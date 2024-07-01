@@ -580,6 +580,9 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
             if checker.enabled(Rule::NoExplicitStacklevel) {
                 flake8_bugbear::rules::no_explicit_stacklevel(checker, call);
             }
+            if checker.enabled(Rule::MutableContextvarDefault) {
+                flake8_bugbear::rules::mutable_contextvar_default(checker, call);
+            }
             if checker.enabled(Rule::UnnecessaryDictKwargs) {
                 flake8_pie::rules::unnecessary_dict_kwargs(checker, call);
             }

@@ -1233,6 +1233,7 @@ impl<'a> SemanticModel<'a> {
             "_typeshed" => self.seen.insert(Modules::TYPESHED),
             "builtins" => self.seen.insert(Modules::BUILTINS),
             "collections" => self.seen.insert(Modules::COLLECTIONS),
+            "contextvars" => self.seen.insert(Modules::CONTEXTVARS),
             "dataclasses" => self.seen.insert(Modules::DATACLASSES),
             "datetime" => self.seen.insert(Modules::DATETIME),
             "django" => self.seen.insert(Modules::DJANGO),
@@ -1820,6 +1821,7 @@ bitflags! {
         const TYPESHED = 1 << 16;
         const DATACLASSES = 1 << 17;
         const BUILTINS = 1 << 18;
+        const CONTEXTVARS = 1 << 19;
     }
 }
 
