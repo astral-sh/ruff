@@ -11,7 +11,6 @@ use crate::files::FileId;
 use crate::module::Module;
 use crate::module::ModuleName;
 use crate::parse::parse;
-use crate::Name;
 pub(crate) use definitions::Definition;
 use definitions::{ImportDefinition, ImportFromDefinition};
 pub(crate) use flow_graph::ConstrainedDefinition;
@@ -437,7 +436,7 @@ impl SourceOrderVisitor<'_> for SemanticIndexer {
                     };
                     let def = Definition::ImportFrom(ImportFromDefinition {
                         module: module.clone(),
-                        name: Name::new(&alias.name.id),
+                        name: alias.name.id.clone(),
                         level: *level,
                     });
                     self.add_or_update_symbol_with_def(symbol_name, def);

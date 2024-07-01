@@ -9,11 +9,11 @@ use hashbrown::hash_map::{Keys, RawEntryMut};
 use rustc_hash::{FxHashMap, FxHasher};
 
 use ruff_index::{newtype_index, IndexVec};
+use ruff_python_ast::name::Name;
 
 use crate::ast_ids::NodeKey;
 use crate::module::ModuleName;
 use crate::semantic::{Definition, ExpressionId};
-use crate::Name;
 
 type Map<K, V> = hashbrown::HashMap<K, V, ()>;
 

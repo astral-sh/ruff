@@ -6,7 +6,7 @@ use crate::module::{Module, ModuleName};
 use crate::semantic::{
     resolve_global_symbol, semantic_index, GlobalSymbolId, ScopeId, ScopeKind, SymbolId,
 };
-use crate::{FxDashMap, FxIndexSet, Name};
+use crate::{FxDashMap, FxIndexSet};
 use ruff_index::{newtype_index, IndexVec};
 use ruff_python_ast as ast;
 use rustc_hash::FxHashMap;
@@ -14,6 +14,7 @@ use rustc_hash::FxHashMap;
 pub(crate) mod infer;
 
 pub(crate) use infer::{infer_definition_type, infer_symbol_public_type};
+use ruff_python_ast::name::Name;
 
 /// unique ID for a type
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]

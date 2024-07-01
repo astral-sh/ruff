@@ -1,7 +1,7 @@
 use crate::ast_ids::TypedNodeKey;
 use crate::semantic::ModuleName;
-use crate::Name;
 use ruff_python_ast as ast;
+use ruff_python_ast::name::Name;
 
 // TODO storing TypedNodeKey for definitions means we have to search to find them again in the AST;
 // this is at best O(log n). If looking up definitions is a bottleneck we should look for
