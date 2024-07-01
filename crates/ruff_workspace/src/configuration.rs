@@ -328,16 +328,11 @@ impl Configuration {
                 flake8_pytest_style: lint
                     .flake8_pytest_style
                     .map(|options| {
-                        Flake8PytestStyleOptions::try_into_settings(
-                            options,
-                            lint_preview.is_enabled(),
-                        )
+                        Flake8PytestStyleOptions::try_into_settings(options, lint_preview)
                     })
                     .transpose()?
                     .unwrap_or_else(|| {
-                        flake8_pytest_style::settings::Settings::resolve_default(
-                            lint_preview.is_enabled(),
-                        )
+                        flake8_pytest_style::settings::Settings::resolve_default(lint_preview)
                     }),
                 flake8_quotes: lint
                     .flake8_quotes

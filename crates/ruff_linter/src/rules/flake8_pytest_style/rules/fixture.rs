@@ -34,8 +34,8 @@ use super::helpers::{
 /// Either removing those unnecessary parentheses _or_ requiring them for all
 /// fixtures is fine, but it's best to be consistent.
 ///
-/// Whilst in [preview], this rule defaults to removing unnecessary parentheses
-/// to cohere better with official pytest projects.
+/// In [preview], this rule defaults to removing unnecessary parentheses, to match
+/// the behavior of official pytest projects.
 ///
 /// ## Example
 /// ```python

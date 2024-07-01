@@ -6,7 +6,7 @@ use std::fmt::Formatter;
 use crate::display_settings;
 use ruff_macros::CacheKey;
 
-use crate::settings::types::IdentifierPattern;
+use crate::settings::types::{IdentifierPattern, PreviewMode};
 
 use super::types;
 
@@ -50,8 +50,8 @@ impl Default for Settings {
 }
 
 impl Settings {
-    pub fn resolve_default(preview: bool) -> Self {
-        if preview {
+    pub fn resolve_default(preview: PreviewMode) -> Self {
+        if preview.is_enabled() {
             Self {
                 fixture_parentheses: false,
                 mark_parentheses: false,
