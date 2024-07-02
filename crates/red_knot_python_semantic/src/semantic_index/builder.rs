@@ -12,7 +12,7 @@ use crate::node_key::NodeKey;
 use crate::semantic_index::ast_ids::{AstId, AstIdsBuilder, ScopedClassId, ScopedFunctionId};
 use crate::semantic_index::definition::{Definition, ImportDefinition, ImportFromDefinition};
 use crate::semantic_index::symbol::{
-    FileScopeId, FileSymbolId, Scope, ScopeKind, ScopedSymbolId, SymbolFlags, SymbolTableBuilder,
+    FileScopeId, Scope, ScopeKind, ScopedSymbolId, SymbolFlags, SymbolTableBuilder,
 };
 use crate::semantic_index::{NodeWithScopeId, NodeWithScopeKey, SemanticIndex};
 
@@ -106,18 +106,9 @@ impl<'a> SemanticIndexBuilder<'a> {
         &mut self.ast_ids[scope_id]
     }
 
-    fn add_or_update_symbol(&mut self, name: Name, flags: SymbolFlags) -> FileSymbolId {
-        for scope in self.scope_stack.iter().rev().skip(1) {
-            let builder = &self.symbol_tables[*scope];
-
-            if let Some(symbol) = builder.symbol_by_name(&name) {
-                return FileSymbolId::new(*scope, symbol);
-            }
-        }
-
-        let scope = self.current_scope();
+    fn add_or_update_symbol(&mut self, name: Name, flags: SymbolFlags) -> ScopedSymbolId {
         let symbol_table = self.current_symbol_table();
-        FileSymbolId::new(scope, symbol_table.add_or_update_symbol(name, flags, None))
+        symbol_table.add_or_update_symbol(name, flags, None)
     }
 
     fn add_or_update_symbol_with_definition(

@@ -88,13 +88,6 @@ pub struct FileSymbolId {
 }
 
 impl FileSymbolId {
-    pub(super) fn new(scope: FileScopeId, symbol: ScopedSymbolId) -> Self {
-        Self {
-            scope,
-            scoped_symbol_id: symbol,
-        }
-    }
-
     pub fn scope(self) -> FileScopeId {
         self.scope
     }
@@ -378,10 +371,6 @@ impl SymbolTableBuilder {
                 id
             }
         }
-    }
-
-    pub(super) fn symbol_by_name(&self, name: &str) -> Option<ScopedSymbolId> {
-        self.table.symbol_id_by_name(name)
     }
 
     pub(super) fn finish(mut self) -> SymbolTable {
