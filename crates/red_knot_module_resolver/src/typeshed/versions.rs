@@ -5,10 +5,18 @@ use std::ops::{RangeFrom, RangeInclusive};
 use std::str::FromStr;
 use std::sync::Arc;
 
+use ruff_db::{source::source_text, vfs::VfsFile};
 use rustc_hash::FxHashMap;
 
+use crate::db::Db;
 use crate::module_name::ModuleName;
 use crate::supported_py_version::SupportedPyVersion;
+
+#[salsa::tracked]
+pub(crate) fn parse_typeshed_versions(db: &dyn Db, versions_file: VfsFile) -> TypeshedVersions {
+    let file_content = source_text(db.upcast(), versions_file);
+    file_content.parse().unwrap()
+}
 
 #[derive(Debug, PartialEq, Eq)]
 pub struct TypeshedVersionsParseError {

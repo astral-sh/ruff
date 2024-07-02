@@ -31,7 +31,6 @@ pub trait Db:
 pub(crate) mod tests {
     use std::fmt::Formatter;
     use std::marker::PhantomData;
-    use std::str::FromStr;
     use std::sync::Arc;
 
     use salsa::id::AsId;
@@ -39,7 +38,7 @@ pub(crate) mod tests {
     use salsa::storage::HasIngredientsFor;
     use salsa::DebugWithDb;
 
-    use red_knot_module_resolver::{Db as ResolverDb, Jar as ResolverJar, TypeshedVersions};
+    use red_knot_module_resolver::{Db as ResolverDb, Jar as ResolverJar};
     use ruff_db::file_system::{FileSystem, MemoryFileSystem, OsFileSystem};
     use ruff_db::vfs::Vfs;
     use ruff_db::{Db as SourceDb, Jar as SourceJar, Upcast};
@@ -52,7 +51,6 @@ pub(crate) mod tests {
         vfs: Vfs,
         file_system: TestFileSystem,
         events: std::sync::Arc<std::sync::Mutex<Vec<salsa::Event>>>,
-        typeshed_versions: TypeshedVersions,
     }
 
     impl TestDb {
@@ -62,7 +60,6 @@ pub(crate) mod tests {
                 file_system: TestFileSystem::Memory(MemoryFileSystem::default()),
                 events: std::sync::Arc::default(),
                 vfs: Vfs::with_stubbed_vendored(),
-                typeshed_versions: TypeshedVersions::from_str("").unwrap(),
             }
         }
 
@@ -128,11 +125,7 @@ pub(crate) mod tests {
         }
     }
 
-    impl red_knot_module_resolver::Db for TestDb {
-        fn typeshed_versions(&self) -> &TypeshedVersions {
-            &self.typeshed_versions
-        }
-    }
+    impl red_knot_module_resolver::Db for TestDb {}
     impl Db for TestDb {}
 
     impl salsa::Database for TestDb {
@@ -153,7 +146,6 @@ pub(crate) mod tests {
                     TestFileSystem::Os(fs) => TestFileSystem::Os(fs.snapshot()),
                 },
                 events: self.events.clone(),
-                typeshed_versions: self.typeshed_versions.clone(),
             })
         }
     }

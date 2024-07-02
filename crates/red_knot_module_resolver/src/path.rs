@@ -1,12 +1,12 @@
 use std::iter::FusedIterator;
 
 use ruff_db::file_system::{FileSystemPath, FileSystemPathBuf};
-use ruff_db::vfs::VfsPath;
+use ruff_db::vfs::{system_path_to_file, VfsPath};
 
 use crate::module_name::ModuleName;
 use crate::supported_py_version::get_target_py_version;
-use crate::typeshed::TypeshedVersionsQueryResult;
-use crate::Db;
+use crate::typeshed::{parse_typeshed_versions, TypeshedVersionsQueryResult};
+use crate::{Db, TypeshedVersions};
 
 #[repr(transparent)]
 #[derive(Debug, PartialEq, Eq, Hash)]
@@ -139,13 +139,13 @@ impl ModuleResolutionPath {
     }
 
     #[must_use]
-    pub(crate) fn is_regular_package(&self, db: &dyn Db) -> bool {
-        ModuleResolutionPathRef::from(self).is_regular_package(db)
+    pub(crate) fn is_regular_package(&self, db: &dyn Db, search_path: &Self) -> bool {
+        ModuleResolutionPathRef::from(self).is_regular_package(db, search_path)
     }
 
     #[must_use]
-    pub(crate) fn is_directory(&self, db: &dyn Db) -> bool {
-        ModuleResolutionPathRef::from(self).is_directory(db)
+    pub(crate) fn is_directory(&self, db: &dyn Db, search_path: &Self) -> bool {
+        ModuleResolutionPathRef::from(self).is_directory(db, search_path)
     }
 
     #[must_use]
@@ -345,19 +345,25 @@ impl<'a> ModuleResolutionPathRef<'a> {
     }
 
     #[must_use]
-    pub(crate) fn is_directory(&self, db: &dyn Db) -> bool {
-        match self {
-            Self::Extra(ExtraPath(path)) => db.file_system().is_directory(path),
-            Self::FirstParty(FirstPartyPath(path)) => db.file_system().is_directory(path),
-            Self::SitePackages(SitePackagesPath(path)) => db.file_system().is_directory(path),
-            Self::StandardLibrary(StandardLibraryPath(path)) => {
+    fn load_typeshed_versions(db: &dyn Db, stdlib_root: &StandardLibraryPath) -> TypeshedVersions {
+        let StandardLibraryPath(stdlib_fs_path) = stdlib_root;
+        let versions_path = stdlib_fs_path.join("VERSIONS");
+        let versions_file = system_path_to_file(db.upcast(), versions_path).unwrap();
+        parse_typeshed_versions(db, versions_file)
+    }
+
+    #[must_use]
+    pub(crate) fn is_directory(&self, db: &dyn Db, search_path: impl Into<Self>) -> bool {
+        match (self, search_path.into()) {
+            (Self::Extra(ExtraPath(path)), Self::Extra(_)) => db.file_system().is_directory(path),
+            (Self::FirstParty(FirstPartyPath(path)), Self::FirstParty(_)) => db.file_system().is_directory(path),
+            (Self::SitePackages(SitePackagesPath(path)), Self::SitePackages(_)) => db.file_system().is_directory(path),
+            (Self::StandardLibrary(StandardLibraryPath(path)), Self::StandardLibrary(stdlib_root)) => {
                 let Some(module_name) = self.as_module_name() else {
                     return false;
                 };
-                match db
-                    .typeshed_versions()
-                    .query_module(&module_name, get_target_py_version(db))
-                {
+                let typeshed_versions = Self::load_typeshed_versions(db, stdlib_root);
+                match typeshed_versions.query_module(&module_name, get_target_py_version(db)) {
                     TypeshedVersionsQueryResult::Exists
                     | TypeshedVersionsQueryResult::MaybeExists => {
                         db.file_system().is_directory(path)
@@ -365,15 +371,18 @@ impl<'a> ModuleResolutionPathRef<'a> {
                     TypeshedVersionsQueryResult::DoesNotExist => false,
                 }
             }
+            (path, root) => unreachable!(
+                "The search path should always be the same variant as `self` (got: {path:?}, {root:?})"
+            )
         }
     }
 
     #[must_use]
-    pub(crate) fn is_regular_package(&self, db: &dyn Db) -> bool {
-        match self {
-            Self::Extra(ExtraPath(fs_path))
-            | Self::FirstParty(FirstPartyPath(fs_path))
-            | Self::SitePackages(SitePackagesPath(fs_path)) => {
+    pub(crate) fn is_regular_package(&self, db: &dyn Db, search_path: impl Into<Self>) -> bool {
+        match (self, search_path.into()) {
+            (Self::Extra(ExtraPath(fs_path)), Self::Extra(_))
+            | (Self::FirstParty(FirstPartyPath(fs_path)), Self::FirstParty(_))
+            | (Self::SitePackages(SitePackagesPath(fs_path)), Self::SitePackages(_)) => {
                 let file_system = db.file_system();
                 file_system.exists(&fs_path.join("__init__.py"))
                     || file_system.exists(&fs_path.join("__init__.pyi"))
@@ -381,14 +390,12 @@ impl<'a> ModuleResolutionPathRef<'a> {
             // Unlike the other variants:
             // (1) Account for VERSIONS
             // (2) Only test for `__init__.pyi`, not `__init__.py`
-            Self::StandardLibrary(StandardLibraryPath(fs_path)) => {
+            (Self::StandardLibrary(StandardLibraryPath(fs_path)), Self::StandardLibrary(stdlib_root)) => {
                 let Some(module_name) = self.as_module_name() else {
                     return false;
                 };
-                match db
-                    .typeshed_versions()
-                    .query_module(&module_name, get_target_py_version(db))
-                {
+                let typeshed_versions = Self::load_typeshed_versions(db, stdlib_root);
+                match typeshed_versions.query_module(&module_name, get_target_py_version(db)) {
                     TypeshedVersionsQueryResult::Exists
                     | TypeshedVersionsQueryResult::MaybeExists => {
                         db.file_system().exists(&fs_path.join("__init__.pyi"))
@@ -396,6 +403,9 @@ impl<'a> ModuleResolutionPathRef<'a> {
                     TypeshedVersionsQueryResult::DoesNotExist => false,
                 }
             }
+            (path, root) => unreachable!(
+                "The search path should always be the same variant as `self` (got: {path:?}, {root:?})"
+            )
         }
     }
 

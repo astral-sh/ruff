@@ -6,7 +6,7 @@ use crate::resolver::{
     resolve_module_query,
 };
 use crate::supported_py_version::TargetPyVersion;
-use crate::typeshed::TypeshedVersions;
+use crate::typeshed::parse_typeshed_versions;
 
 #[salsa::jar(db=Db)]
 pub struct Jar(
@@ -15,14 +15,12 @@ pub struct Jar(
     TargetPyVersion,
     resolve_module_query,
     file_to_module,
+    parse_typeshed_versions,
 );
 
-pub trait Db: salsa::DbWithJar<Jar> + ruff_db::Db + Upcast<dyn ruff_db::Db> {
-    fn typeshed_versions(&self) -> &TypeshedVersions;
-}
+pub trait Db: salsa::DbWithJar<Jar> + ruff_db::Db + Upcast<dyn ruff_db::Db> {}
 
 pub(crate) mod tests {
-    use std::str::FromStr;
     use std::sync;
 
     use salsa::DebugWithDb;
@@ -38,7 +36,6 @@ pub(crate) mod tests {
         file_system: TestFileSystem,
         events: sync::Arc<sync::Mutex<Vec<salsa::Event>>>,
         vfs: Vfs,
-        typeshed_versions: TypeshedVersions,
     }
 
     impl TestDb {
@@ -49,7 +46,6 @@ pub(crate) mod tests {
                 file_system: TestFileSystem::Memory(MemoryFileSystem::default()),
                 events: sync::Arc::default(),
                 vfs: Vfs::with_stubbed_vendored(),
-                typeshed_versions: TypeshedVersions::from_str("").unwrap(),
             }
         }
 
@@ -119,11 +115,7 @@ pub(crate) mod tests {
         }
     }
 
-    impl Db for TestDb {
-        fn typeshed_versions(&self) -> &TypeshedVersions {
-            &self.typeshed_versions
-        }
-    }
+    impl Db for TestDb {}
 
     impl salsa::Database for TestDb {
         fn salsa_event(&self, event: salsa::Event) {
@@ -140,7 +132,6 @@ pub(crate) mod tests {
                 file_system: self.file_system.snapshot(),
                 events: self.events.clone(),
                 vfs: self.vfs.snapshot(),
-                typeshed_versions: self.typeshed_versions.clone(),
             })
         }
     }

@@ -1,5 +1,7 @@
 #![allow(clippy::used_underscore_binding)] // necessary for Salsa inputs
 #![allow(unreachable_pub)]
+#![allow(clippy::needless_lifetimes)]
+#![allow(clippy::clone_on_copy)]
 
 use crate::Db;
 
@@ -18,7 +20,6 @@ pub enum SupportedPyVersion {
 
 #[salsa::input(singleton)]
 pub(crate) struct TargetPyVersion {
-    #[return_ref]
     pub(crate) target_py_version: SupportedPyVersion,
 }
 
@@ -31,5 +32,5 @@ pub(crate) fn set_target_py_version(db: &mut dyn Db, target_version: SupportedPy
 }
 
 pub(crate) fn get_target_py_version(db: &dyn Db) -> SupportedPyVersion {
-    *TargetPyVersion::get(db).target_py_version(db)
+    TargetPyVersion::get(db).target_py_version(db)
 }

@@ -241,7 +241,7 @@ fn resolve_name(
                 package_path.push(module_name);
 
                 // Must be a `__init__.pyi` or `__init__.py` or it isn't a package.
-                let kind = if package_path.is_directory(db) {
+                let kind = if package_path.is_directory(db, search_path) {
                     package_path.push("__init__");
                     ModuleKind::Package
                 } else {
@@ -301,11 +301,11 @@ where
     for folder in components {
         package_path.push(folder);
 
-        let is_regular_package = package_path.is_regular_package(db);
+        let is_regular_package = package_path.is_regular_package(db, module_search_path);
 
         if is_regular_package {
             in_namespace_package = false;
-        } else if package_path.is_directory(db) {
+        } else if package_path.is_directory(db, module_search_path) {
             // A directory without an `__init__.py` is a namespace package, continue with the next folder.
             in_namespace_package = true;
         } else if in_namespace_package {
