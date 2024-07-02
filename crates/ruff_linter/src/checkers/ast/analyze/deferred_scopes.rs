@@ -8,7 +8,7 @@ use crate::codes::Rule;
 use crate::fix;
 use crate::rules::{
     flake8_builtins, flake8_pyi, flake8_type_checking, flake8_unused_arguments, pep8_naming,
-    pyflakes, pylint, ruff,
+    pyflakes, pylint, ruff, wemake_python_styleguide,
 };
 
 /// Run lint rules over all deferred scopes in the [`SemanticModel`].
@@ -17,6 +17,7 @@ pub(crate) fn deferred_scopes(checker: &mut Checker) {
         Rule::AsyncioDanglingTask,
         Rule::BadStaticmethodArgument,
         Rule::BuiltinAttributeShadowing,
+        Rule::ControlVarUsedAfterBlock,
         Rule::GlobalVariableNotAssigned,
         Rule::ImportPrivateName,
         Rule::ImportShadowedByLoopVar,
@@ -85,6 +86,14 @@ pub(crate) fn deferred_scopes(checker: &mut Checker) {
     let mut diagnostics: Vec<Diagnostic> = vec![];
     for scope_id in checker.analyze.scopes.iter().rev().copied() {
         let scope = &checker.semantic.scopes[scope_id];
+
+        if checker.enabled(Rule::ControlVarUsedAfterBlock) {
+            wemake_python_styleguide::rules::control_var_used_after_block(
+                checker,
+                scope,
+                &mut diagnostics,
+            );
+        }
 
         if checker.enabled(Rule::UndefinedLocal) {
             pyflakes::rules::undefined_local(checker, scope_id, scope, &mut diagnostics);
