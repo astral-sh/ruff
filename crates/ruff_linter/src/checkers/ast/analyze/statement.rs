@@ -88,6 +88,9 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
             if checker.enabled(Rule::DjangoNonLeadingReceiverDecorator) {
                 flake8_django::rules::non_leading_receiver_decorator(checker, decorator_list);
             }
+            if checker.enabled(Rule::FastApiRedundantResponseModel) {
+                ruff::rules::fastapi_redundant_response_model(checker, function_def);
+            }
             if checker.enabled(Rule::AmbiguousFunctionName) {
                 if let Some(diagnostic) = pycodestyle::rules::ambiguous_function_name(name) {
                     checker.diagnostics.push(diagnostic);
