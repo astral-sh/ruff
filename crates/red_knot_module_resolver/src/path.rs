@@ -94,15 +94,10 @@ impl ModuleResolutionPath {
             .extension()
             .map_or(true, |ext| matches!(ext, "py" | "pyi"))
         {
-            Some(Self::extra_unchecked(path))
+            Some(Self::Extra(ExtraPathBuf(path)))
         } else {
             None
         }
-    }
-
-    #[must_use]
-    fn extra_unchecked(path: FileSystemPathBuf) -> Self {
-        Self::Extra(ExtraPathBuf(path))
     }
 
     #[must_use]
@@ -111,21 +106,16 @@ impl ModuleResolutionPath {
             .extension()
             .map_or(true, |ext| matches!(ext, "pyi" | "py"))
         {
-            Some(Self::first_party_unchecked(path))
+            Some(Self::FirstParty(FirstPartyPathBuf(path)))
         } else {
             None
         }
     }
 
     #[must_use]
-    fn first_party_unchecked(path: FileSystemPathBuf) -> Self {
-        Self::FirstParty(FirstPartyPathBuf(path))
-    }
-
-    #[must_use]
     pub(crate) fn standard_library(path: FileSystemPathBuf) -> Option<Self> {
         if path.extension().map_or(true, |ext| ext == "pyi") {
-            Some(Self::standard_library_unchecked(path))
+            Some(Self::StandardLibrary(StandardLibraryPathBuf(path)))
         } else {
             None
         }
@@ -137,25 +127,15 @@ impl ModuleResolutionPath {
     }
 
     #[must_use]
-    fn standard_library_unchecked(path: FileSystemPathBuf) -> Self {
-        Self::StandardLibrary(StandardLibraryPathBuf(path))
-    }
-
-    #[must_use]
     pub(crate) fn site_packages(path: FileSystemPathBuf) -> Option<Self> {
         if path
             .extension()
             .map_or(true, |ext| matches!(ext, "pyi" | "py"))
         {
-            Some(Self::site_packages_unchecked(path))
+            Some(Self::SitePackages(SitePackagesPathBuf(path)))
         } else {
             None
         }
-    }
-
-    #[must_use]
-    fn site_packages_unchecked(path: FileSystemPathBuf) -> Self {
-        Self::SitePackages(SitePackagesPathBuf(path))
     }
 
     #[must_use]
@@ -486,16 +466,18 @@ impl<'a> ModuleResolutionPathRef<'a> {
     pub(crate) fn with_pyi_extension(&self) -> ModuleResolutionPath {
         match self {
             Self::Extra(ExtraPath(path)) => {
-                ModuleResolutionPath::extra_unchecked(path.with_extension("pyi"))
+                ModuleResolutionPath::Extra(ExtraPathBuf(path.with_extension("pyi")))
             }
             Self::FirstParty(FirstPartyPath(path)) => {
-                ModuleResolutionPath::first_party_unchecked(path.with_extension("pyi"))
+                ModuleResolutionPath::FirstParty(FirstPartyPathBuf(path.with_extension("pyi")))
             }
             Self::StandardLibrary(StandardLibraryPath(path)) => {
-                ModuleResolutionPath::standard_library_unchecked(path.with_extension("pyi"))
+                ModuleResolutionPath::StandardLibrary(StandardLibraryPathBuf(
+                    path.with_extension("pyi"),
+                ))
             }
             Self::SitePackages(SitePackagesPath(path)) => {
-                ModuleResolutionPath::site_packages_unchecked(path.with_extension("pyi"))
+                ModuleResolutionPath::SitePackages(SitePackagesPathBuf(path.with_extension("pyi")))
             }
         }
     }
@@ -503,16 +485,16 @@ impl<'a> ModuleResolutionPathRef<'a> {
     #[must_use]
     pub(crate) fn with_py_extension(&self) -> Option<ModuleResolutionPath> {
         match self {
-            Self::Extra(ExtraPath(path)) => Some(ModuleResolutionPath::extra_unchecked(
+            Self::Extra(ExtraPath(path)) => Some(ModuleResolutionPath::Extra(ExtraPathBuf(
                 path.with_extension("py"),
+            ))),
+            Self::FirstParty(FirstPartyPath(path)) => Some(ModuleResolutionPath::FirstParty(
+                FirstPartyPathBuf(path.with_extension("py")),
             )),
-            Self::FirstParty(FirstPartyPath(path)) => Some(
-                ModuleResolutionPath::first_party_unchecked(path.with_extension("py")),
-            ),
             Self::StandardLibrary(_) => None,
-            Self::SitePackages(SitePackagesPath(path)) => Some(
-                ModuleResolutionPath::site_packages_unchecked(path.with_extension("py")),
-            ),
+            Self::SitePackages(SitePackagesPath(path)) => Some(ModuleResolutionPath::SitePackages(
+                SitePackagesPathBuf(path.with_extension("py")),
+            )),
         }
     }
 
@@ -521,16 +503,16 @@ impl<'a> ModuleResolutionPathRef<'a> {
     pub(crate) fn to_module_resolution_path(self) -> ModuleResolutionPath {
         match self {
             Self::Extra(ExtraPath(path)) => {
-                ModuleResolutionPath::extra_unchecked(path.to_path_buf())
+                ModuleResolutionPath::Extra(ExtraPathBuf(path.to_path_buf()))
             }
             Self::FirstParty(FirstPartyPath(path)) => {
-                ModuleResolutionPath::first_party_unchecked(path.to_path_buf())
+                ModuleResolutionPath::FirstParty(FirstPartyPathBuf(path.to_path_buf()))
             }
             Self::StandardLibrary(StandardLibraryPath(path)) => {
-                ModuleResolutionPath::standard_library_unchecked(path.to_path_buf())
+                ModuleResolutionPath::StandardLibrary(StandardLibraryPathBuf(path.to_path_buf()))
             }
             Self::SitePackages(SitePackagesPath(path)) => {
-                ModuleResolutionPath::site_packages_unchecked(path.to_path_buf())
+                ModuleResolutionPath::SitePackages(SitePackagesPathBuf(path.to_path_buf()))
             }
         }
     }
