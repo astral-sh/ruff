@@ -27,8 +27,8 @@ pub(super) struct SemanticIndexBuilder<'a> {
     scopes: IndexVec<FileScopeId, Scope>,
     symbol_tables: IndexVec<FileScopeId, SymbolTableBuilder>,
     ast_ids: IndexVec<FileScopeId, AstIdsBuilder>,
-    expression_scopes: FxHashMap<NodeKey, FileScopeId>,
-    node_scopes: FxHashMap<NodeWithScopeKey, FileScopeId>,
+    scopes_by_expression: FxHashMap<NodeKey, FileScopeId>,
+    scopes_by_definition: FxHashMap<NodeWithScopeKey, FileScopeId>,
 }
 
 impl<'a> SemanticIndexBuilder<'a> {
@@ -41,8 +41,8 @@ impl<'a> SemanticIndexBuilder<'a> {
             scopes: IndexVec::new(),
             symbol_tables: IndexVec::new(),
             ast_ids: IndexVec::new(),
-            expression_scopes: FxHashMap::default(),
-            node_scopes: FxHashMap::default(),
+            scopes_by_expression: FxHashMap::default(),
+            scopes_by_definition: FxHashMap::default(),
         };
 
         builder.push_scope_with_parent(
@@ -67,14 +67,11 @@ impl<'a> SemanticIndexBuilder<'a> {
 
     fn push_scope_with_parent(&mut self, node: &NodeWithScope, parent: Option<FileScopeId>) {
         let children_start = self.scopes.next_index() + 1;
-        let node_key = node.key();
-        let node_id = node.id();
-        let scope_kind = node.scope_kind();
 
         let scope = Scope {
-            node: node_id,
+            node: node.id(),
             parent,
-            kind: scope_kind,
+            kind: node.scope_kind(),
             descendents: children_start..children_start,
         };
 
@@ -85,7 +82,7 @@ impl<'a> SemanticIndexBuilder<'a> {
         debug_assert_eq!(ast_id_scope, scope_id);
 
         self.scope_stack.push(scope_id);
-        self.node_scopes.insert(node_key, scope_id);
+        self.scopes_by_definition.insert(node.key(), scope_id);
     }
 
     fn pop_scope(&mut self) -> FileScopeId {
@@ -179,14 +176,14 @@ impl<'a> SemanticIndexBuilder<'a> {
         self.scopes.shrink_to_fit();
         ast_ids.shrink_to_fit();
         symbol_tables.shrink_to_fit();
-        self.expression_scopes.shrink_to_fit();
+        self.scopes_by_expression.shrink_to_fit();
 
         SemanticIndex {
             symbol_tables,
             scopes: self.scopes,
-            scopes_by_definition: self.node_scopes,
+            scopes_by_definition: self.scopes_by_definition,
             ast_ids,
-            scopes_by_expression: self.expression_scopes,
+            scopes_by_expression: self.scopes_by_expression,
         }
     }
 }
@@ -322,7 +319,7 @@ impl Visitor<'_> for SemanticIndexBuilder<'_> {
             self.current_ast_ids().record_expression(expr, module)
         };
 
-        self.expression_scopes
+        self.scopes_by_expression
             .insert(NodeKey::from_node(expr), self.current_scope());
 
         match expr {
