@@ -339,14 +339,9 @@ where
     }
 
     fn visit_expr(&mut self, expr: &'ast ast::Expr) {
-        // SAFETY: `expr` is guaranteed to be a child of `self.module`
         self.scopes_by_expression
             .insert(expr.into(), self.current_scope());
-        let module = self.module;
-        #[allow(unsafe_code)]
-        unsafe {
-            self.current_ast_ids().record_expression(expr, module)
-        };
+        self.current_ast_ids().record_expression(expr);
 
         match expr {
             ast::Expr::Name(ast::ExprName { id, ctx, .. }) => {

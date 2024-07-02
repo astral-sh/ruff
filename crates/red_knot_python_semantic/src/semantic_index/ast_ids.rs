@@ -1,13 +1,13 @@
-use crate::ast_node_ref::AstNodeRef;
+use rustc_hash::FxHashMap;
+
+use ruff_index::{newtype_index, Idx};
+use ruff_python_ast as ast;
+use ruff_python_ast::ExpressionRef;
+
 use crate::semantic_index::ast_ids::node_key::ExpressionNodeKey;
 use crate::semantic_index::semantic_index;
 use crate::semantic_index::symbol::ScopeId;
 use crate::Db;
-use ruff_db::parsed::ParsedModule;
-use ruff_index::{newtype_index, IndexVec};
-use ruff_python_ast as ast;
-use ruff_python_ast::ExpressionRef;
-use rustc_hash::FxHashMap;
 
 /// AST ids for a single scope.
 ///
@@ -24,10 +24,8 @@ use rustc_hash::FxHashMap;
 ///
 /// x = foo()
 /// ```
+#[derive(Debug)]
 pub(crate) struct AstIds {
-    /// Maps expression ids to their expressions.
-    expressions: IndexVec<ScopedExpressionId, AstNodeRef<ast::Expr>>,
-
     /// Maps expressions to their expression id. Uses `NodeKey` because it avoids cloning [`Parsed`].
     expressions_map: FxHashMap<ExpressionNodeKey, ScopedExpressionId>,
 }
@@ -35,15 +33,6 @@ pub(crate) struct AstIds {
 impl AstIds {
     fn expression_id(&self, key: impl Into<ExpressionNodeKey>) -> ScopedExpressionId {
         self.expressions_map[&key.into()]
-    }
-}
-
-#[allow(clippy::missing_fields_in_debug)]
-impl std::fmt::Debug for AstIds {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("AstIds")
-            .field("expressions", &self.expressions)
-            .finish()
     }
 }
 
@@ -121,14 +110,14 @@ impl HasScopedAstId for ast::ExpressionRef<'_> {
 
 #[derive(Debug)]
 pub(super) struct AstIdsBuilder {
-    expressions: IndexVec<ScopedExpressionId, AstNodeRef<ast::Expr>>,
+    next_id: ScopedExpressionId,
     expressions_map: FxHashMap<ExpressionNodeKey, ScopedExpressionId>,
 }
 
 impl AstIdsBuilder {
     pub(super) fn new() -> Self {
         Self {
-            expressions: IndexVec::new(),
+            next_id: ScopedExpressionId::new(0),
             expressions_map: FxHashMap::default(),
         }
     }
@@ -139,12 +128,9 @@ impl AstIdsBuilder {
     /// The function is marked as unsafe because it calls [`AstNodeRef::new`] which requires
     /// that `expr` is a child of `parsed`.
     #[allow(unsafe_code)]
-    pub(super) unsafe fn record_expression(
-        &mut self,
-        expr: &ast::Expr,
-        parsed: &ParsedModule,
-    ) -> ScopedExpressionId {
-        let expression_id = self.expressions.push(AstNodeRef::new(parsed.clone(), expr));
+    pub(super) fn record_expression(&mut self, expr: &ast::Expr) -> ScopedExpressionId {
+        let expression_id = self.next_id;
+        self.next_id = expression_id + 1;
 
         self.expressions_map.insert(expr.into(), expression_id);
 
@@ -152,11 +138,9 @@ impl AstIdsBuilder {
     }
 
     pub(super) fn finish(mut self) -> AstIds {
-        self.expressions.shrink_to_fit();
         self.expressions_map.shrink_to_fit();
 
         AstIds {
-            expressions: self.expressions,
             expressions_map: self.expressions_map,
         }
     }

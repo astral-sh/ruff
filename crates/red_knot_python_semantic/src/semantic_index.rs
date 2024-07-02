@@ -90,6 +90,7 @@ pub struct SemanticIndex<'db> {
     /// Map from nodes that create a scope to the scope they create.
     scopes_by_node: FxHashMap<NodeWithScopeKey, FileScopeId>,
 
+    /// Map from the file-local [`FileScopeId`] to the salsa-ingredient [`ScopeId`].
     scope_ids_by_scope: IndexVec<FileScopeId, ScopeId<'db>>,
 
     /// Lookup table to map between node ids and ast nodes.
@@ -160,6 +161,7 @@ impl<'db> SemanticIndex<'db> {
         AncestorsIter::new(self, scope)
     }
 
+    /// Returns the [`Definition`] salsa ingredient for `definition_node`.
     pub(crate) fn definition<'def>(
         &self,
         definition_node: impl Into<DefinitionNodeRef<'def>>,
@@ -167,6 +169,8 @@ impl<'db> SemanticIndex<'db> {
         self.definitions_by_node[&definition_node.into().key()]
     }
 
+    /// Returns the id of the scope that `node` creates. This is different from [`Definition::scope`] which
+    /// returns the scope in which that definition is defined in.
     pub(crate) fn node_scope(&self, node: NodeWithScopeRef) -> FileScopeId {
         self.scopes_by_node[&node.node_key()]
     }
