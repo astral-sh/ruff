@@ -700,13 +700,13 @@ impl<'db> TypeInferenceBuilder<'db> {
 
 #[cfg(test)]
 mod tests {
+    use ruff_db::file_system::FileSystemPath;
     use ruff_db::vfs::system_path_to_file;
 
     use crate::db::tests::TestDb;
     use crate::types::{public_symbol_ty_by_name, Type, TypingContext};
     use red_knot_module_resolver::{
-        set_module_resolution_settings, FirstPartyPath, ModuleResolutionSettings,
-        SupportedPyVersion,
+        set_module_resolution_settings, ModuleResolutionSettings, SupportedPyVersion,
     };
     use ruff_python_ast::name::Name;
 
@@ -718,7 +718,7 @@ mod tests {
             ModuleResolutionSettings {
                 target_version: SupportedPyVersion::Py38,
                 extra_paths: Vec::new(),
-                workspace_root: FirstPartyPath::new("/src").unwrap().to_path_buf(),
+                workspace_root: FileSystemPath::new("/src").to_path_buf(),
                 site_packages: None,
                 custom_typeshed: None,
             },
