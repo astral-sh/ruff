@@ -288,22 +288,29 @@ pub fn check_path(
         }
     }
 
-    // Remove fixes for any rules marked as unfixable.
-    for diagnostic in &mut diagnostics {
-        if !settings.rules.should_fix(diagnostic.kind.rule()) {
-            diagnostic.fix = None;
-        }
-    }
-
-    // Update fix applicability to account for overrides
-    if !settings.fix_safety.is_empty() {
+    if parsed.is_valid() {
+        // Remove fixes for any rules marked as unfixable.
         for diagnostic in &mut diagnostics {
-            if let Some(fix) = diagnostic.fix.take() {
-                let fixed_applicability = settings
-                    .fix_safety
-                    .resolve_applicability(diagnostic.kind.rule(), fix.applicability());
-                diagnostic.set_fix(fix.with_applicability(fixed_applicability));
+            if !settings.rules.should_fix(diagnostic.kind.rule()) {
+                diagnostic.fix = None;
             }
+        }
+
+        // Update fix applicability to account for overrides
+        if !settings.fix_safety.is_empty() {
+            for diagnostic in &mut diagnostics {
+                if let Some(fix) = diagnostic.fix.take() {
+                    let fixed_applicability = settings
+                        .fix_safety
+                        .resolve_applicability(diagnostic.kind.rule(), fix.applicability());
+                    diagnostic.set_fix(fix.with_applicability(fixed_applicability));
+                }
+            }
+        }
+    } else {
+        // Avoid fixing in case the source code contains syntax errors.
+        for diagnostic in &mut diagnostics {
+            diagnostic.fix = None;
         }
     }
 

@@ -204,12 +204,12 @@ pub(crate) fn test_contents<'a>(
                     print_syntax_errors(parsed.errors(), path, &locator, &transformed);
 
                 panic!(
-                    r#"Fixed source has a syntax error where the source document does not. This is a bug in one of the generated fixes:
+                    "Fixed source has a syntax error where the source document does not. This is a bug in one of the generated fixes:
 {syntax_errors}
 Last generated fixes:
 {fixes}
 Source with applied fixes:
-{}"#,
+{}",
                     transformed.source_code()
                 );
             }
@@ -228,7 +228,12 @@ Source with applied fixes:
         .into_iter()
         .map(|diagnostic| {
             let rule = diagnostic.kind.rule();
-            let fixable = diagnostic.fix.as_ref().is_some_and(|fix| matches!(fix.applicability(), Applicability::Safe | Applicability::Unsafe));
+            let fixable = diagnostic.fix.as_ref().is_some_and(|fix| {
+                matches!(
+                    fix.applicability(),
+                    Applicability::Safe | Applicability::Unsafe
+                )
+            });
 
             match (fixable, rule.fixable()) {
                 (true, FixAvailability::Sometimes | FixAvailability::Always)
@@ -236,28 +241,39 @@ Source with applied fixes:
                     // Ok
                 }
                 (true, FixAvailability::None) => {
-                    panic!("Rule {rule:?} is marked as non-fixable but it created a fix. Change the `Violation::FIX_AVAILABILITY` to either `FixAvailability::Sometimes` or `FixAvailability::Always`");
-                },
+                    panic!(
+                        "Rule {rule:?} is marked as non-fixable but it created a fix.
+Change the `Violation::FIX_AVAILABILITY` to either \
+`FixAvailability::Sometimes` or `FixAvailability::Always`"
+                    );
+                }
+                (false, FixAvailability::Always) if source_has_errors => {
+                    // Ok
+                }
                 (false, FixAvailability::Always) => {
-                    panic!("Rule {rule:?} is marked to always-fixable but the diagnostic has no fix. Either ensure you always emit a fix or change `Violation::FIX_AVAILABILITY` to either `FixAvailability::Sometimes` or `FixAvailability::None")
+                    panic!(
+                        "\
+Rule {rule:?} is marked to always-fixable but the diagnostic has no fix.
+Either ensure you always emit a fix or change `Violation::FIX_AVAILABILITY` to either \
+`FixAvailability::Sometimes` or `FixAvailability::None`"
+                    )
                 }
             }
 
-            assert!(!(fixable && diagnostic.kind.suggestion.is_none()), "Diagnostic emitted by {rule:?} is fixable but `Violation::fix_title` returns `None`.`");
+            assert!(
+                !(fixable && diagnostic.kind.suggestion.is_none()),
+                "Diagnostic emitted by {rule:?} is fixable but \
+                `Violation::fix_title` returns `None`"
+            );
 
             // Not strictly necessary but adds some coverage for this code path
             let noqa = directives.noqa_line_for.resolve(diagnostic.start());
 
             Message::from_diagnostic(diagnostic, source_code.clone(), noqa)
         })
-        .chain(
-            parsed
-                .errors()
-                .iter()
-                .map(|parse_error| {
-                    Message::from_parse_error(parse_error, &locator, source_code.clone())
-                })
-        )
+        .chain(parsed.errors().iter().map(|parse_error| {
+            Message::from_parse_error(parse_error, &locator, source_code.clone())
+        }))
         .sorted()
         .collect();
     (messages, transformed)
