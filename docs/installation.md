@@ -70,6 +70,7 @@ sudo zypper install python3-ruff
 
 On **Docker**, it is published as `ghcr.io/astral-sh/ruff`, tagged for each release and `latest` for
 the latest release.
+If you use Podman and SELinux, mount the current directory by using `.:/io:Z`.
 
 ```shell
 docker run -v .:/io --rm ghcr.io/astral-sh/ruff check
