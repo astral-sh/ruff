@@ -1,0 +1,14 @@
+---
+source: crates/ruff_linter/src/rules/pylint/mod.rs
+---
+E0203.py:3:17: PLE0203 Accessed `fluffiness_level` before it was initialized at line 5
+  |
+1 | class Unicorn:
+2 |     def __init__(self, fluffiness_level):
+3 |         if self.fluffiness_level > 9000:
+  |                 ^^^^^^^^^^^^^^^^ PLE0203
+4 |             print("It's OVER-FLUFFYYYY ! *crush glasses*")
+5 |         self.fluffiness_level = fluffiness_level
+  |
+
+

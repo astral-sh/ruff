@@ -23,7 +23,7 @@ use crate::reference::{
     UnresolvedReferenceFlags, UnresolvedReferences,
 };
 use crate::scope::{Scope, ScopeId, ScopeKind, Scopes};
-use crate::Imported;
+use crate::{Imported, UnresolvedAttribute, UnresolvedAttributes};
 
 pub mod all;
 
@@ -130,6 +130,7 @@ pub struct SemanticModel<'a> {
     /// Map from [`ast::ExprName`] node (represented as a [`NameId`]) to the [`Binding`] to which
     /// it resolved (represented as a [`BindingId`]).
     resolved_names: FxHashMap<NameId, BindingId>,
+    unresolved_attributes: UnresolvedAttributes,
 }
 
 impl<'a> SemanticModel<'a> {
@@ -156,6 +157,7 @@ impl<'a> SemanticModel<'a> {
             seen: Modules::empty(),
             handled_exceptions: Vec::default(),
             resolved_names: FxHashMap::default(),
+            unresolved_attributes: UnresolvedAttributes::default(),
         }
     }
 
@@ -1496,6 +1498,10 @@ impl<'a> SemanticModel<'a> {
         self.unresolved_references.iter()
     }
 
+    pub fn unresolved_attributes(&self) -> impl Iterator<Item = &UnresolvedAttribute> {
+        self.unresolved_attributes.iter()
+    }
+
     /// Return the union of all handled exceptions as an [`Exceptions`] bitflag.
     pub fn exceptions(&self) -> Exceptions {
         let mut exceptions = Exceptions::empty();
@@ -1772,6 +1778,26 @@ impl<'a> SemanticModel<'a> {
 
             None
         })
+    }
+
+    /// Similar to [`SemanticModel::lookup_attribute`], but does not resolve the scope.
+    /// If the attribute is not found in the current scope, it will be added to unresolved attributes.
+    pub fn resolve_load_attribute(&mut self, attr: &ast::Identifier, class_scope_id: ScopeId) {
+        let Some(class_scope) = self.scopes.get(class_scope_id) else {
+            return;
+        };
+        let Some(class_def) = class_scope.kind.as_class() else {
+            return;
+        };
+        if class_scope.has(attr) {
+            return;
+        }
+
+        // If class has base classes, the attribute might be defined in one of them.
+        // Since we don't want to recursively into the base classes, skip resolving.
+        if class_def.bases().is_empty() {
+            self.unresolved_attributes.push(attr.range(), self.scope_id);
+        }
     }
 }
 
