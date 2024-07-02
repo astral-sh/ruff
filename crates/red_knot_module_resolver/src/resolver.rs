@@ -55,7 +55,6 @@ pub(crate) fn resolve_module_query<'db>(
 /// Resolves the module for the given path.
 ///
 /// Returns `None` if the path is not a module locatable via `sys.path`.
-#[tracing::instrument(level = "debug", skip(db))]
 pub fn path_to_module(db: &dyn Db, path: &VfsPath) -> Option<Module> {
     // It's not entirely clear on first sight why this method calls `file_to_module` instead of
     // it being the other way round, considering that the first thing that `file_to_module` does
@@ -367,7 +366,6 @@ impl PackageKind {
 
 #[cfg(test)]
 mod tests {
-
     use ruff_db::file_system::{FileSystemPath, FileSystemPathBuf};
     use ruff_db::vfs::{system_path_to_file, VfsFile, VfsPath};
 

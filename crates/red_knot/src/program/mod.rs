@@ -1,61 +1,65 @@
 use std::collections::hash_map::Entry;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 use std::sync::Arc;
 
 use rustc_hash::FxHashMap;
+use salsa::Database;
 
-use crate::db::{
-    Database, Db, DbRuntime, DbWithJar, HasJar, HasJars, JarsStorage, LintDb, LintJar,
-    ParallelDatabase, QueryResult, SemanticDb, SemanticJar, Snapshot, SourceDb, SourceJar, Upcast,
-};
-use crate::files::{FileId, Files};
+use crate::db::{Db, Jar};
+use red_knot_module_resolver::{Db as ResolverDb, Jar as ResolverJar};
+use red_knot_python_semantic::{Db as SemanticDb, Jar as SemanticJar};
+use ruff_db::file_system::FileSystem;
+use ruff_db::vfs::{Vfs, VfsFile};
+use ruff_db::{Db as SourceDb, Jar as SourceJar, Upcast};
+
 use crate::Workspace;
 
 pub mod check;
 
-#[derive(Debug)]
+#[salsa::db(SourceJar, ResolverJar, SemanticJar, Jar)]
 pub struct Program {
-    jars: JarsStorage<Program>,
-    files: Files,
+    storage: salsa::Storage<Program>,
+    vfs: Vfs,
+    fs: Arc<dyn FileSystem + Send + Sync>,
     workspace: Workspace,
 }
 
 impl Program {
-    pub fn new(workspace: Workspace) -> Self {
+    pub fn new<Fs>(workspace: Workspace, file_system: Fs) -> Self
+    where
+        Fs: FileSystem + 'static + Send + Sync,
+    {
         Self {
-            jars: JarsStorage::default(),
-            files: Files::default(),
+            storage: salsa::Storage::default(),
+            vfs: Vfs::default(),
+            fs: Arc::new(file_system),
             workspace,
         }
     }
 
-    pub fn apply_changes<I>(&mut self, changes: I)
-    where
-        I: IntoIterator<Item = FileWatcherChange>,
-    {
-        let mut aggregated_changes = AggregatedChanges::default();
-
-        aggregated_changes.extend(changes.into_iter().map(|change| FileChange {
-            id: self.files.intern(&change.path),
-            kind: change.kind,
-        }));
-
-        let (source, semantic, lint) = self.jars_mut();
-        for change in aggregated_changes.iter() {
-            semantic.module_resolver.remove_module_by_file(change.id);
-            semantic.semantic_indices.remove(&change.id);
-            source.sources.remove(&change.id);
-            source.parsed.remove(&change.id);
-            // TODO: remove all dependent modules as well
-            semantic.type_store.remove_module(change.id);
-            lint.lint_syntax.remove(&change.id);
-            lint.lint_semantic.remove(&change.id);
-        }
-    }
-
-    pub fn files(&self) -> &Files {
-        &self.files
-    }
+    // pub fn apply_changes<I>(&mut self, changes: I)
+    // where
+    //     I: IntoIterator<Item = FileWatcherChange>,
+    // {
+    //     let mut aggregated_changes = AggregatedChanges::default();
+    //
+    //     aggregated_changes.extend(changes.into_iter().map(|change| FileChange {
+    //         id: self.files.intern(&change.path),
+    //         kind: change.kind,
+    //     }));
+    //
+    //     let (source, semantic, lint) = self.jars_mut();
+    //     for change in aggregated_changes.iter() {
+    //         semantic.module_resolver.remove_module_by_file(change.id);
+    //         semantic.semantic_indices.remove(&change.id);
+    //         source.sources.remove(&change.id);
+    //         source.parsed.remove(&change.id);
+    //         // TODO: remove all dependent modules as well
+    //         semantic.type_store.remove_module(change.id);
+    //         lint.lint_syntax.remove(&change.id);
+    //         lint.lint_semantic.remove(&change.id);
+    //     }
+    // }
 
     pub fn workspace(&self) -> &Workspace {
         &self.workspace
@@ -65,26 +69,6 @@ impl Program {
         &mut self.workspace
     }
 }
-
-impl SourceDb for Program {
-    fn file_id(&self, path: &Path) -> FileId {
-        self.files.intern(path)
-    }
-
-    fn file_path(&self, file_id: FileId) -> Arc<Path> {
-        self.files.path(file_id)
-    }
-}
-
-impl DbWithJar<SourceJar> for Program {}
-
-impl SemanticDb for Program {}
-
-impl DbWithJar<SemanticJar> for Program {}
-
-impl LintDb for Program {}
-
-impl DbWithJar<LintJar> for Program {}
 
 impl Upcast<dyn SemanticDb> for Program {
     fn upcast(&self) -> &(dyn SemanticDb + 'static) {
@@ -98,73 +82,38 @@ impl Upcast<dyn SourceDb> for Program {
     }
 }
 
-impl Upcast<dyn LintDb> for Program {
-    fn upcast(&self) -> &(dyn LintDb + 'static) {
+impl Upcast<dyn ResolverDb> for Program {
+    fn upcast(&self) -> &(dyn ResolverDb + 'static) {
         self
     }
 }
 
+impl ResolverDb for Program {}
+
+impl SemanticDb for Program {}
+
+impl SourceDb for Program {
+    fn file_system(&self) -> &dyn FileSystem {
+        &*self.fs
+    }
+
+    fn vfs(&self) -> &Vfs {
+        &self.vfs
+    }
+}
+
+impl Database for Program {}
+
 impl Db for Program {}
 
-impl Database for Program {
-    fn runtime(&self) -> &DbRuntime {
-        self.jars.runtime()
-    }
-
-    fn runtime_mut(&mut self) -> &mut DbRuntime {
-        self.jars.runtime_mut()
-    }
-}
-
-impl ParallelDatabase for Program {
-    fn snapshot(&self) -> Snapshot<Self> {
-        Snapshot::new(Self {
-            jars: self.jars.snapshot(),
-            files: self.files.snapshot(),
+impl salsa::ParallelDatabase for Program {
+    fn snapshot(&self) -> salsa::Snapshot<Self> {
+        salsa::Snapshot::new(Self {
+            storage: self.storage.snapshot(),
+            vfs: self.vfs.snapshot(),
+            fs: self.fs.clone(),
             workspace: self.workspace.clone(),
         })
-    }
-}
-
-impl HasJars for Program {
-    type Jars = (SourceJar, SemanticJar, LintJar);
-
-    fn jars(&self) -> QueryResult<&Self::Jars> {
-        self.jars.jars()
-    }
-
-    fn jars_mut(&mut self) -> &mut Self::Jars {
-        self.jars.jars_mut()
-    }
-}
-
-impl HasJar<SourceJar> for Program {
-    fn jar(&self) -> QueryResult<&SourceJar> {
-        Ok(&self.jars()?.0)
-    }
-
-    fn jar_mut(&mut self) -> &mut SourceJar {
-        &mut self.jars_mut().0
-    }
-}
-
-impl HasJar<SemanticJar> for Program {
-    fn jar(&self) -> QueryResult<&SemanticJar> {
-        Ok(&self.jars()?.1)
-    }
-
-    fn jar_mut(&mut self) -> &mut SemanticJar {
-        &mut self.jars_mut().1
-    }
-}
-
-impl HasJar<LintJar> for Program {
-    fn jar(&self) -> QueryResult<&LintJar> {
-        Ok(&self.jars()?.2)
-    }
-
-    fn jar_mut(&mut self) -> &mut LintJar {
-        &mut self.jars_mut().2
     }
 }
 
@@ -182,12 +131,12 @@ impl FileWatcherChange {
 
 #[derive(Copy, Clone, Debug)]
 struct FileChange {
-    id: FileId,
+    id: VfsFile,
     kind: FileChangeKind,
 }
 
 impl FileChange {
-    fn file_id(self) -> FileId {
+    fn file_id(self) -> VfsFile {
         self.id
     }
 
@@ -205,7 +154,7 @@ pub enum FileChangeKind {
 
 #[derive(Default, Debug)]
 struct AggregatedChanges {
-    changes: FxHashMap<FileId, FileChangeKind>,
+    changes: FxHashMap<VfsFile, FileChangeKind>,
 }
 
 impl AggregatedChanges {
