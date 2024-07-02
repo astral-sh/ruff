@@ -231,7 +231,7 @@ impl<'db> TypeInferenceBuilder<'db> {
             .map(|arguments| self.infer_arguments(arguments))
             .unwrap_or(Vec::new());
 
-        let class_body_scope_id = self.index.definition_scope(class);
+        let class_body_scope_id = self.index.node_scope(class);
 
         let class_ty = self.class_ty(ClassType {
             name: name.id.clone(),

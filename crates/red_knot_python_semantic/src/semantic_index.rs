@@ -12,7 +12,7 @@ use crate::node_key::NodeKey;
 use crate::semantic_index::ast_ids::{AstId, AstIds, ScopedClassId, ScopedFunctionId};
 use crate::semantic_index::builder::SemanticIndexBuilder;
 use crate::semantic_index::symbol::{
-    FileScopeId, PublicSymbolId, Scope, ScopeId, ScopedSymbolId, SymbolTable,
+    FileScopeId, PublicSymbolId, Scope, ScopeId, ScopeKind, ScopedSymbolId, SymbolTable,
 };
 use crate::Db;
 
@@ -157,11 +157,45 @@ impl SemanticIndex {
         AncestorsIter::new(self, scope)
     }
 
+    /// Returns the scope that is created by `node`.
+    pub(crate) fn node_scope(&self, node: impl Into<NodeWithScopeKey>) -> FileScopeId {
+        self.scopes_by_definition[&node.into()]
+    }
+
+    /// Returns the scope in which `node_with_scope` is defined.
+    ///
+    /// The returned scope can be used to lookup the symbol of the definition or its type.
+    ///
+    /// * Annotation: Returns the direct parent scope
+    /// * Function and classes: Returns the parent scope unless they have type parameters in which case
+    ///   the grandparent scope is returned.
     pub(crate) fn definition_scope(
         &self,
         node_with_scope: impl Into<NodeWithScopeKey>,
     ) -> FileScopeId {
-        self.scopes_by_definition[&node_with_scope.into()]
+        fn resolve_scope(index: &SemanticIndex, node_with_scope: NodeWithScopeKey) -> FileScopeId {
+            let scope_id = index.node_scope(node_with_scope);
+            let scope = index.scope(scope_id);
+
+            match scope.kind() {
+                ScopeKind::Module => scope_id,
+                ScopeKind::Annotation => scope.parent.unwrap(),
+                ScopeKind::Class | ScopeKind::Function => {
+                    let mut ancestors = index.ancestor_scopes(scope_id).skip(1);
+
+                    let (mut scope_id, mut scope) = ancestors.next().unwrap();
+                    if scope.kind() == ScopeKind::Annotation {
+                        (scope_id, scope) = ancestors.next().unwrap();
+                    }
+
+                    debug_assert_ne!(scope.kind(), ScopeKind::Annotation);
+
+                    scope_id
+                }
+            }
+        }
+
+        resolve_scope(self, node_with_scope.into())
     }
 }
 
