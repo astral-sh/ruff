@@ -48,7 +48,7 @@ pub trait HasScopedAstId {
     fn scoped_ast_id(&self, db: &dyn Db, scope: ScopeId) -> Self::Id;
 }
 
-/// Uniquely identifies an [`ast::Expr`] in a [`FileScopeId`].
+/// Uniquely identifies an [`ast::Expr`] in a [`crate::semantic_index::symbol::FileScopeId`].
 #[newtype_index]
 pub struct ScopedExpressionId;
 

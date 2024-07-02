@@ -345,6 +345,7 @@ impl<'db> SymbolTableBuilder<'db> {
     }
 }
 
+/// Reference to a node that introduces a new scope.
 #[derive(Copy, Clone, Debug)]
 pub(crate) enum NodeWithScopeRef<'a> {
     Module,
@@ -405,6 +406,7 @@ impl NodeWithScopeRef<'_> {
     }
 }
 
+/// Node that introduces a new scope.
 #[derive(Clone, Debug)]
 pub enum NodeWithScopeKind {
     Module,
