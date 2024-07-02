@@ -38,6 +38,10 @@ impl<'db> SemanticModel<'db> {
 }
 
 pub trait HasTy {
+    /// Returns the inferred type of `self`.
+    ///
+    /// ## Panics
+    /// May panic if `self` is from another file than `model`.
     fn ty<'db>(&self, model: &SemanticModel<'db>) -> Type<'db>;
 }
 
@@ -48,7 +52,6 @@ impl HasTy for ast::ExpressionRef<'_> {
         let scope = file_scope.to_scope_id(model.db, model.file);
 
         let expression_id = self.scoped_ast_id(model.db, scope);
-
         infer_types(model.db, scope).expression_ty(expression_id)
     }
 }

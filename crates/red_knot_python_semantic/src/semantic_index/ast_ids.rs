@@ -145,10 +145,6 @@ impl<L: Copy> AstId<L> {
     pub(super) fn new(scope: FileScopeId, in_scope_id: L) -> Self {
         Self { scope, in_scope_id }
     }
-
-    pub(super) fn in_scope_id(self) -> L {
-        self.in_scope_id
-    }
 }
 
 /// Uniquely identifies an [`ast::Expr`] in a [`FileScopeId`].

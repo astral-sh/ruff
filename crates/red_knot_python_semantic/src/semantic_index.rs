@@ -83,17 +83,14 @@ pub struct SemanticIndex {
     /// an [`ast::Expr`] to an [`ExpressionId`] (which requires knowing the scope).
     scopes_by_expression: FxHashMap<NodeKey, FileScopeId>,
 
+    /// Map from the definition that introduce a scope to the scope they define.
+    scopes_by_definition: FxHashMap<NodeWithScopeKey, FileScopeId>,
+
     /// Lookup table to map between node ids and ast nodes.
     ///
     /// Note: We should not depend on this map when analysing other files or
     /// changing a file invalidates all dependents.
     ast_ids: IndexVec<FileScopeId, AstIds>,
-
-    /// Map from scope to the node that introduces the scope.
-    nodes_by_scope: IndexVec<FileScopeId, NodeWithScopeId>,
-
-    /// Map from nodes that introduce a scope to the scope they define.
-    scopes_by_node: FxHashMap<NodeWithScopeKey, FileScopeId>,
 }
 
 impl SemanticIndex {
@@ -159,15 +156,11 @@ impl SemanticIndex {
         AncestorsIter::new(self, scope)
     }
 
-    pub(crate) fn scope_node(&self, scope_id: FileScopeId) -> NodeWithScopeId {
-        self.nodes_by_scope[scope_id]
-    }
-
     pub(crate) fn definition_scope(
         &self,
         node_with_scope: impl Into<NodeWithScopeKey>,
     ) -> FileScopeId {
-        self.scopes_by_node[&node_with_scope.into()]
+        self.scopes_by_definition[&node_with_scope.into()]
     }
 }
 
@@ -307,8 +300,9 @@ mod tests {
     use ruff_db::vfs::{system_path_to_file, VfsFile};
 
     use crate::db::tests::TestDb;
-    use crate::semantic_index::symbol::{FileScopeId, FileSymbolId, Scope, ScopeKind, SymbolTable};
-    use crate::semantic_index::{root_scope, semantic_index, symbol_table, SemanticIndex};
+    use crate::semantic_index::symbol::{FileScopeId, Scope, ScopeKind, SymbolTable};
+    use crate::semantic_index::{root_scope, semantic_index, symbol_table};
+    use crate::Db;
 
     struct TestCase {
         db: TestDb,
@@ -440,18 +434,12 @@ y = 2
 
         let index = semantic_index(&db, file);
 
-        let root = index.symbol_table(FileScopeId::root());
         let scopes: Vec<_> = index.child_scopes(FileScopeId::root()).collect();
         assert_eq!(scopes.len(), 1);
 
         let (class_scope_id, class_scope) = scopes[0];
         assert_eq!(class_scope.kind(), ScopeKind::Class);
-        assert_eq!(
-            class_scope
-                .defining_symbol()
-                .map(super::symbol::FileSymbolId::scoped_symbol_id),
-            root.symbol_id_by_name("C")
-        );
+        assert_eq!(class_scope.name(&db, file), "C");
 
         let class_table = index.symbol_table(class_scope_id);
         assert_eq!(names(&class_table), vec!["x"]);
@@ -480,12 +468,7 @@ y = 2
 
         let (function_scope_id, function_scope) = scopes[0];
         assert_eq!(function_scope.kind(), ScopeKind::Function);
-        assert_eq!(
-            function_scope
-                .defining_symbol()
-                .map(FileSymbolId::scoped_symbol_id),
-            root_table.symbol_id_by_name("func")
-        );
+        assert_eq!(function_scope.name(&db, file), "func");
 
         let function_table = index.symbol_table(function_scope_id);
         assert_eq!(names(&function_table), vec!["x"]);
@@ -521,19 +504,9 @@ def func():
 
         assert_eq!(func_scope_1.kind(), ScopeKind::Function);
 
-        assert_eq!(
-            func_scope_1
-                .defining_symbol()
-                .map(FileSymbolId::scoped_symbol_id),
-            root_table.symbol_id_by_name("func")
-        );
+        assert_eq!(func_scope_1.name(&db, file), "func");
         assert_eq!(func_scope_2.kind(), ScopeKind::Function);
-        assert_eq!(
-            func_scope_2
-                .defining_symbol()
-                .map(FileSymbolId::scoped_symbol_id),
-            root_table.symbol_id_by_name("func")
-        );
+        assert_eq!(func_scope_2.name(&db, file), "func");
 
         let func1_table = index.symbol_table(func_scope1_id);
         let func2_table = index.symbol_table(func_scope2_id);
@@ -568,12 +541,7 @@ def func[T]():
         let (ann_scope_id, ann_scope) = scopes[0];
 
         assert_eq!(ann_scope.kind(), ScopeKind::Annotation);
-        assert_eq!(
-            ann_scope
-                .defining_symbol()
-                .map(FileSymbolId::scoped_symbol_id),
-            root_table.symbol_id_by_name("func")
-        );
+        assert_eq!(ann_scope.name(&db, file), "func");
         let ann_table = index.symbol_table(ann_scope_id);
         assert_eq!(names(&ann_table), vec!["T"]);
 
@@ -581,12 +549,7 @@ def func[T]():
         assert_eq!(scopes.len(), 1);
         let (func_scope_id, func_scope) = scopes[0];
         assert_eq!(func_scope.kind(), ScopeKind::Function);
-        assert_eq!(
-            func_scope
-                .defining_symbol()
-                .map(FileSymbolId::scoped_symbol_id),
-            root_table.symbol_id_by_name("func")
-        );
+        assert_eq!(func_scope.name(&db, file), "func");
         let func_table = index.symbol_table(func_scope_id);
         assert_eq!(names(&func_table), vec!["x"]);
     }
@@ -610,12 +573,7 @@ class C[T]:
         assert_eq!(scopes.len(), 1);
         let (ann_scope_id, ann_scope) = scopes[0];
         assert_eq!(ann_scope.kind(), ScopeKind::Annotation);
-        assert_eq!(
-            ann_scope
-                .defining_symbol()
-                .map(FileSymbolId::scoped_symbol_id),
-            root_table.symbol_id_by_name("C")
-        );
+        assert_eq!(ann_scope.name(&db, file), "C");
         let ann_table = index.symbol_table(ann_scope_id);
         assert_eq!(names(&ann_table), vec!["T"]);
         assert!(
@@ -630,12 +588,7 @@ class C[T]:
         let (func_scope_id, class_scope) = scopes[0];
 
         assert_eq!(class_scope.kind(), ScopeKind::Class);
-        assert_eq!(
-            class_scope
-                .defining_symbol()
-                .map(FileSymbolId::scoped_symbol_id),
-            root_table.symbol_id_by_name("C")
-        );
+        assert_eq!(class_scope.name(&db, file), "C");
         assert_eq!(names(&index.symbol_table(func_scope_id)), vec!["x"]);
     }
 
@@ -698,23 +651,13 @@ class C[T]:
     fn scope_iterators() {
         fn scope_names<'a>(
             scopes: impl Iterator<Item = (FileScopeId, &'a Scope)>,
-            index: &'a SemanticIndex,
+            db: &'a dyn Db,
+            file: VfsFile,
         ) -> Vec<&'a str> {
-            let mut names = Vec::new();
-
-            for (_, scope) in scopes {
-                if let Some(defining_symbol) = scope.defining_symbol {
-                    let symbol_table = &index.symbol_tables[defining_symbol.scope()];
-                    let symbol = symbol_table.symbol(defining_symbol.scoped_symbol_id());
-                    names.push(symbol.name().as_str());
-                } else if scope.parent.is_none() {
-                    names.push("<module>");
-                } else {
-                    panic!("Unsupported");
-                }
-            }
-
-            names
+            scopes
+                .into_iter()
+                .map(|(_, scope)| scope.name(db, file))
+                .collect()
         }
 
         let TestCase { db, file } = test_case(
@@ -734,16 +677,19 @@ def x():
 
         let descendents = index.descendent_scopes(FileScopeId::root());
         assert_eq!(
-            scope_names(descendents, index),
+            scope_names(descendents, &db, file),
             vec!["Test", "foo", "bar", "baz", "x"]
         );
 
         let children = index.child_scopes(FileScopeId::root());
-        assert_eq!(scope_names(children, index), vec!["Test", "x"]);
+        assert_eq!(scope_names(children, &db, file), vec!["Test", "x"]);
 
         let test_class = index.child_scopes(FileScopeId::root()).next().unwrap().0;
         let test_child_scopes = index.child_scopes(test_class);
-        assert_eq!(scope_names(test_child_scopes, index), vec!["foo", "baz"]);
+        assert_eq!(
+            scope_names(test_child_scopes, &db, file),
+            vec!["foo", "baz"]
+        );
 
         let bar_scope = index
             .descendent_scopes(FileScopeId::root())
@@ -753,7 +699,7 @@ def x():
         let ancestors = index.ancestor_scopes(bar_scope);
 
         assert_eq!(
-            scope_names(ancestors, index),
+            scope_names(ancestors, &db, file),
             vec!["bar", "foo", "Test", "<module>"]
         );
     }
