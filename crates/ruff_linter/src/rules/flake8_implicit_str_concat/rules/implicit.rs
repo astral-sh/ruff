@@ -98,7 +98,6 @@ pub(crate) fn implicit(
     indexer: &Indexer,
 ) {
     for (a_token, b_token) in tokens
-        .up_to_first_unknown()
         .iter()
         .filter(|token| {
             token.kind() != TokenKind::Comment
