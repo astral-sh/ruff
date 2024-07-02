@@ -1,4 +1,3 @@
-#![allow(unsafe_code)]
 use std::iter::FusedIterator;
 
 use ruff_db::file_system::{FileSystemPath, FileSystemPathBuf};
@@ -186,7 +185,7 @@ impl ModuleResolutionPath {
     }
 
     #[must_use]
-    pub(crate) fn as_file_system_path_buf(&self) -> &FileSystemPathBuf {
+    fn as_file_system_path_buf(&self) -> &FileSystemPathBuf {
         match self {
             Self::Extra(ExtraPathBuf(path)) => path,
             Self::FirstParty(FirstPartyPathBuf(path)) => path,
@@ -195,7 +194,6 @@ impl ModuleResolutionPath {
         }
     }
 
-    #[cfg(test)]
     #[must_use]
     #[inline]
     fn into_file_system_path_buf(self) -> FileSystemPathBuf {
@@ -206,11 +204,11 @@ impl ModuleResolutionPath {
             Self::SitePackages(SitePackagesPathBuf(path)) => path,
         }
     }
+}
 
-    #[cfg(test)]
-    #[must_use]
-    pub(crate) fn into_vfs_path(self) -> VfsPath {
-        VfsPath::FileSystem(self.into_file_system_path_buf())
+impl From<ModuleResolutionPath> for VfsPath {
+    fn from(value: ModuleResolutionPath) -> Self {
+        VfsPath::FileSystem(value.into_file_system_path_buf())
     }
 }
 
@@ -290,6 +288,7 @@ impl<'a> ModuleResolutionPathRef<'a> {
     }
 
     #[must_use]
+    #[allow(unsafe_code)]
     fn extra_unchecked(path: &'a (impl AsRef<FileSystemPath> + ?Sized)) -> Self {
         // SAFETY: ExtraPath is marked as #[repr(transparent)] so the conversion from a
         // *const FileSystemPath to a *const ExtraPath is valid.
@@ -310,6 +309,7 @@ impl<'a> ModuleResolutionPathRef<'a> {
     }
 
     #[must_use]
+    #[allow(unsafe_code)]
     fn first_party_unchecked(path: &'a (impl AsRef<FileSystemPath> + ?Sized)) -> Self {
         // SAFETY: FirstPartyPath is marked as #[repr(transparent)] so the conversion from a
         // *const FileSystemPath to a *const FirstPartyPath is valid.
@@ -332,6 +332,7 @@ impl<'a> ModuleResolutionPathRef<'a> {
     }
 
     #[must_use]
+    #[allow(unsafe_code)]
     fn standard_library_unchecked(path: &'a (impl AsRef<FileSystemPath> + ?Sized)) -> Self {
         // SAFETY: StandardLibraryPath is marked as #[repr(transparent)] so the conversion from a
         // *const FileSystemPath to a *const StandardLibraryPath is valid.
@@ -354,6 +355,7 @@ impl<'a> ModuleResolutionPathRef<'a> {
     }
 
     #[must_use]
+    #[allow(unsafe_code)]
     fn site_packages_unchecked(path: &'a (impl AsRef<FileSystemPath> + ?Sized)) -> Self {
         // SAFETY: SitePackagesPath is marked as #[repr(transparent)] so the conversion from a
         // *const FileSystemPath to a *const SitePackagesPath is valid.

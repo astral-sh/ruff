@@ -86,22 +86,16 @@ pub(crate) fn file_to_module(db: &dyn Db, file: VfsFile) -> Option<Module> {
     let relative_path = search_paths.iter().find_map(|root| match (&**root, path) {
         (_, VfsPath::Vendored(_)) => todo!("VendoredPaths are not yet supported"),
         (ModuleResolutionPath::Extra(_), VfsPath::FileSystem(path)) => {
-            ModuleResolutionPathRef::extra(path.strip_prefix(root.as_file_system_path_buf()).ok()?)
+            ModuleResolutionPathRef::extra(path.strip_prefix(&**root).ok()?)
         }
         (ModuleResolutionPath::FirstParty(_), VfsPath::FileSystem(path)) => {
-            ModuleResolutionPathRef::first_party(
-                path.strip_prefix(root.as_file_system_path_buf()).ok()?,
-            )
+            ModuleResolutionPathRef::first_party(path.strip_prefix(&**root).ok()?)
         }
         (ModuleResolutionPath::StandardLibrary(_), VfsPath::FileSystem(path)) => {
-            ModuleResolutionPathRef::standard_library(
-                path.strip_prefix(root.as_file_system_path_buf()).ok()?,
-            )
+            ModuleResolutionPathRef::standard_library(path.strip_prefix(&**root).ok()?)
         }
         (ModuleResolutionPath::SitePackages(_), VfsPath::FileSystem(path)) => {
-            ModuleResolutionPathRef::site_packages(
-                path.strip_prefix(root.as_file_system_path_buf()).ok()?,
-            )
+            ModuleResolutionPathRef::site_packages(path.strip_prefix(&**root).ok()?)
         }
     })?;
 
@@ -478,7 +472,7 @@ mod tests {
 
         assert_eq!(
             Some(functools_module),
-            path_to_module(&db, &functools_path.into_vfs_path())
+            path_to_module(&db, &VfsPath::from(functools_path))
         );
 
         Ok(())
