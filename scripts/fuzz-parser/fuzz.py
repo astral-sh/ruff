@@ -39,7 +39,7 @@ ExitCode = NewType("ExitCode", int)
 def contains_bug(code: str, *, ruff_executable: str) -> bool:
     """Return `True` if the code triggers a parser error."""
     completed_process = subprocess.run(
-        [ruff_executable, "check", "--select=E999", "--no-cache", "-"],
+        [ruff_executable, "check", "--config", "lint.select=[]", "--no-cache", "-"],
         capture_output=True,
         text=True,
         input=code,

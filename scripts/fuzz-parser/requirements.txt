@@ -10,22 +10,27 @@ markdown-it-py==3.0.0
     # via rich
 mdurl==0.1.2
     # via markdown-it-py
-pygments==2.17.2
+pygments==2.18.0
     # via rich
 pysource-codegen==0.5.2
+    # via -r scripts/fuzz-parser/requirements.in
 pysource-minimize==0.6.3
+    # via -r scripts/fuzz-parser/requirements.in
 rich==13.7.1
     # via
     #   pysource-minimize
     #   rich-argparse
-rich-argparse==1.4.0
-ruff==0.4.2
+rich-argparse==1.5.2
+    # via -r scripts/fuzz-parser/requirements.in
+ruff==0.5.0
+    # via -r scripts/fuzz-parser/requirements.in
 six==1.16.0
     # via
     #   asttokens
     #   astunparse
 termcolor==2.4.0
-typing-extensions==4.11.0
+    # via -r scripts/fuzz-parser/requirements.in
+typing-extensions==4.12.2
     # via pysource-codegen
 wheel==0.43.0
     # via astunparse
