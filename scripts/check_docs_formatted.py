@@ -71,6 +71,7 @@ KNOWN_FORMATTING_VIOLATIONS = [
     "over-indented",
     "pass-statement-stub-body",
     "prohibited-trailing-comma",
+    "quoted-f-string-value",
     "redundant-backslash",
     "shebang-leading-whitespace",
     "surrounding-whitespace",
