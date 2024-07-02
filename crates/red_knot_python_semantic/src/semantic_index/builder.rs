@@ -12,7 +12,7 @@ use crate::node_key::NodeKey;
 use crate::semantic_index::ast_ids::{AstId, AstIdsBuilder, ScopedClassId, ScopedFunctionId};
 use crate::semantic_index::definition::{Definition, ImportDefinition, ImportFromDefinition};
 use crate::semantic_index::symbol::{
-    FileScopeId, FileSymbolId, Scope, ScopeKind, ScopedSymbolId, SymbolFlags, SymbolTableBuilder,
+    FileScopeId, Scope, ScopeKind, ScopedSymbolId, SymbolFlags, SymbolTableBuilder,
 };
 use crate::semantic_index::{NodeWithScopeId, NodeWithScopeKey, SemanticIndex};
 
@@ -27,9 +27,8 @@ pub(super) struct SemanticIndexBuilder<'a> {
     scopes: IndexVec<FileScopeId, Scope>,
     symbol_tables: IndexVec<FileScopeId, SymbolTableBuilder>,
     ast_ids: IndexVec<FileScopeId, AstIdsBuilder>,
-    expression_scopes: FxHashMap<NodeKey, FileScopeId>,
-    scope_nodes: IndexVec<FileScopeId, NodeWithScopeId>,
-    node_scopes: FxHashMap<NodeWithScopeKey, FileScopeId>,
+    scopes_by_expression: FxHashMap<NodeKey, FileScopeId>,
+    scopes_by_definition: FxHashMap<NodeWithScopeKey, FileScopeId>,
 }
 
 impl<'a> SemanticIndexBuilder<'a> {
@@ -42,19 +41,12 @@ impl<'a> SemanticIndexBuilder<'a> {
             scopes: IndexVec::new(),
             symbol_tables: IndexVec::new(),
             ast_ids: IndexVec::new(),
-            expression_scopes: FxHashMap::default(),
-            node_scopes: FxHashMap::default(),
-            scope_nodes: IndexVec::new(),
+            scopes_by_expression: FxHashMap::default(),
+            scopes_by_definition: FxHashMap::default(),
         };
 
         builder.push_scope_with_parent(
-            NodeWithScope::new(
-                parsed.syntax(),
-                NodeWithScopeId::Module,
-                Name::new_static("<module>"),
-            ),
-            None,
-            None,
+            &NodeWithScope::new(parsed.syntax(), NodeWithScopeId::Module),
             None,
         );
 
@@ -68,46 +60,29 @@ impl<'a> SemanticIndexBuilder<'a> {
             .expect("Always to have a root scope")
     }
 
-    fn push_scope(
-        &mut self,
-        node: NodeWithScope,
-        defining_symbol: Option<FileSymbolId>,
-        definition: Option<Definition>,
-    ) {
+    fn push_scope(&mut self, node: &NodeWithScope) {
         let parent = self.current_scope();
-        self.push_scope_with_parent(node, defining_symbol, definition, Some(parent));
+        self.push_scope_with_parent(node, Some(parent));
     }
 
-    fn push_scope_with_parent(
-        &mut self,
-        node: NodeWithScope,
-        defining_symbol: Option<FileSymbolId>,
-        definition: Option<Definition>,
-        parent: Option<FileScopeId>,
-    ) {
+    fn push_scope_with_parent(&mut self, node: &NodeWithScope, parent: Option<FileScopeId>) {
         let children_start = self.scopes.next_index() + 1;
-        let node_key = node.key();
-        let node_id = node.id();
-        let scope_kind = node.scope_kind();
 
         let scope = Scope {
-            name: node.name,
+            node: node.id(),
             parent,
-            defining_symbol,
-            definition,
-            kind: scope_kind,
+            kind: node.scope_kind(),
             descendents: children_start..children_start,
         };
 
         let scope_id = self.scopes.push(scope);
         self.symbol_tables.push(SymbolTableBuilder::new());
         let ast_id_scope = self.ast_ids.push(AstIdsBuilder::new());
-        let scope_node_id = self.scope_nodes.push(node_id);
 
         debug_assert_eq!(ast_id_scope, scope_id);
-        debug_assert_eq!(scope_id, scope_node_id);
+
         self.scope_stack.push(scope_id);
-        self.node_scopes.insert(node_key, scope_id);
+        self.scopes_by_definition.insert(node.key(), scope_id);
     }
 
     fn pop_scope(&mut self) -> FileScopeId {
@@ -128,18 +103,9 @@ impl<'a> SemanticIndexBuilder<'a> {
         &mut self.ast_ids[scope_id]
     }
 
-    fn add_or_update_symbol(&mut self, name: Name, flags: SymbolFlags) -> FileSymbolId {
-        for scope in self.scope_stack.iter().rev().skip(1) {
-            let builder = &self.symbol_tables[*scope];
-
-            if let Some(symbol) = builder.symbol_by_name(&name) {
-                return FileSymbolId::new(*scope, symbol);
-            }
-        }
-
-        let scope = self.current_scope();
+    fn add_or_update_symbol(&mut self, name: Name, flags: SymbolFlags) -> ScopedSymbolId {
         let symbol_table = self.current_symbol_table();
-        FileSymbolId::new(scope, symbol_table.add_or_update_symbol(name, flags, None))
+        symbol_table.add_or_update_symbol(name, flags, None)
     }
 
     fn add_or_update_symbol_with_definition(
@@ -154,9 +120,7 @@ impl<'a> SemanticIndexBuilder<'a> {
 
     fn with_type_params(
         &mut self,
-        name: Name,
         with_params: &WithTypeParams,
-        defining_symbol: FileSymbolId,
         nested: impl FnOnce(&mut Self) -> FileScopeId,
     ) -> FileScopeId {
         let type_params = with_params.type_parameters();
@@ -167,11 +131,7 @@ impl<'a> SemanticIndexBuilder<'a> {
                 WithTypeParams::FunctionDef { id, .. } => NodeWithScopeId::FunctionTypeParams(*id),
             };
 
-            self.push_scope(
-                NodeWithScope::new(type_params, type_params_id, name),
-                Some(defining_symbol),
-                Some(with_params.definition()),
-            );
+            self.push_scope(&NodeWithScope::new(type_params, type_params_id));
             for type_param in &type_params.type_params {
                 let name = match type_param {
                     ast::TypeParam::TypeVar(ast::TypeParamTypeVar { name, .. }) => name,
@@ -216,16 +176,14 @@ impl<'a> SemanticIndexBuilder<'a> {
         self.scopes.shrink_to_fit();
         ast_ids.shrink_to_fit();
         symbol_tables.shrink_to_fit();
-        self.expression_scopes.shrink_to_fit();
-        self.scope_nodes.shrink_to_fit();
+        self.scopes_by_expression.shrink_to_fit();
 
         SemanticIndex {
             symbol_tables,
             scopes: self.scopes,
-            nodes_by_scope: self.scope_nodes,
-            scopes_by_node: self.node_scopes,
+            scopes_by_definition: self.scopes_by_definition,
             ast_ids,
-            scopes_by_expression: self.expression_scopes,
+            scopes_by_expression: self.scopes_by_expression,
         }
     }
 }
@@ -248,33 +206,24 @@ impl Visitor<'_> for SemanticIndexBuilder<'_> {
                 let function_id = ScopedFunctionId(statement_id);
                 let definition = Definition::FunctionDef(function_id);
                 let scope = self.current_scope();
-                let symbol = FileSymbolId::new(
-                    scope,
-                    self.add_or_update_symbol_with_definition(name.clone(), definition),
-                );
+
+                self.add_or_update_symbol_with_definition(name.clone(), definition);
 
                 self.with_type_params(
-                    name.clone(),
                     &WithTypeParams::FunctionDef {
                         node: function_def,
                         id: AstId::new(scope, function_id),
                     },
-                    symbol,
                     |builder| {
                         builder.visit_parameters(&function_def.parameters);
                         for expr in &function_def.returns {
                             builder.visit_annotation(expr);
                         }
 
-                        builder.push_scope(
-                            NodeWithScope::new(
-                                function_def,
-                                NodeWithScopeId::Function(AstId::new(scope, function_id)),
-                                name.clone(),
-                            ),
-                            Some(symbol),
-                            Some(definition),
-                        );
+                        builder.push_scope(&NodeWithScope::new(
+                            function_def,
+                            NodeWithScopeId::Function(AstId::new(scope, function_id)),
+                        ));
                         builder.visit_body(&function_def.body);
                         builder.pop_scope()
                     },
@@ -289,31 +238,23 @@ impl Visitor<'_> for SemanticIndexBuilder<'_> {
                 let class_id = ScopedClassId(statement_id);
                 let definition = Definition::ClassDef(class_id);
                 let scope = self.current_scope();
-                let id = FileSymbolId::new(
-                    self.current_scope(),
-                    self.add_or_update_symbol_with_definition(name.clone(), definition),
-                );
+
+                self.add_or_update_symbol_with_definition(name.clone(), definition);
+
                 self.with_type_params(
-                    name.clone(),
                     &WithTypeParams::ClassDef {
                         node: class,
                         id: AstId::new(scope, class_id),
                     },
-                    id,
                     |builder| {
                         if let Some(arguments) = &class.arguments {
                             builder.visit_arguments(arguments);
                         }
 
-                        builder.push_scope(
-                            NodeWithScope::new(
-                                class,
-                                NodeWithScopeId::Class(AstId::new(scope, class_id)),
-                                name.clone(),
-                            ),
-                            Some(id),
-                            Some(definition),
-                        );
+                        builder.push_scope(&NodeWithScope::new(
+                            class,
+                            NodeWithScopeId::Class(AstId::new(scope, class_id)),
+                        ));
                         builder.visit_body(&class.body);
 
                         builder.pop_scope()
@@ -378,7 +319,7 @@ impl Visitor<'_> for SemanticIndexBuilder<'_> {
             self.current_ast_ids().record_expression(expr, module)
         };
 
-        self.expression_scopes
+        self.scopes_by_expression
             .insert(NodeKey::from_node(expr), self.current_scope());
 
         match expr {
@@ -459,27 +400,18 @@ impl<'a> WithTypeParams<'a> {
             WithTypeParams::FunctionDef { node, .. } => node.type_params.as_deref(),
         }
     }
-
-    fn definition(&self) -> Definition {
-        match self {
-            WithTypeParams::ClassDef { id, .. } => Definition::ClassDef(id.in_scope_id()),
-            WithTypeParams::FunctionDef { id, .. } => Definition::FunctionDef(id.in_scope_id()),
-        }
-    }
 }
 
 struct NodeWithScope {
     id: NodeWithScopeId,
     key: NodeWithScopeKey,
-    name: Name,
 }
 
 impl NodeWithScope {
-    fn new(node: impl Into<NodeWithScopeKey>, id: NodeWithScopeId, name: Name) -> Self {
+    fn new(node: impl Into<NodeWithScopeKey>, id: NodeWithScopeId) -> Self {
         Self {
             id,
             key: node.into(),
-            name,
         }
     }
 

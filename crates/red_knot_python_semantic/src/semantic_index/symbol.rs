@@ -6,12 +6,13 @@ use hashbrown::hash_map::RawEntryMut;
 use rustc_hash::FxHasher;
 use smallvec::SmallVec;
 
-use crate::semantic_index::definition::Definition;
-use crate::semantic_index::{root_scope, semantic_index, symbol_table, SymbolMap};
-use crate::Db;
 use ruff_db::vfs::VfsFile;
 use ruff_index::{newtype_index, IndexVec};
 use ruff_python_ast::name::Name;
+
+use crate::semantic_index::definition::Definition;
+use crate::semantic_index::{root_scope, semantic_index, symbol_table, NodeWithScopeId, SymbolMap};
+use crate::Db;
 
 #[derive(Eq, PartialEq, Debug)]
 pub struct Symbol {
@@ -87,13 +88,6 @@ pub struct FileSymbolId {
 }
 
 impl FileSymbolId {
-    pub(super) fn new(scope: FileScopeId, symbol: ScopedSymbolId) -> Self {
-        Self {
-            scope,
-            scoped_symbol_id: symbol,
-        }
-    }
-
     pub fn scope(self) -> FileScopeId {
         self.scope
     }
@@ -214,25 +208,34 @@ impl FileScopeId {
 
 #[derive(Debug, Eq, PartialEq)]
 pub struct Scope {
-    pub(super) name: Name,
     pub(super) parent: Option<FileScopeId>,
-    pub(super) definition: Option<Definition>,
-    pub(super) defining_symbol: Option<FileSymbolId>,
+    pub(super) node: NodeWithScopeId,
     pub(super) kind: ScopeKind,
     pub(super) descendents: Range<FileScopeId>,
 }
 
 impl Scope {
-    pub fn name(&self) -> &Name {
-        &self.name
+    #[cfg(test)]
+    pub(crate) fn name<'db>(&self, db: &'db dyn Db, file: VfsFile) -> &'db str {
+        use crate::semantic_index::ast_ids::AstIdNode;
+        use ruff_python_ast as ast;
+
+        match self.node {
+            NodeWithScopeId::Module => "<module>",
+            NodeWithScopeId::Class(class) | NodeWithScopeId::ClassTypeParams(class) => {
+                let class = ast::StmtClassDef::lookup(db, file, class);
+                class.name.as_str()
+            }
+            NodeWithScopeId::Function(function) | NodeWithScopeId::FunctionTypeParams(function) => {
+                let function = ast::StmtFunctionDef::lookup(db, file, function);
+                function.name.as_str()
+            }
+        }
     }
 
-    pub fn definition(&self) -> Option<Definition> {
-        self.definition
-    }
-
-    pub fn defining_symbol(&self) -> Option<FileSymbolId> {
-        self.defining_symbol
+    /// The node that creates this scope.
+    pub(crate) fn node(&self) -> NodeWithScopeId {
+        self.node
     }
 
     pub fn parent(self) -> Option<FileScopeId> {
@@ -368,10 +371,6 @@ impl SymbolTableBuilder {
                 id
             }
         }
-    }
-
-    pub(super) fn symbol_by_name(&self, name: &str) -> Option<ScopedSymbolId> {
-        self.table.symbol_id_by_name(name)
     }
 
     pub(super) fn finish(mut self) -> SymbolTable {

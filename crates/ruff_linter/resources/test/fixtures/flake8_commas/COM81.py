@@ -565,10 +565,6 @@ foo(
     **kwargs
 }
 
-(
-    *args
-)
-
 {
     *args
 }

@@ -65,22 +65,13 @@ impl<'a> LogicalLines<'a> {
         assert!(u32::try_from(tokens.len()).is_ok());
 
         let mut builder = LogicalLinesBuilder::with_capacity(tokens.len());
-        let mut parens = 0u32;
+        let mut tokens_iter = tokens.iter_with_context();
 
-        for token in tokens.up_to_first_unknown() {
+        while let Some(token) = tokens_iter.next() {
             builder.push_token(token.kind(), token.range());
 
-            match token.kind() {
-                TokenKind::Lbrace | TokenKind::Lpar | TokenKind::Lsqb => {
-                    parens = parens.saturating_add(1);
-                }
-                TokenKind::Rbrace | TokenKind::Rpar | TokenKind::Rsqb => {
-                    parens = parens.saturating_sub(1);
-                }
-                TokenKind::Newline | TokenKind::NonLogicalNewline if parens == 0 => {
-                    builder.finish_line();
-                }
-                _ => {}
+            if token.kind().is_any_newline() && !tokens_iter.in_parenthesized_context() {
+                builder.finish_line();
             }
         }
 

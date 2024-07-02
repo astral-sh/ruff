@@ -71,7 +71,7 @@ pub(crate) fn infer_types<'db>(db: &'db dyn Db, scope: ScopeId<'db>) -> TypeInfe
     let index = semantic_index(db, file);
 
     let scope_id = scope.file_scope_id(db);
-    let node = index.scope_node(scope_id);
+    let node = index.scope(scope_id).node();
 
     let mut context = TypeInferenceBuilder::new(db, scope, index);
 
