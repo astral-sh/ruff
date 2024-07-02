@@ -1,4 +1,7 @@
-pub(crate) mod versions;
+mod versions;
+
+pub use versions::TypeshedVersions;
+pub(crate) use versions::TypeshedVersionsQueryResult;
 
 #[cfg(test)]
 mod tests {
