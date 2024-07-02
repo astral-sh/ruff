@@ -700,7 +700,7 @@ impl<'db> TypeInferenceBuilder<'db> {
 
 #[cfg(test)]
 mod tests {
-    use ruff_db::file_system::FileSystemPath;
+    use ruff_db::file_system::FileSystemPathBuf;
     use ruff_db::vfs::system_path_to_file;
 
     use crate::db::tests::TestDb;
@@ -718,7 +718,7 @@ mod tests {
             ModuleResolutionSettings {
                 target_version: SupportedPyVersion::Py38,
                 extra_paths: Vec::new(),
-                workspace_root: FileSystemPath::new("/src").to_path_buf(),
+                workspace_root: FileSystemPathBuf::from("/src"),
                 site_packages: None,
                 custom_typeshed: None,
             },

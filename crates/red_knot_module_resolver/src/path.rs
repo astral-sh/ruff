@@ -1,6 +1,5 @@
 #![allow(unsafe_code)]
 use std::iter::FusedIterator;
-use std::ops::Deref;
 
 use ruff_db::file_system::{FileSystemPath, FileSystemPathBuf};
 use ruff_db::vfs::VfsPath;
@@ -14,101 +13,33 @@ use crate::Db;
 #[derive(Debug, PartialEq, Eq, Hash)]
 pub(crate) struct ExtraPath(FileSystemPath);
 
-impl ExtraPath {
-    #[must_use]
-    fn new_unchecked(path: &FileSystemPath) -> &Self {
-        // SAFETY: ExtraPath is marked as #[repr(transparent)] so the conversion from a
-        // *const FileSystemPath to a *const ExtraPath is valid.
-        unsafe { &*(path as *const FileSystemPath as *const Self) }
-    }
-}
-
 #[repr(transparent)]
 #[derive(Debug, PartialEq, Eq, Hash, Clone)]
 pub(crate) struct ExtraPathBuf(FileSystemPathBuf);
-
-impl Deref for ExtraPathBuf {
-    type Target = ExtraPath;
-
-    fn deref(&self) -> &Self::Target {
-        ExtraPath::new_unchecked(&self.0)
-    }
-}
 
 #[repr(transparent)]
 #[derive(Debug, PartialEq, Eq, Hash)]
 pub(crate) struct FirstPartyPath(FileSystemPath);
 
-impl FirstPartyPath {
-    #[must_use]
-    fn new_unchecked(path: &FileSystemPath) -> &Self {
-        // SAFETY: FirstPartyPath is marked as #[repr(transparent)] so the conversion from a
-        // *const FileSystemPath to a *const FirstPartyPath is valid.
-        unsafe { &*(path as *const FileSystemPath as *const Self) }
-    }
-}
-
 #[repr(transparent)]
 #[derive(Debug, PartialEq, Eq, Hash, Clone)]
 pub(crate) struct FirstPartyPathBuf(FileSystemPathBuf);
-
-impl Deref for FirstPartyPathBuf {
-    type Target = FirstPartyPath;
-
-    fn deref(&self) -> &Self::Target {
-        FirstPartyPath::new_unchecked(&self.0)
-    }
-}
 
 #[repr(transparent)]
 #[derive(Debug, PartialEq, Eq, Hash)]
 pub(crate) struct StandardLibraryPath(FileSystemPath);
 
-impl StandardLibraryPath {
-    #[must_use]
-    fn new_unchecked(path: &FileSystemPath) -> &Self {
-        // SAFETY: StandardLibraryPath is marked as #[repr(transparent)] so the conversion from a
-        // *const FileSystemPath to a *const StandardLibraryPath is valid.
-        unsafe { &*(path as *const FileSystemPath as *const Self) }
-    }
-}
-
 #[repr(transparent)]
 #[derive(Debug, PartialEq, Eq, Hash, Clone)]
 pub(crate) struct StandardLibraryPathBuf(FileSystemPathBuf);
-
-impl Deref for StandardLibraryPathBuf {
-    type Target = StandardLibraryPath;
-
-    fn deref(&self) -> &Self::Target {
-        StandardLibraryPath::new_unchecked(&self.0)
-    }
-}
 
 #[repr(transparent)]
 #[derive(Debug, PartialEq, Eq, Hash)]
 pub(crate) struct SitePackagesPath(FileSystemPath);
 
-impl SitePackagesPath {
-    #[must_use]
-    fn new_unchecked(path: &FileSystemPath) -> &Self {
-        // SAFETY: SitePackagesPath is marked as #[repr(transparent)] so the conversion from a
-        // *const FileSystemPath to a *const SitePackagesPath is valid.
-        unsafe { &*(path as *const FileSystemPath as *const Self) }
-    }
-}
-
 #[repr(transparent)]
 #[derive(Debug, PartialEq, Eq, Hash, Clone)]
 pub(crate) struct SitePackagesPathBuf(FileSystemPathBuf);
-
-impl Deref for SitePackagesPathBuf {
-    type Target = SitePackagesPath;
-
-    fn deref(&self) -> &Self::Target {
-        SitePackagesPath::new_unchecked(&self.0)
-    }
-}
 
 /// Enumeration of the different kinds of search paths type checkers are expected to support.
 ///
@@ -158,6 +89,7 @@ impl ModuleResolutionPath {
         inner.push(component);
     }
 
+    #[must_use]
     pub(crate) fn extra(path: FileSystemPathBuf) -> Option<Self> {
         if path
             .extension()
@@ -169,10 +101,12 @@ impl ModuleResolutionPath {
         }
     }
 
+    #[must_use]
     fn extra_unchecked(path: FileSystemPathBuf) -> Self {
         Self::Extra(ExtraPathBuf(path))
     }
 
+    #[must_use]
     pub(crate) fn first_party(path: FileSystemPathBuf) -> Option<Self> {
         if path
             .extension()
@@ -184,10 +118,12 @@ impl ModuleResolutionPath {
         }
     }
 
+    #[must_use]
     fn first_party_unchecked(path: FileSystemPathBuf) -> Self {
         Self::FirstParty(FirstPartyPathBuf(path))
     }
 
+    #[must_use]
     pub(crate) fn standard_library(path: FileSystemPathBuf) -> Option<Self> {
         if path.extension().map_or(true, |ext| ext == "pyi") {
             Some(Self::standard_library_unchecked(path))
@@ -196,14 +132,17 @@ impl ModuleResolutionPath {
         }
     }
 
+    #[must_use]
     pub(crate) fn stdlib_from_typeshed_root(typeshed_root: &FileSystemPath) -> Option<Self> {
         Self::standard_library(typeshed_root.join(FileSystemPath::new("stdlib")))
     }
 
+    #[must_use]
     fn standard_library_unchecked(path: FileSystemPathBuf) -> Self {
         Self::StandardLibrary(StandardLibraryPathBuf(path))
     }
 
+    #[must_use]
     pub(crate) fn site_packages(path: FileSystemPathBuf) -> Option<Self> {
         if path
             .extension()
@@ -215,31 +154,38 @@ impl ModuleResolutionPath {
         }
     }
 
+    #[must_use]
     fn site_packages_unchecked(path: FileSystemPathBuf) -> Self {
         Self::SitePackages(SitePackagesPathBuf(path))
     }
 
+    #[must_use]
     pub(crate) fn is_regular_package(&self, db: &dyn Db) -> bool {
         ModuleResolutionPathRef::from(self).is_regular_package(db)
     }
 
+    #[must_use]
     pub(crate) fn is_directory(&self, db: &dyn Db) -> bool {
         ModuleResolutionPathRef::from(self).is_directory(db)
     }
 
+    #[must_use]
     pub(crate) fn with_pyi_extension(&self) -> Self {
         ModuleResolutionPathRef::from(self).with_pyi_extension()
     }
 
+    #[must_use]
     pub(crate) fn with_py_extension(&self) -> Option<Self> {
         ModuleResolutionPathRef::from(self).with_py_extension()
     }
 
     #[cfg(test)]
+    #[must_use]
     pub(crate) fn join(&self, component: &(impl AsRef<FileSystemPath> + ?Sized)) -> Self {
         ModuleResolutionPathRef::from(self).join(component)
     }
 
+    #[must_use]
     pub(crate) fn as_file_system_path_buf(&self) -> &FileSystemPathBuf {
         match self {
             Self::Extra(ExtraPathBuf(path)) => path,
@@ -308,12 +254,14 @@ impl PartialEq<ModuleResolutionPath> for FileSystemPath {
 }
 
 impl AsRef<FileSystemPathBuf> for ModuleResolutionPath {
+    #[inline]
     fn as_ref(&self) -> &FileSystemPathBuf {
         self.as_file_system_path_buf()
     }
 }
 
 impl AsRef<FileSystemPath> for ModuleResolutionPath {
+    #[inline]
     fn as_ref(&self) -> &FileSystemPath {
         ModuleResolutionPathRef::from(self).as_file_system_path()
     }
@@ -328,6 +276,7 @@ pub(crate) enum ModuleResolutionPathRef<'a> {
 }
 
 impl<'a> ModuleResolutionPathRef<'a> {
+    #[must_use]
     pub(crate) fn extra(path: &'a (impl AsRef<FileSystemPath> + ?Sized)) -> Option<Self> {
         let path = path.as_ref();
         if path
@@ -340,10 +289,14 @@ impl<'a> ModuleResolutionPathRef<'a> {
         }
     }
 
+    #[must_use]
     fn extra_unchecked(path: &'a (impl AsRef<FileSystemPath> + ?Sized)) -> Self {
-        Self::Extra(ExtraPath::new_unchecked(path.as_ref()))
+        // SAFETY: ExtraPath is marked as #[repr(transparent)] so the conversion from a
+        // *const FileSystemPath to a *const ExtraPath is valid.
+        Self::Extra(unsafe { &*(path.as_ref() as *const FileSystemPath as *const ExtraPath) })
     }
 
+    #[must_use]
     pub(crate) fn first_party(path: &'a (impl AsRef<FileSystemPath> + ?Sized)) -> Option<Self> {
         let path = path.as_ref();
         if path
@@ -356,14 +309,21 @@ impl<'a> ModuleResolutionPathRef<'a> {
         }
     }
 
+    #[must_use]
     fn first_party_unchecked(path: &'a (impl AsRef<FileSystemPath> + ?Sized)) -> Self {
-        Self::FirstParty(FirstPartyPath::new_unchecked(path.as_ref()))
+        // SAFETY: FirstPartyPath is marked as #[repr(transparent)] so the conversion from a
+        // *const FileSystemPath to a *const FirstPartyPath is valid.
+        Self::FirstParty(unsafe {
+            &*(path.as_ref() as *const FileSystemPath as *const FirstPartyPath)
+        })
     }
 
+    #[must_use]
     pub(crate) fn standard_library(
         path: &'a (impl AsRef<FileSystemPath> + ?Sized),
     ) -> Option<Self> {
         let path = path.as_ref();
+        // Unlike other variants, only `.pyi` extensions are permitted
         if path.extension().map_or(true, |ext| ext == "pyi") {
             Some(Self::standard_library_unchecked(path))
         } else {
@@ -371,10 +331,16 @@ impl<'a> ModuleResolutionPathRef<'a> {
         }
     }
 
+    #[must_use]
     fn standard_library_unchecked(path: &'a (impl AsRef<FileSystemPath> + ?Sized)) -> Self {
-        Self::StandardLibrary(StandardLibraryPath::new_unchecked(path.as_ref()))
+        // SAFETY: StandardLibraryPath is marked as #[repr(transparent)] so the conversion from a
+        // *const FileSystemPath to a *const StandardLibraryPath is valid.
+        Self::StandardLibrary(unsafe {
+            &*(path.as_ref() as *const FileSystemPath as *const StandardLibraryPath)
+        })
     }
 
+    #[must_use]
     pub(crate) fn site_packages(path: &'a (impl AsRef<FileSystemPath> + ?Sized)) -> Option<Self> {
         let path = path.as_ref();
         if path
@@ -387,10 +353,16 @@ impl<'a> ModuleResolutionPathRef<'a> {
         }
     }
 
+    #[must_use]
     fn site_packages_unchecked(path: &'a (impl AsRef<FileSystemPath> + ?Sized)) -> Self {
-        Self::SitePackages(SitePackagesPath::new_unchecked(path.as_ref()))
+        // SAFETY: SitePackagesPath is marked as #[repr(transparent)] so the conversion from a
+        // *const FileSystemPath to a *const SitePackagesPath is valid.
+        Self::SitePackages(unsafe {
+            &*(path.as_ref() as *const FileSystemPath as *const SitePackagesPath)
+        })
     }
 
+    #[must_use]
     pub(crate) fn is_directory(&self, db: &dyn Db) -> bool {
         match self {
             Self::Extra(ExtraPath(path)) => db.file_system().is_directory(path),
@@ -414,6 +386,7 @@ impl<'a> ModuleResolutionPathRef<'a> {
         }
     }
 
+    #[must_use]
     pub(crate) fn is_regular_package(&self, db: &dyn Db) -> bool {
         match self {
             Self::Extra(ExtraPath(fs_path))
@@ -444,6 +417,7 @@ impl<'a> ModuleResolutionPathRef<'a> {
         }
     }
 
+    #[must_use]
     pub(crate) fn parent(&self) -> Option<Self> {
         Some(match self {
             Self::Extra(ExtraPath(path)) => Self::extra_unchecked(path.parent()?),
@@ -457,6 +431,7 @@ impl<'a> ModuleResolutionPathRef<'a> {
         })
     }
 
+    #[must_use]
     fn ends_with_dunder_init(&self) -> bool {
         match self {
             Self::Extra(ExtraPath(path))
@@ -468,6 +443,7 @@ impl<'a> ModuleResolutionPathRef<'a> {
         }
     }
 
+    #[must_use]
     fn sans_dunder_init(self) -> Self {
         if self.ends_with_dunder_init() {
             self.parent().unwrap_or_else(|| match self {
@@ -481,6 +457,7 @@ impl<'a> ModuleResolutionPathRef<'a> {
         }
     }
 
+    #[must_use]
     pub(crate) fn as_module_name(&self) -> Option<ModuleName> {
         let mut parts_iter = match self.sans_dunder_init() {
             Self::Extra(ExtraPath(path)) => ModulePartIterator::from_fs_path(path),
@@ -503,6 +480,7 @@ impl<'a> ModuleResolutionPathRef<'a> {
         }
     }
 
+    #[must_use]
     pub(crate) fn with_pyi_extension(&self) -> ModuleResolutionPath {
         match self {
             Self::Extra(ExtraPath(path)) => {
@@ -520,6 +498,7 @@ impl<'a> ModuleResolutionPathRef<'a> {
         }
     }
 
+    #[must_use]
     pub(crate) fn with_py_extension(&self) -> Option<ModuleResolutionPath> {
         match self {
             Self::Extra(ExtraPath(path)) => Some(ModuleResolutionPath::extra_unchecked(
@@ -581,12 +560,18 @@ impl<'a> From<&'a ModuleResolutionPath> for ModuleResolutionPathRef<'a> {
     #[inline]
     fn from(value: &'a ModuleResolutionPath) -> Self {
         match value {
-            ModuleResolutionPath::Extra(path) => ModuleResolutionPathRef::Extra(path),
-            ModuleResolutionPath::FirstParty(path) => ModuleResolutionPathRef::FirstParty(path),
-            ModuleResolutionPath::StandardLibrary(path) => {
-                ModuleResolutionPathRef::StandardLibrary(path)
+            ModuleResolutionPath::Extra(ExtraPathBuf(path)) => {
+                ModuleResolutionPathRef::extra_unchecked(path)
             }
-            ModuleResolutionPath::SitePackages(path) => ModuleResolutionPathRef::SitePackages(path),
+            ModuleResolutionPath::FirstParty(FirstPartyPathBuf(path)) => {
+                ModuleResolutionPathRef::first_party_unchecked(path)
+            }
+            ModuleResolutionPath::StandardLibrary(StandardLibraryPathBuf(path)) => {
+                ModuleResolutionPathRef::standard_library_unchecked(path)
+            }
+            ModuleResolutionPath::SitePackages(SitePackagesPathBuf(path)) => {
+                ModuleResolutionPathRef::site_packages_unchecked(path)
+            }
         }
     }
 }
