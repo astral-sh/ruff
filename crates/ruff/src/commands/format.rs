@@ -401,7 +401,10 @@ pub(crate) fn format_source(
                 // Format the cell.
                 let formatted =
                     format_module_source(unformatted, options.clone()).map_err(|err| {
-                        if let FormatModuleError::ParseError(err) = err {
+                        if let FormatModuleError::ParseError(mut err) = err {
+                            // Offset the error location by the start offset of the cell to report
+                            // the correct cell index.
+                            err.location += start;
                             DisplayParseError::from_source_kind(
                                 err,
                                 path.map(Path::to_path_buf),
