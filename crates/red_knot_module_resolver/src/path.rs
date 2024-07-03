@@ -492,6 +492,8 @@ impl<'a> PartialEq<ModuleResolutionPathRef<'a>> for FileSystemPath {
     }
 }
 
+/// Iterate over the "module components" of a path
+/// (stripping the extension, if there is one.)
 pub(crate) struct ModulePartIterator<'a> {
     parent_components: Option<camino::Utf8Components<'a>>,
     stem: Option<&'a str>,
@@ -528,3 +530,22 @@ impl<'a> Iterator for ModulePartIterator<'a> {
 }
 
 impl<'a> FusedIterator for ModulePartIterator<'a> {}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn module_part_iterator() {
+        fn create_module_parts(path: &str) -> Vec<&str> {
+            ModulePartIterator::from_fs_path(FileSystemPath::new(path)).collect()
+        }
+
+        assert_eq!(&create_module_parts("foo.pyi"), &["foo"]);
+        assert_eq!(&create_module_parts("foo/bar.pyi"), &["foo", "bar"]);
+        assert_eq!(&create_module_parts("foo/bar/baz.py"), &["foo", "bar", "baz"]);
+        assert_eq!(&create_module_parts("foo"), &["foo"]);
+        assert_eq!(&create_module_parts("foo/bar"), &["foo", "bar"]);
+        assert_eq!(&create_module_parts("foo/bar/baz"), &["foo", "bar", "baz"]);
+    }
+}

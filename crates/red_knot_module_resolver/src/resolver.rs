@@ -8,8 +8,8 @@ use crate::module::{Module, ModuleKind};
 use crate::module_name::ModuleName;
 use crate::path::ModuleResolutionPathBuf;
 use crate::resolver::internal::ModuleResolverSearchPaths;
-use crate::supported_py_version::set_target_py_version;
-use crate::{Db, SupportedPyVersion};
+use crate::supported_py_version::{SupportedPyVersion, set_target_py_version};
+use crate::db::Db;
 
 /// Configures the module resolver settings.
 ///

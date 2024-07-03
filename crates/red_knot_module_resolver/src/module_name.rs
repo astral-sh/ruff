@@ -1,7 +1,7 @@
 use std::fmt;
 use std::ops::Deref;
 
-use compact_str::ToCompactString;
+use compact_str::{CompactString, ToCompactString};
 
 use ruff_python_stdlib::identifiers::is_identifier;
 
@@ -25,7 +25,7 @@ impl ModuleName {
     #[inline]
     #[must_use]
     pub fn new(name: &str) -> Option<Self> {
-        Self::is_valid_name(name).then(|| Self(compact_str::CompactString::from(name)))
+        Self::is_valid_name(name).then(|| Self(CompactString::from(name)))
     }
 
     /// Creates a new module name for `name` where `name` is a static string.
@@ -56,7 +56,7 @@ impl ModuleName {
     #[must_use]
     pub fn new_static(name: &'static str) -> Option<Self> {
         // TODO(Micha): Use CompactString::const_new once we upgrade to 0.8 https://github.com/ParkMyCar/compact_str/pull/336
-        Self::is_valid_name(name).then(|| Self(compact_str::CompactString::from(name)))
+        Self::is_valid_name(name).then(|| Self(CompactString::from(name)))
     }
 
     #[must_use]
@@ -129,19 +129,46 @@ impl ModuleName {
         &self.0
     }
 
+    /// Construct a [`ModuleName`] from a sequence of parts.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use red_knot_module_resolver::ModuleName;
+    ///
+    /// assert_eq!(&*ModuleName::from_components(["a"]).unwrap(), "a");
+    /// assert_eq!(&*ModuleName::from_components(["a", "b"]).unwrap(), "a.b");
+    /// assert_eq!(&*ModuleName::from_components(["a", "b", "c"]).unwrap(), "a.b.c");
+    ///
+    /// assert_eq!(ModuleName::from_components(["a-b"]), None);
+    /// assert_eq!(ModuleName::from_components(["a", "a-b"]), None);
+    /// assert_eq!(ModuleName::from_components(["a", "b", "a-b-c"]), None);
+    /// ```
     #[must_use]
-    pub fn from_components<'a>(mut components: impl Iterator<Item = &'a str>) -> Option<Self> {
+    pub fn from_components<'a>(components: impl IntoIterator<Item = &'a str>) -> Option<Self> {
+        let mut components = components.into_iter();
         let first_part = components.next()?;
-        if let Some(second_part) = components.next() {
-            let mut name = format!("{first_part}.{second_part}");
-            for part in components {
-                name.push('.');
-                name.push_str(part);
-            }
-            ModuleName::new(&name)
-        } else {
-            ModuleName::new(first_part)
+        if !is_identifier(first_part) {
+            return None;
         }
+        Some(Self({
+            if let Some(second_part) = components.next() {
+                if !is_identifier(second_part) {
+                    return None;
+                }
+                let mut name = format!("{first_part}.{second_part}");
+                for part in components {
+                    if !is_identifier(part) {
+                        return None;
+                    }
+                    name.push('.');
+                    name.push_str(part);
+                }
+                CompactString::from(&name)
+            } else {
+                CompactString::from(first_part)
+            }
+        }))
     }
 }
 

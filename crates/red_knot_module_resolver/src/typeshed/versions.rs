@@ -556,6 +556,31 @@ foo: 3.8-   # trailing comment
     }
 
     #[test]
+    fn invalid_empty_versions_file() {
+        assert_eq!(
+            TypeshedVersions::from_str(""),
+            Err(TypeshedVersionsParseError {
+                line_number: None,
+                reason: TypeshedVersionsParseErrorKind::EmptyVersionsFile
+            })
+        );
+        assert_eq!(
+            TypeshedVersions::from_str("       "),
+            Err(TypeshedVersionsParseError {
+                line_number: None,
+                reason: TypeshedVersionsParseErrorKind::EmptyVersionsFile
+            })
+        );
+        assert_eq!(
+            TypeshedVersions::from_str(" \n  \n  \n "),
+            Err(TypeshedVersionsParseError {
+                line_number: None,
+                reason: TypeshedVersionsParseErrorKind::EmptyVersionsFile
+            })
+        );
+    }
+
+    #[test]
     fn invalid_huge_versions_file() {
         let offset = 100;
         let too_many = u16::MAX as usize + offset;
