@@ -74,6 +74,10 @@ pub(crate) fn lint_semantic(db: &dyn Db, file_id: VfsFile) -> Diagnostics {
     let parsed = parsed_module(db.upcast(), file_id);
     let semantic = SemanticModel::new(db.upcast(), file_id);
 
+    if !parsed.is_valid() {
+        return Diagnostics::Empty;
+    }
+
     let context = SemanticLintContext {
         source,
         parsed,
@@ -258,6 +262,7 @@ impl From<Vec<String>> for Diagnostics {
     }
 }
 
+#[derive(Copy, Clone, Debug)]
 enum AnyImportRef<'a> {
     Import(&'a ast::StmtImport),
     ImportFrom(&'a ast::StmtImportFrom),

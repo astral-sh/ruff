@@ -9,7 +9,7 @@ use tracing_subscriber::layer::{Context, Filter, SubscriberExt};
 use tracing_subscriber::{Layer, Registry};
 use tracing_tree::time::Uptime;
 
-use red_knot::program::{ExecutionMode, FileWatcherChange, Program};
+use red_knot::program::{FileWatcherChange, Program};
 use red_knot::watch::FileWatcher;
 use red_knot::Workspace;
 use red_knot_module_resolver::{set_module_resolution_settings, ModuleResolutionSettings};
@@ -23,6 +23,7 @@ use ruff_db::vfs::system_path_to_file;
     clippy::dbg_macro
 )]
 pub fn main() -> anyhow::Result<()> {
+    countme::enable(true);
     setup_tracing();
 
     let arguments: Vec<_> = std::env::args().collect();
@@ -131,6 +132,7 @@ impl MainLoop {
         }
     }
 
+    #[allow(clippy::print_stderr)]
     fn run(self, program: &mut Program) {
         self.orchestrator_sender
             .send(OrchestratorMessage::Run)
@@ -138,7 +140,6 @@ impl MainLoop {
 
         for message in &self.main_loop_receiver {
             tracing::trace!("Main Loop: Tick");
-            println!("{}", countme::get_all());
 
             match message {
                 MainLoopMessage::CheckProgram { revision } => {
@@ -148,7 +149,7 @@ impl MainLoop {
                     // Spawn a new task that checks the program. This needs to be done in a separate thread
                     // to prevent blocking the main loop here.
                     rayon::spawn(move || {
-                        let result = program.check(ExecutionMode::ThreadPool);
+                        let result = program.check();
                         sender
                             .send(OrchestratorMessage::CheckProgramCompleted {
                                 diagnostics: result,
@@ -163,8 +164,10 @@ impl MainLoop {
                 }
                 MainLoopMessage::CheckCompleted(diagnostics) => {
                     eprintln!("{}", diagnostics.join("\n"));
+                    eprintln!("{}", countme::get_all());
                 }
                 MainLoopMessage::Exit => {
+                    eprintln!("{}", countme::get_all());
                     return;
                 }
             }
@@ -213,6 +216,7 @@ struct Orchestrator {
 }
 
 impl Orchestrator {
+    #[allow(clippy::print_stderr)]
     fn run(&mut self) {
         while let Ok(message) = self.receiver.recv() {
             match message {

@@ -2,7 +2,6 @@ use std::sync::Arc;
 
 use salsa::Database;
 
-pub use check::ExecutionMode;
 use red_knot_module_resolver::{Db as ResolverDb, Jar as ResolverJar};
 use red_knot_python_semantic::{Db as SemanticDb, Jar as SemanticJar};
 use ruff_db::file_system::{FileSystem, FileSystemPathBuf};
