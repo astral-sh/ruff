@@ -162,6 +162,13 @@ impl ModuleResolutionPathBuf {
     pub(crate) fn join(&self, component: &(impl AsRef<FileSystemPath> + ?Sized)) -> Self {
         ModuleResolutionPathRef::from(self).join(component)
     }
+
+    pub(crate) fn relativize_path<'a>(
+        &'a self,
+        absolute_path: &'a FileSystemPath,
+    ) -> Option<ModuleResolutionPathRef<'a>> {
+        ModuleResolutionPathRef::from(self).relativize_path(absolute_path)
+    }
 }
 
 impl From<ModuleResolutionPathBuf> for VfsPath {
@@ -500,6 +507,27 @@ impl<'a> ModuleResolutionPathRef<'a> {
             Self::FirstParty(FirstPartyPath(path)) => path,
             Self::StandardLibrary(StandardLibraryPath(path)) => path,
             Self::SitePackages(SitePackagesPath(path)) => path,
+        }
+    }
+
+    #[must_use]
+    pub(crate) fn relativize_path(&self, absolute_path: &'a FileSystemPath) -> Option<Self> {
+        match self {
+            Self::Extra(ExtraPath(root)) => {
+                absolute_path.strip_prefix(root).ok().and_then(Self::extra)
+            }
+            Self::FirstParty(FirstPartyPath(root)) => absolute_path
+                .strip_prefix(root)
+                .ok()
+                .and_then(Self::first_party),
+            Self::StandardLibrary(StandardLibraryPath(root)) => absolute_path
+                .strip_prefix(root)
+                .ok()
+                .and_then(Self::standard_library),
+            Self::SitePackages(SitePackagesPath(root)) => absolute_path
+                .strip_prefix(root)
+                .ok()
+                .and_then(Self::site_packages),
         }
     }
 }

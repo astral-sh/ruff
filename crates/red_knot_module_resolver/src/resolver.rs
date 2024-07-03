@@ -6,7 +6,7 @@ use ruff_db::vfs::{system_path_to_file, vfs_path_to_file, VfsFile, VfsPath};
 
 use crate::module::{Module, ModuleKind};
 use crate::module_name::ModuleName;
-use crate::path::{ModuleResolutionPathBuf, ModuleResolutionPathRef};
+use crate::path::ModuleResolutionPathBuf;
 use crate::resolver::internal::ModuleResolverSearchPaths;
 use crate::supported_py_version::set_target_py_version;
 use crate::{Db, SupportedPyVersion};
@@ -79,25 +79,15 @@ pub fn path_to_module(db: &dyn Db, path: &VfsPath) -> Option<Module> {
 pub(crate) fn file_to_module(db: &dyn Db, file: VfsFile) -> Option<Module> {
     let _span = tracing::trace_span!("file_to_module", ?file).entered();
 
-    let path = file.path(db.upcast());
+    let VfsPath::FileSystem(path) = file.path(db.upcast()) else {
+        todo!("VendoredPaths are not yet supported")
+    };
 
     let search_paths = module_search_paths(db);
 
-    let relative_path = search_paths.iter().find_map(|root| match (&**root, path) {
-        (_, VfsPath::Vendored(_)) => todo!("VendoredPaths are not yet supported"),
-        (ModuleResolutionPathBuf::Extra(_), VfsPath::FileSystem(path)) => {
-            ModuleResolutionPathRef::extra(path.strip_prefix(&**root).ok()?)
-        }
-        (ModuleResolutionPathBuf::FirstParty(_), VfsPath::FileSystem(path)) => {
-            ModuleResolutionPathRef::first_party(path.strip_prefix(&**root).ok()?)
-        }
-        (ModuleResolutionPathBuf::StandardLibrary(_), VfsPath::FileSystem(path)) => {
-            ModuleResolutionPathRef::standard_library(path.strip_prefix(&**root).ok()?)
-        }
-        (ModuleResolutionPathBuf::SitePackages(_), VfsPath::FileSystem(path)) => {
-            ModuleResolutionPathRef::site_packages(path.strip_prefix(&**root).ok()?)
-        }
-    })?;
+    let relative_path = search_paths
+        .iter()
+        .find_map(|root| root.relativize_path(path))?;
 
     let module_name = relative_path.as_module_name()?;
 
