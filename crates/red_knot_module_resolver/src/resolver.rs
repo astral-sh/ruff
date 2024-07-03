@@ -89,7 +89,7 @@ pub(crate) fn file_to_module(db: &dyn Db, file: VfsFile) -> Option<Module> {
         .iter()
         .find_map(|root| root.relativize_path(path))?;
 
-    let module_name = relative_path.as_module_name()?;
+    let module_name = relative_path.to_module_name()?;
 
     // Resolve the module name to see if Python would resolve the name to the same path.
     // If it doesn't, then that means that multiple modules have the same name in different
