@@ -1,3 +1,4 @@
+use std::panic::{RefUnwindSafe, UnwindSafe};
 use std::sync::Arc;
 
 use salsa::Database;
@@ -17,14 +18,14 @@ mod check;
 pub struct Program {
     storage: salsa::Storage<Program>,
     vfs: Vfs,
-    fs: Arc<dyn FileSystem + Send + Sync>,
+    fs: Arc<dyn FileSystem + Send + Sync + RefUnwindSafe>,
     workspace: Workspace,
 }
 
 impl Program {
     pub fn new<Fs>(workspace: Workspace, file_system: Fs) -> Self
     where
-        Fs: FileSystem + 'static + Send + Sync,
+        Fs: FileSystem + 'static + Send + Sync + RefUnwindSafe,
     {
         Self {
             storage: salsa::Storage::default(),

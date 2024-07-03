@@ -1,7 +1,7 @@
 use std::sync::Mutex;
 
 use crossbeam::channel as crossbeam_channel;
-use salsa::ParallelDatabase;
+use salsa::{Cancelled, ParallelDatabase};
 use tracing::subscriber::Interest;
 use tracing::{Level, Metadata};
 use tracing_subscriber::filter::LevelFilter;
@@ -54,6 +54,7 @@ pub fn main() -> anyhow::Result<()> {
     let workspace_search_path = workspace.root().to_path_buf();
 
     let mut program = Program::new(workspace, fs);
+
     set_module_resolution_settings(
         &mut program,
         ModuleResolutionSettings {
@@ -149,13 +150,14 @@ impl MainLoop {
                     // Spawn a new task that checks the program. This needs to be done in a separate thread
                     // to prevent blocking the main loop here.
                     rayon::spawn(move || {
-                        let result = program.check();
-                        sender
-                            .send(OrchestratorMessage::CheckProgramCompleted {
-                                diagnostics: result,
-                                revision,
-                            })
-                            .unwrap();
+                        if let Ok(result) = program.check() {
+                            sender
+                                .send(OrchestratorMessage::CheckProgramCompleted {
+                                    diagnostics: result,
+                                    revision,
+                                })
+                                .unwrap();
+                        }
                     });
                 }
                 MainLoopMessage::ApplyChanges(changes) => {
