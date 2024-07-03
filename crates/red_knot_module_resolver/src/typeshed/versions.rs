@@ -12,14 +12,17 @@ use crate::module_name::ModuleName;
 use crate::supported_py_version::SupportedPyVersion;
 
 #[salsa::tracked(return_ref)]
-pub(crate) fn parse_typeshed_versions(db: &dyn Db, versions_file: VfsFile) -> TypeshedVersions {
+pub(crate) fn parse_typeshed_versions(
+    db: &dyn Db,
+    versions_file: VfsFile,
+) -> Result<TypeshedVersions, TypeshedVersionsParseError> {
     let file_content = source_text(db.upcast(), versions_file);
-    file_content.parse().unwrap()
+    file_content.parse()
 }
 
 #[derive(Debug, PartialEq, Eq)]
 pub struct TypeshedVersionsParseError {
-    line_number: NonZeroU16,
+    line_number: Option<NonZeroU16>,
     reason: TypeshedVersionsParseErrorKind,
 }
 
@@ -29,10 +32,14 @@ impl fmt::Display for TypeshedVersionsParseError {
             line_number,
             reason,
         } = self;
-        write!(
-            f,
-            "Error while parsing line {line_number} of typeshed's VERSIONS file: {reason}"
-        )
+        if let Some(line_number) = line_number {
+            write!(
+                f,
+                "Error while parsing line {line_number} of typeshed's VERSIONS file: {reason}"
+            )
+        } else {
+            write!(f, "Error while parsing typeshed's VERSIONS file: {reason}")
+        }
     }
 }
 
@@ -57,6 +64,7 @@ pub enum TypeshedVersionsParseErrorKind {
         version: String,
         err: std::num::ParseIntError,
     },
+    EmptyVersionsFile,
 }
 
 impl fmt::Display for TypeshedVersionsParseErrorKind {
@@ -85,6 +93,7 @@ impl fmt::Display for TypeshedVersionsParseErrorKind {
                 f,
                 "Failed to convert '{version}' to a pair of integers due to {err}",
             ),
+            Self::EmptyVersionsFile => f.write_str("Versions file was empty!"),
         }
     }
 }
@@ -163,7 +172,7 @@ impl FromStr for TypeshedVersions {
 
             let Ok(line_number) = NonZeroU16::try_from(line_number) else {
                 return Err(TypeshedVersionsParseError {
-                    line_number: NonZeroU16::MAX,
+                    line_number: None,
                     reason: TypeshedVersionsParseErrorKind::TooManyLines(line_number),
                 });
             };
@@ -179,14 +188,14 @@ impl FromStr for TypeshedVersions {
             let (Some(module_name), Some(rest), None) = (parts.next(), parts.next(), parts.next())
             else {
                 return Err(TypeshedVersionsParseError {
-                    line_number,
+                    line_number: Some(line_number),
                     reason: TypeshedVersionsParseErrorKind::UnexpectedNumberOfColons,
                 });
             };
 
             let Some(module_name) = ModuleName::new(module_name) else {
                 return Err(TypeshedVersionsParseError {
-                    line_number,
+                    line_number: Some(line_number),
                     reason: TypeshedVersionsParseErrorKind::InvalidModuleName(
                         module_name.to_string(),
                     ),
@@ -197,14 +206,21 @@ impl FromStr for TypeshedVersions {
                 Ok(version) => map.insert(module_name, version),
                 Err(reason) => {
                     return Err(TypeshedVersionsParseError {
-                        line_number,
+                        line_number: Some(line_number),
                         reason,
                     })
                 }
             };
         }
 
-        Ok(Self(map))
+        if map.is_empty() {
+            Err(TypeshedVersionsParseError {
+                line_number: None,
+                reason: TypeshedVersionsParseErrorKind::EmptyVersionsFile,
+            })
+        } else {
+            Ok(Self(map))
+        }
     }
 }
 
@@ -343,7 +359,7 @@ mod tests {
     const TYPESHED_STDLIB_DIR: &str = "stdlib";
 
     #[allow(unsafe_code)]
-    const ONE: NonZeroU16 = unsafe { NonZeroU16::new_unchecked(1) };
+    const ONE: Option<NonZeroU16> = Some(unsafe { NonZeroU16::new_unchecked(1) });
 
     #[test]
     fn can_parse_vendored_versions_file() {
@@ -552,7 +568,7 @@ foo: 3.8-   # trailing comment
         assert_eq!(
             TypeshedVersions::from_str(&massive_versions_file),
             Err(TypeshedVersionsParseError {
-                line_number: NonZeroU16::MAX,
+                line_number: None,
                 reason: TypeshedVersionsParseErrorKind::TooManyLines(
                     NonZeroUsize::new(too_many + 1 - offset).unwrap()
                 )

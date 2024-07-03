@@ -288,8 +288,17 @@ impl<'a> ModuleResolutionPathRef<'a> {
     ) -> &'db TypeshedVersions {
         let StandardLibraryPath(stdlib_fs_path) = stdlib_root;
         let versions_path = stdlib_fs_path.join("VERSIONS");
-        let versions_file = system_path_to_file(db.upcast(), versions_path).unwrap();
-        parse_typeshed_versions(db, versions_file)
+        let Some(versions_file) = system_path_to_file(db.upcast(), &versions_path) else {
+            todo!(
+                "Still need to figure out how to handle VERSIONS files being deleted \
+                from custom typeshed directories! Expected a file to exist at {versions_path}"
+            )
+        };
+        // TODO(Alex/Micha): If VERSIONS is invalid,
+        // this should invalidate not just the specific module resolution we're currently attempting,
+        // but all type inference that depends on any standard-library types.
+        // Unwrapping here is not correct...
+        parse_typeshed_versions(db, versions_file).as_ref().unwrap()
     }
 
     // Private helper function with concrete inputs,

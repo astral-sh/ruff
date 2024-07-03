@@ -399,7 +399,7 @@ mod tests {
         fs.create_directory_all(&*site_packages)?;
         fs.create_directory_all(&*custom_typeshed)?;
         fs.create_directory_all(custom_typeshed.join("stdlib"))?;
-        fs.touch(custom_typeshed.join("stdlib/VERSIONS"))?;
+        fs.write_file(custom_typeshed.join("stdlib/VERSIONS"), "functools: 3.8-")?;
 
         let settings = ModuleResolutionSettings {
             target_version: SupportedPyVersion::Py38,
