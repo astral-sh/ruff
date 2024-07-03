@@ -745,7 +745,7 @@ mod tests {
     fn join_1() {
         insta::with_settings!({filters => vec![
             // Replace windows paths
-            (r"\\", "/"),
+            (r"\\\\", "/"),
         ]}, {
             assert_debug_snapshot!(
                 ModuleResolutionPathBuf::standard_library("foo").unwrap().join("bar"),
@@ -762,7 +762,7 @@ mod tests {
     fn join_2() {
         insta::with_settings!({filters => vec![
             // Replace windows paths
-            (r"\\", "/"),
+            (r"\\\\", "/"),
         ]}, {
             assert_debug_snapshot!(
                 ModuleResolutionPathBuf::site_packages("foo").unwrap().join("bar.pyi"),
@@ -779,7 +779,7 @@ mod tests {
     fn join_3() {
         insta::with_settings!({filters => vec![
             // Replace windows paths
-            (r"\\", "/"),
+            (r"\\\\", "/"),
         ]}, {
             assert_debug_snapshot!(
                 ModuleResolutionPathBuf::extra("foo").unwrap().join("bar.py"),
@@ -796,7 +796,7 @@ mod tests {
     fn join_4() {
         insta::with_settings!({filters => vec![
             // Replace windows paths
-            (r"\\", "/"),
+            (r"\\\\", "/"),
         ]}, {
             assert_debug_snapshot!(
                 ModuleResolutionPathBuf::first_party("foo").unwrap().join("bar/baz/eggs/__init__.py"),
