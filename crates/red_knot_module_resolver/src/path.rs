@@ -1,4 +1,4 @@
-use std::iter::FusedIterator;
+use std::fmt;
 
 use ruff_db::file_system::{FileSystemPath, FileSystemPathBuf};
 use ruff_db::vfs::{system_path_to_file, VfsPath};
@@ -25,18 +25,23 @@ enum ModuleResolutionPathBufInner {
 
 impl ModuleResolutionPathBufInner {
     fn push(&mut self, component: &str) {
-        debug_assert!(matches!(component.matches('.').count(), 0 | 1));
-        if cfg!(debug) {
+        if cfg!(debug_assertions) {
             if let Some(extension) = camino::Utf8Path::new(component).extension() {
                 match self {
                     Self::Extra(_) | Self::FirstParty(_) | Self::SitePackages(_) => assert!(
                         matches!(extension, "pyi" | "py"),
-                        "Extension must be `py` or `pyi`; got {extension:?}"
+                        "Extension must be `py` or `pyi`; got `{extension}`"
                     ),
-                    Self::StandardLibrary(_) => assert_eq!(
-                        extension, "pyi",
-                        "Extension must be `py` or `pyi`; got {extension:?}"
-                    ),
+                    Self::StandardLibrary(_) => {
+                        assert!(
+                            matches!(component.matches('.').count(), 0 | 1),
+                            "Component can have at most one '.'; got {component}"
+                        );
+                        assert_eq!(
+                            extension, "pyi",
+                            "Extension must be `pyi`; got `{extension}`"
+                        );
+                    }
                 };
             }
         }
@@ -50,7 +55,7 @@ impl ModuleResolutionPathBufInner {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Clone, PartialEq, Eq, Hash)]
 pub(crate) struct ModuleResolutionPathBuf(ModuleResolutionPathBufInner);
 
 impl ModuleResolutionPathBuf {
@@ -65,21 +70,27 @@ impl ModuleResolutionPathBuf {
     }
 
     #[must_use]
-    pub(crate) fn extra(path: FileSystemPathBuf) -> Option<Self> {
+    pub(crate) fn extra(path: impl Into<FileSystemPathBuf>) -> Option<Self> {
+        let path = path.into();
         path.extension()
             .map_or(true, |ext| matches!(ext, "py" | "pyi"))
             .then_some(Self(ModuleResolutionPathBufInner::Extra(path)))
     }
 
     #[must_use]
-    pub(crate) fn first_party(path: FileSystemPathBuf) -> Option<Self> {
+    pub(crate) fn first_party(path: impl Into<FileSystemPathBuf>) -> Option<Self> {
+        let path = path.into();
         path.extension()
             .map_or(true, |ext| matches!(ext, "pyi" | "py"))
             .then_some(Self(ModuleResolutionPathBufInner::FirstParty(path)))
     }
 
     #[must_use]
-    pub(crate) fn standard_library(path: FileSystemPathBuf) -> Option<Self> {
+    pub(crate) fn standard_library(path: impl Into<FileSystemPathBuf>) -> Option<Self> {
+        let path = path.into();
+        if path.file_stem().is_some_and(|stem| stem.contains('.')) {
+            return None;
+        }
         path.extension()
             .map_or(true, |ext| ext == "pyi")
             .then_some(Self(ModuleResolutionPathBufInner::StandardLibrary(path)))
@@ -91,7 +102,8 @@ impl ModuleResolutionPathBuf {
     }
 
     #[must_use]
-    pub(crate) fn site_packages(path: FileSystemPathBuf) -> Option<Self> {
+    pub(crate) fn site_packages(path: impl Into<FileSystemPathBuf>) -> Option<Self> {
+        let path = path.into();
         path.extension()
             .map_or(true, |ext| matches!(ext, "pyi" | "py"))
             .then_some(Self(ModuleResolutionPathBufInner::SitePackages(path)))
@@ -147,6 +159,20 @@ impl AsRef<FileSystemPath> for ModuleResolutionPathBuf {
     #[inline]
     fn as_ref(&self) -> &FileSystemPath {
         ModuleResolutionPathRefInner::from(&self.0).as_file_system_path()
+    }
+}
+
+impl fmt::Debug for ModuleResolutionPathBuf {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let (name, path) = match &self.0 {
+            ModuleResolutionPathBufInner::Extra(path) => ("Extra", path),
+            ModuleResolutionPathBufInner::FirstParty(path) => ("FirstParty", path),
+            ModuleResolutionPathBufInner::SitePackages(path) => ("SitePackages", path),
+            ModuleResolutionPathBufInner::StandardLibrary(path) => ("StandardLibary", path),
+        };
+        f.debug_tuple(&format!("ModuleResolutionPath::{name}"))
+            .field(path)
+            .finish()
     }
 }
 
@@ -236,36 +262,24 @@ impl<'a> ModuleResolutionPathRefInner<'a> {
     }
 
     #[must_use]
-    fn parent(&self) -> Option<Self> {
-        match self {
-            Self::Extra(path) => path.parent().map(Self::Extra),
-            Self::FirstParty(path) => path.parent().map(Self::FirstParty),
-            Self::StandardLibrary(path) => path.parent().map(Self::StandardLibrary),
-            Self::SitePackages(path) => path.parent().map(Self::SitePackages),
-        }
-    }
+    pub(crate) fn to_module_name(self) -> Option<ModuleName> {
+        let (fs_path, skip_final_part) = match self {
+            Self::Extra(path) | Self::FirstParty(path) | Self::SitePackages(path) => (
+                path,
+                path.ends_with("__init__.py") || path.ends_with("__init__.pyi"),
+            ),
+            Self::StandardLibrary(path) => (path, path.ends_with("__init__.pyi")),
+        };
 
-    #[must_use]
-    fn ends_with_dunder_init(&self) -> bool {
-        match self {
-            Self::Extra(path) | Self::FirstParty(path) | Self::SitePackages(path) => {
-                path.ends_with("__init__.py") || path.ends_with("__init__.pyi")
-            }
-            Self::StandardLibrary(path) => path.ends_with("__init__.pyi"),
-        }
-    }
+        let parent_components = fs_path
+            .parent()?
+            .components()
+            .map(|component| component.as_str());
 
-    #[must_use]
-    fn with_dunder_init_stripped(self) -> Self {
-        if self.ends_with_dunder_init() {
-            self.parent().unwrap_or_else(|| match self {
-                Self::Extra(_) => Self::Extra(FileSystemPath::new("")),
-                Self::FirstParty(_) => Self::FirstParty(FileSystemPath::new("")),
-                Self::StandardLibrary(_) => Self::StandardLibrary(FileSystemPath::new("")),
-                Self::SitePackages(_) => Self::SitePackages(FileSystemPath::new("")),
-            })
+        if skip_final_part {
+            ModuleName::from_components(parent_components)
         } else {
-            self
+            ModuleName::from_components(parent_components.chain(fs_path.file_stem()))
         }
     }
 
@@ -390,9 +404,7 @@ impl<'a> ModuleResolutionPathRef<'a> {
 
     #[must_use]
     pub(crate) fn to_module_name(self) -> Option<ModuleName> {
-        ModuleName::from_components(ModulePartIterator::from_fs_path(
-            self.0.with_dunder_init_stripped().as_file_system_path(),
-        ))
+        self.0.to_module_name()
     }
 
     #[must_use]
@@ -492,59 +504,309 @@ impl<'a> PartialEq<ModuleResolutionPathRef<'a>> for FileSystemPath {
     }
 }
 
-/// Iterate over the "module components" of a path
-/// (stripping the extension, if there is one.)
-pub(crate) struct ModulePartIterator<'a> {
-    parent_components: camino::Utf8Components<'a>,
-    stem: Option<&'a str>,
-}
-
-impl<'a> ModulePartIterator<'a> {
-    #[must_use]
-    fn from_fs_path(path: &'a FileSystemPath) -> Self {
-        let mut parent_components = path.components();
-        parent_components.next_back();
-        Self {
-            parent_components,
-            stem: path.file_stem(),
-        }
-    }
-}
-
-impl<'a> Iterator for ModulePartIterator<'a> {
-    type Item = &'a str;
-
-    fn next(&mut self) -> Option<Self::Item> {
-        let ModulePartIterator {
-            parent_components,
-            stem,
-        } = self;
-        parent_components
-            .next()
-            .map_or_else(|| stem.take(), |component| Some(component.as_str()))
-    }
-}
-
-impl<'a> FusedIterator for ModulePartIterator<'a> {}
-
 #[cfg(test)]
 mod tests {
     use super::*;
 
-    #[test]
-    fn module_part_iterator() {
-        fn create_module_parts(path: &str) -> Vec<&str> {
-            ModulePartIterator::from_fs_path(FileSystemPath::new(path)).collect()
-        }
+    use insta::assert_debug_snapshot;
 
-        assert_eq!(&create_module_parts("foo.pyi"), &["foo"]);
-        assert_eq!(&create_module_parts("foo/bar.pyi"), &["foo", "bar"]);
-        assert_eq!(
-            &create_module_parts("foo/bar/baz.py"),
-            &["foo", "bar", "baz"]
+    #[test]
+    fn constructor_rejects_non_pyi_stdlib_paths() {
+        assert!(ModuleResolutionPathBuf::standard_library("foo.py").is_none());
+        assert!(ModuleResolutionPathBuf::standard_library("foo/__init__.py").is_none());
+        assert!(ModuleResolutionPathBuf::standard_library("foo.py.pyi").is_none());
+    }
+
+    fn stdlib_path_test_case(path: &str) -> ModuleResolutionPathBuf {
+        ModuleResolutionPathBuf::standard_library(path).unwrap()
+    }
+
+    #[test]
+    fn stdlib_path_no_extension() {
+        assert_debug_snapshot!(stdlib_path_test_case("foo"), @r###"
+        ModuleResolutionPath::StandardLibary(
+            "foo",
+        )
+        "###);
+    }
+
+    #[test]
+    fn stdlib_path_pyi_extension() {
+        assert_debug_snapshot!(stdlib_path_test_case("foo.pyi"), @r###"
+        ModuleResolutionPath::StandardLibary(
+            "foo.pyi",
+        )
+        "###);
+    }
+
+    #[test]
+    fn stdlib_path_dunder_init() {
+        assert_debug_snapshot!(stdlib_path_test_case("foo/__init__.pyi"), @r###"
+        ModuleResolutionPath::StandardLibary(
+            "foo/__init__.pyi",
+        )
+        "###);
+    }
+
+    #[test]
+    fn stdlib_paths_can_only_be_pyi() {
+        assert!(stdlib_path_test_case("foo").with_py_extension().is_none());
+    }
+
+    #[test]
+    fn stdlib_path_with_pyi_extension() {
+        assert_debug_snapshot!(
+            ModuleResolutionPathBuf::standard_library("foo").unwrap().with_pyi_extension(),
+            @r###"
+        ModuleResolutionPath::StandardLibary(
+            "foo.pyi",
+        )
+        "###
         );
-        assert_eq!(&create_module_parts("foo"), &["foo"]);
-        assert_eq!(&create_module_parts("foo/bar"), &["foo", "bar"]);
-        assert_eq!(&create_module_parts("foo/bar/baz"), &["foo", "bar", "baz"]);
+    }
+
+    #[test]
+    fn non_stdlib_path_with_py_extension() {
+        assert_debug_snapshot!(
+            ModuleResolutionPathBuf::first_party("foo").unwrap().with_py_extension().unwrap(),
+            @r###"
+        ModuleResolutionPath::FirstParty(
+            "foo.py",
+        )
+        "###
+        );
+    }
+
+    #[test]
+    fn non_stdlib_path_with_pyi_extension() {
+        assert_debug_snapshot!(
+            ModuleResolutionPathBuf::first_party("foo").unwrap().with_pyi_extension(),
+            @r###"
+        ModuleResolutionPath::FirstParty(
+            "foo.pyi",
+        )
+        "###
+        );
+    }
+
+    fn non_stdlib_module_name_test_case(path: &str) -> ModuleName {
+        let variants = [
+            ModuleResolutionPathRef::extra,
+            ModuleResolutionPathRef::first_party,
+            ModuleResolutionPathRef::site_packages,
+        ];
+        let results: Vec<Option<ModuleName>> = variants
+            .into_iter()
+            .map(|variant| variant(path).unwrap().to_module_name())
+            .collect();
+        assert!(results
+            .iter()
+            .zip(results.iter().take(1))
+            .all(|(this, next)| this == next));
+        results.into_iter().next().unwrap().unwrap()
+    }
+
+    #[test]
+    fn module_name_1_part_no_extension() {
+        assert_debug_snapshot!(non_stdlib_module_name_test_case("foo"), @r###"
+        ModuleName(
+            "foo",
+        )
+        "###);
+    }
+
+    #[test]
+    fn module_name_one_part_pyi() {
+        assert_debug_snapshot!(non_stdlib_module_name_test_case("foo.pyi"), @r###"
+        ModuleName(
+            "foo",
+        )
+        "###);
+    }
+
+    #[test]
+    fn module_name_one_part_py() {
+        assert_debug_snapshot!(non_stdlib_module_name_test_case("foo.py"), @r###"
+        ModuleName(
+            "foo",
+        )
+        "###);
+    }
+
+    #[test]
+    fn module_name_2_parts_dunder_init_py() {
+        assert_debug_snapshot!(non_stdlib_module_name_test_case("foo/__init__.py"), @r###"
+        ModuleName(
+            "foo",
+        )
+        "###);
+    }
+
+    #[test]
+    fn module_name_2_parts_dunder_init_pyi() {
+        assert_debug_snapshot!(non_stdlib_module_name_test_case("foo/__init__.pyi"), @r###"
+        ModuleName(
+            "foo",
+        )
+        "###);
+    }
+
+    #[test]
+    fn module_name_2_parts_no_extension() {
+        assert_debug_snapshot!(non_stdlib_module_name_test_case("foo/bar"), @r###"
+        ModuleName(
+            "foo.bar",
+        )
+        "###);
+    }
+
+    #[test]
+    fn module_name_2_parts_pyi() {
+        assert_debug_snapshot!(non_stdlib_module_name_test_case("foo/bar.pyi"), @r###"
+        ModuleName(
+            "foo.bar",
+        )
+        "###);
+    }
+
+    #[test]
+    fn module_name_2_parts_py() {
+        assert_debug_snapshot!(non_stdlib_module_name_test_case("foo/bar.py"), @r###"
+        ModuleName(
+            "foo.bar",
+        )
+        "###);
+    }
+
+    #[test]
+    fn module_name_3_parts_dunder_init_pyi() {
+        assert_debug_snapshot!(non_stdlib_module_name_test_case("foo/bar/__init__.pyi"), @r###"
+        ModuleName(
+            "foo.bar",
+        )
+        "###);
+    }
+
+    #[test]
+    fn module_name_3_parts_dunder_init_py() {
+        assert_debug_snapshot!(non_stdlib_module_name_test_case("foo/bar/__init__.py"), @r###"
+        ModuleName(
+            "foo.bar",
+        )
+        "###);
+    }
+
+    #[test]
+    fn module_name_3_parts_no_extension() {
+        assert_debug_snapshot!(non_stdlib_module_name_test_case("foo/bar/baz"), @r###"
+        ModuleName(
+            "foo.bar.baz",
+        )
+        "###);
+    }
+
+    #[test]
+    fn module_name_3_parts_pyi() {
+        assert_debug_snapshot!(non_stdlib_module_name_test_case("foo/bar/baz.pyi"), @r###"
+        ModuleName(
+            "foo.bar.baz",
+        )
+        "###);
+    }
+
+    #[test]
+    fn module_name_3_parts_py() {
+        assert_debug_snapshot!(non_stdlib_module_name_test_case("foo/bar/baz.py"), @r###"
+        ModuleName(
+            "foo.bar.baz",
+        )
+        "###);
+    }
+
+    #[test]
+    fn module_name_4_parts_dunder_init_pyi() {
+        assert_debug_snapshot!(non_stdlib_module_name_test_case("foo/bar/baz/__init__.pyi"), @r###"
+        ModuleName(
+            "foo.bar.baz",
+        )
+        "###);
+    }
+
+    #[test]
+    fn module_name_4_parts_dunder_init_py() {
+        assert_debug_snapshot!(non_stdlib_module_name_test_case("foo/bar/baz/__init__.py"), @r###"
+        ModuleName(
+            "foo.bar.baz",
+        )
+        "###);
+    }
+
+    #[test]
+    fn join_1() {
+        assert_debug_snapshot!(ModuleResolutionPathBuf::standard_library("foo").unwrap().join("bar"), @r###"
+        ModuleResolutionPath::StandardLibary(
+            "foo/bar",
+        )
+        "###);
+    }
+
+    #[test]
+    fn join_2() {
+        assert_debug_snapshot!(ModuleResolutionPathBuf::site_packages("foo").unwrap().join("bar.pyi"), @r###"
+        ModuleResolutionPath::SitePackages(
+            "foo/bar.pyi",
+        )
+        "###);
+    }
+
+    #[test]
+    fn join_3() {
+        assert_debug_snapshot!(ModuleResolutionPathBuf::extra("foo").unwrap().join("bar.py"), @r###"
+        ModuleResolutionPath::Extra(
+            "foo/bar.py",
+        )
+        "###);
+    }
+
+    #[test]
+    fn join_4() {
+        assert_debug_snapshot!(
+            ModuleResolutionPathBuf::first_party("foo").unwrap().join("bar/baz/eggs/__init__.py"),
+            @r###"
+        ModuleResolutionPath::FirstParty(
+            "foo/bar/baz/eggs/__init__.py",
+        )
+        "###
+        );
+    }
+
+    #[test]
+    #[cfg(debug_assertions)]
+    #[should_panic(expected = "Extension must be `pyi`; got `py`")]
+    fn stdlib_path_invalid_join_py() {
+        stdlib_path_test_case("foo").push("bar.py");
+    }
+
+    #[test]
+    #[cfg(debug_assertions)]
+    #[should_panic(expected = "Extension must be `pyi`; got `rs`")]
+    fn stdlib_path_invalid_join_rs() {
+        stdlib_path_test_case("foo").push("bar.rs");
+    }
+
+    #[test]
+    #[cfg(debug_assertions)]
+    #[should_panic(expected = "Extension must be `py` or `pyi`; got `rs`")]
+    fn non_stdlib_path_invalid_join_rs() {
+        ModuleResolutionPathBuf::site_packages("foo")
+            .unwrap()
+            .push("bar.rs");
+    }
+
+    #[test]
+    #[cfg(debug_assertions)]
+    #[should_panic(expected = "Component can have at most one '.'")]
+    fn invalid_stdlib_join_too_many_extensions() {
+        stdlib_path_test_case("foo").push("bar.py.pyi");
     }
 }
