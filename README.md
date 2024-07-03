@@ -134,10 +134,10 @@ Or, from [PyPI](https://pypi.org/project/ruff/):
 
 ```shell
 # With pip.
-pip install uv
+pip install ruff
 
 # With pipx.
-pipx install uv
+pipx install ruff
 ```
 
 You can also install Ruff via [Homebrew](https://formulae.brew.sh/formula/ruff), [Conda](https://anaconda.org/conda-forge/ruff),
