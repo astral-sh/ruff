@@ -15,12 +15,20 @@ use ruff_python_ast::visitor::{walk_stmt, Visitor};
 
 use crate::db::Db;
 
+/// Workaround query to test for if the computation should be cancelled.
+/// Ideally, push for Salsa to expose an API for testing if cancellation was requested.
+#[salsa::tracked]
+pub(crate) fn unwind_if_cancelled(_db: &dyn Db) -> () {
+    ()
+}
+
 #[salsa::tracked(return_ref)]
 pub(crate) fn lint_syntax(db: &dyn Db, file_id: VfsFile) -> Diagnostics {
     #[allow(clippy::print_stdout)]
     if std::env::var("RED_KNOT_SLOW_LINT").is_ok() {
         for i in 0..10 {
-            let _ = db.runtime();
+            unwind_if_cancelled(db);
+
             println!("RED_KNOT_SLOW_LINT is set, sleeping for {i}/10 seconds");
             std::thread::sleep(Duration::from_secs(1));
         }

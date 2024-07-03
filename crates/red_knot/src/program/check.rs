@@ -8,14 +8,14 @@ impl Program {
     /// Checks all open files in the workspace and its dependencies.
     #[tracing::instrument(level = "debug", skip_all)]
     pub fn check(&self) -> Result<Vec<String>, Cancelled> {
-        // TODO(micha): Wrap in `Cancelled::catch`
-        //   See https://salsa.zulipchat.com/#narrow/stream/145099-general/topic/How.20to.20use.20.60Cancelled.3A.3Acatch.60
-        let mut result = Vec::new();
-        for open_file in self.workspace.open_files() {
-            result.extend_from_slice(&self.check_file(open_file));
-        }
+        self.with_db(|db| {
+            let mut result = Vec::new();
+            for open_file in db.workspace.open_files() {
+                result.extend_from_slice(&db.check_file(open_file));
+            }
 
-        Ok(result)
+            result
+        })
     }
 
     #[tracing::instrument(level = "debug", skip(self))]

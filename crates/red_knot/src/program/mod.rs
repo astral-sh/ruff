@@ -1,7 +1,7 @@
 use std::panic::{RefUnwindSafe, UnwindSafe};
 use std::sync::Arc;
 
-use salsa::Database;
+use salsa::{Cancelled, Database};
 
 use red_knot_module_resolver::{Db as ResolverDb, Jar as ResolverJar};
 use red_knot_python_semantic::{Db as SemanticDb, Jar as SemanticJar};
@@ -50,6 +50,15 @@ impl Program {
 
     pub fn workspace_mut(&mut self) -> &mut Workspace {
         &mut self.workspace
+    }
+
+    fn with_db<F, T>(&self, f: F) -> Result<T, Cancelled>
+    where
+        F: FnOnce(&Program) -> T + UnwindSafe,
+    {
+        // TODO: Catch in `Caancelled::catch`
+        //  See https://salsa.zulipchat.com/#narrow/stream/145099-general/topic/How.20to.20use.20.60Cancelled.3A.3Acatch.60
+        Ok(f(self))
     }
 }
 
