@@ -495,15 +495,17 @@ impl<'a> PartialEq<ModuleResolutionPathRef<'a>> for FileSystemPath {
 /// Iterate over the "module components" of a path
 /// (stripping the extension, if there is one.)
 pub(crate) struct ModulePartIterator<'a> {
-    parent_components: Option<camino::Utf8Components<'a>>,
+    parent_components: camino::Utf8Components<'a>,
     stem: Option<&'a str>,
 }
 
 impl<'a> ModulePartIterator<'a> {
     #[must_use]
     fn from_fs_path(path: &'a FileSystemPath) -> Self {
+        let mut parent_components = path.components();
+        parent_components.next_back();
         Self {
-            parent_components: path.parent().map(|path| path.components()),
+            parent_components,
             stem: path.file_stem(),
         }
     }
@@ -517,15 +519,9 @@ impl<'a> Iterator for ModulePartIterator<'a> {
             parent_components,
             stem,
         } = self;
-
-        if let Some(ref mut components) = parent_components {
-            components
-                .next()
-                .map(|component| component.as_str())
-                .or_else(|| stem.take())
-        } else {
-            stem.take()
-        }
+        parent_components
+            .next()
+            .map_or_else(|| stem.take(), |component| Some(component.as_str()))
     }
 }
 
@@ -543,7 +539,10 @@ mod tests {
 
         assert_eq!(&create_module_parts("foo.pyi"), &["foo"]);
         assert_eq!(&create_module_parts("foo/bar.pyi"), &["foo", "bar"]);
-        assert_eq!(&create_module_parts("foo/bar/baz.py"), &["foo", "bar", "baz"]);
+        assert_eq!(
+            &create_module_parts("foo/bar/baz.py"),
+            &["foo", "bar", "baz"]
+        );
         assert_eq!(&create_module_parts("foo"), &["foo"]);
         assert_eq!(&create_module_parts("foo/bar"), &["foo", "bar"]);
         assert_eq!(&create_module_parts("foo/bar/baz"), &["foo", "bar", "baz"]);

@@ -4,12 +4,12 @@ use std::sync::Arc;
 use ruff_db::file_system::FileSystemPathBuf;
 use ruff_db::vfs::{system_path_to_file, vfs_path_to_file, VfsFile, VfsPath};
 
+use crate::db::Db;
 use crate::module::{Module, ModuleKind};
 use crate::module_name::ModuleName;
 use crate::path::ModuleResolutionPathBuf;
 use crate::resolver::internal::ModuleResolverSearchPaths;
-use crate::supported_py_version::{SupportedPyVersion, set_target_py_version};
-use crate::db::Db;
+use crate::supported_py_version::{set_target_py_version, SupportedPyVersion};
 
 /// Configures the module resolver settings.
 ///
