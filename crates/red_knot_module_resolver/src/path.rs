@@ -168,7 +168,7 @@ impl fmt::Debug for ModuleResolutionPathBuf {
             ModuleResolutionPathBufInner::Extra(path) => ("Extra", path),
             ModuleResolutionPathBufInner::FirstParty(path) => ("FirstParty", path),
             ModuleResolutionPathBufInner::SitePackages(path) => ("SitePackages", path),
-            ModuleResolutionPathBufInner::StandardLibrary(path) => ("StandardLibary", path),
+            ModuleResolutionPathBufInner::StandardLibrary(path) => ("StandardLibrary", path),
         };
         f.debug_tuple(&format!("ModuleResolutionPath::{name}"))
             .field(path)
@@ -524,7 +524,7 @@ mod tests {
     #[test]
     fn stdlib_path_no_extension() {
         assert_debug_snapshot!(stdlib_path_test_case("foo"), @r###"
-        ModuleResolutionPath::StandardLibary(
+        ModuleResolutionPath::StandardLibrary(
             "foo",
         )
         "###);
@@ -533,7 +533,7 @@ mod tests {
     #[test]
     fn stdlib_path_pyi_extension() {
         assert_debug_snapshot!(stdlib_path_test_case("foo.pyi"), @r###"
-        ModuleResolutionPath::StandardLibary(
+        ModuleResolutionPath::StandardLibrary(
             "foo.pyi",
         )
         "###);
@@ -542,7 +542,7 @@ mod tests {
     #[test]
     fn stdlib_path_dunder_init() {
         assert_debug_snapshot!(stdlib_path_test_case("foo/__init__.pyi"), @r###"
-        ModuleResolutionPath::StandardLibary(
+        ModuleResolutionPath::StandardLibrary(
             "foo/__init__.pyi",
         )
         "###);
@@ -558,7 +558,7 @@ mod tests {
         assert_debug_snapshot!(
             ModuleResolutionPathBuf::standard_library("foo").unwrap().with_pyi_extension(),
             @r###"
-        ModuleResolutionPath::StandardLibary(
+        ModuleResolutionPath::StandardLibrary(
             "foo.pyi",
         )
         "###
@@ -743,41 +743,70 @@ mod tests {
 
     #[test]
     fn join_1() {
-        assert_debug_snapshot!(ModuleResolutionPathBuf::standard_library("foo").unwrap().join("bar"), @r###"
-        ModuleResolutionPath::StandardLibary(
-            "foo/bar",
-        )
-        "###);
+        insta::with_settings!({filters => vec![
+            // Replace windows paths
+            (r"\\", "/"),
+        ]}, {
+            assert_debug_snapshot!(
+                ModuleResolutionPathBuf::standard_library("foo").unwrap().join("bar"),
+                @r###"
+                ModuleResolutionPath::StandardLibrary(
+                    "foo/bar",
+                )
+                "###
+            );
+        });
     }
 
     #[test]
     fn join_2() {
-        assert_debug_snapshot!(ModuleResolutionPathBuf::site_packages("foo").unwrap().join("bar.pyi"), @r###"
-        ModuleResolutionPath::SitePackages(
-            "foo/bar.pyi",
-        )
-        "###);
+        insta::with_settings!({filters => vec![
+            // Replace windows paths
+            (r"\\", "/"),
+        ]}, {
+            assert_debug_snapshot!(
+                ModuleResolutionPathBuf::site_packages("foo").unwrap().join("bar.pyi"),
+                @r###"
+                ModuleResolutionPath::SitePackages(
+                    "foo/bar.pyi",
+                )
+                "###
+            );
+        });
     }
 
     #[test]
     fn join_3() {
-        assert_debug_snapshot!(ModuleResolutionPathBuf::extra("foo").unwrap().join("bar.py"), @r###"
-        ModuleResolutionPath::Extra(
-            "foo/bar.py",
-        )
-        "###);
+        insta::with_settings!({filters => vec![
+            // Replace windows paths
+            (r"\\", "/"),
+        ]}, {
+            assert_debug_snapshot!(
+                ModuleResolutionPathBuf::extra("foo").unwrap().join("bar.py"),
+                @r###"
+                ModuleResolutionPath::Extra(
+                    "foo/bar.py",
+                )
+                "###
+            );
+        });
     }
 
     #[test]
     fn join_4() {
-        assert_debug_snapshot!(
-            ModuleResolutionPathBuf::first_party("foo").unwrap().join("bar/baz/eggs/__init__.py"),
-            @r###"
-        ModuleResolutionPath::FirstParty(
-            "foo/bar/baz/eggs/__init__.py",
-        )
-        "###
-        );
+        insta::with_settings!({filters => vec![
+            // Replace windows paths
+            (r"\\", "/"),
+        ]}, {
+            assert_debug_snapshot!(
+                ModuleResolutionPathBuf::first_party("foo").unwrap().join("bar/baz/eggs/__init__.py"),
+                @r###"
+                ModuleResolutionPath::FirstParty(
+                    "foo/bar/baz/eggs/__init__.py",
+                )
+                "###
+            );
+        });
     }
 
     #[test]

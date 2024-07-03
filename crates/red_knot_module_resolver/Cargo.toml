@@ -28,7 +28,7 @@ zip = { workspace = true }
 
 [dev-dependencies]
 anyhow = { workspace = true }
-insta = { workspace = true }
+insta = { workspace = true, features = ["filters"] }
 tempfile = { workspace = true }
 walkdir = { workspace = true }
 
