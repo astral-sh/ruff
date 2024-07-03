@@ -116,10 +116,28 @@ For more, see the [documentation](https://docs.astral.sh/ruff/).
 
 ### Installation
 
-Ruff is available as [`ruff`](https://pypi.org/project/ruff/) on PyPI:
+Install Ruff with our standalone installers:
 
 ```shell
+# On macOS and Linux.
+curl -LsSf https://astral.sh/ruff/install.sh | sh
+
+# On Windows.
+powershell -c "irm https://astral.sh/ruff/install.ps1 | iex"
+
+# For a specific version.
+curl -LsSf https://astral.sh/ruff/0.5.0/install.sh | sh
+powershell -c "irm https://astral.sh/ruff/0.5.0/install.ps1 | iex"
+```
+
+Or, from [PyPI](https://pypi.org/project/ruff/):
+
+```shell
+# With pip.
 pip install ruff
+
+# With pipx.
+pipx install ruff
 ```
 
 You can also install Ruff via [Homebrew](https://formulae.brew.sh/formula/ruff), [Conda](https://anaconda.org/conda-forge/ruff),
