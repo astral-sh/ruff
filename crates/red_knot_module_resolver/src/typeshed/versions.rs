@@ -3,7 +3,6 @@ use std::fmt;
 use std::num::{NonZeroU16, NonZeroUsize};
 use std::ops::{RangeFrom, RangeInclusive};
 use std::str::FromStr;
-use std::sync::Arc;
 
 use ruff_db::{source::source_text, vfs::VfsFile};
 use rustc_hash::FxHashMap;
@@ -12,7 +11,7 @@ use crate::db::Db;
 use crate::module_name::ModuleName;
 use crate::supported_py_version::SupportedPyVersion;
 
-#[salsa::tracked]
+#[salsa::tracked(return_ref)]
 pub(crate) fn parse_typeshed_versions(db: &dyn Db, versions_file: VfsFile) -> TypeshedVersions {
     let file_content = source_text(db.upcast(), versions_file);
     file_content.parse().unwrap()
@@ -90,29 +89,31 @@ impl fmt::Display for TypeshedVersionsParseErrorKind {
     }
 }
 
-#[derive(Debug, PartialEq, Eq, Clone)]
-pub struct TypeshedVersions(Arc<FxHashMap<ModuleName, PyVersionRange>>);
+#[derive(Debug, PartialEq, Eq)]
+pub(crate) struct TypeshedVersions(FxHashMap<ModuleName, PyVersionRange>);
 
 impl TypeshedVersions {
-    pub fn len(&self) -> usize {
-        self.0.len()
-    }
-
-    pub fn is_empty(&self) -> bool {
-        self.0.is_empty()
-    }
-
+    #[must_use]
     fn exact(&self, module_name: &ModuleName) -> Option<&PyVersionRange> {
         self.0.get(module_name)
     }
 
-    /// Helper function for testing purposes
+    /// Helper functions for testing purposes
     #[cfg(test)]
+    #[must_use]
     fn contains_exact(&self, module: &ModuleName) -> bool {
         self.exact(module).is_some()
     }
 
-    pub fn query_module(
+    #[cfg(test)]
+    #[must_use]
+    fn len(&self) -> usize {
+        self.0.len()
+    }
+
+    // The only public API for this struct:
+    #[must_use]
+    pub(crate) fn query_module(
         &self,
         module: &ModuleName,
         version: impl Into<PyVersion>,
@@ -144,7 +145,7 @@ impl TypeshedVersions {
 }
 
 #[derive(Debug, Copy, PartialEq, Eq, Clone, Hash)]
-pub enum TypeshedVersionsQueryResult {
+pub(crate) enum TypeshedVersionsQueryResult {
     Exists,
     DoesNotExist,
     MaybeExists,
@@ -203,7 +204,7 @@ impl FromStr for TypeshedVersions {
             };
         }
 
-        Ok(Self(Arc::new(map)))
+        Ok(Self(map))
     }
 }
 
@@ -224,6 +225,7 @@ enum PyVersionRange {
 }
 
 impl PyVersionRange {
+    #[must_use]
     fn contains(&self, version: PyVersion) -> bool {
         match self {
             Self::AvailableFrom(inner) => inner.contains(&version),
@@ -259,7 +261,7 @@ impl fmt::Display for PyVersionRange {
 }
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Ord, PartialOrd, Hash)]
-pub struct PyVersion {
+pub(crate) struct PyVersion {
     major: u8,
     minor: u8,
 }

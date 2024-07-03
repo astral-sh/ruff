@@ -11,4 +11,4 @@ pub use module::{Module, ModuleKind};
 pub use module_name::ModuleName;
 pub use resolver::{resolve_module, set_module_resolution_settings, ModuleResolutionSettings};
 pub use supported_py_version::SupportedPyVersion;
-pub use typeshed::TypeshedVersions;
+pub use typeshed::{TypeshedVersionsParseError, TypeshedVersionsParseErrorKind};

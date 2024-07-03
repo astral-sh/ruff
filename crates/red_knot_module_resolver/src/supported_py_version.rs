@@ -3,7 +3,7 @@
 #![allow(clippy::needless_lifetimes)]
 #![allow(clippy::clone_on_copy)]
 
-use crate::Db;
+use crate::db::Db;
 
 // TODO: unify with the PythonVersion enum in the linter/formatter crates?
 #[derive(Copy, Clone, Hash, Debug, PartialEq, Eq, PartialOrd, Ord, Default)]

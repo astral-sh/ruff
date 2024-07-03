@@ -6,7 +6,7 @@ use ruff_db::vfs::{system_path_to_file, vfs_path_to_file, VfsFile, VfsPath};
 
 use crate::module::{Module, ModuleKind};
 use crate::module_name::ModuleName;
-use crate::path::{ModuleResolutionPath, ModuleResolutionPathRef};
+use crate::path::{ModuleResolutionPathBuf, ModuleResolutionPathRef};
 use crate::resolver::internal::ModuleResolverSearchPaths;
 use crate::supported_py_version::set_target_py_version;
 use crate::{Db, SupportedPyVersion};
@@ -85,16 +85,16 @@ pub(crate) fn file_to_module(db: &dyn Db, file: VfsFile) -> Option<Module> {
 
     let relative_path = search_paths.iter().find_map(|root| match (&**root, path) {
         (_, VfsPath::Vendored(_)) => todo!("VendoredPaths are not yet supported"),
-        (ModuleResolutionPath::Extra(_), VfsPath::FileSystem(path)) => {
+        (ModuleResolutionPathBuf::Extra(_), VfsPath::FileSystem(path)) => {
             ModuleResolutionPathRef::extra(path.strip_prefix(&**root).ok()?)
         }
-        (ModuleResolutionPath::FirstParty(_), VfsPath::FileSystem(path)) => {
+        (ModuleResolutionPathBuf::FirstParty(_), VfsPath::FileSystem(path)) => {
             ModuleResolutionPathRef::first_party(path.strip_prefix(&**root).ok()?)
         }
-        (ModuleResolutionPath::StandardLibrary(_), VfsPath::FileSystem(path)) => {
+        (ModuleResolutionPathBuf::StandardLibrary(_), VfsPath::FileSystem(path)) => {
             ModuleResolutionPathRef::standard_library(path.strip_prefix(&**root).ok()?)
         }
-        (ModuleResolutionPath::SitePackages(_), VfsPath::FileSystem(path)) => {
+        (ModuleResolutionPathBuf::SitePackages(_), VfsPath::FileSystem(path)) => {
             ModuleResolutionPathRef::site_packages(path.strip_prefix(&**root).ok()?)
         }
     })?;
@@ -158,19 +158,21 @@ impl ModuleResolutionSettings {
 
         let mut paths = extra_paths
             .into_iter()
-            .map(ModuleResolutionPath::extra)
-            .collect::<Option<Vec<ModuleResolutionPath>>>()
+            .map(ModuleResolutionPathBuf::extra)
+            .collect::<Option<Vec<ModuleResolutionPathBuf>>>()
             .unwrap();
 
-        paths.push(ModuleResolutionPath::first_party(workspace_root).unwrap());
+        paths.push(ModuleResolutionPathBuf::first_party(workspace_root).unwrap());
 
         if let Some(custom_typeshed) = custom_typeshed {
-            paths.push(ModuleResolutionPath::stdlib_from_typeshed_root(&custom_typeshed).unwrap());
+            paths.push(
+                ModuleResolutionPathBuf::stdlib_from_typeshed_root(&custom_typeshed).unwrap(),
+            );
         }
 
         // TODO vendor typeshed's third-party stubs as well as the stdlib and fallback to them as a final step
         if let Some(site_packages) = site_packages {
-            paths.push(ModuleResolutionPath::site_packages(site_packages).unwrap());
+            paths.push(ModuleResolutionPathBuf::site_packages(site_packages).unwrap());
         }
 
         (
@@ -183,10 +185,10 @@ impl ModuleResolutionSettings {
 /// A resolved module resolution order, implementing PEP 561
 /// (with some small, deliberate differences)
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
-pub(crate) struct OrderedSearchPaths(Vec<Arc<ModuleResolutionPath>>);
+pub(crate) struct OrderedSearchPaths(Vec<Arc<ModuleResolutionPathBuf>>);
 
 impl Deref for OrderedSearchPaths {
-    type Target = [Arc<ModuleResolutionPath>];
+    type Target = [Arc<ModuleResolutionPathBuf>];
 
     fn deref(&self) -> &Self::Target {
         &self.0
@@ -218,7 +220,7 @@ pub(crate) mod internal {
     }
 }
 
-fn module_search_paths(db: &dyn Db) -> &[Arc<ModuleResolutionPath>] {
+fn module_search_paths(db: &dyn Db) -> &[Arc<ModuleResolutionPathBuf>] {
     ModuleResolverSearchPaths::get(db).search_paths(db)
 }
 
@@ -227,7 +229,7 @@ fn module_search_paths(db: &dyn Db) -> &[Arc<ModuleResolutionPath>] {
 fn resolve_name(
     db: &dyn Db,
     name: &ModuleName,
-) -> Option<(Arc<ModuleResolutionPath>, VfsFile, ModuleKind)> {
+) -> Option<(Arc<ModuleResolutionPathBuf>, VfsFile, ModuleKind)> {
     let search_paths = module_search_paths(db);
 
     for search_path in search_paths {
@@ -281,7 +283,7 @@ fn resolve_name(
 
 fn resolve_package<'a, I>(
     db: &dyn Db,
-    module_search_path: &ModuleResolutionPath,
+    module_search_path: &ModuleResolutionPathBuf,
     components: I,
 ) -> Result<ResolvedPackage, PackageKind>
 where
@@ -338,7 +340,7 @@ where
 
 #[derive(Debug)]
 struct ResolvedPackage {
-    path: ModuleResolutionPath,
+    path: ModuleResolutionPathBuf,
     kind: PackageKind,
 }
 
@@ -454,7 +456,8 @@ mod tests {
             ..
         } = create_resolver()?;
 
-        let stdlib_dir = ModuleResolutionPath::stdlib_from_typeshed_root(&custom_typeshed).unwrap();
+        let stdlib_dir =
+            ModuleResolutionPathBuf::stdlib_from_typeshed_root(&custom_typeshed).unwrap();
         let functools_path = stdlib_dir.join("functools.pyi");
         db.memory_file_system()
             .write_file(&functools_path, "def update_wrapper(): ...")?;
@@ -467,14 +470,16 @@ mod tests {
             resolve_module(&db, functools_module_name).as_ref()
         );
 
-        assert_eq!(stdlib_dir, functools_module.search_path());
+        assert_eq!(stdlib_dir, functools_module.search_path().to_path_buf());
         assert_eq!(ModuleKind::Module, functools_module.kind());
 
-        assert_eq!(functools_path, *functools_module.file().path(&db));
+        let functools_path_vfs = VfsPath::from(functools_path);
+
+        assert_eq!(&functools_path_vfs, functools_module.file().path(&db));
 
         assert_eq!(
             Some(functools_module),
-            path_to_module(&db, &VfsPath::from(functools_path))
+            path_to_module(&db, &functools_path_vfs)
         );
 
         Ok(())

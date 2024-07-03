@@ -23,6 +23,7 @@ impl ModuleName {
     /// * The name contains a sequence of multiple dots
     /// * A component of a name (the part between two dots) isn't a valid python identifier.
     #[inline]
+    #[must_use]
     pub fn new(name: &str) -> Option<Self> {
         Self::is_valid_name(name).then(|| Self(compact_str::CompactString::from(name)))
     }
@@ -52,11 +53,13 @@ impl ModuleName {
     /// assert_eq!(ModuleName::new_static("2000"), None);
     /// ```
     #[inline]
+    #[must_use]
     pub fn new_static(name: &'static str) -> Option<Self> {
         // TODO(Micha): Use CompactString::const_new once we upgrade to 0.8 https://github.com/ParkMyCar/compact_str/pull/336
         Self::is_valid_name(name).then(|| Self(compact_str::CompactString::from(name)))
     }
 
+    #[must_use]
     fn is_valid_name(name: &str) -> bool {
         !name.is_empty() && name.split('.').all(is_identifier)
     }
@@ -70,6 +73,7 @@ impl ModuleName {
     ///
     /// assert_eq!(ModuleName::new_static("foo.bar.baz").unwrap().components().collect::<Vec<_>>(), vec!["foo", "bar", "baz"]);
     /// ```
+    #[must_use]
     pub fn components(&self) -> impl DoubleEndedIterator<Item = &str> {
         self.0.split('.')
     }
@@ -85,6 +89,7 @@ impl ModuleName {
     /// assert_eq!(ModuleName::new_static("foo.bar.baz").unwrap().parent(), Some(ModuleName::new_static("foo.bar").unwrap()));
     /// assert_eq!(ModuleName::new_static("root").unwrap().parent(), None);
     /// ```
+    #[must_use]
     pub fn parent(&self) -> Option<ModuleName> {
         let (parent, _) = self.0.rsplit_once('.')?;
         Some(Self(parent.to_compact_string()))
@@ -104,6 +109,7 @@ impl ModuleName {
     /// assert!(!ModuleName::new_static("foo.bar").unwrap().starts_with(&ModuleName::new_static("bar").unwrap()));
     /// assert!(!ModuleName::new_static("foo_bar").unwrap().starts_with(&ModuleName::new_static("foo").unwrap()));
     /// ```
+    #[must_use]
     pub fn starts_with(&self, other: &ModuleName) -> bool {
         let mut self_components = self.components();
         let other_components = other.components();
@@ -117,9 +123,25 @@ impl ModuleName {
         true
     }
 
+    #[must_use]
     #[inline]
     pub fn as_str(&self) -> &str {
         &self.0
+    }
+
+    #[must_use]
+    pub fn from_components<'a>(mut components: impl Iterator<Item = &'a str>) -> Option<Self> {
+        let first_part = components.next()?;
+        if let Some(second_part) = components.next() {
+            let mut name = format!("{first_part}.{second_part}");
+            for part in components {
+                name.push('.');
+                name.push_str(part);
+            }
+            ModuleName::new(&name)
+        } else {
+            ModuleName::new(first_part)
+        }
     }
 }
 

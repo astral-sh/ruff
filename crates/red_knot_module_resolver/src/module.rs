@@ -3,9 +3,9 @@ use std::sync::Arc;
 
 use ruff_db::vfs::VfsFile;
 
+use crate::db::Db;
 use crate::module_name::ModuleName;
-use crate::path::{ModuleResolutionPath, ModuleResolutionPathRef};
-use crate::Db;
+use crate::path::{ModuleResolutionPathBuf, ModuleResolutionPathRef};
 
 /// Representation of a Python module.
 #[derive(Clone, PartialEq, Eq)]
@@ -17,7 +17,7 @@ impl Module {
     pub(crate) fn new(
         name: ModuleName,
         kind: ModuleKind,
-        search_path: Arc<ModuleResolutionPath>,
+        search_path: Arc<ModuleResolutionPathBuf>,
         file: VfsFile,
     ) -> Self {
         Self {
@@ -77,7 +77,7 @@ impl salsa::DebugWithDb<dyn Db> for Module {
 struct ModuleInner {
     name: ModuleName,
     kind: ModuleKind,
-    search_path: Arc<ModuleResolutionPath>,
+    search_path: Arc<ModuleResolutionPathBuf>,
     file: VfsFile,
 }
 
