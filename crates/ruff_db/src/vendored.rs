@@ -32,8 +32,7 @@ impl VendoredFileSystem {
 
     pub fn exists(&self, path: &VendoredPath) -> bool {
         let normalized = NormalizedVendoredPath::from(path);
-        let inner_locked = self.inner.lock();
-        let mut archive = inner_locked.borrow_mut();
+        let mut archive = self.inner.lock();
 
         // Must probe the zipfile twice, as "stdlib" and "stdlib/" are considered
         // different paths in a zip file, but we want to abstract over that difference here
@@ -47,13 +46,12 @@ impl VendoredFileSystem {
 
     pub fn metadata(&self, path: &VendoredPath) -> Option<Metadata> {
         let normalized = NormalizedVendoredPath::from(path);
-        let inner_locked = self.inner.lock();
+        let mut archive = self.inner.lock();
 
         // Must probe the zipfile twice, as "stdlib" and "stdlib/" are considered
         // different paths in a zip file, but we want to abstract over that difference here
         // so that paths relative to the `VendoredFileSystem`
         // work the same as other paths in Ruff.
-        let mut archive = inner_locked.borrow_mut();
         if let Ok(zip_file) = archive.lookup_path(&normalized) {
             return Some(Metadata::from_zip_file(zip_file));
         }
@@ -71,8 +69,7 @@ impl VendoredFileSystem {
     /// - The path exists in the underlying zip archive, but represents a directory
     /// - The contents of the zip file at `path` contain invalid UTF-8
     pub fn read(&self, path: &VendoredPath) -> Result<String> {
-        let inner_locked = self.inner.lock();
-        let mut archive = inner_locked.borrow_mut();
+        let mut archive = self.inner.lock();
         let mut zip_file = archive.lookup_path(&NormalizedVendoredPath::from(path))?;
         let mut buffer = String::new();
         zip_file.read_to_string(&mut buffer)?;
@@ -82,21 +79,16 @@ impl VendoredFileSystem {
 
 impl fmt::Debug for VendoredFileSystem {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let locked_inner = self.inner.lock();
+        let mut archive = self.inner.lock();
         if f.alternate() {
-            let mut paths: Vec<String> = locked_inner
-                .borrow()
-                .0
-                .file_names()
-                .map(String::from)
-                .collect();
+            let mut paths: Vec<String> = archive.0.file_names().map(String::from).collect();
             paths.sort();
             let debug_info: BTreeMap<String, ZipFileDebugInfo> = paths
                 .iter()
                 .map(|path| {
                     (
                         path.to_owned(),
-                        ZipFileDebugInfo::from(locked_inner.borrow_mut().0.by_name(path).unwrap()),
+                        ZipFileDebugInfo::from(archive.0.by_name(path).unwrap()),
                     )
                 })
                 .collect();
@@ -106,11 +98,7 @@ impl fmt::Debug for VendoredFileSystem {
                 .field("data_by_path", &debug_info)
                 .finish()
         } else {
-            write!(
-                f,
-                "VendoredFileSystem(<{} paths>)",
-                locked_inner.borrow().len()
-            )
+            write!(f, "VendoredFileSystem(<{} paths>)", archive.len())
         }
     }
 }
@@ -196,15 +184,13 @@ impl Metadata {
     }
 }
 
-struct VendoredFileSystemInner(Mutex<RefCell<VendoredZipArchive>>);
+struct VendoredFileSystemInner(Mutex<VendoredZipArchive>);
 
-type LockedZipArchive<'a> = MutexGuard<'a, RefCell<VendoredZipArchive>>;
+type LockedZipArchive<'a> = MutexGuard<'a, VendoredZipArchive>;
 
 impl VendoredFileSystemInner {
     fn new(raw_bytes: &'static [u8]) -> Result<Self> {
-        Ok(Self(Mutex::new(RefCell::new(VendoredZipArchive::new(
-            raw_bytes,
-        )?))))
+        Ok(Self(Mutex::new(VendoredZipArchive::new(raw_bytes)?)))
     }
 
     /// Acquire a lock on the underlying zip archive.
