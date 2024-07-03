@@ -525,27 +525,6 @@ impl<'a> Iterator for ModulePartIterator<'a> {
             stem.take()
         }
     }
-
-    fn last(mut self) -> Option<Self::Item> {
-        self.next_back()
-    }
-}
-
-impl<'a> DoubleEndedIterator for ModulePartIterator<'a> {
-    fn next_back(&mut self) -> Option<Self::Item> {
-        let ModulePartIterator {
-            parent_components,
-            stem,
-        } = self;
-
-        if let Some(part) = stem.take() {
-            Some(part)
-        } else if let Some(components) = parent_components {
-            components.next_back().map(|component| component.as_str())
-        } else {
-            None
-        }
-    }
 }
 
 impl<'a> FusedIterator for ModulePartIterator<'a> {}
