@@ -138,9 +138,9 @@ impl ModuleResolutionPathBuf {
     #[must_use]
     pub(crate) fn relativize_path<'a>(
         &'a self,
-        absolute_path: &'a FileSystemPath,
+        absolute_path: &'a (impl AsRef<FileSystemPath> + ?Sized),
     ) -> Option<ModuleResolutionPathRef<'a>> {
-        ModuleResolutionPathRef::from(self).relativize_path(absolute_path)
+        ModuleResolutionPathRef::from(self).relativize_path(absolute_path.as_ref())
     }
 }
 
@@ -510,6 +510,9 @@ mod tests {
 
     use insta::assert_debug_snapshot;
 
+    // Replace windows paths
+    static WINDOWS_PATH_FILTER: [(&str, &str); 1] = [(r"\\\\", "/")];
+
     #[test]
     fn constructor_rejects_non_pyi_stdlib_paths() {
         assert!(ModuleResolutionPathBuf::standard_library("foo.py").is_none());
@@ -743,10 +746,7 @@ mod tests {
 
     #[test]
     fn join_1() {
-        insta::with_settings!({filters => vec![
-            // Replace windows paths
-            (r"\\\\", "/"),
-        ]}, {
+        insta::with_settings!({filters => WINDOWS_PATH_FILTER.to_vec()}, {
             assert_debug_snapshot!(
                 ModuleResolutionPathBuf::standard_library("foo").unwrap().join("bar"),
                 @r###"
@@ -760,10 +760,7 @@ mod tests {
 
     #[test]
     fn join_2() {
-        insta::with_settings!({filters => vec![
-            // Replace windows paths
-            (r"\\\\", "/"),
-        ]}, {
+        insta::with_settings!({filters => WINDOWS_PATH_FILTER.to_vec()}, {
             assert_debug_snapshot!(
                 ModuleResolutionPathBuf::site_packages("foo").unwrap().join("bar.pyi"),
                 @r###"
@@ -777,10 +774,7 @@ mod tests {
 
     #[test]
     fn join_3() {
-        insta::with_settings!({filters => vec![
-            // Replace windows paths
-            (r"\\\\", "/"),
-        ]}, {
+        insta::with_settings!({filters => WINDOWS_PATH_FILTER.to_vec()}, {
             assert_debug_snapshot!(
                 ModuleResolutionPathBuf::extra("foo").unwrap().join("bar.py"),
                 @r###"
@@ -794,10 +788,7 @@ mod tests {
 
     #[test]
     fn join_4() {
-        insta::with_settings!({filters => vec![
-            // Replace windows paths
-            (r"\\\\", "/"),
-        ]}, {
+        insta::with_settings!({filters => WINDOWS_PATH_FILTER.to_vec()}, {
             assert_debug_snapshot!(
                 ModuleResolutionPathBuf::first_party("foo").unwrap().join("bar/baz/eggs/__init__.py"),
                 @r###"
@@ -837,5 +828,123 @@ mod tests {
     #[should_panic(expected = "Component can have at most one '.'")]
     fn invalid_stdlib_join_too_many_extensions() {
         stdlib_path_test_case("foo").push("bar.py.pyi");
+    }
+
+    #[test]
+    fn relativize_stdlib_path_errors() {
+        let root = ModuleResolutionPathBuf::standard_library("foo/stdlib").unwrap();
+
+        // Must have a `.pyi` extension or no extension:
+        let bad_absolute_path = FileSystemPath::new("foo/stdlib/x.py");
+        assert!(root.relativize_path(bad_absolute_path).is_none());
+        let second_bad_absolute_path = FileSystemPath::new("foo/stdlib/x.rs");
+        assert!(root.relativize_path(second_bad_absolute_path).is_none());
+
+        // Must be a path that is a child of `root`:
+        let third_bad_absolute_path = FileSystemPath::new("bar/stdlib/x.pyi");
+        assert!(root.relativize_path(third_bad_absolute_path).is_none());
+    }
+
+    fn non_stdlib_relativize_tester(
+        variant: impl FnOnce(&'static str) -> Option<ModuleResolutionPathBuf>,
+    ) {
+        let root = variant("foo").unwrap();
+        // Must have a `.py` extension, a `.pyi` extension, or no extension:
+        let bad_absolute_path = FileSystemPath::new("foo/stdlib/x.rs");
+        assert!(root.relativize_path(bad_absolute_path).is_none());
+        // Must be a path that is a child of `root`:
+        let second_bad_absolute_path = FileSystemPath::new("bar/stdlib/x.pyi");
+        assert!(root.relativize_path(second_bad_absolute_path).is_none());
+    }
+
+    #[test]
+    fn relativize_site_packages_errors() {
+        non_stdlib_relativize_tester(ModuleResolutionPathBuf::site_packages);
+    }
+
+    #[test]
+    fn relativize_extra_errors() {
+        non_stdlib_relativize_tester(ModuleResolutionPathBuf::extra);
+    }
+
+    #[test]
+    fn relativize_first_party_errors() {
+        non_stdlib_relativize_tester(ModuleResolutionPathBuf::first_party);
+    }
+
+    #[test]
+    fn relativize_stdlib_path() {
+        insta::with_settings!({filters => WINDOWS_PATH_FILTER.to_vec()}, {
+            assert_debug_snapshot!(
+                ModuleResolutionPathBuf::standard_library("foo")
+                    .unwrap()
+                    .relativize_path("foo/baz/eggs/__init__.pyi")
+                    .unwrap(),
+                @r###"
+            ModuleResolutionPathRef(
+                StandardLibrary(
+                    "baz/eggs/__init__.pyi",
+                ),
+            )
+            "###
+            );
+        });
+    }
+
+    #[test]
+    fn relativize_site_packages_path() {
+        insta::with_settings!({filters => WINDOWS_PATH_FILTER.to_vec()}, {
+            assert_debug_snapshot!(
+                ModuleResolutionPathBuf::site_packages("foo")
+                    .unwrap()
+                    .relativize_path("foo/baz")
+                    .unwrap(),
+                @r###"
+            ModuleResolutionPathRef(
+                SitePackages(
+                    "baz",
+                ),
+            )
+            "###
+            );
+        });
+    }
+
+    #[test]
+    fn relativize_extra_path() {
+        insta::with_settings!({filters => WINDOWS_PATH_FILTER.to_vec()}, {
+            assert_debug_snapshot!(
+                ModuleResolutionPathBuf::extra("foo/baz")
+                    .unwrap()
+                    .relativize_path("foo/baz/functools.py")
+                    .unwrap(),
+                @r###"
+            ModuleResolutionPathRef(
+                Extra(
+                    "functools.py",
+                ),
+            )
+            "###
+            );
+        });
+    }
+
+    #[test]
+    fn relativize_first_party_path() {
+        insta::with_settings!({filters => WINDOWS_PATH_FILTER.to_vec()}, {
+            assert_debug_snapshot!(
+                ModuleResolutionPathBuf::site_packages("dev/src")
+                    .unwrap()
+                    .relativize_path("dev/src/package/bar/baz.pyi")
+                    .unwrap(),
+                @r###"
+            ModuleResolutionPathRef(
+                SitePackages(
+                    "package/bar/baz.pyi",
+                ),
+            )
+            "###
+            );
+        });
     }
 }
