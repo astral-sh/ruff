@@ -19,6 +19,7 @@ use crate::file_system::{FileSystem, FileSystemPath, FileType, Metadata, Result}
 /// Use a tempdir with the real file system to test these advanced file system features and complex file system behavior.
 ///
 /// Only intended for testing purposes.
+#[derive(Clone)]
 pub struct MemoryFileSystem {
     inner: Arc<MemoryFileSystemInner>,
 }

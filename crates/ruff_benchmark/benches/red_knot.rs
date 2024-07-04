@@ -44,6 +44,7 @@ def override(): ...
 
 struct Case {
     program: Program,
+    fs: MemoryFileSystem,
     foo: VfsFile,
     bar: VfsFile,
     typing: VfsFile,
@@ -64,7 +65,7 @@ fn setup_case() -> Case {
     let workspace_root = FileSystemPath::new("/src");
     let workspace = Workspace::new(workspace_root.to_path_buf());
 
-    let mut program = Program::new(workspace, fs);
+    let mut program = Program::new(workspace, fs.clone());
     let foo = system_path_to_file(&program, foo_path).unwrap();
 
     set_module_resolution_settings(
@@ -84,17 +85,18 @@ fn setup_case() -> Case {
 
     Case {
         program,
+        fs,
         foo,
         bar,
         typing,
     }
 }
 
-fn benchmark_warm(criterion: &mut Criterion) {
+fn benchmark_without_parse(criterion: &mut Criterion) {
     let mut group = criterion.benchmark_group("red_knot/check_file");
     group.throughput(Throughput::Bytes(FOO_CODE.len() as u64));
 
-    group.bench_function("red_knot_check_file(warm)", |b| {
+    group.bench_function("red_knot_check_file[without_parse]", |b| {
         b.iter_batched(
             || {
                 let case = setup_case();
@@ -117,11 +119,44 @@ fn benchmark_warm(criterion: &mut Criterion) {
     group.finish();
 }
 
+fn benchmark_incremental(criterion: &mut Criterion) {
+    let mut group = criterion.benchmark_group("red_knot/check_file");
+    group.throughput(Throughput::Bytes(FOO_CODE.len() as u64));
+
+    group.bench_function("red_knot_check_file[incremental]", |b| {
+        b.iter_batched(
+            || {
+                let mut case = setup_case();
+                case.program.check_file(case.foo).unwrap();
+
+                case.fs
+                    .write_file(
+                        FileSystemPath::new("/src/foo.py"),
+                        format!("{BAR_CODE}\n# A comment\n"),
+                    )
+                    .unwrap();
+
+                case.bar.touch(&mut case.program);
+                case
+            },
+            |case| {
+                let Case { program, foo, .. } = case;
+                let result = program.check_file(foo).unwrap();
+
+                assert_eq!(result.as_slice(), [] as [String; 0]);
+            },
+            BatchSize::SmallInput,
+        );
+    });
+
+    group.finish();
+}
+
 fn benchmark_cold(criterion: &mut Criterion) {
     let mut group = criterion.benchmark_group("red_knot/check_file");
     group.throughput(Throughput::Bytes(FOO_CODE.len() as u64));
 
-    group.bench_function("red_knot_check_file(cold)", |b| {
+    group.bench_function("red_knot_check_file[cold]", |b| {
         b.iter_batched(
             setup_case,
             |case| {
@@ -137,6 +172,7 @@ fn benchmark_cold(criterion: &mut Criterion) {
     group.finish();
 }
 
-criterion_group!(cold, benchmark_warm);
-criterion_group!(warm, benchmark_cold);
-criterion_main!(warm, cold);
+criterion_group!(cold, benchmark_without_parse);
+criterion_group!(without_parse, benchmark_cold);
+criterion_group!(incremental, benchmark_incremental);
+criterion_main!(without_parse, cold, incremental);
