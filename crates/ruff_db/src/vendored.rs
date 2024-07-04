@@ -1,5 +1,4 @@
 use std::borrow::Cow;
-use std::cell::RefCell;
 use std::collections::BTreeMap;
 use std::fmt::{self, Debug};
 use std::io::{self, Read};
@@ -13,6 +12,7 @@ pub use path::{VendoredPath, VendoredPathBuf};
 pub mod path;
 
 type Result<T> = io::Result<T>;
+type LockedZipArchive<'a> = MutexGuard<'a, VendoredZipArchive>;
 
 /// File system that stores all content in a static zip archive
 /// bundled as part of the Ruff binary.
@@ -20,20 +20,19 @@ type Result<T> = io::Result<T>;
 /// "Files" in the `VendoredFileSystem` are read-only and immutable.
 /// Directories are supported, but symlinks and hardlinks cannot exist.
 pub struct VendoredFileSystem {
-    inner: VendoredFileSystemInner,
+    inner: Mutex<VendoredZipArchive>,
 }
 
 impl VendoredFileSystem {
     pub fn new(raw_bytes: &'static [u8]) -> Result<Self> {
         Ok(Self {
-            inner: VendoredFileSystemInner::new(raw_bytes)?,
+            inner: Mutex::new(VendoredZipArchive::new(raw_bytes)?),
         })
     }
 
     pub fn exists(&self, path: &VendoredPath) -> bool {
         let normalized = NormalizedVendoredPath::from(path);
-        let inner_locked = self.inner.lock();
-        let mut archive = inner_locked.borrow_mut();
+        let mut archive = self.lock_archive();
 
         // Must probe the zipfile twice, as "stdlib" and "stdlib/" are considered
         // different paths in a zip file, but we want to abstract over that difference here
@@ -47,13 +46,12 @@ impl VendoredFileSystem {
 
     pub fn metadata(&self, path: &VendoredPath) -> Option<Metadata> {
         let normalized = NormalizedVendoredPath::from(path);
-        let inner_locked = self.inner.lock();
+        let mut archive = self.lock_archive();
 
         // Must probe the zipfile twice, as "stdlib" and "stdlib/" are considered
         // different paths in a zip file, but we want to abstract over that difference here
         // so that paths relative to the `VendoredFileSystem`
         // work the same as other paths in Ruff.
-        let mut archive = inner_locked.borrow_mut();
         if let Ok(zip_file) = archive.lookup_path(&normalized) {
             return Some(Metadata::from_zip_file(zip_file));
         }
@@ -71,46 +69,45 @@ impl VendoredFileSystem {
     /// - The path exists in the underlying zip archive, but represents a directory
     /// - The contents of the zip file at `path` contain invalid UTF-8
     pub fn read(&self, path: &VendoredPath) -> Result<String> {
-        let inner_locked = self.inner.lock();
-        let mut archive = inner_locked.borrow_mut();
+        let mut archive = self.lock_archive();
         let mut zip_file = archive.lookup_path(&NormalizedVendoredPath::from(path))?;
         let mut buffer = String::new();
         zip_file.read_to_string(&mut buffer)?;
         Ok(buffer)
     }
+
+    /// Acquire a lock on the underlying zip archive.
+    /// The call will block until it is able to acquire the lock.
+    ///
+    /// ## Panics:
+    /// If the current thread already holds the lock.
+    fn lock_archive(&self) -> LockedZipArchive {
+        self.inner.lock().unwrap()
+    }
 }
 
 impl fmt::Debug for VendoredFileSystem {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let locked_inner = self.inner.lock();
+        let mut archive = self.lock_archive();
         if f.alternate() {
-            let mut paths: Vec<String> = locked_inner
-                .borrow()
-                .0
-                .file_names()
-                .map(String::from)
-                .collect();
+            let mut paths: Vec<String> = archive.0.file_names().map(String::from).collect();
             paths.sort();
             let debug_info: BTreeMap<String, ZipFileDebugInfo> = paths
                 .iter()
                 .map(|path| {
                     (
                         path.to_owned(),
-                        ZipFileDebugInfo::from(locked_inner.borrow_mut().0.by_name(path).unwrap()),
+                        ZipFileDebugInfo::from(archive.0.by_name(path).unwrap()),
                     )
                 })
                 .collect();
             f.debug_struct("VendoredFileSystem")
-                .field("inner_mutex_poisoned", &self.inner.0.is_poisoned())
+                .field("inner_mutex_poisoned", &self.inner.is_poisoned())
                 .field("paths", &paths)
                 .field("data_by_path", &debug_info)
                 .finish()
         } else {
-            write!(
-                f,
-                "VendoredFileSystem(<{} paths>)",
-                locked_inner.borrow().len()
-            )
+            write!(f, "VendoredFileSystem(<{} paths>)", archive.len())
         }
     }
 }
@@ -193,27 +190,6 @@ impl Metadata {
 
     pub fn revision(&self) -> FileRevision {
         self.revision
-    }
-}
-
-struct VendoredFileSystemInner(Mutex<RefCell<VendoredZipArchive>>);
-
-type LockedZipArchive<'a> = MutexGuard<'a, RefCell<VendoredZipArchive>>;
-
-impl VendoredFileSystemInner {
-    fn new(raw_bytes: &'static [u8]) -> Result<Self> {
-        Ok(Self(Mutex::new(RefCell::new(VendoredZipArchive::new(
-            raw_bytes,
-        )?))))
-    }
-
-    /// Acquire a lock on the underlying zip archive.
-    /// The call will block until it is able to acquire the lock.
-    ///
-    /// ## Panics:
-    /// If the current thread already holds the lock.
-    fn lock(&self) -> LockedZipArchive {
-        self.0.lock().unwrap()
     }
 }
 

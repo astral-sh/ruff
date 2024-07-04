@@ -56,7 +56,7 @@ The following rules have been stabilized and are no longer in preview:
 - [`bad-open-mode`](https://docs.astral.sh/ruff/rules/bad-open-mode/) (`PLW1501`)
 - [`empty-comment`](https://docs.astral.sh/ruff/rules/empty-comment/) (`PLR2044`)
 - [`global-at-module-level`](https://docs.astral.sh/ruff/rules/global-at-module-level/) (`PLW0604`)
-- [`misplaced-bare-raise`](https://docs.astral.sh/ruff/rules/misplaced-bare-raise%60/) (`PLE0744`)
+- [`misplaced-bare-raise`](https://docs.astral.sh/ruff/rules/misplaced-bare-raise/) (`PLE0744`)
 - [`non-ascii-import-name`](https://docs.astral.sh/ruff/rules/non-ascii-import-name/) (`PLC2403`)
 - [`non-ascii-name`](https://docs.astral.sh/ruff/rules/non-ascii-name/) (`PLC2401`)
 - [`nonlocal-and-global`](https://docs.astral.sh/ruff/rules/nonlocal-and-global/) (`PLE0115`)

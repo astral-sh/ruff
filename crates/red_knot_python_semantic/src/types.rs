@@ -1,16 +1,13 @@
-use crate::semantic_index::ast_ids::AstIdNode;
-use crate::semantic_index::symbol::{FileScopeId, PublicSymbolId, ScopeId};
-use crate::semantic_index::{
-    public_symbol, root_scope, semantic_index, symbol_table, NodeWithScopeId,
-};
-use crate::types::infer::{TypeInference, TypeInferenceBuilder};
-use crate::Db;
-use crate::FxIndexSet;
 use ruff_db::parsed::parsed_module;
 use ruff_db::vfs::VfsFile;
 use ruff_index::newtype_index;
-use ruff_python_ast as ast;
 use ruff_python_ast::name::Name;
+
+use crate::semantic_index::symbol::{FileScopeId, NodeWithScopeKind, PublicSymbolId, ScopeId};
+use crate::semantic_index::{public_symbol, root_scope, semantic_index, symbol_table};
+use crate::types::infer::{TypeInference, TypeInferenceBuilder};
+use crate::Db;
+use crate::FxIndexSet;
 
 mod display;
 mod infer;
@@ -50,8 +47,9 @@ pub(crate) fn public_symbol_ty<'db>(db: &'db dyn Db, symbol: PublicSymbolId<'db>
     inference.symbol_ty(symbol.scoped_symbol_id(db))
 }
 
-/// Shorthand for `public_symbol_ty` that takes a symbol name instead of a [`PublicSymbolId`].
-pub fn public_symbol_ty_by_name<'db>(
+/// Shorthand for [`public_symbol_ty()`] that takes a symbol name instead of a [`PublicSymbolId`].
+#[allow(unused)]
+pub(crate) fn public_symbol_ty_by_name<'db>(
     db: &'db dyn Db,
     file: VfsFile,
     name: &str,
@@ -70,31 +68,22 @@ pub(crate) fn infer_types<'db>(db: &'db dyn Db, scope: ScopeId<'db>) -> TypeInfe
     // The isolation of the query is by the return inferred types.
     let index = semantic_index(db, file);
 
-    let scope_id = scope.file_scope_id(db);
-    let node = index.scope(scope_id).node();
+    let node = scope.node(db);
 
     let mut context = TypeInferenceBuilder::new(db, scope, index);
 
     match node {
-        NodeWithScopeId::Module => {
+        NodeWithScopeKind::Module => {
             let parsed = parsed_module(db.upcast(), file);
             context.infer_module(parsed.syntax());
         }
-        NodeWithScopeId::Class(class_id) => {
-            let class = ast::StmtClassDef::lookup(db, file, class_id);
-            context.infer_class_body(class);
+        NodeWithScopeKind::Function(function) => context.infer_function_body(function.node()),
+        NodeWithScopeKind::Class(class) => context.infer_class_body(class.node()),
+        NodeWithScopeKind::ClassTypeParameters(class) => {
+            context.infer_class_type_params(class.node());
         }
-        NodeWithScopeId::ClassTypeParams(class_id) => {
-            let class = ast::StmtClassDef::lookup(db, file, class_id);
-            context.infer_class_type_params(class);
-        }
-        NodeWithScopeId::Function(function_id) => {
-            let function = ast::StmtFunctionDef::lookup(db, file, function_id);
-            context.infer_function_body(function);
-        }
-        NodeWithScopeId::FunctionTypeParams(function_id) => {
-            let function = ast::StmtFunctionDef::lookup(db, file, function_id);
-            context.infer_function_type_params(function);
+        NodeWithScopeKind::FunctionTypeParameters(function) => {
+            context.infer_function_type_params(function.node());
         }
     }
 

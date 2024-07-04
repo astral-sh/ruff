@@ -1,6 +1,6 @@
 [package]
 name = "red_knot"
-version = "0.1.0"
+version = "0.0.0"
 edition.workspace = true
 rust-version.workspace = true
 homepage.workspace = true
@@ -8,36 +8,29 @@ documentation.workspace = true
 repository.workspace = true
 authors.workspace = true
 license.workspace = true
+default-run = "red_knot"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
 red_knot_module_resolver = { workspace = true }
+red_knot_python_semantic = { workspace = true }
 
-ruff_python_parser = { workspace = true }
+ruff_db = { workspace = true }
 ruff_python_ast = { workspace = true }
-ruff_text_size = { workspace = true }
-ruff_index = { workspace = true }
-ruff_notebook = { workspace = true }
 
 anyhow = { workspace = true }
-bitflags = { workspace = true }
+countme = { workspace = true, features = ["enable"] }
 crossbeam = { workspace = true }
 ctrlc = { version = "3.4.4" }
-dashmap = { workspace = true }
-hashbrown = { workspace = true }
-indexmap = { workspace = true }
-is-macro = { workspace = true }
 notify = { workspace = true }
-parking_lot = { workspace = true }
 rayon = { workspace = true }
 rustc-hash = { workspace = true }
+salsa = { workspace = true }
 tracing = { workspace = true }
 tracing-subscriber = { workspace = true }
 tracing-tree = { workspace = true }
 
-[dev-dependencies]
-tempfile = { workspace = true }
 
 [lints]
 workspace = true

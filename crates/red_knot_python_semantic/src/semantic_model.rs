@@ -4,9 +4,8 @@ use ruff_python_ast as ast;
 use ruff_python_ast::{Expr, ExpressionRef, StmtClassDef};
 
 use crate::semantic_index::ast_ids::HasScopedAstId;
-use crate::semantic_index::definition::Definition;
 use crate::semantic_index::symbol::PublicSymbolId;
-use crate::semantic_index::{public_symbol, semantic_index, NodeWithScopeKey};
+use crate::semantic_index::{public_symbol, semantic_index};
 use crate::types::{infer_types, public_symbol_ty, Type, TypingContext};
 use crate::Db;
 
@@ -143,12 +142,10 @@ impl HasTy for ast::Expr {
 impl HasTy for ast::StmtFunctionDef {
     fn ty<'db>(&self, model: &SemanticModel<'db>) -> Type<'db> {
         let index = semantic_index(model.db, model.file);
-        let definition_scope = index.definition_scope(NodeWithScopeKey::from(self));
+        let definition = index.definition(self);
 
-        let scope = definition_scope.to_scope_id(model.db, model.file);
-
+        let scope = definition.scope(model.db).to_scope_id(model.db, model.file);
         let types = infer_types(model.db, scope);
-        let definition = Definition::FunctionDef(self.scoped_ast_id(model.db, scope));
 
         types.definition_ty(definition)
     }
@@ -157,11 +154,22 @@ impl HasTy for ast::StmtFunctionDef {
 impl HasTy for StmtClassDef {
     fn ty<'db>(&self, model: &SemanticModel<'db>) -> Type<'db> {
         let index = semantic_index(model.db, model.file);
-        let definition_scope = index.definition_scope(NodeWithScopeKey::from(self));
-        let scope = definition_scope.to_scope_id(model.db, model.file);
+        let definition = index.definition(self);
 
+        let scope = definition.scope(model.db).to_scope_id(model.db, model.file);
         let types = infer_types(model.db, scope);
-        let definition = Definition::ClassDef(self.scoped_ast_id(model.db, scope));
+
+        types.definition_ty(definition)
+    }
+}
+
+impl HasTy for ast::Alias {
+    fn ty<'db>(&self, model: &SemanticModel<'db>) -> Type<'db> {
+        let index = semantic_index(model.db, model.file);
+        let definition = index.definition(self);
+
+        let scope = definition.scope(model.db).to_scope_id(model.db, model.file);
+        let types = infer_types(model.db, scope);
 
         types.definition_ty(definition)
     }
@@ -228,6 +236,28 @@ mod tests {
         let class = ast.suite()[0].as_class_def_stmt().unwrap();
         let model = SemanticModel::new(&db, foo);
         let ty = class.ty(&model);
+
+        assert!(matches!(ty, Type::Class(_)));
+
+        Ok(())
+    }
+
+    #[test]
+    fn alias_ty() -> anyhow::Result<()> {
+        let db = setup_db();
+
+        db.memory_file_system().write_files([
+            ("/src/foo.py", "class Test: pass"),
+            ("/src/bar.py", "from foo import Test"),
+        ])?;
+        let bar = system_path_to_file(&db, "/src/bar.py").unwrap();
+
+        let ast = parsed_module(&db, bar);
+
+        let import = ast.suite()[0].as_import_from_stmt().unwrap();
+        let alias = &import.names[0];
+        let model = SemanticModel::new(&db, bar);
+        let ty = alias.ty(&model);
 
         assert!(matches!(ty, Type::Class(_)));
 

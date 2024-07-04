@@ -1,6 +1,6 @@
-use std::sync::Arc;
-
 use rustc_hash::FxHashMap;
+use std::borrow::Cow;
+use std::sync::Arc;
 
 use red_knot_module_resolver::resolve_module;
 use red_knot_module_resolver::ModuleName;
@@ -9,9 +9,11 @@ use ruff_index::IndexVec;
 use ruff_python_ast as ast;
 use ruff_python_ast::{ExprContext, TypeParams};
 
-use crate::semantic_index::ast_ids::{HasScopedAstId, ScopedExpressionId};
-use crate::semantic_index::definition::{Definition, ImportDefinition, ImportFromDefinition};
-use crate::semantic_index::symbol::{FileScopeId, ScopeId, ScopedSymbolId, SymbolTable};
+use crate::semantic_index::ast_ids::ScopedExpressionId;
+use crate::semantic_index::definition::{Definition, DefinitionNodeRef};
+use crate::semantic_index::symbol::{
+    FileScopeId, NodeWithScopeRef, ScopeId, ScopedSymbolId, SymbolTable,
+};
 use crate::semantic_index::{symbol_table, SemanticIndex};
 use crate::types::{
     infer_types, ClassType, FunctionType, IntersectionType, ModuleType, ScopedClassTypeId,
@@ -42,7 +44,7 @@ pub(crate) struct TypeInference<'db> {
     symbol_tys: IndexVec<ScopedSymbolId, Type<'db>>,
 
     /// The type of a definition.
-    definition_tys: FxHashMap<Definition, Type<'db>>,
+    definition_tys: FxHashMap<Definition<'db>, Type<'db>>,
 }
 
 impl<'db> TypeInference<'db> {
@@ -92,23 +94,27 @@ impl<'db> TypeInference<'db> {
 }
 
 /// Builder to infer all types in a [`ScopeId`].
-pub(super) struct TypeInferenceBuilder<'a> {
-    db: &'a dyn Db,
+pub(super) struct TypeInferenceBuilder<'db> {
+    db: &'db dyn Db,
 
     // Cached lookups
-    index: &'a SemanticIndex,
-    scope: ScopeId<'a>,
+    index: &'db SemanticIndex<'db>,
+    scope: ScopeId<'db>,
     file_scope_id: FileScopeId,
     file_id: VfsFile,
-    symbol_table: Arc<SymbolTable>,
+    symbol_table: Arc<SymbolTable<'db>>,
 
     /// The type inference results
-    types: TypeInference<'a>,
+    types: TypeInference<'db>,
 }
 
 impl<'db> TypeInferenceBuilder<'db> {
     /// Creates a new builder for inferring the types of `scope`.
-    pub(super) fn new(db: &'db dyn Db, scope: ScopeId<'db>, index: &'db SemanticIndex) -> Self {
+    pub(super) fn new(
+        db: &'db dyn Db,
+        scope: ScopeId<'db>,
+        index: &'db SemanticIndex<'db>,
+    ) -> Self {
         let file_scope_id = scope.file_scope_id(db);
         let file = scope.file(db);
         let symbol_table = index.symbol_table(file_scope_id);
@@ -188,7 +194,6 @@ impl<'db> TypeInferenceBuilder<'db> {
             decorator_list,
         } = function;
 
-        let function_id = function.scoped_ast_id(self.db, self.scope);
         let decorator_tys = decorator_list
             .iter()
             .map(|decorator| self.infer_decorator(decorator))
@@ -205,9 +210,8 @@ impl<'db> TypeInferenceBuilder<'db> {
             decorators: decorator_tys,
         });
 
-        self.types
-            .definition_tys
-            .insert(Definition::FunctionDef(function_id), function_ty);
+        let definition = self.index.definition(function);
+        self.types.definition_tys.insert(definition, function_ty);
     }
 
     fn infer_class_definition_statement(&mut self, class: &ast::StmtClassDef) {
@@ -220,8 +224,6 @@ impl<'db> TypeInferenceBuilder<'db> {
             body: _,
         } = class;
 
-        let class_id = class.scoped_ast_id(self.db, self.scope);
-
         for decorator in decorator_list {
             self.infer_decorator(decorator);
         }
@@ -231,17 +233,16 @@ impl<'db> TypeInferenceBuilder<'db> {
             .map(|arguments| self.infer_arguments(arguments))
             .unwrap_or(Vec::new());
 
-        let class_body_scope_id = self.index.node_scope(class);
+        let body_scope = self.index.node_scope(NodeWithScopeRef::Class(class));
 
         let class_ty = self.class_ty(ClassType {
             name: name.id.clone(),
             bases,
-            body_scope: class_body_scope_id.to_scope_id(self.db, self.file_id),
+            body_scope: body_scope.to_scope_id(self.db, self.file_id),
         });
 
-        self.types
-            .definition_tys
-            .insert(Definition::ClassDef(class_id), class_ty);
+        let definition = self.index.definition(class);
+        self.types.definition_tys.insert(definition, class_ty);
     }
 
     fn infer_if_statement(&mut self, if_statement: &ast::StmtIf) {
@@ -281,14 +282,12 @@ impl<'db> TypeInferenceBuilder<'db> {
 
         for target in targets {
             self.infer_expression(target);
+
+            self.types.definition_tys.insert(
+                self.index.definition(DefinitionNodeRef::Target(target)),
+                value_ty,
+            );
         }
-
-        let assign_id = assignment.scoped_ast_id(self.db, self.scope);
-
-        // TODO: Handle multiple targets.
-        self.types
-            .definition_tys
-            .insert(Definition::Assignment(assign_id), value_ty);
     }
 
     fn infer_annotated_assignment_statement(&mut self, assignment: &ast::StmtAnnAssign) {
@@ -308,7 +307,7 @@ impl<'db> TypeInferenceBuilder<'db> {
         self.infer_expression(target);
 
         self.types.definition_tys.insert(
-            Definition::AnnotatedAssignment(assignment.scoped_ast_id(self.db, self.scope)),
+            self.index.definition(DefinitionNodeRef::Target(target)),
             annotation_ty,
         );
     }
@@ -332,9 +331,7 @@ impl<'db> TypeInferenceBuilder<'db> {
     fn infer_import_statement(&mut self, import: &ast::StmtImport) {
         let ast::StmtImport { range: _, names } = import;
 
-        let import_id = import.scoped_ast_id(self.db, self.scope);
-
-        for (i, alias) in names.iter().enumerate() {
+        for alias in names {
             let ast::Alias {
                 range: _,
                 name,
@@ -347,13 +344,9 @@ impl<'db> TypeInferenceBuilder<'db> {
                 .map(|module| self.typing_context().module_ty(module.file()))
                 .unwrap_or(Type::Unknown);
 
-            self.types.definition_tys.insert(
-                Definition::Import(ImportDefinition {
-                    import_id,
-                    alias: u32::try_from(i).unwrap(),
-                }),
-                module_ty,
-            );
+            let definition = self.index.definition(alias);
+
+            self.types.definition_tys.insert(definition, module_ty);
         }
     }
 
@@ -365,7 +358,6 @@ impl<'db> TypeInferenceBuilder<'db> {
             level: _,
         } = import;
 
-        let import_id = import.scoped_ast_id(self.db, self.scope);
         let module_name = ModuleName::new(module.as_deref().expect("Support relative imports"));
 
         let module =
@@ -374,7 +366,7 @@ impl<'db> TypeInferenceBuilder<'db> {
             .map(|module| self.typing_context().module_ty(module.file()))
             .unwrap_or(Type::Unknown);
 
-        for (i, alias) in names.iter().enumerate() {
+        for alias in names {
             let ast::Alias {
                 range: _,
                 name,
@@ -385,13 +377,8 @@ impl<'db> TypeInferenceBuilder<'db> {
                 .member(&self.typing_context(), &name.id)
                 .unwrap_or(Type::Unknown);
 
-            self.types.definition_tys.insert(
-                Definition::ImportFrom(ImportFromDefinition {
-                    import_id,
-                    name: u32::try_from(i).unwrap(),
-                }),
-                ty,
-            );
+            let definition = self.index.definition(alias);
+            self.types.definition_tys.insert(definition, ty);
         }
     }
 
@@ -467,10 +454,9 @@ impl<'db> TypeInferenceBuilder<'db> {
         let value_ty = self.infer_expression(value);
         self.infer_expression(target);
 
-        self.types.definition_tys.insert(
-            Definition::NamedExpr(named.scoped_ast_id(self.db, self.scope)),
-            value_ty,
-        );
+        self.types
+            .definition_tys
+            .insert(self.index.definition(named), value_ty);
 
         value_ty
     }
@@ -502,35 +488,38 @@ impl<'db> TypeInferenceBuilder<'db> {
 
         match ctx {
             ExprContext::Load => {
-                if let Some(symbol_id) = self
-                    .index
-                    .symbol_table(self.file_scope_id)
-                    .symbol_id_by_name(id)
-                {
-                    self.local_definition_ty(symbol_id)
-                } else {
-                    let ancestors = self.index.ancestor_scopes(self.file_scope_id).skip(1);
+                let ancestors = self.index.ancestor_scopes(self.file_scope_id);
 
-                    for (ancestor_id, _) in ancestors {
-                        // TODO: Skip over class scopes unless the they are a immediately-nested type param scope.
-                        // TODO: Support built-ins
+                for (ancestor_id, _) in ancestors {
+                    // TODO: Skip over class scopes unless the they are a immediately-nested type param scope.
+                    // TODO: Support built-ins
 
+                    let (symbol_table, ancestor_scope) = if ancestor_id == self.file_scope_id {
+                        (Cow::Borrowed(&self.symbol_table), None)
+                    } else {
                         let ancestor_scope = ancestor_id.to_scope_id(self.db, self.file_id);
-                        let symbol_table = symbol_table(self.db, ancestor_scope);
+                        (
+                            Cow::Owned(symbol_table(self.db, ancestor_scope)),
+                            Some(ancestor_scope),
+                        )
+                    };
 
-                        if let Some(symbol_id) = symbol_table.symbol_id_by_name(id) {
-                            let symbol = symbol_table.symbol(symbol_id);
+                    if let Some(symbol_id) = symbol_table.symbol_id_by_name(id) {
+                        let symbol = symbol_table.symbol(symbol_id);
 
-                            if !symbol.is_defined() {
-                                continue;
-                            }
-
-                            let types = infer_types(self.db, ancestor_scope);
-                            return types.symbol_ty(symbol_id);
+                        if !symbol.is_defined() {
+                            continue;
                         }
+
+                        return if let Some(ancestor_scope) = ancestor_scope {
+                            let types = infer_types(self.db, ancestor_scope);
+                            types.symbol_ty(symbol_id)
+                        } else {
+                            self.local_definition_ty(symbol_id)
+                        };
                     }
-                    Type::Unknown
                 }
+                Type::Unknown
             }
             ExprContext::Del => Type::None,
             ExprContext::Invalid => Type::Unknown,
