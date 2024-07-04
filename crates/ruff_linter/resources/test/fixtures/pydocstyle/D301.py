@@ -35,3 +35,33 @@ def make_unique_pod_id(pod_id: str) -> str | None:
 
 def shouldnt_add_raw_here2():
     u"Sum\\mary."
+
+
+def shouldnt_add_raw_for_docstring_contains_docstring():
+    """
+    This docstring contains another docstring.
+
+        def foo():
+            \"\"\"Foo.\"\"\"
+    """
+
+
+def shouldnt_add_raw_for_docstring_contains_docstring2():
+    """
+    This docstring contains another docstring.
+
+        def bar():
+            \"""Bar.\"""
+    """
+
+
+def shouldnt_add_raw_for_docstring_contains_escaped_triple_quotes():
+    """
+    Escaped triple quote \""" or \"\"\".
+    """
+
+
+def should_add_raw_for_single_quote_escape():
+    """
+    This is single quote escape \".
+    """

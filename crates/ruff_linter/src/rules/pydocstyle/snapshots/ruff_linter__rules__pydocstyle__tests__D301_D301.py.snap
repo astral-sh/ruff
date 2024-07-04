@@ -25,4 +25,22 @@ D301.py:37:5: D301 Use `r"""` if any backslashes in a docstring
    |
    = help: Add `r` prefix
 
+D301.py:65:5: D301 [*] Use `r"""` if any backslashes in a docstring
+   |
+64 |   def should_add_raw_for_single_quote_escape():
+65 |       """
+   |  _____^
+66 | |     This is single quote escape \".
+67 | |     """
+   | |_______^ D301
+   |
+   = help: Add `r` prefix
 
+ℹ Unsafe fix
+62 62 | 
+63 63 | 
+64 64 | def should_add_raw_for_single_quote_escape():
+65    |-    """
+   65 |+    r"""
+66 66 |     This is single quote escape \".
+67 67 |     """
