@@ -81,10 +81,10 @@ impl DefinitionNodeRef<'_> {
 impl DefinitionNodeRef<'_> {
     pub(super) fn key(self) -> DefinitionNodeKey {
         match self {
-            Self::Alias(node) => DefinitionNodeKey::from(node),
-            Self::Function(node) => DefinitionNodeKey::from(node),
-            Self::Class(node) => DefinitionNodeKey::from(node),
-            Self::NamedExpression(node) => DefinitionNodeKey::from(node),
+            Self::Alias(node) => DefinitionNodeKey(NodeKey::from_node(node)),
+            Self::Function(node) => DefinitionNodeKey(NodeKey::from_node(node)),
+            Self::Class(node) => DefinitionNodeKey(NodeKey::from_node(node)),
+            Self::NamedExpression(node) => DefinitionNodeKey(NodeKey::from_node(node)),
             Self::Target(node) => DefinitionNodeKey(NodeKey::from_node(node)),
         }
     }
@@ -101,33 +101,3 @@ pub enum DefinitionKind {
 
 #[derive(Copy, Clone, Eq, PartialEq, Hash, Debug)]
 pub(super) struct DefinitionNodeKey(NodeKey);
-
-impl From<&ast::Alias> for DefinitionNodeKey {
-    fn from(node: &ast::Alias) -> Self {
-        Self(NodeKey::from_node(node))
-    }
-}
-
-impl From<&ast::StmtFunctionDef> for DefinitionNodeKey {
-    fn from(node: &ast::StmtFunctionDef) -> Self {
-        Self(NodeKey::from_node(node))
-    }
-}
-
-impl From<&ast::StmtClassDef> for DefinitionNodeKey {
-    fn from(value: &ast::StmtClassDef) -> Self {
-        Self(NodeKey::from_node(value))
-    }
-}
-
-impl From<&ast::ExprNamed> for DefinitionNodeKey {
-    fn from(value: &ast::ExprNamed) -> Self {
-        Self(NodeKey::from_node(value))
-    }
-}
-
-impl From<&ast::ExprName> for DefinitionNodeKey {
-    fn from(value: &ast::ExprName) -> Self {
-        Self(NodeKey::from_node(value))
-    }
-}
