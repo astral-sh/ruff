@@ -25,3 +25,10 @@ class Test:
     @ foo
     def baz(self):
         print('baz')
+
+
+# E204
+@ \
+foo
+def baz():
+    print('baz')
