@@ -368,6 +368,9 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
             if checker.enabled(Rule::UnusedAsync) {
                 ruff::rules::unused_async(checker, function_def);
             }
+            if checker.enabled(Rule::WhitespaceAfterDecorator) {
+                pycodestyle::rules::whitespace_after_decorator(checker, decorator_list);
+            }
         }
         Stmt::Return(_) => {
             if checker.enabled(Rule::ReturnOutsideFunction) {
@@ -530,6 +533,9 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
             }
             if checker.enabled(Rule::MetaClassABCMeta) {
                 refurb::rules::metaclass_abcmeta(checker, class_def);
+            }
+            if checker.enabled(Rule::WhitespaceAfterDecorator) {
+                pycodestyle::rules::whitespace_after_decorator(checker, decorator_list);
             }
         }
         Stmt::Import(ast::StmtImport { names, range: _ }) => {
