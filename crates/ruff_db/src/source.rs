@@ -1,7 +1,8 @@
+use countme::Count;
+use ruff_source_file::LineIndex;
+use salsa::DebugWithDb;
 use std::ops::Deref;
 use std::sync::Arc;
-
-use ruff_source_file::LineIndex;
 
 use crate::vfs::VfsFile;
 use crate::Db;
@@ -9,16 +10,21 @@ use crate::Db;
 /// Reads the content of file.
 #[salsa::tracked]
 pub fn source_text(db: &dyn Db, file: VfsFile) -> SourceText {
+    let _span = tracing::trace_span!("source_text", ?file).entered();
+
     let content = file.read(db);
 
     SourceText {
         inner: Arc::from(content),
+        count: Count::new(),
     }
 }
 
 /// Computes the [`LineIndex`] for `file`.
 #[salsa::tracked]
 pub fn line_index(db: &dyn Db, file: VfsFile) -> LineIndex {
+    let _span = tracing::trace_span!("line_index", file = ?file.debug(db)).entered();
+
     let source = source_text(db, file);
 
     LineIndex::from_source_text(&source)
@@ -30,6 +36,7 @@ pub fn line_index(db: &dyn Db, file: VfsFile) -> LineIndex {
 #[derive(Clone, Eq, PartialEq)]
 pub struct SourceText {
     inner: Arc<str>,
+    count: Count<Self>,
 }
 
 impl SourceText {

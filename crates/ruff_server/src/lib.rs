@@ -1,8 +1,9 @@
 //! ## The Ruff Language Server
 
-pub use edit::{PositionEncoding, TextDocument};
+pub use edit::{DocumentKey, NotebookDocument, PositionEncoding, TextDocument};
 use lsp_types::CodeActionKind;
 pub use server::Server;
+pub use session::{ClientSettings, DocumentQuery, DocumentSnapshot, Session};
 
 #[macro_use]
 mod message;

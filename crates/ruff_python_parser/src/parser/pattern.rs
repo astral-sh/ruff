@@ -1,11 +1,12 @@
+use ruff_python_ast::name::Name;
 use ruff_python_ast::{self as ast, Expr, ExprContext, Number, Operator, Pattern, Singleton};
 use ruff_text_size::{Ranged, TextSize};
 
-use crate::lexer::TokenValue;
 use crate::parser::progress::ParserProgress;
 use crate::parser::{recovery, Parser, RecoveryContextKind, SequenceMatchPatternParentheses};
+use crate::token::{TokenKind, TokenValue};
 use crate::token_set::TokenSet;
-use crate::{ParseErrorType, TokenKind};
+use crate::ParseErrorType;
 
 use super::expression::ExpressionContext;
 
@@ -510,7 +511,7 @@ impl<'src> Parser<'src> {
                     );
                     let invalid_node = Expr::Name(ast::ExprName {
                         range: self.missing_node_range(),
-                        id: String::new(),
+                        id: Name::empty(),
                         ctx: ExprContext::Invalid,
                     });
                     Pattern::MatchValue(ast::PatternMatchValue {
@@ -616,7 +617,7 @@ impl<'src> Parser<'src> {
                 } else {
                     Box::new(Expr::Name(ast::ExprName {
                         range: ident.range(),
-                        id: String::new(),
+                        id: Name::empty(),
                         ctx: ExprContext::Invalid,
                     }))
                 }
@@ -667,7 +668,7 @@ impl<'src> Parser<'src> {
                             &pattern,
                         );
                         ast::Identifier {
-                            id: String::new(),
+                            id: Name::empty(),
                             range: parser.missing_node_range(),
                         }
                     };

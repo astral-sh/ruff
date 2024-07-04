@@ -93,7 +93,7 @@ pub(crate) fn check_tokens(
         Rule::InvalidCharacterNul,
         Rule::InvalidCharacterZeroWidthSpace,
     ]) {
-        for token in tokens.up_to_first_unknown() {
+        for token in tokens {
             pylint::rules::invalid_string_characters(
                 &mut diagnostics,
                 token.kind(),

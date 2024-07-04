@@ -49,7 +49,7 @@ enum DocumentController {
 /// This query can 'select' a text document, full notebook, or a specific notebook cell.
 /// It also includes document settings.
 #[derive(Clone)]
-pub(crate) enum DocumentQuery {
+pub enum DocumentQuery {
     Text {
         file_url: Url,
         document: Arc<TextDocument>,
@@ -352,16 +352,9 @@ impl Index {
             anyhow::bail!("Tried to close unavailable document `{key}`");
         };
 
-        let Some(controller) = self.documents.remove(&url) else {
+        let Some(_) = self.documents.remove(&url) else {
             anyhow::bail!("tried to close document that didn't exist at {}", url)
         };
-        if let Some(notebook) = controller.as_notebook() {
-            for url in notebook.urls() {
-                self.notebook_cells.remove(url).ok_or_else(|| {
-                    anyhow!("tried to de-register notebook cell with URL {url} that didn't exist")
-                })?;
-            }
-        }
         Ok(())
     }
 
@@ -519,7 +512,7 @@ impl DocumentQuery {
     }
 
     /// Attempts to access the underlying notebook document that this query is selecting.
-    pub(crate) fn as_notebook(&self) -> Option<&NotebookDocument> {
+    pub fn as_notebook(&self) -> Option<&NotebookDocument> {
         match self {
             Self::Notebook { notebook, .. } => Some(notebook),
             Self::Text { .. } => None,

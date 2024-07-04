@@ -95,7 +95,7 @@ Module(
                                                             expression: Name(
                                                                 ExprName {
                                                                     range: 38..39,
-                                                                    id: "x",
+                                                                    id: Name("x"),
                                                                     ctx: Load,
                                                                 },
                                                             ),
@@ -153,12 +153,19 @@ Module(
 ## Errors
 
   |
-1 |   'hello' 'world
-  |  _________^
-2 | | 1 + 1
-  | |_^ Syntax Error: missing closing quote in string literal
-3 |   'hello' f'world {x}
-4 |   2 + 2
+1 | 'hello' 'world
+  |         ^^^^^^ Syntax Error: missing closing quote in string literal
+2 | 1 + 1
+3 | 'hello' f'world {x}
+  |
+
+
+  |
+1 | 'hello' 'world
+  |               ^ Syntax Error: Expected a statement
+2 | 1 + 1
+3 | 'hello' f'world {x}
+4 | 2 + 2
   |
 
 

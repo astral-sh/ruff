@@ -1,0 +1,75 @@
+---
+source: crates/ruff_python_parser/tests/fixtures.rs
+input_file: crates/ruff_python_parser/resources/invalid/re_lexing/triple_quoted_fstring_2.py
+---
+## AST
+
+```
+Module(
+    ModModule {
+        range: 0..183,
+        body: [
+            Expr(
+                StmtExpr {
+                    range: 167..183,
+                    value: FString(
+                        ExprFString {
+                            range: 167..183,
+                            value: FStringValue {
+                                inner: Single(
+                                    FString(
+                                        FString {
+                                            range: 167..183,
+                                            elements: [
+                                                Expression(
+                                                    FStringExpressionElement {
+                                                        range: 171..180,
+                                                        expression: Name(
+                                                            ExprName {
+                                                                range: 172..175,
+                                                                id: Name("foo"),
+                                                                ctx: Load,
+                                                            },
+                                                        ),
+                                                        debug_text: None,
+                                                        conversion: None,
+                                                        format_spec: Some(
+                                                            FStringFormatSpec {
+                                                                range: 176..180,
+                                                                elements: [
+                                                                    Literal(
+                                                                        FStringLiteralElement {
+                                                                            range: 176..180,
+                                                                            value: ".3f\n",
+                                                                        },
+                                                                    ),
+                                                                ],
+                                                            },
+                                                        ),
+                                                    },
+                                                ),
+                                            ],
+                                            flags: FStringFlags {
+                                                quote_style: Single,
+                                                prefix: Regular,
+                                                triple_quoted: true,
+                                            },
+                                        },
+                                    ),
+                                ),
+                            },
+                        },
+                    ),
+                },
+            ),
+        ],
+    },
+)
+```
+## Errors
+
+  |
+5 | f'''{foo:.3f
+6 | '''
+  | ^^^ Syntax Error: f-string: expecting '}'
+  |

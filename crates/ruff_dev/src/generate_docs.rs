@@ -64,7 +64,7 @@ pub(crate) fn main(args: &Args) -> Result<()> {
                 output.push('\n');
             }
 
-            if rule.is_preview() || rule.is_nursery() {
+            if rule.is_preview() {
                 output.push_str(
                     r"This rule is unstable and in [preview](../preview.md). The `--preview` flag is required for use.",
                 );

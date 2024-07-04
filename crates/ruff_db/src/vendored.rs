@@ -1,8 +1,9 @@
-use std::cell::RefCell;
+use std::borrow::Cow;
+use std::collections::BTreeMap;
+use std::fmt::{self, Debug};
 use std::io::{self, Read};
 use std::sync::{Mutex, MutexGuard};
 
-use itertools::Itertools;
 use zip::{read::ZipFile, ZipArchive};
 
 use crate::file_revision::FileRevision;
@@ -11,28 +12,27 @@ pub use path::{VendoredPath, VendoredPathBuf};
 pub mod path;
 
 type Result<T> = io::Result<T>;
+type LockedZipArchive<'a> = MutexGuard<'a, VendoredZipArchive>;
 
 /// File system that stores all content in a static zip archive
 /// bundled as part of the Ruff binary.
 ///
 /// "Files" in the `VendoredFileSystem` are read-only and immutable.
 /// Directories are supported, but symlinks and hardlinks cannot exist.
-#[derive(Debug)]
 pub struct VendoredFileSystem {
-    inner: VendoredFileSystemInner,
+    inner: Mutex<VendoredZipArchive>,
 }
 
 impl VendoredFileSystem {
     pub fn new(raw_bytes: &'static [u8]) -> Result<Self> {
         Ok(Self {
-            inner: VendoredFileSystemInner::new(raw_bytes)?,
+            inner: Mutex::new(VendoredZipArchive::new(raw_bytes)?),
         })
     }
 
     pub fn exists(&self, path: &VendoredPath) -> bool {
-        let normalized = normalize_vendored_path(path);
-        let inner_locked = self.inner.lock();
-        let mut archive = inner_locked.borrow_mut();
+        let normalized = NormalizedVendoredPath::from(path);
+        let mut archive = self.lock_archive();
 
         // Must probe the zipfile twice, as "stdlib" and "stdlib/" are considered
         // different paths in a zip file, but we want to abstract over that difference here
@@ -45,14 +45,13 @@ impl VendoredFileSystem {
     }
 
     pub fn metadata(&self, path: &VendoredPath) -> Option<Metadata> {
-        let normalized = normalize_vendored_path(path);
-        let inner_locked = self.inner.lock();
+        let normalized = NormalizedVendoredPath::from(path);
+        let mut archive = self.lock_archive();
 
         // Must probe the zipfile twice, as "stdlib" and "stdlib/" are considered
         // different paths in a zip file, but we want to abstract over that difference here
         // so that paths relative to the `VendoredFileSystem`
         // work the same as other paths in Ruff.
-        let mut archive = inner_locked.borrow_mut();
         if let Ok(zip_file) = archive.lookup_path(&normalized) {
             return Some(Metadata::from_zip_file(zip_file));
         }
@@ -70,12 +69,79 @@ impl VendoredFileSystem {
     /// - The path exists in the underlying zip archive, but represents a directory
     /// - The contents of the zip file at `path` contain invalid UTF-8
     pub fn read(&self, path: &VendoredPath) -> Result<String> {
-        let inner_locked = self.inner.lock();
-        let mut archive = inner_locked.borrow_mut();
-        let mut zip_file = archive.lookup_path(&normalize_vendored_path(path))?;
+        let mut archive = self.lock_archive();
+        let mut zip_file = archive.lookup_path(&NormalizedVendoredPath::from(path))?;
         let mut buffer = String::new();
         zip_file.read_to_string(&mut buffer)?;
         Ok(buffer)
+    }
+
+    /// Acquire a lock on the underlying zip archive.
+    /// The call will block until it is able to acquire the lock.
+    ///
+    /// ## Panics:
+    /// If the current thread already holds the lock.
+    fn lock_archive(&self) -> LockedZipArchive {
+        self.inner.lock().unwrap()
+    }
+}
+
+impl fmt::Debug for VendoredFileSystem {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let mut archive = self.lock_archive();
+        if f.alternate() {
+            let mut paths: Vec<String> = archive.0.file_names().map(String::from).collect();
+            paths.sort();
+            let debug_info: BTreeMap<String, ZipFileDebugInfo> = paths
+                .iter()
+                .map(|path| {
+                    (
+                        path.to_owned(),
+                        ZipFileDebugInfo::from(archive.0.by_name(path).unwrap()),
+                    )
+                })
+                .collect();
+            f.debug_struct("VendoredFileSystem")
+                .field("inner_mutex_poisoned", &self.inner.is_poisoned())
+                .field("paths", &paths)
+                .field("data_by_path", &debug_info)
+                .finish()
+        } else {
+            write!(f, "VendoredFileSystem(<{} paths>)", archive.len())
+        }
+    }
+}
+
+/// Private struct only used in `Debug` implementations
+///
+/// This could possibly be unified with the `Metadata` struct,
+/// but that is deliberately kept small, and only exposes metadata
+/// that users of the `VendoredFileSystem` could realistically need.
+/// For debugging purposes, however, we want to have all information
+/// available.
+#[allow(unused)]
+#[derive(Debug)]
+struct ZipFileDebugInfo {
+    crc32_hash: u32,
+    compressed_size: u64,
+    uncompressed_size: u64,
+    compression_method: zip::CompressionMethod,
+    kind: FileType,
+}
+
+impl<'a> From<ZipFile<'a>> for ZipFileDebugInfo {
+    fn from(value: ZipFile<'a>) -> Self {
+        Self {
+            crc32_hash: value.crc32(),
+            compressed_size: value.compressed_size(),
+            uncompressed_size: value.size(),
+            compression_method: value.compression(),
+            kind: if value.is_dir() {
+                FileType::Directory
+            } else {
+                FileType::File
+            },
+        }
     }
 }
 
@@ -127,28 +193,6 @@ impl Metadata {
     }
 }
 
-#[derive(Debug)]
-struct VendoredFileSystemInner(Mutex<RefCell<VendoredZipArchive>>);
-
-type LockedZipArchive<'a> = MutexGuard<'a, RefCell<VendoredZipArchive>>;
-
-impl VendoredFileSystemInner {
-    fn new(raw_bytes: &'static [u8]) -> Result<Self> {
-        Ok(Self(Mutex::new(RefCell::new(VendoredZipArchive::new(
-            raw_bytes,
-        )?))))
-    }
-
-    /// Acquire a lock on the underlying zip archive.
-    /// The call will block until it is able to acquire the lock.
-    ///
-    /// ## Panics:
-    /// If the current thread already holds the lock.
-    fn lock(&self) -> LockedZipArchive {
-        self.0.lock().unwrap()
-    }
-}
-
 /// Newtype wrapper around a ZipArchive.
 #[derive(Debug)]
 struct VendoredZipArchive(ZipArchive<io::Cursor<&'static [u8]>>);
@@ -161,6 +205,10 @@ impl VendoredZipArchive {
     fn lookup_path(&mut self, path: &NormalizedVendoredPath) -> Result<ZipFile> {
         Ok(self.0.by_name(path.as_str())?)
     }
+
+    fn len(&self) -> usize {
+        self.0.len()
+    }
 }
 
 /// A path that has been normalized via the `normalize_vendored_path` function.
@@ -169,54 +217,86 @@ impl VendoredZipArchive {
 /// but trailing slashes are crucial for distinguishing between
 /// files and directories inside zip archives.
 #[derive(Debug, Clone, PartialEq, Eq)]
-struct NormalizedVendoredPath(String);
+struct NormalizedVendoredPath<'a>(Cow<'a, str>);
 
-impl NormalizedVendoredPath {
-    fn with_trailing_slash(mut self) -> Self {
+impl<'a> NormalizedVendoredPath<'a> {
+    fn with_trailing_slash(self) -> Self {
         debug_assert!(!self.0.ends_with('/'));
-        self.0.push('/');
-        self
+        let mut data = self.0.into_owned();
+        data.push('/');
+        Self(Cow::Owned(data))
     }
 
     fn as_str(&self) -> &str {
-        self.0.as_str()
+        &self.0
     }
 }
 
-/// Normalizes the path by removing `.` and `..` components.
-///
-/// ## Panics:
-/// If a path with an unsupported component for vendored paths is passed.
-/// Unsupported components are path prefixes,
-/// and path root directories appearing anywhere except at the start of the path.
-fn normalize_vendored_path(path: &VendoredPath) -> NormalizedVendoredPath {
-    let mut normalized_parts = camino::Utf8PathBuf::new();
-
-    // Allow the `RootDir` component, but only if it is at the very start of the string.
-    let mut components = path.components().peekable();
-    if let Some(camino::Utf8Component::RootDir) = components.peek() {
-        components.next();
-    }
-
-    for component in components {
-        match component {
-            camino::Utf8Component::Normal(part) => normalized_parts.push(part),
-            camino::Utf8Component::CurDir => continue,
-            camino::Utf8Component::ParentDir => {
-                normalized_parts.pop();
+impl<'a> From<&'a VendoredPath> for NormalizedVendoredPath<'a> {
+    /// Normalize the path.
+    ///
+    /// The normalizations are:
+    /// - Remove `.` and `..` components
+    /// - Strip trailing slashes
+    /// - Normalize `\\` separators to `/`
+    /// - Validate that the path does not have any unsupported components
+    ///
+    /// ## Panics:
+    /// If a path with an unsupported component for vendored paths is passed.
+    /// Unsupported components are path prefixes and path root directories.
+    fn from(path: &'a VendoredPath) -> Self {
+        /// Remove `.` and `..` components, and validate that unsupported components are not present.
+        ///
+        /// This inner routine also strips trailing slashes,
+        /// and normalizes paths to use Unix `/` separators.
+        /// However, it always allocates, so avoid calling it if possible.
+        /// In most cases, the path should already be normalized.
+        fn normalize_unnormalized_path(path: &VendoredPath) -> String {
+            let mut normalized_parts = Vec::new();
+            for component in path.components() {
+                match component {
+                    camino::Utf8Component::Normal(part) => normalized_parts.push(part),
+                    camino::Utf8Component::CurDir => continue,
+                    camino::Utf8Component::ParentDir => {
+                        // `VendoredPath("")`, `VendoredPath("..")` and `VendoredPath("../..")`
+                        // all resolve to the same path relative to the zip archive
+                        // (see https://github.com/astral-sh/ruff/pull/11991#issuecomment-2185278014)
+                        normalized_parts.pop();
+                    }
+                    unsupported => {
+                        panic!("Unsupported component in a vendored path: {unsupported}")
+                    }
+                }
             }
-            unsupported => panic!("Unsupported component in a vendored path: {unsupported}"),
+            normalized_parts.join("/")
+        }
+
+        let path_str = path.as_str();
+
+        if std::path::MAIN_SEPARATOR == '\\' && path_str.contains('\\') {
+            // Normalize paths so that they always use Unix path separators
+            NormalizedVendoredPath(Cow::Owned(normalize_unnormalized_path(path)))
+        } else if !path
+            .components()
+            .all(|component| matches!(component, camino::Utf8Component::Normal(_)))
+        {
+            // Remove non-`Normal` components
+            NormalizedVendoredPath(Cow::Owned(normalize_unnormalized_path(path)))
+        } else {
+            // Strip trailing slashes from the path
+            NormalizedVendoredPath(Cow::Borrowed(path_str.trim_end_matches('/')))
         }
     }
-    NormalizedVendoredPath(normalized_parts.into_iter().join("/"))
 }
 
 #[cfg(test)]
 mod tests {
     use std::io::Write;
 
+    use insta::assert_snapshot;
     use once_cell::sync::Lazy;
-    use zip::{write::FileOptions, CompressionMethod, ZipWriter};
+    use zip::write::FileOptions;
+    use zip::{CompressionMethod, ZipWriter};
 
     use super::*;
 
@@ -254,6 +334,59 @@ mod tests {
 
     fn mock_typeshed() -> VendoredFileSystem {
         VendoredFileSystem::new(&MOCK_ZIP_ARCHIVE).unwrap()
+    }
+
+    #[test]
+    fn filesystem_debug_implementation() {
+        assert_snapshot!(
+            format!("{:?}", mock_typeshed()),
+            @"VendoredFileSystem(<4 paths>)"
+        );
+    }
+
+    #[test]
+    fn filesystem_debug_implementation_alternate() {
+        assert_snapshot!(format!("{:#?}", mock_typeshed()), @r###"
+        VendoredFileSystem {
+            inner_mutex_poisoned: false,
+            paths: [
+                "stdlib/",
+                "stdlib/asyncio/",
+                "stdlib/asyncio/tasks.pyi",
+                "stdlib/functools.pyi",
+            ],
+            data_by_path: {
+                "stdlib/": ZipFileDebugInfo {
+                    crc32_hash: 0,
+                    compressed_size: 0,
+                    uncompressed_size: 0,
+                    compression_method: Stored,
+                    kind: Directory,
+                },
+                "stdlib/asyncio/": ZipFileDebugInfo {
+                    crc32_hash: 0,
+                    compressed_size: 0,
+                    uncompressed_size: 0,
+                    compression_method: Stored,
+                    kind: Directory,
+                },
+                "stdlib/asyncio/tasks.pyi": ZipFileDebugInfo {
+                    crc32_hash: 2826547428,
+                    compressed_size: 24,
+                    uncompressed_size: 15,
+                    compression_method: Zstd,
+                    kind: File,
+                },
+                "stdlib/functools.pyi": ZipFileDebugInfo {
+                    crc32_hash: 1099005079,
+                    compressed_size: 34,
+                    uncompressed_size: 25,
+                    compression_method: Zstd,
+                    kind: File,
+                },
+            },
+        }
+        "###);
     }
 
     fn test_directory(dirname: &str) {

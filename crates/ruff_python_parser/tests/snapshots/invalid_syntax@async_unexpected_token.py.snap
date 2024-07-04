@@ -14,7 +14,7 @@ Module(
                     range: 6..20,
                     decorator_list: [],
                     name: Identifier {
-                        id: "Foo",
+                        id: Name("Foo"),
                         range: 12..15,
                     },
                     type_params: None,
@@ -39,7 +39,7 @@ Module(
                     test: Name(
                         ExprName {
                             range: 33..37,
-                            id: "test",
+                            id: Name("test"),
                             ctx: Load,
                         },
                     ),
@@ -65,7 +65,7 @@ Module(
                         Name(
                             ExprName {
                                 range: 49..50,
-                                id: "x",
+                                id: Name("x"),
                                 ctx: Store,
                             },
                         ),
@@ -86,7 +86,7 @@ Module(
                     is_async: true,
                     decorator_list: [],
                     name: Identifier {
-                        id: "foo",
+                        id: Name("foo"),
                         range: 71..74,
                     },
                     type_params: None,
@@ -119,7 +119,7 @@ Module(
                     subject: Name(
                         ExprName {
                             range: 94..98,
-                            id: "test",
+                            id: Name("test"),
                             ctx: Load,
                         },
                     ),

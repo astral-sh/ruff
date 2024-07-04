@@ -64,6 +64,7 @@ mod tests {
     #[test_case(Rule::UselessExpression, Path::new("B018.py"))]
     #[test_case(Rule::ReturnInGenerator, Path::new("B901.py"))]
     #[test_case(Rule::LoopIteratorMutation, Path::new("B909.py"))]
+    #[test_case(Rule::MutableContextvarDefault, Path::new("B039.py"))]
     fn rules(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!("{}_{}", rule_code.noqa_code(), path.to_string_lossy());
         let diagnostics = test_path(
@@ -119,6 +120,22 @@ mod tests {
                     ],
                 },
                 ..LinterSettings::for_rule(Rule::FunctionCallInDefaultArgument)
+            },
+        )?;
+        assert_messages!(snapshot, diagnostics);
+        Ok(())
+    }
+
+    #[test]
+    fn extend_mutable_contextvar_default() -> Result<()> {
+        let snapshot = "extend_mutable_contextvar_default".to_string();
+        let diagnostics = test_path(
+            Path::new("flake8_bugbear/B039_extended.py"),
+            &LinterSettings {
+                flake8_bugbear: super::settings::Settings {
+                    extend_immutable_calls: vec!["fastapi.Query".to_string()],
+                },
+                ..LinterSettings::for_rule(Rule::MutableContextvarDefault)
             },
         )?;
         assert_messages!(snapshot, diagnostics);

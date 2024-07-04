@@ -1,21 +1,22 @@
+use compact_str::CompactString;
 use std::fmt::Display;
-use std::hash::BuildHasherDefault;
 
-use rustc_hash::FxHashSet;
+use rustc_hash::{FxBuildHasher, FxHashSet};
 
+use ruff_python_ast::name::Name;
 use ruff_python_ast::{
     self as ast, ExceptHandler, Expr, ExprContext, IpyEscapeKind, Operator, Stmt, WithItem,
 };
 use ruff_text_size::{Ranged, TextSize};
 
-use crate::lexer::TokenValue;
 use crate::parser::expression::{ParsedExpr, EXPR_SET};
 use crate::parser::progress::ParserProgress;
 use crate::parser::{
     helpers, FunctionKind, Parser, RecoveryContext, RecoveryContextKind, WithItemKind,
 };
+use crate::token::{TokenKind, TokenValue};
 use crate::token_set::TokenSet;
-use crate::{Mode, ParseErrorType, TokenKind};
+use crate::{Mode, ParseErrorType};
 
 use super::expression::ExpressionContext;
 use super::Parenthesized;
@@ -624,7 +625,7 @@ impl<'src> Parser<'src> {
             let range = self.node_range(start);
             return ast::Alias {
                 name: ast::Identifier {
-                    id: "*".into(),
+                    id: Name::new_static("*"),
                     range,
                 },
                 asname: None,
@@ -670,7 +671,7 @@ impl<'src> Parser<'src> {
     fn parse_dotted_name(&mut self) -> ast::Identifier {
         let start = self.node_start();
 
-        let mut dotted_name = self.parse_identifier().id;
+        let mut dotted_name: CompactString = self.parse_identifier().id.into();
         let mut progress = ParserProgress::default();
 
         while self.eat(TokenKind::Dot) {
@@ -687,7 +688,7 @@ impl<'src> Parser<'src> {
         // import a.b.c
         // import a .  b  . c
         ast::Identifier {
-            id: dotted_name,
+            id: Name::from(dotted_name),
             range: self.node_range(start),
         }
     }
@@ -3028,6 +3029,14 @@ impl<'src> Parser<'src> {
             Parser::parse_type_param,
         );
 
+        if type_params.is_empty() {
+            // test_err type_params_empty
+            // def foo[]():
+            //     pass
+            // type ListOrSet[] = list | set
+            self.add_error(ParseErrorType::EmptyTypeParams, self.current_token_range());
+        }
+
         self.expect(TokenKind::Rsqb);
 
         ast::TypeParams {
@@ -3264,7 +3273,7 @@ impl<'src> Parser<'src> {
     /// Report errors for all the duplicate names found.
     fn validate_parameters(&mut self, parameters: &ast::Parameters) {
         let mut all_arg_names =
-            FxHashSet::with_capacity_and_hasher(parameters.len(), BuildHasherDefault::default());
+            FxHashSet::with_capacity_and_hasher(parameters.len(), FxBuildHasher);
 
         for parameter in parameters {
             let range = parameter.name().range();

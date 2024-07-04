@@ -19,7 +19,7 @@ Module(
                             operand: Name(
                                 ExprName {
                                     range: 1..2,
-                                    id: "x",
+                                    id: Name("x"),
                                     ctx: Load,
                                 },
                             ),
@@ -50,7 +50,7 @@ Module(
                             operand: Name(
                                 ExprName {
                                     range: 12..13,
-                                    id: "x",
+                                    id: Name("x"),
                                     ctx: Load,
                                 },
                             ),

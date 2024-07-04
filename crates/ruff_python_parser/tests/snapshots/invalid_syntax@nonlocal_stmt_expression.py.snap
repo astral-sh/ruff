@@ -14,7 +14,7 @@ Module(
                     range: 0..10,
                     names: [
                         Identifier {
-                            id: "x",
+                            id: Name("x"),
                             range: 9..10,
                         },
                     ],

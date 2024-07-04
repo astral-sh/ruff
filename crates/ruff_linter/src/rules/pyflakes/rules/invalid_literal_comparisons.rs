@@ -1,17 +1,17 @@
 use log::error;
-use ruff_python_ast::{CmpOp, Expr};
 
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::helpers;
+use ruff_python_ast::{CmpOp, Expr};
 use ruff_python_parser::{TokenKind, Tokens};
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
 
 /// ## What it does
-/// Checks for `is` and `is not` comparisons against constant literals, like
-/// integers and strings.
+/// Checks for `is` and `is not` comparisons against literals, like integers,
+/// strings, or lists.
 ///
 /// ## Why is this bad?
 /// The `is` and `is not` comparators operate on identity, in that they check
@@ -23,14 +23,14 @@ use crate::checkers::ast::Checker;
 /// As of Python 3.8, using `is` and `is not` with constant literals will produce
 /// a `SyntaxWarning`.
 ///
-/// Instead, use `==` and `!=` to compare constant literals, which will compare
-/// the values of the objects instead of their identities.
+/// This rule will also flag `is` and `is not` comparisons against non-constant
+/// literals, like lists, sets, and dictionaries. While such comparisons will
+/// not raise a `SyntaxWarning`, they are still likely to be incorrect, as they
+/// will compare the identities of the objects instead of their values, which
+/// will always evaluate to `False`.
 ///
-/// In [preview], this rule will also flag `is` and `is not` comparisons against
-/// non-constant literals, like lists, sets, and dictionaries. While such
-/// comparisons will not raise a `SyntaxWarning`, they are still likely to be
-/// incorrect, as they will compare the identities of the objects instead of
-/// their values, which will always evaluate to `False`.
+/// Instead, use `==` and `!=` to compare literals, which will compare the
+/// values of the objects instead of their identities.
 ///
 /// ## Example
 /// ```python
@@ -50,8 +50,6 @@ use crate::checkers::ast::Checker;
 /// - [Python documentation: Identity comparisons](https://docs.python.org/3/reference/expressions.html#is-not)
 /// - [Python documentation: Value comparisons](https://docs.python.org/3/reference/expressions.html#value-comparisons)
 /// - [_Why does Python log a SyntaxWarning for ‘is’ with literals?_ by Adam Johnson](https://adamj.eu/tech/2020/01/21/why-does-python-3-8-syntaxwarning-for-is-literal/)
-///
-/// [preview]: https://docs.astral.sh/ruff/preview/
 #[violation]
 pub struct IsLiteral {
     cmp_op: IsCmpOp,
@@ -90,9 +88,8 @@ pub(crate) fn invalid_literal_comparison(
         if matches!(op, CmpOp::Is | CmpOp::IsNot)
             && (helpers::is_constant_non_singleton(left)
                 || helpers::is_constant_non_singleton(right)
-                || (checker.settings.preview.is_enabled()
-                    && (helpers::is_mutable_iterable_initializer(left)
-                        || helpers::is_mutable_iterable_initializer(right))))
+                || helpers::is_mutable_iterable_initializer(left)
+                || helpers::is_mutable_iterable_initializer(right))
         {
             let mut diagnostic = Diagnostic::new(IsLiteral { cmp_op: op.into() }, expr.range());
             if lazy_located.is_none() {
@@ -146,7 +143,7 @@ fn locate_cmp_ops(expr: &Expr, tokens: &Tokens) -> Vec<LocatedCmpOp> {
     let mut tok_iter = tokens
         .in_range(expr.range())
         .iter()
-        .filter(|token| !token.is_trivia())
+        .filter(|token| !token.kind().is_trivia())
         .peekable();
 
     let mut ops: Vec<LocatedCmpOp> = vec![];

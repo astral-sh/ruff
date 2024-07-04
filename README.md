@@ -119,7 +119,25 @@ For more, see the [documentation](https://docs.astral.sh/ruff/).
 Ruff is available as [`ruff`](https://pypi.org/project/ruff/) on PyPI:
 
 ```shell
+# With pip.
 pip install ruff
+
+# With pipx.
+pipx install ruff
+```
+
+Starting with version `0.5.0`, Ruff can be installed with our standalone installers:
+
+```shell
+# On macOS and Linux.
+curl -LsSf https://astral.sh/ruff/install.sh | sh
+
+# On Windows.
+powershell -c "irm https://astral.sh/ruff/install.ps1 | iex"
+
+# For a specific version.
+curl -LsSf https://astral.sh/ruff/0.5.0/install.sh | sh
+powershell -c "irm https://astral.sh/ruff/0.5.0/install.ps1 | iex"
 ```
 
 You can also install Ruff via [Homebrew](https://formulae.brew.sh/formula/ruff), [Conda](https://anaconda.org/conda-forge/ruff),
@@ -152,7 +170,7 @@ Ruff can also be used as a [pre-commit](https://pre-commit.com/) hook via [`ruff
 ```yaml
 - repo: https://github.com/astral-sh/ruff-pre-commit
   # Ruff version.
-  rev: v0.4.9
+  rev: v0.5.0
   hooks:
     # Run the linter.
     - id: ruff
@@ -334,7 +352,6 @@ quality tools, including:
 - [flake8-super](https://pypi.org/project/flake8-super/)
 - [flake8-tidy-imports](https://pypi.org/project/flake8-tidy-imports/)
 - [flake8-todos](https://pypi.org/project/flake8-todos/)
-- [flake8-trio](https://pypi.org/project/flake8-trio/)
 - [flake8-type-checking](https://pypi.org/project/flake8-type-checking/)
 - [flake8-use-pathlib](https://pypi.org/project/flake8-use-pathlib/)
 - [flynt](https://pypi.org/project/flynt/) ([#2102](https://github.com/astral-sh/ruff/issues/2102))
@@ -442,6 +459,7 @@ Ruff is used by a number of major open-source projects and companies, including:
 - [NumPyro](https://github.com/pyro-ppl/numpyro)
 - [ONNX](https://github.com/onnx/onnx)
 - [OpenBB](https://github.com/OpenBB-finance/OpenBBTerminal)
+- [Open Wine Components](https://github.com/Open-Wine-Components/umu-launcher)
 - [PDM](https://github.com/pdm-project/pdm)
 - [PaddlePaddle](https://github.com/PaddlePaddle/Paddle)
 - [Pandas](https://github.com/pandas-dev/pandas)

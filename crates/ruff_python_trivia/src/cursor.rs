@@ -5,6 +5,8 @@ use ruff_text_size::{TextLen, TextSize};
 pub const EOF_CHAR: char = '\0';
 
 /// A [`Cursor`] over a string.
+///
+/// Based on [`rustc`'s `Cursor`](https://github.com/rust-lang/rust/blob/d1b7355d3d7b4ead564dbecb1d240fcc74fff21b/compiler/rustc_lexer/src/cursor.rs)
 #[derive(Debug, Clone)]
 pub struct Cursor<'a> {
     chars: Chars<'a>,

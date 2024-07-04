@@ -254,7 +254,7 @@ For a complete enumeration of the available configuration options, see [_Setting
 
 ## Config file discovery
 
-Similar to [ESLint](https://eslint.org/docs/latest/user-guide/configuring/configuration-files#cascading-and-hierarchy),
+Similar to [ESLint](https://eslint.org/docs/latest/use/configure/configuration-files#cascading-configuration-objects),
 Ruff supports hierarchical configuration, such that the "closest" config file in the
 directory hierarchy is used for every individual file, with all paths in the config file
 (e.g., `exclude` globs, `src` paths) being resolved relative to the directory containing that
@@ -270,12 +270,12 @@ There are a few exceptions to these rules:
 1. If no config file is found in the filesystem hierarchy, Ruff will fall back to using
     a default configuration. If a user-specific configuration file exists
     at `${config_dir}/ruff/pyproject.toml`, that file will be used instead of the default
-    configuration, with `${config_dir}` being determined via the [`dirs`](https://docs.rs/dirs/4.0.0/dirs/fn.config_dir.html)
-    crate, and all relative paths being again resolved relative to the _current working directory_.
+    configuration, with `${config_dir}` being determined via [`etcetera`'s native strategy](https://docs.rs/etcetera/latest/etcetera/#native-strategy),
+    and all relative paths being again resolved relative to the _current working directory_.
 1. Any config-file-supported settings that are provided on the command-line (e.g., via
     `--select`) will override the settings in _every_ resolved configuration file.
 
-Unlike [ESLint](https://eslint.org/docs/latest/user-guide/configuring/configuration-files#cascading-and-hierarchy),
+Unlike [ESLint](https://eslint.org/docs/latest/use/configure/configuration-files#cascading-configuration-objects),
 Ruff does not merge settings across configuration files; instead, the "closest" configuration file
 is used, and any parent configuration files are ignored. In lieu of this implicit cascade, Ruff
 supports an [`extend`](settings.md#extend) field, which allows you to inherit the settings from another
@@ -516,7 +516,7 @@ See `ruff help` for the full list of Ruff's top-level commands:
 <!-- Begin auto-generated command help. -->
 
 ```text
-Ruff: An extremely fast Python linter.
+Ruff: An extremely fast Python linter and code formatter.
 
 Usage: ruff [OPTIONS] <COMMAND>
 
@@ -576,22 +576,20 @@ Options:
       --unsafe-fixes
           Include fixes that may not retain the original intent of the code.
           Use `--no-unsafe-fixes` to disable
-      --show-source
-          Show violations with source code. Use `--no-show-source` to disable.
-          (Deprecated: use `--output-format=full` or `--output-format=concise`
-          instead of `--show-source` and `--no-show-source`, respectively)
       --show-fixes
           Show an enumeration of all fixed lint violations. Use
           `--no-show-fixes` to disable
       --diff
           Avoid writing any fixed files back; instead, output a diff for each
-          changed file to stdout. Implies `--fix-only`
+          changed file to stdout, and exit 0 if there are no diffs. Implies
+          `--fix-only`
   -w, --watch
           Run in watch mode by re-running whenever files change
       --fix-only
-          Apply fixes to resolve lint violations, but don't report on leftover
-          violations. Implies `--fix`. Use `--no-fix-only` to disable or
-          `--unsafe-fixes` to include unsafe fixes
+          Apply fixes to resolve lint violations, but don't report on, or exit
+          non-zero for, leftover violations. Implies `--fix`. Use
+          `--no-fix-only` to disable or `--unsafe-fixes` to include unsafe
+          fixes
       --ignore-noqa
           Ignore any `# noqa` comments
       --output-format <OUTPUT_FORMAT>

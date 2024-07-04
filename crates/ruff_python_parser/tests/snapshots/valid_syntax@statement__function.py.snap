@@ -15,7 +15,7 @@ Module(
                     is_async: false,
                     decorator_list: [],
                     name: Identifier {
-                        id: "no_parameters",
+                        id: Name("no_parameters"),
                         range: 4..17,
                     },
                     type_params: None,
@@ -43,7 +43,7 @@ Module(
                     is_async: false,
                     decorator_list: [],
                     name: Identifier {
-                        id: "positional_parameters",
+                        id: Name("positional_parameters"),
                         range: 36..57,
                     },
                     type_params: None,
@@ -56,7 +56,7 @@ Module(
                                 parameter: Parameter {
                                     range: 58..59,
                                     name: Identifier {
-                                        id: "a",
+                                        id: Name("a"),
                                         range: 58..59,
                                     },
                                     annotation: None,
@@ -68,7 +68,7 @@ Module(
                                 parameter: Parameter {
                                     range: 61..62,
                                     name: Identifier {
-                                        id: "b",
+                                        id: Name("b"),
                                         range: 61..62,
                                     },
                                     annotation: None,
@@ -80,7 +80,7 @@ Module(
                                 parameter: Parameter {
                                     range: 64..65,
                                     name: Identifier {
-                                        id: "c",
+                                        id: Name("c"),
                                         range: 64..65,
                                     },
                                     annotation: None,
@@ -108,7 +108,7 @@ Module(
                     is_async: false,
                     decorator_list: [],
                     name: Identifier {
-                        id: "positional_parameters_with_default_values",
+                        id: Name("positional_parameters_with_default_values"),
                         range: 83..124,
                     },
                     type_params: None,
@@ -121,7 +121,7 @@ Module(
                                 parameter: Parameter {
                                     range: 125..126,
                                     name: Identifier {
-                                        id: "a",
+                                        id: Name("a"),
                                         range: 125..126,
                                     },
                                     annotation: None,
@@ -133,7 +133,7 @@ Module(
                                 parameter: Parameter {
                                     range: 128..129,
                                     name: Identifier {
-                                        id: "b",
+                                        id: Name("b"),
                                         range: 128..129,
                                     },
                                     annotation: None,
@@ -154,7 +154,7 @@ Module(
                                 parameter: Parameter {
                                     range: 134..135,
                                     name: Identifier {
-                                        id: "c",
+                                        id: Name("c"),
                                         range: 134..135,
                                     },
                                     annotation: None,
@@ -191,7 +191,7 @@ Module(
                     is_async: false,
                     decorator_list: [],
                     name: Identifier {
-                        id: "positional_parameters_with_default_values2",
+                        id: Name("positional_parameters_with_default_values2"),
                         range: 156..198,
                     },
                     type_params: None,
@@ -203,7 +203,7 @@ Module(
                                 parameter: Parameter {
                                     range: 199..200,
                                     name: Identifier {
-                                        id: "a",
+                                        id: Name("a"),
                                         range: 199..200,
                                     },
                                     annotation: None,
@@ -215,7 +215,7 @@ Module(
                                 parameter: Parameter {
                                     range: 202..203,
                                     name: Identifier {
-                                        id: "b",
+                                        id: Name("b"),
                                         range: 202..203,
                                     },
                                     annotation: None,
@@ -238,7 +238,7 @@ Module(
                                 parameter: Parameter {
                                     range: 211..212,
                                     name: Identifier {
-                                        id: "c",
+                                        id: Name("c"),
                                         range: 211..212,
                                     },
                                     annotation: None,
@@ -275,7 +275,7 @@ Module(
                     is_async: false,
                     decorator_list: [],
                     name: Identifier {
-                        id: "positional_only_and_positional_parameters",
+                        id: Name("positional_only_and_positional_parameters"),
                         range: 233..274,
                     },
                     type_params: None,
@@ -287,7 +287,7 @@ Module(
                                 parameter: Parameter {
                                     range: 275..276,
                                     name: Identifier {
-                                        id: "a",
+                                        id: Name("a"),
                                         range: 275..276,
                                     },
                                     annotation: None,
@@ -301,7 +301,7 @@ Module(
                                 parameter: Parameter {
                                     range: 281..282,
                                     name: Identifier {
-                                        id: "b",
+                                        id: Name("b"),
                                         range: 281..282,
                                     },
                                     annotation: None,
@@ -313,7 +313,7 @@ Module(
                                 parameter: Parameter {
                                     range: 284..285,
                                     name: Identifier {
-                                        id: "c",
+                                        id: Name("c"),
                                         range: 284..285,
                                     },
                                     annotation: None,
@@ -341,7 +341,7 @@ Module(
                     is_async: false,
                     decorator_list: [],
                     name: Identifier {
-                        id: "pos_args_with_defaults_and_varargs_and_kwargs",
+                        id: Name("pos_args_with_defaults_and_varargs_and_kwargs"),
                         range: 303..348,
                     },
                     type_params: None,
@@ -353,7 +353,7 @@ Module(
                                 parameter: Parameter {
                                     range: 349..350,
                                     name: Identifier {
-                                        id: "a",
+                                        id: Name("a"),
                                         range: 349..350,
                                     },
                                     annotation: None,
@@ -365,7 +365,7 @@ Module(
                                 parameter: Parameter {
                                     range: 352..353,
                                     name: Identifier {
-                                        id: "b",
+                                        id: Name("b"),
                                         range: 352..353,
                                     },
                                     annotation: None,
@@ -388,7 +388,7 @@ Module(
                                 parameter: Parameter {
                                     range: 361..362,
                                     name: Identifier {
-                                        id: "c",
+                                        id: Name("c"),
                                         range: 361..362,
                                     },
                                     annotation: None,
@@ -409,7 +409,7 @@ Module(
                             Parameter {
                                 range: 367..372,
                                 name: Identifier {
-                                    id: "args",
+                                    id: Name("args"),
                                     range: 368..372,
                                 },
                                 annotation: None,
@@ -420,7 +420,7 @@ Module(
                             Parameter {
                                 range: 374..382,
                                 name: Identifier {
-                                    id: "kwargs",
+                                    id: Name("kwargs"),
                                     range: 376..382,
                                 },
                                 annotation: None,
@@ -443,7 +443,7 @@ Module(
                     is_async: false,
                     decorator_list: [],
                     name: Identifier {
-                        id: "keyword_only_parameters",
+                        id: Name("keyword_only_parameters"),
                         range: 400..423,
                     },
                     type_params: None,
@@ -458,7 +458,7 @@ Module(
                                 parameter: Parameter {
                                     range: 427..428,
                                     name: Identifier {
-                                        id: "a",
+                                        id: Name("a"),
                                         range: 427..428,
                                     },
                                     annotation: None,
@@ -470,7 +470,7 @@ Module(
                                 parameter: Parameter {
                                     range: 430..431,
                                     name: Identifier {
-                                        id: "b",
+                                        id: Name("b"),
                                         range: 430..431,
                                     },
                                     annotation: None,
@@ -482,7 +482,7 @@ Module(
                                 parameter: Parameter {
                                     range: 433..434,
                                     name: Identifier {
-                                        id: "c",
+                                        id: Name("c"),
                                         range: 433..434,
                                     },
                                     annotation: None,
@@ -508,7 +508,7 @@ Module(
                     is_async: false,
                     decorator_list: [],
                     name: Identifier {
-                        id: "keyword_only_parameters_with_defaults",
+                        id: Name("keyword_only_parameters_with_defaults"),
                         range: 452..489,
                     },
                     type_params: None,
@@ -523,7 +523,7 @@ Module(
                                 parameter: Parameter {
                                     range: 493..494,
                                     name: Identifier {
-                                        id: "a",
+                                        id: Name("a"),
                                         range: 493..494,
                                     },
                                     annotation: None,
@@ -535,7 +535,7 @@ Module(
                                 parameter: Parameter {
                                     range: 496..497,
                                     name: Identifier {
-                                        id: "b",
+                                        id: Name("b"),
                                         range: 496..497,
                                     },
                                     annotation: None,
@@ -556,7 +556,7 @@ Module(
                                 parameter: Parameter {
                                     range: 502..503,
                                     name: Identifier {
-                                        id: "c",
+                                        id: Name("c"),
                                         range: 502..503,
                                     },
                                     annotation: None,
@@ -591,7 +591,7 @@ Module(
                     is_async: false,
                     decorator_list: [],
                     name: Identifier {
-                        id: "kw_only_args_with_defaults_and_varargs",
+                        id: Name("kw_only_args_with_defaults_and_varargs"),
                         range: 524..562,
                     },
                     type_params: None,
@@ -603,7 +603,7 @@ Module(
                             Parameter {
                                 range: 563..568,
                                 name: Identifier {
-                                    id: "args",
+                                    id: Name("args"),
                                     range: 564..568,
                                 },
                                 annotation: None,
@@ -615,7 +615,7 @@ Module(
                                 parameter: Parameter {
                                     range: 570..571,
                                     name: Identifier {
-                                        id: "a",
+                                        id: Name("a"),
                                         range: 570..571,
                                     },
                                     annotation: None,
@@ -627,7 +627,7 @@ Module(
                                 parameter: Parameter {
                                     range: 573..574,
                                     name: Identifier {
-                                        id: "b",
+                                        id: Name("b"),
                                         range: 573..574,
                                     },
                                     annotation: None,
@@ -648,7 +648,7 @@ Module(
                                 parameter: Parameter {
                                     range: 579..580,
                                     name: Identifier {
-                                        id: "c",
+                                        id: Name("c"),
                                         range: 579..580,
                                     },
                                     annotation: None,
@@ -683,7 +683,7 @@ Module(
                     is_async: false,
                     decorator_list: [],
                     name: Identifier {
-                        id: "kw_only_args_with_defaults_and_kwargs",
+                        id: Name("kw_only_args_with_defaults_and_kwargs"),
                         range: 601..638,
                     },
                     type_params: None,
@@ -698,7 +698,7 @@ Module(
                                 parameter: Parameter {
                                     range: 642..643,
                                     name: Identifier {
-                                        id: "a",
+                                        id: Name("a"),
                                         range: 642..643,
                                     },
                                     annotation: None,
@@ -710,7 +710,7 @@ Module(
                                 parameter: Parameter {
                                     range: 645..646,
                                     name: Identifier {
-                                        id: "b",
+                                        id: Name("b"),
                                         range: 645..646,
                                     },
                                     annotation: None,
@@ -731,7 +731,7 @@ Module(
                                 parameter: Parameter {
                                     range: 651..652,
                                     name: Identifier {
-                                        id: "c",
+                                        id: Name("c"),
                                         range: 651..652,
                                     },
                                     annotation: None,
@@ -752,7 +752,7 @@ Module(
                             Parameter {
                                 range: 657..665,
                                 name: Identifier {
-                                    id: "kwargs",
+                                    id: Name("kwargs"),
                                     range: 659..665,
                                 },
                                 annotation: None,
@@ -775,7 +775,7 @@ Module(
                     is_async: false,
                     decorator_list: [],
                     name: Identifier {
-                        id: "kw_only_args_with_defaults_and_varargs_and_kwargs",
+                        id: Name("kw_only_args_with_defaults_and_varargs_and_kwargs"),
                         range: 683..732,
                     },
                     type_params: None,
@@ -787,7 +787,7 @@ Module(
                             Parameter {
                                 range: 733..738,
                                 name: Identifier {
-                                    id: "args",
+                                    id: Name("args"),
                                     range: 734..738,
                                 },
                                 annotation: None,
@@ -799,7 +799,7 @@ Module(
                                 parameter: Parameter {
                                     range: 740..741,
                                     name: Identifier {
-                                        id: "a",
+                                        id: Name("a"),
                                         range: 740..741,
                                     },
                                     annotation: None,
@@ -811,7 +811,7 @@ Module(
                                 parameter: Parameter {
                                     range: 743..744,
                                     name: Identifier {
-                                        id: "b",
+                                        id: Name("b"),
                                         range: 743..744,
                                     },
                                     annotation: None,
@@ -832,7 +832,7 @@ Module(
                                 parameter: Parameter {
                                     range: 749..750,
                                     name: Identifier {
-                                        id: "c",
+                                        id: Name("c"),
                                         range: 749..750,
                                     },
                                     annotation: None,
@@ -853,7 +853,7 @@ Module(
                             Parameter {
                                 range: 755..763,
                                 name: Identifier {
-                                    id: "kwargs",
+                                    id: Name("kwargs"),
                                     range: 757..763,
                                 },
                                 annotation: None,
@@ -876,7 +876,7 @@ Module(
                     is_async: false,
                     decorator_list: [],
                     name: Identifier {
-                        id: "pos_and_kw_only_args",
+                        id: Name("pos_and_kw_only_args"),
                         range: 781..801,
                     },
                     type_params: None,
@@ -888,7 +888,7 @@ Module(
                                 parameter: Parameter {
                                     range: 802..803,
                                     name: Identifier {
-                                        id: "a",
+                                        id: Name("a"),
                                         range: 802..803,
                                     },
                                     annotation: None,
@@ -900,7 +900,7 @@ Module(
                                 parameter: Parameter {
                                     range: 805..806,
                                     name: Identifier {
-                                        id: "b",
+                                        id: Name("b"),
                                         range: 805..806,
                                     },
                                     annotation: None,
@@ -914,7 +914,7 @@ Module(
                                 parameter: Parameter {
                                     range: 811..812,
                                     name: Identifier {
-                                        id: "c",
+                                        id: Name("c"),
                                         range: 811..812,
                                     },
                                     annotation: None,
@@ -929,7 +929,7 @@ Module(
                                 parameter: Parameter {
                                     range: 817..818,
                                     name: Identifier {
-                                        id: "d",
+                                        id: Name("d"),
                                         range: 817..818,
                                     },
                                     annotation: None,
@@ -941,7 +941,7 @@ Module(
                                 parameter: Parameter {
                                     range: 820..821,
                                     name: Identifier {
-                                        id: "e",
+                                        id: Name("e"),
                                         range: 820..821,
                                     },
                                     annotation: None,
@@ -953,7 +953,7 @@ Module(
                                 parameter: Parameter {
                                     range: 823..824,
                                     name: Identifier {
-                                        id: "f",
+                                        id: Name("f"),
                                         range: 823..824,
                                     },
                                     annotation: None,
@@ -979,7 +979,7 @@ Module(
                     is_async: false,
                     decorator_list: [],
                     name: Identifier {
-                        id: "pos_and_kw_only_args_with_defaults",
+                        id: Name("pos_and_kw_only_args_with_defaults"),
                         range: 842..876,
                     },
                     type_params: None,
@@ -991,7 +991,7 @@ Module(
                                 parameter: Parameter {
                                     range: 877..878,
                                     name: Identifier {
-                                        id: "a",
+                                        id: Name("a"),
                                         range: 877..878,
                                     },
                                     annotation: None,
@@ -1003,7 +1003,7 @@ Module(
                                 parameter: Parameter {
                                     range: 880..881,
                                     name: Identifier {
-                                        id: "b",
+                                        id: Name("b"),
                                         range: 880..881,
                                     },
                                     annotation: None,
@@ -1017,7 +1017,7 @@ Module(
                                 parameter: Parameter {
                                     range: 886..887,
                                     name: Identifier {
-                                        id: "c",
+                                        id: Name("c"),
                                         range: 886..887,
                                     },
                                     annotation: None,
@@ -1032,7 +1032,7 @@ Module(
                                 parameter: Parameter {
                                     range: 892..893,
                                     name: Identifier {
-                                        id: "d",
+                                        id: Name("d"),
                                         range: 892..893,
                                     },
                                     annotation: None,
@@ -1044,7 +1044,7 @@ Module(
                                 parameter: Parameter {
                                     range: 895..896,
                                     name: Identifier {
-                                        id: "e",
+                                        id: Name("e"),
                                         range: 895..896,
                                     },
                                     annotation: None,
@@ -1065,7 +1065,7 @@ Module(
                                 parameter: Parameter {
                                     range: 901..902,
                                     name: Identifier {
-                                        id: "f",
+                                        id: Name("f"),
                                         range: 901..902,
                                     },
                                     annotation: None,
@@ -1100,7 +1100,7 @@ Module(
                     is_async: false,
                     decorator_list: [],
                     name: Identifier {
-                        id: "pos_and_kw_only_args_with_defaults_and_varargs",
+                        id: Name("pos_and_kw_only_args_with_defaults_and_varargs"),
                         range: 923..969,
                     },
                     type_params: None,
@@ -1112,7 +1112,7 @@ Module(
                                 parameter: Parameter {
                                     range: 970..971,
                                     name: Identifier {
-                                        id: "a",
+                                        id: Name("a"),
                                         range: 970..971,
                                     },
                                     annotation: None,
@@ -1124,7 +1124,7 @@ Module(
                                 parameter: Parameter {
                                     range: 973..974,
                                     name: Identifier {
-                                        id: "b",
+                                        id: Name("b"),
                                         range: 973..974,
                                     },
                                     annotation: None,
@@ -1138,7 +1138,7 @@ Module(
                                 parameter: Parameter {
                                     range: 979..980,
                                     name: Identifier {
-                                        id: "c",
+                                        id: Name("c"),
                                         range: 979..980,
                                     },
                                     annotation: None,
@@ -1150,7 +1150,7 @@ Module(
                             Parameter {
                                 range: 982..987,
                                 name: Identifier {
-                                    id: "args",
+                                    id: Name("args"),
                                     range: 983..987,
                                 },
                                 annotation: None,
@@ -1162,7 +1162,7 @@ Module(
                                 parameter: Parameter {
                                     range: 989..990,
                                     name: Identifier {
-                                        id: "d",
+                                        id: Name("d"),
                                         range: 989..990,
                                     },
                                     annotation: None,
@@ -1174,7 +1174,7 @@ Module(
                                 parameter: Parameter {
                                     range: 992..993,
                                     name: Identifier {
-                                        id: "e",
+                                        id: Name("e"),
                                         range: 992..993,
                                     },
                                     annotation: None,
@@ -1195,7 +1195,7 @@ Module(
                                 parameter: Parameter {
                                     range: 998..999,
                                     name: Identifier {
-                                        id: "f",
+                                        id: Name("f"),
                                         range: 998..999,
                                     },
                                     annotation: None,
@@ -1230,7 +1230,7 @@ Module(
                     is_async: false,
                     decorator_list: [],
                     name: Identifier {
-                        id: "pos_and_kw_only_args_with_defaults_and_kwargs",
+                        id: Name("pos_and_kw_only_args_with_defaults_and_kwargs"),
                         range: 1020..1065,
                     },
                     type_params: None,
@@ -1242,7 +1242,7 @@ Module(
                                 parameter: Parameter {
                                     range: 1071..1072,
                                     name: Identifier {
-                                        id: "a",
+                                        id: Name("a"),
                                         range: 1071..1072,
                                     },
                                     annotation: None,
@@ -1254,7 +1254,7 @@ Module(
                                 parameter: Parameter {
                                     range: 1074..1075,
                                     name: Identifier {
-                                        id: "b",
+                                        id: Name("b"),
                                         range: 1074..1075,
                                     },
                                     annotation: None,
@@ -1268,7 +1268,7 @@ Module(
                                 parameter: Parameter {
                                     range: 1080..1081,
                                     name: Identifier {
-                                        id: "c",
+                                        id: Name("c"),
                                         range: 1080..1081,
                                     },
                                     annotation: None,
@@ -1283,7 +1283,7 @@ Module(
                                 parameter: Parameter {
                                     range: 1086..1087,
                                     name: Identifier {
-                                        id: "d",
+                                        id: Name("d"),
                                         range: 1086..1087,
                                     },
                                     annotation: None,
@@ -1295,7 +1295,7 @@ Module(
                                 parameter: Parameter {
                                     range: 1089..1090,
                                     name: Identifier {
-                                        id: "e",
+                                        id: Name("e"),
                                         range: 1089..1090,
                                     },
                                     annotation: None,
@@ -1316,7 +1316,7 @@ Module(
                                 parameter: Parameter {
                                     range: 1095..1096,
                                     name: Identifier {
-                                        id: "f",
+                                        id: Name("f"),
                                         range: 1095..1096,
                                     },
                                     annotation: None,
@@ -1337,7 +1337,7 @@ Module(
                             Parameter {
                                 range: 1101..1109,
                                 name: Identifier {
-                                    id: "kwargs",
+                                    id: Name("kwargs"),
                                     range: 1103..1109,
                                 },
                                 annotation: None,
@@ -1360,7 +1360,7 @@ Module(
                     is_async: false,
                     decorator_list: [],
                     name: Identifier {
-                        id: "pos_and_kw_only_args_with_defaults_and_varargs_and_kwargs",
+                        id: Name("pos_and_kw_only_args_with_defaults_and_varargs_and_kwargs"),
                         range: 1128..1185,
                     },
                     type_params: None,
@@ -1372,7 +1372,7 @@ Module(
                                 parameter: Parameter {
                                     range: 1191..1192,
                                     name: Identifier {
-                                        id: "a",
+                                        id: Name("a"),
                                         range: 1191..1192,
                                     },
                                     annotation: None,
@@ -1384,7 +1384,7 @@ Module(
                                 parameter: Parameter {
                                     range: 1194..1195,
                                     name: Identifier {
-                                        id: "b",
+                                        id: Name("b"),
                                         range: 1194..1195,
                                     },
                                     annotation: None,
@@ -1398,7 +1398,7 @@ Module(
                                 parameter: Parameter {
                                     range: 1200..1201,
                                     name: Identifier {
-                                        id: "c",
+                                        id: Name("c"),
                                         range: 1200..1201,
                                     },
                                     annotation: None,
@@ -1410,7 +1410,7 @@ Module(
                             Parameter {
                                 range: 1203..1208,
                                 name: Identifier {
-                                    id: "args",
+                                    id: Name("args"),
                                     range: 1204..1208,
                                 },
                                 annotation: None,
@@ -1422,7 +1422,7 @@ Module(
                                 parameter: Parameter {
                                     range: 1210..1211,
                                     name: Identifier {
-                                        id: "d",
+                                        id: Name("d"),
                                         range: 1210..1211,
                                     },
                                     annotation: None,
@@ -1434,7 +1434,7 @@ Module(
                                 parameter: Parameter {
                                     range: 1213..1214,
                                     name: Identifier {
-                                        id: "e",
+                                        id: Name("e"),
                                         range: 1213..1214,
                                     },
                                     annotation: None,
@@ -1455,7 +1455,7 @@ Module(
                                 parameter: Parameter {
                                     range: 1219..1220,
                                     name: Identifier {
-                                        id: "f",
+                                        id: Name("f"),
                                         range: 1219..1220,
                                     },
                                     annotation: None,
@@ -1476,7 +1476,7 @@ Module(
                             Parameter {
                                 range: 1225..1233,
                                 name: Identifier {
-                                    id: "kwargs",
+                                    id: Name("kwargs"),
                                     range: 1227..1233,
                                 },
                                 annotation: None,
@@ -1499,7 +1499,7 @@ Module(
                     is_async: false,
                     decorator_list: [],
                     name: Identifier {
-                        id: "positional_and_keyword_parameters",
+                        id: Name("positional_and_keyword_parameters"),
                         range: 1252..1285,
                     },
                     type_params: None,
@@ -1512,7 +1512,7 @@ Module(
                                 parameter: Parameter {
                                     range: 1286..1287,
                                     name: Identifier {
-                                        id: "a",
+                                        id: Name("a"),
                                         range: 1286..1287,
                                     },
                                     annotation: None,
@@ -1524,7 +1524,7 @@ Module(
                                 parameter: Parameter {
                                     range: 1289..1290,
                                     name: Identifier {
-                                        id: "b",
+                                        id: Name("b"),
                                         range: 1289..1290,
                                     },
                                     annotation: None,
@@ -1536,7 +1536,7 @@ Module(
                                 parameter: Parameter {
                                     range: 1292..1293,
                                     name: Identifier {
-                                        id: "c",
+                                        id: Name("c"),
                                         range: 1292..1293,
                                     },
                                     annotation: None,
@@ -1551,7 +1551,7 @@ Module(
                                 parameter: Parameter {
                                     range: 1298..1299,
                                     name: Identifier {
-                                        id: "d",
+                                        id: Name("d"),
                                         range: 1298..1299,
                                     },
                                     annotation: None,
@@ -1563,7 +1563,7 @@ Module(
                                 parameter: Parameter {
                                     range: 1301..1302,
                                     name: Identifier {
-                                        id: "e",
+                                        id: Name("e"),
                                         range: 1301..1302,
                                     },
                                     annotation: None,
@@ -1575,7 +1575,7 @@ Module(
                                 parameter: Parameter {
                                     range: 1304..1305,
                                     name: Identifier {
-                                        id: "f",
+                                        id: Name("f"),
                                         range: 1304..1305,
                                     },
                                     annotation: None,
@@ -1601,7 +1601,7 @@ Module(
                     is_async: false,
                     decorator_list: [],
                     name: Identifier {
-                        id: "positional_and_keyword_parameters_with_defaults",
+                        id: Name("positional_and_keyword_parameters_with_defaults"),
                         range: 1323..1370,
                     },
                     type_params: None,
@@ -1614,7 +1614,7 @@ Module(
                                 parameter: Parameter {
                                     range: 1371..1372,
                                     name: Identifier {
-                                        id: "a",
+                                        id: Name("a"),
                                         range: 1371..1372,
                                     },
                                     annotation: None,
@@ -1626,7 +1626,7 @@ Module(
                                 parameter: Parameter {
                                     range: 1374..1375,
                                     name: Identifier {
-                                        id: "b",
+                                        id: Name("b"),
                                         range: 1374..1375,
                                     },
                                     annotation: None,
@@ -1638,7 +1638,7 @@ Module(
                                 parameter: Parameter {
                                     range: 1377..1378,
                                     name: Identifier {
-                                        id: "c",
+                                        id: Name("c"),
                                         range: 1377..1378,
                                     },
                                     annotation: None,
@@ -1653,7 +1653,7 @@ Module(
                                 parameter: Parameter {
                                     range: 1383..1384,
                                     name: Identifier {
-                                        id: "d",
+                                        id: Name("d"),
                                         range: 1383..1384,
                                     },
                                     annotation: None,
@@ -1665,7 +1665,7 @@ Module(
                                 parameter: Parameter {
                                     range: 1386..1387,
                                     name: Identifier {
-                                        id: "e",
+                                        id: Name("e"),
                                         range: 1386..1387,
                                     },
                                     annotation: None,
@@ -1686,7 +1686,7 @@ Module(
                                 parameter: Parameter {
                                     range: 1392..1393,
                                     name: Identifier {
-                                        id: "f",
+                                        id: Name("f"),
                                         range: 1392..1393,
                                     },
                                     annotation: None,
@@ -1721,7 +1721,7 @@ Module(
                     is_async: false,
                     decorator_list: [],
                     name: Identifier {
-                        id: "positional_and_keyword_parameters_with_defaults_and_varargs",
+                        id: Name("positional_and_keyword_parameters_with_defaults_and_varargs"),
                         range: 1414..1473,
                     },
                     type_params: None,
@@ -1734,7 +1734,7 @@ Module(
                                 parameter: Parameter {
                                     range: 1479..1480,
                                     name: Identifier {
-                                        id: "a",
+                                        id: Name("a"),
                                         range: 1479..1480,
                                     },
                                     annotation: None,
@@ -1746,7 +1746,7 @@ Module(
                                 parameter: Parameter {
                                     range: 1482..1483,
                                     name: Identifier {
-                                        id: "b",
+                                        id: Name("b"),
                                         range: 1482..1483,
                                     },
                                     annotation: None,
@@ -1758,7 +1758,7 @@ Module(
                                 parameter: Parameter {
                                     range: 1485..1486,
                                     name: Identifier {
-                                        id: "c",
+                                        id: Name("c"),
                                         range: 1485..1486,
                                     },
                                     annotation: None,
@@ -1770,7 +1770,7 @@ Module(
                             Parameter {
                                 range: 1488..1493,
                                 name: Identifier {
-                                    id: "args",
+                                    id: Name("args"),
                                     range: 1489..1493,
                                 },
                                 annotation: None,
@@ -1782,7 +1782,7 @@ Module(
                                 parameter: Parameter {
                                     range: 1495..1496,
                                     name: Identifier {
-                                        id: "d",
+                                        id: Name("d"),
                                         range: 1495..1496,
                                     },
                                     annotation: None,
@@ -1794,7 +1794,7 @@ Module(
                                 parameter: Parameter {
                                     range: 1498..1499,
                                     name: Identifier {
-                                        id: "e",
+                                        id: Name("e"),
                                         range: 1498..1499,
                                     },
                                     annotation: None,
@@ -1815,7 +1815,7 @@ Module(
                                 parameter: Parameter {
                                     range: 1504..1505,
                                     name: Identifier {
-                                        id: "f",
+                                        id: Name("f"),
                                         range: 1504..1505,
                                     },
                                     annotation: None,
@@ -1850,7 +1850,7 @@ Module(
                     is_async: false,
                     decorator_list: [],
                     name: Identifier {
-                        id: "positional_and_keyword_parameters_with_defaults_and_varargs_and_kwargs",
+                        id: Name("positional_and_keyword_parameters_with_defaults_and_varargs_and_kwargs"),
                         range: 1527..1597,
                     },
                     type_params: None,
@@ -1863,7 +1863,7 @@ Module(
                                 parameter: Parameter {
                                     range: 1603..1604,
                                     name: Identifier {
-                                        id: "a",
+                                        id: Name("a"),
                                         range: 1603..1604,
                                     },
                                     annotation: None,
@@ -1875,7 +1875,7 @@ Module(
                                 parameter: Parameter {
                                     range: 1606..1607,
                                     name: Identifier {
-                                        id: "b",
+                                        id: Name("b"),
                                         range: 1606..1607,
                                     },
                                     annotation: None,
@@ -1887,7 +1887,7 @@ Module(
                                 parameter: Parameter {
                                     range: 1609..1610,
                                     name: Identifier {
-                                        id: "c",
+                                        id: Name("c"),
                                         range: 1609..1610,
                                     },
                                     annotation: None,
@@ -1899,7 +1899,7 @@ Module(
                             Parameter {
                                 range: 1612..1617,
                                 name: Identifier {
-                                    id: "args",
+                                    id: Name("args"),
                                     range: 1613..1617,
                                 },
                                 annotation: None,
@@ -1911,7 +1911,7 @@ Module(
                                 parameter: Parameter {
                                     range: 1619..1620,
                                     name: Identifier {
-                                        id: "d",
+                                        id: Name("d"),
                                         range: 1619..1620,
                                     },
                                     annotation: None,
@@ -1923,7 +1923,7 @@ Module(
                                 parameter: Parameter {
                                     range: 1622..1623,
                                     name: Identifier {
-                                        id: "e",
+                                        id: Name("e"),
                                         range: 1622..1623,
                                     },
                                     annotation: None,
@@ -1944,7 +1944,7 @@ Module(
                                 parameter: Parameter {
                                     range: 1628..1629,
                                     name: Identifier {
-                                        id: "f",
+                                        id: Name("f"),
                                         range: 1628..1629,
                                     },
                                     annotation: None,
@@ -1965,7 +1965,7 @@ Module(
                             Parameter {
                                 range: 1634..1642,
                                 name: Identifier {
-                                    id: "kwargs",
+                                    id: Name("kwargs"),
                                     range: 1636..1642,
                                 },
                                 annotation: None,
@@ -1988,7 +1988,7 @@ Module(
                     is_async: false,
                     decorator_list: [],
                     name: Identifier {
-                        id: "func",
+                        id: Name("func"),
                         range: 1707..1711,
                     },
                     type_params: Some(
@@ -1999,7 +1999,7 @@ Module(
                                     TypeParamTypeVar {
                                         range: 1712..1713,
                                         name: Identifier {
-                                            id: "T",
+                                            id: Name("T"),
                                             range: 1712..1713,
                                         },
                                         bound: None,
@@ -2018,14 +2018,14 @@ Module(
                                 parameter: Parameter {
                                     range: 1715..1719,
                                     name: Identifier {
-                                        id: "a",
+                                        id: Name("a"),
                                         range: 1715..1716,
                                     },
                                     annotation: Some(
                                         Name(
                                             ExprName {
                                                 range: 1718..1719,
-                                                id: "T",
+                                                id: Name("T"),
                                                 ctx: Load,
                                             },
                                         ),
@@ -2042,7 +2042,7 @@ Module(
                         Name(
                             ExprName {
                                 range: 1724..1725,
-                                id: "T",
+                                id: Name("T"),
                                 ctx: Load,
                             },
                         ),
@@ -2062,7 +2062,7 @@ Module(
                     is_async: false,
                     decorator_list: [],
                     name: Identifier {
-                        id: "func",
+                        id: Name("func"),
                         range: 1742..1746,
                     },
                     type_params: Some(
@@ -2073,14 +2073,14 @@ Module(
                                     TypeParamTypeVar {
                                         range: 1747..1753,
                                         name: Identifier {
-                                            id: "T",
+                                            id: Name("T"),
                                             range: 1747..1748,
                                         },
                                         bound: Some(
                                             Name(
                                                 ExprName {
                                                     range: 1750..1753,
-                                                    id: "str",
+                                                    id: Name("str"),
                                                     ctx: Load,
                                                 },
                                             ),
@@ -2100,14 +2100,14 @@ Module(
                                 parameter: Parameter {
                                     range: 1755..1759,
                                     name: Identifier {
-                                        id: "a",
+                                        id: Name("a"),
                                         range: 1755..1756,
                                     },
                                     annotation: Some(
                                         Name(
                                             ExprName {
                                                 range: 1758..1759,
-                                                id: "T",
+                                                id: Name("T"),
                                                 ctx: Load,
                                             },
                                         ),
@@ -2124,7 +2124,7 @@ Module(
                         Name(
                             ExprName {
                                 range: 1764..1765,
-                                id: "T",
+                                id: Name("T"),
                                 ctx: Load,
                             },
                         ),
@@ -2144,7 +2144,7 @@ Module(
                     is_async: false,
                     decorator_list: [],
                     name: Identifier {
-                        id: "func",
+                        id: Name("func"),
                         range: 1782..1786,
                     },
                     type_params: Some(
@@ -2155,7 +2155,7 @@ Module(
                                     TypeParamTypeVar {
                                         range: 1787..1802,
                                         name: Identifier {
-                                            id: "T",
+                                            id: Name("T"),
                                             range: 1787..1788,
                                         },
                                         bound: Some(
@@ -2166,14 +2166,14 @@ Module(
                                                         Name(
                                                             ExprName {
                                                                 range: 1791..1794,
-                                                                id: "str",
+                                                                id: Name("str"),
                                                                 ctx: Load,
                                                             },
                                                         ),
                                                         Name(
                                                             ExprName {
                                                                 range: 1796..1801,
-                                                                id: "bytes",
+                                                                id: Name("bytes"),
                                                                 ctx: Load,
                                                             },
                                                         ),
@@ -2198,14 +2198,14 @@ Module(
                                 parameter: Parameter {
                                     range: 1804..1808,
                                     name: Identifier {
-                                        id: "a",
+                                        id: Name("a"),
                                         range: 1804..1805,
                                     },
                                     annotation: Some(
                                         Name(
                                             ExprName {
                                                 range: 1807..1808,
-                                                id: "T",
+                                                id: Name("T"),
                                                 ctx: Load,
                                             },
                                         ),
@@ -2222,7 +2222,7 @@ Module(
                         Name(
                             ExprName {
                                 range: 1813..1814,
-                                id: "T",
+                                id: Name("T"),
                                 ctx: Load,
                             },
                         ),
@@ -2242,7 +2242,7 @@ Module(
                     is_async: false,
                     decorator_list: [],
                     name: Identifier {
-                        id: "func",
+                        id: Name("func"),
                         range: 1831..1835,
                     },
                     type_params: Some(
@@ -2253,7 +2253,7 @@ Module(
                                     TypeParamTypeVarTuple {
                                         range: 1836..1839,
                                         name: Identifier {
-                                            id: "Ts",
+                                            id: Name("Ts"),
                                             range: 1837..1839,
                                         },
                                         default: None,
@@ -2270,7 +2270,7 @@ Module(
                             Parameter {
                                 range: 1841..1848,
                                 name: Identifier {
-                                    id: "a",
+                                    id: Name("a"),
                                     range: 1842..1843,
                                 },
                                 annotation: Some(
@@ -2280,7 +2280,7 @@ Module(
                                             value: Name(
                                                 ExprName {
                                                     range: 1846..1848,
-                                                    id: "Ts",
+                                                    id: Name("Ts"),
                                                     ctx: Load,
                                                 },
                                             ),
@@ -2300,7 +2300,7 @@ Module(
                                 value: Name(
                                     ExprName {
                                         range: 1853..1858,
-                                        id: "Tuple",
+                                        id: Name("Tuple"),
                                         ctx: Load,
                                     },
                                 ),
@@ -2314,7 +2314,7 @@ Module(
                                                     value: Name(
                                                         ExprName {
                                                             range: 1860..1862,
-                                                            id: "Ts",
+                                                            id: Name("Ts"),
                                                             ctx: Load,
                                                         },
                                                     ),
@@ -2345,7 +2345,7 @@ Module(
                     is_async: false,
                     decorator_list: [],
                     name: Identifier {
-                        id: "func",
+                        id: Name("func"),
                         range: 1880..1884,
                     },
                     type_params: Some(
@@ -2356,7 +2356,7 @@ Module(
                                     TypeParamParamSpec {
                                         range: 1885..1888,
                                         name: Identifier {
-                                            id: "P",
+                                            id: Name("P"),
                                             range: 1887..1888,
                                         },
                                         default: None,
@@ -2373,7 +2373,7 @@ Module(
                             Parameter {
                                 range: 1890..1903,
                                 name: Identifier {
-                                    id: "args",
+                                    id: Name("args"),
                                     range: 1891..1895,
                                 },
                                 annotation: Some(
@@ -2383,12 +2383,12 @@ Module(
                                             value: Name(
                                                 ExprName {
                                                     range: 1897..1898,
-                                                    id: "P",
+                                                    id: Name("P"),
                                                     ctx: Load,
                                                 },
                                             ),
                                             attr: Identifier {
-                                                id: "args",
+                                                id: Name("args"),
                                                 range: 1899..1903,
                                             },
                                             ctx: Load,
@@ -2402,7 +2402,7 @@ Module(
                             Parameter {
                                 range: 1905..1923,
                                 name: Identifier {
-                                    id: "kwargs",
+                                    id: Name("kwargs"),
                                     range: 1907..1913,
                                 },
                                 annotation: Some(
@@ -2412,12 +2412,12 @@ Module(
                                             value: Name(
                                                 ExprName {
                                                     range: 1915..1916,
-                                                    id: "P",
+                                                    id: Name("P"),
                                                     ctx: Load,
                                                 },
                                             ),
                                             attr: Identifier {
-                                                id: "kwargs",
+                                                id: Name("kwargs"),
                                                 range: 1917..1923,
                                             },
                                             ctx: Load,
@@ -2443,7 +2443,7 @@ Module(
                     is_async: false,
                     decorator_list: [],
                     name: Identifier {
-                        id: "func",
+                        id: Name("func"),
                         range: 1941..1945,
                     },
                     type_params: Some(
@@ -2454,7 +2454,7 @@ Module(
                                     TypeParamTypeVar {
                                         range: 1946..1947,
                                         name: Identifier {
-                                            id: "T",
+                                            id: Name("T"),
                                             range: 1946..1947,
                                         },
                                         bound: None,
@@ -2465,14 +2465,14 @@ Module(
                                     TypeParamTypeVar {
                                         range: 1949..1955,
                                         name: Identifier {
-                                            id: "U",
+                                            id: Name("U"),
                                             range: 1949..1950,
                                         },
                                         bound: Some(
                                             Name(
                                                 ExprName {
                                                     range: 1952..1955,
-                                                    id: "str",
+                                                    id: Name("str"),
                                                     ctx: Load,
                                                 },
                                             ),
@@ -2484,7 +2484,7 @@ Module(
                                     TypeParamTypeVarTuple {
                                         range: 1957..1960,
                                         name: Identifier {
-                                            id: "Ts",
+                                            id: Name("Ts"),
                                             range: 1958..1960,
                                         },
                                         default: None,
@@ -2494,7 +2494,7 @@ Module(
                                     TypeParamParamSpec {
                                         range: 1962..1965,
                                         name: Identifier {
-                                            id: "P",
+                                            id: Name("P"),
                                             range: 1964..1965,
                                         },
                                         default: None,
@@ -2527,7 +2527,7 @@ Module(
                     is_async: false,
                     decorator_list: [],
                     name: Identifier {
-                        id: "ellipsis",
+                        id: Name("ellipsis"),
                         range: 1985..1993,
                     },
                     type_params: None,
@@ -2560,7 +2560,7 @@ Module(
                     is_async: false,
                     decorator_list: [],
                     name: Identifier {
-                        id: "multiple_statements",
+                        id: Name("multiple_statements"),
                         range: 2007..2026,
                     },
                     type_params: None,
@@ -2576,7 +2576,7 @@ Module(
                         Name(
                             ExprName {
                                 range: 2032..2035,
-                                id: "int",
+                                id: Name("int"),
                                 ctx: Load,
                             },
                         ),
@@ -2591,7 +2591,7 @@ Module(
                                         func: Name(
                                             ExprName {
                                                 range: 2041..2045,
-                                                id: "call",
+                                                id: Name("call"),
                                                 ctx: Load,
                                             },
                                         ),
@@ -2628,7 +2628,7 @@ Module(
                     is_async: false,
                     decorator_list: [],
                     name: Identifier {
-                        id: "foo",
+                        id: Name("foo"),
                         range: 2071..2074,
                     },
                     type_params: None,
@@ -2640,7 +2640,7 @@ Module(
                             Parameter {
                                 range: 2075..2080,
                                 name: Identifier {
-                                    id: "args",
+                                    id: Name("args"),
                                     range: 2076..2080,
                                 },
                                 annotation: None,
@@ -2665,7 +2665,7 @@ Module(
                     is_async: false,
                     decorator_list: [],
                     name: Identifier {
-                        id: "foo",
+                        id: Name("foo"),
                         range: 2098..2101,
                     },
                     type_params: None,
@@ -2679,7 +2679,7 @@ Module(
                             Parameter {
                                 range: 2102..2110,
                                 name: Identifier {
-                                    id: "kwargs",
+                                    id: Name("kwargs"),
                                     range: 2104..2110,
                                 },
                                 annotation: None,
@@ -2702,7 +2702,7 @@ Module(
                     is_async: false,
                     decorator_list: [],
                     name: Identifier {
-                        id: "foo",
+                        id: Name("foo"),
                         range: 2128..2131,
                     },
                     type_params: None,
@@ -2714,7 +2714,7 @@ Module(
                             Parameter {
                                 range: 2132..2137,
                                 name: Identifier {
-                                    id: "args",
+                                    id: Name("args"),
                                     range: 2133..2137,
                                 },
                                 annotation: None,
@@ -2725,7 +2725,7 @@ Module(
                             Parameter {
                                 range: 2139..2147,
                                 name: Identifier {
-                                    id: "kwargs",
+                                    id: Name("kwargs"),
                                     range: 2141..2147,
                                 },
                                 annotation: None,
@@ -2748,7 +2748,7 @@ Module(
                     is_async: false,
                     decorator_list: [],
                     name: Identifier {
-                        id: "foo",
+                        id: Name("foo"),
                         range: 2165..2168,
                     },
                     type_params: None,
@@ -2760,7 +2760,7 @@ Module(
                                 parameter: Parameter {
                                     range: 2169..2170,
                                     name: Identifier {
-                                        id: "a",
+                                        id: Name("a"),
                                         range: 2169..2170,
                                     },
                                     annotation: None,
@@ -2789,7 +2789,7 @@ Module(
                     is_async: false,
                     decorator_list: [],
                     name: Identifier {
-                        id: "foo",
+                        id: Name("foo"),
                         range: 2191..2194,
                     },
                     type_params: None,
@@ -2801,7 +2801,7 @@ Module(
                                 parameter: Parameter {
                                     range: 2195..2196,
                                     name: Identifier {
-                                        id: "a",
+                                        id: Name("a"),
                                         range: 2195..2196,
                                     },
                                     annotation: None,
@@ -2815,7 +2815,7 @@ Module(
                                 parameter: Parameter {
                                     range: 2201..2202,
                                     name: Identifier {
-                                        id: "b",
+                                        id: Name("b"),
                                         range: 2201..2202,
                                     },
                                     annotation: None,
@@ -2843,7 +2843,7 @@ Module(
                     is_async: false,
                     decorator_list: [],
                     name: Identifier {
-                        id: "foo",
+                        id: Name("foo"),
                         range: 2220..2223,
                     },
                     type_params: None,
@@ -2855,7 +2855,7 @@ Module(
                                 parameter: Parameter {
                                     range: 2224..2225,
                                     name: Identifier {
-                                        id: "a",
+                                        id: Name("a"),
                                         range: 2224..2225,
                                     },
                                     annotation: None,
@@ -2893,7 +2893,7 @@ Module(
                     is_async: false,
                     decorator_list: [],
                     name: Identifier {
-                        id: "foo",
+                        id: Name("foo"),
                         range: 2249..2252,
                     },
                     type_params: None,
@@ -2905,7 +2905,7 @@ Module(
                                 parameter: Parameter {
                                     range: 2253..2254,
                                     name: Identifier {
-                                        id: "a",
+                                        id: Name("a"),
                                         range: 2253..2254,
                                     },
                                     annotation: None,
@@ -2917,7 +2917,7 @@ Module(
                                 parameter: Parameter {
                                     range: 2256..2257,
                                     name: Identifier {
-                                        id: "b",
+                                        id: Name("b"),
                                         range: 2256..2257,
                                     },
                                     annotation: None,
@@ -2933,7 +2933,7 @@ Module(
                                 parameter: Parameter {
                                     range: 2265..2266,
                                     name: Identifier {
-                                        id: "c",
+                                        id: Name("c"),
                                         range: 2265..2266,
                                     },
                                     annotation: None,
@@ -2959,7 +2959,7 @@ Module(
                     is_async: false,
                     decorator_list: [],
                     name: Identifier {
-                        id: "foo",
+                        id: Name("foo"),
                         range: 2284..2287,
                     },
                     type_params: None,
@@ -2972,7 +2972,7 @@ Module(
                                 parameter: Parameter {
                                     range: 2288..2290,
                                     name: Identifier {
-                                        id: "kw",
+                                        id: Name("kw"),
                                         range: 2288..2290,
                                     },
                                     annotation: None,
@@ -2996,7 +2996,7 @@ Module(
                                 parameter: Parameter {
                                     range: 2297..2298,
                                     name: Identifier {
-                                        id: "a",
+                                        id: Name("a"),
                                         range: 2297..2298,
                                     },
                                     annotation: None,
@@ -3022,7 +3022,7 @@ Module(
                     is_async: false,
                     decorator_list: [],
                     name: Identifier {
-                        id: "foo",
+                        id: Name("foo"),
                         range: 2316..2319,
                     },
                     type_params: None,
@@ -3035,14 +3035,14 @@ Module(
                                 parameter: Parameter {
                                     range: 2320..2326,
                                     name: Identifier {
-                                        id: "x",
+                                        id: Name("x"),
                                         range: 2320..2321,
                                     },
                                     annotation: Some(
                                         Name(
                                             ExprName {
                                                 range: 2323..2326,
-                                                id: "int",
+                                                id: Name("int"),
                                                 ctx: Load,
                                             },
                                         ),
@@ -3055,7 +3055,7 @@ Module(
                                 parameter: Parameter {
                                     range: 2328..2336,
                                     name: Identifier {
-                                        id: "y",
+                                        id: Name("y"),
                                         range: 2328..2329,
                                     },
                                     annotation: Some(
@@ -3086,7 +3086,7 @@ Module(
                                 parameter: Parameter {
                                     range: 2338..2346,
                                     name: Identifier {
-                                        id: "z",
+                                        id: Name("z"),
                                         range: 2338..2339,
                                     },
                                     annotation: Some(
@@ -3137,7 +3137,7 @@ Module(
                     is_async: false,
                     decorator_list: [],
                     name: Identifier {
-                        id: "foo",
+                        id: Name("foo"),
                         range: 2364..2367,
                     },
                     type_params: None,
@@ -3150,7 +3150,7 @@ Module(
                                 parameter: Parameter {
                                     range: 2368..2372,
                                     name: Identifier {
-                                        id: "self",
+                                        id: Name("self"),
                                         range: 2368..2372,
                                     },
                                     annotation: None,
@@ -3162,7 +3162,7 @@ Module(
                                 parameter: Parameter {
                                     range: 2374..2375,
                                     name: Identifier {
-                                        id: "a",
+                                        id: Name("a"),
                                         range: 2374..2375,
                                     },
                                     annotation: None,
@@ -3183,7 +3183,7 @@ Module(
                                 parameter: Parameter {
                                     range: 2379..2380,
                                     name: Identifier {
-                                        id: "b",
+                                        id: Name("b"),
                                         range: 2379..2380,
                                     },
                                     annotation: None,
@@ -3204,7 +3204,7 @@ Module(
                                 parameter: Parameter {
                                     range: 2384..2385,
                                     name: Identifier {
-                                        id: "c",
+                                        id: Name("c"),
                                         range: 2384..2385,
                                     },
                                     annotation: None,

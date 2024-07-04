@@ -9,7 +9,7 @@ use ruff_formatter::printer::SourceMapGeneration;
 use ruff_formatter::{FormatResult, Formatted, IndentStyle};
 use ruff_linter::directives;
 use ruff_linter::line_width::{IndentWidth, LineLength};
-use ruff_linter::linter::{check_path, LinterResult};
+use ruff_linter::linter::check_path;
 use ruff_linter::registry::AsRule;
 use ruff_linter::settings::types::PythonVersion;
 use ruff_linter::settings::{flags, DEFAULT_SELECTORS, DUMMY_VARIABLE_RGX};
@@ -28,7 +28,7 @@ use ruff_workspace::Settings;
 #[wasm_bindgen(typescript_custom_section)]
 const TYPES: &'static str = r#"
 export interface Diagnostic {
-    code: string;
+    code: string | null;
     message: string;
     location: {
         row: number;
@@ -57,7 +57,7 @@ export interface Diagnostic {
 
 #[derive(Serialize, Deserialize, Eq, PartialEq, Debug)]
 pub struct ExpandedMessage {
-    pub code: String,
+    pub code: Option<String>,
     pub message: String,
     pub location: SourceLocation,
     pub end_location: SourceLocation,
@@ -181,9 +181,7 @@ impl Workspace {
         );
 
         // Generate checks.
-        let LinterResult {
-            data: diagnostics, ..
-        } = check_path(
+        let diagnostics = check_path(
             Path::new("<filename>"),
             None,
             &locator,
@@ -201,17 +199,17 @@ impl Workspace {
 
         let messages: Vec<ExpandedMessage> = diagnostics
             .into_iter()
-            .map(|message| {
-                let start_location = source_code.source_location(message.start());
-                let end_location = source_code.source_location(message.end());
+            .map(|diagnostic| {
+                let start_location = source_code.source_location(diagnostic.start());
+                let end_location = source_code.source_location(diagnostic.end());
 
                 ExpandedMessage {
-                    code: message.kind.rule().noqa_code().to_string(),
-                    message: message.kind.body,
+                    code: Some(diagnostic.kind.rule().noqa_code().to_string()),
+                    message: diagnostic.kind.body,
                     location: start_location,
                     end_location,
-                    fix: message.fix.map(|fix| ExpandedFix {
-                        message: message.kind.suggestion,
+                    fix: diagnostic.fix.map(|fix| ExpandedFix {
+                        message: diagnostic.kind.suggestion,
                         edits: fix
                             .edits()
                             .iter()
@@ -224,6 +222,18 @@ impl Workspace {
                     }),
                 }
             })
+            .chain(parsed.errors().iter().map(|parse_error| {
+                let start_location = source_code.source_location(parse_error.location.start());
+                let end_location = source_code.source_location(parse_error.location.end());
+
+                ExpandedMessage {
+                    code: None,
+                    message: format!("SyntaxError: {}", parse_error.error),
+                    location: start_location,
+                    end_location,
+                    fix: None,
+                }
+            }))
             .collect();
 
         serde_wasm_bindgen::to_value(&messages).map_err(into_error)
@@ -261,7 +271,7 @@ impl Workspace {
     pub fn tokens(&self, contents: &str) -> Result<String, Error> {
         let parsed = parse_unchecked(contents, Mode::Module);
 
-        Ok(format!("{:#?}", parsed.tokens()))
+        Ok(format!("{:#?}", parsed.tokens().as_ref()))
     }
 }
 

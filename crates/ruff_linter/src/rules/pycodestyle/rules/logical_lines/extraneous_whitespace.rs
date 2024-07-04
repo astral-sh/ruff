@@ -273,6 +273,13 @@ pub(crate) fn extraneous_whitespace(line: &LogicalLine, context: &mut LogicalLin
                                     }
                                 }
                             } else {
+                                if fstrings > 0
+                                    && symbol == ':'
+                                    && matches!(prev_token, Some(TokenKind::Equal))
+                                {
+                                    // Avoid removing any whitespace for f-string debug expressions.
+                                    continue;
+                                }
                                 let mut diagnostic = Diagnostic::new(
                                     WhitespaceBeforePunctuation { symbol },
                                     TextRange::at(token.start() - offset, offset),

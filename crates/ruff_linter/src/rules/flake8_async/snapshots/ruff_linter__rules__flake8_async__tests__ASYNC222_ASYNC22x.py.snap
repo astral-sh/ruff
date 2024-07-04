@@ -1,0 +1,64 @@
+---
+source: crates/ruff_linter/src/rules/flake8_async/mod.rs
+---
+ASYNC22x.py:20:5: ASYNC222 Async functions should not wait on processes with blocking methods
+   |
+19 | async def func():
+20 |     os.wait4(10)  # ASYNC222
+   |     ^^^^^^^^ ASYNC222
+   |
+
+ASYNC22x.py:24:5: ASYNC222 Async functions should not wait on processes with blocking methods
+   |
+23 | async def func():
+24 |     os.wait(12)  # ASYNC222
+   |     ^^^^^^^ ASYNC222
+   |
+
+ASYNC22x.py:91:5: ASYNC222 Async functions should not wait on processes with blocking methods
+   |
+90 |     # ASYNC222
+91 |     os.wait()  # ASYNC222
+   |     ^^^^^^^ ASYNC222
+92 |     os.wait3()  # ASYNC222
+93 |     os.wait4()  # ASYNC222
+   |
+
+ASYNC22x.py:92:5: ASYNC222 Async functions should not wait on processes with blocking methods
+   |
+90 |     # ASYNC222
+91 |     os.wait()  # ASYNC222
+92 |     os.wait3()  # ASYNC222
+   |     ^^^^^^^^ ASYNC222
+93 |     os.wait4()  # ASYNC222
+94 |     os.waitid()  # ASYNC222
+   |
+
+ASYNC22x.py:93:5: ASYNC222 Async functions should not wait on processes with blocking methods
+   |
+91 |     os.wait()  # ASYNC222
+92 |     os.wait3()  # ASYNC222
+93 |     os.wait4()  # ASYNC222
+   |     ^^^^^^^^ ASYNC222
+94 |     os.waitid()  # ASYNC222
+95 |     os.waitpid()  # ASYNC222
+   |
+
+ASYNC22x.py:94:5: ASYNC222 Async functions should not wait on processes with blocking methods
+   |
+92 |     os.wait3()  # ASYNC222
+93 |     os.wait4()  # ASYNC222
+94 |     os.waitid()  # ASYNC222
+   |     ^^^^^^^^^ ASYNC222
+95 |     os.waitpid()  # ASYNC222
+   |
+
+ASYNC22x.py:95:5: ASYNC222 Async functions should not wait on processes with blocking methods
+   |
+93 |     os.wait4()  # ASYNC222
+94 |     os.waitid()  # ASYNC222
+95 |     os.waitpid()  # ASYNC222
+   |     ^^^^^^^^^^ ASYNC222
+96 | 
+97 |     os.waitpi()
+   |

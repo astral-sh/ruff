@@ -17,7 +17,7 @@ Settings path: "[BASEPATH]/pyproject.toml"
 cache_dir = "[BASEPATH]/.ruff_cache"
 fix = false
 fix_only = false
-output_format = concise
+output_format = full
 show_fixes = false
 unsafe_fixes = hint
 
@@ -50,7 +50,7 @@ file_resolver.exclude = [
 	"venv",
 ]
 file_resolver.extend_exclude = [
-	"crates/red_knot/vendor/",
+	"crates/red_knot_module_resolver/vendor/",
 	"crates/ruff/resources/",
 	"crates/ruff_linter/resources/",
 	"crates/ruff_python_formatter/resources/",

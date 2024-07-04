@@ -21,6 +21,11 @@ else:
         print(a)
 
 
+def func(_):
+    for _ in range(1):
+        ...
+
+
 # Errors
 def func(a):
     for a in range(1):

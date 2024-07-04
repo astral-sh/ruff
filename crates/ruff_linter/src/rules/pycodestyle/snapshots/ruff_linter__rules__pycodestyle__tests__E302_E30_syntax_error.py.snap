@@ -1,0 +1,51 @@
+---
+source: crates/ruff_linter/src/rules/pycodestyle/mod.rs
+---
+E30_syntax_error.py:4:15: SyntaxError: Expected ']', found '('
+  |
+2 | # parenthesis.
+3 | 
+4 | def foo[T1, T2():
+  |               ^
+5 |     pass
+  |
+
+E30_syntax_error.py:7:1: E302 Expected 2 blank lines, found 1
+  |
+5 |     pass
+6 | 
+7 | def bar():
+  | ^^^ E302
+8 |     pass
+  |
+  = help: Add missing blank line(s)
+
+E30_syntax_error.py:13:18: SyntaxError: Expected ')', found newline
+   |
+12 | class Foo:
+13 |     def __init__(
+   |                  ^
+14 |         pass
+15 |     def method():
+16 |         pass
+   |
+
+E30_syntax_error.py:18:11: SyntaxError: Expected ')', found newline
+   |
+16 |         pass
+17 | 
+18 | foo = Foo(
+   |           ^
+19 | 
+20 | 
+21 | def top(
+   |
+
+E30_syntax_error.py:21:9: SyntaxError: Expected ')', found newline
+   |
+21 | def top(
+   |         ^
+22 |     def nested1():
+23 |         pass
+24 |     def nested2():
+   |

@@ -166,4 +166,19 @@ SIM101.py:41:4: SIM101 [*] Multiple `isinstance` calls for `a`, merge into a sin
 43 43 | 
 44 44 | def f():
 
+SIM101.py:53:3: SIM101 [*] Multiple `isinstance` calls for `a`, merge into a single call
+   |
+52 | # Regression test for: https://github.com/astral-sh/ruff/issues/7455#issuecomment-1722460483
+53 | if(isinstance(a, int)) or (isinstance(a, float)):
+   |   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ SIM101
+54 |     pass
+   |
+   = help: Merge `isinstance` calls for `a`
 
+ℹ Unsafe fix
+50 50 |         pass
+51 51 | 
+52 52 | # Regression test for: https://github.com/astral-sh/ruff/issues/7455#issuecomment-1722460483
+53    |-if(isinstance(a, int)) or (isinstance(a, float)):
+   53 |+if isinstance(a, (int, float)):
+54 54 |     pass

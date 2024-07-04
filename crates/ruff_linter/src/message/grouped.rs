@@ -205,7 +205,9 @@ impl std::fmt::Write for PadAdapter<'_> {
 mod tests {
     use insta::assert_snapshot;
 
-    use crate::message::tests::{capture_emitter_output, create_messages};
+    use crate::message::tests::{
+        capture_emitter_output, create_messages, create_syntax_error_messages,
+    };
     use crate::message::GroupedEmitter;
     use crate::settings::types::UnsafeFixes;
 
@@ -213,6 +215,14 @@ mod tests {
     fn default() {
         let mut emitter = GroupedEmitter::default();
         let content = capture_emitter_output(&mut emitter, &create_messages());
+
+        assert_snapshot!(content);
+    }
+
+    #[test]
+    fn syntax_errors() {
+        let mut emitter = GroupedEmitter::default();
+        let content = capture_emitter_output(&mut emitter, &create_syntax_error_messages());
 
         assert_snapshot!(content);
     }

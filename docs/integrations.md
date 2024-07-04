@@ -14,7 +14,7 @@ Ruff can be used as a [pre-commit](https://pre-commit.com) hook via [`ruff-pre-c
 ```yaml
 - repo: https://github.com/astral-sh/ruff-pre-commit
   # Ruff version.
-  rev: v0.4.9
+  rev: v0.5.0
   hooks:
     # Run the linter.
     - id: ruff
@@ -27,7 +27,7 @@ To enable lint fixes, add the `--fix` argument to the lint hook:
 ```yaml
 - repo: https://github.com/astral-sh/ruff-pre-commit
   # Ruff version.
-  rev: v0.4.9
+  rev: v0.5.0
   hooks:
     # Run the linter.
     - id: ruff
@@ -41,7 +41,7 @@ To run the hooks over Jupyter Notebooks too, add `jupyter` to the list of allowe
 ```yaml
 - repo: https://github.com/astral-sh/ruff-pre-commit
   # Ruff version.
-  rev: v0.4.9
+  rev: v0.5.0
   hooks:
     # Run the linter.
     - id: ruff
@@ -95,12 +95,12 @@ Upon successful installation, you should see Ruff's diagnostics surfaced directl
 
 ![Code Actions available in Neovim](https://user-images.githubusercontent.com/1309177/208278707-25fa37e4-079d-4597-ad35-b95dba066960.png)
 
-To use `ruff-lsp` with other editors, including Sublime Text and Helix, see the [`ruff-lsp` documentation](https://github.com/astral-sh/ruff-lsp#installation-and-usage).
+To use `ruff-lsp` with other editors, including Sublime Text and Helix, see the [`ruff-lsp` documentation](https://github.com/astral-sh/ruff-lsp#setup).
 
 ## Language Server Protocol (Unofficial)
 
 Ruff is also available as the [`python-lsp-ruff`](https://github.com/python-lsp/python-lsp-ruff)
-plugin for [`python-lsp-server`](https://github.com/python-lsp/python-lsp-ruff), both of which are
+plugin for [`python-lsp-server`](https://github.com/python-lsp/python-lsp-server), both of which are
 installable from PyPI:
 
 ```shell
@@ -304,8 +304,11 @@ Ruff is also available as [`emacs-ruff-format`](https://github.com/scop/emacs-ru
 Alternatively, it can be used via the [Apheleia](https://github.com/radian-software/apheleia) formatter library, by setting this configuration:
 
 ```emacs-lisp
-(add-to-list 'apheleia-mode-alist '(python-mode . ruff))
-(add-to-list 'apheleia-mode-alist '(python-ts-mode . ruff))
+;; Replace default (black) to use ruff for sorting import and formatting.
+(setf (alist-get 'python-mode apheleia-mode-alist)
+      '(ruff-isort ruff))
+(setf (alist-get 'python-ts-mode apheleia-mode-alist)
+      '(ruff-isort ruff))
 ```
 
 ## TextMate (Unofficial)
@@ -347,7 +350,7 @@ jobs:
 Ruff can also be used as a GitHub Action via [`ruff-action`](https://github.com/chartboost/ruff-action).
 
 By default, `ruff-action` runs as a pass-fail test to ensure that a given repository doesn't contain
-any lint rule violations as per its [configuration](https://github.com/astral-sh/ruff/blob/main/docs/configuration.md).
+any lint rule violations as per its [configuration](configuration.md).
 However, under-the-hood, `ruff-action` installs and runs `ruff` directly, so it can be used to
 execute any supported `ruff` command (e.g., `ruff check --fix`).
 

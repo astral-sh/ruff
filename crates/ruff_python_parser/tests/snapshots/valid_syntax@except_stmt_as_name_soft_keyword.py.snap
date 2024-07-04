@@ -32,14 +32,14 @@ Module(
                                     Name(
                                         ExprName {
                                             range: 16..25,
-                                            id: "Exception",
+                                            id: Name("Exception"),
                                             ctx: Load,
                                         },
                                     ),
                                 ),
                                 name: Some(
                                     Identifier {
-                                        id: "match",
+                                        id: Name("match"),
                                         range: 29..34,
                                     },
                                 ),
@@ -64,14 +64,14 @@ Module(
                                     Name(
                                         ExprName {
                                             range: 47..56,
-                                            id: "Exception",
+                                            id: Name("Exception"),
                                             ctx: Load,
                                         },
                                     ),
                                 ),
                                 name: Some(
                                     Identifier {
-                                        id: "case",
+                                        id: Name("case"),
                                         range: 60..64,
                                     },
                                 ),
@@ -96,14 +96,14 @@ Module(
                                     Name(
                                         ExprName {
                                             range: 77..86,
-                                            id: "Exception",
+                                            id: Name("Exception"),
                                             ctx: Load,
                                         },
                                     ),
                                 ),
                                 name: Some(
                                     Identifier {
-                                        id: "type",
+                                        id: Name("type"),
                                         range: 90..94,
                                     },
                                 ),

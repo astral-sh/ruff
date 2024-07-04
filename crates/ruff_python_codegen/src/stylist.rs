@@ -36,12 +36,12 @@ impl<'a> Stylist<'a> {
     }
 
     pub fn from_tokens(tokens: &Tokens, locator: &'a Locator<'a>) -> Self {
-        let indentation = detect_indention(tokens.up_to_first_unknown(), locator);
+        let indentation = detect_indention(tokens, locator);
 
         Self {
             locator,
             indentation,
-            quote: detect_quote(tokens.up_to_first_unknown()),
+            quote: detect_quote(tokens),
             line_ending: OnceCell::default(),
         }
     }

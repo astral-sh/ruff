@@ -21,7 +21,7 @@ Module(
                     value: Name(
                         ExprName {
                             range: 8..9,
-                            id: "a",
+                            id: Name("a"),
                             ctx: Load,
                         },
                     ),
@@ -43,14 +43,14 @@ Module(
                                 Name(
                                     ExprName {
                                         range: 19..20,
-                                        id: "a",
+                                        id: Name("a"),
                                         ctx: Load,
                                     },
                                 ),
                                 Name(
                                     ExprName {
                                         range: 22..23,
-                                        id: "b",
+                                        id: Name("b"),
                                         ctx: Load,
                                     },
                                 ),

@@ -1,22 +1,22 @@
 use std::cmp::Ordering;
-use std::hash::BuildHasherDefault;
 use std::ops::Deref;
 
 use bitflags::bitflags;
-use rustc_hash::FxHashSet;
+use rustc_hash::{FxBuildHasher, FxHashSet};
 
+use ruff_python_ast::name::Name;
 use ruff_python_ast::{
     self as ast, BoolOp, CmpOp, ConversionFlag, Expr, ExprContext, FStringElement, FStringElements,
     IpyEscapeKind, Number, Operator, UnaryOp,
 };
 use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 
-use crate::lexer::TokenValue;
 use crate::parser::progress::ParserProgress;
 use crate::parser::{helpers, FunctionKind, Parser};
 use crate::string::{parse_fstring_literal_element, parse_string_literal, StringType};
+use crate::token::{TokenKind, TokenValue};
 use crate::token_set::TokenSet;
-use crate::{FStringErrorType, Mode, ParseErrorType, TokenKind};
+use crate::{FStringErrorType, Mode, ParseErrorType};
 
 use super::{FStringElementsKind, Parenthesized, RecoveryContextKind};
 
@@ -478,14 +478,11 @@ impl<'src> Parser<'src> {
             let TokenValue::Name(name) = self.bump_value(TokenKind::Name) else {
                 unreachable!();
             };
-            return ast::Identifier {
-                id: name.to_string(),
-                range,
-            };
+            return ast::Identifier { id: name, range };
         }
 
         if self.current_token_kind().is_soft_keyword() {
-            let id = self.src_text(range).to_string();
+            let id = Name::new(self.src_text(range));
             self.bump_soft_keyword_as_name();
             return ast::Identifier { id, range };
         }
@@ -500,7 +497,7 @@ impl<'src> Parser<'src> {
                 range,
             );
 
-            let id = self.src_text(range).to_string();
+            let id = Name::new(self.src_text(range));
             self.bump_any();
             ast::Identifier { id, range }
         } else {
@@ -510,7 +507,7 @@ impl<'src> Parser<'src> {
             );
 
             ast::Identifier {
-                id: String::new(),
+                id: Name::empty(),
                 range: self.missing_node_range(),
             }
         }
@@ -598,7 +595,7 @@ impl<'src> Parser<'src> {
                     );
                     Expr::Name(ast::ExprName {
                         range: self.missing_node_range(),
-                        id: String::new(),
+                        id: Name::empty(),
                         ctx: ExprContext::Invalid,
                     })
                 }
@@ -720,7 +717,7 @@ impl<'src> Parser<'src> {
                             &parsed_expr,
                         );
                         ast::Identifier {
-                            id: String::new(),
+                            id: Name::empty(),
                             range: parsed_expr.range(),
                         }
                     };
@@ -794,7 +791,7 @@ impl<'src> Parser<'src> {
                 value: Box::new(value),
                 slice: Box::new(Expr::Name(ast::ExprName {
                     range: slice_range,
-                    id: String::new(),
+                    id: Name::empty(),
                     ctx: ExprContext::Invalid,
                 })),
                 ctx: ExprContext::Load,
@@ -2279,10 +2276,8 @@ impl<'src> Parser<'src> {
     ///
     /// Report errors for all the duplicate names found.
     fn validate_arguments(&mut self, arguments: &ast::Arguments) {
-        let mut all_arg_names = FxHashSet::with_capacity_and_hasher(
-            arguments.keywords.len(),
-            BuildHasherDefault::default(),
-        );
+        let mut all_arg_names =
+            FxHashSet::with_capacity_and_hasher(arguments.keywords.len(), FxBuildHasher);
 
         for (name, range) in arguments
             .keywords

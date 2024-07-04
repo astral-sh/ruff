@@ -7,7 +7,7 @@ input_file: crates/ruff_python_parser/resources/invalid/re_lex_logical_token.py
 ```
 Module(
     ModModule {
-        range: 0..1129,
+        range: 0..979,
         body: [
             If(
                 StmtIf {
@@ -18,7 +18,7 @@ Module(
                             func: Name(
                                 ExprName {
                                     range: 51..55,
-                                    id: "call",
+                                    id: Name("call"),
                                     ctx: Load,
                                 },
                             ),
@@ -28,7 +28,7 @@ Module(
                                     Name(
                                         ExprName {
                                             range: 56..59,
-                                            id: "foo",
+                                            id: Name("foo"),
                                             ctx: Load,
                                         },
                                     ),
@@ -47,7 +47,7 @@ Module(
                     is_async: false,
                     decorator_list: [],
                     name: Identifier {
-                        id: "bar",
+                        id: Name("bar"),
                         range: 64..67,
                     },
                     type_params: None,
@@ -78,7 +78,7 @@ Module(
                             func: Name(
                                 ExprName {
                                     range: 116..120,
-                                    id: "call",
+                                    id: Name("call"),
                                     ctx: Load,
                                 },
                             ),
@@ -88,7 +88,7 @@ Module(
                                     Name(
                                         ExprName {
                                             range: 121..124,
-                                            id: "foo",
+                                            id: Name("foo"),
                                             ctx: Load,
                                         },
                                     ),
@@ -104,7 +104,7 @@ Module(
                                 is_async: false,
                                 decorator_list: [],
                                 name: Identifier {
-                                    id: "bar",
+                                    id: Name("bar"),
                                     range: 133..136,
                                 },
                                 type_params: None,
@@ -139,7 +139,7 @@ Module(
                             func: Name(
                                 ExprName {
                                     range: 231..235,
-                                    id: "call",
+                                    id: Name("call"),
                                     ctx: Load,
                                 },
                             ),
@@ -149,7 +149,7 @@ Module(
                                     Name(
                                         ExprName {
                                             range: 236..239,
-                                            id: "foo",
+                                            id: Name("foo"),
                                             ctx: Load,
                                         },
                                     ),
@@ -165,7 +165,7 @@ Module(
                                 is_async: false,
                                 decorator_list: [],
                                 name: Identifier {
-                                    id: "bar",
+                                    id: Name("bar"),
                                     range: 250..253,
                                 },
                                 type_params: None,
@@ -200,7 +200,7 @@ Module(
                             func: Name(
                                 ExprName {
                                     range: 347..351,
-                                    id: "call",
+                                    id: Name("call"),
                                     ctx: Load,
                                 },
                             ),
@@ -210,7 +210,7 @@ Module(
                                     Name(
                                         ExprName {
                                             range: 352..355,
-                                            id: "foo",
+                                            id: Name("foo"),
                                             ctx: Load,
                                         },
                                     ),
@@ -226,7 +226,7 @@ Module(
                                 is_async: false,
                                 decorator_list: [],
                                 name: Identifier {
-                                    id: "bar",
+                                    id: Name("bar"),
                                     range: 373..376,
                                 },
                                 type_params: None,
@@ -261,7 +261,7 @@ Module(
                             func: Name(
                                 ExprName {
                                     range: 456..460,
-                                    id: "call",
+                                    id: Name("call"),
                                     ctx: Load,
                                 },
                             ),
@@ -271,7 +271,7 @@ Module(
                                     Name(
                                         ExprName {
                                             range: 461..464,
-                                            id: "foo",
+                                            id: Name("foo"),
                                             ctx: Load,
                                         },
                                     ),
@@ -282,14 +282,14 @@ Module(
                                                 Name(
                                                     ExprName {
                                                         range: 467..468,
-                                                        id: "a",
+                                                        id: Name("a"),
                                                         ctx: Load,
                                                     },
                                                 ),
                                                 Name(
                                                     ExprName {
                                                         range: 470..471,
-                                                        id: "b",
+                                                        id: Name("b"),
                                                         ctx: Load,
                                                     },
                                                 ),
@@ -309,7 +309,7 @@ Module(
                                 is_async: false,
                                 decorator_list: [],
                                 name: Identifier {
-                                    id: "bar",
+                                    id: Name("bar"),
                                     range: 480..483,
                                 },
                                 type_params: None,
@@ -344,7 +344,7 @@ Module(
                             func: Name(
                                 ExprName {
                                     range: 567..571,
-                                    id: "call",
+                                    id: Name("call"),
                                     ctx: Load,
                                 },
                             ),
@@ -354,7 +354,7 @@ Module(
                                     Name(
                                         ExprName {
                                             range: 572..575,
-                                            id: "foo",
+                                            id: Name("foo"),
                                             ctx: Load,
                                         },
                                     ),
@@ -365,14 +365,14 @@ Module(
                                                 Name(
                                                     ExprName {
                                                         range: 578..579,
-                                                        id: "a",
+                                                        id: Name("a"),
                                                         ctx: Load,
                                                     },
                                                 ),
                                                 Name(
                                                     ExprName {
                                                         range: 581..582,
-                                                        id: "b",
+                                                        id: Name("b"),
                                                         ctx: Load,
                                                     },
                                                 ),
@@ -392,7 +392,7 @@ Module(
                                 is_async: false,
                                 decorator_list: [],
                                 name: Identifier {
-                                    id: "bar",
+                                    id: Name("bar"),
                                     range: 592..595,
                                 },
                                 type_params: None,
@@ -427,7 +427,7 @@ Module(
                             func: Name(
                                 ExprName {
                                     range: 775..779,
-                                    id: "call",
+                                    id: Name("call"),
                                     ctx: Load,
                                 },
                             ),
@@ -437,7 +437,7 @@ Module(
                                     Name(
                                         ExprName {
                                             range: 780..783,
-                                            id: "foo",
+                                            id: Name("foo"),
                                             ctx: Load,
                                         },
                                     ),
@@ -448,14 +448,14 @@ Module(
                                                 Name(
                                                     ExprName {
                                                         range: 786..787,
-                                                        id: "a",
+                                                        id: Name("a"),
                                                         ctx: Load,
                                                     },
                                                 ),
                                                 Name(
                                                     ExprName {
                                                         range: 793..794,
-                                                        id: "b",
+                                                        id: Name("b"),
                                                         ctx: Load,
                                                     },
                                                 ),
@@ -475,7 +475,7 @@ Module(
                                 is_async: false,
                                 decorator_list: [],
                                 name: Identifier {
-                                    id: "bar",
+                                    id: Name("bar"),
                                     range: 805..808,
                                 },
                                 type_params: None,
@@ -510,7 +510,7 @@ Module(
                             func: Name(
                                 ExprName {
                                     range: 890..894,
-                                    id: "call",
+                                    id: Name("call"),
                                     ctx: Load,
                                 },
                             ),
@@ -538,7 +538,7 @@ Module(
                                                                         expression: Name(
                                                                             ExprName {
                                                                                 range: 904..905,
-                                                                                id: "x",
+                                                                                id: Name("x"),
                                                                                 ctx: Load,
                                                                             },
                                                                         ),
@@ -571,7 +571,7 @@ Module(
                                 is_async: false,
                                 decorator_list: [],
                                 name: Identifier {
-                                    id: "bar",
+                                    id: Name("bar"),
                                     range: 914..917,
                                 },
                                 type_params: None,
@@ -606,7 +606,7 @@ Module(
                             func: Name(
                                 ExprName {
                                     range: 939..943,
-                                    id: "call",
+                                    id: Name("call"),
                                     ctx: Load,
                                 },
                             ),
@@ -648,7 +648,7 @@ Module(
                     is_async: false,
                     decorator_list: [],
                     name: Identifier {
-                        id: "bar",
+                        id: Name("bar"),
                         range: 960..963,
                     },
                     type_params: None,
@@ -668,53 +668,6 @@ Module(
                             },
                         ),
                     ],
-                },
-            ),
-            Expr(
-                StmtExpr {
-                    range: 1097..1109,
-                    value: FString(
-                        ExprFString {
-                            range: 1097..1109,
-                            value: FStringValue {
-                                inner: Single(
-                                    FString(
-                                        FString {
-                                            range: 1097..1109,
-                                            elements: [
-                                                Literal(
-                                                    FStringLiteralElement {
-                                                        range: 1101..1107,
-                                                        value: "hello ",
-                                                    },
-                                                ),
-                                                Expression(
-                                                    FStringExpressionElement {
-                                                        range: 1107..1109,
-                                                        expression: Name(
-                                                            ExprName {
-                                                                range: 1108..1109,
-                                                                id: "x",
-                                                                ctx: Load,
-                                                            },
-                                                        ),
-                                                        debug_text: None,
-                                                        conversion: None,
-                                                        format_spec: None,
-                                                    },
-                                                ),
-                                            ],
-                                            flags: FStringFlags {
-                                                quote_style: Double,
-                                                prefix: Regular,
-                                                triple_quoted: true,
-                                            },
-                                        },
-                                    ),
-                                ),
-                            },
-                        },
-                    ),
                 },
             ),
         ],
@@ -878,45 +831,8 @@ Module(
 
 
    |
-60 | # There are trailing whitespace before the newline character but those whitespaces are
-61 | # part of the comment token
-62 | f"""hello {x # comment    
-   |  Syntax Error: Expected a statement
-63 | y = 1
-   |
-
-
-   |
-60 |   # There are trailing whitespace before the newline character but those whitespaces are
-61 |   # part of the comment token
-62 |   f"""hello {x # comment    
-   |  ___________________________^
-63 | | y = 1
-   | |_____^ Syntax Error: f-string: unterminated triple-quoted string
-   |
-
-
-   |
-61 | # part of the comment token
-62 | f"""hello {x # comment    
-63 | y = 1
-   | ^ Syntax Error: f-string: expecting '}'
-   |
-
-
-   |
-60 |   # There are trailing whitespace before the newline character but those whitespaces are
-61 |   # part of the comment token
-62 |   f"""hello {x # comment    
-   |  ___________________________^
-63 | | y = 1
-   | |_____^ Syntax Error: Expected FStringEnd, found Unknown
-   |
-
-
-   |
-61 | # part of the comment token
-62 | f"""hello {x # comment    
-63 | y = 1
-   |       Syntax Error: Expected a statement
+55 | if call(f"hello
+56 |     def bar():
+57 |         pass
+   |              Syntax Error: Expected a statement
    |

@@ -20,6 +20,8 @@ use ruff_python_parser::{TokenKind, Tokens};
 use ruff_python_trivia::is_python_whitespace;
 use ruff_source_file::Locator;
 
+use crate::rules::pycodestyle::helpers::is_non_logical_token;
+
 mod extraneous_whitespace;
 mod indentation;
 mod missing_whitespace;
@@ -63,22 +65,13 @@ impl<'a> LogicalLines<'a> {
         assert!(u32::try_from(tokens.len()).is_ok());
 
         let mut builder = LogicalLinesBuilder::with_capacity(tokens.len());
-        let mut parens = 0u32;
+        let mut tokens_iter = tokens.iter_with_context();
 
-        for token in tokens.up_to_first_unknown() {
+        while let Some(token) = tokens_iter.next() {
             builder.push_token(token.kind(), token.range());
 
-            match token.kind() {
-                TokenKind::Lbrace | TokenKind::Lpar | TokenKind::Lsqb => {
-                    parens = parens.saturating_add(1);
-                }
-                TokenKind::Rbrace | TokenKind::Rpar | TokenKind::Rsqb => {
-                    parens = parens.saturating_sub(1);
-                }
-                TokenKind::Newline | TokenKind::NonLogicalNewline if parens == 0 => {
-                    builder.finish_line();
-                }
-                _ => {}
+            if token.kind().is_any_newline() && !tokens_iter.in_parenthesized_context() {
+                builder.finish_line();
             }
         }
 
@@ -167,32 +160,14 @@ impl<'a> LogicalLine<'a> {
 
         let start = tokens
             .iter()
-            .position(|t| {
-                !matches!(
-                    t.kind(),
-                    TokenKind::Newline
-                        | TokenKind::NonLogicalNewline
-                        | TokenKind::Indent
-                        | TokenKind::Dedent
-                        | TokenKind::Comment,
-                )
-            })
+            .position(|t| !is_non_logical_token(t.kind()))
             .unwrap_or(tokens.len());
 
         let tokens = &tokens[start..];
 
         let end = tokens
             .iter()
-            .rposition(|t| {
-                !matches!(
-                    t.kind(),
-                    TokenKind::Newline
-                        | TokenKind::NonLogicalNewline
-                        | TokenKind::Indent
-                        | TokenKind::Dedent
-                        | TokenKind::Comment,
-                )
-            })
+            .rposition(|t| !is_non_logical_token(t.kind()))
             .map_or(0, |pos| pos + 1);
 
         &tokens[..end]
@@ -447,14 +422,7 @@ impl LogicalLinesBuilder {
             line.flags.insert(TokenFlags::KEYWORD);
         }
 
-        if !matches!(
-            kind,
-            TokenKind::Comment
-                | TokenKind::Newline
-                | TokenKind::NonLogicalNewline
-                | TokenKind::Dedent
-                | TokenKind::Indent
-        ) {
+        if !is_non_logical_token(kind) {
             line.flags.insert(TokenFlags::NON_TRIVIA);
         }
 
@@ -468,7 +436,7 @@ impl LogicalLinesBuilder {
         if self.current_line.tokens_start < end {
             let is_empty = self.tokens[self.current_line.tokens_start as usize..end as usize]
                 .iter()
-                .all(|token| token.kind.is_newline());
+                .all(|token| token.kind.is_any_newline());
             if !is_empty {
                 self.lines.push(Line {
                     flags: self.current_line.flags,

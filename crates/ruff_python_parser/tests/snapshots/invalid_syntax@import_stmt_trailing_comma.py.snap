@@ -22,7 +22,7 @@ Module(
                         Alias {
                             range: 16..17,
                             name: Identifier {
-                                id: "x",
+                                id: Name("x"),
                                 range: 16..17,
                             },
                             asname: None,
@@ -30,7 +30,7 @@ Module(
                         Alias {
                             range: 19..20,
                             name: Identifier {
-                                id: "y",
+                                id: Name("y"),
                                 range: 19..20,
                             },
                             asname: None,

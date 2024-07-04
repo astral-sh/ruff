@@ -3,7 +3,7 @@
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::helpers::Truthiness;
-use ruff_python_ast::{self as ast, Arguments, Expr, Keyword};
+use ruff_python_ast::{self as ast, Arguments, Expr};
 use ruff_python_semantic::SemanticModel;
 use ruff_text_size::Ranged;
 
@@ -296,7 +296,6 @@ pub(crate) fn shell_injection(checker: &mut Checker, call: &ast::ExprCall) {
                 // S602
                 Some(ShellKeyword {
                     truthiness: truthiness @ (Truthiness::True | Truthiness::Truthy),
-                    keyword,
                 }) => {
                     if checker.enabled(Rule::SubprocessPopenWithShellEqualsTrue) {
                         checker.diagnostics.push(Diagnostic::new(
@@ -304,19 +303,18 @@ pub(crate) fn shell_injection(checker: &mut Checker, call: &ast::ExprCall) {
                                 safety: Safety::from(arg),
                                 is_exact: matches!(truthiness, Truthiness::True),
                             },
-                            keyword.range(),
+                            call.func.range(),
                         ));
                     }
                 }
                 // S603
                 Some(ShellKeyword {
                     truthiness: Truthiness::False | Truthiness::Falsey | Truthiness::Unknown,
-                    keyword,
                 }) => {
                     if checker.enabled(Rule::SubprocessWithoutShellEqualsTrue) {
                         checker.diagnostics.push(Diagnostic::new(
                             SubprocessWithoutShellEqualsTrue,
-                            keyword.range(),
+                            call.func.range(),
                         ));
                     }
                 }
@@ -325,7 +323,7 @@ pub(crate) fn shell_injection(checker: &mut Checker, call: &ast::ExprCall) {
                     if checker.enabled(Rule::SubprocessWithoutShellEqualsTrue) {
                         checker.diagnostics.push(Diagnostic::new(
                             SubprocessWithoutShellEqualsTrue,
-                            arg.range(),
+                            call.func.range(),
                         ));
                     }
                 }
@@ -333,7 +331,6 @@ pub(crate) fn shell_injection(checker: &mut Checker, call: &ast::ExprCall) {
         }
     } else if let Some(ShellKeyword {
         truthiness: truthiness @ (Truthiness::True | Truthiness::Truthy),
-        keyword,
     }) = shell_keyword
     {
         // S604
@@ -342,7 +339,7 @@ pub(crate) fn shell_injection(checker: &mut Checker, call: &ast::ExprCall) {
                 CallWithShellEqualsTrue {
                     is_exact: matches!(truthiness, Truthiness::True),
                 },
-                keyword.range(),
+                call.func.range(),
             ));
         }
     }
@@ -355,7 +352,7 @@ pub(crate) fn shell_injection(checker: &mut Checker, call: &ast::ExprCall) {
                     StartProcessWithAShell {
                         safety: Safety::from(arg),
                     },
-                    arg.range(),
+                    call.func.range(),
                 ));
             }
         }
@@ -392,17 +389,15 @@ pub(crate) fn shell_injection(checker: &mut Checker, call: &ast::ExprCall) {
                     Some(CallKind::Subprocess),
                     Some(ShellKeyword {
                         truthiness: Truthiness::True | Truthiness::Truthy,
-                        keyword: _,
                     })
                 )
             )
         {
             if let Some(arg) = call.arguments.args.first() {
                 if is_wildcard_command(arg) {
-                    checker.diagnostics.push(Diagnostic::new(
-                        UnixCommandWildcardInjection,
-                        call.func.range(),
-                    ));
+                    checker
+                        .diagnostics
+                        .push(Diagnostic::new(UnixCommandWildcardInjection, arg.range()));
                 }
             }
         }
@@ -451,21 +446,15 @@ fn get_call_kind(func: &Expr, semantic: &SemanticModel) -> Option<CallKind> {
 }
 
 #[derive(Copy, Clone, Debug)]
-struct ShellKeyword<'a> {
+struct ShellKeyword {
     /// Whether the `shell` keyword argument is set and evaluates to `True`.
     truthiness: Truthiness,
-    /// The `shell` keyword argument.
-    keyword: &'a Keyword,
 }
 
 /// Return the `shell` keyword argument to the given function call, if any.
-fn find_shell_keyword<'a>(
-    arguments: &'a Arguments,
-    semantic: &SemanticModel,
-) -> Option<ShellKeyword<'a>> {
+fn find_shell_keyword(arguments: &Arguments, semantic: &SemanticModel) -> Option<ShellKeyword> {
     arguments.find_keyword("shell").map(|keyword| ShellKeyword {
         truthiness: Truthiness::from_expr(&keyword.value, |id| semantic.has_builtin_binding(id)),
-        keyword,
     })
 }
 

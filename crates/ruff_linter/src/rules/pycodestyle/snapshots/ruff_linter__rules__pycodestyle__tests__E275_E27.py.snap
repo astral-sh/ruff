@@ -124,6 +124,7 @@ E27.py:77:1: E275 [*] Missing whitespace after keyword
    77 |+match (foo):
 78 78 |     case(1):
 79 79 |         pass
+80 80 | 
 
 E27.py:78:5: E275 [*] Missing whitespace after keyword
    |
@@ -142,3 +143,5 @@ E27.py:78:5: E275 [*] Missing whitespace after keyword
 78    |-    case(1):
    78 |+    case (1):
 79 79 |         pass
+80 80 | 
+81 81 | # https://github.com/astral-sh/ruff/issues/12094

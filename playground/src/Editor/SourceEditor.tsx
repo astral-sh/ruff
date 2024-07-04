@@ -39,7 +39,7 @@ export default function SourceEditor({
         startColumn: diagnostic.location.column,
         endLineNumber: diagnostic.end_location.row,
         endColumn: diagnostic.end_location.column,
-        message: `${diagnostic.code}: ${diagnostic.message}`,
+        message: diagnostic.code ? `${diagnostic.code}: ${diagnostic.message}` : diagnostic.message,
         severity: MarkerSeverity.Error,
         tags:
           diagnostic.code === "F401" || diagnostic.code === "F841"

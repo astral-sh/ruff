@@ -77,3 +77,8 @@ type	Number = int
 match(foo):
     case(1):
         pass
+
+# https://github.com/astral-sh/ruff/issues/12094
+pass;
+
+yield, x

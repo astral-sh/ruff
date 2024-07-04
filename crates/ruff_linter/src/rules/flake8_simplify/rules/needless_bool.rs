@@ -1,5 +1,6 @@
 use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::name::Name;
 use ruff_python_ast::traversal;
 use ruff_python_ast::{self as ast, Arguments, ElifElseClause, Expr, ExprContext, Stmt};
 use ruff_python_semantic::analyze::typing::{is_sys_version_block, is_type_checking_block};
@@ -16,6 +17,7 @@ use crate::fix::snippet::SourceCodeSnippet;
 /// a falsey condition can be replaced with boolean casts.
 ///
 /// ## Example
+/// Given:
 /// ```python
 /// if x > 0:
 ///     return True
@@ -28,17 +30,20 @@ use crate::fix::snippet::SourceCodeSnippet;
 /// return x > 0
 /// ```
 ///
-/// In [preview], this rule will also flag implicit `else` cases, as in:
+/// Or, given:
 /// ```python
 /// if x > 0:
 ///     return True
 /// return False
 /// ```
 ///
+/// Use instead:
+/// ```python
+/// return x > 0
+/// ```
+///
 /// ## References
 /// - [Python documentation: Truth Value Testing](https://docs.python.org/3/library/stdtypes.html#truth-value-testing)
-///
-/// [preview]: https://docs.astral.sh/ruff/preview/
 #[violation]
 pub struct NeedlessBool {
     condition: Option<SourceCodeSnippet>,
@@ -128,7 +133,7 @@ pub(crate) fn needless_bool(checker: &mut Checker, stmt: &Stmt) {
         //     return True
         // return False
         // ```
-        [] if checker.settings.preview.is_enabled() => {
+        [] => {
             // Fetching the next sibling is expensive, so do some validation early.
             if is_one_line_return_bool(if_body).is_none() {
                 return;
@@ -222,7 +227,7 @@ pub(crate) fn needless_bool(checker: &mut Checker, stmt: &Stmt) {
         } else if checker.semantic().has_builtin_binding("bool") {
             // Otherwise, we need to wrap the condition in a call to `bool`.
             let func_node = ast::ExprName {
-                id: "bool".into(),
+                id: Name::new_static("bool"),
                 ctx: ExprContext::Load,
                 range: TextRange::default(),
             };

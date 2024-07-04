@@ -12,7 +12,7 @@ use crate::checkers::ast::Checker;
 /// PEP 563.
 ///
 /// ## Why is this bad?
-/// PEP 563 enabled the use of a number of convenient type annotations, such as
+/// PEP 585 enabled the use of a number of convenient type annotations, such as
 /// `list[str]` instead of `List[str]`. However, these annotations are only
 /// available on Python 3.9 and higher, _unless_ the `from __future__ import annotations`
 /// import is present.

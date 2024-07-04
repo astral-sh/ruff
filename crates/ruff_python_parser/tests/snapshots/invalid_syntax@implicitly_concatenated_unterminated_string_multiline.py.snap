@@ -45,7 +45,7 @@ Module(
                                                             expression: Name(
                                                                 ExprName {
                                                                     range: 27..28,
-                                                                    id: "x",
+                                                                    id: Name("x"),
                                                                     ctx: Load,
                                                                 },
                                                             ),
@@ -216,14 +216,12 @@ Module(
 
 
    |
- 6 |   (
- 7 |       'first'
- 8 |       'second
-   |  _____^
- 9 | |     f'third'
-   | |_^ Syntax Error: missing closing quote in string literal
-10 |   )
-11 |   2 + 2
+ 6 | (
+ 7 |     'first'
+ 8 |     'second
+   |     ^^^^^^^ Syntax Error: missing closing quote in string literal
+ 9 |     f'third'
+10 | )
    |
 
 

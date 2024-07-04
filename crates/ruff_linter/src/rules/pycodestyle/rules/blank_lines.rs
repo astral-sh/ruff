@@ -1,6 +1,6 @@
 use itertools::Itertools;
 use ruff_notebook::CellOffsets;
-use ruff_python_parser::Token;
+use ruff_python_parser::TokenIterWithContext;
 use ruff_python_parser::Tokens;
 use std::cmp::Ordering;
 use std::iter::Peekable;
@@ -15,13 +15,14 @@ use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::PySourceType;
 use ruff_python_codegen::Stylist;
 use ruff_python_parser::TokenKind;
+use ruff_python_trivia::PythonWhitespace;
 use ruff_source_file::{Locator, UniversalNewlines};
 use ruff_text_size::TextRange;
 use ruff_text_size::TextSize;
 
 use crate::checkers::logical_lines::expand_indent;
 use crate::line_width::IndentWidth;
-use ruff_python_trivia::PythonWhitespace;
+use crate::rules::pycodestyle::helpers::is_non_logical_token;
 
 /// Number of blank lines around top level classes and functions.
 const BLANK_LINES_TOP_LEVEL: u32 = 2;
@@ -383,7 +384,7 @@ struct LogicalLineInfo {
 /// Iterator that processes tokens until a full logical line (or comment line) is "built".
 /// It then returns characteristics of that logical line (see `LogicalLineInfo`).
 struct LinePreprocessor<'a> {
-    tokens: Peekable<Iter<'a, Token>>,
+    tokens: TokenIterWithContext<'a>,
     locator: &'a Locator<'a>,
     indent_width: IndentWidth,
     /// The start position of the next logical line.
@@ -405,7 +406,7 @@ impl<'a> LinePreprocessor<'a> {
         cell_offsets: Option<&'a CellOffsets>,
     ) -> LinePreprocessor<'a> {
         LinePreprocessor {
-            tokens: tokens.up_to_first_unknown().iter().peekable(),
+            tokens: tokens.iter_with_context(),
             locator,
             line_start: TextSize::new(0),
             max_preceding_blank_lines: BlankLines::Zero,
@@ -427,7 +428,6 @@ impl<'a> Iterator for LinePreprocessor<'a> {
         let mut blank_lines = BlankLines::Zero;
         let mut first_logical_line_token: Option<(LogicalLineKind, TextRange)> = None;
         let mut last_token = TokenKind::EndOfFile;
-        let mut parens = 0u32;
 
         while let Some(token) = self.tokens.next() {
             let (kind, range) = token.as_tuple();
@@ -489,63 +489,53 @@ impl<'a> Iterator for LinePreprocessor<'a> {
                     (logical_line_kind, range)
                 };
 
-            if !kind.is_trivia() {
+            if !is_non_logical_token(kind) {
                 line_is_comment_only = false;
             }
 
             // A docstring line is composed only of the docstring (TokenKind::String) and trivia tokens.
             // (If a comment follows a docstring, we still count the line as a docstring)
-            if kind != TokenKind::String && !kind.is_trivia() {
+            if kind != TokenKind::String && !is_non_logical_token(kind) {
                 is_docstring = false;
             }
 
-            match kind {
-                TokenKind::Lbrace | TokenKind::Lpar | TokenKind::Lsqb => {
-                    parens = parens.saturating_add(1);
+            if kind.is_any_newline() && !self.tokens.in_parenthesized_context() {
+                let indent_range = TextRange::new(self.line_start, first_token_range.start());
+
+                let indent_length =
+                    expand_indent(self.locator.slice(indent_range), self.indent_width);
+
+                self.max_preceding_blank_lines = self.max_preceding_blank_lines.max(blank_lines);
+
+                let logical_line = LogicalLineInfo {
+                    kind: logical_line_kind,
+                    first_token_range,
+                    last_token,
+                    logical_line_end: range.end(),
+                    is_comment_only: line_is_comment_only,
+                    is_beginning_of_cell: self.is_beginning_of_cell,
+                    is_docstring,
+                    indent_length,
+                    blank_lines,
+                    preceding_blank_lines: self.max_preceding_blank_lines,
+                };
+
+                // Reset the blank lines after a non-comment only line.
+                if !line_is_comment_only {
+                    self.max_preceding_blank_lines = BlankLines::Zero;
                 }
-                TokenKind::Rbrace | TokenKind::Rpar | TokenKind::Rsqb => {
-                    parens = parens.saturating_sub(1);
+
+                // Set the start for the next logical line.
+                self.line_start = range.end();
+
+                if self.cell_offsets.is_some() && !line_is_comment_only {
+                    self.is_beginning_of_cell = false;
                 }
-                TokenKind::Newline | TokenKind::NonLogicalNewline if parens == 0 => {
-                    let indent_range = TextRange::new(self.line_start, first_token_range.start());
 
-                    let indent_length =
-                        expand_indent(self.locator.slice(indent_range), self.indent_width);
-
-                    self.max_preceding_blank_lines =
-                        self.max_preceding_blank_lines.max(blank_lines);
-
-                    let logical_line = LogicalLineInfo {
-                        kind: logical_line_kind,
-                        first_token_range,
-                        last_token,
-                        logical_line_end: range.end(),
-                        is_comment_only: line_is_comment_only,
-                        is_beginning_of_cell: self.is_beginning_of_cell,
-                        is_docstring,
-                        indent_length,
-                        blank_lines,
-                        preceding_blank_lines: self.max_preceding_blank_lines,
-                    };
-
-                    // Reset the blank lines after a non-comment only line.
-                    if !line_is_comment_only {
-                        self.max_preceding_blank_lines = BlankLines::Zero;
-                    }
-
-                    // Set the start for the next logical line.
-                    self.line_start = range.end();
-
-                    if self.cell_offsets.is_some() && !line_is_comment_only {
-                        self.is_beginning_of_cell = false;
-                    }
-
-                    return Some(logical_line);
-                }
-                _ => {}
+                return Some(logical_line);
             }
 
-            if !kind.is_trivia() {
+            if !is_non_logical_token(kind) {
                 last_token = kind;
             }
         }

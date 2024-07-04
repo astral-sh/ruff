@@ -7,7 +7,7 @@ use ruff_python_trivia::{indentation_at_offset, CommentRanges, SimpleTokenKind, 
 use ruff_source_file::Locator;
 use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 
-use crate::name::{QualifiedName, QualifiedNameBuilder};
+use crate::name::{Name, QualifiedName, QualifiedNameBuilder};
 use crate::parenthesize::parenthesized_range;
 use crate::statement_visitor::StatementVisitor;
 use crate::visitor::Visitor;
@@ -1403,7 +1403,7 @@ pub fn pep_604_union(elts: &[Expr]) -> Expr {
 }
 
 /// Format the expression as a `typing.Optional`-style optional.
-pub fn typing_optional(elt: Expr, binding: String) -> Expr {
+pub fn typing_optional(elt: Expr, binding: Name) -> Expr {
     Expr::Subscript(ast::ExprSubscript {
         value: Box::new(Expr::Name(ast::ExprName {
             id: binding,
@@ -1417,8 +1417,8 @@ pub fn typing_optional(elt: Expr, binding: String) -> Expr {
 }
 
 /// Format the expressions as a `typing.Union`-style union.
-pub fn typing_union(elts: &[Expr], binding: String) -> Expr {
-    fn tuple(elts: &[Expr], binding: String) -> Expr {
+pub fn typing_union(elts: &[Expr], binding: Name) -> Expr {
+    fn tuple(elts: &[Expr], binding: Name) -> Expr {
         match elts {
             [] => Expr::Tuple(ast::ExprTuple {
                 elts: vec![],

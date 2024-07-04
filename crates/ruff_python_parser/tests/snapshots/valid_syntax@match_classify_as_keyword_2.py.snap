@@ -15,7 +15,7 @@ Module(
                     subject: Name(
                         ExprName {
                             range: 6..11,
-                            id: "match",
+                            id: Name("match"),
                             ctx: Load,
                         },
                     ),
@@ -52,7 +52,7 @@ Module(
                     subject: Name(
                         ExprName {
                             range: 35..39,
-                            id: "case",
+                            id: Name("case"),
                             ctx: Load,
                         },
                     ),
@@ -89,7 +89,7 @@ Module(
                     subject: Name(
                         ExprName {
                             range: 63..67,
-                            id: "type",
+                            id: Name("type"),
                             ctx: Load,
                         },
                     ),

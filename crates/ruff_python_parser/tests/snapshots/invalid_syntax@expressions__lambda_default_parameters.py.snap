@@ -25,7 +25,7 @@ Module(
                                             parameter: Parameter {
                                                 range: 7..8,
                                                 name: Identifier {
-                                                    id: "a",
+                                                    id: Name("a"),
                                                     range: 7..8,
                                                 },
                                                 annotation: None,
@@ -37,7 +37,7 @@ Module(
                                             parameter: Parameter {
                                                 range: 10..11,
                                                 name: Identifier {
-                                                    id: "b",
+                                                    id: Name("b"),
                                                     range: 10..11,
                                                 },
                                                 annotation: None,
@@ -58,7 +58,7 @@ Module(
                                             parameter: Parameter {
                                                 range: 16..17,
                                                 name: Identifier {
-                                                    id: "c",
+                                                    id: Name("c"),
                                                     range: 16..17,
                                                 },
                                                 annotation: None,

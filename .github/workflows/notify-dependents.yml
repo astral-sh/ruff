@@ -1,0 +1,29 @@
+# Notify downstream repositories of a new release.
+#
+# Assumed to run as a subworkflow of .github/workflows/release.yml; specifically, as a post-announce
+# job within `cargo-dist`.
+name: "[ruff] Notify dependents"
+
+on:
+  workflow_call:
+    inputs:
+      plan:
+        required: true
+        type: string
+
+jobs:
+  update-dependents:
+    name: Notify dependents
+    runs-on: ubuntu-latest
+    steps:
+      - name: "Update pre-commit mirror"
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.RUFF_PRE_COMMIT_PAT }}
+          script: |
+            github.rest.actions.createWorkflowDispatch({
+              owner: 'astral-sh',
+              repo: 'ruff-pre-commit',
+              workflow_id: 'main.yml',
+              ref: 'main',
+            })

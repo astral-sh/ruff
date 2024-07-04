@@ -18,7 +18,7 @@ Module(
                             left: Name(
                                 ExprName {
                                     range: 0..1,
-                                    id: "x",
+                                    id: Name("x"),
                                     ctx: Load,
                                 },
                             ),
@@ -36,7 +36,7 @@ Module(
                                                     parameter: Parameter {
                                                         range: 11..12,
                                                         name: Identifier {
-                                                            id: "y",
+                                                            id: Name("y"),
                                                             range: 11..12,
                                                         },
                                                         annotation: None,
@@ -52,7 +52,7 @@ Module(
                                     body: Name(
                                         ExprName {
                                             range: 14..15,
-                                            id: "y",
+                                            id: Name("y"),
                                             ctx: Load,
                                         },
                                     ),
@@ -71,7 +71,7 @@ Module(
                             left: Name(
                                 ExprName {
                                     range: 17..18,
-                                    id: "x",
+                                    id: Name("x"),
                                     ctx: Load,
                                 },
                             ),
@@ -83,7 +83,7 @@ Module(
                                         Name(
                                             ExprName {
                                                 range: 27..28,
-                                                id: "y",
+                                                id: Name("y"),
                                                 ctx: Load,
                                             },
                                         ),
