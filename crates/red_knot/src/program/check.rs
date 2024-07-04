@@ -11,7 +11,7 @@ impl Program {
         self.with_db(|db| {
             let mut result = Vec::new();
             for open_file in db.workspace.open_files() {
-                result.extend_from_slice(&db.check_file(open_file));
+                result.extend_from_slice(&db.check_file_impl(open_file));
             }
 
             result
@@ -19,7 +19,11 @@ impl Program {
     }
 
     #[tracing::instrument(level = "debug", skip(self))]
-    fn check_file(&self, file: VfsFile) -> Diagnostics {
+    pub fn check_file(&self, file: VfsFile) -> Result<Diagnostics, Cancelled> {
+        self.with_db(|db| db.check_file_impl(file))
+    }
+
+    fn check_file_impl(&self, file: VfsFile) -> Diagnostics {
         let mut diagnostics = Vec::new();
         diagnostics.extend_from_slice(lint_syntax(self, file));
         diagnostics.extend_from_slice(lint_semantic(self, file));

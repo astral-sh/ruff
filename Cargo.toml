@@ -35,6 +35,7 @@ ruff_source_file = { path = "crates/ruff_source_file" }
 ruff_text_size = { path = "crates/ruff_text_size" }
 ruff_workspace = { path = "crates/ruff_workspace" }
 
+red_knot = { path = "crates/red_knot" }
 red_knot_module_resolver = { path = "crates/red_knot_module_resolver" }
 red_knot_python_semantic = { path = "crates/red_knot_python_semantic" }
 
