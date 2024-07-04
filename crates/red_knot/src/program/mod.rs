@@ -52,6 +52,7 @@ impl Program {
         &mut self.workspace
     }
 
+    #[allow(clippy::unnecessary_wraps)]
     fn with_db<F, T>(&self, f: F) -> Result<T, Cancelled>
     where
         F: FnOnce(&Program) -> T + UnwindSafe,

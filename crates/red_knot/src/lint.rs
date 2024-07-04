@@ -18,9 +18,8 @@ use crate::db::Db;
 /// Workaround query to test for if the computation should be cancelled.
 /// Ideally, push for Salsa to expose an API for testing if cancellation was requested.
 #[salsa::tracked]
-pub(crate) fn unwind_if_cancelled(_db: &dyn Db) -> () {
-    ()
-}
+#[allow(unused_variables)]
+pub(crate) fn unwind_if_cancelled(db: &dyn Db) {}
 
 #[salsa::tracked(return_ref)]
 pub(crate) fn lint_syntax(db: &dyn Db, file_id: VfsFile) -> Diagnostics {

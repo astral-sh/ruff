@@ -18,7 +18,6 @@ red_knot_python_semantic = { workspace = true }
 
 ruff_db = { workspace = true }
 ruff_python_ast = { workspace = true }
-ruff_text_size = { workspace = true }
 
 anyhow = { workspace = true }
 countme = { workspace = true, features = ["enable"] }

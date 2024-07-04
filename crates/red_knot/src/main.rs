@@ -1,7 +1,7 @@
 use std::sync::Mutex;
 
 use crossbeam::channel as crossbeam_channel;
-use salsa::{Cancelled, ParallelDatabase};
+use salsa::ParallelDatabase;
 use tracing::subscriber::Interest;
 use tracing::{Level, Metadata};
 use tracing_subscriber::filter::LevelFilter;
