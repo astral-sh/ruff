@@ -250,6 +250,8 @@ pub(crate) mod tests {
 
         // Namespace package on py39+
         fs.create_directory_all(custom_typeshed.join("stdlib/importlib"))?;
+        fs.touch(custom_typeshed.join("stdlib/importlib/abc.pyi"))?;
+
         fs.write_file(
             custom_typeshed.join("stdlib/functools.pyi"),
             "def update_wrapper(): ...",

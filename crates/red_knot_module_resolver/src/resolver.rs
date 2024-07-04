@@ -2,7 +2,7 @@ use std::ops::Deref;
 use std::sync::Arc;
 
 use ruff_db::file_system::FileSystemPathBuf;
-use ruff_db::vfs::{system_path_to_file, vfs_path_to_file, VfsFile, VfsPath};
+use ruff_db::vfs::{vfs_path_to_file, VfsFile, VfsPath};
 
 use crate::db::Db;
 use crate::module::{Module, ModuleKind};
@@ -240,17 +240,19 @@ fn resolve_name(
                 };
 
                 // TODO Implement full https://peps.python.org/pep-0561/#type-checker-module-resolution-order resolution
-                if let Some(stub) =
-                    system_path_to_file(db.upcast(), package_path.with_pyi_extension())
+                if let Some(stub) = package_path
+                    .with_pyi_extension()
+                    .to_vfs_file(db, search_path)
                 {
                     return Some((search_path.clone(), stub, kind));
                 }
 
-                if let Some(path_with_extension) = package_path.with_py_extension() {
-                    if let Some(module) = system_path_to_file(db.upcast(), &path_with_extension) {
-                        return Some((search_path.clone(), module, kind));
-                    }
-                };
+                if let Some(module) = package_path
+                    .with_py_extension()
+                    .and_then(|path| path.to_vfs_file(db, search_path))
+                {
+                    return Some((search_path.clone(), module, kind));
+                }
 
                 // For regular packages, don't search the next search path. All files of that
                 // package must be in the same location
@@ -427,6 +429,96 @@ mod tests {
         );
 
         Ok(())
+    }
+
+    fn create_module_names(raw_names: &[&str]) -> Vec<ModuleName> {
+        raw_names
+            .iter()
+            .map(|raw| ModuleName::new(raw).unwrap())
+            .collect()
+    }
+
+    #[test]
+    fn stdlib_resolution_respects_versions_file_py38() {
+        let TestCase {
+            db,
+            custom_typeshed,
+            ..
+        } = create_resolver_builder().unwrap().build();
+
+        let existing_modules = create_module_names(&["asyncio", "functools", "xml.etree"]);
+        for module_name in existing_modules {
+            let resolved_module = resolve_module(&db, module_name.clone()).unwrap_or_else(|| {
+                panic!("Expected module {module_name} to exist in the mock stdlib")
+            });
+            let search_path = resolved_module.search_path();
+            assert_eq!(
+                *custom_typeshed.join("stdlib"),
+                search_path,
+                "Search path for {module_name} was unexpectedly {search_path:?}"
+            );
+            assert!(
+                search_path.is_stdlib_search_path(),
+                "Expected a stdlib search path, but got {search_path:?}"
+            );
+        }
+
+        let nonexisting_modules = create_module_names(&[
+            "collections",
+            "importlib",
+            "importlib.abc",
+            "xml",
+            "asyncio.tasks",
+        ]);
+        for module_name in nonexisting_modules {
+            assert!(
+                resolve_module(&db, module_name.clone()).is_none(),
+                "Unexpectedly resolved a module for {module_name}"
+            );
+        }
+    }
+
+    #[test]
+    fn stdlib_resolution_respects_versions_file_py39() {
+        let TestCase {
+            db,
+            custom_typeshed,
+            ..
+        } = create_resolver_builder()
+            .unwrap()
+            .with_target_version(SupportedPyVersion::Py39)
+            .build();
+
+        let existing_modules = create_module_names(&[
+            "asyncio",
+            "functools",
+            "importlib.abc",
+            "collections",
+            "asyncio.tasks",
+        ]);
+        for module_name in existing_modules {
+            let resolved_module = resolve_module(&db, module_name.clone()).unwrap_or_else(|| {
+                panic!("Expected module {module_name} to exist in the mock stdlib")
+            });
+            let search_path = resolved_module.search_path();
+            assert_eq!(
+                *custom_typeshed.join("stdlib"),
+                search_path,
+                "Search path for {module_name} was unexpectedly {search_path:?}"
+            );
+            assert!(
+                search_path.is_stdlib_search_path(),
+                "Expected a stdlib search path, but got {search_path:?}"
+            );
+        }
+
+        let nonexisting_modules = create_module_names(&["importlib", "xml", "xml.etree"]);
+        for module_name in nonexisting_modules {
+            assert!(
+                resolve_module(&db, module_name.clone()).is_none(),
+                "Unexpectedly resolved a module for {module_name}"
+            );
+        }
     }
 
     #[test]

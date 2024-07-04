@@ -1,7 +1,7 @@
 use std::fmt;
 
 use ruff_db::file_system::{FileSystemPath, FileSystemPathBuf};
-use ruff_db::vfs::{system_path_to_file, VfsPath};
+use ruff_db::vfs::{system_path_to_file, VfsFile, VfsPath};
 
 use crate::db::Db;
 use crate::module_name::ModuleName;
@@ -142,6 +142,10 @@ impl ModuleResolutionPathBuf {
     ) -> Option<ModuleResolutionPathRef<'a>> {
         ModuleResolutionPathRef::from(self).relativize_path(absolute_path.as_ref())
     }
+
+    pub(crate) fn to_vfs_file(&self, db: &dyn Db, search_path: &Self) -> Option<VfsFile> {
+        ModuleResolutionPathRef::from(self).to_vfs_file(db, search_path)
+    }
 }
 
 impl From<ModuleResolutionPathBuf> for VfsPath {
@@ -152,13 +156,6 @@ impl From<ModuleResolutionPathBuf> for VfsPath {
             ModuleResolutionPathBufInner::StandardLibrary(path) => path,
             ModuleResolutionPathBufInner::SitePackages(path) => path,
         })
-    }
-}
-
-impl AsRef<FileSystemPath> for ModuleResolutionPathBuf {
-    #[inline]
-    fn as_ref(&self) -> &FileSystemPath {
-        ModuleResolutionPathRefInner::from(&self.0).as_file_system_path()
     }
 }
 
@@ -186,7 +183,7 @@ enum ModuleResolutionPathRefInner<'a> {
 
 impl<'a> ModuleResolutionPathRefInner<'a> {
     #[must_use]
-    fn load_typeshed_versions<'db>(
+    pub(crate) fn load_typeshed_versions<'db>(
         db: &'db dyn Db,
         stdlib_root: &FileSystemPath,
     ) -> &'db TypeshedVersions {
@@ -194,7 +191,7 @@ impl<'a> ModuleResolutionPathRefInner<'a> {
         let Some(versions_file) = system_path_to_file(db.upcast(), &versions_path) else {
             todo!(
                 "Still need to figure out how to handle VERSIONS files being deleted \
-                from custom typeshed directories! Expected a file to exist at {versions_path}"
+            from custom typeshed directories! Expected a file to exist at {versions_path}"
             )
         };
         // TODO(Alex/Micha): If VERSIONS is invalid,
@@ -264,6 +261,30 @@ impl<'a> ModuleResolutionPathRefInner<'a> {
                         db.file_system().exists(&path.join("__init__.pyi"))
                     }
                     TypeshedVersionsQueryResult::DoesNotExist => false,
+                }
+            }
+            (path, root) => unreachable!(
+                "The search path should always be the same variant as `self` (got: {path:?}, {root:?})"
+            )
+        }
+    }
+
+    fn to_vfs_file(self, db: &dyn Db, search_path: ModuleResolutionPathRef<'a>) -> Option<VfsFile> {
+        match (self, search_path.0) {
+            (Self::Extra(path), Self::Extra(_)) => system_path_to_file(db.upcast(), path),
+            (Self::FirstParty(path), Self::FirstParty(_)) => system_path_to_file(db.upcast(), path),
+            (Self::SitePackages(path), Self::SitePackages(_)) => {
+                system_path_to_file(db.upcast(), path)
+            }
+            (Self::StandardLibrary(path), Self::StandardLibrary(stdlib_root)) => {
+                let module_name = Self::absolute_path_to_module_name(path, search_path)?;
+                let versions = Self::load_typeshed_versions(db, stdlib_root);
+                match versions.query_module(&module_name, get_target_py_version(db)) {
+                    TypeshedVersionsQueryResult::Exists
+                    | TypeshedVersionsQueryResult::MaybeExists => {
+                        system_path_to_file(db.upcast(), path)
+                    }
+                    TypeshedVersionsQueryResult::DoesNotExist => None,
                 }
             }
             (path, root) => unreachable!(
@@ -414,6 +435,11 @@ impl<'a> ModuleResolutionPathRef<'a> {
     }
 
     #[must_use]
+    pub(crate) fn to_vfs_file(self, db: &dyn Db, search_path: impl Into<Self>) -> Option<VfsFile> {
+        self.0.to_vfs_file(db, search_path.into())
+    }
+
+    #[must_use]
     pub(crate) fn to_module_name(self) -> Option<ModuleName> {
         self.0.to_module_name()
     }
@@ -452,6 +478,11 @@ impl<'a> ModuleResolutionPathRef<'a> {
     #[cfg(test)]
     pub(crate) fn to_path_buf(self) -> ModuleResolutionPathBuf {
         ModuleResolutionPathBuf(self.0.to_path_buf())
+    }
+
+    #[cfg(test)]
+    pub(crate) const fn is_stdlib_search_path(&self) -> bool {
+        matches!(&self.0, ModuleResolutionPathRefInner::StandardLibrary(_))
     }
 }
 
