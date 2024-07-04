@@ -143,6 +143,7 @@ impl ModuleResolutionPathBuf {
         ModuleResolutionPathRef::from(self).relativize_path(absolute_path.as_ref())
     }
 
+    /// Returns `None` if the path doesn't exist, isn't accessible, or if the path points to a directory.
     pub(crate) fn to_vfs_file(&self, db: &dyn Db, search_path: &Self) -> Option<VfsFile> {
         ModuleResolutionPathRef::from(self).to_vfs_file(db, search_path)
     }
@@ -550,7 +551,7 @@ impl<'a> PartialEq<ModuleResolutionPathRef<'a>> for FileSystemPath {
 mod tests {
     use insta::assert_debug_snapshot;
 
-    use crate::db::tests::{create_resolver_builder, TestCase};
+    use crate::db::tests::{create_resolver_builder, TestCase, TestDb};
     use crate::supported_py_version::SupportedPyVersion;
 
     use super::*;
@@ -993,8 +994,7 @@ mod tests {
         });
     }
 
-    #[test]
-    fn is_directory_and_package_stdlib_py38() {
+    fn py38_stdlib_test_case() -> (TestDb, ModuleResolutionPathBuf) {
         let TestCase {
             db,
             custom_typeshed,
@@ -1002,40 +1002,103 @@ mod tests {
         } = create_resolver_builder().unwrap().build();
         let stdlib_module_path =
             ModuleResolutionPathBuf::stdlib_from_typeshed_root(&custom_typeshed).unwrap();
-
-        let asyncio_regular_package = stdlib_module_path.join("asyncio");
-        assert!(asyncio_regular_package.is_directory(&db, &stdlib_module_path));
-        assert!(asyncio_regular_package.is_regular_package(&db, &stdlib_module_path));
-
-        let xml_namespace_package = stdlib_module_path.join("xml");
-        assert!(xml_namespace_package.is_directory(&db, &stdlib_module_path));
-        assert!(!xml_namespace_package.is_regular_package(&db, &stdlib_module_path));
-
-        let functools_module = stdlib_module_path.join("functools.pyi");
-        assert!(!functools_module.is_directory(&db, &stdlib_module_path));
-        assert!(!functools_module.is_regular_package(&db, &stdlib_module_path));
-
-        let asyncio_tasks_module = stdlib_module_path.join("asyncio/tasks.pyi");
-        assert!(!asyncio_tasks_module.is_directory(&db, &stdlib_module_path));
-        assert!(!asyncio_tasks_module.is_regular_package(&db, &stdlib_module_path));
-
-        let non_existent = stdlib_module_path.join("doesnt_even_exist");
-        assert!(!non_existent.is_directory(&db, &stdlib_module_path));
-        assert!(!non_existent.is_regular_package(&db, &stdlib_module_path));
-
-        // `importlib` and `collections` exist as directories in the custom stdlib,
-        // but don't exist yet on the default target version (3.8) according to VERSIONS
-        let importlib_namespace_package = stdlib_module_path.join("importlib");
-        assert!(!importlib_namespace_package.is_directory(&db, &stdlib_module_path));
-        assert!(!importlib_namespace_package.is_regular_package(&db, &stdlib_module_path));
-
-        let collections_regular_package = stdlib_module_path.join("collections");
-        assert!(!collections_regular_package.is_directory(&db, &stdlib_module_path));
-        assert!(!collections_regular_package.is_regular_package(&db, &stdlib_module_path));
+        (db, stdlib_module_path)
     }
 
     #[test]
-    fn is_directory_stdlib_py39() {
+    fn mocked_typeshed_existing_regular_stdlib_pkg_py38() {
+        let (db, stdlib_path) = py38_stdlib_test_case();
+
+        let asyncio_regular_package = stdlib_path.join("asyncio");
+        assert!(asyncio_regular_package.is_directory(&db, &stdlib_path));
+        assert!(asyncio_regular_package.is_regular_package(&db, &stdlib_path));
+        // Paths to directories don't resolve to VfsFiles
+        assert!(asyncio_regular_package
+            .to_vfs_file(&db, &stdlib_path)
+            .is_none());
+        assert!(asyncio_regular_package
+            .join("__init__.pyi")
+            .to_vfs_file(&db, &stdlib_path)
+            .is_some());
+
+        // The `asyncio` package exists on Python 3.8, but the `asyncio.tasks` submodule does not,
+        // according to the `VERSIONS` file in our typeshed mock:
+        let asyncio_tasks_module = stdlib_path.join("asyncio/tasks.pyi");
+        assert!(asyncio_tasks_module
+            .to_vfs_file(&db, &stdlib_path)
+            .is_none());
+        assert!(!asyncio_tasks_module.is_directory(&db, &stdlib_path));
+        assert!(!asyncio_tasks_module.is_regular_package(&db, &stdlib_path));
+    }
+
+    #[test]
+    fn mocked_typeshed_existing_namespace_stdlib_pkg_py38() {
+        let (db, stdlib_path) = py38_stdlib_test_case();
+
+        let xml_namespace_package = stdlib_path.join("xml");
+        assert!(xml_namespace_package.is_directory(&db, &stdlib_path));
+        // Paths to directories don't resolve to VfsFiles
+        assert!(xml_namespace_package
+            .to_vfs_file(&db, &stdlib_path)
+            .is_none());
+        assert!(!xml_namespace_package.is_regular_package(&db, &stdlib_path));
+
+        let xml_etree = stdlib_path.join("xml/etree.pyi");
+        assert!(!xml_etree.is_directory(&db, &stdlib_path));
+        assert!(xml_etree.to_vfs_file(&db, &stdlib_path).is_some());
+        assert!(!xml_etree.is_regular_package(&db, &stdlib_path));
+    }
+
+    #[test]
+    fn mocked_typeshed_single_file_stdlib_module_py38() {
+        let (db, stdlib_path) = py38_stdlib_test_case();
+
+        let functools_module = stdlib_path.join("functools.pyi");
+        assert!(functools_module.to_vfs_file(&db, &stdlib_path).is_some());
+        assert!(!functools_module.is_directory(&db, &stdlib_path));
+        assert!(!functools_module.is_regular_package(&db, &stdlib_path));
+    }
+
+    #[test]
+    fn mocked_typeshed_nonexistent_regular_stdlib_pkg_py38() {
+        let (db, stdlib_path) = py38_stdlib_test_case();
+
+        let collections_regular_package = stdlib_path.join("collections");
+        assert!(collections_regular_package
+            .to_vfs_file(&db, &stdlib_path)
+            .is_none());
+        assert!(!collections_regular_package.is_directory(&db, &stdlib_path));
+        assert!(!collections_regular_package.is_regular_package(&db, &stdlib_path));
+    }
+
+    #[test]
+    fn mocked_typeshed_nonexistent_namespace_stdlib_pkg_py38() {
+        let (db, stdlib_path) = py38_stdlib_test_case();
+
+        let importlib_namespace_package = stdlib_path.join("importlib");
+        assert!(importlib_namespace_package
+            .to_vfs_file(&db, &stdlib_path)
+            .is_none());
+        assert!(!importlib_namespace_package.is_directory(&db, &stdlib_path));
+        assert!(!importlib_namespace_package.is_regular_package(&db, &stdlib_path));
+
+        let importlib_abc = stdlib_path.join("importlib/abc.pyi");
+        assert!(importlib_abc.to_vfs_file(&db, &stdlib_path).is_none());
+        assert!(!importlib_abc.is_directory(&db, &stdlib_path));
+        assert!(!importlib_abc.is_regular_package(&db, &stdlib_path));
+    }
+
+    #[test]
+    fn mocked_typeshed_nonexistent_single_file_module_py38() {
+        let (db, stdlib_path) = py38_stdlib_test_case();
+
+        let non_existent = stdlib_path.join("doesnt_even_exist");
+        assert!(non_existent.to_vfs_file(&db, &stdlib_path).is_none());
+        assert!(!non_existent.is_directory(&db, &stdlib_path));
+        assert!(!non_existent.is_regular_package(&db, &stdlib_path));
+    }
+
+    fn py39_stdlib_test_case() -> (TestDb, ModuleResolutionPathBuf) {
         let TestCase {
             db,
             custom_typeshed,
@@ -1044,23 +1107,73 @@ mod tests {
             .unwrap()
             .with_target_version(SupportedPyVersion::Py39)
             .build();
-
         let stdlib_module_path =
             ModuleResolutionPathBuf::stdlib_from_typeshed_root(&custom_typeshed).unwrap();
+        (db, stdlib_module_path)
+    }
+
+    #[test]
+    fn mocked_typeshed_existing_regular_stdlib_pkgs_py39() {
+        let (db, stdlib_path) = py39_stdlib_test_case();
 
         // Since we've set the target version to Py39,
-        // `importlib` and `collections` should now exist as directories, according to VERSIONS...
-        let importlib_namespace_package = stdlib_module_path.join("importlib");
-        assert!(importlib_namespace_package.is_directory(&db, &stdlib_module_path));
-        assert!(!importlib_namespace_package.is_regular_package(&db, &stdlib_module_path));
+        // `collections` should now exist as a directory, according to VERSIONS...
+        let collections_regular_package = stdlib_path.join("collections");
+        assert!(collections_regular_package.is_directory(&db, &stdlib_path));
+        assert!(collections_regular_package.is_regular_package(&db, &stdlib_path));
+        // (This is still `None`, as directories don't resolve to `Vfs` files)
+        assert!(collections_regular_package
+            .to_vfs_file(&db, &stdlib_path)
+            .is_none());
+        assert!(collections_regular_package
+            .join("__init__.pyi")
+            .to_vfs_file(&db, &stdlib_path)
+            .is_some());
 
-        let collections_regular_package = stdlib_module_path.join("collections");
-        assert!(collections_regular_package.is_directory(&db, &stdlib_module_path));
-        assert!(collections_regular_package.is_regular_package(&db, &stdlib_module_path));
+        // ...and so should the `asyncio.tasks` submodule (though it's still not a directory):
+        let asyncio_tasks_module = stdlib_path.join("asyncio/tasks.pyi");
+        assert!(asyncio_tasks_module
+            .to_vfs_file(&db, &stdlib_path)
+            .is_some());
+        assert!(!asyncio_tasks_module.is_directory(&db, &stdlib_path));
+        assert!(!asyncio_tasks_module.is_regular_package(&db, &stdlib_path));
+    }
 
-        // ...but `xml` no longer exists
-        let xml_namespace_package = stdlib_module_path.join("xml");
-        assert!(!xml_namespace_package.is_directory(&db, &stdlib_module_path));
-        assert!(!xml_namespace_package.is_regular_package(&db, &stdlib_module_path));
+    #[test]
+    fn mocked_typeshed_existing_namespace_stdlib_pkg_py39() {
+        let (db, stdlib_path) = py39_stdlib_test_case();
+
+        // The `importlib` directory now also exists...
+        let importlib_namespace_package = stdlib_path.join("importlib");
+        assert!(importlib_namespace_package.is_directory(&db, &stdlib_path));
+        assert!(!importlib_namespace_package.is_regular_package(&db, &stdlib_path));
+        // (This is still `None`, as directories don't resolve to `Vfs` files)
+        assert!(importlib_namespace_package
+            .to_vfs_file(&db, &stdlib_path)
+            .is_none());
+
+        // ...As do submodules in the `importlib` namespace package:
+        let importlib_abc = importlib_namespace_package.join("abc.pyi");
+        assert!(!importlib_abc.is_directory(&db, &stdlib_path));
+        assert!(!importlib_abc.is_regular_package(&db, &stdlib_path));
+        assert!(importlib_abc.to_vfs_file(&db, &stdlib_path).is_some());
+    }
+
+    #[test]
+    fn mocked_typeshed_nonexistent_namespace_stdlib_pkg_py39() {
+        let (db, stdlib_path) = py39_stdlib_test_case();
+
+        // The `xml` package no longer exists on py39:
+        let xml_namespace_package = stdlib_path.join("xml");
+        assert!(xml_namespace_package
+            .to_vfs_file(&db, &stdlib_path)
+            .is_none());
+        assert!(!xml_namespace_package.is_directory(&db, &stdlib_path));
+        assert!(!xml_namespace_package.is_regular_package(&db, &stdlib_path));
+
+        let xml_etree = xml_namespace_package.join("etree.pyi");
+        assert!(xml_etree.to_vfs_file(&db, &stdlib_path).is_none());
+        assert!(!xml_etree.is_directory(&db, &stdlib_path));
+        assert!(!xml_etree.is_regular_package(&db, &stdlib_path));
     }
 }
