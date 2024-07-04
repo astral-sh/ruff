@@ -95,7 +95,7 @@ Upon successful installation, you should see Ruff's diagnostics surfaced directl
 
 ![Code Actions available in Neovim](https://user-images.githubusercontent.com/1309177/208278707-25fa37e4-079d-4597-ad35-b95dba066960.png)
 
-To use `ruff-lsp` with other editors, including Sublime Text and Helix, see the [`ruff-lsp` documentation](https://github.com/astral-sh/ruff-lsp#installation-and-usage).
+To use `ruff-lsp` with other editors, including Sublime Text and Helix, see the [`ruff-lsp` documentation](https://github.com/astral-sh/ruff-lsp#setup).
 
 ## Language Server Protocol (Unofficial)
 
@@ -350,7 +350,7 @@ jobs:
 Ruff can also be used as a GitHub Action via [`ruff-action`](https://github.com/chartboost/ruff-action).
 
 By default, `ruff-action` runs as a pass-fail test to ensure that a given repository doesn't contain
-any lint rule violations as per its [configuration](https://github.com/astral-sh/ruff/blob/main/docs/configuration.md).
+any lint rule violations as per its [configuration](configuration.md).
 However, under-the-hood, `ruff-action` installs and runs `ruff` directly, so it can be used to
 execute any supported `ruff` command (e.g., `ruff check --fix`).
 
