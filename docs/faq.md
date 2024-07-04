@@ -64,7 +64,7 @@ natively, including:
 - [flake8-executable](https://pypi.org/project/flake8-executable/)
 - [flake8-gettext](https://pypi.org/project/flake8-gettext/)
 - [flake8-implicit-str-concat](https://pypi.org/project/flake8-implicit-str-concat/)
-- [flake8-import-conventions](https://github.com/joaopalmeiro/flake8-import-conventions)
+- [flake8-import-conventions](https://pypi.org/project/flake8-import-conventions/)
 - [flake8-logging](https://pypi.org/project/flake8-logging-format/)
 - [flake8-logging-format](https://pypi.org/project/flake8-logging-format/)
 - [flake8-no-pep420](https://pypi.org/project/flake8-no-pep420)
@@ -93,7 +93,7 @@ natively, including:
 - [pygrep-hooks](https://github.com/pre-commit/pygrep-hooks)
 - [pyupgrade](https://pypi.org/project/pyupgrade/)
 - [tryceratops](https://pypi.org/project/tryceratops/)
-- [yesqa](https://github.com/asottile/yesqa)
+- [yesqa](https://pypi.org/project/yesqa/)
 
 Note that, in some cases, Ruff uses different rule codes and prefixes than would be found in the
 originating Flake8 plugins. For example, Ruff uses `TID252` to represent the `I252` rule from
@@ -177,7 +177,7 @@ Today, Ruff can be used to replace Flake8 when used with any of the following pl
 - [flake8-executable](https://pypi.org/project/flake8-executable/)
 - [flake8-gettext](https://pypi.org/project/flake8-gettext/)
 - [flake8-implicit-str-concat](https://pypi.org/project/flake8-implicit-str-concat/)
-- [flake8-import-conventions](https://github.com/joaopalmeiro/flake8-import-conventions)
+- [flake8-import-conventions](https://pypi.org/project/flake8-import-conventions/)
 - [flake8-logging](https://pypi.org/project/flake8-logging/)
 - [flake8-logging-format](https://pypi.org/project/flake8-logging-format/)
 - [flake8-no-pep420](https://pypi.org/project/flake8-no-pep420)
@@ -204,7 +204,7 @@ Today, Ruff can be used to replace Flake8 when used with any of the following pl
 - [tryceratops](https://pypi.org/project/tryceratops/)
 
 Ruff can also replace [Black](https://pypi.org/project/black/), [isort](https://pypi.org/project/isort/),
-[yesqa](https://github.com/asottile/yesqa), [eradicate](https://pypi.org/project/eradicate/), and
+[yesqa](https://pypi.org/project/yesqa/), [eradicate](https://pypi.org/project/eradicate/), and
 most of the rules implemented in [pyupgrade](https://pypi.org/project/pyupgrade/).
 
 If you're looking to use Ruff, but rely on an unsupported Flake8 plugin, feel free to file an
@@ -271,7 +271,7 @@ Like isort, Ruff's import sorting is compatible with Black.
 
 ## How does Ruff determine which of my imports are first-party, third-party, etc.?
 
-Ruff accepts a `src` option that in your `pyproject.toml`, `ruff.toml`, or `.ruff.toml` file, which
+Ruff accepts a `src` option that in your `pyproject.toml`, `ruff.toml`, or `.ruff.toml` file,
 specifies the directories that Ruff should consider when determining whether an import is
 first-party.
 
@@ -602,7 +602,7 @@ convention = "google"
 ```toml
 line-length = 88
 
-[pydocstyle]
+[lint.pydocstyle]
 convention = "google"
 ```
 
@@ -619,9 +619,9 @@ and respects the `XDG_CONFIG_HOME` specification.
 On Windows, Ruff expects that file to be located at `~\AppData\Roaming\ruff\ruff.toml`.
 
 !!! note
-  Prior to `v0.5.0`, Ruff would read user-specific configuration from
-  `~/Library/Application Support/ruff/ruff.toml` on macOS. While Ruff will still respect
-  such configuration files, the use of `~/Library/ Application Support` is considered deprecated.
+    Prior to `v0.5.0`, Ruff would read user-specific configuration from
+    `~/Library/Application Support/ruff/ruff.toml` on macOS. While Ruff will still respect
+    such configuration files, the use of `~/Library/Application Support` is considered deprecated.
 
 For more, see the [`etcetera`](https://crates.io/crates/etcetera) crate.
 
@@ -630,7 +630,7 @@ For more, see the [`etcetera`](https://crates.io/crates/etcetera) crate.
 Ruff labels fixes as "safe" and "unsafe". By default, Ruff will fix all violations for which safe
 fixes are available, while unsafe fixes can be enabled via the [`unsafe-fixes`](settings.md#unsafe-fixes)
 setting, or passing the [`--unsafe-fixes`](settings.md#unsafe-fixes) flag to `ruff check`. For
-more, see [the fix documentation](configuration.md#fixes).
+more, see [the fix documentation](linter.md#fixes).
 
 Even still, given the dynamic nature of Python, it's difficult to have _complete_ certainty when
 making changes to code, even for seemingly trivial fixes. If a "safe" fix breaks your code, please
