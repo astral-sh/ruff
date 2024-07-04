@@ -122,10 +122,6 @@ pub(crate) fn deferred_scopes(checker: &mut Checker) {
 
         if checker.enabled(Rule::RedefinedArgumentFromLocal) {
             for (name, binding_id) in scope.bindings() {
-                if checker.settings.dummy_variable_rgx.is_match(name) {
-                    continue;
-                }
-
                 for shadow in checker.semantic.shadowed_bindings(scope_id, binding_id) {
                     let binding = &checker.semantic.bindings[shadow.binding_id()];
                     if !matches!(
@@ -138,6 +134,9 @@ pub(crate) fn deferred_scopes(checker: &mut Checker) {
                     }
                     let shadowed = &checker.semantic.bindings[shadow.shadowed_id()];
                     if !shadowed.kind.is_argument() {
+                        continue;
+                    }
+                    if checker.settings.dummy_variable_rgx.is_match(name) {
                         continue;
                     }
                     checker.diagnostics.push(Diagnostic::new(
