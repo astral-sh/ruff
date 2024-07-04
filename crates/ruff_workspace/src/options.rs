@@ -105,7 +105,7 @@ pub struct Options {
     )]
     pub unsafe_fixes: Option<bool>,
 
-    /// Like `fix`, but disables reporting on leftover violation. Implies `fix`.
+    /// Like [`fix`](#fix), but disables reporting on leftover violation. Implies [`fix`](#fix).
     #[option(default = "false", value_type = "bool", example = "fix-only = true")]
     pub fix_only: Option<bool>,
 
@@ -128,7 +128,7 @@ pub struct Options {
     /// Useful for unifying results across many environments, e.g., with a
     /// `pyproject.toml` file.
     ///
-    /// Accepts a PEP 440 specifier, like `==0.3.1` or `>=0.3.1`.
+    /// Accepts a [PEP 440](https://peps.python.org/pep-0440/) specifier, like `==0.3.1` or `>=0.3.1`.
     #[option(
         default = "null",
         value_type = "str",
@@ -177,7 +177,7 @@ pub struct Options {
     pub exclude: Option<Vec<String>>,
 
     /// A list of file patterns to omit from formatting and linting, in addition to those
-    /// specified by `exclude`.
+    /// specified by [`exclude`](#exclude).
     ///
     /// Exclusions are based on globs, and can be either:
     ///
@@ -201,7 +201,7 @@ pub struct Options {
     pub extend_exclude: Option<Vec<String>>,
 
     /// A list of file patterns to include when linting, in addition to those
-    /// specified by `include`.
+    /// specified by [`include`](#include).
     ///
     /// Inclusion are based on globs, and should be single-path patterns, like
     /// `*.pyw`, to include any file with the `.pyw` extension.
@@ -217,8 +217,8 @@ pub struct Options {
     )]
     pub extend_include: Option<Vec<String>>,
 
-    /// Whether to enforce `exclude` and `extend-exclude` patterns, even for
-    /// paths that are passed to Ruff explicitly. Typically, Ruff will lint
+    /// Whether to enforce [`exclude`](#exclude) and [`extend-exclude`](#extend-exclude) patterns,
+    /// even for paths that are passed to Ruff explicitly. Typically, Ruff will lint
     /// any paths passed in directly, even if they would typically be
     /// excluded. Setting `force-exclude = true` will cause Ruff to
     /// respect these exclusions unequivocally.
@@ -564,12 +564,12 @@ pub struct LintCommonOptions {
         "#
     )]
     #[deprecated(
-        note = "The `extend-ignore` option is now interchangeable with `ignore`. Please update your configuration to use the `ignore` option instead."
+        note = "The `extend-ignore` option is now interchangeable with [`ignore`](#lint_ignore). Please update your configuration to use the [`ignore`](#lint_ignore) option instead."
     )]
     pub extend_ignore: Option<Vec<RuleSelector>>,
 
     /// A list of rule codes or prefixes to enable, in addition to those
-    /// specified by `select`.
+    /// specified by [`select`](#lint_select).
     #[option(
         default = "[]",
         value_type = "list[RuleSelector]",
@@ -581,7 +581,7 @@ pub struct LintCommonOptions {
     pub extend_select: Option<Vec<RuleSelector>>,
 
     /// A list of rule codes or prefixes to consider fixable, in addition to those
-    /// specified by `fixable`.
+    /// specified by [`fixable`](#lint_fixable).
     #[option(
         default = r#"[]"#,
         value_type = "list[RuleSelector]",
@@ -593,9 +593,9 @@ pub struct LintCommonOptions {
     pub extend_fixable: Option<Vec<RuleSelector>>,
 
     /// A list of rule codes or prefixes to consider non-auto-fixable, in addition to those
-    /// specified by `unfixable`.
+    /// specified by [`unfixable`](#lint_unfixable).
     #[deprecated(
-        note = "The `extend-unfixable` option is now interchangeable with `unfixable`. Please update your configuration to use the `unfixable` option instead."
+        note = "The `extend-unfixable` option is now interchangeable with [`unfixable`](#lint_unfixable). Please update your configuration to use the `unfixable` option instead."
     )]
     pub extend_unfixable: Option<Vec<RuleSelector>>,
 
@@ -746,7 +746,7 @@ pub struct LintCommonOptions {
     ///
     /// Comments starting with these tags will be ignored by commented-out code
     /// detection (`ERA`), and skipped by line-length rules (`E501`) if
-    /// `ignore-overlong-task-comments` is set to `true`.
+    /// [`ignore-overlong-task-comments`](#lint_pycodestyle_ignore-overlong-task-comments) is set to `true`.
     #[option(
         default = r#"["TODO", "FIXME", "XXX"]"#,
         value_type = "list[str]",
@@ -904,7 +904,7 @@ pub struct LintCommonOptions {
     pub per_file_ignores: Option<FxHashMap<String, Vec<RuleSelector>>>,
 
     /// A list of mappings from file pattern to rule codes or prefixes to
-    /// exclude, in addition to any rules excluded by `per-file-ignores`.
+    /// exclude, in addition to any rules excluded by [`per-file-ignores`](#lint_per-file-ignores).
     #[option(
         default = "{}",
         value_type = "dict[str, list[RuleSelector]]",
@@ -1002,7 +1002,7 @@ pub struct Flake8BanditOptions {
     pub hardcoded_tmp_directory: Option<Vec<String>>,
 
     /// A list of directories to consider temporary, in addition to those
-    /// specified by `hardcoded-tmp-directory`.
+    /// specified by [`hardcoded-tmp-directory`](#lint_flake8-bandit_hardcoded-tmp-directory).
     #[option(
         default = "[]",
         value_type = "list[str]",
@@ -1227,7 +1227,7 @@ pub struct Flake8GetTextOptions {
     pub function_names: Option<Vec<Name>>,
 
     /// Additional function names to consider as internationalization calls, in addition to those
-    /// included in `function-names`.
+    /// included in [`function-names`](#lint_flake8-gettext_function-names).
     #[option(
         default = r#"[]"#,
         value_type = "list[str]",
@@ -1289,7 +1289,7 @@ impl Flake8ImplicitStrConcatOptions {
 #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 pub struct Flake8ImportConventionsOptions {
     /// The conventional aliases for imports. These aliases can be extended by
-    /// the `extend-aliases` option.
+    /// the [`extend-aliases`](#lint_flake8-import-conventions_extend-aliases) option.
     #[option(
         default = r#"{"altair": "alt", "matplotlib": "mpl", "matplotlib.pyplot": "plt", "numpy": "np", "pandas": "pd", "seaborn": "sns", "tensorflow": "tf", "tkinter":  "tk", "holoviews": "hv", "panel": "pn", "plotly.express": "px", "polars": "pl", "pyarrow": "pa"}"#,
         value_type = "dict[str, str]",
@@ -1307,7 +1307,7 @@ pub struct Flake8ImportConventionsOptions {
     pub aliases: Option<FxHashMap<String, String>>,
 
     /// A mapping from module to conventional import alias. These aliases will
-    /// be added to the `aliases` mapping.
+    /// be added to the [`aliases`](#lint_flake8-import-conventions_aliases) mapping.
     #[option(
         default = r#"{}"#,
         value_type = "dict[str, str]",
@@ -1518,7 +1518,7 @@ pub struct Flake8QuotesOptions {
     /// Quote style to prefer for inline strings (either "single" or
     /// "double").
     ///
-    /// When using the formatter, ensure that `format.quote-style` is set to
+    /// When using the formatter, ensure that [`format.quote-style`](#format_quote-style) is set to
     /// the same preferred quote style.
     #[option(
         default = r#""double""#,
@@ -1598,7 +1598,7 @@ pub struct Flake8SelfOptions {
     pub ignore_names: Option<Vec<Name>>,
 
     /// Additional names to ignore when considering `flake8-self` violations,
-    /// in addition to those included in `ignore-names`.
+    /// in addition to those included in [`ignore-names`](#lint_flake8-self_ignore-names).
     #[option(
         default = r#"[]"#,
         value_type = "list[str]",
@@ -1849,11 +1849,11 @@ pub struct IsortOptions {
     /// ```
     ///
     /// Note that this setting is only effective when combined with
-    /// `combine-as-imports = true`. When `combine-as-imports` isn't
+    /// `combine-as-imports = true`. When [`combine-as-imports`](#lint_isort_combine-as-imports) isn't
     /// enabled, every aliased `import from` will be given its own line, in
     /// which case, wrapping is not necessary.
     ///
-    /// When using the formatter, ensure that `format.skip-magic-trailing-comma` is set to `false` (default)
+    /// When using the formatter, ensure that [`format.skip-magic-trailing-comma`](#format_skip-magic-trailing-comma) is set to `false` (default)
     /// when enabling `force-wrap-aliases` to avoid that the formatter collapses members if they all fit on a single line.
     #[option(
         default = r#"false"#,
@@ -1899,7 +1899,7 @@ pub struct IsortOptions {
     ///
     /// See isort's [`split-on-trailing-comma`](https://pycqa.github.io/isort/docs/configuration/options.html#split-on-trailing-comma) option.
     ///
-    /// When using the formatter, ensure that `format.skip-magic-trailing-comma` is set to `false` (default) when enabling `split-on-trailing-comma`
+    /// When using the formatter, ensure that [`format.skip-magic-trailing-comma`](#format_skip-magic-trailing-comma) is set to `false` (default) when enabling `split-on-trailing-comma`
     /// to avoid that the formatter removes the trailing commas.
     #[option(
         default = r#"true"#,
@@ -2014,7 +2014,7 @@ pub struct IsortOptions {
     /// versa.
     ///
     /// The default ("furthest-to-closest") is equivalent to isort's
-    /// `reverse-relative` default (`reverse-relative = false`); setting
+    /// [`reverse-relative`](https://pycqa.github.io/isort/docs/configuration/options.html#reverse-relative) default (`reverse-relative = false`); setting
     /// this to "closest-to-furthest" is equivalent to isort's
     /// `reverse-relative = true`.
     #[option(
@@ -2037,7 +2037,7 @@ pub struct IsortOptions {
     pub required_imports: Option<Vec<String>>,
 
     /// An override list of tokens to always recognize as a Class for
-    /// `order-by-type` regardless of casing.
+    /// [`order-by-type`](#lint_isort_order-by-type) regardless of casing.
     #[option(
         default = r#"[]"#,
         value_type = "list[str]",
@@ -2048,7 +2048,7 @@ pub struct IsortOptions {
     pub classes: Option<Vec<String>>,
 
     /// An override list of tokens to always recognize as a CONSTANT
-    /// for `order-by-type` regardless of casing.
+    /// for [`order-by-type`](#lint_isort_order-by-type) regardless of casing.
     #[option(
         default = r#"[]"#,
         value_type = "list[str]",
@@ -2059,7 +2059,7 @@ pub struct IsortOptions {
     pub constants: Option<Vec<String>>,
 
     /// An override list of tokens to always recognize as a var
-    /// for `order-by-type` regardless of casing.
+    /// for [`order-by-type`](#lint_isort_order-by-type) regardless of casing.
     #[option(
         default = r#"[]"#,
         value_type = "list[str]",
@@ -2133,7 +2133,7 @@ pub struct IsortOptions {
     )]
     pub section_order: Option<Vec<ImportSection>>,
 
-    /// Define a default section for any imports that don't fit into the specified `section-order`.
+    /// Define a default section for any imports that don't fit into the specified [`section-order`](#lint_isort_section-order).
     #[option(
         default = r#"third-party"#,
         value_type = "str",
@@ -2235,7 +2235,7 @@ pub struct IsortOptions {
     )]
     pub length_sort: Option<bool>,
 
-    /// Sort straight imports by their string length. Similar to `length-sort`,
+    /// Sort straight imports by their string length. Similar to [`length-sort`](#lint_isort_length-sort),
     /// but applies only to straight imports and doesn't affect `from` imports.
     #[option(
         default = r#"false"#,
@@ -2264,7 +2264,7 @@ pub struct IsortOptions {
     /// langchain = ["langchain-*"]
     /// ```
     ///
-    /// Custom sections should typically be inserted into the `section-order` list to ensure that
+    /// Custom sections should typically be inserted into the [`section-order`](#lint_isort_section-order) list to ensure that
     /// they're displayed as a standalone group and in the intended order, as in:
     /// ```toml
     /// section-order = [
@@ -2277,8 +2277,8 @@ pub struct IsortOptions {
     /// ]
     /// ```
     ///
-    /// If a custom section is omitted from `section-order`, imports in that section will be
-    /// assigned to the `default-section` (which defaults to `third-party`).
+    /// If a custom section is omitted from [`section-order`](#lint_isort_section-order), imports in that section will be
+    /// assigned to the [`default-section`](#lint_isort_default-section) (which defaults to `third-party`).
     #[option(
         default = "{}",
         value_type = "dict[str, list[str]]",
@@ -2521,7 +2521,7 @@ pub struct Pep8NamingOptions {
     pub ignore_names: Option<Vec<String>>,
 
     /// Additional names (or patterns) to ignore when considering `pep8-naming` violations,
-    /// in addition to those included in `ignore-names`
+    /// in addition to those included in [`ignore-names`](#lint_pep8-naming_ignore-names).
     ///
     /// Supports glob patterns. For example, to ignore all names starting with `test_`
     /// or ending with `_test`, you could use `ignore-names = ["test_*", "*_test"]`.
@@ -2644,7 +2644,7 @@ pub struct PycodestyleOptions {
     pub max_doc_length: Option<LineLength>,
 
     /// Whether line-length violations (`E501`) should be triggered for
-    /// comments starting with `task-tags` (by default: \["TODO", "FIXME",
+    /// comments starting with [`task-tags`](#lint_task-tags) (by default: \["TODO", "FIXME",
     /// and "XXX"\]).
     #[option(
         default = "false",
@@ -2899,7 +2899,7 @@ impl PylintOptions {
 #[serde(deny_unknown_fields, rename_all = "kebab-case")]
 #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 pub struct PyUpgradeOptions {
-    /// Whether to avoid PEP 585 (`List[int]` -> `list[int]`) and PEP 604
+    /// Whether to avoid [PEP 585](https://peps.python.org/pep-0585/) (`List[int]` -> `list[int]`) and [PEP 604](https://peps.python.org/pep-0604/)
     /// (`Union[str, int]` -> `str | int`) rewrites even if a file imports
     /// `from __future__ import annotations`.
     ///
@@ -3197,8 +3197,8 @@ pub struct FormatOptions {
     /// in the reformatted code example that exceed the globally configured
     /// line length limit.
     ///
-    /// For example, when this is set to `20` and `docstring-code-format` is
-    /// enabled, then this code:
+    /// For example, when this is set to `20` and [`docstring-code-format`](#docstring-code-format)
+    /// is enabled, then this code:
     ///
     /// ```python
     /// def f(x):
