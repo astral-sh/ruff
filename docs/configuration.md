@@ -254,7 +254,7 @@ For a complete enumeration of the available configuration options, see [_Setting
 
 ## Config file discovery
 
-Similar to [ESLint](https://eslint.org/docs/latest/user-guide/configuring/configuration-files#cascading-and-hierarchy),
+Similar to [ESLint](https://eslint.org/docs/latest/use/configure/configuration-files#cascading-configuration-objects),
 Ruff supports hierarchical configuration, such that the "closest" config file in the
 directory hierarchy is used for every individual file, with all paths in the config file
 (e.g., `exclude` globs, `src` paths) being resolved relative to the directory containing that
@@ -275,7 +275,7 @@ There are a few exceptions to these rules:
 1. Any config-file-supported settings that are provided on the command-line (e.g., via
     `--select`) will override the settings in _every_ resolved configuration file.
 
-Unlike [ESLint](https://eslint.org/docs/latest/user-guide/configuring/configuration-files#cascading-and-hierarchy),
+Unlike [ESLint](https://eslint.org/docs/latest/use/configure/configuration-files#cascading-configuration-objects),
 Ruff does not merge settings across configuration files; instead, the "closest" configuration file
 is used, and any parent configuration files are ignored. In lieu of this implicit cascade, Ruff
 supports an [`extend`](settings.md#extend) field, which allows you to inherit the settings from another
