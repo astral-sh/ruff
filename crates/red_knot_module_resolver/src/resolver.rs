@@ -405,10 +405,6 @@ mod tests {
 
         let stdlib_dir =
             ModuleResolutionPathBuf::stdlib_from_typeshed_root(&custom_typeshed).unwrap();
-        let functools_path = stdlib_dir.join("functools.pyi");
-        db.memory_file_system()
-            .write_file(&functools_path, "def update_wrapper(): ...")?;
-
         let functools_module_name = ModuleName::new_static("functools").unwrap();
         let functools_module = resolve_module(&db, functools_module_name.clone()).unwrap();
 
@@ -420,13 +416,14 @@ mod tests {
         assert_eq!(stdlib_dir, functools_module.search_path().to_path_buf());
         assert_eq!(ModuleKind::Module, functools_module.kind());
 
-        let functools_path_vfs = VfsPath::from(functools_path);
+        let expected_functools_path =
+            VfsPath::FileSystem(custom_typeshed.join("stdlib/functools.pyi"));
 
-        assert_eq!(&functools_path_vfs, functools_module.file().path(&db));
+        assert_eq!(&expected_functools_path, functools_module.file().path(&db));
 
         assert_eq!(
             Some(functools_module),
-            path_to_module(&db, &functools_path_vfs)
+            path_to_module(&db, &expected_functools_path)
         );
 
         Ok(())
@@ -434,21 +431,11 @@ mod tests {
 
     #[test]
     fn first_party_precedence_over_stdlib() -> anyhow::Result<()> {
-        let TestCase {
-            db,
-            src,
-            custom_typeshed,
-            ..
-        } = create_resolver_builder()?.build();
+        let TestCase { db, src, .. } = create_resolver_builder()?.build();
 
-        let stdlib_dir = custom_typeshed.join("stdlib");
-        let stdlib_functools_path = stdlib_dir.join("functools.pyi");
         let first_party_functools_path = src.join("functools.py");
-
-        db.memory_file_system().write_files([
-            (&stdlib_functools_path, "def update_wrapper(): ..."),
-            (&first_party_functools_path, "def update_wrapper(): ..."),
-        ])?;
+        db.memory_file_system()
+            .write_file(&first_party_functools_path, "def update_wrapper(): ...")?;
 
         let functools_module_name = ModuleName::new_static("functools").unwrap();
         let functools_module = resolve_module(&db, functools_module_name.clone()).unwrap();
@@ -471,30 +458,6 @@ mod tests {
 
         Ok(())
     }
-
-    // TODO: Port typeshed test case. Porting isn't possible at the moment because the vendored zip
-    //   is part of the red knot crate
-    // #[test]
-    // fn typeshed_zip_created_at_build_time() -> anyhow::Result<()> {
-    //     // The file path here is hardcoded in this crate's `build.rs` script.
-    //     // Luckily this crate will fail to build if this file isn't available at build time.
-    //     const TYPESHED_ZIP_BYTES: &[u8] =
-    //         include_bytes!(concat!(env!("OUT_DIR"), "/zipped_typeshed.zip"));
-    //     assert!(!TYPESHED_ZIP_BYTES.is_empty());
-    //     let mut typeshed_zip_archive = ZipArchive::new(Cursor::new(TYPESHED_ZIP_BYTES))?;
-    //
-    //     let path_to_functools = Path::new("stdlib").join("functools.pyi");
-    //     let mut functools_module_stub = typeshed_zip_archive
-    //         .by_name(path_to_functools.to_str().unwrap())
-    //         .unwrap();
-    //     assert!(functools_module_stub.is_file());
-    //
-    //     let mut functools_module_stub_source = String::new();
-    //     functools_module_stub.read_to_string(&mut functools_module_stub_source)?;
-    //
-    //     assert!(functools_module_stub_source.contains("def update_wrapper("));
-    //     Ok(())
-    // }
 
     #[test]
     fn resolve_package() -> anyhow::Result<()> {

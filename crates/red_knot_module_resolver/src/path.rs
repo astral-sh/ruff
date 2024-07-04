@@ -1018,8 +1018,7 @@ mod tests {
             ModuleResolutionPathBuf::stdlib_from_typeshed_root(&custom_typeshed).unwrap();
 
         // Since we've set the target version to Py39,
-        // `importlib` and `collections` should now exist as directories, according to VERSIONS,
-        // but `xml` no longer exists
+        // `importlib` and `collections` should now exist as directories, according to VERSIONS...
         let importlib_namespace_package = stdlib_module_path.join("importlib");
         assert!(importlib_namespace_package.is_directory(&db, &stdlib_module_path));
         assert!(!importlib_namespace_package.is_regular_package(&db, &stdlib_module_path));
@@ -1028,6 +1027,7 @@ mod tests {
         assert!(collections_regular_package.is_directory(&db, &stdlib_module_path));
         assert!(collections_regular_package.is_regular_package(&db, &stdlib_module_path));
 
+        // ...but `xml` no longer exists
         let xml_namespace_package = stdlib_module_path.join("xml");
         assert!(!xml_namespace_package.is_directory(&db, &stdlib_module_path));
         assert!(!xml_namespace_package.is_regular_package(&db, &stdlib_module_path));
