@@ -1,7 +1,7 @@
 {
     "settings": [
         {
-            "experimentalServer": true,
+            "nativeServer": "on",
             "cwd": "/Users/test/projects/pandas",
             "workspace": "file:///Users/test/projects/pandas",
             "path": [],
@@ -21,9 +21,7 @@
             "lint": {
                 "enable": true,
                 "run": "onType",
-                "args": [
-                    "--preview"
-                ]
+                "args": []
             },
             "format": {
                 "args": []
@@ -31,10 +29,11 @@
             "enable": true,
             "organizeImports": true,
             "fixAll": true,
-            "showNotifications": "off"
+            "showNotifications": "off",
+            "showSyntaxErrors": true
         },
         {
-            "experimentalServer": true,
+            "nativeServer": "on",
             "cwd": "/Users/test/projects/scipy",
             "workspace": "file:///Users/test/projects/scipy",
             "path": [],
@@ -55,9 +54,7 @@
                 "enable": true,
                 "preview": false,
                 "run": "onType",
-                "args": [
-                    "--preview"
-                ]
+                "args": []
             },
             "format": {
                 "args": []
@@ -65,11 +62,12 @@
             "enable": true,
             "organizeImports": true,
             "fixAll": true,
-            "showNotifications": "off"
+            "showNotifications": "off",
+            "showSyntaxErrors": true
         }
     ],
     "globalSettings": {
-        "experimentalServer": true,
+        "nativeServer": "on",
         "cwd": "/",
         "workspace": "/",
         "path": [],
@@ -89,9 +87,7 @@
             "preview": true,
             "select": ["F", "I"],
             "run": "onType",
-            "args": [
-                "--preview"
-            ]
+            "args": []
         },
         "format": {
             "args": []
@@ -99,6 +95,7 @@
         "enable": true,
         "organizeImports": true,
         "fixAll": false,
-        "showNotifications": "off"
+        "showNotifications": "off",
+        "showSyntaxErrors": true
     }
 }

@@ -48,7 +48,7 @@ pub struct Server {
 }
 
 impl Server {
-    pub fn new(worker_threads: NonZeroUsize) -> crate::Result<Self> {
+    pub fn new(worker_threads: NonZeroUsize, preview: Option<bool>) -> crate::Result<Self> {
         let connection = ConnectionInitializer::stdio();
 
         let (id, init_params) = connection.initialize_start()?;
@@ -70,14 +70,18 @@ impl Server {
 
         crate::message::init_messenger(connection.make_sender());
 
-        let AllSettings {
-            global_settings,
-            mut workspace_settings,
-        } = AllSettings::from_value(
+        let mut all_settings = AllSettings::from_value(
             init_params
                 .initialization_options
                 .unwrap_or_else(|| serde_json::Value::Object(serde_json::Map::default())),
         );
+        if let Some(preview) = preview {
+            all_settings.set_preview(preview);
+        }
+        let AllSettings {
+            global_settings,
+            mut workspace_settings,
+        } = all_settings;
 
         crate::trace::init_tracing(
             connection.make_sender(),

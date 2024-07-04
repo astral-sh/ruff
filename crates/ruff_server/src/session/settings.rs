@@ -84,6 +84,20 @@ pub struct ClientSettings {
     pub(crate) tracing: TracingSettings,
 }
 
+impl ClientSettings {
+    /// Update the preview flag for the linter and the formatter with the given value.
+    pub(crate) fn set_preview(&mut self, preview: bool) {
+        match self.lint.as_mut() {
+            None => self.lint = Some(LintOptions::default().with_preview(preview)),
+            Some(lint) => lint.set_preview(preview),
+        }
+        match self.format.as_mut() {
+            None => self.format = Some(FormatOptions::default().with_preview(preview)),
+            Some(format) => format.set_preview(preview),
+        }
+    }
+}
+
 /// Settings needed to initialize tracing. These will only be
 /// read from the global configuration.
 #[derive(Debug, Deserialize, Default)]
@@ -107,7 +121,7 @@ struct WorkspaceSettings {
     workspace: Url,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Default, Deserialize)]
 #[cfg_attr(test, derive(PartialEq, Eq))]
 #[serde(rename_all = "camelCase")]
 struct LintOptions {
@@ -118,11 +132,33 @@ struct LintOptions {
     ignore: Option<Vec<String>>,
 }
 
+impl LintOptions {
+    fn with_preview(mut self, preview: bool) -> LintOptions {
+        self.preview = Some(preview);
+        self
+    }
+
+    fn set_preview(&mut self, preview: bool) {
+        self.preview = Some(preview);
+    }
+}
+
 #[derive(Debug, Default, Deserialize)]
 #[cfg_attr(test, derive(PartialEq, Eq))]
 #[serde(rename_all = "camelCase")]
 struct FormatOptions {
     preview: Option<bool>,
+}
+
+impl FormatOptions {
+    fn with_preview(mut self, preview: bool) -> FormatOptions {
+        self.preview = Some(preview);
+        self
+    }
+
+    fn set_preview(&mut self, preview: bool) {
+        self.preview = Some(preview);
+    }
 }
 
 #[derive(Debug, Default, Deserialize)]
@@ -159,6 +195,7 @@ enum InitializationOptions {
 }
 
 /// Built from the initialization options provided by the client.
+#[derive(Debug)]
 pub(crate) struct AllSettings {
     pub(crate) global_settings: ClientSettings,
     /// If this is `None`, the client only passed in global settings.
@@ -177,6 +214,16 @@ impl AllSettings {
                 })
                 .unwrap_or_default(),
         )
+    }
+
+    /// Update the preview flag for both the global and all workspace settings.
+    pub(crate) fn set_preview(&mut self, preview: bool) {
+        self.global_settings.set_preview(preview);
+        if let Some(workspace_settings) = self.workspace_settings.as_mut() {
+            for settings in workspace_settings.values_mut() {
+                settings.set_preview(preview);
+            }
+        }
     }
 
     fn from_init_options(options: InitializationOptions) -> Self {
@@ -393,6 +440,11 @@ mod tests {
     const EMPTY_INIT_OPTIONS_FIXTURE: &str =
         include_str!("../../resources/test/fixtures/settings/empty.json");
 
+    // This fixture contains multiple workspaces with empty initialization options. It only sets
+    // the `cwd` and the `workspace` value.
+    const EMPTY_MULTIPLE_WORKSPACE_INIT_OPTIONS_FIXTURE: &str =
+        include_str!("../../resources/test/fixtures/settings/empty_multiple_workspace.json");
+
     fn deserialize_fixture<T: DeserializeOwned>(content: &str) -> T {
         serde_json::from_str(content).expect("test fixture JSON should deserialize")
     }
@@ -456,7 +508,9 @@ mod tests {
                 exclude: None,
                 line_length: None,
                 configuration_preference: None,
-                show_syntax_errors: None,
+                show_syntax_errors: Some(
+                    true,
+                ),
                 tracing: TracingSettings {
                     log_level: None,
                     log_file: None,
@@ -509,7 +563,9 @@ mod tests {
                         exclude: None,
                         line_length: None,
                         configuration_preference: None,
-                        show_syntax_errors: None,
+                        show_syntax_errors: Some(
+                            true,
+                        ),
                         tracing: TracingSettings {
                             log_level: None,
                             log_file: None,
@@ -575,7 +631,9 @@ mod tests {
                         exclude: None,
                         line_length: None,
                         configuration_preference: None,
-                        show_syntax_errors: None,
+                        show_syntax_errors: Some(
+                            true,
+                        ),
                         tracing: TracingSettings {
                             log_level: None,
                             log_file: None,
@@ -770,5 +828,31 @@ mod tests {
         let options: InitializationOptions = deserialize_fixture(EMPTY_INIT_OPTIONS_FIXTURE);
 
         assert_eq!(options, InitializationOptions::default());
+    }
+
+    fn assert_preview_client_settings(settings: &ClientSettings, preview: bool) {
+        assert_eq!(settings.lint.as_ref().unwrap().preview.unwrap(), preview);
+        assert_eq!(settings.format.as_ref().unwrap().preview.unwrap(), preview);
+    }
+
+    fn assert_preview_all_settings(all_settings: &AllSettings, preview: bool) {
+        assert_preview_client_settings(&all_settings.global_settings, preview);
+        if let Some(workspace_settings) = all_settings.workspace_settings.as_ref() {
+            for settings in workspace_settings.values() {
+                assert_preview_client_settings(settings, preview);
+            }
+        }
+    }
+
+    #[test]
+    fn test_preview_flag() {
+        let options = deserialize_fixture(EMPTY_MULTIPLE_WORKSPACE_INIT_OPTIONS_FIXTURE);
+        let mut all_settings = AllSettings::from_init_options(options);
+
+        all_settings.set_preview(false);
+        assert_preview_all_settings(&all_settings, false);
+
+        all_settings.set_preview(true);
+        assert_preview_all_settings(&all_settings, true);
     }
 }

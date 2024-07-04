@@ -200,15 +200,13 @@ fn format(args: FormatCommand, global_options: GlobalConfigArgs) -> Result<ExitS
 }
 
 fn server(args: ServerCommand) -> Result<ExitStatus> {
-    let ServerCommand { preview } = args;
-
     let four = NonZeroUsize::new(4).unwrap();
 
     // by default, we set the number of worker threads to `num_cpus`, with a maximum of 4.
     let worker_threads = std::thread::available_parallelism()
         .unwrap_or(four)
         .max(four);
-    commands::server::run_server(preview, worker_threads)
+    commands::server::run_server(worker_threads, args.resolve_preview())
 }
 
 pub fn check(args: CheckCommand, global_options: GlobalConfigArgs) -> Result<ExitStatus> {
