@@ -205,13 +205,24 @@ impl<'a> ModuleResolutionPathRefInner<'a> {
     }
 
     #[must_use]
-    fn is_directory(&self, db: &dyn Db, search_path: Self) -> bool {
-        match (self, search_path) {
+    #[inline]
+    fn absolute_path_to_module_name(
+        absolute_path: &FileSystemPath,
+        stdlib_root: ModuleResolutionPathRef,
+    ) -> Option<ModuleName> {
+        stdlib_root
+            .relativize_path(absolute_path)
+            .and_then(ModuleResolutionPathRef::to_module_name)
+    }
+
+    #[must_use]
+    fn is_directory(&self, db: &dyn Db, search_path: ModuleResolutionPathRef<'a>) -> bool {
+        match (self, search_path.0) {
             (Self::Extra(path), Self::Extra(_)) => db.file_system().is_directory(path),
             (Self::FirstParty(path), Self::FirstParty(_)) => db.file_system().is_directory(path),
             (Self::SitePackages(path), Self::SitePackages(_)) => db.file_system().is_directory(path),
             (Self::StandardLibrary(path), Self::StandardLibrary(stdlib_root)) => {
-                let Some(module_name) = ModuleResolutionPathRef(*self).to_module_name() else {
+                let Some(module_name) = Self::absolute_path_to_module_name(path, search_path) else {
                     return false;
                 };
                 let typeshed_versions = Self::load_typeshed_versions(db, stdlib_root);
@@ -230,8 +241,8 @@ impl<'a> ModuleResolutionPathRefInner<'a> {
     }
 
     #[must_use]
-    fn is_regular_package(&self, db: &dyn Db, search_path: Self) -> bool {
-        match (self, search_path) {
+    fn is_regular_package(&self, db: &dyn Db, search_path: ModuleResolutionPathRef<'a>) -> bool {
+        match (self, search_path.0) {
             (Self::Extra(path), Self::Extra(_))
             | (Self::FirstParty(path), Self::FirstParty(_))
             | (Self::SitePackages(path), Self::SitePackages(_)) => {
@@ -243,7 +254,7 @@ impl<'a> ModuleResolutionPathRefInner<'a> {
             // (1) Account for VERSIONS
             // (2) Only test for `__init__.pyi`, not `__init__.py`
             (Self::StandardLibrary(path), Self::StandardLibrary(stdlib_root)) => {
-                let Some(module_name) = ModuleResolutionPathRef(*self).to_module_name() else {
+                let Some(module_name) = Self::absolute_path_to_module_name(path, search_path) else {
                     return false;
                 };
                 let typeshed_versions = Self::load_typeshed_versions(db, stdlib_root);
@@ -394,12 +405,12 @@ impl<'a> ModuleResolutionPathRef<'a> {
 
     #[must_use]
     pub(crate) fn is_directory(&self, db: &dyn Db, search_path: impl Into<Self>) -> bool {
-        self.0.is_directory(db, search_path.into().0)
+        self.0.is_directory(db, search_path.into())
     }
 
     #[must_use]
     pub(crate) fn is_regular_package(&self, db: &dyn Db, search_path: impl Into<Self>) -> bool {
-        self.0.is_regular_package(db, search_path.into().0)
+        self.0.is_regular_package(db, search_path.into())
     }
 
     #[must_use]
@@ -506,9 +517,12 @@ impl<'a> PartialEq<ModuleResolutionPathRef<'a>> for FileSystemPath {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-
     use insta::assert_debug_snapshot;
+
+    use crate::db::tests::{create_resolver_builder, TestCase};
+    use crate::supported_py_version::SupportedPyVersion;
+
+    use super::*;
 
     // Replace windows paths
     static WINDOWS_PATH_FILTER: [(&str, &str); 1] = [(r"\\\\", "/")];
@@ -946,5 +960,76 @@ mod tests {
             "###
             );
         });
+    }
+
+    #[test]
+    fn is_directory_and_package_stdlib_py38() {
+        let TestCase {
+            db,
+            custom_typeshed,
+            ..
+        } = create_resolver_builder().unwrap().build();
+        let stdlib_module_path =
+            ModuleResolutionPathBuf::stdlib_from_typeshed_root(&custom_typeshed).unwrap();
+
+        let asyncio_regular_package = stdlib_module_path.join("asyncio");
+        assert!(asyncio_regular_package.is_directory(&db, &stdlib_module_path));
+        assert!(asyncio_regular_package.is_regular_package(&db, &stdlib_module_path));
+
+        let xml_namespace_package = stdlib_module_path.join("xml");
+        assert!(xml_namespace_package.is_directory(&db, &stdlib_module_path));
+        assert!(!xml_namespace_package.is_regular_package(&db, &stdlib_module_path));
+
+        let functools_module = stdlib_module_path.join("functools.pyi");
+        assert!(!functools_module.is_directory(&db, &stdlib_module_path));
+        assert!(!functools_module.is_regular_package(&db, &stdlib_module_path));
+
+        let asyncio_tasks_module = stdlib_module_path.join("asyncio/tasks.pyi");
+        assert!(!asyncio_tasks_module.is_directory(&db, &stdlib_module_path));
+        assert!(!asyncio_tasks_module.is_regular_package(&db, &stdlib_module_path));
+
+        let non_existent = stdlib_module_path.join("doesnt_even_exist");
+        assert!(!non_existent.is_directory(&db, &stdlib_module_path));
+        assert!(!non_existent.is_regular_package(&db, &stdlib_module_path));
+
+        // `importlib` and `collections` exist as directories in the custom stdlib,
+        // but don't exist yet on the default target version (3.8) according to VERSIONS
+        let importlib_namespace_package = stdlib_module_path.join("importlib");
+        assert!(!importlib_namespace_package.is_directory(&db, &stdlib_module_path));
+        assert!(!importlib_namespace_package.is_regular_package(&db, &stdlib_module_path));
+
+        let collections_regular_package = stdlib_module_path.join("collections");
+        assert!(!collections_regular_package.is_directory(&db, &stdlib_module_path));
+        assert!(!collections_regular_package.is_regular_package(&db, &stdlib_module_path));
+    }
+
+    #[test]
+    fn is_directory_stdlib_py39() {
+        let TestCase {
+            db,
+            custom_typeshed,
+            ..
+        } = create_resolver_builder()
+            .unwrap()
+            .with_target_version(SupportedPyVersion::Py39)
+            .build();
+
+        let stdlib_module_path =
+            ModuleResolutionPathBuf::stdlib_from_typeshed_root(&custom_typeshed).unwrap();
+
+        // Since we've set the target version to Py39,
+        // `importlib` and `collections` should now exist as directories, according to VERSIONS,
+        // but `xml` no longer exists
+        let importlib_namespace_package = stdlib_module_path.join("importlib");
+        assert!(importlib_namespace_package.is_directory(&db, &stdlib_module_path));
+        assert!(!importlib_namespace_package.is_regular_package(&db, &stdlib_module_path));
+
+        let collections_regular_package = stdlib_module_path.join("collections");
+        assert!(collections_regular_package.is_directory(&db, &stdlib_module_path));
+        assert!(collections_regular_package.is_regular_package(&db, &stdlib_module_path));
+
+        let xml_namespace_package = stdlib_module_path.join("xml");
+        assert!(!xml_namespace_package.is_directory(&db, &stdlib_module_path));
+        assert!(!xml_namespace_package.is_regular_package(&db, &stdlib_module_path));
     }
 }

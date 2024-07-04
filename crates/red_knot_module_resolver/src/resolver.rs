@@ -362,56 +362,15 @@ mod tests {
     use ruff_db::file_system::FileSystemPath;
     use ruff_db::vfs::{system_path_to_file, VfsFile, VfsPath};
 
-    use crate::db::tests::TestDb;
+    use crate::db::tests::{create_resolver_builder, TestCase};
     use crate::module::ModuleKind;
     use crate::module_name::ModuleName;
 
     use super::*;
 
-    struct TestCase {
-        db: TestDb,
-
-        src: FileSystemPathBuf,
-        custom_typeshed: FileSystemPathBuf,
-        site_packages: FileSystemPathBuf,
-    }
-
-    fn create_resolver() -> std::io::Result<TestCase> {
-        let mut db = TestDb::new();
-
-        let src = FileSystemPath::new("src").to_path_buf();
-        let site_packages = FileSystemPath::new("site_packages").to_path_buf();
-        let custom_typeshed = FileSystemPath::new("typeshed").to_path_buf();
-
-        let fs = db.memory_file_system();
-
-        fs.create_directory_all(&*src)?;
-        fs.create_directory_all(&*site_packages)?;
-        fs.create_directory_all(&*custom_typeshed)?;
-        fs.create_directory_all(custom_typeshed.join("stdlib"))?;
-        fs.write_file(custom_typeshed.join("stdlib/VERSIONS"), "functools: 3.8-")?;
-
-        let settings = ModuleResolutionSettings {
-            target_version: SupportedPyVersion::Py38,
-            extra_paths: vec![],
-            workspace_root: src.clone(),
-            site_packages: Some(site_packages.clone()),
-            custom_typeshed: Some(custom_typeshed.clone()),
-        };
-
-        set_module_resolution_settings(&mut db, settings);
-
-        Ok(TestCase {
-            db,
-            src,
-            custom_typeshed,
-            site_packages,
-        })
-    }
-
     #[test]
     fn first_party_module() -> anyhow::Result<()> {
-        let TestCase { db, src, .. } = create_resolver()?;
+        let TestCase { db, src, .. } = create_resolver_builder()?.build();
 
         let foo_module_name = ModuleName::new_static("foo").unwrap();
         let foo_path = src.join("foo.py");
@@ -444,7 +403,7 @@ mod tests {
             db,
             custom_typeshed,
             ..
-        } = create_resolver()?;
+        } = create_resolver_builder()?.build();
 
         let stdlib_dir =
             ModuleResolutionPathBuf::stdlib_from_typeshed_root(&custom_typeshed).unwrap();
@@ -482,7 +441,7 @@ mod tests {
             src,
             custom_typeshed,
             ..
-        } = create_resolver()?;
+        } = create_resolver_builder()?.build();
 
         let stdlib_dir = custom_typeshed.join("stdlib");
         let stdlib_functools_path = stdlib_dir.join("functools.pyi");
@@ -541,7 +500,7 @@ mod tests {
 
     #[test]
     fn resolve_package() -> anyhow::Result<()> {
-        let TestCase { src, db, .. } = create_resolver()?;
+        let TestCase { src, db, .. } = create_resolver_builder()?.build();
 
         let foo_dir = src.join("foo");
         let foo_path = foo_dir.join("__init__.py");
@@ -568,7 +527,7 @@ mod tests {
 
     #[test]
     fn package_priority_over_module() -> anyhow::Result<()> {
-        let TestCase { db, src, .. } = create_resolver()?;
+        let TestCase { db, src, .. } = create_resolver_builder()?.build();
 
         let foo_dir = src.join("foo");
         let foo_init = foo_dir.join("__init__.py");
@@ -597,7 +556,7 @@ mod tests {
 
     #[test]
     fn typing_stub_over_module() -> anyhow::Result<()> {
-        let TestCase { db, src, .. } = create_resolver()?;
+        let TestCase { db, src, .. } = create_resolver_builder()?.build();
 
         let foo_stub = src.join("foo.pyi");
         let foo_py = src.join("foo.py");
@@ -620,7 +579,7 @@ mod tests {
 
     #[test]
     fn sub_packages() -> anyhow::Result<()> {
-        let TestCase { db, src, .. } = create_resolver()?;
+        let TestCase { db, src, .. } = create_resolver_builder()?.build();
 
         let foo = src.join("foo");
         let bar = foo.join("bar");
@@ -653,7 +612,7 @@ mod tests {
             src,
             site_packages,
             ..
-        } = create_resolver()?;
+        } = create_resolver_builder()?.build();
 
         // From [PEP420](https://peps.python.org/pep-0420/#nested-namespace-packages).
         // But uses `src` for `project1` and `site_packages2` for `project2`.
@@ -706,7 +665,7 @@ mod tests {
             src,
             site_packages,
             ..
-        } = create_resolver()?;
+        } = create_resolver_builder()?.build();
 
         // Adopted test case from the [PEP420 examples](https://peps.python.org/pep-0420/#nested-namespace-packages).
         // The `src/parent/child` package is a regular package. Therefore, `site_packages/parent/child/two.py` should not be resolved.
@@ -757,7 +716,7 @@ mod tests {
             src,
             site_packages,
             ..
-        } = create_resolver()?;
+        } = create_resolver_builder()?.build();
 
         let foo_src = src.join("foo.py");
         let foo_site_packages = site_packages.join("foo.py");
@@ -790,7 +749,7 @@ mod tests {
             src,
             site_packages,
             custom_typeshed,
-        } = create_resolver()?;
+        } = create_resolver_builder()?.build();
 
         db.with_os_file_system();
 
@@ -855,7 +814,7 @@ mod tests {
 
     #[test]
     fn deleting_an_unrelated_file_doesnt_change_module_resolution() -> anyhow::Result<()> {
-        let TestCase { mut db, src, .. } = create_resolver()?;
+        let TestCase { mut db, src, .. } = create_resolver_builder()?.build();
 
         let foo_path = src.join("foo.py");
         let bar_path = src.join("bar.py");
@@ -892,7 +851,7 @@ mod tests {
     #[test]
     fn adding_a_file_on_which_the_module_resolution_depends_on_invalidates_the_query(
     ) -> anyhow::Result<()> {
-        let TestCase { mut db, src, .. } = create_resolver()?;
+        let TestCase { mut db, src, .. } = create_resolver_builder()?.build();
         let foo_path = src.join("foo.py");
 
         let foo_module_name = ModuleName::new_static("foo").unwrap();
@@ -912,7 +871,7 @@ mod tests {
     #[test]
     fn removing_a_file_that_the_module_resolution_depends_on_invalidates_the_query(
     ) -> anyhow::Result<()> {
-        let TestCase { mut db, src, .. } = create_resolver()?;
+        let TestCase { mut db, src, .. } = create_resolver_builder()?.build();
         let foo_path = src.join("foo.py");
         let foo_init_path = src.join("foo/__init__.py");
 
