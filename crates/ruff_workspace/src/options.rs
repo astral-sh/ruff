@@ -75,7 +75,7 @@ pub struct Options {
     pub extend: Option<String>,
 
     /// The style in which violation messages should be formatted: `"full"`
-    /// (shows source),`"concise"` (default), `"grouped"` (group messages by file), `"json"`
+    /// (shows source), `"concise"` (default), `"grouped"` (group messages by file), `"json"`
     /// (machine-readable), `"junit"` (machine-readable XML), `"github"` (GitHub
     /// Actions annotations), `"gitlab"` (GitLab CI code quality report),
     /// `"pylint"` (Pylint text format) or `"azure"` (Azure Pipeline logging commands).
@@ -421,7 +421,7 @@ pub struct Options {
     pub format: Option<FormatOptions>,
 }
 
-/// Configures how ruff checks your code.
+/// Configures how Ruff checks your code.
 ///
 /// Options specified in the `lint` section take precedence over the deprecated top-level settings.
 #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
@@ -1313,7 +1313,7 @@ pub struct Flake8ImportConventionsOptions {
         value_type = "dict[str, str]",
         scope = "extend-aliases",
         example = r#"
-            # Declare a custom alias for the `matplotlib` module.
+            # Declare a custom alias for the `dask` module.
             "dask.dataframe" = "dd"
         "#
     )]
@@ -1389,10 +1389,10 @@ pub struct Flake8PytestStyleOptions {
     /// The following values are supported:
     ///
     /// - `csv` — a comma-separated list, e.g.
-    ///   `@pytest.mark.parametrize('name1,name2', ...)`
+    ///   `@pytest.mark.parametrize("name1,name2", ...)`
     /// - `tuple` (default) — e.g.
-    ///   `@pytest.mark.parametrize(('name1', 'name2'), ...)`
-    /// - `list` — e.g. `@pytest.mark.parametrize(['name1', 'name2'], ...)`
+    ///   `@pytest.mark.parametrize(("name1", "name2"), ...)`
+    /// - `list` — e.g. `@pytest.mark.parametrize(["name1", "name2"], ...)`
     #[option(
         default = "tuple",
         value_type = r#""csv" | "tuple" | "list""#,
@@ -1403,8 +1403,8 @@ pub struct Flake8PytestStyleOptions {
     /// Expected type for the list of values rows in `@pytest.mark.parametrize`.
     /// The following values are supported:
     ///
-    /// - `tuple` — e.g. `@pytest.mark.parametrize('name', (1, 2, 3))`
-    /// - `list` (default) — e.g. `@pytest.mark.parametrize('name', [1, 2, 3])`
+    /// - `tuple` — e.g. `@pytest.mark.parametrize("name", (1, 2, 3))`
+    /// - `list` (default) — e.g. `@pytest.mark.parametrize("name", [1, 2, 3])`
     #[option(
         default = "list",
         value_type = r#""tuple" | "list""#,
@@ -1416,9 +1416,9 @@ pub struct Flake8PytestStyleOptions {
     /// case of multiple parameters. The following values are supported:
     ///
     /// - `tuple` (default) — e.g.
-    ///   `@pytest.mark.parametrize(('name1', 'name2'), [(1, 2), (3, 4)])`
+    ///   `@pytest.mark.parametrize(("name1", "name2"), [(1, 2), (3, 4)])`
     /// - `list` — e.g.
-    ///   `@pytest.mark.parametrize(('name1', 'name2'), [[1, 2], [3, 4]])`
+    ///   `@pytest.mark.parametrize(("name1", "name2"), [[1, 2], [3, 4]])`
     #[option(
         default = "tuple",
         value_type = r#""tuple" | "list""#,
@@ -1459,7 +1459,7 @@ pub struct Flake8PytestStyleOptions {
     /// Boolean flag specifying whether `@pytest.mark.foo()` without parameters
     /// should have parentheses. If the option is set to `true` (the
     /// default), `@pytest.mark.foo()` is valid and `@pytest.mark.foo` is
-    /// invalid. If set to `false`, `@pytest.fixture` is valid and
+    /// invalid. If set to `false`, `@pytest.mark.foo` is valid and
     /// `@pytest.mark.foo()` is invalid.
     ///
     /// If [preview](https://docs.astral.sh/ruff/preview/) is enabled, defaults to
@@ -1684,7 +1684,7 @@ impl Flake8TidyImportsOptions {
 #[serde(deny_unknown_fields, rename_all = "kebab-case")]
 #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 pub struct Flake8TypeCheckingOptions {
-    /// Enforce TC001, TC002, and TC003 rules even when valid runtime imports
+    /// Enforce `TC001`, `TC002`, and `TC003` rules even when valid runtime imports
     /// are present for the same module.
     ///
     /// See flake8-type-checking's [strict](https://github.com/snok/flake8-type-checking#strict) option.
@@ -2138,7 +2138,7 @@ pub struct IsortOptions {
         default = r#"third-party"#,
         value_type = "str",
         example = r#"
-            default-section = "third-party"
+            default-section = "first-party"
         "#
     )]
     pub default_section: Option<ImportSection>,
@@ -2156,8 +2156,8 @@ pub struct IsortOptions {
     ///
     /// Setting `no-sections = true` will instead group all imports into a single section:
     /// ```python
-    /// import os
     /// import numpy
+    /// import os
     /// import pandas
     /// import sys
     /// ```
@@ -2508,7 +2508,7 @@ impl McCabeOptions {
 pub struct Pep8NamingOptions {
     /// A list of names (or patterns) to ignore when considering `pep8-naming` violations.
     ///
-    /// Supports glob patterns. For example, to ignore all names starting with
+    /// Supports glob patterns. For example, to ignore all names starting with `test_`
     /// or ending with `_test`, you could use `ignore-names = ["test_*", "*_test"]`.
     /// For more information on the glob syntax, refer to the [`globset` documentation](https://docs.rs/globset/latest/globset/#syntax).
     #[option(
@@ -2523,7 +2523,7 @@ pub struct Pep8NamingOptions {
     /// Additional names (or patterns) to ignore when considering `pep8-naming` violations,
     /// in addition to those included in `ignore-names`
     ///
-    /// Supports glob patterns. For example, to ignore all names starting with
+    /// Supports glob patterns. For example, to ignore all names starting with `test_`
     /// or ending with `_test`, you could use `ignore-names = ["test_*", "*_test"]`.
     /// For more information on the glob syntax, refer to the [`globset` documentation](https://docs.rs/globset/latest/globset/#syntax).
     #[option(
@@ -2605,10 +2605,12 @@ pub struct PycodestyleOptions {
     /// `pycodestyle.line-length` to a value larger than [`line-length`](#line-length).
     ///
     /// ```toml
-    /// line-length = 88 # The formatter wraps lines at a length of 88
+    /// # The formatter wraps lines at a length of 88.
+    /// line-length = 88
     ///
     /// [pycodestyle]
-    /// max-line-length = 100 # E501 reports lines that exceed the length of 100.
+    /// # E501 reports lines that exceed the length of 100.
+    /// max-line-length = 100
     /// ```
     ///
     /// The length is determined by the number of characters per line, except for lines containing East Asian characters or emojis.
@@ -2626,7 +2628,7 @@ pub struct PycodestyleOptions {
 
     /// The maximum line length to allow for [`doc-line-too-long`](https://docs.astral.sh/ruff/rules/doc-line-too-long/) violations within
     /// documentation (`W505`), including standalone comments. By default,
-    /// this is set to null which disables reporting violations.
+    /// this is set to `null` which disables reporting violations.
     ///
     /// The length is determined by the number of characters per line, except for lines containing Asian characters or emojis.
     /// For these lines, the [unicode width](https://unicode.org/reports/tr11/) of each character is added up to determine the length.
@@ -2670,7 +2672,7 @@ impl PycodestyleOptions {
 #[serde(deny_unknown_fields, rename_all = "kebab-case")]
 #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 pub struct PydocstyleOptions {
-    /// Whether to use Google-style or NumPy-style conventions or the [PEP 257](https://peps.python.org/pep-0257/)
+    /// Whether to use Google-style, NumPy-style conventions, or the [PEP 257](https://peps.python.org/pep-0257/)
     /// defaults when analyzing docstring sections.
     ///
     /// Enabling a convention will disable all rules that are not included in
@@ -2788,7 +2790,7 @@ impl PyflakesOptions {
 #[serde(deny_unknown_fields, rename_all = "kebab-case")]
 #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 pub struct PylintOptions {
-    /// Constant types to ignore when used as "magic values" (see: `PLR2004`).
+    /// Constant types to ignore when used as "magic values" (see `PLR2004`).
     #[option(
         default = r#"["str", "bytes"]"#,
         value_type = r#"list["str" | "bytes" | "complex" | "float" | "int"]"#,
@@ -2799,7 +2801,7 @@ pub struct PylintOptions {
     pub allow_magic_value_types: Option<Vec<ConstantType>>,
 
     /// Dunder methods name to allow, in addition to the default set from the
-    /// Python standard library (see: `PLW3201`).
+    /// Python standard library (see `PLW3201`).
     #[option(
         default = r#"[]"#,
         value_type = r#"list[str]"#,
@@ -2809,23 +2811,22 @@ pub struct PylintOptions {
     )]
     pub allow_dunder_method_names: Option<FxHashSet<String>>,
 
-    /// Maximum number of branches allowed for a function or method body (see:
-    /// `PLR0912`).
-    #[option(default = r"12", value_type = "int", example = r"max-branches = 12")]
+    /// Maximum number of branches allowed for a function or method body (see `PLR0912`).
+    #[option(default = r"12", value_type = "int", example = r"max-branches = 15")]
     pub max_branches: Option<usize>,
 
     /// Maximum number of return statements allowed for a function or method
     /// body (see `PLR0911`)
-    #[option(default = r"6", value_type = "int", example = r"max-returns = 6")]
+    #[option(default = r"6", value_type = "int", example = r"max-returns = 10")]
     pub max_returns: Option<usize>,
 
     /// Maximum number of arguments allowed for a function or method definition
-    /// (see: `PLR0913`).
-    #[option(default = r"5", value_type = "int", example = r"max-args = 5")]
+    /// (see `PLR0913`).
+    #[option(default = r"5", value_type = "int", example = r"max-args = 10")]
     pub max_args: Option<usize>,
 
     /// Maximum number of positional arguments allowed for a function or method definition
-    /// (see: `PLR0917`).
+    /// (see `PLR0917`).
     ///
     /// If not specified, defaults to the value of `max-args`.
     #[option(
@@ -2835,32 +2836,34 @@ pub struct PylintOptions {
     )]
     pub max_positional_args: Option<usize>,
 
-    /// Maximum number of local variables allowed for a function or method body (see:
-    /// `PLR0914`).
-    #[option(default = r"15", value_type = "int", example = r"max-locals = 15")]
+    /// Maximum number of local variables allowed for a function or method body (see `PLR0914`).
+    #[option(default = r"15", value_type = "int", example = r"max-locals = 20")]
     pub max_locals: Option<usize>,
 
-    /// Maximum number of statements allowed for a function or method body (see:
-    /// `PLR0915`).
-    #[option(default = r"50", value_type = "int", example = r"max-statements = 50")]
+    /// Maximum number of statements allowed for a function or method body (see `PLR0915`).
+    #[option(default = r"50", value_type = "int", example = r"max-statements = 75")]
     pub max_statements: Option<usize>,
 
-    /// Maximum number of public methods allowed for a class (see: `PLR0904`).
+    /// Maximum number of public methods allowed for a class (see `PLR0904`).
     #[option(
         default = r"20",
         value_type = "int",
-        example = r"max-public-methods = 20"
+        example = r"max-public-methods = 30"
     )]
     pub max_public_methods: Option<usize>,
 
     /// Maximum number of Boolean expressions allowed within a single `if` statement
-    /// (see: `PLR0916`).
-    #[option(default = r"5", value_type = "int", example = r"max-bool-expr = 5")]
+    /// (see `PLR0916`).
+    #[option(default = r"5", value_type = "int", example = r"max-bool-expr = 10")]
     pub max_bool_expr: Option<usize>,
 
     /// Maximum number of nested blocks allowed within a function or method body
-    /// (see: `PLR1702`).
-    #[option(default = r"5", value_type = "int", example = r"max-nested-blocks = 5")]
+    /// (see `PLR1702`).
+    #[option(
+        default = r"5",
+        value_type = "int",
+        example = r"max-nested-blocks = 10"
+    )]
     pub max_nested_blocks: Option<usize>,
 }
 
@@ -2912,7 +2915,7 @@ pub struct PyUpgradeOptions {
     /// version.
     ///
     /// For example, while the following is valid Python 3.8 code due to the
-    /// presence of `from __future__ import annotations`, the use of `str| int`
+    /// presence of `from __future__ import annotations`, the use of `str | int`
     /// prior to Python 3.10 will cause Pydantic to raise a `TypeError` at
     /// runtime:
     ///
@@ -2922,7 +2925,7 @@ pub struct PyUpgradeOptions {
     /// import pydantic
     ///
     /// class Foo(pydantic.BaseModel):
-    ///    bar: str | int
+    ///     bar: str | int
     /// ```
     ///
     ///
@@ -2945,7 +2948,7 @@ impl PyUpgradeOptions {
     }
 }
 
-/// Configures the way ruff formats your code.
+/// Configures the way Ruff formats your code.
 #[derive(
     Clone, Debug, PartialEq, Eq, Default, Deserialize, Serialize, OptionsMetadata, CombineOptions,
 )]
@@ -2994,7 +2997,7 @@ pub struct FormatOptions {
     ///     print("Hello") #  Spaces indent the `print` statement.
     /// ```
     ///
-    /// `indent-style = "tab""`:
+    /// `indent-style = "tab"`:
     ///
     /// ```python
     /// def f():
@@ -3032,7 +3035,7 @@ pub struct FormatOptions {
     /// ```
     ///
     /// Ruff will change the quotes of the string assigned to `a` to single quotes when using `quote-style = "single"`.
-    /// However, ruff uses double quotes for he string assigned to `b` because using single quotes would require escaping the `'`,
+    /// However, Ruff uses double quotes for the string assigned to `b` because using single quotes would require escaping the `'`,
     /// which leads to the less readable code: `'It\'s monday morning'`.
     ///
     /// In addition, Ruff supports the quote style `preserve` for projects that already use
@@ -3055,7 +3058,7 @@ pub struct FormatOptions {
     /// collapsing the arguments to a single line doesn't exceed the line length if `skip-magic-trailing-comma = false`:
     ///
     /// ```python
-    ///  # The arguments remain on separate lines because of the trailing comma after `b`
+    /// # The arguments remain on separate lines because of the trailing comma after `b`
     /// def test(
     ///     a,
     ///     b,

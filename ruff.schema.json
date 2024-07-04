@@ -531,7 +531,7 @@
       }
     },
     "output-format": {
-      "description": "The style in which violation messages should be formatted: `\"full\"` (shows source),`\"concise\"` (default), `\"grouped\"` (group messages by file), `\"json\"` (machine-readable), `\"junit\"` (machine-readable XML), `\"github\"` (GitHub Actions annotations), `\"gitlab\"` (GitLab CI code quality report), `\"pylint\"` (Pylint text format) or `\"azure\"` (Azure Pipeline logging commands).",
+      "description": "The style in which violation messages should be formatted: `\"full\"` (shows source), `\"concise\"` (default), `\"grouped\"` (group messages by file), `\"json\"` (machine-readable), `\"junit\"` (machine-readable XML), `\"github\"` (GitHub Actions annotations), `\"gitlab\"` (GitLab CI code quality report), `\"pylint\"` (Pylint text format) or `\"azure\"` (Azure Pipeline logging commands).",
       "anyOf": [
         {
           "$ref": "#/definitions/OutputFormat"
@@ -1100,14 +1100,14 @@
           ]
         },
         "mark-parentheses": {
-          "description": "Boolean flag specifying whether `@pytest.mark.foo()` without parameters should have parentheses. If the option is set to `true` (the default), `@pytest.mark.foo()` is valid and `@pytest.mark.foo` is invalid. If set to `false`, `@pytest.fixture` is valid and `@pytest.mark.foo()` is invalid.\n\nIf [preview](https://docs.astral.sh/ruff/preview/) is enabled, defaults to `false`.",
+          "description": "Boolean flag specifying whether `@pytest.mark.foo()` without parameters should have parentheses. If the option is set to `true` (the default), `@pytest.mark.foo()` is valid and `@pytest.mark.foo` is invalid. If set to `false`, `@pytest.mark.foo` is valid and `@pytest.mark.foo()` is invalid.\n\nIf [preview](https://docs.astral.sh/ruff/preview/) is enabled, defaults to `false`.",
           "type": [
             "boolean",
             "null"
           ]
         },
         "parametrize-names-type": {
-          "description": "Expected type for multiple argument names in `@pytest.mark.parametrize`. The following values are supported:\n\n- `csv` — a comma-separated list, e.g. `@pytest.mark.parametrize('name1,name2', ...)` - `tuple` (default) — e.g. `@pytest.mark.parametrize(('name1', 'name2'), ...)` - `list` — e.g. `@pytest.mark.parametrize(['name1', 'name2'], ...)`",
+          "description": "Expected type for multiple argument names in `@pytest.mark.parametrize`. The following values are supported:\n\n- `csv` — a comma-separated list, e.g. `@pytest.mark.parametrize(\"name1,name2\", ...)` - `tuple` (default) — e.g. `@pytest.mark.parametrize((\"name1\", \"name2\"), ...)` - `list` — e.g. `@pytest.mark.parametrize([\"name1\", \"name2\"], ...)`",
           "anyOf": [
             {
               "$ref": "#/definitions/ParametrizeNameType"
@@ -1118,7 +1118,7 @@
           ]
         },
         "parametrize-values-row-type": {
-          "description": "Expected type for each row of values in `@pytest.mark.parametrize` in case of multiple parameters. The following values are supported:\n\n- `tuple` (default) — e.g. `@pytest.mark.parametrize(('name1', 'name2'), [(1, 2), (3, 4)])` - `list` — e.g. `@pytest.mark.parametrize(('name1', 'name2'), [[1, 2], [3, 4]])`",
+          "description": "Expected type for each row of values in `@pytest.mark.parametrize` in case of multiple parameters. The following values are supported:\n\n- `tuple` (default) — e.g. `@pytest.mark.parametrize((\"name1\", \"name2\"), [(1, 2), (3, 4)])` - `list` — e.g. `@pytest.mark.parametrize((\"name1\", \"name2\"), [[1, 2], [3, 4]])`",
           "anyOf": [
             {
               "$ref": "#/definitions/ParametrizeValuesRowType"
@@ -1129,7 +1129,7 @@
           ]
         },
         "parametrize-values-type": {
-          "description": "Expected type for the list of values rows in `@pytest.mark.parametrize`. The following values are supported:\n\n- `tuple` — e.g. `@pytest.mark.parametrize('name', (1, 2, 3))` - `list` (default) — e.g. `@pytest.mark.parametrize('name', [1, 2, 3])`",
+          "description": "Expected type for the list of values rows in `@pytest.mark.parametrize`. The following values are supported:\n\n- `tuple` — e.g. `@pytest.mark.parametrize(\"name\", (1, 2, 3))` - `list` (default) — e.g. `@pytest.mark.parametrize(\"name\", [1, 2, 3])`",
           "anyOf": [
             {
               "$ref": "#/definitions/ParametrizeValuesType"
@@ -1312,7 +1312,7 @@
           }
         },
         "strict": {
-          "description": "Enforce TC001, TC002, and TC003 rules even when valid runtime imports are present for the same module.\n\nSee flake8-type-checking's [strict](https://github.com/snok/flake8-type-checking#strict) option.",
+          "description": "Enforce `TC001`, `TC002`, and `TC003` rules even when valid runtime imports are present for the same module.\n\nSee flake8-type-checking's [strict](https://github.com/snok/flake8-type-checking#strict) option.",
           "type": [
             "boolean",
             "null"
@@ -1335,7 +1335,7 @@
       "additionalProperties": false
     },
     "FormatOptions": {
-      "description": "Configures the way ruff formats your code.",
+      "description": "Configures the way Ruff formats your code.",
       "type": "object",
       "properties": {
         "docstring-code-format": {
@@ -1367,7 +1367,7 @@
           }
         },
         "indent-style": {
-          "description": "Whether to use spaces or tabs for indentation.\n\n`indent-style = \"space\"` (default):\n\n```python def f(): print(\"Hello\") #  Spaces indent the `print` statement. ```\n\n`indent-style = \"tab\"\"`:\n\n```python def f(): print(\"Hello\") #  A tab `\\t` indents the `print` statement. ```\n\nPEP 8 recommends using spaces for [indentation](https://peps.python.org/pep-0008/#indentation). We care about accessibility; if you do not need tabs for accessibility, we do not recommend you use them.\n\nSee [`indent-width`](#indent-width) to configure the number of spaces per indentation and the tab width.",
+          "description": "Whether to use spaces or tabs for indentation.\n\n`indent-style = \"space\"` (default):\n\n```python def f(): print(\"Hello\") #  Spaces indent the `print` statement. ```\n\n`indent-style = \"tab\"`:\n\n```python def f(): print(\"Hello\") #  A tab `\\t` indents the `print` statement. ```\n\nPEP 8 recommends using spaces for [indentation](https://peps.python.org/pep-0008/#indentation). We care about accessibility; if you do not need tabs for accessibility, we do not recommend you use them.\n\nSee [`indent-width`](#indent-width) to configure the number of spaces per indentation and the tab width.",
           "anyOf": [
             {
               "$ref": "#/definitions/IndentStyle"
@@ -1396,7 +1396,7 @@
           ]
         },
         "quote-style": {
-          "description": "Configures the preferred quote character for strings. The recommended options are\n\n* `double` (default): Use double quotes `\"` * `single`: Use single quotes `'`\n\nIn compliance with [PEP 8](https://peps.python.org/pep-0008/) and [PEP 257](https://peps.python.org/pep-0257/), Ruff prefers double quotes for triple quoted strings and docstrings even when using `quote-style = \"single\"`.\n\nRuff deviates from using the configured quotes if doing so prevents the need for escaping quote characters inside the string:\n\n```python a = \"a string without any quotes\" b = \"It's monday morning\" ```\n\nRuff will change the quotes of the string assigned to `a` to single quotes when using `quote-style = \"single\"`. However, ruff uses double quotes for he string assigned to `b` because using single quotes would require escaping the `'`, which leads to the less readable code: `'It\\'s monday morning'`.\n\nIn addition, Ruff supports the quote style `preserve` for projects that already use a mixture of single and double quotes and can't migrate to the `double` or `single` style. The quote style `preserve` leaves the quotes of all strings unchanged.",
+          "description": "Configures the preferred quote character for strings. The recommended options are\n\n* `double` (default): Use double quotes `\"` * `single`: Use single quotes `'`\n\nIn compliance with [PEP 8](https://peps.python.org/pep-0008/) and [PEP 257](https://peps.python.org/pep-0257/), Ruff prefers double quotes for triple quoted strings and docstrings even when using `quote-style = \"single\"`.\n\nRuff deviates from using the configured quotes if doing so prevents the need for escaping quote characters inside the string:\n\n```python a = \"a string without any quotes\" b = \"It's monday morning\" ```\n\nRuff will change the quotes of the string assigned to `a` to single quotes when using `quote-style = \"single\"`. However, Ruff uses double quotes for the string assigned to `b` because using single quotes would require escaping the `'`, which leads to the less readable code: `'It\\'s monday morning'`.\n\nIn addition, Ruff supports the quote style `preserve` for projects that already use a mixture of single and double quotes and can't migrate to the `double` or `single` style. The quote style `preserve` leaves the quotes of all strings unchanged.",
           "anyOf": [
             {
               "$ref": "#/definitions/QuoteStyle"
@@ -1645,7 +1645,7 @@
           }
         },
         "no-sections": {
-          "description": "Put all imports into the same section bucket.\n\nFor example, rather than separating standard library and third-party imports, as in: ```python import os import sys\n\nimport numpy import pandas ```\n\nSetting `no-sections = true` will instead group all imports into a single section: ```python import os import numpy import pandas import sys ```",
+          "description": "Put all imports into the same section bucket.\n\nFor example, rather than separating standard library and third-party imports, as in: ```python import os import sys\n\nimport numpy import pandas ```\n\nSetting `no-sections = true` will instead group all imports into a single section: ```python import numpy import os import pandas import sys ```",
           "type": [
             "boolean",
             "null"
@@ -1778,7 +1778,7 @@
       "minimum": 1.0
     },
     "LintOptions": {
-      "description": "Configures how ruff checks your code.\n\nOptions specified in the `lint` section take precedence over the deprecated top-level settings.",
+      "description": "Configures how Ruff checks your code.\n\nOptions specified in the `lint` section take precedence over the deprecated top-level settings.",
       "type": "object",
       "properties": {
         "allowed-confusables": {
@@ -2357,7 +2357,7 @@
           }
         },
         "extend-ignore-names": {
-          "description": "Additional names (or patterns) to ignore when considering `pep8-naming` violations, in addition to those included in `ignore-names`\n\nSupports glob patterns. For example, to ignore all names starting with or ending with `_test`, you could use `ignore-names = [\"test_*\", \"*_test\"]`. For more information on the glob syntax, refer to the [`globset` documentation](https://docs.rs/globset/latest/globset/#syntax).",
+          "description": "Additional names (or patterns) to ignore when considering `pep8-naming` violations, in addition to those included in `ignore-names`\n\nSupports glob patterns. For example, to ignore all names starting with `test_` or ending with `_test`, you could use `ignore-names = [\"test_*\", \"*_test\"]`. For more information on the glob syntax, refer to the [`globset` documentation](https://docs.rs/globset/latest/globset/#syntax).",
           "type": [
             "array",
             "null"
@@ -2367,7 +2367,7 @@
           }
         },
         "ignore-names": {
-          "description": "A list of names (or patterns) to ignore when considering `pep8-naming` violations.\n\nSupports glob patterns. For example, to ignore all names starting with or ending with `_test`, you could use `ignore-names = [\"test_*\", \"*_test\"]`. For more information on the glob syntax, refer to the [`globset` documentation](https://docs.rs/globset/latest/globset/#syntax).",
+          "description": "A list of names (or patterns) to ignore when considering `pep8-naming` violations.\n\nSupports glob patterns. For example, to ignore all names starting with `test_` or ending with `_test`, you could use `ignore-names = [\"test_*\", \"*_test\"]`. For more information on the glob syntax, refer to the [`globset` documentation](https://docs.rs/globset/latest/globset/#syntax).",
           "type": [
             "array",
             "null"
@@ -2393,7 +2393,7 @@
       "type": "object",
       "properties": {
         "keep-runtime-typing": {
-          "description": "Whether to avoid PEP 585 (`List[int]` -> `list[int]`) and PEP 604 (`Union[str, int]` -> `str | int`) rewrites even if a file imports `from __future__ import annotations`.\n\nThis setting is only applicable when the target Python version is below 3.9 and 3.10 respectively, and is most commonly used when working with libraries like Pydantic and FastAPI, which rely on the ability to parse type annotations at runtime. The use of `from __future__ import annotations` causes Python to treat the type annotations as strings, which typically allows for the use of language features that appear in later Python versions but are not yet supported by the current version (e.g., `str | int`). However, libraries that rely on runtime type annotations will break if the annotations are incompatible with the current Python version.\n\nFor example, while the following is valid Python 3.8 code due to the presence of `from __future__ import annotations`, the use of `str| int` prior to Python 3.10 will cause Pydantic to raise a `TypeError` at runtime:\n\n```python from __future__ import annotations\n\nimport pydantic\n\nclass Foo(pydantic.BaseModel): bar: str | int ```",
+          "description": "Whether to avoid PEP 585 (`List[int]` -> `list[int]`) and PEP 604 (`Union[str, int]` -> `str | int`) rewrites even if a file imports `from __future__ import annotations`.\n\nThis setting is only applicable when the target Python version is below 3.9 and 3.10 respectively, and is most commonly used when working with libraries like Pydantic and FastAPI, which rely on the ability to parse type annotations at runtime. The use of `from __future__ import annotations` causes Python to treat the type annotations as strings, which typically allows for the use of language features that appear in later Python versions but are not yet supported by the current version (e.g., `str | int`). However, libraries that rely on runtime type annotations will break if the annotations are incompatible with the current Python version.\n\nFor example, while the following is valid Python 3.8 code due to the presence of `from __future__ import annotations`, the use of `str | int` prior to Python 3.10 will cause Pydantic to raise a `TypeError` at runtime:\n\n```python from __future__ import annotations\n\nimport pydantic\n\nclass Foo(pydantic.BaseModel): bar: str | int ```",
           "type": [
             "boolean",
             "null"
@@ -2413,7 +2413,7 @@
           ]
         },
         "max-doc-length": {
-          "description": "The maximum line length to allow for [`doc-line-too-long`](https://docs.astral.sh/ruff/rules/doc-line-too-long/) violations within documentation (`W505`), including standalone comments. By default, this is set to null which disables reporting violations.\n\nThe length is determined by the number of characters per line, except for lines containing Asian characters or emojis. For these lines, the [unicode width](https://unicode.org/reports/tr11/) of each character is added up to determine the length.\n\nSee the [`doc-line-too-long`](https://docs.astral.sh/ruff/rules/doc-line-too-long/) rule for more information.",
+          "description": "The maximum line length to allow for [`doc-line-too-long`](https://docs.astral.sh/ruff/rules/doc-line-too-long/) violations within documentation (`W505`), including standalone comments. By default, this is set to `null` which disables reporting violations.\n\nThe length is determined by the number of characters per line, except for lines containing Asian characters or emojis. For these lines, the [unicode width](https://unicode.org/reports/tr11/) of each character is added up to determine the length.\n\nSee the [`doc-line-too-long`](https://docs.astral.sh/ruff/rules/doc-line-too-long/) rule for more information.",
           "anyOf": [
             {
               "$ref": "#/definitions/LineLength"
@@ -2424,7 +2424,7 @@
           ]
         },
         "max-line-length": {
-          "description": "The maximum line length to allow for [`line-too-long`](https://docs.astral.sh/ruff/rules/line-too-long/) violations. By default, this is set to the value of the [`line-length`](#line-length) option.\n\nUse this option when you want to detect extra-long lines that the formatter can't automatically split by setting `pycodestyle.line-length` to a value larger than [`line-length`](#line-length).\n\n```toml line-length = 88 # The formatter wraps lines at a length of 88\n\n[pycodestyle] max-line-length = 100 # E501 reports lines that exceed the length of 100. ```\n\nThe length is determined by the number of characters per line, except for lines containing East Asian characters or emojis. For these lines, the [unicode width](https://unicode.org/reports/tr11/) of each character is added up to determine the length.\n\nSee the [`line-too-long`](https://docs.astral.sh/ruff/rules/line-too-long/) rule for more information.",
+          "description": "The maximum line length to allow for [`line-too-long`](https://docs.astral.sh/ruff/rules/line-too-long/) violations. By default, this is set to the value of the [`line-length`](#line-length) option.\n\nUse this option when you want to detect extra-long lines that the formatter can't automatically split by setting `pycodestyle.line-length` to a value larger than [`line-length`](#line-length).\n\n```toml # The formatter wraps lines at a length of 88. line-length = 88\n\n[pycodestyle] # E501 reports lines that exceed the length of 100. max-line-length = 100 ```\n\nThe length is determined by the number of characters per line, except for lines containing East Asian characters or emojis. For these lines, the [unicode width](https://unicode.org/reports/tr11/) of each character is added up to determine the length.\n\nSee the [`line-too-long`](https://docs.astral.sh/ruff/rules/line-too-long/) rule for more information.",
           "anyOf": [
             {
               "$ref": "#/definitions/LineLength"
@@ -2441,7 +2441,7 @@
       "type": "object",
       "properties": {
         "convention": {
-          "description": "Whether to use Google-style or NumPy-style conventions or the [PEP 257](https://peps.python.org/pep-0257/) defaults when analyzing docstring sections.\n\nEnabling a convention will disable all rules that are not included in the specified convention. As such, the intended workflow is to enable a convention and then selectively enable or disable any additional rules on top of it.\n\nFor example, to use Google-style conventions but avoid requiring documentation for every function parameter:\n\n```toml [tool.ruff.lint] # Enable all `pydocstyle` rules, limiting to those that adhere to the # Google convention via `convention = \"google\"`, below. select = [\"D\"]\n\n# On top of the Google convention, disable `D417`, which requires # documentation for every function parameter. ignore = [\"D417\"]\n\n[tool.ruff.lint.pydocstyle] convention = \"google\" ```\n\nTo enable an additional rule that's excluded from the convention, select the desired rule via its fully qualified rule code (e.g., `D400` instead of `D4` or `D40`):\n\n```toml [tool.ruff.lint] # Enable D400 on top of the Google convention. extend-select = [\"D400\"]\n\n[tool.ruff.lint.pydocstyle] convention = \"google\" ```",
+          "description": "Whether to use Google-style, NumPy-style conventions, or the [PEP 257](https://peps.python.org/pep-0257/) defaults when analyzing docstring sections.\n\nEnabling a convention will disable all rules that are not included in the specified convention. As such, the intended workflow is to enable a convention and then selectively enable or disable any additional rules on top of it.\n\nFor example, to use Google-style conventions but avoid requiring documentation for every function parameter:\n\n```toml [tool.ruff.lint] # Enable all `pydocstyle` rules, limiting to those that adhere to the # Google convention via `convention = \"google\"`, below. select = [\"D\"]\n\n# On top of the Google convention, disable `D417`, which requires # documentation for every function parameter. ignore = [\"D417\"]\n\n[tool.ruff.lint.pydocstyle] convention = \"google\" ```\n\nTo enable an additional rule that's excluded from the convention, select the desired rule via its fully qualified rule code (e.g., `D400` instead of `D4` or `D40`):\n\n```toml [tool.ruff.lint] # Enable D400 on top of the Google convention. extend-select = [\"D400\"]\n\n[tool.ruff.lint.pydocstyle] convention = \"google\" ```",
           "anyOf": [
             {
               "$ref": "#/definitions/Convention"
@@ -2494,7 +2494,7 @@
       "type": "object",
       "properties": {
         "allow-dunder-method-names": {
-          "description": "Dunder methods name to allow, in addition to the default set from the Python standard library (see: `PLW3201`).",
+          "description": "Dunder methods name to allow, in addition to the default set from the Python standard library (see `PLW3201`).",
           "type": [
             "array",
             "null"
@@ -2505,7 +2505,7 @@
           "uniqueItems": true
         },
         "allow-magic-value-types": {
-          "description": "Constant types to ignore when used as \"magic values\" (see: `PLR2004`).",
+          "description": "Constant types to ignore when used as \"magic values\" (see `PLR2004`).",
           "type": [
             "array",
             "null"
@@ -2515,7 +2515,7 @@
           }
         },
         "max-args": {
-          "description": "Maximum number of arguments allowed for a function or method definition (see: `PLR0913`).",
+          "description": "Maximum number of arguments allowed for a function or method definition (see `PLR0913`).",
           "type": [
             "integer",
             "null"
@@ -2524,7 +2524,7 @@
           "minimum": 0.0
         },
         "max-bool-expr": {
-          "description": "Maximum number of Boolean expressions allowed within a single `if` statement (see: `PLR0916`).",
+          "description": "Maximum number of Boolean expressions allowed within a single `if` statement (see `PLR0916`).",
           "type": [
             "integer",
             "null"
@@ -2533,7 +2533,7 @@
           "minimum": 0.0
         },
         "max-branches": {
-          "description": "Maximum number of branches allowed for a function or method body (see: `PLR0912`).",
+          "description": "Maximum number of branches allowed for a function or method body (see `PLR0912`).",
           "type": [
             "integer",
             "null"
@@ -2542,7 +2542,7 @@
           "minimum": 0.0
         },
         "max-locals": {
-          "description": "Maximum number of local variables allowed for a function or method body (see: `PLR0914`).",
+          "description": "Maximum number of local variables allowed for a function or method body (see `PLR0914`).",
           "type": [
             "integer",
             "null"
@@ -2551,7 +2551,7 @@
           "minimum": 0.0
         },
         "max-nested-blocks": {
-          "description": "Maximum number of nested blocks allowed within a function or method body (see: `PLR1702`).",
+          "description": "Maximum number of nested blocks allowed within a function or method body (see `PLR1702`).",
           "type": [
             "integer",
             "null"
@@ -2560,7 +2560,7 @@
           "minimum": 0.0
         },
         "max-positional-args": {
-          "description": "Maximum number of positional arguments allowed for a function or method definition (see: `PLR0917`).\n\nIf not specified, defaults to the value of `max-args`.",
+          "description": "Maximum number of positional arguments allowed for a function or method definition (see `PLR0917`).\n\nIf not specified, defaults to the value of `max-args`.",
           "type": [
             "integer",
             "null"
@@ -2569,7 +2569,7 @@
           "minimum": 0.0
         },
         "max-public-methods": {
-          "description": "Maximum number of public methods allowed for a class (see: `PLR0904`).",
+          "description": "Maximum number of public methods allowed for a class (see `PLR0904`).",
           "type": [
             "integer",
             "null"
@@ -2587,7 +2587,7 @@
           "minimum": 0.0
         },
         "max-statements": {
-          "description": "Maximum number of statements allowed for a function or method body (see: `PLR0915`).",
+          "description": "Maximum number of statements allowed for a function or method body (see `PLR0915`).",
           "type": [
             "integer",
             "null"
