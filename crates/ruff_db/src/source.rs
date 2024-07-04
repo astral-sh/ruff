@@ -1,8 +1,8 @@
+use countme::Count;
+use ruff_source_file::LineIndex;
 use salsa::DebugWithDb;
 use std::ops::Deref;
 use std::sync::Arc;
-
-use ruff_source_file::LineIndex;
 
 use crate::vfs::VfsFile;
 use crate::Db;
@@ -16,6 +16,7 @@ pub fn source_text(db: &dyn Db, file: VfsFile) -> SourceText {
 
     SourceText {
         inner: Arc::from(content),
+        count: Count::new(),
     }
 }
 
@@ -35,6 +36,7 @@ pub fn line_index(db: &dyn Db, file: VfsFile) -> LineIndex {
 #[derive(Clone, Eq, PartialEq)]
 pub struct SourceText {
     inner: Arc<str>,
+    count: Count<Self>,
 }
 
 impl SourceText {
