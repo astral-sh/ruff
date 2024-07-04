@@ -1,4 +1,4 @@
-use std::panic::{RefUnwindSafe, UnwindSafe};
+use std::panic::{AssertUnwindSafe, RefUnwindSafe};
 use std::sync::Arc;
 
 use salsa::{Cancelled, Database};
@@ -53,14 +53,31 @@ impl Program {
         &mut self.workspace
     }
 
-    #[allow(clippy::unnecessary_wraps)]
     fn with_db<F, T>(&self, f: F) -> Result<T, Cancelled>
     where
-        F: FnOnce(&Program) -> T + UnwindSafe,
+        F: FnOnce(&Program) -> T + std::panic::UnwindSafe,
     {
-        // TODO: Catch in `Cancelled::catch`
-        //  See https://salsa.zulipchat.com/#narrow/stream/145099-general/topic/How.20to.20use.20.60Cancelled.3A.3Acatch.60
-        Ok(f(self))
+        // The `AssertUnwindSafe` here looks scary, but is a consequence of Salsa's design.
+        // Salsa uses panics to implement cancellation and to recover from cycles. However, the Salsa
+        // storage isn't `UnwindSafe` or `RefUnwindSafe` because its dependencies `DashMap` and `parking_lot::*` aren't
+        // unwind safe.
+        //
+        // Having to use `AssertUnwindSafe` isn't as big as a deal as it might seem because
+        // the `UnwindSafe` and `RefUnwindSafe` traits are designed to catch logical bugs.
+        // They don't protect against [UB](https://internals.rust-lang.org/t/pre-rfc-deprecating-unwindsafe/15974).
+        // On top of that, `Cancelled` only catches specific Salsa-panics and propagates all other panics.
+        //
+        // That still leaves us with possible logical bugs in two sources:
+        // * In Salsa itself: This must be considered a bug in Salsa and needs fixing upstream.
+        //   Reviewing Salsa code specifically around unwind safety seems doable.
+        // * Our code: This is the main concern. Luckily, it only involves code that uses internal mutability
+        //     and calls into Salsa queries when mutating the internal state. Using `AssertUnwindSafe`
+        //     certainly makes it harder to catch these issues in our user code.
+        //
+        // For now, this is the only solution at hand unless Salsa decides to change its design.
+        // [Zulip support thread](https://salsa.zulipchat.com/#narrow/stream/145099-general/topic/How.20to.20use.20.60Cancelled.3A.3Acatch.60)
+        let db = &AssertUnwindSafe(self);
+        Cancelled::catch(|| f(db))
     }
 }
 
