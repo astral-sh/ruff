@@ -139,12 +139,6 @@ impl ModuleResolutionPathBuf {
         ModuleResolutionPathRef::from(self).with_py_extension()
     }
 
-    #[cfg(test)]
-    #[must_use]
-    pub(crate) fn join(&self, component: &str) -> Self {
-        Self(ModuleResolutionPathRefInner::from(&self.0).join(component))
-    }
-
     #[must_use]
     pub(crate) fn relativize_path<'a>(
         &'a self,
@@ -366,32 +360,6 @@ impl<'a> ModuleResolutionPathRefInner<'a> {
             )),
         }
     }
-
-    #[cfg(test)]
-    #[must_use]
-    fn to_path_buf(self) -> ModuleResolutionPathBufInner {
-        match self {
-            Self::Extra(path) => ModuleResolutionPathBufInner::Extra(path.to_path_buf()),
-            Self::FirstParty(path) => ModuleResolutionPathBufInner::FirstParty(path.to_path_buf()),
-            Self::StandardLibrary(path) => {
-                ModuleResolutionPathBufInner::StandardLibrary(path.to_path_buf())
-            }
-            Self::SitePackages(path) => {
-                ModuleResolutionPathBufInner::SitePackages(path.to_path_buf())
-            }
-        }
-    }
-
-    #[cfg(test)]
-    #[must_use]
-    fn join(
-        &self,
-        component: &'a (impl AsRef<FileSystemPath> + ?Sized),
-    ) -> ModuleResolutionPathBufInner {
-        let mut result = self.to_path_buf();
-        result.push(component.as_ref().as_str());
-        result
-    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -501,16 +469,6 @@ impl<'a> ModuleResolutionPathRef<'a> {
                 .and_then(Self::site_packages),
         }
     }
-
-    #[cfg(test)]
-    pub(crate) fn to_path_buf(self) -> ModuleResolutionPathBuf {
-        ModuleResolutionPathBuf(self.0.to_path_buf())
-    }
-
-    #[cfg(test)]
-    pub(crate) const fn is_stdlib_search_path(&self) -> bool {
-        matches!(&self.0, ModuleResolutionPathRefInner::StandardLibrary(_))
-    }
 }
 
 impl<'a> From<&'a ModuleResolutionPathBufInner> for ModuleResolutionPathRefInner<'a> {
@@ -584,6 +542,48 @@ mod tests {
 
     // Replace windows paths
     static WINDOWS_PATH_FILTER: [(&str, &str); 1] = [(r"\\\\", "/")];
+
+    impl ModuleResolutionPathBuf {
+        #[must_use]
+        pub(crate) fn join(&self, component: &str) -> Self {
+            ModuleResolutionPathRef::from(self).join(component)
+        }
+    }
+
+    impl<'a> ModuleResolutionPathRef<'a> {
+        #[must_use]
+        fn join(
+            &self,
+            component: &'a (impl AsRef<FileSystemPath> + ?Sized),
+        ) -> ModuleResolutionPathBuf {
+            let mut result = self.to_path_buf();
+            result.push(component.as_ref().as_str());
+            result
+        }
+
+        #[must_use]
+        pub(crate) fn to_path_buf(self) -> ModuleResolutionPathBuf {
+            let inner = match self.0 {
+                ModuleResolutionPathRefInner::Extra(path) => {
+                    ModuleResolutionPathBufInner::Extra(path.to_path_buf())
+                }
+                ModuleResolutionPathRefInner::FirstParty(path) => {
+                    ModuleResolutionPathBufInner::FirstParty(path.to_path_buf())
+                }
+                ModuleResolutionPathRefInner::StandardLibrary(path) => {
+                    ModuleResolutionPathBufInner::StandardLibrary(path.to_path_buf())
+                }
+                ModuleResolutionPathRefInner::SitePackages(path) => {
+                    ModuleResolutionPathBufInner::SitePackages(path.to_path_buf())
+                }
+            };
+            ModuleResolutionPathBuf(inner)
+        }
+
+        pub(crate) const fn is_stdlib_search_path(&self) -> bool {
+            matches!(&self.0, ModuleResolutionPathRefInner::StandardLibrary(_))
+        }
+    }
 
     #[test]
     fn constructor_rejects_non_pyi_stdlib_paths() {

@@ -148,19 +148,6 @@ impl TypeshedVersions {
         self.0.get(module_name)
     }
 
-    /// Helper functions for testing purposes
-    #[cfg(test)]
-    #[must_use]
-    fn contains_exact(&self, module: &ModuleName) -> bool {
-        self.exact(module).is_some()
-    }
-
-    #[cfg(test)]
-    #[must_use]
-    fn len(&self) -> usize {
-        self.0.len()
-    }
-
     #[must_use]
     fn query_module(
         &self,
@@ -399,6 +386,18 @@ mod tests {
 
     #[allow(unsafe_code)]
     const ONE: Option<NonZeroU16> = Some(unsafe { NonZeroU16::new_unchecked(1) });
+
+    impl TypeshedVersions {
+        #[must_use]
+        fn contains_exact(&self, module: &ModuleName) -> bool {
+            self.exact(module).is_some()
+        }
+
+        #[must_use]
+        fn len(&self) -> usize {
+            self.0.len()
+        }
+    }
 
     #[test]
     fn can_parse_vendored_versions_file() {
