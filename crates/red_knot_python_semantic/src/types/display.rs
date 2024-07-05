@@ -25,12 +25,8 @@ impl Display for DisplayType<'_> {
             Type::Unknown => f.write_str("Unknown"),
             Type::Unbound => f.write_str("Unbound"),
             Type::None => f.write_str("None"),
-            Type::Module(module) => {
-                write!(
-                    f,
-                    "<module '{:?}'>",
-                    module.file(self.db).path(self.db.upcast())
-                )
+            Type::Module(file) => {
+                write!(f, "<module '{:?}'>", file.path(self.db.upcast()))
             }
             // TODO functions and classes should display using a fully qualified name
             Type::Class(class) => {

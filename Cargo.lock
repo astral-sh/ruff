@@ -1533,6 +1533,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "04744f49eae99ab78e0d5c0b603ab218f515ea8cfe5a456d7629ad883a3b6e7d"
 
 [[package]]
+name = "ordermap"
+version = "0.5.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ab5a8e22be64dfa1123429350872e7be33594dbf5ae5212c90c5890e71966d1d"
+dependencies = [
+ "indexmap",
+]
+
+[[package]]
 name = "os_str_bytes"
 version = "6.6.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1902,7 +1911,7 @@ dependencies = [
  "anyhow",
  "bitflags 2.6.0",
  "hashbrown 0.14.5",
- "indexmap",
+ "ordermap",
  "red_knot_module_resolver",
  "ruff_db",
  "ruff_index",

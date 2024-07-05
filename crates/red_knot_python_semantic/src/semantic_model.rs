@@ -19,6 +19,8 @@ impl<'db> SemanticModel<'db> {
         Self { db, file }
     }
 
+    // TODO we don't actually want to expose the Db directly to lint rules, but we need to find a
+    // solution for exposing information from types
     pub fn db(&self) -> &dyn Db {
         self.db
     }

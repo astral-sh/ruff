@@ -14,9 +14,7 @@ use crate::semantic_index::symbol::{
     FileScopeId, NodeWithScopeRef, ScopeId, ScopedSymbolId, SymbolTable,
 };
 use crate::semantic_index::{symbol_table, SemanticIndex};
-use crate::types::{
-    infer_types, ClassType, FunctionType, ModuleType, Name, Type, UnionTypeBuilder,
-};
+use crate::types::{infer_types, ClassType, FunctionType, Name, Type, UnionTypeBuilder};
 use crate::Db;
 
 /// The inferred types for a single scope.
@@ -296,7 +294,7 @@ impl<'db> TypeInferenceBuilder<'db> {
             let module_name = ModuleName::new(&name.id);
             let module = module_name.and_then(|name| resolve_module(self.db.upcast(), name));
             let module_ty = module
-                .map(|module| Type::Module(ModuleType::new(self.db, module.file())))
+                .map(|module| Type::Module(module.file()))
                 .unwrap_or(Type::Unknown);
 
             let definition = self.index.definition(alias);
@@ -318,7 +316,7 @@ impl<'db> TypeInferenceBuilder<'db> {
         let module =
             module_name.and_then(|module_name| resolve_module(self.db.upcast(), module_name));
         let module_ty = module
-            .map(|module| Type::Module(ModuleType::new(self.db, module.file())))
+            .map(|module| Type::Module(module.file()))
             .unwrap_or(Type::Unknown);
 
         for alias in names {

@@ -149,6 +149,7 @@ fn lint_bad_override(context: &SemanticLintContext, class: &ast::StmtClassDef) {
             return;
         };
 
+        // TODO this shouldn't make direct use of the Db; see comment on SemanticModel::db
         let db = semantic.db();
 
         if ty.has_decorator(db, override_ty) {

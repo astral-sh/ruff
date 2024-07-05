@@ -5,7 +5,7 @@ use ruff_python_ast::name::Name;
 use crate::semantic_index::symbol::{NodeWithScopeKind, PublicSymbolId, ScopeId};
 use crate::semantic_index::{public_symbol, root_scope, semantic_index, symbol_table};
 use crate::types::infer::{TypeInference, TypeInferenceBuilder};
-use crate::Db;
+use crate::{Db, FxOrderSet};
 
 mod display;
 mod infer;
@@ -105,7 +105,7 @@ pub enum Type<'db> {
     /// a specific function object
     Function(FunctionType<'db>),
     /// a specific module object
-    Module(ModuleType<'db>),
+    Module(VfsFile),
     /// a specific class object
     Class(ClassType<'db>),
     /// the set of Python objects with the given class in their __class__'s method resolution order
@@ -133,7 +133,7 @@ impl<'db> Type<'db> {
             Type::Unbound => todo!("attribute lookup on Unbound type"),
             Type::None => todo!("attribute lookup on None type"),
             Type::Function(_) => todo!("attribute lookup on Function type"),
-            Type::Module(module) => module.member(db, name),
+            Type::Module(file) => public_symbol_ty_by_name(db, *file, name),
             Type::Class(class) => class.class_member(db, name),
             Type::Instance(_) => {
                 // TODO MRO? get_own_instance_member, get_instance_member
@@ -220,11 +220,11 @@ impl<'db> ClassType<'db> {
 #[salsa::interned]
 pub struct UnionType<'db> {
     /// the union type includes values in any of these types
-    elements: Vec<Type<'db>>,
+    elements: FxOrderSet<Type<'db>>,
 }
 
 struct UnionTypeBuilder<'db> {
-    elements: Vec<Type<'db>>,
+    elements: FxOrderSet<Type<'db>>,
     db: &'db dyn Db,
 }
 
@@ -232,7 +232,7 @@ impl<'db> UnionTypeBuilder<'db> {
     fn new(db: &'db dyn Db) -> Self {
         Self {
             db,
-            elements: Vec::default(),
+            elements: FxOrderSet::default(),
         }
     }
 
@@ -243,7 +243,7 @@ impl<'db> UnionTypeBuilder<'db> {
                 self.elements.extend(&union.elements(self.db));
             }
             _ => {
-                self.elements.push(ty);
+                self.elements.insert(ty);
             }
         }
 
@@ -264,20 +264,9 @@ impl<'db> UnionTypeBuilder<'db> {
 #[salsa::interned]
 pub struct IntersectionType<'db> {
     // the intersection type includes only values in all of these types
-    positive: Vec<Type<'db>>,
+    positive: FxOrderSet<Type<'db>>,
     // the intersection type does not include any value in any of these types
-    negative: Vec<Type<'db>>,
-}
-
-#[salsa::interned]
-pub struct ModuleType<'db> {
-    file: VfsFile,
-}
-
-impl<'db> ModuleType<'db> {
-    fn member(self, db: &'db dyn Db, name: &Name) -> Option<Type<'db>> {
-        public_symbol_ty_by_name(db, self.file(db), name)
-    }
+    negative: FxOrderSet<Type<'db>>,
 }
 
 #[cfg(test)]

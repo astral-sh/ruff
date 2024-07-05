@@ -8,7 +8,7 @@ use crate::semantic_index::definition::Definition;
 use crate::semantic_index::symbol::{public_symbols_map, PublicSymbolId, ScopeId};
 use crate::semantic_index::{root_scope, semantic_index, symbol_table};
 use crate::types::{
-    infer_types, public_symbol_ty, ClassType, FunctionType, IntersectionType, ModuleType, UnionType,
+    infer_types, public_symbol_ty, ClassType, FunctionType, IntersectionType, UnionType,
 };
 
 #[salsa::jar(db=Db)]
@@ -18,7 +18,6 @@ pub struct Jar(
     Definition<'_>,
     FunctionType<'_>,
     ClassType<'_>,
-    ModuleType<'_>,
     UnionType<'_>,
     IntersectionType<'_>,
     symbol_table,
