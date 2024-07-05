@@ -495,7 +495,7 @@ impl<'a> From<&'a ModuleResolutionPathBuf> for ModuleResolutionPathRef<'a> {
     }
 }
 
-impl<'a> PartialEq<ModuleResolutionPathBuf> for ModuleResolutionPathRef<'a> {
+impl PartialEq<ModuleResolutionPathBuf> for ModuleResolutionPathRef<'_> {
     fn eq(&self, other: &ModuleResolutionPathBuf) -> bool {
         match (self.0, &other.0) {
             (
@@ -519,14 +519,14 @@ impl<'a> PartialEq<ModuleResolutionPathBuf> for ModuleResolutionPathRef<'a> {
     }
 }
 
-impl<'a> PartialEq<FileSystemPath> for ModuleResolutionPathRef<'a> {
+impl PartialEq<FileSystemPath> for ModuleResolutionPathRef<'_> {
     fn eq(&self, other: &FileSystemPath) -> bool {
         self.0.as_file_system_path() == other
     }
 }
 
-impl<'a> PartialEq<ModuleResolutionPathRef<'a>> for FileSystemPath {
-    fn eq(&self, other: &ModuleResolutionPathRef<'a>) -> bool {
+impl PartialEq<ModuleResolutionPathRef<'_>> for FileSystemPath {
+    fn eq(&self, other: &ModuleResolutionPathRef) -> bool {
         self == other.0.as_file_system_path()
     }
 }
