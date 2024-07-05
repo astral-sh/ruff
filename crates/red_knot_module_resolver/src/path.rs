@@ -1,7 +1,7 @@
 use std::fmt;
 
 use ruff_db::file_system::{FileSystemPath, FileSystemPathBuf};
-use ruff_db::vfs::{system_path_to_file, VfsFile, VfsPath};
+use ruff_db::vfs::{system_path_to_file, VfsFile};
 
 use crate::db::Db;
 use crate::module_name::ModuleName;
@@ -155,17 +155,6 @@ impl ModuleResolutionPathBuf {
         typeshed_versions: &LazyTypeshedVersions,
     ) -> Option<VfsFile> {
         ModuleResolutionPathRef::from(self).to_vfs_file(db, search_path, typeshed_versions)
-    }
-}
-
-impl From<ModuleResolutionPathBuf> for VfsPath {
-    fn from(value: ModuleResolutionPathBuf) -> Self {
-        VfsPath::FileSystem(match value.0 {
-            ModuleResolutionPathBufInner::Extra(path) => path,
-            ModuleResolutionPathBufInner::FirstParty(path) => path,
-            ModuleResolutionPathBufInner::StandardLibrary(path) => path,
-            ModuleResolutionPathBufInner::SitePackages(path) => path,
-        })
     }
 }
 
@@ -471,10 +460,9 @@ impl<'a> ModuleResolutionPathRef<'a> {
     }
 }
 
-impl<'a> From<&'a ModuleResolutionPathBufInner> for ModuleResolutionPathRefInner<'a> {
-    #[inline]
-    fn from(value: &'a ModuleResolutionPathBufInner) -> Self {
-        match value {
+impl<'a> From<&'a ModuleResolutionPathBuf> for ModuleResolutionPathRef<'a> {
+    fn from(value: &'a ModuleResolutionPathBuf) -> Self {
+        let inner = match &value.0 {
             ModuleResolutionPathBufInner::Extra(path) => ModuleResolutionPathRefInner::Extra(path),
             ModuleResolutionPathBufInner::FirstParty(path) => {
                 ModuleResolutionPathRefInner::FirstParty(path)
@@ -485,37 +473,8 @@ impl<'a> From<&'a ModuleResolutionPathBufInner> for ModuleResolutionPathRefInner
             ModuleResolutionPathBufInner::SitePackages(path) => {
                 ModuleResolutionPathRefInner::SitePackages(path)
             }
-        }
-    }
-}
-
-impl<'a> From<&'a ModuleResolutionPathBuf> for ModuleResolutionPathRef<'a> {
-    fn from(value: &'a ModuleResolutionPathBuf) -> Self {
-        ModuleResolutionPathRef(ModuleResolutionPathRefInner::from(&value.0))
-    }
-}
-
-impl PartialEq<ModuleResolutionPathBuf> for ModuleResolutionPathRef<'_> {
-    fn eq(&self, other: &ModuleResolutionPathBuf) -> bool {
-        match (self.0, &other.0) {
-            (
-                ModuleResolutionPathRefInner::Extra(self_path),
-                ModuleResolutionPathBufInner::Extra(other_path),
-            )
-            | (
-                ModuleResolutionPathRefInner::FirstParty(self_path),
-                ModuleResolutionPathBufInner::FirstParty(other_path),
-            )
-            | (
-                ModuleResolutionPathRefInner::StandardLibrary(self_path),
-                ModuleResolutionPathBufInner::StandardLibrary(other_path),
-            )
-            | (
-                ModuleResolutionPathRefInner::SitePackages(self_path),
-                ModuleResolutionPathBufInner::SitePackages(other_path),
-            ) => *self_path == **other_path,
-            _ => false,
-        }
+        };
+        ModuleResolutionPathRef(inner)
     }
 }
 
