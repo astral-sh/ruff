@@ -1,4 +1,9 @@
-pub(crate) mod versions;
+mod versions;
+
+pub(crate) use versions::{
+    parse_typeshed_versions, LazyTypeshedVersions, TypeshedVersionsQueryResult,
+};
+pub use versions::{TypeshedVersionsParseError, TypeshedVersionsParseErrorKind};
 
 #[cfg(test)]
 mod tests {

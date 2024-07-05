@@ -1891,6 +1891,7 @@ name = "red_knot_module_resolver"
 version = "0.0.0"
 dependencies = [
  "anyhow",
+ "camino",
  "compact_str",
  "insta",
  "path-slash",

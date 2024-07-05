@@ -2,27 +2,33 @@ use ruff_db::Upcast;
 
 use crate::resolver::{
     file_to_module,
-    internal::{ModuleNameIngredient, ModuleResolverSearchPaths},
+    internal::{ModuleNameIngredient, ModuleResolverSettings},
     resolve_module_query,
 };
+use crate::typeshed::parse_typeshed_versions;
 
 #[salsa::jar(db=Db)]
 pub struct Jar(
     ModuleNameIngredient<'_>,
-    ModuleResolverSearchPaths,
+    ModuleResolverSettings,
     resolve_module_query,
     file_to_module,
+    parse_typeshed_versions,
 );
 
 pub trait Db: salsa::DbWithJar<Jar> + ruff_db::Db + Upcast<dyn ruff_db::Db> {}
 
+#[cfg(test)]
 pub(crate) mod tests {
     use std::sync;
 
     use salsa::DebugWithDb;
 
-    use ruff_db::file_system::{FileSystem, MemoryFileSystem, OsFileSystem};
+    use ruff_db::file_system::{FileSystem, FileSystemPathBuf, MemoryFileSystem, OsFileSystem};
     use ruff_db::vfs::Vfs;
+
+    use crate::resolver::{set_module_resolution_settings, RawModuleResolutionSettings};
+    use crate::supported_py_version::TargetVersion;
 
     use super::*;
 
@@ -35,7 +41,6 @@ pub(crate) mod tests {
     }
 
     impl TestDb {
-        #[allow(unused)]
         pub(crate) fn new() -> Self {
             Self {
                 storage: salsa::Storage::default(),
@@ -49,7 +54,6 @@ pub(crate) mod tests {
         ///
         /// ## Panics
         /// If this test db isn't using a memory file system.
-        #[allow(unused)]
         pub(crate) fn memory_file_system(&self) -> &MemoryFileSystem {
             if let TestFileSystem::Memory(fs) = &self.file_system {
                 fs
@@ -63,7 +67,6 @@ pub(crate) mod tests {
         /// This useful for testing advanced file system features like permissions, symlinks, etc.
         ///
         /// Note that any files written to the memory file system won't be copied over.
-        #[allow(unused)]
         pub(crate) fn with_os_file_system(&mut self) {
             self.file_system = TestFileSystem::Os(OsFileSystem);
         }
@@ -77,7 +80,6 @@ pub(crate) mod tests {
         ///
         /// ## Panics
         /// If there are any pending salsa snapshots.
-        #[allow(unused)]
         pub(crate) fn take_salsa_events(&mut self) -> Vec<salsa::Event> {
             let inner = sync::Arc::get_mut(&mut self.events).expect("no pending salsa snapshots");
 
@@ -89,7 +91,6 @@ pub(crate) mod tests {
         ///
         /// ## Panics
         /// If there are any pending salsa snapshots.
-        #[allow(unused)]
         pub(crate) fn clear_salsa_events(&mut self) {
             self.take_salsa_events();
         }
@@ -152,5 +153,112 @@ pub(crate) mod tests {
                 Self::Os(inner) => Self::Os(inner.snapshot()),
             }
         }
+    }
+
+    pub(crate) struct TestCaseBuilder {
+        db: TestDb,
+        src: FileSystemPathBuf,
+        custom_typeshed: FileSystemPathBuf,
+        site_packages: FileSystemPathBuf,
+        target_version: Option<TargetVersion>,
+    }
+
+    impl TestCaseBuilder {
+        #[must_use]
+        pub(crate) fn with_target_version(mut self, target_version: TargetVersion) -> Self {
+            self.target_version = Some(target_version);
+            self
+        }
+
+        pub(crate) fn build(self) -> TestCase {
+            let TestCaseBuilder {
+                mut db,
+                src,
+                custom_typeshed,
+                site_packages,
+                target_version,
+            } = self;
+
+            let settings = RawModuleResolutionSettings {
+                target_version: target_version.unwrap_or_default(),
+                extra_paths: vec![],
+                workspace_root: src.clone(),
+                custom_typeshed: Some(custom_typeshed.clone()),
+                site_packages: Some(site_packages.clone()),
+            };
+
+            set_module_resolution_settings(&mut db, settings);
+
+            TestCase {
+                db,
+                src,
+                custom_typeshed,
+                site_packages,
+            }
+        }
+    }
+
+    pub(crate) struct TestCase {
+        pub(crate) db: TestDb,
+        pub(crate) src: FileSystemPathBuf,
+        pub(crate) custom_typeshed: FileSystemPathBuf,
+        pub(crate) site_packages: FileSystemPathBuf,
+    }
+
+    pub(crate) fn create_resolver_builder() -> std::io::Result<TestCaseBuilder> {
+        static VERSIONS_DATA: &str = "\
+        asyncio: 3.8-               # 'Regular' package on py38+
+        asyncio.tasks: 3.9-3.11
+        collections: 3.9-           # 'Regular' package on py39+
+        functools: 3.8-
+        importlib: 3.9-             # Namespace package on py39+
+        xml: 3.8-3.8                # Namespace package on py38 only
+        ";
+
+        let db = TestDb::new();
+
+        let src = FileSystemPathBuf::from("src");
+        let site_packages = FileSystemPathBuf::from("site_packages");
+        let custom_typeshed = FileSystemPathBuf::from("typeshed");
+
+        let fs = db.memory_file_system();
+
+        fs.create_directory_all(&src)?;
+        fs.create_directory_all(&site_packages)?;
+        fs.create_directory_all(&custom_typeshed)?;
+        fs.write_file(custom_typeshed.join("stdlib/VERSIONS"), VERSIONS_DATA)?;
+
+        // Regular package on py38+
+        fs.create_directory_all(custom_typeshed.join("stdlib/asyncio"))?;
+        fs.touch(custom_typeshed.join("stdlib/asyncio/__init__.pyi"))?;
+        fs.write_file(
+            custom_typeshed.join("stdlib/asyncio/tasks.pyi"),
+            "class Task: ...",
+        )?;
+
+        // Regular package on py39+
+        fs.create_directory_all(custom_typeshed.join("stdlib/collections"))?;
+        fs.touch(custom_typeshed.join("stdlib/collections/__init__.pyi"))?;
+
+        // Namespace package on py38 only
+        fs.create_directory_all(custom_typeshed.join("stdlib/xml"))?;
+        fs.touch(custom_typeshed.join("stdlib/xml/etree.pyi"))?;
+
+        // Namespace package on py39+
+        fs.create_directory_all(custom_typeshed.join("stdlib/importlib"))?;
+        fs.touch(custom_typeshed.join("stdlib/importlib/abc.pyi"))?;
+
+        fs.write_file(
+            custom_typeshed.join("stdlib/functools.pyi"),
+            "def update_wrapper(): ...",
+        )?;
+
+        Ok(TestCaseBuilder {
+            db,
+            src,
+            custom_typeshed,
+            site_packages,
+            target_version: None,
+        })
     }
 }

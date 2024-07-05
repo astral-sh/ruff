@@ -598,7 +598,9 @@ impl<'db> TypeInferenceBuilder<'db> {
 
 #[cfg(test)]
 mod tests {
-    use red_knot_module_resolver::{set_module_resolution_settings, ModuleResolutionSettings};
+    use red_knot_module_resolver::{
+        set_module_resolution_settings, RawModuleResolutionSettings, TargetVersion,
+    };
     use ruff_db::file_system::FileSystemPathBuf;
     use ruff_db::vfs::system_path_to_file;
     use ruff_python_ast::name::Name;
@@ -611,7 +613,8 @@ mod tests {
 
         set_module_resolution_settings(
             &mut db,
-            ModuleResolutionSettings {
+            RawModuleResolutionSettings {
+                target_version: TargetVersion::Py38,
                 extra_paths: Vec::new(),
                 workspace_root: FileSystemPathBuf::from("/src"),
                 site_packages: None,
