@@ -1,11 +1,10 @@
+use std::cell::OnceCell;
 use std::collections::BTreeMap;
 use std::fmt;
 use std::num::{NonZeroU16, NonZeroUsize};
 use std::ops::{RangeFrom, RangeInclusive};
 use std::str::FromStr;
 use std::sync::Arc;
-
-use once_cell::sync::OnceCell;
 
 use ruff_db::file_system::FileSystemPath;
 use ruff_db::source::source_text;
