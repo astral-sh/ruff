@@ -2,18 +2,19 @@
 
 use std::fmt::{Display, Formatter};
 
-use crate::types::{IntersectionType, Type, TypingContext, UnionType};
+use crate::types::{IntersectionType, Type, UnionType};
+use crate::Db;
 
-impl Type<'_> {
-    pub fn display<'a>(&'a self, context: &'a TypingContext) -> DisplayType<'a> {
-        DisplayType { ty: self, context }
+impl<'db> Type<'db> {
+    pub fn display(&'db self, db: &'db dyn Db) -> DisplayType<'db> {
+        DisplayType { ty: self, db }
     }
 }
 
 #[derive(Copy, Clone)]
-pub struct DisplayType<'a> {
-    ty: &'a Type<'a>,
-    context: &'a TypingContext<'a, 'a>,
+pub struct DisplayType<'db> {
+    ty: &'db Type<'db>,
+    db: &'db dyn Db,
 }
 
 impl Display for DisplayType<'_> {
@@ -24,42 +25,19 @@ impl Display for DisplayType<'_> {
             Type::Unknown => f.write_str("Unknown"),
             Type::Unbound => f.write_str("Unbound"),
             Type::None => f.write_str("None"),
-            Type::Module(module_id) => {
-                write!(
-                    f,
-                    "<module '{:?}'>",
-                    module_id
-                        .scope
-                        .file(self.context.db)
-                        .path(self.context.db.upcast())
-                )
+            Type::Module(file) => {
+                write!(f, "<module '{:?}'>", file.path(self.db.upcast()))
             }
             // TODO functions and classes should display using a fully qualified name
-            Type::Class(class_id) => {
-                let class = class_id.lookup(self.context);
-
+            Type::Class(class) => {
                 f.write_str("Literal[")?;
-                f.write_str(class.name())?;
+                f.write_str(&class.name(self.db))?;
                 f.write_str("]")
             }
-            Type::Instance(class_id) => {
-                let class = class_id.lookup(self.context);
-                f.write_str(class.name())
-            }
-            Type::Function(function_id) => {
-                let function = function_id.lookup(self.context);
-                f.write_str(function.name())
-            }
-            Type::Union(union_id) => {
-                let union = union_id.lookup(self.context);
-
-                union.display(self.context).fmt(f)
-            }
-            Type::Intersection(intersection_id) => {
-                let intersection = intersection_id.lookup(self.context);
-
-                intersection.display(self.context).fmt(f)
-            }
+            Type::Instance(class) => f.write_str(&class.name(self.db)),
+            Type::Function(function) => f.write_str(&function.name(self.db)),
+            Type::Union(union) => union.display(self.db).fmt(f),
+            Type::Intersection(intersection) => intersection.display(self.db).fmt(f),
             Type::IntLiteral(n) => write!(f, "Literal[{n}]"),
         }
     }
@@ -71,15 +49,15 @@ impl std::fmt::Debug for DisplayType<'_> {
     }
 }
 
-impl UnionType<'_> {
-    fn display<'a>(&'a self, context: &'a TypingContext<'a, 'a>) -> DisplayUnionType<'a> {
-        DisplayUnionType { context, ty: self }
+impl<'db> UnionType<'db> {
+    fn display(&'db self, db: &'db dyn Db) -> DisplayUnionType<'db> {
+        DisplayUnionType { db, ty: self }
     }
 }
 
-struct DisplayUnionType<'a> {
-    ty: &'a UnionType<'a>,
-    context: &'a TypingContext<'a, 'a>,
+struct DisplayUnionType<'db> {
+    ty: &'db UnionType<'db>,
+    db: &'db dyn Db,
 }
 
 impl Display for DisplayUnionType<'_> {
@@ -87,7 +65,7 @@ impl Display for DisplayUnionType<'_> {
         let union = self.ty;
 
         let (int_literals, other_types): (Vec<Type>, Vec<Type>) = union
-            .elements
+            .elements(self.db)
             .iter()
             .copied()
             .partition(|ty| matches!(ty, Type::IntLiteral(_)));
@@ -121,7 +99,7 @@ impl Display for DisplayUnionType<'_> {
                 f.write_str(" | ")?;
             };
             first = false;
-            write!(f, "{}", ty.display(self.context))?;
+            write!(f, "{}", ty.display(self.db))?;
         }
 
         Ok(())
@@ -134,15 +112,15 @@ impl std::fmt::Debug for DisplayUnionType<'_> {
     }
 }
 
-impl IntersectionType<'_> {
-    fn display<'a>(&'a self, context: &'a TypingContext<'a, 'a>) -> DisplayIntersectionType<'a> {
-        DisplayIntersectionType { ty: self, context }
+impl<'db> IntersectionType<'db> {
+    fn display(&'db self, db: &'db dyn Db) -> DisplayIntersectionType<'db> {
+        DisplayIntersectionType { db, ty: self }
     }
 }
 
-struct DisplayIntersectionType<'a> {
-    ty: &'a IntersectionType<'a>,
-    context: &'a TypingContext<'a, 'a>,
+struct DisplayIntersectionType<'db> {
+    ty: &'db IntersectionType<'db>,
+    db: &'db dyn Db,
 }
 
 impl Display for DisplayIntersectionType<'_> {
@@ -150,10 +128,10 @@ impl Display for DisplayIntersectionType<'_> {
         let mut first = true;
         for (neg, ty) in self
             .ty
-            .positive
+            .positive(self.db)
             .iter()
             .map(|ty| (false, ty))
-            .chain(self.ty.negative.iter().map(|ty| (true, ty)))
+            .chain(self.ty.negative(self.db).iter().map(|ty| (true, ty)))
         {
             if !first {
                 f.write_str(" & ")?;
@@ -162,7 +140,7 @@ impl Display for DisplayIntersectionType<'_> {
             if neg {
                 f.write_str("~")?;
             };
-            write!(f, "{}", ty.display(self.context))?;
+            write!(f, "{}", ty.display(self.db))?;
         }
         Ok(())
     }

@@ -6,7 +6,7 @@ use ruff_python_ast::{Expr, ExpressionRef, StmtClassDef};
 use crate::semantic_index::ast_ids::HasScopedAstId;
 use crate::semantic_index::symbol::PublicSymbolId;
 use crate::semantic_index::{public_symbol, semantic_index};
-use crate::types::{infer_types, public_symbol_ty, Type, TypingContext};
+use crate::types::{infer_types, public_symbol_ty, Type};
 use crate::Db;
 
 pub struct SemanticModel<'db> {
@@ -19,6 +19,12 @@ impl<'db> SemanticModel<'db> {
         Self { db, file }
     }
 
+    // TODO we don't actually want to expose the Db directly to lint rules, but we need to find a
+    // solution for exposing information from types
+    pub fn db(&self) -> &dyn Db {
+        self.db
+    }
+
     pub fn resolve_module(&self, module_name: ModuleName) -> Option<Module> {
         resolve_module(self.db.upcast(), module_name)
     }
@@ -27,12 +33,8 @@ impl<'db> SemanticModel<'db> {
         public_symbol(self.db, module.file(), symbol_name)
     }
 
-    pub fn public_symbol_ty(&self, symbol: PublicSymbolId<'db>) -> Type<'db> {
+    pub fn public_symbol_ty(&self, symbol: PublicSymbolId<'db>) -> Type {
         public_symbol_ty(self.db, symbol)
-    }
-
-    pub fn typing_context(&self) -> TypingContext<'db, '_> {
-        TypingContext::global(self.db)
     }
 }
 

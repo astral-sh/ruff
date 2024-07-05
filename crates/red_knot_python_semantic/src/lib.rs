@@ -12,4 +12,4 @@ pub mod semantic_index;
 mod semantic_model;
 pub mod types;
 
-type FxIndexSet<V> = indexmap::set::IndexSet<V, BuildHasherDefault<FxHasher>>;
+type FxOrderSet<V> = ordermap::set::OrderSet<V, BuildHasherDefault<FxHasher>>;

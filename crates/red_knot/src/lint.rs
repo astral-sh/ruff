@@ -122,7 +122,6 @@ fn lint_unresolved_imports(context: &SemanticLintContext, import: AnyImportRef) 
 
 fn lint_bad_override(context: &SemanticLintContext, class: &ast::StmtClassDef) {
     let semantic = &context.semantic;
-    let typing_context = semantic.typing_context();
 
     // TODO we should have a special marker on the real typing module (from typeshed) so if you
     //   have your own "typing" module in your project, we don't consider it THE typing module (and
@@ -150,17 +149,17 @@ fn lint_bad_override(context: &SemanticLintContext, class: &ast::StmtClassDef) {
             return;
         };
 
-        if ty.has_decorator(&typing_context, override_ty) {
-            let method_name = ty.name(&typing_context);
-            if class_ty
-                .inherited_class_member(&typing_context, method_name)
-                .is_none()
-            {
+        // TODO this shouldn't make direct use of the Db; see comment on SemanticModel::db
+        let db = semantic.db();
+
+        if ty.has_decorator(db, override_ty) {
+            let method_name = ty.name(db);
+            if class_ty.inherited_class_member(db, &method_name).is_none() {
                 // TODO should have a qualname() method to support nested classes
                 context.push_diagnostic(
                     format!(
                         "Method {}.{} is decorated with `typing.override` but does not override any base class method",
-                        class_ty.name(&typing_context),
+                        class_ty.name(db),
                         method_name,
                     ));
             }
