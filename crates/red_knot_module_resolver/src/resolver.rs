@@ -136,6 +136,13 @@ pub struct ModuleResolutionSettings {
 impl ModuleResolutionSettings {
     /// Implementation of PEP 561's module resolution order
     /// (with some small, deliberate, differences)
+    ///
+    /// TODO(Alex): this method does multiple `.unwrap()` calls when it should really return an error.
+    /// Each `.unwrap()` call is a point where we're validating a setting that the user would pass
+    /// and transforming it into an internal representation for a validated path.
+    /// Rather than panicking if a path fails to validate, we should display an error message to the user
+    /// and exit the process with a nonzero exit code.
+    /// This validation should probably be done outside of Salsa?
     fn into_ordered_search_paths(self) -> (SupportedPyVersion, OrderedSearchPaths) {
         let ModuleResolutionSettings {
             target_version,
@@ -145,11 +152,10 @@ impl ModuleResolutionSettings {
             custom_typeshed,
         } = self;
 
-        let mut paths = extra_paths
+        let mut paths: Vec<ModuleResolutionPathBuf> = extra_paths
             .into_iter()
-            .map(ModuleResolutionPathBuf::extra)
-            .collect::<Option<Vec<ModuleResolutionPathBuf>>>()
-            .unwrap();
+            .map(|fs_path| ModuleResolutionPathBuf::extra(fs_path).unwrap())
+            .collect();
 
         paths.push(ModuleResolutionPathBuf::first_party(workspace_root).unwrap());
 
