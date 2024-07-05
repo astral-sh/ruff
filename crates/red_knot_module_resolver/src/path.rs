@@ -24,25 +24,23 @@ enum ModuleResolutionPathBufInner {
 
 impl ModuleResolutionPathBufInner {
     fn push(&mut self, component: &str) {
-        if cfg!(debug_assertions) {
-            if let Some(extension) = camino::Utf8Path::new(component).extension() {
-                match self {
-                    Self::Extra(_) | Self::FirstParty(_) | Self::SitePackages(_) => assert!(
-                        matches!(extension, "pyi" | "py"),
-                        "Extension must be `py` or `pyi`; got `{extension}`"
-                    ),
-                    Self::StandardLibrary(_) => {
-                        assert!(
-                            matches!(component.matches('.').count(), 0 | 1),
-                            "Component can have at most one '.'; got {component}"
-                        );
-                        assert_eq!(
-                            extension, "pyi",
-                            "Extension must be `pyi`; got `{extension}`"
-                        );
-                    }
-                };
-            }
+        if let Some(extension) = camino::Utf8Path::new(component).extension() {
+            match self {
+                Self::Extra(_) | Self::FirstParty(_) | Self::SitePackages(_) => assert!(
+                    matches!(extension, "pyi" | "py"),
+                    "Extension must be `py` or `pyi`; got `{extension}`"
+                ),
+                Self::StandardLibrary(_) => {
+                    assert!(
+                        matches!(component.matches('.').count(), 0 | 1),
+                        "Component can have at most one '.'; got {component}"
+                    );
+                    assert_eq!(
+                        extension, "pyi",
+                        "Extension must be `pyi`; got `{extension}`"
+                    );
+                }
+            };
         }
         let inner = match self {
             Self::Extra(ref mut path) => path,
@@ -850,21 +848,18 @@ mod tests {
     }
 
     #[test]
-    #[cfg(debug_assertions)]
     #[should_panic(expected = "Extension must be `pyi`; got `py`")]
     fn stdlib_path_invalid_join_py() {
         stdlib_path_test_case("foo").push("bar.py");
     }
 
     #[test]
-    #[cfg(debug_assertions)]
     #[should_panic(expected = "Extension must be `pyi`; got `rs`")]
     fn stdlib_path_invalid_join_rs() {
         stdlib_path_test_case("foo").push("bar.rs");
     }
 
     #[test]
-    #[cfg(debug_assertions)]
     #[should_panic(expected = "Extension must be `py` or `pyi`; got `rs`")]
     fn non_stdlib_path_invalid_join_rs() {
         ModuleResolutionPathBuf::site_packages("foo")
@@ -873,7 +868,6 @@ mod tests {
     }
 
     #[test]
-    #[cfg(debug_assertions)]
     #[should_panic(expected = "Component can have at most one '.'")]
     fn invalid_stdlib_join_too_many_extensions() {
         stdlib_path_test_case("foo").push("bar.py.pyi");
