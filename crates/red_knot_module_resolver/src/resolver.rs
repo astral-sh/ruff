@@ -379,9 +379,13 @@ mod tests {
 
     use super::*;
 
+    fn setup_resolver_test() -> TestCase {
+        create_resolver_builder().unwrap().build()
+    }
+
     #[test]
     fn first_party_module() -> anyhow::Result<()> {
-        let TestCase { db, src, .. } = create_resolver_builder()?.build();
+        let TestCase { db, src, .. } = setup_resolver_test();
 
         let foo_module_name = ModuleName::new_static("foo").unwrap();
         let foo_path = src.join("foo.py");
@@ -409,12 +413,12 @@ mod tests {
     }
 
     #[test]
-    fn stdlib() -> anyhow::Result<()> {
+    fn stdlib() {
         let TestCase {
             db,
             custom_typeshed,
             ..
-        } = create_resolver_builder()?.build();
+        } = setup_resolver_test();
 
         let stdlib_dir =
             ModuleResolutionPathBuf::stdlib_from_typeshed_root(&custom_typeshed).unwrap();
@@ -438,8 +442,6 @@ mod tests {
             Some(functools_module),
             path_to_module(&db, &expected_functools_path)
         );
-
-        Ok(())
     }
 
     fn create_module_names(raw_names: &[&str]) -> Vec<ModuleName> {
@@ -455,7 +457,7 @@ mod tests {
             db,
             custom_typeshed,
             ..
-        } = create_resolver_builder().unwrap().build();
+        } = setup_resolver_test();
 
         let existing_modules = create_module_names(&["asyncio", "functools", "xml.etree"]);
         for module_name in existing_modules {
@@ -534,7 +536,7 @@ mod tests {
 
     #[test]
     fn first_party_precedence_over_stdlib() -> anyhow::Result<()> {
-        let TestCase { db, src, .. } = create_resolver_builder()?.build();
+        let TestCase { db, src, .. } = setup_resolver_test();
 
         let first_party_functools_path = src.join("functools.py");
         db.memory_file_system()
@@ -564,7 +566,7 @@ mod tests {
 
     #[test]
     fn resolve_package() -> anyhow::Result<()> {
-        let TestCase { src, db, .. } = create_resolver_builder()?.build();
+        let TestCase { src, db, .. } = setup_resolver_test();
 
         let foo_dir = src.join("foo");
         let foo_path = foo_dir.join("__init__.py");
@@ -591,7 +593,7 @@ mod tests {
 
     #[test]
     fn package_priority_over_module() -> anyhow::Result<()> {
-        let TestCase { db, src, .. } = create_resolver_builder()?.build();
+        let TestCase { db, src, .. } = setup_resolver_test();
 
         let foo_dir = src.join("foo");
         let foo_init = foo_dir.join("__init__.py");
@@ -620,7 +622,7 @@ mod tests {
 
     #[test]
     fn typing_stub_over_module() -> anyhow::Result<()> {
-        let TestCase { db, src, .. } = create_resolver_builder()?.build();
+        let TestCase { db, src, .. } = setup_resolver_test();
 
         let foo_stub = src.join("foo.pyi");
         let foo_py = src.join("foo.py");
@@ -643,7 +645,7 @@ mod tests {
 
     #[test]
     fn sub_packages() -> anyhow::Result<()> {
-        let TestCase { db, src, .. } = create_resolver_builder()?.build();
+        let TestCase { db, src, .. } = setup_resolver_test();
 
         let foo = src.join("foo");
         let bar = foo.join("bar");
@@ -676,7 +678,7 @@ mod tests {
             src,
             site_packages,
             ..
-        } = create_resolver_builder()?.build();
+        } = setup_resolver_test();
 
         // From [PEP420](https://peps.python.org/pep-0420/#nested-namespace-packages).
         // But uses `src` for `project1` and `site_packages2` for `project2`.
@@ -729,7 +731,7 @@ mod tests {
             src,
             site_packages,
             ..
-        } = create_resolver_builder()?.build();
+        } = setup_resolver_test();
 
         // Adopted test case from the [PEP420 examples](https://peps.python.org/pep-0420/#nested-namespace-packages).
         // The `src/parent/child` package is a regular package. Therefore, `site_packages/parent/child/two.py` should not be resolved.
@@ -780,7 +782,7 @@ mod tests {
             src,
             site_packages,
             ..
-        } = create_resolver_builder()?.build();
+        } = setup_resolver_test();
 
         let foo_src = src.join("foo.py");
         let foo_site_packages = site_packages.join("foo.py");
@@ -813,7 +815,7 @@ mod tests {
             src,
             site_packages,
             custom_typeshed,
-        } = create_resolver_builder()?.build();
+        } = setup_resolver_test();
 
         db.with_os_file_system();
 
@@ -878,7 +880,7 @@ mod tests {
 
     #[test]
     fn deleting_an_unrelated_file_doesnt_change_module_resolution() -> anyhow::Result<()> {
-        let TestCase { mut db, src, .. } = create_resolver_builder()?.build();
+        let TestCase { mut db, src, .. } = setup_resolver_test();
 
         let foo_path = src.join("foo.py");
         let bar_path = src.join("bar.py");
@@ -915,7 +917,7 @@ mod tests {
     #[test]
     fn adding_a_file_on_which_the_module_resolution_depends_on_invalidates_the_query(
     ) -> anyhow::Result<()> {
-        let TestCase { mut db, src, .. } = create_resolver_builder()?.build();
+        let TestCase { mut db, src, .. } = setup_resolver_test();
         let foo_path = src.join("foo.py");
 
         let foo_module_name = ModuleName::new_static("foo").unwrap();
@@ -935,7 +937,7 @@ mod tests {
     #[test]
     fn removing_a_file_that_the_module_resolution_depends_on_invalidates_the_query(
     ) -> anyhow::Result<()> {
-        let TestCase { mut db, src, .. } = create_resolver_builder()?.build();
+        let TestCase { mut db, src, .. } = setup_resolver_test();
         let foo_path = src.join("foo.py");
         let foo_init_path = src.join("foo/__init__.py");
 
