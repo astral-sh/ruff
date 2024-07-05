@@ -13,7 +13,7 @@ use red_knot::program::{FileWatcherChange, Program};
 use red_knot::watch::FileWatcher;
 use red_knot::Workspace;
 use red_knot_module_resolver::{
-    set_module_resolution_settings, ModuleResolutionSettings, TargetVersion,
+    set_module_resolution_settings, RawModuleResolutionSettings, TargetVersion,
 };
 use ruff_db::file_system::{FileSystem, FileSystemPath, OsFileSystem};
 use ruff_db::vfs::system_path_to_file;
@@ -59,7 +59,7 @@ pub fn main() -> anyhow::Result<()> {
 
     set_module_resolution_settings(
         &mut program,
-        ModuleResolutionSettings {
+        RawModuleResolutionSettings {
             extra_paths: vec![],
             workspace_root: workspace_search_path,
             site_packages: None,

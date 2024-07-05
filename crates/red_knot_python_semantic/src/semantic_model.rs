@@ -178,7 +178,7 @@ impl HasTy for ast::Alias {
 #[cfg(test)]
 mod tests {
     use red_knot_module_resolver::{
-        set_module_resolution_settings, ModuleResolutionSettings, TargetVersion,
+        set_module_resolution_settings, RawModuleResolutionSettings, TargetVersion,
     };
     use ruff_db::file_system::FileSystemPathBuf;
     use ruff_db::parsed::parsed_module;
@@ -192,7 +192,7 @@ mod tests {
         let mut db = TestDb::new();
         set_module_resolution_settings(
             &mut db,
-            ModuleResolutionSettings {
+            RawModuleResolutionSettings {
                 extra_paths: vec![],
                 workspace_root: FileSystemPathBuf::from("/src"),
                 site_packages: None,

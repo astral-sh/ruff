@@ -3,7 +3,7 @@
 use red_knot::program::Program;
 use red_knot::Workspace;
 use red_knot_module_resolver::{
-    set_module_resolution_settings, ModuleResolutionSettings, TargetVersion,
+    set_module_resolution_settings, RawModuleResolutionSettings, TargetVersion,
 };
 use ruff_benchmark::criterion::{
     criterion_group, criterion_main, BatchSize, Criterion, Throughput,
@@ -72,7 +72,7 @@ fn setup_case() -> Case {
 
     set_module_resolution_settings(
         &mut program,
-        ModuleResolutionSettings {
+        RawModuleResolutionSettings {
             extra_paths: vec![],
             workspace_root: workspace_root.to_path_buf(),
             site_packages: None,

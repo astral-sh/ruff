@@ -27,7 +27,7 @@ pub(crate) mod tests {
     use ruff_db::file_system::{FileSystem, FileSystemPathBuf, MemoryFileSystem, OsFileSystem};
     use ruff_db::vfs::Vfs;
 
-    use crate::resolver::{set_module_resolution_settings, ModuleResolutionSettings};
+    use crate::resolver::{set_module_resolution_settings, RawModuleResolutionSettings};
     use crate::supported_py_version::TargetVersion;
 
     use super::*;
@@ -179,7 +179,7 @@ pub(crate) mod tests {
                 target_version,
             } = self;
 
-            let settings = ModuleResolutionSettings {
+            let settings = RawModuleResolutionSettings {
                 target_version: target_version.unwrap_or_default(),
                 extra_paths: vec![],
                 workspace_root: src.clone(),

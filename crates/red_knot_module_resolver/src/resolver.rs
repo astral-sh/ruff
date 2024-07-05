@@ -15,11 +15,11 @@ use crate::typeshed::LazyTypeshedVersions;
 /// Configures the module resolver settings.
 ///
 /// Must be called before calling any other module resolution functions.
-pub fn set_module_resolution_settings(db: &mut dyn Db, config: ModuleResolutionSettings) {
+pub fn set_module_resolution_settings(db: &mut dyn Db, config: RawModuleResolutionSettings) {
     // There's no concurrency issue here because we hold a `&mut dyn Db` reference. No other
     // thread can mutate the `Db` while we're in this call, so using `try_get` to test if
     // the settings have already been set is safe.
-    let resolved_settings = config.into_resolved_settings();
+    let resolved_settings = config.into_configuration_settings();
     if let Some(existing) = ModuleResolverSettings::try_get(db) {
         existing.set_settings(db).to(resolved_settings);
     } else {
@@ -111,9 +111,9 @@ pub(crate) fn file_to_module(db: &dyn Db, file: VfsFile) -> Option<Module> {
     }
 }
 
-/// Configures the search paths that are used to resolve modules.
+/// "Raw" configuration settings for module resolution: unvalidated, unnormalized
 #[derive(Eq, PartialEq, Debug)]
-pub struct ModuleResolutionSettings {
+pub struct RawModuleResolutionSettings {
     /// The target Python version the user has specified
     pub target_version: TargetVersion,
 
@@ -134,7 +134,7 @@ pub struct ModuleResolutionSettings {
     pub site_packages: Option<FileSystemPathBuf>,
 }
 
-impl ModuleResolutionSettings {
+impl RawModuleResolutionSettings {
     /// Implementation of PEP 561's module resolution order
     /// (with some small, deliberate, differences)
     ///
@@ -144,8 +144,8 @@ impl ModuleResolutionSettings {
     /// Rather than panicking if a path fails to validate, we should display an error message to the user
     /// and exit the process with a nonzero exit code.
     /// This validation should probably be done outside of Salsa?
-    fn into_resolved_settings(self) -> ResolvedModuleResolutionSettings {
-        let ModuleResolutionSettings {
+    fn into_configuration_settings(self) -> ModuleResolutionSettings {
+        let RawModuleResolutionSettings {
             target_version,
             extra_paths,
             workspace_root,
@@ -171,7 +171,7 @@ impl ModuleResolutionSettings {
             paths.push(ModuleResolutionPathBuf::site_packages(site_packages).unwrap());
         }
 
-        ResolvedModuleResolutionSettings {
+        ModuleResolutionSettings {
             target_version,
             search_paths: OrderedSearchPaths(paths.into_iter().map(Arc::new).collect()),
         }
@@ -192,12 +192,12 @@ impl Deref for OrderedSearchPaths {
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub(crate) struct ResolvedModuleResolutionSettings {
+pub(crate) struct ModuleResolutionSettings {
     search_paths: OrderedSearchPaths,
     target_version: TargetVersion,
 }
 
-impl ResolvedModuleResolutionSettings {
+impl ModuleResolutionSettings {
     pub(crate) fn search_paths(&self) -> &[Arc<ModuleResolutionPathBuf>] {
         &self.search_paths
     }
@@ -214,12 +214,12 @@ impl ResolvedModuleResolutionSettings {
 #[allow(unreachable_pub, clippy::used_underscore_binding)]
 pub(crate) mod internal {
     use crate::module_name::ModuleName;
-    use crate::resolver::ResolvedModuleResolutionSettings;
+    use crate::resolver::ModuleResolutionSettings;
 
     #[salsa::input(singleton)]
     pub(crate) struct ModuleResolverSettings {
         #[return_ref]
-        pub(super) settings: ResolvedModuleResolutionSettings,
+        pub(super) settings: ModuleResolutionSettings,
     }
 
     /// A thin wrapper around `ModuleName` to make it a Salsa ingredient.
@@ -232,7 +232,7 @@ pub(crate) mod internal {
     }
 }
 
-fn module_resolver_settings(db: &dyn Db) -> &ResolvedModuleResolutionSettings {
+fn module_resolver_settings(db: &dyn Db) -> &ModuleResolutionSettings {
     ModuleResolverSettings::get(db).settings(db)
 }
 
@@ -884,7 +884,7 @@ mod tests {
         std::fs::write(foo.as_std_path(), "")?;
         std::os::unix::fs::symlink(foo.as_std_path(), bar.as_std_path())?;
 
-        let settings = ModuleResolutionSettings {
+        let settings = RawModuleResolutionSettings {
             target_version: TargetVersion::Py38,
             extra_paths: vec![],
             workspace_root: src.clone(),
