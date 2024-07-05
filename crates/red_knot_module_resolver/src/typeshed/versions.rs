@@ -3,15 +3,56 @@ use std::fmt;
 use std::num::{NonZeroU16, NonZeroUsize};
 use std::ops::{RangeFrom, RangeInclusive};
 use std::str::FromStr;
+use std::sync::Arc;
 
-use ruff_db::{source::source_text, vfs::VfsFile};
+use once_cell::sync::OnceCell;
+
+use ruff_db::file_system::FileSystemPath;
+use ruff_db::source::source_text;
+use ruff_db::vfs::{system_path_to_file, VfsFile};
 use rustc_hash::FxHashMap;
 
 use crate::db::Db;
 use crate::module_name::ModuleName;
-use crate::supported_py_version::SupportedPyVersion;
+use crate::supported_py_version::{get_target_py_version, SupportedPyVersion};
 
-#[salsa::tracked(return_ref)]
+pub(crate) struct LazyTypeshedVersions(OnceCell<TypeshedVersions>);
+
+impl LazyTypeshedVersions {
+    pub(crate) fn new() -> Self {
+        Self(OnceCell::new())
+    }
+
+    #[must_use]
+    pub(crate) fn query_module(
+        &self,
+        module: &ModuleName,
+        db: &dyn Db,
+        stdlib_root: &FileSystemPath,
+    ) -> TypeshedVersionsQueryResult {
+        let versions = self.0.get_or_init(|| {
+            let versions_path = stdlib_root.join("VERSIONS");
+            let Some(versions_file) = system_path_to_file(db.upcast(), &versions_path) else {
+                todo!(
+                    "Still need to figure out how to handle VERSIONS files being deleted \
+                    from custom typeshed directories! Expected a file to exist at {versions_path:?}"
+                )
+            };
+            // TODO(Alex/Micha): If VERSIONS is invalid,
+            // this should invalidate not just the specific module resolution we're currently attempting,
+            // but all type inference that depends on any standard-library types.
+            // Unwrapping here is not correct...
+            parse_typeshed_versions(db, versions_file)
+                .as_ref()
+                .unwrap()
+                .clone()
+        });
+        let target_version = PyVersion::from(get_target_py_version(db));
+        versions.query_module(module, target_version)
+    }
+}
+
+#[salsa::tracked]
 pub(crate) fn parse_typeshed_versions(
     db: &dyn Db,
     versions_file: VfsFile,
@@ -20,7 +61,7 @@ pub(crate) fn parse_typeshed_versions(
     file_content.parse()
 }
 
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq, Clone)]
 pub struct TypeshedVersionsParseError {
     line_number: Option<NonZeroU16>,
     reason: TypeshedVersionsParseErrorKind,
@@ -53,7 +94,7 @@ impl std::error::Error for TypeshedVersionsParseError {
     }
 }
 
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq, Clone)]
 pub enum TypeshedVersionsParseErrorKind {
     TooManyLines(NonZeroUsize),
     UnexpectedNumberOfColons,
@@ -98,8 +139,8 @@ impl fmt::Display for TypeshedVersionsParseErrorKind {
     }
 }
 
-#[derive(Debug, PartialEq, Eq)]
-pub(crate) struct TypeshedVersions(FxHashMap<ModuleName, PyVersionRange>);
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct TypeshedVersions(Arc<FxHashMap<ModuleName, PyVersionRange>>);
 
 impl TypeshedVersions {
     #[must_use]
@@ -120,16 +161,14 @@ impl TypeshedVersions {
         self.0.len()
     }
 
-    // The only public API for this struct:
     #[must_use]
-    pub(crate) fn query_module(
+    fn query_module(
         &self,
         module: &ModuleName,
-        version: impl Into<PyVersion>,
+        target_version: PyVersion,
     ) -> TypeshedVersionsQueryResult {
-        let version = version.into();
         if let Some(range) = self.exact(module) {
-            if range.contains(version) {
+            if range.contains(target_version) {
                 TypeshedVersionsQueryResult::Exists
             } else {
                 TypeshedVersionsQueryResult::DoesNotExist
@@ -139,7 +178,7 @@ impl TypeshedVersions {
             while let Some(module_to_try) = module {
                 if let Some(range) = self.exact(&module_to_try) {
                     return {
-                        if range.contains(version) {
+                        if range.contains(target_version) {
                             TypeshedVersionsQueryResult::MaybeExists
                         } else {
                             TypeshedVersionsQueryResult::DoesNotExist
@@ -219,7 +258,7 @@ impl FromStr for TypeshedVersions {
                 reason: TypeshedVersionsParseErrorKind::EmptyVersionsFile,
             })
         } else {
-            Ok(Self(map))
+            Ok(Self(Arc::new(map)))
         }
     }
 }
@@ -378,27 +417,27 @@ mod tests {
 
         assert!(versions.contains_exact(&asyncio));
         assert_eq!(
-            versions.query_module(&asyncio, SupportedPyVersion::Py310),
+            versions.query_module(&asyncio, SupportedPyVersion::Py310.into()),
             TypeshedVersionsQueryResult::Exists
         );
 
         assert!(versions.contains_exact(&asyncio_staggered));
         assert_eq!(
-            versions.query_module(&asyncio_staggered, SupportedPyVersion::Py38),
+            versions.query_module(&asyncio_staggered, SupportedPyVersion::Py38.into()),
             TypeshedVersionsQueryResult::Exists
         );
         assert_eq!(
-            versions.query_module(&asyncio_staggered, SupportedPyVersion::Py37),
+            versions.query_module(&asyncio_staggered, SupportedPyVersion::Py37.into()),
             TypeshedVersionsQueryResult::DoesNotExist
         );
 
         assert!(versions.contains_exact(&audioop));
         assert_eq!(
-            versions.query_module(&audioop, SupportedPyVersion::Py312),
+            versions.query_module(&audioop, SupportedPyVersion::Py312.into()),
             TypeshedVersionsQueryResult::Exists
         );
         assert_eq!(
-            versions.query_module(&audioop, SupportedPyVersion::Py313),
+            versions.query_module(&audioop, SupportedPyVersion::Py313.into()),
             TypeshedVersionsQueryResult::DoesNotExist
         );
     }
@@ -490,67 +529,67 @@ foo: 3.8-   # trailing comment
 
         assert!(parsed_versions.contains_exact(&foo));
         assert_eq!(
-            parsed_versions.query_module(&foo, SupportedPyVersion::Py37),
+            parsed_versions.query_module(&foo, SupportedPyVersion::Py37.into()),
             TypeshedVersionsQueryResult::DoesNotExist
         );
         assert_eq!(
-            parsed_versions.query_module(&foo, SupportedPyVersion::Py38),
+            parsed_versions.query_module(&foo, SupportedPyVersion::Py38.into()),
             TypeshedVersionsQueryResult::Exists
         );
         assert_eq!(
-            parsed_versions.query_module(&foo, SupportedPyVersion::Py311),
+            parsed_versions.query_module(&foo, SupportedPyVersion::Py311.into()),
             TypeshedVersionsQueryResult::Exists
         );
 
         assert!(parsed_versions.contains_exact(&bar));
         assert_eq!(
-            parsed_versions.query_module(&bar, SupportedPyVersion::Py37),
+            parsed_versions.query_module(&bar, SupportedPyVersion::Py37.into()),
             TypeshedVersionsQueryResult::Exists
         );
         assert_eq!(
-            parsed_versions.query_module(&bar, SupportedPyVersion::Py310),
+            parsed_versions.query_module(&bar, SupportedPyVersion::Py310.into()),
             TypeshedVersionsQueryResult::Exists
         );
         assert_eq!(
-            parsed_versions.query_module(&bar, SupportedPyVersion::Py311),
+            parsed_versions.query_module(&bar, SupportedPyVersion::Py311.into()),
             TypeshedVersionsQueryResult::DoesNotExist
         );
 
         assert!(parsed_versions.contains_exact(&bar_baz));
         assert_eq!(
-            parsed_versions.query_module(&bar_baz, SupportedPyVersion::Py37),
+            parsed_versions.query_module(&bar_baz, SupportedPyVersion::Py37.into()),
             TypeshedVersionsQueryResult::Exists
         );
         assert_eq!(
-            parsed_versions.query_module(&bar_baz, SupportedPyVersion::Py39),
+            parsed_versions.query_module(&bar_baz, SupportedPyVersion::Py39.into()),
             TypeshedVersionsQueryResult::Exists
         );
         assert_eq!(
-            parsed_versions.query_module(&bar_baz, SupportedPyVersion::Py310),
+            parsed_versions.query_module(&bar_baz, SupportedPyVersion::Py310.into()),
             TypeshedVersionsQueryResult::DoesNotExist
         );
 
         assert!(!parsed_versions.contains_exact(&spam));
         assert_eq!(
-            parsed_versions.query_module(&spam, SupportedPyVersion::Py37),
+            parsed_versions.query_module(&spam, SupportedPyVersion::Py37.into()),
             TypeshedVersionsQueryResult::DoesNotExist
         );
         assert_eq!(
-            parsed_versions.query_module(&spam, SupportedPyVersion::Py313),
+            parsed_versions.query_module(&spam, SupportedPyVersion::Py313.into()),
             TypeshedVersionsQueryResult::DoesNotExist
         );
 
         assert!(!parsed_versions.contains_exact(&bar_eggs));
         assert_eq!(
-            parsed_versions.query_module(&bar_eggs, SupportedPyVersion::Py37),
+            parsed_versions.query_module(&bar_eggs, SupportedPyVersion::Py37.into()),
             TypeshedVersionsQueryResult::MaybeExists
         );
         assert_eq!(
-            parsed_versions.query_module(&bar_eggs, SupportedPyVersion::Py310),
+            parsed_versions.query_module(&bar_eggs, SupportedPyVersion::Py310.into()),
             TypeshedVersionsQueryResult::MaybeExists
         );
         assert_eq!(
-            parsed_versions.query_module(&bar_eggs, SupportedPyVersion::Py311),
+            parsed_versions.query_module(&bar_eggs, SupportedPyVersion::Py311.into()),
             TypeshedVersionsQueryResult::DoesNotExist
         );
     }

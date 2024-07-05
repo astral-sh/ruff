@@ -10,6 +10,7 @@ use crate::module_name::ModuleName;
 use crate::path::ModuleResolutionPathBuf;
 use crate::resolver::internal::ModuleResolverSearchPaths;
 use crate::supported_py_version::{set_target_py_version, SupportedPyVersion};
+use crate::typeshed::LazyTypeshedVersions;
 
 /// Configures the module resolver settings.
 ///
@@ -226,19 +227,20 @@ fn resolve_name(
     name: &ModuleName,
 ) -> Option<(Arc<ModuleResolutionPathBuf>, VfsFile, ModuleKind)> {
     let search_paths = module_search_paths(db);
+    let typeshed_versions = LazyTypeshedVersions::new();
 
     for search_path in search_paths {
         let mut components = name.components();
         let module_name = components.next_back()?;
 
-        match resolve_package(db, search_path, components) {
+        match resolve_package(db, search_path, components, &typeshed_versions) {
             Ok(resolved_package) => {
                 let mut package_path = resolved_package.path;
 
                 package_path.push(module_name);
 
                 // Must be a `__init__.pyi` or `__init__.py` or it isn't a package.
-                let kind = if package_path.is_directory(db, search_path) {
+                let kind = if package_path.is_directory(db, search_path, &typeshed_versions) {
                     package_path.push("__init__");
                     ModuleKind::Package
                 } else {
@@ -246,16 +248,17 @@ fn resolve_name(
                 };
 
                 // TODO Implement full https://peps.python.org/pep-0561/#type-checker-module-resolution-order resolution
-                if let Some(stub) = package_path
-                    .with_pyi_extension()
-                    .to_vfs_file(db, search_path)
-                {
+                if let Some(stub) = package_path.with_pyi_extension().to_vfs_file(
+                    db,
+                    search_path,
+                    &typeshed_versions,
+                ) {
                     return Some((search_path.clone(), stub, kind));
                 }
 
                 if let Some(module) = package_path
                     .with_py_extension()
-                    .and_then(|path| path.to_vfs_file(db, search_path))
+                    .and_then(|path| path.to_vfs_file(db, search_path, &typeshed_versions))
                 {
                     return Some((search_path.clone(), module, kind));
                 }
@@ -282,6 +285,7 @@ fn resolve_package<'a, I>(
     db: &dyn Db,
     module_search_path: &ModuleResolutionPathBuf,
     components: I,
+    typeshed_versions: &LazyTypeshedVersions,
 ) -> Result<ResolvedPackage, PackageKind>
 where
     I: Iterator<Item = &'a str>,
@@ -300,11 +304,12 @@ where
     for folder in components {
         package_path.push(folder);
 
-        let is_regular_package = package_path.is_regular_package(db, module_search_path);
+        let is_regular_package =
+            package_path.is_regular_package(db, module_search_path, typeshed_versions);
 
         if is_regular_package {
             in_namespace_package = false;
-        } else if package_path.is_directory(db, module_search_path) {
+        } else if package_path.is_directory(db, module_search_path, typeshed_versions) {
             // A directory without an `__init__.py` is a namespace package, continue with the next folder.
             in_namespace_package = true;
         } else if in_namespace_package {
