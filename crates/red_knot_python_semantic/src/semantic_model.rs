@@ -41,11 +41,11 @@ pub trait HasTy {
     ///
     /// ## Panics
     /// May panic if `self` is from another file than `model`.
-    fn ty(&self, model: &SemanticModel<'_>) -> Type;
+    fn ty<'db>(&self, model: &SemanticModel<'db>) -> Type<'db>;
 }
 
 impl HasTy for ast::ExpressionRef<'_> {
-    fn ty(&self, model: &SemanticModel<'_>) -> Type {
+    fn ty<'db>(&self, model: &SemanticModel<'db>) -> Type<'db> {
         let index = semantic_index(model.db, model.file);
         let file_scope = index.expression_scope_id(*self);
         let scope = file_scope.to_scope_id(model.db, model.file);
@@ -59,7 +59,7 @@ macro_rules! impl_expression_has_ty {
     ($ty: ty) => {
         impl HasTy for $ty {
             #[inline]
-            fn ty(&self, model: &SemanticModel<'_>) -> Type {
+            fn ty<'db>(&self, model: &SemanticModel<'db>) -> Type<'db> {
                 let expression_ref = ExpressionRef::from(self);
                 expression_ref.ty(model)
             }
@@ -101,7 +101,7 @@ impl_expression_has_ty!(ast::ExprSlice);
 impl_expression_has_ty!(ast::ExprIpyEscapeCommand);
 
 impl HasTy for ast::Expr {
-    fn ty(&self, model: &SemanticModel<'_>) -> Type {
+    fn ty<'db>(&self, model: &SemanticModel<'db>) -> Type<'db> {
         match self {
             Expr::BoolOp(inner) => inner.ty(model),
             Expr::Named(inner) => inner.ty(model),
@@ -140,7 +140,7 @@ impl HasTy for ast::Expr {
 }
 
 impl HasTy for ast::StmtFunctionDef {
-    fn ty(&self, model: &SemanticModel<'_>) -> Type {
+    fn ty<'db>(&self, model: &SemanticModel<'db>) -> Type<'db> {
         let index = semantic_index(model.db, model.file);
         let definition = index.definition(self);
 
@@ -152,7 +152,7 @@ impl HasTy for ast::StmtFunctionDef {
 }
 
 impl HasTy for StmtClassDef {
-    fn ty(&self, model: &SemanticModel<'_>) -> Type {
+    fn ty<'db>(&self, model: &SemanticModel<'db>) -> Type<'db> {
         let index = semantic_index(model.db, model.file);
         let definition = index.definition(self);
 
@@ -164,7 +164,7 @@ impl HasTy for StmtClassDef {
 }
 
 impl HasTy for ast::Alias {
-    fn ty(&self, model: &SemanticModel<'_>) -> Type {
+    fn ty<'db>(&self, model: &SemanticModel<'db>) -> Type<'db> {
         let index = semantic_index(model.db, model.file);
         let definition = index.definition(self);
 

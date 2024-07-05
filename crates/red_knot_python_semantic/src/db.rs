@@ -7,20 +7,26 @@ use red_knot_module_resolver::Db as ResolverDb;
 use crate::semantic_index::definition::Definition;
 use crate::semantic_index::symbol::{public_symbols_map, PublicSymbolId, ScopeId};
 use crate::semantic_index::{root_scope, semantic_index, symbol_table};
-use crate::types::{infer_types, public_symbol_ty, type_store_query};
+use crate::types::{
+    infer_types, public_symbol_ty, ClassType, FunctionType, IntersectionType, ModuleType, UnionType,
+};
 
 #[salsa::jar(db=Db)]
 pub struct Jar(
     ScopeId<'_>,
     PublicSymbolId<'_>,
     Definition<'_>,
+    FunctionType<'_>,
+    ClassType<'_>,
+    ModuleType<'_>,
+    UnionType<'_>,
+    IntersectionType<'_>,
     symbol_table,
     root_scope,
     semantic_index,
     infer_types,
     public_symbol_ty,
     public_symbols_map,
-    type_store_query,
 );
 
 /// Database giving access to semantic information about a Python program.
