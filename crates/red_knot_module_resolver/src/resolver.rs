@@ -452,7 +452,7 @@ mod tests {
     }
 
     #[test]
-    fn stdlib_resolution_respects_versions_file_py38() {
+    fn stdlib_resolution_respects_versions_file_py38_existing_modules() {
         let TestCase {
             db,
             custom_typeshed,
@@ -475,7 +475,11 @@ mod tests {
                 "Expected a stdlib search path, but got {search_path:?}"
             );
         }
+    }
 
+    #[test]
+    fn stdlib_resolution_respects_versions_file_py38_nonexisting_modules() {
+        let TestCase { db, .. } = setup_resolver_test();
         let nonexisting_modules = create_module_names(&[
             "collections",
             "importlib",
@@ -492,7 +496,7 @@ mod tests {
     }
 
     #[test]
-    fn stdlib_resolution_respects_versions_file_py39() {
+    fn stdlib_resolution_respects_versions_file_py39_existing_modules() {
         let TestCase {
             db,
             custom_typeshed,
@@ -524,6 +528,13 @@ mod tests {
                 "Expected a stdlib search path, but got {search_path:?}"
             );
         }
+    }
+    #[test]
+    fn stdlib_resolution_respects_versions_file_py39_nonexisting_modules() {
+        let TestCase { db, .. } = create_resolver_builder()
+            .unwrap()
+            .with_target_version(SupportedPyVersion::Py39)
+            .build();
 
         let nonexisting_modules = create_module_names(&["importlib", "xml", "xml.etree"]);
         for module_name in nonexisting_modules {
