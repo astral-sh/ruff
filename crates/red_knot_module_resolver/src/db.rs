@@ -26,9 +26,7 @@ pub(crate) mod tests {
 
     use salsa::DebugWithDb;
 
-    use ruff_db::file_system::{
-        FileSystem, FileSystemPath, FileSystemPathBuf, MemoryFileSystem, OsFileSystem,
-    };
+    use ruff_db::file_system::{FileSystem, FileSystemPathBuf, MemoryFileSystem, OsFileSystem};
     use ruff_db::vfs::Vfs;
 
     use crate::resolver::{set_module_resolution_settings, ModuleResolutionSettings};
@@ -221,15 +219,15 @@ pub(crate) mod tests {
 
         let db = TestDb::new();
 
-        let src = FileSystemPath::new("src").to_path_buf();
-        let site_packages = FileSystemPath::new("site_packages").to_path_buf();
-        let custom_typeshed = FileSystemPath::new("typeshed").to_path_buf();
+        let src = FileSystemPathBuf::from("src");
+        let site_packages = FileSystemPathBuf::from("site_packages");
+        let custom_typeshed = FileSystemPathBuf::from("typeshed");
 
         let fs = db.memory_file_system();
 
-        fs.create_directory_all(&*src)?;
-        fs.create_directory_all(&*site_packages)?;
-        fs.create_directory_all(&*custom_typeshed)?;
+        fs.create_directory_all(&src)?;
+        fs.create_directory_all(&site_packages)?;
+        fs.create_directory_all(&custom_typeshed)?;
         fs.write_file(custom_typeshed.join("stdlib/VERSIONS"), VERSIONS_DATA)?;
 
         // Regular package on py38+

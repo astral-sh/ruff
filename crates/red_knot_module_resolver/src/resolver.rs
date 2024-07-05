@@ -386,7 +386,7 @@ mod tests {
         let foo_module_name = ModuleName::new_static("foo").unwrap();
         let foo_path = src.join("foo.py");
         db.memory_file_system()
-            .write_file(&*foo_path, "print('Hello, world!')")?;
+            .write_file(&foo_path, "print('Hello, world!')")?;
 
         let foo_module = resolve_module(&db, foo_module_name.clone()).unwrap();
 
@@ -396,10 +396,10 @@ mod tests {
         );
 
         assert_eq!("foo", foo_module.name());
-        assert_eq!(*src, foo_module.search_path());
+        assert_eq!(&src, &foo_module.search_path());
         assert_eq!(ModuleKind::Module, foo_module.kind());
 
-        assert_eq!(*foo_path, *foo_module.file().path(&db));
+        assert_eq!(&foo_path, foo_module.file().path(&db));
         assert_eq!(
             Some(foo_module),
             path_to_module(&db, &VfsPath::FileSystem(foo_path))
@@ -464,8 +464,8 @@ mod tests {
             });
             let search_path = resolved_module.search_path();
             assert_eq!(
-                *custom_typeshed.join("stdlib"),
-                search_path,
+                &custom_typeshed.join("stdlib"),
+                &search_path,
                 "Search path for {module_name} was unexpectedly {search_path:?}"
             );
             assert!(
@@ -513,8 +513,8 @@ mod tests {
             });
             let search_path = resolved_module.search_path();
             assert_eq!(
-                *custom_typeshed.join("stdlib"),
-                search_path,
+                &custom_typeshed.join("stdlib"),
+                &search_path,
                 "Search path for {module_name} was unexpectedly {search_path:?}"
             );
             assert!(
@@ -547,11 +547,11 @@ mod tests {
             Some(&functools_module),
             resolve_module(&db, functools_module_name).as_ref()
         );
-        assert_eq!(*src, functools_module.search_path());
+        assert_eq!(&src, &functools_module.search_path());
         assert_eq!(ModuleKind::Module, functools_module.kind());
         assert_eq!(
-            *first_party_functools_path,
-            *functools_module.file().path(&db)
+            &first_party_functools_path,
+            functools_module.file().path(&db)
         );
 
         assert_eq!(
@@ -570,13 +570,13 @@ mod tests {
         let foo_path = foo_dir.join("__init__.py");
 
         db.memory_file_system()
-            .write_file(&*foo_path, "print('Hello, world!')")?;
+            .write_file(&foo_path, "print('Hello, world!')")?;
 
         let foo_module = resolve_module(&db, ModuleName::new_static("foo").unwrap()).unwrap();
 
         assert_eq!("foo", foo_module.name());
-        assert_eq!(*src, foo_module.search_path());
-        assert_eq!(*foo_path, *foo_module.file().path(&db));
+        assert_eq!(&src, &foo_module.search_path());
+        assert_eq!(&foo_path, foo_module.file().path(&db));
 
         assert_eq!(
             Some(&foo_module),
@@ -597,16 +597,16 @@ mod tests {
         let foo_init = foo_dir.join("__init__.py");
 
         db.memory_file_system()
-            .write_file(&*foo_init, "print('Hello, world!')")?;
+            .write_file(&foo_init, "print('Hello, world!')")?;
 
         let foo_py = src.join("foo.py");
         db.memory_file_system()
-            .write_file(&*foo_py, "print('Hello, world!')")?;
+            .write_file(&foo_py, "print('Hello, world!')")?;
 
         let foo_module = resolve_module(&db, ModuleName::new_static("foo").unwrap()).unwrap();
 
-        assert_eq!(*src, foo_module.search_path());
-        assert_eq!(*foo_init, *foo_module.file().path(&db));
+        assert_eq!(&src, &foo_module.search_path());
+        assert_eq!(&foo_init, foo_module.file().path(&db));
         assert_eq!(ModuleKind::Package, foo_module.kind());
 
         assert_eq!(
@@ -625,12 +625,12 @@ mod tests {
         let foo_stub = src.join("foo.pyi");
         let foo_py = src.join("foo.py");
         db.memory_file_system()
-            .write_files([(&*foo_stub, "x: int"), (&*foo_py, "print('Hello, world!')")])?;
+            .write_files([(&foo_stub, "x: int"), (&foo_py, "print('Hello, world!')")])?;
 
         let foo = resolve_module(&db, ModuleName::new_static("foo").unwrap()).unwrap();
 
-        assert_eq!(*src, foo.search_path());
-        assert_eq!(*foo_stub, *foo.file().path(&db));
+        assert_eq!(&src, &foo.search_path());
+        assert_eq!(&foo_stub, foo.file().path(&db));
 
         assert_eq!(
             Some(foo),
@@ -650,16 +650,16 @@ mod tests {
         let baz = bar.join("baz.py");
 
         db.memory_file_system().write_files([
-            (&*foo.join("__init__.py"), ""),
-            (&*bar.join("__init__.py"), ""),
-            (&*baz, "print('Hello, world!')"),
+            (&foo.join("__init__.py"), ""),
+            (&bar.join("__init__.py"), ""),
+            (&baz, "print('Hello, world!')"),
         ])?;
 
         let baz_module =
             resolve_module(&db, ModuleName::new_static("foo.bar.baz").unwrap()).unwrap();
 
-        assert_eq!(*src, baz_module.search_path());
-        assert_eq!(*baz, *baz_module.file().path(&db));
+        assert_eq!(&src, &baz_module.search_path());
+        assert_eq!(&baz, baz_module.file().path(&db));
 
         assert_eq!(
             Some(baz_module),
@@ -790,8 +790,8 @@ mod tests {
 
         let foo_module = resolve_module(&db, ModuleName::new_static("foo").unwrap()).unwrap();
 
-        assert_eq!(*src, foo_module.search_path());
-        assert_eq!(*foo_src, *foo_module.file().path(&db));
+        assert_eq!(&src, &foo_module.search_path());
+        assert_eq!(&foo_src, foo_module.file().path(&db));
 
         assert_eq!(
             Some(foo_module),
@@ -820,9 +820,9 @@ mod tests {
         let temp_dir = tempfile::tempdir()?;
         let root = FileSystemPath::from_std_path(temp_dir.path()).unwrap();
 
-        let src = root.join(&*src);
-        let site_packages = root.join(&*site_packages);
-        let custom_typeshed = root.join(&*custom_typeshed);
+        let src = root.join(src);
+        let site_packages = root.join(site_packages);
+        let custom_typeshed = root.join(custom_typeshed);
 
         let foo = src.join("foo.py");
         let bar = src.join("bar.py");
@@ -853,12 +853,12 @@ mod tests {
 
         assert_ne!(foo_module, bar_module);
 
-        assert_eq!(*src, foo_module.search_path());
+        assert_eq!(&src, &foo_module.search_path());
         assert_eq!(&foo, foo_module.file().path(&db));
 
         // `foo` and `bar` shouldn't resolve to the same file
 
-        assert_eq!(*src, bar_module.search_path());
+        assert_eq!(&src, &bar_module.search_path());
         assert_eq!(&bar, bar_module.file().path(&db));
         assert_eq!(&foo, foo_module.file().path(&db));
 
@@ -884,17 +884,17 @@ mod tests {
         let bar_path = src.join("bar.py");
 
         db.memory_file_system()
-            .write_files([(&*foo_path, "x = 1"), (&*bar_path, "y = 2")])?;
+            .write_files([(&foo_path, "x = 1"), (&bar_path, "y = 2")])?;
 
         let foo_module_name = ModuleName::new_static("foo").unwrap();
         let foo_module = resolve_module(&db, foo_module_name.clone()).unwrap();
 
-        let bar = system_path_to_file(&db, &*bar_path).expect("bar.py to exist");
+        let bar = system_path_to_file(&db, &bar_path).expect("bar.py to exist");
 
         db.clear_salsa_events();
 
         // Delete `bar.py`
-        db.memory_file_system().remove_file(&*bar_path)?;
+        db.memory_file_system().remove_file(&bar_path)?;
         bar.touch(&mut db);
 
         // Re-query the foo module. The foo module should still be cached because `bar.py` isn't relevant
@@ -922,9 +922,9 @@ mod tests {
         assert_eq!(resolve_module(&db, foo_module_name.clone()), None);
 
         // Now write the foo file
-        db.memory_file_system().write_file(&*foo_path, "x = 1")?;
+        db.memory_file_system().write_file(&foo_path, "x = 1")?;
         VfsFile::touch_path(&mut db, &VfsPath::FileSystem(foo_path.clone()));
-        let foo_file = system_path_to_file(&db, &*foo_path).expect("foo.py to exist");
+        let foo_file = system_path_to_file(&db, &foo_path).expect("foo.py to exist");
 
         let foo_module = resolve_module(&db, foo_module_name).expect("Foo module to resolve");
         assert_eq!(foo_file, foo_module.file());
@@ -940,21 +940,21 @@ mod tests {
         let foo_init_path = src.join("foo/__init__.py");
 
         db.memory_file_system()
-            .write_files([(&*foo_path, "x = 1"), (&*foo_init_path, "x = 2")])?;
+            .write_files([(&foo_path, "x = 1"), (&foo_init_path, "x = 2")])?;
 
         let foo_module_name = ModuleName::new_static("foo").unwrap();
         let foo_module = resolve_module(&db, foo_module_name.clone()).expect("foo module to exist");
 
-        assert_eq!(*foo_init_path, *foo_module.file().path(&db));
+        assert_eq!(&foo_init_path, foo_module.file().path(&db));
 
         // Delete `foo/__init__.py` and the `foo` folder. `foo` should now resolve to `foo.py`
-        db.memory_file_system().remove_file(&*foo_init_path)?;
+        db.memory_file_system().remove_file(&foo_init_path)?;
         db.memory_file_system()
             .remove_directory(foo_init_path.parent().unwrap())?;
         VfsFile::touch_path(&mut db, &VfsPath::FileSystem(foo_init_path));
 
         let foo_module = resolve_module(&db, foo_module_name).expect("Foo module to resolve");
-        assert_eq!(*foo_path, *foo_module.file().path(&db));
+        assert_eq!(&foo_path, foo_module.file().path(&db));
 
         Ok(())
     }

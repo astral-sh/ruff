@@ -490,6 +490,18 @@ impl PartialEq<ModuleResolutionPathRef<'_>> for FileSystemPath {
     }
 }
 
+impl PartialEq<FileSystemPathBuf> for ModuleResolutionPathRef<'_> {
+    fn eq(&self, other: &FileSystemPathBuf) -> bool {
+        self == &**other
+    }
+}
+
+impl PartialEq<ModuleResolutionPathRef<'_>> for FileSystemPathBuf {
+    fn eq(&self, other: &ModuleResolutionPathRef<'_>) -> bool {
+        &**self == other
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use insta::assert_debug_snapshot;
