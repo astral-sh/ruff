@@ -56,7 +56,7 @@ pub(crate) fn resolve_module_query<'db>(
 
 /// Resolves the module for the given path.
 ///
-/// Returns `None` if the path is not a module locatable via `sys.path`.
+/// Returns `None` if the path is not a module locatable via any of the known search paths.
 #[allow(unused)]
 pub(crate) fn path_to_module(db: &dyn Db, path: &VfsPath) -> Option<Module> {
     // It's not entirely clear on first sight why this method calls `file_to_module` instead of
@@ -73,7 +73,7 @@ pub(crate) fn path_to_module(db: &dyn Db, path: &VfsPath) -> Option<Module> {
 
 /// Resolves the module for the file with the given id.
 ///
-/// Returns `None` if the file is not a module locatable via any of the PEP-561 search paths
+/// Returns `None` if the file is not a module locatable via any of the known search paths.
 #[salsa::tracked]
 pub(crate) fn file_to_module(db: &dyn Db, file: VfsFile) -> Option<Module> {
     let _span = tracing::trace_span!("file_to_module", ?file).entered();
@@ -135,8 +135,7 @@ pub struct RawModuleResolutionSettings {
 }
 
 impl RawModuleResolutionSettings {
-    /// Implementation of PEP 561's module resolution order
-    /// (with some small, deliberate, differences)
+    /// Implementation of the typing spec's [module resolution order]
     ///
     /// TODO(Alex): this method does multiple `.unwrap()` calls when it should really return an error.
     /// Each `.unwrap()` call is a point where we're validating a setting that the user would pass
@@ -144,6 +143,8 @@ impl RawModuleResolutionSettings {
     /// Rather than panicking if a path fails to validate, we should display an error message to the user
     /// and exit the process with a nonzero exit code.
     /// This validation should probably be done outside of Salsa?
+    ///
+    /// [module resolution order]: https://typing.readthedocs.io/en/latest/spec/distributing.html#import-resolution-ordering
     fn into_configuration_settings(self) -> ModuleResolutionSettings {
         let RawModuleResolutionSettings {
             target_version,
@@ -178,8 +179,9 @@ impl RawModuleResolutionSettings {
     }
 }
 
-/// A resolved module resolution order, implementing PEP 561
-/// (with some small, deliberate differences)
+/// A resolved module resolution order as per the [typing spec]
+///
+/// [typing spec]: https://typing.readthedocs.io/en/latest/spec/distributing.html#import-resolution-ordering
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
 pub(crate) struct OrderedSearchPaths(Vec<Arc<ModuleResolutionPathBuf>>);
 
