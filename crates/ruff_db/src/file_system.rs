@@ -21,7 +21,7 @@ pub type Result<T> = std::io::Result<T>;
 /// * Accessing unsaved or even untitled files in the LSP use case
 /// * Testing with an in-memory file system
 /// * Running Ruff in a WASM environment without needing to stub out the full `std::fs` API.
-pub trait FileSystem {
+pub trait FileSystem: std::fmt::Debug {
     /// Reads the metadata of the file or directory at `path`.
     fn metadata(&self, path: &FileSystemPath) -> Result<Metadata>;
 
