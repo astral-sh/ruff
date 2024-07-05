@@ -1,3 +1,7 @@
+/// Internal abstractions for differentiating between different kinds of search paths.
+///
+/// TODO(Alex): Should we use different types for absolute vs relative paths?
+/// <https://github.com/astral-sh/ruff/pull/12141#discussion_r1667010245>
 use std::fmt;
 
 use ruff_db::file_system::{FileSystemPath, FileSystemPathBuf};
