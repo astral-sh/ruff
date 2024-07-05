@@ -25,30 +25,49 @@ enum ModuleResolutionPathBufInner {
 
 impl ModuleResolutionPathBufInner {
     fn push(&mut self, component: &str) {
-        if let Some(extension) = camino::Utf8Path::new(component).extension() {
-            match self {
-                Self::Extra(_) | Self::FirstParty(_) | Self::SitePackages(_) => assert!(
-                    matches!(extension, "pyi" | "py"),
-                    "Extension must be `py` or `pyi`; got `{extension}`"
-                ),
-                Self::StandardLibrary(_) => {
+        let extension = camino::Utf8Path::new(component).extension();
+        let inner = match self {
+            Self::Extra(ref mut path) => {
+                if let Some(extension) = extension {
                     assert!(
-                        matches!(component.matches('.').count(), 0 | 1),
-                        "Component can have at most one '.'; got {component}"
+                        matches!(extension, "pyi" | "py"),
+                        "Extension must be `py` or `pyi`; got `{extension}`"
                     );
+                }
+                path
+            }
+            Self::FirstParty(ref mut path) => {
+                if let Some(extension) = extension {
+                    assert!(
+                        matches!(extension, "pyi" | "py"),
+                        "Extension must be `py` or `pyi`; got `{extension}`"
+                    );
+                }
+                path
+            }
+            Self::StandardLibrary(ref mut path) => {
+                if let Some(extension) = extension {
                     assert_eq!(
                         extension, "pyi",
                         "Extension must be `pyi`; got `{extension}`"
                     );
                 }
-            };
-        }
-        let inner = match self {
-            Self::Extra(ref mut path) => path,
-            Self::FirstParty(ref mut path) => path,
-            Self::StandardLibrary(ref mut path) => path,
-            Self::SitePackages(ref mut path) => path,
+                path
+            }
+            Self::SitePackages(ref mut path) => {
+                if let Some(extension) = extension {
+                    assert!(
+                        matches!(extension, "pyi" | "py"),
+                        "Extension must be `py` or `pyi`; got `{extension}`"
+                    );
+                }
+                path
+            }
         };
+        assert!(
+            inner.extension().is_none(),
+            "Cannot push part {component} to {inner}, which already has an extension"
+        );
         inner.push(component);
     }
 }
@@ -86,9 +105,6 @@ impl ModuleResolutionPathBuf {
     #[must_use]
     pub(crate) fn standard_library(path: impl Into<FileSystemPathBuf>) -> Option<Self> {
         let path = path.into();
-        if path.file_stem().is_some_and(|stem| stem.contains('.')) {
-            return None;
-        }
         path.extension()
             .map_or(true, |ext| ext == "pyi")
             .then_some(Self(ModuleResolutionPathBufInner::StandardLibrary(path)))
@@ -563,10 +579,6 @@ mod tests {
             ModuleResolutionPathBuf::standard_library("foo/__init__.py"),
             None
         );
-        assert_eq!(
-            ModuleResolutionPathBuf::standard_library("foo.py.pyi"),
-            None
-        );
     }
 
     #[test]
@@ -748,11 +760,11 @@ mod tests {
     }
 
     #[test]
-    #[should_panic(expected = "Component can have at most one '.'")]
+    #[should_panic(expected = "already has an extension")]
     fn invalid_stdlib_join_too_many_extensions() {
-        ModuleResolutionPathBuf::standard_library("foo")
+        ModuleResolutionPathBuf::standard_library("foo.pyi")
             .unwrap()
-            .push("bar.py.pyi");
+            .push("bar.pyi");
     }
 
     #[test]
