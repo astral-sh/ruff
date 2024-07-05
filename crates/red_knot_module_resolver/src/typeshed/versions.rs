@@ -358,7 +358,7 @@ impl fmt::Display for PyVersionRange {
 }
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Ord, PartialOrd, Hash)]
-pub(crate) struct PyVersion {
+struct PyVersion {
     major: u8,
     minor: u8,
 }
@@ -574,26 +574,12 @@ foo: 3.8-   # trailing comment
         foo: 3.8-
         "###
         );
+    }
 
-        let foo = ModuleName::new_static("foo").unwrap();
+    #[test]
+    fn version_within_range_parsed_correctly() {
+        let parsed_versions = TypeshedVersions::from_str("bar: 2.7-3.10").unwrap();
         let bar = ModuleName::new_static("bar").unwrap();
-        let bar_baz = ModuleName::new_static("bar.baz").unwrap();
-        let bar_eggs = ModuleName::new_static("bar.eggs").unwrap();
-        let spam = ModuleName::new_static("spam").unwrap();
-
-        assert!(parsed_versions.contains_exact(&foo));
-        assert_eq!(
-            parsed_versions.query_module(&foo, SupportedPyVersion::Py37.into()),
-            TypeshedVersionsQueryResult::DoesNotExist
-        );
-        assert_eq!(
-            parsed_versions.query_module(&foo, SupportedPyVersion::Py38.into()),
-            TypeshedVersionsQueryResult::Exists
-        );
-        assert_eq!(
-            parsed_versions.query_module(&foo, SupportedPyVersion::Py311.into()),
-            TypeshedVersionsQueryResult::Exists
-        );
 
         assert!(parsed_versions.contains_exact(&bar));
         assert_eq!(
@@ -608,6 +594,32 @@ foo: 3.8-   # trailing comment
             parsed_versions.query_module(&bar, SupportedPyVersion::Py311.into()),
             TypeshedVersionsQueryResult::DoesNotExist
         );
+    }
+
+    #[test]
+    fn version_from_range_parsed_correctly() {
+        let parsed_versions = TypeshedVersions::from_str("foo: 3.8-").unwrap();
+        let foo = ModuleName::new_static("foo").unwrap();
+
+        assert!(parsed_versions.contains_exact(&foo));
+        assert_eq!(
+            parsed_versions.query_module(&foo, SupportedPyVersion::Py37.into()),
+            TypeshedVersionsQueryResult::DoesNotExist
+        );
+        assert_eq!(
+            parsed_versions.query_module(&foo, SupportedPyVersion::Py38.into()),
+            TypeshedVersionsQueryResult::Exists
+        );
+        assert_eq!(
+            parsed_versions.query_module(&foo, SupportedPyVersion::Py311.into()),
+            TypeshedVersionsQueryResult::Exists
+        );
+    }
+
+    #[test]
+    fn explicit_submodule_parsed_correctly() {
+        let parsed_versions = TypeshedVersions::from_str("bar.baz: 3.1-3.9").unwrap();
+        let bar_baz = ModuleName::new_static("bar.baz").unwrap();
 
         assert!(parsed_versions.contains_exact(&bar_baz));
         assert_eq!(
@@ -622,16 +634,12 @@ foo: 3.8-   # trailing comment
             parsed_versions.query_module(&bar_baz, SupportedPyVersion::Py310.into()),
             TypeshedVersionsQueryResult::DoesNotExist
         );
+    }
 
-        assert!(!parsed_versions.contains_exact(&spam));
-        assert_eq!(
-            parsed_versions.query_module(&spam, SupportedPyVersion::Py37.into()),
-            TypeshedVersionsQueryResult::DoesNotExist
-        );
-        assert_eq!(
-            parsed_versions.query_module(&spam, SupportedPyVersion::Py313.into()),
-            TypeshedVersionsQueryResult::DoesNotExist
-        );
+    #[test]
+    fn implicit_submodule_queried_correctly() {
+        let parsed_versions = TypeshedVersions::from_str("bar: 2.7-3.10").unwrap();
+        let bar_eggs = ModuleName::new_static("bar.eggs").unwrap();
 
         assert!(!parsed_versions.contains_exact(&bar_eggs));
         assert_eq!(
@@ -644,6 +652,22 @@ foo: 3.8-   # trailing comment
         );
         assert_eq!(
             parsed_versions.query_module(&bar_eggs, SupportedPyVersion::Py311.into()),
+            TypeshedVersionsQueryResult::DoesNotExist
+        );
+    }
+
+    #[test]
+    fn nonexistent_module_queried_correctly() {
+        let parsed_versions = TypeshedVersions::from_str("eggs: 3.8-").unwrap();
+        let spam = ModuleName::new_static("spam").unwrap();
+
+        assert!(!parsed_versions.contains_exact(&spam));
+        assert_eq!(
+            parsed_versions.query_module(&spam, SupportedPyVersion::Py37.into()),
+            TypeshedVersionsQueryResult::DoesNotExist
+        );
+        assert_eq!(
+            parsed_versions.query_module(&spam, SupportedPyVersion::Py313.into()),
             TypeshedVersionsQueryResult::DoesNotExist
         );
     }
