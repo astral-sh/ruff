@@ -9,8 +9,8 @@ use crate::module::{Module, ModuleKind};
 use crate::module_name::ModuleName;
 use crate::path::ModuleResolutionPathBuf;
 use crate::resolver::internal::ModuleResolverSettings;
+use crate::state::ResolverState;
 use crate::supported_py_version::TargetVersion;
-use crate::typeshed::LazyTypeshedVersions;
 
 /// Configures the module resolver settings.
 ///
@@ -245,32 +245,20 @@ fn resolve_name(
     name: &ModuleName,
 ) -> Option<(Arc<ModuleResolutionPathBuf>, VfsFile, ModuleKind)> {
     let resolver_settings = module_resolver_settings(db);
-    let target_version = resolver_settings.target_version();
-    let typeshed_versions = LazyTypeshedVersions::new();
+    let resolver_state = ResolverState::new(db, resolver_settings.target_version());
 
     for search_path in resolver_settings.search_paths() {
         let mut components = name.components();
         let module_name = components.next_back()?;
 
-        match resolve_package(
-            db,
-            search_path,
-            components,
-            &typeshed_versions,
-            target_version,
-        ) {
+        match resolve_package(search_path, components, &resolver_state) {
             Ok(resolved_package) => {
                 let mut package_path = resolved_package.path;
 
                 package_path.push(module_name);
 
                 // Must be a `__init__.pyi` or `__init__.py` or it isn't a package.
-                let kind = if package_path.is_directory(
-                    db,
-                    search_path,
-                    &typeshed_versions,
-                    target_version,
-                ) {
+                let kind = if package_path.is_directory(search_path, &resolver_state) {
                     package_path.push("__init__");
                     ModuleKind::Package
                 } else {
@@ -278,18 +266,17 @@ fn resolve_name(
                 };
 
                 // TODO Implement full https://peps.python.org/pep-0561/#type-checker-module-resolution-order resolution
-                if let Some(stub) = package_path.with_pyi_extension().to_vfs_file(
-                    db,
-                    search_path,
-                    &typeshed_versions,
-                    target_version,
-                ) {
+                if let Some(stub) = package_path
+                    .with_pyi_extension()
+                    .to_vfs_file(search_path, &resolver_state)
+                {
                     return Some((search_path.clone(), stub, kind));
                 }
 
-                if let Some(module) = package_path.with_py_extension().and_then(|path| {
-                    path.to_vfs_file(db, search_path, &typeshed_versions, target_version)
-                }) {
+                if let Some(module) = package_path
+                    .with_py_extension()
+                    .and_then(|path| path.to_vfs_file(search_path, &resolver_state))
+                {
                     return Some((search_path.clone(), module, kind));
                 }
 
@@ -312,11 +299,9 @@ fn resolve_name(
 }
 
 fn resolve_package<'a, 'db, I>(
-    db: &'db dyn Db,
     module_search_path: &ModuleResolutionPathBuf,
     components: I,
-    typeshed_versions: &LazyTypeshedVersions<'db>,
-    target_version: TargetVersion,
+    resolver_state: &ResolverState<'db>,
 ) -> Result<ResolvedPackage, PackageKind>
 where
     I: Iterator<Item = &'a str>,
@@ -335,21 +320,12 @@ where
     for folder in components {
         package_path.push(folder);
 
-        let is_regular_package = package_path.is_regular_package(
-            db,
-            module_search_path,
-            typeshed_versions,
-            target_version,
-        );
+        let is_regular_package =
+            package_path.is_regular_package(module_search_path, resolver_state);
 
         if is_regular_package {
             in_namespace_package = false;
-        } else if package_path.is_directory(
-            db,
-            module_search_path,
-            typeshed_versions,
-            target_version,
-        ) {
+        } else if package_path.is_directory(module_search_path, resolver_state) {
             // A directory without an `__init__.py` is a namespace package, continue with the next folder.
             in_namespace_package = true;
         } else if in_namespace_package {

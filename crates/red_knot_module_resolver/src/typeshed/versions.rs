@@ -14,6 +14,7 @@ use crate::db::Db;
 use crate::module_name::ModuleName;
 use crate::supported_py_version::TargetVersion;
 
+#[derive(Debug)]
 pub(crate) struct LazyTypeshedVersions<'db>(OnceCell<&'db TypeshedVersions>);
 
 impl<'db> LazyTypeshedVersions<'db> {

@@ -3,10 +3,9 @@ use std::fmt;
 use ruff_db::file_system::{FileSystemPath, FileSystemPathBuf};
 use ruff_db::vfs::{system_path_to_file, VfsFile};
 
-use crate::db::Db;
 use crate::module_name::ModuleName;
-use crate::typeshed::{LazyTypeshedVersions, TypeshedVersionsQueryResult};
-use crate::TargetVersion;
+use crate::state::ResolverState;
+use crate::typeshed::TypeshedVersionsQueryResult;
 
 /// Enumeration of the different kinds of search paths type checkers are expected to support.
 ///
@@ -124,35 +123,13 @@ impl ModuleResolutionPathBuf {
     }
 
     #[must_use]
-    pub(crate) fn is_regular_package<'db>(
-        &self,
-        db: &'db dyn Db,
-        search_path: &Self,
-        typeshed_versions: &LazyTypeshedVersions<'db>,
-        target_version: TargetVersion,
-    ) -> bool {
-        ModuleResolutionPathRef::from(self).is_regular_package(
-            db,
-            search_path,
-            typeshed_versions,
-            target_version,
-        )
+    pub(crate) fn is_regular_package(&self, search_path: &Self, resolver: &ResolverState) -> bool {
+        ModuleResolutionPathRef::from(self).is_regular_package(search_path, resolver)
     }
 
     #[must_use]
-    pub(crate) fn is_directory<'db>(
-        &self,
-        db: &'db dyn Db,
-        search_path: &Self,
-        typeshed_versions: &LazyTypeshedVersions<'db>,
-        target_version: TargetVersion,
-    ) -> bool {
-        ModuleResolutionPathRef::from(self).is_directory(
-            db,
-            search_path,
-            typeshed_versions,
-            target_version,
-        )
+    pub(crate) fn is_directory(&self, search_path: &Self, resolver: &ResolverState) -> bool {
+        ModuleResolutionPathRef::from(self).is_directory(search_path, resolver)
     }
 
     #[must_use]
@@ -174,19 +151,12 @@ impl ModuleResolutionPathBuf {
     }
 
     /// Returns `None` if the path doesn't exist, isn't accessible, or if the path points to a directory.
-    pub(crate) fn to_vfs_file<'db>(
+    pub(crate) fn to_vfs_file(
         &self,
-        db: &'db dyn Db,
         search_path: &Self,
-        typeshed_versions: &LazyTypeshedVersions<'db>,
-        target_version: TargetVersion,
+        resolver: &ResolverState,
     ) -> Option<VfsFile> {
-        ModuleResolutionPathRef::from(self).to_vfs_file(
-            db,
-            search_path,
-            typeshed_versions,
-            target_version,
-        )
+        ModuleResolutionPathRef::from(self).to_vfs_file(search_path, resolver)
     }
 }
 
@@ -215,12 +185,10 @@ enum ModuleResolutionPathRefInner<'a> {
 impl<'a> ModuleResolutionPathRefInner<'a> {
     #[must_use]
     fn query_stdlib_version<'db>(
-        db: &'db dyn Db,
         module_path: &'a FileSystemPath,
-        typeshed_versions: &LazyTypeshedVersions<'db>,
         stdlib_search_path: Self,
         stdlib_root: &FileSystemPath,
-        target_version: TargetVersion,
+        resolver_state: &ResolverState<'db>,
     ) -> TypeshedVersionsQueryResult {
         let Some(module_name) = stdlib_search_path
             .relativize_path(module_path)
@@ -228,26 +196,25 @@ impl<'a> ModuleResolutionPathRefInner<'a> {
         else {
             return TypeshedVersionsQueryResult::DoesNotExist;
         };
-        typeshed_versions.query_module(&module_name, db, stdlib_root, target_version)
+        let ResolverState {
+            db,
+            typeshed_versions,
+            target_version,
+        } = resolver_state;
+        typeshed_versions.query_module(&module_name, *db, stdlib_root, *target_version)
     }
 
     #[must_use]
-    fn is_directory<'db>(
-        &self,
-        db: &'db dyn Db,
-        search_path: Self,
-        typeshed_versions: &LazyTypeshedVersions<'db>,
-        target_version: TargetVersion,
-    ) -> bool {
+    fn is_directory(&self, search_path: Self, resolver: &ResolverState) -> bool {
         match (self, search_path) {
-            (Self::Extra(path), Self::Extra(_)) => db.file_system().is_directory(path),
-            (Self::FirstParty(path), Self::FirstParty(_)) => db.file_system().is_directory(path),
-            (Self::SitePackages(path), Self::SitePackages(_)) => db.file_system().is_directory(path),
+            (Self::Extra(path), Self::Extra(_)) => resolver.file_system().is_directory(path),
+            (Self::FirstParty(path), Self::FirstParty(_)) => resolver.file_system().is_directory(path),
+            (Self::SitePackages(path), Self::SitePackages(_)) => resolver.file_system().is_directory(path),
             (Self::StandardLibrary(path), Self::StandardLibrary(stdlib_root)) => {
-                match Self::query_stdlib_version(db, path, typeshed_versions, search_path, stdlib_root, target_version) {
+                match Self::query_stdlib_version( path, search_path, stdlib_root, resolver) {
                     TypeshedVersionsQueryResult::DoesNotExist => false,
-                    TypeshedVersionsQueryResult::Exists => db.file_system().is_directory(path),
-                    TypeshedVersionsQueryResult::MaybeExists => db.file_system().is_directory(path),
+                    TypeshedVersionsQueryResult::Exists => resolver.file_system().is_directory(path),
+                    TypeshedVersionsQueryResult::MaybeExists => resolver.file_system().is_directory(path),
                 }
             }
             (path, root) => unreachable!(
@@ -257,31 +224,25 @@ impl<'a> ModuleResolutionPathRefInner<'a> {
     }
 
     #[must_use]
-    fn is_regular_package<'db>(
-        &self,
-        db: &'db dyn Db,
-        search_path: Self,
-        typeshed_versions: &LazyTypeshedVersions<'db>,
-        target_version: TargetVersion,
-    ) -> bool {
-        fn is_non_stdlib_pkg(db: &dyn Db, path: &FileSystemPath) -> bool {
-            let file_system = db.file_system();
+    fn is_regular_package(&self, search_path: Self, resolver: &ResolverState) -> bool {
+        fn is_non_stdlib_pkg(state: &ResolverState, path: &FileSystemPath) -> bool {
+            let file_system = state.file_system();
             file_system.exists(&path.join("__init__.py"))
                 || file_system.exists(&path.join("__init__.pyi"))
         }
 
         match (self, search_path) {
-            (Self::Extra(path), Self::Extra(_)) => is_non_stdlib_pkg(db, path),
-            (Self::FirstParty(path), Self::FirstParty(_)) => is_non_stdlib_pkg(db, path),
-            (Self::SitePackages(path), Self::SitePackages(_)) => is_non_stdlib_pkg(db, path),
+            (Self::Extra(path), Self::Extra(_)) => is_non_stdlib_pkg(resolver, path),
+            (Self::FirstParty(path), Self::FirstParty(_)) => is_non_stdlib_pkg(resolver, path),
+            (Self::SitePackages(path), Self::SitePackages(_)) => is_non_stdlib_pkg(resolver, path),
             // Unlike the other variants:
             // (1) Account for VERSIONS
             // (2) Only test for `__init__.pyi`, not `__init__.py`
             (Self::StandardLibrary(path), Self::StandardLibrary(stdlib_root)) => {
-                match Self::query_stdlib_version(db, path, typeshed_versions, search_path, stdlib_root, target_version) {
+                match Self::query_stdlib_version( path, search_path, stdlib_root, resolver) {
                     TypeshedVersionsQueryResult::DoesNotExist => false,
-                    TypeshedVersionsQueryResult::Exists => db.file_system().exists(&path.join("__init__.pyi")),
-                    TypeshedVersionsQueryResult::MaybeExists => db.file_system().exists(&path.join("__init__.pyi")),
+                    TypeshedVersionsQueryResult::Exists => resolver.db.file_system().exists(&path.join("__init__.pyi")),
+                    TypeshedVersionsQueryResult::MaybeExists => resolver.db.file_system().exists(&path.join("__init__.pyi")),
                 }
             }
             (path, root) => unreachable!(
@@ -290,24 +251,18 @@ impl<'a> ModuleResolutionPathRefInner<'a> {
         }
     }
 
-    fn to_vfs_file<'db>(
-        self,
-        db: &'db dyn Db,
-        search_path: Self,
-        typeshed_versions: &LazyTypeshedVersions<'db>,
-        target_version: TargetVersion,
-    ) -> Option<VfsFile> {
+    fn to_vfs_file(self, search_path: Self, resolver: &ResolverState) -> Option<VfsFile> {
         match (self, search_path) {
-            (Self::Extra(path), Self::Extra(_)) => system_path_to_file(db.upcast(), path),
-            (Self::FirstParty(path), Self::FirstParty(_)) => system_path_to_file(db.upcast(), path),
+            (Self::Extra(path), Self::Extra(_)) => system_path_to_file(resolver.db.upcast(), path),
+            (Self::FirstParty(path), Self::FirstParty(_)) => system_path_to_file(resolver.db.upcast(), path),
             (Self::SitePackages(path), Self::SitePackages(_)) => {
-                system_path_to_file(db.upcast(), path)
+                system_path_to_file(resolver.db.upcast(), path)
             }
             (Self::StandardLibrary(path), Self::StandardLibrary(stdlib_root)) => {
-                match Self::query_stdlib_version(db, path, typeshed_versions, search_path, stdlib_root, target_version) {
+                match Self::query_stdlib_version(path, search_path, stdlib_root, resolver) {
                     TypeshedVersionsQueryResult::DoesNotExist => None,
-                    TypeshedVersionsQueryResult::Exists => system_path_to_file(db.upcast(), path),
-                    TypeshedVersionsQueryResult::MaybeExists => system_path_to_file(db.upcast(), path)
+                    TypeshedVersionsQueryResult::Exists => system_path_to_file(resolver.db.upcast(), path),
+                    TypeshedVersionsQueryResult::MaybeExists => system_path_to_file(resolver.db.upcast(), path)
                 }
             }
             (path, root) => unreachable!(
@@ -402,39 +357,30 @@ pub(crate) struct ModuleResolutionPathRef<'a>(ModuleResolutionPathRefInner<'a>);
 
 impl<'a> ModuleResolutionPathRef<'a> {
     #[must_use]
-    pub(crate) fn is_directory<'db>(
+    pub(crate) fn is_directory(
         &self,
-        db: &'db dyn Db,
         search_path: impl Into<Self>,
-        typeshed_versions: &LazyTypeshedVersions<'db>,
-        target_version: TargetVersion,
+        resolver: &ResolverState,
     ) -> bool {
-        self.0
-            .is_directory(db, search_path.into().0, typeshed_versions, target_version)
+        self.0.is_directory(search_path.into().0, resolver)
     }
 
     #[must_use]
-    pub(crate) fn is_regular_package<'db>(
+    pub(crate) fn is_regular_package(
         &self,
-        db: &'db dyn Db,
         search_path: impl Into<Self>,
-        typeshed_versions: &LazyTypeshedVersions<'db>,
-        target_version: TargetVersion,
+        resolver: &ResolverState,
     ) -> bool {
-        self.0
-            .is_regular_package(db, search_path.into().0, typeshed_versions, target_version)
+        self.0.is_regular_package(search_path.into().0, resolver)
     }
 
     #[must_use]
-    pub(crate) fn to_vfs_file<'db>(
+    pub(crate) fn to_vfs_file(
         self,
-        db: &'db dyn Db,
         search_path: impl Into<Self>,
-        typeshed_versions: &LazyTypeshedVersions<'db>,
-        target_version: TargetVersion,
+        resolver: &ResolverState,
     ) -> Option<VfsFile> {
-        self.0
-            .to_vfs_file(db, search_path.into().0, typeshed_versions, target_version)
+        self.0.to_vfs_file(search_path.into().0, resolver)
     }
 
     #[must_use]
@@ -526,6 +472,7 @@ mod tests {
 
     use crate::db::tests::{create_resolver_builder, TestCase, TestDb};
     use crate::supported_py_version::TargetVersion;
+    use crate::typeshed::LazyTypeshedVersions;
 
     use super::*;
 
@@ -806,8 +753,7 @@ mod tests {
         );
     }
 
-    fn py38_stdlib_test_case<'db>() -> (TestDb, ModuleResolutionPathBuf, LazyTypeshedVersions<'db>)
-    {
+    fn py38_stdlib_test_case() -> (TestDb, ModuleResolutionPathBuf) {
         let TestCase {
             db,
             custom_typeshed,
@@ -815,194 +761,140 @@ mod tests {
         } = create_resolver_builder().unwrap().build();
         let stdlib_module_path =
             ModuleResolutionPathBuf::stdlib_from_typeshed_root(&custom_typeshed).unwrap();
-        (db, stdlib_module_path, LazyTypeshedVersions::new())
+        (db, stdlib_module_path)
     }
 
     #[test]
     fn mocked_typeshed_existing_regular_stdlib_pkg_py38() {
-        let (db, stdlib_path, versions) = py38_stdlib_test_case();
+        let (db, stdlib_path) = py38_stdlib_test_case();
+        let resolver = ResolverState {
+            db: &db,
+            typeshed_versions: LazyTypeshedVersions::new(),
+            target_version: TargetVersion::Py38,
+        };
 
         let asyncio_regular_package = stdlib_path.join("asyncio");
-        assert!(asyncio_regular_package.is_directory(
-            &db,
-            &stdlib_path,
-            &versions,
-            TargetVersion::Py38
-        ));
-        assert!(asyncio_regular_package.is_regular_package(
-            &db,
-            &stdlib_path,
-            &versions,
-            TargetVersion::Py38
-        ));
+        assert!(asyncio_regular_package.is_directory(&stdlib_path, &resolver));
+        assert!(asyncio_regular_package.is_regular_package(&stdlib_path, &resolver));
         // Paths to directories don't resolve to VfsFiles
         assert_eq!(
-            asyncio_regular_package.to_vfs_file(&db, &stdlib_path, &versions, TargetVersion::Py38),
+            asyncio_regular_package.to_vfs_file(&stdlib_path, &resolver),
             None
         );
         assert!(asyncio_regular_package
             .join("__init__.pyi")
-            .to_vfs_file(&db, &stdlib_path, &versions, TargetVersion::Py38)
+            .to_vfs_file(&stdlib_path, &resolver)
             .is_some());
 
         // The `asyncio` package exists on Python 3.8, but the `asyncio.tasks` submodule does not,
         // according to the `VERSIONS` file in our typeshed mock:
         let asyncio_tasks_module = stdlib_path.join("asyncio/tasks.pyi");
         assert_eq!(
-            asyncio_tasks_module.to_vfs_file(&db, &stdlib_path, &versions, TargetVersion::Py38),
+            asyncio_tasks_module.to_vfs_file(&stdlib_path, &resolver),
             None
         );
-        assert!(!asyncio_tasks_module.is_directory(
-            &db,
-            &stdlib_path,
-            &versions,
-            TargetVersion::Py38
-        ));
-        assert!(!asyncio_tasks_module.is_regular_package(
-            &db,
-            &stdlib_path,
-            &versions,
-            TargetVersion::Py38
-        ));
+        assert!(!asyncio_tasks_module.is_directory(&stdlib_path, &resolver));
+        assert!(!asyncio_tasks_module.is_regular_package(&stdlib_path, &resolver));
     }
 
     #[test]
     fn mocked_typeshed_existing_namespace_stdlib_pkg_py38() {
-        let (db, stdlib_path, versions) = py38_stdlib_test_case();
+        let (db, stdlib_path) = py38_stdlib_test_case();
+        let resolver = ResolverState {
+            db: &db,
+            typeshed_versions: LazyTypeshedVersions::new(),
+            target_version: TargetVersion::Py38,
+        };
 
         let xml_namespace_package = stdlib_path.join("xml");
-        assert!(xml_namespace_package.is_directory(
-            &db,
-            &stdlib_path,
-            &versions,
-            TargetVersion::Py38
-        ));
+        assert!(xml_namespace_package.is_directory(&stdlib_path, &resolver));
         // Paths to directories don't resolve to VfsFiles
         assert_eq!(
-            xml_namespace_package.to_vfs_file(&db, &stdlib_path, &versions, TargetVersion::Py38),
+            xml_namespace_package.to_vfs_file(&stdlib_path, &resolver),
             None
         );
-        assert!(!xml_namespace_package.is_regular_package(
-            &db,
-            &stdlib_path,
-            &versions,
-            TargetVersion::Py38
-        ));
+        assert!(!xml_namespace_package.is_regular_package(&stdlib_path, &resolver));
 
         let xml_etree = stdlib_path.join("xml/etree.pyi");
-        assert!(!xml_etree.is_directory(&db, &stdlib_path, &versions, TargetVersion::Py38));
-        assert!(xml_etree
-            .to_vfs_file(&db, &stdlib_path, &versions, TargetVersion::Py38)
-            .is_some());
-        assert!(!xml_etree.is_regular_package(&db, &stdlib_path, &versions, TargetVersion::Py38));
+        assert!(!xml_etree.is_directory(&stdlib_path, &resolver));
+        assert!(xml_etree.to_vfs_file(&stdlib_path, &resolver).is_some());
+        assert!(!xml_etree.is_regular_package(&stdlib_path, &resolver));
     }
 
     #[test]
     fn mocked_typeshed_single_file_stdlib_module_py38() {
-        let (db, stdlib_path, versions) = py38_stdlib_test_case();
+        let (db, stdlib_path) = py38_stdlib_test_case();
+        let resolver = ResolverState {
+            db: &db,
+            typeshed_versions: LazyTypeshedVersions::new(),
+            target_version: TargetVersion::Py38,
+        };
 
         let functools_module = stdlib_path.join("functools.pyi");
         assert!(functools_module
-            .to_vfs_file(&db, &stdlib_path, &versions, TargetVersion::Py38)
+            .to_vfs_file(&stdlib_path, &resolver)
             .is_some());
-        assert!(!functools_module.is_directory(&db, &stdlib_path, &versions, TargetVersion::Py38));
-        assert!(!functools_module.is_regular_package(
-            &db,
-            &stdlib_path,
-            &versions,
-            TargetVersion::Py38
-        ));
+        assert!(!functools_module.is_directory(&stdlib_path, &resolver));
+        assert!(!functools_module.is_regular_package(&stdlib_path, &resolver));
     }
 
     #[test]
     fn mocked_typeshed_nonexistent_regular_stdlib_pkg_py38() {
-        let (db, stdlib_path, versions) = py38_stdlib_test_case();
+        let (db, stdlib_path) = py38_stdlib_test_case();
+        let resolver = ResolverState {
+            db: &db,
+            typeshed_versions: LazyTypeshedVersions::new(),
+            target_version: TargetVersion::Py38,
+        };
 
         let collections_regular_package = stdlib_path.join("collections");
         assert_eq!(
-            collections_regular_package.to_vfs_file(
-                &db,
-                &stdlib_path,
-                &versions,
-                TargetVersion::Py38
-            ),
+            collections_regular_package.to_vfs_file(&stdlib_path, &resolver),
             None
         );
-        assert!(!collections_regular_package.is_directory(
-            &db,
-            &stdlib_path,
-            &versions,
-            TargetVersion::Py38
-        ));
-        assert!(!collections_regular_package.is_regular_package(
-            &db,
-            &stdlib_path,
-            &versions,
-            TargetVersion::Py38
-        ));
+        assert!(!collections_regular_package.is_directory(&stdlib_path, &resolver));
+        assert!(!collections_regular_package.is_regular_package(&stdlib_path, &resolver));
     }
 
     #[test]
     fn mocked_typeshed_nonexistent_namespace_stdlib_pkg_py38() {
-        let (db, stdlib_path, versions) = py38_stdlib_test_case();
+        let (db, stdlib_path) = py38_stdlib_test_case();
+        let resolver = ResolverState {
+            db: &db,
+            typeshed_versions: LazyTypeshedVersions::new(),
+            target_version: TargetVersion::Py38,
+        };
 
         let importlib_namespace_package = stdlib_path.join("importlib");
         assert_eq!(
-            importlib_namespace_package.to_vfs_file(
-                &db,
-                &stdlib_path,
-                &versions,
-                TargetVersion::Py38
-            ),
+            importlib_namespace_package.to_vfs_file(&stdlib_path, &resolver),
             None
         );
-        assert!(!importlib_namespace_package.is_directory(
-            &db,
-            &stdlib_path,
-            &versions,
-            TargetVersion::Py38
-        ));
-        assert!(!importlib_namespace_package.is_regular_package(
-            &db,
-            &stdlib_path,
-            &versions,
-            TargetVersion::Py38
-        ));
+        assert!(!importlib_namespace_package.is_directory(&stdlib_path, &resolver));
+        assert!(!importlib_namespace_package.is_regular_package(&stdlib_path, &resolver));
 
         let importlib_abc = stdlib_path.join("importlib/abc.pyi");
-        assert_eq!(
-            importlib_abc.to_vfs_file(&db, &stdlib_path, &versions, TargetVersion::Py38),
-            None
-        );
-        assert!(!importlib_abc.is_directory(&db, &stdlib_path, &versions, TargetVersion::Py38));
-        assert!(!importlib_abc.is_regular_package(
-            &db,
-            &stdlib_path,
-            &versions,
-            TargetVersion::Py38
-        ));
+        assert_eq!(importlib_abc.to_vfs_file(&stdlib_path, &resolver), None);
+        assert!(!importlib_abc.is_directory(&stdlib_path, &resolver));
+        assert!(!importlib_abc.is_regular_package(&stdlib_path, &resolver));
     }
 
     #[test]
     fn mocked_typeshed_nonexistent_single_file_module_py38() {
-        let (db, stdlib_path, versions) = py38_stdlib_test_case();
+        let (db, stdlib_path) = py38_stdlib_test_case();
+        let resolver = ResolverState {
+            db: &db,
+            typeshed_versions: LazyTypeshedVersions::new(),
+            target_version: TargetVersion::Py38,
+        };
 
         let non_existent = stdlib_path.join("doesnt_even_exist");
-        assert_eq!(
-            non_existent.to_vfs_file(&db, &stdlib_path, &versions, TargetVersion::Py38),
-            None
-        );
-        assert!(!non_existent.is_directory(&db, &stdlib_path, &versions, TargetVersion::Py38));
-        assert!(!non_existent.is_regular_package(
-            &db,
-            &stdlib_path,
-            &versions,
-            TargetVersion::Py38
-        ));
+        assert_eq!(non_existent.to_vfs_file(&stdlib_path, &resolver), None);
+        assert!(!non_existent.is_directory(&stdlib_path, &resolver));
+        assert!(!non_existent.is_regular_package(&stdlib_path, &resolver));
     }
 
-    fn py39_stdlib_test_case<'db>() -> (TestDb, ModuleResolutionPathBuf, LazyTypeshedVersions<'db>)
-    {
+    fn py39_stdlib_test_case() -> (TestDb, ModuleResolutionPathBuf) {
         let TestCase {
             db,
             custom_typeshed,
@@ -1013,134 +905,89 @@ mod tests {
             .build();
         let stdlib_module_path =
             ModuleResolutionPathBuf::stdlib_from_typeshed_root(&custom_typeshed).unwrap();
-        (db, stdlib_module_path, LazyTypeshedVersions::new())
+        (db, stdlib_module_path)
     }
 
     #[test]
     fn mocked_typeshed_existing_regular_stdlib_pkgs_py39() {
-        let (db, stdlib_path, versions) = py39_stdlib_test_case();
+        let (db, stdlib_path) = py39_stdlib_test_case();
+        let resolver = ResolverState {
+            db: &db,
+            typeshed_versions: LazyTypeshedVersions::new(),
+            target_version: TargetVersion::Py39,
+        };
 
         // Since we've set the target version to Py39,
         // `collections` should now exist as a directory, according to VERSIONS...
         let collections_regular_package = stdlib_path.join("collections");
-        assert!(collections_regular_package.is_directory(
-            &db,
-            &stdlib_path,
-            &versions,
-            TargetVersion::Py39
-        ));
-        assert!(collections_regular_package.is_regular_package(
-            &db,
-            &stdlib_path,
-            &versions,
-            TargetVersion::Py39
-        ));
+        assert!(collections_regular_package.is_directory(&stdlib_path, &resolver));
+        assert!(collections_regular_package.is_regular_package(&stdlib_path, &resolver));
         // (This is still `None`, as directories don't resolve to `Vfs` files)
         assert_eq!(
-            collections_regular_package.to_vfs_file(
-                &db,
-                &stdlib_path,
-                &versions,
-                TargetVersion::Py39
-            ),
+            collections_regular_package.to_vfs_file(&stdlib_path, &resolver),
             None
         );
         assert!(collections_regular_package
             .join("__init__.pyi")
-            .to_vfs_file(&db, &stdlib_path, &versions, TargetVersion::Py39)
+            .to_vfs_file(&stdlib_path, &resolver)
             .is_some());
 
         // ...and so should the `asyncio.tasks` submodule (though it's still not a directory):
         let asyncio_tasks_module = stdlib_path.join("asyncio/tasks.pyi");
         assert!(asyncio_tasks_module
-            .to_vfs_file(&db, &stdlib_path, &versions, TargetVersion::Py39)
+            .to_vfs_file(&stdlib_path, &resolver)
             .is_some());
-        assert!(!asyncio_tasks_module.is_directory(
-            &db,
-            &stdlib_path,
-            &versions,
-            TargetVersion::Py39
-        ));
-        assert!(!asyncio_tasks_module.is_regular_package(
-            &db,
-            &stdlib_path,
-            &versions,
-            TargetVersion::Py39
-        ));
+        assert!(!asyncio_tasks_module.is_directory(&stdlib_path, &resolver));
+        assert!(!asyncio_tasks_module.is_regular_package(&stdlib_path, &resolver));
     }
 
     #[test]
     fn mocked_typeshed_existing_namespace_stdlib_pkg_py39() {
-        let (db, stdlib_path, versions) = py39_stdlib_test_case();
+        let (db, stdlib_path) = py39_stdlib_test_case();
+        let resolver = ResolverState {
+            db: &db,
+            typeshed_versions: LazyTypeshedVersions::new(),
+            target_version: TargetVersion::Py39,
+        };
 
         // The `importlib` directory now also exists...
         let importlib_namespace_package = stdlib_path.join("importlib");
-        assert!(importlib_namespace_package.is_directory(
-            &db,
-            &stdlib_path,
-            &versions,
-            TargetVersion::Py39
-        ));
-        assert!(!importlib_namespace_package.is_regular_package(
-            &db,
-            &stdlib_path,
-            &versions,
-            TargetVersion::Py39
-        ));
+        assert!(importlib_namespace_package.is_directory(&stdlib_path, &resolver));
+        assert!(!importlib_namespace_package.is_regular_package(&stdlib_path, &resolver));
         // (This is still `None`, as directories don't resolve to `Vfs` files)
         assert_eq!(
-            importlib_namespace_package.to_vfs_file(
-                &db,
-                &stdlib_path,
-                &versions,
-                TargetVersion::Py39
-            ),
+            importlib_namespace_package.to_vfs_file(&stdlib_path, &resolver),
             None
         );
 
         // ...As do submodules in the `importlib` namespace package:
         let importlib_abc = importlib_namespace_package.join("abc.pyi");
-        assert!(!importlib_abc.is_directory(&db, &stdlib_path, &versions, TargetVersion::Py39));
-        assert!(!importlib_abc.is_regular_package(
-            &db,
-            &stdlib_path,
-            &versions,
-            TargetVersion::Py39
-        ));
-        assert!(importlib_abc
-            .to_vfs_file(&db, &stdlib_path, &versions, TargetVersion::Py39)
-            .is_some());
+        assert!(!importlib_abc.is_directory(&stdlib_path, &resolver));
+        assert!(!importlib_abc.is_regular_package(&stdlib_path, &resolver));
+        assert!(importlib_abc.to_vfs_file(&stdlib_path, &resolver).is_some());
     }
 
     #[test]
     fn mocked_typeshed_nonexistent_namespace_stdlib_pkg_py39() {
-        let (db, stdlib_path, versions) = py39_stdlib_test_case();
+        let (db, stdlib_path) = py39_stdlib_test_case();
+        let resolver = ResolverState {
+            db: &db,
+            typeshed_versions: LazyTypeshedVersions::new(),
+            target_version: TargetVersion::Py39,
+        };
 
         // The `xml` package no longer exists on py39:
         let xml_namespace_package = stdlib_path.join("xml");
         assert_eq!(
-            xml_namespace_package.to_vfs_file(&db, &stdlib_path, &versions, TargetVersion::Py39),
+            xml_namespace_package.to_vfs_file(&stdlib_path, &resolver),
             None
         );
-        assert!(!xml_namespace_package.is_directory(
-            &db,
-            &stdlib_path,
-            &versions,
-            TargetVersion::Py39
-        ));
-        assert!(!xml_namespace_package.is_regular_package(
-            &db,
-            &stdlib_path,
-            &versions,
-            TargetVersion::Py39
-        ));
+        assert!(!xml_namespace_package.is_directory(&stdlib_path, &resolver));
+        assert!(!xml_namespace_package.is_regular_package(&stdlib_path, &resolver));
 
         let xml_etree = xml_namespace_package.join("etree.pyi");
-        assert_eq!(
-            xml_etree.to_vfs_file(&db, &stdlib_path, &versions, TargetVersion::Py39),
-            None
-        );
-        assert!(!xml_etree.is_directory(&db, &stdlib_path, &versions, TargetVersion::Py39));
-        assert!(!xml_etree.is_regular_package(&db, &stdlib_path, &versions, TargetVersion::Py39));
+        assert_eq!(xml_etree.to_vfs_file(&stdlib_path, &resolver), None);
+        assert!(!xml_etree.is_directory(&stdlib_path, &resolver));
+        assert!(!xml_etree.is_regular_package(&stdlib_path, &resolver));
     }
 }
