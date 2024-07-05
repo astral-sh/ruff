@@ -108,11 +108,11 @@ impl ModuleResolutionPathBuf {
     }
 
     #[must_use]
-    pub(crate) fn is_regular_package(
+    pub(crate) fn is_regular_package<'db>(
         &self,
-        db: &dyn Db,
+        db: &'db dyn Db,
         search_path: &Self,
-        typeshed_versions: &LazyTypeshedVersions,
+        typeshed_versions: &LazyTypeshedVersions<'db>,
         target_version: TargetVersion,
     ) -> bool {
         ModuleResolutionPathRef::from(self).is_regular_package(
@@ -124,11 +124,11 @@ impl ModuleResolutionPathBuf {
     }
 
     #[must_use]
-    pub(crate) fn is_directory(
+    pub(crate) fn is_directory<'db>(
         &self,
-        db: &dyn Db,
+        db: &'db dyn Db,
         search_path: &Self,
-        typeshed_versions: &LazyTypeshedVersions,
+        typeshed_versions: &LazyTypeshedVersions<'db>,
         target_version: TargetVersion,
     ) -> bool {
         ModuleResolutionPathRef::from(self).is_directory(
@@ -158,11 +158,11 @@ impl ModuleResolutionPathBuf {
     }
 
     /// Returns `None` if the path doesn't exist, isn't accessible, or if the path points to a directory.
-    pub(crate) fn to_vfs_file(
+    pub(crate) fn to_vfs_file<'db>(
         &self,
-        db: &dyn Db,
+        db: &'db dyn Db,
         search_path: &Self,
-        typeshed_versions: &LazyTypeshedVersions,
+        typeshed_versions: &LazyTypeshedVersions<'db>,
         target_version: TargetVersion,
     ) -> Option<VfsFile> {
         ModuleResolutionPathRef::from(self).to_vfs_file(
@@ -198,10 +198,10 @@ enum ModuleResolutionPathRefInner<'a> {
 
 impl<'a> ModuleResolutionPathRefInner<'a> {
     #[must_use]
-    fn query_stdlib_version(
-        db: &dyn Db,
+    fn query_stdlib_version<'db>(
+        db: &'db dyn Db,
         module_path: &'a FileSystemPath,
-        typeshed_versions: &LazyTypeshedVersions,
+        typeshed_versions: &LazyTypeshedVersions<'db>,
         stdlib_search_path: Self,
         stdlib_root: &FileSystemPath,
         target_version: TargetVersion,
@@ -216,11 +216,11 @@ impl<'a> ModuleResolutionPathRefInner<'a> {
     }
 
     #[must_use]
-    fn is_directory(
+    fn is_directory<'db>(
         &self,
-        db: &dyn Db,
+        db: &'db dyn Db,
         search_path: Self,
-        typeshed_versions: &LazyTypeshedVersions,
+        typeshed_versions: &LazyTypeshedVersions<'db>,
         target_version: TargetVersion,
     ) -> bool {
         match (self, search_path) {
@@ -241,11 +241,11 @@ impl<'a> ModuleResolutionPathRefInner<'a> {
     }
 
     #[must_use]
-    fn is_regular_package(
+    fn is_regular_package<'db>(
         &self,
-        db: &dyn Db,
+        db: &'db dyn Db,
         search_path: Self,
-        typeshed_versions: &LazyTypeshedVersions,
+        typeshed_versions: &LazyTypeshedVersions<'db>,
         target_version: TargetVersion,
     ) -> bool {
         fn is_non_stdlib_pkg(db: &dyn Db, path: &FileSystemPath) -> bool {
@@ -274,11 +274,11 @@ impl<'a> ModuleResolutionPathRefInner<'a> {
         }
     }
 
-    fn to_vfs_file(
+    fn to_vfs_file<'db>(
         self,
-        db: &dyn Db,
+        db: &'db dyn Db,
         search_path: Self,
-        typeshed_versions: &LazyTypeshedVersions,
+        typeshed_versions: &LazyTypeshedVersions<'db>,
         target_version: TargetVersion,
     ) -> Option<VfsFile> {
         match (self, search_path) {
@@ -386,11 +386,11 @@ pub(crate) struct ModuleResolutionPathRef<'a>(ModuleResolutionPathRefInner<'a>);
 
 impl<'a> ModuleResolutionPathRef<'a> {
     #[must_use]
-    pub(crate) fn is_directory(
+    pub(crate) fn is_directory<'db>(
         &self,
-        db: &dyn Db,
+        db: &'db dyn Db,
         search_path: impl Into<Self>,
-        typeshed_versions: &LazyTypeshedVersions,
+        typeshed_versions: &LazyTypeshedVersions<'db>,
         target_version: TargetVersion,
     ) -> bool {
         self.0
@@ -398,11 +398,11 @@ impl<'a> ModuleResolutionPathRef<'a> {
     }
 
     #[must_use]
-    pub(crate) fn is_regular_package(
+    pub(crate) fn is_regular_package<'db>(
         &self,
-        db: &dyn Db,
+        db: &'db dyn Db,
         search_path: impl Into<Self>,
-        typeshed_versions: &LazyTypeshedVersions,
+        typeshed_versions: &LazyTypeshedVersions<'db>,
         target_version: TargetVersion,
     ) -> bool {
         self.0
@@ -410,11 +410,11 @@ impl<'a> ModuleResolutionPathRef<'a> {
     }
 
     #[must_use]
-    pub(crate) fn to_vfs_file(
+    pub(crate) fn to_vfs_file<'db>(
         self,
-        db: &dyn Db,
+        db: &'db dyn Db,
         search_path: impl Into<Self>,
-        typeshed_versions: &LazyTypeshedVersions,
+        typeshed_versions: &LazyTypeshedVersions<'db>,
         target_version: TargetVersion,
     ) -> Option<VfsFile> {
         self.0
@@ -794,7 +794,8 @@ mod tests {
         );
     }
 
-    fn py38_stdlib_test_case() -> (TestDb, ModuleResolutionPathBuf, LazyTypeshedVersions) {
+    fn py38_stdlib_test_case<'db>() -> (TestDb, ModuleResolutionPathBuf, LazyTypeshedVersions<'db>)
+    {
         let TestCase {
             db,
             custom_typeshed,
@@ -988,7 +989,8 @@ mod tests {
         ));
     }
 
-    fn py39_stdlib_test_case() -> (TestDb, ModuleResolutionPathBuf, LazyTypeshedVersions) {
+    fn py39_stdlib_test_case<'db>() -> (TestDb, ModuleResolutionPathBuf, LazyTypeshedVersions<'db>)
+    {
         let TestCase {
             db,
             custom_typeshed,

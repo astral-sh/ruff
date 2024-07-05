@@ -4,7 +4,6 @@ use std::fmt;
 use std::num::{NonZeroU16, NonZeroUsize};
 use std::ops::{RangeFrom, RangeInclusive};
 use std::str::FromStr;
-use std::sync::Arc;
 
 use ruff_db::file_system::FileSystemPath;
 use ruff_db::source::source_text;
@@ -15,9 +14,9 @@ use crate::db::Db;
 use crate::module_name::ModuleName;
 use crate::supported_py_version::TargetVersion;
 
-pub(crate) struct LazyTypeshedVersions(OnceCell<TypeshedVersions>);
+pub(crate) struct LazyTypeshedVersions<'db>(OnceCell<&'db TypeshedVersions>);
 
-impl LazyTypeshedVersions {
+impl<'db> LazyTypeshedVersions<'db> {
     #[must_use]
     pub(crate) fn new() -> Self {
         Self(OnceCell::new())
@@ -39,7 +38,7 @@ impl LazyTypeshedVersions {
     pub(crate) fn query_module(
         &self,
         module: &ModuleName,
-        db: &dyn Db,
+        db: &'db dyn Db,
         stdlib_root: &FileSystemPath,
         target_version: TargetVersion,
     ) -> TypeshedVersionsQueryResult {
@@ -55,16 +54,13 @@ impl LazyTypeshedVersions {
             // this should invalidate not just the specific module resolution we're currently attempting,
             // but all type inference that depends on any standard-library types.
             // Unwrapping here is not correct...
-            parse_typeshed_versions(db, versions_file)
-                .as_ref()
-                .unwrap()
-                .clone()
+            parse_typeshed_versions(db, versions_file).as_ref().unwrap()
         });
         versions.query_module(module, PyVersion::from(target_version))
     }
 }
 
-#[salsa::tracked]
+#[salsa::tracked(return_ref)]
 pub(crate) fn parse_typeshed_versions(
     db: &dyn Db,
     versions_file: VfsFile,
@@ -151,8 +147,8 @@ impl fmt::Display for TypeshedVersionsParseErrorKind {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub(crate) struct TypeshedVersions(Arc<FxHashMap<ModuleName, PyVersionRange>>);
+#[derive(Debug, PartialEq, Eq)]
+pub(crate) struct TypeshedVersions(FxHashMap<ModuleName, PyVersionRange>);
 
 impl TypeshedVersions {
     #[must_use]
@@ -299,7 +295,7 @@ impl FromStr for TypeshedVersions {
                 reason: TypeshedVersionsParseErrorKind::EmptyVersionsFile,
             })
         } else {
-            Ok(Self(Arc::new(map)))
+            Ok(Self(map))
         }
     }
 }

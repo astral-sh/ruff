@@ -309,11 +309,11 @@ fn resolve_name(
     None
 }
 
-fn resolve_package<'a, I>(
-    db: &dyn Db,
+fn resolve_package<'a, 'db, I>(
+    db: &'db dyn Db,
     module_search_path: &ModuleResolutionPathBuf,
     components: I,
-    typeshed_versions: &LazyTypeshedVersions,
+    typeshed_versions: &LazyTypeshedVersions<'db>,
     target_version: TargetVersion,
 ) -> Result<ResolvedPackage, PackageKind>
 where
