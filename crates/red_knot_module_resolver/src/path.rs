@@ -581,40 +581,50 @@ mod tests {
         );
     }
 
-    fn stdlib_path_test_case(path: &str) -> ModuleResolutionPathBuf {
-        ModuleResolutionPathBuf::standard_library(path).unwrap()
-    }
-
     #[test]
     fn stdlib_path_no_extension() {
-        assert_debug_snapshot!(stdlib_path_test_case("foo"), @r###"
-        ModuleResolutionPathBuf::StandardLibrary(
-            "foo",
-        )
-        "###);
+        assert_debug_snapshot!(
+            ModuleResolutionPathBuf::standard_library("foo").unwrap(),
+            @r###"
+            ModuleResolutionPathBuf::StandardLibrary(
+                "foo",
+            )
+            "###
+        );
     }
 
     #[test]
     fn stdlib_path_pyi_extension() {
-        assert_debug_snapshot!(stdlib_path_test_case("foo.pyi"), @r###"
-        ModuleResolutionPathBuf::StandardLibrary(
-            "foo.pyi",
-        )
-        "###);
+        assert_debug_snapshot!(
+            ModuleResolutionPathBuf::standard_library("foo.pyi").unwrap(),
+            @r###"
+            ModuleResolutionPathBuf::StandardLibrary(
+                "foo.pyi",
+            )
+            "###
+        );
     }
 
     #[test]
     fn stdlib_path_dunder_init() {
-        assert_debug_snapshot!(stdlib_path_test_case("foo/__init__.pyi"), @r###"
-        ModuleResolutionPathBuf::StandardLibrary(
-            "foo/__init__.pyi",
-        )
-        "###);
+        assert_debug_snapshot!(
+            ModuleResolutionPathBuf::standard_library("foo/__init__.pyi").unwrap(),
+            @r###"
+            ModuleResolutionPathBuf::StandardLibrary(
+                "foo/__init__.pyi",
+            )
+            "###
+        );
     }
 
     #[test]
     fn stdlib_paths_can_only_be_pyi() {
-        assert_eq!(stdlib_path_test_case("foo").with_py_extension(), None);
+        assert_eq!(
+            ModuleResolutionPathBuf::standard_library("foo")
+                .unwrap()
+                .with_py_extension(),
+            None
+        );
     }
 
     #[test]
@@ -864,13 +874,17 @@ mod tests {
     #[test]
     #[should_panic(expected = "Extension must be `pyi`; got `py`")]
     fn stdlib_path_invalid_join_py() {
-        stdlib_path_test_case("foo").push("bar.py");
+        ModuleResolutionPathBuf::standard_library("foo")
+            .unwrap()
+            .push("bar.py");
     }
 
     #[test]
     #[should_panic(expected = "Extension must be `pyi`; got `rs`")]
     fn stdlib_path_invalid_join_rs() {
-        stdlib_path_test_case("foo").push("bar.rs");
+        ModuleResolutionPathBuf::standard_library("foo")
+            .unwrap()
+            .push("bar.rs");
     }
 
     #[test]
@@ -884,7 +898,9 @@ mod tests {
     #[test]
     #[should_panic(expected = "Component can have at most one '.'")]
     fn invalid_stdlib_join_too_many_extensions() {
-        stdlib_path_test_case("foo").push("bar.py.pyi");
+        ModuleResolutionPathBuf::standard_library("foo")
+            .unwrap()
+            .push("bar.py.pyi");
     }
 
     #[test]
