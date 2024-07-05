@@ -199,11 +199,11 @@ enum ModuleResolutionPathRefInner<'a> {
 impl<'a> ModuleResolutionPathRefInner<'a> {
     #[must_use]
     fn query_stdlib_version(
+        db: &dyn Db,
         module_path: &'a FileSystemPath,
         typeshed_versions: &LazyTypeshedVersions,
         stdlib_search_path: Self,
         stdlib_root: &FileSystemPath,
-        db: &dyn Db,
         target_version: TargetVersion,
     ) -> TypeshedVersionsQueryResult {
         let Some(module_name) = stdlib_search_path
@@ -228,7 +228,7 @@ impl<'a> ModuleResolutionPathRefInner<'a> {
             (Self::FirstParty(path), Self::FirstParty(_)) => db.file_system().is_directory(path),
             (Self::SitePackages(path), Self::SitePackages(_)) => db.file_system().is_directory(path),
             (Self::StandardLibrary(path), Self::StandardLibrary(stdlib_root)) => {
-                match Self::query_stdlib_version(path, typeshed_versions, search_path, stdlib_root, db, target_version) {
+                match Self::query_stdlib_version(db, path, typeshed_versions, search_path, stdlib_root, target_version) {
                     TypeshedVersionsQueryResult::DoesNotExist => false,
                     TypeshedVersionsQueryResult::Exists => db.file_system().is_directory(path),
                     TypeshedVersionsQueryResult::MaybeExists => db.file_system().is_directory(path),
@@ -248,21 +248,21 @@ impl<'a> ModuleResolutionPathRefInner<'a> {
         typeshed_versions: &LazyTypeshedVersions,
         target_version: TargetVersion,
     ) -> bool {
-        fn is_non_stdlib_pkg(path: &FileSystemPath, db: &dyn Db) -> bool {
+        fn is_non_stdlib_pkg(db: &dyn Db, path: &FileSystemPath) -> bool {
             let file_system = db.file_system();
             file_system.exists(&path.join("__init__.py"))
                 || file_system.exists(&path.join("__init__.pyi"))
         }
 
         match (self, search_path) {
-            (Self::Extra(path), Self::Extra(_)) => is_non_stdlib_pkg(path, db),
-            (Self::FirstParty(path), Self::FirstParty(_)) => is_non_stdlib_pkg(path, db),
-            (Self::SitePackages(path), Self::SitePackages(_)) => is_non_stdlib_pkg(path, db),
+            (Self::Extra(path), Self::Extra(_)) => is_non_stdlib_pkg(db, path),
+            (Self::FirstParty(path), Self::FirstParty(_)) => is_non_stdlib_pkg(db, path),
+            (Self::SitePackages(path), Self::SitePackages(_)) => is_non_stdlib_pkg(db, path),
             // Unlike the other variants:
             // (1) Account for VERSIONS
             // (2) Only test for `__init__.pyi`, not `__init__.py`
             (Self::StandardLibrary(path), Self::StandardLibrary(stdlib_root)) => {
-                match Self::query_stdlib_version(path, typeshed_versions, search_path, stdlib_root, db, target_version) {
+                match Self::query_stdlib_version(db, path, typeshed_versions, search_path, stdlib_root, target_version) {
                     TypeshedVersionsQueryResult::DoesNotExist => false,
                     TypeshedVersionsQueryResult::Exists => db.file_system().exists(&path.join("__init__.pyi")),
                     TypeshedVersionsQueryResult::MaybeExists => db.file_system().exists(&path.join("__init__.pyi")),
@@ -288,7 +288,7 @@ impl<'a> ModuleResolutionPathRefInner<'a> {
                 system_path_to_file(db.upcast(), path)
             }
             (Self::StandardLibrary(path), Self::StandardLibrary(stdlib_root)) => {
-                match Self::query_stdlib_version(path, typeshed_versions, search_path, stdlib_root, db, target_version) {
+                match Self::query_stdlib_version(db, path, typeshed_versions, search_path, stdlib_root, target_version) {
                     TypeshedVersionsQueryResult::DoesNotExist => None,
                     TypeshedVersionsQueryResult::Exists => system_path_to_file(db.upcast(), path),
                     TypeshedVersionsQueryResult::MaybeExists => system_path_to_file(db.upcast(), path)
