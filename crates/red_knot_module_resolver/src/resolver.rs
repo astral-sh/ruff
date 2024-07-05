@@ -435,7 +435,6 @@ mod tests {
 
         let expected_functools_path =
             VfsPath::FileSystem(custom_typeshed.join("stdlib/functools.pyi"));
-
         assert_eq!(&expected_functools_path, functools_module.file().path(&db));
 
         assert_eq!(
@@ -846,10 +845,6 @@ mod tests {
 
         std::fs::write(foo.as_std_path(), "")?;
         std::os::unix::fs::symlink(foo.as_std_path(), bar.as_std_path())?;
-
-        let src = src.to_path_buf();
-        let site_packages = site_packages.to_path_buf();
-        let custom_typeshed = custom_typeshed.to_path_buf();
 
         let settings = ModuleResolutionSettings {
             target_version: SupportedPyVersion::Py38,
