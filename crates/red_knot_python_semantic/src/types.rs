@@ -500,7 +500,7 @@ impl<'db, 'inference> TypingContext<'db, 'inference> {
 #[cfg(test)]
 mod tests {
     use red_knot_module_resolver::{
-        set_module_resolution_settings, ModuleResolutionSettings, SupportedPyVersion,
+        set_module_resolution_settings, ModuleResolutionSettings, TargetVersion,
     };
     use ruff_db::file_system::FileSystemPathBuf;
     use ruff_db::parsed::parsed_module;
@@ -518,7 +518,7 @@ mod tests {
         set_module_resolution_settings(
             &mut db,
             ModuleResolutionSettings {
-                target_version: SupportedPyVersion::Py38,
+                target_version: TargetVersion::Py38,
                 extra_paths: vec![],
                 workspace_root: FileSystemPathBuf::from("/src"),
                 site_packages: None,

@@ -2,17 +2,15 @@ use ruff_db::Upcast;
 
 use crate::resolver::{
     file_to_module,
-    internal::{ModuleNameIngredient, ModuleResolverSearchPaths},
+    internal::{ModuleNameIngredient, ModuleResolverSettings},
     resolve_module_query,
 };
-use crate::supported_py_version::TargetPyVersion;
 use crate::typeshed::parse_typeshed_versions;
 
 #[salsa::jar(db=Db)]
 pub struct Jar(
     ModuleNameIngredient<'_>,
-    ModuleResolverSearchPaths,
-    TargetPyVersion,
+    ModuleResolverSettings,
     resolve_module_query,
     file_to_module,
     parse_typeshed_versions,
@@ -30,7 +28,7 @@ pub(crate) mod tests {
     use ruff_db::vfs::Vfs;
 
     use crate::resolver::{set_module_resolution_settings, ModuleResolutionSettings};
-    use crate::supported_py_version::SupportedPyVersion;
+    use crate::supported_py_version::TargetVersion;
 
     use super::*;
 
@@ -162,12 +160,12 @@ pub(crate) mod tests {
         src: FileSystemPathBuf,
         custom_typeshed: FileSystemPathBuf,
         site_packages: FileSystemPathBuf,
-        target_version: Option<SupportedPyVersion>,
+        target_version: Option<TargetVersion>,
     }
 
     impl TestCaseBuilder {
         #[must_use]
-        pub(crate) fn with_target_version(mut self, target_version: SupportedPyVersion) -> Self {
+        pub(crate) fn with_target_version(mut self, target_version: TargetVersion) -> Self {
             self.target_version = Some(target_version);
             self
         }

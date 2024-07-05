@@ -3,7 +3,7 @@
 use red_knot::program::Program;
 use red_knot::Workspace;
 use red_knot_module_resolver::{
-    set_module_resolution_settings, ModuleResolutionSettings, SupportedPyVersion,
+    set_module_resolution_settings, ModuleResolutionSettings, TargetVersion,
 };
 use ruff_benchmark::criterion::{
     criterion_group, criterion_main, BatchSize, Criterion, Throughput,
@@ -77,7 +77,7 @@ fn setup_case() -> Case {
             workspace_root: workspace_root.to_path_buf(),
             site_packages: None,
             custom_typeshed: None,
-            target_version: SupportedPyVersion::Py38,
+            target_version: TargetVersion::Py38,
         },
     );
 
