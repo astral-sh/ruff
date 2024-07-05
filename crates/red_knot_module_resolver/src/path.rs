@@ -180,14 +180,20 @@ enum ModuleResolutionPathRefInner<'a> {
 
 impl<'a> ModuleResolutionPathRefInner<'a> {
     #[must_use]
-    #[inline]
-    fn absolute_path_to_module_name(
-        absolute_path: &FileSystemPath,
-        stdlib_root: ModuleResolutionPathRef,
-    ) -> Option<ModuleName> {
-        stdlib_root
-            .relativize_path(absolute_path)
+    fn query_stdlib_version(
+        module_path: &FileSystemPath,
+        typeshed_versions: &LazyTypeshedVersions,
+        stdlib_search_path: ModuleResolutionPathRef<'a>,
+        stdlib_root: &FileSystemPath,
+        db: &dyn Db,
+    ) -> TypeshedVersionsQueryResult {
+        let Some(module_name) = stdlib_search_path
+            .relativize_path(module_path)
             .and_then(ModuleResolutionPathRef::to_module_name)
+        else {
+            return TypeshedVersionsQueryResult::DoesNotExist;
+        };
+        typeshed_versions.query_module(&module_name, db, stdlib_root)
     }
 
     #[must_use]
@@ -202,15 +208,10 @@ impl<'a> ModuleResolutionPathRefInner<'a> {
             (Self::FirstParty(path), Self::FirstParty(_)) => db.file_system().is_directory(path),
             (Self::SitePackages(path), Self::SitePackages(_)) => db.file_system().is_directory(path),
             (Self::StandardLibrary(path), Self::StandardLibrary(stdlib_root)) => {
-                let Some(module_name) = Self::absolute_path_to_module_name(path, search_path) else {
-                    return false;
-                };
-                match typeshed_versions.query_module(&module_name, db, stdlib_root) {
-                    TypeshedVersionsQueryResult::Exists
-                    | TypeshedVersionsQueryResult::MaybeExists => {
-                        db.file_system().is_directory(path)
-                    }
+                match Self::query_stdlib_version(path, typeshed_versions, search_path, stdlib_root, db) {
                     TypeshedVersionsQueryResult::DoesNotExist => false,
+                    TypeshedVersionsQueryResult::Exists => db.file_system().is_directory(path),
+                    TypeshedVersionsQueryResult::MaybeExists => db.file_system().is_directory(path),
                 }
             }
             (path, root) => unreachable!(
@@ -226,27 +227,24 @@ impl<'a> ModuleResolutionPathRefInner<'a> {
         search_path: ModuleResolutionPathRef<'a>,
         typeshed_versions: &LazyTypeshedVersions,
     ) -> bool {
+        fn is_non_stdlib_pkg(path: &FileSystemPath, db: &dyn Db) -> bool {
+            let file_system = db.file_system();
+            file_system.exists(&path.join("__init__.py"))
+                || file_system.exists(&path.join("__init__.pyi"))
+        }
+
         match (self, search_path.0) {
-            (Self::Extra(path), Self::Extra(_))
-            | (Self::FirstParty(path), Self::FirstParty(_))
-            | (Self::SitePackages(path), Self::SitePackages(_)) => {
-                let file_system = db.file_system();
-                file_system.exists(&path.join("__init__.py"))
-                    || file_system.exists(&path.join("__init__.pyi"))
-            }
+            (Self::Extra(path), Self::Extra(_)) => is_non_stdlib_pkg(path, db),
+            (Self::FirstParty(path), Self::FirstParty(_)) => is_non_stdlib_pkg(path, db),
+            (Self::SitePackages(path), Self::SitePackages(_)) => is_non_stdlib_pkg(path, db),
             // Unlike the other variants:
             // (1) Account for VERSIONS
             // (2) Only test for `__init__.pyi`, not `__init__.py`
             (Self::StandardLibrary(path), Self::StandardLibrary(stdlib_root)) => {
-                let Some(module_name) = Self::absolute_path_to_module_name(path, search_path) else {
-                    return false;
-                };
-                match typeshed_versions.query_module(&module_name, db, stdlib_root) {
-                    TypeshedVersionsQueryResult::Exists
-                    | TypeshedVersionsQueryResult::MaybeExists => {
-                        db.file_system().exists(&path.join("__init__.pyi"))
-                    }
+                match Self::query_stdlib_version(path, typeshed_versions, search_path, stdlib_root, db) {
                     TypeshedVersionsQueryResult::DoesNotExist => false,
+                    TypeshedVersionsQueryResult::Exists => db.file_system().exists(&path.join("__init__.pyi")),
+                    TypeshedVersionsQueryResult::MaybeExists => db.file_system().exists(&path.join("__init__.pyi")),
                 }
             }
             (path, root) => unreachable!(
@@ -268,13 +266,10 @@ impl<'a> ModuleResolutionPathRefInner<'a> {
                 system_path_to_file(db.upcast(), path)
             }
             (Self::StandardLibrary(path), Self::StandardLibrary(stdlib_root)) => {
-                let module_name = Self::absolute_path_to_module_name(path, search_path)?;
-                match typeshed_versions.query_module(&module_name, db, stdlib_root) {
-                    TypeshedVersionsQueryResult::Exists
-                    | TypeshedVersionsQueryResult::MaybeExists => {
-                        system_path_to_file(db.upcast(), path)
-                    }
+                match Self::query_stdlib_version(path, typeshed_versions, search_path, stdlib_root, db) {
                     TypeshedVersionsQueryResult::DoesNotExist => None,
+                    TypeshedVersionsQueryResult::Exists => system_path_to_file(db.upcast(), path),
+                    TypeshedVersionsQueryResult::MaybeExists => system_path_to_file(db.upcast(), path)
                 }
             }
             (path, root) => unreachable!(
