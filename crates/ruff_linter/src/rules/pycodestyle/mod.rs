@@ -58,6 +58,7 @@ mod tests {
     #[test_case(Rule::TypeComparison, Path::new("E721.py"))]
     #[test_case(Rule::UselessSemicolon, Path::new("E70.py"))]
     #[test_case(Rule::UselessSemicolon, Path::new("E703.ipynb"))]
+    #[test_case(Rule::WhitespaceAfterDecorator, Path::new("E204.py"))]
     fn rules(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!("{}_{}", rule_code.noqa_code(), path.to_string_lossy());
         let diagnostics = test_path(

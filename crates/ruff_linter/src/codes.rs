@@ -78,6 +78,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Pycodestyle, "E201") => (RuleGroup::Preview, rules::pycodestyle::rules::logical_lines::WhitespaceAfterOpenBracket),
         (Pycodestyle, "E202") => (RuleGroup::Preview, rules::pycodestyle::rules::logical_lines::WhitespaceBeforeCloseBracket),
         (Pycodestyle, "E203") => (RuleGroup::Preview, rules::pycodestyle::rules::logical_lines::WhitespaceBeforePunctuation),
+        (Pycodestyle, "E204") => (RuleGroup::Preview, rules::pycodestyle::rules::WhitespaceAfterDecorator),
         (Pycodestyle, "E211") => (RuleGroup::Preview, rules::pycodestyle::rules::logical_lines::WhitespaceBeforeParameters),
         (Pycodestyle, "E221") => (RuleGroup::Preview, rules::pycodestyle::rules::logical_lines::MultipleSpacesBeforeOperator),
         (Pycodestyle, "E222") => (RuleGroup::Preview, rules::pycodestyle::rules::logical_lines::MultipleSpacesAfterOperator),

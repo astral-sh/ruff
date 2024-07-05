@@ -109,24 +109,47 @@ impl NotebookDocument {
             text_content,
         }) = cells
         {
+            // The structural changes should be done first, as they may affect the cell index.
             if let Some(structure) = structure {
                 let start = structure.array.start as usize;
                 let delete = structure.array.delete_count as usize;
+
+                // First, delete the cells and remove them from the index.
                 if delete > 0 {
                     for cell in self.cells.drain(start..start + delete) {
                         self.cell_index.remove(&cell.url);
                     }
                 }
+
+                // Second, insert the new cells with the available information. This array does not
+                // provide the actual contents of the cells, so we'll initialize them with empty
+                // contents.
                 for cell in structure.array.cells.into_iter().flatten().rev() {
                     self.cells
-                        .insert(start, NotebookCell::new(cell, String::new(), version));
+                        .insert(start, NotebookCell::new(cell, String::new(), 0));
                 }
 
-                // register any new cells in the index and update existing ones that came after the insertion
-                for (i, cell) in self.cells.iter().enumerate().skip(start) {
-                    self.cell_index.insert(cell.url.clone(), i);
+                // Third, register the new cells in the index and update existing ones that came
+                // after the insertion.
+                for (index, cell) in self.cells.iter().enumerate().skip(start) {
+                    self.cell_index.insert(cell.url.clone(), index);
+                }
+
+                // Finally, update the text document that represents the cell with the actual
+                // contents. This should be done at the end so that both the `cells` and
+                // `cell_index` are updated before we start applying the changes to the cells.
+                if let Some(did_open) = structure.did_open {
+                    for cell_text_document in did_open {
+                        if let Some(cell) = self.cell_by_uri_mut(&cell_text_document.uri) {
+                            cell.document = TextDocument::new(
+                                cell_text_document.text,
+                                cell_text_document.version,
+                            );
+                        }
+                    }
                 }
             }
+
             if let Some(cell_data) = data {
                 for cell in cell_data {
                     if let Some(existing_cell) = self.cell_by_uri_mut(&cell.document) {
@@ -134,6 +157,7 @@ impl NotebookDocument {
                     }
                 }
             }
+
             if let Some(content_changes) = text_content {
                 for content_change in content_changes {
                     if let Some(cell) = self.cell_by_uri_mut(&content_change.document.uri) {
@@ -143,9 +167,11 @@ impl NotebookDocument {
                 }
             }
         }
+
         if let Some(metadata_change) = metadata_change {
             self.metadata = serde_json::from_value(serde_json::Value::Object(metadata_change))?;
         }
+
         Ok(())
     }
 

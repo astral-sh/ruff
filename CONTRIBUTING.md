@@ -280,7 +280,7 @@ These represent, respectively: the schema used to parse the `pyproject.toml` fil
 intermediate representation; and the final, internal representation used to power Ruff.
 
 To add a new configuration option, you'll likely want to modify these latter few files (along with
-`arg.rs`, if appropriate). If you want to pattern-match against an existing example, grep for
+`args.rs`, if appropriate). If you want to pattern-match against an existing example, grep for
 `dummy_variable_rgx`, which defines a regular expression to match against acceptable unused
 variables (e.g., `_`).
 
