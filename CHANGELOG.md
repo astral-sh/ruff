@@ -1,5 +1,41 @@
 # Changelog
 
+## 0.5.1
+
+### Preview features
+
+- \[`flake8-bugbear`\] Implement mutable-contextvar-default (B039) ([#12113](https://github.com/astral-sh/ruff/pull/12113))
+- \[`pycodestyle`\] Whitespace after decorator (`E204`) ([#12140](https://github.com/astral-sh/ruff/pull/12140))
+- \[`pytest`\] Reverse `PT001` and `PT0023` defaults ([#12106](https://github.com/astral-sh/ruff/pull/12106))
+
+### Rule changes
+
+- Enable token-based rules on source with syntax errors ([#11950](https://github.com/astral-sh/ruff/pull/11950))
+- \[`flake8-bandit`\] Detect `httpx` for `S113` ([#12174](https://github.com/astral-sh/ruff/pull/12174))
+- \[`numpy`\] Update `NPY201` to include exception deprecations ([#12065](https://github.com/astral-sh/ruff/pull/12065))
+- \[`pylint`\] Generate autofix for `duplicate-bases` (`PLE0241`) ([#12105](https://github.com/astral-sh/ruff/pull/12105))
+
+### Server
+
+- Avoid syntax error notification for source code actions ([#12148](https://github.com/astral-sh/ruff/pull/12148))
+- Consider the content of the new cells during notebook sync ([#12203](https://github.com/astral-sh/ruff/pull/12203))
+- Fix replacement edit range computation ([#12171](https://github.com/astral-sh/ruff/pull/12171))
+
+### Bug fixes
+
+- Disable auto-fix when source has syntax errors ([#12134](https://github.com/astral-sh/ruff/pull/12134))
+- Fix cache key collisions for paths with separators ([#12159](https://github.com/astral-sh/ruff/pull/12159))
+- Make `requires-python` inference robust to `==` ([#12091](https://github.com/astral-sh/ruff/pull/12091))
+- Use char-wise width instead of `str`-width ([#12135](https://github.com/astral-sh/ruff/pull/12135))
+- \[`pycodestyle`\] Avoid `E275` if keyword followed by comma ([#12136](https://github.com/astral-sh/ruff/pull/12136))
+- \[`pycodestyle`\] Avoid `E275` if keyword is followed by a semicolon ([#12095](https://github.com/astral-sh/ruff/pull/12095))
+- \[`pylint`\] Skip [dummy variables](https://docs.astral.sh/ruff/settings/#lint_dummy-variable-rgx) for `PLR1704` ([#12190](https://github.com/astral-sh/ruff/pull/12190))
+
+### Performance
+
+- Remove allocation in `parse_identifier` ([#12103](https://github.com/astral-sh/ruff/pull/12103))
+- Use `CompactString` for `Identifier` AST node ([#12101](https://github.com/astral-sh/ruff/pull/12101))
+
 ## 0.5.0
 
 Check out the [blog post](https://astral.sh/blog/ruff-v0.5.0) for a migration guide and overview of the changes!
