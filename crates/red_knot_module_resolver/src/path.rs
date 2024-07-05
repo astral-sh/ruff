@@ -164,7 +164,7 @@ impl fmt::Debug for ModuleResolutionPathBuf {
             ModuleResolutionPathBufInner::SitePackages(path) => ("SitePackages", path),
             ModuleResolutionPathBufInner::StandardLibrary(path) => ("StandardLibrary", path),
         };
-        f.debug_tuple(&format!("ModuleResolutionPath::{name}"))
+        f.debug_tuple(&format!("ModuleResolutionPathBuf::{name}"))
             .field(path)
             .finish()
     }
@@ -349,7 +349,7 @@ impl<'a> ModuleResolutionPathRefInner<'a> {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Clone, Copy, PartialEq, Eq)]
 pub(crate) struct ModuleResolutionPathRef<'a>(ModuleResolutionPathRefInner<'a>);
 
 impl<'a> ModuleResolutionPathRef<'a> {
@@ -455,6 +455,20 @@ impl<'a> ModuleResolutionPathRef<'a> {
                 .ok()
                 .and_then(Self::site_packages),
         }
+    }
+}
+
+impl fmt::Debug for ModuleResolutionPathRef<'_> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let (name, path) = match &self.0 {
+            ModuleResolutionPathRefInner::Extra(path) => ("Extra", path),
+            ModuleResolutionPathRefInner::FirstParty(path) => ("FirstParty", path),
+            ModuleResolutionPathRefInner::SitePackages(path) => ("SitePackages", path),
+            ModuleResolutionPathRefInner::StandardLibrary(path) => ("StandardLibrary", path),
+        };
+        f.debug_tuple(&format!("ModuleResolutionPathRef::{name}"))
+            .field(path)
+            .finish()
     }
 }
 
@@ -574,7 +588,7 @@ mod tests {
     #[test]
     fn stdlib_path_no_extension() {
         assert_debug_snapshot!(stdlib_path_test_case("foo"), @r###"
-        ModuleResolutionPath::StandardLibrary(
+        ModuleResolutionPathBuf::StandardLibrary(
             "foo",
         )
         "###);
@@ -583,7 +597,7 @@ mod tests {
     #[test]
     fn stdlib_path_pyi_extension() {
         assert_debug_snapshot!(stdlib_path_test_case("foo.pyi"), @r###"
-        ModuleResolutionPath::StandardLibrary(
+        ModuleResolutionPathBuf::StandardLibrary(
             "foo.pyi",
         )
         "###);
@@ -592,7 +606,7 @@ mod tests {
     #[test]
     fn stdlib_path_dunder_init() {
         assert_debug_snapshot!(stdlib_path_test_case("foo/__init__.pyi"), @r###"
-        ModuleResolutionPath::StandardLibrary(
+        ModuleResolutionPathBuf::StandardLibrary(
             "foo/__init__.pyi",
         )
         "###);
@@ -608,7 +622,7 @@ mod tests {
         assert_debug_snapshot!(
             ModuleResolutionPathBuf::standard_library("foo").unwrap().with_pyi_extension(),
             @r###"
-        ModuleResolutionPath::StandardLibrary(
+        ModuleResolutionPathBuf::StandardLibrary(
             "foo.pyi",
         )
         "###
@@ -620,7 +634,7 @@ mod tests {
         assert_debug_snapshot!(
             ModuleResolutionPathBuf::first_party("foo").unwrap().with_py_extension().unwrap(),
             @r###"
-        ModuleResolutionPath::FirstParty(
+        ModuleResolutionPathBuf::FirstParty(
             "foo.py",
         )
         "###
@@ -632,7 +646,7 @@ mod tests {
         assert_debug_snapshot!(
             ModuleResolutionPathBuf::first_party("foo").unwrap().with_pyi_extension(),
             @r###"
-        ModuleResolutionPath::FirstParty(
+        ModuleResolutionPathBuf::FirstParty(
             "foo.pyi",
         )
         "###
@@ -797,10 +811,10 @@ mod tests {
             assert_debug_snapshot!(
                 ModuleResolutionPathBuf::standard_library("foo").unwrap().join("bar"),
                 @r###"
-                ModuleResolutionPath::StandardLibrary(
-                    "foo/bar",
-                )
-                "###
+            ModuleResolutionPathBuf::StandardLibrary(
+                "foo/bar",
+            )
+            "###
             );
         });
     }
@@ -811,10 +825,10 @@ mod tests {
             assert_debug_snapshot!(
                 ModuleResolutionPathBuf::site_packages("foo").unwrap().join("bar.pyi"),
                 @r###"
-                ModuleResolutionPath::SitePackages(
-                    "foo/bar.pyi",
-                )
-                "###
+            ModuleResolutionPathBuf::SitePackages(
+                "foo/bar.pyi",
+            )
+            "###
             );
         });
     }
@@ -825,10 +839,10 @@ mod tests {
             assert_debug_snapshot!(
                 ModuleResolutionPathBuf::extra("foo").unwrap().join("bar.py"),
                 @r###"
-                ModuleResolutionPath::Extra(
-                    "foo/bar.py",
-                )
-                "###
+            ModuleResolutionPathBuf::Extra(
+                "foo/bar.py",
+            )
+            "###
             );
         });
     }
@@ -839,10 +853,10 @@ mod tests {
             assert_debug_snapshot!(
                 ModuleResolutionPathBuf::first_party("foo").unwrap().join("bar/baz/eggs/__init__.py"),
                 @r###"
-                ModuleResolutionPath::FirstParty(
-                    "foo/bar/baz/eggs/__init__.py",
-                )
-                "###
+            ModuleResolutionPathBuf::FirstParty(
+                "foo/bar/baz/eggs/__init__.py",
+            )
+            "###
             );
         });
     }
@@ -924,10 +938,8 @@ mod tests {
                     .relativize_path("foo/baz/eggs/__init__.pyi")
                     .unwrap(),
                 @r###"
-            ModuleResolutionPathRef(
-                StandardLibrary(
-                    "baz/eggs/__init__.pyi",
-                ),
+            ModuleResolutionPathRef::StandardLibrary(
+                "baz/eggs/__init__.pyi",
             )
             "###
             );
@@ -943,10 +955,8 @@ mod tests {
                     .relativize_path("foo/baz")
                     .unwrap(),
                 @r###"
-            ModuleResolutionPathRef(
-                SitePackages(
-                    "baz",
-                ),
+            ModuleResolutionPathRef::SitePackages(
+                "baz",
             )
             "###
             );
@@ -962,10 +972,8 @@ mod tests {
                     .relativize_path("foo/baz/functools.py")
                     .unwrap(),
                 @r###"
-            ModuleResolutionPathRef(
-                Extra(
-                    "functools.py",
-                ),
+            ModuleResolutionPathRef::Extra(
+                "functools.py",
             )
             "###
             );
@@ -981,10 +989,8 @@ mod tests {
                     .relativize_path("dev/src/package/bar/baz.pyi")
                     .unwrap(),
                 @r###"
-            ModuleResolutionPathRef(
-                SitePackages(
-                    "package/bar/baz.pyi",
-                ),
+            ModuleResolutionPathRef::SitePackages(
+                "package/bar/baz.pyi",
             )
             "###
             );
