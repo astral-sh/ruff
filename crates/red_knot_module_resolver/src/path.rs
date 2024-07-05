@@ -561,9 +561,15 @@ mod tests {
 
     #[test]
     fn constructor_rejects_non_pyi_stdlib_paths() {
-        assert!(ModuleResolutionPathBuf::standard_library("foo.py").is_none());
-        assert!(ModuleResolutionPathBuf::standard_library("foo/__init__.py").is_none());
-        assert!(ModuleResolutionPathBuf::standard_library("foo.py.pyi").is_none());
+        assert_eq!(ModuleResolutionPathBuf::standard_library("foo.py"), None);
+        assert_eq!(
+            ModuleResolutionPathBuf::standard_library("foo/__init__.py"),
+            None
+        );
+        assert_eq!(
+            ModuleResolutionPathBuf::standard_library("foo.py.pyi"),
+            None
+        );
     }
 
     fn stdlib_path_test_case(path: &str) -> ModuleResolutionPathBuf {
@@ -599,7 +605,7 @@ mod tests {
 
     #[test]
     fn stdlib_paths_can_only_be_pyi() {
-        assert!(stdlib_path_test_case("foo").with_py_extension().is_none());
+        assert_eq!(stdlib_path_test_case("foo").with_py_extension(), None);
     }
 
     #[test]
@@ -882,13 +888,13 @@ mod tests {
 
         // Must have a `.pyi` extension or no extension:
         let bad_absolute_path = FileSystemPath::new("foo/stdlib/x.py");
-        assert!(root.relativize_path(bad_absolute_path).is_none());
+        assert_eq!(root.relativize_path(bad_absolute_path), None);
         let second_bad_absolute_path = FileSystemPath::new("foo/stdlib/x.rs");
-        assert!(root.relativize_path(second_bad_absolute_path).is_none());
+        assert_eq!(root.relativize_path(second_bad_absolute_path), None);
 
         // Must be a path that is a child of `root`:
         let third_bad_absolute_path = FileSystemPath::new("bar/stdlib/x.pyi");
-        assert!(root.relativize_path(third_bad_absolute_path).is_none());
+        assert_eq!(root.relativize_path(third_bad_absolute_path), None);
     }
 
     fn non_stdlib_relativize_tester(
@@ -897,10 +903,10 @@ mod tests {
         let root = variant("foo").unwrap();
         // Must have a `.py` extension, a `.pyi` extension, or no extension:
         let bad_absolute_path = FileSystemPath::new("foo/stdlib/x.rs");
-        assert!(root.relativize_path(bad_absolute_path).is_none());
+        assert_eq!(root.relativize_path(bad_absolute_path), None);
         // Must be a path that is a child of `root`:
         let second_bad_absolute_path = FileSystemPath::new("bar/stdlib/x.pyi");
-        assert!(root.relativize_path(second_bad_absolute_path).is_none());
+        assert_eq!(root.relativize_path(second_bad_absolute_path), None);
     }
 
     #[test]
@@ -1013,9 +1019,7 @@ mod tests {
         assert!(asyncio_regular_package.is_directory(&db, &stdlib_path));
         assert!(asyncio_regular_package.is_regular_package(&db, &stdlib_path));
         // Paths to directories don't resolve to VfsFiles
-        assert!(asyncio_regular_package
-            .to_vfs_file(&db, &stdlib_path)
-            .is_none());
+        assert_eq!(asyncio_regular_package.to_vfs_file(&db, &stdlib_path), None);
         assert!(asyncio_regular_package
             .join("__init__.pyi")
             .to_vfs_file(&db, &stdlib_path)
@@ -1024,9 +1028,7 @@ mod tests {
         // The `asyncio` package exists on Python 3.8, but the `asyncio.tasks` submodule does not,
         // according to the `VERSIONS` file in our typeshed mock:
         let asyncio_tasks_module = stdlib_path.join("asyncio/tasks.pyi");
-        assert!(asyncio_tasks_module
-            .to_vfs_file(&db, &stdlib_path)
-            .is_none());
+        assert_eq!(asyncio_tasks_module.to_vfs_file(&db, &stdlib_path), None);
         assert!(!asyncio_tasks_module.is_directory(&db, &stdlib_path));
         assert!(!asyncio_tasks_module.is_regular_package(&db, &stdlib_path));
     }
@@ -1038,9 +1040,7 @@ mod tests {
         let xml_namespace_package = stdlib_path.join("xml");
         assert!(xml_namespace_package.is_directory(&db, &stdlib_path));
         // Paths to directories don't resolve to VfsFiles
-        assert!(xml_namespace_package
-            .to_vfs_file(&db, &stdlib_path)
-            .is_none());
+        assert_eq!(xml_namespace_package.to_vfs_file(&db, &stdlib_path), None);
         assert!(!xml_namespace_package.is_regular_package(&db, &stdlib_path));
 
         let xml_etree = stdlib_path.join("xml/etree.pyi");
@@ -1064,9 +1064,10 @@ mod tests {
         let (db, stdlib_path) = py38_stdlib_test_case();
 
         let collections_regular_package = stdlib_path.join("collections");
-        assert!(collections_regular_package
-            .to_vfs_file(&db, &stdlib_path)
-            .is_none());
+        assert_eq!(
+            collections_regular_package.to_vfs_file(&db, &stdlib_path),
+            None
+        );
         assert!(!collections_regular_package.is_directory(&db, &stdlib_path));
         assert!(!collections_regular_package.is_regular_package(&db, &stdlib_path));
     }
@@ -1076,14 +1077,15 @@ mod tests {
         let (db, stdlib_path) = py38_stdlib_test_case();
 
         let importlib_namespace_package = stdlib_path.join("importlib");
-        assert!(importlib_namespace_package
-            .to_vfs_file(&db, &stdlib_path)
-            .is_none());
+        assert_eq!(
+            importlib_namespace_package.to_vfs_file(&db, &stdlib_path),
+            None
+        );
         assert!(!importlib_namespace_package.is_directory(&db, &stdlib_path));
         assert!(!importlib_namespace_package.is_regular_package(&db, &stdlib_path));
 
         let importlib_abc = stdlib_path.join("importlib/abc.pyi");
-        assert!(importlib_abc.to_vfs_file(&db, &stdlib_path).is_none());
+        assert_eq!(importlib_abc.to_vfs_file(&db, &stdlib_path), None);
         assert!(!importlib_abc.is_directory(&db, &stdlib_path));
         assert!(!importlib_abc.is_regular_package(&db, &stdlib_path));
     }
@@ -1093,7 +1095,7 @@ mod tests {
         let (db, stdlib_path) = py38_stdlib_test_case();
 
         let non_existent = stdlib_path.join("doesnt_even_exist");
-        assert!(non_existent.to_vfs_file(&db, &stdlib_path).is_none());
+        assert_eq!(non_existent.to_vfs_file(&db, &stdlib_path), None);
         assert!(!non_existent.is_directory(&db, &stdlib_path));
         assert!(!non_existent.is_regular_package(&db, &stdlib_path));
     }
@@ -1122,9 +1124,10 @@ mod tests {
         assert!(collections_regular_package.is_directory(&db, &stdlib_path));
         assert!(collections_regular_package.is_regular_package(&db, &stdlib_path));
         // (This is still `None`, as directories don't resolve to `Vfs` files)
-        assert!(collections_regular_package
-            .to_vfs_file(&db, &stdlib_path)
-            .is_none());
+        assert_eq!(
+            collections_regular_package.to_vfs_file(&db, &stdlib_path),
+            None
+        );
         assert!(collections_regular_package
             .join("__init__.pyi")
             .to_vfs_file(&db, &stdlib_path)
@@ -1148,9 +1151,10 @@ mod tests {
         assert!(importlib_namespace_package.is_directory(&db, &stdlib_path));
         assert!(!importlib_namespace_package.is_regular_package(&db, &stdlib_path));
         // (This is still `None`, as directories don't resolve to `Vfs` files)
-        assert!(importlib_namespace_package
-            .to_vfs_file(&db, &stdlib_path)
-            .is_none());
+        assert_eq!(
+            importlib_namespace_package.to_vfs_file(&db, &stdlib_path),
+            None
+        );
 
         // ...As do submodules in the `importlib` namespace package:
         let importlib_abc = importlib_namespace_package.join("abc.pyi");
@@ -1165,14 +1169,12 @@ mod tests {
 
         // The `xml` package no longer exists on py39:
         let xml_namespace_package = stdlib_path.join("xml");
-        assert!(xml_namespace_package
-            .to_vfs_file(&db, &stdlib_path)
-            .is_none());
+        assert_eq!(xml_namespace_package.to_vfs_file(&db, &stdlib_path), None);
         assert!(!xml_namespace_package.is_directory(&db, &stdlib_path));
         assert!(!xml_namespace_package.is_regular_package(&db, &stdlib_path));
 
         let xml_etree = xml_namespace_package.join("etree.pyi");
-        assert!(xml_etree.to_vfs_file(&db, &stdlib_path).is_none());
+        assert_eq!(xml_etree.to_vfs_file(&db, &stdlib_path), None);
         assert!(!xml_etree.is_directory(&db, &stdlib_path));
         assert!(!xml_etree.is_regular_package(&db, &stdlib_path));
     }
