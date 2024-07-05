@@ -179,10 +179,52 @@ impl TypeshedVersions {
     }
 }
 
+/// Possible answers [`LazyTypeshedVersions::query_module()`] could give to the question:
+/// "Does this module exist in the stdlib at runtime on a certain target version?"
 #[derive(Debug, Copy, PartialEq, Eq, Clone, Hash)]
 pub(crate) enum TypeshedVersionsQueryResult {
+    /// The module definitely exists in the stdlib at runtime on the user-specified target version.
+    ///
+    /// For example:
+    /// - The target version is Python 3.8
+    /// - We're querying whether the `asyncio.tasks` module exists in the stdlib
+    /// - The VERSIONS file contains the line `asyncio.tasks: 3.8-`
     Exists,
+
+    /// The module definitely does not exist in the stdlib on the user-specified target version.
+    ///
+    /// For example:
+    /// - We're querying whether the `foo` module exists in the stdlib
+    /// - There is no top-level `foo` module in VERSIONS
+    ///
+    /// OR:
+    /// - The target version is Python 3.8
+    /// - We're querying whether the module `importlib.abc` exists in the stdlib
+    /// - The VERSIONS file contains the line `importlib.abc: 3.10-`,
+    ///   indicating that the module was added in 3.10
+    ///
+    /// OR:
+    /// - The target version is Python 3.8
+    /// - We're querying whether the module `collections.abc` exists in the stdlib
+    /// - The VERSIONS file does not contain any information about the `collections.abc` submodule,
+    ///   but *does* contain the line `collections: 3.10-`,
+    ///   indicating that the entire `collections` package was added in Python 3.10.
     DoesNotExist,
+
+    /// The module potentially exists in the stdlib and, if it does,
+    /// it definitely exists on the user-specified target version.
+    ///
+    /// This variant is only relevant for submodules,
+    /// for which the typeshed VERSIONS file does not provide comprehensive information.
+    /// (The VERSIONS file is guaranteed to provide information about all top-level stdlib modules and packages,
+    /// but not necessarily about all submodules within each top-level package.)
+    ///
+    /// For example:
+    /// - The target version is Python 3.8
+    /// - We're querying whether the `asyncio.staggered` module exists in the stdlib
+    /// - The typeshed VERSIONS file contains the line `asyncio: 3.8`,
+    ///   indicating that the `asyncio` package was added in Python 3.8,
+    ///   but does not contain any explicit information about the `asyncio.staggered` submodule.
     MaybeExists,
 }
 
