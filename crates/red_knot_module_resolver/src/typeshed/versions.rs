@@ -19,10 +19,23 @@ use crate::supported_py_version::{get_target_py_version, SupportedPyVersion};
 pub(crate) struct LazyTypeshedVersions(OnceCell<TypeshedVersions>);
 
 impl LazyTypeshedVersions {
+    #[must_use]
     pub(crate) fn new() -> Self {
         Self(OnceCell::new())
     }
 
+    /// Query whether a module exists at runtime in the stdlib on a certain Python version.
+    ///
+    /// Simply probing whether a file exists in typeshed is insufficient for this question,
+    /// as a module in the stdlib may have been added in Python 3.10, but the typeshed stub
+    /// will still be available (either in a custom typeshed dir or in our vendored copy)
+    /// even if the user specified Python 3.8 as the target version.
+    ///
+    /// For top-level modules and packages, the VERSIONS file can always provide an unambiguous answer
+    /// as to whether the module exists on the specified target version. However, VERSIONS does not
+    /// provide comprehensive information on all submodules, meaning that this method sometimes
+    /// returns [`TypeshedVersionsQueryResult::MaybeExists`].
+    /// See [`TypeshedVersionsQueryResult`] for more details.
     #[must_use]
     pub(crate) fn query_module(
         &self,
@@ -35,7 +48,7 @@ impl LazyTypeshedVersions {
             let Some(versions_file) = system_path_to_file(db.upcast(), &versions_path) else {
                 todo!(
                     "Still need to figure out how to handle VERSIONS files being deleted \
-                    from custom typeshed directories! Expected a file to exist at {versions_path:?}"
+                    from custom typeshed directories! Expected a file to exist at {versions_path}"
                 )
             };
             // TODO(Alex/Micha): If VERSIONS is invalid,
