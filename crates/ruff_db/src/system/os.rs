@@ -1,12 +1,27 @@
+use crate::system::{FileType, Metadata, Result, System, SystemPath, SystemPathBuf};
 use filetime::FileTime;
 use std::any::Any;
-
-use crate::system::{FileType, Metadata, Result, System, SystemPath};
+use std::sync::Arc;
 
 #[derive(Default, Debug)]
-pub struct OsSystem;
+pub struct OsSystem {
+    inner: Arc<OsSystemInner>,
+}
+
+#[derive(Default, Debug)]
+struct OsSystemInner {
+    cwd: SystemPathBuf,
+}
 
 impl OsSystem {
+    pub fn new(cwd: impl AsRef<SystemPath>) -> Self {
+        Self {
+            inner: Arc::new(OsSystemInner {
+                cwd: cwd.as_ref().to_path_buf(),
+            }),
+        }
+    }
+
     #[cfg(unix)]
     fn permissions(metadata: &std::fs::Metadata) -> Option<u32> {
         use std::os::unix::fs::PermissionsExt;
@@ -20,7 +35,9 @@ impl OsSystem {
     }
 
     pub fn snapshot(&self) -> Self {
-        Self
+        Self {
+            inner: self.inner.clone(),
+        }
     }
 }
 
@@ -42,6 +59,10 @@ impl System for OsSystem {
 
     fn path_exists(&self, path: &SystemPath) -> bool {
         path.as_std_path().exists()
+    }
+
+    fn current_directory(&self) -> &SystemPath {
+        &self.inner.cwd
     }
 
     fn as_any(&self) -> &dyn Any {

@@ -387,7 +387,7 @@ impl PackageKind {
 #[cfg(test)]
 mod tests {
     use ruff_db::files::{system_path_to_file, File, FilePath};
-    use ruff_db::system::{DbWithTestSystem, SystemPath};
+    use ruff_db::system::DbWithTestSystem;
 
     use crate::db::tests::{create_resolver_builder, TestCase};
     use crate::module::ModuleKind;
@@ -826,6 +826,12 @@ mod tests {
     #[test]
     #[cfg(target_family = "unix")]
     fn symlink() -> anyhow::Result<()> {
+        use ruff_db::system::{OsSystem, SystemPath};
+
+        fn make_relative(path: &SystemPath) -> &SystemPath {
+            path.strip_prefix("/").unwrap_or(path)
+        }
+
         let TestCase {
             mut db,
             src,
@@ -833,14 +839,13 @@ mod tests {
             custom_typeshed,
         } = setup_resolver_test();
 
-        db.use_os_system();
-
         let temp_dir = tempfile::tempdir()?;
         let root = SystemPath::from_std_path(temp_dir.path()).unwrap();
+        db.use_os_system(OsSystem::new(root));
 
-        let src = root.join(src);
-        let site_packages = root.join(site_packages);
-        let custom_typeshed = root.join(custom_typeshed);
+        let src = root.join(make_relative(&src));
+        let site_packages = root.join(make_relative(&site_packages));
+        let custom_typeshed = root.join(make_relative(&custom_typeshed));
 
         let foo = src.join("foo.py");
         let bar = src.join("bar.py");

@@ -306,6 +306,94 @@ impl SystemPath {
     pub fn from_std_path(path: &Path) -> Option<&SystemPath> {
         Some(SystemPath::new(Utf8Path::from_path(path)?))
     }
+
+    /// Makes a path absolute and normalizes it without accessing the file system.
+    ///
+    /// Adapted from [cargo](https://github.com/rust-lang/cargo/blob/fede83ccf973457de319ba6fa0e36ead454d2e20/src/cargo/util/paths.rs#L61)
+    ///
+    /// # Examples
+    ///
+    /// ## Posix paths
+    ///
+    /// ```
+    /// # #[cfg(unix)]
+    /// # fn main() {
+    ///   use ruff_db::system::{SystemPath, SystemPathBuf};
+    ///
+    ///   // Relative to absolute
+    ///   let absolute = SystemPath::absolute("foo/./bar", "/tmp");
+    ///   assert_eq!(absolute, SystemPathBuf::from("/tmp/foo/bar"));
+    ///
+    ///   // Path's going past the root are normalized to the root
+    ///   let absolute = SystemPath::absolute("../../../", "/tmp");
+    ///   assert_eq!(absolute, SystemPathBuf::from("/"));
+    ///
+    ///   // Absolute to absolute
+    ///   let absolute = SystemPath::absolute("/foo//test/.././bar.rs", "/tmp");
+    ///   assert_eq!(absolute, SystemPathBuf::from("/foo/bar.rs"));
+    /// # }
+    /// # #[cfg(not(unix))]
+    /// # fn main() {}
+    /// ```
+    ///
+    /// ## Windows paths
+    ///
+    /// ```
+    /// # #[cfg(windows)]
+    /// # fn main() {
+    ///   use ruff_db::system::{SystemPath, SystemPathBuf};
+    ///
+    ///   // Relative to absolute
+    ///   let absolute = SystemPath::absolute(r"foo\.\bar", r"C:\tmp");
+    ///   assert_eq!(absolute, SystemPathBuf::from(r"C:\tmp\foo\bar"));
+    ///
+    ///   // Path's going past the root are normalized to the root
+    ///   let absolute = SystemPath::absolute(r"..\..\..\", r"C:\tmp");
+    ///   assert_eq!(absolute, SystemPathBuf::from(r"C:\"));
+    ///
+    ///   // Absolute to absolute
+    ///   let absolute = SystemPath::absolute(r"C:\foo//test\..\./bar.rs", r"C:\tmp");
+    ///   assert_eq!(absolute, SystemPathBuf::from(r"C:\foo\bar.rs"));
+    /// # }
+    /// # #[cfg(not(windows))]
+    /// # fn main() {}
+    /// ```
+    pub fn absolute(path: impl AsRef<SystemPath>, cwd: impl AsRef<SystemPath>) -> SystemPathBuf {
+        fn absolute(path: &SystemPath, cwd: &SystemPath) -> SystemPathBuf {
+            let path = &path.0;
+
+            let mut components = path.components().peekable();
+            let mut ret = if let Some(
+                c @ (camino::Utf8Component::Prefix(..) | camino::Utf8Component::RootDir),
+            ) = components.peek().cloned()
+            {
+                components.next();
+                Utf8PathBuf::from(c.as_str())
+            } else {
+                cwd.0.to_path_buf()
+            };
+
+            for component in components {
+                match component {
+                    camino::Utf8Component::Prefix(..) => unreachable!(),
+                    camino::Utf8Component::RootDir => {
+                        ret.push(component);
+                    }
+                    camino::Utf8Component::CurDir => {}
+                    camino::Utf8Component::ParentDir => {
+                        ret.pop();
+                    }
+                    camino::Utf8Component::Normal(c) => {
+                        ret.push(c);
+                    }
+                }
+            }
+
+            SystemPathBuf::from_utf8_path_buf(ret)
+        }
+
+        absolute(path.as_ref(), cwd.as_ref())
+    }
 }
 
 /// An owned, mutable path on [`System`](`super::System`) (akin to [`String`]).
@@ -364,6 +452,10 @@ impl SystemPathBuf {
     /// ```
     pub fn push(&mut self, path: impl AsRef<SystemPath>) {
         self.0.push(&path.as_ref().0);
+    }
+
+    pub fn into_utf8_path_buf(self) -> Utf8PathBuf {
+        self.0
     }
 
     #[inline]

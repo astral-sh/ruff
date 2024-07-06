@@ -34,8 +34,8 @@ impl TestSystem {
         }
     }
 
-    fn use_os_system(&mut self) {
-        self.inner = TestFileSystem::Os(OsSystem);
+    fn use_os_system(&mut self, os: OsSystem) {
+        self.inner = TestFileSystem::Os(os);
     }
 }
 
@@ -72,6 +72,13 @@ impl System for TestSystem {
         match &self.inner {
             TestFileSystem::Stub(fs) => fs.is_file(path),
             TestFileSystem::Os(fs) => fs.is_file(path),
+        }
+    }
+
+    fn current_directory(&self) -> &SystemPath {
+        match &self.inner {
+            TestFileSystem::Stub(fs) => fs.current_directory(),
+            TestFileSystem::Os(fs) => fs.current_directory(),
         }
     }
 
@@ -132,8 +139,8 @@ pub trait DbWithTestSystem: Db + Sized {
     /// This useful for testing advanced file system features like permissions, symlinks, etc.
     ///
     /// Note that any files written to the memory file system won't be copied over.
-    fn use_os_system(&mut self) {
-        self.test_system_mut().use_os_system();
+    fn use_os_system(&mut self, os: OsSystem) {
+        self.test_system_mut().use_os_system(os);
     }
 
     /// Returns the memory file system.
