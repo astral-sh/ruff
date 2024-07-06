@@ -100,7 +100,7 @@ fn benchmark_without_parse(criterion: &mut Criterion) {
     group.throughput(Throughput::Bytes(FOO_CODE.len() as u64));
 
     group.bench_function("red_knot_check_file[without_parse]", |b| {
-        b.iter_batched(
+        b.iter_batched_ref(
             || {
                 let case = setup_case();
                 // Pre-parse the module to only measure the semantic time.
@@ -111,7 +111,7 @@ fn benchmark_without_parse(criterion: &mut Criterion) {
             },
             |case| {
                 let Case { program, foo, .. } = case;
-                let result = program.check_file(foo).unwrap();
+                let result = program.check_file(*foo).unwrap();
 
                 assert_eq!(result.as_slice(), [] as [String; 0]);
             },
@@ -127,7 +127,7 @@ fn benchmark_incremental(criterion: &mut Criterion) {
     group.throughput(Throughput::Bytes(FOO_CODE.len() as u64));
 
     group.bench_function("red_knot_check_file[incremental]", |b| {
-        b.iter_batched(
+        b.iter_batched_ref(
             || {
                 let mut case = setup_case();
                 case.program.check_file(case.foo).unwrap();
@@ -144,7 +144,7 @@ fn benchmark_incremental(criterion: &mut Criterion) {
             },
             |case| {
                 let Case { program, foo, .. } = case;
-                let result = program.check_file(foo).unwrap();
+                let result = program.check_file(*foo).unwrap();
 
                 assert_eq!(result.as_slice(), [] as [String; 0]);
             },
@@ -160,11 +160,11 @@ fn benchmark_cold(criterion: &mut Criterion) {
     group.throughput(Throughput::Bytes(FOO_CODE.len() as u64));
 
     group.bench_function("red_knot_check_file[cold]", |b| {
-        b.iter_batched(
+        b.iter_batched_ref(
             setup_case,
             |case| {
                 let Case { program, foo, .. } = case;
-                let result = program.check_file(foo).unwrap();
+                let result = program.check_file(*foo).unwrap();
 
                 assert_eq!(result.as_slice(), [] as [String; 0]);
             },
