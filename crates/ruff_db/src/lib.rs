@@ -3,15 +3,16 @@ use std::hash::BuildHasherDefault;
 use rustc_hash::FxHasher;
 use salsa::DbWithJar;
 
-use crate::file_system::FileSystem;
+use crate::files::{File, FilePath, Files};
 use crate::parsed::parsed_module;
 use crate::source::{line_index, source_text};
-use crate::vfs::{Vfs, VfsFile};
+use crate::system::System;
+use crate::vendored::VendoredFileSystem;
 
 pub mod file_revision;
-pub mod file_system;
 pub mod parsed;
 pub mod source;
+pub mod system;
 pub mod vendored;
 pub mod vfs;
 
@@ -22,9 +23,42 @@ pub struct Jar(VfsFile, source_text, line_index, parsed_module);
 
 /// Database that gives access to the virtual filesystem, source code, and parsed AST.
 pub trait Db: DbWithJar<Jar> {
-    fn file_system(&self) -> &dyn FileSystem;
+    fn vendored(&self) -> &VendoredFileSystem;
+    fn system(&self) -> &dyn System;
+    fn files(&self) -> &Files;
 
-    fn vfs(&self) -> &Vfs;
+    /// Reads the contents of the file at `path` into a string. Returns an error if the file doesn't exist,
+    /// isn't accessible, isn't a file, or contains non-UTF8 content.
+    fn read_to_string(&self, path: &FilePath) -> std::io::Result<String> {
+        match path {
+            FilePath::System(path) => self.system().read_to_string(path),
+            FilePath::Vendored(path) => self.vendored().read_to_string(path),
+        }
+    }
+
+    /// Returns `true` if `path` exists.
+    fn exists(&self, path: &FilePath) -> bool {
+        match path {
+            FilePath::System(path) => self.system().exists(path),
+            FilePath::Vendored(path) => self.vendored().exists(path),
+        }
+    }
+
+    /// Returns `true` if `path` points to a directory.
+    fn is_directory(&self, path: &FilePath) -> bool {
+        match path {
+            FilePath::System(path) => self.system().is_directory(path),
+            FilePath::Vendored(path) => self.vendored().is_directory(path),
+        }
+    }
+
+    /// Returns `true` if `path` points to a file.
+    fn is_file(&self, path: &FilePath) -> bool {
+        match path {
+            FilePath::System(path) => self.system().is_file(path),
+            FilePath::Vendored(path) => self.vendored().is_file(path),
+        }
+    }
 }
 
 /// Trait for upcasting a reference to a base trait object.
@@ -38,37 +72,34 @@ mod tests {
 
     use salsa::DebugWithDb;
 
-    use crate::file_system::{FileSystem, MemoryFileSystem};
-    use crate::vfs::{VendoredPathBuf, Vfs};
+    use crate::system::System;
+    use crate::system::TestSystem;
+    use crate::vendored::VendoredFileSystem;
+    use crate::vfs::Vfs;
     use crate::{Db, Jar};
 
     /// Database that can be used for testing.
     ///
     /// Uses an in memory filesystem and it stubs out the vendored files by default.
+    #[derive(Default)]
     #[salsa::db(Jar)]
     pub(crate) struct TestDb {
         storage: salsa::Storage<Self>,
         vfs: Vfs,
-        file_system: MemoryFileSystem,
+        system: TestSystem,
+        vendored: VendoredFileSystem,
         events: std::sync::Arc<std::sync::Mutex<Vec<salsa::Event>>>,
     }
 
     impl TestDb {
         pub(crate) fn new() -> Self {
-            let mut vfs = Vfs::default();
-            vfs.stub_vendored::<VendoredPathBuf, String>([]);
-
             Self {
                 storage: salsa::Storage::default(),
-                file_system: MemoryFileSystem::default(),
+                system: TestSystem::default(),
+                vendored: VendoredFileSystem::default(),
                 events: std::sync::Arc::default(),
-                vfs,
+                vfs: Vfs::default(),
             }
-        }
-
-        #[allow(unused)]
-        pub(crate) fn file_system(&self) -> &MemoryFileSystem {
-            &self.file_system
         }
 
         /// Empties the internal store of salsa events that have been emitted,
@@ -93,18 +124,26 @@ mod tests {
             self.take_salsa_events();
         }
 
-        pub(crate) fn file_system_mut(&mut self) -> &mut MemoryFileSystem {
-            &mut self.file_system
+        pub(crate) fn system(&self) -> &TestSystem {
+            &self.system
         }
 
-        pub(crate) fn vfs_mut(&mut self) -> &mut Vfs {
-            &mut self.vfs
+        pub(crate) fn system_mut(&mut self) -> &mut TestSystem {
+            &mut self.system
+        }
+
+        pub(crate) fn with_vendored(&mut self, vendored_file_system: VendoredFileSystem) {
+            self.vendored = vendored_file_system;
         }
     }
 
     impl Db for TestDb {
-        fn file_system(&self) -> &dyn FileSystem {
-            &self.file_system
+        fn vendored(&self) -> &VendoredFileSystem {
+            &self.vendored
+        }
+
+        fn system(&self) -> &dyn System {
+            self.system()
         }
 
         fn vfs(&self) -> &Vfs {
@@ -124,9 +163,10 @@ mod tests {
         fn snapshot(&self) -> salsa::Snapshot<Self> {
             salsa::Snapshot::new(Self {
                 storage: self.storage.snapshot(),
-                file_system: self.file_system.snapshot(),
-                vfs: self.vfs.snapshot(),
+                system: self.system.snapshot(),
+                files: self.files.snapshot(),
                 events: self.events.clone(),
+                vendored: self.vendored.snapshot(),
             })
         }
     }

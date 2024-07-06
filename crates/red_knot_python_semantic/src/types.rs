@@ -274,9 +274,9 @@ mod tests {
     use red_knot_module_resolver::{
         set_module_resolution_settings, RawModuleResolutionSettings, TargetVersion,
     };
-    use ruff_db::file_system::FileSystemPathBuf;
+    use ruff_db::files::system_path_to_file;
     use ruff_db::parsed::parsed_module;
-    use ruff_db::vfs::system_path_to_file;
+    use ruff_db::system::SystemPathBuf;
 
     use crate::db::tests::{
         assert_will_not_run_function_query, assert_will_run_function_query, TestDb,
@@ -292,7 +292,7 @@ mod tests {
             RawModuleResolutionSettings {
                 target_version: TargetVersion::Py38,
                 extra_paths: vec![],
-                workspace_root: FileSystemPathBuf::from("/src"),
+                workspace_root: SystemPathBuf::from("/src"),
                 site_packages: None,
                 custom_typeshed: None,
             },
@@ -305,7 +305,7 @@ mod tests {
     fn local_inference() -> anyhow::Result<()> {
         let db = setup_db();
 
-        db.memory_file_system().write_file("/src/a.py", "x = 10")?;
+        db.system().write_file("/src/a.py", "x = 10")?;
         let a = system_path_to_file(&db, "/src/a.py").unwrap();
 
         let parsed = parsed_module(&db, a);
@@ -324,7 +324,7 @@ mod tests {
     fn dependency_public_symbol_type_change() -> anyhow::Result<()> {
         let mut db = setup_db();
 
-        db.memory_file_system().write_files([
+        db.system().write_files([
             ("/src/a.py", "from foo import x"),
             ("/src/foo.py", "x = 10\ndef foo(): ..."),
         ])?;
@@ -335,7 +335,7 @@ mod tests {
         assert_eq!(x_ty.display(&db).to_string(), "Literal[10]");
 
         // Change `x` to a different value
-        db.memory_file_system()
+        db.system()
             .write_file("/src/foo.py", "x = 20\ndef foo(): ...")?;
 
         let foo = system_path_to_file(&db, "/src/foo.py").unwrap();
@@ -365,7 +365,7 @@ mod tests {
     fn dependency_non_public_symbol_change() -> anyhow::Result<()> {
         let mut db = setup_db();
 
-        db.memory_file_system().write_files([
+        db.system().write_files([
             ("/src/a.py", "from foo import x"),
             ("/src/foo.py", "x = 10\ndef foo(): y = 1"),
         ])?;
@@ -375,7 +375,7 @@ mod tests {
 
         assert_eq!(x_ty.display(&db).to_string(), "Literal[10]");
 
-        db.memory_file_system()
+        db.system()
             .write_file("/src/foo.py", "x = 10\ndef foo(): pass")?;
 
         let a = system_path_to_file(&db, "/src/a.py").unwrap();
@@ -407,7 +407,7 @@ mod tests {
     fn dependency_unrelated_public_symbol() -> anyhow::Result<()> {
         let mut db = setup_db();
 
-        db.memory_file_system().write_files([
+        db.system().write_files([
             ("/src/a.py", "from foo import x"),
             ("/src/foo.py", "x = 10\ny = 20"),
         ])?;
@@ -417,8 +417,7 @@ mod tests {
 
         assert_eq!(x_ty.display(&db).to_string(), "Literal[10]");
 
-        db.memory_file_system()
-            .write_file("/src/foo.py", "x = 10\ny = 30")?;
+        db.system().write_file("/src/foo.py", "x = 10\ny = 30")?;
 
         let a = system_path_to_file(&db, "/src/a.py").unwrap();
         let foo = system_path_to_file(&db, "/src/foo.py").unwrap();

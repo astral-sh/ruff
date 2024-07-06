@@ -601,8 +601,8 @@ mod tests {
     use red_knot_module_resolver::{
         set_module_resolution_settings, RawModuleResolutionSettings, TargetVersion,
     };
-    use ruff_db::file_system::FileSystemPathBuf;
-    use ruff_db::vfs::system_path_to_file;
+    use ruff_db::files::system_path_to_file;
+    use ruff_db::system::SystemPathBuf;
     use ruff_python_ast::name::Name;
 
     use crate::db::tests::TestDb;
@@ -616,7 +616,7 @@ mod tests {
             RawModuleResolutionSettings {
                 target_version: TargetVersion::Py38,
                 extra_paths: Vec::new(),
-                workspace_root: FileSystemPathBuf::from("/src"),
+                workspace_root: SystemPathBuf::from("/src"),
                 site_packages: None,
                 custom_typeshed: None,
             },
@@ -636,7 +636,7 @@ mod tests {
     fn follow_import_to_class() -> anyhow::Result<()> {
         let db = setup_db();
 
-        db.memory_file_system().write_files([
+        db.system().write_files([
             ("src/a.py", "from b import C as D; E = D"),
             ("src/b.py", "class C: pass"),
         ])?;
@@ -650,7 +650,7 @@ mod tests {
     fn resolve_base_class_by_name() -> anyhow::Result<()> {
         let db = setup_db();
 
-        db.memory_file_system().write_file(
+        db.system().write_file(
             "src/mod.py",
             r#"
 class Base:
@@ -682,7 +682,7 @@ class Sub(Base):
     fn resolve_method() -> anyhow::Result<()> {
         let db = setup_db();
 
-        db.memory_file_system().write_file(
+        db.system().write_file(
             "src/mod.py",
             "
 class C:
@@ -712,7 +712,7 @@ class C:
     fn resolve_module_member() -> anyhow::Result<()> {
         let db = setup_db();
 
-        db.memory_file_system().write_files([
+        db.system().write_files([
             ("src/a.py", "import b; D = b.C"),
             ("src/b.py", "class C: pass"),
         ])?;
@@ -726,7 +726,7 @@ class C:
     fn resolve_literal() -> anyhow::Result<()> {
         let db = setup_db();
 
-        db.memory_file_system().write_file("src/a.py", "x = 1")?;
+        db.system().write_file("src/a.py", "x = 1")?;
 
         assert_public_ty(&db, "src/a.py", "x", "Literal[1]");
 
@@ -737,7 +737,7 @@ class C:
     fn resolve_union() -> anyhow::Result<()> {
         let db = setup_db();
 
-        db.memory_file_system().write_file(
+        db.system().write_file(
             "src/a.py",
             "
 if flag:
@@ -756,7 +756,7 @@ else:
     fn literal_int_arithmetic() -> anyhow::Result<()> {
         let db = setup_db();
 
-        db.memory_file_system().write_file(
+        db.system().write_file(
             "src/a.py",
             "
 a = 2 + 1
@@ -780,8 +780,7 @@ e = 5 % 3
     fn walrus() -> anyhow::Result<()> {
         let db = setup_db();
 
-        db.memory_file_system()
-            .write_file("src/a.py", "x = (y := 1) + 1")?;
+        db.system().write_file("src/a.py", "x = (y := 1) + 1")?;
 
         assert_public_ty(&db, "src/a.py", "x", "Literal[2]");
         assert_public_ty(&db, "src/a.py", "y", "Literal[1]");
@@ -793,8 +792,7 @@ e = 5 % 3
     fn ifexpr() -> anyhow::Result<()> {
         let db = setup_db();
 
-        db.memory_file_system()
-            .write_file("src/a.py", "x = 1 if flag else 2")?;
+        db.system().write_file("src/a.py", "x = 1 if flag else 2")?;
 
         assert_public_ty(&db, "src/a.py", "x", "Literal[1, 2]");
 
@@ -805,7 +803,7 @@ e = 5 % 3
     fn ifexpr_walrus() -> anyhow::Result<()> {
         let db = setup_db();
 
-        db.memory_file_system().write_file(
+        db.system().write_file(
             "src/a.py",
             "
 y = z = 0
@@ -826,7 +824,7 @@ b = z
     fn ifexpr_nested() -> anyhow::Result<()> {
         let db = setup_db();
 
-        db.memory_file_system()
+        db.system()
             .write_file("src/a.py", "x = 1 if flag else 2 if flag2 else 3")?;
 
         assert_public_ty(&db, "src/a.py", "x", "Literal[1, 2, 3]");
@@ -838,7 +836,7 @@ b = z
     fn none() -> anyhow::Result<()> {
         let db = setup_db();
 
-        db.memory_file_system()
+        db.system()
             .write_file("src/a.py", "x = 1 if flag else None")?;
 
         assert_public_ty(&db, "src/a.py", "x", "Literal[1] | None");

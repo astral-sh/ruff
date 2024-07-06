@@ -182,9 +182,9 @@ mod tests {
     use red_knot_module_resolver::{
         set_module_resolution_settings, RawModuleResolutionSettings, TargetVersion,
     };
-    use ruff_db::file_system::FileSystemPathBuf;
+    use ruff_db::files::system_path_to_file;
     use ruff_db::parsed::parsed_module;
-    use ruff_db::vfs::system_path_to_file;
+    use ruff_db::system::SystemPathBuf;
 
     use crate::db::tests::TestDb;
     use crate::types::Type;
@@ -196,7 +196,7 @@ mod tests {
             &mut db,
             RawModuleResolutionSettings {
                 extra_paths: vec![],
-                workspace_root: FileSystemPathBuf::from("/src"),
+                workspace_root: SystemPathBuf::from("/src"),
                 site_packages: None,
                 custom_typeshed: None,
                 target_version: TargetVersion::Py38,
@@ -210,8 +210,7 @@ mod tests {
     fn function_ty() -> anyhow::Result<()> {
         let db = setup_db();
 
-        db.memory_file_system()
-            .write_file("/src/foo.py", "def test(): pass")?;
+        db.system().write_file("/src/foo.py", "def test(): pass")?;
         let foo = system_path_to_file(&db, "/src/foo.py").unwrap();
 
         let ast = parsed_module(&db, foo);
@@ -229,8 +228,7 @@ mod tests {
     fn class_ty() -> anyhow::Result<()> {
         let db = setup_db();
 
-        db.memory_file_system()
-            .write_file("/src/foo.py", "class Test: pass")?;
+        db.system().write_file("/src/foo.py", "class Test: pass")?;
         let foo = system_path_to_file(&db, "/src/foo.py").unwrap();
 
         let ast = parsed_module(&db, foo);
@@ -248,7 +246,7 @@ mod tests {
     fn alias_ty() -> anyhow::Result<()> {
         let db = setup_db();
 
-        db.memory_file_system().write_files([
+        db.system().write_files([
             ("/src/foo.py", "class Test: pass"),
             ("/src/bar.py", "from foo import Test"),
         ])?;

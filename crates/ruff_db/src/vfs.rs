@@ -3,12 +3,11 @@ use std::sync::Arc;
 use countme::Count;
 use dashmap::mapref::entry::Entry;
 
-pub use crate::vendored::{VendoredPath, VendoredPathBuf};
 pub use path::VfsPath;
 
 use crate::file_revision::FileRevision;
-use crate::file_system::FileSystemPath;
-use crate::vendored::VendoredFileSystem;
+use crate::system::SystemPath;
+use crate::vendored::VendoredPath;
 use crate::vfs::private::FileStatus;
 use crate::{Db, FxDashMap};
 
@@ -18,8 +17,8 @@ mod path;
 ///
 /// Returns `None` if the path doesn't exist, isn't accessible, or if the path points to a directory.
 #[inline]
-pub fn system_path_to_file(db: &dyn Db, path: impl AsRef<FileSystemPath>) -> Option<VfsFile> {
-    let file = db.vfs().file_system(db, path.as_ref());
+pub fn system_path_to_file(db: &dyn Db, path: impl AsRef<SystemPath>) -> Option<VfsFile> {
+    let file = db.vfs().system(db, path.as_ref());
 
     // It's important that `vfs.file_system` creates a `VfsFile` even for files that don't exist or don't
     // exist anymore so that Salsa can track that the caller of this function depends on the existence of
@@ -45,7 +44,7 @@ pub fn vendored_path_to_file(db: &dyn Db, path: impl AsRef<VendoredPath>) -> Opt
 #[inline]
 pub fn vfs_path_to_file(db: &dyn Db, path: &VfsPath) -> Option<VfsFile> {
     match path {
-        VfsPath::FileSystem(path) => system_path_to_file(db, path),
+        VfsPath::System(path) => system_path_to_file(db, path),
         VfsPath::Vendored(path) => vendored_path_to_file(db, path),
     }
 }
@@ -57,10 +56,10 @@ pub fn vfs_path_to_file(db: &dyn Db, path: &VfsPath) -> Option<VfsFile> {
 /// * The file system
 /// * Vendored files that are part of the distributed Ruff binary
 ///
-/// ## Why do both the [`Vfs`] and [`FileSystem`](crate::FileSystem) trait exist?
+/// ## Why do both the [`Vfs`] and [`FileSystem`](crate::System) trait exist?
 ///
-/// It would have been an option to define [`FileSystem`](crate::FileSystem) in a way that all its operation accept
-/// a [`VfsPath`]. This would have allowed to unify most of [`Vfs`] and [`FileSystem`](crate::FileSystem). The reason why they are
+/// It would have been an option to define [`FileSystem`](crate::System) in a way that all its operation accept
+/// a [`VfsPath`]. This would have allowed to unify most of [`Vfs`] and [`FileSystem`](crate::System). The reason why they are
 /// separate is that not all operations are supported for all [`VfsPath`]s:
 ///
 /// * The only relevant operations for [`VendoredPath`]s are testing for existence and reading the content.
@@ -84,20 +83,9 @@ struct VfsInner {
     /// so that queries that depend on the existence of a file are re-executed when the file is created.
     ///
     files_by_path: FxDashMap<VfsPath, VfsFile>,
-    vendored: VendoredVfs,
 }
 
 impl Vfs {
-    /// Creates a new [`Vfs`] instance where the vendored files are stubbed out.
-    pub fn with_stubbed_vendored() -> Self {
-        Self {
-            inner: Arc::new(VfsInner {
-                vendored: VendoredVfs::Stubbed(FxDashMap::default()),
-                ..VfsInner::default()
-            }),
-        }
-    }
-
     /// Looks up a file by its path.
     ///
     /// For a non-existing file, creates a new salsa [`VfsFile`] ingredient and stores it for future lookups.
@@ -105,18 +93,18 @@ impl Vfs {
     /// The operation always succeeds even if the path doesn't exist on disk, isn't accessible or if the path points to a directory.
     /// In these cases, a file with status [`FileStatus::Deleted`] is returned.
     #[tracing::instrument(level = "debug", skip(self, db))]
-    fn file_system(&self, db: &dyn Db, path: &FileSystemPath) -> VfsFile {
+    fn system(&self, db: &dyn Db, path: &SystemPath) -> VfsFile {
         *self
             .inner
             .files_by_path
-            .entry(VfsPath::FileSystem(path.to_path_buf()))
+            .entry(VfsPath::System(path.to_path_buf()))
             .or_insert_with(|| {
-                let metadata = db.file_system().metadata(path);
+                let metadata = db.system().metadata(path);
 
                 match metadata {
                     Ok(metadata) if metadata.file_type().is_file() => VfsFile::new(
                         db,
-                        VfsPath::FileSystem(path.to_path_buf()),
+                        VfsPath::System(path.to_path_buf()),
                         metadata.permissions(),
                         metadata.revision(),
                         FileStatus::Exists,
@@ -124,7 +112,7 @@ impl Vfs {
                     ),
                     _ => VfsFile::new(
                         db,
-                        VfsPath::FileSystem(path.to_path_buf()),
+                        VfsPath::System(path.to_path_buf()),
                         None,
                         FileRevision::zero(),
                         FileStatus::Deleted,
@@ -145,13 +133,13 @@ impl Vfs {
         {
             Entry::Occupied(entry) => *entry.get(),
             Entry::Vacant(entry) => {
-                let revision = self.inner.vendored.revision(path)?;
+                let metadata = db.vendored().metadata(path).ok()?;
 
                 let file = VfsFile::new(
                     db,
                     VfsPath::Vendored(path.to_path_buf()),
                     Some(0o444),
-                    revision,
+                    metadata.revision(),
                     FileStatus::Exists,
                     Count::default(),
                 );
@@ -165,44 +153,11 @@ impl Vfs {
         Some(file)
     }
 
-    /// Stubs out the vendored files with the given content.
-    ///
-    /// ## Panics
-    /// If there are pending snapshots referencing this `Vfs` instance.
-    pub fn stub_vendored<P, S>(&mut self, vendored: impl IntoIterator<Item = (P, S)>)
-    where
-        P: AsRef<VendoredPath>,
-        S: ToString,
-    {
-        let inner = Arc::get_mut(&mut self.inner).unwrap();
-
-        let stubbed = FxDashMap::default();
-
-        for (path, content) in vendored {
-            stubbed.insert(path.as_ref().to_path_buf(), content.to_string());
-        }
-
-        inner.vendored = VendoredVfs::Stubbed(stubbed);
-    }
-
     /// Creates a salsa like snapshot of the files. The instances share
     /// the same path-to-file mapping.
     pub fn snapshot(&self) -> Self {
         Self {
             inner: self.inner.clone(),
-        }
-    }
-
-    fn read(&self, db: &dyn Db, path: &VfsPath) -> String {
-        match path {
-            VfsPath::FileSystem(path) => db.file_system().read(path).unwrap_or_default(),
-
-            VfsPath::Vendored(vendored) => db
-                .vfs()
-                .inner
-                .vendored
-                .read(vendored)
-                .expect("Vendored file to exist"),
         }
     }
 }
@@ -256,12 +211,12 @@ impl VfsFile {
     pub(crate) fn read(&self, db: &dyn Db) -> String {
         let path = self.path(db);
 
-        if path.is_file_system_path() {
+        if path.is_system_path() {
             // Add a dependency on the revision to ensure the operation gets re-executed when the file changes.
             let _ = self.revision(db);
         }
 
-        db.vfs().read(db, path)
+        db.read_to_string(path).unwrap_or_default()
     }
 
     /// Refreshes the file metadata by querying the file system if needed.
@@ -279,8 +234,8 @@ impl VfsFile {
     /// Private method providing the implementation for [`Self::touch_path`] and [`Self::touch`].
     fn touch_impl(db: &mut dyn Db, path: &VfsPath, file: Option<VfsFile>) {
         match path {
-            VfsPath::FileSystem(path) => {
-                let metadata = db.file_system().metadata(path);
+            VfsPath::System(path) => {
+                let metadata = db.system().metadata(path);
 
                 let (status, revision) = match metadata {
                     Ok(metadata) if metadata.file_type().is_file() => {
@@ -289,54 +244,12 @@ impl VfsFile {
                     _ => (FileStatus::Deleted, FileRevision::zero()),
                 };
 
-                let file = file.unwrap_or_else(|| db.vfs().file_system(db, path));
+                let file = file.unwrap_or_else(|| db.vfs().system(db, path));
                 file.set_status(db).to(status);
                 file.set_revision(db).to(revision);
             }
             VfsPath::Vendored(_) => {
                 // Readonly, can never be out of date.
-            }
-        }
-    }
-}
-
-#[derive(Debug)]
-enum VendoredVfs {
-    #[allow(unused)]
-    Real(VendoredFileSystem),
-    Stubbed(FxDashMap<VendoredPathBuf, String>),
-}
-
-impl Default for VendoredVfs {
-    fn default() -> Self {
-        Self::Stubbed(FxDashMap::default())
-    }
-}
-
-impl VendoredVfs {
-    fn revision(&self, path: &VendoredPath) -> Option<FileRevision> {
-        match self {
-            VendoredVfs::Real(file_system) => file_system
-                .metadata(path)
-                .map(|metadata| metadata.revision()),
-            VendoredVfs::Stubbed(stubbed) => stubbed
-                .contains_key(&path.to_path_buf())
-                .then_some(FileRevision::new(1)),
-        }
-    }
-
-    fn read(&self, path: &VendoredPath) -> std::io::Result<String> {
-        match self {
-            VendoredVfs::Real(file_system) => file_system.read(path),
-            VendoredVfs::Stubbed(stubbed) => {
-                if let Some(contents) = stubbed.get(&path.to_path_buf()).as_deref().cloned() {
-                    Ok(contents)
-                } else {
-                    Err(std::io::Error::new(
-                        std::io::ErrorKind::NotFound,
-                        format!("Could not find file {path:?}"),
-                    ))
-                }
             }
         }
     }
@@ -359,14 +272,15 @@ mod private {
 mod tests {
     use crate::file_revision::FileRevision;
     use crate::tests::TestDb;
+    use crate::vendored::VendoredStubsBuilder;
     use crate::vfs::{system_path_to_file, vendored_path_to_file};
 
     #[test]
-    fn file_system_existing_file() -> crate::file_system::Result<()> {
+    fn file_system_existing_file() -> crate::system::Result<()> {
         let mut db = TestDb::new();
 
-        db.file_system_mut()
-            .write_files([("test.py", "print('Hello world')")])?;
+        db.system_mut()
+            .write_file("test.py", "print('Hello world')")?;
 
         let test = system_path_to_file(&db, "test.py").expect("File to exist.");
 
@@ -390,10 +304,14 @@ mod tests {
     fn stubbed_vendored_file() {
         let mut db = TestDb::new();
 
-        db.vfs_mut()
-            .stub_vendored([("test.py", "def foo() -> str")]);
+        let mut vendored_builder = VendoredStubsBuilder::new();
+        vendored_builder
+            .add_stub("test.pyi", "def foo() -> str")
+            .unwrap();
+        let vendored = vendored_builder.finish().unwrap();
+        db.with_vendored(vendored);
 
-        let test = vendored_path_to_file(&db, "test.py").expect("Vendored file to exist.");
+        let test = vendored_path_to_file(&db, "test.pyi").expect("Vendored file to exist.");
 
         assert_eq!(test.permissions(&db), Some(0o444));
         assert_ne!(test.revision(&db), FileRevision::zero());

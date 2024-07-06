@@ -45,18 +45,19 @@ pub(crate) mod tests {
     use salsa::storage::HasIngredientsFor;
     use salsa::DebugWithDb;
 
-    use red_knot_module_resolver::{Db as ResolverDb, Jar as ResolverJar};
-    use ruff_db::file_system::{FileSystem, MemoryFileSystem, OsFileSystem};
-    use ruff_db::vfs::Vfs;
-    use ruff_db::{Db as SourceDb, Jar as SourceJar, Upcast};
-
     use super::{Db, Jar};
+    use red_knot_module_resolver::{Db as ResolverDb, Jar as ResolverJar};
+    use ruff_db::files::Files;
+    use ruff_db::system::{System, TestSystem};
+    use ruff_db::vendored::VendoredFileSystem;
+    use ruff_db::{Db as SourceDb, Jar as SourceJar, Upcast};
 
     #[salsa::db(Jar, ResolverJar, SourceJar)]
     pub(crate) struct TestDb {
         storage: salsa::Storage<Self>,
-        vfs: Vfs,
-        file_system: TestFileSystem,
+        files: Files,
+        system: TestSystem,
+        vendored: VendoredFileSystem,
         events: std::sync::Arc<std::sync::Mutex<Vec<salsa::Event>>>,
     }
 
@@ -64,21 +65,10 @@ pub(crate) mod tests {
         pub(crate) fn new() -> Self {
             Self {
                 storage: salsa::Storage::default(),
-                file_system: TestFileSystem::Memory(MemoryFileSystem::default()),
+                system: TestSystem::default(),
+                vendored: VendoredFileSystem::default(),
                 events: std::sync::Arc::default(),
-                vfs: Vfs::with_stubbed_vendored(),
-            }
-        }
-
-        /// Returns the memory file system.
-        ///
-        /// ## Panics
-        /// If this test db isn't using a memory file system.
-        pub(crate) fn memory_file_system(&self) -> &MemoryFileSystem {
-            if let TestFileSystem::Memory(fs) = &self.file_system {
-                fs
-            } else {
-                panic!("The test db is not using a memory file system");
+                files: Files::default(),
             }
         }
 
@@ -105,14 +95,19 @@ pub(crate) mod tests {
         pub(crate) fn clear_salsa_events(&mut self) {
             self.take_salsa_events();
         }
+
+        pub(crate) fn system(&self) -> &TestSystem {
+            &self.system
+        }
     }
 
     impl SourceDb for TestDb {
-        fn file_system(&self) -> &dyn FileSystem {
-            match &self.file_system {
-                TestFileSystem::Memory(fs) => fs,
-                TestFileSystem::Os(fs) => fs,
-            }
+        fn vendored(&self) -> &VendoredFileSystem {
+            &self.vendored
+        }
+
+        fn system(&self) -> &dyn System {
+            &self.system
         }
 
         fn vfs(&self) -> &Vfs {
@@ -147,20 +142,12 @@ pub(crate) mod tests {
         fn snapshot(&self) -> salsa::Snapshot<Self> {
             salsa::Snapshot::new(Self {
                 storage: self.storage.snapshot(),
-                vfs: self.vfs.snapshot(),
-                file_system: match &self.file_system {
-                    TestFileSystem::Memory(memory) => TestFileSystem::Memory(memory.snapshot()),
-                    TestFileSystem::Os(fs) => TestFileSystem::Os(fs.snapshot()),
-                },
+                files: self.files.snapshot(),
+                system: self.system.snapshot(),
+                vendored: self.vendored.snapshot(),
                 events: self.events.clone(),
             })
         }
-    }
-
-    enum TestFileSystem {
-        Memory(MemoryFileSystem),
-        #[allow(dead_code)]
-        Os(OsFileSystem),
     }
 
     pub(crate) fn assert_will_run_function_query<'db, C, Db, Jar>(

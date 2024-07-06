@@ -1,11 +1,12 @@
 use filetime::FileTime;
+use std::any::Any;
 
-use crate::file_system::{FileSystem, FileSystemPath, FileType, Metadata, Result};
+use crate::system::{FileType, Metadata, Result, System, SystemPath};
 
 #[derive(Default, Debug)]
-pub struct OsFileSystem;
+pub struct OsSystem;
 
-impl OsFileSystem {
+impl OsSystem {
     #[cfg(unix)]
     fn permissions(metadata: &std::fs::Metadata) -> Option<u32> {
         use std::os::unix::fs::PermissionsExt;
@@ -23,8 +24,8 @@ impl OsFileSystem {
     }
 }
 
-impl FileSystem for OsFileSystem {
-    fn metadata(&self, path: &FileSystemPath) -> Result<Metadata> {
+impl System for OsSystem {
+    fn path_metadata(&self, path: &SystemPath) -> Result<Metadata> {
         let metadata = path.as_std_path().metadata()?;
         let last_modified = FileTime::from_last_modification_time(&metadata);
 
@@ -35,12 +36,16 @@ impl FileSystem for OsFileSystem {
         })
     }
 
-    fn read(&self, path: &FileSystemPath) -> Result<String> {
-        std::fs::read_to_string(path)
+    fn read_to_string(&self, path: &SystemPath) -> Result<String> {
+        std::fs::read_to_string(path.as_std_path())
     }
 
-    fn exists(&self, path: &FileSystemPath) -> bool {
+    fn path_exists(&self, path: &SystemPath) -> bool {
         path.as_std_path().exists()
+    }
+
+    fn as_any(&self) -> &dyn Any {
+        self
     }
 }
 

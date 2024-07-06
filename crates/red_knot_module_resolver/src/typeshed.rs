@@ -10,8 +10,7 @@ mod tests {
     use std::io::{self, Read};
     use std::path::Path;
 
-    use ruff_db::vendored::VendoredFileSystem;
-    use ruff_db::vfs::VendoredPath;
+    use ruff_db::vendored::{VendoredFileSystem, VendoredPath};
 
     // The file path here is hardcoded in this crate's `build.rs` script.
     // Luckily this crate will fail to build if this file isn't available at build time.
@@ -39,8 +38,8 @@ mod tests {
     #[test]
     fn typeshed_vfs_consistent_with_vendored_stubs() {
         let vendored_typeshed_dir = Path::new("vendor/typeshed").canonicalize().unwrap();
-        let vendored_typeshed_stubs = VendoredFileSystem::new(TYPESHED_ZIP_BYTES).unwrap();
-
+        let vendored_typeshed_stubs = VendoredFileSystem::new_static(TYPESHED_ZIP_BYTES).unwrap();
+        let vendored_typeshed_stubs = vendored_typeshed_stubs();
         let mut empty_iterator = true;
         for entry in walkdir::WalkDir::new(&vendored_typeshed_dir).min_depth(1) {
             empty_iterator = false;
@@ -69,7 +68,7 @@ mod tests {
 
             let vendored_path_kind = vendored_typeshed_stubs
                 .metadata(vendored_path)
-                .unwrap_or_else(|| {
+                .unwrap_or_else(|_| {
                     panic!(
                         "Expected metadata for {vendored_path:?} to be retrievable from the `VendoredFileSystem!
 

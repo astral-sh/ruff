@@ -272,13 +272,16 @@ impl FusedIterator for ChildrenIter<'_> {}
 
 #[cfg(test)]
 mod tests {
+    use ruff_db::files::{system_path_to_file, File};
     use ruff_db::parsed::parsed_module;
-    use ruff_db::vfs::{system_path_to_file, VfsFile};
+    use ruff_db::system::DbWithTestSystem;
 
     use crate::db::tests::TestDb;
     use crate::semantic_index::symbol::{FileScopeId, Scope, ScopeKind, SymbolTable};
     use crate::semantic_index::{root_scope, semantic_index, symbol_table};
     use crate::Db;
+    use ruff_db::files::{system_path_to_file, File};
+    use ruff_db::parsed::parsed_module;
 
     struct TestCase {
         db: TestDb,
@@ -287,9 +290,7 @@ mod tests {
 
     fn test_case(content: impl ToString) -> TestCase {
         let db = TestDb::new();
-        db.memory_file_system()
-            .write_file("test.py", content)
-            .unwrap();
+        db.system().write_file("test.py", content).unwrap();
 
         let file = system_path_to_file(&db, "test.py").unwrap();
 

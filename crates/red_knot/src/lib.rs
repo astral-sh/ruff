@@ -1,7 +1,7 @@
 use rustc_hash::FxHashSet;
 
-use ruff_db::file_system::{FileSystemPath, FileSystemPathBuf};
-use ruff_db::vfs::VfsFile;
+use ruff_db::files::File;
+use ruff_db::system::{SystemPath, SystemPathBuf};
 
 use crate::db::Jar;
 
@@ -12,7 +12,7 @@ pub mod watch;
 
 #[derive(Debug, Clone)]
 pub struct Workspace {
-    root: FileSystemPathBuf,
+    root: SystemPathBuf,
     /// The files that are open in the workspace.
     ///
     /// * Editor: The files that are actively being edited in the editor (the user has a tab open with the file).
@@ -21,14 +21,14 @@ pub struct Workspace {
 }
 
 impl Workspace {
-    pub fn new(root: FileSystemPathBuf) -> Self {
+    pub fn new(root: SystemPathBuf) -> Self {
         Self {
             root,
             open_files: FxHashSet::default(),
         }
     }
 
-    pub fn root(&self) -> &FileSystemPath {
+    pub fn root(&self) -> &SystemPath {
         self.root.as_path()
     }
 

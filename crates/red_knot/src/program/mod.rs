@@ -3,34 +3,36 @@ use std::sync::Arc;
 
 use salsa::{Cancelled, Database};
 
-use red_knot_module_resolver::{Db as ResolverDb, Jar as ResolverJar};
-use red_knot_python_semantic::{Db as SemanticDb, Jar as SemanticJar};
-use ruff_db::file_system::{FileSystem, FileSystemPathBuf};
-use ruff_db::vfs::{Vfs, VfsFile, VfsPath};
-use ruff_db::{Db as SourceDb, Jar as SourceJar, Upcast};
-
 use crate::db::{Db, Jar};
 use crate::Workspace;
+use red_knot_module_resolver::{Db as ResolverDb, Jar as ResolverJar};
+use red_knot_python_semantic::{Db as SemanticDb, Jar as SemanticJar};
+use ruff_db::files::{File, FilePath, Files};
+use ruff_db::system::{System, SystemPathBuf};
+use ruff_db::vendored::VendoredFileSystem;
+use ruff_db::{Db as SourceDb, Jar as SourceJar, Upcast};
 
 mod check;
 
 #[salsa::db(SourceJar, ResolverJar, SemanticJar, Jar)]
 pub struct Program {
     storage: salsa::Storage<Program>,
-    vfs: Vfs,
-    fs: Arc<dyn FileSystem + Send + Sync + RefUnwindSafe>,
+    files: Files,
+    system: Arc<dyn System + Send + Sync + RefUnwindSafe>,
     workspace: Workspace,
 }
 
 impl Program {
-    pub fn new<Fs>(workspace: Workspace, file_system: Fs) -> Self
+    pub fn new<S>(workspace: Workspace, system: S) -> Self
     where
-        Fs: FileSystem + 'static + Send + Sync + RefUnwindSafe,
+        S: System + 'static + Send + Sync + RefUnwindSafe,
     {
         Self {
             storage: salsa::Storage::default(),
-            vfs: Vfs::default(),
-            fs: Arc::new(file_system),
+            files: Files::default(),
+            // TODO correctly initialize vendored file system
+            vendored: VendoredFileSystem::default(),
+            system: Arc::new(system),
             workspace,
         }
     }
@@ -40,7 +42,7 @@ impl Program {
         I: IntoIterator<Item = FileWatcherChange>,
     {
         for change in changes {
-            VfsFile::touch_path(self, &VfsPath::file_system(change.path));
+            File::touch_path(self, &FilePath::system(change.path));
         }
     }
 
@@ -86,8 +88,12 @@ impl ResolverDb for Program {}
 impl SemanticDb for Program {}
 
 impl SourceDb for Program {
-    fn file_system(&self) -> &dyn FileSystem {
-        &*self.fs
+        vendored_typeshed_stubs()
+        &self.vendored
+    }
+
+    fn system(&self) -> &dyn System {
+        &*self.system
     }
 
     fn vfs(&self) -> &Vfs {
@@ -103,8 +109,8 @@ impl salsa::ParallelDatabase for Program {
     fn snapshot(&self) -> salsa::Snapshot<Self> {
         salsa::Snapshot::new(Self {
             storage: self.storage.snapshot(),
-            vfs: self.vfs.snapshot(),
-            fs: self.fs.clone(),
+            files: self.files.snapshot(),
+            vendored: self.vendored.snapshot(),
             workspace: self.workspace.clone(),
         })
     }
@@ -112,13 +118,13 @@ impl salsa::ParallelDatabase for Program {
 
 #[derive(Clone, Debug)]
 pub struct FileWatcherChange {
-    path: FileSystemPathBuf,
+    path: SystemPathBuf,
     #[allow(unused)]
     kind: FileChangeKind,
 }
 
 impl FileWatcherChange {
-    pub fn new(path: FileSystemPathBuf, kind: FileChangeKind) -> Self {
+    pub fn new(path: SystemPathBuf, kind: FileChangeKind) -> Self {
         Self { path, kind }
     }
 }

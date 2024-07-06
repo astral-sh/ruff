@@ -4,7 +4,8 @@ use crate::program::{FileChangeKind, FileWatcherChange};
 use anyhow::Context;
 use notify::event::{CreateKind, RemoveKind};
 use notify::{recommended_watcher, Event, EventKind, RecommendedWatcher, RecursiveMode, Watcher};
-use ruff_db::file_system::FileSystemPath;
+
+use ruff_db::system::SystemPath;
 
 pub struct FileWatcher {
     watcher: RecommendedWatcher,
@@ -50,7 +51,7 @@ impl FileWatcher {
 
                     for path in event.paths {
                         if path.is_file() {
-                            if let Some(fs_path) = FileSystemPath::from_std_path(&path) {
+                            if let Some(fs_path) = SystemPath::from_std_path(&path) {
                                 changes.push(FileWatcherChange::new(
                                     fs_path.to_path_buf(),
                                     change_kind,
