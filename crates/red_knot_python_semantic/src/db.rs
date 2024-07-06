@@ -48,7 +48,7 @@ pub(crate) mod tests {
     use super::{Db, Jar};
     use red_knot_module_resolver::{Db as ResolverDb, Jar as ResolverJar};
     use ruff_db::files::Files;
-    use ruff_db::system::{System, TestSystem};
+    use ruff_db::system::{DbWithTestSystem, System, TestSystem};
     use ruff_db::vendored::VendoredFileSystem;
     use ruff_db::{Db as SourceDb, Jar as SourceJar, Upcast};
 
@@ -90,9 +90,15 @@ pub(crate) mod tests {
         pub(crate) fn clear_salsa_events(&mut self) {
             self.take_salsa_events();
         }
+    }
 
-        pub(crate) fn system(&self) -> &TestSystem {
+    impl DbWithTestSystem for TestDb {
+        fn test_system(&self) -> &TestSystem {
             &self.system
+        }
+
+        fn test_system_mut(&mut self) -> &mut TestSystem {
+            &mut self.system
         }
     }
 

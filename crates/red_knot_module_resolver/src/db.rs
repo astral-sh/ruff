@@ -25,8 +25,8 @@ pub(crate) mod tests {
     use salsa::DebugWithDb;
 
     use ruff_db::files::Files;
-    use ruff_db::system::SystemPathBuf;
     use ruff_db::system::TestSystem;
+    use ruff_db::system::{DbWithTestSystem, SystemPathBuf};
     use ruff_db::vendored::VendoredFileSystem;
 
     use crate::resolver::{set_module_resolution_settings, RawModuleResolutionSettings};
@@ -72,14 +72,6 @@ pub(crate) mod tests {
         pub(crate) fn clear_salsa_events(&mut self) {
             self.take_salsa_events();
         }
-
-        pub(crate) fn system(&self) -> &TestSystem {
-            &self.system
-        }
-
-        pub(crate) fn system_mut(&mut self) -> &mut TestSystem {
-            &mut self.system
-        }
     }
 
     impl Upcast<dyn ruff_db::Db> for TestDb {
@@ -103,6 +95,16 @@ pub(crate) mod tests {
     }
 
     impl Db for TestDb {}
+
+    impl DbWithTestSystem for TestDb {
+        fn test_system(&self) -> &TestSystem {
+            &self.system
+        }
+
+        fn test_system_mut(&mut self) -> &mut TestSystem {
+            &mut self.system
+        }
+    }
 
     impl salsa::Database for TestDb {
         fn salsa_event(&self, event: salsa::Event) {
@@ -190,7 +192,7 @@ pub(crate) mod tests {
         let site_packages = SystemPathBuf::from("site_packages");
         let custom_typeshed = SystemPathBuf::from("typeshed");
 
-        let fs = db.system().memory_file_system();
+        let fs = db.memory_file_system();
 
         fs.create_directory_all(&src)?;
         fs.create_directory_all(&site_packages)?;

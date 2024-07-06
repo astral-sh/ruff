@@ -276,7 +276,7 @@ mod tests {
     };
     use ruff_db::files::system_path_to_file;
     use ruff_db::parsed::parsed_module;
-    use ruff_db::system::SystemPathBuf;
+    use ruff_db::system::{DbWithTestSystem, SystemPathBuf};
 
     use crate::db::tests::{
         assert_will_not_run_function_query, assert_will_run_function_query, TestDb,
@@ -303,9 +303,9 @@ mod tests {
 
     #[test]
     fn local_inference() -> anyhow::Result<()> {
-        let db = setup_db();
+        let mut db = setup_db();
 
-        db.system().write_file("/src/a.py", "x = 10")?;
+        db.write_file("/src/a.py", "x = 10")?;
         let a = system_path_to_file(&db, "/src/a.py").unwrap();
 
         let parsed = parsed_module(&db, a);
@@ -324,7 +324,7 @@ mod tests {
     fn dependency_public_symbol_type_change() -> anyhow::Result<()> {
         let mut db = setup_db();
 
-        db.system().write_files([
+        db.write_files([
             ("/src/a.py", "from foo import x"),
             ("/src/foo.py", "x = 10\ndef foo(): ..."),
         ])?;
@@ -335,11 +335,9 @@ mod tests {
         assert_eq!(x_ty.display(&db).to_string(), "Literal[10]");
 
         // Change `x` to a different value
-        db.system()
-            .write_file("/src/foo.py", "x = 20\ndef foo(): ...")?;
+        db.write_file("/src/foo.py", "x = 20\ndef foo(): ...")?;
 
         let foo = system_path_to_file(&db, "/src/foo.py").unwrap();
-        foo.touch(&mut db);
 
         let a = system_path_to_file(&db, "/src/a.py").unwrap();
 
@@ -365,7 +363,7 @@ mod tests {
     fn dependency_non_public_symbol_change() -> anyhow::Result<()> {
         let mut db = setup_db();
 
-        db.system().write_files([
+        db.write_files([
             ("/src/a.py", "from foo import x"),
             ("/src/foo.py", "x = 10\ndef foo(): y = 1"),
         ])?;
@@ -375,13 +373,10 @@ mod tests {
 
         assert_eq!(x_ty.display(&db).to_string(), "Literal[10]");
 
-        db.system()
-            .write_file("/src/foo.py", "x = 10\ndef foo(): pass")?;
+        db.write_file("/src/foo.py", "x = 10\ndef foo(): pass")?;
 
         let a = system_path_to_file(&db, "/src/a.py").unwrap();
         let foo = system_path_to_file(&db, "/src/foo.py").unwrap();
-
-        foo.touch(&mut db);
 
         db.clear_salsa_events();
 
@@ -407,7 +402,7 @@ mod tests {
     fn dependency_unrelated_public_symbol() -> anyhow::Result<()> {
         let mut db = setup_db();
 
-        db.system().write_files([
+        db.write_files([
             ("/src/a.py", "from foo import x"),
             ("/src/foo.py", "x = 10\ny = 20"),
         ])?;
@@ -417,12 +412,10 @@ mod tests {
 
         assert_eq!(x_ty.display(&db).to_string(), "Literal[10]");
 
-        db.system().write_file("/src/foo.py", "x = 10\ny = 30")?;
+        db.write_file("/src/foo.py", "x = 10\ny = 30")?;
 
         let a = system_path_to_file(&db, "/src/a.py").unwrap();
         let foo = system_path_to_file(&db, "/src/foo.py").unwrap();
-
-        foo.touch(&mut db);
 
         db.clear_salsa_events();
 

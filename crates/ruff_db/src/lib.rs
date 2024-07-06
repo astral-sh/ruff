@@ -21,7 +21,7 @@ pub(crate) type FxDashMap<K, V> = dashmap::DashMap<K, V, BuildHasherDefault<FxHa
 #[salsa::jar(db=Db)]
 pub struct Jar(File, source_text, line_index, parsed_module);
 
-/// Database that gives access to the virtual filesystem, source code, and parsed AST.
+/// Most basic database that gives access to files, the host system, source code, and parsed AST.
 pub trait Db: DbWithJar<Jar> {
     fn vendored(&self) -> &VendoredFileSystem;
     fn system(&self) -> &dyn System;
@@ -73,8 +73,8 @@ mod tests {
     use salsa::DebugWithDb;
 
     use crate::files::Files;
-    use crate::system::System;
     use crate::system::TestSystem;
+    use crate::system::{DbWithTestSystem, System};
     use crate::vendored::VendoredFileSystem;
     use crate::{Db, Jar};
 
@@ -124,14 +124,6 @@ mod tests {
             self.take_salsa_events();
         }
 
-        pub(crate) fn system(&self) -> &TestSystem {
-            &self.system
-        }
-
-        pub(crate) fn system_mut(&mut self) -> &mut TestSystem {
-            &mut self.system
-        }
-
         pub(crate) fn with_vendored(&mut self, vendored_file_system: VendoredFileSystem) {
             self.vendored = vendored_file_system;
         }
@@ -143,11 +135,21 @@ mod tests {
         }
 
         fn system(&self) -> &dyn System {
-            self.system()
+            &self.system
         }
 
         fn files(&self) -> &Files {
             &self.files
+        }
+    }
+
+    impl DbWithTestSystem for TestDb {
+        fn test_system(&self) -> &TestSystem {
+            &self.system
+        }
+
+        fn test_system_mut(&mut self) -> &mut TestSystem {
+            &mut self.system
         }
     }
 

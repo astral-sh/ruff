@@ -65,7 +65,7 @@ mod tests {
 
     use crate::files::system_path_to_file;
     use crate::source::{line_index, source_text};
-    use crate::system::SystemPath;
+    use crate::system::{DbWithTestSystem, SystemPath};
     use crate::tests::TestDb;
     use ruff_source_file::OneIndexed;
     use ruff_text_size::TextSize;
@@ -75,16 +75,13 @@ mod tests {
         let mut db = TestDb::new();
         let path = SystemPath::new("test.py");
 
-        db.system_mut().write_file(path, "x = 10".to_string())?;
+        db.write_file(path, "x = 10".to_string())?;
 
         let file = system_path_to_file(&db, path).unwrap();
 
         assert_eq!(&*source_text(&db, file), "x = 10");
 
-        db.system_mut()
-            .write_file(path, "x = 20".to_string())
-            .unwrap();
-        file.touch(&mut db);
+        db.write_file(path, "x = 20".to_string()).unwrap();
 
         assert_eq!(&*source_text(&db, file), "x = 20");
 
@@ -96,7 +93,7 @@ mod tests {
         let mut db = TestDb::new();
         let path = SystemPath::new("test.py");
 
-        db.system_mut().write_file(path, "x = 10".to_string())?;
+        db.write_file(path, "x = 10".to_string())?;
 
         let file = system_path_to_file(&db, path).unwrap();
 
@@ -122,8 +119,7 @@ mod tests {
         let mut db = TestDb::new();
         let path = SystemPath::new("test.py");
 
-        db.system_mut()
-            .write_file(path, "x = 10\ny = 20".to_string())?;
+        db.write_file(path, "x = 10\ny = 20".to_string())?;
 
         let file = system_path_to_file(&db, path).unwrap();
         let index = line_index(&db, file);

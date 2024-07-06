@@ -88,6 +88,14 @@ impl Files {
             })
     }
 
+    /// Tries to look up the file for the given system path, returns `None` if no such file exists yet
+    fn try_system(&self, path: &SystemPath) -> Option<File> {
+        self.inner
+            .files_by_path
+            .get(&FilePath::System(path.to_path_buf()))
+            .map(|entry| *entry.value())
+    }
+
     /// Looks up a vendored file by its path. Returns `Some` if a vendored file for the given path
     /// exists and `None` otherwise.
     #[tracing::instrument(level = "debug", skip(self, db))]
@@ -211,7 +219,10 @@ impl File {
                     _ => (FileStatus::Deleted, FileRevision::zero()),
                 };
 
-                let file = file.unwrap_or_else(|| db.files().system(db, path));
+                let Some(file) = file.or_else(|| db.files().try_system(path)) else {
+                    return;
+                };
+
                 file.set_status(db).to(status);
                 file.set_revision(db).to(revision);
             }
@@ -239,6 +250,7 @@ mod private {
 mod tests {
     use crate::file_revision::FileRevision;
     use crate::files::{system_path_to_file, vendored_path_to_file};
+    use crate::system::DbWithTestSystem;
     use crate::tests::TestDb;
     use crate::vendored::tests::VendoredFileSystemBuilder;
 
@@ -246,8 +258,7 @@ mod tests {
     fn file_system_existing_file() -> crate::system::Result<()> {
         let mut db = TestDb::new();
 
-        db.system_mut()
-            .write_file("test.py", "print('Hello world')")?;
+        db.write_file("test.py", "print('Hello world')")?;
 
         let test = system_path_to_file(&db, "test.py").expect("File to exist.");
 

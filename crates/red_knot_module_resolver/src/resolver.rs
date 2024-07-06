@@ -387,7 +387,7 @@ impl PackageKind {
 #[cfg(test)]
 mod tests {
     use ruff_db::files::{system_path_to_file, File, FilePath};
-    use ruff_db::system::SystemPath;
+    use ruff_db::system::{DbWithTestSystem, SystemPath};
 
     use crate::db::tests::{create_resolver_builder, TestCase};
     use crate::module::ModuleKind;
@@ -401,13 +401,11 @@ mod tests {
 
     #[test]
     fn first_party_module() -> anyhow::Result<()> {
-        let TestCase { db, src, .. } = setup_resolver_test();
+        let TestCase { mut db, src, .. } = setup_resolver_test();
 
         let foo_module_name = ModuleName::new_static("foo").unwrap();
         let foo_path = src.join("foo.py");
-        db.system()
-            .memory_file_system()
-            .write_file(&foo_path, "print('Hello, world!')")?;
+        db.write_file(&foo_path, "print('Hello, world!')")?;
 
         let foo_module = resolve_module(&db, foo_module_name.clone()).unwrap();
 
@@ -563,11 +561,10 @@ mod tests {
 
     #[test]
     fn first_party_precedence_over_stdlib() -> anyhow::Result<()> {
-        let TestCase { db, src, .. } = setup_resolver_test();
+        let TestCase { mut db, src, .. } = setup_resolver_test();
 
         let first_party_functools_path = src.join("functools.py");
-        db.system()
-            .write_file(&first_party_functools_path, "def update_wrapper(): ...")?;
+        db.write_file(&first_party_functools_path, "def update_wrapper(): ...")?;
 
         let functools_module_name = ModuleName::new_static("functools").unwrap();
         let functools_module = resolve_module(&db, functools_module_name.clone()).unwrap();
@@ -593,13 +590,12 @@ mod tests {
 
     #[test]
     fn resolve_package() -> anyhow::Result<()> {
-        let TestCase { src, db, .. } = setup_resolver_test();
+        let TestCase { src, mut db, .. } = setup_resolver_test();
 
         let foo_dir = src.join("foo");
         let foo_path = foo_dir.join("__init__.py");
 
-        db.system()
-            .write_file(&foo_path, "print('Hello, world!')")?;
+        db.write_file(&foo_path, "print('Hello, world!')")?;
 
         let foo_module = resolve_module(&db, ModuleName::new_static("foo").unwrap()).unwrap();
 
@@ -620,16 +616,15 @@ mod tests {
 
     #[test]
     fn package_priority_over_module() -> anyhow::Result<()> {
-        let TestCase { db, src, .. } = setup_resolver_test();
+        let TestCase { mut db, src, .. } = setup_resolver_test();
 
         let foo_dir = src.join("foo");
         let foo_init = foo_dir.join("__init__.py");
 
-        db.system()
-            .write_file(&foo_init, "print('Hello, world!')")?;
+        db.write_file(&foo_init, "print('Hello, world!')")?;
 
         let foo_py = src.join("foo.py");
-        db.system().write_file(&foo_py, "print('Hello, world!')")?;
+        db.write_file(&foo_py, "print('Hello, world!')")?;
 
         let foo_module = resolve_module(&db, ModuleName::new_static("foo").unwrap()).unwrap();
 
@@ -648,12 +643,11 @@ mod tests {
 
     #[test]
     fn typing_stub_over_module() -> anyhow::Result<()> {
-        let TestCase { db, src, .. } = setup_resolver_test();
+        let TestCase { mut db, src, .. } = setup_resolver_test();
 
         let foo_stub = src.join("foo.pyi");
         let foo_py = src.join("foo.py");
-        db.system()
-            .write_files([(&foo_stub, "x: int"), (&foo_py, "print('Hello, world!')")])?;
+        db.write_files([(&foo_stub, "x: int"), (&foo_py, "print('Hello, world!')")])?;
 
         let foo = resolve_module(&db, ModuleName::new_static("foo").unwrap()).unwrap();
 
@@ -668,13 +662,13 @@ mod tests {
 
     #[test]
     fn sub_packages() -> anyhow::Result<()> {
-        let TestCase { db, src, .. } = setup_resolver_test();
+        let TestCase { mut db, src, .. } = setup_resolver_test();
 
         let foo = src.join("foo");
         let bar = foo.join("bar");
         let baz = bar.join("baz.py");
 
-        db.system().write_files([
+        db.write_files([
             (&foo.join("__init__.py"), ""),
             (&bar.join("__init__.py"), ""),
             (&baz, "print('Hello, world!')"),
@@ -697,7 +691,7 @@ mod tests {
     #[test]
     fn namespace_package() -> anyhow::Result<()> {
         let TestCase {
-            db,
+            mut db,
             src,
             site_packages,
             ..
@@ -724,7 +718,7 @@ mod tests {
         let child2 = parent2.join("child");
         let two = child2.join("two.py");
 
-        db.system().write_files([
+        db.write_files([
             (&one, "print('Hello, world!')"),
             (&two, "print('Hello, world!')"),
         ])?;
@@ -750,7 +744,7 @@ mod tests {
     #[test]
     fn regular_package_in_namespace_package() -> anyhow::Result<()> {
         let TestCase {
-            db,
+            mut db,
             src,
             site_packages,
             ..
@@ -777,7 +771,7 @@ mod tests {
         let child2 = parent2.join("child");
         let two = child2.join("two.py");
 
-        db.system().write_files([
+        db.write_files([
             (&child1.join("__init__.py"), "print('Hello, world!')"),
             (&one, "print('Hello, world!')"),
             (&two, "print('Hello, world!')"),
@@ -801,7 +795,7 @@ mod tests {
     #[test]
     fn module_search_path_priority() -> anyhow::Result<()> {
         let TestCase {
-            db,
+            mut db,
             src,
             site_packages,
             ..
@@ -810,8 +804,7 @@ mod tests {
         let foo_src = src.join("foo.py");
         let foo_site_packages = site_packages.join("foo.py");
 
-        db.system()
-            .write_files([(&foo_src, ""), (&foo_site_packages, "")])?;
+        db.write_files([(&foo_src, ""), (&foo_site_packages, "")])?;
 
         let foo_module = resolve_module(&db, ModuleName::new_static("foo").unwrap()).unwrap();
 
@@ -840,7 +833,7 @@ mod tests {
             custom_typeshed,
         } = setup_resolver_test();
 
-        db.system_mut().use_os_system();
+        db.use_os_system();
 
         let temp_dir = tempfile::tempdir()?;
         let root = SystemPath::from_std_path(temp_dir.path()).unwrap();
@@ -904,8 +897,7 @@ mod tests {
         let foo_path = src.join("foo.py");
         let bar_path = src.join("bar.py");
 
-        db.system()
-            .write_files([(&foo_path, "x = 1"), (&bar_path, "y = 2")])?;
+        db.write_files([(&foo_path, "x = 1"), (&bar_path, "y = 2")])?;
 
         let foo_module_name = ModuleName::new_static("foo").unwrap();
         let foo_module = resolve_module(&db, foo_module_name.clone()).unwrap();
@@ -915,7 +907,7 @@ mod tests {
         db.clear_salsa_events();
 
         // Delete `bar.py`
-        db.system().memory_file_system().remove_file(&bar_path)?;
+        db.memory_file_system().remove_file(&bar_path)?;
         bar.touch(&mut db);
 
         // Re-query the foo module. The foo module should still be cached because `bar.py` isn't relevant
@@ -943,8 +935,8 @@ mod tests {
         assert_eq!(resolve_module(&db, foo_module_name.clone()), None);
 
         // Now write the foo file
-        db.system().write_file(&foo_path, "x = 1")?;
-        File::touch_path(&mut db, &FilePath::System(foo_path.clone()));
+        db.write_file(&foo_path, "x = 1")?;
+
         let foo_file = system_path_to_file(&db, &foo_path).expect("foo.py to exist");
 
         let foo_module = resolve_module(&db, foo_module_name).expect("Foo module to resolve");
@@ -960,8 +952,7 @@ mod tests {
         let foo_path = src.join("foo.py");
         let foo_init_path = src.join("foo/__init__.py");
 
-        db.system()
-            .write_files([(&foo_path, "x = 1"), (&foo_init_path, "x = 2")])?;
+        db.write_files([(&foo_path, "x = 1"), (&foo_init_path, "x = 2")])?;
 
         let foo_module_name = ModuleName::new_static("foo").unwrap();
         let foo_module = resolve_module(&db, foo_module_name.clone()).expect("foo module to exist");
@@ -969,11 +960,8 @@ mod tests {
         assert_eq!(&foo_init_path, foo_module.file().path(&db));
 
         // Delete `foo/__init__.py` and the `foo` folder. `foo` should now resolve to `foo.py`
-        db.system()
-            .memory_file_system()
-            .remove_file(&foo_init_path)?;
-        db.system()
-            .memory_file_system()
+        db.memory_file_system().remove_file(&foo_init_path)?;
+        db.memory_file_system()
             .remove_directory(foo_init_path.parent().unwrap())?;
         File::touch_path(&mut db, &FilePath::System(foo_init_path));
 

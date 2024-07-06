@@ -184,7 +184,7 @@ mod tests {
     };
     use ruff_db::files::system_path_to_file;
     use ruff_db::parsed::parsed_module;
-    use ruff_db::system::SystemPathBuf;
+    use ruff_db::system::{DbWithTestSystem, SystemPathBuf};
 
     use crate::db::tests::TestDb;
     use crate::types::Type;
@@ -208,9 +208,9 @@ mod tests {
 
     #[test]
     fn function_ty() -> anyhow::Result<()> {
-        let db = setup_db();
+        let mut db = setup_db();
 
-        db.system().write_file("/src/foo.py", "def test(): pass")?;
+        db.write_file("/src/foo.py", "def test(): pass")?;
         let foo = system_path_to_file(&db, "/src/foo.py").unwrap();
 
         let ast = parsed_module(&db, foo);
@@ -226,9 +226,9 @@ mod tests {
 
     #[test]
     fn class_ty() -> anyhow::Result<()> {
-        let db = setup_db();
+        let mut db = setup_db();
 
-        db.system().write_file("/src/foo.py", "class Test: pass")?;
+        db.write_file("/src/foo.py", "class Test: pass")?;
         let foo = system_path_to_file(&db, "/src/foo.py").unwrap();
 
         let ast = parsed_module(&db, foo);
@@ -244,9 +244,9 @@ mod tests {
 
     #[test]
     fn alias_ty() -> anyhow::Result<()> {
-        let db = setup_db();
+        let mut db = setup_db();
 
-        db.system().write_files([
+        db.write_files([
             ("/src/foo.py", "class Test: pass"),
             ("/src/bar.py", "from foo import Test"),
         ])?;

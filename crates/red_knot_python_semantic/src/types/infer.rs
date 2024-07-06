@@ -602,7 +602,7 @@ mod tests {
         set_module_resolution_settings, RawModuleResolutionSettings, TargetVersion,
     };
     use ruff_db::files::system_path_to_file;
-    use ruff_db::system::SystemPathBuf;
+    use ruff_db::system::{DbWithTestSystem, SystemPathBuf};
     use ruff_python_ast::name::Name;
 
     use crate::db::tests::TestDb;
@@ -634,9 +634,9 @@ mod tests {
 
     #[test]
     fn follow_import_to_class() -> anyhow::Result<()> {
-        let db = setup_db();
+        let mut db = setup_db();
 
-        db.system().write_files([
+        db.write_files([
             ("src/a.py", "from b import C as D; E = D"),
             ("src/b.py", "class C: pass"),
         ])?;
@@ -648,9 +648,9 @@ mod tests {
 
     #[test]
     fn resolve_base_class_by_name() -> anyhow::Result<()> {
-        let db = setup_db();
+        let mut db = setup_db();
 
-        db.system().write_file(
+        db.write_file(
             "src/mod.py",
             r#"
 class Base:
@@ -680,9 +680,9 @@ class Sub(Base):
 
     #[test]
     fn resolve_method() -> anyhow::Result<()> {
-        let db = setup_db();
+        let mut db = setup_db();
 
-        db.system().write_file(
+        db.write_file(
             "src/mod.py",
             "
 class C:
@@ -710,9 +710,9 @@ class C:
 
     #[test]
     fn resolve_module_member() -> anyhow::Result<()> {
-        let db = setup_db();
+        let mut db = setup_db();
 
-        db.system().write_files([
+        db.write_files([
             ("src/a.py", "import b; D = b.C"),
             ("src/b.py", "class C: pass"),
         ])?;
@@ -724,9 +724,9 @@ class C:
 
     #[test]
     fn resolve_literal() -> anyhow::Result<()> {
-        let db = setup_db();
+        let mut db = setup_db();
 
-        db.system().write_file("src/a.py", "x = 1")?;
+        db.write_file("src/a.py", "x = 1")?;
 
         assert_public_ty(&db, "src/a.py", "x", "Literal[1]");
 
@@ -735,9 +735,9 @@ class C:
 
     #[test]
     fn resolve_union() -> anyhow::Result<()> {
-        let db = setup_db();
+        let mut db = setup_db();
 
-        db.system().write_file(
+        db.write_file(
             "src/a.py",
             "
 if flag:
@@ -754,9 +754,9 @@ else:
 
     #[test]
     fn literal_int_arithmetic() -> anyhow::Result<()> {
-        let db = setup_db();
+        let mut db = setup_db();
 
-        db.system().write_file(
+        db.write_file(
             "src/a.py",
             "
 a = 2 + 1
@@ -778,9 +778,9 @@ e = 5 % 3
 
     #[test]
     fn walrus() -> anyhow::Result<()> {
-        let db = setup_db();
+        let mut db = setup_db();
 
-        db.system().write_file("src/a.py", "x = (y := 1) + 1")?;
+        db.write_file("src/a.py", "x = (y := 1) + 1")?;
 
         assert_public_ty(&db, "src/a.py", "x", "Literal[2]");
         assert_public_ty(&db, "src/a.py", "y", "Literal[1]");
@@ -790,9 +790,9 @@ e = 5 % 3
 
     #[test]
     fn ifexpr() -> anyhow::Result<()> {
-        let db = setup_db();
+        let mut db = setup_db();
 
-        db.system().write_file("src/a.py", "x = 1 if flag else 2")?;
+        db.write_file("src/a.py", "x = 1 if flag else 2")?;
 
         assert_public_ty(&db, "src/a.py", "x", "Literal[1, 2]");
 
@@ -801,9 +801,9 @@ e = 5 % 3
 
     #[test]
     fn ifexpr_walrus() -> anyhow::Result<()> {
-        let db = setup_db();
+        let mut db = setup_db();
 
-        db.system().write_file(
+        db.write_file(
             "src/a.py",
             "
 y = z = 0
@@ -822,10 +822,9 @@ b = z
 
     #[test]
     fn ifexpr_nested() -> anyhow::Result<()> {
-        let db = setup_db();
+        let mut db = setup_db();
 
-        db.system()
-            .write_file("src/a.py", "x = 1 if flag else 2 if flag2 else 3")?;
+        db.write_file("src/a.py", "x = 1 if flag else 2 if flag2 else 3")?;
 
         assert_public_ty(&db, "src/a.py", "x", "Literal[1, 2, 3]");
 
@@ -834,10 +833,9 @@ b = z
 
     #[test]
     fn none() -> anyhow::Result<()> {
-        let db = setup_db();
+        let mut db = setup_db();
 
-        db.system()
-            .write_file("src/a.py", "x = 1 if flag else None")?;
+        db.write_file("src/a.py", "x = 1 if flag else None")?;
 
         assert_public_ty(&db, "src/a.py", "x", "Literal[1] | None");
         Ok(())
