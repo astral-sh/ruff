@@ -2100,7 +2100,6 @@ dependencies = [
  "dashmap 6.0.1",
  "filetime",
  "insta",
- "once_cell",
  "ruff_python_ast",
  "ruff_python_parser",
  "ruff_source_file",
