@@ -59,7 +59,7 @@ impl Program {
     where
         F: FnOnce(&Program) -> T + UnwindSafe,
     {
-        // TODO: Catch in `Caancelled::catch`
+        // TODO: Catch in `Cancelled::catch`
         //  See https://salsa.zulipchat.com/#narrow/stream/145099-general/topic/How.20to.20use.20.60Cancelled.3A.3Acatch.60
         Ok(f(self))
     }
