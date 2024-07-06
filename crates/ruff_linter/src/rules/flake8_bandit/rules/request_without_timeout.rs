@@ -72,7 +72,7 @@ pub(crate) fn request_without_timeout(checker: &mut Checker, call: &ast::ExprCal
                     keyword.range(),
                 ));
             }
-        } else {
+        } else if module == "requests" {
             checker.diagnostics.push(Diagnostic::new(
                 RequestWithoutTimeout { implicit: true, module: module.to_string() },
                 call.func.range(),
