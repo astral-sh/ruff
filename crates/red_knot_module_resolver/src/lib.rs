@@ -12,4 +12,6 @@ pub use module::{Module, ModuleKind};
 pub use module_name::ModuleName;
 pub use resolver::{resolve_module, set_module_resolution_settings, RawModuleResolutionSettings};
 pub use supported_py_version::TargetVersion;
-pub use typeshed::{TypeshedVersionsParseError, TypeshedVersionsParseErrorKind};
+pub use typeshed::{
+    vendored_typeshed_stubs, TypeshedVersionsParseError, TypeshedVersionsParseErrorKind,
+};

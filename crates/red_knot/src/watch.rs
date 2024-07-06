@@ -1,11 +1,12 @@
 use std::path::Path;
 
-use crate::program::{FileChangeKind, FileWatcherChange};
 use anyhow::Context;
 use notify::event::{CreateKind, RemoveKind};
 use notify::{recommended_watcher, Event, EventKind, RecommendedWatcher, RecursiveMode, Watcher};
 
 use ruff_db::system::SystemPath;
+
+use crate::program::{FileChangeKind, FileWatcherChange};
 
 pub struct FileWatcher {
     watcher: RecommendedWatcher,

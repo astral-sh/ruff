@@ -338,7 +338,7 @@ impl<'a> From<&'a VendoredPath> for NormalizedVendoredPath<'a> {
 }
 
 #[cfg(test)]
-mod tests {
+pub(crate) mod tests {
     use std::io::Write;
 
     use insta::assert_snapshot;

@@ -1,8 +1,7 @@
 use salsa::DbWithJar;
 
-use ruff_db::{Db as SourceDb, Upcast};
-
 use red_knot_module_resolver::Db as ResolverDb;
+use ruff_db::{Db as SourceDb, Upcast};
 
 use crate::semantic_index::definition::Definition;
 use crate::semantic_index::symbol::{public_symbols_map, PublicSymbolId, ScopeId};
@@ -45,12 +44,13 @@ pub(crate) mod tests {
     use salsa::storage::HasIngredientsFor;
     use salsa::DebugWithDb;
 
-    use super::{Db, Jar};
-    use red_knot_module_resolver::{Db as ResolverDb, Jar as ResolverJar};
+    use red_knot_module_resolver::{vendored_typeshed_stubs, Db as ResolverDb, Jar as ResolverJar};
     use ruff_db::files::Files;
     use ruff_db::system::{DbWithTestSystem, System, TestSystem};
     use ruff_db::vendored::VendoredFileSystem;
     use ruff_db::{Db as SourceDb, Jar as SourceJar, Upcast};
+
+    use super::{Db, Jar};
 
     #[salsa::db(Jar, ResolverJar, SourceJar)]
     pub(crate) struct TestDb {
@@ -66,7 +66,7 @@ pub(crate) mod tests {
             Self {
                 storage: salsa::Storage::default(),
                 system: TestSystem::default(),
-                vendored: VendoredFileSystem::default(),
+                vendored: vendored_typeshed_stubs().snapshot(),
                 events: std::sync::Arc::default(),
                 files: Files::default(),
             }

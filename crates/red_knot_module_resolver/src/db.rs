@@ -31,6 +31,7 @@ pub(crate) mod tests {
 
     use crate::resolver::{set_module_resolution_settings, RawModuleResolutionSettings};
     use crate::supported_py_version::TargetVersion;
+    use crate::vendored_typeshed_stubs;
 
     use super::*;
 
@@ -48,7 +49,7 @@ pub(crate) mod tests {
             Self {
                 storage: salsa::Storage::default(),
                 system: TestSystem::default(),
-                vendored: VendoredFileSystem::default(),
+                vendored: vendored_typeshed_stubs().snapshot(),
                 events: sync::Arc::default(),
                 files: Files::default(),
             }

@@ -11,7 +11,7 @@ use crate::Db;
 
 /// Returns the parsed AST of `file`, including its token stream.
 ///
-/// The query uses Ruff's error-resilient parser. That means that the parser always succeeds to produce a
+/// The query uses Ruff's error-resilient parser. That means that the parser always succeeds to produce an
 /// AST even if the file contains syntax errors. The parse errors
 /// are then accessible through [`Parsed::errors`].
 ///

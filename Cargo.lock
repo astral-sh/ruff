@@ -1888,6 +1888,7 @@ dependencies = [
  "camino",
  "compact_str",
  "insta",
+ "once_cell",
  "path-slash",
  "ruff_db",
  "ruff_python_stdlib",

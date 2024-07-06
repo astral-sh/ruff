@@ -430,9 +430,9 @@ mod tests {
     use std::num::{IntErrorKind, NonZeroU16};
     use std::path::Path;
 
-    use super::*;
-
     use insta::assert_snapshot;
+
+    use super::*;
 
     const TYPESHED_STDLIB_DIR: &str = "stdlib";
 

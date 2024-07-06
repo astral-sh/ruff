@@ -12,7 +12,7 @@ use crate::Db;
 pub fn source_text(db: &dyn Db, file: File) -> SourceText {
     let _span = tracing::trace_span!("source_text", ?file).entered();
 
-    let content = file.read(db);
+    let content = file.read_to_string(db);
 
     SourceText {
         inner: Arc::from(content),

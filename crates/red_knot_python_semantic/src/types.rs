@@ -337,8 +337,6 @@ mod tests {
         // Change `x` to a different value
         db.write_file("/src/foo.py", "x = 20\ndef foo(): ...")?;
 
-        let foo = system_path_to_file(&db, "/src/foo.py").unwrap();
-
         let a = system_path_to_file(&db, "/src/a.py").unwrap();
 
         db.clear_salsa_events();
@@ -376,7 +374,6 @@ mod tests {
         db.write_file("/src/foo.py", "x = 10\ndef foo(): pass")?;
 
         let a = system_path_to_file(&db, "/src/a.py").unwrap();
-        let foo = system_path_to_file(&db, "/src/foo.py").unwrap();
 
         db.clear_salsa_events();
 
@@ -415,7 +412,6 @@ mod tests {
         db.write_file("/src/foo.py", "x = 10\ny = 30")?;
 
         let a = system_path_to_file(&db, "/src/a.py").unwrap();
-        let foo = system_path_to_file(&db, "/src/foo.py").unwrap();
 
         db.clear_salsa_events();
 

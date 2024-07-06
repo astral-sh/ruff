@@ -3,14 +3,15 @@ use std::sync::Arc;
 
 use salsa::{Cancelled, Database};
 
-use crate::db::{Db, Jar};
-use crate::Workspace;
-use red_knot_module_resolver::{Db as ResolverDb, Jar as ResolverJar};
+use red_knot_module_resolver::{vendored_typeshed_stubs, Db as ResolverDb, Jar as ResolverJar};
 use red_knot_python_semantic::{Db as SemanticDb, Jar as SemanticJar};
 use ruff_db::files::{File, FilePath, Files};
 use ruff_db::system::{System, SystemPathBuf};
 use ruff_db::vendored::VendoredFileSystem;
 use ruff_db::{Db as SourceDb, Jar as SourceJar, Upcast};
+
+use crate::db::{Db, Jar};
+use crate::Workspace;
 
 mod check;
 
@@ -30,8 +31,6 @@ impl Program {
         Self {
             storage: salsa::Storage::default(),
             files: Files::default(),
-            // TODO correctly initialize vendored file system
-            vendored: VendoredFileSystem::default(),
             system: Arc::new(system),
             workspace,
         }
@@ -88,8 +87,8 @@ impl ResolverDb for Program {}
 impl SemanticDb for Program {}
 
 impl SourceDb for Program {
+    fn vendored(&self) -> &VendoredFileSystem {
         vendored_typeshed_stubs()
-        &self.vendored
     }
 
     fn system(&self) -> &dyn System {
@@ -110,7 +109,7 @@ impl salsa::ParallelDatabase for Program {
         salsa::Snapshot::new(Self {
             storage: self.storage.snapshot(),
             files: self.files.snapshot(),
-            vendored: self.vendored.snapshot(),
+            system: self.system.clone(),
             workspace: self.workspace.clone(),
         })
     }
