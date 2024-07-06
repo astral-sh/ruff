@@ -5,8 +5,8 @@ use std::sync::Arc;
 use ruff_python_ast::{ModModule, PySourceType};
 use ruff_python_parser::{parse_unchecked_source, Parsed};
 
+use crate::files::{File, FilePath};
 use crate::source::source_text;
-use crate::vfs::{VfsFile, VfsPath};
 use crate::Db;
 
 /// Returns the parsed AST of `file`, including its token stream.
@@ -21,7 +21,7 @@ use crate::Db;
 /// The other reason is that Ruff's AST doesn't implement `Eq` which Sala requires
 /// for determining if a query result is unchanged.
 #[salsa::tracked(return_ref, no_eq)]
-pub fn parsed_module(db: &dyn Db, file: VfsFile) -> ParsedModule {
+pub fn parsed_module(db: &dyn Db, file: File) -> ParsedModule {
     let _span = tracing::trace_span!("parse_module", file = ?file).entered();
 
     let source = source_text(db, file);
@@ -31,7 +31,7 @@ pub fn parsed_module(db: &dyn Db, file: VfsFile) -> ParsedModule {
         FilePath::System(path) => path
             .extension()
             .map_or(PySourceType::Python, PySourceType::from_extension),
-        VfsPath::Vendored(_) => PySourceType::Stub,
+        FilePath::Vendored(_) => PySourceType::Stub,
     };
 
     ParsedModule::new(parse_unchecked_source(&source, ty))

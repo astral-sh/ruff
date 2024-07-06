@@ -72,11 +72,6 @@ pub(crate) mod tests {
             }
         }
 
-        #[allow(unused)]
-        pub(crate) fn vfs_mut(&mut self) -> &mut Vfs {
-            &mut self.vfs
-        }
-
         /// Takes the salsa events.
         ///
         /// ## Panics
@@ -110,8 +105,8 @@ pub(crate) mod tests {
             &self.system
         }
 
-        fn vfs(&self) -> &Vfs {
-            &self.vfs
+        fn files(&self) -> &Files {
+            &self.files
         }
     }
 

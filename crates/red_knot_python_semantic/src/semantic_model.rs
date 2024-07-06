@@ -1,5 +1,5 @@
 use red_knot_module_resolver::{resolve_module, Module, ModuleName};
-use ruff_db::vfs::VfsFile;
+use ruff_db::files::File;
 use ruff_python_ast as ast;
 use ruff_python_ast::{Expr, ExpressionRef, StmtClassDef};
 
@@ -11,11 +11,11 @@ use crate::Db;
 
 pub struct SemanticModel<'db> {
     db: &'db dyn Db,
-    file: VfsFile,
+    file: File,
 }
 
 impl<'db> SemanticModel<'db> {
-    pub fn new(db: &'db dyn Db, file: VfsFile) -> Self {
+    pub fn new(db: &'db dyn Db, file: File) -> Self {
         Self { db, file }
     }
 

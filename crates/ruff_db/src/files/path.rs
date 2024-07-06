@@ -1,25 +1,27 @@
+use crate::files::{system_path_to_file, vendored_path_to_file, File};
 use crate::system::{SystemPath, SystemPathBuf};
 use crate::vendored::{VendoredPath, VendoredPathBuf};
+use crate::Db;
 
 /// Path to a file.
 ///
 /// The path abstracts that files in Ruff can come from different sources:
 ///
-/// * a file stored on disk
-/// * a vendored file that ships as part of the ruff binary
-/// * Future: A virtual file that references a slice of another file. For example, the CSS code in a python file.
+/// * a file stored on the [host system](crate::system::System).
+/// * a vendored file stored in the [vendored file system](crate::vendored::VendoredFileSystem).
 #[derive(Clone, Debug, Eq, PartialEq, Hash)]
-pub enum VfsPath {
-    /// Path that points to a file on disk.
+pub enum FilePath {
+    /// Path to a file on the [host system](crate::system::System).
     System(SystemPathBuf),
+    /// Path to a file vendored as part of Ruff. Stored in the [vendored file system](crate::vendored::VendoredFileSystem).
     Vendored(VendoredPathBuf),
 }
 
-impl VfsPath {
+impl FilePath {
     /// Create a new path to a file on the file system.
     #[must_use]
     pub fn system(path: impl AsRef<SystemPath>) -> Self {
-        VfsPath::System(path.as_ref().to_path_buf())
+        FilePath::System(path.as_ref().to_path_buf())
     }
 
     /// Returns `Some` if the path is a file system path that points to a path on disk.
@@ -27,8 +29,8 @@ impl VfsPath {
     #[inline]
     pub fn into_system_path_buf(self) -> Option<SystemPathBuf> {
         match self {
-            VfsPath::System(path) => Some(path),
-            VfsPath::Vendored(_) => None,
+            FilePath::System(path) => Some(path),
+            FilePath::Vendored(_) => None,
         }
     }
 
@@ -36,8 +38,8 @@ impl VfsPath {
     #[inline]
     pub fn as_system_path(&self) -> Option<&SystemPath> {
         match self {
-            VfsPath::System(path) => Some(path.as_path()),
-            VfsPath::Vendored(_) => None,
+            FilePath::System(path) => Some(path.as_path()),
+            FilePath::Vendored(_) => None,
         }
     }
 
@@ -45,65 +47,78 @@ impl VfsPath {
     #[must_use]
     #[inline]
     pub const fn is_system_path(&self) -> bool {
-        matches!(self, VfsPath::System(_))
+        matches!(self, FilePath::System(_))
     }
 
     /// Returns `true` if the path is a vendored path.
     #[must_use]
     #[inline]
     pub const fn is_vendored_path(&self) -> bool {
-        matches!(self, VfsPath::Vendored(_))
+        matches!(self, FilePath::Vendored(_))
     }
 
     #[must_use]
     #[inline]
     pub fn as_vendored_path(&self) -> Option<&VendoredPath> {
         match self {
-            VfsPath::Vendored(path) => Some(path.as_path()),
-            VfsPath::System(_) => None,
+            FilePath::Vendored(path) => Some(path.as_path()),
+            FilePath::System(_) => None,
         }
     }
 
     /// Yields the underlying [`str`] slice.
     pub fn as_str(&self) -> &str {
         match self {
-            VfsPath::System(path) => path.as_str(),
-            VfsPath::Vendored(path) => path.as_str(),
+            FilePath::System(path) => path.as_str(),
+            FilePath::Vendored(path) => path.as_str(),
+        }
+    }
+
+    /// Interns a virtual file system path and returns a salsa [`File`] ingredient.
+    ///
+    /// Returns `Some` if a file for `path` exists and is accessible by the user. Returns `None` otherwise.
+    ///
+    /// See [`system_path_to_file`] and [`vendored_path_to_file`] if you always have either a file system or vendored path.
+    #[inline]
+    pub fn to_file(&self, db: &dyn Db) -> Option<File> {
+        match self {
+            FilePath::System(path) => system_path_to_file(db, path),
+            FilePath::Vendored(path) => vendored_path_to_file(db, path),
         }
     }
 }
 
-impl AsRef<str> for VfsPath {
+impl AsRef<str> for FilePath {
     fn as_ref(&self) -> &str {
         self.as_str()
     }
 }
 
-impl From<SystemPathBuf> for VfsPath {
+impl From<SystemPathBuf> for FilePath {
     fn from(value: SystemPathBuf) -> Self {
         Self::System(value)
     }
 }
 
-impl From<&SystemPath> for VfsPath {
+impl From<&SystemPath> for FilePath {
     fn from(value: &SystemPath) -> Self {
-        VfsPath::System(value.to_path_buf())
+        FilePath::System(value.to_path_buf())
     }
 }
 
-impl From<VendoredPathBuf> for VfsPath {
+impl From<VendoredPathBuf> for FilePath {
     fn from(value: VendoredPathBuf) -> Self {
         Self::Vendored(value)
     }
 }
 
-impl From<&VendoredPath> for VfsPath {
+impl From<&VendoredPath> for FilePath {
     fn from(value: &VendoredPath) -> Self {
         Self::Vendored(value.to_path_buf())
     }
 }
 
-impl PartialEq<SystemPath> for VfsPath {
+impl PartialEq<SystemPath> for FilePath {
     #[inline]
     fn eq(&self, other: &SystemPath) -> bool {
         self.as_system_path()
@@ -111,27 +126,27 @@ impl PartialEq<SystemPath> for VfsPath {
     }
 }
 
-impl PartialEq<VfsPath> for SystemPath {
+impl PartialEq<FilePath> for SystemPath {
     #[inline]
-    fn eq(&self, other: &VfsPath) -> bool {
+    fn eq(&self, other: &FilePath) -> bool {
         other == self
     }
 }
 
-impl PartialEq<SystemPathBuf> for VfsPath {
+impl PartialEq<SystemPathBuf> for FilePath {
     #[inline]
     fn eq(&self, other: &SystemPathBuf) -> bool {
         self == other.as_path()
     }
 }
 
-impl PartialEq<VfsPath> for SystemPathBuf {
-    fn eq(&self, other: &VfsPath) -> bool {
+impl PartialEq<FilePath> for SystemPathBuf {
+    fn eq(&self, other: &FilePath) -> bool {
         other == self
     }
 }
 
-impl PartialEq<VendoredPath> for VfsPath {
+impl PartialEq<VendoredPath> for FilePath {
     #[inline]
     fn eq(&self, other: &VendoredPath) -> bool {
         self.as_vendored_path()
@@ -139,23 +154,23 @@ impl PartialEq<VendoredPath> for VfsPath {
     }
 }
 
-impl PartialEq<VfsPath> for VendoredPath {
+impl PartialEq<FilePath> for VendoredPath {
     #[inline]
-    fn eq(&self, other: &VfsPath) -> bool {
+    fn eq(&self, other: &FilePath) -> bool {
         other == self
     }
 }
 
-impl PartialEq<VendoredPathBuf> for VfsPath {
+impl PartialEq<VendoredPathBuf> for FilePath {
     #[inline]
     fn eq(&self, other: &VendoredPathBuf) -> bool {
         other.as_path() == self
     }
 }
 
-impl PartialEq<VfsPath> for VendoredPathBuf {
+impl PartialEq<FilePath> for VendoredPathBuf {
     #[inline]
-    fn eq(&self, other: &VfsPath) -> bool {
+    fn eq(&self, other: &FilePath) -> bool {
         other == self
     }
 }

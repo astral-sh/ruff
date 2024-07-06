@@ -41,7 +41,6 @@ pub(crate) mod tests {
         vendored: VendoredFileSystem,
         files: Files,
         events: sync::Arc<sync::Mutex<Vec<salsa::Event>>>,
-        vfs: Vfs,
     }
 
     impl TestDb {
@@ -53,11 +52,6 @@ pub(crate) mod tests {
                 events: sync::Arc::default(),
                 files: Files::default(),
             }
-        }
-
-        #[allow(unused)]
-        pub(crate) fn vfs_mut(&mut self) -> &mut Vfs {
-            &mut self.vfs
         }
 
         /// Takes the salsa events.
@@ -99,8 +93,12 @@ pub(crate) mod tests {
             &self.vendored
         }
 
-        fn vfs(&self) -> &ruff_db::vfs::Vfs {
-            &self.vfs
+        fn system(&self) -> &dyn ruff_db::system::System {
+            &self.system
+        }
+
+        fn files(&self) -> &Files {
+            &self.files
         }
     }
 
@@ -122,7 +120,6 @@ pub(crate) mod tests {
                 vendored: self.vendored.snapshot(),
                 files: self.files.snapshot(),
                 events: self.events.clone(),
-                vfs: self.vfs.snapshot(),
             })
         }
     }

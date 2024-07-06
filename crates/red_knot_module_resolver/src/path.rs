@@ -156,12 +156,8 @@ impl ModuleResolutionPathBuf {
     }
 
     /// Returns `None` if the path doesn't exist, isn't accessible, or if the path points to a directory.
-    pub(crate) fn to_vfs_file(
-        &self,
-        search_path: &Self,
-        resolver: &ResolverState,
-    ) -> Option<VfsFile> {
-        ModuleResolutionPathRef::from(self).to_vfs_file(search_path, resolver)
+    pub(crate) fn to_file(&self, search_path: &Self, resolver: &ResolverState) -> Option<File> {
+        ModuleResolutionPathRef::from(self).to_file(search_path, resolver)
     }
 }
 
@@ -256,7 +252,7 @@ impl<'a> ModuleResolutionPathRefInner<'a> {
         }
     }
 
-    fn to_vfs_file(self, search_path: Self, resolver: &ResolverState) -> Option<VfsFile> {
+    fn to_file(self, search_path: Self, resolver: &ResolverState) -> Option<File> {
         match (self, search_path) {
             (Self::Extra(path), Self::Extra(_)) => system_path_to_file(resolver.db.upcast(), path),
             (Self::FirstParty(path), Self::FirstParty(_)) => system_path_to_file(resolver.db.upcast(), path),
@@ -380,12 +376,12 @@ impl<'a> ModuleResolutionPathRef<'a> {
     }
 
     #[must_use]
-    pub(crate) fn to_vfs_file(
+    pub(crate) fn to_file(
         self,
         search_path: impl Into<Self>,
         resolver: &ResolverState,
-    ) -> Option<VfsFile> {
-        self.0.to_vfs_file(search_path.into().0, resolver)
+    ) -> Option<File> {
+        self.0.to_file(search_path.into().0, resolver)
     }
 
     #[must_use]
@@ -781,21 +777,18 @@ mod tests {
         assert!(asyncio_regular_package.is_regular_package(&stdlib_path, &resolver));
         // Paths to directories don't resolve to VfsFiles
         assert_eq!(
-            asyncio_regular_package.to_vfs_file(&stdlib_path, &resolver),
+            asyncio_regular_package.to_file(&stdlib_path, &resolver),
             None
         );
         assert!(asyncio_regular_package
             .join("__init__.pyi")
-            .to_vfs_file(&stdlib_path, &resolver)
+            .to_file(&stdlib_path, &resolver)
             .is_some());
 
         // The `asyncio` package exists on Python 3.8, but the `asyncio.tasks` submodule does not,
         // according to the `VERSIONS` file in our typeshed mock:
         let asyncio_tasks_module = stdlib_path.join("asyncio/tasks.pyi");
-        assert_eq!(
-            asyncio_tasks_module.to_vfs_file(&stdlib_path, &resolver),
-            None
-        );
+        assert_eq!(asyncio_tasks_module.to_file(&stdlib_path, &resolver), None);
         assert!(!asyncio_tasks_module.is_directory(&stdlib_path, &resolver));
         assert!(!asyncio_tasks_module.is_regular_package(&stdlib_path, &resolver));
     }
@@ -812,15 +805,12 @@ mod tests {
         let xml_namespace_package = stdlib_path.join("xml");
         assert!(xml_namespace_package.is_directory(&stdlib_path, &resolver));
         // Paths to directories don't resolve to VfsFiles
-        assert_eq!(
-            xml_namespace_package.to_vfs_file(&stdlib_path, &resolver),
-            None
-        );
+        assert_eq!(xml_namespace_package.to_file(&stdlib_path, &resolver), None);
         assert!(!xml_namespace_package.is_regular_package(&stdlib_path, &resolver));
 
         let xml_etree = stdlib_path.join("xml/etree.pyi");
         assert!(!xml_etree.is_directory(&stdlib_path, &resolver));
-        assert!(xml_etree.to_vfs_file(&stdlib_path, &resolver).is_some());
+        assert!(xml_etree.to_file(&stdlib_path, &resolver).is_some());
         assert!(!xml_etree.is_regular_package(&stdlib_path, &resolver));
     }
 
@@ -834,9 +824,7 @@ mod tests {
         };
 
         let functools_module = stdlib_path.join("functools.pyi");
-        assert!(functools_module
-            .to_vfs_file(&stdlib_path, &resolver)
-            .is_some());
+        assert!(functools_module.to_file(&stdlib_path, &resolver).is_some());
         assert!(!functools_module.is_directory(&stdlib_path, &resolver));
         assert!(!functools_module.is_regular_package(&stdlib_path, &resolver));
     }
@@ -852,7 +840,7 @@ mod tests {
 
         let collections_regular_package = stdlib_path.join("collections");
         assert_eq!(
-            collections_regular_package.to_vfs_file(&stdlib_path, &resolver),
+            collections_regular_package.to_file(&stdlib_path, &resolver),
             None
         );
         assert!(!collections_regular_package.is_directory(&stdlib_path, &resolver));
@@ -870,14 +858,14 @@ mod tests {
 
         let importlib_namespace_package = stdlib_path.join("importlib");
         assert_eq!(
-            importlib_namespace_package.to_vfs_file(&stdlib_path, &resolver),
+            importlib_namespace_package.to_file(&stdlib_path, &resolver),
             None
         );
         assert!(!importlib_namespace_package.is_directory(&stdlib_path, &resolver));
         assert!(!importlib_namespace_package.is_regular_package(&stdlib_path, &resolver));
 
         let importlib_abc = stdlib_path.join("importlib/abc.pyi");
-        assert_eq!(importlib_abc.to_vfs_file(&stdlib_path, &resolver), None);
+        assert_eq!(importlib_abc.to_file(&stdlib_path, &resolver), None);
         assert!(!importlib_abc.is_directory(&stdlib_path, &resolver));
         assert!(!importlib_abc.is_regular_package(&stdlib_path, &resolver));
     }
@@ -892,7 +880,7 @@ mod tests {
         };
 
         let non_existent = stdlib_path.join("doesnt_even_exist");
-        assert_eq!(non_existent.to_vfs_file(&stdlib_path, &resolver), None);
+        assert_eq!(non_existent.to_file(&stdlib_path, &resolver), None);
         assert!(!non_existent.is_directory(&stdlib_path, &resolver));
         assert!(!non_existent.is_regular_package(&stdlib_path, &resolver));
     }
@@ -927,18 +915,18 @@ mod tests {
         assert!(collections_regular_package.is_regular_package(&stdlib_path, &resolver));
         // (This is still `None`, as directories don't resolve to `Vfs` files)
         assert_eq!(
-            collections_regular_package.to_vfs_file(&stdlib_path, &resolver),
+            collections_regular_package.to_file(&stdlib_path, &resolver),
             None
         );
         assert!(collections_regular_package
             .join("__init__.pyi")
-            .to_vfs_file(&stdlib_path, &resolver)
+            .to_file(&stdlib_path, &resolver)
             .is_some());
 
         // ...and so should the `asyncio.tasks` submodule (though it's still not a directory):
         let asyncio_tasks_module = stdlib_path.join("asyncio/tasks.pyi");
         assert!(asyncio_tasks_module
-            .to_vfs_file(&stdlib_path, &resolver)
+            .to_file(&stdlib_path, &resolver)
             .is_some());
         assert!(!asyncio_tasks_module.is_directory(&stdlib_path, &resolver));
         assert!(!asyncio_tasks_module.is_regular_package(&stdlib_path, &resolver));
@@ -959,7 +947,7 @@ mod tests {
         assert!(!importlib_namespace_package.is_regular_package(&stdlib_path, &resolver));
         // (This is still `None`, as directories don't resolve to `Vfs` files)
         assert_eq!(
-            importlib_namespace_package.to_vfs_file(&stdlib_path, &resolver),
+            importlib_namespace_package.to_file(&stdlib_path, &resolver),
             None
         );
 
@@ -967,7 +955,7 @@ mod tests {
         let importlib_abc = importlib_namespace_package.join("abc.pyi");
         assert!(!importlib_abc.is_directory(&stdlib_path, &resolver));
         assert!(!importlib_abc.is_regular_package(&stdlib_path, &resolver));
-        assert!(importlib_abc.to_vfs_file(&stdlib_path, &resolver).is_some());
+        assert!(importlib_abc.to_file(&stdlib_path, &resolver).is_some());
     }
 
     #[test]
@@ -981,15 +969,12 @@ mod tests {
 
         // The `xml` package no longer exists on py39:
         let xml_namespace_package = stdlib_path.join("xml");
-        assert_eq!(
-            xml_namespace_package.to_vfs_file(&stdlib_path, &resolver),
-            None
-        );
+        assert_eq!(xml_namespace_package.to_file(&stdlib_path, &resolver), None);
         assert!(!xml_namespace_package.is_directory(&stdlib_path, &resolver));
         assert!(!xml_namespace_package.is_regular_package(&stdlib_path, &resolver));
 
         let xml_etree = xml_namespace_package.join("etree.pyi");
-        assert_eq!(xml_etree.to_vfs_file(&stdlib_path, &resolver), None);
+        assert_eq!(xml_etree.to_file(&stdlib_path, &resolver), None);
         assert!(!xml_etree.is_directory(&stdlib_path, &resolver));
         assert!(!xml_etree.is_regular_package(&stdlib_path, &resolver));
     }

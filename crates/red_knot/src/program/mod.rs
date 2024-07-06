@@ -96,8 +96,8 @@ impl SourceDb for Program {
         &*self.system
     }
 
-    fn vfs(&self) -> &Vfs {
-        &self.vfs
+    fn files(&self) -> &Files {
+        &self.files
     }
 }
 

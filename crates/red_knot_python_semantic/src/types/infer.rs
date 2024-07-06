@@ -3,7 +3,7 @@ use std::borrow::Cow;
 use std::sync::Arc;
 
 use red_knot_module_resolver::{resolve_module, ModuleName};
-use ruff_db::vfs::VfsFile;
+use ruff_db::files::File;
 use ruff_index::IndexVec;
 use ruff_python_ast as ast;
 use ruff_python_ast::{ExprContext, TypeParams};
@@ -58,7 +58,7 @@ pub(super) struct TypeInferenceBuilder<'db> {
     // Cached lookups
     index: &'db SemanticIndex<'db>,
     file_scope_id: FileScopeId,
-    file_id: VfsFile,
+    file_id: File,
     symbol_table: Arc<SymbolTable<'db>>,
 
     /// The type inference results

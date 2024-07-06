@@ -47,9 +47,9 @@ def override(): ...
 struct Case {
     program: Program,
     fs: MemoryFileSystem,
-    foo: VfsFile,
-    bar: VfsFile,
-    typing: VfsFile,
+    foo: File,
+    bar: File,
+    typing: File,
 }
 
 fn setup_case() -> Case {

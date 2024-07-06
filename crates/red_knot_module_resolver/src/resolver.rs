@@ -58,7 +58,7 @@ pub(crate) fn resolve_module_query<'db>(
 ///
 /// Returns `None` if the path is not a module locatable via any of the known search paths.
 #[allow(unused)]
-pub(crate) fn path_to_module(db: &dyn Db, path: &VfsPath) -> Option<Module> {
+pub(crate) fn path_to_module(db: &dyn Db, path: &FilePath) -> Option<Module> {
     // It's not entirely clear on first sight why this method calls `file_to_module` instead of
     // it being the other way round, considering that the first thing that `file_to_module` does
     // is to retrieve the file's path.
@@ -67,7 +67,7 @@ pub(crate) fn path_to_module(db: &dyn Db, path: &VfsPath) -> Option<Module> {
     // all arguments are Salsa ingredients (something stored in Salsa). `Path`s aren't salsa ingredients but
     // `VfsFile` is. So what we do here is to retrieve the `path`'s `VfsFile` so that we can make
     // use of Salsa's caching and invalidation.
-    let file = vfs_path_to_file(db.upcast(), path)?;
+    let file = path.to_file(db.upcast())?;
     file_to_module(db, file)
 }
 
@@ -75,7 +75,7 @@ pub(crate) fn path_to_module(db: &dyn Db, path: &VfsPath) -> Option<Module> {
 ///
 /// Returns `None` if the file is not a module locatable via any of the known search paths.
 #[salsa::tracked]
-pub(crate) fn file_to_module(db: &dyn Db, file: VfsFile) -> Option<Module> {
+pub(crate) fn file_to_module(db: &dyn Db, file: File) -> Option<Module> {
     let _span = tracing::trace_span!("file_to_module", ?file).entered();
 
     let FilePath::System(path) = file.path(db.upcast()) else {
@@ -243,7 +243,7 @@ fn module_resolver_settings(db: &dyn Db) -> &ModuleResolutionSettings {
 fn resolve_name(
     db: &dyn Db,
     name: &ModuleName,
-) -> Option<(Arc<ModuleResolutionPathBuf>, VfsFile, ModuleKind)> {
+) -> Option<(Arc<ModuleResolutionPathBuf>, File, ModuleKind)> {
     let resolver_settings = module_resolver_settings(db);
     let resolver_state = ResolverState::new(db, resolver_settings.target_version());
 
@@ -268,14 +268,14 @@ fn resolve_name(
                 // TODO Implement full https://peps.python.org/pep-0561/#type-checker-module-resolution-order resolution
                 if let Some(stub) = package_path
                     .with_pyi_extension()
-                    .to_vfs_file(search_path, &resolver_state)
+                    .to_file(search_path, &resolver_state)
                 {
                     return Some((search_path.clone(), stub, kind));
                 }
 
                 if let Some(module) = package_path
                     .with_py_extension()
-                    .and_then(|path| path.to_vfs_file(search_path, &resolver_state))
+                    .and_then(|path| path.to_file(search_path, &resolver_state))
                 {
                     return Some((search_path.clone(), module, kind));
                 }

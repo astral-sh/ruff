@@ -1,5 +1,5 @@
+use ruff_db::files::File;
 use ruff_db::parsed::parsed_module;
-use ruff_db::vfs::VfsFile;
 use ruff_python_ast::name::Name;
 
 use crate::semantic_index::symbol::{NodeWithScopeKind, PublicSymbolId, ScopeId};
@@ -49,7 +49,7 @@ pub(crate) fn public_symbol_ty<'db>(db: &'db dyn Db, symbol: PublicSymbolId<'db>
 /// Shorthand for `public_symbol_ty` that takes a symbol name instead of a [`PublicSymbolId`].
 pub(crate) fn public_symbol_ty_by_name<'db>(
     db: &'db dyn Db,
-    file: VfsFile,
+    file: File,
     name: &str,
 ) -> Option<Type<'db>> {
     let symbol = public_symbol(db, file, name)?;
@@ -105,7 +105,7 @@ pub enum Type<'db> {
     /// a specific function object
     Function(FunctionType<'db>),
     /// a specific module object
-    Module(VfsFile),
+    Module(File),
     /// a specific class object
     Class(ClassType<'db>),
     /// the set of Python objects with the given class in their __class__'s method resolution order

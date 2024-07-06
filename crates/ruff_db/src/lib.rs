@@ -10,16 +10,16 @@ use crate::system::System;
 use crate::vendored::VendoredFileSystem;
 
 pub mod file_revision;
+pub mod files;
 pub mod parsed;
 pub mod source;
 pub mod system;
 pub mod vendored;
-pub mod vfs;
 
 pub(crate) type FxDashMap<K, V> = dashmap::DashMap<K, V, BuildHasherDefault<FxHasher>>;
 
 #[salsa::jar(db=Db)]
-pub struct Jar(VfsFile, source_text, line_index, parsed_module);
+pub struct Jar(File, source_text, line_index, parsed_module);
 
 /// Database that gives access to the virtual filesystem, source code, and parsed AST.
 pub trait Db: DbWithJar<Jar> {
@@ -72,10 +72,10 @@ mod tests {
 
     use salsa::DebugWithDb;
 
+    use crate::files::Files;
     use crate::system::System;
     use crate::system::TestSystem;
     use crate::vendored::VendoredFileSystem;
-    use crate::vfs::Vfs;
     use crate::{Db, Jar};
 
     /// Database that can be used for testing.
@@ -85,7 +85,7 @@ mod tests {
     #[salsa::db(Jar)]
     pub(crate) struct TestDb {
         storage: salsa::Storage<Self>,
-        vfs: Vfs,
+        files: Files,
         system: TestSystem,
         vendored: VendoredFileSystem,
         events: std::sync::Arc<std::sync::Mutex<Vec<salsa::Event>>>,
@@ -98,7 +98,7 @@ mod tests {
                 system: TestSystem::default(),
                 vendored: VendoredFileSystem::default(),
                 events: std::sync::Arc::default(),
-                vfs: Vfs::default(),
+                files: Files::default(),
             }
         }
 
@@ -146,8 +146,8 @@ mod tests {
             self.system()
         }
 
-        fn vfs(&self) -> &Vfs {
-            &self.vfs
+        fn files(&self) -> &Files {
+            &self.files
         }
     }
 

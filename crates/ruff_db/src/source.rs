@@ -4,12 +4,12 @@ use salsa::DebugWithDb;
 use std::ops::Deref;
 use std::sync::Arc;
 
-use crate::vfs::VfsFile;
+use crate::files::File;
 use crate::Db;
 
 /// Reads the content of file.
 #[salsa::tracked]
-pub fn source_text(db: &dyn Db, file: VfsFile) -> SourceText {
+pub fn source_text(db: &dyn Db, file: File) -> SourceText {
     let _span = tracing::trace_span!("source_text", ?file).entered();
 
     let content = file.read(db);
@@ -22,7 +22,7 @@ pub fn source_text(db: &dyn Db, file: VfsFile) -> SourceText {
 
 /// Computes the [`LineIndex`] for `file`.
 #[salsa::tracked]
-pub fn line_index(db: &dyn Db, file: VfsFile) -> LineIndex {
+pub fn line_index(db: &dyn Db, file: File) -> LineIndex {
     let _span = tracing::trace_span!("line_index", file = ?file.debug(db)).entered();
 
     let source = source_text(db, file);
@@ -30,7 +30,7 @@ pub fn line_index(db: &dyn Db, file: VfsFile) -> LineIndex {
     LineIndex::from_source_text(&source)
 }
 
-/// The source text of a [`VfsFile`].
+/// The source text of a [`File`].
 ///
 /// Cheap cloneable in `O(1)`.
 #[derive(Clone, Eq, PartialEq)]

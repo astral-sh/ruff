@@ -65,7 +65,7 @@ impl<'db> LazyTypeshedVersions<'db> {
 #[salsa::tracked(return_ref)]
 pub(crate) fn parse_typeshed_versions(
     db: &dyn Db,
-    versions_file: VfsFile,
+    versions_file: File,
 ) -> Result<TypeshedVersions, TypeshedVersionsParseError> {
     let file_content = source_text(db.upcast(), versions_file);
     file_content.parse()
