@@ -9,55 +9,62 @@ use ruff_python_ast as ast;
 use ruff_python_ast::name::Name;
 use ruff_python_ast::visitor::{walk_expr, walk_stmt, Visitor};
 
+use crate::ast_node_ref::AstNodeRef;
 use crate::semantic_index::ast_ids::node_key::ExpressionNodeKey;
 use crate::semantic_index::ast_ids::AstIdsBuilder;
-use crate::semantic_index::definition::{Definition, DefinitionNodeKey, DefinitionNodeRef};
+use crate::semantic_index::definition::{
+    AssignmentDefinitionNodeRef, Definition, DefinitionNodeKey, DefinitionNodeRef,
+    ImportFromDefinitionNodeRef,
+};
+use crate::semantic_index::expression::Expression;
 use crate::semantic_index::symbol::{
     FileScopeId, NodeWithScopeKey, NodeWithScopeRef, Scope, ScopeId, ScopedSymbolId, SymbolFlags,
     SymbolTableBuilder,
 };
+use crate::semantic_index::usedef::{FlowSnapshot, UseDefMapBuilder};
 use crate::semantic_index::SemanticIndex;
 use crate::Db;
 
-pub(super) struct SemanticIndexBuilder<'db, 'ast> {
+pub(super) struct SemanticIndexBuilder<'db> {
     // Builder state
     db: &'db dyn Db,
     file: File,
     module: &'db ParsedModule,
     scope_stack: Vec<FileScopeId>,
-    /// the target we're currently inferring
-    current_target: Option<CurrentTarget<'ast>>,
+    /// the assignment we're currently visiting
+    current_assignment: Option<CurrentAssignment<'db>>,
 
     // Semantic Index fields
     scopes: IndexVec<FileScopeId, Scope>,
     scope_ids_by_scope: IndexVec<FileScopeId, ScopeId<'db>>,
-    symbol_tables: IndexVec<FileScopeId, SymbolTableBuilder<'db>>,
+    symbol_tables: IndexVec<FileScopeId, SymbolTableBuilder>,
     ast_ids: IndexVec<FileScopeId, AstIdsBuilder>,
+    use_def_maps: IndexVec<FileScopeId, UseDefMapBuilder<'db>>,
     scopes_by_node: FxHashMap<NodeWithScopeKey, FileScopeId>,
     scopes_by_expression: FxHashMap<ExpressionNodeKey, FileScopeId>,
     definitions_by_node: FxHashMap<DefinitionNodeKey, Definition<'db>>,
+    expressions_by_node: FxHashMap<ExpressionNodeKey, Expression<'db>>,
 }
 
-impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast>
-where
-    'db: 'ast,
-{
+impl<'db> SemanticIndexBuilder<'db> {
     pub(super) fn new(db: &'db dyn Db, file: File, parsed: &'db ParsedModule) -> Self {
         let mut builder = Self {
             db,
             file,
             module: parsed,
             scope_stack: Vec::new(),
-            current_target: None,
+            current_assignment: None,
 
             scopes: IndexVec::new(),
             symbol_tables: IndexVec::new(),
             ast_ids: IndexVec::new(),
             scope_ids_by_scope: IndexVec::new(),
+            use_def_maps: IndexVec::new(),
 
             scopes_by_expression: FxHashMap::default(),
             scopes_by_node: FxHashMap::default(),
             definitions_by_node: FxHashMap::default(),
+            expressions_by_node: FxHashMap::default(),
         };
 
         builder.push_scope_with_parent(NodeWithScopeRef::Module, None);
@@ -72,16 +79,12 @@ where
             .expect("Always to have a root scope")
     }
 
-    fn push_scope(&mut self, node: NodeWithScopeRef<'ast>) {
+    fn push_scope(&mut self, node: NodeWithScopeRef) {
         let parent = self.current_scope();
         self.push_scope_with_parent(node, Some(parent));
     }
 
-    fn push_scope_with_parent(
-        &mut self,
-        node: NodeWithScopeRef<'ast>,
-        parent: Option<FileScopeId>,
-    ) {
+    fn push_scope_with_parent(&mut self, node: NodeWithScopeRef, parent: Option<FileScopeId>) {
         let children_start = self.scopes.next_index() + 1;
 
         let scope = Scope {
@@ -92,6 +95,7 @@ where
 
         let file_scope_id = self.scopes.push(scope);
         self.symbol_tables.push(SymbolTableBuilder::new());
+        self.use_def_maps.push(UseDefMapBuilder::new());
         let ast_id_scope = self.ast_ids.push(AstIdsBuilder::new());
 
         #[allow(unsafe_code)]
@@ -116,9 +120,14 @@ where
         id
     }
 
-    fn current_symbol_table(&mut self) -> &mut SymbolTableBuilder<'db> {
+    fn current_symbol_table(&mut self) -> &mut SymbolTableBuilder {
         let scope_id = self.current_scope();
         &mut self.symbol_tables[scope_id]
+    }
+
+    fn current_use_def_map(&mut self) -> &mut UseDefMapBuilder<'db> {
+        let scope_id = self.current_scope();
+        &mut self.use_def_maps[scope_id]
     }
 
     fn current_ast_ids(&mut self) -> &mut AstIdsBuilder {
@@ -126,22 +135,39 @@ where
         &mut self.ast_ids[scope_id]
     }
 
-    fn add_or_update_symbol(&mut self, name: Name, flags: SymbolFlags) -> ScopedSymbolId {
-        let symbol_table = self.current_symbol_table();
-        symbol_table.add_or_update_symbol(name, flags)
+    fn flow_snapshot(&mut self) -> FlowSnapshot {
+        self.current_use_def_map().snapshot()
     }
 
-    fn add_definition(
+    fn flow_set(&mut self, state: &FlowSnapshot) {
+        self.current_use_def_map().set(state);
+    }
+
+    fn flow_merge(&mut self, state: &FlowSnapshot) {
+        self.current_use_def_map().merge(state);
+    }
+
+    fn add_or_update_symbol(&mut self, name: Name, flags: SymbolFlags) -> ScopedSymbolId {
+        let symbol_table = self.current_symbol_table();
+        let (symbol_id, added) = symbol_table.add_or_update_symbol(name, flags);
+        if added {
+            let use_def_map = self.current_use_def_map();
+            use_def_map.add_symbol(symbol_id);
+        }
+        symbol_id
+    }
+
+    fn add_definition<'a>(
         &mut self,
-        definition_node: impl Into<DefinitionNodeRef<'ast>>,
-        symbol_id: ScopedSymbolId,
+        symbol: ScopedSymbolId,
+        definition_node: impl Into<DefinitionNodeRef<'a>>,
     ) -> Definition<'db> {
         let definition_node = definition_node.into();
         let definition = Definition::new(
             self.db,
             self.file,
             self.current_scope(),
-            symbol_id,
+            symbol,
             #[allow(unsafe_code)]
             unsafe {
                 definition_node.into_owned(self.module.clone())
@@ -150,26 +176,30 @@ where
 
         self.definitions_by_node
             .insert(definition_node.key(), definition);
+        self.current_use_def_map().record_def(symbol, definition);
 
         definition
     }
 
-    fn add_or_update_symbol_with_definition(
-        &mut self,
-        name: Name,
-        definition: impl Into<DefinitionNodeRef<'ast>>,
-    ) -> (ScopedSymbolId, Definition<'db>) {
-        let symbol_table = self.current_symbol_table();
-
-        let id = symbol_table.add_or_update_symbol(name, SymbolFlags::IS_DEFINED);
-        let definition = self.add_definition(definition, id);
-        self.current_symbol_table().add_definition(id, definition);
-        (id, definition)
+    /// Record an expression that needs to be a Salsa ingredient, because we need to infer its type
+    /// standalone (type narrowing tests, RHS of an assignment.)
+    fn add_standalone_expression(&mut self, expression_node: &ast::Expr) {
+        let expression = Expression::new(
+            self.db,
+            self.file,
+            self.current_scope(),
+            #[allow(unsafe_code)]
+            unsafe {
+                AstNodeRef::new(self.module.clone(), expression_node)
+            },
+        );
+        self.expressions_by_node
+            .insert(expression_node.into(), expression);
     }
 
     fn with_type_params(
         &mut self,
-        with_params: &WithTypeParams<'ast>,
+        with_params: &WithTypeParams,
         nested: impl FnOnce(&mut Self) -> FileScopeId,
     ) -> FileScopeId {
         let type_params = with_params.type_parameters();
@@ -213,10 +243,16 @@ where
         self.pop_scope();
         assert!(self.scope_stack.is_empty());
 
-        assert!(self.current_target.is_none());
+        assert!(self.current_assignment.is_none());
 
         let mut symbol_tables: IndexVec<_, _> = self
             .symbol_tables
+            .into_iter()
+            .map(|builder| Arc::new(builder.finish()))
+            .collect();
+
+        let mut use_def_maps: IndexVec<_, _> = self
+            .use_def_maps
             .into_iter()
             .map(|builder| Arc::new(builder.finish()))
             .collect();
@@ -228,8 +264,9 @@ where
             .collect();
 
         self.scopes.shrink_to_fit();
-        ast_ids.shrink_to_fit();
         symbol_tables.shrink_to_fit();
+        use_def_maps.shrink_to_fit();
+        ast_ids.shrink_to_fit();
         self.scopes_by_expression.shrink_to_fit();
         self.definitions_by_node.shrink_to_fit();
 
@@ -240,17 +277,19 @@ where
             symbol_tables,
             scopes: self.scopes,
             definitions_by_node: self.definitions_by_node,
+            expressions_by_node: self.expressions_by_node,
             scope_ids_by_scope: self.scope_ids_by_scope,
             ast_ids,
             scopes_by_expression: self.scopes_by_expression,
             scopes_by_node: self.scopes_by_node,
+            use_def_maps,
         }
     }
 }
 
-impl<'db, 'ast> Visitor<'ast> for SemanticIndexBuilder<'db, 'ast>
+impl<'db, 'ast> Visitor<'ast> for SemanticIndexBuilder<'db>
 where
-    'db: 'ast,
+    'ast: 'db,
 {
     fn visit_stmt(&mut self, stmt: &'ast ast::Stmt) {
         match stmt {
@@ -259,10 +298,9 @@ where
                     self.visit_decorator(decorator);
                 }
 
-                self.add_or_update_symbol_with_definition(
-                    function_def.name.id.clone(),
-                    function_def,
-                );
+                let symbol = self
+                    .add_or_update_symbol(function_def.name.id.clone(), SymbolFlags::IS_DEFINED);
+                self.add_definition(symbol, function_def);
 
                 self.with_type_params(
                     &WithTypeParams::FunctionDef { node: function_def },
@@ -283,7 +321,9 @@ where
                     self.visit_decorator(decorator);
                 }
 
-                self.add_or_update_symbol_with_definition(class.name.id.clone(), class);
+                let symbol =
+                    self.add_or_update_symbol(class.name.id.clone(), SymbolFlags::IS_DEFINED);
+                self.add_definition(symbol, class);
 
                 self.with_type_params(&WithTypeParams::ClassDef { node: class }, |builder| {
                     if let Some(arguments) = &class.arguments {
@@ -296,41 +336,84 @@ where
                     builder.pop_scope()
                 });
             }
-            ast::Stmt::Import(ast::StmtImport { names, .. }) => {
-                for alias in names {
+            ast::Stmt::Import(node) => {
+                for alias in &node.names {
                     let symbol_name = if let Some(asname) = &alias.asname {
                         asname.id.clone()
                     } else {
                         Name::new(alias.name.id.split('.').next().unwrap())
                     };
 
-                    self.add_or_update_symbol_with_definition(symbol_name, alias);
+                    let symbol = self.add_or_update_symbol(symbol_name, SymbolFlags::IS_DEFINED);
+                    self.add_definition(symbol, alias);
                 }
             }
-            ast::Stmt::ImportFrom(ast::StmtImportFrom {
-                module: _,
-                names,
-                level: _,
-                ..
-            }) => {
-                for alias in names {
+            ast::Stmt::ImportFrom(node) => {
+                for (alias_index, alias) in node.names.iter().enumerate() {
                     let symbol_name = if let Some(asname) = &alias.asname {
                         &asname.id
                     } else {
                         &alias.name.id
                     };
 
-                    self.add_or_update_symbol_with_definition(symbol_name.clone(), alias);
+                    let symbol =
+                        self.add_or_update_symbol(symbol_name.clone(), SymbolFlags::IS_DEFINED);
+                    self.add_definition(symbol, ImportFromDefinitionNodeRef { node, alias_index });
                 }
             }
             ast::Stmt::Assign(node) => {
-                debug_assert!(self.current_target.is_none());
+                debug_assert!(self.current_assignment.is_none());
                 self.visit_expr(&node.value);
+                self.add_standalone_expression(&node.value);
+                self.current_assignment = Some(node.into());
                 for target in &node.targets {
-                    self.current_target = Some(CurrentTarget::Expr(target));
                     self.visit_expr(target);
                 }
-                self.current_target = None;
+                self.current_assignment = None;
+            }
+            ast::Stmt::AnnAssign(node) => {
+                debug_assert!(self.current_assignment.is_none());
+                // TODO deferred annotation visiting
+                self.visit_expr(&node.annotation);
+                match &node.value {
+                    Some(value) => {
+                        self.visit_expr(value);
+                        self.current_assignment = Some(node.into());
+                        self.visit_expr(&node.target);
+                        self.current_assignment = None;
+                    }
+                    None => {
+                        // TODO annotation-only assignments
+                        self.visit_expr(&node.target);
+                    }
+                }
+            }
+            ast::Stmt::If(node) => {
+                self.visit_expr(&node.test);
+                let pre_if = self.flow_snapshot();
+                self.visit_body(&node.body);
+                let mut last_clause_is_else = false;
+                let mut post_clauses: Vec<FlowSnapshot> = vec![self.flow_snapshot()];
+                for clause in &node.elif_else_clauses {
+                    // we can only take an elif/else clause if none of the previous ones were taken
+                    self.flow_set(&pre_if);
+                    self.visit_elif_else_clause(clause);
+                    post_clauses.push(self.flow_snapshot());
+                    if clause.test.is_none() {
+                        last_clause_is_else = true;
+                    }
+                }
+                let mut post_clause_iter = post_clauses.iter();
+                if last_clause_is_else {
+                    // if the last clause was an else, the pre_if state can't directly reach the
+                    // post-state; we have to enter one of the clauses.
+                    self.flow_set(post_clause_iter.next().unwrap());
+                } else {
+                    self.flow_set(&pre_if);
+                }
+                for post_clause_state in post_clause_iter {
+                    self.flow_merge(post_clause_state);
+                }
             }
             _ => {
                 walk_stmt(self, stmt);
@@ -344,57 +427,64 @@ where
         self.current_ast_ids().record_expression(expr);
 
         match expr {
-            ast::Expr::Name(ast::ExprName { id, ctx, .. }) => {
+            ast::Expr::Name(name_node) => {
+                let ast::ExprName { id, ctx, .. } = name_node;
                 let flags = match ctx {
                     ast::ExprContext::Load => SymbolFlags::IS_USED,
                     ast::ExprContext::Store => SymbolFlags::IS_DEFINED,
                     ast::ExprContext::Del => SymbolFlags::IS_DEFINED,
                     ast::ExprContext::Invalid => SymbolFlags::empty(),
                 };
-                match self.current_target {
-                    Some(target) if flags.contains(SymbolFlags::IS_DEFINED) => {
-                        self.add_or_update_symbol_with_definition(id.clone(), target);
+                let symbol = self.add_or_update_symbol(id.clone(), flags);
+                if flags.contains(SymbolFlags::IS_DEFINED) {
+                    match self.current_assignment {
+                        Some(CurrentAssignment::Assign(assignment)) => {
+                            self.add_definition(
+                                symbol,
+                                AssignmentDefinitionNodeRef {
+                                    assignment,
+                                    target: name_node,
+                                },
+                            );
+                        }
+                        Some(CurrentAssignment::AnnAssign(ann_assign)) => {
+                            self.add_definition(symbol, ann_assign);
+                        }
+                        Some(CurrentAssignment::Named(named)) => {
+                            self.add_definition(symbol, named);
+                        }
+                        None => {}
                     }
-                    _ => {
-                        self.add_or_update_symbol(id.clone(), flags);
-                    }
+                }
+
+                if flags.contains(SymbolFlags::IS_USED) {
+                    let use_id = self.current_ast_ids().record_use(expr);
+                    self.current_use_def_map().record_use(symbol, use_id);
                 }
 
                 walk_expr(self, expr);
             }
             ast::Expr::Named(node) => {
-                debug_assert!(self.current_target.is_none());
-                self.current_target = Some(CurrentTarget::ExprNamed(node));
+                debug_assert!(self.current_assignment.is_none());
+                self.current_assignment = Some(node.into());
                 // TODO walrus in comprehensions is implicitly nonlocal
                 self.visit_expr(&node.target);
-                self.current_target = None;
+                self.current_assignment = None;
                 self.visit_expr(&node.value);
             }
             ast::Expr::If(ast::ExprIf {
                 body, test, orelse, ..
             }) => {
                 // TODO detect statically known truthy or falsy test (via type inference, not naive
-                // AST inspection, so we can't simplify here, need to record test expression in CFG
-                // for later checking)
-
+                // AST inspection, so we can't simplify here, need to record test expression for
+                // later checking)
                 self.visit_expr(test);
-
-                // let if_branch = self.flow_graph_builder.add_branch(self.current_flow_node());
-
-                // self.set_current_flow_node(if_branch);
-                // self.insert_constraint(test);
+                let pre_if = self.flow_snapshot();
                 self.visit_expr(body);
-
-                // let post_body = self.current_flow_node();
-
-                // self.set_current_flow_node(if_branch);
+                let post_body = self.flow_snapshot();
+                self.flow_set(&pre_if);
                 self.visit_expr(orelse);
-
-                // let post_else = self
-                //     .flow_graph_builder
-                //     .add_phi(self.current_flow_node(), post_body);
-
-                // self.set_current_flow_node(post_else);
+                self.flow_merge(&post_body);
             }
             _ => {
                 walk_expr(self, expr);
@@ -418,16 +508,26 @@ impl<'node> WithTypeParams<'node> {
 }
 
 #[derive(Copy, Clone, Debug)]
-enum CurrentTarget<'a> {
-    Expr(&'a ast::Expr),
-    ExprNamed(&'a ast::ExprNamed),
+enum CurrentAssignment<'a> {
+    Assign(&'a ast::StmtAssign),
+    AnnAssign(&'a ast::StmtAnnAssign),
+    Named(&'a ast::ExprNamed),
 }
 
-impl<'a> From<CurrentTarget<'a>> for DefinitionNodeRef<'a> {
-    fn from(val: CurrentTarget<'a>) -> Self {
-        match val {
-            CurrentTarget::Expr(expression) => DefinitionNodeRef::Target(expression),
-            CurrentTarget::ExprNamed(named) => DefinitionNodeRef::NamedExpression(named),
-        }
+impl<'a> From<&'a ast::StmtAssign> for CurrentAssignment<'a> {
+    fn from(value: &'a ast::StmtAssign) -> Self {
+        Self::Assign(value)
+    }
+}
+
+impl<'a> From<&'a ast::StmtAnnAssign> for CurrentAssignment<'a> {
+    fn from(value: &'a ast::StmtAnnAssign) -> Self {
+        Self::AnnAssign(value)
+    }
+}
+
+impl<'a> From<&'a ast::ExprNamed> for CurrentAssignment<'a> {
+    fn from(value: &'a ast::ExprNamed) -> Self {
+        Self::Named(value)
     }
 }

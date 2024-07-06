@@ -1,91 +1,92 @@
 use ruff_db::files::File;
-use ruff_db::parsed::parsed_module;
 use ruff_python_ast::name::Name;
 
-use crate::semantic_index::symbol::{NodeWithScopeKind, PublicSymbolId, ScopeId};
-use crate::semantic_index::{public_symbol, root_scope, semantic_index, symbol_table};
-use crate::types::infer::{TypeInference, TypeInferenceBuilder};
+use crate::semantic_index::definition::Definition;
+use crate::semantic_index::symbol::{ScopeId, ScopedSymbolId};
+use crate::semantic_index::{module_global_scope, symbol_table, use_def_map};
 use crate::{Db, FxOrderSet};
 
 mod display;
 mod infer;
 
-/// Infers the type of a public symbol.
-///
-/// This is a Salsa query to get symbol-level invalidation instead of file-level dependency invalidation.
-/// Without this being a query, changing any public type of a module would invalidate the type inference
-/// for the module scope of its dependents and the transitive dependents because.
-///
-/// For example if we have
-/// ```python
-/// # a.py
-/// import x from b
-///
-/// # b.py
-///
-/// x = 20
-/// ```
-///
-/// And x is now changed from `x = 20` to `x = 30`. The following happens:
-///
-/// * The module level types of `b.py` change because `x` now is a `Literal[30]`.
-/// * The module level types of `a.py` change because the imported symbol `x` now has a `Literal[30]` type
-/// * The module level types of any dependents of `a.py` change because the imported symbol `x` now has a `Literal[30]` type
-/// * And so on for all transitive dependencies.
-///
-/// This being a query ensures that the invalidation short-circuits if the type of this symbol didn't change.
-#[salsa::tracked]
-pub(crate) fn public_symbol_ty<'db>(db: &'db dyn Db, symbol: PublicSymbolId<'db>) -> Type<'db> {
-    let _span = tracing::trace_span!("public_symbol_ty", ?symbol).entered();
+pub(crate) use self::infer::{infer_definition_types, infer_expression_types, infer_scope_types};
 
-    let file = symbol.file(db);
-    let scope = root_scope(db, file);
+/// Infer the public type of a symbol (its type as seen from outside its scope).
+pub(crate) fn symbol_ty<'db>(
+    db: &'db dyn Db,
+    scope: ScopeId<'db>,
+    symbol: ScopedSymbolId,
+) -> Type<'db> {
+    let _span = tracing::trace_span!("symbol_ty", ?symbol).entered();
 
-    // TODO switch to inferring just the definition(s), not the whole scope
-    let inference = infer_types(db, scope);
-    inference.symbol_ty(symbol.scoped_symbol_id(db))
+    let use_def = use_def_map(db, scope);
+    definitions_ty(
+        db,
+        use_def.public_definitions(symbol),
+        use_def.public_may_be_unbound(symbol),
+    )
 }
 
-/// Shorthand for `public_symbol_ty` that takes a symbol name instead of a [`PublicSymbolId`].
-pub(crate) fn public_symbol_ty_by_name<'db>(
+/// Shorthand for `symbol_ty` that takes a symbol name instead of an ID.
+pub(crate) fn symbol_ty_by_name<'db>(
+    db: &'db dyn Db,
+    scope: ScopeId<'db>,
+    name: &str,
+) -> Type<'db> {
+    let table = symbol_table(db, scope);
+    table
+        .symbol_id_by_name(name)
+        .map(|symbol| symbol_ty(db, scope, symbol))
+        .unwrap_or(Type::Unbound)
+}
+
+/// Shorthand for `symbol_ty` that looks up a module-global symbol in a file.
+pub(crate) fn module_global_symbol_ty_by_name<'db>(
     db: &'db dyn Db,
     file: File,
     name: &str,
-) -> Option<Type<'db>> {
-    let symbol = public_symbol(db, file, name)?;
-    Some(public_symbol_ty(db, symbol))
+) -> Type<'db> {
+    symbol_ty_by_name(db, module_global_scope(db, file), name)
 }
 
-/// Infers all types for `scope`.
-#[salsa::tracked(return_ref)]
-pub(crate) fn infer_types<'db>(db: &'db dyn Db, scope: ScopeId<'db>) -> TypeInference<'db> {
-    let _span = tracing::trace_span!("infer_types", ?scope).entered();
+/// Infer the type of a [`Definition`].
+pub(crate) fn definition_ty<'db>(db: &'db dyn Db, definition: Definition<'db>) -> Type<'db> {
+    let inference = infer_definition_types(db, definition);
+    inference.definition_ty(definition)
+}
 
-    let file = scope.file(db);
-    // Using the index here is fine because the code below depends on the AST anyway.
-    // The isolation of the query is by the return inferred types.
-    let index = semantic_index(db, file);
+/// Infer the combined type of an array of [`Definition`].
+/// Will return a union if there are more than definition, or at least one plus the possibility of
+/// Unbound.
+pub(crate) fn definitions_ty<'db>(
+    db: &'db dyn Db,
+    definitions: &[Definition<'db>],
+    may_be_unbound: bool,
+) -> Type<'db> {
+    let unbound_iter = if may_be_unbound {
+        [Type::Unbound].iter()
+    } else {
+        [].iter()
+    };
+    let def_types = definitions.iter().map(|def| definition_ty(db, *def));
+    let mut all_types = unbound_iter.copied().chain(def_types);
 
-    let node = scope.node(db);
+    let Some(first) = all_types.next() else {
+        return Type::Unbound;
+    };
 
-    let mut context = TypeInferenceBuilder::new(db, scope, index);
+    if let Some(second) = all_types.next() {
+        let mut builder = UnionTypeBuilder::new(db);
+        builder = builder.add(first).add(second);
 
-    match node {
-        NodeWithScopeKind::Module => {
-            let parsed = parsed_module(db.upcast(), file);
-            context.infer_module(parsed.syntax());
+        for variant in all_types {
+            builder = builder.add(variant);
         }
-        NodeWithScopeKind::Function(function) => context.infer_function_body(function.node()),
-        NodeWithScopeKind::Class(class) => context.infer_class_body(class.node()),
-        NodeWithScopeKind::ClassTypeParameters(class) => {
-            context.infer_class_type_params(class.node());
-        }
-        NodeWithScopeKind::FunctionTypeParameters(function) => {
-            context.infer_function_type_params(function.node());
-        }
+
+        Type::Union(builder.build())
+    } else {
+        first
     }
-
-    context.finish()
 }
 
 /// unique ID for a type
@@ -96,9 +97,10 @@ pub enum Type<'db> {
     /// the empty set of values
     Never,
     /// unknown type (no annotation)
-    /// equivalent to Any, or to object in strict mode
+    /// equivalent to Any, or possibly to object in strict mode
     Unknown,
-    /// name is not bound to any value
+    /// name does not exist or is not bound to any value (this represents an error, but with some
+    /// leniency options it could be silently resolved to Unknown in some cases)
     Unbound,
     /// the None object (TODO remove this in favor of Instance(types.NoneType)
     None,
@@ -125,15 +127,16 @@ impl<'db> Type<'db> {
         matches!(self, Type::Unknown)
     }
 
-    pub fn member(&self, db: &'db dyn Db, name: &Name) -> Option<Type<'db>> {
+    #[must_use]
+    pub fn member(&self, db: &'db dyn Db, name: &Name) -> Type<'db> {
         match self {
-            Type::Any => Some(Type::Any),
+            Type::Any => Type::Any,
             Type::Never => todo!("attribute lookup on Never type"),
-            Type::Unknown => Some(Type::Unknown),
-            Type::Unbound => todo!("attribute lookup on Unbound type"),
+            Type::Unknown => Type::Unknown,
+            Type::Unbound => Type::Unbound,
             Type::None => todo!("attribute lookup on None type"),
             Type::Function(_) => todo!("attribute lookup on Function type"),
-            Type::Module(file) => public_symbol_ty_by_name(db, *file, name),
+            Type::Module(file) => module_global_symbol_ty_by_name(db, *file, name),
             Type::Class(class) => class.class_member(db, name),
             Type::Instance(_) => {
                 // TODO MRO? get_own_instance_member, get_instance_member
@@ -152,7 +155,7 @@ impl<'db> Type<'db> {
             }
             Type::IntLiteral(_) => {
                 // TODO raise error
-                Some(Type::Unknown)
+                Type::Unknown
             }
         }
     }
@@ -188,32 +191,30 @@ impl<'db> ClassType<'db> {
     /// Returns the class member of this class named `name`.
     ///
     /// The member resolves to a member of the class itself or any of its bases.
-    pub fn class_member(self, db: &'db dyn Db, name: &Name) -> Option<Type<'db>> {
-        if let Some(member) = self.own_class_member(db, name) {
-            return Some(member);
+    pub fn class_member(self, db: &'db dyn Db, name: &Name) -> Type<'db> {
+        let member = self.own_class_member(db, name);
+        if !member.is_unbound() {
+            return member;
         }
 
         self.inherited_class_member(db, name)
     }
 
     /// Returns the inferred type of the class member named `name`.
-    pub fn own_class_member(self, db: &'db dyn Db, name: &Name) -> Option<Type<'db>> {
+    pub fn own_class_member(self, db: &'db dyn Db, name: &Name) -> Type<'db> {
         let scope = self.body_scope(db);
-        let symbols = symbol_table(db, scope);
-        let symbol = symbols.symbol_id_by_name(name)?;
-        let types = infer_types(db, scope);
-
-        Some(types.symbol_ty(symbol))
+        symbol_ty_by_name(db, scope, name)
     }
 
-    pub fn inherited_class_member(self, db: &'db dyn Db, name: &Name) -> Option<Type<'db>> {
+    pub fn inherited_class_member(self, db: &'db dyn Db, name: &Name) -> Type<'db> {
         for base in self.bases(db) {
-            if let Some(member) = base.member(db, name) {
-                return Some(member);
+            let member = base.member(db, name);
+            if !member.is_unbound() {
+                return member;
             }
         }
 
-        None
+        Type::Unbound
     }
 }
 
@@ -267,166 +268,4 @@ pub struct IntersectionType<'db> {
     positive: FxOrderSet<Type<'db>>,
     // the intersection type does not include any value in any of these types
     negative: FxOrderSet<Type<'db>>,
-}
-
-#[cfg(test)]
-mod tests {
-    use red_knot_module_resolver::{
-        set_module_resolution_settings, RawModuleResolutionSettings, TargetVersion,
-    };
-    use ruff_db::files::system_path_to_file;
-    use ruff_db::parsed::parsed_module;
-    use ruff_db::system::{DbWithTestSystem, SystemPathBuf};
-    use ruff_db::testing::{assert_function_query_was_not_run, assert_function_query_was_run};
-
-    use crate::db::tests::TestDb;
-    use crate::semantic_index::root_scope;
-    use crate::types::{infer_types, public_symbol_ty_by_name};
-    use crate::{HasTy, SemanticModel};
-
-    fn setup_db() -> TestDb {
-        let mut db = TestDb::new();
-        set_module_resolution_settings(
-            &mut db,
-            RawModuleResolutionSettings {
-                target_version: TargetVersion::Py38,
-                extra_paths: vec![],
-                workspace_root: SystemPathBuf::from("/src"),
-                site_packages: None,
-                custom_typeshed: None,
-            },
-        );
-
-        db
-    }
-
-    #[test]
-    fn local_inference() -> anyhow::Result<()> {
-        let mut db = setup_db();
-
-        db.write_file("/src/a.py", "x = 10")?;
-        let a = system_path_to_file(&db, "/src/a.py").unwrap();
-
-        let parsed = parsed_module(&db, a);
-
-        let statement = parsed.suite().first().unwrap().as_assign_stmt().unwrap();
-        let model = SemanticModel::new(&db, a);
-
-        let literal_ty = statement.value.ty(&model);
-
-        assert_eq!(format!("{}", literal_ty.display(&db)), "Literal[10]");
-
-        Ok(())
-    }
-
-    #[test]
-    fn dependency_public_symbol_type_change() -> anyhow::Result<()> {
-        let mut db = setup_db();
-
-        db.write_files([
-            ("/src/a.py", "from foo import x"),
-            ("/src/foo.py", "x = 10\ndef foo(): ..."),
-        ])?;
-
-        let a = system_path_to_file(&db, "/src/a.py").unwrap();
-        let x_ty = public_symbol_ty_by_name(&db, a, "x").unwrap();
-
-        assert_eq!(x_ty.display(&db).to_string(), "Literal[10]");
-
-        // Change `x` to a different value
-        db.write_file("/src/foo.py", "x = 20\ndef foo(): ...")?;
-
-        let a = system_path_to_file(&db, "/src/a.py").unwrap();
-
-        db.clear_salsa_events();
-        let x_ty_2 = public_symbol_ty_by_name(&db, a, "x").unwrap();
-
-        assert_eq!(x_ty_2.display(&db).to_string(), "Literal[20]");
-
-        let events = db.take_salsa_events();
-
-        let a_root_scope = root_scope(&db, a);
-        assert_function_query_was_run::<infer_types, _, _>(
-            &db,
-            |ty| &ty.function,
-            &a_root_scope,
-            &events,
-        );
-
-        Ok(())
-    }
-
-    #[test]
-    fn dependency_non_public_symbol_change() -> anyhow::Result<()> {
-        let mut db = setup_db();
-
-        db.write_files([
-            ("/src/a.py", "from foo import x"),
-            ("/src/foo.py", "x = 10\ndef foo(): y = 1"),
-        ])?;
-
-        let a = system_path_to_file(&db, "/src/a.py").unwrap();
-        let x_ty = public_symbol_ty_by_name(&db, a, "x").unwrap();
-
-        assert_eq!(x_ty.display(&db).to_string(), "Literal[10]");
-
-        db.write_file("/src/foo.py", "x = 10\ndef foo(): pass")?;
-
-        let a = system_path_to_file(&db, "/src/a.py").unwrap();
-
-        db.clear_salsa_events();
-
-        let x_ty_2 = public_symbol_ty_by_name(&db, a, "x").unwrap();
-
-        assert_eq!(x_ty_2.display(&db).to_string(), "Literal[10]");
-
-        let events = db.take_salsa_events();
-
-        let a_root_scope = root_scope(&db, a);
-
-        assert_function_query_was_not_run::<infer_types, _, _>(
-            &db,
-            |ty| &ty.function,
-            &a_root_scope,
-            &events,
-        );
-
-        Ok(())
-    }
-
-    #[test]
-    fn dependency_unrelated_public_symbol() -> anyhow::Result<()> {
-        let mut db = setup_db();
-
-        db.write_files([
-            ("/src/a.py", "from foo import x"),
-            ("/src/foo.py", "x = 10\ny = 20"),
-        ])?;
-
-        let a = system_path_to_file(&db, "/src/a.py").unwrap();
-        let x_ty = public_symbol_ty_by_name(&db, a, "x").unwrap();
-
-        assert_eq!(x_ty.display(&db).to_string(), "Literal[10]");
-
-        db.write_file("/src/foo.py", "x = 10\ny = 30")?;
-
-        let a = system_path_to_file(&db, "/src/a.py").unwrap();
-
-        db.clear_salsa_events();
-
-        let x_ty_2 = public_symbol_ty_by_name(&db, a, "x").unwrap();
-
-        assert_eq!(x_ty_2.display(&db).to_string(), "Literal[10]");
-
-        let events = db.take_salsa_events();
-
-        let a_root_scope = root_scope(&db, a);
-        assert_function_query_was_not_run::<infer_types, _, _>(
-            &db,
-            |ty| &ty.function,
-            &a_root_scope,
-            &events,
-        );
-        Ok(())
-    }
 }

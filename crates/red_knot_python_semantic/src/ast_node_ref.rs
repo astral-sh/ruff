@@ -27,12 +27,13 @@ pub struct AstNodeRef<T> {
 
 #[allow(unsafe_code)]
 impl<T> AstNodeRef<T> {
-    /// Creates a new `AstNodeRef` that reference `node`. The `parsed` is the [`ParsedModule`] to which
-    /// the `AstNodeRef` belongs.
+    /// Creates a new `AstNodeRef` that reference `node`. The `parsed` is the [`ParsedModule`] to
+    /// which the `AstNodeRef` belongs.
     ///
     /// ## Safety
-    /// Dereferencing the `node` can result in undefined behavior if `parsed` isn't the [`ParsedModule`] to
-    /// which `node` belongs. It's the caller's responsibility to ensure that the invariant `node belongs to parsed` is upheld.
+    /// Dereferencing the `node` can result in undefined behavior if `parsed` isn't the
+    /// [`ParsedModule`] to which `node` belongs. It's the caller's responsibility to ensure that
+    /// the invariant `node belongs to parsed` is upheld.
 
     pub(super) unsafe fn new(parsed: ParsedModule, node: &T) -> Self {
         Self {
@@ -43,8 +44,8 @@ impl<T> AstNodeRef<T> {
 
     /// Returns a reference to the wrapped node.
     pub fn node(&self) -> &T {
-        // SAFETY: Holding on to `parsed` ensures that the AST to which `node` belongs is still alive
-        // and not moved.
+        // SAFETY: Holding on to `parsed` ensures that the AST to which `node` belongs is still
+        // alive and not moved.
         unsafe { self.node.as_ref() }
     }
 }

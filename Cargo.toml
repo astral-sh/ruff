@@ -127,6 +127,7 @@ strum_macros = { version = "0.26.0" }
 syn = { version = "2.0.55" }
 tempfile = { version = "3.9.0" }
 test-case = { version = "3.3.1" }
+textwrap = { version = "0.16.1" }
 thiserror = { version = "1.0.58" }
 tikv-jemallocator = { version = "0.6.0" }
 toml = { version = "0.8.11" }

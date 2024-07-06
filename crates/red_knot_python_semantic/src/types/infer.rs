@@ -1,43 +1,92 @@
 use rustc_hash::FxHashMap;
-use std::borrow::Cow;
-use std::sync::Arc;
+use salsa;
 
 use red_knot_module_resolver::{resolve_module, ModuleName};
 use ruff_db::files::File;
-use ruff_index::IndexVec;
 use ruff_python_ast as ast;
 use ruff_python_ast::{ExprContext, TypeParams};
 
-use crate::semantic_index::ast_ids::ScopedExpressionId;
-use crate::semantic_index::definition::{Definition, DefinitionNodeRef};
-use crate::semantic_index::symbol::{
-    FileScopeId, NodeWithScopeRef, ScopeId, ScopedSymbolId, SymbolTable,
+use crate::semantic_index::ast_ids::{HasScopedAstId, HasScopedUseId, ScopedExpressionId};
+use crate::semantic_index::definition::{Definition, DefinitionKind};
+use crate::semantic_index::expression::Expression;
+use crate::semantic_index::symbol::{NodeWithScopeRef, ScopeId};
+use crate::semantic_index::SemanticIndex;
+use crate::types::{
+    definitions_ty, use_def_map, ClassType, FunctionType, Name, Type, UnionTypeBuilder,
 };
-use crate::semantic_index::{symbol_table, SemanticIndex};
-use crate::types::{infer_types, ClassType, FunctionType, Name, Type, UnionTypeBuilder};
 use crate::Db;
+use ruff_db::parsed::parsed_module;
 
-/// The inferred types for a single scope.
+use crate::semantic_index::semantic_index;
+use crate::semantic_index::symbol::NodeWithScopeKind;
+
+/// Infer all types for a [`Definition`] (including sub-expressions).
+/// Use when resolving a symbol name use or public type of a symbol.
+#[salsa::tracked(return_ref)]
+pub(crate) fn infer_definition_types<'db>(
+    db: &'db dyn Db,
+    definition: Definition<'db>,
+) -> TypeInference<'db> {
+    let _span = tracing::trace_span!("infer_definition_types", ?definition).entered();
+
+    let index = semantic_index(db, definition.file(db));
+
+    TypeInferenceBuilder::new(db, InferenceRegion::Definition(definition), index).finish()
+}
+
+/// Infer all types for an [`Expression`] (including sub-expressions).
+/// Use rarely; only for cases where we'd otherwise risk double-inferring an expression (RHS of an
+/// assignment, which might be unpacking/multi-target and thus part of multiple definitions, or a
+/// type narrowing guard expression (e.g. if statement test node).
+#[allow(unused)]
+#[salsa::tracked(return_ref)]
+pub(crate) fn infer_expression_types<'db>(
+    db: &'db dyn Db,
+    expression: Expression<'db>,
+) -> TypeInference<'db> {
+    let _span = tracing::trace_span!("infer_expression_types", ?expression).entered();
+
+    let index = semantic_index(db, expression.file(db));
+
+    TypeInferenceBuilder::new(db, InferenceRegion::Expression(expression), index).finish()
+}
+
+/// Infer all types for a [`ScopeId`], including all definitions and expressions.
+/// Use when checking a scope, or needing to provide a type for an arbitrary expression in the
+/// scope.
+#[salsa::tracked(return_ref)]
+pub(crate) fn infer_scope_types<'db>(db: &'db dyn Db, scope: ScopeId<'db>) -> TypeInference<'db> {
+    let _span = tracing::trace_span!("infer_scope_types", ?scope).entered();
+
+    let file = scope.file(db);
+    // Using the index here is fine because the code below depends on the AST anyway.
+    // The isolation of the query is by the return inferred types.
+    let index = semantic_index(db, file);
+
+    TypeInferenceBuilder::new(db, InferenceRegion::Scope(scope), index).finish()
+}
+
+/// A region within which we can infer types.
+pub(crate) enum InferenceRegion<'db> {
+    Expression(Expression<'db>),
+    Definition(Definition<'db>),
+    Scope(ScopeId<'db>),
+}
+
+/// The inferred types for a single region.
 #[derive(Debug, Eq, PartialEq, Default, Clone)]
 pub(crate) struct TypeInference<'db> {
-    /// The types of every expression in this scope.
-    expressions: IndexVec<ScopedExpressionId, Type<'db>>,
+    /// The types of every expression in this region.
+    expressions: FxHashMap<ScopedExpressionId, Type<'db>>,
 
-    /// The public types of every symbol in this scope.
-    symbols: IndexVec<ScopedSymbolId, Type<'db>>,
-
-    /// The type of a definition.
+    /// The types of every definition in this region.
     definitions: FxHashMap<Definition<'db>, Type<'db>>,
 }
 
 impl<'db> TypeInference<'db> {
     #[allow(unused)]
     pub(crate) fn expression_ty(&self, expression: ScopedExpressionId) -> Type<'db> {
-        self.expressions[expression]
-    }
-
-    pub(super) fn symbol_ty(&self, symbol: ScopedSymbolId) -> Type<'db> {
-        self.symbols[symbol]
+        self.expressions[&expression]
     }
 
     pub(crate) fn definition_ty(&self, definition: Definition<'db>) -> Type<'db> {
@@ -46,69 +95,134 @@ impl<'db> TypeInference<'db> {
 
     fn shrink_to_fit(&mut self) {
         self.expressions.shrink_to_fit();
-        self.symbols.shrink_to_fit();
         self.definitions.shrink_to_fit();
     }
 }
 
-/// Builder to infer all types in a [`ScopeId`].
-pub(super) struct TypeInferenceBuilder<'db> {
+/// Builder to infer all types in a region.
+struct TypeInferenceBuilder<'db> {
     db: &'db dyn Db,
+    index: &'db SemanticIndex<'db>,
+    region: InferenceRegion<'db>,
 
     // Cached lookups
-    index: &'db SemanticIndex<'db>,
-    file_scope_id: FileScopeId,
-    file_id: File,
-    symbol_table: Arc<SymbolTable<'db>>,
+    file: File,
+    scope: ScopeId<'db>,
 
     /// The type inference results
     types: TypeInference<'db>,
 }
 
 impl<'db> TypeInferenceBuilder<'db> {
-    /// Creates a new builder for inferring the types of `scope`.
+    /// Creates a new builder for inferring types in a region.
     pub(super) fn new(
         db: &'db dyn Db,
-        scope: ScopeId<'db>,
+        region: InferenceRegion<'db>,
         index: &'db SemanticIndex<'db>,
     ) -> Self {
-        let file_scope_id = scope.file_scope_id(db);
-        let file = scope.file(db);
-        let symbol_table = index.symbol_table(file_scope_id);
+        let (file, scope) = match region {
+            InferenceRegion::Expression(expression) => (expression.file(db), expression.scope(db)),
+            InferenceRegion::Definition(definition) => (definition.file(db), definition.scope(db)),
+            InferenceRegion::Scope(scope) => (scope.file(db), scope),
+        };
 
         Self {
-            index,
-            file_scope_id,
-            file_id: file,
-            symbol_table,
-
             db,
+            index,
+            region,
+
+            file,
+            scope,
+
             types: TypeInference::default(),
         }
     }
 
-    /// Infers the types of a `module`.
-    pub(super) fn infer_module(&mut self, module: &ast::ModModule) {
+    fn extend(&mut self, inference: &TypeInference<'db>) {
+        self.types.definitions.extend(inference.definitions.iter());
+        self.types.expressions.extend(inference.expressions.iter());
+    }
+
+    /// Infers types in the given [`InferenceRegion`].
+    fn infer_region(&mut self) {
+        match self.region {
+            InferenceRegion::Scope(scope) => self.infer_region_scope(scope),
+            InferenceRegion::Definition(definition) => self.infer_region_definition(definition),
+            InferenceRegion::Expression(expression) => self.infer_region_expression(expression),
+        }
+    }
+
+    fn infer_region_scope(&mut self, scope: ScopeId<'db>) {
+        let node = scope.node(self.db);
+        match node {
+            NodeWithScopeKind::Module => {
+                let parsed = parsed_module(self.db.upcast(), self.file);
+                self.infer_module(parsed.syntax());
+            }
+            NodeWithScopeKind::Function(function) => self.infer_function_body(function.node()),
+            NodeWithScopeKind::Class(class) => self.infer_class_body(class.node()),
+            NodeWithScopeKind::ClassTypeParameters(class) => {
+                self.infer_class_type_params(class.node());
+            }
+            NodeWithScopeKind::FunctionTypeParameters(function) => {
+                self.infer_function_type_params(function.node());
+            }
+        }
+    }
+
+    fn infer_region_definition(&mut self, definition: Definition<'db>) {
+        match definition.node(self.db) {
+            DefinitionKind::Function(function) => {
+                self.infer_function_definition(function.node(), definition);
+            }
+            DefinitionKind::Class(class) => self.infer_class_definition(class.node(), definition),
+            DefinitionKind::Import(import) => {
+                self.infer_import_definition(import.node(), definition);
+            }
+            DefinitionKind::ImportFrom(import_from) => {
+                self.infer_import_from_definition(
+                    import_from.import(),
+                    import_from.alias(),
+                    definition,
+                );
+            }
+            DefinitionKind::Assignment(assignment) => {
+                self.infer_assignment_definition(assignment.assignment(), definition);
+            }
+            DefinitionKind::AnnotatedAssignment(annotated_assignment) => {
+                self.infer_annotated_assignment_definition(annotated_assignment.node(), definition);
+            }
+            DefinitionKind::NamedExpression(named_expression) => {
+                self.infer_named_expression_definition(named_expression.node(), definition);
+            }
+        }
+    }
+
+    fn infer_region_expression(&mut self, expression: Expression<'db>) {
+        self.infer_expression(expression.node(self.db));
+    }
+
+    fn infer_module(&mut self, module: &ast::ModModule) {
         self.infer_body(&module.body);
     }
 
-    pub(super) fn infer_class_type_params(&mut self, class: &ast::StmtClassDef) {
+    fn infer_class_type_params(&mut self, class: &ast::StmtClassDef) {
         if let Some(type_params) = class.type_params.as_deref() {
             self.infer_type_parameters(type_params);
         }
     }
 
-    pub(super) fn infer_class_body(&mut self, class: &ast::StmtClassDef) {
+    fn infer_class_body(&mut self, class: &ast::StmtClassDef) {
         self.infer_body(&class.body);
     }
 
-    pub(super) fn infer_function_type_params(&mut self, function: &ast::StmtFunctionDef) {
+    fn infer_function_type_params(&mut self, function: &ast::StmtFunctionDef) {
         if let Some(type_params) = function.type_params.as_deref() {
             self.infer_type_parameters(type_params);
         }
     }
 
-    pub(super) fn infer_function_body(&mut self, function: &ast::StmtFunctionDef) {
+    fn infer_function_body(&mut self, function: &ast::StmtFunctionDef) {
         self.infer_body(&function.body);
     }
 
@@ -139,6 +253,16 @@ impl<'db> TypeInferenceBuilder<'db> {
     }
 
     fn infer_function_definition_statement(&mut self, function: &ast::StmtFunctionDef) {
+        let definition = self.index.definition(function);
+        let result = infer_definition_types(self.db, definition);
+        self.extend(result);
+    }
+
+    fn infer_function_definition(
+        &mut self,
+        function: &ast::StmtFunctionDef,
+        definition: Definition<'db>,
+    ) {
         let ast::StmtFunctionDef {
             range: _,
             is_async: _,
@@ -164,11 +288,16 @@ impl<'db> TypeInferenceBuilder<'db> {
         let function_ty =
             Type::Function(FunctionType::new(self.db, name.id.clone(), decorator_tys));
 
-        let definition = self.index.definition(function);
         self.types.definitions.insert(definition, function_ty);
     }
 
     fn infer_class_definition_statement(&mut self, class: &ast::StmtClassDef) {
+        let definition = self.index.definition(class);
+        let result = infer_definition_types(self.db, definition);
+        self.extend(result);
+    }
+
+    fn infer_class_definition(&mut self, class: &ast::StmtClassDef, definition: Definition<'db>) {
         let ast::StmtClassDef {
             range: _,
             name,
@@ -190,11 +319,10 @@ impl<'db> TypeInferenceBuilder<'db> {
         let body_scope = self
             .index
             .node_scope(NodeWithScopeRef::Class(class))
-            .to_scope_id(self.db, self.file_id);
+            .to_scope_id(self.db, self.file);
 
         let class_ty = Type::Class(ClassType::new(self.db, name.id.clone(), bases, body_scope));
 
-        let definition = self.index.definition(class);
         self.types.definitions.insert(definition, class_ty);
     }
 
@@ -228,22 +356,46 @@ impl<'db> TypeInferenceBuilder<'db> {
         let ast::StmtAssign {
             range: _,
             targets,
-            value,
+            value: _,
         } = assignment;
 
-        let value_ty = self.infer_expression(value);
-
         for target in targets {
-            self.infer_expression(target);
-
-            self.types.definitions.insert(
-                self.index.definition(DefinitionNodeRef::Target(target)),
-                value_ty,
-            );
+            match target {
+                ast::Expr::Name(name) => {
+                    let definition = self.index.definition(name);
+                    let result = infer_definition_types(self.db, definition);
+                    self.extend(result);
+                }
+                _ => todo!("support unpacking assignment"),
+            }
         }
     }
 
+    fn infer_assignment_definition(
+        &mut self,
+        assignment: &ast::StmtAssign,
+        definition: Definition<'db>,
+    ) {
+        let expression = self.index.expression(assignment.value.as_ref());
+        let result = infer_expression_types(self.db, expression);
+        self.extend(result);
+        let value_ty = self
+            .types
+            .expression_ty(assignment.value.scoped_ast_id(self.db, self.scope));
+        self.types.definitions.insert(definition, value_ty);
+    }
+
     fn infer_annotated_assignment_statement(&mut self, assignment: &ast::StmtAnnAssign) {
+        let definition = self.index.definition(assignment);
+        let result = infer_definition_types(self.db, definition);
+        self.extend(result);
+    }
+
+    fn infer_annotated_assignment_definition(
+        &mut self,
+        assignment: &ast::StmtAnnAssign,
+        definition: Definition<'db>,
+    ) {
         let ast::StmtAnnAssign {
             range: _,
             target,
@@ -257,12 +409,10 @@ impl<'db> TypeInferenceBuilder<'db> {
         }
 
         let annotation_ty = self.infer_expression(annotation);
+
         self.infer_expression(target);
 
-        self.types.definitions.insert(
-            self.index.definition(DefinitionNodeRef::Target(target)),
-            annotation_ty,
-        );
+        self.types.definitions.insert(definition, annotation_ty);
     }
 
     fn infer_for_statement(&mut self, for_statement: &ast::StmtFor) {
@@ -285,54 +435,66 @@ impl<'db> TypeInferenceBuilder<'db> {
         let ast::StmtImport { range: _, names } = import;
 
         for alias in names {
-            let ast::Alias {
-                range: _,
-                name,
-                asname: _,
-            } = alias;
-
-            let module_name = ModuleName::new(&name.id);
-            let module = module_name.and_then(|name| resolve_module(self.db.upcast(), name));
-            let module_ty = module
-                .map(|module| Type::Module(module.file()))
-                .unwrap_or(Type::Unknown);
-
             let definition = self.index.definition(alias);
-
-            self.types.definitions.insert(definition, module_ty);
+            let result = infer_definition_types(self.db, definition);
+            self.extend(result);
         }
+    }
+
+    fn infer_import_definition(&mut self, alias: &ast::Alias, definition: Definition<'db>) {
+        let ast::Alias {
+            range: _,
+            name,
+            asname: _,
+        } = alias;
+
+        let module_ty = self.module_ty_from_name(name);
+        self.types.definitions.insert(definition, module_ty);
     }
 
     fn infer_import_from_statement(&mut self, import: &ast::StmtImportFrom) {
         let ast::StmtImportFrom {
             range: _,
-            module,
+            module: _,
             names,
             level: _,
         } = import;
 
-        let module_name = ModuleName::new(module.as_deref().expect("Support relative imports"));
+        for alias in names {
+            let definition = self.index.definition(alias);
+            let result = infer_definition_types(self.db, definition);
+            self.extend(result);
+        }
+    }
 
+    fn infer_import_from_definition(
+        &mut self,
+        import_from: &ast::StmtImportFrom,
+        alias: &ast::Alias,
+        definition: Definition<'db>,
+    ) {
+        let ast::StmtImportFrom { module, .. } = import_from;
+        let module_ty =
+            self.module_ty_from_name(module.as_ref().expect("Support relative imports"));
+
+        let ast::Alias {
+            range: _,
+            name,
+            asname: _,
+        } = alias;
+
+        let ty = module_ty.member(self.db, &Name::new(&name.id));
+
+        self.types.definitions.insert(definition, ty);
+    }
+
+    fn module_ty_from_name(&self, name: &ast::Identifier) -> Type<'db> {
+        let module_name = ModuleName::new(&name.id);
         let module =
             module_name.and_then(|module_name| resolve_module(self.db.upcast(), module_name));
-        let module_ty = module
+        module
             .map(|module| Type::Module(module.file()))
-            .unwrap_or(Type::Unknown);
-
-        for alias in names {
-            let ast::Alias {
-                range: _,
-                name,
-                asname: _,
-            } = alias;
-
-            let ty = module_ty
-                .member(self.db, &Name::new(&name.id))
-                .unwrap_or(Type::Unknown);
-
-            let definition = self.index.definition(alias);
-            self.types.definitions.insert(definition, ty);
-        }
+            .unwrap_or(Type::Unbound)
     }
 
     fn infer_decorator(&mut self, decorator: &ast::Decorator) -> Type<'db> {
@@ -378,7 +540,8 @@ impl<'db> TypeInferenceBuilder<'db> {
             _ => todo!("expression type resolution for {:?}", expression),
         };
 
-        self.types.expressions.push(ty);
+        let expr_id = expression.scoped_ast_id(self.db, self.scope);
+        self.types.expressions.insert(expr_id, ty);
 
         ty
     }
@@ -398,6 +561,17 @@ impl<'db> TypeInferenceBuilder<'db> {
     }
 
     fn infer_named_expression(&mut self, named: &ast::ExprNamed) -> Type<'db> {
+        let definition = self.index.definition(named);
+        let result = infer_definition_types(self.db, definition);
+        self.extend(result);
+        result.definition_ty(definition)
+    }
+
+    fn infer_named_expression_definition(
+        &mut self,
+        named: &ast::ExprNamed,
+        definition: Definition<'db>,
+    ) -> Type<'db> {
         let ast::ExprNamed {
             range: _,
             target,
@@ -407,9 +581,7 @@ impl<'db> TypeInferenceBuilder<'db> {
         let value_ty = self.infer_expression(value);
         self.infer_expression(target);
 
-        self.types
-            .definitions
-            .insert(self.index.definition(named), value_ty);
+        self.types.definitions.insert(definition, value_ty);
 
         value_ty
     }
@@ -437,46 +609,21 @@ impl<'db> TypeInferenceBuilder<'db> {
     }
 
     fn infer_name_expression(&mut self, name: &ast::ExprName) -> Type<'db> {
-        let ast::ExprName { range: _, id, ctx } = name;
+        let ast::ExprName {
+            range: _,
+            id: _,
+            ctx,
+        } = name;
 
         match ctx {
             ExprContext::Load => {
-                let ancestors = self.index.ancestor_scopes(self.file_scope_id);
-
-                for (ancestor_id, _) in ancestors {
-                    // TODO: Skip over class scopes unless the they are a immediately-nested type param scope.
-                    // TODO: Support built-ins
-
-                    let (symbol_table, ancestor_scope) = if ancestor_id == self.file_scope_id {
-                        (Cow::Borrowed(&self.symbol_table), None)
-                    } else {
-                        let ancestor_scope = ancestor_id.to_scope_id(self.db, self.file_id);
-                        (
-                            Cow::Owned(symbol_table(self.db, ancestor_scope)),
-                            Some(ancestor_scope),
-                        )
-                    };
-
-                    if let Some(symbol_id) = symbol_table.symbol_id_by_name(id) {
-                        let symbol = symbol_table.symbol(symbol_id);
-
-                        if !symbol.is_defined() {
-                            continue;
-                        }
-
-                        return if let Some(ancestor_scope) = ancestor_scope {
-                            let types = infer_types(self.db, ancestor_scope);
-                            types.symbol_ty(symbol_id)
-                        } else {
-                            self.local_definition_ty(symbol_id)
-                        };
-                    }
-                }
-                Type::Unknown
+                let use_def = use_def_map(self.db, self.scope);
+                let use_id = name.scoped_use_id(self.db, self.scope);
+                let definitions = use_def.use_definitions(use_id);
+                definitions_ty(self.db, definitions, use_def.use_may_be_unbound(use_id))
             }
-            ExprContext::Del => Type::None,
+            ExprContext::Store | ExprContext::Del => Type::None,
             ExprContext::Invalid => Type::Unknown,
-            ExprContext::Store => Type::None,
         }
     }
 
@@ -489,9 +636,7 @@ impl<'db> TypeInferenceBuilder<'db> {
         } = attribute;
 
         let value_ty = self.infer_expression(value);
-        let member_ty = value_ty
-            .member(self.db, &Name::new(&attr.id))
-            .unwrap_or(Type::Unknown);
+        let member_ty = value_ty.member(self.db, &Name::new(&attr.id));
 
         match ctx {
             ExprContext::Load => member_ty,
@@ -558,41 +703,9 @@ impl<'db> TypeInferenceBuilder<'db> {
     }
 
     pub(super) fn finish(mut self) -> TypeInference<'db> {
-        let symbol_tys: IndexVec<_, _> = self
-            .index
-            .symbol_table(self.file_scope_id)
-            .symbol_ids()
-            .map(|symbol| self.local_definition_ty(symbol))
-            .collect();
-
-        self.types.symbols = symbol_tys;
+        self.infer_region();
         self.types.shrink_to_fit();
         self.types
-    }
-
-    fn local_definition_ty(&mut self, symbol: ScopedSymbolId) -> Type<'db> {
-        let symbol = self.symbol_table.symbol(symbol);
-        let mut definitions = symbol
-            .definitions()
-            .iter()
-            .filter_map(|definition| self.types.definitions.get(definition).copied());
-
-        let Some(first) = definitions.next() else {
-            return Type::Unbound;
-        };
-
-        if let Some(second) = definitions.next() {
-            let mut builder = UnionTypeBuilder::new(self.db);
-            builder = builder.add(first).add(second);
-
-            for variant in definitions {
-                builder = builder.add(variant);
-            }
-
-            Type::Union(builder.build())
-        } else {
-            first
-        }
     }
 }
 
@@ -601,12 +714,20 @@ mod tests {
     use red_knot_module_resolver::{
         set_module_resolution_settings, RawModuleResolutionSettings, TargetVersion,
     };
-    use ruff_db::files::system_path_to_file;
+    use ruff_db::files::{system_path_to_file, File};
+    use ruff_db::parsed::parsed_module;
     use ruff_db::system::{DbWithTestSystem, SystemPathBuf};
+    use ruff_db::testing::{assert_function_query_was_not_run, assert_function_query_was_run};
     use ruff_python_ast::name::Name;
 
     use crate::db::tests::TestDb;
-    use crate::types::{public_symbol_ty_by_name, Type};
+    use crate::semantic_index::definition::Definition;
+    use crate::types::{
+        infer_definition_types, module_global_scope, module_global_symbol_ty_by_name, symbol_table,
+        use_def_map, Type,
+    };
+    use crate::{HasTy, SemanticModel};
+    use textwrap::dedent;
 
     fn setup_db() -> TestDb {
         let mut db = TestDb::new();
@@ -628,8 +749,15 @@ mod tests {
     fn assert_public_ty(db: &TestDb, file_name: &str, symbol_name: &str, expected: &str) {
         let file = system_path_to_file(db, file_name).expect("Expected file to exist.");
 
-        let ty = public_symbol_ty_by_name(db, file, symbol_name).unwrap_or(Type::Unknown);
+        let ty = module_global_symbol_ty_by_name(db, file, symbol_name);
         assert_eq!(ty.display(db).to_string(), expected);
+    }
+
+    impl TestDb {
+        fn write_dedented(&mut self, path: &str, content: &str) -> anyhow::Result<()> {
+            self.write_file(path, dedent(content))?;
+            Ok(())
+        }
     }
 
     #[test]
@@ -650,18 +778,19 @@ mod tests {
     fn resolve_base_class_by_name() -> anyhow::Result<()> {
         let mut db = setup_db();
 
-        db.write_file(
+        db.write_dedented(
             "src/mod.py",
-            r#"
-class Base:
-    pass
+            "
+                class Base:
+                    pass
 
-class Sub(Base):
-    pass"#,
+                class Sub(Base):
+                    pass
+            ",
         )?;
 
         let mod_file = system_path_to_file(&db, "src/mod.py").expect("Expected file to exist.");
-        let ty = public_symbol_ty_by_name(&db, mod_file, "Sub").expect("Symbol type to exist");
+        let ty = module_global_symbol_ty_by_name(&db, mod_file, "Sub");
 
         let Type::Class(class) = ty else {
             panic!("Sub is not a Class")
@@ -682,16 +811,16 @@ class Sub(Base):
     fn resolve_method() -> anyhow::Result<()> {
         let mut db = setup_db();
 
-        db.write_file(
+        db.write_dedented(
             "src/mod.py",
             "
-class C:
-    def f(self): pass
+                class C:
+                    def f(self): pass
             ",
         )?;
 
         let mod_file = system_path_to_file(&db, "src/mod.py").unwrap();
-        let ty = public_symbol_ty_by_name(&db, mod_file, "C").unwrap();
+        let ty = module_global_symbol_ty_by_name(&db, mod_file, "C");
 
         let Type::Class(class_id) = ty else {
             panic!("C is not a Class");
@@ -699,7 +828,7 @@ class C:
 
         let member_ty = class_id.class_member(&db, &Name::new_static("f"));
 
-        let Some(Type::Function(func)) = member_ty else {
+        let Type::Function(func) = member_ty else {
             panic!("C.f is not a Function");
         };
 
@@ -737,13 +866,13 @@ class C:
     fn resolve_union() -> anyhow::Result<()> {
         let mut db = setup_db();
 
-        db.write_file(
+        db.write_dedented(
             "src/a.py",
             "
-if flag:
-    x = 1
-else:
-    x = 2
+                if flag:
+                    x = 1
+                else:
+                    x = 2
             ",
         )?;
 
@@ -756,14 +885,14 @@ else:
     fn literal_int_arithmetic() -> anyhow::Result<()> {
         let mut db = setup_db();
 
-        db.write_file(
+        db.write_dedented(
             "src/a.py",
             "
-a = 2 + 1
-b = a - 4
-c = a * b
-d = c / 3
-e = 5 % 3
+                a = 2 + 1
+                b = a - 4
+                c = a * b
+                d = c / 3
+                e = 5 % 3
             ",
         )?;
 
@@ -803,13 +932,14 @@ e = 5 % 3
     fn ifexpr_walrus() -> anyhow::Result<()> {
         let mut db = setup_db();
 
-        db.write_file(
+        db.write_dedented(
             "src/a.py",
             "
-y = z = 0
-x = (y := 1) if flag else (z := 2)
-a = y
-b = z
+                y = 0
+                z = 0
+                x = (y := 1) if flag else (z := 2)
+                a = y
+                b = z
             ",
         )?;
 
@@ -832,12 +962,284 @@ b = z
     }
 
     #[test]
+    fn multi_target_assign() -> anyhow::Result<()> {
+        let db = setup_db();
+
+        db.memory_file_system()
+            .write_file("src/a.py", "x = y = 1")?;
+
+        assert_public_ty(&db, "src/a.py", "x", "Literal[1]");
+        assert_public_ty(&db, "src/a.py", "y", "Literal[1]");
+
+        Ok(())
+    }
+
+    #[test]
     fn none() -> anyhow::Result<()> {
         let mut db = setup_db();
 
         db.write_file("src/a.py", "x = 1 if flag else None")?;
 
         assert_public_ty(&db, "src/a.py", "x", "Literal[1] | None");
+        Ok(())
+    }
+
+    #[test]
+    fn simple_if() -> anyhow::Result<()> {
+        let mut db = setup_db();
+
+        db.write_dedented(
+            "src/a.py",
+            "
+                y = 1
+                y = 2
+                if flag:
+                    y = 3
+                x = y
+            ",
+        )?;
+
+        assert_public_ty(&db, "src/a.py", "x", "Literal[2, 3]");
+        Ok(())
+    }
+
+    #[test]
+    fn maybe_unbound() -> anyhow::Result<()> {
+        let mut db = setup_db();
+
+        db.write_dedented(
+            "src/a.py",
+            "
+                if flag:
+                    y = 3
+                x = y
+            ",
+        )?;
+
+        assert_public_ty(&db, "src/a.py", "x", "Literal[3] | Unbound");
+        Ok(())
+    }
+
+    #[test]
+    fn if_elif_else() -> anyhow::Result<()> {
+        let mut db = setup_db();
+
+        db.write_dedented(
+            "src/a.py",
+            "
+                y = 1
+                y = 2
+                if flag:
+                    y = 3
+                elif flag2:
+                    y = 4
+                else:
+                    r = y
+                    y = 5
+                    s = y
+                x = y
+            ",
+        )?;
+
+        assert_public_ty(&db, "src/a.py", "x", "Literal[3, 4, 5]");
+        assert_public_ty(&db, "src/a.py", "r", "Literal[2] | Unbound");
+        assert_public_ty(&db, "src/a.py", "s", "Literal[5] | Unbound");
+        Ok(())
+    }
+
+    #[test]
+    fn if_elif() -> anyhow::Result<()> {
+        let mut db = setup_db();
+
+        db.write_dedented(
+            "src/a.py",
+            "
+                y = 1
+                y = 2
+                if flag:
+                    y = 3
+                elif flag2:
+                    y = 4
+                x = y
+            ",
+        )?;
+
+        assert_public_ty(&db, "src/a.py", "x", "Literal[2, 3, 4]");
+        Ok(())
+    }
+
+    #[test]
+    fn import_cycle() -> anyhow::Result<()> {
+        let mut db = setup_db();
+
+        db.write_dedented(
+            "src/a.py",
+            "
+                class A: pass
+                import b
+                class C(b.B): pass
+            ",
+        )?;
+        db.write_dedented(
+            "src/b.py",
+            "
+                from a import A
+                class B(A): pass
+            ",
+        )?;
+
+        let a = system_path_to_file(&db, "src/a.py").expect("Expected file to exist.");
+        let c_ty = module_global_symbol_ty_by_name(&db, a, "C");
+        let Type::Class(c_class) = c_ty else {
+            panic!("C is not a Class")
+        };
+        let c_bases = c_class.bases(&db);
+        let b_ty = c_bases.first().unwrap();
+        let Type::Class(b_class) = b_ty else {
+            panic!("B is not a Class")
+        };
+        assert_eq!(b_class.name(&db), "B");
+        let b_bases = b_class.bases(&db);
+        let a_ty = b_bases.first().unwrap();
+        let Type::Class(a_class) = a_ty else {
+            panic!("A is not a Class")
+        };
+        assert_eq!(a_class.name(&db), "A");
+
+        Ok(())
+    }
+
+    #[test]
+    fn local_inference() -> anyhow::Result<()> {
+        let mut db = setup_db();
+
+        db.write_file("/src/a.py", "x = 10")?;
+        let a = system_path_to_file(&db, "/src/a.py").unwrap();
+
+        let parsed = parsed_module(&db, a);
+
+        let statement = parsed.suite().first().unwrap().as_assign_stmt().unwrap();
+        let model = SemanticModel::new(&db, a);
+
+        let literal_ty = statement.value.ty(&model);
+
+        assert_eq!(format!("{}", literal_ty.display(&db)), "Literal[10]");
+
+        Ok(())
+    }
+
+    fn first_public_def<'db>(db: &'db TestDb, file: File, name: &str) -> Definition<'db> {
+        let scope = module_global_scope(db, file);
+        *use_def_map(db, scope)
+            .public_definitions(symbol_table(db, scope).symbol_id_by_name(name).unwrap())
+            .first()
+            .unwrap()
+    }
+
+    #[test]
+    fn dependency_public_symbol_type_change() -> anyhow::Result<()> {
+        let mut db = setup_db();
+
+        db.write_files([
+            ("/src/a.py", "from foo import x"),
+            ("/src/foo.py", "x = 10\ndef foo(): ..."),
+        ])?;
+
+        let a = system_path_to_file(&db, "/src/a.py").unwrap();
+        let x_ty = module_global_symbol_ty_by_name(&db, a, "x");
+
+        assert_eq!(x_ty.display(&db).to_string(), "Literal[10]");
+
+        // Change `x` to a different value
+        db.write_file("/src/foo.py", "x = 20\ndef foo(): ...")?;
+
+        let a = system_path_to_file(&db, "/src/a.py").unwrap();
+
+        db.clear_salsa_events();
+        let x_ty_2 = module_global_symbol_ty_by_name(&db, a, "x");
+
+        assert_eq!(x_ty_2.display(&db).to_string(), "Literal[20]");
+
+        let events = db.take_salsa_events();
+
+        assert_function_query_was_run::<infer_definition_types, _, _>(
+            &db,
+            |ty| &ty.function,
+            &first_public_def(&db, a, "x"),
+            &events,
+        );
+
+        Ok(())
+    }
+
+    #[test]
+    fn dependency_internal_symbol_change() -> anyhow::Result<()> {
+        let mut db = setup_db();
+
+        db.write_files([
+            ("/src/a.py", "from foo import x"),
+            ("/src/foo.py", "x = 10\ndef foo(): y = 1"),
+        ])?;
+
+        let a = system_path_to_file(&db, "/src/a.py").unwrap();
+        let x_ty = module_global_symbol_ty_by_name(&db, a, "x");
+
+        assert_eq!(x_ty.display(&db).to_string(), "Literal[10]");
+
+        db.write_file("/src/foo.py", "x = 10\ndef foo(): pass")?;
+
+        let a = system_path_to_file(&db, "/src/a.py").unwrap();
+
+        db.clear_salsa_events();
+
+        let x_ty_2 = module_global_symbol_ty_by_name(&db, a, "x");
+
+        assert_eq!(x_ty_2.display(&db).to_string(), "Literal[10]");
+
+        let events = db.take_salsa_events();
+
+        assert_function_query_was_not_run::<infer_definition_types, _, _>(
+            &db,
+            |ty| &ty.function,
+            &first_public_def(&db, a, "x"),
+            &events,
+        );
+
+        Ok(())
+    }
+
+    #[test]
+    fn dependency_unrelated_symbol() -> anyhow::Result<()> {
+        let mut db = setup_db();
+
+        db.write_files([
+            ("/src/a.py", "from foo import x"),
+            ("/src/foo.py", "x = 10\ny = 20"),
+        ])?;
+
+        let a = system_path_to_file(&db, "/src/a.py").unwrap();
+        let x_ty = module_global_symbol_ty_by_name(&db, a, "x");
+
+        assert_eq!(x_ty.display(&db).to_string(), "Literal[10]");
+
+        db.write_file("/src/foo.py", "x = 10\ny = 30")?;
+
+        let a = system_path_to_file(&db, "/src/a.py").unwrap();
+
+        db.clear_salsa_events();
+
+        let x_ty_2 = module_global_symbol_ty_by_name(&db, a, "x");
+
+        assert_eq!(x_ty_2.display(&db).to_string(), "Literal[10]");
+
+        let events = db.take_salsa_events();
+
+        assert_function_query_was_not_run::<infer_definition_types, _, _>(
+            &db,
+            |ty| &ty.function,
+            &first_public_def(&db, a, "x"),
+            &events,
+        );
         Ok(())
     }
 }
