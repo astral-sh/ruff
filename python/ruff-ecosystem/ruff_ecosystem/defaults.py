@@ -127,7 +127,7 @@ DEFAULT_TARGETS = [
         },
     ),
     Project(repo=Repository(owner="agronholm", name="anyio", ref="master")),
-    Project(repo=Repository(owner="python-trio", name="trio", ref="master")),
+    Project(repo=Repository(owner="python-trio", name="trio", ref="main")),
     Project(repo=Repository(owner="wntrblm", name="nox", ref="main")),
     Project(repo=Repository(owner="pytest-dev", name="pytest", ref="main")),
     Project(repo=Repository(owner="encode", name="httpx", ref="master")),
