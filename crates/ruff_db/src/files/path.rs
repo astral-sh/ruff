@@ -86,6 +86,14 @@ impl FilePath {
             FilePath::Vendored(path) => vendored_path_to_file(db, path),
         }
     }
+
+    #[must_use]
+    pub fn extension(&self) -> Option<&str> {
+        match self {
+            FilePath::System(path) => path.extension(),
+            FilePath::Vendored(path) => path.extension(),
+        }
+    }
 }
 
 impl AsRef<str> for FilePath {
@@ -172,5 +180,66 @@ impl PartialEq<FilePath> for VendoredPathBuf {
     #[inline]
     fn eq(&self, other: &FilePath) -> bool {
         other == self
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum FilePathRef<'a> {
+    System(&'a SystemPath),
+    Vendored(&'a VendoredPath),
+}
+
+impl<'a> FilePathRef<'a> {
+    pub fn to_path_buf(self) -> FilePath {
+        match self {
+            Self::System(path) => FilePath::System(path.to_path_buf()),
+            Self::Vendored(path) => FilePath::Vendored(path.to_path_buf()),
+        }
+    }
+
+    pub fn parent(&self) -> Option<Self> {
+        match self {
+            Self::System(path) => path.parent().map(Self::System),
+            Self::Vendored(path) => path.parent().map(Self::Vendored),
+        }
+    }
+
+    pub fn components(&self) -> camino::Utf8Components {
+        match self {
+            Self::System(path) => path.components(),
+            Self::Vendored(path) => path.components(),
+        }
+    }
+
+    pub fn file_stem(&self) -> Option<&str> {
+        match self {
+            Self::System(path) => path.file_stem(),
+            Self::Vendored(path) => path.file_stem(),
+        }
+    }
+
+    #[inline]
+    pub fn to_file(self, db: &dyn Db) -> Option<File> {
+        match self {
+            Self::System(path) => system_path_to_file(db, path),
+            Self::Vendored(path) => vendored_path_to_file(db, path),
+        }
+    }
+
+    pub fn system(path: &'a (impl AsRef<SystemPath> + ?Sized)) -> Self {
+        Self::System(path.as_ref())
+    }
+
+    pub fn vendored(path: &'a (impl AsRef<VendoredPath> + ?Sized)) -> Self {
+        Self::Vendored(path.as_ref())
+    }
+}
+
+impl<'a> From<&'a FilePath> for FilePathRef<'a> {
+    fn from(value: &'a FilePath) -> Self {
+        match value {
+            FilePath::System(path) => FilePathRef::System(path),
+            FilePath::Vendored(path) => FilePathRef::Vendored(path),
+        }
     }
 }

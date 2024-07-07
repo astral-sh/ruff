@@ -30,6 +30,43 @@ impl VendoredPath {
     pub fn components(&self) -> Utf8Components {
         self.0.components()
     }
+
+    #[must_use]
+    pub fn extension(&self) -> Option<&str> {
+        self.0.extension()
+    }
+
+    #[must_use]
+    pub fn with_pyi_extension(&self) -> VendoredPathBuf {
+        VendoredPathBuf(self.0.with_extension("pyi"))
+    }
+
+    #[must_use]
+    pub fn join(&self, other: impl AsRef<Utf8Path>) -> VendoredPathBuf {
+        VendoredPathBuf(self.0.join(other.as_ref()))
+    }
+
+    #[must_use]
+    pub fn ends_with(&self, suffix: impl AsRef<VendoredPath>) -> bool {
+        self.0.ends_with(suffix.as_ref())
+    }
+
+    #[must_use]
+    pub fn parent(&self) -> Option<&Self> {
+        self.0.parent().map(Self::new)
+    }
+
+    #[must_use]
+    pub fn file_stem(&self) -> Option<&str> {
+        self.0.file_stem()
+    }
+
+    pub fn strip_prefix(
+        &self,
+        prefix: impl AsRef<Utf8Path>,
+    ) -> Result<&Self, path::StripPrefixError> {
+        self.0.strip_prefix(prefix.as_ref()).map(Self::new)
+    }
 }
 
 #[repr(transparent)]
@@ -49,6 +86,10 @@ impl VendoredPathBuf {
 
     pub fn as_path(&self) -> &VendoredPath {
         VendoredPath::new(&self.0)
+    }
+
+    pub fn push(&mut self, component: &str) {
+        self.0.push(component)
     }
 }
 
@@ -86,11 +127,24 @@ impl AsRef<path::Path> for VendoredPath {
     }
 }
 
+impl AsRef<Utf8Path> for VendoredPath {
+    #[inline]
+    fn as_ref(&self) -> &Utf8Path {
+        &self.0
+    }
+}
+
 impl Deref for VendoredPathBuf {
     type Target = VendoredPath;
 
     fn deref(&self) -> &Self::Target {
         self.as_path()
+    }
+}
+
+impl From<&str> for VendoredPathBuf {
+    fn from(value: &str) -> Self {
+        Self(Utf8PathBuf::from(value))
     }
 }
 

@@ -5,11 +5,11 @@ use std::num::{NonZeroU16, NonZeroUsize};
 use std::ops::{RangeFrom, RangeInclusive};
 use std::str::FromStr;
 
+use once_cell::sync::Lazy;
 use rustc_hash::FxHashMap;
 
-use ruff_db::files::{system_path_to_file, File};
+use ruff_db::files::{system_path_to_file, File, FilePathRef};
 use ruff_db::source::source_text;
-use ruff_db::system::SystemPath;
 
 use crate::db::Db;
 use crate::module_name::ModuleName;
@@ -41,11 +41,14 @@ impl<'db> LazyTypeshedVersions<'db> {
         &self,
         module: &ModuleName,
         db: &'db dyn Db,
-        stdlib_root: &SystemPath,
+        stdlib_root: &FilePathRef,
         target_version: TargetVersion,
     ) -> TypeshedVersionsQueryResult {
         let versions = self.0.get_or_init(|| {
-            let versions_path = stdlib_root.join("VERSIONS");
+            let versions_path = match stdlib_root {
+                FilePathRef::System(path) => path.join("VERSIONS"),
+                FilePathRef::Vendored(_) => return &VENDORED_VERSIONS,
+            };
             let Some(versions_file) = system_path_to_file(db.upcast(), &versions_path) else {
                 todo!(
                     "Still need to figure out how to handle VERSIONS files being deleted \
@@ -70,6 +73,10 @@ pub(crate) fn parse_typeshed_versions(
     let file_content = source_text(db.upcast(), versions_file);
     file_content.parse()
 }
+
+static VENDORED_VERSIONS: Lazy<TypeshedVersions> = Lazy::new(|| {
+    TypeshedVersions::from_str(include_str!("../../vendor/typeshed/stdlib/VERSIONS")).unwrap()
+});
 
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub struct TypeshedVersionsParseError {
