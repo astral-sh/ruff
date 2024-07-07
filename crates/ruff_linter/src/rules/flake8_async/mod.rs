@@ -14,7 +14,7 @@ mod tests {
     use crate::settings::LinterSettings;
     use crate::test::test_path;
 
-    #[test_case(Rule::TrioTimeoutWithoutAwait, Path::new("ASYNC100.py"))]
+    #[test_case(Rule::CancelScopeNoCheckpoint, Path::new("ASYNC100.py"))]
     #[test_case(Rule::TrioSyncCall, Path::new("ASYNC105.py"))]
     #[test_case(Rule::TrioAsyncFunctionWithTimeout, Path::new("ASYNC109.py"))]
     #[test_case(Rule::TrioUnneededSleep, Path::new("ASYNC110.py"))]
