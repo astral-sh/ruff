@@ -186,12 +186,17 @@ impl File {
     pub(crate) fn read_to_string(&self, db: &dyn Db) -> String {
         let path = self.path(db);
 
-        if path.is_system_path() {
-            // Add a dependency on the revision to ensure the operation gets re-executed when the file changes.
-            let _ = self.revision(db);
-        }
+        let result = match path {
+            FilePath::System(system) => {
+                // Add a dependency on the revision to ensure the operation gets re-executed when the file changes.
+                let _ = self.revision(db);
 
-        db.read_to_string(path).unwrap_or_default()
+                db.system().read_to_string(system)
+            }
+            FilePath::Vendored(vendored) => db.vendored().read_to_string(vendored),
+        };
+
+        result.unwrap_or_default()
     }
 
     /// Refreshes the file metadata by querying the file system if needed.

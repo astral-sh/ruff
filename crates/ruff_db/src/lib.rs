@@ -3,7 +3,7 @@ use std::hash::BuildHasherDefault;
 use rustc_hash::FxHasher;
 use salsa::DbWithJar;
 
-use crate::files::{File, FilePath, Files};
+use crate::files::{File, Files};
 use crate::parsed::parsed_module;
 use crate::source::{line_index, source_text};
 use crate::system::System;
@@ -26,39 +26,6 @@ pub trait Db: DbWithJar<Jar> {
     fn vendored(&self) -> &VendoredFileSystem;
     fn system(&self) -> &dyn System;
     fn files(&self) -> &Files;
-
-    /// Reads the contents of the file at `path` into a string. Returns an error if the file doesn't exist,
-    /// isn't accessible, isn't a file, or contains non-UTF8 content.
-    fn read_to_string(&self, path: &FilePath) -> std::io::Result<String> {
-        match path {
-            FilePath::System(path) => self.system().read_to_string(path),
-            FilePath::Vendored(path) => self.vendored().read_to_string(path),
-        }
-    }
-
-    /// Returns `true` if `path` exists.
-    fn exists(&self, path: &FilePath) -> bool {
-        match path {
-            FilePath::System(path) => self.system().exists(path),
-            FilePath::Vendored(path) => self.vendored().exists(path),
-        }
-    }
-
-    /// Returns `true` if `path` points to a directory.
-    fn is_directory(&self, path: &FilePath) -> bool {
-        match path {
-            FilePath::System(path) => self.system().is_directory(path),
-            FilePath::Vendored(path) => self.vendored().is_directory(path),
-        }
-    }
-
-    /// Returns `true` if `path` points to a file.
-    fn is_file(&self, path: &FilePath) -> bool {
-        match path {
-            FilePath::System(path) => self.system().is_file(path),
-            FilePath::Vendored(path) => self.vendored().is_file(path),
-        }
-    }
 }
 
 /// Trait for upcasting a reference to a base trait object.
