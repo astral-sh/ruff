@@ -40,51 +40,49 @@ pub(super) enum MethodName {
 impl MethodName {
     /// Returns `true` if the method is async, `false` if it is sync.
     pub(super) fn is_async(self) -> bool {
-        match self {
+        matches!(
+            self,
             MethodName::TrioAcloseForcefully
-            | MethodName::TrioCancelShieldedCheckpoint
-            | MethodName::TrioCheckpoint
-            | MethodName::TrioCheckpointIfCancelled
-            | MethodName::TrioOpenFile
-            | MethodName::TrioOpenProcess
-            | MethodName::TrioOpenSslOverTcpListeners
-            | MethodName::TrioOpenSslOverTcpStream
-            | MethodName::TrioOpenTcpListeners
-            | MethodName::TrioOpenTcpStream
-            | MethodName::TrioOpenUnixSocket
-            | MethodName::TrioPermanentlyDetachCoroutineObject
-            | MethodName::TrioReattachDetachedCoroutineObject
-            | MethodName::TrioRunProcess
-            | MethodName::TrioServeListeners
-            | MethodName::TrioServeSslOverTcp
-            | MethodName::TrioServeTcp
-            | MethodName::TrioSleep
-            | MethodName::TrioSleepForever
-            | MethodName::TrioTemporarilyDetachCoroutineObject
-            | MethodName::TrioWaitReadable
-            | MethodName::TrioWaitTaskRescheduled
-            | MethodName::TrioWaitWritable => true,
-
-            _ => false,
-        }
+                | MethodName::TrioCancelShieldedCheckpoint
+                | MethodName::TrioCheckpoint
+                | MethodName::TrioCheckpointIfCancelled
+                | MethodName::TrioOpenFile
+                | MethodName::TrioOpenProcess
+                | MethodName::TrioOpenSslOverTcpListeners
+                | MethodName::TrioOpenSslOverTcpStream
+                | MethodName::TrioOpenTcpListeners
+                | MethodName::TrioOpenTcpStream
+                | MethodName::TrioOpenUnixSocket
+                | MethodName::TrioPermanentlyDetachCoroutineObject
+                | MethodName::TrioReattachDetachedCoroutineObject
+                | MethodName::TrioRunProcess
+                | MethodName::TrioServeListeners
+                | MethodName::TrioServeSslOverTcp
+                | MethodName::TrioServeTcp
+                | MethodName::TrioSleep
+                | MethodName::TrioSleepForever
+                | MethodName::TrioTemporarilyDetachCoroutineObject
+                | MethodName::TrioWaitReadable
+                | MethodName::TrioWaitTaskRescheduled
+                | MethodName::TrioWaitWritable
+        )
     }
 
     /// Returns `true` if the method a timeout context manager.
     pub(super) fn is_timeout_context(self) -> bool {
-        match self {
+        matches!(
+            self,
             MethodName::AsyncIOTimeout
-            | MethodName::AsyncIOTimeoutAt
-            | MethodName::AnyIOMoveOnAfter
-            | MethodName::AnyIOFailAfter
-            | MethodName::AnyIOCancelScope
-            | MethodName::TrioMoveOnAfter
-            | MethodName::TrioMoveOnAt
-            | MethodName::TrioFailAfter
-            | MethodName::TrioFailAt
-            | MethodName::TrioCancelScope => true,
-
-            _ => false,
-        }
+                | MethodName::AsyncIOTimeoutAt
+                | MethodName::AnyIOMoveOnAfter
+                | MethodName::AnyIOFailAfter
+                | MethodName::AnyIOCancelScope
+                | MethodName::TrioMoveOnAfter
+                | MethodName::TrioMoveOnAt
+                | MethodName::TrioFailAfter
+                | MethodName::TrioFailAt
+                | MethodName::TrioCancelScope
+        )
     }
 }
 
