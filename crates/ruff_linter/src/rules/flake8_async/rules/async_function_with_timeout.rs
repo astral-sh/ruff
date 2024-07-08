@@ -70,7 +70,7 @@ pub(crate) fn async_function_with_timeout(
         return;
     };
 
-    // Get prefered module.
+    // Get preferred module.
     let module = if checker.semantic().seen_module(Modules::ANYIO) {
         AsyncModule::AnyIO
     } else if checker.semantic().seen_module(Modules::TRIO) {
