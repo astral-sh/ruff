@@ -20,6 +20,7 @@ use crate::rules::flake8_async::helpers::AsyncModule;
 /// async def long_running_task(timeout):
 ///     ...
 ///
+///
 /// async def main():
 ///     await long_running_task(timeout=2)
 /// ```
@@ -28,6 +29,7 @@ use crate::rules::flake8_async::helpers::AsyncModule;
 /// ```python
 /// async def long_running_task():
 ///     ...
+///
 ///
 /// async def main():
 ///     with asyncio.timeout(2):
