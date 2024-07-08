@@ -16,6 +16,8 @@ use crate::db::Db;
 use crate::module_name::ModuleName;
 use crate::supported_py_version::TargetVersion;
 
+use super::vendored::vendored_typeshed_stubs;
+
 #[derive(Debug)]
 pub(crate) struct LazyTypeshedVersions<'db>(OnceCell<&'db TypeshedVersions>);
 
@@ -77,7 +79,12 @@ pub(crate) fn parse_typeshed_versions(
 }
 
 static VENDORED_VERSIONS: Lazy<TypeshedVersions> = Lazy::new(|| {
-    TypeshedVersions::from_str(include_str!("../../vendor/typeshed/stdlib/VERSIONS")).unwrap()
+    TypeshedVersions::from_str(
+        &vendored_typeshed_stubs()
+            .read_to_string("stdlib/VERSIONS")
+            .unwrap(),
+    )
+    .unwrap()
 });
 
 #[derive(Debug, PartialEq, Eq, Clone)]
