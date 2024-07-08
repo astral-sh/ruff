@@ -14,7 +14,6 @@ license = { workspace = true }
 ruff_db = { workspace = true }
 ruff_python_stdlib = { workspace = true }
 
-clap = { workspace = true }
 compact_str = { workspace = true }
 camino = { workspace = true }
 once_cell = { workspace = true }

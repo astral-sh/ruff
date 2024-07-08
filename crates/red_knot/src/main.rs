@@ -11,11 +11,10 @@ use tracing_subscriber::{Layer, Registry};
 use tracing_tree::time::Uptime;
 
 use red_knot::program::{FileWatcherChange, Program};
+use red_knot::target_version::TargetVersion;
 use red_knot::watch::FileWatcher;
 use red_knot::Workspace;
-use red_knot_module_resolver::{
-    set_module_resolution_settings, RawModuleResolutionSettings, TargetVersion,
-};
+use red_knot_module_resolver::{set_module_resolution_settings, RawModuleResolutionSettings};
 use ruff_db::files::system_path_to_file;
 use ruff_db::system::{OsSystem, System, SystemPath, SystemPathBuf};
 
@@ -32,8 +31,7 @@ struct Args {
     #[arg(
         long,
         value_name = "DIRECTORY",
-        help = "Custom directory to use for stdlib typeshed stubs",
-        env = "RUFF_CUSTOM_TYPESHED_DIR"
+        help = "Custom directory to use for stdlib typeshed stubs"
     )]
     custom_typeshed_dir: Option<SystemPathBuf>,
     #[arg(
@@ -63,7 +61,6 @@ pub fn main() -> anyhow::Result<()> {
         target_version,
     } = Args::parse_from(std::env::args().collect::<Vec<_>>());
 
-    tracing::trace!("Checking file {entry_point}");
     tracing::trace!("Target version: {target_version}");
     if let Some(custom_typeshed) = custom_typeshed_dir.as_ref() {
         tracing::trace!("Custom typeshed directory: {custom_typeshed}");
@@ -100,7 +97,7 @@ pub fn main() -> anyhow::Result<()> {
             workspace_root: workspace_search_path,
             site_packages: None,
             custom_typeshed: custom_typeshed_dir,
-            target_version,
+            target_version: red_knot_module_resolver::TargetVersion::from(target_version),
         },
     );
 
