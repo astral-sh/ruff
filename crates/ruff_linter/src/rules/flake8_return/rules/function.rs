@@ -9,7 +9,7 @@ use ruff_python_ast::helpers::{is_const_false, is_const_true};
 use ruff_python_ast::stmt_if::elif_else_range;
 use ruff_python_ast::visitor::Visitor;
 use ruff_python_ast::whitespace::indentation;
-use ruff_python_ast::{self as ast, ElifElseClause, Expr, Stmt};
+use ruff_python_ast::{self as ast, Decorator, ElifElseClause, Expr, Stmt};
 use ruff_python_codegen::Stylist;
 use ruff_python_index::Indexer;
 use ruff_python_semantic::SemanticModel;
@@ -364,7 +364,16 @@ impl Violation for SuperfluousElseBreak {
 }
 
 /// RET501
-fn unnecessary_return_none(checker: &mut Checker, stack: &Stack) {
+fn unnecessary_return_none(checker: &mut Checker, decorator_list: &[Decorator], stack: &Stack) {
+    // Skip properties.
+    let semantic = checker.semantic();
+    if decorator_list
+        .iter()
+        .any(|decorator| semantic.match_builtin_expr(&decorator.expression, "property"))
+    {
+        return;
+    }
+
     for stmt in &stack.returns {
         let Some(expr) = stmt.value.as_deref() else {
             continue;
@@ -731,7 +740,12 @@ fn superfluous_elif_else(checker: &mut Checker, stack: &Stack) {
 }
 
 /// Run all checks from the `flake8-return` plugin.
-pub(crate) fn function(checker: &mut Checker, body: &[Stmt], returns: Option<&Expr>) {
+pub(crate) fn function(
+    checker: &mut Checker,
+    body: &[Stmt],
+    decorator_list: &[Decorator],
+    returns: Option<&Expr>,
+) {
     // Find the last statement in the function.
     let Some(last_stmt) = body.last() else {
         // Skip empty functions.
@@ -785,9 +799,17 @@ pub(crate) fn function(checker: &mut Checker, body: &[Stmt], returns: Option<&Ex
         }
     } else {
         if checker.enabled(Rule::UnnecessaryReturnNone) {
+            // Skip properties.
+            let semantic = checker.semantic();
+            if decorator_list
+                .iter()
+                .any(|decorator| semantic.match_builtin_expr(&decorator.expression, "property"))
+            {
+                return;
+            }
             // Skip functions that have a return annotation that is not `None`.
             if returns.map_or(true, Expr::is_none_literal_expr) {
-                unnecessary_return_none(checker, &stack);
+                unnecessary_return_none(checker, decorator_list, &stack);
             }
         }
     }
