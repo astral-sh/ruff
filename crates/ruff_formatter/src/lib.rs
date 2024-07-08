@@ -15,9 +15,9 @@
 //! ## Formatting Macros
 //!
 //! This crate defines two macros to construct the IR. These are inspired by Rust's `fmt` macros
-//! * [`format!`]: Formats a formatable object
+//! * [`format!`]: Formats a formattable object
 //! * [`format_args!`]: Concatenates a sequence of Format objects.
-//! * [`write!`]: Writes a sequence of formatable objects into an output buffer.
+//! * [`write!`]: Writes a sequence of formattable objects into an output buffer.
 
 mod arguments;
 mod buffer;
