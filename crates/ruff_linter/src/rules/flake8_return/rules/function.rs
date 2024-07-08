@@ -799,14 +799,6 @@ pub(crate) fn function(
         }
     } else {
         if checker.enabled(Rule::UnnecessaryReturnNone) {
-            // Skip properties.
-            let semantic = checker.semantic();
-            if decorator_list
-                .iter()
-                .any(|decorator| semantic.match_builtin_expr(&decorator.expression, "property"))
-            {
-                return;
-            }
             // Skip functions that have a return annotation that is not `None`.
             if returns.map_or(true, Expr::is_none_literal_expr) {
                 unnecessary_return_none(checker, decorator_list, &stack);
