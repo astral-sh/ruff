@@ -1,6 +1,13 @@
 use ruff_python_ast::name::QualifiedName;
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
+pub(super) enum AsyncModule {
+    AnyIO,
+    AsyncIO,
+    Trio,
+}
+
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub(super) enum MethodName {
     AcloseForcefully,
     CancelScope,

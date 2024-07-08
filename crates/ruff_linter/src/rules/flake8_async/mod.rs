@@ -16,7 +16,8 @@ mod tests {
 
     #[test_case(Rule::TrioTimeoutWithoutAwait, Path::new("ASYNC100.py"))]
     #[test_case(Rule::TrioSyncCall, Path::new("ASYNC105.py"))]
-    #[test_case(Rule::TrioAsyncFunctionWithTimeout, Path::new("ASYNC109.py"))]
+    #[test_case(Rule::AsyncFunctionWithTimeout, Path::new("ASYNC109_0.py"))]
+    #[test_case(Rule::AsyncFunctionWithTimeout, Path::new("ASYNC109_1.py"))]
     #[test_case(Rule::TrioUnneededSleep, Path::new("ASYNC110.py"))]
     #[test_case(Rule::TrioZeroSleepCall, Path::new("ASYNC115.py"))]
     #[test_case(Rule::SleepForeverCall, Path::new("ASYNC116.py"))]
