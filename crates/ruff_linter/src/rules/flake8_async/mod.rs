@@ -9,10 +9,11 @@ mod tests {
     use anyhow::Result;
     use test_case::test_case;
 
-    use crate::assert_messages;
     use crate::registry::Rule;
+    use crate::settings::types::PreviewMode;
     use crate::settings::LinterSettings;
     use crate::test::test_path;
+    use crate::{assert_messages, settings};
 
     #[test_case(Rule::TrioTimeoutWithoutAwait, Path::new("ASYNC100.py"))]
     #[test_case(Rule::TrioSyncCall, Path::new("ASYNC105.py"))]
@@ -32,6 +33,25 @@ mod tests {
         let diagnostics = test_path(
             Path::new("flake8_async").join(path).as_path(),
             &LinterSettings::for_rule(rule_code),
+        )?;
+        assert_messages!(snapshot, diagnostics);
+        Ok(())
+    }
+
+    #[test_case(Rule::AsyncFunctionWithTimeout, Path::new("ASYNC109_0.py"))]
+    #[test_case(Rule::AsyncFunctionWithTimeout, Path::new("ASYNC109_1.py"))]
+    fn preview_rules(rule_code: Rule, path: &Path) -> Result<()> {
+        let snapshot = format!(
+            "preview__{}_{}",
+            rule_code.noqa_code(),
+            path.to_string_lossy()
+        );
+        let diagnostics = test_path(
+            Path::new("flake8_async").join(path).as_path(),
+            &settings::LinterSettings {
+                preview: PreviewMode::Enabled,
+                ..settings::LinterSettings::for_rule(rule_code)
+            },
         )?;
         assert_messages!(snapshot, diagnostics);
         Ok(())

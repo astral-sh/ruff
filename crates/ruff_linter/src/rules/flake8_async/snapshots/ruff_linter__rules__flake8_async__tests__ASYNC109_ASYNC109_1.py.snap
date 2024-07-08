@@ -1,16 +1,4 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_async/mod.rs
 ---
-ASYNC109_1.py:5:16: ASYNC109 Prefer using an async timeout context manager such as `asyncio.timeout` over reimplementing the functionality
-  |
-5 | async def func(timeout):
-  |                ^^^^^^^ ASYNC109
-6 |     ...
-  |
 
-ASYNC109_1.py:9:16: ASYNC109 Prefer using an async timeout context manager such as `asyncio.timeout` over reimplementing the functionality
-   |
- 9 | async def func(timeout=10):
-   |                ^^^^^^^^^^ ASYNC109
-10 |     ...
-   |
