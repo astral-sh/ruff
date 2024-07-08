@@ -234,7 +234,7 @@ impl<'a> ModuleResolutionPathRefInner<'a> {
             typeshed_versions,
             target_version,
         } = resolver_state;
-        typeshed_versions.query_module(&module_name, *db, stdlib_root, *target_version)
+        typeshed_versions.query_module(*db, &module_name, stdlib_root, *target_version)
     }
 
     #[must_use]
@@ -298,7 +298,8 @@ impl<'a> ModuleResolutionPathRefInner<'a> {
             (Self::StandardLibrary(path), Self::StandardLibrary(stdlib_root)) => {
                 match Self::query_stdlib_version(&path, search_path, &stdlib_root, resolver) {
                     TypeshedVersionsQueryResult::DoesNotExist => None,
-                    TypeshedVersionsQueryResult::Exists | TypeshedVersionsQueryResult::MaybeExists => path.to_file(resolver.db.upcast()),
+                    TypeshedVersionsQueryResult::Exists => path.to_file(resolver.db.upcast()),
+                    TypeshedVersionsQueryResult::MaybeExists => path.to_file(resolver.db.upcast()),
                 }
             }
             (path, root) => unreachable!(

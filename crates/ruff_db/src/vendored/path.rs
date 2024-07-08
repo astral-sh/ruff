@@ -42,7 +42,7 @@ impl VendoredPath {
     }
 
     #[must_use]
-    pub fn join(&self, other: impl AsRef<Utf8Path>) -> VendoredPathBuf {
+    pub fn join(&self, other: impl AsRef<VendoredPath>) -> VendoredPathBuf {
         VendoredPathBuf(self.0.join(other.as_ref()))
     }
 
@@ -63,7 +63,7 @@ impl VendoredPath {
 
     pub fn strip_prefix(
         &self,
-        prefix: impl AsRef<Utf8Path>,
+        prefix: impl AsRef<VendoredPath>,
     ) -> Result<&Self, path::StripPrefixError> {
         self.0.strip_prefix(prefix.as_ref()).map(Self::new)
     }
@@ -88,8 +88,8 @@ impl VendoredPathBuf {
         VendoredPath::new(&self.0)
     }
 
-    pub fn push(&mut self, component: &str) {
-        self.0.push(component)
+    pub fn push(&mut self, component: impl AsRef<VendoredPath>) {
+        self.0.push(component.as_ref())
     }
 }
 

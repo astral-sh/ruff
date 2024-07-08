@@ -39,8 +39,8 @@ impl<'db> LazyTypeshedVersions<'db> {
     #[must_use]
     pub(crate) fn query_module(
         &self,
-        module: &ModuleName,
         db: &'db dyn Db,
+        module: &ModuleName,
         stdlib_root: &FilePathRef,
         target_version: TargetVersion,
     ) -> TypeshedVersionsQueryResult {

@@ -25,8 +25,9 @@ pub(crate) mod tests {
     use salsa::DebugWithDb;
 
     use ruff_db::files::Files;
-    use ruff_db::system::{DbWithTestSystem, SystemPathBuf};
-    use ruff_db::system::{MemoryFileSystem, SystemPath, TestSystem};
+    use ruff_db::system::{
+        DbWithTestSystem, MemoryFileSystem, SystemPath, SystemPathBuf, TestSystem,
+    };
     use ruff_db::vendored::VendoredFileSystem;
 
     use crate::resolver::{set_module_resolution_settings, RawModuleResolutionSettings};
@@ -132,7 +133,7 @@ pub(crate) mod tests {
         src: SystemPathBuf,
         site_packages: SystemPathBuf,
         target_version: Option<TargetVersion>,
-        use_mocked_typeshed: bool,
+        with_vendored_stubs: bool,
     }
 
     impl TestCaseBuilder {
@@ -144,7 +145,7 @@ pub(crate) mod tests {
 
         #[must_use]
         pub(crate) fn with_vendored_stubs_used(mut self) -> Self {
-            self.use_mocked_typeshed = false;
+            self.with_vendored_stubs = true;
             self
         }
 
@@ -194,18 +195,18 @@ pub(crate) mod tests {
             let TestCaseBuilder {
                 mut db,
                 src,
-                use_mocked_typeshed,
+                with_vendored_stubs,
                 site_packages,
                 target_version,
             } = self;
 
             let typeshed_dir = SystemPathBuf::from("/typeshed");
 
-            let custom_typeshed = if use_mocked_typeshed {
+            let custom_typeshed = if with_vendored_stubs {
+                None
+            } else {
                 Self::create_mocked_typeshed(&typeshed_dir, db.memory_file_system())?;
                 Some(typeshed_dir.clone())
-            } else {
-                None
             };
 
             let settings = RawModuleResolutionSettings {
@@ -248,7 +249,7 @@ pub(crate) mod tests {
         Ok(TestCaseBuilder {
             db,
             src,
-            use_mocked_typeshed: true,
+            with_vendored_stubs: false,
             site_packages,
             target_version: None,
         })
