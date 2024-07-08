@@ -4,6 +4,8 @@ use ruff_python_codegen::Generator;
 use ruff_python_semantic::{BindingId, ResolvedReference, SemanticModel};
 use ruff_text_size::{Ranged, TextRange};
 
+use crate::settings::types::PythonVersion;
+
 /// Format a code snippet to call `name.method()`.
 pub(super) fn generate_method_call(name: Name, method: &str, generator: Generator) -> String {
     // Construct `name`.
@@ -117,10 +119,11 @@ pub(super) fn find_file_opens<'a>(
     with: &'a ast::StmtWith,
     semantic: &'a SemanticModel<'a>,
     read_mode: bool,
+    python_version: PythonVersion,
 ) -> Vec<FileOpen<'a>> {
     with.items
         .iter()
-        .filter_map(|item| find_file_open(item, with, semantic, read_mode))
+        .filter_map(|item| find_file_open(item, with, semantic, read_mode, python_version))
         .collect()
 }
 
@@ -130,6 +133,7 @@ fn find_file_open<'a>(
     with: &'a ast::StmtWith,
     semantic: &'a SemanticModel<'a>,
     read_mode: bool,
+    python_version: PythonVersion,
 ) -> Option<FileOpen<'a>> {
     // We want to match `open(...) as var`.
     let ast::ExprCall {
@@ -157,7 +161,7 @@ fn find_file_open<'a>(
     let (filename, pos_mode) = match_open_args(args)?;
 
     // Match keyword arguments, get keyword arguments to forward and possibly mode.
-    let (keywords, kw_mode) = match_open_keywords(keywords, read_mode)?;
+    let (keywords, kw_mode) = match_open_keywords(keywords, read_mode, python_version)?;
 
     let mode = kw_mode.unwrap_or(pos_mode);
 
@@ -228,6 +232,7 @@ fn match_open_args(args: &[Expr]) -> Option<(&Expr, OpenMode)> {
 fn match_open_keywords(
     keywords: &[ast::Keyword],
     read_mode: bool,
+    target_version: PythonVersion,
 ) -> Option<(Vec<&ast::Keyword>, Option<OpenMode>)> {
     let mut result: Vec<&ast::Keyword> = vec![];
     let mut mode: Option<OpenMode> = None;
@@ -235,11 +240,16 @@ fn match_open_keywords(
     for keyword in keywords {
         match keyword.arg.as_ref()?.as_str() {
             "encoding" | "errors" => result.push(keyword),
-            // newline is only valid for write_text
             "newline" => {
                 if read_mode {
+                    // newline is only valid for write_text
                     return None;
+                } else if target_version < PythonVersion::Py310 {
+                    // Pathlib on versions earlier than 3.10 doesn't support the `newline`
+                    // argument, so we can't forward it
+                    continue;
                 }
+
                 result.push(keyword);
             }
 
