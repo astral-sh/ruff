@@ -440,20 +440,45 @@ fn is_noreturn_func(func: &Expr, semantic: &SemanticModel) -> bool {
     semantic.match_typing_qualified_name(&qualified_name, "NoReturn")
 }
 
-/// RET503
-fn implicit_return(checker: &mut Checker, stmt: &Stmt) {
+fn add_return_none(checker: &mut Checker, stmt: &Stmt, range: TextRange) {
+    let mut diagnostic = Diagnostic::new(ImplicitReturn, range);
+    if let Some(indent) = indentation(checker.locator(), stmt) {
+        let mut content = String::new();
+        content.push_str(checker.stylist().line_ending().as_str());
+        content.push_str(indent);
+        content.push_str("return None");
+        diagnostic.set_fix(Fix::unsafe_edit(Edit::insertion(
+            content,
+            end_of_last_statement(stmt, checker.locator()),
+        )));
+    }
+    checker.diagnostics.push(diagnostic);
+}
+
+fn has_implicit_return(checker: &mut Checker, stmt: &Stmt) -> bool {
     match stmt {
         Stmt::If(ast::StmtIf {
             body,
             elif_else_clauses,
             ..
         }) => {
+            let mut result = false;
             if let Some(last_stmt) = body.last() {
-                implicit_return(checker, last_stmt);
+                if has_implicit_return(checker, last_stmt) {
+                    result = true;
+                    if checker.settings.preview.is_enabled() {
+                        return result;
+                    }
+                }
             }
             for clause in elif_else_clauses {
                 if let Some(last_stmt) = clause.body.last() {
-                    implicit_return(checker, last_stmt);
+                    if has_implicit_return(checker, last_stmt) {
+                        result = true;
+                        if checker.settings.preview.is_enabled() {
+                            return result;
+                        }
+                    }
                 }
             }
 
@@ -462,73 +487,70 @@ fn implicit_return(checker: &mut Checker, stmt: &Stmt) {
                 elif_else_clauses.last(),
                 None | Some(ast::ElifElseClause { test: Some(_), .. })
             ) {
-                let mut diagnostic = Diagnostic::new(ImplicitReturn, stmt.range());
-                if let Some(indent) = indentation(checker.locator(), stmt) {
-                    let mut content = String::new();
-                    content.push_str(checker.stylist().line_ending().as_str());
-                    content.push_str(indent);
-                    content.push_str("return None");
-                    diagnostic.set_fix(Fix::unsafe_edit(Edit::insertion(
-                        content,
-                        end_of_last_statement(stmt, checker.locator()),
-                    )));
+                if checker.settings.preview.is_disabled() {
+                    add_return_none(checker, stmt, stmt.range());
                 }
-                checker.diagnostics.push(diagnostic);
+                return true;
             }
+            result
         }
-        Stmt::Assert(ast::StmtAssert { test, .. }) if is_const_false(test) => {}
-        Stmt::While(ast::StmtWhile { test, .. }) if is_const_true(test) => {}
+        Stmt::Assert(ast::StmtAssert { test, .. }) if is_const_false(test) => false,
+        Stmt::While(ast::StmtWhile { test, .. }) if is_const_true(test) => false,
         Stmt::For(ast::StmtFor { orelse, .. }) | Stmt::While(ast::StmtWhile { orelse, .. }) => {
             if let Some(last_stmt) = orelse.last() {
-                implicit_return(checker, last_stmt);
+                has_implicit_return(checker, last_stmt)
             } else {
-                let mut diagnostic = Diagnostic::new(ImplicitReturn, stmt.range());
-                if let Some(indent) = indentation(checker.locator(), stmt) {
-                    let mut content = String::new();
-                    content.push_str(checker.stylist().line_ending().as_str());
-                    content.push_str(indent);
-                    content.push_str("return None");
-                    diagnostic.set_fix(Fix::unsafe_edit(Edit::insertion(
-                        content,
-                        end_of_last_statement(stmt, checker.locator()),
-                    )));
+                if checker.settings.preview.is_disabled() {
+                    add_return_none(checker, stmt, stmt.range());
                 }
-                checker.diagnostics.push(diagnostic);
+                true
             }
         }
         Stmt::Match(ast::StmtMatch { cases, .. }) => {
+            let mut result = false;
             for case in cases {
                 if let Some(last_stmt) = case.body.last() {
-                    implicit_return(checker, last_stmt);
+                    if has_implicit_return(checker, last_stmt) {
+                        result = true;
+                        if checker.settings.preview.is_enabled() {
+                            return result;
+                        }
+                    }
                 }
             }
+            result
         }
         Stmt::With(ast::StmtWith { body, .. }) => {
             if let Some(last_stmt) = body.last() {
-                implicit_return(checker, last_stmt);
+                if has_implicit_return(checker, last_stmt) {
+                    return true;
+                }
             }
+            false
         }
-        Stmt::Return(_) | Stmt::Raise(_) | Stmt::Try(_) => {}
+        Stmt::Return(_) | Stmt::Raise(_) | Stmt::Try(_) => false,
         Stmt::Expr(ast::StmtExpr { value, .. })
             if matches!(
                 value.as_ref(),
                 Expr::Call(ast::ExprCall { func, ..  })
                     if is_noreturn_func(func, checker.semantic())
-            ) => {}
-        _ => {
-            let mut diagnostic = Diagnostic::new(ImplicitReturn, stmt.range());
-            if let Some(indent) = indentation(checker.locator(), stmt) {
-                let mut content = String::new();
-                content.push_str(checker.stylist().line_ending().as_str());
-                content.push_str(indent);
-                content.push_str("return None");
-                diagnostic.set_fix(Fix::unsafe_edit(Edit::insertion(
-                    content,
-                    end_of_last_statement(stmt, checker.locator()),
-                )));
-            }
-            checker.diagnostics.push(diagnostic);
+            ) =>
+        {
+            false
         }
+        _ => {
+            if checker.settings.preview.is_disabled() {
+                add_return_none(checker, stmt, stmt.range());
+            }
+            true
+        }
+    }
+}
+
+/// RET503
+fn implicit_return(checker: &mut Checker, function_def: &ast::StmtFunctionDef, stmt: &Stmt) {
+    if has_implicit_return(checker, stmt) && checker.settings.preview.is_enabled() {
+        add_return_none(checker, stmt, function_def.range());
     }
 }
 
@@ -731,7 +753,12 @@ fn superfluous_elif_else(checker: &mut Checker, stack: &Stack) {
 }
 
 /// Run all checks from the `flake8-return` plugin.
-pub(crate) fn function(checker: &mut Checker, body: &[Stmt], returns: Option<&Expr>) {
+pub(crate) fn function(
+    checker: &mut Checker,
+    function_def: &ast::StmtFunctionDef,
+    body: &[Stmt],
+    returns: Option<&Expr>,
+) {
     // Find the last statement in the function.
     let Some(last_stmt) = body.last() else {
         // Skip empty functions.
@@ -777,7 +804,7 @@ pub(crate) fn function(checker: &mut Checker, body: &[Stmt], returns: Option<&Ex
             implicit_return_value(checker, &stack);
         }
         if checker.enabled(Rule::ImplicitReturn) {
-            implicit_return(checker, last_stmt);
+            implicit_return(checker, function_def, last_stmt);
         }
 
         if checker.enabled(Rule::UnnecessaryAssign) {

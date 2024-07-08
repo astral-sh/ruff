@@ -35,6 +35,7 @@ mod tests {
         Ok(())
     }
 
+    #[test_case(Rule::ImplicitReturn, Path::new("RET503.py"))]
     #[test_case(Rule::SuperfluousElseReturn, Path::new("RET505.py"))]
     #[test_case(Rule::SuperfluousElseRaise, Path::new("RET506.py"))]
     #[test_case(Rule::SuperfluousElseContinue, Path::new("RET507.py"))]
