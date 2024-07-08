@@ -3,7 +3,7 @@ use std::sync::Arc;
 use countme::Count;
 use dashmap::mapref::entry::Entry;
 
-pub use path::{FilePath, FilePathRef};
+pub use path::FilePath;
 
 use crate::file_revision::FileRevision;
 use crate::files::private::FileStatus;

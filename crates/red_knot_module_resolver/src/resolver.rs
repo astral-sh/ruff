@@ -1,7 +1,7 @@
 use std::ops::Deref;
 use std::sync::Arc;
 
-use ruff_db::files::{File, FilePath, FilePathRef};
+use ruff_db::files::{File, FilePath};
 use ruff_db::system::SystemPathBuf;
 
 use crate::db::Db;
@@ -78,14 +78,14 @@ pub(crate) fn path_to_module(db: &dyn Db, path: &FilePath) -> Option<Module> {
 pub(crate) fn file_to_module(db: &dyn Db, file: File) -> Option<Module> {
     let _span = tracing::trace_span!("file_to_module", ?file).entered();
 
-    let path = FilePathRef::from(file.path(db.upcast()));
+    let path = file.path(db.upcast());
 
     let resolver_settings = module_resolver_settings(db);
 
     let relative_path = resolver_settings
         .search_paths()
         .iter()
-        .find_map(|root| root.relativize_path(&path))?;
+        .find_map(|root| root.relativize_path(path))?;
 
     let module_name = relative_path.to_module_name()?;
 

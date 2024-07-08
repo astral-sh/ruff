@@ -6,9 +6,10 @@ use std::ops::{RangeFrom, RangeInclusive};
 use std::str::FromStr;
 
 use once_cell::sync::Lazy;
+use ruff_db::system::SystemPath;
 use rustc_hash::FxHashMap;
 
-use ruff_db::files::{system_path_to_file, File, FilePathRef};
+use ruff_db::files::{system_path_to_file, File};
 use ruff_db::source::source_text;
 
 use crate::db::Db;
@@ -41,13 +42,14 @@ impl<'db> LazyTypeshedVersions<'db> {
         &self,
         db: &'db dyn Db,
         module: &ModuleName,
-        stdlib_root: &FilePathRef,
+        stdlib_root: Option<&SystemPath>,
         target_version: TargetVersion,
     ) -> TypeshedVersionsQueryResult {
         let versions = self.0.get_or_init(|| {
-            let versions_path = match stdlib_root {
-                FilePathRef::System(path) => path.join("VERSIONS"),
-                FilePathRef::Vendored(_) => return &VENDORED_VERSIONS,
+            let versions_path = if let Some(system_path) = stdlib_root {
+                system_path.join("VERSIONS")
+            } else {
+                return &VENDORED_VERSIONS;
             };
             let Some(versions_file) = system_path_to_file(db.upcast(), &versions_path) else {
                 todo!(
