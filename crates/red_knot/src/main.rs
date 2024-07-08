@@ -1,5 +1,6 @@
 use std::sync::Mutex;
 
+use clap::Parser;
 use crossbeam::channel as crossbeam_channel;
 use salsa::ParallelDatabase;
 use tracing::subscriber::Interest;
@@ -16,7 +17,34 @@ use red_knot_module_resolver::{
     set_module_resolution_settings, RawModuleResolutionSettings, TargetVersion,
 };
 use ruff_db::files::system_path_to_file;
-use ruff_db::system::{OsSystem, System, SystemPath};
+use ruff_db::system::{OsSystem, System, SystemPath, SystemPathBuf};
+
+#[derive(Debug, Parser)]
+#[command(
+    author,
+    name = "red-knot",
+    about = "An experimental multifile analysis backend for Ruff"
+)]
+#[command(version)]
+struct Args {
+    #[clap(help = "File to check", required = true, value_name = "FILE")]
+    entry_point: SystemPathBuf,
+    #[arg(
+        long,
+        value_name = "DIRECTORY",
+        help = "Custom directory to use for stdlib typeshed stubs",
+        env = "RUFF_CUSTOM_TYPESHED_DIR"
+    )]
+    custom_typeshed_dir: Option<SystemPathBuf>,
+    #[arg(
+        long,
+        value_name = "PATH",
+        help = "Additional path to use as a module-resolution source (can be passed multiple times)"
+    )]
+    extra_search_path: Vec<SystemPathBuf>,
+    #[arg(long, help = "Python version to assume when resolving types", default_value_t = TargetVersion::default(), value_name="VERSION")]
+    target_version: TargetVersion,
+}
 
 #[allow(
     clippy::print_stdout,
@@ -28,29 +56,35 @@ pub fn main() -> anyhow::Result<()> {
     countme::enable(true);
     setup_tracing();
 
-    let arguments: Vec<_> = std::env::args().collect();
+    let Args {
+        entry_point,
+        custom_typeshed_dir,
+        extra_search_path: extra_search_paths,
+        target_version,
+    } = Args::parse_from(std::env::args().collect::<Vec<_>>());
 
-    if arguments.len() < 2 {
-        eprintln!("Usage: red_knot <path>");
-        return Err(anyhow::anyhow!("Invalid arguments"));
+    tracing::trace!("Checking file {entry_point}");
+    tracing::trace!("Target version: {target_version}");
+    if let Some(custom_typeshed) = custom_typeshed_dir.as_ref() {
+        tracing::trace!("Custom typeshed directory: {custom_typeshed}");
+    }
+    if !extra_search_paths.is_empty() {
+        tracing::trace!("extra search paths: {extra_search_paths:?}");
     }
 
     let cwd = std::env::current_dir().unwrap();
     let cwd = SystemPath::from_std_path(&cwd).unwrap();
     let system = OsSystem::new(cwd);
-    let entry_point = SystemPath::new(&arguments[1]);
 
-    if !system.path_exists(entry_point) {
+    if !system.path_exists(&entry_point) {
         eprintln!("The entry point does not exist.");
         return Err(anyhow::anyhow!("Invalid arguments"));
     }
 
-    if !system.is_file(entry_point) {
+    if !system.is_file(&entry_point) {
         eprintln!("The entry point is not a file.");
         return Err(anyhow::anyhow!("Invalid arguments"));
     }
-
-    let entry_point = entry_point.to_path_buf();
 
     let workspace_folder = entry_point.parent().unwrap();
     let workspace = Workspace::new(workspace_folder.to_path_buf());
@@ -62,11 +96,11 @@ pub fn main() -> anyhow::Result<()> {
     set_module_resolution_settings(
         &mut program,
         RawModuleResolutionSettings {
-            extra_paths: vec![],
+            extra_paths: extra_search_paths,
             workspace_root: workspace_search_path,
             site_packages: None,
-            custom_typeshed: None,
-            target_version: TargetVersion::Py38,
+            custom_typeshed: custom_typeshed_dir,
+            target_version,
         },
     );
 

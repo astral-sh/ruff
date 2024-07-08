@@ -1864,6 +1864,7 @@ name = "red_knot"
 version = "0.0.0"
 dependencies = [
  "anyhow",
+ "clap",
  "countme",
  "crossbeam",
  "ctrlc",
@@ -1886,6 +1887,7 @@ version = "0.0.0"
 dependencies = [
  "anyhow",
  "camino",
+ "clap",
  "compact_str",
  "insta",
  "once_cell",
