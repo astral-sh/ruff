@@ -21,7 +21,7 @@ pub(crate) struct TestCase<T> {
 pub(crate) type FileSpec = (&'static str, &'static str);
 
 /// Specification for a typeshed mock to be created as part of a test
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, Default)]
 pub(crate) struct MockedTypeshed {
     /// The stdlib files to be created in the typeshed mock
     pub(crate) stdlib_files: &'static [FileSpec],
@@ -184,19 +184,13 @@ impl TestCaseBuilder<UnspecifiedTypeshed> {
     }
 
     pub(crate) fn build(self) -> TestCase<()> {
-        const DEFAULT_TYPESHED: MockedTypeshed = MockedTypeshed {
-            stdlib_files: &[("functools.pyi", "def update_wrapper(): ...")],
-            versions: "functools: 3.8-",
-        };
-
         let TestCase {
             db,
             src,
             stdlib: _,
             site_packages,
             target_version,
-        } = self.with_custom_typeshed(DEFAULT_TYPESHED).build();
-
+        } = self.with_custom_typeshed(MockedTypeshed::default()).build();
         TestCase {
             db,
             src,

@@ -131,7 +131,6 @@ pub enum TypeshedVersionsParseErrorKind {
         version: String,
         err: std::num::ParseIntError,
     },
-    EmptyVersionsFile,
 }
 
 impl fmt::Display for TypeshedVersionsParseErrorKind {
@@ -160,7 +159,6 @@ impl fmt::Display for TypeshedVersionsParseErrorKind {
                 f,
                 "Failed to convert '{version}' to a pair of integers due to {err}",
             ),
-            Self::EmptyVersionsFile => f.write_str("Versions file was empty!"),
         }
     }
 }
@@ -307,14 +305,7 @@ impl FromStr for TypeshedVersions {
             };
         }
 
-        if map.is_empty() {
-            Err(TypeshedVersionsParseError {
-                line_number: None,
-                reason: TypeshedVersionsParseErrorKind::EmptyVersionsFile,
-            })
-        } else {
-            Ok(Self(map))
-        }
+        Ok(Self(map))
     }
 }
 
@@ -682,31 +673,6 @@ foo: 3.8-   # trailing comment
         assert_eq!(
             parsed_versions.query_module(&spam, TargetVersion::Py313.into()),
             TypeshedVersionsQueryResult::DoesNotExist
-        );
-    }
-
-    #[test]
-    fn invalid_empty_versions_file() {
-        assert_eq!(
-            TypeshedVersions::from_str(""),
-            Err(TypeshedVersionsParseError {
-                line_number: None,
-                reason: TypeshedVersionsParseErrorKind::EmptyVersionsFile
-            })
-        );
-        assert_eq!(
-            TypeshedVersions::from_str("       "),
-            Err(TypeshedVersionsParseError {
-                line_number: None,
-                reason: TypeshedVersionsParseErrorKind::EmptyVersionsFile
-            })
-        );
-        assert_eq!(
-            TypeshedVersions::from_str(" \n  \n  \n "),
-            Err(TypeshedVersionsParseError {
-                line_number: None,
-                reason: TypeshedVersionsParseErrorKind::EmptyVersionsFile
-            })
         );
     }
 
