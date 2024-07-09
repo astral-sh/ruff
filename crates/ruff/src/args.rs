@@ -182,8 +182,7 @@ pub struct CheckCommand {
     ignore_noqa: bool,
 
     /// Output serialization format for violations.
-    /// The default serialization format is "concise".
-    /// In preview mode, the default serialization format is "full".
+    /// The default serialization format is "full".
     #[arg(long, value_enum, env = "RUFF_OUTPUT_FORMAT")]
     pub output_format: Option<OutputFormat>,
 
