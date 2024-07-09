@@ -4,7 +4,7 @@ use std::sync::{Arc, RwLock, RwLockWriteGuard};
 use camino::{Utf8Path, Utf8PathBuf};
 use filetime::FileTime;
 
-use crate::system::{FileType, Metadata, Result, SystemPath};
+use crate::system::{FileType, Metadata, Result, SystemPath, SystemPathBuf};
 
 /// File system that stores all content in memory.
 ///
@@ -27,12 +27,12 @@ impl MemoryFileSystem {
     const PERMISSION: u32 = 0o755;
 
     pub fn new() -> Self {
-        Self::with_cwd("/")
+        Self::with_current_directory("/")
     }
 
     /// Creates a new, empty in memory file system with the given current working directory.
-    pub fn with_cwd(cwd: impl AsRef<SystemPath>) -> Self {
-        let cwd = Utf8PathBuf::from(cwd.as_ref().as_str());
+    pub fn with_current_directory(cwd: impl AsRef<SystemPath>) -> Self {
+        let cwd = cwd.as_ref().to_path_buf();
 
         assert!(
             cwd.starts_with("/"),
@@ -46,9 +46,13 @@ impl MemoryFileSystem {
             }),
         };
 
-        fs.create_directory_all(SystemPath::new(&cwd)).unwrap();
+        fs.create_directory_all(&cwd).unwrap();
 
         fs
+    }
+
+    pub fn current_directory(&self) -> &SystemPath {
+        &self.inner.cwd
     }
 
     #[must_use]
@@ -59,9 +63,9 @@ impl MemoryFileSystem {
     }
 
     pub fn metadata(&self, path: impl AsRef<SystemPath>) -> Result<Metadata> {
-        fn metadata(fs: &MemoryFileSystemInner, path: &SystemPath) -> Result<Metadata> {
-            let by_path = fs.by_path.read().unwrap();
-            let normalized = normalize_path(path, &fs.cwd);
+        fn metadata(fs: &MemoryFileSystem, path: &SystemPath) -> Result<Metadata> {
+            let by_path = fs.inner.by_path.read().unwrap();
+            let normalized = fs.normalize_path(path);
 
             let entry = by_path.get(&normalized).ok_or_else(not_found)?;
 
@@ -81,27 +85,27 @@ impl MemoryFileSystem {
             Ok(metadata)
         }
 
-        metadata(&self.inner, path.as_ref())
+        metadata(self, path.as_ref())
     }
 
     pub fn is_file(&self, path: impl AsRef<SystemPath>) -> bool {
         let by_path = self.inner.by_path.read().unwrap();
-        let normalized = normalize_path(path.as_ref(), &self.inner.cwd);
+        let normalized = self.normalize_path(path.as_ref());
 
         matches!(by_path.get(&normalized), Some(Entry::File(_)))
     }
 
     pub fn is_directory(&self, path: impl AsRef<SystemPath>) -> bool {
         let by_path = self.inner.by_path.read().unwrap();
-        let normalized = normalize_path(path.as_ref(), &self.inner.cwd);
+        let normalized = self.normalize_path(path.as_ref());
 
         matches!(by_path.get(&normalized), Some(Entry::Directory(_)))
     }
 
     pub fn read_to_string(&self, path: impl AsRef<SystemPath>) -> Result<String> {
-        fn read_to_string(fs: &MemoryFileSystemInner, path: &SystemPath) -> Result<String> {
-            let by_path = fs.by_path.read().unwrap();
-            let normalized = normalize_path(path, &fs.cwd);
+        fn read_to_string(fs: &MemoryFileSystem, path: &SystemPath) -> Result<String> {
+            let by_path = fs.inner.by_path.read().unwrap();
+            let normalized = fs.normalize_path(path);
 
             let entry = by_path.get(&normalized).ok_or_else(not_found)?;
 
@@ -111,12 +115,12 @@ impl MemoryFileSystem {
             }
         }
 
-        read_to_string(&self.inner, path.as_ref())
+        read_to_string(self, path.as_ref())
     }
 
     pub fn exists(&self, path: &SystemPath) -> bool {
         let by_path = self.inner.by_path.read().unwrap();
-        let normalized = normalize_path(path, &self.inner.cwd);
+        let normalized = self.normalize_path(path);
 
         by_path.contains_key(&normalized)
     }
@@ -146,7 +150,7 @@ impl MemoryFileSystem {
     pub fn write_file(&self, path: impl AsRef<SystemPath>, content: impl ToString) -> Result<()> {
         let mut by_path = self.inner.by_path.write().unwrap();
 
-        let normalized = normalize_path(path.as_ref(), &self.inner.cwd);
+        let normalized = self.normalize_path(path.as_ref());
 
         get_or_create_file(&mut by_path, &normalized)?.content = content.to_string();
 
@@ -156,7 +160,7 @@ impl MemoryFileSystem {
     pub fn remove_file(&self, path: impl AsRef<SystemPath>) -> Result<()> {
         fn remove_file(fs: &MemoryFileSystem, path: &SystemPath) -> Result<()> {
             let mut by_path = fs.inner.by_path.write().unwrap();
-            let normalized = normalize_path(path, &fs.inner.cwd);
+            let normalized = fs.normalize_path(path);
 
             match by_path.entry(normalized) {
                 std::collections::btree_map::Entry::Occupied(entry) => match entry.get() {
@@ -178,7 +182,7 @@ impl MemoryFileSystem {
     /// Creates a new file if the file at `path` doesn't exist.
     pub fn touch(&self, path: impl AsRef<SystemPath>) -> Result<()> {
         let mut by_path = self.inner.by_path.write().unwrap();
-        let normalized = normalize_path(path.as_ref(), &self.inner.cwd);
+        let normalized = self.normalize_path(path.as_ref());
 
         get_or_create_file(&mut by_path, &normalized)?.last_modified = FileTime::now();
 
@@ -188,7 +192,7 @@ impl MemoryFileSystem {
     /// Creates a directory at `path`. All enclosing directories are created if they don't exist.
     pub fn create_directory_all(&self, path: impl AsRef<SystemPath>) -> Result<()> {
         let mut by_path = self.inner.by_path.write().unwrap();
-        let normalized = normalize_path(path.as_ref(), &self.inner.cwd);
+        let normalized = self.normalize_path(path.as_ref());
 
         create_dir_all(&mut by_path, &normalized)
     }
@@ -202,7 +206,7 @@ impl MemoryFileSystem {
     pub fn remove_directory(&self, path: impl AsRef<SystemPath>) -> Result<()> {
         fn remove_directory(fs: &MemoryFileSystem, path: &SystemPath) -> Result<()> {
             let mut by_path = fs.inner.by_path.write().unwrap();
-            let normalized = normalize_path(path, &fs.inner.cwd);
+            let normalized = fs.normalize_path(path);
 
             // Test if the directory is empty
             // Skip the directory path itself
@@ -228,6 +232,11 @@ impl MemoryFileSystem {
 
         remove_directory(self, path.as_ref())
     }
+
+    fn normalize_path(&self, path: impl AsRef<SystemPath>) -> Utf8PathBuf {
+        let normalized = SystemPath::absolute(path, &self.inner.cwd);
+        normalized.into_utf8_path_buf()
+    }
 }
 
 impl Default for MemoryFileSystem {
@@ -246,7 +255,7 @@ impl std::fmt::Debug for MemoryFileSystem {
 
 struct MemoryFileSystemInner {
     by_path: RwLock<BTreeMap<Utf8PathBuf, Entry>>,
-    cwd: Utf8PathBuf,
+    cwd: SystemPathBuf,
 }
 
 #[derive(Debug)]
@@ -290,42 +299,6 @@ fn not_a_directory() -> std::io::Error {
 
 fn directory_not_empty() -> std::io::Error {
     std::io::Error::new(std::io::ErrorKind::Other, "directory not empty")
-}
-
-/// Normalizes the path by removing `.` and `..` components and transform the path into an absolute path.
-///
-/// Adapted from https://github.com/rust-lang/cargo/blob/fede83ccf973457de319ba6fa0e36ead454d2e20/src/cargo/util/paths.rs#L61
-fn normalize_path(path: &SystemPath, cwd: &Utf8Path) -> Utf8PathBuf {
-    let path = camino::Utf8Path::new(path.as_str());
-
-    let mut components = path.components().peekable();
-    let mut ret =
-        if let Some(c @ (camino::Utf8Component::Prefix(..) | camino::Utf8Component::RootDir)) =
-            components.peek().cloned()
-        {
-            components.next();
-            Utf8PathBuf::from(c.as_str())
-        } else {
-            cwd.to_path_buf()
-        };
-
-    for component in components {
-        match component {
-            camino::Utf8Component::Prefix(..) => unreachable!(),
-            camino::Utf8Component::RootDir => {
-                ret.push(component);
-            }
-            camino::Utf8Component::CurDir => {}
-            camino::Utf8Component::ParentDir => {
-                ret.pop();
-            }
-            camino::Utf8Component::Normal(c) => {
-                ret.push(c);
-            }
-        }
-    }
-
-    ret
 }
 
 fn create_dir_all(

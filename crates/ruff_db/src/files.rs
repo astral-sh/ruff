@@ -60,17 +60,20 @@ impl Files {
     /// In these cases, a file with status [`FileStatus::Deleted`] is returned.
     #[tracing::instrument(level = "debug", skip(self, db))]
     fn system(&self, db: &dyn Db, path: &SystemPath) -> File {
+        let absolute = SystemPath::absolute(path, db.system().current_directory());
+        let absolute = FilePath::System(absolute);
+
         *self
             .inner
             .files_by_path
-            .entry(FilePath::System(path.to_path_buf()))
+            .entry(absolute.clone())
             .or_insert_with(|| {
                 let metadata = db.system().path_metadata(path);
 
                 match metadata {
                     Ok(metadata) if metadata.file_type().is_file() => File::new(
                         db,
-                        FilePath::System(path.to_path_buf()),
+                        absolute,
                         metadata.permissions(),
                         metadata.revision(),
                         FileStatus::Exists,
@@ -78,7 +81,7 @@ impl Files {
                     ),
                     _ => File::new(
                         db,
-                        FilePath::System(path.to_path_buf()),
+                        absolute,
                         None,
                         FileRevision::zero(),
                         FileStatus::Deleted,
@@ -89,10 +92,11 @@ impl Files {
     }
 
     /// Tries to look up the file for the given system path, returns `None` if no such file exists yet
-    fn try_system(&self, path: &SystemPath) -> Option<File> {
+    fn try_system(&self, db: &dyn Db, path: &SystemPath) -> Option<File> {
+        let absolute = SystemPath::absolute(path, db.system().current_directory());
         self.inner
             .files_by_path
-            .get(&FilePath::System(path.to_path_buf()))
+            .get(&FilePath::System(absolute))
             .map(|entry| *entry.value())
     }
 
@@ -224,7 +228,7 @@ impl File {
                     _ => (FileStatus::Deleted, FileRevision::zero()),
                 };
 
-                let Some(file) = file.or_else(|| db.files().try_system(path)) else {
+                let Some(file) = file.or_else(|| db.files().try_system(db, path)) else {
                     return;
                 };
 
@@ -260,7 +264,7 @@ mod tests {
     use crate::vendored::tests::VendoredFileSystemBuilder;
 
     #[test]
-    fn file_system_existing_file() -> crate::system::Result<()> {
+    fn system_existing_file() -> crate::system::Result<()> {
         let mut db = TestDb::new();
 
         db.write_file("test.py", "print('Hello world')")?;
@@ -275,12 +279,27 @@ mod tests {
     }
 
     #[test]
-    fn file_system_non_existing_file() {
+    fn system_non_existing_file() {
         let db = TestDb::new();
 
         let test = system_path_to_file(&db, "test.py");
 
         assert_eq!(test, None);
+    }
+
+    #[test]
+    fn system_normalize_paths() {
+        let db = TestDb::new();
+
+        assert_eq!(
+            system_path_to_file(&db, "test.py"),
+            system_path_to_file(&db, "/test.py")
+        );
+
+        assert_eq!(
+            system_path_to_file(&db, "/root/.././test.py"),
+            system_path_to_file(&db, "/root/test.py")
+        );
     }
 
     #[test]

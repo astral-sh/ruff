@@ -51,6 +51,9 @@ pub trait System {
             .map_or(false, |metadata| metadata.file_type.is_file())
     }
 
+    /// Returns the current working directory
+    fn current_directory(&self) -> &SystemPath;
+
     fn as_any(&self) -> &dyn std::any::Any;
 }
 

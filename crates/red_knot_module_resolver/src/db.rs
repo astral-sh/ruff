@@ -189,9 +189,9 @@ pub(crate) mod tests {
 
         let db = TestDb::new();
 
-        let src = SystemPathBuf::from("src");
-        let site_packages = SystemPathBuf::from("site_packages");
-        let custom_typeshed = SystemPathBuf::from("typeshed");
+        let src = SystemPathBuf::from("/src");
+        let site_packages = SystemPathBuf::from("/site_packages");
+        let custom_typeshed = SystemPathBuf::from("/typeshed");
 
         let fs = db.memory_file_system();
 
