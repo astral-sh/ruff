@@ -93,6 +93,31 @@ fn wrong_class_structure(body: &[ast::Stmt]) -> Option<usize> {
     }
 }
 
+fn only_self_assignments(function_def: &ast::StmtFunctionDef) -> bool {
+    let body = &function_def.body;
+
+    for stmt in body {
+        match stmt {
+            ast::Stmt::Assign(assign_stmt) => {
+                if assign_stmt.targets.len() != 1 {
+                    return false;
+                }
+
+                if let ast::Expr::Attribute(attr) = &assign_stmt.targets[0] {
+                    if attr.value.is_name_expr() && attr.attr.as_str() == "self" {
+                        return true;
+                    }
+                } else {
+                    return false;
+                }
+            }
+            _ => return false,
+        }
+    }
+
+    true
+}
+
 // B903
 pub(crate) fn simple_init_classes(checker: &mut Checker, class_def: &ast::StmtClassDef) {
     let body = &class_def.body;
@@ -110,4 +135,37 @@ pub(crate) fn simple_init_classes(checker: &mut Checker, class_def: &ast::StmtCl
 
     // Now check that the "__init__" method is only doing assignments
     let init_function = body.get(init_index.unwrap());
+
+    // Check if the __init__ method is empty
+    if let Some(ast::Stmt::FunctionDef(init_function)) = init_function {
+        if init_function.body.is_empty() {
+            return;
+        }
+    }
+
+    // Check that the __init__ method is only doing assignments
+    if let Some(ast::Stmt::FunctionDef(init_function)) = init_function {
+        if !only_self_assignments(init_function) {
+            return;
+        }
+    }
+
+    // If the class has arrived here, then it need to checks for "collections.namedtuple" or "typing.NamedTuple"
+    // first of all it needs to check if there are any bases
+    let bases = class_def.bases();
+
+    if !bases.is_empty() {
+        for base in bases {
+            // Check that one of the bases name is "typing.NamedTuple" and if not it return a Diagnostic
+            if let Some(qualified_name) = checker.semantic().resolve_qualified_name(base) {
+                if qualified_name.segments() == ["typing", "NamedTuple"] {
+                    return;
+                }
+            }
+        }
+    }
+
+    let mut diagnostic = Diagnostic::new(SimpleInitClasses, class_def.range);
+    diagnostic.set_fix(Fix::safe_edit(Edit::range_deletion(class_def.range)));
+    checker.diagnostics.push(diagnostic);
 }
