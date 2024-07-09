@@ -299,7 +299,6 @@ impl Index {
     }
 
     /// Reloads relevant existing settings files based on a changed settings file path.
-    /// This does not currently register new settings files.
     pub(super) fn reload_settings(&mut self, changed_url: &Url) {
         let Ok(changed_path) = changed_url.to_file_path() else {
             // Files that don't map to a path can't be a workspace configuration file.
@@ -310,10 +309,12 @@ impl Index {
             return;
         };
 
-        // TODO: I think this does not correctly reload settings when using `extend` and the extended
-        //  setting isn't in a parent folder.
-        for (root, settings) in self.settings.range_mut(enclosing_folder.to_path_buf()..) {
-            if !root.starts_with(enclosing_folder) {
+        for (root, settings) in self
+            .settings
+            .range_mut(..=enclosing_folder.to_path_buf())
+            .rev()
+        {
+            if !enclosing_folder.starts_with(root) {
                 break;
             }
 
