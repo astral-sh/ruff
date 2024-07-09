@@ -45,7 +45,7 @@ impl VendoredFileSystem {
         }
     }
 
-    pub fn exists(&self, path: impl AsRef<VendoredPath>) -> bool {
+    pub fn path_exists(&self, path: impl AsRef<VendoredPath>) -> bool {
         fn exists(fs: &VendoredFileSystem, path: &VendoredPath) -> bool {
             let normalized = NormalizedVendoredPath::from(path);
             let mut archive = fs.lock_archive();
@@ -63,7 +63,7 @@ impl VendoredFileSystem {
         exists(self, path.as_ref())
     }
 
-    pub fn metadata(&self, path: impl AsRef<VendoredPath>) -> Result<Metadata> {
+    pub fn path_metadata(&self, path: impl AsRef<VendoredPath>) -> Result<Metadata> {
         fn metadata(fs: &VendoredFileSystem, path: &VendoredPath) -> Result<Metadata> {
             let normalized = NormalizedVendoredPath::from(path);
             let mut archive = fs.lock_archive();
@@ -83,12 +83,12 @@ impl VendoredFileSystem {
     }
 
     pub fn is_directory(&self, path: impl AsRef<VendoredPath>) -> bool {
-        self.metadata(path)
+        self.path_metadata(path)
             .is_ok_and(|metadata| metadata.kind().is_directory())
     }
 
     pub fn is_file(&self, path: impl AsRef<VendoredPath>) -> bool {
-        self.metadata(path)
+        self.path_metadata(path)
             .is_ok_and(|metadata| metadata.kind().is_file())
     }
 
@@ -471,9 +471,9 @@ pub(crate) mod tests {
 
         let path = VendoredPath::new(dirname);
 
-        assert!(mock_typeshed.exists(path));
+        assert!(mock_typeshed.path_exists(path));
         assert!(mock_typeshed.read_to_string(path).is_err());
-        let metadata = mock_typeshed.metadata(path).unwrap();
+        let metadata = mock_typeshed.path_metadata(path).unwrap();
         assert!(metadata.kind().is_directory());
     }
 
@@ -510,8 +510,8 @@ pub(crate) mod tests {
     fn test_nonexistent_path(path: &str) {
         let mock_typeshed = mock_typeshed();
         let path = VendoredPath::new(path);
-        assert!(!mock_typeshed.exists(path));
-        assert!(mock_typeshed.metadata(path).is_err());
+        assert!(!mock_typeshed.path_exists(path));
+        assert!(mock_typeshed.path_metadata(path).is_err());
         assert!(mock_typeshed
             .read_to_string(path)
             .is_err_and(|err| err.to_string().contains("file not found")));
@@ -538,8 +538,8 @@ pub(crate) mod tests {
     }
 
     fn test_file(mock_typeshed: &VendoredFileSystem, path: &VendoredPath) {
-        assert!(mock_typeshed.exists(path));
-        let metadata = mock_typeshed.metadata(path).unwrap();
+        assert!(mock_typeshed.path_exists(path));
+        let metadata = mock_typeshed.path_metadata(path).unwrap();
         assert!(metadata.kind().is_file());
     }
 

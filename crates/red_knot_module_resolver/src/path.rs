@@ -329,7 +329,7 @@ impl<'a> ModuleResolutionPathRefInner<'a> {
                     TypeshedVersionsQueryResult::DoesNotExist => false,
                     TypeshedVersionsQueryResult::Exists | TypeshedVersionsQueryResult::MaybeExists => match path {
                         FilePathRef::System(path) => resolver.db.system().path_exists(&path.join("__init__.pyi")),
-                        FilePathRef::Vendored(path) => resolver.db.vendored().exists(path.join("__init__.pyi")),
+                        FilePathRef::Vendored(path) => resolver.db.vendored().path_exists(path.join("__init__.pyi")),
                     },
                 }
             }

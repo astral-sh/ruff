@@ -61,7 +61,7 @@ mod tests {
                 .unwrap_or_else(|_| panic!("Expected {relative_path:?} to be valid UTF-8"));
 
             assert!(
-                vendored_typeshed_stubs.exists(vendored_path),
+                vendored_typeshed_stubs.path_exists(vendored_path),
                 "Expected {vendored_path:?} to exist in the `VendoredFileSystem`!
 
                 Vendored file system:
@@ -71,7 +71,7 @@ mod tests {
             );
 
             let vendored_path_kind = vendored_typeshed_stubs
-                .metadata(vendored_path)
+                .path_metadata(vendored_path)
                 .unwrap_or_else(|_| {
                     panic!(
                         "Expected metadata for {vendored_path:?} to be retrievable from the `VendoredFileSystem!

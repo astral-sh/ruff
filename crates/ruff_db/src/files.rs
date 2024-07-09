@@ -111,7 +111,7 @@ impl Files {
         {
             Entry::Occupied(entry) => *entry.get(),
             Entry::Vacant(entry) => {
-                let metadata = db.vendored().metadata(path).ok()?;
+                let metadata = db.vendored().path_metadata(path).ok()?;
 
                 let file = File::new(
                     db,
