@@ -794,6 +794,8 @@ pub(super) fn warn_incompatible_formatter_settings(resolver: &Resolver) {
             //     pass
             // ```
             Rule::MissingTrailingComma,
+            // The formatter always removes blank lines before the docstring.
+            Rule::OneBlankLineBeforeClass,
         ] {
             if setting.linter.rules.enabled(rule) {
                 incompatible_rules.insert(rule);
