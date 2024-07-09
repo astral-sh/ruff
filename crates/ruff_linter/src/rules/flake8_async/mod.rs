@@ -38,6 +38,7 @@ mod tests {
         Ok(())
     }
 
+    #[test_case(Rule::CancelScopeNoCheckpoint, Path::new("ASYNC100.py"))]
     #[test_case(Rule::AsyncFunctionWithTimeout, Path::new("ASYNC109_0.py"))]
     #[test_case(Rule::AsyncFunctionWithTimeout, Path::new("ASYNC109_1.py"))]
     fn preview_rules(rule_code: Rule, path: &Path) -> Result<()> {

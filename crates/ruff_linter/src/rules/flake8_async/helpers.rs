@@ -12,11 +12,11 @@ pub(super) enum AsyncModule {
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub(super) enum MethodName {
-    AsyncIOTimeout,
-    AsyncIOTimeoutAt,
-    AnyIOMoveOnAfter,
-    AnyIOFailAfter,
-    AnyIOCancelScope,
+    AsyncIoTimeout,
+    AsyncIoTimeoutAt,
+    AnyIoMoveOnAfter,
+    AnyIoFailAfter,
+    AnyIoCancelScope,
     TrioAcloseForcefully,
     TrioCancelScope,
     TrioCancelShieldedCheckpoint,
@@ -82,11 +82,11 @@ impl MethodName {
     pub(super) fn is_timeout_context(self) -> bool {
         matches!(
             self,
-            MethodName::AsyncIOTimeout
-                | MethodName::AsyncIOTimeoutAt
-                | MethodName::AnyIOMoveOnAfter
-                | MethodName::AnyIOFailAfter
-                | MethodName::AnyIOCancelScope
+            MethodName::AsyncIoTimeout
+                | MethodName::AsyncIoTimeoutAt
+                | MethodName::AnyIoMoveOnAfter
+                | MethodName::AnyIoFailAfter
+                | MethodName::AnyIoCancelScope
                 | MethodName::TrioMoveOnAfter
                 | MethodName::TrioMoveOnAt
                 | MethodName::TrioFailAfter
@@ -94,16 +94,54 @@ impl MethodName {
                 | MethodName::TrioCancelScope
         )
     }
+
+    /// Returns associated module
+    pub(super) fn module(self) -> AsyncModule {
+        match self {
+            MethodName::AsyncIoTimeout | MethodName::AsyncIoTimeoutAt => AsyncModule::AsyncIo,
+            MethodName::AnyIoMoveOnAfter
+            | MethodName::AnyIoFailAfter
+            | MethodName::AnyIoCancelScope => AsyncModule::AnyIo,
+            MethodName::TrioAcloseForcefully
+            | MethodName::TrioCancelScope
+            | MethodName::TrioCancelShieldedCheckpoint
+            | MethodName::TrioCheckpoint
+            | MethodName::TrioCheckpointIfCancelled
+            | MethodName::TrioFailAfter
+            | MethodName::TrioFailAt
+            | MethodName::TrioMoveOnAfter
+            | MethodName::TrioMoveOnAt
+            | MethodName::TrioOpenFile
+            | MethodName::TrioOpenProcess
+            | MethodName::TrioOpenSslOverTcpListeners
+            | MethodName::TrioOpenSslOverTcpStream
+            | MethodName::TrioOpenTcpListeners
+            | MethodName::TrioOpenTcpStream
+            | MethodName::TrioOpenUnixSocket
+            | MethodName::TrioPermanentlyDetachCoroutineObject
+            | MethodName::TrioReattachDetachedCoroutineObject
+            | MethodName::TrioRunProcess
+            | MethodName::TrioServeListeners
+            | MethodName::TrioServeSslOverTcp
+            | MethodName::TrioServeTcp
+            | MethodName::TrioSleep
+            | MethodName::TrioSleepForever
+            | MethodName::TrioTemporarilyDetachCoroutineObject
+            | MethodName::TrioWaitReadable
+            | MethodName::TrioWaitTaskRescheduled
+            | MethodName::TrioWaitWritable => AsyncModule::Trio,
+        }
+    }
 }
 
 impl MethodName {
     pub(super) fn try_from(qualified_name: &QualifiedName<'_>) -> Option<Self> {
         match qualified_name.segments() {
-            ["asyncio", "timeout"] => Some(Self::AsyncIOTimeout),
-            ["asyncio", "timeout_at"] => Some(Self::AsyncIOTimeoutAt),
-            ["anyio", "move_on_after"] => Some(Self::AnyIOMoveOnAfter),
-            ["anyio", "fail_after"] => Some(Self::AnyIOFailAfter),
-            ["anyio", "CancelScope"] => Some(Self::AnyIOCancelScope),
+            ["asyncio", "timeout"] => Some(Self::AsyncIoTimeout),
+            ["asyncio", "timeout_at"] => Some(Self::AsyncIoTimeoutAt),
+            ["anyio", "move_on_after"] => Some(Self::AnyIoMoveOnAfter),
+            ["anyio", "fail_after"] => Some(Self::AnyIoFailAfter),
+            ["anyio", "CancelScope"] => Some(Self::AnyIoCancelScope),
             ["trio", "CancelScope"] => Some(Self::TrioCancelScope),
             ["trio", "aclose_forcefully"] => Some(Self::TrioAcloseForcefully),
             ["trio", "fail_after"] => Some(Self::TrioFailAfter),
@@ -150,11 +188,11 @@ impl MethodName {
 impl std::fmt::Display for MethodName {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            MethodName::AsyncIOTimeout => write!(f, "asyncio.timeout"),
-            MethodName::AsyncIOTimeoutAt => write!(f, "asyncio.timeout_at"),
-            MethodName::AnyIOMoveOnAfter => write!(f, "anyio.move_on_after"),
-            MethodName::AnyIOFailAfter => write!(f, "anyio.fail_after"),
-            MethodName::AnyIOCancelScope => write!(f, "anyio.CancelScope"),
+            MethodName::AsyncIoTimeout => write!(f, "asyncio.timeout"),
+            MethodName::AsyncIoTimeoutAt => write!(f, "asyncio.timeout_at"),
+            MethodName::AnyIoMoveOnAfter => write!(f, "anyio.move_on_after"),
+            MethodName::AnyIoFailAfter => write!(f, "anyio.fail_after"),
+            MethodName::AnyIoCancelScope => write!(f, "anyio.CancelScope"),
             MethodName::TrioAcloseForcefully => write!(f, "trio.aclose_forcefully"),
             MethodName::TrioCancelScope => write!(f, "trio.CancelScope"),
             MethodName::TrioCancelShieldedCheckpoint => {

@@ -5,7 +5,8 @@ use ruff_python_ast::visitor::Visitor;
 use ruff_python_ast::{StmtWith, WithItem};
 
 use crate::checkers::ast::Checker;
-use crate::rules::flake8_async::helpers::MethodName;
+use crate::rules::flake8_async::helpers::{AsyncModule, MethodName};
+use crate::settings::types::PreviewMode;
 
 /// ## What it does
 /// Checks for timeout context managers which do not contain a checkpoint.
@@ -31,9 +32,9 @@ use crate::rules::flake8_async::helpers::MethodName;
 ///         await awaitable()
 /// ```
 ///
-/// [asyncio timeouts]: https://docs.python.org/3/library/asyncio-task.html#timeouts
-/// [anyio timeouts]: https://anyio.readthedocs.io/en/stable/cancellation.html
-/// [trio timeouts]: https://trio.readthedocs.io/en/stable/reference-core.html#cancellation-and-timeouts
+/// [`asyncio` timeouts]: https://docs.python.org/3/library/asyncio-task.html#timeouts
+/// [`anyio` timeouts]: https://anyio.readthedocs.io/en/stable/cancellation.html
+/// [`trio` timeouts]: https://trio.readthedocs.io/en/stable/reference-core.html#cancellation-and-timeouts
 #[violation]
 pub struct CancelScopeNoCheckpoint {
     method_name: MethodName,
@@ -73,8 +74,17 @@ pub(crate) fn cancel_scope_no_checkpoint(
         return;
     }
 
-    checker.diagnostics.push(Diagnostic::new(
-        CancelScopeNoCheckpoint { method_name },
-        with_stmt.range,
-    ));
+    if matches!(checker.settings.preview, PreviewMode::Disabled) {
+        if matches!(method_name.module(), AsyncModule::Trio) {
+            checker.diagnostics.push(Diagnostic::new(
+                CancelScopeNoCheckpoint { method_name },
+                with_stmt.range,
+            ));
+        }
+    } else {
+        checker.diagnostics.push(Diagnostic::new(
+            CancelScopeNoCheckpoint { method_name },
+            with_stmt.range,
+        ));
+    }
 }
