@@ -3,40 +3,44 @@ use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::helpers::AwaitVisitor;
 use ruff_python_ast::visitor::Visitor;
 use ruff_python_ast::{StmtWith, WithItem};
-use ruff_python_semantic::Modules;
 
 use crate::checkers::ast::Checker;
-use crate::rules::flake8_async::helpers::MethodName;
+use crate::rules::flake8_async::helpers::{AsyncModule, MethodName};
+use crate::settings::types::PreviewMode;
 
 /// ## What it does
-/// Checks for trio functions that should contain await but don't.
+/// Checks for timeout context managers which do not contain a checkpoint.
 ///
 /// ## Why is this bad?
-/// Some trio context managers, such as `trio.fail_after` and
+/// Some asynchronous context managers, such as `asyncio.timeout` and
 /// `trio.move_on_after`, have no effect unless they contain an `await`
-/// statement. The use of such functions without an `await` statement is
+/// statement. The use of such context managers without an `await` statement is
 /// likely a mistake.
 ///
 /// ## Example
 /// ```python
 /// async def func():
-///     with trio.move_on_after(2):
+///     with asyncio.timeout(2):
 ///         do_something()
 /// ```
 ///
 /// Use instead:
 /// ```python
 /// async def func():
-///     with trio.move_on_after(2):
+///     with asyncio.timeout(2):
 ///         do_something()
 ///         await awaitable()
 /// ```
+///
+/// [`asyncio` timeouts]: https://docs.python.org/3/library/asyncio-task.html#timeouts
+/// [`anyio` timeouts]: https://anyio.readthedocs.io/en/stable/cancellation.html
+/// [`trio` timeouts]: https://trio.readthedocs.io/en/stable/reference-core.html#cancellation-and-timeouts
 #[violation]
-pub struct TrioTimeoutWithoutAwait {
+pub struct CancelScopeNoCheckpoint {
     method_name: MethodName,
 }
 
-impl Violation for TrioTimeoutWithoutAwait {
+impl Violation for CancelScopeNoCheckpoint {
     #[derive_message_formats]
     fn message(&self) -> String {
         let Self { method_name } = self;
@@ -45,15 +49,11 @@ impl Violation for TrioTimeoutWithoutAwait {
 }
 
 /// ASYNC100
-pub(crate) fn timeout_without_await(
+pub(crate) fn cancel_scope_no_checkpoint(
     checker: &mut Checker,
     with_stmt: &StmtWith,
     with_items: &[WithItem],
 ) {
-    if !checker.semantic().seen_module(Modules::TRIO) {
-        return;
-    }
-
     let Some(method_name) = with_items.iter().find_map(|item| {
         let call = item.context_expr.as_call_expr()?;
         let qualified_name = checker
@@ -64,14 +64,7 @@ pub(crate) fn timeout_without_await(
         return;
     };
 
-    if !matches!(
-        method_name,
-        MethodName::MoveOnAfter
-            | MethodName::MoveOnAt
-            | MethodName::FailAfter
-            | MethodName::FailAt
-            | MethodName::CancelScope
-    ) {
+    if !method_name.is_timeout_context() {
         return;
     }
 
@@ -81,8 +74,17 @@ pub(crate) fn timeout_without_await(
         return;
     }
 
-    checker.diagnostics.push(Diagnostic::new(
-        TrioTimeoutWithoutAwait { method_name },
-        with_stmt.range,
-    ));
+    if matches!(checker.settings.preview, PreviewMode::Disabled) {
+        if matches!(method_name.module(), AsyncModule::Trio) {
+            checker.diagnostics.push(Diagnostic::new(
+                CancelScopeNoCheckpoint { method_name },
+                with_stmt.range,
+            ));
+        }
+    } else {
+        checker.diagnostics.push(Diagnostic::new(
+            CancelScopeNoCheckpoint { method_name },
+            with_stmt.range,
+        ));
+    }
 }

@@ -1313,8 +1313,8 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
             if checker.enabled(Rule::UselessWithLock) {
                 pylint::rules::useless_with_lock(checker, with_stmt);
             }
-            if checker.enabled(Rule::TrioTimeoutWithoutAwait) {
-                flake8_async::rules::timeout_without_await(checker, with_stmt, items);
+            if checker.enabled(Rule::CancelScopeNoCheckpoint) {
+                flake8_async::rules::cancel_scope_no_checkpoint(checker, with_stmt, items);
             }
         }
         Stmt::While(while_stmt @ ast::StmtWhile { body, orelse, .. }) => {

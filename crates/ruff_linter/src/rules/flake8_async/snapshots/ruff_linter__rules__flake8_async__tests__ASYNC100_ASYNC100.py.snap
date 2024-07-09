@@ -1,20 +1,20 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_async/mod.rs
 ---
-ASYNC100.py:5:5: ASYNC100 A `with trio.fail_after(...):` context does not contain any `await` statements. This makes it pointless, as the timeout can only be triggered by a checkpoint.
+ASYNC100.py:7:5: ASYNC100 A `with trio.fail_after(...):` context does not contain any `await` statements. This makes it pointless, as the timeout can only be triggered by a checkpoint.
   |
-4 |   async def func():
-5 |       with trio.fail_after():
+6 |   async def func():
+7 |       with trio.fail_after():
   |  _____^
-6 | |         ...
+8 | |         ...
   | |___________^ ASYNC100
   |
 
-ASYNC100.py:15:5: ASYNC100 A `with trio.move_on_after(...):` context does not contain any `await` statements. This makes it pointless, as the timeout can only be triggered by a checkpoint.
+ASYNC100.py:17:5: ASYNC100 A `with trio.move_on_after(...):` context does not contain any `await` statements. This makes it pointless, as the timeout can only be triggered by a checkpoint.
    |
-14 |   async def func():
-15 |       with trio.move_on_after():
+16 |   async def func():
+17 |       with trio.move_on_after():
    |  _____^
-16 | |         ...
+18 | |         ...
    | |___________^ ASYNC100
    |
