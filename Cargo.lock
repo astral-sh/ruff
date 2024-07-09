@@ -1864,6 +1864,7 @@ name = "red_knot"
 version = "0.0.0"
 dependencies = [
  "anyhow",
+ "clap",
  "countme",
  "crossbeam",
  "ctrlc",

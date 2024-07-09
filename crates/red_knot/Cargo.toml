@@ -19,6 +19,7 @@ ruff_db = { workspace = true }
 ruff_python_ast = { workspace = true }
 
 anyhow = { workspace = true }
+clap = { workspace = true, features = ["wrap_help"] }
 countme = { workspace = true, features = ["enable"] }
 crossbeam = { workspace = true }
 ctrlc = { version = "3.4.4" }

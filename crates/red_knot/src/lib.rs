@@ -8,6 +8,7 @@ use crate::db::Jar;
 pub mod db;
 pub mod lint;
 pub mod program;
+pub mod target_version;
 pub mod watch;
 
 #[derive(Debug, Clone)]
