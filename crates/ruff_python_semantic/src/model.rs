@@ -1231,6 +1231,7 @@ impl<'a> SemanticModel<'a> {
     pub fn add_module(&mut self, module: &str) {
         match module {
             "_typeshed" => self.seen.insert(Modules::TYPESHED),
+            "anyio" => self.seen.insert(Modules::ANYIO),
             "builtins" => self.seen.insert(Modules::BUILTINS),
             "collections" => self.seen.insert(Modules::COLLECTIONS),
             "contextvars" => self.seen.insert(Modules::CONTEXTVARS),
@@ -1822,6 +1823,7 @@ bitflags! {
         const DATACLASSES = 1 << 17;
         const BUILTINS = 1 << 18;
         const CONTEXTVARS = 1 << 19;
+        const ANYIO = 1 << 20;
     }
 }
 

@@ -5,14 +5,18 @@ use std::num::{NonZeroU16, NonZeroUsize};
 use std::ops::{RangeFrom, RangeInclusive};
 use std::str::FromStr;
 
-use ruff_db::file_system::FileSystemPath;
-use ruff_db::source::source_text;
-use ruff_db::vfs::{system_path_to_file, VfsFile};
+use once_cell::sync::Lazy;
+use ruff_db::system::SystemPath;
 use rustc_hash::FxHashMap;
+
+use ruff_db::files::{system_path_to_file, File};
+use ruff_db::source::source_text;
 
 use crate::db::Db;
 use crate::module_name::ModuleName;
 use crate::supported_py_version::TargetVersion;
+
+use super::vendored::vendored_typeshed_stubs;
 
 #[derive(Debug)]
 pub(crate) struct LazyTypeshedVersions<'db>(OnceCell<&'db TypeshedVersions>);
@@ -38,13 +42,17 @@ impl<'db> LazyTypeshedVersions<'db> {
     #[must_use]
     pub(crate) fn query_module(
         &self,
-        module: &ModuleName,
         db: &'db dyn Db,
-        stdlib_root: &FileSystemPath,
+        module: &ModuleName,
+        stdlib_root: Option<&SystemPath>,
         target_version: TargetVersion,
     ) -> TypeshedVersionsQueryResult {
         let versions = self.0.get_or_init(|| {
-            let versions_path = stdlib_root.join("VERSIONS");
+            let versions_path = if let Some(system_path) = stdlib_root {
+                system_path.join("VERSIONS")
+            } else {
+                return &VENDORED_VERSIONS;
+            };
             let Some(versions_file) = system_path_to_file(db.upcast(), &versions_path) else {
                 todo!(
                     "Still need to figure out how to handle VERSIONS files being deleted \
@@ -64,11 +72,20 @@ impl<'db> LazyTypeshedVersions<'db> {
 #[salsa::tracked(return_ref)]
 pub(crate) fn parse_typeshed_versions(
     db: &dyn Db,
-    versions_file: VfsFile,
+    versions_file: File,
 ) -> Result<TypeshedVersions, TypeshedVersionsParseError> {
     let file_content = source_text(db.upcast(), versions_file);
     file_content.parse()
 }
+
+static VENDORED_VERSIONS: Lazy<TypeshedVersions> = Lazy::new(|| {
+    TypeshedVersions::from_str(
+        &vendored_typeshed_stubs()
+            .read_to_string("stdlib/VERSIONS")
+            .unwrap(),
+    )
+    .unwrap()
+});
 
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub struct TypeshedVersionsParseError {
@@ -429,9 +446,9 @@ mod tests {
     use std::num::{IntErrorKind, NonZeroU16};
     use std::path::Path;
 
-    use super::*;
-
     use insta::assert_snapshot;
+
+    use super::*;
 
     const TYPESHED_STDLIB_DIR: &str = "stdlib";
 

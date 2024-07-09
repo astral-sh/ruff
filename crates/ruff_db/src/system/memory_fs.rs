@@ -4,7 +4,7 @@ use std::sync::{Arc, RwLock, RwLockWriteGuard};
 use camino::{Utf8Path, Utf8PathBuf};
 use filetime::FileTime;
 
-use crate::file_system::{FileSystem, FileSystemPath, FileType, Metadata, Result};
+use crate::system::{FileType, Metadata, Result, SystemPath, SystemPathBuf};
 
 /// File system that stores all content in memory.
 ///
@@ -16,9 +16,7 @@ use crate::file_system::{FileSystem, FileSystemPath, FileType, Metadata, Result}
 /// * hardlinks
 /// * permissions: All files and directories have the permission 0755.
 ///
-/// Use a tempdir with the real file system to test these advanced file system features and complex file system behavior.
-///
-/// Only intended for testing purposes.
+/// Use a tempdir with the real file system to test these advanced file system features and behavior.
 #[derive(Clone)]
 pub struct MemoryFileSystem {
     inner: Arc<MemoryFileSystemInner>,
@@ -29,11 +27,12 @@ impl MemoryFileSystem {
     const PERMISSION: u32 = 0o755;
 
     pub fn new() -> Self {
-        Self::with_cwd("/")
+        Self::with_current_directory("/")
     }
 
-    pub fn with_cwd(cwd: impl AsRef<FileSystemPath>) -> Self {
-        let cwd = Utf8PathBuf::from(cwd.as_ref().as_str());
+    /// Creates a new, empty in memory file system with the given current working directory.
+    pub fn with_current_directory(cwd: impl AsRef<SystemPath>) -> Self {
+        let cwd = cwd.as_ref().to_path_buf();
 
         assert!(
             cwd.starts_with("/"),
@@ -47,9 +46,13 @@ impl MemoryFileSystem {
             }),
         };
 
-        fs.create_directory_all(FileSystemPath::new(&cwd)).unwrap();
+        fs.create_directory_all(&cwd).unwrap();
 
         fs
+    }
+
+    pub fn current_directory(&self) -> &SystemPath {
+        &self.inner.cwd
     }
 
     #[must_use]
@@ -59,6 +62,69 @@ impl MemoryFileSystem {
         }
     }
 
+    pub fn metadata(&self, path: impl AsRef<SystemPath>) -> Result<Metadata> {
+        fn metadata(fs: &MemoryFileSystem, path: &SystemPath) -> Result<Metadata> {
+            let by_path = fs.inner.by_path.read().unwrap();
+            let normalized = fs.normalize_path(path);
+
+            let entry = by_path.get(&normalized).ok_or_else(not_found)?;
+
+            let metadata = match entry {
+                Entry::File(file) => Metadata {
+                    revision: file.last_modified.into(),
+                    permissions: Some(MemoryFileSystem::PERMISSION),
+                    file_type: FileType::File,
+                },
+                Entry::Directory(directory) => Metadata {
+                    revision: directory.last_modified.into(),
+                    permissions: Some(MemoryFileSystem::PERMISSION),
+                    file_type: FileType::Directory,
+                },
+            };
+
+            Ok(metadata)
+        }
+
+        metadata(self, path.as_ref())
+    }
+
+    pub fn is_file(&self, path: impl AsRef<SystemPath>) -> bool {
+        let by_path = self.inner.by_path.read().unwrap();
+        let normalized = self.normalize_path(path.as_ref());
+
+        matches!(by_path.get(&normalized), Some(Entry::File(_)))
+    }
+
+    pub fn is_directory(&self, path: impl AsRef<SystemPath>) -> bool {
+        let by_path = self.inner.by_path.read().unwrap();
+        let normalized = self.normalize_path(path.as_ref());
+
+        matches!(by_path.get(&normalized), Some(Entry::Directory(_)))
+    }
+
+    pub fn read_to_string(&self, path: impl AsRef<SystemPath>) -> Result<String> {
+        fn read_to_string(fs: &MemoryFileSystem, path: &SystemPath) -> Result<String> {
+            let by_path = fs.inner.by_path.read().unwrap();
+            let normalized = fs.normalize_path(path);
+
+            let entry = by_path.get(&normalized).ok_or_else(not_found)?;
+
+            match entry {
+                Entry::File(file) => Ok(file.content.clone()),
+                Entry::Directory(_) => Err(is_a_directory()),
+            }
+        }
+
+        read_to_string(self, path.as_ref())
+    }
+
+    pub fn exists(&self, path: &SystemPath) -> bool {
+        let by_path = self.inner.by_path.read().unwrap();
+        let normalized = self.normalize_path(path);
+
+        by_path.contains_key(&normalized)
+    }
+
     /// Writes the files to the file system.
     ///
     /// The operation overrides existing files with the same normalized path.
@@ -66,7 +132,7 @@ impl MemoryFileSystem {
     /// Enclosing directories are automatically created if they don't exist.
     pub fn write_files<P, C>(&self, files: impl IntoIterator<Item = (P, C)>) -> Result<()>
     where
-        P: AsRef<FileSystemPath>,
+        P: AsRef<SystemPath>,
         C: ToString,
     {
         for (path, content) in files {
@@ -81,42 +147,42 @@ impl MemoryFileSystem {
     /// The operation overrides the content for an existing file with the same normalized `path`.
     ///
     /// Enclosing directories are automatically created if they don't exist.
-    pub fn write_file(
-        &self,
-        path: impl AsRef<FileSystemPath>,
-        content: impl ToString,
-    ) -> Result<()> {
+    pub fn write_file(&self, path: impl AsRef<SystemPath>, content: impl ToString) -> Result<()> {
         let mut by_path = self.inner.by_path.write().unwrap();
 
-        let normalized = normalize_path(path.as_ref(), &self.inner.cwd);
+        let normalized = self.normalize_path(path.as_ref());
 
         get_or_create_file(&mut by_path, &normalized)?.content = content.to_string();
 
         Ok(())
     }
 
-    pub fn remove_file(&self, path: impl AsRef<FileSystemPath>) -> Result<()> {
-        let mut by_path = self.inner.by_path.write().unwrap();
-        let normalized = normalize_path(path.as_ref(), &self.inner.cwd);
+    pub fn remove_file(&self, path: impl AsRef<SystemPath>) -> Result<()> {
+        fn remove_file(fs: &MemoryFileSystem, path: &SystemPath) -> Result<()> {
+            let mut by_path = fs.inner.by_path.write().unwrap();
+            let normalized = fs.normalize_path(path);
 
-        match by_path.entry(normalized) {
-            std::collections::btree_map::Entry::Occupied(entry) => match entry.get() {
-                Entry::File(_) => {
-                    entry.remove();
-                    Ok(())
-                }
-                Entry::Directory(_) => Err(is_a_directory()),
-            },
-            std::collections::btree_map::Entry::Vacant(_) => Err(not_found()),
+            match by_path.entry(normalized) {
+                std::collections::btree_map::Entry::Occupied(entry) => match entry.get() {
+                    Entry::File(_) => {
+                        entry.remove();
+                        Ok(())
+                    }
+                    Entry::Directory(_) => Err(is_a_directory()),
+                },
+                std::collections::btree_map::Entry::Vacant(_) => Err(not_found()),
+            }
         }
+
+        remove_file(self, path.as_ref())
     }
 
     /// Sets the last modified timestamp of the file stored at `path` to now.
     ///
     /// Creates a new file if the file at `path` doesn't exist.
-    pub fn touch(&self, path: impl AsRef<FileSystemPath>) -> Result<()> {
+    pub fn touch(&self, path: impl AsRef<SystemPath>) -> Result<()> {
         let mut by_path = self.inner.by_path.write().unwrap();
-        let normalized = normalize_path(path.as_ref(), &self.inner.cwd);
+        let normalized = self.normalize_path(path.as_ref());
 
         get_or_create_file(&mut by_path, &normalized)?.last_modified = FileTime::now();
 
@@ -124,9 +190,9 @@ impl MemoryFileSystem {
     }
 
     /// Creates a directory at `path`. All enclosing directories are created if they don't exist.
-    pub fn create_directory_all(&self, path: impl AsRef<FileSystemPath>) -> Result<()> {
+    pub fn create_directory_all(&self, path: impl AsRef<SystemPath>) -> Result<()> {
         let mut by_path = self.inner.by_path.write().unwrap();
-        let normalized = normalize_path(path.as_ref(), &self.inner.cwd);
+        let normalized = self.normalize_path(path.as_ref());
 
         create_dir_all(&mut by_path, &normalized)
     }
@@ -137,73 +203,39 @@ impl MemoryFileSystem {
     /// * If the directory is not empty
     /// * The `path` is not a directory
     /// * The `path` does not exist
-    pub fn remove_directory(&self, path: impl AsRef<FileSystemPath>) -> Result<()> {
-        let mut by_path = self.inner.by_path.write().unwrap();
-        let normalized = normalize_path(path.as_ref(), &self.inner.cwd);
+    pub fn remove_directory(&self, path: impl AsRef<SystemPath>) -> Result<()> {
+        fn remove_directory(fs: &MemoryFileSystem, path: &SystemPath) -> Result<()> {
+            let mut by_path = fs.inner.by_path.write().unwrap();
+            let normalized = fs.normalize_path(path);
 
-        // Test if the directory is empty
-        // Skip the directory path itself
-        for (maybe_child, _) in by_path.range(normalized.clone()..).skip(1) {
-            if maybe_child.starts_with(&normalized) {
-                return Err(directory_not_empty());
-            } else if !maybe_child.as_str().starts_with(normalized.as_str()) {
-                break;
+            // Test if the directory is empty
+            // Skip the directory path itself
+            for (maybe_child, _) in by_path.range(normalized.clone()..).skip(1) {
+                if maybe_child.starts_with(&normalized) {
+                    return Err(directory_not_empty());
+                } else if !maybe_child.as_str().starts_with(normalized.as_str()) {
+                    break;
+                }
+            }
+
+            match by_path.entry(normalized.clone()) {
+                std::collections::btree_map::Entry::Occupied(entry) => match entry.get() {
+                    Entry::Directory(_) => {
+                        entry.remove();
+                        Ok(())
+                    }
+                    Entry::File(_) => Err(not_a_directory()),
+                },
+                std::collections::btree_map::Entry::Vacant(_) => Err(not_found()),
             }
         }
 
-        match by_path.entry(normalized.clone()) {
-            std::collections::btree_map::Entry::Occupied(entry) => match entry.get() {
-                Entry::Directory(_) => {
-                    entry.remove();
-                    Ok(())
-                }
-                Entry::File(_) => Err(not_a_directory()),
-            },
-            std::collections::btree_map::Entry::Vacant(_) => Err(not_found()),
-        }
-    }
-}
-
-impl FileSystem for MemoryFileSystem {
-    fn metadata(&self, path: &FileSystemPath) -> Result<Metadata> {
-        let by_path = self.inner.by_path.read().unwrap();
-        let normalized = normalize_path(path, &self.inner.cwd);
-
-        let entry = by_path.get(&normalized).ok_or_else(not_found)?;
-
-        let metadata = match entry {
-            Entry::File(file) => Metadata {
-                revision: file.last_modified.into(),
-                permissions: Some(Self::PERMISSION),
-                file_type: FileType::File,
-            },
-            Entry::Directory(directory) => Metadata {
-                revision: directory.last_modified.into(),
-                permissions: Some(Self::PERMISSION),
-                file_type: FileType::Directory,
-            },
-        };
-
-        Ok(metadata)
+        remove_directory(self, path.as_ref())
     }
 
-    fn read(&self, path: &FileSystemPath) -> Result<String> {
-        let by_path = self.inner.by_path.read().unwrap();
-        let normalized = normalize_path(path, &self.inner.cwd);
-
-        let entry = by_path.get(&normalized).ok_or_else(not_found)?;
-
-        match entry {
-            Entry::File(file) => Ok(file.content.clone()),
-            Entry::Directory(_) => Err(is_a_directory()),
-        }
-    }
-
-    fn exists(&self, path: &FileSystemPath) -> bool {
-        let by_path = self.inner.by_path.read().unwrap();
-        let normalized = normalize_path(path, &self.inner.cwd);
-
-        by_path.contains_key(&normalized)
+    fn normalize_path(&self, path: impl AsRef<SystemPath>) -> Utf8PathBuf {
+        let normalized = SystemPath::absolute(path, &self.inner.cwd);
+        normalized.into_utf8_path_buf()
     }
 }
 
@@ -223,7 +255,7 @@ impl std::fmt::Debug for MemoryFileSystem {
 
 struct MemoryFileSystemInner {
     by_path: RwLock<BTreeMap<Utf8PathBuf, Entry>>,
-    cwd: Utf8PathBuf,
+    cwd: SystemPathBuf,
 }
 
 #[derive(Debug)]
@@ -267,42 +299,6 @@ fn not_a_directory() -> std::io::Error {
 
 fn directory_not_empty() -> std::io::Error {
     std::io::Error::new(std::io::ErrorKind::Other, "directory not empty")
-}
-
-/// Normalizes the path by removing `.` and `..` components and transform the path into an absolute path.
-///
-/// Adapted from https://github.com/rust-lang/cargo/blob/fede83ccf973457de319ba6fa0e36ead454d2e20/src/cargo/util/paths.rs#L61
-fn normalize_path(path: &FileSystemPath, cwd: &Utf8Path) -> Utf8PathBuf {
-    let path = camino::Utf8Path::new(path.as_str());
-
-    let mut components = path.components().peekable();
-    let mut ret =
-        if let Some(c @ (camino::Utf8Component::Prefix(..) | camino::Utf8Component::RootDir)) =
-            components.peek().cloned()
-        {
-            components.next();
-            Utf8PathBuf::from(c.as_str())
-        } else {
-            cwd.to_path_buf()
-        };
-
-    for component in components {
-        match component {
-            camino::Utf8Component::Prefix(..) => unreachable!(),
-            camino::Utf8Component::RootDir => {
-                ret.push(component);
-            }
-            camino::Utf8Component::CurDir => {}
-            camino::Utf8Component::ParentDir => {
-                ret.pop();
-            }
-            camino::Utf8Component::Normal(c) => {
-                ret.push(c);
-            }
-        }
-    }
-
-    ret
 }
 
 fn create_dir_all(
@@ -353,14 +349,14 @@ mod tests {
     use std::io::ErrorKind;
     use std::time::Duration;
 
-    use crate::file_system::{FileSystem, FileSystemPath, MemoryFileSystem, Result};
+    use crate::system::{MemoryFileSystem, Result, SystemPath};
 
     /// Creates a file system with the given files.
     ///
     /// The content of all files will be empty.
     fn with_files<P>(files: impl IntoIterator<Item = P>) -> super::MemoryFileSystem
     where
-        P: AsRef<FileSystemPath>,
+        P: AsRef<SystemPath>,
     {
         let fs = MemoryFileSystem::new();
         fs.write_files(files.into_iter().map(|path| (path, "")))
@@ -371,7 +367,7 @@ mod tests {
 
     #[test]
     fn is_file() {
-        let path = FileSystemPath::new("a.py");
+        let path = SystemPath::new("a.py");
         let fs = with_files([path]);
 
         assert!(fs.is_file(path));
@@ -382,26 +378,26 @@ mod tests {
     fn exists() {
         let fs = with_files(["a.py"]);
 
-        assert!(fs.exists(FileSystemPath::new("a.py")));
-        assert!(!fs.exists(FileSystemPath::new("b.py")));
+        assert!(fs.exists(SystemPath::new("a.py")));
+        assert!(!fs.exists(SystemPath::new("b.py")));
     }
 
     #[test]
     fn exists_directories() {
         let fs = with_files(["a/b/c.py"]);
 
-        assert!(fs.exists(FileSystemPath::new("a")));
-        assert!(fs.exists(FileSystemPath::new("a/b")));
-        assert!(fs.exists(FileSystemPath::new("a/b/c.py")));
+        assert!(fs.exists(SystemPath::new("a")));
+        assert!(fs.exists(SystemPath::new("a/b")));
+        assert!(fs.exists(SystemPath::new("a/b/c.py")));
     }
 
     #[test]
     fn path_normalization() {
         let fs = with_files(["a.py"]);
 
-        assert!(fs.exists(FileSystemPath::new("a.py")));
-        assert!(fs.exists(FileSystemPath::new("/a.py")));
-        assert!(fs.exists(FileSystemPath::new("/b/./../a.py")));
+        assert!(fs.exists(SystemPath::new("a.py")));
+        assert!(fs.exists(SystemPath::new("/a.py")));
+        assert!(fs.exists(SystemPath::new("/b/./../a.py")));
     }
 
     #[test]
@@ -410,7 +406,7 @@ mod tests {
 
         // The default permissions match the default on Linux: 0755
         assert_eq!(
-            fs.metadata(FileSystemPath::new("a.py"))?.permissions(),
+            fs.metadata(SystemPath::new("a.py"))?.permissions(),
             Some(MemoryFileSystem::PERMISSION)
         );
 
@@ -420,7 +416,7 @@ mod tests {
     #[test]
     fn touch() -> Result<()> {
         let fs = MemoryFileSystem::new();
-        let path = FileSystemPath::new("a.py");
+        let path = SystemPath::new("a.py");
 
         // Creates a file if it doesn't exist
         fs.touch(path)?;
@@ -445,16 +441,14 @@ mod tests {
     fn create_dir_all() {
         let fs = MemoryFileSystem::new();
 
-        fs.create_directory_all(FileSystemPath::new("a/b/c"))
-            .unwrap();
+        fs.create_directory_all(SystemPath::new("a/b/c")).unwrap();
 
-        assert!(fs.is_directory(FileSystemPath::new("a")));
-        assert!(fs.is_directory(FileSystemPath::new("a/b")));
-        assert!(fs.is_directory(FileSystemPath::new("a/b/c")));
+        assert!(fs.is_directory(SystemPath::new("a")));
+        assert!(fs.is_directory(SystemPath::new("a/b")));
+        assert!(fs.is_directory(SystemPath::new("a/b/c")));
 
         // Should not fail if the directory already exists
-        fs.create_directory_all(FileSystemPath::new("a/b/c"))
-            .unwrap();
+        fs.create_directory_all(SystemPath::new("a/b/c")).unwrap();
     }
 
     #[test]
@@ -462,7 +456,7 @@ mod tests {
         let fs = with_files(["a/b.py"]);
 
         let error = fs
-            .create_directory_all(FileSystemPath::new("a/b.py/c"))
+            .create_directory_all(SystemPath::new("a/b.py/c"))
             .unwrap_err();
         assert_eq!(error.kind(), ErrorKind::Other);
     }
@@ -472,7 +466,7 @@ mod tests {
         let fs = with_files(["a/b.py"]);
 
         let error = fs
-            .write_file(FileSystemPath::new("a/b.py/c"), "content".to_string())
+            .write_file(SystemPath::new("a/b.py/c"), "content".to_string())
             .unwrap_err();
 
         assert_eq!(error.kind(), ErrorKind::Other);
@@ -485,7 +479,7 @@ mod tests {
         fs.create_directory_all("a")?;
 
         let error = fs
-            .write_file(FileSystemPath::new("a"), "content".to_string())
+            .write_file(SystemPath::new("a"), "content".to_string())
             .unwrap_err();
 
         assert_eq!(error.kind(), ErrorKind::Other);
@@ -496,11 +490,11 @@ mod tests {
     #[test]
     fn read() -> Result<()> {
         let fs = MemoryFileSystem::new();
-        let path = FileSystemPath::new("a.py");
+        let path = SystemPath::new("a.py");
 
         fs.write_file(path, "Test content".to_string())?;
 
-        assert_eq!(fs.read(path)?, "Test content");
+        assert_eq!(fs.read_to_string(path)?, "Test content");
 
         Ok(())
     }
@@ -511,7 +505,7 @@ mod tests {
 
         fs.create_directory_all("a")?;
 
-        let error = fs.read(FileSystemPath::new("a")).unwrap_err();
+        let error = fs.read_to_string(SystemPath::new("a")).unwrap_err();
 
         assert_eq!(error.kind(), ErrorKind::Other);
 
@@ -522,7 +516,7 @@ mod tests {
     fn read_fails_if_path_doesnt_exist() -> Result<()> {
         let fs = MemoryFileSystem::new();
 
-        let error = fs.read(FileSystemPath::new("a")).unwrap_err();
+        let error = fs.read_to_string(SystemPath::new("a")).unwrap_err();
 
         assert_eq!(error.kind(), ErrorKind::NotFound);
 
@@ -535,13 +529,13 @@ mod tests {
 
         fs.remove_file("a/a.py")?;
 
-        assert!(!fs.exists(FileSystemPath::new("a/a.py")));
+        assert!(!fs.exists(SystemPath::new("a/a.py")));
 
         // It doesn't delete the enclosing directories
-        assert!(fs.exists(FileSystemPath::new("a")));
+        assert!(fs.exists(SystemPath::new("a")));
 
         // It doesn't delete unrelated files.
-        assert!(fs.exists(FileSystemPath::new("b.py")));
+        assert!(fs.exists(SystemPath::new("b.py")));
 
         Ok(())
     }
@@ -573,10 +567,10 @@ mod tests {
 
         fs.remove_directory("a")?;
 
-        assert!(!fs.exists(FileSystemPath::new("a")));
+        assert!(!fs.exists(SystemPath::new("a")));
 
         // It doesn't delete unrelated files.
-        assert!(fs.exists(FileSystemPath::new("b.py")));
+        assert!(fs.exists(SystemPath::new("b.py")));
 
         Ok(())
     }
@@ -596,9 +590,9 @@ mod tests {
 
         fs.remove_directory("foo").unwrap();
 
-        assert!(!fs.exists(FileSystemPath::new("foo")));
-        assert!(fs.exists(FileSystemPath::new("foo_bar.py")));
-        assert!(fs.exists(FileSystemPath::new("foob.py")));
+        assert!(!fs.exists(SystemPath::new("foo")));
+        assert!(fs.exists(SystemPath::new("foo_bar.py")));
+        assert!(fs.exists(SystemPath::new("foob.py")));
 
         Ok(())
     }

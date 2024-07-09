@@ -1,6 +1,16 @@
 use ruff_python_ast::name::QualifiedName;
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
+pub(super) enum AsyncModule {
+    /// `anyio`
+    AnyIo,
+    /// `asyncio`
+    AsyncIo,
+    /// `trio`
+    Trio,
+}
+
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub(super) enum MethodName {
     AsyncIOTimeout,
     AsyncIOTimeoutAt,

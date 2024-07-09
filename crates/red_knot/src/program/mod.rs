@@ -1,12 +1,13 @@
-use std::panic::{RefUnwindSafe, UnwindSafe};
+use std::panic::{AssertUnwindSafe, RefUnwindSafe};
 use std::sync::Arc;
 
 use salsa::{Cancelled, Database};
 
-use red_knot_module_resolver::{Db as ResolverDb, Jar as ResolverJar};
+use red_knot_module_resolver::{vendored_typeshed_stubs, Db as ResolverDb, Jar as ResolverJar};
 use red_knot_python_semantic::{Db as SemanticDb, Jar as SemanticJar};
-use ruff_db::file_system::{FileSystem, FileSystemPathBuf};
-use ruff_db::vfs::{Vfs, VfsFile, VfsPath};
+use ruff_db::files::{File, FilePath, Files};
+use ruff_db::system::{System, SystemPathBuf};
+use ruff_db::vendored::VendoredFileSystem;
 use ruff_db::{Db as SourceDb, Jar as SourceJar, Upcast};
 
 use crate::db::{Db, Jar};
@@ -17,20 +18,20 @@ mod check;
 #[salsa::db(SourceJar, ResolverJar, SemanticJar, Jar)]
 pub struct Program {
     storage: salsa::Storage<Program>,
-    vfs: Vfs,
-    fs: Arc<dyn FileSystem + Send + Sync + RefUnwindSafe>,
+    files: Files,
+    system: Arc<dyn System + Send + Sync + RefUnwindSafe>,
     workspace: Workspace,
 }
 
 impl Program {
-    pub fn new<Fs>(workspace: Workspace, file_system: Fs) -> Self
+    pub fn new<S>(workspace: Workspace, system: S) -> Self
     where
-        Fs: FileSystem + 'static + Send + Sync + RefUnwindSafe,
+        S: System + 'static + Send + Sync + RefUnwindSafe,
     {
         Self {
             storage: salsa::Storage::default(),
-            vfs: Vfs::default(),
-            fs: Arc::new(file_system),
+            files: Files::default(),
+            system: Arc::new(system),
             workspace,
         }
     }
@@ -40,7 +41,7 @@ impl Program {
         I: IntoIterator<Item = FileWatcherChange>,
     {
         for change in changes {
-            VfsFile::touch_path(self, &VfsPath::file_system(change.path));
+            File::touch_path(self, &FilePath::system(change.path));
         }
     }
 
@@ -52,14 +53,31 @@ impl Program {
         &mut self.workspace
     }
 
-    #[allow(clippy::unnecessary_wraps)]
     fn with_db<F, T>(&self, f: F) -> Result<T, Cancelled>
     where
-        F: FnOnce(&Program) -> T + UnwindSafe,
+        F: FnOnce(&Program) -> T + std::panic::UnwindSafe,
     {
-        // TODO: Catch in `Caancelled::catch`
-        //  See https://salsa.zulipchat.com/#narrow/stream/145099-general/topic/How.20to.20use.20.60Cancelled.3A.3Acatch.60
-        Ok(f(self))
+        // The `AssertUnwindSafe` here looks scary, but is a consequence of Salsa's design.
+        // Salsa uses panics to implement cancellation and to recover from cycles. However, the Salsa
+        // storage isn't `UnwindSafe` or `RefUnwindSafe` because its dependencies `DashMap` and `parking_lot::*` aren't
+        // unwind safe.
+        //
+        // Having to use `AssertUnwindSafe` isn't as big as a deal as it might seem because
+        // the `UnwindSafe` and `RefUnwindSafe` traits are designed to catch logical bugs.
+        // They don't protect against [UB](https://internals.rust-lang.org/t/pre-rfc-deprecating-unwindsafe/15974).
+        // On top of that, `Cancelled` only catches specific Salsa-panics and propagates all other panics.
+        //
+        // That still leaves us with possible logical bugs in two sources:
+        // * In Salsa itself: This must be considered a bug in Salsa and needs fixing upstream.
+        //   Reviewing Salsa code specifically around unwind safety seems doable.
+        // * Our code: This is the main concern. Luckily, it only involves code that uses internal mutability
+        //     and calls into Salsa queries when mutating the internal state. Using `AssertUnwindSafe`
+        //     certainly makes it harder to catch these issues in our user code.
+        //
+        // For now, this is the only solution at hand unless Salsa decides to change its design.
+        // [Zulip support thread](https://salsa.zulipchat.com/#narrow/stream/145099-general/topic/How.20to.20use.20.60Cancelled.3A.3Acatch.60)
+        let db = &AssertUnwindSafe(self);
+        Cancelled::catch(|| f(db))
     }
 }
 
@@ -86,12 +104,16 @@ impl ResolverDb for Program {}
 impl SemanticDb for Program {}
 
 impl SourceDb for Program {
-    fn file_system(&self) -> &dyn FileSystem {
-        &*self.fs
+    fn vendored(&self) -> &VendoredFileSystem {
+        vendored_typeshed_stubs()
     }
 
-    fn vfs(&self) -> &Vfs {
-        &self.vfs
+    fn system(&self) -> &dyn System {
+        &*self.system
+    }
+
+    fn files(&self) -> &Files {
+        &self.files
     }
 }
 
@@ -103,8 +125,8 @@ impl salsa::ParallelDatabase for Program {
     fn snapshot(&self) -> salsa::Snapshot<Self> {
         salsa::Snapshot::new(Self {
             storage: self.storage.snapshot(),
-            vfs: self.vfs.snapshot(),
-            fs: self.fs.clone(),
+            files: self.files.snapshot(),
+            system: self.system.clone(),
             workspace: self.workspace.clone(),
         })
     }
@@ -112,13 +134,13 @@ impl salsa::ParallelDatabase for Program {
 
 #[derive(Clone, Debug)]
 pub struct FileWatcherChange {
-    path: FileSystemPathBuf,
+    path: SystemPathBuf,
     #[allow(unused)]
     kind: FileChangeKind,
 }
 
 impl FileWatcherChange {
-    pub fn new(path: FileSystemPathBuf, kind: FileChangeKind) -> Self {
+    pub fn new(path: SystemPathBuf, kind: FileChangeKind) -> Self {
         Self { path, kind }
     }
 }

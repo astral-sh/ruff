@@ -1,7 +1,7 @@
 use std::fmt::Formatter;
 use std::sync::Arc;
 
-use ruff_db::vfs::VfsFile;
+use ruff_db::files::File;
 
 use crate::db::Db;
 use crate::module_name::ModuleName;
@@ -18,7 +18,7 @@ impl Module {
         name: ModuleName,
         kind: ModuleKind,
         search_path: Arc<ModuleResolutionPathBuf>,
-        file: VfsFile,
+        file: File,
     ) -> Self {
         Self {
             inner: Arc::new(ModuleInner {
@@ -36,7 +36,7 @@ impl Module {
     }
 
     /// The file to the source code that defines this module
-    pub fn file(&self) -> VfsFile {
+    pub fn file(&self) -> File {
         self.inner.file
     }
 
@@ -78,7 +78,7 @@ struct ModuleInner {
     name: ModuleName,
     kind: ModuleKind,
     search_path: Arc<ModuleResolutionPathBuf>,
-    file: VfsFile,
+    file: File,
 }
 
 #[derive(Copy, Clone, Debug, Eq, PartialEq, Hash)]

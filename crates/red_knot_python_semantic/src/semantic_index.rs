@@ -3,8 +3,8 @@ use std::sync::Arc;
 
 use rustc_hash::FxHashMap;
 
+use ruff_db::files::File;
 use ruff_db::parsed::parsed_module;
-use ruff_db::vfs::VfsFile;
 use ruff_index::{IndexSlice, IndexVec};
 
 use crate::semantic_index::ast_ids::node_key::ExpressionNodeKey;
@@ -28,7 +28,7 @@ type SymbolMap = hashbrown::HashMap<ScopedSymbolId, (), ()>;
 ///
 /// Prefer using [`symbol_table`] when working with symbols from a single scope.
 #[salsa::tracked(return_ref, no_eq)]
-pub(crate) fn semantic_index(db: &dyn Db, file: VfsFile) -> SemanticIndex<'_> {
+pub(crate) fn semantic_index(db: &dyn Db, file: File) -> SemanticIndex<'_> {
     let _span = tracing::trace_span!("semantic_index", ?file).entered();
 
     let parsed = parsed_module(db.upcast(), file);
@@ -51,7 +51,7 @@ pub(crate) fn symbol_table<'db>(db: &'db dyn Db, scope: ScopeId<'db>) -> Arc<Sym
 
 /// Returns the root scope of `file`.
 #[salsa::tracked]
-pub(crate) fn root_scope(db: &dyn Db, file: VfsFile) -> ScopeId<'_> {
+pub(crate) fn root_scope(db: &dyn Db, file: File) -> ScopeId<'_> {
     let _span = tracing::trace_span!("root_scope", ?file).entered();
 
     FileScopeId::root().to_scope_id(db, file)
@@ -61,7 +61,7 @@ pub(crate) fn root_scope(db: &dyn Db, file: VfsFile) -> ScopeId<'_> {
 /// no symbol with the given name exists.
 pub(crate) fn public_symbol<'db>(
     db: &'db dyn Db,
-    file: VfsFile,
+    file: File,
     name: &str,
 ) -> Option<PublicSymbolId<'db>> {
     let root_scope = root_scope(db, file);
@@ -272,8 +272,9 @@ impl FusedIterator for ChildrenIter<'_> {}
 
 #[cfg(test)]
 mod tests {
+    use ruff_db::files::{system_path_to_file, File};
     use ruff_db::parsed::parsed_module;
-    use ruff_db::vfs::{system_path_to_file, VfsFile};
+    use ruff_db::system::DbWithTestSystem;
 
     use crate::db::tests::TestDb;
     use crate::semantic_index::symbol::{FileScopeId, Scope, ScopeKind, SymbolTable};
@@ -282,14 +283,12 @@ mod tests {
 
     struct TestCase {
         db: TestDb,
-        file: VfsFile,
+        file: File,
     }
 
     fn test_case(content: impl ToString) -> TestCase {
-        let db = TestDb::new();
-        db.memory_file_system()
-            .write_file("test.py", content)
-            .unwrap();
+        let mut db = TestDb::new();
+        db.write_file("test.py", content).unwrap();
 
         let file = system_path_to_file(&db, "test.py").unwrap();
 
@@ -631,7 +630,7 @@ class C[T]:
         fn scope_names<'a>(
             scopes: impl Iterator<Item = (FileScopeId, &'a Scope)>,
             db: &'a dyn Db,
-            file: VfsFile,
+            file: File,
         ) -> Vec<&'a str> {
             scopes
                 .into_iter()

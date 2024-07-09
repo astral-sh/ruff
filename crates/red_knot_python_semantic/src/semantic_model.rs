@@ -1,5 +1,5 @@
 use red_knot_module_resolver::{resolve_module, Module, ModuleName};
-use ruff_db::vfs::VfsFile;
+use ruff_db::files::File;
 use ruff_python_ast as ast;
 use ruff_python_ast::{Expr, ExpressionRef, StmtClassDef};
 
@@ -11,11 +11,11 @@ use crate::Db;
 
 pub struct SemanticModel<'db> {
     db: &'db dyn Db,
-    file: VfsFile,
+    file: File,
 }
 
 impl<'db> SemanticModel<'db> {
-    pub fn new(db: &'db dyn Db, file: VfsFile) -> Self {
+    pub fn new(db: &'db dyn Db, file: File) -> Self {
         Self { db, file }
     }
 
@@ -182,9 +182,9 @@ mod tests {
     use red_knot_module_resolver::{
         set_module_resolution_settings, RawModuleResolutionSettings, TargetVersion,
     };
-    use ruff_db::file_system::FileSystemPathBuf;
+    use ruff_db::files::system_path_to_file;
     use ruff_db::parsed::parsed_module;
-    use ruff_db::vfs::system_path_to_file;
+    use ruff_db::system::{DbWithTestSystem, SystemPathBuf};
 
     use crate::db::tests::TestDb;
     use crate::types::Type;
@@ -196,7 +196,7 @@ mod tests {
             &mut db,
             RawModuleResolutionSettings {
                 extra_paths: vec![],
-                workspace_root: FileSystemPathBuf::from("/src"),
+                workspace_root: SystemPathBuf::from("/src"),
                 site_packages: None,
                 custom_typeshed: None,
                 target_version: TargetVersion::Py38,
@@ -208,10 +208,9 @@ mod tests {
 
     #[test]
     fn function_ty() -> anyhow::Result<()> {
-        let db = setup_db();
+        let mut db = setup_db();
 
-        db.memory_file_system()
-            .write_file("/src/foo.py", "def test(): pass")?;
+        db.write_file("/src/foo.py", "def test(): pass")?;
         let foo = system_path_to_file(&db, "/src/foo.py").unwrap();
 
         let ast = parsed_module(&db, foo);
@@ -227,10 +226,9 @@ mod tests {
 
     #[test]
     fn class_ty() -> anyhow::Result<()> {
-        let db = setup_db();
+        let mut db = setup_db();
 
-        db.memory_file_system()
-            .write_file("/src/foo.py", "class Test: pass")?;
+        db.write_file("/src/foo.py", "class Test: pass")?;
         let foo = system_path_to_file(&db, "/src/foo.py").unwrap();
 
         let ast = parsed_module(&db, foo);
@@ -246,9 +244,9 @@ mod tests {
 
     #[test]
     fn alias_ty() -> anyhow::Result<()> {
-        let db = setup_db();
+        let mut db = setup_db();
 
-        db.memory_file_system().write_files([
+        db.write_files([
             ("/src/foo.py", "class Test: pass"),
             ("/src/bar.py", "from foo import Test"),
         ])?;

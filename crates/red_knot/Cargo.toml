@@ -8,7 +8,6 @@ documentation.workspace = true
 repository.workspace = true
 authors.workspace = true
 license.workspace = true
-default-run = "red_knot"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
@@ -20,6 +19,7 @@ ruff_db = { workspace = true }
 ruff_python_ast = { workspace = true }
 
 anyhow = { workspace = true }
+clap = { workspace = true, features = ["wrap_help"] }
 countme = { workspace = true, features = ["enable"] }
 crossbeam = { workspace = true }
 ctrlc = { version = "3.4.4" }

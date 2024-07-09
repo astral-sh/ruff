@@ -1,4 +1,4 @@
-use ruff_db::vfs::VfsFile;
+use ruff_db::files::File;
 use salsa::Cancelled;
 
 use crate::lint::{lint_semantic, lint_syntax, Diagnostics};
@@ -19,11 +19,11 @@ impl Program {
     }
 
     #[tracing::instrument(level = "debug", skip(self))]
-    pub fn check_file(&self, file: VfsFile) -> Result<Diagnostics, Cancelled> {
+    pub fn check_file(&self, file: File) -> Result<Diagnostics, Cancelled> {
         self.with_db(|db| db.check_file_impl(file))
     }
 
-    fn check_file_impl(&self, file: VfsFile) -> Diagnostics {
+    fn check_file_impl(&self, file: File) -> Diagnostics {
         let mut diagnostics = Vec::new();
         diagnostics.extend_from_slice(lint_syntax(self, file));
         diagnostics.extend_from_slice(lint_semantic(self, file));

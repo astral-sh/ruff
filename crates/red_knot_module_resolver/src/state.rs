@@ -1,4 +1,5 @@
-use ruff_db::file_system::FileSystem;
+use ruff_db::system::System;
+use ruff_db::vendored::VendoredFileSystem;
 
 use crate::db::Db;
 use crate::supported_py_version::TargetVersion;
@@ -19,7 +20,11 @@ impl<'db> ResolverState<'db> {
         }
     }
 
-    pub(crate) fn file_system(&self) -> &dyn FileSystem {
-        self.db.file_system()
+    pub(crate) fn system(&self) -> &dyn System {
+        self.db.system()
+    }
+
+    pub(crate) fn vendored(&self) -> &VendoredFileSystem {
+        self.db.vendored()
     }
 }

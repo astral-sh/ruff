@@ -223,7 +223,12 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                 Rule::SuperfluousElseContinue,
                 Rule::SuperfluousElseBreak,
             ]) {
-                flake8_return::rules::function(checker, body, returns.as_ref().map(AsRef::as_ref));
+                flake8_return::rules::function(
+                    checker,
+                    body,
+                    decorator_list,
+                    returns.as_ref().map(AsRef::as_ref),
+                );
             }
             if checker.enabled(Rule::UselessReturn) {
                 pylint::rules::useless_return(
@@ -356,7 +361,7 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                     flake8_builtins::rules::builtin_variable_shadowing(checker, name, name.range());
                 }
             }
-            if checker.enabled(Rule::TrioAsyncFunctionWithTimeout) {
+            if checker.enabled(Rule::AsyncFunctionWithTimeout) {
                 flake8_async::rules::async_function_with_timeout(checker, function_def);
             }
             if checker.enabled(Rule::ReimplementedOperator) {

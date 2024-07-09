@@ -3,8 +3,8 @@ use std::ops::Range;
 
 use bitflags::bitflags;
 use hashbrown::hash_map::RawEntryMut;
+use ruff_db::files::File;
 use ruff_db::parsed::ParsedModule;
-use ruff_db::vfs::VfsFile;
 use ruff_index::{newtype_index, IndexVec};
 use ruff_python_ast::name::Name;
 use ruff_python_ast::{self as ast};
@@ -79,7 +79,7 @@ bitflags! {
 #[salsa::tracked]
 pub struct PublicSymbolId<'db> {
     #[id]
-    pub(crate) file: VfsFile,
+    pub(crate) file: File,
     #[id]
     pub(crate) scoped_symbol_id: ScopedSymbolId,
 }
@@ -116,14 +116,14 @@ impl ScopedSymbolId {
     ///
     /// # Panics
     /// May panic if the symbol does not belong to `file` or is not a symbol of `file`'s root scope.
-    pub(crate) fn to_public_symbol(self, db: &dyn Db, file: VfsFile) -> PublicSymbolId {
+    pub(crate) fn to_public_symbol(self, db: &dyn Db, file: File) -> PublicSymbolId {
         let symbols = public_symbols_map(db, file);
         symbols.public(self)
     }
 }
 
 #[salsa::tracked(return_ref)]
-pub(crate) fn public_symbols_map(db: &dyn Db, file: VfsFile) -> PublicSymbolsMap<'_> {
+pub(crate) fn public_symbols_map(db: &dyn Db, file: File) -> PublicSymbolsMap<'_> {
     let _span = tracing::trace_span!("public_symbols_map", ?file).entered();
 
     let module_scope = root_scope(db, file);
@@ -156,7 +156,7 @@ impl<'db> PublicSymbolsMap<'db> {
 #[salsa::tracked]
 pub struct ScopeId<'db> {
     #[id]
-    pub file: VfsFile,
+    pub file: File,
     #[id]
     pub file_scope_id: FileScopeId,
 
@@ -190,7 +190,7 @@ impl FileScopeId {
         FileScopeId::from_u32(0)
     }
 
-    pub fn to_scope_id(self, db: &dyn Db, file: VfsFile) -> ScopeId<'_> {
+    pub fn to_scope_id(self, db: &dyn Db, file: File) -> ScopeId<'_> {
         let index = semantic_index(db, file);
         index.scope_ids_by_scope[self]
     }
