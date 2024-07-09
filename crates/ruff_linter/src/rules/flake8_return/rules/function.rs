@@ -364,16 +364,7 @@ impl Violation for SuperfluousElseBreak {
 }
 
 /// RET501
-fn unnecessary_return_none(checker: &mut Checker, decorator_list: &[Decorator], stack: &Stack) {
-    // Skip properties.
-    let semantic = checker.semantic();
-    if decorator_list
-        .iter()
-        .any(|decorator| semantic.match_builtin_expr(&decorator.expression, "property"))
-    {
-        return;
-    }
-
+fn unnecessary_return_none(checker: &mut Checker, stack: &Stack) {
     for stmt in &stack.returns {
         let Some(expr) = stmt.value.as_deref() else {
             continue;
@@ -801,7 +792,16 @@ pub(crate) fn function(
         if checker.enabled(Rule::UnnecessaryReturnNone) {
             // Skip functions that have a return annotation that is not `None`.
             if returns.map_or(true, Expr::is_none_literal_expr) {
-                unnecessary_return_none(checker, decorator_list, &stack);
+                // Skip properties.
+                if decorator_list.iter().any(|decorator| {
+                    checker
+                        .semantic()
+                        .match_builtin_expr(&decorator.expression, "property")
+                }) {
+                    return;
+                }
+
+                unnecessary_return_none(checker, &stack);
             }
         }
     }
