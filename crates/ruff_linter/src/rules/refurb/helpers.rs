@@ -189,7 +189,7 @@ fn find_file_open<'a>(
 
     let binding = bindings
         .iter()
-        .map(|x| semantic.binding(*x))
+        .map(|id| semantic.binding(*id))
         // We might have many bindings with the same name, but we only care
         // for the one we are looking at right now.
         .find(|binding| binding.range() == var.range())?;
@@ -245,9 +245,8 @@ fn match_open_keywords(
                     // newline is only valid for write_text
                     return None;
                 } else if target_version < PythonVersion::Py310 {
-                    // Pathlib on versions earlier than 3.10 doesn't support the `newline`
-                    // argument, so we can't forward it
-                    continue;
+                    // `pathlib` doesn't support `newline` until Python 3.10.
+                    return None;
                 }
 
                 result.push(keyword);
