@@ -361,7 +361,7 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                     flake8_builtins::rules::builtin_variable_shadowing(checker, name, name.range());
                 }
             }
-            if checker.enabled(Rule::TrioAsyncFunctionWithTimeout) {
+            if checker.enabled(Rule::AsyncFunctionWithTimeout) {
                 flake8_async::rules::async_function_with_timeout(checker, function_def);
             }
             if checker.enabled(Rule::ReimplementedOperator) {
