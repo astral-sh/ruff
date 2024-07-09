@@ -78,9 +78,7 @@ pub(crate) fn path_to_module(db: &dyn Db, path: &FilePath) -> Option<Module> {
 pub(crate) fn file_to_module(db: &dyn Db, file: File) -> Option<Module> {
     let _span = tracing::trace_span!("file_to_module", ?file).entered();
 
-    let FilePath::System(path) = file.path(db.upcast()) else {
-        todo!("VendoredPaths are not yet supported")
-    };
+    let path = file.path(db.upcast());
 
     let resolver_settings = module_resolver_settings(db);
 
@@ -161,11 +159,11 @@ impl RawModuleResolutionSettings {
 
         paths.push(ModuleResolutionPathBuf::first_party(workspace_root).unwrap());
 
-        if let Some(custom_typeshed) = custom_typeshed {
-            paths.push(
-                ModuleResolutionPathBuf::stdlib_from_typeshed_root(&custom_typeshed).unwrap(),
-            );
-        }
+        paths.push(
+            custom_typeshed.map_or_else(ModuleResolutionPathBuf::vendored_stdlib, |custom| {
+                ModuleResolutionPathBuf::stdlib_from_custom_typeshed_root(&custom).unwrap()
+            }),
+        );
 
         // TODO vendor typeshed's third-party stubs as well as the stdlib and fallback to them as a final step
         if let Some(site_packages) = site_packages {
@@ -388,6 +386,8 @@ impl PackageKind {
 mod tests {
     use ruff_db::files::{system_path_to_file, File, FilePath};
     use ruff_db::system::DbWithTestSystem;
+    use ruff_db::vendored::{VendoredPath, VendoredPathBuf};
+    use ruff_db::Upcast;
 
     use crate::db::tests::{create_resolver_builder, TestCase};
     use crate::module::ModuleKind;
@@ -396,7 +396,7 @@ mod tests {
     use super::*;
 
     fn setup_resolver_test() -> TestCase {
-        create_resolver_builder().unwrap().build()
+        create_resolver_builder().unwrap().build().unwrap()
     }
 
     #[test]
@@ -436,7 +436,7 @@ mod tests {
         } = setup_resolver_test();
 
         let stdlib_dir =
-            ModuleResolutionPathBuf::stdlib_from_typeshed_root(&custom_typeshed).unwrap();
+            ModuleResolutionPathBuf::stdlib_from_custom_typeshed_root(&custom_typeshed).unwrap();
         let functools_module_name = ModuleName::new_static("functools").unwrap();
         let functools_module = resolve_module(&db, functools_module_name.clone()).unwrap();
 
@@ -518,7 +518,8 @@ mod tests {
         } = create_resolver_builder()
             .unwrap()
             .with_target_version(TargetVersion::Py39)
-            .build();
+            .build()
+            .unwrap();
 
         let existing_modules = create_module_names(&[
             "asyncio",
@@ -548,7 +549,8 @@ mod tests {
         let TestCase { db, .. } = create_resolver_builder()
             .unwrap()
             .with_target_version(TargetVersion::Py39)
-            .build();
+            .build()
+            .unwrap();
 
         let nonexisting_modules = create_module_names(&["importlib", "xml", "xml.etree"]);
         for module_name in nonexisting_modules {
@@ -586,6 +588,27 @@ mod tests {
         );
 
         Ok(())
+    }
+
+    #[test]
+    fn stdlib_uses_vendored_typeshed_when_no_custom_typeshed_supplied() {
+        let TestCase { db, .. } = create_resolver_builder()
+            .unwrap()
+            .with_vendored_stubs_used()
+            .build()
+            .unwrap();
+
+        let pydoc_data_topics_name = ModuleName::new_static("pydoc_data.topics").unwrap();
+        let pydoc_data_topics = resolve_module(&db, pydoc_data_topics_name).unwrap();
+        assert_eq!("pydoc_data.topics", pydoc_data_topics.name());
+        assert_eq!(
+            pydoc_data_topics.search_path(),
+            VendoredPathBuf::from("stdlib")
+        );
+        assert_eq!(
+            &pydoc_data_topics.file().path(db.upcast()),
+            &VendoredPath::new("stdlib/pydoc_data/topics.pyi")
+        );
     }
 
     #[test]

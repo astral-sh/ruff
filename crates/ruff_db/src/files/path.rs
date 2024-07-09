@@ -86,6 +86,14 @@ impl FilePath {
             FilePath::Vendored(path) => vendored_path_to_file(db, path),
         }
     }
+
+    #[must_use]
+    pub fn extension(&self) -> Option<&str> {
+        match self {
+            FilePath::System(path) => path.extension(),
+            FilePath::Vendored(path) => path.extension(),
+        }
+    }
 }
 
 impl AsRef<str> for FilePath {
