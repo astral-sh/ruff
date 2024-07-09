@@ -381,7 +381,7 @@ pub fn python_files_in_path<'a>(
 
     builder.threads(
         std::thread::available_parallelism()
-            .map_or(1, std::num::NonZero::get)
+            .map_or(1, std::num::NonZeroUsize::get)
             .min(12),
     );
 
