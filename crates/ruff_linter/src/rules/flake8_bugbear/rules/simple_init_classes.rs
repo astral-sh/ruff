@@ -1,6 +1,6 @@
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::StmtClassDef;
+use ruff_python_ast as ast;
 
 use crate::checkers::ast::Checker;
 
@@ -51,9 +51,63 @@ impl AlwaysFixableViolation for SimpleInitClasses {
     }
 }
 
+fn wrong_class_structure(body: &[ast::Stmt]) -> Option<usize> {
+    // Variables to check if the class body is correct
+    let mut idx = 0;
+    let mut init_index = None;
+    let mut has_other_methods = false;
+
+    while idx < body.len() && !has_other_methods {
+        let stmt = &body[idx];
+        match stmt {
+            ast::Stmt::Expr(stmt_expr) => {
+                // Check if it's a string literal (potential docstring)
+                if stmt_expr.value.is_string_literal_expr() {
+                    idx += 1;
+                }
+            }
+            // Check for assignment statement
+            ast::Stmt::Assign(_) => {
+                idx += 1;
+            }
+            ast::Stmt::FunctionDef(func) => {
+                // Check if it's the __init__ method
+                if func.name.as_str() == "__init__" {
+                    init_index = Some(idx);
+                    idx += 1;
+                } else {
+                    has_other_methods = true;
+                }
+            }
+            _ => {
+                // Unexpected statement type in class body
+                has_other_methods = true;
+            }
+        }
+    }
+
+    if has_other_methods || init_index.is_none() {
+        None
+    } else {
+        init_index
+    }
+}
+
 // B903
-pub(crate) fn simple_init_classes(
-    checker: &mut Checker,
-    class_def: &StmtClassDef,
-) -> Option<Diagnostic> {
+pub(crate) fn simple_init_classes(checker: &mut Checker, class_def: &ast::StmtClassDef) {
+    let body = &class_def.body;
+
+    // Ensure class body is not empty
+    if body.is_empty() {
+        return;
+    }
+
+    let init_index = wrong_class_structure(body);
+
+    if init_index.is_none() {
+        return;
+    }
+
+    // Now check that the "__init__" method is only doing assignments
+    let init_function = body.get(init_index.unwrap());
 }
