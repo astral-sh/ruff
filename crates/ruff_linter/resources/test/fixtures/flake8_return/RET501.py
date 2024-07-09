@@ -17,3 +17,16 @@ class BaseCache:
     def prop(self) -> None:
         print("Property not found")
         return None
+
+import abc
+
+class Foo(abc.ABC):
+    @abc.abstractmethod
+    def get(self, key: str) -> str | None:
+        ...
+
+
+class Bar(Foo):
+    def get(self, key: str) -> None:
+        print(f"{key} not found")
+        return None
