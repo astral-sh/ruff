@@ -2,8 +2,11 @@ use ruff_python_ast::name::QualifiedName;
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub(super) enum AsyncModule {
-    AnyIO,
-    AsyncIO,
+    /// `anyio`
+    AnyIo,
+    /// `asyncio`
+    AsyncIo,
+    /// `trio`
     Trio,
 }
 

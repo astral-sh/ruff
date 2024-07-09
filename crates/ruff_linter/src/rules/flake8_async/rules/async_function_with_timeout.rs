@@ -37,9 +37,9 @@ use crate::settings::types::PreviewMode;
 ///         await long_running_task()
 /// ```
 ///
-/// [asyncio timeouts]: https://docs.python.org/3/library/asyncio-task.html#timeouts
-/// [anyio timeouts]: https://anyio.readthedocs.io/en/stable/cancellation.html
-/// [trio timeouts]: https://trio.readthedocs.io/en/stable/reference-core.html#cancellation-and-timeouts
+/// [`asyncio` timeouts]: https://docs.python.org/3/library/asyncio-task.html#timeouts
+/// [`anyio` timeouts]: https://anyio.readthedocs.io/en/stable/cancellation.html
+/// [`trio` timeouts]: https://trio.readthedocs.io/en/stable/reference-core.html#cancellation-and-timeouts
 #[violation]
 pub struct AsyncFunctionWithTimeout {
     module: AsyncModule,
@@ -48,13 +48,17 @@ pub struct AsyncFunctionWithTimeout {
 impl Violation for AsyncFunctionWithTimeout {
     #[derive_message_formats]
     fn message(&self) -> String {
+        format!("Async function definition with a `timeout` parameter")
+    }
+
+    fn fix_title(&self) -> Option<String> {
         let Self { module } = self;
         let recommendation = match module {
-            AsyncModule::AnyIO => "anyio.fail_after",
+            AsyncModule::AnyIo => "anyio.fail_after",
             AsyncModule::Trio => "trio.fail_after",
-            AsyncModule::AsyncIO => "asyncio.timeout",
+            AsyncModule::AsyncIo => "asyncio.timeout",
         };
-        format!("Prefer using an async timeout context manager such as `{recommendation}` over reimplementing the functionality")
+        Some(format!("Use `{recommendation}` instead"))
     }
 }
 
@@ -75,11 +79,11 @@ pub(crate) fn async_function_with_timeout(
 
     // Get preferred module.
     let module = if checker.semantic().seen_module(Modules::ANYIO) {
-        AsyncModule::AnyIO
+        AsyncModule::AnyIo
     } else if checker.semantic().seen_module(Modules::TRIO) {
         AsyncModule::Trio
     } else {
-        AsyncModule::AsyncIO
+        AsyncModule::AsyncIo
     };
 
     if matches!(checker.settings.preview, PreviewMode::Disabled) {
