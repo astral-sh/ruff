@@ -11,6 +11,7 @@ mod tests {
     use test_case::test_case;
 
     use crate::registry::Rule;
+    use crate::settings::types::PythonVersion;
     use crate::test::test_path;
     use crate::{assert_messages, settings};
 
@@ -52,6 +53,17 @@ mod tests {
             &settings::LinterSettings::for_rule(rule_code),
         )?;
         assert_messages!(snapshot, diagnostics);
+        Ok(())
+    }
+
+    #[test]
+    fn write_whole_file_python_39() -> Result<()> {
+        let diagnostics = test_path(
+            Path::new("refurb/FURB103.py"),
+            &settings::LinterSettings::for_rule(Rule::WriteWholeFile)
+                .with_target_version(PythonVersion::Py39),
+        )?;
+        assert_messages!(diagnostics);
         Ok(())
     }
 }
