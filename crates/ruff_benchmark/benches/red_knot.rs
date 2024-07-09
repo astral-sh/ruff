@@ -8,9 +8,9 @@ use red_knot_module_resolver::{
 use ruff_benchmark::criterion::{
     criterion_group, criterion_main, BatchSize, Criterion, Throughput,
 };
-use ruff_db::file_system::{FileSystemPath, MemoryFileSystem};
+use ruff_db::files::{system_path_to_file, File};
 use ruff_db::parsed::parsed_module;
-use ruff_db::vfs::{system_path_to_file, VfsFile};
+use ruff_db::system::{MemoryFileSystem, SystemPath, TestSystem};
 use ruff_db::Upcast;
 
 static FOO_CODE: &str = r#"
@@ -47,16 +47,17 @@ def override(): ...
 struct Case {
     program: Program,
     fs: MemoryFileSystem,
-    foo: VfsFile,
-    bar: VfsFile,
-    typing: VfsFile,
+    foo: File,
+    bar: File,
+    typing: File,
 }
 
 fn setup_case() -> Case {
-    let fs = MemoryFileSystem::new();
-    let foo_path = FileSystemPath::new("/src/foo.py");
-    let bar_path = FileSystemPath::new("/src/bar.py");
-    let typing_path = FileSystemPath::new("/src/typing.pyi");
+    let system = TestSystem::default();
+    let fs = system.memory_file_system().clone();
+    let foo_path = SystemPath::new("/src/foo.py");
+    let bar_path = SystemPath::new("/src/bar.py");
+    let typing_path = SystemPath::new("/src/typing.pyi");
     fs.write_files([
         (foo_path, FOO_CODE),
         (bar_path, BAR_CODE),
@@ -64,10 +65,10 @@ fn setup_case() -> Case {
     ])
     .unwrap();
 
-    let workspace_root = FileSystemPath::new("/src");
+    let workspace_root = SystemPath::new("/src");
     let workspace = Workspace::new(workspace_root.to_path_buf());
 
-    let mut program = Program::new(workspace, fs.clone());
+    let mut program = Program::new(workspace, system);
     let foo = system_path_to_file(&program, foo_path).unwrap();
 
     set_module_resolution_settings(
@@ -134,7 +135,7 @@ fn benchmark_incremental(criterion: &mut Criterion) {
 
                 case.fs
                     .write_file(
-                        FileSystemPath::new("/src/foo.py"),
+                        SystemPath::new("/src/foo.py"),
                         format!("{BAR_CODE}\n# A comment\n"),
                     )
                     .unwrap();

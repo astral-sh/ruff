@@ -1,8 +1,8 @@
 use std::ops::Deref;
 use std::sync::Arc;
 
-use ruff_db::file_system::FileSystemPathBuf;
-use ruff_db::vfs::{vfs_path_to_file, VfsFile, VfsPath};
+use ruff_db::files::{File, FilePath};
+use ruff_db::system::SystemPathBuf;
 
 use crate::db::Db;
 use crate::module::{Module, ModuleKind};
@@ -58,7 +58,7 @@ pub(crate) fn resolve_module_query<'db>(
 ///
 /// Returns `None` if the path is not a module locatable via any of the known search paths.
 #[allow(unused)]
-pub(crate) fn path_to_module(db: &dyn Db, path: &VfsPath) -> Option<Module> {
+pub(crate) fn path_to_module(db: &dyn Db, path: &FilePath) -> Option<Module> {
     // It's not entirely clear on first sight why this method calls `file_to_module` instead of
     // it being the other way round, considering that the first thing that `file_to_module` does
     // is to retrieve the file's path.
@@ -67,7 +67,7 @@ pub(crate) fn path_to_module(db: &dyn Db, path: &VfsPath) -> Option<Module> {
     // all arguments are Salsa ingredients (something stored in Salsa). `Path`s aren't salsa ingredients but
     // `VfsFile` is. So what we do here is to retrieve the `path`'s `VfsFile` so that we can make
     // use of Salsa's caching and invalidation.
-    let file = vfs_path_to_file(db.upcast(), path)?;
+    let file = path.to_file(db.upcast())?;
     file_to_module(db, file)
 }
 
@@ -75,10 +75,10 @@ pub(crate) fn path_to_module(db: &dyn Db, path: &VfsPath) -> Option<Module> {
 ///
 /// Returns `None` if the file is not a module locatable via any of the known search paths.
 #[salsa::tracked]
-pub(crate) fn file_to_module(db: &dyn Db, file: VfsFile) -> Option<Module> {
+pub(crate) fn file_to_module(db: &dyn Db, file: File) -> Option<Module> {
     let _span = tracing::trace_span!("file_to_module", ?file).entered();
 
-    let VfsPath::FileSystem(path) = file.path(db.upcast()) else {
+    let FilePath::System(path) = file.path(db.upcast()) else {
         todo!("VendoredPaths are not yet supported")
     };
 
@@ -120,18 +120,18 @@ pub struct RawModuleResolutionSettings {
     /// List of user-provided paths that should take first priority in the module resolution.
     /// Examples in other type checkers are mypy's MYPYPATH environment variable,
     /// or pyright's stubPath configuration setting.
-    pub extra_paths: Vec<FileSystemPathBuf>,
+    pub extra_paths: Vec<SystemPathBuf>,
 
     /// The root of the workspace, used for finding first-party modules.
-    pub workspace_root: FileSystemPathBuf,
+    pub workspace_root: SystemPathBuf,
 
     /// Optional (already validated) path to standard-library typeshed stubs.
     /// If this is not provided, we will fallback to our vendored typeshed stubs
     /// bundled as a zip file in the binary
-    pub custom_typeshed: Option<FileSystemPathBuf>,
+    pub custom_typeshed: Option<SystemPathBuf>,
 
     /// The path to the user's `site-packages` directory, where third-party packages from ``PyPI`` are installed.
-    pub site_packages: Option<FileSystemPathBuf>,
+    pub site_packages: Option<SystemPathBuf>,
 }
 
 impl RawModuleResolutionSettings {
@@ -243,7 +243,7 @@ fn module_resolver_settings(db: &dyn Db) -> &ModuleResolutionSettings {
 fn resolve_name(
     db: &dyn Db,
     name: &ModuleName,
-) -> Option<(Arc<ModuleResolutionPathBuf>, VfsFile, ModuleKind)> {
+) -> Option<(Arc<ModuleResolutionPathBuf>, File, ModuleKind)> {
     let resolver_settings = module_resolver_settings(db);
     let resolver_state = ResolverState::new(db, resolver_settings.target_version());
 
@@ -268,14 +268,14 @@ fn resolve_name(
                 // TODO Implement full https://peps.python.org/pep-0561/#type-checker-module-resolution-order resolution
                 if let Some(stub) = package_path
                     .with_pyi_extension()
-                    .to_vfs_file(search_path, &resolver_state)
+                    .to_file(search_path, &resolver_state)
                 {
                     return Some((search_path.clone(), stub, kind));
                 }
 
                 if let Some(module) = package_path
                     .with_py_extension()
-                    .and_then(|path| path.to_vfs_file(search_path, &resolver_state))
+                    .and_then(|path| path.to_file(search_path, &resolver_state))
                 {
                     return Some((search_path.clone(), module, kind));
                 }
@@ -386,8 +386,8 @@ impl PackageKind {
 
 #[cfg(test)]
 mod tests {
-    use ruff_db::file_system::FileSystemPath;
-    use ruff_db::vfs::{system_path_to_file, VfsFile, VfsPath};
+    use ruff_db::files::{system_path_to_file, File, FilePath};
+    use ruff_db::system::{DbWithTestSystem, SystemPath};
 
     use crate::db::tests::{create_resolver_builder, TestCase};
     use crate::module::ModuleKind;
@@ -401,12 +401,11 @@ mod tests {
 
     #[test]
     fn first_party_module() -> anyhow::Result<()> {
-        let TestCase { db, src, .. } = setup_resolver_test();
+        let TestCase { mut db, src, .. } = setup_resolver_test();
 
         let foo_module_name = ModuleName::new_static("foo").unwrap();
         let foo_path = src.join("foo.py");
-        db.memory_file_system()
-            .write_file(&foo_path, "print('Hello, world!')")?;
+        db.write_file(&foo_path, "print('Hello, world!')")?;
 
         let foo_module = resolve_module(&db, foo_module_name.clone()).unwrap();
 
@@ -422,7 +421,7 @@ mod tests {
         assert_eq!(&foo_path, foo_module.file().path(&db));
         assert_eq!(
             Some(foo_module),
-            path_to_module(&db, &VfsPath::FileSystem(foo_path))
+            path_to_module(&db, &FilePath::System(foo_path))
         );
 
         Ok(())
@@ -450,7 +449,7 @@ mod tests {
         assert_eq!(ModuleKind::Module, functools_module.kind());
 
         let expected_functools_path =
-            VfsPath::FileSystem(custom_typeshed.join("stdlib/functools.pyi"));
+            FilePath::System(custom_typeshed.join("stdlib/functools.pyi"));
         assert_eq!(&expected_functools_path, functools_module.file().path(&db));
 
         assert_eq!(
@@ -562,11 +561,10 @@ mod tests {
 
     #[test]
     fn first_party_precedence_over_stdlib() -> anyhow::Result<()> {
-        let TestCase { db, src, .. } = setup_resolver_test();
+        let TestCase { mut db, src, .. } = setup_resolver_test();
 
         let first_party_functools_path = src.join("functools.py");
-        db.memory_file_system()
-            .write_file(&first_party_functools_path, "def update_wrapper(): ...")?;
+        db.write_file(&first_party_functools_path, "def update_wrapper(): ...")?;
 
         let functools_module_name = ModuleName::new_static("functools").unwrap();
         let functools_module = resolve_module(&db, functools_module_name.clone()).unwrap();
@@ -584,7 +582,7 @@ mod tests {
 
         assert_eq!(
             Some(functools_module),
-            path_to_module(&db, &VfsPath::FileSystem(first_party_functools_path))
+            path_to_module(&db, &FilePath::System(first_party_functools_path))
         );
 
         Ok(())
@@ -592,13 +590,12 @@ mod tests {
 
     #[test]
     fn resolve_package() -> anyhow::Result<()> {
-        let TestCase { src, db, .. } = setup_resolver_test();
+        let TestCase { src, mut db, .. } = setup_resolver_test();
 
         let foo_dir = src.join("foo");
         let foo_path = foo_dir.join("__init__.py");
 
-        db.memory_file_system()
-            .write_file(&foo_path, "print('Hello, world!')")?;
+        db.write_file(&foo_path, "print('Hello, world!')")?;
 
         let foo_module = resolve_module(&db, ModuleName::new_static("foo").unwrap()).unwrap();
 
@@ -608,28 +605,26 @@ mod tests {
 
         assert_eq!(
             Some(&foo_module),
-            path_to_module(&db, &VfsPath::FileSystem(foo_path)).as_ref()
+            path_to_module(&db, &FilePath::System(foo_path)).as_ref()
         );
 
         // Resolving by directory doesn't resolve to the init file.
-        assert_eq!(None, path_to_module(&db, &VfsPath::FileSystem(foo_dir)));
+        assert_eq!(None, path_to_module(&db, &FilePath::System(foo_dir)));
 
         Ok(())
     }
 
     #[test]
     fn package_priority_over_module() -> anyhow::Result<()> {
-        let TestCase { db, src, .. } = setup_resolver_test();
+        let TestCase { mut db, src, .. } = setup_resolver_test();
 
         let foo_dir = src.join("foo");
         let foo_init = foo_dir.join("__init__.py");
 
-        db.memory_file_system()
-            .write_file(&foo_init, "print('Hello, world!')")?;
+        db.write_file(&foo_init, "print('Hello, world!')")?;
 
         let foo_py = src.join("foo.py");
-        db.memory_file_system()
-            .write_file(&foo_py, "print('Hello, world!')")?;
+        db.write_file(&foo_py, "print('Hello, world!')")?;
 
         let foo_module = resolve_module(&db, ModuleName::new_static("foo").unwrap()).unwrap();
 
@@ -639,45 +634,41 @@ mod tests {
 
         assert_eq!(
             Some(foo_module),
-            path_to_module(&db, &VfsPath::FileSystem(foo_init))
+            path_to_module(&db, &FilePath::System(foo_init))
         );
-        assert_eq!(None, path_to_module(&db, &VfsPath::FileSystem(foo_py)));
+        assert_eq!(None, path_to_module(&db, &FilePath::System(foo_py)));
 
         Ok(())
     }
 
     #[test]
     fn typing_stub_over_module() -> anyhow::Result<()> {
-        let TestCase { db, src, .. } = setup_resolver_test();
+        let TestCase { mut db, src, .. } = setup_resolver_test();
 
         let foo_stub = src.join("foo.pyi");
         let foo_py = src.join("foo.py");
-        db.memory_file_system()
-            .write_files([(&foo_stub, "x: int"), (&foo_py, "print('Hello, world!')")])?;
+        db.write_files([(&foo_stub, "x: int"), (&foo_py, "print('Hello, world!')")])?;
 
         let foo = resolve_module(&db, ModuleName::new_static("foo").unwrap()).unwrap();
 
         assert_eq!(&src, &foo.search_path());
         assert_eq!(&foo_stub, foo.file().path(&db));
 
-        assert_eq!(
-            Some(foo),
-            path_to_module(&db, &VfsPath::FileSystem(foo_stub))
-        );
-        assert_eq!(None, path_to_module(&db, &VfsPath::FileSystem(foo_py)));
+        assert_eq!(Some(foo), path_to_module(&db, &FilePath::System(foo_stub)));
+        assert_eq!(None, path_to_module(&db, &FilePath::System(foo_py)));
 
         Ok(())
     }
 
     #[test]
     fn sub_packages() -> anyhow::Result<()> {
-        let TestCase { db, src, .. } = setup_resolver_test();
+        let TestCase { mut db, src, .. } = setup_resolver_test();
 
         let foo = src.join("foo");
         let bar = foo.join("bar");
         let baz = bar.join("baz.py");
 
-        db.memory_file_system().write_files([
+        db.write_files([
             (&foo.join("__init__.py"), ""),
             (&bar.join("__init__.py"), ""),
             (&baz, "print('Hello, world!')"),
@@ -691,7 +682,7 @@ mod tests {
 
         assert_eq!(
             Some(baz_module),
-            path_to_module(&db, &VfsPath::FileSystem(baz))
+            path_to_module(&db, &FilePath::System(baz))
         );
 
         Ok(())
@@ -700,7 +691,7 @@ mod tests {
     #[test]
     fn namespace_package() -> anyhow::Result<()> {
         let TestCase {
-            db,
+            mut db,
             src,
             site_packages,
             ..
@@ -727,7 +718,7 @@ mod tests {
         let child2 = parent2.join("child");
         let two = child2.join("two.py");
 
-        db.memory_file_system().write_files([
+        db.write_files([
             (&one, "print('Hello, world!')"),
             (&two, "print('Hello, world!')"),
         ])?;
@@ -737,14 +728,14 @@ mod tests {
 
         assert_eq!(
             Some(one_module),
-            path_to_module(&db, &VfsPath::FileSystem(one))
+            path_to_module(&db, &FilePath::System(one))
         );
 
         let two_module =
             resolve_module(&db, ModuleName::new_static("parent.child.two").unwrap()).unwrap();
         assert_eq!(
             Some(two_module),
-            path_to_module(&db, &VfsPath::FileSystem(two))
+            path_to_module(&db, &FilePath::System(two))
         );
 
         Ok(())
@@ -753,7 +744,7 @@ mod tests {
     #[test]
     fn regular_package_in_namespace_package() -> anyhow::Result<()> {
         let TestCase {
-            db,
+            mut db,
             src,
             site_packages,
             ..
@@ -780,7 +771,7 @@ mod tests {
         let child2 = parent2.join("child");
         let two = child2.join("two.py");
 
-        db.memory_file_system().write_files([
+        db.write_files([
             (&child1.join("__init__.py"), "print('Hello, world!')"),
             (&one, "print('Hello, world!')"),
             (&two, "print('Hello, world!')"),
@@ -791,7 +782,7 @@ mod tests {
 
         assert_eq!(
             Some(one_module),
-            path_to_module(&db, &VfsPath::FileSystem(one))
+            path_to_module(&db, &FilePath::System(one))
         );
 
         assert_eq!(
@@ -804,7 +795,7 @@ mod tests {
     #[test]
     fn module_search_path_priority() -> anyhow::Result<()> {
         let TestCase {
-            db,
+            mut db,
             src,
             site_packages,
             ..
@@ -813,8 +804,7 @@ mod tests {
         let foo_src = src.join("foo.py");
         let foo_site_packages = site_packages.join("foo.py");
 
-        db.memory_file_system()
-            .write_files([(&foo_src, ""), (&foo_site_packages, "")])?;
+        db.write_files([(&foo_src, ""), (&foo_site_packages, "")])?;
 
         let foo_module = resolve_module(&db, ModuleName::new_static("foo").unwrap()).unwrap();
 
@@ -823,11 +813,11 @@ mod tests {
 
         assert_eq!(
             Some(foo_module),
-            path_to_module(&db, &VfsPath::FileSystem(foo_src))
+            path_to_module(&db, &FilePath::System(foo_src))
         );
         assert_eq!(
             None,
-            path_to_module(&db, &VfsPath::FileSystem(foo_site_packages))
+            path_to_module(&db, &FilePath::System(foo_site_packages))
         );
 
         Ok(())
@@ -843,10 +833,10 @@ mod tests {
             custom_typeshed,
         } = setup_resolver_test();
 
-        db.with_os_file_system();
+        db.use_os_system();
 
         let temp_dir = tempfile::tempdir()?;
-        let root = FileSystemPath::from_std_path(temp_dir.path()).unwrap();
+        let root = SystemPath::from_std_path(temp_dir.path()).unwrap();
 
         let src = root.join(src);
         let site_packages = root.join(site_packages);
@@ -890,11 +880,11 @@ mod tests {
 
         assert_eq!(
             Some(foo_module),
-            path_to_module(&db, &VfsPath::FileSystem(foo))
+            path_to_module(&db, &FilePath::System(foo))
         );
         assert_eq!(
             Some(bar_module),
-            path_to_module(&db, &VfsPath::FileSystem(bar))
+            path_to_module(&db, &FilePath::System(bar))
         );
 
         Ok(())
@@ -907,8 +897,7 @@ mod tests {
         let foo_path = src.join("foo.py");
         let bar_path = src.join("bar.py");
 
-        db.memory_file_system()
-            .write_files([(&foo_path, "x = 1"), (&bar_path, "y = 2")])?;
+        db.write_files([(&foo_path, "x = 1"), (&bar_path, "y = 2")])?;
 
         let foo_module_name = ModuleName::new_static("foo").unwrap();
         let foo_module = resolve_module(&db, foo_module_name.clone()).unwrap();
@@ -946,8 +935,8 @@ mod tests {
         assert_eq!(resolve_module(&db, foo_module_name.clone()), None);
 
         // Now write the foo file
-        db.memory_file_system().write_file(&foo_path, "x = 1")?;
-        VfsFile::touch_path(&mut db, &VfsPath::FileSystem(foo_path.clone()));
+        db.write_file(&foo_path, "x = 1")?;
+
         let foo_file = system_path_to_file(&db, &foo_path).expect("foo.py to exist");
 
         let foo_module = resolve_module(&db, foo_module_name).expect("Foo module to resolve");
@@ -963,8 +952,7 @@ mod tests {
         let foo_path = src.join("foo.py");
         let foo_init_path = src.join("foo/__init__.py");
 
-        db.memory_file_system()
-            .write_files([(&foo_path, "x = 1"), (&foo_init_path, "x = 2")])?;
+        db.write_files([(&foo_path, "x = 1"), (&foo_init_path, "x = 2")])?;
 
         let foo_module_name = ModuleName::new_static("foo").unwrap();
         let foo_module = resolve_module(&db, foo_module_name.clone()).expect("foo module to exist");
@@ -975,7 +963,7 @@ mod tests {
         db.memory_file_system().remove_file(&foo_init_path)?;
         db.memory_file_system()
             .remove_directory(foo_init_path.parent().unwrap())?;
-        VfsFile::touch_path(&mut db, &VfsPath::FileSystem(foo_init_path));
+        File::touch_path(&mut db, &FilePath::System(foo_init_path));
 
         let foo_module = resolve_module(&db, foo_module_name).expect("Foo module to resolve");
         assert_eq!(&foo_path, foo_module.file().path(&db));

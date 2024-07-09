@@ -5,13 +5,13 @@ use std::sync::Arc;
 use ruff_python_ast::{ModModule, PySourceType};
 use ruff_python_parser::{parse_unchecked_source, Parsed};
 
+use crate::files::{File, FilePath};
 use crate::source::source_text;
-use crate::vfs::{VfsFile, VfsPath};
 use crate::Db;
 
 /// Returns the parsed AST of `file`, including its token stream.
 ///
-/// The query uses Ruff's error-resilient parser. That means that the parser always succeeds to produce a
+/// The query uses Ruff's error-resilient parser. That means that the parser always succeeds to produce an
 /// AST even if the file contains syntax errors. The parse errors
 /// are then accessible through [`Parsed::errors`].
 ///
@@ -21,17 +21,17 @@ use crate::Db;
 /// The other reason is that Ruff's AST doesn't implement `Eq` which Sala requires
 /// for determining if a query result is unchanged.
 #[salsa::tracked(return_ref, no_eq)]
-pub fn parsed_module(db: &dyn Db, file: VfsFile) -> ParsedModule {
+pub fn parsed_module(db: &dyn Db, file: File) -> ParsedModule {
     let _span = tracing::trace_span!("parse_module", file = ?file).entered();
 
     let source = source_text(db, file);
     let path = file.path(db);
 
     let ty = match path {
-        VfsPath::FileSystem(path) => path
+        FilePath::System(path) => path
             .extension()
             .map_or(PySourceType::Python, PySourceType::from_extension),
-        VfsPath::Vendored(_) => PySourceType::Stub,
+        FilePath::Vendored(_) => PySourceType::Stub,
     };
 
     ParsedModule::new(parse_unchecked_source(&source, ty))
@@ -72,19 +72,18 @@ impl std::fmt::Debug for ParsedModule {
 
 #[cfg(test)]
 mod tests {
-    use crate::file_system::FileSystemPath;
+    use crate::files::{system_path_to_file, vendored_path_to_file};
     use crate::parsed::parsed_module;
+    use crate::system::{DbWithTestSystem, SystemPath};
     use crate::tests::TestDb;
-    use crate::vendored::VendoredPath;
-    use crate::vfs::{system_path_to_file, vendored_path_to_file};
+    use crate::vendored::{tests::VendoredFileSystemBuilder, VendoredPath};
 
     #[test]
-    fn python_file() -> crate::file_system::Result<()> {
+    fn python_file() -> crate::system::Result<()> {
         let mut db = TestDb::new();
         let path = "test.py";
 
-        db.file_system_mut()
-            .write_file(path, "x = 10".to_string())?;
+        db.write_file(path, "x = 10".to_string())?;
 
         let file = system_path_to_file(&db, path).unwrap();
 
@@ -96,12 +95,11 @@ mod tests {
     }
 
     #[test]
-    fn python_ipynb_file() -> crate::file_system::Result<()> {
+    fn python_ipynb_file() -> crate::system::Result<()> {
         let mut db = TestDb::new();
-        let path = FileSystemPath::new("test.ipynb");
+        let path = SystemPath::new("test.ipynb");
 
-        db.file_system_mut()
-            .write_file(path, "%timeit a = b".to_string())?;
+        db.write_file(path, "%timeit a = b".to_string())?;
 
         let file = system_path_to_file(&db, path).unwrap();
 
@@ -115,9 +113,12 @@ mod tests {
     #[test]
     fn vendored_file() {
         let mut db = TestDb::new();
-        db.vfs_mut().stub_vendored([(
-            "path.pyi",
-            r#"
+
+        let mut vendored_builder = VendoredFileSystemBuilder::new();
+        vendored_builder
+            .add_file(
+                "path.pyi",
+                r#"
 import sys
 
 if sys.platform == "win32":
@@ -126,7 +127,10 @@ if sys.platform == "win32":
 else:
     from posixpath import *
     from posixpath import __all__ as __all__"#,
-        )]);
+            )
+            .unwrap();
+        let vendored = vendored_builder.finish().unwrap();
+        db.with_vendored(vendored);
 
         let file = vendored_path_to_file(&db, VendoredPath::new("path.pyi")).unwrap();
 

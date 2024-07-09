@@ -1,5 +1,5 @@
+use ruff_db::files::File;
 use ruff_db::parsed::ParsedModule;
-use ruff_db::vfs::VfsFile;
 use ruff_python_ast as ast;
 
 use crate::ast_node_ref::AstNodeRef;
@@ -10,7 +10,7 @@ use crate::semantic_index::symbol::{FileScopeId, ScopedSymbolId};
 pub struct Definition<'db> {
     /// The file in which the definition is defined.
     #[id]
-    pub(super) file: VfsFile,
+    pub(super) file: File,
 
     /// The scope in which the definition is defined.
     #[id]

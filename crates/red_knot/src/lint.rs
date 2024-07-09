@@ -7,9 +7,9 @@ use tracing::trace_span;
 use red_knot_module_resolver::ModuleName;
 use red_knot_python_semantic::types::Type;
 use red_knot_python_semantic::{HasTy, SemanticModel};
+use ruff_db::files::File;
 use ruff_db::parsed::{parsed_module, ParsedModule};
 use ruff_db::source::{source_text, SourceText};
-use ruff_db::vfs::VfsFile;
 use ruff_python_ast as ast;
 use ruff_python_ast::visitor::{walk_stmt, Visitor};
 
@@ -22,7 +22,7 @@ use crate::db::Db;
 pub(crate) fn unwind_if_cancelled(db: &dyn Db) {}
 
 #[salsa::tracked(return_ref)]
-pub(crate) fn lint_syntax(db: &dyn Db, file_id: VfsFile) -> Diagnostics {
+pub(crate) fn lint_syntax(db: &dyn Db, file_id: File) -> Diagnostics {
     #[allow(clippy::print_stdout)]
     if std::env::var("RED_KNOT_SLOW_LINT").is_ok() {
         for i in 0..10 {
@@ -74,7 +74,7 @@ fn lint_lines(source: &str, diagnostics: &mut Vec<String>) {
 }
 
 #[salsa::tracked(return_ref)]
-pub(crate) fn lint_semantic(db: &dyn Db, file_id: VfsFile) -> Diagnostics {
+pub(crate) fn lint_semantic(db: &dyn Db, file_id: File) -> Diagnostics {
     let _span = trace_span!("lint_semantic", ?file_id).entered();
 
     let source = source_text(db.upcast(), file_id);

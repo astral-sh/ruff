@@ -24,56 +24,35 @@ pub(crate) mod tests {
 
     use salsa::DebugWithDb;
 
-    use ruff_db::file_system::{FileSystem, FileSystemPathBuf, MemoryFileSystem, OsFileSystem};
-    use ruff_db::vfs::Vfs;
+    use ruff_db::files::Files;
+    use ruff_db::system::TestSystem;
+    use ruff_db::system::{DbWithTestSystem, SystemPathBuf};
+    use ruff_db::vendored::VendoredFileSystem;
 
     use crate::resolver::{set_module_resolution_settings, RawModuleResolutionSettings};
     use crate::supported_py_version::TargetVersion;
+    use crate::vendored_typeshed_stubs;
 
     use super::*;
 
     #[salsa::db(Jar, ruff_db::Jar)]
     pub(crate) struct TestDb {
         storage: salsa::Storage<Self>,
-        file_system: TestFileSystem,
+        system: TestSystem,
+        vendored: VendoredFileSystem,
+        files: Files,
         events: sync::Arc<sync::Mutex<Vec<salsa::Event>>>,
-        vfs: Vfs,
     }
 
     impl TestDb {
         pub(crate) fn new() -> Self {
             Self {
                 storage: salsa::Storage::default(),
-                file_system: TestFileSystem::Memory(MemoryFileSystem::default()),
+                system: TestSystem::default(),
+                vendored: vendored_typeshed_stubs().snapshot(),
                 events: sync::Arc::default(),
-                vfs: Vfs::with_stubbed_vendored(),
+                files: Files::default(),
             }
-        }
-
-        /// Returns the memory file system.
-        ///
-        /// ## Panics
-        /// If this test db isn't using a memory file system.
-        pub(crate) fn memory_file_system(&self) -> &MemoryFileSystem {
-            if let TestFileSystem::Memory(fs) = &self.file_system {
-                fs
-            } else {
-                panic!("The test db is not using a memory file system");
-            }
-        }
-
-        /// Uses the real file system instead of the memory file system.
-        ///
-        /// This useful for testing advanced file system features like permissions, symlinks, etc.
-        ///
-        /// Note that any files written to the memory file system won't be copied over.
-        pub(crate) fn with_os_file_system(&mut self) {
-            self.file_system = TestFileSystem::Os(OsFileSystem);
-        }
-
-        #[allow(unused)]
-        pub(crate) fn vfs_mut(&mut self) -> &mut Vfs {
-            &mut self.vfs
         }
 
         /// Takes the salsa events.
@@ -103,16 +82,30 @@ pub(crate) mod tests {
     }
 
     impl ruff_db::Db for TestDb {
-        fn file_system(&self) -> &dyn ruff_db::file_system::FileSystem {
-            self.file_system.inner()
+        fn vendored(&self) -> &VendoredFileSystem {
+            &self.vendored
         }
 
-        fn vfs(&self) -> &ruff_db::vfs::Vfs {
-            &self.vfs
+        fn system(&self) -> &dyn ruff_db::system::System {
+            &self.system
+        }
+
+        fn files(&self) -> &Files {
+            &self.files
         }
     }
 
     impl Db for TestDb {}
+
+    impl DbWithTestSystem for TestDb {
+        fn test_system(&self) -> &TestSystem {
+            &self.system
+        }
+
+        fn test_system_mut(&mut self) -> &mut TestSystem {
+            &mut self.system
+        }
+    }
 
     impl salsa::Database for TestDb {
         fn salsa_event(&self, event: salsa::Event) {
@@ -126,40 +119,19 @@ pub(crate) mod tests {
         fn snapshot(&self) -> salsa::Snapshot<Self> {
             salsa::Snapshot::new(Self {
                 storage: self.storage.snapshot(),
-                file_system: self.file_system.snapshot(),
+                system: self.system.snapshot(),
+                vendored: self.vendored.snapshot(),
+                files: self.files.snapshot(),
                 events: self.events.clone(),
-                vfs: self.vfs.snapshot(),
             })
-        }
-    }
-
-    enum TestFileSystem {
-        Memory(MemoryFileSystem),
-        #[allow(unused)]
-        Os(OsFileSystem),
-    }
-
-    impl TestFileSystem {
-        fn inner(&self) -> &dyn FileSystem {
-            match self {
-                Self::Memory(inner) => inner,
-                Self::Os(inner) => inner,
-            }
-        }
-
-        fn snapshot(&self) -> Self {
-            match self {
-                Self::Memory(inner) => Self::Memory(inner.snapshot()),
-                Self::Os(inner) => Self::Os(inner.snapshot()),
-            }
         }
     }
 
     pub(crate) struct TestCaseBuilder {
         db: TestDb,
-        src: FileSystemPathBuf,
-        custom_typeshed: FileSystemPathBuf,
-        site_packages: FileSystemPathBuf,
+        src: SystemPathBuf,
+        custom_typeshed: SystemPathBuf,
+        site_packages: SystemPathBuf,
         target_version: Option<TargetVersion>,
     }
 
@@ -200,9 +172,9 @@ pub(crate) mod tests {
 
     pub(crate) struct TestCase {
         pub(crate) db: TestDb,
-        pub(crate) src: FileSystemPathBuf,
-        pub(crate) custom_typeshed: FileSystemPathBuf,
-        pub(crate) site_packages: FileSystemPathBuf,
+        pub(crate) src: SystemPathBuf,
+        pub(crate) custom_typeshed: SystemPathBuf,
+        pub(crate) site_packages: SystemPathBuf,
     }
 
     pub(crate) fn create_resolver_builder() -> std::io::Result<TestCaseBuilder> {
@@ -217,9 +189,9 @@ pub(crate) mod tests {
 
         let db = TestDb::new();
 
-        let src = FileSystemPathBuf::from("src");
-        let site_packages = FileSystemPathBuf::from("site_packages");
-        let custom_typeshed = FileSystemPathBuf::from("typeshed");
+        let src = SystemPathBuf::from("src");
+        let site_packages = SystemPathBuf::from("site_packages");
+        let custom_typeshed = SystemPathBuf::from("typeshed");
 
         let fs = db.memory_file_system();
 

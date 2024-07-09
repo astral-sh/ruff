@@ -2,8 +2,8 @@ use std::sync::Arc;
 
 use rustc_hash::FxHashMap;
 
+use ruff_db::files::File;
 use ruff_db::parsed::ParsedModule;
-use ruff_db::vfs::VfsFile;
 use ruff_index::IndexVec;
 use ruff_python_ast as ast;
 use ruff_python_ast::name::Name;
@@ -22,7 +22,7 @@ use crate::Db;
 pub(super) struct SemanticIndexBuilder<'db, 'ast> {
     // Builder state
     db: &'db dyn Db,
-    file: VfsFile,
+    file: File,
     module: &'db ParsedModule,
     scope_stack: Vec<FileScopeId>,
     /// the target we're currently inferring
@@ -42,7 +42,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast>
 where
     'db: 'ast,
 {
-    pub(super) fn new(db: &'db dyn Db, file: VfsFile, parsed: &'db ParsedModule) -> Self {
+    pub(super) fn new(db: &'db dyn Db, file: File, parsed: &'db ParsedModule) -> Self {
         let mut builder = Self {
             db,
             file,

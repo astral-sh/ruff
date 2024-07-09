@@ -5,10 +5,11 @@ use std::num::{NonZeroU16, NonZeroUsize};
 use std::ops::{RangeFrom, RangeInclusive};
 use std::str::FromStr;
 
-use ruff_db::file_system::FileSystemPath;
-use ruff_db::source::source_text;
-use ruff_db::vfs::{system_path_to_file, VfsFile};
 use rustc_hash::FxHashMap;
+
+use ruff_db::files::{system_path_to_file, File};
+use ruff_db::source::source_text;
+use ruff_db::system::SystemPath;
 
 use crate::db::Db;
 use crate::module_name::ModuleName;
@@ -40,7 +41,7 @@ impl<'db> LazyTypeshedVersions<'db> {
         &self,
         module: &ModuleName,
         db: &'db dyn Db,
-        stdlib_root: &FileSystemPath,
+        stdlib_root: &SystemPath,
         target_version: TargetVersion,
     ) -> TypeshedVersionsQueryResult {
         let versions = self.0.get_or_init(|| {
@@ -64,7 +65,7 @@ impl<'db> LazyTypeshedVersions<'db> {
 #[salsa::tracked(return_ref)]
 pub(crate) fn parse_typeshed_versions(
     db: &dyn Db,
-    versions_file: VfsFile,
+    versions_file: File,
 ) -> Result<TypeshedVersions, TypeshedVersionsParseError> {
     let file_content = source_text(db.upcast(), versions_file);
     file_content.parse()
@@ -429,9 +430,9 @@ mod tests {
     use std::num::{IntErrorKind, NonZeroU16};
     use std::path::Path;
 
-    use super::*;
-
     use insta::assert_snapshot;
+
+    use super::*;
 
     const TYPESHED_STDLIB_DIR: &str = "stdlib";
 

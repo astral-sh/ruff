@@ -4,15 +4,15 @@ use salsa::DebugWithDb;
 use std::ops::Deref;
 use std::sync::Arc;
 
-use crate::vfs::VfsFile;
+use crate::files::File;
 use crate::Db;
 
 /// Reads the content of file.
 #[salsa::tracked]
-pub fn source_text(db: &dyn Db, file: VfsFile) -> SourceText {
+pub fn source_text(db: &dyn Db, file: File) -> SourceText {
     let _span = tracing::trace_span!("source_text", ?file).entered();
 
-    let content = file.read(db);
+    let content = file.read_to_string(db);
 
     SourceText {
         inner: Arc::from(content),
@@ -22,7 +22,7 @@ pub fn source_text(db: &dyn Db, file: VfsFile) -> SourceText {
 
 /// Computes the [`LineIndex`] for `file`.
 #[salsa::tracked]
-pub fn line_index(db: &dyn Db, file: VfsFile) -> LineIndex {
+pub fn line_index(db: &dyn Db, file: File) -> LineIndex {
     let _span = tracing::trace_span!("line_index", file = ?file.debug(db)).entered();
 
     let source = source_text(db, file);
@@ -30,7 +30,7 @@ pub fn line_index(db: &dyn Db, file: VfsFile) -> LineIndex {
     LineIndex::from_source_text(&source)
 }
 
-/// The source text of a [`VfsFile`].
+/// The source text of a [`File`].
 ///
 /// Cheap cloneable in `O(1)`.
 #[derive(Clone, Eq, PartialEq)]
@@ -63,30 +63,25 @@ impl std::fmt::Debug for SourceText {
 mod tests {
     use salsa::EventKind;
 
+    use crate::files::system_path_to_file;
+    use crate::source::{line_index, source_text};
+    use crate::system::{DbWithTestSystem, SystemPath};
+    use crate::tests::TestDb;
     use ruff_source_file::OneIndexed;
     use ruff_text_size::TextSize;
 
-    use crate::file_system::FileSystemPath;
-    use crate::source::{line_index, source_text};
-    use crate::tests::TestDb;
-    use crate::vfs::system_path_to_file;
-
     #[test]
-    fn re_runs_query_when_file_revision_changes() -> crate::file_system::Result<()> {
+    fn re_runs_query_when_file_revision_changes() -> crate::system::Result<()> {
         let mut db = TestDb::new();
-        let path = FileSystemPath::new("test.py");
+        let path = SystemPath::new("test.py");
 
-        db.file_system_mut()
-            .write_file(path, "x = 10".to_string())?;
+        db.write_file(path, "x = 10".to_string())?;
 
         let file = system_path_to_file(&db, path).unwrap();
 
         assert_eq!(&*source_text(&db, file), "x = 10");
 
-        db.file_system_mut()
-            .write_file(path, "x = 20".to_string())
-            .unwrap();
-        file.touch(&mut db);
+        db.write_file(path, "x = 20".to_string()).unwrap();
 
         assert_eq!(&*source_text(&db, file), "x = 20");
 
@@ -94,12 +89,11 @@ mod tests {
     }
 
     #[test]
-    fn text_is_cached_if_revision_is_unchanged() -> crate::file_system::Result<()> {
+    fn text_is_cached_if_revision_is_unchanged() -> crate::system::Result<()> {
         let mut db = TestDb::new();
-        let path = FileSystemPath::new("test.py");
+        let path = SystemPath::new("test.py");
 
-        db.file_system_mut()
-            .write_file(path, "x = 10".to_string())?;
+        db.write_file(path, "x = 10".to_string())?;
 
         let file = system_path_to_file(&db, path).unwrap();
 
@@ -121,12 +115,11 @@ mod tests {
     }
 
     #[test]
-    fn line_index_for_source() -> crate::file_system::Result<()> {
+    fn line_index_for_source() -> crate::system::Result<()> {
         let mut db = TestDb::new();
-        let path = FileSystemPath::new("test.py");
+        let path = SystemPath::new("test.py");
 
-        db.file_system_mut()
-            .write_file(path, "x = 10\ny = 20".to_string())?;
+        db.write_file(path, "x = 10\ny = 20".to_string())?;
 
         let file = system_path_to_file(&db, path).unwrap();
         let index = line_index(&db, file);
