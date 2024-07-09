@@ -7,6 +7,9 @@ mod state;
 mod supported_py_version;
 mod typeshed;
 
+#[cfg(test)]
+mod testing;
+
 pub use db::{Db, Jar};
 pub use module::{Module, ModuleKind};
 pub use module_name::ModuleName;

@@ -1,0 +1,303 @@
+use ruff_db::system::{DbWithTestSystem, MemoryFileSystem, SystemPath, SystemPathBuf};
+use ruff_db::vendored::VendoredPathBuf;
+
+use crate::db::tests::TestDb;
+use crate::resolver::{set_module_resolution_settings, RawModuleResolutionSettings};
+use crate::supported_py_version::TargetVersion;
+
+/// A test case for the module resolver.
+///
+/// You generally shouldn't construct instances of this struct directly;
+/// instead, use the [`TestCaseBuilder`].
+pub(crate) struct TestCase<T> {
+    pub(crate) db: TestDb,
+    pub(crate) src: SystemPathBuf,
+    pub(crate) stdlib: T,
+    pub(crate) site_packages: SystemPathBuf,
+    pub(crate) target_version: TargetVersion,
+}
+
+/// A `(file_name, file_contents)` tuple
+pub(crate) type FileSpec = (&'static str, &'static str);
+
+/// Specification for a typeshed mock to be created as part of a test
+#[derive(Debug, Clone, Copy)]
+pub(crate) struct MockedTypeshed {
+    /// The stdlib files to be created in the typeshed mock
+    pub(crate) stdlib_files: &'static [FileSpec],
+
+    /// The contents of the `stdlib/VERSIONS` file
+    /// to be created in the typeshed mock
+    pub(crate) versions: &'static str,
+}
+
+#[derive(Debug)]
+pub(crate) struct VendoredTypeshed;
+
+#[derive(Debug)]
+pub(crate) struct UnspecifiedTypeshed;
+
+/// A builder for a module-resolver test case.
+///
+/// The builder takes care of creating a [`TestDb`]
+/// instance, applying the module resolver settings,
+/// and creating mock directories for the stdlib, `site-packages`,
+/// first-party code, etc.
+///
+/// For simple tests that do not involve typeshed,
+/// test cases can be created as follows:
+///
+/// ```rs
+/// let test_case = TestCaseBuilder::new()
+///     .with_src_files(...)
+///     .build();
+///
+/// let test_case2 = TestCaseBuilder::new()
+///     .with_site_packages_files(...)
+///     .build();
+/// ```
+///
+/// Any tests can specify the target Python version that should be used
+/// in the module resolver settings:
+///
+/// ```rs
+/// let test_case = TestCaseBuilder::new()
+///     .with_src_files(...)
+///     .with_target_version(...)
+///     .build();
+/// ```
+///
+/// For tests checking that standard-library module resolution is working
+/// correctly, you should usually create a [`MockedTypeshed`] instance
+/// and pass it to the [`TestCaseBuilder::with_custom_typeshed`] method.
+/// If you need to check something that involves the vendored typeshed stubs
+/// we include as part of the binary, you can instead use the
+/// [`TestCaseBuilder::with_vendored_typeshed`] method.
+/// For either of these, you should almost always try to be explicit
+/// about the Python version you want to be specified in the module-resolver
+/// settings for the test:
+///
+/// ```rs
+/// const TYPESHED = MockedTypeshed { ... };
+///
+/// let test_case = resolver_test_case()
+///     .with_custom_typeshed(TYPESHED)
+///     .with_target_version(...)
+///     .build();
+///
+/// let test_case2 = resolver_test_case()
+///     .with_vendored_typeshed()
+///     .with_target_version(...)
+///     .build();
+/// ```
+///
+/// If you have not called one of those options, the `stdlib` field
+/// on the [`TestCase`] instance created from `.build()` will be set
+/// to `()`.
+pub(crate) struct TestCaseBuilder<T> {
+    typeshed_option: T,
+    target_version: TargetVersion,
+    first_party_files: Vec<FileSpec>,
+    site_packages_files: Vec<FileSpec>,
+}
+
+impl<T> TestCaseBuilder<T> {
+    /// Specify files to be created in the `src` mock directory
+    pub(crate) fn with_src_files(mut self, files: &[FileSpec]) -> Self {
+        self.first_party_files.extend(files.iter().copied());
+        self
+    }
+
+    /// Specify files to be created in the `site-packages` mock directory
+    pub(crate) fn with_site_packages_files(mut self, files: &[FileSpec]) -> Self {
+        self.site_packages_files.extend(files.iter().copied());
+        self
+    }
+
+    /// Specify the target Python version the module resolver should assume
+    pub(crate) fn with_target_version(mut self, target_version: TargetVersion) -> Self {
+        self.target_version = target_version;
+        self
+    }
+
+    fn write_mock_directory(
+        location: impl AsRef<SystemPath>,
+        system: &MemoryFileSystem,
+        files: impl IntoIterator<Item = FileSpec>,
+    ) -> SystemPathBuf {
+        let root = location.as_ref().to_path_buf();
+        system.create_directory_all(&root).unwrap();
+        for (path, contents) in files {
+            let path = root.join(path);
+            if let Some(parent) = path.parent() {
+                system.create_directory_all(parent).unwrap();
+            }
+            system.write_file(path, contents).unwrap();
+        }
+        root
+    }
+}
+
+impl TestCaseBuilder<UnspecifiedTypeshed> {
+    pub(crate) fn new() -> TestCaseBuilder<UnspecifiedTypeshed> {
+        Self {
+            typeshed_option: UnspecifiedTypeshed,
+            target_version: TargetVersion::default(),
+            first_party_files: vec![],
+            site_packages_files: vec![],
+        }
+    }
+
+    /// Use the vendored stdlib stubs included in the Ruff binary for this test case
+    pub(crate) fn with_vendored_typeshed(self) -> TestCaseBuilder<VendoredTypeshed> {
+        let TestCaseBuilder {
+            typeshed_option: _,
+            target_version,
+            first_party_files,
+            site_packages_files,
+        } = self;
+        TestCaseBuilder {
+            typeshed_option: VendoredTypeshed,
+            target_version,
+            first_party_files,
+            site_packages_files,
+        }
+    }
+
+    /// Use a mock typeshed directory for this test case
+    pub(crate) fn with_custom_typeshed(
+        self,
+        typeshed: MockedTypeshed,
+    ) -> TestCaseBuilder<MockedTypeshed> {
+        let TestCaseBuilder {
+            typeshed_option: _,
+            target_version,
+            first_party_files,
+            site_packages_files,
+        } = self;
+        TestCaseBuilder {
+            typeshed_option: typeshed,
+            target_version,
+            first_party_files,
+            site_packages_files,
+        }
+    }
+
+    pub(crate) fn build(self) -> TestCase<()> {
+        const DEFAULT_TYPESHED: MockedTypeshed = MockedTypeshed {
+            stdlib_files: &[("functools.pyi", "def update_wrapper(): ...")],
+            versions: "functools: 3.8-",
+        };
+
+        let TestCase {
+            db,
+            src,
+            stdlib: _,
+            site_packages,
+            target_version,
+        } = self.with_custom_typeshed(DEFAULT_TYPESHED).build();
+
+        TestCase {
+            db,
+            src,
+            stdlib: (),
+            site_packages,
+            target_version,
+        }
+    }
+}
+
+impl TestCaseBuilder<MockedTypeshed> {
+    pub(crate) fn build(self) -> TestCase<SystemPathBuf> {
+        let TestCaseBuilder {
+            typeshed_option,
+            target_version,
+            first_party_files,
+            site_packages_files,
+        } = self;
+
+        let mut db = TestDb::new();
+        let system = db.memory_file_system();
+
+        let site_packages =
+            Self::write_mock_directory("/site-packages", system, site_packages_files);
+        let src = Self::write_mock_directory("/src", system, first_party_files);
+        let typeshed = Self::build_typeshed_mock(system, &typeshed_option);
+
+        set_module_resolution_settings(
+            &mut db,
+            RawModuleResolutionSettings {
+                target_version,
+                extra_paths: vec![],
+                workspace_root: src.clone(),
+                custom_typeshed: Some(typeshed.clone()),
+                site_packages: Some(site_packages.clone()),
+            },
+        );
+
+        TestCase {
+            db,
+            src,
+            stdlib: typeshed.join("stdlib"),
+            site_packages,
+            target_version,
+        }
+    }
+
+    fn build_typeshed_mock(
+        system: &MemoryFileSystem,
+        typeshed_to_build: &MockedTypeshed,
+    ) -> SystemPathBuf {
+        let typeshed = SystemPathBuf::from("/typeshed");
+        let MockedTypeshed {
+            stdlib_files,
+            versions,
+        } = typeshed_to_build;
+        Self::write_mock_directory(
+            typeshed.join("stdlib"),
+            system,
+            stdlib_files
+                .iter()
+                .copied()
+                .chain(std::iter::once(("VERSIONS", *versions))),
+        );
+        typeshed
+    }
+}
+
+impl TestCaseBuilder<VendoredTypeshed> {
+    pub(crate) fn build(self) -> TestCase<VendoredPathBuf> {
+        let TestCaseBuilder {
+            typeshed_option: VendoredTypeshed,
+            target_version,
+            first_party_files,
+            site_packages_files,
+        } = self;
+
+        let mut db = TestDb::new();
+        let system = db.memory_file_system();
+
+        let site_packages =
+            Self::write_mock_directory("/site-packages", system, site_packages_files);
+        let src = Self::write_mock_directory("/src", system, first_party_files);
+
+        set_module_resolution_settings(
+            &mut db,
+            RawModuleResolutionSettings {
+                target_version,
+                extra_paths: vec![],
+                workspace_root: src.clone(),
+                custom_typeshed: None,
+                site_packages: Some(site_packages.clone()),
+            },
+        );
+
+        TestCase {
+            db,
+            src,
+            stdlib: VendoredPathBuf::from("stdlib"),
+            site_packages,
+            target_version,
+        }
+    }
+}
