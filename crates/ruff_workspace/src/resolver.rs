@@ -378,6 +378,13 @@ pub fn python_files_in_path<'a>(
     }
     builder.standard_filters(resolver.respect_gitignore());
     builder.hidden(false);
+
+    builder.threads(
+        std::thread::available_parallelism()
+            .map_or(1, std::num::NonZero::get)
+            .min(12),
+    );
+
     let walker = builder.build_parallel();
 
     // Run the `WalkParallel` to collect all Python files.
@@ -389,10 +396,11 @@ pub fn python_files_in_path<'a>(
     state.finish()
 }
 
+type ResolvedFiles = Vec<Result<ResolvedFile, ignore::Error>>;
+
 struct WalkPythonFilesState<'config> {
     is_hierarchical: bool,
-    files: std::sync::Mutex<Vec<Result<ResolvedFile, ignore::Error>>>,
-    error: std::sync::Mutex<Result<()>>,
+    merged: std::sync::Mutex<(ResolvedFiles, Result<()>)>,
     resolver: RwLock<Resolver<'config>>,
 }
 
@@ -400,19 +408,16 @@ impl<'config> WalkPythonFilesState<'config> {
     fn new(resolver: Resolver<'config>) -> Self {
         Self {
             is_hierarchical: resolver.is_hierarchical(),
-            files: std::sync::Mutex::new(Vec::new()),
-            error: std::sync::Mutex::new(Ok(())),
+            merged: std::sync::Mutex::new((Vec::new(), Ok(()))),
             resolver: RwLock::new(resolver),
         }
     }
 
     fn finish(self) -> Result<(Vec<Result<ResolvedFile, ignore::Error>>, Resolver<'config>)> {
-        self.error.into_inner().unwrap()?;
+        let (files, error) = self.merged.into_inner().unwrap();
+        error?;
 
-        Ok((
-            self.files.into_inner().unwrap(),
-            self.resolver.into_inner().unwrap(),
-        ))
+        Ok((files, self.resolver.into_inner().unwrap()))
     }
 }
 
@@ -426,7 +431,7 @@ impl<'s, 'config> PythonFilesVisitorBuilder<'s, 'config> {
         transformer: &'s dyn ConfigurationTransformer,
         state: &'s WalkPythonFilesState<'config>,
     ) -> Self {
-        Self { transformer, state }
+        Self { state, transformer }
     }
 }
 
@@ -555,12 +560,18 @@ impl ParallelVisitor for PythonFilesVisitor<'_, '_> {
 
 impl Drop for PythonFilesVisitor<'_, '_> {
     fn drop(&mut self) {
-        let mut files = self.global.files.lock().unwrap();
-        files.extend(std::mem::take(&mut self.local_files));
-        let mut error = self.global.error.lock().unwrap();
+        let mut merged = self.global.merged.lock().unwrap();
+        let (ref mut files, ref mut error) = &mut *merged;
 
+        if files.is_empty() {
+            *files = std::mem::take(&mut self.local_files);
+        } else {
+            files.append(&mut self.local_files);
+        }
+
+        let local_error = std::mem::replace(&mut self.local_error, Ok(()));
         if error.is_ok() {
-            *error = std::mem::replace(&mut self.local_error, Ok(()));
+            *error = local_error;
         }
     }
 }
