@@ -18,15 +18,14 @@ class BaseCache:
         print("Property not found")
         return None
 
-import abc
 
-class Foo(abc.ABC):
-    @abc.abstractmethod
+class Parent:
     def get(self, key: str) -> str | None:
-        ...
+        print(f"{key} not found")
+        return None
 
 
-class Bar(Foo):
+class Child(Parent):
     def get(self, key: str) -> None:
         print(f"{key} not found")
         return None
