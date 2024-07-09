@@ -2447,7 +2447,6 @@ version = "0.2.2"
 dependencies = [
  "anyhow",
  "crossbeam",
- "globset",
  "insta",
  "jod-thread",
  "libc",

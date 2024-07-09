@@ -1,6 +1,6 @@
 use lsp_types::{self as types, request as req, Range};
 
-use ruff_workspace::resolver::match_any_exclusion;
+use ruff_workspace::resolver::{match_any_exclusion, match_any_inclusion};
 
 use crate::edit::{RangeExt, ToRangeExt};
 use crate::server::api::LSPResult;
@@ -58,6 +58,16 @@ fn format_text_document_range(
             Some(&formatter_settings.exclude),
         ) {
             tracing::debug!("Ignored path via `{}`: {}", exclusion, file_path.display());
+            return Ok(None);
+        }
+
+        if let Some(inclusion) = match_any_inclusion(
+            &file_path,
+            &file_resolver_settings.include,
+            &file_resolver_settings.extend_include,
+        ) {
+            tracing::debug!("Included path via `{}`: {}", inclusion, file_path.display());
+        } else {
             return Ok(None);
         }
     }

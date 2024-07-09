@@ -19,7 +19,7 @@ use ruff_python_codegen::Stylist;
 use ruff_python_index::Indexer;
 use ruff_source_file::{LineIndex, Locator};
 use ruff_text_size::{Ranged, TextRange};
-use ruff_workspace::resolver::match_any_exclusion;
+use ruff_workspace::resolver::{match_any_exclusion, match_any_inclusion};
 
 use crate::{
     edit::{NotebookRange, ToRangeExt},
@@ -84,6 +84,20 @@ pub(crate) fn check(
                 exclusion,
                 document_path.display()
             );
+            return DiagnosticsMap::default();
+        }
+
+        if let Some(inclusion) = match_any_inclusion(
+            document_path,
+            &file_resolver_settings.include,
+            &file_resolver_settings.extend_include,
+        ) {
+            tracing::debug!(
+                "Included path via `{}`: {}",
+                inclusion,
+                document_path.display()
+            );
+        } else {
             return DiagnosticsMap::default();
         }
 

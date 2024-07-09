@@ -9,7 +9,7 @@ use ruff_linter::{
 };
 use ruff_notebook::SourceValue;
 use ruff_source_file::LineIndex;
-use ruff_workspace::resolver::match_any_exclusion;
+use ruff_workspace::resolver::{match_any_exclusion, match_any_inclusion};
 
 use crate::{
     edit::{Replacement, ToRangeExt},
@@ -45,6 +45,20 @@ pub(crate) fn fix_all(
                 exclusion,
                 document_path.display()
             );
+            return Ok(Fixes::default());
+        }
+
+        if let Some(inclusion) = match_any_inclusion(
+            document_path,
+            &file_resolver_settings.include,
+            &file_resolver_settings.extend_include,
+        ) {
+            tracing::debug!(
+                "Included path via `{}`: {}",
+                inclusion,
+                document_path.display()
+            );
+        } else {
             return Ok(Fixes::default());
         }
 
