@@ -975,8 +975,8 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
             if checker.enabled(Rule::TrioSyncCall) {
                 flake8_async::rules::sync_call(checker, call);
             }
-            if checker.enabled(Rule::TrioZeroSleepCall) {
-                flake8_async::rules::zero_sleep_call(checker, call);
+            if checker.enabled(Rule::AsyncZeroSleep) {
+                flake8_async::rules::async_zero_sleep(checker, call);
             }
             if checker.enabled(Rule::UnnecessaryDunderCall) {
                 pylint::rules::unnecessary_dunder_call(checker, call);
