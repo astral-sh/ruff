@@ -966,7 +966,7 @@ mod tests {
     }
 
     #[test]
-    fn adding_a_file_on_which_the_module_resolution_depends_on_invalidates_the_query(
+    fn adding_file_on_which_module_resolution_depends_invalidates_previously_failing_query_that_now_succeeds(
     ) -> anyhow::Result<()> {
         let TestCase { mut db, src, .. } = TestCaseBuilder::new().build();
         let foo_path = src.join("foo.py");
@@ -986,7 +986,7 @@ mod tests {
     }
 
     #[test]
-    fn removing_a_file_that_the_module_resolution_depends_on_invalidates_the_query(
+    fn removing_file_on_which_module_resolution_depends_invalidates_previously_successful_query_that_now_fails(
     ) -> anyhow::Result<()> {
         const SRC: &[FileSpec] = &[("foo.py", "x = 1"), ("foo/__init__.py", "x = 2")];
 
@@ -1008,5 +1008,77 @@ mod tests {
         assert_eq!(&src.join("foo.py"), foo_module.file().path(&db));
 
         Ok(())
+    }
+
+    #[test]
+    fn adding_or_removing_file_on_which_module_resolution_depends_invalidates_previously_successful_query_that_still_succeeds(
+    ) {
+        const TYPESHED: MockedTypeshed = MockedTypeshed {
+            versions: "functools: 3.8-",
+            stdlib_files: &[("functools.pyi", "def update_wrapper(): ...")],
+        };
+
+        let TestCase {
+            mut db,
+            src,
+            stdlib,
+            site_packages,
+            ..
+        } = TestCaseBuilder::new()
+            .with_custom_typeshed(TYPESHED)
+            .with_target_version(TargetVersion::Py38)
+            .build();
+
+        let functools_module_name = ModuleName::new_static("functools").unwrap();
+        let stdlib_functools_path = stdlib.join("functools.pyi");
+
+        let functools_module = resolve_module(&db, functools_module_name.clone()).unwrap();
+        assert_eq!(functools_module.search_path(), stdlib);
+        assert_eq!(
+            Some(functools_module.file()),
+            system_path_to_file(&db, &stdlib_functools_path)
+        );
+
+        // Adding a file to site-packages does not invalidate the query,
+        // since site-packages takes lower priority in the module resolution...
+        let site_packages_functools_path = site_packages.join("functools.py");
+        db.write_file(&site_packages_functools_path, "f: int")
+            .unwrap();
+        let functools_module = resolve_module(&db, functools_module_name.clone()).unwrap();
+        assert_eq!(functools_module.search_path(), stdlib);
+        assert_eq!(
+            Some(functools_module.file()),
+            system_path_to_file(&db, &stdlib_functools_path)
+        );
+
+        // ...but adding a first-party file does invalidate the query,
+        // since first-party files take higher priority in module resolution:
+        let src_functools_path = src.join("functools.py");
+        db.write_file(&src_functools_path, "FOO: int").unwrap();
+        let functools_module = resolve_module(&db, functools_module_name.clone()).unwrap();
+        assert_eq!(functools_module.search_path(), src);
+        assert_eq!(
+            Some(functools_module.file()),
+            system_path_to_file(&db, &src_functools_path)
+        );
+
+        // If we now delete both the stdlib and first-party files,
+        // it should resolve to site-packages:
+        db.memory_file_system()
+            .remove_file(stdlib_functools_path)
+            .unwrap();
+        db.memory_file_system()
+            .write_file(stdlib.join("VERSIONS"), "")
+            .unwrap();
+        db.memory_file_system()
+            .remove_file(src_functools_path)
+            .unwrap();
+        dbg!(db.memory_file_system());
+        let functools_module = resolve_module(&db, functools_module_name.clone()).unwrap();
+        assert_eq!(functools_module.search_path(), site_packages);
+        assert_eq!(
+            Some(functools_module.file()),
+            system_path_to_file(&db, &site_packages_functools_path)
+        );
     }
 }
