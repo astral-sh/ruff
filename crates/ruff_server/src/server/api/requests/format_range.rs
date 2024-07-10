@@ -1,8 +1,7 @@
 use lsp_types::{self as types, request as req, Range};
 
-use ruff_workspace::resolver::{match_any_exclusion, match_any_inclusion};
-
 use crate::edit::{RangeExt, ToRangeExt};
+use crate::resolve::is_document_excluded;
 use crate::server::api::LSPResult;
 use crate::server::{client::Notifier, Result};
 use crate::session::{DocumentQuery, DocumentSnapshot};
@@ -50,24 +49,12 @@ fn format_text_document_range(
 
     // If the document is excluded, return early.
     if let Some(file_path) = query.file_path() {
-        if let Some(exclusion) = match_any_exclusion(
+        if is_document_excluded(
             &file_path,
-            &file_resolver_settings.exclude,
-            &file_resolver_settings.extend_exclude,
+            file_resolver_settings,
             None,
-            Some(&formatter_settings.exclude),
+            Some(formatter_settings),
         ) {
-            tracing::debug!("Ignored path via `{}`: {}", exclusion, file_path.display());
-            return Ok(None);
-        }
-
-        if let Some(inclusion) = match_any_inclusion(
-            &file_path,
-            &file_resolver_settings.include,
-            &file_resolver_settings.extend_include,
-        ) {
-            tracing::debug!("Included path via `{}`: {}", inclusion, file_path.display());
-        } else {
             return Ok(None);
         }
     }
