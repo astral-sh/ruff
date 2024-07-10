@@ -277,10 +277,9 @@ mod tests {
     use ruff_db::files::system_path_to_file;
     use ruff_db::parsed::parsed_module;
     use ruff_db::system::{DbWithTestSystem, SystemPathBuf};
+    use ruff_db::testing::{assert_will_not_run_function_query, assert_will_run_function_query};
 
-    use crate::db::tests::{
-        assert_will_not_run_function_query, assert_will_run_function_query, TestDb,
-    };
+    use crate::db::tests::TestDb;
     use crate::semantic_index::root_scope;
     use crate::types::{infer_types, public_symbol_ty_by_name};
     use crate::{HasTy, SemanticModel};

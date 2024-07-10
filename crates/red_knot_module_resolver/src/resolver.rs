@@ -384,8 +384,10 @@ impl PackageKind {
 
 #[cfg(test)]
 mod tests {
+    use internal::ModuleNameIngredient;
     use ruff_db::files::{system_path_to_file, File, FilePath};
     use ruff_db::system::{DbWithTestSystem, OsSystem, SystemPath};
+    use ruff_db::testing::assert_will_not_run_function_query;
 
     use crate::db::tests::TestDb;
     use crate::module::ModuleKind;
@@ -1044,6 +1046,13 @@ mod tests {
         let site_packages_functools_path = site_packages.join("functools.py");
         db.write_file(&site_packages_functools_path, "f: int")
             .unwrap();
+        let events = db.take_salsa_events();
+        assert_will_not_run_function_query::<resolve_module_query, _, _>(
+            &db,
+            |res| &res.function,
+            &ModuleNameIngredient::new(&db, functools_module_name.clone()),
+            &events,
+        );
         let functools_module = resolve_module(&db, functools_module_name.clone()).unwrap();
         assert_eq!(functools_module.search_path(), stdlib);
         assert_eq!(
