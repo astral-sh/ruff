@@ -1,4 +1,4 @@
-use crate::files::{File, FilePath};
+use crate::files::File;
 use crate::system::{MemoryFileSystem, Metadata, OsSystem, System, SystemPath};
 use crate::Db;
 use std::any::Any;
@@ -104,14 +104,14 @@ pub trait DbWithTestSystem: Db + Sized {
         path: impl AsRef<SystemPath>,
         content: impl ToString,
     ) -> crate::system::Result<()> {
-        let path = path.as_ref().to_path_buf();
+        let path = path.as_ref();
         let result = self
             .test_system()
             .memory_file_system()
-            .write_file(&path, content);
+            .write_file(path, content);
 
         if result.is_ok() {
-            File::touch_path(self, &FilePath::System(path));
+            File::touch_path(self, path);
         }
 
         result

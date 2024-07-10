@@ -1002,7 +1002,7 @@ mod tests {
         db.memory_file_system().remove_file(&foo_init_path)?;
         db.memory_file_system()
             .remove_directory(foo_init_path.parent().unwrap())?;
-        File::touch_path(&mut db, &FilePath::System(foo_init_path));
+        File::touch_path(&mut db, &foo_init_path);
 
         let foo_module = resolve_module(&db, foo_module_name).expect("Foo module to resolve");
         assert_eq!(&src.join("foo.py"), foo_module.file().path(&db));
