@@ -387,7 +387,7 @@ mod tests {
     use internal::ModuleNameIngredient;
     use ruff_db::files::{system_path_to_file, File, FilePath};
     use ruff_db::system::{DbWithTestSystem, OsSystem, SystemPath};
-    use ruff_db::testing::assert_will_not_run_function_query;
+    use ruff_db::testing::{assert_function_query_was_not_run, assert_function_query_was_run};
 
     use crate::db::tests::TestDb;
     use crate::module::ModuleKind;
@@ -1043,17 +1043,18 @@ mod tests {
 
         // Adding a file to site-packages does not invalidate the query,
         // since site-packages takes lower priority in the module resolution...
+        db.clear_salsa_events();
         let site_packages_functools_path = site_packages.join("functools.py");
         db.write_file(&site_packages_functools_path, "f: int")
             .unwrap();
+        let functools_module = resolve_module(&db, functools_module_name.clone()).unwrap();
         let events = db.take_salsa_events();
-        assert_will_not_run_function_query::<resolve_module_query, _, _>(
+        assert_function_query_was_not_run::<resolve_module_query, _, _>(
             &db,
             |res| &res.function,
             &ModuleNameIngredient::new(&db, functools_module_name.clone()),
             &events,
         );
-        let functools_module = resolve_module(&db, functools_module_name.clone()).unwrap();
         assert_eq!(functools_module.search_path(), stdlib);
         assert_eq!(
             Some(functools_module.file()),
@@ -1062,9 +1063,17 @@ mod tests {
 
         // ...but adding a first-party file does invalidate the query,
         // since first-party files take higher priority in module resolution:
+        db.clear_salsa_events();
         let src_functools_path = src.join("functools.py");
         db.write_file(&src_functools_path, "FOO: int").unwrap();
         let functools_module = resolve_module(&db, functools_module_name.clone()).unwrap();
+        let events = db.take_salsa_events();
+        assert_function_query_was_run::<resolve_module_query, _, _>(
+            &db,
+            |res| &res.function,
+            &ModuleNameIngredient::new(&db, functools_module_name.clone()),
+            &events,
+        );
         assert_eq!(functools_module.search_path(), src);
         assert_eq!(
             Some(functools_module.file()),
@@ -1080,7 +1089,15 @@ mod tests {
         let stdlib_versions_path = stdlib.join("VERSIONS");
         db.write_file(&stdlib_versions_path, "").unwrap();
         File::touch_path(&mut db, &stdlib_versions_path);
+        db.clear_salsa_events();
         let functools_module = resolve_module(&db, functools_module_name.clone()).unwrap();
+        let events = db.take_salsa_events();
+        assert_function_query_was_run::<resolve_module_query, _, _>(
+            &db,
+            |res| &res.function,
+            &ModuleNameIngredient::new(&db, functools_module_name.clone()),
+            &events,
+        );
         assert_eq!(functools_module.search_path(), site_packages);
         assert_eq!(
             Some(functools_module.file()),

@@ -277,7 +277,7 @@ mod tests {
     use ruff_db::files::system_path_to_file;
     use ruff_db::parsed::parsed_module;
     use ruff_db::system::{DbWithTestSystem, SystemPathBuf};
-    use ruff_db::testing::{assert_will_not_run_function_query, assert_will_run_function_query};
+    use ruff_db::testing::{assert_function_query_was_not_run, assert_function_query_was_run};
 
     use crate::db::tests::TestDb;
     use crate::semantic_index::root_scope;
@@ -346,7 +346,7 @@ mod tests {
         let events = db.take_salsa_events();
 
         let a_root_scope = root_scope(&db, a);
-        assert_will_run_function_query::<infer_types, _, _>(
+        assert_function_query_was_run::<infer_types, _, _>(
             &db,
             |ty| &ty.function,
             &a_root_scope,
@@ -384,7 +384,7 @@ mod tests {
 
         let a_root_scope = root_scope(&db, a);
 
-        assert_will_not_run_function_query::<infer_types, _, _>(
+        assert_function_query_was_not_run::<infer_types, _, _>(
             &db,
             |ty| &ty.function,
             &a_root_scope,
@@ -421,7 +421,7 @@ mod tests {
         let events = db.take_salsa_events();
 
         let a_root_scope = root_scope(&db, a);
-        assert_will_not_run_function_query::<infer_types, _, _>(
+        assert_function_query_was_not_run::<infer_types, _, _>(
             &db,
             |ty| &ty.function,
             &a_root_scope,

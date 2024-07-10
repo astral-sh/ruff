@@ -7,9 +7,10 @@ use salsa::id::AsId;
 use salsa::ingredient::Ingredient;
 use salsa::storage::HasIngredientsFor;
 
-/// Assert that calling `to_function` with `input` as an argument
-/// will result in a (re-)execution of the query specified by the generic parameter `C`
-pub fn assert_will_run_function_query<'db, C, Db, Jar>(
+/// Assert that the Salsa query described by the generic parameter `C`
+/// was executed at least once with the input `input`
+/// in the history span represented by `events`.
+pub fn assert_function_query_was_run<'db, C, Db, Jar>(
     db: &'db Db,
     to_function: impl FnOnce(&C) -> &salsa::function::FunctionIngredient<C>,
     input: &C::Input<'db>,
@@ -21,12 +22,13 @@ pub fn assert_will_run_function_query<'db, C, Db, Jar>(
     Db: salsa::DbWithJar<Jar>,
     C::Input<'db>: AsId,
 {
-    will_run_function_query(db, to_function, input, events, true);
+    function_query_was_run(db, to_function, input, events, true);
 }
 
-/// Assert that calling `to_function` with `input` as an argument
-/// will *not* result in a (re-)execution of the query specified by the generic parameter `C`
-pub fn assert_will_not_run_function_query<'db, C, Db, Jar>(
+/// Assert that there were no executions with the input `input`
+/// of the Salsa query described by the generic parameter `C`
+/// in the history span represented by `events`.
+pub fn assert_function_query_was_not_run<'db, C, Db, Jar>(
     db: &'db Db,
     to_function: impl FnOnce(&C) -> &salsa::function::FunctionIngredient<C>,
     input: &C::Input<'db>,
@@ -38,15 +40,15 @@ pub fn assert_will_not_run_function_query<'db, C, Db, Jar>(
     Db: salsa::DbWithJar<Jar>,
     C::Input<'db>: AsId,
 {
-    will_run_function_query(db, to_function, input, events, false);
+    function_query_was_run(db, to_function, input, events, false);
 }
 
-fn will_run_function_query<'db, C, Db, Jar>(
+fn function_query_was_run<'db, C, Db, Jar>(
     db: &'db Db,
     to_function: impl FnOnce(&C) -> &salsa::function::FunctionIngredient<C>,
     input: &C::Input<'db>,
     events: &[salsa::Event],
-    should_run: bool,
+    should_have_run: bool,
 ) where
     C: salsa::function::Configuration<Jar = Jar>
         + salsa::storage::IngredientsFor<Jar = Jar, Ingredients = C>,
@@ -74,18 +76,18 @@ fn will_run_function_query<'db, C, Db, Jar>(
         }
     });
 
-    if should_run && !did_run {
+    if should_have_run && !did_run {
         panic!(
-            "Expected query {:?} to run but it didn't",
+            "Expected query {:?} to have run but it didn't",
             DebugIdx {
                 db: PhantomData::<Db>,
                 value_id: input.as_id(),
                 ingredient: function_ingredient,
             }
         );
-    } else if !should_run && did_run {
+    } else if !should_have_run && did_run {
         panic!(
-            "Expected query {:?} not to run but it did",
+            "Expected query {:?} not to have run but it did",
             DebugIdx {
                 db: PhantomData::<Db>,
                 value_id: input.as_id(),
