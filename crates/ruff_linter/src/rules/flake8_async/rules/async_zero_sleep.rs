@@ -7,7 +7,6 @@ use ruff_text_size::Ranged;
 use crate::checkers::ast::Checker;
 use crate::importer::ImportRequest;
 use crate::rules::flake8_async::helpers::AsyncModule;
-use crate::settings::types::PreviewMode;
 
 /// ## What it does
 /// Checks for uses of `trio.sleep(0)` or `anyio.sleep(0)`.
@@ -83,43 +82,31 @@ pub(crate) fn async_zero_sleep(checker: &mut Checker, call: &ExprCall) {
         return;
     };
 
-    if matches!(checker.settings.preview, PreviewMode::Disabled) {
-        if matches!(qualified_name.segments(), ["trio", "sleep"]) {
-            let mut diagnostic = Diagnostic::new(
-                AsyncZeroSleep {
-                    module: AsyncModule::Trio,
-                },
-                call.range(),
-            );
-            diagnostic.try_set_fix(|| {
-                let (import_edit, binding) = checker.importer().get_or_import_symbol(
-                    &ImportRequest::import_from("trio", "lowlevel"),
-                    call.func.start(),
-                    checker.semantic(),
-                )?;
-                let reference_edit =
-                    Edit::range_replacement(format!("{binding}.checkpoint"), call.func.range());
-                let arg_edit = Edit::range_replacement("()".to_string(), call.arguments.range());
-                Ok(Fix::safe_edits(import_edit, [reference_edit, arg_edit]))
-            });
-            checker.diagnostics.push(diagnostic);
+    if let Some(module) = AsyncModule::try_from(&qualified_name) {
+        let is_relevant_module = if checker.settings.preview.is_enabled() {
+            matches!(module, AsyncModule::Trio | AsyncModule::AnyIo)
+        } else {
+            matches!(module, AsyncModule::Trio)
+        };
+
+        let is_sleep = is_relevant_module && matches!(qualified_name.segments(), [_, "sleep"]);
+
+        if !is_sleep {
+            return;
         }
-    } else {
-        if matches!(qualified_name.segments(), ["trio" | "anyio", "sleep"]) {
-            let module = AsyncModule::try_from(&qualified_name).unwrap();
-            let mut diagnostic = Diagnostic::new(AsyncZeroSleep { module }, call.range());
-            diagnostic.try_set_fix(|| {
-                let (import_edit, binding) = checker.importer().get_or_import_symbol(
-                    &ImportRequest::import_from(&module.to_string(), "lowlevel"),
-                    call.func.start(),
-                    checker.semantic(),
-                )?;
-                let reference_edit =
-                    Edit::range_replacement(format!("{binding}.checkpoint"), call.func.range());
-                let arg_edit = Edit::range_replacement("()".to_string(), call.arguments.range());
-                Ok(Fix::safe_edits(import_edit, [reference_edit, arg_edit]))
-            });
-            checker.diagnostics.push(diagnostic);
-        }
+
+        let mut diagnostic = Diagnostic::new(AsyncZeroSleep { module }, call.range());
+        diagnostic.try_set_fix(|| {
+            let (import_edit, binding) = checker.importer().get_or_import_symbol(
+                &ImportRequest::import_from(&module.to_string(), "lowlevel"),
+                call.func.start(),
+                checker.semantic(),
+            )?;
+            let reference_edit =
+                Edit::range_replacement(format!("{binding}.checkpoint"), call.func.range());
+            let arg_edit = Edit::range_replacement("()".to_string(), call.arguments.range());
+            Ok(Fix::safe_edits(import_edit, [reference_edit, arg_edit]))
+        });
+        checker.diagnostics.push(diagnostic);
     }
 }
