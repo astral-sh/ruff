@@ -71,17 +71,6 @@ pub(crate) fn long_sleep_not_forever(checker: &mut Checker, call: &ExprCall) {
         return;
     };
 
-    let Some(qualified_name) = checker
-        .semantic()
-        .resolve_qualified_name(call.func.as_ref())
-    else {
-        return;
-    };
-
-    if !matches!(qualified_name.segments(), ["trio" | "anyio", "sleep"]) {
-        return;
-    }
-
     let Expr::NumberLiteral(ExprNumberLiteral { value, .. }) = arg else {
         return;
     };
@@ -107,36 +96,40 @@ pub(crate) fn long_sleep_not_forever(checker: &mut Checker, call: &ExprCall) {
         Number::Complex { .. } => return,
     }
 
-    let module = AsyncModule::try_from(&qualified_name).unwrap();
-    if checker.settings.preview.is_enabled() {
-        let mut diagnostic = Diagnostic::new(LongSleepNotForever { module }, call.range());
-        let replacement_function = "sleep_forever";
-        diagnostic.try_set_fix(|| {
-            let (import_edit, binding) = checker.importer().get_or_import_symbol(
-                &ImportRequest::import_from(&module.to_string(), replacement_function),
-                call.func.start(),
-                checker.semantic(),
-            )?;
-            let reference_edit = Edit::range_replacement(binding, call.func.range());
-            let arg_edit = Edit::range_replacement("()".to_string(), call.arguments.range());
-            Ok(Fix::unsafe_edits(import_edit, [reference_edit, arg_edit]))
-        });
-        checker.diagnostics.push(diagnostic);
+    let Some(qualified_name) = checker
+        .semantic()
+        .resolve_qualified_name(call.func.as_ref())
+    else {
+        return;
+    };
+
+    let Some(module) = AsyncModule::try_from(&qualified_name) else {
+        return;
+    };
+
+    let is_relevant_module = if checker.settings.preview.is_enabled() {
+        matches!(module, AsyncModule::AnyIo | AsyncModule::Trio)
     } else {
-        if matches!(module, AsyncModule::Trio) {
-            let mut diagnostic = Diagnostic::new(LongSleepNotForever { module }, call.range());
-            let replacement_function = "sleep_forever";
-            diagnostic.try_set_fix(|| {
-                let (import_edit, binding) = checker.importer().get_or_import_symbol(
-                    &ImportRequest::import_from("trio", replacement_function),
-                    call.func.start(),
-                    checker.semantic(),
-                )?;
-                let reference_edit = Edit::range_replacement(binding, call.func.range());
-                let arg_edit = Edit::range_replacement("()".to_string(), call.arguments.range());
-                Ok(Fix::unsafe_edits(import_edit, [reference_edit, arg_edit]))
-            });
-            checker.diagnostics.push(diagnostic);
-        }
+        matches!(module, AsyncModule::Trio)
+    };
+
+    let is_sleep = is_relevant_module && matches!(qualified_name.segments(), [_, "sleep"]);
+
+    if !is_sleep {
+        return;
     }
+
+    let mut diagnostic = Diagnostic::new(LongSleepNotForever { module }, call.range());
+    let replacement_function = "sleep_forever";
+    diagnostic.try_set_fix(|| {
+        let (import_edit, binding) = checker.importer().get_or_import_symbol(
+            &ImportRequest::import_from(&module.to_string(), replacement_function),
+            call.func.start(),
+            checker.semantic(),
+        )?;
+        let reference_edit = Edit::range_replacement(binding, call.func.range());
+        let arg_edit = Edit::range_replacement("()".to_string(), call.arguments.range());
+        Ok(Fix::unsafe_edits(import_edit, [reference_edit, arg_edit]))
+    });
+    checker.diagnostics.push(diagnostic);
 }
