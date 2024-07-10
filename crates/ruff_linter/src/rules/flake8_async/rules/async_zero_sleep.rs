@@ -1,6 +1,7 @@
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::{self as ast, Expr, ExprCall, Int, Number};
+use ruff_python_semantic::Modules;
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
@@ -52,6 +53,12 @@ impl AlwaysFixableViolation for AsyncZeroSleep {
 
 /// ASYNC115
 pub(crate) fn async_zero_sleep(checker: &mut Checker, call: &ExprCall) {
+    if !(checker.semantic().seen_module(Modules::TRIO)
+        || checker.semantic().seen_module(Modules::ANYIO))
+    {
+        return;
+    }
+
     if call.arguments.len() != 1 {
         return;
     }
