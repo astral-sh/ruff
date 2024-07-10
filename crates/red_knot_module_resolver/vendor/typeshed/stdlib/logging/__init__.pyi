@@ -8,7 +8,7 @@ from string import Template
 from time import struct_time
 from types import FrameType, TracebackType
 from typing import Any, ClassVar, Generic, Literal, Protocol, TextIO, TypeVar, overload
-from typing_extensions import Self, TypeAlias
+from typing_extensions import Self, TypeAlias, deprecated
 
 if sys.version_info >= (3, 11):
     from types import GenericAlias
@@ -574,11 +574,8 @@ def disable(level: int = 50) -> None: ...
 def addLevelName(level: int, levelName: str) -> None: ...
 @overload
 def getLevelName(level: int) -> str: ...
-
-# The str -> int case is considered a mistake, but retained for backward
-# compatibility.  See
-# https://docs.python.org/3/library/logging.html#logging.getLevelName.
 @overload
+@deprecated("The str -> int case is considered a mistake.")
 def getLevelName(level: str) -> Any: ...
 
 if sys.version_info >= (3, 11):

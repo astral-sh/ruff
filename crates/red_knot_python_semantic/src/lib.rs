@@ -1,12 +1,15 @@
-pub mod ast_node_ref;
-mod db;
-pub mod name;
-mod node_key;
-pub mod semantic_index;
-pub mod types;
+use std::hash::BuildHasherDefault;
 
-type FxIndexSet<V> = indexmap::set::IndexSet<V, BuildHasherDefault<FxHasher>>;
+use rustc_hash::FxHasher;
 
 pub use db::{Db, Jar};
-use rustc_hash::FxHasher;
-use std::hash::BuildHasherDefault;
+pub use semantic_model::{HasTy, SemanticModel};
+
+pub mod ast_node_ref;
+mod db;
+mod node_key;
+pub mod semantic_index;
+mod semantic_model;
+pub mod types;
+
+type FxOrderSet<V> = ordermap::set::OrderSet<V, BuildHasherDefault<FxHasher>>;

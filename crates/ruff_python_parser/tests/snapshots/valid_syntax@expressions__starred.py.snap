@@ -18,7 +18,7 @@ Module(
                             value: Name(
                                 ExprName {
                                     range: 1..2,
-                                    id: "a",
+                                    id: Name("a"),
                                     ctx: Load,
                                 },
                             ),
@@ -39,7 +39,7 @@ Module(
                                     left: Name(
                                         ExprName {
                                             range: 5..6,
-                                            id: "a",
+                                            id: Name("a"),
                                             ctx: Load,
                                         },
                                     ),
@@ -71,12 +71,12 @@ Module(
                                     value: Name(
                                         ExprName {
                                             range: 13..14,
-                                            id: "x",
+                                            id: Name("x"),
                                             ctx: Load,
                                         },
                                     ),
                                     attr: Identifier {
-                                        id: "attr",
+                                        id: Name("attr"),
                                         range: 15..19,
                                     },
                                     ctx: Load,
@@ -94,7 +94,7 @@ Module(
                         Name(
                             ExprName {
                                 range: 21..32,
-                                id: "array_slice",
+                                id: Name("array_slice"),
                                 ctx: Store,
                             },
                         ),
@@ -105,7 +105,7 @@ Module(
                             value: Name(
                                 ExprName {
                                     range: 35..40,
-                                    id: "array",
+                                    id: Name("array"),
                                     ctx: Load,
                                 },
                             ),
@@ -127,7 +127,7 @@ Module(
                                                 value: Name(
                                                     ExprName {
                                                         range: 45..52,
-                                                        id: "indexes",
+                                                        id: Name("indexes"),
                                                         ctx: Load,
                                                     },
                                                 ),
@@ -168,7 +168,7 @@ Module(
                                 value: Name(
                                     ExprName {
                                         range: 58..63,
-                                        id: "array",
+                                        id: Name("array"),
                                         ctx: Load,
                                     },
                                 ),
@@ -190,7 +190,7 @@ Module(
                                                     value: Name(
                                                         ExprName {
                                                             range: 68..75,
-                                                            id: "indexes",
+                                                            id: Name("indexes"),
                                                             ctx: Load,
                                                         },
                                                     ),
@@ -223,7 +223,7 @@ Module(
                     value: Name(
                         ExprName {
                             range: 83..94,
-                            id: "array_slice",
+                            id: Name("array_slice"),
                             ctx: Load,
                         },
                     ),
@@ -238,7 +238,7 @@ Module(
                             value: Name(
                                 ExprName {
                                     range: 95..100,
-                                    id: "array",
+                                    id: Name("array"),
                                     ctx: Load,
                                 },
                             ),
@@ -252,7 +252,7 @@ Module(
                                                 value: Name(
                                                     ExprName {
                                                         range: 102..119,
-                                                        id: "indexes_to_select",
+                                                        id: Name("indexes_to_select"),
                                                         ctx: Load,
                                                     },
                                                 ),
@@ -265,7 +265,7 @@ Module(
                                                 value: Name(
                                                     ExprName {
                                                         range: 122..139,
-                                                        id: "indexes_to_select",
+                                                        id: Name("indexes_to_select"),
                                                         ctx: Load,
                                                     },
                                                 ),
@@ -291,7 +291,7 @@ Module(
                             value: Name(
                                 ExprName {
                                     range: 141..146,
-                                    id: "array",
+                                    id: Name("array"),
                                     ctx: Load,
                                 },
                             ),
@@ -331,7 +331,7 @@ Module(
                                                 value: Name(
                                                     ExprName {
                                                         range: 153..170,
-                                                        id: "indexes_to_select",
+                                                        id: Name("indexes_to_select"),
                                                         ctx: Load,
                                                     },
                                                 ),

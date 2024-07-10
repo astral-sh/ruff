@@ -3,36 +3,39 @@ use std::ops::Range;
 
 use bitflags::bitflags;
 use hashbrown::hash_map::RawEntryMut;
-use rustc_hash::FxHasher;
-use salsa::DebugWithDb;
-use smallvec::SmallVec;
-
-use ruff_db::vfs::VfsFile;
+use ruff_db::files::File;
+use ruff_db::parsed::ParsedModule;
 use ruff_index::{newtype_index, IndexVec};
+use ruff_python_ast::name::Name;
+use ruff_python_ast::{self as ast};
+use rustc_hash::FxHasher;
 
-use crate::name::Name;
+use crate::ast_node_ref::AstNodeRef;
+use crate::node_key::NodeKey;
 use crate::semantic_index::definition::Definition;
 use crate::semantic_index::{root_scope, semantic_index, symbol_table, SymbolMap};
 use crate::Db;
 
 #[derive(Eq, PartialEq, Debug)]
-pub struct Symbol {
+pub struct Symbol<'db> {
     name: Name,
     flags: SymbolFlags,
     /// The nodes that define this symbol, in source order.
-    definitions: SmallVec<[Definition; 4]>,
+    ///
+    /// TODO: Use smallvec here, but it creates the same lifetime issues as in [QualifiedName](https://github.com/astral-sh/ruff/blob/5109b50bb3847738eeb209352cf26bda392adf62/crates/ruff_python_ast/src/name.rs#L562-L569)
+    definitions: Vec<Definition<'db>>,
 }
 
-impl Symbol {
-    fn new(name: Name, definition: Option<Definition>) -> Self {
+impl<'db> Symbol<'db> {
+    fn new(name: Name) -> Self {
         Self {
             name,
             flags: SymbolFlags::empty(),
-            definitions: definition.into_iter().collect(),
+            definitions: Vec::new(),
         }
     }
 
-    fn push_definition(&mut self, definition: Definition) {
+    fn push_definition(&mut self, definition: Definition<'db>) {
         self.definitions.push(definition);
     }
 
@@ -76,7 +79,7 @@ bitflags! {
 #[salsa::tracked]
 pub struct PublicSymbolId<'db> {
     #[id]
-    pub(crate) file: VfsFile,
+    pub(crate) file: File,
     #[id]
     pub(crate) scoped_symbol_id: ScopedSymbolId,
 }
@@ -89,13 +92,6 @@ pub struct FileSymbolId {
 }
 
 impl FileSymbolId {
-    pub(super) fn new(scope: FileScopeId, symbol: ScopedSymbolId) -> Self {
-        Self {
-            scope,
-            scoped_symbol_id: symbol,
-        }
-    }
-
     pub fn scope(self) -> FileScopeId {
         self.scope
     }
@@ -120,48 +116,15 @@ impl ScopedSymbolId {
     ///
     /// # Panics
     /// May panic if the symbol does not belong to `file` or is not a symbol of `file`'s root scope.
-    pub(crate) fn to_public_symbol(self, db: &dyn Db, file: VfsFile) -> PublicSymbolId {
+    pub(crate) fn to_public_symbol(self, db: &dyn Db, file: File) -> PublicSymbolId {
         let symbols = public_symbols_map(db, file);
         symbols.public(self)
     }
 }
 
-/// Returns a mapping from [`FileScopeId`] to globally unique [`ScopeId`].
 #[salsa::tracked(return_ref)]
-pub(crate) fn scopes_map(db: &dyn Db, file: VfsFile) -> ScopesMap<'_> {
-    let _ = tracing::trace_span!("scopes_map", file = ?file.debug(db.upcast())).enter();
-
-    let index = semantic_index(db, file);
-
-    let scopes: IndexVec<_, _> = index
-        .scopes
-        .indices()
-        .map(|id| ScopeId::new(db, file, id))
-        .collect();
-
-    ScopesMap { scopes }
-}
-
-/// Maps from the file specific [`FileScopeId`] to the global [`ScopeId`] that can be used as a Salsa query parameter.
-///
-/// The [`SemanticIndex`] uses [`FileScopeId`] on a per-file level to identify scopes
-/// because they allow for more efficient storage of associated data
-/// (use of an [`IndexVec`] keyed by [`FileScopeId`] over an [`FxHashMap`] keyed by [`ScopeId`]).
-#[derive(Eq, PartialEq, Debug)]
-pub(crate) struct ScopesMap<'db> {
-    scopes: IndexVec<FileScopeId, ScopeId<'db>>,
-}
-
-impl<'db> ScopesMap<'db> {
-    /// Gets the program-wide unique scope id for the given file specific `scope_id`.
-    fn get(&self, scope: FileScopeId) -> ScopeId<'db> {
-        self.scopes[scope]
-    }
-}
-
-#[salsa::tracked(return_ref)]
-pub(crate) fn public_symbols_map(db: &dyn Db, file: VfsFile) -> PublicSymbolsMap<'_> {
-    let _ = tracing::trace_span!("public_symbols_map", file = ?file.debug(db.upcast())).enter();
+pub(crate) fn public_symbols_map(db: &dyn Db, file: File) -> PublicSymbolsMap<'_> {
+    let _span = tracing::trace_span!("public_symbols_map", ?file).entered();
 
     let module_scope = root_scope(db, file);
     let symbols = symbol_table(db, module_scope);
@@ -192,11 +155,29 @@ impl<'db> PublicSymbolsMap<'db> {
 /// A cross-module identifier of a scope that can be used as a salsa query parameter.
 #[salsa::tracked]
 pub struct ScopeId<'db> {
-    #[allow(clippy::used_underscore_binding)]
     #[id]
-    pub file: VfsFile,
+    pub file: File,
     #[id]
     pub file_scope_id: FileScopeId,
+
+    /// The node that introduces this scope.
+    #[no_eq]
+    #[return_ref]
+    pub node: NodeWithScopeKind,
+}
+
+impl<'db> ScopeId<'db> {
+    #[cfg(test)]
+    pub(crate) fn name(self, db: &'db dyn Db) -> &'db str {
+        match self.node(db) {
+            NodeWithScopeKind::Module => "<module>",
+            NodeWithScopeKind::Class(class) | NodeWithScopeKind::ClassTypeParameters(class) => {
+                class.name.as_str()
+            }
+            NodeWithScopeKind::Function(function)
+            | NodeWithScopeKind::FunctionTypeParameters(function) => function.name.as_str(),
+        }
+    }
 }
 
 /// ID that uniquely identifies a scope inside of a module.
@@ -209,34 +190,20 @@ impl FileScopeId {
         FileScopeId::from_u32(0)
     }
 
-    pub fn to_scope_id(self, db: &dyn Db, file: VfsFile) -> ScopeId<'_> {
-        scopes_map(db, file).get(self)
+    pub fn to_scope_id(self, db: &dyn Db, file: File) -> ScopeId<'_> {
+        let index = semantic_index(db, file);
+        index.scope_ids_by_scope[self]
     }
 }
 
 #[derive(Debug, Eq, PartialEq)]
 pub struct Scope {
-    pub(super) name: Name,
     pub(super) parent: Option<FileScopeId>,
-    pub(super) definition: Option<Definition>,
-    pub(super) defining_symbol: Option<FileSymbolId>,
     pub(super) kind: ScopeKind,
     pub(super) descendents: Range<FileScopeId>,
 }
 
 impl Scope {
-    pub fn name(&self) -> &Name {
-        &self.name
-    }
-
-    pub fn definition(&self) -> Option<Definition> {
-        self.definition
-    }
-
-    pub fn defining_symbol(&self) -> Option<FileSymbolId> {
-        self.defining_symbol
-    }
-
     pub fn parent(self) -> Option<FileScopeId> {
         self.parent
     }
@@ -256,15 +223,15 @@ pub enum ScopeKind {
 
 /// Symbol table for a specific [`Scope`].
 #[derive(Debug)]
-pub struct SymbolTable {
+pub struct SymbolTable<'db> {
     /// The symbols in this scope.
-    symbols: IndexVec<ScopedSymbolId, Symbol>,
+    symbols: IndexVec<ScopedSymbolId, Symbol<'db>>,
 
     /// The symbols indexed by name.
     symbols_by_name: SymbolMap,
 }
 
-impl SymbolTable {
+impl<'db> SymbolTable<'db> {
     fn new() -> Self {
         Self {
             symbols: IndexVec::new(),
@@ -276,21 +243,21 @@ impl SymbolTable {
         self.symbols.shrink_to_fit();
     }
 
-    pub(crate) fn symbol(&self, symbol_id: impl Into<ScopedSymbolId>) -> &Symbol {
+    pub(crate) fn symbol(&self, symbol_id: impl Into<ScopedSymbolId>) -> &Symbol<'db> {
         &self.symbols[symbol_id.into()]
     }
 
-    pub(crate) fn symbol_ids(&self) -> impl Iterator<Item = ScopedSymbolId> {
+    pub(crate) fn symbol_ids(&self) -> impl Iterator<Item = ScopedSymbolId> + 'db {
         self.symbols.indices()
     }
 
-    pub fn symbols(&self) -> impl Iterator<Item = &Symbol> {
+    pub fn symbols(&self) -> impl Iterator<Item = &Symbol<'db>> {
         self.symbols.iter()
     }
 
     /// Returns the symbol named `name`.
     #[allow(unused)]
-    pub(crate) fn symbol_by_name(&self, name: &str) -> Option<&Symbol> {
+    pub(crate) fn symbol_by_name(&self, name: &str) -> Option<&Symbol<'db>> {
         let id = self.symbol_id_by_name(name)?;
         Some(self.symbol(id))
     }
@@ -314,21 +281,21 @@ impl SymbolTable {
     }
 }
 
-impl PartialEq for SymbolTable {
+impl PartialEq for SymbolTable<'_> {
     fn eq(&self, other: &Self) -> bool {
         // We don't need to compare the symbols_by_name because the name is already captured in `Symbol`.
         self.symbols == other.symbols
     }
 }
 
-impl Eq for SymbolTable {}
+impl Eq for SymbolTable<'_> {}
 
 #[derive(Debug)]
-pub(super) struct SymbolTableBuilder {
-    table: SymbolTable,
+pub(super) struct SymbolTableBuilder<'db> {
+    table: SymbolTable<'db>,
 }
 
-impl SymbolTableBuilder {
+impl<'db> SymbolTableBuilder<'db> {
     pub(super) fn new() -> Self {
         Self {
             table: SymbolTable::new(),
@@ -339,7 +306,6 @@ impl SymbolTableBuilder {
         &mut self,
         name: Name,
         flags: SymbolFlags,
-        definition: Option<Definition>,
     ) -> ScopedSymbolId {
         let hash = SymbolTable::hash_name(&name);
         let entry = self
@@ -353,14 +319,10 @@ impl SymbolTableBuilder {
                 let symbol = &mut self.table.symbols[*entry.key()];
                 symbol.insert_flags(flags);
 
-                if let Some(definition) = definition {
-                    symbol.push_definition(definition);
-                }
-
                 *entry.key()
             }
             RawEntryMut::Vacant(entry) => {
-                let mut symbol = Symbol::new(name, definition);
+                let mut symbol = Symbol::new(name);
                 symbol.insert_flags(flags);
 
                 let id = self.table.symbols.push(symbol);
@@ -372,8 +334,92 @@ impl SymbolTableBuilder {
         }
     }
 
-    pub(super) fn finish(mut self) -> SymbolTable {
+    pub(super) fn add_definition(&mut self, symbol: ScopedSymbolId, definition: Definition<'db>) {
+        self.table.symbols[symbol].push_definition(definition);
+    }
+
+    pub(super) fn finish(mut self) -> SymbolTable<'db> {
         self.table.shrink_to_fit();
         self.table
     }
+}
+
+/// Reference to a node that introduces a new scope.
+#[derive(Copy, Clone, Debug)]
+pub(crate) enum NodeWithScopeRef<'a> {
+    Module,
+    Class(&'a ast::StmtClassDef),
+    Function(&'a ast::StmtFunctionDef),
+    FunctionTypeParameters(&'a ast::StmtFunctionDef),
+    ClassTypeParameters(&'a ast::StmtClassDef),
+}
+
+impl NodeWithScopeRef<'_> {
+    /// Converts the unowned reference to an owned [`NodeWithScopeKind`].
+    ///
+    /// # Safety
+    /// The node wrapped by `self` must be a child of `module`.
+    #[allow(unsafe_code)]
+    pub(super) unsafe fn to_kind(self, module: ParsedModule) -> NodeWithScopeKind {
+        match self {
+            NodeWithScopeRef::Module => NodeWithScopeKind::Module,
+            NodeWithScopeRef::Class(class) => {
+                NodeWithScopeKind::Class(AstNodeRef::new(module, class))
+            }
+            NodeWithScopeRef::Function(function) => {
+                NodeWithScopeKind::Function(AstNodeRef::new(module, function))
+            }
+            NodeWithScopeRef::FunctionTypeParameters(function) => {
+                NodeWithScopeKind::FunctionTypeParameters(AstNodeRef::new(module, function))
+            }
+            NodeWithScopeRef::ClassTypeParameters(class) => {
+                NodeWithScopeKind::Class(AstNodeRef::new(module, class))
+            }
+        }
+    }
+
+    pub(super) fn scope_kind(self) -> ScopeKind {
+        match self {
+            NodeWithScopeRef::Module => ScopeKind::Module,
+            NodeWithScopeRef::Class(_) => ScopeKind::Class,
+            NodeWithScopeRef::Function(_) => ScopeKind::Function,
+            NodeWithScopeRef::FunctionTypeParameters(_)
+            | NodeWithScopeRef::ClassTypeParameters(_) => ScopeKind::Annotation,
+        }
+    }
+
+    pub(crate) fn node_key(self) -> NodeWithScopeKey {
+        match self {
+            NodeWithScopeRef::Module => NodeWithScopeKey::Module,
+            NodeWithScopeRef::Class(class) => NodeWithScopeKey::Class(NodeKey::from_node(class)),
+            NodeWithScopeRef::Function(function) => {
+                NodeWithScopeKey::Function(NodeKey::from_node(function))
+            }
+            NodeWithScopeRef::FunctionTypeParameters(function) => {
+                NodeWithScopeKey::FunctionTypeParameters(NodeKey::from_node(function))
+            }
+            NodeWithScopeRef::ClassTypeParameters(class) => {
+                NodeWithScopeKey::ClassTypeParameters(NodeKey::from_node(class))
+            }
+        }
+    }
+}
+
+/// Node that introduces a new scope.
+#[derive(Clone, Debug)]
+pub enum NodeWithScopeKind {
+    Module,
+    Class(AstNodeRef<ast::StmtClassDef>),
+    ClassTypeParameters(AstNodeRef<ast::StmtClassDef>),
+    Function(AstNodeRef<ast::StmtFunctionDef>),
+    FunctionTypeParameters(AstNodeRef<ast::StmtFunctionDef>),
+}
+
+#[derive(Copy, Clone, Debug, Eq, PartialEq, Hash)]
+pub(crate) enum NodeWithScopeKey {
+    Module,
+    Class(NodeKey),
+    ClassTypeParameters(NodeKey),
+    Function(NodeKey),
+    FunctionTypeParameters(NodeKey),
 }

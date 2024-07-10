@@ -683,6 +683,39 @@ pub fn match_any_exclusion(
     None
 }
 
+#[derive(Debug, Copy, Clone)]
+pub enum InclusionKind {
+    /// The inclusion came from the `include` setting.
+    Include,
+    /// The inclusion came from the `extend-include` setting.
+    ExtendInclude,
+}
+
+impl std::fmt::Display for InclusionKind {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            InclusionKind::Include => write!(f, "include"),
+            InclusionKind::ExtendInclude => write!(f, "extend-include"),
+        }
+    }
+}
+
+/// Return the [`InclusionKind`] for a given [`Path`], if the path match any of the inclusion
+/// criteria.
+pub fn match_any_inclusion(
+    path: &Path,
+    include: &GlobSet,
+    extend_include: &GlobSet,
+) -> Option<InclusionKind> {
+    if include.is_match(path) {
+        Some(InclusionKind::Include)
+    } else if extend_include.is_match(path) {
+        Some(InclusionKind::ExtendInclude)
+    } else {
+        None
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use std::fs::{create_dir, File};

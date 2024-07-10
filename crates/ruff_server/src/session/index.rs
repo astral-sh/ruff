@@ -145,14 +145,16 @@ impl Index {
         encoding: PositionEncoding,
     ) -> crate::Result<()> {
         // update notebook cell index
-        if let Some(lsp_types::NotebookDocumentCellChangeStructure { did_open, .. }) =
-            cells.as_ref().and_then(|cells| cells.structure.as_ref())
+        if let Some(lsp_types::NotebookDocumentCellChangeStructure {
+            did_open: Some(did_open),
+            ..
+        }) = cells.as_ref().and_then(|cells| cells.structure.as_ref())
         {
             let Some(path) = self.url_for_key(key).cloned() else {
                 anyhow::bail!("Tried to open unavailable document `{key}`");
             };
 
-            for opened_cell in did_open.iter().flatten() {
+            for opened_cell in did_open {
                 self.notebook_cells
                     .insert(opened_cell.uri.clone(), path.clone());
             }

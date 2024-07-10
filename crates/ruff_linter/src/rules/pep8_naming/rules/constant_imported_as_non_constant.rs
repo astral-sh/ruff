@@ -54,7 +54,7 @@ pub(crate) fn constant_imported_as_non_constant(
 ) -> Option<Diagnostic> {
     if str::is_cased_uppercase(name) && !str::is_cased_uppercase(asname) {
         // Ignore any explicitly-allowed names.
-        if ignore_names.matches(asname) {
+        if ignore_names.matches(name) || ignore_names.matches(asname) {
             return None;
         }
         let mut diagnostic = Diagnostic::new(

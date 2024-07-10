@@ -16,17 +16,17 @@ use ruff_notebook::NotebookError;
 use ruff_python_ast::PySourceType;
 use ruff_python_codegen::Stylist;
 use ruff_python_index::Indexer;
+use ruff_python_parser::ParseError;
 use ruff_python_trivia::textwrap::dedent;
 use ruff_source_file::{Locator, SourceFileBuilder};
 use ruff_text_size::Ranged;
 
 use crate::directives;
 use crate::fix::{fix_file, FixResult};
-use crate::linter::{check_path, LinterResult};
+use crate::linter::check_path;
 use crate::message::{Emitter, EmitterContext, Message, TextEmitter};
 use crate::packaging::detect_package_root;
 use crate::registry::AsRule;
-use crate::rules::pycodestyle::rules::syntax_error;
 use crate::settings::types::UnsafeFixes;
 use crate::settings::{flags, LinterSettings};
 use crate::source_kind::SourceKind;
@@ -119,10 +119,7 @@ pub(crate) fn test_contents<'a>(
         &locator,
         &indexer,
     );
-    let LinterResult {
-        data: diagnostics,
-        error,
-    } = check_path(
+    let diagnostics = check_path(
         path,
         path.parent()
             .and_then(|parent| detect_package_root(parent, &settings.namespace_packages)),
@@ -137,7 +134,7 @@ pub(crate) fn test_contents<'a>(
         &parsed,
     );
 
-    let source_has_errors = error.is_some();
+    let source_has_errors = !parsed.is_valid();
 
     // Detect fixes that don't converge after multiple iterations.
     let mut iterations = 0;
@@ -186,10 +183,7 @@ pub(crate) fn test_contents<'a>(
                 &indexer,
             );
 
-            let LinterResult {
-                data: fixed_diagnostics,
-                error: fixed_error,
-            } = check_path(
+            let fixed_diagnostics = check_path(
                 path,
                 None,
                 &locator,
@@ -203,25 +197,21 @@ pub(crate) fn test_contents<'a>(
                 &parsed,
             );
 
-            if let Some(fixed_error) = fixed_error {
-                if !source_has_errors {
-                    // Previous fix introduced a syntax error, abort
-                    let fixes = print_diagnostics(diagnostics, path, source_kind);
+            if !parsed.is_valid() && !source_has_errors {
+                // Previous fix introduced a syntax error, abort
+                let fixes = print_diagnostics(diagnostics, path, source_kind);
+                let syntax_errors =
+                    print_syntax_errors(parsed.errors(), path, &locator, &transformed);
 
-                    let mut syntax_diagnostics = Vec::new();
-                    syntax_error(&mut syntax_diagnostics, &fixed_error, &locator);
-                    let syntax_errors = print_diagnostics(syntax_diagnostics, path, &transformed);
-
-                    panic!(
-                        r#"Fixed source has a syntax error where the source document does not. This is a bug in one of the generated fixes:
+                panic!(
+                    "Fixed source has a syntax error where the source document does not. This is a bug in one of the generated fixes:
 {syntax_errors}
 Last generated fixes:
 {fixes}
 Source with applied fixes:
-{}"#,
-                        transformed.source_code()
-                    );
-                }
+{}",
+                    transformed.source_code()
+                );
             }
 
             diagnostics = fixed_diagnostics;
@@ -238,7 +228,12 @@ Source with applied fixes:
         .into_iter()
         .map(|diagnostic| {
             let rule = diagnostic.kind.rule();
-            let fixable = diagnostic.fix.as_ref().is_some_and(|fix| matches!(fix.applicability(), Applicability::Safe | Applicability::Unsafe));
+            let fixable = diagnostic.fix.as_ref().is_some_and(|fix| {
+                matches!(
+                    fix.applicability(),
+                    Applicability::Safe | Applicability::Unsafe
+                )
+            });
 
             match (fixable, rule.fixable()) {
                 (true, FixAvailability::Sometimes | FixAvailability::Always)
@@ -246,23 +241,63 @@ Source with applied fixes:
                     // Ok
                 }
                 (true, FixAvailability::None) => {
-                    panic!("Rule {rule:?} is marked as non-fixable but it created a fix. Change the `Violation::FIX_AVAILABILITY` to either `FixAvailability::Sometimes` or `FixAvailability::Always`");
-                },
+                    panic!(
+                        "Rule {rule:?} is marked as non-fixable but it created a fix.
+Change the `Violation::FIX_AVAILABILITY` to either \
+`FixAvailability::Sometimes` or `FixAvailability::Always`"
+                    );
+                }
+                (false, FixAvailability::Always) if source_has_errors => {
+                    // Ok
+                }
                 (false, FixAvailability::Always) => {
-                    panic!("Rule {rule:?} is marked to always-fixable but the diagnostic has no fix. Either ensure you always emit a fix or change `Violation::FIX_AVAILABILITY` to either `FixAvailability::Sometimes` or `FixAvailability::None")
+                    panic!(
+                        "\
+Rule {rule:?} is marked to always-fixable but the diagnostic has no fix.
+Either ensure you always emit a fix or change `Violation::FIX_AVAILABILITY` to either \
+`FixAvailability::Sometimes` or `FixAvailability::None`"
+                    )
                 }
             }
 
-            assert!(!(fixable && diagnostic.kind.suggestion.is_none()), "Diagnostic emitted by {rule:?} is fixable but `Violation::fix_title` returns `None`.`");
+            assert!(
+                !(fixable && diagnostic.kind.suggestion.is_none()),
+                "Diagnostic emitted by {rule:?} is fixable but \
+                `Violation::fix_title` returns `None`"
+            );
 
             // Not strictly necessary but adds some coverage for this code path
             let noqa = directives.noqa_line_for.resolve(diagnostic.start());
 
             Message::from_diagnostic(diagnostic, source_code.clone(), noqa)
         })
+        .chain(parsed.errors().iter().map(|parse_error| {
+            Message::from_parse_error(parse_error, &locator, source_code.clone())
+        }))
         .sorted()
         .collect();
     (messages, transformed)
+}
+
+fn print_syntax_errors(
+    errors: &[ParseError],
+    path: &Path,
+    locator: &Locator,
+    source: &SourceKind,
+) -> String {
+    let filename = path.file_name().unwrap().to_string_lossy();
+    let source_file = SourceFileBuilder::new(filename.as_ref(), source.source_code()).finish();
+
+    let messages: Vec<_> = errors
+        .iter()
+        .map(|parse_error| Message::from_parse_error(parse_error, locator, source_file.clone()))
+        .collect();
+
+    if let Some(notebook) = source.as_ipy_notebook() {
+        print_jupyter_messages(&messages, path, notebook)
+    } else {
+        print_messages(&messages)
+    }
 }
 
 fn print_diagnostics(diagnostics: Vec<Diagnostic>, path: &Path, source: &SourceKind) -> String {

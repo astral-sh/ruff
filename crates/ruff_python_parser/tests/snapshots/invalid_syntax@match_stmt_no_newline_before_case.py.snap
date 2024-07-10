@@ -15,7 +15,7 @@ Module(
                     subject: Name(
                         ExprName {
                             range: 6..9,
-                            id: "foo",
+                            id: Name("foo"),
                             ctx: Load,
                         },
                     ),

@@ -156,14 +156,16 @@ enum MinMax {
 }
 
 impl MinMax {
-    fn reverse(self) -> Self {
+    #[must_use]
+    const fn reverse(self) -> Self {
         match self {
             Self::Min => Self::Max,
             Self::Max => Self::Min,
         }
     }
 
-    fn as_str(self) -> &'static str {
+    #[must_use]
+    const fn as_str(self) -> &'static str {
         match self {
             Self::Min => "min",
             Self::Max => "max",

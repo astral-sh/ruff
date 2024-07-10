@@ -14,9 +14,11 @@ license = { workspace = true }
 ruff_db = { workspace = true }
 ruff_python_stdlib = { workspace = true }
 
+compact_str = { workspace = true }
+camino = { workspace = true }
+once_cell = { workspace = true }
 rustc-hash = { workspace = true }
 salsa = { workspace = true }
-smol_str = { workspace = true }
 tracing = { workspace = true }
 zip = { workspace = true }
 

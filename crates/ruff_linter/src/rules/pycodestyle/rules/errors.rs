@@ -1,11 +1,5 @@
-use ruff_python_parser::ParseError;
-use ruff_text_size::{TextLen, TextRange, TextSize};
-
-use ruff_diagnostics::{Diagnostic, Violation};
+use ruff_diagnostics::Violation;
 use ruff_macros::{derive_message_formats, violation};
-use ruff_source_file::Locator;
-
-use crate::logging::DisplayParseErrorType;
 
 /// ## What it does
 /// This is not a regular diagnostic; instead, it's raised when a file cannot be read
@@ -43,6 +37,10 @@ impl Violation for IOError {
     }
 }
 
+/// ## Deprecated
+/// This rule has been deprecated and will be removed in a future release. Syntax errors will
+/// always be shown regardless of whether this rule is selected or not.
+///
 /// ## What it does
 /// Checks for code that contains syntax errors.
 ///
@@ -73,28 +71,4 @@ impl Violation for SyntaxError {
         let SyntaxError { message } = self;
         format!("SyntaxError: {message}")
     }
-}
-
-/// E901
-pub(crate) fn syntax_error(
-    diagnostics: &mut Vec<Diagnostic>,
-    parse_error: &ParseError,
-    locator: &Locator,
-) {
-    let rest = locator.after(parse_error.location.start());
-
-    // Try to create a non-empty range so that the diagnostic can print a caret at the
-    // right position. This requires that we retrieve the next character, if any, and take its length
-    // to maintain char-boundaries.
-    let len = rest
-        .chars()
-        .next()
-        .map_or(TextSize::new(0), TextLen::text_len);
-
-    diagnostics.push(Diagnostic::new(
-        SyntaxError {
-            message: format!("{}", DisplayParseErrorType::new(&parse_error.error)),
-        },
-        TextRange::at(parse_error.location.start(), len),
-    ));
 }

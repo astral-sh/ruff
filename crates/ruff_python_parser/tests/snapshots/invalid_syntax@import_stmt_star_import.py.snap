@@ -24,7 +24,7 @@ Module(
                             value: Name(
                                 ExprName {
                                     range: 8..8,
-                                    id: "",
+                                    id: Name(""),
                                     ctx: Invalid,
                                 },
                             ),
@@ -40,7 +40,7 @@ Module(
                         Alias {
                             range: 16..17,
                             name: Identifier {
-                                id: "x",
+                                id: Name("x"),
                                 range: 16..17,
                             },
                             asname: None,
@@ -61,7 +61,7 @@ Module(
                                         value: Name(
                                             ExprName {
                                                 range: 20..20,
-                                                id: "",
+                                                id: Name(""),
                                                 ctx: Invalid,
                                             },
                                         ),
@@ -71,7 +71,7 @@ Module(
                                 Name(
                                     ExprName {
                                         range: 22..23,
-                                        id: "y",
+                                        id: Name("y"),
                                         ctx: Load,
                                     },
                                 ),

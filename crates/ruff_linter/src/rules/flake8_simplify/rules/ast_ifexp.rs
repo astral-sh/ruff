@@ -4,6 +4,7 @@ use ruff_text_size::{Ranged, TextRange};
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::helpers::{is_const_false, is_const_true};
+use ruff_python_ast::name::Name;
 use ruff_python_ast::parenthesize::parenthesized_range;
 
 use crate::checkers::ast::Checker;
@@ -178,7 +179,7 @@ pub(crate) fn if_expr_with_true_false(
                 &ast::ExprCall {
                     func: Box::new(
                         ast::ExprName {
-                            id: "bool".into(),
+                            id: Name::new_static("bool"),
                             ctx: ExprContext::Load,
                             range: TextRange::default(),
                         }

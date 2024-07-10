@@ -574,6 +574,86 @@ pub(crate) fn numpy_2_0_deprecation(checker: &mut Checker, expr: &Expr) {
                     compatibility: Compatibility::BackwardsCompatible,
                 },
             }),
+            ["numpy", "AxisError"] => Some(Replacement {
+                existing: "AxisError",
+                details: Details::AutoImport {
+                    path: "numpy.exceptions",
+                    name: "AxisError",
+                    compatibility: Compatibility::BackwardsCompatible,
+                },
+            }),
+            ["numpy", "ComplexWarning"] => Some(Replacement {
+                existing: "ComplexWarning",
+                details: Details::AutoImport {
+                    path: "numpy.exceptions",
+                    name: "ComplexWarning",
+                    compatibility: Compatibility::BackwardsCompatible,
+                },
+            }),
+            ["numpy", "DTypePromotionError"] => Some(Replacement {
+                existing: "DTypePromotionError",
+                details: Details::AutoImport {
+                    path: "numpy.exceptions",
+                    name: "DTypePromotionError",
+                    compatibility: Compatibility::BackwardsCompatible,
+                },
+            }),
+            ["numpy", "ModuleDeprecationWarning"] => Some(Replacement {
+                existing: "ModuleDeprecationWarning",
+                details: Details::AutoImport {
+                    path: "numpy.exceptions",
+                    name: "ModuleDeprecationWarning",
+                    compatibility: Compatibility::BackwardsCompatible,
+                },
+            }),
+            ["numpy", "RankWarning"] => Some(Replacement {
+                existing: "RankWarning",
+                details: Details::AutoImport {
+                    path: "numpy.exceptions",
+                    name: "RankWarning",
+                    compatibility: Compatibility::Breaking,
+                },
+            }),
+            ["numpy", "TooHardError"] => Some(Replacement {
+                existing: "TooHardError",
+                details: Details::AutoImport {
+                    path: "numpy.exceptions",
+                    name: "TooHardError",
+                    compatibility: Compatibility::BackwardsCompatible,
+                },
+            }),
+            ["numpy", "VisibleDeprecationWarning"] => Some(Replacement {
+                existing: "VisibleDeprecationWarning",
+                details: Details::AutoImport {
+                    path: "numpy.exceptions",
+                    name: "VisibleDeprecationWarning",
+                    compatibility: Compatibility::BackwardsCompatible,
+                },
+            }),
+            ["numpy", "compare_chararrays"] => Some(Replacement {
+                existing: "compare_chararrays",
+                details: Details::AutoImport {
+                    path: "numpy.char",
+                    name: "compare_chararrays",
+                    compatibility: Compatibility::BackwardsCompatible,
+                },
+            }),
+            ["numpy", "chararray"] => Some(Replacement {
+                existing: "chararray",
+                details: Details::AutoImport {
+                    path: "numpy.char",
+                    name: "chararray",
+                    compatibility: Compatibility::BackwardsCompatible,
+                },
+            }),
+            ["numpy", "format_parser"] => Some(Replacement {
+                existing: "format_parser",
+                details: Details::AutoImport {
+                    path: "numpy.rec",
+                    name: "format_parser",
+                    compatibility: Compatibility::BackwardsCompatible,
+                },
+            }),
             _ => None,
         });
 

@@ -18,14 +18,14 @@ Module(
                             target: Name(
                                 ExprName {
                                     range: 62..63,
-                                    id: "x",
+                                    id: Name("x"),
                                     ctx: Store,
                                 },
                             ),
                             value: Name(
                                 ExprName {
                                     range: 68..71,
-                                    id: "def",
+                                    id: Name("def"),
                                     ctx: Load,
                                 },
                             ),
@@ -42,7 +42,7 @@ Module(
                             func: Name(
                                 ExprName {
                                     range: 72..75,
-                                    id: "foo",
+                                    id: Name("foo"),
                                     ctx: Load,
                                 },
                             ),
@@ -56,7 +56,7 @@ Module(
                     annotation: Name(
                         ExprName {
                             range: 83..87,
-                            id: "pass",
+                            id: Name("pass"),
                             ctx: Load,
                         },
                     ),

@@ -1,18 +1,19 @@
 use std::borrow::Cow;
-use std::cell::RefCell;
 use std::collections::BTreeMap;
 use std::fmt::{self, Debug};
 use std::io::{self, Read};
-use std::sync::{Mutex, MutexGuard};
+use std::sync::{Arc, Mutex, MutexGuard};
 
-use zip::{read::ZipFile, ZipArchive};
+use zip::{read::ZipFile, ZipArchive, ZipWriter};
 
 use crate::file_revision::FileRevision;
-pub use path::{VendoredPath, VendoredPathBuf};
 
-pub mod path;
+pub use self::path::{VendoredPath, VendoredPathBuf};
+
+mod path;
 
 type Result<T> = io::Result<T>;
+type LockedZipArchive<'a> = MutexGuard<'a, VendoredZipArchive>;
 
 /// File system that stores all content in a static zip archive
 /// bundled as part of the Ruff binary.
@@ -20,48 +21,75 @@ type Result<T> = io::Result<T>;
 /// "Files" in the `VendoredFileSystem` are read-only and immutable.
 /// Directories are supported, but symlinks and hardlinks cannot exist.
 pub struct VendoredFileSystem {
-    inner: VendoredFileSystemInner,
+    inner: Arc<Mutex<VendoredZipArchive>>,
 }
 
 impl VendoredFileSystem {
-    pub fn new(raw_bytes: &'static [u8]) -> Result<Self> {
+    pub fn new_static(raw_bytes: &'static [u8]) -> Result<Self> {
+        Self::new_impl(Cow::Borrowed(raw_bytes))
+    }
+
+    pub fn new(raw_bytes: Vec<u8>) -> Result<Self> {
+        Self::new_impl(Cow::Owned(raw_bytes))
+    }
+
+    fn new_impl(data: Cow<'static, [u8]>) -> Result<Self> {
         Ok(Self {
-            inner: VendoredFileSystemInner::new(raw_bytes)?,
+            inner: Arc::new(Mutex::new(VendoredZipArchive::new(data)?)),
         })
     }
 
-    pub fn exists(&self, path: &VendoredPath) -> bool {
-        let normalized = NormalizedVendoredPath::from(path);
-        let inner_locked = self.inner.lock();
-        let mut archive = inner_locked.borrow_mut();
-
-        // Must probe the zipfile twice, as "stdlib" and "stdlib/" are considered
-        // different paths in a zip file, but we want to abstract over that difference here
-        // so that paths relative to the `VendoredFileSystem`
-        // work the same as other paths in Ruff.
-        archive.lookup_path(&normalized).is_ok()
-            || archive
-                .lookup_path(&normalized.with_trailing_slash())
-                .is_ok()
+    pub fn snapshot(&self) -> Self {
+        Self {
+            inner: Arc::clone(&self.inner),
+        }
     }
 
-    pub fn metadata(&self, path: &VendoredPath) -> Option<Metadata> {
-        let normalized = NormalizedVendoredPath::from(path);
-        let inner_locked = self.inner.lock();
+    pub fn exists(&self, path: impl AsRef<VendoredPath>) -> bool {
+        fn exists(fs: &VendoredFileSystem, path: &VendoredPath) -> bool {
+            let normalized = NormalizedVendoredPath::from(path);
+            let mut archive = fs.lock_archive();
 
-        // Must probe the zipfile twice, as "stdlib" and "stdlib/" are considered
-        // different paths in a zip file, but we want to abstract over that difference here
-        // so that paths relative to the `VendoredFileSystem`
-        // work the same as other paths in Ruff.
-        let mut archive = inner_locked.borrow_mut();
-        if let Ok(zip_file) = archive.lookup_path(&normalized) {
-            return Some(Metadata::from_zip_file(zip_file));
-        }
-        if let Ok(zip_file) = archive.lookup_path(&normalized.with_trailing_slash()) {
-            return Some(Metadata::from_zip_file(zip_file));
+            // Must probe the zipfile twice, as "stdlib" and "stdlib/" are considered
+            // different paths in a zip file, but we want to abstract over that difference here
+            // so that paths relative to the `VendoredFileSystem`
+            // work the same as other paths in Ruff.
+            archive.lookup_path(&normalized).is_ok()
+                || archive
+                    .lookup_path(&normalized.with_trailing_slash())
+                    .is_ok()
         }
 
-        None
+        exists(self, path.as_ref())
+    }
+
+    pub fn metadata(&self, path: impl AsRef<VendoredPath>) -> Result<Metadata> {
+        fn metadata(fs: &VendoredFileSystem, path: &VendoredPath) -> Result<Metadata> {
+            let normalized = NormalizedVendoredPath::from(path);
+            let mut archive = fs.lock_archive();
+
+            // Must probe the zipfile twice, as "stdlib" and "stdlib/" are considered
+            // different paths in a zip file, but we want to abstract over that difference here
+            // so that paths relative to the `VendoredFileSystem`
+            // work the same as other paths in Ruff.
+            if let Ok(zip_file) = archive.lookup_path(&normalized) {
+                return Ok(Metadata::from_zip_file(zip_file));
+            }
+            let zip_file = archive.lookup_path(&normalized.with_trailing_slash())?;
+            Ok(Metadata::from_zip_file(zip_file))
+        }
+
+        metadata(self, path.as_ref())
+    }
+
+    pub fn is_directory(&self, path: impl AsRef<VendoredPath>) -> bool {
+        self.metadata(path)
+            .is_ok_and(|metadata| metadata.kind().is_directory())
+    }
+
+    pub fn is_file(&self, path: impl AsRef<VendoredPath>) -> bool {
+        self.metadata(path)
+            .is_ok_and(|metadata| metadata.kind().is_file())
     }
 
     /// Read the entire contents of the zip file at `path` into a string
@@ -70,48 +98,65 @@ impl VendoredFileSystem {
     /// - The path does not exist in the underlying zip archive
     /// - The path exists in the underlying zip archive, but represents a directory
     /// - The contents of the zip file at `path` contain invalid UTF-8
-    pub fn read(&self, path: &VendoredPath) -> Result<String> {
-        let inner_locked = self.inner.lock();
-        let mut archive = inner_locked.borrow_mut();
-        let mut zip_file = archive.lookup_path(&NormalizedVendoredPath::from(path))?;
-        let mut buffer = String::new();
-        zip_file.read_to_string(&mut buffer)?;
-        Ok(buffer)
+    pub fn read_to_string(&self, path: impl AsRef<VendoredPath>) -> Result<String> {
+        fn read_to_string(fs: &VendoredFileSystem, path: &VendoredPath) -> Result<String> {
+            let mut archive = fs.lock_archive();
+            let mut zip_file = archive.lookup_path(&NormalizedVendoredPath::from(path))?;
+            let mut buffer = String::new();
+            zip_file.read_to_string(&mut buffer)?;
+            Ok(buffer)
+        }
+
+        read_to_string(self, path.as_ref())
+    }
+
+    /// Acquire a lock on the underlying zip archive.
+    /// The call will block until it is able to acquire the lock.
+    ///
+    /// ## Panics:
+    /// If the current thread already holds the lock.
+    fn lock_archive(&self) -> LockedZipArchive {
+        self.inner.lock().unwrap()
     }
 }
 
 impl fmt::Debug for VendoredFileSystem {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let locked_inner = self.inner.lock();
+        let mut archive = self.lock_archive();
         if f.alternate() {
-            let mut paths: Vec<String> = locked_inner
-                .borrow()
-                .0
-                .file_names()
-                .map(String::from)
-                .collect();
+            let mut paths: Vec<String> = archive.0.file_names().map(String::from).collect();
             paths.sort();
             let debug_info: BTreeMap<String, ZipFileDebugInfo> = paths
                 .iter()
                 .map(|path| {
                     (
                         path.to_owned(),
-                        ZipFileDebugInfo::from(locked_inner.borrow_mut().0.by_name(path).unwrap()),
+                        ZipFileDebugInfo::from(archive.0.by_name(path).unwrap()),
                     )
                 })
                 .collect();
             f.debug_struct("VendoredFileSystem")
-                .field("inner_mutex_poisoned", &self.inner.0.is_poisoned())
+                .field("inner_mutex_poisoned", &self.inner.is_poisoned())
                 .field("paths", &paths)
                 .field("data_by_path", &debug_info)
                 .finish()
         } else {
-            write!(
-                f,
-                "VendoredFileSystem(<{} paths>)",
-                locked_inner.borrow().len()
-            )
+            write!(f, "VendoredFileSystem(<{} paths>)", archive.len())
         }
+    }
+}
+
+impl Default for VendoredFileSystem {
+    fn default() -> Self {
+        let mut bytes: Vec<u8> = Vec::new();
+        let mut cursor = io::Cursor::new(&mut bytes);
+
+        {
+            let mut writer = ZipWriter::new(&mut cursor);
+            writer.finish().unwrap();
+        }
+
+        VendoredFileSystem::new(bytes).unwrap()
     }
 }
 
@@ -196,33 +241,12 @@ impl Metadata {
     }
 }
 
-struct VendoredFileSystemInner(Mutex<RefCell<VendoredZipArchive>>);
-
-type LockedZipArchive<'a> = MutexGuard<'a, RefCell<VendoredZipArchive>>;
-
-impl VendoredFileSystemInner {
-    fn new(raw_bytes: &'static [u8]) -> Result<Self> {
-        Ok(Self(Mutex::new(RefCell::new(VendoredZipArchive::new(
-            raw_bytes,
-        )?))))
-    }
-
-    /// Acquire a lock on the underlying zip archive.
-    /// The call will block until it is able to acquire the lock.
-    ///
-    /// ## Panics:
-    /// If the current thread already holds the lock.
-    fn lock(&self) -> LockedZipArchive {
-        self.0.lock().unwrap()
-    }
-}
-
 /// Newtype wrapper around a ZipArchive.
 #[derive(Debug)]
-struct VendoredZipArchive(ZipArchive<io::Cursor<&'static [u8]>>);
+struct VendoredZipArchive(ZipArchive<io::Cursor<Cow<'static, [u8]>>>);
 
 impl VendoredZipArchive {
-    fn new(data: &'static [u8]) -> Result<Self> {
+    fn new(data: Cow<'static, [u8]>) -> Result<Self> {
         Ok(Self(ZipArchive::new(io::Cursor::new(data))?))
     }
 
@@ -314,11 +338,11 @@ impl<'a> From<&'a VendoredPath> for NormalizedVendoredPath<'a> {
 }
 
 #[cfg(test)]
-mod tests {
+pub(crate) mod tests {
     use std::io::Write;
 
     use insta::assert_snapshot;
-    use once_cell::sync::Lazy;
+    use zip::result::ZipResult;
     use zip::write::FileOptions;
     use zip::{CompressionMethod, ZipWriter};
 
@@ -327,37 +351,66 @@ mod tests {
     const FUNCTOOLS_CONTENTS: &str = "def update_wrapper(): ...";
     const ASYNCIO_TASKS_CONTENTS: &str = "class Task: ...";
 
-    static MOCK_ZIP_ARCHIVE: Lazy<Box<[u8]>> = Lazy::new(|| {
-        let mut typeshed_buffer = Vec::new();
-        let typeshed = io::Cursor::new(&mut typeshed_buffer);
+    pub struct VendoredFileSystemBuilder {
+        writer: ZipWriter<io::Cursor<Vec<u8>>>,
+    }
 
-        let options = FileOptions::default()
-            .compression_method(CompressionMethod::Zstd)
-            .unix_permissions(0o644);
+    impl Default for VendoredFileSystemBuilder {
+        fn default() -> Self {
+            Self::new()
+        }
+    }
 
-        {
-            let mut archive = ZipWriter::new(typeshed);
+    impl VendoredFileSystemBuilder {
+        pub fn new() -> Self {
+            let buffer = io::Cursor::new(Vec::new());
 
-            archive.add_directory("stdlib/", options).unwrap();
-            archive.start_file("stdlib/functools.pyi", options).unwrap();
-            archive.write_all(FUNCTOOLS_CONTENTS.as_bytes()).unwrap();
-
-            archive.add_directory("stdlib/asyncio/", options).unwrap();
-            archive
-                .start_file("stdlib/asyncio/tasks.pyi", options)
-                .unwrap();
-            archive
-                .write_all(ASYNCIO_TASKS_CONTENTS.as_bytes())
-                .unwrap();
-
-            archive.finish().unwrap();
+            Self {
+                writer: ZipWriter::new(buffer),
+            }
         }
 
-        typeshed_buffer.into_boxed_slice()
-    });
+        pub fn add_file(
+            &mut self,
+            path: impl AsRef<VendoredPath>,
+            content: &str,
+        ) -> std::io::Result<()> {
+            self.writer
+                .start_file(path.as_ref().as_str(), Self::options())?;
+            self.writer.write_all(content.as_bytes())
+        }
+
+        pub fn add_directory(&mut self, path: impl AsRef<VendoredPath>) -> ZipResult<()> {
+            self.writer
+                .add_directory(path.as_ref().as_str(), Self::options())
+        }
+
+        pub fn finish(mut self) -> Result<VendoredFileSystem> {
+            let buffer = self.writer.finish()?;
+
+            VendoredFileSystem::new(buffer.into_inner())
+        }
+
+        fn options() -> FileOptions {
+            FileOptions::default()
+                .compression_method(CompressionMethod::Zstd)
+                .unix_permissions(0o644)
+        }
+    }
 
     fn mock_typeshed() -> VendoredFileSystem {
-        VendoredFileSystem::new(&MOCK_ZIP_ARCHIVE).unwrap()
+        let mut builder = VendoredFileSystemBuilder::new();
+
+        builder.add_directory("stdlib/").unwrap();
+        builder
+            .add_file("stdlib/functools.pyi", FUNCTOOLS_CONTENTS)
+            .unwrap();
+        builder.add_directory("stdlib/asyncio/").unwrap();
+        builder
+            .add_file("stdlib/asyncio/tasks.pyi", ASYNCIO_TASKS_CONTENTS)
+            .unwrap();
+
+        builder.finish().unwrap()
     }
 
     #[test]
@@ -419,9 +472,9 @@ mod tests {
         let path = VendoredPath::new(dirname);
 
         assert!(mock_typeshed.exists(path));
-        assert!(mock_typeshed.read(path).is_err());
+        assert!(mock_typeshed.read_to_string(path).is_err());
         let metadata = mock_typeshed.metadata(path).unwrap();
-        assert!(metadata.kind.is_directory());
+        assert!(metadata.kind().is_directory());
     }
 
     #[test]
@@ -458,9 +511,9 @@ mod tests {
         let mock_typeshed = mock_typeshed();
         let path = VendoredPath::new(path);
         assert!(!mock_typeshed.exists(path));
-        assert!(mock_typeshed.metadata(path).is_none());
+        assert!(mock_typeshed.metadata(path).is_err());
         assert!(mock_typeshed
-            .read(path)
+            .read_to_string(path)
             .is_err_and(|err| err.to_string().contains("file not found")));
     }
 
@@ -487,7 +540,7 @@ mod tests {
     fn test_file(mock_typeshed: &VendoredFileSystem, path: &VendoredPath) {
         assert!(mock_typeshed.exists(path));
         let metadata = mock_typeshed.metadata(path).unwrap();
-        assert!(metadata.kind.is_file());
+        assert!(metadata.kind().is_file());
     }
 
     #[test]
@@ -495,11 +548,11 @@ mod tests {
         let mock_typeshed = mock_typeshed();
         let path = VendoredPath::new("stdlib/functools.pyi");
         test_file(&mock_typeshed, path);
-        let functools_stub = mock_typeshed.read(path).unwrap();
+        let functools_stub = mock_typeshed.read_to_string(path).unwrap();
         assert_eq!(functools_stub.as_str(), FUNCTOOLS_CONTENTS);
         // Test that using the RefCell doesn't mutate
         // the internal state of the underlying zip archive incorrectly:
-        let functools_stub_again = mock_typeshed.read(path).unwrap();
+        let functools_stub_again = mock_typeshed.read_to_string(path).unwrap();
         assert_eq!(functools_stub_again.as_str(), FUNCTOOLS_CONTENTS);
     }
 
@@ -516,7 +569,7 @@ mod tests {
         let mock_typeshed = mock_typeshed();
         let path = VendoredPath::new("stdlib/asyncio/tasks.pyi");
         test_file(&mock_typeshed, path);
-        let asyncio_stub = mock_typeshed.read(path).unwrap();
+        let asyncio_stub = mock_typeshed.read_to_string(path).unwrap();
         assert_eq!(asyncio_stub.as_str(), ASYNCIO_TASKS_CONTENTS);
     }
 

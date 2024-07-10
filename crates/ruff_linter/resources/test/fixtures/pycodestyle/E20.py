@@ -185,3 +185,7 @@ f"{ham[lower +1 :, "columnname"]}"
 
 #: E203:1:13
 f"{ham[lower + 1  :, "columnname"]}"
+
+#: Okay: https://github.com/astral-sh/ruff/issues/12023
+f"{x = :.2f}"
+f"{(x) = :.2f}"

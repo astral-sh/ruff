@@ -59,7 +59,7 @@ pub(crate) fn camelcase_imported_as_constant(
         && !helpers::is_acronym(name, asname)
     {
         // Ignore any explicitly-allowed names.
-        if ignore_names.matches(asname) {
+        if ignore_names.matches(name) || ignore_names.matches(asname) {
             return None;
         }
         let mut diagnostic = Diagnostic::new(

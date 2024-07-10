@@ -86,6 +86,7 @@ KNOWN_FORMATTING_VIOLATIONS = [
     "unnecessary-class-parentheses",
     "unnecessary-escaped-quote",
     "useless-semicolon",
+    "whitespace-after-decorator",
     "whitespace-after-open-bracket",
     "whitespace-before-close-bracket",
     "whitespace-before-parameters",

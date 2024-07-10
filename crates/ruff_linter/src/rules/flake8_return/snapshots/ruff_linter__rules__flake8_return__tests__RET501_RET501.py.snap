@@ -26,6 +26,8 @@ RET501.py:14:9: RET501 [*] Do not explicitly `return None` in function if it is 
 13 |         print(f"{key} not found")
 14 |         return None
    |         ^^^^^^^^^^^ RET501
+15 | 
+16 |     @property
    |
    = help: Remove explicit `return None`
 
@@ -35,5 +37,6 @@ RET501.py:14:9: RET501 [*] Do not explicitly `return None` in function if it is 
 13 13 |         print(f"{key} not found")
 14    |-        return None
    14 |+        return
-
-
+15 15 | 
+16 16 |     @property
+17 17 |     def prop(self) -> None:

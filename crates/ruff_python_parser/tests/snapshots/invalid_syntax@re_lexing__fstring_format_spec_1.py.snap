@@ -1,0 +1,423 @@
+---
+source: crates/ruff_python_parser/tests/fixtures.rs
+input_file: crates/ruff_python_parser/resources/invalid/re_lexing/fstring_format_spec_1.py
+---
+## AST
+
+```
+Module(
+    ModModule {
+        range: 0..298,
+        body: [
+            Expr(
+                StmtExpr {
+                    range: 162..192,
+                    value: FString(
+                        ExprFString {
+                            range: 162..192,
+                            value: FStringValue {
+                                inner: Single(
+                                    FString(
+                                        FString {
+                                            range: 162..192,
+                                            elements: [
+                                                Literal(
+                                                    FStringLiteralElement {
+                                                        range: 164..171,
+                                                        value: "middle ",
+                                                    },
+                                                ),
+                                                Expression(
+                                                    FStringExpressionElement {
+                                                        range: 171..191,
+                                                        expression: StringLiteral(
+                                                            ExprStringLiteral {
+                                                                range: 172..180,
+                                                                value: StringLiteralValue {
+                                                                    inner: Single(
+                                                                        StringLiteral {
+                                                                            range: 172..180,
+                                                                            value: "string",
+                                                                            flags: StringLiteralFlags {
+                                                                                quote_style: Single,
+                                                                                prefix: Empty,
+                                                                                triple_quoted: false,
+                                                                            },
+                                                                        },
+                                                                    ),
+                                                                },
+                                                            },
+                                                        ),
+                                                        debug_text: None,
+                                                        conversion: None,
+                                                        format_spec: Some(
+                                                            FStringFormatSpec {
+                                                                range: 181..191,
+                                                                elements: [
+                                                                    Literal(
+                                                                        FStringLiteralElement {
+                                                                            range: 181..191,
+                                                                            value: "        ",
+                                                                        },
+                                                                    ),
+                                                                ],
+                                                            },
+                                                        ),
+                                                    },
+                                                ),
+                                            ],
+                                            flags: FStringFlags {
+                                                quote_style: Single,
+                                                prefix: Regular,
+                                                triple_quoted: false,
+                                            },
+                                        },
+                                    ),
+                                ),
+                            },
+                        },
+                    ),
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    range: 192..198,
+                    value: Name(
+                        ExprName {
+                            range: 192..198,
+                            id: Name("format"),
+                            ctx: Load,
+                        },
+                    ),
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    range: 199..203,
+                    value: Name(
+                        ExprName {
+                            range: 199..203,
+                            id: Name("spec"),
+                            ctx: Load,
+                        },
+                    ),
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    range: 207..228,
+                    value: FString(
+                        ExprFString {
+                            range: 207..228,
+                            value: FStringValue {
+                                inner: Single(
+                                    FString(
+                                        FString {
+                                            range: 207..228,
+                                            elements: [
+                                                Literal(
+                                                    FStringLiteralElement {
+                                                        range: 209..216,
+                                                        value: "middle ",
+                                                    },
+                                                ),
+                                                Expression(
+                                                    FStringExpressionElement {
+                                                        range: 216..228,
+                                                        expression: StringLiteral(
+                                                            ExprStringLiteral {
+                                                                range: 217..225,
+                                                                value: StringLiteralValue {
+                                                                    inner: Single(
+                                                                        StringLiteral {
+                                                                            range: 217..225,
+                                                                            value: "string",
+                                                                            flags: StringLiteralFlags {
+                                                                                quote_style: Single,
+                                                                                prefix: Empty,
+                                                                                triple_quoted: false,
+                                                                            },
+                                                                        },
+                                                                    ),
+                                                                },
+                                                            },
+                                                        ),
+                                                        debug_text: None,
+                                                        conversion: None,
+                                                        format_spec: Some(
+                                                            FStringFormatSpec {
+                                                                range: 226..228,
+                                                                elements: [
+                                                                    Literal(
+                                                                        FStringLiteralElement {
+                                                                            range: 226..228,
+                                                                            value: "\\",
+                                                                        },
+                                                                    ),
+                                                                ],
+                                                            },
+                                                        ),
+                                                    },
+                                                ),
+                                            ],
+                                            flags: FStringFlags {
+                                                quote_style: Single,
+                                                prefix: Regular,
+                                                triple_quoted: false,
+                                            },
+                                        },
+                                    ),
+                                ),
+                            },
+                        },
+                    ),
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    range: 237..250,
+                    value: StringLiteral(
+                        ExprStringLiteral {
+                            range: 237..250,
+                            value: StringLiteralValue {
+                                inner: Single(
+                                    StringLiteral {
+                                        range: 237..250,
+                                        value: "format spec",
+                                        flags: StringLiteralFlags {
+                                            quote_style: Single,
+                                            prefix: Empty,
+                                            triple_quoted: false,
+                                        },
+                                    },
+                                ),
+                            },
+                        },
+                    ),
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    range: 253..285,
+                    value: FString(
+                        ExprFString {
+                            range: 253..285,
+                            value: FStringValue {
+                                inner: Single(
+                                    FString(
+                                        FString {
+                                            range: 253..285,
+                                            elements: [
+                                                Literal(
+                                                    FStringLiteralElement {
+                                                        range: 255..262,
+                                                        value: "middle ",
+                                                    },
+                                                ),
+                                                Expression(
+                                                    FStringExpressionElement {
+                                                        range: 262..284,
+                                                        expression: StringLiteral(
+                                                            ExprStringLiteral {
+                                                                range: 263..271,
+                                                                value: StringLiteralValue {
+                                                                    inner: Single(
+                                                                        StringLiteral {
+                                                                            range: 263..271,
+                                                                            value: "string",
+                                                                            flags: StringLiteralFlags {
+                                                                                quote_style: Single,
+                                                                                prefix: Empty,
+                                                                                triple_quoted: false,
+                                                                            },
+                                                                        },
+                                                                    ),
+                                                                },
+                                                            },
+                                                        ),
+                                                        debug_text: None,
+                                                        conversion: None,
+                                                        format_spec: Some(
+                                                            FStringFormatSpec {
+                                                                range: 272..284,
+                                                                elements: [
+                                                                    Literal(
+                                                                        FStringLiteralElement {
+                                                                            range: 272..284,
+                                                                            value: "\\        ",
+                                                                        },
+                                                                    ),
+                                                                ],
+                                                            },
+                                                        ),
+                                                    },
+                                                ),
+                                            ],
+                                            flags: FStringFlags {
+                                                quote_style: Single,
+                                                prefix: Regular,
+                                                triple_quoted: false,
+                                            },
+                                        },
+                                    ),
+                                ),
+                            },
+                        },
+                    ),
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    range: 285..291,
+                    value: Name(
+                        ExprName {
+                            range: 285..291,
+                            id: Name("format"),
+                            ctx: Load,
+                        },
+                    ),
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    range: 292..296,
+                    value: Name(
+                        ExprName {
+                            range: 292..296,
+                            id: Name("spec"),
+                            ctx: Load,
+                        },
+                    ),
+                },
+            ),
+        ],
+    },
+)
+```
+## Errors
+
+  |
+5 | f'middle {'string':\
+6 |         'format spec'}
+  |         ^ Syntax Error: f-string: expecting '}'
+7 | 
+8 | f'middle {'string':\\
+  |
+
+
+  |
+5 | f'middle {'string':\
+6 |         'format spec'}
+  |          ^^^^^^ Syntax Error: Simple statements must be separated by newlines or semicolons
+7 | 
+8 | f'middle {'string':\\
+  |
+
+
+  |
+5 | f'middle {'string':\
+6 |         'format spec'}
+  |                 ^^^^ Syntax Error: Simple statements must be separated by newlines or semicolons
+7 | 
+8 | f'middle {'string':\\
+  |
+
+
+  |
+5 | f'middle {'string':\
+6 |         'format spec'}
+  |                     ^^ Syntax Error: missing closing quote in string literal
+7 | 
+8 | f'middle {'string':\\
+  |
+
+
+  |
+5 | f'middle {'string':\
+6 |         'format spec'}
+  |                       ^ Syntax Error: Expected a statement
+7 | 
+8 | f'middle {'string':\\
+9 |         'format spec'}
+  |
+
+
+  |
+6 |         'format spec'}
+7 | 
+8 | f'middle {'string':\\
+  |                       Syntax Error: f-string: unterminated string
+9 |         'format spec'}
+  |
+
+
+   |
+ 8 | f'middle {'string':\\
+ 9 |         'format spec'}
+   | ^^^^^^^^ Syntax Error: Unexpected indentation
+10 | 
+11 | f'middle {'string':\\\
+   |
+
+
+   |
+ 8 | f'middle {'string':\\
+ 9 |         'format spec'}
+   |                      ^ Syntax Error: Expected a statement
+10 | 
+11 | f'middle {'string':\\\
+   |
+
+
+   |
+ 8 | f'middle {'string':\\
+ 9 |         'format spec'}
+   |                       ^ Syntax Error: Expected a statement
+10 | 
+11 | f'middle {'string':\\\
+12 |         'format spec'}
+   |
+
+
+   |
+ 9 |         'format spec'}
+10 | 
+11 | f'middle {'string':\\\
+   |  Syntax Error: Expected a statement
+12 |         'format spec'}
+   |
+
+
+   |
+11 | f'middle {'string':\\\
+12 |         'format spec'}
+   |         ^ Syntax Error: f-string: expecting '}'
+   |
+
+
+   |
+11 | f'middle {'string':\\\
+12 |         'format spec'}
+   |          ^^^^^^ Syntax Error: Simple statements must be separated by newlines or semicolons
+   |
+
+
+   |
+11 | f'middle {'string':\\\
+12 |         'format spec'}
+   |                 ^^^^ Syntax Error: Simple statements must be separated by newlines or semicolons
+   |
+
+
+   |
+11 | f'middle {'string':\\\
+12 |         'format spec'}
+   |                     ^^ Syntax Error: Got unexpected string
+   |
+
+
+   |
+11 | f'middle {'string':\\\
+12 |         'format spec'}
+   |                        Syntax Error: Expected a statement
+   |

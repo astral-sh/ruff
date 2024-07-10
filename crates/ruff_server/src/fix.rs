@@ -9,10 +9,10 @@ use ruff_linter::{
 };
 use ruff_notebook::SourceValue;
 use ruff_source_file::LineIndex;
-use ruff_workspace::resolver::match_any_exclusion;
 
 use crate::{
     edit::{Replacement, ToRangeExt},
+    resolve::is_document_excluded,
     session::DocumentQuery,
     PositionEncoding,
 };
@@ -33,18 +33,12 @@ pub(crate) fn fix_all(
 
     // If the document is excluded, return an empty list of fixes.
     let package = if let Some(document_path) = document_path.as_ref() {
-        if let Some(exclusion) = match_any_exclusion(
+        if is_document_excluded(
             document_path,
-            &file_resolver_settings.exclude,
-            &file_resolver_settings.extend_exclude,
-            Some(&linter_settings.exclude),
+            file_resolver_settings,
+            Some(linter_settings),
             None,
         ) {
-            tracing::debug!(
-                "Ignored path via `{}`: {}",
-                exclusion,
-                document_path.display()
-            );
             return Ok(Fixes::default());
         }
 
@@ -68,7 +62,9 @@ pub(crate) fn fix_all(
     // which is inconsistent with how `ruff check --fix` works.
     let FixerResult {
         transformed,
-        result: LinterResult { error, .. },
+        result: LinterResult {
+            has_syntax_error, ..
+        },
         ..
     } = ruff_linter::linter::lint_fix(
         &query.virtual_file_path(),
@@ -80,11 +76,9 @@ pub(crate) fn fix_all(
         source_type,
     )?;
 
-    if let Some(error) = error {
-        // abort early if a parsing error occurred
-        return Err(anyhow::anyhow!(
-            "A parsing error occurred during `fix_all`: {error}"
-        ));
+    if has_syntax_error {
+        // If there's a syntax error, then there won't be any fixes to apply.
+        return Ok(Fixes::default());
     }
 
     // fast path: if `transformed` is still borrowed, no changes were made and we can return early

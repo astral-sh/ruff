@@ -34,6 +34,7 @@ _dummy_thread: 3.0-3.8
 _dummy_threading: 3.0-3.8
 _heapq: 3.0-
 _imp: 3.0-
+_interpchannels: 3.13-
 _json: 3.0-
 _locale: 3.0-
 _lsprof: 3.0-

@@ -34,7 +34,11 @@ impl Violation for NonAsciiName {
     #[derive_message_formats]
     fn message(&self) -> String {
         let Self { name, kind } = self;
-        format!("{kind} name `{name}` contains a non-ASCII character, consider renaming it")
+        format!("{kind} name `{name}` contains a non-ASCII character")
+    }
+
+    fn fix_title(&self) -> Option<String> {
+        Some("Rename the variable using ASCII characters".to_string())
     }
 }
 
@@ -82,7 +86,7 @@ pub(crate) fn non_ascii_name(binding: &Binding, locator: &Locator) -> Option<Dia
     ))
 }
 
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq, Copy, Clone)]
 enum Kind {
     Annotation,
     Argument,

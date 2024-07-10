@@ -1,9 +1,8 @@
-#![allow(clippy::dbg_macro)]
-
-use std::path::Path;
 use std::sync::Mutex;
 
+use clap::Parser;
 use crossbeam::channel as crossbeam_channel;
+use salsa::ParallelDatabase;
 use tracing::subscriber::Interest;
 use tracing::{Level, Metadata};
 use tracing_subscriber::filter::LevelFilter;
@@ -11,32 +10,75 @@ use tracing_subscriber::layer::{Context, Filter, SubscriberExt};
 use tracing_subscriber::{Layer, Registry};
 use tracing_tree::time::Uptime;
 
-use red_knot::db::{HasJar, ParallelDatabase, QueryError, SourceDb, SourceJar};
-use red_knot::module::{set_module_search_paths, ModuleResolutionInputs};
-use red_knot::program::check::ExecutionMode;
 use red_knot::program::{FileWatcherChange, Program};
+use red_knot::target_version::TargetVersion;
 use red_knot::watch::FileWatcher;
 use red_knot::Workspace;
+use red_knot_module_resolver::{set_module_resolution_settings, RawModuleResolutionSettings};
+use ruff_db::files::system_path_to_file;
+use ruff_db::system::{OsSystem, System, SystemPath, SystemPathBuf};
 
-#[allow(clippy::print_stdout, clippy::unnecessary_wraps, clippy::print_stderr)]
-fn main() -> anyhow::Result<()> {
+#[derive(Debug, Parser)]
+#[command(
+    author,
+    name = "red-knot",
+    about = "An experimental multifile analysis backend for Ruff"
+)]
+#[command(version)]
+struct Args {
+    #[clap(help = "File to check", required = true, value_name = "FILE")]
+    entry_point: SystemPathBuf,
+    #[arg(
+        long,
+        value_name = "DIRECTORY",
+        help = "Custom directory to use for stdlib typeshed stubs"
+    )]
+    custom_typeshed_dir: Option<SystemPathBuf>,
+    #[arg(
+        long,
+        value_name = "PATH",
+        help = "Additional path to use as a module-resolution source (can be passed multiple times)"
+    )]
+    extra_search_path: Vec<SystemPathBuf>,
+    #[arg(long, help = "Python version to assume when resolving types", default_value_t = TargetVersion::default(), value_name="VERSION")]
+    target_version: TargetVersion,
+}
+
+#[allow(
+    clippy::print_stdout,
+    clippy::unnecessary_wraps,
+    clippy::print_stderr,
+    clippy::dbg_macro
+)]
+pub fn main() -> anyhow::Result<()> {
+    countme::enable(true);
     setup_tracing();
 
-    let arguments: Vec<_> = std::env::args().collect();
+    let Args {
+        entry_point,
+        custom_typeshed_dir,
+        extra_search_path: extra_search_paths,
+        target_version,
+    } = Args::parse_from(std::env::args().collect::<Vec<_>>());
 
-    if arguments.len() < 2 {
-        eprintln!("Usage: red_knot <path>");
-        return Err(anyhow::anyhow!("Invalid arguments"));
+    tracing::trace!("Target version: {target_version}");
+    if let Some(custom_typeshed) = custom_typeshed_dir.as_ref() {
+        tracing::trace!("Custom typeshed directory: {custom_typeshed}");
+    }
+    if !extra_search_paths.is_empty() {
+        tracing::trace!("extra search paths: {extra_search_paths:?}");
     }
 
-    let entry_point = Path::new(&arguments[1]);
+    let cwd = std::env::current_dir().unwrap();
+    let cwd = SystemPath::from_std_path(&cwd).unwrap();
+    let system = OsSystem::new(cwd);
 
-    if !entry_point.exists() {
+    if !system.path_exists(&entry_point) {
         eprintln!("The entry point does not exist.");
         return Err(anyhow::anyhow!("Invalid arguments"));
     }
 
-    if !entry_point.is_file() {
+    if !system.is_file(&entry_point) {
         eprintln!("The entry point is not a file.");
         return Err(anyhow::anyhow!("Invalid arguments"));
     }
@@ -46,17 +88,20 @@ fn main() -> anyhow::Result<()> {
 
     let workspace_search_path = workspace.root().to_path_buf();
 
-    let search_paths = ModuleResolutionInputs {
-        extra_paths: vec![],
-        workspace_root: workspace_search_path,
-        site_packages: None,
-        custom_typeshed: None,
-    };
+    let mut program = Program::new(workspace, system);
 
-    let mut program = Program::new(workspace);
-    set_module_search_paths(&mut program, search_paths);
+    set_module_resolution_settings(
+        &mut program,
+        RawModuleResolutionSettings {
+            extra_paths: extra_search_paths,
+            workspace_root: workspace_search_path,
+            site_packages: None,
+            custom_typeshed: custom_typeshed_dir,
+            target_version: red_knot_module_resolver::TargetVersion::from(target_version),
+        },
+    );
 
-    let entry_id = program.file_id(entry_point);
+    let entry_id = system_path_to_file(&program, entry_point.clone()).unwrap();
     program.workspace_mut().open_file(entry_id);
 
     let (main_loop, main_loop_cancellation_token) = MainLoop::new();
@@ -78,14 +123,11 @@ fn main() -> anyhow::Result<()> {
         file_changes_notifier.notify(changes);
     })?;
 
-    file_watcher.watch_folder(workspace_folder)?;
+    file_watcher.watch_folder(workspace_folder.as_std_path())?;
 
     main_loop.run(&mut program);
 
-    let source_jar: &SourceJar = program.jar().unwrap();
-
-    dbg!(source_jar.parsed.statistics());
-    dbg!(source_jar.sources.statistics());
+    println!("{}", countme::get_all());
 
     Ok(())
 }
@@ -127,6 +169,7 @@ impl MainLoop {
         }
     }
 
+    #[allow(clippy::print_stderr)]
     fn run(self, program: &mut Program) {
         self.orchestrator_sender
             .send(OrchestratorMessage::Run)
@@ -142,8 +185,8 @@ impl MainLoop {
 
                     // Spawn a new task that checks the program. This needs to be done in a separate thread
                     // to prevent blocking the main loop here.
-                    rayon::spawn(move || match program.check(ExecutionMode::ThreadPool) {
-                        Ok(result) => {
+                    rayon::spawn(move || {
+                        if let Ok(result) = program.check() {
                             sender
                                 .send(OrchestratorMessage::CheckProgramCompleted {
                                     diagnostics: result,
@@ -151,7 +194,6 @@ impl MainLoop {
                                 })
                                 .unwrap();
                         }
-                        Err(QueryError::Cancelled) => {}
                     });
                 }
                 MainLoopMessage::ApplyChanges(changes) => {
@@ -159,9 +201,11 @@ impl MainLoop {
                     program.apply_changes(changes);
                 }
                 MainLoopMessage::CheckCompleted(diagnostics) => {
-                    dbg!(diagnostics);
+                    eprintln!("{}", diagnostics.join("\n"));
+                    eprintln!("{}", countme::get_all());
                 }
                 MainLoopMessage::Exit => {
+                    eprintln!("{}", countme::get_all());
                     return;
                 }
             }
@@ -210,6 +254,7 @@ struct Orchestrator {
 }
 
 impl Orchestrator {
+    #[allow(clippy::print_stderr)]
     fn run(&mut self) {
         while let Ok(message) = self.receiver.recv() {
             match message {

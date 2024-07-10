@@ -16,14 +16,14 @@ Module(
                     target: Name(
                         ExprName {
                             range: 4..6,
-                            id: "in",
+                            id: Name("in"),
                             ctx: Store,
                         },
                     ),
                     iter: Name(
                         ExprName {
                             range: 7..8,
-                            id: "x",
+                            id: Name("x"),
                             ctx: Load,
                         },
                     ),

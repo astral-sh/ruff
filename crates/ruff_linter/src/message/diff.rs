@@ -27,8 +27,8 @@ pub(super) struct Diff<'a> {
 
 impl<'a> Diff<'a> {
     pub(crate) fn from_message(message: &'a Message) -> Option<Diff> {
-        message.fix.as_ref().map(|fix| Diff {
-            source_code: &message.file,
+        message.fix().map(|fix| Diff {
+            source_code: message.source_file(),
             fix,
         })
     }

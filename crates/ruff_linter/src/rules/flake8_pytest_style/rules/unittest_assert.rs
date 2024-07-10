@@ -1,4 +1,5 @@
 use anyhow::{anyhow, bail, Result};
+use ruff_python_ast::name::Name;
 use ruff_python_ast::{
     self as ast, Arguments, CmpOp, Expr, ExprContext, Identifier, Keyword, Stmt, UnaryOp,
 };
@@ -379,7 +380,7 @@ impl UnittestAssert {
                     .ok_or_else(|| anyhow!("Missing argument `cls`"))?;
                 let msg = args.get("msg").copied();
                 let node = ast::ExprName {
-                    id: "isinstance".into(),
+                    id: Name::new_static("isinstance"),
                     ctx: ExprContext::Load,
                     range: TextRange::default(),
                 };
@@ -417,7 +418,7 @@ impl UnittestAssert {
                     .ok_or_else(|| anyhow!("Missing argument `regex`"))?;
                 let msg = args.get("msg").copied();
                 let node = ast::ExprName {
-                    id: "re".into(),
+                    id: Name::new_static("re"),
                     ctx: ExprContext::Load,
                     range: TextRange::default(),
                 };

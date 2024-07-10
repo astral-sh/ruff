@@ -1,3 +1,4 @@
+use ruff_python_ast::name::Name;
 use ruff_python_ast::{self as ast, Expr, ExprContext, Number, Operator, Pattern, Singleton};
 use ruff_text_size::{Ranged, TextSize};
 
@@ -510,7 +511,7 @@ impl<'src> Parser<'src> {
                     );
                     let invalid_node = Expr::Name(ast::ExprName {
                         range: self.missing_node_range(),
-                        id: String::new(),
+                        id: Name::empty(),
                         ctx: ExprContext::Invalid,
                     });
                     Pattern::MatchValue(ast::PatternMatchValue {
@@ -616,7 +617,7 @@ impl<'src> Parser<'src> {
                 } else {
                     Box::new(Expr::Name(ast::ExprName {
                         range: ident.range(),
-                        id: String::new(),
+                        id: Name::empty(),
                         ctx: ExprContext::Invalid,
                     }))
                 }
@@ -667,7 +668,7 @@ impl<'src> Parser<'src> {
                             &pattern,
                         );
                         ast::Identifier {
-                            id: String::new(),
+                            id: Name::empty(),
                             range: parser.missing_node_range(),
                         }
                     };

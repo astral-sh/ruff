@@ -4,6 +4,8 @@ use anyhow::Context;
 use notify::event::{CreateKind, RemoveKind};
 use notify::{recommended_watcher, Event, EventKind, RecommendedWatcher, RecursiveMode, Watcher};
 
+use ruff_db::system::SystemPath;
+
 use crate::program::{FileChangeKind, FileWatcherChange};
 
 pub struct FileWatcher {
@@ -50,7 +52,12 @@ impl FileWatcher {
 
                     for path in event.paths {
                         if path.is_file() {
-                            changes.push(FileWatcherChange::new(path, change_kind));
+                            if let Some(fs_path) = SystemPath::from_std_path(&path) {
+                                changes.push(FileWatcherChange::new(
+                                    fs_path.to_path_buf(),
+                                    change_kind,
+                                ));
+                            }
                         }
                     }
 

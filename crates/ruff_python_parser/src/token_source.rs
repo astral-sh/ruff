@@ -60,12 +60,23 @@ impl<'src> TokenSource<'src> {
         self.lexer.take_value()
     }
 
-    /// Calls the underlying [`re_lex_logical_token`] method on the lexer and updates the token
-    /// vector accordingly.
+    /// Calls the underlying [`re_lex_logical_token`] method on the lexer with the new lexer
+    /// position and updates the token vector accordingly.
     ///
     /// [`re_lex_logical_token`]: Lexer::re_lex_logical_token
     pub(crate) fn re_lex_logical_token(&mut self) {
-        if self.lexer.re_lex_logical_token() {
+        let mut non_logical_newline_start = None;
+        for token in self.tokens.iter().rev() {
+            match token.kind() {
+                TokenKind::NonLogicalNewline => {
+                    non_logical_newline_start = Some(token.start());
+                }
+                TokenKind::Comment => continue,
+                _ => break,
+            }
+        }
+
+        if self.lexer.re_lex_logical_token(non_logical_newline_start) {
             let current_start = self.current_range().start();
             while self
                 .tokens

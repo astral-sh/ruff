@@ -1,9 +1,8 @@
-use globset::Candidate;
 use ruff_linter::{
     display_settings, fs::normalize_path_to, settings::types::FilePattern,
     settings::types::PreviewMode,
 };
-use ruff_workspace::resolver::match_candidate_exclusion;
+use ruff_workspace::resolver::match_exclusion;
 use ruff_workspace::{
     configuration::{Configuration, FormatConfiguration, LintConfiguration, RuleSelection},
     pyproject::{find_user_settings_toml, settings_toml},
@@ -41,6 +40,7 @@ impl std::fmt::Display for RuffSettings {
         display_settings! {
             formatter = f,
             fields = [
+                self.file_resolver,
                 self.linter,
                 self.formatter
             ]
@@ -146,20 +146,14 @@ impl RuffSettingsIndex {
                     .range(..directory.clone())
                     .rfind(|(path, _)| directory.starts_with(path))
                 {
-                    let candidate = Candidate::new(&directory);
-                    let basename = Candidate::new(file_name);
-                    if match_candidate_exclusion(
-                        &candidate,
-                        &basename,
-                        &settings.file_resolver.exclude,
-                    ) {
+                    if match_exclusion(&directory, file_name, &settings.file_resolver.exclude) {
                         tracing::debug!("Ignored path via `exclude`: {}", directory.display());
 
                         walker.skip_current_dir();
                         continue;
-                    } else if match_candidate_exclusion(
-                        &candidate,
-                        &basename,
+                    } else if match_exclusion(
+                        &directory,
+                        file_name,
                         &settings.file_resolver.extend_exclude,
                     ) {
                         tracing::debug!(
