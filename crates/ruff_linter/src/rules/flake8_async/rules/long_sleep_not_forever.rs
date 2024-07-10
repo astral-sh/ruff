@@ -7,7 +7,6 @@ use ruff_text_size::Ranged;
 use crate::checkers::ast::Checker;
 use crate::importer::ImportRequest;
 use crate::rules::flake8_async::helpers::AsyncModule;
-use crate::settings::types::PreviewMode;
 
 /// ## What it does
 /// Checks for uses of `trio.sleep()` or `anyio.sleep()` with a delay greater than 24 hours.
@@ -109,7 +108,21 @@ pub(crate) fn long_sleep_not_forever(checker: &mut Checker, call: &ExprCall) {
     }
 
     let module = AsyncModule::try_from(&qualified_name).unwrap();
-    if matches!(checker.settings.preview, PreviewMode::Disabled) {
+    if checker.settings.preview.is_enabled() {
+        let mut diagnostic = Diagnostic::new(LongSleepNotForever { module }, call.range());
+        let replacement_function = "sleep_forever";
+        diagnostic.try_set_fix(|| {
+            let (import_edit, binding) = checker.importer().get_or_import_symbol(
+                &ImportRequest::import_from(&module.to_string(), replacement_function),
+                call.func.start(),
+                checker.semantic(),
+            )?;
+            let reference_edit = Edit::range_replacement(binding, call.func.range());
+            let arg_edit = Edit::range_replacement("()".to_string(), call.arguments.range());
+            Ok(Fix::unsafe_edits(import_edit, [reference_edit, arg_edit]))
+        });
+        checker.diagnostics.push(diagnostic);
+    } else {
         if matches!(module, AsyncModule::Trio) {
             let mut diagnostic = Diagnostic::new(LongSleepNotForever { module }, call.range());
             let replacement_function = "sleep_forever";
@@ -125,19 +138,5 @@ pub(crate) fn long_sleep_not_forever(checker: &mut Checker, call: &ExprCall) {
             });
             checker.diagnostics.push(diagnostic);
         }
-    } else {
-        let mut diagnostic = Diagnostic::new(LongSleepNotForever { module }, call.range());
-        let replacement_function = "sleep_forever";
-        diagnostic.try_set_fix(|| {
-            let (import_edit, binding) = checker.importer().get_or_import_symbol(
-                &ImportRequest::import_from(&module.to_string(), replacement_function),
-                call.func.start(),
-                checker.semantic(),
-            )?;
-            let reference_edit = Edit::range_replacement(binding, call.func.range());
-            let arg_edit = Edit::range_replacement("()".to_string(), call.arguments.range());
-            Ok(Fix::unsafe_edits(import_edit, [reference_edit, arg_edit]))
-        });
-        checker.diagnostics.push(diagnostic);
     }
 }
