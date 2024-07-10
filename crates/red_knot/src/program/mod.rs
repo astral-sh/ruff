@@ -5,7 +5,7 @@ use salsa::{Cancelled, Database};
 
 use red_knot_module_resolver::{vendored_typeshed_stubs, Db as ResolverDb, Jar as ResolverJar};
 use red_knot_python_semantic::{Db as SemanticDb, Jar as SemanticJar};
-use ruff_db::files::{File, FilePath, Files};
+use ruff_db::files::{File, Files};
 use ruff_db::system::{System, SystemPathBuf};
 use ruff_db::vendored::VendoredFileSystem;
 use ruff_db::{Db as SourceDb, Jar as SourceJar, Upcast};
@@ -41,7 +41,7 @@ impl Program {
         I: IntoIterator<Item = FileWatcherChange>,
     {
         for change in changes {
-            File::touch_path(self, &FilePath::system(change.path));
+            File::touch_path(self, &change.path);
         }
     }
 

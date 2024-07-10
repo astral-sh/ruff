@@ -206,39 +206,40 @@ impl File {
     /// Refreshes the file metadata by querying the file system if needed.
     /// TODO: The API should instead take all observed changes from the file system directly
     ///   and then apply the VfsFile status accordingly. But for now, this is sufficient.
-    pub fn touch_path(db: &mut dyn Db, path: &FilePath) {
+    pub fn touch_path(db: &mut dyn Db, path: &SystemPath) {
         Self::touch_impl(db, path, None);
     }
 
     pub fn touch(self, db: &mut dyn Db) {
         let path = self.path(db).clone();
-        Self::touch_impl(db, &path, Some(self));
-    }
 
-    /// Private method providing the implementation for [`Self::touch_path`] and [`Self::touch`].
-    fn touch_impl(db: &mut dyn Db, path: &FilePath, file: Option<File>) {
         match path {
-            FilePath::System(path) => {
-                let metadata = db.system().path_metadata(path);
-
-                let (status, revision) = match metadata {
-                    Ok(metadata) if metadata.file_type().is_file() => {
-                        (FileStatus::Exists, metadata.revision())
-                    }
-                    _ => (FileStatus::Deleted, FileRevision::zero()),
-                };
-
-                let Some(file) = file.or_else(|| db.files().try_system(db, path)) else {
-                    return;
-                };
-
-                file.set_status(db).to(status);
-                file.set_revision(db).to(revision);
+            FilePath::System(system) => {
+                Self::touch_impl(db, &system, Some(self));
             }
             FilePath::Vendored(_) => {
                 // Readonly, can never be out of date.
             }
         }
+    }
+
+    /// Private method providing the implementation for [`Self::touch_path`] and [`Self::touch`].
+    fn touch_impl(db: &mut dyn Db, path: &SystemPath, file: Option<File>) {
+        let metadata = db.system().path_metadata(path);
+
+        let (status, revision) = match metadata {
+            Ok(metadata) if metadata.file_type().is_file() => {
+                (FileStatus::Exists, metadata.revision())
+            }
+            _ => (FileStatus::Deleted, FileRevision::zero()),
+        };
+
+        let Some(file) = file.or_else(|| db.files().try_system(db, path)) else {
+            return;
+        };
+
+        file.set_status(db).to(status);
+        file.set_revision(db).to(revision);
     }
 }
 
