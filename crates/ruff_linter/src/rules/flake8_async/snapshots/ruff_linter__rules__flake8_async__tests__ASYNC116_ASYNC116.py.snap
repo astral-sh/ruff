@@ -143,3 +143,6 @@ ASYNC116.py:57:11: ASYNC116 [*] `trio.sleep()` with >24 hour interval should usu
 56 57 |     # catch from import
 57    |-    await sleep(86401)  # error: 116, "async"
    58 |+    await sleep_forever()  # error: 116, "async"
+58 59 | 
+59 60 | 
+60 61 | async def import_anyio():
