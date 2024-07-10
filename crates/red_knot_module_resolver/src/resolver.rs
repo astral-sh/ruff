@@ -1069,9 +1069,7 @@ mod tests {
             File::touch_path(&mut db, &path);
         }
         let stdlib_versions_path = stdlib.join("VERSIONS");
-        db.memory_file_system()
-            .write_file(&stdlib_versions_path, "")
-            .unwrap();
+        db.write_file(&stdlib_versions_path, "").unwrap();
         File::touch_path(&mut db, &stdlib_versions_path);
         let functools_module = resolve_module(&db, functools_module_name.clone()).unwrap();
         assert_eq!(functools_module.search_path(), site_packages);
