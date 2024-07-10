@@ -1,4 +1,4 @@
-use ruff_db::system::{DbWithTestSystem, MemoryFileSystem, SystemPath, SystemPathBuf};
+use ruff_db::system::{DbWithTestSystem, SystemPath, SystemPathBuf};
 use ruff_db::vendored::VendoredPathBuf;
 
 use crate::db::tests::TestDb;
@@ -121,19 +121,17 @@ impl<T> TestCaseBuilder<T> {
     }
 
     fn write_mock_directory(
+        db: &mut TestDb,
         location: impl AsRef<SystemPath>,
-        system: &MemoryFileSystem,
         files: impl IntoIterator<Item = FileSpec>,
     ) -> SystemPathBuf {
         let root = location.as_ref().to_path_buf();
-        system.create_directory_all(&root).unwrap();
-        for (path, contents) in files {
-            let path = root.join(path);
-            if let Some(parent) = path.parent() {
-                system.create_directory_all(parent).unwrap();
-            }
-            system.write_file(path, contents).unwrap();
-        }
+        db.write_files(
+            files
+                .into_iter()
+                .map(|(relative_path, contents)| (root.join(relative_path), contents)),
+        )
+        .unwrap();
         root
     }
 }
@@ -211,12 +209,11 @@ impl TestCaseBuilder<MockedTypeshed> {
         } = self;
 
         let mut db = TestDb::new();
-        let system = db.memory_file_system();
 
         let site_packages =
-            Self::write_mock_directory("/site-packages", system, site_packages_files);
-        let src = Self::write_mock_directory("/src", system, first_party_files);
-        let typeshed = Self::build_typeshed_mock(system, &typeshed_option);
+            Self::write_mock_directory(&mut db, "/site-packages", site_packages_files);
+        let src = Self::write_mock_directory(&mut db, "/src", first_party_files);
+        let typeshed = Self::build_typeshed_mock(&mut db, &typeshed_option);
 
         set_module_resolution_settings(
             &mut db,
@@ -238,18 +235,15 @@ impl TestCaseBuilder<MockedTypeshed> {
         }
     }
 
-    fn build_typeshed_mock(
-        system: &MemoryFileSystem,
-        typeshed_to_build: &MockedTypeshed,
-    ) -> SystemPathBuf {
+    fn build_typeshed_mock(db: &mut TestDb, typeshed_to_build: &MockedTypeshed) -> SystemPathBuf {
         let typeshed = SystemPathBuf::from("/typeshed");
         let MockedTypeshed {
             stdlib_files,
             versions,
         } = typeshed_to_build;
         Self::write_mock_directory(
+            db,
             typeshed.join("stdlib"),
-            system,
             stdlib_files
                 .iter()
                 .copied()
@@ -269,11 +263,10 @@ impl TestCaseBuilder<VendoredTypeshed> {
         } = self;
 
         let mut db = TestDb::new();
-        let system = db.memory_file_system();
 
         let site_packages =
-            Self::write_mock_directory("/site-packages", system, site_packages_files);
-        let src = Self::write_mock_directory("/src", system, first_party_files);
+            Self::write_mock_directory(&mut db, "/site-packages", site_packages_files);
+        let src = Self::write_mock_directory(&mut db, "/src", first_party_files);
 
         set_module_resolution_settings(
             &mut db,
