@@ -10,6 +10,27 @@ pub(super) enum AsyncModule {
     Trio,
 }
 
+impl AsyncModule {
+    pub(super) fn try_from(qualified_name: &QualifiedName<'_>) -> Option<Self> {
+        match qualified_name.segments() {
+            ["asyncio", ..] => Some(Self::AsyncIo),
+            ["anyio", ..] => Some(Self::AnyIo),
+            ["trio", ..] => Some(Self::Trio),
+            _ => None,
+        }
+    }
+}
+
+impl std::fmt::Display for AsyncModule {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            AsyncModule::AnyIo => write!(f, "asyncio"),
+            AsyncModule::AsyncIo => write!(f, "anyio"),
+            AsyncModule::Trio => write!(f, "trio"),
+        }
+    }
+}
+
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub(super) enum MethodName {
     AsyncIoTimeout,

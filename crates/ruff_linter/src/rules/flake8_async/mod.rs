@@ -19,7 +19,7 @@ mod tests {
     #[test_case(Rule::TrioSyncCall, Path::new("ASYNC105.py"))]
     #[test_case(Rule::AsyncFunctionWithTimeout, Path::new("ASYNC109_0.py"))]
     #[test_case(Rule::AsyncFunctionWithTimeout, Path::new("ASYNC109_1.py"))]
-    #[test_case(Rule::TrioUnneededSleep, Path::new("ASYNC110.py"))]
+    #[test_case(Rule::AsyncBusyWait, Path::new("ASYNC110.py"))]
     #[test_case(Rule::TrioZeroSleepCall, Path::new("ASYNC115.py"))]
     #[test_case(Rule::SleepForeverCall, Path::new("ASYNC116.py"))]
     #[test_case(Rule::BlockingHttpCallInAsyncFunction, Path::new("ASYNC210.py"))]
@@ -41,6 +41,7 @@ mod tests {
     #[test_case(Rule::CancelScopeNoCheckpoint, Path::new("ASYNC100.py"))]
     #[test_case(Rule::AsyncFunctionWithTimeout, Path::new("ASYNC109_0.py"))]
     #[test_case(Rule::AsyncFunctionWithTimeout, Path::new("ASYNC109_1.py"))]
+    #[test_case(Rule::AsyncBusyWait, Path::new("ASYNC110.py"))]
     fn preview_rules(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!(
             "preview__{}_{}",

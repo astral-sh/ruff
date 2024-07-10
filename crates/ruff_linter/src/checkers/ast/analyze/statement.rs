@@ -1330,8 +1330,8 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
             if checker.enabled(Rule::TryExceptInLoop) {
                 perflint::rules::try_except_in_loop(checker, body);
             }
-            if checker.enabled(Rule::TrioUnneededSleep) {
-                flake8_async::rules::unneeded_sleep(checker, while_stmt);
+            if checker.enabled(Rule::AsyncBusyWait) {
+                flake8_async::rules::async_busy_wait(checker, while_stmt);
             }
         }
         Stmt::For(
