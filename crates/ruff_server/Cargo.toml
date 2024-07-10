@@ -28,7 +28,6 @@ ruff_workspace = { workspace = true }
 
 anyhow = { workspace = true }
 crossbeam = { workspace = true }
-globset = { workspace = true }
 jod-thread = { workspace = true }
 lsp-server = { workspace = true }
 lsp-types = { workspace = true }
