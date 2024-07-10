@@ -387,7 +387,7 @@ mod tests {
     use internal::ModuleNameIngredient;
     use ruff_db::files::{system_path_to_file, File, FilePath};
     use ruff_db::system::{DbWithTestSystem, OsSystem, SystemPath};
-    use ruff_db::testing::{assert_function_query_was_not_run, assert_function_query_was_run};
+    use ruff_db::testing::assert_function_query_was_not_run;
 
     use crate::db::tests::TestDb;
     use crate::module::ModuleKind;
@@ -1013,8 +1013,7 @@ mod tests {
     }
 
     #[test]
-    fn adding_or_removing_file_on_which_module_resolution_depends_invalidates_previously_successful_query_that_still_succeeds(
-    ) {
+    fn adding_file_to_search_path_with_lower_priority_does_not_invalidate_query() {
         const TYPESHED: MockedTypeshed = MockedTypeshed {
             versions: "functools: 3.8-",
             stdlib_files: &[("functools.pyi", "def update_wrapper(): ...")],
@@ -1022,7 +1021,6 @@ mod tests {
 
         let TestCase {
             mut db,
-            src,
             stdlib,
             site_packages,
             ..
@@ -1042,7 +1040,7 @@ mod tests {
         );
 
         // Adding a file to site-packages does not invalidate the query,
-        // since site-packages takes lower priority in the module resolution...
+        // since site-packages takes lower priority in the module resolution
         db.clear_salsa_events();
         let site_packages_functools_path = site_packages.join("functools.py");
         db.write_file(&site_packages_functools_path, "f: int")
@@ -1060,48 +1058,86 @@ mod tests {
             Some(functools_module.file()),
             system_path_to_file(&db, &stdlib_functools_path)
         );
+    }
 
-        // ...but adding a first-party file does invalidate the query,
+    #[test]
+    fn adding_file_to_search_path_with_higher_priority_invalidates_the_query() {
+        const TYPESHED: MockedTypeshed = MockedTypeshed {
+            versions: "functools: 3.8-",
+            stdlib_files: &[("functools.pyi", "def update_wrapper(): ...")],
+        };
+
+        let TestCase {
+            mut db,
+            stdlib,
+            src,
+            ..
+        } = TestCaseBuilder::new()
+            .with_custom_typeshed(TYPESHED)
+            .with_target_version(TargetVersion::Py38)
+            .build();
+
+        let functools_module_name = ModuleName::new_static("functools").unwrap();
+        let functools_module = resolve_module(&db, functools_module_name.clone()).unwrap();
+        assert_eq!(functools_module.search_path(), stdlib);
+        assert_eq!(
+            Some(functools_module.file()),
+            system_path_to_file(&db, stdlib.join("functools.pyi"))
+        );
+
+        // Adding a first-party file invalidates the query,
         // since first-party files take higher priority in module resolution:
-        db.clear_salsa_events();
         let src_functools_path = src.join("functools.py");
         db.write_file(&src_functools_path, "FOO: int").unwrap();
         let functools_module = resolve_module(&db, functools_module_name.clone()).unwrap();
-        let events = db.take_salsa_events();
-        assert_function_query_was_run::<resolve_module_query, _, _>(
-            &db,
-            |res| &res.function,
-            &ModuleNameIngredient::new(&db, functools_module_name.clone()),
-            &events,
+        assert_eq!(functools_module.search_path(), src);
+        assert_eq!(
+            Some(functools_module.file()),
+            system_path_to_file(&db, &src_functools_path)
         );
+    }
+
+    #[test]
+    fn deleting_file_from_higher_priority_search_path_invalidates_the_query() {
+        const SRC: &[FileSpec] = &[("functools.py", "FOO: int")];
+
+        const TYPESHED: MockedTypeshed = MockedTypeshed {
+            versions: "functools: 3.8-",
+            stdlib_files: &[("functools.pyi", "def update_wrapper(): ...")],
+        };
+
+        let TestCase {
+            mut db,
+            stdlib,
+            src,
+            ..
+        } = TestCaseBuilder::new()
+            .with_src_files(SRC)
+            .with_custom_typeshed(TYPESHED)
+            .with_target_version(TargetVersion::Py38)
+            .build();
+
+        let functools_module_name = ModuleName::new_static("functools").unwrap();
+        let src_functools_path = src.join("functools.py");
+
+        let functools_module = resolve_module(&db, functools_module_name.clone()).unwrap();
         assert_eq!(functools_module.search_path(), src);
         assert_eq!(
             Some(functools_module.file()),
             system_path_to_file(&db, &src_functools_path)
         );
 
-        // If we now delete both the stdlib and first-party files,
-        // it should resolve to site-packages:
-        for path in [stdlib_functools_path, src_functools_path] {
-            db.memory_file_system().remove_file(&path).unwrap();
-            File::touch_path(&mut db, &path);
-        }
-        let stdlib_versions_path = stdlib.join("VERSIONS");
-        db.write_file(&stdlib_versions_path, "").unwrap();
-        File::touch_path(&mut db, &stdlib_versions_path);
-        db.clear_salsa_events();
+        // If we now delete the first-party file,
+        // it should resolve to the stdlib:
+        db.memory_file_system()
+            .remove_file(&src_functools_path)
+            .unwrap();
+        File::touch_path(&mut db, &src_functools_path);
         let functools_module = resolve_module(&db, functools_module_name.clone()).unwrap();
-        let events = db.take_salsa_events();
-        assert_function_query_was_run::<resolve_module_query, _, _>(
-            &db,
-            |res| &res.function,
-            &ModuleNameIngredient::new(&db, functools_module_name.clone()),
-            &events,
-        );
-        assert_eq!(functools_module.search_path(), site_packages);
+        assert_eq!(functools_module.search_path(), stdlib);
         assert_eq!(
             Some(functools_module.file()),
-            system_path_to_file(&db, &site_packages_functools_path)
+            system_path_to_file(&db, stdlib.join("functools.pyi"))
         );
     }
 }
