@@ -195,7 +195,7 @@ As an example, the following would configure Ruff to:
     "**/{tests,docs,tools}/*" = ["E402"]
 
     [tool.ruff.format]
-    # 5. Use single quotes for non-triple-quoted strings.
+    # 5. Use single quotes in `ruff format`.
     quote-style = "single"
     ```
 
@@ -218,7 +218,7 @@ As an example, the following would configure Ruff to:
     "**/{tests,docs,tools}/*" = ["E402"]
 
     [format]
-    # 5. Use single quotes for non-triple-quoted strings.
+    # 5. Use single quotes in `ruff format`.
     quote-style = "single"
     ```
 
