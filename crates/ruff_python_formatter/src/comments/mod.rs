@@ -100,7 +100,6 @@ use ruff_python_ast::AnyNodeRef;
 use ruff_python_trivia::{CommentLinePosition, CommentRanges, SuppressionKind};
 use ruff_source_file::Locator;
 use ruff_text_size::{Ranged, TextRange};
-pub(crate) use visitor::collect_comments;
 
 use crate::comments::debug::{DebugComment, DebugComments};
 use crate::comments::map::{LeadingDanglingTrailing, MultiMap};

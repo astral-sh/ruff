@@ -23,7 +23,6 @@ pub use crate::shared_traits::{AsFormat, FormattedIter, FormattedIterExt, IntoFo
 use crate::verbatim::suppressed_node;
 
 pub(crate) mod builders;
-pub mod cli;
 mod comments;
 pub(crate) mod context;
 pub(crate) mod expression;

@@ -3,7 +3,7 @@ use std::iter::Peekable;
 
 use ruff_formatter::{SourceCode, SourceCodeSlice};
 use ruff_python_ast::AnyNodeRef;
-use ruff_python_ast::{Mod, Stmt};
+use ruff_python_ast::Stmt;
 // The interface is designed to only export the members relevant for iterating nodes in
 // pre-order.
 #[allow(clippy::wildcard_imports)]
@@ -15,18 +15,6 @@ use ruff_text_size::{Ranged, TextRange, TextSize};
 use crate::comments::node_key::NodeRefEqualityKey;
 use crate::comments::placement::place_comment;
 use crate::comments::{CommentsMap, SourceComment};
-
-/// Collect the preceding, following and enclosing node for each comment without applying
-/// [`place_comment`] for debugging.
-pub(crate) fn collect_comments<'a>(
-    root: &'a Mod,
-    source_code: SourceCode<'a>,
-    comment_ranges: &'a CommentRanges,
-) -> Vec<DecoratedComment<'a>> {
-    let mut collector = CommentsVecBuilder::default();
-    CommentsVisitor::new(source_code, comment_ranges, &mut collector).visit(AnyNodeRef::from(root));
-    collector.comments
-}
 
 /// Visitor extracting the comments from an AST.
 pub(super) struct CommentsVisitor<'a, 'builder> {
@@ -313,11 +301,6 @@ impl<'a> DecoratedComment<'a> {
     /// The position of the comment in the text.
     pub(super) fn line_position(&self) -> CommentLinePosition {
         self.line_position
-    }
-
-    /// Returns the slice into the source code.
-    pub(crate) fn slice(&self) -> &SourceCodeSlice {
-        &self.slice
     }
 }
 
