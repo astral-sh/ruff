@@ -6,10 +6,8 @@ use std::ops::Deref;
 use crate::{nodes, Expr};
 
 #[derive(Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Default)]
-#[cfg_attr(
-    feature = "serde",
-    derive(serde::Serialize, serde::Deserialize, ruff_macros::CacheKey)
-)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "cache", derive(ruff_macros::CacheKey))]
 pub struct Name(compact_str::CompactString);
 
 impl Name {
@@ -179,7 +177,7 @@ impl PartialEq<Name> for &String {
     }
 }
 
-#[cfg(feature = "serde")]
+#[cfg(feature = "schemars")]
 impl schemars::JsonSchema for Name {
     fn is_referenceable() -> bool {
         String::is_referenceable()

@@ -31,7 +31,8 @@ compact_str = { workspace = true }
 
 [features]
 schemars = ["dep:schemars"]
-serde = ["dep:serde", "ruff_text_size/serde", "dep:ruff_cache", "compact_str/serde", "dep:ruff_macros", "dep:schemars"]
+cache = ["dep:ruff_cache", "dep:ruff_macros"]
+serde = ["dep:serde", "ruff_text_size/serde", "dep:ruff_cache", "compact_str/serde"]
 
 [lints]
 workspace = true
