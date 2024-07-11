@@ -388,6 +388,14 @@ pub(crate) fn numpy_2_0_deprecation(checker: &mut Checker, expr: &Expr) {
                     compatibility: Compatibility::BackwardsCompatible,
                 },
             }),
+            ["numpy", "NAN"] => Some(Replacement {
+                existing: "NAN",
+                details: Details::AutoImport {
+                    path: "numpy",
+                    name: "nan",
+                    compatibility: Compatibility::BackwardsCompatible,
+                },
+            }),
             ["numpy", "nbytes"] => Some(Replacement {
                 existing: "nbytes",
                 details: Details::Manual {
