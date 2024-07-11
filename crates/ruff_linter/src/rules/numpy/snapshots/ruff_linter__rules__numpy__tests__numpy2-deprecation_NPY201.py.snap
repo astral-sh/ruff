@@ -552,6 +552,7 @@ NPY201.py:68:5: NPY201 [*] `np.longfloat` will be removed in NumPy 2.0. Use `num
    68 |+    np.longdouble(12+34j)
 69 69 | 
 70 70 |     np.lookfor
+71 71 | 
 
 NPY201.py:70:5: NPY201 `np.lookfor` will be removed in NumPy 2.0. Search NumPy’s documentation directly.
    |
@@ -559,4 +560,22 @@ NPY201.py:70:5: NPY201 `np.lookfor` will be removed in NumPy 2.0. Search NumPy�
 69 | 
 70 |     np.lookfor
    |     ^^^^^^^^^^ NPY201
+71 | 
+72 |     np.NAN
    |
+
+NPY201.py:72:5: NPY201 [*] `np.NAN` will be removed in NumPy 2.0. Use `numpy.nan` instead.
+   |
+70 |     np.lookfor
+71 | 
+72 |     np.NAN
+   |     ^^^^^^ NPY201
+   |
+   = help: Replace with `numpy.nan`
+
+ℹ Safe fix
+69 69 | 
+70 70 |     np.lookfor
+71 71 | 
+72    |-    np.NAN
+   72 |+    np.nan
