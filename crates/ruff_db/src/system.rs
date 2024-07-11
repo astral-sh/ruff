@@ -54,6 +54,11 @@ pub trait System {
     /// Returns the current working directory
     fn current_directory(&self) -> &SystemPath;
 
+    fn read_dir<'a>(
+        &'a self,
+        path: &SystemPath,
+    ) -> Result<Box<dyn Iterator<Item = Result<DirEntry>> + 'a>>;
+
     fn as_any(&self) -> &dyn std::any::Any;
 }
 
@@ -78,7 +83,7 @@ impl Metadata {
     }
 }
 
-#[derive(Copy, Clone, Eq, PartialEq, Debug, Hash)]
+#[derive(Copy, Clone, Eq, PartialEq, Debug, Hash, PartialOrd, Ord)]
 pub enum FileType {
     File,
     Directory,
@@ -96,5 +101,25 @@ impl FileType {
 
     pub const fn is_symlink(self) -> bool {
         matches!(self, FileType::Symlink)
+    }
+}
+
+#[derive(Debug, PartialEq, Eq, PartialOrd, Ord)]
+pub struct DirEntry {
+    path: SystemPathBuf,
+    file_type: FileType,
+}
+
+impl DirEntry {
+    pub fn new(path: SystemPathBuf, file_type: FileType) -> Self {
+        Self { path, file_type }
+    }
+
+    pub fn path(&self) -> &SystemPath {
+        &self.path
+    }
+
+    pub fn file_type(&self) -> FileType {
+        self.file_type
     }
 }

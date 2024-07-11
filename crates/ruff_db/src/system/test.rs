@@ -1,5 +1,5 @@
 use crate::files::File;
-use crate::system::{MemoryFileSystem, Metadata, OsSystem, System, SystemPath};
+use crate::system::{DirEntry, MemoryFileSystem, Metadata, OsSystem, Result, System, SystemPath};
 use crate::Db;
 use std::any::Any;
 
@@ -84,6 +84,16 @@ impl System for TestSystem {
 
     fn as_any(&self) -> &dyn Any {
         self
+    }
+
+    fn read_dir<'a>(
+        &'a self,
+        path: &SystemPath,
+    ) -> Result<Box<dyn Iterator<Item = Result<DirEntry>> + 'a>> {
+        match &self.inner {
+            TestFileSystem::Os(fs) => fs.read_dir(path),
+            TestFileSystem::Stub(fs) => Ok(Box::new(fs.read_dir(path)?)),
+        }
     }
 }
 

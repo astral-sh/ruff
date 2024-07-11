@@ -1,4 +1,4 @@
-use crate::system::{FileType, Metadata, Result, System, SystemPath, SystemPathBuf};
+use crate::system::{DirEntry, FileType, Metadata, Result, System, SystemPath, SystemPathBuf};
 use filetime::FileTime;
 use std::any::Any;
 use std::sync::Arc;
@@ -68,6 +68,14 @@ impl System for OsSystem {
     fn as_any(&self) -> &dyn Any {
         self
     }
+
+    fn read_dir(&self, path: &SystemPath) -> Result<Box<dyn Iterator<Item = Result<DirEntry>>>> {
+        Ok(Box::new(
+            path.as_camino_path()
+                .read_dir_utf8()?
+                .map(|res| res.and_then(DirEntry::try_from)),
+        ))
+    }
 }
 
 impl From<std::fs::FileType> for FileType {
@@ -79,5 +87,76 @@ impl From<std::fs::FileType> for FileType {
         } else {
             FileType::Symlink
         }
+    }
+}
+
+impl TryFrom<camino::Utf8DirEntry> for DirEntry {
+    type Error = std::io::Error;
+
+    fn try_from(value: camino::Utf8DirEntry) -> Result<Self> {
+        Ok(Self {
+            path: SystemPathBuf::from_utf8_path_buf(value.path().to_path_buf()),
+            file_type: FileType::from(value.file_type()?),
+        })
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use tempfile::TempDir;
+
+    use super::*;
+
+    #[test]
+    fn read_dir() {
+        let tempdir = TempDir::new().unwrap();
+        let tempdir_path = tempdir.path();
+        std::fs::create_dir_all(tempdir_path.join("a/foo")).unwrap();
+        let files = &["b.ts", "a/bar.py", "d.rs", "a/foo/bar.py", "a/baz.pyi"];
+        for path in files {
+            std::fs::File::create(tempdir_path.join(path)).unwrap();
+        }
+
+        let tempdir_path = SystemPath::from_std_path(tempdir_path).unwrap();
+        let fs = OsSystem::new(tempdir_path);
+
+        let mut sorted_contents: Vec<DirEntry> = fs
+            .read_dir(&tempdir_path.join("a"))
+            .unwrap()
+            .map(Result::unwrap)
+            .collect();
+        sorted_contents.sort();
+
+        let expected_contents = vec![
+            DirEntry::new(tempdir_path.join("a/bar.py"), FileType::File),
+            DirEntry::new(tempdir_path.join("a/baz.pyi"), FileType::File),
+            DirEntry::new(tempdir_path.join("a/foo"), FileType::Directory),
+        ];
+        assert_eq!(sorted_contents, expected_contents)
+    }
+
+    #[test]
+    fn read_dir_nonexistent() {
+        let fs = OsSystem::new("");
+        let result = fs.read_dir(SystemPath::new("doesnt_exist"));
+        assert!(result.is_err_and(|error| error.kind() == std::io::ErrorKind::NotFound));
+    }
+
+    #[test]
+    fn read_dir_on_file() {
+        let tempdir = TempDir::new().unwrap();
+        let tempdir_path = tempdir.path();
+        std::fs::File::create(tempdir_path.join("a.py")).unwrap();
+
+        let tempdir_path = SystemPath::from_std_path(tempdir_path).unwrap();
+        let fs = OsSystem::new(tempdir_path);
+        let result = fs.read_dir(&tempdir_path.join("a.py"));
+        let Err(error) = result else {
+            panic!("Expected the read_dir() call to fail!");
+        };
+        // We can't assert the error kind here because it's apparently an unstable feature!
+        // https://github.com/rust-lang/rust/issues/86442
+        // assert_eq!(error.kind(), std::io::ErrorKind::NotADirectory);
+        assert!(error.to_string().contains("Not a directory"));
     }
 }
