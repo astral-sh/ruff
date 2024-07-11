@@ -17,7 +17,7 @@ ruff_cache = { workspace = true }
 ruff_diagnostics = { workspace = true, features = ["serde"] }
 ruff_notebook = { workspace = true }
 ruff_macros = { workspace = true }
-ruff_python_ast = { workspace = true, features = ["serde"] }
+ruff_python_ast = { workspace = true, features = ["serde", "cache"] }
 ruff_python_codegen = { workspace = true }
 ruff_python_index = { workspace = true }
 ruff_python_literal = { workspace = true }
@@ -79,7 +79,7 @@ colored = { workspace = true, features = ["no-color"] }
 
 [features]
 default = []
-schemars = ["dep:schemars"]
+schemars = ["dep:schemars", "ruff_python_ast/schemars"]
 # Enables rules for internal integration tests
 test-rules = []
 
