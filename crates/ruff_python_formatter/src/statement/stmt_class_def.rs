@@ -132,7 +132,7 @@ impl FormatNodeRule<StmtClassDef> for FormatStmtClassDef {
                         Ok(())
                     }),
                 ),
-                clause_body(body, trailing_definition_comments).with_kind(SuiteKind::Class),
+                clause_body(body, SuiteKind::Class, trailing_definition_comments),
             ]
         )?;
 

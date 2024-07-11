@@ -5,9 +5,10 @@ use ruff_text_size::Ranged;
 use crate::comments;
 use crate::comments::leading_alternate_branch_comments;
 use crate::comments::SourceComment;
-use crate::other::except_handler_except_handler::ExceptHandlerKind;
+use crate::other::except_handler_except_handler::{format_except_handler, ExceptHandlerKind};
 use crate::prelude::*;
 use crate::statement::clause::{clause_body, clause_header, ClauseHeader, ElseClause};
+use crate::statement::suite::SuiteKind;
 use crate::statement::{FormatRefWithRule, Stmt};
 
 #[derive(Default)]
@@ -56,8 +57,8 @@ impl FormatNodeRule<StmtTry> for FormatStmtTry {
         let StmtTry {
             body,
             handlers,
-            orelse: _,
-            finalbody: _,
+            orelse,
+            finalbody,
             is_star,
             range: _,
         } = item;
@@ -65,31 +66,55 @@ impl FormatNodeRule<StmtTry> for FormatStmtTry {
         let comments_info = f.context().comments().clone();
         let mut dangling_comments = comments_info.dangling(item);
 
-        (_, dangling_comments) = format_case(item, CaseKind::Try, None, dangling_comments, f)?;
+        let try_last_suite_in_statement =
+            handlers.is_empty() && orelse.is_empty() && finalbody.is_empty();
+        (_, dangling_comments) = format_case(
+            item,
+            CaseKind::Try,
+            None,
+            dangling_comments,
+            try_last_suite_in_statement,
+            f,
+        )?;
         let mut previous_node = body.last();
 
         for handler in handlers {
             let handler_comments = comments_info.leading(handler);
-            write!(
-                f,
-                [
-                    leading_alternate_branch_comments(handler_comments, previous_node),
-                    &handler.format().with_options(if *is_star {
-                        ExceptHandlerKind::Starred
-                    } else {
-                        ExceptHandlerKind::Regular
-                    }),
-                ]
-            )?;
-            previous_node = match handler {
-                ExceptHandler::ExceptHandler(handler) => handler.body.last(),
+            leading_alternate_branch_comments(handler_comments, previous_node).fmt(f)?;
+            let ExceptHandler::ExceptHandler(except_handler) = handler;
+            let except_handler_kind = if *is_star {
+                ExceptHandlerKind::Starred
+            } else {
+                ExceptHandlerKind::Regular
             };
+            let last_suite_in_statement =
+                handler == handlers.last().unwrap() && orelse.is_empty() && finalbody.is_empty();
+            format_except_handler(
+                except_handler,
+                except_handler_kind,
+                last_suite_in_statement,
+                f,
+            )?;
+            previous_node = except_handler.body.last();
         }
 
-        (previous_node, dangling_comments) =
-            format_case(item, CaseKind::Else, previous_node, dangling_comments, f)?;
+        (previous_node, dangling_comments) = format_case(
+            item,
+            CaseKind::Else,
+            previous_node,
+            dangling_comments,
+            finalbody.is_empty(),
+            f,
+        )?;
 
-        format_case(item, CaseKind::Finally, previous_node, dangling_comments, f)?;
+        format_case(
+            item,
+            CaseKind::Finally,
+            previous_node,
+            dangling_comments,
+            true,
+            f,
+        )?;
 
         write!(f, [comments::dangling_comments(dangling_comments)])
     }
@@ -100,6 +125,7 @@ fn format_case<'a>(
     kind: CaseKind,
     previous_node: Option<&'a Stmt>,
     dangling_comments: &'a [SourceComment],
+    last_suite_in_statement: bool,
     f: &mut PyFormatter,
 ) -> FormatResult<(Option<&'a Stmt>, &'a [SourceComment])> {
     let body = match kind {
@@ -129,7 +155,11 @@ fn format_case<'a>(
             [
                 clause_header(header, trailing_case_comments, &token(kind.keyword()))
                     .with_leading_comments(leading_case_comments, previous_node),
-                clause_body(body, trailing_case_comments),
+                clause_body(
+                    body,
+                    SuiteKind::other(last_suite_in_statement),
+                    trailing_case_comments
+                ),
             ]
         )?;
         (Some(last), rest)

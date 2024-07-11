@@ -159,22 +159,6 @@ def bar():
  # leading 3 that already has an empty line
  @deco3
  # leading 4
-@@ -106,7 +105,6 @@
-         # Another leading comment
-         def another_inline():
-             pass
--
-     else:
-         # More leading comments
-         def inline_after_else():
-@@ -121,7 +119,6 @@
-     # Another leading comment
-     def another_top_level_quote_inline_inline():
-         pass
--
- else:
-     # More leading comments
-     def top_level_quote_inline_after_else():
 ```
 
 ## Ruff Output
@@ -287,6 +271,7 @@ def main():
         # Another leading comment
         def another_inline():
             pass
+
     else:
         # More leading comments
         def inline_after_else():
@@ -301,6 +286,7 @@ if a:
     # Another leading comment
     def another_top_level_quote_inline_inline():
         pass
+
 else:
     # More leading comments
     def top_level_quote_inline_after_else():
@@ -505,5 +491,3 @@ def foo():
 def bar():
     pass
 ```
-
-

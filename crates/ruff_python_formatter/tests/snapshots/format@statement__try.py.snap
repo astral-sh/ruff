@@ -295,16 +295,19 @@ try:
     def f():
         pass
         # a
+
 except:
 
     def f():
         pass
         # b
+
 else:
 
     def f():
         pass
         # c
+
 finally:
 
     def f():
@@ -364,6 +367,3 @@ else:
 finally:
     pass
 ```
-
-
-

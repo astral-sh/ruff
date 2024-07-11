@@ -7,6 +7,7 @@ use crate::expression::maybe_parenthesize_expression;
 use crate::expression::parentheses::Parenthesize;
 use crate::prelude::*;
 use crate::statement::clause::{clause_body, clause_header, ClauseHeader, ElseClause};
+use crate::statement::suite::SuiteKind;
 
 #[derive(Default)]
 pub struct FormatStmtWhile;
@@ -42,7 +43,11 @@ impl FormatNodeRule<StmtWhile> for FormatStmtWhile {
                         maybe_parenthesize_expression(test, item, Parenthesize::IfBreaks),
                     ]
                 ),
-                clause_body(body, trailing_condition_comments),
+                clause_body(
+                    body,
+                    SuiteKind::other(orelse.is_empty()),
+                    trailing_condition_comments
+                ),
             ]
         )?;
 
@@ -62,7 +67,7 @@ impl FormatNodeRule<StmtWhile> for FormatStmtWhile {
                         &token("else")
                     )
                     .with_leading_comments(leading, body.last()),
-                    clause_body(orelse, trailing),
+                    clause_body(orelse, SuiteKind::other(true), trailing),
                 ]
             )?;
         }

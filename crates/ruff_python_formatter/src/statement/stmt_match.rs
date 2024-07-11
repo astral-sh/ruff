@@ -36,7 +36,7 @@ impl FormatNodeRule<StmtMatch> for FormatStmtMatch {
         )
         .fmt(f)?;
 
-        let mut cases_iter = cases.iter();
+        let mut cases_iter = cases.iter().peekable();
         let Some(first) = cases_iter.next() else {
             return Ok(());
         };
@@ -48,6 +48,7 @@ impl FormatNodeRule<StmtMatch> for FormatStmtMatch {
         let mut last_case = first;
 
         for case in cases_iter {
+            let last_suite_in_statement = case == cases.last().unwrap();
             write!(
                 f,
                 [block_indent(&format_args!(
@@ -55,7 +56,7 @@ impl FormatNodeRule<StmtMatch> for FormatStmtMatch {
                         comments.leading(case),
                         last_case.body.last(),
                     ),
-                    case.format()
+                    case.format().with_options(last_suite_in_statement)
                 ))]
             )?;
             last_case = case;

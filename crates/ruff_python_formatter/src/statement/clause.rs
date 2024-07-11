@@ -380,21 +380,14 @@ pub(crate) struct FormatClauseBody<'a> {
     trailing_comments: &'a [SourceComment],
 }
 
-impl<'a> FormatClauseBody<'a> {
-    #[must_use]
-    pub(crate) fn with_kind(mut self, kind: SuiteKind) -> Self {
-        self.kind = kind;
-        self
-    }
-}
-
 pub(crate) fn clause_body<'a>(
     body: &'a Suite,
+    kind: SuiteKind,
     trailing_comments: &'a [SourceComment],
 ) -> FormatClauseBody<'a> {
     FormatClauseBody {
         body,
-        kind: SuiteKind::default(),
+        kind,
         trailing_comments,
     }
 }

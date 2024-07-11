@@ -609,6 +609,7 @@ if True:
 
     def f1():
         pass  # a
+
 else:
     pass
 
@@ -618,6 +619,7 @@ if True:
     def f2():
         pass
         # a
+
 else:
     pass
 
