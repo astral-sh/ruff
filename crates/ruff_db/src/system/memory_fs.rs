@@ -316,7 +316,7 @@ impl<'a> Iterator for DirectoryIterator<'a> {
             } else {
                 FileType::File
             };
-            break Some(Ok(DirEntry::new(path, file_type)));
+            break Some(Ok(DirEntry::new(path, Ok(file_type))));
         }
     }
 }
@@ -675,9 +675,9 @@ mod tests {
             .map(Result::unwrap)
             .collect();
         let expected_contents = vec![
-            DirEntry::new(SystemPathBuf::from("/a/bar.py"), FileType::File),
-            DirEntry::new(SystemPathBuf::from("/a/baz.pyi"), FileType::File),
-            DirEntry::new(SystemPathBuf::from("/a/foo"), FileType::Directory),
+            DirEntry::new(SystemPathBuf::from("/a/bar.py"), Ok(FileType::File)),
+            DirEntry::new(SystemPathBuf::from("/a/baz.pyi"), Ok(FileType::File)),
+            DirEntry::new(SystemPathBuf::from("/a/foo"), Ok(FileType::Directory)),
         ];
         assert_eq!(contents, expected_contents)
     }

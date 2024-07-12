@@ -76,7 +76,7 @@ impl System for OsSystem {
         Ok(Box::new(
             path.as_camino_path()
                 .read_dir_utf8()?
-                .map(|res| res.and_then(DirEntry::try_from)),
+                .map(|res| res.map(DirEntry::from)),
         ))
     }
 }
@@ -93,14 +93,13 @@ impl From<std::fs::FileType> for FileType {
     }
 }
 
-impl TryFrom<camino::Utf8DirEntry> for DirEntry {
-    type Error = std::io::Error;
-
-    fn try_from(value: camino::Utf8DirEntry) -> Result<Self> {
-        Ok(Self {
-            path: SystemPathBuf::from_utf8_path_buf(value.path().to_path_buf()),
-            file_type: FileType::from(value.file_type()?),
-        })
+impl From<camino::Utf8DirEntry> for DirEntry {
+    fn from(value: camino::Utf8DirEntry) -> Self {
+        let file_type = value.file_type().map(FileType::from);
+        Self {
+            path: SystemPathBuf::from_utf8_path_buf(value.into_path()),
+            file_type,
+        }
     }
 }
 
@@ -128,12 +127,12 @@ mod tests {
             .unwrap()
             .map(Result::unwrap)
             .collect();
-        sorted_contents.sort();
+        sorted_contents.sort_by(|a, b| a.path.cmp(&b.path));
 
         let expected_contents = vec![
-            DirEntry::new(tempdir_path.join("a/bar.py"), FileType::File),
-            DirEntry::new(tempdir_path.join("a/baz.pyi"), FileType::File),
-            DirEntry::new(tempdir_path.join("a/foo"), FileType::Directory),
+            DirEntry::new(tempdir_path.join("a/bar.py"), Ok(FileType::File)),
+            DirEntry::new(tempdir_path.join("a/baz.pyi"), Ok(FileType::File)),
+            DirEntry::new(tempdir_path.join("a/foo"), Ok(FileType::Directory)),
         ];
         assert_eq!(sorted_contents, expected_contents)
     }

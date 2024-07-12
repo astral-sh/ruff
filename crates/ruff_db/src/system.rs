@@ -83,7 +83,7 @@ impl Metadata {
     }
 }
 
-#[derive(Copy, Clone, Eq, PartialEq, Debug, Hash, PartialOrd, Ord)]
+#[derive(Copy, Clone, Eq, PartialEq, Debug, Hash)]
 pub enum FileType {
     File,
     Directory,
@@ -104,14 +104,14 @@ impl FileType {
     }
 }
 
-#[derive(Debug, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Debug)]
 pub struct DirEntry {
     path: SystemPathBuf,
-    file_type: FileType,
+    file_type: Result<FileType>,
 }
 
 impl DirEntry {
-    pub fn new(path: SystemPathBuf, file_type: FileType) -> Self {
+    pub fn new(path: SystemPathBuf, file_type: Result<FileType>) -> Self {
         Self { path, file_type }
     }
 
@@ -119,7 +119,13 @@ impl DirEntry {
         &self.path
     }
 
-    pub fn file_type(&self) -> FileType {
-        self.file_type
+    pub fn file_type(&self) -> &Result<FileType> {
+        &self.file_type
+    }
+}
+
+impl PartialEq for DirEntry {
+    fn eq(&self, other: &Self) -> bool {
+        self.path == other.path
     }
 }
