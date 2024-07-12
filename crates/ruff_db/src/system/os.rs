@@ -1,4 +1,6 @@
-use crate::system::{DirEntry, FileType, Metadata, Result, System, SystemPath, SystemPathBuf};
+use crate::system::{
+    DirectoryEntry, FileType, Metadata, Result, System, SystemPath, SystemPathBuf,
+};
 use filetime::FileTime;
 use std::any::Any;
 use std::sync::Arc;
@@ -72,11 +74,11 @@ impl System for OsSystem {
     fn read_directory(
         &self,
         path: &SystemPath,
-    ) -> Result<Box<dyn Iterator<Item = Result<DirEntry>>>> {
+    ) -> Result<Box<dyn Iterator<Item = Result<DirectoryEntry>>>> {
         Ok(Box::new(
             path.as_camino_path()
                 .read_dir_utf8()?
-                .map(|res| res.map(DirEntry::from)),
+                .map(|res| res.map(DirectoryEntry::from)),
         ))
     }
 }
@@ -93,7 +95,7 @@ impl From<std::fs::FileType> for FileType {
     }
 }
 
-impl From<camino::Utf8DirEntry> for DirEntry {
+impl From<camino::Utf8DirEntry> for DirectoryEntry {
     fn from(value: camino::Utf8DirEntry) -> Self {
         let file_type = value.file_type().map(FileType::from);
         Self {
@@ -122,7 +124,7 @@ mod tests {
         let tempdir_path = SystemPath::from_std_path(tempdir_path).unwrap();
         let fs = OsSystem::new(tempdir_path);
 
-        let mut sorted_contents: Vec<DirEntry> = fs
+        let mut sorted_contents: Vec<DirectoryEntry> = fs
             .read_directory(&tempdir_path.join("a"))
             .unwrap()
             .map(Result::unwrap)
@@ -130,9 +132,9 @@ mod tests {
         sorted_contents.sort_by(|a, b| a.path.cmp(&b.path));
 
         let expected_contents = vec![
-            DirEntry::new(tempdir_path.join("a/bar.py"), Ok(FileType::File)),
-            DirEntry::new(tempdir_path.join("a/baz.pyi"), Ok(FileType::File)),
-            DirEntry::new(tempdir_path.join("a/foo"), Ok(FileType::Directory)),
+            DirectoryEntry::new(tempdir_path.join("a/bar.py"), Ok(FileType::File)),
+            DirectoryEntry::new(tempdir_path.join("a/baz.pyi"), Ok(FileType::File)),
+            DirectoryEntry::new(tempdir_path.join("a/foo"), Ok(FileType::Directory)),
         ];
         assert_eq!(sorted_contents, expected_contents)
     }

@@ -4,7 +4,7 @@ use std::sync::{Arc, RwLock, RwLockWriteGuard};
 use camino::{Utf8Path, Utf8PathBuf};
 use filetime::FileTime;
 
-use crate::system::{DirEntry, FileType, Metadata, Result, SystemPath, SystemPathBuf};
+use crate::system::{DirectoryEntry, FileType, Metadata, Result, SystemPath, SystemPathBuf};
 
 /// File system that stores all content in memory.
 ///
@@ -241,7 +241,7 @@ impl MemoryFileSystem {
     pub(crate) fn read_directory(
         &self,
         path: impl AsRef<SystemPath>,
-    ) -> Result<impl Iterator<Item = Result<DirEntry>> + '_> {
+    ) -> Result<impl Iterator<Item = Result<DirectoryEntry>> + '_> {
         let by_path = self.inner.by_path.read().unwrap();
         let normalized = self.normalize_path(path.as_ref());
         let entry = by_path.get(&normalized).ok_or_else(not_found)?;
@@ -254,7 +254,7 @@ impl MemoryFileSystem {
             .take_while(|(path, _)| path.starts_with(&normalized))
             .filter_map(|(path, entry)| {
                 if path.parent()? == normalized {
-                    Some(Ok(DirEntry {
+                    Some(Ok(DirectoryEntry {
                         path: SystemPathBuf::from_utf8_path_buf(path.to_owned()),
                         file_type: Ok(entry.file_type()),
                     }))
@@ -384,7 +384,9 @@ mod tests {
     use std::io::ErrorKind;
     use std::time::Duration;
 
-    use crate::system::{DirEntry, FileType, MemoryFileSystem, Result, SystemPath, SystemPathBuf};
+    use crate::system::{
+        DirectoryEntry, FileType, MemoryFileSystem, Result, SystemPath, SystemPathBuf,
+    };
 
     /// Creates a file system with the given files.
     ///
@@ -651,15 +653,15 @@ mod tests {
     #[test]
     fn read_directory() {
         let fs = with_files(["b.ts", "a/bar.py", "d.rs", "a/foo/bar.py", "a/baz.pyi"]);
-        let contents: Vec<DirEntry> = fs
+        let contents: Vec<DirectoryEntry> = fs
             .read_directory("a")
             .unwrap()
             .map(Result::unwrap)
             .collect();
         let expected_contents = vec![
-            DirEntry::new(SystemPathBuf::from("/a/bar.py"), Ok(FileType::File)),
-            DirEntry::new(SystemPathBuf::from("/a/baz.pyi"), Ok(FileType::File)),
-            DirEntry::new(SystemPathBuf::from("/a/foo"), Ok(FileType::Directory)),
+            DirectoryEntry::new(SystemPathBuf::from("/a/bar.py"), Ok(FileType::File)),
+            DirectoryEntry::new(SystemPathBuf::from("/a/baz.pyi"), Ok(FileType::File)),
+            DirectoryEntry::new(SystemPathBuf::from("/a/foo"), Ok(FileType::Directory)),
         ];
         assert_eq!(contents, expected_contents)
     }

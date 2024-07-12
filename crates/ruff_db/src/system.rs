@@ -57,7 +57,7 @@ pub trait System {
     fn read_directory<'a>(
         &'a self,
         path: &SystemPath,
-    ) -> Result<Box<dyn Iterator<Item = Result<DirEntry>> + 'a>>;
+    ) -> Result<Box<dyn Iterator<Item = Result<DirectoryEntry>> + 'a>>;
 
     fn as_any(&self) -> &dyn std::any::Any;
 }
@@ -105,12 +105,12 @@ impl FileType {
 }
 
 #[derive(Debug)]
-pub struct DirEntry {
+pub struct DirectoryEntry {
     path: SystemPathBuf,
     file_type: Result<FileType>,
 }
 
-impl DirEntry {
+impl DirectoryEntry {
     pub fn new(path: SystemPathBuf, file_type: Result<FileType>) -> Self {
         Self { path, file_type }
     }
@@ -124,7 +124,7 @@ impl DirEntry {
     }
 }
 
-impl PartialEq for DirEntry {
+impl PartialEq for DirectoryEntry {
     fn eq(&self, other: &Self) -> bool {
         self.path == other.path
     }
