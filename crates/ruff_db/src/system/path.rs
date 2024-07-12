@@ -303,6 +303,12 @@ impl SystemPath {
         self.0.as_std_path()
     }
 
+    /// Returns the [`Utf8Path`] for the file.
+    #[inline]
+    pub fn as_utf8_path(&self) -> &Utf8Path {
+        &self.0
+    }
+
     pub fn from_std_path(path: &Path) -> Option<&SystemPath> {
         Some(SystemPath::new(Utf8Path::from_path(path)?))
     }

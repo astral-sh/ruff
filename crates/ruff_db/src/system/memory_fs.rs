@@ -4,7 +4,7 @@ use std::sync::{Arc, RwLock, RwLockWriteGuard};
 use camino::{Utf8Path, Utf8PathBuf};
 use filetime::FileTime;
 
-use crate::system::{FileType, Metadata, Result, SystemPath, SystemPathBuf};
+use crate::system::{DirectoryEntry, FileType, Metadata, Result, SystemPath, SystemPathBuf};
 
 /// File system that stores all content in memory.
 ///
@@ -237,6 +237,34 @@ impl MemoryFileSystem {
         let normalized = SystemPath::absolute(path, &self.inner.cwd);
         normalized.into_utf8_path_buf()
     }
+
+    pub fn read_directory(
+        &self,
+        path: impl AsRef<SystemPath>,
+    ) -> Result<impl Iterator<Item = Result<DirectoryEntry>> + '_> {
+        let by_path = self.inner.by_path.read().unwrap();
+        let normalized = self.normalize_path(path.as_ref());
+        let entry = by_path.get(&normalized).ok_or_else(not_found)?;
+        if entry.is_file() {
+            return Err(not_a_directory());
+        };
+        Ok(by_path
+            .range(normalized.clone()..)
+            .skip(1)
+            .take_while(|(path, _)| path.starts_with(&normalized))
+            .filter_map(|(path, entry)| {
+                if path.parent()? == normalized {
+                    Some(Ok(DirectoryEntry {
+                        path: SystemPathBuf::from_utf8_path_buf(path.to_owned()),
+                        file_type: Ok(entry.file_type()),
+                    }))
+                } else {
+                    None
+                }
+            })
+            .collect::<Vec<_>>()
+            .into_iter())
+    }
 }
 
 impl Default for MemoryFileSystem {
@@ -267,6 +295,13 @@ enum Entry {
 impl Entry {
     const fn is_file(&self) -> bool {
         matches!(self, Entry::File(_))
+    }
+
+    const fn file_type(&self) -> FileType {
+        match self {
+            Self::File(_) => FileType::File,
+            Self::Directory(_) => FileType::Directory,
+        }
     }
 }
 
@@ -349,7 +384,9 @@ mod tests {
     use std::io::ErrorKind;
     use std::time::Duration;
 
-    use crate::system::{MemoryFileSystem, Result, SystemPath};
+    use crate::system::{
+        DirectoryEntry, FileType, MemoryFileSystem, Result, SystemPath, SystemPathBuf,
+    };
 
     /// Creates a file system with the given files.
     ///
@@ -611,5 +648,40 @@ mod tests {
 
         let error = fs.remove_directory("a").unwrap_err();
         assert_eq!(error.kind(), ErrorKind::Other);
+    }
+
+    #[test]
+    fn read_directory() {
+        let fs = with_files(["b.ts", "a/bar.py", "d.rs", "a/foo/bar.py", "a/baz.pyi"]);
+        let contents: Vec<DirectoryEntry> = fs
+            .read_directory("a")
+            .unwrap()
+            .map(Result::unwrap)
+            .collect();
+        let expected_contents = vec![
+            DirectoryEntry::new(SystemPathBuf::from("/a/bar.py"), Ok(FileType::File)),
+            DirectoryEntry::new(SystemPathBuf::from("/a/baz.pyi"), Ok(FileType::File)),
+            DirectoryEntry::new(SystemPathBuf::from("/a/foo"), Ok(FileType::Directory)),
+        ];
+        assert_eq!(contents, expected_contents)
+    }
+
+    #[test]
+    fn read_directory_nonexistent() {
+        let fs = MemoryFileSystem::new();
+        let Err(error) = fs.read_directory("doesnt_exist") else {
+            panic!("Expected this to fail");
+        };
+        assert_eq!(error.kind(), std::io::ErrorKind::NotFound);
+    }
+
+    #[test]
+    fn read_directory_on_file() {
+        let fs = with_files(["a.py"]);
+        let Err(error) = fs.read_directory("a.py") else {
+            panic!("Expected this to fail");
+        };
+        assert_eq!(error.kind(), std::io::ErrorKind::Other);
+        assert!(error.to_string().contains("Not a directory"));
     }
 }
