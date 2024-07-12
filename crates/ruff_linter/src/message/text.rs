@@ -116,7 +116,8 @@ impl Emitter for TextEmitter {
             )?;
 
             if self.flags.intersects(EmitterFlags::SHOW_SOURCE) {
-                if message.range().len() > TextSize::default() {
+				// The `0..0` range is used to highlight file-level diagnostics.
+                if message.range() != TextRange::default() {
                     writeln!(
                         writer,
                         "{}",
