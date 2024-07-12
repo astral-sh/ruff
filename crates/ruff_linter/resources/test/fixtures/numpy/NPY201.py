@@ -68,3 +68,5 @@ def func():
     np.longfloat(12+34j)
 
     np.lookfor
+
+    np.NAN
