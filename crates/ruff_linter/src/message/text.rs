@@ -116,14 +116,16 @@ impl Emitter for TextEmitter {
             )?;
 
             if self.flags.intersects(EmitterFlags::SHOW_SOURCE) {
-                writeln!(
-                    writer,
-                    "{}",
-                    MessageCodeFrame {
-                        message,
-                        notebook_index
-                    }
-                )?;
+                if message.range().len() > TextSize::default() {
+                    writeln!(
+                        writer,
+                        "{}",
+                        MessageCodeFrame {
+                            message,
+                            notebook_index
+                        }
+                    )?;
+                }
             }
 
             if self.flags.intersects(EmitterFlags::SHOW_FIX_DIFF) {
