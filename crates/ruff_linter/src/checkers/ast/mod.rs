@@ -1140,6 +1140,13 @@ impl<'a> Visitor<'a> for Checker<'a> {
                 self.visit_expr(body);
                 self.visit_expr(orelse);
             }
+            Expr::UnaryOp(ast::ExprUnaryOp {
+                op: UnaryOp::Not,
+                operand,
+                range: _,
+            }) => {
+                self.visit_boolean_test(operand);
+            }
             Expr::Call(ast::ExprCall {
                 func,
                 arguments,
