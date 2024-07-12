@@ -2,12 +2,6 @@
 source: crates/ruff_linter/src/rules/pydocstyle/mod.rs
 ---
 all.py:1:1: D100 Missing docstring in public module
-  |
-1 | def public_func():
-  |  D100
-2 |     pass
-  |
-
 all.py:1:5: D103 Missing docstring in public function
   |
 1 | def public_func():
@@ -30,5 +24,3 @@ all.py:10:11: D106 Missing docstring in public nested class
    |           ^^^^^^^^^^^^^^^^^ D106
 11 |         pass
    |
-
-
