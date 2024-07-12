@@ -1,8 +1,8 @@
-use std::ops::Deref;
 use std::sync::Arc;
 
-use ruff_db::files::{File, FilePath};
-use ruff_db::system::SystemPathBuf;
+use ruff_db::files::{system_path_to_file, File, FilePath};
+use ruff_db::source::{source_text, SourceText};
+use ruff_db::system::{DirectoryEntry, SystemPath, SystemPathBuf};
 
 use crate::db::Db;
 use crate::module::{Module, ModuleKind};
@@ -82,12 +82,14 @@ pub(crate) fn file_to_module(db: &dyn Db, file: File) -> Option<Module> {
 
     let resolver_settings = module_resolver_settings(db);
 
-    let relative_path = resolver_settings
-        .search_paths()
-        .iter()
-        .find_map(|root| root.relativize_path(path))?;
+    let mut search_paths = resolver_settings.search_paths(db).into_iter();
 
-    let module_name = relative_path.to_module_name()?;
+    let module_name = loop {
+        let candidate = search_paths.next()?;
+        if let Some(relative_path) = candidate.relativize_path(path) {
+            break relative_path.to_module_name()?;
+        }
+    };
 
     // Resolve the module name to see if Python would resolve the name to the same path.
     // If it doesn't, then that means that multiple modules have the same name in different
@@ -152,54 +154,183 @@ impl RawModuleResolutionSettings {
             custom_typeshed,
         } = self;
 
-        let mut paths: Vec<ModuleResolutionPathBuf> = extra_paths
+        let extra_paths: Vec<Arc<ModuleResolutionPathBuf>> = extra_paths
             .into_iter()
-            .map(|fs_path| ModuleResolutionPathBuf::extra(fs_path).unwrap())
+            .map(|fs_path| Arc::new(ModuleResolutionPathBuf::extra(fs_path).unwrap()))
             .collect();
 
-        paths.push(ModuleResolutionPathBuf::first_party(workspace_root).unwrap());
+        let workspace_root =
+            Arc::new(ModuleResolutionPathBuf::first_party(workspace_root).unwrap());
 
-        paths.push(
+        let stdlib = Arc::new(
             custom_typeshed.map_or_else(ModuleResolutionPathBuf::vendored_stdlib, |custom| {
                 ModuleResolutionPathBuf::stdlib_from_custom_typeshed_root(&custom).unwrap()
             }),
         );
 
         // TODO vendor typeshed's third-party stubs as well as the stdlib and fallback to them as a final step
-        if let Some(site_packages) = site_packages {
-            paths.push(ModuleResolutionPathBuf::site_packages(site_packages).unwrap());
-        }
+        let site_packages = site_packages
+            .map(|path| Arc::new(ModuleResolutionPathBuf::site_packages(path).unwrap()));
 
         ModuleResolutionSettings {
             target_version,
-            search_paths: OrderedSearchPaths(paths.into_iter().map(Arc::new).collect()),
+            search_path_settings: ValidatedSearchPathSettings {
+                extra_paths,
+                workspace_root,
+                stdlib,
+                site_packages,
+            },
         }
     }
 }
 
-/// A resolved module resolution order as per the [typing spec]
-///
-/// [typing spec]: https://typing.readthedocs.io/en/latest/spec/distributing.html#import-resolution-ordering
-#[derive(Clone, Debug, Default, Eq, PartialEq)]
-pub(crate) struct OrderedSearchPaths(Vec<Arc<ModuleResolutionPathBuf>>);
+#[derive(Debug, PartialEq, Eq, Clone)]
+pub(crate) struct ValidatedSearchPathSettings {
+    extra_paths: Vec<Arc<ModuleResolutionPathBuf>>,
+    workspace_root: Arc<ModuleResolutionPathBuf>,
+    stdlib: Arc<ModuleResolutionPathBuf>,
+    site_packages: Option<Arc<ModuleResolutionPathBuf>>,
+}
 
-impl Deref for OrderedSearchPaths {
-    type Target = [Arc<ModuleResolutionPathBuf>];
+impl ValidatedSearchPathSettings {
+    fn search_paths(&self, db: &dyn Db) -> Vec<Arc<ModuleResolutionPathBuf>> {
+        let ValidatedSearchPathSettings {
+            extra_paths,
+            workspace_root,
+            stdlib,
+            site_packages,
+        } = self;
+        let mut search_paths: Vec<Arc<ModuleResolutionPathBuf>> = extra_paths
+            .iter()
+            .cloned()
+            .chain([workspace_root, stdlib].into_iter().cloned())
+            .collect();
+        if let Some(site_packages) = site_packages {
+            search_paths.push(Arc::clone(site_packages));
+            let site_packages = site_packages
+                .as_system_path()
+                .expect("Expected site-packages never to be a VendoredPath!");
+            let Ok(pth_file_iterator) = PthFileIterator::new(db, site_packages) else {
+                return search_paths;
+            };
 
-    fn deref(&self) -> &Self::Target {
-        &self.0
+            // The Python documentation specifies that `.pth` files in `site-packages`
+            // are processed in alphabetical order.
+            // We know that files returned from [`ruff_db::system::MemoryFileSystem::read_directory()`]
+            // will be in alphabetical order already. However, [`ruff_db::system::OsSystem::read_directory()`]
+            // gives no such guarantees. Therefore, collecting and then sorting is necessary.
+            // https://docs.python.org/3/library/site.html#module-site
+            let mut all_pth_files: Vec<PthFile> = pth_file_iterator.collect();
+            all_pth_files.sort_by(|a, b| a.path.cmp(&b.path));
+
+            for pth_file in &all_pth_files {
+                search_paths.extend(pth_file.iter_editable_installations().map(Arc::new));
+            }
+        }
+        search_paths
+    }
+}
+
+struct PthFile<'db> {
+    db: &'db dyn Db,
+    path: SystemPathBuf,
+    contents: SourceText,
+    site_packages: &'db SystemPath,
+}
+
+impl<'db> PthFile<'db> {
+    fn new(
+        db: &'db dyn Db,
+        pth_path: SystemPathBuf,
+        file: File,
+        site_packages: &'db SystemPath,
+    ) -> Self {
+        Self {
+            db,
+            path: pth_path,
+            contents: source_text(db.upcast(), file),
+            site_packages,
+        }
+    }
+
+    fn iter_editable_installations<'a>(
+        &'a self,
+    ) -> impl Iterator<Item = ModuleResolutionPathBuf> + 'db
+    where
+        'a: 'db,
+    {
+        // Empty lines or lines starting with '#' are ignored by the Python interpreter.
+        // Lines that start with "import " do not represent editable installs at all;
+        // instead, these are files that are executed by Python at startup.
+        // https://docs.python.org/3/library/site.html#module-site
+        self.contents.lines().filter_map(|line| {
+            if line.is_empty() || line.starts_with('#') || line.starts_with("import ") {
+                return None;
+            }
+            let possible_editable_install = self.site_packages.join(line);
+
+            ModuleResolutionPathBuf::editable_installation_root(self.db, possible_editable_install)
+        })
+    }
+}
+
+struct PthFileIterator<'db> {
+    db: &'db dyn Db,
+    directory_iterator: Box<dyn Iterator<Item = std::io::Result<DirectoryEntry>> + 'db>,
+    site_packages: &'db SystemPath,
+}
+
+impl<'db> PthFileIterator<'db> {
+    fn new(db: &'db dyn Db, site_packages: &'db SystemPath) -> std::io::Result<Self> {
+        Ok(Self {
+            db,
+            directory_iterator: db.system().read_directory(site_packages)?,
+            site_packages,
+        })
+    }
+}
+
+impl<'db> Iterator for PthFileIterator<'db> {
+    type Item = PthFile<'db>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        loop {
+            let entry_result = self.directory_iterator.next()?;
+            let Ok(entry) = entry_result else {
+                continue;
+            };
+            let Ok(file_type) = entry.file_type() else {
+                continue;
+            };
+            if file_type.is_directory() {
+                continue;
+            }
+            let path = entry.path();
+            if path.extension() != Some("pth") {
+                continue;
+            }
+            let Some(file) = system_path_to_file(self.db.upcast(), path) else {
+                continue;
+            };
+            return Some(PthFile::new(
+                self.db,
+                path.to_path_buf(),
+                file,
+                self.site_packages,
+            ));
+        }
     }
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub(crate) struct ModuleResolutionSettings {
-    search_paths: OrderedSearchPaths,
+    search_path_settings: ValidatedSearchPathSettings,
     target_version: TargetVersion,
 }
 
 impl ModuleResolutionSettings {
-    pub(crate) fn search_paths(&self) -> &[Arc<ModuleResolutionPathBuf>] {
-        &self.search_paths
+    pub(crate) fn search_paths(&self, db: &dyn Db) -> Vec<Arc<ModuleResolutionPathBuf>> {
+        self.search_path_settings.search_paths(db)
     }
 
     pub(crate) fn target_version(&self) -> TargetVersion {
@@ -245,18 +376,18 @@ fn resolve_name(
     let resolver_settings = module_resolver_settings(db);
     let resolver_state = ResolverState::new(db, resolver_settings.target_version());
 
-    for search_path in resolver_settings.search_paths() {
+    for search_path in resolver_settings.search_paths(db) {
         let mut components = name.components();
         let module_name = components.next_back()?;
 
-        match resolve_package(search_path, components, &resolver_state) {
+        match resolve_package(&search_path, components, &resolver_state) {
             Ok(resolved_package) => {
                 let mut package_path = resolved_package.path;
 
                 package_path.push(module_name);
 
                 // Must be a `__init__.pyi` or `__init__.py` or it isn't a package.
-                let kind = if package_path.is_directory(search_path, &resolver_state) {
+                let kind = if package_path.is_directory(&search_path, &resolver_state) {
                     package_path.push("__init__");
                     ModuleKind::Package
                 } else {
@@ -266,14 +397,14 @@ fn resolve_name(
                 // TODO Implement full https://peps.python.org/pep-0561/#type-checker-module-resolution-order resolution
                 if let Some(stub) = package_path
                     .with_pyi_extension()
-                    .to_file(search_path, &resolver_state)
+                    .to_file(&search_path, &resolver_state)
                 {
                     return Some((search_path.clone(), stub, kind));
                 }
 
                 if let Some(module) = package_path
                     .with_py_extension()
-                    .and_then(|path| path.to_file(search_path, &resolver_state))
+                    .and_then(|path| path.to_file(&search_path, &resolver_state))
                 {
                     return Some((search_path.clone(), module, kind));
                 }
@@ -1138,6 +1269,115 @@ mod tests {
         assert_eq!(
             Some(functools_module.file()),
             system_path_to_file(&db, stdlib.join("functools.pyi"))
+        );
+    }
+
+    #[test]
+    fn editable_install_absolute_path() {
+        const SITE_PACKAGES: &[FileSpec] = &[("_foo.pth", "/x/src")];
+        const X_DIRECTORY: &[FileSpec] =
+            &[("/x/src/foo/__init__.py", ""), ("/x/src/foo/bar.py", "")];
+
+        let TestCase { db, .. } = TestCaseBuilder::new()
+            .with_site_packages_files(SITE_PACKAGES)
+            .with_other_files(X_DIRECTORY)
+            .build();
+
+        let foo_module_name = ModuleName::new_static("foo").unwrap();
+        let foo_bar_module_name = ModuleName::new_static("foo.bar").unwrap();
+
+        let foo_module = resolve_module(&db, foo_module_name.clone()).unwrap();
+        let foo_bar_module = resolve_module(&db, foo_bar_module_name.clone()).unwrap();
+
+        assert_eq!(
+            Some(foo_module.file()),
+            system_path_to_file(&db, SystemPathBuf::from("/x/src/foo/__init__.py"))
+        );
+        assert_eq!(
+            Some(foo_bar_module.file()),
+            system_path_to_file(&db, SystemPathBuf::from("/x/src/foo/bar.py"))
+        );
+    }
+
+    #[test]
+    fn editable_install_relative_path() {
+        const SITE_PACKAGES: &[FileSpec] = &[
+            ("_foo.pth", "../../x/../x/y/src"),
+            ("../x/y/src/foo.pyi", ""),
+        ];
+
+        let TestCase {
+            db, site_packages, ..
+        } = TestCaseBuilder::new()
+            .with_site_packages_files(SITE_PACKAGES)
+            .build();
+
+        let foo_module_name = ModuleName::new_static("foo").unwrap();
+        let foo_module = resolve_module(&db, foo_module_name.clone()).unwrap();
+
+        assert_eq!(
+            Some(foo_module.file()),
+            system_path_to_file(&db, site_packages.join("../x/y/src/foo.pyi"))
+        );
+    }
+
+    #[test]
+    fn editable_install_multiple_pth_files_with_multiple_paths() {
+        const COMPLEX_PTH_FILE: &str = "\
+/
+
+# a comment
+/baz
+
+import not_an_editable_install; do_something_else_crazy_dynamic()
+
+# another comment
+spam
+
+not_a_directory
+";
+
+        const SITE_PACKAGES: &[FileSpec] = &[
+            ("_foo.pth", "../../x/../x/y/src"),
+            ("_lots_of_others.pth", COMPLEX_PTH_FILE),
+            ("../x/y/src/foo.pyi", ""),
+            ("spam/spam.py", ""),
+        ];
+
+        const ROOT: &[FileSpec] = &[("/a.py", ""), ("/baz/b.py", "")];
+
+        let TestCase {
+            db, site_packages, ..
+        } = TestCaseBuilder::new()
+            .with_site_packages_files(SITE_PACKAGES)
+            .with_other_files(ROOT)
+            .build();
+
+        let foo_module_name = ModuleName::new_static("foo").unwrap();
+        let a_module_name = ModuleName::new_static("a").unwrap();
+        let b_module_name = ModuleName::new_static("b").unwrap();
+        let spam_module_name = ModuleName::new_static("spam").unwrap();
+
+        let foo_module = resolve_module(&db, foo_module_name.clone()).unwrap();
+        let a_module = resolve_module(&db, a_module_name.clone()).unwrap();
+        let b_module = resolve_module(&db, b_module_name.clone()).unwrap();
+        let spam_module = resolve_module(&db, spam_module_name.clone()).unwrap();
+
+        assert_eq!(
+            Some(foo_module.file()),
+            system_path_to_file(&db, site_packages.join("../x/y/src/foo.pyi"))
+        );
+        assert_eq!(
+            Some(a_module.file()),
+            system_path_to_file(&db, SystemPathBuf::from("/a.py"))
+        );
+        assert_eq!(
+            Some(b_module.file()),
+            system_path_to_file(&db, SystemPathBuf::from("/baz/b.py"))
+        );
+        assert_eq!(
+            Some(spam_module.file()),
+            system_path_to_file(&db, site_packages.join("spam/spam.py"))
         );
     }
 }
