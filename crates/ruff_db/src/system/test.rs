@@ -2,7 +2,10 @@ use crate::files::File;
 use crate::system::{DirectoryEntry, MemoryFileSystem, Metadata, Result, System, SystemPath};
 use crate::Db;
 use std::any::Any;
+use std::panic::RefUnwindSafe;
 use std::sync::Arc;
+
+use super::walk_directory::WalkDirectoryBuilder;
 
 /// System implementation intended for testing.
 ///
@@ -37,7 +40,7 @@ impl TestSystem {
 
     fn us_system<S>(&mut self, system: S)
     where
-        S: System + Send + Sync + 'static,
+        S: System + Send + Sync + RefUnwindSafe + 'static,
     {
         self.inner = TestSystemInner::System(Arc::new(system));
     }
@@ -61,28 +64,35 @@ impl System for TestSystem {
     fn path_exists(&self, path: &SystemPath) -> bool {
         match &self.inner {
             TestSystemInner::Stub(fs) => fs.exists(path),
-            TestSystemInner::System(fs) => fs.path_exists(path),
+            TestSystemInner::System(system) => system.path_exists(path),
         }
     }
 
     fn is_directory(&self, path: &SystemPath) -> bool {
         match &self.inner {
             TestSystemInner::Stub(fs) => fs.is_directory(path),
-            TestSystemInner::System(fs) => fs.is_directory(path),
+            TestSystemInner::System(system) => system.is_directory(path),
         }
     }
 
     fn is_file(&self, path: &SystemPath) -> bool {
         match &self.inner {
             TestSystemInner::Stub(fs) => fs.is_file(path),
-            TestSystemInner::System(fs) => fs.is_file(path),
+            TestSystemInner::System(system) => system.is_file(path),
         }
     }
 
     fn current_directory(&self) -> &SystemPath {
         match &self.inner {
             TestSystemInner::Stub(fs) => fs.current_directory(),
-            TestSystemInner::System(fs) => fs.current_directory(),
+            TestSystemInner::System(system) => system.current_directory(),
+        }
+    }
+
+    fn walk_directory(&self, path: &SystemPath) -> WalkDirectoryBuilder {
+        match &self.inner {
+            TestSystemInner::Stub(fs) => fs.walk_directory(path),
+            TestSystemInner::System(system) => system.walk_directory(path),
         }
     }
 
@@ -155,7 +165,7 @@ pub trait DbWithTestSystem: Db + Sized {
     /// Note that any files written to the memory file system won't be copied over.
     fn use_system<S>(&mut self, os: S)
     where
-        S: System + Send + Sync + 'static,
+        S: System + Send + Sync + RefUnwindSafe + 'static,
     {
         self.test_system_mut().us_system(os);
     }
@@ -172,7 +182,7 @@ pub trait DbWithTestSystem: Db + Sized {
 #[derive(Debug)]
 enum TestSystemInner {
     Stub(MemoryFileSystem),
-    System(Arc<dyn System + Send + Sync>),
+    System(Arc<dyn System + RefUnwindSafe + Send + Sync>),
 }
 
 impl TestSystemInner {

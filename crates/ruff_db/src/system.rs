@@ -1,8 +1,10 @@
+use std::fmt::Debug;
+
 pub use memory_fs::MemoryFileSystem;
 #[cfg(feature = "os")]
 pub use os::OsSystem;
-use std::fmt::Debug;
 pub use test::{DbWithTestSystem, TestSystem};
+use walk_directory::WalkDirectoryBuilder;
 
 use crate::file_revision::FileRevision;
 
@@ -13,6 +15,7 @@ mod memory_fs;
 mod os;
 mod path;
 mod test;
+pub mod walk_directory;
 
 pub type Result<T> = std::io::Result<T>;
 
@@ -85,6 +88,12 @@ pub trait System: Debug {
         path: &SystemPath,
     ) -> Result<Box<dyn Iterator<Item = Result<DirectoryEntry>> + 'a>>;
 
+    /// Recursively walks the content of `path`.
+    ///
+    /// It is allowed to pass a `path` that points to a file. In this case, the walker
+    /// yields a single entry for that file.
+    fn walk_directory(&self, path: &SystemPath) -> WalkDirectoryBuilder;
+
     fn as_any(&self) -> &dyn std::any::Any;
 }
 
@@ -130,14 +139,14 @@ impl FileType {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Eq)]
 pub struct DirectoryEntry {
     path: SystemPathBuf,
-    file_type: Result<FileType>,
+    file_type: FileType,
 }
 
 impl DirectoryEntry {
-    pub fn new(path: SystemPathBuf, file_type: Result<FileType>) -> Self {
+    pub fn new(path: SystemPathBuf, file_type: FileType) -> Self {
         Self { path, file_type }
     }
 
@@ -145,13 +154,7 @@ impl DirectoryEntry {
         &self.path
     }
 
-    pub fn file_type(&self) -> &Result<FileType> {
-        &self.file_type
-    }
-}
-
-impl PartialEq for DirectoryEntry {
-    fn eq(&self, other: &Self) -> bool {
-        self.path == other.path
+    pub fn file_type(&self) -> FileType {
+        self.file_type
     }
 }

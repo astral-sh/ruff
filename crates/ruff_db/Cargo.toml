@@ -31,4 +31,4 @@ insta = { workspace = true }
 tempfile = { workspace = true }
 
 [features]
-os = []
+os = ["ignore"]
