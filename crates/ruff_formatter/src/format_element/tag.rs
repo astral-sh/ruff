@@ -20,7 +20,7 @@ pub enum Tag {
     StartAlign(Align),
     EndAlign,
 
-    /// Reduces the indention of the specified content either by one level or to the root, depending on the mode.
+    /// Reduces the indentation of the specified content either by one level or to the root, depending on the mode.
     /// Reverse operation of `Indent` and can be used to *undo* an `Align` for nested content.
     StartDedent(DedentMode),
     EndDedent,
