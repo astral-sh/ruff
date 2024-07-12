@@ -54,6 +54,29 @@ pub trait System {
     /// Returns the current working directory
     fn current_directory(&self) -> &SystemPath;
 
+    /// Iterate over the contents of the directory at `path`.
+    ///
+    /// The returned iterator must have the following properties:
+    /// - It only iterates over the top level of the directory,
+    ///   i.e., it does not recurse into subdirectories.
+    /// - It skips the current and parent directories (`.` and `..`
+    ///   respectively).
+    /// - The iterator yields `std::io::Result<DirEntry>` instances.
+    ///   For each instance, an `Err` variant may signify that the path
+    ///   of the entry was not valid UTF8, in which case it should be an
+    ///   [`std::io::Error`] with the ErrorKind set to
+    ///   [`std::io::ErrorKind::InvalidData`] and the payload set to a
+    ///   [`camino::FromPathBufError`]. It may also indicate that
+    ///   "some sort of intermittent IO error occurred during iteration"
+    ///   (language taken from the [`std::fs::read_dir`] documentation).
+    ///
+    /// # Errors
+    /// Returns an error:
+    /// - if `path` does not exist in the system,
+    /// - if `path` does not point to a directory,
+    /// - if the process does not have sufficient permissions to
+    ///   view the contents of the directory at `path`
+    /// - May also return an error in some other situations as well.
     fn read_directory<'a>(
         &'a self,
         path: &SystemPath,
