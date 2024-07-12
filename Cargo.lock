@@ -1890,6 +1890,7 @@ dependencies = [
  "compact_str",
  "insta",
  "once_cell",
+ "ordermap",
  "path-slash",
  "ruff_db",
  "ruff_python_stdlib",

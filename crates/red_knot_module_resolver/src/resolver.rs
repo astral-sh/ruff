@@ -1,4 +1,8 @@
+use std::hash::BuildHasherDefault;
 use std::sync::Arc;
+
+use ordermap::OrderSet;
+use rustc_hash::FxHasher;
 
 use ruff_db::files::{system_path_to_file, File, FilePath};
 use ruff_db::source::{source_text, SourceText};
@@ -11,6 +15,14 @@ use crate::path::ModuleResolutionPathBuf;
 use crate::resolver::internal::ModuleResolverSettings;
 use crate::state::ResolverState;
 use crate::supported_py_version::TargetVersion;
+
+/// A sequence of search paths that maintains its insertion order, but never contains duplicates.
+///
+/// This follows the invariants maintained by [`sys.path` at runtime]:
+/// "No item is added to `sys.path` more than once."
+///
+/// [`sys.path` at runtime]: https://docs.python.org/3/library/site.html#module-site
+type OrderedSearchPaths = OrderSet<Arc<ModuleResolutionPathBuf>, BuildHasherDefault<FxHasher>>;
 
 /// Configures the module resolver settings.
 ///
@@ -193,20 +205,20 @@ pub(crate) struct ValidatedSearchPathSettings {
 }
 
 impl ValidatedSearchPathSettings {
-    fn search_paths(&self, db: &dyn Db) -> Vec<Arc<ModuleResolutionPathBuf>> {
+    fn search_paths(&self, db: &dyn Db) -> OrderedSearchPaths {
         let ValidatedSearchPathSettings {
             extra_paths,
             workspace_root,
             stdlib,
             site_packages,
         } = self;
-        let mut search_paths: Vec<Arc<ModuleResolutionPathBuf>> = extra_paths
+        let mut search_paths: OrderedSearchPaths = extra_paths
             .iter()
             .cloned()
             .chain([workspace_root, stdlib].into_iter().cloned())
             .collect();
         if let Some(site_packages) = site_packages {
-            search_paths.push(Arc::clone(site_packages));
+            search_paths.insert(Arc::clone(site_packages));
             let site_packages = site_packages
                 .as_system_path()
                 .expect("Expected site-packages never to be a VendoredPath!");
@@ -260,11 +272,15 @@ impl<'db> PthFile<'db> {
         'a: 'db,
     {
         // Empty lines or lines starting with '#' are ignored by the Python interpreter.
-        // Lines that start with "import " do not represent editable installs at all;
+        // Lines that start with "import " or "import\t" do not represent editable installs at all;
         // instead, these are files that are executed by Python at startup.
         // https://docs.python.org/3/library/site.html#module-site
         self.contents.lines().filter_map(|line| {
-            if line.is_empty() || line.starts_with('#') || line.starts_with("import ") {
+            if line.is_empty()
+                || line.starts_with('#')
+                || line.starts_with("import ")
+                || line.starts_with("import\t")
+            {
                 return None;
             }
             let possible_editable_install = self.site_packages.join(line);
@@ -329,7 +345,7 @@ pub(crate) struct ModuleResolutionSettings {
 }
 
 impl ModuleResolutionSettings {
-    pub(crate) fn search_paths(&self, db: &dyn Db) -> Vec<Arc<ModuleResolutionPathBuf>> {
+    pub(crate) fn search_paths(&self, db: &dyn Db) -> OrderedSearchPaths {
         self.search_path_settings.search_paths(db)
     }
 
