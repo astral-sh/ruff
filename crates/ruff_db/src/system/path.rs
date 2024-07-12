@@ -305,7 +305,7 @@ impl SystemPath {
 
     /// Returns the [`Utf8Path`] for the file.
     #[inline]
-    pub fn as_camino_path(&self) -> &Utf8Path {
+    pub fn as_utf8_path(&self) -> &Utf8Path {
         &self.0
     }
 

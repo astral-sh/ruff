@@ -76,7 +76,7 @@ impl System for OsSystem {
         path: &SystemPath,
     ) -> Result<Box<dyn Iterator<Item = Result<DirectoryEntry>>>> {
         Ok(Box::new(
-            path.as_camino_path()
+            path.as_utf8_path()
                 .read_dir_utf8()?
                 .map(|res| res.map(DirectoryEntry::from)),
         ))
