@@ -380,16 +380,8 @@ pub(crate) fn numpy_2_0_deprecation(checker: &mut Checker, expr: &Expr) {
                     guideline: None,
                 },
             }),
-            ["numpy", "NaN"] => Some(Replacement {
-                existing: "NaN",
-                details: Details::AutoImport {
-                    path: "numpy",
-                    name: "nan",
-                    compatibility: Compatibility::BackwardsCompatible,
-                },
-            }),
-            ["numpy", "NAN"] => Some(Replacement {
-                existing: "NAN",
+            ["numpy", existing @ ("NaN" | "NAN")] => Some(Replacement {
+                existing,
                 details: Details::AutoImport {
                     path: "numpy",
                     name: "nan",
