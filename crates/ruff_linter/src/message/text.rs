@@ -116,7 +116,7 @@ impl Emitter for TextEmitter {
             )?;
 
             if self.flags.intersects(EmitterFlags::SHOW_SOURCE) {
-				// The `0..0` range is used to highlight file-level diagnostics.
+                // The `0..0` range is used to highlight file-level diagnostics.
                 if message.range() != TextRange::default() {
                     writeln!(
                         writer,
