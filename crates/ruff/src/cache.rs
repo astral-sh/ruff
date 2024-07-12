@@ -180,12 +180,24 @@ impl Cache {
             .write_all(&serialized)
             .context("Failed to write serialized cache to temporary file.")?;
 
-        temp_file.persist(&self.path).with_context(|| {
-            format!(
-                "Failed to rename temporary cache file to {}",
-                self.path.display()
-            )
-        })?;
+        if let Err(err) = temp_file.persist(&self.path) {
+            // On Windows, writing to the cache file can fail if the file is still open (e.g., if
+            // the user is running Ruff from multiple processes over the same directory).
+            if cfg!(windows) && err.error.kind() == io::ErrorKind::PermissionDenied {
+                warn_user!(
+                    "Failed to write cache file '{}': {}",
+                    self.path.display(),
+                    err.error
+                );
+            } else {
+                return Err(err).with_context(|| {
+                    format!(
+                        "Failed to rename temporary cache file to {}",
+                        self.path.display()
+                    )
+                });
+            }
+        }
 
         Ok(())
     }
