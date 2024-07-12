@@ -1,9 +1,8 @@
 use crate::files::File;
-use crate::system::{
-    DirectoryEntry, MemoryFileSystem, Metadata, OsSystem, Result, System, SystemPath,
-};
+use crate::system::{DirectoryEntry, MemoryFileSystem, Metadata, Result, System, SystemPath};
 use crate::Db;
 use std::any::Any;
+use std::sync::Arc;
 
 /// System implementation intended for testing.
 ///
@@ -14,7 +13,7 @@ use std::any::Any;
 /// Don't use this system for production code. It's intended for testing only.
 #[derive(Default, Debug)]
 pub struct TestSystem {
-    inner: TestFileSystem,
+    inner: TestSystemInner,
 }
 
 impl TestSystem {
@@ -29,58 +28,61 @@ impl TestSystem {
     /// ## Panics
     /// If this test db isn't using a memory file system.
     pub fn memory_file_system(&self) -> &MemoryFileSystem {
-        if let TestFileSystem::Stub(fs) = &self.inner {
+        if let TestSystemInner::Stub(fs) = &self.inner {
             fs
         } else {
             panic!("The test db is not using a memory file system");
         }
     }
 
-    fn use_os_system(&mut self, os: OsSystem) {
-        self.inner = TestFileSystem::Os(os);
+    fn us_system<S>(&mut self, system: S)
+    where
+        S: System + Send + Sync + 'static,
+    {
+        self.inner = TestSystemInner::System(Arc::new(system));
     }
 }
 
 impl System for TestSystem {
     fn path_metadata(&self, path: &SystemPath) -> crate::system::Result<Metadata> {
         match &self.inner {
-            TestFileSystem::Stub(fs) => fs.metadata(path),
-            TestFileSystem::Os(fs) => fs.path_metadata(path),
+            TestSystemInner::Stub(fs) => fs.metadata(path),
+            TestSystemInner::System(fs) => fs.path_metadata(path),
         }
     }
 
     fn read_to_string(&self, path: &SystemPath) -> crate::system::Result<String> {
         match &self.inner {
-            TestFileSystem::Stub(fs) => fs.read_to_string(path),
-            TestFileSystem::Os(fs) => fs.read_to_string(path),
+            TestSystemInner::Stub(fs) => fs.read_to_string(path),
+            TestSystemInner::System(fs) => fs.read_to_string(path),
         }
     }
 
     fn path_exists(&self, path: &SystemPath) -> bool {
         match &self.inner {
-            TestFileSystem::Stub(fs) => fs.exists(path),
-            TestFileSystem::Os(fs) => fs.path_exists(path),
+            TestSystemInner::Stub(fs) => fs.exists(path),
+            TestSystemInner::System(fs) => fs.path_exists(path),
         }
     }
 
     fn is_directory(&self, path: &SystemPath) -> bool {
         match &self.inner {
-            TestFileSystem::Stub(fs) => fs.is_directory(path),
-            TestFileSystem::Os(fs) => fs.is_directory(path),
+            TestSystemInner::Stub(fs) => fs.is_directory(path),
+            TestSystemInner::System(fs) => fs.is_directory(path),
         }
     }
 
     fn is_file(&self, path: &SystemPath) -> bool {
         match &self.inner {
-            TestFileSystem::Stub(fs) => fs.is_file(path),
-            TestFileSystem::Os(fs) => fs.is_file(path),
+            TestSystemInner::Stub(fs) => fs.is_file(path),
+            TestSystemInner::System(fs) => fs.is_file(path),
         }
     }
 
     fn current_directory(&self) -> &SystemPath {
         match &self.inner {
-            TestFileSystem::Stub(fs) => fs.current_directory(),
-            TestFileSystem::Os(fs) => fs.current_directory(),
+            TestSystemInner::Stub(fs) => fs.current_directory(),
+            TestSystemInner::System(fs) => fs.current_directory(),
         }
     }
 
@@ -93,8 +95,8 @@ impl System for TestSystem {
         path: &SystemPath,
     ) -> Result<Box<dyn Iterator<Item = Result<DirectoryEntry>> + 'a>> {
         match &self.inner {
-            TestFileSystem::Os(fs) => fs.read_directory(path),
-            TestFileSystem::Stub(fs) => Ok(Box::new(fs.read_directory(path)?)),
+            TestSystemInner::System(fs) => fs.read_directory(path),
+            TestSystemInner::Stub(fs) => Ok(Box::new(fs.read_directory(path)?)),
         }
     }
 }
@@ -146,13 +148,16 @@ pub trait DbWithTestSystem: Db + Sized {
         Ok(())
     }
 
-    /// Uses the real file system instead of the memory file system.
+    /// Uses the given system instead of the testing system.
     ///
     /// This useful for testing advanced file system features like permissions, symlinks, etc.
     ///
     /// Note that any files written to the memory file system won't be copied over.
-    fn use_os_system(&mut self, os: OsSystem) {
-        self.test_system_mut().use_os_system(os);
+    fn use_system<S>(&mut self, os: S)
+    where
+        S: System + Send + Sync + 'static,
+    {
+        self.test_system_mut().us_system(os);
     }
 
     /// Returns the memory file system.
@@ -165,21 +170,21 @@ pub trait DbWithTestSystem: Db + Sized {
 }
 
 #[derive(Debug)]
-enum TestFileSystem {
+enum TestSystemInner {
     Stub(MemoryFileSystem),
-    Os(OsSystem),
+    System(Arc<dyn System + Send + Sync>),
 }
 
-impl TestFileSystem {
+impl TestSystemInner {
     fn snapshot(&self) -> Self {
         match self {
-            Self::Stub(fs) => Self::Stub(fs.snapshot()),
-            Self::Os(fs) => Self::Os(fs.snapshot()),
+            Self::Stub(system) => Self::Stub(system.snapshot()),
+            Self::System(system) => Self::System(Arc::clone(system)),
         }
     }
 }
 
-impl Default for TestFileSystem {
+impl Default for TestSystemInner {
     fn default() -> Self {
         Self::Stub(MemoryFileSystem::default())
     }

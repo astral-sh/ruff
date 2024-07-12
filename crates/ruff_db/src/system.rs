@@ -1,5 +1,7 @@
 pub use memory_fs::MemoryFileSystem;
+#[cfg(feature = "os")]
 pub use os::OsSystem;
+use std::fmt::Debug;
 pub use test::{DbWithTestSystem, TestSystem};
 
 use crate::file_revision::FileRevision;
@@ -7,6 +9,7 @@ use crate::file_revision::FileRevision;
 pub use self::path::{SystemPath, SystemPathBuf};
 
 mod memory_fs;
+#[cfg(feature = "os")]
 mod os;
 mod path;
 mod test;
@@ -27,7 +30,7 @@ pub type Result<T> = std::io::Result<T>;
 ///    * File watching isn't supported.
 ///
 /// Abstracting the system also enables tests to use a more efficient in-memory file system.
-pub trait System {
+pub trait System: Debug {
     /// Reads the metadata of the file or directory at `path`.
     fn path_metadata(&self, path: &SystemPath) -> Result<Metadata>;
 
