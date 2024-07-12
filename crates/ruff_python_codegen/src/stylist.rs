@@ -36,7 +36,7 @@ impl<'a> Stylist<'a> {
     }
 
     pub fn from_tokens(tokens: &Tokens, locator: &'a Locator<'a>) -> Self {
-        let indentation = detect_indention(tokens, locator);
+        let indentation = detect_indentation(tokens, locator);
 
         Self {
             locator,
@@ -60,7 +60,7 @@ fn detect_quote(tokens: &[Token]) -> Quote {
     Quote::default()
 }
 
-fn detect_indention(tokens: &[Token], locator: &Locator) -> Indentation {
+fn detect_indentation(tokens: &[Token], locator: &Locator) -> Indentation {
     let indent_range = tokens.iter().find_map(|token| {
         if matches!(token.kind(), TokenKind::Indent) {
             Some(token.range())
@@ -204,7 +204,7 @@ x = (
         let stylist = Stylist::from_tokens(parsed.tokens(), &locator);
         assert_eq!(stylist.indentation(), &Indentation("  ".to_string()));
 
-        // formfeed indent, see `detect_indention` comment.
+        // formfeed indent, see `detect_indentation` comment.
         let contents = r"
 class FormFeedIndent:
    def __init__(self, a=[]):
