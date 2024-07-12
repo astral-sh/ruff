@@ -1,5 +1,4 @@
 use std::collections::BTreeMap;
-use std::iter::FusedIterator;
 use std::sync::{Arc, RwLock, RwLockWriteGuard};
 
 use camino::{Utf8Path, Utf8PathBuf};
@@ -239,22 +238,32 @@ impl MemoryFileSystem {
         normalized.into_utf8_path_buf()
     }
 
-    pub(crate) fn read_directory(&self, path: impl AsRef<SystemPath>) -> Result<DirectoryIterator> {
+    pub(crate) fn read_directory(
+        &self,
+        path: impl AsRef<SystemPath>,
+    ) -> Result<impl Iterator<Item = Result<DirEntry>> + '_> {
         let by_path = self.inner.by_path.read().unwrap();
         let normalized = self.normalize_path(path.as_ref());
         let entry = by_path.get(&normalized).ok_or_else(not_found)?;
         if entry.is_file() {
             return Err(not_a_directory());
         };
-        // Is this inefficient? Yes, but this implementation of `System` is just for testing,
-        // and the lifetime issues get somewhat complicated without the cloning.
-        let contents = by_path.keys().cloned().collect();
-        Ok(DirectoryIterator {
-            paths: contents,
-            directory: normalized,
-            index: 0,
-            fs: self,
-        })
+        Ok(by_path
+            .range(normalized.clone()..)
+            .skip(1)
+            .take_while(|(path, _)| path.starts_with(&normalized))
+            .filter_map(|(path, entry)| {
+                if path.parent()? == normalized {
+                    Some(Ok(DirEntry {
+                        path: SystemPathBuf::from_utf8_path_buf(path.to_owned()),
+                        file_type: Ok(entry.file_type()),
+                    }))
+                } else {
+                    None
+                }
+            })
+            .collect::<Vec<_>>()
+            .into_iter())
     }
 }
 
@@ -287,41 +296,14 @@ impl Entry {
     const fn is_file(&self) -> bool {
         matches!(self, Entry::File(_))
     }
-}
 
-#[derive(Debug)]
-pub(crate) struct DirectoryIterator<'a> {
-    paths: Vec<Utf8PathBuf>,
-    directory: Utf8PathBuf,
-    index: usize,
-    fs: &'a MemoryFileSystem,
-}
-
-impl<'a> Iterator for DirectoryIterator<'a> {
-    type Item = Result<DirEntry>;
-
-    fn next(&mut self) -> Option<Self::Item> {
-        loop {
-            let path = self.paths.get(self.index)?;
-            self.index += 1;
-            let Some(parent) = path.parent() else {
-                continue;
-            };
-            if parent != self.directory {
-                continue;
-            }
-            let path = SystemPathBuf::from_utf8_path_buf(path.to_owned());
-            let file_type = if self.fs.is_directory(&path) {
-                FileType::Directory
-            } else {
-                FileType::File
-            };
-            break Some(Ok(DirEntry::new(path, Ok(file_type))));
+    const fn file_type(&self) -> FileType {
+        match self {
+            Self::File(_) => FileType::File,
+            Self::Directory(_) => FileType::Directory,
         }
     }
 }
-
-impl FusedIterator for DirectoryIterator<'_> {}
 
 #[derive(Debug)]
 struct File {
@@ -685,14 +667,18 @@ mod tests {
     #[test]
     fn read_directory_nonexistent() {
         let fs = MemoryFileSystem::new();
-        let error = fs.read_directory("doesnt_exist").unwrap_err();
+        let Err(error) = fs.read_directory("doesnt_exist") else {
+            panic!("Expected this to fail");
+        };
         assert_eq!(error.kind(), std::io::ErrorKind::NotFound);
     }
 
     #[test]
     fn read_directory_on_file() {
         let fs = with_files(["a.py"]);
-        let error = fs.read_directory("a.py").unwrap_err();
+        let Err(error) = fs.read_directory("a.py") else {
+            panic!("Expected this to fail");
+        };
         assert_eq!(error.kind(), std::io::ErrorKind::Other);
         assert!(error.to_string().contains("Not a directory"));
     }
