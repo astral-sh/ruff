@@ -122,6 +122,12 @@ impl SystemPath {
         self.0.parent().map(SystemPath::new)
     }
 
+    #[inline]
+    #[must_use]
+    pub fn ancestors(&self) -> impl Iterator<Item = &SystemPath> {
+        self.0.ancestors().map(SystemPath::new)
+    }
+
     /// Produces an iterator over the [`camino::Utf8Component`]s of the path.
     ///
     /// When parsing the path, there is a small amount of normalization:

@@ -598,10 +598,8 @@ impl<'db> TypeInferenceBuilder<'db> {
 
 #[cfg(test)]
 mod tests {
-    use red_knot_module_resolver::{
-        set_module_resolution_settings, RawModuleResolutionSettings, TargetVersion,
-    };
     use ruff_db::files::system_path_to_file;
+    use ruff_db::program::{Program, RawModuleResolutionSettings, TargetVersion};
     use ruff_db::system::{DbWithTestSystem, SystemPathBuf};
     use ruff_python_ast::name::Name;
 
@@ -609,13 +607,13 @@ mod tests {
     use crate::types::{public_symbol_ty_by_name, Type};
 
     fn setup_db() -> TestDb {
-        let mut db = TestDb::new();
+        let db = TestDb::new();
 
-        set_module_resolution_settings(
-            &mut db,
+        Program::new(
+            &db,
+            TargetVersion::Py38,
             RawModuleResolutionSettings {
-                target_version: TargetVersion::Py38,
-                extra_paths: Vec::new(),
+                extra_paths: vec![],
                 workspace_root: SystemPathBuf::from("/src"),
                 site_packages: None,
                 custom_typeshed: None,

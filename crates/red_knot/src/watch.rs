@@ -1,12 +1,12 @@
 use std::path::Path;
 
 use anyhow::Context;
-use notify::event::{CreateKind, RemoveKind};
+use notify::event::{CreateKind, ModifyKind, RemoveKind, RenameMode};
 use notify::{recommended_watcher, Event, EventKind, RecommendedWatcher, RecursiveMode, Watcher};
 
 use ruff_db::system::SystemPath;
 
-use crate::program::{FileChangeKind, FileWatcherChange};
+use crate::db::{FileChangeKind, FileWatcherChange};
 
 pub struct FileWatcher {
     watcher: RecommendedWatcher,
@@ -36,12 +36,17 @@ impl FileWatcher {
 
     fn from_handler(handler: Box<dyn EventHandler>) -> anyhow::Result<Self> {
         let watcher = recommended_watcher(move |changes: notify::Result<Event>| {
+            dbg!(&changes);
             match changes {
                 Ok(event) => {
                     // TODO verify that this handles all events correctly
                     let change_kind = match event.kind {
                         EventKind::Create(CreateKind::File) => FileChangeKind::Created,
-                        EventKind::Modify(_) => FileChangeKind::Modified,
+                        EventKind::Modify(kind) => match kind {
+                            ModifyKind::Name(RenameMode::To) => FileChangeKind::Created,
+                            ModifyKind::Name(RenameMode::From) => FileChangeKind::Deleted,
+                            _ => FileChangeKind::Modified,
+                        },
                         EventKind::Remove(RemoveKind::File) => FileChangeKind::Deleted,
                         _ => {
                             return;
@@ -51,13 +56,18 @@ impl FileWatcher {
                     let mut changes = Vec::new();
 
                     for path in event.paths {
-                        if path.is_file() {
-                            if let Some(fs_path) = SystemPath::from_std_path(&path) {
-                                changes.push(FileWatcherChange::new(
-                                    fs_path.to_path_buf(),
-                                    change_kind,
-                                ));
-                            }
+                        // TODO what about directory removals?
+                        //   how do we track this, because we don't know anymore which files were deleted.
+                        //   One option is that `Files` uses a `BTreeMap` so that we can search by the prefix
+                        //   An other option is to use Rust-analyzers's `SourceRoot` approach where a source-root maps to a directory
+                        //   and it stores all known files to that directory. Removing a directory would mean resolving the
+                        //   relevant source root and then schedule a removal of all its files.
+                        //   Having a `SourceRoot` concept might also be interesting for other use cases:
+                        //   - WorkspaceMember::open_paths could store a `SourceRoot` instead of a `PathBuf`
+                        //   - Queries retrieving the formatter/linter settings could accept a `SourceRoot` rather than a file, reducing the granularity.
+                        if let Some(fs_path) = SystemPath::from_std_path(&path) {
+                            changes
+                                .push(FileWatcherChange::new(fs_path.to_path_buf(), change_kind));
                         }
                     }
 

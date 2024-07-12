@@ -653,11 +653,10 @@ impl PartialEq<ModuleResolutionPathRef<'_>> for VendoredPathBuf {
 
 #[cfg(test)]
 mod tests {
-    use insta::assert_debug_snapshot;
-
     use crate::db::tests::TestDb;
-    use crate::supported_py_version::TargetVersion;
     use crate::testing::{FileSpec, MockedTypeshed, TestCase, TestCaseBuilder};
+    use insta::assert_debug_snapshot;
+    use ruff_db::program::TargetVersion;
 
     use super::*;
 

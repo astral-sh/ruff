@@ -11,7 +11,7 @@ use super::walk_directory::{
 };
 
 /// A system implementation that uses the OS file system.
-#[derive(Default, Debug)]
+#[derive(Default, Debug, Clone)]
 pub struct OsSystem {
     inner: Arc<OsSystemInner>,
 }
@@ -404,15 +404,15 @@ mod tests {
 
         let writer = DirectoryEntryToString::new(root_sys.to_path_buf());
 
-        system
-            .walk_directory(root_sys)
-            .standard_filters(true)
-            .run(|| {
-                Box::new(|entry| {
-                    writer.write_entry(entry);
-                    WalkState::Continue
-                })
-            });
+        let mut builder = system.walk_directory(root_sys);
+        builder.standard_filters(true);
+
+        builder.run(|| {
+            Box::new(|entry| {
+                writer.write_entry(entry);
+                WalkState::Continue
+            })
+        });
 
         assert_eq!(
             writer.into_string(),
@@ -455,15 +455,14 @@ mod tests {
 
         let writer = DirectoryEntryToString::new(root_sys.to_path_buf());
 
-        system
-            .walk_directory(&root_sys.join("foo.py"))
-            .standard_filters(true)
-            .run(|| {
-                Box::new(|entry| {
-                    writer.write_entry(entry);
-                    WalkState::Continue
-                })
-            });
+        let mut builder = system.walk_directory(&root_sys.join("foo.py"));
+        builder.standard_filters(true);
+        builder.run(|| {
+            Box::new(|entry| {
+                writer.write_entry(entry);
+                WalkState::Continue
+            })
+        });
 
         assert_eq!(
             writer.into_string(),

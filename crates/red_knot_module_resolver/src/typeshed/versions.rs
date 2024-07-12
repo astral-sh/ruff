@@ -10,11 +10,11 @@ use ruff_db::system::SystemPath;
 use rustc_hash::FxHashMap;
 
 use ruff_db::files::{system_path_to_file, File};
+use ruff_db::program::TargetVersion;
 use ruff_db::source::source_text;
 
 use crate::db::Db;
 use crate::module_name::ModuleName;
-use crate::supported_py_version::TargetVersion;
 
 use super::vendored::vendored_typeshed_stubs;
 

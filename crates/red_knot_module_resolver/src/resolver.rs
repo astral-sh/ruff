@@ -2,30 +2,13 @@ use std::ops::Deref;
 use std::sync::Arc;
 
 use ruff_db::files::{File, FilePath};
-use ruff_db::system::SystemPathBuf;
+use ruff_db::program::{Program, RawModuleResolutionSettings, TargetVersion};
 
 use crate::db::Db;
 use crate::module::{Module, ModuleKind};
 use crate::module_name::ModuleName;
 use crate::path::ModuleResolutionPathBuf;
-use crate::resolver::internal::ModuleResolverSettings;
 use crate::state::ResolverState;
-use crate::supported_py_version::TargetVersion;
-
-/// Configures the module resolver settings.
-///
-/// Must be called before calling any other module resolution functions.
-pub fn set_module_resolution_settings(db: &mut dyn Db, config: RawModuleResolutionSettings) {
-    // There's no concurrency issue here because we hold a `&mut dyn Db` reference. No other
-    // thread can mutate the `Db` while we're in this call, so using `try_get` to test if
-    // the settings have already been set is safe.
-    let resolved_settings = config.into_configuration_settings();
-    if let Some(existing) = ModuleResolverSettings::try_get(db) {
-        existing.set_settings(db).to(resolved_settings);
-    } else {
-        ModuleResolverSettings::new(db, resolved_settings);
-    }
-}
 
 /// Resolves a module name to a module.
 pub fn resolve_module(db: &dyn Db, module_name: ModuleName) -> Option<Module> {
@@ -109,30 +92,13 @@ pub(crate) fn file_to_module(db: &dyn Db, file: File) -> Option<Module> {
     }
 }
 
-/// "Raw" configuration settings for module resolution: unvalidated, unnormalized
-#[derive(Eq, PartialEq, Debug)]
-pub struct RawModuleResolutionSettings {
-    /// The target Python version the user has specified
-    pub target_version: TargetVersion,
+/// A resolved module resolution order as per the [typing spec]
+///
+/// [typing spec]: https://typing.readthedocs.io/en/latest/spec/distributing.html#import-resolution-ordering
+#[derive(Clone, Debug, Default, Eq, PartialEq)]
+pub(crate) struct OrderedSearchPaths(Vec<Arc<ModuleResolutionPathBuf>>);
 
-    /// List of user-provided paths that should take first priority in the module resolution.
-    /// Examples in other type checkers are mypy's MYPYPATH environment variable,
-    /// or pyright's stubPath configuration setting.
-    pub extra_paths: Vec<SystemPathBuf>,
-
-    /// The root of the workspace, used for finding first-party modules.
-    pub workspace_root: SystemPathBuf,
-
-    /// Optional (already validated) path to standard-library typeshed stubs.
-    /// If this is not provided, we will fallback to our vendored typeshed stubs
-    /// bundled as a zip file in the binary
-    pub custom_typeshed: Option<SystemPathBuf>,
-
-    /// The path to the user's `site-packages` directory, where third-party packages from ``PyPI`` are installed.
-    pub site_packages: Option<SystemPathBuf>,
-}
-
-impl RawModuleResolutionSettings {
+impl OrderedSearchPaths {
     /// Implementation of the typing spec's [module resolution order]
     ///
     /// TODO(Alex): this method does multiple `.unwrap()` calls when it should really return an error.
@@ -143,45 +109,38 @@ impl RawModuleResolutionSettings {
     /// This validation should probably be done outside of Salsa?
     ///
     /// [module resolution order]: https://typing.readthedocs.io/en/latest/spec/distributing.html#import-resolution-ordering
-    fn into_configuration_settings(self) -> ModuleResolutionSettings {
+    fn from_raw_settings(settings: &RawModuleResolutionSettings) -> Self {
         let RawModuleResolutionSettings {
-            target_version,
             extra_paths,
             workspace_root,
             site_packages,
             custom_typeshed,
-        } = self;
+        } = settings;
 
         let mut paths: Vec<ModuleResolutionPathBuf> = extra_paths
             .into_iter()
-            .map(|fs_path| ModuleResolutionPathBuf::extra(fs_path).unwrap())
+            .map(|fs_path| ModuleResolutionPathBuf::extra(fs_path.clone()).unwrap())
             .collect();
 
-        paths.push(ModuleResolutionPathBuf::first_party(workspace_root).unwrap());
+        paths.push(ModuleResolutionPathBuf::first_party(workspace_root.clone()).unwrap());
 
         paths.push(
-            custom_typeshed.map_or_else(ModuleResolutionPathBuf::vendored_stdlib, |custom| {
-                ModuleResolutionPathBuf::stdlib_from_custom_typeshed_root(&custom).unwrap()
-            }),
+            custom_typeshed.as_ref().map_or_else(
+                ModuleResolutionPathBuf::vendored_stdlib,
+                |custom| {
+                    ModuleResolutionPathBuf::stdlib_from_custom_typeshed_root(&custom).unwrap()
+                },
+            ),
         );
 
         // TODO vendor typeshed's third-party stubs as well as the stdlib and fallback to them as a final step
         if let Some(site_packages) = site_packages {
-            paths.push(ModuleResolutionPathBuf::site_packages(site_packages).unwrap());
+            paths.push(ModuleResolutionPathBuf::site_packages(site_packages.clone()).unwrap());
         }
 
-        ModuleResolutionSettings {
-            target_version,
-            search_paths: OrderedSearchPaths(paths.into_iter().map(Arc::new).collect()),
-        }
+        Self(paths.into_iter().map(Arc::new).collect())
     }
 }
-
-/// A resolved module resolution order as per the [typing spec]
-///
-/// [typing spec]: https://typing.readthedocs.io/en/latest/spec/distributing.html#import-resolution-ordering
-#[derive(Clone, Debug, Default, Eq, PartialEq)]
-pub(crate) struct OrderedSearchPaths(Vec<Arc<ModuleResolutionPathBuf>>);
 
 impl Deref for OrderedSearchPaths {
     type Target = [Arc<ModuleResolutionPathBuf>];
@@ -191,8 +150,8 @@ impl Deref for OrderedSearchPaths {
     }
 }
 
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub(crate) struct ModuleResolutionSettings {
+#[derive(Debug, PartialEq, Eq)]
+pub struct ModuleResolutionSettings {
     search_paths: OrderedSearchPaths,
     target_version: TargetVersion,
 }
@@ -214,13 +173,6 @@ impl ModuleResolutionSettings {
 #[allow(unreachable_pub, clippy::used_underscore_binding)]
 pub(crate) mod internal {
     use crate::module_name::ModuleName;
-    use crate::resolver::ModuleResolutionSettings;
-
-    #[salsa::input(singleton)]
-    pub(crate) struct ModuleResolverSettings {
-        #[return_ref]
-        pub(super) settings: ModuleResolutionSettings,
-    }
 
     /// A thin wrapper around `ModuleName` to make it a Salsa ingredient.
     ///
@@ -232,8 +184,29 @@ pub(crate) mod internal {
     }
 }
 
-fn module_resolver_settings(db: &dyn Db) -> &ModuleResolutionSettings {
-    ModuleResolverSettings::get(db).settings(db)
+#[salsa::tracked(return_ref)]
+pub(crate) fn module_resolver_settings(db: &dyn Db) -> ModuleResolutionSettings {
+    let program = Program::get(db.upcast());
+    let raw_settings = program.module_resolution_settings(db.upcast());
+
+    if let Some(typeshed_directory) = &raw_settings.custom_typeshed {
+        tracing::trace!("Custom typeshed directory: {typeshed_directory}");
+    }
+
+    if !raw_settings.extra_paths.is_empty() {
+        tracing::trace!(
+            "extra search paths: {extra_search_path:?}",
+            extra_search_path = raw_settings.extra_paths
+        );
+    }
+
+    let target_version = program.target_version(db.upcast());
+    tracing::trace!("Target version: {target_version:?}");
+
+    ModuleResolutionSettings {
+        search_paths: OrderedSearchPaths::from_raw_settings(raw_settings),
+        target_version,
+    }
 }
 
 /// Given a module name and a list of search paths in which to lookup modules,
@@ -898,14 +871,13 @@ mod tests {
         std::os::unix::fs::symlink(foo.as_std_path(), bar.as_std_path())?;
 
         let settings = RawModuleResolutionSettings {
-            target_version: TargetVersion::Py38,
             extra_paths: vec![],
             workspace_root: src.clone(),
             site_packages: Some(site_packages.clone()),
             custom_typeshed: Some(custom_typeshed.clone()),
         };
 
-        set_module_resolution_settings(&mut db, settings);
+        Program::new(&db, TargetVersion::Py38, settings);
 
         let foo_module = resolve_module(&db, ModuleName::new_static("foo").unwrap()).unwrap();
         let bar_module = resolve_module(&db, ModuleName::new_static("bar").unwrap()).unwrap();

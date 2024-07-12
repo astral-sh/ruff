@@ -1,7 +1,6 @@
 #![allow(clippy::disallowed_names)]
 
 use red_knot::program::Program;
-use red_knot::Workspace;
 use red_knot_module_resolver::{
     set_module_resolution_settings, RawModuleResolutionSettings, TargetVersion,
 };
@@ -65,24 +64,23 @@ fn setup_case() -> Case {
     ])
     .unwrap();
 
-    let workspace_root = SystemPath::new("/src");
-    let workspace = Workspace::new(workspace_root.to_path_buf());
+    let program_root = SystemPath::new("/src");
 
-    let mut program = Program::new(workspace, system);
+    let mut program = Program::new(program_root, system);
     let foo = system_path_to_file(&program, foo_path).unwrap();
 
     set_module_resolution_settings(
         &mut program,
         RawModuleResolutionSettings {
             extra_paths: vec![],
-            workspace_root: workspace_root.to_path_buf(),
+            workspace_root: program_root.to_path_buf(),
             site_packages: None,
             custom_typeshed: None,
             target_version: TargetVersion::Py38,
         },
     );
 
-    program.workspace_mut().open_file(foo);
+    program.open_file(foo);
 
     let bar = system_path_to_file(&program, bar_path).unwrap();
     let typing = system_path_to_file(&program, typing_path).unwrap();

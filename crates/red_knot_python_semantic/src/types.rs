@@ -271,11 +271,9 @@ pub struct IntersectionType<'db> {
 
 #[cfg(test)]
 mod tests {
-    use red_knot_module_resolver::{
-        set_module_resolution_settings, RawModuleResolutionSettings, TargetVersion,
-    };
     use ruff_db::files::system_path_to_file;
     use ruff_db::parsed::parsed_module;
+    use ruff_db::program::{Program, RawModuleResolutionSettings, TargetVersion};
     use ruff_db::system::{DbWithTestSystem, SystemPathBuf};
     use ruff_db::testing::{assert_function_query_was_not_run, assert_function_query_was_run};
 
@@ -285,11 +283,11 @@ mod tests {
     use crate::{HasTy, SemanticModel};
 
     fn setup_db() -> TestDb {
-        let mut db = TestDb::new();
-        set_module_resolution_settings(
-            &mut db,
+        let db = TestDb::new();
+        Program::new(
+            &db,
+            TargetVersion::Py38,
             RawModuleResolutionSettings {
-                target_version: TargetVersion::Py38,
                 extra_paths: vec![],
                 workspace_root: SystemPathBuf::from("/src"),
                 site_packages: None,

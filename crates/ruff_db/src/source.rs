@@ -1,4 +1,3 @@
-use countme::Count;
 use ruff_source_file::LineIndex;
 use salsa::DebugWithDb;
 use std::ops::Deref;
@@ -16,7 +15,6 @@ pub fn source_text(db: &dyn Db, file: File) -> SourceText {
 
     SourceText {
         inner: Arc::from(content),
-        count: Count::new(),
     }
 }
 
@@ -36,7 +34,6 @@ pub fn line_index(db: &dyn Db, file: File) -> LineIndex {
 #[derive(Clone, Eq, PartialEq)]
 pub struct SourceText {
     inner: Arc<str>,
-    count: Count<Self>,
 }
 
 impl SourceText {

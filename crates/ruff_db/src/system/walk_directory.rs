@@ -31,7 +31,7 @@ impl WalkDirectoryBuilder {
     }
 
     #[allow(clippy::should_implement_trait)]
-    pub fn add(mut self, path: impl AsRef<SystemPath>) -> Self {
+    pub fn add(&mut self, path: impl AsRef<SystemPath>) -> &mut Self {
         self.paths.push(path.as_ref().to_path_buf());
         self
     }
@@ -41,7 +41,7 @@ impl WalkDirectoryBuilder {
     /// The definition of what a hidden file depends on the [`System`](super::System) and can be platform dependent.
     ///
     /// This is enabled by default.
-    pub fn ignore_hidden(mut self, hidden: bool) -> Self {
+    pub fn ignore_hidden(&mut self, hidden: bool) -> &mut Self {
         self.ignore_hidden = hidden;
         self
     }
@@ -51,7 +51,7 @@ impl WalkDirectoryBuilder {
     /// This includes ignoring hidden files.
     ///
     /// Defaults to `true`.
-    pub fn standard_filters(mut self, standard_filters: bool) -> Self {
+    pub fn standard_filters(&mut self, standard_filters: bool) -> &mut Self {
         self.standard_filters = standard_filters;
         self.ignore_hidden = true;
         self
