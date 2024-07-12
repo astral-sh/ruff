@@ -238,7 +238,7 @@ impl MemoryFileSystem {
         normalized.into_utf8_path_buf()
     }
 
-    pub(crate) fn read_directory(
+    pub fn read_directory(
         &self,
         path: impl AsRef<SystemPath>,
     ) -> Result<impl Iterator<Item = Result<DirectoryEntry>> + '_> {

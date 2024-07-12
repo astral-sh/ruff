@@ -158,10 +158,15 @@ mod tests {
         let Err(error) = result else {
             panic!("Expected the read_dir() call to fail!");
         };
-        dbg!(error.to_string());
+
         // We can't assert the error kind here because it's apparently an unstable feature!
         // https://github.com/rust-lang/rust/issues/86442
         // assert_eq!(error.kind(), std::io::ErrorKind::NotADirectory);
-        assert!(error.to_string().contains("Not a directory"));
+
+        // We can't even assert the error message on all platforms, as it's different on Windows,
+        // where the message is "The directory name is invalid" rather than "Not a directory".
+        if cfg!(unix) {
+            assert!(error.to_string().contains("Not a directory"));
+        }
     }
 }
