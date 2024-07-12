@@ -850,9 +850,9 @@ pub(crate) fn suspicious_function_call(checker: &mut Checker, call: &ExprCall) {
             // MarkSafe
             ["django", "utils", "safestring" | "html", "mark_safe"] => Some(SuspiciousMarkSafeUsage.into()),
             // URLOpen (`Request`)
-            ["urllib", "request","Request"] |
+            ["urllib", "request", "Request"] |
             ["six", "moves", "urllib", "request","Request"] => {
-                // If the `url` argument is a string literal, allow `http` and `https` schemes.
+                // If the `url` argument is a string literal or an f string, allow `http` and `https` schemes.
                 if call.arguments.args.iter().all(|arg| !arg.is_starred_expr()) && call.arguments.keywords.iter().all(|keyword| keyword.arg.is_some()) {
                     if let Some(Expr::StringLiteral(ast::ExprStringLiteral { value, .. })) = &call.arguments.find_argument("url", 0) {
                             let url = value.to_str().trim_start();
@@ -860,6 +860,15 @@ pub(crate) fn suspicious_function_call(checker: &mut Checker, call: &ExprCall) {
                                 return None;
                             }
 
+                    }
+
+                    if let Some(Expr::FString(ast::ExprFString { value, .. })) = &call.arguments.find_argument("url", 0) {
+                        if let ast::FStringElement::Literal(ast::FStringLiteralElement { value, .. }) = value.elements().next().unwrap() {
+                            let url = value.trim_start();
+                            if url.starts_with("http://") || url.starts_with("https://") {
+                                return None;
+                            }
+                        }
                     }
                 }
                 Some(SuspiciousURLOpenUsage.into())
@@ -877,15 +886,34 @@ pub(crate) fn suspicious_function_call(checker: &mut Checker, call: &ExprCall) {
                             }
                         }
 
+                        // If the `url` argument is an f string, allow `http` and `https` schemes.
+                        if let Expr::FString(ast::ExprFString { value, .. }) = arg {
+                            if let ast::FStringElement::Literal(ast::FStringLiteralElement { value, .. }) = value.elements().next().unwrap() {
+                                let url = value.trim_start();
+                                if url.starts_with("http://") || url.starts_with("https://") {
+                                    return None;
+                                }
+                            }
+                        }
+
                         // If the `url` argument is a `urllib.request.Request` object, allow `http` and `https` schemes.
                         if let Expr::Call(ExprCall { func, arguments, .. }) = arg {
                             if checker.semantic().resolve_qualified_name(func.as_ref()).is_some_and(|name| name.segments() == ["urllib", "request", "Request"]) {
-                                if let Some( Expr::StringLiteral(ast::ExprStringLiteral { value, .. })) = arguments.find_argument("url", 0) {
+                                if let Some(Expr::StringLiteral(ast::ExprStringLiteral { value, .. })) = arguments.find_argument("url", 0) {
                                         let url = value.to_str().trim_start();
                                         if url.starts_with("http://") || url.starts_with("https://") {
                                             return None;
                                         }
 
+                                }
+
+                                if let Some(Expr::FString(ast::ExprFString { value, .. })) = arguments.find_argument("url", 0) {
+                                    if let ast::FStringElement::Literal(ast::FStringLiteralElement { value, .. }) = value.elements().next().unwrap() {
+                                        let url = value.trim_start();
+                                        if url.starts_with("http://") || url.starts_with("https://") {
+                                            return None;
+                                        }
+                                    }
                                 }
                             }
                         }
