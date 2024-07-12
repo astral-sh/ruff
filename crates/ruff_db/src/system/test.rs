@@ -86,13 +86,13 @@ impl System for TestSystem {
         self
     }
 
-    fn read_dir<'a>(
+    fn read_directory<'a>(
         &'a self,
         path: &SystemPath,
     ) -> Result<Box<dyn Iterator<Item = Result<DirEntry>> + 'a>> {
         match &self.inner {
-            TestFileSystem::Os(fs) => fs.read_dir(path),
-            TestFileSystem::Stub(fs) => Ok(Box::new(fs.read_dir(path)?)),
+            TestFileSystem::Os(fs) => fs.read_directory(path),
+            TestFileSystem::Stub(fs) => Ok(Box::new(fs.read_directory(path)?)),
         }
     }
 }

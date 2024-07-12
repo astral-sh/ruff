@@ -54,7 +54,7 @@ pub trait System {
     /// Returns the current working directory
     fn current_directory(&self) -> &SystemPath;
 
-    fn read_dir<'a>(
+    fn read_directory<'a>(
         &'a self,
         path: &SystemPath,
     ) -> Result<Box<dyn Iterator<Item = Result<DirEntry>> + 'a>>;

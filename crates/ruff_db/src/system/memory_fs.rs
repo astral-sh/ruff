@@ -239,7 +239,7 @@ impl MemoryFileSystem {
         normalized.into_utf8_path_buf()
     }
 
-    pub(crate) fn read_dir(&self, path: impl AsRef<SystemPath>) -> Result<DirectoryIterator> {
+    pub(crate) fn read_directory(&self, path: impl AsRef<SystemPath>) -> Result<DirectoryIterator> {
         let by_path = self.inner.by_path.read().unwrap();
         let normalized = self.normalize_path(path.as_ref());
         let entry = by_path.get(&normalized).ok_or_else(not_found)?;
@@ -667,9 +667,13 @@ mod tests {
     }
 
     #[test]
-    fn read_dir() {
+    fn read_directory() {
         let fs = with_files(["b.ts", "a/bar.py", "d.rs", "a/foo/bar.py", "a/baz.pyi"]);
-        let contents: Vec<DirEntry> = fs.read_dir("a").unwrap().map(Result::unwrap).collect();
+        let contents: Vec<DirEntry> = fs
+            .read_directory("a")
+            .unwrap()
+            .map(Result::unwrap)
+            .collect();
         let expected_contents = vec![
             DirEntry::new(SystemPathBuf::from("/a/bar.py"), FileType::File),
             DirEntry::new(SystemPathBuf::from("/a/baz.pyi"), FileType::File),
@@ -679,16 +683,16 @@ mod tests {
     }
 
     #[test]
-    fn read_dir_nonexistent() {
+    fn read_directory_nonexistent() {
         let fs = MemoryFileSystem::new();
-        let error = fs.read_dir("doesnt_exist").unwrap_err();
+        let error = fs.read_directory("doesnt_exist").unwrap_err();
         assert_eq!(error.kind(), std::io::ErrorKind::NotFound);
     }
 
     #[test]
-    fn read_dir_on_file() {
+    fn read_directory_on_file() {
         let fs = with_files(["a.py"]);
-        let error = fs.read_dir("a.py").unwrap_err();
+        let error = fs.read_directory("a.py").unwrap_err();
         assert_eq!(error.kind(), std::io::ErrorKind::Other);
         assert!(error.to_string().contains("Not a directory"));
     }

@@ -69,7 +69,10 @@ impl System for OsSystem {
         self
     }
 
-    fn read_dir(&self, path: &SystemPath) -> Result<Box<dyn Iterator<Item = Result<DirEntry>>>> {
+    fn read_directory(
+        &self,
+        path: &SystemPath,
+    ) -> Result<Box<dyn Iterator<Item = Result<DirEntry>>>> {
         Ok(Box::new(
             path.as_camino_path()
                 .read_dir_utf8()?
@@ -108,7 +111,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn read_dir() {
+    fn read_directory() {
         let tempdir = TempDir::new().unwrap();
         let tempdir_path = tempdir.path();
         std::fs::create_dir_all(tempdir_path.join("a/foo")).unwrap();
@@ -121,7 +124,7 @@ mod tests {
         let fs = OsSystem::new(tempdir_path);
 
         let mut sorted_contents: Vec<DirEntry> = fs
-            .read_dir(&tempdir_path.join("a"))
+            .read_directory(&tempdir_path.join("a"))
             .unwrap()
             .map(Result::unwrap)
             .collect();
@@ -136,21 +139,21 @@ mod tests {
     }
 
     #[test]
-    fn read_dir_nonexistent() {
+    fn read_directory_nonexistent() {
         let fs = OsSystem::new("");
-        let result = fs.read_dir(SystemPath::new("doesnt_exist"));
+        let result = fs.read_directory(SystemPath::new("doesnt_exist"));
         assert!(result.is_err_and(|error| error.kind() == std::io::ErrorKind::NotFound));
     }
 
     #[test]
-    fn read_dir_on_file() {
+    fn read_directory_on_file() {
         let tempdir = TempDir::new().unwrap();
         let tempdir_path = tempdir.path();
         std::fs::File::create(tempdir_path.join("a.py")).unwrap();
 
         let tempdir_path = SystemPath::from_std_path(tempdir_path).unwrap();
         let fs = OsSystem::new(tempdir_path);
-        let result = fs.read_dir(&tempdir_path.join("a.py"));
+        let result = fs.read_directory(&tempdir_path.join("a.py"));
         let Err(error) = result else {
             panic!("Expected the read_dir() call to fail!");
         };
