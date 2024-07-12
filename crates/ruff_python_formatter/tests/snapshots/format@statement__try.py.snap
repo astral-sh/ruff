@@ -295,19 +295,16 @@ try:
     def f():
         pass
         # a
-
 except:
 
     def f():
         pass
         # b
-
 else:
 
     def f():
         pass
         # c
-
 finally:
 
     def f():
@@ -366,4 +363,31 @@ else:
 
 finally:
     pass
+```
+
+
+## Preview changes
+```diff
+--- Stable
++++ Preview
+@@ -117,16 +117,19 @@
+     def f():
+         pass
+         # a
++
+ except:
+ 
+     def f():
+         pass
+         # b
++
+ else:
+ 
+     def f():
+         pass
+         # c
++
+ finally:
+ 
+     def f():
 ```

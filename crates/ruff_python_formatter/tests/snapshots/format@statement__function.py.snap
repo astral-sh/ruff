@@ -609,7 +609,6 @@ if True:
 
     def f1():
         pass  # a
-
 else:
     pass
 
@@ -619,7 +618,6 @@ if True:
     def f2():
         pass
         # a
-
 else:
     pass
 
@@ -1043,4 +1041,27 @@ def func[T](
     lotsoflongargs4: T,
     lotsoflongargs5: T,
 ) -> T: ...
+```
+
+
+## Preview changes
+```diff
+--- Stable
++++ Preview
+@@ -161,6 +161,7 @@
+ 
+     def f1():
+         pass  # a
++
+ else:
+     pass
+ 
+@@ -170,6 +171,7 @@
+     def f2():
+         pass
+         # a
++
+ else:
+     pass
+ 
 ```

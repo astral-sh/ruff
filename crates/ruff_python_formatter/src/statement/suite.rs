@@ -516,7 +516,13 @@ impl FormatSuite {
         let existing_newlines =
             lines_after_ignoring_end_of_line_trivia(end_of_def_or_class, f.context().source());
         if existing_newlines < 2 {
-            empty_line().fmt(f)?;
+            if f.context().is_preview() {
+                empty_line().fmt(f)?;
+            } else {
+                if last_def_or_class.is_stmt_class_def() && f.options().source_type().is_stub() {
+                    empty_line().fmt(f)?;
+                }
+            }
         }
         Ok(())
     }

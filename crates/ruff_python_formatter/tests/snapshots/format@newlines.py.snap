@@ -616,7 +616,6 @@ if True:
 
     def a():
         return 1
-
 else:
     pass
 
@@ -625,7 +624,6 @@ match True:
 
         def a():
             return 1
-
     case 1:
 
         def a():
@@ -636,7 +634,6 @@ try:
 
     def a():
         return 1
-
 except RuntimeError:
 
     def a():
@@ -647,7 +644,6 @@ try:
 
     def a():
         return 1
-
 finally:
 
     def a():
@@ -658,22 +654,18 @@ try:
 
     def a():
         return 1
-
 except RuntimeError:
 
     def a():
         return 1
-
 except ZeroDivisionError:
 
     def a():
         return 1
-
 else:
 
     def a():
         return 1
-
 finally:
 
     def a():
@@ -723,4 +715,66 @@ def overload4():
 
 
 def overload4(a: int): ...
+```
+
+
+## Preview changes
+```diff
+--- Stable
++++ Preview
+@@ -277,6 +277,7 @@
+ 
+     def a():
+         return 1
++
+ else:
+     pass
+ 
+@@ -285,6 +286,7 @@
+ 
+         def a():
+             return 1
++
+     case 1:
+ 
+         def a():
+@@ -295,6 +297,7 @@
+ 
+     def a():
+         return 1
++
+ except RuntimeError:
+ 
+     def a():
+@@ -305,6 +308,7 @@
+ 
+     def a():
+         return 1
++
+ finally:
+ 
+     def a():
+@@ -315,18 +319,22 @@
+ 
+     def a():
+         return 1
++
+ except RuntimeError:
+ 
+     def a():
+         return 1
++
+ except ZeroDivisionError:
+ 
+     def a():
+         return 1
++
+ else:
+ 
+     def a():
+         return 1
++
+ finally:
+ 
+     def a():
 ```
