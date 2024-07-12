@@ -1,10 +1,10 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_quotes/mod.rs
 ---
-doubles_escaped.py:1:26: Q003 [*] Change outer quotes to avoid escaping inner quotes
+doubles_escaped.py:1:26: Q003 (avoidable-escaped-quote) [*] Change outer quotes to avoid escaping inner quotes
   |
 1 | this_should_raise_Q003 = 'This is a \'string\''
-  |                          ^^^^^^^^^^^^^^^^^^^^^^ Q003
+  |                          ^^^^^^^^^^^^^^^^^^^^^^ Q003 (avoidable-escaped-quote)
 2 | this_should_raise_Q003 = 'This is \\ a \\\'string\''
 3 | this_is_fine = '"This" is a \'string\''
   |
@@ -17,11 +17,11 @@ doubles_escaped.py:1:26: Q003 [*] Change outer quotes to avoid escaping inner qu
 3 3 | this_is_fine = '"This" is a \'string\''
 4 4 | this_is_fine = "This is a 'string'"
 
-doubles_escaped.py:2:26: Q003 [*] Change outer quotes to avoid escaping inner quotes
+doubles_escaped.py:2:26: Q003 (avoidable-escaped-quote) [*] Change outer quotes to avoid escaping inner quotes
   |
 1 | this_should_raise_Q003 = 'This is a \'string\''
 2 | this_should_raise_Q003 = 'This is \\ a \\\'string\''
-  |                          ^^^^^^^^^^^^^^^^^^^^^^^^^^^ Q003
+  |                          ^^^^^^^^^^^^^^^^^^^^^^^^^^^ Q003 (avoidable-escaped-quote)
 3 | this_is_fine = '"This" is a \'string\''
 4 | this_is_fine = "This is a 'string'"
   |
@@ -35,12 +35,12 @@ doubles_escaped.py:2:26: Q003 [*] Change outer quotes to avoid escaping inner qu
 4 4 | this_is_fine = "This is a 'string'"
 5 5 | this_is_fine = "\"This\" is a 'string'"
 
-doubles_escaped.py:10:5: Q003 [*] Change outer quotes to avoid escaping inner quotes
+doubles_escaped.py:10:5: Q003 (avoidable-escaped-quote) [*] Change outer quotes to avoid escaping inner quotes
    |
  8 | this_should_raise = (
  9 |     'This is a'
 10 |     '\'string\''
-   |     ^^^^^^^^^^^^ Q003
+   |     ^^^^^^^^^^^^ Q003 (avoidable-escaped-quote)
 11 | )
    |
    = help: Change outer quotes to avoid escaping inner quotes
@@ -55,11 +55,11 @@ doubles_escaped.py:10:5: Q003 [*] Change outer quotes to avoid escaping inner qu
 12 12 | 
 13 13 | # Same as above, but with f-strings
 
-doubles_escaped.py:14:1: Q003 [*] Change outer quotes to avoid escaping inner quotes
+doubles_escaped.py:14:1: Q003 (avoidable-escaped-quote) [*] Change outer quotes to avoid escaping inner quotes
    |
 13 | # Same as above, but with f-strings
 14 | f'This is a \'string\''  # Q003
-   | ^^^^^^^^^^^^^^^^^^^^^^^ Q003
+   | ^^^^^^^^^^^^^^^^^^^^^^^ Q003 (avoidable-escaped-quote)
 15 | f'This is \\ a \\\'string\''  # Q003
 16 | f'"This" is a \'string\''
    |
@@ -75,12 +75,12 @@ doubles_escaped.py:14:1: Q003 [*] Change outer quotes to avoid escaping inner qu
 16 16 | f'"This" is a \'string\''
 17 17 | f"This is a 'string'"
 
-doubles_escaped.py:15:1: Q003 [*] Change outer quotes to avoid escaping inner quotes
+doubles_escaped.py:15:1: Q003 (avoidable-escaped-quote) [*] Change outer quotes to avoid escaping inner quotes
    |
 13 | # Same as above, but with f-strings
 14 | f'This is a \'string\''  # Q003
 15 | f'This is \\ a \\\'string\''  # Q003
-   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^ Q003
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^ Q003 (avoidable-escaped-quote)
 16 | f'"This" is a \'string\''
 17 | f"This is a 'string'"
    |
@@ -96,12 +96,12 @@ doubles_escaped.py:15:1: Q003 [*] Change outer quotes to avoid escaping inner qu
 17 17 | f"This is a 'string'"
 18 18 | f"\"This\" is a 'string'"
 
-doubles_escaped.py:23:5: Q003 [*] Change outer quotes to avoid escaping inner quotes
+doubles_escaped.py:23:5: Q003 (avoidable-escaped-quote) [*] Change outer quotes to avoid escaping inner quotes
    |
 21 | foo = (
 22 |     f'This is a'
 23 |     f'\'string\''  # Q003
-   |     ^^^^^^^^^^^^^ Q003
+   |     ^^^^^^^^^^^^^ Q003 (avoidable-escaped-quote)
 24 | )
    |
    = help: Change outer quotes to avoid escaping inner quotes
@@ -115,5 +115,3 @@ doubles_escaped.py:23:5: Q003 [*] Change outer quotes to avoid escaping inner qu
 24 24 | )
 25 25 | 
 26 26 | # Nested f-strings (Python 3.12+)
-
-

@@ -1,20 +1,20 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_datetimez/mod.rs
 ---
-DTZ012.py:4:1: DTZ012 `datetime.date.fromtimestamp()` used
+DTZ012.py:4:1: DTZ012 (call-date-fromtimestamp) `datetime.date.fromtimestamp()` used
   |
 3 | # qualified
 4 | datetime.date.fromtimestamp(1234)
-  | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ DTZ012
+  | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ DTZ012 (call-date-fromtimestamp)
 5 | 
 6 | from datetime import date
   |
   = help: Use `datetime.datetime.fromtimestamp(ts, tz=...).date()` instead
 
-DTZ012.py:9:1: DTZ012 `datetime.date.fromtimestamp()` used
+DTZ012.py:9:1: DTZ012 (call-date-fromtimestamp) `datetime.date.fromtimestamp()` used
   |
 8 | # unqualified
 9 | date.fromtimestamp(1234)
-  | ^^^^^^^^^^^^^^^^^^^^^^^^ DTZ012
+  | ^^^^^^^^^^^^^^^^^^^^^^^^ DTZ012 (call-date-fromtimestamp)
   |
   = help: Use `datetime.datetime.fromtimestamp(ts, tz=...).date()` instead

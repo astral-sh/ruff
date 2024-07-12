@@ -1,10 +1,10 @@
 ---
 source: crates/ruff_linter/src/rules/ruff/mod.rs
 ---
-ruff_noqa_invalid.py:1:8: F401 [*] `os` imported but unused
+ruff_noqa_invalid.py:1:8: F401 (unused-import) [*] `os` imported but unused
   |
 1 | import os  # ruff: noqa: F401
-  |        ^^ F401
+  |        ^^ F401 (unused-import)
   |
   = help: Remove unused import: `os`
 
@@ -14,11 +14,11 @@ ruff_noqa_invalid.py:1:8: F401 [*] `os` imported but unused
 3 2 | 
 4 3 | def f():
 
-ruff_noqa_invalid.py:5:5: F841 [*] Local variable `x` is assigned to but never used
+ruff_noqa_invalid.py:5:5: F841 (unused-variable) [*] Local variable `x` is assigned to but never used
   |
 4 | def f():
 5 |     x = 1
-  |     ^ F841
+  |     ^ F841 (unused-variable)
   |
   = help: Remove assignment to unused variable `x`
 
@@ -28,5 +28,3 @@ ruff_noqa_invalid.py:5:5: F841 [*] Local variable `x` is assigned to but never u
 4 4 | def f():
 5   |-    x = 1
   5 |+    pass
-
-

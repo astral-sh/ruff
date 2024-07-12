@@ -1,11 +1,11 @@
 ---
 source: crates/ruff_linter/src/rules/pycodestyle/mod.rs
 ---
-E712.py:2:4: E712 [*] Avoid equality comparisons to `True`; use `if res:` for truth checks
+E712.py:2:4: E712 (true-false-comparison) [*] Avoid equality comparisons to `True`; use `if res:` for truth checks
   |
 1 | #: E712
 2 | if res == True:
-  |    ^^^^^^^^^^^ E712
+  |    ^^^^^^^^^^^ E712 (true-false-comparison)
 3 |     pass
 4 | #: E712
   |
@@ -19,12 +19,12 @@ E712.py:2:4: E712 [*] Avoid equality comparisons to `True`; use `if res:` for tr
 4 4 | #: E712
 5 5 | if res != False:
 
-E712.py:5:4: E712 [*] Avoid inequality comparisons to `False`; use `if res:` for truth checks
+E712.py:5:4: E712 (true-false-comparison) [*] Avoid inequality comparisons to `False`; use `if res:` for truth checks
   |
 3 |     pass
 4 | #: E712
 5 | if res != False:
-  |    ^^^^^^^^^^^^ E712
+  |    ^^^^^^^^^^^^ E712 (true-false-comparison)
 6 |     pass
 7 | #: E712
   |
@@ -40,12 +40,12 @@ E712.py:5:4: E712 [*] Avoid inequality comparisons to `False`; use `if res:` for
 7 7 | #: E712
 8 8 | if True != res:
 
-E712.py:8:4: E712 [*] Avoid inequality comparisons to `True`; use `if not res:` for false checks
+E712.py:8:4: E712 (true-false-comparison) [*] Avoid inequality comparisons to `True`; use `if not res:` for false checks
    |
  6 |     pass
  7 | #: E712
  8 | if True != res:
-   |    ^^^^^^^^^^^ E712
+   |    ^^^^^^^^^^^ E712 (true-false-comparison)
  9 |     pass
 10 | #: E712
    |
@@ -61,12 +61,12 @@ E712.py:8:4: E712 [*] Avoid inequality comparisons to `True`; use `if not res:` 
 10 10 | #: E712
 11 11 | if False == res:
 
-E712.py:11:4: E712 [*] Avoid equality comparisons to `False`; use `if not res:` for false checks
+E712.py:11:4: E712 (true-false-comparison) [*] Avoid equality comparisons to `False`; use `if not res:` for false checks
    |
  9 |     pass
 10 | #: E712
 11 | if False == res:
-   |    ^^^^^^^^^^^^ E712
+   |    ^^^^^^^^^^^^ E712 (true-false-comparison)
 12 |     pass
 13 | #: E712
    |
@@ -82,12 +82,12 @@ E712.py:11:4: E712 [*] Avoid equality comparisons to `False`; use `if not res:` 
 13 13 | #: E712
 14 14 | if res[1] == True:
 
-E712.py:14:4: E712 [*] Avoid equality comparisons to `True`; use `if res[1]:` for truth checks
+E712.py:14:4: E712 (true-false-comparison) [*] Avoid equality comparisons to `True`; use `if res[1]:` for truth checks
    |
 12 |     pass
 13 | #: E712
 14 | if res[1] == True:
-   |    ^^^^^^^^^^^^^^ E712
+   |    ^^^^^^^^^^^^^^ E712 (true-false-comparison)
 15 |     pass
 16 | #: E712
    |
@@ -103,12 +103,12 @@ E712.py:14:4: E712 [*] Avoid equality comparisons to `True`; use `if res[1]:` fo
 16 16 | #: E712
 17 17 | if res[1] != False:
 
-E712.py:17:4: E712 [*] Avoid inequality comparisons to `False`; use `if res[1]:` for truth checks
+E712.py:17:4: E712 (true-false-comparison) [*] Avoid inequality comparisons to `False`; use `if res[1]:` for truth checks
    |
 15 |     pass
 16 | #: E712
 17 | if res[1] != False:
-   |    ^^^^^^^^^^^^^^^ E712
+   |    ^^^^^^^^^^^^^^^ E712 (true-false-comparison)
 18 |     pass
 19 | #: E712
    |
@@ -124,12 +124,12 @@ E712.py:17:4: E712 [*] Avoid inequality comparisons to `False`; use `if res[1]:`
 19 19 | #: E712
 20 20 | var = 1 if cond == True else -1 if cond == False else cond
 
-E712.py:20:12: E712 [*] Avoid equality comparisons to `True`; use `if cond:` for truth checks
+E712.py:20:12: E712 (true-false-comparison) [*] Avoid equality comparisons to `True`; use `if cond:` for truth checks
    |
 18 |     pass
 19 | #: E712
 20 | var = 1 if cond == True else -1 if cond == False else cond
-   |            ^^^^^^^^^^^^ E712
+   |            ^^^^^^^^^^^^ E712 (true-false-comparison)
 21 | #: E712
 22 | if (True) == TrueElement or x == TrueElement:
    |
@@ -145,12 +145,12 @@ E712.py:20:12: E712 [*] Avoid equality comparisons to `True`; use `if cond:` for
 22 22 | if (True) == TrueElement or x == TrueElement:
 23 23 |     pass
 
-E712.py:20:36: E712 [*] Avoid equality comparisons to `False`; use `if not cond:` for false checks
+E712.py:20:36: E712 (true-false-comparison) [*] Avoid equality comparisons to `False`; use `if not cond:` for false checks
    |
 18 |     pass
 19 | #: E712
 20 | var = 1 if cond == True else -1 if cond == False else cond
-   |                                    ^^^^^^^^^^^^^ E712
+   |                                    ^^^^^^^^^^^^^ E712 (true-false-comparison)
 21 | #: E712
 22 | if (True) == TrueElement or x == TrueElement:
    |
@@ -166,12 +166,12 @@ E712.py:20:36: E712 [*] Avoid equality comparisons to `False`; use `if not cond:
 22 22 | if (True) == TrueElement or x == TrueElement:
 23 23 |     pass
 
-E712.py:22:4: E712 [*] Avoid equality comparisons to `True`; use `if TrueElement:` for truth checks
+E712.py:22:4: E712 (true-false-comparison) [*] Avoid equality comparisons to `True`; use `if TrueElement:` for truth checks
    |
 20 | var = 1 if cond == True else -1 if cond == False else cond
 21 | #: E712
 22 | if (True) == TrueElement or x == TrueElement:
-   |    ^^^^^^^^^^^^^^^^^^^^^ E712
+   |    ^^^^^^^^^^^^^^^^^^^^^ E712 (true-false-comparison)
 23 |     pass
    |
    = help: Replace with `TrueElement`
@@ -186,12 +186,12 @@ E712.py:22:4: E712 [*] Avoid equality comparisons to `True`; use `if TrueElement
 24 24 | 
 25 25 | if res == True != False:
 
-E712.py:25:4: E712 [*] Avoid equality comparisons to `True` or `False`
+E712.py:25:4: E712 (true-false-comparison) [*] Avoid equality comparisons to `True` or `False`
    |
 23 |     pass
 24 | 
 25 | if res == True != False:
-   |    ^^^^^^^^^^^^^^^^^^^^ E712
+   |    ^^^^^^^^^^^^^^^^^^^^ E712 (true-false-comparison)
 26 |     pass
    |
    = help: Replace comparison
@@ -206,12 +206,12 @@ E712.py:25:4: E712 [*] Avoid equality comparisons to `True` or `False`
 27 27 | 
 28 28 | if(True) == TrueElement or x == TrueElement:
 
-E712.py:25:4: E712 [*] Avoid equality comparisons to `True` or `False`
+E712.py:25:4: E712 (true-false-comparison) [*] Avoid equality comparisons to `True` or `False`
    |
 23 |     pass
 24 | 
 25 | if res == True != False:
-   |    ^^^^^^^^^^^^^^^^^^^^ E712
+   |    ^^^^^^^^^^^^^^^^^^^^ E712 (true-false-comparison)
 26 |     pass
    |
    = help: Replace comparison
@@ -226,12 +226,12 @@ E712.py:25:4: E712 [*] Avoid equality comparisons to `True` or `False`
 27 27 | 
 28 28 | if(True) == TrueElement or x == TrueElement:
 
-E712.py:28:3: E712 [*] Avoid equality comparisons to `True`; use `if TrueElement:` for truth checks
+E712.py:28:3: E712 (true-false-comparison) [*] Avoid equality comparisons to `True`; use `if TrueElement:` for truth checks
    |
 26 |     pass
 27 | 
 28 | if(True) == TrueElement or x == TrueElement:
-   |   ^^^^^^^^^^^^^^^^^^^^^ E712
+   |   ^^^^^^^^^^^^^^^^^^^^^ E712 (true-false-comparison)
 29 |     pass
    |
    = help: Replace with `TrueElement`
@@ -246,12 +246,12 @@ E712.py:28:3: E712 [*] Avoid equality comparisons to `True`; use `if TrueElement
 30 30 | 
 31 31 | if (yield i) == True:
 
-E712.py:31:4: E712 [*] Avoid equality comparisons to `True`; use `if yield i:` for truth checks
+E712.py:31:4: E712 (true-false-comparison) [*] Avoid equality comparisons to `True`; use `if yield i:` for truth checks
    |
 29 |     pass
 30 | 
 31 | if (yield i) == True:
-   |    ^^^^^^^^^^^^^^^^^ E712
+   |    ^^^^^^^^^^^^^^^^^ E712 (true-false-comparison)
 32 |       print("even")
    |
    = help: Replace with `yield i`

@@ -1,12 +1,12 @@
 ---
 source: crates/ruff_linter/src/rules/pycodestyle/mod.rs
 ---
-E11.py:6:1: E117 Over-indented
+E11.py:6:1: E117 (over-indented) Over-indented
   |
 4 | #: E111 E117
 5 | if True:
 6 |      print()
-  | ^^^^^ E117
+  | ^^^^^ E117 (over-indented)
 7 | #: E112
 8 | if False:
   |
@@ -41,22 +41,22 @@ E11.py:14:1: SyntaxError: Expected a statement
 16 | create_date = False
    |
 
-E11.py:39:1: E117 Over-indented
+E11.py:39:1: E117 (over-indented) Over-indented
    |
 37 | #: E117
 38 | def start():
 39 |         print()
-   | ^^^^^^^^ E117
+   | ^^^^^^^^ E117 (over-indented)
 40 | #: E117 W191
 41 | def start():
    |
 
-E11.py:42:1: E117 Over-indented
+E11.py:42:1: E117 (over-indented) Over-indented
    |
 40 | #: E117 W191
 41 | def start():
 42 |         print()
-   | ^^^^^^^^ E117
+   | ^^^^^^^^ E117 (over-indented)
 43 | #: E112
 44 | if False:  #
    |

@@ -1,185 +1,185 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_debugger/mod.rs
 ---
-T100.py:1:1: T100 Trace found: `breakpoint` used
+T100.py:1:1: T100 (debugger) Trace found: `breakpoint` used
   |
 1 | breakpoint()
-  | ^^^^^^^^^^^^ T100
+  | ^^^^^^^^^^^^ T100 (debugger)
 2 | 
 3 | import pdb
   |
 
-T100.py:3:1: T100 Import for `pdb` found
+T100.py:3:1: T100 (debugger) Import for `pdb` found
   |
 1 | breakpoint()
 2 | 
 3 | import pdb
-  | ^^^^^^^^^^ T100
+  | ^^^^^^^^^^ T100 (debugger)
 4 | import builtins
 5 | from builtins import breakpoint
   |
 
-T100.py:5:1: T100 Import for `builtins.breakpoint` found
+T100.py:5:1: T100 (debugger) Import for `builtins.breakpoint` found
   |
 3 | import pdb
 4 | import builtins
 5 | from builtins import breakpoint
-  | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ T100
+  | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ T100 (debugger)
 6 | from pdb import set_trace as st
 7 | from celery.contrib.rdb import set_trace
   |
 
-T100.py:6:1: T100 Import for `pdb.set_trace` found
+T100.py:6:1: T100 (debugger) Import for `pdb.set_trace` found
   |
 4 | import builtins
 5 | from builtins import breakpoint
 6 | from pdb import set_trace as st
-  | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ T100
+  | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ T100 (debugger)
 7 | from celery.contrib.rdb import set_trace
 8 | from celery.contrib import rdb
   |
 
-T100.py:7:1: T100 Import for `celery.contrib.rdb.set_trace` found
+T100.py:7:1: T100 (debugger) Import for `celery.contrib.rdb.set_trace` found
   |
 5 | from builtins import breakpoint
 6 | from pdb import set_trace as st
 7 | from celery.contrib.rdb import set_trace
-  | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ T100
+  | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ T100 (debugger)
 8 | from celery.contrib import rdb
 9 | import celery.contrib.rdb
   |
 
-T100.py:9:1: T100 Import for `celery.contrib.rdb` found
+T100.py:9:1: T100 (debugger) Import for `celery.contrib.rdb` found
    |
  7 | from celery.contrib.rdb import set_trace
  8 | from celery.contrib import rdb
  9 | import celery.contrib.rdb
-   | ^^^^^^^^^^^^^^^^^^^^^^^^^ T100
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^ T100 (debugger)
 10 | from debugpy import wait_for_client
 11 | import debugpy
    |
 
-T100.py:10:1: T100 Import for `debugpy.wait_for_client` found
+T100.py:10:1: T100 (debugger) Import for `debugpy.wait_for_client` found
    |
  8 | from celery.contrib import rdb
  9 | import celery.contrib.rdb
 10 | from debugpy import wait_for_client
-   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ T100
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ T100 (debugger)
 11 | import debugpy
 12 | from ptvsd import break_into_debugger
    |
 
-T100.py:11:1: T100 Import for `debugpy` found
+T100.py:11:1: T100 (debugger) Import for `debugpy` found
    |
  9 | import celery.contrib.rdb
 10 | from debugpy import wait_for_client
 11 | import debugpy
-   | ^^^^^^^^^^^^^^ T100
+   | ^^^^^^^^^^^^^^ T100 (debugger)
 12 | from ptvsd import break_into_debugger
 13 | from ptvsd import enable_attach
    |
 
-T100.py:12:1: T100 Import for `ptvsd.break_into_debugger` found
+T100.py:12:1: T100 (debugger) Import for `ptvsd.break_into_debugger` found
    |
 10 | from debugpy import wait_for_client
 11 | import debugpy
 12 | from ptvsd import break_into_debugger
-   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ T100
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ T100 (debugger)
 13 | from ptvsd import enable_attach
 14 | from ptvsd import wait_for_attach
    |
 
-T100.py:14:1: T100 Import for `ptvsd.wait_for_attach` found
+T100.py:14:1: T100 (debugger) Import for `ptvsd.wait_for_attach` found
    |
 12 | from ptvsd import break_into_debugger
 13 | from ptvsd import enable_attach
 14 | from ptvsd import wait_for_attach
-   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ T100
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ T100 (debugger)
 15 | import ptvsd
    |
 
-T100.py:15:1: T100 Import for `ptvsd` found
+T100.py:15:1: T100 (debugger) Import for `ptvsd` found
    |
 13 | from ptvsd import enable_attach
 14 | from ptvsd import wait_for_attach
 15 | import ptvsd
-   | ^^^^^^^^^^^^ T100
+   | ^^^^^^^^^^^^ T100 (debugger)
 16 | 
 17 | breakpoint()
    |
 
-T100.py:17:1: T100 Trace found: `builtins.breakpoint` used
+T100.py:17:1: T100 (debugger) Trace found: `builtins.breakpoint` used
    |
 15 | import ptvsd
 16 | 
 17 | breakpoint()
-   | ^^^^^^^^^^^^ T100
+   | ^^^^^^^^^^^^ T100 (debugger)
 18 | st()
 19 | set_trace()
    |
 
-T100.py:18:1: T100 Trace found: `pdb.set_trace` used
+T100.py:18:1: T100 (debugger) Trace found: `pdb.set_trace` used
    |
 17 | breakpoint()
 18 | st()
-   | ^^^^ T100
+   | ^^^^ T100 (debugger)
 19 | set_trace()
 20 | debugpy.breakpoint()
    |
 
-T100.py:19:1: T100 Trace found: `celery.contrib.rdb.set_trace` used
+T100.py:19:1: T100 (debugger) Trace found: `celery.contrib.rdb.set_trace` used
    |
 17 | breakpoint()
 18 | st()
 19 | set_trace()
-   | ^^^^^^^^^^^ T100
+   | ^^^^^^^^^^^ T100 (debugger)
 20 | debugpy.breakpoint()
 21 | wait_for_client()
    |
 
-T100.py:20:1: T100 Trace found: `debugpy.breakpoint` used
+T100.py:20:1: T100 (debugger) Trace found: `debugpy.breakpoint` used
    |
 18 | st()
 19 | set_trace()
 20 | debugpy.breakpoint()
-   | ^^^^^^^^^^^^^^^^^^^^ T100
+   | ^^^^^^^^^^^^^^^^^^^^ T100 (debugger)
 21 | wait_for_client()
 22 | debugpy.listen(1234)
    |
 
-T100.py:21:1: T100 Trace found: `debugpy.wait_for_client` used
+T100.py:21:1: T100 (debugger) Trace found: `debugpy.wait_for_client` used
    |
 19 | set_trace()
 20 | debugpy.breakpoint()
 21 | wait_for_client()
-   | ^^^^^^^^^^^^^^^^^ T100
+   | ^^^^^^^^^^^^^^^^^ T100 (debugger)
 22 | debugpy.listen(1234)
 23 | enable_attach()
    |
 
-T100.py:22:1: T100 Trace found: `debugpy.listen` used
+T100.py:22:1: T100 (debugger) Trace found: `debugpy.listen` used
    |
 20 | debugpy.breakpoint()
 21 | wait_for_client()
 22 | debugpy.listen(1234)
-   | ^^^^^^^^^^^^^^^^^^^^ T100
+   | ^^^^^^^^^^^^^^^^^^^^ T100 (debugger)
 23 | enable_attach()
 24 | break_into_debugger()
    |
 
-T100.py:24:1: T100 Trace found: `ptvsd.break_into_debugger` used
+T100.py:24:1: T100 (debugger) Trace found: `ptvsd.break_into_debugger` used
    |
 22 | debugpy.listen(1234)
 23 | enable_attach()
 24 | break_into_debugger()
-   | ^^^^^^^^^^^^^^^^^^^^^ T100
+   | ^^^^^^^^^^^^^^^^^^^^^ T100 (debugger)
 25 | wait_for_attach()
    |
 
-T100.py:25:1: T100 Trace found: `ptvsd.wait_for_attach` used
+T100.py:25:1: T100 (debugger) Trace found: `ptvsd.wait_for_attach` used
    |
 23 | enable_attach()
 24 | break_into_debugger()
 25 | wait_for_attach()
-   | ^^^^^^^^^^^^^^^^^ T100
+   | ^^^^^^^^^^^^^^^^^ T100 (debugger)
    |

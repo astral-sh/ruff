@@ -1,11 +1,11 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_pyi/mod.rs
 ---
-PYI032.py:6:29: PYI032 [*] Prefer `object` to `Any` for the second parameter to `__eq__`
+PYI032.py:6:29: PYI032 (any-eq-ne-annotation) [*] Prefer `object` to `Any` for the second parameter to `__eq__`
   |
 5 | class Bad:
 6 |     def __eq__(self, other: Any) -> bool: ...  # Y032
-  |                             ^^^ PYI032
+  |                             ^^^ PYI032 (any-eq-ne-annotation)
 7 |     def __ne__(self, other: typing.Any) -> typing.Any: ...  # Y032
   |
   = help: Replace with `object`
@@ -20,12 +20,12 @@ PYI032.py:6:29: PYI032 [*] Prefer `object` to `Any` for the second parameter to 
 8 8 | 
 9 9 | 
 
-PYI032.py:7:29: PYI032 [*] Prefer `object` to `Any` for the second parameter to `__ne__`
+PYI032.py:7:29: PYI032 (any-eq-ne-annotation) [*] Prefer `object` to `Any` for the second parameter to `__ne__`
   |
 5 | class Bad:
 6 |     def __eq__(self, other: Any) -> bool: ...  # Y032
 7 |     def __ne__(self, other: typing.Any) -> typing.Any: ...  # Y032
-  |                             ^^^^^^^^^^ PYI032
+  |                             ^^^^^^^^^^ PYI032 (any-eq-ne-annotation)
   |
   = help: Replace with `object`
 
@@ -38,5 +38,3 @@ PYI032.py:7:29: PYI032 [*] Prefer `object` to `Any` for the second parameter to 
 8 8 | 
 9 9 | 
 10 10 | class Good:
-
-

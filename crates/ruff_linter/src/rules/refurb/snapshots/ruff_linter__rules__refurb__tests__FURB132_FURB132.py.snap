@@ -1,12 +1,12 @@
 ---
 source: crates/ruff_linter/src/rules/refurb/mod.rs
 ---
-FURB132.py:12:1: FURB132 [*] Use `s.discard("x")` instead of check and `remove`
+FURB132.py:12:1: FURB132 (check-and-remove-from-set) [*] Use `s.discard("x")` instead of check and `remove`
    |
 11 |   # FURB132
 12 | / if "x" in s:
 13 | |     s.remove("x")
-   | |_________________^ FURB132
+   | |_________________^ FURB132 (check-and-remove-from-set)
    |
    = help: Replace with `s.discard("x")`
 
@@ -21,12 +21,12 @@ FURB132.py:12:1: FURB132 [*] Use `s.discard("x")` instead of check and `remove`
 15 14 | 
 16 15 | # FURB132
 
-FURB132.py:22:1: FURB132 [*] Use `s3.discard("x")` instead of check and `remove`
+FURB132.py:22:1: FURB132 (check-and-remove-from-set) [*] Use `s3.discard("x")` instead of check and `remove`
    |
 21 |   # FURB132
 22 | / if "x" in s3:
 23 | |     s3.remove("x")
-   | |__________________^ FURB132
+   | |__________________^ FURB132 (check-and-remove-from-set)
    |
    = help: Replace with `s3.discard("x")`
 
@@ -41,13 +41,13 @@ FURB132.py:22:1: FURB132 [*] Use `s3.discard("x")` instead of check and `remove`
 25 24 | 
 26 25 | var = "y"
 
-FURB132.py:28:1: FURB132 [*] Use `s.discard(var)` instead of check and `remove`
+FURB132.py:28:1: FURB132 (check-and-remove-from-set) [*] Use `s.discard(var)` instead of check and `remove`
    |
 26 |   var = "y"
 27 |   # FURB132
 28 | / if var in s:
 29 | |     s.remove(var)
-   | |_________________^ FURB132
+   | |_________________^ FURB132 (check-and-remove-from-set)
    |
    = help: Replace with `s.discard(var)`
 
@@ -62,11 +62,11 @@ FURB132.py:28:1: FURB132 [*] Use `s.discard(var)` instead of check and `remove`
 31 30 | 
 32 31 | if f"{var}:{var}" in s:
 
-FURB132.py:32:1: FURB132 [*] Use `s.discard(f"{var}:{var}")` instead of check and `remove`
+FURB132.py:32:1: FURB132 (check-and-remove-from-set) [*] Use `s.discard(f"{var}:{var}")` instead of check and `remove`
    |
 32 | / if f"{var}:{var}" in s:
 33 | |     s.remove(f"{var}:{var}")
-   | |____________________________^ FURB132
+   | |____________________________^ FURB132 (check-and-remove-from-set)
    |
    = help: Replace with `s.discard(f"{var}:{var}")`
 
@@ -80,5 +80,3 @@ FURB132.py:32:1: FURB132 [*] Use `s.discard(f"{var}:{var}")` instead of check an
 34 33 | 
 35 34 | 
 36 35 | def identity(x):
-
-

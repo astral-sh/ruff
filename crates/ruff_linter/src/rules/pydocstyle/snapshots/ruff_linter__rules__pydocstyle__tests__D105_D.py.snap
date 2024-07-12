@@ -1,12 +1,10 @@
 ---
 source: crates/ruff_linter/src/rules/pydocstyle/mod.rs
 ---
-D.py:64:9: D105 Missing docstring in magic method
+D.py:64:9: D105 (undocumented-magic-method) Missing docstring in magic method
    |
 63 |     @expect('D105: Missing docstring in magic method')
 64 |     def __str__(self=None):
-   |         ^^^^^^^ D105
+   |         ^^^^^^^ D105 (undocumented-magic-method)
 65 |         pass
    |
-
-

@@ -1,7 +1,7 @@
 ---
 source: crates/ruff_linter/src/rules/pydocstyle/mod.rs
 ---
-D.py:200:5: D205 1 blank line required between summary line and description
+D.py:200:5: D205 (blank-line-after-summary) 1 blank line required between summary line and description
     |
 198 |   @expect('D213: Multi-line docstring summary should start at the second line')
 199 |   def multi_line_zero_separating_blanks():
@@ -10,11 +10,11 @@ D.py:200:5: D205 1 blank line required between summary line and description
 201 | |     Description.
 202 | | 
 203 | |     """
-    | |_______^ D205
+    | |_______^ D205 (blank-line-after-summary)
     |
     = help: Insert single blank line
 
-D.py:210:5: D205 [*] 1 blank line required between summary line and description (found 2)
+D.py:210:5: D205 (blank-line-after-summary) [*] 1 blank line required between summary line and description (found 2)
     |
 208 |   @expect('D213: Multi-line docstring summary should start at the second line')
 209 |   def multi_line_two_separating_blanks():
@@ -25,7 +25,7 @@ D.py:210:5: D205 [*] 1 blank line required between summary line and description 
 213 | |     Description.
 214 | | 
 215 | |     """
-    | |_______^ D205
+    | |_______^ D205 (blank-line-after-summary)
     |
     = help: Insert single blank line
 
@@ -37,5 +37,3 @@ D.py:210:5: D205 [*] 1 blank line required between summary line and description 
 213 212 |     Description.
 214 213 | 
 215 214 |     """
-
-

@@ -1,150 +1,150 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_bandit/mod.rs
 ---
-S310.py:4:1: S310 Audit URL open for permitted schemes. Allowing use of `file:` or custom schemes is often unexpected.
+S310.py:4:1: S310 (suspicious-url-open-usage) Audit URL open for permitted schemes. Allowing use of `file:` or custom schemes is often unexpected.
   |
 3 | urllib.request.urlopen(url='http://www.google.com')
 4 | urllib.request.urlopen(url='http://www.google.com', **kwargs)
-  | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ S310
+  | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ S310 (suspicious-url-open-usage)
 5 | urllib.request.urlopen('http://www.google.com')
 6 | urllib.request.urlopen('file:///foo/bar/baz')
   |
 
-S310.py:6:1: S310 Audit URL open for permitted schemes. Allowing use of `file:` or custom schemes is often unexpected.
+S310.py:6:1: S310 (suspicious-url-open-usage) Audit URL open for permitted schemes. Allowing use of `file:` or custom schemes is often unexpected.
   |
 4 | urllib.request.urlopen(url='http://www.google.com', **kwargs)
 5 | urllib.request.urlopen('http://www.google.com')
 6 | urllib.request.urlopen('file:///foo/bar/baz')
-  | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ S310
+  | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ S310 (suspicious-url-open-usage)
 7 | urllib.request.urlopen(url)
   |
 
-S310.py:7:1: S310 Audit URL open for permitted schemes. Allowing use of `file:` or custom schemes is often unexpected.
+S310.py:7:1: S310 (suspicious-url-open-usage) Audit URL open for permitted schemes. Allowing use of `file:` or custom schemes is often unexpected.
   |
 5 | urllib.request.urlopen('http://www.google.com')
 6 | urllib.request.urlopen('file:///foo/bar/baz')
 7 | urllib.request.urlopen(url)
-  | ^^^^^^^^^^^^^^^^^^^^^^^^^^^ S310
+  | ^^^^^^^^^^^^^^^^^^^^^^^^^^^ S310 (suspicious-url-open-usage)
 8 | 
 9 | urllib.request.Request(url='http://www.google.com', **kwargs)
   |
 
-S310.py:9:1: S310 Audit URL open for permitted schemes. Allowing use of `file:` or custom schemes is often unexpected.
+S310.py:9:1: S310 (suspicious-url-open-usage) Audit URL open for permitted schemes. Allowing use of `file:` or custom schemes is often unexpected.
    |
  7 | urllib.request.urlopen(url)
  8 | 
  9 | urllib.request.Request(url='http://www.google.com', **kwargs)
-   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ S310
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ S310 (suspicious-url-open-usage)
 10 | urllib.request.Request(url='http://www.google.com')
 11 | urllib.request.Request('http://www.google.com')
    |
 
-S310.py:12:1: S310 Audit URL open for permitted schemes. Allowing use of `file:` or custom schemes is often unexpected.
+S310.py:12:1: S310 (suspicious-url-open-usage) Audit URL open for permitted schemes. Allowing use of `file:` or custom schemes is often unexpected.
    |
 10 | urllib.request.Request(url='http://www.google.com')
 11 | urllib.request.Request('http://www.google.com')
 12 | urllib.request.Request('file:///foo/bar/baz')
-   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ S310
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ S310 (suspicious-url-open-usage)
 13 | urllib.request.Request(url)
    |
 
-S310.py:13:1: S310 Audit URL open for permitted schemes. Allowing use of `file:` or custom schemes is often unexpected.
+S310.py:13:1: S310 (suspicious-url-open-usage) Audit URL open for permitted schemes. Allowing use of `file:` or custom schemes is often unexpected.
    |
 11 | urllib.request.Request('http://www.google.com')
 12 | urllib.request.Request('file:///foo/bar/baz')
 13 | urllib.request.Request(url)
-   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^ S310
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^ S310 (suspicious-url-open-usage)
 14 | 
 15 | urllib.request.URLopener().open(fullurl='http://www.google.com', **kwargs)
    |
 
-S310.py:15:1: S310 Audit URL open for permitted schemes. Allowing use of `file:` or custom schemes is often unexpected.
+S310.py:15:1: S310 (suspicious-url-open-usage) Audit URL open for permitted schemes. Allowing use of `file:` or custom schemes is often unexpected.
    |
 13 | urllib.request.Request(url)
 14 | 
 15 | urllib.request.URLopener().open(fullurl='http://www.google.com', **kwargs)
-   | ^^^^^^^^^^^^^^^^^^^^^^^^^^ S310
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^ S310 (suspicious-url-open-usage)
 16 | urllib.request.URLopener().open(fullurl='http://www.google.com')
 17 | urllib.request.URLopener().open('http://www.google.com')
    |
 
-S310.py:16:1: S310 Audit URL open for permitted schemes. Allowing use of `file:` or custom schemes is often unexpected.
+S310.py:16:1: S310 (suspicious-url-open-usage) Audit URL open for permitted schemes. Allowing use of `file:` or custom schemes is often unexpected.
    |
 15 | urllib.request.URLopener().open(fullurl='http://www.google.com', **kwargs)
 16 | urllib.request.URLopener().open(fullurl='http://www.google.com')
-   | ^^^^^^^^^^^^^^^^^^^^^^^^^^ S310
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^ S310 (suspicious-url-open-usage)
 17 | urllib.request.URLopener().open('http://www.google.com')
 18 | urllib.request.URLopener().open('file:///foo/bar/baz')
    |
 
-S310.py:17:1: S310 Audit URL open for permitted schemes. Allowing use of `file:` or custom schemes is often unexpected.
+S310.py:17:1: S310 (suspicious-url-open-usage) Audit URL open for permitted schemes. Allowing use of `file:` or custom schemes is often unexpected.
    |
 15 | urllib.request.URLopener().open(fullurl='http://www.google.com', **kwargs)
 16 | urllib.request.URLopener().open(fullurl='http://www.google.com')
 17 | urllib.request.URLopener().open('http://www.google.com')
-   | ^^^^^^^^^^^^^^^^^^^^^^^^^^ S310
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^ S310 (suspicious-url-open-usage)
 18 | urllib.request.URLopener().open('file:///foo/bar/baz')
 19 | urllib.request.URLopener().open(url)
    |
 
-S310.py:18:1: S310 Audit URL open for permitted schemes. Allowing use of `file:` or custom schemes is often unexpected.
+S310.py:18:1: S310 (suspicious-url-open-usage) Audit URL open for permitted schemes. Allowing use of `file:` or custom schemes is often unexpected.
    |
 16 | urllib.request.URLopener().open(fullurl='http://www.google.com')
 17 | urllib.request.URLopener().open('http://www.google.com')
 18 | urllib.request.URLopener().open('file:///foo/bar/baz')
-   | ^^^^^^^^^^^^^^^^^^^^^^^^^^ S310
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^ S310 (suspicious-url-open-usage)
 19 | urllib.request.URLopener().open(url)
    |
 
-S310.py:19:1: S310 Audit URL open for permitted schemes. Allowing use of `file:` or custom schemes is often unexpected.
+S310.py:19:1: S310 (suspicious-url-open-usage) Audit URL open for permitted schemes. Allowing use of `file:` or custom schemes is often unexpected.
    |
 17 | urllib.request.URLopener().open('http://www.google.com')
 18 | urllib.request.URLopener().open('file:///foo/bar/baz')
 19 | urllib.request.URLopener().open(url)
-   | ^^^^^^^^^^^^^^^^^^^^^^^^^^ S310
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^ S310 (suspicious-url-open-usage)
 20 | 
 21 | urllib.request.urlopen(url=urllib.request.Request('http://www.google.com'))
    |
 
-S310.py:22:1: S310 Audit URL open for permitted schemes. Allowing use of `file:` or custom schemes is often unexpected.
+S310.py:22:1: S310 (suspicious-url-open-usage) Audit URL open for permitted schemes. Allowing use of `file:` or custom schemes is often unexpected.
    |
 21 | urllib.request.urlopen(url=urllib.request.Request('http://www.google.com'))
 22 | urllib.request.urlopen(url=urllib.request.Request('http://www.google.com'), **kwargs)
-   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ S310
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ S310 (suspicious-url-open-usage)
 23 | urllib.request.urlopen(urllib.request.Request('http://www.google.com'))
 24 | urllib.request.urlopen(urllib.request.Request('file:///foo/bar/baz'))
    |
 
-S310.py:24:1: S310 Audit URL open for permitted schemes. Allowing use of `file:` or custom schemes is often unexpected.
+S310.py:24:1: S310 (suspicious-url-open-usage) Audit URL open for permitted schemes. Allowing use of `file:` or custom schemes is often unexpected.
    |
 22 | urllib.request.urlopen(url=urllib.request.Request('http://www.google.com'), **kwargs)
 23 | urllib.request.urlopen(urllib.request.Request('http://www.google.com'))
 24 | urllib.request.urlopen(urllib.request.Request('file:///foo/bar/baz'))
-   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ S310
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ S310 (suspicious-url-open-usage)
 25 | urllib.request.urlopen(urllib.request.Request(url))
    |
 
-S310.py:24:24: S310 Audit URL open for permitted schemes. Allowing use of `file:` or custom schemes is often unexpected.
+S310.py:24:24: S310 (suspicious-url-open-usage) Audit URL open for permitted schemes. Allowing use of `file:` or custom schemes is often unexpected.
    |
 22 | urllib.request.urlopen(url=urllib.request.Request('http://www.google.com'), **kwargs)
 23 | urllib.request.urlopen(urllib.request.Request('http://www.google.com'))
 24 | urllib.request.urlopen(urllib.request.Request('file:///foo/bar/baz'))
-   |                        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ S310
+   |                        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ S310 (suspicious-url-open-usage)
 25 | urllib.request.urlopen(urllib.request.Request(url))
    |
 
-S310.py:25:1: S310 Audit URL open for permitted schemes. Allowing use of `file:` or custom schemes is often unexpected.
+S310.py:25:1: S310 (suspicious-url-open-usage) Audit URL open for permitted schemes. Allowing use of `file:` or custom schemes is often unexpected.
    |
 23 | urllib.request.urlopen(urllib.request.Request('http://www.google.com'))
 24 | urllib.request.urlopen(urllib.request.Request('file:///foo/bar/baz'))
 25 | urllib.request.urlopen(urllib.request.Request(url))
-   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ S310
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ S310 (suspicious-url-open-usage)
    |
 
-S310.py:25:24: S310 Audit URL open for permitted schemes. Allowing use of `file:` or custom schemes is often unexpected.
+S310.py:25:24: S310 (suspicious-url-open-usage) Audit URL open for permitted schemes. Allowing use of `file:` or custom schemes is often unexpected.
    |
 23 | urllib.request.urlopen(urllib.request.Request('http://www.google.com'))
 24 | urllib.request.urlopen(urllib.request.Request('file:///foo/bar/baz'))
 25 | urllib.request.urlopen(urllib.request.Request(url))
-   |                        ^^^^^^^^^^^^^^^^^^^^^^^^^^^ S310
+   |                        ^^^^^^^^^^^^^^^^^^^^^^^^^^^ S310 (suspicious-url-open-usage)
    |

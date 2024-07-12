@@ -28,8 +28,9 @@ impl Emitter for PylintEmitter {
 
             let body = if let Some(rule) = message.rule() {
                 format!(
-                    "[{code}] {body}",
+                    "[{code} ({rule_name})] {body}",
                     code = rule.noqa_code(),
+                    rule_name = rule.as_ref(),
                     body = message.body()
                 )
             } else {

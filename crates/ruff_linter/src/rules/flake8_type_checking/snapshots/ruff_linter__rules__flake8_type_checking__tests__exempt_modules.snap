@@ -1,11 +1,11 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_type_checking/mod.rs
 ---
-exempt_modules.py:14:12: TCH002 [*] Move third-party import `flask` into a type-checking block
+exempt_modules.py:14:12: TCH002 (typing-only-third-party-import) [*] Move third-party import `flask` into a type-checking block
    |
 13 | def f():
 14 |     import flask
-   |            ^^^^^ TCH002
+   |            ^^^^^ TCH002 (typing-only-third-party-import)
 15 | 
 16 |     x: flask
    |
@@ -26,5 +26,3 @@ exempt_modules.py:14:12: TCH002 [*] Move third-party import `flask` into a type-
 14    |-    import flask
 15 18 | 
 16 19 |     x: flask
-
-

@@ -1,11 +1,11 @@
 ---
 source: crates/ruff_linter/src/rules/pycodestyle/mod.rs
 ---
-E20.py:51:10: E203 [*] Whitespace before ':'
+E20.py:51:10: E203 (whitespace-before-punctuation) [*] Whitespace before ':'
    |
 50 | #: E203:1:10
 51 | if x == 4 :
-   |          ^ E203
+   |          ^ E203 (whitespace-before-punctuation)
 52 |     print(x, y)
 53 |     x, y = y, x
    |
@@ -21,12 +21,12 @@ E20.py:51:10: E203 [*] Whitespace before ':'
 53 53 |     x, y = y, x
 54 54 | #: E203:1:10
 
-E20.py:55:10: E203 [*] Whitespace before ':'
+E20.py:55:10: E203 (whitespace-before-punctuation) [*] Whitespace before ':'
    |
 53 |     x, y = y, x
 54 | #: E203:1:10
 55 | if x == 4   :
-   |          ^^^ E203
+   |          ^^^ E203 (whitespace-before-punctuation)
 56 |     print(x, y)
 57 |     x, y = y, x
    |
@@ -42,12 +42,12 @@ E20.py:55:10: E203 [*] Whitespace before ':'
 57 57 |     x, y = y, x
 58 58 | #: E203:2:15 E702:2:16
 
-E20.py:60:16: E203 [*] Whitespace before ';'
+E20.py:60:16: E203 (whitespace-before-punctuation) [*] Whitespace before ';'
    |
 58 | #: E203:2:15 E702:2:16
 59 | if x == 4:
 60 |     print(x, y) ; x, y = y, x
-   |                ^ E203
+   |                ^ E203 (whitespace-before-punctuation)
 61 | #: E203:2:15 E702:2:16
 62 | if x == 4:
    |
@@ -63,12 +63,12 @@ E20.py:60:16: E203 [*] Whitespace before ';'
 62 62 | if x == 4:
 63 63 |     print(x, y)	; x, y = y, x
 
-E20.py:63:16: E203 [*] Whitespace before ';'
+E20.py:63:16: E203 (whitespace-before-punctuation) [*] Whitespace before ';'
    |
 61 | #: E203:2:15 E702:2:16
 62 | if x == 4:
 63 |     print(x, y) ; x, y = y, x
-   |                ^ E203
+   |                ^ E203 (whitespace-before-punctuation)
 64 | #: E203:3:13
 65 | if x == 4:
    |
@@ -84,12 +84,12 @@ E20.py:63:16: E203 [*] Whitespace before ';'
 65 65 | if x == 4:
 66 66 |     print(x, y)
 
-E20.py:67:13: E203 [*] Whitespace before ','
+E20.py:67:13: E203 (whitespace-before-punctuation) [*] Whitespace before ','
    |
 65 | if x == 4:
 66 |     print(x, y)
 67 |     x, y = y , x
-   |             ^ E203
+   |             ^ E203 (whitespace-before-punctuation)
 68 | #: E203:3:13
 69 | if x == 4:
    |
@@ -105,12 +105,12 @@ E20.py:67:13: E203 [*] Whitespace before ','
 69 69 | if x == 4:
 70 70 |     print(x, y)
 
-E20.py:71:13: E203 [*] Whitespace before ','
+E20.py:71:13: E203 (whitespace-before-punctuation) [*] Whitespace before ','
    |
 69 | if x == 4:
 70 |     print(x, y)
 71 |     x, y = y    , x
-   |             ^^^^ E203
+   |             ^^^^ E203 (whitespace-before-punctuation)
 72 | #: Okay
 73 | if x == 4:
    |
@@ -126,12 +126,12 @@ E20.py:71:13: E203 [*] Whitespace before ','
 73 73 | if x == 4:
 74 74 |     print(x, y)
 
-E20.py:86:61: E203 [*] Whitespace before ':'
+E20.py:86:61: E203 (whitespace-before-punctuation) [*] Whitespace before ':'
    |
 84 | #: E203 multi whitespace before :
 85 | predictions = predictions[
 86 |     len(past_covariates) // datamodule.hparams["downsample"]  :
-   |                                                             ^^ E203
+   |                                                             ^^ E203 (whitespace-before-punctuation)
 87 | ]
    |
    = help: Remove whitespace before ':'
@@ -146,12 +146,12 @@ E20.py:86:61: E203 [*] Whitespace before ':'
 88 88 | 
 89 89 | #: E203 tab before :
 
-E20.py:91:61: E203 [*] Whitespace before ':'
+E20.py:91:61: E203 (whitespace-before-punctuation) [*] Whitespace before ':'
    |
 89 | #: E203 tab before :
 90 | predictions = predictions[
 91 |     len(past_covariates) // datamodule.hparams["downsample"]    :
-   |                                                             ^^^^ E203
+   |                                                             ^^^^ E203 (whitespace-before-punctuation)
 92 | ]
    |
    = help: Remove whitespace before ':'
@@ -166,12 +166,12 @@ E20.py:91:61: E203 [*] Whitespace before ':'
 93 93 | 
 94 94 | #: E203 single whitespace before : with line a comment
 
-E20.py:101:61: E203 [*] Whitespace before ':'
+E20.py:101:61: E203 (whitespace-before-punctuation) [*] Whitespace before ':'
     |
  99 | #: E203 multi whitespace before : with line a comment
 100 | predictions = predictions[
 101 |     len(past_covariates) // datamodule.hparams["downsample"]  :  # Just some comment
-    |                                                             ^^ E203
+    |                                                             ^^ E203 (whitespace-before-punctuation)
 102 | ]
     |
     = help: Remove whitespace before ':'
@@ -186,11 +186,11 @@ E20.py:101:61: E203 [*] Whitespace before ':'
 103 103 | 
 104 104 | #:
 
-E20.py:126:16: E203 [*] Whitespace before ':'
+E20.py:126:16: E203 (whitespace-before-punctuation) [*] Whitespace before ':'
     |
 125 | #: E203:1:19
 126 | {lower + offset : upper + offset}
-    |                ^ E203
+    |                ^ E203 (whitespace-before-punctuation)
 127 | 
 128 | #: E203:1:19
     |
@@ -206,11 +206,11 @@ E20.py:126:16: E203 [*] Whitespace before ':'
 128 128 | #: E203:1:19
 129 129 | ham[lower + offset  : upper + offset]
 
-E20.py:129:19: E203 [*] Whitespace before ':'
+E20.py:129:19: E203 (whitespace-before-punctuation) [*] Whitespace before ':'
     |
 128 | #: E203:1:19
 129 | ham[lower + offset  : upper + offset]
-    |                   ^^ E203
+    |                   ^^ E203 (whitespace-before-punctuation)
 130 | 
 131 | #: Okay
     |
@@ -226,11 +226,11 @@ E20.py:129:19: E203 [*] Whitespace before ':'
 131 131 | #: Okay
 132 132 | release_lines = history_file_lines[history_file_lines.index('## Unreleased') + 1: -1]
 
-E20.py:157:21: E203 [*] Whitespace before ':'
+E20.py:157:21: E203 (whitespace-before-punctuation) [*] Whitespace before ':'
     |
 156 | #: E203:1:21
 157 | ham[lower + offset : : upper + offset]
-    |                     ^ E203
+    |                     ^ E203 (whitespace-before-punctuation)
 158 | 
 159 | #: E203:1:20
     |
@@ -246,11 +246,11 @@ E20.py:157:21: E203 [*] Whitespace before ':'
 159 159 | #: E203:1:20
 160 160 | ham[lower + offset: :upper + offset]
 
-E20.py:160:20: E203 [*] Whitespace before ':'
+E20.py:160:20: E203 (whitespace-before-punctuation) [*] Whitespace before ':'
     |
 159 | #: E203:1:20
 160 | ham[lower + offset: :upper + offset]
-    |                    ^ E203
+    |                    ^ E203 (whitespace-before-punctuation)
 161 | 
 162 | #: E203:1:20
     |
@@ -266,11 +266,11 @@ E20.py:160:20: E203 [*] Whitespace before ':'
 162 162 | #: E203:1:20
 163 163 | ham[{lower + offset : upper + offset} : upper + offset]
 
-E20.py:163:20: E203 [*] Whitespace before ':'
+E20.py:163:20: E203 (whitespace-before-punctuation) [*] Whitespace before ':'
     |
 162 | #: E203:1:20
 163 | ham[{lower + offset : upper + offset} : upper + offset]
-    |                    ^ E203
+    |                    ^ E203 (whitespace-before-punctuation)
 164 | 
 165 | #: Okay
     |
@@ -286,11 +286,11 @@ E20.py:163:20: E203 [*] Whitespace before ':'
 165 165 | #: Okay
 166 166 | ham[upper:]
 
-E20.py:175:10: E203 [*] Whitespace before ':'
+E20.py:175:10: E203 (whitespace-before-punctuation) [*] Whitespace before ':'
     |
 174 | #: E203:1:10
 175 | ham[upper  :]
-    |          ^^ E203
+    |          ^^ E203 (whitespace-before-punctuation)
 176 | 
 177 | #: Okay
     |
@@ -306,11 +306,11 @@ E20.py:175:10: E203 [*] Whitespace before ':'
 177 177 | #: Okay
 178 178 | ham[lower +1 :, "columnname"]
 
-E20.py:181:14: E203 [*] Whitespace before ':'
+E20.py:181:14: E203 (whitespace-before-punctuation) [*] Whitespace before ':'
     |
 180 | #: E203:1:13
 181 | ham[lower + 1  :, "columnname"]
-    |              ^^ E203
+    |              ^^ E203 (whitespace-before-punctuation)
 182 | 
 183 | #: Okay
     |
@@ -326,11 +326,11 @@ E20.py:181:14: E203 [*] Whitespace before ':'
 183 183 | #: Okay
 184 184 | f"{ham[lower +1 :, "columnname"]}"
 
-E20.py:187:17: E203 [*] Whitespace before ':'
+E20.py:187:17: E203 (whitespace-before-punctuation) [*] Whitespace before ':'
     |
 186 | #: E203:1:13
 187 | f"{ham[lower + 1  :, "columnname"]}"
-    |                 ^^ E203
+    |                 ^^ E203 (whitespace-before-punctuation)
 188 | 
 189 | #: Okay: https://github.com/astral-sh/ruff/issues/12023
     |

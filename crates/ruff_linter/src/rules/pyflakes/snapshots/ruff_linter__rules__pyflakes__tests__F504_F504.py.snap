@@ -1,12 +1,12 @@
 ---
 source: crates/ruff_linter/src/rules/pyflakes/mod.rs
 ---
-F504.py:3:1: F504 [*] `%`-format string has unused named argument(s): b
+F504.py:3:1: F504 (percent-format-extra-named-arguments) [*] `%`-format string has unused named argument(s): b
   |
 1 | # Ruff has no way of knowing if the following are F505s
 2 | a = "wrong"
 3 | "%(a)s %(c)s" % {a: "?", "b": "!"}  # F504 ("b" not used)
-  | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ F504
+  | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ F504 (percent-format-extra-named-arguments)
 4 | 
 5 | hidden = {"a": "!"}
   |
@@ -21,12 +21,12 @@ F504.py:3:1: F504 [*] `%`-format string has unused named argument(s): b
 5 5 | hidden = {"a": "!"}
 6 6 | "%(a)s %(c)s" % {"x": 1, **hidden}  # Ok (cannot see through splat)
 
-F504.py:8:1: F504 [*] `%`-format string has unused named argument(s): b
+F504.py:8:1: F504 (percent-format-extra-named-arguments) [*] `%`-format string has unused named argument(s): b
   |
 6 | "%(a)s %(c)s" % {"x": 1, **hidden}  # Ok (cannot see through splat)
 7 | 
 8 | "%(a)s" % {"a": 1, r"b": "!"}  # F504 ("b" not used)
-  | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ F504
+  | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ F504 (percent-format-extra-named-arguments)
 9 | "%(a)s" % {'a': 1, u"b": "!"}  # F504 ("b" not used)
   |
   = help: Remove extra named arguments: b
@@ -41,11 +41,11 @@ F504.py:8:1: F504 [*] `%`-format string has unused named argument(s): b
 10 10 | 
 11 11 | '' % {'a''b' : ''}  # F504 ("ab" not used)
 
-F504.py:9:1: F504 [*] `%`-format string has unused named argument(s): b
+F504.py:9:1: F504 (percent-format-extra-named-arguments) [*] `%`-format string has unused named argument(s): b
    |
  8 | "%(a)s" % {"a": 1, r"b": "!"}  # F504 ("b" not used)
  9 | "%(a)s" % {'a': 1, u"b": "!"}  # F504 ("b" not used)
-   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ F504
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ F504 (percent-format-extra-named-arguments)
 10 | 
 11 | '' % {'a''b' : ''}  # F504 ("ab" not used)
    |
@@ -61,12 +61,12 @@ F504.py:9:1: F504 [*] `%`-format string has unused named argument(s): b
 11 11 | '' % {'a''b' : ''}  # F504 ("ab" not used)
 12 12 | 
 
-F504.py:11:1: F504 [*] `%`-format string has unused named argument(s): ab
+F504.py:11:1: F504 (percent-format-extra-named-arguments) [*] `%`-format string has unused named argument(s): ab
    |
  9 | "%(a)s" % {'a': 1, u"b": "!"}  # F504 ("b" not used)
 10 | 
 11 | '' % {'a''b' : ''}  # F504 ("ab" not used)
-   | ^^^^^^^^^^^^^^^^^^ F504
+   | ^^^^^^^^^^^^^^^^^^ F504 (percent-format-extra-named-arguments)
 12 | 
 13 | # https://github.com/astral-sh/ruff/issues/4899
    |
@@ -82,13 +82,13 @@ F504.py:11:1: F504 [*] `%`-format string has unused named argument(s): ab
 13 13 | # https://github.com/astral-sh/ruff/issues/4899
 14 14 | "" % {
 
-F504.py:14:1: F504 [*] `%`-format string has unused named argument(s): test1, test2
+F504.py:14:1: F504 (percent-format-extra-named-arguments) [*] `%`-format string has unused named argument(s): test1, test2
    |
 13 |   # https://github.com/astral-sh/ruff/issues/4899
 14 | / "" % {
 15 | |   'test1': '',  'test2': '',
 16 | | }
-   | |_^ F504
+   | |_^ F504 (percent-format-extra-named-arguments)
    |
    = help: Remove extra named arguments: test1, test2
 
@@ -99,5 +99,3 @@ F504.py:14:1: F504 [*] `%`-format string has unused named argument(s): test1, te
 15    |-  'test1': '',16    |-  'test2': '',
    15 |+  
 17 16 | }
-
-

@@ -1,10 +1,10 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_pytest_style/mod.rs
 ---
-PT001.py:9:1: PT001 [*] Use `@pytest.fixture()` over `@pytest.fixture`
+PT001.py:9:1: PT001 (pytest-fixture-incorrect-parentheses-style) [*] Use `@pytest.fixture()` over `@pytest.fixture`
    |
  9 | @pytest.fixture
-   | ^^^^^^^^^^^^^^^ PT001
+   | ^^^^^^^^^^^^^^^ PT001 (pytest-fixture-incorrect-parentheses-style)
 10 | def no_parentheses():
 11 |     return 42
    |
@@ -20,10 +20,10 @@ PT001.py:9:1: PT001 [*] Use `@pytest.fixture()` over `@pytest.fixture`
 11 11 |     return 42
 12 12 | 
 
-PT001.py:34:1: PT001 [*] Use `@pytest.fixture()` over `@pytest.fixture`
+PT001.py:34:1: PT001 (pytest-fixture-incorrect-parentheses-style) [*] Use `@pytest.fixture()` over `@pytest.fixture`
    |
 34 | @fixture
-   | ^^^^^^^^ PT001
+   | ^^^^^^^^ PT001 (pytest-fixture-incorrect-parentheses-style)
 35 | def imported_from_no_parentheses():
 36 |     return 42
    |
@@ -39,10 +39,10 @@ PT001.py:34:1: PT001 [*] Use `@pytest.fixture()` over `@pytest.fixture`
 36 36 |     return 42
 37 37 | 
 
-PT001.py:59:1: PT001 [*] Use `@pytest.fixture()` over `@pytest.fixture`
+PT001.py:59:1: PT001 (pytest-fixture-incorrect-parentheses-style) [*] Use `@pytest.fixture()` over `@pytest.fixture`
    |
 59 | @aliased
-   | ^^^^^^^^ PT001
+   | ^^^^^^^^ PT001 (pytest-fixture-incorrect-parentheses-style)
 60 | def aliased_no_parentheses():
 61 |     return 42
    |
@@ -56,6 +56,4 @@ PT001.py:59:1: PT001 [*] Use `@pytest.fixture()` over `@pytest.fixture`
    59 |+@aliased()
 60 60 | def aliased_no_parentheses():
 61 61 |     return 42
-62 62 | 
-
-
+62 62 |

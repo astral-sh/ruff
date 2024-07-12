@@ -1,10 +1,10 @@
 ---
 source: crates/ruff_linter/src/rules/pyupgrade/mod.rs
 ---
-UP033_1.py:4:11: UP033 [*] Use `@functools.cache` instead of `@functools.lru_cache(maxsize=None)`
+UP033_1.py:4:11: UP033 (lru-cache-with-maxsize-none) [*] Use `@functools.cache` instead of `@functools.lru_cache(maxsize=None)`
   |
 4 | @lru_cache(maxsize=None)
-  |           ^^^^^^^^^^^^^^ UP033
+  |           ^^^^^^^^^^^^^^ UP033 (lru-cache-with-maxsize-none)
 5 | def fixme():
 6 |     pass
   |
@@ -21,11 +21,11 @@ UP033_1.py:4:11: UP033 [*] Use `@functools.cache` instead of `@functools.lru_cac
 6 6 |     pass
 7 7 | 
 
-UP033_1.py:10:11: UP033 [*] Use `@functools.cache` instead of `@functools.lru_cache(maxsize=None)`
+UP033_1.py:10:11: UP033 (lru-cache-with-maxsize-none) [*] Use `@functools.cache` instead of `@functools.lru_cache(maxsize=None)`
    |
  9 | @other_decorator
 10 | @lru_cache(maxsize=None)
-   |           ^^^^^^^^^^^^^^ UP033
+   |           ^^^^^^^^^^^^^^ UP033 (lru-cache-with-maxsize-none)
 11 | def fixme():
 12 |     pass
    |
@@ -47,10 +47,10 @@ UP033_1.py:10:11: UP033 [*] Use `@functools.cache` instead of `@functools.lru_ca
 12 12 |     pass
 13 13 | 
 
-UP033_1.py:15:11: UP033 [*] Use `@functools.cache` instead of `@functools.lru_cache(maxsize=None)`
+UP033_1.py:15:11: UP033 (lru-cache-with-maxsize-none) [*] Use `@functools.cache` instead of `@functools.lru_cache(maxsize=None)`
    |
 15 | @lru_cache(maxsize=None)
-   |           ^^^^^^^^^^^^^^ UP033
+   |           ^^^^^^^^^^^^^^ UP033 (lru-cache-with-maxsize-none)
 16 | @other_decorator
 17 | def fixme():
    |
@@ -71,5 +71,3 @@ UP033_1.py:15:11: UP033 [*] Use `@functools.cache` instead of `@functools.lru_ca
 16 16 | @other_decorator
 17 17 | def fixme():
 18 18 |     pass
-
-

@@ -1,7 +1,7 @@
 ---
 source: crates/ruff_linter/src/rules/isort/mod.rs
 ---
-order_by_type_with_custom_classes.py:1:1: I001 [*] Import block is un-sorted or un-formatted
+order_by_type_with_custom_classes.py:1:1: I001 (unsorted-imports) [*] Import block is un-sorted or un-formatted
   |
 1 | / from sklearn.svm import func, SVC, CONST, Klass
 2 | | from subprocess import N_CLASS, PIPE, Popen, STDOUT
@@ -20,5 +20,3 @@ order_by_type_with_custom_classes.py:1:1: I001 [*] Import block is un-sorted or 
   3 |+from module import BASIC, CONSTANT, Apple, CLASS, Class, function
   4 |+from sklearn.svm import CONST, Klass, SVC, func
   5 |+from torch.nn import A_CONSTANT, AClass, SELU
-
-

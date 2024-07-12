@@ -32,7 +32,7 @@ impl Emitter for GithubEmitter {
             write!(
                 writer,
                 "::error title=Ruff{code},file={file},line={row},col={column},endLine={end_row},endColumn={end_column}::",
-                code = message.rule().map_or_else(String::new, |rule| format!(" ({})", rule.noqa_code())),
+                code = message.rule().map_or_else(String::new, |rule| format!(" ({code} {rule_name})", code = rule.noqa_code(), rule_name = rule.as_ref())),
                 file = message.filename(),
                 row = source_location.row,
                 column = source_location.column,
@@ -49,7 +49,12 @@ impl Emitter for GithubEmitter {
             )?;
 
             if let Some(rule) = message.rule() {
-                write!(writer, " {}", rule.noqa_code())?;
+                write!(
+                    writer,
+                    " {code} ({rule_name})",
+                    code = rule.noqa_code(),
+                    rule_name = rule.as_ref()
+                )?;
             }
 
             writeln!(writer, " {}", message.body())?;

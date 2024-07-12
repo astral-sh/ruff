@@ -1,28 +1,26 @@
 ---
 source: crates/ruff_linter/src/rules/pep8_naming/mod.rs
 ---
-N813.py:1:8: N813 Camelcase `Camel` imported as lowercase `camel`
+N813.py:1:8: N813 (camelcase-imported-as-lowercase) Camelcase `Camel` imported as lowercase `camel`
   |
 1 | import mod.Camel as camel
-  |        ^^^^^^^^^^^^^^^^^^ N813
+  |        ^^^^^^^^^^^^^^^^^^ N813 (camelcase-imported-as-lowercase)
 2 | from mod import CamelCase as camelcase
 3 | from mod import AnotherCamelCase as another_camelcase
   |
 
-N813.py:2:17: N813 Camelcase `CamelCase` imported as lowercase `camelcase`
+N813.py:2:17: N813 (camelcase-imported-as-lowercase) Camelcase `CamelCase` imported as lowercase `camelcase`
   |
 1 | import mod.Camel as camel
 2 | from mod import CamelCase as camelcase
-  |                 ^^^^^^^^^^^^^^^^^^^^^^ N813
+  |                 ^^^^^^^^^^^^^^^^^^^^^^ N813 (camelcase-imported-as-lowercase)
 3 | from mod import AnotherCamelCase as another_camelcase
   |
 
-N813.py:3:17: N813 Camelcase `AnotherCamelCase` imported as lowercase `another_camelcase`
+N813.py:3:17: N813 (camelcase-imported-as-lowercase) Camelcase `AnotherCamelCase` imported as lowercase `another_camelcase`
   |
 1 | import mod.Camel as camel
 2 | from mod import CamelCase as camelcase
 3 | from mod import AnotherCamelCase as another_camelcase
-  |                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ N813
+  |                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ N813 (camelcase-imported-as-lowercase)
   |
-
-

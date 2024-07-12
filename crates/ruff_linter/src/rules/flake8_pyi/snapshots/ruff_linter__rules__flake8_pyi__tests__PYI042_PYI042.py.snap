@@ -1,40 +1,38 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_pyi/mod.rs
 ---
-PYI042.py:10:1: PYI042 Type alias `just_literals_pipe_union` should be CamelCase
+PYI042.py:10:1: PYI042 (snake-case-type-alias) Type alias `just_literals_pipe_union` should be CamelCase
    |
  8 | )
  9 | 
 10 | just_literals_pipe_union: TypeAlias = (
-   | ^^^^^^^^^^^^^^^^^^^^^^^^ PYI042
+   | ^^^^^^^^^^^^^^^^^^^^^^^^ PYI042 (snake-case-type-alias)
 11 |     Literal[True] | Literal["idk"]
 12 | )  # PYI042, since not camel case
    |
 
-PYI042.py:19:1: PYI042 Type alias `snake_case_alias1` should be CamelCase
+PYI042.py:19:1: PYI042 (snake-case-type-alias) Type alias `snake_case_alias1` should be CamelCase
    |
 17 | _PrivateAliasS2: TypeAlias = Annotated[str, "also okay"]
 18 | 
 19 | snake_case_alias1: TypeAlias = str | int  # PYI042, since not camel case
-   | ^^^^^^^^^^^^^^^^^ PYI042
+   | ^^^^^^^^^^^^^^^^^ PYI042 (snake-case-type-alias)
 20 | _snake_case_alias2: TypeAlias = Literal["whatever"]  # PYI042, since not camel case
 21 | Snake_case_alias: TypeAlias = int | float  # PYI042, since not camel case
    |
 
-PYI042.py:20:1: PYI042 Type alias `_snake_case_alias2` should be CamelCase
+PYI042.py:20:1: PYI042 (snake-case-type-alias) Type alias `_snake_case_alias2` should be CamelCase
    |
 19 | snake_case_alias1: TypeAlias = str | int  # PYI042, since not camel case
 20 | _snake_case_alias2: TypeAlias = Literal["whatever"]  # PYI042, since not camel case
-   | ^^^^^^^^^^^^^^^^^^ PYI042
+   | ^^^^^^^^^^^^^^^^^^ PYI042 (snake-case-type-alias)
 21 | Snake_case_alias: TypeAlias = int | float  # PYI042, since not camel case
    |
 
-PYI042.py:27:6: PYI042 Type alias `foo_bar` should be CamelCase
+PYI042.py:27:6: PYI042 (snake-case-type-alias) Type alias `foo_bar` should be CamelCase
    |
 26 | # PEP 695
 27 | type foo_bar = int | str
-   |      ^^^^^^^ PYI042
+   |      ^^^^^^^ PYI042 (snake-case-type-alias)
 28 | type FooBar = int | str
    |
-
-

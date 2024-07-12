@@ -1,16 +1,14 @@
 ---
 source: crates/ruff_linter/src/rules/perflint/mod.rs
 ---
-PERF203.py:5:5: PERF203 `try`-`except` within a loop incurs performance overhead
+PERF203.py:5:5: PERF203 (try-except-in-loop) `try`-`except` within a loop incurs performance overhead
   |
 3 |       try:
 4 |           print(f"{i}")
 5 |       except:
   |  _____^
 6 | |         print("error")
-  | |______________________^ PERF203
+  | |______________________^ PERF203 (try-except-in-loop)
 7 |   
 8 |   # OK
   |
-
-

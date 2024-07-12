@@ -1,7 +1,7 @@
 ---
 source: crates/ruff_linter/src/rules/isort/mod.rs
 ---
-separate_first_party_imports.py:1:1: I001 [*] Import block is un-sorted or un-formatted
+separate_first_party_imports.py:1:1: I001 (unsorted-imports) [*] Import block is un-sorted or un-formatted
   |
 1 | / import sys
 2 | | import leading_prefix
@@ -21,5 +21,3 @@ separate_first_party_imports.py:1:1: I001 [*] Import block is un-sorted or un-fo
 3   |-import numpy as np
 4   |-import os
 5 7 | from leading_prefix import Class
-
-

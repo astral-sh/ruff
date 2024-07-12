@@ -1,12 +1,12 @@
 ---
 source: crates/ruff_linter/src/rules/pycodestyle/mod.rs
 ---
-E30.ipynb:21:1: E302 [*] Expected 2 blank lines, found 1
+E30.ipynb:21:1: E302 (blank-lines-top-level) [*] Expected 2 blank lines, found 1
    |
 19 |     pass
 20 | 
 21 | def b():
-   | ^^^ E302
+   | ^^^ E302 (blank-lines-top-level)
 22 |     pass
 23 | # end
    |

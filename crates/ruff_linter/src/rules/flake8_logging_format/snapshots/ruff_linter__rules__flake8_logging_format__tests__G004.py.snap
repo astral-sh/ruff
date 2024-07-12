@@ -1,55 +1,55 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_logging_format/mod.rs
 ---
-G004.py:4:14: G004 Logging statement uses f-string
+G004.py:4:14: G004 (logging-f-string) Logging statement uses f-string
   |
 3 | name = "world"
 4 | logging.info(f"Hello {name}")
-  |              ^^^^^^^^^^^^^^^ G004
+  |              ^^^^^^^^^^^^^^^ G004 (logging-f-string)
 5 | logging.log(logging.INFO, f"Hello {name}")
   |
 
-G004.py:5:27: G004 Logging statement uses f-string
+G004.py:5:27: G004 (logging-f-string) Logging statement uses f-string
   |
 3 | name = "world"
 4 | logging.info(f"Hello {name}")
 5 | logging.log(logging.INFO, f"Hello {name}")
-  |                           ^^^^^^^^^^^^^^^ G004
+  |                           ^^^^^^^^^^^^^^^ G004 (logging-f-string)
 6 | 
 7 | _LOGGER = logging.getLogger()
   |
 
-G004.py:8:14: G004 Logging statement uses f-string
+G004.py:8:14: G004 (logging-f-string) Logging statement uses f-string
    |
  7 | _LOGGER = logging.getLogger()
  8 | _LOGGER.info(f"{__name__}")
-   |              ^^^^^^^^^^^^^ G004
+   |              ^^^^^^^^^^^^^ G004 (logging-f-string)
  9 | 
 10 | logging.getLogger().info(f"{name}")
    |
 
-G004.py:10:26: G004 Logging statement uses f-string
+G004.py:10:26: G004 (logging-f-string) Logging statement uses f-string
    |
  8 | _LOGGER.info(f"{__name__}")
  9 | 
 10 | logging.getLogger().info(f"{name}")
-   |                          ^^^^^^^^^ G004
+   |                          ^^^^^^^^^ G004 (logging-f-string)
 11 | 
 12 | from logging import info
    |
 
-G004.py:14:6: G004 Logging statement uses f-string
+G004.py:14:6: G004 (logging-f-string) Logging statement uses f-string
    |
 12 | from logging import info
 13 | 
 14 | info(f"{name}")
-   |      ^^^^^^^^^ G004
+   |      ^^^^^^^^^ G004 (logging-f-string)
 15 | info(f"{__name__}")
    |
 
-G004.py:15:6: G004 Logging statement uses f-string
+G004.py:15:6: G004 (logging-f-string) Logging statement uses f-string
    |
 14 | info(f"{name}")
 15 | info(f"{__name__}")
-   |      ^^^^^^^^^^^^^ G004
+   |      ^^^^^^^^^^^^^ G004 (logging-f-string)
    |

@@ -33,6 +33,7 @@ expression: content
       "row": 1
     },
     "message": "`os` imported but unused",
+    "name": "unused-import",
     "noqa_row": 1,
     "url": "https://docs.astral.sh/ruff/rules/unused-import"
   },
@@ -66,6 +67,7 @@ expression: content
       "row": 6
     },
     "message": "Local variable `x` is assigned to but never used",
+    "name": "unused-variable",
     "noqa_row": 6,
     "url": "https://docs.astral.sh/ruff/rules/unused-variable"
   },
@@ -83,6 +85,7 @@ expression: content
       "row": 1
     },
     "message": "Undefined name `a`",
+    "name": "undefined-name",
     "noqa_row": 1,
     "url": "https://docs.astral.sh/ruff/rules/undefined-name"
   }

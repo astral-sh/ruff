@@ -1,12 +1,12 @@
 ---
 source: crates/ruff_linter/src/rules/pyflakes/mod.rs
 ---
-future_annotations.py:8:5: F401 [*] `models.Nut` imported but unused
+future_annotations.py:8:5: F401 (unused-import) [*] `models.Nut` imported but unused
   |
 6 | from models import (
 7 |     Fruit,
 8 |     Nut,
-  |     ^^^ F401
+  |     ^^^ F401 (unused-import)
 9 | )
   |
   = help: Remove unused import: `models.Nut`
@@ -20,12 +20,10 @@ future_annotations.py:8:5: F401 [*] `models.Nut` imported but unused
 10 9 | 
 11 10 | 
 
-future_annotations.py:26:19: F821 Undefined name `Bar`
+future_annotations.py:26:19: F821 (undefined-name) Undefined name `Bar`
    |
 25 |     @classmethod
 26 |     def c(cls) -> Bar:
-   |                   ^^^ F821
+   |                   ^^^ F821 (undefined-name)
 27 |         return cls(x=0, y=0)
    |
-
-

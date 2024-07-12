@@ -1,11 +1,11 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_simplify/mod.rs
 ---
-SIM300.py:2:1: SIM300 [*] Yoda condition detected
+SIM300.py:2:1: SIM300 (yoda-conditions) [*] Yoda condition detected
   |
 1 | # Errors
 2 | "yoda" == compare  # SIM300
-  | ^^^^^^^^^^^^^^^^^ SIM300
+  | ^^^^^^^^^^^^^^^^^ SIM300 (yoda-conditions)
 3 | 42 == age  # SIM300
 4 | ("a", "b") == compare  # SIM300
   |
@@ -19,12 +19,12 @@ SIM300.py:2:1: SIM300 [*] Yoda condition detected
 4 4 | ("a", "b") == compare  # SIM300
 5 5 | "yoda" <= compare  # SIM300
 
-SIM300.py:3:1: SIM300 [*] Yoda condition detected
+SIM300.py:3:1: SIM300 (yoda-conditions) [*] Yoda condition detected
   |
 1 | # Errors
 2 | "yoda" == compare  # SIM300
 3 | 42 == age  # SIM300
-  | ^^^^^^^^^ SIM300
+  | ^^^^^^^^^ SIM300 (yoda-conditions)
 4 | ("a", "b") == compare  # SIM300
 5 | "yoda" <= compare  # SIM300
   |
@@ -39,12 +39,12 @@ SIM300.py:3:1: SIM300 [*] Yoda condition detected
 5 5 | "yoda" <= compare  # SIM300
 6 6 | "yoda" < compare  # SIM300
 
-SIM300.py:4:1: SIM300 [*] Yoda condition detected
+SIM300.py:4:1: SIM300 (yoda-conditions) [*] Yoda condition detected
   |
 2 | "yoda" == compare  # SIM300
 3 | 42 == age  # SIM300
 4 | ("a", "b") == compare  # SIM300
-  | ^^^^^^^^^^^^^^^^^^^^^ SIM300
+  | ^^^^^^^^^^^^^^^^^^^^^ SIM300 (yoda-conditions)
 5 | "yoda" <= compare  # SIM300
 6 | "yoda" < compare  # SIM300
   |
@@ -60,12 +60,12 @@ SIM300.py:4:1: SIM300 [*] Yoda condition detected
 6 6 | "yoda" < compare  # SIM300
 7 7 | 42 > age  # SIM300
 
-SIM300.py:5:1: SIM300 [*] Yoda condition detected
+SIM300.py:5:1: SIM300 (yoda-conditions) [*] Yoda condition detected
   |
 3 | 42 == age  # SIM300
 4 | ("a", "b") == compare  # SIM300
 5 | "yoda" <= compare  # SIM300
-  | ^^^^^^^^^^^^^^^^^ SIM300
+  | ^^^^^^^^^^^^^^^^^ SIM300 (yoda-conditions)
 6 | "yoda" < compare  # SIM300
 7 | 42 > age  # SIM300
   |
@@ -81,12 +81,12 @@ SIM300.py:5:1: SIM300 [*] Yoda condition detected
 7 7 | 42 > age  # SIM300
 8 8 | -42 > age  # SIM300
 
-SIM300.py:6:1: SIM300 [*] Yoda condition detected
+SIM300.py:6:1: SIM300 (yoda-conditions) [*] Yoda condition detected
   |
 4 | ("a", "b") == compare  # SIM300
 5 | "yoda" <= compare  # SIM300
 6 | "yoda" < compare  # SIM300
-  | ^^^^^^^^^^^^^^^^ SIM300
+  | ^^^^^^^^^^^^^^^^ SIM300 (yoda-conditions)
 7 | 42 > age  # SIM300
 8 | -42 > age  # SIM300
   |
@@ -102,12 +102,12 @@ SIM300.py:6:1: SIM300 [*] Yoda condition detected
 8 8 | -42 > age  # SIM300
 9 9 | +42 > age  # SIM300
 
-SIM300.py:7:1: SIM300 [*] Yoda condition detected
+SIM300.py:7:1: SIM300 (yoda-conditions) [*] Yoda condition detected
   |
 5 | "yoda" <= compare  # SIM300
 6 | "yoda" < compare  # SIM300
 7 | 42 > age  # SIM300
-  | ^^^^^^^^ SIM300
+  | ^^^^^^^^ SIM300 (yoda-conditions)
 8 | -42 > age  # SIM300
 9 | +42 > age  # SIM300
   |
@@ -123,12 +123,12 @@ SIM300.py:7:1: SIM300 [*] Yoda condition detected
 9 9 | +42 > age  # SIM300
 10 10 | YODA == age  # SIM300
 
-SIM300.py:8:1: SIM300 [*] Yoda condition detected
+SIM300.py:8:1: SIM300 (yoda-conditions) [*] Yoda condition detected
    |
  6 | "yoda" < compare  # SIM300
  7 | 42 > age  # SIM300
  8 | -42 > age  # SIM300
-   | ^^^^^^^^^ SIM300
+   | ^^^^^^^^^ SIM300 (yoda-conditions)
  9 | +42 > age  # SIM300
 10 | YODA == age  # SIM300
    |
@@ -144,12 +144,12 @@ SIM300.py:8:1: SIM300 [*] Yoda condition detected
 10 10 | YODA == age  # SIM300
 11 11 | YODA > age  # SIM300
 
-SIM300.py:9:1: SIM300 [*] Yoda condition detected
+SIM300.py:9:1: SIM300 (yoda-conditions) [*] Yoda condition detected
    |
  7 | 42 > age  # SIM300
  8 | -42 > age  # SIM300
  9 | +42 > age  # SIM300
-   | ^^^^^^^^^ SIM300
+   | ^^^^^^^^^ SIM300 (yoda-conditions)
 10 | YODA == age  # SIM300
 11 | YODA > age  # SIM300
    |
@@ -165,12 +165,12 @@ SIM300.py:9:1: SIM300 [*] Yoda condition detected
 11 11 | YODA > age  # SIM300
 12 12 | YODA >= age  # SIM300
 
-SIM300.py:10:1: SIM300 [*] Yoda condition detected
+SIM300.py:10:1: SIM300 (yoda-conditions) [*] Yoda condition detected
    |
  8 | -42 > age  # SIM300
  9 | +42 > age  # SIM300
 10 | YODA == age  # SIM300
-   | ^^^^^^^^^^^ SIM300
+   | ^^^^^^^^^^^ SIM300 (yoda-conditions)
 11 | YODA > age  # SIM300
 12 | YODA >= age  # SIM300
    |
@@ -186,12 +186,12 @@ SIM300.py:10:1: SIM300 [*] Yoda condition detected
 12 12 | YODA >= age  # SIM300
 13 13 | JediOrder.YODA == age  # SIM300
 
-SIM300.py:11:1: SIM300 [*] Yoda condition detected
+SIM300.py:11:1: SIM300 (yoda-conditions) [*] Yoda condition detected
    |
  9 | +42 > age  # SIM300
 10 | YODA == age  # SIM300
 11 | YODA > age  # SIM300
-   | ^^^^^^^^^^ SIM300
+   | ^^^^^^^^^^ SIM300 (yoda-conditions)
 12 | YODA >= age  # SIM300
 13 | JediOrder.YODA == age  # SIM300
    |
@@ -207,12 +207,12 @@ SIM300.py:11:1: SIM300 [*] Yoda condition detected
 13 13 | JediOrder.YODA == age  # SIM300
 14 14 | 0 < (number - 100)  # SIM300
 
-SIM300.py:12:1: SIM300 [*] Yoda condition detected
+SIM300.py:12:1: SIM300 (yoda-conditions) [*] Yoda condition detected
    |
 10 | YODA == age  # SIM300
 11 | YODA > age  # SIM300
 12 | YODA >= age  # SIM300
-   | ^^^^^^^^^^^ SIM300
+   | ^^^^^^^^^^^ SIM300 (yoda-conditions)
 13 | JediOrder.YODA == age  # SIM300
 14 | 0 < (number - 100)  # SIM300
    |
@@ -228,12 +228,12 @@ SIM300.py:12:1: SIM300 [*] Yoda condition detected
 14 14 | 0 < (number - 100)  # SIM300
 15 15 | B<A[0][0]or B
 
-SIM300.py:13:1: SIM300 [*] Yoda condition detected
+SIM300.py:13:1: SIM300 (yoda-conditions) [*] Yoda condition detected
    |
 11 | YODA > age  # SIM300
 12 | YODA >= age  # SIM300
 13 | JediOrder.YODA == age  # SIM300
-   | ^^^^^^^^^^^^^^^^^^^^^ SIM300
+   | ^^^^^^^^^^^^^^^^^^^^^ SIM300 (yoda-conditions)
 14 | 0 < (number - 100)  # SIM300
 15 | B<A[0][0]or B
    |
@@ -249,12 +249,12 @@ SIM300.py:13:1: SIM300 [*] Yoda condition detected
 15 15 | B<A[0][0]or B
 16 16 | B or(B)<A[0][0]
 
-SIM300.py:14:1: SIM300 [*] Yoda condition detected
+SIM300.py:14:1: SIM300 (yoda-conditions) [*] Yoda condition detected
    |
 12 | YODA >= age  # SIM300
 13 | JediOrder.YODA == age  # SIM300
 14 | 0 < (number - 100)  # SIM300
-   | ^^^^^^^^^^^^^^^^^^ SIM300
+   | ^^^^^^^^^^^^^^^^^^ SIM300 (yoda-conditions)
 15 | B<A[0][0]or B
 16 | B or(B)<A[0][0]
    |
@@ -270,12 +270,12 @@ SIM300.py:14:1: SIM300 [*] Yoda condition detected
 16 16 | B or(B)<A[0][0]
 17 17 | 
 
-SIM300.py:15:1: SIM300 [*] Yoda condition detected
+SIM300.py:15:1: SIM300 (yoda-conditions) [*] Yoda condition detected
    |
 13 | JediOrder.YODA == age  # SIM300
 14 | 0 < (number - 100)  # SIM300
 15 | B<A[0][0]or B
-   | ^^^^^^^^^ SIM300
+   | ^^^^^^^^^ SIM300 (yoda-conditions)
 16 | B or(B)<A[0][0]
    |
    = help: Rewrite as `A[0][0] > B`
@@ -290,12 +290,12 @@ SIM300.py:15:1: SIM300 [*] Yoda condition detected
 17 17 | 
 18 18 | # Errors in preview
 
-SIM300.py:16:5: SIM300 [*] Yoda condition detected
+SIM300.py:16:5: SIM300 (yoda-conditions) [*] Yoda condition detected
    |
 14 | 0 < (number - 100)  # SIM300
 15 | B<A[0][0]or B
 16 | B or(B)<A[0][0]
-   |     ^^^^^^^^^^^ SIM300
+   |     ^^^^^^^^^^^ SIM300 (yoda-conditions)
 17 | 
 18 | # Errors in preview
    |
@@ -311,11 +311,11 @@ SIM300.py:16:5: SIM300 [*] Yoda condition detected
 18 18 | # Errors in preview
 19 19 | ['upper'] == UPPER_LIST
 
-SIM300.py:19:1: SIM300 [*] Yoda condition detected
+SIM300.py:19:1: SIM300 (yoda-conditions) [*] Yoda condition detected
    |
 18 | # Errors in preview
 19 | ['upper'] == UPPER_LIST
-   | ^^^^^^^^^^^^^^^^^^^^^^^ SIM300
+   | ^^^^^^^^^^^^^^^^^^^^^^^ SIM300 (yoda-conditions)
 20 | {} == DummyHandler.CONFIG
    |
    = help: Rewrite as `UPPER_LIST == ['upper']`
@@ -330,12 +330,12 @@ SIM300.py:19:1: SIM300 [*] Yoda condition detected
 21 21 | 
 22 22 | # Errors in stable
 
-SIM300.py:20:1: SIM300 [*] Yoda condition detected
+SIM300.py:20:1: SIM300 (yoda-conditions) [*] Yoda condition detected
    |
 18 | # Errors in preview
 19 | ['upper'] == UPPER_LIST
 20 | {} == DummyHandler.CONFIG
-   | ^^^^^^^^^^^^^^^^^^^^^^^^^ SIM300
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^ SIM300 (yoda-conditions)
 21 | 
 22 | # Errors in stable
    |

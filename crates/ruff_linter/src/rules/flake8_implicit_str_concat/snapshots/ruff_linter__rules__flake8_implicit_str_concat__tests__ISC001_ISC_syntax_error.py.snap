@@ -20,12 +20,12 @@ ISC_syntax_error.py:2:7: SyntaxError: Expected a statement
 5 | c""" "d
   |
 
-ISC_syntax_error.py:3:1: ISC001 Implicitly concatenated string literals on one line
+ISC_syntax_error.py:3:1: ISC001 (single-line-implicit-string-concatenation) Implicitly concatenated string literals on one line
   |
 1 | # The lexer doesn't emit a string token if it's unterminated
 2 | "a" "b
 3 | "a" "b" "c
-  | ^^^^^^^ ISC001
+  | ^^^^^^^ ISC001 (single-line-implicit-string-concatenation)
 4 | "a" """b
 5 | c""" "d
   |
@@ -51,13 +51,13 @@ ISC_syntax_error.py:3:11: SyntaxError: Expected a statement
 5 | c""" "d
   |
 
-ISC_syntax_error.py:4:1: ISC001 Implicitly concatenated string literals on one line
+ISC_syntax_error.py:4:1: ISC001 (single-line-implicit-string-concatenation) Implicitly concatenated string literals on one line
   |
 2 |   "a" "b
 3 |   "a" "b" "c
 4 | / "a" """b
 5 | | c""" "d
-  | |____^ ISC001
+  | |____^ ISC001 (single-line-implicit-string-concatenation)
 6 |   
 7 |   # For f-strings, the `FStringRanges` won't contain the range for
   |
@@ -105,12 +105,12 @@ ISC_syntax_error.py:9:9: SyntaxError: Expected FStringEnd, found newline
 12 | c""" f"d {e
    |
 
-ISC_syntax_error.py:10:1: ISC001 Implicitly concatenated string literals on one line
+ISC_syntax_error.py:10:1: ISC001 (single-line-implicit-string-concatenation) Implicitly concatenated string literals on one line
    |
  8 | # unterminated f-strings.
  9 | f"a" f"b
 10 | f"a" f"b" f"c
-   | ^^^^^^^^^ ISC001
+   | ^^^^^^^^^ ISC001 (single-line-implicit-string-concatenation)
 11 | f"a" f"""b
 12 | c""" f"d {e
    |
@@ -136,13 +136,13 @@ ISC_syntax_error.py:10:14: SyntaxError: Expected FStringEnd, found newline
 12 | c""" f"d {e
    |
 
-ISC_syntax_error.py:11:1: ISC001 Implicitly concatenated string literals on one line
+ISC_syntax_error.py:11:1: ISC001 (single-line-implicit-string-concatenation) Implicitly concatenated string literals on one line
    |
  9 |   f"a" f"b
 10 |   f"a" f"b" f"c
 11 | / f"a" f"""b
 12 | | c""" f"d {e
-   | |____^ ISC001
+   | |____^ ISC001 (single-line-implicit-string-concatenation)
 13 |   
 14 |   (
    |

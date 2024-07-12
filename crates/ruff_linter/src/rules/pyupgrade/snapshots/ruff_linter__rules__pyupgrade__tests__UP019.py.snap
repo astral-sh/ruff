@@ -1,10 +1,10 @@
 ---
 source: crates/ruff_linter/src/rules/pyupgrade/mod.rs
 ---
-UP019.py:7:22: UP019 [*] `typing.Text` is deprecated, use `str`
+UP019.py:7:22: UP019 (typing-text-str-alias) [*] `typing.Text` is deprecated, use `str`
   |
 7 | def print_word(word: Text) -> None:
-  |                      ^^^^ UP019
+  |                      ^^^^ UP019 (typing-text-str-alias)
 8 |     print(word)
   |
   = help: Replace with `str`
@@ -19,10 +19,10 @@ UP019.py:7:22: UP019 [*] `typing.Text` is deprecated, use `str`
 9 9 | 
 10 10 | 
 
-UP019.py:11:29: UP019 [*] `typing.Text` is deprecated, use `str`
+UP019.py:11:29: UP019 (typing-text-str-alias) [*] `typing.Text` is deprecated, use `str`
    |
 11 | def print_second_word(word: typing.Text) -> None:
-   |                             ^^^^^^^^^^^ UP019
+   |                             ^^^^^^^^^^^ UP019 (typing-text-str-alias)
 12 |     print(word)
    |
    = help: Replace with `str`
@@ -37,10 +37,10 @@ UP019.py:11:29: UP019 [*] `typing.Text` is deprecated, use `str`
 13 13 | 
 14 14 | 
 
-UP019.py:15:28: UP019 [*] `typing.Text` is deprecated, use `str`
+UP019.py:15:28: UP019 (typing-text-str-alias) [*] `typing.Text` is deprecated, use `str`
    |
 15 | def print_third_word(word: Hello.Text) -> None:
-   |                            ^^^^^^^^^^ UP019
+   |                            ^^^^^^^^^^ UP019 (typing-text-str-alias)
 16 |     print(word)
    |
    = help: Replace with `str`
@@ -55,10 +55,10 @@ UP019.py:15:28: UP019 [*] `typing.Text` is deprecated, use `str`
 17 17 | 
 18 18 | 
 
-UP019.py:19:29: UP019 [*] `typing.Text` is deprecated, use `str`
+UP019.py:19:29: UP019 (typing-text-str-alias) [*] `typing.Text` is deprecated, use `str`
    |
 19 | def print_fourth_word(word: Goodbye) -> None:
-   |                             ^^^^^^^ UP019
+   |                             ^^^^^^^ UP019 (typing-text-str-alias)
 20 |     print(word)
    |
    = help: Replace with `str`
@@ -70,5 +70,3 @@ UP019.py:19:29: UP019 [*] `typing.Text` is deprecated, use `str`
 19    |-def print_fourth_word(word: Goodbye) -> None:
    19 |+def print_fourth_word(word: str) -> None:
 20 20 |     print(word)
-
-

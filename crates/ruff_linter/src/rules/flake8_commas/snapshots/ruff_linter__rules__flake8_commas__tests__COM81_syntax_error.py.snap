@@ -19,12 +19,12 @@ COM81_syntax_error.py:6:9: SyntaxError: Type parameter list cannot be empty
 7 |     pass
   |
 
-COM81_syntax_error.py:6:38: COM819 Trailing comma prohibited
+COM81_syntax_error.py:6:38: COM819 (prohibited-trailing-comma) Trailing comma prohibited
   |
 4 | )
 5 | 
 6 | def foo[(param1='test', param2='test',):
-  |                                      ^ COM819
+  |                                      ^ COM819 (prohibited-trailing-comma)
 7 |     pass
   |
   = help: Remove trailing comma

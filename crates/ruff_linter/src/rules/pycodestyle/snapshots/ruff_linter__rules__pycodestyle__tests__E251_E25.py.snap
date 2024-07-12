@@ -1,11 +1,11 @@
 ---
 source: crates/ruff_linter/src/rules/pycodestyle/mod.rs
 ---
-E25.py:2:12: E251 [*] Unexpected spaces around keyword / parameter equals
+E25.py:2:12: E251 (unexpected-spaces-around-keyword-parameter-equals) [*] Unexpected spaces around keyword / parameter equals
   |
 1 | #: E251 E251
 2 | def foo(bar = False):
-  |            ^ E251
+  |            ^ E251 (unexpected-spaces-around-keyword-parameter-equals)
 3 |     '''Test function with an error in declaration'''
 4 |     pass
   |
@@ -19,11 +19,11 @@ E25.py:2:12: E251 [*] Unexpected spaces around keyword / parameter equals
 4 4 |     pass
 5 5 | #: E251
 
-E25.py:2:14: E251 [*] Unexpected spaces around keyword / parameter equals
+E25.py:2:14: E251 (unexpected-spaces-around-keyword-parameter-equals) [*] Unexpected spaces around keyword / parameter equals
   |
 1 | #: E251 E251
 2 | def foo(bar = False):
-  |              ^ E251
+  |              ^ E251 (unexpected-spaces-around-keyword-parameter-equals)
 3 |     '''Test function with an error in declaration'''
 4 |     pass
   |
@@ -37,12 +37,12 @@ E25.py:2:14: E251 [*] Unexpected spaces around keyword / parameter equals
 4 4 |     pass
 5 5 | #: E251
 
-E25.py:6:9: E251 [*] Unexpected spaces around keyword / parameter equals
+E25.py:6:9: E251 (unexpected-spaces-around-keyword-parameter-equals) [*] Unexpected spaces around keyword / parameter equals
   |
 4 |     pass
 5 | #: E251
 6 | foo(bar= True)
-  |         ^ E251
+  |         ^ E251 (unexpected-spaces-around-keyword-parameter-equals)
 7 | #: E251
 8 | foo(bar =True)
   |
@@ -58,12 +58,12 @@ E25.py:6:9: E251 [*] Unexpected spaces around keyword / parameter equals
 8 8 | foo(bar =True)
 9 9 | #: E251 E251
 
-E25.py:8:8: E251 [*] Unexpected spaces around keyword / parameter equals
+E25.py:8:8: E251 (unexpected-spaces-around-keyword-parameter-equals) [*] Unexpected spaces around keyword / parameter equals
    |
  6 | foo(bar= True)
  7 | #: E251
  8 | foo(bar =True)
-   |        ^ E251
+   |        ^ E251 (unexpected-spaces-around-keyword-parameter-equals)
  9 | #: E251 E251
 10 | foo(bar = True)
    |
@@ -79,12 +79,12 @@ E25.py:8:8: E251 [*] Unexpected spaces around keyword / parameter equals
 10 10 | foo(bar = True)
 11 11 | #: E251
 
-E25.py:10:8: E251 [*] Unexpected spaces around keyword / parameter equals
+E25.py:10:8: E251 (unexpected-spaces-around-keyword-parameter-equals) [*] Unexpected spaces around keyword / parameter equals
    |
  8 | foo(bar =True)
  9 | #: E251 E251
 10 | foo(bar = True)
-   |        ^ E251
+   |        ^ E251 (unexpected-spaces-around-keyword-parameter-equals)
 11 | #: E251
 12 | y = bar(root= "sdasd")
    |
@@ -100,12 +100,12 @@ E25.py:10:8: E251 [*] Unexpected spaces around keyword / parameter equals
 12 12 | y = bar(root= "sdasd")
 13 13 | #: E251:2:29
 
-E25.py:10:10: E251 [*] Unexpected spaces around keyword / parameter equals
+E25.py:10:10: E251 (unexpected-spaces-around-keyword-parameter-equals) [*] Unexpected spaces around keyword / parameter equals
    |
  8 | foo(bar =True)
  9 | #: E251 E251
 10 | foo(bar = True)
-   |          ^ E251
+   |          ^ E251 (unexpected-spaces-around-keyword-parameter-equals)
 11 | #: E251
 12 | y = bar(root= "sdasd")
    |
@@ -121,12 +121,12 @@ E25.py:10:10: E251 [*] Unexpected spaces around keyword / parameter equals
 12 12 | y = bar(root= "sdasd")
 13 13 | #: E251:2:29
 
-E25.py:12:14: E251 [*] Unexpected spaces around keyword / parameter equals
+E25.py:12:14: E251 (unexpected-spaces-around-keyword-parameter-equals) [*] Unexpected spaces around keyword / parameter equals
    |
 10 | foo(bar = True)
 11 | #: E251
 12 | y = bar(root= "sdasd")
-   |              ^ E251
+   |              ^ E251 (unexpected-spaces-around-keyword-parameter-equals)
 13 | #: E251:2:29
 14 | parser.add_argument('--long-option',
    |
@@ -142,14 +142,14 @@ E25.py:12:14: E251 [*] Unexpected spaces around keyword / parameter equals
 14 14 | parser.add_argument('--long-option',
 15 15 |                     default=
 
-E25.py:15:29: E251 [*] Unexpected spaces around keyword / parameter equals
+E25.py:15:29: E251 (unexpected-spaces-around-keyword-parameter-equals) [*] Unexpected spaces around keyword / parameter equals
    |
 13 |   #: E251:2:29
 14 |   parser.add_argument('--long-option',
 15 |                       default=
    |  _____________________________^
 16 | |                     "/rather/long/filesystem/path/here/blah/blah/blah")
-   | |____________________^ E251
+   | |____________________^ E251 (unexpected-spaces-around-keyword-parameter-equals)
 17 |   #: E251:1:45
 18 |   parser.add_argument('--long-option', default
    |
@@ -166,14 +166,14 @@ E25.py:15:29: E251 [*] Unexpected spaces around keyword / parameter equals
 18 17 | parser.add_argument('--long-option', default
 19 18 |                     ="/rather/long/filesystem/path/here/blah/blah/blah")
 
-E25.py:18:45: E251 [*] Unexpected spaces around keyword / parameter equals
+E25.py:18:45: E251 (unexpected-spaces-around-keyword-parameter-equals) [*] Unexpected spaces around keyword / parameter equals
    |
 16 |                       "/rather/long/filesystem/path/here/blah/blah/blah")
 17 |   #: E251:1:45
 18 |   parser.add_argument('--long-option', default
    |  _____________________________________________^
 19 | |                     ="/rather/long/filesystem/path/here/blah/blah/blah")
-   | |____________________^ E251
+   | |____________________^ E251 (unexpected-spaces-around-keyword-parameter-equals)
 20 |   #: E251:3:8 E251:3:10
 21 |   foo(True,
    |
@@ -190,12 +190,12 @@ E25.py:18:45: E251 [*] Unexpected spaces around keyword / parameter equals
 21 20 | foo(True,
 22 21 |     baz=(1, 2),
 
-E25.py:23:8: E251 [*] Unexpected spaces around keyword / parameter equals
+E25.py:23:8: E251 (unexpected-spaces-around-keyword-parameter-equals) [*] Unexpected spaces around keyword / parameter equals
    |
 21 | foo(True,
 22 |     baz=(1, 2),
 23 |     biz = 'foo'
-   |        ^ E251
+   |        ^ E251 (unexpected-spaces-around-keyword-parameter-equals)
 24 |     )
 25 | #: Okay
    |
@@ -211,12 +211,12 @@ E25.py:23:8: E251 [*] Unexpected spaces around keyword / parameter equals
 25 25 | #: Okay
 26 26 | foo(bar=(1 == 1))
 
-E25.py:23:10: E251 [*] Unexpected spaces around keyword / parameter equals
+E25.py:23:10: E251 (unexpected-spaces-around-keyword-parameter-equals) [*] Unexpected spaces around keyword / parameter equals
    |
 21 | foo(True,
 22 |     baz=(1, 2),
 23 |     biz = 'foo'
-   |          ^ E251
+   |          ^ E251 (unexpected-spaces-around-keyword-parameter-equals)
 24 |     )
 25 | #: Okay
    |
@@ -231,5 +231,3 @@ E25.py:23:10: E251 [*] Unexpected spaces around keyword / parameter equals
 24 24 |     )
 25 25 | #: Okay
 26 26 | foo(bar=(1 == 1))
-
-

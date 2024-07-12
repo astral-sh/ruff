@@ -1,12 +1,12 @@
 ---
 source: crates/ruff_linter/src/rules/pycodestyle/mod.rs
 ---
-shebang.py:3:1: E265 [*] Block comment should start with `# `
+shebang.py:3:1: E265 (no-space-after-block-comment) [*] Block comment should start with `# `
   |
 1 | #!/usr/bin/python
 2 | #
 3 | #!
-  | ^^ E265
+  | ^^ E265 (no-space-after-block-comment)
 4 | #:
   |
   = help: Format space
@@ -17,5 +17,3 @@ shebang.py:3:1: E265 [*] Block comment should start with `# `
 3   |-#!
   3 |+# !
 4 4 | #:
-
-

@@ -1,11 +1,11 @@
 ---
 source: crates/ruff_linter/src/rules/pyupgrade/mod.rs
 ---
-UP040.py:5:1: UP040 [*] Type alias `x` uses `TypeAlias` annotation instead of the `type` keyword
+UP040.py:5:1: UP040 (non-pep695-type-alias) [*] Type alias `x` uses `TypeAlias` annotation instead of the `type` keyword
   |
 4 | # UP040
 5 | x: typing.TypeAlias = int
-  | ^^^^^^^^^^^^^^^^^^^^^^^^^ UP040
+  | ^^^^^^^^^^^^^^^^^^^^^^^^^ UP040 (non-pep695-type-alias)
 6 | x: TypeAlias = int
   |
   = help: Use the `type` keyword
@@ -20,12 +20,12 @@ UP040.py:5:1: UP040 [*] Type alias `x` uses `TypeAlias` annotation instead of th
 7 7 | 
 8 8 | # UP040 simple generic
 
-UP040.py:6:1: UP040 [*] Type alias `x` uses `TypeAlias` annotation instead of the `type` keyword
+UP040.py:6:1: UP040 (non-pep695-type-alias) [*] Type alias `x` uses `TypeAlias` annotation instead of the `type` keyword
   |
 4 | # UP040
 5 | x: typing.TypeAlias = int
 6 | x: TypeAlias = int
-  | ^^^^^^^^^^^^^^^^^^ UP040
+  | ^^^^^^^^^^^^^^^^^^ UP040 (non-pep695-type-alias)
 7 | 
 8 | # UP040 simple generic
   |
@@ -41,12 +41,12 @@ UP040.py:6:1: UP040 [*] Type alias `x` uses `TypeAlias` annotation instead of th
 8 8 | # UP040 simple generic
 9 9 | T = typing.TypeVar["T"]
 
-UP040.py:10:1: UP040 [*] Type alias `x` uses `TypeAlias` annotation instead of the `type` keyword
+UP040.py:10:1: UP040 (non-pep695-type-alias) [*] Type alias `x` uses `TypeAlias` annotation instead of the `type` keyword
    |
  8 | # UP040 simple generic
  9 | T = typing.TypeVar["T"]
 10 | x: typing.TypeAlias = list[T]
-   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP040
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP040 (non-pep695-type-alias)
 11 | 
 12 | # UP040 call style generic
    |
@@ -62,12 +62,12 @@ UP040.py:10:1: UP040 [*] Type alias `x` uses `TypeAlias` annotation instead of t
 12 12 | # UP040 call style generic
 13 13 | T = typing.TypeVar("T")
 
-UP040.py:14:1: UP040 [*] Type alias `x` uses `TypeAlias` annotation instead of the `type` keyword
+UP040.py:14:1: UP040 (non-pep695-type-alias) [*] Type alias `x` uses `TypeAlias` annotation instead of the `type` keyword
    |
 12 | # UP040 call style generic
 13 | T = typing.TypeVar("T")
 14 | x: typing.TypeAlias = list[T]
-   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP040
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP040 (non-pep695-type-alias)
 15 | 
 16 | # UP040 bounded generic
    |
@@ -83,12 +83,12 @@ UP040.py:14:1: UP040 [*] Type alias `x` uses `TypeAlias` annotation instead of t
 16 16 | # UP040 bounded generic
 17 17 | T = typing.TypeVar("T", bound=int)
 
-UP040.py:18:1: UP040 [*] Type alias `x` uses `TypeAlias` annotation instead of the `type` keyword
+UP040.py:18:1: UP040 (non-pep695-type-alias) [*] Type alias `x` uses `TypeAlias` annotation instead of the `type` keyword
    |
 16 | # UP040 bounded generic
 17 | T = typing.TypeVar("T", bound=int)
 18 | x: typing.TypeAlias = list[T]
-   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP040
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP040 (non-pep695-type-alias)
 19 | 
 20 | # UP040 constrained generic
    |
@@ -104,12 +104,12 @@ UP040.py:18:1: UP040 [*] Type alias `x` uses `TypeAlias` annotation instead of t
 20 20 | # UP040 constrained generic
 21 21 | T = typing.TypeVar("T", int, str)
 
-UP040.py:22:1: UP040 [*] Type alias `x` uses `TypeAlias` annotation instead of the `type` keyword
+UP040.py:22:1: UP040 (non-pep695-type-alias) [*] Type alias `x` uses `TypeAlias` annotation instead of the `type` keyword
    |
 20 | # UP040 constrained generic
 21 | T = typing.TypeVar("T", int, str)
 22 | x: typing.TypeAlias = list[T]
-   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP040
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP040 (non-pep695-type-alias)
 23 | 
 24 | # UP040 contravariant generic
    |
@@ -125,12 +125,12 @@ UP040.py:22:1: UP040 [*] Type alias `x` uses `TypeAlias` annotation instead of t
 24 24 | # UP040 contravariant generic
 25 25 | T = typing.TypeVar("T", contravariant=True)
 
-UP040.py:26:1: UP040 [*] Type alias `x` uses `TypeAlias` annotation instead of the `type` keyword
+UP040.py:26:1: UP040 (non-pep695-type-alias) [*] Type alias `x` uses `TypeAlias` annotation instead of the `type` keyword
    |
 24 | # UP040 contravariant generic
 25 | T = typing.TypeVar("T", contravariant=True)
 26 | x: typing.TypeAlias = list[T]
-   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP040
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP040 (non-pep695-type-alias)
 27 | 
 28 | # UP040 covariant generic
    |
@@ -146,12 +146,12 @@ UP040.py:26:1: UP040 [*] Type alias `x` uses `TypeAlias` annotation instead of t
 28 28 | # UP040 covariant generic
 29 29 | T = typing.TypeVar("T", covariant=True)
 
-UP040.py:30:1: UP040 [*] Type alias `x` uses `TypeAlias` annotation instead of the `type` keyword
+UP040.py:30:1: UP040 (non-pep695-type-alias) [*] Type alias `x` uses `TypeAlias` annotation instead of the `type` keyword
    |
 28 | # UP040 covariant generic
 29 | T = typing.TypeVar("T", covariant=True)
 30 | x: typing.TypeAlias = list[T]
-   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP040
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP040 (non-pep695-type-alias)
 31 | 
 32 | # UP040 in class scope
    |
@@ -167,12 +167,12 @@ UP040.py:30:1: UP040 [*] Type alias `x` uses `TypeAlias` annotation instead of t
 32 32 | # UP040 in class scope
 33 33 | T = typing.TypeVar["T"]
 
-UP040.py:36:5: UP040 [*] Type alias `x` uses `TypeAlias` annotation instead of the `type` keyword
+UP040.py:36:5: UP040 (non-pep695-type-alias) [*] Type alias `x` uses `TypeAlias` annotation instead of the `type` keyword
    |
 34 | class Foo:
 35 |     # reference to global variable
 36 |     x: typing.TypeAlias = list[T]
-   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP040
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP040 (non-pep695-type-alias)
 37 | 
 38 |     # reference to class variable
    |
@@ -188,12 +188,12 @@ UP040.py:36:5: UP040 [*] Type alias `x` uses `TypeAlias` annotation instead of t
 38 38 |     # reference to class variable
 39 39 |     TCLS = typing.TypeVar["TCLS"]
 
-UP040.py:40:5: UP040 [*] Type alias `y` uses `TypeAlias` annotation instead of the `type` keyword
+UP040.py:40:5: UP040 (non-pep695-type-alias) [*] Type alias `y` uses `TypeAlias` annotation instead of the `type` keyword
    |
 38 |     # reference to class variable
 39 |     TCLS = typing.TypeVar["TCLS"]
 40 |     y: typing.TypeAlias = list[TCLS]
-   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP040
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP040 (non-pep695-type-alias)
 41 | 
 42 | # UP040 won't add generics in fix
    |
@@ -209,12 +209,12 @@ UP040.py:40:5: UP040 [*] Type alias `y` uses `TypeAlias` annotation instead of t
 42 42 | # UP040 won't add generics in fix
 43 43 | T = typing.TypeVar(*args)
 
-UP040.py:44:1: UP040 [*] Type alias `x` uses `TypeAlias` annotation instead of the `type` keyword
+UP040.py:44:1: UP040 (non-pep695-type-alias) [*] Type alias `x` uses `TypeAlias` annotation instead of the `type` keyword
    |
 42 | # UP040 won't add generics in fix
 43 | T = typing.TypeVar(*args)
 44 | x: typing.TypeAlias = list[T]
-   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP040
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP040 (non-pep695-type-alias)
 45 | 
 46 | # OK
    |
@@ -230,12 +230,12 @@ UP040.py:44:1: UP040 [*] Type alias `x` uses `TypeAlias` annotation instead of t
 46 46 | # OK
 47 47 | x: TypeAlias
 
-UP040.py:53:1: UP040 [*] Type alias `Decorator` uses `TypeAlias` annotation instead of the `type` keyword
+UP040.py:53:1: UP040 (non-pep695-type-alias) [*] Type alias `Decorator` uses `TypeAlias` annotation instead of the `type` keyword
    |
 51 | # type alias.
 52 | T = typing.TypeVar["T"]
 53 | Decorator: TypeAlias = typing.Callable[[T], T]
-   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP040
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP040 (non-pep695-type-alias)
    |
    = help: Use the `type` keyword
 
@@ -249,14 +249,14 @@ UP040.py:53:1: UP040 [*] Type alias `Decorator` uses `TypeAlias` annotation inst
 55 55 | 
 56 56 | from typing import TypeVar, Annotated, TypeAliasType
 
-UP040.py:63:1: UP040 [*] Type alias `PositiveList` uses `TypeAliasType` assignment instead of the `type` keyword
+UP040.py:63:1: UP040 (non-pep695-type-alias) [*] Type alias `PositiveList` uses `TypeAliasType` assignment instead of the `type` keyword
    |
 61 |   # https://github.com/astral-sh/ruff/issues/11422
 62 |   T = TypeVar("T")
 63 | / PositiveList = TypeAliasType(
 64 | |     "PositiveList", list[Annotated[T, Gt(0)]], type_params=(T,)
 65 | | )
-   | |_^ UP040
+   | |_^ UP040 (non-pep695-type-alias)
 66 |   
 67 |   # Bound
    |
@@ -274,14 +274,14 @@ UP040.py:63:1: UP040 [*] Type alias `PositiveList` uses `TypeAliasType` assignme
 67 65 | # Bound
 68 66 | T = TypeVar("T", bound=SupportGt)
 
-UP040.py:69:1: UP040 [*] Type alias `PositiveList` uses `TypeAliasType` assignment instead of the `type` keyword
+UP040.py:69:1: UP040 (non-pep695-type-alias) [*] Type alias `PositiveList` uses `TypeAliasType` assignment instead of the `type` keyword
    |
 67 |   # Bound
 68 |   T = TypeVar("T", bound=SupportGt)
 69 | / PositiveList = TypeAliasType(
 70 | |     "PositiveList", list[Annotated[T, Gt(0)]], type_params=(T,)
 71 | | )
-   | |_^ UP040
+   | |_^ UP040 (non-pep695-type-alias)
 72 |   
 73 |   # Multiple bounds
    |
@@ -299,12 +299,12 @@ UP040.py:69:1: UP040 [*] Type alias `PositiveList` uses `TypeAliasType` assignme
 73 71 | # Multiple bounds
 74 72 | T1 = TypeVar("T1", bound=SupportGt)
 
-UP040.py:77:1: UP040 [*] Type alias `Tuple3` uses `TypeAliasType` assignment instead of the `type` keyword
+UP040.py:77:1: UP040 (non-pep695-type-alias) [*] Type alias `Tuple3` uses `TypeAliasType` assignment instead of the `type` keyword
    |
 75 | T2 = TypeVar("T2")
 76 | T3 = TypeVar("T3")
 77 | Tuple3 = TypeAliasType("Tuple3", tuple[T1, T2, T3], type_params=(T1, T2, T3))
-   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP040
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP040 (non-pep695-type-alias)
 78 | 
 79 | # No type_params
    |
@@ -320,11 +320,11 @@ UP040.py:77:1: UP040 [*] Type alias `Tuple3` uses `TypeAliasType` assignment ins
 79 79 | # No type_params
 80 80 | PositiveInt = TypeAliasType("PositiveInt", Annotated[int, Gt(0)])
 
-UP040.py:80:1: UP040 [*] Type alias `PositiveInt` uses `TypeAliasType` assignment instead of the `type` keyword
+UP040.py:80:1: UP040 (non-pep695-type-alias) [*] Type alias `PositiveInt` uses `TypeAliasType` assignment instead of the `type` keyword
    |
 79 | # No type_params
 80 | PositiveInt = TypeAliasType("PositiveInt", Annotated[int, Gt(0)])
-   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP040
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP040 (non-pep695-type-alias)
 81 | PositiveInt = TypeAliasType("PositiveInt", Annotated[int, Gt(0)], type_params=())
    |
    = help: Use the `type` keyword
@@ -339,12 +339,12 @@ UP040.py:80:1: UP040 [*] Type alias `PositiveInt` uses `TypeAliasType` assignmen
 82 82 | 
 83 83 | # OK: Other name
 
-UP040.py:81:1: UP040 [*] Type alias `PositiveInt` uses `TypeAliasType` assignment instead of the `type` keyword
+UP040.py:81:1: UP040 (non-pep695-type-alias) [*] Type alias `PositiveInt` uses `TypeAliasType` assignment instead of the `type` keyword
    |
 79 | # No type_params
 80 | PositiveInt = TypeAliasType("PositiveInt", Annotated[int, Gt(0)])
 81 | PositiveInt = TypeAliasType("PositiveInt", Annotated[int, Gt(0)], type_params=())
-   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP040
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP040 (non-pep695-type-alias)
 82 | 
 83 | # OK: Other name
    |

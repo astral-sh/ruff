@@ -1,11 +1,11 @@
 ---
 source: crates/ruff_linter/src/rules/pycodestyle/mod.rs
 ---
-W605_1.py:4:11: W605 [*] Invalid escape sequence: `\.`
+W605_1.py:4:11: W605 (invalid-escape-sequence) [*] Invalid escape sequence: `\.`
   |
 3 | #: W605:1:10
 4 | regex = f'\.png$'
-  |           ^^ W605
+  |           ^^ W605 (invalid-escape-sequence)
 5 | 
 6 | #: W605:2:1
   |
@@ -21,12 +21,12 @@ W605_1.py:4:11: W605 [*] Invalid escape sequence: `\.`
 6 6 | #: W605:2:1
 7 7 | regex = f'''
 
-W605_1.py:8:1: W605 [*] Invalid escape sequence: `\.`
+W605_1.py:8:1: W605 (invalid-escape-sequence) [*] Invalid escape sequence: `\.`
   |
 6 | #: W605:2:1
 7 | regex = f'''
 8 | \.png$
-  | ^^ W605
+  | ^^ W605 (invalid-escape-sequence)
 9 | '''
   |
   = help: Use a raw string literal
@@ -41,12 +41,12 @@ W605_1.py:8:1: W605 [*] Invalid escape sequence: `\.`
 9 9 | '''
 10 10 | 
 
-W605_1.py:13:7: W605 [*] Invalid escape sequence: `\_`
+W605_1.py:13:7: W605 (invalid-escape-sequence) [*] Invalid escape sequence: `\_`
    |
 11 | #: W605:2:6
 12 | f(
 13 |     f'\_'
-   |       ^^ W605
+   |       ^^ W605 (invalid-escape-sequence)
 14 | )
    |
    = help: Use a raw string literal
@@ -61,12 +61,12 @@ W605_1.py:13:7: W605 [*] Invalid escape sequence: `\_`
 15 15 | 
 16 16 | #: W605:4:6
 
-W605_1.py:20:6: W605 [*] Invalid escape sequence: `\_`
+W605_1.py:20:6: W605 (invalid-escape-sequence) [*] Invalid escape sequence: `\_`
    |
 18 | multi-line
 19 | literal
 20 | with \_ somewhere
-   |      ^^ W605
+   |      ^^ W605 (invalid-escape-sequence)
 21 | in the middle
 22 | """
    |
@@ -82,11 +82,11 @@ W605_1.py:20:6: W605 [*] Invalid escape sequence: `\_`
 19 19 | literal
 20 20 | with \_ somewhere
 
-W605_1.py:25:40: W605 [*] Invalid escape sequence: `\_`
+W605_1.py:25:40: W605 (invalid-escape-sequence) [*] Invalid escape sequence: `\_`
    |
 24 | #: W605:1:38
 25 | value = f'new line\nand invalid escape \_ here'
-   |                                        ^^ W605
+   |                                        ^^ W605 (invalid-escape-sequence)
    |
    = help: Add backslash to escape sequence
 
@@ -100,12 +100,12 @@ W605_1.py:25:40: W605 [*] Invalid escape sequence: `\_`
 27 27 | 
 28 28 | #: Okay
 
-W605_1.py:43:13: W605 [*] Invalid escape sequence: `\_`
+W605_1.py:43:13: W605 (invalid-escape-sequence) [*] Invalid escape sequence: `\_`
    |
 41 | '''  # noqa
 42 | 
 43 | regex = f'\\\_'
-   |             ^^ W605
+   |             ^^ W605 (invalid-escape-sequence)
 44 | value = f'\{{1}}'
 45 | value = f'\{1}'
    |
@@ -121,11 +121,11 @@ W605_1.py:43:13: W605 [*] Invalid escape sequence: `\_`
 45 45 | value = f'\{1}'
 46 46 | value = f'{1:\}'
 
-W605_1.py:44:11: W605 [*] Invalid escape sequence: `\{`
+W605_1.py:44:11: W605 (invalid-escape-sequence) [*] Invalid escape sequence: `\{`
    |
 43 | regex = f'\\\_'
 44 | value = f'\{{1}}'
-   |           ^^ W605
+   |           ^^ W605 (invalid-escape-sequence)
 45 | value = f'\{1}'
 46 | value = f'{1:\}'
    |
@@ -141,12 +141,12 @@ W605_1.py:44:11: W605 [*] Invalid escape sequence: `\{`
 46 46 | value = f'{1:\}'
 47 47 | value = f"{f"\{1}"}"
 
-W605_1.py:45:11: W605 [*] Invalid escape sequence: `\{`
+W605_1.py:45:11: W605 (invalid-escape-sequence) [*] Invalid escape sequence: `\{`
    |
 43 | regex = f'\\\_'
 44 | value = f'\{{1}}'
 45 | value = f'\{1}'
-   |           ^^ W605
+   |           ^^ W605 (invalid-escape-sequence)
 46 | value = f'{1:\}'
 47 | value = f"{f"\{1}"}"
    |
@@ -162,12 +162,12 @@ W605_1.py:45:11: W605 [*] Invalid escape sequence: `\{`
 47 47 | value = f"{f"\{1}"}"
 48 48 | value = rf"{f"\{1}"}"
 
-W605_1.py:46:14: W605 [*] Invalid escape sequence: `\}`
+W605_1.py:46:14: W605 (invalid-escape-sequence) [*] Invalid escape sequence: `\}`
    |
 44 | value = f'\{{1}}'
 45 | value = f'\{1}'
 46 | value = f'{1:\}'
-   |              ^^ W605
+   |              ^^ W605 (invalid-escape-sequence)
 47 | value = f"{f"\{1}"}"
 48 | value = rf"{f"\{1}"}"
    |
@@ -183,12 +183,12 @@ W605_1.py:46:14: W605 [*] Invalid escape sequence: `\}`
 48 48 | value = rf"{f"\{1}"}"
 49 49 | 
 
-W605_1.py:47:14: W605 [*] Invalid escape sequence: `\{`
+W605_1.py:47:14: W605 (invalid-escape-sequence) [*] Invalid escape sequence: `\{`
    |
 45 | value = f'\{1}'
 46 | value = f'{1:\}'
 47 | value = f"{f"\{1}"}"
-   |              ^^ W605
+   |              ^^ W605 (invalid-escape-sequence)
 48 | value = rf"{f"\{1}"}"
    |
    = help: Use a raw string literal
@@ -203,12 +203,12 @@ W605_1.py:47:14: W605 [*] Invalid escape sequence: `\{`
 49 49 | 
 50 50 | # Okay
 
-W605_1.py:48:15: W605 [*] Invalid escape sequence: `\{`
+W605_1.py:48:15: W605 (invalid-escape-sequence) [*] Invalid escape sequence: `\{`
    |
 46 | value = f'{1:\}'
 47 | value = f"{f"\{1}"}"
 48 | value = rf"{f"\{1}"}"
-   |               ^^ W605
+   |               ^^ W605 (invalid-escape-sequence)
 49 | 
 50 | # Okay
    |
@@ -224,11 +224,11 @@ W605_1.py:48:15: W605 [*] Invalid escape sequence: `\{`
 50 50 | # Okay
 51 51 | value = rf'\{{1}}'
 
-W605_1.py:57:9: W605 [*] Invalid escape sequence: `\d`
+W605_1.py:57:9: W605 (invalid-escape-sequence) [*] Invalid escape sequence: `\d`
    |
 56 | # Regression tests for https://github.com/astral-sh/ruff/issues/10434
 57 | f"{{}}+-\d"
-   |         ^^ W605
+   |         ^^ W605 (invalid-escape-sequence)
 58 | f"\n{{}}+-\d+"
 59 | f"\n{{}}�+-\d+"
    |
@@ -243,12 +243,12 @@ W605_1.py:57:9: W605 [*] Invalid escape sequence: `\d`
 58 58 | f"\n{{}}+-\d+"
 59 59 | f"\n{{}}�+-\d+"
 
-W605_1.py:58:11: W605 [*] Invalid escape sequence: `\d`
+W605_1.py:58:11: W605 (invalid-escape-sequence) [*] Invalid escape sequence: `\d`
    |
 56 | # Regression tests for https://github.com/astral-sh/ruff/issues/10434
 57 | f"{{}}+-\d"
 58 | f"\n{{}}+-\d+"
-   |           ^^ W605
+   |           ^^ W605 (invalid-escape-sequence)
 59 | f"\n{{}}�+-\d+"
    |
    = help: Add backslash to escape sequence
@@ -261,12 +261,12 @@ W605_1.py:58:11: W605 [*] Invalid escape sequence: `\d`
    58 |+f"\n{{}}+-\\d+"
 59 59 | f"\n{{}}�+-\d+"
 
-W605_1.py:59:12: W605 [*] Invalid escape sequence: `\d`
+W605_1.py:59:12: W605 (invalid-escape-sequence) [*] Invalid escape sequence: `\d`
    |
 57 | f"{{}}+-\d"
 58 | f"\n{{}}+-\d+"
 59 | f"\n{{}}�+-\d+"
-   |            ^^ W605
+   |            ^^ W605 (invalid-escape-sequence)
    |
    = help: Add backslash to escape sequence
 

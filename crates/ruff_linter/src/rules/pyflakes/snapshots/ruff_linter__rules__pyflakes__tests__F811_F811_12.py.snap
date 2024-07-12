@@ -1,12 +1,12 @@
 ---
 source: crates/ruff_linter/src/rules/pyflakes/mod.rs
 ---
-F811_12.py:6:20: F811 Redefinition of unused `mixer` from line 2
+F811_12.py:6:20: F811 (redefined-while-unused) Redefinition of unused `mixer` from line 2
   |
 4 |     pass
 5 | else:
 6 |     from bb import mixer
-  |                    ^^^^^ F811
+  |                    ^^^^^ F811 (redefined-while-unused)
 7 | mixer(123)
   |
   = help: Remove definition: `mixer`

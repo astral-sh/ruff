@@ -1,11 +1,11 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_simplify/mod.rs
 ---
-SIM109.py:2:4: SIM109 [*] Use `a in (b, c)` instead of multiple equality comparisons
+SIM109.py:2:4: SIM109 (compare-with-tuple) [*] Use `a in (b, c)` instead of multiple equality comparisons
   |
 1 | # SIM109
 2 | if a == b or a == c:
-  |    ^^^^^^^^^^^^^^^^ SIM109
+  |    ^^^^^^^^^^^^^^^^ SIM109 (compare-with-tuple)
 3 |     d
   |
   = help: Replace with `a in (b, c)`
@@ -18,11 +18,11 @@ SIM109.py:2:4: SIM109 [*] Use `a in (b, c)` instead of multiple equality compari
 4 4 | 
 5 5 | # SIM109
 
-SIM109.py:6:5: SIM109 [*] Use `a in (b, c)` instead of multiple equality comparisons
+SIM109.py:6:5: SIM109 (compare-with-tuple) [*] Use `a in (b, c)` instead of multiple equality comparisons
   |
 5 | # SIM109
 6 | if (a == b or a == c) and None:
-  |     ^^^^^^^^^^^^^^^^ SIM109
+  |     ^^^^^^^^^^^^^^^^ SIM109 (compare-with-tuple)
 7 |     d
   |
   = help: Replace with `a in (b, c)`
@@ -37,11 +37,11 @@ SIM109.py:6:5: SIM109 [*] Use `a in (b, c)` instead of multiple equality compari
 8 8 | 
 9 9 | # SIM109
 
-SIM109.py:10:4: SIM109 [*] Use `a in (b, c)` instead of multiple equality comparisons
+SIM109.py:10:4: SIM109 (compare-with-tuple) [*] Use `a in (b, c)` instead of multiple equality comparisons
    |
  9 | # SIM109
 10 | if a == b or a == c or None:
-   |    ^^^^^^^^^^^^^^^^^^^^^^^^ SIM109
+   |    ^^^^^^^^^^^^^^^^^^^^^^^^ SIM109 (compare-with-tuple)
 11 |     d
    |
    = help: Replace with `a in (b, c)`
@@ -56,11 +56,11 @@ SIM109.py:10:4: SIM109 [*] Use `a in (b, c)` instead of multiple equality compar
 12 12 | 
 13 13 | # SIM109
 
-SIM109.py:14:4: SIM109 [*] Use `a in (b, c)` instead of multiple equality comparisons
+SIM109.py:14:4: SIM109 (compare-with-tuple) [*] Use `a in (b, c)` instead of multiple equality comparisons
    |
 13 | # SIM109
 14 | if a == b or None or a == c:
-   |    ^^^^^^^^^^^^^^^^^^^^^^^^ SIM109
+   |    ^^^^^^^^^^^^^^^^^^^^^^^^ SIM109 (compare-with-tuple)
 15 |     d
    |
    = help: Replace with `a in (b, c)`
@@ -74,5 +74,3 @@ SIM109.py:14:4: SIM109 [*] Use `a in (b, c)` instead of multiple equality compar
 15 15 |     d
 16 16 | 
 17 17 | # OK
-
-

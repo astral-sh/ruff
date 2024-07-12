@@ -1,12 +1,12 @@
 ---
 source: crates/ruff_linter/src/rules/refurb/mod.rs
 ---
-FURB116.py:6:7: FURB116 [*] Replace `oct` call with `f"{num:o}"`
+FURB116.py:6:7: FURB116 (f-string-number-format) [*] Replace `oct` call with `f"{num:o}"`
   |
 4 |     return num
 5 | 
 6 | print(oct(num)[2:])  # FURB116
-  |       ^^^^^^^^^^^^ FURB116
+  |       ^^^^^^^^^^^^ FURB116 (f-string-number-format)
 7 | print(hex(num)[2:])  # FURB116
 8 | print(bin(num)[2:])  # FURB116
   |
@@ -22,11 +22,11 @@ FURB116.py:6:7: FURB116 [*] Replace `oct` call with `f"{num:o}"`
 8 8 | print(bin(num)[2:])  # FURB116
 9 9 | 
 
-FURB116.py:7:7: FURB116 [*] Replace `hex` call with `f"{num:x}"`
+FURB116.py:7:7: FURB116 (f-string-number-format) [*] Replace `hex` call with `f"{num:x}"`
   |
 6 | print(oct(num)[2:])  # FURB116
 7 | print(hex(num)[2:])  # FURB116
-  |       ^^^^^^^^^^^^ FURB116
+  |       ^^^^^^^^^^^^ FURB116 (f-string-number-format)
 8 | print(bin(num)[2:])  # FURB116
   |
   = help: Replace with `f"{num:x}"`
@@ -41,12 +41,12 @@ FURB116.py:7:7: FURB116 [*] Replace `hex` call with `f"{num:x}"`
 9 9 | 
 10 10 | print(oct(1337)[2:])  # FURB116
 
-FURB116.py:8:7: FURB116 [*] Replace `bin` call with `f"{num:b}"`
+FURB116.py:8:7: FURB116 (f-string-number-format) [*] Replace `bin` call with `f"{num:b}"`
    |
  6 | print(oct(num)[2:])  # FURB116
  7 | print(hex(num)[2:])  # FURB116
  8 | print(bin(num)[2:])  # FURB116
-   |       ^^^^^^^^^^^^ FURB116
+   |       ^^^^^^^^^^^^ FURB116 (f-string-number-format)
  9 | 
 10 | print(oct(1337)[2:])  # FURB116
    |
@@ -62,12 +62,12 @@ FURB116.py:8:7: FURB116 [*] Replace `bin` call with `f"{num:b}"`
 10 10 | print(oct(1337)[2:])  # FURB116
 11 11 | print(hex(1337)[2:])  # FURB116
 
-FURB116.py:10:7: FURB116 [*] Replace `oct` call with `f"{1337:o}"`
+FURB116.py:10:7: FURB116 (f-string-number-format) [*] Replace `oct` call with `f"{1337:o}"`
    |
  8 | print(bin(num)[2:])  # FURB116
  9 | 
 10 | print(oct(1337)[2:])  # FURB116
-   |       ^^^^^^^^^^^^^ FURB116
+   |       ^^^^^^^^^^^^^ FURB116 (f-string-number-format)
 11 | print(hex(1337)[2:])  # FURB116
 12 | print(bin(1337)[2:])  # FURB116
    |
@@ -83,11 +83,11 @@ FURB116.py:10:7: FURB116 [*] Replace `oct` call with `f"{1337:o}"`
 12 12 | print(bin(1337)[2:])  # FURB116
 13 13 | 
 
-FURB116.py:11:7: FURB116 [*] Replace `hex` call with `f"{1337:x}"`
+FURB116.py:11:7: FURB116 (f-string-number-format) [*] Replace `hex` call with `f"{1337:x}"`
    |
 10 | print(oct(1337)[2:])  # FURB116
 11 | print(hex(1337)[2:])  # FURB116
-   |       ^^^^^^^^^^^^^ FURB116
+   |       ^^^^^^^^^^^^^ FURB116 (f-string-number-format)
 12 | print(bin(1337)[2:])  # FURB116
    |
    = help: Replace with `f"{1337:x}"`
@@ -102,12 +102,12 @@ FURB116.py:11:7: FURB116 [*] Replace `hex` call with `f"{1337:x}"`
 13 13 | 
 14 14 | print(bin(return_num())[2:])  # FURB116 (no autofix)
 
-FURB116.py:12:7: FURB116 [*] Replace `bin` call with `f"{1337:b}"`
+FURB116.py:12:7: FURB116 (f-string-number-format) [*] Replace `bin` call with `f"{1337:b}"`
    |
 10 | print(oct(1337)[2:])  # FURB116
 11 | print(hex(1337)[2:])  # FURB116
 12 | print(bin(1337)[2:])  # FURB116
-   |       ^^^^^^^^^^^^^ FURB116
+   |       ^^^^^^^^^^^^^ FURB116 (f-string-number-format)
 13 | 
 14 | print(bin(return_num())[2:])  # FURB116 (no autofix)
    |
@@ -123,21 +123,21 @@ FURB116.py:12:7: FURB116 [*] Replace `bin` call with `f"{1337:b}"`
 14 14 | print(bin(return_num())[2:])  # FURB116 (no autofix)
 15 15 | print(bin(int(f"{num}"))[2:])  # FURB116 (no autofix)
 
-FURB116.py:14:7: FURB116 Replace `bin` call with f-string
+FURB116.py:14:7: FURB116 (f-string-number-format) Replace `bin` call with f-string
    |
 12 | print(bin(1337)[2:])  # FURB116
 13 | 
 14 | print(bin(return_num())[2:])  # FURB116 (no autofix)
-   |       ^^^^^^^^^^^^^^^^^^^^^ FURB116
+   |       ^^^^^^^^^^^^^^^^^^^^^ FURB116 (f-string-number-format)
 15 | print(bin(int(f"{num}"))[2:])  # FURB116 (no autofix)
    |
    = help: Replace with f-string
 
-FURB116.py:15:7: FURB116 Replace `bin` call with f-string
+FURB116.py:15:7: FURB116 (f-string-number-format) Replace `bin` call with f-string
    |
 14 | print(bin(return_num())[2:])  # FURB116 (no autofix)
 15 | print(bin(int(f"{num}"))[2:])  # FURB116 (no autofix)
-   |       ^^^^^^^^^^^^^^^^^^^^^^ FURB116
+   |       ^^^^^^^^^^^^^^^^^^^^^^ FURB116 (f-string-number-format)
 16 | 
 17 | ## invalid
    |

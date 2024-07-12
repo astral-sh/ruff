@@ -1,22 +1,22 @@
 ---
 source: crates/ruff_linter/src/rules/numpy/mod.rs
 ---
-NPY201_2.py:4:5: NPY201 `np.obj2sctype` will be removed without replacement in NumPy 2.0
+NPY201_2.py:4:5: NPY201 (numpy2-deprecation) `np.obj2sctype` will be removed without replacement in NumPy 2.0
   |
 2 |     import numpy as np
 3 | 
 4 |     np.obj2sctype(int)
-  |     ^^^^^^^^^^^^^ NPY201
+  |     ^^^^^^^^^^^^^ NPY201 (numpy2-deprecation)
 5 | 
 6 |     np.PINF
   |
 
-NPY201_2.py:6:5: NPY201 [*] `np.PINF` will be removed in NumPy 2.0. Use `numpy.inf` instead.
+NPY201_2.py:6:5: NPY201 (numpy2-deprecation) [*] `np.PINF` will be removed in NumPy 2.0. Use `numpy.inf` instead.
   |
 4 |     np.obj2sctype(int)
 5 | 
 6 |     np.PINF
-  |     ^^^^^^^ NPY201
+  |     ^^^^^^^ NPY201 (numpy2-deprecation)
 7 | 
 8 |     np.PZERO
   |
@@ -32,12 +32,12 @@ NPY201_2.py:6:5: NPY201 [*] `np.PINF` will be removed in NumPy 2.0. Use `numpy.i
 8 8 |     np.PZERO
 9 9 | 
 
-NPY201_2.py:8:5: NPY201 [*] `np.PZERO` will be removed in NumPy 2.0. Use `0.0` instead.
+NPY201_2.py:8:5: NPY201 (numpy2-deprecation) [*] `np.PZERO` will be removed in NumPy 2.0. Use `0.0` instead.
    |
  6 |     np.PINF
  7 | 
  8 |     np.PZERO
-   |     ^^^^^^^^ NPY201
+   |     ^^^^^^^^ NPY201 (numpy2-deprecation)
  9 | 
 10 |     np.recfromcsv
    |
@@ -53,32 +53,32 @@ NPY201_2.py:8:5: NPY201 [*] `np.PZERO` will be removed in NumPy 2.0. Use `0.0` i
 10 10 |     np.recfromcsv
 11 11 | 
 
-NPY201_2.py:10:5: NPY201 `np.recfromcsv` will be removed in NumPy 2.0. Use `np.genfromtxt` with comma delimiter instead.
+NPY201_2.py:10:5: NPY201 (numpy2-deprecation) `np.recfromcsv` will be removed in NumPy 2.0. Use `np.genfromtxt` with comma delimiter instead.
    |
  8 |     np.PZERO
  9 | 
 10 |     np.recfromcsv
-   |     ^^^^^^^^^^^^^ NPY201
+   |     ^^^^^^^^^^^^^ NPY201 (numpy2-deprecation)
 11 | 
 12 |     np.recfromtxt
    |
 
-NPY201_2.py:12:5: NPY201 `np.recfromtxt` will be removed in NumPy 2.0. Use `np.genfromtxt` instead.
+NPY201_2.py:12:5: NPY201 (numpy2-deprecation) `np.recfromtxt` will be removed in NumPy 2.0. Use `np.genfromtxt` instead.
    |
 10 |     np.recfromcsv
 11 | 
 12 |     np.recfromtxt
-   |     ^^^^^^^^^^^^^ NPY201
+   |     ^^^^^^^^^^^^^ NPY201 (numpy2-deprecation)
 13 | 
 14 |     np.round_(12.34)
    |
 
-NPY201_2.py:14:5: NPY201 [*] `np.round_` will be removed in NumPy 2.0. Use `numpy.round` instead.
+NPY201_2.py:14:5: NPY201 (numpy2-deprecation) [*] `np.round_` will be removed in NumPy 2.0. Use `numpy.round` instead.
    |
 12 |     np.recfromtxt
 13 | 
 14 |     np.round_(12.34)
-   |     ^^^^^^^^^ NPY201
+   |     ^^^^^^^^^ NPY201 (numpy2-deprecation)
 15 | 
 16 |     np.safe_eval
    |
@@ -94,12 +94,12 @@ NPY201_2.py:14:5: NPY201 [*] `np.round_` will be removed in NumPy 2.0. Use `nump
 16 16 |     np.safe_eval
 17 17 | 
 
-NPY201_2.py:16:5: NPY201 [*] `np.safe_eval` will be removed in NumPy 2.0. Use `ast.literal_eval` instead.
+NPY201_2.py:16:5: NPY201 (numpy2-deprecation) [*] `np.safe_eval` will be removed in NumPy 2.0. Use `ast.literal_eval` instead.
    |
 14 |     np.round_(12.34)
 15 | 
 16 |     np.safe_eval
-   |     ^^^^^^^^^^^^ NPY201
+   |     ^^^^^^^^^^^^ NPY201 (numpy2-deprecation)
 17 | 
 18 |     np.sctype2char
    |
@@ -120,52 +120,52 @@ NPY201_2.py:16:5: NPY201 [*] `np.safe_eval` will be removed in NumPy 2.0. Use `a
 18 19 |     np.sctype2char
 19 20 | 
 
-NPY201_2.py:18:5: NPY201 `np.sctype2char` will be removed without replacement in NumPy 2.0
+NPY201_2.py:18:5: NPY201 (numpy2-deprecation) `np.sctype2char` will be removed without replacement in NumPy 2.0
    |
 16 |     np.safe_eval
 17 | 
 18 |     np.sctype2char
-   |     ^^^^^^^^^^^^^^ NPY201
+   |     ^^^^^^^^^^^^^^ NPY201 (numpy2-deprecation)
 19 | 
 20 |     np.sctypes
    |
 
-NPY201_2.py:20:5: NPY201 `np.sctypes` will be removed without replacement in NumPy 2.0
+NPY201_2.py:20:5: NPY201 (numpy2-deprecation) `np.sctypes` will be removed without replacement in NumPy 2.0
    |
 18 |     np.sctype2char
 19 | 
 20 |     np.sctypes
-   |     ^^^^^^^^^^ NPY201
+   |     ^^^^^^^^^^ NPY201 (numpy2-deprecation)
 21 | 
 22 |     np.seterrobj
    |
 
-NPY201_2.py:22:5: NPY201 `np.seterrobj` will be removed in NumPy 2.0. Use the `np.errstate` context manager instead.
+NPY201_2.py:22:5: NPY201 (numpy2-deprecation) `np.seterrobj` will be removed in NumPy 2.0. Use the `np.errstate` context manager instead.
    |
 20 |     np.sctypes
 21 | 
 22 |     np.seterrobj
-   |     ^^^^^^^^^^^^ NPY201
+   |     ^^^^^^^^^^^^ NPY201 (numpy2-deprecation)
 23 | 
 24 |     np.set_numeric_ops
    |
 
-NPY201_2.py:26:5: NPY201 `np.set_string_function` will be removed in NumPy 2.0. Use `np.set_printoptions` for custom printing of NumPy objects.
+NPY201_2.py:26:5: NPY201 (numpy2-deprecation) `np.set_string_function` will be removed in NumPy 2.0. Use `np.set_printoptions` for custom printing of NumPy objects.
    |
 24 |     np.set_numeric_ops
 25 | 
 26 |     np.set_string_function
-   |     ^^^^^^^^^^^^^^^^^^^^^^ NPY201
+   |     ^^^^^^^^^^^^^^^^^^^^^^ NPY201 (numpy2-deprecation)
 27 | 
 28 |     np.singlecomplex(12+1j)
    |
 
-NPY201_2.py:28:5: NPY201 [*] `np.singlecomplex` will be removed in NumPy 2.0. Use `numpy.complex64` instead.
+NPY201_2.py:28:5: NPY201 (numpy2-deprecation) [*] `np.singlecomplex` will be removed in NumPy 2.0. Use `numpy.complex64` instead.
    |
 26 |     np.set_string_function
 27 | 
 28 |     np.singlecomplex(12+1j)
-   |     ^^^^^^^^^^^^^^^^ NPY201
+   |     ^^^^^^^^^^^^^^^^ NPY201 (numpy2-deprecation)
 29 | 
 30 |     np.string_("asdf")
    |
@@ -181,12 +181,12 @@ NPY201_2.py:28:5: NPY201 [*] `np.singlecomplex` will be removed in NumPy 2.0. Us
 30 30 |     np.string_("asdf")
 31 31 | 
 
-NPY201_2.py:30:5: NPY201 [*] `np.string_` will be removed in NumPy 2.0. Use `numpy.bytes_` instead.
+NPY201_2.py:30:5: NPY201 (numpy2-deprecation) [*] `np.string_` will be removed in NumPy 2.0. Use `numpy.bytes_` instead.
    |
 28 |     np.singlecomplex(12+1j)
 29 | 
 30 |     np.string_("asdf")
-   |     ^^^^^^^^^^ NPY201
+   |     ^^^^^^^^^^ NPY201 (numpy2-deprecation)
 31 | 
 32 |     np.source
    |
@@ -202,12 +202,12 @@ NPY201_2.py:30:5: NPY201 [*] `np.string_` will be removed in NumPy 2.0. Use `num
 32 32 |     np.source
 33 33 | 
 
-NPY201_2.py:32:5: NPY201 [*] `np.source` will be removed in NumPy 2.0. Use `inspect.getsource` instead.
+NPY201_2.py:32:5: NPY201 (numpy2-deprecation) [*] `np.source` will be removed in NumPy 2.0. Use `inspect.getsource` instead.
    |
 30 |     np.string_("asdf")
 31 | 
 32 |     np.source
-   |     ^^^^^^^^^ NPY201
+   |     ^^^^^^^^^ NPY201 (numpy2-deprecation)
 33 | 
 34 |     np.tracemalloc_domain
    |
@@ -228,12 +228,12 @@ NPY201_2.py:32:5: NPY201 [*] `np.source` will be removed in NumPy 2.0. Use `insp
 34 35 |     np.tracemalloc_domain
 35 36 | 
 
-NPY201_2.py:34:5: NPY201 [*] `np.tracemalloc_domain` will be removed in NumPy 2.0. Use `numpy.lib.tracemalloc_domain` instead.
+NPY201_2.py:34:5: NPY201 (numpy2-deprecation) [*] `np.tracemalloc_domain` will be removed in NumPy 2.0. Use `numpy.lib.tracemalloc_domain` instead.
    |
 32 |     np.source
 33 | 
 34 |     np.tracemalloc_domain
-   |     ^^^^^^^^^^^^^^^^^^^^^ NPY201
+   |     ^^^^^^^^^^^^^^^^^^^^^ NPY201 (numpy2-deprecation)
 35 | 
 36 |     np.unicode_("asf")
    |
@@ -254,12 +254,12 @@ NPY201_2.py:34:5: NPY201 [*] `np.tracemalloc_domain` will be removed in NumPy 2.
 36 37 |     np.unicode_("asf")
 37 38 | 
 
-NPY201_2.py:36:5: NPY201 [*] `np.unicode_` will be removed in NumPy 2.0. Use `numpy.str_` instead.
+NPY201_2.py:36:5: NPY201 (numpy2-deprecation) [*] `np.unicode_` will be removed in NumPy 2.0. Use `numpy.str_` instead.
    |
 34 |     np.tracemalloc_domain
 35 | 
 36 |     np.unicode_("asf")
-   |     ^^^^^^^^^^^ NPY201
+   |     ^^^^^^^^^^^ NPY201 (numpy2-deprecation)
 37 | 
 38 |     np.who()
    |
@@ -275,22 +275,22 @@ NPY201_2.py:36:5: NPY201 [*] `np.unicode_` will be removed in NumPy 2.0. Use `nu
 38 38 |     np.who()
 39 39 | 
 
-NPY201_2.py:38:5: NPY201 `np.who` will be removed in NumPy 2.0. Use an IDE variable explorer or `locals()` instead.
+NPY201_2.py:38:5: NPY201 (numpy2-deprecation) `np.who` will be removed in NumPy 2.0. Use an IDE variable explorer or `locals()` instead.
    |
 36 |     np.unicode_("asf")
 37 | 
 38 |     np.who()
-   |     ^^^^^^ NPY201
+   |     ^^^^^^ NPY201 (numpy2-deprecation)
 39 | 
 40 |     np.row_stack(([1,2], [3,4]))
    |
 
-NPY201_2.py:40:5: NPY201 [*] `np.row_stack` will be removed in NumPy 2.0. Use `numpy.vstack` instead.
+NPY201_2.py:40:5: NPY201 (numpy2-deprecation) [*] `np.row_stack` will be removed in NumPy 2.0. Use `numpy.vstack` instead.
    |
 38 |     np.who()
 39 | 
 40 |     np.row_stack(([1,2], [3,4]))
-   |     ^^^^^^^^^^^^ NPY201
+   |     ^^^^^^^^^^^^ NPY201 (numpy2-deprecation)
 41 | 
 42 |     np.alltrue([True, True])
    |
@@ -306,12 +306,12 @@ NPY201_2.py:40:5: NPY201 [*] `np.row_stack` will be removed in NumPy 2.0. Use `n
 42 42 |     np.alltrue([True, True])
 43 43 | 
 
-NPY201_2.py:42:5: NPY201 [*] `np.alltrue` will be removed in NumPy 2.0. Use `all` instead.
+NPY201_2.py:42:5: NPY201 (numpy2-deprecation) [*] `np.alltrue` will be removed in NumPy 2.0. Use `all` instead.
    |
 40 |     np.row_stack(([1,2], [3,4]))
 41 | 
 42 |     np.alltrue([True, True])
-   |     ^^^^^^^^^^ NPY201
+   |     ^^^^^^^^^^ NPY201 (numpy2-deprecation)
 43 | 
 44 |     np.anytrue([True, False])
    |
@@ -327,12 +327,12 @@ NPY201_2.py:42:5: NPY201 [*] `np.alltrue` will be removed in NumPy 2.0. Use `all
 44 44 |     np.anytrue([True, False])
 45 45 | 
 
-NPY201_2.py:46:5: NPY201 [*] `np.cumproduct` will be removed in NumPy 2.0. Use `numpy.cumprod` instead.
+NPY201_2.py:46:5: NPY201 (numpy2-deprecation) [*] `np.cumproduct` will be removed in NumPy 2.0. Use `numpy.cumprod` instead.
    |
 44 |     np.anytrue([True, False])
 45 | 
 46 |     np.cumproduct([1, 2, 3])
-   |     ^^^^^^^^^^^^^ NPY201
+   |     ^^^^^^^^^^^^^ NPY201 (numpy2-deprecation)
 47 | 
 48 |     np.product([1, 2, 3])
    |
@@ -348,12 +348,12 @@ NPY201_2.py:46:5: NPY201 [*] `np.cumproduct` will be removed in NumPy 2.0. Use `
 48 48 |     np.product([1, 2, 3])
 49 49 | 
 
-NPY201_2.py:48:5: NPY201 [*] `np.product` will be removed in NumPy 2.0. Use `numpy.prod` instead.
+NPY201_2.py:48:5: NPY201 (numpy2-deprecation) [*] `np.product` will be removed in NumPy 2.0. Use `numpy.prod` instead.
    |
 46 |     np.cumproduct([1, 2, 3])
 47 | 
 48 |     np.product([1, 2, 3])
-   |     ^^^^^^^^^^ NPY201
+   |     ^^^^^^^^^^ NPY201 (numpy2-deprecation)
 49 | 
 50 |     np.trapz([1, 2, 3])
    |
@@ -369,12 +369,12 @@ NPY201_2.py:48:5: NPY201 [*] `np.product` will be removed in NumPy 2.0. Use `num
 50 50 |     np.trapz([1, 2, 3])
 51 51 | 
 
-NPY201_2.py:50:5: NPY201 [*] `np.trapz` will be removed in NumPy 2.0. Use `numpy.trapezoid` on NumPy 2.0, or ignore this warning on earlier versions.
+NPY201_2.py:50:5: NPY201 (numpy2-deprecation) [*] `np.trapz` will be removed in NumPy 2.0. Use `numpy.trapezoid` on NumPy 2.0, or ignore this warning on earlier versions.
    |
 48 |     np.product([1, 2, 3])
 49 | 
 50 |     np.trapz([1, 2, 3])
-   |     ^^^^^^^^ NPY201
+   |     ^^^^^^^^ NPY201 (numpy2-deprecation)
 51 | 
 52 |     np.in1d([1, 2], [1, 3, 5])
    |
@@ -390,12 +390,12 @@ NPY201_2.py:50:5: NPY201 [*] `np.trapz` will be removed in NumPy 2.0. Use `numpy
 52 52 |     np.in1d([1, 2], [1, 3, 5])
 53 53 | 
 
-NPY201_2.py:52:5: NPY201 [*] `np.in1d` will be removed in NumPy 2.0. Use `numpy.isin` instead.
+NPY201_2.py:52:5: NPY201 (numpy2-deprecation) [*] `np.in1d` will be removed in NumPy 2.0. Use `numpy.isin` instead.
    |
 50 |     np.trapz([1, 2, 3])
 51 | 
 52 |     np.in1d([1, 2], [1, 3, 5])
-   |     ^^^^^^^ NPY201
+   |     ^^^^^^^ NPY201 (numpy2-deprecation)
 53 | 
 54 |     np.AxisError
    |
@@ -411,12 +411,12 @@ NPY201_2.py:52:5: NPY201 [*] `np.in1d` will be removed in NumPy 2.0. Use `numpy.
 54 54 |     np.AxisError
 55 55 | 
 
-NPY201_2.py:54:5: NPY201 [*] `np.AxisError` will be removed in NumPy 2.0. Use `numpy.exceptions.AxisError` instead.
+NPY201_2.py:54:5: NPY201 (numpy2-deprecation) [*] `np.AxisError` will be removed in NumPy 2.0. Use `numpy.exceptions.AxisError` instead.
    |
 52 |     np.in1d([1, 2], [1, 3, 5])
 53 | 
 54 |     np.AxisError
-   |     ^^^^^^^^^^^^ NPY201
+   |     ^^^^^^^^^^^^ NPY201 (numpy2-deprecation)
 55 | 
 56 |     np.ComplexWarning
    |
@@ -437,12 +437,12 @@ NPY201_2.py:54:5: NPY201 [*] `np.AxisError` will be removed in NumPy 2.0. Use `n
 56 57 |     np.ComplexWarning
 57 58 | 
 
-NPY201_2.py:56:5: NPY201 [*] `np.ComplexWarning` will be removed in NumPy 2.0. Use `numpy.exceptions.ComplexWarning` instead.
+NPY201_2.py:56:5: NPY201 (numpy2-deprecation) [*] `np.ComplexWarning` will be removed in NumPy 2.0. Use `numpy.exceptions.ComplexWarning` instead.
    |
 54 |     np.AxisError
 55 | 
 56 |     np.ComplexWarning
-   |     ^^^^^^^^^^^^^^^^^ NPY201
+   |     ^^^^^^^^^^^^^^^^^ NPY201 (numpy2-deprecation)
 57 | 
 58 |     np.compare_chararrays
    |
@@ -462,12 +462,12 @@ NPY201_2.py:56:5: NPY201 [*] `np.ComplexWarning` will be removed in NumPy 2.0. U
 57 58 | 
 58 59 |     np.compare_chararrays
 
-NPY201_2.py:58:5: NPY201 [*] `np.compare_chararrays` will be removed in NumPy 2.0. Use `numpy.char.compare_chararrays` instead.
+NPY201_2.py:58:5: NPY201 (numpy2-deprecation) [*] `np.compare_chararrays` will be removed in NumPy 2.0. Use `numpy.char.compare_chararrays` instead.
    |
 56 |     np.ComplexWarning
 57 | 
 58 |     np.compare_chararrays
-   |     ^^^^^^^^^^^^^^^^^^^^^ NPY201
+   |     ^^^^^^^^^^^^^^^^^^^^^ NPY201 (numpy2-deprecation)
    |
    = help: Replace with `numpy.char.compare_chararrays`
 

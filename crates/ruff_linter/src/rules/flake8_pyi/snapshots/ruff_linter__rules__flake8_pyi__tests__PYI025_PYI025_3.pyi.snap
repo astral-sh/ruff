@@ -1,12 +1,12 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_pyi/mod.rs
 ---
-PYI025_3.pyi:6:36: PYI025 [*] Use `from collections.abc import Set as AbstractSet` to avoid confusion with the `set` builtin
+PYI025_3.pyi:6:36: PYI025 (unaliased-collections-abc-set-import) [*] Use `from collections.abc import Set as AbstractSet` to avoid confusion with the `set` builtin
   |
 4 | """
 5 | 
 6 | from collections.abc import Set as Set  # PYI025 triggered but fix is not marked as safe
-  |                                    ^^^ PYI025
+  |                                    ^^^ PYI025 (unaliased-collections-abc-set-import)
   |
   = help: Alias `Set` to `AbstractSet`
 

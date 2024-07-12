@@ -1,86 +1,86 @@
 ---
 source: crates/ruff_linter/src/rules/refurb/mod.rs
 ---
-FURB101.py:12:6: FURB101 `open` and `read` should be replaced by `Path("file.txt").read_text()`
+FURB101.py:12:6: FURB101 (read-whole-file) `open` and `read` should be replaced by `Path("file.txt").read_text()`
    |
 11 | # FURB101
 12 | with open("file.txt") as f:
-   |      ^^^^^^^^^^^^^^^^^^^^^ FURB101
+   |      ^^^^^^^^^^^^^^^^^^^^^ FURB101 (read-whole-file)
 13 |     x = f.read()
    |
 
-FURB101.py:16:6: FURB101 `open` and `read` should be replaced by `Path("file.txt").read_bytes()`
+FURB101.py:16:6: FURB101 (read-whole-file) `open` and `read` should be replaced by `Path("file.txt").read_bytes()`
    |
 15 | # FURB101
 16 | with open("file.txt", "rb") as f:
-   |      ^^^^^^^^^^^^^^^^^^^^^^^^^^^ FURB101
+   |      ^^^^^^^^^^^^^^^^^^^^^^^^^^^ FURB101 (read-whole-file)
 17 |     x = f.read()
    |
 
-FURB101.py:20:6: FURB101 `open` and `read` should be replaced by `Path("file.txt").read_bytes()`
+FURB101.py:20:6: FURB101 (read-whole-file) `open` and `read` should be replaced by `Path("file.txt").read_bytes()`
    |
 19 | # FURB101
 20 | with open("file.txt", mode="rb") as f:
-   |      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ FURB101
+   |      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ FURB101 (read-whole-file)
 21 |     x = f.read()
    |
 
-FURB101.py:24:6: FURB101 `open` and `read` should be replaced by `Path("file.txt").read_text(encoding="utf8")`
+FURB101.py:24:6: FURB101 (read-whole-file) `open` and `read` should be replaced by `Path("file.txt").read_text(encoding="utf8")`
    |
 23 | # FURB101
 24 | with open("file.txt", encoding="utf8") as f:
-   |      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ FURB101
+   |      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ FURB101 (read-whole-file)
 25 |     x = f.read()
    |
 
-FURB101.py:28:6: FURB101 `open` and `read` should be replaced by `Path("file.txt").read_text(errors="ignore")`
+FURB101.py:28:6: FURB101 (read-whole-file) `open` and `read` should be replaced by `Path("file.txt").read_text(errors="ignore")`
    |
 27 | # FURB101
 28 | with open("file.txt", errors="ignore") as f:
-   |      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ FURB101
+   |      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ FURB101 (read-whole-file)
 29 |     x = f.read()
    |
 
-FURB101.py:32:6: FURB101 `open` and `read` should be replaced by `Path("file.txt").read_text()`
+FURB101.py:32:6: FURB101 (read-whole-file) `open` and `read` should be replaced by `Path("file.txt").read_text()`
    |
 31 | # FURB101
 32 | with open("file.txt", mode="r") as f:  # noqa: FURB120
-   |      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ FURB101
+   |      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ FURB101 (read-whole-file)
 33 |     x = f.read()
    |
 
-FURB101.py:36:6: FURB101 `open` and `read` should be replaced by `Path(foo()).read_bytes()`
+FURB101.py:36:6: FURB101 (read-whole-file) `open` and `read` should be replaced by `Path(foo()).read_bytes()`
    |
 35 | # FURB101
 36 | with open(foo(), "rb") as f:
-   |      ^^^^^^^^^^^^^^^^^^^^^^ FURB101
+   |      ^^^^^^^^^^^^^^^^^^^^^^ FURB101 (read-whole-file)
 37 |     # The body of `with` is non-trivial, but the recommendation holds.
 38 |     bar("pre")
    |
 
-FURB101.py:44:6: FURB101 `open` and `read` should be replaced by `Path("a.txt").read_text()`
+FURB101.py:44:6: FURB101 (read-whole-file) `open` and `read` should be replaced by `Path("a.txt").read_text()`
    |
 43 | # FURB101
 44 | with open("a.txt") as a, open("b.txt", "rb") as b:
-   |      ^^^^^^^^^^^^^^^^^^ FURB101
+   |      ^^^^^^^^^^^^^^^^^^ FURB101 (read-whole-file)
 45 |     x = a.read()
 46 |     y = b.read()
    |
 
-FURB101.py:44:26: FURB101 `open` and `read` should be replaced by `Path("b.txt").read_bytes()`
+FURB101.py:44:26: FURB101 (read-whole-file) `open` and `read` should be replaced by `Path("b.txt").read_bytes()`
    |
 43 | # FURB101
 44 | with open("a.txt") as a, open("b.txt", "rb") as b:
-   |                          ^^^^^^^^^^^^^^^^^^^^^^^^ FURB101
+   |                          ^^^^^^^^^^^^^^^^^^^^^^^^ FURB101 (read-whole-file)
 45 |     x = a.read()
 46 |     y = b.read()
    |
 
-FURB101.py:49:18: FURB101 `open` and `read` should be replaced by `Path("file.txt").read_text()`
+FURB101.py:49:18: FURB101 (read-whole-file) `open` and `read` should be replaced by `Path("file.txt").read_text()`
    |
 48 | # FURB101
 49 | with foo() as a, open("file.txt") as b, foo() as c:
-   |                  ^^^^^^^^^^^^^^^^^^^^^ FURB101
+   |                  ^^^^^^^^^^^^^^^^^^^^^ FURB101 (read-whole-file)
 50 |     # We have other things in here, multiple with items, but
 51 |     # the user reads the whole file and that bit they can replace.
    |

@@ -1,12 +1,12 @@
 ---
 source: crates/ruff_linter/src/rules/pydocstyle/mod.rs
 ---
-sections.py:32:5: D406 [*] Section name should end with a newline ("Returns")
+sections.py:32:5: D406 (new-line-after-section-name) [*] Section name should end with a newline ("Returns")
    |
 30 |     """Toggle the gizmo.
 31 | 
 32 |     Returns:
-   |     ^^^^^^^ D406
+   |     ^^^^^^^ D406 (new-line-after-section-name)
 33 |     -------
 34 |     A value of some sort.
    |
@@ -22,12 +22,12 @@ sections.py:32:5: D406 [*] Section name should end with a newline ("Returns")
 34 34 |     A value of some sort.
 35 35 | 
 
-sections.py:227:5: D406 [*] Section name should end with a newline ("Raises")
+sections.py:227:5: D406 (new-line-after-section-name) [*] Section name should end with a newline ("Raises")
     |
 225 |     ------
 226 |     Many many wonderful things.
 227 |     Raises:
-    |     ^^^^^^ D406
+    |     ^^^^^^ D406 (new-line-after-section-name)
 228 |     My attention.
     |
     = help: Add newline after "Raises"
@@ -42,12 +42,12 @@ sections.py:227:5: D406 [*] Section name should end with a newline ("Raises")
 229 229 | 
 230 230 |     """
 
-sections.py:590:5: D406 [*] Section name should end with a newline ("Parameters")
+sections.py:590:5: D406 (new-line-after-section-name) [*] Section name should end with a newline ("Parameters")
     |
 588 |     """Test that lower case subsection header is valid even if it has the same name as section kind.
 589 | 
 590 |     Parameters:
-    |     ^^^^^^^^^^ D406
+    |     ^^^^^^^^^^ D406 (new-line-after-section-name)
 591 |     ----------
 592 |     parameters:
     |

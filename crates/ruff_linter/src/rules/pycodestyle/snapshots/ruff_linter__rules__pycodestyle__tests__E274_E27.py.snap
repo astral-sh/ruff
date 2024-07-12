@@ -1,12 +1,12 @@
 ---
 source: crates/ruff_linter/src/rules/pycodestyle/mod.rs
 ---
-E27.py:29:2: E274 [*] Tab before keyword
+E27.py:29:2: E274 (tab-before-keyword) [*] Tab before keyword
    |
 27 | a and   b
 28 | #: E274
 29 | a       and b
-   |  ^^^^^^^ E274
+   |  ^^^^^^^ E274 (tab-before-keyword)
 30 | #: E273 E274
 31 | this        and False
    |
@@ -22,12 +22,12 @@ E27.py:29:2: E274 [*] Tab before keyword
 31 31 | this		and	False
 32 32 | #: Okay
 
-E27.py:31:5: E274 [*] Tab before keyword
+E27.py:31:5: E274 (tab-before-keyword) [*] Tab before keyword
    |
 29 | a       and b
 30 | #: E273 E274
 31 | this        and False
-   |     ^^^^^^^^ E274
+   |     ^^^^^^^^ E274 (tab-before-keyword)
 32 | #: Okay
 33 | from u import (a, b)
    |

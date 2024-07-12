@@ -1,11 +1,11 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_pyi/mod.rs
 ---
-PYI036.pyi:54:31: PYI036 [*] Star-args in `__exit__` should be annotated with `object`
+PYI036.pyi:54:31: PYI036 (bad-exit-annotation) [*] Star-args in `__exit__` should be annotated with `object`
    |
 53 | class BadOne:
 54 |     def __exit__(self, *args: Any) -> None: ... # PYI036: Bad star-args annotation
-   |                               ^^^ PYI036
+   |                               ^^^ PYI036 (bad-exit-annotation)
 55 |     async def __aexit__(self) -> None: ... # PYI036: Missing args
    |
    = help: Annotate star-args with `object`
@@ -20,103 +20,103 @@ PYI036.pyi:54:31: PYI036 [*] Star-args in `__exit__` should be annotated with `o
 56 56 | 
 57 57 | class BadTwo:
 
-PYI036.pyi:55:24: PYI036 If there are no star-args, `__aexit__` should have at least 3 non-keyword-only args (excluding `self`)
+PYI036.pyi:55:24: PYI036 (bad-exit-annotation) If there are no star-args, `__aexit__` should have at least 3 non-keyword-only args (excluding `self`)
    |
 53 | class BadOne:
 54 |     def __exit__(self, *args: Any) -> None: ... # PYI036: Bad star-args annotation
 55 |     async def __aexit__(self) -> None: ... # PYI036: Missing args
-   |                        ^^^^^^ PYI036
+   |                        ^^^^^^ PYI036 (bad-exit-annotation)
 56 | 
 57 | class BadTwo:
    |
 
-PYI036.pyi:58:38: PYI036 All arguments after the first four in `__exit__` must have a default value
+PYI036.pyi:58:38: PYI036 (bad-exit-annotation) All arguments after the first four in `__exit__` must have a default value
    |
 57 | class BadTwo:
 58 |     def __exit__(self, typ, exc, tb, weird_extra_arg) -> None: ... # PYI036: Extra arg must have default
-   |                                      ^^^^^^^^^^^^^^^ PYI036
+   |                                      ^^^^^^^^^^^^^^^ PYI036 (bad-exit-annotation)
 59 |     async def __aexit__(self, typ, exc, tb, *, weird_extra_arg1, weird_extra_arg2) -> None: ...# PYI036: kwargs must have default
    |
 
-PYI036.pyi:59:48: PYI036 All keyword-only arguments in `__aexit__` must have a default value
+PYI036.pyi:59:48: PYI036 (bad-exit-annotation) All keyword-only arguments in `__aexit__` must have a default value
    |
 57 | class BadTwo:
 58 |     def __exit__(self, typ, exc, tb, weird_extra_arg) -> None: ... # PYI036: Extra arg must have default
 59 |     async def __aexit__(self, typ, exc, tb, *, weird_extra_arg1, weird_extra_arg2) -> None: ...# PYI036: kwargs must have default
-   |                                                ^^^^^^^^^^^^^^^^ PYI036
+   |                                                ^^^^^^^^^^^^^^^^ PYI036 (bad-exit-annotation)
 60 | 
 61 | class BadThree:
    |
 
-PYI036.pyi:59:66: PYI036 All keyword-only arguments in `__aexit__` must have a default value
+PYI036.pyi:59:66: PYI036 (bad-exit-annotation) All keyword-only arguments in `__aexit__` must have a default value
    |
 57 | class BadTwo:
 58 |     def __exit__(self, typ, exc, tb, weird_extra_arg) -> None: ... # PYI036: Extra arg must have default
 59 |     async def __aexit__(self, typ, exc, tb, *, weird_extra_arg1, weird_extra_arg2) -> None: ...# PYI036: kwargs must have default
-   |                                                                  ^^^^^^^^^^^^^^^^ PYI036
+   |                                                                  ^^^^^^^^^^^^^^^^ PYI036 (bad-exit-annotation)
 60 | 
 61 | class BadThree:
    |
 
-PYI036.pyi:62:29: PYI036 The first argument in `__exit__` should be annotated with `object` or `type[BaseException] | None`
+PYI036.pyi:62:29: PYI036 (bad-exit-annotation) The first argument in `__exit__` should be annotated with `object` or `type[BaseException] | None`
    |
 61 | class BadThree:
 62 |     def __exit__(self, typ: type[BaseException], exc: BaseException | None, tb: TracebackType | None) -> None: ... # PYI036: First arg has bad annotation
-   |                             ^^^^^^^^^^^^^^^^^^^ PYI036
+   |                             ^^^^^^^^^^^^^^^^^^^ PYI036 (bad-exit-annotation)
 63 |     async def __aexit__(self, __typ: type[BaseException] | None, __exc: BaseException, __tb: TracebackType) -> bool | None: ... # PYI036: Second arg has bad annotation
    |
 
-PYI036.pyi:63:73: PYI036 The second argument in `__aexit__` should be annotated with `object` or `BaseException | None`
+PYI036.pyi:63:73: PYI036 (bad-exit-annotation) The second argument in `__aexit__` should be annotated with `object` or `BaseException | None`
    |
 61 | class BadThree:
 62 |     def __exit__(self, typ: type[BaseException], exc: BaseException | None, tb: TracebackType | None) -> None: ... # PYI036: First arg has bad annotation
 63 |     async def __aexit__(self, __typ: type[BaseException] | None, __exc: BaseException, __tb: TracebackType) -> bool | None: ... # PYI036: Second arg has bad annotation
-   |                                                                         ^^^^^^^^^^^^^ PYI036
+   |                                                                         ^^^^^^^^^^^^^ PYI036 (bad-exit-annotation)
 64 | 
 65 | class BadFour:
    |
 
-PYI036.pyi:63:94: PYI036 The third argument in `__aexit__` should be annotated with `object` or `types.TracebackType | None`
+PYI036.pyi:63:94: PYI036 (bad-exit-annotation) The third argument in `__aexit__` should be annotated with `object` or `types.TracebackType | None`
    |
 61 | class BadThree:
 62 |     def __exit__(self, typ: type[BaseException], exc: BaseException | None, tb: TracebackType | None) -> None: ... # PYI036: First arg has bad annotation
 63 |     async def __aexit__(self, __typ: type[BaseException] | None, __exc: BaseException, __tb: TracebackType) -> bool | None: ... # PYI036: Second arg has bad annotation
-   |                                                                                              ^^^^^^^^^^^^^ PYI036
+   |                                                                                              ^^^^^^^^^^^^^ PYI036 (bad-exit-annotation)
 64 | 
 65 | class BadFour:
    |
 
-PYI036.pyi:66:111: PYI036 The third argument in `__exit__` should be annotated with `object` or `types.TracebackType | None`
+PYI036.pyi:66:111: PYI036 (bad-exit-annotation) The third argument in `__exit__` should be annotated with `object` or `types.TracebackType | None`
    |
 65 | class BadFour:
 66 |     def __exit__(self, typ: typing.Optional[type[BaseException]], exc: typing.Union[BaseException, None], tb: TracebackType) -> None: ... # PYI036: Third arg has bad annotation
-   |                                                                                                               ^^^^^^^^^^^^^ PYI036
+   |                                                                                                               ^^^^^^^^^^^^^ PYI036 (bad-exit-annotation)
 67 |     async def __aexit__(self, __typ: type[BaseException] | None, __exc: BaseException | None, __tb: typing.Union[TracebackType, None, int]) -> bool | None: ... # PYI036: Third arg has bad annotation
    |
 
-PYI036.pyi:67:101: PYI036 The third argument in `__aexit__` should be annotated with `object` or `types.TracebackType | None`
+PYI036.pyi:67:101: PYI036 (bad-exit-annotation) The third argument in `__aexit__` should be annotated with `object` or `types.TracebackType | None`
    |
 65 | class BadFour:
 66 |     def __exit__(self, typ: typing.Optional[type[BaseException]], exc: typing.Union[BaseException, None], tb: TracebackType) -> None: ... # PYI036: Third arg has bad annotation
 67 |     async def __aexit__(self, __typ: type[BaseException] | None, __exc: BaseException | None, __tb: typing.Union[TracebackType, None, int]) -> bool | None: ... # PYI036: Third arg has bad annotation
-   |                                                                                                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PYI036
+   |                                                                                                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PYI036 (bad-exit-annotation)
 68 | 
 69 | class BadFive:
    |
 
-PYI036.pyi:70:29: PYI036 The first argument in `__exit__` should be annotated with `object` or `type[BaseException] | None`
+PYI036.pyi:70:29: PYI036 (bad-exit-annotation) The first argument in `__exit__` should be annotated with `object` or `type[BaseException] | None`
    |
 69 | class BadFive:
 70 |     def __exit__(self, typ: BaseException | None, *args: list[str]) -> bool: ... # PYI036: Bad star-args annotation
-   |                             ^^^^^^^^^^^^^^^^^^^^ PYI036
+   |                             ^^^^^^^^^^^^^^^^^^^^ PYI036 (bad-exit-annotation)
 71 |     async def __aexit__(self, /, typ: type[BaseException] | None, *args: Any) -> Awaitable[None]: ... # PYI036: Bad star-args annotation
    |
 
-PYI036.pyi:70:58: PYI036 [*] Star-args in `__exit__` should be annotated with `object`
+PYI036.pyi:70:58: PYI036 (bad-exit-annotation) [*] Star-args in `__exit__` should be annotated with `object`
    |
 69 | class BadFive:
 70 |     def __exit__(self, typ: BaseException | None, *args: list[str]) -> bool: ... # PYI036: Bad star-args annotation
-   |                                                          ^^^^^^^^^ PYI036
+   |                                                          ^^^^^^^^^ PYI036 (bad-exit-annotation)
 71 |     async def __aexit__(self, /, typ: type[BaseException] | None, *args: Any) -> Awaitable[None]: ... # PYI036: Bad star-args annotation
    |
    = help: Annotate star-args with `object`
@@ -131,12 +131,12 @@ PYI036.pyi:70:58: PYI036 [*] Star-args in `__exit__` should be annotated with `o
 72 72 | 
 73 73 | class BadSix:
 
-PYI036.pyi:71:74: PYI036 [*] Star-args in `__aexit__` should be annotated with `object`
+PYI036.pyi:71:74: PYI036 (bad-exit-annotation) [*] Star-args in `__aexit__` should be annotated with `object`
    |
 69 | class BadFive:
 70 |     def __exit__(self, typ: BaseException | None, *args: list[str]) -> bool: ... # PYI036: Bad star-args annotation
 71 |     async def __aexit__(self, /, typ: type[BaseException] | None, *args: Any) -> Awaitable[None]: ... # PYI036: Bad star-args annotation
-   |                                                                          ^^^ PYI036
+   |                                                                          ^^^ PYI036 (bad-exit-annotation)
 72 | 
 73 | class BadSix:
    |
@@ -152,64 +152,64 @@ PYI036.pyi:71:74: PYI036 [*] Star-args in `__aexit__` should be annotated with `
 73 73 | class BadSix:
 74 74 |     def __exit__(self, typ, exc, tb, weird_extra_arg, extra_arg2 = None) -> None: ... # PYI036: Extra arg must have default
 
-PYI036.pyi:74:38: PYI036 All arguments after the first four in `__exit__` must have a default value
+PYI036.pyi:74:38: PYI036 (bad-exit-annotation) All arguments after the first four in `__exit__` must have a default value
    |
 73 | class BadSix:
 74 |     def __exit__(self, typ, exc, tb, weird_extra_arg, extra_arg2 = None) -> None: ... # PYI036: Extra arg must have default
-   |                                      ^^^^^^^^^^^^^^^ PYI036
+   |                                      ^^^^^^^^^^^^^^^ PYI036 (bad-exit-annotation)
 75 |     async def __aexit__(self, typ, exc, tb, *, weird_extra_arg) -> None: ... # PYI036: kwargs must have default
    |
 
-PYI036.pyi:75:48: PYI036 All keyword-only arguments in `__aexit__` must have a default value
+PYI036.pyi:75:48: PYI036 (bad-exit-annotation) All keyword-only arguments in `__aexit__` must have a default value
    |
 73 | class BadSix:
 74 |     def __exit__(self, typ, exc, tb, weird_extra_arg, extra_arg2 = None) -> None: ... # PYI036: Extra arg must have default
 75 |     async def __aexit__(self, typ, exc, tb, *, weird_extra_arg) -> None: ... # PYI036: kwargs must have default
-   |                                                ^^^^^^^^^^^^^^^ PYI036
+   |                                                ^^^^^^^^^^^^^^^ PYI036 (bad-exit-annotation)
    |
 
-PYI036.pyi:89:29: PYI036 The first argument in `__exit__` should be annotated with `object` or `type[BaseException] | None`
+PYI036.pyi:89:29: PYI036 (bad-exit-annotation) The first argument in `__exit__` should be annotated with `object` or `type[BaseException] | None`
    |
 88 | class BadAllPositionalOnlyArgs:
 89 |     def __exit__(self, typ: type[Exception] | None, exc: BaseException | None, tb: TracebackType | None, /) -> None: ...
-   |                             ^^^^^^^^^^^^^^^^^^^^^^ PYI036
+   |                             ^^^^^^^^^^^^^^^^^^^^^^ PYI036 (bad-exit-annotation)
 90 |     async def __aexit__(self, typ: type[BaseException] | None, exc: BaseException | None, tb: TracebackType, /) -> None: ...
    |
 
-PYI036.pyi:90:95: PYI036 The third argument in `__aexit__` should be annotated with `object` or `types.TracebackType | None`
+PYI036.pyi:90:95: PYI036 (bad-exit-annotation) The third argument in `__aexit__` should be annotated with `object` or `types.TracebackType | None`
    |
 88 | class BadAllPositionalOnlyArgs:
 89 |     def __exit__(self, typ: type[Exception] | None, exc: BaseException | None, tb: TracebackType | None, /) -> None: ...
 90 |     async def __aexit__(self, typ: type[BaseException] | None, exc: BaseException | None, tb: TracebackType, /) -> None: ...
-   |                                                                                               ^^^^^^^^^^^^^ PYI036
+   |                                                                                               ^^^^^^^^^^^^^ PYI036 (bad-exit-annotation)
 91 | 
 92 | # Definitions not in a class scope can do whatever, we don't care
    |
 
-PYI036.pyi:159:17: PYI036 Annotations for a three-argument `__exit__` overload (excluding `self`) should either be `None, None, None` or `type[BaseException], BaseException, types.TracebackType`
+PYI036.pyi:159:17: PYI036 (bad-exit-annotation) Annotations for a three-argument `__exit__` overload (excluding `self`) should either be `None, None, None` or `type[BaseException], BaseException, types.TracebackType`
     |
 157 |     def __exit__(self, exc_typ: None, exc: None, tb: None) -> None: ...  # Okay
 158 |     @overload
 159 |     def __exit__(self, exc_typ: Exception, exc: Exception, tb: TracebackType) -> None: ...  # PYI036
-    |                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PYI036
+    |                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PYI036 (bad-exit-annotation)
 160 | 
 161 | class UnacceptableOverload2:
     |
 
-PYI036.pyi:163:17: PYI036 Annotations for a three-argument `__exit__` overload (excluding `self`) should either be `None, None, None` or `type[BaseException], BaseException, types.TracebackType`
+PYI036.pyi:163:17: PYI036 (bad-exit-annotation) Annotations for a three-argument `__exit__` overload (excluding `self`) should either be `None, None, None` or `type[BaseException], BaseException, types.TracebackType`
     |
 161 | class UnacceptableOverload2:
 162 |     @overload
 163 |     def __exit__(self, exc_typ: type[BaseException] | None, exc: None, tb: None) -> None: ...  # PYI036
-    |                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PYI036
+    |                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PYI036 (bad-exit-annotation)
 164 |     @overload
 165 |     def __exit__(self, exc_typ: object, exc: Exception, tb: builtins.TracebackType) -> None: ...  # PYI036
     |
 
-PYI036.pyi:165:17: PYI036 Annotations for a three-argument `__exit__` overload (excluding `self`) should either be `None, None, None` or `type[BaseException], BaseException, types.TracebackType`
+PYI036.pyi:165:17: PYI036 (bad-exit-annotation) Annotations for a three-argument `__exit__` overload (excluding `self`) should either be `None, None, None` or `type[BaseException], BaseException, types.TracebackType`
     |
 163 |     def __exit__(self, exc_typ: type[BaseException] | None, exc: None, tb: None) -> None: ...  # PYI036
 164 |     @overload
 165 |     def __exit__(self, exc_typ: object, exc: Exception, tb: builtins.TracebackType) -> None: ...  # PYI036
-    |                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PYI036
+    |                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PYI036 (bad-exit-annotation)
     |

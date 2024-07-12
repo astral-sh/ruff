@@ -1,12 +1,12 @@
 ---
 source: crates/ruff_linter/src/rules/pyupgrade/mod.rs
 ---
-UP017.py:10:11: UP017 [*] Use `datetime.UTC` alias
+UP017.py:10:11: UP017 (datetime-timezone-utc) [*] Use `datetime.UTC` alias
    |
  8 |     from datetime import timezone
  9 | 
 10 |     print(timezone.utc)
-   |           ^^^^^^^^^^^^ UP017
+   |           ^^^^^^^^^^^^ UP017 (datetime-timezone-utc)
    |
    = help: Convert to `datetime.UTC` alias
 
@@ -25,12 +25,12 @@ UP017.py:10:11: UP017 [*] Use `datetime.UTC` alias
 12 13 | 
 13 14 | def func():
 
-UP017.py:16:11: UP017 [*] Use `datetime.UTC` alias
+UP017.py:16:11: UP017 (datetime-timezone-utc) [*] Use `datetime.UTC` alias
    |
 14 |     from datetime import timezone as tz
 15 | 
 16 |     print(tz.utc)
-   |           ^^^^^^ UP017
+   |           ^^^^^^ UP017 (datetime-timezone-utc)
    |
    = help: Convert to `datetime.UTC` alias
 
@@ -49,12 +49,12 @@ UP017.py:16:11: UP017 [*] Use `datetime.UTC` alias
 18 19 | 
 19 20 | def func():
 
-UP017.py:22:11: UP017 [*] Use `datetime.UTC` alias
+UP017.py:22:11: UP017 (datetime-timezone-utc) [*] Use `datetime.UTC` alias
    |
 20 |     import datetime
 21 | 
 22 |     print(datetime.timezone.utc)
-   |           ^^^^^^^^^^^^^^^^^^^^^ UP017
+   |           ^^^^^^^^^^^^^^^^^^^^^ UP017 (datetime-timezone-utc)
    |
    = help: Convert to `datetime.UTC` alias
 
@@ -68,12 +68,12 @@ UP017.py:22:11: UP017 [*] Use `datetime.UTC` alias
 24 24 | 
 25 25 | def func():
 
-UP017.py:28:11: UP017 [*] Use `datetime.UTC` alias
+UP017.py:28:11: UP017 (datetime-timezone-utc) [*] Use `datetime.UTC` alias
    |
 26 |     import datetime as dt
 27 | 
 28 |     print(dt.timezone.utc)
-   |           ^^^^^^^^^^^^^^^ UP017
+   |           ^^^^^^^^^^^^^^^ UP017 (datetime-timezone-utc)
    |
    = help: Convert to `datetime.UTC` alias
 

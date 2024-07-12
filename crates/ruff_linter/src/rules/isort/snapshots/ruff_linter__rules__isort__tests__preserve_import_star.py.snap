@@ -1,7 +1,7 @@
 ---
 source: crates/ruff_linter/src/rules/isort/mod.rs
 ---
-preserve_import_star.py:1:1: I001 [*] Import block is un-sorted or un-formatted
+preserve_import_star.py:1:1: I001 (unsorted-imports) [*] Import block is un-sorted or un-formatted
   |
 1 | / from some_other_module import some_class
 2 | | from some_other_module import *
@@ -24,5 +24,3 @@ preserve_import_star.py:1:1: I001 [*] Import block is un-sorted or un-formatted
   5 |+from some_module import some_class  # Aside
   6 |+from some_other_module import *
   7 |+from some_other_module import some_class
-
-

@@ -1,11 +1,11 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_use_pathlib/mod.rs
 ---
-PTH201.py:5:10: PTH201 [*] Do not pass the current directory explicitly to `Path`
+PTH201.py:5:10: PTH201 (path-constructor-current-directory) [*] Do not pass the current directory explicitly to `Path`
   |
 4 | # match
 5 | _ = Path(".")
-  |          ^^^ PTH201
+  |          ^^^ PTH201 (path-constructor-current-directory)
 6 | _ = pth(".")
 7 | _ = PurePath(".")
   |
@@ -21,12 +21,12 @@ PTH201.py:5:10: PTH201 [*] Do not pass the current directory explicitly to `Path
 7 7 | _ = PurePath(".")
 8 8 | _ = Path("")
 
-PTH201.py:6:9: PTH201 [*] Do not pass the current directory explicitly to `Path`
+PTH201.py:6:9: PTH201 (path-constructor-current-directory) [*] Do not pass the current directory explicitly to `Path`
   |
 4 | # match
 5 | _ = Path(".")
 6 | _ = pth(".")
-  |         ^^^ PTH201
+  |         ^^^ PTH201 (path-constructor-current-directory)
 7 | _ = PurePath(".")
 8 | _ = Path("")
   |
@@ -42,12 +42,12 @@ PTH201.py:6:9: PTH201 [*] Do not pass the current directory explicitly to `Path`
 8 8 | _ = Path("")
 9 9 | 
 
-PTH201.py:7:14: PTH201 [*] Do not pass the current directory explicitly to `Path`
+PTH201.py:7:14: PTH201 (path-constructor-current-directory) [*] Do not pass the current directory explicitly to `Path`
   |
 5 | _ = Path(".")
 6 | _ = pth(".")
 7 | _ = PurePath(".")
-  |              ^^^ PTH201
+  |              ^^^ PTH201 (path-constructor-current-directory)
 8 | _ = Path("")
   |
   = help: Remove the current directory argument
@@ -62,12 +62,12 @@ PTH201.py:7:14: PTH201 [*] Do not pass the current directory explicitly to `Path
 9 9 | 
 10 10 | # no match
 
-PTH201.py:8:10: PTH201 [*] Do not pass the current directory explicitly to `Path`
+PTH201.py:8:10: PTH201 (path-constructor-current-directory) [*] Do not pass the current directory explicitly to `Path`
    |
  6 | _ = pth(".")
  7 | _ = PurePath(".")
  8 | _ = Path("")
-   |          ^^ PTH201
+   |          ^^ PTH201 (path-constructor-current-directory)
  9 | 
 10 | # no match
    |
@@ -82,5 +82,3 @@ PTH201.py:8:10: PTH201 [*] Do not pass the current directory explicitly to `Path
 9 9 | 
 10 10 | # no match
 11 11 | _ = Path()
-
-

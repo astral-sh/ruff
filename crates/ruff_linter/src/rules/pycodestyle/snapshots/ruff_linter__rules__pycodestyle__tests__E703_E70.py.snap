@@ -1,12 +1,12 @@
 ---
 source: crates/ruff_linter/src/rules/pycodestyle/mod.rs
 ---
-E70.py:10:13: E703 [*] Statement ends with an unnecessary semicolon
+E70.py:10:13: E703 (useless-semicolon) [*] Statement ends with an unnecessary semicolon
    |
  8 | import bdist_egg; bdist_egg.write_safety_flag(cmd.egg_info, safe)
  9 | #: E703:1:13
 10 | import shlex;
-   |             ^ E703
+   |             ^ E703 (useless-semicolon)
 11 | #: E702:1:9 E703:1:23
 12 | del a[:]; a.append(42);
    |
@@ -22,12 +22,12 @@ E70.py:10:13: E703 [*] Statement ends with an unnecessary semicolon
 12 12 | del a[:]; a.append(42);
 13 13 | #: E704:1:1
 
-E70.py:12:23: E703 [*] Statement ends with an unnecessary semicolon
+E70.py:12:23: E703 (useless-semicolon) [*] Statement ends with an unnecessary semicolon
    |
 10 | import shlex;
 11 | #: E702:1:9 E703:1:23
 12 | del a[:]; a.append(42);
-   |                       ^ E703
+   |                       ^ E703 (useless-semicolon)
 13 | #: E704:1:1
 14 | def f(x): return 2
    |
@@ -43,12 +43,12 @@ E70.py:12:23: E703 [*] Statement ends with an unnecessary semicolon
 14 14 | def f(x): return 2
 15 15 | #: E704:1:1
 
-E70.py:25:14: E703 [*] Statement ends with an unnecessary semicolon
+E70.py:25:14: E703 (useless-semicolon) [*] Statement ends with an unnecessary semicolon
    |
 23 |     def f(x): return 2*x
 24 | #: E704:1:8 E702:1:11 E703:1:14
 25 | if True: x; y;
-   |              ^ E703
+   |              ^ E703 (useless-semicolon)
 26 | #: E701:1:8
 27 | if True: lambda a: b
    |
@@ -64,12 +64,12 @@ E70.py:25:14: E703 [*] Statement ends with an unnecessary semicolon
 27 27 | if True: lambda a: b
 28 28 | #: E701:1:10
 
-E70.py:68:1: E703 [*] Statement ends with an unnecessary semicolon
+E70.py:68:1: E703 (useless-semicolon) [*] Statement ends with an unnecessary semicolon
    |
 66 | #: E703:2:1
 67 | 0\
 68 | ;
-   | ^ E703
+   | ^ E703 (useless-semicolon)
 69 | #: E701:2:3
 70 | a = \
    |
@@ -86,12 +86,12 @@ E70.py:68:1: E703 [*] Statement ends with an unnecessary semicolon
 70 69 | a = \
 71 70 |   5;
 
-E70.py:71:4: E703 [*] Statement ends with an unnecessary semicolon
+E70.py:71:4: E703 (useless-semicolon) [*] Statement ends with an unnecessary semicolon
    |
 69 | #: E701:2:3
 70 | a = \
 71 |   5;
-   |    ^ E703
+   |    ^ E703 (useless-semicolon)
 72 | #:
 73 | with x(y) as z: ...
    |
@@ -105,5 +105,3 @@ E70.py:71:4: E703 [*] Statement ends with an unnecessary semicolon
    71 |+  5
 72 72 | #:
 73 73 | with x(y) as z: ...
-
-

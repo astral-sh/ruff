@@ -1,12 +1,12 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_return/mod.rs
 ---
-RET501.py:4:5: RET501 [*] Do not explicitly `return None` in function if it is the only possible return value
+RET501.py:4:5: RET501 (unnecessary-return-none) [*] Do not explicitly `return None` in function if it is the only possible return value
   |
 2 |     if not y:
 3 |         return
 4 |     return None  # error
-  |     ^^^^^^^^^^^ RET501
+  |     ^^^^^^^^^^^ RET501 (unnecessary-return-none)
   |
   = help: Remove explicit `return None`
 
@@ -20,12 +20,12 @@ RET501.py:4:5: RET501 [*] Do not explicitly `return None` in function if it is t
 6 6 | 
 7 7 | class BaseCache:
 
-RET501.py:14:9: RET501 [*] Do not explicitly `return None` in function if it is the only possible return value
+RET501.py:14:9: RET501 (unnecessary-return-none) [*] Do not explicitly `return None` in function if it is the only possible return value
    |
 12 |     def get(self, key: str) -> None:
 13 |         print(f"{key} not found")
 14 |         return None
-   |         ^^^^^^^^^^^ RET501
+   |         ^^^^^^^^^^^ RET501 (unnecessary-return-none)
 15 | 
 16 |     @property
    |

@@ -1,14 +1,14 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_return/mod.rs
 ---
-RET503.py:21:5: RET503 [*] Missing explicit `return` at the end of function able to return non-`None` value
+RET503.py:21:5: RET503 (implicit-return) [*] Missing explicit `return` at the end of function able to return non-`None` value
    |
 19 |   # if/elif/else
 20 |   def x(y):
 21 |       if not y:
    |  _____^
 22 | |         return 1
-   | |________________^ RET503
+   | |________________^ RET503 (implicit-return)
 23 |       # error
    |
    = help: Add explicit `return` statement
@@ -22,12 +22,12 @@ RET503.py:21:5: RET503 [*] Missing explicit `return` at the end of function able
 24 25 | 
 25 26 | 
 
-RET503.py:28:9: RET503 [*] Missing explicit `return` at the end of function able to return non-`None` value
+RET503.py:28:9: RET503 (implicit-return) [*] Missing explicit `return` at the end of function able to return non-`None` value
    |
 26 | def x(y):
 27 |     if not y:
 28 |         print()  # error
-   |         ^^^^^^^ RET503
+   |         ^^^^^^^ RET503 (implicit-return)
 29 |     else:
 30 |         return 2
    |
@@ -42,12 +42,12 @@ RET503.py:28:9: RET503 [*] Missing explicit `return` at the end of function able
 30 31 |         return 2
 31 32 | 
 
-RET503.py:37:5: RET503 [*] Missing explicit `return` at the end of function able to return non-`None` value
+RET503.py:37:5: RET503 (implicit-return) [*] Missing explicit `return` at the end of function able to return non-`None` value
    |
 35 |         return 1
 36 | 
 37 |     print()  # error
-   |     ^^^^^^^ RET503
+   |     ^^^^^^^ RET503 (implicit-return)
    |
    = help: Add explicit `return` statement
 
@@ -60,7 +60,7 @@ RET503.py:37:5: RET503 [*] Missing explicit `return` at the end of function able
 39 40 | 
 40 41 | # for
 
-RET503.py:42:5: RET503 [*] Missing explicit `return` at the end of function able to return non-`None` value
+RET503.py:42:5: RET503 (implicit-return) [*] Missing explicit `return` at the end of function able to return non-`None` value
    |
 40 |   # for
 41 |   def x(y):
@@ -68,7 +68,7 @@ RET503.py:42:5: RET503 [*] Missing explicit `return` at the end of function able
    |  _____^
 43 | |         if i > 10:
 44 | |             return i
-   | |____________________^ RET503
+   | |____________________^ RET503 (implicit-return)
 45 |       # error
    |
    = help: Add explicit `return` statement
@@ -82,12 +82,12 @@ RET503.py:42:5: RET503 [*] Missing explicit `return` at the end of function able
 46 47 | 
 47 48 | 
 
-RET503.py:53:9: RET503 [*] Missing explicit `return` at the end of function able to return non-`None` value
+RET503.py:53:9: RET503 (implicit-return) [*] Missing explicit `return` at the end of function able to return non-`None` value
    |
 51 |             return i
 52 |     else:
 53 |         print()  # error
-   |         ^^^^^^^ RET503
+   |         ^^^^^^^ RET503 (implicit-return)
    |
    = help: Add explicit `return` statement
 
@@ -100,12 +100,12 @@ RET503.py:53:9: RET503 [*] Missing explicit `return` at the end of function able
 55 56 | 
 56 57 | # A nonexistent function
 
-RET503.py:60:5: RET503 [*] Missing explicit `return` at the end of function able to return non-`None` value
+RET503.py:60:5: RET503 (implicit-return) [*] Missing explicit `return` at the end of function able to return non-`None` value
    |
 58 |     if x > 0:
 59 |         return False
 60 |     no_such_function()  # error
-   |     ^^^^^^^^^^^^^^^^^^ RET503
+   |     ^^^^^^^^^^^^^^^^^^ RET503 (implicit-return)
    |
    = help: Add explicit `return` statement
 
@@ -118,12 +118,12 @@ RET503.py:60:5: RET503 [*] Missing explicit `return` at the end of function able
 62 63 | 
 63 64 | # A function that does return the control
 
-RET503.py:67:5: RET503 [*] Missing explicit `return` at the end of function able to return non-`None` value
+RET503.py:67:5: RET503 (implicit-return) [*] Missing explicit `return` at the end of function able to return non-`None` value
    |
 65 |     if x > 0:
 66 |         return False
 67 |     print("", end="")  # error
-   |     ^^^^^^^^^^^^^^^^^ RET503
+   |     ^^^^^^^^^^^^^^^^^ RET503 (implicit-return)
    |
    = help: Add explicit `return` statement
 
@@ -136,7 +136,7 @@ RET503.py:67:5: RET503 [*] Missing explicit `return` at the end of function able
 69 70 | 
 70 71 | ###
 
-RET503.py:83:5: RET503 [*] Missing explicit `return` at the end of function able to return non-`None` value
+RET503.py:83:5: RET503 (implicit-return) [*] Missing explicit `return` at the end of function able to return non-`None` value
    |
 81 |   # last line in while loop
 82 |   def x(y):
@@ -145,7 +145,7 @@ RET503.py:83:5: RET503 [*] Missing explicit `return` at the end of function able
 84 | |         if y > 0:
 85 | |             return 1
 86 | |         y += 1
-   | |______________^ RET503
+   | |______________^ RET503 (implicit-return)
    |
    = help: Add explicit `return` statement
 
@@ -158,7 +158,7 @@ RET503.py:83:5: RET503 [*] Missing explicit `return` at the end of function able
 88 89 | 
 89 90 | # exclude empty functions
 
-RET503.py:114:5: RET503 [*] Missing explicit `return` at the end of function able to return non-`None` value
+RET503.py:114:5: RET503 (implicit-return) [*] Missing explicit `return` at the end of function able to return non-`None` value
     |
 112 |   # return value within loop
 113 |   def bar1(x, y, z):
@@ -167,7 +167,7 @@ RET503.py:114:5: RET503 [*] Missing explicit `return` at the end of function abl
 115 | |         if i > y:
 116 | |             break
 117 | |         return z
-    | |________________^ RET503
+    | |________________^ RET503 (implicit-return)
     |
     = help: Add explicit `return` statement
 
@@ -180,7 +180,7 @@ RET503.py:114:5: RET503 [*] Missing explicit `return` at the end of function abl
 119 120 | 
 120 121 | def bar3(x, y, z):
 
-RET503.py:121:5: RET503 [*] Missing explicit `return` at the end of function able to return non-`None` value
+RET503.py:121:5: RET503 (implicit-return) [*] Missing explicit `return` at the end of function able to return non-`None` value
     |
 120 |   def bar3(x, y, z):
 121 |       for i in x:
@@ -191,7 +191,7 @@ RET503.py:121:5: RET503 [*] Missing explicit `return` at the end of function abl
 125 | |         else:
 126 | |             return z
 127 | |         return None
-    | |___________________^ RET503
+    | |___________________^ RET503 (implicit-return)
     |
     = help: Add explicit `return` statement
 
@@ -204,7 +204,7 @@ RET503.py:121:5: RET503 [*] Missing explicit `return` at the end of function abl
 129 130 | 
 130 131 | def bar1(x, y, z):
 
-RET503.py:131:5: RET503 [*] Missing explicit `return` at the end of function able to return non-`None` value
+RET503.py:131:5: RET503 (implicit-return) [*] Missing explicit `return` at the end of function able to return non-`None` value
     |
 130 |   def bar1(x, y, z):
 131 |       for i in x:
@@ -212,7 +212,7 @@ RET503.py:131:5: RET503 [*] Missing explicit `return` at the end of function abl
 132 | |         if i < y:
 133 | |             continue
 134 | |         return z
-    | |________________^ RET503
+    | |________________^ RET503 (implicit-return)
     |
     = help: Add explicit `return` statement
 
@@ -225,7 +225,7 @@ RET503.py:131:5: RET503 [*] Missing explicit `return` at the end of function abl
 136 137 | 
 137 138 | def bar3(x, y, z):
 
-RET503.py:138:5: RET503 [*] Missing explicit `return` at the end of function able to return non-`None` value
+RET503.py:138:5: RET503 (implicit-return) [*] Missing explicit `return` at the end of function able to return non-`None` value
     |
 137 |   def bar3(x, y, z):
 138 |       for i in x:
@@ -236,7 +236,7 @@ RET503.py:138:5: RET503 [*] Missing explicit `return` at the end of function abl
 142 | |         else:
 143 | |             return z
 144 | |         return None
-    | |___________________^ RET503
+    | |___________________^ RET503 (implicit-return)
     |
     = help: Add explicit `return` statement
 
@@ -249,14 +249,14 @@ RET503.py:138:5: RET503 [*] Missing explicit `return` at the end of function abl
 146 147 | 
 147 148 | def prompts(self, foo):
 
-RET503.py:275:5: RET503 [*] Missing explicit `return` at the end of function able to return non-`None` value
+RET503.py:275:5: RET503 (implicit-return) [*] Missing explicit `return` at the end of function able to return non-`None` value
     |
 273 |           return False
 274 |   
 275 |       for value in values:
     |  _____^
 276 | |         print(value)
-    | |____________________^ RET503
+    | |____________________^ RET503 (implicit-return)
     |
     = help: Add explicit `return` statement
 
@@ -269,12 +269,12 @@ RET503.py:275:5: RET503 [*] Missing explicit `return` at the end of function abl
 278 279 | 
 279 280 | def while_true():
 
-RET503.py:292:13: RET503 [*] Missing explicit `return` at the end of function able to return non-`None` value
+RET503.py:292:13: RET503 (implicit-return) [*] Missing explicit `return` at the end of function able to return non-`None` value
     |
 290 |             return 1
 291 |         case 1:
 292 |             print()  # error
-    |             ^^^^^^^ RET503
+    |             ^^^^^^^ RET503 (implicit-return)
     |
     = help: Add explicit `return` statement
 
@@ -287,14 +287,14 @@ RET503.py:292:13: RET503 [*] Missing explicit `return` at the end of function ab
 294 295 | 
 295 296 | def foo(baz: str) -> str:
 
-RET503.py:301:9: RET503 [*] Missing explicit `return` at the end of function able to return non-`None` value
+RET503.py:301:9: RET503 (implicit-return) [*] Missing explicit `return` at the end of function able to return non-`None` value
     |
 299 |   def end_of_statement():
 300 |       def example():
 301 |           if True:
     |  _________^
 302 | |             return ""
-    | |_____________________^ RET503
+    | |_____________________^ RET503 (implicit-return)
     |
     = help: Add explicit `return` statement
 
@@ -307,13 +307,13 @@ RET503.py:301:9: RET503 [*] Missing explicit `return` at the end of function abl
 304 305 | 
 305 306 |     def example():
 
-RET503.py:306:9: RET503 [*] Missing explicit `return` at the end of function able to return non-`None` value
+RET503.py:306:9: RET503 (implicit-return) [*] Missing explicit `return` at the end of function able to return non-`None` value
     |
 305 |       def example():
 306 |           if True:
     |  _________^
 307 | |             return ""
-    | |_____________________^ RET503
+    | |_____________________^ RET503 (implicit-return)
     |
     = help: Add explicit `return` statement
 
@@ -326,13 +326,13 @@ RET503.py:306:9: RET503 [*] Missing explicit `return` at the end of function abl
 309 310 | 
 310 311 |     def example():
 
-RET503.py:311:9: RET503 [*] Missing explicit `return` at the end of function able to return non-`None` value
+RET503.py:311:9: RET503 (implicit-return) [*] Missing explicit `return` at the end of function able to return non-`None` value
     |
 310 |       def example():
 311 |           if True:
     |  _________^
 312 | |             return ""  # type: ignore
-    | |_____________________^ RET503
+    | |_____________________^ RET503 (implicit-return)
     |
     = help: Add explicit `return` statement
 
@@ -345,13 +345,13 @@ RET503.py:311:9: RET503 [*] Missing explicit `return` at the end of function abl
 314 315 | 
 315 316 |     def example():
 
-RET503.py:316:9: RET503 [*] Missing explicit `return` at the end of function able to return non-`None` value
+RET503.py:316:9: RET503 (implicit-return) [*] Missing explicit `return` at the end of function able to return non-`None` value
     |
 315 |       def example():
 316 |           if True:
     |  _________^
 317 | |             return ""  ;
-    | |_____________________^ RET503
+    | |_____________________^ RET503 (implicit-return)
     |
     = help: Add explicit `return` statement
 
@@ -364,13 +364,13 @@ RET503.py:316:9: RET503 [*] Missing explicit `return` at the end of function abl
 319 320 | 
 320 321 |     def example():
 
-RET503.py:321:9: RET503 [*] Missing explicit `return` at the end of function able to return non-`None` value
+RET503.py:321:9: RET503 (implicit-return) [*] Missing explicit `return` at the end of function able to return non-`None` value
     |
 320 |       def example():
 321 |           if True:
     |  _________^
 322 | |             return "" \
-    | |_____________________^ RET503
+    | |_____________________^ RET503 (implicit-return)
 323 |                   ;  # type: ignore
     |
     = help: Add explicit `return` statement
@@ -384,12 +384,12 @@ RET503.py:321:9: RET503 [*] Missing explicit `return` at the end of function abl
 325 326 | 
 326 327 | def end_of_file():
 
-RET503.py:329:5: RET503 [*] Missing explicit `return` at the end of function able to return non-`None` value
+RET503.py:329:5: RET503 (implicit-return) [*] Missing explicit `return` at the end of function able to return non-`None` value
     |
 327 |     if False:
 328 |         return 1
 329 |     x = 2 \
-    |     ^^^^^ RET503
+    |     ^^^^^ RET503 (implicit-return)
     |
     = help: Add explicit `return` statement
 
@@ -402,12 +402,12 @@ RET503.py:329:5: RET503 [*] Missing explicit `return` at the end of function abl
 332 333 | 
 333 334 | # function return type annotation NoReturn
 
-RET503.py:339:5: RET503 [*] Missing explicit `return` at the end of function able to return non-`None` value
+RET503.py:339:5: RET503 (implicit-return) [*] Missing explicit `return` at the end of function able to return non-`None` value
     |
 337 |     if x == 5:
 338 |         return 5
 339 |     bar()
-    |     ^^^^^ RET503
+    |     ^^^^^ RET503 (implicit-return)
     |
     = help: Add explicit `return` statement
 
@@ -420,12 +420,12 @@ RET503.py:339:5: RET503 [*] Missing explicit `return` at the end of function abl
 341 342 | 
 342 343 | def foo(string: str) -> str:
 
-RET503.py:354:13: RET503 [*] Missing explicit `return` at the end of function able to return non-`None` value
+RET503.py:354:13: RET503 (implicit-return) [*] Missing explicit `return` at the end of function able to return non-`None` value
     |
 352 |             return "third"
 353 |         case _:
 354 |             raises(string)
-    |             ^^^^^^^^^^^^^^ RET503
+    |             ^^^^^^^^^^^^^^ RET503 (implicit-return)
     |
     = help: Add explicit `return` statement
 
@@ -438,12 +438,12 @@ RET503.py:354:13: RET503 [*] Missing explicit `return` at the end of function ab
 356 357 | 
 357 358 | def foo() -> int:
 
-RET503.py:370:5: RET503 [*] Missing explicit `return` at the end of function able to return non-`None` value
+RET503.py:370:5: RET503 (implicit-return) [*] Missing explicit `return` at the end of function able to return non-`None` value
     |
 368 |     if baz() > 3:
 369 |         return 1
 370 |     bar()
-    |     ^^^^^ RET503
+    |     ^^^^^ RET503 (implicit-return)
     |
     = help: Add explicit `return` statement
 
@@ -452,5 +452,3 @@ RET503.py:370:5: RET503 [*] Missing explicit `return` at the end of function abl
 369 369 |         return 1
 370 370 |     bar()
     371 |+    return None
-
-

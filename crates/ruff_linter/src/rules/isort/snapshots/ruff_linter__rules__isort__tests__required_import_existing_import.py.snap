@@ -1,7 +1,7 @@
 ---
 source: crates/ruff_linter/src/rules/isort/mod.rs
 ---
-existing_import.py:1:1: I002 [*] Missing required import: `from __future__ import annotations`
+existing_import.py:1:1: I002 (missing-required-import) [*] Missing required import: `from __future__ import annotations`
 ℹ Safe fix
   1 |+from __future__ import annotations
 1 2 | from __future__ import generator_stop

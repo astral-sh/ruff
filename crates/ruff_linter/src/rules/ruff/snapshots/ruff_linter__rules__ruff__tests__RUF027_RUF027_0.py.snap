@@ -1,12 +1,12 @@
 ---
 source: crates/ruff_linter/src/rules/ruff/mod.rs
 ---
-RUF027_0.py:5:7: RUF027 [*] Possible f-string without an `f` prefix
+RUF027_0.py:5:7: RUF027 (missing-f-string-syntax) [*] Possible f-string without an `f` prefix
   |
 3 | "always ignore this: {val}"
 4 | 
 5 | print("but don't ignore this: {val}")  # RUF027
-  |       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF027
+  |       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF027 (missing-f-string-syntax)
   |
   = help: Add `f` prefix
 
@@ -20,12 +20,12 @@ RUF027_0.py:5:7: RUF027 [*] Possible f-string without an `f` prefix
 7 7 | 
 8 8 | def simple_cases():
 
-RUF027_0.py:10:9: RUF027 [*] Possible f-string without an `f` prefix
+RUF027_0.py:10:9: RUF027 (missing-f-string-syntax) [*] Possible f-string without an `f` prefix
    |
  8 | def simple_cases():
  9 |     a = 4
 10 |     b = "{a}"  # RUF027
-   |         ^^^^^ RUF027
+   |         ^^^^^ RUF027 (missing-f-string-syntax)
 11 |     c = "{a} {b} f'{val}' "  # RUF027
    |
    = help: Add `f` prefix
@@ -40,12 +40,12 @@ RUF027_0.py:10:9: RUF027 [*] Possible f-string without an `f` prefix
 12 12 | 
 13 13 | 
 
-RUF027_0.py:11:9: RUF027 [*] Possible f-string without an `f` prefix
+RUF027_0.py:11:9: RUF027 (missing-f-string-syntax) [*] Possible f-string without an `f` prefix
    |
  9 |     a = 4
 10 |     b = "{a}"  # RUF027
 11 |     c = "{a} {b} f'{val}' "  # RUF027
-   |         ^^^^^^^^^^^^^^^^^^^ RUF027
+   |         ^^^^^^^^^^^^^^^^^^^ RUF027 (missing-f-string-syntax)
    |
    = help: Add `f` prefix
 
@@ -59,12 +59,12 @@ RUF027_0.py:11:9: RUF027 [*] Possible f-string without an `f` prefix
 13 13 | 
 14 14 | def escaped_string():
 
-RUF027_0.py:21:9: RUF027 [*] Possible f-string without an `f` prefix
+RUF027_0.py:21:9: RUF027 (missing-f-string-syntax) [*] Possible f-string without an `f` prefix
    |
 19 | def raw_string():
 20 |     a = 4
 21 |     b = r"raw string with formatting: {a}"  # RUF027
-   |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF027
+   |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF027 (missing-f-string-syntax)
 22 |     c = r"raw string with \backslashes\ and \"escaped quotes\": {a}"  # RUF027
    |
    = help: Add `f` prefix
@@ -79,12 +79,12 @@ RUF027_0.py:21:9: RUF027 [*] Possible f-string without an `f` prefix
 23 23 | 
 24 24 | 
 
-RUF027_0.py:22:9: RUF027 [*] Possible f-string without an `f` prefix
+RUF027_0.py:22:9: RUF027 (missing-f-string-syntax) [*] Possible f-string without an `f` prefix
    |
 20 |     a = 4
 21 |     b = r"raw string with formatting: {a}"  # RUF027
 22 |     c = r"raw string with \backslashes\ and \"escaped quotes\": {a}"  # RUF027
-   |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF027
+   |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF027 (missing-f-string-syntax)
    |
    = help: Add `f` prefix
 
@@ -98,12 +98,12 @@ RUF027_0.py:22:9: RUF027 [*] Possible f-string without an `f` prefix
 24 24 | 
 25 25 | def print_name(name: str):
 
-RUF027_0.py:27:11: RUF027 [*] Possible f-string without an `f` prefix
+RUF027_0.py:27:11: RUF027 (missing-f-string-syntax) [*] Possible f-string without an `f` prefix
    |
 25 | def print_name(name: str):
 26 |     a = 4
 27 |     print("Hello, {name}!")  # RUF027
-   |           ^^^^^^^^^^^^^^^^ RUF027
+   |           ^^^^^^^^^^^^^^^^ RUF027 (missing-f-string-syntax)
 28 |     print("The test value we're using today is {a}")  # RUF027
    |
    = help: Add `f` prefix
@@ -118,12 +118,12 @@ RUF027_0.py:27:11: RUF027 [*] Possible f-string without an `f` prefix
 29 29 | 
 30 30 | 
 
-RUF027_0.py:28:11: RUF027 [*] Possible f-string without an `f` prefix
+RUF027_0.py:28:11: RUF027 (missing-f-string-syntax) [*] Possible f-string without an `f` prefix
    |
 26 |     a = 4
 27 |     print("Hello, {name}!")  # RUF027
 28 |     print("The test value we're using today is {a}")  # RUF027
-   |           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF027
+   |           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF027 (missing-f-string-syntax)
    |
    = help: Add `f` prefix
 
@@ -137,12 +137,12 @@ RUF027_0.py:28:11: RUF027 [*] Possible f-string without an `f` prefix
 30 30 | 
 31 31 | def nested_funcs():
 
-RUF027_0.py:33:33: RUF027 [*] Possible f-string without an `f` prefix
+RUF027_0.py:33:33: RUF027 (missing-f-string-syntax) [*] Possible f-string without an `f` prefix
    |
 31 | def nested_funcs():
 32 |     a = 4
 33 |     print(do_nothing(do_nothing("{a}")))  # RUF027
-   |                                 ^^^^^ RUF027
+   |                                 ^^^^^ RUF027 (missing-f-string-syntax)
    |
    = help: Add `f` prefix
 
@@ -156,12 +156,12 @@ RUF027_0.py:33:33: RUF027 [*] Possible f-string without an `f` prefix
 35 35 | 
 36 36 | def tripled_quoted():
 
-RUF027_0.py:39:19: RUF027 [*] Possible f-string without an `f` prefix
+RUF027_0.py:39:19: RUF027 (missing-f-string-syntax) [*] Possible f-string without an `f` prefix
    |
 37 |     a = 4
 38 |     c = a
 39 |     single_line = """ {a} """  # RUF027
-   |                   ^^^^^^^^^^^ RUF027
+   |                   ^^^^^^^^^^^ RUF027 (missing-f-string-syntax)
 40 |     # RUF027
 41 |     multi_line = a = """b { # comment
    |
@@ -177,7 +177,7 @@ RUF027_0.py:39:19: RUF027 [*] Possible f-string without an `f` prefix
 41 41 |     multi_line = a = """b { # comment
 42 42 |     c}  d
 
-RUF027_0.py:41:22: RUF027 [*] Possible f-string without an `f` prefix
+RUF027_0.py:41:22: RUF027 (missing-f-string-syntax) [*] Possible f-string without an `f` prefix
    |
 39 |       single_line = """ {a} """  # RUF027
 40 |       # RUF027
@@ -185,7 +185,7 @@ RUF027_0.py:41:22: RUF027 [*] Possible f-string without an `f` prefix
    |  ______________________^
 42 | |     c}  d
 43 | |     """
-   | |_______^ RUF027
+   | |_______^ RUF027 (missing-f-string-syntax)
    |
    = help: Add `f` prefix
 
@@ -199,7 +199,7 @@ RUF027_0.py:41:22: RUF027 [*] Possible f-string without an `f` prefix
 43 43 |     """
 44 44 | 
 
-RUF027_0.py:49:9: RUF027 [*] Possible f-string without an `f` prefix
+RUF027_0.py:49:9: RUF027 (missing-f-string-syntax) [*] Possible f-string without an `f` prefix
    |
 47 |       a = 4
 48 |       # RUF027
@@ -207,7 +207,7 @@ RUF027_0.py:49:9: RUF027 [*] Possible f-string without an `f` prefix
    |  _________^
 50 | |     a} \
 51 | |     "
-   | |_____^ RUF027
+   | |_____^ RUF027 (missing-f-string-syntax)
    |
    = help: Add `f` prefix
 
@@ -221,12 +221,12 @@ RUF027_0.py:49:9: RUF027 [*] Possible f-string without an `f` prefix
 51 51 |     "
 52 52 | 
 
-RUF027_0.py:56:9: RUF027 [*] Possible f-string without an `f` prefix
+RUF027_0.py:56:9: RUF027 (missing-f-string-syntax) [*] Possible f-string without an `f` prefix
    |
 54 | def implicit_concat():
 55 |     a = 4
 56 |     b = "{a}" "+" "{b}" r" \\ "  # RUF027 for the first part only
-   |         ^^^^^ RUF027
+   |         ^^^^^ RUF027 (missing-f-string-syntax)
 57 |     print(f"{a}" "{a}" f"{b}")  # RUF027
    |
    = help: Add `f` prefix
@@ -241,12 +241,12 @@ RUF027_0.py:56:9: RUF027 [*] Possible f-string without an `f` prefix
 58 58 | 
 59 59 | 
 
-RUF027_0.py:57:18: RUF027 [*] Possible f-string without an `f` prefix
+RUF027_0.py:57:18: RUF027 (missing-f-string-syntax) [*] Possible f-string without an `f` prefix
    |
 55 |     a = 4
 56 |     b = "{a}" "+" "{b}" r" \\ "  # RUF027 for the first part only
 57 |     print(f"{a}" "{a}" f"{b}")  # RUF027
-   |                  ^^^^^ RUF027
+   |                  ^^^^^ RUF027 (missing-f-string-syntax)
    |
    = help: Add `f` prefix
 
@@ -260,12 +260,12 @@ RUF027_0.py:57:18: RUF027 [*] Possible f-string without an `f` prefix
 59 59 | 
 60 60 | def escaped_chars():
 
-RUF027_0.py:62:9: RUF027 [*] Possible f-string without an `f` prefix
+RUF027_0.py:62:9: RUF027 (missing-f-string-syntax) [*] Possible f-string without an `f` prefix
    |
 60 | def escaped_chars():
 61 |     a = 4
 62 |     b = "\"not escaped:\" '{a}' \"escaped:\": '{{c}}'"  # RUF027
-   |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF027
+   |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF027 (missing-f-string-syntax)
    |
    = help: Add `f` prefix
 
@@ -279,12 +279,12 @@ RUF027_0.py:62:9: RUF027 [*] Possible f-string without an `f` prefix
 64 64 | 
 65 65 | def method_calls():
 
-RUF027_0.py:70:18: RUF027 [*] Possible f-string without an `f` prefix
+RUF027_0.py:70:18: RUF027 (missing-f-string-syntax) [*] Possible f-string without an `f` prefix
    |
 68 |     first = "Wendy"
 69 |     last = "Appleseed"
 70 |     value.method("{first} {last}")  # RUF027
-   |                  ^^^^^^^^^^^^^^^^ RUF027
+   |                  ^^^^^^^^^^^^^^^^ RUF027 (missing-f-string-syntax)
 71 | 
 72 | def format_specifiers():
    |
@@ -300,12 +300,12 @@ RUF027_0.py:70:18: RUF027 [*] Possible f-string without an `f` prefix
 72 72 | def format_specifiers():
 73 73 |     a = 4
 
-RUF027_0.py:74:9: RUF027 [*] Possible f-string without an `f` prefix
+RUF027_0.py:74:9: RUF027 (missing-f-string-syntax) [*] Possible f-string without an `f` prefix
    |
 72 | def format_specifiers():
 73 |     a = 4
 74 |     b = "{a:b} {a:^5}"
-   |         ^^^^^^^^^^^^^^ RUF027
+   |         ^^^^^^^^^^^^^^ RUF027 (missing-f-string-syntax)
    |
    = help: Add `f` prefix
 
@@ -315,5 +315,3 @@ RUF027_0.py:74:9: RUF027 [*] Possible f-string without an `f` prefix
 73 73 |     a = 4
 74    |-    b = "{a:b} {a:^5}"
    74 |+    b = f"{a:b} {a:^5}"
-
-

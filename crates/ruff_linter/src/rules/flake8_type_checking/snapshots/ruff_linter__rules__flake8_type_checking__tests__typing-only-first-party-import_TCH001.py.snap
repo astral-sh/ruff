@@ -1,11 +1,11 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_type_checking/mod.rs
 ---
-TCH001.py:20:19: TCH001 [*] Move application import `.TYP001` into a type-checking block
+TCH001.py:20:19: TCH001 (typing-only-first-party-import) [*] Move application import `.TYP001` into a type-checking block
    |
 19 | def f():
 20 |     from . import TYP001
-   |                   ^^^^^^ TCH001
+   |                   ^^^^^^ TCH001 (typing-only-first-party-import)
 21 | 
 22 |     x: TYP001
    |
@@ -29,6 +29,4 @@ TCH001.py:20:19: TCH001 [*] Move application import `.TYP001` into a type-checki
 20    |-    from . import TYP001
 21 24 | 
 22 25 |     x: TYP001
-23 26 | 
-
-
+23 26 |

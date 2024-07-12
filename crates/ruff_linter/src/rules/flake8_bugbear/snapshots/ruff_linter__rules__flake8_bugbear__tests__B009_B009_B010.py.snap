@@ -1,11 +1,11 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_bugbear/mod.rs
 ---
-B009_B010.py:19:1: B009 [*] Do not call `getattr` with a constant attribute value. It is not any safer than normal property access.
+B009_B010.py:19:1: B009 (get-attr-with-constant) [*] Do not call `getattr` with a constant attribute value. It is not any safer than normal property access.
    |
 18 | # Invalid usage
 19 | getattr(foo, "bar")
-   | ^^^^^^^^^^^^^^^^^^^ B009
+   | ^^^^^^^^^^^^^^^^^^^ B009 (get-attr-with-constant)
 20 | getattr(foo, "_123abc")
 21 | getattr(foo, "__123abc__")
    |
@@ -21,12 +21,12 @@ B009_B010.py:19:1: B009 [*] Do not call `getattr` with a constant attribute valu
 21 21 | getattr(foo, "__123abc__")
 22 22 | getattr(foo, "abc123")
 
-B009_B010.py:20:1: B009 [*] Do not call `getattr` with a constant attribute value. It is not any safer than normal property access.
+B009_B010.py:20:1: B009 (get-attr-with-constant) [*] Do not call `getattr` with a constant attribute value. It is not any safer than normal property access.
    |
 18 | # Invalid usage
 19 | getattr(foo, "bar")
 20 | getattr(foo, "_123abc")
-   | ^^^^^^^^^^^^^^^^^^^^^^^ B009
+   | ^^^^^^^^^^^^^^^^^^^^^^^ B009 (get-attr-with-constant)
 21 | getattr(foo, "__123abc__")
 22 | getattr(foo, "abc123")
    |
@@ -42,12 +42,12 @@ B009_B010.py:20:1: B009 [*] Do not call `getattr` with a constant attribute valu
 22 22 | getattr(foo, "abc123")
 23 23 | getattr(foo, r"abc123")
 
-B009_B010.py:21:1: B009 [*] Do not call `getattr` with a constant attribute value. It is not any safer than normal property access.
+B009_B010.py:21:1: B009 (get-attr-with-constant) [*] Do not call `getattr` with a constant attribute value. It is not any safer than normal property access.
    |
 19 | getattr(foo, "bar")
 20 | getattr(foo, "_123abc")
 21 | getattr(foo, "__123abc__")
-   | ^^^^^^^^^^^^^^^^^^^^^^^^^^ B009
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^ B009 (get-attr-with-constant)
 22 | getattr(foo, "abc123")
 23 | getattr(foo, r"abc123")
    |
@@ -63,12 +63,12 @@ B009_B010.py:21:1: B009 [*] Do not call `getattr` with a constant attribute valu
 23 23 | getattr(foo, r"abc123")
 24 24 | _ = lambda x: getattr(x, "bar")
 
-B009_B010.py:22:1: B009 [*] Do not call `getattr` with a constant attribute value. It is not any safer than normal property access.
+B009_B010.py:22:1: B009 (get-attr-with-constant) [*] Do not call `getattr` with a constant attribute value. It is not any safer than normal property access.
    |
 20 | getattr(foo, "_123abc")
 21 | getattr(foo, "__123abc__")
 22 | getattr(foo, "abc123")
-   | ^^^^^^^^^^^^^^^^^^^^^^ B009
+   | ^^^^^^^^^^^^^^^^^^^^^^ B009 (get-attr-with-constant)
 23 | getattr(foo, r"abc123")
 24 | _ = lambda x: getattr(x, "bar")
    |
@@ -84,12 +84,12 @@ B009_B010.py:22:1: B009 [*] Do not call `getattr` with a constant attribute valu
 24 24 | _ = lambda x: getattr(x, "bar")
 25 25 | if getattr(x, "bar"):
 
-B009_B010.py:23:1: B009 [*] Do not call `getattr` with a constant attribute value. It is not any safer than normal property access.
+B009_B010.py:23:1: B009 (get-attr-with-constant) [*] Do not call `getattr` with a constant attribute value. It is not any safer than normal property access.
    |
 21 | getattr(foo, "__123abc__")
 22 | getattr(foo, "abc123")
 23 | getattr(foo, r"abc123")
-   | ^^^^^^^^^^^^^^^^^^^^^^^ B009
+   | ^^^^^^^^^^^^^^^^^^^^^^^ B009 (get-attr-with-constant)
 24 | _ = lambda x: getattr(x, "bar")
 25 | if getattr(x, "bar"):
    |
@@ -105,12 +105,12 @@ B009_B010.py:23:1: B009 [*] Do not call `getattr` with a constant attribute valu
 25 25 | if getattr(x, "bar"):
 26 26 |     pass
 
-B009_B010.py:24:15: B009 [*] Do not call `getattr` with a constant attribute value. It is not any safer than normal property access.
+B009_B010.py:24:15: B009 (get-attr-with-constant) [*] Do not call `getattr` with a constant attribute value. It is not any safer than normal property access.
    |
 22 | getattr(foo, "abc123")
 23 | getattr(foo, r"abc123")
 24 | _ = lambda x: getattr(x, "bar")
-   |               ^^^^^^^^^^^^^^^^^ B009
+   |               ^^^^^^^^^^^^^^^^^ B009 (get-attr-with-constant)
 25 | if getattr(x, "bar"):
 26 |     pass
    |
@@ -126,12 +126,12 @@ B009_B010.py:24:15: B009 [*] Do not call `getattr` with a constant attribute val
 26 26 |     pass
 27 27 | getattr(1, "real")
 
-B009_B010.py:25:4: B009 [*] Do not call `getattr` with a constant attribute value. It is not any safer than normal property access.
+B009_B010.py:25:4: B009 (get-attr-with-constant) [*] Do not call `getattr` with a constant attribute value. It is not any safer than normal property access.
    |
 23 | getattr(foo, r"abc123")
 24 | _ = lambda x: getattr(x, "bar")
 25 | if getattr(x, "bar"):
-   |    ^^^^^^^^^^^^^^^^^ B009
+   |    ^^^^^^^^^^^^^^^^^ B009 (get-attr-with-constant)
 26 |     pass
 27 | getattr(1, "real")
    |
@@ -147,12 +147,12 @@ B009_B010.py:25:4: B009 [*] Do not call `getattr` with a constant attribute valu
 27 27 | getattr(1, "real")
 28 28 | getattr(1., "real")
 
-B009_B010.py:27:1: B009 [*] Do not call `getattr` with a constant attribute value. It is not any safer than normal property access.
+B009_B010.py:27:1: B009 (get-attr-with-constant) [*] Do not call `getattr` with a constant attribute value. It is not any safer than normal property access.
    |
 25 | if getattr(x, "bar"):
 26 |     pass
 27 | getattr(1, "real")
-   | ^^^^^^^^^^^^^^^^^^ B009
+   | ^^^^^^^^^^^^^^^^^^ B009 (get-attr-with-constant)
 28 | getattr(1., "real")
 29 | getattr(1.0, "real")
    |
@@ -168,12 +168,12 @@ B009_B010.py:27:1: B009 [*] Do not call `getattr` with a constant attribute valu
 29 29 | getattr(1.0, "real")
 30 30 | getattr(1j, "real")
 
-B009_B010.py:28:1: B009 [*] Do not call `getattr` with a constant attribute value. It is not any safer than normal property access.
+B009_B010.py:28:1: B009 (get-attr-with-constant) [*] Do not call `getattr` with a constant attribute value. It is not any safer than normal property access.
    |
 26 |     pass
 27 | getattr(1, "real")
 28 | getattr(1., "real")
-   | ^^^^^^^^^^^^^^^^^^^ B009
+   | ^^^^^^^^^^^^^^^^^^^ B009 (get-attr-with-constant)
 29 | getattr(1.0, "real")
 30 | getattr(1j, "real")
    |
@@ -189,12 +189,12 @@ B009_B010.py:28:1: B009 [*] Do not call `getattr` with a constant attribute valu
 30 30 | getattr(1j, "real")
 31 31 | getattr(True, "real")
 
-B009_B010.py:29:1: B009 [*] Do not call `getattr` with a constant attribute value. It is not any safer than normal property access.
+B009_B010.py:29:1: B009 (get-attr-with-constant) [*] Do not call `getattr` with a constant attribute value. It is not any safer than normal property access.
    |
 27 | getattr(1, "real")
 28 | getattr(1., "real")
 29 | getattr(1.0, "real")
-   | ^^^^^^^^^^^^^^^^^^^^ B009
+   | ^^^^^^^^^^^^^^^^^^^^ B009 (get-attr-with-constant)
 30 | getattr(1j, "real")
 31 | getattr(True, "real")
    |
@@ -210,12 +210,12 @@ B009_B010.py:29:1: B009 [*] Do not call `getattr` with a constant attribute valu
 31 31 | getattr(True, "real")
 32 32 | getattr(x := 1, "real")
 
-B009_B010.py:30:1: B009 [*] Do not call `getattr` with a constant attribute value. It is not any safer than normal property access.
+B009_B010.py:30:1: B009 (get-attr-with-constant) [*] Do not call `getattr` with a constant attribute value. It is not any safer than normal property access.
    |
 28 | getattr(1., "real")
 29 | getattr(1.0, "real")
 30 | getattr(1j, "real")
-   | ^^^^^^^^^^^^^^^^^^^ B009
+   | ^^^^^^^^^^^^^^^^^^^ B009 (get-attr-with-constant)
 31 | getattr(True, "real")
 32 | getattr(x := 1, "real")
    |
@@ -231,12 +231,12 @@ B009_B010.py:30:1: B009 [*] Do not call `getattr` with a constant attribute valu
 32 32 | getattr(x := 1, "real")
 33 33 | getattr(x + y, "real")
 
-B009_B010.py:31:1: B009 [*] Do not call `getattr` with a constant attribute value. It is not any safer than normal property access.
+B009_B010.py:31:1: B009 (get-attr-with-constant) [*] Do not call `getattr` with a constant attribute value. It is not any safer than normal property access.
    |
 29 | getattr(1.0, "real")
 30 | getattr(1j, "real")
 31 | getattr(True, "real")
-   | ^^^^^^^^^^^^^^^^^^^^^ B009
+   | ^^^^^^^^^^^^^^^^^^^^^ B009 (get-attr-with-constant)
 32 | getattr(x := 1, "real")
 33 | getattr(x + y, "real")
    |
@@ -252,12 +252,12 @@ B009_B010.py:31:1: B009 [*] Do not call `getattr` with a constant attribute valu
 33 33 | getattr(x + y, "real")
 34 34 | getattr("foo"
 
-B009_B010.py:32:1: B009 [*] Do not call `getattr` with a constant attribute value. It is not any safer than normal property access.
+B009_B010.py:32:1: B009 (get-attr-with-constant) [*] Do not call `getattr` with a constant attribute value. It is not any safer than normal property access.
    |
 30 | getattr(1j, "real")
 31 | getattr(True, "real")
 32 | getattr(x := 1, "real")
-   | ^^^^^^^^^^^^^^^^^^^^^^^ B009
+   | ^^^^^^^^^^^^^^^^^^^^^^^ B009 (get-attr-with-constant)
 33 | getattr(x + y, "real")
 34 | getattr("foo"
    |
@@ -273,12 +273,12 @@ B009_B010.py:32:1: B009 [*] Do not call `getattr` with a constant attribute valu
 34 34 | getattr("foo"
 35 35 |         "bar", "real")
 
-B009_B010.py:33:1: B009 [*] Do not call `getattr` with a constant attribute value. It is not any safer than normal property access.
+B009_B010.py:33:1: B009 (get-attr-with-constant) [*] Do not call `getattr` with a constant attribute value. It is not any safer than normal property access.
    |
 31 | getattr(True, "real")
 32 | getattr(x := 1, "real")
 33 | getattr(x + y, "real")
-   | ^^^^^^^^^^^^^^^^^^^^^^ B009
+   | ^^^^^^^^^^^^^^^^^^^^^^ B009 (get-attr-with-constant)
 34 | getattr("foo"
 35 |         "bar", "real")
    |
@@ -294,13 +294,13 @@ B009_B010.py:33:1: B009 [*] Do not call `getattr` with a constant attribute valu
 35 35 |         "bar", "real")
 36 36 | 
 
-B009_B010.py:34:1: B009 [*] Do not call `getattr` with a constant attribute value. It is not any safer than normal property access.
+B009_B010.py:34:1: B009 (get-attr-with-constant) [*] Do not call `getattr` with a constant attribute value. It is not any safer than normal property access.
    |
 32 |   getattr(x := 1, "real")
 33 |   getattr(x + y, "real")
 34 | / getattr("foo"
 35 | |         "bar", "real")
-   | |______________________^ B009
+   | |______________________^ B009 (get-attr-with-constant)
    |
    = help: Replace `getattr` with attribute access
 
@@ -316,11 +316,11 @@ B009_B010.py:34:1: B009 [*] Do not call `getattr` with a constant attribute valu
 37 37 | 
 38 38 | # Valid setattr usage
 
-B009_B010.py:58:8: B009 [*] Do not call `getattr` with a constant attribute value. It is not any safer than normal property access.
+B009_B010.py:58:8: B009 (get-attr-with-constant) [*] Do not call `getattr` with a constant attribute value. It is not any safer than normal property access.
    |
 57 | # Regression test for: https://github.com/astral-sh/ruff/issues/7455#issuecomment-1722458885
 58 | assert getattr(func, '_rpc')is True
-   |        ^^^^^^^^^^^^^^^^^^^^^ B009
+   |        ^^^^^^^^^^^^^^^^^^^^^ B009 (get-attr-with-constant)
 59 | 
 60 | # Regression test for: https://github.com/astral-sh/ruff/issues/7455#issuecomment-1732387247
    |
@@ -336,12 +336,12 @@ B009_B010.py:58:8: B009 [*] Do not call `getattr` with a constant attribute valu
 60 60 | # Regression test for: https://github.com/astral-sh/ruff/issues/7455#issuecomment-1732387247
 61 61 | getattr(*foo, "bar")
 
-B009_B010.py:65:1: B009 [*] Do not call `getattr` with a constant attribute value. It is not any safer than normal property access.
+B009_B010.py:65:1: B009 (get-attr-with-constant) [*] Do not call `getattr` with a constant attribute value. It is not any safer than normal property access.
    |
 64 |   # Regression test for: https://github.com/astral-sh/ruff/issues/7455#issuecomment-1739800901
 65 | / getattr(self.
 66 | |    registration.registry, '__name__')
-   | |_____________________________________^ B009
+   | |_____________________________________^ B009 (get-attr-with-constant)
 67 |   
 68 |   import builtins
    |
@@ -359,11 +359,11 @@ B009_B010.py:65:1: B009 [*] Do not call `getattr` with a constant attribute valu
 68 68 | import builtins
 69 69 | builtins.getattr(foo, "bar")
 
-B009_B010.py:69:1: B009 [*] Do not call `getattr` with a constant attribute value. It is not any safer than normal property access.
+B009_B010.py:69:1: B009 (get-attr-with-constant) [*] Do not call `getattr` with a constant attribute value. It is not any safer than normal property access.
    |
 68 | import builtins
 69 | builtins.getattr(foo, "bar")
-   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^ B009
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^ B009 (get-attr-with-constant)
    |
    = help: Replace `getattr` with attribute access
 

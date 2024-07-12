@@ -1,11 +1,11 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_type_checking/mod.rs
 ---
-<filename>:7:5: TCH002 [*] Move third-party import `pandas.DataFrame` into a type-checking block
+<filename>:7:5: TCH002 (typing-only-third-party-import) [*] Move third-party import `pandas.DataFrame` into a type-checking block
   |
 6 | from pandas import (
 7 |     DataFrame,  # DataFrame
-  |     ^^^^^^^^^ TCH002
+  |     ^^^^^^^^^ TCH002 (typing-only-third-party-import)
 8 |     Series,  # Series
 9 | )
   |
@@ -26,5 +26,3 @@ source: crates/ruff_linter/src/rules/flake8_type_checking/mod.rs
 12 14 |     import os
 13 15 | 
 14 16 | def f(x: DataFrame):
-
-

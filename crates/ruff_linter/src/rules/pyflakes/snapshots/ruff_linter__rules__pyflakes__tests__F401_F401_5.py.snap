@@ -1,11 +1,11 @@
 ---
 source: crates/ruff_linter/src/rules/pyflakes/mod.rs
 ---
-F401_5.py:2:17: F401 [*] `a.b.c` imported but unused
+F401_5.py:2:17: F401 (unused-import) [*] `a.b.c` imported but unused
   |
 1 | """Test: removal of multi-segment and aliases imports."""
 2 | from a.b import c
-  |                 ^ F401
+  |                 ^ F401 (unused-import)
 3 | from d.e import f as g
 4 | import h.i
   |
@@ -18,12 +18,12 @@ F401_5.py:2:17: F401 [*] `a.b.c` imported but unused
 4 3 | import h.i
 5 4 | import j.k as l
 
-F401_5.py:3:22: F401 [*] `d.e.f` imported but unused
+F401_5.py:3:22: F401 (unused-import) [*] `d.e.f` imported but unused
   |
 1 | """Test: removal of multi-segment and aliases imports."""
 2 | from a.b import c
 3 | from d.e import f as g
-  |                      ^ F401
+  |                      ^ F401 (unused-import)
 4 | import h.i
 5 | import j.k as l
   |
@@ -36,12 +36,12 @@ F401_5.py:3:22: F401 [*] `d.e.f` imported but unused
 4 3 | import h.i
 5 4 | import j.k as l
 
-F401_5.py:4:8: F401 [*] `h.i` imported but unused
+F401_5.py:4:8: F401 (unused-import) [*] `h.i` imported but unused
   |
 2 | from a.b import c
 3 | from d.e import f as g
 4 | import h.i
-  |        ^^^ F401
+  |        ^^^ F401 (unused-import)
 5 | import j.k as l
   |
   = help: Remove unused import: `h.i`
@@ -53,12 +53,12 @@ F401_5.py:4:8: F401 [*] `h.i` imported but unused
 4   |-import h.i
 5 4 | import j.k as l
 
-F401_5.py:5:15: F401 [*] `j.k` imported but unused
+F401_5.py:5:15: F401 (unused-import) [*] `j.k` imported but unused
   |
 3 | from d.e import f as g
 4 | import h.i
 5 | import j.k as l
-  |               ^ F401
+  |               ^ F401 (unused-import)
   |
   = help: Remove unused import: `j.k`
 
@@ -67,5 +67,3 @@ F401_5.py:5:15: F401 [*] `j.k` imported but unused
 3 3 | from d.e import f as g
 4 4 | import h.i
 5   |-import j.k as l
-
-

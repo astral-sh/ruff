@@ -1,12 +1,12 @@
 ---
 source: crates/ruff_linter/src/rules/pycodestyle/mod.rs
 ---
-E27.py:38:8: E275 [*] Missing whitespace after keyword
+E27.py:38:8: E275 (missing-whitespace-after-keyword) [*] Missing whitespace after keyword
    |
 36 | from w import  (e, f)
 37 | #: E275
 38 | from w import(e, f)
-   |        ^^^^^^ E275
+   |        ^^^^^^ E275 (missing-whitespace-after-keyword)
 39 | #: E275
 40 | from importable.module import(e, f)
    |
@@ -22,12 +22,12 @@ E27.py:38:8: E275 [*] Missing whitespace after keyword
 40 40 | from importable.module import(e, f)
 41 41 | #: E275
 
-E27.py:40:24: E275 [*] Missing whitespace after keyword
+E27.py:40:24: E275 (missing-whitespace-after-keyword) [*] Missing whitespace after keyword
    |
 38 | from w import(e, f)
 39 | #: E275
 40 | from importable.module import(e, f)
-   |                        ^^^^^^ E275
+   |                        ^^^^^^ E275 (missing-whitespace-after-keyword)
 41 | #: E275
 42 | try:
    |
@@ -43,12 +43,12 @@ E27.py:40:24: E275 [*] Missing whitespace after keyword
 42 42 | try:
 43 43 |     from importable.module import(e, f)
 
-E27.py:43:28: E275 [*] Missing whitespace after keyword
+E27.py:43:28: E275 (missing-whitespace-after-keyword) [*] Missing whitespace after keyword
    |
 41 | #: E275
 42 | try:
 43 |     from importable.module import(e, f)
-   |                            ^^^^^^ E275
+   |                            ^^^^^^ E275 (missing-whitespace-after-keyword)
 44 | except ImportError:
 45 |     pass
    |
@@ -64,12 +64,12 @@ E27.py:43:28: E275 [*] Missing whitespace after keyword
 45 45 |     pass
 46 46 | #: E275
 
-E27.py:47:1: E275 [*] Missing whitespace after keyword
+E27.py:47:1: E275 (missing-whitespace-after-keyword) [*] Missing whitespace after keyword
    |
 45 |     pass
 46 | #: E275
 47 | if(foo):
-   | ^^ E275
+   | ^^ E275 (missing-whitespace-after-keyword)
 48 |     pass
 49 | else:
    |
@@ -85,12 +85,12 @@ E27.py:47:1: E275 [*] Missing whitespace after keyword
 49 49 | else:
 50 50 |     pass
 
-E27.py:55:5: E275 [*] Missing whitespace after keyword
+E27.py:55:5: E275 (missing-whitespace-after-keyword) [*] Missing whitespace after keyword
    |
 53 | #: E275:2:11
 54 | if True:
 55 |     assert(1)
-   |     ^^^^^^ E275
+   |     ^^^^^^ E275 (missing-whitespace-after-keyword)
 56 | #: Okay
 57 | def f():
    |
@@ -106,11 +106,11 @@ E27.py:55:5: E275 [*] Missing whitespace after keyword
 57 57 | def f():
 58 58 |     print((yield))
 
-E27.py:77:1: E275 [*] Missing whitespace after keyword
+E27.py:77:1: E275 (missing-whitespace-after-keyword) [*] Missing whitespace after keyword
    |
 76 | #: E275
 77 | match(foo):
-   | ^^^^^ E275
+   | ^^^^^ E275 (missing-whitespace-after-keyword)
 78 |     case(1):
 79 |         pass
    |
@@ -126,12 +126,12 @@ E27.py:77:1: E275 [*] Missing whitespace after keyword
 79 79 |         pass
 80 80 | 
 
-E27.py:78:5: E275 [*] Missing whitespace after keyword
+E27.py:78:5: E275 (missing-whitespace-after-keyword) [*] Missing whitespace after keyword
    |
 76 | #: E275
 77 | match(foo):
 78 |     case(1):
-   |     ^^^^ E275
+   |     ^^^^ E275 (missing-whitespace-after-keyword)
 79 |         pass
    |
    = help: Added missing whitespace after keyword

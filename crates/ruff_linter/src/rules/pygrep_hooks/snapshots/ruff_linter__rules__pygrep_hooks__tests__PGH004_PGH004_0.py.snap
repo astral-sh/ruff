@@ -1,39 +1,39 @@
 ---
 source: crates/ruff_linter/src/rules/pygrep_hooks/mod.rs
 ---
-PGH004_0.py:1:8: PGH004 Use specific rule codes when using `noqa`
+PGH004_0.py:1:8: PGH004 (blanket-noqa) Use specific rule codes when using `noqa`
   |
 1 | x = 1  # noqa
-  |        ^^^^^^ PGH004
+  |        ^^^^^^ PGH004 (blanket-noqa)
 2 | x = 1  # NOQA:F401,W203
 3 | # noqa
   |
 
-PGH004_0.py:3:1: PGH004 Use specific rule codes when using `noqa`
+PGH004_0.py:3:1: PGH004 (blanket-noqa) Use specific rule codes when using `noqa`
   |
 1 | x = 1  # noqa
 2 | x = 1  # NOQA:F401,W203
 3 | # noqa
-  | ^^^^^^ PGH004
+  | ^^^^^^ PGH004 (blanket-noqa)
 4 | # NOQA
 5 | # noqa:F401
   |
 
-PGH004_0.py:4:1: PGH004 Use specific rule codes when using `noqa`
+PGH004_0.py:4:1: PGH004 (blanket-noqa) Use specific rule codes when using `noqa`
   |
 2 | x = 1  # NOQA:F401,W203
 3 | # noqa
 4 | # NOQA
-  | ^^^^^^ PGH004
+  | ^^^^^^ PGH004 (blanket-noqa)
 5 | # noqa:F401
 6 | # noqa:F401,W203
   |
 
-PGH004_0.py:18:8: PGH004 [*] Use a colon when specifying `noqa` rule codes
+PGH004_0.py:18:8: PGH004 (blanket-noqa) [*] Use a colon when specifying `noqa` rule codes
    |
 17 | # PGH004
 18 | x = 2  # noqa X100
-   |        ^^^^^^^ PGH004
+   |        ^^^^^^^ PGH004 (blanket-noqa)
 19 | 
 20 | # PGH004
    |
@@ -49,11 +49,11 @@ PGH004_0.py:18:8: PGH004 [*] Use a colon when specifying `noqa` rule codes
 20 20 | # PGH004
 21 21 | x = 2  # noqa X100, X200
 
-PGH004_0.py:21:8: PGH004 [*] Use a colon when specifying `noqa` rule codes
+PGH004_0.py:21:8: PGH004 (blanket-noqa) [*] Use a colon when specifying `noqa` rule codes
    |
 20 | # PGH004
 21 | x = 2  # noqa X100, X200
-   |        ^^^^^^^ PGH004
+   |        ^^^^^^^ PGH004 (blanket-noqa)
 22 | 
 23 | # PGH004
    |
@@ -69,11 +69,11 @@ PGH004_0.py:21:8: PGH004 [*] Use a colon when specifying `noqa` rule codes
 23 23 | # PGH004
 24 24 | x = 2  # noqa : X300
 
-PGH004_0.py:24:8: PGH004 [*] Do not add spaces between `noqa` and its colon
+PGH004_0.py:24:8: PGH004 (blanket-noqa) [*] Do not add spaces between `noqa` and its colon
    |
 23 | # PGH004
 24 | x = 2  # noqa : X300
-   |        ^^^^^^^ PGH004
+   |        ^^^^^^^ PGH004 (blanket-noqa)
 25 | 
 26 | # PGH004
    |
@@ -89,11 +89,11 @@ PGH004_0.py:24:8: PGH004 [*] Do not add spaces between `noqa` and its colon
 26 26 | # PGH004
 27 27 | x = 2  # noqa  : X400
 
-PGH004_0.py:27:8: PGH004 [*] Do not add spaces between `noqa` and its colon
+PGH004_0.py:27:8: PGH004 (blanket-noqa) [*] Do not add spaces between `noqa` and its colon
    |
 26 | # PGH004
 27 | x = 2  # noqa  : X400
-   |        ^^^^^^^^ PGH004
+   |        ^^^^^^^^ PGH004 (blanket-noqa)
 28 | 
 29 | # PGH004
    |
@@ -109,11 +109,11 @@ PGH004_0.py:27:8: PGH004 [*] Do not add spaces between `noqa` and its colon
 29 29 | # PGH004
 30 30 | x = 2  # noqa :X500
 
-PGH004_0.py:30:8: PGH004 [*] Do not add spaces between `noqa` and its colon
+PGH004_0.py:30:8: PGH004 (blanket-noqa) [*] Do not add spaces between `noqa` and its colon
    |
 29 | # PGH004
 30 | x = 2  # noqa :X500
-   |        ^^^^^^^ PGH004
+   |        ^^^^^^^ PGH004 (blanket-noqa)
    |
    = help: Remove space(s) before colon
 

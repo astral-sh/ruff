@@ -1,10 +1,10 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_future_annotations/mod.rs
 ---
-import_typing.py:5:13: FA100 Add `from __future__ import annotations` to simplify `typing.List`
+import_typing.py:5:13: FA100 (future-rewritable-type-annotation) Add `from __future__ import annotations` to simplify `typing.List`
   |
 4 | def main() -> None:
 5 |     a_list: typing.List[str] = []
-  |             ^^^^^^^^^^^ FA100
+  |             ^^^^^^^^^^^ FA100 (future-rewritable-type-annotation)
 6 |     a_list.append("hello")
   |

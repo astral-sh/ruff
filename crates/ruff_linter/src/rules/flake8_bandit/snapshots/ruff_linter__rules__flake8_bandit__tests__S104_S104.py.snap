@@ -1,64 +1,64 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_bandit/mod.rs
 ---
-S104.py:9:1: S104 Possible binding to all interfaces
+S104.py:9:1: S104 (hardcoded-bind-all-interfaces) Possible binding to all interfaces
    |
  8 | # Error
  9 | "0.0.0.0"
-   | ^^^^^^^^^ S104
+   | ^^^^^^^^^ S104 (hardcoded-bind-all-interfaces)
 10 | '0.0.0.0'
 11 | f"0.0.0.0"
    |
 
-S104.py:10:1: S104 Possible binding to all interfaces
+S104.py:10:1: S104 (hardcoded-bind-all-interfaces) Possible binding to all interfaces
    |
  8 | # Error
  9 | "0.0.0.0"
 10 | '0.0.0.0'
-   | ^^^^^^^^^ S104
+   | ^^^^^^^^^ S104 (hardcoded-bind-all-interfaces)
 11 | f"0.0.0.0"
    |
 
-S104.py:11:3: S104 Possible binding to all interfaces
+S104.py:11:3: S104 (hardcoded-bind-all-interfaces) Possible binding to all interfaces
    |
  9 | "0.0.0.0"
 10 | '0.0.0.0'
 11 | f"0.0.0.0"
-   |   ^^^^^^^ S104
+   |   ^^^^^^^ S104 (hardcoded-bind-all-interfaces)
    |
 
-S104.py:15:6: S104 Possible binding to all interfaces
+S104.py:15:6: S104 (hardcoded-bind-all-interfaces) Possible binding to all interfaces
    |
 14 | # Error
 15 | func("0.0.0.0")
-   |      ^^^^^^^^^ S104
+   |      ^^^^^^^^^ S104 (hardcoded-bind-all-interfaces)
    |
 
-S104.py:19:9: S104 Possible binding to all interfaces
+S104.py:19:9: S104 (hardcoded-bind-all-interfaces) Possible binding to all interfaces
    |
 18 | def my_func():
 19 |     x = "0.0.0.0"
-   |         ^^^^^^^^^ S104
+   |         ^^^^^^^^^ S104 (hardcoded-bind-all-interfaces)
 20 |     print(x)
    |
 
-S104.py:24:1: S104 Possible binding to all interfaces
+S104.py:24:1: S104 (hardcoded-bind-all-interfaces) Possible binding to all interfaces
    |
 23 | # Implicit string concatenation
 24 | "0.0.0.0" f"0.0.0.0{expr}0.0.0.0"
-   | ^^^^^^^^^ S104
+   | ^^^^^^^^^ S104 (hardcoded-bind-all-interfaces)
    |
 
-S104.py:24:13: S104 Possible binding to all interfaces
+S104.py:24:13: S104 (hardcoded-bind-all-interfaces) Possible binding to all interfaces
    |
 23 | # Implicit string concatenation
 24 | "0.0.0.0" f"0.0.0.0{expr}0.0.0.0"
-   |             ^^^^^^^ S104
+   |             ^^^^^^^ S104 (hardcoded-bind-all-interfaces)
    |
 
-S104.py:24:26: S104 Possible binding to all interfaces
+S104.py:24:26: S104 (hardcoded-bind-all-interfaces) Possible binding to all interfaces
    |
 23 | # Implicit string concatenation
 24 | "0.0.0.0" f"0.0.0.0{expr}0.0.0.0"
-   |                          ^^^^^^^ S104
+   |                          ^^^^^^^ S104 (hardcoded-bind-all-interfaces)
    |

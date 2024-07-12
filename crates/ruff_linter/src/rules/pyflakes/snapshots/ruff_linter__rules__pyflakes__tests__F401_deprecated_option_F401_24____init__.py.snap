@@ -1,10 +1,10 @@
 ---
 source: crates/ruff_linter/src/rules/pyflakes/mod.rs
 ---
-__init__.py:19:8: F401 [*] `sys` imported but unused; consider removing, adding to `__all__`, or using a redundant alias
+__init__.py:19:8: F401 (unused-import) [*] `sys` imported but unused; consider removing, adding to `__all__`, or using a redundant alias
    |
 19 | import sys  # F401: remove unused
-   |        ^^^ F401
+   |        ^^^ F401 (unused-import)
    |
    = help: Remove unused import: `sys`
 
@@ -17,10 +17,10 @@ __init__.py:19:8: F401 [*] `sys` imported but unused; consider removing, adding 
 21 20 | 
 22 21 | # first-party
 
-__init__.py:33:15: F401 [*] `.unused` imported but unused; consider removing, adding to `__all__`, or using a redundant alias
+__init__.py:33:15: F401 (unused-import) [*] `.unused` imported but unused; consider removing, adding to `__all__`, or using a redundant alias
    |
 33 | from . import unused  # F401: change to redundant alias
-   |               ^^^^^^ F401
+   |               ^^^^^^ F401 (unused-import)
    |
    = help: Remove unused import: `.unused`
 
@@ -33,10 +33,10 @@ __init__.py:33:15: F401 [*] `.unused` imported but unused; consider removing, ad
 35 34 | 
 36 35 | from . import renamed as bees  # F401: no fix
 
-__init__.py:36:26: F401 [*] `.renamed` imported but unused; consider removing, adding to `__all__`, or using a redundant alias
+__init__.py:36:26: F401 (unused-import) [*] `.renamed` imported but unused; consider removing, adding to `__all__`, or using a redundant alias
    |
 36 | from . import renamed as bees  # F401: no fix
-   |                          ^^^^ F401
+   |                          ^^^^ F401 (unused-import)
    |
    = help: Remove unused import: `.renamed`
 

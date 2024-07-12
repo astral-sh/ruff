@@ -1,10 +1,10 @@
 ---
 source: crates/ruff_linter/src/rules/pyupgrade/mod.rs
 ---
-UP007.py:6:10: UP007 [*] Use `X | Y` for type annotations
+UP007.py:6:10: UP007 (non-pep604-annotation) [*] Use `X | Y` for type annotations
   |
 6 | def f(x: Optional[str]) -> None:
-  |          ^^^^^^^^^^^^^ UP007
+  |          ^^^^^^^^^^^^^ UP007 (non-pep604-annotation)
 7 |     ...
   |
   = help: Convert to `X | Y`
@@ -19,10 +19,10 @@ UP007.py:6:10: UP007 [*] Use `X | Y` for type annotations
 8 8 | 
 9 9 | 
 
-UP007.py:10:10: UP007 [*] Use `X | Y` for type annotations
+UP007.py:10:10: UP007 (non-pep604-annotation) [*] Use `X | Y` for type annotations
    |
 10 | def f(x: typing.Optional[str]) -> None:
-   |          ^^^^^^^^^^^^^^^^^^^^ UP007
+   |          ^^^^^^^^^^^^^^^^^^^^ UP007 (non-pep604-annotation)
 11 |     ...
    |
    = help: Convert to `X | Y`
@@ -37,10 +37,10 @@ UP007.py:10:10: UP007 [*] Use `X | Y` for type annotations
 12 12 | 
 13 13 | 
 
-UP007.py:14:10: UP007 [*] Use `X | Y` for type annotations
+UP007.py:14:10: UP007 (non-pep604-annotation) [*] Use `X | Y` for type annotations
    |
 14 | def f(x: Union[str, int, Union[float, bytes]]) -> None:
-   |          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP007
+   |          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP007 (non-pep604-annotation)
 15 |     ...
    |
    = help: Convert to `X | Y`
@@ -55,10 +55,10 @@ UP007.py:14:10: UP007 [*] Use `X | Y` for type annotations
 16 16 | 
 17 17 | 
 
-UP007.py:14:26: UP007 [*] Use `X | Y` for type annotations
+UP007.py:14:26: UP007 (non-pep604-annotation) [*] Use `X | Y` for type annotations
    |
 14 | def f(x: Union[str, int, Union[float, bytes]]) -> None:
-   |                          ^^^^^^^^^^^^^^^^^^^ UP007
+   |                          ^^^^^^^^^^^^^^^^^^^ UP007 (non-pep604-annotation)
 15 |     ...
    |
    = help: Convert to `X | Y`
@@ -73,10 +73,10 @@ UP007.py:14:26: UP007 [*] Use `X | Y` for type annotations
 16 16 | 
 17 17 | 
 
-UP007.py:18:10: UP007 [*] Use `X | Y` for type annotations
+UP007.py:18:10: UP007 (non-pep604-annotation) [*] Use `X | Y` for type annotations
    |
 18 | def f(x: typing.Union[str, int]) -> None:
-   |          ^^^^^^^^^^^^^^^^^^^^^^ UP007
+   |          ^^^^^^^^^^^^^^^^^^^^^^ UP007 (non-pep604-annotation)
 19 |     ...
    |
    = help: Convert to `X | Y`
@@ -91,10 +91,10 @@ UP007.py:18:10: UP007 [*] Use `X | Y` for type annotations
 20 20 | 
 21 21 | 
 
-UP007.py:22:10: UP007 [*] Use `X | Y` for type annotations
+UP007.py:22:10: UP007 (non-pep604-annotation) [*] Use `X | Y` for type annotations
    |
 22 | def f(x: typing.Union[(str, int)]) -> None:
-   |          ^^^^^^^^^^^^^^^^^^^^^^^^ UP007
+   |          ^^^^^^^^^^^^^^^^^^^^^^^^ UP007 (non-pep604-annotation)
 23 |     ...
    |
    = help: Convert to `X | Y`
@@ -109,10 +109,10 @@ UP007.py:22:10: UP007 [*] Use `X | Y` for type annotations
 24 24 | 
 25 25 | 
 
-UP007.py:26:10: UP007 [*] Use `X | Y` for type annotations
+UP007.py:26:10: UP007 (non-pep604-annotation) [*] Use `X | Y` for type annotations
    |
 26 | def f(x: typing.Union[(str, int), float]) -> None:
-   |          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP007
+   |          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP007 (non-pep604-annotation)
 27 |     ...
    |
    = help: Convert to `X | Y`
@@ -127,10 +127,10 @@ UP007.py:26:10: UP007 [*] Use `X | Y` for type annotations
 28 28 | 
 29 29 | 
 
-UP007.py:30:10: UP007 [*] Use `X | Y` for type annotations
+UP007.py:30:10: UP007 (non-pep604-annotation) [*] Use `X | Y` for type annotations
    |
 30 | def f(x: typing.Union[(int,)]) -> None:
-   |          ^^^^^^^^^^^^^^^^^^^^ UP007
+   |          ^^^^^^^^^^^^^^^^^^^^ UP007 (non-pep604-annotation)
 31 |     ...
    |
    = help: Convert to `X | Y`
@@ -145,10 +145,10 @@ UP007.py:30:10: UP007 [*] Use `X | Y` for type annotations
 32 32 | 
 33 33 | 
 
-UP007.py:34:10: UP007 [*] Use `X | Y` for type annotations
+UP007.py:34:10: UP007 (non-pep604-annotation) [*] Use `X | Y` for type annotations
    |
 34 | def f(x: typing.Union[()]) -> None:
-   |          ^^^^^^^^^^^^^^^^ UP007
+   |          ^^^^^^^^^^^^^^^^ UP007 (non-pep604-annotation)
 35 |     ...
    |
    = help: Convert to `X | Y`
@@ -163,10 +163,10 @@ UP007.py:34:10: UP007 [*] Use `X | Y` for type annotations
 36 36 | 
 37 37 | 
 
-UP007.py:38:11: UP007 [*] Use `X | Y` for type annotations
+UP007.py:38:11: UP007 (non-pep604-annotation) [*] Use `X | Y` for type annotations
    |
 38 | def f(x: "Union[str, int, Union[float, bytes]]") -> None:
-   |           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP007
+   |           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP007 (non-pep604-annotation)
 39 |     ...
    |
    = help: Convert to `X | Y`
@@ -181,10 +181,10 @@ UP007.py:38:11: UP007 [*] Use `X | Y` for type annotations
 40 40 | 
 41 41 | 
 
-UP007.py:38:27: UP007 [*] Use `X | Y` for type annotations
+UP007.py:38:27: UP007 (non-pep604-annotation) [*] Use `X | Y` for type annotations
    |
 38 | def f(x: "Union[str, int, Union[float, bytes]]") -> None:
-   |                           ^^^^^^^^^^^^^^^^^^^ UP007
+   |                           ^^^^^^^^^^^^^^^^^^^ UP007 (non-pep604-annotation)
 39 |     ...
    |
    = help: Convert to `X | Y`
@@ -199,10 +199,10 @@ UP007.py:38:27: UP007 [*] Use `X | Y` for type annotations
 40 40 | 
 41 41 | 
 
-UP007.py:42:11: UP007 [*] Use `X | Y` for type annotations
+UP007.py:42:11: UP007 (non-pep604-annotation) [*] Use `X | Y` for type annotations
    |
 42 | def f(x: "typing.Union[str, int]") -> None:
-   |           ^^^^^^^^^^^^^^^^^^^^^^ UP007
+   |           ^^^^^^^^^^^^^^^^^^^^^^ UP007 (non-pep604-annotation)
 43 |     ...
    |
    = help: Convert to `X | Y`
@@ -217,11 +217,11 @@ UP007.py:42:11: UP007 [*] Use `X | Y` for type annotations
 44 44 | 
 45 45 | 
 
-UP007.py:55:8: UP007 [*] Use `X | Y` for type annotations
+UP007.py:55:8: UP007 (non-pep604-annotation) [*] Use `X | Y` for type annotations
    |
 54 | def f() -> None:
 55 |     x: Optional[str]
-   |        ^^^^^^^^^^^^^ UP007
+   |        ^^^^^^^^^^^^^ UP007 (non-pep604-annotation)
 56 |     x = Optional[str]
    |
    = help: Convert to `X | Y`
@@ -236,34 +236,34 @@ UP007.py:55:8: UP007 [*] Use `X | Y` for type annotations
 57 57 | 
 58 58 |     x = Union[str, int]
 
-UP007.py:56:9: UP007 Use `X | Y` for type annotations
+UP007.py:56:9: UP007 (non-pep604-annotation) Use `X | Y` for type annotations
    |
 54 | def f() -> None:
 55 |     x: Optional[str]
 56 |     x = Optional[str]
-   |         ^^^^^^^^^^^^^ UP007
+   |         ^^^^^^^^^^^^^ UP007 (non-pep604-annotation)
 57 | 
 58 |     x = Union[str, int]
    |
    = help: Convert to `X | Y`
 
-UP007.py:58:9: UP007 Use `X | Y` for type annotations
+UP007.py:58:9: UP007 (non-pep604-annotation) Use `X | Y` for type annotations
    |
 56 |     x = Optional[str]
 57 | 
 58 |     x = Union[str, int]
-   |         ^^^^^^^^^^^^^^^ UP007
+   |         ^^^^^^^^^^^^^^^ UP007 (non-pep604-annotation)
 59 |     x = Union["str", "int"]
 60 |     x: Union[str, int]
    |
    = help: Convert to `X | Y`
 
-UP007.py:60:8: UP007 [*] Use `X | Y` for type annotations
+UP007.py:60:8: UP007 (non-pep604-annotation) [*] Use `X | Y` for type annotations
    |
 58 |     x = Union[str, int]
 59 |     x = Union["str", "int"]
 60 |     x: Union[str, int]
-   |        ^^^^^^^^^^^^^^^ UP007
+   |        ^^^^^^^^^^^^^^^ UP007 (non-pep604-annotation)
 61 |     x: Union["str", "int"]
    |
    = help: Convert to `X | Y`
@@ -278,12 +278,12 @@ UP007.py:60:8: UP007 [*] Use `X | Y` for type annotations
 62 62 | 
 63 63 | 
 
-UP007.py:61:8: UP007 [*] Use `X | Y` for type annotations
+UP007.py:61:8: UP007 (non-pep604-annotation) [*] Use `X | Y` for type annotations
    |
 59 |     x = Union["str", "int"]
 60 |     x: Union[str, int]
 61 |     x: Union["str", "int"]
-   |        ^^^^^^^^^^^^^^^^^^^ UP007
+   |        ^^^^^^^^^^^^^^^^^^^ UP007 (non-pep604-annotation)
    |
    = help: Convert to `X | Y`
 
@@ -297,79 +297,79 @@ UP007.py:61:8: UP007 [*] Use `X | Y` for type annotations
 63 63 | 
 64 64 | def f(x: Union[int : float]) -> None:
 
-UP007.py:64:10: UP007 Use `X | Y` for type annotations
+UP007.py:64:10: UP007 (non-pep604-annotation) Use `X | Y` for type annotations
    |
 64 | def f(x: Union[int : float]) -> None:
-   |          ^^^^^^^^^^^^^^^^^^ UP007
+   |          ^^^^^^^^^^^^^^^^^^ UP007 (non-pep604-annotation)
 65 |     ...
    |
    = help: Convert to `X | Y`
 
-UP007.py:68:10: UP007 Use `X | Y` for type annotations
+UP007.py:68:10: UP007 (non-pep604-annotation) Use `X | Y` for type annotations
    |
 68 | def f(x: Union[str, int : float]) -> None:
-   |          ^^^^^^^^^^^^^^^^^^^^^^^ UP007
+   |          ^^^^^^^^^^^^^^^^^^^^^^^ UP007 (non-pep604-annotation)
 69 |     ...
    |
    = help: Convert to `X | Y`
 
-UP007.py:72:10: UP007 Use `X | Y` for type annotations
+UP007.py:72:10: UP007 (non-pep604-annotation) Use `X | Y` for type annotations
    |
 72 | def f(x: Union[x := int]) -> None:
-   |          ^^^^^^^^^^^^^^^ UP007
+   |          ^^^^^^^^^^^^^^^ UP007 (non-pep604-annotation)
 73 |     ...
    |
    = help: Convert to `X | Y`
 
-UP007.py:76:10: UP007 Use `X | Y` for type annotations
+UP007.py:76:10: UP007 (non-pep604-annotation) Use `X | Y` for type annotations
    |
 76 | def f(x: Union[str, x := int]) -> None:
-   |          ^^^^^^^^^^^^^^^^^^^^ UP007
+   |          ^^^^^^^^^^^^^^^^^^^^ UP007 (non-pep604-annotation)
 77 |     ...
    |
    = help: Convert to `X | Y`
 
-UP007.py:80:10: UP007 Use `X | Y` for type annotations
+UP007.py:80:10: UP007 (non-pep604-annotation) Use `X | Y` for type annotations
    |
 80 | def f(x: Union[lambda: int]) -> None:
-   |          ^^^^^^^^^^^^^^^^^^ UP007
+   |          ^^^^^^^^^^^^^^^^^^ UP007 (non-pep604-annotation)
 81 |     ...
    |
    = help: Convert to `X | Y`
 
-UP007.py:84:10: UP007 Use `X | Y` for type annotations
+UP007.py:84:10: UP007 (non-pep604-annotation) Use `X | Y` for type annotations
    |
 84 | def f(x: Union[str, lambda: int]) -> None:
-   |          ^^^^^^^^^^^^^^^^^^^^^^^ UP007
+   |          ^^^^^^^^^^^^^^^^^^^^^^^ UP007 (non-pep604-annotation)
 85 |     ...
    |
    = help: Convert to `X | Y`
 
-UP007.py:88:10: UP007 Use `X | Y` for type annotations
+UP007.py:88:10: UP007 (non-pep604-annotation) Use `X | Y` for type annotations
    |
 88 | def f(x: Optional[int : float]) -> None:
-   |          ^^^^^^^^^^^^^^^^^^^^^ UP007
+   |          ^^^^^^^^^^^^^^^^^^^^^ UP007 (non-pep604-annotation)
 89 |     ...
    |
    = help: Convert to `X | Y`
 
-UP007.py:92:10: UP007 Use `X | Y` for type annotations
+UP007.py:92:10: UP007 (non-pep604-annotation) Use `X | Y` for type annotations
    |
 92 | def f(x: Optional[str, int : float]) -> None:
-   |          ^^^^^^^^^^^^^^^^^^^^^^^^^^ UP007
+   |          ^^^^^^^^^^^^^^^^^^^^^^^^^^ UP007 (non-pep604-annotation)
 93 |     ...
    |
    = help: Convert to `X | Y`
 
-UP007.py:96:10: UP007 Use `X | Y` for type annotations
+UP007.py:96:10: UP007 (non-pep604-annotation) Use `X | Y` for type annotations
    |
 96 | def f(x: Optional[int, float]) -> None:
-   |          ^^^^^^^^^^^^^^^^^^^^ UP007
+   |          ^^^^^^^^^^^^^^^^^^^^ UP007 (non-pep604-annotation)
 97 |     ...
    |
    = help: Convert to `X | Y`
 
-UP007.py:102:28: UP007 [*] Use `X | Y` for type annotations
+UP007.py:102:28: UP007 (non-pep604-annotation) [*] Use `X | Y` for type annotations
     |
 100 |   # Regression test for: https://github.com/astral-sh/ruff/issues/7131
 101 |   class ServiceRefOrValue:
@@ -378,7 +378,7 @@ UP007.py:102:28: UP007 [*] Use `X | Y` for type annotations
 103 | |         list[ServiceSpecificationRef]
 104 | |         | list[ServiceSpecification]
 105 | |     ] = None
-    | |_____^ UP007
+    | |_____^ UP007 (non-pep604-annotation)
     |
     = help: Convert to `X | Y`
 
@@ -395,12 +395,12 @@ UP007.py:102:28: UP007 [*] Use `X | Y` for type annotations
 107 104 | 
 108 105 | # Regression test for: https://github.com/astral-sh/ruff/issues/7201
 
-UP007.py:110:28: UP007 [*] Use `X | Y` for type annotations
+UP007.py:110:28: UP007 (non-pep604-annotation) [*] Use `X | Y` for type annotations
     |
 108 | # Regression test for: https://github.com/astral-sh/ruff/issues/7201
 109 | class ServiceRefOrValue:
 110 |     service_specification: Optional[str]is not True = None
-    |                            ^^^^^^^^^^^^^ UP007
+    |                            ^^^^^^^^^^^^^ UP007 (non-pep604-annotation)
     |
     = help: Convert to `X | Y`
 
@@ -414,11 +414,11 @@ UP007.py:110:28: UP007 [*] Use `X | Y` for type annotations
 112 112 | 
 113 113 | # Regression test for: https://github.com/astral-sh/ruff/issues/7452
 
-UP007.py:120:10: UP007 [*] Use `X | Y` for type annotations
+UP007.py:120:10: UP007 (non-pep604-annotation) [*] Use `X | Y` for type annotations
     |
 119 | # Regression test for: https://github.com/astral-sh/ruff/issues/8609
 120 | def f(x: Union[int, str, bytes]) -> None:
-    |          ^^^^^^^^^^^^^^^^^^^^^^ UP007
+    |          ^^^^^^^^^^^^^^^^^^^^^^ UP007 (non-pep604-annotation)
 121 |     ...
     |
     = help: Convert to `X | Y`
@@ -430,5 +430,3 @@ UP007.py:120:10: UP007 [*] Use `X | Y` for type annotations
 120     |-def f(x: Union[int, str, bytes]) -> None:
     120 |+def f(x: int | str | bytes) -> None:
 121 121 |     ...
-
-

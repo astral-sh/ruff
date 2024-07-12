@@ -1,11 +1,11 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_type_checking/mod.rs
 ---
-TCH004_1.py:4:26: TCH004 [*] Move import `datetime.datetime` out of type-checking block. Import is used for more than type hinting.
+TCH004_1.py:4:26: TCH004 (runtime-import-in-type-checking-block) [*] Move import `datetime.datetime` out of type-checking block. Import is used for more than type hinting.
   |
 3 | if TYPE_CHECKING:
 4 |     from datetime import datetime
-  |                          ^^^^^^^^ TCH004
+  |                          ^^^^^^^^ TCH004 (runtime-import-in-type-checking-block)
 5 | x = datetime
   |
   = help: Move out of type-checking block
@@ -18,5 +18,3 @@ TCH004_1.py:4:26: TCH004 [*] Move import `datetime.datetime` out of type-checkin
 4   |-    from datetime import datetime
   5 |+    pass
 5 6 | x = datetime
-
-

@@ -1,10 +1,10 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_pytest_style/mod.rs
 ---
-PT014.py:4:35: PT014 [*] Duplicate of test case at index 0 in `@pytest_mark.parametrize`
+PT014.py:4:35: PT014 (pytest-duplicate-parametrize-test-cases) [*] Duplicate of test case at index 0 in `@pytest_mark.parametrize`
   |
 4 | @pytest.mark.parametrize("x", [1, 1, 2])
-  |                                   ^ PT014
+  |                                   ^ PT014 (pytest-duplicate-parametrize-test-cases)
 5 | def test_error_literal(x):
 6 |     ...
   |
@@ -20,10 +20,10 @@ PT014.py:4:35: PT014 [*] Duplicate of test case at index 0 in `@pytest_mark.para
 6 6 |     ...
 7 7 | 
 
-PT014.py:14:35: PT014 [*] Duplicate of test case at index 0 in `@pytest_mark.parametrize`
+PT014.py:14:35: PT014 (pytest-duplicate-parametrize-test-cases) [*] Duplicate of test case at index 0 in `@pytest_mark.parametrize`
    |
 14 | @pytest.mark.parametrize("x", [a, a, b, b, b, c])
-   |                                   ^ PT014
+   |                                   ^ PT014 (pytest-duplicate-parametrize-test-cases)
 15 | def test_error_expr_simple(x):
 16 |     ...
    |
@@ -39,10 +39,10 @@ PT014.py:14:35: PT014 [*] Duplicate of test case at index 0 in `@pytest_mark.par
 16 16 |     ...
 17 17 | 
 
-PT014.py:14:41: PT014 [*] Duplicate of test case at index 2 in `@pytest_mark.parametrize`
+PT014.py:14:41: PT014 (pytest-duplicate-parametrize-test-cases) [*] Duplicate of test case at index 2 in `@pytest_mark.parametrize`
    |
 14 | @pytest.mark.parametrize("x", [a, a, b, b, b, c])
-   |                                         ^ PT014
+   |                                         ^ PT014 (pytest-duplicate-parametrize-test-cases)
 15 | def test_error_expr_simple(x):
 16 |     ...
    |
@@ -58,10 +58,10 @@ PT014.py:14:41: PT014 [*] Duplicate of test case at index 2 in `@pytest_mark.par
 16 16 |     ...
 17 17 | 
 
-PT014.py:14:44: PT014 [*] Duplicate of test case at index 2 in `@pytest_mark.parametrize`
+PT014.py:14:44: PT014 (pytest-duplicate-parametrize-test-cases) [*] Duplicate of test case at index 2 in `@pytest_mark.parametrize`
    |
 14 | @pytest.mark.parametrize("x", [a, a, b, b, b, c])
-   |                                            ^ PT014
+   |                                            ^ PT014 (pytest-duplicate-parametrize-test-cases)
 15 | def test_error_expr_simple(x):
 16 |     ...
    |
@@ -77,21 +77,21 @@ PT014.py:14:44: PT014 [*] Duplicate of test case at index 2 in `@pytest_mark.par
 16 16 |     ...
 17 17 | 
 
-PT014.py:24:9: PT014 Duplicate of test case at index 0 in `@pytest_mark.parametrize`
+PT014.py:24:9: PT014 (pytest-duplicate-parametrize-test-cases) Duplicate of test case at index 0 in `@pytest_mark.parametrize`
    |
 22 |         (a, b),
 23 |         # comment
 24 |         (a, b),
-   |         ^^^^^^ PT014
+   |         ^^^^^^ PT014 (pytest-duplicate-parametrize-test-cases)
 25 |         (b, c),
 26 |     ],
    |
    = help: Remove duplicate test case
 
-PT014.py:32:39: PT014 [*] Duplicate of test case at index 0 in `@pytest_mark.parametrize`
+PT014.py:32:39: PT014 (pytest-duplicate-parametrize-test-cases) [*] Duplicate of test case at index 0 in `@pytest_mark.parametrize`
    |
 32 | @pytest.mark.parametrize("x", [a, b, (a), c, ((a))])
-   |                                       ^ PT014
+   |                                       ^ PT014 (pytest-duplicate-parametrize-test-cases)
 33 | def test_error_parentheses(x):
 34 |     ...
    |
@@ -107,10 +107,10 @@ PT014.py:32:39: PT014 [*] Duplicate of test case at index 0 in `@pytest_mark.par
 34 34 |     ...
 35 35 | 
 
-PT014.py:32:48: PT014 [*] Duplicate of test case at index 0 in `@pytest_mark.parametrize`
+PT014.py:32:48: PT014 (pytest-duplicate-parametrize-test-cases) [*] Duplicate of test case at index 0 in `@pytest_mark.parametrize`
    |
 32 | @pytest.mark.parametrize("x", [a, b, (a), c, ((a))])
-   |                                                ^ PT014
+   |                                                ^ PT014 (pytest-duplicate-parametrize-test-cases)
 33 | def test_error_parentheses(x):
 34 |     ...
    |
@@ -126,12 +126,12 @@ PT014.py:32:48: PT014 [*] Duplicate of test case at index 0 in `@pytest_mark.par
 34 34 |     ...
 35 35 | 
 
-PT014.py:42:10: PT014 [*] Duplicate of test case at index 0 in `@pytest_mark.parametrize`
+PT014.py:42:10: PT014 (pytest-duplicate-parametrize-test-cases) [*] Duplicate of test case at index 0 in `@pytest_mark.parametrize`
    |
 40 |         a,
 41 |         b,
 42 |         (a),
-   |          ^ PT014
+   |          ^ PT014 (pytest-duplicate-parametrize-test-cases)
 43 |         c,
 44 |         ((a)),
    |
@@ -146,12 +146,12 @@ PT014.py:42:10: PT014 [*] Duplicate of test case at index 0 in `@pytest_mark.par
 44 43 |         ((a)),
 45 44 |     ],
 
-PT014.py:44:11: PT014 [*] Duplicate of test case at index 0 in `@pytest_mark.parametrize`
+PT014.py:44:11: PT014 (pytest-duplicate-parametrize-test-cases) [*] Duplicate of test case at index 0 in `@pytest_mark.parametrize`
    |
 42 |         (a),
 43 |         c,
 44 |         ((a)),
-   |           ^ PT014
+   |           ^ PT014 (pytest-duplicate-parametrize-test-cases)
 45 |     ],
 46 | )
    |
@@ -166,10 +166,10 @@ PT014.py:44:11: PT014 [*] Duplicate of test case at index 0 in `@pytest_mark.par
 46 45 | )
 47 46 | def test_error_parentheses_trailing_comma(x):
 
-PT014.py:56:53: PT014 [*] Duplicate of test case at index 0 in `@pytest_mark.parametrize`
+PT014.py:56:53: PT014 (pytest-duplicate-parametrize-test-cases) [*] Duplicate of test case at index 0 in `@pytest_mark.parametrize`
    |
 56 | @pytest.mark.parametrize('data, spec', [(1.0, 1.0), (1.0, 1.0)])
-   |                                                     ^^^^^^^^^^ PT014
+   |                                                     ^^^^^^^^^^ PT014 (pytest-duplicate-parametrize-test-cases)
 57 | def test_numbers(data, spec):
 58 |     ...
    |

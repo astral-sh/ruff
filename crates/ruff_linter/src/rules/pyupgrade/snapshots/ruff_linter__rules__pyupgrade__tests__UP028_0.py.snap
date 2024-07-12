@@ -1,13 +1,13 @@
 ---
 source: crates/ruff_linter/src/rules/pyupgrade/mod.rs
 ---
-UP028_0.py:2:5: UP028 [*] Replace `yield` over `for` loop with `yield from`
+UP028_0.py:2:5: UP028 (yield-in-for-loop) [*] Replace `yield` over `for` loop with `yield from`
   |
 1 |   def f():
 2 |       for x in y:
   |  _____^
 3 | |         yield x
-  | |_______________^ UP028
+  | |_______________^ UP028 (yield-in-for-loop)
   |
   = help: Replace with `yield from`
 
@@ -20,13 +20,13 @@ UP028_0.py:2:5: UP028 [*] Replace `yield` over `for` loop with `yield from`
 5 4 | 
 6 5 | def g():
 
-UP028_0.py:7:5: UP028 [*] Replace `yield` over `for` loop with `yield from`
+UP028_0.py:7:5: UP028 (yield-in-for-loop) [*] Replace `yield` over `for` loop with `yield from`
   |
 6 |   def g():
 7 |       for x, y in z:
   |  _____^
 8 | |         yield (x, y)
-  | |____________________^ UP028
+  | |____________________^ UP028 (yield-in-for-loop)
   |
   = help: Replace with `yield from`
 
@@ -41,13 +41,13 @@ UP028_0.py:7:5: UP028 [*] Replace `yield` over `for` loop with `yield from`
 10 9 | 
 11 10 | def h():
 
-UP028_0.py:12:5: UP028 [*] Replace `yield` over `for` loop with `yield from`
+UP028_0.py:12:5: UP028 (yield-in-for-loop) [*] Replace `yield` over `for` loop with `yield from`
    |
 11 |   def h():
 12 |       for x in [1, 2, 3]:
    |  _____^
 13 | |         yield x
-   | |_______________^ UP028
+   | |_______________^ UP028 (yield-in-for-loop)
    |
    = help: Replace with `yield from`
 
@@ -62,13 +62,13 @@ UP028_0.py:12:5: UP028 [*] Replace `yield` over `for` loop with `yield from`
 15 14 | 
 16 15 | def i():
 
-UP028_0.py:17:5: UP028 [*] Replace `yield` over `for` loop with `yield from`
+UP028_0.py:17:5: UP028 (yield-in-for-loop) [*] Replace `yield` over `for` loop with `yield from`
    |
 16 |   def i():
 17 |       for x in {x for x in y}:
    |  _____^
 18 | |         yield x
-   | |_______________^ UP028
+   | |_______________^ UP028 (yield-in-for-loop)
    |
    = help: Replace with `yield from`
 
@@ -83,13 +83,13 @@ UP028_0.py:17:5: UP028 [*] Replace `yield` over `for` loop with `yield from`
 20 19 | 
 21 20 | def j():
 
-UP028_0.py:22:5: UP028 [*] Replace `yield` over `for` loop with `yield from`
+UP028_0.py:22:5: UP028 (yield-in-for-loop) [*] Replace `yield` over `for` loop with `yield from`
    |
 21 |   def j():
 22 |       for x in (1, 2, 3):
    |  _____^
 23 | |         yield x
-   | |_______________^ UP028
+   | |_______________^ UP028 (yield-in-for-loop)
    |
    = help: Replace with `yield from`
 
@@ -104,13 +104,13 @@ UP028_0.py:22:5: UP028 [*] Replace `yield` over `for` loop with `yield from`
 25 24 | 
 26 25 | def k():
 
-UP028_0.py:27:5: UP028 [*] Replace `yield` over `for` loop with `yield from`
+UP028_0.py:27:5: UP028 (yield-in-for-loop) [*] Replace `yield` over `for` loop with `yield from`
    |
 26 |   def k():
 27 |       for x, y in {3: "x", 6: "y"}:
    |  _____^
 28 | |         yield x, y
-   | |__________________^ UP028
+   | |__________________^ UP028 (yield-in-for-loop)
    |
    = help: Replace with `yield from`
 
@@ -125,7 +125,7 @@ UP028_0.py:27:5: UP028 [*] Replace `yield` over `for` loop with `yield from`
 30 29 | 
 31 30 | def f():  # Comment one\n'
 
-UP028_0.py:33:5: UP028 [*] Replace `yield` over `for` loop with `yield from`
+UP028_0.py:33:5: UP028 (yield-in-for-loop) [*] Replace `yield` over `for` loop with `yield from`
    |
 31 |   def f():  # Comment one\n'
 32 |       # Comment two\n'
@@ -137,7 +137,7 @@ UP028_0.py:33:5: UP028 [*] Replace `yield` over `for` loop with `yield from`
 37 | |     }:  # Comment seven\n'
 38 | |         # Comment eight\n'
 39 | |         yield x, y  # Comment nine\n'
-   | |__________________^ UP028
+   | |__________________^ UP028 (yield-in-for-loop)
 40 |           # Comment ten',
    |
    = help: Replace with `yield from`
@@ -159,13 +159,13 @@ UP028_0.py:33:5: UP028 [*] Replace `yield` over `for` loop with `yield from`
 41 39 | 
 42 40 | 
 
-UP028_0.py:44:5: UP028 [*] Replace `yield` over `for` loop with `yield from`
+UP028_0.py:44:5: UP028 (yield-in-for-loop) [*] Replace `yield` over `for` loop with `yield from`
    |
 43 |   def f():
 44 |       for x, y in [{3: (3, [44, "long ss"]), 6: "y"}]:
    |  _____^
 45 | |         yield x, y
-   | |__________________^ UP028
+   | |__________________^ UP028 (yield-in-for-loop)
    |
    = help: Replace with `yield from`
 
@@ -180,13 +180,13 @@ UP028_0.py:44:5: UP028 [*] Replace `yield` over `for` loop with `yield from`
 47 46 | 
 48 47 | def f():
 
-UP028_0.py:49:5: UP028 [*] Replace `yield` over `for` loop with `yield from`
+UP028_0.py:49:5: UP028 (yield-in-for-loop) [*] Replace `yield` over `for` loop with `yield from`
    |
 48 |   def f():
 49 |       for x, y in z():
    |  _____^
 50 | |         yield x, y
-   | |__________________^ UP028
+   | |__________________^ UP028 (yield-in-for-loop)
 51 |   
 52 |   def f():
    |
@@ -203,7 +203,7 @@ UP028_0.py:49:5: UP028 [*] Replace `yield` over `for` loop with `yield from`
 52 51 | def f():
 53 52 |     def func():
 
-UP028_0.py:55:9: UP028 [*] Replace `yield` over `for` loop with `yield from`
+UP028_0.py:55:9: UP028 (yield-in-for-loop) [*] Replace `yield` over `for` loop with `yield from`
    |
 53 |       def func():
 54 |           # This comment is preserved\n'
@@ -211,7 +211,7 @@ UP028_0.py:55:9: UP028 [*] Replace `yield` over `for` loop with `yield from`
    |  _________^
 56 | |             # Comment two\n'
 57 | |             yield x, y  # Comment three\n'
-   | |______________________^ UP028
+   | |______________________^ UP028 (yield-in-for-loop)
 58 |               # Comment four\n'
 59 |   # Comment\n'
    |
@@ -229,14 +229,14 @@ UP028_0.py:55:9: UP028 [*] Replace `yield` over `for` loop with `yield from`
 59 57 | # Comment\n'
 60 58 | def g():
 
-UP028_0.py:67:5: UP028 [*] Replace `yield` over `for` loop with `yield from`
+UP028_0.py:67:5: UP028 (yield-in-for-loop) [*] Replace `yield` over `for` loop with `yield from`
    |
 65 |       for x in y:
 66 |           yield x
 67 |       for z in x:
    |  _____^
 68 | |         yield z
-   | |_______________^ UP028
+   | |_______________^ UP028 (yield-in-for-loop)
    |
    = help: Replace with `yield from`
 
@@ -251,13 +251,13 @@ UP028_0.py:67:5: UP028 [*] Replace `yield` over `for` loop with `yield from`
 70 69 | 
 71 70 | def f():
 
-UP028_0.py:72:5: UP028 [*] Replace `yield` over `for` loop with `yield from`
+UP028_0.py:72:5: UP028 (yield-in-for-loop) [*] Replace `yield` over `for` loop with `yield from`
    |
 71 |   def f():
 72 |       for x, y in z():
    |  _____^
 73 | |         yield x, y
-   | |__________________^ UP028
+   | |__________________^ UP028 (yield-in-for-loop)
 74 |       x = 1
    |
    = help: Replace with `yield from`
@@ -273,7 +273,7 @@ UP028_0.py:72:5: UP028 [*] Replace `yield` over `for` loop with `yield from`
 75 74 | 
 76 75 | 
 
-UP028_0.py:79:5: UP028 [*] Replace `yield` over `for` loop with `yield from`
+UP028_0.py:79:5: UP028 (yield-in-for-loop) [*] Replace `yield` over `for` loop with `yield from`
    |
 77 |   # Regression test for: https://github.com/astral-sh/ruff/issues/7103
 78 |   def _serve_method(fn):
@@ -283,7 +283,7 @@ UP028_0.py:79:5: UP028 [*] Replace `yield` over `for` loop with `yield from`
 81 | |             .markup(highlight=args.region)
 82 | |     ):
 83 | |         yield h
-   | |_______________^ UP028
+   | |_______________^ UP028 (yield-in-for-loop)
    |
    = help: Replace with `yield from`
 
@@ -298,5 +298,3 @@ UP028_0.py:79:5: UP028 [*] Replace `yield` over `for` loop with `yield from`
 82    |-    ):
 83    |-        yield h
    82 |+    )
-
-

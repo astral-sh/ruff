@@ -1,20 +1,18 @@
 ---
 source: crates/ruff_linter/src/rules/pyflakes/mod.rs
 ---
-F403.py:1:1: F403 `from F634 import *` used; unable to detect undefined names
+F403.py:1:1: F403 (undefined-local-with-import-star) `from F634 import *` used; unable to detect undefined names
   |
 1 | from F634 import *
-  | ^^^^^^^^^^^^^^^^^^ F403
+  | ^^^^^^^^^^^^^^^^^^ F403 (undefined-local-with-import-star)
 2 | from F634 import *  # noqa: E501
   |
 
-F403.py:2:1: F403 `from F634 import *` used; unable to detect undefined names
+F403.py:2:1: F403 (undefined-local-with-import-star) `from F634 import *` used; unable to detect undefined names
   |
 1 | from F634 import *
 2 | from F634 import *  # noqa: E501
-  | ^^^^^^^^^^^^^^^^^^ F403
+  | ^^^^^^^^^^^^^^^^^^ F403 (undefined-local-with-import-star)
 3 | 
 4 | from F634 import *  # noqa
   |
-
-

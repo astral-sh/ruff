@@ -1,0 +1,64 @@
+---
+source: crates/ruff_linter/src/rules/ruff/mod.rs
+---
+noqa_mixed.py:23:5: F841 (unused-variable) [*] Local variable `I` is assigned to but never used
+   |
+21 | def f():
+22 |     # Only `E741` should be ignored by the `noqa`.
+23 |     I = 1  # noqa: E741 unused-variable
+   |     ^ F841 (unused-variable)
+   |
+   = help: Remove assignment to unused variable `I`
+
+ℹ Unsafe fix
+20 20 | 
+21 21 | def f():
+22 22 |     # Only `E741` should be ignored by the `noqa`.
+23    |-    I = 1  # noqa: E741 unused-variable
+   23 |+    pass  # noqa: E741 unused-variable
+24 24 | 
+25 25 | 
+26 26 | def f():
+
+noqa_mixed.py:44:5: F841 (unused-variable) [*] Local variable `I` is assigned to but never used
+   |
+42 | def f():
+43 |     # Only `E741` should be ignored by the `noqa`.
+44 |     I = 1  # noqa: E741.unused-variable
+   |     ^ F841 (unused-variable)
+   |
+   = help: Remove assignment to unused variable `I`
+
+ℹ Unsafe fix
+41 41 | 
+42 42 | def f():
+43 43 |     # Only `E741` should be ignored by the `noqa`.
+44    |-    I = 1  # noqa: E741.unused-variable
+   44 |+    pass  # noqa: E741.unused-variable
+45 45 | 
+46 46 | 
+47 47 | def f():
+
+noqa_mixed.py:49:5: E741 (ambiguous-variable-name) Ambiguous variable name: `I`
+   |
+47 | def f():
+48 |     # Neither of these should be ignored by the `noqa`.
+49 |     I = 1  # noqa: ambiguous-variable-name.unused-variable
+   |     ^ E741 (ambiguous-variable-name)
+   |
+
+noqa_mixed.py:49:5: F841 (unused-variable) [*] Local variable `I` is assigned to but never used
+   |
+47 | def f():
+48 |     # Neither of these should be ignored by the `noqa`.
+49 |     I = 1  # noqa: ambiguous-variable-name.unused-variable
+   |     ^ F841 (unused-variable)
+   |
+   = help: Remove assignment to unused variable `I`
+
+ℹ Unsafe fix
+46 46 | 
+47 47 | def f():
+48 48 |     # Neither of these should be ignored by the `noqa`.
+49    |-    I = 1  # noqa: ambiguous-variable-name.unused-variable
+   49 |+    pass  # noqa: ambiguous-variable-name.unused-variable

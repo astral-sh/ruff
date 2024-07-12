@@ -1,12 +1,12 @@
 ---
 source: crates/ruff_linter/src/rules/pylint/mod.rs
 ---
-invalid_characters.py:15:6: PLE2510 [*] Invalid unescaped character backspace, use "\b" instead
+invalid_characters.py:15:6: PLE2510 (invalid-character-backspace) [*] Invalid unescaped character backspace, use "\b" instead
    |
 13 | #        (Pylint, "C3002") => Rule::UnnecessaryDirectLambdaCall,
 14 | #foo = 'hi'
 15 | b = '␈'
-   |      ^ PLE2510
+   |      ^ PLE2510 (invalid-character-backspace)
 16 | b = f'␈'
    |
    = help: Replace with escape sequence
@@ -21,12 +21,12 @@ invalid_characters.py:15:6: PLE2510 [*] Invalid unescaped character backspace, u
 17 17 | 
 18 18 | b_ok = '\\b'
 
-invalid_characters.py:16:7: PLE2510 [*] Invalid unescaped character backspace, use "\b" instead
+invalid_characters.py:16:7: PLE2510 (invalid-character-backspace) [*] Invalid unescaped character backspace, use "\b" instead
    |
 14 | #foo = 'hi'
 15 | b = '␈'
 16 | b = f'␈'
-   |       ^ PLE2510
+   |       ^ PLE2510 (invalid-character-backspace)
 17 | 
 18 | b_ok = '\\b'
    |
@@ -42,12 +42,12 @@ invalid_characters.py:16:7: PLE2510 [*] Invalid unescaped character backspace, u
 18 18 | b_ok = '\\b'
 19 19 | b_ok = f'\\b'
 
-invalid_characters.py:55:21: PLE2510 [*] Invalid unescaped character backspace, use "\b" instead
+invalid_characters.py:55:21: PLE2510 (invalid-character-backspace) [*] Invalid unescaped character backspace, use "\b" instead
    |
 53 | zwsp_after_multicharacter_grapheme_cluster = f"ಫ್ರಾನ್ಸಿಸ್ಕೊ ​​"
 54 | 
 55 | nested_fstrings = f'␈{f'{f'␛'}'}'
-   |                     ^ PLE2510
+   |                     ^ PLE2510 (invalid-character-backspace)
 56 | 
 57 | # https://github.com/astral-sh/ruff/issues/7455#issuecomment-1741998106
    |

@@ -1,18 +1,16 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_bandit/mod.rs
 ---
-S407.py:1:6: S407 `xml.dom.expatbuilder` is vulnerable to XML attacks
+S407.py:1:6: S407 (suspicious-xml-expat-import) `xml.dom.expatbuilder` is vulnerable to XML attacks
   |
 1 | from xml.dom import expatbuilder  # S407
-  |      ^^^^^^^ S407
+  |      ^^^^^^^ S407 (suspicious-xml-expat-import)
 2 | import xml.dom.expatbuilder  # S407
   |
 
-S407.py:2:8: S407 `xml.dom.expatbuilder` is vulnerable to XML attacks
+S407.py:2:8: S407 (suspicious-xml-expat-import) `xml.dom.expatbuilder` is vulnerable to XML attacks
   |
 1 | from xml.dom import expatbuilder  # S407
 2 | import xml.dom.expatbuilder  # S407
-  |        ^^^^^^^^^^^^^^^^^^^^ S407
+  |        ^^^^^^^^^^^^^^^^^^^^ S407 (suspicious-xml-expat-import)
   |
-
-

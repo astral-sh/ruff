@@ -1,12 +1,12 @@
 ---
 source: crates/ruff_linter/src/rules/pydocstyle/mod.rs
 ---
-D.py:137:5: D201 [*] No blank lines allowed before function docstring (found 1)
+D.py:137:5: D201 (no-blank-line-before-function) [*] No blank lines allowed before function docstring (found 1)
     |
 135 | def leading_space():
 136 | 
 137 |     """Leading space."""
-    |     ^^^^^^^^^^^^^^^^^^^^ D201
+    |     ^^^^^^^^^^^^^^^^^^^^ D201 (no-blank-line-before-function)
     |
     = help: Remove blank line(s) before function docstring
 
@@ -19,12 +19,12 @@ D.py:137:5: D201 [*] No blank lines allowed before function docstring (found 1)
 138 137 | 
 139 138 | 
 
-D.py:151:5: D201 [*] No blank lines allowed before function docstring (found 1)
+D.py:151:5: D201 (no-blank-line-before-function) [*] No blank lines allowed before function docstring (found 1)
     |
 149 | def trailing_and_leading_space():
 150 | 
 151 |     """Trailing and leading space."""
-    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ D201
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ D201 (no-blank-line-before-function)
 152 | 
 153 |     pass
     |
@@ -39,7 +39,7 @@ D.py:151:5: D201 [*] No blank lines allowed before function docstring (found 1)
 152 151 | 
 153 152 |     pass
 
-D.py:546:5: D201 [*] No blank lines allowed before function docstring (found 1)
+D.py:546:5: D201 (no-blank-line-before-function) [*] No blank lines allowed before function docstring (found 1)
     |
 544 |   def multiline_leading_space():
 545 |   
@@ -48,7 +48,7 @@ D.py:546:5: D201 [*] No blank lines allowed before function docstring (found 1)
 547 | | 
 548 | |     More content.
 549 | |     """
-    | |_______^ D201
+    | |_______^ D201 (no-blank-line-before-function)
     |
     = help: Remove blank line(s) before function docstring
 
@@ -61,7 +61,7 @@ D.py:546:5: D201 [*] No blank lines allowed before function docstring (found 1)
 547 546 | 
 548 547 |     More content.
 
-D.py:568:5: D201 [*] No blank lines allowed before function docstring (found 1)
+D.py:568:5: D201 (no-blank-line-before-function) [*] No blank lines allowed before function docstring (found 1)
     |
 566 |   def multiline_trailing_and_leading_space():
 567 |   
@@ -70,7 +70,7 @@ D.py:568:5: D201 [*] No blank lines allowed before function docstring (found 1)
 569 | | 
 570 | |     More content.
 571 | |     """
-    | |_______^ D201
+    | |_______^ D201 (no-blank-line-before-function)
 572 |   
 573 |       pass
     |
@@ -84,5 +84,3 @@ D.py:568:5: D201 [*] No blank lines allowed before function docstring (found 1)
 568 567 |     """Trailing and leading space.
 569 568 | 
 570 569 |     More content.
-
-

@@ -1,10 +1,10 @@
 ---
 source: crates/ruff_linter/src/rules/pyflakes/mod.rs
 ---
-F522.py:1:1: F522 [*] `.format` call has unused named argument(s): bar
+F522.py:1:1: F522 (string-dot-format-extra-named-arguments) [*] `.format` call has unused named argument(s): bar
   |
 1 | "{}".format(1, bar=2)  # F522
-  | ^^^^^^^^^^^^^^^^^^^^^ F522
+  | ^^^^^^^^^^^^^^^^^^^^^ F522 (string-dot-format-extra-named-arguments)
 2 | "{bar}{}".format(1, bar=2, spam=3)  # F522
 3 | "{bar:{spam}}".format(bar=2, spam=3)  # No issues
   |
@@ -17,11 +17,11 @@ F522.py:1:1: F522 [*] `.format` call has unused named argument(s): bar
 3 3 | "{bar:{spam}}".format(bar=2, spam=3)  # No issues
 4 4 | "{bar:{spam}}".format(bar=2, spam=3, eggs=4, ham=5)  # F522
 
-F522.py:2:1: F522 [*] `.format` call has unused named argument(s): spam
+F522.py:2:1: F522 (string-dot-format-extra-named-arguments) [*] `.format` call has unused named argument(s): spam
   |
 1 | "{}".format(1, bar=2)  # F522
 2 | "{bar}{}".format(1, bar=2, spam=3)  # F522
-  | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ F522
+  | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ F522 (string-dot-format-extra-named-arguments)
 3 | "{bar:{spam}}".format(bar=2, spam=3)  # No issues
 4 | "{bar:{spam}}".format(bar=2, spam=3, eggs=4, ham=5)  # F522
   |
@@ -35,12 +35,12 @@ F522.py:2:1: F522 [*] `.format` call has unused named argument(s): spam
 4 4 | "{bar:{spam}}".format(bar=2, spam=3, eggs=4, ham=5)  # F522
 5 5 | (''
 
-F522.py:4:1: F522 [*] `.format` call has unused named argument(s): eggs, ham
+F522.py:4:1: F522 (string-dot-format-extra-named-arguments) [*] `.format` call has unused named argument(s): eggs, ham
   |
 2 | "{bar}{}".format(1, bar=2, spam=3)  # F522
 3 | "{bar:{spam}}".format(bar=2, spam=3)  # No issues
 4 | "{bar:{spam}}".format(bar=2, spam=3, eggs=4, ham=5)  # F522
-  | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ F522
+  | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ F522 (string-dot-format-extra-named-arguments)
 5 | (''
 6 |  .format(x=2))  # F522
   |
@@ -55,14 +55,14 @@ F522.py:4:1: F522 [*] `.format` call has unused named argument(s): eggs, ham
 5 5 | (''
 6 6 |  .format(x=2))  # F522
 
-F522.py:5:2: F522 [*] `.format` call has unused named argument(s): x
+F522.py:5:2: F522 (string-dot-format-extra-named-arguments) [*] `.format` call has unused named argument(s): x
   |
 3 |   "{bar:{spam}}".format(bar=2, spam=3)  # No issues
 4 |   "{bar:{spam}}".format(bar=2, spam=3, eggs=4, ham=5)  # F522
 5 |   (''
   |  __^
 6 | |  .format(x=2))  # F522
-  | |_____________^ F522
+  | |_____________^ F522 (string-dot-format-extra-named-arguments)
   |
   = help: Remove extra named arguments: x
 
@@ -72,5 +72,3 @@ F522.py:5:2: F522 [*] `.format` call has unused named argument(s): x
 5 5 | (''
 6   |- .format(x=2))  # F522
   6 |+ .format())  # F522
-
-

@@ -1,8 +1,8 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_bandit/mod.rs
 ---
-S604.py:5:1: S604 Function call with `shell=True` parameter identified, security issue
+S604.py:5:1: S604 (call-with-shell-equals-true) Function call with `shell=True` parameter identified, security issue
   |
 5 | foo(shell=True)
-  | ^^^ S604
+  | ^^^ S604 (call-with-shell-equals-true)
   |

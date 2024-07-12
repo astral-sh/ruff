@@ -1,20 +1,18 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_pytest_style/mod.rs
 ---
-PT002.py:14:1: PT002 Configuration for fixture `my_fixture` specified via positional args, use kwargs
+PT002.py:14:1: PT002 (pytest-fixture-positional-args) Configuration for fixture `my_fixture` specified via positional args, use kwargs
    |
 14 | @pytest.fixture("module")
-   | ^^^^^^^^^^^^^^^^^^^^^^^^^ PT002
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^ PT002 (pytest-fixture-positional-args)
 15 | def my_fixture():  # Error only args
 16 |     return 0
    |
 
-PT002.py:19:1: PT002 Configuration for fixture `my_fixture` specified via positional args, use kwargs
+PT002.py:19:1: PT002 (pytest-fixture-positional-args) Configuration for fixture `my_fixture` specified via positional args, use kwargs
    |
 19 | @pytest.fixture("module", autouse=True)
-   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PT002
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PT002 (pytest-fixture-positional-args)
 20 | def my_fixture():  # Error mixed
 21 |     return 0
    |
-
-

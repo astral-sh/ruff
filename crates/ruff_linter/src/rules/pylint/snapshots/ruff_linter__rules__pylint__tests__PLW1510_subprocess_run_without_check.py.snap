@@ -1,11 +1,11 @@
 ---
 source: crates/ruff_linter/src/rules/pylint/mod.rs
 ---
-subprocess_run_without_check.py:4:1: PLW1510 [*] `subprocess.run` without explicit `check` argument
+subprocess_run_without_check.py:4:1: PLW1510 (subprocess-run-without-check) [*] `subprocess.run` without explicit `check` argument
   |
 3 | # Errors.
 4 | subprocess.run("ls")
-  | ^^^^^^^^^^^^^^ PLW1510
+  | ^^^^^^^^^^^^^^ PLW1510 (subprocess-run-without-check)
 5 | subprocess.run("ls", shell=True)
 6 | subprocess.run(
   |
@@ -21,12 +21,12 @@ subprocess_run_without_check.py:4:1: PLW1510 [*] `subprocess.run` without explic
 6 6 | subprocess.run(
 7 7 |     ["ls"],
 
-subprocess_run_without_check.py:5:1: PLW1510 [*] `subprocess.run` without explicit `check` argument
+subprocess_run_without_check.py:5:1: PLW1510 (subprocess-run-without-check) [*] `subprocess.run` without explicit `check` argument
   |
 3 | # Errors.
 4 | subprocess.run("ls")
 5 | subprocess.run("ls", shell=True)
-  | ^^^^^^^^^^^^^^ PLW1510
+  | ^^^^^^^^^^^^^^ PLW1510 (subprocess-run-without-check)
 6 | subprocess.run(
 7 |     ["ls"],
   |
@@ -42,12 +42,12 @@ subprocess_run_without_check.py:5:1: PLW1510 [*] `subprocess.run` without explic
 7 7 |     ["ls"],
 8 8 |     shell=False,
 
-subprocess_run_without_check.py:6:1: PLW1510 [*] `subprocess.run` without explicit `check` argument
+subprocess_run_without_check.py:6:1: PLW1510 (subprocess-run-without-check) [*] `subprocess.run` without explicit `check` argument
   |
 4 | subprocess.run("ls")
 5 | subprocess.run("ls", shell=True)
 6 | subprocess.run(
-  | ^^^^^^^^^^^^^^ PLW1510
+  | ^^^^^^^^^^^^^^ PLW1510 (subprocess-run-without-check)
 7 |     ["ls"],
 8 |     shell=False,
   |
@@ -63,12 +63,12 @@ subprocess_run_without_check.py:6:1: PLW1510 [*] `subprocess.run` without explic
 10 10 | subprocess.run(["ls"], **kwargs)
 11 11 | 
 
-subprocess_run_without_check.py:10:1: PLW1510 [*] `subprocess.run` without explicit `check` argument
+subprocess_run_without_check.py:10:1: PLW1510 (subprocess-run-without-check) [*] `subprocess.run` without explicit `check` argument
    |
  8 |     shell=False,
  9 | )
 10 | subprocess.run(["ls"], **kwargs)
-   | ^^^^^^^^^^^^^^ PLW1510
+   | ^^^^^^^^^^^^^^ PLW1510 (subprocess-run-without-check)
 11 | 
 12 | # Non-errors.
    |
@@ -83,5 +83,3 @@ subprocess_run_without_check.py:10:1: PLW1510 [*] `subprocess.run` without expli
 11 11 | 
 12 12 | # Non-errors.
 13 13 | subprocess.run("ls", check=True)
-
-

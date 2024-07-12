@@ -1,19 +1,17 @@
 ---
 source: crates/ruff_linter/src/rules/pep8_naming/mod.rs
 ---
-N807.py:1:5: N807 Function name should not start and end with `__`
+N807.py:1:5: N807 (dunder-function-name) Function name should not start and end with `__`
   |
 1 | def __bad__():
-  |     ^^^^^^^ N807
+  |     ^^^^^^^ N807 (dunder-function-name)
 2 |     pass
   |
 
-N807.py:14:9: N807 Function name should not start and end with `__`
+N807.py:14:9: N807 (dunder-function-name) Function name should not start and end with `__`
    |
 13 | def nested():
 14 |     def __bad__():
-   |         ^^^^^^^ N807
+   |         ^^^^^^^ N807 (dunder-function-name)
 15 |         pass
    |
-
-

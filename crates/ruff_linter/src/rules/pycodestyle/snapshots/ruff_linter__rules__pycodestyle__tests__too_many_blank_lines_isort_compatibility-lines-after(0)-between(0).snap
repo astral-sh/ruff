@@ -1,7 +1,7 @@
 ---
 source: crates/ruff_linter/src/rules/pycodestyle/mod.rs
 ---
-E30_isort.py:1:1: I001 [*] Import block is un-sorted or un-formatted
+E30_isort.py:1:1: I001 (unsorted-imports) [*] Import block is un-sorted or un-formatted
   |
 1 | / import json
 2 | | 
@@ -11,7 +11,7 @@ E30_isort.py:1:1: I001 [*] Import block is un-sorted or un-formatted
 6 | | 
 7 | | 
 8 | | class MissingCommand(TypeError): ...  # noqa: N818
-  | |_^ I001
+  | |_^ I001 (unsorted-imports)
   |
   = help: Organize imports
 
@@ -27,10 +27,10 @@ E30_isort.py:1:1: I001 [*] Import block is un-sorted or un-formatted
 9 4 | 
 10 5 | 
 
-E30_isort.py:5:1: E303 [*] Too many blank lines (3)
+E30_isort.py:5:1: E303 (too-many-blank-lines) [*] Too many blank lines (3)
   |
 5 | from typing import Any, Sequence
-  | ^^^^ E303
+  | ^^^^ E303 (too-many-blank-lines)
   |
   = help: Remove extraneous blank line(s)
 
@@ -43,10 +43,10 @@ E30_isort.py:5:1: E303 [*] Too many blank lines (3)
 6 5 | 
 7 6 | 
 
-E30_isort.py:8:1: E303 [*] Too many blank lines (2)
+E30_isort.py:8:1: E303 (too-many-blank-lines) [*] Too many blank lines (2)
   |
 8 | class MissingCommand(TypeError): ...  # noqa: N818
-  | ^^^^^ E303
+  | ^^^^^ E303 (too-many-blank-lines)
   |
   = help: Remove extraneous blank line(s)
 
@@ -60,10 +60,10 @@ E30_isort.py:8:1: E303 [*] Too many blank lines (2)
 9 7 | 
 10 8 | 
 
-E30_isort.py:21:5: E303 [*] Too many blank lines (2)
+E30_isort.py:21:5: E303 (too-many-blank-lines) [*] Too many blank lines (2)
    |
 21 |     abcd.foo()
-   |     ^^^^ E303
+   |     ^^^^ E303 (too-many-blank-lines)
 22 | 
 23 | def __init__(self, backend_module: str, backend_obj: str | None) -> None: ...
    |
@@ -78,7 +78,7 @@ E30_isort.py:21:5: E303 [*] Too many blank lines (2)
 22 21 | 
 23 22 | def __init__(self, backend_module: str, backend_obj: str | None) -> None: ...
 
-E30_isort.py:26:1: I001 [*] Import block is un-sorted or un-formatted
+E30_isort.py:26:1: I001 (unsorted-imports) [*] Import block is un-sorted or un-formatted
    |
 25 |   if TYPE_CHECKING:
 26 | /     import os
@@ -87,7 +87,7 @@ E30_isort.py:26:1: I001 [*] Import block is un-sorted or un-formatted
 29 | | 
 30 | |     from typing_extensions import TypeAlias
 31 | | 
-   | |_^ I001
+   | |_^ I001 (unsorted-imports)
 32 |   
 33 |       abcd.foo()
    |
@@ -103,10 +103,10 @@ E30_isort.py:26:1: I001 [*] Import block is un-sorted or un-formatted
 31 29 | 
 32 30 | 
 
-E30_isort.py:30:5: E303 [*] Too many blank lines (3)
+E30_isort.py:30:5: E303 (too-many-blank-lines) [*] Too many blank lines (3)
    |
 30 |     from typing_extensions import TypeAlias
-   |     ^^^^ E303
+   |     ^^^^ E303 (too-many-blank-lines)
    |
    = help: Remove extraneous blank line(s)
 
@@ -120,10 +120,10 @@ E30_isort.py:30:5: E303 [*] Too many blank lines (3)
 31 29 | 
 32 30 | 
 
-E30_isort.py:33:5: E303 [*] Too many blank lines (2)
+E30_isort.py:33:5: E303 (too-many-blank-lines) [*] Too many blank lines (2)
    |
 33 |     abcd.foo()
-   |     ^^^^ E303
+   |     ^^^^ E303 (too-many-blank-lines)
 34 | 
 35 | def __call__(self, name: str, *args: Any, **kwargs: Any) -> Any:
    |
@@ -138,12 +138,12 @@ E30_isort.py:33:5: E303 [*] Too many blank lines (2)
 34 33 | 
 35 34 | def __call__(self, name: str, *args: Any, **kwargs: Any) -> Any:
 
-E30_isort.py:60:1: I001 [*] Import block is un-sorted or un-formatted
+E30_isort.py:60:1: I001 (unsorted-imports) [*] Import block is un-sorted or un-formatted
    |
 60 | / from typing import Any, Sequence
 61 | | 
 62 | | class MissingCommand(TypeError): ...  # noqa: N818
-   | |_^ I001
+   | |_^ I001 (unsorted-imports)
    |
    = help: Organize imports
 
@@ -154,12 +154,12 @@ E30_isort.py:60:1: I001 [*] Import block is un-sorted or un-formatted
 61    |-
 62 61 | class MissingCommand(TypeError): ...  # noqa: N818
 
-E30_isort.py:62:1: E303 [*] Too many blank lines (1)
+E30_isort.py:62:1: E303 (too-many-blank-lines) [*] Too many blank lines (1)
    |
 60 | from typing import Any, Sequence
 61 | 
 62 | class MissingCommand(TypeError): ...  # noqa: N818
-   | ^^^^^ E303
+   | ^^^^^ E303 (too-many-blank-lines)
    |
    = help: Remove extraneous blank line(s)
 

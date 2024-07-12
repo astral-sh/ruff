@@ -1,11 +1,11 @@
 ---
 source: crates/ruff_linter/src/rules/pyflakes/mod.rs
 ---
-F901.py:2:11: F901 [*] `raise NotImplemented` should be `raise NotImplementedError`
+F901.py:2:11: F901 (raise-not-implemented) [*] `raise NotImplemented` should be `raise NotImplementedError`
   |
 1 | def f() -> None:
 2 |     raise NotImplemented()
-  |           ^^^^^^^^^^^^^^ F901
+  |           ^^^^^^^^^^^^^^ F901 (raise-not-implemented)
   |
   = help: Use `raise NotImplementedError`
 
@@ -17,11 +17,11 @@ F901.py:2:11: F901 [*] `raise NotImplemented` should be `raise NotImplementedErr
 4 4 | 
 5 5 | def g() -> None:
 
-F901.py:6:11: F901 [*] `raise NotImplemented` should be `raise NotImplementedError`
+F901.py:6:11: F901 (raise-not-implemented) [*] `raise NotImplemented` should be `raise NotImplementedError`
   |
 5 | def g() -> None:
 6 |     raise NotImplemented
-  |           ^^^^^^^^^^^^^^ F901
+  |           ^^^^^^^^^^^^^^ F901 (raise-not-implemented)
   |
   = help: Use `raise NotImplementedError`
 
@@ -35,12 +35,12 @@ F901.py:6:11: F901 [*] `raise NotImplemented` should be `raise NotImplementedErr
 8 8 | 
 9 9 | def h() -> None:
 
-F901.py:11:11: F901 [*] `raise NotImplemented` should be `raise NotImplementedError`
+F901.py:11:11: F901 (raise-not-implemented) [*] `raise NotImplemented` should be `raise NotImplementedError`
    |
  9 | def h() -> None:
 10 |     NotImplementedError = "foo"
 11 |     raise NotImplemented
-   |           ^^^^^^^^^^^^^^ F901
+   |           ^^^^^^^^^^^^^^ F901 (raise-not-implemented)
    |
    = help: Use `raise NotImplementedError`
 

@@ -1,21 +1,21 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_datetimez/mod.rs
 ---
-DTZ003.py:4:1: DTZ003 `datetime.datetime.utcnow()` used
+DTZ003.py:4:1: DTZ003 (call-datetime-utcnow) `datetime.datetime.utcnow()` used
   |
 3 | # qualified
 4 | datetime.datetime.utcnow()
-  | ^^^^^^^^^^^^^^^^^^^^^^^^^^ DTZ003
+  | ^^^^^^^^^^^^^^^^^^^^^^^^^^ DTZ003 (call-datetime-utcnow)
 5 | 
 6 | from datetime import datetime
   |
   = help: Use `datetime.datetime.now(tz=...)` instead
 
-DTZ003.py:9:1: DTZ003 `datetime.datetime.utcnow()` used
+DTZ003.py:9:1: DTZ003 (call-datetime-utcnow) `datetime.datetime.utcnow()` used
    |
  8 | # unqualified
  9 | datetime.utcnow()
-   | ^^^^^^^^^^^^^^^^^ DTZ003
+   | ^^^^^^^^^^^^^^^^^ DTZ003 (call-datetime-utcnow)
 10 | 
 11 | # uses `astimezone` method
    |

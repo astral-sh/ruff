@@ -1,12 +1,12 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_pytest_style/mod.rs
 ---
-PT022.py:17:5: PT022 [*] No teardown in fixture `error`, use `return` instead of `yield`
+PT022.py:17:5: PT022 (pytest-useless-yield-fixture) [*] No teardown in fixture `error`, use `return` instead of `yield`
    |
 15 | def error():
 16 |     resource = acquire_resource()
 17 |     yield resource
-   |     ^^^^^^^^^^^^^^ PT022
+   |     ^^^^^^^^^^^^^^ PT022 (pytest-useless-yield-fixture)
    |
    = help: Replace `yield` with `return`
 
@@ -20,12 +20,12 @@ PT022.py:17:5: PT022 [*] No teardown in fixture `error`, use `return` instead of
 19 19 | 
 20 20 | import typing
 
-PT022.py:37:5: PT022 [*] No teardown in fixture `error`, use `return` instead of `yield`
+PT022.py:37:5: PT022 (pytest-useless-yield-fixture) [*] No teardown in fixture `error`, use `return` instead of `yield`
    |
 35 | def error() -> typing.Generator[typing.Any, None, None]:
 36 |     resource = acquire_resource()
 37 |     yield resource
-   |     ^^^^^^^^^^^^^^ PT022
+   |     ^^^^^^^^^^^^^^ PT022 (pytest-useless-yield-fixture)
    |
    = help: Replace `yield` with `return`
 
@@ -42,12 +42,12 @@ PT022.py:37:5: PT022 [*] No teardown in fixture `error`, use `return` instead of
 39 39 | 
 40 40 | @pytest.fixture()
 
-PT022.py:43:5: PT022 [*] No teardown in fixture `error`, use `return` instead of `yield`
+PT022.py:43:5: PT022 (pytest-useless-yield-fixture) [*] No teardown in fixture `error`, use `return` instead of `yield`
    |
 41 | def error() -> Generator[Resource, None, None]:
 42 |     resource = acquire_resource()
 43 |     yield resource
-   |     ^^^^^^^^^^^^^^ PT022
+   |     ^^^^^^^^^^^^^^ PT022 (pytest-useless-yield-fixture)
    |
    = help: Replace `yield` with `return`
 
@@ -60,5 +60,3 @@ PT022.py:43:5: PT022 [*] No teardown in fixture `error`, use `return` instead of
 42 42 |     resource = acquire_resource()
 43    |-    yield resource
    43 |+    return resource
-
-

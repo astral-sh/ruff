@@ -1,12 +1,12 @@
 ---
 source: crates/ruff_linter/src/rules/pep8_naming/mod.rs
 ---
-N805.py:10:18: N805 [*] First argument of a method should be named `self`
+N805.py:10:18: N805 (invalid-first-argument-name-for-method) [*] First argument of a method should be named `self`
    |
  8 |         pass
  9 | 
 10 |     def stillBad(this):
-   |                  ^^^^ N805
+   |                  ^^^^ N805 (invalid-first-argument-name-for-method)
 11 |         pass
    |
    = help: Rename `this` to `self`
@@ -21,12 +21,12 @@ N805.py:10:18: N805 [*] First argument of a method should be named `self`
 12 12 | 
 13 13 |     if False:
 
-N805.py:18:22: N805 [*] First argument of a method should be named `self`
+N805.py:18:22: N805 (invalid-first-argument-name-for-method) [*] First argument of a method should be named `self`
    |
 16 |             pass
 17 | 
 18 |         def stillBad(this):
-   |                      ^^^^ N805
+   |                      ^^^^ N805 (invalid-first-argument-name-for-method)
 19 |             pass
    |
    = help: Rename `this` to `self`
@@ -41,11 +41,11 @@ N805.py:18:22: N805 [*] First argument of a method should be named `self`
 20 20 | 
 21 21 |     @pydantic.validator
 
-N805.py:26:18: N805 [*] First argument of a method should be named `self`
+N805.py:26:18: N805 (invalid-first-argument-name-for-method) [*] First argument of a method should be named `self`
    |
 25 |     @pydantic.validator
 26 |     def stillBad(cls, my_field: str) -> str:
-   |                  ^^^ N805
+   |                  ^^^ N805 (invalid-first-argument-name-for-method)
 27 |         pass
    |
    = help: Rename `cls` to `self`
@@ -60,11 +60,11 @@ N805.py:26:18: N805 [*] First argument of a method should be named `self`
 28 28 | 
 29 29 |     @pydantic.validator("my_field")
 
-N805.py:34:18: N805 [*] First argument of a method should be named `self`
+N805.py:34:18: N805 (invalid-first-argument-name-for-method) [*] First argument of a method should be named `self`
    |
 33 |     @pydantic.validator("my_field")
 34 |     def stillBad(cls, my_field: str) -> str:
-   |                  ^^^ N805
+   |                  ^^^ N805 (invalid-first-argument-name-for-method)
 35 |         pass
    |
    = help: Rename `cls` to `self`
@@ -79,12 +79,12 @@ N805.py:34:18: N805 [*] First argument of a method should be named `self`
 36 36 | 
 37 37 |     @classmethod
 
-N805.py:58:18: N805 First argument of a method should be named `self`
+N805.py:58:18: N805 (invalid-first-argument-name-for-method) First argument of a method should be named `self`
    |
 56 |         pass
 57 | 
 58 |     def stillBad(this, blah, /, self, something: str):
-   |                  ^^^^ N805
+   |                  ^^^^ N805 (invalid-first-argument-name-for-method)
 59 |         pass
    |
    = help: Rename `this` to `self`

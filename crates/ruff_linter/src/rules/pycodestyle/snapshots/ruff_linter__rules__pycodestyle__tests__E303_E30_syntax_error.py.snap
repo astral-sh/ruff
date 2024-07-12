@@ -10,10 +10,10 @@ E30_syntax_error.py:4:15: SyntaxError: Expected ']', found '('
 5 |     pass
   |
 
-E30_syntax_error.py:12:1: E303 Too many blank lines (3)
+E30_syntax_error.py:12:1: E303 (too-many-blank-lines) Too many blank lines (3)
    |
 12 | class Foo:
-   | ^^^^^ E303
+   | ^^^^^ E303 (too-many-blank-lines)
 13 |     def __init__(
 14 |         pass
    |

@@ -1,165 +1,165 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_bandit/mod.rs
 ---
-S605.py:8:1: S605 Starting a process with a shell: seems safe, but may be changed in the future; consider rewriting without `shell`
+S605.py:8:1: S605 (start-process-with-a-shell) Starting a process with a shell: seems safe, but may be changed in the future; consider rewriting without `shell`
    |
  7 | # Check all shell functions.
  8 | os.system("true")
-   | ^^^^^^^^^ S605
+   | ^^^^^^^^^ S605 (start-process-with-a-shell)
  9 | os.popen("true")
 10 | os.popen2("true")
    |
 
-S605.py:9:1: S605 Starting a process with a shell: seems safe, but may be changed in the future; consider rewriting without `shell`
+S605.py:9:1: S605 (start-process-with-a-shell) Starting a process with a shell: seems safe, but may be changed in the future; consider rewriting without `shell`
    |
  7 | # Check all shell functions.
  8 | os.system("true")
  9 | os.popen("true")
-   | ^^^^^^^^ S605
+   | ^^^^^^^^ S605 (start-process-with-a-shell)
 10 | os.popen2("true")
 11 | os.popen3("true")
    |
 
-S605.py:10:1: S605 Starting a process with a shell: seems safe, but may be changed in the future; consider rewriting without `shell`
+S605.py:10:1: S605 (start-process-with-a-shell) Starting a process with a shell: seems safe, but may be changed in the future; consider rewriting without `shell`
    |
  8 | os.system("true")
  9 | os.popen("true")
 10 | os.popen2("true")
-   | ^^^^^^^^^ S605
+   | ^^^^^^^^^ S605 (start-process-with-a-shell)
 11 | os.popen3("true")
 12 | os.popen4("true")
    |
 
-S605.py:11:1: S605 Starting a process with a shell: seems safe, but may be changed in the future; consider rewriting without `shell`
+S605.py:11:1: S605 (start-process-with-a-shell) Starting a process with a shell: seems safe, but may be changed in the future; consider rewriting without `shell`
    |
  9 | os.popen("true")
 10 | os.popen2("true")
 11 | os.popen3("true")
-   | ^^^^^^^^^ S605
+   | ^^^^^^^^^ S605 (start-process-with-a-shell)
 12 | os.popen4("true")
 13 | popen2.popen2("true")
    |
 
-S605.py:12:1: S605 Starting a process with a shell: seems safe, but may be changed in the future; consider rewriting without `shell`
+S605.py:12:1: S605 (start-process-with-a-shell) Starting a process with a shell: seems safe, but may be changed in the future; consider rewriting without `shell`
    |
 10 | os.popen2("true")
 11 | os.popen3("true")
 12 | os.popen4("true")
-   | ^^^^^^^^^ S605
+   | ^^^^^^^^^ S605 (start-process-with-a-shell)
 13 | popen2.popen2("true")
 14 | popen2.popen3("true")
    |
 
-S605.py:13:1: S605 Starting a process with a shell: seems safe, but may be changed in the future; consider rewriting without `shell`
+S605.py:13:1: S605 (start-process-with-a-shell) Starting a process with a shell: seems safe, but may be changed in the future; consider rewriting without `shell`
    |
 11 | os.popen3("true")
 12 | os.popen4("true")
 13 | popen2.popen2("true")
-   | ^^^^^^^^^^^^^ S605
+   | ^^^^^^^^^^^^^ S605 (start-process-with-a-shell)
 14 | popen2.popen3("true")
 15 | popen2.popen4("true")
    |
 
-S605.py:14:1: S605 Starting a process with a shell: seems safe, but may be changed in the future; consider rewriting without `shell`
+S605.py:14:1: S605 (start-process-with-a-shell) Starting a process with a shell: seems safe, but may be changed in the future; consider rewriting without `shell`
    |
 12 | os.popen4("true")
 13 | popen2.popen2("true")
 14 | popen2.popen3("true")
-   | ^^^^^^^^^^^^^ S605
+   | ^^^^^^^^^^^^^ S605 (start-process-with-a-shell)
 15 | popen2.popen4("true")
 16 | popen2.Popen3("true")
    |
 
-S605.py:15:1: S605 Starting a process with a shell: seems safe, but may be changed in the future; consider rewriting without `shell`
+S605.py:15:1: S605 (start-process-with-a-shell) Starting a process with a shell: seems safe, but may be changed in the future; consider rewriting without `shell`
    |
 13 | popen2.popen2("true")
 14 | popen2.popen3("true")
 15 | popen2.popen4("true")
-   | ^^^^^^^^^^^^^ S605
+   | ^^^^^^^^^^^^^ S605 (start-process-with-a-shell)
 16 | popen2.Popen3("true")
 17 | popen2.Popen4("true")
    |
 
-S605.py:16:1: S605 Starting a process with a shell: seems safe, but may be changed in the future; consider rewriting without `shell`
+S605.py:16:1: S605 (start-process-with-a-shell) Starting a process with a shell: seems safe, but may be changed in the future; consider rewriting without `shell`
    |
 14 | popen2.popen3("true")
 15 | popen2.popen4("true")
 16 | popen2.Popen3("true")
-   | ^^^^^^^^^^^^^ S605
+   | ^^^^^^^^^^^^^ S605 (start-process-with-a-shell)
 17 | popen2.Popen4("true")
 18 | commands.getoutput("true")
    |
 
-S605.py:17:1: S605 Starting a process with a shell: seems safe, but may be changed in the future; consider rewriting without `shell`
+S605.py:17:1: S605 (start-process-with-a-shell) Starting a process with a shell: seems safe, but may be changed in the future; consider rewriting without `shell`
    |
 15 | popen2.popen4("true")
 16 | popen2.Popen3("true")
 17 | popen2.Popen4("true")
-   | ^^^^^^^^^^^^^ S605
+   | ^^^^^^^^^^^^^ S605 (start-process-with-a-shell)
 18 | commands.getoutput("true")
 19 | commands.getstatusoutput("true")
    |
 
-S605.py:18:1: S605 Starting a process with a shell: seems safe, but may be changed in the future; consider rewriting without `shell`
+S605.py:18:1: S605 (start-process-with-a-shell) Starting a process with a shell: seems safe, but may be changed in the future; consider rewriting without `shell`
    |
 16 | popen2.Popen3("true")
 17 | popen2.Popen4("true")
 18 | commands.getoutput("true")
-   | ^^^^^^^^^^^^^^^^^^ S605
+   | ^^^^^^^^^^^^^^^^^^ S605 (start-process-with-a-shell)
 19 | commands.getstatusoutput("true")
 20 | subprocess.getoutput("true")
    |
 
-S605.py:19:1: S605 Starting a process with a shell: seems safe, but may be changed in the future; consider rewriting without `shell`
+S605.py:19:1: S605 (start-process-with-a-shell) Starting a process with a shell: seems safe, but may be changed in the future; consider rewriting without `shell`
    |
 17 | popen2.Popen4("true")
 18 | commands.getoutput("true")
 19 | commands.getstatusoutput("true")
-   | ^^^^^^^^^^^^^^^^^^^^^^^^ S605
+   | ^^^^^^^^^^^^^^^^^^^^^^^^ S605 (start-process-with-a-shell)
 20 | subprocess.getoutput("true")
 21 | subprocess.getstatusoutput("true")
    |
 
-S605.py:20:1: S605 Starting a process with a shell: seems safe, but may be changed in the future; consider rewriting without `shell`
+S605.py:20:1: S605 (start-process-with-a-shell) Starting a process with a shell: seems safe, but may be changed in the future; consider rewriting without `shell`
    |
 18 | commands.getoutput("true")
 19 | commands.getstatusoutput("true")
 20 | subprocess.getoutput("true")
-   | ^^^^^^^^^^^^^^^^^^^^ S605
+   | ^^^^^^^^^^^^^^^^^^^^ S605 (start-process-with-a-shell)
 21 | subprocess.getstatusoutput("true")
    |
 
-S605.py:21:1: S605 Starting a process with a shell: seems safe, but may be changed in the future; consider rewriting without `shell`
+S605.py:21:1: S605 (start-process-with-a-shell) Starting a process with a shell: seems safe, but may be changed in the future; consider rewriting without `shell`
    |
 19 | commands.getstatusoutput("true")
 20 | subprocess.getoutput("true")
 21 | subprocess.getstatusoutput("true")
-   | ^^^^^^^^^^^^^^^^^^^^^^^^^^ S605
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^ S605 (start-process-with-a-shell)
    |
 
-S605.py:26:1: S605 Starting a process with a shell, possible injection detected
+S605.py:26:1: S605 (start-process-with-a-shell) Starting a process with a shell, possible injection detected
    |
 24 | # Check command argument looks unsafe.
 25 | var_string = "true"
 26 | os.system(var_string)
-   | ^^^^^^^^^ S605
+   | ^^^^^^^^^ S605 (start-process-with-a-shell)
 27 | os.system([var_string])
 28 | os.system([var_string, ""])
    |
 
-S605.py:27:1: S605 Starting a process with a shell, possible injection detected
+S605.py:27:1: S605 (start-process-with-a-shell) Starting a process with a shell, possible injection detected
    |
 25 | var_string = "true"
 26 | os.system(var_string)
 27 | os.system([var_string])
-   | ^^^^^^^^^ S605
+   | ^^^^^^^^^ S605 (start-process-with-a-shell)
 28 | os.system([var_string, ""])
    |
 
-S605.py:28:1: S605 Starting a process with a shell, possible injection detected
+S605.py:28:1: S605 (start-process-with-a-shell) Starting a process with a shell, possible injection detected
    |
 26 | os.system(var_string)
 27 | os.system([var_string])
 28 | os.system([var_string, ""])
-   | ^^^^^^^^^ S605
+   | ^^^^^^^^^ S605 (start-process-with-a-shell)
    |

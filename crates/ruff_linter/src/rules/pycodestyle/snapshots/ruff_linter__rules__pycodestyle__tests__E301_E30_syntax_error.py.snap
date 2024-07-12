@@ -20,12 +20,12 @@ E30_syntax_error.py:13:18: SyntaxError: Expected ')', found newline
 16 |         pass
    |
 
-E30_syntax_error.py:15:5: E301 Expected 1 blank line, found 0
+E30_syntax_error.py:15:5: E301 (blank-line-between-methods) Expected 1 blank line, found 0
    |
 13 |     def __init__(
 14 |         pass
 15 |     def method():
-   |     ^^^ E301
+   |     ^^^ E301 (blank-line-between-methods)
 16 |         pass
    |
    = help: Add missing blank line

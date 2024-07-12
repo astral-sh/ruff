@@ -1,10 +1,10 @@
 ---
 source: crates/ruff_linter/src/rules/ruff/mod.rs
 ---
-RUF100_3.py:1:1: RUF100 [*] Unused blanket `noqa` directive
+RUF100_3.py:1:1: RUF100 (unused-noqa) [*] Unused blanket `noqa` directive
   |
 1 | # noqa
-  | ^^^^^^ RUF100
+  | ^^^^^^ RUF100 (unused-noqa)
 2 | # noqa # comment
 3 | print()  # noqa
   |
@@ -16,11 +16,11 @@ RUF100_3.py:1:1: RUF100 [*] Unused blanket `noqa` directive
 3 2 | print()  # noqa
 4 3 | print()  # noqa # comment
 
-RUF100_3.py:2:1: RUF100 [*] Unused blanket `noqa` directive
+RUF100_3.py:2:1: RUF100 (unused-noqa) [*] Unused blanket `noqa` directive
   |
 1 | # noqa
 2 | # noqa # comment
-  | ^^^^^^ RUF100
+  | ^^^^^^ RUF100 (unused-noqa)
 3 | print()  # noqa
 4 | print()  # noqa # comment
   |
@@ -34,12 +34,12 @@ RUF100_3.py:2:1: RUF100 [*] Unused blanket `noqa` directive
 4 4 | print()  # noqa # comment
 5 5 | print()  # noqa  # comment
 
-RUF100_3.py:3:10: RUF100 [*] Unused blanket `noqa` directive
+RUF100_3.py:3:10: RUF100 (unused-noqa) [*] Unused blanket `noqa` directive
   |
 1 | # noqa
 2 | # noqa # comment
 3 | print()  # noqa
-  |          ^^^^^^ RUF100
+  |          ^^^^^^ RUF100 (unused-noqa)
 4 | print()  # noqa # comment
 5 | print()  # noqa  # comment
   |
@@ -54,12 +54,12 @@ RUF100_3.py:3:10: RUF100 [*] Unused blanket `noqa` directive
 5 5 | print()  # noqa  # comment
 6 6 | print()  # noqa comment
 
-RUF100_3.py:4:10: RUF100 [*] Unused blanket `noqa` directive
+RUF100_3.py:4:10: RUF100 (unused-noqa) [*] Unused blanket `noqa` directive
   |
 2 | # noqa # comment
 3 | print()  # noqa
 4 | print()  # noqa # comment
-  |          ^^^^^^ RUF100
+  |          ^^^^^^ RUF100 (unused-noqa)
 5 | print()  # noqa  # comment
 6 | print()  # noqa comment
   |
@@ -75,12 +75,12 @@ RUF100_3.py:4:10: RUF100 [*] Unused blanket `noqa` directive
 6 6 | print()  # noqa comment
 7 7 | print()  # noqa  comment
 
-RUF100_3.py:5:10: RUF100 [*] Unused blanket `noqa` directive
+RUF100_3.py:5:10: RUF100 (unused-noqa) [*] Unused blanket `noqa` directive
   |
 3 | print()  # noqa
 4 | print()  # noqa # comment
 5 | print()  # noqa  # comment
-  |          ^^^^^^ RUF100
+  |          ^^^^^^ RUF100 (unused-noqa)
 6 | print()  # noqa comment
 7 | print()  # noqa  comment
   |
@@ -96,12 +96,12 @@ RUF100_3.py:5:10: RUF100 [*] Unused blanket `noqa` directive
 7 7 | print()  # noqa  comment
 8 8 | print(a)  # noqa
 
-RUF100_3.py:6:10: RUF100 [*] Unused blanket `noqa` directive
+RUF100_3.py:6:10: RUF100 (unused-noqa) [*] Unused blanket `noqa` directive
   |
 4 | print()  # noqa # comment
 5 | print()  # noqa  # comment
 6 | print()  # noqa comment
-  |          ^^^^^^ RUF100
+  |          ^^^^^^ RUF100 (unused-noqa)
 7 | print()  # noqa  comment
 8 | print(a)  # noqa
   |
@@ -117,12 +117,12 @@ RUF100_3.py:6:10: RUF100 [*] Unused blanket `noqa` directive
 8 8 | print(a)  # noqa
 9 9 | print(a)  # noqa # comment
 
-RUF100_3.py:7:10: RUF100 [*] Unused blanket `noqa` directive
+RUF100_3.py:7:10: RUF100 (unused-noqa) [*] Unused blanket `noqa` directive
   |
 5 | print()  # noqa  # comment
 6 | print()  # noqa comment
 7 | print()  # noqa  comment
-  |          ^^^^^^ RUF100
+  |          ^^^^^^ RUF100 (unused-noqa)
 8 | print(a)  # noqa
 9 | print(a)  # noqa # comment
   |
@@ -138,12 +138,12 @@ RUF100_3.py:7:10: RUF100 [*] Unused blanket `noqa` directive
 9 9 | print(a)  # noqa # comment
 10 10 | print(a)  # noqa  # comment
 
-RUF100_3.py:14:1: RUF100 [*] Unused `noqa` directive (unused: `E501`, `F821`)
+RUF100_3.py:14:1: RUF100 (unused-noqa) [*] Unused `noqa` directive (unused: `E501`, `F821`)
    |
 12 | print(a)  # noqa  comment
 13 | 
 14 | # noqa: E501, F821
-   | ^^^^^^^^^^^^^^^^^^ RUF100
+   | ^^^^^^^^^^^^^^^^^^ RUF100 (unused-noqa)
 15 | # noqa: E501, F821 # comment
 16 | print()  # noqa: E501, F821
    |
@@ -158,11 +158,11 @@ RUF100_3.py:14:1: RUF100 [*] Unused `noqa` directive (unused: `E501`, `F821`)
 16 15 | print()  # noqa: E501, F821
 17 16 | print()  # noqa: E501, F821 # comment
 
-RUF100_3.py:15:1: RUF100 [*] Unused `noqa` directive (unused: `E501`, `F821`)
+RUF100_3.py:15:1: RUF100 (unused-noqa) [*] Unused `noqa` directive (unused: `E501`, `F821`)
    |
 14 | # noqa: E501, F821
 15 | # noqa: E501, F821 # comment
-   | ^^^^^^^^^^^^^^^^^^ RUF100
+   | ^^^^^^^^^^^^^^^^^^ RUF100 (unused-noqa)
 16 | print()  # noqa: E501, F821
 17 | print()  # noqa: E501, F821 # comment
    |
@@ -178,12 +178,12 @@ RUF100_3.py:15:1: RUF100 [*] Unused `noqa` directive (unused: `E501`, `F821`)
 17 17 | print()  # noqa: E501, F821 # comment
 18 18 | print()  # noqa: E501, F821  # comment
 
-RUF100_3.py:16:10: RUF100 [*] Unused `noqa` directive (unused: `E501`, `F821`)
+RUF100_3.py:16:10: RUF100 (unused-noqa) [*] Unused `noqa` directive (unused: `E501`, `F821`)
    |
 14 | # noqa: E501, F821
 15 | # noqa: E501, F821 # comment
 16 | print()  # noqa: E501, F821
-   |          ^^^^^^^^^^^^^^^^^^ RUF100
+   |          ^^^^^^^^^^^^^^^^^^ RUF100 (unused-noqa)
 17 | print()  # noqa: E501, F821 # comment
 18 | print()  # noqa: E501, F821  # comment
    |
@@ -199,12 +199,12 @@ RUF100_3.py:16:10: RUF100 [*] Unused `noqa` directive (unused: `E501`, `F821`)
 18 18 | print()  # noqa: E501, F821  # comment
 19 19 | print()  # noqa: E501, F821 comment
 
-RUF100_3.py:17:10: RUF100 [*] Unused `noqa` directive (unused: `E501`, `F821`)
+RUF100_3.py:17:10: RUF100 (unused-noqa) [*] Unused `noqa` directive (unused: `E501`, `F821`)
    |
 15 | # noqa: E501, F821 # comment
 16 | print()  # noqa: E501, F821
 17 | print()  # noqa: E501, F821 # comment
-   |          ^^^^^^^^^^^^^^^^^^ RUF100
+   |          ^^^^^^^^^^^^^^^^^^ RUF100 (unused-noqa)
 18 | print()  # noqa: E501, F821  # comment
 19 | print()  # noqa: E501, F821 comment
    |
@@ -220,12 +220,12 @@ RUF100_3.py:17:10: RUF100 [*] Unused `noqa` directive (unused: `E501`, `F821`)
 19 19 | print()  # noqa: E501, F821 comment
 20 20 | print()  # noqa: E501, F821  comment
 
-RUF100_3.py:18:10: RUF100 [*] Unused `noqa` directive (unused: `E501`, `F821`)
+RUF100_3.py:18:10: RUF100 (unused-noqa) [*] Unused `noqa` directive (unused: `E501`, `F821`)
    |
 16 | print()  # noqa: E501, F821
 17 | print()  # noqa: E501, F821 # comment
 18 | print()  # noqa: E501, F821  # comment
-   |          ^^^^^^^^^^^^^^^^^^ RUF100
+   |          ^^^^^^^^^^^^^^^^^^ RUF100 (unused-noqa)
 19 | print()  # noqa: E501, F821 comment
 20 | print()  # noqa: E501, F821  comment
    |
@@ -241,12 +241,12 @@ RUF100_3.py:18:10: RUF100 [*] Unused `noqa` directive (unused: `E501`, `F821`)
 20 20 | print()  # noqa: E501, F821  comment
 21 21 | print(a)  # noqa: E501, F821
 
-RUF100_3.py:19:10: RUF100 [*] Unused `noqa` directive (unused: `E501`, `F821`)
+RUF100_3.py:19:10: RUF100 (unused-noqa) [*] Unused `noqa` directive (unused: `E501`, `F821`)
    |
 17 | print()  # noqa: E501, F821 # comment
 18 | print()  # noqa: E501, F821  # comment
 19 | print()  # noqa: E501, F821 comment
-   |          ^^^^^^^^^^^^^^^^^^ RUF100
+   |          ^^^^^^^^^^^^^^^^^^ RUF100 (unused-noqa)
 20 | print()  # noqa: E501, F821  comment
 21 | print(a)  # noqa: E501, F821
    |
@@ -262,12 +262,12 @@ RUF100_3.py:19:10: RUF100 [*] Unused `noqa` directive (unused: `E501`, `F821`)
 21 21 | print(a)  # noqa: E501, F821
 22 22 | print(a)  # noqa: E501, F821 # comment
 
-RUF100_3.py:20:10: RUF100 [*] Unused `noqa` directive (unused: `E501`, `F821`)
+RUF100_3.py:20:10: RUF100 (unused-noqa) [*] Unused `noqa` directive (unused: `E501`, `F821`)
    |
 18 | print()  # noqa: E501, F821  # comment
 19 | print()  # noqa: E501, F821 comment
 20 | print()  # noqa: E501, F821  comment
-   |          ^^^^^^^^^^^^^^^^^^ RUF100
+   |          ^^^^^^^^^^^^^^^^^^ RUF100 (unused-noqa)
 21 | print(a)  # noqa: E501, F821
 22 | print(a)  # noqa: E501, F821 # comment
    |
@@ -283,12 +283,12 @@ RUF100_3.py:20:10: RUF100 [*] Unused `noqa` directive (unused: `E501`, `F821`)
 22 22 | print(a)  # noqa: E501, F821 # comment
 23 23 | print(a)  # noqa: E501, F821  # comment
 
-RUF100_3.py:21:11: RUF100 [*] Unused `noqa` directive (unused: `E501`)
+RUF100_3.py:21:11: RUF100 (unused-noqa) [*] Unused `noqa` directive (unused: `E501`)
    |
 19 | print()  # noqa: E501, F821 comment
 20 | print()  # noqa: E501, F821  comment
 21 | print(a)  # noqa: E501, F821
-   |           ^^^^^^^^^^^^^^^^^^ RUF100
+   |           ^^^^^^^^^^^^^^^^^^ RUF100 (unused-noqa)
 22 | print(a)  # noqa: E501, F821 # comment
 23 | print(a)  # noqa: E501, F821  # comment
    |
@@ -304,12 +304,12 @@ RUF100_3.py:21:11: RUF100 [*] Unused `noqa` directive (unused: `E501`)
 23 23 | print(a)  # noqa: E501, F821  # comment
 24 24 | print(a)  # noqa: E501, F821 comment
 
-RUF100_3.py:22:11: RUF100 [*] Unused `noqa` directive (unused: `E501`)
+RUF100_3.py:22:11: RUF100 (unused-noqa) [*] Unused `noqa` directive (unused: `E501`)
    |
 20 | print()  # noqa: E501, F821  comment
 21 | print(a)  # noqa: E501, F821
 22 | print(a)  # noqa: E501, F821 # comment
-   |           ^^^^^^^^^^^^^^^^^^ RUF100
+   |           ^^^^^^^^^^^^^^^^^^ RUF100 (unused-noqa)
 23 | print(a)  # noqa: E501, F821  # comment
 24 | print(a)  # noqa: E501, F821 comment
    |
@@ -325,12 +325,12 @@ RUF100_3.py:22:11: RUF100 [*] Unused `noqa` directive (unused: `E501`)
 24 24 | print(a)  # noqa: E501, F821 comment
 25 25 | print(a)  # noqa: E501, F821  comment
 
-RUF100_3.py:23:11: RUF100 [*] Unused `noqa` directive (unused: `E501`)
+RUF100_3.py:23:11: RUF100 (unused-noqa) [*] Unused `noqa` directive (unused: `E501`)
    |
 21 | print(a)  # noqa: E501, F821
 22 | print(a)  # noqa: E501, F821 # comment
 23 | print(a)  # noqa: E501, F821  # comment
-   |           ^^^^^^^^^^^^^^^^^^ RUF100
+   |           ^^^^^^^^^^^^^^^^^^ RUF100 (unused-noqa)
 24 | print(a)  # noqa: E501, F821 comment
 25 | print(a)  # noqa: E501, F821  comment
    |
@@ -346,12 +346,12 @@ RUF100_3.py:23:11: RUF100 [*] Unused `noqa` directive (unused: `E501`)
 25 25 | print(a)  # noqa: E501, F821  comment
 26 26 | 
 
-RUF100_3.py:24:11: RUF100 [*] Unused `noqa` directive (unused: `E501`)
+RUF100_3.py:24:11: RUF100 (unused-noqa) [*] Unused `noqa` directive (unused: `E501`)
    |
 22 | print(a)  # noqa: E501, F821 # comment
 23 | print(a)  # noqa: E501, F821  # comment
 24 | print(a)  # noqa: E501, F821 comment
-   |           ^^^^^^^^^^^^^^^^^^ RUF100
+   |           ^^^^^^^^^^^^^^^^^^ RUF100 (unused-noqa)
 25 | print(a)  # noqa: E501, F821  comment
    |
    = help: Remove unused `noqa` directive
@@ -366,12 +366,12 @@ RUF100_3.py:24:11: RUF100 [*] Unused `noqa` directive (unused: `E501`)
 26 26 | 
 27 27 | print(a)  # comment with unicode µ    # noqa: E501
 
-RUF100_3.py:25:11: RUF100 [*] Unused `noqa` directive (unused: `E501`)
+RUF100_3.py:25:11: RUF100 (unused-noqa) [*] Unused `noqa` directive (unused: `E501`)
    |
 23 | print(a)  # noqa: E501, F821  # comment
 24 | print(a)  # noqa: E501, F821 comment
 25 | print(a)  # noqa: E501, F821  comment
-   |           ^^^^^^^^^^^^^^^^^^ RUF100
+   |           ^^^^^^^^^^^^^^^^^^ RUF100 (unused-noqa)
 26 | 
 27 | print(a)  # comment with unicode µ    # noqa: E501
    |
@@ -387,21 +387,21 @@ RUF100_3.py:25:11: RUF100 [*] Unused `noqa` directive (unused: `E501`)
 27 27 | print(a)  # comment with unicode µ    # noqa: E501
 28 28 | print(a)  # comment with unicode µ    # noqa: E501, F821
 
-RUF100_3.py:27:7: F821 Undefined name `a`
+RUF100_3.py:27:7: F821 (undefined-name) Undefined name `a`
    |
 25 | print(a)  # noqa: E501, F821  comment
 26 | 
 27 | print(a)  # comment with unicode µ    # noqa: E501
-   |       ^ F821
+   |       ^ F821 (undefined-name)
 28 | print(a)  # comment with unicode µ    # noqa: E501, F821
    |
 
-RUF100_3.py:27:39: RUF100 [*] Unused `noqa` directive (unused: `E501`)
+RUF100_3.py:27:39: RUF100 (unused-noqa) [*] Unused `noqa` directive (unused: `E501`)
    |
 25 | print(a)  # noqa: E501, F821  comment
 26 | 
 27 | print(a)  # comment with unicode µ    # noqa: E501
-   |                                       ^^^^^^^^^^^^ RUF100
+   |                                       ^^^^^^^^^^^^ RUF100 (unused-noqa)
 28 | print(a)  # comment with unicode µ    # noqa: E501, F821
    |
    = help: Remove unused `noqa` directive
@@ -414,11 +414,11 @@ RUF100_3.py:27:39: RUF100 [*] Unused `noqa` directive (unused: `E501`)
    27 |+print(a)  # comment with unicode µ
 28 28 | print(a)  # comment with unicode µ    # noqa: E501, F821
 
-RUF100_3.py:28:39: RUF100 [*] Unused `noqa` directive (unused: `E501`)
+RUF100_3.py:28:39: RUF100 (unused-noqa) [*] Unused `noqa` directive (unused: `E501`)
    |
 27 | print(a)  # comment with unicode µ    # noqa: E501
 28 | print(a)  # comment with unicode µ    # noqa: E501, F821
-   |                                       ^^^^^^^^^^^^^^^^^^ RUF100
+   |                                       ^^^^^^^^^^^^^^^^^^ RUF100 (unused-noqa)
    |
    = help: Remove unused `noqa` directive
 
@@ -428,5 +428,3 @@ RUF100_3.py:28:39: RUF100 [*] Unused `noqa` directive (unused: `E501`)
 27 27 | print(a)  # comment with unicode µ    # noqa: E501
 28    |-print(a)  # comment with unicode µ    # noqa: E501, F821
    28 |+print(a)  # comment with unicode µ    # noqa: F821
-
-

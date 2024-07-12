@@ -1,20 +1,18 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_2020/mod.rs
 ---
-YTT203.py:4:1: YTT203 `sys.version_info[1]` compared to integer (python4), compare `sys.version_info` to tuple
+YTT203.py:4:1: YTT203 (sys-version-info1-cmp-int) `sys.version_info[1]` compared to integer (python4), compare `sys.version_info` to tuple
   |
 2 | from sys import version_info
 3 | 
 4 | sys.version_info[1] >= 5
-  | ^^^^^^^^^^^^^^^^^^^ YTT203
+  | ^^^^^^^^^^^^^^^^^^^ YTT203 (sys-version-info1-cmp-int)
 5 | version_info[1] < 6
   |
 
-YTT203.py:5:1: YTT203 `sys.version_info[1]` compared to integer (python4), compare `sys.version_info` to tuple
+YTT203.py:5:1: YTT203 (sys-version-info1-cmp-int) `sys.version_info[1]` compared to integer (python4), compare `sys.version_info` to tuple
   |
 4 | sys.version_info[1] >= 5
 5 | version_info[1] < 6
-  | ^^^^^^^^^^^^^^^ YTT203
+  | ^^^^^^^^^^^^^^^ YTT203 (sys-version-info1-cmp-int)
   |
-
-

@@ -1,11 +1,11 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_pie/mod.rs
 ---
-PIE810.py:2:1: PIE810 [*] Call `startswith` once with a `tuple`
+PIE810.py:2:1: PIE810 (multiple-starts-ends-with) [*] Call `startswith` once with a `tuple`
   |
 1 | # error
 2 | obj.startswith("foo") or obj.startswith("bar")
-  | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PIE810
+  | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PIE810 (multiple-starts-ends-with)
 3 | # error
 4 | obj.endswith("foo") or obj.endswith("bar")
   |
@@ -19,12 +19,12 @@ PIE810.py:2:1: PIE810 [*] Call `startswith` once with a `tuple`
 4 4 | obj.endswith("foo") or obj.endswith("bar")
 5 5 | # error
 
-PIE810.py:4:1: PIE810 [*] Call `endswith` once with a `tuple`
+PIE810.py:4:1: PIE810 (multiple-starts-ends-with) [*] Call `endswith` once with a `tuple`
   |
 2 | obj.startswith("foo") or obj.startswith("bar")
 3 | # error
 4 | obj.endswith("foo") or obj.endswith("bar")
-  | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PIE810
+  | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PIE810 (multiple-starts-ends-with)
 5 | # error
 6 | obj.startswith(foo) or obj.startswith(bar)
   |
@@ -40,12 +40,12 @@ PIE810.py:4:1: PIE810 [*] Call `endswith` once with a `tuple`
 6 6 | obj.startswith(foo) or obj.startswith(bar)
 7 7 | # error
 
-PIE810.py:6:1: PIE810 [*] Call `startswith` once with a `tuple`
+PIE810.py:6:1: PIE810 (multiple-starts-ends-with) [*] Call `startswith` once with a `tuple`
   |
 4 | obj.endswith("foo") or obj.endswith("bar")
 5 | # error
 6 | obj.startswith(foo) or obj.startswith(bar)
-  | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PIE810
+  | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PIE810 (multiple-starts-ends-with)
 7 | # error
 8 | obj.startswith(foo) or obj.startswith("foo")
   |
@@ -61,12 +61,12 @@ PIE810.py:6:1: PIE810 [*] Call `startswith` once with a `tuple`
 8 8 | obj.startswith(foo) or obj.startswith("foo")
 9 9 | # error
 
-PIE810.py:8:1: PIE810 [*] Call `startswith` once with a `tuple`
+PIE810.py:8:1: PIE810 (multiple-starts-ends-with) [*] Call `startswith` once with a `tuple`
    |
  6 | obj.startswith(foo) or obj.startswith(bar)
  7 | # error
  8 | obj.startswith(foo) or obj.startswith("foo")
-   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PIE810
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PIE810 (multiple-starts-ends-with)
  9 | # error
 10 | obj.endswith(foo) or obj.startswith(foo) or obj.startswith("foo")
    |
@@ -82,12 +82,12 @@ PIE810.py:8:1: PIE810 [*] Call `startswith` once with a `tuple`
 10 10 | obj.endswith(foo) or obj.startswith(foo) or obj.startswith("foo")
 11 11 | 
 
-PIE810.py:10:1: PIE810 [*] Call `startswith` once with a `tuple`
+PIE810.py:10:1: PIE810 (multiple-starts-ends-with) [*] Call `startswith` once with a `tuple`
    |
  8 | obj.startswith(foo) or obj.startswith("foo")
  9 | # error
 10 | obj.endswith(foo) or obj.startswith(foo) or obj.startswith("foo")
-   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PIE810
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PIE810 (multiple-starts-ends-with)
 11 | 
 12 | def func():
    |
@@ -103,12 +103,12 @@ PIE810.py:10:1: PIE810 [*] Call `startswith` once with a `tuple`
 12 12 | def func():
 13 13 |     msg = "hello world"
 
-PIE810.py:19:8: PIE810 [*] Call `startswith` once with a `tuple`
+PIE810.py:19:8: PIE810 (multiple-starts-ends-with) [*] Call `startswith` once with a `tuple`
    |
 17 |     z = "w"
 18 | 
 19 |     if msg.startswith(x) or msg.startswith(y) or msg.startswith(z): # Error
-   |        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PIE810
+   |        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PIE810 (multiple-starts-ends-with)
 20 |         print("yes") 
    |
    = help: Merge into a single `startswith` call
@@ -123,12 +123,12 @@ PIE810.py:19:8: PIE810 [*] Call `startswith` once with a `tuple`
 21 21 | 
 22 22 | def func():
 
-PIE810.py:25:8: PIE810 [*] Call `startswith` once with a `tuple`
+PIE810.py:25:8: PIE810 (multiple-starts-ends-with) [*] Call `startswith` once with a `tuple`
    |
 23 |     msg = "hello world"
 24 | 
 25 |     if msg.startswith(("h", "e", "l", "l", "o")) or msg.startswith("h") or msg.startswith("w"): # Error
-   |        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PIE810
+   |        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PIE810 (multiple-starts-ends-with)
 26 |         print("yes") 
    |
    = help: Merge into a single `startswith` call
@@ -142,5 +142,3 @@ PIE810.py:25:8: PIE810 [*] Call `startswith` once with a `tuple`
 26 26 |         print("yes") 
 27 27 | 
 28 28 | # ok
-
-

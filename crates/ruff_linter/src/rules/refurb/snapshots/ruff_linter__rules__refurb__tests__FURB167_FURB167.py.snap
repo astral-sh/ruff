@@ -1,11 +1,11 @@
 ---
 source: crates/ruff_linter/src/rules/refurb/mod.rs
 ---
-FURB167.py:13:42: FURB167 [*] Use of regular expression alias `re.I`
+FURB167.py:13:42: FURB167 (regex-flag-alias) [*] Use of regular expression alias `re.I`
    |
 12 |     # FURB167
 13 |     if re.match("^hello", "hello world", re.I):
-   |                                          ^^^^ FURB167
+   |                                          ^^^^ FURB167 (regex-flag-alias)
 14 |         pass
    |
    = help: Replace with `re.IGNORECASE`
@@ -20,11 +20,11 @@ FURB167.py:13:42: FURB167 [*] Use of regular expression alias `re.I`
 15 15 | 
 16 16 | 
 
-FURB167.py:21:39: FURB167 [*] Use of regular expression alias `re.I`
+FURB167.py:21:39: FURB167 (regex-flag-alias) [*] Use of regular expression alias `re.I`
    |
 20 |     # FURB167
 21 |     if match("^hello", "hello world", I):
-   |                                       ^ FURB167
+   |                                       ^ FURB167 (regex-flag-alias)
 22 |         pass
    |
    = help: Replace with `re.IGNORECASE`
@@ -41,5 +41,3 @@ FURB167.py:21:39: FURB167 [*] Use of regular expression alias `re.I`
 21    |-    if match("^hello", "hello world", I):
    22 |+    if match("^hello", "hello world", re.IGNORECASE):
 22 23 |         pass
-
-

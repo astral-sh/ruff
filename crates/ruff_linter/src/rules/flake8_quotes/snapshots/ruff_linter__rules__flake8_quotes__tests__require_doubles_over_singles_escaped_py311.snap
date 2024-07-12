@@ -1,10 +1,10 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_quotes/mod.rs
 ---
-singles_escaped.py:1:26: Q003 [*] Change outer quotes to avoid escaping inner quotes
+singles_escaped.py:1:26: Q003 (avoidable-escaped-quote) [*] Change outer quotes to avoid escaping inner quotes
   |
 1 | this_should_raise_Q003 = "This is a \"string\""
-  |                          ^^^^^^^^^^^^^^^^^^^^^^ Q003
+  |                          ^^^^^^^^^^^^^^^^^^^^^^ Q003 (avoidable-escaped-quote)
 2 | this_is_fine = "'This' is a \"string\""
 3 | this_is_fine = 'This is a "string"'
   |
@@ -17,12 +17,12 @@ singles_escaped.py:1:26: Q003 [*] Change outer quotes to avoid escaping inner qu
 3 3 | this_is_fine = 'This is a "string"'
 4 4 | this_is_fine = '\'This\' is a "string"'
 
-singles_escaped.py:9:5: Q003 [*] Change outer quotes to avoid escaping inner quotes
+singles_escaped.py:9:5: Q003 (avoidable-escaped-quote) [*] Change outer quotes to avoid escaping inner quotes
    |
  7 | this_should_raise = (
  8 |     "This is a"
  9 |     "\"string\""
-   |     ^^^^^^^^^^^^ Q003
+   |     ^^^^^^^^^^^^ Q003 (avoidable-escaped-quote)
 10 | )
    |
    = help: Change outer quotes to avoid escaping inner quotes
@@ -37,11 +37,11 @@ singles_escaped.py:9:5: Q003 [*] Change outer quotes to avoid escaping inner quo
 11 11 | 
 12 12 | # Same as above, but with f-strings
 
-singles_escaped.py:13:1: Q003 [*] Change outer quotes to avoid escaping inner quotes
+singles_escaped.py:13:1: Q003 (avoidable-escaped-quote) [*] Change outer quotes to avoid escaping inner quotes
    |
 12 | # Same as above, but with f-strings
 13 | f"This is a \"string\""
-   | ^^^^^^^^^^^^^^^^^^^^^^^ Q003
+   | ^^^^^^^^^^^^^^^^^^^^^^^ Q003 (avoidable-escaped-quote)
 14 | f"'This' is a \"string\""
 15 | f'This is a "string"'
    |
@@ -57,12 +57,12 @@ singles_escaped.py:13:1: Q003 [*] Change outer quotes to avoid escaping inner qu
 15 15 | f'This is a "string"'
 16 16 | f'\'This\' is a "string"'
 
-singles_escaped.py:21:5: Q003 [*] Change outer quotes to avoid escaping inner quotes
+singles_escaped.py:21:5: Q003 (avoidable-escaped-quote) [*] Change outer quotes to avoid escaping inner quotes
    |
 19 | foo = (
 20 |     f"This is a"
 21 |     f"\"string\""
-   |     ^^^^^^^^^^^^^ Q003
+   |     ^^^^^^^^^^^^^ Q003 (avoidable-escaped-quote)
 22 | )
    |
    = help: Change outer quotes to avoid escaping inner quotes
@@ -76,5 +76,3 @@ singles_escaped.py:21:5: Q003 [*] Change outer quotes to avoid escaping inner qu
 22 22 | )
 23 23 | 
 24 24 | # Nested f-strings (Python 3.12+)
-
-

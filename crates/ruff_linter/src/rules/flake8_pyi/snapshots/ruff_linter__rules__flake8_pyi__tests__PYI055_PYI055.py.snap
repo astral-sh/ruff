@@ -1,12 +1,12 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_pyi/mod.rs
 ---
-PYI055.py:31:8: PYI055 [*] Multiple `type` members in a union. Combine them into one, e.g., `type[requests_mock.Mocker | httpretty | str]`.
+PYI055.py:31:8: PYI055 (unnecessary-type-union) [*] Multiple `type` members in a union. Combine them into one, e.g., `type[requests_mock.Mocker | httpretty | str]`.
    |
 29 | def func():
 30 |     # PYI055
 31 |     x: type[requests_mock.Mocker] | type[httpretty] | type[str] = requests_mock.Mocker
-   |        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PYI055
+   |        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PYI055 (unnecessary-type-union)
 32 |     y: Union[type[requests_mock.Mocker], type[httpretty], type[str]] = requests_mock.Mocker
    |
    = help: Combine multiple `type` members
@@ -21,12 +21,12 @@ PYI055.py:31:8: PYI055 [*] Multiple `type` members in a union. Combine them into
 33 33 | 
 34 34 | 
 
-PYI055.py:32:8: PYI055 [*] Multiple `type` members in a union. Combine them into one, e.g., `type[Union[requests_mock.Mocker, httpretty, str]]`.
+PYI055.py:32:8: PYI055 (unnecessary-type-union) [*] Multiple `type` members in a union. Combine them into one, e.g., `type[Union[requests_mock.Mocker, httpretty, str]]`.
    |
 30 |     # PYI055
 31 |     x: type[requests_mock.Mocker] | type[httpretty] | type[str] = requests_mock.Mocker
 32 |     y: Union[type[requests_mock.Mocker], type[httpretty], type[str]] = requests_mock.Mocker
-   |        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PYI055
+   |        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PYI055 (unnecessary-type-union)
    |
    = help: Combine multiple `type` members
 
@@ -40,11 +40,11 @@ PYI055.py:32:8: PYI055 [*] Multiple `type` members in a union. Combine them into
 34 34 | 
 35 35 | def func():
 
-PYI055.py:39:8: PYI055 [*] Multiple `type` members in a union. Combine them into one, e.g., `type[Union[requests_mock.Mocker, httpretty, str]]`.
+PYI055.py:39:8: PYI055 (unnecessary-type-union) [*] Multiple `type` members in a union. Combine them into one, e.g., `type[Union[requests_mock.Mocker, httpretty, str]]`.
    |
 38 |     # PYI055
 39 |     x: Union[type[requests_mock.Mocker], type[httpretty], type[str]] = requests_mock.Mocker
-   |        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PYI055
+   |        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PYI055 (unnecessary-type-union)
    |
    = help: Combine multiple `type` members
 
@@ -58,12 +58,12 @@ PYI055.py:39:8: PYI055 [*] Multiple `type` members in a union. Combine them into
 41 41 | 
 42 42 | def convert_union(union: UnionType) -> _T | None:
 
-PYI055.py:44:9: PYI055 [*] Multiple `type` members in a union. Combine them into one, e.g., `type[_T | Converter[_T]]`.
+PYI055.py:44:9: PYI055 (unnecessary-type-union) [*] Multiple `type` members in a union. Combine them into one, e.g., `type[_T | Converter[_T]]`.
    |
 42 | def convert_union(union: UnionType) -> _T | None:
 43 |     converters: tuple[
 44 |         type[_T] | type[Converter[_T]] | Converter[_T] | Callable[[str], _T], ...  # PYI055
-   |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PYI055
+   |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PYI055 (unnecessary-type-union)
 45 |     ] = union.__args__
 46 |     ...
    |
@@ -79,12 +79,12 @@ PYI055.py:44:9: PYI055 [*] Multiple `type` members in a union. Combine them into
 46 46 |     ...
 47 47 | 
 
-PYI055.py:50:15: PYI055 [*] Multiple `type` members in a union. Combine them into one, e.g., `type[_T | Converter[_T]]`.
+PYI055.py:50:15: PYI055 (unnecessary-type-union) [*] Multiple `type` members in a union. Combine them into one, e.g., `type[_T | Converter[_T]]`.
    |
 48 | def convert_union(union: UnionType) -> _T | None:
 49 |     converters: tuple[
 50 |         Union[type[_T] | type[Converter[_T]] | Converter[_T] | Callable[[str], _T]], ...  # PYI055
-   |               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PYI055
+   |               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PYI055 (unnecessary-type-union)
 51 |     ] = union.__args__
 52 |     ...
    |
@@ -100,12 +100,12 @@ PYI055.py:50:15: PYI055 [*] Multiple `type` members in a union. Combine them int
 52 52 |     ...
 53 53 | 
 
-PYI055.py:56:15: PYI055 [*] Multiple `type` members in a union. Combine them into one, e.g., `type[_T | Converter[_T]]`.
+PYI055.py:56:15: PYI055 (unnecessary-type-union) [*] Multiple `type` members in a union. Combine them into one, e.g., `type[_T | Converter[_T]]`.
    |
 54 | def convert_union(union: UnionType) -> _T | None:
 55 |     converters: tuple[
 56 |         Union[type[_T] | type[Converter[_T]]] | Converter[_T] | Callable[[str], _T], ...  # PYI055
-   |               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PYI055
+   |               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PYI055 (unnecessary-type-union)
 57 |     ] = union.__args__
 58 |     ...
    |
@@ -121,12 +121,12 @@ PYI055.py:56:15: PYI055 [*] Multiple `type` members in a union. Combine them int
 58 58 |     ...
 59 59 | 
 
-PYI055.py:62:15: PYI055 [*] Multiple `type` members in a union. Combine them into one, e.g., `type[_T | Converter[_T]]`.
+PYI055.py:62:15: PYI055 (unnecessary-type-union) [*] Multiple `type` members in a union. Combine them into one, e.g., `type[_T | Converter[_T]]`.
    |
 60 | def convert_union(union: UnionType) -> _T | None:
 61 |     converters: tuple[
 62 |         Union[type[_T] | type[Converter[_T]] | str] | Converter[_T] | Callable[[str], _T], ...  # PYI055
-   |               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PYI055
+   |               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PYI055 (unnecessary-type-union)
 63 |     ] = union.__args__
 64 |     ...
    |
@@ -140,5 +140,3 @@ PYI055.py:62:15: PYI055 [*] Multiple `type` members in a union. Combine them int
    62 |+        Union[type[_T | Converter[_T]] | str] | Converter[_T] | Callable[[str], _T], ...  # PYI055
 63 63 |     ] = union.__args__
 64 64 |     ...
-
-

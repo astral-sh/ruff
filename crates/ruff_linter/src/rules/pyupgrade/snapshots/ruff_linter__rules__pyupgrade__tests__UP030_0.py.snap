@@ -1,12 +1,12 @@
 ---
 source: crates/ruff_linter/src/rules/pyupgrade/mod.rs
 ---
-UP030_0.py:3:1: UP030 [*] Use implicit references for positional format fields
+UP030_0.py:3:1: UP030 (format-literals) [*] Use implicit references for positional format fields
   |
 1 | # Invalid calls; errors expected.
 2 | 
 3 | "{0}" "{1}" "{2}".format(1, 2, 3)
-  | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP030
+  | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP030 (format-literals)
 4 | 
 5 | "a {3} complicated {1} string with {0} {2}".format(
   |
@@ -21,14 +21,14 @@ UP030_0.py:3:1: UP030 [*] Use implicit references for positional format fields
 5 5 | "a {3} complicated {1} string with {0} {2}".format(
 6 6 |     "first", "second", "third", "fourth"
 
-UP030_0.py:5:1: UP030 [*] Use implicit references for positional format fields
+UP030_0.py:5:1: UP030 (format-literals) [*] Use implicit references for positional format fields
   |
 3 |   "{0}" "{1}" "{2}".format(1, 2, 3)
 4 |   
 5 | / "a {3} complicated {1} string with {0} {2}".format(
 6 | |     "first", "second", "third", "fourth"
 7 | | )
-  | |_^ UP030
+  | |_^ UP030 (format-literals)
 8 |   
 9 |   '{0}'.format(1)
   |
@@ -46,12 +46,12 @@ UP030_0.py:5:1: UP030 [*] Use implicit references for positional format fields
 8 8 | 
 9 9 | '{0}'.format(1)
 
-UP030_0.py:9:1: UP030 [*] Use implicit references for positional format fields
+UP030_0.py:9:1: UP030 (format-literals) [*] Use implicit references for positional format fields
    |
  7 | )
  8 | 
  9 | '{0}'.format(1)
-   | ^^^^^^^^^^^^^^^ UP030
+   | ^^^^^^^^^^^^^^^ UP030 (format-literals)
 10 | 
 11 | '{0:x}'.format(30)
    |
@@ -67,12 +67,12 @@ UP030_0.py:9:1: UP030 [*] Use implicit references for positional format fields
 11 11 | '{0:x}'.format(30)
 12 12 | 
 
-UP030_0.py:11:1: UP030 [*] Use implicit references for positional format fields
+UP030_0.py:11:1: UP030 (format-literals) [*] Use implicit references for positional format fields
    |
  9 | '{0}'.format(1)
 10 | 
 11 | '{0:x}'.format(30)
-   | ^^^^^^^^^^^^^^^^^^ UP030
+   | ^^^^^^^^^^^^^^^^^^ UP030 (format-literals)
 12 | 
 13 | x = '{0}'.format(1)
    |
@@ -88,12 +88,12 @@ UP030_0.py:11:1: UP030 [*] Use implicit references for positional format fields
 13 13 | x = '{0}'.format(1)
 14 14 | 
 
-UP030_0.py:13:5: UP030 [*] Use implicit references for positional format fields
+UP030_0.py:13:5: UP030 (format-literals) [*] Use implicit references for positional format fields
    |
 11 | '{0:x}'.format(30)
 12 | 
 13 | x = '{0}'.format(1)
-   |     ^^^^^^^^^^^^^^^ UP030
+   |     ^^^^^^^^^^^^^^^ UP030 (format-literals)
 14 | 
 15 | '''{0}\n{1}\n'''.format(1, 2)
    |
@@ -109,12 +109,12 @@ UP030_0.py:13:5: UP030 [*] Use implicit references for positional format fields
 15 15 | '''{0}\n{1}\n'''.format(1, 2)
 16 16 | 
 
-UP030_0.py:15:1: UP030 [*] Use implicit references for positional format fields
+UP030_0.py:15:1: UP030 (format-literals) [*] Use implicit references for positional format fields
    |
 13 | x = '{0}'.format(1)
 14 | 
 15 | '''{0}\n{1}\n'''.format(1, 2)
-   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP030
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP030 (format-literals)
 16 | 
 17 | x = "foo {0}" \
    |
@@ -130,14 +130,14 @@ UP030_0.py:15:1: UP030 [*] Use implicit references for positional format fields
 17 17 | x = "foo {0}" \
 18 18 |     "bar {1}".format(1, 2)
 
-UP030_0.py:17:5: UP030 [*] Use implicit references for positional format fields
+UP030_0.py:17:5: UP030 (format-literals) [*] Use implicit references for positional format fields
    |
 15 |   '''{0}\n{1}\n'''.format(1, 2)
 16 |   
 17 |   x = "foo {0}" \
    |  _____^
 18 | |     "bar {1}".format(1, 2)
-   | |__________________________^ UP030
+   | |__________________________^ UP030 (format-literals)
 19 |   
 20 |   ("{0}").format(1)
    |
@@ -155,12 +155,12 @@ UP030_0.py:17:5: UP030 [*] Use implicit references for positional format fields
 20 20 | ("{0}").format(1)
 21 21 | 
 
-UP030_0.py:20:1: UP030 [*] Use implicit references for positional format fields
+UP030_0.py:20:1: UP030 (format-literals) [*] Use implicit references for positional format fields
    |
 18 |     "bar {1}".format(1, 2)
 19 | 
 20 | ("{0}").format(1)
-   | ^^^^^^^^^^^^^^^^^ UP030
+   | ^^^^^^^^^^^^^^^^^ UP030 (format-literals)
 21 | 
 22 | "\N{snowman} {0}".format(1)
    |
@@ -176,12 +176,12 @@ UP030_0.py:20:1: UP030 [*] Use implicit references for positional format fields
 22 22 | "\N{snowman} {0}".format(1)
 23 23 | 
 
-UP030_0.py:22:1: UP030 [*] Use implicit references for positional format fields
+UP030_0.py:22:1: UP030 (format-literals) [*] Use implicit references for positional format fields
    |
 20 | ("{0}").format(1)
 21 | 
 22 | "\N{snowman} {0}".format(1)
-   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP030
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP030 (format-literals)
 23 | 
 24 | print(
    |
@@ -197,13 +197,13 @@ UP030_0.py:22:1: UP030 [*] Use implicit references for positional format fields
 24 24 | print(
 25 25 |     'foo{0}'
 
-UP030_0.py:25:5: UP030 [*] Use implicit references for positional format fields
+UP030_0.py:25:5: UP030 (format-literals) [*] Use implicit references for positional format fields
    |
 24 |   print(
 25 |       'foo{0}'
    |  _____^
 26 | |     'bar{1}'.format(1, 2)
-   | |_________________________^ UP030
+   | |_________________________^ UP030 (format-literals)
 27 |   )
    |
    = help: Remove explicit positional indices
@@ -220,13 +220,13 @@ UP030_0.py:25:5: UP030 [*] Use implicit references for positional format fields
 28 28 | 
 29 29 | print(
 
-UP030_0.py:30:5: UP030 [*] Use implicit references for positional format fields
+UP030_0.py:30:5: UP030 (format-literals) [*] Use implicit references for positional format fields
    |
 29 |   print(
 30 |       'foo{0}'  # ohai\n"
    |  _____^
 31 | |     'bar{1}'.format(1, 2)
-   | |_________________________^ UP030
+   | |_________________________^ UP030 (format-literals)
 32 |   )
    |
    = help: Remove explicit positional indices
@@ -243,23 +243,23 @@ UP030_0.py:30:5: UP030 [*] Use implicit references for positional format fields
 33 33 | 
 34 34 | '{' '0}'.format(1)
 
-UP030_0.py:34:1: UP030 Use implicit references for positional format fields
+UP030_0.py:34:1: UP030 (format-literals) Use implicit references for positional format fields
    |
 32 | )
 33 | 
 34 | '{' '0}'.format(1)
-   | ^^^^^^^^^^^^^^^^^^ UP030
+   | ^^^^^^^^^^^^^^^^^^ UP030 (format-literals)
 35 | 
 36 | args = list(range(10))
    |
    = help: Remove explicit positional indices
 
-UP030_0.py:39:1: UP030 [*] Use implicit references for positional format fields
+UP030_0.py:39:1: UP030 (format-literals) [*] Use implicit references for positional format fields
    |
 37 | kwargs = {x: x for x in range(10)}
 38 | 
 39 | "{0}".format(*args)
-   | ^^^^^^^^^^^^^^^^^^^ UP030
+   | ^^^^^^^^^^^^^^^^^^^ UP030 (format-literals)
 40 | 
 41 | "{0}".format(**kwargs)
    |
@@ -275,12 +275,12 @@ UP030_0.py:39:1: UP030 [*] Use implicit references for positional format fields
 41 41 | "{0}".format(**kwargs)
 42 42 | 
 
-UP030_0.py:41:1: UP030 [*] Use implicit references for positional format fields
+UP030_0.py:41:1: UP030 (format-literals) [*] Use implicit references for positional format fields
    |
 39 | "{0}".format(*args)
 40 | 
 41 | "{0}".format(**kwargs)
-   | ^^^^^^^^^^^^^^^^^^^^^^ UP030
+   | ^^^^^^^^^^^^^^^^^^^^^^ UP030 (format-literals)
 42 | 
 43 | "{0}_{1}".format(*args)
    |
@@ -296,12 +296,12 @@ UP030_0.py:41:1: UP030 [*] Use implicit references for positional format fields
 43 43 | "{0}_{1}".format(*args)
 44 44 | 
 
-UP030_0.py:43:1: UP030 [*] Use implicit references for positional format fields
+UP030_0.py:43:1: UP030 (format-literals) [*] Use implicit references for positional format fields
    |
 41 | "{0}".format(**kwargs)
 42 | 
 43 | "{0}_{1}".format(*args)
-   | ^^^^^^^^^^^^^^^^^^^^^^^ UP030
+   | ^^^^^^^^^^^^^^^^^^^^^^^ UP030 (format-literals)
 44 | 
 45 | "{0}_{1}".format(1, *args)
    |
@@ -317,12 +317,12 @@ UP030_0.py:43:1: UP030 [*] Use implicit references for positional format fields
 45 45 | "{0}_{1}".format(1, *args)
 46 46 | 
 
-UP030_0.py:45:1: UP030 [*] Use implicit references for positional format fields
+UP030_0.py:45:1: UP030 (format-literals) [*] Use implicit references for positional format fields
    |
 43 | "{0}_{1}".format(*args)
 44 | 
 45 | "{0}_{1}".format(1, *args)
-   | ^^^^^^^^^^^^^^^^^^^^^^^^^^ UP030
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^ UP030 (format-literals)
 46 | 
 47 | "{0}_{1}".format(1, 2, *args)
    |
@@ -338,12 +338,12 @@ UP030_0.py:45:1: UP030 [*] Use implicit references for positional format fields
 47 47 | "{0}_{1}".format(1, 2, *args)
 48 48 | 
 
-UP030_0.py:47:1: UP030 [*] Use implicit references for positional format fields
+UP030_0.py:47:1: UP030 (format-literals) [*] Use implicit references for positional format fields
    |
 45 | "{0}_{1}".format(1, *args)
 46 | 
 47 | "{0}_{1}".format(1, 2, *args)
-   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP030
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP030 (format-literals)
 48 | 
 49 | "{0}_{1}".format(*args, 1, 2)
    |
@@ -359,12 +359,12 @@ UP030_0.py:47:1: UP030 [*] Use implicit references for positional format fields
 49 49 | "{0}_{1}".format(*args, 1, 2)
 50 50 | 
 
-UP030_0.py:49:1: UP030 [*] Use implicit references for positional format fields
+UP030_0.py:49:1: UP030 (format-literals) [*] Use implicit references for positional format fields
    |
 47 | "{0}_{1}".format(1, 2, *args)
 48 | 
 49 | "{0}_{1}".format(*args, 1, 2)
-   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP030
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP030 (format-literals)
 50 | 
 51 | "{0}_{1}_{2}".format(1, **kwargs)
    |
@@ -380,12 +380,12 @@ UP030_0.py:49:1: UP030 [*] Use implicit references for positional format fields
 51 51 | "{0}_{1}_{2}".format(1, **kwargs)
 52 52 | 
 
-UP030_0.py:51:1: UP030 [*] Use implicit references for positional format fields
+UP030_0.py:51:1: UP030 (format-literals) [*] Use implicit references for positional format fields
    |
 49 | "{0}_{1}".format(*args, 1, 2)
 50 | 
 51 | "{0}_{1}_{2}".format(1, **kwargs)
-   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP030
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP030 (format-literals)
 52 | 
 53 | "{0}_{1}_{2}".format(1, 2, **kwargs)
    |
@@ -401,12 +401,12 @@ UP030_0.py:51:1: UP030 [*] Use implicit references for positional format fields
 53 53 | "{0}_{1}_{2}".format(1, 2, **kwargs)
 54 54 | 
 
-UP030_0.py:53:1: UP030 [*] Use implicit references for positional format fields
+UP030_0.py:53:1: UP030 (format-literals) [*] Use implicit references for positional format fields
    |
 51 | "{0}_{1}_{2}".format(1, **kwargs)
 52 | 
 53 | "{0}_{1}_{2}".format(1, 2, **kwargs)
-   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP030
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP030 (format-literals)
 54 | 
 55 | "{0}_{1}_{2}".format(1, 2, 3, **kwargs)
    |
@@ -422,12 +422,12 @@ UP030_0.py:53:1: UP030 [*] Use implicit references for positional format fields
 55 55 | "{0}_{1}_{2}".format(1, 2, 3, **kwargs)
 56 56 | 
 
-UP030_0.py:55:1: UP030 [*] Use implicit references for positional format fields
+UP030_0.py:55:1: UP030 (format-literals) [*] Use implicit references for positional format fields
    |
 53 | "{0}_{1}_{2}".format(1, 2, **kwargs)
 54 | 
 55 | "{0}_{1}_{2}".format(1, 2, 3, **kwargs)
-   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP030
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP030 (format-literals)
 56 | 
 57 | "{0}_{1}_{2}".format(1, 2, 3, *args, **kwargs)
    |
@@ -443,12 +443,12 @@ UP030_0.py:55:1: UP030 [*] Use implicit references for positional format fields
 57 57 | "{0}_{1}_{2}".format(1, 2, 3, *args, **kwargs)
 58 58 | 
 
-UP030_0.py:57:1: UP030 [*] Use implicit references for positional format fields
+UP030_0.py:57:1: UP030 (format-literals) [*] Use implicit references for positional format fields
    |
 55 | "{0}_{1}_{2}".format(1, 2, 3, **kwargs)
 56 | 
 57 | "{0}_{1}_{2}".format(1, 2, 3, *args, **kwargs)
-   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP030
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP030 (format-literals)
 58 | 
 59 | "{1}_{0}".format(1, 2, *args)
    |
@@ -464,12 +464,12 @@ UP030_0.py:57:1: UP030 [*] Use implicit references for positional format fields
 59 59 | "{1}_{0}".format(1, 2, *args)
 60 60 | 
 
-UP030_0.py:59:1: UP030 [*] Use implicit references for positional format fields
+UP030_0.py:59:1: UP030 (format-literals) [*] Use implicit references for positional format fields
    |
 57 | "{0}_{1}_{2}".format(1, 2, 3, *args, **kwargs)
 58 | 
 59 | "{1}_{0}".format(1, 2, *args)
-   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP030
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP030 (format-literals)
 60 | 
 61 | "{1}_{0}".format(1, 2)
    |
@@ -484,12 +484,12 @@ UP030_0.py:59:1: UP030 [*] Use implicit references for positional format fields
 60 60 | 
 61 61 | "{1}_{0}".format(1, 2)
 
-UP030_0.py:61:1: UP030 [*] Use implicit references for positional format fields
+UP030_0.py:61:1: UP030 (format-literals) [*] Use implicit references for positional format fields
    |
 59 | "{1}_{0}".format(1, 2, *args)
 60 | 
 61 | "{1}_{0}".format(1, 2)
-   | ^^^^^^^^^^^^^^^^^^^^^^ UP030
+   | ^^^^^^^^^^^^^^^^^^^^^^ UP030 (format-literals)
    |
    = help: Remove explicit positional indices
 
@@ -499,5 +499,3 @@ UP030_0.py:61:1: UP030 [*] Use implicit references for positional format fields
 60 60 | 
 61    |-"{1}_{0}".format(1, 2)
    61 |+"{}_{}".format(2, 1)
-
-

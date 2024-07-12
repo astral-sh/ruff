@@ -1,12 +1,12 @@
 ---
 source: crates/ruff_linter/src/rules/pycodestyle/mod.rs
 ---
-E30.py:533:1: E302 [*] Expected 2 blank lines, found 0
+E30.py:533:1: E302 (blank-lines-top-level) [*] Expected 2 blank lines, found 0
     |
 531 | # E302
 532 | """Main module."""
 533 | def fn():
-    | ^^^ E302
+    | ^^^ E302 (blank-lines-top-level)
 534 |     pass
 535 | # end
     |
@@ -22,12 +22,12 @@ E30.py:533:1: E302 [*] Expected 2 blank lines, found 0
 534 536 |     pass
 535 537 | # end
 
-E30.py:540:1: E302 [*] Expected 2 blank lines, found 0
+E30.py:540:1: E302 (blank-lines-top-level) [*] Expected 2 blank lines, found 0
     |
 538 | # E302
 539 | import sys
 540 | def get_sys_path():
-    | ^^^ E302
+    | ^^^ E302 (blank-lines-top-level)
 541 |     return sys.path
 542 | # end
     |
@@ -43,12 +43,12 @@ E30.py:540:1: E302 [*] Expected 2 blank lines, found 0
 541 543 |     return sys.path
 542 544 | # end
 
-E30.py:549:1: E302 [*] Expected 2 blank lines, found 1
+E30.py:549:1: E302 (blank-lines-top-level) [*] Expected 2 blank lines, found 1
     |
 547 |     pass
 548 | 
 549 | def b():
-    | ^^^ E302
+    | ^^^ E302 (blank-lines-top-level)
 550 |     pass
 551 | # end
     |
@@ -63,12 +63,12 @@ E30.py:549:1: E302 [*] Expected 2 blank lines, found 1
 550 551 |     pass
 551 552 | # end
 
-E30.py:560:1: E302 [*] Expected 2 blank lines, found 1
+E30.py:560:1: E302 (blank-lines-top-level) [*] Expected 2 blank lines, found 1
     |
 558 | # comment
 559 | 
 560 | def b():
-    | ^^^ E302
+    | ^^^ E302 (blank-lines-top-level)
 561 |     pass
 562 | # end
     |
@@ -83,12 +83,12 @@ E30.py:560:1: E302 [*] Expected 2 blank lines, found 1
 561 562 |     pass
 562 563 | # end
 
-E30.py:569:1: E302 [*] Expected 2 blank lines, found 1
+E30.py:569:1: E302 (blank-lines-top-level) [*] Expected 2 blank lines, found 1
     |
 567 |     pass
 568 | 
 569 | async def b():
-    | ^^^^^ E302
+    | ^^^^^ E302 (blank-lines-top-level)
 570 |     pass
 571 | # end
     |
@@ -103,12 +103,12 @@ E30.py:569:1: E302 [*] Expected 2 blank lines, found 1
 570 571 |     pass
 571 572 | # end
 
-E30.py:578:1: E302 [*] Expected 2 blank lines, found 1
+E30.py:578:1: E302 (blank-lines-top-level) [*] Expected 2 blank lines, found 1
     |
 576 |     pass
 577 | 
 578 | async  def x(y: int = 1):
-    | ^^^^^ E302
+    | ^^^^^ E302 (blank-lines-top-level)
 579 |     pass
 580 | # end
     |
@@ -123,12 +123,12 @@ E30.py:578:1: E302 [*] Expected 2 blank lines, found 1
 579 580 |     pass
 580 581 | # end
 
-E30.py:586:1: E302 [*] Expected 2 blank lines, found 0
+E30.py:586:1: E302 (blank-lines-top-level) [*] Expected 2 blank lines, found 0
     |
 584 | def bar():
 585 |     pass
 586 | def baz(): pass
-    | ^^^ E302
+    | ^^^ E302 (blank-lines-top-level)
 587 | # end
     |
     = help: Add missing blank line(s)
@@ -143,12 +143,12 @@ E30.py:586:1: E302 [*] Expected 2 blank lines, found 0
 587 589 | # end
 588 590 | 
 
-E30.py:592:1: E302 [*] Expected 2 blank lines, found 0
+E30.py:592:1: E302 (blank-lines-top-level) [*] Expected 2 blank lines, found 0
     |
 590 | # E302
 591 | def bar(): pass
 592 | def baz():
-    | ^^^ E302
+    | ^^^ E302 (blank-lines-top-level)
 593 |     pass
 594 | # end
     |
@@ -164,11 +164,11 @@ E30.py:592:1: E302 [*] Expected 2 blank lines, found 0
 593 595 |     pass
 594 596 | # end
 
-E30.py:602:1: E302 [*] Expected 2 blank lines, found 1
+E30.py:602:1: E302 (blank-lines-top-level) [*] Expected 2 blank lines, found 1
     |
 601 | # comment
 602 | @decorator
-    | ^ E302
+    | ^ E302 (blank-lines-top-level)
 603 | def g():
 604 |     pass
     |
@@ -184,12 +184,12 @@ E30.py:602:1: E302 [*] Expected 2 blank lines, found 1
 602 604 | @decorator
 603 605 | def g():
 
-E30.py:624:1: E302 [*] Expected 2 blank lines, found 0
+E30.py:624:1: E302 (blank-lines-top-level) [*] Expected 2 blank lines, found 0
     |
 622 | # E302
 623 | class A:...
 624 | class B: ...
-    | ^^^^^ E302
+    | ^^^^^ E302 (blank-lines-top-level)
 625 | # end
     |
     = help: Add missing blank line(s)
@@ -204,12 +204,12 @@ E30.py:624:1: E302 [*] Expected 2 blank lines, found 0
 625 627 | # end
 626 628 | 
 
-E30.py:634:1: E302 [*] Expected 2 blank lines, found 1
+E30.py:634:1: E302 (blank-lines-top-level) [*] Expected 2 blank lines, found 1
     |
 632 | def fn(a: str) -> str: ...
 633 | 
 634 | def fn(a: int | str) -> int | str:
-    | ^^^ E302
+    | ^^^ E302 (blank-lines-top-level)
 635 |     ...
 636 | # end
     |

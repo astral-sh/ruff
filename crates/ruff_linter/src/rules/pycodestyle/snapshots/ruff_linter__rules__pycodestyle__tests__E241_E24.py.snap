@@ -1,11 +1,11 @@
 ---
 source: crates/ruff_linter/src/rules/pycodestyle/mod.rs
 ---
-E24.py:2:8: E241 [*] Multiple spaces after comma
+E24.py:2:8: E241 (multiple-spaces-after-comma) [*] Multiple spaces after comma
   |
 1 | #: E241
 2 | a = (1,  2)
-  |        ^^ E241
+  |        ^^ E241 (multiple-spaces-after-comma)
 3 | #: Okay
 4 | b = (1, 20)
   |
@@ -19,12 +19,12 @@ E24.py:2:8: E241 [*] Multiple spaces after comma
 4 4 | b = (1, 20)
 5 5 | #: E242
 
-E24.py:11:18: E241 [*] Multiple spaces after comma
+E24.py:11:18: E241 (multiple-spaces-after-comma) [*] Multiple spaces after comma
    |
  9 | #: E241 E241 E241
 10 | # issue 135
 11 | more_spaces = [a,    b,
-   |                  ^^^^ E241
+   |                  ^^^^ E241 (multiple-spaces-after-comma)
 12 |                ef,  +h,
 13 |                c,   -d]
    |
@@ -39,12 +39,12 @@ E24.py:11:18: E241 [*] Multiple spaces after comma
 12 12 |                ef,  +h,
 13 13 |                c,   -d]
 
-E24.py:12:19: E241 [*] Multiple spaces after comma
+E24.py:12:19: E241 (multiple-spaces-after-comma) [*] Multiple spaces after comma
    |
 10 | # issue 135
 11 | more_spaces = [a,    b,
 12 |                ef,  +h,
-   |                   ^^ E241
+   |                   ^^ E241 (multiple-spaces-after-comma)
 13 |                c,   -d]
    |
    = help: Replace with single space
@@ -57,12 +57,12 @@ E24.py:12:19: E241 [*] Multiple spaces after comma
    12 |+               ef, +h,
 13 13 |                c,   -d]
 
-E24.py:13:18: E241 [*] Multiple spaces after comma
+E24.py:13:18: E241 (multiple-spaces-after-comma) [*] Multiple spaces after comma
    |
 11 | more_spaces = [a,    b,
 12 |                ef,  +h,
 13 |                c,   -d]
-   |                  ^^^ E241
+   |                  ^^^ E241 (multiple-spaces-after-comma)
    |
    = help: Replace with single space
 
@@ -72,5 +72,3 @@ E24.py:13:18: E241 [*] Multiple spaces after comma
 12 12 |                ef,  +h,
 13    |-               c,   -d]
    13 |+               c, -d]
-
-

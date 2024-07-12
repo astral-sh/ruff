@@ -1,12 +1,12 @@
 ---
 source: crates/ruff_linter/src/rules/pyupgrade/mod.rs
 ---
-UP037_1.py:9:8: UP037 [*] Remove quotes from type annotation
+UP037_1.py:9:8: UP037 (quoted-annotation) [*] Remove quotes from type annotation
    |
  7 | def foo():
  8 |     # UP037
  9 |     x: "Tuple[int, int]" = (0, 0)
-   |        ^^^^^^^^^^^^^^^^^ UP037
+   |        ^^^^^^^^^^^^^^^^^ UP037 (quoted-annotation)
 10 |     print(x)
    |
    = help: Remove quotes

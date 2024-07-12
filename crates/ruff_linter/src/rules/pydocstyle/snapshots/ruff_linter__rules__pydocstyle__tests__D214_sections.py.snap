@@ -1,12 +1,12 @@
 ---
 source: crates/ruff_linter/src/rules/pydocstyle/mod.rs
 ---
-sections.py:146:9: D214 [*] Section is over-indented ("Returns")
+sections.py:146:9: D214 (section-not-over-indented) [*] Section is over-indented ("Returns")
     |
 144 |     """Toggle the gizmo.
 145 | 
 146 |         Returns
-    |         ^^^^^^^ D214
+    |         ^^^^^^^ D214 (section-not-over-indented)
 147 |     -------
 148 |     A value of some sort.
     |
@@ -22,12 +22,12 @@ sections.py:146:9: D214 [*] Section is over-indented ("Returns")
 148 148 |     A value of some sort.
 149 149 | 
 
-sections.py:563:9: D214 [*] Section is over-indented ("Returns")
+sections.py:563:9: D214 (section-not-over-indented) [*] Section is over-indented ("Returns")
     |
 561 |         Here's a note.
 562 | 
 563 |         Returns:
-    |         ^^^^^^^ D214
+    |         ^^^^^^^ D214 (section-not-over-indented)
 564 |     """
     |
     = help: Remove over-indentation from "Returns"

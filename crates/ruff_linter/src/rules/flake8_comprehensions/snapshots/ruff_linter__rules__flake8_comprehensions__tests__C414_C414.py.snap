@@ -1,11 +1,11 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_comprehensions/mod.rs
 ---
-C414.py:2:1: C414 [*] Unnecessary `list` call within `list()`
+C414.py:2:1: C414 (unnecessary-double-cast-or-process) [*] Unnecessary `list` call within `list()`
   |
 1 | x = [1, 2, 3]
 2 | list(list(x))
-  | ^^^^^^^^^^^^^ C414
+  | ^^^^^^^^^^^^^ C414 (unnecessary-double-cast-or-process)
 3 | list(tuple(x))
 4 | tuple(list(x))
   |
@@ -19,12 +19,12 @@ C414.py:2:1: C414 [*] Unnecessary `list` call within `list()`
 4 4 | tuple(list(x))
 5 5 | tuple(tuple(x))
 
-C414.py:3:1: C414 [*] Unnecessary `tuple` call within `list()`
+C414.py:3:1: C414 (unnecessary-double-cast-or-process) [*] Unnecessary `tuple` call within `list()`
   |
 1 | x = [1, 2, 3]
 2 | list(list(x))
 3 | list(tuple(x))
-  | ^^^^^^^^^^^^^^ C414
+  | ^^^^^^^^^^^^^^ C414 (unnecessary-double-cast-or-process)
 4 | tuple(list(x))
 5 | tuple(tuple(x))
   |
@@ -39,12 +39,12 @@ C414.py:3:1: C414 [*] Unnecessary `tuple` call within `list()`
 5 5 | tuple(tuple(x))
 6 6 | set(set(x))
 
-C414.py:4:1: C414 [*] Unnecessary `list` call within `tuple()`
+C414.py:4:1: C414 (unnecessary-double-cast-or-process) [*] Unnecessary `list` call within `tuple()`
   |
 2 | list(list(x))
 3 | list(tuple(x))
 4 | tuple(list(x))
-  | ^^^^^^^^^^^^^^ C414
+  | ^^^^^^^^^^^^^^ C414 (unnecessary-double-cast-or-process)
 5 | tuple(tuple(x))
 6 | set(set(x))
   |
@@ -60,12 +60,12 @@ C414.py:4:1: C414 [*] Unnecessary `list` call within `tuple()`
 6 6 | set(set(x))
 7 7 | set(list(x))
 
-C414.py:5:1: C414 [*] Unnecessary `tuple` call within `tuple()`
+C414.py:5:1: C414 (unnecessary-double-cast-or-process) [*] Unnecessary `tuple` call within `tuple()`
   |
 3 | list(tuple(x))
 4 | tuple(list(x))
 5 | tuple(tuple(x))
-  | ^^^^^^^^^^^^^^^ C414
+  | ^^^^^^^^^^^^^^^ C414 (unnecessary-double-cast-or-process)
 6 | set(set(x))
 7 | set(list(x))
   |
@@ -81,12 +81,12 @@ C414.py:5:1: C414 [*] Unnecessary `tuple` call within `tuple()`
 7 7 | set(list(x))
 8 8 | set(tuple(x))
 
-C414.py:6:1: C414 [*] Unnecessary `set` call within `set()`
+C414.py:6:1: C414 (unnecessary-double-cast-or-process) [*] Unnecessary `set` call within `set()`
   |
 4 | tuple(list(x))
 5 | tuple(tuple(x))
 6 | set(set(x))
-  | ^^^^^^^^^^^ C414
+  | ^^^^^^^^^^^ C414 (unnecessary-double-cast-or-process)
 7 | set(list(x))
 8 | set(tuple(x))
   |
@@ -102,12 +102,12 @@ C414.py:6:1: C414 [*] Unnecessary `set` call within `set()`
 8 8 | set(tuple(x))
 9 9 | set(sorted(x))
 
-C414.py:7:1: C414 [*] Unnecessary `list` call within `set()`
+C414.py:7:1: C414 (unnecessary-double-cast-or-process) [*] Unnecessary `list` call within `set()`
   |
 5 | tuple(tuple(x))
 6 | set(set(x))
 7 | set(list(x))
-  | ^^^^^^^^^^^^ C414
+  | ^^^^^^^^^^^^ C414 (unnecessary-double-cast-or-process)
 8 | set(tuple(x))
 9 | set(sorted(x))
   |
@@ -123,12 +123,12 @@ C414.py:7:1: C414 [*] Unnecessary `list` call within `set()`
 9 9 | set(sorted(x))
 10 10 | set(sorted(x, key=lambda y: y))
 
-C414.py:8:1: C414 [*] Unnecessary `tuple` call within `set()`
+C414.py:8:1: C414 (unnecessary-double-cast-or-process) [*] Unnecessary `tuple` call within `set()`
    |
  6 | set(set(x))
  7 | set(list(x))
  8 | set(tuple(x))
-   | ^^^^^^^^^^^^^ C414
+   | ^^^^^^^^^^^^^ C414 (unnecessary-double-cast-or-process)
  9 | set(sorted(x))
 10 | set(sorted(x, key=lambda y: y))
    |
@@ -144,12 +144,12 @@ C414.py:8:1: C414 [*] Unnecessary `tuple` call within `set()`
 10 10 | set(sorted(x, key=lambda y: y))
 11 11 | set(reversed(x))
 
-C414.py:9:1: C414 [*] Unnecessary `sorted` call within `set()`
+C414.py:9:1: C414 (unnecessary-double-cast-or-process) [*] Unnecessary `sorted` call within `set()`
    |
  7 | set(list(x))
  8 | set(tuple(x))
  9 | set(sorted(x))
-   | ^^^^^^^^^^^^^^ C414
+   | ^^^^^^^^^^^^^^ C414 (unnecessary-double-cast-or-process)
 10 | set(sorted(x, key=lambda y: y))
 11 | set(reversed(x))
    |
@@ -165,12 +165,12 @@ C414.py:9:1: C414 [*] Unnecessary `sorted` call within `set()`
 11 11 | set(reversed(x))
 12 12 | sorted(list(x))
 
-C414.py:10:1: C414 [*] Unnecessary `sorted` call within `set()`
+C414.py:10:1: C414 (unnecessary-double-cast-or-process) [*] Unnecessary `sorted` call within `set()`
    |
  8 | set(tuple(x))
  9 | set(sorted(x))
 10 | set(sorted(x, key=lambda y: y))
-   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ C414
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ C414 (unnecessary-double-cast-or-process)
 11 | set(reversed(x))
 12 | sorted(list(x))
    |
@@ -186,12 +186,12 @@ C414.py:10:1: C414 [*] Unnecessary `sorted` call within `set()`
 12 12 | sorted(list(x))
 13 13 | sorted(tuple(x))
 
-C414.py:11:1: C414 [*] Unnecessary `reversed` call within `set()`
+C414.py:11:1: C414 (unnecessary-double-cast-or-process) [*] Unnecessary `reversed` call within `set()`
    |
  9 | set(sorted(x))
 10 | set(sorted(x, key=lambda y: y))
 11 | set(reversed(x))
-   | ^^^^^^^^^^^^^^^^ C414
+   | ^^^^^^^^^^^^^^^^ C414 (unnecessary-double-cast-or-process)
 12 | sorted(list(x))
 13 | sorted(tuple(x))
    |
@@ -207,12 +207,12 @@ C414.py:11:1: C414 [*] Unnecessary `reversed` call within `set()`
 13 13 | sorted(tuple(x))
 14 14 | sorted(sorted(x))
 
-C414.py:12:1: C414 [*] Unnecessary `list` call within `sorted()`
+C414.py:12:1: C414 (unnecessary-double-cast-or-process) [*] Unnecessary `list` call within `sorted()`
    |
 10 | set(sorted(x, key=lambda y: y))
 11 | set(reversed(x))
 12 | sorted(list(x))
-   | ^^^^^^^^^^^^^^^ C414
+   | ^^^^^^^^^^^^^^^ C414 (unnecessary-double-cast-or-process)
 13 | sorted(tuple(x))
 14 | sorted(sorted(x))
    |
@@ -228,12 +228,12 @@ C414.py:12:1: C414 [*] Unnecessary `list` call within `sorted()`
 14 14 | sorted(sorted(x))
 15 15 | sorted(sorted(x, key=foo, reverse=False), reverse=False, key=foo)
 
-C414.py:13:1: C414 [*] Unnecessary `tuple` call within `sorted()`
+C414.py:13:1: C414 (unnecessary-double-cast-or-process) [*] Unnecessary `tuple` call within `sorted()`
    |
 11 | set(reversed(x))
 12 | sorted(list(x))
 13 | sorted(tuple(x))
-   | ^^^^^^^^^^^^^^^^ C414
+   | ^^^^^^^^^^^^^^^^ C414 (unnecessary-double-cast-or-process)
 14 | sorted(sorted(x))
 15 | sorted(sorted(x, key=foo, reverse=False), reverse=False, key=foo)
    |
@@ -249,12 +249,12 @@ C414.py:13:1: C414 [*] Unnecessary `tuple` call within `sorted()`
 15 15 | sorted(sorted(x, key=foo, reverse=False), reverse=False, key=foo)
 16 16 | sorted(sorted(x, reverse=True), reverse=True)
 
-C414.py:14:1: C414 [*] Unnecessary `sorted` call within `sorted()`
+C414.py:14:1: C414 (unnecessary-double-cast-or-process) [*] Unnecessary `sorted` call within `sorted()`
    |
 12 | sorted(list(x))
 13 | sorted(tuple(x))
 14 | sorted(sorted(x))
-   | ^^^^^^^^^^^^^^^^^ C414
+   | ^^^^^^^^^^^^^^^^^ C414 (unnecessary-double-cast-or-process)
 15 | sorted(sorted(x, key=foo, reverse=False), reverse=False, key=foo)
 16 | sorted(sorted(x, reverse=True), reverse=True)
    |
@@ -270,12 +270,12 @@ C414.py:14:1: C414 [*] Unnecessary `sorted` call within `sorted()`
 16 16 | sorted(sorted(x, reverse=True), reverse=True)
 17 17 | sorted(reversed(x))
 
-C414.py:15:1: C414 [*] Unnecessary `sorted` call within `sorted()`
+C414.py:15:1: C414 (unnecessary-double-cast-or-process) [*] Unnecessary `sorted` call within `sorted()`
    |
 13 | sorted(tuple(x))
 14 | sorted(sorted(x))
 15 | sorted(sorted(x, key=foo, reverse=False), reverse=False, key=foo)
-   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ C414
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ C414 (unnecessary-double-cast-or-process)
 16 | sorted(sorted(x, reverse=True), reverse=True)
 17 | sorted(reversed(x))
    |
@@ -291,12 +291,12 @@ C414.py:15:1: C414 [*] Unnecessary `sorted` call within `sorted()`
 17 17 | sorted(reversed(x))
 18 18 | sorted(list(x), key=lambda y: y)
 
-C414.py:16:1: C414 [*] Unnecessary `sorted` call within `sorted()`
+C414.py:16:1: C414 (unnecessary-double-cast-or-process) [*] Unnecessary `sorted` call within `sorted()`
    |
 14 | sorted(sorted(x))
 15 | sorted(sorted(x, key=foo, reverse=False), reverse=False, key=foo)
 16 | sorted(sorted(x, reverse=True), reverse=True)
-   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ C414
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ C414 (unnecessary-double-cast-or-process)
 17 | sorted(reversed(x))
 18 | sorted(list(x), key=lambda y: y)
    |
@@ -312,12 +312,12 @@ C414.py:16:1: C414 [*] Unnecessary `sorted` call within `sorted()`
 18 18 | sorted(list(x), key=lambda y: y)
 19 19 | tuple(
 
-C414.py:17:1: C414 [*] Unnecessary `reversed` call within `sorted()`
+C414.py:17:1: C414 (unnecessary-double-cast-or-process) [*] Unnecessary `reversed` call within `sorted()`
    |
 15 | sorted(sorted(x, key=foo, reverse=False), reverse=False, key=foo)
 16 | sorted(sorted(x, reverse=True), reverse=True)
 17 | sorted(reversed(x))
-   | ^^^^^^^^^^^^^^^^^^^ C414
+   | ^^^^^^^^^^^^^^^^^^^ C414 (unnecessary-double-cast-or-process)
 18 | sorted(list(x), key=lambda y: y)
 19 | tuple(
    |
@@ -333,12 +333,12 @@ C414.py:17:1: C414 [*] Unnecessary `reversed` call within `sorted()`
 19 19 | tuple(
 20 20 |     list(
 
-C414.py:18:1: C414 [*] Unnecessary `list` call within `sorted()`
+C414.py:18:1: C414 (unnecessary-double-cast-or-process) [*] Unnecessary `list` call within `sorted()`
    |
 16 | sorted(sorted(x, reverse=True), reverse=True)
 17 | sorted(reversed(x))
 18 | sorted(list(x), key=lambda y: y)
-   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ C414
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ C414 (unnecessary-double-cast-or-process)
 19 | tuple(
 20 |     list(
    |
@@ -354,7 +354,7 @@ C414.py:18:1: C414 [*] Unnecessary `list` call within `sorted()`
 20 20 |     list(
 21 21 |         [x, 3, "hell"\
 
-C414.py:19:1: C414 [*] Unnecessary `list` call within `tuple()`
+C414.py:19:1: C414 (unnecessary-double-cast-or-process) [*] Unnecessary `list` call within `tuple()`
    |
 17 |   sorted(reversed(x))
 18 |   sorted(list(x), key=lambda y: y)
@@ -364,7 +364,7 @@ C414.py:19:1: C414 [*] Unnecessary `list` call within `tuple()`
 22 | |         "o"]
 23 | |     )
 24 | | )
-   | |_^ C414
+   | |_^ C414 (unnecessary-double-cast-or-process)
 25 |   set(set())
 26 |   set(list())
    |
@@ -383,12 +383,12 @@ C414.py:19:1: C414 [*] Unnecessary `list` call within `tuple()`
 25 23 | set(set())
 26 24 | set(list())
 
-C414.py:25:1: C414 [*] Unnecessary `set` call within `set()`
+C414.py:25:1: C414 (unnecessary-double-cast-or-process) [*] Unnecessary `set` call within `set()`
    |
 23 |     )
 24 | )
 25 | set(set())
-   | ^^^^^^^^^^ C414
+   | ^^^^^^^^^^ C414 (unnecessary-double-cast-or-process)
 26 | set(list())
 27 | set(tuple())
    |
@@ -404,12 +404,12 @@ C414.py:25:1: C414 [*] Unnecessary `set` call within `set()`
 27 27 | set(tuple())
 28 28 | sorted(reversed())
 
-C414.py:26:1: C414 [*] Unnecessary `list` call within `set()`
+C414.py:26:1: C414 (unnecessary-double-cast-or-process) [*] Unnecessary `list` call within `set()`
    |
 24 | )
 25 | set(set())
 26 | set(list())
-   | ^^^^^^^^^^^ C414
+   | ^^^^^^^^^^^ C414 (unnecessary-double-cast-or-process)
 27 | set(tuple())
 28 | sorted(reversed())
    |
@@ -425,12 +425,12 @@ C414.py:26:1: C414 [*] Unnecessary `list` call within `set()`
 28 28 | sorted(reversed())
 29 29 | 
 
-C414.py:27:1: C414 [*] Unnecessary `tuple` call within `set()`
+C414.py:27:1: C414 (unnecessary-double-cast-or-process) [*] Unnecessary `tuple` call within `set()`
    |
 25 | set(set())
 26 | set(list())
 27 | set(tuple())
-   | ^^^^^^^^^^^^ C414
+   | ^^^^^^^^^^^^ C414 (unnecessary-double-cast-or-process)
 28 | sorted(reversed())
    |
    = help: Remove the inner `tuple` call
@@ -445,12 +445,12 @@ C414.py:27:1: C414 [*] Unnecessary `tuple` call within `set()`
 29 29 | 
 30 30 | # Nested sorts with differing keyword arguments. Not flagged.
 
-C414.py:28:1: C414 [*] Unnecessary `reversed` call within `sorted()`
+C414.py:28:1: C414 (unnecessary-double-cast-or-process) [*] Unnecessary `reversed` call within `sorted()`
    |
 26 | set(list())
 27 | set(tuple())
 28 | sorted(reversed())
-   | ^^^^^^^^^^^^^^^^^^ C414
+   | ^^^^^^^^^^^^^^^^^^ C414 (unnecessary-double-cast-or-process)
 29 | 
 30 | # Nested sorts with differing keyword arguments. Not flagged.
    |
@@ -466,7 +466,7 @@ C414.py:28:1: C414 [*] Unnecessary `reversed` call within `sorted()`
 30 30 | # Nested sorts with differing keyword arguments. Not flagged.
 31 31 | sorted(sorted(x, key=lambda y: y))
 
-C414.py:37:27: C414 [*] Unnecessary `list` call within `sorted()`
+C414.py:37:27: C414 (unnecessary-double-cast-or-process) [*] Unnecessary `list` call within `sorted()`
    |
 36 |   # Preserve trailing comments.
 37 |   xxxxxxxxxxx_xxxxx_xxxxx = sorted(
@@ -476,7 +476,7 @@ C414.py:37:27: C414 [*] Unnecessary `list` call within `sorted()`
 40 | |     # xx xxxx xxxxxxx xxxx xxx xxxxxxxx Nxxx
 41 | |     key=lambda xxxxx: xxxxx or "",
 42 | | )
-   | |_^ C414
+   | |_^ C414 (unnecessary-double-cast-or-process)
 43 |   
 44 |   xxxxxxxxxxx_xxxxx_xxxxx = sorted(
    |
@@ -492,7 +492,7 @@ C414.py:37:27: C414 [*] Unnecessary `list` call within `sorted()`
 40 40 |     # xx xxxx xxxxxxx xxxx xxx xxxxxxxx Nxxx
 41 41 |     key=lambda xxxxx: xxxxx or "",
 
-C414.py:44:27: C414 [*] Unnecessary `list` call within `sorted()`
+C414.py:44:27: C414 (unnecessary-double-cast-or-process) [*] Unnecessary `list` call within `sorted()`
    |
 42 |   )
 43 |   
@@ -501,7 +501,7 @@ C414.py:44:27: C414 [*] Unnecessary `list` call within `sorted()`
 45 | |     list(x_xxxx_xxxxxxxxxxx_xxxxx.xxxx()),  # xxxxxxxxxxx xxxxx xxxx xxx xx Nxxx
 46 | |     key=lambda xxxxx: xxxxx or "",
 47 | | )
-   | |_^ C414
+   | |_^ C414 (unnecessary-double-cast-or-process)
    |
    = help: Remove the inner `list` call
 
@@ -513,5 +513,3 @@ C414.py:44:27: C414 [*] Unnecessary `list` call within `sorted()`
    45 |+    x_xxxx_xxxxxxxxxxx_xxxxx.xxxx(),  # xxxxxxxxxxx xxxxx xxxx xxx xx Nxxx
 46 46 |     key=lambda xxxxx: xxxxx or "",
 47 47 | )
-
-

@@ -1,64 +1,64 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_bandit/mod.rs
 ---
-S108.py:5:11: S108 Probable insecure usage of temporary file or directory: "/tmp/abc"
+S108.py:5:11: S108 (hardcoded-temp-file) Probable insecure usage of temporary file or directory: "/tmp/abc"
   |
 3 |     f.write("def")
 4 | 
 5 | with open("/tmp/abc", "w") as f:
-  |           ^^^^^^^^^^ S108
+  |           ^^^^^^^^^^ S108 (hardcoded-temp-file)
 6 |     f.write("def")
   |
 
-S108.py:8:13: S108 Probable insecure usage of temporary file or directory: "/tmp/abc"
+S108.py:8:13: S108 (hardcoded-temp-file) Probable insecure usage of temporary file or directory: "/tmp/abc"
   |
 6 |     f.write("def")
 7 | 
 8 | with open(f"/tmp/abc", "w") as f:
-  |             ^^^^^^^^ S108
+  |             ^^^^^^^^ S108 (hardcoded-temp-file)
 9 |     f.write("def")
   |
 
-S108.py:11:11: S108 Probable insecure usage of temporary file or directory: "/var/tmp/123"
+S108.py:11:11: S108 (hardcoded-temp-file) Probable insecure usage of temporary file or directory: "/var/tmp/123"
    |
  9 |     f.write("def")
 10 | 
 11 | with open("/var/tmp/123", "w") as f:
-   |           ^^^^^^^^^^^^^^ S108
+   |           ^^^^^^^^^^^^^^ S108 (hardcoded-temp-file)
 12 |     f.write("def")
    |
 
-S108.py:14:11: S108 Probable insecure usage of temporary file or directory: "/dev/shm/unit/test"
+S108.py:14:11: S108 (hardcoded-temp-file) Probable insecure usage of temporary file or directory: "/dev/shm/unit/test"
    |
 12 |     f.write("def")
 13 | 
 14 | with open("/dev/shm/unit/test", "w") as f:
-   |           ^^^^^^^^^^^^^^^^^^^^ S108
+   |           ^^^^^^^^^^^^^^^^^^^^ S108 (hardcoded-temp-file)
 15 |     f.write("def")
    |
 
-S108.py:22:11: S108 Probable insecure usage of temporary file or directory: "/tmp/abc"
+S108.py:22:11: S108 (hardcoded-temp-file) Probable insecure usage of temporary file or directory: "/tmp/abc"
    |
 21 | # Implicit string concatenation
 22 | with open("/tmp/" "abc", "w") as f:
-   |           ^^^^^^^^^^^^^ S108
+   |           ^^^^^^^^^^^^^ S108 (hardcoded-temp-file)
 23 |     f.write("def")
    |
 
-S108.py:25:11: S108 Probable insecure usage of temporary file or directory: "/tmp/abc"
+S108.py:25:11: S108 (hardcoded-temp-file) Probable insecure usage of temporary file or directory: "/tmp/abc"
    |
 23 |     f.write("def")
 24 | 
 25 | with open("/tmp/abc" f"/tmp/abc", "w") as f:
-   |           ^^^^^^^^^^ S108
+   |           ^^^^^^^^^^ S108 (hardcoded-temp-file)
 26 |     f.write("def")
    |
 
-S108.py:25:24: S108 Probable insecure usage of temporary file or directory: "/tmp/abc"
+S108.py:25:24: S108 (hardcoded-temp-file) Probable insecure usage of temporary file or directory: "/tmp/abc"
    |
 23 |     f.write("def")
 24 | 
 25 | with open("/tmp/abc" f"/tmp/abc", "w") as f:
-   |                        ^^^^^^^^ S108
+   |                        ^^^^^^^^ S108 (hardcoded-temp-file)
 26 |     f.write("def")
    |

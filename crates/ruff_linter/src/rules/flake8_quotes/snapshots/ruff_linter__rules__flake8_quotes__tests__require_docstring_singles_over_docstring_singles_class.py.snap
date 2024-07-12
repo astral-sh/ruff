@@ -1,12 +1,12 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_quotes/mod.rs
 ---
-docstring_singles_class.py:3:5: Q001 [*] Single quote multiline found but double quotes preferred
+docstring_singles_class.py:3:5: Q001 (bad-quotes-multiline-string) [*] Single quote multiline found but double quotes preferred
   |
 1 | class SingleLineDocstrings():
 2 |     ''' Double quotes single line class docstring '''
 3 |     ''' Not a docstring '''
-  |     ^^^^^^^^^^^^^^^^^^^^^^^ Q001
+  |     ^^^^^^^^^^^^^^^^^^^^^^^ Q001 (bad-quotes-multiline-string)
 4 | 
 5 |     def foo(self, bar='''not a docstring'''):
   |
@@ -21,12 +21,12 @@ docstring_singles_class.py:3:5: Q001 [*] Single quote multiline found but double
 5 5 |     def foo(self, bar='''not a docstring'''):
 6 6 |         ''' Double quotes single line method docstring'''
 
-docstring_singles_class.py:5:23: Q001 [*] Single quote multiline found but double quotes preferred
+docstring_singles_class.py:5:23: Q001 (bad-quotes-multiline-string) [*] Single quote multiline found but double quotes preferred
   |
 3 |     ''' Not a docstring '''
 4 | 
 5 |     def foo(self, bar='''not a docstring'''):
-  |                       ^^^^^^^^^^^^^^^^^^^^^ Q001
+  |                       ^^^^^^^^^^^^^^^^^^^^^ Q001 (bad-quotes-multiline-string)
 6 |         ''' Double quotes single line method docstring'''
 7 |         pass
   |
@@ -40,6 +40,4 @@ docstring_singles_class.py:5:23: Q001 [*] Single quote multiline found but doubl
   5 |+    def foo(self, bar="""not a docstring"""):
 6 6 |         ''' Double quotes single line method docstring'''
 7 7 |         pass
-8 8 | 
-
-
+8 8 |

@@ -1,12 +1,12 @@
 ---
 source: crates/ruff_linter/src/rules/pydocstyle/mod.rs
 ---
-D215.py:3:5: D215 [*] Section underline is over-indented ("TODO")
+D215.py:3:5: D215 (section-underline-not-over-indented) [*] Section underline is over-indented ("TODO")
   |
 1 | """
 2 | TODO:
 3 |     -
-  |     ^ D215
+  |     ^ D215 (section-underline-not-over-indented)
 4 | """
   |
   = help: Remove over-indentation from "TODO" underline

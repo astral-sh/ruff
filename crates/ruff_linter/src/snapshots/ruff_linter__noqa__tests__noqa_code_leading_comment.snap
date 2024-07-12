@@ -8,8 +8,10 @@ Ok(
             Codes {
                 range: 35..47,
                 codes: [
-                    Code {
-                        code: "F401",
+                    RuleIdent {
+                        identifier: Code(
+                            "F401",
+                        ),
                         range: 43..47,
                     },
                 ],

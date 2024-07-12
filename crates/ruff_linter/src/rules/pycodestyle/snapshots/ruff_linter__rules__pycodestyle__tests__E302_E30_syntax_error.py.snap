@@ -10,12 +10,12 @@ E30_syntax_error.py:4:15: SyntaxError: Expected ']', found '('
 5 |     pass
   |
 
-E30_syntax_error.py:7:1: E302 Expected 2 blank lines, found 1
+E30_syntax_error.py:7:1: E302 (blank-lines-top-level) Expected 2 blank lines, found 1
   |
 5 |     pass
 6 | 
 7 | def bar():
-  | ^^^ E302
+  | ^^^ E302 (blank-lines-top-level)
 8 |     pass
   |
   = help: Add missing blank line(s)

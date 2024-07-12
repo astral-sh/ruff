@@ -1,20 +1,20 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_datetimez/mod.rs
 ---
-DTZ011.py:4:1: DTZ011 `datetime.date.today()` used
+DTZ011.py:4:1: DTZ011 (call-date-today) `datetime.date.today()` used
   |
 3 | # qualified
 4 | datetime.date.today()
-  | ^^^^^^^^^^^^^^^^^^^^^ DTZ011
+  | ^^^^^^^^^^^^^^^^^^^^^ DTZ011 (call-date-today)
 5 | 
 6 | from datetime import date
   |
   = help: Use `datetime.datetime.now(tz=...).date()` instead
 
-DTZ011.py:9:1: DTZ011 `datetime.date.today()` used
+DTZ011.py:9:1: DTZ011 (call-date-today) `datetime.date.today()` used
   |
 8 | # unqualified
 9 | date.today()
-  | ^^^^^^^^^^^^ DTZ011
+  | ^^^^^^^^^^^^ DTZ011 (call-date-today)
   |
   = help: Use `datetime.datetime.now(tz=...).date()` instead

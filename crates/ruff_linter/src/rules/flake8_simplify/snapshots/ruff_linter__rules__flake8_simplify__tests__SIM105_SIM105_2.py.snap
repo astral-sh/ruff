@@ -1,14 +1,14 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_simplify/mod.rs
 ---
-SIM105_2.py:10:1: SIM105 [*] Use `contextlib.suppress(ValueError)` instead of `try`-`except`-`pass`
+SIM105_2.py:10:1: SIM105 (suppressible-exception) [*] Use `contextlib.suppress(ValueError)` instead of `try`-`except`-`pass`
    |
  9 |   # SIM105
 10 | / try:
 11 | |     foo()
 12 | | except ValueError:
 13 | |     pass
-   | |________^ SIM105
+   | |________^ SIM105 (suppressible-exception)
    |
    = help: Replace with `contextlib.suppress(ValueError)`
 
@@ -21,5 +21,3 @@ SIM105_2.py:10:1: SIM105 [*] Use `contextlib.suppress(ValueError)` instead of `t
 11 11 |     foo()
 12    |-except ValueError:
 13    |-    pass
-
-

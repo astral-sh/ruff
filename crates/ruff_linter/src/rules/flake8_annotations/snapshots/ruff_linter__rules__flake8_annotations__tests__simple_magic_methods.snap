@@ -1,11 +1,11 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_annotations/mod.rs
 ---
-simple_magic_methods.py:2:9: ANN204 [*] Missing return type annotation for special method `__str__`
+simple_magic_methods.py:2:9: ANN204 (missing-return-type-special-method) [*] Missing return type annotation for special method `__str__`
   |
 1 | class Foo:
 2 |     def __str__(self):
-  |         ^^^^^^^ ANN204
+  |         ^^^^^^^ ANN204 (missing-return-type-special-method)
 3 |         ...
   |
   = help: Add return type annotation: `str`
@@ -18,12 +18,12 @@ simple_magic_methods.py:2:9: ANN204 [*] Missing return type annotation for speci
 4 4 | 
 5 5 |     def __repr__(self):
 
-simple_magic_methods.py:5:9: ANN204 [*] Missing return type annotation for special method `__repr__`
+simple_magic_methods.py:5:9: ANN204 (missing-return-type-special-method) [*] Missing return type annotation for special method `__repr__`
   |
 3 |         ...
 4 | 
 5 |     def __repr__(self):
-  |         ^^^^^^^^ ANN204
+  |         ^^^^^^^^ ANN204 (missing-return-type-special-method)
 6 |         ...
   |
   = help: Add return type annotation: `str`
@@ -38,12 +38,12 @@ simple_magic_methods.py:5:9: ANN204 [*] Missing return type annotation for speci
 7 7 | 
 8 8 |     def __len__(self):
 
-simple_magic_methods.py:8:9: ANN204 [*] Missing return type annotation for special method `__len__`
+simple_magic_methods.py:8:9: ANN204 (missing-return-type-special-method) [*] Missing return type annotation for special method `__len__`
   |
 6 |         ...
 7 | 
 8 |     def __len__(self):
-  |         ^^^^^^^ ANN204
+  |         ^^^^^^^ ANN204 (missing-return-type-special-method)
 9 |         ...
   |
   = help: Add return type annotation: `int`
@@ -58,12 +58,12 @@ simple_magic_methods.py:8:9: ANN204 [*] Missing return type annotation for speci
 10 10 | 
 11 11 |     def __length_hint__(self):
 
-simple_magic_methods.py:11:9: ANN204 [*] Missing return type annotation for special method `__length_hint__`
+simple_magic_methods.py:11:9: ANN204 (missing-return-type-special-method) [*] Missing return type annotation for special method `__length_hint__`
    |
  9 |         ...
 10 | 
 11 |     def __length_hint__(self):
-   |         ^^^^^^^^^^^^^^^ ANN204
+   |         ^^^^^^^^^^^^^^^ ANN204 (missing-return-type-special-method)
 12 |         ...
    |
    = help: Add return type annotation: `int`
@@ -78,12 +78,12 @@ simple_magic_methods.py:11:9: ANN204 [*] Missing return type annotation for spec
 13 13 | 
 14 14 |     def __init__(self):
 
-simple_magic_methods.py:14:9: ANN204 [*] Missing return type annotation for special method `__init__`
+simple_magic_methods.py:14:9: ANN204 (missing-return-type-special-method) [*] Missing return type annotation for special method `__init__`
    |
 12 |         ...
 13 | 
 14 |     def __init__(self):
-   |         ^^^^^^^^ ANN204
+   |         ^^^^^^^^ ANN204 (missing-return-type-special-method)
 15 |         ...
    |
    = help: Add return type annotation: `None`
@@ -98,12 +98,12 @@ simple_magic_methods.py:14:9: ANN204 [*] Missing return type annotation for spec
 16 16 | 
 17 17 |     def __del__(self):
 
-simple_magic_methods.py:17:9: ANN204 [*] Missing return type annotation for special method `__del__`
+simple_magic_methods.py:17:9: ANN204 (missing-return-type-special-method) [*] Missing return type annotation for special method `__del__`
    |
 15 |         ...
 16 | 
 17 |     def __del__(self):
-   |         ^^^^^^^ ANN204
+   |         ^^^^^^^ ANN204 (missing-return-type-special-method)
 18 |         ...
    |
    = help: Add return type annotation: `None`
@@ -118,12 +118,12 @@ simple_magic_methods.py:17:9: ANN204 [*] Missing return type annotation for spec
 19 19 | 
 20 20 |     def __bool__(self):
 
-simple_magic_methods.py:20:9: ANN204 [*] Missing return type annotation for special method `__bool__`
+simple_magic_methods.py:20:9: ANN204 (missing-return-type-special-method) [*] Missing return type annotation for special method `__bool__`
    |
 18 |         ...
 19 | 
 20 |     def __bool__(self):
-   |         ^^^^^^^^ ANN204
+   |         ^^^^^^^^ ANN204 (missing-return-type-special-method)
 21 |         ...
    |
    = help: Add return type annotation: `bool`
@@ -138,12 +138,12 @@ simple_magic_methods.py:20:9: ANN204 [*] Missing return type annotation for spec
 22 22 | 
 23 23 |     def __bytes__(self):
 
-simple_magic_methods.py:23:9: ANN204 [*] Missing return type annotation for special method `__bytes__`
+simple_magic_methods.py:23:9: ANN204 (missing-return-type-special-method) [*] Missing return type annotation for special method `__bytes__`
    |
 21 |         ...
 22 | 
 23 |     def __bytes__(self):
-   |         ^^^^^^^^^ ANN204
+   |         ^^^^^^^^^ ANN204 (missing-return-type-special-method)
 24 |         ...
    |
    = help: Add return type annotation: `bytes`
@@ -158,12 +158,12 @@ simple_magic_methods.py:23:9: ANN204 [*] Missing return type annotation for spec
 25 25 | 
 26 26 |     def __format__(self, format_spec):
 
-simple_magic_methods.py:26:9: ANN204 [*] Missing return type annotation for special method `__format__`
+simple_magic_methods.py:26:9: ANN204 (missing-return-type-special-method) [*] Missing return type annotation for special method `__format__`
    |
 24 |         ...
 25 | 
 26 |     def __format__(self, format_spec):
-   |         ^^^^^^^^^^ ANN204
+   |         ^^^^^^^^^^ ANN204 (missing-return-type-special-method)
 27 |         ...
    |
    = help: Add return type annotation: `str`
@@ -178,12 +178,12 @@ simple_magic_methods.py:26:9: ANN204 [*] Missing return type annotation for spec
 28 28 | 
 29 29 |     def __contains__(self, item):
 
-simple_magic_methods.py:29:9: ANN204 [*] Missing return type annotation for special method `__contains__`
+simple_magic_methods.py:29:9: ANN204 (missing-return-type-special-method) [*] Missing return type annotation for special method `__contains__`
    |
 27 |         ...
 28 | 
 29 |     def __contains__(self, item):
-   |         ^^^^^^^^^^^^ ANN204
+   |         ^^^^^^^^^^^^ ANN204 (missing-return-type-special-method)
 30 |         ...
    |
    = help: Add return type annotation: `bool`
@@ -198,12 +198,12 @@ simple_magic_methods.py:29:9: ANN204 [*] Missing return type annotation for spec
 31 31 | 
 32 32 |     def __complex__(self):
 
-simple_magic_methods.py:32:9: ANN204 [*] Missing return type annotation for special method `__complex__`
+simple_magic_methods.py:32:9: ANN204 (missing-return-type-special-method) [*] Missing return type annotation for special method `__complex__`
    |
 30 |         ...
 31 | 
 32 |     def __complex__(self):
-   |         ^^^^^^^^^^^ ANN204
+   |         ^^^^^^^^^^^ ANN204 (missing-return-type-special-method)
 33 |         ...
    |
    = help: Add return type annotation: `complex`
@@ -218,12 +218,12 @@ simple_magic_methods.py:32:9: ANN204 [*] Missing return type annotation for spec
 34 34 | 
 35 35 |     def __int__(self):
 
-simple_magic_methods.py:35:9: ANN204 [*] Missing return type annotation for special method `__int__`
+simple_magic_methods.py:35:9: ANN204 (missing-return-type-special-method) [*] Missing return type annotation for special method `__int__`
    |
 33 |         ...
 34 | 
 35 |     def __int__(self):
-   |         ^^^^^^^ ANN204
+   |         ^^^^^^^ ANN204 (missing-return-type-special-method)
 36 |         ...
    |
    = help: Add return type annotation: `int`
@@ -238,12 +238,12 @@ simple_magic_methods.py:35:9: ANN204 [*] Missing return type annotation for spec
 37 37 | 
 38 38 |     def __float__(self):
 
-simple_magic_methods.py:38:9: ANN204 [*] Missing return type annotation for special method `__float__`
+simple_magic_methods.py:38:9: ANN204 (missing-return-type-special-method) [*] Missing return type annotation for special method `__float__`
    |
 36 |         ...
 37 | 
 38 |     def __float__(self):
-   |         ^^^^^^^^^ ANN204
+   |         ^^^^^^^^^ ANN204 (missing-return-type-special-method)
 39 |         ...
    |
    = help: Add return type annotation: `float`
@@ -258,12 +258,12 @@ simple_magic_methods.py:38:9: ANN204 [*] Missing return type annotation for spec
 40 40 | 
 41 41 |     def __index__(self):
 
-simple_magic_methods.py:41:9: ANN204 [*] Missing return type annotation for special method `__index__`
+simple_magic_methods.py:41:9: ANN204 (missing-return-type-special-method) [*] Missing return type annotation for special method `__index__`
    |
 39 |         ...
 40 | 
 41 |     def __index__(self):
-   |         ^^^^^^^^^ ANN204
+   |         ^^^^^^^^^ ANN204 (missing-return-type-special-method)
 42 |         ...
    |
    = help: Add return type annotation: `int`
@@ -275,5 +275,3 @@ simple_magic_methods.py:41:9: ANN204 [*] Missing return type annotation for spec
 41    |-    def __index__(self):
    41 |+    def __index__(self) -> int:
 42 42 |         ...
-
-

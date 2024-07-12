@@ -1,10 +1,10 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_simplify/mod.rs
 ---
-SIM208.py:1:4: SIM208 [*] Use `a` instead of `not (not a)`
+SIM208.py:1:4: SIM208 (double-negation) [*] Use `a` instead of `not (not a)`
   |
 1 | if not (not a):  # SIM208
-  |    ^^^^^^^^^^^ SIM208
+  |    ^^^^^^^^^^^ SIM208 (double-negation)
 2 |     pass
   |
   = help: Replace with `a`
@@ -16,12 +16,12 @@ SIM208.py:1:4: SIM208 [*] Use `a` instead of `not (not a)`
 3 3 | 
 4 4 | if not (not (a == b)):  # SIM208
 
-SIM208.py:4:4: SIM208 [*] Use `a == b` instead of `not (not a == b)`
+SIM208.py:4:4: SIM208 (double-negation) [*] Use `a == b` instead of `not (not a == b)`
   |
 2 |     pass
 3 | 
 4 | if not (not (a == b)):  # SIM208
-  |    ^^^^^^^^^^^^^^^^^^ SIM208
+  |    ^^^^^^^^^^^^^^^^^^ SIM208 (double-negation)
 5 |     pass
   |
   = help: Replace with `a == b`
@@ -36,12 +36,12 @@ SIM208.py:4:4: SIM208 [*] Use `a == b` instead of `not (not a == b)`
 6 6 | 
 7 7 | if not a:  # OK
 
-SIM208.py:16:5: SIM208 [*] Use `b` instead of `not (not b)`
+SIM208.py:16:5: SIM208 (double-negation) [*] Use `b` instead of `not (not b)`
    |
 14 |     pass
 15 | 
 16 | a = not not b  # SIM208
-   |     ^^^^^^^^^ SIM208
+   |     ^^^^^^^^^ SIM208 (double-negation)
 17 | 
 18 | f(not not a)  # SIM208
    |
@@ -57,12 +57,12 @@ SIM208.py:16:5: SIM208 [*] Use `b` instead of `not (not b)`
 18 18 | f(not not a)  # SIM208
 19 19 | 
 
-SIM208.py:18:3: SIM208 [*] Use `a` instead of `not (not a)`
+SIM208.py:18:3: SIM208 (double-negation) [*] Use `a` instead of `not (not a)`
    |
 16 | a = not not b  # SIM208
 17 | 
 18 | f(not not a)  # SIM208
-   |   ^^^^^^^^^ SIM208
+   |   ^^^^^^^^^ SIM208 (double-negation)
 19 | 
 20 | if 1 + (not (not a)):  # SIM208
    |
@@ -78,12 +78,12 @@ SIM208.py:18:3: SIM208 [*] Use `a` instead of `not (not a)`
 20 20 | if 1 + (not (not a)):  # SIM208
 21 21 |     pass
 
-SIM208.py:20:9: SIM208 [*] Use `a` instead of `not (not a)`
+SIM208.py:20:9: SIM208 (double-negation) [*] Use `a` instead of `not (not a)`
    |
 18 | f(not not a)  # SIM208
 19 | 
 20 | if 1 + (not (not a)):  # SIM208
-   |         ^^^^^^^^^^^ SIM208
+   |         ^^^^^^^^^^^ SIM208 (double-negation)
 21 |     pass
    |
    = help: Replace with `a`
@@ -95,5 +95,3 @@ SIM208.py:20:9: SIM208 [*] Use `a` instead of `not (not a)`
 20    |-if 1 + (not (not a)):  # SIM208
    20 |+if 1 + (bool(a)):  # SIM208
 21 21 |     pass
-
-

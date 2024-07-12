@@ -1,7 +1,7 @@
 ---
 source: crates/ruff_linter/src/rules/pydocstyle/mod.rs
 ---
-D.py:281:5: D209 [*] Multi-line docstring closing quotes should be on a separate line
+D.py:281:5: D209 (new-line-after-last-paragraph) [*] Multi-line docstring closing quotes should be on a separate line
     |
 279 |   @expect('D213: Multi-line docstring summary should start at the second line')
 280 |   def asdfljdf24():
@@ -9,7 +9,7 @@ D.py:281:5: D209 [*] Multi-line docstring closing quotes should be on a separate
     |  _____^
 282 | | 
 283 | |     Description."""
-    | |___________________^ D209
+    | |___________________^ D209 (new-line-after-last-paragraph)
     |
     = help: Move closing quotes to new line
 
@@ -24,7 +24,7 @@ D.py:281:5: D209 [*] Multi-line docstring closing quotes should be on a separate
 285 286 | 
 286 287 | @expect('D210: No whitespaces allowed surrounding docstring text')
 
-D.py:588:5: D209 [*] Multi-line docstring closing quotes should be on a separate line
+D.py:588:5: D209 (new-line-after-last-paragraph) [*] Multi-line docstring closing quotes should be on a separate line
     |
 586 |   @expect('D213: Multi-line docstring summary should start at the second line')
 587 |   def asdfljdjgf24():
@@ -32,7 +32,7 @@ D.py:588:5: D209 [*] Multi-line docstring closing quotes should be on a separate
     |  _____^
 589 | | 
 590 | |     Description.  """
-    | |_____________________^ D209
+    | |_____________________^ D209 (new-line-after-last-paragraph)
     |
     = help: Move closing quotes to new line
 
@@ -46,5 +46,3 @@ D.py:588:5: D209 [*] Multi-line docstring closing quotes should be on a separate
 591 592 | 
 592 593 | 
 593 594 | @expect('D200: One-line docstring should fit on one line with quotes '
-
-

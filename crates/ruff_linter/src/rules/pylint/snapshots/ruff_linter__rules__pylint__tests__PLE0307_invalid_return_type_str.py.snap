@@ -1,43 +1,43 @@
 ---
 source: crates/ruff_linter/src/rules/pylint/mod.rs
 ---
-invalid_return_type_str.py:6:16: PLE0307 `__str__` does not return `str`
+invalid_return_type_str.py:6:16: PLE0307 (invalid-str-return-type) `__str__` does not return `str`
   |
 4 | class Float:
 5 |     def __str__(self):
 6 |         return 3.05
-  |                ^^^^ PLE0307
+  |                ^^^^ PLE0307 (invalid-str-return-type)
   |
 
-invalid_return_type_str.py:11:16: PLE0307 `__str__` does not return `str`
+invalid_return_type_str.py:11:16: PLE0307 (invalid-str-return-type) `__str__` does not return `str`
    |
  9 | class Int:
 10 |     def __str__(self):
 11 |         return 1
-   |                ^ PLE0307
+   |                ^ PLE0307 (invalid-str-return-type)
    |
 
-invalid_return_type_str.py:16:16: PLE0307 `__str__` does not return `str`
+invalid_return_type_str.py:16:16: PLE0307 (invalid-str-return-type) `__str__` does not return `str`
    |
 14 | class Int2:
 15 |     def __str__(self):
 16 |         return 0
-   |                ^ PLE0307
+   |                ^ PLE0307 (invalid-str-return-type)
    |
 
-invalid_return_type_str.py:21:16: PLE0307 `__str__` does not return `str`
+invalid_return_type_str.py:21:16: PLE0307 (invalid-str-return-type) `__str__` does not return `str`
    |
 19 | class Bool:
 20 |     def __str__(self):
 21 |         return False
-   |                ^^^^^ PLE0307
+   |                ^^^^^ PLE0307 (invalid-str-return-type)
    |
 
-invalid_return_type_str.py:58:9: PLE0307 `__str__` does not return `str`
+invalid_return_type_str.py:58:9: PLE0307 (invalid-str-return-type) `__str__` does not return `str`
    |
 57 | class Str5:
 58 |     def __str__(self):  # PLE0307 (returns None if x <= 0)
-   |         ^^^^^^^ PLE0307
+   |         ^^^^^^^ PLE0307 (invalid-str-return-type)
 59 |         if x > 0:
 60 |             raise RuntimeError("__str__ not allowed")
    |

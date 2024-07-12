@@ -1,12 +1,12 @@
 ---
 source: crates/ruff_linter/src/rules/numpy/mod.rs
 ---
-NPY201_3.py:4:5: NPY201 [*] `np.DTypePromotionError` will be removed in NumPy 2.0. Use `numpy.exceptions.DTypePromotionError` instead.
+NPY201_3.py:4:5: NPY201 (numpy2-deprecation) [*] `np.DTypePromotionError` will be removed in NumPy 2.0. Use `numpy.exceptions.DTypePromotionError` instead.
   |
 2 |     import numpy as np
 3 | 
 4 |     np.DTypePromotionError
-  |     ^^^^^^^^^^^^^^^^^^^^^^ NPY201
+  |     ^^^^^^^^^^^^^^^^^^^^^^ NPY201 (numpy2-deprecation)
 5 | 
 6 |     np.ModuleDeprecationWarning
   |
@@ -23,12 +23,12 @@ NPY201_3.py:4:5: NPY201 [*] `np.DTypePromotionError` will be removed in NumPy 2.
 6 7 |     np.ModuleDeprecationWarning
 7 8 | 
 
-NPY201_3.py:6:5: NPY201 [*] `np.ModuleDeprecationWarning` will be removed in NumPy 2.0. Use `numpy.exceptions.ModuleDeprecationWarning` instead.
+NPY201_3.py:6:5: NPY201 (numpy2-deprecation) [*] `np.ModuleDeprecationWarning` will be removed in NumPy 2.0. Use `numpy.exceptions.ModuleDeprecationWarning` instead.
   |
 4 |     np.DTypePromotionError
 5 | 
 6 |     np.ModuleDeprecationWarning
-  |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^ NPY201
+  |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^ NPY201 (numpy2-deprecation)
 7 | 
 8 |     np.RankWarning
   |
@@ -47,12 +47,12 @@ NPY201_3.py:6:5: NPY201 [*] `np.ModuleDeprecationWarning` will be removed in Num
 8 9 |     np.RankWarning
 9 10 | 
 
-NPY201_3.py:8:5: NPY201 [*] `np.RankWarning` will be removed in NumPy 2.0. Use `numpy.exceptions.RankWarning` on NumPy 2.0, or ignore this warning on earlier versions.
+NPY201_3.py:8:5: NPY201 (numpy2-deprecation) [*] `np.RankWarning` will be removed in NumPy 2.0. Use `numpy.exceptions.RankWarning` on NumPy 2.0, or ignore this warning on earlier versions.
    |
  6 |     np.ModuleDeprecationWarning
  7 | 
  8 |     np.RankWarning
-   |     ^^^^^^^^^^^^^^ NPY201
+   |     ^^^^^^^^^^^^^^ NPY201 (numpy2-deprecation)
  9 | 
 10 |     np.TooHardError
    |
@@ -73,12 +73,12 @@ NPY201_3.py:8:5: NPY201 [*] `np.RankWarning` will be removed in NumPy 2.0. Use `
 10 11 |     np.TooHardError
 11 12 | 
 
-NPY201_3.py:10:5: NPY201 [*] `np.TooHardError` will be removed in NumPy 2.0. Use `numpy.exceptions.TooHardError` instead.
+NPY201_3.py:10:5: NPY201 (numpy2-deprecation) [*] `np.TooHardError` will be removed in NumPy 2.0. Use `numpy.exceptions.TooHardError` instead.
    |
  8 |     np.RankWarning
  9 | 
 10 |     np.TooHardError
-   |     ^^^^^^^^^^^^^^^ NPY201
+   |     ^^^^^^^^^^^^^^^ NPY201 (numpy2-deprecation)
 11 | 
 12 |     np.VisibleDeprecationWarning
    |
@@ -99,12 +99,12 @@ NPY201_3.py:10:5: NPY201 [*] `np.TooHardError` will be removed in NumPy 2.0. Use
 12 13 |     np.VisibleDeprecationWarning
 13 14 | 
 
-NPY201_3.py:12:5: NPY201 [*] `np.VisibleDeprecationWarning` will be removed in NumPy 2.0. Use `numpy.exceptions.VisibleDeprecationWarning` instead.
+NPY201_3.py:12:5: NPY201 (numpy2-deprecation) [*] `np.VisibleDeprecationWarning` will be removed in NumPy 2.0. Use `numpy.exceptions.VisibleDeprecationWarning` instead.
    |
 10 |     np.TooHardError
 11 | 
 12 |     np.VisibleDeprecationWarning
-   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^ NPY201
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^ NPY201 (numpy2-deprecation)
 13 | 
 14 |     np.chararray
    |
@@ -125,12 +125,12 @@ NPY201_3.py:12:5: NPY201 [*] `np.VisibleDeprecationWarning` will be removed in N
 14 15 |     np.chararray
 15 16 | 
 
-NPY201_3.py:14:5: NPY201 [*] `np.chararray` will be removed in NumPy 2.0. Use `numpy.char.chararray` instead.
+NPY201_3.py:14:5: NPY201 (numpy2-deprecation) [*] `np.chararray` will be removed in NumPy 2.0. Use `numpy.char.chararray` instead.
    |
 12 |     np.VisibleDeprecationWarning
 13 | 
 14 |     np.chararray
-   |     ^^^^^^^^^^^^ NPY201
+   |     ^^^^^^^^^^^^ NPY201 (numpy2-deprecation)
 15 | 
 16 |     np.format_parser
    |
@@ -150,12 +150,12 @@ NPY201_3.py:14:5: NPY201 [*] `np.chararray` will be removed in NumPy 2.0. Use `n
 15 16 | 
 16 17 |     np.format_parser
 
-NPY201_3.py:16:5: NPY201 [*] `np.format_parser` will be removed in NumPy 2.0. Use `numpy.rec.format_parser` instead.
+NPY201_3.py:16:5: NPY201 (numpy2-deprecation) [*] `np.format_parser` will be removed in NumPy 2.0. Use `numpy.rec.format_parser` instead.
    |
 14 |     np.chararray
 15 | 
 16 |     np.format_parser
-   |     ^^^^^^^^^^^^^^^^ NPY201
+   |     ^^^^^^^^^^^^^^^^ NPY201 (numpy2-deprecation)
    |
    = help: Replace with `numpy.rec.format_parser`
 

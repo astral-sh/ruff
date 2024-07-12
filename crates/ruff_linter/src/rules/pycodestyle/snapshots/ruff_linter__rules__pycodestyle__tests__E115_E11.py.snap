@@ -31,62 +31,62 @@ E11.py:14:1: SyntaxError: Expected a statement
 16 | create_date = False
    |
 
-E11.py:30:1: E115 Expected an indented block (comment)
+E11.py:30:1: E115 (no-indented-block-comment) Expected an indented block (comment)
    |
 28 | def start(self):
 29 |     if True:
 30 | #       try:
-   |  E115
+   |  E115 (no-indented-block-comment)
 31 | #           self.master.start()
 32 | #       except MasterExit:
    |
 
-E11.py:31:1: E115 Expected an indented block (comment)
+E11.py:31:1: E115 (no-indented-block-comment) Expected an indented block (comment)
    |
 29 |     if True:
 30 | #       try:
 31 | #           self.master.start()
-   |  E115
+   |  E115 (no-indented-block-comment)
 32 | #       except MasterExit:
 33 | #           self.shutdown()
    |
 
-E11.py:32:1: E115 Expected an indented block (comment)
+E11.py:32:1: E115 (no-indented-block-comment) Expected an indented block (comment)
    |
 30 | #       try:
 31 | #           self.master.start()
 32 | #       except MasterExit:
-   |  E115
+   |  E115 (no-indented-block-comment)
 33 | #           self.shutdown()
 34 | #       finally:
    |
 
-E11.py:33:1: E115 Expected an indented block (comment)
+E11.py:33:1: E115 (no-indented-block-comment) Expected an indented block (comment)
    |
 31 | #           self.master.start()
 32 | #       except MasterExit:
 33 | #           self.shutdown()
-   |  E115
+   |  E115 (no-indented-block-comment)
 34 | #       finally:
 35 | #           sys.exit()
    |
 
-E11.py:34:1: E115 Expected an indented block (comment)
+E11.py:34:1: E115 (no-indented-block-comment) Expected an indented block (comment)
    |
 32 | #       except MasterExit:
 33 | #           self.shutdown()
 34 | #       finally:
-   |  E115
+   |  E115 (no-indented-block-comment)
 35 | #           sys.exit()
 36 |         self.master.start()
    |
 
-E11.py:35:1: E115 Expected an indented block (comment)
+E11.py:35:1: E115 (no-indented-block-comment) Expected an indented block (comment)
    |
 33 | #           self.shutdown()
 34 | #       finally:
 35 | #           sys.exit()
-   |  E115
+   |  E115 (no-indented-block-comment)
 36 |         self.master.start()
 37 | #: E117
    |

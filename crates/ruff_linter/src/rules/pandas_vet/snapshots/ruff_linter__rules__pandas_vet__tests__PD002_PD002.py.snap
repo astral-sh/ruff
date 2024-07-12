@@ -1,12 +1,12 @@
 ---
 source: crates/ruff_linter/src/rules/pandas_vet/mod.rs
 ---
-PD002.py:5:23: PD002 [*] `inplace=True` should be avoided; it has inconsistent behavior
+PD002.py:5:23: PD002 (pandas-use-of-inplace-argument) [*] `inplace=True` should be avoided; it has inconsistent behavior
   |
 3 | x = pd.DataFrame()
 4 | 
 5 | x.drop(["a"], axis=1, inplace=True)
-  |                       ^^^^^^^^^^^^ PD002
+  |                       ^^^^^^^^^^^^ PD002 (pandas-use-of-inplace-argument)
 6 | 
 7 | x.y.drop(["a"], axis=1, inplace=True)
   |
@@ -22,12 +22,12 @@ PD002.py:5:23: PD002 [*] `inplace=True` should be avoided; it has inconsistent b
 7 7 | x.y.drop(["a"], axis=1, inplace=True)
 8 8 | 
 
-PD002.py:7:25: PD002 [*] `inplace=True` should be avoided; it has inconsistent behavior
+PD002.py:7:25: PD002 (pandas-use-of-inplace-argument) [*] `inplace=True` should be avoided; it has inconsistent behavior
   |
 5 | x.drop(["a"], axis=1, inplace=True)
 6 | 
 7 | x.y.drop(["a"], axis=1, inplace=True)
-  |                         ^^^^^^^^^^^^ PD002
+  |                         ^^^^^^^^^^^^ PD002 (pandas-use-of-inplace-argument)
 8 | 
 9 | x["y"].drop(["a"], axis=1, inplace=True)
   |
@@ -43,12 +43,12 @@ PD002.py:7:25: PD002 [*] `inplace=True` should be avoided; it has inconsistent b
 9 9 | x["y"].drop(["a"], axis=1, inplace=True)
 10 10 | 
 
-PD002.py:9:28: PD002 [*] `inplace=True` should be avoided; it has inconsistent behavior
+PD002.py:9:28: PD002 (pandas-use-of-inplace-argument) [*] `inplace=True` should be avoided; it has inconsistent behavior
    |
  7 | x.y.drop(["a"], axis=1, inplace=True)
  8 | 
  9 | x["y"].drop(["a"], axis=1, inplace=True)
-   |                            ^^^^^^^^^^^^ PD002
+   |                            ^^^^^^^^^^^^ PD002 (pandas-use-of-inplace-argument)
 10 | 
 11 | x.drop(
    |
@@ -64,11 +64,11 @@ PD002.py:9:28: PD002 [*] `inplace=True` should be avoided; it has inconsistent b
 11 11 | x.drop(
 12 12 |     inplace=True,
 
-PD002.py:12:5: PD002 [*] `inplace=True` should be avoided; it has inconsistent behavior
+PD002.py:12:5: PD002 (pandas-use-of-inplace-argument) [*] `inplace=True` should be avoided; it has inconsistent behavior
    |
 11 | x.drop(
 12 |     inplace=True,
-   |     ^^^^^^^^^^^^ PD002
+   |     ^^^^^^^^^^^^ PD002 (pandas-use-of-inplace-argument)
 13 |     columns=["a"],
 14 |     axis=1,
    |
@@ -85,12 +85,12 @@ PD002.py:12:5: PD002 [*] `inplace=True` should be avoided; it has inconsistent b
 14 13 |     axis=1,
 15 14 | )
 
-PD002.py:19:9: PD002 [*] `inplace=True` should be avoided; it has inconsistent behavior
+PD002.py:19:9: PD002 (pandas-use-of-inplace-argument) [*] `inplace=True` should be avoided; it has inconsistent behavior
    |
 17 | if True:
 18 |     x.drop(
 19 |         inplace=True,
-   |         ^^^^^^^^^^^^ PD002
+   |         ^^^^^^^^^^^^ PD002 (pandas-use-of-inplace-argument)
 20 |         columns=["a"],
 21 |         axis=1,
    |
@@ -107,12 +107,12 @@ PD002.py:19:9: PD002 [*] `inplace=True` should be avoided; it has inconsistent b
 21 20 |         axis=1,
 22 21 |     )
 
-PD002.py:24:33: PD002 [*] `inplace=True` should be avoided; it has inconsistent behavior
+PD002.py:24:33: PD002 (pandas-use-of-inplace-argument) [*] `inplace=True` should be avoided; it has inconsistent behavior
    |
 22 |     )
 23 | 
 24 | x.drop(["a"], axis=1, **kwargs, inplace=True)
-   |                                 ^^^^^^^^^^^^ PD002
+   |                                 ^^^^^^^^^^^^ PD002 (pandas-use-of-inplace-argument)
 25 | x.drop(["a"], axis=1, inplace=True, **kwargs)
 26 | f(x.drop(["a"], axis=1, inplace=True))
    |
@@ -128,42 +128,42 @@ PD002.py:24:33: PD002 [*] `inplace=True` should be avoided; it has inconsistent 
 26 26 | f(x.drop(["a"], axis=1, inplace=True))
 27 27 | 
 
-PD002.py:25:23: PD002 `inplace=True` should be avoided; it has inconsistent behavior
+PD002.py:25:23: PD002 (pandas-use-of-inplace-argument) `inplace=True` should be avoided; it has inconsistent behavior
    |
 24 | x.drop(["a"], axis=1, **kwargs, inplace=True)
 25 | x.drop(["a"], axis=1, inplace=True, **kwargs)
-   |                       ^^^^^^^^^^^^ PD002
+   |                       ^^^^^^^^^^^^ PD002 (pandas-use-of-inplace-argument)
 26 | f(x.drop(["a"], axis=1, inplace=True))
    |
    = help: Assign to variable; remove `inplace` arg
 
-PD002.py:26:25: PD002 `inplace=True` should be avoided; it has inconsistent behavior
+PD002.py:26:25: PD002 (pandas-use-of-inplace-argument) `inplace=True` should be avoided; it has inconsistent behavior
    |
 24 | x.drop(["a"], axis=1, **kwargs, inplace=True)
 25 | x.drop(["a"], axis=1, inplace=True, **kwargs)
 26 | f(x.drop(["a"], axis=1, inplace=True))
-   |                         ^^^^^^^^^^^^ PD002
+   |                         ^^^^^^^^^^^^ PD002 (pandas-use-of-inplace-argument)
 27 | 
 28 | x.apply(lambda x: x.sort_values("a", inplace=True))
    |
    = help: Assign to variable; remove `inplace` arg
 
-PD002.py:28:38: PD002 `inplace=True` should be avoided; it has inconsistent behavior
+PD002.py:28:38: PD002 (pandas-use-of-inplace-argument) `inplace=True` should be avoided; it has inconsistent behavior
    |
 26 | f(x.drop(["a"], axis=1, inplace=True))
 27 | 
 28 | x.apply(lambda x: x.sort_values("a", inplace=True))
-   |                                      ^^^^^^^^^^^^ PD002
+   |                                      ^^^^^^^^^^^^ PD002 (pandas-use-of-inplace-argument)
 29 | import torch
    |
    = help: Assign to variable; remove `inplace` arg
 
-PD002.py:33:24: PD002 [*] `inplace=True` should be avoided; it has inconsistent behavior
+PD002.py:33:24: PD002 (pandas-use-of-inplace-argument) [*] `inplace=True` should be avoided; it has inconsistent behavior
    |
 31 | torch.m.ReLU(inplace=True)  # safe because this isn't a pandas call
 32 | 
 33 | (x.drop(["a"], axis=1, inplace=True))
-   |                        ^^^^^^^^^^^^ PD002
+   |                        ^^^^^^^^^^^^ PD002 (pandas-use-of-inplace-argument)
 34 | 
 35 | # This method doesn't take exist in Pandas, so ignore it.
    |
@@ -178,5 +178,3 @@ PD002.py:33:24: PD002 [*] `inplace=True` should be avoided; it has inconsistent 
 34 34 | 
 35 35 | # This method doesn't take exist in Pandas, so ignore it.
 36 36 | x.rotate_z(45, inplace=True)
-
-

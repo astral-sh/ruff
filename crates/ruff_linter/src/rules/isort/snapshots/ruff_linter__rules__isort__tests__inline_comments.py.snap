@@ -1,7 +1,7 @@
 ---
 source: crates/ruff_linter/src/rules/isort/mod.rs
 ---
-inline_comments.py:1:1: I001 [*] Import block is un-sorted or un-formatted
+inline_comments.py:1:1: I001 (unsorted-imports) [*] Import block is un-sorted or un-formatted
    |
  1 | / from a.prometheus.metrics import (  # type:ignore[attr-defined]
  2 | |     TERMINAL_CURRENTLY_RUNNING_TOTAL,
@@ -36,5 +36,3 @@ inline_comments.py:1:1: I001 [*] Import block is un-sorted or un-formatted
   11 |+    OTHER_RUNNING_TOTAL,
   12 |+    TERMINAL_CURRENTLY_RUNNING_TOTAL,
   13 |+)
-
-

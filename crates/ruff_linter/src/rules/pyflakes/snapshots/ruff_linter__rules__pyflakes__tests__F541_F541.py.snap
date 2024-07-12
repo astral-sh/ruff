@@ -1,11 +1,11 @@
 ---
 source: crates/ruff_linter/src/rules/pyflakes/mod.rs
 ---
-F541.py:6:5: F541 [*] f-string without any placeholders
+F541.py:6:5: F541 (f-string-missing-placeholders) [*] f-string without any placeholders
   |
 5 | # Errors
 6 | c = f"def"
-  |     ^^^^^^ F541
+  |     ^^^^^^ F541 (f-string-missing-placeholders)
 7 | d = f"def" + "ghi"
 8 | e = (
   |
@@ -21,12 +21,12 @@ F541.py:6:5: F541 [*] f-string without any placeholders
 8 8 | e = (
 9 9 |     f"def" +
 
-F541.py:7:5: F541 [*] f-string without any placeholders
+F541.py:7:5: F541 (f-string-missing-placeholders) [*] f-string without any placeholders
   |
 5 | # Errors
 6 | c = f"def"
 7 | d = f"def" + "ghi"
-  |     ^^^^^^ F541
+  |     ^^^^^^ F541 (f-string-missing-placeholders)
 8 | e = (
 9 |     f"def" +
   |
@@ -42,12 +42,12 @@ F541.py:7:5: F541 [*] f-string without any placeholders
 9 9 |     f"def" +
 10 10 |     "ghi"
 
-F541.py:9:5: F541 [*] f-string without any placeholders
+F541.py:9:5: F541 (f-string-missing-placeholders) [*] f-string without any placeholders
    |
  7 | d = f"def" + "ghi"
  8 | e = (
  9 |     f"def" +
-   |     ^^^^^^ F541
+   |     ^^^^^^ F541 (f-string-missing-placeholders)
 10 |     "ghi"
 11 | )
    |
@@ -63,12 +63,12 @@ F541.py:9:5: F541 [*] f-string without any placeholders
 11 11 | )
 12 12 | f = (
 
-F541.py:13:5: F541 [*] f-string without any placeholders
+F541.py:13:5: F541 (f-string-missing-placeholders) [*] f-string without any placeholders
    |
 11 | )
 12 | f = (
 13 |     f"a"
-   |     ^^^^ F541
+   |     ^^^^ F541 (f-string-missing-placeholders)
 14 |     F"b"
 15 |     "c"
    |
@@ -84,12 +84,12 @@ F541.py:13:5: F541 [*] f-string without any placeholders
 15 15 |     "c"
 16 16 |     rf"d"
 
-F541.py:14:5: F541 [*] f-string without any placeholders
+F541.py:14:5: F541 (f-string-missing-placeholders) [*] f-string without any placeholders
    |
 12 | f = (
 13 |     f"a"
 14 |     F"b"
-   |     ^^^^ F541
+   |     ^^^^ F541 (f-string-missing-placeholders)
 15 |     "c"
 16 |     rf"d"
    |
@@ -105,12 +105,12 @@ F541.py:14:5: F541 [*] f-string without any placeholders
 16 16 |     rf"d"
 17 17 |     fr"e"
 
-F541.py:16:5: F541 [*] f-string without any placeholders
+F541.py:16:5: F541 (f-string-missing-placeholders) [*] f-string without any placeholders
    |
 14 |     F"b"
 15 |     "c"
 16 |     rf"d"
-   |     ^^^^^ F541
+   |     ^^^^^ F541 (f-string-missing-placeholders)
 17 |     fr"e"
 18 | )
    |
@@ -126,12 +126,12 @@ F541.py:16:5: F541 [*] f-string without any placeholders
 18 18 | )
 19 19 | g = f""
 
-F541.py:17:5: F541 [*] f-string without any placeholders
+F541.py:17:5: F541 (f-string-missing-placeholders) [*] f-string without any placeholders
    |
 15 |     "c"
 16 |     rf"d"
 17 |     fr"e"
-   |     ^^^^^ F541
+   |     ^^^^^ F541 (f-string-missing-placeholders)
 18 | )
 19 | g = f""
    |
@@ -147,12 +147,12 @@ F541.py:17:5: F541 [*] f-string without any placeholders
 19 19 | g = f""
 20 20 | 
 
-F541.py:19:5: F541 [*] f-string without any placeholders
+F541.py:19:5: F541 (f-string-missing-placeholders) [*] f-string without any placeholders
    |
 17 |     fr"e"
 18 | )
 19 | g = f""
-   |     ^^^ F541
+   |     ^^^ F541 (f-string-missing-placeholders)
 20 | 
 21 | # OK
    |
@@ -168,11 +168,11 @@ F541.py:19:5: F541 [*] f-string without any placeholders
 21 21 | # OK
 22 22 | g = f"ghi{123:{45}}"
 
-F541.py:25:13: F541 [*] f-string without any placeholders
+F541.py:25:13: F541 (f-string-missing-placeholders) [*] f-string without any placeholders
    |
 24 | # Error
 25 | h = "x" "y" f"z"
-   |             ^^^^ F541
+   |             ^^^^ F541 (f-string-missing-placeholders)
 26 | 
 27 | v = 23.234234
    |
@@ -188,11 +188,11 @@ F541.py:25:13: F541 [*] f-string without any placeholders
 27 27 | v = 23.234234
 28 28 | 
 
-F541.py:34:7: F541 [*] f-string without any placeholders
+F541.py:34:7: F541 (f-string-missing-placeholders) [*] f-string without any placeholders
    |
 33 | # Errors
 34 | f"{v:{f'0.2f'}}"
-   |       ^^^^^^^ F541
+   |       ^^^^^^^ F541 (f-string-missing-placeholders)
 35 | f"{f''}"
 36 | f"{{test}}"
    |
@@ -208,12 +208,12 @@ F541.py:34:7: F541 [*] f-string without any placeholders
 36 36 | f"{{test}}"
 37 37 | f'{{ 40 }}'
 
-F541.py:35:4: F541 [*] f-string without any placeholders
+F541.py:35:4: F541 (f-string-missing-placeholders) [*] f-string without any placeholders
    |
 33 | # Errors
 34 | f"{v:{f'0.2f'}}"
 35 | f"{f''}"
-   |    ^^^ F541
+   |    ^^^ F541 (f-string-missing-placeholders)
 36 | f"{{test}}"
 37 | f'{{ 40 }}'
    |
@@ -229,12 +229,12 @@ F541.py:35:4: F541 [*] f-string without any placeholders
 37 37 | f'{{ 40 }}'
 38 38 | f"{{a {{x}}"
 
-F541.py:36:1: F541 [*] f-string without any placeholders
+F541.py:36:1: F541 (f-string-missing-placeholders) [*] f-string without any placeholders
    |
 34 | f"{v:{f'0.2f'}}"
 35 | f"{f''}"
 36 | f"{{test}}"
-   | ^^^^^^^^^^^ F541
+   | ^^^^^^^^^^^ F541 (f-string-missing-placeholders)
 37 | f'{{ 40 }}'
 38 | f"{{a {{x}}"
    |
@@ -250,12 +250,12 @@ F541.py:36:1: F541 [*] f-string without any placeholders
 38 38 | f"{{a {{x}}"
 39 39 | f"{{{{x}}}}"
 
-F541.py:37:1: F541 [*] f-string without any placeholders
+F541.py:37:1: F541 (f-string-missing-placeholders) [*] f-string without any placeholders
    |
 35 | f"{f''}"
 36 | f"{{test}}"
 37 | f'{{ 40 }}'
-   | ^^^^^^^^^^^ F541
+   | ^^^^^^^^^^^ F541 (f-string-missing-placeholders)
 38 | f"{{a {{x}}"
 39 | f"{{{{x}}}}"
    |
@@ -271,12 +271,12 @@ F541.py:37:1: F541 [*] f-string without any placeholders
 39 39 | f"{{{{x}}}}"
 40 40 | ""f""
 
-F541.py:38:1: F541 [*] f-string without any placeholders
+F541.py:38:1: F541 (f-string-missing-placeholders) [*] f-string without any placeholders
    |
 36 | f"{{test}}"
 37 | f'{{ 40 }}'
 38 | f"{{a {{x}}"
-   | ^^^^^^^^^^^^ F541
+   | ^^^^^^^^^^^^ F541 (f-string-missing-placeholders)
 39 | f"{{{{x}}}}"
 40 | ""f""
    |
@@ -292,12 +292,12 @@ F541.py:38:1: F541 [*] f-string without any placeholders
 40 40 | ""f""
 41 41 | ''f""
 
-F541.py:39:1: F541 [*] f-string without any placeholders
+F541.py:39:1: F541 (f-string-missing-placeholders) [*] f-string without any placeholders
    |
 37 | f'{{ 40 }}'
 38 | f"{{a {{x}}"
 39 | f"{{{{x}}}}"
-   | ^^^^^^^^^^^^ F541
+   | ^^^^^^^^^^^^ F541 (f-string-missing-placeholders)
 40 | ""f""
 41 | ''f""
    |
@@ -313,12 +313,12 @@ F541.py:39:1: F541 [*] f-string without any placeholders
 41 41 | ''f""
 42 42 | (""f""r"")
 
-F541.py:40:3: F541 [*] f-string without any placeholders
+F541.py:40:3: F541 (f-string-missing-placeholders) [*] f-string without any placeholders
    |
 38 | f"{{a {{x}}"
 39 | f"{{{{x}}}}"
 40 | ""f""
-   |   ^^^ F541
+   |   ^^^ F541 (f-string-missing-placeholders)
 41 | ''f""
 42 | (""f""r"")
    |
@@ -334,12 +334,12 @@ F541.py:40:3: F541 [*] f-string without any placeholders
 42 42 | (""f""r"")
 43 43 | f"{v:{f"0.2f"}}"
 
-F541.py:41:3: F541 [*] f-string without any placeholders
+F541.py:41:3: F541 (f-string-missing-placeholders) [*] f-string without any placeholders
    |
 39 | f"{{{{x}}}}"
 40 | ""f""
 41 | ''f""
-   |   ^^^ F541
+   |   ^^^ F541 (f-string-missing-placeholders)
 42 | (""f""r"")
 43 | f"{v:{f"0.2f"}}"
    |
@@ -355,12 +355,12 @@ F541.py:41:3: F541 [*] f-string without any placeholders
 43 43 | f"{v:{f"0.2f"}}"
 44 44 | f"\{{x}}"
 
-F541.py:42:4: F541 [*] f-string without any placeholders
+F541.py:42:4: F541 (f-string-missing-placeholders) [*] f-string without any placeholders
    |
 40 | ""f""
 41 | ''f""
 42 | (""f""r"")
-   |    ^^^ F541
+   |    ^^^ F541 (f-string-missing-placeholders)
 43 | f"{v:{f"0.2f"}}"
 44 | f"\{{x}}"
    |
@@ -375,12 +375,12 @@ F541.py:42:4: F541 [*] f-string without any placeholders
 43 43 | f"{v:{f"0.2f"}}"
 44 44 | f"\{{x}}"
 
-F541.py:43:7: F541 [*] f-string without any placeholders
+F541.py:43:7: F541 (f-string-missing-placeholders) [*] f-string without any placeholders
    |
 41 | ''f""
 42 | (""f""r"")
 43 | f"{v:{f"0.2f"}}"
-   |       ^^^^^^^ F541
+   |       ^^^^^^^ F541 (f-string-missing-placeholders)
 44 | f"\{{x}}"
    |
    = help: Remove extraneous `f` prefix
@@ -393,12 +393,12 @@ F541.py:43:7: F541 [*] f-string without any placeholders
    43 |+f"{v:{"0.2f"}}"
 44 44 | f"\{{x}}"
 
-F541.py:44:1: F541 [*] f-string without any placeholders
+F541.py:44:1: F541 (f-string-missing-placeholders) [*] f-string without any placeholders
    |
 42 | (""f""r"")
 43 | f"{v:{f"0.2f"}}"
 44 | f"\{{x}}"
-   | ^^^^^^^^^ F541
+   | ^^^^^^^^^ F541 (f-string-missing-placeholders)
    |
    = help: Remove extraneous `f` prefix
 
@@ -408,5 +408,3 @@ F541.py:44:1: F541 [*] f-string without any placeholders
 43 43 | f"{v:{f"0.2f"}}"
 44    |-f"\{{x}}"
    44 |+"\{x}"
-
-

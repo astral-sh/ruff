@@ -1,11 +1,11 @@
 ---
 source: crates/ruff_linter/src/rules/pyflakes/mod.rs
 ---
-F401_0.py:2:8: F401 [*] `functools` imported but unused
+F401_0.py:2:8: F401 (unused-import) [*] `functools` imported but unused
   |
 1 | from __future__ import all_feature_names
 2 | import functools, os
-  |        ^^^^^^^^^ F401
+  |        ^^^^^^^^^ F401 (unused-import)
 3 | from datetime import datetime
 4 | from collections import (
   |
@@ -19,12 +19,12 @@ F401_0.py:2:8: F401 [*] `functools` imported but unused
 4 4 | from collections import (
 5 5 |     Counter,
 
-F401_0.py:6:5: F401 [*] `collections.OrderedDict` imported but unused
+F401_0.py:6:5: F401 (unused-import) [*] `collections.OrderedDict` imported but unused
   |
 4 | from collections import (
 5 |     Counter,
 6 |     OrderedDict,
-  |     ^^^^^^^^^^^ F401
+  |     ^^^^^^^^^^^ F401 (unused-import)
 7 |     namedtuple,
 8 | )
   |
@@ -39,12 +39,12 @@ F401_0.py:6:5: F401 [*] `collections.OrderedDict` imported but unused
 8 7 | )
 9 8 | import multiprocessing.pool
 
-F401_0.py:12:8: F401 [*] `logging.handlers` imported but unused
+F401_0.py:12:8: F401 (unused-import) [*] `logging.handlers` imported but unused
    |
 10 | import multiprocessing.process
 11 | import logging.config
 12 | import logging.handlers
-   |        ^^^^^^^^^^^^^^^^ F401
+   |        ^^^^^^^^^^^^^^^^ F401 (unused-import)
 13 | from typing import (
 14 |     TYPE_CHECKING,
    |
@@ -59,11 +59,11 @@ F401_0.py:12:8: F401 [*] `logging.handlers` imported but unused
 14 13 |     TYPE_CHECKING,
 15 14 |     NamedTuple,
 
-F401_0.py:32:12: F401 [*] `shelve` imported but unused
+F401_0.py:32:12: F401 (unused-import) [*] `shelve` imported but unused
    |
 31 | if TYPE_CHECKING:
 32 |     import shelve
-   |            ^^^^^^ F401
+   |            ^^^^^^ F401 (unused-import)
 33 |     import importlib
    |
    = help: Remove unused import: `shelve`
@@ -77,12 +77,12 @@ F401_0.py:32:12: F401 [*] `shelve` imported but unused
 34 33 | 
 35 34 | if TYPE_CHECKING:
 
-F401_0.py:33:12: F401 [*] `importlib` imported but unused
+F401_0.py:33:12: F401 (unused-import) [*] `importlib` imported but unused
    |
 31 | if TYPE_CHECKING:
 32 |     import shelve
 33 |     import importlib
-   |            ^^^^^^^^^ F401
+   |            ^^^^^^^^^ F401 (unused-import)
 34 | 
 35 | if TYPE_CHECKING:
    |
@@ -97,12 +97,12 @@ F401_0.py:33:12: F401 [*] `importlib` imported but unused
 35 34 | if TYPE_CHECKING:
 36 35 |     """Hello, world!"""
 
-F401_0.py:37:12: F401 [*] `pathlib` imported but unused
+F401_0.py:37:12: F401 (unused-import) [*] `pathlib` imported but unused
    |
 35 | if TYPE_CHECKING:
 36 |     """Hello, world!"""
 37 |     import pathlib
-   |            ^^^^^^^ F401
+   |            ^^^^^^^ F401 (unused-import)
 38 | 
 39 |     z = 1
    |
@@ -117,11 +117,11 @@ F401_0.py:37:12: F401 [*] `pathlib` imported but unused
 39 38 |     z = 1
 40 39 | 
 
-F401_0.py:52:16: F401 [*] `pickle` imported but unused
+F401_0.py:52:16: F401 (unused-import) [*] `pickle` imported but unused
    |
 51 |     def b(self) -> None:
 52 |         import pickle
-   |                ^^^^^^ F401
+   |                ^^^^^^ F401 (unused-import)
    |
    = help: Remove unused import: `pickle`
 
@@ -135,12 +135,12 @@ F401_0.py:52:16: F401 [*] `pickle` imported but unused
 54 54 | 
 55 55 | __all__ = ["ClassA"] + ["ClassB"]
 
-F401_0.py:93:16: F401 [*] `x` imported but unused
+F401_0.py:93:16: F401 (unused-import) [*] `x` imported but unused
    |
 91 | match *0, 1, *2:
 92 |     case 0,:
 93 |         import x
-   |                ^ F401
+   |                ^ F401 (unused-import)
 94 |         import y
    |
    = help: Remove unused import: `x`
@@ -154,12 +154,12 @@ F401_0.py:93:16: F401 [*] `x` imported but unused
 95 94 | 
 96 95 | 
 
-F401_0.py:94:16: F401 [*] `y` imported but unused
+F401_0.py:94:16: F401 (unused-import) [*] `y` imported but unused
    |
 92 |     case 0,:
 93 |         import x
 94 |         import y
-   |                ^ F401
+   |                ^ F401 (unused-import)
    |
    = help: Remove unused import: `y`
 
@@ -172,12 +172,12 @@ F401_0.py:94:16: F401 [*] `y` imported but unused
 96 95 | 
 97 96 | # Test: access a sub-importation via an alias.
 
-F401_0.py:99:8: F401 [*] `foo.bar.baz` imported but unused
+F401_0.py:99:8: F401 (unused-import) [*] `foo.bar.baz` imported but unused
     |
  97 | # Test: access a sub-importation via an alias.
  98 | import foo.bar as bop
  99 | import foo.bar.baz
-    |        ^^^^^^^^^^^ F401
+    |        ^^^^^^^^^^^ F401 (unused-import)
 100 | 
 101 | print(bop.baz.read_csv("test.csv"))
     |
@@ -192,12 +192,12 @@ F401_0.py:99:8: F401 [*] `foo.bar.baz` imported but unused
 101 100 | print(bop.baz.read_csv("test.csv"))
 102 101 | 
 
-F401_0.py:105:12: F401 [*] `a1` imported but unused
+F401_0.py:105:12: F401 (unused-import) [*] `a1` imported but unused
     |
 103 | # Test: isolated deletions.
 104 | if TYPE_CHECKING:
 105 |     import a1
-    |            ^^ F401
+    |            ^^ F401 (unused-import)
 106 | 
 107 |     import a2
     |
@@ -212,12 +212,12 @@ F401_0.py:105:12: F401 [*] `a1` imported but unused
 107 106 |     import a2
 108 107 | 
 
-F401_0.py:107:12: F401 [*] `a2` imported but unused
+F401_0.py:107:12: F401 (unused-import) [*] `a2` imported but unused
     |
 105 |     import a1
 106 | 
 107 |     import a2
-    |            ^^ F401
+    |            ^^ F401 (unused-import)
     |
     = help: Remove unused import: `a2`
 
@@ -230,12 +230,12 @@ F401_0.py:107:12: F401 [*] `a2` imported but unused
 109 108 | 
 110 109 | match *0, 1, *2:
 
-F401_0.py:112:16: F401 [*] `b1` imported but unused
+F401_0.py:112:16: F401 (unused-import) [*] `b1` imported but unused
     |
 110 | match *0, 1, *2:
 111 |     case 0,:
 112 |         import b1
-    |                ^^ F401
+    |                ^^ F401 (unused-import)
 113 | 
 114 |         import b2
     |
@@ -250,12 +250,12 @@ F401_0.py:112:16: F401 [*] `b1` imported but unused
 114 113 |         import b2
 115 114 | 
 
-F401_0.py:114:16: F401 [*] `b2` imported but unused
+F401_0.py:114:16: F401 (unused-import) [*] `b2` imported but unused
     |
 112 |         import b1
 113 | 
 114 |         import b2
-    |                ^^ F401
+    |                ^^ F401 (unused-import)
     |
     = help: Remove unused import: `b2`
 
@@ -268,11 +268,11 @@ F401_0.py:114:16: F401 [*] `b2` imported but unused
 116 115 | 
 117 116 | # Regression test for: https://github.com/astral-sh/ruff/issues/7244
 
-F401_0.py:122:1: F401 [*] `datameta_client_lib.model_helpers.noqa` imported but unused
+F401_0.py:122:1: F401 (unused-import) [*] `datameta_client_lib.model_helpers.noqa` imported but unused
     |
 121 | from datameta_client_lib.model_helpers import (
 122 | noqa )
-    | ^^^^ F401
+    | ^^^^ F401 (unused-import)
     |
     = help: Remove unused import: `datameta_client_lib.model_helpers.noqa`
 
@@ -282,5 +282,3 @@ F401_0.py:122:1: F401 [*] `datameta_client_lib.model_helpers.noqa` imported but 
 120 120 | 
 121     |-from datameta_client_lib.model_helpers import (
 122     |-noqa )
-
-

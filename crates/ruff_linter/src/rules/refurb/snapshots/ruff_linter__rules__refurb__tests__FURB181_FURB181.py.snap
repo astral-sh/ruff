@@ -1,12 +1,12 @@
 ---
 source: crates/ruff_linter/src/rules/refurb/mod.rs
 ---
-FURB181.py:19:1: FURB181 [*] Use of hashlib's `.digest().hex()`
+FURB181.py:19:1: FURB181 (hashlib-digest-hex) [*] Use of hashlib's `.digest().hex()`
    |
 17 | # these will match
 18 | 
 19 | blake2b().digest().hex()
-   | ^^^^^^^^^^^^^^^^^^^^^^^^ FURB181
+   | ^^^^^^^^^^^^^^^^^^^^^^^^ FURB181 (hashlib-digest-hex)
 20 | blake2s().digest().hex()
 21 | md5().digest().hex()
    |
@@ -22,11 +22,11 @@ FURB181.py:19:1: FURB181 [*] Use of hashlib's `.digest().hex()`
 21 21 | md5().digest().hex()
 22 22 | sha1().digest().hex()
 
-FURB181.py:20:1: FURB181 [*] Use of hashlib's `.digest().hex()`
+FURB181.py:20:1: FURB181 (hashlib-digest-hex) [*] Use of hashlib's `.digest().hex()`
    |
 19 | blake2b().digest().hex()
 20 | blake2s().digest().hex()
-   | ^^^^^^^^^^^^^^^^^^^^^^^^ FURB181
+   | ^^^^^^^^^^^^^^^^^^^^^^^^ FURB181 (hashlib-digest-hex)
 21 | md5().digest().hex()
 22 | sha1().digest().hex()
    |
@@ -42,12 +42,12 @@ FURB181.py:20:1: FURB181 [*] Use of hashlib's `.digest().hex()`
 22 22 | sha1().digest().hex()
 23 23 | sha224().digest().hex()
 
-FURB181.py:21:1: FURB181 [*] Use of hashlib's `.digest().hex()`
+FURB181.py:21:1: FURB181 (hashlib-digest-hex) [*] Use of hashlib's `.digest().hex()`
    |
 19 | blake2b().digest().hex()
 20 | blake2s().digest().hex()
 21 | md5().digest().hex()
-   | ^^^^^^^^^^^^^^^^^^^^ FURB181
+   | ^^^^^^^^^^^^^^^^^^^^ FURB181 (hashlib-digest-hex)
 22 | sha1().digest().hex()
 23 | sha224().digest().hex()
    |
@@ -63,12 +63,12 @@ FURB181.py:21:1: FURB181 [*] Use of hashlib's `.digest().hex()`
 23 23 | sha224().digest().hex()
 24 24 | sha256().digest().hex()
 
-FURB181.py:22:1: FURB181 [*] Use of hashlib's `.digest().hex()`
+FURB181.py:22:1: FURB181 (hashlib-digest-hex) [*] Use of hashlib's `.digest().hex()`
    |
 20 | blake2s().digest().hex()
 21 | md5().digest().hex()
 22 | sha1().digest().hex()
-   | ^^^^^^^^^^^^^^^^^^^^^ FURB181
+   | ^^^^^^^^^^^^^^^^^^^^^ FURB181 (hashlib-digest-hex)
 23 | sha224().digest().hex()
 24 | sha256().digest().hex()
    |
@@ -84,12 +84,12 @@ FURB181.py:22:1: FURB181 [*] Use of hashlib's `.digest().hex()`
 24 24 | sha256().digest().hex()
 25 25 | sha384().digest().hex()
 
-FURB181.py:23:1: FURB181 [*] Use of hashlib's `.digest().hex()`
+FURB181.py:23:1: FURB181 (hashlib-digest-hex) [*] Use of hashlib's `.digest().hex()`
    |
 21 | md5().digest().hex()
 22 | sha1().digest().hex()
 23 | sha224().digest().hex()
-   | ^^^^^^^^^^^^^^^^^^^^^^^ FURB181
+   | ^^^^^^^^^^^^^^^^^^^^^^^ FURB181 (hashlib-digest-hex)
 24 | sha256().digest().hex()
 25 | sha384().digest().hex()
    |
@@ -105,12 +105,12 @@ FURB181.py:23:1: FURB181 [*] Use of hashlib's `.digest().hex()`
 25 25 | sha384().digest().hex()
 26 26 | sha3_224().digest().hex()
 
-FURB181.py:24:1: FURB181 [*] Use of hashlib's `.digest().hex()`
+FURB181.py:24:1: FURB181 (hashlib-digest-hex) [*] Use of hashlib's `.digest().hex()`
    |
 22 | sha1().digest().hex()
 23 | sha224().digest().hex()
 24 | sha256().digest().hex()
-   | ^^^^^^^^^^^^^^^^^^^^^^^ FURB181
+   | ^^^^^^^^^^^^^^^^^^^^^^^ FURB181 (hashlib-digest-hex)
 25 | sha384().digest().hex()
 26 | sha3_224().digest().hex()
    |
@@ -126,12 +126,12 @@ FURB181.py:24:1: FURB181 [*] Use of hashlib's `.digest().hex()`
 26 26 | sha3_224().digest().hex()
 27 27 | sha3_256().digest().hex()
 
-FURB181.py:25:1: FURB181 [*] Use of hashlib's `.digest().hex()`
+FURB181.py:25:1: FURB181 (hashlib-digest-hex) [*] Use of hashlib's `.digest().hex()`
    |
 23 | sha224().digest().hex()
 24 | sha256().digest().hex()
 25 | sha384().digest().hex()
-   | ^^^^^^^^^^^^^^^^^^^^^^^ FURB181
+   | ^^^^^^^^^^^^^^^^^^^^^^^ FURB181 (hashlib-digest-hex)
 26 | sha3_224().digest().hex()
 27 | sha3_256().digest().hex()
    |
@@ -147,12 +147,12 @@ FURB181.py:25:1: FURB181 [*] Use of hashlib's `.digest().hex()`
 27 27 | sha3_256().digest().hex()
 28 28 | sha3_384().digest().hex()
 
-FURB181.py:26:1: FURB181 [*] Use of hashlib's `.digest().hex()`
+FURB181.py:26:1: FURB181 (hashlib-digest-hex) [*] Use of hashlib's `.digest().hex()`
    |
 24 | sha256().digest().hex()
 25 | sha384().digest().hex()
 26 | sha3_224().digest().hex()
-   | ^^^^^^^^^^^^^^^^^^^^^^^^^ FURB181
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^ FURB181 (hashlib-digest-hex)
 27 | sha3_256().digest().hex()
 28 | sha3_384().digest().hex()
    |
@@ -168,12 +168,12 @@ FURB181.py:26:1: FURB181 [*] Use of hashlib's `.digest().hex()`
 28 28 | sha3_384().digest().hex()
 29 29 | sha3_512().digest().hex()
 
-FURB181.py:27:1: FURB181 [*] Use of hashlib's `.digest().hex()`
+FURB181.py:27:1: FURB181 (hashlib-digest-hex) [*] Use of hashlib's `.digest().hex()`
    |
 25 | sha384().digest().hex()
 26 | sha3_224().digest().hex()
 27 | sha3_256().digest().hex()
-   | ^^^^^^^^^^^^^^^^^^^^^^^^^ FURB181
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^ FURB181 (hashlib-digest-hex)
 28 | sha3_384().digest().hex()
 29 | sha3_512().digest().hex()
    |
@@ -189,12 +189,12 @@ FURB181.py:27:1: FURB181 [*] Use of hashlib's `.digest().hex()`
 29 29 | sha3_512().digest().hex()
 30 30 | sha512().digest().hex()
 
-FURB181.py:28:1: FURB181 [*] Use of hashlib's `.digest().hex()`
+FURB181.py:28:1: FURB181 (hashlib-digest-hex) [*] Use of hashlib's `.digest().hex()`
    |
 26 | sha3_224().digest().hex()
 27 | sha3_256().digest().hex()
 28 | sha3_384().digest().hex()
-   | ^^^^^^^^^^^^^^^^^^^^^^^^^ FURB181
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^ FURB181 (hashlib-digest-hex)
 29 | sha3_512().digest().hex()
 30 | sha512().digest().hex()
    |
@@ -210,12 +210,12 @@ FURB181.py:28:1: FURB181 [*] Use of hashlib's `.digest().hex()`
 30 30 | sha512().digest().hex()
 31 31 | shake_128().digest(10).hex()
 
-FURB181.py:29:1: FURB181 [*] Use of hashlib's `.digest().hex()`
+FURB181.py:29:1: FURB181 (hashlib-digest-hex) [*] Use of hashlib's `.digest().hex()`
    |
 27 | sha3_256().digest().hex()
 28 | sha3_384().digest().hex()
 29 | sha3_512().digest().hex()
-   | ^^^^^^^^^^^^^^^^^^^^^^^^^ FURB181
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^ FURB181 (hashlib-digest-hex)
 30 | sha512().digest().hex()
 31 | shake_128().digest(10).hex()
    |
@@ -231,12 +231,12 @@ FURB181.py:29:1: FURB181 [*] Use of hashlib's `.digest().hex()`
 31 31 | shake_128().digest(10).hex()
 32 32 | shake_256().digest(10).hex()
 
-FURB181.py:30:1: FURB181 [*] Use of hashlib's `.digest().hex()`
+FURB181.py:30:1: FURB181 (hashlib-digest-hex) [*] Use of hashlib's `.digest().hex()`
    |
 28 | sha3_384().digest().hex()
 29 | sha3_512().digest().hex()
 30 | sha512().digest().hex()
-   | ^^^^^^^^^^^^^^^^^^^^^^^ FURB181
+   | ^^^^^^^^^^^^^^^^^^^^^^^ FURB181 (hashlib-digest-hex)
 31 | shake_128().digest(10).hex()
 32 | shake_256().digest(10).hex()
    |
@@ -252,33 +252,33 @@ FURB181.py:30:1: FURB181 [*] Use of hashlib's `.digest().hex()`
 32 32 | shake_256().digest(10).hex()
 33 33 | 
 
-FURB181.py:31:1: FURB181 Use of hashlib's `.digest().hex()`
+FURB181.py:31:1: FURB181 (hashlib-digest-hex) Use of hashlib's `.digest().hex()`
    |
 29 | sha3_512().digest().hex()
 30 | sha512().digest().hex()
 31 | shake_128().digest(10).hex()
-   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^ FURB181
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^ FURB181 (hashlib-digest-hex)
 32 | shake_256().digest(10).hex()
    |
    = help: Replace with `.hexdigest()`
 
-FURB181.py:32:1: FURB181 Use of hashlib's `.digest().hex()`
+FURB181.py:32:1: FURB181 (hashlib-digest-hex) Use of hashlib's `.digest().hex()`
    |
 30 | sha512().digest().hex()
 31 | shake_128().digest(10).hex()
 32 | shake_256().digest(10).hex()
-   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^ FURB181
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^ FURB181 (hashlib-digest-hex)
 33 | 
 34 | hashlib.sha256().digest().hex()
    |
    = help: Replace with `.hexdigest()`
 
-FURB181.py:34:1: FURB181 [*] Use of hashlib's `.digest().hex()`
+FURB181.py:34:1: FURB181 (hashlib-digest-hex) [*] Use of hashlib's `.digest().hex()`
    |
 32 | shake_256().digest(10).hex()
 33 | 
 34 | hashlib.sha256().digest().hex()
-   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ FURB181
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ FURB181 (hashlib-digest-hex)
 35 | 
 36 | sha256(b"text").digest().hex()
    |
@@ -294,12 +294,12 @@ FURB181.py:34:1: FURB181 [*] Use of hashlib's `.digest().hex()`
 36 36 | sha256(b"text").digest().hex()
 37 37 | 
 
-FURB181.py:36:1: FURB181 [*] Use of hashlib's `.digest().hex()`
+FURB181.py:36:1: FURB181 (hashlib-digest-hex) [*] Use of hashlib's `.digest().hex()`
    |
 34 | hashlib.sha256().digest().hex()
 35 | 
 36 | sha256(b"text").digest().hex()
-   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ FURB181
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ FURB181 (hashlib-digest-hex)
 37 | 
 38 | hash_algo().digest().hex()
    |
@@ -315,12 +315,12 @@ FURB181.py:36:1: FURB181 [*] Use of hashlib's `.digest().hex()`
 38 38 | hash_algo().digest().hex()
 39 39 | 
 
-FURB181.py:38:1: FURB181 [*] Use of hashlib's `.digest().hex()`
+FURB181.py:38:1: FURB181 (hashlib-digest-hex) [*] Use of hashlib's `.digest().hex()`
    |
 36 | sha256(b"text").digest().hex()
 37 | 
 38 | hash_algo().digest().hex()
-   | ^^^^^^^^^^^^^^^^^^^^^^^^^^ FURB181
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^ FURB181 (hashlib-digest-hex)
 39 | 
 40 | # not yet supported
    |
@@ -335,5 +335,3 @@ FURB181.py:38:1: FURB181 [*] Use of hashlib's `.digest().hex()`
 39 39 | 
 40 40 | # not yet supported
 41 41 | h = sha256()
-
-

@@ -1,10 +1,10 @@
 ---
 source: crates/ruff_linter/src/rules/pyflakes/mod.rs
 ---
-F822_1.py:3:22: F822 Undefined name `b` in `__all__`
+F822_1.py:3:22: F822 (undefined-export) Undefined name `b` in `__all__`
   |
 1 | a = 1
 2 | 
 3 | __all__ = list(["a", "b"])
-  |                      ^^^ F822
+  |                      ^^^ F822 (undefined-export)
   |

@@ -1,11 +1,11 @@
 ---
 source: crates/ruff_linter/src/rules/pycodestyle/mod.rs
 ---
-E23.py:2:7: E231 [*] Missing whitespace after ','
+E23.py:2:7: E231 (missing-whitespace) [*] Missing whitespace after ','
   |
 1 | #: E231
 2 | a = (1,2)
-  |       ^ E231
+  |       ^ E231 (missing-whitespace)
 3 | #: E231
 4 | a[b1,:]
   |
@@ -19,12 +19,12 @@ E23.py:2:7: E231 [*] Missing whitespace after ','
 4 4 | a[b1,:]
 5 5 | #: E231
 
-E23.py:4:5: E231 [*] Missing whitespace after ','
+E23.py:4:5: E231 (missing-whitespace) [*] Missing whitespace after ','
   |
 2 | a = (1,2)
 3 | #: E231
 4 | a[b1,:]
-  |     ^ E231
+  |     ^ E231 (missing-whitespace)
 5 | #: E231
 6 | a = [{'a':''}]
   |
@@ -40,12 +40,12 @@ E23.py:4:5: E231 [*] Missing whitespace after ','
 6 6 | a = [{'a':''}]
 7 7 | #: Okay
 
-E23.py:6:10: E231 [*] Missing whitespace after ':'
+E23.py:6:10: E231 (missing-whitespace) [*] Missing whitespace after ':'
   |
 4 | a[b1,:]
 5 | #: E231
 6 | a = [{'a':''}]
-  |          ^ E231
+  |          ^ E231 (missing-whitespace)
 7 | #: Okay
 8 | a = (4,)
   |
@@ -61,12 +61,12 @@ E23.py:6:10: E231 [*] Missing whitespace after ':'
 8 8 | a = (4,)
 9 9 | b = (5, )
 
-E23.py:19:10: E231 [*] Missing whitespace after ','
+E23.py:19:10: E231 (missing-whitespace) [*] Missing whitespace after ','
    |
 17 | def foo() -> None:
 18 |     #: E231
 19 |     if (1,2):
-   |          ^ E231
+   |          ^ E231 (missing-whitespace)
 20 |         pass
    |
    = help: Add missing whitespace
@@ -81,12 +81,12 @@ E23.py:19:10: E231 [*] Missing whitespace after ','
 21 21 | 
 22 22 | #: Okay
 
-E23.py:29:20: E231 [*] Missing whitespace after ':'
+E23.py:29:20: E231 (missing-whitespace) [*] Missing whitespace after ':'
    |
 27 | mdtypes_template = {
 28 |     'tag_full': [('mdtype', 'u4'), ('byte_count', 'u4')],
 29 |     'tag_smalldata':[('byte_count_mdtype', 'u4'), ('data', 'S4')],
-   |                    ^ E231
+   |                    ^ E231 (missing-whitespace)
 30 | }
    |
    = help: Add missing whitespace
@@ -101,11 +101,11 @@ E23.py:29:20: E231 [*] Missing whitespace after ':'
 31 31 | 
 32 32 | # E231
 
-E23.py:33:6: E231 [*] Missing whitespace after ','
+E23.py:33:6: E231 (missing-whitespace) [*] Missing whitespace after ','
    |
 32 | # E231
 33 | f"{(a,b)}"
-   |      ^ E231
+   |      ^ E231 (missing-whitespace)
 34 | 
 35 | # Okay because it's hard to differentiate between the usages of a colon in a f-string
    |
@@ -121,11 +121,11 @@ E23.py:33:6: E231 [*] Missing whitespace after ','
 35 35 | # Okay because it's hard to differentiate between the usages of a colon in a f-string
 36 36 | f"{a:=1}"
 
-E23.py:47:37: E231 [*] Missing whitespace after ':'
+E23.py:47:37: E231 (missing-whitespace) [*] Missing whitespace after ':'
    |
 46 | #: E231
 47 | {len(f's3://{self.s3_bucket_name}/'):1}
-   |                                     ^ E231
+   |                                     ^ E231 (missing-whitespace)
 48 | 
 49 | #: Okay
    |
@@ -141,12 +141,12 @@ E23.py:47:37: E231 [*] Missing whitespace after ':'
 49 49 | #: Okay
 50 50 | a = (1,)
 
-E23.py:60:13: E231 [*] Missing whitespace after ':'
+E23.py:60:13: E231 (missing-whitespace) [*] Missing whitespace after ':'
    |
 58 |     results = {
 59 |         "k1": [1],
 60 |         "k2":[2],
-   |             ^ E231
+   |             ^ E231 (missing-whitespace)
 61 |     }
 62 |     results_in_tuple = (
    |
@@ -162,12 +162,12 @@ E23.py:60:13: E231 [*] Missing whitespace after ':'
 62 62 |     results_in_tuple = (
 63 63 |         {
 
-E23.py:65:17: E231 [*] Missing whitespace after ':'
+E23.py:65:17: E231 (missing-whitespace) [*] Missing whitespace after ':'
    |
 63 |         {
 64 |             "k1": [1],
 65 |             "k2":[2],
-   |                 ^ E231
+   |                 ^ E231 (missing-whitespace)
 66 |         },
 67 |     )
    |
@@ -183,12 +183,12 @@ E23.py:65:17: E231 [*] Missing whitespace after ':'
 67 67 |     )
 68 68 |     results_in_list = [
 
-E23.py:71:17: E231 [*] Missing whitespace after ':'
+E23.py:71:17: E231 (missing-whitespace) [*] Missing whitespace after ':'
    |
 69 |         {
 70 |             "k1": [1],
 71 |             "k2":[2],
-   |                 ^ E231
+   |                 ^ E231 (missing-whitespace)
 72 |         }
 73 |     ]
    |
@@ -204,12 +204,12 @@ E23.py:71:17: E231 [*] Missing whitespace after ':'
 73 73 |     ]
 74 74 |     results_in_list_first = [
 
-E23.py:76:17: E231 [*] Missing whitespace after ':'
+E23.py:76:17: E231 (missing-whitespace) [*] Missing whitespace after ':'
    |
 74 |     results_in_list_first = [
 75 |         {
 76 |             "k2":[2],
-   |                 ^ E231
+   |                 ^ E231 (missing-whitespace)
 77 |         }
 78 |     ]
    |
@@ -225,12 +225,12 @@ E23.py:76:17: E231 [*] Missing whitespace after ':'
 78 78 |     ]
 79 79 | 
 
-E23.py:82:13: E231 [*] Missing whitespace after ':'
+E23.py:82:13: E231 (missing-whitespace) [*] Missing whitespace after ':'
    |
 80 | x = [
 81 |     {
 82 |         "k1":[2], # E231
-   |             ^ E231
+   |             ^ E231 (missing-whitespace)
 83 |         "k2": x[2:4],
 84 |         "k3":[2],  # E231
    |
@@ -246,12 +246,12 @@ E23.py:82:13: E231 [*] Missing whitespace after ':'
 84 84 |         "k3":[2],  # E231
 85 85 |         "k4": [2],
 
-E23.py:84:13: E231 [*] Missing whitespace after ':'
+E23.py:84:13: E231 (missing-whitespace) [*] Missing whitespace after ':'
    |
 82 |         "k1":[2], # E231
 83 |         "k2": x[2:4],
 84 |         "k3":[2],  # E231
-   |             ^ E231
+   |             ^ E231 (missing-whitespace)
 85 |         "k4": [2],
 86 |         "k5": [2],
    |
@@ -267,12 +267,12 @@ E23.py:84:13: E231 [*] Missing whitespace after ':'
 86 86 |         "k5": [2],
 87 87 |         "k6": [1, 2, 3, 4,5,6,7]  # E231
 
-E23.py:87:26: E231 [*] Missing whitespace after ','
+E23.py:87:26: E231 (missing-whitespace) [*] Missing whitespace after ','
    |
 85 |         "k4": [2],
 86 |         "k5": [2],
 87 |         "k6": [1, 2, 3, 4,5,6,7]  # E231
-   |                          ^ E231
+   |                          ^ E231 (missing-whitespace)
 88 |     },
 89 |     {
    |
@@ -288,12 +288,12 @@ E23.py:87:26: E231 [*] Missing whitespace after ','
 89 89 |     {
 90 90 |         "k1": [
 
-E23.py:87:28: E231 [*] Missing whitespace after ','
+E23.py:87:28: E231 (missing-whitespace) [*] Missing whitespace after ','
    |
 85 |         "k4": [2],
 86 |         "k5": [2],
 87 |         "k6": [1, 2, 3, 4,5,6,7]  # E231
-   |                            ^ E231
+   |                            ^ E231 (missing-whitespace)
 88 |     },
 89 |     {
    |
@@ -309,12 +309,12 @@ E23.py:87:28: E231 [*] Missing whitespace after ','
 89 89 |     {
 90 90 |         "k1": [
 
-E23.py:87:30: E231 [*] Missing whitespace after ','
+E23.py:87:30: E231 (missing-whitespace) [*] Missing whitespace after ','
    |
 85 |         "k4": [2],
 86 |         "k5": [2],
 87 |         "k6": [1, 2, 3, 4,5,6,7]  # E231
-   |                              ^ E231
+   |                              ^ E231 (missing-whitespace)
 88 |     },
 89 |     {
    |
@@ -330,12 +330,12 @@ E23.py:87:30: E231 [*] Missing whitespace after ','
 89 89 |     {
 90 90 |         "k1": [
 
-E23.py:92:21: E231 [*] Missing whitespace after ':'
+E23.py:92:21: E231 (missing-whitespace) [*] Missing whitespace after ':'
    |
 90 |         "k1": [
 91 |             {
 92 |                 "ka":[2,3],  # E231
-   |                     ^ E231
+   |                     ^ E231 (missing-whitespace)
 93 |             },
 94 |             {
    |
@@ -351,12 +351,12 @@ E23.py:92:21: E231 [*] Missing whitespace after ':'
 94 94 |             {
 95 95 |                 "kb": [2,3],  # E231
 
-E23.py:92:24: E231 [*] Missing whitespace after ','
+E23.py:92:24: E231 (missing-whitespace) [*] Missing whitespace after ','
    |
 90 |         "k1": [
 91 |             {
 92 |                 "ka":[2,3],  # E231
-   |                        ^ E231
+   |                        ^ E231 (missing-whitespace)
 93 |             },
 94 |             {
    |
@@ -372,12 +372,12 @@ E23.py:92:24: E231 [*] Missing whitespace after ','
 94 94 |             {
 95 95 |                 "kb": [2,3],  # E231
 
-E23.py:95:25: E231 [*] Missing whitespace after ','
+E23.py:95:25: E231 (missing-whitespace) [*] Missing whitespace after ','
    |
 93 |             },
 94 |             {
 95 |                 "kb": [2,3],  # E231
-   |                         ^ E231
+   |                         ^ E231 (missing-whitespace)
 96 |             },
 97 |             {
    |
@@ -393,12 +393,12 @@ E23.py:95:25: E231 [*] Missing whitespace after ','
 97 97 |             {
 98 98 |                 "ka":[2, 3],  # E231
 
-E23.py:98:21: E231 [*] Missing whitespace after ':'
+E23.py:98:21: E231 (missing-whitespace) [*] Missing whitespace after ':'
     |
  96 |             },
  97 |             {
  98 |                 "ka":[2, 3],  # E231
-    |                     ^ E231
+    |                     ^ E231 (missing-whitespace)
  99 |                 "kb": [2, 3],  # Ok
 100 |                 "kc": [2, 3],  # Ok
     |
@@ -414,12 +414,12 @@ E23.py:98:21: E231 [*] Missing whitespace after ':'
 100 100 |                 "kc": [2, 3],  # Ok
 101 101 |                 "kd": [2,3],  # E231
 
-E23.py:101:25: E231 [*] Missing whitespace after ','
+E23.py:101:25: E231 (missing-whitespace) [*] Missing whitespace after ','
     |
  99 |                 "kb": [2, 3],  # Ok
 100 |                 "kc": [2, 3],  # Ok
 101 |                 "kd": [2,3],  # E231
-    |                         ^ E231
+    |                         ^ E231 (missing-whitespace)
 102 |                 "ke":[2,3],  # E231
 103 |             },
     |
@@ -435,12 +435,12 @@ E23.py:101:25: E231 [*] Missing whitespace after ','
 103 103 |             },
 104 104 |         ]
 
-E23.py:102:21: E231 [*] Missing whitespace after ':'
+E23.py:102:21: E231 (missing-whitespace) [*] Missing whitespace after ':'
     |
 100 |                 "kc": [2, 3],  # Ok
 101 |                 "kd": [2,3],  # E231
 102 |                 "ke":[2,3],  # E231
-    |                     ^ E231
+    |                     ^ E231 (missing-whitespace)
 103 |             },
 104 |         ]
     |
@@ -456,12 +456,12 @@ E23.py:102:21: E231 [*] Missing whitespace after ':'
 104 104 |         ]
 105 105 |     }
 
-E23.py:102:24: E231 [*] Missing whitespace after ','
+E23.py:102:24: E231 (missing-whitespace) [*] Missing whitespace after ','
     |
 100 |                 "kc": [2, 3],  # Ok
 101 |                 "kd": [2,3],  # E231
 102 |                 "ke":[2,3],  # E231
-    |                        ^ E231
+    |                        ^ E231 (missing-whitespace)
 103 |             },
 104 |         ]
     |

@@ -138,7 +138,7 @@ pub(crate) fn blanket_noqa(
                 );
                 diagnostic.set_fix(Fix::unsafe_edit(Edit::deletion(start, end)));
                 diagnostics.push(diagnostic);
-            } else if Directive::lex_code(cursor.chars().as_str()).is_some() {
+            } else if Directive::lex_code_or_name(cursor.chars().as_str()).is_some() {
                 // Check for a missing colon.
                 // Ex) `# noqa F401`
                 let start = all.end();

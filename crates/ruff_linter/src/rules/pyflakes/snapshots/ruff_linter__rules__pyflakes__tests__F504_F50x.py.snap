@@ -1,12 +1,12 @@
 ---
 source: crates/ruff_linter/src/rules/pyflakes/mod.rs
 ---
-F50x.py:8:1: F504 [*] `%`-format string has unused named argument(s): baz
+F50x.py:8:1: F504 (percent-format-extra-named-arguments) [*] `%`-format string has unused named argument(s): baz
    |
  6 | '%s %s' % (1, 2, 3)  # F507
  7 | '%(bar)s' % {}  # F505
  8 | '%(bar)s' % {'bar': 1, 'baz': 2}  # F504
-   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ F504
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ F504 (percent-format-extra-named-arguments)
  9 | '%(bar)s' % (1, 2, 3)  # F502
 10 | '%s %s' % {'k': 'v'}  # F503
    |
@@ -21,5 +21,3 @@ F50x.py:8:1: F504 [*] `%`-format string has unused named argument(s): baz
 9 9 | '%(bar)s' % (1, 2, 3)  # F502
 10 10 | '%s %s' % {'k': 'v'}  # F503
 11 11 | '%(bar)*s' % {'bar': 'baz'}  # F506, F508
-
-

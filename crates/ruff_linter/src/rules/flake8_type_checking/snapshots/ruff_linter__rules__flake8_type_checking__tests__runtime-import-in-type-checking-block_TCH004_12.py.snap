@@ -1,11 +1,11 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_type_checking/mod.rs
 ---
-TCH004_12.py:6:33: TCH004 [*] Move import `collections.abc.Callable` out of type-checking block. Import is used for more than type hinting.
+TCH004_12.py:6:33: TCH004 (runtime-import-in-type-checking-block) [*] Move import `collections.abc.Callable` out of type-checking block. Import is used for more than type hinting.
   |
 5 | if TYPE_CHECKING:
 6 |     from collections.abc import Callable
-  |                                 ^^^^^^^^ TCH004
+  |                                 ^^^^^^^^ TCH004 (runtime-import-in-type-checking-block)
 7 | 
 8 | AnyCallable: TypeAlias = Callable[..., Any]
   |
@@ -22,5 +22,3 @@ TCH004_12.py:6:33: TCH004 [*] Move import `collections.abc.Callable` out of type
   7 |+    pass
 7 8 | 
 8 9 | AnyCallable: TypeAlias = Callable[..., Any]
-
-

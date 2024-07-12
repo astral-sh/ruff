@@ -1,11 +1,11 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_type_checking/mod.rs
 ---
-TCH005.py:4:5: TCH005 [*] Found empty type-checking block
+TCH005.py:4:5: TCH005 (empty-type-checking-block) [*] Found empty type-checking block
   |
 3 | if TYPE_CHECKING:
 4 |     pass  # TCH005
-  |     ^^^^ TCH005
+  |     ^^^^ TCH005 (empty-type-checking-block)
   |
   = help: Delete empty type-checking block
 
@@ -18,11 +18,11 @@ TCH005.py:4:5: TCH005 [*] Found empty type-checking block
 6 4 | 
 7 5 | if False:
 
-TCH005.py:8:5: TCH005 [*] Found empty type-checking block
+TCH005.py:8:5: TCH005 (empty-type-checking-block) [*] Found empty type-checking block
    |
  7 | if False:
  8 |     pass  # TCH005
-   |     ^^^^ TCH005
+   |     ^^^^ TCH005 (empty-type-checking-block)
  9 | 
 10 | if 0:
    |
@@ -38,11 +38,11 @@ TCH005.py:8:5: TCH005 [*] Found empty type-checking block
 10 8 | if 0:
 11 9 |     pass  # TCH005
 
-TCH005.py:11:5: TCH005 [*] Found empty type-checking block
+TCH005.py:11:5: TCH005 (empty-type-checking-block) [*] Found empty type-checking block
    |
 10 | if 0:
 11 |     pass  # TCH005
-   |     ^^^^ TCH005
+   |     ^^^^ TCH005 (empty-type-checking-block)
    |
    = help: Delete empty type-checking block
 
@@ -56,12 +56,12 @@ TCH005.py:11:5: TCH005 [*] Found empty type-checking block
 13 11 | 
 14 12 | def example():
 
-TCH005.py:16:9: TCH005 [*] Found empty type-checking block
+TCH005.py:16:9: TCH005 (empty-type-checking-block) [*] Found empty type-checking block
    |
 14 | def example():
 15 |     if TYPE_CHECKING:
 16 |         pass  # TCH005
-   |         ^^^^ TCH005
+   |         ^^^^ TCH005 (empty-type-checking-block)
 17 |     return
    |
    = help: Delete empty type-checking block
@@ -76,12 +76,12 @@ TCH005.py:16:9: TCH005 [*] Found empty type-checking block
 18 16 | 
 19 17 | 
 
-TCH005.py:22:9: TCH005 [*] Found empty type-checking block
+TCH005.py:22:9: TCH005 (empty-type-checking-block) [*] Found empty type-checking block
    |
 20 | class Test:
 21 |     if TYPE_CHECKING:
 22 |         pass  # TCH005
-   |         ^^^^ TCH005
+   |         ^^^^ TCH005 (empty-type-checking-block)
 23 |     x = 2
    |
    = help: Delete empty type-checking block
@@ -96,11 +96,11 @@ TCH005.py:22:9: TCH005 [*] Found empty type-checking block
 24 22 | 
 25 23 | 
 
-TCH005.py:45:5: TCH005 [*] Found empty type-checking block
+TCH005.py:45:5: TCH005 (empty-type-checking-block) [*] Found empty type-checking block
    |
 44 | if TYPE_CHECKING:
 45 |     pass  # TCH005
-   |     ^^^^ TCH005
+   |     ^^^^ TCH005 (empty-type-checking-block)
 46 | 
 47 | # https://github.com/astral-sh/ruff/issues/11368
    |

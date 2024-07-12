@@ -31,12 +31,12 @@ E11.py:14:1: SyntaxError: Expected a statement
 16 | create_date = False
    |
 
-E11.py:15:1: E114 Indentation is not a multiple of 4 (comment)
+E11.py:15:1: E114 (indentation-with-invalid-multiple-comment) Indentation is not a multiple of 4 (comment)
    |
 13 | #: E114 E116
 14 | mimetype = 'application/x-directory'
 15 |      # 'httpd/unix-directory'
-   | ^^^^^ E114
+   | ^^^^^ E114 (indentation-with-invalid-multiple-comment)
 16 | create_date = False
 17 | #: E116 E116 E116
    |

@@ -1,12 +1,12 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_pie/mod.rs
 ---
-PIE794.py:4:5: PIE794 [*] Class field `name` is defined multiple times
+PIE794.py:4:5: PIE794 (duplicate-class-field-definition) [*] Class field `name` is defined multiple times
   |
 2 |     name = StringField()
 3 |     # ....
 4 |     name = StringField()  # PIE794
-  |     ^^^^^^^^^^^^^^^^^^^^ PIE794
+  |     ^^^^^^^^^^^^^^^^^^^^ PIE794 (duplicate-class-field-definition)
 5 | 
 6 |     def remove(self) -> None:
   |
@@ -21,12 +21,12 @@ PIE794.py:4:5: PIE794 [*] Class field `name` is defined multiple times
 6 5 |     def remove(self) -> None:
 7 6 |         ...
 
-PIE794.py:13:5: PIE794 [*] Class field `name` is defined multiple times
+PIE794.py:13:5: PIE794 (duplicate-class-field-definition) [*] Class field `name` is defined multiple times
    |
 11 |     name: str = StringField()
 12 |     # ....
 13 |     name = StringField()  # PIE794
-   |     ^^^^^^^^^^^^^^^^^^^^ PIE794
+   |     ^^^^^^^^^^^^^^^^^^^^ PIE794 (duplicate-class-field-definition)
 14 | 
 15 |     def foo(self) -> None:
    |
@@ -41,12 +41,12 @@ PIE794.py:13:5: PIE794 [*] Class field `name` is defined multiple times
 15 14 |     def foo(self) -> None:
 16 15 |         ...
 
-PIE794.py:23:5: PIE794 [*] Class field `bar` is defined multiple times
+PIE794.py:23:5: PIE794 (duplicate-class-field-definition) [*] Class field `bar` is defined multiple times
    |
 21 |     foo: bool = BooleanField()
 22 |     # ...
 23 |     bar = StringField()  # PIE794
-   |     ^^^^^^^^^^^^^^^^^^^ PIE794
+   |     ^^^^^^^^^^^^^^^^^^^ PIE794 (duplicate-class-field-definition)
    |
    = help: Remove duplicate field definition for `bar`
 
@@ -59,12 +59,12 @@ PIE794.py:23:5: PIE794 [*] Class field `bar` is defined multiple times
 25 24 | 
 26 25 | class User(BaseModel):
 
-PIE794.py:40:5: PIE794 [*] Class field `bar` is defined multiple times
+PIE794.py:40:5: PIE794 (duplicate-class-field-definition) [*] Class field `bar` is defined multiple times
    |
 38 |     foo: bool = BooleanField()
 39 |     # ...
 40 |     bar = StringField()  # PIE794
-   |     ^^^^^^^^^^^^^^^^^^^ PIE794
+   |     ^^^^^^^^^^^^^^^^^^^ PIE794 (duplicate-class-field-definition)
    |
    = help: Remove duplicate field definition for `bar`
 
@@ -77,12 +77,12 @@ PIE794.py:40:5: PIE794 [*] Class field `bar` is defined multiple times
 42 41 | 
 43 42 | class Person:
 
-PIE794.py:46:5: PIE794 [*] Class field `name` is defined multiple times
+PIE794.py:46:5: PIE794 (duplicate-class-field-definition) [*] Class field `name` is defined multiple times
    |
 44 |     name = "Foo"
 45 |     name = name + " Bar"
 46 |     name = "Bar"  # PIE794
-   |     ^^^^^^^^^^^^ PIE794
+   |     ^^^^^^^^^^^^ PIE794 (duplicate-class-field-definition)
    |
    = help: Remove duplicate field definition for `name`
 
@@ -95,12 +95,12 @@ PIE794.py:46:5: PIE794 [*] Class field `name` is defined multiple times
 48 47 | 
 49 48 | class Person:
 
-PIE794.py:52:5: PIE794 [*] Class field `name` is defined multiple times
+PIE794.py:52:5: PIE794 (duplicate-class-field-definition) [*] Class field `name` is defined multiple times
    |
 50 |     name: str = "Foo"
 51 |     name: str = name + " Bar"
 52 |     name: str = "Bar"  # PIE794
-   |     ^^^^^^^^^^^^^^^^^ PIE794
+   |     ^^^^^^^^^^^^^^^^^ PIE794 (duplicate-class-field-definition)
    |
    = help: Remove duplicate field definition for `name`
 
@@ -109,5 +109,3 @@ PIE794.py:52:5: PIE794 [*] Class field `name` is defined multiple times
 50 50 |     name: str = "Foo"
 51 51 |     name: str = name + " Bar"
 52    |-    name: str = "Bar"  # PIE794
-
-

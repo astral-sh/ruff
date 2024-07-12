@@ -45,9 +45,9 @@ inline-quotes = "single"
         success: false
         exit_code: 1
         ----- stdout -----
-        test.py:1:5: Q000 [*] Double quotes found but single quotes preferred
-        test.py:1:5: B005 Using `.strip()` with multi-character strings is misleading
-        test.py:1:19: Q000 [*] Double quotes found but single quotes preferred
+        test.py:1:5: Q000 (bad-quotes-inline-string) [*] Double quotes found but single quotes preferred
+        test.py:1:5: B005 (strip-with-multi-characters) Using `.strip()` with multi-character strings is misleading
+        test.py:1:19: Q000 (bad-quotes-inline-string) [*] Double quotes found but single quotes preferred
         Found 3 errors.
         [*] 2 fixable with the `--fix` option.
 
@@ -88,9 +88,9 @@ inline-quotes = "single"
     success: false
     exit_code: 1
     ----- stdout -----
-    -:1:5: Q000 [*] Double quotes found but single quotes preferred
-    -:1:5: B005 Using `.strip()` with multi-character strings is misleading
-    -:1:19: Q000 [*] Double quotes found but single quotes preferred
+    -:1:5: Q000 (bad-quotes-inline-string) [*] Double quotes found but single quotes preferred
+    -:1:5: B005 (strip-with-multi-characters) Using `.strip()` with multi-character strings is misleading
+    -:1:19: Q000 (bad-quotes-inline-string) [*] Double quotes found but single quotes preferred
     Found 3 errors.
     [*] 2 fixable with the `--fix` option.
 
@@ -128,9 +128,9 @@ inline-quotes = "single"
     success: false
     exit_code: 1
     ----- stdout -----
-    -:1:5: Q000 [*] Double quotes found but single quotes preferred
-    -:1:5: B005 Using `.strip()` with multi-character strings is misleading
-    -:1:19: Q000 [*] Double quotes found but single quotes preferred
+    -:1:5: Q000 (bad-quotes-inline-string) [*] Double quotes found but single quotes preferred
+    -:1:5: B005 (strip-with-multi-characters) Using `.strip()` with multi-character strings is misleading
+    -:1:19: Q000 (bad-quotes-inline-string) [*] Double quotes found but single quotes preferred
     Found 3 errors.
     [*] 2 fixable with the `--fix` option.
 
@@ -174,9 +174,9 @@ inline-quotes = "single"
     success: false
     exit_code: 1
     ----- stdout -----
-    -:1:5: Q000 [*] Double quotes found but single quotes preferred
-    -:1:5: B005 Using `.strip()` with multi-character strings is misleading
-    -:1:19: Q000 [*] Double quotes found but single quotes preferred
+    -:1:5: Q000 (bad-quotes-inline-string) [*] Double quotes found but single quotes preferred
+    -:1:5: B005 (strip-with-multi-characters) Using `.strip()` with multi-character strings is misleading
+    -:1:19: Q000 (bad-quotes-inline-string) [*] Double quotes found but single quotes preferred
     Found 3 errors.
     [*] 2 fixable with the `--fix` option.
 
@@ -255,9 +255,9 @@ OTHER = "OTHER"
     success: false
     exit_code: 1
     ----- stdout -----
-    main.py:4:16: Q000 [*] Double quotes found but single quotes preferred
-    main.py:5:12: Q000 [*] Double quotes found but single quotes preferred
-    test.py:3:15: Q000 [*] Double quotes found but single quotes preferred
+    main.py:4:16: Q000 (bad-quotes-inline-string) [*] Double quotes found but single quotes preferred
+    main.py:5:12: Q000 (bad-quotes-inline-string) [*] Double quotes found but single quotes preferred
+    test.py:3:15: Q000 (bad-quotes-inline-string) [*] Double quotes found but single quotes preferred
     Found 3 errors.
     [*] 3 fixable with the `--fix` option.
 
@@ -305,8 +305,8 @@ if __name__ == "__main__":
     success: false
     exit_code: 1
     ----- stdout -----
-    generated.py:4:16: Q000 [*] Double quotes found but single quotes preferred
-    generated.py:5:12: Q000 [*] Double quotes found but single quotes preferred
+    generated.py:4:16: Q000 (bad-quotes-inline-string) [*] Double quotes found but single quotes preferred
+    generated.py:5:12: Q000 (bad-quotes-inline-string) [*] Double quotes found but single quotes preferred
     Found 2 errors.
     [*] 2 fixable with the `--fix` option.
 
@@ -352,7 +352,7 @@ _ = "---------------------------------------------------------------------------
     success: false
     exit_code: 1
     ----- stdout -----
-    test.py:5:91: E501 Line too long (109 > 100)
+    test.py:5:91: E501 (line-too-long) Line too long (109 > 100)
     Found 1 error.
 
     ----- stderr -----
@@ -400,7 +400,7 @@ if __name__ == "__main__":
     success: false
     exit_code: 1
     ----- stdout -----
-    generated.py:2:8: F401 [*] `os` imported but unused
+    generated.py:2:8: F401 (unused-import) [*] `os` imported but unused
     Found 1 error.
     [*] 1 fixable with the `--fix` option.
 
@@ -448,7 +448,7 @@ if __name__ == "__main__":
     success: false
     exit_code: 1
     ----- stdout -----
-    generated.py:2:8: F401 [*] `os` imported but unused
+    generated.py:2:8: F401 (unused-import) [*] `os` imported but unused
     Found 1 error.
     [*] 1 fixable with the `--fix` option.
 
@@ -684,8 +684,8 @@ x = "longer_than_90_charactersssssssssssssssssssssssssssssssssssssssssssssssssss
     success: false
     exit_code: 1
     ----- stdout -----
-    -:2:1: I001 [*] Import block is un-sorted or un-formatted
-    -:15:91: E501 Line too long (97 > 90)
+    -:2:1: I001 (unsorted-imports) [*] Import block is un-sorted or un-formatted
+    -:15:91: E501 (line-too-long) Line too long (97 > 90)
     Found 2 errors.
     [*] 1 fixable with the `--fix` option.
 
@@ -809,7 +809,7 @@ select=["E501"]
     success: false
     exit_code: 1
     ----- stdout -----
-    -:1:91: E501 Line too long (97 > 90)
+    -:1:91: E501 (line-too-long) Line too long (97 > 90)
     Found 1 error.
 
     ----- stderr -----
@@ -851,7 +851,7 @@ fn deprecated_config_option_overridden_via_cli() {
     success: false
     exit_code: 1
     ----- stdout -----
-    -:1:7: N801 Class name `lowercase` should use CapWords convention
+    -:1:7: N801 (invalid-class-name) Class name `lowercase` should use CapWords convention
     Found 1 error.
 
     ----- stderr -----
@@ -925,7 +925,7 @@ include = ["*.ipy"]
     success: false
     exit_code: 1
     ----- stdout -----
-    main.ipy:cell 1:1:8: F401 [*] `os` imported but unused
+    main.ipy:cell 1:1:8: F401 (unused-import) [*] `os` imported but unused
     Found 1 error.
     [*] 1 fixable with the `--fix` option.
 
@@ -963,7 +963,7 @@ import os
     success: false
     exit_code: 1
     ----- stdout -----
-    -:3:8: F401 [*] `os` imported but unused
+    -:3:8: F401 (unused-import) [*] `os` imported but unused
     Found 1 error.
     [*] 1 fixable with the `--fix` option.
 
@@ -1041,7 +1041,7 @@ import os
     success: false
     exit_code: 1
     ----- stdout -----
-    -:2:8: F401 [*] `os` imported but unused
+    -:2:8: F401 (unused-import) [*] `os` imported but unused
     Found 1 error.
     [*] 1 fixable with the `--fix` option.
 
@@ -1118,7 +1118,7 @@ import os
     success: false
     exit_code: 1
     ----- stdout -----
-    -:2:8: F401 [*] `os` imported but unused
+    -:2:8: F401 (unused-import) [*] `os` imported but unused
     Found 1 error.
     [*] 1 fixable with the `--fix` option.
 
@@ -1159,7 +1159,7 @@ def func():
     success: false
     exit_code: 1
     ----- stdout -----
-    -:2:8: F401 [*] `os` imported but unused
+    -:2:8: F401 (unused-import) [*] `os` imported but unused
     Found 1 error.
     [*] 1 fixable with the `--fix` option.
 
@@ -1197,7 +1197,7 @@ fn negated_per_file_ignores() -> Result<()> {
     success: false
     exit_code: 1
     ----- stdout -----
-    selected.py:1:1: RUF901 [*] Hey this is a stable test rule with a safe fix.
+    selected.py:1:1: RUF901 (stable-test-rule-safe-fix) [*] Hey this is a stable test rule with a safe fix.
     Found 1 error.
     [*] 1 fixable with the `--fix` option.
 
@@ -1239,7 +1239,7 @@ fn negated_per_file_ignores_absolute() -> Result<()> {
         success: false
         exit_code: 1
         ----- stdout -----
-        src/selected.py:1:1: RUF901 [*] Hey this is a stable test rule with a safe fix.
+        src/selected.py:1:1: RUF901 (stable-test-rule-safe-fix) [*] Hey this is a stable test rule with a safe fix.
         Found 1 error.
         [*] 1 fixable with the `--fix` option.
 
@@ -1647,7 +1647,7 @@ select = ["UP006"]
         success: false
         exit_code: 1
         ----- stdout -----
-        test.py:1:31: UP006 [*] Use `list` instead of `List` for type annotation
+        test.py:1:31: UP006 (non-pep585-annotation) [*] Use `list` instead of `List` for type annotation
         Found 1 error.
         [*] 1 fixable with the `--fix` option.
 
@@ -1716,7 +1716,7 @@ select = ["UP006"]
         success: false
         exit_code: 1
         ----- stdout -----
-        test.py:1:31: UP006 [*] Use `list` instead of `List` for type annotation
+        test.py:1:31: UP006 (non-pep585-annotation) [*] Use `list` instead of `List` for type annotation
         Found 1 error.
         [*] 1 fixable with the `--fix` option.
 
@@ -1755,7 +1755,7 @@ select = ["UP006"]
         success: false
         exit_code: 1
         ----- stdout -----
-        test.py:1:31: UP006 [*] Use `list` instead of `List` for type annotation
+        test.py:1:31: UP006 (non-pep585-annotation) [*] Use `list` instead of `List` for type annotation
         Found 1 error.
         [*] 1 fixable with the `--fix` option.
 
@@ -1794,7 +1794,7 @@ select = ["UP006"]
         success: false
         exit_code: 1
         ----- stdout -----
-        test.py:1:31: UP006 [*] Use `list` instead of `List` for type annotation
+        test.py:1:31: UP006 (non-pep585-annotation) [*] Use `list` instead of `List` for type annotation
         Found 1 error.
         [*] 1 fixable with the `--fix` option.
 

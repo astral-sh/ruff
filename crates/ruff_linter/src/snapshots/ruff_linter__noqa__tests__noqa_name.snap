@@ -1,0 +1,21 @@
+---
+source: crates/ruff_linter/src/noqa.rs
+expression: "Directive::try_extract(source, TextSize::default())"
+---
+Ok(
+    Some(
+        Codes(
+            Codes {
+                range: 0..21,
+                codes: [
+                    RuleIdent {
+                        identifier: Name(
+                            "unused-import",
+                        ),
+                        range: 8..21,
+                    },
+                ],
+            },
+        ),
+    ),
+)

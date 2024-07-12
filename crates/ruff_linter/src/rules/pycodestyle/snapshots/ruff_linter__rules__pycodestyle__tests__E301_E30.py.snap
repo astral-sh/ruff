@@ -1,12 +1,12 @@
 ---
 source: crates/ruff_linter/src/rules/pycodestyle/mod.rs
 ---
-E30.py:478:5: E301 [*] Expected 1 blank line, found 0
+E30.py:478:5: E301 (blank-line-between-methods) [*] Expected 1 blank line, found 0
     |
 476 |     def func1():
 477 |         pass
 478 |     def func2():
-    |     ^^^ E301
+    |     ^^^ E301 (blank-line-between-methods)
 479 |         pass
 480 | # end
     |
@@ -21,12 +21,12 @@ E30.py:478:5: E301 [*] Expected 1 blank line, found 0
 479 480 |         pass
 480 481 | # end
 
-E30.py:489:5: E301 [*] Expected 1 blank line, found 0
+E30.py:489:5: E301 (blank-line-between-methods) [*] Expected 1 blank line, found 0
     |
 487 |         pass
 488 |     # comment
 489 |     def fn2():
-    |     ^^^ E301
+    |     ^^^ E301 (blank-line-between-methods)
 490 |         pass
 491 | # end
     |
@@ -41,11 +41,11 @@ E30.py:489:5: E301 [*] Expected 1 blank line, found 0
 489 490 |     def fn2():
 490 491 |         pass
 
-E30.py:499:5: E301 [*] Expected 1 blank line, found 0
+E30.py:499:5: E301 (blank-line-between-methods) [*] Expected 1 blank line, found 0
     |
 498 |     columns = []
 499 |     @classmethod
-    |     ^ E301
+    |     ^ E301 (blank-line-between-methods)
 500 |     def cls_method(cls) -> None:
 501 |         pass
     |
@@ -60,12 +60,12 @@ E30.py:499:5: E301 [*] Expected 1 blank line, found 0
 500 501 |     def cls_method(cls) -> None:
 501 502 |         pass
 
-E30.py:511:5: E301 [*] Expected 1 blank line, found 0
+E30.py:511:5: E301 (blank-line-between-methods) [*] Expected 1 blank line, found 0
     |
 509 |     def method(cls) -> None:
 510 |         pass
 511 |     @classmethod
-    |     ^ E301
+    |     ^ E301 (blank-line-between-methods)
 512 |     def cls_method(cls) -> None:
 513 |         pass
     |
@@ -80,12 +80,12 @@ E30.py:511:5: E301 [*] Expected 1 blank line, found 0
 512 513 |     def cls_method(cls) -> None:
 513 514 |         pass
 
-E30.py:526:5: E301 [*] Expected 1 blank line, found 0
+E30.py:526:5: E301 (blank-line-between-methods) [*] Expected 1 blank line, found 0
     |
 524 |     def bar(self, x: str) -> str:
 525 |         ...
 526 |     def bar(self, x: int | str) -> int | str:
-    |     ^^^ E301
+    |     ^^^ E301 (blank-line-between-methods)
 527 |         return x
 528 | # end
     |

@@ -1,38 +1,36 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_logging_format/mod.rs
 ---
-G002.py:3:14: G002 Logging statement uses `%`
+G002.py:3:14: G002 (logging-percent-format) Logging statement uses `%`
   |
 1 | import logging
 2 | 
 3 | logging.info("Hello %s" % "World!")
-  |              ^^^^^^^^^^^^^^^^^^^^^ G002
+  |              ^^^^^^^^^^^^^^^^^^^^^ G002 (logging-percent-format)
 4 | logging.log(logging.INFO, "Hello %s" % "World!")
   |
 
-G002.py:4:27: G002 Logging statement uses `%`
+G002.py:4:27: G002 (logging-percent-format) Logging statement uses `%`
   |
 3 | logging.info("Hello %s" % "World!")
 4 | logging.log(logging.INFO, "Hello %s" % "World!")
-  |                           ^^^^^^^^^^^^^^^^^^^^^ G002
+  |                           ^^^^^^^^^^^^^^^^^^^^^ G002 (logging-percent-format)
 5 | 
 6 | from logging import info, log
   |
 
-G002.py:8:6: G002 Logging statement uses `%`
+G002.py:8:6: G002 (logging-percent-format) Logging statement uses `%`
   |
 6 | from logging import info, log
 7 | 
 8 | info("Hello %s" % "World!")
-  |      ^^^^^^^^^^^^^^^^^^^^^ G002
+  |      ^^^^^^^^^^^^^^^^^^^^^ G002 (logging-percent-format)
 9 | log(logging.INFO, "Hello %s" % "World!")
   |
 
-G002.py:9:19: G002 Logging statement uses `%`
+G002.py:9:19: G002 (logging-percent-format) Logging statement uses `%`
   |
 8 | info("Hello %s" % "World!")
 9 | log(logging.INFO, "Hello %s" % "World!")
-  |                   ^^^^^^^^^^^^^^^^^^^^^ G002
+  |                   ^^^^^^^^^^^^^^^^^^^^^ G002 (logging-percent-format)
   |
-
-

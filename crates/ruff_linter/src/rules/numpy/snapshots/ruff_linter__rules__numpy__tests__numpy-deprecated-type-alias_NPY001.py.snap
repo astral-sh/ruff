@@ -1,11 +1,11 @@
 ---
 source: crates/ruff_linter/src/rules/numpy/mod.rs
 ---
-NPY001.py:6:1: NPY001 [*] Type alias `np.float` is deprecated, replace with builtin type
+NPY001.py:6:1: NPY001 (numpy-deprecated-type-alias) [*] Type alias `np.float` is deprecated, replace with builtin type
   |
 5 | # Error
 6 | npy.float
-  | ^^^^^^^^^ NPY001
+  | ^^^^^^^^^ NPY001 (numpy-deprecated-type-alias)
 7 | npy.int
   |
   = help: Replace `np.float` with builtin type
@@ -20,12 +20,12 @@ NPY001.py:6:1: NPY001 [*] Type alias `np.float` is deprecated, replace with buil
 8 8 | 
 9 9 | if dtype == np.object:
 
-NPY001.py:7:1: NPY001 [*] Type alias `np.int` is deprecated, replace with builtin type
+NPY001.py:7:1: NPY001 (numpy-deprecated-type-alias) [*] Type alias `np.int` is deprecated, replace with builtin type
   |
 5 | # Error
 6 | npy.float
 7 | npy.int
-  | ^^^^^^^ NPY001
+  | ^^^^^^^ NPY001 (numpy-deprecated-type-alias)
 8 | 
 9 | if dtype == np.object:
   |
@@ -41,12 +41,12 @@ NPY001.py:7:1: NPY001 [*] Type alias `np.int` is deprecated, replace with builti
 9 9 | if dtype == np.object:
 10 10 |     ...
 
-NPY001.py:9:13: NPY001 [*] Type alias `np.object` is deprecated, replace with builtin type
+NPY001.py:9:13: NPY001 (numpy-deprecated-type-alias) [*] Type alias `np.object` is deprecated, replace with builtin type
    |
  7 | npy.int
  8 | 
  9 | if dtype == np.object:
-   |             ^^^^^^^^^ NPY001
+   |             ^^^^^^^^^ NPY001 (numpy-deprecated-type-alias)
 10 |     ...
    |
    = help: Replace `np.object` with builtin type
@@ -61,12 +61,12 @@ NPY001.py:9:13: NPY001 [*] Type alias `np.object` is deprecated, replace with bu
 11 11 | 
 12 12 | result = result.select_dtypes([np.byte, np.ubyte, np.short, np.ushort, np.int, np.complex])
 
-NPY001.py:12:72: NPY001 [*] Type alias `np.int` is deprecated, replace with builtin type
+NPY001.py:12:72: NPY001 (numpy-deprecated-type-alias) [*] Type alias `np.int` is deprecated, replace with builtin type
    |
 10 |     ...
 11 | 
 12 | result = result.select_dtypes([np.byte, np.ubyte, np.short, np.ushort, np.int, np.complex])
-   |                                                                        ^^^^^^ NPY001
+   |                                                                        ^^^^^^ NPY001 (numpy-deprecated-type-alias)
 13 | 
 14 | pdf = pd.DataFrame(
    |
@@ -82,12 +82,12 @@ NPY001.py:12:72: NPY001 [*] Type alias `np.int` is deprecated, replace with buil
 14 14 | pdf = pd.DataFrame(
 15 15 |     data=[[1, 2, 3]],
 
-NPY001.py:12:80: NPY001 [*] Type alias `np.complex` is deprecated, replace with builtin type
+NPY001.py:12:80: NPY001 (numpy-deprecated-type-alias) [*] Type alias `np.complex` is deprecated, replace with builtin type
    |
 10 |     ...
 11 | 
 12 | result = result.select_dtypes([np.byte, np.ubyte, np.short, np.ushort, np.int, np.complex])
-   |                                                                                ^^^^^^^^^^ NPY001
+   |                                                                                ^^^^^^^^^^ NPY001 (numpy-deprecated-type-alias)
 13 | 
 14 | pdf = pd.DataFrame(
    |
@@ -103,12 +103,12 @@ NPY001.py:12:80: NPY001 [*] Type alias `np.complex` is deprecated, replace with 
 14 14 | pdf = pd.DataFrame(
 15 15 |     data=[[1, 2, 3]],
 
-NPY001.py:17:11: NPY001 [*] Type alias `np.object` is deprecated, replace with builtin type
+NPY001.py:17:11: NPY001 (numpy-deprecated-type-alias) [*] Type alias `np.object` is deprecated, replace with builtin type
    |
 15 |     data=[[1, 2, 3]],
 16 |     columns=["a", "b", "c"],
 17 |     dtype=numpy.object,
-   |           ^^^^^^^^^^^^ NPY001
+   |           ^^^^^^^^^^^^ NPY001 (numpy-deprecated-type-alias)
 18 | )
    |
    = help: Replace `np.object` with builtin type
@@ -123,12 +123,12 @@ NPY001.py:17:11: NPY001 [*] Type alias `np.object` is deprecated, replace with b
 19 19 | 
 20 20 | _ = arr.astype(np.int)
 
-NPY001.py:20:16: NPY001 [*] Type alias `np.int` is deprecated, replace with builtin type
+NPY001.py:20:16: NPY001 (numpy-deprecated-type-alias) [*] Type alias `np.int` is deprecated, replace with builtin type
    |
 18 | )
 19 | 
 20 | _ = arr.astype(np.int)
-   |                ^^^^^^ NPY001
+   |                ^^^^^^ NPY001 (numpy-deprecated-type-alias)
 21 | 
 22 | # Regression test for: https://github.com/astral-sh/ruff/issues/6952
    |
@@ -144,12 +144,12 @@ NPY001.py:20:16: NPY001 [*] Type alias `np.int` is deprecated, replace with buil
 22 22 | # Regression test for: https://github.com/astral-sh/ruff/issues/6952
 23 23 | from numpy import float
 
-NPY001.py:25:1: NPY001 [*] Type alias `np.float` is deprecated, replace with builtin type
+NPY001.py:25:1: NPY001 (numpy-deprecated-type-alias) [*] Type alias `np.float` is deprecated, replace with builtin type
    |
 23 | from numpy import float
 24 | 
 25 | float(1)
-   | ^^^^^ NPY001
+   | ^^^^^ NPY001 (numpy-deprecated-type-alias)
    |
    = help: Replace `np.float` with builtin type
 

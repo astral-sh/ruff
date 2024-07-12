@@ -91,7 +91,12 @@ impl Serialize for SerializedMessages<'_> {
             fingerprints.insert(message_fingerprint);
 
             let description = if let Some(rule) = message.rule() {
-                format!("({}) {}", rule.noqa_code(), message.body())
+                format!(
+                    "({code} {rule_name}) {body}",
+                    code = rule.noqa_code(),
+                    rule_name = rule.as_ref(),
+                    body = message.body()
+                )
             } else {
                 message.body().to_string()
             };

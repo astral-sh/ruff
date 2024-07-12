@@ -1,10 +1,10 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_quotes/mod.rs
 ---
-singles_escaped.py:1:26: Q003 [*] Change outer quotes to avoid escaping inner quotes
+singles_escaped.py:1:26: Q003 (avoidable-escaped-quote) [*] Change outer quotes to avoid escaping inner quotes
   |
 1 | this_should_raise_Q003 = "This is a \"string\""
-  |                          ^^^^^^^^^^^^^^^^^^^^^^ Q003
+  |                          ^^^^^^^^^^^^^^^^^^^^^^ Q003 (avoidable-escaped-quote)
 2 | this_is_fine = "'This' is a \"string\""
 3 | this_is_fine = 'This is a "string"'
   |
@@ -17,12 +17,12 @@ singles_escaped.py:1:26: Q003 [*] Change outer quotes to avoid escaping inner qu
 3 3 | this_is_fine = 'This is a "string"'
 4 4 | this_is_fine = '\'This\' is a "string"'
 
-singles_escaped.py:9:5: Q003 [*] Change outer quotes to avoid escaping inner quotes
+singles_escaped.py:9:5: Q003 (avoidable-escaped-quote) [*] Change outer quotes to avoid escaping inner quotes
    |
  7 | this_should_raise = (
  8 |     "This is a"
  9 |     "\"string\""
-   |     ^^^^^^^^^^^^ Q003
+   |     ^^^^^^^^^^^^ Q003 (avoidable-escaped-quote)
 10 | )
    |
    = help: Change outer quotes to avoid escaping inner quotes
@@ -37,11 +37,11 @@ singles_escaped.py:9:5: Q003 [*] Change outer quotes to avoid escaping inner quo
 11 11 | 
 12 12 | # Same as above, but with f-strings
 
-singles_escaped.py:13:1: Q003 [*] Change outer quotes to avoid escaping inner quotes
+singles_escaped.py:13:1: Q003 (avoidable-escaped-quote) [*] Change outer quotes to avoid escaping inner quotes
    |
 12 | # Same as above, but with f-strings
 13 | f"This is a \"string\""
-   | ^^^^^^^^^^^^^^^^^^^^^^^ Q003
+   | ^^^^^^^^^^^^^^^^^^^^^^^ Q003 (avoidable-escaped-quote)
 14 | f"'This' is a \"string\""
 15 | f'This is a "string"'
    |
@@ -57,12 +57,12 @@ singles_escaped.py:13:1: Q003 [*] Change outer quotes to avoid escaping inner qu
 15 15 | f'This is a "string"'
 16 16 | f'\'This\' is a "string"'
 
-singles_escaped.py:21:5: Q003 [*] Change outer quotes to avoid escaping inner quotes
+singles_escaped.py:21:5: Q003 (avoidable-escaped-quote) [*] Change outer quotes to avoid escaping inner quotes
    |
 19 | foo = (
 20 |     f"This is a"
 21 |     f"\"string\""
-   |     ^^^^^^^^^^^^^ Q003
+   |     ^^^^^^^^^^^^^ Q003 (avoidable-escaped-quote)
 22 | )
    |
    = help: Change outer quotes to avoid escaping inner quotes
@@ -77,12 +77,12 @@ singles_escaped.py:21:5: Q003 [*] Change outer quotes to avoid escaping inner qu
 23 23 | 
 24 24 | # Nested f-strings (Python 3.12+)
 
-singles_escaped.py:31:1: Q003 [*] Change outer quotes to avoid escaping inner quotes
+singles_escaped.py:31:1: Q003 (avoidable-escaped-quote) [*] Change outer quotes to avoid escaping inner quotes
    |
 29 | #
 30 | # but as the actual string itself is invalid pre 3.12, we don't catch it.
 31 | f"\"foo\" {"foo"}"  # Q003
-   | ^^^^^^^^^^^^^^^^^^ Q003
+   | ^^^^^^^^^^^^^^^^^^ Q003 (avoidable-escaped-quote)
 32 | f"\"foo\" {f"foo"}"  # Q003
 33 | f"\"foo\" {f"\"foo\""} \"\""  # Q003
    |
@@ -98,12 +98,12 @@ singles_escaped.py:31:1: Q003 [*] Change outer quotes to avoid escaping inner qu
 33 33 | f"\"foo\" {f"\"foo\""} \"\""  # Q003
 34 34 | 
 
-singles_escaped.py:32:1: Q003 [*] Change outer quotes to avoid escaping inner quotes
+singles_escaped.py:32:1: Q003 (avoidable-escaped-quote) [*] Change outer quotes to avoid escaping inner quotes
    |
 30 | # but as the actual string itself is invalid pre 3.12, we don't catch it.
 31 | f"\"foo\" {"foo"}"  # Q003
 32 | f"\"foo\" {f"foo"}"  # Q003
-   | ^^^^^^^^^^^^^^^^^^^ Q003
+   | ^^^^^^^^^^^^^^^^^^^ Q003 (avoidable-escaped-quote)
 33 | f"\"foo\" {f"\"foo\""} \"\""  # Q003
    |
    = help: Change outer quotes to avoid escaping inner quotes
@@ -118,12 +118,12 @@ singles_escaped.py:32:1: Q003 [*] Change outer quotes to avoid escaping inner qu
 34 34 | 
 35 35 | f"normal {f"nested"} normal"
 
-singles_escaped.py:33:1: Q003 [*] Change outer quotes to avoid escaping inner quotes
+singles_escaped.py:33:1: Q003 (avoidable-escaped-quote) [*] Change outer quotes to avoid escaping inner quotes
    |
 31 | f"\"foo\" {"foo"}"  # Q003
 32 | f"\"foo\" {f"foo"}"  # Q003
 33 | f"\"foo\" {f"\"foo\""} \"\""  # Q003
-   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^ Q003
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^ Q003 (avoidable-escaped-quote)
 34 | 
 35 | f"normal {f"nested"} normal"
    |
@@ -139,12 +139,12 @@ singles_escaped.py:33:1: Q003 [*] Change outer quotes to avoid escaping inner qu
 35 35 | f"normal {f"nested"} normal"
 36 36 | f"\"normal\" {f"nested"} normal"  # Q003
 
-singles_escaped.py:33:12: Q003 [*] Change outer quotes to avoid escaping inner quotes
+singles_escaped.py:33:12: Q003 (avoidable-escaped-quote) [*] Change outer quotes to avoid escaping inner quotes
    |
 31 | f"\"foo\" {"foo"}"  # Q003
 32 | f"\"foo\" {f"foo"}"  # Q003
 33 | f"\"foo\" {f"\"foo\""} \"\""  # Q003
-   |            ^^^^^^^^^^ Q003
+   |            ^^^^^^^^^^ Q003 (avoidable-escaped-quote)
 34 | 
 35 | f"normal {f"nested"} normal"
    |
@@ -160,11 +160,11 @@ singles_escaped.py:33:12: Q003 [*] Change outer quotes to avoid escaping inner q
 35 35 | f"normal {f"nested"} normal"
 36 36 | f"\"normal\" {f"nested"} normal"  # Q003
 
-singles_escaped.py:36:1: Q003 [*] Change outer quotes to avoid escaping inner quotes
+singles_escaped.py:36:1: Q003 (avoidable-escaped-quote) [*] Change outer quotes to avoid escaping inner quotes
    |
 35 | f"normal {f"nested"} normal"
 36 | f"\"normal\" {f"nested"} normal"  # Q003
-   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ Q003
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ Q003 (avoidable-escaped-quote)
 37 | f"\"normal\" {f"nested"} 'single quotes'"
 38 | f"\"normal\" {f"\"nested\" {"other"} normal"} 'single quotes'"  # Q003
    |
@@ -180,12 +180,12 @@ singles_escaped.py:36:1: Q003 [*] Change outer quotes to avoid escaping inner qu
 38 38 | f"\"normal\" {f"\"nested\" {"other"} normal"} 'single quotes'"  # Q003
 39 39 | f"\"normal\" {f"\"nested\" {"other"} 'single quotes'"} normal"  # Q003
 
-singles_escaped.py:38:15: Q003 [*] Change outer quotes to avoid escaping inner quotes
+singles_escaped.py:38:15: Q003 (avoidable-escaped-quote) [*] Change outer quotes to avoid escaping inner quotes
    |
 36 | f"\"normal\" {f"nested"} normal"  # Q003
 37 | f"\"normal\" {f"nested"} 'single quotes'"
 38 | f"\"normal\" {f"\"nested\" {"other"} normal"} 'single quotes'"  # Q003
-   |               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ Q003
+   |               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ Q003 (avoidable-escaped-quote)
 39 | f"\"normal\" {f"\"nested\" {"other"} 'single quotes'"} normal"  # Q003
    |
    = help: Change outer quotes to avoid escaping inner quotes
@@ -198,12 +198,12 @@ singles_escaped.py:38:15: Q003 [*] Change outer quotes to avoid escaping inner q
    38 |+f"\"normal\" {f'"nested" {"other"} normal'} 'single quotes'"  # Q003
 39 39 | f"\"normal\" {f"\"nested\" {"other"} 'single quotes'"} normal"  # Q003
 
-singles_escaped.py:39:1: Q003 [*] Change outer quotes to avoid escaping inner quotes
+singles_escaped.py:39:1: Q003 (avoidable-escaped-quote) [*] Change outer quotes to avoid escaping inner quotes
    |
 37 | f"\"normal\" {f"nested"} 'single quotes'"
 38 | f"\"normal\" {f"\"nested\" {"other"} normal"} 'single quotes'"  # Q003
 39 | f"\"normal\" {f"\"nested\" {"other"} 'single quotes'"} normal"  # Q003
-   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ Q003
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ Q003 (avoidable-escaped-quote)
    |
    = help: Change outer quotes to avoid escaping inner quotes
 
@@ -213,5 +213,3 @@ singles_escaped.py:39:1: Q003 [*] Change outer quotes to avoid escaping inner qu
 38 38 | f"\"normal\" {f"\"nested\" {"other"} normal"} 'single quotes'"  # Q003
 39    |-f"\"normal\" {f"\"nested\" {"other"} 'single quotes'"} normal"  # Q003
    39 |+f'"normal" {f"\"nested\" {"other"} 'single quotes'"} normal'  # Q003
-
-

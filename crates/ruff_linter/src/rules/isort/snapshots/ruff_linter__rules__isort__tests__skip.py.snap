@@ -1,14 +1,14 @@
 ---
 source: crates/ruff_linter/src/rules/isort/mod.rs
 ---
-skip.py:20:1: I001 [*] Import block is un-sorted or un-formatted
+skip.py:20:1: I001 (unsorted-imports) [*] Import block is un-sorted or un-formatted
    |
 18 |       import sys
 19 |       import os  # isort: skip
 20 | /     import collections
 21 | |     import abc
 22 | | 
-   | |_^ I001
+   | |_^ I001 (unsorted-imports)
 23 |   
 24 |   def f():
    |
@@ -25,14 +25,14 @@ skip.py:20:1: I001 [*] Import block is un-sorted or un-formatted
 23 23 | 
 24 24 | def f():
 
-skip.py:27:1: I001 [*] Import block is un-sorted or un-formatted
+skip.py:27:1: I001 (unsorted-imports) [*] Import block is un-sorted or un-formatted
    |
 25 |       import sys
 26 |       import os  # isort:skip
 27 | /     import collections
 28 | |     import abc
 29 | | 
-   | |_^ I001
+   | |_^ I001 (unsorted-imports)
 30 |   
 31 |   def f():
    |
@@ -49,7 +49,7 @@ skip.py:27:1: I001 [*] Import block is un-sorted or un-formatted
 30 30 | 
 31 31 | def f():
 
-skip.py:34:1: I001 [*] Import block is un-sorted or un-formatted
+skip.py:34:1: I001 (unsorted-imports) [*] Import block is un-sorted or un-formatted
    |
 32 |       import sys; import os  # isort:skip
 33 |       import sys; import os  # isort:skip  # isort:skip
@@ -64,5 +64,3 @@ skip.py:34:1: I001 [*] Import block is un-sorted or un-formatted
 34    |-    import sys; import os
    34 |+    import os
    35 |+    import sys
-
-

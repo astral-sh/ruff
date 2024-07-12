@@ -1,31 +1,31 @@
 ---
 source: crates/ruff_linter/src/rules/ruff/mod.rs
 ---
-RUF005.py:4:1: RUF005 Consider `[*foo]` instead of concatenation
+RUF005.py:4:1: RUF005 (collection-literal-concatenation) Consider `[*foo]` instead of concatenation
   |
 2 |   # Non-fixable Errors.
 3 |   ###
 4 | / foo + [  # This will be preserved.
 5 | | ]
-  | |_^ RUF005
+  | |_^ RUF005 (collection-literal-concatenation)
 6 |   [*foo] + [  # This will be preserved.
 7 |   ]
   |
   = help: Replace with `[*foo]`
 
-RUF005.py:6:1: RUF005 Consider `[*foo]` instead of concatenation
+RUF005.py:6:1: RUF005 (collection-literal-concatenation) Consider `[*foo]` instead of concatenation
   |
 4 |   foo + [  # This will be preserved.
 5 |   ]
 6 | / [*foo] + [  # This will be preserved.
 7 | | ]
-  | |_^ RUF005
+  | |_^ RUF005 (collection-literal-concatenation)
 8 |   first = [
 9 |       # The order
   |
   = help: Replace with `[*foo]`
 
-RUF005.py:16:10: RUF005 Consider `[*first, 4, 5, 6]` instead of concatenation
+RUF005.py:16:10: RUF005 (collection-literal-concatenation) Consider `[*first, 4, 5, 6]` instead of concatenation
    |
 14 |       # to preserve
 15 |   ]
@@ -38,15 +38,15 @@ RUF005.py:16:10: RUF005 Consider `[*first, 4, 5, 6]` instead of concatenation
 21 | |     # touch
 22 | |     6,
 23 | | ]
-   | |_^ RUF005
+   | |_^ RUF005 (collection-literal-concatenation)
    |
    = help: Replace with `[*first, 4, 5, 6]`
 
-RUF005.py:39:7: RUF005 [*] Consider `[1, 2, 3, *foo]` instead of concatenation
+RUF005.py:39:7: RUF005 (collection-literal-concatenation) [*] Consider `[1, 2, 3, *foo]` instead of concatenation
    |
 38 | foo = [4, 5, 6]
 39 | bar = [1, 2, 3] + foo
-   |       ^^^^^^^^^^^^^^^ RUF005
+   |       ^^^^^^^^^^^^^^^ RUF005 (collection-literal-concatenation)
 40 | zoob = tuple(bar)
 41 | quux = (7, 8, 9) + zoob
    |
@@ -62,12 +62,12 @@ RUF005.py:39:7: RUF005 [*] Consider `[1, 2, 3, *foo]` instead of concatenation
 41 41 | quux = (7, 8, 9) + zoob
 42 42 | spam = quux + (10, 11, 12)
 
-RUF005.py:41:8: RUF005 [*] Consider `(7, 8, 9, *zoob)` instead of concatenation
+RUF005.py:41:8: RUF005 (collection-literal-concatenation) [*] Consider `(7, 8, 9, *zoob)` instead of concatenation
    |
 39 | bar = [1, 2, 3] + foo
 40 | zoob = tuple(bar)
 41 | quux = (7, 8, 9) + zoob
-   |        ^^^^^^^^^^^^^^^^ RUF005
+   |        ^^^^^^^^^^^^^^^^ RUF005 (collection-literal-concatenation)
 42 | spam = quux + (10, 11, 12)
 43 | spom = list(spam)
    |
@@ -83,12 +83,12 @@ RUF005.py:41:8: RUF005 [*] Consider `(7, 8, 9, *zoob)` instead of concatenation
 43 43 | spom = list(spam)
 44 44 | eggs = spom + [13, 14, 15]
 
-RUF005.py:42:8: RUF005 [*] Consider `(*quux, 10, 11, 12)` instead of concatenation
+RUF005.py:42:8: RUF005 (collection-literal-concatenation) [*] Consider `(*quux, 10, 11, 12)` instead of concatenation
    |
 40 | zoob = tuple(bar)
 41 | quux = (7, 8, 9) + zoob
 42 | spam = quux + (10, 11, 12)
-   |        ^^^^^^^^^^^^^^^^^^^ RUF005
+   |        ^^^^^^^^^^^^^^^^^^^ RUF005 (collection-literal-concatenation)
 43 | spom = list(spam)
 44 | eggs = spom + [13, 14, 15]
    |
@@ -104,12 +104,12 @@ RUF005.py:42:8: RUF005 [*] Consider `(*quux, 10, 11, 12)` instead of concatenati
 44 44 | eggs = spom + [13, 14, 15]
 45 45 | elatement = ("we all say",) + yay()
 
-RUF005.py:44:8: RUF005 [*] Consider `[*spom, 13, 14, 15]` instead of concatenation
+RUF005.py:44:8: RUF005 (collection-literal-concatenation) [*] Consider `[*spom, 13, 14, 15]` instead of concatenation
    |
 42 | spam = quux + (10, 11, 12)
 43 | spom = list(spam)
 44 | eggs = spom + [13, 14, 15]
-   |        ^^^^^^^^^^^^^^^^^^^ RUF005
+   |        ^^^^^^^^^^^^^^^^^^^ RUF005 (collection-literal-concatenation)
 45 | elatement = ("we all say",) + yay()
 46 | excitement = ("we all think",) + Fun().yay()
    |
@@ -125,12 +125,12 @@ RUF005.py:44:8: RUF005 [*] Consider `[*spom, 13, 14, 15]` instead of concatenati
 46 46 | excitement = ("we all think",) + Fun().yay()
 47 47 | astonishment = ("we all feel",) + Fun.words
 
-RUF005.py:45:13: RUF005 [*] Consider `("we all say", *yay())` instead of concatenation
+RUF005.py:45:13: RUF005 (collection-literal-concatenation) [*] Consider `("we all say", *yay())` instead of concatenation
    |
 43 | spom = list(spam)
 44 | eggs = spom + [13, 14, 15]
 45 | elatement = ("we all say",) + yay()
-   |             ^^^^^^^^^^^^^^^^^^^^^^^ RUF005
+   |             ^^^^^^^^^^^^^^^^^^^^^^^ RUF005 (collection-literal-concatenation)
 46 | excitement = ("we all think",) + Fun().yay()
 47 | astonishment = ("we all feel",) + Fun.words
    |
@@ -146,12 +146,12 @@ RUF005.py:45:13: RUF005 [*] Consider `("we all say", *yay())` instead of concate
 47 47 | astonishment = ("we all feel",) + Fun.words
 48 48 | 
 
-RUF005.py:46:14: RUF005 [*] Consider `("we all think", *Fun().yay())` instead of concatenation
+RUF005.py:46:14: RUF005 (collection-literal-concatenation) [*] Consider `("we all think", *Fun().yay())` instead of concatenation
    |
 44 | eggs = spom + [13, 14, 15]
 45 | elatement = ("we all say",) + yay()
 46 | excitement = ("we all think",) + Fun().yay()
-   |              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF005
+   |              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF005 (collection-literal-concatenation)
 47 | astonishment = ("we all feel",) + Fun.words
    |
    = help: Replace with `("we all think", *Fun().yay())`
@@ -166,12 +166,12 @@ RUF005.py:46:14: RUF005 [*] Consider `("we all think", *Fun().yay())` instead of
 48 48 | 
 49 49 | chain = ["a", "b", "c"] + eggs + list(("yes", "no", "pants") + zoob)
 
-RUF005.py:47:16: RUF005 [*] Consider `("we all feel", *Fun.words)` instead of concatenation
+RUF005.py:47:16: RUF005 (collection-literal-concatenation) [*] Consider `("we all feel", *Fun.words)` instead of concatenation
    |
 45 | elatement = ("we all say",) + yay()
 46 | excitement = ("we all think",) + Fun().yay()
 47 | astonishment = ("we all feel",) + Fun.words
-   |                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF005
+   |                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF005 (collection-literal-concatenation)
 48 | 
 49 | chain = ["a", "b", "c"] + eggs + list(("yes", "no", "pants") + zoob)
    |
@@ -187,12 +187,12 @@ RUF005.py:47:16: RUF005 [*] Consider `("we all feel", *Fun.words)` instead of co
 49 49 | chain = ["a", "b", "c"] + eggs + list(("yes", "no", "pants") + zoob)
 50 50 | 
 
-RUF005.py:49:9: RUF005 [*] Consider iterable unpacking instead of concatenation
+RUF005.py:49:9: RUF005 (collection-literal-concatenation) [*] Consider iterable unpacking instead of concatenation
    |
 47 | astonishment = ("we all feel",) + Fun.words
 48 | 
 49 | chain = ["a", "b", "c"] + eggs + list(("yes", "no", "pants") + zoob)
-   |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF005
+   |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF005 (collection-literal-concatenation)
 50 | 
 51 | baz = () + zoob
    |
@@ -208,12 +208,12 @@ RUF005.py:49:9: RUF005 [*] Consider iterable unpacking instead of concatenation
 51 51 | baz = () + zoob
 52 52 | 
 
-RUF005.py:49:39: RUF005 [*] Consider `("yes", "no", "pants", *zoob)` instead of concatenation
+RUF005.py:49:39: RUF005 (collection-literal-concatenation) [*] Consider `("yes", "no", "pants", *zoob)` instead of concatenation
    |
 47 | astonishment = ("we all feel",) + Fun.words
 48 | 
 49 | chain = ["a", "b", "c"] + eggs + list(("yes", "no", "pants") + zoob)
-   |                                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF005
+   |                                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF005 (collection-literal-concatenation)
 50 | 
 51 | baz = () + zoob
    |
@@ -229,12 +229,12 @@ RUF005.py:49:39: RUF005 [*] Consider `("yes", "no", "pants", *zoob)` instead of 
 51 51 | baz = () + zoob
 52 52 | 
 
-RUF005.py:51:7: RUF005 [*] Consider `(*zoob,)` instead of concatenation
+RUF005.py:51:7: RUF005 (collection-literal-concatenation) [*] Consider `(*zoob,)` instead of concatenation
    |
 49 | chain = ["a", "b", "c"] + eggs + list(("yes", "no", "pants") + zoob)
 50 | 
 51 | baz = () + zoob
-   |       ^^^^^^^^^ RUF005
+   |       ^^^^^^^^^ RUF005 (collection-literal-concatenation)
 52 | 
 53 | [] + foo + [
    |
@@ -250,13 +250,13 @@ RUF005.py:51:7: RUF005 [*] Consider `(*zoob,)` instead of concatenation
 53 53 | [] + foo + [
 54 54 | ]
 
-RUF005.py:53:1: RUF005 [*] Consider `[*foo]` instead of concatenation
+RUF005.py:53:1: RUF005 (collection-literal-concatenation) [*] Consider `[*foo]` instead of concatenation
    |
 51 |   baz = () + zoob
 52 |   
 53 | / [] + foo + [
 54 | | ]
-   | |_^ RUF005
+   | |_^ RUF005 (collection-literal-concatenation)
 55 |   
 56 |   pylint_call = [sys.executable, "-m", "pylint"] + args + [path]
    |
@@ -273,12 +273,12 @@ RUF005.py:53:1: RUF005 [*] Consider `[*foo]` instead of concatenation
 56 55 | pylint_call = [sys.executable, "-m", "pylint"] + args + [path]
 57 56 | pylint_call_tuple = (sys.executable, "-m", "pylint") + args + (path, path2)
 
-RUF005.py:56:15: RUF005 [*] Consider `[sys.executable, "-m", "pylint", *args, path]` instead of concatenation
+RUF005.py:56:15: RUF005 (collection-literal-concatenation) [*] Consider `[sys.executable, "-m", "pylint", *args, path]` instead of concatenation
    |
 54 | ]
 55 | 
 56 | pylint_call = [sys.executable, "-m", "pylint"] + args + [path]
-   |               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF005
+   |               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF005 (collection-literal-concatenation)
 57 | pylint_call_tuple = (sys.executable, "-m", "pylint") + args + (path, path2)
 58 | b = a + [2, 3] + [4]
    |
@@ -294,11 +294,11 @@ RUF005.py:56:15: RUF005 [*] Consider `[sys.executable, "-m", "pylint", *args, pa
 58 58 | b = a + [2, 3] + [4]
 59 59 | 
 
-RUF005.py:57:21: RUF005 [*] Consider iterable unpacking instead of concatenation
+RUF005.py:57:21: RUF005 (collection-literal-concatenation) [*] Consider iterable unpacking instead of concatenation
    |
 56 | pylint_call = [sys.executable, "-m", "pylint"] + args + [path]
 57 | pylint_call_tuple = (sys.executable, "-m", "pylint") + args + (path, path2)
-   |                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF005
+   |                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF005 (collection-literal-concatenation)
 58 | b = a + [2, 3] + [4]
    |
    = help: Replace with iterable unpacking
@@ -313,12 +313,12 @@ RUF005.py:57:21: RUF005 [*] Consider iterable unpacking instead of concatenation
 59 59 | 
 60 60 | # Uses the non-preferred quote style, which should be retained.
 
-RUF005.py:58:5: RUF005 [*] Consider `[*a, 2, 3, 4]` instead of concatenation
+RUF005.py:58:5: RUF005 (collection-literal-concatenation) [*] Consider `[*a, 2, 3, 4]` instead of concatenation
    |
 56 | pylint_call = [sys.executable, "-m", "pylint"] + args + [path]
 57 | pylint_call_tuple = (sys.executable, "-m", "pylint") + args + (path, path2)
 58 | b = a + [2, 3] + [4]
-   |     ^^^^^^^^^^^^^^^^ RUF005
+   |     ^^^^^^^^^^^^^^^^ RUF005 (collection-literal-concatenation)
 59 | 
 60 | # Uses the non-preferred quote style, which should be retained.
    |
@@ -334,11 +334,11 @@ RUF005.py:58:5: RUF005 [*] Consider `[*a, 2, 3, 4]` instead of concatenation
 60 60 | # Uses the non-preferred quote style, which should be retained.
 61 61 | f"{a() + ['b']}"
 
-RUF005.py:61:4: RUF005 [*] Consider `[*a(), 'b']` instead of concatenation
+RUF005.py:61:4: RUF005 (collection-literal-concatenation) [*] Consider `[*a(), 'b']` instead of concatenation
    |
 60 | # Uses the non-preferred quote style, which should be retained.
 61 | f"{a() + ['b']}"
-   |    ^^^^^^^^^^^ RUF005
+   |    ^^^^^^^^^^^ RUF005 (collection-literal-concatenation)
 62 | 
 63 | ###
    |
@@ -353,5 +353,3 @@ RUF005.py:61:4: RUF005 [*] Consider `[*a(), 'b']` instead of concatenation
 62 62 | 
 63 63 | ###
 64 64 | # Non-errors.
-
-

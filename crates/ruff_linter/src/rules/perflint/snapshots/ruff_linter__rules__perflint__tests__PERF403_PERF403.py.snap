@@ -1,58 +1,58 @@
 ---
 source: crates/ruff_linter/src/rules/perflint/mod.rs
 ---
-PERF403.py:5:9: PERF403 Use a dictionary comprehension instead of a for-loop
+PERF403.py:5:9: PERF403 (manual-dict-comprehension) Use a dictionary comprehension instead of a for-loop
   |
 3 |     result = {}
 4 |     for idx, name in enumerate(fruit):
 5 |         result[idx] = name  # PERF403
-  |         ^^^^^^^^^^^^^^^^^^ PERF403
+  |         ^^^^^^^^^^^^^^^^^^ PERF403 (manual-dict-comprehension)
   |
 
-PERF403.py:13:13: PERF403 Use a dictionary comprehension instead of a for-loop
+PERF403.py:13:13: PERF403 (manual-dict-comprehension) Use a dictionary comprehension instead of a for-loop
    |
 11 |     for idx, name in enumerate(fruit):
 12 |         if idx % 2:
 13 |             result[idx] = name  # PERF403
-   |             ^^^^^^^^^^^^^^^^^^ PERF403
+   |             ^^^^^^^^^^^^^^^^^^ PERF403 (manual-dict-comprehension)
    |
 
-PERF403.py:31:13: PERF403 Use a dictionary comprehension instead of a for-loop
+PERF403.py:31:13: PERF403 (manual-dict-comprehension) Use a dictionary comprehension instead of a for-loop
    |
 29 |     for idx, name in enumerate(fruit):
 30 |         if idx % 2:
 31 |             result[idx] = name  # PERF403
-   |             ^^^^^^^^^^^^^^^^^^ PERF403
+   |             ^^^^^^^^^^^^^^^^^^ PERF403 (manual-dict-comprehension)
    |
 
-PERF403.py:61:13: PERF403 Use a dictionary comprehension instead of a for-loop
+PERF403.py:61:13: PERF403 (manual-dict-comprehension) Use a dictionary comprehension instead of a for-loop
    |
 59 |     for idx, name in enumerate(fruit):
 60 |         if idx % 2:
 61 |             result[idx] = name  # PERF403
-   |             ^^^^^^^^^^^^^^^^^^ PERF403
+   |             ^^^^^^^^^^^^^^^^^^ PERF403 (manual-dict-comprehension)
    |
 
-PERF403.py:76:9: PERF403 Use a dictionary comprehension instead of a for-loop
+PERF403.py:76:9: PERF403 (manual-dict-comprehension) Use a dictionary comprehension instead of a for-loop
    |
 74 |     result = {}
 75 |     for name in fruit:
 76 |         result[name] = name  # PERF403
-   |         ^^^^^^^^^^^^^^^^^^^ PERF403
+   |         ^^^^^^^^^^^^^^^^^^^ PERF403 (manual-dict-comprehension)
    |
 
-PERF403.py:83:9: PERF403 Use a dictionary comprehension instead of a for-loop
+PERF403.py:83:9: PERF403 (manual-dict-comprehension) Use a dictionary comprehension instead of a for-loop
    |
 81 |     result = {}
 82 |     for idx, name in enumerate(fruit):
 83 |         result[name] = idx  # PERF403
-   |         ^^^^^^^^^^^^^^^^^^ PERF403
+   |         ^^^^^^^^^^^^^^^^^^ PERF403 (manual-dict-comprehension)
    |
 
-PERF403.py:91:9: PERF403 Use a dictionary comprehension instead of a for-loop
+PERF403.py:91:9: PERF403 (manual-dict-comprehension) Use a dictionary comprehension instead of a for-loop
    |
 89 |     result = SneakyDict()
 90 |     for idx, name in enumerate(fruit):
 91 |         result[name] = idx  # PERF403
-   |         ^^^^^^^^^^^^^^^^^^ PERF403
+   |         ^^^^^^^^^^^^^^^^^^ PERF403 (manual-dict-comprehension)
    |

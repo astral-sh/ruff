@@ -1,10 +1,10 @@
 ---
 source: crates/ruff_linter/src/rules/pylint/mod.rs
 ---
-singledispatchmethod_function.py:4:1: PLE1520 [*] `@singledispatchmethod` decorator should not be used on non-method functions
+singledispatchmethod_function.py:4:1: PLE1520 (singledispatchmethod-function) [*] `@singledispatchmethod` decorator should not be used on non-method functions
   |
 4 | @singledispatchmethod  # [singledispatchmethod-function]
-  | ^^^^^^^^^^^^^^^^^^^^^ PLE1520
+  | ^^^^^^^^^^^^^^^^^^^^^ PLE1520 (singledispatchmethod-function)
 5 | def convert_position(position):
 6 |     pass
   |

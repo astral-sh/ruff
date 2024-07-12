@@ -1,51 +1,51 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_datetimez/mod.rs
 ---
-DTZ006.py:4:1: DTZ006 `datetime.datetime.fromtimestamp()` called without a `tz` argument
+DTZ006.py:4:1: DTZ006 (call-datetime-fromtimestamp) `datetime.datetime.fromtimestamp()` called without a `tz` argument
   |
 3 | # no args
 4 | datetime.datetime.fromtimestamp(1234)
-  | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ DTZ006
+  | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ DTZ006 (call-datetime-fromtimestamp)
 5 | 
 6 | # wrong keywords
   |
   = help: Pass a `datetime.timezone` object to the `tz` parameter
 
-DTZ006.py:7:1: DTZ006 `datetime.datetime.fromtimestamp()` called without a `tz` argument
+DTZ006.py:7:1: DTZ006 (call-datetime-fromtimestamp) `datetime.datetime.fromtimestamp()` called without a `tz` argument
   |
 6 | # wrong keywords
 7 | datetime.datetime.fromtimestamp(1234, bad=datetime.timezone.utc)
-  | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ DTZ006
+  | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ DTZ006 (call-datetime-fromtimestamp)
 8 | 
 9 | # none args
   |
   = help: Pass a `datetime.timezone` object to the `tz` parameter
 
-DTZ006.py:10:1: DTZ006 `tz=None` passed to `datetime.datetime.fromtimestamp()`
+DTZ006.py:10:1: DTZ006 (call-datetime-fromtimestamp) `tz=None` passed to `datetime.datetime.fromtimestamp()`
    |
  9 | # none args
 10 | datetime.datetime.fromtimestamp(1234, None)
-   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ DTZ006
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ DTZ006 (call-datetime-fromtimestamp)
 11 | 
 12 | # none keywords
    |
    = help: Pass a `datetime.timezone` object to the `tz` parameter
 
-DTZ006.py:13:1: DTZ006 `tz=None` passed to `datetime.datetime.fromtimestamp()`
+DTZ006.py:13:1: DTZ006 (call-datetime-fromtimestamp) `tz=None` passed to `datetime.datetime.fromtimestamp()`
    |
 12 | # none keywords
 13 | datetime.datetime.fromtimestamp(1234, tz=None)
-   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ DTZ006
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ DTZ006 (call-datetime-fromtimestamp)
 14 | 
 15 | from datetime import datetime
    |
    = help: Pass a `datetime.timezone` object to the `tz` parameter
 
-DTZ006.py:18:1: DTZ006 `datetime.datetime.fromtimestamp()` called without a `tz` argument
+DTZ006.py:18:1: DTZ006 (call-datetime-fromtimestamp) `datetime.datetime.fromtimestamp()` called without a `tz` argument
    |
 17 | # no args unqualified
 18 | datetime.fromtimestamp(1234)
-   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^ DTZ006
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^ DTZ006 (call-datetime-fromtimestamp)
 19 | 
 20 | # uses `astimezone` method
    |

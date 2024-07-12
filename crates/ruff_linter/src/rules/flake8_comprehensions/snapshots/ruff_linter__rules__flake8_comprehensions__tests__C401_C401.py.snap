@@ -1,11 +1,11 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_comprehensions/mod.rs
 ---
-C401.py:2:13: C401 [*] Unnecessary generator (rewrite as a `set` comprehension)
+C401.py:2:13: C401 (unnecessary-generator-set) [*] Unnecessary generator (rewrite as a `set` comprehension)
   |
 1 | # Cannot conbime with C416. Should use set comprehension here.
 2 | even_nums = set(2 * x for x in range(3))
-  |             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^ C401
+  |             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^ C401 (unnecessary-generator-set)
 3 | odd_nums = set(
 4 |     2 * x + 1 for x in range(3)
   |
@@ -19,7 +19,7 @@ C401.py:2:13: C401 [*] Unnecessary generator (rewrite as a `set` comprehension)
 4 4 |     2 * x + 1 for x in range(3)
 5 5 | )
 
-C401.py:3:12: C401 [*] Unnecessary generator (rewrite as a `set` comprehension)
+C401.py:3:12: C401 (unnecessary-generator-set) [*] Unnecessary generator (rewrite as a `set` comprehension)
   |
 1 |   # Cannot conbime with C416. Should use set comprehension here.
 2 |   even_nums = set(2 * x for x in range(3))
@@ -27,7 +27,7 @@ C401.py:3:12: C401 [*] Unnecessary generator (rewrite as a `set` comprehension)
   |  ____________^
 4 | |     2 * x + 1 for x in range(3)
 5 | | )
-  | |_^ C401
+  | |_^ C401 (unnecessary-generator-set)
 6 |   small_nums = f"{set(a if a < 6 else 0 for a in range(3))}"
   |
   = help: Rewrite as a `set` comprehension
@@ -44,12 +44,12 @@ C401.py:3:12: C401 [*] Unnecessary generator (rewrite as a `set` comprehension)
 7 7 | 
 8 8 | def f(x):
 
-C401.py:6:17: C401 [*] Unnecessary generator (rewrite as a `set` comprehension)
+C401.py:6:17: C401 (unnecessary-generator-set) [*] Unnecessary generator (rewrite as a `set` comprehension)
   |
 4 |     2 * x + 1 for x in range(3)
 5 | )
 6 | small_nums = f"{set(a if a < 6 else 0 for a in range(3))}"
-  |                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ C401
+  |                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ C401 (unnecessary-generator-set)
 7 | 
 8 | def f(x):
   |
@@ -65,12 +65,12 @@ C401.py:6:17: C401 [*] Unnecessary generator (rewrite as a `set` comprehension)
 8 8 | def f(x):
 9 9 |     return x
 
-C401.py:11:16: C401 [*] Unnecessary generator (rewrite as a `set` comprehension)
+C401.py:11:16: C401 (unnecessary-generator-set) [*] Unnecessary generator (rewrite as a `set` comprehension)
    |
  9 |     return x
 10 | 
 11 | print(f"Hello {set(f(a) for a in 'abc')} World")
-   |                ^^^^^^^^^^^^^^^^^^^^^^^^ C401
+   |                ^^^^^^^^^^^^^^^^^^^^^^^^ C401 (unnecessary-generator-set)
 12 | print(f"Hello { set(f(a) for a in 'abc') } World")
    |
    = help: Rewrite as a `set` comprehension
@@ -85,11 +85,11 @@ C401.py:11:16: C401 [*] Unnecessary generator (rewrite as a `set` comprehension)
 13 13 | 
 14 14 | 
 
-C401.py:12:17: C401 [*] Unnecessary generator (rewrite as a `set` comprehension)
+C401.py:12:17: C401 (unnecessary-generator-set) [*] Unnecessary generator (rewrite as a `set` comprehension)
    |
 11 | print(f"Hello {set(f(a) for a in 'abc')} World")
 12 | print(f"Hello { set(f(a) for a in 'abc') } World")
-   |                 ^^^^^^^^^^^^^^^^^^^^^^^^ C401
+   |                 ^^^^^^^^^^^^^^^^^^^^^^^^ C401 (unnecessary-generator-set)
    |
    = help: Rewrite as a `set` comprehension
 
@@ -103,11 +103,11 @@ C401.py:12:17: C401 [*] Unnecessary generator (rewrite as a `set` comprehension)
 14 14 | 
 15 15 | # Short-circuit case, combine with C416 and should produce x = set(range(3))
 
-C401.py:16:5: C401 [*] Unnecessary generator (rewrite using `set()`
+C401.py:16:5: C401 (unnecessary-generator-set) [*] Unnecessary generator (rewrite using `set()`
    |
 15 | # Short-circuit case, combine with C416 and should produce x = set(range(3))
 16 | x = set(x for x in range(3))
-   |     ^^^^^^^^^^^^^^^^^^^^^^^^ C401
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^ C401 (unnecessary-generator-set)
 17 | x = set(
 18 |     x for x in range(3)
    |
@@ -123,7 +123,7 @@ C401.py:16:5: C401 [*] Unnecessary generator (rewrite using `set()`
 18 18 |     x for x in range(3)
 19 19 | )
 
-C401.py:17:5: C401 [*] Unnecessary generator (rewrite using `set()`
+C401.py:17:5: C401 (unnecessary-generator-set) [*] Unnecessary generator (rewrite using `set()`
    |
 15 |   # Short-circuit case, combine with C416 and should produce x = set(range(3))
 16 |   x = set(x for x in range(3))
@@ -131,7 +131,7 @@ C401.py:17:5: C401 [*] Unnecessary generator (rewrite using `set()`
    |  _____^
 18 | |     x for x in range(3)
 19 | | )
-   | |_^ C401
+   | |_^ C401 (unnecessary-generator-set)
 20 |   print(f"Hello {set(a for a in range(3))} World")
 21 |   print(f"{set(a for a in 'abc') - set(a for a in 'ab')}")
    |
@@ -149,12 +149,12 @@ C401.py:17:5: C401 [*] Unnecessary generator (rewrite using `set()`
 21 19 | print(f"{set(a for a in 'abc') - set(a for a in 'ab')}")
 22 20 | print(f"{ set(a for a in 'abc') - set(a for a in 'ab') }")
 
-C401.py:20:16: C401 [*] Unnecessary generator (rewrite using `set()`
+C401.py:20:16: C401 (unnecessary-generator-set) [*] Unnecessary generator (rewrite using `set()`
    |
 18 |     x for x in range(3)
 19 | )
 20 | print(f"Hello {set(a for a in range(3))} World")
-   |                ^^^^^^^^^^^^^^^^^^^^^^^^ C401
+   |                ^^^^^^^^^^^^^^^^^^^^^^^^ C401 (unnecessary-generator-set)
 21 | print(f"{set(a for a in 'abc') - set(a for a in 'ab')}")
 22 | print(f"{ set(a for a in 'abc') - set(a for a in 'ab') }")
    |
@@ -170,12 +170,12 @@ C401.py:20:16: C401 [*] Unnecessary generator (rewrite using `set()`
 22 22 | print(f"{ set(a for a in 'abc') - set(a for a in 'ab') }")
 23 23 | 
 
-C401.py:21:10: C401 [*] Unnecessary generator (rewrite using `set()`
+C401.py:21:10: C401 (unnecessary-generator-set) [*] Unnecessary generator (rewrite using `set()`
    |
 19 | )
 20 | print(f"Hello {set(a for a in range(3))} World")
 21 | print(f"{set(a for a in 'abc') - set(a for a in 'ab')}")
-   |          ^^^^^^^^^^^^^^^^^^^^^ C401
+   |          ^^^^^^^^^^^^^^^^^^^^^ C401 (unnecessary-generator-set)
 22 | print(f"{ set(a for a in 'abc') - set(a for a in 'ab') }")
    |
    = help: Rewrite using `set()`
@@ -190,12 +190,12 @@ C401.py:21:10: C401 [*] Unnecessary generator (rewrite using `set()`
 23 23 | 
 24 24 | 
 
-C401.py:21:34: C401 [*] Unnecessary generator (rewrite using `set()`
+C401.py:21:34: C401 (unnecessary-generator-set) [*] Unnecessary generator (rewrite using `set()`
    |
 19 | )
 20 | print(f"Hello {set(a for a in range(3))} World")
 21 | print(f"{set(a for a in 'abc') - set(a for a in 'ab')}")
-   |                                  ^^^^^^^^^^^^^^^^^^^^ C401
+   |                                  ^^^^^^^^^^^^^^^^^^^^ C401 (unnecessary-generator-set)
 22 | print(f"{ set(a for a in 'abc') - set(a for a in 'ab') }")
    |
    = help: Rewrite using `set()`
@@ -210,12 +210,12 @@ C401.py:21:34: C401 [*] Unnecessary generator (rewrite using `set()`
 23 23 | 
 24 24 | 
 
-C401.py:22:11: C401 [*] Unnecessary generator (rewrite using `set()`
+C401.py:22:11: C401 (unnecessary-generator-set) [*] Unnecessary generator (rewrite using `set()`
    |
 20 | print(f"Hello {set(a for a in range(3))} World")
 21 | print(f"{set(a for a in 'abc') - set(a for a in 'ab')}")
 22 | print(f"{ set(a for a in 'abc') - set(a for a in 'ab') }")
-   |           ^^^^^^^^^^^^^^^^^^^^^ C401
+   |           ^^^^^^^^^^^^^^^^^^^^^ C401 (unnecessary-generator-set)
    |
    = help: Rewrite using `set()`
 
@@ -229,12 +229,12 @@ C401.py:22:11: C401 [*] Unnecessary generator (rewrite using `set()`
 24 24 | 
 25 25 | # Not built-in set.
 
-C401.py:22:35: C401 [*] Unnecessary generator (rewrite using `set()`
+C401.py:22:35: C401 (unnecessary-generator-set) [*] Unnecessary generator (rewrite using `set()`
    |
 20 | print(f"Hello {set(a for a in range(3))} World")
 21 | print(f"{set(a for a in 'abc') - set(a for a in 'ab')}")
 22 | print(f"{ set(a for a in 'abc') - set(a for a in 'ab') }")
-   |                                   ^^^^^^^^^^^^^^^^^^^^ C401
+   |                                   ^^^^^^^^^^^^^^^^^^^^ C401 (unnecessary-generator-set)
    |
    = help: Rewrite using `set()`
 

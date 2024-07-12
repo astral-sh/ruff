@@ -1,16 +1,16 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_slots/mod.rs
 ---
-SLOT002.py:5:7: SLOT002 Subclasses of `collections.namedtuple()` should define `__slots__`
+SLOT002.py:5:7: SLOT002 (no-slots-in-namedtuple-subclass) Subclasses of `collections.namedtuple()` should define `__slots__`
   |
 5 | class Bad(namedtuple("foo", ["str", "int"])):  # SLOT002
-  |       ^^^ SLOT002
+  |       ^^^ SLOT002 (no-slots-in-namedtuple-subclass)
 6 |     pass
   |
 
-SLOT002.py:9:7: SLOT002 Subclasses of call-based `typing.NamedTuple()` should define `__slots__`
+SLOT002.py:9:7: SLOT002 (no-slots-in-namedtuple-subclass) Subclasses of call-based `typing.NamedTuple()` should define `__slots__`
    |
  9 | class UnusualButStillBad(NamedTuple("foo", [("x", int, "y", int)])):  # SLOT002
-   |       ^^^^^^^^^^^^^^^^^^ SLOT002
+   |       ^^^^^^^^^^^^^^^^^^ SLOT002 (no-slots-in-namedtuple-subclass)
 10 |     pass
    |

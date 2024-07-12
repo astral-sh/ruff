@@ -1,11 +1,11 @@
 ---
 source: crates/ruff_linter/src/rules/pylint/mod.rs
 ---
-unnecessary_list_index_lookup.py:7:6: PLR1736 [*] List index lookup in `enumerate()` loop
+unnecessary_list_index_lookup.py:7:6: PLR1736 (unnecessary-list-index-lookup) [*] List index lookup in `enumerate()` loop
   |
 6 | def fix_these():
 7 |     [letters[index] for index, letter in enumerate(letters)]  # PLR1736
-  |      ^^^^^^^^^^^^^^ PLR1736
+  |      ^^^^^^^^^^^^^^ PLR1736 (unnecessary-list-index-lookup)
 8 |     {letters[index] for index, letter in enumerate(letters)}  # PLR1736
 9 |     {letter: letters[index] for index, letter in enumerate(letters)}  # PLR1736
   |
@@ -21,12 +21,12 @@ unnecessary_list_index_lookup.py:7:6: PLR1736 [*] List index lookup in `enumerat
 9 9 |     {letter: letters[index] for index, letter in enumerate(letters)}  # PLR1736
 10 10 | 
 
-unnecessary_list_index_lookup.py:8:6: PLR1736 [*] List index lookup in `enumerate()` loop
+unnecessary_list_index_lookup.py:8:6: PLR1736 (unnecessary-list-index-lookup) [*] List index lookup in `enumerate()` loop
   |
 6 | def fix_these():
 7 |     [letters[index] for index, letter in enumerate(letters)]  # PLR1736
 8 |     {letters[index] for index, letter in enumerate(letters)}  # PLR1736
-  |      ^^^^^^^^^^^^^^ PLR1736
+  |      ^^^^^^^^^^^^^^ PLR1736 (unnecessary-list-index-lookup)
 9 |     {letter: letters[index] for index, letter in enumerate(letters)}  # PLR1736
   |
   = help: Use the loop variable directly
@@ -41,12 +41,12 @@ unnecessary_list_index_lookup.py:8:6: PLR1736 [*] List index lookup in `enumerat
 10 10 | 
 11 11 |     for index, letter in enumerate(letters):
 
-unnecessary_list_index_lookup.py:9:14: PLR1736 [*] List index lookup in `enumerate()` loop
+unnecessary_list_index_lookup.py:9:14: PLR1736 (unnecessary-list-index-lookup) [*] List index lookup in `enumerate()` loop
    |
  7 |     [letters[index] for index, letter in enumerate(letters)]  # PLR1736
  8 |     {letters[index] for index, letter in enumerate(letters)}  # PLR1736
  9 |     {letter: letters[index] for index, letter in enumerate(letters)}  # PLR1736
-   |              ^^^^^^^^^^^^^^ PLR1736
+   |              ^^^^^^^^^^^^^^ PLR1736 (unnecessary-list-index-lookup)
 10 | 
 11 |     for index, letter in enumerate(letters):
    |
@@ -62,11 +62,11 @@ unnecessary_list_index_lookup.py:9:14: PLR1736 [*] List index lookup in `enumera
 11 11 |     for index, letter in enumerate(letters):
 12 12 |         print(letters[index])  # PLR1736
 
-unnecessary_list_index_lookup.py:12:15: PLR1736 [*] List index lookup in `enumerate()` loop
+unnecessary_list_index_lookup.py:12:15: PLR1736 (unnecessary-list-index-lookup) [*] List index lookup in `enumerate()` loop
    |
 11 |     for index, letter in enumerate(letters):
 12 |         print(letters[index])  # PLR1736
-   |               ^^^^^^^^^^^^^^ PLR1736
+   |               ^^^^^^^^^^^^^^ PLR1736 (unnecessary-list-index-lookup)
 13 |         blah = letters[index]  # PLR1736
 14 |         assert letters[index]  == "d"  # PLR1736
    |
@@ -82,12 +82,12 @@ unnecessary_list_index_lookup.py:12:15: PLR1736 [*] List index lookup in `enumer
 14 14 |         assert letters[index]  == "d"  # PLR1736
 15 15 | 
 
-unnecessary_list_index_lookup.py:13:16: PLR1736 [*] List index lookup in `enumerate()` loop
+unnecessary_list_index_lookup.py:13:16: PLR1736 (unnecessary-list-index-lookup) [*] List index lookup in `enumerate()` loop
    |
 11 |     for index, letter in enumerate(letters):
 12 |         print(letters[index])  # PLR1736
 13 |         blah = letters[index]  # PLR1736
-   |                ^^^^^^^^^^^^^^ PLR1736
+   |                ^^^^^^^^^^^^^^ PLR1736 (unnecessary-list-index-lookup)
 14 |         assert letters[index]  == "d"  # PLR1736
    |
    = help: Use the loop variable directly
@@ -102,12 +102,12 @@ unnecessary_list_index_lookup.py:13:16: PLR1736 [*] List index lookup in `enumer
 15 15 | 
 16 16 |     for index, letter in builtins.enumerate(letters):
 
-unnecessary_list_index_lookup.py:14:16: PLR1736 [*] List index lookup in `enumerate()` loop
+unnecessary_list_index_lookup.py:14:16: PLR1736 (unnecessary-list-index-lookup) [*] List index lookup in `enumerate()` loop
    |
 12 |         print(letters[index])  # PLR1736
 13 |         blah = letters[index]  # PLR1736
 14 |         assert letters[index]  == "d"  # PLR1736
-   |                ^^^^^^^^^^^^^^ PLR1736
+   |                ^^^^^^^^^^^^^^ PLR1736 (unnecessary-list-index-lookup)
 15 | 
 16 |     for index, letter in builtins.enumerate(letters):
    |
@@ -123,11 +123,11 @@ unnecessary_list_index_lookup.py:14:16: PLR1736 [*] List index lookup in `enumer
 16 16 |     for index, letter in builtins.enumerate(letters):
 17 17 |         print(letters[index])  # PLR1736
 
-unnecessary_list_index_lookup.py:17:15: PLR1736 [*] List index lookup in `enumerate()` loop
+unnecessary_list_index_lookup.py:17:15: PLR1736 (unnecessary-list-index-lookup) [*] List index lookup in `enumerate()` loop
    |
 16 |     for index, letter in builtins.enumerate(letters):
 17 |         print(letters[index])  # PLR1736
-   |               ^^^^^^^^^^^^^^ PLR1736
+   |               ^^^^^^^^^^^^^^ PLR1736 (unnecessary-list-index-lookup)
 18 |         blah = letters[index]  # PLR1736
 19 |         assert letters[index]  == "d"  # PLR1736
    |
@@ -143,12 +143,12 @@ unnecessary_list_index_lookup.py:17:15: PLR1736 [*] List index lookup in `enumer
 19 19 |         assert letters[index]  == "d"  # PLR1736
 20 20 | 
 
-unnecessary_list_index_lookup.py:18:16: PLR1736 [*] List index lookup in `enumerate()` loop
+unnecessary_list_index_lookup.py:18:16: PLR1736 (unnecessary-list-index-lookup) [*] List index lookup in `enumerate()` loop
    |
 16 |     for index, letter in builtins.enumerate(letters):
 17 |         print(letters[index])  # PLR1736
 18 |         blah = letters[index]  # PLR1736
-   |                ^^^^^^^^^^^^^^ PLR1736
+   |                ^^^^^^^^^^^^^^ PLR1736 (unnecessary-list-index-lookup)
 19 |         assert letters[index]  == "d"  # PLR1736
    |
    = help: Use the loop variable directly
@@ -163,12 +163,12 @@ unnecessary_list_index_lookup.py:18:16: PLR1736 [*] List index lookup in `enumer
 20 20 | 
 21 21 | 
 
-unnecessary_list_index_lookup.py:19:16: PLR1736 [*] List index lookup in `enumerate()` loop
+unnecessary_list_index_lookup.py:19:16: PLR1736 (unnecessary-list-index-lookup) [*] List index lookup in `enumerate()` loop
    |
 17 |         print(letters[index])  # PLR1736
 18 |         blah = letters[index]  # PLR1736
 19 |         assert letters[index]  == "d"  # PLR1736
-   |                ^^^^^^^^^^^^^^ PLR1736
+   |                ^^^^^^^^^^^^^^ PLR1736 (unnecessary-list-index-lookup)
    |
    = help: Use the loop variable directly
 

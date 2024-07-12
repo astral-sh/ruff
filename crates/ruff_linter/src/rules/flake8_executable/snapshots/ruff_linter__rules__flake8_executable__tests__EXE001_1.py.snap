@@ -1,11 +1,10 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_executable/mod.rs
 ---
-EXE001_1.py:1:1: EXE001 Shebang is present but file is not executable
+EXE001_1.py:1:1: EXE001 (shebang-not-executable) Shebang is present but file is not executable
   |
 1 | #!/usr/bin/python
-  | ^^^^^^^^^^^^^^^^^ EXE001
+  | ^^^^^^^^^^^^^^^^^ EXE001 (shebang-not-executable)
 2 | 
 3 | if __name__ == '__main__':
   |
-

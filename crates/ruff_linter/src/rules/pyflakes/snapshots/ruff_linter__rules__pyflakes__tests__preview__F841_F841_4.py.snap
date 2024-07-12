@@ -1,11 +1,11 @@
 ---
 source: crates/ruff_linter/src/rules/pyflakes/mod.rs
 ---
-F841_4.py:12:5: F841 [*] Local variable `a` is assigned to but never used
+F841_4.py:12:5: F841 (unused-variable) [*] Local variable `a` is assigned to but never used
    |
 11 | def bar():
 12 |     a = foo()
-   |     ^ F841
+   |     ^ F841 (unused-variable)
 13 |     b, c = foo()
    |
    = help: Remove assignment to unused variable `a`
@@ -20,12 +20,12 @@ F841_4.py:12:5: F841 [*] Local variable `a` is assigned to but never used
 14 14 | 
 15 15 | 
 
-F841_4.py:13:5: F841 [*] Local variable `b` is assigned to but never used
+F841_4.py:13:5: F841 (unused-variable) [*] Local variable `b` is assigned to but never used
    |
 11 | def bar():
 12 |     a = foo()
 13 |     b, c = foo()
-   |     ^ F841
+   |     ^ F841 (unused-variable)
    |
    = help: Remove assignment to unused variable `b`
 
@@ -39,12 +39,12 @@ F841_4.py:13:5: F841 [*] Local variable `b` is assigned to but never used
 15 15 | 
 16 16 | def baz():
 
-F841_4.py:13:8: F841 [*] Local variable `c` is assigned to but never used
+F841_4.py:13:8: F841 (unused-variable) [*] Local variable `c` is assigned to but never used
    |
 11 | def bar():
 12 |     a = foo()
 13 |     b, c = foo()
-   |        ^ F841
+   |        ^ F841 (unused-variable)
    |
    = help: Remove assignment to unused variable `c`
 
@@ -57,5 +57,3 @@ F841_4.py:13:8: F841 [*] Local variable `c` is assigned to but never used
 14 14 | 
 15 15 | 
 16 16 | def baz():
-
-

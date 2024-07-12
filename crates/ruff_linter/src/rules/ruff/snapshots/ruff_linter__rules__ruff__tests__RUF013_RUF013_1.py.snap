@@ -1,10 +1,10 @@
 ---
 source: crates/ruff_linter/src/rules/ruff/mod.rs
 ---
-RUF013_1.py:4:12: RUF013 [*] PEP 484 prohibits implicit `Optional`
+RUF013_1.py:4:12: RUF013 (implicit-optional) [*] PEP 484 prohibits implicit `Optional`
   |
 4 | def f(arg: int = None):  # RUF013
-  |            ^^^ RUF013
+  |            ^^^ RUF013 (implicit-optional)
 5 |     pass
   |
   = help: Convert to `T | None`

@@ -1,11 +1,11 @@
 ---
 source: crates/ruff_linter/src/rules/pydocstyle/mod.rs
 ---
-sections.py:111:5: D409 [*] Section underline should match the length of its name ("Returns")
+sections.py:111:5: D409 (section-underline-matches-section-length) [*] Section underline should match the length of its name ("Returns")
     |
 110 |     Returns
 111 |     --
-    |     ^^ D409
+    |     ^^ D409 (section-underline-matches-section-length)
 112 |     A value of some sort.
     |
     = help: Adjust underline length to match "Returns"
@@ -20,11 +20,11 @@ sections.py:111:5: D409 [*] Section underline should match the length of its nam
 113 113 | 
 114 114 |     """
 
-sections.py:225:5: D409 [*] Section underline should match the length of its name ("Returns")
+sections.py:225:5: D409 (section-underline-matches-section-length) [*] Section underline should match the length of its name ("Returns")
     |
 224 |     Returns
 225 |     ------
-    |     ^^^^^^ D409
+    |     ^^^^^^ D409 (section-underline-matches-section-length)
 226 |     Many many wonderful things.
 227 |     Raises:
     |
@@ -40,11 +40,11 @@ sections.py:225:5: D409 [*] Section underline should match the length of its nam
 227 227 |     Raises:
 228 228 |     My attention.
 
-sections.py:578:5: D409 [*] Section underline should match the length of its name ("Other Parameters")
+sections.py:578:5: D409 (section-underline-matches-section-length) [*] Section underline should match the length of its name ("Other Parameters")
     |
 577 |     Other Parameters
 578 |     ----------
-    |     ^^^^^^^^^^ D409
+    |     ^^^^^^^^^^ D409 (section-underline-matches-section-length)
 579 |     other_parameters:
 580 |         A dictionary of string attributes
     |

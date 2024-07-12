@@ -2,7 +2,7 @@ use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_text_size::Ranged;
 
-use crate::noqa::{Directive, NoqaDirectives};
+use crate::noqa::{Directive, NoqaDirectives, NoqaIdentifier};
 use crate::rule_redirects::get_redirect_target;
 
 /// ## What it does
@@ -49,18 +49,22 @@ pub(crate) fn redirected_noqa(diagnostics: &mut Vec<Diagnostic>, noqa_directives
             continue;
         };
 
-        for code in directive.iter() {
-            if let Some(redirected) = get_redirect_target(code.as_str()) {
+        for rule_ident in directive.iter() {
+            let NoqaIdentifier::Code(code) = rule_ident.identifier() else {
+                continue;
+            };
+
+            if let Some(redirected) = get_redirect_target(code) {
                 let mut diagnostic = Diagnostic::new(
                     RedirectedNOQA {
                         original: code.to_string(),
                         target: redirected.to_string(),
                     },
-                    code.range(),
+                    rule_ident.range(),
                 );
                 diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
                     redirected.to_string(),
-                    code.range(),
+                    rule_ident.range(),
                 )));
                 diagnostics.push(diagnostic);
             }

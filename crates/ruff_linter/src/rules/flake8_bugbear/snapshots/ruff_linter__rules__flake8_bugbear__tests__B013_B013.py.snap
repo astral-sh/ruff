@@ -1,12 +1,12 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_bugbear/mod.rs
 ---
-B013.py:5:8: B013 [*] A length-one tuple literal is redundant in exception handlers
+B013.py:5:8: B013 (redundant-tuple-in-exception-handler) [*] A length-one tuple literal is redundant in exception handlers
   |
 3 | try:
 4 |     pass
 5 | except (ValueError,):
-  |        ^^^^^^^^^^^^^ B013
+  |        ^^^^^^^^^^^^^ B013 (redundant-tuple-in-exception-handler)
 6 |     pass
 7 | except AttributeError:
   |
@@ -22,12 +22,12 @@ B013.py:5:8: B013 [*] A length-one tuple literal is redundant in exception handl
 7 7 | except AttributeError:
 8 8 |     pass
 
-B013.py:11:8: B013 [*] A length-one tuple literal is redundant in exception handlers
+B013.py:11:8: B013 (redundant-tuple-in-exception-handler) [*] A length-one tuple literal is redundant in exception handlers
    |
  9 | except (ImportError, TypeError):
 10 |     pass
 11 | except (*retriable_exceptions,):
-   |        ^^^^^^^^^^^^^^^^^^^^^^^^ B013
+   |        ^^^^^^^^^^^^^^^^^^^^^^^^ B013 (redundant-tuple-in-exception-handler)
 12 |     pass
 13 | except(ValueError,):
    |
@@ -43,12 +43,12 @@ B013.py:11:8: B013 [*] A length-one tuple literal is redundant in exception hand
 13 13 | except(ValueError,):
 14 14 |     pass
 
-B013.py:13:7: B013 [*] A length-one tuple literal is redundant in exception handlers
+B013.py:13:7: B013 (redundant-tuple-in-exception-handler) [*] A length-one tuple literal is redundant in exception handlers
    |
 11 | except (*retriable_exceptions,):
 12 |     pass
 13 | except(ValueError,):
-   |       ^^^^^^^^^^^^^ B013
+   |       ^^^^^^^^^^^^^ B013 (redundant-tuple-in-exception-handler)
 14 |     pass
    |
    = help: Replace with `except ValueError`
@@ -60,5 +60,3 @@ B013.py:13:7: B013 [*] A length-one tuple literal is redundant in exception hand
 13    |-except(ValueError,):
    13 |+except ValueError:
 14 14 |     pass
-
-

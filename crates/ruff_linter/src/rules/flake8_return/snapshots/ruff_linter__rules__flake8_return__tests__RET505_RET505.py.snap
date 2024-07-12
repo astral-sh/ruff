@@ -1,218 +1,216 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_return/mod.rs
 ---
-RET505.py:8:5: RET505 Unnecessary `elif` after `return` statement
+RET505.py:8:5: RET505 (superfluous-else-return) Unnecessary `elif` after `return` statement
    |
  6 |         a = 1
  7 |         return y
  8 |     elif z:
-   |     ^^^^ RET505
+   |     ^^^^ RET505 (superfluous-else-return)
  9 |         b = 2
 10 |         return w
    |
    = help: Remove unnecessary `elif`
 
-RET505.py:23:5: RET505 Unnecessary `elif` after `return` statement
+RET505.py:23:5: RET505 (superfluous-else-return) Unnecessary `elif` after `return` statement
    |
 21 |             b = 2
 22 |         return
 23 |     elif z:
-   |     ^^^^ RET505
+   |     ^^^^ RET505 (superfluous-else-return)
 24 |         c = 2
 25 |     else:
    |
    = help: Remove unnecessary `elif`
 
-RET505.py:41:5: RET505 Unnecessary `elif` after `return` statement
+RET505.py:41:5: RET505 (superfluous-else-return) Unnecessary `elif` after `return` statement
    |
 39 |         a = 1
 40 |         return y
 41 |     elif z:
-   |     ^^^^ RET505
+   |     ^^^^ RET505 (superfluous-else-return)
 42 |         b = 2
 43 |         return w
    |
    = help: Remove unnecessary `elif`
 
-RET505.py:53:5: RET505 Unnecessary `else` after `return` statement
+RET505.py:53:5: RET505 (superfluous-else-return) Unnecessary `else` after `return` statement
    |
 51 |         a = 1
 52 |         return y
 53 |     else:
-   |     ^^^^ RET505
+   |     ^^^^ RET505 (superfluous-else-return)
 54 |         b = 2
 55 |         return z
    |
    = help: Remove unnecessary `else`
 
-RET505.py:64:9: RET505 Unnecessary `else` after `return` statement
+RET505.py:64:9: RET505 (superfluous-else-return) Unnecessary `else` after `return` statement
    |
 62 |             b = 2
 63 |             return y
 64 |         else:
-   |         ^^^^ RET505
+   |         ^^^^ RET505 (superfluous-else-return)
 65 |             c = 3
 66 |             return x
    |
    = help: Remove unnecessary `else`
 
-RET505.py:79:5: RET505 Unnecessary `else` after `return` statement
+RET505.py:79:5: RET505 (superfluous-else-return) Unnecessary `else` after `return` statement
    |
 77 |             b = 2
 78 |         return
 79 |     else:
-   |     ^^^^ RET505
+   |     ^^^^ RET505 (superfluous-else-return)
 80 |         c = 3
 81 |     return
    |
    = help: Remove unnecessary `else`
 
-RET505.py:89:9: RET505 Unnecessary `else` after `return` statement
+RET505.py:89:9: RET505 (superfluous-else-return) Unnecessary `else` after `return` statement
    |
 87 |             a = 4
 88 |             return
 89 |         else:
-   |         ^^^^ RET505
+   |         ^^^^ RET505 (superfluous-else-return)
 90 |             b = 2
 91 |     else:
    |
    = help: Remove unnecessary `else`
 
-RET505.py:99:5: RET505 Unnecessary `else` after `return` statement
+RET505.py:99:5: RET505 (superfluous-else-return) Unnecessary `else` after `return` statement
     |
  97 |     if x:  # [no-else-return]
  98 |         return True
  99 |     else:
-    |     ^^^^ RET505
+    |     ^^^^ RET505 (superfluous-else-return)
 100 |         try:
 101 |             return False
     |
     = help: Remove unnecessary `else`
 
-RET505.py:109:5: RET505 Unnecessary `else` after `return` statement
+RET505.py:109:5: RET505 (superfluous-else-return) Unnecessary `else` after `return` statement
     |
 107 |     if n<2:
 108 |         return n;
 109 |     else:
-    |     ^^^^ RET505
+    |     ^^^^ RET505 (superfluous-else-return)
 110 |         last = 1;
 111 |         last2 = 0;
     |
     = help: Remove unnecessary `else`
 
-RET505.py:145:5: RET505 Unnecessary `else` after `return` statement
+RET505.py:145:5: RET505 (superfluous-else-return) Unnecessary `else` after `return` statement
     |
 143 |     if True:
 144 |         return
 145 |     else:
-    |     ^^^^ RET505
+    |     ^^^^ RET505 (superfluous-else-return)
 146 |         # comment
 147 |         pass
     |
     = help: Remove unnecessary `else`
 
-RET505.py:153:5: RET505 Unnecessary `else` after `return` statement
+RET505.py:153:5: RET505 (superfluous-else-return) Unnecessary `else` after `return` statement
     |
 151 |     if True:
 152 |         return
 153 |     else:  # comment
-    |     ^^^^ RET505
+    |     ^^^^ RET505 (superfluous-else-return)
 154 |         pass
     |
     = help: Remove unnecessary `else`
 
-RET505.py:160:5: RET505 Unnecessary `else` after `return` statement
+RET505.py:160:5: RET505 (superfluous-else-return) Unnecessary `else` after `return` statement
     |
 158 |     if True:
 159 |         return
 160 |     else\
-    |     ^^^^ RET505
+    |     ^^^^ RET505 (superfluous-else-return)
 161 |         :\
 162 |         # comment
     |
     = help: Remove unnecessary `else`
 
-RET505.py:169:5: RET505 Unnecessary `else` after `return` statement
+RET505.py:169:5: RET505 (superfluous-else-return) Unnecessary `else` after `return` statement
     |
 167 |     if True:
 168 |         return
 169 |     else\
-    |     ^^^^ RET505
+    |     ^^^^ RET505 (superfluous-else-return)
 170 |         :  # comment
 171 |         pass
     |
     = help: Remove unnecessary `else`
 
-RET505.py:177:5: RET505 Unnecessary `else` after `return` statement
+RET505.py:177:5: RET505 (superfluous-else-return) Unnecessary `else` after `return` statement
     |
 175 |     if True:
 176 |         return
 177 |     else: pass
-    |     ^^^^ RET505
+    |     ^^^^ RET505 (superfluous-else-return)
     |
     = help: Remove unnecessary `else`
 
-RET505.py:183:5: RET505 Unnecessary `else` after `return` statement
+RET505.py:183:5: RET505 (superfluous-else-return) Unnecessary `else` after `return` statement
     |
 181 |     if True:
 182 |         return
 183 |     else:\
-    |     ^^^^ RET505
+    |     ^^^^ RET505 (superfluous-else-return)
 184 |         pass
     |
     = help: Remove unnecessary `else`
 
-RET505.py:200:5: RET505 Unnecessary `else` after `return` statement
+RET505.py:200:5: RET505 (superfluous-else-return) Unnecessary `else` after `return` statement
     |
 198 | def sb(self):
 199 |     if self._sb is not None: return self._sb
 200 |     else: self._sb = '\033[01;%dm'; self._sa = '\033[0;0m';
-    |     ^^^^ RET505
+    |     ^^^^ RET505 (superfluous-else-return)
     |
     = help: Remove unnecessary `else`
 
-RET505.py:207:5: RET505 Unnecessary `else` after `return` statement
+RET505.py:207:5: RET505 (superfluous-else-return) Unnecessary `else` after `return` statement
     |
 205 |         a = 1
 206 |         return y
 207 |     else:
-    |     ^^^^ RET505
+    |     ^^^^ RET505 (superfluous-else-return)
 208 | 
 209 |         c = 3
     |
     = help: Remove unnecessary `else`
 
-RET505.py:217:5: RET505 Unnecessary `else` after `return` statement
+RET505.py:217:5: RET505 (superfluous-else-return) Unnecessary `else` after `return` statement
     |
 215 |         a = 1
 216 |         return y
 217 |     else:
-    |     ^^^^ RET505
+    |     ^^^^ RET505 (superfluous-else-return)
 218 |         # comment
 219 |         c = 3
     |
     = help: Remove unnecessary `else`
 
-RET505.py:227:5: RET505 Unnecessary `else` after `return` statement
+RET505.py:227:5: RET505 (superfluous-else-return) Unnecessary `else` after `return` statement
     |
 225 |         a = 1
 226 |         return y
 227 |     else:
-    |     ^^^^ RET505
+    |     ^^^^ RET505 (superfluous-else-return)
 228 |           # comment
 229 |         c = 3
     |
     = help: Remove unnecessary `else`
 
-RET505.py:237:5: RET505 Unnecessary `else` after `return` statement
+RET505.py:237:5: RET505 (superfluous-else-return) Unnecessary `else` after `return` statement
     |
 235 |         a = 1
 236 |         return y
 237 |     else:
-    |     ^^^^ RET505
+    |     ^^^^ RET505 (superfluous-else-return)
 238 |   # comment
 239 |         c = 3
     |
     = help: Remove unnecessary `else`
-
-

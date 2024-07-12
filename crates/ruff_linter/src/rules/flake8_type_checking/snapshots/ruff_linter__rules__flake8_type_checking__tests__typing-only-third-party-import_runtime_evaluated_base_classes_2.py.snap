@@ -1,12 +1,12 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_type_checking/mod.rs
 ---
-runtime_evaluated_base_classes_2.py:3:21: TCH002 [*] Move third-party import `geopandas` into a type-checking block
+runtime_evaluated_base_classes_2.py:3:21: TCH002 (typing-only-third-party-import) [*] Move third-party import `geopandas` into a type-checking block
   |
 1 | from __future__ import annotations
 2 | 
 3 | import geopandas as gpd  # TCH002
-  |                     ^^^ TCH002
+  |                     ^^^ TCH002 (typing-only-third-party-import)
 4 | import pydantic
 5 | import pyproj  # TCH002
   |
@@ -29,12 +29,12 @@ runtime_evaluated_base_classes_2.py:3:21: TCH002 [*] Move third-party import `ge
 10 13 | 
 11 14 | class A(BaseModel):
 
-runtime_evaluated_base_classes_2.py:5:8: TCH002 [*] Move third-party import `pyproj` into a type-checking block
+runtime_evaluated_base_classes_2.py:5:8: TCH002 (typing-only-third-party-import) [*] Move third-party import `pyproj` into a type-checking block
   |
 3 | import geopandas as gpd  # TCH002
 4 | import pydantic
 5 | import pyproj  # TCH002
-  |        ^^^^^^ TCH002
+  |        ^^^^^^ TCH002 (typing-only-third-party-import)
 6 | from pydantic import BaseModel
   |
   = help: Move into type-checking block
@@ -54,5 +54,3 @@ runtime_evaluated_base_classes_2.py:5:8: TCH002 [*] Move third-party import `pyp
 9  12 | 
 10 13 | 
 11 14 | class A(BaseModel):
-
-
