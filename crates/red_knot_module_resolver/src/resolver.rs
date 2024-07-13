@@ -92,9 +92,7 @@ pub(crate) fn file_to_module(db: &dyn Db, file: File) -> Option<Module> {
 
     let path = file.path(db.upcast());
 
-    let resolver_settings = module_resolver_settings(db);
-
-    let mut search_paths = resolver_settings.search_paths(db).into_iter();
+    let mut search_paths = module_search_paths(db).into_iter();
 
     let module_name = loop {
         let candidate = search_paths.next()?;
@@ -224,7 +222,7 @@ impl RawModuleResolutionSettings {
 }
 
 #[derive(Debug, PartialEq, Eq, Clone)]
-pub(crate) struct ValidatedSearchPathSettings {
+struct ValidatedSearchPathSettings {
     extra_paths: Vec<Arc<ModuleResolutionPathBuf>>,
     workspace_root: Arc<ModuleResolutionPathBuf>,
     stdlib: Arc<ModuleResolutionPathBuf>,
@@ -346,6 +344,8 @@ struct PthFileIterator<'db> {
 
 impl<'db> PthFileIterator<'db> {
     fn new(db: &'db dyn Db, site_packages: &'db SystemPath) -> std::io::Result<Self> {
+        // TODO: The salsa cache should be invalidated every time a `.pth` file is added to `site-packages`,
+        // as well as every time an existing one is removed.
         Ok(Self {
             db,
             directory_iterator: db.system().read_directory(site_packages)?,
@@ -394,10 +394,6 @@ pub(crate) struct ModuleResolutionSettings {
 }
 
 impl ModuleResolutionSettings {
-    pub(crate) fn search_paths(&self, db: &dyn Db) -> OrderedSearchPaths {
-        self.search_path_settings.search_paths(db)
-    }
-
     pub(crate) fn target_version(&self) -> TargetVersion {
         self.target_version
     }
@@ -432,6 +428,13 @@ fn module_resolver_settings(db: &dyn Db) -> &ModuleResolutionSettings {
     ModuleResolverSettings::get(db).settings(db)
 }
 
+#[salsa::tracked(return_ref)]
+pub(crate) fn module_search_paths(db: &dyn Db) -> OrderedSearchPaths {
+    module_resolver_settings(db)
+        .search_path_settings
+        .search_paths(db)
+}
+
 /// Given a module name and a list of search paths in which to lookup modules,
 /// attempt to resolve the module name
 fn resolve_name(
@@ -441,18 +444,18 @@ fn resolve_name(
     let resolver_settings = module_resolver_settings(db);
     let resolver_state = ResolverState::new(db, resolver_settings.target_version());
 
-    for search_path in resolver_settings.search_paths(db) {
+    for search_path in module_search_paths(db) {
         let mut components = name.components();
         let module_name = components.next_back()?;
 
-        match resolve_package(&search_path, components, &resolver_state) {
+        match resolve_package(search_path, components, &resolver_state) {
             Ok(resolved_package) => {
                 let mut package_path = resolved_package.path;
 
                 package_path.push(module_name);
 
                 // Must be a `__init__.pyi` or `__init__.py` or it isn't a package.
-                let kind = if package_path.is_directory(&search_path, &resolver_state) {
+                let kind = if package_path.is_directory(search_path, &resolver_state) {
                     package_path.push("__init__");
                     ModuleKind::Package
                 } else {
@@ -462,14 +465,14 @@ fn resolve_name(
                 // TODO Implement full https://peps.python.org/pep-0561/#type-checker-module-resolution-order resolution
                 if let Some(stub) = package_path
                     .with_pyi_extension()
-                    .to_file(&search_path, &resolver_state)
+                    .to_file(search_path, &resolver_state)
                 {
                     return Some((search_path.clone(), stub, kind));
                 }
 
                 if let Some(module) = package_path
                     .with_py_extension()
-                    .and_then(|path| path.to_file(&search_path, &resolver_state))
+                    .and_then(|path| path.to_file(search_path, &resolver_state))
                 {
                     return Some((search_path.clone(), module, kind));
                 }
@@ -1444,5 +1447,98 @@ not_a_directory
             Some(spam_module.file()),
             system_path_to_file(&db, site_packages.join("spam/spam.py"))
         );
+    }
+
+    #[test]
+    fn module_resolution_paths_cached_between_different_module_resolutions() {
+        const SRC: &[FileSpec] = &[("foo.py", "")];
+        const SITE_PACKAGES: &[FileSpec] = &[("bar.py", "")];
+
+        let TestCase {
+            mut db,
+            src,
+            site_packages,
+            ..
+        } = TestCaseBuilder::new()
+            .with_src_files(SRC)
+            .with_site_packages_files(SITE_PACKAGES)
+            .build();
+
+        let foo_module_name = ModuleName::new_static("foo").unwrap();
+        let bar_module_name = ModuleName::new_static("bar").unwrap();
+
+        let foo_module = resolve_module(&db, foo_module_name).unwrap();
+        assert_eq!(
+            Some(foo_module.file()),
+            system_path_to_file(&db, src.join("foo.py"))
+        );
+
+        db.clear_salsa_events();
+        let bar_module = resolve_module(&db, bar_module_name).unwrap();
+        assert_eq!(
+            Some(bar_module.file()),
+            system_path_to_file(&db, site_packages.join("bar.py"))
+        );
+        let events = db.take_salsa_events();
+        assert_function_query_was_not_run::<module_search_paths, _, _>(
+            &db,
+            |res| &res.function,
+            &(),
+            &events,
+        );
+    }
+
+    #[test]
+    fn deleting_pth_file_on_which_module_resolution_depends_invalidates_cache() {
+        const SITE_PACKAGES: &[FileSpec] = &[("_foo.pth", "/x/src")];
+        const X_DIRECTORY: &[FileSpec] = &[("/x/src/foo.py", "")];
+
+        let TestCase {
+            mut db,
+            site_packages,
+            ..
+        } = TestCaseBuilder::new()
+            .with_site_packages_files(SITE_PACKAGES)
+            .with_other_files(X_DIRECTORY)
+            .build();
+
+        let foo_module_name = ModuleName::new_static("foo").unwrap();
+        let foo_module = resolve_module(&db, foo_module_name.clone()).unwrap();
+        assert_eq!(
+            Some(foo_module.file()),
+            system_path_to_file(&db, SystemPathBuf::from("/x/src/foo.py"))
+        );
+
+        let pth_file = site_packages.join("_foo.pth");
+        db.memory_file_system().remove_file(&pth_file).unwrap();
+        File::touch_path(&mut db, &pth_file);
+        assert_eq!(resolve_module(&db, foo_module_name.clone()), None);
+    }
+
+    #[test]
+    fn deleting_editable_install_on_which_module_resolution_depends_invalidates_cache() {
+        const SITE_PACKAGES: &[FileSpec] = &[("_foo.pth", "/x/src")];
+        const X_DIRECTORY: &[FileSpec] = &[("/x/src/foo.py", "")];
+
+        let TestCase { mut db, .. } = TestCaseBuilder::new()
+            .with_site_packages_files(SITE_PACKAGES)
+            .with_other_files(X_DIRECTORY)
+            .build();
+
+        let foo_module_name = ModuleName::new_static("foo").unwrap();
+        let foo_module = resolve_module(&db, foo_module_name.clone()).unwrap();
+        let src_path = SystemPathBuf::from("/x/src");
+        assert_eq!(
+            Some(foo_module.file()),
+            system_path_to_file(&db, src_path.join("foo.py"))
+        );
+
+        db.memory_file_system()
+            .remove_file(src_path.join("foo.py"))
+            .unwrap();
+        db.memory_file_system().remove_directory(&src_path).unwrap();
+        File::touch_path(&mut db, &src_path.join("foo.py"));
+        File::touch_path(&mut db, &src_path);
+        assert_eq!(resolve_module(&db, foo_module_name.clone()), None);
     }
 }
