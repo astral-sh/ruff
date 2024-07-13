@@ -928,6 +928,19 @@ impl<'a> Visitor<'a> for Checker<'a> {
                     self.visit_expr(expr);
                 }
             }
+            Stmt::With(ast::StmtWith {
+                items,
+                body,
+                is_async: _,
+                range: _,
+            }) => {
+                for item in items {
+                    self.visit_with_item(item);
+                }
+                self.semantic.push_branch();
+                self.visit_body(body);
+                self.semantic.pop_branch();
+            }
             Stmt::While(ast::StmtWhile {
                 test,
                 body,
