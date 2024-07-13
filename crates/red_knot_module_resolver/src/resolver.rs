@@ -384,29 +384,25 @@ impl PackageKind {
 
 #[cfg(test)]
 mod tests {
+    use internal::ModuleNameIngredient;
     use ruff_db::files::{system_path_to_file, File, FilePath};
-    use ruff_db::system::DbWithTestSystem;
-    use ruff_db::vendored::{VendoredPath, VendoredPathBuf};
-    use ruff_db::Upcast;
+    use ruff_db::system::{DbWithTestSystem, OsSystem, SystemPath};
+    use ruff_db::testing::assert_function_query_was_not_run;
 
-    use crate::db::tests::{create_resolver_builder, TestCase};
+    use crate::db::tests::TestDb;
     use crate::module::ModuleKind;
     use crate::module_name::ModuleName;
+    use crate::testing::{FileSpec, MockedTypeshed, TestCase, TestCaseBuilder};
 
     use super::*;
 
-    fn setup_resolver_test() -> TestCase {
-        create_resolver_builder().unwrap().build().unwrap()
-    }
-
     #[test]
-    fn first_party_module() -> anyhow::Result<()> {
-        let TestCase { mut db, src, .. } = setup_resolver_test();
+    fn first_party_module() {
+        let TestCase { db, src, .. } = TestCaseBuilder::new()
+            .with_src_files(&[("foo.py", "print('Hello, world!')")])
+            .build();
 
         let foo_module_name = ModuleName::new_static("foo").unwrap();
-        let foo_path = src.join("foo.py");
-        db.write_file(&foo_path, "print('Hello, world!')")?;
-
         let foo_module = resolve_module(&db, foo_module_name.clone()).unwrap();
 
         assert_eq!(
@@ -418,25 +414,26 @@ mod tests {
         assert_eq!(&src, &foo_module.search_path());
         assert_eq!(ModuleKind::Module, foo_module.kind());
 
-        assert_eq!(&foo_path, foo_module.file().path(&db));
+        let expected_foo_path = src.join("foo.py");
+        assert_eq!(&expected_foo_path, foo_module.file().path(&db));
         assert_eq!(
             Some(foo_module),
-            path_to_module(&db, &FilePath::System(foo_path))
+            path_to_module(&db, &FilePath::System(expected_foo_path))
         );
-
-        Ok(())
     }
 
     #[test]
     fn stdlib() {
-        let TestCase {
-            db,
-            custom_typeshed,
-            ..
-        } = setup_resolver_test();
+        const TYPESHED: MockedTypeshed = MockedTypeshed {
+            stdlib_files: &[("functools.pyi", "def update_wrapper(): ...")],
+            versions: "functools: 3.8-",
+        };
 
-        let stdlib_dir =
-            ModuleResolutionPathBuf::stdlib_from_custom_typeshed_root(&custom_typeshed).unwrap();
+        let TestCase { db, stdlib, .. } = TestCaseBuilder::new()
+            .with_custom_typeshed(TYPESHED)
+            .with_target_version(TargetVersion::Py38)
+            .build();
+
         let functools_module_name = ModuleName::new_static("functools").unwrap();
         let functools_module = resolve_module(&db, functools_module_name.clone()).unwrap();
 
@@ -445,16 +442,15 @@ mod tests {
             resolve_module(&db, functools_module_name).as_ref()
         );
 
-        assert_eq!(stdlib_dir, functools_module.search_path().to_path_buf());
+        assert_eq!(&stdlib, &functools_module.search_path().to_path_buf());
         assert_eq!(ModuleKind::Module, functools_module.kind());
 
-        let expected_functools_path =
-            FilePath::System(custom_typeshed.join("stdlib/functools.pyi"));
+        let expected_functools_path = stdlib.join("functools.pyi");
         assert_eq!(&expected_functools_path, functools_module.file().path(&db));
 
         assert_eq!(
             Some(functools_module),
-            path_to_module(&db, &expected_functools_path)
+            path_to_module(&db, &FilePath::System(expected_functools_path))
         );
     }
 
@@ -467,11 +463,29 @@ mod tests {
 
     #[test]
     fn stdlib_resolution_respects_versions_file_py38_existing_modules() {
-        let TestCase {
-            db,
-            custom_typeshed,
-            ..
-        } = setup_resolver_test();
+        const VERSIONS: &str = "\
+            asyncio: 3.8-               # 'Regular' package on py38+
+            asyncio.tasks: 3.9-3.11     # Submodule on py39+ only
+            functools: 3.8-             # Top-level single-file module
+            xml: 3.8-3.8                # Namespace package on py38 only
+        ";
+
+        const STDLIB: &[FileSpec] = &[
+            ("asyncio/__init__.pyi", ""),
+            ("asyncio/tasks.pyi", ""),
+            ("functools.pyi", ""),
+            ("xml/etree.pyi", ""),
+        ];
+
+        const TYPESHED: MockedTypeshed = MockedTypeshed {
+            stdlib_files: STDLIB,
+            versions: VERSIONS,
+        };
+
+        let TestCase { db, stdlib, .. } = TestCaseBuilder::new()
+            .with_custom_typeshed(TYPESHED)
+            .with_target_version(TargetVersion::Py38)
+            .build();
 
         let existing_modules = create_module_names(&["asyncio", "functools", "xml.etree"]);
         for module_name in existing_modules {
@@ -480,8 +494,7 @@ mod tests {
             });
             let search_path = resolved_module.search_path();
             assert_eq!(
-                &custom_typeshed.join("stdlib"),
-                &search_path,
+                &stdlib, &search_path,
                 "Search path for {module_name} was unexpectedly {search_path:?}"
             );
             assert!(
@@ -493,7 +506,32 @@ mod tests {
 
     #[test]
     fn stdlib_resolution_respects_versions_file_py38_nonexisting_modules() {
-        let TestCase { db, .. } = setup_resolver_test();
+        const VERSIONS: &str = "\
+            asyncio: 3.8-               # 'Regular' package on py38+
+            asyncio.tasks: 3.9-3.11     # Submodule on py39+ only
+            collections: 3.9-           # 'Regular' package on py39+
+            importlib: 3.9-             # Namespace package on py39+
+            xml: 3.8-3.8                # Namespace package on 3.8 only
+        ";
+
+        const STDLIB: &[FileSpec] = &[
+            ("collections/__init__.pyi", ""),
+            ("asyncio/__init__.pyi", ""),
+            ("asyncio/tasks.pyi", ""),
+            ("importlib/abc.pyi", ""),
+            ("xml/etree.pyi", ""),
+        ];
+
+        const TYPESHED: MockedTypeshed = MockedTypeshed {
+            stdlib_files: STDLIB,
+            versions: VERSIONS,
+        };
+
+        let TestCase { db, .. } = TestCaseBuilder::new()
+            .with_custom_typeshed(TYPESHED)
+            .with_target_version(TargetVersion::Py38)
+            .build();
+
         let nonexisting_modules = create_module_names(&[
             "collections",
             "importlib",
@@ -501,6 +539,7 @@ mod tests {
             "xml",
             "asyncio.tasks",
         ]);
+
         for module_name in nonexisting_modules {
             assert!(
                 resolve_module(&db, module_name.clone()).is_none(),
@@ -511,15 +550,31 @@ mod tests {
 
     #[test]
     fn stdlib_resolution_respects_versions_file_py39_existing_modules() {
-        let TestCase {
-            db,
-            custom_typeshed,
-            ..
-        } = create_resolver_builder()
-            .unwrap()
+        const VERSIONS: &str = "\
+            asyncio: 3.8-               # 'Regular' package on py38+
+            asyncio.tasks: 3.9-3.11     # Submodule on py39+ only
+            collections: 3.9-           # 'Regular' package on py39+
+            functools: 3.8-             # Top-level single-file module
+            importlib: 3.9-             # Namespace package on py39+
+        ";
+
+        const STDLIB: &[FileSpec] = &[
+            ("asyncio/__init__.pyi", ""),
+            ("asyncio/tasks.pyi", ""),
+            ("collections/__init__.pyi", ""),
+            ("functools.pyi", ""),
+            ("importlib/abc.pyi", ""),
+        ];
+
+        const TYPESHED: MockedTypeshed = MockedTypeshed {
+            stdlib_files: STDLIB,
+            versions: VERSIONS,
+        };
+
+        let TestCase { db, stdlib, .. } = TestCaseBuilder::new()
+            .with_custom_typeshed(TYPESHED)
             .with_target_version(TargetVersion::Py39)
-            .build()
-            .unwrap();
+            .build();
 
         let existing_modules = create_module_names(&[
             "asyncio",
@@ -528,14 +583,14 @@ mod tests {
             "collections",
             "asyncio.tasks",
         ]);
+
         for module_name in existing_modules {
             let resolved_module = resolve_module(&db, module_name.clone()).unwrap_or_else(|| {
                 panic!("Expected module {module_name} to exist in the mock stdlib")
             });
             let search_path = resolved_module.search_path();
             assert_eq!(
-                &custom_typeshed.join("stdlib"),
-                &search_path,
+                &stdlib, &search_path,
                 "Search path for {module_name} was unexpectedly {search_path:?}"
             );
             assert!(
@@ -546,11 +601,22 @@ mod tests {
     }
     #[test]
     fn stdlib_resolution_respects_versions_file_py39_nonexisting_modules() {
-        let TestCase { db, .. } = create_resolver_builder()
-            .unwrap()
+        const VERSIONS: &str = "\
+            importlib: 3.9-   # Namespace package on py39+
+            xml: 3.8-3.8      # Namespace package on 3.8 only
+        ";
+
+        const STDLIB: &[FileSpec] = &[("importlib/abc.pyi", ""), ("xml/etree.pyi", "")];
+
+        const TYPESHED: MockedTypeshed = MockedTypeshed {
+            stdlib_files: STDLIB,
+            versions: VERSIONS,
+        };
+
+        let TestCase { db, .. } = TestCaseBuilder::new()
+            .with_custom_typeshed(TYPESHED)
             .with_target_version(TargetVersion::Py39)
-            .build()
-            .unwrap();
+            .build();
 
         let nonexisting_modules = create_module_names(&["importlib", "xml", "xml.etree"]);
         for module_name in nonexisting_modules {
@@ -562,11 +628,19 @@ mod tests {
     }
 
     #[test]
-    fn first_party_precedence_over_stdlib() -> anyhow::Result<()> {
-        let TestCase { mut db, src, .. } = setup_resolver_test();
+    fn first_party_precedence_over_stdlib() {
+        const SRC: &[FileSpec] = &[("functools.py", "def update_wrapper(): ...")];
 
-        let first_party_functools_path = src.join("functools.py");
-        db.write_file(&first_party_functools_path, "def update_wrapper(): ...")?;
+        const TYPESHED: MockedTypeshed = MockedTypeshed {
+            stdlib_files: &[("functools.pyi", "def update_wrapper(): ...")],
+            versions: "functools: 3.8-",
+        };
+
+        let TestCase { db, src, .. } = TestCaseBuilder::new()
+            .with_src_files(SRC)
+            .with_custom_typeshed(TYPESHED)
+            .with_target_version(TargetVersion::Py38)
+            .build();
 
         let functools_module_name = ModuleName::new_static("functools").unwrap();
         let functools_module = resolve_module(&db, functools_module_name.clone()).unwrap();
@@ -577,49 +651,39 @@ mod tests {
         );
         assert_eq!(&src, &functools_module.search_path());
         assert_eq!(ModuleKind::Module, functools_module.kind());
-        assert_eq!(
-            &first_party_functools_path,
-            functools_module.file().path(&db)
-        );
+        assert_eq!(&src.join("functools.py"), functools_module.file().path(&db));
 
         assert_eq!(
             Some(functools_module),
-            path_to_module(&db, &FilePath::System(first_party_functools_path))
+            path_to_module(&db, &FilePath::System(src.join("functools.py")))
         );
-
-        Ok(())
     }
 
     #[test]
     fn stdlib_uses_vendored_typeshed_when_no_custom_typeshed_supplied() {
-        let TestCase { db, .. } = create_resolver_builder()
-            .unwrap()
-            .with_vendored_stubs_used()
-            .build()
-            .unwrap();
+        let TestCase { db, stdlib, .. } = TestCaseBuilder::new()
+            .with_vendored_typeshed()
+            .with_target_version(TargetVersion::default())
+            .build();
 
         let pydoc_data_topics_name = ModuleName::new_static("pydoc_data.topics").unwrap();
         let pydoc_data_topics = resolve_module(&db, pydoc_data_topics_name).unwrap();
+
         assert_eq!("pydoc_data.topics", pydoc_data_topics.name());
+        assert_eq!(pydoc_data_topics.search_path(), stdlib);
         assert_eq!(
-            pydoc_data_topics.search_path(),
-            VendoredPathBuf::from("stdlib")
-        );
-        assert_eq!(
-            &pydoc_data_topics.file().path(db.upcast()),
-            &VendoredPath::new("stdlib/pydoc_data/topics.pyi")
+            pydoc_data_topics.file().path(&db),
+            &stdlib.join("pydoc_data/topics.pyi")
         );
     }
 
     #[test]
-    fn resolve_package() -> anyhow::Result<()> {
-        let TestCase { src, mut db, .. } = setup_resolver_test();
+    fn resolve_package() {
+        let TestCase { src, db, .. } = TestCaseBuilder::new()
+            .with_src_files(&[("foo/__init__.py", "print('Hello, world!'")])
+            .build();
 
-        let foo_dir = src.join("foo");
-        let foo_path = foo_dir.join("__init__.py");
-
-        db.write_file(&foo_path, "print('Hello, world!')")?;
-
+        let foo_path = src.join("foo/__init__.py");
         let foo_module = resolve_module(&db, ModuleName::new_static("foo").unwrap()).unwrap();
 
         assert_eq!("foo", foo_module.name());
@@ -632,96 +696,84 @@ mod tests {
         );
 
         // Resolving by directory doesn't resolve to the init file.
-        assert_eq!(None, path_to_module(&db, &FilePath::System(foo_dir)));
-
-        Ok(())
+        assert_eq!(
+            None,
+            path_to_module(&db, &FilePath::System(src.join("foo")))
+        );
     }
 
     #[test]
-    fn package_priority_over_module() -> anyhow::Result<()> {
-        let TestCase { mut db, src, .. } = setup_resolver_test();
+    fn package_priority_over_module() {
+        const SRC: &[FileSpec] = &[
+            ("foo/__init__.py", "print('Hello, world!')"),
+            ("foo.py", "print('Hello, world!')"),
+        ];
 
-        let foo_dir = src.join("foo");
-        let foo_init = foo_dir.join("__init__.py");
-
-        db.write_file(&foo_init, "print('Hello, world!')")?;
-
-        let foo_py = src.join("foo.py");
-        db.write_file(&foo_py, "print('Hello, world!')")?;
+        let TestCase { db, src, .. } = TestCaseBuilder::new().with_src_files(SRC).build();
 
         let foo_module = resolve_module(&db, ModuleName::new_static("foo").unwrap()).unwrap();
+        let foo_init_path = src.join("foo/__init__.py");
 
         assert_eq!(&src, &foo_module.search_path());
-        assert_eq!(&foo_init, foo_module.file().path(&db));
+        assert_eq!(&foo_init_path, foo_module.file().path(&db));
         assert_eq!(ModuleKind::Package, foo_module.kind());
 
         assert_eq!(
             Some(foo_module),
-            path_to_module(&db, &FilePath::System(foo_init))
+            path_to_module(&db, &FilePath::System(foo_init_path))
         );
-        assert_eq!(None, path_to_module(&db, &FilePath::System(foo_py)));
-
-        Ok(())
+        assert_eq!(
+            None,
+            path_to_module(&db, &FilePath::System(src.join("foo.py")))
+        );
     }
 
     #[test]
-    fn typing_stub_over_module() -> anyhow::Result<()> {
-        let TestCase { mut db, src, .. } = setup_resolver_test();
+    fn typing_stub_over_module() {
+        const SRC: &[FileSpec] = &[("foo.py", "print('Hello, world!')"), ("foo.pyi", "x: int")];
 
-        let foo_stub = src.join("foo.pyi");
-        let foo_py = src.join("foo.py");
-        db.write_files([(&foo_stub, "x: int"), (&foo_py, "print('Hello, world!')")])?;
+        let TestCase { db, src, .. } = TestCaseBuilder::new().with_src_files(SRC).build();
 
         let foo = resolve_module(&db, ModuleName::new_static("foo").unwrap()).unwrap();
+        let foo_stub = src.join("foo.pyi");
 
         assert_eq!(&src, &foo.search_path());
         assert_eq!(&foo_stub, foo.file().path(&db));
 
         assert_eq!(Some(foo), path_to_module(&db, &FilePath::System(foo_stub)));
-        assert_eq!(None, path_to_module(&db, &FilePath::System(foo_py)));
-
-        Ok(())
+        assert_eq!(
+            None,
+            path_to_module(&db, &FilePath::System(src.join("foo.py")))
+        );
     }
 
     #[test]
-    fn sub_packages() -> anyhow::Result<()> {
-        let TestCase { mut db, src, .. } = setup_resolver_test();
+    fn sub_packages() {
+        const SRC: &[FileSpec] = &[
+            ("foo/__init__.py", ""),
+            ("foo/bar/__init__.py", ""),
+            ("foo/bar/baz.py", "print('Hello, world!)'"),
+        ];
 
-        let foo = src.join("foo");
-        let bar = foo.join("bar");
-        let baz = bar.join("baz.py");
-
-        db.write_files([
-            (&foo.join("__init__.py"), ""),
-            (&bar.join("__init__.py"), ""),
-            (&baz, "print('Hello, world!')"),
-        ])?;
+        let TestCase { db, src, .. } = TestCaseBuilder::new().with_src_files(SRC).build();
 
         let baz_module =
             resolve_module(&db, ModuleName::new_static("foo.bar.baz").unwrap()).unwrap();
+        let baz_path = src.join("foo/bar/baz.py");
 
         assert_eq!(&src, &baz_module.search_path());
-        assert_eq!(&baz, baz_module.file().path(&db));
+        assert_eq!(&baz_path, baz_module.file().path(&db));
 
         assert_eq!(
             Some(baz_module),
-            path_to_module(&db, &FilePath::System(baz))
+            path_to_module(&db, &FilePath::System(baz_path))
         );
-
-        Ok(())
     }
 
     #[test]
-    fn namespace_package() -> anyhow::Result<()> {
-        let TestCase {
-            mut db,
-            src,
-            site_packages,
-            ..
-        } = setup_resolver_test();
-
+    fn namespace_package() {
         // From [PEP420](https://peps.python.org/pep-0420/#nested-namespace-packages).
-        // But uses `src` for `project1` and `site_packages2` for `project2`.
+        // But uses `src` for `project1` and `site-packages` for `project2`.
         // ```
         // src
         //   parent
@@ -732,47 +784,33 @@ mod tests {
         //     child
         //       two.py
         // ```
-
-        let parent1 = src.join("parent");
-        let child1 = parent1.join("child");
-        let one = child1.join("one.py");
-
-        let parent2 = site_packages.join("parent");
-        let child2 = parent2.join("child");
-        let two = child2.join("two.py");
-
-        db.write_files([
-            (&one, "print('Hello, world!')"),
-            (&two, "print('Hello, world!')"),
-        ])?;
-
-        let one_module =
-            resolve_module(&db, ModuleName::new_static("parent.child.one").unwrap()).unwrap();
-
-        assert_eq!(
-            Some(one_module),
-            path_to_module(&db, &FilePath::System(one))
-        );
-
-        let two_module =
-            resolve_module(&db, ModuleName::new_static("parent.child.two").unwrap()).unwrap();
-        assert_eq!(
-            Some(two_module),
-            path_to_module(&db, &FilePath::System(two))
-        );
-
-        Ok(())
-    }
-
-    #[test]
-    fn regular_package_in_namespace_package() -> anyhow::Result<()> {
         let TestCase {
-            mut db,
+            db,
             src,
             site_packages,
             ..
-        } = setup_resolver_test();
+        } = TestCaseBuilder::new()
+            .with_src_files(&[("parent/child/one.py", "print('Hello, world!')")])
+            .with_site_packages_files(&[("parent/child/two.py", "print('Hello, world!')")])
+            .build();
 
+        let one_module_name = ModuleName::new_static("parent.child.one").unwrap();
+        let one_module_path = FilePath::System(src.join("parent/child/one.py"));
+        assert_eq!(
+            resolve_module(&db, one_module_name),
+            path_to_module(&db, &one_module_path)
+        );
+
+        let two_module_name = ModuleName::new_static("parent.child.two").unwrap();
+        let two_module_path = FilePath::System(site_packages.join("parent/child/two.py"));
+        assert_eq!(
+            resolve_module(&db, two_module_name),
+            path_to_module(&db, &two_module_path)
+        );
+    }
+
+    #[test]
+    fn regular_package_in_namespace_package() {
         // Adopted test case from the [PEP420 examples](https://peps.python.org/pep-0420/#nested-namespace-packages).
         // The `src/parent/child` package is a regular package. Therefore, `site_packages/parent/child/two.py` should not be resolved.
         // ```
@@ -785,90 +823,69 @@ mod tests {
         //     child
         //       two.py
         // ```
+        const SRC: &[FileSpec] = &[
+            ("parent/child/__init__.py", "print('Hello, world!')"),
+            ("parent/child/one.py", "print('Hello, world!')"),
+        ];
 
-        let parent1 = src.join("parent");
-        let child1 = parent1.join("child");
-        let one = child1.join("one.py");
+        const SITE_PACKAGES: &[FileSpec] = &[("parent/child/two.py", "print('Hello, world!')")];
 
-        let parent2 = site_packages.join("parent");
-        let child2 = parent2.join("child");
-        let two = child2.join("two.py");
+        let TestCase { db, src, .. } = TestCaseBuilder::new()
+            .with_src_files(SRC)
+            .with_site_packages_files(SITE_PACKAGES)
+            .build();
 
-        db.write_files([
-            (&child1.join("__init__.py"), "print('Hello, world!')"),
-            (&one, "print('Hello, world!')"),
-            (&two, "print('Hello, world!')"),
-        ])?;
-
-        let one_module =
-            resolve_module(&db, ModuleName::new_static("parent.child.one").unwrap()).unwrap();
-
-        assert_eq!(
-            Some(one_module),
-            path_to_module(&db, &FilePath::System(one))
-        );
+        let one_module_path = FilePath::System(src.join("parent/child/one.py"));
+        let one_module_name =
+            resolve_module(&db, ModuleName::new_static("parent.child.one").unwrap());
+        assert_eq!(one_module_name, path_to_module(&db, &one_module_path));
 
         assert_eq!(
             None,
             resolve_module(&db, ModuleName::new_static("parent.child.two").unwrap())
         );
-        Ok(())
     }
 
     #[test]
-    fn module_search_path_priority() -> anyhow::Result<()> {
+    fn module_search_path_priority() {
         let TestCase {
-            mut db,
+            db,
             src,
             site_packages,
             ..
-        } = setup_resolver_test();
-
-        let foo_src = src.join("foo.py");
-        let foo_site_packages = site_packages.join("foo.py");
-
-        db.write_files([(&foo_src, ""), (&foo_site_packages, "")])?;
+        } = TestCaseBuilder::new()
+            .with_src_files(&[("foo.py", "")])
+            .with_site_packages_files(&[("foo.py", "")])
+            .build();
 
         let foo_module = resolve_module(&db, ModuleName::new_static("foo").unwrap()).unwrap();
+        let foo_src_path = src.join("foo.py");
 
         assert_eq!(&src, &foo_module.search_path());
-        assert_eq!(&foo_src, foo_module.file().path(&db));
-
+        assert_eq!(&foo_src_path, foo_module.file().path(&db));
         assert_eq!(
             Some(foo_module),
-            path_to_module(&db, &FilePath::System(foo_src))
-        );
-        assert_eq!(
-            None,
-            path_to_module(&db, &FilePath::System(foo_site_packages))
+            path_to_module(&db, &FilePath::System(foo_src_path))
         );
 
-        Ok(())
+        assert_eq!(
+            None,
+            path_to_module(&db, &FilePath::System(site_packages.join("foo.py")))
+        );
     }
 
     #[test]
     #[cfg(target_family = "unix")]
     fn symlink() -> anyhow::Result<()> {
-        use ruff_db::system::{OsSystem, SystemPath};
-
-        fn make_relative(path: &SystemPath) -> &SystemPath {
-            path.strip_prefix("/").unwrap_or(path)
-        }
-
-        let TestCase {
-            mut db,
-            src,
-            site_packages,
-            custom_typeshed,
-        } = setup_resolver_test();
+        let mut db = TestDb::new();
 
         let temp_dir = tempfile::tempdir()?;
         let root = SystemPath::from_std_path(temp_dir.path()).unwrap();
         db.use_os_system(OsSystem::new(root));
 
-        let src = root.join(make_relative(&src));
-        let site_packages = root.join(make_relative(&site_packages));
-        let custom_typeshed = root.join(make_relative(&custom_typeshed));
+        let src = root.join("src");
+        let site_packages = root.join("site-packages");
+        let custom_typeshed = root.join("typeshed");
 
         let foo = src.join("foo.py");
         let bar = src.join("bar.py");
@@ -919,23 +936,22 @@ mod tests {
     }
 
     #[test]
-    fn deleting_an_unrelated_file_doesnt_change_module_resolution() -> anyhow::Result<()> {
-        let TestCase { mut db, src, .. } = setup_resolver_test();
-
-        let foo_path = src.join("foo.py");
-        let bar_path = src.join("bar.py");
-
-        db.write_files([(&foo_path, "x = 1"), (&bar_path, "y = 2")])?;
+    fn deleting_an_unrelated_file_doesnt_change_module_resolution() {
+        let TestCase { mut db, src, .. } = TestCaseBuilder::new()
+            .with_src_files(&[("foo.py", "x = 1"), ("bar.py", "x = 2")])
+            .with_target_version(TargetVersion::Py38)
+            .build();
 
         let foo_module_name = ModuleName::new_static("foo").unwrap();
         let foo_module = resolve_module(&db, foo_module_name.clone()).unwrap();
 
+        let bar_path = src.join("bar.py");
         let bar = system_path_to_file(&db, &bar_path).expect("bar.py to exist");
 
         db.clear_salsa_events();
 
         // Delete `bar.py`
-        db.memory_file_system().remove_file(&bar_path)?;
+        db.memory_file_system().remove_file(&bar_path).unwrap();
         bar.touch(&mut db);
 
         // Re-query the foo module. The foo module should still be cached because `bar.py` isn't relevant
@@ -949,14 +965,12 @@ mod tests {
             .any(|event| { matches!(event.kind, salsa::EventKind::WillExecute { .. }) }));
 
         assert_eq!(Some(foo_module), foo_module2);
-
-        Ok(())
     }
 
     #[test]
-    fn adding_a_file_on_which_the_module_resolution_depends_on_invalidates_the_query(
+    fn adding_file_on_which_module_resolution_depends_invalidates_previously_failing_query_that_now_succeeds(
     ) -> anyhow::Result<()> {
-        let TestCase { mut db, src, .. } = setup_resolver_test();
+        let TestCase { mut db, src, .. } = TestCaseBuilder::new().build();
         let foo_path = src.join("foo.py");
 
         let foo_module_name = ModuleName::new_static("foo").unwrap();
@@ -974,16 +988,15 @@ mod tests {
     }
 
     #[test]
-    fn removing_a_file_that_the_module_resolution_depends_on_invalidates_the_query(
+    fn removing_file_on_which_module_resolution_depends_invalidates_previously_successful_query_that_now_fails(
     ) -> anyhow::Result<()> {
-        let TestCase { mut db, src, .. } = setup_resolver_test();
-        let foo_path = src.join("foo.py");
-        let foo_init_path = src.join("foo/__init__.py");
+        const SRC: &[FileSpec] = &[("foo.py", "x = 1"), ("foo/__init__.py", "x = 2")];
 
-        db.write_files([(&foo_path, "x = 1"), (&foo_init_path, "x = 2")])?;
+        let TestCase { mut db, src, .. } = TestCaseBuilder::new().with_src_files(SRC).build();
 
         let foo_module_name = ModuleName::new_static("foo").unwrap();
         let foo_module = resolve_module(&db, foo_module_name.clone()).expect("foo module to exist");
+        let foo_init_path = src.join("foo/__init__.py");
 
         assert_eq!(&foo_init_path, foo_module.file().path(&db));
 
@@ -991,11 +1004,140 @@ mod tests {
         db.memory_file_system().remove_file(&foo_init_path)?;
         db.memory_file_system()
             .remove_directory(foo_init_path.parent().unwrap())?;
-        File::touch_path(&mut db, &FilePath::System(foo_init_path));
+        File::touch_path(&mut db, &foo_init_path);
 
         let foo_module = resolve_module(&db, foo_module_name).expect("Foo module to resolve");
-        assert_eq!(&foo_path, foo_module.file().path(&db));
+        assert_eq!(&src.join("foo.py"), foo_module.file().path(&db));
 
         Ok(())
+    }
+
+    #[test]
+    fn adding_file_to_search_path_with_lower_priority_does_not_invalidate_query() {
+        const TYPESHED: MockedTypeshed = MockedTypeshed {
+            versions: "functools: 3.8-",
+            stdlib_files: &[("functools.pyi", "def update_wrapper(): ...")],
+        };
+
+        let TestCase {
+            mut db,
+            stdlib,
+            site_packages,
+            ..
+        } = TestCaseBuilder::new()
+            .with_custom_typeshed(TYPESHED)
+            .with_target_version(TargetVersion::Py38)
+            .build();
+
+        let functools_module_name = ModuleName::new_static("functools").unwrap();
+        let stdlib_functools_path = stdlib.join("functools.pyi");
+
+        let functools_module = resolve_module(&db, functools_module_name.clone()).unwrap();
+        assert_eq!(functools_module.search_path(), stdlib);
+        assert_eq!(
+            Some(functools_module.file()),
+            system_path_to_file(&db, &stdlib_functools_path)
+        );
+
+        // Adding a file to site-packages does not invalidate the query,
+        // since site-packages takes lower priority in the module resolution
+        db.clear_salsa_events();
+        let site_packages_functools_path = site_packages.join("functools.py");
+        db.write_file(&site_packages_functools_path, "f: int")
+            .unwrap();
+        let functools_module = resolve_module(&db, functools_module_name.clone()).unwrap();
+        let events = db.take_salsa_events();
+        assert_function_query_was_not_run::<resolve_module_query, _, _>(
+            &db,
+            |res| &res.function,
+            &ModuleNameIngredient::new(&db, functools_module_name.clone()),
+            &events,
+        );
+        assert_eq!(functools_module.search_path(), stdlib);
+        assert_eq!(
+            Some(functools_module.file()),
+            system_path_to_file(&db, &stdlib_functools_path)
+        );
+    }
+
+    #[test]
+    fn adding_file_to_search_path_with_higher_priority_invalidates_the_query() {
+        const TYPESHED: MockedTypeshed = MockedTypeshed {
+            versions: "functools: 3.8-",
+            stdlib_files: &[("functools.pyi", "def update_wrapper(): ...")],
+        };
+
+        let TestCase {
+            mut db,
+            stdlib,
+            src,
+            ..
+        } = TestCaseBuilder::new()
+            .with_custom_typeshed(TYPESHED)
+            .with_target_version(TargetVersion::Py38)
+            .build();
+
+        let functools_module_name = ModuleName::new_static("functools").unwrap();
+        let functools_module = resolve_module(&db, functools_module_name.clone()).unwrap();
+        assert_eq!(functools_module.search_path(), stdlib);
+        assert_eq!(
+            Some(functools_module.file()),
+            system_path_to_file(&db, stdlib.join("functools.pyi"))
+        );
+
+        // Adding a first-party file invalidates the query,
+        // since first-party files take higher priority in module resolution:
+        let src_functools_path = src.join("functools.py");
+        db.write_file(&src_functools_path, "FOO: int").unwrap();
+        let functools_module = resolve_module(&db, functools_module_name.clone()).unwrap();
+        assert_eq!(functools_module.search_path(), src);
+        assert_eq!(
+            Some(functools_module.file()),
+            system_path_to_file(&db, &src_functools_path)
+        );
+    }
+
+    #[test]
+    fn deleting_file_from_higher_priority_search_path_invalidates_the_query() {
+        const SRC: &[FileSpec] = &[("functools.py", "FOO: int")];
+
+        const TYPESHED: MockedTypeshed = MockedTypeshed {
+            versions: "functools: 3.8-",
+            stdlib_files: &[("functools.pyi", "def update_wrapper(): ...")],
+        };
+
+        let TestCase {
+            mut db,
+            stdlib,
+            src,
+            ..
+        } = TestCaseBuilder::new()
+            .with_src_files(SRC)
+            .with_custom_typeshed(TYPESHED)
+            .with_target_version(TargetVersion::Py38)
+            .build();
+
+        let functools_module_name = ModuleName::new_static("functools").unwrap();
+        let src_functools_path = src.join("functools.py");
+
+        let functools_module = resolve_module(&db, functools_module_name.clone()).unwrap();
+        assert_eq!(functools_module.search_path(), src);
+        assert_eq!(
+            Some(functools_module.file()),
+            system_path_to_file(&db, &src_functools_path)
+        );
+
+        // If we now delete the first-party file,
+        // it should resolve to the stdlib:
+        db.memory_file_system()
+            .remove_file(&src_functools_path)
+            .unwrap();
+        File::touch_path(&mut db, &src_functools_path);
+        let functools_module = resolve_module(&db, functools_module_name.clone()).unwrap();
+        assert_eq!(functools_module.search_path(), stdlib);
+        assert_eq!(
+            Some(functools_module.file()),
+            system_path_to_file(&db, stdlib.join("functools.pyi"))
+        );
     }
 }

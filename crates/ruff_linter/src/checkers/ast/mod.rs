@@ -928,6 +928,19 @@ impl<'a> Visitor<'a> for Checker<'a> {
                     self.visit_expr(expr);
                 }
             }
+            Stmt::With(ast::StmtWith {
+                items,
+                body,
+                is_async: _,
+                range: _,
+            }) => {
+                for item in items {
+                    self.visit_with_item(item);
+                }
+                self.semantic.push_branch();
+                self.visit_body(body);
+                self.semantic.pop_branch();
+            }
             Stmt::While(ast::StmtWhile {
                 test,
                 body,
@@ -1139,6 +1152,13 @@ impl<'a> Visitor<'a> for Checker<'a> {
                 self.visit_boolean_test(test);
                 self.visit_expr(body);
                 self.visit_expr(orelse);
+            }
+            Expr::UnaryOp(ast::ExprUnaryOp {
+                op: UnaryOp::Not,
+                operand,
+                range: _,
+            }) => {
+                self.visit_boolean_test(operand);
             }
             Expr::Call(ast::ExprCall {
                 func,

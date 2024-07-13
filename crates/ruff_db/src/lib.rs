@@ -14,6 +14,7 @@ pub mod files;
 pub mod parsed;
 pub mod source;
 pub mod system;
+pub mod testing;
 pub mod vendored;
 
 pub(crate) type FxDashMap<K, V> = dashmap::DashMap<K, V, BuildHasherDefault<FxHasher>>;

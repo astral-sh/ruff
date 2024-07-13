@@ -1259,9 +1259,6 @@ fn redirect_direct() {
     exit_code: 1
     ----- stdout -----
     -:1:1: RUF950 Hey this is a test rule that was redirected from another.
-     |
-     |
-
     Found 1 error.
 
     ----- stderr -----
@@ -1294,9 +1291,6 @@ fn redirect_prefix() {
     exit_code: 1
     ----- stdout -----
     -:1:1: RUF950 Hey this is a test rule that was redirected from another.
-     |
-     |
-
     Found 1 error.
 
     ----- stderr -----
@@ -1314,9 +1308,6 @@ fn deprecated_direct() {
     exit_code: 1
     ----- stdout -----
     -:1:1: RUF920 Hey this is a deprecated test rule.
-     |
-     |
-
     Found 1 error.
 
     ----- stderr -----
@@ -1334,13 +1325,7 @@ fn deprecated_multiple_direct() {
     exit_code: 1
     ----- stdout -----
     -:1:1: RUF920 Hey this is a deprecated test rule.
-     |
-     |
-
     -:1:1: RUF921 Hey this is another deprecated test rule.
-     |
-     |
-
     Found 2 errors.
 
     ----- stderr -----
@@ -1359,13 +1344,7 @@ fn deprecated_indirect() {
     exit_code: 1
     ----- stdout -----
     -:1:1: RUF920 Hey this is a deprecated test rule.
-     |
-     |
-
     -:1:1: RUF921 Hey this is another deprecated test rule.
-     |
-     |
-
     Found 2 errors.
 
     ----- stderr -----
@@ -1544,13 +1523,7 @@ fn check_hints_hidden_unsafe_fixes() {
     exit_code: 1
     ----- stdout -----
     -:1:1: RUF901 [*] Hey this is a stable test rule with a safe fix.
-     |
-     |
-
     -:1:1: RUF902 Hey this is a stable test rule with an unsafe fix.
-     |
-     |
-
     Found 2 errors.
     [*] 1 fixable with the `--fix` option (1 hidden fix can be enabled with the `--unsafe-fixes` option).
 
@@ -1568,11 +1541,6 @@ fn check_hints_hidden_unsafe_fixes_with_no_safe_fixes() {
     exit_code: 1
     ----- stdout -----
     -:1:1: RUF902 Hey this is a stable test rule with an unsafe fix.
-      |
-    1 | x = {'a': 1, 'a': 1}
-      |  RUF902
-      |
-
     Found 1 error.
     No fixes available (1 hidden fix can be enabled with the `--unsafe-fixes` option).
 
@@ -1591,13 +1559,7 @@ fn check_no_hint_for_hidden_unsafe_fixes_when_disabled() {
     exit_code: 1
     ----- stdout -----
     -:1:1: RUF901 [*] Hey this is a stable test rule with a safe fix.
-     |
-     |
-
     -:1:1: RUF902 Hey this is a stable test rule with an unsafe fix.
-     |
-     |
-
     Found 2 errors.
     [*] 1 fixable with the --fix option.
 
@@ -1617,11 +1579,6 @@ fn check_no_hint_for_hidden_unsafe_fixes_with_no_safe_fixes_when_disabled() {
     exit_code: 1
     ----- stdout -----
     -:1:1: RUF902 Hey this is a stable test rule with an unsafe fix.
-      |
-    1 | x = {'a': 1, 'a': 1}
-      |  RUF902
-      |
-
     Found 1 error.
 
     ----- stderr -----
@@ -1639,13 +1596,7 @@ fn check_shows_unsafe_fixes_with_opt_in() {
     exit_code: 1
     ----- stdout -----
     -:1:1: RUF901 [*] Hey this is a stable test rule with a safe fix.
-     |
-     |
-
     -:1:1: RUF902 [*] Hey this is a stable test rule with an unsafe fix.
-     |
-     |
-
     Found 2 errors.
     [*] 2 fixable with the --fix option.
 
@@ -1667,11 +1618,6 @@ fn fix_applies_safe_fixes_by_default() {
 
     ----- stderr -----
     -:1:1: RUF902 Hey this is a stable test rule with an unsafe fix.
-      |
-    1 | # fix from stable-test-rule-safe-fix
-      |  RUF902
-      |
-
     Found 2 errors (1 fixed, 1 remaining).
     No fixes available (1 hidden fix can be enabled with the `--unsafe-fixes` option).
     "###);
@@ -1709,11 +1655,6 @@ fn fix_does_not_apply_display_only_fixes() {
     def add_to_list(item, some_list=[]): ...
     ----- stderr -----
     -:1:1: RUF903 Hey this is a stable test rule with a display only fix.
-      |
-    1 | def add_to_list(item, some_list=[]): ...
-      |  RUF903
-      |
-
     Found 1 error.
     "###);
 }
@@ -1732,11 +1673,6 @@ fn fix_does_not_apply_display_only_fixes_with_unsafe_fixes_enabled() {
     def add_to_list(item, some_list=[]): ...
     ----- stderr -----
     -:1:1: RUF903 Hey this is a stable test rule with a display only fix.
-      |
-    1 | def add_to_list(item, some_list=[]): ...
-      |  RUF903
-      |
-
     Found 1 error.
     "###);
 }
@@ -1754,9 +1690,6 @@ fn fix_only_unsafe_fixes_available() {
 
     ----- stderr -----
     -:1:1: RUF902 Hey this is a stable test rule with an unsafe fix.
-     |
-     |
-
     Found 1 error.
     No fixes available (1 hidden fix can be enabled with the `--unsafe-fixes` option).
     "###);
@@ -1893,13 +1826,7 @@ extend-unsafe-fixes = ["RUF901"]
     exit_code: 1
     ----- stdout -----
     -:1:1: RUF901 Hey this is a stable test rule with a safe fix.
-     |
-     |
-
     -:1:1: RUF902 Hey this is a stable test rule with an unsafe fix.
-     |
-     |
-
     Found 2 errors.
     No fixes available (2 hidden fixes can be enabled with the `--unsafe-fixes` option).
 
@@ -1931,13 +1858,7 @@ extend-safe-fixes = ["RUF902"]
     exit_code: 1
     ----- stdout -----
     -:1:1: RUF901 [*] Hey this is a stable test rule with a safe fix.
-     |
-     |
-
     -:1:1: RUF902 [*] Hey this is a stable test rule with an unsafe fix.
-     |
-     |
-
     Found 2 errors.
     [*] 2 fixable with the `--fix` option.
 
@@ -1971,13 +1892,7 @@ extend-safe-fixes = ["RUF902"]
     exit_code: 1
     ----- stdout -----
     -:1:1: RUF901 [*] Hey this is a stable test rule with a safe fix.
-     |
-     |
-
     -:1:1: RUF902 Hey this is a stable test rule with an unsafe fix.
-     |
-     |
-
     Found 2 errors.
     [*] 1 fixable with the `--fix` option (1 hidden fix can be enabled with the `--unsafe-fixes` option).
 
@@ -2013,61 +1928,12 @@ extend-safe-fixes = ["RUF9"]
     exit_code: 1
     ----- stdout -----
     -:1:1: RUF900 Hey this is a stable test rule.
-      |
-    1 | x = {'a': 1, 'a': 1}
-      |  RUF900
-    2 | print(('foo'))
-    3 | print(str('foo'))
-      |
-
     -:1:1: RUF901 Hey this is a stable test rule with a safe fix.
-      |
-    1 | x = {'a': 1, 'a': 1}
-      |  RUF901
-    2 | print(('foo'))
-    3 | print(str('foo'))
-      |
-
     -:1:1: RUF902 [*] Hey this is a stable test rule with an unsafe fix.
-      |
-    1 | x = {'a': 1, 'a': 1}
-      |  RUF902
-    2 | print(('foo'))
-    3 | print(str('foo'))
-      |
-
     -:1:1: RUF903 Hey this is a stable test rule with a display only fix.
-      |
-    1 | x = {'a': 1, 'a': 1}
-      |  RUF903
-    2 | print(('foo'))
-    3 | print(str('foo'))
-      |
-
     -:1:1: RUF920 Hey this is a deprecated test rule.
-      |
-    1 | x = {'a': 1, 'a': 1}
-      |  RUF920
-    2 | print(('foo'))
-    3 | print(str('foo'))
-      |
-
     -:1:1: RUF921 Hey this is another deprecated test rule.
-      |
-    1 | x = {'a': 1, 'a': 1}
-      |  RUF921
-    2 | print(('foo'))
-    3 | print(str('foo'))
-      |
-
     -:1:1: RUF950 Hey this is a test rule that was redirected from another.
-      |
-    1 | x = {'a': 1, 'a': 1}
-      |  RUF950
-    2 | print(('foo'))
-    3 | print(str('foo'))
-      |
-
     Found 7 errors.
     [*] 1 fixable with the `--fix` option (1 hidden fix can be enabled with the `--unsafe-fixes` option).
 

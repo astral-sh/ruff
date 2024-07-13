@@ -16,10 +16,7 @@ use crate::checkers::ast::Checker;
 /// Unlike a direct type comparison, `isinstance` will also check if an object
 /// is an instance of a class or a subclass thereof.
 ///
-/// Under [preview mode](https://docs.astral.sh/ruff/preview), this rule also
-/// allows for direct type comparisons using `is` and `is not`, to check for
-/// exact type equality (while still forbidding comparisons using `==` and
-/// `!=`).
+/// If you want to check for an exact type match, use `is` or `is not`.
 ///
 /// ## Example
 /// ```python
@@ -74,18 +71,7 @@ pub(crate) fn type_comparison(checker: &mut Checker, compare: &ast::ExprCompare)
 /// Returns `true` if the [`Expr`] is known to evaluate to a type (e.g., `int`, or `type(1)`).
 fn is_type(expr: &Expr, semantic: &SemanticModel) -> bool {
     match expr {
-        Expr::Call(ast::ExprCall {
-            func, arguments, ..
-        }) => {
-            // Allow comparison for types which are not obvious.
-            if !arguments
-                .args
-                .first()
-                .is_some_and(|arg| !arg.is_name_expr() && !arg.is_none_literal_expr())
-            {
-                return false;
-            }
-
+        Expr::Call(ast::ExprCall { func, .. }) => {
             // Ex) `type(obj) == type(1)`
             semantic.match_builtin_expr(func, "type")
         }

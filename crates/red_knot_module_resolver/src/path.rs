@@ -254,6 +254,18 @@ impl fmt::Debug for ModuleResolutionPathBuf {
     }
 }
 
+impl PartialEq<SystemPathBuf> for ModuleResolutionPathBuf {
+    fn eq(&self, other: &SystemPathBuf) -> bool {
+        ModuleResolutionPathRef::from(self) == **other
+    }
+}
+
+impl PartialEq<ModuleResolutionPathBuf> for SystemPathBuf {
+    fn eq(&self, other: &ModuleResolutionPathBuf) -> bool {
+        other.eq(self)
+    }
+}
+
 #[derive(Debug, PartialEq, Eq, Hash, Clone, Copy)]
 enum ModuleResolutionPathRefInner<'a> {
     Extra(&'a SystemPath),
@@ -643,9 +655,9 @@ impl PartialEq<ModuleResolutionPathRef<'_>> for VendoredPathBuf {
 mod tests {
     use insta::assert_debug_snapshot;
 
-    use crate::db::tests::{create_resolver_builder, TestCase, TestDb};
+    use crate::db::tests::TestDb;
     use crate::supported_py_version::TargetVersion;
-    use crate::typeshed::LazyTypeshedVersions;
+    use crate::testing::{FileSpec, MockedTypeshed, TestCase, TestCaseBuilder};
 
     use super::*;
 
@@ -943,25 +955,40 @@ mod tests {
         );
     }
 
-    fn py38_stdlib_test_case() -> (TestDb, ModuleResolutionPathBuf) {
-        let TestCase {
-            db,
-            custom_typeshed,
-            ..
-        } = create_resolver_builder().unwrap().build().unwrap();
-        let stdlib_module_path =
-            ModuleResolutionPathBuf::stdlib_from_custom_typeshed_root(&custom_typeshed).unwrap();
-        (db, stdlib_module_path)
+    fn typeshed_test_case(
+        typeshed: MockedTypeshed,
+        target_version: TargetVersion,
+    ) -> (TestDb, ModuleResolutionPathBuf) {
+        let TestCase { db, stdlib, .. } = TestCaseBuilder::new()
+            .with_custom_typeshed(typeshed)
+            .with_target_version(target_version)
+            .build();
+        let stdlib = ModuleResolutionPathBuf::standard_library(FilePath::System(stdlib)).unwrap();
+        (db, stdlib)
+    }
+
+    fn py38_typeshed_test_case(typeshed: MockedTypeshed) -> (TestDb, ModuleResolutionPathBuf) {
+        typeshed_test_case(typeshed, TargetVersion::Py38)
+    }
+
+    fn py39_typeshed_test_case(typeshed: MockedTypeshed) -> (TestDb, ModuleResolutionPathBuf) {
+        typeshed_test_case(typeshed, TargetVersion::Py39)
     }
 
     #[test]
     fn mocked_typeshed_existing_regular_stdlib_pkg_py38() {
-        let (db, stdlib_path) = py38_stdlib_test_case();
-        let resolver = ResolverState {
-            db: &db,
-            typeshed_versions: LazyTypeshedVersions::new(),
-            target_version: TargetVersion::Py38,
+        const VERSIONS: &str = "\
+            asyncio: 3.8-
+            asyncio.tasks: 3.9-3.11
+        ";
+
+        const TYPESHED: MockedTypeshed = MockedTypeshed {
+            versions: VERSIONS,
+            stdlib_files: &[("asyncio/__init__.pyi", ""), ("asyncio/tasks.pyi", "")],
         };
+
+        let (db, stdlib_path) = py38_typeshed_test_case(TYPESHED);
+        let resolver = ResolverState::new(&db, TargetVersion::Py38);
 
         let asyncio_regular_package = stdlib_path.join("asyncio");
         assert!(asyncio_regular_package.is_directory(&stdlib_path, &resolver));
@@ -986,12 +1013,13 @@ mod tests {
 
     #[test]
     fn mocked_typeshed_existing_namespace_stdlib_pkg_py38() {
-        let (db, stdlib_path) = py38_stdlib_test_case();
-        let resolver = ResolverState {
-            db: &db,
-            typeshed_versions: LazyTypeshedVersions::new(),
-            target_version: TargetVersion::Py38,
+        const TYPESHED: MockedTypeshed = MockedTypeshed {
+            versions: "xml: 3.8-3.8",
+            stdlib_files: &[("xml/etree.pyi", "")],
         };
+
+        let (db, stdlib_path) = py38_typeshed_test_case(TYPESHED);
+        let resolver = ResolverState::new(&db, TargetVersion::Py38);
 
         let xml_namespace_package = stdlib_path.join("xml");
         assert!(xml_namespace_package.is_directory(&stdlib_path, &resolver));
@@ -1007,12 +1035,13 @@ mod tests {
 
     #[test]
     fn mocked_typeshed_single_file_stdlib_module_py38() {
-        let (db, stdlib_path) = py38_stdlib_test_case();
-        let resolver = ResolverState {
-            db: &db,
-            typeshed_versions: LazyTypeshedVersions::new(),
-            target_version: TargetVersion::Py38,
+        const TYPESHED: MockedTypeshed = MockedTypeshed {
+            versions: "functools: 3.8-",
+            stdlib_files: &[("functools.pyi", "")],
         };
+
+        let (db, stdlib_path) = py38_typeshed_test_case(TYPESHED);
+        let resolver = ResolverState::new(&db, TargetVersion::Py38);
 
         let functools_module = stdlib_path.join("functools.pyi");
         assert!(functools_module.to_file(&stdlib_path, &resolver).is_some());
@@ -1022,12 +1051,13 @@ mod tests {
 
     #[test]
     fn mocked_typeshed_nonexistent_regular_stdlib_pkg_py38() {
-        let (db, stdlib_path) = py38_stdlib_test_case();
-        let resolver = ResolverState {
-            db: &db,
-            typeshed_versions: LazyTypeshedVersions::new(),
-            target_version: TargetVersion::Py38,
+        const TYPESHED: MockedTypeshed = MockedTypeshed {
+            versions: "collections: 3.9-",
+            stdlib_files: &[("collections/__init__.pyi", "")],
         };
+
+        let (db, stdlib_path) = py38_typeshed_test_case(TYPESHED);
+        let resolver = ResolverState::new(&db, TargetVersion::Py38);
 
         let collections_regular_package = stdlib_path.join("collections");
         assert_eq!(
@@ -1040,12 +1070,13 @@ mod tests {
 
     #[test]
     fn mocked_typeshed_nonexistent_namespace_stdlib_pkg_py38() {
-        let (db, stdlib_path) = py38_stdlib_test_case();
-        let resolver = ResolverState {
-            db: &db,
-            typeshed_versions: LazyTypeshedVersions::new(),
-            target_version: TargetVersion::Py38,
+        const TYPESHED: MockedTypeshed = MockedTypeshed {
+            versions: "importlib: 3.9-",
+            stdlib_files: &[("importlib/abc.pyi", "")],
         };
+
+        let (db, stdlib_path) = py38_typeshed_test_case(TYPESHED);
+        let resolver = ResolverState::new(&db, TargetVersion::Py38);
 
         let importlib_namespace_package = stdlib_path.join("importlib");
         assert_eq!(
@@ -1063,12 +1094,13 @@ mod tests {
 
     #[test]
     fn mocked_typeshed_nonexistent_single_file_module_py38() {
-        let (db, stdlib_path) = py38_stdlib_test_case();
-        let resolver = ResolverState {
-            db: &db,
-            typeshed_versions: LazyTypeshedVersions::new(),
-            target_version: TargetVersion::Py38,
+        const TYPESHED: MockedTypeshed = MockedTypeshed {
+            versions: "foo: 2.6-",
+            stdlib_files: &[("foo.pyi", "")],
         };
+
+        let (db, stdlib_path) = py38_typeshed_test_case(TYPESHED);
+        let resolver = ResolverState::new(&db, TargetVersion::Py38);
 
         let non_existent = stdlib_path.join("doesnt_even_exist");
         assert_eq!(non_existent.to_file(&stdlib_path, &resolver), None);
@@ -1076,29 +1108,27 @@ mod tests {
         assert!(!non_existent.is_regular_package(&stdlib_path, &resolver));
     }
 
-    fn py39_stdlib_test_case() -> (TestDb, ModuleResolutionPathBuf) {
-        let TestCase {
-            db,
-            custom_typeshed,
-            ..
-        } = create_resolver_builder()
-            .unwrap()
-            .with_target_version(TargetVersion::Py39)
-            .build()
-            .unwrap();
-        let stdlib_module_path =
-            ModuleResolutionPathBuf::stdlib_from_custom_typeshed_root(&custom_typeshed).unwrap();
-        (db, stdlib_module_path)
-    }
-
     #[test]
     fn mocked_typeshed_existing_regular_stdlib_pkgs_py39() {
-        let (db, stdlib_path) = py39_stdlib_test_case();
-        let resolver = ResolverState {
-            db: &db,
-            typeshed_versions: LazyTypeshedVersions::new(),
-            target_version: TargetVersion::Py39,
+        const VERSIONS: &str = "\
+            asyncio: 3.8-
+            asyncio.tasks: 3.9-3.11
+            collections: 3.9-
+        ";
+
+        const STDLIB: &[FileSpec] = &[
+            ("asyncio/__init__.pyi", ""),
+            ("asyncio/tasks.pyi", ""),
+            ("collections/__init__.pyi", ""),
+        ];
+
+        const TYPESHED: MockedTypeshed = MockedTypeshed {
+            versions: VERSIONS,
+            stdlib_files: STDLIB,
         };
+
+        let (db, stdlib_path) = py39_typeshed_test_case(TYPESHED);
+        let resolver = ResolverState::new(&db, TargetVersion::Py39);
 
         // Since we've set the target version to Py39,
         // `collections` should now exist as a directory, according to VERSIONS...
@@ -1126,14 +1156,15 @@ mod tests {
 
     #[test]
     fn mocked_typeshed_existing_namespace_stdlib_pkg_py39() {
-        let (db, stdlib_path) = py39_stdlib_test_case();
-        let resolver = ResolverState {
-            db: &db,
-            typeshed_versions: LazyTypeshedVersions::new(),
-            target_version: TargetVersion::Py39,
+        const TYPESHED: MockedTypeshed = MockedTypeshed {
+            versions: "importlib: 3.9-",
+            stdlib_files: &[("importlib/abc.pyi", "")],
         };
 
-        // The `importlib` directory now also exists...
+        let (db, stdlib_path) = py39_typeshed_test_case(TYPESHED);
+        let resolver = ResolverState::new(&db, TargetVersion::Py39);
+
+        // The `importlib` directory now also exists
         let importlib_namespace_package = stdlib_path.join("importlib");
         assert!(importlib_namespace_package.is_directory(&stdlib_path, &resolver));
         assert!(!importlib_namespace_package.is_regular_package(&stdlib_path, &resolver));
@@ -1143,7 +1174,7 @@ mod tests {
             None
         );
 
-        // ...As do submodules in the `importlib` namespace package:
+        // Submodules in the `importlib` namespace package also now exist:
         let importlib_abc = importlib_namespace_package.join("abc.pyi");
         assert!(!importlib_abc.is_directory(&stdlib_path, &resolver));
         assert!(!importlib_abc.is_regular_package(&stdlib_path, &resolver));
@@ -1152,12 +1183,13 @@ mod tests {
 
     #[test]
     fn mocked_typeshed_nonexistent_namespace_stdlib_pkg_py39() {
-        let (db, stdlib_path) = py39_stdlib_test_case();
-        let resolver = ResolverState {
-            db: &db,
-            typeshed_versions: LazyTypeshedVersions::new(),
-            target_version: TargetVersion::Py39,
+        const TYPESHED: MockedTypeshed = MockedTypeshed {
+            versions: "xml: 3.8-3.8",
+            stdlib_files: &[("xml/etree.pyi", "")],
         };
+
+        let (db, stdlib_path) = py39_typeshed_test_case(TYPESHED);
+        let resolver = ResolverState::new(&db, TargetVersion::Py39);
 
         // The `xml` package no longer exists on py39:
         let xml_namespace_package = stdlib_path.join("xml");

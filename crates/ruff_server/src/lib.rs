@@ -12,6 +12,7 @@ mod edit;
 mod fix;
 mod format;
 mod lint;
+mod resolve;
 mod server;
 mod session;
 mod trace;

@@ -4,15 +4,17 @@ use ruff_python_ast::{Expr, ExprCall, ExprNumberLiteral, Number};
 use ruff_python_semantic::Modules;
 use ruff_text_size::Ranged;
 
-use crate::{checkers::ast::Checker, importer::ImportRequest};
+use crate::checkers::ast::Checker;
+use crate::importer::ImportRequest;
+use crate::rules::flake8_async::helpers::AsyncModule;
 
 /// ## What it does
-/// Checks for uses of `trio.sleep()` with an interval greater than 24 hours.
+/// Checks for uses of `trio.sleep()` or `anyio.sleep()` with a delay greater than 24 hours.
 ///
 /// ## Why is this bad?
-/// `trio.sleep()` with an interval greater than 24 hours is usually intended
-/// to sleep indefinitely. Instead of using a large interval,
-/// `trio.sleep_forever()` better conveys the intent.
+/// Calling `sleep()` with a delay greater than 24 hours is usually intended
+/// to sleep indefinitely. Instead of using a large delay,
+/// `trio.sleep_forever()` or `anyio.sleep_forever()` better conveys the intent.
 ///
 ///
 /// ## Example
@@ -33,23 +35,31 @@ use crate::{checkers::ast::Checker, importer::ImportRequest};
 ///     await trio.sleep_forever()
 /// ```
 #[violation]
-pub struct SleepForeverCall;
+pub struct LongSleepNotForever {
+    module: AsyncModule,
+}
 
-impl Violation for SleepForeverCall {
+impl Violation for LongSleepNotForever {
     const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("`trio.sleep()` with >24 hour interval should usually be `trio.sleep_forever()`")
+        let Self { module } = self;
+        format!(
+            "`{module}.sleep()` with >24 hour interval should usually be `{module}.sleep_forever()`"
+        )
     }
 
     fn fix_title(&self) -> Option<String> {
-        Some(format!("Replace with `trio.sleep_forever()`"))
+        let Self { module } = self;
+        Some(format!("Replace with `{module}.sleep_forever()`"))
     }
 }
 
 /// ASYNC116
-pub(crate) fn sleep_forever_call(checker: &mut Checker, call: &ExprCall) {
-    if !checker.semantic().seen_module(Modules::TRIO) {
+pub(crate) fn long_sleep_not_forever(checker: &mut Checker, call: &ExprCall) {
+    if !(checker.semantic().seen_module(Modules::TRIO)
+        || checker.semantic().seen_module(Modules::ANYIO))
+    {
         return;
     }
 
@@ -60,14 +70,6 @@ pub(crate) fn sleep_forever_call(checker: &mut Checker, call: &ExprCall) {
     let Some(arg) = call.arguments.find_argument("seconds", 0) else {
         return;
     };
-
-    if !checker
-        .semantic()
-        .resolve_qualified_name(call.func.as_ref())
-        .is_some_and(|qualified_name| matches!(qualified_name.segments(), ["trio", "sleep"]))
-    {
-        return;
-    }
 
     let Expr::NumberLiteral(ExprNumberLiteral { value, .. }) = arg else {
         return;
@@ -94,11 +96,34 @@ pub(crate) fn sleep_forever_call(checker: &mut Checker, call: &ExprCall) {
         Number::Complex { .. } => return,
     }
 
-    let mut diagnostic = Diagnostic::new(SleepForeverCall, call.range());
+    let Some(qualified_name) = checker
+        .semantic()
+        .resolve_qualified_name(call.func.as_ref())
+    else {
+        return;
+    };
+
+    let Some(module) = AsyncModule::try_from(&qualified_name) else {
+        return;
+    };
+
+    let is_relevant_module = if checker.settings.preview.is_enabled() {
+        matches!(module, AsyncModule::AnyIo | AsyncModule::Trio)
+    } else {
+        matches!(module, AsyncModule::Trio)
+    };
+
+    let is_sleep = is_relevant_module && matches!(qualified_name.segments(), [_, "sleep"]);
+
+    if !is_sleep {
+        return;
+    }
+
+    let mut diagnostic = Diagnostic::new(LongSleepNotForever { module }, call.range());
     let replacement_function = "sleep_forever";
     diagnostic.try_set_fix(|| {
         let (import_edit, binding) = checker.importer().get_or_import_symbol(
-            &ImportRequest::import_from("trio", replacement_function),
+            &ImportRequest::import_from(&module.to_string(), replacement_function),
             call.func.start(),
             checker.semantic(),
         )?;

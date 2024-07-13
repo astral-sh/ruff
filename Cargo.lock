@@ -2102,6 +2102,7 @@ dependencies = [
  "ruff_text_size",
  "rustc-hash 2.0.0",
  "salsa",
+ "tempfile",
  "tracing",
  "zip",
 ]
@@ -2448,7 +2449,6 @@ version = "0.2.2"
 dependencies = [
  "anyhow",
  "crossbeam",
- "globset",
  "insta",
  "jod-thread",
  "libc",

@@ -1,5 +1,7 @@
-use crate::files::{File, FilePath};
-use crate::system::{MemoryFileSystem, Metadata, OsSystem, System, SystemPath};
+use crate::files::File;
+use crate::system::{
+    DirectoryEntry, MemoryFileSystem, Metadata, OsSystem, Result, System, SystemPath,
+};
 use crate::Db;
 use std::any::Any;
 
@@ -85,6 +87,16 @@ impl System for TestSystem {
     fn as_any(&self) -> &dyn Any {
         self
     }
+
+    fn read_directory<'a>(
+        &'a self,
+        path: &SystemPath,
+    ) -> Result<Box<dyn Iterator<Item = Result<DirectoryEntry>> + 'a>> {
+        match &self.inner {
+            TestFileSystem::Os(fs) => fs.read_directory(path),
+            TestFileSystem::Stub(fs) => Ok(Box::new(fs.read_directory(path)?)),
+        }
+    }
 }
 
 /// Extension trait for databases that use [`TestSystem`].
@@ -104,14 +116,14 @@ pub trait DbWithTestSystem: Db + Sized {
         path: impl AsRef<SystemPath>,
         content: impl ToString,
     ) -> crate::system::Result<()> {
-        let path = path.as_ref().to_path_buf();
+        let path = path.as_ref();
         let result = self
             .test_system()
             .memory_file_system()
-            .write_file(&path, content);
+            .write_file(path, content);
 
         if result.is_ok() {
-            File::touch_path(self, &FilePath::System(path));
+            File::touch_path(self, path);
         }
 
         result

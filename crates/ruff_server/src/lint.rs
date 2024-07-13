@@ -19,10 +19,10 @@ use ruff_python_codegen::Stylist;
 use ruff_python_index::Indexer;
 use ruff_source_file::{LineIndex, Locator};
 use ruff_text_size::{Ranged, TextRange};
-use ruff_workspace::resolver::match_any_exclusion;
 
 use crate::{
     edit::{NotebookRange, ToRangeExt},
+    resolve::is_document_excluded,
     session::DocumentQuery,
     PositionEncoding, DIAGNOSTIC_NAME,
 };
@@ -72,18 +72,12 @@ pub(crate) fn check(
 
     // If the document is excluded, return an empty list of diagnostics.
     let package = if let Some(document_path) = document_path.as_ref() {
-        if let Some(exclusion) = match_any_exclusion(
+        if is_document_excluded(
             document_path,
-            &file_resolver_settings.exclude,
-            &file_resolver_settings.extend_exclude,
-            Some(&linter_settings.exclude),
+            file_resolver_settings,
+            Some(linter_settings),
             None,
         ) {
-            tracing::debug!(
-                "Ignored path via `{}`: {}",
-                exclusion,
-                document_path.display()
-            );
             return DiagnosticsMap::default();
         }
 

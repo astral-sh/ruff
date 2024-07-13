@@ -176,6 +176,7 @@ pub(crate) fn format(
         duration
     );
 
+    // Store the caches.
     caches.persist()?;
 
     // Report on any errors.

@@ -25,13 +25,9 @@ pub(crate) mod tests {
     use salsa::DebugWithDb;
 
     use ruff_db::files::Files;
-    use ruff_db::system::{
-        DbWithTestSystem, MemoryFileSystem, SystemPath, SystemPathBuf, TestSystem,
-    };
+    use ruff_db::system::{DbWithTestSystem, TestSystem};
     use ruff_db::vendored::VendoredFileSystem;
 
-    use crate::resolver::{set_module_resolution_settings, RawModuleResolutionSettings};
-    use crate::supported_py_version::TargetVersion;
     use crate::vendored_typeshed_stubs;
 
     use super::*;
@@ -126,132 +122,5 @@ pub(crate) mod tests {
                 events: self.events.clone(),
             })
         }
-    }
-
-    pub(crate) struct TestCaseBuilder {
-        db: TestDb,
-        src: SystemPathBuf,
-        site_packages: SystemPathBuf,
-        target_version: Option<TargetVersion>,
-        with_vendored_stubs: bool,
-    }
-
-    impl TestCaseBuilder {
-        #[must_use]
-        pub(crate) fn with_target_version(mut self, target_version: TargetVersion) -> Self {
-            self.target_version = Some(target_version);
-            self
-        }
-
-        #[must_use]
-        pub(crate) fn with_vendored_stubs_used(mut self) -> Self {
-            self.with_vendored_stubs = true;
-            self
-        }
-
-        fn create_mocked_typeshed(
-            typeshed_dir: &SystemPath,
-            fs: &MemoryFileSystem,
-        ) -> std::io::Result<()> {
-            static VERSIONS_DATA: &str = "\
-            asyncio: 3.8-               # 'Regular' package on py38+
-            asyncio.tasks: 3.9-3.11
-            collections: 3.9-           # 'Regular' package on py39+
-            functools: 3.8-
-            importlib: 3.9-             # Namespace package on py39+
-            xml: 3.8-3.8                # Namespace package on py38 only
-            ";
-
-            fs.create_directory_all(typeshed_dir)?;
-            fs.write_file(typeshed_dir.join("stdlib/VERSIONS"), VERSIONS_DATA)?;
-
-            // Regular package on py38+
-            fs.create_directory_all(typeshed_dir.join("stdlib/asyncio"))?;
-            fs.touch(typeshed_dir.join("stdlib/asyncio/__init__.pyi"))?;
-            fs.write_file(
-                typeshed_dir.join("stdlib/asyncio/tasks.pyi"),
-                "class Task: ...",
-            )?;
-
-            // Regular package on py39+
-            fs.create_directory_all(typeshed_dir.join("stdlib/collections"))?;
-            fs.touch(typeshed_dir.join("stdlib/collections/__init__.pyi"))?;
-
-            // Namespace package on py38 only
-            fs.create_directory_all(typeshed_dir.join("stdlib/xml"))?;
-            fs.touch(typeshed_dir.join("stdlib/xml/etree.pyi"))?;
-
-            // Namespace package on py39+
-            fs.create_directory_all(typeshed_dir.join("stdlib/importlib"))?;
-            fs.touch(typeshed_dir.join("stdlib/importlib/abc.pyi"))?;
-
-            fs.write_file(
-                typeshed_dir.join("stdlib/functools.pyi"),
-                "def update_wrapper(): ...",
-            )
-        }
-
-        pub(crate) fn build(self) -> std::io::Result<TestCase> {
-            let TestCaseBuilder {
-                mut db,
-                src,
-                with_vendored_stubs,
-                site_packages,
-                target_version,
-            } = self;
-
-            let typeshed_dir = SystemPathBuf::from("/typeshed");
-
-            let custom_typeshed = if with_vendored_stubs {
-                None
-            } else {
-                Self::create_mocked_typeshed(&typeshed_dir, db.memory_file_system())?;
-                Some(typeshed_dir.clone())
-            };
-
-            let settings = RawModuleResolutionSettings {
-                target_version: target_version.unwrap_or_default(),
-                extra_paths: vec![],
-                workspace_root: src.clone(),
-                custom_typeshed: custom_typeshed.clone(),
-                site_packages: Some(site_packages.clone()),
-            };
-
-            set_module_resolution_settings(&mut db, settings);
-
-            Ok(TestCase {
-                db,
-                src: src.clone(),
-                custom_typeshed: typeshed_dir,
-                site_packages: site_packages.clone(),
-            })
-        }
-    }
-
-    pub(crate) struct TestCase {
-        pub(crate) db: TestDb,
-        pub(crate) src: SystemPathBuf,
-        pub(crate) custom_typeshed: SystemPathBuf,
-        pub(crate) site_packages: SystemPathBuf,
-    }
-
-    pub(crate) fn create_resolver_builder() -> std::io::Result<TestCaseBuilder> {
-        let db = TestDb::new();
-
-        let src = SystemPathBuf::from("/src");
-        let site_packages = SystemPathBuf::from("/site_packages");
-
-        let fs = db.memory_file_system();
-
-        fs.create_directory_all(&src)?;
-        fs.create_directory_all(&site_packages)?;
-
-        Ok(TestCaseBuilder {
-            db,
-            src,
-            with_vendored_stubs: false,
-            site_packages,
-            target_version: None,
-        })
     }
 }

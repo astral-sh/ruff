@@ -518,8 +518,8 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
             if checker.enabled(Rule::BlockingSleepInAsyncFunction) {
                 flake8_async::rules::blocking_sleep(checker, call);
             }
-            if checker.enabled(Rule::SleepForeverCall) {
-                flake8_async::rules::sleep_forever_call(checker, call);
+            if checker.enabled(Rule::LongSleepNotForever) {
+                flake8_async::rules::long_sleep_not_forever(checker, call);
             }
             if checker.any_enabled(&[Rule::Print, Rule::PPrint]) {
                 flake8_print::rules::print_call(checker, call);
@@ -975,8 +975,8 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
             if checker.enabled(Rule::TrioSyncCall) {
                 flake8_async::rules::sync_call(checker, call);
             }
-            if checker.enabled(Rule::TrioZeroSleepCall) {
-                flake8_async::rules::zero_sleep_call(checker, call);
+            if checker.enabled(Rule::AsyncZeroSleep) {
+                flake8_async::rules::async_zero_sleep(checker, call);
             }
             if checker.enabled(Rule::UnnecessaryDunderCall) {
                 pylint::rules::unnecessary_dunder_call(checker, call);

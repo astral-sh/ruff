@@ -40,6 +40,16 @@ E721.py:21:8: E721 Use `is` and `is not` for type comparisons, or `isinstance()`
 23 | assert type(res) == type([])
    |
 
+E721.py:21:36: E721 Use `is` and `is not` for type comparisons, or `isinstance()` for isinstance checks
+   |
+19 |     pass
+20 | #: E721
+21 | assert type(res) == type(False) or type(res) == type(None)
+   |                                    ^^^^^^^^^^^^^^^^^^^^^^^ E721
+22 | #: E721
+23 | assert type(res) == type([])
+   |
+
 E721.py:23:8: E721 Use `is` and `is not` for type comparisons, or `isinstance()` for isinstance checks
    |
 21 | assert type(res) == type(False) or type(res) == type(None)
