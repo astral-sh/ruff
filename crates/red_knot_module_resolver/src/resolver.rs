@@ -147,7 +147,8 @@ pub struct RawModuleResolutionSettings {
 }
 
 impl RawModuleResolutionSettings {
-    /// Implementation of the typing spec's [module resolution order]
+    /// Validate and normalize the raw settings given by the user
+    /// into settings we can use for module resolution
     ///
     /// TODO(Alex): this method does multiple `.unwrap()` calls when it should really return an error.
     /// Each `.unwrap()` call is a point where we're validating a setting that the user would pass
@@ -155,8 +156,6 @@ impl RawModuleResolutionSettings {
     /// Rather than panicking if a path fails to validate, we should display an error message to the user
     /// and exit the process with a nonzero exit code.
     /// This validation should probably be done outside of Salsa?
-    ///
-    /// [module resolution order]: https://typing.readthedocs.io/en/latest/spec/distributing.html#import-resolution-ordering
     fn into_configuration_settings(
         self,
         current_directory: &SystemPath,
@@ -233,6 +232,9 @@ pub(crate) struct ValidatedSearchPathSettings {
 }
 
 impl ValidatedSearchPathSettings {
+    /// Implementation of the typing spec's [module resolution order]
+    ///
+    /// [module resolution order]: https://typing.readthedocs.io/en/latest/spec/distributing.html#import-resolution-ordering
     fn search_paths(&self, db: &dyn Db) -> OrderedSearchPaths {
         let ValidatedSearchPathSettings {
             extra_paths,
@@ -250,6 +252,13 @@ impl ValidatedSearchPathSettings {
             let site_packages = site_packages
                 .as_system_path()
                 .expect("Expected site-packages never to be a VendoredPath!");
+
+            // As well as modules installed directly into `site-packages`,
+            // the directory may also contain `.pth` files.
+            // Each `.pth` file in `site-packages` may contain one or more lines
+            // containing a (relative or absolute) path.
+            // Each of these paths may point to an editable install of a package,
+            // so should be considered an additional search path.
             let Ok(pth_file_iterator) = PthFileIterator::new(db, site_packages) else {
                 return search_paths;
             };
@@ -271,6 +280,9 @@ impl ValidatedSearchPathSettings {
     }
 }
 
+/// Represents a single `.pth` file in a `site-packages` directory.
+/// One or more lines in a `.pth` file may be a (relative or absolute)
+/// path that represents an editable installation of a package.
 struct PthFile<'db> {
     db: &'db dyn Db,
     path: SystemPathBuf,
@@ -293,6 +305,8 @@ impl<'db> PthFile<'db> {
         }
     }
 
+    /// Yield paths in this `.pth` file that appear to represent editable installations,
+    /// and should therefore be added as module-resolution search paths.
     fn iter_editable_installations<'a>(
         &'a self,
     ) -> impl Iterator<Item = ModuleResolutionPathBuf> + 'db
@@ -321,6 +335,8 @@ impl<'db> PthFile<'db> {
     }
 }
 
+/// Iterator that yields a [`PthFile`] instance for every `.pth` file
+/// found in a given `site-packages` directory.
 struct PthFileIterator<'db> {
     db: &'db dyn Db,
     directory_iterator: Box<dyn Iterator<Item = std::io::Result<DirectoryEntry>> + 'db>,
@@ -369,6 +385,7 @@ impl<'db> Iterator for PthFileIterator<'db> {
     }
 }
 
+/// Validated and normalized module-resolution settings.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub(crate) struct ModuleResolutionSettings {
     search_path_settings: ValidatedSearchPathSettings,
