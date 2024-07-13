@@ -850,16 +850,28 @@ pub(crate) fn suspicious_function_call(checker: &mut Checker, call: &ExprCall) {
             // MarkSafe
             ["django", "utils", "safestring" | "html", "mark_safe"] => Some(SuspiciousMarkSafeUsage.into()),
             // URLOpen (`Request`)
-            ["urllib", "request","Request"] |
+            ["urllib", "request", "Request"] |
             ["six", "moves", "urllib", "request","Request"] => {
-                // If the `url` argument is a string literal, allow `http` and `https` schemes.
+                // If the `url` argument is a string literal or an f string, allow `http` and `https` schemes.
                 if call.arguments.args.iter().all(|arg| !arg.is_starred_expr()) && call.arguments.keywords.iter().all(|keyword| keyword.arg.is_some()) {
-                    if let Some(Expr::StringLiteral(ast::ExprStringLiteral { value, .. })) = &call.arguments.find_argument("url", 0) {
+                    match call.arguments.find_argument("url", 0) {
+                    // If the `url` argument is a string literal, allow `http` and `https` schemes.
+                        Some(Expr::StringLiteral(ast::ExprStringLiteral { value, .. })) => {
                             let url = value.to_str().trim_start();
                             if url.starts_with("http://") || url.starts_with("https://") {
                                 return None;
                             }
-
+                        },
+                        // If the `url` argument is an f-string literal, allow `http` and `https` schemes.
+                        Some(Expr::FString(ast::ExprFString { value, .. })) => {
+                            if let Some(ast::FStringElement::Literal(ast::FStringLiteralElement { value, .. })) = value.elements().next() {
+                                let url = value.trim_start();
+                                if url.starts_with("http://") || url.starts_with("https://") {
+                                    return None;
+                                }
+                            }
+                        },
+                        _ => {}
                     }
                 }
                 Some(SuspiciousURLOpenUsage.into())
@@ -868,27 +880,52 @@ pub(crate) fn suspicious_function_call(checker: &mut Checker, call: &ExprCall) {
             ["urllib", "request", "urlopen" | "urlretrieve" ] |
             ["six", "moves", "urllib", "request", "urlopen" | "urlretrieve" ] => {
                 if call.arguments.args.iter().all(|arg| !arg.is_starred_expr()) && call.arguments.keywords.iter().all(|keyword| keyword.arg.is_some()) {
-                    if let Some(arg) = &call.arguments.find_argument("url", 0) {
+                    match call.arguments.find_argument("url", 0) {
                         // If the `url` argument is a string literal, allow `http` and `https` schemes.
-                        if let Expr::StringLiteral(ast::ExprStringLiteral { value, .. }) = arg {
+                        Some(Expr::StringLiteral(ast::ExprStringLiteral { value, .. })) => {
                             let url = value.to_str().trim_start();
                             if url.starts_with("http://") || url.starts_with("https://") {
                                 return None;
                             }
-                        }
+                        },
+
+                        // If the `url` argument is an f-string literal, allow `http` and `https` schemes.
+                        Some(Expr::FString(ast::ExprFString { value, .. })) => {
+                            if let Some(ast::FStringElement::Literal(ast::FStringLiteralElement { value, .. })) = value.elements().next() {
+                                let url = value.trim_start();
+                                if url.starts_with("http://") || url.starts_with("https://") {
+                                    return None;
+                                }
+                            }
+                        },
 
                         // If the `url` argument is a `urllib.request.Request` object, allow `http` and `https` schemes.
-                        if let Expr::Call(ExprCall { func, arguments, .. }) = arg {
+                        Some(Expr::Call(ExprCall { func, arguments, .. })) => {
                             if checker.semantic().resolve_qualified_name(func.as_ref()).is_some_and(|name| name.segments() == ["urllib", "request", "Request"]) {
-                                if let Some( Expr::StringLiteral(ast::ExprStringLiteral { value, .. })) = arguments.find_argument("url", 0) {
+                                match arguments.find_argument("url", 0) {
+                                    // If the `url` argument is a string literal, allow `http` and `https` schemes.
+                                    Some(Expr::StringLiteral(ast::ExprStringLiteral { value, .. })) => {
                                         let url = value.to_str().trim_start();
                                         if url.starts_with("http://") || url.starts_with("https://") {
                                             return None;
                                         }
+                                    },
 
+                                    // If the `url` argument is an f-string literal, allow `http` and `https` schemes.
+                                    Some(Expr::FString(ast::ExprFString { value, .. })) => {
+                                        if let Some(ast::FStringElement::Literal(ast::FStringLiteralElement { value, .. })) = value.elements().next() {
+                                            let url = value.trim_start();
+                                            if url.starts_with("http://") || url.starts_with("https://") {
+                                                return None;
+                                            }
+                                        }
+                                    },
+                                    _ => {}
                                 }
                             }
-                        }
+                        },
+
+                        _ => {}
                     }
                 }
                 Some(SuspiciousURLOpenUsage.into())
