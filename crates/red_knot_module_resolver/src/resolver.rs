@@ -318,6 +318,7 @@ impl<'db> PthFile<'db> {
         // instead, these are files that are executed by Python at startup.
         // https://docs.python.org/3/library/site.html#module-site
         self.contents.lines().filter_map(|line| {
+            let line = line.trim();
             if line.is_empty()
                 || line.starts_with('#')
                 || line.starts_with("import ")
@@ -1396,7 +1397,7 @@ mod tests {
 import not_an_editable_install; do_something_else_crazy_dynamic()
 
 # another comment
-spam
+  spam
 
 not_a_directory
 ";
