@@ -825,6 +825,19 @@ impl Violation for SuspiciousFTPLibUsage {
 
 /// S301, S302, S303, S304, S305, S306, S307, S308, S310, S311, S312, S313, S314, S315, S316, S317, S318, S319, S320, S321, S323
 pub(crate) fn suspicious_function_call(checker: &mut Checker, call: &ExprCall) {
+    /// Returns `true` if the iterator starts with the given prefix.
+    fn has_prefix(mut chars: impl Iterator<Item = char>, prefix: &str) -> bool {
+        for expected in prefix.chars() {
+            let Some(actual) = chars.next() else {
+                return false;
+            };
+            if actual != expected {
+                return false;
+            }
+        }
+        true
+    }
+
     let Some(diagnostic_kind) = checker.semantic().resolve_qualified_name(call.func.as_ref()).and_then(|qualified_name| {
         match qualified_name.segments() {
             // Pickle
@@ -857,16 +870,14 @@ pub(crate) fn suspicious_function_call(checker: &mut Checker, call: &ExprCall) {
                     match call.arguments.find_argument("url", 0) {
                     // If the `url` argument is a string literal, allow `http` and `https` schemes.
                         Some(Expr::StringLiteral(ast::ExprStringLiteral { value, .. })) => {
-                            let url = value.to_str().trim_start();
-                            if url.starts_with("http://") || url.starts_with("https://") {
+                            if has_prefix(value.chars().skip_while(|c| c.is_whitespace()), "http://") || has_prefix(value.chars().skip_while(|c| c.is_whitespace()), "https://") {
                                 return None;
                             }
                         },
                         // If the `url` argument is an f-string literal, allow `http` and `https` schemes.
                         Some(Expr::FString(ast::ExprFString { value, .. })) => {
                             if let Some(ast::FStringElement::Literal(ast::FStringLiteralElement { value, .. })) = value.elements().next() {
-                                let url = value.trim_start();
-                                if url.starts_with("http://") || url.starts_with("https://") {
+                                if has_prefix(value.chars().skip_while(|c| c.is_whitespace()), "http://") || has_prefix(value.chars().skip_while(|c| c.is_whitespace()), "https://") {
                                     return None;
                                 }
                             }
@@ -883,8 +894,7 @@ pub(crate) fn suspicious_function_call(checker: &mut Checker, call: &ExprCall) {
                     match call.arguments.find_argument("url", 0) {
                         // If the `url` argument is a string literal, allow `http` and `https` schemes.
                         Some(Expr::StringLiteral(ast::ExprStringLiteral { value, .. })) => {
-                            let url = value.to_str().trim_start();
-                            if url.starts_with("http://") || url.starts_with("https://") {
+                            if has_prefix(value.chars().skip_while(|c| c.is_whitespace()), "http://") || has_prefix(value.chars().skip_while(|c| c.is_whitespace()), "https://") {
                                 return None;
                             }
                         },
@@ -892,8 +902,7 @@ pub(crate) fn suspicious_function_call(checker: &mut Checker, call: &ExprCall) {
                         // If the `url` argument is an f-string literal, allow `http` and `https` schemes.
                         Some(Expr::FString(ast::ExprFString { value, .. })) => {
                             if let Some(ast::FStringElement::Literal(ast::FStringLiteralElement { value, .. })) = value.elements().next() {
-                                let url = value.trim_start();
-                                if url.starts_with("http://") || url.starts_with("https://") {
+                                if has_prefix(value.chars().skip_while(|c| c.is_whitespace()), "http://") || has_prefix(value.chars().skip_while(|c| c.is_whitespace()), "https://") {
                                     return None;
                                 }
                             }
@@ -905,8 +914,7 @@ pub(crate) fn suspicious_function_call(checker: &mut Checker, call: &ExprCall) {
                                 match arguments.find_argument("url", 0) {
                                     // If the `url` argument is a string literal, allow `http` and `https` schemes.
                                     Some(Expr::StringLiteral(ast::ExprStringLiteral { value, .. })) => {
-                                        let url = value.to_str().trim_start();
-                                        if url.starts_with("http://") || url.starts_with("https://") {
+                                        if has_prefix(value.chars().skip_while(|c| c.is_whitespace()), "http://") || has_prefix(value.chars().skip_while(|c| c.is_whitespace()), "https://") {
                                             return None;
                                         }
                                     },
@@ -914,8 +922,7 @@ pub(crate) fn suspicious_function_call(checker: &mut Checker, call: &ExprCall) {
                                     // If the `url` argument is an f-string literal, allow `http` and `https` schemes.
                                     Some(Expr::FString(ast::ExprFString { value, .. })) => {
                                         if let Some(ast::FStringElement::Literal(ast::FStringLiteralElement { value, .. })) = value.elements().next() {
-                                            let url = value.trim_start();
-                                            if url.starts_with("http://") || url.starts_with("https://") {
+                                            if has_prefix(value.chars().skip_while(|c| c.is_whitespace()), "http://") || has_prefix(value.chars().skip_while(|c| c.is_whitespace()), "https://") {
                                                 return None;
                                             }
                                         }
