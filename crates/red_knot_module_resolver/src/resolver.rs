@@ -31,7 +31,7 @@ pub fn set_module_resolution_settings(db: &mut dyn Db, config: RawModuleResoluti
     // There's no concurrency issue here because we hold a `&mut dyn Db` reference. No other
     // thread can mutate the `Db` while we're in this call, so using `try_get` to test if
     // the settings have already been set is safe.
-    let resolved_settings = config.into_configuration_settings();
+    let resolved_settings = config.into_configuration_settings(db.system().current_directory());
     if let Some(existing) = ModuleResolverSettings::try_get(db) {
         existing.set_settings(db).to(resolved_settings);
     } else {
@@ -157,7 +157,10 @@ impl RawModuleResolutionSettings {
     /// This validation should probably be done outside of Salsa?
     ///
     /// [module resolution order]: https://typing.readthedocs.io/en/latest/spec/distributing.html#import-resolution-ordering
-    fn into_configuration_settings(self) -> ModuleResolutionSettings {
+    fn into_configuration_settings(
+        self,
+        current_directory: &SystemPath,
+    ) -> ModuleResolutionSettings {
         let RawModuleResolutionSettings {
             target_version,
             extra_paths,
@@ -168,21 +171,46 @@ impl RawModuleResolutionSettings {
 
         let extra_paths: Vec<Arc<ModuleResolutionPathBuf>> = extra_paths
             .into_iter()
-            .map(|fs_path| Arc::new(ModuleResolutionPathBuf::extra(fs_path).unwrap()))
+            .map(|fs_path| {
+                Arc::new(
+                    ModuleResolutionPathBuf::extra(SystemPath::absolute(
+                        fs_path,
+                        current_directory,
+                    ))
+                    .unwrap(),
+                )
+            })
             .collect();
 
-        let workspace_root =
-            Arc::new(ModuleResolutionPathBuf::first_party(workspace_root).unwrap());
-
-        let stdlib = Arc::new(
-            custom_typeshed.map_or_else(ModuleResolutionPathBuf::vendored_stdlib, |custom| {
-                ModuleResolutionPathBuf::stdlib_from_custom_typeshed_root(&custom).unwrap()
-            }),
+        let workspace_root = Arc::new(
+            ModuleResolutionPathBuf::first_party(SystemPath::absolute(
+                workspace_root,
+                current_directory,
+            ))
+            .unwrap(),
         );
 
+        let stdlib = Arc::new(custom_typeshed.map_or_else(
+            ModuleResolutionPathBuf::vendored_stdlib,
+            |custom| {
+                ModuleResolutionPathBuf::stdlib_from_custom_typeshed_root(&SystemPath::absolute(
+                    custom,
+                    current_directory,
+                ))
+                .unwrap()
+            },
+        ));
+
         // TODO vendor typeshed's third-party stubs as well as the stdlib and fallback to them as a final step
-        let site_packages = site_packages
-            .map(|path| Arc::new(ModuleResolutionPathBuf::site_packages(path).unwrap()));
+        let site_packages = site_packages.map(|path| {
+            Arc::new(
+                ModuleResolutionPathBuf::site_packages(SystemPath::absolute(
+                    path,
+                    current_directory,
+                ))
+                .unwrap(),
+            )
+        });
 
         ModuleResolutionSettings {
             target_version,
@@ -283,7 +311,10 @@ impl<'db> PthFile<'db> {
             {
                 return None;
             }
-            let possible_editable_install = self.site_packages.join(line);
+            let possible_editable_install = SystemPath::absolute(
+                self.site_packages.join(line),
+                self.db.system().current_directory(),
+            );
 
             ModuleResolutionPathBuf::editable_installation_root(self.db, possible_editable_install)
         })
