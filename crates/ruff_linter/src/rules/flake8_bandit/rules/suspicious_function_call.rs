@@ -864,7 +864,7 @@ pub(crate) fn suspicious_function_call(checker: &mut Checker, call: &ExprCall) {
                         },
                         // If the `url` argument is an f-string literal, allow `http` and `https` schemes.
                         Some(Expr::FString(ast::ExprFString { value, .. })) => {
-                            if let ast::FStringElement::Literal(ast::FStringLiteralElement { value, .. }) = value.elements().next().unwrap() {
+                            if let Some(ast::FStringElement::Literal(ast::FStringLiteralElement { value, .. })) = value.elements().next() {
                                 let url = value.trim_start();
                                 if url.starts_with("http://") || url.starts_with("https://") {
                                     return None;
@@ -891,7 +891,7 @@ pub(crate) fn suspicious_function_call(checker: &mut Checker, call: &ExprCall) {
 
                         // If the `url` argument is an f-string literal, allow `http` and `https` schemes.
                         Some(Expr::FString(ast::ExprFString { value, .. })) => {
-                            if let ast::FStringElement::Literal(ast::FStringLiteralElement { value, .. }) = value.elements().next().unwrap() {
+                            if let Some(ast::FStringElement::Literal(ast::FStringLiteralElement { value, .. })) = value.elements().next() {
                                 let url = value.trim_start();
                                 if url.starts_with("http://") || url.starts_with("https://") {
                                     return None;
@@ -913,7 +913,7 @@ pub(crate) fn suspicious_function_call(checker: &mut Checker, call: &ExprCall) {
 
                                     // If the `url` argument is an f-string literal, allow `http` and `https` schemes.
                                     Some(Expr::FString(ast::ExprFString { value, .. })) => {
-                                        if let ast::FStringElement::Literal(ast::FStringLiteralElement { value, .. }) = value.elements().next().unwrap() {
+                                        if let Some(ast::FStringElement::Literal(ast::FStringLiteralElement { value, .. })) = value.elements().next() {
                                             let url = value.trim_start();
                                             if url.starts_with("http://") || url.starts_with("https://") {
                                                 return None;
