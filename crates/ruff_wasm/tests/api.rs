@@ -4,7 +4,7 @@ use wasm_bindgen_test::wasm_bindgen_test;
 
 use ruff_linter::registry::Rule;
 use ruff_source_file::{OneIndexed, SourceLocation};
-use ruff_wasm::{ExpandedMessage, Workspace};
+use ruff_api::{ExpandedMessage, Workspace};
 
 macro_rules! check {
     ($source:expr, $config:expr, $expected:expr) => {{

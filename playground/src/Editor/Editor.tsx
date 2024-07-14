@@ -7,7 +7,7 @@ import {
 } from "react";
 import { Panel, PanelGroup } from "react-resizable-panels";
 import { DEFAULT_PYTHON_SOURCE } from "../constants";
-import init, { Diagnostic, Workspace } from "../pkg/ruff_wasm";
+import init, { Diagnostic, Workspace } from "../pkg/ruff_api";
 import { ErrorMessage } from "./ErrorMessage";
 import Header from "./Header";
 import PrimarySideBar from "./PrimarySideBar";

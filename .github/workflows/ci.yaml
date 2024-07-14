@@ -111,7 +111,7 @@ jobs:
       - name: "Clippy"
         run: cargo clippy --workspace --all-targets --all-features --locked -- -D warnings
       - name: "Clippy (wasm)"
-        run: cargo clippy -p ruff_wasm --target wasm32-unknown-unknown --all-features --locked -- -D warnings
+        run: cargo clippy -p ruff-api --target wasm32-unknown-unknown --all-features --locked -- -D warnings
 
   cargo-test-linux:
     name: "cargo test (linux)"
