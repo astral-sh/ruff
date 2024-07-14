@@ -1720,7 +1720,7 @@ impl StringLiteralValue {
     }
 
     /// Returns an iterator over the [`char`]s of each string literal part.
-    pub fn chars(&self) -> impl Iterator<Item = char> + '_ {
+    pub fn chars(&self) -> impl Iterator<Item = char> + Clone + '_ {
         self.iter().flat_map(|part| part.value.chars())
     }
 
