@@ -2,7 +2,7 @@
 #
 # Assumed to run as a subworkflow of .github/workflows/release.yml; specifically, as a publish
 # job within `cargo-dist`.
-name: "Build wasm"
+name: "Build and publish wasm"
 
 on:
   workflow_call:
