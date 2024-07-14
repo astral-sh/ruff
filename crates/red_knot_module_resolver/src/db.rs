@@ -1,9 +1,8 @@
 use ruff_db::Upcast;
 
 use crate::resolver::{
-    file_to_module,
+    dynamic_module_resolution_paths, file_to_module,
     internal::{ModuleNameIngredient, ModuleResolverSettings},
-    module_search_paths,
     resolve_module_query,
 };
 use crate::typeshed::parse_typeshed_versions;
@@ -12,7 +11,7 @@ use crate::typeshed::parse_typeshed_versions;
 pub struct Jar(
     ModuleNameIngredient<'_>,
     ModuleResolverSettings,
-    module_search_paths,
+    dynamic_module_resolution_paths,
     resolve_module_query,
     file_to_module,
     parse_typeshed_versions,
