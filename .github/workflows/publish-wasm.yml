@@ -35,6 +35,7 @@ jobs:
         with:
           node-version: 18
           registry-url: "https://registry.npmjs.org"
+      - run: cp LICENSE crates/ruff_wasm/pkg # wasm-pack does not put the LICENSE file in the pkg
       - name: "Publish"
         run: npm publish --provenance --access public crates/ruff_wasm/pkg
         env:
