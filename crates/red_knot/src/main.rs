@@ -10,13 +10,16 @@ use tracing_subscriber::layer::{Context, Filter, SubscriberExt};
 use tracing_subscriber::{Layer, Registry};
 use tracing_tree::time::Uptime;
 
-use red_knot::program::{FileWatcherChange, Program};
-use red_knot::target_version::TargetVersion;
+use red_knot::db::RootDatabase;
 use red_knot::watch::FileWatcher;
-use red_knot::Workspace;
-use red_knot_module_resolver::{set_module_resolution_settings, RawModuleResolutionSettings};
-use ruff_db::files::system_path_to_file;
-use ruff_db::system::{OsSystem, System, SystemPath, SystemPathBuf};
+use red_knot::watch::FileWatcherChange;
+use red_knot::workspace::WorkspaceMetadata;
+use ruff_db::program::{ProgramSettings, SearchPaths};
+use ruff_db::system::{OsSystem, System, SystemPathBuf};
+
+use self::target_version::TargetVersion;
+
+mod target_version;
 
 #[derive(Debug, Parser)]
 #[command(
@@ -26,8 +29,14 @@ use ruff_db::system::{OsSystem, System, SystemPath, SystemPathBuf};
 )]
 #[command(version)]
 struct Args {
-    #[clap(help = "File to check", required = true, value_name = "FILE")]
-    entry_point: SystemPathBuf,
+    #[arg(
+        long,
+        help = "Changes the current working directory.",
+        long_help = "Changes the current working directory before any specified operations. This affects the workspace and configuration discovery.",
+        value_name = "PATH"
+    )]
+    current_directory: Option<SystemPathBuf>,
+
     #[arg(
         long,
         value_name = "DIRECTORY",
@@ -55,54 +64,38 @@ pub fn main() -> anyhow::Result<()> {
     setup_tracing();
 
     let Args {
-        entry_point,
+        current_directory,
         custom_typeshed_dir,
-        extra_search_path: extra_search_paths,
+        extra_search_path: extra_paths,
         target_version,
     } = Args::parse_from(std::env::args().collect::<Vec<_>>());
 
-    tracing::trace!("Target version: {target_version}");
-    if let Some(custom_typeshed) = custom_typeshed_dir.as_ref() {
-        tracing::trace!("Custom typeshed directory: {custom_typeshed}");
-    }
-    if !extra_search_paths.is_empty() {
-        tracing::trace!("extra search paths: {extra_search_paths:?}");
-    }
+    let cwd = if let Some(cwd) = current_directory {
+        let canonicalized = cwd.as_utf8_path().canonicalize_utf8().unwrap();
+        SystemPathBuf::from_utf8_path_buf(canonicalized)
+    } else {
+        let cwd = std::env::current_dir().unwrap();
+        SystemPathBuf::from_path_buf(cwd).unwrap()
+    };
 
-    let cwd = std::env::current_dir().unwrap();
-    let cwd = SystemPath::from_std_path(&cwd).unwrap();
-    let system = OsSystem::new(cwd);
+    let system = OsSystem::new(cwd.clone());
+    let workspace_metadata =
+        WorkspaceMetadata::from_path(system.current_directory(), &system).unwrap();
 
-    if !system.path_exists(&entry_point) {
-        eprintln!("The entry point does not exist.");
-        return Err(anyhow::anyhow!("Invalid arguments"));
-    }
-
-    if !system.is_file(&entry_point) {
-        eprintln!("The entry point is not a file.");
-        return Err(anyhow::anyhow!("Invalid arguments"));
-    }
-
-    let workspace_folder = entry_point.parent().unwrap();
-    let workspace = Workspace::new(workspace_folder.to_path_buf());
-
-    let workspace_search_path = workspace.root().to_path_buf();
-
-    let mut program = Program::new(workspace, system);
-
-    set_module_resolution_settings(
-        &mut program,
-        RawModuleResolutionSettings {
-            extra_paths: extra_search_paths,
-            workspace_root: workspace_search_path,
-            site_packages: None,
+    // TODO: Respect the settings from the workspace metadata. when resolving the program settings.
+    let program_settings = ProgramSettings {
+        target_version: target_version.into(),
+        search_paths: SearchPaths {
+            extra_paths,
+            workspace_root: workspace_metadata.root().to_path_buf(),
             custom_typeshed: custom_typeshed_dir,
-            target_version: red_knot_module_resolver::TargetVersion::from(target_version),
+            site_packages: None,
         },
-    );
+    };
 
-    let entry_id = system_path_to_file(&program, entry_point.clone()).unwrap();
-    program.workspace_mut().open_file(entry_id);
+    // TODO: Use the `program_settings` to compute the key for the database's persistent
+    //   cache and load the cache if it exists.
+    let mut db = RootDatabase::new(workspace_metadata, program_settings, system);
 
     let (main_loop, main_loop_cancellation_token) = MainLoop::new();
 
@@ -123,9 +116,9 @@ pub fn main() -> anyhow::Result<()> {
         file_changes_notifier.notify(changes);
     })?;
 
-    file_watcher.watch_folder(workspace_folder.as_std_path())?;
+    file_watcher.watch_folder(db.workspace().root(&db).as_std_path())?;
 
-    main_loop.run(&mut program);
+    main_loop.run(&mut db);
 
     println!("{}", countme::get_all());
 
@@ -170,7 +163,7 @@ impl MainLoop {
     }
 
     #[allow(clippy::print_stderr)]
-    fn run(self, program: &mut Program) {
+    fn run(self, db: &mut RootDatabase) {
         self.orchestrator_sender
             .send(OrchestratorMessage::Run)
             .unwrap();
@@ -179,16 +172,16 @@ impl MainLoop {
             tracing::trace!("Main Loop: Tick");
 
             match message {
-                MainLoopMessage::CheckProgram { revision } => {
-                    let program = program.snapshot();
+                MainLoopMessage::CheckWorkspace { revision } => {
+                    let db = db.snapshot();
                     let sender = self.orchestrator_sender.clone();
 
-                    // Spawn a new task that checks the program. This needs to be done in a separate thread
+                    // Spawn a new task that checks the workspace. This needs to be done in a separate thread
                     // to prevent blocking the main loop here.
                     rayon::spawn(move || {
-                        if let Ok(result) = program.check() {
+                        if let Ok(result) = db.check() {
                             sender
-                                .send(OrchestratorMessage::CheckProgramCompleted {
+                                .send(OrchestratorMessage::CheckCompleted {
                                     diagnostics: result,
                                     revision,
                                 })
@@ -198,7 +191,7 @@ impl MainLoop {
                 }
                 MainLoopMessage::ApplyChanges(changes) => {
                     // Automatically cancels any pending queries and waits for them to complete.
-                    program.apply_changes(changes);
+                    db.apply_changes(changes);
                 }
                 MainLoopMessage::CheckCompleted(diagnostics) => {
                     eprintln!("{}", diagnostics.join("\n"));
@@ -260,13 +253,13 @@ impl Orchestrator {
             match message {
                 OrchestratorMessage::Run => {
                     self.sender
-                        .send(MainLoopMessage::CheckProgram {
+                        .send(MainLoopMessage::CheckWorkspace {
                             revision: self.revision,
                         })
                         .unwrap();
                 }
 
-                OrchestratorMessage::CheckProgramCompleted {
+                OrchestratorMessage::CheckCompleted {
                     diagnostics,
                     revision,
                 } => {
@@ -307,7 +300,7 @@ impl Orchestrator {
                             changes.extend(file_changes);
                         }
 
-                        Ok(OrchestratorMessage::CheckProgramCompleted { .. })=> {
+                        Ok(OrchestratorMessage::CheckCompleted { .. })=> {
                             // disregard any outdated completion message.
                         }
                         Ok(OrchestratorMessage::Run) => unreachable!("The orchestrator is already running."),
@@ -321,7 +314,7 @@ impl Orchestrator {
                 default(std::time::Duration::from_millis(10)) => {
                     // No more file changes after 10 ms, send the changes and schedule a new analysis
                     self.sender.send(MainLoopMessage::ApplyChanges(changes)).unwrap();
-                    self.sender.send(MainLoopMessage::CheckProgram { revision: self.revision}).unwrap();
+                    self.sender.send(MainLoopMessage::CheckWorkspace { revision: self.revision}).unwrap();
                     return;
                 }
             }
@@ -337,7 +330,7 @@ impl Orchestrator {
 /// Message sent from the orchestrator to the main loop.
 #[derive(Debug)]
 enum MainLoopMessage {
-    CheckProgram { revision: usize },
+    CheckWorkspace { revision: usize },
     CheckCompleted(Vec<String>),
     ApplyChanges(Vec<FileWatcherChange>),
     Exit,
@@ -348,7 +341,7 @@ enum OrchestratorMessage {
     Run,
     Shutdown,
 
-    CheckProgramCompleted {
+    CheckCompleted {
         diagnostics: Vec<String>,
         revision: usize,
     },

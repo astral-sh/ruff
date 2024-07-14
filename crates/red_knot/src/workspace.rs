@@ -1,0 +1,328 @@
+// TODO: Fix clippy warnings created by salsa macros
+#![allow(clippy::used_underscore_binding)]
+
+use std::{collections::BTreeMap, sync::Arc};
+
+use rustc_hash::{FxBuildHasher, FxHashSet};
+
+pub use metadata::{PackageMetadata, WorkspaceMetadata};
+use ruff_db::{
+    files::{system_path_to_file, File},
+    system::{walk_directory::WalkState, SystemPath, SystemPathBuf},
+};
+use ruff_python_ast::{name::Name, PySourceType};
+
+use crate::{
+    db::Db,
+    lint::{lint_semantic, lint_syntax, Diagnostics},
+};
+
+mod metadata;
+
+/// The project workspace as a Salsa ingredient.
+///
+/// ## Examples
+///
+/// ```text
+/// app-1/
+///     pyproject.toml
+///     src/
+///         ... python files
+///
+/// app-2/
+///     pyproject.toml
+///     src/
+///         ... python files
+///
+/// shared/
+///     pyproject.toml
+///     src/
+///         ... python files
+///
+/// pyproject.toml
+/// ```
+///
+/// The above project structure has three packages: `app-1`, `app-2`, and `shared`.
+/// Each of the packages can define their own settings in their `pyproject.toml` file, but
+/// they must be compatible. For example, each package can define a different `requires-python` range,
+/// but the ranges must overlap.
+#[salsa::input]
+pub struct Workspace {
+    #[id]
+    #[return_ref]
+    root_buf: SystemPathBuf,
+
+    /// The files that are open in the workspace.
+    ///
+    /// Setting the open files to a non-`None` value changes `check` to only check the
+    /// open files rather than all files in the workspace.
+    #[return_ref]
+    open_file_set: Option<Arc<FxHashSet<File>>>,
+
+    /// The (first-party) packages in this workspace.
+    #[return_ref]
+    package_tree: BTreeMap<SystemPathBuf, Package>,
+}
+
+/// A first-party package in a workspace.
+#[salsa::input]
+pub struct Package {
+    #[return_ref]
+    pub name: Name,
+
+    /// The path to the root directory of the package.
+    #[id]
+    #[return_ref]
+    root_buf: SystemPathBuf,
+
+    /// The files that are part of this package.
+    #[return_ref]
+    file_set: Arc<FxHashSet<File>>,
+    // TODO: Add the loaded settings.
+}
+
+impl Workspace {
+    /// Discovers the closest workspace at `path` and returns its metadata.
+    pub fn from_metadata(db: &dyn Db, metadata: WorkspaceMetadata) -> Self {
+        let mut packages = BTreeMap::new();
+
+        for package in metadata.packages {
+            packages.insert(package.root.clone(), Package::from_metadata(db, package));
+        }
+
+        Workspace::new(db, metadata.root, None, packages)
+    }
+
+    pub fn root(self, db: &dyn Db) -> &SystemPath {
+        self.root_buf(db)
+    }
+
+    pub fn packages(self, db: &dyn Db) -> impl Iterator<Item = Package> + '_ {
+        self.package_tree(db).values().copied()
+    }
+
+    pub fn reload(self, db: &mut dyn Db, metadata: WorkspaceMetadata) {
+        assert_eq!(self.root(db), metadata.root());
+
+        let mut old_packages = self.package_tree(db).clone();
+        let mut new_packages = BTreeMap::new();
+
+        for package_metadata in metadata.packages {
+            let path = package_metadata.root().to_path_buf();
+
+            let package = if let Some(old_package) = old_packages.remove(&path) {
+                old_package.update(db, package_metadata);
+                old_package
+            } else {
+                Package::from_metadata(db, package_metadata)
+            };
+
+            new_packages.insert(path, package);
+        }
+
+        self.set_package_tree(db).to(new_packages);
+    }
+
+    pub fn update_package(self, db: &mut dyn Db, metadata: PackageMetadata) -> anyhow::Result<()> {
+        let path = metadata.root().to_path_buf();
+
+        if let Some(package) = self.package_tree(db).get(&path).copied() {
+            package.update(db, metadata);
+            Ok(())
+        } else {
+            Err(anyhow::anyhow!("Package {path} not found"))
+        }
+    }
+
+    /// Returns the closest package to which the first-party `path` belongs.
+    ///
+    /// Returns `None` if the `path` is outside of any package or if `file` isn't a first-party file
+    /// (e.g. third-party dependencies or `excluded`).
+    pub fn package(self, db: &dyn Db, path: &SystemPath) -> Option<Package> {
+        let packages = self.package_tree(db);
+
+        let (package_path, package) = packages.range(..path.to_path_buf()).next_back()?;
+
+        if path.starts_with(package_path) {
+            Some(*package)
+        } else {
+            None
+        }
+    }
+
+    /// Checks all open files in the workspace and its dependencies.
+    #[tracing::instrument(level = "debug", skip_all)]
+    pub fn check(self, db: &dyn Db) -> Vec<String> {
+        let mut result = Vec::new();
+
+        if let Some(open_files) = self.open_files(db) {
+            for file in open_files {
+                result.extend_from_slice(&check_file(db, *file));
+            }
+        } else {
+            for package in self.packages(db) {
+                result.extend(package.check(db));
+            }
+        }
+
+        result
+    }
+
+    /// Opens a file in the workspace.
+    ///
+    /// This changes the behavior of `check` to only check the open files rather than all files in the workspace.
+    #[tracing::instrument(level = "debug", skip(self, db))]
+    pub fn open_file(self, db: &mut dyn Db, file: File) {
+        let mut open_files = self.take_open_files(db);
+        open_files.insert(file);
+        self.set_open_files(db, open_files);
+    }
+
+    /// Closes a file in the workspace.
+    #[tracing::instrument(level = "debug", skip(self, db))]
+    pub fn close_file(self, db: &mut dyn Db, file: File) -> bool {
+        let mut open_files = self.take_open_files(db);
+        let removed = open_files.remove(&file);
+
+        if removed {
+            self.set_open_files(db, open_files);
+        }
+
+        removed
+    }
+
+    /// Returns the open files in the workspace or `None` if the entire workspace should be checked.
+    pub fn open_files(self, db: &dyn Db) -> Option<&FxHashSet<File>> {
+        self.open_file_set(db).as_deref()
+    }
+
+    /// Sets the open files in the workspace.
+    ///
+    /// This changes the behavior of `check` to only check the open files rather than all files in the workspace.
+    #[tracing::instrument(level = "debug", skip(self, db))]
+    pub fn set_open_files(self, db: &mut dyn Db, open_files: FxHashSet<File>) {
+        self.set_open_file_set(db).to(Some(Arc::new(open_files)));
+    }
+
+    /// This takes the open files from the workspace and returns them.
+    ///
+    /// This changes the behavior of `check` to check all files in the workspace instead of just the open files.
+    pub fn take_open_files(self, db: &mut dyn Db) -> FxHashSet<File> {
+        let open_files = self.open_file_set(db).clone();
+
+        if let Some(open_files) = open_files {
+            // Salsa will cancel any pending queries and remove its own reference to `open_files`
+            // so that the reference counter to `open_files` now drops to 1.
+            self.set_open_file_set(db).to(None);
+
+            Arc::try_unwrap(open_files).unwrap()
+        } else {
+            FxHashSet::default()
+        }
+    }
+}
+
+impl Package {
+    pub fn root(self, db: &dyn Db) -> &SystemPath {
+        self.root_buf(db)
+    }
+
+    /// Returns `true` if `file` is a first-party file part of this package.
+    pub fn contains_file(self, db: &dyn Db, file: File) -> bool {
+        self.files(db).contains(&file)
+    }
+
+    pub fn files(self, db: &dyn Db) -> &FxHashSet<File> {
+        self.file_set(db)
+    }
+
+    pub fn remove_file(self, db: &mut dyn Db, file: File) -> bool {
+        let mut files_arc = self.file_set(db).clone();
+
+        // Set a dummy value. Salsa will cancel any pending queries and remove its own reference to `files`
+        // so that the reference counter to `files` now drops to 1.
+        self.set_file_set(db).to(Arc::new(FxHashSet::default()));
+
+        let files = Arc::get_mut(&mut files_arc).unwrap();
+        let removed = files.remove(&file);
+        self.set_file_set(db).to(files_arc);
+
+        removed
+    }
+
+    pub(crate) fn check(self, db: &dyn Db) -> Vec<String> {
+        let mut result = Vec::new();
+        for file in self.files(db) {
+            let diagnostics = check_file(db, *file);
+            result.extend_from_slice(&diagnostics);
+        }
+
+        result
+    }
+
+    fn from_metadata(db: &dyn Db, metadata: PackageMetadata) -> Self {
+        let files = discover_package_files(db, metadata.root());
+
+        Self::new(db, metadata.name, metadata.root, Arc::new(files))
+    }
+
+    fn update(self, db: &mut dyn Db, metadata: PackageMetadata) {
+        let root = self.root(db);
+        assert_eq!(root, metadata.root());
+
+        let files = discover_package_files(db, root);
+
+        self.set_name(db).to(metadata.name);
+        self.set_file_set(db).to(Arc::new(files));
+    }
+}
+
+pub(super) fn check_file(db: &dyn Db, file: File) -> Diagnostics {
+    let mut diagnostics = Vec::new();
+    diagnostics.extend_from_slice(lint_syntax(db, file));
+    diagnostics.extend_from_slice(lint_semantic(db, file));
+    Diagnostics::from(diagnostics)
+}
+
+fn discover_package_files(db: &dyn Db, path: &SystemPath) -> FxHashSet<File> {
+    let paths = std::sync::Mutex::new(Vec::new());
+
+    db.system().walk_directory(path).run(|| {
+        Box::new(|entry| {
+            match entry {
+                Ok(entry) => {
+                    // Skip over any non python files to avoid creating too many entries in `Files`.
+                    if entry.file_type().is_file()
+                        && entry
+                            .path()
+                            .extension()
+                            .and_then(PySourceType::try_from_extension)
+                            .is_some()
+                    {
+                        let mut paths = paths.lock().unwrap();
+                        paths.push(entry.into_path());
+                    }
+                }
+                Err(error) => {
+                    // TODO Handle error
+                    tracing::error!("Failed to walk path: {error}");
+                }
+            }
+
+            WalkState::Continue
+        })
+    });
+
+    let paths = paths.into_inner().unwrap();
+    let mut files = FxHashSet::with_capacity_and_hasher(paths.len(), FxBuildHasher);
+
+    for path in paths {
+        // If this returns `None`, then the file was deleted between the `walk_directory` call and now.
+        // We can ignore this.
+        if let Some(file) = system_path_to_file(db.upcast(), &path) {
+            files.insert(file);
+        }
+    }
+
+    files
+}

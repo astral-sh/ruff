@@ -3,20 +3,19 @@ use salsa;
 
 use red_knot_module_resolver::{resolve_module, ModuleName};
 use ruff_db::files::File;
+use ruff_db::parsed::parsed_module;
 use ruff_python_ast as ast;
 use ruff_python_ast::{ExprContext, TypeParams};
 
 use crate::semantic_index::ast_ids::{HasScopedAstId, HasScopedUseId, ScopedExpressionId};
 use crate::semantic_index::definition::{Definition, DefinitionKind, DefinitionNodeKey};
 use crate::semantic_index::expression::Expression;
+use crate::semantic_index::semantic_index;
+use crate::semantic_index::symbol::NodeWithScopeKind;
 use crate::semantic_index::symbol::{NodeWithScopeRef, ScopeId};
 use crate::semantic_index::SemanticIndex;
 use crate::types::{definitions_ty, ClassType, FunctionType, Name, Type, UnionTypeBuilder};
 use crate::Db;
-use ruff_db::parsed::parsed_module;
-
-use crate::semantic_index::semantic_index;
-use crate::semantic_index::symbol::NodeWithScopeKind;
 
 /// Infer all types for a [`Definition`] (including sub-expressions).
 /// Use when resolving a symbol name use or public type of a symbol.
@@ -703,11 +702,9 @@ impl<'db> TypeInferenceBuilder<'db> {
 
 #[cfg(test)]
 mod tests {
-    use red_knot_module_resolver::{
-        set_module_resolution_settings, RawModuleResolutionSettings, TargetVersion,
-    };
     use ruff_db::files::{system_path_to_file, File};
     use ruff_db::parsed::parsed_module;
+    use ruff_db::program::{Program, SearchPaths, TargetVersion};
     use ruff_db::system::{DbWithTestSystem, SystemPathBuf};
     use ruff_db::testing::assert_function_query_was_not_run;
     use ruff_python_ast::name::Name;
@@ -721,12 +718,12 @@ mod tests {
     use crate::{HasTy, SemanticModel};
 
     fn setup_db() -> TestDb {
-        let mut db = TestDb::new();
+        let db = TestDb::new();
 
-        set_module_resolution_settings(
-            &mut db,
-            RawModuleResolutionSettings {
-                target_version: TargetVersion::Py38,
+        Program::new(
+            &db,
+            TargetVersion::Py38,
+            SearchPaths {
                 extra_paths: Vec::new(),
                 workspace_root: SystemPathBuf::from("/src"),
                 site_packages: None,

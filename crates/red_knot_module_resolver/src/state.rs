@@ -1,8 +1,8 @@
+use ruff_db::program::TargetVersion;
 use ruff_db::system::System;
 use ruff_db::vendored::VendoredFileSystem;
 
 use crate::db::Db;
-use crate::supported_py_version::TargetVersion;
 use crate::typeshed::LazyTypeshedVersions;
 
 pub(crate) struct ResolverState<'db> {

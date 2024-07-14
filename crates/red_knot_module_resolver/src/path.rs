@@ -233,6 +233,10 @@ impl ModuleResolutionPathBuf {
         ModuleResolutionPathRef::from(self).is_directory(search_path, resolver)
     }
 
+    pub(crate) fn is_site_packages(&self) -> bool {
+        matches!(self.0, ModuleResolutionPathBufInner::SitePackages(_))
+    }
+
     #[must_use]
     pub(crate) fn with_pyi_extension(&self) -> Self {
         ModuleResolutionPathRef::from(self).with_pyi_extension()
@@ -724,9 +728,9 @@ impl PartialEq<ModuleResolutionPathRef<'_>> for VendoredPathBuf {
 #[cfg(test)]
 mod tests {
     use insta::assert_debug_snapshot;
+    use ruff_db::program::TargetVersion;
 
     use crate::db::tests::TestDb;
-    use crate::supported_py_version::TargetVersion;
     use crate::testing::{FileSpec, MockedTypeshed, TestCase, TestCaseBuilder};
 
     use super::*;

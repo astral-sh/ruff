@@ -162,11 +162,9 @@ impl HasTy for ast::Alias {
 
 #[cfg(test)]
 mod tests {
-    use red_knot_module_resolver::{
-        set_module_resolution_settings, RawModuleResolutionSettings, TargetVersion,
-    };
     use ruff_db::files::system_path_to_file;
     use ruff_db::parsed::parsed_module;
+    use ruff_db::program::{Program, SearchPaths, TargetVersion};
     use ruff_db::system::{DbWithTestSystem, SystemPathBuf};
 
     use crate::db::tests::TestDb;
@@ -174,15 +172,15 @@ mod tests {
     use crate::{HasTy, SemanticModel};
 
     fn setup_db() -> TestDb {
-        let mut db = TestDb::new();
-        set_module_resolution_settings(
-            &mut db,
-            RawModuleResolutionSettings {
+        let db = TestDb::new();
+        Program::new(
+            &db,
+            TargetVersion::Py38,
+            SearchPaths {
                 extra_paths: vec![],
                 workspace_root: SystemPathBuf::from("/src"),
                 site_packages: None,
                 custom_typeshed: None,
-                target_version: TargetVersion::Py38,
             },
         );
 

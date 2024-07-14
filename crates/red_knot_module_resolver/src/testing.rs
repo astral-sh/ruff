@@ -1,9 +1,8 @@
+use ruff_db::program::{Program, SearchPaths, TargetVersion};
 use ruff_db::system::{DbWithTestSystem, SystemPath, SystemPathBuf};
 use ruff_db::vendored::VendoredPathBuf;
 
 use crate::db::tests::TestDb;
-use crate::resolver::{set_module_resolution_settings, RawModuleResolutionSettings};
-use crate::supported_py_version::TargetVersion;
 
 /// A test case for the module resolver.
 ///
@@ -215,10 +214,10 @@ impl TestCaseBuilder<MockedTypeshed> {
         let src = Self::write_mock_directory(&mut db, "/src", first_party_files);
         let typeshed = Self::build_typeshed_mock(&mut db, &typeshed_option);
 
-        set_module_resolution_settings(
-            &mut db,
-            RawModuleResolutionSettings {
-                target_version,
+        Program::new(
+            &db,
+            target_version,
+            SearchPaths {
                 extra_paths: vec![],
                 workspace_root: src.clone(),
                 custom_typeshed: Some(typeshed.clone()),
@@ -268,10 +267,10 @@ impl TestCaseBuilder<VendoredTypeshed> {
             Self::write_mock_directory(&mut db, "/site-packages", site_packages_files);
         let src = Self::write_mock_directory(&mut db, "/src", first_party_files);
 
-        set_module_resolution_settings(
-            &mut db,
-            RawModuleResolutionSettings {
-                target_version,
+        Program::new(
+            &db,
+            target_version,
+            SearchPaths {
                 extra_paths: vec![],
                 workspace_root: src.clone(),
                 custom_typeshed: None,
