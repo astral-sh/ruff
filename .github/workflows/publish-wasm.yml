@@ -10,9 +10,6 @@ on:
       plan:
         required: true
         type: string
-  pull_request:
-    paths:
-      - .github/workflows/build-wasm.yml
 
 env:
   CARGO_INCREMENTAL: 0
