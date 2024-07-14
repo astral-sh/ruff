@@ -29,9 +29,10 @@
 
 ### Bug fixes
 
-- Make cache-write failures non-fatal ([#12302](https://github.com/astral-sh/ruff/pull/12302))
+- Make cache-write failures non-fatal on Windows ([#12302](https://github.com/astral-sh/ruff/pull/12302))
 - Treat `not` operations as boolean tests ([#12301](https://github.com/astral-sh/ruff/pull/12301))
 - \[`flake8-bandit`\] Avoid `S310` violations for HTTP-safe f-strings ([#12305](https://github.com/astral-sh/ruff/pull/12305))
+- \[`flake8-bandit`\] Support explicit string concatenations in S310 HTTP detection ([#12315](https://github.com/astral-sh/ruff/pull/12315))
 - \[`flake8-bandit`\] fix S113 false positive for httpx without `timeout` argument ([#12213](https://github.com/astral-sh/ruff/pull/12213))
 - \[`pycodestyle`\] Remove "non-obvious" allowance for E721 ([#12300](https://github.com/astral-sh/ruff/pull/12300))
 - \[`pyflakes`\] Consider `with` blocks as single-item branches for redefinition analysis ([#12311](https://github.com/astral-sh/ruff/pull/12311))
