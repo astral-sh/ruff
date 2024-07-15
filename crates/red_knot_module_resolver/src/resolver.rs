@@ -246,6 +246,8 @@ struct ValidatedSearchPathSettings {
 /// due to editable installations of third-party packages.
 #[salsa::tracked(return_ref)]
 pub(crate) fn dynamic_module_resolution_paths(db: &dyn Db) -> OrderSet<SearchPathRoot> {
+    db.report_untracked_read();
+
     let ValidatedSearchPathSettings {
         static_search_paths,
         site_packages,
