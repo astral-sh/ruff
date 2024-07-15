@@ -48,7 +48,7 @@ impl FormatNodeRule<StmtMatch> for FormatStmtMatch {
         let mut last_case = first;
 
         for case in cases_iter {
-            let last_suite_in_statement = case == cases.last().unwrap();
+            let last_suite_in_statement = Some(case) == cases.last();
             write!(
                 f,
                 [block_indent(&format_args!(
