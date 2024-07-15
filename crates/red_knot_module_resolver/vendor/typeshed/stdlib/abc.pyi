@@ -28,17 +28,17 @@ class ABCMeta(type):
     def register(cls: ABCMeta, subclass: type[_T]) -> type[_T]: ...
 
 def abstractmethod(funcobj: _FuncT) -> _FuncT: ...
-@deprecated("Deprecated, use 'classmethod' with 'abstractmethod' instead")
+@deprecated("Use 'classmethod' with 'abstractmethod' instead")
 class abstractclassmethod(classmethod[_T, _P, _R_co]):
     __isabstractmethod__: Literal[True]
     def __init__(self, callable: Callable[Concatenate[type[_T], _P], _R_co]) -> None: ...
 
-@deprecated("Deprecated, use 'staticmethod' with 'abstractmethod' instead")
+@deprecated("Use 'staticmethod' with 'abstractmethod' instead")
 class abstractstaticmethod(staticmethod[_P, _R_co]):
     __isabstractmethod__: Literal[True]
     def __init__(self, callable: Callable[_P, _R_co]) -> None: ...
 
-@deprecated("Deprecated, use 'property' with 'abstractmethod' instead")
+@deprecated("Use 'property' with 'abstractmethod' instead")
 class abstractproperty(property):
     __isabstractmethod__: Literal[True]
 

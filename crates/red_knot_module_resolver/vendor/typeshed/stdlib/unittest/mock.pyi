@@ -12,23 +12,44 @@ _F = TypeVar("_F", bound=Callable[..., Any])
 _AF = TypeVar("_AF", bound=Callable[..., Coroutine[Any, Any, Any]])
 _P = ParamSpec("_P")
 
-__all__ = (
-    "Mock",
-    "MagicMock",
-    "patch",
-    "sentinel",
-    "DEFAULT",
-    "ANY",
-    "call",
-    "create_autospec",
-    "AsyncMock",
-    "FILTER_DIR",
-    "NonCallableMock",
-    "NonCallableMagicMock",
-    "mock_open",
-    "PropertyMock",
-    "seal",
-)
+if sys.version_info >= (3, 13):
+    # ThreadingMock added in 3.13
+    __all__ = (
+        "Mock",
+        "MagicMock",
+        "patch",
+        "sentinel",
+        "DEFAULT",
+        "ANY",
+        "call",
+        "create_autospec",
+        "ThreadingMock",
+        "AsyncMock",
+        "FILTER_DIR",
+        "NonCallableMock",
+        "NonCallableMagicMock",
+        "mock_open",
+        "PropertyMock",
+        "seal",
+    )
+else:
+    __all__ = (
+        "Mock",
+        "MagicMock",
+        "patch",
+        "sentinel",
+        "DEFAULT",
+        "ANY",
+        "call",
+        "create_autospec",
+        "AsyncMock",
+        "FILTER_DIR",
+        "NonCallableMock",
+        "NonCallableMagicMock",
+        "mock_open",
+        "PropertyMock",
+        "seal",
+    )
 
 if sys.version_info < (3, 9):
     __version__: Final[str]
@@ -124,7 +145,6 @@ class NonCallableMock(Base, Any):
     def __delattr__(self, name: str) -> None: ...
     def __setattr__(self, name: str, value: Any) -> None: ...
     def __dir__(self) -> list[str]: ...
-    def _calls_repr(self, prefix: str = "Calls") -> str: ...
     def assert_called_with(self, *args: Any, **kwargs: Any) -> None: ...
     def assert_not_called(self) -> None: ...
     def assert_called_once_with(self, *args: Any, **kwargs: Any) -> None: ...
@@ -150,6 +170,10 @@ class NonCallableMock(Base, Any):
     def _format_mock_call_signature(self, args: Any, kwargs: Any) -> str: ...
     def _call_matcher(self, _call: tuple[_Call, ...]) -> _Call: ...
     def _get_child_mock(self, **kw: Any) -> NonCallableMock: ...
+    if sys.version_info >= (3, 13):
+        def _calls_repr(self) -> str: ...
+    else:
+        def _calls_repr(self, prefix: str = "Calls") -> str: ...
 
 class CallableMixin(Base):
     side_effect: Any
@@ -426,5 +450,17 @@ def mock_open(mock: Any | None = None, read_data: Any = "") -> Any: ...
 class PropertyMock(Mock):
     def __get__(self, obj: _T, obj_type: type[_T] | None = None) -> Self: ...
     def __set__(self, obj: Any, val: Any) -> None: ...
+
+if sys.version_info >= (3, 13):
+    class ThreadingMixin(Base):
+        DEFAULT_TIMEOUT: Final[float | None] = None
+
+        def __init__(self, /, *args: Any, timeout: float | None | _SentinelObject = ..., **kwargs: Any) -> None: ...
+        # Same as `NonCallableMock.reset_mock.`
+        def reset_mock(self, visited: Any = None, *, return_value: bool = False, side_effect: bool = False) -> None: ...
+        def wait_until_called(self, *, timeout: float | None | _SentinelObject = ...) -> None: ...
+        def wait_until_any_call_with(self, *args: Any, **kwargs: Any) -> None: ...
+
+    class ThreadingMock(ThreadingMixin, MagicMixin, Mock): ...
 
 def seal(mock: Any) -> None: ...

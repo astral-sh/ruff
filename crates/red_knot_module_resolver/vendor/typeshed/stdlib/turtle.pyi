@@ -101,7 +101,6 @@ __all__ = [
     "setheading",
     "setpos",
     "setposition",
-    "settiltangle",
     "setundobuffer",
     "setx",
     "sety",
@@ -131,6 +130,9 @@ __all__ = [
 
 if sys.version_info >= (3, 12):
     __all__ += ["teleport"]
+
+if sys.version_info < (3, 13):
+    __all__ += ["settiltangle"]
 
 # Note: '_Color' is the alias we use for arguments and _AnyColor is the
 # alias we use for return types. Really, these two aliases should be the
@@ -399,7 +401,10 @@ class RawTurtle(TPen, TNavigator):
         self, t11: float | None = None, t12: float | None = None, t21: float | None = None, t22: float | None = None
     ) -> None: ...
     def get_shapepoly(self) -> _PolygonCoords | None: ...
-    def settiltangle(self, angle: float) -> None: ...
+
+    if sys.version_info < (3, 13):
+        def settiltangle(self, angle: float) -> None: ...
+
     @overload
     def tiltangle(self, angle: None = None) -> float: ...
     @overload
@@ -672,7 +677,10 @@ def shapetransform(
     t11: float | None = None, t12: float | None = None, t21: float | None = None, t22: float | None = None
 ) -> None: ...
 def get_shapepoly() -> _PolygonCoords | None: ...
-def settiltangle(angle: float) -> None: ...
+
+if sys.version_info < (3, 13):
+    def settiltangle(angle: float) -> None: ...
+
 @overload
 def tiltangle(angle: None = None) -> float: ...
 @overload

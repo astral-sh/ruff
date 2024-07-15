@@ -2,6 +2,7 @@ import ssl
 import sys
 from _typeshed import ReadableBuffer, StrPath
 from collections.abc import AsyncIterator, Awaitable, Callable, Iterable, Sequence, Sized
+from types import ModuleType
 from typing import Any, Protocol, SupportsIndex
 from typing_extensions import Self, TypeAlias
 
@@ -130,7 +131,10 @@ class StreamWriter:
         async def start_tls(
             self, sslcontext: ssl.SSLContext, *, server_hostname: str | None = None, ssl_handshake_timeout: float | None = None
         ) -> None: ...
-    if sys.version_info >= (3, 11):
+
+    if sys.version_info >= (3, 13):
+        def __del__(self, warnings: ModuleType = ...) -> None: ...
+    elif sys.version_info >= (3, 11):
         def __del__(self) -> None: ...
 
 class StreamReader(AsyncIterator[bytes]):

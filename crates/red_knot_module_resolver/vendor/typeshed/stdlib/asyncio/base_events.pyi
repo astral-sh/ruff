@@ -49,6 +49,10 @@ class Server(AbstractServer):
             ssl_handshake_timeout: float | None,
         ) -> None: ...
 
+    if sys.version_info >= (3, 13):
+        def close_clients(self) -> None: ...
+        def abort_clients(self) -> None: ...
+
     def get_loop(self) -> AbstractEventLoop: ...
     def is_serving(self) -> bool: ...
     async def start_serving(self) -> None: ...
@@ -222,7 +226,48 @@ class BaseEventLoop(AbstractEventLoop):
             happy_eyeballs_delay: float | None = None,
             interleave: int | None = None,
         ) -> tuple[Transport, _ProtocolT]: ...
-    if sys.version_info >= (3, 11):
+
+    if sys.version_info >= (3, 13):
+        # 3.13 added `keep_alive`.
+        @overload
+        async def create_server(
+            self,
+            protocol_factory: _ProtocolFactory,
+            host: str | Sequence[str] | None = None,
+            port: int = ...,
+            *,
+            family: int = ...,
+            flags: int = ...,
+            sock: None = None,
+            backlog: int = 100,
+            ssl: _SSLContext = None,
+            reuse_address: bool | None = None,
+            reuse_port: bool | None = None,
+            keep_alive: bool | None = None,
+            ssl_handshake_timeout: float | None = None,
+            ssl_shutdown_timeout: float | None = None,
+            start_serving: bool = True,
+        ) -> Server: ...
+        @overload
+        async def create_server(
+            self,
+            protocol_factory: _ProtocolFactory,
+            host: None = None,
+            port: None = None,
+            *,
+            family: int = ...,
+            flags: int = ...,
+            sock: socket = ...,
+            backlog: int = 100,
+            ssl: _SSLContext = None,
+            reuse_address: bool | None = None,
+            reuse_port: bool | None = None,
+            keep_alive: bool | None = None,
+            ssl_handshake_timeout: float | None = None,
+            ssl_shutdown_timeout: float | None = None,
+            start_serving: bool = True,
+        ) -> Server: ...
+    elif sys.version_info >= (3, 11):
         @overload
         async def create_server(
             self,
@@ -259,26 +304,6 @@ class BaseEventLoop(AbstractEventLoop):
             ssl_shutdown_timeout: float | None = None,
             start_serving: bool = True,
         ) -> Server: ...
-        async def start_tls(
-            self,
-            transport: BaseTransport,
-            protocol: BaseProtocol,
-            sslcontext: ssl.SSLContext,
-            *,
-            server_side: bool = False,
-            server_hostname: str | None = None,
-            ssl_handshake_timeout: float | None = None,
-            ssl_shutdown_timeout: float | None = None,
-        ) -> Transport | None: ...
-        async def connect_accepted_socket(
-            self,
-            protocol_factory: Callable[[], _ProtocolT],
-            sock: socket,
-            *,
-            ssl: _SSLContext = None,
-            ssl_handshake_timeout: float | None = None,
-            ssl_shutdown_timeout: float | None = None,
-        ) -> tuple[Transport, _ProtocolT]: ...
     else:
         @overload
         async def create_server(
@@ -314,6 +339,29 @@ class BaseEventLoop(AbstractEventLoop):
             ssl_handshake_timeout: float | None = None,
             start_serving: bool = True,
         ) -> Server: ...
+
+    if sys.version_info >= (3, 11):
+        async def start_tls(
+            self,
+            transport: BaseTransport,
+            protocol: BaseProtocol,
+            sslcontext: ssl.SSLContext,
+            *,
+            server_side: bool = False,
+            server_hostname: str | None = None,
+            ssl_handshake_timeout: float | None = None,
+            ssl_shutdown_timeout: float | None = None,
+        ) -> Transport | None: ...
+        async def connect_accepted_socket(
+            self,
+            protocol_factory: Callable[[], _ProtocolT],
+            sock: socket,
+            *,
+            ssl: _SSLContext = None,
+            ssl_handshake_timeout: float | None = None,
+            ssl_shutdown_timeout: float | None = None,
+        ) -> tuple[Transport, _ProtocolT]: ...
+    else:
         async def start_tls(
             self,
             transport: BaseTransport,

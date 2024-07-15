@@ -31,6 +31,9 @@ __all__ = [
     "EXTENDED_ARG",
     "stack_effect",
 ]
+if sys.version_info >= (3, 13):
+    __all__ += ["hasjump"]
+
 if sys.version_info >= (3, 12):
     __all__ += ["hasarg", "hasexc"]
 else:
@@ -86,12 +89,41 @@ else:
         is_jump_target: bool
 
 class Instruction(_Instruction):
-    def _disassemble(self, lineno_width: int = 3, mark_as_current: bool = False, offset_width: int = 4) -> str: ...
+    if sys.version_info < (3, 13):
+        def _disassemble(self, lineno_width: int = 3, mark_as_current: bool = False, offset_width: int = 4) -> str: ...
+    if sys.version_info >= (3, 13):
+        @property
+        def oparg(self) -> int: ...
+        @property
+        def baseopcode(self) -> int: ...
+        @property
+        def baseopname(self) -> str: ...
+        @property
+        def cache_offset(self) -> int: ...
+        @property
+        def end_offset(self) -> int: ...
+        @property
+        def jump_target(self) -> int: ...
+        @property
+        def is_jump_target(self) -> bool: ...
 
 class Bytecode:
     codeobj: types.CodeType
     first_line: int
-    if sys.version_info >= (3, 11):
+    if sys.version_info >= (3, 13):
+        show_offsets: bool
+        # 3.13 added `show_offsets`
+        def __init__(
+            self,
+            x: _HaveCodeType | str,
+            *,
+            first_line: int | None = None,
+            current_offset: int | None = None,
+            show_caches: bool = False,
+            adaptive: bool = False,
+            show_offsets: bool = False,
+        ) -> None: ...
+    elif sys.version_info >= (3, 11):
         def __init__(
             self,
             x: _HaveCodeType | str,
@@ -101,12 +133,15 @@ class Bytecode:
             show_caches: bool = False,
             adaptive: bool = False,
         ) -> None: ...
-        @classmethod
-        def from_traceback(cls, tb: types.TracebackType, *, show_caches: bool = False, adaptive: bool = False) -> Self: ...
     else:
         def __init__(
             self, x: _HaveCodeType | str, *, first_line: int | None = None, current_offset: int | None = None
         ) -> None: ...
+
+    if sys.version_info >= (3, 11):
+        @classmethod
+        def from_traceback(cls, tb: types.TracebackType, *, show_caches: bool = False, adaptive: bool = False) -> Self: ...
+    else:
         @classmethod
         def from_traceback(cls, tb: types.TracebackType) -> Self: ...
 
@@ -121,7 +156,41 @@ def findlinestarts(code: _HaveCodeType) -> Iterator[tuple[int, int]]: ...
 def pretty_flags(flags: int) -> str: ...
 def code_info(x: _HaveCodeType | str) -> str: ...
 
-if sys.version_info >= (3, 11):
+if sys.version_info >= (3, 13):
+    # 3.13 added `show_offsets`
+    def dis(
+        x: _HaveCodeType | str | bytes | bytearray | None = None,
+        *,
+        file: IO[str] | None = None,
+        depth: int | None = None,
+        show_caches: bool = False,
+        adaptive: bool = False,
+        show_offsets: bool = False,
+    ) -> None: ...
+    def disassemble(
+        co: _HaveCodeType,
+        lasti: int = -1,
+        *,
+        file: IO[str] | None = None,
+        show_caches: bool = False,
+        adaptive: bool = False,
+        show_offsets: bool = False,
+    ) -> None: ...
+    def distb(
+        tb: types.TracebackType | None = None,
+        *,
+        file: IO[str] | None = None,
+        show_caches: bool = False,
+        adaptive: bool = False,
+        show_offsets: bool = False,
+    ) -> None: ...
+    # 3.13 made `show_cache` `None` by default
+    def get_instructions(
+        x: _HaveCodeType, *, first_line: int | None = None, show_caches: bool | None = None, adaptive: bool = False
+    ) -> Iterator[Instruction]: ...
+
+elif sys.version_info >= (3, 11):
+    # 3.11 added `show_caches` and `adaptive`
     def dis(
         x: _HaveCodeType | str | bytes | bytearray | None = None,
         *,
@@ -130,17 +199,7 @@ if sys.version_info >= (3, 11):
         show_caches: bool = False,
         adaptive: bool = False,
     ) -> None: ...
-
-else:
-    def dis(
-        x: _HaveCodeType | str | bytes | bytearray | None = None, *, file: IO[str] | None = None, depth: int | None = None
-    ) -> None: ...
-
-if sys.version_info >= (3, 11):
     def disassemble(
-        co: _HaveCodeType, lasti: int = -1, *, file: IO[str] | None = None, show_caches: bool = False, adaptive: bool = False
-    ) -> None: ...
-    def disco(
         co: _HaveCodeType, lasti: int = -1, *, file: IO[str] | None = None, show_caches: bool = False, adaptive: bool = False
     ) -> None: ...
     def distb(
@@ -151,9 +210,13 @@ if sys.version_info >= (3, 11):
     ) -> Iterator[Instruction]: ...
 
 else:
+    def dis(
+        x: _HaveCodeType | str | bytes | bytearray | None = None, *, file: IO[str] | None = None, depth: int | None = None
+    ) -> None: ...
     def disassemble(co: _HaveCodeType, lasti: int = -1, *, file: IO[str] | None = None) -> None: ...
-    def disco(co: _HaveCodeType, lasti: int = -1, *, file: IO[str] | None = None) -> None: ...
     def distb(tb: types.TracebackType | None = None, *, file: IO[str] | None = None) -> None: ...
     def get_instructions(x: _HaveCodeType, *, first_line: int | None = None) -> Iterator[Instruction]: ...
 
 def show_code(co: _HaveCodeType, *, file: IO[str] | None = None) -> None: ...
+
+disco = disassemble
