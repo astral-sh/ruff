@@ -366,11 +366,7 @@ impl<'db> PthFile<'db> {
             {
                 return None;
             }
-            let possible_editable_install = SystemPath::absolute(
-                self.site_packages.join(line),
-                self.db.system().current_directory(),
-            );
-
+            let possible_editable_install = SystemPath::absolute(line, self.site_packages);
             ModuleResolutionPathBuf::editable_installation_root(self.db, possible_editable_install)
         })
     }
