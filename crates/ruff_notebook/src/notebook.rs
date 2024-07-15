@@ -19,7 +19,7 @@ use ruff_text_size::TextSize;
 use crate::cell::CellOffsets;
 use crate::index::NotebookIndex;
 use crate::schema::{Cell, RawNotebook, SortAlphabetically, SourceValue};
-use crate::RawNotebookMetadata;
+use crate::{schema, RawNotebookMetadata};
 
 /// Run round-trip source code generation on a given Jupyter notebook file path.
 pub fn round_trip(path: &Path) -> anyhow::Result<String> {
@@ -52,7 +52,7 @@ pub enum NotebookError {
     InvalidFormat(i64),
 }
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug)]
 pub struct Notebook {
     /// Python source code of the notebook.
     ///
@@ -203,6 +203,28 @@ impl Notebook {
             valid_code_cells,
             trailing_newline,
         })
+    }
+
+    /// Creates an empty notebook.
+    ///
+    ///
+    pub fn empty() -> Self {
+        Self::from_raw_notebook(
+            RawNotebook {
+                cells: vec![schema::Cell::Code(schema::CodeCell {
+                    execution_count: None,
+                    id: None,
+                    metadata: serde_json::Value::default(),
+                    outputs: vec![],
+                    source: schema::SourceValue::String(String::default()),
+                })],
+                metadata: RawNotebookMetadata::default(),
+                nbformat: 4,
+                nbformat_minor: 5,
+            },
+            false,
+        )
+        .unwrap()
     }
 
     /// Update the cell offsets as per the given [`SourceMap`].
@@ -412,6 +434,14 @@ impl Notebook {
     }
 }
 
+impl PartialEq for Notebook {
+    fn eq(&self, other: &Self) -> bool {
+        self.trailing_newline == other.trailing_newline && self.raw == other.raw
+    }
+}
+
+impl Eq for Notebook {}
+
 #[cfg(test)]
 mod tests {
     use std::path::Path;
@@ -456,6 +486,13 @@ mod tests {
             Notebook::from_path(&notebook_path("wrong_schema.ipynb")),
             Err(NotebookError::InvalidSchema(_))
         ));
+    }
+
+    #[test]
+    fn empty_notebook() {
+        let notebook = Notebook::empty();
+
+        assert_eq!(notebook.source_code(), "\n");
     }
 
     #[test_case("markdown", false)]
