@@ -9,7 +9,7 @@ use crate::statement::clause::{clause_body, clause_header, ClauseHeader};
 use crate::statement::suite::SuiteKind;
 
 #[derive(Copy, Clone, Default)]
-pub enum ExceptHandlerKind {
+pub(crate) enum ExceptHandlerKind {
     #[default]
     Regular,
     Starred,
@@ -17,16 +17,18 @@ pub enum ExceptHandlerKind {
 
 #[derive(Default)]
 pub struct FormatExceptHandlerExceptHandler {
-    except_handler_kind: ExceptHandlerKind,
+    pub(crate) except_handler_kind: ExceptHandlerKind,
+    pub(crate) last_suite_in_statement: bool,
 }
 
 impl FormatRuleWithOptions<ExceptHandlerExceptHandler, PyFormatContext<'_>>
     for FormatExceptHandlerExceptHandler
 {
-    type Options = ExceptHandlerKind;
+    type Options = FormatExceptHandlerExceptHandler;
 
     fn with_options(mut self, options: Self::Options) -> Self {
-        self.except_handler_kind = options;
+        self.except_handler_kind = options.except_handler_kind;
+        self.last_suite_in_statement = options.last_suite_in_statement;
         self
     }
 }
@@ -37,65 +39,61 @@ impl FormatNodeRule<ExceptHandlerExceptHandler> for FormatExceptHandlerExceptHan
         item: &ExceptHandlerExceptHandler,
         f: &mut PyFormatter,
     ) -> FormatResult<()> {
-        format_except_handler(item, self.except_handler_kind, true, f)
-    }
-}
+        let except_handler_kind = self.except_handler_kind;
+        let ExceptHandlerExceptHandler {
+            range: _,
+            type_,
+            name,
+            body,
+        } = item;
 
-pub(crate) fn format_except_handler(
-    item: &ExceptHandlerExceptHandler,
-    except_handler_kind: ExceptHandlerKind,
-    last_suite_in_statement: bool,
-    f: &mut PyFormatter,
-) -> FormatResult<()> {
-    let ExceptHandlerExceptHandler {
-        range: _,
-        type_,
-        name,
-        body,
-    } = item;
+        let comments_info = f.context().comments().clone();
+        let dangling_comments = comments_info.dangling(item);
 
-    let comments_info = f.context().comments().clone();
-    let dangling_comments = comments_info.dangling(item);
-
-    write!(
-        f,
-        [
-            clause_header(
-                ClauseHeader::ExceptHandler(item),
-                dangling_comments,
-                &format_with(|f| {
-                    write!(
-                        f,
-                        [
-                            token("except"),
-                            match except_handler_kind {
-                                ExceptHandlerKind::Regular => None,
-                                ExceptHandlerKind::Starred => Some(token("*")),
-                            }
-                        ]
-                    )?;
-
-                    if let Some(type_) = type_ {
+        write!(
+            f,
+            [
+                clause_header(
+                    ClauseHeader::ExceptHandler(item),
+                    dangling_comments,
+                    &format_with(|f| {
                         write!(
                             f,
                             [
-                                space(),
-                                maybe_parenthesize_expression(type_, item, Parenthesize::IfBreaks)
+                                token("except"),
+                                match except_handler_kind {
+                                    ExceptHandlerKind::Regular => None,
+                                    ExceptHandlerKind::Starred => Some(token("*")),
+                                }
                             ]
                         )?;
-                        if let Some(name) = name {
-                            write!(f, [space(), token("as"), space(), name.format()])?;
-                        }
-                    }
 
-                    Ok(())
-                }),
-            ),
-            clause_body(
-                body,
-                SuiteKind::other(last_suite_in_statement),
-                dangling_comments
-            ),
-        ]
-    )
+                        if let Some(type_) = type_ {
+                            write!(
+                                f,
+                                [
+                                    space(),
+                                    maybe_parenthesize_expression(
+                                        type_,
+                                        item,
+                                        Parenthesize::IfBreaks
+                                    )
+                                ]
+                            )?;
+                            if let Some(name) = name {
+                                write!(f, [space(), token("as"), space(), name.format()])?;
+                            }
+                        }
+
+                        Ok(())
+                    }),
+                ),
+                clause_body(
+                    body,
+                    SuiteKind::other(self.last_suite_in_statement),
+                    dangling_comments
+                ),
+            ]
+        )
+    }
 }

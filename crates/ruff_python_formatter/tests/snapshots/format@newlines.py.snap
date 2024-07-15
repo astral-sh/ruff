@@ -261,6 +261,14 @@ if True:
 else:
     pass
 
+if True:
+    # fmt: off
+    def a():
+        return 1
+    # fmt: on
+else:
+    pass
+
 match True:
     case 1:
         def a():
@@ -619,6 +627,14 @@ if True:
 else:
     pass
 
+if True:
+    # fmt: off
+    def a():
+        return 1
+    # fmt: on
+else:
+    pass
+
 match True:
     case 1:
 
@@ -730,7 +746,7 @@ def overload4(a: int): ...
  else:
      pass
  
-@@ -285,6 +286,7 @@
+@@ -293,6 +294,7 @@
  
          def a():
              return 1
@@ -738,7 +754,7 @@ def overload4(a: int): ...
      case 1:
  
          def a():
-@@ -295,6 +297,7 @@
+@@ -303,6 +305,7 @@
  
      def a():
          return 1
@@ -746,7 +762,7 @@ def overload4(a: int): ...
  except RuntimeError:
  
      def a():
-@@ -305,6 +308,7 @@
+@@ -313,6 +316,7 @@
  
      def a():
          return 1
@@ -754,7 +770,7 @@ def overload4(a: int): ...
  finally:
  
      def a():
-@@ -315,18 +319,22 @@
+@@ -323,18 +327,22 @@
  
      def a():
          return 1

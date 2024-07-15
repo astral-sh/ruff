@@ -36,7 +36,7 @@ impl FormatNodeRule<StmtMatch> for FormatStmtMatch {
         )
         .fmt(f)?;
 
-        let mut cases_iter = cases.iter().peekable();
+        let mut cases_iter = cases.iter();
         let Some(first) = cases_iter.next() else {
             return Ok(());
         };

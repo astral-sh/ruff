@@ -38,16 +38,19 @@ pub enum SuiteKind {
         /// Below, `last_suite_in_statement` is `false` for the suite containing `foo10` and `foo12`
         /// and `true` for the suite containing `bar`.
         /// ```python
-        // if sys.version_info >= (3, 10):
-        //     def foo10():
-        //         return "new"
-        // elif sys.version_info >= (3, 12):
-        //     def foo12():
-        //         return "new"
-        // else:
-        //     def bar():
-        //         return "old"
-        // ```
+        /// if sys.version_info >= (3, 10):
+        ///     def foo10():
+        ///         return "new"
+        /// elif sys.version_info >= (3, 12):
+        ///     def foo12():
+        ///         return "new"
+        /// else:
+        ///     def bar():
+        ///         return "old"
+        /// ```
+        ///
+        /// When this value is true, we don't insert trailing empty lines since the containing suite
+        /// will do that.
         last_suite_in_statement: bool,
     },
 }
@@ -197,55 +200,7 @@ impl FormatRule<Suite, PyFormatContext<'_>> for FormatSuite {
                 // Here we insert empty lines even if the preceding has a trailing own line comment
                 true
             } else {
-                // Find nested class or function definitions that need an empty line after them.
-                //
-                // ```python
-                // def f():
-                //     if True:
-                //
-                //         def double(s):
-                //             return s + s
-                //
-                //     print("below function")
-                // ```
-                std::iter::successors(
-                    Some(AnyNodeRef::from(preceding)),
-                    AnyNodeRef::last_child_in_body,
-                )
-                .take_while(|last_child|
-                    // If there is a comment between preceding and following the empty lines were
-                    // inserted before the comment by preceding and there are no extra empty lines
-                    // after the comment.
-                    // ```python
-                    // class Test:
-                    //     def a(self):
-                    //         pass
-                    //         # trailing comment
-                    //
-                    //
-                    // # two lines before, one line after
-                    //
-                    // c = 30
-                    // ````
-                    // This also includes nested class/function definitions, so we stop recursing
-                    // once we see a node with a trailing own line comment:
-                    // ```python
-                    // def f():
-                    //     if True:
-                    //
-                    //         def double(s):
-                    //             return s + s
-                    //
-                    //         # nested trailing own line comment
-                    //     print("below function with trailing own line comment")
-                    // ```
-                    !comments.has_trailing_own_line(*last_child))
-                .any(|last_child| {
-                    matches!(
-                        last_child,
-                        AnyNodeRef::StmtFunctionDef(_) | AnyNodeRef::StmtClassDef(_)
-                    )
-                })
+                trailing_function_or_class_def(Some(preceding), &comments).is_some()
             };
 
             // Add empty lines before and after a function or class definition. If the preceding
@@ -485,19 +440,8 @@ impl FormatSuite {
             return Ok(());
         }
 
-        let last_def_or_class = std::iter::successors(
-            statements.last().map(AnyNodeRef::from),
-            AnyNodeRef::last_child_in_body,
-        )
-        // If there is a trailing own line comment, the empty line is inserted before that comment.
-        .take_while(|last_child| !comments.has_trailing_own_line(*last_child))
-        .find(|last_child| {
-            matches!(
-                last_child,
-                AnyNodeRef::StmtFunctionDef(_) | AnyNodeRef::StmtClassDef(_)
-            )
-        });
-        let Some(last_def_or_class) = last_def_or_class else {
+        let Some(last_def_or_class) = trailing_function_or_class_def(statements.last(), comments)
+        else {
             // An empty line is only inserted for function and class definitions.
             return Ok(());
         };
@@ -526,6 +470,61 @@ impl FormatSuite {
         }
         Ok(())
     }
+}
+
+/// Find nested class or function definitions that need an empty line after them.
+///
+/// ```python
+/// def f():
+///     if True:
+///
+///         def double(s):
+///             return s + s
+///
+///     print("below function")
+/// ```
+fn trailing_function_or_class_def<'a>(
+    preceding: Option<&'a Stmt>,
+    comments: &Comments,
+) -> Option<AnyNodeRef<'a>> {
+    std::iter::successors(
+        preceding.map(AnyNodeRef::from),
+        AnyNodeRef::last_child_in_body,
+    )
+    .take_while(|last_child|
+        // If there is a comment between preceding and following the empty lines were
+        // inserted before the comment by preceding and there are no extra empty lines
+        // after the comment.
+        // ```python
+        // class Test:
+        //     def a(self):
+        //         pass
+        //         # trailing comment
+        //
+        //
+        // # two lines before, one line after
+        //
+        // c = 30
+        // ````
+        // This also includes nested class/function definitions, so we stop recursing
+        // once we see a node with a trailing own line comment:
+        // ```python
+        // def f():
+        //     if True:
+        //
+        //         def double(s):
+        //             return s + s
+        //
+        //         # nested trailing own line comment
+        //     print("below function with trailing own line comment")
+        // ```
+        !comments.has_trailing_own_line(*last_child))
+    .find(|last_child| {
+        matches!(
+            last_child,
+            AnyNodeRef::StmtFunctionDef(_) | AnyNodeRef::StmtClassDef(_)
+        )
+    })
 }
 
 /// Stub files have bespoke rules for empty lines.
@@ -1015,7 +1014,9 @@ def trailing_func():
 
     #[test]
     fn nested_level() {
-        let formatted = format_suite(SuiteKind::default());
+        let formatted = format_suite(SuiteKind::Other {
+            last_suite_in_statement: true,
+        });
 
         assert_eq!(
             formatted,

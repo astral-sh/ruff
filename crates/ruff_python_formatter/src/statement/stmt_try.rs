@@ -1,11 +1,15 @@
 use ruff_formatter::{write, FormatRuleWithOptions};
-use ruff_python_ast::{ExceptHandler, StmtTry};
+use ruff_python_ast::{ExceptHandler, ExceptHandlerExceptHandler, StmtTry};
 use ruff_text_size::Ranged;
 
 use crate::comments;
 use crate::comments::leading_alternate_branch_comments;
 use crate::comments::SourceComment;
-use crate::other::except_handler_except_handler::{format_except_handler, ExceptHandlerKind};
+use crate::expression::maybe_parenthesize_expression;
+use crate::expression::parentheses::Parenthesize;
+use crate::other::except_handler_except_handler::{
+    ExceptHandlerKind, FormatExceptHandlerExceptHandler,
+};
 use crate::prelude::*;
 use crate::statement::clause::{clause_body, clause_header, ClauseHeader, ElseClause};
 use crate::statement::suite::SuiteKind;
@@ -17,13 +21,15 @@ pub struct FormatStmtTry;
 #[derive(Copy, Clone, Default)]
 pub struct FormatExceptHandler {
     except_handler_kind: ExceptHandlerKind,
+    last_suite_in_statement: bool,
 }
 
 impl FormatRuleWithOptions<ExceptHandler, PyFormatContext<'_>> for FormatExceptHandler {
-    type Options = ExceptHandlerKind;
+    type Options = FormatExceptHandler;
 
     fn with_options(mut self, options: Self::Options) -> Self {
-        self.except_handler_kind = options;
+        self.except_handler_kind = options.except_handler_kind;
+        self.last_suite_in_statement = options.last_suite_in_statement;
         self
     }
 }
@@ -33,7 +39,10 @@ impl FormatRule<ExceptHandler, PyFormatContext<'_>> for FormatExceptHandler {
         match item {
             ExceptHandler::ExceptHandler(except_handler) => except_handler
                 .format()
-                .with_options(self.except_handler_kind)
+                .with_options(FormatExceptHandlerExceptHandler {
+                    except_handler_kind: self.except_handler_kind,
+                    last_suite_in_statement: self.last_suite_in_statement,
+                })
                 .fmt(f),
         }
     }
@@ -66,16 +75,8 @@ impl FormatNodeRule<StmtTry> for FormatStmtTry {
         let comments_info = f.context().comments().clone();
         let mut dangling_comments = comments_info.dangling(item);
 
-        let try_last_suite_in_statement =
-            handlers.is_empty() && orelse.is_empty() && finalbody.is_empty();
-        (_, dangling_comments) = format_case(
-            item,
-            CaseKind::Try,
-            None,
-            dangling_comments,
-            try_last_suite_in_statement,
-            f,
-        )?;
+        (_, dangling_comments) =
+            format_case(item, CaseKind::Try, None, dangling_comments, false, f)?;
         let mut previous_node = body.last();
 
         for handler in handlers {
@@ -89,11 +90,59 @@ impl FormatNodeRule<StmtTry> for FormatStmtTry {
             };
             let last_suite_in_statement =
                 handler == handlers.last().unwrap() && orelse.is_empty() && finalbody.is_empty();
-            format_except_handler(
-                except_handler,
-                except_handler_kind,
-                last_suite_in_statement,
+            let ExceptHandlerExceptHandler {
+                range: _,
+                type_,
+                name,
+                body,
+            } = except_handler;
+
+            let comments_info1 = f.context().comments().clone();
+            let dangling_comments1 = comments_info1.dangling(except_handler);
+            write!(
                 f,
+                [
+                    clause_header(
+                        ClauseHeader::ExceptHandler(except_handler),
+                        dangling_comments1,
+                        &format_with(|f| {
+                            write!(
+                                f,
+                                [
+                                    token("except"),
+                                    match except_handler_kind {
+                                        ExceptHandlerKind::Regular => None,
+                                        ExceptHandlerKind::Starred => Some(token("*")),
+                                    }
+                                ]
+                            )?;
+
+                            if let Some(type_) = type_ {
+                                write!(
+                                    f,
+                                    [
+                                        space(),
+                                        maybe_parenthesize_expression(
+                                            type_,
+                                            except_handler,
+                                            Parenthesize::IfBreaks
+                                        )
+                                    ]
+                                )?;
+                                if let Some(name) = name {
+                                    write!(f, [space(), token("as"), space(), name.format()])?;
+                                }
+                            }
+
+                            Ok(())
+                        }),
+                    ),
+                    clause_body(
+                        body,
+                        SuiteKind::other(last_suite_in_statement),
+                        dangling_comments1
+                    ),
+                ]
             )?;
             previous_node = except_handler.body.last();
         }

@@ -255,6 +255,14 @@ if True:
 else:
     pass
 
+if True:
+    # fmt: off
+    def a():
+        return 1
+    # fmt: on
+else:
+    pass
+
 match True:
     case 1:
         def a():

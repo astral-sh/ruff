@@ -12,6 +12,15 @@ pub struct FormatElifElseClause;
 
 impl FormatNodeRule<ElifElseClause> for FormatElifElseClause {
     fn fmt_fields(&self, item: &ElifElseClause, f: &mut PyFormatter) -> FormatResult<()> {
-        format_elif_else_clause(item, f, None, SuiteKind::default())
+        format_elif_else_clause(
+            item,
+            f,
+            None,
+            SuiteKind::Other {
+                // For stability, we can't insert an empty line if we don't know if the outer suite
+                // also does.
+                last_suite_in_statement: true,
+            },
+        )
     }
 }
