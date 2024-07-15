@@ -2052,31 +2052,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "ruff-api"
-version = "0.5.1"
-dependencies = [
- "console_error_panic_hook",
- "console_log",
- "js-sys",
- "log",
- "ruff_formatter",
- "ruff_linter",
- "ruff_python_ast",
- "ruff_python_codegen",
- "ruff_python_formatter",
- "ruff_python_index",
- "ruff_python_parser",
- "ruff_python_trivia",
- "ruff_source_file",
- "ruff_text_size",
- "ruff_workspace",
- "serde",
- "serde-wasm-bindgen",
- "wasm-bindgen",
- "wasm-bindgen-test",
-]
-
-[[package]]
 name = "ruff_benchmark"
 version = "0.0.0"
 dependencies = [
@@ -2519,6 +2494,31 @@ dependencies = [
  "serde",
  "serde_test",
  "static_assertions",
+]
+
+[[package]]
+name = "ruff_wasm"
+version = "0.5.2"
+dependencies = [
+ "console_error_panic_hook",
+ "console_log",
+ "js-sys",
+ "log",
+ "ruff_formatter",
+ "ruff_linter",
+ "ruff_python_ast",
+ "ruff_python_codegen",
+ "ruff_python_formatter",
+ "ruff_python_index",
+ "ruff_python_parser",
+ "ruff_python_trivia",
+ "ruff_source_file",
+ "ruff_text_size",
+ "ruff_workspace",
+ "serde",
+ "serde-wasm-bindgen",
+ "wasm-bindgen",
+ "wasm-bindgen-test",
 ]
 
 [[package]]
