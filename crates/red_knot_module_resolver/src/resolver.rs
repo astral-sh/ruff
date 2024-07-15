@@ -17,7 +17,7 @@ use crate::state::ResolverState;
 use crate::supported_py_version::TargetVersion;
 
 type SearchPathRoot = Arc<ModuleResolutionPathBuf>;
-type OrderSet<T> = ordermap::OrderSet<T, BuildHasherDefault<FxHasher>>;
+type OrderSet<T> = indexmap::IndexSet<T, BuildHasherDefault<FxHasher>>;
 
 /// Configures the module resolver settings.
 ///
@@ -87,7 +87,9 @@ pub(crate) fn file_to_module(db: &dyn Db, file: File) -> Option<Module> {
 
     let path = file.path(db.upcast());
 
-    let mut search_paths = iter_module_search_paths(db);
+    let resolver_settings = module_resolver_settings(db);
+
+    let mut search_paths = resolver_settings.search_paths(db);
 
     let module_name = loop {
         let candidate = search_paths.next()?;
@@ -143,12 +145,16 @@ impl RawModuleResolutionSettings {
     /// Validate and normalize the raw settings given by the user
     /// into settings we can use for module resolution
     ///
+    /// This method also implements the typing spec's [module resolution order].
+    ///
     /// TODO(Alex): this method does multiple `.unwrap()` calls when it should really return an error.
     /// Each `.unwrap()` call is a point where we're validating a setting that the user would pass
     /// and transforming it into an internal representation for a validated path.
     /// Rather than panicking if a path fails to validate, we should display an error message to the user
     /// and exit the process with a nonzero exit code.
     /// This validation should probably be done outside of Salsa?
+    ///
+    /// [module resolution order]: https://typing.readthedocs.io/en/latest/spec/distributing.html#import-resolution-ordering
     fn into_configuration_settings(
         self,
         current_directory: &SystemPath,
@@ -157,11 +163,11 @@ impl RawModuleResolutionSettings {
             target_version,
             extra_paths,
             workspace_root,
-            site_packages,
+            site_packages: site_packages_setting,
             custom_typeshed,
         } = self;
 
-        let extra_paths: Vec<SearchPathRoot> = extra_paths
+        let mut static_search_paths: OrderSet<SearchPathRoot> = extra_paths
             .into_iter()
             .map(|fs_path| {
                 Arc::new(
@@ -174,15 +180,15 @@ impl RawModuleResolutionSettings {
             })
             .collect();
 
-        let workspace_root = Arc::new(
+        static_search_paths.insert(Arc::new(
             ModuleResolutionPathBuf::first_party(SystemPath::absolute(
                 workspace_root,
                 current_directory,
             ))
             .unwrap(),
-        );
+        ));
 
-        let stdlib = Arc::new(custom_typeshed.map_or_else(
+        static_search_paths.insert(Arc::new(custom_typeshed.map_or_else(
             ModuleResolutionPathBuf::vendored_stdlib,
             |custom| {
                 ModuleResolutionPathBuf::stdlib_from_custom_typeshed_root(&SystemPath::absolute(
@@ -191,25 +197,28 @@ impl RawModuleResolutionSettings {
                 ))
                 .unwrap()
             },
-        ));
+        )));
 
-        // TODO vendor typeshed's third-party stubs as well as the stdlib and fallback to them as a final step
-        let site_packages = site_packages.map(|path| {
-            Arc::new(
+        let mut site_packages = None;
+
+        if let Some(path) = site_packages_setting {
+            let site_packages_root = Arc::new(
                 ModuleResolutionPathBuf::site_packages(SystemPath::absolute(
                     path,
                     current_directory,
                 ))
                 .unwrap(),
-            )
-        });
+            );
+            site_packages = Some(site_packages_root.clone());
+            static_search_paths.insert(site_packages_root);
+        }
+
+        // TODO vendor typeshed's third-party stubs as well as the stdlib and fallback to them as a final step
 
         ModuleResolutionSettings {
             target_version,
             search_path_settings: ValidatedSearchPathSettings {
-                extra_paths,
-                workspace_root,
-                stdlib,
+                static_search_paths,
                 site_packages,
             },
         }
@@ -218,35 +227,18 @@ impl RawModuleResolutionSettings {
 
 #[derive(Debug, PartialEq, Eq, Clone)]
 struct ValidatedSearchPathSettings {
-    extra_paths: Vec<SearchPathRoot>,
-    workspace_root: SearchPathRoot,
-    stdlib: SearchPathRoot,
-    site_packages: Option<SearchPathRoot>,
-}
-
-impl ValidatedSearchPathSettings {
-    /// Implementation of the typing spec's [module resolution order].
+    /// Search paths that have been statically determined purely from reading Ruff's configuration settings.
+    /// These shouldn't ever change unless the config settings themselves change.
     ///
-    /// It's important that we collect these instead of iterating over them lazily,
-    /// so that we can be sure that it doesn't contain any duplicates.
-    /// At runtime, [`sys.path` never contains duplicate entries]
+    /// We use an `OrderSet` for storing the paths, since the order is important,
+    /// but at runtime, [`sys.path` never contains duplicate entries]
     ///
-    /// [module resolution order]: https://typing.readthedocs.io/en/latest/spec/distributing.html#import-resolution-ordering
+    /// Note that `site-packages` *is included* as a search path in this sequence,
+    /// but it is also stored separately so that we're able to find editable installs later.
+    ///
     /// [`sys.path` never contains duplicate entries]: https://docs.python.org/3/library/site.html#module-site
-    fn static_search_paths(&self) -> OrderSet<&SearchPathRoot> {
-        let ValidatedSearchPathSettings {
-            extra_paths,
-            workspace_root,
-            stdlib,
-            site_packages,
-        } = self;
-        extra_paths
-            .iter()
-            .chain(std::iter::once(workspace_root))
-            .chain(std::iter::once(stdlib))
-            .chain(site_packages)
-            .collect()
-    }
+    static_search_paths: OrderSet<SearchPathRoot>,
+    site_packages: Option<SearchPathRoot>,
 }
 
 /// Collect all dynamic search paths:
@@ -254,11 +246,14 @@ impl ValidatedSearchPathSettings {
 /// due to editable installations of third-party packages.
 #[salsa::tracked(return_ref)]
 pub(crate) fn dynamic_module_resolution_paths(db: &dyn Db) -> OrderSet<SearchPathRoot> {
-    let settings = &module_resolver_settings(db).search_path_settings;
-    let static_paths = settings.static_search_paths();
+    let ValidatedSearchPathSettings {
+        static_search_paths,
+        site_packages,
+    } = &module_resolver_settings(db).search_path_settings;
+
     let mut dynamic_paths = OrderSet::default();
 
-    if let Some(site_packages) = &settings.site_packages {
+    if let Some(site_packages) = site_packages {
         let site_packages = site_packages
             .as_system_path()
             .expect("Expected site-packages never to be a VendoredPath!");
@@ -274,21 +269,21 @@ pub(crate) fn dynamic_module_resolution_paths(db: &dyn Db) -> OrderSet<SearchPat
         };
 
         // The Python documentation specifies that `.pth` files in `site-packages`
-        // are processed in alphabetical order.
-        // We know that files returned from [`ruff_db::system::MemoryFileSystem::read_directory()`]
-        // will be in alphabetical order already. However, [`ruff_db::system::OsSystem::read_directory()`]
-        // gives no such guarantees. Therefore, collecting and then sorting is necessary.
+        // are processed in alphabetical order, so collecting and then sorting is necessary.
         // https://docs.python.org/3/library/site.html#module-site
         let mut all_pth_files: Vec<PthFile> = pth_file_iterator.collect();
         all_pth_files.sort_by(|a, b| a.path.cmp(&b.path));
 
         for pth_file in &all_pth_files {
-            dynamic_paths.extend(pth_file.iter_editable_installations().filter_map(
-                |editable_path| {
-                    let possible_search_path = Arc::new(editable_path);
-                    (!static_paths.contains(&possible_search_path)).then_some(possible_search_path)
-                },
-            ));
+            dynamic_paths.extend(
+                pth_file
+                    .editable_installations()
+                    .filter_map(|editable_path| {
+                        let possible_search_path = Arc::new(editable_path);
+                        (!static_search_paths.contains(&possible_search_path))
+                            .then_some(possible_search_path)
+                    }),
+            );
         }
     }
     dynamic_paths
@@ -303,23 +298,8 @@ pub(crate) fn dynamic_module_resolution_paths(db: &dyn Db) -> OrderSet<SearchPat
 /// [`sys.path` at runtime]: https://docs.python.org/3/library/site.html#module-site
 struct SearchPathIterator<'db> {
     db: &'db dyn Db,
-    static_paths: ordermap::set::IntoIter<&'db SearchPathRoot>,
-    dynamic_paths: Option<ordermap::set::Iter<'db, SearchPathRoot>>,
-}
-
-impl<'db> SearchPathIterator<'db> {
-    fn new(db: &'db dyn Db) -> Self {
-        let static_paths = module_resolver_settings(db)
-            .search_path_settings
-            .static_search_paths()
-            .into_iter();
-
-        Self {
-            db,
-            static_paths,
-            dynamic_paths: None,
-        }
-    }
+    static_paths: indexmap::set::Iter<'db, SearchPathRoot>,
+    dynamic_paths: Option<indexmap::set::Iter<'db, SearchPathRoot>>,
 }
 
 impl<'db> Iterator for SearchPathIterator<'db> {
@@ -341,10 +321,6 @@ impl<'db> Iterator for SearchPathIterator<'db> {
 }
 
 impl<'db> FusedIterator for SearchPathIterator<'db> {}
-
-fn iter_module_search_paths(db: &dyn Db) -> SearchPathIterator {
-    SearchPathIterator::new(db)
-}
 
 /// Represents a single `.pth` file in a `site-packages` directory.
 /// One or more lines in a `.pth` file may be a (relative or absolute)
@@ -373,9 +349,7 @@ impl<'db> PthFile<'db> {
 
     /// Yield paths in this `.pth` file that appear to represent editable installations,
     /// and should therefore be added as module-resolution search paths.
-    fn iter_editable_installations<'a>(
-        &'a self,
-    ) -> impl Iterator<Item = ModuleResolutionPathBuf> + 'db
+    fn editable_installations<'a>(&'a self) -> impl Iterator<Item = ModuleResolutionPathBuf> + 'db
     where
         'a: 'db,
     {
@@ -465,6 +439,16 @@ impl ModuleResolutionSettings {
     fn target_version(&self) -> TargetVersion {
         self.target_version
     }
+
+    fn search_paths<'db>(&'db self, db: &'db dyn Db) -> SearchPathIterator<'db> {
+        let static_paths = self.search_path_settings.static_search_paths.iter();
+
+        SearchPathIterator {
+            db,
+            static_paths,
+            dynamic_paths: None,
+        }
+    }
 }
 
 // The singleton methods generated by salsa are all `pub` instead of `pub(crate)` which triggers
@@ -505,7 +489,7 @@ fn resolve_name(
     let resolver_settings = module_resolver_settings(db);
     let resolver_state = ResolverState::new(db, resolver_settings.target_version());
 
-    for search_path in iter_module_search_paths(db) {
+    for search_path in resolver_settings.search_paths(db) {
         let mut components = name.components();
         let module_name = components.next_back()?;
 

@@ -16,7 +16,7 @@ ruff_python_stdlib = { workspace = true }
 
 compact_str = { workspace = true }
 camino = { workspace = true }
-ordermap = { workspace = true }
+indexmap = { workspace = true }
 once_cell = { workspace = true }
 rustc-hash = { workspace = true }
 salsa = { workspace = true }
