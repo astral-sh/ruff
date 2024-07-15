@@ -1,12 +1,10 @@
 use ruff_formatter::{write, FormatRuleWithOptions};
-use ruff_python_ast::{ExceptHandler, ExceptHandlerExceptHandler, StmtTry};
+use ruff_python_ast::{ExceptHandler, StmtTry};
 use ruff_text_size::Ranged;
 
 use crate::comments;
 use crate::comments::leading_alternate_branch_comments;
 use crate::comments::SourceComment;
-use crate::expression::maybe_parenthesize_expression;
-use crate::expression::parentheses::Parenthesize;
 use crate::other::except_handler_except_handler::{
     ExceptHandlerKind, FormatExceptHandlerExceptHandler,
 };
@@ -81,7 +79,6 @@ impl FormatNodeRule<StmtTry> for FormatStmtTry {
 
         for handler in handlers {
             let handler_comments = comments_info.leading(handler);
-            leading_alternate_branch_comments(handler_comments, previous_node).fmt(f)?;
             let ExceptHandler::ExceptHandler(except_handler) = handler;
             let except_handler_kind = if *is_star {
                 ExceptHandlerKind::Starred
@@ -90,58 +87,15 @@ impl FormatNodeRule<StmtTry> for FormatStmtTry {
             };
             let last_suite_in_statement =
                 handler == handlers.last().unwrap() && orelse.is_empty() && finalbody.is_empty();
-            let ExceptHandlerExceptHandler {
-                range: _,
-                type_,
-                name,
-                body,
-            } = except_handler;
 
-            let comments_info1 = f.context().comments().clone();
-            let dangling_comments1 = comments_info1.dangling(except_handler);
             write!(
                 f,
                 [
-                    clause_header(
-                        ClauseHeader::ExceptHandler(except_handler),
-                        dangling_comments1,
-                        &format_with(|f| {
-                            write!(
-                                f,
-                                [
-                                    token("except"),
-                                    match except_handler_kind {
-                                        ExceptHandlerKind::Regular => None,
-                                        ExceptHandlerKind::Starred => Some(token("*")),
-                                    }
-                                ]
-                            )?;
-
-                            if let Some(type_) = type_ {
-                                write!(
-                                    f,
-                                    [
-                                        space(),
-                                        maybe_parenthesize_expression(
-                                            type_,
-                                            except_handler,
-                                            Parenthesize::IfBreaks
-                                        )
-                                    ]
-                                )?;
-                                if let Some(name) = name {
-                                    write!(f, [space(), token("as"), space(), name.format()])?;
-                                }
-                            }
-
-                            Ok(())
-                        }),
-                    ),
-                    clause_body(
-                        body,
-                        SuiteKind::other(last_suite_in_statement),
-                        dangling_comments1
-                    ),
+                    leading_alternate_branch_comments(handler_comments, previous_node),
+                    &handler.format().with_options(FormatExceptHandler {
+                        except_handler_kind,
+                        last_suite_in_statement
+                    })
                 ]
             )?;
             previous_node = except_handler.body.last();
