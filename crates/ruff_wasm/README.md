@@ -1,6 +1,6 @@
 # Ruff WASM
 
-### ⚠️ WARNING: This API is experimental and may change at any time
+> **⚠️ WARNING: This API is experimental and may change at any time**
 
 [**Docs**](https://docs.astral.sh/ruff/) | [**Playground**](https://play.ruff.rs/)
 
