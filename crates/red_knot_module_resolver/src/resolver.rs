@@ -1404,8 +1404,8 @@ mod tests {
         let foo_bar_module = resolve_module(&db, foo_bar_module_name.clone()).unwrap();
 
         assert_eq!(
-            Some(foo_module.file()),
-            system_path_to_file(&db, SystemPathBuf::from("/x/src/foo/__init__.py"))
+            foo_module.file().path,
+            FilePath::System(SystemPathBuf::from("/x/src/foo/__init__.py"))
         );
         assert_eq!(
             Some(foo_bar_module.file()),
