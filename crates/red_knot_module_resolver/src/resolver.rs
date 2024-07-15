@@ -1379,13 +1379,13 @@ mod tests {
     #[test]
     fn editable_install_absolute_path() {
         const SITE_PACKAGES: &[FileSpec] = &[("_foo.pth", "/x/src")];
-        const X_DIRECTORY: &[FileSpec] =
-            &[("/x/src/foo/__init__.py", ""), ("/x/src/foo/bar.py", "")];
+        let x_directory = [("/x/src/foo/__init__.py", ""), ("/x/src/foo/bar.py", "")];
 
-        let TestCase { db, .. } = TestCaseBuilder::new()
+        let TestCase { mut db, .. } = TestCaseBuilder::new()
             .with_site_packages_files(SITE_PACKAGES)
-            .with_other_files(X_DIRECTORY)
             .build();
+
+        db.write_files(x_directory).unwrap();
 
         let foo_module_name = ModuleName::new_static("foo").unwrap();
         let foo_bar_module_name = ModuleName::new_static("foo.bar").unwrap();
@@ -1448,14 +1448,17 @@ not_a_directory
             ("spam/spam.py", ""),
         ];
 
-        const ROOT: &[FileSpec] = &[("/a.py", ""), ("/baz/b.py", "")];
+        let root_files = [("/a.py", ""), ("/baz/b.py", "")];
 
         let TestCase {
-            db, site_packages, ..
+            mut db,
+            site_packages,
+            ..
         } = TestCaseBuilder::new()
             .with_site_packages_files(SITE_PACKAGES)
-            .with_other_files(ROOT)
             .build();
+
+        db.write_files(root_files).unwrap();
 
         let foo_module_name = ModuleName::new_static("foo").unwrap();
         let a_module_name = ModuleName::new_static("a").unwrap();
@@ -1488,12 +1491,13 @@ not_a_directory
     #[test]
     fn module_resolution_paths_cached_between_different_module_resolutions() {
         const SITE_PACKAGES: &[FileSpec] = &[("_foo.pth", "/x/src"), ("_bar.pth", "/y/src")];
-        const EXTERNAL_DIRECTORIES: &[FileSpec] = &[("/x/src/foo.py", ""), ("/y/src/bar.py", "")];
+        let external_directories = [("/x/src/foo.py", ""), ("/y/src/bar.py", "")];
 
         let TestCase { mut db, .. } = TestCaseBuilder::new()
             .with_site_packages_files(SITE_PACKAGES)
-            .with_other_files(EXTERNAL_DIRECTORIES)
             .build();
+
+        db.write_files(external_directories).unwrap();
 
         let foo_module_name = ModuleName::new_static("foo").unwrap();
         let bar_module_name = ModuleName::new_static("bar").unwrap();
@@ -1522,7 +1526,7 @@ not_a_directory
     #[test]
     fn deleting_pth_file_on_which_module_resolution_depends_invalidates_cache() {
         const SITE_PACKAGES: &[FileSpec] = &[("_foo.pth", "/x/src")];
-        const X_DIRECTORY: &[FileSpec] = &[("/x/src/foo.py", "")];
+        let x_directory = [("/x/src/foo.py", "")];
 
         let TestCase {
             mut db,
@@ -1530,8 +1534,9 @@ not_a_directory
             ..
         } = TestCaseBuilder::new()
             .with_site_packages_files(SITE_PACKAGES)
-            .with_other_files(X_DIRECTORY)
             .build();
+
+        db.write_files(x_directory).unwrap();
 
         let foo_module_name = ModuleName::new_static("foo").unwrap();
         let foo_module = resolve_module(&db, foo_module_name.clone()).unwrap();
@@ -1549,12 +1554,13 @@ not_a_directory
     #[test]
     fn deleting_editable_install_on_which_module_resolution_depends_invalidates_cache() {
         const SITE_PACKAGES: &[FileSpec] = &[("_foo.pth", "/x/src")];
-        const X_DIRECTORY: &[FileSpec] = &[("/x/src/foo.py", "")];
+        let x_directory = [("/x/src/foo.py", "")];
 
         let TestCase { mut db, .. } = TestCaseBuilder::new()
             .with_site_packages_files(SITE_PACKAGES)
-            .with_other_files(X_DIRECTORY)
             .build();
+
+        db.write_files(x_directory).unwrap();
 
         let foo_module_name = ModuleName::new_static("foo").unwrap();
         let foo_module = resolve_module(&db, foo_module_name.clone()).unwrap();

@@ -99,7 +99,6 @@ pub(crate) struct TestCaseBuilder<T> {
     target_version: TargetVersion,
     first_party_files: Vec<FileSpec>,
     site_packages_files: Vec<FileSpec>,
-    other_files: Vec<FileSpec>,
 }
 
 impl<T> TestCaseBuilder<T> {
@@ -118,16 +117,6 @@ impl<T> TestCaseBuilder<T> {
     /// Specify the target Python version the module resolver should assume
     pub(crate) fn with_target_version(mut self, target_version: TargetVersion) -> Self {
         self.target_version = target_version;
-        self
-    }
-
-    /// Add other files external to any of the pre-configured search paths.
-    ///
-    /// (For example, an editable installation in `site-packages`
-    /// might point to a directory outside of any of the typing spec's
-    /// listed module resolution sources)
-    pub(crate) fn with_other_files(mut self, files: &[FileSpec]) -> Self {
-        self.other_files.extend(files.iter().copied());
         self
     }
 
@@ -154,7 +143,6 @@ impl TestCaseBuilder<UnspecifiedTypeshed> {
             target_version: TargetVersion::default(),
             first_party_files: vec![],
             site_packages_files: vec![],
-            other_files: vec![],
         }
     }
 
@@ -165,14 +153,12 @@ impl TestCaseBuilder<UnspecifiedTypeshed> {
             target_version,
             first_party_files,
             site_packages_files,
-            other_files,
         } = self;
         TestCaseBuilder {
             typeshed_option: VendoredTypeshed,
             target_version,
             first_party_files,
             site_packages_files,
-            other_files,
         }
     }
 
@@ -186,14 +172,12 @@ impl TestCaseBuilder<UnspecifiedTypeshed> {
             target_version,
             first_party_files,
             site_packages_files,
-            other_files,
         } = self;
         TestCaseBuilder {
             typeshed_option: typeshed,
             target_version,
             first_party_files,
             site_packages_files,
-            other_files,
         }
     }
 
@@ -222,7 +206,6 @@ impl TestCaseBuilder<MockedTypeshed> {
             target_version,
             first_party_files,
             site_packages_files,
-            other_files,
         } = self;
 
         let mut db = TestDb::new();
@@ -231,7 +214,6 @@ impl TestCaseBuilder<MockedTypeshed> {
             Self::write_mock_directory(&mut db, "/site-packages", site_packages_files);
         let src = Self::write_mock_directory(&mut db, "/src", first_party_files);
         let typeshed = Self::build_typeshed_mock(&mut db, &typeshed_option);
-        Self::write_mock_directory(&mut db, "", other_files);
 
         set_module_resolution_settings(
             &mut db,
@@ -278,7 +260,6 @@ impl TestCaseBuilder<VendoredTypeshed> {
             target_version,
             first_party_files,
             site_packages_files,
-            other_files,
         } = self;
 
         let mut db = TestDb::new();
@@ -286,7 +267,6 @@ impl TestCaseBuilder<VendoredTypeshed> {
         let site_packages =
             Self::write_mock_directory(&mut db, "/site-packages", site_packages_files);
         let src = Self::write_mock_directory(&mut db, "/src", first_party_files);
-        Self::write_mock_directory(&mut db, "", other_files);
 
         set_module_resolution_settings(
             &mut db,
