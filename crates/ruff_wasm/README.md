@@ -13,7 +13,6 @@ There are multiple versions for the different wasm-pack targets. See [here](http
 - [Bundler](https://www.npmjs.com/package/@astral-sh/ruff-wasm-bundler)
 - [Web](https://www.npmjs.com/package/@astral-sh/ruff-wasm-web)
 - [Node.js](https://www.npmjs.com/package/@astral-sh/ruff-wasm-nodejs)
-- [Deno](https://www.npmjs.com/package/@astral-sh/ruff-wasm-deno)
 
 ## Usage
 
