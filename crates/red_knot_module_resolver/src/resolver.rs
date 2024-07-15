@@ -1404,12 +1404,12 @@ mod tests {
         let foo_bar_module = resolve_module(&db, foo_bar_module_name.clone()).unwrap();
 
         assert_eq!(
-            foo_module.file().path,
-            FilePath::System(SystemPathBuf::from("/x/src/foo/__init__.py"))
+            foo_module.file().path(&db),
+            &FilePath::system("/x/src/foo/__init__.py")
         );
         assert_eq!(
-            Some(foo_bar_module.file()),
-            system_path_to_file(&db, SystemPathBuf::from("/x/src/foo/bar.py"))
+            foo_bar_module.file().path(&db),
+            &FilePath::system("/x/src/foo/bar.py")
         );
     }
 
@@ -1420,9 +1420,7 @@ mod tests {
             ("../x/y/src/foo.pyi", ""),
         ];
 
-        let TestCase {
-            db, site_packages, ..
-        } = TestCaseBuilder::new()
+        let TestCase { db, .. } = TestCaseBuilder::new()
             .with_site_packages_files(SITE_PACKAGES)
             .build();
 
@@ -1430,8 +1428,8 @@ mod tests {
         let foo_module = resolve_module(&db, foo_module_name.clone()).unwrap();
 
         assert_eq!(
-            Some(foo_module.file()),
-            system_path_to_file(&db, site_packages.join("../x/y/src/foo.pyi"))
+            foo_module.file().path(&db),
+            &FilePath::system("/x/y/src/foo.pyi")
         );
     }
 
@@ -1481,20 +1479,14 @@ not_a_directory
         let spam_module = resolve_module(&db, spam_module_name.clone()).unwrap();
 
         assert_eq!(
-            Some(foo_module.file()),
-            system_path_to_file(&db, site_packages.join("../x/y/src/foo.pyi"))
+            foo_module.file().path(&db),
+            &FilePath::system("/x/y/src/foo.pyi")
         );
+        assert_eq!(a_module.file().path(&db), &FilePath::system("/a.py"));
+        assert_eq!(b_module.file().path(&db), &FilePath::system("/baz/b.py"));
         assert_eq!(
-            Some(a_module.file()),
-            system_path_to_file(&db, SystemPathBuf::from("/a.py"))
-        );
-        assert_eq!(
-            Some(b_module.file()),
-            system_path_to_file(&db, SystemPathBuf::from("/baz/b.py"))
-        );
-        assert_eq!(
-            Some(spam_module.file()),
-            system_path_to_file(&db, site_packages.join("spam/spam.py"))
+            spam_module.file().path(&db),
+            &FilePath::System(site_packages.join("spam/spam.py"))
         );
     }
 
@@ -1514,15 +1506,15 @@ not_a_directory
 
         let foo_module = resolve_module(&db, foo_module_name).unwrap();
         assert_eq!(
-            Some(foo_module.file()),
-            system_path_to_file(&db, "/x/src/foo.py")
+            foo_module.file().path(&db),
+            &FilePath::system("/x/src/foo.py")
         );
 
         db.clear_salsa_events();
         let bar_module = resolve_module(&db, bar_module_name).unwrap();
         assert_eq!(
-            Some(bar_module.file()),
-            system_path_to_file(&db, "/y/src/bar.py")
+            bar_module.file().path(&db),
+            &FilePath::system("/y/src/bar.py")
         );
         let events = db.take_salsa_events();
         assert_function_query_was_not_run::<dynamic_module_resolution_paths, _, _>(
@@ -1551,8 +1543,8 @@ not_a_directory
         let foo_module_name = ModuleName::new_static("foo").unwrap();
         let foo_module = resolve_module(&db, foo_module_name.clone()).unwrap();
         assert_eq!(
-            Some(foo_module.file()),
-            system_path_to_file(&db, SystemPathBuf::from("/x/src/foo.py"))
+            foo_module.file().path(&db),
+            &FilePath::system("/x/src/foo.py")
         );
 
         let pth_file_path = site_packages.join("_foo.pth");
@@ -1578,8 +1570,8 @@ not_a_directory
         let foo_module = resolve_module(&db, foo_module_name.clone()).unwrap();
         let src_path = SystemPathBuf::from("/x/src");
         assert_eq!(
-            Some(foo_module.file()),
-            system_path_to_file(&db, src_path.join("foo.py"))
+            foo_module.file().path(&db),
+            &FilePath::System(src_path.join("foo.py"))
         );
 
         db.memory_file_system()
