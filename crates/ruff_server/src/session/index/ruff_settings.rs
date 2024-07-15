@@ -100,6 +100,7 @@ impl RuffSettings {
 impl RuffSettingsIndex {
     pub(super) fn new(root: &Path, editor_settings: &ResolvedEditorSettings) -> Self {
         let mut index = BTreeMap::default();
+        let mut respect_gitignore = true;
 
         // Add any settings from above the workspace root.
         for directory in root.ancestors() {
@@ -112,6 +113,7 @@ impl RuffSettingsIndex {
                     continue;
                 };
 
+                respect_gitignore = settings.file_resolver.respect_gitignore;
                 index.insert(
                     directory.to_path_buf(),
                     Arc::new(RuffSettings {
@@ -127,7 +129,7 @@ impl RuffSettingsIndex {
 
         // Add any settings within the workspace itself
         let mut builder = WalkBuilder::new(root);
-        builder.standard_filters(true);
+        builder.standard_filters(respect_gitignore);
         builder.hidden(false);
         builder.threads(
             std::thread::available_parallelism()
