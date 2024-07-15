@@ -409,19 +409,14 @@ impl<'db> Iterator for PthFileIterator<'db> {
             if file_type.is_directory() {
                 continue;
             }
-            let path = entry.path();
+            let path = entry.into_path();
             if path.extension() != Some("pth") {
                 continue;
             }
-            let Some(file) = system_path_to_file(self.db.upcast(), path) else {
+            let Some(file) = system_path_to_file(self.db.upcast(), &path) else {
                 continue;
             };
-            return Some(PthFile::new(
-                self.db,
-                path.to_path_buf(),
-                file,
-                self.site_packages,
-            ));
+            return Some(PthFile::new(self.db, path, file, self.site_packages));
         }
     }
 }
@@ -439,11 +434,9 @@ impl ModuleResolutionSettings {
     }
 
     fn search_paths<'db>(&'db self, db: &'db dyn Db) -> SearchPathIterator<'db> {
-        let static_paths = self.search_path_settings.static_search_paths.iter();
-
         SearchPathIterator {
             db,
-            static_paths,
+            static_paths: self.search_path_settings.static_search_paths.iter(),
             dynamic_paths: None,
         }
     }

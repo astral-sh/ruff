@@ -138,6 +138,10 @@ impl DirectoryEntry {
         Self { path, file_type }
     }
 
+    pub fn into_path(self) -> SystemPathBuf {
+        self.path
+    }
+
     pub fn path(&self) -> &SystemPath {
         &self.path
     }
