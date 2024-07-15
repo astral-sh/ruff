@@ -1,14 +1,54 @@
 import sys
 import types
+from _typeshed import StrPath
 from abc import ABCMeta, abstractmethod
 from collections.abc import Callable
+from socket import socket
 from typing import Literal
 from typing_extensions import Self, TypeVarTuple, Unpack, deprecated
 
+from .base_events import Server, _ProtocolFactory, _SSLContext
 from .events import AbstractEventLoop, BaseDefaultEventLoopPolicy
 from .selector_events import BaseSelectorEventLoop
 
 _Ts = TypeVarTuple("_Ts")
+
+if sys.platform != "win32":
+    if sys.version_info >= (3, 14):
+        __all__ = ("SelectorEventLoop", "DefaultEventLoopPolicy", "EventLoop")
+    elif sys.version_info >= (3, 13):
+        __all__ = (
+            "SelectorEventLoop",
+            "AbstractChildWatcher",
+            "SafeChildWatcher",
+            "FastChildWatcher",
+            "PidfdChildWatcher",
+            "MultiLoopChildWatcher",
+            "ThreadedChildWatcher",
+            "DefaultEventLoopPolicy",
+            "EventLoop",
+        )
+    elif sys.version_info >= (3, 9):
+        __all__ = (
+            "SelectorEventLoop",
+            "AbstractChildWatcher",
+            "SafeChildWatcher",
+            "FastChildWatcher",
+            "PidfdChildWatcher",
+            "MultiLoopChildWatcher",
+            "ThreadedChildWatcher",
+            "DefaultEventLoopPolicy",
+        )
+    else:
+        __all__ = (
+            "SelectorEventLoop",
+            "AbstractChildWatcher",
+            "SafeChildWatcher",
+            "FastChildWatcher",
+            "MultiLoopChildWatcher",
+            "ThreadedChildWatcher",
+            "DefaultEventLoopPolicy",
+        )
 
 # This is also technically not available on Win,
 # but other parts of typeshed need this definition.
@@ -58,30 +98,6 @@ if sys.version_info < (3, 14):
             def is_active(self) -> bool: ...
 
 if sys.platform != "win32":
-    if sys.version_info >= (3, 14):
-        __all__ = ("SelectorEventLoop", "DefaultEventLoopPolicy")
-    elif sys.version_info >= (3, 9):
-        __all__ = (
-            "SelectorEventLoop",
-            "AbstractChildWatcher",
-            "SafeChildWatcher",
-            "FastChildWatcher",
-            "PidfdChildWatcher",
-            "MultiLoopChildWatcher",
-            "ThreadedChildWatcher",
-            "DefaultEventLoopPolicy",
-        )
-    else:
-        __all__ = (
-            "SelectorEventLoop",
-            "AbstractChildWatcher",
-            "SafeChildWatcher",
-            "FastChildWatcher",
-            "MultiLoopChildWatcher",
-            "ThreadedChildWatcher",
-            "DefaultEventLoopPolicy",
-        )
-
     if sys.version_info < (3, 14):
         if sys.version_info >= (3, 12):
             # Doesn't actually have ABCMeta metaclass at runtime, but mypy complains if we don't have it in the stub.
@@ -141,7 +157,21 @@ if sys.platform != "win32":
                 ) -> None: ...
                 def remove_child_handler(self, pid: int) -> bool: ...
 
-    class _UnixSelectorEventLoop(BaseSelectorEventLoop): ...
+    class _UnixSelectorEventLoop(BaseSelectorEventLoop):
+        if sys.version_info >= (3, 13):
+            async def create_unix_server(  # type: ignore[override]
+                self,
+                protocol_factory: _ProtocolFactory,
+                path: StrPath | None = None,
+                *,
+                sock: socket | None = None,
+                backlog: int = 100,
+                ssl: _SSLContext = None,
+                ssl_handshake_timeout: float | None = None,
+                ssl_shutdown_timeout: float | None = None,
+                start_serving: bool = True,
+                cleanup_socket: bool = True,
+            ) -> Server: ...
 
     class _UnixDefaultEventLoopPolicy(BaseDefaultEventLoopPolicy):
         if sys.version_info < (3, 14):
@@ -157,6 +187,9 @@ if sys.platform != "win32":
     SelectorEventLoop = _UnixSelectorEventLoop
 
     DefaultEventLoopPolicy = _UnixDefaultEventLoopPolicy
+
+    if sys.version_info >= (3, 13):
+        EventLoop = SelectorEventLoop
 
     if sys.version_info < (3, 14):
         if sys.version_info >= (3, 12):

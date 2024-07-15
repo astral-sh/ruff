@@ -11,13 +11,7 @@ from .case import (
     skipIf as skipIf,
     skipUnless as skipUnless,
 )
-from .loader import (
-    TestLoader as TestLoader,
-    defaultTestLoader as defaultTestLoader,
-    findTestCases as findTestCases,
-    getTestCaseNames as getTestCaseNames,
-    makeSuite as makeSuite,
-)
+from .loader import TestLoader as TestLoader, defaultTestLoader as defaultTestLoader
 from .main import TestProgram as TestProgram, main as main
 from .result import TestResult as TestResult
 from .runner import TextTestResult as TextTestResult, TextTestRunner as TextTestRunner
@@ -52,11 +46,13 @@ __all__ = [
     "registerResult",
     "removeResult",
     "removeHandler",
-    "getTestCaseNames",
-    "makeSuite",
-    "findTestCases",
     "addModuleCleanup",
 ]
+
+if sys.version_info < (3, 13):
+    from .loader import findTestCases as findTestCases, getTestCaseNames as getTestCaseNames, makeSuite as makeSuite
+
+    __all__ += ["getTestCaseNames", "makeSuite", "findTestCases"]
 
 if sys.version_info >= (3, 11):
     __all__ += ["enterModuleContext", "doModuleCleanups"]

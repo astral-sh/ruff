@@ -1,7 +1,7 @@
 import sys
 from _typeshed import ReadableBuffer, Unused
 from collections.abc import Iterable, Iterator, Sized
-from typing import Final, NoReturn, overload
+from typing import Final, Literal, NoReturn, overload
 from typing_extensions import Self
 
 ACCESS_DEFAULT: int
@@ -77,7 +77,7 @@ class mmap(Iterable[int], Sized):
     def __buffer__(self, flags: int, /) -> memoryview: ...
     def __release_buffer__(self, buffer: memoryview, /) -> None: ...
     if sys.version_info >= (3, 13):
-        def seekable(self) -> bool: ...
+        def seekable(self) -> Literal[True]: ...
 
 if sys.platform != "win32":
     MADV_NORMAL: int

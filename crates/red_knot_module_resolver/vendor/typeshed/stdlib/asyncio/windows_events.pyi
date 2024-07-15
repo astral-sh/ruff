@@ -7,14 +7,26 @@ from typing import IO, Any, ClassVar, Literal, NoReturn
 from . import events, futures, proactor_events, selector_events, streams, windows_utils
 
 if sys.platform == "win32":
-    __all__ = (
-        "SelectorEventLoop",
-        "ProactorEventLoop",
-        "IocpProactor",
-        "DefaultEventLoopPolicy",
-        "WindowsSelectorEventLoopPolicy",
-        "WindowsProactorEventLoopPolicy",
-    )
+    if sys.version_info >= (3, 13):
+        # 3.13 added `EventLoop`.
+        __all__ = (
+            "SelectorEventLoop",
+            "ProactorEventLoop",
+            "IocpProactor",
+            "DefaultEventLoopPolicy",
+            "WindowsSelectorEventLoopPolicy",
+            "WindowsProactorEventLoopPolicy",
+            "EventLoop",
+        )
+    else:
+        __all__ = (
+            "SelectorEventLoop",
+            "ProactorEventLoop",
+            "IocpProactor",
+            "DefaultEventLoopPolicy",
+            "WindowsSelectorEventLoopPolicy",
+            "WindowsProactorEventLoopPolicy",
+        )
 
     NULL: Literal[0]
     INFINITE: Literal[0xFFFFFFFF]
@@ -84,3 +96,5 @@ if sys.platform == "win32":
         def set_child_watcher(self, watcher: Any) -> NoReturn: ...
 
     DefaultEventLoopPolicy = WindowsSelectorEventLoopPolicy
+    if sys.version_info >= (3, 13):
+        EventLoop = ProactorEventLoop

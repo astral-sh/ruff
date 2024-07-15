@@ -1,9 +1,12 @@
 import sys
+from _typeshed import StrPath
 from collections.abc import Iterator
-from typing import Any, Protocol, TypeVar, overload
+from os import PathLike
+from typing import Any, Protocol, overload
+from typing_extensions import TypeVar
 
 _T = TypeVar("_T")
-_T_co = TypeVar("_T_co", covariant=True)
+_T_co = TypeVar("_T_co", covariant=True, default=Any)
 
 class PackageMetadata(Protocol):
     def __len__(self) -> int: ...
@@ -22,7 +25,18 @@ class PackageMetadata(Protocol):
         @overload
         def get(self, name: str, failobj: _T) -> _T | str: ...
 
-if sys.version_info >= (3, 12):
+if sys.version_info >= (3, 13):
+    class SimplePath(Protocol):
+        def joinpath(self, other: StrPath, /) -> SimplePath: ...
+        def __truediv__(self, other: StrPath, /) -> SimplePath: ...
+        # Incorrect at runtime
+        @property
+        def parent(self) -> PathLike[str]: ...
+        def read_text(self, encoding: str | None = None) -> str: ...
+        def read_bytes(self) -> bytes: ...
+        def exists(self) -> bool: ...
+
+elif sys.version_info >= (3, 12):
     class SimplePath(Protocol[_T_co]):
         # At runtime this is defined as taking `str | _T`, but that causes trouble.
         # See #11436.
