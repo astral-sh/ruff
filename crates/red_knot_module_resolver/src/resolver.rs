@@ -350,7 +350,7 @@ impl<'db> PthFile<'db> {
 
         // Empty lines or lines starting with '#' are ignored by the Python interpreter.
         // Lines that start with "import " or "import\t" do not represent editable installs at all;
-        // instead, these are files that are executed by Python at startup.
+        // instead, these are lines that are executed by Python at startup.
         // https://docs.python.org/3/library/site.html#module-site
         contents.lines().filter_map(move |line| {
             let line = line.trim();
