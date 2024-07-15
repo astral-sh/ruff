@@ -6,7 +6,7 @@
 use std::fmt;
 
 use ruff_db::files::{system_path_to_file, vendored_path_to_file, File, FilePath};
-use ruff_db::system::{SystemPath, SystemPathBuf};
+use ruff_db::system::{System, SystemPath, SystemPathBuf};
 use ruff_db::vendored::{VendoredPath, VendoredPathBuf};
 
 use crate::db::Db;
@@ -213,12 +213,12 @@ impl ModuleResolutionPathBuf {
 
     #[must_use]
     pub(crate) fn editable_installation_root(
-        db: &dyn Db,
+        system: &dyn System,
         path: impl Into<SystemPathBuf>,
     ) -> Option<Self> {
         let path = path.into();
         // TODO: Add Salsa invalidation to this system call:
-        db.system()
+        system
             .is_directory(&path)
             .then_some(Self(ModuleResolutionPathBufInner::EditableInstall(path)))
     }

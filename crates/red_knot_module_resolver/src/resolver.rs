@@ -2,11 +2,11 @@ use std::hash::BuildHasherDefault;
 use std::iter::FusedIterator;
 use std::sync::Arc;
 
+use ruff_db::source::{source_text, SourceText};
 use rustc_hash::FxHasher;
 
 use ruff_db::files::{system_path_to_file, File, FilePath};
-use ruff_db::source::{source_text, SourceText};
-use ruff_db::system::{DirectoryEntry, SystemPath, SystemPathBuf};
+use ruff_db::system::{DirectoryEntry, System, SystemPath, SystemPathBuf};
 
 use crate::db::Db;
 use crate::module::{Module, ModuleKind};
@@ -328,38 +328,31 @@ impl<'db> FusedIterator for SearchPathIterator<'db> {}
 /// One or more lines in a `.pth` file may be a (relative or absolute)
 /// path that represents an editable installation of a package.
 struct PthFile<'db> {
-    db: &'db dyn Db,
+    system: &'db dyn System,
     path: SystemPathBuf,
     contents: SourceText,
     site_packages: &'db SystemPath,
 }
 
 impl<'db> PthFile<'db> {
-    fn new(
-        db: &'db dyn Db,
-        pth_path: SystemPathBuf,
-        file: File,
-        site_packages: &'db SystemPath,
-    ) -> Self {
-        Self {
-            db,
-            path: pth_path,
-            contents: source_text(db.upcast(), file),
-            site_packages,
-        }
-    }
-
     /// Yield paths in this `.pth` file that appear to represent editable installations,
     /// and should therefore be added as module-resolution search paths.
     fn editable_installations<'a>(&'a self) -> impl Iterator<Item = ModuleResolutionPathBuf> + 'db
     where
         'a: 'db,
     {
+        let PthFile {
+            system,
+            path: _,
+            contents,
+            site_packages,
+        } = self;
+
         // Empty lines or lines starting with '#' are ignored by the Python interpreter.
         // Lines that start with "import " or "import\t" do not represent editable installs at all;
         // instead, these are files that are executed by Python at startup.
         // https://docs.python.org/3/library/site.html#module-site
-        self.contents.lines().filter_map(|line| {
+        contents.lines().filter_map(move |line| {
             let line = line.trim();
             if line.is_empty()
                 || line.starts_with('#')
@@ -368,8 +361,8 @@ impl<'db> PthFile<'db> {
             {
                 return None;
             }
-            let possible_editable_install = SystemPath::absolute(line, self.site_packages);
-            ModuleResolutionPathBuf::editable_installation_root(self.db, possible_editable_install)
+            let possible_editable_install = SystemPath::absolute(line, site_packages);
+            ModuleResolutionPathBuf::editable_installation_root(*system, possible_editable_install)
         })
     }
 }
@@ -398,8 +391,16 @@ impl<'db> Iterator for PthFileIterator<'db> {
     type Item = PthFile<'db>;
 
     fn next(&mut self) -> Option<Self::Item> {
+        let PthFileIterator {
+            db,
+            directory_iterator,
+            site_packages,
+        } = self;
+
+        let system = db.system();
+
         loop {
-            let entry_result = self.directory_iterator.next()?;
+            let entry_result = directory_iterator.next()?;
             let Ok(entry) = entry_result else {
                 continue;
             };
@@ -413,10 +414,19 @@ impl<'db> Iterator for PthFileIterator<'db> {
             if path.extension() != Some("pth") {
                 continue;
             }
-            let Some(file) = system_path_to_file(self.db.upcast(), &path) else {
+
+            let Some(file) = system_path_to_file(db.upcast(), &path) else {
                 continue;
             };
-            return Some(PthFile::new(self.db, path, file, self.site_packages));
+
+            let contents = source_text(db.upcast(), file);
+
+            return Some(PthFile {
+                system,
+                path,
+                contents,
+                site_packages,
+            });
         }
     }
 }
@@ -1524,7 +1534,7 @@ not_a_directory
     }
 
     #[test]
-    fn deleting_pth_file_on_which_module_resolution_depends_invalidates_cache() {
+    fn changing_pth_file_on_which_module_resolution_depends_invalidates_cache() {
         const SITE_PACKAGES: &[FileSpec] = &[("_foo.pth", "/x/src")];
         let x_directory = [("/x/src/foo.py", "")];
 
@@ -1545,9 +1555,11 @@ not_a_directory
             system_path_to_file(&db, SystemPathBuf::from("/x/src/foo.py"))
         );
 
-        let pth_file = site_packages.join("_foo.pth");
-        db.memory_file_system().remove_file(&pth_file).unwrap();
-        File::touch_path(&mut db, &pth_file);
+        let pth_file_path = site_packages.join("_foo.pth");
+        db.memory_file_system()
+            .write_file(&pth_file_path, "/y/src")
+            .unwrap();
+        File::touch_path(&mut db, &pth_file_path);
         assert_eq!(resolve_module(&db, foo_module_name.clone()), None);
     }
 
