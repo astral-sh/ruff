@@ -35,6 +35,10 @@ jobs:
         with:
           node-version: 18
           registry-url: "https://registry.npmjs.org"
+      - name: "Rename generated package"
+        run: | # Replace the package name w/ jq
+          jq '.name="@astral-sh/ruff-api-web"' crates/ruff_wasm/pkg/package.json > /tmp/package.json
+          mv /tmp/package.json crates/ruff_wasm/pkg
       - run: cp LICENSE crates/ruff_wasm/pkg # wasm-pack does not put the LICENSE file in the pkg
       - name: "Publish"
         run: npm publish --provenance --access public crates/ruff_wasm/pkg
