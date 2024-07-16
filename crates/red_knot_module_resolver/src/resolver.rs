@@ -1,11 +1,11 @@
+use std::collections;
 use std::hash::BuildHasherDefault;
 use std::iter::FusedIterator;
 use std::sync::Arc;
 
-use ruff_db::source::{source_text, SourceText};
 use rustc_hash::FxHasher;
 
-use ruff_db::files::{system_path_to_file, File, FilePath};
+use ruff_db::files::{File, FilePath};
 use ruff_db::system::{DirectoryEntry, System, SystemPath, SystemPathBuf};
 
 use crate::db::Db;
@@ -17,7 +17,77 @@ use crate::state::ResolverState;
 use crate::supported_py_version::TargetVersion;
 
 type SearchPathRoot = Arc<ModuleResolutionPathBuf>;
-type OrderSet<T> = indexmap::IndexSet<T, BuildHasherDefault<FxHasher>>;
+
+/// An ordered sequence of search paths.
+///
+/// The sequence respects the invariant maintained by [`sys.path` at runtime]
+/// where no two module-resolution paths ever point to the same directory on disk.
+/// (Paths may, however, *overlap* -- e.g. you could have both `src/` and `src/foo`
+/// as module resolution paths simultaneously.)
+///
+/// [`sys.path` at runtime]: https://docs.python.org/3/library/site.html#module-site
+#[derive(Debug, PartialEq, Eq, Default, Clone)]
+pub(crate) struct SearchPathSequence {
+    raw_paths: collections::HashSet<SystemPathBuf, BuildHasherDefault<FxHasher>>,
+    search_paths: Vec<SearchPathRoot>,
+}
+
+impl SearchPathSequence {
+    fn insert(&mut self, path: SearchPathRoot) -> bool {
+        // Just assume that all search paths that aren't SystemPaths are unique
+        if let Some(fs_path) = path.as_system_path() {
+            if self.raw_paths.contains(fs_path) {
+                false
+            } else {
+                let raw_path = fs_path.to_owned();
+                self.search_paths.push(path);
+                self.raw_paths.insert(raw_path)
+            }
+        } else {
+            self.search_paths.push(path);
+            true
+        }
+    }
+
+    fn contains(&self, path: &SearchPathRoot) -> bool {
+        if let Some(fs_path) = path.as_system_path() {
+            self.raw_paths.contains(fs_path)
+        } else {
+            self.search_paths.contains(path)
+        }
+    }
+
+    fn iter(&self) -> std::slice::Iter<SearchPathRoot> {
+        self.search_paths.iter()
+    }
+}
+
+impl<'a> IntoIterator for &'a SearchPathSequence {
+    type IntoIter = std::slice::Iter<'a, SearchPathRoot>;
+    type Item = &'a SearchPathRoot;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.iter()
+    }
+}
+
+impl FromIterator<SearchPathRoot> for SearchPathSequence {
+    fn from_iter<T: IntoIterator<Item = SearchPathRoot>>(iter: T) -> Self {
+        let mut sequence = Self::default();
+        for item in iter {
+            sequence.insert(item);
+        }
+        sequence
+    }
+}
+
+impl Extend<SearchPathRoot> for SearchPathSequence {
+    fn extend<T: IntoIterator<Item = SearchPathRoot>>(&mut self, iter: T) {
+        for item in iter {
+            self.insert(item);
+        }
+    }
+}
 
 /// Configures the module resolver settings.
 ///
@@ -167,7 +237,7 @@ impl RawModuleResolutionSettings {
             custom_typeshed,
         } = self;
 
-        let mut static_search_paths: OrderSet<SearchPathRoot> = extra_paths
+        let mut static_search_paths: SearchPathSequence = extra_paths
             .into_iter()
             .map(|fs_path| {
                 Arc::new(
@@ -230,14 +300,9 @@ struct ValidatedSearchPathSettings {
     /// Search paths that have been statically determined purely from reading Ruff's configuration settings.
     /// These shouldn't ever change unless the config settings themselves change.
     ///
-    /// We use an `OrderSet` for storing the paths, since the order is important,
-    /// but at runtime, [`sys.path` never contains duplicate entries]
-    ///
     /// Note that `site-packages` *is included* as a search path in this sequence,
     /// but it is also stored separately so that we're able to find editable installs later.
-    ///
-    /// [`sys.path` never contains duplicate entries]: https://docs.python.org/3/library/site.html#module-site
-    static_search_paths: OrderSet<SearchPathRoot>,
+    static_search_paths: SearchPathSequence,
     site_packages: Option<SearchPathRoot>,
 }
 
@@ -245,7 +310,18 @@ struct ValidatedSearchPathSettings {
 /// search paths listed in `.pth` files in the `site-packages` directory
 /// due to editable installations of third-party packages.
 #[salsa::tracked(return_ref)]
-pub(crate) fn dynamic_module_resolution_paths(db: &dyn Db) -> OrderSet<SearchPathRoot> {
+pub(crate) fn editable_install_resolution_paths(db: &dyn Db) -> SearchPathSequence {
+    // This query needs to be re-executed each time a `.pth` file
+    // is added, modified or removed from the `site-packages` directory.
+    // However, we don't use Salsa queries to read the source text of `.pth` files;
+    // we use the APIs on the `System` trait directly. As such, for now we simply ask
+    // Salsa to recompute this query on each new revision.
+    //
+    // TODO: add some kind of watcher for the `site-packages` directory that looks
+    // for `site-packages/*.pth` files being added/modified/removed; get rid of this.
+    // When doing so, also make the test
+    // `deleting_pth_file_on_which_module_resolution_depends_invalidates_cache()`
+    // more principled!
     db.report_untracked_read();
 
     let ValidatedSearchPathSettings {
@@ -253,7 +329,7 @@ pub(crate) fn dynamic_module_resolution_paths(db: &dyn Db) -> OrderSet<SearchPat
         site_packages,
     } = &module_resolver_settings(db).search_path_settings;
 
-    let mut dynamic_paths = OrderSet::default();
+    let mut dynamic_paths = SearchPathSequence::default();
 
     if let Some(site_packages) = site_packages {
         let site_packages = site_packages
@@ -300,8 +376,8 @@ pub(crate) fn dynamic_module_resolution_paths(db: &dyn Db) -> OrderSet<SearchPat
 /// [`sys.path` at runtime]: https://docs.python.org/3/library/site.html#module-site
 struct SearchPathIterator<'db> {
     db: &'db dyn Db,
-    static_paths: indexmap::set::Iter<'db, SearchPathRoot>,
-    dynamic_paths: Option<indexmap::set::Iter<'db, SearchPathRoot>>,
+    static_paths: std::slice::Iter<'db, SearchPathRoot>,
+    dynamic_paths: Option<std::slice::Iter<'db, SearchPathRoot>>,
 }
 
 impl<'db> Iterator for SearchPathIterator<'db> {
@@ -316,7 +392,7 @@ impl<'db> Iterator for SearchPathIterator<'db> {
 
         static_paths.next().or_else(|| {
             dynamic_paths
-                .get_or_insert_with(|| dynamic_module_resolution_paths(*db).into_iter())
+                .get_or_insert_with(|| editable_install_resolution_paths(*db).into_iter())
                 .next()
         })
     }
@@ -330,17 +406,14 @@ impl<'db> FusedIterator for SearchPathIterator<'db> {}
 struct PthFile<'db> {
     system: &'db dyn System,
     path: SystemPathBuf,
-    contents: SourceText,
+    contents: String,
     site_packages: &'db SystemPath,
 }
 
 impl<'db> PthFile<'db> {
     /// Yield paths in this `.pth` file that appear to represent editable installations,
     /// and should therefore be added as module-resolution search paths.
-    fn editable_installations<'a>(&'a self) -> impl Iterator<Item = ModuleResolutionPathBuf> + 'db
-    where
-        'a: 'db,
-    {
+    fn editable_installations(&'db self) -> impl Iterator<Item = ModuleResolutionPathBuf> + 'db {
         let PthFile {
             system,
             path: _,
@@ -353,7 +426,7 @@ impl<'db> PthFile<'db> {
         // instead, these are files that are executed by Python at startup.
         // https://docs.python.org/3/library/site.html#module-site
         contents.lines().filter_map(move |line| {
-            let line = line.trim();
+            let line = line.trim_end();
             if line.is_empty()
                 || line.starts_with('#')
                 || line.starts_with("import ")
@@ -377,8 +450,6 @@ struct PthFileIterator<'db> {
 
 impl<'db> PthFileIterator<'db> {
     fn new(db: &'db dyn Db, site_packages: &'db SystemPath) -> std::io::Result<Self> {
-        // TODO: The salsa cache should be invalidated every time a `.pth` file is added to `site-packages`,
-        // as well as every time an existing one is removed.
         Ok(Self {
             db,
             directory_iterator: db.system().read_directory(site_packages)?,
@@ -415,11 +486,9 @@ impl<'db> Iterator for PthFileIterator<'db> {
                 continue;
             }
 
-            let Some(file) = system_path_to_file(db.upcast(), &path) else {
+            let Ok(contents) = db.system().read_to_string(&path) else {
                 continue;
             };
-
-            let contents = source_text(db.upcast(), file);
 
             return Some(PthFile {
                 system,
@@ -633,6 +702,7 @@ mod tests {
     use ruff_db::files::{system_path_to_file, File, FilePath};
     use ruff_db::system::{DbWithTestSystem, OsSystem, SystemPath};
     use ruff_db::testing::assert_function_query_was_not_run;
+    use ruff_db::Db;
 
     use crate::db::tests::TestDb;
     use crate::module::ModuleKind;
@@ -1414,6 +1484,33 @@ mod tests {
     }
 
     #[test]
+    fn editable_install_pth_file_with_whitespace() {
+        const SITE_PACKAGES: &[FileSpec] = &[
+            ("_foo.pth", "        /x/src"),
+            ("_bar.pth", "/y/src        "),
+        ];
+        let external_files = [("/x/src/foo.py", ""), ("/y/src/bar.py", "")];
+
+        let TestCase { mut db, .. } = TestCaseBuilder::new()
+            .with_site_packages_files(SITE_PACKAGES)
+            .build();
+
+        db.write_files(external_files).unwrap();
+
+        // Lines with leading whitespace in `.pth` files do not parse:
+        let foo_module_name = ModuleName::new_static("foo").unwrap();
+        assert_eq!(resolve_module(&db, foo_module_name), None);
+
+        // Lines with trailing whitespace in `.pth` files do:
+        let bar_module_name = ModuleName::new_static("bar").unwrap();
+        let bar_module = resolve_module(&db, bar_module_name.clone()).unwrap();
+        assert_eq!(
+            bar_module.file().path(&db),
+            &FilePath::system("/y/src/bar.py")
+        );
+    }
+
+    #[test]
     fn editable_install_relative_path() {
         const SITE_PACKAGES: &[FileSpec] = &[
             ("_foo.pth", "../../x/../x/y/src"),
@@ -1444,7 +1541,7 @@ mod tests {
 import not_an_editable_install; do_something_else_crazy_dynamic()
 
 # another comment
-  spam
+spam
 
 not_a_directory
 ";
@@ -1517,7 +1614,7 @@ not_a_directory
             &FilePath::system("/y/src/bar.py")
         );
         let events = db.take_salsa_events();
-        assert_function_query_was_not_run::<dynamic_module_resolution_paths, _, _>(
+        assert_function_query_was_not_run::<editable_install_resolution_paths, _, _>(
             &db,
             |res| &res.function,
             &(),
@@ -1526,7 +1623,7 @@ not_a_directory
     }
 
     #[test]
-    fn changing_pth_file_on_which_module_resolution_depends_invalidates_cache() {
+    fn deleting_pth_file_on_which_module_resolution_depends_invalidates_cache() {
         const SITE_PACKAGES: &[FileSpec] = &[("_foo.pth", "/x/src")];
         let x_directory = [("/x/src/foo.py", "")];
 
@@ -1547,11 +1644,23 @@ not_a_directory
             &FilePath::system("/x/src/foo.py")
         );
 
-        let pth_file_path = site_packages.join("_foo.pth");
         db.memory_file_system()
-            .write_file(&pth_file_path, "/y/src")
+            .remove_file(site_packages.join("_foo.pth"))
             .unwrap();
-        File::touch_path(&mut db, &pth_file_path);
+
+        // Why are we touching a random file in the path that's been editably installed,
+        // rather than the `.pth` file, when the `.pth` file is the one that has been deleted?
+        // It's because the `.pth` file isn't directly tracked as a dependency by Salsa
+        // currently (we don't use `system_path_to_file()` to get the file, and we don't use
+        // `source_text()` to read the source of the file). Instead of using these APIs which
+        // would automatically add the existence and contents of the file as a Salsa-tracked
+        // dependency, we use `.report_untracked_read()` to force Salsa to re-parse all
+        // `.pth` files on each new "revision". Making a random modification to a tracked
+        // Salsa file forces a new revision.
+        //
+        // TODO: get rid of the `.report_untracked_read()` call...
+        File::touch_path(&mut db, SystemPath::new("/x/src/foo.py"));
+
         assert_eq!(resolve_module(&db, foo_module_name.clone()), None);
     }
 
@@ -1581,5 +1690,24 @@ not_a_directory
         File::touch_path(&mut db, &src_path.join("foo.py"));
         File::touch_path(&mut db, &src_path);
         assert_eq!(resolve_module(&db, foo_module_name.clone()), None);
+    }
+
+    #[test]
+    fn no_duplicate_search_paths_added() {
+        let TestCase { db, .. } = TestCaseBuilder::new()
+            .with_src_files(&[("foo.py", "")])
+            .with_site_packages_files(&[("_foo.pth", "/src")])
+            .build();
+
+        let search_paths: Vec<&SearchPathRoot> =
+            module_resolver_settings(&db).search_paths(&db).collect();
+
+        assert!(search_paths.contains(&&Arc::new(
+            ModuleResolutionPathBuf::first_party("/src").unwrap()
+        )));
+
+        assert!(!search_paths.contains(&&Arc::new(
+            ModuleResolutionPathBuf::editable_installation_root(db.system(), "/src").unwrap()
+        )));
     }
 }

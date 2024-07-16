@@ -72,7 +72,6 @@ hashbrown = "0.14.3"
 ignore = { version = "0.4.22" }
 imara-diff = { version = "0.1.5" }
 imperative = { version = "1.0.4" }
-indexmap = { version = "2.2.6" }
 indicatif = { version = "0.17.8" }
 indoc = { version = "2.0.4" }
 insta = { version = "1.35.1" }

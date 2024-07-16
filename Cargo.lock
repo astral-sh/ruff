@@ -1888,7 +1888,6 @@ dependencies = [
  "anyhow",
  "camino",
  "compact_str",
- "indexmap",
  "insta",
  "once_cell",
  "path-slash",

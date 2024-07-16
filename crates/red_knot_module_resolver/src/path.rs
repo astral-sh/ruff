@@ -256,7 +256,7 @@ impl ModuleResolutionPathBuf {
         ModuleResolutionPathRef::from(self).to_file(search_path, resolver)
     }
 
-    pub(crate) fn as_system_path(&self) -> Option<&SystemPath> {
+    pub(crate) fn as_system_path(&self) -> Option<&SystemPathBuf> {
         match &self.0 {
             ModuleResolutionPathBufInner::Extra(path) => Some(path),
             ModuleResolutionPathBufInner::FirstParty(path) => Some(path),
