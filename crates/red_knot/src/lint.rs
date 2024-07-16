@@ -130,11 +130,7 @@ fn lint_bad_override(context: &SemanticLintContext, class: &ast::StmtClassDef) {
         return;
     };
 
-    let Some(typing_override) = semantic.public_symbol(&typing, "override") else {
-        return;
-    };
-
-    let override_ty = semantic.public_symbol_ty(typing_override);
+    let override_ty = semantic.module_global_symbol_ty(&typing, "override");
 
     let Type::Class(class_ty) = class.ty(semantic) else {
         return;
@@ -154,7 +150,10 @@ fn lint_bad_override(context: &SemanticLintContext, class: &ast::StmtClassDef) {
 
         if ty.has_decorator(db, override_ty) {
             let method_name = ty.name(db);
-            if class_ty.inherited_class_member(db, &method_name).is_none() {
+            if class_ty
+                .inherited_class_member(db, &method_name)
+                .is_unbound()
+            {
                 // TODO should have a qualname() method to support nested classes
                 context.push_diagnostic(
                     format!(

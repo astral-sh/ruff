@@ -4,63 +4,111 @@ use ruff_python_ast as ast;
 
 use crate::ast_node_ref::AstNodeRef;
 use crate::node_key::NodeKey;
-use crate::semantic_index::symbol::{FileScopeId, ScopedSymbolId};
+use crate::semantic_index::symbol::{FileScopeId, ScopeId, ScopedSymbolId};
+use crate::Db;
 
 #[salsa::tracked]
 pub struct Definition<'db> {
-    /// The file in which the definition is defined.
+    /// The file in which the definition occurs.
     #[id]
-    pub(super) file: File,
+    pub(crate) file: File,
 
-    /// The scope in which the definition is defined.
+    /// The scope in which the definition occurs.
     #[id]
-    pub(crate) scope: FileScopeId,
+    pub(crate) file_scope: FileScopeId,
 
-    /// The id of the corresponding symbol. Mainly used as ID.
+    /// The symbol defined.
     #[id]
-    symbol_id: ScopedSymbolId,
+    pub(crate) symbol: ScopedSymbolId,
 
     #[no_eq]
     #[return_ref]
     pub(crate) node: DefinitionKind,
 }
 
+impl<'db> Definition<'db> {
+    pub(crate) fn scope(self, db: &'db dyn Db) -> ScopeId<'db> {
+        self.file_scope(db).to_scope_id(db, self.file(db))
+    }
+}
+
 #[derive(Copy, Clone, Debug)]
 pub(crate) enum DefinitionNodeRef<'a> {
-    Alias(&'a ast::Alias),
+    Import(&'a ast::Alias),
+    ImportFrom(ImportFromDefinitionNodeRef<'a>),
     Function(&'a ast::StmtFunctionDef),
     Class(&'a ast::StmtClassDef),
     NamedExpression(&'a ast::ExprNamed),
-    Target(&'a ast::Expr),
+    Assignment(AssignmentDefinitionNodeRef<'a>),
+    AnnotatedAssignment(&'a ast::StmtAnnAssign),
 }
 
-impl<'a> From<&'a ast::Alias> for DefinitionNodeRef<'a> {
-    fn from(node: &'a ast::Alias) -> Self {
-        Self::Alias(node)
-    }
-}
 impl<'a> From<&'a ast::StmtFunctionDef> for DefinitionNodeRef<'a> {
     fn from(node: &'a ast::StmtFunctionDef) -> Self {
         Self::Function(node)
     }
 }
+
 impl<'a> From<&'a ast::StmtClassDef> for DefinitionNodeRef<'a> {
     fn from(node: &'a ast::StmtClassDef) -> Self {
         Self::Class(node)
     }
 }
+
 impl<'a> From<&'a ast::ExprNamed> for DefinitionNodeRef<'a> {
     fn from(node: &'a ast::ExprNamed) -> Self {
         Self::NamedExpression(node)
     }
 }
 
+impl<'a> From<&'a ast::StmtAnnAssign> for DefinitionNodeRef<'a> {
+    fn from(node: &'a ast::StmtAnnAssign) -> Self {
+        Self::AnnotatedAssignment(node)
+    }
+}
+
+impl<'a> From<&'a ast::Alias> for DefinitionNodeRef<'a> {
+    fn from(node_ref: &'a ast::Alias) -> Self {
+        Self::Import(node_ref)
+    }
+}
+
+impl<'a> From<ImportFromDefinitionNodeRef<'a>> for DefinitionNodeRef<'a> {
+    fn from(node_ref: ImportFromDefinitionNodeRef<'a>) -> Self {
+        Self::ImportFrom(node_ref)
+    }
+}
+
+impl<'a> From<AssignmentDefinitionNodeRef<'a>> for DefinitionNodeRef<'a> {
+    fn from(node_ref: AssignmentDefinitionNodeRef<'a>) -> Self {
+        Self::Assignment(node_ref)
+    }
+}
+
+#[derive(Copy, Clone, Debug)]
+pub(crate) struct ImportFromDefinitionNodeRef<'a> {
+    pub(crate) node: &'a ast::StmtImportFrom,
+    pub(crate) alias_index: usize,
+}
+
+#[derive(Copy, Clone, Debug)]
+pub(crate) struct AssignmentDefinitionNodeRef<'a> {
+    pub(crate) assignment: &'a ast::StmtAssign,
+    pub(crate) target: &'a ast::ExprName,
+}
+
 impl DefinitionNodeRef<'_> {
     #[allow(unsafe_code)]
     pub(super) unsafe fn into_owned(self, parsed: ParsedModule) -> DefinitionKind {
         match self {
-            DefinitionNodeRef::Alias(alias) => {
-                DefinitionKind::Alias(AstNodeRef::new(parsed, alias))
+            DefinitionNodeRef::Import(alias) => {
+                DefinitionKind::Import(AstNodeRef::new(parsed, alias))
+            }
+            DefinitionNodeRef::ImportFrom(ImportFromDefinitionNodeRef { node, alias_index }) => {
+                DefinitionKind::ImportFrom(ImportFromDefinitionKind {
+                    node: AstNodeRef::new(parsed, node),
+                    alias_index,
+                })
             }
             DefinitionNodeRef::Function(function) => {
                 DefinitionKind::Function(AstNodeRef::new(parsed, function))
@@ -71,33 +119,111 @@ impl DefinitionNodeRef<'_> {
             DefinitionNodeRef::NamedExpression(named) => {
                 DefinitionKind::NamedExpression(AstNodeRef::new(parsed, named))
             }
-            DefinitionNodeRef::Target(target) => {
-                DefinitionKind::Target(AstNodeRef::new(parsed, target))
+            DefinitionNodeRef::Assignment(AssignmentDefinitionNodeRef { assignment, target }) => {
+                DefinitionKind::Assignment(AssignmentDefinitionKind {
+                    assignment: AstNodeRef::new(parsed.clone(), assignment),
+                    target: AstNodeRef::new(parsed, target),
+                })
+            }
+            DefinitionNodeRef::AnnotatedAssignment(assign) => {
+                DefinitionKind::AnnotatedAssignment(AstNodeRef::new(parsed, assign))
             }
         }
     }
-}
 
-impl DefinitionNodeRef<'_> {
     pub(super) fn key(self) -> DefinitionNodeKey {
         match self {
-            Self::Alias(node) => DefinitionNodeKey(NodeKey::from_node(node)),
-            Self::Function(node) => DefinitionNodeKey(NodeKey::from_node(node)),
-            Self::Class(node) => DefinitionNodeKey(NodeKey::from_node(node)),
-            Self::NamedExpression(node) => DefinitionNodeKey(NodeKey::from_node(node)),
-            Self::Target(node) => DefinitionNodeKey(NodeKey::from_node(node)),
+            Self::Import(node) => node.into(),
+            Self::ImportFrom(ImportFromDefinitionNodeRef { node, alias_index }) => {
+                (&node.names[alias_index]).into()
+            }
+            Self::Function(node) => node.into(),
+            Self::Class(node) => node.into(),
+            Self::NamedExpression(node) => node.into(),
+            Self::Assignment(AssignmentDefinitionNodeRef {
+                assignment: _,
+                target,
+            }) => target.into(),
+            Self::AnnotatedAssignment(node) => node.into(),
         }
     }
 }
 
 #[derive(Clone, Debug)]
 pub enum DefinitionKind {
-    Alias(AstNodeRef<ast::Alias>),
+    Import(AstNodeRef<ast::Alias>),
+    ImportFrom(ImportFromDefinitionKind),
     Function(AstNodeRef<ast::StmtFunctionDef>),
     Class(AstNodeRef<ast::StmtClassDef>),
     NamedExpression(AstNodeRef<ast::ExprNamed>),
-    Target(AstNodeRef<ast::Expr>),
+    Assignment(AssignmentDefinitionKind),
+    AnnotatedAssignment(AstNodeRef<ast::StmtAnnAssign>),
+}
+
+#[derive(Clone, Debug)]
+pub struct ImportFromDefinitionKind {
+    node: AstNodeRef<ast::StmtImportFrom>,
+    alias_index: usize,
+}
+
+impl ImportFromDefinitionKind {
+    pub(crate) fn import(&self) -> &ast::StmtImportFrom {
+        self.node.node()
+    }
+
+    pub(crate) fn alias(&self) -> &ast::Alias {
+        &self.node.node().names[self.alias_index]
+    }
+}
+
+#[derive(Clone, Debug)]
+#[allow(dead_code)]
+pub struct AssignmentDefinitionKind {
+    assignment: AstNodeRef<ast::StmtAssign>,
+    target: AstNodeRef<ast::ExprName>,
+}
+
+impl AssignmentDefinitionKind {
+    pub(crate) fn assignment(&self) -> &ast::StmtAssign {
+        self.assignment.node()
+    }
 }
 
 #[derive(Copy, Clone, Eq, PartialEq, Hash, Debug)]
-pub(super) struct DefinitionNodeKey(NodeKey);
+pub(crate) struct DefinitionNodeKey(NodeKey);
+
+impl From<&ast::Alias> for DefinitionNodeKey {
+    fn from(node: &ast::Alias) -> Self {
+        Self(NodeKey::from_node(node))
+    }
+}
+
+impl From<&ast::StmtFunctionDef> for DefinitionNodeKey {
+    fn from(node: &ast::StmtFunctionDef) -> Self {
+        Self(NodeKey::from_node(node))
+    }
+}
+
+impl From<&ast::StmtClassDef> for DefinitionNodeKey {
+    fn from(node: &ast::StmtClassDef) -> Self {
+        Self(NodeKey::from_node(node))
+    }
+}
+
+impl From<&ast::ExprName> for DefinitionNodeKey {
+    fn from(node: &ast::ExprName) -> Self {
+        Self(NodeKey::from_node(node))
+    }
+}
+
+impl From<&ast::ExprNamed> for DefinitionNodeKey {
+    fn from(node: &ast::ExprNamed) -> Self {
+        Self(NodeKey::from_node(node))
+    }
+}
+
+impl From<&ast::StmtAnnAssign> for DefinitionNodeKey {
+    fn from(node: &ast::StmtAnnAssign) -> Self {
+        Self(NodeKey::from_node(node))
+    }
+}

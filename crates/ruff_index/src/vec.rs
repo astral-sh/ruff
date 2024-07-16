@@ -74,6 +74,14 @@ impl<I: Idx, T> IndexVec<I, T> {
     pub fn shrink_to_fit(&mut self) {
         self.raw.shrink_to_fit();
     }
+
+    #[inline]
+    pub fn resize(&mut self, new_len: usize, value: T)
+    where
+        T: Clone,
+    {
+        self.raw.resize(new_len, value);
+    }
 }
 
 impl<I, T> Debug for IndexVec<I, T>

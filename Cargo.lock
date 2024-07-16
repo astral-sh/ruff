@@ -1904,6 +1904,7 @@ dependencies = [
  "ruff_index",
  "ruff_python_ast",
  "ruff_python_parser",
+ "ruff_python_trivia",
  "ruff_text_size",
  "rustc-hash 2.0.0",
  "salsa",

@@ -4,9 +4,8 @@ use ruff_python_ast as ast;
 use ruff_python_ast::{Expr, ExpressionRef, StmtClassDef};
 
 use crate::semantic_index::ast_ids::HasScopedAstId;
-use crate::semantic_index::symbol::PublicSymbolId;
-use crate::semantic_index::{public_symbol, semantic_index};
-use crate::types::{infer_types, public_symbol_ty, Type};
+use crate::semantic_index::semantic_index;
+use crate::types::{definition_ty, infer_scope_types, module_global_symbol_ty_by_name, Type};
 use crate::Db;
 
 pub struct SemanticModel<'db> {
@@ -29,12 +28,8 @@ impl<'db> SemanticModel<'db> {
         resolve_module(self.db.upcast(), module_name)
     }
 
-    pub fn public_symbol(&self, module: &Module, symbol_name: &str) -> Option<PublicSymbolId<'db>> {
-        public_symbol(self.db, module.file(), symbol_name)
-    }
-
-    pub fn public_symbol_ty(&self, symbol: PublicSymbolId<'db>) -> Type {
-        public_symbol_ty(self.db, symbol)
+    pub fn module_global_symbol_ty(&self, module: &Module, symbol_name: &str) -> Type<'db> {
+        module_global_symbol_ty_by_name(self.db, module.file(), symbol_name)
     }
 }
 
@@ -53,7 +48,7 @@ impl HasTy for ast::ExpressionRef<'_> {
         let scope = file_scope.to_scope_id(model.db, model.file);
 
         let expression_id = self.scoped_ast_id(model.db, scope);
-        infer_types(model.db, scope).expression_ty(expression_id)
+        infer_scope_types(model.db, scope).expression_ty(expression_id)
     }
 }
 
@@ -145,11 +140,7 @@ impl HasTy for ast::StmtFunctionDef {
     fn ty<'db>(&self, model: &SemanticModel<'db>) -> Type<'db> {
         let index = semantic_index(model.db, model.file);
         let definition = index.definition(self);
-
-        let scope = definition.scope(model.db).to_scope_id(model.db, model.file);
-        let types = infer_types(model.db, scope);
-
-        types.definition_ty(definition)
+        definition_ty(model.db, definition)
     }
 }
 
@@ -157,11 +148,7 @@ impl HasTy for StmtClassDef {
     fn ty<'db>(&self, model: &SemanticModel<'db>) -> Type<'db> {
         let index = semantic_index(model.db, model.file);
         let definition = index.definition(self);
-
-        let scope = definition.scope(model.db).to_scope_id(model.db, model.file);
-        let types = infer_types(model.db, scope);
-
-        types.definition_ty(definition)
+        definition_ty(model.db, definition)
     }
 }
 
@@ -169,11 +156,7 @@ impl HasTy for ast::Alias {
     fn ty<'db>(&self, model: &SemanticModel<'db>) -> Type<'db> {
         let index = semantic_index(model.db, model.file);
         let definition = index.definition(self);
-
-        let scope = definition.scope(model.db).to_scope_id(model.db, model.file);
-        let types = infer_types(model.db, scope);
-
-        types.definition_ty(definition)
+        definition_ty(model.db, definition)
     }
 }
 

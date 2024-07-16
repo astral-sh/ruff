@@ -141,7 +141,7 @@ pub trait DbWithTestSystem: Db + Sized {
         result
     }
 
-    /// Writes the content of the given file and notifies the Db about the change.
+    /// Writes the content of the given files and notifies the Db about the change.
     ///
     /// # Panics
     /// If the system isn't using the memory file system for testing.
