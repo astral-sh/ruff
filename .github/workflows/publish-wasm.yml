@@ -49,7 +49,7 @@ jobs:
         if: ${{ inputs.plan == '' || fromJson(inputs.plan).announcement_tag_is_implicit }}
         run: npm publish --dry-run crates/ruff_wasm/pkg
       - name: "Publish"
-        if: ! ${{ inputs.plan == '' || fromJson(inputs.plan).announcement_tag_is_implicit }}
+        if: ${{ inputs.plan != '' && !fromJson(inputs.plan).announcement_tag_is_implicit }}
         run: npm publish --provenance --access public crates/ruff_wasm/pkg
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
