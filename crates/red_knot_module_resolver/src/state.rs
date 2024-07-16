@@ -5,6 +5,7 @@ use crate::db::Db;
 use crate::supported_py_version::TargetVersion;
 use crate::typeshed::LazyTypeshedVersions;
 
+#[derive(Debug)]
 pub(crate) struct ResolverState<'db> {
     pub(crate) db: &'db dyn Db,
     pub(crate) typeshed_versions: LazyTypeshedVersions<'db>,

@@ -1,9 +1,11 @@
+use std::any::Any;
+use std::fmt;
+use std::panic::RefUnwindSafe;
+use std::sync::Arc;
+
 use crate::files::File;
 use crate::system::{DirectoryEntry, MemoryFileSystem, Metadata, Result, System, SystemPath};
 use crate::Db;
-use std::any::Any;
-use std::panic::RefUnwindSafe;
-use std::sync::Arc;
 
 use super::walk_directory::WalkDirectoryBuilder;
 
@@ -179,7 +181,6 @@ pub trait DbWithTestSystem: Db + Sized {
     }
 }
 
-#[derive(Debug)]
 enum TestSystemInner {
     Stub(MemoryFileSystem),
     System(Arc<dyn System + RefUnwindSafe + Send + Sync>),
@@ -197,5 +198,16 @@ impl TestSystemInner {
 impl Default for TestSystemInner {
     fn default() -> Self {
         Self::Stub(MemoryFileSystem::default())
+    }
+}
+
+impl fmt::Debug for TestSystemInner {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match (self, f.alternate()) {
+            (Self::System(fs), true) => f.debug_tuple("TestFileSystem::Os").field(fs).finish(),
+            (Self::System(_), false) => f.write_str("TestFileSystem::Os(...)"),
+            (Self::Stub(fs), true) => f.debug_tuple("TestFileSystem::Stub").field(fs).finish(),
+            (Self::Stub(_), false) => f.write_str("TestFileSystem::Stub(...)"),
+        }
     }
 }

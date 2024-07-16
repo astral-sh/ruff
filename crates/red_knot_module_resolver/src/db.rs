@@ -20,6 +20,7 @@ pub trait Db: salsa::DbWithJar<Jar> + ruff_db::Db + Upcast<dyn ruff_db::Db> {}
 
 #[cfg(test)]
 pub(crate) mod tests {
+    use std::fmt;
     use std::sync;
 
     use salsa::DebugWithDb;
@@ -75,6 +76,24 @@ pub(crate) mod tests {
     impl Upcast<dyn ruff_db::Db> for TestDb {
         fn upcast(&self) -> &(dyn ruff_db::Db + 'static) {
             self
+        }
+    }
+
+    impl fmt::Debug for TestDb {
+        fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+            let TestDb {
+                storage: _,
+                system,
+                vendored,
+                files: _,
+                events,
+            } = self;
+            let num_salsa_events = events.lock().unwrap().len();
+            f.debug_struct("TestDb")
+                .field("system", system)
+                .field("vendored", vendored)
+                .field("total_salsa_events", &num_salsa_events)
+                .finish()
         }
     }
 

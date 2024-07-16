@@ -1,3 +1,4 @@
+use std::fmt;
 use std::hash::BuildHasherDefault;
 
 use rustc_hash::FxHasher;
@@ -23,7 +24,7 @@ pub(crate) type FxDashMap<K, V> = dashmap::DashMap<K, V, BuildHasherDefault<FxHa
 pub struct Jar(File, source_text, line_index, parsed_module);
 
 /// Most basic database that gives access to files, the host system, source code, and parsed AST.
-pub trait Db: DbWithJar<Jar> {
+pub trait Db: DbWithJar<Jar> + fmt::Debug {
     fn vendored(&self) -> &VendoredFileSystem;
     fn system(&self) -> &dyn System;
     fn files(&self) -> &Files;
@@ -36,8 +37,10 @@ pub trait Upcast<T: ?Sized> {
 
 #[cfg(test)]
 mod tests {
+    use std::fmt;
     use std::sync::Arc;
 
+    use insta::assert_snapshot;
     use salsa::DebugWithDb;
 
     use crate::files::Files;
@@ -97,6 +100,24 @@ mod tests {
         }
     }
 
+    impl fmt::Debug for TestDb {
+        fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+            let TestDb {
+                storage: _,
+                files: _,
+                system,
+                vendored,
+                events,
+            } = self;
+            let num_events = events.lock().unwrap().len();
+            f.debug_struct("TestDb")
+                .field("system", system)
+                .field("total_salsa_events", &num_events)
+                .field("vendored", vendored)
+                .finish()
+        }
+    }
+
     impl Db for TestDb {
         fn vendored(&self) -> &VendoredFileSystem {
             &self.vendored
@@ -139,5 +160,13 @@ mod tests {
                 vendored: self.vendored.snapshot(),
             })
         }
+    }
+
+    #[test]
+    fn test_db_debug_impl() {
+        assert_snapshot!(
+            format!("{:?}", TestDb::new()),
+            @"TestDb { system: TestSystem { inner: TestFileSystem::Stub(...) }, total_salsa_events: 0, vendored: VendoredFileSystem(<0 paths>) }"
+        );
     }
 }

@@ -1,3 +1,5 @@
+use std::fmt;
+
 use ruff_db::system::{DbWithTestSystem, SystemPath, SystemPathBuf};
 use ruff_db::vendored::VendoredPathBuf;
 
@@ -9,6 +11,7 @@ use crate::supported_py_version::TargetVersion;
 ///
 /// You generally shouldn't construct instances of this struct directly;
 /// instead, use the [`TestCaseBuilder`].
+#[derive(Debug)]
 pub(crate) struct TestCase<T> {
     pub(crate) db: TestDb,
     pub(crate) src: SystemPathBuf,
@@ -94,14 +97,15 @@ pub(crate) struct UnspecifiedTypeshed;
 /// If you have not called one of those options, the `stdlib` field
 /// on the [`TestCase`] instance created from `.build()` will be set
 /// to `()`.
-pub(crate) struct TestCaseBuilder<T> {
+#[derive(Debug)]
+pub(crate) struct TestCaseBuilder<T: fmt::Debug> {
     typeshed_option: T,
     target_version: TargetVersion,
     first_party_files: Vec<FileSpec>,
     site_packages_files: Vec<FileSpec>,
 }
 
-impl<T> TestCaseBuilder<T> {
+impl<T: fmt::Debug> TestCaseBuilder<T> {
     /// Specify files to be created in the `src` mock directory
     pub(crate) fn with_src_files(mut self, files: &[FileSpec]) -> Self {
         self.first_party_files.extend(files.iter().copied());

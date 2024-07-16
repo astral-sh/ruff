@@ -35,6 +35,7 @@ pub trait Db:
 
 #[cfg(test)]
 pub(crate) mod tests {
+    use std::fmt;
     use std::sync::Arc;
 
     use salsa::DebugWithDb;
@@ -84,6 +85,24 @@ pub(crate) mod tests {
         /// If there are any pending salsa snapshots.
         pub(crate) fn clear_salsa_events(&mut self) {
             self.take_salsa_events();
+        }
+    }
+
+    impl fmt::Debug for TestDb {
+        fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+            let TestDb {
+                storage: _,
+                files: _,
+                system,
+                vendored,
+                events,
+            } = self;
+            let num_events = events.lock().unwrap().len();
+            f.debug_struct("TestDb")
+                .field("system", system)
+                .field("total_salsa_events", &num_events)
+                .field("vendored", vendored)
+                .finish_non_exhaustive()
         }
     }
 
