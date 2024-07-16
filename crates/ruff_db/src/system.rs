@@ -1,15 +1,21 @@
+use std::fmt::Debug;
+
 pub use memory_fs::MemoryFileSystem;
+#[cfg(feature = "os")]
 pub use os::OsSystem;
 pub use test::{DbWithTestSystem, TestSystem};
+use walk_directory::WalkDirectoryBuilder;
 
 use crate::file_revision::FileRevision;
 
 pub use self::path::{SystemPath, SystemPathBuf};
 
 mod memory_fs;
+#[cfg(feature = "os")]
 mod os;
 mod path;
 mod test;
+pub mod walk_directory;
 
 pub type Result<T> = std::io::Result<T>;
 
@@ -27,7 +33,7 @@ pub type Result<T> = std::io::Result<T>;
 ///    * File watching isn't supported.
 ///
 /// Abstracting the system also enables tests to use a more efficient in-memory file system.
-pub trait System {
+pub trait System: Debug {
     /// Reads the metadata of the file or directory at `path`.
     fn path_metadata(&self, path: &SystemPath) -> Result<Metadata>;
 
@@ -82,6 +88,12 @@ pub trait System {
         path: &SystemPath,
     ) -> Result<Box<dyn Iterator<Item = Result<DirectoryEntry>> + 'a>>;
 
+    /// Recursively walks the content of `path`.
+    ///
+    /// It is allowed to pass a `path` that points to a file. In this case, the walker
+    /// yields a single entry for that file.
+    fn walk_directory(&self, path: &SystemPath) -> WalkDirectoryBuilder;
+
     fn as_any(&self) -> &dyn std::any::Any;
 }
 
@@ -127,14 +139,14 @@ impl FileType {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Eq)]
 pub struct DirectoryEntry {
     path: SystemPathBuf,
-    file_type: Result<FileType>,
+    file_type: FileType,
 }
 
 impl DirectoryEntry {
-    pub fn new(path: SystemPathBuf, file_type: Result<FileType>) -> Self {
+    pub fn new(path: SystemPathBuf, file_type: FileType) -> Self {
         Self { path, file_type }
     }
 
@@ -142,13 +154,7 @@ impl DirectoryEntry {
         &self.path
     }
 
-    pub fn file_type(&self) -> &Result<FileType> {
-        &self.file_type
-    }
-}
-
-impl PartialEq for DirectoryEntry {
-    fn eq(&self, other: &Self) -> bool {
-        self.path == other.path
+    pub fn file_type(&self) -> FileType {
+        self.file_type
     }
 }

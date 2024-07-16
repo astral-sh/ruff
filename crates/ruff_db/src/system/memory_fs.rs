@@ -1,10 +1,18 @@
 use std::collections::BTreeMap;
+use std::iter::FusedIterator;
 use std::sync::{Arc, RwLock, RwLockWriteGuard};
 
 use camino::{Utf8Path, Utf8PathBuf};
 use filetime::FileTime;
 
-use crate::system::{DirectoryEntry, FileType, Metadata, Result, SystemPath, SystemPathBuf};
+use crate::system::{
+    walk_directory, DirectoryEntry, FileType, Metadata, Result, SystemPath, SystemPathBuf,
+};
+
+use super::walk_directory::{
+    DirectoryWalker, WalkDirectoryBuilder, WalkDirectoryConfiguration, WalkDirectoryVisitor,
+    WalkDirectoryVisitorBuilder, WalkState,
+};
 
 /// File system that stores all content in memory.
 ///
@@ -157,6 +165,14 @@ impl MemoryFileSystem {
         Ok(())
     }
 
+    /// Returns a builder for walking the directory tree of `path`.
+    ///
+    /// The only files that are ignored when setting `WalkDirectoryBuilder::standard_filters`
+    /// are hidden files (files with a name starting with a `.`).
+    pub fn walk_directory(&self, path: impl AsRef<SystemPath>) -> WalkDirectoryBuilder {
+        WalkDirectoryBuilder::new(path, MemoryWalker { fs: self.clone() })
+    }
+
     pub fn remove_file(&self, path: impl AsRef<SystemPath>) -> Result<()> {
         fn remove_file(fs: &MemoryFileSystem, path: &SystemPath) -> Result<()> {
             let mut by_path = fs.inner.by_path.write().unwrap();
@@ -238,17 +254,18 @@ impl MemoryFileSystem {
         normalized.into_utf8_path_buf()
     }
 
-    pub fn read_directory(
-        &self,
-        path: impl AsRef<SystemPath>,
-    ) -> Result<impl Iterator<Item = Result<DirectoryEntry>> + '_> {
+    pub fn read_directory(&self, path: impl AsRef<SystemPath>) -> Result<ReadDirectory> {
         let by_path = self.inner.by_path.read().unwrap();
         let normalized = self.normalize_path(path.as_ref());
         let entry = by_path.get(&normalized).ok_or_else(not_found)?;
         if entry.is_file() {
             return Err(not_a_directory());
         };
-        Ok(by_path
+
+        // Collect the entries into a vector to avoid deadlocks when the
+        // consumer calls into other file system methods while iterating over the
+        // directory entries.
+        let collected = by_path
             .range(normalized.clone()..)
             .skip(1)
             .take_while(|(path, _)| path.starts_with(&normalized))
@@ -256,14 +273,15 @@ impl MemoryFileSystem {
                 if path.parent()? == normalized {
                     Some(Ok(DirectoryEntry {
                         path: SystemPathBuf::from_utf8_path_buf(path.to_owned()),
-                        file_type: Ok(entry.file_type()),
+                        file_type: entry.file_type(),
                     }))
                 } else {
                     None
                 }
             })
-            .collect::<Vec<_>>()
-            .into_iter())
+            .collect();
+
+        Ok(ReadDirectory::new(collected))
     }
 }
 
@@ -379,11 +397,185 @@ fn get_or_create_file<'a>(
     }
 }
 
+#[derive(Debug)]
+pub struct ReadDirectory {
+    entries: std::vec::IntoIter<Result<DirectoryEntry>>,
+}
+
+impl ReadDirectory {
+    fn new(entries: Vec<Result<DirectoryEntry>>) -> Self {
+        Self {
+            entries: entries.into_iter(),
+        }
+    }
+}
+
+impl Iterator for ReadDirectory {
+    type Item = std::io::Result<DirectoryEntry>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        self.entries.next()
+    }
+}
+
+impl FusedIterator for ReadDirectory {}
+
+/// Recursively walks a directory in the memory file system.
+#[derive(Debug)]
+struct MemoryWalker {
+    fs: MemoryFileSystem,
+}
+
+impl MemoryWalker {
+    fn visit_entry(
+        &self,
+        visitor: &mut dyn WalkDirectoryVisitor,
+        entry: walk_directory::DirectoryEntry,
+        queue: &mut Vec<WalkerState>,
+        ignore_hidden: bool,
+    ) -> WalkState {
+        if entry.file_type().is_directory() {
+            let path = entry.path.clone();
+            let depth = entry.depth;
+
+            let state = visitor.visit(Ok(entry));
+
+            if matches!(state, WalkState::Continue) {
+                queue.push(WalkerState::Nested {
+                    path,
+                    depth: depth + 1,
+                });
+            }
+
+            state
+        } else if ignore_hidden
+            && entry
+                .path
+                .file_name()
+                .is_some_and(|name| name.starts_with('.'))
+        {
+            WalkState::Skip
+        } else {
+            visitor.visit(Ok(entry))
+        }
+    }
+}
+
+impl DirectoryWalker for MemoryWalker {
+    fn walk(
+        &self,
+        builder: &mut dyn WalkDirectoryVisitorBuilder,
+        configuration: WalkDirectoryConfiguration,
+    ) {
+        let WalkDirectoryConfiguration {
+            paths,
+            ignore_hidden,
+            standard_filters: _,
+        } = configuration;
+
+        let mut visitor = builder.build();
+        let mut queue: Vec<_> = paths
+            .into_iter()
+            .map(|path| WalkerState::Start { path })
+            .collect();
+
+        while let Some(state) = queue.pop() {
+            let (path, depth) = match state {
+                WalkerState::Start { path } => {
+                    match self.fs.metadata(&path) {
+                        Ok(metadata) => {
+                            let entry = walk_directory::DirectoryEntry {
+                                file_type: metadata.file_type,
+                                depth: 0,
+                                path,
+                            };
+
+                            if self.visit_entry(&mut *visitor, entry, &mut queue, ignore_hidden)
+                                == WalkState::Quit
+                            {
+                                return;
+                            }
+                        }
+                        Err(error) => {
+                            visitor.visit(Err(walk_directory::Error {
+                                depth: Some(0),
+                                kind: walk_directory::ErrorKind::Io {
+                                    path: Some(path),
+                                    err: error,
+                                },
+                            }));
+                        }
+                    }
+
+                    continue;
+                }
+                WalkerState::Nested { path, depth } => (path, depth),
+            };
+
+            // Use `read_directory` here instead of locking `by_path` to avoid deadlocks
+            // when the `visitor` calls any file system operations.
+            let entries = match self.fs.read_directory(&path) {
+                Ok(entries) => entries,
+                Err(error) => {
+                    visitor.visit(Err(walk_directory::Error {
+                        depth: Some(depth),
+                        kind: walk_directory::ErrorKind::Io {
+                            path: Some(path),
+                            err: error,
+                        },
+                    }));
+
+                    continue;
+                }
+            };
+
+            for entry in entries {
+                match entry {
+                    Ok(entry) => {
+                        let entry = walk_directory::DirectoryEntry {
+                            file_type: entry.file_type,
+                            depth,
+                            path: entry.path,
+                        };
+
+                        if self.visit_entry(&mut *visitor, entry, &mut queue, ignore_hidden)
+                            == WalkState::Quit
+                        {
+                            return;
+                        }
+                    }
+
+                    Err(error) => {
+                        visitor.visit(Err(walk_directory::Error {
+                            depth: Some(depth),
+                            kind: walk_directory::ErrorKind::Io {
+                                path: None,
+                                err: error,
+                            },
+                        }));
+                    }
+                }
+            }
+        }
+    }
+}
+
+#[derive(Debug)]
+enum WalkerState {
+    /// An entry path that was directly provided to the walker. Always has depth 0.
+    Start { path: SystemPathBuf },
+
+    /// Traverse into the directory with the given path at the given depth.
+    Nested { path: SystemPathBuf, depth: usize },
+}
+
 #[cfg(test)]
 mod tests {
     use std::io::ErrorKind;
     use std::time::Duration;
 
+    use crate::system::walk_directory::tests::DirectoryEntryToString;
+    use crate::system::walk_directory::WalkState;
     use crate::system::{
         DirectoryEntry, FileType, MemoryFileSystem, Result, SystemPath, SystemPathBuf,
     };
@@ -659,9 +851,9 @@ mod tests {
             .map(Result::unwrap)
             .collect();
         let expected_contents = vec![
-            DirectoryEntry::new(SystemPathBuf::from("/a/bar.py"), Ok(FileType::File)),
-            DirectoryEntry::new(SystemPathBuf::from("/a/baz.pyi"), Ok(FileType::File)),
-            DirectoryEntry::new(SystemPathBuf::from("/a/foo"), Ok(FileType::Directory)),
+            DirectoryEntry::new(SystemPathBuf::from("/a/bar.py"), FileType::File),
+            DirectoryEntry::new(SystemPathBuf::from("/a/baz.pyi"), FileType::File),
+            DirectoryEntry::new(SystemPathBuf::from("/a/foo"), FileType::Directory),
         ];
         assert_eq!(contents, expected_contents)
     }
@@ -683,5 +875,140 @@ mod tests {
         };
         assert_eq!(error.kind(), std::io::ErrorKind::Other);
         assert!(error.to_string().contains("Not a directory"));
+    }
+
+    #[test]
+    fn walk_directory() -> std::io::Result<()> {
+        let root = SystemPath::new("/src");
+        let system = MemoryFileSystem::with_current_directory(root);
+
+        system.write_files([
+            (root.join("foo.py"), "print('foo')"),
+            (root.join("a/bar.py"), "print('bar')"),
+            (root.join("a/baz.py"), "print('baz')"),
+            (root.join("a/b/c.py"), "print('c')"),
+        ])?;
+
+        let writer = DirectoryEntryToString::new(root.to_path_buf());
+
+        system.walk_directory(root).run(|| {
+            Box::new(|entry| {
+                writer.write_entry(entry);
+
+                WalkState::Continue
+            })
+        });
+
+        assert_eq!(
+            writer.to_string(),
+            r#"{
+    "": (
+        Directory,
+        0,
+    ),
+    "a": (
+        Directory,
+        1,
+    ),
+    "a/b": (
+        Directory,
+        2,
+    ),
+    "a/b/c.py": (
+        File,
+        3,
+    ),
+    "a/bar.py": (
+        File,
+        2,
+    ),
+    "a/baz.py": (
+        File,
+        2,
+    ),
+    "foo.py": (
+        File,
+        1,
+    ),
+}"#
+        );
+
+        Ok(())
+    }
+
+    #[test]
+    fn walk_directory_hidden() -> std::io::Result<()> {
+        let root = SystemPath::new("/src");
+        let system = MemoryFileSystem::with_current_directory(root);
+
+        system.write_files([
+            (root.join("foo.py"), "print('foo')"),
+            (root.join("a/bar.py"), "print('bar')"),
+            (root.join("a/.baz.py"), "print('baz')"),
+        ])?;
+
+        let writer = DirectoryEntryToString::new(root.to_path_buf());
+
+        system.walk_directory(root).run(|| {
+            Box::new(|entry| {
+                writer.write_entry(entry);
+
+                WalkState::Continue
+            })
+        });
+
+        assert_eq!(
+            writer.to_string(),
+            r#"{
+    "": (
+        Directory,
+        0,
+    ),
+    "a": (
+        Directory,
+        1,
+    ),
+    "a/bar.py": (
+        File,
+        2,
+    ),
+    "foo.py": (
+        File,
+        1,
+    ),
+}"#
+        );
+
+        Ok(())
+    }
+
+    #[test]
+    fn walk_directory_file() -> std::io::Result<()> {
+        let root = SystemPath::new("/src");
+        let system = MemoryFileSystem::with_current_directory(root);
+
+        system.write_file(root.join("foo.py"), "print('foo')")?;
+
+        let writer = DirectoryEntryToString::new(root.to_path_buf());
+
+        system.walk_directory(root.join("foo.py")).run(|| {
+            Box::new(|entry| {
+                writer.write_entry(entry);
+
+                WalkState::Continue
+            })
+        });
+
+        assert_eq!(
+            writer.to_string(),
+            r#"{
+    "foo.py": (
+        File,
+        0,
+    ),
+}"#
+        );
+
+        Ok(())
     }
 }

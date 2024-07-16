@@ -2085,6 +2085,7 @@ dependencies = [
  "countme",
  "dashmap 6.0.1",
  "filetime",
+ "ignore",
  "insta",
  "ruff_python_ast",
  "ruff_python_parser",
