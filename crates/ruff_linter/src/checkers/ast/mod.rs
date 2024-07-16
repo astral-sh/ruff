@@ -1950,38 +1950,6 @@ impl<'a> Checker<'a> {
             flags.insert(BindingFlags::UNPACKED_ASSIGNMENT);
         }
 
-        // Match the left-hand side of an annotated assignment without a value,
-        // like `x` in `x: int`. N.B. In stub files, these should be viewed
-        // as assignments on par with statements such as `x: int = 5`.
-        if matches!(
-            parent,
-            Stmt::AnnAssign(ast::StmtAnnAssign { value: None, .. })
-        ) && !self.semantic.in_annotation()
-        {
-            self.add_binding(id, expr.range(), BindingKind::Annotation, flags);
-            return;
-        }
-
-        // A binding within a `for` must be a loop variable, as in:
-        // ```python
-        // for x in range(10):
-        //     ...
-        // ```
-        if parent.is_for_stmt() {
-            self.add_binding(id, expr.range(), BindingKind::LoopVar, flags);
-            return;
-        }
-
-        // A binding within a `with` must be an item, as in:
-        // ```python
-        // with open("file.txt") as fp:
-        //     ...
-        // ```
-        if parent.is_with_stmt() {
-            self.add_binding(id, expr.range(), BindingKind::WithItemVar, flags);
-            return;
-        }
-
         let scope = self.semantic.current_scope();
 
         if scope.kind.is_module()
@@ -2048,6 +2016,38 @@ impl<'a> Checker<'a> {
         // ```
         if self.semantic.in_comprehension_assignment() {
             self.add_binding(id, expr.range(), BindingKind::ComprehensionVar, flags);
+            return;
+        }
+
+        // Match the left-hand side of an annotated assignment without a value,
+        // like `x` in `x: int`. N.B. In stub files, these should be viewed
+        // as assignments on par with statements such as `x: int = 5`.
+        if matches!(
+            parent,
+            Stmt::AnnAssign(ast::StmtAnnAssign { value: None, .. })
+        ) && !self.semantic.in_annotation()
+        {
+            self.add_binding(id, expr.range(), BindingKind::Annotation, flags);
+            return;
+        }
+
+        // A binding within a `for` must be a loop variable, as in:
+        // ```python
+        // for x in range(10):
+        //     ...
+        // ```
+        if parent.is_for_stmt() {
+            self.add_binding(id, expr.range(), BindingKind::LoopVar, flags);
+            return;
+        }
+
+        // A binding within a `with` must be an item, as in:
+        // ```python
+        // with open("file.txt") as fp:
+        //     ...
+        // ```
+        if parent.is_with_stmt() {
+            self.add_binding(id, expr.range(), BindingKind::WithItemVar, flags);
             return;
         }
 
