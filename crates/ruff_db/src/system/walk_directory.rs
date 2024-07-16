@@ -30,9 +30,11 @@ impl WalkDirectoryBuilder {
         }
     }
 
-    /// Adds an additional path that should be traversed recursively.
+    /// Adds a path that should be traversed recursively.
     ///
-    /// Using the same walker to traverse multiple paths can be more efficient than creating a new walker for each path.
+    /// Each additional path is traversed recursively.
+    /// This should be preferred over building multiple
+    /// walkers since it enables reusing resources.
     #[allow(clippy::should_implement_trait)]
     pub fn add(mut self, path: impl AsRef<SystemPath>) -> Self {
         self.paths.push(path.as_ref().to_path_buf());
@@ -41,7 +43,7 @@ impl WalkDirectoryBuilder {
 
     /// Whether hidden files should be ignored.
     ///
-    /// The definition of what a hidden file depends on the [`System`](super::System) and can be platform dependent.
+    /// The definition of what a hidden file depends on the [`System`](super::System) and can be platform-dependent.
     ///
     /// This is enabled by default.
     pub fn ignore_hidden(mut self, hidden: bool) -> Self {
@@ -49,14 +51,17 @@ impl WalkDirectoryBuilder {
         self
     }
 
-    /// Whether files that are commonly ignored according to the conventions on [`System`](super::System) should be ignored.
+    /// Enables all the standard ignore filters.
     ///
-    /// This includes ignoring hidden files.
+    /// This toggles, as a group, all the filters that are enabled by default:
+    /// * [`hidden`](Self::ignore_hidden)
+    /// * Any [`System`](super::System) specific filters according (e.g., respecting `.ignore`, `.gitignore`, files).
     ///
     /// Defaults to `true`.
     pub fn standard_filters(mut self, standard_filters: bool) -> Self {
         self.standard_filters = standard_filters;
-        self.ignore_hidden = true;
+        self.ignore_hidden = standard_filters;
+
         self
     }
 
@@ -153,18 +158,8 @@ impl DirectoryEntry {
     }
 
     /// Return the file type for the file that this entry points to.
-    ///
-    /// This entry doesn't have a file type if it corresponds to stdin.
     pub fn file_type(&self) -> FileType {
         self.file_type
-    }
-
-    /// Return the file name of this entry.
-    ///
-    /// If this entry has no file name (e.g., `/`), then the full path is
-    /// returned.
-    pub fn file_name(&self) -> &str {
-        self.path.file_name().unwrap_or(self.path.as_str())
     }
 
     /// Returns the depth at which this entry was created relative to the root.
@@ -178,7 +173,7 @@ pub enum WalkState {
     /// Continue walking as normal
     Continue,
 
-    /// If the entry given is a directory, don't decent into it.
+    /// If the entry given is a directory, don't descend into it.
     /// In all other cases, this has no effect.
     Skip,
 
@@ -260,7 +255,7 @@ pub(super) mod tests {
     use crate::system::{FileType, SystemPathBuf};
     use std::collections::BTreeMap;
 
-    /// Test helper that creates a visual representation of the visisted directory entries.
+    /// Test helper that creates a visual representation of the visited directory entries.
     pub(crate) struct DirectoryEntryToString {
         root_path: SystemPathBuf,
         inner: std::sync::Mutex<DirectoryEntryToStringInner>,
@@ -317,7 +312,7 @@ pub(super) mod tests {
     #[derive(Default)]
     struct DirectoryEntryToStringInner {
         errors: String,
-        /// Stores the visisted path. The key is the relative path to the root, using `/` as path separator.
+        /// Stores the visited path. The key is the relative path to the root, using `/` as path separator.
         visited: BTreeMap<String, (FileType, usize)>,
     }
 }

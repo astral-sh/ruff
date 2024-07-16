@@ -38,7 +38,7 @@ impl TestSystem {
         }
     }
 
-    fn us_system<S>(&mut self, system: S)
+    fn use_system<S>(&mut self, system: S)
     where
         S: System + Send + Sync + RefUnwindSafe + 'static,
     {
@@ -167,7 +167,7 @@ pub trait DbWithTestSystem: Db + Sized {
     where
         S: System + Send + Sync + RefUnwindSafe + 'static,
     {
-        self.test_system_mut().us_system(os);
+        self.test_system_mut().use_system(os);
     }
 
     /// Returns the memory file system.

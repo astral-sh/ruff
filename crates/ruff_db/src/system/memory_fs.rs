@@ -262,23 +262,24 @@ impl MemoryFileSystem {
             return Err(not_a_directory());
         };
 
-        // Collect the entries into a vector to avoid dead-locks when the
+        // Collect the entries into a vector to avoid deadlocks when the
         // consumer calls into other file system methods while iterating over the
         // directory entries.
-        let mut collected = Vec::new();
-
-        for (path, entry) in by_path.range(normalized.clone()..).skip(1) {
-            if !path.starts_with(&normalized) {
-                break;
-            }
-
-            if path.parent() == Some(&normalized) {
-                collected.push(Ok(DirectoryEntry {
-                    path: SystemPathBuf::from_utf8_path_buf(path.to_owned()),
-                    file_type: entry.file_type(),
-                }));
-            }
-        }
+        let collected = by_path
+            .range(normalized.clone()..)
+            .skip(1)
+            .take_while(|(path, _)| path.starts_with(&normalized))
+            .filter_map(|(path, entry)| {
+                if path.parent()? == normalized {
+                    Some(Ok(DirectoryEntry {
+                        path: SystemPathBuf::from_utf8_path_buf(path.to_owned()),
+                        file_type: entry.file_type(),
+                    }))
+                } else {
+                    None
+                }
+            })
+            .collect();
 
         Ok(ReadDirectory::new(collected))
     }

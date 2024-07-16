@@ -141,12 +141,14 @@ impl DirectoryWalker for OsDirectoryWalker {
             Box::new(move |entry| {
                 match entry {
                     Ok(entry) => {
-                        // SAFETY: A system path can't be a stdin path.
+                        // SAFETY: The walkdir crate supports `stdin` files and `file_type` can be `None` for these files.
+                        //   We don't make use of this feature, which is why unwrapping here is ok.
                         let file_type = entry.file_type().unwrap();
                         let depth = entry.depth();
 
-                        // If there's an error related to a git ignore file, warn.
-                        // Errors related to traversing the file system are reported alongside the entry.
+                        // `walkdir` reports errors related to parsing ignore files as part of the entry.
+                        // These aren't fatal for us. We should keep going even if an ignore file contains a syntax error.
+                        // But we log the error here for better visibility (same as ripgrep, Ruff ignores it)
                         if let Some(error) = entry.error() {
                             tracing::warn!("{error}");
                         }
