@@ -123,6 +123,8 @@ DEFAULT_TARGETS = [
             "exclude": [
                 "examples/gpt_actions_library/.gpt_action_getting_started.ipynb",
                 "examples/gpt_actions_library/gpt_action_bigquery.ipynb",
+                "examples/chatgpt/gpt_actions_library/.gpt_action_getting_started.ipynb",
+                "examples/chatgpt/gpt_actions_library/gpt_action_bigquery.ipynb",
             ],
         },
     ),
