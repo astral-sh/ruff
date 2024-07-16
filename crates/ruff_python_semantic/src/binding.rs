@@ -467,12 +467,6 @@ pub enum BindingKind<'a> {
     /// ```
     LoopVar,
 
-    /// A binding for a comprehension variable, like `x` in:
-    /// ```python
-    /// [x for x in range(10)]
-    /// ```
-    ComprehensionVar,
-
     /// A binding for a with statement variable, like `x` in:
     /// ```python
     /// with open('foo.py') as x:
