@@ -7,7 +7,7 @@ use ruff_python_ast as ast;
 use ruff_python_ast::{ExprContext, TypeParams};
 
 use crate::semantic_index::ast_ids::{HasScopedAstId, HasScopedUseId, ScopedExpressionId};
-use crate::semantic_index::definition::{Definition, DefinitionKind};
+use crate::semantic_index::definition::{Definition, DefinitionKind, DefinitionNodeKey};
 use crate::semantic_index::expression::Expression;
 use crate::semantic_index::symbol::{NodeWithScopeRef, ScopeId};
 use crate::semantic_index::SemanticIndex;
@@ -250,10 +250,14 @@ impl<'db> TypeInferenceBuilder<'db> {
         }
     }
 
-    fn infer_function_definition_statement(&mut self, function: &ast::StmtFunctionDef) {
-        let definition = self.index.definition(function);
+    fn infer_definition(&mut self, node: impl Into<DefinitionNodeKey>) {
+        let definition = self.index.definition(node);
         let result = infer_definition_types(self.db, definition);
         self.extend(result);
+    }
+
+    fn infer_function_definition_statement(&mut self, function: &ast::StmtFunctionDef) {
+        self.infer_definition(function);
     }
 
     fn infer_function_definition(
@@ -290,9 +294,7 @@ impl<'db> TypeInferenceBuilder<'db> {
     }
 
     fn infer_class_definition_statement(&mut self, class: &ast::StmtClassDef) {
-        let definition = self.index.definition(class);
-        let result = infer_definition_types(self.db, definition);
-        self.extend(result);
+        self.infer_definition(class);
     }
 
     fn infer_class_definition(&mut self, class: &ast::StmtClassDef, definition: Definition<'db>) {
@@ -360,9 +362,7 @@ impl<'db> TypeInferenceBuilder<'db> {
         for target in targets {
             match target {
                 ast::Expr::Name(name) => {
-                    let definition = self.index.definition(name);
-                    let result = infer_definition_types(self.db, definition);
-                    self.extend(result);
+                    self.infer_definition(name);
                 }
                 _ => todo!("support unpacking assignment"),
             }
@@ -384,9 +384,7 @@ impl<'db> TypeInferenceBuilder<'db> {
     }
 
     fn infer_annotated_assignment_statement(&mut self, assignment: &ast::StmtAnnAssign) {
-        let definition = self.index.definition(assignment);
-        let result = infer_definition_types(self.db, definition);
-        self.extend(result);
+        self.infer_definition(assignment);
     }
 
     fn infer_annotated_assignment_definition(
@@ -433,9 +431,7 @@ impl<'db> TypeInferenceBuilder<'db> {
         let ast::StmtImport { range: _, names } = import;
 
         for alias in names {
-            let definition = self.index.definition(alias);
-            let result = infer_definition_types(self.db, definition);
-            self.extend(result);
+            self.infer_definition(alias);
         }
     }
 
@@ -459,9 +455,7 @@ impl<'db> TypeInferenceBuilder<'db> {
         } = import;
 
         for alias in names {
-            let definition = self.index.definition(alias);
-            let result = infer_definition_types(self.db, definition);
-            self.extend(result);
+            self.infer_definition(alias);
         }
     }
 
