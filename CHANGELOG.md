@@ -1,5 +1,51 @@
 # Changelog
 
+## 0.5.2
+
+### Preview features
+
+- Use `space` separator before parenthesized expressions in comprehensions with leading comments ([#12282](https://github.com/astral-sh/ruff/pull/12282))
+- \[`flake8-async`\] Update `ASYNC100` to include `anyio` and `asyncio` ([#12221](https://github.com/astral-sh/ruff/pull/12221))
+- \[`flake8-async`\] Update `ASYNC109` to include `anyio` and `asyncio` ([#12236](https://github.com/astral-sh/ruff/pull/12236))
+- \[`flake8-async`\] Update `ASYNC110` to include `anyio` and `asyncio` ([#12261](https://github.com/astral-sh/ruff/pull/12261))
+- \[`flake8-async`\] Update `ASYNC115` to include `anyio` and `asyncio` ([#12262](https://github.com/astral-sh/ruff/pull/12262))
+- \[`flake8-async`\] Update `ASYNC116` to include `anyio` and `asyncio` ([#12266](https://github.com/astral-sh/ruff/pull/12266))
+
+### Rule changes
+
+- \[`flake8-return`\] Exempt properties from explicit return rule (`RET501`) ([#12243](https://github.com/astral-sh/ruff/pull/12243))
+- \[`numpy`\] Add `np.NAN`-to-`np.nan` diagnostic ([#12292](https://github.com/astral-sh/ruff/pull/12292))
+- \[`refurb`\] Make `list-reverse-copy` an unsafe fix ([#12303](https://github.com/astral-sh/ruff/pull/12303))
+
+### Server
+
+- Consider `include` and `extend-include` settings in native server ([#12252](https://github.com/astral-sh/ruff/pull/12252))
+- Include nested configurations in settings reloading ([#12253](https://github.com/astral-sh/ruff/pull/12253))
+
+### CLI
+
+- Omit code frames for fixes with empty ranges ([#12304](https://github.com/astral-sh/ruff/pull/12304))
+- Warn about formatter incompatibility for `D203` ([#12238](https://github.com/astral-sh/ruff/pull/12238))
+
+### Bug fixes
+
+- Make cache-write failures non-fatal on Windows ([#12302](https://github.com/astral-sh/ruff/pull/12302))
+- Treat `not` operations as boolean tests ([#12301](https://github.com/astral-sh/ruff/pull/12301))
+- \[`flake8-bandit`\] Avoid `S310` violations for HTTP-safe f-strings ([#12305](https://github.com/astral-sh/ruff/pull/12305))
+- \[`flake8-bandit`\] Support explicit string concatenations in S310 HTTP detection ([#12315](https://github.com/astral-sh/ruff/pull/12315))
+- \[`flake8-bandit`\] fix S113 false positive for httpx without `timeout` argument ([#12213](https://github.com/astral-sh/ruff/pull/12213))
+- \[`pycodestyle`\] Remove "non-obvious" allowance for E721 ([#12300](https://github.com/astral-sh/ruff/pull/12300))
+- \[`pyflakes`\] Consider `with` blocks as single-item branches for redefinition analysis ([#12311](https://github.com/astral-sh/ruff/pull/12311))
+- \[`refurb`\] Restrict forwarding for `newline` argument in `open()` calls to Python versions >= 3.10 ([#12244](https://github.com/astral-sh/ruff/pull/12244))
+
+### Documentation
+
+- Update help and documentation to reflect `--output-format full` default ([#12248](https://github.com/astral-sh/ruff/pull/12248))
+
+### Performance
+
+- Use more threads when discovering Python files ([#12258](https://github.com/astral-sh/ruff/pull/12258))
+
 ## 0.5.1
 
 ### Preview features

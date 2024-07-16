@@ -116,14 +116,17 @@ impl Emitter for TextEmitter {
             )?;
 
             if self.flags.intersects(EmitterFlags::SHOW_SOURCE) {
-                writeln!(
-                    writer,
-                    "{}",
-                    MessageCodeFrame {
-                        message,
-                        notebook_index
-                    }
-                )?;
+                // The `0..0` range is used to highlight file-level diagnostics.
+                if message.range() != TextRange::default() {
+                    writeln!(
+                        writer,
+                        "{}",
+                        MessageCodeFrame {
+                            message,
+                            notebook_index
+                        }
+                    )?;
+                }
             }
 
             if self.flags.intersects(EmitterFlags::SHOW_FIX_DIFF) {

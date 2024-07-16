@@ -6,7 +6,7 @@ from _typeshed import FileDescriptorOrPath, ReadableBuffer, WriteableBuffer
 from collections.abc import Callable, Iterable, Iterator
 from os import _Opener
 from types import TracebackType
-from typing import IO, Any, BinaryIO, Literal, Protocol, TextIO, TypeVar, overload, type_check_only
+from typing import IO, Any, BinaryIO, Generic, Literal, Protocol, TextIO, TypeVar, overload, type_check_only
 from typing_extensions import Self
 
 __all__ = [
@@ -173,12 +173,12 @@ class _WrappedBuffer(Protocol):
     # def seek(self, offset: Literal[0], whence: Literal[2]) -> int: ...
     # def tell(self) -> int: ...
 
-# TODO: Should be generic over the buffer type, but needs to wait for
-# TypeVar defaults.
-class TextIOWrapper(TextIOBase, TextIO):  # type: ignore[misc]  # incompatible definitions of write in the base classes
+_BufferT_co = TypeVar("_BufferT_co", bound=_WrappedBuffer, default=_WrappedBuffer, covariant=True)
+
+class TextIOWrapper(TextIOBase, TextIO, Generic[_BufferT_co]):  # type: ignore[misc]  # incompatible definitions of write in the base classes
     def __init__(
         self,
-        buffer: _WrappedBuffer,
+        buffer: _BufferT_co,
         encoding: str | None = None,
         errors: str | None = None,
         newline: str | None = None,
@@ -187,7 +187,7 @@ class TextIOWrapper(TextIOBase, TextIO):  # type: ignore[misc]  # incompatible d
     ) -> None: ...
     # Equals the "buffer" argument passed in to the constructor.
     @property
-    def buffer(self) -> BinaryIO: ...
+    def buffer(self) -> _BufferT_co: ...  # type: ignore[override]
     @property
     def closed(self) -> bool: ...
     @property
@@ -211,7 +211,7 @@ class TextIOWrapper(TextIOBase, TextIO):  # type: ignore[misc]  # incompatible d
     def readline(self, size: int = -1, /) -> str: ...  # type: ignore[override]
     def readlines(self, hint: int = -1, /) -> list[str]: ...  # type: ignore[override]
     # Equals the "buffer" argument passed in to the constructor.
-    def detach(self) -> BinaryIO: ...
+    def detach(self) -> _BufferT_co: ...  # type: ignore[override]
     # TextIOWrapper's version of seek only supports a limited subset of
     # operations.
     def seek(self, cookie: int, whence: int = 0, /) -> int: ...

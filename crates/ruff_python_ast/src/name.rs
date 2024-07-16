@@ -22,9 +22,8 @@ impl Name {
     }
 
     #[inline]
-    pub fn new_static(name: &'static str) -> Self {
-        // TODO(Micha): Use CompactString::const_new once we upgrade to 0.8 https://github.com/ParkMyCar/compact_str/pull/336
-        Self(compact_str::CompactString::from(name))
+    pub const fn new_static(name: &'static str) -> Self {
+        Self(compact_str::CompactString::const_new(name))
     }
 
     pub fn as_str(&self) -> &str {

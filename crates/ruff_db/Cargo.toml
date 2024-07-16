@@ -20,6 +20,7 @@ camino = { workspace = true }
 countme = { workspace = true }
 dashmap = { workspace = true }
 filetime = { workspace = true }
+ignore = { workspace = true, optional = true }
 salsa = { workspace = true }
 tracing = { workspace = true }
 rustc-hash = { workspace = true }
@@ -28,3 +29,6 @@ zip = { workspace = true }
 [dev-dependencies]
 insta = { workspace = true }
 tempfile = { workspace = true }
+
+[features]
+os = ["ignore"]

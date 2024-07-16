@@ -1,4 +1,4 @@
-use ruff_formatter::write;
+use ruff_formatter::{write, FormatRuleWithOptions};
 use ruff_python_ast::AstNode;
 use ruff_python_ast::MatchCase;
 
@@ -6,9 +6,21 @@ use crate::builders::parenthesize_if_expands;
 use crate::expression::parentheses::{NeedsParentheses, OptionalParentheses, Parentheses};
 use crate::prelude::*;
 use crate::statement::clause::{clause_body, clause_header, ClauseHeader};
+use crate::statement::suite::SuiteKind;
 
 #[derive(Default)]
-pub struct FormatMatchCase;
+pub struct FormatMatchCase {
+    last_suite_in_statement: bool,
+}
+
+impl FormatRuleWithOptions<MatchCase, PyFormatContext<'_>> for FormatMatchCase {
+    type Options = bool;
+
+    fn with_options(mut self, options: Self::Options) -> Self {
+        self.last_suite_in_statement = options;
+        self
+    }
+}
 
 impl FormatNodeRule<MatchCase> for FormatMatchCase {
     fn fmt_fields(&self, item: &MatchCase, f: &mut PyFormatter) -> FormatResult<()> {
@@ -63,7 +75,11 @@ impl FormatNodeRule<MatchCase> for FormatMatchCase {
                         Ok(())
                     }),
                 ),
-                clause_body(body, dangling_item_comments),
+                clause_body(
+                    body,
+                    SuiteKind::other(self.last_suite_in_statement),
+                    dangling_item_comments
+                ),
             ]
         )
     }

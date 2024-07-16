@@ -245,7 +245,7 @@ class CodeType:
             co_qualname: str = ...,
             co_linetable: bytes = ...,
             co_exceptiontable: bytes = ...,
-        ) -> CodeType: ...
+        ) -> Self: ...
     elif sys.version_info >= (3, 10):
         def replace(
             self,
@@ -266,7 +266,7 @@ class CodeType:
             co_filename: str = ...,
             co_name: str = ...,
             co_linetable: bytes = ...,
-        ) -> CodeType: ...
+        ) -> Self: ...
     else:
         def replace(
             self,
@@ -287,7 +287,10 @@ class CodeType:
             co_filename: str = ...,
             co_name: str = ...,
             co_lnotab: bytes = ...,
-        ) -> CodeType: ...
+        ) -> Self: ...
+
+    if sys.version_info >= (3, 13):
+        __replace__ = replace
 
 @final
 class MappingProxyType(Mapping[_KT, _VT_co]):
@@ -309,11 +312,17 @@ class MappingProxyType(Mapping[_KT, _VT_co]):
 
 class SimpleNamespace:
     __hash__: ClassVar[None]  # type: ignore[assignment]
-    def __init__(self, **kwargs: Any) -> None: ...
+    if sys.version_info >= (3, 13):
+        def __init__(self, mapping_or_iterable: Mapping[str, Any] | Iterable[tuple[str, Any]] = (), /, **kwargs: Any) -> None: ...
+    else:
+        def __init__(self, **kwargs: Any) -> None: ...
+
     def __eq__(self, value: object, /) -> bool: ...
     def __getattribute__(self, name: str, /) -> Any: ...
     def __setattr__(self, name: str, value: Any, /) -> None: ...
     def __delattr__(self, name: str, /) -> None: ...
+    if sys.version_info >= (3, 13):
+        def __replace__(self, **kwargs: Any) -> Self: ...
 
 class ModuleType:
     __name__: str

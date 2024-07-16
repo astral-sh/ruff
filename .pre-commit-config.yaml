@@ -42,7 +42,7 @@ repos:
           )$
 
   - repo: https://github.com/crate-ci/typos
-    rev: v1.23.1
+    rev: v1.23.2
     hooks:
       - id: typos
 
@@ -56,7 +56,7 @@ repos:
         pass_filenames: false # This makes it a lot faster
 
   - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.5.1
+    rev: v0.5.2
     hooks:
       - id: ruff-format
       - id: ruff

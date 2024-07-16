@@ -55,8 +55,7 @@ impl ModuleName {
     #[inline]
     #[must_use]
     pub fn new_static(name: &'static str) -> Option<Self> {
-        // TODO(Micha): Use CompactString::const_new once we upgrade to 0.8 https://github.com/ParkMyCar/compact_str/pull/336
-        Self::is_valid_name(name).then(|| Self(CompactString::from(name)))
+        Self::is_valid_name(name).then(|| Self(CompactString::const_new(name)))
     }
 
     #[must_use]

@@ -206,6 +206,9 @@ class ZipInfo:
     compress_size: int
     file_size: int
     orig_filename: str  # undocumented
+    if sys.version_info >= (3, 13):
+        compress_level: int | None
+
     def __init__(self, filename: str = "NoName", date_time: _DateTuple = (1980, 1, 1, 0, 0, 0)) -> None: ...
     @classmethod
     def from_file(cls, filename: StrPath, arcname: StrPath | None = None, *, strict_timestamps: bool = True) -> Self: ...

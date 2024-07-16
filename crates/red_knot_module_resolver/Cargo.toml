@@ -28,6 +28,8 @@ walkdir = { workspace = true }
 zip = { workspace = true }
 
 [dev-dependencies]
+ruff_db = { workspace = true, features = ["os"] }
+
 anyhow = { workspace = true }
 insta = { workspace = true }
 tempfile = { workspace = true }

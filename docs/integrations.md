@@ -14,7 +14,7 @@ Ruff can be used as a [pre-commit](https://pre-commit.com) hook via [`ruff-pre-c
 ```yaml
 - repo: https://github.com/astral-sh/ruff-pre-commit
   # Ruff version.
-  rev: v0.5.1
+  rev: v0.5.2
   hooks:
     # Run the linter.
     - id: ruff
@@ -27,7 +27,7 @@ To enable lint fixes, add the `--fix` argument to the lint hook:
 ```yaml
 - repo: https://github.com/astral-sh/ruff-pre-commit
   # Ruff version.
-  rev: v0.5.1
+  rev: v0.5.2
   hooks:
     # Run the linter.
     - id: ruff
@@ -41,7 +41,7 @@ To run the hooks over Jupyter Notebooks too, add `jupyter` to the list of allowe
 ```yaml
 - repo: https://github.com/astral-sh/ruff-pre-commit
   # Ruff version.
-  rev: v0.5.1
+  rev: v0.5.2
   hooks:
     # Run the linter.
     - id: ruff

@@ -475,9 +475,7 @@ impl<'db> Iterator for PthFileIterator<'db> {
             let Ok(entry) = entry_result else {
                 continue;
             };
-            let Ok(file_type) = entry.file_type() else {
-                continue;
-            };
+            let file_type = entry.file_type();
             if file_type.is_directory() {
                 continue;
             }
@@ -1196,7 +1194,7 @@ mod tests {
 
         let temp_dir = tempfile::tempdir()?;
         let root = SystemPath::from_std_path(temp_dir.path()).unwrap();
-        db.use_os_system(OsSystem::new(root));
+        db.use_system(OsSystem::new(root));
 
         let src = root.join("src");
         let site_packages = root.join("site-packages");

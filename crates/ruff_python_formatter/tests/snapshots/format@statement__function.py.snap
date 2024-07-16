@@ -1042,3 +1042,26 @@ def func[T](
     lotsoflongargs5: T,
 ) -> T: ...
 ```
+
+
+## Preview changes
+```diff
+--- Stable
++++ Preview
+@@ -161,6 +161,7 @@
+ 
+     def f1():
+         pass  # a
++
+ else:
+     pass
+ 
+@@ -170,6 +171,7 @@
+     def f2():
+         pass
+         # a
++
+ else:
+     pass
+ 
+```

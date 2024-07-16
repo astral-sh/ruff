@@ -50,14 +50,14 @@ cachedir = { version = "0.3.1" }
 camino = { version = "1.1.7" }
 chrono = { version = "0.4.35", default-features = false, features = ["clock"] }
 clap = { version = "4.5.3", features = ["derive"] }
-clap_complete_command = { version = "0.5.1" }
+clap_complete_command = { version = "0.6.0" }
 clearscreen = { version = "3.0.0" }
 codspeed-criterion-compat = { version = "2.6.0", default-features = false }
 colored = { version = "2.1.0" }
 console_error_panic_hook = { version = "0.1.7" }
 console_log = { version = "1.0.0" }
 countme = { version = "3.0.1" }
-compact_str = "0.7.1"
+compact_str = "0.8.0"
 criterion = { version = "0.5.1", default-features = false }
 crossbeam = { version = "0.8.4" }
 dashmap = { version = "6.0.1" }
@@ -128,7 +128,7 @@ syn = { version = "2.0.55" }
 tempfile = { version = "3.9.0" }
 test-case = { version = "3.3.1" }
 thiserror = { version = "1.0.58" }
-tikv-jemallocator = { version = "0.5.0" }
+tikv-jemallocator = { version = "0.6.0" }
 toml = { version = "0.8.11" }
 tracing = { version = "0.1.40" }
 tracing-indicatif = { version = "0.3.6" }

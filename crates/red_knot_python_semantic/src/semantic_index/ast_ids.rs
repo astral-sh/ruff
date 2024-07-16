@@ -1,6 +1,6 @@
 use rustc_hash::FxHashMap;
 
-use ruff_index::{newtype_index, Idx};
+use ruff_index::newtype_index;
 use ruff_python_ast as ast;
 use ruff_python_ast::ExpressionRef;
 
@@ -28,16 +28,52 @@ use crate::Db;
 pub(crate) struct AstIds {
     /// Maps expressions to their expression id. Uses `NodeKey` because it avoids cloning [`Parsed`].
     expressions_map: FxHashMap<ExpressionNodeKey, ScopedExpressionId>,
+    /// Maps expressions which "use" a symbol (that is, [`ExprName`]) to a use id.
+    uses_map: FxHashMap<ExpressionNodeKey, ScopedUseId>,
 }
 
 impl AstIds {
     fn expression_id(&self, key: impl Into<ExpressionNodeKey>) -> ScopedExpressionId {
         self.expressions_map[&key.into()]
     }
+
+    fn use_id(&self, key: impl Into<ExpressionNodeKey>) -> ScopedUseId {
+        self.uses_map[&key.into()]
+    }
 }
 
 fn ast_ids<'db>(db: &'db dyn Db, scope: ScopeId) -> &'db AstIds {
     semantic_index(db, scope.file(db)).ast_ids(scope.file_scope_id(db))
+}
+
+pub trait HasScopedUseId {
+    /// The type of the ID uniquely identifying the use.
+    type Id: Copy;
+
+    /// Returns the ID that uniquely identifies the use in `scope`.
+    fn scoped_use_id(&self, db: &dyn Db, scope: ScopeId) -> Self::Id;
+}
+
+/// Uniquely identifies a use of a name in a [`crate::semantic_index::symbol::FileScopeId`].
+#[newtype_index]
+pub struct ScopedUseId;
+
+impl HasScopedUseId for ast::ExprName {
+    type Id = ScopedUseId;
+
+    fn scoped_use_id(&self, db: &dyn Db, scope: ScopeId) -> Self::Id {
+        let expression_ref = ExpressionRef::from(self);
+        expression_ref.scoped_use_id(db, scope)
+    }
+}
+
+impl HasScopedUseId for ast::ExpressionRef<'_> {
+    type Id = ScopedUseId;
+
+    fn scoped_use_id(&self, db: &dyn Db, scope: ScopeId) -> Self::Id {
+        let ast_ids = ast_ids(db, scope);
+        ast_ids.use_id(*self)
+    }
 }
 
 pub trait HasScopedAstId {
@@ -110,38 +146,43 @@ impl HasScopedAstId for ast::ExpressionRef<'_> {
 
 #[derive(Debug)]
 pub(super) struct AstIdsBuilder {
-    next_id: ScopedExpressionId,
     expressions_map: FxHashMap<ExpressionNodeKey, ScopedExpressionId>,
+    uses_map: FxHashMap<ExpressionNodeKey, ScopedUseId>,
 }
 
 impl AstIdsBuilder {
     pub(super) fn new() -> Self {
         Self {
-            next_id: ScopedExpressionId::new(0),
             expressions_map: FxHashMap::default(),
+            uses_map: FxHashMap::default(),
         }
     }
 
-    /// Adds `expr` to the AST ids map and returns its id.
-    ///
-    /// ## Safety
-    /// The function is marked as unsafe because it calls [`AstNodeRef::new`] which requires
-    /// that `expr` is a child of `parsed`.
-    #[allow(unsafe_code)]
+    /// Adds `expr` to the expression ids map and returns its id.
     pub(super) fn record_expression(&mut self, expr: &ast::Expr) -> ScopedExpressionId {
-        let expression_id = self.next_id;
-        self.next_id = expression_id + 1;
+        let expression_id = self.expressions_map.len().into();
 
         self.expressions_map.insert(expr.into(), expression_id);
 
         expression_id
     }
 
+    /// Adds `expr` to the use ids map and returns its id.
+    pub(super) fn record_use(&mut self, expr: &ast::Expr) -> ScopedUseId {
+        let use_id = self.uses_map.len().into();
+
+        self.uses_map.insert(expr.into(), use_id);
+
+        use_id
+    }
+
     pub(super) fn finish(mut self) -> AstIds {
         self.expressions_map.shrink_to_fit();
+        self.uses_map.shrink_to_fit();
 
         AstIds {
             expressions_map: self.expressions_map,
+            uses_map: self.uses_map,
         }
     }
 }

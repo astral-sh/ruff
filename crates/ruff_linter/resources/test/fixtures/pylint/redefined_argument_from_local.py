@@ -26,6 +26,16 @@ def func(_):
         ...
 
 
+def func(foo):
+    for _ in bar(foo for foo in [1]):
+        pass
+
+
+def func(foo):
+    for _ in bar((foo := 1) for foo in [1]):
+        pass
+
+
 # Errors
 def func(a):
     for a in range(1):
