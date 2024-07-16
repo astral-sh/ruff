@@ -17,24 +17,28 @@ use crate::checkers::ast::Checker;
 ///
 /// ```python
 /// class Point:
-///    def __init__(self, x, y):
-///       self.x = x
-///       self.y = y
+///     def __init__(self, x, y):
+///         self.x = x
+///         self.y = y
 /// ```
 ///
 /// Use instead:
+///
 /// ```python
 /// from collections import namedtuple
 ///
-/// Point = namedtuple('Point', ['x', 'y'])
+/// Point = namedtuple("Point", ["x", "y"])
 /// ```
+///
 /// or:
+///
 /// ```python
 /// from typing import NamedTuple
 ///
+///
 /// class Point(NamedTuple):
-///    x: int
-///    y: int
+///     x: int
+///     y: int
 /// ```
 
 #[violation]
