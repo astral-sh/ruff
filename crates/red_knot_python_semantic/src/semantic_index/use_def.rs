@@ -44,7 +44,7 @@ struct Definitions {
 impl Default for Definitions {
     fn default() -> Self {
         Self {
-            definitions: 0..0,
+            definitions: Range::default(),
             may_be_unbound: true,
         }
     }
@@ -60,7 +60,7 @@ pub(super) struct UseDefMapBuilder<'db> {
 
     definitions_by_use: IndexVec<ScopedUseId, Definitions>,
 
-    // builder state: currently visible definitions for each symbol
+    /// builder state: currently visible definitions for each symbol
     definitions_by_symbol: IndexVec<ScopedSymbolId, Definitions>,
 }
 
@@ -78,7 +78,11 @@ impl<'db> UseDefMapBuilder<'db> {
         debug_assert_eq!(symbol, new_symbol);
     }
 
-    pub(super) fn record_def(&mut self, symbol: ScopedSymbolId, definition: Definition<'db>) {
+    pub(super) fn record_definition(
+        &mut self,
+        symbol: ScopedSymbolId,
+        definition: Definition<'db>,
+    ) {
         let def_idx = self.all_definitions.len();
         self.all_definitions.push(definition);
         self.definitions_by_symbol[symbol] = Definitions {
@@ -110,7 +114,7 @@ impl<'db> UseDefMapBuilder<'db> {
 
     pub(super) fn merge(&mut self, state: &FlowSnapshot) {
         for (symbol_id, to_merge) in state.definitions_by_symbol.iter_enumerated() {
-            let current = self.definitions_by_symbol.get_mut(symbol_id).unwrap();
+            let current = &mut self.definitions_by_symbol[symbol_id];
             // if the symbol can be unbound in either predecessor, it can be unbound
             current.may_be_unbound |= to_merge.may_be_unbound;
             // merge the definition ranges

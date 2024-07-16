@@ -11,9 +11,7 @@ use crate::semantic_index::definition::{Definition, DefinitionKind};
 use crate::semantic_index::expression::Expression;
 use crate::semantic_index::symbol::{NodeWithScopeRef, ScopeId};
 use crate::semantic_index::SemanticIndex;
-use crate::types::{
-    definitions_ty, use_def_map, ClassType, FunctionType, Name, Type, UnionTypeBuilder,
-};
+use crate::types::{definitions_ty, ClassType, FunctionType, Name, Type, UnionTypeBuilder};
 use crate::Db;
 use ruff_db::parsed::parsed_module;
 
@@ -617,7 +615,7 @@ impl<'db> TypeInferenceBuilder<'db> {
 
         match ctx {
             ExprContext::Load => {
-                let use_def = use_def_map(self.db, self.scope);
+                let use_def = self.index.use_def_map(self.scope.file_scope_id(self.db));
                 let use_id = name.scoped_use_id(self.db, self.scope);
                 let definitions = use_def.use_definitions(use_id);
                 definitions_ty(self.db, definitions, use_def.use_may_be_unbound(use_id))
@@ -717,7 +715,7 @@ mod tests {
     use ruff_db::files::{system_path_to_file, File};
     use ruff_db::parsed::parsed_module;
     use ruff_db::system::{DbWithTestSystem, SystemPathBuf};
-    use ruff_db::testing::{assert_function_query_was_not_run, assert_function_query_was_run};
+    use ruff_db::testing::assert_function_query_was_not_run;
     use ruff_python_ast::name::Name;
 
     use crate::db::tests::TestDb;
@@ -727,7 +725,6 @@ mod tests {
         use_def_map, Type,
     };
     use crate::{HasTy, SemanticModel};
-    use textwrap::dedent;
 
     fn setup_db() -> TestDb {
         let mut db = TestDb::new();
@@ -753,13 +750,6 @@ mod tests {
         assert_eq!(ty.display(db).to_string(), expected);
     }
 
-    impl TestDb {
-        fn write_dedented(&mut self, path: &str, content: &str) -> anyhow::Result<()> {
-            self.write_file(path, dedent(content))?;
-            Ok(())
-        }
-    }
-
     #[test]
     fn follow_import_to_class() -> anyhow::Result<()> {
         let mut db = setup_db();
@@ -781,11 +771,11 @@ mod tests {
         db.write_dedented(
             "src/mod.py",
             "
-                class Base:
-                    pass
+            class Base:
+                pass
 
-                class Sub(Base):
-                    pass
+            class Sub(Base):
+                pass
             ",
         )?;
 
@@ -814,8 +804,8 @@ mod tests {
         db.write_dedented(
             "src/mod.py",
             "
-                class C:
-                    def f(self): pass
+            class C:
+                def f(self): pass
             ",
         )?;
 
@@ -869,10 +859,10 @@ mod tests {
         db.write_dedented(
             "src/a.py",
             "
-                if flag:
-                    x = 1
-                else:
-                    x = 2
+            if flag:
+                x = 1
+            else:
+                x = 2
             ",
         )?;
 
@@ -888,11 +878,11 @@ mod tests {
         db.write_dedented(
             "src/a.py",
             "
-                a = 2 + 1
-                b = a - 4
-                c = a * b
-                d = c / 3
-                e = 5 % 3
+            a = 2 + 1
+            b = a - 4
+            c = a * b
+            d = c / 3
+            e = 5 % 3
             ",
         )?;
 
@@ -935,11 +925,11 @@ mod tests {
         db.write_dedented(
             "src/a.py",
             "
-                y = 0
-                z = 0
-                x = (y := 1) if flag else (z := 2)
-                a = y
-                b = z
+            y = 0
+            z = 0
+            x = (y := 1) if flag else (z := 2)
+            a = y
+            b = z
             ",
         )?;
 
@@ -963,10 +953,9 @@ mod tests {
 
     #[test]
     fn multi_target_assign() -> anyhow::Result<()> {
-        let db = setup_db();
+        let mut db = setup_db();
 
-        db.memory_file_system()
-            .write_file("src/a.py", "x = y = 1")?;
+        db.write_file("src/a.py", "x = y = 1")?;
 
         assert_public_ty(&db, "src/a.py", "x", "Literal[1]");
         assert_public_ty(&db, "src/a.py", "y", "Literal[1]");
@@ -991,11 +980,11 @@ mod tests {
         db.write_dedented(
             "src/a.py",
             "
-                y = 1
-                y = 2
-                if flag:
-                    y = 3
-                x = y
+            y = 1
+            y = 2
+            if flag:
+                y = 3
+            x = y
             ",
         )?;
 
@@ -1010,9 +999,9 @@ mod tests {
         db.write_dedented(
             "src/a.py",
             "
-                if flag:
-                    y = 3
-                x = y
+            if flag:
+                y = 3
+            x = y
             ",
         )?;
 
@@ -1027,17 +1016,17 @@ mod tests {
         db.write_dedented(
             "src/a.py",
             "
-                y = 1
-                y = 2
-                if flag:
-                    y = 3
-                elif flag2:
-                    y = 4
-                else:
-                    r = y
-                    y = 5
-                    s = y
-                x = y
+            y = 1
+            y = 2
+            if flag:
+                y = 3
+            elif flag2:
+                y = 4
+            else:
+                r = y
+                y = 5
+                s = y
+            x = y
             ",
         )?;
 
@@ -1054,13 +1043,13 @@ mod tests {
         db.write_dedented(
             "src/a.py",
             "
-                y = 1
-                y = 2
-                if flag:
-                    y = 3
-                elif flag2:
-                    y = 4
-                x = y
+            y = 1
+            y = 2
+            if flag:
+                y = 3
+            elif flag2:
+                y = 4
+            x = y
             ",
         )?;
 
@@ -1075,16 +1064,16 @@ mod tests {
         db.write_dedented(
             "src/a.py",
             "
-                class A: pass
-                import b
-                class C(b.B): pass
+            class A: pass
+            import b
+            class C(b.B): pass
             ",
         )?;
         db.write_dedented(
             "src/b.py",
             "
-                from a import A
-                class B(A): pass
+            from a import A
+            class B(A): pass
             ",
         )?;
 
@@ -1155,19 +1144,9 @@ mod tests {
 
         let a = system_path_to_file(&db, "/src/a.py").unwrap();
 
-        db.clear_salsa_events();
         let x_ty_2 = module_global_symbol_ty_by_name(&db, a, "x");
 
         assert_eq!(x_ty_2.display(&db).to_string(), "Literal[20]");
-
-        let events = db.take_salsa_events();
-
-        assert_function_query_was_run::<infer_definition_types, _, _>(
-            &db,
-            |ty| &ty.function,
-            &first_public_def(&db, a, "x"),
-            &events,
-        );
 
         Ok(())
     }

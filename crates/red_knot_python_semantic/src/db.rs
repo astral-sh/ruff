@@ -47,6 +47,7 @@ pub(crate) mod tests {
     use ruff_db::system::{DbWithTestSystem, System, TestSystem};
     use ruff_db::vendored::VendoredFileSystem;
     use ruff_db::{Db as SourceDb, Jar as SourceJar, Upcast};
+    use ruff_python_trivia::textwrap;
 
     use super::{Db, Jar};
 
@@ -87,6 +88,12 @@ pub(crate) mod tests {
         /// If there are any pending salsa snapshots.
         pub(crate) fn clear_salsa_events(&mut self) {
             self.take_salsa_events();
+        }
+
+        /// Write auto-dedented text to a file.
+        pub(crate) fn write_dedented(&mut self, path: &str, content: &str) -> anyhow::Result<()> {
+            self.write_file(path, textwrap::dedent(content))?;
+            Ok(())
         }
     }
 

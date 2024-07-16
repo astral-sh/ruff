@@ -21,7 +21,7 @@ use crate::semantic_index::symbol::{
     FileScopeId, NodeWithScopeKey, NodeWithScopeRef, Scope, ScopeId, ScopedSymbolId, SymbolFlags,
     SymbolTableBuilder,
 };
-use crate::semantic_index::usedef::{FlowSnapshot, UseDefMapBuilder};
+use crate::semantic_index::use_def::{FlowSnapshot, UseDefMapBuilder};
 use crate::semantic_index::SemanticIndex;
 use crate::Db;
 
@@ -176,7 +176,8 @@ impl<'db> SemanticIndexBuilder<'db> {
 
         self.definitions_by_node
             .insert(definition_node.key(), definition);
-        self.current_use_def_map().record_def(symbol, definition);
+        self.current_use_def_map()
+            .record_definition(symbol, definition);
 
         definition
     }

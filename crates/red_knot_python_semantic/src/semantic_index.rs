@@ -15,7 +15,7 @@ use crate::semantic_index::expression::Expression;
 use crate::semantic_index::symbol::{
     FileScopeId, NodeWithScopeKey, NodeWithScopeRef, Scope, ScopeId, ScopedSymbolId, SymbolTable,
 };
-use crate::semantic_index::usedef::UseDefMap;
+use crate::semantic_index::use_def::UseDefMap;
 use crate::Db;
 
 pub mod ast_ids;
@@ -23,7 +23,7 @@ mod builder;
 pub mod definition;
 pub mod expression;
 pub mod symbol;
-pub mod usedef;
+pub mod use_def;
 
 type SymbolMap = hashbrown::HashMap<ScopedSymbolId, (), ()>;
 
@@ -188,6 +188,9 @@ impl<'db> SemanticIndex<'db> {
     }
 
     /// Returns the [`Expression`] ingredient for an expression node.
+    /// Panics if we have no expression ingredient for that node. We can only call this method for
+    /// standalone-inferable expressions, which we call `add_standalone_expression` for in
+    /// [`SemanticIndexBuilder`].
     pub(crate) fn expression(
         &self,
         expression_key: impl Into<ExpressionNodeKey>,
