@@ -2009,16 +2009,6 @@ impl<'a> Checker<'a> {
             return;
         }
 
-        // If the expression is part of a comprehension target, then it's a comprehension variable
-        // assignment, as in:
-        // ```python
-        // [x for x in range(10)]
-        // ```
-        if self.semantic.in_comprehension_assignment() {
-            self.add_binding(id, expr.range(), BindingKind::ComprehensionVar, flags);
-            return;
-        }
-
         // Match the left-hand side of an annotated assignment without a value,
         // like `x` in `x: int`. N.B. In stub files, these should be viewed
         // as assignments on par with statements such as `x: int = 5`.
