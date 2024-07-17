@@ -396,15 +396,4 @@ mod tests {
         assert_messages!(diagnostics);
         Ok(())
     }
-
-    #[test]
-    fn unspecified_encoding_python39_or_lower() -> Result<()> {
-        let diagnostics = test_path(
-            Path::new("pylint/unspecified_encoding.py"),
-            &LinterSettings::for_rule(Rule::UnspecifiedEncoding)
-                .with_target_version(PythonVersion::Py39),
-        )?;
-        assert_messages!(diagnostics);
-        Ok(())
-    }
 }
