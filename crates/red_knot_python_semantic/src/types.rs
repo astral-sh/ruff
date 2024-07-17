@@ -89,7 +89,7 @@ pub(crate) fn definitions_ty<'db>(
     }
 }
 
-/// unique ID for a type
+/// Unique ID for a type.
 #[derive(Copy, Clone, Debug, PartialOrd, Ord, PartialEq, Eq, Hash)]
 pub enum Type<'db> {
     /// the dynamic type: a statically-unknown set of values

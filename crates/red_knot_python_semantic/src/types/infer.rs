@@ -2,7 +2,8 @@
 //! definition-level, and expression-level.
 //!
 //! Scope-level inference is for when we are actually checking a file, and need to check types for
-//! everything in that file's scopes.
+//! everything in that file's scopes, or give a linter access to types of arbitrary expressions
+//! (via the [`HasTy`](crate::semantic_model::HasTy) trait).
 //!
 //! Definition-level inference allows us to look up the types of symbols in other scopes (e.g. for
 //! imports) with the minimum inference necessary, so that if we're looking up one symbol from a
@@ -118,6 +119,51 @@ impl<'db> TypeInference<'db> {
 }
 
 /// Builder to infer all types in a region.
+///
+/// A builder is used by creating it with [`new()`](TypeInferenceBuilder::new), and then calling
+/// [`finish()`](TypeInferenceBuilder::finish) on it, which returns the resulting
+/// [`TypeInference`].
+///
+/// There are a few different kinds of methods in the type inference builder, and the naming
+/// distinctions are a bit subtle.
+///
+/// The `finish` method calls [`infer_region`](TypeInferenceBuilder::infer_region), which delegates
+/// to one of [`infer_region_scope`](TypeInferenceBuilder::infer_region_scope),
+/// [`infer_region_definition`](TypeInferenceBuilder::infer_region_definition), or
+/// [`infer_region_expression`](TypeInferenceBuilder::infer_region_expression), depending which
+/// kind of [`InferenceRegion`] we are inferring types for.
+///
+/// Scope inference starts with the scope body, walking all statements and expressions and
+/// recording the types of each expression in the [`TypeInference`] result. Most of the methods
+/// here (with names like `infer_*_statement` or `infer_*_expression` or some other node kind) take
+/// a single AST node and are called as part of this AST visit.
+///
+/// When the visit encounters a node which creates a [`Definition`], we look up the definition in
+/// the semantic index and call the [`infer_definition_types()`] query on it, which creates another
+/// [`TypeInferenceBuilder`] just for that definition, and we merge the returned [`TypeInference`]
+/// into the one we are currently building for the entire scope. Using the query in this way
+/// ensures that if we first infer types for some scattered definitions in a scope, and later for
+/// the entire scope, we don't re-infer any types, we re-use the cached inference for those
+/// definitions and their sub-expressions.
+///
+/// Functions with a name like `infer_*_definition` take both a node and a [`Definition`], and are
+/// called by [`infer_region_definition`](TypeInferenceBuilder::infer_region_definition).
+///
+/// So for example we have both
+/// [`infer_function_definition_statement`](TypeInferenceBuilder::infer_function_definition_statement),
+/// which takes just the function AST node, and
+/// [`infer_function_definition`](TypeInferenceBuilder::infer_function_definition), which takes
+/// both the node and the [`Definition`] id. The former is called as part of walking the AST, and
+/// it just looks up the [`Definition`] for that function in the semantic index and calls
+/// [`infer_definition_types()`] on it, which will create a new [`TypeInferenceBuilder`] with
+/// [`InferenceRegion::Definition`], and in that builder
+/// [`infer_region_definition`](TypeInferenceBuilder::infer_region_definition) will call
+/// [`infer_function_definition`](TypeInferenceBuilder::infer_function_definition) to actually
+/// infer a type for the definition.
+///
+/// Similarly, when we encounter a standalone-inferable expression (right-hand side of an
+/// assignment, type narrowing guard), we use the [`infer_expression_types()`] query to ensure we
+/// don't infer its types more than once.
 struct TypeInferenceBuilder<'db> {
     db: &'db dyn Db,
     index: &'db SemanticIndex<'db>,
@@ -131,43 +177,6 @@ struct TypeInferenceBuilder<'db> {
     types: TypeInference<'db>,
 }
 
-/// A builder is used by creating it with `::new`, and then calling `.finish()` on it, which
-/// returns the resulting [`TypeInference`].
-///
-/// There are a few different kinds of methods in the type inference builder, and the naming
-/// distinctions are a bit subtle.
-///
-/// The `finish` method calls `infer_region`, which delegates to one of `infer_region_scope`,
-/// `infer_region_definition`, or `infer_region_expression`, depending which kind of
-/// [`InferenceRegion`] we are inferring types for.
-///
-/// Scope inference starts with the scope body, walking all statements and expressions and
-/// recording the types of each expression in the [`TypeInference`] result. Most of the methods
-/// here (with names like `infer_*_statement` or `infer_*_expression` or some other node kind) take
-/// a single AST node and are called as part of this AST visit.
-///
-/// When the visit encounters a node which creates a [`Definition`], we look up the definition in
-/// the semantic index and call the `infer_definition_types` query on it, which creates another
-/// [`TypeInferenceBuilder`] just for that definition, and we merge the returned `TypeInference`
-/// into the one we are currently building for the entire scope. Using the query in this way
-/// ensures that if we first infer types for some scattered definitions in a scope, and later for
-/// the entire scope, we don't re-infer any types, we re-use the cached inference for those
-/// definitions and their sub-expressions.
-///
-/// Functions with a name like `infer_*_definition` take both a node and a [`Definition`], and are
-/// called by `infer_region_definition`.
-///
-/// So for example we have both `infer_function_definition_statement`, which takes just the
-/// function AST node, and `infer_function_definition`, which takes both the node and the
-/// [`Definition`] id. The former is called as part of walking the AST, and it just looks up the
-/// [`Definition`] for that function in the semantic index and calls `infer_definition_types` on
-/// it, which will create a new `TypeInferenceBuilder` with `InferenceRegion::Definition`, and in
-/// that builder `infer_region_definition` will call `infer_function_definition` to actually infer
-/// a type for the definition.
-///
-/// Similarly, when we encounter a standalone-inferable expression (right-hand side of an
-/// assignment, type narrowing guard), we use the `infer_expression_types` query to ensure we don't
-/// infer its types more than once.
 impl<'db> TypeInferenceBuilder<'db> {
     /// Creates a new builder for inferring types in a region.
     pub(super) fn new(
