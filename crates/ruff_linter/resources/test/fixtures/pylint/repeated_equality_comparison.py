@@ -55,3 +55,9 @@ foo() == "a" or foo() == "b"  # Calls.
 import sys
 
 sys.platform == "win32" or sys.platform == "emscripten"  # sys attributes
+
+foo == "a" or "c" == bar or foo == "b" or "d" == bar  # Multiple targets
+
+foo == "a" or ("c" == bar or "d" == bar) or foo == "b"  # Multiple targets
+
+foo == "a" or foo == "b" or "c" != bar and "d" != bar  # Multiple targets
