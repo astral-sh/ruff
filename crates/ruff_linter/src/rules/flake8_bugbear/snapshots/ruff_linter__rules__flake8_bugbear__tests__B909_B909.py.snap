@@ -340,12 +340,41 @@ B909.py:150:8: B909 Mutation to loop iterable `some_list` during iteration
 152 |     else:
     |
 
-B909.py:164:5: B909 Mutation to loop iterable `some_list` during iteration
+B909.py:157:5: B909 Mutation to loop iterable `some_list` during iteration
     |
-162 | # should error
-163 | for i, elem in enumerate(some_list):
-164 |     some_list.pop(0)
+155 | # should error
+156 | for elem in some_list:
+157 |     del some_list[elem]
+    |     ^^^^^^^^^^^^^^^^^^^ B909
+158 |     some_list.remove(elem)
+159 |     some_list.discard(elem)
+    |
+
+B909.py:158:5: B909 Mutation to loop iterable `some_list` during iteration
+    |
+156 | for elem in some_list:
+157 |     del some_list[elem]
+158 |     some_list.remove(elem)
+    |     ^^^^^^^^^^^^^^^^ B909
+159 |     some_list.discard(elem)
+    |
+
+B909.py:159:5: B909 Mutation to loop iterable `some_list` during iteration
+    |
+157 |     del some_list[elem]
+158 |     some_list.remove(elem)
+159 |     some_list.discard(elem)
+    |     ^^^^^^^^^^^^^^^^^ B909
+160 | 
+161 | # should not error
+    |
+
+B909.py:167:5: B909 Mutation to loop iterable `some_list` during iteration
+    |
+165 | # should error
+166 | for i, elem in enumerate(some_list):
+167 |     some_list.pop(0)
     |     ^^^^^^^^^^^^^ B909
-165 | 
-166 | # should not error (list)
+168 | 
+169 | # should not error (list)
     |

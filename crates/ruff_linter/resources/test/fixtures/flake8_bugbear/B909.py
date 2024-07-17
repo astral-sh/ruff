@@ -152,12 +152,15 @@ for elem in some_list:
     else:
         break
 
-# should not error
+# should error
 for elem in some_list:
     del some_list[elem]
-    some_list[elem] = 1
     some_list.remove(elem)
     some_list.discard(elem)
+
+# should not error
+for elem in some_list:
+    some_list[elem] = 1
 
 # should error
 for i, elem in enumerate(some_list):
