@@ -1,6 +1,6 @@
 use std::ops::Deref;
 
-use itertools::{any, Itertools};
+use itertools::Itertools;
 use rustc_hash::{FxBuildHasher, FxHashMap};
 
 use ast::ExprContext;
@@ -8,7 +8,7 @@ use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::comparable::ComparableExpr;
 use ruff_python_ast::hashable::HashableExpr;
-use ruff_python_ast::helpers::any_over_expr;
+use ruff_python_ast::helpers::{any_over_expr, contains_effect};
 use ruff_python_ast::{self as ast, BoolOp, CmpOp, Expr};
 use ruff_python_semantic::SemanticModel;
 use ruff_source_file::Locator;
@@ -81,7 +81,7 @@ pub(crate) fn repeated_equality_comparison(checker: &mut Checker, bool_op: &ast:
     }
 
     // Map from expression hash to (starting offset, number of comparisons, list
-    let mut value_to_comparators: FxHashMap<HashableExpr, (TextSize, Vec<&Expr>)> =
+    let mut value_to_comparators: FxHashMap<HashableExpr, (TextSize, Vec<&Expr>, Vec<&Expr>)> =
         FxHashMap::with_capacity_and_hasher(bool_op.values.len() * 2, FxBuildHasher);
 
     for value in &bool_op.values {
@@ -99,23 +99,25 @@ pub(crate) fn repeated_equality_comparison(checker: &mut Checker, bool_op: &ast:
         };
 
         if matches!(left.as_ref(), Expr::Name(_) | Expr::Attribute(_)) {
-            let (_, left_matches) = value_to_comparators
+            let (_, left_matches, value_matches) = value_to_comparators
                 .entry(left.deref().into())
-                .or_insert_with(|| (left.start(), Vec::new()));
+                .or_insert_with(|| (left.start(), Vec::new(), Vec::new()));
             left_matches.push(right);
+            value_matches.push(value);
         }
 
         if matches!(right, Expr::Name(_) | Expr::Attribute(_)) {
-            let (_, right_matches) = value_to_comparators
+            let (_, right_matches, value_matches) = value_to_comparators
                 .entry(right.into())
-                .or_insert_with(|| (right.start(), Vec::new()));
+                .or_insert_with(|| (right.start(), Vec::new(), Vec::new()));
             right_matches.push(left);
+            value_matches.push(value);
         }
     }
 
-    for (value, (_, comparators)) in value_to_comparators
+    for (value, (start, comparators, values)) in value_to_comparators
         .iter()
-        .sorted_by_key(|(_, (start, _))| *start)
+        .sorted_by_key(|(_, (start, _, _))| *start)
     {
         if comparators.len() > 1 {
             let mut diagnostic = Diagnostic::new(
@@ -130,19 +132,35 @@ pub(crate) fn repeated_equality_comparison(checker: &mut Checker, bool_op: &ast:
                 bool_op.range(),
             );
 
+            // Grab the remaining comparisons.
+            let (before, after) = bool_op
+                .values
+                .iter()
+                .filter(|value| !values.contains(value))
+                .partition::<Vec<_>, _>(|value| value.start() < *start);
+
             diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(
-                checker.generator().expr(&Expr::Compare(ast::ExprCompare {
-                    left: Box::new(value.as_expr().clone()),
-                    ops: match bool_op.op {
-                        BoolOp::Or => Box::from([CmpOp::In]),
-                        BoolOp::And => Box::from([CmpOp::NotIn]),
-                    },
-                    comparators: Box::from([Expr::Tuple(ast::ExprTuple {
-                        elts: comparators.iter().copied().cloned().collect(),
-                        range: TextRange::default(),
-                        ctx: ExprContext::Load,
-                        parenthesized: true,
-                    })]),
+                checker.generator().expr(&Expr::BoolOp(ast::ExprBoolOp {
+                    op: bool_op.op,
+                    values: before
+                        .into_iter()
+                        .cloned()
+                        .chain(std::iter::once(Expr::Compare(ast::ExprCompare {
+                            left: Box::new(value.as_expr().clone()),
+                            ops: match bool_op.op {
+                                BoolOp::Or => Box::from([CmpOp::In]),
+                                BoolOp::And => Box::from([CmpOp::NotIn]),
+                            },
+                            comparators: Box::from([Expr::Tuple(ast::ExprTuple {
+                                elts: comparators.iter().copied().cloned().collect(),
+                                range: TextRange::default(),
+                                ctx: ExprContext::Load,
+                                parenthesized: true,
+                            })]),
+                            range: bool_op.range(),
+                        })))
+                        .chain(after.into_iter().cloned())
+                        .collect(),
                     range: bool_op.range(),
                 })),
                 bool_op.range(),
@@ -187,11 +205,7 @@ fn is_allowed_value(bool_op: BoolOp, value: &Expr, semantic: &SemanticModel) -> 
         return false;
     }
 
-    if left.is_call_expr() {
-        return false;
-    }
-
-    if any(comparators.iter(), Expr::is_call_expr) {
+    if contains_effect(value, |id| semantic.has_builtin_binding(id)) {
         return false;
     }
 
