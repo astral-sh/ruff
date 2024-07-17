@@ -302,8 +302,11 @@ mod tests {
     use ruff_db::files::{system_path_to_file, File};
     use ruff_db::parsed::parsed_module;
     use ruff_db::system::DbWithTestSystem;
+    use ruff_python_ast as ast;
 
     use crate::db::tests::TestDb;
+    use crate::semantic_index::ast_ids::HasScopedUseId;
+    use crate::semantic_index::definition::DefinitionKind;
     use crate::semantic_index::symbol::{FileScopeId, Scope, ScopeKind, SymbolTable};
     use crate::semantic_index::{module_global_scope, semantic_index, symbol_table, use_def_map};
     use crate::Db;
@@ -366,7 +369,10 @@ mod tests {
         let foo = module_global_table.symbol_id_by_name("foo").unwrap();
 
         let use_def = use_def_map(&db, scope);
-        assert_eq!(use_def.public_definitions(foo).len(), 1);
+        let [definition] = use_def.public_definitions(foo) else {
+            panic!("expected one definition");
+        };
+        assert!(matches!(definition.node(&db), DefinitionKind::Import(_)));
     }
 
     #[test]
@@ -400,16 +406,17 @@ mod tests {
         );
 
         let use_def = use_def_map(&db, scope);
-        assert_eq!(
-            use_def
-                .public_definitions(
-                    module_global_table
-                        .symbol_id_by_name("foo")
-                        .expect("symbol exists")
-                )
-                .len(),
-            1
-        );
+        let [definition] = use_def.public_definitions(
+            module_global_table
+                .symbol_id_by_name("foo")
+                .expect("symbol to exist"),
+        ) else {
+            panic!("expected one definition");
+        };
+        assert!(matches!(
+            definition.node(&db),
+            DefinitionKind::ImportFrom(_)
+        ));
     }
 
     #[test]
@@ -426,16 +433,17 @@ mod tests {
             "a symbol used but not defined in a scope should have only the used flag"
         );
         let use_def = use_def_map(&db, scope);
-        assert_eq!(
-            use_def
-                .public_definitions(
-                    module_global_table
-                        .symbol_id_by_name("x")
-                        .expect("symbol exists")
-                )
-                .len(),
-            1
-        );
+        let [definition] = use_def.public_definitions(
+            module_global_table
+                .symbol_id_by_name("x")
+                .expect("symbol exists"),
+        ) else {
+            panic!("expected one definition");
+        };
+        assert!(matches!(
+            definition.node(&db),
+            DefinitionKind::Assignment(_)
+        ));
     }
 
     #[test]
@@ -453,24 +461,28 @@ y = 2
 
         let index = semantic_index(&db, file);
 
-        let scopes: Vec<_> = index.child_scopes(FileScopeId::module_global()).collect();
-        assert_eq!(scopes.len(), 1);
-
-        let (class_scope_id, class_scope) = scopes[0];
+        let [(class_scope_id, class_scope)] = index
+            .child_scopes(FileScopeId::module_global())
+            .collect::<Vec<_>>()[..]
+        else {
+            panic!("expected one child scope")
+        };
         assert_eq!(class_scope.kind(), ScopeKind::Class);
-
         assert_eq!(class_scope_id.to_scope_id(&db, file).name(&db), "C");
 
         let class_table = index.symbol_table(class_scope_id);
         assert_eq!(names(&class_table), vec!["x"]);
 
         let use_def = index.use_def_map(class_scope_id);
-        assert_eq!(
-            use_def
-                .public_definitions(class_table.symbol_id_by_name("x").expect("symbol exists"))
-                .len(),
-            1
-        );
+        let [definition] =
+            use_def.public_definitions(class_table.symbol_id_by_name("x").expect("symbol exists"))
+        else {
+            panic!("expected one definition");
+        };
+        assert!(matches!(
+            definition.node(&db),
+            DefinitionKind::Assignment(_)
+        ));
     }
 
     #[test]
@@ -487,12 +499,12 @@ y = 2
 
         assert_eq!(names(&module_global_table), vec!["func", "y"]);
 
-        let scopes = index
+        let [(function_scope_id, function_scope)] = index
             .child_scopes(FileScopeId::module_global())
-            .collect::<Vec<_>>();
-        assert_eq!(scopes.len(), 1);
-
-        let (function_scope_id, function_scope) = scopes[0];
+            .collect::<Vec<_>>()[..]
+        else {
+            panic!("expected one child scope")
+        };
         assert_eq!(function_scope.kind(), ScopeKind::Function);
         assert_eq!(function_scope_id.to_scope_id(&db, file).name(&db), "func");
 
@@ -500,16 +512,17 @@ y = 2
         assert_eq!(names(&function_table), vec!["x"]);
 
         let use_def = index.use_def_map(function_scope_id);
-        assert_eq!(
-            use_def
-                .public_definitions(
-                    function_table
-                        .symbol_id_by_name("x")
-                        .expect("symbol exists")
-                )
-                .len(),
-            1
-        );
+        let [definition] = use_def.public_definitions(
+            function_table
+                .symbol_id_by_name("x")
+                .expect("symbol exists"),
+        ) else {
+            panic!("expected one definition");
+        };
+        assert!(matches!(
+            definition.node(&db),
+            DefinitionKind::Assignment(_)
+        ));
     }
 
     #[test]
@@ -526,11 +539,12 @@ def func():
         let module_global_table = index.symbol_table(FileScopeId::module_global());
 
         assert_eq!(names(&module_global_table), vec!["func"]);
-        let scopes: Vec<_> = index.child_scopes(FileScopeId::module_global()).collect();
-        assert_eq!(scopes.len(), 2);
-
-        let (func_scope1_id, func_scope_1) = scopes[0];
-        let (func_scope2_id, func_scope_2) = scopes[1];
+        let [(func_scope1_id, func_scope_1), (func_scope2_id, func_scope_2)] = index
+            .child_scopes(FileScopeId::module_global())
+            .collect::<Vec<_>>()[..]
+        else {
+            panic!("expected two child scopes");
+        };
 
         assert_eq!(func_scope_1.kind(), ScopeKind::Function);
 
@@ -544,16 +558,14 @@ def func():
         assert_eq!(names(&func2_table), vec!["y"]);
 
         let use_def = index.use_def_map(FileScopeId::module_global());
-        assert_eq!(
-            use_def
-                .public_definitions(
-                    module_global_table
-                        .symbol_id_by_name("func")
-                        .expect("symbol exists")
-                )
-                .len(),
-            1
-        );
+        let [definition] = use_def.public_definitions(
+            module_global_table
+                .symbol_id_by_name("func")
+                .expect("symbol exists"),
+        ) else {
+            panic!("expected one definition");
+        };
+        assert!(matches!(definition.node(&db), DefinitionKind::Function(_)));
     }
 
     #[test]
@@ -570,18 +582,23 @@ def func[T]():
 
         assert_eq!(names(&module_global_table), vec!["func"]);
 
-        let scopes: Vec<_> = index.child_scopes(FileScopeId::module_global()).collect();
-        assert_eq!(scopes.len(), 1);
-        let (ann_scope_id, ann_scope) = scopes[0];
+        let [(ann_scope_id, ann_scope)] = index
+            .child_scopes(FileScopeId::module_global())
+            .collect::<Vec<_>>()[..]
+        else {
+            panic!("expected one child scope");
+        };
 
         assert_eq!(ann_scope.kind(), ScopeKind::Annotation);
         assert_eq!(ann_scope_id.to_scope_id(&db, file).name(&db), "func");
         let ann_table = index.symbol_table(ann_scope_id);
         assert_eq!(names(&ann_table), vec!["T"]);
 
-        let scopes: Vec<_> = index.child_scopes(ann_scope_id).collect();
-        assert_eq!(scopes.len(), 1);
-        let (func_scope_id, func_scope) = scopes[0];
+        let [(func_scope_id, func_scope)] =
+            index.child_scopes(ann_scope_id).collect::<Vec<_>>()[..]
+        else {
+            panic!("expected one child scope");
+        };
         assert_eq!(func_scope.kind(), ScopeKind::Function);
         assert_eq!(func_scope_id.to_scope_id(&db, file).name(&db), "func");
         let func_table = index.symbol_table(func_scope_id);
@@ -602,10 +619,13 @@ class C[T]:
 
         assert_eq!(names(&module_global_table), vec!["C"]);
 
-        let scopes: Vec<_> = index.child_scopes(FileScopeId::module_global()).collect();
+        let [(ann_scope_id, ann_scope)] = index
+            .child_scopes(FileScopeId::module_global())
+            .collect::<Vec<_>>()[..]
+        else {
+            panic!("expected one child scope");
+        };
 
-        assert_eq!(scopes.len(), 1);
-        let (ann_scope_id, ann_scope) = scopes[0];
         assert_eq!(ann_scope.kind(), ScopeKind::Annotation);
         assert_eq!(ann_scope_id.to_scope_id(&db, file).name(&db), "C");
         let ann_table = index.symbol_table(ann_scope_id);
@@ -617,48 +637,49 @@ class C[T]:
             "type parameters are defined by the scope that introduces them"
         );
 
-        let scopes: Vec<_> = index.child_scopes(ann_scope_id).collect();
-        assert_eq!(scopes.len(), 1);
-        let (class_scope_id, class_scope) = scopes[0];
+        let [(class_scope_id, class_scope)] =
+            index.child_scopes(ann_scope_id).collect::<Vec<_>>()[..]
+        else {
+            panic!("expected one child scope");
+        };
 
         assert_eq!(class_scope.kind(), ScopeKind::Class);
         assert_eq!(class_scope_id.to_scope_id(&db, file).name(&db), "C");
         assert_eq!(names(&index.symbol_table(class_scope_id)), vec!["x"]);
     }
 
-    // TODO: After porting the control flow graph.
-    // #[test]
-    // fn reachability_trivial() {
-    //     let parsed = parse("x = 1; x");
-    //     let ast = parsed.syntax();
-    //     let index = SemanticIndex::from_ast(ast);
-    //     let table = &index.symbol_table;
-    //     let x_sym = table
-    //         .module_global_symbol_id_by_name("x")
-    //         .expect("x symbol should exist");
-    //     let ast::Stmt::Expr(ast::StmtExpr { value: x_use, .. }) = &ast.body[1] else {
-    //         panic!("should be an expr")
-    //     };
-    //     let x_defs: Vec<_> = index
-    //         .reachable_definitions(x_sym, x_use)
-    //         .map(|constrained_definition| constrained_definition.definition)
-    //         .collect();
-    //     assert_eq!(x_defs.len(), 1);
-    //     let Definition::Assignment(node_key) = &x_defs[0] else {
-    //         panic!("def should be an assignment")
-    //     };
-    //     let Some(def_node) = node_key.resolve(ast.into()) else {
-    //         panic!("node key should resolve")
-    //     };
-    //     let ast::Expr::NumberLiteral(ast::ExprNumberLiteral {
-    //                                      value: ast::Number::Int(num),
-    //                                      ..
-    //                                  }) = &*def_node.value
-    //     else {
-    //         panic!("should be a number literal")
-    //     };
-    //     assert_eq!(*num, 1);
-    // }
+    #[test]
+    fn reachability_trivial() {
+        let TestCase { db, file } = test_case("x = 1; x");
+        let parsed = parsed_module(&db, file);
+        let scope = module_global_scope(&db, file);
+        let ast = parsed.syntax();
+        let ast::Stmt::Expr(ast::StmtExpr {
+            value: x_use_expr, ..
+        }) = &ast.body[1]
+        else {
+            panic!("should be an expr")
+        };
+        let ast::Expr::Name(x_use_expr_name) = x_use_expr.as_ref() else {
+            panic!("expected a Name");
+        };
+        let x_use_id = x_use_expr_name.scoped_use_id(&db, scope);
+        let use_def = use_def_map(&db, scope);
+        let [definition] = use_def.use_definitions(x_use_id) else {
+            panic!("expected one definition");
+        };
+        let DefinitionKind::Assignment(assignment) = definition.node(&db) else {
+            panic!("should be an assignment definition")
+        };
+        let ast::Expr::NumberLiteral(ast::ExprNumberLiteral {
+            value: ast::Number::Int(num),
+            ..
+        }) = &*assignment.assignment().value
+        else {
+            panic!("should be a number literal")
+        };
+        assert_eq!(*num, 1);
+    }
 
     #[test]
     fn expression_scope() {
