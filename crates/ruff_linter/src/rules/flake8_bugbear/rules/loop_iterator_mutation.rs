@@ -5,8 +5,8 @@ use ruff_python_ast::comparable::ComparableExpr;
 use ruff_python_ast::name::UnqualifiedName;
 use ruff_python_ast::{
     visitor::{self, Visitor},
-    Arguments, Expr, ExprAttribute, ExprCall, ExprSubscript, ExprTuple, Stmt, StmtAssign,
-    StmtAugAssign, StmtBreak, StmtDelete, StmtFor, StmtIf,
+    Expr, ExprAttribute, ExprCall, ExprSubscript, ExprTuple, Stmt, StmtAssign, StmtAugAssign,
+    StmtBreak, StmtDelete, StmtFor, StmtIf,
 };
 use ruff_text_size::TextRange;
 use std::collections::HashMap;
@@ -175,18 +175,13 @@ impl<'a> LoopMutationsVisitor<'a> {
             if let Expr::Subscript(ExprSubscript {
                 range: _,
                 value,
-                slice,
+                slice: _,
                 ctx: _,
             }) = target
             {
                 // Find, e.g., `del items[0]`.
                 if ComparableExpr::from(self.iter) == ComparableExpr::from(value) {
-                    // But allow, e.g., `for item in items: del items[item]`.
-                    if ComparableExpr::from(self.index) != ComparableExpr::from(slice)
-                        && ComparableExpr::from(self.target) != ComparableExpr::from(slice)
-                    {
-                        self.add_mutation(range);
-                    }
+                    self.add_mutation(range);
                 }
             }
         }
@@ -223,7 +218,7 @@ impl<'a> LoopMutationsVisitor<'a> {
     }
 
     /// Handle, e.g., `items.append(1)`.
-    fn handle_call(&mut self, func: &Expr, arguments: &Arguments) {
+    fn handle_call(&mut self, func: &Expr) {
         if let Expr::Attribute(ExprAttribute {
             range,
             value,
@@ -234,20 +229,6 @@ impl<'a> LoopMutationsVisitor<'a> {
             if is_mutating_function(attr.as_str()) {
                 // Find, e.g., `items.remove(1)`.
                 if ComparableExpr::from(self.iter) == ComparableExpr::from(value) {
-                    // But allow, e.g., `for item in items: items.remove(item)`.
-                    if matches!(attr.as_str(), "remove" | "discard" | "pop") {
-                        if arguments.len() == 1 {
-                            if let [arg] = &*arguments.args {
-                                if ComparableExpr::from(self.index) == ComparableExpr::from(arg)
-                                    || ComparableExpr::from(self.target)
-                                        == ComparableExpr::from(arg)
-                                {
-                                    return;
-                                }
-                            }
-                        }
-                    }
-
                     self.add_mutation(*range);
                 }
             }
@@ -323,11 +304,8 @@ impl<'a> Visitor<'a> for LoopMutationsVisitor<'a> {
 
     fn visit_expr(&mut self, expr: &'a Expr) {
         // Ex) `items.append(1)`
-        if let Expr::Call(ExprCall {
-            func, arguments, ..
-        }) = expr
-        {
-            self.handle_call(func, arguments);
+        if let Expr::Call(ExprCall { func, .. }) = expr {
+            self.handle_call(func);
         }
 
         visitor::walk_expr(self, expr);
