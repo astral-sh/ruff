@@ -407,7 +407,7 @@ where
                 let mut post_clause_iter = post_clauses.iter();
                 if last_clause_is_else {
                     // if the last clause was an else, the pre_if state can't directly reach the
-                    // post-state; we have to enter one of the clauses.
+                    // post-state; we must enter one of the clauses.
                     self.flow_set(post_clause_iter.next().unwrap());
                 } else {
                     self.flow_set(&pre_if);
