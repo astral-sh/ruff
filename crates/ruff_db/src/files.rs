@@ -3,13 +3,13 @@ use std::sync::Arc;
 use countme::Count;
 use dashmap::mapref::entry::Entry;
 
-pub use path::FilePath;
-
 use crate::file_revision::FileRevision;
 use crate::files::private::FileStatus;
 use crate::system::SystemPath;
 use crate::vendored::VendoredPath;
 use crate::{Db, FxDashMap};
+pub use path::FilePath;
+use ruff_notebook::{Notebook, NotebookError};
 
 mod path;
 
@@ -182,11 +182,7 @@ impl File {
     /// Reads the content of the file into a [`String`].
     ///
     /// Reading the same file multiple times isn't guaranteed to return the same content. It's possible
-    /// that the file has been modified in between the reads. It's even possible that a file that
-    /// is considered to exist has been deleted in the meantime. If this happens, then the method returns
-    /// an empty string, which is the closest to the content that the file contains now. Returning
-    /// an empty string shouldn't be a problem because the query will be re-executed as soon as the
-    /// changes are applied to the database.
+    /// that the file has been modified in between the reads.
     pub fn read_to_string(&self, db: &dyn Db) -> crate::system::Result<String> {
         let path = self.path(db);
 
@@ -198,6 +194,27 @@ impl File {
                 db.system().read_to_string(system)
             }
             FilePath::Vendored(vendored) => db.vendored().read_to_string(vendored),
+        }
+    }
+
+    /// Reads the content of the file into a [`Notebook`].
+    ///
+    /// Reading the same file multiple times isn't guaranteed to return the same content. It's possible
+    /// that the file has been modified in between the reads.
+    pub fn read_to_notebook(&self, db: &dyn Db) -> Result<Notebook, NotebookError> {
+        let path = self.path(db);
+
+        match path {
+            FilePath::System(system) => {
+                // Add a dependency on the revision to ensure the operation gets re-executed when the file changes.
+                let _ = self.revision(db);
+
+                db.system().read_to_notebook(system)
+            }
+            FilePath::Vendored(_) => Err(NotebookError::Io(std::io::Error::new(
+                std::io::ErrorKind::InvalidInput,
+                "Reading a notebook from the vendored file system is not supported.",
+            ))),
         }
     }
 

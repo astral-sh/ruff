@@ -21,7 +21,7 @@ pub fn source_text(db: &dyn Db, file: File) -> SourceText {
             PySourceType::try_from_extension(extension) == Some(PySourceType::Ipynb)
         }) {
             // TODO(micha): Proper error handling and emit a diagnostic. Tackle it together with `source_text`.
-            let notebook = db.system().read_to_notebook(path).unwrap_or_else(|error| {
+            let notebook = file.read_to_notebook(db).unwrap_or_else(|error| {
                 tracing::error!("Failed to load notebook: {error}");
                 Notebook::empty()
             });
