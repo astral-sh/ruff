@@ -1,3 +1,24 @@
+//! We have three Salsa queries for inferring types at three different granularities: scope-level,
+//! definition-level, and expression-level.
+//!
+//! Scope-level inference is for when we are actually checking a file, and need to check types for
+//! everything in that file's scopes.
+//!
+//! Definition-level inference allows us to look up the types of symbols in other scopes (e.g. for
+//! imports) with the minimum inference necessary, so that if we're looking up one symbol from a
+//! very large module, we can avoid a bunch of unnecessary work. Definition-level inference also
+//! allows us to handle import cycles without getting into a cycle of scope-level inference
+//! queries.
+//!
+//! The expression-level inference query is needed in only a few cases. Since an assignment
+//! statement can have multiple targets (via `x = y = z` or unpacking `(x, y) = z`, it can be
+//! associated with multiple definitions. In order to avoid inferring the type of the right-hand
+//! side once per definition, we infer it as a standalone query, so its result will be cached by
+//! Salsa. We also need the expression-level query for inferring types in type guard expressions
+//! (e.g. the test clause of an `if` statement.)
+//!
+//! Inferring types at any of the three region granularities returns a [`TypeInference`], which
+//! holds types for every [`Definition`] and expression within the inferred region.
 use rustc_hash::FxHashMap;
 use salsa;
 
@@ -17,6 +38,21 @@ use crate::semantic_index::SemanticIndex;
 use crate::types::{definitions_ty, ClassType, FunctionType, Name, Type, UnionTypeBuilder};
 use crate::Db;
 
+/// Infer all types for a [`ScopeId`], including all definitions and expressions in that scope.
+/// Use when checking a scope, or needing to provide a type for an arbitrary expression in the
+/// scope.
+#[salsa::tracked(return_ref)]
+pub(crate) fn infer_scope_types<'db>(db: &'db dyn Db, scope: ScopeId<'db>) -> TypeInference<'db> {
+    let _span = tracing::trace_span!("infer_scope_types", ?scope).entered();
+
+    let file = scope.file(db);
+    // Using the index here is fine because the code below depends on the AST anyway.
+    // The isolation of the query is by the return inferred types.
+    let index = semantic_index(db, file);
+
+    TypeInferenceBuilder::new(db, InferenceRegion::Scope(scope), index).finish()
+}
+
 /// Infer all types for a [`Definition`] (including sub-expressions).
 /// Use when resolving a symbol name use or public type of a symbol.
 #[salsa::tracked(return_ref)]
@@ -32,7 +68,7 @@ pub(crate) fn infer_definition_types<'db>(
 }
 
 /// Infer all types for an [`Expression`] (including sub-expressions).
-/// Use rarely; only for cases where we'd otherwise risk double-inferring an expression (RHS of an
+/// Use rarely; only for cases where we'd otherwise risk double-inferring an expression: RHS of an
 /// assignment, which might be unpacking/multi-target and thus part of multiple definitions, or a
 /// type narrowing guard expression (e.g. if statement test node).
 #[allow(unused)]
@@ -46,21 +82,6 @@ pub(crate) fn infer_expression_types<'db>(
     let index = semantic_index(db, expression.file(db));
 
     TypeInferenceBuilder::new(db, InferenceRegion::Expression(expression), index).finish()
-}
-
-/// Infer all types for a [`ScopeId`], including all definitions and expressions.
-/// Use when checking a scope, or needing to provide a type for an arbitrary expression in the
-/// scope.
-#[salsa::tracked(return_ref)]
-pub(crate) fn infer_scope_types<'db>(db: &'db dyn Db, scope: ScopeId<'db>) -> TypeInference<'db> {
-    let _span = tracing::trace_span!("infer_scope_types", ?scope).entered();
-
-    let file = scope.file(db);
-    // Using the index here is fine because the code below depends on the AST anyway.
-    // The isolation of the query is by the return inferred types.
-    let index = semantic_index(db, file);
-
-    TypeInferenceBuilder::new(db, InferenceRegion::Scope(scope), index).finish()
 }
 
 /// A region within which we can infer types.
@@ -110,6 +131,43 @@ struct TypeInferenceBuilder<'db> {
     types: TypeInference<'db>,
 }
 
+/// A builder is used by creating it with `::new`, and then calling `.finish()` on it, which
+/// returns the resulting [`TypeInference`].
+///
+/// There are a few different kinds of methods in the type inference builder, and the naming
+/// distinctions are a bit subtle.
+///
+/// The `finish` method calls `infer_region`, which delegates to one of `infer_region_scope`,
+/// `infer_region_definition`, or `infer_region_expression`, depending which kind of
+/// [`InferenceRegion`] we are inferring types for.
+///
+/// Scope inference starts with the scope body, walking all statements and expressions and
+/// recording the types of each expression in the [`TypeInference`] result. Most of the methods
+/// here (with names like `infer_*_statement` or `infer_*_expression` or some other node kind) take
+/// a single AST node and are called as part of this AST visit.
+///
+/// When the visit encounters a node which creates a [`Definition`], we look up the definition in
+/// the semantic index and call the `infer_definition_types` query on it, which creates another
+/// [`TypeInferenceBuilder`] just for that definition, and we merge the returned `TypeInference`
+/// into the one we are currently building for the entire scope. Using the query in this way
+/// ensures that if we first infer types for some scattered definitions in a scope, and later for
+/// the entire scope, we don't re-infer any types, we re-use the cached inference for those
+/// definitions and their sub-expressions.
+///
+/// Functions with a name like `infer_*_definition` take both a node and a [`Definition`], and are
+/// called by `infer_region_definition`.
+///
+/// So for example we have both `infer_function_definition_statement`, which takes just the
+/// function AST node, and `infer_function_definition`, which takes both the node and the
+/// [`Definition`] id. The former is called as part of walking the AST, and it just looks up the
+/// [`Definition`] for that function in the semantic index and calls `infer_definition_types` on
+/// it, which will create a new `TypeInferenceBuilder` with `InferenceRegion::Definition`, and in
+/// that builder `infer_region_definition` will call `infer_function_definition` to actually infer
+/// a type for the definition.
+///
+/// Similarly, when we encounter a standalone-inferable expression (right-hand side of an
+/// assignment, type narrowing guard), we use the `infer_expression_types` query to ensure we don't
+/// infer its types more than once.
 impl<'db> TypeInferenceBuilder<'db> {
     /// Creates a new builder for inferring types in a region.
     pub(super) fn new(
@@ -282,8 +340,8 @@ impl<'db> TypeInferenceBuilder<'db> {
 
         // TODO: Infer parameters
 
-        if let Some(return_ty) = returns {
-            self.infer_expression(return_ty);
+        if let Some(return_expr) = returns {
+            self.infer_expression(return_expr);
         }
 
         let function_ty =
