@@ -1,3 +1,4 @@
+use std::fmt;
 use std::panic::{AssertUnwindSafe, RefUnwindSafe};
 use std::sync::Arc;
 
@@ -96,6 +97,21 @@ impl Upcast<dyn SourceDb> for Program {
 impl Upcast<dyn ResolverDb> for Program {
     fn upcast(&self) -> &(dyn ResolverDb + 'static) {
         self
+    }
+}
+
+impl fmt::Debug for Program {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let Program {
+            storage: _,
+            files: _,
+            system,
+            workspace,
+        } = self;
+        f.debug_struct("TestDb")
+            .field("system", system)
+            .field("workspace", workspace)
+            .finish()
     }
 }
 
