@@ -2490,7 +2490,7 @@ dependencies = [
 
 [[package]]
 name = "ruff_wasm"
-version = "0.0.0"
+version = "0.5.2"
 dependencies = [
  "console_error_panic_hook",
  "console_log",
