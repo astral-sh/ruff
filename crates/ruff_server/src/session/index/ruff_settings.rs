@@ -154,7 +154,6 @@ impl RuffSettingsIndex {
                 }
 
                 let directory = entry.into_path();
-                tracing::debug!("Visiting: {}", directory.display());
 
                 // If the directory is excluded from the workspace, skip it.
                 if let Some(file_name) = directory.file_name() {
