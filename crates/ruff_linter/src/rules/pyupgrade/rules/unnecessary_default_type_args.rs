@@ -14,28 +14,35 @@ use crate::checkers::ast::Checker;
 /// Including unnecessary default type arguments can make the code more verbose and less readable.
 ///
 /// ## Examples
+///
 /// ```python
 /// from typing import Generator, AsyncGenerator
 ///
+///
 /// def sync_gen() -> Generator[int, None, None]:
 ///     yield 42
+///
 ///
 /// async def async_gen() -> AsyncGenerator[int, None]:
 ///     yield 42
 /// ```
 ///
 /// Use instead:
+///
 /// ```python
 /// from typing import Generator, AsyncGenerator
 ///
+///
 /// def sync_gen() -> Generator[int]:
 ///     yield 42
+///
 ///
 /// async def async_gen() -> AsyncGenerator[int]:
 ///     yield 42
 /// ```
 ///
 /// ## References
+///
 /// - [PEP 696 – Type Defaults for Type Parameters](https://peps.python.org/pep-0696/)
 /// - [typing.Generator](https://docs.python.org/3.13/library/typing.html#typing.Generator)
 /// - [typing.AsyncGenerator](https://docs.python.org/3.13/library/typing.html#typing.AsyncGenerator)
