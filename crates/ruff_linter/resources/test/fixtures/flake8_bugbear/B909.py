@@ -158,3 +158,15 @@ for elem in some_list:
     some_list[elem] = 1
     some_list.remove(elem)
     some_list.discard(elem)
+
+# should error
+for i, elem in enumerate(some_list):
+    some_list.pop(0)
+
+# should not error (list)
+for i, elem in enumerate(some_list):
+    some_list[i] = 1
+
+# should not error (dict)
+for i, elem in enumerate(some_list):
+    some_list[elem] = 1
