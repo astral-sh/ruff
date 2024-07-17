@@ -100,7 +100,7 @@ impl RuffSettings {
 impl RuffSettingsIndex {
     pub(super) fn new(root: &Path, editor_settings: &ResolvedEditorSettings) -> Self {
         let mut index = BTreeMap::default();
-        let mut respect_gitignore = true;
+        let mut respect_gitignore = None;
 
         // Add any settings from above the workspace root.
         for directory in root.ancestors() {
@@ -113,7 +113,8 @@ impl RuffSettingsIndex {
                     continue;
                 };
 
-                respect_gitignore = settings.file_resolver.respect_gitignore;
+                respect_gitignore = Some(settings.file_resolver.respect_gitignore);
+
                 index.insert(
                     directory.to_path_buf(),
                     Arc::new(RuffSettings {
@@ -127,9 +128,13 @@ impl RuffSettingsIndex {
             }
         }
 
+        let fallback = Arc::new(RuffSettings::fallback(editor_settings, root));
+
         // Add any settings within the workspace itself
         let mut builder = WalkBuilder::new(root);
-        builder.standard_filters(respect_gitignore);
+        builder.standard_filters(
+            respect_gitignore.unwrap_or_else(|| fallback.file_resolver().respect_gitignore),
+        );
         builder.hidden(false);
         builder.threads(
             std::thread::available_parallelism()
@@ -157,26 +162,27 @@ impl RuffSettingsIndex {
 
                 // If the directory is excluded from the workspace, skip it.
                 if let Some(file_name) = directory.file_name() {
-                    if let Some((_, settings)) = index
+                    let settings = index
                         .read()
                         .unwrap()
                         .range(..directory.clone())
                         .rfind(|(path, _)| directory.starts_with(path))
-                    {
-                        if match_exclusion(&directory, file_name, &settings.file_resolver.exclude) {
-                            tracing::debug!("Ignored path via `exclude`: {}", directory.display());
-                            return WalkState::Continue;
-                        } else if match_exclusion(
-                            &directory,
-                            file_name,
-                            &settings.file_resolver.extend_exclude,
-                        ) {
-                            tracing::debug!(
-                                "Ignored path via `extend-exclude`: {}",
-                                directory.display()
-                            );
-                            return WalkState::Continue;
-                        }
+                        .map(|(_, settings)| settings.clone())
+                        .unwrap_or_else(|| fallback.clone());
+
+                    if match_exclusion(&directory, file_name, &settings.file_resolver.exclude) {
+                        tracing::debug!("Ignored path via `exclude`: {}", directory.display());
+                        return WalkState::Continue;
+                    } else if match_exclusion(
+                        &directory,
+                        file_name,
+                        &settings.file_resolver.extend_exclude,
+                    ) {
+                        tracing::debug!(
+                            "Ignored path via `extend-exclude`: {}",
+                            directory.display()
+                        );
+                        return WalkState::Continue;
                     }
                 }
 
@@ -202,8 +208,6 @@ impl RuffSettingsIndex {
                 WalkState::Continue
             })
         });
-
-        let fallback = Arc::new(RuffSettings::fallback(editor_settings, root));
 
         Self {
             index: index.into_inner().unwrap(),
