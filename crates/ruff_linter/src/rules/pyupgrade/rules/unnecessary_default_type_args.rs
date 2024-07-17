@@ -85,7 +85,7 @@ pub(crate) fn unnecessary_default_type_args(checker: &mut Checker, expr: &Expr) 
         return;
     };
 
-    let valid_elts = type_annotation.trim_unnecessary_defaults(&elts);
+    let valid_elts = type_annotation.trim_unnecessary_defaults(elts);
 
     // If we didn't trim any elements, then the default type arguments are necessary.
     if *elts == valid_elts {
