@@ -1095,6 +1095,87 @@ mod tests {
     }
 
     #[test]
+    fn if_elif_else_single_symbol() -> anyhow::Result<()> {
+        let mut db = setup_db();
+
+        db.write_dedented(
+            "src/a.py",
+            "
+            if flag:
+                y = 1
+            elif flag2:
+                y = 2
+            else:
+                y = 3
+            ",
+        )?;
+
+        assert_public_ty(&db, "src/a.py", "y", "Literal[1, 2, 3]");
+        Ok(())
+    }
+
+    #[test]
+    fn if_elif_else_no_definition_in_else() -> anyhow::Result<()> {
+        let mut db = setup_db();
+
+        db.write_dedented(
+            "src/a.py",
+            "
+            y = 0
+            if flag:
+                y = 1
+            elif flag2:
+                y = 2
+            else:
+                pass
+            ",
+        )?;
+
+        assert_public_ty(&db, "src/a.py", "y", "Literal[0, 1, 2]");
+        Ok(())
+    }
+
+    #[test]
+    fn if_elif_else_no_definition_in_else_one_intervening_definition() -> anyhow::Result<()> {
+        let mut db = setup_db();
+
+        db.write_dedented(
+            "src/a.py",
+            "
+            y = 0
+            if flag:
+                y = 1
+                z = 3
+            elif flag2:
+                y = 2
+            else:
+                pass
+            ",
+        )?;
+
+        assert_public_ty(&db, "src/a.py", "y", "Literal[0, 1, 2]");
+        Ok(())
+    }
+
+    #[test]
+    fn nested_if() -> anyhow::Result<()> {
+        let mut db = setup_db();
+
+        db.write_dedented(
+            "src/a.py",
+            "
+            y = 0
+            if flag:
+                if flag2:
+                    y = 1
+            ",
+        )?;
+
+        assert_public_ty(&db, "src/a.py", "y", "Literal[0, 1]");
+        Ok(())
+    }
+
+    #[test]
     fn if_elif() -> anyhow::Result<()> {
         let mut db = setup_db();
 

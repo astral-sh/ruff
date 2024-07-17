@@ -81,6 +81,13 @@ impl<I: Idx, T> IndexSlice<I, T> {
     }
 
     #[inline]
+    pub fn iter_mut_enumerated(
+        &mut self,
+    ) -> impl DoubleEndedIterator<Item = (I, &mut T)> + ExactSizeIterator + '_ {
+        self.raw.iter_mut().enumerate().map(|(n, t)| (I::new(n), t))
+    }
+
+    #[inline]
     pub fn last_index(&self) -> Option<I> {
         self.len().checked_sub(1).map(I::new)
     }
