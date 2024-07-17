@@ -52,6 +52,8 @@ def shouldnt_add_raw_for_double_quote_docstring_contains_docstring2():
 
         def bar():
             \"""Bar.\"""
+    
+    More content here.
     """
 
 
@@ -61,6 +63,8 @@ def shouldnt_add_raw_for_single_quote_docstring_contains_docstring():
 
         def foo():
             \'\'\'Foo.\'\'\'
+    
+    More content here.
     '''
 
 
@@ -70,6 +74,8 @@ def shouldnt_add_raw_for_single_quote_docstring_contains_docstring2():
 
         def bar():
             \'''Bar.\'''
+    
+    More content here.
     '''
 
 def shouldnt_add_raw_for_docstring_contains_escaped_double_triple_quotes():
