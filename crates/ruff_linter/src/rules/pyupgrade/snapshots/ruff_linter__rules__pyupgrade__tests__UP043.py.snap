@@ -7,7 +7,7 @@ UP043.py:4:15: UP043 [*] Unnecessary default type arguments
   |               ^^^^^^^^^^^^^^^^^^^^^^^^^^ UP043
 5 |     yield 42
   |
-  = help: Remove unnecessary default type arguments
+  = help: Remove default type arguments
 
 ℹ Safe fix
 1 1 | from typing import Generator, AsyncGenerator
@@ -25,7 +25,7 @@ UP043.py:8:15: UP043 [*] Unnecessary default type arguments
   |               ^^^^^^^^^^^^^^^^^^^^ UP043
 9 |     yield 42
   |
-  = help: Remove unnecessary default type arguments
+  = help: Remove default type arguments
 
 ℹ Safe fix
 5 5 |     yield 42
@@ -44,7 +44,7 @@ UP043.py:21:15: UP043 [*] Unnecessary default type arguments
 22 |     _ = yield 42
 23 |     return None
    |
-   = help: Remove unnecessary default type arguments
+   = help: Remove default type arguments
 
 ℹ Safe fix
 18 18 |     return foo
@@ -62,7 +62,7 @@ UP043.py:31:21: UP043 [*] Unnecessary default type arguments
    |                     ^^^^^^^^^^^^^^^^^^^^^^^^^ UP043
 32 |     yield 42
    |
-   = help: Remove unnecessary default type arguments
+   = help: Remove default type arguments
 
 ℹ Safe fix
 28 28 |     return 42
