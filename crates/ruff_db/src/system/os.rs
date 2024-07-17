@@ -27,9 +27,12 @@ struct OsSystemInner {
 
 impl OsSystem {
     pub fn new(cwd: impl AsRef<SystemPath>) -> Self {
+        let cwd = cwd.as_ref();
+        assert!(cwd.as_utf8_path().is_absolute());
+
         Self {
             inner: Arc::new(OsSystemInner {
-                cwd: cwd.as_ref().to_path_buf(),
+                cwd: cwd.to_path_buf(),
             }),
         }
     }
@@ -311,7 +314,9 @@ mod tests {
 
     #[test]
     fn read_directory_nonexistent() {
-        let fs = OsSystem::new("");
+        let tempdir = TempDir::new().unwrap();
+
+        let fs = OsSystem::new(SystemPath::from_std_path(tempdir.path()).unwrap());
         let result = fs.read_directory(SystemPath::new("doesnt_exist"));
         assert!(result.is_err_and(|error| error.kind() == std::io::ErrorKind::NotFound));
     }

@@ -1,5 +1,6 @@
 use std::hash::BuildHasherDefault;
 
+use program::Program;
 use rustc_hash::FxHasher;
 use salsa::DbWithJar;
 
@@ -12,6 +13,7 @@ use crate::vendored::VendoredFileSystem;
 pub mod file_revision;
 pub mod files;
 pub mod parsed;
+pub mod program;
 pub mod source;
 pub mod system;
 pub mod testing;
@@ -20,7 +22,7 @@ pub mod vendored;
 pub(crate) type FxDashMap<K, V> = dashmap::DashMap<K, V, BuildHasherDefault<FxHasher>>;
 
 #[salsa::jar(db=Db)]
-pub struct Jar(File, source_text, line_index, parsed_module);
+pub struct Jar(File, Program, source_text, line_index, parsed_module);
 
 /// Most basic database that gives access to files, the host system, source code, and parsed AST.
 pub trait Db: DbWithJar<Jar> {
