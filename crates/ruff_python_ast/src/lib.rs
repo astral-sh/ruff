@@ -86,12 +86,19 @@ impl PySourceType {
     ///
     /// Falls back to `Python` if the extension is not recognized.
     pub fn from_extension(extension: &str) -> Self {
-        match extension {
+        Self::try_from_extension(extension).unwrap_or_default()
+    }
+
+    /// Infers the source type from the file extension.
+    pub fn try_from_extension(extension: &str) -> Option<Self> {
+        let ty = match extension {
             "py" => Self::Python,
             "pyi" => Self::Stub,
             "ipynb" => Self::Ipynb,
-            _ => Self::Python,
-        }
+            _ => return None,
+        };
+
+        Some(ty)
     }
 }
 

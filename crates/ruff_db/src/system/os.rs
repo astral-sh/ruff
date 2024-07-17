@@ -1,9 +1,13 @@
+use std::sync::Arc;
+use std::{any::Any, path::PathBuf};
+
+use filetime::FileTime;
+
+use ruff_notebook::{Notebook, NotebookError};
+
 use crate::system::{
     DirectoryEntry, FileType, Metadata, Result, System, SystemPath, SystemPathBuf,
 };
-use filetime::FileTime;
-use std::sync::Arc;
-use std::{any::Any, path::PathBuf};
 
 use super::walk_directory::{
     self, DirectoryWalker, WalkDirectoryBuilder, WalkDirectoryConfiguration,
@@ -63,6 +67,10 @@ impl System for OsSystem {
 
     fn read_to_string(&self, path: &SystemPath) -> Result<String> {
         std::fs::read_to_string(path.as_std_path())
+    }
+
+    fn read_to_notebook(&self, path: &SystemPath) -> std::result::Result<Notebook, NotebookError> {
+        Notebook::from_path(path.as_std_path())
     }
 
     fn path_exists(&self, path: &SystemPath) -> bool {
@@ -266,10 +274,12 @@ impl From<WalkState> for ignore::WalkState {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
+    use tempfile::TempDir;
+
     use crate::system::walk_directory::tests::DirectoryEntryToString;
     use crate::system::DirectoryEntry;
-    use tempfile::TempDir;
+
+    use super::*;
 
     #[test]
     fn read_directory() {

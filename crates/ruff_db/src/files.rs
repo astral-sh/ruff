@@ -187,10 +187,10 @@ impl File {
     /// an empty string, which is the closest to the content that the file contains now. Returning
     /// an empty string shouldn't be a problem because the query will be re-executed as soon as the
     /// changes are applied to the database.
-    pub(crate) fn read_to_string(&self, db: &dyn Db) -> String {
+    pub fn read_to_string(&self, db: &dyn Db) -> crate::system::Result<String> {
         let path = self.path(db);
 
-        let result = match path {
+        match path {
             FilePath::System(system) => {
                 // Add a dependency on the revision to ensure the operation gets re-executed when the file changes.
                 let _ = self.revision(db);
@@ -198,9 +198,7 @@ impl File {
                 db.system().read_to_string(system)
             }
             FilePath::Vendored(vendored) => db.vendored().read_to_string(vendored),
-        };
-
-        result.unwrap_or_default()
+        }
     }
 
     /// Refreshes the file metadata by querying the file system if needed.
@@ -274,7 +272,7 @@ mod tests {
 
         assert_eq!(test.permissions(&db), Some(0o755));
         assert_ne!(test.revision(&db), FileRevision::zero());
-        assert_eq!(&test.read_to_string(&db), "print('Hello world')");
+        assert_eq!(&test.read_to_string(&db)?, "print('Hello world')");
 
         Ok(())
     }
@@ -304,7 +302,7 @@ mod tests {
     }
 
     #[test]
-    fn stubbed_vendored_file() {
+    fn stubbed_vendored_file() -> crate::system::Result<()> {
         let mut db = TestDb::new();
 
         let mut vendored_builder = VendoredFileSystemBuilder::new();
@@ -318,7 +316,9 @@ mod tests {
 
         assert_eq!(test.permissions(&db), Some(0o444));
         assert_ne!(test.revision(&db), FileRevision::zero());
-        assert_eq!(&test.read_to_string(&db), "def foo() -> str");
+        assert_eq!(&test.read_to_string(&db)?, "def foo() -> str");
+
+        Ok(())
     }
 
     #[test]

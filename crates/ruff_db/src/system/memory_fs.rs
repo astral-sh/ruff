@@ -126,6 +126,14 @@ impl MemoryFileSystem {
         read_to_string(self, path.as_ref())
     }
 
+    pub(crate) fn read_to_notebook(
+        &self,
+        path: impl AsRef<SystemPath>,
+    ) -> std::result::Result<ruff_notebook::Notebook, ruff_notebook::NotebookError> {
+        let content = self.read_to_string(path)?;
+        ruff_notebook::Notebook::from_source_code(&content)
+    }
+
     pub fn exists(&self, path: &SystemPath) -> bool {
         let by_path = self.inner.by_path.read().unwrap();
         let normalized = self.normalize_path(path);
