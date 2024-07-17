@@ -15,7 +15,6 @@ use crate::semantic_index::expression::Expression;
 use crate::semantic_index::symbol::{
     FileScopeId, NodeWithScopeKey, NodeWithScopeRef, Scope, ScopeId, ScopedSymbolId, SymbolTable,
 };
-use crate::semantic_index::use_def::UseDefMap;
 use crate::Db;
 
 pub mod ast_ids;
@@ -23,7 +22,9 @@ mod builder;
 pub mod definition;
 pub mod expression;
 pub mod symbol;
-pub mod use_def;
+mod use_def;
+
+pub(crate) use self::use_def::UseDefMap;
 
 type SymbolMap = hashbrown::HashMap<ScopedSymbolId, (), ()>;
 

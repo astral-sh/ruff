@@ -2,7 +2,7 @@
 //!
 //! Let's take this code sample:
 //!
-//! ```
+//! ```python
 //! x = 1
 //! x = 2
 //! y = x
@@ -30,8 +30,9 @@
 //! and `Literal[4]` -- for the second use of `x`.
 //!
 //! So that's one question our use-def map needs to answer: given a specific use of a symbol, which
-//! definition(s) is/are visible from that use. In `ast_ids.rs` we number all uses (that means a
-//! `Name` node with `Load` context) so we have a `ScopedUseId` to efficiently represent each use.
+//! definition(s) is/are visible from that use. In
+//! [`AstIds`](crate::semantic_index::ast_ids::AstIds) we number all uses (that means a `Name` node
+//! with `Load` context) so we have a `ScopedUseId` to efficiently represent each use.
 //!
 //! The other case we need to handle is when a symbol is referenced from a different scope (the
 //! most obvious example of this is an import). We call this "public" use of a symbol. So the other
@@ -42,12 +43,12 @@
 //! scope where the symbol is defined (via inline imports and import cycles, in the case of an
 //! import, or via a function call partway through the local scope that ends up using a symbol from
 //! the scope via a global or nonlocal reference.) But modeling this fully accurately requires
-//! whole-program analysis that isn't tractable for an efficient query-based compiler, since it
+//! whole-program analysis that isn't tractable for an efficient incremental compiler, since it
 //! means a given symbol could have a different type every place it's referenced throughout the
 //! program, depending on the shape of arbitrarily-sized call/import graphs. So we follow other
 //! Python type-checkers in making the simplifying assumption that usually the scope will finish
 //! execution before its symbols are made visible to other scopes; for instance, most imports will
-//! import from a complete module, not a partially-executed module. (We may need to get a little
+//! import from a complete module, not a partially-executed module. (We may want to get a little
 //! smarter than this in the future, in particular for closures, but for now this is where we
 //! start.)
 //!
@@ -82,11 +83,12 @@
 //! for this symbol.
 //!
 //! To build a [`UseDefMap`], the [`UseDefMapBuilder`] is notified of each new use and definition
-//! as they are encountered by the [`SemanticIndexBuilder`] AST visit. For each symbol, the builder
-//! tracks the currently-visible definitions for that symbol. When we hit a use of a symbol, it
-//! records the currently-visible definitions for that symbol as the visible definitions for that
-//! use. When we reach the end of the scope, it records the currently-visible definitions for each
-//! symbol as the public definitions of that symbol.
+//! as they are encountered by the
+//! [`SemanticIndexBuilder`](crate::semantic_index::builder::SemanticIndexBuilder) AST visit. For
+//! each symbol, the builder tracks the currently-visible definitions for that symbol. When we hit
+//! a use of a symbol, it records the currently-visible definitions for that symbol as the visible
+//! definitions for that use. When we reach the end of the scope, it records the currently-visible
+//! definitions for each symbol as the public definitions of that symbol.
 //!
 //! Let's walk through the above example. Initially we record for `x` that it has no visible
 //! definitions, and may be unbound. When we see `x = 1`, we record that as the sole visible
@@ -117,7 +119,8 @@
 //!
 //! The [`UseDefMapBuilder`] itself just exposes methods for taking a snapshot, resetting to a
 //! snapshot, and merging a snapshot into the current state. The logic using these methods lives in
-//! [`SemanticIndexBuilder`], e.g. where it visits a `StmtIf` node.
+//! [`SemanticIndexBuilder`](crate::semantic_index::builder::SemanticIndexBuilder), e.g. where it
+//! visits a `StmtIf` node.
 //!
 //! (In the future we may have some other questions we want to answer as well, such as "is this
 //! definition used?", which will require tracking a bit more info in our map, e.g. a "used" bit
@@ -169,9 +172,9 @@ struct Definitions {
     may_be_unbound: bool,
 }
 
-/// The default state of a symbol is "no definitions, may be unbound", aka definitely-unbound.
-impl Default for Definitions {
-    fn default() -> Self {
+impl Definitions {
+    /// The default state of a symbol is "no definitions, may be unbound", aka definitely-unbound.
+    fn unbound() -> Self {
         Self {
             definitions_range: Range::default(),
             may_be_unbound: true,
@@ -179,8 +182,14 @@ impl Default for Definitions {
     }
 }
 
+impl Default for Definitions {
+    fn default() -> Self {
+        Definitions::unbound()
+    }
+}
+
 /// A snapshot of the visible definitions for each symbol at a particular point in control flow.
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub(super) struct FlowSnapshot {
     definitions_by_symbol: IndexVec<ScopedSymbolId, Definitions>,
 }
@@ -206,7 +215,7 @@ impl<'db> UseDefMapBuilder<'db> {
     }
 
     pub(super) fn add_symbol(&mut self, symbol: ScopedSymbolId) {
-        let new_symbol = self.definitions_by_symbol.push(Definitions::default());
+        let new_symbol = self.definitions_by_symbol.push(Definitions::unbound());
         debug_assert_eq!(symbol, new_symbol);
     }
 
@@ -242,28 +251,29 @@ impl<'db> UseDefMapBuilder<'db> {
         }
     }
 
-    /// Reset the current builder visible-definitions state to the given snapshot state.
-    pub(super) fn set(&mut self, state: &FlowSnapshot) {
+    /// Restore the current builder visible-definitions state to the given snapshot.
+    pub(super) fn restore(&mut self, snapshot: FlowSnapshot) {
         // We never remove symbols from `definitions_by_symbol` (its an IndexVec, and the symbol
         // IDs need to line up), so the current number of recorded symbols must always be equal or
         // greater than the number of symbols in a previously-recorded snapshot.
         let num_symbols = self.definitions_by_symbol.len();
-        debug_assert!(num_symbols >= state.definitions_by_symbol.len());
+        debug_assert!(num_symbols >= snapshot.definitions_by_symbol.len());
 
-        // Reset the current visible-definitions state to the given snapshot.
-        self.definitions_by_symbol = state.definitions_by_symbol.clone();
+        // Restore the current visible-definitions state to the given snapshot.
+        self.definitions_by_symbol = snapshot.definitions_by_symbol;
 
-        // If the snapshot we are resetting to is missing some symbols we've recorded since, we
-        // need to fill them in so the symbol IDs continue to line up. Since they don't exist in
-        // the snapshot, the correct state to fill them in with is "unbound", the default.
+        // If the snapshot we are restoring is missing some symbols we've recorded since, we need
+        // to fill them in so the symbol IDs continue to line up. Since they don't exist in the
+        // snapshot, the correct state to fill them in with is "unbound", the default.
         self.definitions_by_symbol
-            .resize(num_symbols, Definitions::default());
+            .resize(num_symbols, Definitions::unbound());
     }
 
     /// Merge the given snapshot into the current state, reflecting that we might have taken either
     /// path to get here. The new visible-definitions state for each symbol should include
     /// definitions from both the prior state and the snapshot.
-    pub(super) fn merge(&mut self, state: &FlowSnapshot) {
+    #[allow(clippy::needless_pass_by_value)]
+    pub(super) fn merge(&mut self, snapshot: FlowSnapshot) {
         // The tricky thing about merging two Ranges pointing into `all_definitions` is that if the
         // two Ranges aren't already adjacent in `all_definitions`, we will have to copy at least
         // one or the other of the ranges to the end of `all_definitions` so as to make them
@@ -272,7 +282,7 @@ impl<'db> UseDefMapBuilder<'db> {
         // It's possible we may end up with some old entries in `all_definitions` that nobody is
         // pointing to, but that's OK.
 
-        for (symbol_id, to_merge) in state.definitions_by_symbol.iter_enumerated() {
+        for (symbol_id, to_merge) in snapshot.definitions_by_symbol.iter_enumerated() {
             let current = &mut self.definitions_by_symbol[symbol_id];
 
             // If the symbol can be unbound in either predecessor, it can be unbound post-merge.
