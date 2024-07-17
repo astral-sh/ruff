@@ -21,6 +21,12 @@ mod metadata;
 
 /// The project workspace as a Salsa ingredient.
 ///
+/// A workspace consists of one or multiple packages. Packages can be nested. A file in a workspace
+/// belongs to no or exactly one package (files can't belong to multiple packages).
+///
+/// How workspaces and packages are discovered is TBD. For now, a workspace can be any directory,
+/// and it always contains a single package which has the same root as the workspace.
+///
 /// ## Examples
 ///
 /// ```text
@@ -46,6 +52,16 @@ mod metadata;
 /// Each of the packages can define their own settings in their `pyproject.toml` file, but
 /// they must be compatible. For example, each package can define a different `requires-python` range,
 /// but the ranges must overlap.
+///
+/// ## How is a workspace different from a program?
+/// There are two (related) motivations:
+///
+/// 1. Program is defined in `ruff_db` and it can't reference the settings types for the linter and formatter
+///    without introducing a cyclic dependency. The workspace is defined in a higher level crate
+///    where it can reference these setting types.
+/// 2. Running `ruff check` with different target versions results in different programs (settings) but
+///    it remains the same workspace. That's why program is a narrowed view of the workspace only
+///    holding on to the most fundamental settings required for checking.
 #[salsa::input]
 pub struct Workspace {
     #[id]

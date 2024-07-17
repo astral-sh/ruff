@@ -14,7 +14,7 @@ use red_knot::db::RootDatabase;
 use red_knot::watch::FileWatcher;
 use red_knot::watch::FileWatcherChange;
 use red_knot::workspace::WorkspaceMetadata;
-use ruff_db::program::{ProgramSettings, SearchPaths};
+use ruff_db::program::{ProgramSettings, SearchPathSettings};
 use ruff_db::system::{OsSystem, System, SystemPathBuf};
 
 use self::target_version::TargetVersion;
@@ -85,7 +85,7 @@ pub fn main() -> anyhow::Result<()> {
     // TODO: Respect the settings from the workspace metadata. when resolving the program settings.
     let program_settings = ProgramSettings {
         target_version: target_version.into(),
-        search_paths: SearchPaths {
+        search_paths: SearchPathSettings {
             extra_paths,
             workspace_root: workspace_metadata.root().to_path_buf(),
             custom_typeshed: custom_typeshed_dir,

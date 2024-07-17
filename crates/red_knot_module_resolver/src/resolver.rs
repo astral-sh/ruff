@@ -5,7 +5,7 @@ use std::sync::Arc;
 use rustc_hash::{FxBuildHasher, FxHashSet};
 
 use ruff_db::files::{File, FilePath};
-use ruff_db::program::{Program, SearchPaths, TargetVersion};
+use ruff_db::program::{Program, SearchPathSettings, TargetVersion};
 use ruff_db::system::{DirectoryEntry, System, SystemPath, SystemPathBuf};
 
 use crate::db::Db;
@@ -117,7 +117,7 @@ pub(crate) fn file_to_module(db: &dyn Db, file: File) -> Option<Module> {
 pub(crate) fn module_resolution_settings(db: &dyn Db) -> ModuleResolutionSettings {
     let program = Program::get(db.upcast());
 
-    let SearchPaths {
+    let SearchPathSettings {
         extra_paths,
         workspace_root,
         custom_typeshed,
@@ -1106,7 +1106,7 @@ mod tests {
         std::fs::write(foo.as_std_path(), "")?;
         std::os::unix::fs::symlink(foo.as_std_path(), bar.as_std_path())?;
 
-        let search_paths = SearchPaths {
+        let search_paths = SearchPathSettings {
             extra_paths: vec![],
             workspace_root: src.clone(),
             custom_typeshed: Some(custom_typeshed.clone()),

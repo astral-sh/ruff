@@ -8,7 +8,7 @@ pub struct Program {
     pub target_version: TargetVersion,
 
     #[return_ref]
-    pub search_paths: SearchPaths,
+    pub search_paths: SearchPathSettings,
 }
 
 impl Program {
@@ -20,7 +20,7 @@ impl Program {
 #[derive(Debug, Eq, PartialEq)]
 pub struct ProgramSettings {
     pub target_version: TargetVersion,
-    pub search_paths: SearchPaths,
+    pub search_paths: SearchPathSettings,
 }
 
 /// Enumeration of all supported Python versions
@@ -64,9 +64,9 @@ impl std::fmt::Debug for TargetVersion {
     }
 }
 
-/// "Raw" configuration settings for module resolution: unvalidated, unnormalized
+/// Configures the search paths for module resolution.
 #[derive(Eq, PartialEq, Debug)]
-pub struct SearchPaths {
+pub struct SearchPathSettings {
     /// List of user-provided paths that should take first priority in the module resolution.
     /// Examples in other type checkers are mypy's MYPYPATH environment variable,
     /// or pyright's stubPath configuration setting.

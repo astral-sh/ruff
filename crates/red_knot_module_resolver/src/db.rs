@@ -1,8 +1,8 @@
 use ruff_db::Upcast;
 
 use crate::resolver::{
-    editable_install_resolution_paths, file_to_module, internal::ModuleNameIngredient, module_resolution_settings,
-    resolve_module_query,
+    editable_install_resolution_paths, file_to_module, internal::ModuleNameIngredient,
+    module_resolution_settings, resolve_module_query,
 };
 use crate::typeshed::parse_typeshed_versions;
 

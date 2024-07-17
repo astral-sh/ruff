@@ -7,7 +7,7 @@ use ruff_benchmark::criterion::{
 };
 use ruff_db::files::{system_path_to_file, File};
 use ruff_db::parsed::parsed_module;
-use ruff_db::program::{ProgramSettings, SearchPaths, TargetVersion};
+use ruff_db::program::{ProgramSettings, SearchPathSettings, TargetVersion};
 use ruff_db::system::{MemoryFileSystem, SystemPath, TestSystem};
 use ruff_db::Upcast;
 
@@ -67,7 +67,7 @@ fn setup_case() -> Case {
     let metadata = WorkspaceMetadata::from_path(workspace_root, &system).unwrap();
     let settings = ProgramSettings {
         target_version: TargetVersion::default(),
-        search_paths: SearchPaths {
+        search_paths: SearchPathSettings {
             extra_paths: vec![],
             workspace_root: workspace_root.to_path_buf(),
             site_packages: None,

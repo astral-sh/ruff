@@ -1,4 +1,4 @@
-use ruff_db::program::{Program, SearchPaths, TargetVersion};
+use ruff_db::program::{Program, SearchPathSettings, TargetVersion};
 use ruff_db::system::{DbWithTestSystem, SystemPath, SystemPathBuf};
 use ruff_db::vendored::VendoredPathBuf;
 
@@ -217,7 +217,7 @@ impl TestCaseBuilder<MockedTypeshed> {
         Program::new(
             &db,
             target_version,
-            SearchPaths {
+            SearchPathSettings {
                 extra_paths: vec![],
                 workspace_root: src.clone(),
                 custom_typeshed: Some(typeshed.clone()),
@@ -270,7 +270,7 @@ impl TestCaseBuilder<VendoredTypeshed> {
         Program::new(
             &db,
             target_version,
-            SearchPaths {
+            SearchPathSettings {
                 extra_paths: vec![],
                 workspace_root: src.clone(),
                 custom_typeshed: None,

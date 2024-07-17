@@ -704,7 +704,7 @@ impl<'db> TypeInferenceBuilder<'db> {
 mod tests {
     use ruff_db::files::{system_path_to_file, File};
     use ruff_db::parsed::parsed_module;
-    use ruff_db::program::{Program, SearchPaths, TargetVersion};
+    use ruff_db::program::{Program, SearchPathSettings, TargetVersion};
     use ruff_db::system::{DbWithTestSystem, SystemPathBuf};
     use ruff_db::testing::assert_function_query_was_not_run;
     use ruff_python_ast::name::Name;
@@ -723,7 +723,7 @@ mod tests {
         Program::new(
             &db,
             TargetVersion::Py38,
-            SearchPaths {
+            SearchPathSettings {
                 extra_paths: Vec::new(),
                 workspace_root: SystemPathBuf::from("/src"),
                 site_packages: None,
