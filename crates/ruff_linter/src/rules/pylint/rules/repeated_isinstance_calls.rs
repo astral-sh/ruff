@@ -53,7 +53,7 @@ pub struct RepeatedIsinstanceCalls {
     expression: SourceCodeSnippet,
 }
 
-// PLR1701
+/// PLR1701
 impl AlwaysFixableViolation for RepeatedIsinstanceCalls {
     #[derive_message_formats]
     fn message(&self) -> String {

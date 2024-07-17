@@ -72,30 +72,26 @@ impl AlwaysFixableViolation for RepeatedEqualityComparison {
 
 /// PLR1714
 pub(crate) fn repeated_equality_comparison(checker: &mut Checker, bool_op: &ast::ExprBoolOp) {
-    if bool_op
-        .values
-        .iter()
-        .any(|value| !is_allowed_value(bool_op.op, value, checker.semantic()))
-    {
-        return;
-    }
-
     // Map from expression hash to (starting offset, number of comparisons, list
     let mut value_to_comparators: FxHashMap<HashableExpr, (TextSize, Vec<&Expr>, Vec<&Expr>)> =
         FxHashMap::with_capacity_and_hasher(bool_op.values.len() * 2, FxBuildHasher);
 
     for value in &bool_op.values {
+        if !is_allowed_value(bool_op.op, value, checker.semantic()) {
+            continue;
+        }
+
         // Enforced via `is_allowed_value`.
         let Expr::Compare(ast::ExprCompare {
             left, comparators, ..
         }) = value
         else {
-            return;
+            continue;
         };
 
         // Enforced via `is_allowed_value`.
         let [right] = &**comparators else {
-            return;
+            continue;
         };
 
         if matches!(left.as_ref(), Expr::Name(_) | Expr::Attribute(_)) {

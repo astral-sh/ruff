@@ -61,3 +61,7 @@ foo == "a" or "c" == bar or foo == "b" or "d" == bar  # Multiple targets
 foo == "a" or ("c" == bar or "d" == bar) or foo == "b"  # Multiple targets
 
 foo == "a" or foo == "b" or "c" != bar and "d" != bar  # Multiple targets
+
+foo == "a" or ("c" != bar and "d" != bar) or foo == "b"  # Multiple targets
+
+foo == "a" and "c" != bar or foo == "b" and "d" != bar  # Multiple targets
