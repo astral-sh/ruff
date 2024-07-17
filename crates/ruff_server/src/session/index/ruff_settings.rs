@@ -172,7 +172,7 @@ impl RuffSettingsIndex {
 
                     if match_exclusion(&directory, file_name, &settings.file_resolver.exclude) {
                         tracing::debug!("Ignored path via `exclude`: {}", directory.display());
-                        return WalkState::Continue;
+                        return WalkState::Skip;
                     } else if match_exclusion(
                         &directory,
                         file_name,
@@ -182,7 +182,7 @@ impl RuffSettingsIndex {
                             "Ignored path via `extend-exclude`: {}",
                             directory.display()
                         );
-                        return WalkState::Continue;
+                        return WalkState::Skip;
                     }
                 }
 
