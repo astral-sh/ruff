@@ -563,9 +563,219 @@ Whether to enable Ruff's preview mode when formatting.
 
 ## VS Code specific
 
-The extension provides additional settings to control the behavior of the Ruff extension in VS Code.
-The detailed documentation for these settings can be found in the UI of the settings editor in VS
-Code.
+Additionally, the Ruff extension provides the following settings specific to VS Code. These settings
+are not used by the language server and are only relevant to the extension.
 
-Refer to the [VS Code extension documentation](https://github.com/astral-sh/ruff-vscode#settings)
+### `enable`
+
+Whether to enable the Ruff extension. Modifying this setting requires restarting VS Code to take effect.
+
+**Default value**: `true`
+
+**Type**: `bool`
+
+**Example usage**:
+
+```json
+{
+    "ruff.enable": false
+}
+```
+
+### `format.args`
+
+_**This setting is not used by the native language server.**_
+
+Additional arguments to pass to the Ruff formatter.
+
+**Default value**: `[]`
+
+**Type**: `string[]`
+
+**Example usage**:
+
+```json
+{
+    "ruff.format.args": ["--line-length", "100"]
+}
+```
+
+### `ignoreStandardLibrary`
+
+_**This setting is not used by the native language server.**_
+
+Whether to ignore files that are inferred to be part of the Python standard library.
+
+**Default value**: `true`
+
+**Type**: `bool`
+
+**Example usage**:
+
+```json
+{
+    "ruff.ignoreStandardLibrary": false
+}
+```
+
+### `importStrategy`
+
+Strategy for loading the `ruff` executable.
+
+- `fromEnvironment` finds Ruff in the environment, falling back to the bundled version
+- `useBundled` uses the version bundled with the extension
+
+**Default value**: `"fromEnvironment"`
+
+**Type**: `"fromEnvironment" | "useBundled"`
+
+**Example usage**:
+
+```json
+{
+    "ruff.importStrategy": "useBundled"
+}
+```
+
+### `interpreter`
+
+A list of paths to Python interpreters. Even though this is a list, only the first interpreter is
+used.
+
+This setting depends on the [`ruff.nativeServer`](#nativeserver) setting:
+
+- If using the native server, the interpreter is used to find the `ruff` executable when
+    [`ruff.importStrategy`](#importstrategy) is set to `fromEnvironment`.
+- Otherwise, the interpreter is used to run the `ruff-lsp` server.
+
+**Default value**: `[]`
+
+**Type**: `string[]`
+
+**Example usage**:
+
+```json
+{
+    "ruff.interpreter": ["/home/user/.local/bin/python"]
+}
+```
+
+### `lint.args`
+
+_**This setting is not used by the native language server.**_
+
+Additional arguments to pass to the Ruff linter.
+
+**Default value**: `[]`
+
+**Type**: `string[]`
+
+**Example usage**:
+
+```json
+{
+    "ruff.lint.args": ["--config", "/path/to/pyproject.toml"]
+}
+```
+
+### `lint.run`
+
+_**This setting is not used by the native language server.**_
+
+Run Ruff on every keystroke (`onType`) or on save (`onSave`).
+
+**Default value**: `"onType"`
+
+**Type**: `"onType" | "onSave"`
+
+**Example usage**:
+
+```json
+{
+    "ruff.lint.run": "onSave"
+}
+```
+
+### `nativeServer`
+
+Whether to use the native language server, [`ruff-lsp`](https://github.com/astral-sh/ruff-lsp) or
+automatically decide between the two based on the Ruff version and extension settings.
+
+- `"on"`: Use the native language server. A warning will be displayed if deprecated settings are
+    detected.
+- `"off"`: Use [`ruff-lsp`](https://github.com/astral-sh/ruff-lsp). A warning will be displayed if
+    settings specific to the native server are detected.
+- `"auto"`: Automatically select between the native language server and
+    [`ruff-lsp`](https://github.com/astral-sh/ruff-lsp) based on the following conditions:
+    1. If the Ruff version is >= `0.5.3`, use the native language server unless any deprecated
+        settings are detected. In that case, show a warning and use
+        [`ruff-lsp`](https://github.com/astral-sh/ruff-lsp) instead.
+    1. If the Ruff version is \< `0.5.3`, use [`ruff-lsp`](https://github.com/astral-sh/ruff-lsp). A
+        warning will be displayed if settings specific to the native server are detected.
+- `true`: Same as `on`
+- `false: Same as`off\`
+
+**Default value**: `"auto"`
+
+**Type**: `"on" | "off" | "auto" | true | false`
+
+**Example usage**:
+
+```json
+{
+    "ruff.nativeServer": "on"
+}
+```
+
+### `path`
+
+A list of path to `ruff` executables.
+
+The first executable in the list which is exists is used. This setting takes precedence over the
+[`ruff.importStrategy`](#importstrategy) setting.
+
+**Default value**: `[]`
+
+**Type**: `string[]`
+
+**Example usage**:
+
+```json
+{
+    "ruff.path": ["/home/user/.local/bin/ruff"]
+}
+```
+
+### `showNotifications`
+
+Setting to control when a notification is shown.
+
+**Default value**: `"off"`
+
+**Type**: `"off" | "onError" | "onWarning" | "always"`
+
+**Example usage**:
+
+```json
+{
+    "ruff.showNotifications": "onWarning"
+}
+```
+
+### `trace.server`
+
+The trace level for the language server. Refer to the [LSP
+specification](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#traceValue)
 for more information.
+
+**Default value**: `"off"`
+
+**Type**: `"off" | "messages" | "verbose"`
+
+**Example usage**:
+
+```json
+{
+    "ruff.trace.server": "messages"
+}
+```
