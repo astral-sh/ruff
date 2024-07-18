@@ -804,6 +804,7 @@ mod tests {
     use ruff_db::testing::assert_function_query_was_not_run;
     use ruff_python_ast::name::Name;
 
+    use crate::builtins::builtins_scope;
     use crate::db::tests::TestDb;
     use crate::semantic_index::definition::Definition;
     use crate::semantic_index::semantic_index;
@@ -1450,6 +1451,25 @@ mod tests {
         ])?;
 
         assert_public_ty(&db, "/src/a.py", "x", "Unbound");
+
+        Ok(())
+    }
+
+    #[test]
+    fn import_builtins() -> anyhow::Result<()> {
+        let mut db = setup_db();
+
+        db.write_file("/src/a.py", "import builtins; x = builtins.copyright")?;
+
+        assert_public_ty(&db, "/src/a.py", "x", "Literal[copyright]");
+        // imported builtins module is the same file as the implicit builtins
+        let file = system_path_to_file(&db, "/src/a.py").expect("Expected file to exist.");
+        let builtins_ty = global_symbol_ty_by_name(&db, file, "builtins");
+        let Type::Module(builtins_file) = builtins_ty else {
+            panic!("Builtins are not a module?");
+        };
+        let implicit_builtins_file = builtins_scope(&db).expect("builtins to exist").file(&db);
+        assert_eq!(builtins_file, implicit_builtins_file);
 
         Ok(())
     }
