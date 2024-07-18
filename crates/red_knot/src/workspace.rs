@@ -12,6 +12,7 @@ use ruff_db::{
 };
 use ruff_python_ast::{name::Name, PySourceType};
 
+use crate::db::RootDatabase;
 use crate::{
     db::Db,
     lint::{lint_semantic, lint_syntax, Diagnostics},
@@ -139,7 +140,11 @@ impl Workspace {
         self.set_package_tree(db).to(new_packages);
     }
 
-    pub fn update_package(self, db: &mut dyn Db, metadata: PackageMetadata) -> anyhow::Result<()> {
+    pub fn update_package(
+        self,
+        db: &mut RootDatabase,
+        metadata: PackageMetadata,
+    ) -> anyhow::Result<()> {
         let path = metadata.root().to_path_buf();
 
         if let Some(package) = self.package_tree(db).get(&path).copied() {
@@ -287,6 +292,14 @@ impl Package {
         assert_eq!(root, metadata.root());
 
         let files = discover_package_files(db, root);
+
+        {
+            // Touch all files to reflect changes to added files.
+            let db: &mut dyn ruff_db::Db = db.upcast_mut();
+            for file in files.iter() {
+                file.touch(db);
+            }
+        }
 
         self.set_name(db).to(metadata.name);
         self.set_file_set(db).to(Arc::new(files));

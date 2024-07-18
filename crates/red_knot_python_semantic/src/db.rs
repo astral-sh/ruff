@@ -33,10 +33,7 @@ pub struct Jar(
 );
 
 /// Database giving access to semantic information about a Python program.
-pub trait Db:
-    SourceDb + ResolverDb + DbWithJar<Jar> + Upcast<dyn SourceDb> + Upcast<dyn ResolverDb>
-{
-}
+pub trait Db: SourceDb + ResolverDb + DbWithJar<Jar> + Upcast<dyn ResolverDb> {}
 
 #[cfg(test)]
 pub(crate) mod tests {
@@ -127,10 +124,16 @@ pub(crate) mod tests {
         fn upcast(&self) -> &(dyn SourceDb + 'static) {
             self
         }
+        fn upcast_mut(&mut self) -> &mut (dyn SourceDb + 'static) {
+            self
+        }
     }
 
     impl Upcast<dyn ResolverDb> for TestDb {
         fn upcast(&self) -> &(dyn ResolverDb + 'static) {
+            self
+        }
+        fn upcast_mut(&mut self) -> &mut (dyn ResolverDb + 'static) {
             self
         }
     }
