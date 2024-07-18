@@ -8,7 +8,7 @@ import re
 import shutil
 import subprocess
 from pathlib import Path
-from typing import NamedTuple
+from typing import NamedTuple, Sequence
 
 import mdformat
 import yaml
@@ -22,6 +22,8 @@ class Section(NamedTuple):
     title: str
     filename: str
     generated: bool
+    # If subsections is present, the `filename` and `generated` value is unused.
+    subsections: Sequence[Section] | None = None
 
 
 SECTIONS: list[Section] = [
@@ -30,6 +32,18 @@ SECTIONS: list[Section] = [
     Section("Installing Ruff", "installation.md", generated=False),
     Section("The Ruff Linter", "linter.md", generated=False),
     Section("The Ruff Formatter", "formatter.md", generated=False),
+    Section(
+        "Editors",
+        "",
+        generated=False,
+        subsections=[
+            Section("Editor Integration", "editors/index.md", generated=False),
+            Section("Setup", "editors/setup.md", generated=False),
+            Section("Features", "editors/features.md", generated=False),
+            Section("Settings", "editors/settings.md", generated=False),
+            Section("Migrating from ruff-lsp", "editors/migration.md", generated=False),
+        ],
+    ),
     Section("Configuring Ruff", "configuration.md", generated=False),
     Section("Preview", "preview.md", generated=False),
     Section("Rules", "rules.md", generated=True),
@@ -108,7 +122,7 @@ def main() -> None:
     Path("docs").mkdir(parents=True, exist_ok=True)
 
     # Split the README.md into sections.
-    for title, filename, generated in SECTIONS:
+    for title, filename, generated, _ in SECTIONS:
         if not generated:
             continue
 
@@ -180,7 +194,19 @@ def main() -> None:
     )
 
     # Add the nav section to mkdocs.yml.
-    config["nav"] = [{section.title: section.filename} for section in SECTIONS]
+    config["nav"] = []
+    for section in SECTIONS:
+        if section.subsections is None:
+            config["nav"].append({section.title: section.filename})
+        else:
+            config["nav"].append(
+                {
+                    section.title: [
+                        {subsection.title: subsection.filename}
+                        for subsection in section.subsections
+                    ]
+                }
+            )
 
     with Path("mkdocs.generated.yml").open("w+", encoding="utf8") as fp:
         yaml.safe_dump(config, fp)
