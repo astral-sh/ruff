@@ -5,8 +5,8 @@ use dashmap::mapref::entry::Entry;
 
 use crate::file_revision::FileRevision;
 use crate::files::private::FileStatus;
-use crate::system::SystemPath;
-use crate::vendored::VendoredPath;
+use crate::system::{SystemPath, SystemPathBuf};
+use crate::vendored::{VendoredPath, VendoredPathBuf};
 use crate::{Db, FxDashMap};
 pub use path::FilePath;
 use ruff_notebook::{Notebook, NotebookError};
@@ -44,11 +44,14 @@ pub struct Files {
 
 #[derive(Default)]
 struct FilesInner {
-    /// Lookup table that maps [`FilePath`]s to salsa interned [`File`] instances.
+    /// Lookup table that maps [`SystemPathBuf`]s to salsa interned [`File`] instances.
     ///
     /// The map also stores entries for files that don't exist on the file system. This is necessary
     /// so that queries that depend on the existence of a file are re-executed when the file is created.
-    files_by_path: FxDashMap<FilePath, File>,
+    system_by_path: FxDashMap<SystemPathBuf, File>,
+
+    /// Lookup table that maps vendored files to the salsa [`File`] ingredients.
+    vendored_by_path: FxDashMap<VendoredPathBuf, File>,
 }
 
 impl Files {
@@ -61,11 +64,10 @@ impl Files {
     #[tracing::instrument(level = "trace", skip(self, db), ret)]
     fn system(&self, db: &dyn Db, path: &SystemPath) -> File {
         let absolute = SystemPath::absolute(path, db.system().current_directory());
-        let absolute = FilePath::System(absolute);
 
         *self
             .inner
-            .files_by_path
+            .system_by_path
             .entry(absolute.clone())
             .or_insert_with(|| {
                 let metadata = db.system().path_metadata(path);
@@ -73,7 +75,7 @@ impl Files {
                 match metadata {
                     Ok(metadata) if metadata.file_type().is_file() => File::new(
                         db,
-                        absolute,
+                        FilePath::System(absolute),
                         metadata.permissions(),
                         metadata.revision(),
                         FileStatus::Exists,
@@ -81,7 +83,7 @@ impl Files {
                     ),
                     _ => File::new(
                         db,
-                        absolute,
+                        FilePath::System(absolute),
                         None,
                         FileRevision::zero(),
                         FileStatus::Deleted,
@@ -95,8 +97,8 @@ impl Files {
     fn try_system(&self, db: &dyn Db, path: &SystemPath) -> Option<File> {
         let absolute = SystemPath::absolute(path, db.system().current_directory());
         self.inner
-            .files_by_path
-            .get(&FilePath::System(absolute))
+            .system_by_path
+            .get(&absolute)
             .map(|entry| *entry.value())
     }
 
@@ -104,11 +106,7 @@ impl Files {
     /// exists and `None` otherwise.
     #[tracing::instrument(level = "trace", skip(self, db), ret)]
     fn vendored(&self, db: &dyn Db, path: &VendoredPath) -> Option<File> {
-        let file = match self
-            .inner
-            .files_by_path
-            .entry(FilePath::Vendored(path.to_path_buf()))
-        {
+        let file = match self.inner.vendored_by_path.entry(path.to_path_buf()) {
             Entry::Occupied(entry) => *entry.get(),
             Entry::Vacant(entry) => {
                 let metadata = db.vendored().metadata(path).ok()?;
@@ -144,7 +142,7 @@ impl std::fmt::Debug for Files {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let mut map = f.debug_map();
 
-        for entry in self.inner.files_by_path.iter() {
+        for entry in self.inner.system_by_path.iter() {
             map.entry(entry.key(), entry.value());
         }
         map.finish()
