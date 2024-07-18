@@ -5,7 +5,7 @@ use ruff_python_ast::{Expr, ExpressionRef, StmtClassDef};
 
 use crate::semantic_index::ast_ids::HasScopedAstId;
 use crate::semantic_index::semantic_index;
-use crate::types::{definition_ty, infer_scope_types, module_global_symbol_ty_by_name, Type};
+use crate::types::{definition_ty, global_symbol_ty_by_name, infer_scope_types, Type};
 use crate::Db;
 
 pub struct SemanticModel<'db> {
@@ -28,8 +28,8 @@ impl<'db> SemanticModel<'db> {
         resolve_module(self.db.upcast(), module_name)
     }
 
-    pub fn module_global_symbol_ty(&self, module: &Module, symbol_name: &str) -> Type<'db> {
-        module_global_symbol_ty_by_name(self.db, module.file(), symbol_name)
+    pub fn global_symbol_ty(&self, module: &Module, symbol_name: &str) -> Type<'db> {
+        global_symbol_ty_by_name(self.db, module.file(), symbol_name)
     }
 }
 

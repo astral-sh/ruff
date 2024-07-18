@@ -130,7 +130,7 @@ fn lint_bad_override(context: &SemanticLintContext, class: &ast::StmtClassDef) {
         return;
     };
 
-    let override_ty = semantic.module_global_symbol_ty(&typing, "override");
+    let override_ty = semantic.global_symbol_ty(&typing, "override");
 
     let Type::Class(class_ty) = class.ty(semantic) else {
         return;

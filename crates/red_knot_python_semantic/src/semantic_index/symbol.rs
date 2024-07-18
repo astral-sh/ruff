@@ -133,7 +133,7 @@ pub struct FileScopeId;
 
 impl FileScopeId {
     /// Returns the scope id of the module-global scope.
-    pub fn module_global() -> Self {
+    pub fn global() -> Self {
         FileScopeId::from_u32(0)
     }
 
