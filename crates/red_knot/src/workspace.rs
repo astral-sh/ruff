@@ -12,7 +12,6 @@ use ruff_db::{
 };
 use ruff_python_ast::{name::Name, PySourceType};
 
-use crate::db::RootDatabase;
 use crate::{
     db::Db,
     lint::{lint_semantic, lint_syntax, Diagnostics},
@@ -118,6 +117,7 @@ impl Workspace {
         self.package_tree(db).values().copied()
     }
 
+    #[tracing::instrument(skip_all)]
     pub fn reload(self, db: &mut dyn Db, metadata: WorkspaceMetadata) {
         assert_eq!(self.root(db), metadata.root());
 
@@ -140,11 +140,8 @@ impl Workspace {
         self.set_package_tree(db).to(new_packages);
     }
 
-    pub fn update_package(
-        self,
-        db: &mut RootDatabase,
-        metadata: PackageMetadata,
-    ) -> anyhow::Result<()> {
+    #[tracing::instrument(level = "debug", skip_all)]
+    pub fn update_package(self, db: &mut dyn Db, metadata: PackageMetadata) -> anyhow::Result<()> {
         let path = metadata.root().to_path_buf();
 
         if let Some(package) = self.package_tree(db).get(&path).copied() {
@@ -162,7 +159,7 @@ impl Workspace {
     pub fn package(self, db: &dyn Db, path: &SystemPath) -> Option<Package> {
         let packages = self.package_tree(db);
 
-        let (package_path, package) = packages.range(..path.to_path_buf()).next_back()?;
+        let (package_path, package) = packages.range(..=path.to_path_buf()).next_back()?;
 
         if path.starts_with(package_path) {
             Some(*package)
@@ -271,6 +268,22 @@ impl Package {
         removed
     }
 
+    #[tracing::instrument(level = "debug", skip(db))]
+    pub fn add_file(self, db: &mut dyn Db, file: File) -> bool {
+        let mut files_arc = self.file_set(db).clone();
+
+        // Set a dummy value. Salsa will cancel any pending queries and remove its own reference to `files`
+        // so that the reference counter to `files` now drops to 1.
+        self.set_file_set(db).to(Arc::new(FxHashSet::default()));
+
+        let files = Arc::get_mut(&mut files_arc).unwrap();
+        let added = files.insert(file);
+        self.set_file_set(db).to(files_arc);
+
+        added
+    }
+
+    #[tracing::instrument(level = "debug", skip(db))]
     pub(crate) fn check(self, db: &dyn Db) -> Vec<String> {
         let mut result = Vec::new();
         for file in self.files(db) {
@@ -291,17 +304,14 @@ impl Package {
         let root = self.root(db);
         assert_eq!(root, metadata.root());
 
-        let files = discover_package_files(db, root);
-
-        {
-            // Touch all files to reflect changes to added files.
-            let db: &mut dyn ruff_db::Db = db.upcast_mut();
-            for file in files.iter() {
-                file.touch(db);
-            }
-        }
-
+        self.reload_files(db);
         self.set_name(db).to(metadata.name);
+    }
+
+    #[tracing::instrument(level = "debug", skip(db))]
+    pub fn reload_files(self, db: &mut dyn Db) {
+        let files = discover_package_files(db, self.root(db));
+
         self.set_file_set(db).to(Arc::new(files));
     }
 }

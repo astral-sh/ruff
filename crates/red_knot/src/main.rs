@@ -11,8 +11,8 @@ use tracing_subscriber::{Layer, Registry};
 use tracing_tree::time::Uptime;
 
 use red_knot::db::RootDatabase;
-use red_knot::watch::FileWatcher;
-use red_knot::watch::FileWatcherChange;
+use red_knot::watch;
+use red_knot::watch::Watcher;
 use red_knot::workspace::WorkspaceMetadata;
 use ruff_db::program::{ProgramSettings, SearchPathSettings};
 use ruff_db::system::{OsSystem, System, SystemPathBuf};
@@ -57,6 +57,13 @@ struct Args {
 
     #[clap(flatten)]
     verbosity: Verbosity,
+
+    #[arg(
+        long,
+        help = "Run in watch mode by re-running whenever files change",
+        short = 'W'
+    )]
+    watch: bool,
 }
 
 #[allow(
@@ -72,6 +79,7 @@ pub fn main() -> anyhow::Result<()> {
         extra_search_path: extra_paths,
         target_version,
         verbosity,
+        watch,
     } = Args::parse_from(std::env::args().collect::<Vec<_>>());
 
     let verbosity = verbosity.level();
@@ -117,125 +125,120 @@ pub fn main() -> anyhow::Result<()> {
         }
     })?;
 
-    let file_changes_notifier = main_loop.file_changes_notifier();
-
-    // Watch for file changes and re-trigger the analysis.
-    let mut file_watcher = FileWatcher::new(move |changes| {
-        file_changes_notifier.notify(changes);
-    })?;
-
-    file_watcher.watch_folder(db.workspace().root(&db).as_std_path())?;
-
-    main_loop.run(&mut db);
-
-    println!("{}", countme::get_all());
+    if watch {
+        main_loop.watch(&mut db)?;
+    } else {
+        main_loop.run(&mut db);
+    }
 
     Ok(())
 }
 
 struct MainLoop {
-    verbosity: Option<VerbosityLevel>,
-    orchestrator: crossbeam_channel::Sender<OrchestratorMessage>,
+    /// Sender that can be used to send messages to the main loop.
+    sender: crossbeam_channel::Sender<MainLoopMessage>,
+
+    /// Receiver for the messages sent **to** the main loop.
     receiver: crossbeam_channel::Receiver<MainLoopMessage>,
+
+    /// The file system watcher, if running in watch mode.
+    watcher: Option<Watcher>,
+
+    verbosity: Option<VerbosityLevel>,
 }
 
 impl MainLoop {
     fn new(verbosity: Option<VerbosityLevel>) -> (Self, MainLoopCancellationToken) {
-        let (orchestrator_sender, orchestrator_receiver) = crossbeam_channel::bounded(1);
-        let (main_loop_sender, main_loop_receiver) = crossbeam_channel::bounded(1);
-
-        let mut orchestrator = Orchestrator {
-            receiver: orchestrator_receiver,
-            main_loop: main_loop_sender.clone(),
-            revision: 0,
-        };
-
-        std::thread::spawn(move || {
-            orchestrator.run();
-        });
+        let (sender, receiver) = crossbeam_channel::bounded(10);
 
         (
             Self {
+                sender: sender.clone(),
+                receiver,
+                watcher: None,
                 verbosity,
-                orchestrator: orchestrator_sender,
-                receiver: main_loop_receiver,
             },
-            MainLoopCancellationToken {
-                sender: main_loop_sender,
-            },
+            MainLoopCancellationToken { sender },
         )
     }
 
-    fn file_changes_notifier(&self) -> FileChangesNotifier {
-        FileChangesNotifier {
-            sender: self.orchestrator.clone(),
-        }
+    fn watch(mut self, db: &mut RootDatabase) -> anyhow::Result<()> {
+        let sender = self.sender.clone();
+        let mut watcher = watch::directory_watcher(move |event| {
+            sender.send(MainLoopMessage::ApplyChanges(event)).unwrap();
+        })?;
+
+        watcher.watch(db.workspace().root(db))?;
+
+        self.watcher = Some(watcher);
+
+        self.run(db);
+
+        Ok(())
     }
 
     #[allow(clippy::print_stderr)]
     fn run(self, db: &mut RootDatabase) {
-        self.orchestrator.send(OrchestratorMessage::Run).unwrap();
+        // Schedule the first check.
+        self.sender.send(MainLoopMessage::CheckWorkspace).unwrap();
+        let mut revision = 0usize;
 
         for message in &self.receiver {
             tracing::trace!("Main Loop: Tick");
 
             match message {
-                MainLoopMessage::CheckWorkspace { revision } => {
+                MainLoopMessage::CheckWorkspace => {
                     let db = db.snapshot();
-                    let orchestrator = self.orchestrator.clone();
+                    let sender = self.sender.clone();
 
                     // Spawn a new task that checks the workspace. This needs to be done in a separate thread
                     // to prevent blocking the main loop here.
                     rayon::spawn(move || {
                         if let Ok(result) = db.check() {
-                            orchestrator
-                                .send(OrchestratorMessage::CheckCompleted {
-                                    diagnostics: result,
-                                    revision,
-                                })
-                                .unwrap();
+                            // Send the result back to the main loop for printing.
+                            sender
+                                .send(MainLoopMessage::CheckCompleted { result, revision })
+                                .ok();
                         }
                     });
                 }
+
+                MainLoopMessage::CheckCompleted {
+                    result,
+                    revision: check_revision,
+                } => {
+                    if check_revision == revision {
+                        eprintln!("{}", result.join("\n"));
+
+                        if self.verbosity == Some(VerbosityLevel::Trace) {
+                            eprintln!("{}", countme::get_all());
+                        }
+                    }
+
+                    if self.watcher.is_none() {
+                        return self.exit();
+                    }
+                }
+
                 MainLoopMessage::ApplyChanges(changes) => {
+                    revision += 1;
                     // Automatically cancels any pending queries and waits for them to complete.
                     db.apply_changes(changes);
-                }
-                MainLoopMessage::CheckCompleted(diagnostics) => {
-                    eprintln!("{}", diagnostics.join("\n"));
-                    if self.verbosity == Some(VerbosityLevel::Trace) {
-                        eprintln!("{}", countme::get_all());
-                    }
+                    self.sender.send(MainLoopMessage::CheckWorkspace).unwrap();
                 }
                 MainLoopMessage::Exit => {
-                    if self.verbosity == Some(VerbosityLevel::Trace) {
-                        eprintln!("{}", countme::get_all());
-                    }
-                    return;
+                    return self.exit();
                 }
             }
         }
     }
-}
 
-impl Drop for MainLoop {
-    fn drop(&mut self) {
-        self.orchestrator
-            .send(OrchestratorMessage::Shutdown)
-            .unwrap();
-    }
-}
-
-#[derive(Debug, Clone)]
-struct FileChangesNotifier {
-    sender: crossbeam_channel::Sender<OrchestratorMessage>,
-}
-
-impl FileChangesNotifier {
-    fn notify(&self, changes: Vec<FileWatcherChange>) {
-        self.sender
-            .send(OrchestratorMessage::FileChanges(changes))
-            .unwrap();
+    #[allow(clippy::print_stderr, clippy::unused_self)]
+    fn exit(self) {
+        if self.verbosity == Some(VerbosityLevel::Trace) {
+            eprintln!("Exit");
+            eprintln!("{}", countme::get_all());
+        }
     }
 }
 
@@ -250,115 +253,16 @@ impl MainLoopCancellationToken {
     }
 }
 
-struct Orchestrator {
-    /// Sends messages to the main loop.
-    main_loop: crossbeam_channel::Sender<MainLoopMessage>,
-    /// Receives messages from the main loop.
-    receiver: crossbeam_channel::Receiver<OrchestratorMessage>,
-    revision: usize,
-}
-
-impl Orchestrator {
-    #[allow(clippy::print_stderr)]
-    fn run(&mut self) {
-        while let Ok(message) = self.receiver.recv() {
-            match message {
-                OrchestratorMessage::Run => {
-                    self.main_loop
-                        .send(MainLoopMessage::CheckWorkspace {
-                            revision: self.revision,
-                        })
-                        .unwrap();
-                }
-
-                OrchestratorMessage::CheckCompleted {
-                    diagnostics,
-                    revision,
-                } => {
-                    // Only take the diagnostics if they are for the latest revision.
-                    if self.revision == revision {
-                        self.main_loop
-                            .send(MainLoopMessage::CheckCompleted(diagnostics))
-                            .unwrap();
-                    } else {
-                        tracing::debug!("Discarding diagnostics for outdated revision {revision} (current: {}).", self.revision);
-                    }
-                }
-
-                OrchestratorMessage::FileChanges(changes) => {
-                    // Request cancellation, but wait until all analysis tasks have completed to
-                    // avoid stale messages in the next main loop.
-
-                    self.revision += 1;
-                    self.debounce_changes(changes);
-                }
-                OrchestratorMessage::Shutdown => {
-                    return self.shutdown();
-                }
-            }
-        }
-    }
-
-    fn debounce_changes(&self, mut changes: Vec<FileWatcherChange>) {
-        loop {
-            // Consume possibly incoming file change messages before running a new analysis, but don't wait for more than 100ms.
-            crossbeam_channel::select! {
-                recv(self.receiver) -> message => {
-                    match message {
-                        Ok(OrchestratorMessage::Shutdown) => {
-                            return self.shutdown();
-                        }
-                        Ok(OrchestratorMessage::FileChanges(file_changes)) => {
-                            changes.extend(file_changes);
-                        }
-
-                        Ok(OrchestratorMessage::CheckCompleted { .. })=> {
-                            // disregard any outdated completion message.
-                        }
-                        Ok(OrchestratorMessage::Run) => unreachable!("The orchestrator is already running."),
-
-                        Err(_) => {
-                            // There are no more senders, no point in waiting for more messages
-                            return;
-                        }
-                    }
-                },
-                default(std::time::Duration::from_millis(10)) => {
-                    // No more file changes after 10 ms, send the changes and schedule a new analysis
-                    self.main_loop.send(MainLoopMessage::ApplyChanges(changes)).unwrap();
-                    self.main_loop.send(MainLoopMessage::CheckWorkspace { revision: self.revision}).unwrap();
-                    return;
-                }
-            }
-        }
-    }
-
-    #[allow(clippy::unused_self)]
-    fn shutdown(&self) {
-        tracing::trace!("Shutting down orchestrator.");
-    }
-}
-
 /// Message sent from the orchestrator to the main loop.
 #[derive(Debug)]
 enum MainLoopMessage {
-    CheckWorkspace { revision: usize },
-    CheckCompleted(Vec<String>),
-    ApplyChanges(Vec<FileWatcherChange>),
-    Exit,
-}
-
-#[derive(Debug)]
-enum OrchestratorMessage {
-    Run,
-    Shutdown,
-
+    CheckWorkspace,
     CheckCompleted {
-        diagnostics: Vec<String>,
+        result: Vec<String>,
         revision: usize,
     },
-
-    FileChanges(Vec<FileWatcherChange>),
+    ApplyChanges(Vec<watch::ChangeEvent>),
+    Exit,
 }
 
 fn setup_tracing(verbosity: Option<VerbosityLevel>) {

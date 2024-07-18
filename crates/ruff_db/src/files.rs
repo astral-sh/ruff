@@ -24,10 +24,7 @@ pub fn system_path_to_file(db: &dyn Db, path: impl AsRef<SystemPath>) -> Option<
     // exist anymore so that Salsa can track that the caller of this function depends on the existence of
     // that file. This function filters out files that don't exist, but Salsa will know that it must
     // re-run the calling query whenever the `file`'s status changes (because of the `.status` call here).
-    match file.status(db) {
-        FileStatus::Exists => Some(file),
-        FileStatus::Deleted => None,
-    }
+    file.exists(db).then_some(file)
 }
 
 /// Interns a vendored file path. Returns `Some` if the vendored file for `path` exists and `None` otherwise.
@@ -94,7 +91,7 @@ impl Files {
     }
 
     /// Tries to look up the file for the given system path, returns `None` if no such file exists yet
-    fn try_system(&self, db: &dyn Db, path: &SystemPath) -> Option<File> {
+    pub fn try_system(&self, db: &dyn Db, path: &SystemPath) -> Option<File> {
         let absolute = SystemPath::absolute(path, db.system().current_directory());
         self.inner
             .system_by_path
@@ -127,6 +124,44 @@ impl Files {
         };
 
         Some(file)
+    }
+
+    /// Refreshes the state of all known files under `path` recursively.
+    ///
+    /// The most common use case is to update the [`Files`] state after removing or moving a directory.
+    ///
+    /// # Performance
+    /// Refreshing the state of every file under `path` is expensive. It requires iterating over all known files
+    /// and making system calls to get the latest status of each file in `path`.
+    /// That's why [`File::sync_path`] and [`File::sync_path`] is preferred if it is known that the path is a file.
+    #[tracing::instrument(level = "debug", skip(db))]
+    pub fn sync_recursively(db: &mut dyn Db, path: &SystemPath) {
+        let path = SystemPath::absolute(path, db.system().current_directory());
+
+        let inner = Arc::clone(&db.files().inner);
+        for entry in inner.system_by_path.iter_mut() {
+            if entry.key().starts_with(&path) {
+                let file = entry.value();
+                file.sync(db);
+            }
+        }
+    }
+
+    /// Refreshes the state of all known files.
+    ///
+    /// This is a last-resort method that should only be used when more granular updates aren't possible
+    /// (for example, because the file watcher failed to observe some changes). Use responsibly!
+    ///
+    /// # Performance
+    /// Refreshing the state of every file is expensive. It requires iterating over all known files and
+    /// issuing a system call to get the latest status of each file.
+    #[tracing::instrument(level = "debug", skip(db))]
+    pub fn sync_all(db: &mut dyn Db) {
+        let inner = Arc::clone(&db.files().inner);
+        for entry in inner.system_by_path.iter_mut() {
+            let file = entry.value();
+            file.sync(db);
+        }
     }
 
     /// Creates a salsa like snapshot. The instances share
@@ -217,18 +252,20 @@ impl File {
     }
 
     /// Refreshes the file metadata by querying the file system if needed.
-    /// TODO: The API should instead take all observed changes from the file system directly
-    ///   and then apply the VfsFile status accordingly. But for now, this is sufficient.
-    pub fn touch_path(db: &mut dyn Db, path: &SystemPath) {
-        Self::touch_impl(db, path, None);
+    #[tracing::instrument(level = "debug", skip(db))]
+    pub fn sync_path(db: &mut dyn Db, path: &SystemPath) {
+        let absolute = SystemPath::absolute(path, db.system().current_directory());
+        Self::sync_impl(db, &absolute, None);
     }
 
-    pub fn touch(self, db: &mut dyn Db) {
+    /// Syncs the [`File`]'s state with the state of the file on the system.
+    #[tracing::instrument(level = "debug", skip(db))]
+    pub fn sync(self, db: &mut dyn Db) {
         let path = self.path(db).clone();
 
         match path {
             FilePath::System(system) => {
-                Self::touch_impl(db, &system, Some(self));
+                Self::sync_impl(db, &system, Some(self));
             }
             FilePath::Vendored(_) => {
                 // Readonly, can never be out of date.
@@ -236,8 +273,12 @@ impl File {
         }
     }
 
-    /// Private method providing the implementation for [`Self::touch_path`] and [`Self::touch`].
-    fn touch_impl(db: &mut dyn Db, path: &SystemPath, file: Option<File>) {
+    /// Private method providing the implementation for [`Self::sync_path`] and [`Self::sync_path`].
+    fn sync_impl(db: &mut dyn Db, path: &SystemPath, file: Option<File>) {
+        let Some(file) = file.or_else(|| db.files().try_system(db, path)) else {
+            return;
+        };
+
         let metadata = db.system().path_metadata(path);
 
         let (status, revision) = match metadata {
@@ -247,12 +288,13 @@ impl File {
             _ => (FileStatus::Deleted, FileRevision::zero()),
         };
 
-        let Some(file) = file.or_else(|| db.files().try_system(db, path)) else {
-            return;
-        };
-
         file.set_status(db).to(status);
         file.set_revision(db).to(revision);
+    }
+
+    /// Returns `true` if the file exists.
+    pub fn exists(self, db: &dyn Db) -> bool {
+        self.status(db) == FileStatus::Exists
     }
 }
 
