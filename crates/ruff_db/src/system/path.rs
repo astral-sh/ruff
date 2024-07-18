@@ -549,3 +549,17 @@ impl std::fmt::Display for SystemPathBuf {
         self.0.fmt(f)
     }
 }
+
+#[cfg(feature = "cache")]
+impl ruff_cache::CacheKey for SystemPath {
+    fn cache_key(&self, hasher: &mut ruff_cache::CacheKeyHasher) {
+        self.0.as_str().cache_key(hasher);
+    }
+}
+
+#[cfg(feature = "cache")]
+impl ruff_cache::CacheKey for SystemPathBuf {
+    fn cache_key(&self, hasher: &mut ruff_cache::CacheKeyHasher) {
+        self.as_path().cache_key(hasher);
+    }
+}

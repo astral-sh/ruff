@@ -161,7 +161,7 @@ pub struct CodeCell {
 
 /// Notebook root-level metadata.
 #[skip_serializing_none]
-#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Default)]
 pub struct RawNotebookMetadata {
     /// The author(s) of the notebook document
     pub authors: Option<Value>,

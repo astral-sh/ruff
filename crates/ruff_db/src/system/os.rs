@@ -1,9 +1,13 @@
+use std::sync::Arc;
+use std::{any::Any, path::PathBuf};
+
+use filetime::FileTime;
+
+use ruff_notebook::{Notebook, NotebookError};
+
 use crate::system::{
     DirectoryEntry, FileType, Metadata, Result, System, SystemPath, SystemPathBuf,
 };
-use filetime::FileTime;
-use std::sync::Arc;
-use std::{any::Any, path::PathBuf};
 
 use super::walk_directory::{
     self, DirectoryWalker, WalkDirectoryBuilder, WalkDirectoryConfiguration,
@@ -23,9 +27,12 @@ struct OsSystemInner {
 
 impl OsSystem {
     pub fn new(cwd: impl AsRef<SystemPath>) -> Self {
+        let cwd = cwd.as_ref();
+        assert!(cwd.as_utf8_path().is_absolute());
+
         Self {
             inner: Arc::new(OsSystemInner {
-                cwd: cwd.as_ref().to_path_buf(),
+                cwd: cwd.to_path_buf(),
             }),
         }
     }
@@ -63,6 +70,10 @@ impl System for OsSystem {
 
     fn read_to_string(&self, path: &SystemPath) -> Result<String> {
         std::fs::read_to_string(path.as_std_path())
+    }
+
+    fn read_to_notebook(&self, path: &SystemPath) -> std::result::Result<Notebook, NotebookError> {
+        Notebook::from_path(path.as_std_path())
     }
 
     fn path_exists(&self, path: &SystemPath) -> bool {
@@ -266,10 +277,12 @@ impl From<WalkState> for ignore::WalkState {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
+    use tempfile::TempDir;
+
     use crate::system::walk_directory::tests::DirectoryEntryToString;
     use crate::system::DirectoryEntry;
-    use tempfile::TempDir;
+
+    use super::*;
 
     #[test]
     fn read_directory() {
@@ -301,7 +314,9 @@ mod tests {
 
     #[test]
     fn read_directory_nonexistent() {
-        let fs = OsSystem::new("");
+        let tempdir = TempDir::new().unwrap();
+
+        let fs = OsSystem::new(SystemPath::from_std_path(tempdir.path()).unwrap());
         let result = fs.read_directory(SystemPath::new("doesnt_exist"));
         assert!(result.is_err_and(|error| error.kind() == std::io::ErrorKind::NotFound));
     }

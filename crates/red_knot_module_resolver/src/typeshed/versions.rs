@@ -6,15 +6,14 @@ use std::ops::{RangeFrom, RangeInclusive};
 use std::str::FromStr;
 
 use once_cell::sync::Lazy;
+use ruff_db::program::TargetVersion;
 use ruff_db::system::SystemPath;
 use rustc_hash::FxHashMap;
 
 use ruff_db::files::{system_path_to_file, File};
-use ruff_db::source::source_text;
 
 use crate::db::Db;
 use crate::module_name::ModuleName;
-use crate::supported_py_version::TargetVersion;
 
 use super::vendored::vendored_typeshed_stubs;
 
@@ -74,7 +73,10 @@ pub(crate) fn parse_typeshed_versions(
     db: &dyn Db,
     versions_file: File,
 ) -> Result<TypeshedVersions, TypeshedVersionsParseError> {
-    let file_content = source_text(db.upcast(), versions_file);
+    // TODO: Handle IO errors
+    let file_content = versions_file
+        .read_to_string(db.upcast())
+        .unwrap_or_default();
     file_content.parse()
 }
 
@@ -438,6 +440,7 @@ mod tests {
     use std::path::Path;
 
     use insta::assert_snapshot;
+    use ruff_db::program::TargetVersion;
 
     use super::*;
 

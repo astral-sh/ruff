@@ -1,3 +1,5 @@
+use ruff_notebook::{Notebook, NotebookError};
+
 use crate::files::File;
 use crate::system::{DirectoryEntry, MemoryFileSystem, Metadata, Result, System, SystemPath};
 use crate::Db;
@@ -50,14 +52,21 @@ impl System for TestSystem {
     fn path_metadata(&self, path: &SystemPath) -> crate::system::Result<Metadata> {
         match &self.inner {
             TestSystemInner::Stub(fs) => fs.metadata(path),
-            TestSystemInner::System(fs) => fs.path_metadata(path),
+            TestSystemInner::System(system) => system.path_metadata(path),
         }
     }
 
     fn read_to_string(&self, path: &SystemPath) -> crate::system::Result<String> {
         match &self.inner {
             TestSystemInner::Stub(fs) => fs.read_to_string(path),
-            TestSystemInner::System(fs) => fs.read_to_string(path),
+            TestSystemInner::System(system) => system.read_to_string(path),
+        }
+    }
+
+    fn read_to_notebook(&self, path: &SystemPath) -> std::result::Result<Notebook, NotebookError> {
+        match &self.inner {
+            TestSystemInner::Stub(fs) => fs.read_to_notebook(path),
+            TestSystemInner::System(system) => system.read_to_notebook(path),
         }
     }
 
@@ -141,7 +150,7 @@ pub trait DbWithTestSystem: Db + Sized {
         result
     }
 
-    /// Writes the content of the given file and notifies the Db about the change.
+    /// Writes the content of the given files and notifies the Db about the change.
     ///
     /// # Panics
     /// If the system isn't using the memory file system for testing.

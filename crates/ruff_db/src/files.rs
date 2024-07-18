@@ -3,13 +3,13 @@ use std::sync::Arc;
 use countme::Count;
 use dashmap::mapref::entry::Entry;
 
-pub use path::FilePath;
-
 use crate::file_revision::FileRevision;
 use crate::files::private::FileStatus;
 use crate::system::SystemPath;
 use crate::vendored::VendoredPath;
 use crate::{Db, FxDashMap};
+pub use path::FilePath;
+use ruff_notebook::{Notebook, NotebookError};
 
 mod path;
 
@@ -58,7 +58,7 @@ impl Files {
     ///
     /// The operation always succeeds even if the path doesn't exist on disk, isn't accessible or if the path points to a directory.
     /// In these cases, a file with status [`FileStatus::Deleted`] is returned.
-    #[tracing::instrument(level = "debug", skip(self, db))]
+    #[tracing::instrument(level = "debug", skip(self, db), ret)]
     fn system(&self, db: &dyn Db, path: &SystemPath) -> File {
         let absolute = SystemPath::absolute(path, db.system().current_directory());
         let absolute = FilePath::System(absolute);
@@ -102,7 +102,7 @@ impl Files {
 
     /// Looks up a vendored file by its path. Returns `Some` if a vendored file for the given path
     /// exists and `None` otherwise.
-    #[tracing::instrument(level = "debug", skip(self, db))]
+    #[tracing::instrument(level = "debug", skip(self, db), ret)]
     fn vendored(&self, db: &dyn Db, path: &VendoredPath) -> Option<File> {
         let file = match self
             .inner
@@ -182,15 +182,11 @@ impl File {
     /// Reads the content of the file into a [`String`].
     ///
     /// Reading the same file multiple times isn't guaranteed to return the same content. It's possible
-    /// that the file has been modified in between the reads. It's even possible that a file that
-    /// is considered to exist has been deleted in the meantime. If this happens, then the method returns
-    /// an empty string, which is the closest to the content that the file contains now. Returning
-    /// an empty string shouldn't be a problem because the query will be re-executed as soon as the
-    /// changes are applied to the database.
-    pub(crate) fn read_to_string(&self, db: &dyn Db) -> String {
+    /// that the file has been modified in between the reads.
+    pub fn read_to_string(&self, db: &dyn Db) -> crate::system::Result<String> {
         let path = self.path(db);
 
-        let result = match path {
+        match path {
             FilePath::System(system) => {
                 // Add a dependency on the revision to ensure the operation gets re-executed when the file changes.
                 let _ = self.revision(db);
@@ -198,9 +194,28 @@ impl File {
                 db.system().read_to_string(system)
             }
             FilePath::Vendored(vendored) => db.vendored().read_to_string(vendored),
-        };
+        }
+    }
 
-        result.unwrap_or_default()
+    /// Reads the content of the file into a [`Notebook`].
+    ///
+    /// Reading the same file multiple times isn't guaranteed to return the same content. It's possible
+    /// that the file has been modified in between the reads.
+    pub fn read_to_notebook(&self, db: &dyn Db) -> Result<Notebook, NotebookError> {
+        let path = self.path(db);
+
+        match path {
+            FilePath::System(system) => {
+                // Add a dependency on the revision to ensure the operation gets re-executed when the file changes.
+                let _ = self.revision(db);
+
+                db.system().read_to_notebook(system)
+            }
+            FilePath::Vendored(_) => Err(NotebookError::Io(std::io::Error::new(
+                std::io::ErrorKind::InvalidInput,
+                "Reading a notebook from the vendored file system is not supported.",
+            ))),
+        }
     }
 
     /// Refreshes the file metadata by querying the file system if needed.
@@ -274,7 +289,7 @@ mod tests {
 
         assert_eq!(test.permissions(&db), Some(0o755));
         assert_ne!(test.revision(&db), FileRevision::zero());
-        assert_eq!(&test.read_to_string(&db), "print('Hello world')");
+        assert_eq!(&test.read_to_string(&db)?, "print('Hello world')");
 
         Ok(())
     }
@@ -304,7 +319,7 @@ mod tests {
     }
 
     #[test]
-    fn stubbed_vendored_file() {
+    fn stubbed_vendored_file() -> crate::system::Result<()> {
         let mut db = TestDb::new();
 
         let mut vendored_builder = VendoredFileSystemBuilder::new();
@@ -318,7 +333,9 @@ mod tests {
 
         assert_eq!(test.permissions(&db), Some(0o444));
         assert_ne!(test.revision(&db), FileRevision::zero());
-        assert_eq!(&test.read_to_string(&db), "def foo() -> str");
+        assert_eq!(&test.read_to_string(&db)?, "def foo() -> str");
+
+        Ok(())
     }
 
     #[test]

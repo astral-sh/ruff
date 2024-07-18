@@ -1,31 +1,20 @@
-use std::ops::Deref;
+use std::borrow::Cow;
+use std::iter::FusedIterator;
 use std::sync::Arc;
 
+use rustc_hash::{FxBuildHasher, FxHashSet};
+
 use ruff_db::files::{File, FilePath};
-use ruff_db::system::SystemPathBuf;
+use ruff_db::program::{Program, SearchPathSettings, TargetVersion};
+use ruff_db::system::{DirectoryEntry, System, SystemPath, SystemPathBuf};
 
 use crate::db::Db;
 use crate::module::{Module, ModuleKind};
 use crate::module_name::ModuleName;
 use crate::path::ModuleResolutionPathBuf;
-use crate::resolver::internal::ModuleResolverSettings;
 use crate::state::ResolverState;
-use crate::supported_py_version::TargetVersion;
 
-/// Configures the module resolver settings.
-///
-/// Must be called before calling any other module resolution functions.
-pub fn set_module_resolution_settings(db: &mut dyn Db, config: RawModuleResolutionSettings) {
-    // There's no concurrency issue here because we hold a `&mut dyn Db` reference. No other
-    // thread can mutate the `Db` while we're in this call, so using `try_get` to test if
-    // the settings have already been set is safe.
-    let resolved_settings = config.into_configuration_settings();
-    if let Some(existing) = ModuleResolverSettings::try_get(db) {
-        existing.set_settings(db).to(resolved_settings);
-    } else {
-        ModuleResolverSettings::new(db, resolved_settings);
-    }
-}
+type SearchPathRoot = Arc<ModuleResolutionPathBuf>;
 
 /// Resolves a module name to a module.
 pub fn resolve_module(db: &dyn Db, module_name: ModuleName) -> Option<Module> {
@@ -80,14 +69,16 @@ pub(crate) fn file_to_module(db: &dyn Db, file: File) -> Option<Module> {
 
     let path = file.path(db.upcast());
 
-    let resolver_settings = module_resolver_settings(db);
+    let settings = module_resolution_settings(db);
 
-    let relative_path = resolver_settings
-        .search_paths()
-        .iter()
-        .find_map(|root| root.relativize_path(path))?;
+    let mut search_paths = settings.search_paths(db);
 
-    let module_name = relative_path.to_module_name()?;
+    let module_name = loop {
+        let candidate = search_paths.next()?;
+        if let Some(relative_path) = candidate.relativize_path(path) {
+            break relative_path.to_module_name()?;
+        }
+    };
 
     // Resolve the module name to see if Python would resolve the name to the same path.
     // If it doesn't, then that means that multiple modules have the same name in different
@@ -109,101 +100,327 @@ pub(crate) fn file_to_module(db: &dyn Db, file: File) -> Option<Module> {
     }
 }
 
-/// "Raw" configuration settings for module resolution: unvalidated, unnormalized
-#[derive(Eq, PartialEq, Debug)]
-pub struct RawModuleResolutionSettings {
-    /// The target Python version the user has specified
-    pub target_version: TargetVersion,
+/// Validate and normalize the raw settings given by the user
+/// into settings we can use for module resolution
+///
+/// This method also implements the typing spec's [module resolution order].
+///
+/// TODO(Alex): this method does multiple `.unwrap()` calls when it should really return an error.
+/// Each `.unwrap()` call is a point where we're validating a setting that the user would pass
+/// and transforming it into an internal representation for a validated path.
+/// Rather than panicking if a path fails to validate, we should display an error message to the user
+/// and exit the process with a nonzero exit code.
+/// This validation should probably be done outside of Salsa?
+///
+/// [module resolution order]: https://typing.readthedocs.io/en/latest/spec/distributing.html#import-resolution-ordering
+#[salsa::tracked(return_ref)]
+pub(crate) fn module_resolution_settings(db: &dyn Db) -> ModuleResolutionSettings {
+    let program = Program::get(db.upcast());
 
-    /// List of user-provided paths that should take first priority in the module resolution.
-    /// Examples in other type checkers are mypy's MYPYPATH environment variable,
-    /// or pyright's stubPath configuration setting.
-    pub extra_paths: Vec<SystemPathBuf>,
+    let SearchPathSettings {
+        extra_paths,
+        workspace_root,
+        custom_typeshed,
+        site_packages,
+    } = program.search_paths(db.upcast());
 
-    /// The root of the workspace, used for finding first-party modules.
-    pub workspace_root: SystemPathBuf,
+    if let Some(custom_typeshed) = custom_typeshed {
+        tracing::debug!("Custom typeshed directory: {custom_typeshed}");
+    }
 
-    /// Optional (already validated) path to standard-library typeshed stubs.
-    /// If this is not provided, we will fallback to our vendored typeshed stubs
-    /// bundled as a zip file in the binary
-    pub custom_typeshed: Option<SystemPathBuf>,
+    if !extra_paths.is_empty() {
+        tracing::debug!("extra search paths: {extra_paths:?}");
+    }
 
-    /// The path to the user's `site-packages` directory, where third-party packages from ``PyPI`` are installed.
-    pub site_packages: Option<SystemPathBuf>,
+    let current_directory = db.system().current_directory();
+
+    let mut static_search_paths: Vec<_> = extra_paths
+        .iter()
+        .map(|fs_path| {
+            Arc::new(
+                ModuleResolutionPathBuf::extra(SystemPath::absolute(fs_path, current_directory))
+                    .unwrap(),
+            )
+        })
+        .collect();
+
+    static_search_paths.push(Arc::new(
+        ModuleResolutionPathBuf::first_party(SystemPath::absolute(
+            workspace_root,
+            current_directory,
+        ))
+        .unwrap(),
+    ));
+
+    static_search_paths.push(Arc::new(custom_typeshed.as_ref().map_or_else(
+        ModuleResolutionPathBuf::vendored_stdlib,
+        |custom| {
+            ModuleResolutionPathBuf::stdlib_from_custom_typeshed_root(&SystemPath::absolute(
+                custom,
+                current_directory,
+            ))
+            .unwrap()
+        },
+    )));
+
+    if let Some(path) = site_packages {
+        let site_packages_root = Arc::new(
+            ModuleResolutionPathBuf::site_packages(SystemPath::absolute(path, current_directory))
+                .unwrap(),
+        );
+        static_search_paths.push(site_packages_root);
+    }
+
+    // TODO vendor typeshed's third-party stubs as well as the stdlib and fallback to them as a final step
+
+    let target_version = program.target_version(db.upcast());
+    tracing::debug!("Target version: {target_version}");
+
+    // Filter out module resolution paths that point to the same directory on disk (the same invariant maintained by [`sys.path` at runtime]).
+    // (Paths may, however, *overlap* -- e.g. you could have both `src/` and `src/foo`
+    // as module resolution paths simultaneously.)
+    //
+    // [`sys.path` at runtime]: https://docs.python.org/3/library/site.html#module-site
+    // This code doesn't use an `IndexSet` because the key is the system path and not the search root.
+    let mut seen_paths =
+        FxHashSet::with_capacity_and_hasher(static_search_paths.len(), FxBuildHasher);
+
+    static_search_paths.retain(|path| {
+        if let Some(path) = path.as_system_path() {
+            seen_paths.insert(path.to_path_buf())
+        } else {
+            true
+        }
+    });
+
+    ModuleResolutionSettings {
+        target_version,
+        static_search_paths,
+    }
 }
 
-impl RawModuleResolutionSettings {
-    /// Implementation of the typing spec's [module resolution order]
-    ///
-    /// TODO(Alex): this method does multiple `.unwrap()` calls when it should really return an error.
-    /// Each `.unwrap()` call is a point where we're validating a setting that the user would pass
-    /// and transforming it into an internal representation for a validated path.
-    /// Rather than panicking if a path fails to validate, we should display an error message to the user
-    /// and exit the process with a nonzero exit code.
-    /// This validation should probably be done outside of Salsa?
-    ///
-    /// [module resolution order]: https://typing.readthedocs.io/en/latest/spec/distributing.html#import-resolution-ordering
-    fn into_configuration_settings(self) -> ModuleResolutionSettings {
-        let RawModuleResolutionSettings {
-            target_version,
-            extra_paths,
-            workspace_root,
-            site_packages,
-            custom_typeshed,
-        } = self;
+/// Collect all dynamic search paths:
+/// search paths listed in `.pth` files in the `site-packages` directory
+/// due to editable installations of third-party packages.
+#[salsa::tracked(return_ref)]
+pub(crate) fn editable_install_resolution_paths(db: &dyn Db) -> Vec<Arc<ModuleResolutionPathBuf>> {
+    // This query needs to be re-executed each time a `.pth` file
+    // is added, modified or removed from the `site-packages` directory.
+    // However, we don't use Salsa queries to read the source text of `.pth` files;
+    // we use the APIs on the `System` trait directly. As such, for now we simply ask
+    // Salsa to recompute this query on each new revision.
+    //
+    // TODO: add some kind of watcher for the `site-packages` directory that looks
+    // for `site-packages/*.pth` files being added/modified/removed; get rid of this.
+    // When doing so, also make the test
+    // `deleting_pth_file_on_which_module_resolution_depends_invalidates_cache()`
+    // more principled!
+    db.report_untracked_read();
 
-        let mut paths: Vec<ModuleResolutionPathBuf> = extra_paths
-            .into_iter()
-            .map(|fs_path| ModuleResolutionPathBuf::extra(fs_path).unwrap())
+    let static_search_paths = &module_resolution_settings(db).static_search_paths;
+    let site_packages = static_search_paths
+        .iter()
+        .find(|path| path.is_site_packages());
+
+    let mut dynamic_paths = Vec::default();
+
+    if let Some(site_packages) = site_packages {
+        let site_packages = site_packages
+            .as_system_path()
+            .expect("Expected site-packages never to be a VendoredPath!");
+
+        // As well as modules installed directly into `site-packages`,
+        // the directory may also contain `.pth` files.
+        // Each `.pth` file in `site-packages` may contain one or more lines
+        // containing a (relative or absolute) path.
+        // Each of these paths may point to an editable install of a package,
+        // so should be considered an additional search path.
+        let Ok(pth_file_iterator) = PthFileIterator::new(db, site_packages) else {
+            return dynamic_paths;
+        };
+
+        // The Python documentation specifies that `.pth` files in `site-packages`
+        // are processed in alphabetical order, so collecting and then sorting is necessary.
+        // https://docs.python.org/3/library/site.html#module-site
+        let mut all_pth_files: Vec<PthFile> = pth_file_iterator.collect();
+        all_pth_files.sort_by(|a, b| a.path.cmp(&b.path));
+
+        let mut existing_paths: FxHashSet<_> = static_search_paths
+            .iter()
+            .filter_map(|path| path.as_system_path())
+            .map(Cow::Borrowed)
             .collect();
 
-        paths.push(ModuleResolutionPathBuf::first_party(workspace_root).unwrap());
+        dynamic_paths.reserve(all_pth_files.len());
 
-        paths.push(
-            custom_typeshed.map_or_else(ModuleResolutionPathBuf::vendored_stdlib, |custom| {
-                ModuleResolutionPathBuf::stdlib_from_custom_typeshed_root(&custom).unwrap()
-            }),
-        );
-
-        // TODO vendor typeshed's third-party stubs as well as the stdlib and fallback to them as a final step
-        if let Some(site_packages) = site_packages {
-            paths.push(ModuleResolutionPathBuf::site_packages(site_packages).unwrap());
-        }
-
-        ModuleResolutionSettings {
-            target_version,
-            search_paths: OrderedSearchPaths(paths.into_iter().map(Arc::new).collect()),
+        for pth_file in &all_pth_files {
+            for installation in pth_file.editable_installations() {
+                if existing_paths.insert(Cow::Owned(
+                    installation.as_system_path().unwrap().to_path_buf(),
+                )) {
+                    dynamic_paths.push(Arc::new(installation));
+                }
+            }
         }
     }
+
+    dynamic_paths
 }
 
-/// A resolved module resolution order as per the [typing spec]
+/// Iterate over the available module-resolution search paths,
+/// following the invariants maintained by [`sys.path` at runtime]:
+/// "No item is added to `sys.path` more than once."
+/// Dynamic search paths (required for editable installs into `site-packages`)
+/// are only calculated lazily.
 ///
-/// [typing spec]: https://typing.readthedocs.io/en/latest/spec/distributing.html#import-resolution-ordering
-#[derive(Clone, Debug, Default, Eq, PartialEq)]
-pub(crate) struct OrderedSearchPaths(Vec<Arc<ModuleResolutionPathBuf>>);
+/// [`sys.path` at runtime]: https://docs.python.org/3/library/site.html#module-site
+struct SearchPathIterator<'db> {
+    db: &'db dyn Db,
+    static_paths: std::slice::Iter<'db, SearchPathRoot>,
+    dynamic_paths: Option<std::slice::Iter<'db, SearchPathRoot>>,
+}
 
-impl Deref for OrderedSearchPaths {
-    type Target = [Arc<ModuleResolutionPathBuf>];
+impl<'db> Iterator for SearchPathIterator<'db> {
+    type Item = &'db SearchPathRoot;
 
-    fn deref(&self) -> &Self::Target {
-        &self.0
+    fn next(&mut self) -> Option<Self::Item> {
+        let SearchPathIterator {
+            db,
+            static_paths,
+            dynamic_paths,
+        } = self;
+
+        static_paths.next().or_else(|| {
+            dynamic_paths
+                .get_or_insert_with(|| editable_install_resolution_paths(*db).iter())
+                .next()
+        })
     }
 }
 
+impl<'db> FusedIterator for SearchPathIterator<'db> {}
+
+/// Represents a single `.pth` file in a `site-packages` directory.
+/// One or more lines in a `.pth` file may be a (relative or absolute)
+/// path that represents an editable installation of a package.
+struct PthFile<'db> {
+    system: &'db dyn System,
+    path: SystemPathBuf,
+    contents: String,
+    site_packages: &'db SystemPath,
+}
+
+impl<'db> PthFile<'db> {
+    /// Yield paths in this `.pth` file that appear to represent editable installations,
+    /// and should therefore be added as module-resolution search paths.
+    fn editable_installations(&'db self) -> impl Iterator<Item = ModuleResolutionPathBuf> + 'db {
+        let PthFile {
+            system,
+            path: _,
+            contents,
+            site_packages,
+        } = self;
+
+        // Empty lines or lines starting with '#' are ignored by the Python interpreter.
+        // Lines that start with "import " or "import\t" do not represent editable installs at all;
+        // instead, these are lines that are executed by Python at startup.
+        // https://docs.python.org/3/library/site.html#module-site
+        contents.lines().filter_map(move |line| {
+            let line = line.trim_end();
+            if line.is_empty()
+                || line.starts_with('#')
+                || line.starts_with("import ")
+                || line.starts_with("import\t")
+            {
+                return None;
+            }
+            let possible_editable_install = SystemPath::absolute(line, site_packages);
+            ModuleResolutionPathBuf::editable_installation_root(*system, possible_editable_install)
+        })
+    }
+}
+
+/// Iterator that yields a [`PthFile`] instance for every `.pth` file
+/// found in a given `site-packages` directory.
+struct PthFileIterator<'db> {
+    db: &'db dyn Db,
+    directory_iterator: Box<dyn Iterator<Item = std::io::Result<DirectoryEntry>> + 'db>,
+    site_packages: &'db SystemPath,
+}
+
+impl<'db> PthFileIterator<'db> {
+    fn new(db: &'db dyn Db, site_packages: &'db SystemPath) -> std::io::Result<Self> {
+        Ok(Self {
+            db,
+            directory_iterator: db.system().read_directory(site_packages)?,
+            site_packages,
+        })
+    }
+}
+
+impl<'db> Iterator for PthFileIterator<'db> {
+    type Item = PthFile<'db>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        let PthFileIterator {
+            db,
+            directory_iterator,
+            site_packages,
+        } = self;
+
+        let system = db.system();
+
+        loop {
+            let entry_result = directory_iterator.next()?;
+            let Ok(entry) = entry_result else {
+                continue;
+            };
+            let file_type = entry.file_type();
+            if file_type.is_directory() {
+                continue;
+            }
+            let path = entry.into_path();
+            if path.extension() != Some("pth") {
+                continue;
+            }
+
+            let Ok(contents) = db.system().read_to_string(&path) else {
+                continue;
+            };
+
+            return Some(PthFile {
+                system,
+                path,
+                contents,
+                site_packages,
+            });
+        }
+    }
+}
+
+/// Validated and normalized module-resolution settings.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub(crate) struct ModuleResolutionSettings {
-    search_paths: OrderedSearchPaths,
     target_version: TargetVersion,
+    /// Search paths that have been statically determined purely from reading Ruff's configuration settings.
+    /// These shouldn't ever change unless the config settings themselves change.
+    ///
+    /// Note that `site-packages` *is included* as a search path in this sequence,
+    /// but it is also stored separately so that we're able to find editable installs later.
+    static_search_paths: Vec<SearchPathRoot>,
 }
 
 impl ModuleResolutionSettings {
-    pub(crate) fn search_paths(&self) -> &[Arc<ModuleResolutionPathBuf>] {
-        &self.search_paths
+    fn target_version(&self) -> TargetVersion {
+        self.target_version
     }
 
-    pub(crate) fn target_version(&self) -> TargetVersion {
-        self.target_version
+    fn search_paths<'db>(&'db self, db: &'db dyn Db) -> SearchPathIterator<'db> {
+        SearchPathIterator {
+            db,
+            static_paths: self.static_search_paths.iter(),
+            dynamic_paths: None,
+        }
     }
 }
 
@@ -214,13 +431,6 @@ impl ModuleResolutionSettings {
 #[allow(unreachable_pub, clippy::used_underscore_binding)]
 pub(crate) mod internal {
     use crate::module_name::ModuleName;
-    use crate::resolver::ModuleResolutionSettings;
-
-    #[salsa::input(singleton)]
-    pub(crate) struct ModuleResolverSettings {
-        #[return_ref]
-        pub(super) settings: ModuleResolutionSettings,
-    }
 
     /// A thin wrapper around `ModuleName` to make it a Salsa ingredient.
     ///
@@ -232,20 +442,16 @@ pub(crate) mod internal {
     }
 }
 
-fn module_resolver_settings(db: &dyn Db) -> &ModuleResolutionSettings {
-    ModuleResolverSettings::get(db).settings(db)
-}
-
 /// Given a module name and a list of search paths in which to lookup modules,
 /// attempt to resolve the module name
 fn resolve_name(
     db: &dyn Db,
     name: &ModuleName,
 ) -> Option<(Arc<ModuleResolutionPathBuf>, File, ModuleKind)> {
-    let resolver_settings = module_resolver_settings(db);
+    let resolver_settings = module_resolution_settings(db);
     let resolver_state = ResolverState::new(db, resolver_settings.target_version());
 
-    for search_path in resolver_settings.search_paths() {
+    for search_path in resolver_settings.search_paths(db) {
         let mut components = name.components();
         let module_name = components.next_back()?;
 
@@ -388,6 +594,7 @@ mod tests {
     use ruff_db::files::{system_path_to_file, File, FilePath};
     use ruff_db::system::{DbWithTestSystem, OsSystem, SystemPath};
     use ruff_db::testing::assert_function_query_was_not_run;
+    use ruff_db::Db;
 
     use crate::db::tests::TestDb;
     use crate::module::ModuleKind;
@@ -877,6 +1084,8 @@ mod tests {
     #[test]
     #[cfg(target_family = "unix")]
     fn symlink() -> anyhow::Result<()> {
+        use ruff_db::program::Program;
+
         let mut db = TestDb::new();
 
         let temp_dir = tempfile::tempdir()?;
@@ -897,15 +1106,14 @@ mod tests {
         std::fs::write(foo.as_std_path(), "")?;
         std::os::unix::fs::symlink(foo.as_std_path(), bar.as_std_path())?;
 
-        let settings = RawModuleResolutionSettings {
-            target_version: TargetVersion::Py38,
+        let search_paths = SearchPathSettings {
             extra_paths: vec![],
             workspace_root: src.clone(),
-            site_packages: Some(site_packages.clone()),
             custom_typeshed: Some(custom_typeshed.clone()),
+            site_packages: Some(site_packages.clone()),
         };
 
-        set_module_resolution_settings(&mut db, settings);
+        Program::new(&db, TargetVersion::Py38, search_paths);
 
         let foo_module = resolve_module(&db, ModuleName::new_static("foo").unwrap()).unwrap();
         let bar_module = resolve_module(&db, ModuleName::new_static("bar").unwrap()).unwrap();
@@ -1139,5 +1347,260 @@ mod tests {
             Some(functools_module.file()),
             system_path_to_file(&db, stdlib.join("functools.pyi"))
         );
+    }
+
+    #[test]
+    fn editable_install_absolute_path() {
+        const SITE_PACKAGES: &[FileSpec] = &[("_foo.pth", "/x/src")];
+        let x_directory = [("/x/src/foo/__init__.py", ""), ("/x/src/foo/bar.py", "")];
+
+        let TestCase { mut db, .. } = TestCaseBuilder::new()
+            .with_site_packages_files(SITE_PACKAGES)
+            .build();
+
+        db.write_files(x_directory).unwrap();
+
+        let foo_module_name = ModuleName::new_static("foo").unwrap();
+        let foo_bar_module_name = ModuleName::new_static("foo.bar").unwrap();
+
+        let foo_module = resolve_module(&db, foo_module_name.clone()).unwrap();
+        let foo_bar_module = resolve_module(&db, foo_bar_module_name.clone()).unwrap();
+
+        assert_eq!(
+            foo_module.file().path(&db),
+            &FilePath::system("/x/src/foo/__init__.py")
+        );
+        assert_eq!(
+            foo_bar_module.file().path(&db),
+            &FilePath::system("/x/src/foo/bar.py")
+        );
+    }
+
+    #[test]
+    fn editable_install_pth_file_with_whitespace() {
+        const SITE_PACKAGES: &[FileSpec] = &[
+            ("_foo.pth", "        /x/src"),
+            ("_bar.pth", "/y/src        "),
+        ];
+        let external_files = [("/x/src/foo.py", ""), ("/y/src/bar.py", "")];
+
+        let TestCase { mut db, .. } = TestCaseBuilder::new()
+            .with_site_packages_files(SITE_PACKAGES)
+            .build();
+
+        db.write_files(external_files).unwrap();
+
+        // Lines with leading whitespace in `.pth` files do not parse:
+        let foo_module_name = ModuleName::new_static("foo").unwrap();
+        assert_eq!(resolve_module(&db, foo_module_name), None);
+
+        // Lines with trailing whitespace in `.pth` files do:
+        let bar_module_name = ModuleName::new_static("bar").unwrap();
+        let bar_module = resolve_module(&db, bar_module_name.clone()).unwrap();
+        assert_eq!(
+            bar_module.file().path(&db),
+            &FilePath::system("/y/src/bar.py")
+        );
+    }
+
+    #[test]
+    fn editable_install_relative_path() {
+        const SITE_PACKAGES: &[FileSpec] = &[
+            ("_foo.pth", "../../x/../x/y/src"),
+            ("../x/y/src/foo.pyi", ""),
+        ];
+
+        let TestCase { db, .. } = TestCaseBuilder::new()
+            .with_site_packages_files(SITE_PACKAGES)
+            .build();
+
+        let foo_module_name = ModuleName::new_static("foo").unwrap();
+        let foo_module = resolve_module(&db, foo_module_name.clone()).unwrap();
+
+        assert_eq!(
+            foo_module.file().path(&db),
+            &FilePath::system("/x/y/src/foo.pyi")
+        );
+    }
+
+    #[test]
+    fn editable_install_multiple_pth_files_with_multiple_paths() {
+        const COMPLEX_PTH_FILE: &str = "\
+/
+
+# a comment
+/baz
+
+import not_an_editable_install; do_something_else_crazy_dynamic()
+
+# another comment
+spam
+
+not_a_directory
+";
+
+        const SITE_PACKAGES: &[FileSpec] = &[
+            ("_foo.pth", "../../x/../x/y/src"),
+            ("_lots_of_others.pth", COMPLEX_PTH_FILE),
+            ("../x/y/src/foo.pyi", ""),
+            ("spam/spam.py", ""),
+        ];
+
+        let root_files = [("/a.py", ""), ("/baz/b.py", "")];
+
+        let TestCase {
+            mut db,
+            site_packages,
+            ..
+        } = TestCaseBuilder::new()
+            .with_site_packages_files(SITE_PACKAGES)
+            .build();
+
+        db.write_files(root_files).unwrap();
+
+        let foo_module_name = ModuleName::new_static("foo").unwrap();
+        let a_module_name = ModuleName::new_static("a").unwrap();
+        let b_module_name = ModuleName::new_static("b").unwrap();
+        let spam_module_name = ModuleName::new_static("spam").unwrap();
+
+        let foo_module = resolve_module(&db, foo_module_name.clone()).unwrap();
+        let a_module = resolve_module(&db, a_module_name.clone()).unwrap();
+        let b_module = resolve_module(&db, b_module_name.clone()).unwrap();
+        let spam_module = resolve_module(&db, spam_module_name.clone()).unwrap();
+
+        assert_eq!(
+            foo_module.file().path(&db),
+            &FilePath::system("/x/y/src/foo.pyi")
+        );
+        assert_eq!(a_module.file().path(&db), &FilePath::system("/a.py"));
+        assert_eq!(b_module.file().path(&db), &FilePath::system("/baz/b.py"));
+        assert_eq!(
+            spam_module.file().path(&db),
+            &FilePath::System(site_packages.join("spam/spam.py"))
+        );
+    }
+
+    #[test]
+    fn module_resolution_paths_cached_between_different_module_resolutions() {
+        const SITE_PACKAGES: &[FileSpec] = &[("_foo.pth", "/x/src"), ("_bar.pth", "/y/src")];
+        let external_directories = [("/x/src/foo.py", ""), ("/y/src/bar.py", "")];
+
+        let TestCase { mut db, .. } = TestCaseBuilder::new()
+            .with_site_packages_files(SITE_PACKAGES)
+            .build();
+
+        db.write_files(external_directories).unwrap();
+
+        let foo_module_name = ModuleName::new_static("foo").unwrap();
+        let bar_module_name = ModuleName::new_static("bar").unwrap();
+
+        let foo_module = resolve_module(&db, foo_module_name).unwrap();
+        assert_eq!(
+            foo_module.file().path(&db),
+            &FilePath::system("/x/src/foo.py")
+        );
+
+        db.clear_salsa_events();
+        let bar_module = resolve_module(&db, bar_module_name).unwrap();
+        assert_eq!(
+            bar_module.file().path(&db),
+            &FilePath::system("/y/src/bar.py")
+        );
+        let events = db.take_salsa_events();
+        assert_function_query_was_not_run::<editable_install_resolution_paths, _, _>(
+            &db,
+            |res| &res.function,
+            &(),
+            &events,
+        );
+    }
+
+    #[test]
+    fn deleting_pth_file_on_which_module_resolution_depends_invalidates_cache() {
+        const SITE_PACKAGES: &[FileSpec] = &[("_foo.pth", "/x/src")];
+        let x_directory = [("/x/src/foo.py", "")];
+
+        let TestCase {
+            mut db,
+            site_packages,
+            ..
+        } = TestCaseBuilder::new()
+            .with_site_packages_files(SITE_PACKAGES)
+            .build();
+
+        db.write_files(x_directory).unwrap();
+
+        let foo_module_name = ModuleName::new_static("foo").unwrap();
+        let foo_module = resolve_module(&db, foo_module_name.clone()).unwrap();
+        assert_eq!(
+            foo_module.file().path(&db),
+            &FilePath::system("/x/src/foo.py")
+        );
+
+        db.memory_file_system()
+            .remove_file(site_packages.join("_foo.pth"))
+            .unwrap();
+
+        // Why are we touching a random file in the path that's been editably installed,
+        // rather than the `.pth` file, when the `.pth` file is the one that has been deleted?
+        // It's because the `.pth` file isn't directly tracked as a dependency by Salsa
+        // currently (we don't use `system_path_to_file()` to get the file, and we don't use
+        // `source_text()` to read the source of the file). Instead of using these APIs which
+        // would automatically add the existence and contents of the file as a Salsa-tracked
+        // dependency, we use `.report_untracked_read()` to force Salsa to re-parse all
+        // `.pth` files on each new "revision". Making a random modification to a tracked
+        // Salsa file forces a new revision.
+        //
+        // TODO: get rid of the `.report_untracked_read()` call...
+        File::touch_path(&mut db, SystemPath::new("/x/src/foo.py"));
+
+        assert_eq!(resolve_module(&db, foo_module_name.clone()), None);
+    }
+
+    #[test]
+    fn deleting_editable_install_on_which_module_resolution_depends_invalidates_cache() {
+        const SITE_PACKAGES: &[FileSpec] = &[("_foo.pth", "/x/src")];
+        let x_directory = [("/x/src/foo.py", "")];
+
+        let TestCase { mut db, .. } = TestCaseBuilder::new()
+            .with_site_packages_files(SITE_PACKAGES)
+            .build();
+
+        db.write_files(x_directory).unwrap();
+
+        let foo_module_name = ModuleName::new_static("foo").unwrap();
+        let foo_module = resolve_module(&db, foo_module_name.clone()).unwrap();
+        let src_path = SystemPathBuf::from("/x/src");
+        assert_eq!(
+            foo_module.file().path(&db),
+            &FilePath::System(src_path.join("foo.py"))
+        );
+
+        db.memory_file_system()
+            .remove_file(src_path.join("foo.py"))
+            .unwrap();
+        db.memory_file_system().remove_directory(&src_path).unwrap();
+        File::touch_path(&mut db, &src_path.join("foo.py"));
+        File::touch_path(&mut db, &src_path);
+        assert_eq!(resolve_module(&db, foo_module_name.clone()), None);
+    }
+
+    #[test]
+    fn no_duplicate_search_paths_added() {
+        let TestCase { db, .. } = TestCaseBuilder::new()
+            .with_src_files(&[("foo.py", "")])
+            .with_site_packages_files(&[("_foo.pth", "/src")])
+            .build();
+
+        let search_paths: Vec<&SearchPathRoot> =
+            module_resolution_settings(&db).search_paths(&db).collect();
+
+        assert!(search_paths.contains(&&Arc::new(
+            ModuleResolutionPathBuf::first_party("/src").unwrap()
+        )));
+
+        assert!(!search_paths.contains(&&Arc::new(
+            ModuleResolutionPathBuf::editable_installation_root(db.system(), "/src").unwrap()
+        )));
     }
 }

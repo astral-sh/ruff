@@ -494,9 +494,20 @@ pub struct FormatCommand {
 
 #[derive(Copy, Clone, Debug, clap::Parser)]
 pub struct ServerCommand {
-    /// Enable preview mode; required for regular operation
-    #[arg(long)]
-    pub(crate) preview: bool,
+    /// Enable preview mode. Use `--no-preview` to disable.
+    ///
+    /// This enables unstable server features and turns on the preview mode for the linter
+    /// and the formatter.
+    #[arg(long, overrides_with("no_preview"))]
+    preview: bool,
+    #[clap(long, overrides_with("preview"), hide = true)]
+    no_preview: bool,
+}
+
+impl ServerCommand {
+    pub(crate) fn resolve_preview(self) -> Option<bool> {
+        resolve_bool_arg(self.preview, self.no_preview)
+    }
 }
 
 #[derive(Debug, Clone, Copy, clap::ValueEnum)]

@@ -4,13 +4,11 @@ use crate::ExitStatus;
 use anyhow::Result;
 use ruff_server::Server;
 
-pub(crate) fn run_server(preview: bool, worker_threads: NonZeroUsize) -> Result<ExitStatus> {
-    if !preview {
-        tracing::error!("--preview needs to be provided as a command line argument while the server is still unstable.\nFor example: `ruff server --preview`");
-        return Ok(ExitStatus::Error);
-    }
-
-    let server = Server::new(worker_threads)?;
+pub(crate) fn run_server(
+    worker_threads: NonZeroUsize,
+    preview: Option<bool>,
+) -> Result<ExitStatus> {
+    let server = Server::new(worker_threads, preview)?;
 
     server.run().map(|()| ExitStatus::Success)
 }

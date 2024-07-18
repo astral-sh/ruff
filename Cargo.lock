@@ -1904,6 +1904,7 @@ dependencies = [
  "ruff_index",
  "ruff_python_ast",
  "ruff_python_parser",
+ "ruff_python_trivia",
  "ruff_text_size",
  "rustc-hash 2.0.0",
  "salsa",
@@ -2050,7 +2051,6 @@ dependencies = [
  "mimalloc",
  "once_cell",
  "red_knot",
- "red_knot_module_resolver",
  "ruff_db",
  "ruff_linter",
  "ruff_python_ast",
@@ -2087,6 +2087,8 @@ dependencies = [
  "filetime",
  "ignore",
  "insta",
+ "ruff_cache",
+ "ruff_notebook",
  "ruff_python_ast",
  "ruff_python_parser",
  "ruff_source_file",
@@ -2489,7 +2491,7 @@ dependencies = [
 
 [[package]]
 name = "ruff_wasm"
-version = "0.0.0"
+version = "0.5.2"
 dependencies = [
  "console_error_panic_hook",
  "console_log",

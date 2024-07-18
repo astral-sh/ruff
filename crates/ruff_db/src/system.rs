@@ -3,6 +3,7 @@ use std::fmt::Debug;
 pub use memory_fs::MemoryFileSystem;
 #[cfg(feature = "os")]
 pub use os::OsSystem;
+use ruff_notebook::{Notebook, NotebookError};
 pub use test::{DbWithTestSystem, TestSystem};
 use walk_directory::WalkDirectoryBuilder;
 
@@ -39,6 +40,13 @@ pub trait System: Debug {
 
     /// Reads the content of the file at `path` into a [`String`].
     fn read_to_string(&self, path: &SystemPath) -> Result<String>;
+
+    /// Reads the content of the file at `path` as a Notebook.
+    ///
+    /// This method optimizes for the case where the system holds a structured representation of a [`Notebook`],
+    /// allowing to skip the notebook deserialization. Systems that don't use a structured
+    /// representation fall-back to deserializing the notebook from a string.
+    fn read_to_notebook(&self, path: &SystemPath) -> std::result::Result<Notebook, NotebookError>;
 
     /// Returns `true` if `path` exists.
     fn path_exists(&self, path: &SystemPath) -> bool {
@@ -148,6 +156,10 @@ pub struct DirectoryEntry {
 impl DirectoryEntry {
     pub fn new(path: SystemPathBuf, file_type: FileType) -> Self {
         Self { path, file_type }
+    }
+
+    pub fn into_path(self) -> SystemPathBuf {
+        self.path
     }
 
     pub fn path(&self) -> &SystemPath {

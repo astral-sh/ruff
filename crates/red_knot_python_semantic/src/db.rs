@@ -4,27 +4,30 @@ use red_knot_module_resolver::Db as ResolverDb;
 use ruff_db::{Db as SourceDb, Upcast};
 
 use crate::semantic_index::definition::Definition;
-use crate::semantic_index::symbol::{public_symbols_map, PublicSymbolId, ScopeId};
-use crate::semantic_index::{root_scope, semantic_index, symbol_table};
+use crate::semantic_index::expression::Expression;
+use crate::semantic_index::symbol::ScopeId;
+use crate::semantic_index::{module_global_scope, semantic_index, symbol_table, use_def_map};
 use crate::types::{
-    infer_types, public_symbol_ty, ClassType, FunctionType, IntersectionType, UnionType,
+    infer_definition_types, infer_expression_types, infer_scope_types, ClassType, FunctionType,
+    IntersectionType, UnionType,
 };
 
 #[salsa::jar(db=Db)]
 pub struct Jar(
     ScopeId<'_>,
-    PublicSymbolId<'_>,
     Definition<'_>,
+    Expression<'_>,
     FunctionType<'_>,
     ClassType<'_>,
     UnionType<'_>,
     IntersectionType<'_>,
     symbol_table,
-    root_scope,
+    use_def_map,
+    module_global_scope,
     semantic_index,
-    infer_types,
-    public_symbol_ty,
-    public_symbols_map,
+    infer_definition_types,
+    infer_expression_types,
+    infer_scope_types,
 );
 
 /// Database giving access to semantic information about a Python program.
@@ -44,6 +47,7 @@ pub(crate) mod tests {
     use ruff_db::system::{DbWithTestSystem, System, TestSystem};
     use ruff_db::vendored::VendoredFileSystem;
     use ruff_db::{Db as SourceDb, Jar as SourceJar, Upcast};
+    use ruff_python_trivia::textwrap;
 
     use super::{Db, Jar};
 
@@ -84,6 +88,12 @@ pub(crate) mod tests {
         /// If there are any pending salsa snapshots.
         pub(crate) fn clear_salsa_events(&mut self) {
             self.take_salsa_events();
+        }
+
+        /// Write auto-dedented text to a file.
+        pub(crate) fn write_dedented(&mut self, path: &str, content: &str) -> anyhow::Result<()> {
+            self.write_file(path, textwrap::dedent(content))?;
+            Ok(())
         }
     }
 

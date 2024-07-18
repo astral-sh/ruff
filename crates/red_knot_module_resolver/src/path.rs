@@ -6,7 +6,7 @@
 use std::fmt;
 
 use ruff_db::files::{system_path_to_file, vendored_path_to_file, File, FilePath};
-use ruff_db::system::{SystemPath, SystemPathBuf};
+use ruff_db::system::{System, SystemPath, SystemPathBuf};
 use ruff_db::vendored::{VendoredPath, VendoredPathBuf};
 
 use crate::db::Db;
@@ -73,6 +73,7 @@ enum ModuleResolutionPathBufInner {
     FirstParty(SystemPathBuf),
     StandardLibrary(FilePath),
     SitePackages(SystemPathBuf),
+    EditableInstall(SystemPathBuf),
 }
 
 impl ModuleResolutionPathBufInner {
@@ -122,6 +123,19 @@ impl ModuleResolutionPathBufInner {
                 }
             }
             Self::SitePackages(ref mut path) => {
+                if let Some(extension) = extension {
+                    assert!(
+                        matches!(extension, "pyi" | "py"),
+                        "Extension must be `py` or `pyi`; got `{extension}`"
+                    );
+                }
+                assert!(
+                    path.extension().is_none(),
+                    "Cannot push part {component} to {path}, which already has an extension"
+                );
+                path.push(component);
+            }
+            Self::EditableInstall(ref mut path) => {
                 if let Some(extension) = extension {
                     assert!(
                         matches!(extension, "pyi" | "py"),
@@ -198,6 +212,18 @@ impl ModuleResolutionPathBuf {
     }
 
     #[must_use]
+    pub(crate) fn editable_installation_root(
+        system: &dyn System,
+        path: impl Into<SystemPathBuf>,
+    ) -> Option<Self> {
+        let path = path.into();
+        // TODO: Add Salsa invalidation to this system call:
+        system
+            .is_directory(&path)
+            .then_some(Self(ModuleResolutionPathBufInner::EditableInstall(path)))
+    }
+
+    #[must_use]
     pub(crate) fn is_regular_package(&self, search_path: &Self, resolver: &ResolverState) -> bool {
         ModuleResolutionPathRef::from(self).is_regular_package(search_path, resolver)
     }
@@ -205,6 +231,10 @@ impl ModuleResolutionPathBuf {
     #[must_use]
     pub(crate) fn is_directory(&self, search_path: &Self, resolver: &ResolverState) -> bool {
         ModuleResolutionPathRef::from(self).is_directory(search_path, resolver)
+    }
+
+    pub(crate) fn is_site_packages(&self) -> bool {
+        matches!(self.0, ModuleResolutionPathBufInner::SitePackages(_))
     }
 
     #[must_use]
@@ -229,6 +259,16 @@ impl ModuleResolutionPathBuf {
     pub(crate) fn to_file(&self, search_path: &Self, resolver: &ResolverState) -> Option<File> {
         ModuleResolutionPathRef::from(self).to_file(search_path, resolver)
     }
+
+    pub(crate) fn as_system_path(&self) -> Option<&SystemPathBuf> {
+        match &self.0 {
+            ModuleResolutionPathBufInner::Extra(path) => Some(path),
+            ModuleResolutionPathBufInner::FirstParty(path) => Some(path),
+            ModuleResolutionPathBufInner::StandardLibrary(_) => None,
+            ModuleResolutionPathBufInner::SitePackages(path) => Some(path),
+            ModuleResolutionPathBufInner::EditableInstall(path) => Some(path),
+        }
+    }
 }
 
 impl fmt::Debug for ModuleResolutionPathBuf {
@@ -248,6 +288,10 @@ impl fmt::Debug for ModuleResolutionPathBuf {
                 .finish(),
             ModuleResolutionPathBufInner::StandardLibrary(path) => f
                 .debug_tuple("ModuleResolutionPathBuf::StandardLibrary")
+                .field(path)
+                .finish(),
+            ModuleResolutionPathBufInner::EditableInstall(path) => f
+                .debug_tuple("ModuleResolutionPathBuf::EditableInstall")
                 .field(path)
                 .finish(),
         }
@@ -272,6 +316,7 @@ enum ModuleResolutionPathRefInner<'a> {
     FirstParty(&'a SystemPath),
     StandardLibrary(FilePathRef<'a>),
     SitePackages(&'a SystemPath),
+    EditableInstall(&'a SystemPath),
 }
 
 impl<'a> ModuleResolutionPathRefInner<'a> {
@@ -306,6 +351,7 @@ impl<'a> ModuleResolutionPathRefInner<'a> {
             (Self::Extra(path), Self::Extra(_)) => resolver.system().is_directory(path),
             (Self::FirstParty(path), Self::FirstParty(_)) => resolver.system().is_directory(path),
             (Self::SitePackages(path), Self::SitePackages(_)) => resolver.system().is_directory(path),
+            (Self::EditableInstall(path), Self::EditableInstall(_)) => resolver.system().is_directory(path),
             (Self::StandardLibrary(path), Self::StandardLibrary(stdlib_root)) => {
                 match Self::query_stdlib_version(path, search_path, &stdlib_root, resolver) {
                     TypeshedVersionsQueryResult::DoesNotExist => false,
@@ -333,6 +379,7 @@ impl<'a> ModuleResolutionPathRefInner<'a> {
             (Self::Extra(path), Self::Extra(_)) => is_non_stdlib_pkg(resolver, path),
             (Self::FirstParty(path), Self::FirstParty(_)) => is_non_stdlib_pkg(resolver, path),
             (Self::SitePackages(path), Self::SitePackages(_)) => is_non_stdlib_pkg(resolver, path),
+            (Self::EditableInstall(path), Self::EditableInstall(_)) => is_non_stdlib_pkg(resolver, path),
             // Unlike the other variants:
             // (1) Account for VERSIONS
             // (2) Only test for `__init__.pyi`, not `__init__.py`
@@ -358,6 +405,7 @@ impl<'a> ModuleResolutionPathRefInner<'a> {
             (Self::SitePackages(path), Self::SitePackages(_)) => {
                 system_path_to_file(resolver.db.upcast(), path)
             }
+            (Self::EditableInstall(path), Self::EditableInstall(_)) => system_path_to_file(resolver.db.upcast(), path),
             (Self::StandardLibrary(path), Self::StandardLibrary(stdlib_root)) => {
                 match Self::query_stdlib_version(&path, search_path, &stdlib_root, resolver) {
                     TypeshedVersionsQueryResult::DoesNotExist => None,
@@ -374,7 +422,10 @@ impl<'a> ModuleResolutionPathRefInner<'a> {
     #[must_use]
     fn to_module_name(self) -> Option<ModuleName> {
         match self {
-            Self::Extra(path) | Self::FirstParty(path) | Self::SitePackages(path) => {
+            Self::Extra(path)
+            | Self::FirstParty(path)
+            | Self::SitePackages(path)
+            | Self::EditableInstall(path) => {
                 let parent = path.parent()?;
                 let parent_components = parent.components().map(|component| component.as_str());
                 let skip_final_part =
@@ -421,6 +472,9 @@ impl<'a> ModuleResolutionPathRefInner<'a> {
             Self::SitePackages(path) => {
                 ModuleResolutionPathBufInner::SitePackages(path.with_extension("pyi"))
             }
+            Self::EditableInstall(path) => {
+                ModuleResolutionPathBufInner::EditableInstall(path.with_extension("pyi"))
+            }
         }
     }
 
@@ -435,6 +489,9 @@ impl<'a> ModuleResolutionPathRefInner<'a> {
             )),
             Self::StandardLibrary(_) => None,
             Self::SitePackages(path) => Some(ModuleResolutionPathBufInner::SitePackages(
+                path.with_extension("py"),
+            )),
+            Self::EditableInstall(path) => Some(ModuleResolutionPathBufInner::EditableInstall(
                 path.with_extension("py"),
             )),
         }
@@ -474,6 +531,13 @@ impl<'a> ModuleResolutionPathRefInner<'a> {
                         .then_some(Self::SitePackages(path))
                 })
             }
+            (Self::EditableInstall(root), FilePathRef::System(absolute_path)) => {
+                absolute_path.strip_prefix(root).ok().and_then(|path| {
+                    path.extension()
+                        .map_or(true, |ext| matches!(ext, "pyi" | "py"))
+                        .then_some(Self::EditableInstall(path))
+                })
+            }
             (Self::Extra(_), FilePathRef::Vendored(_)) => None,
             (Self::FirstParty(_), FilePathRef::Vendored(_)) => None,
             (Self::StandardLibrary(root), FilePathRef::Vendored(absolute_path)) => match root {
@@ -487,6 +551,7 @@ impl<'a> ModuleResolutionPathRefInner<'a> {
                 }
             },
             (Self::SitePackages(_), FilePathRef::Vendored(_)) => None,
+            (Self::EditableInstall(_), FilePathRef::Vendored(_)) => None,
         }
     }
 }
@@ -562,6 +627,10 @@ impl fmt::Debug for ModuleResolutionPathRef<'_> {
                 .debug_tuple("ModuleResolutionPathRef::StandardLibrary")
                 .field(path)
                 .finish(),
+            ModuleResolutionPathRefInner::EditableInstall(path) => f
+                .debug_tuple("ModuleResolutionPathRef::EditableInstall")
+                .field(path)
+                .finish(),
         }
     }
 }
@@ -582,6 +651,9 @@ impl<'a> From<&'a ModuleResolutionPathBuf> for ModuleResolutionPathRef<'a> {
             ModuleResolutionPathBufInner::SitePackages(path) => {
                 ModuleResolutionPathRefInner::SitePackages(path)
             }
+            ModuleResolutionPathBufInner::EditableInstall(path) => {
+                ModuleResolutionPathRefInner::EditableInstall(path)
+            }
         };
         ModuleResolutionPathRef(inner)
     }
@@ -593,6 +665,7 @@ impl PartialEq<SystemPath> for ModuleResolutionPathRef<'_> {
             ModuleResolutionPathRefInner::Extra(path) => path == other,
             ModuleResolutionPathRefInner::FirstParty(path) => path == other,
             ModuleResolutionPathRefInner::SitePackages(path) => path == other,
+            ModuleResolutionPathRefInner::EditableInstall(path) => path == other,
             ModuleResolutionPathRefInner::StandardLibrary(FilePathRef::System(path)) => {
                 path == other
             }
@@ -625,6 +698,7 @@ impl PartialEq<VendoredPath> for ModuleResolutionPathRef<'_> {
             ModuleResolutionPathRefInner::Extra(_) => false,
             ModuleResolutionPathRefInner::FirstParty(_) => false,
             ModuleResolutionPathRefInner::SitePackages(_) => false,
+            ModuleResolutionPathRefInner::EditableInstall(_) => false,
             ModuleResolutionPathRefInner::StandardLibrary(FilePathRef::System(_)) => false,
             ModuleResolutionPathRefInner::StandardLibrary(FilePathRef::Vendored(path)) => {
                 path == other
@@ -654,9 +728,9 @@ impl PartialEq<ModuleResolutionPathRef<'_>> for VendoredPathBuf {
 #[cfg(test)]
 mod tests {
     use insta::assert_debug_snapshot;
+    use ruff_db::program::TargetVersion;
 
     use crate::db::tests::TestDb;
-    use crate::supported_py_version::TargetVersion;
     use crate::testing::{FileSpec, MockedTypeshed, TestCase, TestCaseBuilder};
 
     use super::*;
@@ -706,6 +780,9 @@ mod tests {
                 }
                 ModuleResolutionPathRefInner::SitePackages(path) => {
                     ModuleResolutionPathBufInner::SitePackages(path.to_path_buf())
+                }
+                ModuleResolutionPathRefInner::EditableInstall(path) => {
+                    ModuleResolutionPathBufInner::EditableInstall(path.to_path_buf())
                 }
             };
             ModuleResolutionPathBuf(inner)

@@ -1,15 +1,13 @@
 #![allow(clippy::disallowed_names)]
 
-use red_knot::program::Program;
-use red_knot::Workspace;
-use red_knot_module_resolver::{
-    set_module_resolution_settings, RawModuleResolutionSettings, TargetVersion,
-};
+use red_knot::db::RootDatabase;
+use red_knot::workspace::WorkspaceMetadata;
 use ruff_benchmark::criterion::{
     criterion_group, criterion_main, BatchSize, Criterion, Throughput,
 };
 use ruff_db::files::{system_path_to_file, File};
 use ruff_db::parsed::parsed_module;
+use ruff_db::program::{ProgramSettings, SearchPathSettings, TargetVersion};
 use ruff_db::system::{MemoryFileSystem, SystemPath, TestSystem};
 use ruff_db::Upcast;
 
@@ -45,7 +43,7 @@ def override(): ...
 "#;
 
 struct Case {
-    program: Program,
+    db: RootDatabase,
     fs: MemoryFileSystem,
     foo: File,
     bar: File,
@@ -66,29 +64,27 @@ fn setup_case() -> Case {
     .unwrap();
 
     let workspace_root = SystemPath::new("/src");
-    let workspace = Workspace::new(workspace_root.to_path_buf());
-
-    let mut program = Program::new(workspace, system);
-    let foo = system_path_to_file(&program, foo_path).unwrap();
-
-    set_module_resolution_settings(
-        &mut program,
-        RawModuleResolutionSettings {
+    let metadata = WorkspaceMetadata::from_path(workspace_root, &system).unwrap();
+    let settings = ProgramSettings {
+        target_version: TargetVersion::default(),
+        search_paths: SearchPathSettings {
             extra_paths: vec![],
             workspace_root: workspace_root.to_path_buf(),
             site_packages: None,
             custom_typeshed: None,
-            target_version: TargetVersion::Py38,
         },
-    );
+    };
 
-    program.workspace_mut().open_file(foo);
+    let mut db = RootDatabase::new(metadata, settings, system);
+    let foo = system_path_to_file(&db, foo_path).unwrap();
 
-    let bar = system_path_to_file(&program, bar_path).unwrap();
-    let typing = system_path_to_file(&program, typing_path).unwrap();
+    db.workspace().open_file(&mut db, foo);
+
+    let bar = system_path_to_file(&db, bar_path).unwrap();
+    let typing = system_path_to_file(&db, typing_path).unwrap();
 
     Case {
-        program,
+        db,
         fs,
         foo,
         bar,
@@ -105,14 +101,14 @@ fn benchmark_without_parse(criterion: &mut Criterion) {
             || {
                 let case = setup_case();
                 // Pre-parse the module to only measure the semantic time.
-                parsed_module(case.program.upcast(), case.foo);
-                parsed_module(case.program.upcast(), case.bar);
-                parsed_module(case.program.upcast(), case.typing);
+                parsed_module(case.db.upcast(), case.foo);
+                parsed_module(case.db.upcast(), case.bar);
+                parsed_module(case.db.upcast(), case.typing);
                 case
             },
             |case| {
-                let Case { program, foo, .. } = case;
-                let result = program.check_file(*foo).unwrap();
+                let Case { db, foo, .. } = case;
+                let result = db.check_file(*foo).unwrap();
 
                 assert_eq!(result.as_slice(), [] as [String; 0]);
             },
@@ -131,7 +127,7 @@ fn benchmark_incremental(criterion: &mut Criterion) {
         b.iter_batched_ref(
             || {
                 let mut case = setup_case();
-                case.program.check_file(case.foo).unwrap();
+                case.db.check_file(case.foo).unwrap();
 
                 case.fs
                     .write_file(
@@ -140,12 +136,12 @@ fn benchmark_incremental(criterion: &mut Criterion) {
                     )
                     .unwrap();
 
-                case.bar.touch(&mut case.program);
+                case.bar.touch(&mut case.db);
                 case
             },
             |case| {
-                let Case { program, foo, .. } = case;
-                let result = program.check_file(*foo).unwrap();
+                let Case { db, foo, .. } = case;
+                let result = db.check_file(*foo).unwrap();
 
                 assert_eq!(result.as_slice(), [] as [String; 0]);
             },
@@ -164,8 +160,8 @@ fn benchmark_cold(criterion: &mut Criterion) {
         b.iter_batched_ref(
             setup_case,
             |case| {
-                let Case { program, foo, .. } = case;
-                let result = program.check_file(*foo).unwrap();
+                let Case { db, foo, .. } = case;
+                let result = db.check_file(*foo).unwrap();
 
                 assert_eq!(result.as_slice(), [] as [String; 0]);
             },

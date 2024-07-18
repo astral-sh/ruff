@@ -357,7 +357,7 @@ This tutorial has focused on Ruff's command-line interface, but Ruff can also be
     - id: ruff-format
 ```
 
-Ruff can also be used as a [VS Code extension](https://github.com/astral-sh/ruff-vscode) or
-alongside any other editor through the [Ruff LSP](https://github.com/astral-sh/ruff-lsp).
+Ruff can also be integrated into your editor of choice. Refer to the [Editors](editors/index.md)
+section for more information.
 
-For more, see [_Integrations_](integrations.md).
+For other integrations, see the [Integrations](integrations.md) section.

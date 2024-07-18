@@ -12,31 +12,21 @@ use rustc_hash::FxHasher;
 
 use crate::ast_node_ref::AstNodeRef;
 use crate::node_key::NodeKey;
-use crate::semantic_index::definition::Definition;
-use crate::semantic_index::{root_scope, semantic_index, symbol_table, SymbolMap};
+use crate::semantic_index::{semantic_index, SymbolMap};
 use crate::Db;
 
 #[derive(Eq, PartialEq, Debug)]
-pub struct Symbol<'db> {
+pub struct Symbol {
     name: Name,
     flags: SymbolFlags,
-    /// The nodes that define this symbol, in source order.
-    ///
-    /// TODO: Use smallvec here, but it creates the same lifetime issues as in [QualifiedName](https://github.com/astral-sh/ruff/blob/5109b50bb3847738eeb209352cf26bda392adf62/crates/ruff_python_ast/src/name.rs#L562-L569)
-    definitions: Vec<Definition<'db>>,
 }
 
-impl<'db> Symbol<'db> {
+impl Symbol {
     fn new(name: Name) -> Self {
         Self {
             name,
             flags: SymbolFlags::empty(),
-            definitions: Vec::new(),
         }
-    }
-
-    fn push_definition(&mut self, definition: Definition<'db>) {
-        self.definitions.push(definition);
     }
 
     fn insert_flags(&mut self, flags: SymbolFlags) {
@@ -57,10 +47,6 @@ impl<'db> Symbol<'db> {
     pub fn is_defined(&self) -> bool {
         self.flags.contains(SymbolFlags::IS_DEFINED)
     }
-
-    pub fn definitions(&self) -> &[Definition] {
-        &self.definitions
-    }
 }
 
 bitflags! {
@@ -73,15 +59,6 @@ bitflags! {
         /// TODO: This flag is not yet set by anything
         const MARKED_NONLOCAL = 1 << 3;
     }
-}
-
-/// ID that uniquely identifies a public symbol defined in a module's root scope.
-#[salsa::tracked]
-pub struct PublicSymbolId<'db> {
-    #[id]
-    pub(crate) file: File,
-    #[id]
-    pub(crate) scoped_symbol_id: ScopedSymbolId,
 }
 
 /// ID that uniquely identifies a symbol in a file.
@@ -110,47 +87,6 @@ impl From<FileSymbolId> for ScopedSymbolId {
 /// Symbol ID that uniquely identifies a symbol inside a [`Scope`].
 #[newtype_index]
 pub struct ScopedSymbolId;
-
-impl ScopedSymbolId {
-    /// Converts the symbol to a public symbol.
-    ///
-    /// # Panics
-    /// May panic if the symbol does not belong to `file` or is not a symbol of `file`'s root scope.
-    pub(crate) fn to_public_symbol(self, db: &dyn Db, file: File) -> PublicSymbolId {
-        let symbols = public_symbols_map(db, file);
-        symbols.public(self)
-    }
-}
-
-#[salsa::tracked(return_ref)]
-pub(crate) fn public_symbols_map(db: &dyn Db, file: File) -> PublicSymbolsMap<'_> {
-    let _span = tracing::trace_span!("public_symbols_map", ?file).entered();
-
-    let module_scope = root_scope(db, file);
-    let symbols = symbol_table(db, module_scope);
-
-    let public_symbols: IndexVec<_, _> = symbols
-        .symbol_ids()
-        .map(|id| PublicSymbolId::new(db, file, id))
-        .collect();
-
-    PublicSymbolsMap {
-        symbols: public_symbols,
-    }
-}
-
-/// Maps [`LocalSymbolId`] of a file's root scope to the corresponding [`PublicSymbolId`] (Salsa ingredients).
-#[derive(Eq, PartialEq, Debug)]
-pub(crate) struct PublicSymbolsMap<'db> {
-    symbols: IndexVec<ScopedSymbolId, PublicSymbolId<'db>>,
-}
-
-impl<'db> PublicSymbolsMap<'db> {
-    /// Resolve the [`PublicSymbolId`] for the module-level `symbol_id`.
-    fn public(&self, symbol_id: ScopedSymbolId) -> PublicSymbolId<'db> {
-        self.symbols[symbol_id]
-    }
-}
 
 /// A cross-module identifier of a scope that can be used as a salsa query parameter.
 #[salsa::tracked]
@@ -185,8 +121,8 @@ impl<'db> ScopeId<'db> {
 pub struct FileScopeId;
 
 impl FileScopeId {
-    /// Returns the scope id of the Root scope.
-    pub fn root() -> Self {
+    /// Returns the scope id of the module-global scope.
+    pub fn module_global() -> Self {
         FileScopeId::from_u32(0)
     }
 
@@ -223,15 +159,15 @@ pub enum ScopeKind {
 
 /// Symbol table for a specific [`Scope`].
 #[derive(Debug)]
-pub struct SymbolTable<'db> {
+pub struct SymbolTable {
     /// The symbols in this scope.
-    symbols: IndexVec<ScopedSymbolId, Symbol<'db>>,
+    symbols: IndexVec<ScopedSymbolId, Symbol>,
 
     /// The symbols indexed by name.
     symbols_by_name: SymbolMap,
 }
 
-impl<'db> SymbolTable<'db> {
+impl SymbolTable {
     fn new() -> Self {
         Self {
             symbols: IndexVec::new(),
@@ -243,21 +179,22 @@ impl<'db> SymbolTable<'db> {
         self.symbols.shrink_to_fit();
     }
 
-    pub(crate) fn symbol(&self, symbol_id: impl Into<ScopedSymbolId>) -> &Symbol<'db> {
+    pub(crate) fn symbol(&self, symbol_id: impl Into<ScopedSymbolId>) -> &Symbol {
         &self.symbols[symbol_id.into()]
     }
 
-    pub(crate) fn symbol_ids(&self) -> impl Iterator<Item = ScopedSymbolId> + 'db {
+    #[allow(unused)]
+    pub(crate) fn symbol_ids(&self) -> impl Iterator<Item = ScopedSymbolId> {
         self.symbols.indices()
     }
 
-    pub fn symbols(&self) -> impl Iterator<Item = &Symbol<'db>> {
+    pub fn symbols(&self) -> impl Iterator<Item = &Symbol> {
         self.symbols.iter()
     }
 
     /// Returns the symbol named `name`.
     #[allow(unused)]
-    pub(crate) fn symbol_by_name(&self, name: &str) -> Option<&Symbol<'db>> {
+    pub(crate) fn symbol_by_name(&self, name: &str) -> Option<&Symbol> {
         let id = self.symbol_id_by_name(name)?;
         Some(self.symbol(id))
     }
@@ -281,21 +218,21 @@ impl<'db> SymbolTable<'db> {
     }
 }
 
-impl PartialEq for SymbolTable<'_> {
+impl PartialEq for SymbolTable {
     fn eq(&self, other: &Self) -> bool {
         // We don't need to compare the symbols_by_name because the name is already captured in `Symbol`.
         self.symbols == other.symbols
     }
 }
 
-impl Eq for SymbolTable<'_> {}
+impl Eq for SymbolTable {}
 
 #[derive(Debug)]
-pub(super) struct SymbolTableBuilder<'db> {
-    table: SymbolTable<'db>,
+pub(super) struct SymbolTableBuilder {
+    table: SymbolTable,
 }
 
-impl<'db> SymbolTableBuilder<'db> {
+impl SymbolTableBuilder {
     pub(super) fn new() -> Self {
         Self {
             table: SymbolTable::new(),
@@ -306,7 +243,7 @@ impl<'db> SymbolTableBuilder<'db> {
         &mut self,
         name: Name,
         flags: SymbolFlags,
-    ) -> ScopedSymbolId {
+    ) -> (ScopedSymbolId, bool) {
         let hash = SymbolTable::hash_name(&name);
         let entry = self
             .table
@@ -319,7 +256,7 @@ impl<'db> SymbolTableBuilder<'db> {
                 let symbol = &mut self.table.symbols[*entry.key()];
                 symbol.insert_flags(flags);
 
-                *entry.key()
+                (*entry.key(), false)
             }
             RawEntryMut::Vacant(entry) => {
                 let mut symbol = Symbol::new(name);
@@ -329,16 +266,12 @@ impl<'db> SymbolTableBuilder<'db> {
                 entry.insert_with_hasher(hash, id, (), |id| {
                     SymbolTable::hash_name(self.table.symbols[*id].name().as_str())
                 });
-                id
+                (id, true)
             }
         }
     }
 
-    pub(super) fn add_definition(&mut self, symbol: ScopedSymbolId, definition: Definition<'db>) {
-        self.table.symbols[symbol].push_definition(definition);
-    }
-
-    pub(super) fn finish(mut self) -> SymbolTable<'db> {
+    pub(super) fn finish(mut self) -> SymbolTable {
         self.table.shrink_to_fit();
         self.table
     }
