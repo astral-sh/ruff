@@ -17,17 +17,17 @@ import typing
 from bar import Bar
 
 class Foo(Bar):
-    def foo() -> str:
+    def foo() -> object:
         return "foo"
 
     @typing.override
-    def bar() -> str:
+    def bar() -> object:
         return "foo_bar"
 "#;
 
 static BAR_CODE: &str = r#"
 class Bar:
-    def bar() -> str:
+    def bar() -> object:
         return "bar"
 
     def random(arg: int) -> int:
