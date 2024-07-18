@@ -1,5 +1,47 @@
 # Changelog
 
+## 0.5.3
+
+**This release marks the Ruff language server as stable and introduces a new [documentation
+section](https://docs.astral.sh/ruff/editors) which provides all the details on [how to set it up in
+your editor of choice](https://docs.astral.sh/ruff/editors/setup) along with [different ways to
+configure it](https://docs.astral.sh/ruff/editors/settings).**
+
+### Preview features
+
+- Formatter: Insert empty line between suite and alternative branch after function/class definition ([#12294](https://github.com/astral-sh/ruff/pull/12294))
+- \[`pyupgrade`\] Implement `unnecessary-default-type-args` (`UP043`) ([#12371](https://github.com/astral-sh/ruff/pull/12371))
+
+### Rule changes
+
+- \[`flake8-bugbear`\] Detect enumerate iterations in `loop-iterator-mutation` (`B909`) ([#12366](https://github.com/astral-sh/ruff/pull/12366))
+- \[`flake8-bugbear`\] Remove `discard`, `remove`, and `pop` allowance for `loop-iterator-mutation` (`B909`) ([#12365](https://github.com/astral-sh/ruff/pull/12365))
+- \[`pylint`\] Allow `repeated-equality-comparison` for mixed operations (`PLR1714`) ([#12369](https://github.com/astral-sh/ruff/pull/12369))
+- \[`pylint`\] Ignore `self` and `cls` when counting arguments (`PLR0913`) ([#12367](https://github.com/astral-sh/ruff/pull/12367))
+- \[`pylint`\] Use UTF-8 as default encoding in `unspecified-encoding` fix (`PLW1514`) ([#12370](https://github.com/astral-sh/ruff/pull/12370))
+
+### Server
+
+- Build settings index in parallel for the native server ([#12299](https://github.com/astral-sh/ruff/pull/12299))
+- Use fallback settings when indexing the project ([#12362](https://github.com/astral-sh/ruff/pull/12362))
+- Consider `--preview` flag for `server` subcommand for the linter and formatter ([#12208](https://github.com/astral-sh/ruff/pull/12208))
+
+### Bug fixes
+
+- \[`flake8-comprehensions`\] Allow additional arguments for `sum` and `max` comprehensions (`C419`) ([#12364](https://github.com/astral-sh/ruff/pull/12364))
+- \[`pylint`\] Avoid dropping extra boolean operations in `repeated-equality-comparison` (`PLR1714`) ([#12368](https://github.com/astral-sh/ruff/pull/12368))
+- \[`pylint`\] Consider expression before statement when determining binding kind (`PLR1704`) ([#12346](https://github.com/astral-sh/ruff/pull/12346))
+
+### Documentation
+
+- Add docs for Ruff language server ([#12344](https://github.com/astral-sh/ruff/pull/12344))
+- Migrate to standalone docs repo ([#12341](https://github.com/astral-sh/ruff/pull/12341))
+- Update versioning policy for editor integration ([#12375](https://github.com/astral-sh/ruff/pull/12375))
+
+### Other changes
+
+- Publish Wasm API to npm ([#12317](https://github.com/astral-sh/ruff/pull/12317))
+
 ## 0.5.2
 
 ### Preview features
