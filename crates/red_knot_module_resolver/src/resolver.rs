@@ -46,8 +46,6 @@ pub(crate) fn resolve_module_query<'db>(
 /// Salsa query to return the Module for builtins.
 ///
 /// Can return None if a custom typeshed is used that has no `builtins.pyi`.
-#[allow(unreachable_pub)]
-#[salsa::tracked]
 pub fn builtins_module(db: &dyn Db) -> Option<Module> {
     let _span = tracing::trace_span!("resolve_builtins").entered();
 
