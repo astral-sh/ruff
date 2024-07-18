@@ -95,7 +95,7 @@ fn match_slice_info(expr: &Expr) -> Option<SliceInfo> {
 }
 
 /// RUF007
-pub(crate) fn pairwise_over_zipped(checker: &mut Checker, func: &Expr, args: &[Expr]) {
+pub(crate) fn zip_instead_of_pairwise(checker: &mut Checker, func: &Expr, args: &[Expr]) {
     // Require exactly two positional arguments.
     let [first, second] = args else {
         return;

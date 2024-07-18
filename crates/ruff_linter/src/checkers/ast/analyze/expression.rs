@@ -850,9 +850,9 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
             if checker.enabled(Rule::PytestFailWithoutMessage) {
                 flake8_pytest_style::rules::fail_call(checker, call);
             }
-            if checker.enabled(Rule::PairwiseOverZipped) {
+            if checker.enabled(Rule::ZipInsteadOfPairwise) {
                 if checker.settings.target_version >= PythonVersion::Py310 {
-                    ruff::rules::pairwise_over_zipped(checker, func, args);
+                    ruff::rules::zip_instead_of_pairwise(checker, func, args);
                 }
             }
             if checker.any_enabled(&[
