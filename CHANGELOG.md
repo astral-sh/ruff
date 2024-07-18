@@ -40,7 +40,7 @@ configure it](https://docs.astral.sh/ruff/editors/settings).**
 
 ### Other changes
 
-- Publish wasm API to npm ([#12317](https://github.com/astral-sh/ruff/pull/12317))
+- Publish Wasm API to npm ([#12317](https://github.com/astral-sh/ruff/pull/12317))
 
 ## 0.5.2
 
