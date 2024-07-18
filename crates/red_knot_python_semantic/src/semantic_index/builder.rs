@@ -139,11 +139,11 @@ impl<'db> SemanticIndexBuilder<'db> {
         self.current_use_def_map().snapshot()
     }
 
-    fn flow_set(&mut self, state: &FlowSnapshot) {
-        self.current_use_def_map().set(state);
+    fn flow_restore(&mut self, state: FlowSnapshot) {
+        self.current_use_def_map().restore(state);
     }
 
-    fn flow_merge(&mut self, state: &FlowSnapshot) {
+    fn flow_merge(&mut self, state: FlowSnapshot) {
         self.current_use_def_map().merge(state);
     }
 
@@ -397,20 +397,20 @@ where
                 let mut post_clauses: Vec<FlowSnapshot> = vec![self.flow_snapshot()];
                 for clause in &node.elif_else_clauses {
                     // we can only take an elif/else clause if none of the previous ones were taken
-                    self.flow_set(&pre_if);
+                    self.flow_restore(pre_if.clone());
                     self.visit_elif_else_clause(clause);
                     post_clauses.push(self.flow_snapshot());
                     if clause.test.is_none() {
                         last_clause_is_else = true;
                     }
                 }
-                let mut post_clause_iter = post_clauses.iter();
+                let mut post_clause_iter = post_clauses.into_iter();
                 if last_clause_is_else {
                     // if the last clause was an else, the pre_if state can't directly reach the
-                    // post-state; we have to enter one of the clauses.
-                    self.flow_set(post_clause_iter.next().unwrap());
+                    // post-state; we must enter one of the clauses.
+                    self.flow_restore(post_clause_iter.next().unwrap());
                 } else {
-                    self.flow_set(&pre_if);
+                    self.flow_restore(pre_if);
                 }
                 for post_clause_state in post_clause_iter {
                     self.flow_merge(post_clause_state);
@@ -483,9 +483,9 @@ where
                 let pre_if = self.flow_snapshot();
                 self.visit_expr(body);
                 let post_body = self.flow_snapshot();
-                self.flow_set(&pre_if);
+                self.flow_restore(pre_if);
                 self.visit_expr(orelse);
-                self.flow_merge(&post_body);
+                self.flow_merge(post_body);
             }
             _ => {
                 walk_expr(self, expr);
