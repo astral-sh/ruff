@@ -1,7 +1,8 @@
 use red_knot_module_resolver::builtins_module;
 
 use crate::semantic_index::global_scope;
-use crate::{semantic_index::symbol::ScopeId, Db};
+use crate::semantic_index::symbol::ScopeId;
+use crate::Db;
 
 #[salsa::tracked]
 pub(crate) fn builtins_scope(db: &dyn Db) -> Option<ScopeId<'_>> {

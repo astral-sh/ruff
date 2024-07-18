@@ -29,12 +29,12 @@ use ruff_db::parsed::parsed_module;
 use ruff_python_ast as ast;
 use ruff_python_ast::{ExprContext, TypeParams};
 
+use crate::builtins::builtins_scope;
 use crate::semantic_index::ast_ids::{HasScopedAstId, HasScopedUseId, ScopedExpressionId};
 use crate::semantic_index::definition::{Definition, DefinitionKind, DefinitionNodeKey};
 use crate::semantic_index::expression::Expression;
 use crate::semantic_index::semantic_index;
-use crate::semantic_index::symbol::NodeWithScopeKind;
-use crate::semantic_index::symbol::{NodeWithScopeRef, ScopeId};
+use crate::semantic_index::symbol::{FileScopeId, NodeWithScopeKind, NodeWithScopeRef, ScopeId};
 use crate::semantic_index::SemanticIndex;
 use crate::types::{
     builtins_symbol_ty_by_name, definitions_ty, global_symbol_ty_by_name, ClassType, FunctionType,
@@ -687,8 +687,15 @@ impl<'db> TypeInferenceBuilder<'db> {
                     let symbol = symbols.symbol_by_name(id).unwrap();
                     if !symbol.is_defined() || !self.scope.is_function_like(self.db) {
                         // implicit global
-                        let mut unbound_ty = global_symbol_ty_by_name(self.db, self.file, id);
-                        if matches!(unbound_ty, Type::Unbound) {
+                        let mut unbound_ty = if file_scope_id == FileScopeId::global() {
+                            Type::Unbound
+                        } else {
+                            global_symbol_ty_by_name(self.db, self.file, id)
+                        };
+                        // fallback to builtins
+                        if matches!(unbound_ty, Type::Unbound)
+                            && Some(self.scope) != builtins_scope(self.db)
+                        {
                             unbound_ty = builtins_symbol_ty_by_name(self.db, id);
                         }
                         Some(unbound_ty)
@@ -1395,14 +1402,18 @@ mod tests {
     #[test]
     fn builtin_symbol_vendored_stdlib() -> anyhow::Result<()> {
         let mut db = setup_db();
+
         db.write_file("/src/a.py", "c = copyright")?;
+
         assert_public_ty(&db, "/src/a.py", "c", "Literal[copyright]");
+
         Ok(())
     }
 
     #[test]
     fn builtin_symbol_custom_stdlib() -> anyhow::Result<()> {
         let mut db = setup_db_with_custom_typeshed("/typeshed");
+
         db.write_files([
             ("/src/a.py", "c = copyright"),
             (
@@ -1411,7 +1422,35 @@ mod tests {
             ),
             ("/typeshed/stdlib/VERSIONS", "builtins: 3.8-"),
         ])?;
+
         assert_public_ty(&db, "/src/a.py", "c", "Literal[copyright]");
+
+        Ok(())
+    }
+
+    #[test]
+    fn unknown_global_later_defined() -> anyhow::Result<()> {
+        let mut db = setup_db();
+
+        db.write_file("/src/a.py", "x = foo; foo = 1")?;
+
+        assert_public_ty(&db, "/src/a.py", "x", "Unbound");
+
+        Ok(())
+    }
+
+    #[test]
+    fn unknown_builtin_later_defined() -> anyhow::Result<()> {
+        let mut db = setup_db_with_custom_typeshed("/typeshed");
+
+        db.write_files([
+            ("/src/a.py", "x = foo"),
+            ("/typeshed/stdlib/builtins.pyi", "foo = bar; bar = 1"),
+            ("/typeshed/stdlib/VERSIONS", "builtins: 3.8-"),
+        ])?;
+
+        assert_public_ty(&db, "/src/a.py", "x", "Unbound");
+
         Ok(())
     }
 
