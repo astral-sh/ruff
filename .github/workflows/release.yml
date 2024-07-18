@@ -225,6 +225,7 @@ jobs:
     secrets: inherit
     # publish jobs get escalated permissions
     permissions:
+      "contents": "read"
       "id-token": "write"
       "packages": "write"
 
