@@ -918,7 +918,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Ruff, "003") => (RuleGroup::Stable, rules::ruff::rules::AmbiguousUnicodeCharacterComment),
         (Ruff, "005") => (RuleGroup::Stable, rules::ruff::rules::CollectionLiteralConcatenation),
         (Ruff, "006") => (RuleGroup::Stable, rules::ruff::rules::AsyncioDanglingTask),
-        (Ruff, "007") => (RuleGroup::Stable, rules::ruff::rules::PairwiseOverZipped),
+        (Ruff, "007") => (RuleGroup::Stable, rules::ruff::rules::ZipInsteadOfPairwise),
         (Ruff, "008") => (RuleGroup::Stable, rules::ruff::rules::MutableDataclassDefault),
         (Ruff, "009") => (RuleGroup::Stable, rules::ruff::rules::FunctionCallInDataclassDefaultArgument),
         (Ruff, "010") => (RuleGroup::Stable, rules::ruff::rules::ExplicitFStringTypeConversion),
