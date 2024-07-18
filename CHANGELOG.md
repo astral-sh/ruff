@@ -2,10 +2,10 @@
 
 ## 0.5.3
 
-**This release marks the Ruff language server as stable and introduces a new [documentation
-section](https://docs.astral.sh/ruff/editors) which provides all the details on [how to set it up in
-your editor of choice](https://docs.astral.sh/ruff/editors/setup) along with [different ways to
-configure it](https://docs.astral.sh/ruff/editors/settings).**
+**Ruff 0.5.3 marks the stable release of the Ruff language server and introduces revamped
+[documentation](https://docs.astral.sh/ruff/editors), including [setup guides for your editor of
+choice](https://docs.astral.sh/ruff/editors/setup) and [the language server
+itself](https://docs.astral.sh/ruff/editors/settings)**.
 
 ### Preview features
 
