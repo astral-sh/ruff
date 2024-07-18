@@ -29,13 +29,9 @@ impl Display for DisplayType<'_> {
                 write!(f, "<module '{:?}'>", file.path(self.db.upcast()))
             }
             // TODO functions and classes should display using a fully qualified name
-            Type::Class(class) => {
-                f.write_str("Literal[")?;
-                f.write_str(&class.name(self.db))?;
-                f.write_str("]")
-            }
+            Type::Class(class) => write!(f, "Literal[{}]", class.name(self.db)),
             Type::Instance(class) => f.write_str(&class.name(self.db)),
-            Type::Function(function) => f.write_str(&function.name(self.db)),
+            Type::Function(function) => write!(f, "Literal[{}]", function.name(self.db)),
             Type::Union(union) => union.display(self.db).fmt(f),
             Type::Intersection(intersection) => intersection.display(self.db).fmt(f),
             Type::IntLiteral(n) => write!(f, "Literal[{n}]"),

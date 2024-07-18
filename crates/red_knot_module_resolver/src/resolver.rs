@@ -43,12 +43,12 @@ pub(crate) fn resolve_module_query<'db>(
     Some(module)
 }
 
-pub fn resolve_builtins(db: &dyn Db) -> Option<Module> {
-    resolve_builtins_query(db)
-}
-
+/// Salsa query to return the Module for builtins.
+///
+/// Can return None if a custom typeshed is used that has no `builtins.pyi`.
+#[allow(unreachable_pub)]
 #[salsa::tracked]
-pub(crate) fn resolve_builtins_query(db: &dyn Db) -> Option<Module> {
+pub fn builtins_module(db: &dyn Db) -> Option<Module> {
     let _span = tracing::trace_span!("resolve_builtins").entered();
 
     let resolver_settings = module_resolution_settings(db);
@@ -670,7 +670,7 @@ mod tests {
     fn builtins_vendored() {
         let TestCase { db, stdlib, .. } = TestCaseBuilder::new().with_vendored_typeshed().build();
 
-        let builtins = resolve_builtins(&db).expect("builtins to resolve");
+        let builtins = builtins_module(&db).expect("builtins to resolve");
 
         assert_eq!(builtins.file().path(&db), &stdlib.join("builtins.pyi"));
     }
@@ -686,7 +686,7 @@ mod tests {
             .with_target_version(TargetVersion::Py38)
             .build();
 
-        let builtins = resolve_builtins(&db).expect("builtins to resolve");
+        let builtins = builtins_module(&db).expect("builtins to resolve");
 
         assert_eq!(builtins.file().path(&db), &stdlib.join("builtins.pyi"));
     }

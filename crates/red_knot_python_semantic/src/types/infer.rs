@@ -37,7 +37,8 @@ use crate::semantic_index::symbol::NodeWithScopeKind;
 use crate::semantic_index::symbol::{NodeWithScopeRef, ScopeId};
 use crate::semantic_index::SemanticIndex;
 use crate::types::{
-    definitions_ty, global_symbol_ty_by_name, ClassType, FunctionType, Name, Type, UnionTypeBuilder,
+    builtins_symbol_ty_by_name, definitions_ty, global_symbol_ty_by_name, ClassType, FunctionType,
+    Name, Type, UnionTypeBuilder,
 };
 use crate::Db;
 
@@ -686,7 +687,11 @@ impl<'db> TypeInferenceBuilder<'db> {
                     let symbol = symbols.symbol_by_name(id).unwrap();
                     if !symbol.is_defined() || !self.scope.is_function_like(self.db) {
                         // implicit global
-                        Some(global_symbol_ty_by_name(self.db, self.file, id))
+                        let mut unbound_ty = global_symbol_ty_by_name(self.db, self.file, id);
+                        if matches!(unbound_ty, Type::Unbound) {
+                            unbound_ty = builtins_symbol_ty_by_name(self.db, id);
+                        }
+                        Some(unbound_ty)
                     } else {
                         Some(Type::Unbound)
                     }
@@ -813,6 +818,23 @@ mod tests {
                 workspace_root: SystemPathBuf::from("/src"),
                 site_packages: None,
                 custom_typeshed: None,
+            },
+        );
+
+        db
+    }
+
+    fn setup_db_with_custom_typeshed(typeshed: &str) -> TestDb {
+        let db = TestDb::new();
+
+        Program::new(
+            &db,
+            TargetVersion::Py38,
+            SearchPathSettings {
+                extra_paths: Vec::new(),
+                workspace_root: SystemPathBuf::from("/src"),
+                site_packages: None,
+                custom_typeshed: Some(SystemPathBuf::from(typeshed)),
             },
         );
 
@@ -1367,6 +1389,29 @@ mod tests {
 
         assert_eq!(format!("{}", literal_ty.display(&db)), "Literal[10]");
 
+        Ok(())
+    }
+
+    #[test]
+    fn builtin_symbol_vendored_stdlib() -> anyhow::Result<()> {
+        let mut db = setup_db();
+        db.write_file("/src/a.py", "c = copyright")?;
+        assert_public_ty(&db, "/src/a.py", "c", "Literal[copyright]");
+        Ok(())
+    }
+
+    #[test]
+    fn builtin_symbol_custom_stdlib() -> anyhow::Result<()> {
+        let mut db = setup_db_with_custom_typeshed("/typeshed");
+        db.write_files([
+            ("/src/a.py", "c = copyright"),
+            (
+                "/typeshed/stdlib/builtins.pyi",
+                "def copyright() -> None: ...",
+            ),
+            ("/typeshed/stdlib/VERSIONS", "builtins: 3.8-"),
+        ])?;
+        assert_public_ty(&db, "/src/a.py", "c", "Literal[copyright]");
         Ok(())
     }
 
