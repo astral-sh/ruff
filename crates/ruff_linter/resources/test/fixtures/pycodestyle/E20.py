@@ -49,32 +49,58 @@ result = [
 
 #: E203:1:10
 if x == 4 :
-    print x, y
+    print(x, y)
     x, y = y, x
 #: E203:1:10
 if x == 4	:
-    print x, y
+    print(x, y)
     x, y = y, x
 #: E203:2:15 E702:2:16
 if x == 4:
-    print x, y ; x, y = y, x
+    print(x, y) ; x, y = y, x
 #: E203:2:15 E702:2:16
 if x == 4:
-    print x, y	; x, y = y, x
+    print(x, y)	; x, y = y, x
 #: E203:3:13
 if x == 4:
-    print x, y
+    print(x, y)
     x, y = y , x
 #: E203:3:13
 if x == 4:
-    print x, y
+    print(x, y)
     x, y = y	, x
 #: Okay
 if x == 4:
-    print x, y
+    print(x, y)
     x, y = y, x
 a[b1, :] == a[b1, ...]
 b = a[:, b1]
+
+#: E203 linebreak before ]
+predictions = predictions[
+    len(past_covariates) // datamodule.hparams["downsample"] :
+]
+
+#: E203 multi whitespace before :
+predictions = predictions[
+    len(past_covariates) // datamodule.hparams["downsample"]  :
+]
+
+#: E203 tab before :
+predictions = predictions[
+    len(past_covariates) // datamodule.hparams["downsample"]	:
+]
+
+#: E203 single whitespace before : with line a comment
+predictions = predictions[
+    len(past_covariates) // datamodule.hparams["downsample"] :  # Just some comment
+]
+
+#: E203 multi whitespace before : with line a comment
+predictions = predictions[
+    len(past_covariates) // datamodule.hparams["downsample"]  :  # Just some comment
+]
+
 #:
 
 #: E201:1:6
@@ -97,7 +123,7 @@ ham[lower + offset : upper + offset]
 ham[(lower + offset) : upper + offset]
 
 #: E203:1:19
-ham{lower + offset : upper + offset}
+{lower + offset : upper + offset}
 
 #: E203:1:19
 ham[lower + offset  : upper + offset]
@@ -159,3 +185,7 @@ f"{ham[lower +1 :, "columnname"]}"
 
 #: E203:1:13
 f"{ham[lower + 1  :, "columnname"]}"
+
+#: Okay: https://github.com/astral-sh/ruff/issues/12023
+f"{x = :.2f}"
+f"{(x) = :.2f}"

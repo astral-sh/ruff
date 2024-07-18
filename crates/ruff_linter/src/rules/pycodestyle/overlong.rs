@@ -1,9 +1,6 @@
 use std::ops::Deref;
 
-use unicode_width::UnicodeWidthStr;
-
-use ruff_python_index::Indexer;
-use ruff_python_trivia::is_pragma_comment;
+use ruff_python_trivia::{is_pragma_comment, CommentRanges};
 use ruff_source_file::Line;
 use ruff_text_size::{TextLen, TextRange};
 
@@ -20,7 +17,7 @@ impl Overlong {
     /// otherwise.
     pub(super) fn try_from_line(
         line: &Line,
-        indexer: &Indexer,
+        comment_ranges: &CommentRanges,
         limit: LineLength,
         task_tags: &[String],
         tab_size: IndentWidth,
@@ -40,7 +37,7 @@ impl Overlong {
         }
 
         // Strip trailing comments and re-measure the line, if needed.
-        let line = StrippedLine::from_line(line, indexer, task_tags);
+        let line = StrippedLine::from_line(line, comment_ranges, task_tags);
         let width = match &line {
             StrippedLine::WithoutPragma(line) => {
                 let width = measure(line.as_str(), tab_size);
@@ -62,7 +59,7 @@ impl Overlong {
         // begins before the limit.
         let last_chunk = chunks.last().unwrap_or(second_chunk);
         if last_chunk.contains("://") {
-            if width.get() - last_chunk.width() <= limit.value() as usize {
+            if width.get() - measure(last_chunk, tab_size).get() <= limit.value() as usize {
                 return None;
             }
         }
@@ -119,8 +116,8 @@ enum StrippedLine<'a> {
 impl<'a> StrippedLine<'a> {
     /// Strip trailing comments from a [`Line`], if the line ends with a pragma comment (like
     /// `# type: ignore`) or, if necessary, a task comment (like `# TODO`).
-    fn from_line(line: &'a Line<'a>, indexer: &Indexer, task_tags: &[String]) -> Self {
-        let [comment_range] = indexer.comment_ranges().comments_in_range(line.range()) else {
+    fn from_line(line: &'a Line<'a>, comment_ranges: &CommentRanges, task_tags: &[String]) -> Self {
+        let [comment_range] = comment_ranges.comments_in_range(line.range()) else {
             return Self::Unchanged(line);
         };
 

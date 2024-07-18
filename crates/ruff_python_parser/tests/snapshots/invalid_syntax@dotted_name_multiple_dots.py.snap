@@ -16,7 +16,7 @@ Module(
                         Alias {
                             range: 7..11,
                             name: Identifier {
-                                id: "a..b",
+                                id: Name("a..b"),
                                 range: 7..11,
                             },
                             asname: None,
@@ -31,7 +31,7 @@ Module(
                         Alias {
                             range: 19..20,
                             name: Identifier {
-                                id: "a",
+                                id: Name("a"),
                                 range: 19..20,
                             },
                             asname: None,
@@ -55,7 +55,7 @@ Module(
                     value: Name(
                         ExprName {
                             range: 23..24,
-                            id: "b",
+                            id: Name("b"),
                             ctx: Load,
                         },
                     ),
@@ -77,7 +77,7 @@ Module(
   |
 1 | import a..b
 2 | import a...b
-  |         ^^^ Syntax Error: Expected ',', found '...'
+  |         ^^^ Syntax Error: Simple statements must be separated by newlines or semicolons
   |
 
 

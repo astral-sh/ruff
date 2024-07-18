@@ -2,13 +2,13 @@
 
 use std::path::{Path, PathBuf};
 
-use anyhow::{format_err, Context, Result};
+use anyhow::{Context, Result};
 use clap::{command, Parser, ValueEnum};
 
 use ruff_formatter::SourceCode;
 use ruff_python_ast::PySourceType;
-use ruff_python_index::tokens_and_ranges;
-use ruff_python_parser::{parse_tokens, AsMode};
+use ruff_python_parser::{parse, AsMode};
+use ruff_python_trivia::CommentRanges;
 use ruff_text_size::Ranged;
 
 use crate::comments::collect_comments;
@@ -46,12 +46,9 @@ pub struct Cli {
 
 pub fn format_and_debug_print(source: &str, cli: &Cli, source_path: &Path) -> Result<String> {
     let source_type = PySourceType::from(source_path);
-    let (tokens, comment_ranges) = tokens_and_ranges(source, source_type)
-        .map_err(|err| format_err!("Source contains syntax errors {err:?}"))?;
 
     // Parse the AST.
-    let module =
-        parse_tokens(tokens, source, source_type.as_mode()).context("Syntax error in input")?;
+    let parsed = parse(source, source_type.as_mode()).context("Syntax error in input")?;
 
     let options = PyFormatOptions::from_extension(source_path)
         .with_preview(if cli.preview {
@@ -66,14 +63,15 @@ pub fn format_and_debug_print(source: &str, cli: &Cli, source_path: &Path) -> Re
         });
 
     let source_code = SourceCode::new(source);
-    let formatted = format_module_ast(&module, &comment_ranges, source, options)
+    let comment_ranges = CommentRanges::from(parsed.tokens());
+    let formatted = format_module_ast(&parsed, &comment_ranges, source, options)
         .context("Failed to format node")?;
     if cli.print_ir {
         println!("{}", formatted.document().display(source_code));
     }
     if cli.print_comments {
         // Print preceding, following and enclosing nodes
-        let decorated_comments = collect_comments(&module, source_code, &comment_ranges);
+        let decorated_comments = collect_comments(parsed.syntax(), source_code, &comment_ranges);
         if !decorated_comments.is_empty() {
             println!("# Comment decoration: Range, Preceding, Following, Enclosing, Comment");
         }

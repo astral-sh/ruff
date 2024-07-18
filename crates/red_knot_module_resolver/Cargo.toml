@@ -1,0 +1,39 @@
+[package]
+name = "red_knot_module_resolver"
+version = "0.0.0"
+publish = false
+authors = { workspace = true }
+edition = { workspace = true }
+rust-version = { workspace = true }
+homepage = { workspace = true }
+documentation = { workspace = true }
+repository = { workspace = true }
+license = { workspace = true }
+
+[dependencies]
+ruff_db = { workspace = true }
+ruff_python_stdlib = { workspace = true }
+
+compact_str = { workspace = true }
+camino = { workspace = true }
+once_cell = { workspace = true }
+rustc-hash = { workspace = true }
+salsa = { workspace = true }
+tracing = { workspace = true }
+zip = { workspace = true }
+
+[build-dependencies]
+path-slash = { workspace = true }
+walkdir = { workspace = true }
+zip = { workspace = true }
+
+[dev-dependencies]
+ruff_db = { workspace = true, features = ["os"] }
+
+anyhow = { workspace = true }
+insta = { workspace = true }
+tempfile = { workspace = true }
+walkdir = { workspace = true }
+
+[lints]
+workspace = true

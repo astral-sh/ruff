@@ -1,0 +1,110 @@
+---
+source: crates/ruff_linter/src/rules/flake8_pyi/mod.rs
+---
+PYI063.pyi:6:9: PYI063 Use PEP 570 syntax for positional-only arguments
+  |
+4 | from typing import Self
+5 | 
+6 | def bad(__x: int) -> None: ...  # PYI063
+  |         ^^^ PYI063
+7 | def also_bad(__x: int, __y: str) -> None: ...  # PYI063
+8 | def still_bad(__x_: int) -> None: ...  # PYI063
+  |
+  = help: Add `/` to function signature
+
+PYI063.pyi:7:14: PYI063 Use PEP 570 syntax for positional-only arguments
+  |
+6 | def bad(__x: int) -> None: ...  # PYI063
+7 | def also_bad(__x: int, __y: str) -> None: ...  # PYI063
+  |              ^^^ PYI063
+8 | def still_bad(__x_: int) -> None: ...  # PYI063
+  |
+  = help: Add `/` to function signature
+
+PYI063.pyi:8:15: PYI063 Use PEP 570 syntax for positional-only arguments
+   |
+ 6 | def bad(__x: int) -> None: ...  # PYI063
+ 7 | def also_bad(__x: int, __y: str) -> None: ...  # PYI063
+ 8 | def still_bad(__x_: int) -> None: ...  # PYI063
+   |               ^^^^ PYI063
+ 9 | 
+10 | def no_args() -> None: ...
+   |
+   = help: Add `/` to function signature
+
+PYI063.pyi:24:14: PYI063 Use PEP 570 syntax for positional-only arguments
+   |
+22 |     def bad(__self) -> None: ...  # PYI063
+23 |     @staticmethod
+24 |     def bad2(__self) -> None: ...  # PYI063
+   |              ^^^^^^ PYI063
+25 |     def bad3(__self, __x: int) -> None: ...  # PYI063
+26 |     def still_bad(self, __x_: int) -> None: ...  # PYI063  # TODO: doesn't get raised here
+   |
+   = help: Add `/` to function signature
+
+PYI063.pyi:25:22: PYI063 Use PEP 570 syntax for positional-only arguments
+   |
+23 |     @staticmethod
+24 |     def bad2(__self) -> None: ...  # PYI063
+25 |     def bad3(__self, __x: int) -> None: ...  # PYI063
+   |                      ^^^ PYI063
+26 |     def still_bad(self, __x_: int) -> None: ...  # PYI063  # TODO: doesn't get raised here
+27 |     @staticmethod
+   |
+   = help: Add `/` to function signature
+
+PYI063.pyi:26:25: PYI063 Use PEP 570 syntax for positional-only arguments
+   |
+24 |     def bad2(__self) -> None: ...  # PYI063
+25 |     def bad3(__self, __x: int) -> None: ...  # PYI063
+26 |     def still_bad(self, __x_: int) -> None: ...  # PYI063  # TODO: doesn't get raised here
+   |                         ^^^^ PYI063
+27 |     @staticmethod
+28 |     def this_is_bad_too(__x: int) -> None: ...  # PYI063
+   |
+   = help: Add `/` to function signature
+
+PYI063.pyi:28:25: PYI063 Use PEP 570 syntax for positional-only arguments
+   |
+26 |     def still_bad(self, __x_: int) -> None: ...  # PYI063  # TODO: doesn't get raised here
+27 |     @staticmethod
+28 |     def this_is_bad_too(__x: int) -> None: ...  # PYI063
+   |                         ^^^ PYI063
+29 |     @classmethod
+30 |     def not_good(cls, __foo: int) -> None: ...  # PYI063
+   |
+   = help: Add `/` to function signature
+
+PYI063.pyi:30:23: PYI063 Use PEP 570 syntax for positional-only arguments
+   |
+28 |     def this_is_bad_too(__x: int) -> None: ...  # PYI063
+29 |     @classmethod
+30 |     def not_good(cls, __foo: int) -> None: ...  # PYI063
+   |                       ^^^^^ PYI063
+31 | 
+32 |     # The first non-self argument isn't positional-only, so logically the second can't be either:
+   |
+   = help: Add `/` to function signature
+
+PYI063.pyi:52:23: PYI063 Use PEP 570 syntax for positional-only arguments
+   |
+50 | class Metaclass(type):
+51 |     @classmethod
+52 |     def __new__(mcls, __name: str, __bases: tuple[type, ...], __namespace: dict, **kwds) -> Self: ...  # PYI063
+   |                       ^^^^^^ PYI063
+53 | 
+54 | class Metaclass2(type):
+   |
+   = help: Add `/` to function signature
+
+PYI063.pyi:56:26: PYI063 Use PEP 570 syntax for positional-only arguments
+   |
+54 | class Metaclass2(type):
+55 |     @classmethod
+56 |     def __new__(metacls, __name: str, __bases: tuple[type, ...], __namespace: dict, **kwds) -> Self: ...  # PYI063
+   |                          ^^^^^^ PYI063
+57 | 
+58 | class GoodMetaclass(type):
+   |
+   = help: Add `/` to function signature

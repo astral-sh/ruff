@@ -184,6 +184,12 @@ pub(crate) fn numpy_2_0_deprecation(checker: &mut Checker, expr: &Expr) {
                     guideline: Some("`add_newdoc_ufunc` is an internal function."),
                 },
             }),
+            ["numpy", "alltrue"] => Some(Replacement {
+                existing: "alltrue",
+                details: Details::AutoPurePython {
+                    python_expr: "all",
+                },
+            }),
             ["numpy", "asfarray"] => Some(Replacement {
                 existing: "asfarray",
                 details: Details::Manual {
@@ -231,6 +237,14 @@ pub(crate) fn numpy_2_0_deprecation(checker: &mut Checker, expr: &Expr) {
                 details: Details::AutoImport {
                     path: "numpy",
                     name: "complex128",
+                    compatibility: Compatibility::BackwardsCompatible,
+                },
+            }),
+            ["numpy", "cumproduct"] => Some(Replacement {
+                existing: "cumproduct",
+                details: Details::AutoImport {
+                    path: "numpy",
+                    name: "cumprod",
                     compatibility: Compatibility::BackwardsCompatible,
                 },
             }),
@@ -290,6 +304,14 @@ pub(crate) fn numpy_2_0_deprecation(checker: &mut Checker, expr: &Expr) {
                 existing: "geterrobj",
                 details: Details::Manual {
                     guideline: Some("Use the `np.errstate` context manager instead."),
+                },
+            }),
+            ["numpy", "in1d"] => Some(Replacement {
+                existing: "in1d",
+                details: Details::AutoImport {
+                    path: "numpy",
+                    name: "isin",
+                    compatibility: Compatibility::BackwardsCompatible,
                 },
             }),
             ["numpy", "INF"] => Some(Replacement {
@@ -358,8 +380,8 @@ pub(crate) fn numpy_2_0_deprecation(checker: &mut Checker, expr: &Expr) {
                     guideline: None,
                 },
             }),
-            ["numpy", "NaN"] => Some(Replacement {
-                existing: "NaN",
+            ["numpy", existing @ ("NaN" | "NAN")] => Some(Replacement {
+                existing,
                 details: Details::AutoImport {
                     path: "numpy",
                     name: "nan",
@@ -417,6 +439,14 @@ pub(crate) fn numpy_2_0_deprecation(checker: &mut Checker, expr: &Expr) {
                 details: Details::AutoImport {
                     path: "numpy",
                     name: "inf",
+                    compatibility: Compatibility::BackwardsCompatible,
+                },
+            }),
+            ["numpy", "product"] => Some(Replacement {
+                existing: "product",
+                details: Details::AutoImport {
+                    path: "numpy",
+                    name: "prod",
                     compatibility: Compatibility::BackwardsCompatible,
                 },
             }),
@@ -492,6 +522,12 @@ pub(crate) fn numpy_2_0_deprecation(checker: &mut Checker, expr: &Expr) {
                     compatibility: Compatibility::BackwardsCompatible,
                 },
             }),
+            ["numpy", "sometrue"] => Some(Replacement {
+                existing: "sometrue",
+                details: Details::AutoPurePython {
+                    python_expr: "any",
+                },
+            }),
             ["numpy", "source"] => Some(Replacement {
                 existing: "source",
                 details: Details::AutoImport {
@@ -506,6 +542,14 @@ pub(crate) fn numpy_2_0_deprecation(checker: &mut Checker, expr: &Expr) {
                     path: "numpy.lib",
                     name: "tracemalloc_domain",
                     compatibility: Compatibility::BackwardsCompatible,
+                },
+            }),
+            ["numpy", "trapz"] => Some(Replacement {
+                existing: "trapz",
+                details: Details::AutoImport {
+                    path: "numpy",
+                    name: "trapezoid",
+                    compatibility: Compatibility::Breaking,
                 },
             }),
             ["numpy", "unicode_"] => Some(Replacement {
@@ -527,6 +571,86 @@ pub(crate) fn numpy_2_0_deprecation(checker: &mut Checker, expr: &Expr) {
                 details: Details::AutoImport {
                     path: "numpy",
                     name: "vstack",
+                    compatibility: Compatibility::BackwardsCompatible,
+                },
+            }),
+            ["numpy", "AxisError"] => Some(Replacement {
+                existing: "AxisError",
+                details: Details::AutoImport {
+                    path: "numpy.exceptions",
+                    name: "AxisError",
+                    compatibility: Compatibility::BackwardsCompatible,
+                },
+            }),
+            ["numpy", "ComplexWarning"] => Some(Replacement {
+                existing: "ComplexWarning",
+                details: Details::AutoImport {
+                    path: "numpy.exceptions",
+                    name: "ComplexWarning",
+                    compatibility: Compatibility::BackwardsCompatible,
+                },
+            }),
+            ["numpy", "DTypePromotionError"] => Some(Replacement {
+                existing: "DTypePromotionError",
+                details: Details::AutoImport {
+                    path: "numpy.exceptions",
+                    name: "DTypePromotionError",
+                    compatibility: Compatibility::BackwardsCompatible,
+                },
+            }),
+            ["numpy", "ModuleDeprecationWarning"] => Some(Replacement {
+                existing: "ModuleDeprecationWarning",
+                details: Details::AutoImport {
+                    path: "numpy.exceptions",
+                    name: "ModuleDeprecationWarning",
+                    compatibility: Compatibility::BackwardsCompatible,
+                },
+            }),
+            ["numpy", "RankWarning"] => Some(Replacement {
+                existing: "RankWarning",
+                details: Details::AutoImport {
+                    path: "numpy.exceptions",
+                    name: "RankWarning",
+                    compatibility: Compatibility::Breaking,
+                },
+            }),
+            ["numpy", "TooHardError"] => Some(Replacement {
+                existing: "TooHardError",
+                details: Details::AutoImport {
+                    path: "numpy.exceptions",
+                    name: "TooHardError",
+                    compatibility: Compatibility::BackwardsCompatible,
+                },
+            }),
+            ["numpy", "VisibleDeprecationWarning"] => Some(Replacement {
+                existing: "VisibleDeprecationWarning",
+                details: Details::AutoImport {
+                    path: "numpy.exceptions",
+                    name: "VisibleDeprecationWarning",
+                    compatibility: Compatibility::BackwardsCompatible,
+                },
+            }),
+            ["numpy", "compare_chararrays"] => Some(Replacement {
+                existing: "compare_chararrays",
+                details: Details::AutoImport {
+                    path: "numpy.char",
+                    name: "compare_chararrays",
+                    compatibility: Compatibility::BackwardsCompatible,
+                },
+            }),
+            ["numpy", "chararray"] => Some(Replacement {
+                existing: "chararray",
+                details: Details::AutoImport {
+                    path: "numpy.char",
+                    name: "chararray",
+                    compatibility: Compatibility::BackwardsCompatible,
+                },
+            }),
+            ["numpy", "format_parser"] => Some(Replacement {
+                existing: "format_parser",
+                details: Details::AutoImport {
+                    path: "numpy.rec",
+                    name: "format_parser",
                     compatibility: Compatibility::BackwardsCompatible,
                 },
             }),

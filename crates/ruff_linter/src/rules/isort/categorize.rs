@@ -1,11 +1,10 @@
 use std::collections::BTreeMap;
 use std::fmt;
-use std::hash::BuildHasherDefault;
 use std::path::{Path, PathBuf};
 use std::{fs, iter};
 
 use log::debug;
-use rustc_hash::{FxHashMap, FxHashSet};
+use rustc_hash::{FxBuildHasher, FxHashMap, FxHashSet};
 use serde::{Deserialize, Serialize};
 use strum_macros::EnumIter;
 
@@ -316,8 +315,7 @@ impl KnownModules {
             .collect();
 
         // Warn in the case of duplicate modules.
-        let mut seen =
-            FxHashSet::with_capacity_and_hasher(known.len(), BuildHasherDefault::default());
+        let mut seen = FxHashSet::with_capacity_and_hasher(known.len(), FxBuildHasher);
         for (module, _) in &known {
             if !seen.insert(module) {
                 warn_user_once!("One or more modules are part of multiple import sections, including: `{module}`");
@@ -381,26 +379,6 @@ impl KnownModules {
             }
         };
         Some((section, reason))
-    }
-
-    /// Return the list of modules that are known to be of a given type.
-    pub fn modules_for_known_type(
-        &self,
-        import_type: ImportType,
-    ) -> impl Iterator<Item = &glob::Pattern> {
-        self.known
-            .iter()
-            .filter_map(move |(module, known_section)| {
-                if let ImportSection::Known(section) = known_section {
-                    if *section == import_type {
-                        Some(module)
-                    } else {
-                        None
-                    }
-                } else {
-                    None
-                }
-            })
     }
 
     /// Return the list of user-defined modules, indexed by section.

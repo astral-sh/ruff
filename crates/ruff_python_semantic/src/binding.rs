@@ -177,16 +177,31 @@ impl<'a> Binding<'a> {
             | BindingKind::Builtin => {
                 return false;
             }
+            // Assignment-assignment bindings are not considered redefinitions, as in:
+            // ```python
+            // x = 1
+            // x = 2
+            // ```
+            BindingKind::Assignment | BindingKind::NamedExprAssignment => {
+                if matches!(
+                    existing.kind,
+                    BindingKind::Assignment | BindingKind::NamedExprAssignment
+                ) {
+                    return false;
+                }
+            }
             _ => {}
         }
-        // Otherwise, the shadowed binding must be a class definition, function definition, or
-        // import to be considered a redefinition.
+        // Otherwise, the shadowed binding must be a class definition, function definition,
+        // import, or assignment to be considered a redefinition.
         matches!(
             existing.kind,
             BindingKind::ClassDefinition(_)
                 | BindingKind::FunctionDefinition(_)
                 | BindingKind::Import(_)
                 | BindingKind::FromImport(_)
+                | BindingKind::Assignment
+                | BindingKind::NamedExprAssignment
         )
     }
 
@@ -452,12 +467,6 @@ pub enum BindingKind<'a> {
     /// ```
     LoopVar,
 
-    /// A binding for a comprehension variable, like `x` in:
-    /// ```python
-    /// [x for x in range(10)]
-    /// ```
-    ComprehensionVar,
-
     /// A binding for a with statement variable, like `x` in:
     /// ```python
     /// with open('foo.py') as x:
@@ -470,14 +479,14 @@ pub enum BindingKind<'a> {
     /// def foo():
     ///     global x
     /// ```
-    Global,
+    Global(Option<BindingId>),
 
     /// A binding for a nonlocal variable, like `x` in:
     /// ```python
     /// def foo():
     ///     nonlocal x
     /// ```
-    Nonlocal(ScopeId),
+    Nonlocal(BindingId, ScopeId),
 
     /// A binding for a builtin, like `print` or `bool`.
     Builtin,
@@ -565,7 +574,7 @@ pub enum BindingKind<'a> {
 }
 
 bitflags! {
-    #[derive(Debug, Copy, Clone, Eq, PartialEq, Hash)]
+    #[derive(Debug, Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash)]
     pub struct Exceptions: u8 {
         const NAME_ERROR = 0b0000_0001;
         const MODULE_NOT_FOUND_ERROR = 0b0000_0010;
@@ -668,5 +677,16 @@ impl<'a, 'ast> Imported<'ast> for AnyImport<'a, 'ast> {
             Self::SubmoduleImport(import) => import.member_name(),
             Self::FromImport(import) => import.member_name(),
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::BindingKind;
+
+    #[test]
+    #[cfg(target_pointer_width = "64")]
+    fn size() {
+        assert!(std::mem::size_of::<BindingKind>() <= 24);
     }
 }

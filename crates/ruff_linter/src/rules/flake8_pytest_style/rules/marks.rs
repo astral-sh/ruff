@@ -14,6 +14,9 @@ use super::helpers::get_mark_decorators;
 /// without parentheses, depending on the [`lint.flake8-pytest-style.mark-parentheses`]
 /// setting.
 ///
+/// In [preview], this rule defaults to removing unnecessary parentheses, to match
+/// the behavior of official pytest projects.
+///
 /// ## Why is this bad?
 /// If a `@pytest.mark.<marker>()` doesn't take any arguments, the parentheses are
 /// optional.
@@ -46,6 +49,8 @@ use super::helpers::get_mark_decorators;
 ///
 /// ## References
 /// - [`pytest` documentation: Marks](https://docs.pytest.org/en/latest/reference/reference.html#marks)
+///
+/// [preview]: https://docs.astral.sh/ruff/preview/
 #[violation]
 pub struct PytestIncorrectMarkParenthesesStyle {
     mark_name: String,

@@ -727,11 +727,11 @@ impl<Context> std::fmt::Debug for Indent<'_, Context> {
     }
 }
 
-/// It reduces the indention for the given content depending on the closest [indent] or [align] parent element.
+/// It reduces the indentation for the given content depending on the closest [indent] or [align] parent element.
 /// - [align] Undoes the spaces added by [align]
-/// - [indent] Reduces the indention level by one
+/// - [indent] Reduces the indentation level by one
 ///
-/// This is a No-op if the indention level is zero.
+/// This is a No-op if the indentation level is zero.
 ///
 /// # Examples
 ///
@@ -863,7 +863,7 @@ where
 ///
 /// # Examples
 ///
-/// ## Tab indention
+/// ## Tab indentation
 ///
 /// ```
 /// use std::num::NonZeroU8;
@@ -904,11 +904,11 @@ where
 ///
 /// - the printer indents the function's `}` by two spaces because it is inside of an `align`.
 /// - the block `console.log` gets indented by two tabs.
-///   This is because `align` increases the indention level by one (same as `indent`)
+///   This is because `align` increases the indentation level by one (same as `indent`)
 ///   if you nest an `indent` inside an `align`.
-///   Meaning that, `align > ... > indent` results in the same indention as `indent > ... > indent`.
+///   Meaning that, `align > ... > indent` results in the same indentation as `indent > ... > indent`.
 ///
-/// ## Spaces indention
+/// ## Spaces indentation
 ///
 /// ```
 /// use std::num::NonZeroU8;
@@ -952,11 +952,11 @@ where
 /// # }
 /// ```
 ///
-/// The printing of `align` differs if using spaces as indention sequence *and* it contains an `indent`.
-/// You can see the difference when comparing the indention of the `console.log(...)` expression to the previous example:
+/// The printing of `align` differs if using spaces as indentation sequence *and* it contains an `indent`.
+/// You can see the difference when comparing the indentation of the `console.log(...)` expression to the previous example:
 ///
-/// - tab indention: Printer indents the expression with two tabs because the `align` increases the indention level.
-/// - space indention: Printer indents the expression by 4 spaces (one indention level) **and** 2 spaces for the align.
+/// - tab indentation: Printer indents the expression with two tabs because the `align` increases the indentation level.
+/// - space indentation: Printer indents the expression by 4 spaces (one indentation level) **and** 2 spaces for the align.
 pub fn align<Content, Context>(count: u8, content: &Content) -> Align<Context>
 where
     Content: Format<Context>,
@@ -992,12 +992,12 @@ impl<Context> std::fmt::Debug for Align<'_, Context> {
     }
 }
 
-/// Inserts a hard line break before and after the content and increases the indention level for the content by one.
+/// Inserts a hard line break before and after the content and increases the indentation level for the content by one.
 ///
 /// Block indents indent a block of code, such as in a function body, and therefore insert a line
 /// break before and after the content.
 ///
-/// Doesn't create an indention if the passed in content is [`FormatElement.is_empty`].
+/// Doesn't create an indentation if the passed in content is [`FormatElement.is_empty`].
 ///
 /// # Examples
 ///
@@ -1035,7 +1035,7 @@ pub fn block_indent<Context>(content: &impl Format<Context>) -> BlockIndent<Cont
 }
 
 /// Indents the content by inserting a line break before and after the content and increasing
-/// the indention level for the content by one if the enclosing group doesn't fit on a single line.
+/// the indentation level for the content by one if the enclosing group doesn't fit on a single line.
 /// Doesn't change the formatting if the enclosing group fits on a single line.
 ///
 /// # Examples
@@ -2057,7 +2057,7 @@ impl<Context> std::fmt::Debug for IfGroupBreaks<'_, Context> {
 /// If you want to indent some content if the enclosing group breaks, use [`indent`].
 ///
 /// Use [`if_group_breaks`] or [`if_group_fits_on_line`] if the fitting and breaking content differs more than just the
-/// indention level.
+/// indentation level.
 ///
 /// # Examples
 ///

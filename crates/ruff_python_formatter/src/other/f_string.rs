@@ -1,5 +1,5 @@
 use ruff_formatter::write;
-use ruff_python_ast::{AnyStringFlags, FString};
+use ruff_python_ast::{AnyStringFlags, FString, StringFlags};
 use ruff_source_file::Locator;
 
 use crate::prelude::*;

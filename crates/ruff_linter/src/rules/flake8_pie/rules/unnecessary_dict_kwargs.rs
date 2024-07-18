@@ -1,7 +1,5 @@
-use std::hash::BuildHasherDefault;
-
 use itertools::Itertools;
-use rustc_hash::FxHashSet;
+use rustc_hash::{FxBuildHasher, FxHashSet};
 
 use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, violation};
@@ -129,7 +127,7 @@ pub(crate) fn unnecessary_dict_kwargs(checker: &mut Checker, call: &ast::ExprCal
                                         parenthesized_range(
                                             value.into(),
                                             dict.into(),
-                                            checker.indexer().comment_ranges(),
+                                            checker.comment_ranges(),
                                             checker.locator().contents(),
                                         )
                                         .unwrap_or(value.range())
@@ -150,14 +148,10 @@ pub(crate) fn unnecessary_dict_kwargs(checker: &mut Checker, call: &ast::ExprCal
 /// Determine the set of keywords that appear in multiple positions (either directly, as in
 /// `func(x=1)`, or indirectly, as in `func(**{"x": 1})`).
 fn duplicates(call: &ast::ExprCall) -> FxHashSet<&str> {
-    let mut seen = FxHashSet::with_capacity_and_hasher(
-        call.arguments.keywords.len(),
-        BuildHasherDefault::default(),
-    );
-    let mut duplicates = FxHashSet::with_capacity_and_hasher(
-        call.arguments.keywords.len(),
-        BuildHasherDefault::default(),
-    );
+    let mut seen =
+        FxHashSet::with_capacity_and_hasher(call.arguments.keywords.len(), FxBuildHasher);
+    let mut duplicates =
+        FxHashSet::with_capacity_and_hasher(call.arguments.keywords.len(), FxBuildHasher);
     for keyword in call.arguments.keywords.iter() {
         if let Some(name) = &keyword.arg {
             if !seen.insert(name.as_str()) {

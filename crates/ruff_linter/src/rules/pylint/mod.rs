@@ -39,10 +39,6 @@ mod tests {
     #[test_case(Rule::CollapsibleElseIf, Path::new("collapsible_else_if.py"))]
     #[test_case(Rule::CompareToEmptyString, Path::new("compare_to_empty_string.py"))]
     #[test_case(Rule::ComparisonOfConstant, Path::new("comparison_of_constant.py"))]
-    #[test_case(
-        Rule::RepeatedIsinstanceCalls,
-        Path::new("repeated_isinstance_calls.py")
-    )]
     #[test_case(Rule::ComparisonWithItself, Path::new("comparison_with_itself.py"))]
     #[test_case(Rule::EqWithoutHash, Path::new("eq_without_hash.py"))]
     #[test_case(Rule::EmptyComment, Path::new("empty_comment.py"))]
@@ -99,6 +95,10 @@ mod tests {
     #[test_case(
         Rule::InvalidCharacterZeroWidthSpace,
         Path::new("invalid_characters.py")
+    )]
+    #[test_case(
+        Rule::InvalidCharacterBackspace,
+        Path::new("invalid_characters_syntax_error.py")
     )]
     #[test_case(Rule::InvalidEnvvarDefault, Path::new("invalid_envvar_default.py"))]
     #[test_case(Rule::InvalidEnvvarValue, Path::new("invalid_envvar_value.py"))]
@@ -195,6 +195,7 @@ mod tests {
     #[test_case(Rule::SuperWithoutBrackets, Path::new("super_without_brackets.py"))]
     #[test_case(Rule::SelfOrClsAssignment, Path::new("self_or_cls_assignment.py"))]
     #[test_case(Rule::TooManyNestedBlocks, Path::new("too_many_nested_blocks.py"))]
+    #[test_case(Rule::DictIndexMissingItems, Path::new("dict_index_missing_items.py"))]
     #[test_case(Rule::DictIterMissingItems, Path::new("dict_iter_missing_items.py"))]
     #[test_case(
         Rule::UnnecessaryDictIndexLookup,
@@ -225,17 +226,6 @@ mod tests {
             },
         )?;
         assert_messages!(snapshot, diagnostics);
-        Ok(())
-    }
-
-    #[test]
-    fn repeated_isinstance_calls() -> Result<()> {
-        let diagnostics = test_path(
-            Path::new("pylint/repeated_isinstance_calls.py"),
-            &LinterSettings::for_rule(Rule::RepeatedIsinstanceCalls)
-                .with_target_version(PythonVersion::Py39),
-        )?;
-        assert_messages!(diagnostics);
         Ok(())
     }
 
@@ -402,17 +392,6 @@ mod tests {
                 },
                 ..LinterSettings::for_rules(vec![Rule::TooManyLocals])
             },
-        )?;
-        assert_messages!(diagnostics);
-        Ok(())
-    }
-
-    #[test]
-    fn unspecified_encoding_python39_or_lower() -> Result<()> {
-        let diagnostics = test_path(
-            Path::new("pylint/unspecified_encoding.py"),
-            &LinterSettings::for_rule(Rule::UnspecifiedEncoding)
-                .with_target_version(PythonVersion::Py39),
         )?;
         assert_messages!(diagnostics);
         Ok(())

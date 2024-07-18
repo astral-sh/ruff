@@ -2,11 +2,13 @@
 source: crates/ruff_python_parser/src/lexer.rs
 expression: newline_in_brackets_eol(WINDOWS_EOL)
 ---
+## Tokens
+```
 [
     (
-        Name {
-            name: "x",
-        },
+        Name(
+            Name("x"),
+        ),
         0..1,
     ),
     (
@@ -26,9 +28,9 @@ expression: newline_in_brackets_eol(WINDOWS_EOL)
         7..9,
     ),
     (
-        Int {
-            value: 1,
-        },
+        Int(
+            1,
+        ),
         13..14,
     ),
     (
@@ -36,9 +38,9 @@ expression: newline_in_brackets_eol(WINDOWS_EOL)
         14..15,
     ),
     (
-        Int {
-            value: 2,
-        },
+        Int(
+            2,
+        ),
         15..16,
     ),
     (
@@ -54,9 +56,9 @@ expression: newline_in_brackets_eol(WINDOWS_EOL)
         19..20,
     ),
     (
-        Int {
-            value: 3,
-        },
+        Int(
+            3,
+        ),
         20..21,
     ),
     (
@@ -68,9 +70,9 @@ expression: newline_in_brackets_eol(WINDOWS_EOL)
         22..24,
     ),
     (
-        Int {
-            value: 4,
-        },
+        Int(
+            4,
+        ),
         24..25,
     ),
     (
@@ -98,9 +100,9 @@ expression: newline_in_brackets_eol(WINDOWS_EOL)
         32..34,
     ),
     (
-        Int {
-            value: 5,
-        },
+        Int(
+            5,
+        ),
         34..35,
     ),
     (
@@ -112,9 +114,9 @@ expression: newline_in_brackets_eol(WINDOWS_EOL)
         36..38,
     ),
     (
-        Int {
-            value: 6,
-        },
+        Int(
+            6,
+        ),
         38..39,
     ),
     (
@@ -122,9 +124,9 @@ expression: newline_in_brackets_eol(WINDOWS_EOL)
         39..40,
     ),
     (
-        Int {
-            value: 7,
-        },
+        Int(
+            7,
+        ),
         43..44,
     ),
     (
@@ -140,3 +142,4 @@ expression: newline_in_brackets_eol(WINDOWS_EOL)
         46..48,
     ),
 ]
+```

@@ -33,8 +33,9 @@ pub fn generate_noqa_edits(
     noqa_line_for: &NoqaMapping,
     line_ending: LineEnding,
 ) -> Vec<Option<Edit>> {
-    let exemption =
-        FileExemption::try_extract(locator.contents(), comment_ranges, external, path, locator);
+    let file_directives =
+        FileNoqaDirectives::extract(locator.contents(), comment_ranges, external, path, locator);
+    let exemption = FileExemption::from(&file_directives);
     let directives = NoqaDirectives::from_commented_ranges(comment_ranges, path, locator);
     let comments = find_noqa_comments(diagnostics, locator, &exemption, &directives, noqa_line_for);
     build_noqa_edits_by_diagnostic(comments, locator, line_ending)
@@ -275,26 +276,89 @@ pub(crate) fn rule_is_ignored(
     }
 }
 
-/// The file-level exemptions extracted from a given Python file.
+/// A summary of the file-level exemption as extracted from [`FileNoqaDirectives`].
 #[derive(Debug)]
-pub(crate) enum FileExemption {
+pub(crate) enum FileExemption<'a> {
     /// The file is exempt from all rules.
-    All,
+    All(Vec<&'a NoqaCode>),
     /// The file is exempt from the given rules.
-    Codes(Vec<NoqaCode>),
+    Codes(Vec<&'a NoqaCode>),
 }
 
-impl FileExemption {
-    /// Extract the [`FileExemption`] for a given Python source file, enumerating any rules that are
-    /// globally ignored within the file.
-    pub(crate) fn try_extract(
-        contents: &str,
+impl<'a> FileExemption<'a> {
+    /// Returns `true` if the file is exempt from the given rule.
+    pub(crate) fn includes(&self, needle: Rule) -> bool {
+        let needle = needle.noqa_code();
+        match self {
+            FileExemption::All(_) => true,
+            FileExemption::Codes(codes) => codes.iter().any(|code| needle == **code),
+        }
+    }
+
+    /// Returns `true` if the file exemption lists the rule directly, rather than via a blanket
+    /// exemption.
+    pub(crate) fn enumerates(&self, needle: Rule) -> bool {
+        let needle = needle.noqa_code();
+        let codes = match self {
+            FileExemption::All(codes) => codes,
+            FileExemption::Codes(codes) => codes,
+        };
+        codes.iter().any(|code| needle == **code)
+    }
+}
+
+impl<'a> From<&'a FileNoqaDirectives<'a>> for FileExemption<'a> {
+    fn from(directives: &'a FileNoqaDirectives) -> Self {
+        let codes = directives
+            .lines()
+            .iter()
+            .flat_map(|line| &line.matches)
+            .collect();
+        if directives
+            .lines()
+            .iter()
+            .any(|line| ParsedFileExemption::All == line.parsed_file_exemption)
+        {
+            FileExemption::All(codes)
+        } else {
+            FileExemption::Codes(codes)
+        }
+    }
+}
+
+/// The directive for a file-level exemption (e.g., `# ruff: noqa`) from an individual line.
+#[derive(Debug)]
+pub(crate) struct FileNoqaDirectiveLine<'a> {
+    /// The range of the text line for which the noqa directive applies.
+    pub(crate) range: TextRange,
+    /// The blanket noqa directive.
+    pub(crate) parsed_file_exemption: ParsedFileExemption<'a>,
+    /// The codes that are ignored by the parsed exemptions.
+    pub(crate) matches: Vec<NoqaCode>,
+}
+
+impl Ranged for FileNoqaDirectiveLine<'_> {
+    /// The range of the `noqa` directive.
+    fn range(&self) -> TextRange {
+        self.range
+    }
+}
+
+/// All file-level exemptions (e.g., `# ruff: noqa`) from a given Python file.
+#[derive(Debug)]
+pub(crate) struct FileNoqaDirectives<'a>(Vec<FileNoqaDirectiveLine<'a>>);
+
+impl<'a> FileNoqaDirectives<'a> {
+    /// Extract the [`FileNoqaDirectives`] for a given Python source file, enumerating any rules
+    /// that are globally ignored within the file.
+    pub(crate) fn extract(
+        contents: &'a str,
         comment_ranges: &CommentRanges,
         external: &[String],
         path: &Path,
         locator: &Locator,
-    ) -> Option<Self> {
-        let mut exempt_codes: Vec<NoqaCode> = vec![];
+    ) -> Self {
+        let mut lines = vec![];
 
         for range in comment_ranges {
             match ParsedFileExemption::try_extract(&contents[*range]) {
@@ -313,12 +377,12 @@ impl FileExemption {
                         continue;
                     }
 
-                    match exemption {
+                    let matches = match &exemption {
                         ParsedFileExemption::All => {
-                            return Some(Self::All);
+                            vec![]
                         }
                         ParsedFileExemption::Codes(codes) => {
-                            exempt_codes.extend(codes.into_iter().filter_map(|code| {
+                            codes.iter().filter_map(|code| {
                                 // Ignore externally-defined rules.
                                 if external.iter().any(|external| code.starts_with(external)) {
                                     return None;
@@ -334,27 +398,33 @@ impl FileExemption {
                                     warn!("Invalid rule code provided to `# ruff: noqa` at {path_display}:{line}: {code}");
                                     None
                                 }
-                            }));
+                            }).collect()
                         }
-                    }
+                    };
+
+                    lines.push(FileNoqaDirectiveLine {
+                        range: *range,
+                        parsed_file_exemption: exemption,
+                        matches,
+                    });
                 }
                 Ok(None) => {}
             }
         }
 
-        if exempt_codes.is_empty() {
-            None
-        } else {
-            Some(Self::Codes(exempt_codes))
-        }
+        Self(lines)
+    }
+
+    pub(crate) fn lines(&self) -> &[FileNoqaDirectiveLine] {
+        &self.0
     }
 }
 
 /// An individual file-level exemption (e.g., `# ruff: noqa` or `# ruff: noqa: F401, F841`). Like
-/// [`FileExemption`], but only for a single line, as opposed to an aggregated set of exemptions
+/// [`FileNoqaDirectives`], but only for a single line, as opposed to an aggregated set of exemptions
 /// across a source file.
-#[derive(Debug)]
-enum ParsedFileExemption<'a> {
+#[derive(Debug, PartialEq, Eq)]
+pub(crate) enum ParsedFileExemption<'a> {
     /// The file-level exemption ignores all rules (e.g., `# ruff: noqa`).
     All,
     /// The file-level exemption ignores specific rules (e.g., `# ruff: noqa: F401, F841`).
@@ -549,9 +619,10 @@ fn add_noqa_inner(
     let mut count = 0;
 
     // Whether the file is exempted from all checks.
-    // Codes that are globally exempted (within the current file).
-    let exemption =
-        FileExemption::try_extract(locator.contents(), comment_ranges, external, path, locator);
+    let directives =
+        FileNoqaDirectives::extract(locator.contents(), comment_ranges, external, path, locator);
+    let exemption = FileExemption::from(&directives);
+
     let directives = NoqaDirectives::from_commented_ranges(comment_ranges, path, locator);
 
     let comments = find_noqa_comments(diagnostics, locator, &exemption, &directives, noqa_line_for);
@@ -646,7 +717,7 @@ struct NoqaComment<'a> {
 fn find_noqa_comments<'a>(
     diagnostics: &'a [Diagnostic],
     locator: &'a Locator,
-    exemption: &Option<FileExemption>,
+    exemption: &'a FileExemption,
     directives: &'a NoqaDirectives,
     noqa_line_for: &NoqaMapping,
 ) -> Vec<Option<NoqaComment<'a>>> {
@@ -656,19 +727,18 @@ fn find_noqa_comments<'a>(
     // Mark any non-ignored diagnostics.
     for diagnostic in diagnostics {
         match &exemption {
-            Some(FileExemption::All) => {
+            FileExemption::All(_) => {
                 // If the file is exempted, don't add any noqa directives.
                 comments_by_line.push(None);
                 continue;
             }
-            Some(FileExemption::Codes(codes)) => {
+            FileExemption::Codes(codes) => {
                 // If the diagnostic is ignored by a global exemption, don't add a noqa directive.
-                if codes.contains(&diagnostic.kind.rule().noqa_code()) {
+                if codes.contains(&&diagnostic.kind.rule().noqa_code()) {
                     comments_by_line.push(None);
                     continue;
                 }
             }
-            None => {}
         }
 
         // Is the violation ignored by a `noqa` directive on the parent line?
@@ -993,7 +1063,7 @@ mod tests {
 
     use crate::generate_noqa_edits;
     use crate::noqa::{add_noqa_inner, Directive, NoqaMapping, ParsedFileExemption};
-    use crate::rules::pycodestyle::rules::AmbiguousVariableName;
+    use crate::rules::pycodestyle::rules::{AmbiguousVariableName, UselessSemicolon};
     use crate::rules::pyflakes::rules::UnusedVariable;
     use crate::rules::pyupgrade::rules::PrintfStringFormatting;
 
@@ -1307,6 +1377,38 @@ print(
                 "  # noqa: UP031\n".to_string(),
                 68.into(),
                 69.into()
+            ))]
+        );
+    }
+
+    #[test]
+    fn syntax_error() {
+        let path = Path::new("/tmp/foo.txt");
+        let source = "\
+foo;
+bar =
+";
+        let diagnostics = [Diagnostic::new(
+            UselessSemicolon,
+            TextRange::new(4.into(), 5.into()),
+        )];
+        let noqa_line_for = NoqaMapping::default();
+        let comment_ranges = CommentRanges::default();
+        let edits = generate_noqa_edits(
+            path,
+            &diagnostics,
+            &Locator::new(source),
+            &comment_ranges,
+            &[],
+            &noqa_line_for,
+            LineEnding::Lf,
+        );
+        assert_eq!(
+            edits,
+            vec![Some(Edit::replacement(
+                "  # noqa: E703\n".to_string(),
+                4.into(),
+                5.into()
             ))]
         );
     }

@@ -22,3 +22,10 @@ pub(crate) fn is_f_string_formatting_enabled(context: &PyFormatContext) -> bool 
 pub(crate) fn is_with_single_item_pre_39_enabled(context: &PyFormatContext) -> bool {
     context.is_preview()
 }
+
+/// See [#12282](https://github.com/astral-sh/ruff/pull/12282).
+pub(crate) fn is_comprehension_leading_expression_comments_same_line_enabled(
+    context: &PyFormatContext,
+) -> bool {
+    context.is_preview()
+}

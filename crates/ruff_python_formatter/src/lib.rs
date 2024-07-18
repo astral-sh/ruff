@@ -6,8 +6,7 @@ use ruff_formatter::prelude::*;
 use ruff_formatter::{format, write, FormatError, Formatted, PrintError, Printed, SourceCode};
 use ruff_python_ast::AstNode;
 use ruff_python_ast::Mod;
-use ruff_python_index::tokens_and_ranges;
-use ruff_python_parser::{parse_tokens, AsMode, ParseError, ParseErrorType};
+use ruff_python_parser::{parse, AsMode, ParseError, Parsed};
 use ruff_python_trivia::CommentRanges;
 use ruff_source_file::Locator;
 
@@ -114,29 +113,25 @@ pub fn format_module_source(
     options: PyFormatOptions,
 ) -> Result<Printed, FormatModuleError> {
     let source_type = options.source_type();
-    let (tokens, comment_ranges) =
-        tokens_and_ranges(source, source_type).map_err(|err| ParseError {
-            location: err.location(),
-            error: ParseErrorType::Lexical(err.into_error()),
-        })?;
-    let module = parse_tokens(tokens, source, source_type.as_mode())?;
-    let formatted = format_module_ast(&module, &comment_ranges, source, options)?;
+    let parsed = parse(source, source_type.as_mode())?;
+    let comment_ranges = CommentRanges::from(parsed.tokens());
+    let formatted = format_module_ast(&parsed, &comment_ranges, source, options)?;
     Ok(formatted.print()?)
 }
 
 pub fn format_module_ast<'a>(
-    module: &'a Mod,
+    parsed: &'a Parsed<Mod>,
     comment_ranges: &'a CommentRanges,
     source: &'a str,
     options: PyFormatOptions,
 ) -> FormatResult<Formatted<PyFormatContext<'a>>> {
     let source_code = SourceCode::new(source);
-    let comments = Comments::from_ast(module, source_code, comment_ranges);
+    let comments = Comments::from_ast(parsed.syntax(), source_code, comment_ranges);
     let locator = Locator::new(source);
 
     let formatted = format!(
-        PyFormatContext::new(options, locator.contents(), comments),
-        [module.format()]
+        PyFormatContext::new(options, locator.contents(), comments, parsed.tokens()),
+        [parsed.syntax().format()]
     )?;
     formatted
         .context()
@@ -161,8 +156,8 @@ mod tests {
     use insta::assert_snapshot;
 
     use ruff_python_ast::PySourceType;
-    use ruff_python_index::tokens_and_ranges;
-    use ruff_python_parser::{parse_tokens, AsMode};
+    use ruff_python_parser::{parse, AsMode};
+    use ruff_python_trivia::CommentRanges;
     use ruff_text_size::{TextRange, TextSize};
 
     use crate::{format_module_ast, format_module_source, format_range, PyFormatOptions};
@@ -203,13 +198,13 @@ def main() -> None:
 
 "#;
         let source_type = PySourceType::Python;
-        let (tokens, comment_ranges) = tokens_and_ranges(source, source_type).unwrap();
 
         // Parse the AST.
         let source_path = "code_inline.py";
-        let module = parse_tokens(tokens, source, source_type.as_mode()).unwrap();
+        let parsed = parse(source, source_type.as_mode()).unwrap();
+        let comment_ranges = CommentRanges::from(parsed.tokens());
         let options = PyFormatOptions::from_extension(Path::new(source_path));
-        let formatted = format_module_ast(&module, &comment_ranges, source, options).unwrap();
+        let formatted = format_module_ast(&parsed, &comment_ranges, source, options).unwrap();
 
         // Uncomment the `dbg` to print the IR.
         // Use `dbg_write!(f, []) instead of `write!(f, [])` in your formatting code to print some IR

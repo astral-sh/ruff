@@ -1,6 +1,7 @@
 //! Scheduling, I/O, and API endpoints.
 
 use std::num::NonZeroUsize;
+use std::str::FromStr;
 
 use lsp_server as lsp;
 use lsp_types as types;
@@ -10,6 +11,9 @@ use types::CodeActionOptions;
 use types::DiagnosticOptions;
 use types::DidChangeWatchedFilesRegistrationOptions;
 use types::FileSystemWatcher;
+use types::NotebookCellSelector;
+use types::NotebookDocumentSyncOptions;
+use types::NotebookSelector;
 use types::OneOf;
 use types::TextDocumentSyncCapability;
 use types::TextDocumentSyncKind;
@@ -44,7 +48,7 @@ pub struct Server {
 }
 
 impl Server {
-    pub fn new(worker_threads: NonZeroUsize) -> crate::Result<Self> {
+    pub fn new(worker_threads: NonZeroUsize, preview: Option<bool>) -> crate::Result<Self> {
         let connection = ConnectionInitializer::stdio();
 
         let (id, init_params) = connection.initialize_start()?;
@@ -60,33 +64,55 @@ impl Server {
             crate::version(),
         )?;
 
+        if let Some(trace) = init_params.trace {
+            crate::trace::set_trace_value(trace);
+        }
+
         crate::message::init_messenger(connection.make_sender());
 
+        let mut all_settings = AllSettings::from_value(
+            init_params
+                .initialization_options
+                .unwrap_or_else(|| serde_json::Value::Object(serde_json::Map::default())),
+        );
+        if let Some(preview) = preview {
+            all_settings.set_preview(preview);
+        }
         let AllSettings {
             global_settings,
             mut workspace_settings,
-        } = AllSettings::from_value(init_params.initialization_options.unwrap_or_default());
+        } = all_settings;
 
-        let mut workspace_for_uri = |uri| {
+        crate::trace::init_tracing(
+            connection.make_sender(),
+            global_settings
+                .tracing
+                .log_level
+                .unwrap_or(crate::trace::LogLevel::Info),
+            global_settings.tracing.log_file.as_deref(),
+        );
+
+        let mut workspace_for_url = |url: lsp_types::Url| {
             let Some(workspace_settings) = workspace_settings.as_mut() else {
-                return (uri, ClientSettings::default());
+                return (url, ClientSettings::default());
             };
-            let settings = workspace_settings.remove(&uri).unwrap_or_else(|| {
-                tracing::warn!("No workspace settings found for {uri}");
+            let settings = workspace_settings.remove(&url).unwrap_or_else(|| {
+                tracing::warn!("No workspace settings found for {}", url);
                 ClientSettings::default()
             });
-            (uri, settings)
+            (url, settings)
         };
 
         let workspaces = init_params
             .workspace_folders
+            .filter(|folders| !folders.is_empty())
             .map(|folders| folders.into_iter().map(|folder| {
-                workspace_for_uri(folder.uri)
+                workspace_for_url(folder.uri)
             }).collect())
             .or_else(|| {
-                tracing::debug!("No workspace(s) were provided during initialization. Using the current working directory as a default workspace...");
+                tracing::warn!("No workspace(s) were provided during initialization. Using the current working directory as a default workspace...");
                 let uri = types::Url::from_file_path(std::env::current_dir().ok()?).ok()?;
-                Some(vec![workspace_for_uri(uri)])
+                Some(vec![workspace_for_url(uri)])
             })
             .ok_or_else(|| {
                 anyhow::anyhow!("Failed to get the current working directory while creating a default workspace.")
@@ -169,8 +195,12 @@ impl Server {
                             watchers: vec![
                                 FileSystemWatcher {
                                     glob_pattern: types::GlobPattern::String(
-                                        "**/.?ruff.toml".into(),
+                                        "**/.ruff.toml".into(),
                                     ),
+                                    kind: None,
+                                },
+                                FileSystemWatcher {
+                                    glob_pattern: types::GlobPattern::String("**/ruff.toml".into()),
                                     kind: None,
                                 },
                                 FileSystemWatcher {
@@ -251,7 +281,25 @@ impl Server {
                     },
                 },
             )),
+            execute_command_provider: Some(types::ExecuteCommandOptions {
+                commands: SupportedCommand::all()
+                    .map(|command| command.identifier().to_string())
+                    .to_vec(),
+                work_done_progress_options: WorkDoneProgressOptions {
+                    work_done_progress: Some(false),
+                },
+            }),
             hover_provider: Some(types::HoverProviderCapability::Simple(true)),
+            notebook_document_sync: Some(types::OneOf::Left(NotebookDocumentSyncOptions {
+                save: Some(false),
+                notebook_selector: [NotebookSelector::ByCells {
+                    notebook: None,
+                    cells: vec![NotebookCellSelector {
+                        language: "python".to_string(),
+                    }],
+                }]
+                .to_vec(),
+            })),
             text_document_sync: Some(TextDocumentSyncCapability::Options(
                 TextDocumentSyncOptions {
                     open_close: Some(true),
@@ -278,8 +326,15 @@ pub(crate) enum SupportedCodeAction {
     SourceFixAll,
     /// Maps to `source.organizeImports` and `source.organizeImports.ruff` code action kinds.
     /// This is a source action that applies import sorting fixes to the currently open document.
-    #[allow(dead_code)] // TODO: remove
     SourceOrganizeImports,
+    /// Maps to the `notebook.source.fixAll` and `notebook.source.fixAll.ruff` code action kinds.
+    /// This is a source action, specifically for notebooks, that applies all safe fixes
+    /// to the currently open document.
+    NotebookSourceFixAll,
+    /// Maps to `source.organizeImports` and `source.organizeImports.ruff` code action kinds.
+    /// This is a source action, specifically for notebooks, that applies import sorting fixes
+    /// to the currently open document.
+    NotebookSourceOrganizeImports,
 }
 
 impl SupportedCodeAction {
@@ -289,6 +344,8 @@ impl SupportedCodeAction {
             Self::QuickFix => CodeActionKind::QUICKFIX,
             Self::SourceFixAll => crate::SOURCE_FIX_ALL_RUFF,
             Self::SourceOrganizeImports => crate::SOURCE_ORGANIZE_IMPORTS_RUFF,
+            Self::NotebookSourceFixAll => crate::NOTEBOOK_SOURCE_FIX_ALL_RUFF,
+            Self::NotebookSourceOrganizeImports => crate::NOTEBOOK_SOURCE_ORGANIZE_IMPORTS_RUFF,
         }
     }
 
@@ -304,7 +361,62 @@ impl SupportedCodeAction {
             Self::QuickFix,
             Self::SourceFixAll,
             Self::SourceOrganizeImports,
+            Self::NotebookSourceFixAll,
+            Self::NotebookSourceOrganizeImports,
         ]
         .into_iter()
+    }
+}
+
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub(crate) enum SupportedCommand {
+    Debug,
+    Format,
+    FixAll,
+    OrganizeImports,
+}
+
+impl SupportedCommand {
+    const fn label(self) -> &'static str {
+        match self {
+            Self::FixAll => "Fix all auto-fixable problems",
+            Self::Format => "Format document",
+            Self::OrganizeImports => "Format imports",
+            Self::Debug => "Print debug information",
+        }
+    }
+
+    /// Returns the identifier of the command.
+    const fn identifier(self) -> &'static str {
+        match self {
+            SupportedCommand::Format => "ruff.applyFormat",
+            SupportedCommand::FixAll => "ruff.applyAutofix",
+            SupportedCommand::OrganizeImports => "ruff.applyOrganizeImports",
+            SupportedCommand::Debug => "ruff.printDebugInformation",
+        }
+    }
+
+    /// Returns all the commands that the server currently supports.
+    const fn all() -> [SupportedCommand; 4] {
+        [
+            SupportedCommand::Format,
+            SupportedCommand::FixAll,
+            SupportedCommand::OrganizeImports,
+            SupportedCommand::Debug,
+        ]
+    }
+}
+
+impl FromStr for SupportedCommand {
+    type Err = anyhow::Error;
+
+    fn from_str(name: &str) -> anyhow::Result<Self, Self::Err> {
+        Ok(match name {
+            "ruff.applyAutofix" => Self::FixAll,
+            "ruff.applyFormat" => Self::Format,
+            "ruff.applyOrganizeImports" => Self::OrganizeImports,
+            "ruff.printDebugInformation" => Self::Debug,
+            _ => return Err(anyhow::anyhow!("Invalid command `{name}`")),
+        })
     }
 }

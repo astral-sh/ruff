@@ -12,3 +12,8 @@ class BaseCache:
     def get(self, key: str) -> None:
         print(f"{key} not found")
         return None
+
+    @property
+    def prop(self) -> None:
+        print("Property not found")
+        return None

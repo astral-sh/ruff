@@ -7,7 +7,7 @@ use ruff_python_ast::comparable::ComparableExpr;
 use ruff_python_ast::helpers::contains_effect;
 use ruff_python_ast::parenthesize::parenthesized_range;
 use ruff_python_ast::Expr;
-use ruff_python_index::Indexer;
+use ruff_python_trivia::CommentRanges;
 use ruff_source_file::Locator;
 use ruff_text_size::Ranged;
 
@@ -74,8 +74,8 @@ pub(crate) fn if_exp_instead_of_or_operator(checker: &mut Checker, if_expr: &ast
         Edit::range_replacement(
             format!(
                 "{} or {}",
-                parenthesize_test(test, if_expr, checker.indexer(), checker.locator()),
-                parenthesize_test(orelse, if_expr, checker.indexer(), checker.locator()),
+                parenthesize_test(test, if_expr, checker.comment_ranges(), checker.locator()),
+                parenthesize_test(orelse, if_expr, checker.comment_ranges(), checker.locator()),
             ),
             if_expr.range(),
         ),
@@ -99,13 +99,13 @@ pub(crate) fn if_exp_instead_of_or_operator(checker: &mut Checker, if_expr: &ast
 fn parenthesize_test<'a>(
     expr: &Expr,
     if_expr: &ast::ExprIf,
-    indexer: &Indexer,
+    comment_ranges: &CommentRanges,
     locator: &Locator<'a>,
 ) -> Cow<'a, str> {
     if let Some(range) = parenthesized_range(
         expr.into(),
         if_expr.into(),
-        indexer.comment_ranges(),
+        comment_ranges,
         locator.contents(),
     ) {
         Cow::Borrowed(locator.slice(range))

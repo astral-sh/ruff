@@ -16,7 +16,7 @@ Module(
                         Alias {
                             range: 7..8,
                             name: Identifier {
-                                id: "a",
+                                id: Name("a"),
                                 range: 7..8,
                             },
                             asname: None,
@@ -31,7 +31,7 @@ Module(
                         Alias {
                             range: 16..21,
                             name: Identifier {
-                                id: "a.b.c",
+                                id: Name("a.b.c"),
                                 range: 16..21,
                             },
                             asname: None,
@@ -46,12 +46,12 @@ Module(
                         Alias {
                             range: 29..39,
                             name: Identifier {
-                                id: "a.b.c",
+                                id: Name("a.b.c"),
                                 range: 29..34,
                             },
                             asname: Some(
                                 Identifier {
-                                    id: "d",
+                                    id: Name("d"),
                                     range: 38..39,
                                 },
                             ),
@@ -66,7 +66,7 @@ Module(
                         Alias {
                             range: 47..48,
                             name: Identifier {
-                                id: "a",
+                                id: Name("a"),
                                 range: 47..48,
                             },
                             asname: None,
@@ -74,7 +74,7 @@ Module(
                         Alias {
                             range: 50..51,
                             name: Identifier {
-                                id: "b",
+                                id: Name("b"),
                                 range: 50..51,
                             },
                             asname: None,
@@ -82,7 +82,7 @@ Module(
                         Alias {
                             range: 53..54,
                             name: Identifier {
-                                id: "c",
+                                id: Name("c"),
                                 range: 53..54,
                             },
                             asname: None,
@@ -97,12 +97,12 @@ Module(
                         Alias {
                             range: 62..74,
                             name: Identifier {
-                                id: "foo.bar",
+                                id: Name("foo.bar"),
                                 range: 62..69,
                             },
                             asname: Some(
                                 Identifier {
-                                    id: "a",
+                                    id: Name("a"),
                                     range: 73..74,
                                 },
                             ),
@@ -110,12 +110,12 @@ Module(
                         Alias {
                             range: 76..91,
                             name: Identifier {
-                                id: "a.b.c.d",
+                                id: Name("a.b.c.d"),
                                 range: 76..83,
                             },
                             asname: Some(
                                 Identifier {
-                                    id: "abcd",
+                                    id: Name("abcd"),
                                     range: 87..91,
                                 },
                             ),

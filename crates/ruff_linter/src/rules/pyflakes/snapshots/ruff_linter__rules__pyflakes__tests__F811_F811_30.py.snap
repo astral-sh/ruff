@@ -1,0 +1,30 @@
+---
+source: crates/ruff_linter/src/rules/pyflakes/mod.rs
+---
+F811_30.py:12:9: F811 Redefinition of unused `bar` from line 10
+   |
+10 |     bar = foo
+11 | 
+12 |     def bar(self) -> None:
+   |         ^^^ F811
+13 |         """Bar."""
+   |
+   = help: Remove definition: `bar`
+
+F811_30.py:21:5: F811 Redefinition of unused `baz` from line 18
+   |
+19 |         """Baz."""
+20 | 
+21 |     baz = 1
+   |     ^^^ F811
+   |
+   = help: Remove definition: `baz`
+
+F811_30.py:29:12: F811 Redefinition of unused `foo` from line 26
+   |
+27 |         """Foo."""
+28 | 
+29 |     bar = (foo := 1)
+   |            ^^^ F811
+   |
+   = help: Remove definition: `foo`

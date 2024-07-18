@@ -2,7 +2,7 @@ use std::borrow::Cow;
 use std::iter;
 
 use anyhow::{anyhow, bail, Result};
-use rustc_hash::FxHashMap;
+use std::collections::BTreeMap;
 
 use ruff_diagnostics::{Applicability, Diagnostic, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, violation};
@@ -24,6 +24,7 @@ enum UnusedImportContext {
     Init {
         first_party: bool,
         dunder_all_count: usize,
+        ignore_init_module_imports: bool,
     },
 }
 
@@ -46,12 +47,29 @@ enum UnusedImportContext {
 /// from module import member as member
 /// ```
 ///
+/// Alternatively, you can use `__all__` to declare a symbol as part of the module's
+/// interface, as in:
+///
+/// ```python
+/// # __init__.py
+/// import some_module
+///
+/// __all__ = ["some_module"]
+/// ```
+///
 /// ## Fix safety
 ///
-/// When `ignore_init_module_imports` is disabled, fixes can remove for unused imports in `__init__` files.
-/// These fixes are considered unsafe because they can change the public interface.
+/// Fixes to remove unused imports are safe, except in `__init__.py` files.
+///
+/// Applying fixes to `__init__.py` files is currently in preview. The fix offered depends on the
+/// type of the unused import. Ruff will suggest a safe fix to export first-party imports with
+/// either a redundant alias or, if already present in the file, an `__all__` entry. If multiple
+/// `__all__` declarations are present, Ruff will not offer a fix. Ruff will suggest an unsafe fix
+/// to remove third-party and standard library imports -- the fix is unsafe because the module's
+/// interface changes.
 ///
 /// ## Example
+///
 /// ```python
 /// import numpy as np  # unused import
 ///
@@ -61,12 +79,14 @@ enum UnusedImportContext {
 /// ```
 ///
 /// Use instead:
+///
 /// ```python
 /// def area(radius):
 ///     return 3.14 * radius**2
 /// ```
 ///
 /// To check the availability of a module, use `importlib.util.find_spec`:
+///
 /// ```python
 /// from importlib.util import find_spec
 ///
@@ -87,6 +107,8 @@ enum UnusedImportContext {
 pub struct UnusedImport {
     /// Qualified name of the import
     name: String,
+    /// Unqualified name of the import
+    module: String,
     /// Name of the import binding
     binding: String,
     context: Option<UnusedImportContext>,
@@ -117,6 +139,7 @@ impl Violation for UnusedImport {
     fn fix_title(&self) -> Option<String> {
         let UnusedImport {
             name,
+            module,
             binding,
             multiple,
             ..
@@ -125,14 +148,14 @@ impl Violation for UnusedImport {
             Some(UnusedImportContext::Init {
                 first_party: true,
                 dunder_all_count: 1,
+                ignore_init_module_imports: true,
             }) => Some(format!("Add unused import `{binding}` to __all__")),
 
             Some(UnusedImportContext::Init {
                 first_party: true,
                 dunder_all_count: 0,
-            }) => Some(format!(
-                "Use an explicit re-export: `{binding} as {binding}`"
-            )),
+                ignore_init_module_imports: true,
+            }) => Some(format!("Use an explicit re-export: `{module} as {module}`")),
 
             _ => Some(if *multiple {
                 "Remove unused import".to_string()
@@ -197,8 +220,8 @@ fn find_dunder_all_exprs<'a>(semantic: &'a SemanticModel) -> Vec<&'a ast::Expr> 
 ///
 pub(crate) fn unused_import(checker: &Checker, scope: &Scope, diagnostics: &mut Vec<Diagnostic>) {
     // Collect all unused imports by statement.
-    let mut unused: FxHashMap<(NodeId, Exceptions), Vec<ImportBinding>> = FxHashMap::default();
-    let mut ignored: FxHashMap<(NodeId, Exceptions), Vec<ImportBinding>> = FxHashMap::default();
+    let mut unused: BTreeMap<(NodeId, Exceptions), Vec<ImportBinding>> = BTreeMap::default();
+    let mut ignored: BTreeMap<(NodeId, Exceptions), Vec<ImportBinding>> = BTreeMap::default();
 
     for binding_id in scope.binding_ids() {
         let binding = checker.semantic().binding(binding_id);
@@ -244,7 +267,8 @@ pub(crate) fn unused_import(checker: &Checker, scope: &Scope, diagnostics: &mut 
     }
 
     let in_init = checker.path().ends_with("__init__.py");
-    let fix_init = checker.settings.preview.is_enabled();
+    let fix_init = !checker.settings.ignore_init_module_imports;
+    let preview_mode = checker.settings.preview.is_enabled();
     let dunder_all_exprs = find_dunder_all_exprs(checker.semantic());
 
     // Generate a diagnostic for every import, but share fixes across all imports within the same
@@ -275,6 +299,7 @@ pub(crate) fn unused_import(checker: &Checker, scope: &Scope, diagnostics: &mut 
                             checker,
                         ),
                         dunder_all_count: dunder_all_exprs.len(),
+                        ignore_init_module_imports: !fix_init,
                     })
                 } else {
                     None
@@ -288,30 +313,31 @@ pub(crate) fn unused_import(checker: &Checker, scope: &Scope, diagnostics: &mut 
                         first_party: true,
                         ..
                     })
-                )
+                ) && preview_mode
             });
 
         // generate fixes that are shared across bindings in the statement
-        let (fix_remove, fix_reexport) = if (!in_init || fix_init) && !in_except_handler {
-            (
-                fix_by_removing_imports(
-                    checker,
-                    import_statement,
-                    to_remove.iter().map(|(binding, _)| binding),
-                    in_init,
+        let (fix_remove, fix_reexport) =
+            if (!in_init || fix_init || preview_mode) && !in_except_handler {
+                (
+                    fix_by_removing_imports(
+                        checker,
+                        import_statement,
+                        to_remove.iter().map(|(binding, _)| binding),
+                        in_init,
+                    )
+                    .ok(),
+                    fix_by_reexporting(
+                        checker,
+                        import_statement,
+                        to_reexport.iter().map(|(b, _)| b).collect::<Vec<_>>(),
+                        &dunder_all_exprs,
+                    )
+                    .ok(),
                 )
-                .ok(),
-                fix_by_reexporting(
-                    checker,
-                    import_statement,
-                    &to_reexport.iter().map(|(b, _)| b).collect::<Vec<_>>(),
-                    &dunder_all_exprs,
-                )
-                .ok(),
-            )
-        } else {
-            (None, None)
-        };
+            } else {
+                (None, None)
+            };
 
         for ((binding, context), fix) in iter::Iterator::chain(
             iter::zip(to_remove, iter::repeat(fix_remove)),
@@ -320,6 +346,7 @@ pub(crate) fn unused_import(checker: &Checker, scope: &Scope, diagnostics: &mut 
             let mut diagnostic = Diagnostic::new(
                 UnusedImport {
                     name: binding.import.qualified_name().to_string(),
+                    module: binding.import.member_name().to_string(),
                     binding: binding.name.to_string(),
                     context,
                     multiple,
@@ -344,6 +371,7 @@ pub(crate) fn unused_import(checker: &Checker, scope: &Scope, diagnostics: &mut 
         let mut diagnostic = Diagnostic::new(
             UnusedImport {
                 name: binding.import.qualified_name().to_string(),
+                module: binding.import.member_name().to_string(),
                 binding: binding.name.to_string(),
                 context: None,
                 multiple: false,
@@ -422,13 +450,15 @@ fn fix_by_removing_imports<'a>(
 fn fix_by_reexporting(
     checker: &Checker,
     node_id: NodeId,
-    imports: &[&ImportBinding],
+    mut imports: Vec<&ImportBinding>,
     dunder_all_exprs: &[&ast::Expr],
 ) -> Result<Fix> {
     let statement = checker.semantic().statement(node_id);
     if imports.is_empty() {
         bail!("Expected import bindings");
     }
+
+    imports.sort_by_key(|b| b.name);
 
     let edits = match dunder_all_exprs {
         [] => fix::edits::make_redundant_alias(

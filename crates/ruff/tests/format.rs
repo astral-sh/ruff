@@ -812,14 +812,13 @@ tab-size = 2
 if True:
     pass
     "), @r###"
-        success: true
-        exit_code: 0
+        success: false
+        exit_code: 2
         ----- stdout -----
-        if True:
-          pass
 
         ----- stderr -----
-        warning: The `tab-size` option has been renamed to `indent-width` to emphasize that it configures the indentation used by the formatter as well as the tab width. Please update your configuration to use `indent-width = <value>` instead.
+        ruff failed
+          Cause: The `tab-size` option has been renamed to `indent-width` to emphasize that it configures the indentation used by the formatter as well as the tab width. Please update `[RUFF-TOML-PATH]` to use `indent-width = <value>` instead.
         "###);
     });
     Ok(())
@@ -1013,6 +1012,48 @@ multiline-quotes = "double"
 [format]
 skip-magic-trailing-comma = false
 quote-style = "single"
+"#,
+    )?;
+
+    let test_path = tempdir.path().join("test.py");
+    fs::write(
+        &test_path,
+        r#"
+def say_hy(name: str):
+        print(f"Hy {name}")"#,
+    )?;
+
+    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
+        .args(["format", "--no-cache", "--config"])
+        .arg(&ruff_toml)
+        .arg(test_path), @r###"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+    1 file reformatted
+
+    ----- stderr -----
+    "###);
+    Ok(())
+}
+
+#[test]
+fn valid_linter_options_preserve() -> Result<()> {
+    let tempdir = TempDir::new()?;
+    let ruff_toml = tempdir.path().join("ruff.toml");
+    fs::write(
+        &ruff_toml,
+        r#"
+[lint]
+select = ["Q"]
+
+[lint.flake8-quotes]
+inline-quotes = "single"
+docstring-quotes = "single"
+multiline-quotes = "single"
+
+[format]
+quote-style = "preserve"
 "#,
     )?;
 

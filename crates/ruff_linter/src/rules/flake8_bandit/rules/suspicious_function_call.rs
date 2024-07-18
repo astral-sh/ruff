@@ -1,9 +1,10 @@
 //! Check for calls to suspicious functions, or calls into suspicious modules.
 //!
 //! See: <https://bandit.readthedocs.io/en/latest/blacklists/blacklist_calls.html>
+use itertools::Either;
 use ruff_diagnostics::{Diagnostic, DiagnosticKind, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::{self as ast, Decorator, Expr, ExprCall};
+use ruff_python_ast::{self as ast, Decorator, Expr, ExprCall, Operator};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
@@ -825,6 +826,56 @@ impl Violation for SuspiciousFTPLibUsage {
 
 /// S301, S302, S303, S304, S305, S306, S307, S308, S310, S311, S312, S313, S314, S315, S316, S317, S318, S319, S320, S321, S323
 pub(crate) fn suspicious_function_call(checker: &mut Checker, call: &ExprCall) {
+    /// Returns `true` if the iterator starts with the given prefix.
+    fn has_prefix(mut chars: impl Iterator<Item = char>, prefix: &str) -> bool {
+        for expected in prefix.chars() {
+            let Some(actual) = chars.next() else {
+                return false;
+            };
+            if actual != expected {
+                return false;
+            }
+        }
+        true
+    }
+
+    /// Returns `true` if the iterator starts with an HTTP or HTTPS prefix.
+    fn has_http_prefix(chars: impl Iterator<Item = char> + Clone) -> bool {
+        has_prefix(chars.clone().skip_while(|c| c.is_whitespace()), "http://")
+            || has_prefix(chars.skip_while(|c| c.is_whitespace()), "https://")
+    }
+
+    /// Return the leading characters for an expression, if it's a string literal, f-string, or
+    /// string concatenation.
+    fn leading_chars(expr: &Expr) -> Option<impl Iterator<Item = char> + Clone + '_> {
+        match expr {
+            // Ex) `"foo"`
+            Expr::StringLiteral(ast::ExprStringLiteral { value, .. }) => {
+                Some(Either::Left(value.chars()))
+            }
+            // Ex) f"foo"
+            Expr::FString(ast::ExprFString { value, .. }) => {
+                value.elements().next().and_then(|element| {
+                    if let ast::FStringElement::Literal(ast::FStringLiteralElement {
+                        value, ..
+                    }) = element
+                    {
+                        Some(Either::Right(value.chars()))
+                    } else {
+                        None
+                    }
+                })
+            }
+            // Ex) "foo" + "bar"
+            Expr::BinOp(ast::ExprBinOp {
+                op: Operator::Add,
+                left,
+                ..
+            }) => leading_chars(left),
+            _ => None,
+        }
+    }
+
     let Some(diagnostic_kind) = checker.semantic().resolve_qualified_name(call.func.as_ref()).and_then(|qualified_name| {
         match qualified_name.segments() {
             // Pickle
@@ -850,16 +901,12 @@ pub(crate) fn suspicious_function_call(checker: &mut Checker, call: &ExprCall) {
             // MarkSafe
             ["django", "utils", "safestring" | "html", "mark_safe"] => Some(SuspiciousMarkSafeUsage.into()),
             // URLOpen (`Request`)
-            ["urllib", "request","Request"] |
-            ["six", "moves", "urllib", "request","Request"] => {
-                // If the `url` argument is a string literal, allow `http` and `https` schemes.
+            ["urllib", "request", "Request"] |
+            ["six", "moves", "urllib", "request", "Request"] => {
+                // If the `url` argument is a string literal or an f-string, allow `http` and `https` schemes.
                 if call.arguments.args.iter().all(|arg| !arg.is_starred_expr()) && call.arguments.keywords.iter().all(|keyword| keyword.arg.is_some()) {
-                    if let Some(Expr::StringLiteral(ast::ExprStringLiteral { value, .. })) = &call.arguments.find_argument("url", 0) {
-                            let url = value.to_str().trim_start();
-                            if url.starts_with("http://") || url.starts_with("https://") {
-                                return None;
-                            }
-
+                    if call.arguments.find_argument("url", 0).and_then(leading_chars).is_some_and(has_http_prefix) {
+                        return None;
                     }
                 }
                 Some(SuspiciousURLOpenUsage.into())
@@ -868,27 +915,24 @@ pub(crate) fn suspicious_function_call(checker: &mut Checker, call: &ExprCall) {
             ["urllib", "request", "urlopen" | "urlretrieve" ] |
             ["six", "moves", "urllib", "request", "urlopen" | "urlretrieve" ] => {
                 if call.arguments.args.iter().all(|arg| !arg.is_starred_expr()) && call.arguments.keywords.iter().all(|keyword| keyword.arg.is_some()) {
-                    if let Some(arg) = &call.arguments.find_argument("url", 0) {
-                        // If the `url` argument is a string literal, allow `http` and `https` schemes.
-                        if let Expr::StringLiteral(ast::ExprStringLiteral { value, .. }) = arg {
-                            let url = value.to_str().trim_start();
-                            if url.starts_with("http://") || url.starts_with("https://") {
-                                return None;
-                            }
-                        }
-
+                    match call.arguments.find_argument("url", 0) {
                         // If the `url` argument is a `urllib.request.Request` object, allow `http` and `https` schemes.
-                        if let Expr::Call(ExprCall { func, arguments, .. }) = arg {
+                        Some(Expr::Call(ExprCall { func, arguments, .. })) => {
                             if checker.semantic().resolve_qualified_name(func.as_ref()).is_some_and(|name| name.segments() == ["urllib", "request", "Request"]) {
-                                if let Some( Expr::StringLiteral(ast::ExprStringLiteral { value, .. })) = arguments.find_argument("url", 0) {
-                                        let url = value.to_str().trim_start();
-                                        if url.starts_with("http://") || url.starts_with("https://") {
-                                            return None;
-                                        }
-
+                                if arguments.find_argument("url", 0).and_then(leading_chars).is_some_and(has_http_prefix) {
+                                    return None;
                                 }
                             }
-                        }
+                        },
+
+                        // If the `url` argument is a string literal, allow `http` and `https` schemes.
+                        Some(expr) => {
+                            if leading_chars(expr).is_some_and(has_http_prefix) {
+                                return None;
+                            }
+                        },
+
+                        _ => {}
                     }
                 }
                 Some(SuspiciousURLOpenUsage.into())

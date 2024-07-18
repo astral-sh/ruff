@@ -90,7 +90,7 @@ pub(crate) fn unnecessary_comprehension_in_call(
     if !keywords.is_empty() {
         return;
     }
-    let [arg] = args else {
+    let Some(arg) = args.first() else {
         return;
     };
     let (Expr::ListComp(ast::ExprListComp { elt, .. })

@@ -1,13 +1,16 @@
+use ruff_python_ast::name::Name;
 use ruff_python_ast::{self as ast, Expr};
 use ruff_python_codegen::Generator;
 use ruff_python_semantic::{BindingId, ResolvedReference, SemanticModel};
 use ruff_text_size::{Ranged, TextRange};
 
+use crate::settings::types::PythonVersion;
+
 /// Format a code snippet to call `name.method()`.
-pub(super) fn generate_method_call(name: &str, method: &str, generator: Generator) -> String {
+pub(super) fn generate_method_call(name: Name, method: &str, generator: Generator) -> String {
     // Construct `name`.
     let var = ast::ExprName {
-        id: name.to_string(),
+        id: name,
         ctx: ast::ExprContext::Load,
         range: TextRange::default(),
     };
@@ -38,13 +41,13 @@ pub(super) fn generate_method_call(name: &str, method: &str, generator: Generato
 
 /// Format a code snippet comparing `name` to `None` (e.g., `name is None`).
 pub(super) fn generate_none_identity_comparison(
-    name: &str,
+    name: Name,
     negate: bool,
     generator: Generator,
 ) -> String {
     // Construct `name`.
     let var = ast::ExprName {
-        id: name.to_string(),
+        id: name,
         ctx: ast::ExprContext::Load,
         range: TextRange::default(),
     };
@@ -77,12 +80,12 @@ pub(super) enum OpenMode {
 }
 
 impl OpenMode {
-    pub(super) fn pathlib_method(self) -> String {
+    pub(super) fn pathlib_method(self) -> Name {
         match self {
-            OpenMode::ReadText => "read_text".to_string(),
-            OpenMode::ReadBytes => "read_bytes".to_string(),
-            OpenMode::WriteText => "write_text".to_string(),
-            OpenMode::WriteBytes => "write_bytes".to_string(),
+            OpenMode::ReadText => Name::new_static("read_text"),
+            OpenMode::ReadBytes => Name::new_static("read_bytes"),
+            OpenMode::WriteText => Name::new_static("write_text"),
+            OpenMode::WriteBytes => Name::new_static("write_bytes"),
         }
     }
 }
@@ -116,10 +119,11 @@ pub(super) fn find_file_opens<'a>(
     with: &'a ast::StmtWith,
     semantic: &'a SemanticModel<'a>,
     read_mode: bool,
+    python_version: PythonVersion,
 ) -> Vec<FileOpen<'a>> {
     with.items
         .iter()
-        .filter_map(|item| find_file_open(item, with, semantic, read_mode))
+        .filter_map(|item| find_file_open(item, with, semantic, read_mode, python_version))
         .collect()
 }
 
@@ -129,6 +133,7 @@ fn find_file_open<'a>(
     with: &'a ast::StmtWith,
     semantic: &'a SemanticModel<'a>,
     read_mode: bool,
+    python_version: PythonVersion,
 ) -> Option<FileOpen<'a>> {
     // We want to match `open(...) as var`.
     let ast::ExprCall {
@@ -156,7 +161,7 @@ fn find_file_open<'a>(
     let (filename, pos_mode) = match_open_args(args)?;
 
     // Match keyword arguments, get keyword arguments to forward and possibly mode.
-    let (keywords, kw_mode) = match_open_keywords(keywords, read_mode)?;
+    let (keywords, kw_mode) = match_open_keywords(keywords, read_mode, python_version)?;
 
     let mode = kw_mode.unwrap_or(pos_mode);
 
@@ -184,7 +189,7 @@ fn find_file_open<'a>(
 
     let binding = bindings
         .iter()
-        .map(|x| semantic.binding(*x))
+        .map(|id| semantic.binding(*id))
         // We might have many bindings with the same name, but we only care
         // for the one we are looking at right now.
         .find(|binding| binding.range() == var.range())?;
@@ -227,6 +232,7 @@ fn match_open_args(args: &[Expr]) -> Option<(&Expr, OpenMode)> {
 fn match_open_keywords(
     keywords: &[ast::Keyword],
     read_mode: bool,
+    target_version: PythonVersion,
 ) -> Option<(Vec<&ast::Keyword>, Option<OpenMode>)> {
     let mut result: Vec<&ast::Keyword> = vec![];
     let mut mode: Option<OpenMode> = None;
@@ -234,11 +240,15 @@ fn match_open_keywords(
     for keyword in keywords {
         match keyword.arg.as_ref()?.as_str() {
             "encoding" | "errors" => result.push(keyword),
-            // newline is only valid for write_text
             "newline" => {
                 if read_mode {
+                    // newline is only valid for write_text
+                    return None;
+                } else if target_version < PythonVersion::Py310 {
+                    // `pathlib` doesn't support `newline` until Python 3.10.
                     return None;
                 }
+
                 result.push(keyword);
             }
 

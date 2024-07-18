@@ -15,8 +15,8 @@ use crate::rules::{
     flake8_comprehensions, flake8_datetimez, flake8_debugger, flake8_django,
     flake8_future_annotations, flake8_gettext, flake8_implicit_str_concat, flake8_logging,
     flake8_logging_format, flake8_pie, flake8_print, flake8_pyi, flake8_pytest_style, flake8_self,
-    flake8_simplify, flake8_tidy_imports, flake8_trio, flake8_type_checking, flake8_use_pathlib,
-    flynt, numpy, pandas_vet, pep8_naming, pycodestyle, pyflakes, pylint, pyupgrade, refurb, ruff,
+    flake8_simplify, flake8_tidy_imports, flake8_type_checking, flake8_use_pathlib, flynt, numpy,
+    pandas_vet, pep8_naming, pycodestyle, pyflakes, pylint, pyupgrade, refurb, ruff,
 };
 use crate::settings::types::PythonVersion;
 
@@ -62,6 +62,8 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
                 if !checker.semantic.future_annotations_or_stub()
                     && checker.settings.target_version < PythonVersion::Py39
                     && checker.semantic.in_annotation()
+                    && checker.semantic.in_runtime_evaluated_annotation()
+                    && !checker.semantic.in_string_type_definition()
                     && typing::is_pep585_generic(value, &checker.semantic)
                 {
                     flake8_future_annotations::rules::future_required_type_annotation(
@@ -106,6 +108,12 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
 
             if checker.enabled(Rule::NeverUnion) {
                 ruff::rules::never_union(checker, expr);
+            }
+
+            if checker.enabled(Rule::UnnecessaryDefaultTypeArgs) {
+                if checker.settings.target_version >= PythonVersion::Py313 {
+                    pyupgrade::rules::unnecessary_default_type_args(checker, expr);
+                }
             }
 
             if checker.any_enabled(&[
@@ -344,6 +352,9 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
             if checker.enabled(Rule::PandasUseOfDotValues) {
                 pandas_vet::rules::attr(checker, attribute);
             }
+            if checker.enabled(Rule::ByteStringUsage) {
+                flake8_pyi::rules::bytestring_attribute(checker, expr);
+            }
         }
         Expr::Call(
             call @ ast::ExprCall {
@@ -500,11 +511,21 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
             if checker.enabled(Rule::BlockingHttpCallInAsyncFunction) {
                 flake8_async::rules::blocking_http_call(checker, call);
             }
-            if checker.enabled(Rule::OpenSleepOrSubprocessInAsyncFunction) {
-                flake8_async::rules::open_sleep_or_subprocess_call(checker, call);
+            if checker.enabled(Rule::BlockingOpenCallInAsyncFunction) {
+                flake8_async::rules::blocking_open_call(checker, call);
             }
-            if checker.enabled(Rule::BlockingOsCallInAsyncFunction) {
-                flake8_async::rules::blocking_os_call(checker, call);
+            if checker.any_enabled(&[
+                Rule::CreateSubprocessInAsyncFunction,
+                Rule::RunProcessInAsyncFunction,
+                Rule::WaitForProcessInAsyncFunction,
+            ]) {
+                flake8_async::rules::blocking_process_invocation(checker, call);
+            }
+            if checker.enabled(Rule::BlockingSleepInAsyncFunction) {
+                flake8_async::rules::blocking_sleep(checker, call);
+            }
+            if checker.enabled(Rule::LongSleepNotForever) {
+                flake8_async::rules::long_sleep_not_forever(checker, call);
             }
             if checker.any_enabled(&[Rule::Print, Rule::PPrint]) {
                 flake8_print::rules::print_call(checker, call);
@@ -564,6 +585,9 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
             }
             if checker.enabled(Rule::NoExplicitStacklevel) {
                 flake8_bugbear::rules::no_explicit_stacklevel(checker, call);
+            }
+            if checker.enabled(Rule::MutableContextvarDefault) {
+                flake8_bugbear::rules::mutable_contextvar_default(checker, call);
             }
             if checker.enabled(Rule::UnnecessaryDictKwargs) {
                 flake8_pie::rules::unnecessary_dict_kwargs(checker, call);
@@ -955,10 +979,10 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
                 refurb::rules::no_implicit_cwd(checker, call);
             }
             if checker.enabled(Rule::TrioSyncCall) {
-                flake8_trio::rules::sync_call(checker, call);
+                flake8_async::rules::sync_call(checker, call);
             }
-            if checker.enabled(Rule::TrioZeroSleepCall) {
-                flake8_trio::rules::zero_sleep_call(checker, call);
+            if checker.enabled(Rule::AsyncZeroSleep) {
+                flake8_async::rules::async_zero_sleep(checker, call);
             }
             if checker.enabled(Rule::UnnecessaryDunderCall) {
                 pylint::rules::unnecessary_dunder_call(checker, call);
@@ -1152,7 +1176,7 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
                     }
                 }
                 if checker.enabled(Rule::PrintfStringFormatting) {
-                    pyupgrade::rules::printf_string_formatting(checker, expr, right);
+                    pyupgrade::rules::printf_string_formatting(checker, bin_op, format_string);
                 }
                 if checker.enabled(Rule::BadStringFormatCharacter) {
                     pylint::rules::bad_string_format_character::percent(
@@ -1195,6 +1219,8 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
                 if !checker.semantic.future_annotations_or_stub()
                     && checker.settings.target_version < PythonVersion::Py310
                     && checker.semantic.in_annotation()
+                    && checker.semantic.in_runtime_evaluated_annotation()
+                    && !checker.semantic.in_string_type_definition()
                 {
                     flake8_future_annotations::rules::future_required_type_annotation(
                         checker,
@@ -1505,16 +1531,7 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
                 refurb::rules::reimplemented_starmap(checker, &generator.into());
             }
         }
-        Expr::BoolOp(
-            bool_op @ ast::ExprBoolOp {
-                op,
-                values,
-                range: _,
-            },
-        ) => {
-            if checker.enabled(Rule::RepeatedIsinstanceCalls) {
-                pylint::rules::repeated_isinstance_calls(checker, expr, *op, values);
-            }
+        Expr::BoolOp(bool_op) => {
             if checker.enabled(Rule::MultipleStartsEndsWith) {
                 flake8_pie::rules::multiple_starts_ends_with(checker, expr);
             }

@@ -45,3 +45,32 @@ def f(x, y, z, a, b, c, *, u, v, w):  # OK
 @overload
 def f(x, y, z, a, b, c, *, u, v, w):  # OK
     pass
+
+
+class C:
+    def f(self, y, z, a, b, c, *, u, v, w):  # Too many arguments (8/5)
+        pass
+
+    def f(self, y, z, a, b, c):  # OK
+        pass
+
+    @classmethod
+    def f(cls, y, z, a, b, c, *, u, v, w):  # Too many arguments (8/5)
+        pass
+
+    @classmethod
+    def f(cls, y, z, a, b, c):  # OK
+        pass
+
+    @staticmethod
+    def f(y, z, a, b, c, *, u, v, w):  # Too many arguments (8/5)
+        pass
+
+    @staticmethod
+    def f(y, z, a, b, c, d):  # OK
+        pass
+
+    @staticmethod
+    def f(y, z, a, b, c):  # OK
+        pass
+

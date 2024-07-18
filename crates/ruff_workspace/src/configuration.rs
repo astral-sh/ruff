@@ -23,12 +23,12 @@ use ruff_linter::line_width::{IndentWidth, LineLength};
 use ruff_linter::registry::RuleNamespace;
 use ruff_linter::registry::{Rule, RuleSet, INCOMPATIBLE_CODES};
 use ruff_linter::rule_selector::{PreviewOptions, Specificity};
-use ruff_linter::rules::pycodestyle;
+use ruff_linter::rules::{flake8_pytest_style, pycodestyle};
 use ruff_linter::settings::fix_safety_table::FixSafetyTable;
 use ruff_linter::settings::rule_table::RuleTable;
 use ruff_linter::settings::types::{
-    CompiledPerFileIgnoreList, ExtensionMapping, FilePattern, FilePatternSet, PerFileIgnore,
-    PreviewMode, PythonVersion, RequiredVersion, SerializationFormat, UnsafeFixes,
+    CompiledPerFileIgnoreList, ExtensionMapping, FilePattern, FilePatternSet, OutputFormat,
+    PerFileIgnore, PreviewMode, PythonVersion, RequiredVersion, UnsafeFixes,
 };
 use ruff_linter::settings::{LinterSettings, DEFAULT_SELECTORS, DUMMY_VARIABLE_RGX, TASK_TAGS};
 use ruff_linter::{
@@ -116,7 +116,7 @@ pub struct Configuration {
     pub fix: Option<bool>,
     pub fix_only: Option<bool>,
     pub unsafe_fixes: Option<UnsafeFixes>,
-    pub output_format: Option<SerializationFormat>,
+    pub output_format: Option<OutputFormat>,
     pub preview: Option<PreviewMode>,
     pub required_version: Option<RequiredVersion>,
     pub extension: Option<ExtensionMapping>,
@@ -220,9 +220,7 @@ impl Configuration {
             fix: self.fix.unwrap_or(false),
             fix_only: self.fix_only.unwrap_or(false),
             unsafe_fixes: self.unsafe_fixes.unwrap_or_default(),
-            output_format: self
-                .output_format
-                .unwrap_or_else(|| SerializationFormat::default(global_preview.is_enabled())),
+            output_format: self.output_format.unwrap_or_default(),
             show_fixes: self.show_fixes.unwrap_or(false),
 
             file_resolver: FileResolverSettings {
@@ -329,9 +327,13 @@ impl Configuration {
                     .unwrap_or_default(),
                 flake8_pytest_style: lint
                     .flake8_pytest_style
-                    .map(Flake8PytestStyleOptions::try_into_settings)
+                    .map(|options| {
+                        Flake8PytestStyleOptions::try_into_settings(options, lint_preview)
+                    })
                     .transpose()?
-                    .unwrap_or_default(),
+                    .unwrap_or_else(|| {
+                        flake8_pytest_style::settings::Settings::resolve_default(lint_preview)
+                    }),
                 flake8_quotes: lint
                     .flake8_quotes
                     .map(Flake8QuotesOptions::into_settings)
@@ -421,39 +423,24 @@ impl Configuration {
         };
 
         #[allow(deprecated)]
-        let indent_width = {
-            if options.tab_size.is_some() {
-                warn_user_once!("The `tab-size` option has been renamed to `indent-width` to emphasize that it configures the indentation used by the formatter as well as the tab width. Please update your configuration to use `indent-width = <value>` instead.");
-            }
-
-            options.indent_width.or(options.tab_size)
-        };
+        if options.tab_size.is_some() {
+            let config_to_update = path.map_or_else(
+                || String::from("your `--config` CLI arguments"),
+                |path| format!("`{}`", fs::relativize_path(path)),
+            );
+            return Err(anyhow!("The `tab-size` option has been renamed to `indent-width` to emphasize that it configures the indentation used by the formatter as well as the tab width. Please update {config_to_update} to use `indent-width = <value>` instead."));
+        }
 
         #[allow(deprecated)]
-        let output_format = {
-            if options.show_source.is_some() {
-                warn_user_once!(
-                    r#"The `show-source` option has been deprecated in favor of `output-format`'s "full" and "concise" variants. Please update your configuration to use `output-format = <full|concise>` instead."#
-                );
-            }
-
-            options
-                .output_format
-                .map(|format| match format {
-                    SerializationFormat::Text => {
-                        warn_user_once!(r#"Setting `output_format` to "text" is deprecated. Use "full" or "concise" instead. "text" will be treated as "{}"."#, SerializationFormat::default(options.preview.unwrap_or_default()));
-                        SerializationFormat::default(options.preview.unwrap_or_default())
-                    },
-                    other => other
-                })
-                .or(options.show_source.map(|show_source| {
-                    if show_source {
-                        SerializationFormat::Full
-                    } else {
-                        SerializationFormat::Concise
-                    }
-                }))
-        };
+        if options.output_format == Some(OutputFormat::Text) {
+            let config_to_update = path.map_or_else(
+                || String::from("your `--config` CLI arguments"),
+                |path| format!("`{}`", fs::relativize_path(path)),
+            );
+            return Err(anyhow!(
+                r#"The option `output_format=text` is no longer supported. Update {config_to_update} to use `output-format="concise"` or  `output-format="full"` instead."#
+            ));
+        }
 
         Ok(Self {
             builtins: options.builtins,
@@ -519,10 +506,10 @@ impl Configuration {
             fix: options.fix,
             fix_only: options.fix_only,
             unsafe_fixes: options.unsafe_fixes.map(UnsafeFixes::from),
-            output_format,
+            output_format: options.output_format,
             force_exclude: options.force_exclude,
             line_length: options.line_length,
-            indent_width,
+            indent_width: options.indent_width,
             namespace_packages: options
                 .namespace_packages
                 .map(|namespace_package| resolve_src(&namespace_package, project_root))
@@ -660,7 +647,12 @@ impl LintConfiguration {
             .collect();
 
         #[allow(deprecated)]
-        let ignore_init_module_imports = options.common.ignore_init_module_imports;
+        let ignore_init_module_imports = {
+            if options.common.ignore_init_module_imports.is_some() {
+                warn_user_once!("The `ignore-init-module-imports` option is deprecated and will be removed in a future release. Ruff's handling of imports in `__init__.py` files has been improved (in preview) and unused imports will always be flagged.");
+            }
+            options.common.ignore_init_module_imports
+        };
 
         Ok(LintConfiguration {
             exclude: options.exclude.map(|paths| {
@@ -772,7 +764,6 @@ impl LintConfiguration {
 
         // Store selectors for displaying warnings
         let mut redirects = FxHashMap::default();
-        let mut deprecated_nursery_selectors = FxHashSet::default();
         let mut deprecated_selectors = FxHashSet::default();
         let mut removed_selectors = FxHashSet::default();
         let mut ignored_preview_selectors = FxHashSet::default();
@@ -897,27 +888,11 @@ impl LintConfiguration {
 
             // Check for selections that require a warning
             for (kind, selector) in selection.selectors_by_kind() {
-                #[allow(deprecated)]
-                if matches!(selector, RuleSelector::Nursery) {
-                    let suggestion = if preview.mode.is_disabled() {
-                        " Use the `--preview` flag instead."
-                    } else {
-                        " Unstable rules should be selected individually or by their respective groups."
-                    };
-                    return Err(anyhow!("The `NURSERY` selector was removed.{suggestion}"));
-                };
-
                 // Some of these checks are only for `Kind::Enable` which means only `--select` will warn
                 // and use with, e.g., `--ignore` or `--fixable` is okay
 
                 // Unstable rules
                 if preview.mode.is_disabled() && kind.is_enable() {
-                    if selector.is_exact() {
-                        if selector.all_rules().all(|rule| rule.is_nursery()) {
-                            deprecated_nursery_selectors.insert(selector);
-                        }
-                    }
-
                     // Check if the selector is empty because preview mode is disabled
                     if selector.rules(&preview).next().is_none()
                         && selector
@@ -994,35 +969,16 @@ impl LintConfiguration {
             );
         }
 
-        let deprecated_nursery_selectors = deprecated_nursery_selectors
-            .iter()
-            .sorted()
-            .collect::<Vec<_>>();
-        match deprecated_nursery_selectors.as_slice() {
-            [] => (),
-            [selection] => {
-                let (prefix, code) = selection.prefix_and_code();
-                return Err(anyhow!("Selection of unstable rule `{prefix}{code}` without the `--preview` flag is not allowed."));
-            }
-            [..] => {
-                let mut message = "Selection of unstable rules without the `--preview` flag is not allowed. Enable preview or remove selection of:".to_string();
-                for selection in deprecated_nursery_selectors {
-                    let (prefix, code) = selection.prefix_and_code();
-                    message.push_str("\n\t- ");
-                    message.push_str(prefix);
-                    message.push_str(code);
-                }
-                message.push('\n');
-                return Err(anyhow!(message));
-            }
-        }
-
         if preview.mode.is_disabled() {
             for selection in deprecated_selectors.iter().sorted() {
                 let (prefix, code) = selection.prefix_and_code();
-                warn_user_once_by_message!(
-                    "Rule `{prefix}{code}` is deprecated and will be removed in a future release.",
-                );
+                let rule = format!("{prefix}{code}");
+                let mut message =
+                    format!("Rule `{rule}` is deprecated and will be removed in a future release.");
+                if matches!(rule.as_str(), "E999") {
+                    message.push_str(" Syntax errors will always be shown regardless of whether this rule is selected or not.");
+                }
+                warn_user_once_by_message!("{message}");
             }
         } else {
             let deprecated_selectors = deprecated_selectors.iter().sorted().collect::<Vec<_>>();
@@ -1270,188 +1226,233 @@ fn warn_about_deprecated_top_level_lint_options(
     top_level_options: &LintCommonOptions,
     path: Option<&Path>,
 ) {
+    #[allow(deprecated)]
+    let LintCommonOptions {
+        allowed_confusables,
+        dummy_variable_rgx,
+        extend_ignore,
+        extend_select,
+        extend_fixable,
+        extend_unfixable,
+        external,
+        fixable,
+        ignore,
+        extend_safe_fixes,
+        extend_unsafe_fixes,
+        ignore_init_module_imports,
+        logger_objects,
+        select,
+        explicit_preview_rules,
+        task_tags,
+        typing_modules,
+        unfixable,
+        flake8_annotations,
+        flake8_bandit,
+        flake8_boolean_trap,
+        flake8_bugbear,
+        flake8_builtins,
+        flake8_comprehensions,
+        flake8_copyright,
+        flake8_errmsg,
+        flake8_quotes,
+        flake8_self,
+        flake8_tidy_imports,
+        flake8_type_checking,
+        flake8_gettext,
+        flake8_implicit_str_concat,
+        flake8_import_conventions,
+        flake8_pytest_style,
+        flake8_unused_arguments,
+        isort,
+        mccabe,
+        pep8_naming,
+        pycodestyle,
+        pydocstyle,
+        pyflakes,
+        pylint,
+        pyupgrade,
+        per_file_ignores,
+        extend_per_file_ignores,
+    } = top_level_options;
     let mut used_options = Vec::new();
 
-    if top_level_options.allowed_confusables.is_some() {
+    if allowed_confusables.is_some() {
         used_options.push("allowed-confusables");
     }
 
-    if top_level_options.dummy_variable_rgx.is_some() {
+    if dummy_variable_rgx.is_some() {
         used_options.push("dummy-variable-rgx");
     }
 
-    #[allow(deprecated)]
-    if top_level_options.extend_ignore.is_some() {
+    if extend_ignore.is_some() {
         used_options.push("extend-ignore");
     }
 
-    if top_level_options.extend_select.is_some() {
+    if extend_select.is_some() {
         used_options.push("extend-select");
     }
 
-    if top_level_options.extend_fixable.is_some() {
+    if extend_fixable.is_some() {
         used_options.push("extend-fixable");
     }
 
-    #[allow(deprecated)]
-    if top_level_options.extend_unfixable.is_some() {
+    if extend_unfixable.is_some() {
         used_options.push("extend-unfixable");
     }
 
-    if top_level_options.external.is_some() {
+    if external.is_some() {
         used_options.push("external");
     }
 
-    if top_level_options.fixable.is_some() {
+    if fixable.is_some() {
         used_options.push("fixable");
     }
 
-    if top_level_options.ignore.is_some() {
+    if ignore.is_some() {
         used_options.push("ignore");
     }
 
-    if top_level_options.extend_safe_fixes.is_some() {
+    if extend_safe_fixes.is_some() {
         used_options.push("extend-safe-fixes");
     }
 
-    if top_level_options.extend_unsafe_fixes.is_some() {
+    if extend_unsafe_fixes.is_some() {
         used_options.push("extend-unsafe-fixes");
     }
 
-    #[allow(deprecated)]
-    if top_level_options.ignore_init_module_imports.is_some() {
+    if ignore_init_module_imports.is_some() {
         used_options.push("ignore-init-module-imports");
     }
 
-    if top_level_options.logger_objects.is_some() {
+    if logger_objects.is_some() {
         used_options.push("logger-objects");
     }
 
-    if top_level_options.select.is_some() {
+    if select.is_some() {
         used_options.push("select");
     }
 
-    if top_level_options.explicit_preview_rules.is_some() {
+    if explicit_preview_rules.is_some() {
         used_options.push("explicit-preview-rules");
     }
 
-    if top_level_options.task_tags.is_some() {
+    if task_tags.is_some() {
         used_options.push("task-tags");
     }
 
-    if top_level_options.typing_modules.is_some() {
+    if typing_modules.is_some() {
         used_options.push("typing-modules");
     }
 
-    if top_level_options.unfixable.is_some() {
+    if unfixable.is_some() {
         used_options.push("unfixable");
     }
 
-    if top_level_options.flake8_annotations.is_some() {
+    if flake8_annotations.is_some() {
         used_options.push("flake8-annotations");
     }
 
-    if top_level_options.flake8_bandit.is_some() {
+    if flake8_bandit.is_some() {
         used_options.push("flake8-bandit");
     }
 
-    if top_level_options.flake8_boolean_trap.is_some() {
+    if flake8_boolean_trap.is_some() {
         used_options.push("flake8-boolean-trap");
     }
 
-    if top_level_options.flake8_bugbear.is_some() {
+    if flake8_bugbear.is_some() {
         used_options.push("flake8-bugbear");
     }
 
-    if top_level_options.flake8_builtins.is_some() {
+    if flake8_builtins.is_some() {
         used_options.push("flake8-builtins");
     }
 
-    if top_level_options.flake8_comprehensions.is_some() {
+    if flake8_comprehensions.is_some() {
         used_options.push("flake8-comprehensions");
     }
 
-    if top_level_options.flake8_copyright.is_some() {
+    if flake8_copyright.is_some() {
         used_options.push("flake8-copyright");
     }
 
-    if top_level_options.flake8_errmsg.is_some() {
+    if flake8_errmsg.is_some() {
         used_options.push("flake8-errmsg");
     }
 
-    if top_level_options.flake8_quotes.is_some() {
+    if flake8_quotes.is_some() {
         used_options.push("flake8-quotes");
     }
 
-    if top_level_options.flake8_self.is_some() {
+    if flake8_self.is_some() {
         used_options.push("flake8-self");
     }
 
-    if top_level_options.flake8_tidy_imports.is_some() {
+    if flake8_tidy_imports.is_some() {
         used_options.push("flake8-tidy-imports");
     }
 
-    if top_level_options.flake8_type_checking.is_some() {
+    if flake8_type_checking.is_some() {
         used_options.push("flake8-type-checking");
     }
 
-    if top_level_options.flake8_gettext.is_some() {
+    if flake8_gettext.is_some() {
         used_options.push("flake8-gettext");
     }
 
-    if top_level_options.flake8_implicit_str_concat.is_some() {
+    if flake8_implicit_str_concat.is_some() {
         used_options.push("flake8-implicit-str-concat");
     }
 
-    if top_level_options.flake8_import_conventions.is_some() {
+    if flake8_import_conventions.is_some() {
         used_options.push("flake8-import-conventions");
     }
 
-    if top_level_options.flake8_pytest_style.is_some() {
+    if flake8_pytest_style.is_some() {
         used_options.push("flake8-pytest-style");
     }
 
-    if top_level_options.flake8_unused_arguments.is_some() {
+    if flake8_unused_arguments.is_some() {
         used_options.push("flake8-unused-arguments");
     }
 
-    if top_level_options.isort.is_some() {
+    if isort.is_some() {
         used_options.push("isort");
     }
 
-    if top_level_options.mccabe.is_some() {
+    if mccabe.is_some() {
         used_options.push("mccabe");
     }
 
-    if top_level_options.pep8_naming.is_some() {
+    if pep8_naming.is_some() {
         used_options.push("pep8-naming");
     }
 
-    if top_level_options.pycodestyle.is_some() {
+    if pycodestyle.is_some() {
         used_options.push("pycodestyle");
     }
 
-    if top_level_options.pydocstyle.is_some() {
+    if pydocstyle.is_some() {
         used_options.push("pydocstyle");
     }
 
-    if top_level_options.pyflakes.is_some() {
+    if pyflakes.is_some() {
         used_options.push("pyflakes");
     }
 
-    if top_level_options.pylint.is_some() {
+    if pylint.is_some() {
         used_options.push("pylint");
     }
 
-    if top_level_options.pyupgrade.is_some() {
+    if pyupgrade.is_some() {
         used_options.push("pyupgrade");
     }
 
-    if top_level_options.per_file_ignores.is_some() {
+    if per_file_ignores.is_some() {
         used_options.push("per-file-ignores");
     }
 
-    if top_level_options.extend_per_file_ignores.is_some() {
+    if extend_per_file_ignores.is_some() {
         used_options.push("extend-per-file-ignores");
     }
 
@@ -1491,9 +1492,6 @@ mod tests {
     use crate::options::PydocstyleOptions;
 
     const PREVIEW_RULES: &[Rule] = &[
-        Rule::IsinstanceTypeNone,
-        Rule::IfExprMinMax,
-        Rule::ManualDictComprehension,
         Rule::ReimplementedStarmap,
         Rule::SliceCopy,
         Rule::TooManyPublicMethods,
@@ -1889,64 +1887,6 @@ mod tests {
         let expected = RuleSet::from_rule(Rule::SliceCopy);
         assert_eq!(actual, expected);
         Ok(())
-    }
-
-    #[test]
-    fn nursery_select_code() -> Result<()> {
-        // We do not allow selection of nursery rules when preview is disabled
-        assert!(resolve_rules(
-            [RuleSelection {
-                select: Some(vec![Flake8Copyright::_001.into()]),
-                ..RuleSelection::default()
-            }],
-            Some(PreviewOptions {
-                mode: PreviewMode::Disabled,
-                ..PreviewOptions::default()
-            }),
-        )
-        .is_err());
-
-        let actual = resolve_rules(
-            [RuleSelection {
-                select: Some(vec![Flake8Copyright::_001.into()]),
-                ..RuleSelection::default()
-            }],
-            Some(PreviewOptions {
-                mode: PreviewMode::Enabled,
-                ..PreviewOptions::default()
-            }),
-        )?;
-        let expected = RuleSet::from_rule(Rule::MissingCopyrightNotice);
-        assert_eq!(actual, expected);
-        Ok(())
-    }
-
-    #[test]
-    #[allow(deprecated)]
-    fn select_nursery() {
-        // We no longer allow use of the NURSERY selector and should error in both cases
-        assert!(resolve_rules(
-            [RuleSelection {
-                select: Some(vec![RuleSelector::Nursery]),
-                ..RuleSelection::default()
-            }],
-            Some(PreviewOptions {
-                mode: PreviewMode::Disabled,
-                ..PreviewOptions::default()
-            }),
-        )
-        .is_err());
-        assert!(resolve_rules(
-            [RuleSelection {
-                select: Some(vec![RuleSelector::Nursery]),
-                ..RuleSelection::default()
-            }],
-            Some(PreviewOptions {
-                mode: PreviewMode::Enabled,
-                ..PreviewOptions::default()
-            }),
-        )
-        .is_err());
     }
 
     #[test]

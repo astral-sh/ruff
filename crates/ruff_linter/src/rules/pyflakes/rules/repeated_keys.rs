@@ -1,6 +1,4 @@
-use std::hash::BuildHasherDefault;
-
-use rustc_hash::{FxHashMap, FxHashSet};
+use rustc_hash::{FxBuildHasher, FxHashMap, FxHashSet};
 
 use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, violation};
@@ -132,7 +130,7 @@ impl Violation for MultiValueRepeatedKeyVariable {
 pub(crate) fn repeated_keys(checker: &mut Checker, dict: &ast::ExprDict) {
     // Generate a map from key to (index, value).
     let mut seen: FxHashMap<ComparableExpr, FxHashSet<ComparableExpr>> =
-        FxHashMap::with_capacity_and_hasher(dict.items.len(), BuildHasherDefault::default());
+        FxHashMap::with_capacity_and_hasher(dict.items.len(), FxBuildHasher);
 
     // Detect duplicate keys.
     for (i, ast::DictItem { key, value }) in dict.items.iter().enumerate() {
@@ -169,7 +167,7 @@ pub(crate) fn repeated_keys(checker: &mut Checker, dict: &ast::ExprDict) {
                             parenthesized_range(
                                 dict.value(i - 1).into(),
                                 dict.into(),
-                                checker.indexer().comment_ranges(),
+                                checker.comment_ranges(),
                                 checker.locator().contents(),
                             )
                             .unwrap_or_else(|| dict.value(i - 1).range())
@@ -177,7 +175,7 @@ pub(crate) fn repeated_keys(checker: &mut Checker, dict: &ast::ExprDict) {
                             parenthesized_range(
                                 dict.value(i).into(),
                                 dict.into(),
-                                checker.indexer().comment_ranges(),
+                                checker.comment_ranges(),
                                 checker.locator().contents(),
                             )
                             .unwrap_or_else(|| dict.value(i).range())
@@ -201,7 +199,7 @@ pub(crate) fn repeated_keys(checker: &mut Checker, dict: &ast::ExprDict) {
                             parenthesized_range(
                                 dict.value(i - 1).into(),
                                 dict.into(),
-                                checker.indexer().comment_ranges(),
+                                checker.comment_ranges(),
                                 checker.locator().contents(),
                             )
                             .unwrap_or_else(|| dict.value(i - 1).range())
@@ -209,7 +207,7 @@ pub(crate) fn repeated_keys(checker: &mut Checker, dict: &ast::ExprDict) {
                             parenthesized_range(
                                 dict.value(i).into(),
                                 dict.into(),
-                                checker.indexer().comment_ranges(),
+                                checker.comment_ranges(),
                                 checker.locator().contents(),
                             )
                             .unwrap_or_else(|| dict.value(i).range())

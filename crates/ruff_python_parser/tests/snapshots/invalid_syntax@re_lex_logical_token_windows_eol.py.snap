@@ -1,0 +1,107 @@
+---
+source: crates/ruff_python_parser/tests/fixtures.rs
+input_file: crates/ruff_python_parser/resources/invalid/re_lex_logical_token_windows_eol.py
+---
+## AST
+
+```
+Module(
+    ModModule {
+        range: 0..50,
+        body: [
+            If(
+                StmtIf {
+                    range: 0..48,
+                    test: Call(
+                        ExprCall {
+                            range: 3..20,
+                            func: Name(
+                                ExprName {
+                                    range: 3..7,
+                                    id: Name("call"),
+                                    ctx: Load,
+                                },
+                            ),
+                            arguments: Arguments {
+                                range: 7..20,
+                                args: [
+                                    Name(
+                                        ExprName {
+                                            range: 8..11,
+                                            id: Name("foo"),
+                                            ctx: Load,
+                                        },
+                                    ),
+                                    List(
+                                        ExprList {
+                                            range: 13..18,
+                                            elts: [
+                                                Name(
+                                                    ExprName {
+                                                        range: 14..15,
+                                                        id: Name("a"),
+                                                        ctx: Load,
+                                                    },
+                                                ),
+                                                Name(
+                                                    ExprName {
+                                                        range: 17..18,
+                                                        id: Name("b"),
+                                                        ctx: Load,
+                                                    },
+                                                ),
+                                            ],
+                                            ctx: Load,
+                                        },
+                                    ),
+                                ],
+                                keywords: [],
+                            },
+                        },
+                    ),
+                    body: [
+                        FunctionDef(
+                            StmtFunctionDef {
+                                range: 24..48,
+                                is_async: false,
+                                decorator_list: [],
+                                name: Identifier {
+                                    id: Name("bar"),
+                                    range: 28..31,
+                                },
+                                type_params: None,
+                                parameters: Parameters {
+                                    range: 31..33,
+                                    posonlyargs: [],
+                                    args: [],
+                                    vararg: None,
+                                    kwonlyargs: [],
+                                    kwarg: None,
+                                },
+                                returns: None,
+                                body: [
+                                    Pass(
+                                        StmtPass {
+                                            range: 44..48,
+                                        },
+                                    ),
+                                ],
+                            },
+                        ),
+                    ],
+                    elif_else_clauses: [],
+                },
+            ),
+        ],
+    },
+)
+```
+## Errors
+
+  |
+1 |   if call(foo, [a, b
+  |  ___________________^
+2 | |     def bar():
+  | |_^ Syntax Error: Expected ']', found NonLogicalNewline
+3 |           pass
+  |

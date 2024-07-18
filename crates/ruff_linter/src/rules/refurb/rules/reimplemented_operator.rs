@@ -5,6 +5,7 @@ use anyhow::Result;
 
 use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::helpers::any_over_expr;
 use ruff_python_ast::identifier::Identifier;
 use ruff_python_ast::{self as ast, Expr, ExprSlice, ExprSubscript, ExprTuple, Parameters, Stmt};
 use ruff_python_semantic::SemanticModel;
@@ -211,6 +212,12 @@ fn slice_expr_to_slice_call(slice: &ExprSlice, locator: &Locator) -> String {
 fn subscript_slice_to_string<'a>(expr: &Expr, locator: &Locator<'a>) -> Cow<'a, str> {
     if let Expr::Slice(expr_slice) = expr {
         Cow::Owned(slice_expr_to_slice_call(expr_slice, locator))
+    } else if let Expr::Tuple(tuple) = expr {
+        if tuple.parenthesized {
+            Cow::Borrowed(locator.slice(expr))
+        } else {
+            Cow::Owned(format!("({})", locator.slice(tuple)))
+        }
     } else {
         Cow::Borrowed(locator.slice(expr))
     }
@@ -221,9 +228,17 @@ fn itemgetter_op(expr: &ExprSubscript, params: &Parameters, locator: &Locator) -
     let [arg] = params.args.as_slice() else {
         return None;
     };
+
+    // The argument to the lambda must match the subscripted value, as in: `lambda x: x[1]`.
     if !is_same_expression(arg, &expr.value) {
         return None;
     };
+
+    // The subscripted expression can't contain references to the argument, as in: `lambda x: x[x]`.
+    if any_over_expr(expr.slice.as_ref(), &|expr| is_same_expression(arg, expr)) {
+        return None;
+    }
+
     Some(Operator {
         name: "itemgetter",
         args: vec![subscript_slice_to_string(expr.slice.as_ref(), locator).to_string()],

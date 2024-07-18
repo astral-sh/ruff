@@ -2,7 +2,7 @@ use std::iter::Peekable;
 
 use ruff_python_ast::{
     helpers::comment_indentation_after,
-    visitor::preorder::{self, PreorderVisitor, TraversalSignal},
+    visitor::source_order::{self, SourceOrderVisitor, TraversalSignal},
     AnyNodeRef, Suite,
 };
 use ruff_python_trivia::{
@@ -62,7 +62,7 @@ where
     }
 }
 
-impl<'ast, I> PreorderVisitor<'ast> for SuppressionCommentVisitor<'ast, '_, I>
+impl<'ast, I> SourceOrderVisitor<'ast> for SuppressionCommentVisitor<'ast, '_, I>
 where
     I: Iterator<Item = SuppressionComment> + 'ast,
 {
@@ -187,7 +187,7 @@ where
                     self.visit_stmt(first);
                     self.preceding_node = Some(last.into());
                 } else {
-                    preorder::walk_body(self, body);
+                    source_order::walk_body(self, body);
                 }
             }
         }

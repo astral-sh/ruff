@@ -2,28 +2,29 @@
 //! standalone comment or a constant string statement.
 
 use std::iter::FusedIterator;
+use std::slice::Iter;
 
 use ruff_python_ast::{self as ast, Stmt, Suite};
-use ruff_python_parser::{TokenKind, TokenKindIter};
+use ruff_python_parser::{Token, TokenKind, Tokens};
 use ruff_text_size::{Ranged, TextSize};
 
 use ruff_python_ast::statement_visitor::{walk_stmt, StatementVisitor};
 use ruff_source_file::{Locator, UniversalNewlineIterator};
 
 /// Extract doc lines (standalone comments) from a token sequence.
-pub(crate) fn doc_lines_from_tokens(tokens: TokenKindIter) -> DocLines {
+pub(crate) fn doc_lines_from_tokens(tokens: &Tokens) -> DocLines {
     DocLines::new(tokens)
 }
 
 pub(crate) struct DocLines<'a> {
-    inner: TokenKindIter<'a>,
+    inner: Iter<'a, Token>,
     prev: TextSize,
 }
 
 impl<'a> DocLines<'a> {
-    fn new(tokens: TokenKindIter<'a>) -> Self {
+    fn new(tokens: &'a Tokens) -> Self {
         Self {
-            inner: tokens,
+            inner: tokens.iter(),
             prev: TextSize::default(),
         }
     }
@@ -35,12 +36,12 @@ impl Iterator for DocLines<'_> {
     fn next(&mut self) -> Option<Self::Item> {
         let mut at_start_of_line = true;
         loop {
-            let (tok, range) = self.inner.next()?;
+            let token = self.inner.next()?;
 
-            match tok {
+            match token.kind() {
                 TokenKind::Comment => {
                     if at_start_of_line {
-                        break Some(range.start());
+                        break Some(token.start());
                     }
                 }
                 TokenKind::Newline | TokenKind::NonLogicalNewline => {
@@ -54,7 +55,7 @@ impl Iterator for DocLines<'_> {
                 }
             }
 
-            self.prev = range.end();
+            self.prev = token.end();
         }
     }
 }

@@ -6,7 +6,7 @@ use ruff_formatter::{
 };
 use ruff_python_ast as ast;
 use ruff_python_ast::parenthesize::parentheses_iterator;
-use ruff_python_ast::visitor::preorder::{walk_expr, PreorderVisitor};
+use ruff_python_ast::visitor::source_order::{walk_expr, SourceOrderVisitor};
 use ruff_python_ast::{AnyNodeRef, Expr, ExpressionRef, Operator};
 use ruff_python_trivia::CommentRanges;
 use ruff_text_size::Ranged;
@@ -806,7 +806,7 @@ impl<'input> CanOmitOptionalParenthesesVisitor<'input> {
     }
 }
 
-impl<'input> PreorderVisitor<'input> for CanOmitOptionalParenthesesVisitor<'input> {
+impl<'input> SourceOrderVisitor<'input> for CanOmitOptionalParenthesesVisitor<'input> {
     fn visit_expr(&mut self, expr: &'input Expr) {
         self.last = Some(expr);
 

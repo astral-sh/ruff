@@ -1,5 +1,3 @@
-use std::collections::HashMap;
-
 use ruff_diagnostics::Diagnostic;
 use ruff_diagnostics::Violation;
 use ruff_macros::{derive_message_formats, violation};
@@ -7,10 +5,12 @@ use ruff_python_ast::comparable::ComparableExpr;
 use ruff_python_ast::name::UnqualifiedName;
 use ruff_python_ast::{
     visitor::{self, Visitor},
-    Arguments, Expr, ExprAttribute, ExprCall, ExprSubscript, Stmt, StmtAssign, StmtAugAssign,
+    Expr, ExprAttribute, ExprCall, ExprSubscript, ExprTuple, Stmt, StmtAssign, StmtAugAssign,
     StmtBreak, StmtDelete, StmtFor, StmtIf,
 };
 use ruff_text_size::TextRange;
+use std::collections::HashMap;
+use std::fmt::Debug;
 
 use crate::checkers::ast::Checker;
 use crate::fix::snippet::SourceCodeSnippet;
@@ -64,13 +64,44 @@ pub(crate) fn loop_iterator_mutation(checker: &mut Checker, stmt_for: &StmtFor) 
         range: _,
     } = stmt_for;
 
-    if !matches!(iter.as_ref(), Expr::Name(_) | Expr::Attribute(_)) {
-        return;
-    }
+    let (index, target, iter) = match iter.as_ref() {
+        Expr::Name(_) | Expr::Attribute(_) => {
+            // Ex) Given, `for item in items:`, `item` is the index and `items` is the iterable.
+            (&**target, &**target, &**iter)
+        }
+        Expr::Call(ExprCall {
+            func, arguments, ..
+        }) => {
+            // Ex) Given `for i, item in enumerate(items):`, `i` is the index and `items` is the
+            // iterable.
+            if checker.semantic().match_builtin_expr(func, "enumerate") {
+                // Ex) `items`
+                let Some(iter) = arguments.args.first() else {
+                    return;
+                };
+
+                let Expr::Tuple(ExprTuple { elts, .. }) = &**target else {
+                    return;
+                };
+
+                let [index, target] = elts.as_slice() else {
+                    return;
+                };
+
+                // Ex) `i`
+                (index, target, iter)
+            } else {
+                return;
+            }
+        }
+        _ => {
+            return;
+        }
+    };
 
     // Collect mutations to the iterable.
     let mutations = {
-        let mut visitor = LoopMutationsVisitor::new(iter, target);
+        let mut visitor = LoopMutationsVisitor::new(iter, target, index);
         visitor.visit_body(body);
         visitor.mutations
     };
@@ -114,17 +145,19 @@ fn is_mutating_function(function_name: &str) -> bool {
 struct LoopMutationsVisitor<'a> {
     iter: &'a Expr,
     target: &'a Expr,
-    mutations: HashMap<u8, Vec<TextRange>>,
-    branches: Vec<u8>,
-    branch: u8,
+    index: &'a Expr,
+    mutations: HashMap<u32, Vec<TextRange>>,
+    branches: Vec<u32>,
+    branch: u32,
 }
 
 impl<'a> LoopMutationsVisitor<'a> {
     /// Initialize the visitor.
-    fn new(iter: &'a Expr, target: &'a Expr) -> Self {
+    fn new(iter: &'a Expr, target: &'a Expr, index: &'a Expr) -> Self {
         Self {
             iter,
             target,
+            index,
             mutations: HashMap::new(),
             branches: vec![0],
             branch: 0,
@@ -142,16 +175,13 @@ impl<'a> LoopMutationsVisitor<'a> {
             if let Expr::Subscript(ExprSubscript {
                 range: _,
                 value,
-                slice,
+                slice: _,
                 ctx: _,
             }) = target
             {
                 // Find, e.g., `del items[0]`.
                 if ComparableExpr::from(self.iter) == ComparableExpr::from(value) {
-                    // But allow, e.g., `for item in items: del items[item]`.
-                    if ComparableExpr::from(self.target) != ComparableExpr::from(slice) {
-                        self.add_mutation(range);
-                    }
+                    self.add_mutation(range);
                 }
             }
         }
@@ -170,7 +200,9 @@ impl<'a> LoopMutationsVisitor<'a> {
                 // Find, e.g., `items[0] = 1`.
                 if ComparableExpr::from(self.iter) == ComparableExpr::from(value) {
                     // But allow, e.g., `for item in items: items[item] = 1`.
-                    if ComparableExpr::from(self.target) != ComparableExpr::from(slice) {
+                    if ComparableExpr::from(self.index) != ComparableExpr::from(slice)
+                        && ComparableExpr::from(self.target) != ComparableExpr::from(slice)
+                    {
                         self.add_mutation(range);
                     }
                 }
@@ -186,7 +218,7 @@ impl<'a> LoopMutationsVisitor<'a> {
     }
 
     /// Handle, e.g., `items.append(1)`.
-    fn handle_call(&mut self, func: &Expr, arguments: &Arguments) {
+    fn handle_call(&mut self, func: &Expr) {
         if let Expr::Attribute(ExprAttribute {
             range,
             value,
@@ -197,17 +229,6 @@ impl<'a> LoopMutationsVisitor<'a> {
             if is_mutating_function(attr.as_str()) {
                 // Find, e.g., `items.remove(1)`.
                 if ComparableExpr::from(self.iter) == ComparableExpr::from(value) {
-                    // But allow, e.g., `for item in items: items.remove(item)`.
-                    if matches!(attr.as_str(), "remove" | "discard" | "pop") {
-                        if arguments.len() == 1 {
-                            if let [arg] = &*arguments.args {
-                                if ComparableExpr::from(self.target) == ComparableExpr::from(arg) {
-                                    return;
-                                }
-                            }
-                        }
-                    }
-
                     self.add_mutation(*range);
                 }
             }
@@ -283,11 +304,8 @@ impl<'a> Visitor<'a> for LoopMutationsVisitor<'a> {
 
     fn visit_expr(&mut self, expr: &'a Expr) {
         // Ex) `items.append(1)`
-        if let Expr::Call(ExprCall {
-            func, arguments, ..
-        }) = expr
-        {
-            self.handle_call(func, arguments);
+        if let Expr::Call(ExprCall { func, .. }) = expr {
+            self.handle_call(func);
         }
 
         visitor::walk_expr(self, expr);

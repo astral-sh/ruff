@@ -8,8 +8,8 @@ use std::{borrow::Cow, collections::VecDeque};
 use itertools::Itertools;
 
 use ruff_formatter::printer::SourceMapGeneration;
-use ruff_python_ast::str::Quote;
-use ruff_python_parser::ParseError;
+use ruff_python_ast::{str::Quote, StringFlags};
+use ruff_python_trivia::CommentRanges;
 use {once_cell::sync::Lazy, regex::Regex};
 use {
     ruff_formatter::{write, FormatOptions, IndentStyle, LineWidth, Printed},
@@ -1552,16 +1552,15 @@ fn docstring_format_source(
     use ruff_python_parser::AsMode;
 
     let source_type = options.source_type();
-    let (tokens, comment_ranges) =
-        ruff_python_index::tokens_and_ranges(source, source_type).map_err(ParseError::from)?;
-    let module = ruff_python_parser::parse_tokens(tokens, source, source_type.as_mode())?;
+    let parsed = ruff_python_parser::parse(source, source_type.as_mode())?;
+    let comment_ranges = CommentRanges::from(parsed.tokens());
     let source_code = ruff_formatter::SourceCode::new(source);
-    let comments = crate::Comments::from_ast(&module, source_code, &comment_ranges);
+    let comments = crate::Comments::from_ast(parsed.syntax(), source_code, &comment_ranges);
     let locator = Locator::new(source);
 
-    let ctx = PyFormatContext::new(options, locator.contents(), comments)
+    let ctx = PyFormatContext::new(options, locator.contents(), comments, parsed.tokens())
         .in_docstring(docstring_quote_style);
-    let formatted = crate::format!(ctx, [module.format()])?;
+    let formatted = crate::format!(ctx, [parsed.syntax().format()])?;
     formatted
         .context()
         .comments()

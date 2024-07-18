@@ -14,13 +14,12 @@ license = { workspace = true }
 
 [dependencies]
 ruff_python_ast = { workspace = true }
+ruff_python_trivia = { workspace = true }
 ruff_text_size = { workspace = true }
 
-anyhow = { workspace = true }
 bitflags = { workspace = true }
 bstr = { workspace = true }
-is-macro = { workspace = true }
-itertools = { workspace = true }
+compact_str = { workspace = true }
 memchr = { workspace = true }
 rustc-hash = { workspace = true }
 static_assertions = { workspace = true }
@@ -32,6 +31,7 @@ unicode-normalization = { workspace = true }
 ruff_source_file = { workspace = true }
 
 annotate-snippets = { workspace = true }
+anyhow = { workspace = true }
 insta = { workspace = true, features = ["glob"] }
 walkdir = { workspace = true }
 

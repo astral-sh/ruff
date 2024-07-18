@@ -140,7 +140,7 @@ pub(crate) fn make_redundant_alias<'a>(
         .filter_map(|name| {
             aliases
                 .iter()
-                .find(|alias| alias.asname.is_none() && name == alias.name.id)
+                .find(|alias| alias.asname.is_none() && *name == alias.name.id)
                 .map(|alias| Edit::range_replacement(format!("{name} as {name}"), alias.range))
         })
         .collect()
@@ -202,11 +202,11 @@ pub(crate) enum Parentheses {
 }
 
 /// Generic function to remove arguments or keyword arguments in function
-/// calls and class definitions. (For classes `args` should be considered
-/// `bases`)
+/// calls and class definitions. (For classes, `args` should be considered
+/// `bases`.)
 ///
 /// Supports the removal of parentheses when this is the only (kw)arg left.
-/// For this behavior, set `remove_parentheses` to `true`.
+/// For this behavior, set `parentheses` to `Parentheses::Remove`.
 pub(crate) fn remove_argument<T: Ranged>(
     argument: &T,
     arguments: &Arguments,
@@ -531,8 +531,9 @@ mod tests {
     use test_case::test_case;
 
     use ruff_diagnostics::{Diagnostic, Edit, Fix};
+    use ruff_python_ast::Stmt;
     use ruff_python_codegen::Stylist;
-    use ruff_python_parser::{lexer, parse_expression, parse_suite, Mode};
+    use ruff_python_parser::{parse_expression, parse_module};
     use ruff_source_file::Locator;
     use ruff_text_size::{Ranged, TextRange, TextSize};
 
@@ -541,17 +542,21 @@ mod tests {
         add_to_dunder_all, make_redundant_alias, next_stmt_break, trailing_semicolon,
     };
 
+    /// Parse the given source using [`Mode::Module`] and return the first statement.
+    fn parse_first_stmt(source: &str) -> Result<Stmt> {
+        let suite = parse_module(source)?.into_suite();
+        Ok(suite.into_iter().next().unwrap())
+    }
+
     #[test]
     fn find_semicolon() -> Result<()> {
         let contents = "x = 1";
-        let program = parse_suite(contents)?;
-        let stmt = program.first().unwrap();
+        let stmt = parse_first_stmt(contents)?;
         let locator = Locator::new(contents);
         assert_eq!(trailing_semicolon(stmt.end(), &locator), None);
 
         let contents = "x = 1; y = 1";
-        let program = parse_suite(contents)?;
-        let stmt = program.first().unwrap();
+        let stmt = parse_first_stmt(contents)?;
         let locator = Locator::new(contents);
         assert_eq!(
             trailing_semicolon(stmt.end(), &locator),
@@ -559,8 +564,7 @@ mod tests {
         );
 
         let contents = "x = 1 ; y = 1";
-        let program = parse_suite(contents)?;
-        let stmt = program.first().unwrap();
+        let stmt = parse_first_stmt(contents)?;
         let locator = Locator::new(contents);
         assert_eq!(
             trailing_semicolon(stmt.end(), &locator),
@@ -572,8 +576,7 @@ x = 1 \
   ; y = 1
 "
         .trim();
-        let program = parse_suite(contents)?;
-        let stmt = program.first().unwrap();
+        let stmt = parse_first_stmt(contents)?;
         let locator = Locator::new(contents);
         assert_eq!(
             trailing_semicolon(stmt.end(), &locator),
@@ -612,12 +615,11 @@ x = 1 \
     }
 
     #[test]
-    fn redundant_alias() {
+    fn redundant_alias() -> Result<()> {
         let contents = "import x, y as y, z as bees";
-        let program = parse_suite(contents).unwrap();
-        let stmt = program.first().unwrap();
+        let stmt = parse_first_stmt(contents)?;
         assert_eq!(
-            make_redundant_alias(["x"].into_iter().map(Cow::from), stmt),
+            make_redundant_alias(["x"].into_iter().map(Cow::from), &stmt),
             vec![Edit::range_replacement(
                 String::from("x as x"),
                 TextRange::new(TextSize::new(7), TextSize::new(8)),
@@ -625,7 +627,7 @@ x = 1 \
             "make just one item redundant"
         );
         assert_eq!(
-            make_redundant_alias(vec!["x", "y"].into_iter().map(Cow::from), stmt),
+            make_redundant_alias(vec!["x", "y"].into_iter().map(Cow::from), &stmt),
             vec![Edit::range_replacement(
                 String::from("x as x"),
                 TextRange::new(TextSize::new(7), TextSize::new(8)),
@@ -633,13 +635,14 @@ x = 1 \
             "the second item is already a redundant alias"
         );
         assert_eq!(
-            make_redundant_alias(vec!["x", "z"].into_iter().map(Cow::from), stmt),
+            make_redundant_alias(vec!["x", "z"].into_iter().map(Cow::from), &stmt),
             vec![Edit::range_replacement(
                 String::from("x as x"),
                 TextRange::new(TextSize::new(7), TextSize::new(8)),
             )],
             "the third item is already aliased to something else"
         );
+        Ok(())
     }
 
     #[test_case("()",             &["x", "y"], r#"("x", "y")"#             ; "2 into empty tuple")]
@@ -661,13 +664,9 @@ x = 1 \
     fn add_to_dunder_all_test(raw: &str, names: &[&str], expect: &str) -> Result<()> {
         let locator = Locator::new(raw);
         let edits = {
-            let expr = parse_expression(raw)?;
-            let stylist = Stylist::from_tokens(
-                &lexer::lex(raw, Mode::Expression).collect::<Vec<_>>(),
-                &locator,
-            );
-            // SUT
-            add_to_dunder_all(names.iter().copied(), &expr, &stylist)
+            let parsed = parse_expression(raw)?;
+            let stylist = Stylist::from_tokens(parsed.tokens(), &locator);
+            add_to_dunder_all(names.iter().copied(), parsed.expr(), &stylist)
         };
         let diag = {
             use crate::rules::pycodestyle::rules::MissingNewlineAtEndOfFile;

@@ -53,3 +53,7 @@ from itertools import starmap as sm
 [print(x, *y) for x, y in zipped()]
 
 [print(*x, *y) for x, y in zipped()]
+
+[" ".join(x)(x, y) for x, y in zipped()]
+
+[" ".join(x)(*x) for x in zipped()]

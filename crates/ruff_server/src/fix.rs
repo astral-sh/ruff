@@ -1,41 +1,58 @@
+use std::borrow::Cow;
+
+use rustc_hash::FxHashMap;
+
 use ruff_linter::{
     linter::{FixerResult, LinterResult},
     packaging::detect_package_root,
     settings::{flags, types::UnsafeFixes, LinterSettings},
-    source_kind::SourceKind,
 };
-use ruff_python_ast::PySourceType;
+use ruff_notebook::SourceValue;
 use ruff_source_file::LineIndex;
-use std::borrow::Cow;
 
 use crate::{
     edit::{Replacement, ToRangeExt},
+    resolve::is_document_excluded,
+    session::DocumentQuery,
     PositionEncoding,
 };
 
+/// A simultaneous fix made across a single text document or among an arbitrary
+/// number of notebook cells.
+pub(crate) type Fixes = FxHashMap<lsp_types::Url, Vec<lsp_types::TextEdit>>;
+
 pub(crate) fn fix_all(
-    document: &crate::edit::Document,
-    document_url: &lsp_types::Url,
+    query: &DocumentQuery,
     linter_settings: &LinterSettings,
     encoding: PositionEncoding,
-) -> crate::Result<Vec<lsp_types::TextEdit>> {
-    let source = document.contents();
+) -> crate::Result<Fixes> {
+    let source_kind = query.make_source_kind();
 
-    let document_path = document_url
-        .to_file_path()
-        .expect("document URL should be a valid file path");
+    let file_resolver_settings = query.settings().file_resolver();
+    let document_path = query.file_path();
 
-    let package = detect_package_root(
-        document_path
-            .parent()
-            .expect("a path to a document should have a parent path"),
-        &linter_settings.namespace_packages,
-    );
+    // If the document is excluded, return an empty list of fixes.
+    let package = if let Some(document_path) = document_path.as_ref() {
+        if is_document_excluded(
+            document_path,
+            file_resolver_settings,
+            Some(linter_settings),
+            None,
+        ) {
+            return Ok(Fixes::default());
+        }
 
-    let source_type = PySourceType::default();
+        detect_package_root(
+            document_path
+                .parent()
+                .expect("a path to a document should have a parent path"),
+            &linter_settings.namespace_packages,
+        )
+    } else {
+        None
+    };
 
-    // TODO(jane): Support Jupyter Notebooks
-    let source_kind = SourceKind::Python(source.to_string());
+    let source_type = query.source_type();
 
     // We need to iteratively apply all safe fixes onto a single file and then
     // create a diff between the modified file and the original source to use as a single workspace
@@ -45,10 +62,12 @@ pub(crate) fn fix_all(
     // which is inconsistent with how `ruff check --fix` works.
     let FixerResult {
         transformed,
-        result: LinterResult { error, .. },
+        result: LinterResult {
+            has_syntax_error, ..
+        },
         ..
     } = ruff_linter::linter::lint_fix(
-        &document_path,
+        &query.virtual_file_path(),
         package,
         flags::Noqa::Enabled,
         UnsafeFixes::Disabled,
@@ -57,36 +76,86 @@ pub(crate) fn fix_all(
         source_type,
     )?;
 
-    if let Some(error) = error {
-        // abort early if a parsing error occurred
-        return Err(anyhow::anyhow!(
-            "A parsing error occurred during `fix_all`: {error}"
-        ));
+    if has_syntax_error {
+        // If there's a syntax error, then there won't be any fixes to apply.
+        return Ok(Fixes::default());
     }
 
     // fast path: if `transformed` is still borrowed, no changes were made and we can return early
     if let Cow::Borrowed(_) = transformed {
-        return Ok(vec![]);
+        return Ok(Fixes::default());
     }
 
-    let modified = transformed.source_code();
+    if let (Some(source_notebook), Some(modified_notebook)) =
+        (source_kind.as_ipy_notebook(), transformed.as_ipy_notebook())
+    {
+        fn cell_source(cell: &ruff_notebook::Cell) -> String {
+            match cell.source() {
+                SourceValue::String(string) => string.clone(),
+                SourceValue::StringArray(array) => array.join(""),
+            }
+        }
 
-    let modified_index = LineIndex::from_source_text(modified);
+        let Some(notebook) = query.as_notebook() else {
+            anyhow::bail!("Notebook document expected from notebook source kind");
+        };
+        let mut fixes = Fixes::default();
+        for ((source, modified), url) in source_notebook
+            .cells()
+            .iter()
+            .map(cell_source)
+            .zip(modified_notebook.cells().iter().map(cell_source))
+            .zip(notebook.urls())
+        {
+            let source_index = LineIndex::from_source_text(&source);
+            let modified_index = LineIndex::from_source_text(&modified);
 
-    let source_index = document.index();
+            let Replacement {
+                source_range,
+                modified_range,
+            } = Replacement::between(
+                &source,
+                source_index.line_starts(),
+                &modified,
+                modified_index.line_starts(),
+            );
 
-    let Replacement {
-        source_range,
-        modified_range,
-    } = Replacement::between(
-        source,
-        source_index.line_starts(),
-        modified,
-        modified_index.line_starts(),
-    );
+            fixes.insert(
+                url.clone(),
+                vec![lsp_types::TextEdit {
+                    range: source_range.to_range(
+                        source_kind.source_code(),
+                        &source_index,
+                        encoding,
+                    ),
+                    new_text: modified[modified_range].to_owned(),
+                }],
+            );
+        }
+        Ok(fixes)
+    } else {
+        let source_index = LineIndex::from_source_text(source_kind.source_code());
 
-    Ok(vec![lsp_types::TextEdit {
-        range: source_range.to_range(source, source_index, encoding),
-        new_text: modified[modified_range].to_owned(),
-    }])
+        let modified = transformed.source_code();
+        let modified_index = LineIndex::from_source_text(modified);
+
+        let Replacement {
+            source_range,
+            modified_range,
+        } = Replacement::between(
+            source_kind.source_code(),
+            source_index.line_starts(),
+            modified,
+            modified_index.line_starts(),
+        );
+        Ok([(
+            query.make_key().into_url(),
+            vec![lsp_types::TextEdit {
+                range: source_range.to_range(source_kind.source_code(), &source_index, encoding),
+                new_text: modified[modified_range].to_owned(),
+            }],
+        )]
+        .into_iter()
+        .collect())
+    }
 }

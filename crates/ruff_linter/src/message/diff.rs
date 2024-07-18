@@ -10,6 +10,7 @@ use ruff_diagnostics::{Applicability, Fix};
 use ruff_source_file::{OneIndexed, SourceFile};
 
 use crate::message::Message;
+use crate::text_helpers::ShowNonprinting;
 
 /// Renders a diff that shows the code fixes.
 ///
@@ -26,8 +27,8 @@ pub(super) struct Diff<'a> {
 
 impl<'a> Diff<'a> {
     pub(crate) fn from_message(message: &'a Message) -> Option<Diff> {
-        message.fix.as_ref().map(|fix| Diff {
-            source_code: &message.file,
+        message.fix().map(|fix| Diff {
+            source_code: message.source_file(),
             fix,
         })
     }
@@ -101,6 +102,7 @@ impl Display for Diff<'_> {
                     )?;
 
                     for (emphasized, value) in change.iter_strings_lossy() {
+                        let value = value.show_nonprinting();
                         if emphasized {
                             write!(f, "{}", line_style.apply_to(&value).underline().on_black())?;
                         } else {

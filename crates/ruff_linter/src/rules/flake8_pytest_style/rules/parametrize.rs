@@ -1,6 +1,4 @@
-use std::hash::BuildHasherDefault;
-
-use rustc_hash::FxHashMap;
+use rustc_hash::{FxBuildHasher, FxHashMap};
 
 use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, violation};
@@ -353,7 +351,7 @@ fn check_names(checker: &mut Checker, decorator: &Decorator, expr: &Expr) {
                         let name_range = get_parametrize_name_range(
                             decorator,
                             expr,
-                            checker.indexer().comment_ranges(),
+                            checker.comment_ranges(),
                             checker.locator().contents(),
                         )
                         .unwrap_or(expr.range());
@@ -388,7 +386,7 @@ fn check_names(checker: &mut Checker, decorator: &Decorator, expr: &Expr) {
                         let name_range = get_parametrize_name_range(
                             decorator,
                             expr,
-                            checker.indexer().comment_ranges(),
+                            checker.comment_ranges(),
                             checker.locator().contents(),
                         )
                         .unwrap_or(expr.range());
@@ -664,7 +662,7 @@ fn check_duplicates(checker: &mut Checker, values: &Expr) {
     };
 
     let mut seen: FxHashMap<ComparableExpr, usize> =
-        FxHashMap::with_capacity_and_hasher(elts.len(), BuildHasherDefault::default());
+        FxHashMap::with_capacity_and_hasher(elts.len(), FxBuildHasher);
     let mut prev = None;
     for (index, element) in elts.iter().enumerate() {
         let expr = ComparableExpr::from(element);
@@ -681,11 +679,7 @@ fn check_duplicates(checker: &mut Checker, values: &Expr) {
                     let element_end =
                         trailing_comma(element, checker.locator().contents(), values_end);
                     let deletion_range = TextRange::new(previous_end, element_end);
-                    if !checker
-                        .indexer()
-                        .comment_ranges()
-                        .intersects(deletion_range)
-                    {
+                    if !checker.comment_ranges().intersects(deletion_range) {
                         diagnostic.set_fix(Fix::unsafe_edit(Edit::range_deletion(deletion_range)));
                     }
                 }

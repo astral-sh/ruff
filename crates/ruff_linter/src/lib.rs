@@ -11,7 +11,7 @@ pub use registry::clap_completion::RuleParser;
 #[cfg(feature = "clap")]
 pub use rule_selector::clap_completion::RuleSelectorParser;
 pub use rule_selector::RuleSelector;
-pub use rules::pycodestyle::rules::{IOError, SyntaxError};
+pub use rules::pycodestyle::rules::IOError;
 
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");
 
@@ -39,6 +39,7 @@ pub mod rule_selector;
 pub mod rules;
 pub mod settings;
 pub mod source_kind;
+mod text_helpers;
 pub mod upstream_categories;
 
 #[cfg(any(test, fuzzing))]

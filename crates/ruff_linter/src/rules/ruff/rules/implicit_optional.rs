@@ -5,6 +5,7 @@ use anyhow::Result;
 use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, violation};
 
+use ruff_python_ast::name::Name;
 use ruff_python_ast::{self as ast, Expr, Operator, ParameterWithDefault, Parameters};
 use ruff_python_parser::typing::parse_type_annotation;
 use ruff_text_size::{Ranged, TextRange};
@@ -145,7 +146,7 @@ fn generate_fix(checker: &Checker, conversion_type: ConversionType, expr: &Expr)
             let new_expr = Expr::Subscript(ast::ExprSubscript {
                 range: TextRange::default(),
                 value: Box::new(Expr::Name(ast::ExprName {
-                    id: binding,
+                    id: Name::new(binding),
                     ctx: ast::ExprContext::Store,
                     range: TextRange::default(),
                 })),
@@ -177,13 +178,13 @@ pub(crate) fn implicit_optional(checker: &mut Checker, parameters: &Parameters) 
             continue;
         };
 
-        if let Expr::StringLiteral(ast::ExprStringLiteral { range, value }) = annotation.as_ref() {
+        if let Expr::StringLiteral(string_expr) = annotation.as_ref() {
             // Quoted annotation.
-            if let Ok((annotation, kind)) =
-                parse_type_annotation(value.to_str(), *range, checker.locator().contents())
+            if let Ok((parsed_annotation, kind)) =
+                parse_type_annotation(string_expr, checker.locator().contents())
             {
                 let Some(expr) = type_hint_explicitly_allows_none(
-                    &annotation,
+                    parsed_annotation.expr(),
                     checker.semantic(),
                     checker.locator(),
                     checker.settings.target_version.minor(),

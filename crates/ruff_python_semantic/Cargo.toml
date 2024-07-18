@@ -10,9 +10,6 @@ documentation = { workspace = true }
 repository = { workspace = true }
 license = { workspace = true }
 
-[lib]
-doctest = false
-
 [dependencies]
 ruff_index = { workspace = true }
 ruff_python_ast = { workspace = true }
@@ -29,3 +26,4 @@ ruff_python_parser = { workspace = true }
 
 [lints]
 workspace = true
+

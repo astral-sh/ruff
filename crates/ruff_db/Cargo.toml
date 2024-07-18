@@ -1,0 +1,37 @@
+[package]
+name = "ruff_db"
+version = "0.0.0"
+publish = false
+authors = { workspace = true }
+edition = { workspace = true }
+rust-version = { workspace = true }
+homepage = { workspace = true }
+documentation = { workspace = true }
+repository = { workspace = true }
+license = { workspace = true }
+
+[dependencies]
+ruff_cache = { workspace = true, optional = true }
+ruff_notebook = { workspace = true }
+ruff_python_ast = { workspace = true }
+ruff_python_parser = { workspace = true }
+ruff_source_file = { workspace = true }
+ruff_text_size = { workspace = true }
+
+camino = { workspace = true }
+countme = { workspace = true }
+dashmap = { workspace = true }
+filetime = { workspace = true }
+ignore = { workspace = true, optional = true }
+salsa = { workspace = true }
+tracing = { workspace = true }
+rustc-hash = { workspace = true }
+zip = { workspace = true }
+
+[dev-dependencies]
+insta = { workspace = true }
+tempfile = { workspace = true }
+
+[features]
+cache = ["ruff_cache"]
+os = ["ignore"]

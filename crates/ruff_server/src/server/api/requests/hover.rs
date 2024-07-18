@@ -29,7 +29,11 @@ pub(crate) fn hover(
     snapshot: &DocumentSnapshot,
     position: &types::TextDocumentPositionParams,
 ) -> Option<types::Hover> {
-    let document = snapshot.document();
+    // Hover only operates on text documents or notebook cells
+    let document = snapshot
+        .query()
+        .as_single_document()
+        .expect("hover should only be called on text documents or notebook cells");
     let line_number: usize = position
         .position
         .line
@@ -97,7 +101,7 @@ fn format_rule_text(rule: Rule) -> String {
         output.push('\n');
     }
 
-    if rule.is_preview() || rule.is_nursery() {
+    if rule.is_preview() {
         output.push_str(r"This rule is in preview and is not stable.");
         output.push('\n');
         output.push('\n');

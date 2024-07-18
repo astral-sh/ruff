@@ -60,7 +60,7 @@ impl<'a> Printer<'a> {
         document: &'a Document,
         indent: u16,
     ) -> PrintResult<Printed> {
-        let indentation = Indention::Level(indent);
+        let indentation = Indentation::Level(indent);
         self.state.pending_indent = indentation;
 
         let mut stack = PrintCallStack::new(PrintElementArgs::new(indentation));
@@ -124,7 +124,7 @@ impl<'a> Printer<'a> {
                     self.flush_line_suffixes(queue, stack, Some(element));
                 } else {
                     // Only print a newline if the current line isn't already empty
-                    if self.state.line_width > 0 {
+                    if !self.state.buffer[self.state.line_start..].is_empty() {
                         self.push_marker();
                         self.print_char('\n');
                     }
@@ -135,7 +135,7 @@ impl<'a> Printer<'a> {
                         self.print_char('\n');
                     }
 
-                    self.state.pending_indent = args.indention();
+                    self.state.pending_indent = args.indentation();
                 }
             }
 
@@ -830,6 +830,7 @@ impl<'a> Printer<'a> {
                 .push_str(self.options.line_ending.as_str());
 
             self.state.line_width = 0;
+            self.state.line_start = self.state.buffer.len();
 
             // Fit's only tests if groups up to the first line break fit.
             // The next group must re-measure if it still fits.
@@ -872,12 +873,29 @@ enum FillPairLayout {
 /// position the printer currently is.
 #[derive(Default, Debug)]
 struct PrinterState<'a> {
+    /// The formatted output.
     buffer: String,
+
+    /// The source markers that map source positions to formatted positions.
     source_markers: Vec<SourceMarker>,
+
+    /// The next source position that should be flushed when writing the next text.
     pending_source_position: Option<TextSize>,
-    pending_indent: Indention,
+
+    /// The current indentation that should be written before the next text.
+    pending_indent: Indentation,
+
+    /// Caches if the code up to the next newline has been measured to fit on a single line.
+    /// This is used to avoid re-measuring the same content multiple times.
     measured_group_fits: bool,
+
+    /// The offset at which the current line in `buffer` starts.
+    line_start: usize,
+
+    /// The accumulated unicode-width of all characters on the current line.
     line_width: u32,
+
+    /// The line suffixes that should be printed at the end of the line.
     line_suffixes: LineSuffixes<'a>,
     verbatim_markers: Vec<TextRange>,
     group_modes: GroupModes,
@@ -925,37 +943,37 @@ impl GroupModes {
 }
 
 #[derive(Copy, Clone, Eq, PartialEq, Debug)]
-enum Indention {
-    /// Indent the content by `count` levels by using the indention sequence specified by the printer options.
+enum Indentation {
+    /// Indent the content by `count` levels by using the indentation sequence specified by the printer options.
     Level(u16),
 
-    /// Indent the content by n-`level`s using the indention sequence specified by the printer options and `align` spaces.
+    /// Indent the content by n-`level`s using the indentation sequence specified by the printer options and `align` spaces.
     Align { level: u16, align: NonZeroU8 },
 }
 
-impl Indention {
+impl Indentation {
     const fn is_empty(self) -> bool {
-        matches!(self, Indention::Level(0))
+        matches!(self, Indentation::Level(0))
     }
 
-    /// Creates a new indention level with a zero-indent.
+    /// Creates a new indentation level with a zero-indent.
     const fn new() -> Self {
-        Indention::Level(0)
+        Indentation::Level(0)
     }
 
-    /// Returns the indention level
+    /// Returns the indentation level
     fn level(self) -> u16 {
         match self {
-            Indention::Level(count) => count,
-            Indention::Align { level: indent, .. } => indent,
+            Indentation::Level(count) => count,
+            Indentation::Align { level: indent, .. } => indent,
         }
     }
 
     /// Returns the number of trailing align spaces or 0 if none
     fn align(self) -> u8 {
         match self {
-            Indention::Level(_) => 0,
-            Indention::Align { align, .. } => align.into(),
+            Indentation::Level(_) => 0,
+            Indentation::Align { align, .. } => align.into(),
         }
     }
 
@@ -967,13 +985,15 @@ impl Indention {
     /// Keeps any  the current value is [`Indent::Align`] and increments the level by one.
     fn increment_level(self, indent_style: IndentStyle) -> Self {
         match self {
-            Indention::Level(count) => Indention::Level(count + 1),
+            Indentation::Level(count) => Indentation::Level(count + 1),
             // Increase the indent AND convert the align to an indent
-            Indention::Align { level, .. } if indent_style.is_tab() => Indention::Level(level + 2),
-            Indention::Align {
+            Indentation::Align { level, .. } if indent_style.is_tab() => {
+                Indentation::Level(level + 2)
+            }
+            Indentation::Align {
                 level: indent,
                 align,
-            } => Indention::Align {
+            } => Indentation::Align {
                 level: indent + 1,
                 align,
             },
@@ -987,23 +1007,23 @@ impl Indention {
     /// No-op if the level is already zero.
     fn decrement(self) -> Self {
         match self {
-            Indention::Level(level) => Indention::Level(level.saturating_sub(1)),
-            Indention::Align { level, .. } => Indention::Level(level),
+            Indentation::Level(level) => Indentation::Level(level.saturating_sub(1)),
+            Indentation::Align { level, .. } => Indentation::Level(level),
         }
     }
 
-    /// Adds an `align` of `count` spaces to the current indention.
+    /// Adds an `align` of `count` spaces to the current indentation.
     ///
     /// It increments the `level` value if the current value is [`Indent::IndentAlign`].
     fn set_align(self, count: NonZeroU8) -> Self {
         match self {
-            Indention::Level(indent_count) => Indention::Align {
+            Indentation::Level(indent_count) => Indentation::Align {
                 level: indent_count,
                 align: count,
             },
 
             // Convert the existing align to an indent
-            Indention::Align { level: indent, .. } => Indention::Align {
+            Indentation::Align { level: indent, .. } => Indentation::Align {
                 level: indent + 1,
                 align: count,
             },
@@ -1011,9 +1031,9 @@ impl Indention {
     }
 }
 
-impl Default for Indention {
+impl Default for Indentation {
     fn default() -> Self {
-        Indention::new()
+        Indentation::new()
     }
 }
 
@@ -1173,7 +1193,7 @@ impl<'a, 'print> FitsMeasurer<'a, 'print> {
                             MeasureMode::AllLines | MeasureMode::AllLinesAllowTextOverflow => {
                                 // Continue measuring on the next line
                                 self.state.line_width = 0;
-                                self.state.pending_indent = args.indention();
+                                self.state.pending_indent = args.indentation();
                             }
                         }
                     }
@@ -1284,7 +1304,7 @@ impl<'a, 'print> FitsMeasurer<'a, 'print> {
                     // to ensure any trailing comments (that, unfortunately, are attached to the statement and not the expression)
                     // fit too.
                     self.state.line_width = 0;
-                    self.state.pending_indent = unindented.indention();
+                    self.state.pending_indent = unindented.indentation();
 
                     return Ok(self.fits_text(Text::Token(")"), unindented));
                 }
@@ -1597,7 +1617,7 @@ impl From<bool> for Fits {
 /// State used when measuring if a group fits on a single line
 #[derive(Debug)]
 struct FitsState {
-    pending_indent: Indention,
+    pending_indent: Indentation,
     has_line_suffix: bool,
     line_width: u32,
 }

@@ -1,7 +1,7 @@
 ---
 source: crates/ruff_linter/src/rules/pylint/mod.rs
 ---
-potential_index_error.py:1:17: PLE0643 Potential IndexError
+potential_index_error.py:1:17: PLE0643 Expression is likely to raise `IndexError`
   |
 1 | print([1, 2, 3][3])  # PLE0643
   |                 ^ PLE0643
@@ -9,7 +9,7 @@ potential_index_error.py:1:17: PLE0643 Potential IndexError
 3 | print([1, 2, 3][999999999999999999999999999999999999999999])  # PLE0643
   |
 
-potential_index_error.py:2:17: PLE0643 Potential IndexError
+potential_index_error.py:2:17: PLE0643 Expression is likely to raise `IndexError`
   |
 1 | print([1, 2, 3][3])  # PLE0643
 2 | print([1, 2, 3][-4])  # PLE0643
@@ -18,7 +18,7 @@ potential_index_error.py:2:17: PLE0643 Potential IndexError
 4 | print([1, 2, 3][-999999999999999999999999999999999999999999])  # PLE0643
   |
 
-potential_index_error.py:3:17: PLE0643 Potential IndexError
+potential_index_error.py:3:17: PLE0643 Expression is likely to raise `IndexError`
   |
 1 | print([1, 2, 3][3])  # PLE0643
 2 | print([1, 2, 3][-4])  # PLE0643
@@ -27,7 +27,7 @@ potential_index_error.py:3:17: PLE0643 Potential IndexError
 4 | print([1, 2, 3][-999999999999999999999999999999999999999999])  # PLE0643
   |
 
-potential_index_error.py:4:17: PLE0643 Potential IndexError
+potential_index_error.py:4:17: PLE0643 Expression is likely to raise `IndexError`
   |
 2 | print([1, 2, 3][-4])  # PLE0643
 3 | print([1, 2, 3][999999999999999999999999999999999999999999])  # PLE0643
@@ -36,5 +36,3 @@ potential_index_error.py:4:17: PLE0643 Potential IndexError
 5 | 
 6 | print([1, 2, 3][2])  # OK
   |
-
-

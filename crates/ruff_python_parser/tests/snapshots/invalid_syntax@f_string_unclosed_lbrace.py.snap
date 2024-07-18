@@ -11,102 +11,144 @@ Module(
         body: [
             Expr(
                 StmtExpr {
-                    range: 0..38,
+                    range: 0..4,
                     value: FString(
                         ExprFString {
-                            range: 0..38,
+                            range: 0..4,
+                            value: FStringValue {
+                                inner: Single(
+                                    FString(
+                                        FString {
+                                            range: 0..4,
+                                            elements: [
+                                                Expression(
+                                                    FStringExpressionElement {
+                                                        range: 2..3,
+                                                        expression: Name(
+                                                            ExprName {
+                                                                range: 3..3,
+                                                                id: Name(""),
+                                                                ctx: Invalid,
+                                                            },
+                                                        ),
+                                                        debug_text: None,
+                                                        conversion: None,
+                                                        format_spec: None,
+                                                    },
+                                                ),
+                                            ],
+                                            flags: FStringFlags {
+                                                quote_style: Double,
+                                                prefix: Regular,
+                                                triple_quoted: false,
+                                            },
+                                        },
+                                    ),
+                                ),
+                            },
+                        },
+                    ),
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    range: 5..14,
+                    value: FString(
+                        ExprFString {
+                            range: 5..14,
+                            value: FStringValue {
+                                inner: Single(
+                                    FString(
+                                        FString {
+                                            range: 5..14,
+                                            elements: [
+                                                Expression(
+                                                    FStringExpressionElement {
+                                                        range: 7..14,
+                                                        expression: Name(
+                                                            ExprName {
+                                                                range: 8..11,
+                                                                id: Name("foo"),
+                                                                ctx: Load,
+                                                            },
+                                                        ),
+                                                        debug_text: None,
+                                                        conversion: None,
+                                                        format_spec: None,
+                                                    },
+                                                ),
+                                            ],
+                                            flags: FStringFlags {
+                                                quote_style: Double,
+                                                prefix: Regular,
+                                                triple_quoted: false,
+                                            },
+                                        },
+                                    ),
+                                ),
+                            },
+                        },
+                    ),
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    range: 15..23,
+                    value: FString(
+                        ExprFString {
+                            range: 15..23,
+                            value: FStringValue {
+                                inner: Single(
+                                    FString(
+                                        FString {
+                                            range: 15..23,
+                                            elements: [
+                                                Expression(
+                                                    FStringExpressionElement {
+                                                        range: 17..22,
+                                                        expression: Name(
+                                                            ExprName {
+                                                                range: 18..21,
+                                                                id: Name("foo"),
+                                                                ctx: Load,
+                                                            },
+                                                        ),
+                                                        debug_text: Some(
+                                                            DebugText {
+                                                                leading: "",
+                                                                trailing: "=",
+                                                            },
+                                                        ),
+                                                        conversion: None,
+                                                        format_spec: None,
+                                                    },
+                                                ),
+                                            ],
+                                            flags: FStringFlags {
+                                                quote_style: Double,
+                                                prefix: Regular,
+                                                triple_quoted: false,
+                                            },
+                                        },
+                                    ),
+                                ),
+                            },
+                        },
+                    ),
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    range: 24..37,
+                    value: FString(
+                        ExprFString {
+                            range: 24..37,
                             value: FStringValue {
                                 inner: Concatenated(
                                     [
                                         FString(
                                             FString {
-                                                range: 0..5,
-                                                elements: [
-                                                    Expression(
-                                                        FStringExpressionElement {
-                                                            range: 2..3,
-                                                            expression: Name(
-                                                                ExprName {
-                                                                    range: 3..3,
-                                                                    id: "",
-                                                                    ctx: Invalid,
-                                                                },
-                                                            ),
-                                                            debug_text: None,
-                                                            conversion: None,
-                                                            format_spec: None,
-                                                        },
-                                                    ),
-                                                ],
-                                                flags: FStringFlags {
-                                                    quote_style: Double,
-                                                    prefix: Regular,
-                                                    triple_quoted: false,
-                                                },
-                                            },
-                                        ),
-                                        FString(
-                                            FString {
-                                                range: 5..15,
-                                                elements: [
-                                                    Expression(
-                                                        FStringExpressionElement {
-                                                            range: 7..15,
-                                                            expression: Name(
-                                                                ExprName {
-                                                                    range: 8..11,
-                                                                    id: "foo",
-                                                                    ctx: Load,
-                                                                },
-                                                            ),
-                                                            debug_text: None,
-                                                            conversion: None,
-                                                            format_spec: None,
-                                                        },
-                                                    ),
-                                                ],
-                                                flags: FStringFlags {
-                                                    quote_style: Double,
-                                                    prefix: Regular,
-                                                    triple_quoted: false,
-                                                },
-                                            },
-                                        ),
-                                        FString(
-                                            FString {
-                                                range: 15..24,
-                                                elements: [
-                                                    Expression(
-                                                        FStringExpressionElement {
-                                                            range: 17..22,
-                                                            expression: Name(
-                                                                ExprName {
-                                                                    range: 18..21,
-                                                                    id: "foo",
-                                                                    ctx: Load,
-                                                                },
-                                                            ),
-                                                            debug_text: Some(
-                                                                DebugText {
-                                                                    leading: "",
-                                                                    trailing: "=",
-                                                                },
-                                                            ),
-                                                            conversion: None,
-                                                            format_spec: None,
-                                                        },
-                                                    ),
-                                                ],
-                                                flags: FStringFlags {
-                                                    quote_style: Double,
-                                                    prefix: Regular,
-                                                    triple_quoted: false,
-                                                },
-                                            },
-                                        ),
-                                        FString(
-                                            FString {
-                                                range: 24..29,
+                                                range: 24..28,
                                                 elements: [
                                                     Expression(
                                                         FStringExpressionElement {
@@ -114,7 +156,7 @@ Module(
                                                             expression: Name(
                                                                 ExprName {
                                                                     range: 27..27,
-                                                                    id: "",
+                                                                    id: Name(""),
                                                                     ctx: Invalid,
                                                                 },
                                                             ),
@@ -133,7 +175,7 @@ Module(
                                         ),
                                         FString(
                                             FString {
-                                                range: 29..38,
+                                                range: 29..37,
                                                 elements: [
                                                     Expression(
                                                         FStringExpressionElement {
@@ -141,7 +183,7 @@ Module(
                                                             expression: Name(
                                                                 ExprName {
                                                                     range: 34..34,
-                                                                    id: "",
+                                                                    id: Name(""),
                                                                     ctx: Invalid,
                                                                 },
                                                             ),
@@ -172,32 +214,53 @@ Module(
 ## Errors
 
   |
-1 |   f"{"
-  |  ____^
-2 | | f"{foo!r"
-  | |_^ Syntax Error: missing closing quote in string literal
-3 |   f"{foo="
-4 |   f"{"
+1 | f"{"
+  |    ^ Syntax Error: missing closing quote in string literal
+2 | f"{foo!r"
+3 | f"{foo="
+  |
+
+
+  |
+1 | f"{"
+  |      Syntax Error: f-string: unterminated string
+2 | f"{foo!r"
+3 | f"{foo="
+  |
+
+
+  |
+1 | f"{"
+  |      Syntax Error: f-string: unterminated string
+2 | f"{foo!r"
+3 | f"{foo="
   |
 
 
   |
 1 | f"{"
 2 | f"{foo!r"
-  | ^^ Syntax Error: Expected an f-string element or the end of the f-string
+  |        ^^ Syntax Error: missing closing quote in string literal
 3 | f"{foo="
 4 | f"{"
   |
 
 
   |
-1 |   f"{"
-2 |   f"{foo!r"
-  |  ________^
-3 | | f"{foo="
-  | |_^ Syntax Error: missing closing quote in string literal
-4 |   f"{"
-5 |   f"""{"""
+1 | f"{"
+2 | f"{foo!r"
+  |           Syntax Error: f-string: unterminated string
+3 | f"{foo="
+4 | f"{"
+  |
+
+
+  |
+1 | f"{"
+2 | f"{foo!r"
+  |           Syntax Error: f-string: unterminated string
+3 | f"{foo="
+4 | f"{"
   |
 
 
@@ -212,13 +275,41 @@ Module(
 
 
   |
-1 |   f"{"
-2 |   f"{foo!r"
-3 |   f"{foo="
-  |  ________^
-4 | | f"{"
-  | |_^ Syntax Error: missing closing quote in string literal
-5 |   f"""{"""
+1 | f"{"
+2 | f"{foo!r"
+  |           Syntax Error: Expected FStringEnd, found Unknown
+3 | f"{foo="
+4 | f"{"
+  |
+
+
+  |
+1 | f"{"
+2 | f"{foo!r"
+3 | f"{foo="
+  |        ^ Syntax Error: missing closing quote in string literal
+4 | f"{"
+5 | f"""{"""
+  |
+
+
+  |
+1 | f"{"
+2 | f"{foo!r"
+3 | f"{foo="
+  |          Syntax Error: f-string: unterminated string
+4 | f"{"
+5 | f"""{"""
+  |
+
+
+  |
+1 | f"{"
+2 | f"{foo!r"
+3 | f"{foo="
+  |          Syntax Error: f-string: unterminated string
+4 | f"{"
+5 | f"""{"""
   |
 
 
@@ -226,18 +317,8 @@ Module(
 2 | f"{foo!r"
 3 | f"{foo="
 4 | f"{"
-  | ^^ Syntax Error: Expected an f-string element or the end of the f-string
+  |    ^ Syntax Error: missing closing quote in string literal
 5 | f"""{"""
-  |
-
-
-  |
-2 |   f"{foo!r"
-3 |   f"{foo="
-4 |   f"{"
-  |  ____^
-5 | | f"""{"""
-  | |_^ Syntax Error: missing closing quote in string literal
   |
 
 
@@ -245,7 +326,7 @@ Module(
 3 | f"{foo="
 4 | f"{"
 5 | f"""{"""
-  | ^^^^ Syntax Error: Expected an f-string element or the end of the f-string
+  | ^^^^ Syntax Error: Expected FStringEnd, found FStringStart
   |
 
 
@@ -253,31 +334,7 @@ Module(
 3 | f"{foo="
 4 | f"{"
 5 | f"""{"""
-  |______^
-  |
-
-
-  |
-4 | f"{"
-5 | f"""{"""
-  |
-
-
-  |
-4 | f"{"
-5 | f"""{"""
-  |
-
-
-  |
-4 | f"{"
-5 | f"""{"""
-  |
-
-
-  |
-4 | f"{"
-5 | f"""{"""
+  |      ^^^ Syntax Error: Expected an expression
   |
 
 

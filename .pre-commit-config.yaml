@@ -2,7 +2,7 @@ fail_fast: true
 
 exclude: |
   (?x)^(
-    crates/red_knot/vendor/.*|
+    crates/red_knot_module_resolver/vendor/.*|
     crates/ruff_linter/resources/.*|
     crates/ruff_linter/src/rules/.*/snapshots/.*|
     crates/ruff/resources/.*|
@@ -14,7 +14,7 @@ exclude: |
 
 repos:
   - repo: https://github.com/abravalheri/validate-pyproject
-    rev: v0.17
+    rev: v0.18
     hooks:
       - id: validate-pyproject
 
@@ -32,7 +32,7 @@ repos:
           )$
 
   - repo: https://github.com/igorshubovych/markdownlint-cli
-    rev: v0.40.0
+    rev: v0.41.0
     hooks:
       - id: markdownlint-fix
         exclude: |
@@ -42,7 +42,7 @@ repos:
           )$
 
   - repo: https://github.com/crate-ci/typos
-    rev: v1.21.0
+    rev: v1.23.2
     hooks:
       - id: typos
 
@@ -56,7 +56,7 @@ repos:
         pass_filenames: false # This makes it a lot faster
 
   - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.4.4
+    rev: v0.5.2
     hooks:
       - id: ruff-format
       - id: ruff

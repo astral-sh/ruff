@@ -1,0 +1,6 @@
+---
+source: crates/ruff_linter/src/message/pylint.rs
+expression: content
+---
+syntax_errors.py:1: SyntaxError: Expected one or more symbol names after import
+syntax_errors.py:3: SyntaxError: Expected ')', found newline

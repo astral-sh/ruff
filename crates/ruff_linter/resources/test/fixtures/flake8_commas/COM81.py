@@ -42,7 +42,7 @@ foo = (
 4,
 )
 
-foo = 3, 
+foo = 3,
 
 class A(object):
  foo = 3
@@ -443,13 +443,13 @@ multiline_index_access[
 ]
 
 multiline_index_access[
-    lambda fine,
-    fine,
-    fine: (0,)
+    lambda fine1,
+    fine2,
+    fine3: (0,)
     :
-    lambda fine,
-    fine,
-    fine: (0,),
+    lambda fine1,
+    fine2,
+    fine3: (0,),
     "fine"
     :
     "fine",
@@ -510,7 +510,7 @@ image[:,]
 
 image[:,:,]
 
-lambda x, :
+lambda x, : x
 
 # ==> unpack.py <==
 def function(
@@ -564,10 +564,6 @@ foo(
 {
     **kwargs
 }
-
-(
-    *args
-)
 
 {
     *args

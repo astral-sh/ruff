@@ -9,7 +9,7 @@ use ruff_python_ast::helpers::{is_const_false, is_const_true};
 use ruff_python_ast::stmt_if::elif_else_range;
 use ruff_python_ast::visitor::Visitor;
 use ruff_python_ast::whitespace::indentation;
-use ruff_python_ast::{self as ast, ElifElseClause, Expr, Stmt};
+use ruff_python_ast::{self as ast, Decorator, ElifElseClause, Expr, Stmt};
 use ruff_python_codegen::Stylist;
 use ruff_python_index::Indexer;
 use ruff_python_semantic::SemanticModel;
@@ -364,7 +364,7 @@ impl Violation for SuperfluousElseBreak {
 }
 
 /// RET501
-fn unnecessary_return_none(checker: &mut Checker, stack: &Stack) {
+fn unnecessary_return_none(checker: &mut Checker, decorator_list: &[Decorator], stack: &Stack) {
     for stmt in &stack.returns {
         let Some(expr) = stmt.value.as_deref() else {
             continue;
@@ -372,7 +372,17 @@ fn unnecessary_return_none(checker: &mut Checker, stack: &Stack) {
         if !expr.is_none_literal_expr() {
             continue;
         }
-        let mut diagnostic = Diagnostic::new(UnnecessaryReturnNone, stmt.range);
+
+        // Skip properties.
+        if decorator_list.iter().any(|decorator| {
+            checker
+                .semantic()
+                .match_builtin_expr(&decorator.expression, "property")
+        }) {
+            return;
+        }
+
+        let mut diagnostic = Diagnostic::new(UnnecessaryReturnNone, stmt.range());
         diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
             "return".to_string(),
             stmt.range(),
@@ -387,10 +397,10 @@ fn implicit_return_value(checker: &mut Checker, stack: &Stack) {
         if stmt.value.is_some() {
             continue;
         }
-        let mut diagnostic = Diagnostic::new(ImplicitReturnValue, stmt.range);
+        let mut diagnostic = Diagnostic::new(ImplicitReturnValue, stmt.range());
         diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
             "return None".to_string(),
-            stmt.range,
+            stmt.range(),
         )));
         checker.diagnostics.push(diagnostic);
     }
@@ -731,7 +741,12 @@ fn superfluous_elif_else(checker: &mut Checker, stack: &Stack) {
 }
 
 /// Run all checks from the `flake8-return` plugin.
-pub(crate) fn function(checker: &mut Checker, body: &[Stmt], returns: Option<&Expr>) {
+pub(crate) fn function(
+    checker: &mut Checker,
+    body: &[Stmt],
+    decorator_list: &[Decorator],
+    returns: Option<&Expr>,
+) {
     // Find the last statement in the function.
     let Some(last_stmt) = body.last() else {
         // Skip empty functions.
@@ -787,7 +802,7 @@ pub(crate) fn function(checker: &mut Checker, body: &[Stmt], returns: Option<&Ex
         if checker.enabled(Rule::UnnecessaryReturnNone) {
             // Skip functions that have a return annotation that is not `None`.
             if returns.map_or(true, Expr::is_none_literal_expr) {
-                unnecessary_return_none(checker, &stack);
+                unnecessary_return_none(checker, decorator_list, &stack);
             }
         }
     }

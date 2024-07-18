@@ -1,0 +1,103 @@
+---
+source: crates/ruff_python_parser/tests/fixtures.rs
+input_file: crates/ruff_python_parser/resources/inline/ok/from_import_soft_keyword_module_name.py
+---
+## AST
+
+```
+Module(
+    ModModule {
+        range: 0..104,
+        body: [
+            ImportFrom(
+                StmtImportFrom {
+                    range: 0..25,
+                    module: Some(
+                        Identifier {
+                            id: Name("match"),
+                            range: 5..10,
+                        },
+                    ),
+                    names: [
+                        Alias {
+                            range: 18..25,
+                            name: Identifier {
+                                id: Name("pattern"),
+                                range: 18..25,
+                            },
+                            asname: None,
+                        },
+                    ],
+                    level: 0,
+                },
+            ),
+            ImportFrom(
+                StmtImportFrom {
+                    range: 26..46,
+                    module: Some(
+                        Identifier {
+                            id: Name("type"),
+                            range: 31..35,
+                        },
+                    ),
+                    names: [
+                        Alias {
+                            range: 43..46,
+                            name: Identifier {
+                                id: Name("bar"),
+                                range: 43..46,
+                            },
+                            asname: None,
+                        },
+                    ],
+                    level: 0,
+                },
+            ),
+            ImportFrom(
+                StmtImportFrom {
+                    range: 47..71,
+                    module: Some(
+                        Identifier {
+                            id: Name("case"),
+                            range: 52..56,
+                        },
+                    ),
+                    names: [
+                        Alias {
+                            range: 64..71,
+                            name: Identifier {
+                                id: Name("pattern"),
+                                range: 64..71,
+                            },
+                            asname: None,
+                        },
+                    ],
+                    level: 0,
+                },
+            ),
+            ImportFrom(
+                StmtImportFrom {
+                    range: 72..103,
+                    module: Some(
+                        Identifier {
+                            id: Name("match.type.case"),
+                            range: 77..92,
+                        },
+                    ),
+                    names: [
+                        Alias {
+                            range: 100..103,
+                            name: Identifier {
+                                id: Name("foo"),
+                                range: 100..103,
+                            },
+                            asname: None,
+                        },
+                    ],
+                    level: 0,
+                },
+            ),
+        ],
+    },
+)
+```

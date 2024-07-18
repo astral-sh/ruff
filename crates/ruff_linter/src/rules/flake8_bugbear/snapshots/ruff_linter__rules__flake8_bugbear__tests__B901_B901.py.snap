@@ -1,0 +1,21 @@
+---
+source: crates/ruff_linter/src/rules/flake8_bugbear/mod.rs
+---
+B901.py:9:9: B901 Using `yield` and `return {value}` in a generator function can lead to confusing behavior
+   |
+ 7 | def broken():
+ 8 |     if True:
+ 9 |         return [1, 2, 3]
+   |         ^^^^^^^^^^^^^^^^ B901
+10 | 
+11 |     yield 3
+   |
+
+B901.py:36:5: B901 Using `yield` and `return {value}` in a generator function can lead to confusing behavior
+   |
+35 | def broken2():
+36 |     return [3, 2, 1]
+   |     ^^^^^^^^^^^^^^^^ B901
+37 | 
+38 |     yield from not_broken()
+   |

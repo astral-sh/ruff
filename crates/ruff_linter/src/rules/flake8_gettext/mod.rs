@@ -1,11 +1,12 @@
 //! Rules from [flake8-gettext](https://pypi.org/project/flake8-gettext/).
+use ruff_python_ast::name::Name;
 use ruff_python_ast::{self as ast, Expr};
 
 pub(crate) mod rules;
 pub mod settings;
 
 /// Returns true if the [`Expr`] is an internationalization function call.
-pub(crate) fn is_gettext_func_call(func: &Expr, functions_names: &[String]) -> bool {
+pub(crate) fn is_gettext_func_call(func: &Expr, functions_names: &[Name]) -> bool {
     if let Expr::Name(ast::ExprName { id, .. }) = func {
         functions_names.contains(id)
     } else {

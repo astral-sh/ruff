@@ -1,0 +1,102 @@
+---
+source: crates/ruff_python_parser/tests/fixtures.rs
+input_file: crates/ruff_python_parser/resources/inline/err/type_params_empty.py
+---
+## AST
+
+```
+Module(
+    ModModule {
+        range: 0..52,
+        body: [
+            FunctionDef(
+                StmtFunctionDef {
+                    range: 0..21,
+                    is_async: false,
+                    decorator_list: [],
+                    name: Identifier {
+                        id: Name("foo"),
+                        range: 4..7,
+                    },
+                    type_params: Some(
+                        TypeParams {
+                            range: 7..9,
+                            type_params: [],
+                        },
+                    ),
+                    parameters: Parameters {
+                        range: 9..11,
+                        posonlyargs: [],
+                        args: [],
+                        vararg: None,
+                        kwonlyargs: [],
+                        kwarg: None,
+                    },
+                    returns: None,
+                    body: [
+                        Pass(
+                            StmtPass {
+                                range: 17..21,
+                            },
+                        ),
+                    ],
+                },
+            ),
+            TypeAlias(
+                StmtTypeAlias {
+                    range: 22..51,
+                    name: Name(
+                        ExprName {
+                            range: 27..36,
+                            id: Name("ListOrSet"),
+                            ctx: Store,
+                        },
+                    ),
+                    type_params: Some(
+                        TypeParams {
+                            range: 36..38,
+                            type_params: [],
+                        },
+                    ),
+                    value: BinOp(
+                        ExprBinOp {
+                            range: 41..51,
+                            left: Name(
+                                ExprName {
+                                    range: 41..45,
+                                    id: Name("list"),
+                                    ctx: Load,
+                                },
+                            ),
+                            op: BitOr,
+                            right: Name(
+                                ExprName {
+                                    range: 48..51,
+                                    id: Name("set"),
+                                    ctx: Load,
+                                },
+                            ),
+                        },
+                    ),
+                },
+            ),
+        ],
+    },
+)
+```
+## Errors
+
+  |
+1 | def foo[]():
+  |         ^ Syntax Error: Type parameter list cannot be empty
+2 |     pass
+3 | type ListOrSet[] = list | set
+  |
+
+
+  |
+1 | def foo[]():
+2 |     pass
+3 | type ListOrSet[] = list | set
+  |                ^ Syntax Error: Type parameter list cannot be empty
+  |

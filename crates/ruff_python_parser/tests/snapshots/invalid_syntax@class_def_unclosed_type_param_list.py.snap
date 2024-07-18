@@ -11,10 +11,10 @@ Module(
         body: [
             ClassDef(
                 StmtClassDef {
-                    range: 0..40,
+                    range: 0..33,
                     decorator_list: [],
                     name: Identifier {
-                        id: "Foo",
+                        id: Name("Foo"),
                         range: 6..9,
                     },
                     type_params: Some(
@@ -25,7 +25,7 @@ Module(
                                     TypeParamTypeVar {
                                         range: 10..12,
                                         name: Identifier {
-                                            id: "T1",
+                                            id: Name("T1"),
                                             range: 10..12,
                                         },
                                         bound: None,
@@ -36,7 +36,7 @@ Module(
                                     TypeParamTypeVarTuple {
                                         range: 14..17,
                                         name: Identifier {
-                                            id: "T2",
+                                            id: Name("T2"),
                                             range: 15..17,
                                         },
                                         default: None,
@@ -52,14 +52,14 @@ Module(
                                 Name(
                                     ExprName {
                                         range: 18..19,
-                                        id: "a",
+                                        id: Name("a"),
                                         ctx: Load,
                                     },
                                 ),
                                 Name(
                                     ExprName {
                                         range: 21..22,
-                                        id: "b",
+                                        id: Name("b"),
                                         ctx: Load,
                                     },
                                 ),
@@ -73,29 +73,29 @@ Module(
                                 range: 29..33,
                             },
                         ),
-                        Assign(
-                            StmtAssign {
-                                range: 34..40,
-                                targets: [
-                                    Name(
-                                        ExprName {
-                                            range: 34..35,
-                                            id: "x",
-                                            ctx: Store,
-                                        },
-                                    ),
-                                ],
-                                value: NumberLiteral(
-                                    ExprNumberLiteral {
-                                        range: 38..40,
-                                        value: Int(
-                                            10,
-                                        ),
-                                    },
-                                ),
+                    ],
+                },
+            ),
+            Assign(
+                StmtAssign {
+                    range: 34..40,
+                    targets: [
+                        Name(
+                            ExprName {
+                                range: 34..35,
+                                id: Name("x"),
+                                ctx: Store,
                             },
                         ),
                     ],
+                    value: NumberLiteral(
+                        ExprNumberLiteral {
+                            range: 38..40,
+                            value: Int(
+                                10,
+                            ),
+                        },
+                    ),
                 },
             ),
         ],
@@ -107,20 +107,6 @@ Module(
   |
 1 | class Foo[T1, *T2(a, b):
   |                  ^ Syntax Error: Expected ']', found '('
-2 |     pass
-3 | x = 10
-  |
-
-
-  |
-1 | class Foo[T1, *T2(a, b):
-2 |     pass
-3 | x = 10
-  | ^ Syntax Error: Simple statements must be separated by newlines or semicolons
-  |
-
-
-  |
 2 |     pass
 3 | x = 10
   |

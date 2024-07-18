@@ -14,6 +14,7 @@ use crate::other::commas;
 use crate::other::with_item::WithItemLayout;
 use crate::prelude::*;
 use crate::statement::clause::{clause_body, clause_header, ClauseHeader};
+use crate::statement::suite::SuiteKind;
 use crate::PythonVersion;
 
 #[derive(Default)]
@@ -124,7 +125,7 @@ impl FormatNodeRule<StmtWith> for FormatStmtWith {
                         }
                     })
                 ),
-                clause_body(&with_stmt.body, colon_comments)
+                clause_body(&with_stmt.body, SuiteKind::other(true), colon_comments)
             ]
         )
     }

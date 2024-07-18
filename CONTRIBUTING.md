@@ -101,6 +101,8 @@ pre-commit run --all-files --show-diff-on-failure  # Rust and Python formatting,
 These checks will run on GitHub Actions when you open your pull request, but running them locally
 will save you time and expedite the merge process.
 
+If you're using VS Code, you can also install the recommended [rust-analyzer](https://marketplace.visualstudio.com/items?itemName=rust-lang.rust-analyzer) extension to get these checks while editing.
+
 Note that many code changes also require updating the snapshot tests, which is done interactively
 after running `cargo test` like so:
 
@@ -278,7 +280,7 @@ These represent, respectively: the schema used to parse the `pyproject.toml` fil
 intermediate representation; and the final, internal representation used to power Ruff.
 
 To add a new configuration option, you'll likely want to modify these latter few files (along with
-`arg.rs`, if appropriate). If you want to pattern-match against an existing example, grep for
+`args.rs`, if appropriate). If you want to pattern-match against an existing example, grep for
 `dummy_variable_rgx`, which defines a regular expression to match against acceptable unused
 variables (e.g., `_`).
 
@@ -331,7 +333,7 @@ even patch releases may contain [non-backwards-compatible changes](https://semve
 ### Creating a new release
 
 1. Install `uv`: `curl -LsSf https://astral.sh/uv/install.sh | sh`
-1. Run `./scripts/release/bump.sh`; this command will:
+1. Run `./scripts/release.sh`; this command will:
     - Generate a temporary virtual environment with `rooster`
     - Generate a changelog entry in `CHANGELOG.md`
     - Update versions in `pyproject.toml` and `Cargo.toml`
@@ -344,22 +346,21 @@ even patch releases may contain [non-backwards-compatible changes](https://semve
 1. Run `cargo check`. This should update the lock file with new versions.
 1. Create a pull request with the changelog and version updates
 1. Merge the PR
-1. Run the [release workflow](https://github.com/astral-sh/ruff/actions/workflows/release.yaml) with:
+1. Run the [release workflow](https://github.com/astral-sh/ruff/actions/workflows/release.yml) with:
     - The new version number (without starting `v`)
-    - The commit hash of the merged release pull request on `main`
 1. The release workflow will do the following:
     1. Build all the assets. If this fails (even though we tested in step 4), we haven't tagged or
-        uploaded anything, you can restart after pushing a fix.
+        uploaded anything, you can restart after pushing a fix. If you just need to rerun the build,
+        make sure you're [re-running all the failed
+        jobs](https://docs.github.com/en/actions/managing-workflow-runs/re-running-workflows-and-jobs#re-running-failed-jobs-in-a-workflow) and not just a single failed job.
     1. Upload to PyPI.
     1. Create and push the Git tag (as extracted from `pyproject.toml`). We create the Git tag only
         after building the wheels and uploading to PyPI, since we can't delete or modify the tag ([#4468](https://github.com/astral-sh/ruff/issues/4468)).
     1. Attach artifacts to draft GitHub release
     1. Trigger downstream repositories. This can fail non-catastrophically, as we can run any
         downstream jobs manually if needed.
-1. Publish the GitHub release
-    1. Open the draft release in the GitHub release section
-    1. Copy the changelog for the release into the GitHub release
-        - See previous releases for formatting of section headers
+1. Verify the GitHub release:
+    1. The Changelog should match the content of `CHANGELOG.md`
     1. Append the contributors from the `bump.sh` script
 1. If needed, [update the schemastore](https://github.com/astral-sh/ruff/blob/main/scripts/update_schemastore.py).
     1. One can determine if an update is needed when

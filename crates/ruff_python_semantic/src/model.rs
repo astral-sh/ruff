@@ -1,5 +1,3 @@
-pub mod all;
-
 use std::path::Path;
 
 use bitflags::bitflags;
@@ -26,6 +24,8 @@ use crate::reference::{
 };
 use crate::scope::{Scope, ScopeId, ScopeKind, Scopes};
 use crate::Imported;
+
+pub mod all;
 
 /// A semantic model for a Python module, to enable querying the module's semantic information.
 pub struct SemanticModel<'a> {
@@ -540,6 +540,23 @@ impl<'a> SemanticModel<'a> {
                         return ReadResult::Resolved(binding_id);
                     }
 
+                    BindingKind::Global(Some(binding_id))
+                    | BindingKind::Nonlocal(binding_id, _) => {
+                        // Mark the shadowed binding as used.
+                        let reference_id = self.resolved_references.push(
+                            self.scope_id,
+                            self.node_id,
+                            ExprContext::Load,
+                            self.flags,
+                            name.range,
+                        );
+                        self.bindings[binding_id].references.push(reference_id);
+
+                        // Treat it as resolved.
+                        self.resolved_names.insert(name.into(), binding_id);
+                        return ReadResult::Resolved(binding_id);
+                    }
+
                     _ => {
                         // Otherwise, treat it as resolved.
                         self.resolved_names.insert(name.into(), binding_id);
@@ -919,7 +936,7 @@ impl<'a> SemanticModel<'a> {
                                             .all(|scope| !scope.has(name))
                                         {
                                             return Some(ImportedName {
-                                                name: (*name).to_string(),
+                                                name: name.to_string(),
                                                 source,
                                                 range: self.nodes[source].range(),
                                                 context: binding.context,
@@ -1214,8 +1231,10 @@ impl<'a> SemanticModel<'a> {
     pub fn add_module(&mut self, module: &str) {
         match module {
             "_typeshed" => self.seen.insert(Modules::TYPESHED),
+            "anyio" => self.seen.insert(Modules::ANYIO),
             "builtins" => self.seen.insert(Modules::BUILTINS),
             "collections" => self.seen.insert(Modules::COLLECTIONS),
+            "contextvars" => self.seen.insert(Modules::CONTEXTVARS),
             "dataclasses" => self.seen.insert(Modules::DATACLASSES),
             "datetime" => self.seen.insert(Modules::DATETIME),
             "django" => self.seen.insert(Modules::DJANGO),
@@ -1803,6 +1822,8 @@ bitflags! {
         const TYPESHED = 1 << 16;
         const DATACLASSES = 1 << 17;
         const BUILTINS = 1 << 18;
+        const CONTEXTVARS = 1 << 19;
+        const ANYIO = 1 << 20;
     }
 }
 

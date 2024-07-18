@@ -3,11 +3,11 @@ use std::iter;
 use anyhow::{bail, Result};
 use itertools::Itertools;
 use libcst_native::{
-    Arg, AssignEqual, AssignTargetExpression, Call, Comment, CompFor, Dict, DictComp, DictElement,
-    Element, EmptyLine, Expression, GeneratorExp, LeftCurlyBrace, LeftParen, LeftSquareBracket,
-    ListComp, Name, ParenthesizableWhitespace, ParenthesizedNode, ParenthesizedWhitespace,
-    RightCurlyBrace, RightParen, RightSquareBracket, SetComp, SimpleString, SimpleWhitespace,
-    TrailingWhitespace, Tuple,
+    Arg, AssignEqual, AssignTargetExpression, Call, Comma, Comment, CompFor, Dict, DictComp,
+    DictElement, Element, EmptyLine, Expression, GeneratorExp, LeftCurlyBrace, LeftParen,
+    LeftSquareBracket, ListComp, Name, ParenthesizableWhitespace, ParenthesizedNode,
+    ParenthesizedWhitespace, RightCurlyBrace, RightParen, RightSquareBracket, SetComp,
+    SimpleString, SimpleWhitespace, TrailingWhitespace, Tuple,
 };
 
 use ruff_diagnostics::{Edit, Fix};
@@ -937,7 +937,10 @@ pub(crate) fn fix_unnecessary_comprehension_in_call(
     let whitespace_after_arg = match &call.args[0].comma {
         Some(comma) => {
             let whitespace_after_comma = comma.whitespace_after.clone();
-            call.args[0].comma = None;
+            call.args[0].comma = Some(Comma {
+                whitespace_after: ParenthesizableWhitespace::default(),
+                ..comma.clone()
+            });
             whitespace_after_comma
         }
         _ => call.args[0].whitespace_after_arg.clone(),

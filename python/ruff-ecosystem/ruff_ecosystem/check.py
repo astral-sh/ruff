@@ -36,7 +36,6 @@ if TYPE_CHECKING:
         Project,
     )
 
-
 # Matches lines that are summaries rather than diagnostics
 CHECK_SUMMARY_LINE_RE = re.compile(r"^(Found \d+ error.*)|(.* fixable with .*)$")
 
@@ -154,6 +153,9 @@ def markdown_check_result(result: Result) -> str:
                     # skip display. This shouldn't really happen and indicates a problem in the
                     # calculation of these values. Instead of skipping entirely when `total_changes`
                     # is zero, we'll attempt to report the results to help diagnose the problem.
+                    #
+                    # There's similar issues with the `max_display_per_rule` calculation immediately
+                    # below as well.
                     project_changes / max(total_changes, 1)
                 )
                 * 50
@@ -163,7 +165,11 @@ def markdown_check_result(result: Result) -> str:
         # Limit the number of items displayed per rule to between 5 and the max for
         # the project based on the number of rules affected (less rules, more per rule)
         max_display_per_rule = max(
-            5, max_display_per_project // len(rule_changes.rule_codes())
+            5,
+            # TODO: remove the need for the max() call here,
+            # which is a workaround for if `len(rule_changes.rule_codes()) == 0`
+            # (see comment in the assignment of `max_display_per_project` immediately above)
+            max_display_per_project // max(len(rule_changes.rule_codes()), 1),
         )
 
         # Display the diff

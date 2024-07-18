@@ -15,9 +15,9 @@
 //! ## Formatting Macros
 //!
 //! This crate defines two macros to construct the IR. These are inspired by Rust's `fmt` macros
-//! * [`format!`]: Formats a formatable object
+//! * [`format!`]: Formats a formattable object
 //! * [`format_args!`]: Concatenates a sequence of Format objects.
-//! * [`write!`]: Writes a sequence of formatable objects into an output buffer.
+//! * [`write!`]: Writes a sequence of formattable objects into an output buffer.
 
 mod arguments;
 mod buffer;
@@ -553,11 +553,6 @@ impl PrintedRange {
     pub fn source_range(&self) -> TextRange {
         self.source_range
     }
-
-    #[must_use]
-    pub fn with_code(self, code: String) -> Self {
-        Self { code, ..self }
-    }
 }
 
 /// Public return type of the formatter
@@ -779,10 +774,6 @@ where
     pub fn with_item(mut self, item: T) -> Self {
         self.item = item;
         self
-    }
-
-    pub fn into_item(self) -> T {
-        self.item
     }
 }
 

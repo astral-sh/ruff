@@ -52,7 +52,7 @@ impl FormatNodeRule<StmtFunctionDef> for FormatStmtFunctionDef {
         // newline between the comment and the node, but we _require_ two newlines. If there are
         // _no_ newlines between the comment and the node, we don't insert _any_ newlines; if there
         // are more than two, then `leading_comments` will preserve the correct number of newlines.
-        empty_lines_after_leading_comments(f, comments.leading(item)).fmt(f)?;
+        empty_lines_after_leading_comments(comments.leading(item)).fmt(f)?;
 
         write!(
             f,
@@ -66,7 +66,7 @@ impl FormatNodeRule<StmtFunctionDef> for FormatStmtFunctionDef {
                     trailing_definition_comments,
                     &format_with(|f| format_function_header(f, item)),
                 ),
-                clause_body(body, trailing_definition_comments).with_kind(SuiteKind::Function),
+                clause_body(body, SuiteKind::Function, trailing_definition_comments),
             ]
         )?;
 
@@ -86,7 +86,7 @@ impl FormatNodeRule<StmtFunctionDef> for FormatStmtFunctionDef {
         //
         // # comment
         // ```
-        empty_lines_before_trailing_comments(f, comments.trailing(item), NodeKind::StmtFunctionDef)
+        empty_lines_before_trailing_comments(comments.trailing(item), NodeKind::StmtFunctionDef)
             .fmt(f)
     }
 }

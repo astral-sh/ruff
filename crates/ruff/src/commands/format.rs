@@ -176,6 +176,7 @@ pub(crate) fn format(
         duration
     );
 
+    // Store the caches.
     caches.persist()?;
 
     // Report on any errors.
@@ -794,6 +795,8 @@ pub(super) fn warn_incompatible_formatter_settings(resolver: &Resolver) {
             //     pass
             // ```
             Rule::MissingTrailingComma,
+            // The formatter always removes blank lines before the docstring.
+            Rule::OneBlankLineBeforeClass,
         ] {
             if setting.linter.rules.enabled(rule) {
                 incompatible_rules.insert(rule);
@@ -857,12 +860,20 @@ pub(super) fn warn_incompatible_formatter_settings(resolver: &Resolver) {
 
         if setting.linter.rules.enabled(Rule::BadQuotesMultilineString)
             && setting.linter.flake8_quotes.multiline_quotes == Quote::Single
+            && matches!(
+                setting.formatter.quote_style,
+                QuoteStyle::Single | QuoteStyle::Double
+            )
         {
             warn_user_once!("The `flake8-quotes.multiline-quotes=\"single\"` option is incompatible with the formatter. We recommend disabling `Q001` when using the formatter, which enforces double quotes for multiline strings. Alternatively, set the `flake8-quotes.multiline-quotes` option to `\"double\"`.`");
         }
 
         if setting.linter.rules.enabled(Rule::BadQuotesDocstring)
             && setting.linter.flake8_quotes.docstring_quotes == Quote::Single
+            && matches!(
+                setting.formatter.quote_style,
+                QuoteStyle::Single | QuoteStyle::Double
+            )
         {
             warn_user_once!("The `flake8-quotes.multiline-quotes=\"single\"` option is incompatible with the formatter. We recommend disabling `Q002` when using the formatter, which enforces double quotes for docstrings. Alternatively, set the `flake8-quotes.docstring-quotes` option to `\"double\"`.`");
         }

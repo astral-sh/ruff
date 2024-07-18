@@ -10,23 +10,25 @@ use crate::checkers::ast::Checker;
 /// Checks for deprecated NumPy type aliases.
 ///
 /// ## Why is this bad?
-/// NumPy's `np.int` has long been an alias of the builtin `int`. The same
-/// goes for `np.float`, `np.bool`, and others. These aliases exist
-/// primarily for historic reasons, and have been a cause of
-/// frequent confusion for newcomers.
+/// NumPy's `np.int` has long been an alias of the builtin `int`; the same
+/// is true of `np.float` and others. These aliases exist primarily
+/// for historic reasons, and have been a cause of frequent confusion
+/// for newcomers.
 ///
 /// These aliases were deprecated in 1.20, and removed in 1.24.
+/// Note, however, that `np.bool` and `np.long` were reintroduced in 2.0 with
+/// different semantics, and are thus omitted from this rule.
 ///
 /// ## Examples
 /// ```python
 /// import numpy as np
 ///
-/// np.bool
+/// np.int
 /// ```
 ///
 /// Use instead:
 /// ```python
-/// bool
+/// int
 /// ```
 #[violation]
 pub struct NumpyDeprecatedTypeAlias {
@@ -63,14 +65,7 @@ pub(crate) fn deprecated_type_alias(checker: &mut Checker, expr: &Expr) {
                     qualified_name.segments(),
                     [
                         "numpy",
-                        "bool"
-                            | "int"
-                            | "float"
-                            | "complex"
-                            | "object"
-                            | "str"
-                            | "long"
-                            | "unicode"
+                        "int" | "float" | "complex" | "object" | "str" | "unicode"
                     ]
                 ) {
                     Some(qualified_name.segments()[1])
@@ -87,7 +82,6 @@ pub(crate) fn deprecated_type_alias(checker: &mut Checker, expr: &Expr) {
         );
         let type_name = match type_name {
             "unicode" => "str",
-            "long" => "int",
             _ => type_name,
         };
         diagnostic.try_set_fix(|| {

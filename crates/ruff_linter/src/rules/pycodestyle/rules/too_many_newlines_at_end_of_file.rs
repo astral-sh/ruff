@@ -1,7 +1,7 @@
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_parser::{TokenKind, TokenKindIter};
-use ruff_text_size::{TextRange, TextSize};
+use ruff_python_parser::{TokenKind, Tokens};
+use ruff_text_size::{Ranged, TextRange, TextSize};
 
 /// ## What it does
 /// Checks for files with multiple trailing blank lines.
@@ -54,22 +54,19 @@ impl AlwaysFixableViolation for TooManyNewlinesAtEndOfFile {
 }
 
 /// W391
-pub(crate) fn too_many_newlines_at_end_of_file(
-    diagnostics: &mut Vec<Diagnostic>,
-    tokens: TokenKindIter,
-) {
+pub(crate) fn too_many_newlines_at_end_of_file(diagnostics: &mut Vec<Diagnostic>, tokens: &Tokens) {
     let mut num_trailing_newlines = 0u32;
     let mut start: Option<TextSize> = None;
     let mut end: Option<TextSize> = None;
 
     // Count the number of trailing newlines.
-    for (token, range) in tokens.rev() {
-        match token {
+    for token in tokens.iter().rev() {
+        match token.kind() {
             TokenKind::NonLogicalNewline | TokenKind::Newline => {
                 if num_trailing_newlines == 0 {
-                    end = Some(range.end());
+                    end = Some(token.end());
                 }
-                start = Some(range.end());
+                start = Some(token.end());
                 num_trailing_newlines += 1;
             }
             TokenKind::Dedent => continue,

@@ -52,14 +52,16 @@ pub(crate) fn missing_whitespace_after_keyword(
         let tok0_kind = tok0.kind();
         let tok1_kind = tok1.kind();
 
-        if tok0_kind.is_non_soft_keyword()
+        if tok0_kind.is_keyword()
             && !(tok0_kind.is_singleton()
                 || matches!(tok0_kind, TokenKind::Async | TokenKind::Await)
                 || tok0_kind == TokenKind::Except && tok1_kind == TokenKind::Star
-                || tok0_kind == TokenKind::Yield && tok1_kind == TokenKind::Rpar
+                || tok0_kind == TokenKind::Yield
+                    && matches!(tok1_kind, TokenKind::Rpar | TokenKind::Comma)
                 || matches!(
                     tok1_kind,
                     TokenKind::Colon
+                        | TokenKind::Semi
                         | TokenKind::Newline
                         | TokenKind::NonLogicalNewline
                         // In the event of a syntax error, do not attempt to add a whitespace.

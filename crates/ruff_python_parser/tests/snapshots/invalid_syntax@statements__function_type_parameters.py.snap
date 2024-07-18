@@ -15,7 +15,7 @@ Module(
                     is_async: false,
                     decorator_list: [],
                     name: Identifier {
-                        id: "keyword",
+                        id: Name("keyword"),
                         range: 800..807,
                     },
                     type_params: Some(
@@ -26,7 +26,7 @@ Module(
                                     TypeParamTypeVar {
                                         range: 808..809,
                                         name: Identifier {
-                                            id: "A",
+                                            id: Name("A"),
                                             range: 808..809,
                                         },
                                         bound: None,
@@ -37,7 +37,7 @@ Module(
                                     TypeParamTypeVar {
                                         range: 811..816,
                                         name: Identifier {
-                                            id: "await",
+                                            id: Name("await"),
                                             range: 811..816,
                                         },
                                         bound: None,
@@ -76,7 +76,7 @@ Module(
                     is_async: false,
                     decorator_list: [],
                     name: Identifier {
-                        id: "not_a_type_param",
+                        id: Name("not_a_type_param"),
                         range: 830..846,
                     },
                     type_params: Some(
@@ -87,7 +87,7 @@ Module(
                                     TypeParamTypeVar {
                                         range: 847..848,
                                         name: Identifier {
-                                            id: "A",
+                                            id: Name("A"),
                                             range: 847..848,
                                         },
                                         bound: None,
@@ -98,7 +98,7 @@ Module(
                                     TypeParamTypeVar {
                                         range: 853..854,
                                         name: Identifier {
-                                            id: "B",
+                                            id: Name("B"),
                                             range: 853..854,
                                         },
                                         bound: None,
@@ -137,7 +137,7 @@ Module(
                     is_async: false,
                     decorator_list: [],
                     name: Identifier {
-                        id: "multiple_commas",
+                        id: Name("multiple_commas"),
                         range: 868..883,
                     },
                     type_params: Some(
@@ -148,7 +148,7 @@ Module(
                                     TypeParamTypeVar {
                                         range: 884..885,
                                         name: Identifier {
-                                            id: "A",
+                                            id: Name("A"),
                                             range: 884..885,
                                         },
                                         bound: None,
@@ -159,7 +159,7 @@ Module(
                                     TypeParamTypeVar {
                                         range: 887..888,
                                         name: Identifier {
-                                            id: "B",
+                                            id: Name("B"),
                                             range: 887..888,
                                         },
                                         bound: None,
@@ -198,7 +198,7 @@ Module(
                     is_async: false,
                     decorator_list: [],
                     name: Identifier {
-                        id: "multiple_trailing_commas",
+                        id: Name("multiple_trailing_commas"),
                         range: 902..926,
                     },
                     type_params: Some(
@@ -209,7 +209,7 @@ Module(
                                     TypeParamTypeVar {
                                         range: 927..928,
                                         name: Identifier {
-                                            id: "A",
+                                            id: Name("A"),
                                             range: 927..928,
                                         },
                                         bound: None,
@@ -248,7 +248,7 @@ Module(
                     is_async: false,
                     decorator_list: [],
                     name: Identifier {
-                        id: "multiple_commas_and_recovery",
+                        id: Name("multiple_commas_and_recovery"),
                         range: 944..972,
                     },
                     type_params: Some(
@@ -259,7 +259,7 @@ Module(
                                     TypeParamTypeVar {
                                         range: 973..974,
                                         name: Identifier {
-                                            id: "A",
+                                            id: Name("A"),
                                             range: 973..974,
                                         },
                                         bound: None,
@@ -335,7 +335,7 @@ Module(
 11 | def keyword[A, await](): ...
 12 | 
 13 | def not_a_type_param[A, |, B](): ...
-   |                         ^ Syntax Error: Expected a type parameter or the end of the type parameter list
+   |                         ^ Syntax Error: Expected ',', found '|'
 14 | 
 15 | def multiple_commas[A,,B](): ...
    |
@@ -383,7 +383,7 @@ Module(
 17 | def multiple_trailing_commas[A,,](): ...
 18 | 
 19 | def multiple_commas_and_recovery[A,,100](): ...
-   |                                     ^^^ Syntax Error: Expected a type parameter or the end of the type parameter list
+   |                                     ^^^ Syntax Error: Expected ']', found int
    |
 
 
