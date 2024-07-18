@@ -23,7 +23,9 @@ pub(crate) fn symbol_ty<'db>(
     definitions_ty(
         db,
         use_def.public_definitions(symbol),
-        use_def.public_may_be_unbound(symbol),
+        use_def
+            .public_may_be_unbound(symbol)
+            .then_some(Type::Unbound),
     )
 }
 
@@ -55,24 +57,31 @@ pub(crate) fn definition_ty<'db>(db: &'db dyn Db, definition: Definition<'db>) -
     inference.definition_ty(definition)
 }
 
-/// Infer the combined type of an array of [`Definition`].
-/// Will return a union if there are more than definition, or at least one plus the possibility of
-/// Unbound.
+/// Infer the combined type of an array of [`Definition`]s, plus one optional "unbound type".
+///
+/// Will return a union if there is more than one definition, or at least one plus an unbound
+/// type.
+///
+/// The "unbound type" represents the type in case control flow may not have passed through any
+/// definitions in this scope. If this isn't possible, then it will be `None`. If it is possible,
+/// and the result in that case should be Unbound (e.g. an unbound function local), then it will be
+/// `Some(Type::Unbound)`. If it is possible and the result should be something else (e.g. an
+/// implicit global lookup), then `unbound_type` will be `Some(the_global_symbol_type)`.
+///
+/// # Panics
+/// Will panic if called with zero definitions and no `unbound_ty`. This is a logic error,
+/// as any symbol with zero visible definitions clearly may be unbound, and the caller should
+/// provide an `unbound_ty`.
 pub(crate) fn definitions_ty<'db>(
     db: &'db dyn Db,
     definitions: &[Definition<'db>],
-    may_be_unbound: bool,
+    unbound_ty: Option<Type<'db>>,
 ) -> Type<'db> {
-    let unbound_iter = if may_be_unbound {
-        [Type::Unbound].iter()
-    } else {
-        [].iter()
-    };
     let def_types = definitions.iter().map(|def| definition_ty(db, *def));
-    let mut all_types = unbound_iter.copied().chain(def_types);
+    let mut all_types = unbound_ty.into_iter().chain(def_types);
 
     let Some(first) = all_types.next() else {
-        return Type::Unbound;
+        panic!("definitions_ty should never be called with zero definitions and no unbound_ty.")
     };
 
     if let Some(second) = all_types.next() {

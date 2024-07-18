@@ -36,7 +36,10 @@ use crate::semantic_index::semantic_index;
 use crate::semantic_index::symbol::NodeWithScopeKind;
 use crate::semantic_index::symbol::{NodeWithScopeRef, ScopeId};
 use crate::semantic_index::SemanticIndex;
-use crate::types::{definitions_ty, ClassType, FunctionType, Name, Type, UnionTypeBuilder};
+use crate::types::{
+    definitions_ty, module_global_symbol_ty_by_name, ClassType, FunctionType, Name, Type,
+    UnionTypeBuilder,
+};
 use crate::Db;
 
 /// Infer all types for a [`ScopeId`], including all definitions and expressions in that scope.
@@ -667,18 +670,30 @@ impl<'db> TypeInferenceBuilder<'db> {
     }
 
     fn infer_name_expression(&mut self, name: &ast::ExprName) -> Type<'db> {
-        let ast::ExprName {
-            range: _,
-            id: _,
-            ctx,
-        } = name;
+        let ast::ExprName { range: _, id, ctx } = name;
 
         match ctx {
             ExprContext::Load => {
-                let use_def = self.index.use_def_map(self.scope.file_scope_id(self.db));
+                let file_scope_id = self.scope.file_scope_id(self.db);
+                let use_def = self.index.use_def_map(file_scope_id);
                 let use_id = name.scoped_use_id(self.db, self.scope);
-                let definitions = use_def.use_definitions(use_id);
-                definitions_ty(self.db, definitions, use_def.use_may_be_unbound(use_id))
+                let may_be_unbound = use_def.use_may_be_unbound(use_id);
+
+                let unbound_ty = if may_be_unbound {
+                    let symbols = self.index.symbol_table(file_scope_id);
+                    // SAFETY: the symbol table always creates a symbol for every Name node.
+                    let symbol = symbols.symbol_by_name(id).unwrap();
+                    if !symbol.is_defined() || !self.scope.is_function_like(self.db) {
+                        // implicit global
+                        Some(module_global_symbol_ty_by_name(self.db, self.file, id))
+                    } else {
+                        Some(Type::Unbound)
+                    }
+                } else {
+                    None
+                };
+
+                definitions_ty(self.db, use_def.use_definitions(use_id), unbound_ty)
             }
             ExprContext::Store | ExprContext::Del => Type::None,
             ExprContext::Invalid => Type::Unknown,
@@ -778,9 +793,11 @@ mod tests {
 
     use crate::db::tests::TestDb;
     use crate::semantic_index::definition::Definition;
+    use crate::semantic_index::semantic_index;
+    use crate::semantic_index::symbol::FileScopeId;
     use crate::types::{
         infer_definition_types, module_global_scope, module_global_symbol_ty_by_name, symbol_table,
-        use_def_map, Type,
+        symbol_ty_by_name, use_def_map, Type,
     };
     use crate::{HasTy, SemanticModel};
 
@@ -1233,6 +1250,102 @@ mod tests {
             panic!("A is not a Class")
         };
         assert_eq!(a_class.name(&db), "A");
+
+        Ok(())
+    }
+
+    /// An unbound function local that has definitions in the scope does not fall back to globals.
+    #[test]
+    fn unbound_function_local() -> anyhow::Result<()> {
+        let mut db = setup_db();
+
+        db.write_dedented(
+            "src/a.py",
+            "
+            x = 1
+            def f():
+                y = x
+                x = 2
+            ",
+        )?;
+
+        let file = system_path_to_file(&db, "src/a.py").expect("Expected file to exist.");
+        let index = semantic_index(&db, file);
+        let function_scope = index
+            .child_scopes(FileScopeId::module_global())
+            .next()
+            .unwrap()
+            .0
+            .to_scope_id(&db, file);
+        let y_ty = symbol_ty_by_name(&db, function_scope, "y");
+        let x_ty = symbol_ty_by_name(&db, function_scope, "x");
+
+        assert_eq!(y_ty.display(&db).to_string(), "Unbound");
+        assert_eq!(x_ty.display(&db).to_string(), "Literal[2]");
+
+        Ok(())
+    }
+
+    /// A name reference to a never-defined symbol in a function is implicitly a global lookup.
+    #[test]
+    fn implicit_global_in_function() -> anyhow::Result<()> {
+        let mut db = setup_db();
+
+        db.write_dedented(
+            "src/a.py",
+            "
+            x = 1
+            def f():
+                y = x
+            ",
+        )?;
+
+        let file = system_path_to_file(&db, "src/a.py").expect("Expected file to exist.");
+        let index = semantic_index(&db, file);
+        let function_scope = index
+            .child_scopes(FileScopeId::module_global())
+            .next()
+            .unwrap()
+            .0
+            .to_scope_id(&db, file);
+        let y_ty = symbol_ty_by_name(&db, function_scope, "y");
+        let x_ty = symbol_ty_by_name(&db, function_scope, "x");
+
+        assert_eq!(x_ty.display(&db).to_string(), "Unbound");
+        assert_eq!(y_ty.display(&db).to_string(), "Literal[1]");
+
+        Ok(())
+    }
+
+    /// Class name lookups do fall back to globals, but the public type never does.
+    #[test]
+    fn unbound_class_local() -> anyhow::Result<()> {
+        let mut db = setup_db();
+
+        db.write_dedented(
+            "src/a.py",
+            "
+            x = 1
+            class C:
+                y = x
+                if flag:
+                    x = 2
+            ",
+        )?;
+
+        let file = system_path_to_file(&db, "src/a.py").expect("Expected file to exist.");
+        let index = semantic_index(&db, file);
+        let class_scope = index
+            .child_scopes(FileScopeId::module_global())
+            .next()
+            .unwrap()
+            .0
+            .to_scope_id(&db, file);
+        let y_ty = symbol_ty_by_name(&db, class_scope, "y");
+        let x_ty = symbol_ty_by_name(&db, class_scope, "x");
+
+        assert_eq!(x_ty.display(&db).to_string(), "Literal[2] | Unbound");
+        assert_eq!(y_ty.display(&db).to_string(), "Literal[1]");
 
         Ok(())
     }
