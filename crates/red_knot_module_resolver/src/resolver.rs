@@ -43,6 +43,43 @@ pub(crate) fn resolve_module_query<'db>(
     Some(module)
 }
 
+pub fn resolve_builtins(db: &dyn Db) -> Option<Module> {
+    resolve_builtins_query(db)
+}
+
+#[salsa::tracked]
+pub(crate) fn resolve_builtins_query(db: &dyn Db) -> Option<Module> {
+    let _span = tracing::trace_span!("resolve_builtins").entered();
+
+    let resolver_settings = module_resolution_settings(db);
+
+    let mut standard_library_search_paths = resolver_settings
+        .search_paths(db)
+        .filter(|search_path| search_path.is_standard_library());
+
+    let standard_library = standard_library_search_paths
+        .next()
+        .expect("Expected there to be a standard library search path");
+
+    debug_assert_eq!(
+        standard_library_search_paths.next(),
+        None,
+        "Unexpectedly found multiple search paths for the standard library"
+    );
+
+    let builtins_file = standard_library.join("builtins.pyi").to_file(
+        standard_library,
+        &ResolverState::new(db, resolver_settings.target_version()),
+    )?;
+
+    Some(Module::new(
+        ModuleName::new_static("builtins").unwrap(),
+        ModuleKind::Module,
+        Arc::clone(standard_library),
+        builtins_file,
+    ))
+}
+
 /// Resolves the module for the given path.
 ///
 /// Returns `None` if the path is not a module locatable via any of the known search paths.
@@ -627,6 +664,31 @@ mod tests {
             Some(foo_module),
             path_to_module(&db, &FilePath::System(expected_foo_path))
         );
+    }
+
+    #[test]
+    fn builtins_vendored() {
+        let TestCase { db, stdlib, .. } = TestCaseBuilder::new().with_vendored_typeshed().build();
+
+        let builtins = resolve_builtins(&db).expect("builtins to resolve");
+
+        assert_eq!(builtins.file().path(&db), &stdlib.join("builtins.pyi"));
+    }
+
+    #[test]
+    fn builtins_custom() {
+        const TYPESHED: MockedTypeshed = MockedTypeshed {
+            stdlib_files: &[("builtins.pyi", "def min(a, b): ...")],
+            versions: "builtins: 3.8-",
+        };
+        let TestCase { db, stdlib, .. } = TestCaseBuilder::new()
+            .with_custom_typeshed(TYPESHED)
+            .with_target_version(TargetVersion::Py38)
+            .build();
+
+        let builtins = resolve_builtins(&db).expect("builtins to resolve");
+
+        assert_eq!(builtins.file().path(&db), &stdlib.join("builtins.pyi"));
     }
 
     #[test]

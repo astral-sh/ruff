@@ -167,6 +167,11 @@ impl ModuleResolutionPathBuf {
     }
 
     #[must_use]
+    pub(crate) fn join(&self, component: &str) -> Self {
+        ModuleResolutionPathRef::from(self).join(component)
+    }
+
+    #[must_use]
     pub(crate) fn extra(path: impl Into<SystemPathBuf>) -> Option<Self> {
         let path = path.into();
         path.extension()
@@ -233,8 +238,14 @@ impl ModuleResolutionPathBuf {
         ModuleResolutionPathRef::from(self).is_directory(search_path, resolver)
     }
 
-    pub(crate) fn is_site_packages(&self) -> bool {
+    #[must_use]
+    pub(crate) const fn is_site_packages(&self) -> bool {
         matches!(self.0, ModuleResolutionPathBufInner::SitePackages(_))
+    }
+
+    #[must_use]
+    pub(crate) const fn is_standard_library(&self) -> bool {
+        matches!(self.0, ModuleResolutionPathBufInner::StandardLibrary(_))
     }
 
     #[must_use]
@@ -610,6 +621,40 @@ impl<'a> ModuleResolutionPathRef<'a> {
     fn relativize_path(&self, absolute_path: &FilePathRef<'a>) -> Option<Self> {
         self.0.relativize_path(absolute_path).map(Self)
     }
+
+    #[must_use]
+    fn join(&self, component: &str) -> ModuleResolutionPathBuf {
+        let mut result = self.to_path_buf();
+        result.push(component);
+        result
+    }
+
+    #[must_use]
+    pub(crate) fn to_path_buf(self) -> ModuleResolutionPathBuf {
+        let inner = match self.0 {
+            ModuleResolutionPathRefInner::Extra(path) => {
+                ModuleResolutionPathBufInner::Extra(path.to_path_buf())
+            }
+            ModuleResolutionPathRefInner::FirstParty(path) => {
+                ModuleResolutionPathBufInner::FirstParty(path.to_path_buf())
+            }
+            ModuleResolutionPathRefInner::StandardLibrary(FilePathRef::System(path)) => {
+                ModuleResolutionPathBufInner::StandardLibrary(FilePath::System(path.to_path_buf()))
+            }
+            ModuleResolutionPathRefInner::StandardLibrary(FilePathRef::Vendored(path)) => {
+                ModuleResolutionPathBufInner::StandardLibrary(FilePath::Vendored(
+                    path.to_path_buf(),
+                ))
+            }
+            ModuleResolutionPathRefInner::SitePackages(path) => {
+                ModuleResolutionPathBufInner::SitePackages(path.to_path_buf())
+            }
+            ModuleResolutionPathRefInner::EditableInstall(path) => {
+                ModuleResolutionPathBufInner::EditableInstall(path.to_path_buf())
+            }
+        };
+        ModuleResolutionPathBuf(inner)
+    }
 }
 
 impl fmt::Debug for ModuleResolutionPathRef<'_> {
@@ -745,53 +790,7 @@ mod tests {
         }
     }
 
-    impl ModuleResolutionPathBuf {
-        #[must_use]
-        pub(crate) fn join(&self, component: &str) -> Self {
-            ModuleResolutionPathRef::from(self).join(component)
-        }
-    }
-
     impl<'a> ModuleResolutionPathRef<'a> {
-        #[must_use]
-        fn join(
-            &self,
-            component: &'a (impl AsRef<SystemPath> + ?Sized),
-        ) -> ModuleResolutionPathBuf {
-            let mut result = self.to_path_buf();
-            result.push(component.as_ref().as_str());
-            result
-        }
-
-        #[must_use]
-        pub(crate) fn to_path_buf(self) -> ModuleResolutionPathBuf {
-            let inner = match self.0 {
-                ModuleResolutionPathRefInner::Extra(path) => {
-                    ModuleResolutionPathBufInner::Extra(path.to_path_buf())
-                }
-                ModuleResolutionPathRefInner::FirstParty(path) => {
-                    ModuleResolutionPathBufInner::FirstParty(path.to_path_buf())
-                }
-                ModuleResolutionPathRefInner::StandardLibrary(FilePathRef::System(path)) => {
-                    ModuleResolutionPathBufInner::StandardLibrary(FilePath::System(
-                        path.to_path_buf(),
-                    ))
-                }
-                ModuleResolutionPathRefInner::StandardLibrary(FilePathRef::Vendored(path)) => {
-                    ModuleResolutionPathBufInner::StandardLibrary(FilePath::Vendored(
-                        path.to_path_buf(),
-                    ))
-                }
-                ModuleResolutionPathRefInner::SitePackages(path) => {
-                    ModuleResolutionPathBufInner::SitePackages(path.to_path_buf())
-                }
-                ModuleResolutionPathRefInner::EditableInstall(path) => {
-                    ModuleResolutionPathBufInner::EditableInstall(path.to_path_buf())
-                }
-            };
-            ModuleResolutionPathBuf(inner)
-        }
-
         #[must_use]
         pub(crate) const fn is_stdlib_search_path(&self) -> bool {
             matches!(&self.0, ModuleResolutionPathRefInner::StandardLibrary(_))

@@ -12,7 +12,7 @@ mod testing;
 pub use db::{Db, Jar};
 pub use module::{Module, ModuleKind};
 pub use module_name::ModuleName;
-pub use resolver::resolve_module;
+pub use resolver::{resolve_builtins, resolve_module};
 pub use typeshed::{
     vendored_typeshed_stubs, TypeshedVersionsParseError, TypeshedVersionsParseErrorKind,
 };
