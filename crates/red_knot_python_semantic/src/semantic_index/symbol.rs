@@ -104,6 +104,8 @@ pub struct ScopeId<'db> {
 
 impl<'db> ScopeId<'db> {
     pub(crate) fn is_function_like(self, db: &'db dyn Db) -> bool {
+        // Type parameter scopes behave like function scopes in terms of name resolution; CPython
+        // symbol table also uses the term "function-like" for these scopes.
         matches!(
             self.node(db),
             NodeWithScopeKind::ClassTypeParameters(_)
@@ -202,7 +204,6 @@ impl SymbolTable {
     }
 
     /// Returns the symbol named `name`.
-    #[allow(unused)]
     pub(crate) fn symbol_by_name(&self, name: &str) -> Option<&Symbol> {
         let id = self.symbol_id_by_name(name)?;
         Some(self.symbol(id))

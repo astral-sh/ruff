@@ -677,13 +677,12 @@ impl<'db> TypeInferenceBuilder<'db> {
                 let file_scope_id = self.scope.file_scope_id(self.db);
                 let use_def = self.index.use_def_map(file_scope_id);
                 let use_id = name.scoped_use_id(self.db, self.scope);
-                let definitions = use_def.use_definitions(use_id);
                 let may_be_unbound = use_def.use_may_be_unbound(use_id);
-                let symbols = self.index.symbol_table(file_scope_id);
-                // SAFETY: the symbol table always creates a symbol for every Name node.
-                let symbol = symbols.symbol_by_name(id).unwrap();
 
                 let unbound_ty = if may_be_unbound {
+                    let symbols = self.index.symbol_table(file_scope_id);
+                    // SAFETY: the symbol table always creates a symbol for every Name node.
+                    let symbol = symbols.symbol_by_name(id).unwrap();
                     if !symbol.is_defined() || !self.scope.is_function_like(self.db) {
                         // implicit global
                         Some(module_global_symbol_ty_by_name(self.db, self.file, id))
@@ -694,7 +693,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                     None
                 };
 
-                definitions_ty(self.db, definitions, unbound_ty)
+                definitions_ty(self.db, use_def.use_definitions(use_id), unbound_ty)
             }
             ExprContext::Store | ExprContext::Del => Type::None,
             ExprContext::Invalid => Type::Unknown,
