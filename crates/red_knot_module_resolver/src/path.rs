@@ -369,10 +369,9 @@ impl<'a> ModuleResolutionPathRefInner<'a> {
 
     #[must_use]
     fn is_regular_package(&self, search_path: Self, resolver: &ResolverState) -> bool {
-        fn is_non_stdlib_pkg(state: &ResolverState, path: &SystemPath) -> bool {
-            let file_system = state.system();
-            file_system.path_exists(&path.join("__init__.py"))
-                || file_system.path_exists(&path.join("__init__.pyi"))
+        fn is_non_stdlib_pkg(resolver: &ResolverState, path: &SystemPath) -> bool {
+            system_path_to_file(resolver.db.upcast(), path.join("__init__.py")).is_some()
+                || system_path_to_file(resolver.db.upcast(), path.join("__init__.py")).is_some()
         }
 
         match (self, search_path) {
@@ -387,8 +386,8 @@ impl<'a> ModuleResolutionPathRefInner<'a> {
                 match Self::query_stdlib_version( path, search_path, &stdlib_root, resolver) {
                     TypeshedVersionsQueryResult::DoesNotExist => false,
                     TypeshedVersionsQueryResult::Exists | TypeshedVersionsQueryResult::MaybeExists => match path {
-                        FilePathRef::System(path) => resolver.db.system().path_exists(&path.join("__init__.pyi")),
-                        FilePathRef::Vendored(path) => resolver.db.vendored().exists(path.join("__init__.pyi")),
+                        FilePathRef::System(path) => system_path_to_file(resolver.db.upcast(),path.join("__init__.pyi")).is_some(),
+                        FilePathRef::Vendored(path) => vendored_path_to_file(resolver.db.upcast(), path.join("__init__.pyi")).is_some(),
                     },
                 }
             }

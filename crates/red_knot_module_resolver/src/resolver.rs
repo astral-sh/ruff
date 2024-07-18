@@ -1603,4 +1603,23 @@ not_a_directory
             ModuleResolutionPathBuf::editable_installation_root(db.system(), "/src").unwrap()
         )));
     }
+
+    #[test]
+    fn resolution_query_invalidated_when_package_deleted() {
+        const SRC: &[FileSpec] = &[("foo/__init__.py", ""), ("foo/bar.py", "")];
+
+        let TestCase { mut db, src, .. } = TestCaseBuilder::new().with_src_files(SRC).build();
+        let memory_fs = db.memory_file_system();
+
+        let foo_bar_name = ModuleName::new_static("foo.bar").unwrap();
+
+        let foo_module = resolve_module(&db, foo_bar_name.clone()).unwrap();
+        assert_eq!(foo_module.file().path(&db), &src.join("foo/bar.py"));
+
+        memory_fs.remove_file(src.join("foo/__init__.py")).unwrap();
+        memory_fs.remove_file(src.join("foo/bar.py")).unwrap();
+        memory_fs.remove_directory(src.join("foo")).unwrap();
+        File::touch_path(&mut db, &src.join("foo/__init__.py"));
+        assert_eq!(resolve_module(&db, foo_bar_name), None);
+    }
 }
