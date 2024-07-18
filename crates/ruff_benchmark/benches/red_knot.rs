@@ -178,7 +178,7 @@ fn benchmark_cold(criterion: &mut Criterion) {
     group.finish();
 }
 
-criterion_group!(cold, benchmark_without_parse);
-criterion_group!(without_parse, benchmark_cold);
+criterion_group!(cold, benchmark_cold);
+criterion_group!(without_parse, benchmark_without_parse);
 criterion_group!(incremental, benchmark_incremental);
 criterion_main!(without_parse, cold, incremental);
