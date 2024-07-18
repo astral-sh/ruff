@@ -253,9 +253,9 @@ impl<'db> UseDefMapBuilder<'db> {
 
     /// Restore the current builder visible-definitions state to the given snapshot.
     pub(super) fn restore(&mut self, snapshot: FlowSnapshot) {
-        // We never remove symbols from `definitions_by_symbol` (its an IndexVec, and the symbol
-        // IDs need to line up), so the current number of recorded symbols must always be equal or
-        // greater than the number of symbols in a previously-recorded snapshot.
+        // We never remove symbols from `definitions_by_symbol` (it's an IndexVec, and the symbol
+        // IDs must line up), so the current number of known symbols must always be equal to or
+        // greater than the number of known symbols in a previously-taken snapshot.
         let num_symbols = self.definitions_by_symbol.len();
         debug_assert!(num_symbols >= snapshot.definitions_by_symbol.len());
 
@@ -272,8 +272,7 @@ impl<'db> UseDefMapBuilder<'db> {
     /// Merge the given snapshot into the current state, reflecting that we might have taken either
     /// path to get here. The new visible-definitions state for each symbol should include
     /// definitions from both the prior state and the snapshot.
-    #[allow(clippy::needless_pass_by_value)]
-    pub(super) fn merge(&mut self, snapshot: FlowSnapshot) {
+    pub(super) fn merge(&mut self, snapshot: &FlowSnapshot) {
         // The tricky thing about merging two Ranges pointing into `all_definitions` is that if the
         // two Ranges aren't already adjacent in `all_definitions`, we will have to copy at least
         // one or the other of the ranges to the end of `all_definitions` so as to make them
@@ -282,48 +281,60 @@ impl<'db> UseDefMapBuilder<'db> {
         // It's possible we may end up with some old entries in `all_definitions` that nobody is
         // pointing to, but that's OK.
 
-        for (symbol_id, to_merge) in snapshot.definitions_by_symbol.iter_enumerated() {
-            let current = &mut self.definitions_by_symbol[symbol_id];
+        // We never remove symbols from `definitions_by_symbol` (it's an IndexVec, and the symbol
+        // IDs must line up), so the current number of known symbols must always be equal to or
+        // greater than the number of known symbols in a previously-taken snapshot.
+        debug_assert!(self.definitions_by_symbol.len() >= snapshot.definitions_by_symbol.len());
+
+        for (symbol_id, current) in self.definitions_by_symbol.iter_mut_enumerated() {
+            let Some(snapshot) = snapshot.definitions_by_symbol.get(symbol_id) else {
+                // Symbol not present in snapshot, so it's unbound from that path.
+                current.may_be_unbound = true;
+                continue;
+            };
 
             // If the symbol can be unbound in either predecessor, it can be unbound post-merge.
-            current.may_be_unbound |= to_merge.may_be_unbound;
+            current.may_be_unbound |= snapshot.may_be_unbound;
 
             // Merge the definition ranges.
-            if current.definitions_range == to_merge.definitions_range {
-                // Ranges already identical, nothing to do!
-            } else if current.definitions_range.end == to_merge.definitions_range.start {
-                // Ranges are adjacent (`current` first), just merge them into one range.
-                current.definitions_range =
-                    (current.definitions_range.start)..(to_merge.definitions_range.end);
-            } else if current.definitions_range.start == to_merge.definitions_range.end {
-                // Ranges are adjacent (`to_merge` first), just merge them into one range.
-                current.definitions_range =
-                    (to_merge.definitions_range.start)..(current.definitions_range.end);
-            } else if current.definitions_range.end == self.all_definitions.len() {
-                // Ranges are not adjacent, `current` is at the end of `all_definitions`, we need
-                // to copy `to_merge` to the end so they are adjacent and can be merged into one
-                // range.
-                self.all_definitions
-                    .extend_from_within(to_merge.definitions_range.clone());
-                current.definitions_range.end = self.all_definitions.len();
-            } else if to_merge.definitions_range.end == self.all_definitions.len() {
-                // Ranges are not adjacent, `to_merge` is at the end of `all_definitions`, we need
-                // to copy `current` to the end so they are adjacent and can be merged into one
-                // range.
-                self.all_definitions
-                    .extend_from_within(current.definitions_range.clone());
-                current.definitions_range.start = to_merge.definitions_range.start;
-                current.definitions_range.end = self.all_definitions.len();
+            let current = &mut current.definitions_range;
+            let snapshot = &snapshot.definitions_range;
+
+            // We never create reversed ranges.
+            debug_assert!(current.end >= current.start);
+            debug_assert!(snapshot.end >= snapshot.start);
+
+            if current == snapshot {
+                // Ranges already identical, nothing to do.
+            } else if snapshot.is_empty() {
+                // Merging from an empty range; nothing to do.
+            } else if (*current).is_empty() {
+                // Merging to an empty range; just use the incoming range.
+                *current = snapshot.clone();
+            } else if snapshot.end >= current.start && snapshot.start <= current.end {
+                // Ranges are adjacent or overlapping, merge them in-place.
+                *current = current.start.min(snapshot.start)..current.end.max(snapshot.end);
+            } else if current.end == self.all_definitions.len() {
+                // Ranges are not adjacent or overlapping, `current` is at the end of
+                // `all_definitions`, we need to copy `snapshot` to the end so they are adjacent
+                // and can be merged into one range.
+                self.all_definitions.extend_from_within(snapshot.clone());
+                current.end = self.all_definitions.len();
+            } else if snapshot.end == self.all_definitions.len() {
+                // Ranges are not adjacent or overlapping, `snapshot` is at the end of
+                // `all_definitions`, we need to copy `current` to the end so they are adjacent and
+                // can be merged into one range.
+                self.all_definitions.extend_from_within(current.clone());
+                current.start = snapshot.start;
+                current.end = self.all_definitions.len();
             } else {
                 // Ranges are not adjacent and neither one is at the end of `all_definitions`, we
                 // have to copy both to the end so they are adjacent and we can merge them.
                 let start = self.all_definitions.len();
-                self.all_definitions
-                    .extend_from_within(current.definitions_range.clone());
-                self.all_definitions
-                    .extend_from_within(to_merge.definitions_range.clone());
-                current.definitions_range.start = start;
-                current.definitions_range.end = self.all_definitions.len();
+                self.all_definitions.extend_from_within(current.clone());
+                self.all_definitions.extend_from_within(snapshot.clone());
+                current.start = start;
+                current.end = self.all_definitions.len();
             }
         }
     }
