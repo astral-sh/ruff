@@ -15,7 +15,6 @@ pub(crate) use mutable_class_default::*;
 pub(crate) use mutable_dataclass_default::*;
 pub(crate) use mutable_fromkeys_value::*;
 pub(crate) use never_union::*;
-pub(crate) use pairwise_over_zipped::*;
 pub(crate) use parenthesize_logical_operators::*;
 pub(crate) use quadratic_list_summation::*;
 pub(crate) use redirected_noqa::*;
@@ -29,6 +28,7 @@ pub(crate) use unnecessary_iterable_allocation_for_first_element::*;
 pub(crate) use unnecessary_key_check::*;
 pub(crate) use unused_async::*;
 pub(crate) use unused_noqa::*;
+pub(crate) use zip_instead_of_pairwise::*;
 
 mod ambiguous_unicode_character;
 mod assert_with_print_message;
@@ -49,7 +49,6 @@ mod mutable_class_default;
 mod mutable_dataclass_default;
 mod mutable_fromkeys_value;
 mod never_union;
-mod pairwise_over_zipped;
 mod parenthesize_logical_operators;
 mod quadratic_list_summation;
 mod redirected_noqa;
@@ -65,6 +64,7 @@ mod unnecessary_iterable_allocation_for_first_element;
 mod unnecessary_key_check;
 mod unused_async;
 mod unused_noqa;
+mod zip_instead_of_pairwise;
 
 #[derive(Clone, Copy)]
 pub(crate) enum Context {
