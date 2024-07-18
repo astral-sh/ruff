@@ -393,7 +393,6 @@ where
                 self.visit_expr(&node.test);
                 let pre_if = self.flow_snapshot();
                 self.visit_body(&node.body);
-                let mut has_else = false;
                 let mut post_clauses: Vec<FlowSnapshot> = vec![];
                 for clause in &node.elif_else_clauses {
                     // snapshot after every block except the last; the last one will just become
@@ -403,13 +402,14 @@ where
                     // taken, so the block entry state is always `pre_if`
                     self.flow_restore(pre_if.clone());
                     self.visit_elif_else_clause(clause);
-                    if clause.test.is_none() {
-                        has_else = true;
-                    }
                 }
                 for post_clause_state in post_clauses {
                     self.flow_merge(&post_clause_state);
                 }
+                let has_else = node
+                    .elif_else_clauses
+                    .last()
+                    .is_some_and(|clause| clause.test.is_none());
                 if !has_else {
                     // if there's no else clause, then it's possible we took none of the branches,
                     // and the pre_if state can reach here

@@ -129,7 +129,6 @@ use crate::semantic_index::ast_ids::ScopedUseId;
 use crate::semantic_index::definition::Definition;
 use crate::semantic_index::symbol::ScopedSymbolId;
 use ruff_index::IndexVec;
-use std::cmp;
 use std::ops::Range;
 
 /// All definitions that can reach a given use of a name.
@@ -288,55 +287,54 @@ impl<'db> UseDefMapBuilder<'db> {
         debug_assert!(self.definitions_by_symbol.len() >= snapshot.definitions_by_symbol.len());
 
         for (symbol_id, current) in self.definitions_by_symbol.iter_mut_enumerated() {
-            let Some(to_merge) = snapshot.definitions_by_symbol.get(symbol_id) else {
+            let Some(snapshot) = snapshot.definitions_by_symbol.get(symbol_id) else {
                 // Symbol not present in snapshot, so it's unbound from that path.
                 current.may_be_unbound = true;
                 continue;
             };
 
             // If the symbol can be unbound in either predecessor, it can be unbound post-merge.
-            current.may_be_unbound |= to_merge.may_be_unbound;
+            current.may_be_unbound |= snapshot.may_be_unbound;
 
             // Merge the definition ranges.
-            let cur = &mut current.definitions_range;
-            let snap = &to_merge.definitions_range;
+            let current = &mut current.definitions_range;
+            let snapshot = &snapshot.definitions_range;
 
             // We never create reversed ranges.
-            debug_assert!(cur.end >= cur.start);
-            debug_assert!(snap.end >= snap.start);
+            debug_assert!(current.end >= current.start);
+            debug_assert!(snapshot.end >= snapshot.start);
 
-            if cur == snap {
+            if current == snapshot {
                 // Ranges already identical, nothing to do.
-            } else if snap.is_empty() {
+            } else if snapshot.is_empty() {
                 // Merging from an empty range; nothing to do.
-            } else if (*cur).is_empty() {
+            } else if (*current).is_empty() {
                 // Merging to an empty range; just use the incoming range.
-                current.definitions_range = snap.clone();
-            } else if snap.end >= cur.start && snap.start <= cur.end {
+                *current = snapshot.clone();
+            } else if snapshot.end >= current.start && snapshot.start <= current.end {
                 // Ranges are adjacent or overlapping, merge them in-place.
-                current.definitions_range =
-                    (cmp::min(cur.start, snap.start))..(cmp::max(cur.end, snap.end));
-            } else if cur.end == self.all_definitions.len() {
+                *current = current.start.min(snapshot.start)..current.end.max(snapshot.end);
+            } else if current.end == self.all_definitions.len() {
                 // Ranges are not adjacent or overlapping, `current` is at the end of
-                // `all_definitions`, we need to copy `to_merge` to the end so they are adjacent
+                // `all_definitions`, we need to copy `snapshot` to the end so they are adjacent
                 // and can be merged into one range.
-                self.all_definitions.extend_from_within(snap.clone());
-                cur.end = self.all_definitions.len();
-            } else if snap.end == self.all_definitions.len() {
-                // Ranges are not adjacent or overlapping, `to_merge` is at the end of
+                self.all_definitions.extend_from_within(snapshot.clone());
+                current.end = self.all_definitions.len();
+            } else if snapshot.end == self.all_definitions.len() {
+                // Ranges are not adjacent or overlapping, `snapshot` is at the end of
                 // `all_definitions`, we need to copy `current` to the end so they are adjacent and
                 // can be merged into one range.
-                self.all_definitions.extend_from_within(cur.clone());
-                cur.start = snap.start;
-                cur.end = self.all_definitions.len();
+                self.all_definitions.extend_from_within(current.clone());
+                current.start = snapshot.start;
+                current.end = self.all_definitions.len();
             } else {
                 // Ranges are not adjacent and neither one is at the end of `all_definitions`, we
                 // have to copy both to the end so they are adjacent and we can merge them.
                 let start = self.all_definitions.len();
-                self.all_definitions.extend_from_within(cur.clone());
-                self.all_definitions.extend_from_within(snap.clone());
-                cur.start = start;
-                cur.end = self.all_definitions.len();
+                self.all_definitions.extend_from_within(current.clone());
+                self.all_definitions.extend_from_within(snapshot.clone());
+                current.start = start;
+                current.end = self.all_definitions.len();
             }
         }
     }
