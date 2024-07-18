@@ -10,7 +10,7 @@ use crate::checkers::ast::Checker;
 use crate::codes::Rule;
 use crate::docstrings::Docstring;
 use crate::fs::relativize_path;
-use crate::rules::{darglint, flake8_annotations, flake8_pyi, pydocstyle, pylint};
+use crate::rules::{flake8_annotations, flake8_pyi, pydoclint, pydocstyle, pylint};
 use crate::{docstrings, warn_user};
 
 /// Run lint rules over all [`Definition`] nodes in the [`SemanticModel`].
@@ -83,7 +83,7 @@ pub(crate) fn definitions(checker: &mut Checker) {
         Rule::UndocumentedPublicNestedClass,
         Rule::UndocumentedPublicPackage,
     ]);
-    let enforce_darglint = checker.any_enabled(&[
+    let enforce_pydoclint = checker.any_enabled(&[
         Rule::DocstringMissingException,
         Rule::DocstringExtraneousException,
     ]);
@@ -93,7 +93,7 @@ pub(crate) fn definitions(checker: &mut Checker) {
         && !enforce_stubs
         && !enforce_stubs_and_runtime
         && !enforce_dunder_method
-        && !enforce_darglint
+        && !enforce_pydoclint
     {
         return;
     }
@@ -174,8 +174,8 @@ pub(crate) fn definitions(checker: &mut Checker) {
             }
         }
 
-        // pydocstyle, darglint
-        if enforce_docstrings || enforce_darglint {
+        // pydocstyle, pydoclint
+        if enforce_docstrings || enforce_pydoclint {
             if pydocstyle::helpers::should_ignore_definition(
                 definition,
                 &checker.settings.pydocstyle.ignore_decorators,
@@ -311,7 +311,7 @@ pub(crate) fn definitions(checker: &mut Checker) {
                 Rule::SectionUnderlineNotOverIndented,
                 Rule::UndocumentedParam,
             ]);
-            if enforce_sections || enforce_darglint {
+            if enforce_sections || enforce_pydoclint {
                 let section_contexts = pydocstyle::helpers::get_section_contexts(
                     &docstring,
                     checker.settings.pydocstyle.convention.as_ref(),
@@ -326,8 +326,8 @@ pub(crate) fn definitions(checker: &mut Checker) {
                     );
                 }
 
-                if enforce_darglint {
-                    darglint::rules::check_docstring(
+                if enforce_pydoclint {
+                    pydoclint::rules::check_docstring(
                         checker,
                         definition,
                         &section_contexts,

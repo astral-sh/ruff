@@ -255,7 +255,7 @@ impl Visitor<'_> for BodyVisitor<'_> {
     }
 }
 
-/// DAR401, DAR402
+/// DOC501, DOC502
 pub(crate) fn check_docstring(
     checker: &mut Checker,
     definition: &Definition,
@@ -283,7 +283,7 @@ pub(crate) fn check_docstring(
     visitor::walk_body(&mut visitor, member.body());
     let body_entries = visitor.finish();
 
-    // DAR401
+    // DOC501
     if checker.enabled(Rule::DocstringMissingException) {
         for body_raise in &body_entries.raised_exceptions {
             if body_raise.id == "NotImplementedError" {
@@ -302,7 +302,7 @@ pub(crate) fn check_docstring(
         }
     }
 
-    // DAR402
+    // DOC502
     if checker.enabled(Rule::DocstringExtraneousException) {
         let mut extraneous_exceptions = Vec::new();
         for docstring_raise in docstring_entries.raised_exceptions {

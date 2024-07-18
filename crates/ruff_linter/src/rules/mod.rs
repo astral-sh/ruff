@@ -1,6 +1,5 @@
 #![allow(clippy::useless_format)]
 pub mod airflow;
-pub mod darglint;
 pub mod eradicate;
 pub mod flake8_2020;
 pub mod flake8_annotations;
@@ -50,6 +49,7 @@ pub mod pandas_vet;
 pub mod pep8_naming;
 pub mod perflint;
 pub mod pycodestyle;
+pub mod pydoclint;
 pub mod pydocstyle;
 pub mod pyflakes;
 pub mod pygrep_hooks;

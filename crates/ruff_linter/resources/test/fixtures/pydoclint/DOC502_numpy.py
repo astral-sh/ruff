@@ -2,6 +2,7 @@ class FasterThanLightError(Exception):
     ...
 
 
+# DOC502
 def calculate_speed(distance: float, time: float) -> float:
     """
     Calculate speed as distance divided by time.
@@ -26,6 +27,7 @@ def calculate_speed(distance: float, time: float) -> float:
     return distance / time
 
 
+# DOC502
 def calculate_speed(distance: float, time: float) -> float:
     """
     Calculate speed as distance divided by time.
@@ -52,6 +54,7 @@ def calculate_speed(distance: float, time: float) -> float:
     return distance / time
 
 
+# DOC502
 def calculate_speed(distance: float, time: float) -> float:
     """
     Calculate speed as distance divided by time.

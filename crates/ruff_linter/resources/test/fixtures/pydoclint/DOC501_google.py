@@ -8,7 +8,7 @@ class FasterThanLightError(Exception):
 _some_error = Exception
 
 
-# DAR401
+# DOC501
 def calculate_speed(distance: float, time: float) -> float:
     """Calculate speed as distance divided by time.
 
@@ -28,7 +28,7 @@ def calculate_speed(distance: float, time: float) -> float:
         raise FasterThanLightError from exc
 
 
-# DAR401
+# DOC501
 def calculate_speed(distance: float, time: float) -> float:
     """Calculate speed as distance divided by time.
 
@@ -45,7 +45,7 @@ def calculate_speed(distance: float, time: float) -> float:
         raise FasterThanLightError from exc
 
 
-# DAR401
+# DOC501
 def calculate_speed(distance: float, time: float) -> float:
     """Calculate speed as distance divided by time.
 
@@ -64,7 +64,7 @@ def calculate_speed(distance: float, time: float) -> float:
         raise ValueError
 
 
-# DAR401
+# DOC501
 def calculate_speed(distance: float, time: float) -> float:
     """Calculate speed as distance divided by time.
 
@@ -82,7 +82,7 @@ def calculate_speed(distance: float, time: float) -> float:
         raise exc
 
 
-# DAR401
+# DOC501
 def calculate_speed(distance: float, time: float) -> float:
     """Calculate speed as distance divided by time.
 
@@ -100,7 +100,7 @@ def calculate_speed(distance: float, time: float) -> float:
         raise exc
 
 
-# DAR401
+# DOC501
 def calculate_speed(distance: float, time: float) -> float:
     """Calculate speed as distance divided by time.
 
@@ -114,7 +114,7 @@ def calculate_speed(distance: float, time: float) -> float:
     raise AnotherError
 
 
-# DAR401
+# DOC501
 def calculate_speed(distance: float, time: float) -> float:
     """Calculate speed as distance divided by time.
 
@@ -128,7 +128,7 @@ def calculate_speed(distance: float, time: float) -> float:
     raise AnotherError()
 
 
-# DAR401, but can't resolve the error
+# DOC501, but can't resolve the error
 def calculate_speed(distance: float, time: float) -> float:
     """Calculate speed as distance divided by time.
 

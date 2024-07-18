@@ -1,4 +1,4 @@
-//! Rules from [darglint](https://pypi.org/project/darglint/).
+//! Rules from [pydoclint](https://pypi.org/project/pydoclint/).
 pub(crate) mod rules;
 
 #[cfg(test)]
@@ -15,12 +15,12 @@ mod tests {
     use crate::test::test_path;
     use crate::{assert_messages, settings};
 
-    #[test_case(Rule::DocstringMissingException, Path::new("DAR401_google.py"))]
-    #[test_case(Rule::DocstringExtraneousException, Path::new("DAR402_google.py"))]
+    #[test_case(Rule::DocstringMissingException, Path::new("DOC501_google.py"))]
+    #[test_case(Rule::DocstringExtraneousException, Path::new("DOC502_google.py"))]
     fn rules_google_style(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!("{}_{}", rule_code.as_ref(), path.to_string_lossy());
         let diagnostics = test_path(
-            Path::new("darglint").join(path).as_path(),
+            Path::new("pydoclint").join(path).as_path(),
             &settings::LinterSettings {
                 pydocstyle: Settings {
                     convention: Some(Convention::Google),
@@ -34,12 +34,12 @@ mod tests {
         Ok(())
     }
 
-    #[test_case(Rule::DocstringMissingException, Path::new("DAR401_numpy.py"))]
-    #[test_case(Rule::DocstringExtraneousException, Path::new("DAR402_numpy.py"))]
+    #[test_case(Rule::DocstringMissingException, Path::new("DOC501_numpy.py"))]
+    #[test_case(Rule::DocstringExtraneousException, Path::new("DOC502_numpy.py"))]
     fn rules_numpy_style(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!("{}_{}", rule_code.as_ref(), path.to_string_lossy());
         let diagnostics = test_path(
-            Path::new("darglint").join(path).as_path(),
+            Path::new("pydoclint").join(path).as_path(),
             &settings::LinterSettings {
                 pydocstyle: Settings {
                     convention: Some(Convention::Numpy),
