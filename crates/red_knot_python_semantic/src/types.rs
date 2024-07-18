@@ -3,7 +3,7 @@ use ruff_python_ast::name::Name;
 
 use crate::semantic_index::definition::Definition;
 use crate::semantic_index::symbol::{ScopeId, ScopedSymbolId};
-use crate::semantic_index::{module_global_scope, symbol_table, use_def_map};
+use crate::semantic_index::{global_scope, symbol_table, use_def_map};
 use crate::{Db, FxOrderSet};
 
 mod display;
@@ -43,12 +43,8 @@ pub(crate) fn symbol_ty_by_name<'db>(
 }
 
 /// Shorthand for `symbol_ty` that looks up a module-global symbol in a file.
-pub(crate) fn module_global_symbol_ty_by_name<'db>(
-    db: &'db dyn Db,
-    file: File,
-    name: &str,
-) -> Type<'db> {
-    symbol_ty_by_name(db, module_global_scope(db, file), name)
+pub(crate) fn global_symbol_ty_by_name<'db>(db: &'db dyn Db, file: File, name: &str) -> Type<'db> {
+    symbol_ty_by_name(db, global_scope(db, file), name)
 }
 
 /// Infer the type of a [`Definition`].
@@ -145,7 +141,7 @@ impl<'db> Type<'db> {
             Type::Unbound => Type::Unbound,
             Type::None => todo!("attribute lookup on None type"),
             Type::Function(_) => todo!("attribute lookup on Function type"),
-            Type::Module(file) => module_global_symbol_ty_by_name(db, *file, name),
+            Type::Module(file) => global_symbol_ty_by_name(db, *file, name),
             Type::Class(class) => class.class_member(db, name),
             Type::Instance(_) => {
                 // TODO MRO? get_own_instance_member, get_instance_member

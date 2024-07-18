@@ -37,8 +37,7 @@ use crate::semantic_index::symbol::NodeWithScopeKind;
 use crate::semantic_index::symbol::{NodeWithScopeRef, ScopeId};
 use crate::semantic_index::SemanticIndex;
 use crate::types::{
-    definitions_ty, module_global_symbol_ty_by_name, ClassType, FunctionType, Name, Type,
-    UnionTypeBuilder,
+    definitions_ty, global_symbol_ty_by_name, ClassType, FunctionType, Name, Type, UnionTypeBuilder,
 };
 use crate::Db;
 
@@ -685,7 +684,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                     let symbol = symbols.symbol_by_name(id).unwrap();
                     if !symbol.is_defined() || !self.scope.is_function_like(self.db) {
                         // implicit global
-                        Some(module_global_symbol_ty_by_name(self.db, self.file, id))
+                        Some(global_symbol_ty_by_name(self.db, self.file, id))
                     } else {
                         Some(Type::Unbound)
                     }
@@ -796,7 +795,7 @@ mod tests {
     use crate::semantic_index::semantic_index;
     use crate::semantic_index::symbol::FileScopeId;
     use crate::types::{
-        infer_definition_types, module_global_scope, module_global_symbol_ty_by_name, symbol_table,
+        global_scope, global_symbol_ty_by_name, infer_definition_types, symbol_table,
         symbol_ty_by_name, use_def_map, Type,
     };
     use crate::{HasTy, SemanticModel};
@@ -821,7 +820,7 @@ mod tests {
     fn assert_public_ty(db: &TestDb, file_name: &str, symbol_name: &str, expected: &str) {
         let file = system_path_to_file(db, file_name).expect("Expected file to exist.");
 
-        let ty = module_global_symbol_ty_by_name(db, file, symbol_name);
+        let ty = global_symbol_ty_by_name(db, file, symbol_name);
         assert_eq!(ty.display(db).to_string(), expected);
     }
 
@@ -855,7 +854,7 @@ mod tests {
         )?;
 
         let mod_file = system_path_to_file(&db, "src/mod.py").expect("Expected file to exist.");
-        let ty = module_global_symbol_ty_by_name(&db, mod_file, "Sub");
+        let ty = global_symbol_ty_by_name(&db, mod_file, "Sub");
 
         let Type::Class(class) = ty else {
             panic!("Sub is not a Class")
@@ -885,7 +884,7 @@ mod tests {
         )?;
 
         let mod_file = system_path_to_file(&db, "src/mod.py").unwrap();
-        let ty = module_global_symbol_ty_by_name(&db, mod_file, "C");
+        let ty = global_symbol_ty_by_name(&db, mod_file, "C");
 
         let Type::Class(class_id) = ty else {
             panic!("C is not a Class");
@@ -1234,7 +1233,7 @@ mod tests {
         )?;
 
         let a = system_path_to_file(&db, "src/a.py").expect("Expected file to exist.");
-        let c_ty = module_global_symbol_ty_by_name(&db, a, "C");
+        let c_ty = global_symbol_ty_by_name(&db, a, "C");
         let Type::Class(c_class) = c_ty else {
             panic!("C is not a Class")
         };
@@ -1272,7 +1271,7 @@ mod tests {
         let file = system_path_to_file(&db, "src/a.py").expect("Expected file to exist.");
         let index = semantic_index(&db, file);
         let function_scope = index
-            .child_scopes(FileScopeId::module_global())
+            .child_scopes(FileScopeId::global())
             .next()
             .unwrap()
             .0
@@ -1303,7 +1302,7 @@ mod tests {
         let file = system_path_to_file(&db, "src/a.py").expect("Expected file to exist.");
         let index = semantic_index(&db, file);
         let function_scope = index
-            .child_scopes(FileScopeId::module_global())
+            .child_scopes(FileScopeId::global())
             .next()
             .unwrap()
             .0
@@ -1336,7 +1335,7 @@ mod tests {
         let file = system_path_to_file(&db, "src/a.py").expect("Expected file to exist.");
         let index = semantic_index(&db, file);
         let class_scope = index
-            .child_scopes(FileScopeId::module_global())
+            .child_scopes(FileScopeId::global())
             .next()
             .unwrap()
             .0
@@ -1370,7 +1369,7 @@ mod tests {
     }
 
     fn first_public_def<'db>(db: &'db TestDb, file: File, name: &str) -> Definition<'db> {
-        let scope = module_global_scope(db, file);
+        let scope = global_scope(db, file);
         *use_def_map(db, scope)
             .public_definitions(symbol_table(db, scope).symbol_id_by_name(name).unwrap())
             .first()
@@ -1387,7 +1386,7 @@ mod tests {
         ])?;
 
         let a = system_path_to_file(&db, "/src/a.py").unwrap();
-        let x_ty = module_global_symbol_ty_by_name(&db, a, "x");
+        let x_ty = global_symbol_ty_by_name(&db, a, "x");
 
         assert_eq!(x_ty.display(&db).to_string(), "Literal[10]");
 
@@ -1396,7 +1395,7 @@ mod tests {
 
         let a = system_path_to_file(&db, "/src/a.py").unwrap();
 
-        let x_ty_2 = module_global_symbol_ty_by_name(&db, a, "x");
+        let x_ty_2 = global_symbol_ty_by_name(&db, a, "x");
 
         assert_eq!(x_ty_2.display(&db).to_string(), "Literal[20]");
 
@@ -1413,7 +1412,7 @@ mod tests {
         ])?;
 
         let a = system_path_to_file(&db, "/src/a.py").unwrap();
-        let x_ty = module_global_symbol_ty_by_name(&db, a, "x");
+        let x_ty = global_symbol_ty_by_name(&db, a, "x");
 
         assert_eq!(x_ty.display(&db).to_string(), "Literal[10]");
 
@@ -1423,7 +1422,7 @@ mod tests {
 
         db.clear_salsa_events();
 
-        let x_ty_2 = module_global_symbol_ty_by_name(&db, a, "x");
+        let x_ty_2 = global_symbol_ty_by_name(&db, a, "x");
 
         assert_eq!(x_ty_2.display(&db).to_string(), "Literal[10]");
 
@@ -1449,7 +1448,7 @@ mod tests {
         ])?;
 
         let a = system_path_to_file(&db, "/src/a.py").unwrap();
-        let x_ty = module_global_symbol_ty_by_name(&db, a, "x");
+        let x_ty = global_symbol_ty_by_name(&db, a, "x");
 
         assert_eq!(x_ty.display(&db).to_string(), "Literal[10]");
 
@@ -1459,7 +1458,7 @@ mod tests {
 
         db.clear_salsa_events();
 
-        let x_ty_2 = module_global_symbol_ty_by_name(&db, a, "x");
+        let x_ty_2 = global_symbol_ty_by_name(&db, a, "x");
 
         assert_eq!(x_ty_2.display(&db).to_string(), "Literal[10]");
 

@@ -68,10 +68,10 @@ pub(crate) fn use_def_map<'db>(db: &'db dyn Db, scope: ScopeId<'db>) -> Arc<UseD
 
 /// Returns the module global scope of `file`.
 #[salsa::tracked]
-pub(crate) fn module_global_scope(db: &dyn Db, file: File) -> ScopeId<'_> {
-    let _span = tracing::trace_span!("module_global_scope", ?file).entered();
+pub(crate) fn global_scope(db: &dyn Db, file: File) -> ScopeId<'_> {
+    let _span = tracing::trace_span!("global_scope", ?file).entered();
 
-    FileScopeId::module_global().to_scope_id(db, file)
+    FileScopeId::global().to_scope_id(db, file)
 }
 
 /// The symbol tables and use-def maps for all scopes in a file.
@@ -309,7 +309,7 @@ mod tests {
     use crate::semantic_index::ast_ids::HasScopedUseId;
     use crate::semantic_index::definition::DefinitionKind;
     use crate::semantic_index::symbol::{FileScopeId, Scope, ScopeKind, SymbolTable};
-    use crate::semantic_index::{module_global_scope, semantic_index, symbol_table, use_def_map};
+    use crate::semantic_index::{global_scope, semantic_index, symbol_table, use_def_map};
     use crate::Db;
 
     struct TestCase {
@@ -336,38 +336,38 @@ mod tests {
     #[test]
     fn empty() {
         let TestCase { db, file } = test_case("");
-        let module_global_table = symbol_table(&db, module_global_scope(&db, file));
+        let global_table = symbol_table(&db, global_scope(&db, file));
 
-        let module_global_names = names(&module_global_table);
+        let global_names = names(&global_table);
 
-        assert_eq!(module_global_names, Vec::<&str>::new());
+        assert_eq!(global_names, Vec::<&str>::new());
     }
 
     #[test]
     fn simple() {
         let TestCase { db, file } = test_case("x");
-        let module_global_table = symbol_table(&db, module_global_scope(&db, file));
+        let global_table = symbol_table(&db, global_scope(&db, file));
 
-        assert_eq!(names(&module_global_table), vec!["x"]);
+        assert_eq!(names(&global_table), vec!["x"]);
     }
 
     #[test]
     fn annotation_only() {
         let TestCase { db, file } = test_case("x: int");
-        let module_global_table = symbol_table(&db, module_global_scope(&db, file));
+        let global_table = symbol_table(&db, global_scope(&db, file));
 
-        assert_eq!(names(&module_global_table), vec!["int", "x"]);
+        assert_eq!(names(&global_table), vec!["int", "x"]);
         // TODO record definition
     }
 
     #[test]
     fn import() {
         let TestCase { db, file } = test_case("import foo");
-        let scope = module_global_scope(&db, file);
-        let module_global_table = symbol_table(&db, scope);
+        let scope = global_scope(&db, file);
+        let global_table = symbol_table(&db, scope);
 
-        assert_eq!(names(&module_global_table), vec!["foo"]);
-        let foo = module_global_table.symbol_id_by_name("foo").unwrap();
+        assert_eq!(names(&global_table), vec!["foo"]);
+        let foo = global_table.symbol_id_by_name("foo").unwrap();
 
         let use_def = use_def_map(&db, scope);
         let [definition] = use_def.public_definitions(foo) else {
@@ -379,28 +379,28 @@ mod tests {
     #[test]
     fn import_sub() {
         let TestCase { db, file } = test_case("import foo.bar");
-        let module_global_table = symbol_table(&db, module_global_scope(&db, file));
+        let global_table = symbol_table(&db, global_scope(&db, file));
 
-        assert_eq!(names(&module_global_table), vec!["foo"]);
+        assert_eq!(names(&global_table), vec!["foo"]);
     }
 
     #[test]
     fn import_as() {
         let TestCase { db, file } = test_case("import foo.bar as baz");
-        let module_global_table = symbol_table(&db, module_global_scope(&db, file));
+        let global_table = symbol_table(&db, global_scope(&db, file));
 
-        assert_eq!(names(&module_global_table), vec!["baz"]);
+        assert_eq!(names(&global_table), vec!["baz"]);
     }
 
     #[test]
     fn import_from() {
         let TestCase { db, file } = test_case("from bar import foo");
-        let scope = module_global_scope(&db, file);
-        let module_global_table = symbol_table(&db, scope);
+        let scope = global_scope(&db, file);
+        let global_table = symbol_table(&db, scope);
 
-        assert_eq!(names(&module_global_table), vec!["foo"]);
+        assert_eq!(names(&global_table), vec!["foo"]);
         assert!(
-            module_global_table
+            global_table
                 .symbol_by_name("foo")
                 .is_some_and(|symbol| { symbol.is_defined() && !symbol.is_used() }),
             "symbols that are defined get the defined flag"
@@ -408,7 +408,7 @@ mod tests {
 
         let use_def = use_def_map(&db, scope);
         let [definition] = use_def.public_definitions(
-            module_global_table
+            global_table
                 .symbol_id_by_name("foo")
                 .expect("symbol to exist"),
         ) else {
@@ -423,22 +423,20 @@ mod tests {
     #[test]
     fn assign() {
         let TestCase { db, file } = test_case("x = foo");
-        let scope = module_global_scope(&db, file);
-        let module_global_table = symbol_table(&db, scope);
+        let scope = global_scope(&db, file);
+        let global_table = symbol_table(&db, scope);
 
-        assert_eq!(names(&module_global_table), vec!["foo", "x"]);
+        assert_eq!(names(&global_table), vec!["foo", "x"]);
         assert!(
-            module_global_table
+            global_table
                 .symbol_by_name("foo")
                 .is_some_and(|symbol| { !symbol.is_defined() && symbol.is_used() }),
             "a symbol used but not defined in a scope should have only the used flag"
         );
         let use_def = use_def_map(&db, scope);
-        let [definition] = use_def.public_definitions(
-            module_global_table
-                .symbol_id_by_name("x")
-                .expect("symbol exists"),
-        ) else {
+        let [definition] =
+            use_def.public_definitions(global_table.symbol_id_by_name("x").expect("symbol exists"))
+        else {
             panic!("expected one definition");
         };
         assert!(matches!(
@@ -456,14 +454,14 @@ class C:
 y = 2
 ",
         );
-        let module_global_table = symbol_table(&db, module_global_scope(&db, file));
+        let global_table = symbol_table(&db, global_scope(&db, file));
 
-        assert_eq!(names(&module_global_table), vec!["C", "y"]);
+        assert_eq!(names(&global_table), vec!["C", "y"]);
 
         let index = semantic_index(&db, file);
 
         let [(class_scope_id, class_scope)] = index
-            .child_scopes(FileScopeId::module_global())
+            .child_scopes(FileScopeId::global())
             .collect::<Vec<_>>()[..]
         else {
             panic!("expected one child scope")
@@ -496,12 +494,12 @@ y = 2
 ",
         );
         let index = semantic_index(&db, file);
-        let module_global_table = index.symbol_table(FileScopeId::module_global());
+        let global_table = index.symbol_table(FileScopeId::global());
 
-        assert_eq!(names(&module_global_table), vec!["func", "y"]);
+        assert_eq!(names(&global_table), vec!["func", "y"]);
 
         let [(function_scope_id, function_scope)] = index
-            .child_scopes(FileScopeId::module_global())
+            .child_scopes(FileScopeId::global())
             .collect::<Vec<_>>()[..]
         else {
             panic!("expected one child scope")
@@ -537,11 +535,11 @@ def func():
 ",
         );
         let index = semantic_index(&db, file);
-        let module_global_table = index.symbol_table(FileScopeId::module_global());
+        let global_table = index.symbol_table(FileScopeId::global());
 
-        assert_eq!(names(&module_global_table), vec!["func"]);
+        assert_eq!(names(&global_table), vec!["func"]);
         let [(func_scope1_id, func_scope_1), (func_scope2_id, func_scope_2)] = index
-            .child_scopes(FileScopeId::module_global())
+            .child_scopes(FileScopeId::global())
             .collect::<Vec<_>>()[..]
         else {
             panic!("expected two child scopes");
@@ -558,9 +556,9 @@ def func():
         assert_eq!(names(&func1_table), vec!["x"]);
         assert_eq!(names(&func2_table), vec!["y"]);
 
-        let use_def = index.use_def_map(FileScopeId::module_global());
+        let use_def = index.use_def_map(FileScopeId::global());
         let [definition] = use_def.public_definitions(
-            module_global_table
+            global_table
                 .symbol_id_by_name("func")
                 .expect("symbol exists"),
         ) else {
@@ -579,12 +577,12 @@ def func[T]():
         );
 
         let index = semantic_index(&db, file);
-        let module_global_table = index.symbol_table(FileScopeId::module_global());
+        let global_table = index.symbol_table(FileScopeId::global());
 
-        assert_eq!(names(&module_global_table), vec!["func"]);
+        assert_eq!(names(&global_table), vec!["func"]);
 
         let [(ann_scope_id, ann_scope)] = index
-            .child_scopes(FileScopeId::module_global())
+            .child_scopes(FileScopeId::global())
             .collect::<Vec<_>>()[..]
         else {
             panic!("expected one child scope");
@@ -616,12 +614,12 @@ class C[T]:
         );
 
         let index = semantic_index(&db, file);
-        let module_global_table = index.symbol_table(FileScopeId::module_global());
+        let global_table = index.symbol_table(FileScopeId::global());
 
-        assert_eq!(names(&module_global_table), vec!["C"]);
+        assert_eq!(names(&global_table), vec!["C"]);
 
         let [(ann_scope_id, ann_scope)] = index
-            .child_scopes(FileScopeId::module_global())
+            .child_scopes(FileScopeId::global())
             .collect::<Vec<_>>()[..]
         else {
             panic!("expected one child scope");
@@ -653,7 +651,7 @@ class C[T]:
     fn reachability_trivial() {
         let TestCase { db, file } = test_case("x = 1; x");
         let parsed = parsed_module(&db, file);
-        let scope = module_global_scope(&db, file);
+        let scope = global_scope(&db, file);
         let ast = parsed.syntax();
         let ast::Stmt::Expr(ast::StmtExpr {
             value: x_use_expr, ..
@@ -694,7 +692,7 @@ class C[T]:
         let x = &x_stmt.targets[0];
 
         assert_eq!(index.expression_scope(x).kind(), ScopeKind::Module);
-        assert_eq!(index.expression_scope_id(x), FileScopeId::module_global());
+        assert_eq!(index.expression_scope_id(x), FileScopeId::global());
 
         let def = ast.body[1].as_function_def_stmt().unwrap();
         let y_stmt = def.body[0].as_assign_stmt().unwrap();
@@ -731,20 +729,16 @@ def x():
 
         let index = semantic_index(&db, file);
 
-        let descendents = index.descendent_scopes(FileScopeId::module_global());
+        let descendents = index.descendent_scopes(FileScopeId::global());
         assert_eq!(
             scope_names(descendents, &db, file),
             vec!["Test", "foo", "bar", "baz", "x"]
         );
 
-        let children = index.child_scopes(FileScopeId::module_global());
+        let children = index.child_scopes(FileScopeId::global());
         assert_eq!(scope_names(children, &db, file), vec!["Test", "x"]);
 
-        let test_class = index
-            .child_scopes(FileScopeId::module_global())
-            .next()
-            .unwrap()
-            .0;
+        let test_class = index.child_scopes(FileScopeId::global()).next().unwrap().0;
         let test_child_scopes = index.child_scopes(test_class);
         assert_eq!(
             scope_names(test_child_scopes, &db, file),
@@ -752,7 +746,7 @@ def x():
         );
 
         let bar_scope = index
-            .descendent_scopes(FileScopeId::module_global())
+            .descendent_scopes(FileScopeId::global())
             .nth(2)
             .unwrap()
             .0;
