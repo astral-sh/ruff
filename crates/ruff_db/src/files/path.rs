@@ -24,6 +24,12 @@ impl FilePath {
         FilePath::System(path.as_ref().to_path_buf())
     }
 
+    /// Create a new path relative to the vendored zip directory.
+    #[must_use]
+    pub fn vendored(path: impl AsRef<VendoredPath>) -> Self {
+        FilePath::Vendored(path.as_ref().to_path_buf())
+    }
+
     /// Returns `Some` if the path is a file system path that points to a path on disk.
     #[must_use]
     #[inline]

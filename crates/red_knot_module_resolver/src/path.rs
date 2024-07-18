@@ -4,6 +4,8 @@
 //! <https://github.com/astral-sh/ruff/pull/12141#discussion_r1667010245>
 
 use std::fmt;
+use std::ops::Deref;
+use std::sync::Arc;
 
 use ruff_db::files::{system_path_to_file, vendored_path_to_file, File, FilePath};
 use ruff_db::system::{System, SystemPath, SystemPathBuf};
@@ -190,20 +192,6 @@ impl ModuleResolutionPathBuf {
     }
 
     #[must_use]
-    pub(crate) fn stdlib_from_custom_typeshed_root(typeshed_root: &SystemPath) -> Option<Self> {
-        Self::standard_library(FilePath::System(
-            typeshed_root.join(SystemPath::new("stdlib")),
-        ))
-    }
-
-    #[must_use]
-    pub(crate) fn vendored_stdlib() -> Self {
-        Self(ModuleResolutionPathBufInner::StandardLibrary(
-            FilePath::Vendored(VendoredPathBuf::from("stdlib")),
-        ))
-    }
-
-    #[must_use]
     pub(crate) fn site_packages(path: impl Into<SystemPathBuf>) -> Option<Self> {
         let path = path.into();
         path.extension()
@@ -311,6 +299,18 @@ impl PartialEq<SystemPathBuf> for ModuleResolutionPathBuf {
 }
 
 impl PartialEq<ModuleResolutionPathBuf> for SystemPathBuf {
+    fn eq(&self, other: &ModuleResolutionPathBuf) -> bool {
+        other.eq(self)
+    }
+}
+
+impl PartialEq<VendoredPathBuf> for ModuleResolutionPathBuf {
+    fn eq(&self, other: &VendoredPathBuf) -> bool {
+        ModuleResolutionPathRef::from(self) == **other
+    }
+}
+
+impl PartialEq<ModuleResolutionPathBuf> for VendoredPathBuf {
     fn eq(&self, other: &ModuleResolutionPathBuf) -> bool {
         other.eq(self)
     }
@@ -735,6 +735,82 @@ impl PartialEq<ModuleResolutionPathRef<'_>> for VendoredPathBuf {
     }
 }
 
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+pub(crate) struct ModuleSearchPath(Arc<ModuleResolutionPathBuf>);
+
+impl ModuleSearchPath {
+    pub(crate) fn extra(path: SystemPathBuf) -> Option<Self> {
+        Some(Self(Arc::new(ModuleResolutionPathBuf::extra(path)?)))
+    }
+
+    pub(crate) fn first_party(path: SystemPathBuf) -> Option<Self> {
+        Some(Self(Arc::new(ModuleResolutionPathBuf::first_party(path)?)))
+    }
+
+    pub(crate) fn custom_stdlib(path: &SystemPath) -> Option<Self> {
+        Some(Self(Arc::new(ModuleResolutionPathBuf::standard_library(
+            FilePath::System(path.join("stdlib")),
+        )?)))
+    }
+
+    pub(crate) fn vendored_stdlib() -> Self {
+        Self(Arc::new(ModuleResolutionPathBuf(
+            ModuleResolutionPathBufInner::StandardLibrary(FilePath::vendored("stdlib")),
+        )))
+    }
+
+    pub(crate) fn site_packages(path: SystemPathBuf) -> Option<Self> {
+        Some(Self(Arc::new(ModuleResolutionPathBuf::site_packages(
+            path,
+        )?)))
+    }
+
+    pub(crate) fn editable(system: &dyn System, path: SystemPathBuf) -> Option<Self> {
+        Some(Self(Arc::new(
+            ModuleResolutionPathBuf::editable_installation_root(system, path)?,
+        )))
+    }
+
+    pub(crate) fn as_module_path(&self) -> &ModuleResolutionPathBuf {
+        &self.0
+    }
+}
+
+impl PartialEq<SystemPathBuf> for ModuleSearchPath {
+    fn eq(&self, other: &SystemPathBuf) -> bool {
+        &*self.0 == other
+    }
+}
+
+impl PartialEq<ModuleSearchPath> for SystemPathBuf {
+    fn eq(&self, other: &ModuleSearchPath) -> bool {
+        other.eq(self)
+    }
+}
+
+impl PartialEq<VendoredPathBuf> for ModuleSearchPath {
+    fn eq(&self, other: &VendoredPathBuf) -> bool {
+        &*self.0 == other
+    }
+}
+
+impl PartialEq<ModuleSearchPath> for VendoredPathBuf {
+    fn eq(&self, other: &ModuleSearchPath) -> bool {
+        other.eq(self)
+    }
+}
+
+// TODO: this is unprincipled.
+// We should instead just implement the methods we need on ModuleSearchPath,
+// and adjust the signatures/implementations of methods that receive ModuleSearchPaths.
+impl Deref for ModuleSearchPath {
+    type Target = ModuleResolutionPathBuf;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use insta::assert_debug_snapshot;
@@ -797,10 +873,12 @@ mod tests {
             };
             ModuleResolutionPathBuf(inner)
         }
+    }
 
+    impl ModuleSearchPath {
         #[must_use]
-        pub(crate) const fn is_stdlib_search_path(&self) -> bool {
-            matches!(&self.0, ModuleResolutionPathRefInner::StandardLibrary(_))
+        pub(crate) fn is_stdlib_search_path(&self) -> bool {
+            matches!(&self.0 .0, ModuleResolutionPathBufInner::StandardLibrary(_))
         }
     }
 
