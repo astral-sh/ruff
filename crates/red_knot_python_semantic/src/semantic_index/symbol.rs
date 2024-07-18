@@ -103,6 +103,15 @@ pub struct ScopeId<'db> {
 }
 
 impl<'db> ScopeId<'db> {
+    pub(crate) fn is_function_like(self, db: &'db dyn Db) -> bool {
+        matches!(
+            self.node(db),
+            NodeWithScopeKind::ClassTypeParameters(_)
+                | NodeWithScopeKind::FunctionTypeParameters(_)
+                | NodeWithScopeKind::Function(_)
+        )
+    }
+
     #[cfg(test)]
     pub(crate) fn name(self, db: &'db dyn Db) -> &'db str {
         match self.node(db) {
