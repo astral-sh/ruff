@@ -194,6 +194,7 @@ pub(super) struct FlowSnapshot {
     definitions_by_symbol: IndexVec<ScopedSymbolId, Definitions>,
 }
 
+#[derive(Debug)]
 pub(super) struct UseDefMapBuilder<'db> {
     /// Definition IDs array for `definitions_by_use` and `definitions_by_symbol` to slice into.
     all_definitions: Vec<Definition<'db>>,
