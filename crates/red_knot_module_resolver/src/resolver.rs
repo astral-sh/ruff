@@ -43,36 +43,6 @@ pub(crate) fn resolve_module_query<'db>(
     Some(module)
 }
 
-/// Return the File for builtins.
-///
-/// Can return None if a custom typeshed is used that has no `builtins.pyi`.
-pub fn builtins_file(db: &dyn Db) -> Option<File> {
-    let _span = tracing::trace_span!("builtins_file").entered();
-
-    let resolver_settings = module_resolution_settings(db);
-
-    let mut standard_library_search_paths = resolver_settings
-        .search_paths(db)
-        .filter(|search_path| search_path.is_standard_library());
-
-    let standard_library = standard_library_search_paths
-        .next()
-        .expect("Expected there to be a standard library search path");
-
-    debug_assert_eq!(
-        standard_library_search_paths.next(),
-        None,
-        "Unexpectedly found multiple search paths for the standard library"
-    );
-
-    let builtins_file = standard_library.join("builtins.pyi").to_file(
-        standard_library,
-        &ResolverState::new(db, resolver_settings.target_version()),
-    )?;
-
-    Some(builtins_file)
-}
-
 /// Resolves the module for the given path.
 ///
 /// Returns `None` if the path is not a module locatable via any of the known search paths.
@@ -472,6 +442,49 @@ pub(crate) mod internal {
     }
 }
 
+/// Modules that are builtin to the Python interpreter itself.
+///
+/// When these module names are imported, standard module resolution is bypassed:
+/// the module name always resolves to the stdlib module,
+/// even if there's a module of the same name in the workspace root
+/// (which would normally result in the stdlib module being overridden).
+///
+/// TODO(Alex): write a script to generate this list,
+/// similar to what we do in `crates/ruff_python_stdlib/src/sys.rs`
+const BUILTIN_MODULES: &[&str] = &[
+    "_abc",
+    "_ast",
+    "_codecs",
+    "_collections",
+    "_functools",
+    "_imp",
+    "_io",
+    "_locale",
+    "_operator",
+    "_signal",
+    "_sre",
+    "_stat",
+    "_string",
+    "_symtable",
+    "_thread",
+    "_tokenize",
+    "_tracemalloc",
+    "_typing",
+    "_warnings",
+    "_weakref",
+    "atexit",
+    "builtins",
+    "errno",
+    "faulthandler",
+    "gc",
+    "itertools",
+    "marshal",
+    "posix",
+    "pwd",
+    "sys",
+    "time",
+];
+
 /// Given a module name and a list of search paths in which to lookup modules,
 /// attempt to resolve the module name
 fn resolve_name(
@@ -480,8 +493,12 @@ fn resolve_name(
 ) -> Option<(Arc<ModuleResolutionPathBuf>, File, ModuleKind)> {
     let resolver_settings = module_resolution_settings(db);
     let resolver_state = ResolverState::new(db, resolver_settings.target_version());
+    let is_builtin_module = BUILTIN_MODULES.contains(&name.as_str());
 
     for search_path in resolver_settings.search_paths(db) {
+        if is_builtin_module && !search_path.is_standard_library() {
+            continue;
+        }
         let mut components = name.components();
         let module_name = components.next_back()?;
 
@@ -661,11 +678,15 @@ mod tests {
 
     #[test]
     fn builtins_vendored() {
-        let TestCase { db, stdlib, .. } = TestCaseBuilder::new().with_vendored_typeshed().build();
+        let TestCase { db, stdlib, .. } = TestCaseBuilder::new()
+            .with_vendored_typeshed()
+            .with_src_files(&[("builtins.py", "FOOOO = 42")])
+            .build();
 
-        let builtins = builtins_file(&db).expect("builtins to resolve");
+        let builtins_module_name = ModuleName::new_static("builtins").unwrap();
+        let builtins = resolve_module(&db, builtins_module_name).expect("builtins to resolve");
 
-        assert_eq!(builtins.path(&db), &stdlib.join("builtins.pyi"));
+        assert_eq!(builtins.file().path(&db), &stdlib.join("builtins.pyi"));
     }
 
     #[test]
@@ -674,14 +695,19 @@ mod tests {
             stdlib_files: &[("builtins.pyi", "def min(a, b): ...")],
             versions: "builtins: 3.8-",
         };
+
+        const SRC: &[FileSpec] = &[("builtins.py", "FOOOO = 42")];
+
         let TestCase { db, stdlib, .. } = TestCaseBuilder::new()
+            .with_src_files(SRC)
             .with_custom_typeshed(TYPESHED)
             .with_target_version(TargetVersion::Py38)
             .build();
 
-        let builtins = builtins_file(&db).expect("builtins to resolve");
+        let builtins_module_name = ModuleName::new_static("builtins").unwrap();
+        let builtins = resolve_module(&db, builtins_module_name).expect("builtins to resolve");
 
-        assert_eq!(builtins.path(&db), &stdlib.join("builtins.pyi"));
+        assert_eq!(builtins.file().path(&db), &stdlib.join("builtins.pyi"));
     }
 
     #[test]
