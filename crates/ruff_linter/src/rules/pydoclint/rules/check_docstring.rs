@@ -72,7 +72,7 @@ impl Violation for DocstringMissingException {
     }
 }
 
-/// ## What it does'
+/// ## What it does
 /// Checks for function docstrings that include exceptions which are not
 /// explicitly raised.
 ///
