@@ -71,15 +71,14 @@ pub(crate) fn get_section_contexts<'a>(
     docstring: &'a Docstring<'a>,
     convention: Option<&'a Convention>,
 ) -> SectionContexts<'a> {
-    let section_contexts;
     match convention {
         Some(Convention::Google) => {
-            section_contexts = SectionContexts::from_docstring(docstring, SectionStyle::Google);
+            return SectionContexts::from_docstring(docstring, SectionStyle::Google);
         }
         Some(Convention::Numpy) => {
-            section_contexts = SectionContexts::from_docstring(docstring, SectionStyle::Numpy);
+            return SectionContexts::from_docstring(docstring, SectionStyle::Numpy);
         }
-        Some(Convention::Pep257) | None => 'unspecified: {
+        Some(Convention::Pep257) | None => {
             // There are some overlapping section names, between the Google and NumPy conventions
             // (e.g., "Returns", "Raises"). Break ties by checking for the presence of some of the
             // section names that are unique to each convention.
@@ -95,8 +94,7 @@ pub(crate) fn get_section_contexts<'a>(
                         | SectionKind::OtherParameters
                 )
             }) {
-                section_contexts = numpy_sections;
-                break 'unspecified;
+                return numpy_sections;
             }
 
             // If the docstring contains any argument specifier, use the Google convention.
@@ -112,17 +110,15 @@ pub(crate) fn get_section_contexts<'a>(
                         | SectionKind::OtherArguments
                 )
             }) {
-                section_contexts = google_sections;
-                break 'unspecified;
+                return google_sections;
             }
 
             // Otherwise, use whichever convention matched more sections.
             if google_sections.len() > numpy_sections.len() {
-                section_contexts = google_sections;
+                return google_sections;
             } else {
-                section_contexts = numpy_sections;
+                return numpy_sections;
             }
         }
     }
-    section_contexts
 }
