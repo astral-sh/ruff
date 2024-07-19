@@ -233,8 +233,14 @@ impl ModuleResolutionPathBuf {
         ModuleResolutionPathRef::from(self).is_directory(search_path, resolver)
     }
 
-    pub(crate) fn is_site_packages(&self) -> bool {
+    #[must_use]
+    pub(crate) const fn is_site_packages(&self) -> bool {
         matches!(self.0, ModuleResolutionPathBufInner::SitePackages(_))
+    }
+
+    #[must_use]
+    pub(crate) const fn is_standard_library(&self) -> bool {
+        matches!(self.0, ModuleResolutionPathBufInner::StandardLibrary(_))
     }
 
     #[must_use]

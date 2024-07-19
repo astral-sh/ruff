@@ -1,6 +1,7 @@
 use ruff_db::files::File;
 use ruff_python_ast::name::Name;
 
+use crate::builtins::builtins_scope;
 use crate::semantic_index::definition::Definition;
 use crate::semantic_index::symbol::{ScopeId, ScopedSymbolId};
 use crate::semantic_index::{global_scope, symbol_table, use_def_map};
@@ -45,6 +46,15 @@ pub(crate) fn symbol_ty_by_name<'db>(
 /// Shorthand for `symbol_ty` that looks up a module-global symbol in a file.
 pub(crate) fn global_symbol_ty_by_name<'db>(db: &'db dyn Db, file: File, name: &str) -> Type<'db> {
     symbol_ty_by_name(db, global_scope(db, file), name)
+}
+
+/// Shorthand for `symbol_ty` that looks up a symbol in the builtins.
+///
+/// Returns `None` if the builtins module isn't available for some reason.
+pub(crate) fn builtins_symbol_ty_by_name<'db>(db: &'db dyn Db, name: &str) -> Type<'db> {
+    builtins_scope(db)
+        .map(|builtins| symbol_ty_by_name(db, builtins, name))
+        .unwrap_or(Type::Unbound)
 }
 
 /// Infer the type of a [`Definition`].
