@@ -1,10 +1,13 @@
 use crate::checkers::ast::Checker;
 use crate::rules::ruff::fastapi::is_fastapi_route;
-use ruff_diagnostics::{Diagnostic, Violation};
+use crate::settings::types::PythonVersion;
+use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast as ast;
 use ruff_python_ast::helpers::map_callable;
+use ruff_python_ast::imports::{AnyImport, ImportFrom};
 use ruff_python_semantic::Modules;
+use ruff_text_size::{Ranged, TextSize};
 
 /// ## What it does
 /// Identifies FastApi routes using the deprecated dependency style, which omits Annotated.
@@ -54,19 +57,18 @@ use ruff_python_semantic::Modules;
 
 #[violation]
 pub struct FastApiNotAnnotatedDependency {
-    name: String,
+    annotated_style: String,
 }
 
-impl Violation for FastApiNotAnnotatedDependency {
+impl AlwaysFixableViolation for FastApiNotAnnotatedDependency {
     #[derive_message_formats]
     fn message(&self) -> String {
         format!("FastAPI dependency without Annotated")
     }
 
-    // fn fix_title(&self) -> String {
-    //     format!("Parameter {} should use Annotated.", self.name)
-    //
-    // }
+    fn fix_title(&self) -> String {
+        format!("Replace with `{}`", self.annotated_style)
+    }
 }
 
 /// RUF103
@@ -81,7 +83,9 @@ pub(crate) fn fastapi_not_annotated_dependency(
         return;
     }
     for parameter in &function_def.parameters.args {
-        if let (Some(_), Some(default)) = (&parameter.parameter.annotation, &parameter.default) {
+        if let (Some(annotation), Some(default)) =
+            (&parameter.parameter.annotation, &parameter.default)
+        {
             if checker
                 .semantic()
                 .resolve_qualified_name(map_callable(default))
@@ -103,12 +107,32 @@ pub(crate) fn fastapi_not_annotated_dependency(
                     )
                 })
             {
-                let diagnostic = Diagnostic::new(
+                let fix_content = format!(
+                    "{}: Annotated[{}, {}]",
+                    parameter.parameter.name.id,
+                    checker.locator().slice(annotation.range()),
+                    checker.locator().slice(default.range())
+                );
+                let mut diagnostic = Diagnostic::new(
                     FastApiNotAnnotatedDependency {
-                        name: parameter.parameter.name.id.to_string(),
+                        annotated_style: fix_content.clone(),
                     },
                     parameter.range,
                 );
+                let required_import = AnyImport::ImportFrom(ImportFrom::member(
+                    if checker.settings.target_version >= PythonVersion::Py39 {
+                        "typing"
+                    } else {
+                        "typing_extensions"
+                    },
+                    "Annotated",
+                ));
+                diagnostic.set_fix(Fix::unsafe_edits(
+                    Edit::range_replacement(fix_content, parameter.range),
+                    [checker
+                        .importer()
+                        .add_import(&required_import, TextSize::default())],
+                ));
                 checker.diagnostics.push(diagnostic);
             }
         }
