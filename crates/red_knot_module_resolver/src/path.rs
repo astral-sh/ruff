@@ -387,7 +387,12 @@ impl<'a> ModuleResolutionPathRefInner<'a> {
                     TypeshedVersionsQueryResult::DoesNotExist => false,
                     TypeshedVersionsQueryResult::Exists | TypeshedVersionsQueryResult::MaybeExists => match path {
                         FilePathRef::System(path) => system_path_to_file(resolver.db.upcast(),path.join("__init__.pyi")).is_some(),
-                        FilePathRef::Vendored(path) => vendored_path_to_file(resolver.db.upcast(), path.join("__init__.pyi")).is_some(),
+                        // No need to use `vendored_path_to_file` here:
+                        // (1) The vendored filesystem is immutable, so we don't need to worry about Salsa invalidation
+                        // (2) The caching Salsa provides probably won't speed us up that much
+                        //     (TODO: check that assumption when we're able to run red-knot on larger code bases)
+                        // (3) We don't need the `File` object that `vendored_path_to_file` would return; we just need to know if the file exists
+                        FilePathRef::Vendored(path) => resolver.db.vendored().exists(path.join("__init__.pyi"))
                     },
                 }
             }
