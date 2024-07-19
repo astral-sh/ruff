@@ -114,9 +114,13 @@ pub struct ResolvedReferenceId;
 
 /// The references of a program indexed by [`ResolvedReferenceId`].
 #[derive(Debug, Default)]
-pub(crate) struct ResolvedReferences(IndexVec<ResolvedReferenceId, ResolvedReference>);
+pub struct ResolvedReferences(IndexVec<ResolvedReferenceId, ResolvedReference>);
 
 impl ResolvedReferences {
+    pub fn reserve(&mut self, additional: usize) {
+        self.0.reserve(additional)
+    }
+
     /// Pushes a new [`ResolvedReference`] and returns its [`ResolvedReferenceId`].
     pub(crate) fn push(
         &mut self,
@@ -195,9 +199,13 @@ bitflags! {
 }
 
 #[derive(Debug, Default)]
-pub(crate) struct UnresolvedReferences(Vec<UnresolvedReference>);
+pub struct UnresolvedReferences(Vec<UnresolvedReference>);
 
 impl UnresolvedReferences {
+    pub fn reserve(&mut self, additional: usize) {
+        self.0.reserve(additional)
+    }
+
     /// Pushes a new [`UnresolvedReference`].
     pub(crate) fn push(
         &mut self,

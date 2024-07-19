@@ -22,6 +22,10 @@ impl<I: Idx, T> IndexVec<I, T> {
         }
     }
 
+    pub fn reserve(&mut self, additional: usize) {
+        self.raw.reserve(additional)
+    }
+
     #[inline]
     pub fn with_capacity(capacity: usize) -> Self {
         Self {

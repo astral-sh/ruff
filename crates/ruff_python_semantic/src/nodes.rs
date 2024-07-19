@@ -47,6 +47,14 @@ impl<'a> Nodes<'a> {
         })
     }
 
+    pub fn reserve(&mut self, additional: usize) {
+        self.nodes.reserve(additional)
+    }
+
+    pub fn len(&self) -> usize {
+        self.nodes.len()
+    }
+
     /// Return the [`NodeId`] of the parent node.
     #[inline]
     pub fn parent_id(&self, node_id: NodeId) -> Option<NodeId> {

@@ -33,7 +33,7 @@ pub struct SemanticModel<'a> {
     module: Module<'a>,
 
     /// Stack of all AST nodes in the program.
-    nodes: Nodes<'a>,
+    pub nodes: Nodes<'a>,
 
     /// The ID of the current AST node.
     node_id: Option<NodeId>,
@@ -58,13 +58,13 @@ pub struct SemanticModel<'a> {
     pub bindings: Bindings<'a>,
 
     /// Stack of all references created in any scope, at any point in execution.
-    resolved_references: ResolvedReferences,
+    pub resolved_references: ResolvedReferences,
 
     /// Stack of all unresolved references created in any scope, at any point in execution.
-    unresolved_references: UnresolvedReferences,
+    pub unresolved_references: UnresolvedReferences,
 
     /// Arena of global bindings.
-    globals: GlobalsArena<'a>,
+    pub globals: GlobalsArena<'a>,
 
     /// Map from binding ID to binding ID that it shadows (in another scope).
     ///
@@ -129,7 +129,7 @@ pub struct SemanticModel<'a> {
 
     /// Map from [`ast::ExprName`] node (represented as a [`NameId`]) to the [`Binding`] to which
     /// it resolved (represented as a [`BindingId`]).
-    resolved_names: FxHashMap<NameId, BindingId>,
+    pub resolved_names: FxHashMap<NameId, BindingId>,
 }
 
 impl<'a> SemanticModel<'a> {
@@ -157,6 +157,37 @@ impl<'a> SemanticModel<'a> {
             handled_exceptions: Vec::default(),
             resolved_names: FxHashMap::default(),
         }
+    }
+
+    pub fn reserve(&mut self, capacity: usize) {
+        const NODES_PER_BYTE: f64 = 0.0735463782722034;
+        const SCOPES_PER_BYTE: f64 = 0.003789696886327717;
+        const BINDINGS_PER_BYTE: f64 = 0.033044323498783695;
+        const DEFINITIONS_PER_BYTE: f64 = 0.001704180043788056;
+        const RESOLVED_REFERENCES_PER_BYTE: f64 = 0.01967324945679754;
+        const UNRESOLVED_REFERENCES_PER_BYTE: f64 = 0.0001548020396830927;
+        const GLOBALS_PER_BYTE: f64 = 3.8755626455402864e-06;
+        const RESOLVED_NAMES_PER_BYTE: f64 = 0.019565557549871618;
+        const SHADOWED_BINDINGS_PER_BYTE: f64 = 0.00017560708107067872;
+
+        self.nodes
+            .reserve((NODES_PER_BYTE * capacity as f64) as usize);
+        self.scopes
+            .reserve((SCOPES_PER_BYTE * capacity as f64) as usize);
+        self.bindings
+            .reserve((BINDINGS_PER_BYTE * capacity as f64) as usize);
+        self.definitions
+            .reserve((DEFINITIONS_PER_BYTE * capacity as f64) as usize);
+        self.resolved_references
+            .reserve((RESOLVED_REFERENCES_PER_BYTE * capacity as f64) as usize);
+        self.unresolved_references
+            .reserve((UNRESOLVED_REFERENCES_PER_BYTE * capacity as f64) as usize);
+        self.globals
+            .reserve((GLOBALS_PER_BYTE * capacity as f64) as usize);
+        self.resolved_names
+            .reserve((RESOLVED_NAMES_PER_BYTE * capacity as f64) as usize);
+        self.shadowed_bindings
+            .reserve((SHADOWED_BINDINGS_PER_BYTE * capacity as f64) as usize);
     }
 
     /// Return the [`Binding`] for the given [`BindingId`].
@@ -2328,7 +2359,7 @@ impl Ranged for ImportedName {
 /// A unique identifier for an [`ast::ExprName`]. No two names can even appear at the same location
 /// in the source code, so the starting offset is a cheap and sufficient unique identifier.
 #[derive(Debug, Hash, PartialEq, Eq)]
-struct NameId(TextSize);
+pub struct NameId(TextSize);
 
 impl From<&ast::ExprName> for NameId {
     fn from(name: &ast::ExprName) -> Self {

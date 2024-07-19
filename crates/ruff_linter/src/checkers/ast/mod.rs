@@ -1914,6 +1914,10 @@ impl<'a> Checker<'a> {
         binding_id
     }
 
+    fn reserve(&mut self) {
+        self.semantic.reserve(self.locator.contents().len());
+    }
+
     fn bind_builtins(&mut self) {
         for builtin in PYTHON_BUILTINS
             .iter()
@@ -2411,6 +2415,7 @@ pub(crate) fn check_ast(
         cell_offsets,
         notebook_index,
     );
+    checker.reserve();
     checker.bind_builtins();
 
     // Iterate over the AST.
@@ -2435,6 +2440,30 @@ pub(crate) fn check_ast(
     checker.semantic.scope_id = ScopeId::global();
     checker.analyze.scopes.push(ScopeId::global());
     analyze::deferred_scopes(&mut checker);
+
+    // println!("source: {:?}", checker.locator.contents().len());
+    // println!("nodes: {:?}", checker.semantic().nodes.len());
+    // println!("lines: {:?}", checker.locator.contents().lines().count());
+    // println!("scopes: {:?}", checker.semantic.scopes.len());
+    // println!("bindings: {:?}", checker.semantic.bindings.len());
+    // println!("definitions: {:?}", checker.semantic.definitions.len());
+    // println!(
+    //     "resolved_references: {:?}",
+    //     checker.semantic.resolved_references.len()
+    // );
+    // println!(
+    //     "unresolved_references: {:?}",
+    //     checker.semantic.unresolved_references.len()
+    // );
+    // println!("globals: {:?}", checker.semantic.globals.len());
+    // println!(
+    //     "resolved_names: {:?}",
+    //     checker.semantic.resolved_names.len()
+    // );
+    // println!(
+    //     "shadowed_bindings: {:?}",
+    //     checker.semantic.shadowed_bindings.len()
+    // );
 
     checker.diagnostics
 }

@@ -357,6 +357,10 @@ pub struct BindingId;
 pub struct Bindings<'a>(IndexVec<BindingId, Binding<'a>>);
 
 impl<'a> Bindings<'a> {
+    pub fn reserve(&mut self, additional: usize) {
+        self.0.reserve(additional)
+    }
+
     /// Pushes a new [`Binding`] and returns its [`BindingId`].
     pub fn push(&mut self, binding: Binding<'a>) -> BindingId {
         self.0.push(binding)

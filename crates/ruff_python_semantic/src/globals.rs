@@ -16,12 +16,20 @@ use ruff_python_ast::statement_visitor::{walk_stmt, StatementVisitor};
 pub struct GlobalsId;
 
 #[derive(Debug, Default)]
-pub(crate) struct GlobalsArena<'a>(IndexVec<GlobalsId, Globals<'a>>);
+pub struct GlobalsArena<'a>(IndexVec<GlobalsId, Globals<'a>>);
 
 impl<'a> GlobalsArena<'a> {
+    pub fn reserve(&mut self, additional: usize) {
+        self.0.reserve(additional)
+    }
+
     /// Inserts a new set of global names into the global names arena and returns its unique id.
     pub(crate) fn push(&mut self, globals: Globals<'a>) -> GlobalsId {
         self.0.push(globals)
+    }
+
+    pub fn len(&self) -> usize {
+        self.0.len()
     }
 }
 

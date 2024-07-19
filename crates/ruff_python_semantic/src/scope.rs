@@ -203,6 +203,10 @@ impl ScopeId {
 pub struct Scopes<'a>(IndexVec<ScopeId, Scope<'a>>);
 
 impl<'a> Scopes<'a> {
+    pub fn reserve(&mut self, additional: usize) {
+        self.0.reserve(additional)
+    }
+
     /// Returns a reference to the global scope
     pub(crate) fn global(&self) -> &Scope<'a> {
         &self[ScopeId::global()]

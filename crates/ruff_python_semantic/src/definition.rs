@@ -187,6 +187,10 @@ impl<'a> Definition<'a> {
 pub struct Definitions<'a>(IndexVec<DefinitionId, Definition<'a>>);
 
 impl<'a> Definitions<'a> {
+    pub fn reserve(&mut self, additional: usize) {
+        self.0.reserve(additional)
+    }
+
     pub fn for_module(definition: Module<'a>) -> Self {
         Self(IndexVec::from_raw(vec![Definition::Module(definition)]))
     }
