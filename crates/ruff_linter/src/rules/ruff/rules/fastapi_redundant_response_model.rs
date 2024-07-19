@@ -1,7 +1,7 @@
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast as ast;
-use ruff_python_ast::{Decorator, ExprCall, Keyword, StmtFunctionDef};
+use ruff_python_ast::{Decorator, Expr, ExprCall, Keyword, StmtFunctionDef};
 use ruff_python_semantic::analyze::typing::resolve_assignment;
 use ruff_text_size::Ranged;
 
@@ -118,13 +118,48 @@ fn check_decorator<'a>(
         return None;
     }
     let response_model_arg = call.arguments.find_keyword("response_model")?;
-    let return_value = function_def.returns.clone()?;
-    let response_mode_name_expr = response_model_arg.value.as_name_expr()?;
-    let return_value_name_expr = return_value.as_name_expr()?;
-    let is_response_model_redundant = checker.semantic().resolve_name(response_mode_name_expr)
-        == checker.semantic().resolve_name(return_value_name_expr);
-    if !is_response_model_redundant {
+    let return_value = function_def.returns.as_ref()?;
+    if !is_identical_types(&response_model_arg.value, return_value, checker) {
         return None;
     }
     Some((call, response_model_arg))
+}
+
+fn is_identical_types(response_model_arg: &Expr, return_value: &Expr, checker: &Checker) -> bool {
+    if let (Some(response_mode_name_expr), Some(return_value_name_expr)) = (
+        response_model_arg.as_name_expr(),
+        return_value.as_name_expr(),
+    ) {
+        return checker.semantic().resolve_name(response_mode_name_expr)
+            == checker.semantic().resolve_name(return_value_name_expr);
+    }
+    if let (Some(response_mode_subscript), Some(return_value_subscript)) = (
+        response_model_arg.as_subscript_expr(),
+        return_value.as_subscript_expr(),
+    ) {
+        return is_identical_types(
+            &response_mode_subscript.value,
+            &return_value_subscript.value,
+            checker,
+        ) && is_identical_types(
+            &response_mode_subscript.slice,
+            &return_value_subscript.slice,
+            checker,
+        );
+    }
+    if let (Some(response_mode_tuple), Some(return_value_tuple)) = (
+        response_model_arg.as_tuple_expr(),
+        return_value.as_tuple_expr(),
+    ) {
+        return if response_mode_tuple.elts.len() == return_value_tuple.elts.len() {
+            response_mode_tuple
+                .elts
+                .iter()
+                .zip(return_value_tuple.elts.iter())
+                .all(|(x, y)| is_identical_types(x, y, checker))
+        } else {
+            false
+        };
+    }
+    false
 }

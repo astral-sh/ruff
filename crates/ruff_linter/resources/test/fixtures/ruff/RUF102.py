@@ -11,6 +11,18 @@ class Item(BaseModel):
 async def create_item(item: Item) -> Item:
     return item
 
+@app.post("/items/", response_model=list[Item])
+async def create_item(item: Item) -> list[Item]:
+    return item
+
+@app.post("/items/", response_model=List[Item])
+async def create_item(item: Item) -> List[Item]:
+    return item
+
+@app.post("/items/", response_model=Dict[str, Item])
+async def create_item(item: Item) -> Dict[str, Item]:
+    return item
+
 @app.post("/items/", response_model=str)
 async def create_item(item: Item) -> str:
     return item
@@ -55,6 +67,18 @@ async def create_item(item: Item) -> Item:
 
 @app.post("/items/", response_model=str)
 async def create_item(item: Item):
+    return item
+
+@app.post("/items/", response_model=list[str])
+async def create_item(item: Item) -> Dict[str, Item]:
+    return item
+
+@app.post("/items/", response_model=list[str])
+async def create_item(item: Item) -> list[str, str]:
+    return item
+
+@app.post("/items/", response_model=Dict[str, int])
+async def create_item(item: Item) -> Dict[str, str]:
     return item
 
 app = None
