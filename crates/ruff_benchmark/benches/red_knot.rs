@@ -137,7 +137,7 @@ fn benchmark_incremental(criterion: &mut Criterion) {
 
                 case.fs
                     .write_file(
-                        SystemPath::new("/src/foo.py"),
+                        SystemPath::new("/src/bar.py"),
                         format!("{BAR_CODE}\n# A comment\n"),
                     )
                     .unwrap();
