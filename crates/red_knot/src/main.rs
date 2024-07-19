@@ -17,9 +17,10 @@ use red_knot::workspace::WorkspaceMetadata;
 use ruff_db::program::{ProgramSettings, SearchPathSettings};
 use ruff_db::system::{OsSystem, System, SystemPathBuf};
 
-use self::target_version::TargetVersion;
+use cli::target_version::TargetVersion;
+use cli::verbosity::{Verbosity, VerbosityLevel};
 
-mod target_version;
+mod cli;
 
 #[derive(Debug, Parser)]
 #[command(
@@ -43,14 +44,19 @@ struct Args {
         help = "Custom directory to use for stdlib typeshed stubs"
     )]
     custom_typeshed_dir: Option<SystemPathBuf>,
+
     #[arg(
         long,
         value_name = "PATH",
         help = "Additional path to use as a module-resolution source (can be passed multiple times)"
     )]
     extra_search_path: Vec<SystemPathBuf>,
+
     #[arg(long, help = "Python version to assume when resolving types", default_value_t = TargetVersion::default(), value_name="VERSION")]
     target_version: TargetVersion,
+
+    #[clap(flatten)]
+    verbosity: Verbosity,
 }
 
 #[allow(
@@ -60,15 +66,17 @@ struct Args {
     clippy::dbg_macro
 )]
 pub fn main() -> anyhow::Result<()> {
-    countme::enable(true);
-    setup_tracing();
-
     let Args {
         current_directory,
         custom_typeshed_dir,
         extra_search_path: extra_paths,
         target_version,
+        verbosity,
     } = Args::parse_from(std::env::args().collect::<Vec<_>>());
+
+    let verbosity = verbosity.level();
+    countme::enable(verbosity == Some(VerbosityLevel::Trace));
+    setup_tracing(verbosity);
 
     let cwd = if let Some(cwd) = current_directory {
         let canonicalized = cwd.as_utf8_path().canonicalize_utf8().unwrap();
@@ -97,7 +105,7 @@ pub fn main() -> anyhow::Result<()> {
     //   cache and load the cache if it exists.
     let mut db = RootDatabase::new(workspace_metadata, program_settings, system);
 
-    let (main_loop, main_loop_cancellation_token) = MainLoop::new();
+    let (main_loop, main_loop_cancellation_token) = MainLoop::new(verbosity);
 
     // Listen to Ctrl+C and abort the watch mode.
     let main_loop_cancellation_token = Mutex::new(Some(main_loop_cancellation_token));
@@ -126,18 +134,19 @@ pub fn main() -> anyhow::Result<()> {
 }
 
 struct MainLoop {
-    orchestrator_sender: crossbeam_channel::Sender<OrchestratorMessage>,
-    main_loop_receiver: crossbeam_channel::Receiver<MainLoopMessage>,
+    verbosity: Option<VerbosityLevel>,
+    orchestrator: crossbeam_channel::Sender<OrchestratorMessage>,
+    receiver: crossbeam_channel::Receiver<MainLoopMessage>,
 }
 
 impl MainLoop {
-    fn new() -> (Self, MainLoopCancellationToken) {
+    fn new(verbosity: Option<VerbosityLevel>) -> (Self, MainLoopCancellationToken) {
         let (orchestrator_sender, orchestrator_receiver) = crossbeam_channel::bounded(1);
         let (main_loop_sender, main_loop_receiver) = crossbeam_channel::bounded(1);
 
         let mut orchestrator = Orchestrator {
             receiver: orchestrator_receiver,
-            sender: main_loop_sender.clone(),
+            main_loop: main_loop_sender.clone(),
             revision: 0,
         };
 
@@ -147,8 +156,9 @@ impl MainLoop {
 
         (
             Self {
-                orchestrator_sender,
-                main_loop_receiver,
+                verbosity,
+                orchestrator: orchestrator_sender,
+                receiver: main_loop_receiver,
             },
             MainLoopCancellationToken {
                 sender: main_loop_sender,
@@ -158,29 +168,27 @@ impl MainLoop {
 
     fn file_changes_notifier(&self) -> FileChangesNotifier {
         FileChangesNotifier {
-            sender: self.orchestrator_sender.clone(),
+            sender: self.orchestrator.clone(),
         }
     }
 
     #[allow(clippy::print_stderr)]
     fn run(self, db: &mut RootDatabase) {
-        self.orchestrator_sender
-            .send(OrchestratorMessage::Run)
-            .unwrap();
+        self.orchestrator.send(OrchestratorMessage::Run).unwrap();
 
-        for message in &self.main_loop_receiver {
+        for message in &self.receiver {
             tracing::trace!("Main Loop: Tick");
 
             match message {
                 MainLoopMessage::CheckWorkspace { revision } => {
                     let db = db.snapshot();
-                    let sender = self.orchestrator_sender.clone();
+                    let orchestrator = self.orchestrator.clone();
 
                     // Spawn a new task that checks the workspace. This needs to be done in a separate thread
                     // to prevent blocking the main loop here.
                     rayon::spawn(move || {
                         if let Ok(result) = db.check() {
-                            sender
+                            orchestrator
                                 .send(OrchestratorMessage::CheckCompleted {
                                     diagnostics: result,
                                     revision,
@@ -195,10 +203,14 @@ impl MainLoop {
                 }
                 MainLoopMessage::CheckCompleted(diagnostics) => {
                     eprintln!("{}", diagnostics.join("\n"));
-                    eprintln!("{}", countme::get_all());
+                    if self.verbosity == Some(VerbosityLevel::Trace) {
+                        eprintln!("{}", countme::get_all());
+                    }
                 }
                 MainLoopMessage::Exit => {
-                    eprintln!("{}", countme::get_all());
+                    if self.verbosity == Some(VerbosityLevel::Trace) {
+                        eprintln!("{}", countme::get_all());
+                    }
                     return;
                 }
             }
@@ -208,7 +220,7 @@ impl MainLoop {
 
 impl Drop for MainLoop {
     fn drop(&mut self) {
-        self.orchestrator_sender
+        self.orchestrator
             .send(OrchestratorMessage::Shutdown)
             .unwrap();
     }
@@ -240,7 +252,7 @@ impl MainLoopCancellationToken {
 
 struct Orchestrator {
     /// Sends messages to the main loop.
-    sender: crossbeam_channel::Sender<MainLoopMessage>,
+    main_loop: crossbeam_channel::Sender<MainLoopMessage>,
     /// Receives messages from the main loop.
     receiver: crossbeam_channel::Receiver<OrchestratorMessage>,
     revision: usize,
@@ -252,7 +264,7 @@ impl Orchestrator {
         while let Ok(message) = self.receiver.recv() {
             match message {
                 OrchestratorMessage::Run => {
-                    self.sender
+                    self.main_loop
                         .send(MainLoopMessage::CheckWorkspace {
                             revision: self.revision,
                         })
@@ -265,7 +277,7 @@ impl Orchestrator {
                 } => {
                     // Only take the diagnostics if they are for the latest revision.
                     if self.revision == revision {
-                        self.sender
+                        self.main_loop
                             .send(MainLoopMessage::CheckCompleted(diagnostics))
                             .unwrap();
                     } else {
@@ -313,8 +325,8 @@ impl Orchestrator {
                 },
                 default(std::time::Duration::from_millis(10)) => {
                     // No more file changes after 10 ms, send the changes and schedule a new analysis
-                    self.sender.send(MainLoopMessage::ApplyChanges(changes)).unwrap();
-                    self.sender.send(MainLoopMessage::CheckWorkspace { revision: self.revision}).unwrap();
+                    self.main_loop.send(MainLoopMessage::ApplyChanges(changes)).unwrap();
+                    self.main_loop.send(MainLoopMessage::CheckWorkspace { revision: self.revision}).unwrap();
                     return;
                 }
             }
@@ -349,7 +361,14 @@ enum OrchestratorMessage {
     FileChanges(Vec<FileWatcherChange>),
 }
 
-fn setup_tracing() {
+fn setup_tracing(verbosity: Option<VerbosityLevel>) {
+    let trace_level = match verbosity {
+        None => Level::WARN,
+        Some(VerbosityLevel::Info) => Level::INFO,
+        Some(VerbosityLevel::Debug) => Level::DEBUG,
+        Some(VerbosityLevel::Trace) => Level::TRACE,
+    };
+
     let subscriber = Registry::default().with(
         tracing_tree::HierarchicalLayer::default()
             .with_indent_lines(true)
@@ -359,9 +378,7 @@ fn setup_tracing() {
             .with_targets(true)
             .with_writer(|| Box::new(std::io::stderr()))
             .with_timer(Uptime::default())
-            .with_filter(LoggingFilter {
-                trace_level: Level::TRACE,
-            }),
+            .with_filter(LoggingFilter { trace_level }),
     );
 
     tracing::subscriber::set_global_default(subscriber).unwrap();

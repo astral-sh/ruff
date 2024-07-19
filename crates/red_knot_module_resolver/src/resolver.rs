@@ -125,11 +125,11 @@ pub(crate) fn module_resolution_settings(db: &dyn Db) -> ModuleResolutionSetting
     } = program.search_paths(db.upcast());
 
     if let Some(custom_typeshed) = custom_typeshed {
-        tracing::debug!("Custom typeshed directory: {custom_typeshed}");
+        tracing::info!("Custom typeshed directory: {custom_typeshed}");
     }
 
     if !extra_paths.is_empty() {
-        tracing::debug!("extra search paths: {extra_paths:?}");
+        tracing::info!("extra search paths: {extra_paths:?}");
     }
 
     let current_directory = db.system().current_directory();
@@ -174,7 +174,7 @@ pub(crate) fn module_resolution_settings(db: &dyn Db) -> ModuleResolutionSetting
     // TODO vendor typeshed's third-party stubs as well as the stdlib and fallback to them as a final step
 
     let target_version = program.target_version(db.upcast());
-    tracing::debug!("Target version: {target_version}");
+    tracing::info!("Target version: {target_version}");
 
     // Filter out module resolution paths that point to the same directory on disk (the same invariant maintained by [`sys.path` at runtime]).
     // (Paths may, however, *overlap* -- e.g. you could have both `src/` and `src/foo`
