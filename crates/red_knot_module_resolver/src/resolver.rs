@@ -1603,4 +1603,28 @@ not_a_directory
             ModuleResolutionPathBuf::editable_installation_root(db.system(), "/src").unwrap()
         )));
     }
+
+    #[test]
+    fn no_duplicate_editable_search_paths_added() {
+        let TestCase { mut db, .. } = TestCaseBuilder::new()
+            .with_site_packages_files(&[("_foo.pth", "/x"), ("_bar.pth", "/x")])
+            .build();
+
+        db.write_file("/x/foo.py", "").unwrap();
+
+        let search_paths: Vec<&SearchPathRoot> =
+            module_resolution_settings(&db).search_paths(&db).collect();
+
+        let editable_install =
+            ModuleResolutionPathBuf::editable_installation_root(db.system(), "/x").unwrap();
+
+        assert_eq!(
+            search_paths
+                .iter()
+                .filter(|path| ****path == editable_install)
+                .count(),
+            1,
+            "Unexpected search paths: {search_paths:?}"
+        );
+    }
 }
