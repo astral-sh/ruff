@@ -41,6 +41,7 @@ impl TestCase {
 
     fn stop_watch(&mut self) -> Vec<watch::ChangeEvent> {
         if let Some(watcher) = self.watcher.take() {
+            // Give the watcher some time to catch up.
             std::thread::sleep(Duration::from_millis(10));
             watcher.flush();
             watcher.stop();
@@ -60,17 +61,30 @@ where
     I: IntoIterator<Item = (P, &'static str)>,
     P: AsRef<SystemPath>,
 {
-    let root = tempfile::tempdir()?;
-    let root_path = SystemPath::from_std_path(root.path()).with_context(|| {
+    let temp_dir = tempfile::tempdir()?;
+
+    let workspace_path = temp_dir.path().join("workspace");
+
+    std::fs::create_dir_all(&workspace_path).with_context(|| {
         format!(
-            "Temp directory root '{}' is not a valid UTF-8 path.",
-            root.path().display()
+            "Failed to create workspace directory '{}'",
+            workspace_path.display()
         )
     })?;
 
-    let workspace_path = root_path.join("workspace");
-    std::fs::create_dir_all(workspace_path.as_std_path())
-        .with_context(|| format!("Failed to create workspace directory '{workspace_path}'"))?;
+    let workspace_path = SystemPath::from_std_path(&workspace_path).ok_or_else(|| {
+        anyhow!(
+            "Workspace root '{}' in temp directory is not a valid UTF-8 path.",
+            workspace_path.display()
+        )
+    })?;
+
+    let workspace_path = SystemPathBuf::from_utf8_path_buf(
+        workspace_path
+            .as_utf8_path()
+            .canonicalize_utf8()
+            .with_context(|| "Failed to canonzialize workspace path.")?,
+    );
 
     for (relative_path, content) in workspace_files {
         let relative_path = relative_path.as_ref();
@@ -112,7 +126,7 @@ where
         db,
         changes_receiver: receiver,
         watcher: Some(watcher),
-        temp_dir: root,
+        temp_dir,
     };
 
     Ok(test_case)
