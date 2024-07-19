@@ -281,15 +281,18 @@ impl File {
 
         let metadata = db.system().path_metadata(path);
 
-        let (status, revision) = match metadata {
-            Ok(metadata) if metadata.file_type().is_file() => {
-                (FileStatus::Exists, metadata.revision())
-            }
-            _ => (FileStatus::Deleted, FileRevision::zero()),
+        let (status, revision, permission) = match metadata {
+            Ok(metadata) if metadata.file_type().is_file() => (
+                FileStatus::Exists,
+                metadata.revision(),
+                metadata.permissions(),
+            ),
+            _ => (FileStatus::Deleted, FileRevision::zero(), None),
         };
 
         file.set_status(db).to(status);
         file.set_revision(db).to(revision);
+        file.set_permissions(db).to(permission);
     }
 
     /// Returns `true` if the file exists.

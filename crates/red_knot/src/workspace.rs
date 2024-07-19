@@ -254,6 +254,7 @@ impl Package {
         self.file_set(db)
     }
 
+    #[tracing::instrument(level = "debug", skip(db))]
     pub fn remove_file(self, db: &mut dyn Db, file: File) -> bool {
         let mut files_arc = self.file_set(db).clone();
 

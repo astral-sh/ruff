@@ -31,6 +31,9 @@ tracing = { workspace = true }
 tracing-subscriber = { workspace = true }
 tracing-tree = { workspace = true }
 
+[dev-dependencies]
+tempfile = { workspace = true }
+
 
 [lints]
 workspace = true

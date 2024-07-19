@@ -14,6 +14,8 @@ use ruff_db::{Db as SourceDb, Jar as SourceJar, Upcast};
 use crate::lint::{lint_semantic, lint_syntax, unwind_if_cancelled, Diagnostics};
 use crate::workspace::{check_file, Package, Workspace, WorkspaceMetadata};
 
+mod changes;
+
 pub trait Db: DbWithJar<Jar> + SemanticDb + Upcast<dyn SemanticDb> {}
 
 #[salsa::jar(db=Db)]
