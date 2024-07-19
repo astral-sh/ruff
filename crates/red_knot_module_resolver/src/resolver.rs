@@ -47,7 +47,7 @@ pub(crate) fn resolve_module_query<'db>(
 ///
 /// Can return None if a custom typeshed is used that has no `builtins.pyi`.
 pub fn builtins_file(db: &dyn Db) -> Option<File> {
-    let _span = tracing::trace_span!("resolve_builtins").entered();
+    let _span = tracing::trace_span!("builtins_file").entered();
 
     let resolver_settings = module_resolution_settings(db);
 
