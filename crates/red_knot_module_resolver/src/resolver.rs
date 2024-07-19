@@ -2,6 +2,7 @@ use std::borrow::Cow;
 use std::iter::FusedIterator;
 use std::sync::Arc;
 
+use once_cell::sync::Lazy;
 use rustc_hash::{FxBuildHasher, FxHashSet};
 
 use ruff_db::files::{File, FilePath};
@@ -451,39 +452,42 @@ pub(crate) mod internal {
 ///
 /// TODO(Alex): write a script to generate this list,
 /// similar to what we do in `crates/ruff_python_stdlib/src/sys.rs`
-const BUILTIN_MODULES: &[&str] = &[
-    "_abc",
-    "_ast",
-    "_codecs",
-    "_collections",
-    "_functools",
-    "_imp",
-    "_io",
-    "_locale",
-    "_operator",
-    "_signal",
-    "_sre",
-    "_stat",
-    "_string",
-    "_symtable",
-    "_thread",
-    "_tokenize",
-    "_tracemalloc",
-    "_typing",
-    "_warnings",
-    "_weakref",
-    "atexit",
-    "builtins",
-    "errno",
-    "faulthandler",
-    "gc",
-    "itertools",
-    "marshal",
-    "posix",
-    "pwd",
-    "sys",
-    "time",
-];
+static BUILTIN_MODULES: Lazy<FxHashSet<&str>> = Lazy::new(|| {
+    const BUILTIN_MODULE_NAMES: &[&str] = &[
+        "_abc",
+        "_ast",
+        "_codecs",
+        "_collections",
+        "_functools",
+        "_imp",
+        "_io",
+        "_locale",
+        "_operator",
+        "_signal",
+        "_sre",
+        "_stat",
+        "_string",
+        "_symtable",
+        "_thread",
+        "_tokenize",
+        "_tracemalloc",
+        "_typing",
+        "_warnings",
+        "_weakref",
+        "atexit",
+        "builtins",
+        "errno",
+        "faulthandler",
+        "gc",
+        "itertools",
+        "marshal",
+        "posix",
+        "pwd",
+        "sys",
+        "time",
+    ];
+    BUILTIN_MODULE_NAMES.iter().copied().collect()
+});
 
 /// Given a module name and a list of search paths in which to lookup modules,
 /// attempt to resolve the module name
