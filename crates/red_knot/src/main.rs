@@ -12,7 +12,7 @@ use tracing_tree::time::Uptime;
 
 use red_knot::db::RootDatabase;
 use red_knot::watch;
-use red_knot::watch::Watcher;
+use red_knot::watch::WorkspaceWatcher;
 use red_knot::workspace::WorkspaceMetadata;
 use ruff_db::program::{ProgramSettings, SearchPathSettings};
 use ruff_db::system::{OsSystem, System, SystemPathBuf};
@@ -142,7 +142,7 @@ struct MainLoop {
     receiver: crossbeam_channel::Receiver<MainLoopMessage>,
 
     /// The file system watcher, if running in watch mode.
-    watcher: Option<Watcher>,
+    watcher: Option<WorkspaceWatcher>,
 
     verbosity: Option<VerbosityLevel>,
 }
@@ -164,26 +164,23 @@ impl MainLoop {
 
     fn watch(mut self, db: &mut RootDatabase) -> anyhow::Result<()> {
         let sender = self.sender.clone();
-        let mut watcher = watch::directory_watcher(move |event| {
+        let watcher = watch::directory_watcher(move |event| {
             sender.send(MainLoopMessage::ApplyChanges(event)).unwrap();
         })?;
 
-        watcher.watch(db.workspace().root(db))?;
-
-        self.watcher = Some(watcher);
-
+        self.watcher = Some(WorkspaceWatcher::new(watcher, db));
         self.run(db);
 
         Ok(())
     }
 
     #[allow(clippy::print_stderr)]
-    fn run(self, db: &mut RootDatabase) {
+    fn run(mut self, db: &mut RootDatabase) {
         // Schedule the first check.
         self.sender.send(MainLoopMessage::CheckWorkspace).unwrap();
         let mut revision = 0usize;
 
-        for message in &self.receiver {
+        while let Ok(message) = self.receiver.recv() {
             tracing::trace!("Main Loop: Tick");
 
             match message {
@@ -224,6 +221,9 @@ impl MainLoop {
                     revision += 1;
                     // Automatically cancels any pending queries and waits for them to complete.
                     db.apply_changes(changes);
+                    if let Some(watcher) = self.watcher.as_mut() {
+                        watcher.update(db);
+                    }
                     self.sender.send(MainLoopMessage::CheckWorkspace).unwrap();
                 }
                 MainLoopMessage::Exit => {

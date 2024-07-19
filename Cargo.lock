@@ -1898,6 +1898,7 @@ version = "0.0.0"
 dependencies = [
  "anyhow",
  "bitflags 2.6.0",
+ "countme",
  "hashbrown",
  "ordermap",
  "red_knot_module_resolver",

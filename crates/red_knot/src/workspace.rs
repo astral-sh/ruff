@@ -6,6 +6,7 @@ use std::{collections::BTreeMap, sync::Arc};
 use rustc_hash::{FxBuildHasher, FxHashSet};
 
 pub use metadata::{PackageMetadata, WorkspaceMetadata};
+use red_knot_module_resolver::system_module_search_paths;
 use ruff_db::{
     files::{system_path_to_file, File},
     system::{walk_directory::WalkState, SystemPath, SystemPathBuf},
@@ -239,6 +240,17 @@ impl Workspace {
         } else {
             FxHashSet::default()
         }
+    }
+
+    /// Returns the paths that should be watched.
+    ///
+    /// The paths that require watching might change with every revision.
+    pub fn watch_paths(self, db: &dyn Db) -> FxHashSet<SystemPathBuf> {
+        ruff_db::system::deduplicate_nested_paths(
+            std::iter::once(self.root(db)).chain(system_module_search_paths(db.upcast())),
+        )
+        .map(SystemPath::to_path_buf)
+        .collect()
     }
 }
 

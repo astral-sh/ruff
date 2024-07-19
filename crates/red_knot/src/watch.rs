@@ -1,7 +1,9 @@
 use ruff_db::system::{SystemPath, SystemPathBuf};
 pub use watcher::{directory_watcher, EventHandler, Watcher};
+pub use workspace_watcher::WorkspaceWatcher;
 
 mod watcher;
+mod workspace_watcher;
 
 /// Classification of a file system change event.
 ///

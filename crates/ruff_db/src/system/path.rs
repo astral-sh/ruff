@@ -563,3 +563,58 @@ impl ruff_cache::CacheKey for SystemPathBuf {
         self.as_path().cache_key(hasher);
     }
 }
+
+/// Deduplicates identical paths and removes nested paths.
+///
+/// # Examples
+/// ```rust
+/// use ruff_db::system::{SystemPath, deduplicate_nested_paths};///
+///
+/// let paths = vec![SystemPath::new("/a/b/c"), SystemPath::new("/a/b"), SystemPath::new("/a/beta"), SystemPath::new("/a/b/c")];
+/// assert_eq!(deduplicate_nested_paths(paths).collect::<Vec<_>>(), &[SystemPath::new("/a/b"), SystemPath::new("/a/beta")]);
+/// ```
+pub fn deduplicate_nested_paths<'a, I>(paths: I) -> DeduplicatedNestedPathsIter<'a>
+where
+    I: IntoIterator<Item = &'a SystemPath>,
+{
+    DeduplicatedNestedPathsIter::new(paths)
+}
+
+pub struct DeduplicatedNestedPathsIter<'a> {
+    inner: std::vec::IntoIter<&'a SystemPath>,
+    next: Option<&'a SystemPath>,
+}
+
+impl<'a> DeduplicatedNestedPathsIter<'a> {
+    fn new<I>(paths: I) -> Self
+    where
+        I: IntoIterator<Item = &'a SystemPath>,
+    {
+        let mut paths = paths.into_iter().collect::<Vec<_>>();
+        paths.sort_unstable();
+        let mut iter = paths.into_iter();
+
+        Self {
+            next: iter.next(),
+            inner: iter,
+        }
+    }
+}
+
+impl<'a> Iterator for DeduplicatedNestedPathsIter<'a> {
+    type Item = &'a SystemPath;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        let current = self.next.take()?;
+
+        for next in self.inner.by_ref() {
+            // Skip all paths that have the same prefix as the current path
+            if !next.starts_with(current) {
+                self.next = Some(next);
+                break;
+            }
+        }
+
+        Some(current)
+    }
+}

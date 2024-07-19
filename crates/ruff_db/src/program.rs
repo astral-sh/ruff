@@ -65,7 +65,7 @@ impl std::fmt::Debug for TargetVersion {
 }
 
 /// Configures the search paths for module resolution.
-#[derive(Eq, PartialEq, Debug)]
+#[derive(Eq, PartialEq, Debug, Clone)]
 pub struct SearchPathSettings {
     /// List of user-provided paths that should take first priority in the module resolution.
     /// Examples in other type checkers are mypy's MYPYPATH environment variable,
