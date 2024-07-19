@@ -46,9 +46,9 @@ use crate::Db;
 /// scope.
 #[salsa::tracked(return_ref)]
 pub(crate) fn infer_scope_types<'db>(db: &'db dyn Db, scope: ScopeId<'db>) -> TypeInference<'db> {
-    let _span = tracing::trace_span!("infer_scope_types", ?scope).entered();
-
     let file = scope.file(db);
+    let _span = tracing::trace_span!("infer_scope_types", ?scope, ?file).entered();
+
     // Using the index here is fine because the code below depends on the AST anyway.
     // The isolation of the query is by the return inferred types.
     let index = semantic_index(db, file);
@@ -63,9 +63,10 @@ pub(crate) fn infer_definition_types<'db>(
     db: &'db dyn Db,
     definition: Definition<'db>,
 ) -> TypeInference<'db> {
-    let _span = tracing::trace_span!("infer_definition_types", ?definition).entered();
+    let file = definition.file(db);
+    let _span = tracing::trace_span!("infer_definition_types", ?definition, ?file,).entered();
 
-    let index = semantic_index(db, definition.file(db));
+    let index = semantic_index(db, file);
 
     TypeInferenceBuilder::new(db, InferenceRegion::Definition(definition), index).finish()
 }
@@ -80,9 +81,10 @@ pub(crate) fn infer_expression_types<'db>(
     db: &'db dyn Db,
     expression: Expression<'db>,
 ) -> TypeInference<'db> {
-    let _span = tracing::trace_span!("infer_expression_types", ?expression).entered();
+    let file = expression.file(db);
+    let _span = tracing::trace_span!("infer_expression_types", ?expression, ?file).entered();
 
-    let index = semantic_index(db, expression.file(db));
+    let index = semantic_index(db, file);
 
     TypeInferenceBuilder::new(db, InferenceRegion::Expression(expression), index).finish()
 }
