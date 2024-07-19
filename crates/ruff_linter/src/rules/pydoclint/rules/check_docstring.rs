@@ -150,6 +150,7 @@ impl DocstringEntries {
     }
 }
 
+// Parses docstring sections of supported styles.
 fn parse_entries(content: &str, style: SectionStyle) -> Vec<String> {
     match style {
         SectionStyle::Google => parse_entries_google(content),
@@ -157,6 +158,12 @@ fn parse_entries(content: &str, style: SectionStyle) -> Vec<String> {
     }
 }
 
+// Parses google style docstring sections of the form:
+//
+//     Raises:
+//         FasterThanLightError: If speed is greater than the speed of light.
+//         DivisionByZero: If attempting to divide by zero.
+//
 fn parse_entries_google(content: &str) -> Vec<String> {
     let mut entries: Vec<String> = Vec::new();
     for potential in content.split('\n') {
@@ -169,6 +176,15 @@ fn parse_entries_google(content: &str) -> Vec<String> {
     entries
 }
 
+// Parses numpy style docstring sections of the form:
+//
+//    Raises
+//    ------
+//    FasterThanLightError
+//        If speed is greater than the speed of light.
+//    DivisionByZero
+//        If attempting to divide by zero.
+//
 fn parse_entries_numpy(content: &str) -> Vec<String> {
     let mut entries: Vec<String> = Vec::new();
     let mut split = content.split('\n');
