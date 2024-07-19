@@ -2,7 +2,6 @@ use std::sync::Mutex;
 
 use clap::Parser;
 use crossbeam::channel as crossbeam_channel;
-use salsa::ParallelDatabase;
 use tracing::subscriber::Interest;
 use tracing::{Level, Metadata};
 use tracing_subscriber::filter::LevelFilter;
@@ -185,19 +184,19 @@ impl MainLoop {
 
             match message {
                 MainLoopMessage::CheckWorkspace => {
-                    let db = db.snapshot();
+                    // let db = db.snapshot();
                     let sender = self.sender.clone();
 
                     // Spawn a new task that checks the workspace. This needs to be done in a separate thread
                     // to prevent blocking the main loop here.
-                    rayon::spawn(move || {
-                        if let Ok(result) = db.check() {
-                            // Send the result back to the main loop for printing.
-                            sender
-                                .send(MainLoopMessage::CheckCompleted { result, revision })
-                                .ok();
-                        }
-                    });
+                    // rayon::spawn(move || {
+                    if let Ok(result) = db.check() {
+                        // Send the result back to the main loop for printing.
+                        sender
+                            .send(MainLoopMessage::CheckCompleted { result, revision })
+                            .ok();
+                    }
+                    // });
                 }
 
                 MainLoopMessage::CheckCompleted {

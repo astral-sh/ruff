@@ -1,116 +1,230 @@
 //! Test helpers for working with Salsa databases
 
-use std::fmt;
-use std::marker::PhantomData;
+pub fn assert_function_query_was_not_run<Db, Q, QDb, I, R>(
+    db: &Db,
+    query: Q,
+    input: I,
+    events: &[salsa::Event],
+) where
+    Db: salsa::Database,
+    Q: Fn(QDb, I) -> R,
+    I: salsa::plumbing::AsId + std::fmt::Debug + Copy,
+{
+    let id = input.as_id().as_u32();
+    let (query_name, will_execute_event) = find_will_execute_event(db, query, input, events);
 
-use salsa::id::AsId;
-use salsa::ingredient::Ingredient;
-use salsa::storage::HasIngredientsFor;
+    db.attach(|_| {
+        if let Some(will_execute_event) = will_execute_event {
+            panic!("Expected query {query_name}({id}) not to have run but it did: {will_execute_event:?}");
+        }
+    });
+}
+
+pub fn assert_const_function_query_was_not_run<Db, Q, QDb, R>(
+    db: &Db,
+    query: Q,
+    events: &[salsa::Event],
+) where
+    Db: salsa::Database,
+    Q: Fn(QDb) -> R,
+{
+    let (query_name, will_execute_event) = find_will_execute_event(db, query, (), events);
+
+    db.attach(|_| {
+        if let Some(will_execute_event) = will_execute_event {
+            panic!(
+                "Expected query {query_name}() not to have run but it did: {will_execute_event:?}"
+            );
+        }
+    });
+}
 
 /// Assert that the Salsa query described by the generic parameter `C`
 /// was executed at least once with the input `input`
 /// in the history span represented by `events`.
-pub fn assert_function_query_was_run<'db, C, Db, Jar>(
-    db: &'db Db,
-    to_function: impl FnOnce(&C) -> &salsa::function::FunctionIngredient<C>,
-    input: &C::Input<'db>,
+pub fn assert_function_query_was_run<Db, Q, QDb, I, R>(
+    db: &Db,
+    query: Q,
+    input: I,
     events: &[salsa::Event],
 ) where
-    C: salsa::function::Configuration<Jar = Jar>
-        + salsa::storage::IngredientsFor<Jar = Jar, Ingredients = C>,
-    Jar: HasIngredientsFor<C>,
-    Db: salsa::DbWithJar<Jar>,
-    C::Input<'db>: AsId,
+    Db: salsa::Database,
+    Q: Fn(QDb, I) -> R,
+    I: salsa::plumbing::AsId + std::fmt::Debug + Copy,
 {
-    function_query_was_run(db, to_function, input, events, true);
-}
+    let id = input.as_id().as_u32();
+    let (query_name, will_execute_event) = find_will_execute_event(db, query, input, events);
 
-/// Assert that there were no executions with the input `input`
-/// of the Salsa query described by the generic parameter `C`
-/// in the history span represented by `events`.
-pub fn assert_function_query_was_not_run<'db, C, Db, Jar>(
-    db: &'db Db,
-    to_function: impl FnOnce(&C) -> &salsa::function::FunctionIngredient<C>,
-    input: &C::Input<'db>,
-    events: &[salsa::Event],
-) where
-    C: salsa::function::Configuration<Jar = Jar>
-        + salsa::storage::IngredientsFor<Jar = Jar, Ingredients = C>,
-    Jar: HasIngredientsFor<C>,
-    Db: salsa::DbWithJar<Jar>,
-    C::Input<'db>: AsId,
-{
-    function_query_was_run(db, to_function, input, events, false);
-}
-
-fn function_query_was_run<'db, C, Db, Jar>(
-    db: &'db Db,
-    to_function: impl FnOnce(&C) -> &salsa::function::FunctionIngredient<C>,
-    input: &C::Input<'db>,
-    events: &[salsa::Event],
-    should_have_run: bool,
-) where
-    C: salsa::function::Configuration<Jar = Jar>
-        + salsa::storage::IngredientsFor<Jar = Jar, Ingredients = C>,
-    Jar: HasIngredientsFor<C>,
-    Db: salsa::DbWithJar<Jar>,
-    C::Input<'db>: AsId,
-{
-    let (jar, _) =
-        <_ as salsa::storage::HasJar<<C as salsa::storage::IngredientsFor>::Jar>>::jar(db);
-    let ingredient = jar.ingredient();
-
-    let function_ingredient = to_function(ingredient);
-
-    let ingredient_index =
-        <salsa::function::FunctionIngredient<C> as Ingredient<Db>>::ingredient_index(
-            function_ingredient,
+    db.attach(|_| {
+        assert!(
+            will_execute_event.is_some(),
+            "Expected query {query_name}({id:?}) to have run but it did not:\n{events:#?}"
         );
+    });
+}
 
-    let did_run = events.iter().any(|event| {
+pub fn find_will_execute_event<'a, Q, I>(
+    db: &dyn salsa::Database,
+    query: Q,
+    input: I,
+    events: &'a [salsa::Event],
+) -> (&'static str, Option<&'a salsa::Event>)
+where
+    I: salsa::plumbing::AsId,
+{
+    let query_name = query_name(&query);
+
+    let event = events.iter().find(|event| {
         if let salsa::EventKind::WillExecute { database_key } = event.kind {
-            database_key.ingredient_index() == ingredient_index
+            dbg!(db
+                .lookup_ingredient(database_key.ingredient_index())
+                .debug_name())
+                == query_name
                 && database_key.key_index() == input.as_id()
         } else {
             false
         }
     });
 
-    if should_have_run && !did_run {
-        panic!(
-            "Expected query {:?} to have run but it didn't",
-            DebugIdx {
-                db: PhantomData::<Db>,
-                value_id: input.as_id(),
-                ingredient: function_ingredient,
-            }
-        );
-    } else if !should_have_run && did_run {
-        panic!(
-            "Expected query {:?} not to have run but it did",
-            DebugIdx {
-                db: PhantomData::<Db>,
-                value_id: input.as_id(),
-                ingredient: function_ingredient,
-            }
-        );
-    }
+    (query_name, event)
 }
 
-struct DebugIdx<'a, I, Db>
-where
-    I: Ingredient<Db>,
-{
-    value_id: salsa::Id,
-    ingredient: &'a I,
-    db: PhantomData<Db>,
+fn query_name<Q>(_query: &Q) -> &'static str {
+    let full_qualified_query_name = std::any::type_name::<Q>();
+    full_qualified_query_name
+        .rsplit_once("::")
+        .map(|(_, name)| name)
+        .unwrap_or(full_qualified_query_name)
 }
 
-impl<'a, I, Db> fmt::Debug for DebugIdx<'a, I, Db>
-where
-    I: Ingredient<Db>,
-{
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> std::fmt::Result {
-        self.ingredient.fmt_index(Some(self.value_id), f)
+#[test]
+fn query_was_not_run() {
+    use crate::tests::TestDb;
+    use salsa::prelude::*;
+
+    #[salsa::input]
+    struct Input {
+        text: String,
     }
+
+    #[salsa::tracked]
+    fn len(db: &dyn salsa::Database, input: Input) -> usize {
+        input.text(db).len()
+    }
+
+    let mut db = TestDb::new();
+
+    let hello = Input::new(&db, "Hello, world!".to_string());
+    let goodbye = Input::new(&db, "Goodbye!".to_string());
+
+    assert_eq!(len(&db, hello), 13);
+    assert_eq!(len(&db, goodbye), 8);
+
+    // Change the input of one query
+    goodbye.set_text(&mut db).to("Bye".to_string());
+    db.clear_salsa_events();
+
+    assert_eq!(len(&db, goodbye), 3);
+    let events = db.take_salsa_events();
+
+    assert_function_query_was_run(&db, len, goodbye, &events);
+    assert_function_query_was_not_run(&db, len, hello, &events);
+}
+
+#[test]
+#[should_panic(expected = "Expected query len(0) not to have run but it did:")]
+fn query_was_not_run_fails_if_query_was_run() {
+    use crate::tests::TestDb;
+    use salsa::prelude::*;
+
+    #[salsa::input]
+    struct Input {
+        text: String,
+    }
+
+    #[salsa::tracked]
+    fn len(db: &dyn salsa::Database, input: Input) -> usize {
+        input.text(db).len()
+    }
+
+    let mut db = TestDb::new();
+
+    let hello = Input::new(&db, "Hello, world!".to_string());
+
+    assert_eq!(len(&db, hello), 13);
+
+    // Change the input
+    hello.set_text(&mut db).to("Hy".to_string());
+    db.clear_salsa_events();
+
+    assert_eq!(len(&db, hello), 2);
+    let events = db.take_salsa_events();
+
+    assert_function_query_was_not_run(&db, len, hello, &events);
+}
+
+#[test]
+#[should_panic(expected = "Expected query len() not to have run but it did:")]
+fn const_query_was_not_run_fails_if_query_was_run() {
+    use crate::tests::TestDb;
+    use salsa::prelude::*;
+
+    #[salsa::input]
+    struct Input {
+        text: String,
+    }
+
+    #[salsa::tracked]
+    fn len(db: &dyn salsa::Database) -> usize {
+        db.report_untracked_read();
+        5
+    }
+
+    let mut db = TestDb::new();
+    let hello = Input::new(&db, "Hello, world!".to_string());
+    assert_eq!(len(&db), 5);
+
+    // Create a new revision
+    db.clear_salsa_events();
+    hello.set_text(&mut db).to("Hy".to_string());
+
+    assert_eq!(len(&db), 5);
+    let events = db.take_salsa_events();
+    dbg!(&events);
+
+    assert_const_function_query_was_not_run(&db, len, &events);
+}
+
+#[test]
+#[should_panic(expected = "Expected query len(0) to have run but it did not:")]
+fn query_was_run_fails_if_query_was_not_run() {
+    use crate::tests::TestDb;
+    use salsa::prelude::*;
+
+    #[salsa::input]
+    struct Input {
+        text: String,
+    }
+
+    #[salsa::tracked]
+    fn len(db: &dyn salsa::Database, input: Input) -> usize {
+        input.text(db).len()
+    }
+
+    let mut db = TestDb::new();
+
+    let hello = Input::new(&db, "Hello, world!".to_string());
+    let goodbye = Input::new(&db, "Goodbye!".to_string());
+
+    assert_eq!(len(&db, hello), 13);
+    assert_eq!(len(&db, goodbye), 8);
+
+    // Change the input of one query
+    goodbye.set_text(&mut db).to("Bye".to_string());
+    db.clear_salsa_events();
+
+    assert_eq!(len(&db, goodbye), 3);
+    let events = db.take_salsa_events();
+
+    assert_function_query_was_run(&db, len, hello, &events);
 }

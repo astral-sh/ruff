@@ -41,7 +41,7 @@ pub fn parsed_module(db: &dyn Db, file: File) -> ParsedModule {
 }
 
 /// Cheap cloneable wrapper around the parsed module.
-#[derive(Clone, PartialEq)]
+#[derive(Clone)]
 pub struct ParsedModule {
     inner: Arc<Parsed<ModModule>>,
 }

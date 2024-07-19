@@ -3,10 +3,12 @@ use std::ops::Deref;
 use std::sync::Arc;
 
 use rustc_hash::FxHashSet;
+use salsa::Setter;
+
+use ruff_db::files::File;
 
 use crate::db::Db;
 use crate::workspace::Package;
-use ruff_db::files::File;
 
 /// The indexed files of a package.
 ///

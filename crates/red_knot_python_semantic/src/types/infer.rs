@@ -1491,12 +1491,9 @@ mod tests {
     use crate::builtins::builtins_scope;
     use crate::db::tests::TestDb;
     use crate::semantic_index::definition::Definition;
-    use crate::semantic_index::semantic_index;
     use crate::semantic_index::symbol::FileScopeId;
-    use crate::types::{
-        global_scope, global_symbol_ty_by_name, infer_definition_types, symbol_table,
-        symbol_ty_by_name, use_def_map, Type,
-    };
+    use crate::semantic_index::{global_scope, semantic_index, symbol_table, use_def_map};
+    use crate::types::{global_symbol_ty_by_name, infer_definition_types, symbol_ty_by_name, Type};
     use crate::{HasTy, SemanticModel};
 
     fn setup_db() -> TestDb {
@@ -2315,14 +2312,6 @@ mod tests {
         Ok(())
     }
 
-    fn first_public_def<'db>(db: &'db TestDb, file: File, name: &str) -> Definition<'db> {
-        let scope = global_scope(db, file);
-        *use_def_map(db, scope)
-            .public_definitions(symbol_table(db, scope).symbol_id_by_name(name).unwrap())
-            .first()
-            .unwrap()
-    }
-
     #[test]
     fn dependency_public_symbol_type_change() -> anyhow::Result<()> {
         let mut db = setup_db();
@@ -2375,10 +2364,10 @@ mod tests {
 
         let events = db.take_salsa_events();
 
-        assert_function_query_was_not_run::<infer_definition_types, _, _>(
+        assert_function_query_was_not_run(
             &db,
-            |ty| &ty.function,
-            &first_public_def(&db, a, "x"),
+            infer_definition_types,
+            first_public_def(&db, a, "x"),
             &events,
         );
 
@@ -2411,10 +2400,10 @@ mod tests {
 
         let events = db.take_salsa_events();
 
-        assert_function_query_was_not_run::<infer_definition_types, _, _>(
+        assert_function_query_was_not_run(
             &db,
-            |ty| &ty.function,
-            &first_public_def(&db, a, "x"),
+            infer_definition_types,
+            first_public_def(&db, a, "x"),
             &events,
         );
         Ok(())

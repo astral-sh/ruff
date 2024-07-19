@@ -2,7 +2,6 @@ use std::ops::Deref;
 use std::sync::Arc;
 
 use countme::Count;
-use salsa::DebugWithDb;
 
 use ruff_notebook::Notebook;
 use ruff_python_ast::PySourceType;
@@ -129,7 +128,7 @@ enum SourceTextKind {
 /// Computes the [`LineIndex`] for `file`.
 #[salsa::tracked]
 pub fn line_index(db: &dyn Db, file: File) -> LineIndex {
-    let _span = tracing::trace_span!("line_index", file = ?file.debug(db)).entered();
+    let _span = tracing::trace_span!("line_index", file = ?file).entered();
 
     let source = source_text(db, file);
 
@@ -139,6 +138,7 @@ pub fn line_index(db: &dyn Db, file: File) -> LineIndex {
 #[cfg(test)]
 mod tests {
     use salsa::EventKind;
+    use salsa::Setter as _;
 
     use ruff_source_file::OneIndexed;
     use ruff_text_size::TextSize;

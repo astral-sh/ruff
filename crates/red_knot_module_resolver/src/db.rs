@@ -1,28 +1,11 @@
 use ruff_db::Upcast;
 
-use crate::resolver::{
-    editable_install_resolution_paths, file_to_module, internal::ModuleNameIngredient,
-    module_resolution_settings, resolve_module_query,
-};
-use crate::typeshed::parse_typeshed_versions;
-
-#[salsa::jar(db=Db)]
-pub struct Jar(
-    ModuleNameIngredient<'_>,
-    module_resolution_settings,
-    editable_install_resolution_paths,
-    resolve_module_query,
-    file_to_module,
-    parse_typeshed_versions,
-);
-
-pub trait Db: salsa::DbWithJar<Jar> + ruff_db::Db + Upcast<dyn ruff_db::Db> {}
+#[salsa::db]
+pub trait Db: ruff_db::Db + Upcast<dyn ruff_db::Db> {}
 
 #[cfg(test)]
 pub(crate) mod tests {
     use std::sync;
-
-    use salsa::DebugWithDb;
 
     use ruff_db::files::Files;
     use ruff_db::system::{DbWithTestSystem, TestSystem};
@@ -32,7 +15,7 @@ pub(crate) mod tests {
 
     use super::*;
 
-    #[salsa::db(Jar, ruff_db::Jar)]
+    #[salsa::db]
     pub(crate) struct TestDb {
         storage: salsa::Storage<Self>,
         system: TestSystem,
@@ -81,6 +64,7 @@ pub(crate) mod tests {
         }
     }
 
+    #[salsa::db]
     impl ruff_db::Db for TestDb {
         fn vendored(&self) -> &VendoredFileSystem {
             &self.vendored
@@ -95,6 +79,7 @@ pub(crate) mod tests {
         }
     }
 
+    #[salsa::db]
     impl Db for TestDb {}
 
     impl DbWithTestSystem for TestDb {
@@ -107,23 +92,14 @@ pub(crate) mod tests {
         }
     }
 
+    #[salsa::db]
     impl salsa::Database for TestDb {
         fn salsa_event(&self, event: salsa::Event) {
-            tracing::trace!("event: {:?}", event.debug(self));
-            let mut events = self.events.lock().unwrap();
-            events.push(event);
-        }
-    }
-
-    impl salsa::ParallelDatabase for TestDb {
-        fn snapshot(&self) -> salsa::Snapshot<Self> {
-            salsa::Snapshot::new(Self {
-                storage: self.storage.snapshot(),
-                system: self.system.snapshot(),
-                vendored: self.vendored.snapshot(),
-                files: self.files.snapshot(),
-                events: self.events.clone(),
-            })
+            self.attach(|_| {
+                tracing::trace!("event: {event:?}");
+                let mut events = self.events.lock().unwrap();
+                events.push(event);
+            });
         }
     }
 }
