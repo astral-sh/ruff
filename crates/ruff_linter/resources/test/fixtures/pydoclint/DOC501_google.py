@@ -1,3 +1,4 @@
+import something
 from somewhere import AnotherError
 
 
@@ -8,7 +9,7 @@ class FasterThanLightError(Exception):
 _some_error = Exception
 
 
-# DOC501
+# OK
 def calculate_speed(distance: float, time: float) -> float:
     """Calculate speed as distance divided by time.
 
@@ -128,6 +129,16 @@ def calculate_speed(distance: float, time: float) -> float:
     raise AnotherError()
 
 
+# DOC501
+def foo(bar: int):
+    """Foo.
+
+    Args:
+        bar: Bar.
+    """
+    raise something.SomeError
+
+
 # DOC501, but can't resolve the error
 def calculate_speed(distance: float, time: float) -> float:
     """Calculate speed as distance divided by time.
@@ -153,3 +164,29 @@ def calculate_speed(distance: float, time: float) -> float:
 # OK
 def calculate_speed(distance: float, time: float) -> float:
     raise NotImplementedError
+
+
+# OK
+def foo(bar: int):
+    """Foo.
+
+    Args:
+        bar: Bar.
+
+    Raises:
+        SomeError: Wow.
+    """
+    raise something.SomeError
+
+
+# OK
+def foo(bar: int):
+    """Foo.
+
+    Args:
+        bar: Bar.
+
+    Raises:
+        something.SomeError: Wow.
+    """
+    raise something.SomeError

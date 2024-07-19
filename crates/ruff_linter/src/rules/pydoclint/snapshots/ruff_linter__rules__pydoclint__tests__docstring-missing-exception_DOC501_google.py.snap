@@ -1,44 +1,52 @@
 ---
 source: crates/ruff_linter/src/rules/pydoclint/mod.rs
 ---
-DOC501_google.py:45:15: DOC501 Raised exception `FasterThanLightError` missing from docstring
+DOC501_google.py:46:15: DOC501 Raised exception `FasterThanLightError` missing from docstring
    |
-43 |         return distance / time
-44 |     except ZeroDivisionError as exc:
-45 |         raise FasterThanLightError from exc
+44 |         return distance / time
+45 |     except ZeroDivisionError as exc:
+46 |         raise FasterThanLightError from exc
    |               ^^^^^^^^^^^^^^^^^^^^ DOC501
    |
 
-DOC501_google.py:62:15: DOC501 Raised exception `FasterThanLightError` missing from docstring
+DOC501_google.py:63:15: DOC501 Raised exception `FasterThanLightError` missing from docstring
    |
-60 |         return distance / time
-61 |     except ZeroDivisionError as exc:
-62 |         raise FasterThanLightError from exc
+61 |         return distance / time
+62 |     except ZeroDivisionError as exc:
+63 |         raise FasterThanLightError from exc
    |               ^^^^^^^^^^^^^^^^^^^^ DOC501
-63 |     except:
-64 |         raise ValueError
+64 |     except:
+65 |         raise ValueError
    |
 
-DOC501_google.py:64:15: DOC501 Raised exception `ValueError` missing from docstring
+DOC501_google.py:65:15: DOC501 Raised exception `ValueError` missing from docstring
    |
-62 |         raise FasterThanLightError from exc
-63 |     except:
-64 |         raise ValueError
+63 |         raise FasterThanLightError from exc
+64 |     except:
+65 |         raise ValueError
    |               ^^^^^^^^^^ DOC501
    |
 
-DOC501_google.py:114:11: DOC501 Raised exception `AnotherError` missing from docstring
+DOC501_google.py:115:11: DOC501 Raised exception `AnotherError` missing from docstring
     |
-112 |         Speed as distance divided by time.
-113 |     """
-114 |     raise AnotherError
+113 |         Speed as distance divided by time.
+114 |     """
+115 |     raise AnotherError
     |           ^^^^^^^^^^^^ DOC501
     |
 
-DOC501_google.py:128:11: DOC501 Raised exception `AnotherError` missing from docstring
+DOC501_google.py:129:11: DOC501 Raised exception `AnotherError` missing from docstring
     |
-126 |         Speed as distance divided by time.
-127 |     """
-128 |     raise AnotherError()
+127 |         Speed as distance divided by time.
+128 |     """
+129 |     raise AnotherError()
     |           ^^^^^^^^^^^^^^ DOC501
+    |
+
+DOC501_google.py:139:11: DOC501 Raised exception `SomeError` missing from docstring
+    |
+137 |         bar: Bar.
+138 |     """
+139 |     raise something.SomeError
+    |           ^^^^^^^^^^^^^^^^^^^ DOC501
     |
