@@ -12,6 +12,7 @@ pub(crate) struct Verbosity {
     #[arg(
         long,
         short = 'v',
+        help = "Use verbose output",
         action = clap::ArgAction::Count,
         global = true,
     )]
