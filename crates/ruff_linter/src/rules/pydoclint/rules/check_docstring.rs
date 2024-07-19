@@ -282,6 +282,7 @@ pub(crate) fn check_docstring(
         return;
     };
 
+    // Only check function docstrings.
     if matches!(
         member.kind,
         MemberKind::Class(_) | MemberKind::NestedClass(_)
@@ -289,6 +290,7 @@ pub(crate) fn check_docstring(
         return;
     }
 
+    // Prioritize the specified convention over the determined style.
     let docstring_entries = match convention {
         Some(Convention::Google) => DocstringEntries::new(section_contexts, SectionStyle::Google),
         Some(Convention::Numpy) => DocstringEntries::new(section_contexts, SectionStyle::Numpy),
