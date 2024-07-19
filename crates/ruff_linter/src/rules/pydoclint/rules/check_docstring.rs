@@ -1,11 +1,11 @@
 use ruff_diagnostics::Diagnostic;
 use ruff_diagnostics::Violation;
 use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::name::QualifiedName;
 use ruff_python_ast::visitor::{self, Visitor};
 use ruff_python_ast::{self as ast, Expr, Stmt};
-use ruff_python_semantic::SemanticModel;
-use ruff_python_semantic::{Definition, MemberKind};
-use ruff_text_size::TextRange;
+use ruff_python_semantic::{Definition, MemberKind, SemanticModel};
+use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
 use crate::docstrings::sections::{SectionContexts, SectionKind};
@@ -126,14 +126,14 @@ impl Violation for DocstringExtraneousException {
 
 // Parse docstring
 #[derive(Debug)]
-struct DocstringEntries {
-    raised_exceptions: Vec<String>,
+struct DocstringEntries<'a> {
+    raised_exceptions: Vec<QualifiedName<'a>>,
     raised_exceptions_range: Option<TextRange>,
 }
 
-impl DocstringEntries {
-    fn new(sections: &SectionContexts, style: SectionStyle) -> Self {
-        let mut raised_exceptions: Vec<String> = Vec::new();
+impl<'a> DocstringEntries<'a> {
+    fn new(sections: &'a SectionContexts, style: SectionStyle) -> Self {
+        let mut raised_exceptions: Vec<QualifiedName> = Vec::new();
         let mut raised_exceptions_range = None;
 
         for section in sections.iter() {
@@ -151,7 +151,7 @@ impl DocstringEntries {
 }
 
 // Parses docstring sections of supported styles.
-fn parse_entries(content: &str, style: SectionStyle) -> Vec<String> {
+fn parse_entries<'a>(content: &'a str, style: SectionStyle) -> Vec<QualifiedName<'a>> {
     match style {
         SectionStyle::Google => parse_entries_google(content),
         SectionStyle::Numpy => parse_entries_numpy(content),
@@ -164,14 +164,14 @@ fn parse_entries(content: &str, style: SectionStyle) -> Vec<String> {
 //         FasterThanLightError: If speed is greater than the speed of light.
 //         DivisionByZero: If attempting to divide by zero.
 //
-fn parse_entries_google(content: &str) -> Vec<String> {
-    let mut entries: Vec<String> = Vec::new();
+fn parse_entries_google(content: &str) -> Vec<QualifiedName> {
+    let mut entries: Vec<QualifiedName> = Vec::new();
     for potential in content.split('\n') {
         let Some(colon_idx) = potential.find(':') else {
             continue;
         };
-        let entry = potential[..colon_idx].trim().to_string();
-        entries.push(entry);
+        let entry = potential[..colon_idx].trim();
+        entries.push(QualifiedName::user_defined(entry));
     }
     entries
 }
@@ -185,8 +185,8 @@ fn parse_entries_google(content: &str) -> Vec<String> {
 //    DivisionByZero
 //        If attempting to divide by zero.
 //
-fn parse_entries_numpy(content: &str) -> Vec<String> {
-    let mut entries: Vec<String> = Vec::new();
+fn parse_entries_numpy(content: &str) -> Vec<QualifiedName> {
+    let mut entries: Vec<QualifiedName> = Vec::new();
     let mut split = content.split('\n');
     let Some(dashes) = split.next() else {
         return entries;
@@ -195,8 +195,8 @@ fn parse_entries_numpy(content: &str) -> Vec<String> {
     for potential in split {
         if let Some(first_char) = potential.chars().nth(indentation) {
             if !first_char.is_whitespace() {
-                let entry = potential[indentation..].trim().to_string();
-                entries.push(entry);
+                let entry = potential[indentation..].trim();
+                entries.push(QualifiedName::user_defined(entry));
             }
         }
     }
@@ -205,70 +205,60 @@ fn parse_entries_numpy(content: &str) -> Vec<String> {
 
 // Parse body
 #[derive(Debug)]
-struct Entry {
-    id: String,
+struct Entry<'a> {
+    qualified_name: QualifiedName<'a>,
     range: TextRange,
 }
 
-struct BodyEntries {
-    raised_exceptions: Vec<Entry>,
+struct BodyEntries<'a> {
+    raised_exceptions: Vec<Entry<'a>>,
 }
 
 struct BodyVisitor<'a> {
-    raised_exceptions: Vec<Entry>,
+    raised_exceptions: Vec<Entry<'a>>,
     semantic: &'a SemanticModel<'a>,
 }
 
 impl<'a> BodyVisitor<'a> {
-    fn new(semantic: &'a SemanticModel<'a>) -> Self {
+    fn new(semantic: &'a SemanticModel) -> Self {
         Self {
             raised_exceptions: Vec::new(),
             semantic,
         }
     }
 
-    fn finish(self) -> BodyEntries {
+    fn finish(self) -> BodyEntries<'a> {
         BodyEntries {
             raised_exceptions: self.raised_exceptions,
         }
     }
 }
 
-impl Visitor<'_> for BodyVisitor<'_> {
-    fn visit_stmt(&mut self, stmt: &Stmt) {
+impl<'a> Visitor<'a> for BodyVisitor<'a> {
+    fn visit_stmt(&mut self, stmt: &'a Stmt) {
         if let Stmt::Raise(ast::StmtRaise { exc: Some(exc), .. }) = stmt {
-            match exc.as_ref() {
-                Expr::Name(ast::ExprName { id, range, .. }) => {
-                    // SemanticModel will resolve qualified_name for local Class definitions,
-                    // or imported definitions, but not variables which we want to ignore.
-                    if self.semantic.resolve_qualified_name(exc.as_ref()).is_some() {
-                        self.raised_exceptions.push(Entry {
-                            id: id.to_string(),
-                            range: *range,
-                        });
-                    }
-                }
-                Expr::Call(ast::ExprCall { func, range, .. }) => {
-                    if let Expr::Name(ast::ExprName { id, .. }) = func.as_ref() {
-                        // SemanticModel will resolve qualified_name for local Class definitions,
-                        // or imported definitions, but not variables which we want to ignore.
-                        if self
-                            .semantic
-                            .resolve_qualified_name(func.as_ref())
-                            .is_some()
-                        {
-                            self.raised_exceptions.push(Entry {
-                                id: id.to_string(),
-                                range: *range,
-                            });
-                        }
-                    }
-                }
-                _ => {}
-            };
+            if let Some(qualified_name) = extract_raised_exception(self.semantic, exc.as_ref()) {
+                self.raised_exceptions.push(Entry {
+                    qualified_name,
+                    range: exc.as_ref().range(),
+                });
+            }
         }
         visitor::walk_stmt(self, stmt);
     }
+}
+
+fn extract_raised_exception<'a>(
+    semantic: &SemanticModel<'a>,
+    exc: &'a Expr,
+) -> Option<QualifiedName<'a>> {
+    if let Some(qualified_name) = semantic.resolve_qualified_name(exc) {
+        return Some(qualified_name);
+    }
+    if let Expr::Call(ast::ExprCall { func, .. }) = exc {
+        return extract_raised_exception(semantic, func.as_ref());
+    }
+    None
 }
 
 /// DOC501, DOC502
@@ -278,6 +268,7 @@ pub(crate) fn check_docstring(
     section_contexts: &SectionContexts,
     convention: Option<&Convention>,
 ) {
+    let mut diagnostics = Vec::new();
     let Definition::Member(member) = definition else {
         return;
     };
@@ -304,18 +295,27 @@ pub(crate) fn check_docstring(
     // DOC501
     if checker.enabled(Rule::DocstringMissingException) {
         for body_raise in &body_entries.raised_exceptions {
-            if body_raise.id == "NotImplementedError" {
+            if *body_raise.qualified_name.segments().last().unwrap() == "NotImplementedError" {
                 continue;
             }
 
-            if !docstring_entries.raised_exceptions.contains(&body_raise.id) {
+            if !docstring_entries
+                .raised_exceptions
+                .iter()
+                .any(|r| body_raise.qualified_name.segments().ends_with(r.segments()))
+            {
                 let diagnostic = Diagnostic::new(
                     DocstringMissingException {
-                        id: body_raise.id.clone(),
+                        id: body_raise
+                            .qualified_name
+                            .segments()
+                            .last()
+                            .unwrap()
+                            .to_string(),
                     },
                     body_raise.range,
                 );
-                checker.diagnostics.push(diagnostic);
+                diagnostics.push(diagnostic);
             }
         }
     }
@@ -323,13 +323,13 @@ pub(crate) fn check_docstring(
     // DOC502
     if checker.enabled(Rule::DocstringExtraneousException) {
         let mut extraneous_exceptions = Vec::new();
-        for docstring_raise in docstring_entries.raised_exceptions {
-            if !body_entries
-                .raised_exceptions
-                .iter()
-                .any(|r| r.id == docstring_raise)
-            {
-                extraneous_exceptions.push(docstring_raise);
+        for docstring_raise in &docstring_entries.raised_exceptions {
+            if !body_entries.raised_exceptions.iter().any(|r| {
+                r.qualified_name
+                    .segments()
+                    .ends_with(docstring_raise.segments())
+            }) {
+                extraneous_exceptions.push(docstring_raise.to_string());
             }
         }
         if !extraneous_exceptions.is_empty() {
@@ -339,7 +339,9 @@ pub(crate) fn check_docstring(
                 },
                 docstring_entries.raised_exceptions_range.unwrap(),
             );
-            checker.diagnostics.push(diagnostic);
+            diagnostics.push(diagnostic);
         }
     }
+
+    checker.diagnostics.extend(diagnostics);
 }
