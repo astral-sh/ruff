@@ -151,7 +151,7 @@ impl<'a> DocstringEntries<'a> {
 }
 
 // Parses docstring sections of supported styles.
-fn parse_entries<'a>(content: &'a str, style: SectionStyle) -> Vec<QualifiedName<'a>> {
+fn parse_entries(content: &str, style: SectionStyle) -> Vec<QualifiedName> {
     match style {
         SectionStyle::Google => parse_entries_google(content),
         SectionStyle::Numpy => parse_entries_numpy(content),
@@ -306,12 +306,7 @@ pub(crate) fn check_docstring(
             {
                 let diagnostic = Diagnostic::new(
                     DocstringMissingException {
-                        id: body_raise
-                            .qualified_name
-                            .segments()
-                            .last()
-                            .unwrap()
-                            .to_string(),
+                        id: (*body_raise.qualified_name.segments().last().unwrap()).to_string(),
                     },
                     body_raise.range,
                 );
