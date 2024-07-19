@@ -2,11 +2,12 @@ use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast as ast;
 use ruff_python_ast::{Decorator, Expr, ExprCall, Keyword, StmtFunctionDef};
-use ruff_python_semantic::analyze::typing::resolve_assignment;
+use ruff_python_semantic::Modules;
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
 use crate::fix::edits::{remove_argument, Parentheses};
+use crate::rules::ruff::fastapi::{is_fastapi_route, is_fastapi_route_decorator};
 
 /// ## What it does
 /// Checks for FastApi routes that uses the optional `response_model` parameter with the same type as the return type.
@@ -72,6 +73,12 @@ pub(crate) fn fastapi_redundant_response_model(
     checker: &mut Checker,
     function_def: &ast::StmtFunctionDef,
 ) {
+    if !checker.semantic().seen_module(Modules::FASTAPI) {
+        return;
+    }
+    if !is_fastapi_route(checker, function_def) {
+        return;
+    }
     // Check if the function has a fast api app.post decorator
     for decorator in &function_def.decorator_list {
         let Some((call, response_model_arg)) = check_decorator(checker, function_def, decorator)
@@ -98,25 +105,7 @@ fn check_decorator<'a>(
     function_def: &StmtFunctionDef,
     decorator: &'a Decorator,
 ) -> Option<(&'a ExprCall, &'a Keyword)> {
-    let call = decorator.expression.as_call_expr()?;
-    let decorator_method = call.func.as_attribute_expr()?;
-    let method_name = &decorator_method.attr;
-
-    let route_methods = [
-        "get", "post", "put", "delete", "patch", "options", "head", "trace",
-    ];
-    if !route_methods.contains(&method_name.as_str()) {
-        return None;
-    }
-    let ra = resolve_assignment(&decorator_method.value, checker.semantic());
-    if !ra.is_some_and(|qualified_name| {
-        matches!(
-            qualified_name.segments(),
-            ["fastapi", "FastAPI" | "APIRouter"]
-        )
-    }) {
-        return None;
-    }
+    let call = is_fastapi_route_decorator(checker, decorator)?;
     let response_model_arg = call.arguments.find_keyword("response_model")?;
     let return_value = function_def.returns.as_ref()?;
     if !is_identical_types(&response_model_arg.value, return_value, checker) {

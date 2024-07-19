@@ -91,6 +91,9 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
             if checker.enabled(Rule::FastApiRedundantResponseModel) {
                 ruff::rules::fastapi_redundant_response_model(checker, function_def);
             }
+            if checker.enabled(Rule::FastApiNotAnnotatedDependency) {
+                ruff::rules::fastapi_not_annotated_dependency(checker, function_def);
+            }
             if checker.enabled(Rule::AmbiguousFunctionName) {
                 if let Some(diagnostic) = pycodestyle::rules::ambiguous_function_name(name) {
                     checker.diagnostics.push(diagnostic);

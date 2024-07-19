@@ -1,0 +1,92 @@
+---
+source: crates/ruff_linter/src/rules/ruff/mod.rs
+---
+RUF103.py:10:5: RUF103 FastAPI dependency without Annotated
+   |
+ 8 | @app.get("/items/")
+ 9 | def get_items(
+10 |     current_user: User = Depends(get_current_user),
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF103
+11 |     some_security_param: str = Security(get_oauth2_user),
+12 | ):
+   |
+
+RUF103.py:11:5: RUF103 FastAPI dependency without Annotated
+   |
+ 9 | def get_items(
+10 |     current_user: User = Depends(get_current_user),
+11 |     some_security_param: str = Security(get_oauth2_user),
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF103
+12 | ):
+13 |     pass
+   |
+
+RUF103.py:17:5: RUF103 FastAPI dependency without Annotated
+   |
+15 | @app.post("/stuff/")
+16 | def do_stuff(
+17 |     some_query_param: str | None = Query(default=None),
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF103
+18 |     some_path_param: str = Path(),
+19 |     some_body_param: str = Body("foo"),
+   |
+
+RUF103.py:18:5: RUF103 FastAPI dependency without Annotated
+   |
+16 | def do_stuff(
+17 |     some_query_param: str | None = Query(default=None),
+18 |     some_path_param: str = Path(),
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF103
+19 |     some_body_param: str = Body("foo"),
+20 |     some_cookie_param: str = Cookie(),
+   |
+
+RUF103.py:19:5: RUF103 FastAPI dependency without Annotated
+   |
+17 |     some_query_param: str | None = Query(default=None),
+18 |     some_path_param: str = Path(),
+19 |     some_body_param: str = Body("foo"),
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF103
+20 |     some_cookie_param: str = Cookie(),
+21 |     some_header_param: int = Header(default=5),
+   |
+
+RUF103.py:20:5: RUF103 FastAPI dependency without Annotated
+   |
+18 |     some_path_param: str = Path(),
+19 |     some_body_param: str = Body("foo"),
+20 |     some_cookie_param: str = Cookie(),
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF103
+21 |     some_header_param: int = Header(default=5),
+22 |     some_file_param: UploadFile = File(),
+   |
+
+RUF103.py:21:5: RUF103 FastAPI dependency without Annotated
+   |
+19 |     some_body_param: str = Body("foo"),
+20 |     some_cookie_param: str = Cookie(),
+21 |     some_header_param: int = Header(default=5),
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF103
+22 |     some_file_param: UploadFile = File(),
+23 |     some_form_param: str = Form(),
+   |
+
+RUF103.py:22:5: RUF103 FastAPI dependency without Annotated
+   |
+20 |     some_cookie_param: str = Cookie(),
+21 |     some_header_param: int = Header(default=5),
+22 |     some_file_param: UploadFile = File(),
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF103
+23 |     some_form_param: str = Form(),
+24 | ):
+   |
+
+RUF103.py:23:5: RUF103 FastAPI dependency without Annotated
+   |
+21 |     some_header_param: int = Header(default=5),
+22 |     some_file_param: UploadFile = File(),
+23 |     some_form_param: str = Form(),
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF103
+24 | ):
+25 |     # do stuff
+   |
