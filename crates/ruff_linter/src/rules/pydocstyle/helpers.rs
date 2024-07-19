@@ -115,9 +115,9 @@ pub(crate) fn get_section_contexts<'a>(
 
             // Otherwise, use whichever convention matched more sections.
             if google_sections.len() > numpy_sections.len() {
-                return google_sections;
+                google_sections
             } else {
-                return numpy_sections;
+                numpy_sections
             }
         }
     }
