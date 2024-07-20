@@ -8,7 +8,7 @@ use ruff_db::parsed::parsed_module;
 use ruff_index::{IndexSlice, IndexVec};
 
 use crate::semantic_index::ast_ids::node_key::ExpressionNodeKey;
-use crate::semantic_index::ast_ids::AstIds;
+use crate::semantic_index::ast_ids::{AstIds, ScopedExpressionId};
 use crate::semantic_index::builder::SemanticIndexBuilder;
 use crate::semantic_index::definition::{Definition, DefinitionNodeKey};
 use crate::semantic_index::expression::Expression;

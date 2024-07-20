@@ -29,7 +29,7 @@ pub(crate) struct AstIds {
     /// Maps expressions to their expression id. Uses `NodeKey` because it avoids cloning [`Parsed`].
     expressions_map: FxHashMap<ExpressionNodeKey, ScopedExpressionId>,
     /// Maps expressions which "use" a symbol (that is, [`ExprName`]) to a use id.
-    uses_map: FxHashMap<ExpressionNodeKey, ScopedUseId>,
+    uses_map: FxHashMap<ScopedExpressionId, ScopedUseId>,
 }
 
 impl AstIds {
@@ -37,8 +37,8 @@ impl AstIds {
         self.expressions_map[&key.into()]
     }
 
-    fn use_id(&self, key: impl Into<ExpressionNodeKey>) -> ScopedUseId {
-        self.uses_map[&key.into()]
+    fn use_id(&self, key: ScopedExpressionId) -> ScopedUseId {
+        self.uses_map[&key]
     }
 }
 
@@ -72,7 +72,8 @@ impl HasScopedUseId for ast::ExpressionRef<'_> {
 
     fn scoped_use_id(&self, db: &dyn Db, scope: ScopeId) -> Self::Id {
         let ast_ids = ast_ids(db, scope);
-        ast_ids.use_id(*self)
+        let expression_id = ast_ids.expression_id(*self);
+        ast_ids.use_id(expression_id)
     }
 }
 
@@ -147,7 +148,7 @@ impl HasScopedAstId for ast::ExpressionRef<'_> {
 #[derive(Debug)]
 pub(super) struct AstIdsBuilder {
     expressions_map: FxHashMap<ExpressionNodeKey, ScopedExpressionId>,
-    uses_map: FxHashMap<ExpressionNodeKey, ScopedUseId>,
+    uses_map: FxHashMap<ScopedExpressionId, ScopedUseId>,
 }
 
 impl AstIdsBuilder {
@@ -168,10 +169,10 @@ impl AstIdsBuilder {
     }
 
     /// Adds `expr` to the use ids map and returns its id.
-    pub(super) fn record_use(&mut self, expr: &ast::Expr) -> ScopedUseId {
+    pub(super) fn record_use(&mut self, id: ScopedExpressionId) -> ScopedUseId {
         let use_id = self.uses_map.len().into();
 
-        self.uses_map.insert(expr.into(), use_id);
+        self.uses_map.insert(id, use_id);
 
         use_id
     }

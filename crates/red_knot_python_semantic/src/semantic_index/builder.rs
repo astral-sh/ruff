@@ -425,7 +425,7 @@ where
     fn visit_expr(&mut self, expr: &'ast ast::Expr) {
         self.scopes_by_expression
             .insert(expr.into(), self.current_scope());
-        self.current_ast_ids().record_expression(expr);
+        let expression_id = self.current_ast_ids().record_expression(expr);
 
         match expr {
             ast::Expr::Name(name_node) => {
@@ -459,7 +459,7 @@ where
                 }
 
                 if flags.contains(SymbolFlags::IS_USED) {
-                    let use_id = self.current_ast_ids().record_use(expr);
+                    let use_id = self.current_ast_ids().record_use(expression_id);
                     self.current_use_def_map().record_use(symbol, use_id);
                 }
 
