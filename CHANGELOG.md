@@ -8,7 +8,7 @@
 
 ### Bug fixes
 
-- \[`flake8-builtins`\] A void shadowing diagnostics for `@override` methods ([#12415](https://github.com/astral-sh/ruff/pull/12415))
+- \[`flake8-builtins`\] Avoid shadowing diagnostics for `@override` methods ([#12415](https://github.com/astral-sh/ruff/pull/12415))
 - \[`flake8-comprehensions`\] Insert parentheses for multi-argument generators ([#12422](https://github.com/astral-sh/ruff/pull/12422))
 - \[`pydocstyle`\] Handle escaped docstrings within docstring (`D301`) ([#12192](https://github.com/astral-sh/ruff/pull/12192))
 
