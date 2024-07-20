@@ -11,8 +11,8 @@ use crate::ExpressionRef;
 /// Note that without a parent the range can be inaccurate, e.g. `f(a)` we falsely return a set of
 /// parentheses around `a` even if the parentheses actually belong to `f`. That is why you should
 /// generally prefer [`parenthesized_range`].
-pub fn parentheses_iterator<'a>(
-    expr: ExpressionRef<'a>,
+pub fn parentheses_iterator<'a, 'ast>(
+    expr: ExpressionRef<'a, 'ast>,
     parent: Option<AnyNodeRef>,
     comment_ranges: &'a CommentRanges,
     source: &'a str,

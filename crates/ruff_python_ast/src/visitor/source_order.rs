@@ -10,37 +10,37 @@ use crate::{AnyNodeRef, AstNode};
 ///
 /// If you need a visitor that visits the nodes in the order they're evaluated at runtime,
 /// use [`Visitor`](super::Visitor) instead.
-pub trait SourceOrderVisitor<'a> {
+pub trait SourceOrderVisitor<'a, 'ast> {
     #[inline]
-    fn enter_node(&mut self, _node: AnyNodeRef<'a>) -> TraversalSignal {
+    fn enter_node(&mut self, _node: AnyNodeRef<'a, 'ast>) -> TraversalSignal {
         TraversalSignal::Traverse
     }
 
     #[inline(always)]
-    fn leave_node(&mut self, _node: AnyNodeRef<'a>) {}
+    fn leave_node(&mut self, _node: AnyNodeRef<'a, 'ast>) {}
 
     #[inline]
-    fn visit_mod(&mut self, module: &'a Mod) {
+    fn visit_mod(&mut self, module: &'a Mod<'ast>) {
         walk_module(self, module);
     }
 
     #[inline]
-    fn visit_stmt(&mut self, stmt: &'a Stmt) {
+    fn visit_stmt(&mut self, stmt: &'a Stmt<'ast>) {
         walk_stmt(self, stmt);
     }
 
     #[inline]
-    fn visit_annotation(&mut self, expr: &'a Expr) {
+    fn visit_annotation(&mut self, expr: &'a Expr<'ast>) {
         walk_annotation(self, expr);
     }
 
     #[inline]
-    fn visit_expr(&mut self, expr: &'a Expr) {
+    fn visit_expr(&mut self, expr: &'a Expr<'ast>) {
         walk_expr(self, expr);
     }
 
     #[inline]
-    fn visit_decorator(&mut self, decorator: &'a Decorator) {
+    fn visit_decorator(&mut self, decorator: &'a Decorator<'ast>) {
         walk_decorator(self, decorator);
     }
 
@@ -68,113 +68,116 @@ pub trait SourceOrderVisitor<'a> {
     }
 
     #[inline]
-    fn visit_comprehension(&mut self, comprehension: &'a Comprehension) {
+    fn visit_comprehension(&mut self, comprehension: &'a Comprehension<'ast>) {
         walk_comprehension(self, comprehension);
     }
 
     #[inline]
-    fn visit_except_handler(&mut self, except_handler: &'a ExceptHandler) {
+    fn visit_except_handler(&mut self, except_handler: &'a ExceptHandler<'ast>) {
         walk_except_handler(self, except_handler);
     }
 
     #[inline]
-    fn visit_arguments(&mut self, arguments: &'a Arguments) {
+    fn visit_arguments(&mut self, arguments: &'a Arguments<'ast>) {
         walk_arguments(self, arguments);
     }
 
     #[inline]
-    fn visit_parameters(&mut self, parameters: &'a Parameters) {
+    fn visit_parameters(&mut self, parameters: &'a Parameters<'ast>) {
         walk_parameters(self, parameters);
     }
 
     #[inline]
-    fn visit_parameter(&mut self, arg: &'a Parameter) {
+    fn visit_parameter(&mut self, arg: &'a Parameter<'ast>) {
         walk_parameter(self, arg);
     }
 
-    fn visit_parameter_with_default(&mut self, parameter_with_default: &'a ParameterWithDefault) {
+    fn visit_parameter_with_default(
+        &mut self,
+        parameter_with_default: &'a ParameterWithDefault<'ast>,
+    ) {
         walk_parameter_with_default(self, parameter_with_default);
     }
 
     #[inline]
-    fn visit_keyword(&mut self, keyword: &'a Keyword) {
+    fn visit_keyword(&mut self, keyword: &'a Keyword<'ast>) {
         walk_keyword(self, keyword);
     }
 
     #[inline]
-    fn visit_alias(&mut self, alias: &'a Alias) {
+    fn visit_alias(&mut self, alias: &'a Alias<'ast>) {
         walk_alias(self, alias);
     }
 
     #[inline]
-    fn visit_with_item(&mut self, with_item: &'a WithItem) {
+    fn visit_with_item(&mut self, with_item: &'a WithItem<'ast>) {
         walk_with_item(self, with_item);
     }
 
     #[inline]
-    fn visit_type_params(&mut self, type_params: &'a TypeParams) {
+    fn visit_type_params(&mut self, type_params: &'a TypeParams<'ast>) {
         walk_type_params(self, type_params);
     }
 
     #[inline]
-    fn visit_type_param(&mut self, type_param: &'a TypeParam) {
+    fn visit_type_param(&mut self, type_param: &'a TypeParam<'ast>) {
         walk_type_param(self, type_param);
     }
 
     #[inline]
-    fn visit_match_case(&mut self, match_case: &'a MatchCase) {
+    fn visit_match_case(&mut self, match_case: &'a MatchCase<'ast>) {
         walk_match_case(self, match_case);
     }
 
     #[inline]
-    fn visit_pattern(&mut self, pattern: &'a Pattern) {
+    fn visit_pattern(&mut self, pattern: &'a Pattern<'ast>) {
         walk_pattern(self, pattern);
     }
 
     #[inline]
-    fn visit_pattern_arguments(&mut self, pattern_arguments: &'a PatternArguments) {
+    fn visit_pattern_arguments(&mut self, pattern_arguments: &'a PatternArguments<'ast>) {
         walk_pattern_arguments(self, pattern_arguments);
     }
 
     #[inline]
-    fn visit_pattern_keyword(&mut self, pattern_keyword: &'a PatternKeyword) {
+    fn visit_pattern_keyword(&mut self, pattern_keyword: &'a PatternKeyword<'ast>) {
         walk_pattern_keyword(self, pattern_keyword);
     }
 
     #[inline]
-    fn visit_body(&mut self, body: &'a [Stmt]) {
+    fn visit_body(&mut self, body: &'a [Stmt<'ast>]) {
         walk_body(self, body);
     }
 
     #[inline]
-    fn visit_elif_else_clause(&mut self, elif_else_clause: &'a ElifElseClause) {
+    fn visit_elif_else_clause(&mut self, elif_else_clause: &'a ElifElseClause<'ast>) {
         walk_elif_else_clause(self, elif_else_clause);
     }
 
     #[inline]
-    fn visit_f_string(&mut self, f_string: &'a FString) {
+    fn visit_f_string(&mut self, f_string: &'a FString<'ast>) {
         walk_f_string(self, f_string);
     }
 
     #[inline]
-    fn visit_f_string_element(&mut self, f_string_element: &'a FStringElement) {
+    fn visit_f_string_element(&mut self, f_string_element: &'a FStringElement<'ast>) {
         walk_f_string_element(self, f_string_element);
     }
 
     #[inline]
-    fn visit_string_literal(&mut self, string_literal: &'a StringLiteral) {
+    fn visit_string_literal(&mut self, string_literal: &'a StringLiteral<'ast>) {
         walk_string_literal(self, string_literal);
     }
 
     #[inline]
-    fn visit_bytes_literal(&mut self, bytes_literal: &'a BytesLiteral) {
+    fn visit_bytes_literal(&mut self, bytes_literal: &'a BytesLiteral<'ast>) {
         walk_bytes_literal(self, bytes_literal);
     }
 }
 
-pub fn walk_module<'a, V>(visitor: &mut V, module: &'a Mod)
+pub fn walk_module<'a, 'ast, V>(visitor: &mut V, module: &'a Mod<'ast>)
 where
-    V: SourceOrderVisitor<'a> + ?Sized,
+    V: SourceOrderVisitor<'a, 'ast> + ?Sized,
 {
     let node = AnyNodeRef::from(module);
     if visitor.enter_node(node).is_traverse() {
@@ -187,18 +190,18 @@ where
     visitor.leave_node(node);
 }
 
-pub fn walk_body<'a, V>(visitor: &mut V, body: &'a [Stmt])
+pub fn walk_body<'a, 'ast, V>(visitor: &mut V, body: &'a [Stmt<'ast>])
 where
-    V: SourceOrderVisitor<'a> + ?Sized,
+    V: SourceOrderVisitor<'a, 'ast> + ?Sized,
 {
     for stmt in body {
         visitor.visit_stmt(stmt);
     }
 }
 
-pub fn walk_stmt<'a, V>(visitor: &mut V, stmt: &'a Stmt)
+pub fn walk_stmt<'a, 'ast, V>(visitor: &mut V, stmt: &'a Stmt<'ast>)
 where
-    V: SourceOrderVisitor<'a> + ?Sized,
+    V: SourceOrderVisitor<'a, 'ast> + ?Sized,
 {
     let node = AnyNodeRef::from(stmt);
 
@@ -247,7 +250,10 @@ impl TraversalSignal {
     }
 }
 
-pub fn walk_annotation<'a, V: SourceOrderVisitor<'a> + ?Sized>(visitor: &mut V, expr: &'a Expr) {
+pub fn walk_annotation<'a, 'ast, V: SourceOrderVisitor<'a, 'ast> + ?Sized>(
+    visitor: &mut V,
+    expr: &'a Expr<'ast>,
+) {
     let node = AnyNodeRef::from(expr);
     if visitor.enter_node(node).is_traverse() {
         visitor.visit_expr(expr);
@@ -256,9 +262,9 @@ pub fn walk_annotation<'a, V: SourceOrderVisitor<'a> + ?Sized>(visitor: &mut V, 
     visitor.leave_node(node);
 }
 
-pub fn walk_decorator<'a, V>(visitor: &mut V, decorator: &'a Decorator)
+pub fn walk_decorator<'a, 'ast, V>(visitor: &mut V, decorator: &'a Decorator<'ast>)
 where
-    V: SourceOrderVisitor<'a> + ?Sized,
+    V: SourceOrderVisitor<'a, 'ast> + ?Sized,
 {
     let node = AnyNodeRef::from(decorator);
     if visitor.enter_node(node).is_traverse() {
@@ -268,9 +274,9 @@ where
     visitor.leave_node(node);
 }
 
-pub fn walk_expr<'a, V>(visitor: &mut V, expr: &'a Expr)
+pub fn walk_expr<'a, 'ast, V>(visitor: &mut V, expr: &'a Expr<'ast>)
 where
-    V: SourceOrderVisitor<'a> + ?Sized,
+    V: SourceOrderVisitor<'a, 'ast> + ?Sized,
 {
     let node = AnyNodeRef::from(expr);
     if visitor.enter_node(node).is_traverse() {
@@ -313,9 +319,9 @@ where
     visitor.leave_node(node);
 }
 
-pub fn walk_comprehension<'a, V>(visitor: &mut V, comprehension: &'a Comprehension)
+pub fn walk_comprehension<'a, 'ast, V>(visitor: &mut V, comprehension: &'a Comprehension<'ast>)
 where
-    V: SourceOrderVisitor<'a> + ?Sized,
+    V: SourceOrderVisitor<'a, 'ast> + ?Sized,
 {
     let node = AnyNodeRef::from(comprehension);
     if visitor.enter_node(node).is_traverse() {
@@ -325,9 +331,11 @@ where
     visitor.leave_node(node);
 }
 
-pub fn walk_elif_else_clause<'a, V>(visitor: &mut V, elif_else_clause: &'a ElifElseClause)
-where
-    V: SourceOrderVisitor<'a> + ?Sized,
+pub fn walk_elif_else_clause<'a, 'ast, V>(
+    visitor: &mut V,
+    elif_else_clause: &'a ElifElseClause<'ast>,
+) where
+    V: SourceOrderVisitor<'a, 'ast> + ?Sized,
 {
     let node = AnyNodeRef::from(elif_else_clause);
     if visitor.enter_node(node).is_traverse() {
@@ -337,9 +345,9 @@ where
     visitor.leave_node(node);
 }
 
-pub fn walk_except_handler<'a, V>(visitor: &mut V, except_handler: &'a ExceptHandler)
+pub fn walk_except_handler<'a, 'ast, V>(visitor: &mut V, except_handler: &'a ExceptHandler<'ast>)
 where
-    V: SourceOrderVisitor<'a> + ?Sized,
+    V: SourceOrderVisitor<'a, 'ast> + ?Sized,
 {
     let node = AnyNodeRef::from(except_handler);
     if visitor.enter_node(node).is_traverse() {
@@ -352,9 +360,9 @@ where
     visitor.leave_node(node);
 }
 
-pub fn walk_format_spec<'a, V: SourceOrderVisitor<'a> + ?Sized>(
+pub fn walk_format_spec<'a, 'ast, V: SourceOrderVisitor<'a, 'ast> + ?Sized>(
     visitor: &mut V,
-    format_spec: &'a Expr,
+    format_spec: &'a Expr<'ast>,
 ) {
     let node = AnyNodeRef::from(format_spec);
     if visitor.enter_node(node).is_traverse() {
@@ -364,9 +372,9 @@ pub fn walk_format_spec<'a, V: SourceOrderVisitor<'a> + ?Sized>(
     visitor.leave_node(node);
 }
 
-pub fn walk_arguments<'a, V>(visitor: &mut V, arguments: &'a Arguments)
+pub fn walk_arguments<'a, 'ast, V>(visitor: &mut V, arguments: &'a Arguments<'ast>)
 where
-    V: SourceOrderVisitor<'a> + ?Sized,
+    V: SourceOrderVisitor<'a, 'ast> + ?Sized,
 {
     let node = AnyNodeRef::from(arguments);
     if visitor.enter_node(node).is_traverse() {
@@ -376,9 +384,9 @@ where
     visitor.leave_node(node);
 }
 
-pub fn walk_parameters<'a, V>(visitor: &mut V, parameters: &'a Parameters)
+pub fn walk_parameters<'a, 'ast, V>(visitor: &mut V, parameters: &'a Parameters<'ast>)
 where
-    V: SourceOrderVisitor<'a> + ?Sized,
+    V: SourceOrderVisitor<'a, 'ast> + ?Sized,
 {
     let node = AnyNodeRef::from(parameters);
     if visitor.enter_node(node).is_traverse() {
@@ -388,9 +396,9 @@ where
     visitor.leave_node(node);
 }
 
-pub fn walk_parameter<'a, V>(visitor: &mut V, parameter: &'a Parameter)
+pub fn walk_parameter<'a, 'ast, V>(visitor: &mut V, parameter: &'a Parameter<'ast>)
 where
-    V: SourceOrderVisitor<'a> + ?Sized,
+    V: SourceOrderVisitor<'a, 'ast> + ?Sized,
 {
     let node = AnyNodeRef::from(parameter);
 
@@ -400,11 +408,11 @@ where
     visitor.leave_node(node);
 }
 
-pub fn walk_parameter_with_default<'a, V>(
+pub fn walk_parameter_with_default<'a, 'ast, V>(
     visitor: &mut V,
-    parameter_with_default: &'a ParameterWithDefault,
+    parameter_with_default: &'a ParameterWithDefault<'ast>,
 ) where
-    V: SourceOrderVisitor<'a> + ?Sized,
+    V: SourceOrderVisitor<'a, 'ast> + ?Sized,
 {
     let node = AnyNodeRef::from(parameter_with_default);
     if visitor.enter_node(node).is_traverse() {
@@ -415,9 +423,9 @@ pub fn walk_parameter_with_default<'a, V>(
 }
 
 #[inline]
-pub fn walk_keyword<'a, V>(visitor: &mut V, keyword: &'a Keyword)
+pub fn walk_keyword<'a, 'ast, V>(visitor: &mut V, keyword: &'a Keyword<'ast>)
 where
-    V: SourceOrderVisitor<'a> + ?Sized,
+    V: SourceOrderVisitor<'a, 'ast> + ?Sized,
 {
     let node = AnyNodeRef::from(keyword);
 
@@ -427,9 +435,9 @@ where
     visitor.leave_node(node);
 }
 
-pub fn walk_with_item<'a, V>(visitor: &mut V, with_item: &'a WithItem)
+pub fn walk_with_item<'a, 'ast, V>(visitor: &mut V, with_item: &'a WithItem<'ast>)
 where
-    V: SourceOrderVisitor<'a> + ?Sized,
+    V: SourceOrderVisitor<'a, 'ast> + ?Sized,
 {
     let node = AnyNodeRef::from(with_item);
     if visitor.enter_node(node).is_traverse() {
@@ -438,9 +446,9 @@ where
     visitor.leave_node(node);
 }
 
-pub fn walk_type_params<'a, V>(visitor: &mut V, type_params: &'a TypeParams)
+pub fn walk_type_params<'a, 'ast, V>(visitor: &mut V, type_params: &'a TypeParams<'ast>)
 where
-    V: SourceOrderVisitor<'a> + ?Sized,
+    V: SourceOrderVisitor<'a, 'ast> + ?Sized,
 {
     let node = AnyNodeRef::from(type_params);
     if visitor.enter_node(node).is_traverse() {
@@ -449,9 +457,9 @@ where
     visitor.leave_node(node);
 }
 
-pub fn walk_type_param<'a, V>(visitor: &mut V, type_param: &'a TypeParam)
+pub fn walk_type_param<'a, 'ast, V>(visitor: &mut V, type_param: &'a TypeParam<'ast>)
 where
-    V: SourceOrderVisitor<'a> + ?Sized,
+    V: SourceOrderVisitor<'a, 'ast> + ?Sized,
 {
     let node = AnyNodeRef::from(type_param);
     if visitor.enter_node(node).is_traverse() {
@@ -464,9 +472,9 @@ where
     visitor.leave_node(node);
 }
 
-pub fn walk_match_case<'a, V>(visitor: &mut V, match_case: &'a MatchCase)
+pub fn walk_match_case<'a, 'ast, V>(visitor: &mut V, match_case: &'a MatchCase<'ast>)
 where
-    V: SourceOrderVisitor<'a> + ?Sized,
+    V: SourceOrderVisitor<'a, 'ast> + ?Sized,
 {
     let node = AnyNodeRef::from(match_case);
     if visitor.enter_node(node).is_traverse() {
@@ -475,9 +483,9 @@ where
     visitor.leave_node(node);
 }
 
-pub fn walk_pattern<'a, V>(visitor: &mut V, pattern: &'a Pattern)
+pub fn walk_pattern<'a, 'ast, V>(visitor: &mut V, pattern: &'a Pattern<'ast>)
 where
-    V: SourceOrderVisitor<'a> + ?Sized,
+    V: SourceOrderVisitor<'a, 'ast> + ?Sized,
 {
     let node = AnyNodeRef::from(pattern);
     if visitor.enter_node(node).is_traverse() {
@@ -495,9 +503,11 @@ where
     visitor.leave_node(node);
 }
 
-pub fn walk_pattern_arguments<'a, V>(visitor: &mut V, pattern_arguments: &'a PatternArguments)
-where
-    V: SourceOrderVisitor<'a> + ?Sized,
+pub fn walk_pattern_arguments<'a, 'ast, V>(
+    visitor: &mut V,
+    pattern_arguments: &'a PatternArguments<'ast>,
+) where
+    V: SourceOrderVisitor<'a, 'ast> + ?Sized,
 {
     let node = AnyNodeRef::from(pattern_arguments);
     if visitor.enter_node(node).is_traverse() {
@@ -511,9 +521,9 @@ where
     visitor.leave_node(node);
 }
 
-pub fn walk_pattern_keyword<'a, V>(visitor: &mut V, pattern_keyword: &'a PatternKeyword)
+pub fn walk_pattern_keyword<'a, 'ast, V>(visitor: &mut V, pattern_keyword: &'a PatternKeyword<'ast>)
 where
-    V: SourceOrderVisitor<'a> + ?Sized,
+    V: SourceOrderVisitor<'a, 'ast> + ?Sized,
 {
     let node = AnyNodeRef::from(pattern_keyword);
     if visitor.enter_node(node).is_traverse() {
@@ -522,9 +532,9 @@ where
     visitor.leave_node(node);
 }
 
-pub fn walk_f_string_element<'a, V: SourceOrderVisitor<'a> + ?Sized>(
+pub fn walk_f_string_element<'a, 'ast, V: SourceOrderVisitor<'a, 'ast> + ?Sized>(
     visitor: &mut V,
-    f_string_element: &'a FStringElement,
+    f_string_element: &'a FStringElement<'ast>,
 ) {
     let node = AnyNodeRef::from(f_string_element);
     if visitor.enter_node(node).is_traverse() {
@@ -536,37 +546,37 @@ pub fn walk_f_string_element<'a, V: SourceOrderVisitor<'a> + ?Sized>(
     visitor.leave_node(node);
 }
 
-pub fn walk_bool_op<'a, V>(_visitor: &mut V, _bool_op: &'a BoolOp)
+pub fn walk_bool_op<'a, 'ast, V>(_visitor: &mut V, _bool_op: &'a BoolOp)
 where
-    V: SourceOrderVisitor<'a> + ?Sized,
+    V: SourceOrderVisitor<'a, 'ast> + ?Sized,
 {
 }
 
 #[inline]
-pub fn walk_operator<'a, V>(_visitor: &mut V, _operator: &'a Operator)
+pub fn walk_operator<'a, 'ast, V>(_visitor: &mut V, _operator: &'a Operator)
 where
-    V: SourceOrderVisitor<'a> + ?Sized,
+    V: SourceOrderVisitor<'a, 'ast> + ?Sized,
 {
 }
 
 #[inline]
-pub fn walk_unary_op<'a, V>(_visitor: &mut V, _unary_op: &'a UnaryOp)
+pub fn walk_unary_op<'a, 'ast, V>(_visitor: &mut V, _unary_op: &'a UnaryOp)
 where
-    V: SourceOrderVisitor<'a> + ?Sized,
+    V: SourceOrderVisitor<'a, 'ast> + ?Sized,
 {
 }
 
 #[inline]
-pub fn walk_cmp_op<'a, V>(_visitor: &mut V, _cmp_op: &'a CmpOp)
+pub fn walk_cmp_op<'a, 'ast, V>(_visitor: &mut V, _cmp_op: &'a CmpOp)
 where
-    V: SourceOrderVisitor<'a> + ?Sized,
+    V: SourceOrderVisitor<'a, 'ast> + ?Sized,
 {
 }
 
 #[inline]
-pub fn walk_f_string<'a, V>(visitor: &mut V, f_string: &'a FString)
+pub fn walk_f_string<'a, 'ast, V>(visitor: &mut V, f_string: &'a FString<'ast>)
 where
-    V: SourceOrderVisitor<'a> + ?Sized,
+    V: SourceOrderVisitor<'a, 'ast> + ?Sized,
 {
     let node = AnyNodeRef::from(f_string);
     if visitor.enter_node(node).is_traverse() {
@@ -576,9 +586,9 @@ where
 }
 
 #[inline]
-pub fn walk_string_literal<'a, V>(visitor: &mut V, string_literal: &'a StringLiteral)
+pub fn walk_string_literal<'a, 'ast, V>(visitor: &mut V, string_literal: &'a StringLiteral<'ast>)
 where
-    V: SourceOrderVisitor<'a> + ?Sized,
+    V: SourceOrderVisitor<'a, 'ast> + ?Sized,
 {
     let node = AnyNodeRef::from(string_literal);
     if visitor.enter_node(node).is_traverse() {
@@ -588,9 +598,9 @@ where
 }
 
 #[inline]
-pub fn walk_bytes_literal<'a, V>(visitor: &mut V, bytes_literal: &'a BytesLiteral)
+pub fn walk_bytes_literal<'a, 'ast, V>(visitor: &mut V, bytes_literal: &'a BytesLiteral<'ast>)
 where
-    V: SourceOrderVisitor<'a> + ?Sized,
+    V: SourceOrderVisitor<'a, 'ast> + ?Sized,
 {
     let node = AnyNodeRef::from(bytes_literal);
     if visitor.enter_node(node).is_traverse() {
@@ -600,9 +610,9 @@ where
 }
 
 #[inline]
-pub fn walk_alias<'a, V>(visitor: &mut V, alias: &'a Alias)
+pub fn walk_alias<'a, 'ast, V>(visitor: &mut V, alias: &'a Alias<'ast>)
 where
-    V: SourceOrderVisitor<'a> + ?Sized,
+    V: SourceOrderVisitor<'a, 'ast> + ?Sized,
 {
     let node = AnyNodeRef::from(alias);
     if visitor.enter_node(node).is_traverse() {

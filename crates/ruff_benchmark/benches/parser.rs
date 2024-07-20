@@ -2,6 +2,7 @@ use codspeed_criterion_compat::{
     criterion_group, criterion_main, measurement::WallTime, BenchmarkId, Criterion, Throughput,
 };
 
+use ruff_allocator::Allocator;
 use ruff_benchmark::{TestCase, TestFile, TestFileDownloadError};
 use ruff_python_ast::statement_visitor::{walk_stmt, StatementVisitor};
 use ruff_python_ast::Stmt;
@@ -43,8 +44,8 @@ struct CountVisitor {
     count: usize,
 }
 
-impl<'a> StatementVisitor<'a> for CountVisitor {
-    fn visit_stmt(&mut self, stmt: &'a Stmt) {
+impl<'a, 'ast> StatementVisitor<'a, 'ast> for CountVisitor {
+    fn visit_stmt(&mut self, stmt: &'a Stmt<'ast>) {
         walk_stmt(self, stmt);
         self.count += 1;
     }
@@ -61,7 +62,8 @@ fn benchmark_parser(criterion: &mut Criterion<WallTime>) {
             &case,
             |b, case| {
                 b.iter(|| {
-                    let parsed = parse_module(case.code())
+                    let allocator = Allocator::new();
+                    let parsed = parse_module(case.code(), &allocator)
                         .expect("Input should be a valid Python code")
                         .into_suite();
 

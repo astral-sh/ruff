@@ -15,9 +15,9 @@ license = { workspace = true }
 bench = false
 doctest = false
 
-[[bench]]
-name = "linter"
-harness = false
+#[[bench]]
+#name = "linter"
+#harness = false
 
 [[bench]]
 name = "lexer"
@@ -27,13 +27,13 @@ harness = false
 name = "parser"
 harness = false
 
-[[bench]]
-name = "formatter"
-harness = false
+#[[bench]]
+#name = "formatter"
+#harness = false
 
-[[bench]]
-name = "red_knot"
-harness = false
+#[[bench]]
+#name = "red_knot"
+#harness = false
 
 [dependencies]
 once_cell = { workspace = true }
@@ -44,13 +44,14 @@ ureq = { workspace = true }
 codspeed-criterion-compat = { workspace = true, default-features = false }
 
 [dev-dependencies]
-ruff_db = { workspace = true }
-ruff_linter = { workspace = true }
+ruff_allocator = { workspace = true }
+#ruff_db = { workspace = true }
+#ruff_linter = { workspace = true }
 ruff_python_ast = { workspace = true }
-ruff_python_formatter = { workspace = true }
+#ruff_python_formatter = { workspace = true }
 ruff_python_parser = { workspace = true }
 ruff_python_trivia = { workspace = true }
-red_knot = { workspace = true }
+#red_knot = { workspace = true }
 
 [lints]
 workspace = true

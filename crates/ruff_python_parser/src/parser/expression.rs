@@ -106,7 +106,7 @@ pub(super) const END_EXPR_SET: TokenSet = TokenSet::new([
 /// Tokens that can appear at the end of a sequence.
 const END_SEQUENCE_SET: TokenSet = END_EXPR_SET.remove(TokenKind::Comma);
 
-impl<'src> Parser<'src> {
+impl<'src, 'ast> Parser<'src, 'ast> {
     /// Returns `true` if the parser is at a name or keyword (including soft keyword) token.
     pub(super) fn at_name_or_keyword(&self) -> bool {
         self.at(TokenKind::Name) || self.current_token_kind().is_keyword()
@@ -138,7 +138,7 @@ impl<'src> Parser<'src> {
     /// used to match the `star_expressions` rule.
     ///
     /// [Python grammar]: https://docs.python.org/3/reference/grammar.html
-    pub(super) fn parse_expression_list(&mut self, context: ExpressionContext) -> ParsedExpr {
+    pub(super) fn parse_expression_list(&mut self, context: ExpressionContext) -> ParsedExpr<'ast> {
         let start = self.node_start();
         let parsed_expr = self.parse_conditional_expression_or_higher_impl(context);
 
@@ -167,7 +167,7 @@ impl<'src> Parser<'src> {
     pub(super) fn parse_named_expression_or_higher(
         &mut self,
         context: ExpressionContext,
-    ) -> ParsedExpr {
+    ) -> ParsedExpr<'ast> {
         let start = self.node_start();
         let parsed_expr = self.parse_conditional_expression_or_higher_impl(context);
 
@@ -190,14 +190,14 @@ impl<'src> Parser<'src> {
     /// instead of as a tuple, as done by [`Parser::parse_expression_list`] use this function.
     ///
     /// [Python grammar]: https://docs.python.org/3/reference/grammar.html
-    pub(super) fn parse_conditional_expression_or_higher(&mut self) -> ParsedExpr {
+    pub(super) fn parse_conditional_expression_or_higher(&mut self) -> ParsedExpr<'ast> {
         self.parse_conditional_expression_or_higher_impl(ExpressionContext::default())
     }
 
     pub(super) fn parse_conditional_expression_or_higher_impl(
         &mut self,
         context: ExpressionContext,
-    ) -> ParsedExpr {
+    ) -> ParsedExpr<'ast> {
         if self.at(TokenKind::Lambda) {
             Expr::Lambda(self.parse_lambda_expr()).into()
         } else {
@@ -224,7 +224,7 @@ impl<'src> Parser<'src> {
     /// specified method to allow parsing lambda expression.
     ///
     /// [Python grammar]: https://docs.python.org/3/reference/grammar.html
-    fn parse_simple_expression(&mut self, context: ExpressionContext) -> ParsedExpr {
+    fn parse_simple_expression(&mut self, context: ExpressionContext) -> ParsedExpr<'ast> {
         self.parse_binary_expression_or_higher(OperatorPrecedence::Initial, context)
     }
 
@@ -235,7 +235,7 @@ impl<'src> Parser<'src> {
         &mut self,
         left_precedence: OperatorPrecedence,
         context: ExpressionContext,
-    ) -> ParsedExpr {
+    ) -> ParsedExpr<'ast> {
         let start = self.node_start();
         let lhs = self.parse_lhs_expression(left_precedence, context);
         self.parse_binary_expression_or_higher_recursive(lhs, left_precedence, context, start)
@@ -243,11 +243,11 @@ impl<'src> Parser<'src> {
 
     pub(super) fn parse_binary_expression_or_higher_recursive(
         &mut self,
-        mut left: ParsedExpr,
+        mut left: ParsedExpr<'ast>,
         left_precedence: OperatorPrecedence,
         context: ExpressionContext,
         start: TextSize,
-    ) -> ParsedExpr {
+    ) -> ParsedExpr<'ast> {
         let mut progress = ParserProgress::default();
 
         loop {
@@ -292,9 +292,9 @@ impl<'src> Parser<'src> {
                     let right = self.parse_binary_expression_or_higher(new_precedence, context);
 
                     Expr::BinOp(ast::ExprBinOp {
-                        left: Box::new(left.expr),
+                        left: self.alloc_box(left.expr),
                         op: bin_op,
-                        right: Box::new(right.expr),
+                        right: self.alloc_box(right.expr),
                         range: self.node_range(start),
                     })
                 }
@@ -317,7 +317,7 @@ impl<'src> Parser<'src> {
         &mut self,
         left_precedence: OperatorPrecedence,
         context: ExpressionContext,
-    ) -> ParsedExpr {
+    ) -> ParsedExpr<'ast> {
         let start = self.node_start();
         let token = self.current_token_kind();
 
@@ -416,7 +416,7 @@ impl<'src> Parser<'src> {
     /// sense, it matches the `bitwise_or` rule of the [Python grammar].
     ///
     /// [Python grammar]: https://docs.python.org/3/reference/grammar.html
-    fn parse_expression_with_bitwise_or_precedence(&mut self) -> ParsedExpr {
+    fn parse_expression_with_bitwise_or_precedence(&mut self) -> ParsedExpr<'ast> {
         let parsed_expr = self.parse_conditional_expression_or_higher();
 
         if parsed_expr.is_parenthesized {
@@ -450,7 +450,7 @@ impl<'src> Parser<'src> {
     /// field will be [`ExprContext::Invalid`].
     ///
     /// See: <https://docs.python.org/3/reference/expressions.html#atom-identifiers>
-    pub(super) fn parse_name(&mut self) -> ast::ExprName {
+    pub(super) fn parse_name(&mut self) -> ast::ExprName<'ast> {
         let identifier = self.parse_identifier();
 
         let ctx = if identifier.is_valid() {
@@ -471,20 +471,26 @@ impl<'src> Parser<'src> {
     /// For an invalid identifier, the `id` field will be an empty string.
     ///
     /// See: <https://docs.python.org/3/reference/expressions.html#atom-identifiers>
-    pub(super) fn parse_identifier(&mut self) -> ast::Identifier {
+    pub(super) fn parse_identifier(&mut self) -> ast::Identifier<'ast> {
         let range = self.current_token_range();
 
         if self.at(TokenKind::Name) {
             let TokenValue::Name(name) = self.bump_value(TokenKind::Name) else {
                 unreachable!();
             };
-            return ast::Identifier { id: name, range };
+            return ast::Identifier {
+                id: self.allocator.alloc_str(&name),
+                range,
+            };
         }
 
         if self.current_token_kind().is_soft_keyword() {
             let id = Name::new(self.src_text(range));
             self.bump_soft_keyword_as_name();
-            return ast::Identifier { id, range };
+            return ast::Identifier {
+                id: self.allocator.alloc_str(&id),
+                range,
+            };
         }
 
         if self.current_token_kind().is_keyword() {
@@ -497,7 +503,7 @@ impl<'src> Parser<'src> {
                 range,
             );
 
-            let id = Name::new(self.src_text(range));
+            let id = self.alloc_str(self.src_text(range));
             self.bump_any();
             ast::Identifier { id, range }
         } else {
@@ -507,7 +513,7 @@ impl<'src> Parser<'src> {
             );
 
             ast::Identifier {
-                id: Name::empty(),
+                id: "",
                 range: self.missing_node_range(),
             }
         }
@@ -516,7 +522,7 @@ impl<'src> Parser<'src> {
     /// Parses an atom.
     ///
     /// See: <https://docs.python.org/3/reference/expressions.html#atoms>
-    fn parse_atom(&mut self) -> ParsedExpr {
+    fn parse_atom(&mut self) -> ParsedExpr<'ast> {
         let start = self.node_start();
 
         let lhs = match self.current_token_kind() {
@@ -595,7 +601,7 @@ impl<'src> Parser<'src> {
                     );
                     Expr::Name(ast::ExprName {
                         range: self.missing_node_range(),
-                        id: Name::empty(),
+                        id: "",
                         ctx: ExprContext::Invalid,
                     })
                 }
@@ -611,7 +617,11 @@ impl<'src> Parser<'src> {
     /// expression, `[` for a subscript expression, or `.` for an attribute expression.
     ///
     /// This method does nothing if the current token is not a candidate for a postfix expression.
-    pub(super) fn parse_postfix_expression(&mut self, mut lhs: Expr, start: TextSize) -> Expr {
+    pub(super) fn parse_postfix_expression(
+        &mut self,
+        mut lhs: Expr<'ast>,
+        start: TextSize,
+    ) -> Expr<'ast> {
         loop {
             lhs = match self.current_token_kind() {
                 TokenKind::Lpar => Expr::Call(self.parse_call_expression(lhs, start)),
@@ -632,11 +642,11 @@ impl<'src> Parser<'src> {
     /// If the parser isn't position at a `(` token.
     ///
     /// See: <https://docs.python.org/3/reference/expressions.html#calls>
-    fn parse_call_expression(&mut self, func: Expr, start: TextSize) -> ast::ExprCall {
+    fn parse_call_expression(&mut self, func: Expr<'ast>, start: TextSize) -> ast::ExprCall<'ast> {
         let arguments = self.parse_arguments();
 
         ast::ExprCall {
-            func: Box::new(func),
+            func: self.alloc_box(func),
             arguments,
             range: self.node_range(start),
         }
@@ -649,12 +659,12 @@ impl<'src> Parser<'src> {
     /// If the parser isn't positioned at a `(` token.
     ///
     /// See: <https://docs.python.org/3/reference/expressions.html#grammar-token-python-grammar-argument_list>
-    pub(super) fn parse_arguments(&mut self) -> ast::Arguments {
+    pub(super) fn parse_arguments(&mut self) -> ast::Arguments<'ast> {
         let start = self.node_start();
         self.bump(TokenKind::Lpar);
 
-        let mut args = vec![];
-        let mut keywords = vec![];
+        let mut args = ruff_allocator::Vec::new_in(&self.allocator);
+        let mut keywords = ruff_allocator::Vec::new_in(&self.allocator);
         let mut seen_keyword_argument = false; // foo = 1
         let mut seen_keyword_unpacking = false; // **foo
 
@@ -717,7 +727,7 @@ impl<'src> Parser<'src> {
                             &parsed_expr,
                         );
                         ast::Identifier {
-                            id: Name::empty(),
+                            id: "",
                             range: parsed_expr.range(),
                         }
                     };
@@ -752,8 +762,8 @@ impl<'src> Parser<'src> {
 
         let arguments = ast::Arguments {
             range: self.node_range(start),
-            args: args.into_boxed_slice(),
-            keywords: keywords.into_boxed_slice(),
+            args: args.into_bump_slice_mut(),
+            keywords: keywords.into_bump_slice_mut(),
         };
 
         self.validate_arguments(&arguments);
@@ -770,9 +780,9 @@ impl<'src> Parser<'src> {
     /// See: <https://docs.python.org/3/reference/expressions.html#subscriptions>
     fn parse_subscript_expression(
         &mut self,
-        mut value: Expr,
+        mut value: Expr<'ast>,
         start: TextSize,
-    ) -> ast::ExprSubscript {
+    ) -> ast::ExprSubscript<'ast> {
         self.bump(TokenKind::Lsqb);
 
         // To prevent the `value` context from being `Del` within a `del` statement,
@@ -788,10 +798,10 @@ impl<'src> Parser<'src> {
             self.add_error(ParseErrorType::EmptySlice, slice_range);
 
             return ast::ExprSubscript {
-                value: Box::new(value),
-                slice: Box::new(Expr::Name(ast::ExprName {
+                value: self.alloc_box(value),
+                slice: self.alloc_box(Expr::Name(ast::ExprName {
                     range: slice_range,
-                    id: Name::empty(),
+                    id: "",
                     ctx: ExprContext::Invalid,
                 })),
                 ctx: ExprContext::Load,
@@ -831,8 +841,8 @@ impl<'src> Parser<'src> {
         self.expect(TokenKind::Rsqb);
 
         ast::ExprSubscript {
-            value: Box::new(value),
-            slice: Box::new(slice),
+            value: self.alloc_box(value),
+            slice: self.alloc_box(slice),
             ctx: ExprContext::Load,
             range: self.node_range(start),
         }
@@ -841,7 +851,7 @@ impl<'src> Parser<'src> {
     /// Parses a slice expression.
     ///
     /// See: <https://docs.python.org/3/reference/expressions.html#slicings>
-    fn parse_slice(&mut self) -> Expr {
+    fn parse_slice(&mut self) -> Expr<'ast> {
         const UPPER_END_SET: TokenSet =
             TokenSet::new([TokenKind::Comma, TokenKind::Colon, TokenKind::Rsqb])
                 .union(NEWLINE_EOF_SET);
@@ -876,18 +886,20 @@ impl<'src> Parser<'src> {
 
         self.expect(TokenKind::Colon);
 
-        let lower = lower.map(Box::new);
+        let lower = lower.map(|lower| self.alloc_box(lower));
         let upper = if self.at_ts(UPPER_END_SET) {
             None
         } else {
-            Some(Box::new(self.parse_conditional_expression_or_higher().expr))
+            let expression = self.parse_conditional_expression_or_higher().expr;
+            Some(self.alloc_box(expression))
         };
 
         let step = if self.eat(TokenKind::Colon) {
             if self.at_ts(STEP_END_SET) {
                 None
             } else {
-                Some(Box::new(self.parse_conditional_expression_or_higher().expr))
+                let expression = self.parse_conditional_expression_or_higher().expr;
+                Some(self.alloc_box(expression))
             }
         } else {
             None
@@ -915,7 +927,7 @@ impl<'src> Parser<'src> {
         &mut self,
         op: UnaryOp,
         context: ExpressionContext,
-    ) -> ast::ExprUnaryOp {
+    ) -> ast::ExprUnaryOp<'ast> {
         let start = self.node_start();
         self.bump(TokenKind::from(op));
 
@@ -923,7 +935,7 @@ impl<'src> Parser<'src> {
 
         ast::ExprUnaryOp {
             op,
-            operand: Box::new(operand.expr),
+            operand: self.alloc_box(operand.expr),
             range: self.node_range(start),
         }
     }
@@ -937,15 +949,15 @@ impl<'src> Parser<'src> {
     /// See: <https://docs.python.org/3/reference/expressions.html#attribute-references>
     pub(super) fn parse_attribute_expression(
         &mut self,
-        value: Expr,
+        value: Expr<'ast>,
         start: TextSize,
-    ) -> ast::ExprAttribute {
+    ) -> ast::ExprAttribute<'ast> {
         self.bump(TokenKind::Dot);
 
         let attr = self.parse_identifier();
 
         ast::ExprAttribute {
-            value: Box::new(value),
+            value: self.alloc_box(value),
             attr,
             ctx: ExprContext::Load,
             range: self.node_range(start),
@@ -964,11 +976,11 @@ impl<'src> Parser<'src> {
     /// See: <https://docs.python.org/3/reference/expressions.html#boolean-operations>
     fn parse_boolean_expression(
         &mut self,
-        lhs: Expr,
+        lhs: Expr<'ast>,
         start: TextSize,
         op: BoolOp,
         context: ExpressionContext,
-    ) -> ast::ExprBoolOp {
+    ) -> ast::ExprBoolOp<'ast> {
         self.bump(TokenKind::from(op));
 
         let mut values = vec![lhs];
@@ -1030,15 +1042,16 @@ impl<'src> Parser<'src> {
     /// See: <https://docs.python.org/3/reference/expressions.html#comparisons>
     fn parse_comparison_expression(
         &mut self,
-        lhs: Expr,
+        lhs: Expr<'ast>,
         start: TextSize,
         op: CmpOp,
         context: ExpressionContext,
-    ) -> ast::ExprCompare {
+    ) -> ast::ExprCompare<'ast> {
         self.bump_cmp_op(op);
 
-        let mut comparators = vec![];
-        let mut operators = vec![op];
+        let mut comparators = ruff_allocator::Vec::new_in(&self.allocator);
+        let mut operators = ruff_allocator::Vec::new_in(&self.allocator);
+        operators.push(op);
 
         let mut progress = ParserProgress::default();
 
@@ -1067,9 +1080,9 @@ impl<'src> Parser<'src> {
         }
 
         ast::ExprCompare {
-            left: Box::new(lhs),
-            ops: operators.into_boxed_slice(),
-            comparators: comparators.into_boxed_slice(),
+            left: self.alloc_box(lhs),
+            ops: operators.into_bump_slice_mut(),
+            comparators: comparators.into_bump_slice_mut(),
             range: self.node_range(start),
         }
     }
@@ -1081,7 +1094,7 @@ impl<'src> Parser<'src> {
     /// If the parser isn't positioned at a `String` or `FStringStart` token.
     ///
     /// See: <https://docs.python.org/3/reference/grammar.html> (Search "strings:")
-    pub(super) fn parse_strings(&mut self) -> Expr {
+    pub(super) fn parse_strings(&mut self) -> Expr<'ast> {
         const STRING_START_SET: TokenSet =
             TokenSet::new([TokenKind::String, TokenKind::FStringStart]);
 
@@ -1132,9 +1145,9 @@ impl<'src> Parser<'src> {
     /// If the length of `strings` is less than 2.
     fn handle_implicitly_concatenated_strings(
         &mut self,
-        strings: Vec<StringType>,
+        strings: Vec<StringType<'ast>>,
         range: TextRange,
-    ) -> Expr {
+    ) -> Expr<'ast> {
         assert!(strings.len() > 1);
 
         let mut has_fstring = false;
@@ -1251,7 +1264,7 @@ impl<'src> Parser<'src> {
     /// If the parser isn't positioned at a `String` token.
     ///
     /// See: <https://docs.python.org/3.13/reference/lexical_analysis.html#string-and-bytes-literals>
-    fn parse_string_or_byte_literal(&mut self) -> StringType {
+    fn parse_string_or_byte_literal(&mut self) -> StringType<'ast> {
         let range = self.current_token_range();
         let flags = self.tokens.current_flags().as_any_string_flags();
 
@@ -1259,7 +1272,7 @@ impl<'src> Parser<'src> {
             unreachable!()
         };
 
-        match parse_string_literal(value, flags, range) {
+        match parse_string_literal(&value, flags, range, self.allocator) {
             Ok(string) => string,
             Err(error) => {
                 let location = error.location();
@@ -1271,7 +1284,7 @@ impl<'src> Parser<'src> {
                     // rb"a𝐁c123"
                     // b"""123a𝐁c"""
                     StringType::Bytes(ast::BytesLiteral {
-                        value: Box::new([]),
+                        value: &[],
                         range,
                         flags: ast::BytesLiteralFlags::from(flags).with_invalid(),
                     })
@@ -1299,7 +1312,7 @@ impl<'src> Parser<'src> {
     ///
     /// See: <https://docs.python.org/3/reference/grammar.html> (Search "fstring:")
     /// See: <https://docs.python.org/3/reference/lexical_analysis.html#formatted-string-literals>
-    fn parse_fstring(&mut self) -> ast::FString {
+    fn parse_fstring(&mut self) -> ast::FString<'ast> {
         let start = self.node_start();
         let flags = self.tokens.current_flags().as_any_string_flags();
 
@@ -1324,7 +1337,7 @@ impl<'src> Parser<'src> {
         &mut self,
         flags: ast::AnyStringFlags,
         kind: FStringElementsKind,
-    ) -> FStringElements {
+    ) -> FStringElements<'ast> {
         let mut elements = vec![];
 
         self.parse_list(RecoveryContextKind::FStringElements(kind), |parser| {
@@ -1340,8 +1353,8 @@ impl<'src> Parser<'src> {
                         unreachable!()
                     };
                     FStringElement::Literal(
-                        parse_fstring_literal_element(value, flags, range).unwrap_or_else(
-                            |lex_error| {
+                        parse_fstring_literal_element(&value, flags, range, self.allocator)
+                            .unwrap_or_else(|lex_error| {
                                 // test_err invalid_fstring_literal_element
                                 // f'hello \N{INVALID} world'
                                 // f"""hello \N{INVALID} world"""
@@ -1354,8 +1367,7 @@ impl<'src> Parser<'src> {
                                     value: "".into(),
                                     range,
                                 }
-                            },
-                        ),
+                            }),
                     )
                 }
                 // `Invalid` tokens are created when there's a lexical error, so
@@ -1388,7 +1400,7 @@ impl<'src> Parser<'src> {
     fn parse_fstring_expression_element(
         &mut self,
         flags: ast::AnyStringFlags,
-    ) -> ast::FStringExpressionElement {
+    ) -> ast::FStringExpressionElement<'ast> {
         let start = self.node_start();
         self.bump(TokenKind::Lbrace);
 
@@ -1465,7 +1477,7 @@ impl<'src> Parser<'src> {
         let format_spec = if self.eat(TokenKind::Colon) {
             let spec_start = self.node_start();
             let elements = self.parse_fstring_elements(flags, FStringElementsKind::FormatSpec);
-            Some(Box::new(ast::FStringFormatSpec {
+            Some(self.alloc_box(ast::FStringFormatSpec {
                 range: self.node_range(spec_start),
                 elements,
             }))
@@ -1498,7 +1510,7 @@ impl<'src> Parser<'src> {
         }
 
         ast::FStringExpressionElement {
-            expression: Box::new(value.expr),
+            expression: self.alloc_box(value.expr),
             debug_text,
             conversion,
             format_spec,
@@ -1513,7 +1525,7 @@ impl<'src> Parser<'src> {
     /// If the parser isn't positioned at a `[` token.
     ///
     /// See: <https://docs.python.org/3/reference/expressions.html#list-displays>
-    fn parse_list_like_expression(&mut self) -> Expr {
+    fn parse_list_like_expression(&mut self) -> Expr<'ast> {
         let start = self.node_start();
 
         self.bump(TokenKind::Lsqb);
@@ -1566,7 +1578,7 @@ impl<'src> Parser<'src> {
     /// - <https://docs.python.org/3/reference/expressions.html#set-displays>
     /// - <https://docs.python.org/3/reference/expressions.html#dictionary-displays>
     /// - <https://docs.python.org/3/reference/expressions.html#displays-for-lists-sets-and-dictionaries>
-    fn parse_set_or_dict_like_expression(&mut self) -> Expr {
+    fn parse_set_or_dict_like_expression(&mut self) -> Expr<'ast> {
         let start = self.node_start();
         self.bump(TokenKind::Lbrace);
 
@@ -1654,7 +1666,7 @@ impl<'src> Parser<'src> {
     /// Matches the `(tuple | group | genexp)` rule in the [Python grammar].
     ///
     /// [Python grammar]: https://docs.python.org/3/reference/grammar.html
-    fn parse_parenthesized_expression(&mut self) -> ParsedExpr {
+    fn parse_parenthesized_expression(&mut self) -> ParsedExpr<'ast> {
         let start = self.node_start();
         self.bump(TokenKind::Lpar);
 
@@ -1735,11 +1747,11 @@ impl<'src> Parser<'src> {
     /// Uses the `parse_func` to parse each item in the tuple.
     pub(super) fn parse_tuple_expression(
         &mut self,
-        first_element: Expr,
+        first_element: Expr<'ast>,
         start: TextSize,
         parenthesized: Parenthesized,
-        mut parse_func: impl FnMut(&mut Parser<'src>) -> ParsedExpr,
-    ) -> ast::ExprTuple {
+        mut parse_func: impl FnMut(&mut Parser<'src, 'ast>) -> ParsedExpr<'ast>,
+    ) -> ast::ExprTuple<'ast> {
         // TODO(dhruvmanila): Can we remove `parse_func` and use `parenthesized` to
         // determine the parsing function?
 
@@ -1768,7 +1780,11 @@ impl<'src> Parser<'src> {
     /// Parses a list expression.
     ///
     /// See: <https://docs.python.org/3/reference/expressions.html#list-displays>
-    fn parse_list_expression(&mut self, first_element: Expr, start: TextSize) -> ast::ExprList {
+    fn parse_list_expression(
+        &mut self,
+        first_element: Expr<'ast>,
+        start: TextSize,
+    ) -> ast::ExprList<'ast> {
         if !self.at_sequence_end() {
             self.expect(TokenKind::Comma);
         }
@@ -1795,7 +1811,11 @@ impl<'src> Parser<'src> {
     /// Parses a set expression.
     ///
     /// See: <https://docs.python.org/3/reference/expressions.html#set-displays>
-    fn parse_set_expression(&mut self, first_element: Expr, start: TextSize) -> ast::ExprSet {
+    fn parse_set_expression(
+        &mut self,
+        first_element: Expr<'ast>,
+        start: TextSize,
+    ) -> ast::ExprSet<'ast> {
         if !self.at_sequence_end() {
             self.expect(TokenKind::Comma);
         }
@@ -1823,10 +1843,10 @@ impl<'src> Parser<'src> {
     /// See: <https://docs.python.org/3/reference/expressions.html#dictionary-displays>
     fn parse_dictionary_expression(
         &mut self,
-        key: Option<Expr>,
-        value: Expr,
+        key: Option<Expr<'ast>>,
+        value: Expr<'ast>,
         start: TextSize,
-    ) -> ast::ExprDict {
+    ) -> ast::ExprDict<'ast> {
         if !self.at_sequence_end() {
             self.expect(TokenKind::Comma);
         }
@@ -1866,7 +1886,7 @@ impl<'src> Parser<'src> {
     /// followed by `if` clauses.
     ///
     /// See: <https://docs.python.org/3/reference/expressions.html#grammar-token-python-grammar-comp_for>
-    fn parse_generators(&mut self) -> Vec<ast::Comprehension> {
+    fn parse_generators(&mut self) -> Vec<ast::Comprehension<'ast>> {
         const GENERATOR_SET: TokenSet = TokenSet::new([TokenKind::For, TokenKind::Async]);
 
         let mut generators = vec![];
@@ -1887,7 +1907,7 @@ impl<'src> Parser<'src> {
     /// If the parser isn't positioned at an `async` or `for` token.
     ///
     /// See: <https://docs.python.org/3/reference/expressions.html#displays-for-lists-sets-and-dictionaries>
-    fn parse_comprehension(&mut self) -> ast::Comprehension {
+    fn parse_comprehension(&mut self) -> ast::Comprehension<'ast> {
         let start = self.node_start();
 
         let is_async = self.eat(TokenKind::Async);
@@ -1938,10 +1958,10 @@ impl<'src> Parser<'src> {
     /// See: <https://docs.python.org/3/reference/expressions.html#generator-expressions>
     pub(super) fn parse_generator_expression(
         &mut self,
-        element: Expr,
+        element: Expr<'ast>,
         start: TextSize,
         parenthesized: Parenthesized,
-    ) -> ast::ExprGenerator {
+    ) -> ast::ExprGenerator<'ast> {
         let generators = self.parse_generators();
 
         if parenthesized.is_yes() {
@@ -1949,7 +1969,7 @@ impl<'src> Parser<'src> {
         }
 
         ast::ExprGenerator {
-            elt: Box::new(element),
+            elt: self.alloc_box(element),
             generators,
             range: self.node_range(start),
             parenthesized: parenthesized.is_yes(),
@@ -1961,15 +1981,15 @@ impl<'src> Parser<'src> {
     /// See: <https://docs.python.org/3/reference/expressions.html#displays-for-lists-sets-and-dictionaries>
     fn parse_list_comprehension_expression(
         &mut self,
-        element: Expr,
+        element: Expr<'ast>,
         start: TextSize,
-    ) -> ast::ExprListComp {
+    ) -> ast::ExprListComp<'ast> {
         let generators = self.parse_generators();
 
         self.expect(TokenKind::Rsqb);
 
         ast::ExprListComp {
-            elt: Box::new(element),
+            elt: self.alloc_box(element),
             generators,
             range: self.node_range(start),
         }
@@ -1980,17 +2000,17 @@ impl<'src> Parser<'src> {
     /// See: <https://docs.python.org/3/reference/expressions.html#displays-for-lists-sets-and-dictionaries>
     fn parse_dictionary_comprehension_expression(
         &mut self,
-        key: Expr,
-        value: Expr,
+        key: Expr<'ast>,
+        value: Expr<'ast>,
         start: TextSize,
-    ) -> ast::ExprDictComp {
+    ) -> ast::ExprDictComp<'ast> {
         let generators = self.parse_generators();
 
         self.expect(TokenKind::Rbrace);
 
         ast::ExprDictComp {
-            key: Box::new(key),
-            value: Box::new(value),
+            key: self.alloc_box(key),
+            value: self.alloc_box(value),
             generators,
             range: self.node_range(start),
         }
@@ -2001,15 +2021,15 @@ impl<'src> Parser<'src> {
     /// See: <https://docs.python.org/3/reference/expressions.html#displays-for-lists-sets-and-dictionaries>
     fn parse_set_comprehension_expression(
         &mut self,
-        element: Expr,
+        element: Expr<'ast>,
         start: TextSize,
-    ) -> ast::ExprSetComp {
+    ) -> ast::ExprSetComp<'ast> {
         let generators = self.parse_generators();
 
         self.expect(TokenKind::Rbrace);
 
         ast::ExprSetComp {
-            elt: Box::new(element),
+            elt: self.alloc_box(element),
             generators,
             range: self.node_range(start),
         }
@@ -2031,7 +2051,7 @@ impl<'src> Parser<'src> {
     /// If the parser isn't positioned at a `*` token.
     ///
     /// [Python grammar]: https://docs.python.org/3/reference/grammar.html
-    fn parse_starred_expression(&mut self, context: ExpressionContext) -> ast::ExprStarred {
+    fn parse_starred_expression(&mut self, context: ExpressionContext) -> ast::ExprStarred<'ast> {
         let start = self.node_start();
         self.bump(TokenKind::Star);
 
@@ -2045,7 +2065,7 @@ impl<'src> Parser<'src> {
         };
 
         ast::ExprStarred {
-            value: Box::new(parsed_expr.expr),
+            value: self.alloc_box(parsed_expr.expr),
             ctx: ExprContext::Load,
             range: self.node_range(start),
         }
@@ -2058,7 +2078,7 @@ impl<'src> Parser<'src> {
     /// If the parser isn't positioned at an `await` token.
     ///
     /// See: <https://docs.python.org/3/reference/expressions.html#await-expression>
-    fn parse_await_expression(&mut self) -> ast::ExprAwait {
+    fn parse_await_expression(&mut self) -> ast::ExprAwait<'ast> {
         let start = self.node_start();
         self.bump(TokenKind::Await);
 
@@ -2068,7 +2088,7 @@ impl<'src> Parser<'src> {
         );
 
         ast::ExprAwait {
-            value: Box::new(parsed_expr.expr),
+            value: self.alloc_box(parsed_expr.expr),
             range: self.node_range(start),
         }
     }
@@ -2080,7 +2100,7 @@ impl<'src> Parser<'src> {
     /// If the parser isn't positioned at a `yield` token.
     ///
     /// See: <https://docs.python.org/3/reference/expressions.html#yield-expressions>
-    fn parse_yield_expression(&mut self) -> Expr {
+    fn parse_yield_expression(&mut self) -> Expr<'ast> {
         let start = self.node_start();
         self.bump(TokenKind::Yield);
 
@@ -2089,10 +2109,10 @@ impl<'src> Parser<'src> {
         }
 
         let value = self.at_expr().then(|| {
-            Box::new(
-                self.parse_expression_list(ExpressionContext::starred_bitwise_or())
-                    .expr,
-            )
+            let expression = self
+                .parse_expression_list(ExpressionContext::starred_bitwise_or())
+                .expr;
+            self.alloc_box(expression)
         });
 
         Expr::Yield(ast::ExprYield {
@@ -2107,7 +2127,7 @@ impl<'src> Parser<'src> {
     /// even when parsing a `yield from` expression.
     ///
     /// See: <https://docs.python.org/3/reference/expressions.html#yield-expressions>
-    fn parse_yield_from_expression(&mut self, start: TextSize) -> Expr {
+    fn parse_yield_from_expression(&mut self, start: TextSize) -> Expr<'ast> {
         // Grammar:
         //     'yield' 'from' expression
         //
@@ -2135,7 +2155,7 @@ impl<'src> Parser<'src> {
         }
 
         Expr::YieldFrom(ast::ExprYieldFrom {
-            value: Box::new(expr),
+            value: self.alloc_box(expr),
             range: self.node_range(start),
         })
     }
@@ -2149,9 +2169,9 @@ impl<'src> Parser<'src> {
     /// See: <https://docs.python.org/3/reference/expressions.html#assignment-expressions>
     pub(super) fn parse_named_expression(
         &mut self,
-        mut target: Expr,
+        mut target: Expr<'ast>,
         start: TextSize,
-    ) -> ast::ExprNamed {
+    ) -> ast::ExprNamed<'ast> {
         self.bump(TokenKind::ColonEqual);
 
         if !target.is_name_expr() {
@@ -2162,8 +2182,8 @@ impl<'src> Parser<'src> {
         let value = self.parse_conditional_expression_or_higher();
 
         ast::ExprNamed {
-            target: Box::new(target),
-            value: Box::new(value.expr),
+            target: self.alloc_box(target),
+            value: self.alloc_box(value.expr),
             range: self.node_range(start),
         }
     }
@@ -2175,7 +2195,7 @@ impl<'src> Parser<'src> {
     /// If the parser isn't positioned at a `lambda` token.
     ///
     /// See: <https://docs.python.org/3/reference/expressions.html#lambda>
-    fn parse_lambda_expr(&mut self) -> ast::ExprLambda {
+    fn parse_lambda_expr(&mut self) -> ast::ExprLambda<'ast> {
         let start = self.node_start();
         self.bump(TokenKind::Lambda);
 
@@ -2184,7 +2204,8 @@ impl<'src> Parser<'src> {
             // lambda: 1
             None
         } else {
-            Some(Box::new(self.parse_parameters(FunctionKind::Lambda)))
+            let parameters = self.parse_parameters(FunctionKind::Lambda);
+            Some(self.alloc_box(parameters))
         };
 
         self.expect(TokenKind::Colon);
@@ -2209,7 +2230,7 @@ impl<'src> Parser<'src> {
         let body = self.parse_conditional_expression_or_higher();
 
         ast::ExprLambda {
-            body: Box::new(body.expr),
+            body: self.alloc_box(body.expr),
             parameters,
             range: self.node_range(start),
         }
@@ -2222,7 +2243,11 @@ impl<'src> Parser<'src> {
     /// If the parser isn't positioned at an `if` token.
     ///
     /// See: <https://docs.python.org/3/reference/expressions.html#conditional-expressions>
-    pub(super) fn parse_if_expression(&mut self, body: Expr, start: TextSize) -> ast::ExprIf {
+    pub(super) fn parse_if_expression(
+        &mut self,
+        body: Expr<'ast>,
+        start: TextSize,
+    ) -> ast::ExprIf<'ast> {
         self.bump(TokenKind::If);
 
         let test = self.parse_simple_expression(ExpressionContext::default());
@@ -2232,9 +2257,9 @@ impl<'src> Parser<'src> {
         let orelse = self.parse_conditional_expression_or_higher();
 
         ast::ExprIf {
-            body: Box::new(body),
-            test: Box::new(test.expr),
-            orelse: Box::new(orelse.expr),
+            body: self.alloc_box(body),
+            test: self.alloc_box(test.expr),
+            orelse: self.alloc_box(orelse.expr),
             range: self.node_range(start),
         }
     }
@@ -2245,7 +2270,7 @@ impl<'src> Parser<'src> {
     ///
     /// If the parser isn't positioned at a `IpyEscapeCommand` token.
     /// If the escape command kind is not `%` or `!`.
-    fn parse_ipython_escape_command_expression(&mut self) -> ast::ExprIpyEscapeCommand {
+    fn parse_ipython_escape_command_expression(&mut self) -> ast::ExprIpyEscapeCommand<'ast> {
         let start = self.node_start();
 
         let TokenValue::IpyEscapeCommand { value, kind } =
@@ -2262,7 +2287,7 @@ impl<'src> Parser<'src> {
         let command = ast::ExprIpyEscapeCommand {
             range: self.node_range(start),
             kind,
-            value,
+            value: self.alloc_str(&value),
         };
 
         if self.mode != Mode::Ipython {
@@ -2276,7 +2301,7 @@ impl<'src> Parser<'src> {
     /// 1. There aren't any duplicate keyword argument
     /// 2. If there are more than one argument (positional or keyword), all generator expressions
     ///    present should be parenthesized.
-    fn validate_arguments(&mut self, arguments: &ast::Arguments) {
+    fn validate_arguments(&mut self, arguments: &ast::Arguments<'ast>) {
         let mut all_arg_names =
             FxHashSet::with_capacity_and_hasher(arguments.keywords.len(), FxBuildHasher);
 
@@ -2316,21 +2341,21 @@ impl<'src> Parser<'src> {
 }
 
 #[derive(Debug)]
-pub(super) struct ParsedExpr {
-    pub(super) expr: Expr,
+pub(super) struct ParsedExpr<'ast> {
+    pub(super) expr: Expr<'ast>,
     pub(super) is_parenthesized: bool,
 }
 
-impl ParsedExpr {
+impl ParsedExpr<'_> {
     #[inline]
     pub(super) const fn is_unparenthesized_starred_expr(&self) -> bool {
         !self.is_parenthesized && self.expr.is_starred_expr()
     }
 }
 
-impl From<Expr> for ParsedExpr {
+impl<'ast> From<Expr<'ast>> for ParsedExpr<'ast> {
     #[inline]
-    fn from(expr: Expr) -> Self {
+    fn from(expr: Expr<'ast>) -> Self {
         ParsedExpr {
             expr,
             is_parenthesized: false,
@@ -2338,15 +2363,15 @@ impl From<Expr> for ParsedExpr {
     }
 }
 
-impl Deref for ParsedExpr {
-    type Target = Expr;
+impl<'ast> Deref for ParsedExpr<'ast> {
+    type Target = Expr<'ast>;
 
     fn deref(&self) -> &Self::Target {
         &self.expr
     }
 }
 
-impl Ranged for ParsedExpr {
+impl Ranged for ParsedExpr<'_> {
     #[inline]
     fn range(&self) -> TextRange {
         self.expr.range()

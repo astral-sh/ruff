@@ -5,7 +5,7 @@ use std::path::Path;
 
 use annotate_snippets::display_list::{DisplayList, FormatOptions};
 use annotate_snippets::snippet::{AnnotationType, Slice, Snippet, SourceAnnotation};
-
+use ruff_allocator::Allocator;
 use ruff_python_ast::visitor::source_order::{walk_module, SourceOrderVisitor, TraversalSignal};
 use ruff_python_ast::{AnyNodeRef, Mod};
 use ruff_python_parser::{parse_unchecked, Mode, ParseErrorType, Token};
@@ -36,7 +36,8 @@ fn inline_err() {
 /// Snapshots the AST.
 fn test_valid_syntax(input_path: &Path) {
     let source = fs::read_to_string(input_path).expect("Expected test file to exist");
-    let parsed = parse_unchecked(&source, Mode::Module);
+    let allocator = Allocator::new();
+    let parsed = parse_unchecked(&source, Mode::Module, &allocator);
 
     if !parsed.is_valid() {
         let line_index = LineIndex::from_source_text(&source);
@@ -80,7 +81,8 @@ fn test_valid_syntax(input_path: &Path) {
 /// Snapshots the AST and the error messages.
 fn test_invalid_syntax(input_path: &Path) {
     let source = fs::read_to_string(input_path).expect("Expected test file to exist");
-    let parsed = parse_unchecked(&source, Mode::Module);
+    let allocator = Allocator::new();
+    let parsed = parse_unchecked(&source, Mode::Module, &allocator);
 
     assert!(
         !parsed.is_valid(),
@@ -132,7 +134,8 @@ f'{'
 f'{foo!r'
 ";
 
-    let parsed = parse_unchecked(source, Mode::Module);
+    let allocator = Allocator::new();
+    let parsed = parse_unchecked(source, Mode::Module, &allocator);
 
     println!("AST:\n----\n{:#?}", parsed.syntax());
     println!("Tokens:\n-------\n{:#?}", parsed.tokens());
@@ -272,14 +275,14 @@ fn validate_ast(root: &Mod, source_len: TextSize, test_path: &Path) {
 }
 
 #[derive(Debug)]
-struct ValidateAstVisitor<'a> {
-    parents: Vec<AnyNodeRef<'a>>,
-    previous: Option<AnyNodeRef<'a>>,
+struct ValidateAstVisitor<'a, 'ast> {
+    parents: Vec<AnyNodeRef<'a, 'ast>>,
+    previous: Option<AnyNodeRef<'a, 'ast>>,
     source_length: TextSize,
     test_path: &'a Path,
 }
 
-impl<'a> ValidateAstVisitor<'a> {
+impl<'a, 'ast> ValidateAstVisitor<'a, 'ast> {
     fn new(source_length: TextSize, test_path: &'a Path) -> Self {
         Self {
             parents: Vec::new(),
@@ -290,8 +293,8 @@ impl<'a> ValidateAstVisitor<'a> {
     }
 }
 
-impl<'ast> SourceOrderVisitor<'ast> for ValidateAstVisitor<'ast> {
-    fn enter_node(&mut self, node: AnyNodeRef<'ast>) -> TraversalSignal {
+impl<'a, 'ast> SourceOrderVisitor<'a, 'ast> for ValidateAstVisitor<'a, 'ast> {
+    fn enter_node(&mut self, node: AnyNodeRef<'a, 'ast>) -> TraversalSignal {
         assert!(
             node.end() <= self.source_length,
             "{path}: The range of the node exceeds the length of the source code. Node: {node:#?}",
@@ -319,7 +322,7 @@ impl<'ast> SourceOrderVisitor<'ast> for ValidateAstVisitor<'ast> {
         TraversalSignal::Traverse
     }
 
-    fn leave_node(&mut self, node: AnyNodeRef<'ast>) {
+    fn leave_node(&mut self, node: AnyNodeRef<'a, 'ast>) {
         self.parents.pop().expect("Expected tree to be balanced");
 
         self.previous = Some(node);

@@ -13,6 +13,7 @@ license = "MIT"
 
 [workspace.dependencies]
 ruff = { path = "crates/ruff" }
+ruff_allocator = { path = "crates/ruff_allocator" }
 ruff_cache = { path = "crates/ruff_cache" }
 ruff_db = { path = "crates/ruff_db" }
 ruff_diagnostics = { path = "crates/ruff_diagnostics" }
@@ -46,6 +47,7 @@ argfile = { version = "0.2.0" }
 bincode = { version = "1.3.3" }
 bitflags = { version = "2.5.0" }
 bstr = { version = "1.9.1" }
+bumpalo = { version = "3.16.0" }
 cachedir = { version = "0.3.1" }
 camino = { version = "1.1.7" }
 chrono = { version = "0.4.35", default-features = false, features = ["clock"] }

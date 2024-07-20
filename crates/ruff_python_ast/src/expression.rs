@@ -6,49 +6,49 @@ use crate::{self as ast, AnyNodeRef, AnyStringFlags, Expr};
 
 /// Unowned pendant to [`ast::Expr`] that stores a reference instead of a owned value.
 #[derive(Copy, Clone, Debug, PartialEq)]
-pub enum ExpressionRef<'a> {
-    BoolOp(&'a ast::ExprBoolOp),
-    Named(&'a ast::ExprNamed),
-    BinOp(&'a ast::ExprBinOp),
-    UnaryOp(&'a ast::ExprUnaryOp),
-    Lambda(&'a ast::ExprLambda),
-    If(&'a ast::ExprIf),
-    Dict(&'a ast::ExprDict),
-    Set(&'a ast::ExprSet),
-    ListComp(&'a ast::ExprListComp),
-    SetComp(&'a ast::ExprSetComp),
-    DictComp(&'a ast::ExprDictComp),
-    Generator(&'a ast::ExprGenerator),
-    Await(&'a ast::ExprAwait),
-    Yield(&'a ast::ExprYield),
-    YieldFrom(&'a ast::ExprYieldFrom),
-    Compare(&'a ast::ExprCompare),
-    Call(&'a ast::ExprCall),
-    FString(&'a ast::ExprFString),
-    StringLiteral(&'a ast::ExprStringLiteral),
-    BytesLiteral(&'a ast::ExprBytesLiteral),
+pub enum ExpressionRef<'a, 'ast> {
+    BoolOp(&'a ast::ExprBoolOp<'ast>),
+    Named(&'a ast::ExprNamed<'ast>),
+    BinOp(&'a ast::ExprBinOp<'ast>),
+    UnaryOp(&'a ast::ExprUnaryOp<'ast>),
+    Lambda(&'a ast::ExprLambda<'ast>),
+    If(&'a ast::ExprIf<'ast>),
+    Dict(&'a ast::ExprDict<'ast>),
+    Set(&'a ast::ExprSet<'ast>),
+    ListComp(&'a ast::ExprListComp<'ast>),
+    SetComp(&'a ast::ExprSetComp<'ast>),
+    DictComp(&'a ast::ExprDictComp<'ast>),
+    Generator(&'a ast::ExprGenerator<'ast>),
+    Await(&'a ast::ExprAwait<'ast>),
+    Yield(&'a ast::ExprYield<'ast>),
+    YieldFrom(&'a ast::ExprYieldFrom<'ast>),
+    Compare(&'a ast::ExprCompare<'ast>),
+    Call(&'a ast::ExprCall<'ast>),
+    FString(&'a ast::ExprFString<'ast>),
+    StringLiteral(&'a ast::ExprStringLiteral<'ast>),
+    BytesLiteral(&'a ast::ExprBytesLiteral<'ast>),
     NumberLiteral(&'a ast::ExprNumberLiteral),
     BooleanLiteral(&'a ast::ExprBooleanLiteral),
     NoneLiteral(&'a ast::ExprNoneLiteral),
     EllipsisLiteral(&'a ast::ExprEllipsisLiteral),
-    Attribute(&'a ast::ExprAttribute),
-    Subscript(&'a ast::ExprSubscript),
-    Starred(&'a ast::ExprStarred),
-    Name(&'a ast::ExprName),
-    List(&'a ast::ExprList),
-    Tuple(&'a ast::ExprTuple),
-    Slice(&'a ast::ExprSlice),
-    IpyEscapeCommand(&'a ast::ExprIpyEscapeCommand),
+    Attribute(&'a ast::ExprAttribute<'ast>),
+    Subscript(&'a ast::ExprSubscript<'ast>),
+    Starred(&'a ast::ExprStarred<'ast>),
+    Name(&'a ast::ExprName<'ast>),
+    List(&'a ast::ExprList<'ast>),
+    Tuple(&'a ast::ExprTuple<'ast>),
+    Slice(&'a ast::ExprSlice<'ast>),
+    IpyEscapeCommand(&'a ast::ExprIpyEscapeCommand<'ast>),
 }
 
-impl<'a> From<&'a Box<Expr>> for ExpressionRef<'a> {
-    fn from(value: &'a Box<Expr>) -> Self {
+impl<'a, 'ast> From<&'a Box<Expr<'ast>>> for ExpressionRef<'a, 'ast> {
+    fn from(value: &'a Box<Expr<'ast>>) -> Self {
         ExpressionRef::from(value.as_ref())
     }
 }
 
-impl<'a> From<&'a Expr> for ExpressionRef<'a> {
-    fn from(value: &'a Expr) -> Self {
+impl<'a, 'ast> From<&'a Expr<'ast>> for ExpressionRef<'a, 'ast> {
+    fn from(value: &'a Expr<'ast>) -> Self {
         match value {
             Expr::BoolOp(value) => ExpressionRef::BoolOp(value),
             Expr::Named(value) => ExpressionRef::Named(value),
@@ -86,169 +86,169 @@ impl<'a> From<&'a Expr> for ExpressionRef<'a> {
     }
 }
 
-impl<'a> From<&'a ast::ExprBoolOp> for ExpressionRef<'a> {
-    fn from(value: &'a ast::ExprBoolOp) -> Self {
+impl<'a, 'ast> From<&'a ast::ExprBoolOp<'ast>> for ExpressionRef<'a, 'ast> {
+    fn from(value: &'a ast::ExprBoolOp<'ast>) -> Self {
         Self::BoolOp(value)
     }
 }
-impl<'a> From<&'a ast::ExprNamed> for ExpressionRef<'a> {
-    fn from(value: &'a ast::ExprNamed) -> Self {
+impl<'a, 'ast> From<&'a ast::ExprNamed<'ast>> for ExpressionRef<'a, 'ast> {
+    fn from(value: &'a ast::ExprNamed<'ast>) -> Self {
         Self::Named(value)
     }
 }
-impl<'a> From<&'a ast::ExprBinOp> for ExpressionRef<'a> {
-    fn from(value: &'a ast::ExprBinOp) -> Self {
+impl<'a, 'ast> From<&'a ast::ExprBinOp<'ast>> for ExpressionRef<'a, 'ast> {
+    fn from(value: &'a ast::ExprBinOp<'ast>) -> Self {
         Self::BinOp(value)
     }
 }
-impl<'a> From<&'a ast::ExprUnaryOp> for ExpressionRef<'a> {
-    fn from(value: &'a ast::ExprUnaryOp) -> Self {
+impl<'a, 'ast> From<&'a ast::ExprUnaryOp<'ast>> for ExpressionRef<'a, 'ast> {
+    fn from(value: &'a ast::ExprUnaryOp<'ast>) -> Self {
         Self::UnaryOp(value)
     }
 }
-impl<'a> From<&'a ast::ExprLambda> for ExpressionRef<'a> {
-    fn from(value: &'a ast::ExprLambda) -> Self {
+impl<'a, 'ast> From<&'a ast::ExprLambda<'ast>> for ExpressionRef<'a, 'ast> {
+    fn from(value: &'a ast::ExprLambda<'ast>) -> Self {
         Self::Lambda(value)
     }
 }
-impl<'a> From<&'a ast::ExprIf> for ExpressionRef<'a> {
-    fn from(value: &'a ast::ExprIf) -> Self {
+impl<'a, 'ast> From<&'a ast::ExprIf<'ast>> for ExpressionRef<'a, 'ast> {
+    fn from(value: &'a ast::ExprIf<'ast>) -> Self {
         Self::If(value)
     }
 }
-impl<'a> From<&'a ast::ExprDict> for ExpressionRef<'a> {
-    fn from(value: &'a ast::ExprDict) -> Self {
+impl<'a, 'ast> From<&'a ast::ExprDict<'ast>> for ExpressionRef<'a, 'ast> {
+    fn from(value: &'a ast::ExprDict<'ast>) -> Self {
         Self::Dict(value)
     }
 }
-impl<'a> From<&'a ast::ExprSet> for ExpressionRef<'a> {
-    fn from(value: &'a ast::ExprSet) -> Self {
+impl<'a, 'ast> From<&'a ast::ExprSet<'ast>> for ExpressionRef<'a, 'ast> {
+    fn from(value: &'a ast::ExprSet<'ast>) -> Self {
         Self::Set(value)
     }
 }
-impl<'a> From<&'a ast::ExprListComp> for ExpressionRef<'a> {
-    fn from(value: &'a ast::ExprListComp) -> Self {
+impl<'a, 'ast> From<&'a ast::ExprListComp<'ast>> for ExpressionRef<'a, 'ast> {
+    fn from(value: &'a ast::ExprListComp<'ast>) -> Self {
         Self::ListComp(value)
     }
 }
-impl<'a> From<&'a ast::ExprSetComp> for ExpressionRef<'a> {
-    fn from(value: &'a ast::ExprSetComp) -> Self {
+impl<'a, 'ast> From<&'a ast::ExprSetComp<'ast>> for ExpressionRef<'a, 'ast> {
+    fn from(value: &'a ast::ExprSetComp<'ast>) -> Self {
         Self::SetComp(value)
     }
 }
-impl<'a> From<&'a ast::ExprDictComp> for ExpressionRef<'a> {
-    fn from(value: &'a ast::ExprDictComp) -> Self {
+impl<'a, 'ast> From<&'a ast::ExprDictComp<'ast>> for ExpressionRef<'a, 'ast> {
+    fn from(value: &'a ast::ExprDictComp<'ast>) -> Self {
         Self::DictComp(value)
     }
 }
-impl<'a> From<&'a ast::ExprGenerator> for ExpressionRef<'a> {
-    fn from(value: &'a ast::ExprGenerator) -> Self {
+impl<'a, 'ast> From<&'a ast::ExprGenerator<'ast>> for ExpressionRef<'a, 'ast> {
+    fn from(value: &'a ast::ExprGenerator<'ast>) -> Self {
         Self::Generator(value)
     }
 }
-impl<'a> From<&'a ast::ExprAwait> for ExpressionRef<'a> {
-    fn from(value: &'a ast::ExprAwait) -> Self {
+impl<'a, 'ast> From<&'a ast::ExprAwait<'ast>> for ExpressionRef<'a, 'ast> {
+    fn from(value: &'a ast::ExprAwait<'ast>) -> Self {
         Self::Await(value)
     }
 }
-impl<'a> From<&'a ast::ExprYield> for ExpressionRef<'a> {
-    fn from(value: &'a ast::ExprYield) -> Self {
+impl<'a, 'ast> From<&'a ast::ExprYield<'ast>> for ExpressionRef<'a, 'ast> {
+    fn from(value: &'a ast::ExprYield<'ast>) -> Self {
         Self::Yield(value)
     }
 }
-impl<'a> From<&'a ast::ExprYieldFrom> for ExpressionRef<'a> {
-    fn from(value: &'a ast::ExprYieldFrom) -> Self {
+impl<'a, 'ast> From<&'a ast::ExprYieldFrom<'ast>> for ExpressionRef<'a, 'ast> {
+    fn from(value: &'a ast::ExprYieldFrom<'ast>) -> Self {
         Self::YieldFrom(value)
     }
 }
-impl<'a> From<&'a ast::ExprCompare> for ExpressionRef<'a> {
-    fn from(value: &'a ast::ExprCompare) -> Self {
+impl<'a, 'ast> From<&'a ast::ExprCompare<'ast>> for ExpressionRef<'a, 'ast> {
+    fn from(value: &'a ast::ExprCompare<'ast>) -> Self {
         Self::Compare(value)
     }
 }
-impl<'a> From<&'a ast::ExprCall> for ExpressionRef<'a> {
-    fn from(value: &'a ast::ExprCall) -> Self {
+impl<'a, 'ast> From<&'a ast::ExprCall<'ast>> for ExpressionRef<'a, 'ast> {
+    fn from(value: &'a ast::ExprCall<'ast>) -> Self {
         Self::Call(value)
     }
 }
-impl<'a> From<&'a ast::ExprFString> for ExpressionRef<'a> {
-    fn from(value: &'a ast::ExprFString) -> Self {
+impl<'a, 'ast> From<&'a ast::ExprFString<'ast>> for ExpressionRef<'a, 'ast> {
+    fn from(value: &'a ast::ExprFString<'ast>) -> Self {
         Self::FString(value)
     }
 }
-impl<'a> From<&'a ast::ExprStringLiteral> for ExpressionRef<'a> {
-    fn from(value: &'a ast::ExprStringLiteral) -> Self {
+impl<'a, 'ast> From<&'a ast::ExprStringLiteral<'ast>> for ExpressionRef<'a, 'ast> {
+    fn from(value: &'a ast::ExprStringLiteral<'ast>) -> Self {
         Self::StringLiteral(value)
     }
 }
-impl<'a> From<&'a ast::ExprBytesLiteral> for ExpressionRef<'a> {
-    fn from(value: &'a ast::ExprBytesLiteral) -> Self {
+impl<'a, 'ast> From<&'a ast::ExprBytesLiteral<'ast>> for ExpressionRef<'a, 'ast> {
+    fn from(value: &'a ast::ExprBytesLiteral<'ast>) -> Self {
         Self::BytesLiteral(value)
     }
 }
-impl<'a> From<&'a ast::ExprNumberLiteral> for ExpressionRef<'a> {
+impl<'a> From<&'a ast::ExprNumberLiteral> for ExpressionRef<'a, '_> {
     fn from(value: &'a ast::ExprNumberLiteral) -> Self {
         Self::NumberLiteral(value)
     }
 }
-impl<'a> From<&'a ast::ExprBooleanLiteral> for ExpressionRef<'a> {
+impl<'a> From<&'a ast::ExprBooleanLiteral> for ExpressionRef<'a, '_> {
     fn from(value: &'a ast::ExprBooleanLiteral) -> Self {
         Self::BooleanLiteral(value)
     }
 }
-impl<'a> From<&'a ast::ExprNoneLiteral> for ExpressionRef<'a> {
+impl<'a> From<&'a ast::ExprNoneLiteral> for ExpressionRef<'a, '_> {
     fn from(value: &'a ast::ExprNoneLiteral) -> Self {
         Self::NoneLiteral(value)
     }
 }
-impl<'a> From<&'a ast::ExprEllipsisLiteral> for ExpressionRef<'a> {
+impl<'a> From<&'a ast::ExprEllipsisLiteral> for ExpressionRef<'a, '_> {
     fn from(value: &'a ast::ExprEllipsisLiteral) -> Self {
         Self::EllipsisLiteral(value)
     }
 }
-impl<'a> From<&'a ast::ExprAttribute> for ExpressionRef<'a> {
-    fn from(value: &'a ast::ExprAttribute) -> Self {
+impl<'a, 'ast> From<&'a ast::ExprAttribute<'ast>> for ExpressionRef<'a, 'ast> {
+    fn from(value: &'a ast::ExprAttribute<'ast>) -> Self {
         Self::Attribute(value)
     }
 }
-impl<'a> From<&'a ast::ExprSubscript> for ExpressionRef<'a> {
-    fn from(value: &'a ast::ExprSubscript) -> Self {
+impl<'a, 'ast> From<&'a ast::ExprSubscript<'ast>> for ExpressionRef<'a, 'ast> {
+    fn from(value: &'a ast::ExprSubscript<'ast>) -> Self {
         Self::Subscript(value)
     }
 }
-impl<'a> From<&'a ast::ExprStarred> for ExpressionRef<'a> {
-    fn from(value: &'a ast::ExprStarred) -> Self {
+impl<'a, 'ast> From<&'a ast::ExprStarred<'ast>> for ExpressionRef<'a, 'ast> {
+    fn from(value: &'a ast::ExprStarred<'ast>) -> Self {
         Self::Starred(value)
     }
 }
-impl<'a> From<&'a ast::ExprName> for ExpressionRef<'a> {
-    fn from(value: &'a ast::ExprName) -> Self {
+impl<'a, 'ast> From<&'a ast::ExprName<'ast>> for ExpressionRef<'a, 'ast> {
+    fn from(value: &'a ast::ExprName<'ast>) -> Self {
         Self::Name(value)
     }
 }
-impl<'a> From<&'a ast::ExprList> for ExpressionRef<'a> {
-    fn from(value: &'a ast::ExprList) -> Self {
+impl<'a, 'ast> From<&'a ast::ExprList<'ast>> for ExpressionRef<'a, 'ast> {
+    fn from(value: &'a ast::ExprList<'ast>) -> Self {
         Self::List(value)
     }
 }
-impl<'a> From<&'a ast::ExprTuple> for ExpressionRef<'a> {
-    fn from(value: &'a ast::ExprTuple) -> Self {
+impl<'a, 'ast> From<&'a ast::ExprTuple<'ast>> for ExpressionRef<'a, 'ast> {
+    fn from(value: &'a ast::ExprTuple<'ast>) -> Self {
         Self::Tuple(value)
     }
 }
-impl<'a> From<&'a ast::ExprSlice> for ExpressionRef<'a> {
-    fn from(value: &'a ast::ExprSlice) -> Self {
+impl<'a, 'ast> From<&'a ast::ExprSlice<'ast>> for ExpressionRef<'a, 'ast> {
+    fn from(value: &'a ast::ExprSlice<'ast>) -> Self {
         Self::Slice(value)
     }
 }
-impl<'a> From<&'a ast::ExprIpyEscapeCommand> for ExpressionRef<'a> {
-    fn from(value: &'a ast::ExprIpyEscapeCommand) -> Self {
+impl<'a, 'ast> From<&'a ast::ExprIpyEscapeCommand<'ast>> for ExpressionRef<'a, 'ast> {
+    fn from(value: &'a ast::ExprIpyEscapeCommand<'ast>) -> Self {
         Self::IpyEscapeCommand(value)
     }
 }
 
-impl<'a> From<ExpressionRef<'a>> for AnyNodeRef<'a> {
-    fn from(value: ExpressionRef<'a>) -> Self {
+impl<'a, 'ast> From<ExpressionRef<'a, 'ast>> for AnyNodeRef<'a, 'ast> {
+    fn from(value: ExpressionRef<'a, 'ast>) -> Self {
         match value {
             ExpressionRef::BoolOp(expression) => AnyNodeRef::ExprBoolOp(expression),
             ExpressionRef::Named(expression) => AnyNodeRef::ExprNamed(expression),
@@ -290,7 +290,7 @@ impl<'a> From<ExpressionRef<'a>> for AnyNodeRef<'a> {
     }
 }
 
-impl Ranged for ExpressionRef<'_> {
+impl Ranged for ExpressionRef<'_, '_> {
     fn range(&self) -> TextRange {
         match self {
             ExpressionRef::BoolOp(expression) => expression.range(),
@@ -332,16 +332,16 @@ impl Ranged for ExpressionRef<'_> {
 /// Unowned pendant to all the literal variants of [`ast::Expr`] that stores a
 /// reference instead of an owned value.
 #[derive(Copy, Clone, Debug, PartialEq, is_macro::Is)]
-pub enum LiteralExpressionRef<'a> {
-    StringLiteral(&'a ast::ExprStringLiteral),
-    BytesLiteral(&'a ast::ExprBytesLiteral),
+pub enum LiteralExpressionRef<'a, 'ast> {
+    StringLiteral(&'a ast::ExprStringLiteral<'ast>),
+    BytesLiteral(&'a ast::ExprBytesLiteral<'ast>),
     NumberLiteral(&'a ast::ExprNumberLiteral),
     BooleanLiteral(&'a ast::ExprBooleanLiteral),
     NoneLiteral(&'a ast::ExprNoneLiteral),
     EllipsisLiteral(&'a ast::ExprEllipsisLiteral),
 }
 
-impl Ranged for LiteralExpressionRef<'_> {
+impl Ranged for LiteralExpressionRef<'_, '_> {
     fn range(&self) -> TextRange {
         match self {
             LiteralExpressionRef::StringLiteral(expression) => expression.range(),
@@ -354,8 +354,8 @@ impl Ranged for LiteralExpressionRef<'_> {
     }
 }
 
-impl<'a> From<LiteralExpressionRef<'a>> for AnyNodeRef<'a> {
-    fn from(value: LiteralExpressionRef<'a>) -> Self {
+impl<'a, 'ast> From<LiteralExpressionRef<'a, 'ast>> for AnyNodeRef<'a, 'ast> {
+    fn from(value: LiteralExpressionRef<'a, 'ast>) -> Self {
         match value {
             LiteralExpressionRef::StringLiteral(expression) => {
                 AnyNodeRef::ExprStringLiteral(expression)
@@ -379,7 +379,7 @@ impl<'a> From<LiteralExpressionRef<'a>> for AnyNodeRef<'a> {
     }
 }
 
-impl LiteralExpressionRef<'_> {
+impl LiteralExpressionRef<'_, '_> {
     /// Returns `true` if the literal is either a string or bytes literal that
     /// is implicitly concatenated.
     pub fn is_implicit_concatenated(&self) -> bool {
@@ -398,15 +398,15 @@ impl LiteralExpressionRef<'_> {
 /// An enum that holds a reference to a string-like expression from the AST. This includes string
 /// literals, bytes literals, and f-strings.
 #[derive(Copy, Clone, Debug, PartialEq)]
-pub enum StringLike<'a> {
-    String(&'a ast::ExprStringLiteral),
-    Bytes(&'a ast::ExprBytesLiteral),
-    FString(&'a ast::ExprFString),
+pub enum StringLike<'a, 'ast> {
+    String(&'a ast::ExprStringLiteral<'ast>),
+    Bytes(&'a ast::ExprBytesLiteral<'ast>),
+    FString(&'a ast::ExprFString<'ast>),
 }
 
-impl<'a> StringLike<'a> {
+impl<'a, 'ast> StringLike<'a, 'ast> {
     /// Returns an iterator over the [`StringLikePart`] contained in this string-like expression.
-    pub fn parts(&self) -> StringLikePartIter<'_> {
+    pub fn parts(&self) -> StringLikePartIter<'a, 'ast> {
         match self {
             StringLike::String(expr) => StringLikePartIter::String(expr.value.iter()),
             StringLike::Bytes(expr) => StringLikePartIter::Bytes(expr.value.iter()),
@@ -415,25 +415,25 @@ impl<'a> StringLike<'a> {
     }
 }
 
-impl<'a> From<&'a ast::ExprStringLiteral> for StringLike<'a> {
-    fn from(value: &'a ast::ExprStringLiteral) -> Self {
+impl<'a, 'ast> From<&'a ast::ExprStringLiteral<'ast>> for StringLike<'a, 'ast> {
+    fn from(value: &'a ast::ExprStringLiteral<'ast>) -> Self {
         StringLike::String(value)
     }
 }
 
-impl<'a> From<&'a ast::ExprBytesLiteral> for StringLike<'a> {
-    fn from(value: &'a ast::ExprBytesLiteral) -> Self {
+impl<'a, 'ast> From<&'a ast::ExprBytesLiteral<'ast>> for StringLike<'a, 'ast> {
+    fn from(value: &'a ast::ExprBytesLiteral<'ast>) -> Self {
         StringLike::Bytes(value)
     }
 }
 
-impl<'a> From<&'a ast::ExprFString> for StringLike<'a> {
-    fn from(value: &'a ast::ExprFString) -> Self {
+impl<'a, 'ast> From<&'a ast::ExprFString<'ast>> for StringLike<'a, 'ast> {
+    fn from(value: &'a ast::ExprFString<'ast>) -> Self {
         StringLike::FString(value)
     }
 }
 
-impl Ranged for StringLike<'_> {
+impl Ranged for StringLike<'_, '_> {
     fn range(&self) -> TextRange {
         match self {
             StringLike::String(literal) => literal.range(),
@@ -445,13 +445,13 @@ impl Ranged for StringLike<'_> {
 
 /// An enum that holds a reference to an individual part of a string-like expression.
 #[derive(Copy, Clone, Debug, PartialEq)]
-pub enum StringLikePart<'a> {
-    String(&'a ast::StringLiteral),
-    Bytes(&'a ast::BytesLiteral),
-    FString(&'a ast::FString),
+pub enum StringLikePart<'a, 'ast> {
+    String(&'a ast::StringLiteral<'ast>),
+    Bytes(&'a ast::BytesLiteral<'ast>),
+    FString(&'a ast::FString<'ast>),
 }
 
-impl StringLikePart<'_> {
+impl StringLikePart<'_, '_> {
     /// Returns the [`AnyStringFlags`] for the current string-like part.
     pub fn flags(&self) -> AnyStringFlags {
         match self {
@@ -462,25 +462,25 @@ impl StringLikePart<'_> {
     }
 }
 
-impl<'a> From<&'a ast::StringLiteral> for StringLikePart<'a> {
-    fn from(value: &'a ast::StringLiteral) -> Self {
+impl<'a, 'ast> From<&'a ast::StringLiteral<'ast>> for StringLikePart<'a, 'ast> {
+    fn from(value: &'a ast::StringLiteral<'ast>) -> Self {
         StringLikePart::String(value)
     }
 }
 
-impl<'a> From<&'a ast::BytesLiteral> for StringLikePart<'a> {
-    fn from(value: &'a ast::BytesLiteral) -> Self {
+impl<'a, 'ast> From<&'a ast::BytesLiteral<'ast>> for StringLikePart<'a, 'ast> {
+    fn from(value: &'a ast::BytesLiteral<'ast>) -> Self {
         StringLikePart::Bytes(value)
     }
 }
 
-impl<'a> From<&'a ast::FString> for StringLikePart<'a> {
-    fn from(value: &'a ast::FString) -> Self {
+impl<'a, 'ast> From<&'a ast::FString<'ast>> for StringLikePart<'a, 'ast> {
+    fn from(value: &'a ast::FString<'ast>) -> Self {
         StringLikePart::FString(value)
     }
 }
 
-impl Ranged for StringLikePart<'_> {
+impl Ranged for StringLikePart<'_, '_> {
     fn range(&self) -> TextRange {
         match self {
             StringLikePart::String(part) => part.range(),
@@ -493,14 +493,14 @@ impl Ranged for StringLikePart<'_> {
 /// An iterator over all the [`StringLikePart`] of a string-like expression.
 ///
 /// This is created by the [`StringLike::parts`] method.
-pub enum StringLikePartIter<'a> {
-    String(std::slice::Iter<'a, ast::StringLiteral>),
-    Bytes(std::slice::Iter<'a, ast::BytesLiteral>),
-    FString(std::slice::Iter<'a, ast::FStringPart>),
+pub enum StringLikePartIter<'a, 'ast> {
+    String(std::slice::Iter<'a, ast::StringLiteral<'ast>>),
+    Bytes(std::slice::Iter<'a, ast::BytesLiteral<'ast>>),
+    FString(std::slice::Iter<'a, ast::FStringPart<'ast>>),
 }
 
-impl<'a> Iterator for StringLikePartIter<'a> {
-    type Item = StringLikePart<'a>;
+impl<'a, 'ast> Iterator for StringLikePartIter<'a, 'ast> {
+    type Item = StringLikePart<'a, 'ast>;
 
     fn next(&mut self) -> Option<Self::Item> {
         let part = match self {
@@ -529,5 +529,5 @@ impl<'a> Iterator for StringLikePartIter<'a> {
     }
 }
 
-impl FusedIterator for StringLikePartIter<'_> {}
-impl ExactSizeIterator for StringLikePartIter<'_> {}
+impl FusedIterator for StringLikePartIter<'_, '_> {}
+impl ExactSizeIterator for StringLikePartIter<'_, '_> {}

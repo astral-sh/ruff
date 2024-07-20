@@ -1,51 +1,57 @@
 use crate::{parse, parse_expression, parse_module, Mode};
+use ruff_allocator::Allocator;
 
 #[test]
 fn test_modes() {
+    let allocator = Allocator::new();
     let source = "a[0][1][2][3][4]";
 
-    assert!(parse(source, Mode::Expression).is_ok());
-    assert!(parse(source, Mode::Module).is_ok());
+    assert!(parse(source, Mode::Expression, &allocator).is_ok());
+    assert!(parse(source, Mode::Module, &allocator).is_ok());
 }
 
 #[test]
 fn test_expr_mode_invalid_syntax1() {
+    let allocator = Allocator::new();
     let source = "first second";
-    let error = parse_expression(source).unwrap_err();
+    let error = parse_expression(source, &allocator).unwrap_err();
 
     insta::assert_debug_snapshot!(error);
 }
 
 #[test]
 fn test_expr_mode_invalid_syntax2() {
+    let allocator = Allocator::new();
     let source = r"first
 
 second
 ";
-    let error = parse_expression(source).unwrap_err();
+    let error = parse_expression(source, &allocator).unwrap_err();
 
     insta::assert_debug_snapshot!(error);
 }
 
 #[test]
 fn test_expr_mode_invalid_syntax3() {
+    let allocator = Allocator::new();
     let source = r"first
 
 second
 
 third
 ";
-    let error = parse_expression(source).unwrap_err();
+    let error = parse_expression(source, &allocator).unwrap_err();
 
     insta::assert_debug_snapshot!(error);
 }
 
 #[test]
 fn test_expr_mode_valid_syntax() {
+    let allocator = Allocator::new();
     let source = "first
 
 ";
-    let parsed = parse_expression(source).unwrap();
+    let parsed = parse_expression(source, &allocator).unwrap();
 
     insta::assert_debug_snapshot!(parsed.expr());
 }
@@ -53,14 +59,16 @@ fn test_expr_mode_valid_syntax() {
 #[test]
 fn test_unicode_aliases() {
     // https://github.com/RustPython/RustPython/issues/4566
+    let allocator = Allocator::new();
     let source = r#"x = "\N{BACKSPACE}another cool trick""#;
-    let suite = parse_module(source).unwrap().into_suite();
+    let suite = parse_module(source, &allocator).unwrap().into_suite();
 
     insta::assert_debug_snapshot!(suite);
 }
 
 #[test]
 fn test_ipython_escape_commands() {
+    let allocator = Allocator::new();
     let parsed = parse(
         r"
 # Normal Python code
@@ -130,6 +138,7 @@ foo.bar[0].baz[2].egg??
 "
         .trim(),
         Mode::Ipython,
+        &allocator,
     )
     .unwrap();
     insta::assert_debug_snapshot!(parsed.syntax());

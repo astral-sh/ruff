@@ -64,11 +64,11 @@
 //! [parsing]: https://en.wikipedia.org/wiki/Parsing
 //! [lexer]: crate::lexer
 
-use std::iter::FusedIterator;
-use std::ops::Deref;
-
 pub use crate::error::{FStringErrorType, ParseError, ParseErrorType};
 pub use crate::token::{Token, TokenKind};
+use ruff_allocator::Allocator;
+use std::iter::FusedIterator;
+use std::ops::Deref;
 
 use crate::parser::Parser;
 
@@ -107,8 +107,11 @@ pub mod typing;
 /// let module = parse_module(source);
 /// assert!(module.is_ok());
 /// ```
-pub fn parse_module(source: &str) -> Result<Parsed<ModModule>, ParseError> {
-    Parser::new(source, Mode::Module)
+pub fn parse_module<'ast>(
+    source: &str,
+    allocator: &'ast Allocator,
+) -> Result<Parsed<ModModule<'ast>>, ParseError> {
+    Parser::new(source, Mode::Module, allocator)
         .parse()
         .try_into_module()
         .unwrap()
@@ -130,8 +133,11 @@ pub fn parse_module(source: &str) -> Result<Parsed<ModModule>, ParseError> {
 /// let expr = parse_expression("1 + 2");
 /// assert!(expr.is_ok());
 /// ```
-pub fn parse_expression(source: &str) -> Result<Parsed<ModExpression>, ParseError> {
-    Parser::new(source, Mode::Expression)
+pub fn parse_expression<'a>(
+    source: &str,
+    allocator: &'a Allocator,
+) -> Result<Parsed<ModExpression<'a>>, ParseError> {
+    Parser::new(source, Mode::Expression, allocator)
         .parse()
         .try_into_expression()
         .unwrap()
@@ -154,12 +160,13 @@ pub fn parse_expression(source: &str) -> Result<Parsed<ModExpression>, ParseErro
 /// let parsed = parse_expression_range("11 + 22 + 33", TextRange::new(TextSize::new(5), TextSize::new(7)));
 /// assert!(parsed.is_ok());
 /// ```
-pub fn parse_expression_range(
+pub fn parse_expression_range<'ast>(
     source: &str,
     range: TextRange,
-) -> Result<Parsed<ModExpression>, ParseError> {
+    allocator: &'ast Allocator,
+) -> Result<Parsed<ModExpression<'ast>>, ParseError> {
     let source = &source[..range.end().to_usize()];
-    Parser::new_starts_at(source, Mode::Expression, range.start())
+    Parser::new_starts_at(source, Mode::Expression, range.start(), allocator)
         .parse()
         .try_into_expression()
         .unwrap()
@@ -212,29 +219,41 @@ pub fn parse_expression_range(
 /// let parsed = parse(source, Mode::Ipython);
 /// assert!(parsed.is_ok());
 /// ```
-pub fn parse(source: &str, mode: Mode) -> Result<Parsed<Mod>, ParseError> {
-    parse_unchecked(source, mode).into_result()
+pub fn parse<'ast>(
+    source: &str,
+    mode: Mode,
+    allocator: &'ast Allocator,
+) -> Result<Parsed<Mod<'ast>>, ParseError> {
+    parse_unchecked(source, mode, allocator).into_result()
 }
 
 /// Parse the given Python source code using the specified [`Mode`].
 ///
 /// This is same as the [`parse`] function except that it doesn't check for any [`ParseError`]
 /// and returns the [`Parsed`] as is.
-pub fn parse_unchecked(source: &str, mode: Mode) -> Parsed<Mod> {
-    Parser::new(source, mode).parse()
+pub fn parse_unchecked<'ast>(
+    source: &str,
+    mode: Mode,
+    allocator: &'ast Allocator,
+) -> Parsed<Mod<'ast>> {
+    Parser::new(source, mode, allocator).parse()
 }
 
 /// Parse the given Python source code using the specified [`PySourceType`].
-pub fn parse_unchecked_source(source: &str, source_type: PySourceType) -> Parsed<ModModule> {
+pub fn parse_unchecked_source<'ast>(
+    source: &str,
+    source_type: PySourceType,
+    allocator: &'ast Allocator,
+) -> Parsed<ModModule<'ast>> {
     // SAFETY: Safe because `PySourceType` always parses to a `ModModule`
-    Parser::new(source, source_type.as_mode())
+    Parser::new(source, source_type.as_mode(), allocator)
         .parse()
         .try_into_module()
         .unwrap()
 }
 
 /// Represents the parsed source code.
-#[derive(Debug, PartialEq, Clone)]
+#[derive(Debug)]
 pub struct Parsed<T> {
     syntax: T,
     tokens: Tokens,
@@ -293,7 +312,16 @@ impl<T> Parsed<T> {
     }
 }
 
-impl Parsed<Mod> {
+impl<T> PartialEq for Parsed<T>
+where
+    T: PartialEq,
+{
+    fn eq(&self, other: &Self) -> bool {
+        self.syntax == other.syntax && self.tokens == other.tokens && self.errors == other.errors
+    }
+}
+
+impl<'ast> Parsed<Mod<'ast>> {
     /// Attempts to convert the [`Parsed<Mod>`] into a [`Parsed<ModModule>`].
     ///
     /// This method checks if the `syntax` field of the output is a [`Mod::Module`]. If it is, the
@@ -301,7 +329,7 @@ impl Parsed<Mod> {
     /// returns [`None`].
     ///
     /// [`Some(Parsed<ModModule>)`]: Some
-    pub fn try_into_module(self) -> Option<Parsed<ModModule>> {
+    pub fn try_into_module(self) -> Option<Parsed<ModModule<'ast>>> {
         match self.syntax {
             Mod::Module(module) => Some(Parsed {
                 syntax: module,
@@ -319,7 +347,7 @@ impl Parsed<Mod> {
     /// Otherwise, it returns [`None`].
     ///
     /// [`Some(Parsed<ModExpression>)`]: Some
-    pub fn try_into_expression(self) -> Option<Parsed<ModExpression>> {
+    pub fn try_into_expression(self) -> Option<Parsed<ModExpression<'ast>>> {
         match self.syntax {
             Mod::Module(_) => None,
             Mod::Expression(expression) => Some(Parsed {
@@ -331,32 +359,32 @@ impl Parsed<Mod> {
     }
 }
 
-impl Parsed<ModModule> {
+impl<'ast> Parsed<ModModule<'ast>> {
     /// Returns the module body contained in this parsed output as a [`Suite`].
-    pub fn suite(&self) -> &Suite {
+    pub fn suite(&self) -> &Suite<'ast> {
         &self.syntax.body
     }
 
     /// Consumes the [`Parsed`] output and returns the module body as a [`Suite`].
-    pub fn into_suite(self) -> Suite {
+    pub fn into_suite(self) -> Suite<'ast> {
         self.syntax.body
     }
 }
 
-impl Parsed<ModExpression> {
+impl<'ast> Parsed<ModExpression<'ast>> {
     /// Returns the expression contained in this parsed output.
-    pub fn expr(&self) -> &Expr {
+    pub fn expr(&self) -> &Expr<'ast> {
         &self.syntax.body
     }
 
     /// Returns a mutable reference to the expression contained in this parsed output.
-    pub fn expr_mut(&mut self) -> &mut Expr {
+    pub fn expr_mut(&mut self) -> &mut Expr<'ast> {
         &mut self.syntax.body
     }
 
     /// Consumes the [`Parsed`] output and returns the contained [`Expr`].
-    pub fn into_expr(self) -> Expr {
-        *self.syntax.body
+    pub fn into_expr(self) -> Expr<'ast> {
+        self.syntax.body
     }
 }
 

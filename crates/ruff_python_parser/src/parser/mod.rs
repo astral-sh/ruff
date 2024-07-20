@@ -1,7 +1,7 @@
 use std::cmp::Ordering;
 
 use bitflags::bitflags;
-
+use ruff_allocator::Allocator;
 use ruff_python_ast::{Mod, ModExpression, ModModule};
 use ruff_text_size::{Ranged, TextRange, TextSize};
 
@@ -23,7 +23,7 @@ mod statement;
 mod tests;
 
 #[derive(Debug)]
-pub(crate) struct Parser<'src> {
+pub(crate) struct Parser<'src, 'ast> {
     source: &'src str,
 
     /// Token source for the parser that skips over any non-trivia token.
@@ -47,16 +47,23 @@ pub(crate) struct Parser<'src> {
 
     /// The start offset in the source code from which to start parsing at.
     start_offset: TextSize,
+
+    allocator: &'ast Allocator,
 }
 
-impl<'src> Parser<'src> {
+impl<'src, 'ast> Parser<'src, 'ast> {
     /// Create a new parser for the given source code.
-    pub(crate) fn new(source: &'src str, mode: Mode) -> Self {
-        Parser::new_starts_at(source, mode, TextSize::new(0))
+    pub(crate) fn new(source: &'src str, mode: Mode, allocator: &'ast Allocator) -> Self {
+        Parser::new_starts_at(source, mode, TextSize::new(0), allocator)
     }
 
     /// Create a new parser for the given source code which starts parsing at the given offset.
-    pub(crate) fn new_starts_at(source: &'src str, mode: Mode, start_offset: TextSize) -> Self {
+    pub(crate) fn new_starts_at(
+        source: &'src str,
+        mode: Mode,
+        start_offset: TextSize,
+        allocator: &'ast Allocator,
+    ) -> Self {
         let tokens = TokenSource::from_source(source, mode, start_offset);
 
         Parser {
@@ -68,11 +75,12 @@ impl<'src> Parser<'src> {
             prev_token_end: TextSize::new(0),
             start_offset,
             current_token_id: TokenId::default(),
+            allocator,
         }
     }
 
     /// Consumes the [`Parser`] and returns the parsed [`Parsed`].
-    pub(crate) fn parse(mut self) -> Parsed<Mod> {
+    pub(crate) fn parse(mut self) -> Parsed<Mod<'ast>> {
         let syntax = match self.mode {
             Mode::Expression => Mod::Expression(self.parse_single_expression()),
             Mode::Module | Mode::Ipython => Mod::Module(self.parse_module()),
@@ -89,7 +97,7 @@ impl<'src> Parser<'src> {
     ///
     /// After parsing a single expression, an error is reported and all remaining tokens are
     /// dropped by the parser.
-    fn parse_single_expression(&mut self) -> ModExpression {
+    fn parse_single_expression(&mut self) -> ModExpression<'ast> {
         let start = self.node_start();
         let parsed_expr = self.parse_expression_list(ExpressionContext::default());
 
@@ -116,7 +124,7 @@ impl<'src> Parser<'src> {
         self.bump(TokenKind::EndOfFile);
 
         ModExpression {
-            body: Box::new(parsed_expr.expr),
+            body: parsed_expr.expr,
             range: self.node_range(start),
         }
     }
@@ -124,7 +132,7 @@ impl<'src> Parser<'src> {
     /// Parses a Python module.
     ///
     /// This is to be used for [`Mode::Module`] and [`Mode::Ipython`].
-    fn parse_module(&mut self) -> ModModule {
+    fn parse_module(&mut self) -> ModModule<'ast> {
         let body = self.parse_list_into_vec(
             RecoveryContextKind::ModuleStatements,
             Parser::parse_statement,
@@ -136,6 +144,21 @@ impl<'src> Parser<'src> {
             body,
             range: TextRange::new(self.start_offset, self.current_token_range().end()),
         }
+    }
+
+    fn alloc_box<T>(&self, value: T) -> ruff_allocator::Box<'ast, T> {
+        ruff_allocator::Box::new_in(value, &self.allocator)
+    }
+
+    fn alloc<T>(&self, value: T) -> &'ast mut T {
+        self.allocator.alloc(value)
+    }
+
+    fn alloc_str<T>(&self, value: T) -> &'ast mut str
+    where
+        T: AsRef<str>,
+    {
+        self.allocator.alloc_str(value.as_ref())
     }
 
     fn finish(self, syntax: Mod) -> Parsed<Mod> {
@@ -444,7 +467,7 @@ impl<'src> Parser<'src> {
     fn parse_list_into_vec<T>(
         &mut self,
         recovery_context_kind: RecoveryContextKind,
-        parse_element: impl Fn(&mut Parser<'src>) -> T,
+        parse_element: impl Fn(&mut Parser<'src, 'ast>) -> T,
     ) -> Vec<T> {
         let mut elements = Vec::new();
         self.parse_list(recovery_context_kind, |p| elements.push(parse_element(p)));
@@ -461,7 +484,7 @@ impl<'src> Parser<'src> {
     fn parse_list(
         &mut self,
         recovery_context_kind: RecoveryContextKind,
-        mut parse_element: impl FnMut(&mut Parser<'src>),
+        mut parse_element: impl FnMut(&mut Parser<'src, 'ast>),
     ) {
         let mut progress = ParserProgress::default();
 
@@ -503,7 +526,7 @@ impl<'src> Parser<'src> {
     fn parse_comma_separated_list_into_vec<T>(
         &mut self,
         recovery_context_kind: RecoveryContextKind,
-        parse_element: impl Fn(&mut Parser<'src>) -> T,
+        parse_element: impl Fn(&mut Parser<'src, 'ast>) -> T,
     ) -> Vec<T> {
         let mut elements = Vec::new();
         self.parse_comma_separated_list(recovery_context_kind, |p| elements.push(parse_element(p)));
@@ -520,7 +543,7 @@ impl<'src> Parser<'src> {
     fn parse_comma_separated_list(
         &mut self,
         recovery_context_kind: RecoveryContextKind,
-        mut parse_element: impl FnMut(&mut Parser<'src>),
+        mut parse_element: impl FnMut(&mut Parser<'src, 'ast>),
     ) {
         let mut progress = ParserProgress::default();
 

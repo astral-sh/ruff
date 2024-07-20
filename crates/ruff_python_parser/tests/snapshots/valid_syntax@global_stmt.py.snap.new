@@ -1,0 +1,46 @@
+---
+source: crates/ruff_python_parser/tests/fixtures.rs
+assertion_line: 76
+input_file: crates/ruff_python_parser/resources/inline/ok/global_stmt.py
+---
+## AST
+
+```
+Module(
+    ModModule {
+        range: 0..24,
+        body: [
+            Global(
+                StmtGlobal {
+                    range: 0..8,
+                    names: [
+                        Identifier {
+                            id: "x",
+                            range: 7..8,
+                        },
+                    ],
+                },
+            ),
+            Global(
+                StmtGlobal {
+                    range: 9..23,
+                    names: [
+                        Identifier {
+                            id: "x",
+                            range: 16..17,
+                        },
+                        Identifier {
+                            id: "y",
+                            range: 19..20,
+                        },
+                        Identifier {
+                            id: "z",
+                            range: 22..23,
+                        },
+                    ],
+                },
+            ),
+        ],
+    },
+)
+```

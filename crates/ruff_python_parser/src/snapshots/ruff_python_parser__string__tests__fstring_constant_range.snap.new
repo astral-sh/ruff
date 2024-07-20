@@ -1,0 +1,81 @@
+---
+source: crates/ruff_python_parser/src/string.rs
+assertion_line: 802
+expression: suite
+---
+[
+    Expr(
+        StmtExpr {
+            range: 0..22,
+            value: FString(
+                ExprFString {
+                    range: 0..22,
+                    value: FStringValue {
+                        inner: Single(
+                            FString(
+                                FString {
+                                    range: 0..22,
+                                    elements: [
+                                        Literal(
+                                            FStringLiteralElement {
+                                                range: 2..5,
+                                                value: "aaa",
+                                            },
+                                        ),
+                                        Expression(
+                                            FStringExpressionElement {
+                                                range: 5..10,
+                                                expression: Name(
+                                                    ExprName {
+                                                        range: 6..9,
+                                                        id: "bbb",
+                                                        ctx: Load,
+                                                    },
+                                                ),
+                                                debug_text: None,
+                                                conversion: None,
+                                                format_spec: None,
+                                            },
+                                        ),
+                                        Literal(
+                                            FStringLiteralElement {
+                                                range: 10..13,
+                                                value: "ccc",
+                                            },
+                                        ),
+                                        Expression(
+                                            FStringExpressionElement {
+                                                range: 13..18,
+                                                expression: Name(
+                                                    ExprName {
+                                                        range: 14..17,
+                                                        id: "ddd",
+                                                        ctx: Load,
+                                                    },
+                                                ),
+                                                debug_text: None,
+                                                conversion: None,
+                                                format_spec: None,
+                                            },
+                                        ),
+                                        Literal(
+                                            FStringLiteralElement {
+                                                range: 18..21,
+                                                value: "eee",
+                                            },
+                                        ),
+                                    ],
+                                    flags: FStringFlags {
+                                        quote_style: Double,
+                                        prefix: Regular,
+                                        triple_quoted: false,
+                                    },
+                                },
+                            ),
+                        ),
+                    },
+                },
+            ),
+        },
+    ),
+]

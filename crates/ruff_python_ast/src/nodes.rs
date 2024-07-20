@@ -9,10 +9,10 @@ use std::sync::OnceLock;
 
 use bitflags::bitflags;
 use itertools::Itertools;
+use ruff_allocator::{Allocator, Box, CloneIn};
 
 use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 
-use crate::name::Name;
 use crate::{
     int,
     str::Quote,
@@ -21,83 +21,83 @@ use crate::{
 };
 
 /// See also [mod](https://docs.python.org/3/library/ast.html#ast.mod)
-#[derive(Clone, Debug, PartialEq, is_macro::Is)]
-pub enum Mod {
-    Module(ModModule),
-    Expression(ModExpression),
+#[derive(Debug, PartialEq, is_macro::Is)]
+pub enum Mod<'ast> {
+    Module(ModModule<'ast>),
+    Expression(ModExpression<'ast>),
 }
 
 /// See also [Module](https://docs.python.org/3/library/ast.html#ast.Module)
-#[derive(Clone, Debug, PartialEq)]
-pub struct ModModule {
+#[derive(Debug, PartialEq)]
+pub struct ModModule<'ast> {
     pub range: TextRange,
-    pub body: Vec<Stmt>,
+    pub body: Vec<Stmt<'ast>>,
 }
 
-impl From<ModModule> for Mod {
-    fn from(payload: ModModule) -> Self {
+impl<'ast> From<ModModule<'ast>> for Mod<'ast> {
+    fn from(payload: ModModule<'ast>) -> Self {
         Mod::Module(payload)
     }
 }
 
 /// See also [Expression](https://docs.python.org/3/library/ast.html#ast.Expression)
-#[derive(Clone, Debug, PartialEq)]
-pub struct ModExpression {
+#[derive(Debug, PartialEq)]
+pub struct ModExpression<'ast> {
     pub range: TextRange,
-    pub body: Box<Expr>,
+    pub body: Expr<'ast>,
 }
 
-impl From<ModExpression> for Mod {
-    fn from(payload: ModExpression) -> Self {
+impl<'ast> From<ModExpression<'ast>> for Mod<'ast> {
+    fn from(payload: ModExpression<'ast>) -> Self {
         Mod::Expression(payload)
     }
 }
 
 /// See also [stmt](https://docs.python.org/3/library/ast.html#ast.stmt)
-#[derive(Clone, Debug, PartialEq, is_macro::Is)]
-pub enum Stmt {
+#[derive(Debug, PartialEq, is_macro::Is)]
+pub enum Stmt<'ast> {
     #[is(name = "function_def_stmt")]
-    FunctionDef(StmtFunctionDef),
+    FunctionDef(StmtFunctionDef<'ast>),
     #[is(name = "class_def_stmt")]
-    ClassDef(StmtClassDef),
+    ClassDef(StmtClassDef<'ast>),
     #[is(name = "return_stmt")]
-    Return(StmtReturn),
+    Return(StmtReturn<'ast>),
     #[is(name = "delete_stmt")]
-    Delete(StmtDelete),
+    Delete(StmtDelete<'ast>),
     #[is(name = "assign_stmt")]
-    Assign(StmtAssign),
+    Assign(StmtAssign<'ast>),
     #[is(name = "aug_assign_stmt")]
-    AugAssign(StmtAugAssign),
+    AugAssign(StmtAugAssign<'ast>),
     #[is(name = "ann_assign_stmt")]
-    AnnAssign(StmtAnnAssign),
+    AnnAssign(StmtAnnAssign<'ast>),
     #[is(name = "type_alias_stmt")]
-    TypeAlias(StmtTypeAlias),
+    TypeAlias(StmtTypeAlias<'ast>),
     #[is(name = "for_stmt")]
-    For(StmtFor),
+    For(StmtFor<'ast>),
     #[is(name = "while_stmt")]
-    While(StmtWhile),
+    While(StmtWhile<'ast>),
     #[is(name = "if_stmt")]
-    If(StmtIf),
+    If(StmtIf<'ast>),
     #[is(name = "with_stmt")]
-    With(StmtWith),
+    With(StmtWith<'ast>),
     #[is(name = "match_stmt")]
-    Match(StmtMatch),
+    Match(StmtMatch<'ast>),
     #[is(name = "raise_stmt")]
-    Raise(StmtRaise),
+    Raise(StmtRaise<'ast>),
     #[is(name = "try_stmt")]
-    Try(StmtTry),
+    Try(StmtTry<'ast>),
     #[is(name = "assert_stmt")]
-    Assert(StmtAssert),
+    Assert(StmtAssert<'ast>),
     #[is(name = "import_stmt")]
-    Import(StmtImport),
+    Import(StmtImport<'ast>),
     #[is(name = "import_from_stmt")]
-    ImportFrom(StmtImportFrom),
+    ImportFrom(StmtImportFrom<'ast>),
     #[is(name = "global_stmt")]
-    Global(StmtGlobal),
+    Global(StmtGlobal<'ast>),
     #[is(name = "nonlocal_stmt")]
-    Nonlocal(StmtNonlocal),
+    Nonlocal(StmtNonlocal<'ast>),
     #[is(name = "expr_stmt")]
-    Expr(StmtExpr),
+    Expr(StmtExpr<'ast>),
     #[is(name = "pass_stmt")]
     Pass(StmtPass),
     #[is(name = "break_stmt")]
@@ -107,7 +107,7 @@ pub enum Stmt {
 
     // Jupyter notebook specific
     #[is(name = "ipy_escape_command_stmt")]
-    IpyEscapeCommand(StmtIpyEscapeCommand),
+    IpyEscapeCommand(StmtIpyEscapeCommand<'ast>),
 }
 
 /// An AST node used to represent a IPython escape command at the statement level.
@@ -163,15 +163,15 @@ pub enum Stmt {
 /// `%%timeit??`, etc.
 ///
 /// [Escape kind]: IpyEscapeKind
-#[derive(Clone, Debug, PartialEq)]
-pub struct StmtIpyEscapeCommand {
+#[derive(Debug, PartialEq)]
+pub struct StmtIpyEscapeCommand<'ast> {
     pub range: TextRange,
     pub kind: IpyEscapeKind,
-    pub value: Box<str>,
+    pub value: &'ast str,
 }
 
-impl From<StmtIpyEscapeCommand> for Stmt {
-    fn from(payload: StmtIpyEscapeCommand) -> Self {
+impl<'ast> From<StmtIpyEscapeCommand<'ast>> for Stmt<'ast> {
+    fn from(payload: StmtIpyEscapeCommand<'ast>) -> Self {
         Stmt::IpyEscapeCommand(payload)
     }
 }
@@ -181,38 +181,38 @@ impl From<StmtIpyEscapeCommand> for Stmt {
 ///
 /// This type differs from the original Python AST, as it collapses the
 /// synchronous and asynchronous variants into a single type.
-#[derive(Clone, Debug, PartialEq)]
-pub struct StmtFunctionDef {
+#[derive(Debug, PartialEq)]
+pub struct StmtFunctionDef<'ast> {
     pub range: TextRange,
     pub is_async: bool,
-    pub decorator_list: Vec<Decorator>,
-    pub name: Identifier,
-    pub type_params: Option<Box<TypeParams>>,
-    pub parameters: Box<Parameters>,
-    pub returns: Option<Box<Expr>>,
-    pub body: Vec<Stmt>,
+    pub decorator_list: Vec<Decorator<'ast>>,
+    pub name: Identifier<'ast>,
+    pub type_params: Option<Box<'ast, TypeParams<'ast>>>,
+    pub parameters: Box<'ast, Parameters<'ast>>,
+    pub returns: Option<Box<'ast, Expr<'ast>>>,
+    pub body: Vec<Stmt<'ast>>,
 }
 
-impl From<StmtFunctionDef> for Stmt {
-    fn from(payload: StmtFunctionDef) -> Self {
+impl<'ast> From<StmtFunctionDef<'ast>> for Stmt<'ast> {
+    fn from(payload: StmtFunctionDef<'ast>) -> Self {
         Stmt::FunctionDef(payload)
     }
 }
 
 /// See also [ClassDef](https://docs.python.org/3/library/ast.html#ast.ClassDef)
-#[derive(Clone, Debug, PartialEq)]
-pub struct StmtClassDef {
+#[derive(Debug, PartialEq)]
+pub struct StmtClassDef<'ast> {
     pub range: TextRange,
-    pub decorator_list: Vec<Decorator>,
-    pub name: Identifier,
-    pub type_params: Option<Box<TypeParams>>,
-    pub arguments: Option<Box<Arguments>>,
-    pub body: Vec<Stmt>,
+    pub decorator_list: Vec<Decorator<'ast>>,
+    pub name: Identifier<'ast>,
+    pub type_params: Option<Box<'ast, TypeParams<'ast>>>,
+    pub arguments: Option<Box<'ast, Arguments<'ast>>>,
+    pub body: Vec<Stmt<'ast>>,
 }
 
-impl StmtClassDef {
+impl<'ast> StmtClassDef<'ast> {
     /// Return an iterator over the bases of the class.
-    pub fn bases(&self) -> &[Expr] {
+    pub fn bases(&self) -> &[Expr<'ast>] {
         match &self.arguments {
             Some(arguments) => &arguments.args,
             None => &[],
@@ -220,7 +220,7 @@ impl StmtClassDef {
     }
 
     /// Return an iterator over the metaclass keywords of the class.
-    pub fn keywords(&self) -> &[Keyword] {
+    pub fn keywords(&self) -> &[Keyword<'ast>] {
         match &self.arguments {
             Some(arguments) => &arguments.keywords,
             None => &[],
@@ -228,94 +228,94 @@ impl StmtClassDef {
     }
 }
 
-impl From<StmtClassDef> for Stmt {
-    fn from(payload: StmtClassDef) -> Self {
+impl<'ast> From<StmtClassDef<'ast>> for Stmt<'ast> {
+    fn from(payload: StmtClassDef<'ast>) -> Self {
         Stmt::ClassDef(payload)
     }
 }
 
 /// See also [Return](https://docs.python.org/3/library/ast.html#ast.Return)
-#[derive(Clone, Debug, PartialEq)]
-pub struct StmtReturn {
+#[derive(Debug, PartialEq)]
+pub struct StmtReturn<'ast> {
     pub range: TextRange,
-    pub value: Option<Box<Expr>>,
+    pub value: Option<Box<'ast, Expr<'ast>>>,
 }
 
-impl From<StmtReturn> for Stmt {
-    fn from(payload: StmtReturn) -> Self {
+impl<'ast> From<StmtReturn<'ast>> for Stmt<'ast> {
+    fn from(payload: StmtReturn<'ast>) -> Self {
         Stmt::Return(payload)
     }
 }
 
 /// See also [Delete](https://docs.python.org/3/library/ast.html#ast.Delete)
-#[derive(Clone, Debug, PartialEq)]
-pub struct StmtDelete {
+#[derive(Debug, PartialEq)]
+pub struct StmtDelete<'ast> {
     pub range: TextRange,
-    pub targets: Vec<Expr>,
+    pub targets: Vec<Expr<'ast>>,
 }
 
-impl From<StmtDelete> for Stmt {
-    fn from(payload: StmtDelete) -> Self {
+impl<'ast> From<StmtDelete<'ast>> for Stmt<'ast> {
+    fn from(payload: StmtDelete<'ast>) -> Self {
         Stmt::Delete(payload)
     }
 }
 
 /// See also [TypeAlias](https://docs.python.org/3/library/ast.html#ast.TypeAlias)
-#[derive(Clone, Debug, PartialEq)]
-pub struct StmtTypeAlias {
+#[derive(Debug, PartialEq)]
+pub struct StmtTypeAlias<'ast> {
     pub range: TextRange,
-    pub name: Box<Expr>,
-    pub type_params: Option<TypeParams>,
-    pub value: Box<Expr>,
+    pub name: Box<'ast, Expr<'ast>>,
+    pub type_params: Option<TypeParams<'ast>>,
+    pub value: Box<'ast, Expr<'ast>>,
 }
 
-impl From<StmtTypeAlias> for Stmt {
-    fn from(payload: StmtTypeAlias) -> Self {
+impl<'ast> From<StmtTypeAlias<'ast>> for Stmt<'ast> {
+    fn from(payload: StmtTypeAlias<'ast>) -> Self {
         Stmt::TypeAlias(payload)
     }
 }
 
 /// See also [Assign](https://docs.python.org/3/library/ast.html#ast.Assign)
-#[derive(Clone, Debug, PartialEq)]
-pub struct StmtAssign {
+#[derive(Debug, PartialEq)]
+pub struct StmtAssign<'ast> {
     pub range: TextRange,
-    pub targets: Vec<Expr>,
-    pub value: Box<Expr>,
+    pub targets: Vec<Expr<'ast>>,
+    pub value: Box<'ast, Expr<'ast>>,
 }
 
-impl From<StmtAssign> for Stmt {
-    fn from(payload: StmtAssign) -> Self {
+impl<'ast> From<StmtAssign<'ast>> for Stmt<'ast> {
+    fn from(payload: StmtAssign<'ast>) -> Self {
         Stmt::Assign(payload)
     }
 }
 
 /// See also [AugAssign](https://docs.python.org/3/library/ast.html#ast.AugAssign)
-#[derive(Clone, Debug, PartialEq)]
-pub struct StmtAugAssign {
+#[derive(Debug, PartialEq)]
+pub struct StmtAugAssign<'ast> {
     pub range: TextRange,
-    pub target: Box<Expr>,
+    pub target: Box<'ast, Expr<'ast>>,
     pub op: Operator,
-    pub value: Box<Expr>,
+    pub value: Box<'ast, Expr<'ast>>,
 }
 
-impl From<StmtAugAssign> for Stmt {
-    fn from(payload: StmtAugAssign) -> Self {
+impl<'ast> From<StmtAugAssign<'ast>> for Stmt<'ast> {
+    fn from(payload: StmtAugAssign<'ast>) -> Self {
         Stmt::AugAssign(payload)
     }
 }
 
 /// See also [AnnAssign](https://docs.python.org/3/library/ast.html#ast.AnnAssign)
-#[derive(Clone, Debug, PartialEq)]
-pub struct StmtAnnAssign {
+#[derive(Debug, PartialEq)]
+pub struct StmtAnnAssign<'ast> {
     pub range: TextRange,
-    pub target: Box<Expr>,
-    pub annotation: Box<Expr>,
-    pub value: Option<Box<Expr>>,
+    pub target: Box<'ast, Expr<'ast>>,
+    pub annotation: Box<'ast, Expr<'ast>>,
+    pub value: Option<Box<'ast, Expr<'ast>>>,
     pub simple: bool,
 }
 
-impl From<StmtAnnAssign> for Stmt {
-    fn from(payload: StmtAnnAssign) -> Self {
+impl<'ast> From<StmtAnnAssign<'ast>> for Stmt<'ast> {
+    fn from(payload: StmtAnnAssign<'ast>) -> Self {
         Stmt::AnnAssign(payload)
     }
 }
@@ -325,58 +325,58 @@ impl From<StmtAnnAssign> for Stmt {
 ///
 /// This type differs from the original Python AST, as it collapses the
 /// synchronous and asynchronous variants into a single type.
-#[derive(Clone, Debug, PartialEq)]
-pub struct StmtFor {
+#[derive(Debug, PartialEq)]
+pub struct StmtFor<'ast> {
     pub range: TextRange,
     pub is_async: bool,
-    pub target: Box<Expr>,
-    pub iter: Box<Expr>,
-    pub body: Vec<Stmt>,
-    pub orelse: Vec<Stmt>,
+    pub target: Box<'ast, Expr<'ast>>,
+    pub iter: Box<'ast, Expr<'ast>>,
+    pub body: Vec<Stmt<'ast>>,
+    pub orelse: Vec<Stmt<'ast>>,
 }
 
-impl From<StmtFor> for Stmt {
-    fn from(payload: StmtFor) -> Self {
+impl<'ast> From<StmtFor<'ast>> for Stmt<'ast> {
+    fn from(payload: StmtFor<'ast>) -> Self {
         Stmt::For(payload)
     }
 }
 
 /// See also [While](https://docs.python.org/3/library/ast.html#ast.While) and
 /// [AsyncWhile](https://docs.python.org/3/library/ast.html#ast.AsyncWhile).
-#[derive(Clone, Debug, PartialEq)]
-pub struct StmtWhile {
+#[derive(Debug, PartialEq)]
+pub struct StmtWhile<'ast> {
     pub range: TextRange,
-    pub test: Box<Expr>,
-    pub body: Vec<Stmt>,
-    pub orelse: Vec<Stmt>,
+    pub test: Box<'ast, Expr<'ast>>,
+    pub body: Vec<Stmt<'ast>>,
+    pub orelse: Vec<Stmt<'ast>>,
 }
 
-impl From<StmtWhile> for Stmt {
-    fn from(payload: StmtWhile) -> Self {
+impl<'ast> From<StmtWhile<'ast>> for Stmt<'ast> {
+    fn from(payload: StmtWhile<'ast>) -> Self {
         Stmt::While(payload)
     }
 }
 
 /// See also [If](https://docs.python.org/3/library/ast.html#ast.If)
-#[derive(Clone, Debug, PartialEq)]
-pub struct StmtIf {
+#[derive(Debug, PartialEq)]
+pub struct StmtIf<'ast> {
     pub range: TextRange,
-    pub test: Box<Expr>,
-    pub body: Vec<Stmt>,
-    pub elif_else_clauses: Vec<ElifElseClause>,
+    pub test: Box<'ast, Expr<'ast>>,
+    pub body: Vec<Stmt<'ast>>,
+    pub elif_else_clauses: Vec<ElifElseClause<'ast>>,
 }
 
-impl From<StmtIf> for Stmt {
-    fn from(payload: StmtIf) -> Self {
+impl<'ast> From<StmtIf<'ast>> for Stmt<'ast> {
+    fn from(payload: StmtIf<'ast>) -> Self {
         Stmt::If(payload)
     }
 }
 
-#[derive(Clone, Debug, PartialEq)]
-pub struct ElifElseClause {
+#[derive(Debug, PartialEq)]
+pub struct ElifElseClause<'ast> {
     pub range: TextRange,
-    pub test: Option<Expr>,
-    pub body: Vec<Stmt>,
+    pub test: Option<Expr<'ast>>,
+    pub body: Vec<Stmt<'ast>>,
 }
 
 /// See also [With](https://docs.python.org/3/library/ast.html#ast.With) and
@@ -384,143 +384,143 @@ pub struct ElifElseClause {
 ///
 /// This type differs from the original Python AST, as it collapses the
 /// synchronous and asynchronous variants into a single type.
-#[derive(Clone, Debug, PartialEq)]
-pub struct StmtWith {
+#[derive(Debug, PartialEq)]
+pub struct StmtWith<'ast> {
     pub range: TextRange,
     pub is_async: bool,
-    pub items: Vec<WithItem>,
-    pub body: Vec<Stmt>,
+    pub items: Vec<WithItem<'ast>>,
+    pub body: Vec<Stmt<'ast>>,
 }
 
-impl From<StmtWith> for Stmt {
-    fn from(payload: StmtWith) -> Self {
+impl<'ast> From<StmtWith<'ast>> for Stmt<'ast> {
+    fn from(payload: StmtWith<'ast>) -> Self {
         Stmt::With(payload)
     }
 }
 
 /// See also [Match](https://docs.python.org/3/library/ast.html#ast.Match)
-#[derive(Clone, Debug, PartialEq)]
-pub struct StmtMatch {
+#[derive(Debug, PartialEq)]
+pub struct StmtMatch<'ast> {
     pub range: TextRange,
-    pub subject: Box<Expr>,
-    pub cases: Vec<MatchCase>,
+    pub subject: Box<'ast, Expr<'ast>>,
+    pub cases: Vec<MatchCase<'ast>>,
 }
 
-impl From<StmtMatch> for Stmt {
-    fn from(payload: StmtMatch) -> Self {
+impl<'ast> From<StmtMatch<'ast>> for Stmt<'ast> {
+    fn from(payload: StmtMatch<'ast>) -> Self {
         Stmt::Match(payload)
     }
 }
 
 /// See also [Raise](https://docs.python.org/3/library/ast.html#ast.Raise)
-#[derive(Clone, Debug, PartialEq)]
-pub struct StmtRaise {
+#[derive(Debug, PartialEq)]
+pub struct StmtRaise<'ast> {
     pub range: TextRange,
-    pub exc: Option<Box<Expr>>,
-    pub cause: Option<Box<Expr>>,
+    pub exc: Option<Box<'ast, Expr<'ast>>>,
+    pub cause: Option<Box<'ast, Expr<'ast>>>,
 }
 
-impl From<StmtRaise> for Stmt {
-    fn from(payload: StmtRaise) -> Self {
+impl<'ast> From<StmtRaise<'ast>> for Stmt<'ast> {
+    fn from(payload: StmtRaise<'ast>) -> Self {
         Stmt::Raise(payload)
     }
 }
 
 /// See also [Try](https://docs.python.org/3/library/ast.html#ast.Try) and
 /// [TryStar](https://docs.python.org/3/library/ast.html#ast.TryStar)
-#[derive(Clone, Debug, PartialEq)]
-pub struct StmtTry {
+#[derive(Debug, PartialEq)]
+pub struct StmtTry<'ast> {
     pub range: TextRange,
-    pub body: Vec<Stmt>,
-    pub handlers: Vec<ExceptHandler>,
-    pub orelse: Vec<Stmt>,
-    pub finalbody: Vec<Stmt>,
+    pub body: Vec<Stmt<'ast>>,
+    pub handlers: Vec<ExceptHandler<'ast>>,
+    pub orelse: Vec<Stmt<'ast>>,
+    pub finalbody: Vec<Stmt<'ast>>,
     pub is_star: bool,
 }
 
-impl From<StmtTry> for Stmt {
-    fn from(payload: StmtTry) -> Self {
+impl<'ast> From<StmtTry<'ast>> for Stmt<'ast> {
+    fn from(payload: StmtTry<'ast>) -> Self {
         Stmt::Try(payload)
     }
 }
 
 /// See also [Assert](https://docs.python.org/3/library/ast.html#ast.Assert)
-#[derive(Clone, Debug, PartialEq)]
-pub struct StmtAssert {
+#[derive(Debug, PartialEq)]
+pub struct StmtAssert<'ast> {
     pub range: TextRange,
-    pub test: Box<Expr>,
-    pub msg: Option<Box<Expr>>,
+    pub test: Box<'ast, Expr<'ast>>,
+    pub msg: Option<Box<'ast, Expr<'ast>>>,
 }
 
-impl From<StmtAssert> for Stmt {
-    fn from(payload: StmtAssert) -> Self {
+impl<'ast> From<StmtAssert<'ast>> for Stmt<'ast> {
+    fn from(payload: StmtAssert<'ast>) -> Self {
         Stmt::Assert(payload)
     }
 }
 
 /// See also [Import](https://docs.python.org/3/library/ast.html#ast.Import)
 #[derive(Clone, Debug, PartialEq)]
-pub struct StmtImport {
+pub struct StmtImport<'ast> {
     pub range: TextRange,
-    pub names: Vec<Alias>,
+    pub names: Vec<Alias<'ast>>,
 }
 
-impl From<StmtImport> for Stmt {
-    fn from(payload: StmtImport) -> Self {
+impl<'ast> From<StmtImport<'ast>> for Stmt<'ast> {
+    fn from(payload: StmtImport<'ast>) -> Self {
         Stmt::Import(payload)
     }
 }
 
 /// See also [ImportFrom](https://docs.python.org/3/library/ast.html#ast.ImportFrom)
 #[derive(Clone, Debug, PartialEq)]
-pub struct StmtImportFrom {
+pub struct StmtImportFrom<'ast> {
     pub range: TextRange,
-    pub module: Option<Identifier>,
-    pub names: Vec<Alias>,
+    pub module: Option<Identifier<'ast>>,
+    pub names: Vec<Alias<'ast>>,
     pub level: u32,
 }
 
-impl From<StmtImportFrom> for Stmt {
-    fn from(payload: StmtImportFrom) -> Self {
+impl<'ast> From<StmtImportFrom<'ast>> for Stmt<'ast> {
+    fn from(payload: StmtImportFrom<'ast>) -> Self {
         Stmt::ImportFrom(payload)
     }
 }
 
 /// See also [Global](https://docs.python.org/3/library/ast.html#ast.Global)
 #[derive(Clone, Debug, PartialEq)]
-pub struct StmtGlobal {
+pub struct StmtGlobal<'ast> {
     pub range: TextRange,
-    pub names: Vec<Identifier>,
+    pub names: Vec<Identifier<'ast>>,
 }
 
-impl From<StmtGlobal> for Stmt {
-    fn from(payload: StmtGlobal) -> Self {
+impl<'ast> From<StmtGlobal<'ast>> for Stmt<'ast> {
+    fn from(payload: StmtGlobal<'ast>) -> Self {
         Stmt::Global(payload)
     }
 }
 
 /// See also [Nonlocal](https://docs.python.org/3/library/ast.html#ast.Nonlocal)
 #[derive(Clone, Debug, PartialEq)]
-pub struct StmtNonlocal {
+pub struct StmtNonlocal<'ast> {
     pub range: TextRange,
-    pub names: Vec<Identifier>,
+    pub names: Vec<Identifier<'ast>>,
 }
 
-impl From<StmtNonlocal> for Stmt {
-    fn from(payload: StmtNonlocal) -> Self {
+impl<'ast> From<StmtNonlocal<'ast>> for Stmt<'ast> {
+    fn from(payload: StmtNonlocal<'ast>) -> Self {
         Stmt::Nonlocal(payload)
     }
 }
 
 /// See also [Expr](https://docs.python.org/3/library/ast.html#ast.Expr)
-#[derive(Clone, Debug, PartialEq)]
-pub struct StmtExpr {
+#[derive(Debug, PartialEq)]
+pub struct StmtExpr<'ast> {
     pub range: TextRange,
-    pub value: Box<Expr>,
+    pub value: Box<'ast, Expr<'ast>>,
 }
 
-impl From<StmtExpr> for Stmt {
-    fn from(payload: StmtExpr) -> Self {
+impl<'ast> From<StmtExpr<'ast>> for Stmt<'ast> {
+    fn from(payload: StmtExpr<'ast>) -> Self {
         Stmt::Expr(payload)
     }
 }
@@ -531,7 +531,7 @@ pub struct StmtPass {
     pub range: TextRange,
 }
 
-impl From<StmtPass> for Stmt {
+impl From<StmtPass> for Stmt<'_> {
     fn from(payload: StmtPass) -> Self {
         Stmt::Pass(payload)
     }
@@ -543,7 +543,7 @@ pub struct StmtBreak {
     pub range: TextRange,
 }
 
-impl From<StmtBreak> for Stmt {
+impl From<StmtBreak> for Stmt<'_> {
     fn from(payload: StmtBreak) -> Self {
         Stmt::Break(payload)
     }
@@ -555,55 +555,55 @@ pub struct StmtContinue {
     pub range: TextRange,
 }
 
-impl From<StmtContinue> for Stmt {
+impl From<StmtContinue> for Stmt<'_> {
     fn from(payload: StmtContinue) -> Self {
         Stmt::Continue(payload)
     }
 }
 
 /// See also [expr](https://docs.python.org/3/library/ast.html#ast.expr)
-#[derive(Clone, Debug, PartialEq, is_macro::Is)]
-pub enum Expr {
+#[derive(Debug, PartialEq, is_macro::Is)]
+pub enum Expr<'ast> {
     #[is(name = "bool_op_expr")]
-    BoolOp(ExprBoolOp),
+    BoolOp(ExprBoolOp<'ast>),
     #[is(name = "named_expr")]
-    Named(ExprNamed),
+    Named(ExprNamed<'ast>),
     #[is(name = "bin_op_expr")]
-    BinOp(ExprBinOp),
+    BinOp(ExprBinOp<'ast>),
     #[is(name = "unary_op_expr")]
-    UnaryOp(ExprUnaryOp),
+    UnaryOp(ExprUnaryOp<'ast>),
     #[is(name = "lambda_expr")]
-    Lambda(ExprLambda),
+    Lambda(ExprLambda<'ast>),
     #[is(name = "if_expr")]
-    If(ExprIf),
+    If(ExprIf<'ast>),
     #[is(name = "dict_expr")]
-    Dict(ExprDict),
+    Dict(ExprDict<'ast>),
     #[is(name = "set_expr")]
-    Set(ExprSet),
+    Set(ExprSet<'ast>),
     #[is(name = "list_comp_expr")]
-    ListComp(ExprListComp),
+    ListComp(ExprListComp<'ast>),
     #[is(name = "set_comp_expr")]
-    SetComp(ExprSetComp),
+    SetComp(ExprSetComp<'ast>),
     #[is(name = "dict_comp_expr")]
-    DictComp(ExprDictComp),
+    DictComp(ExprDictComp<'ast>),
     #[is(name = "generator_expr")]
-    Generator(ExprGenerator),
+    Generator(ExprGenerator<'ast>),
     #[is(name = "await_expr")]
-    Await(ExprAwait),
+    Await(ExprAwait<'ast>),
     #[is(name = "yield_expr")]
-    Yield(ExprYield),
+    Yield(ExprYield<'ast>),
     #[is(name = "yield_from_expr")]
-    YieldFrom(ExprYieldFrom),
+    YieldFrom(ExprYieldFrom<'ast>),
     #[is(name = "compare_expr")]
-    Compare(ExprCompare),
+    Compare(ExprCompare<'ast>),
     #[is(name = "call_expr")]
-    Call(ExprCall),
+    Call(ExprCall<'ast>),
     #[is(name = "f_string_expr")]
-    FString(ExprFString),
+    FString(ExprFString<'ast>),
     #[is(name = "string_literal_expr")]
-    StringLiteral(ExprStringLiteral),
+    StringLiteral(ExprStringLiteral<'ast>),
     #[is(name = "bytes_literal_expr")]
-    BytesLiteral(ExprBytesLiteral),
+    BytesLiteral(ExprBytesLiteral<'ast>),
     #[is(name = "number_literal_expr")]
     NumberLiteral(ExprNumberLiteral),
     #[is(name = "boolean_literal_expr")]
@@ -613,26 +613,26 @@ pub enum Expr {
     #[is(name = "ellipsis_literal_expr")]
     EllipsisLiteral(ExprEllipsisLiteral),
     #[is(name = "attribute_expr")]
-    Attribute(ExprAttribute),
+    Attribute(ExprAttribute<'ast>),
     #[is(name = "subscript_expr")]
-    Subscript(ExprSubscript),
+    Subscript(ExprSubscript<'ast>),
     #[is(name = "starred_expr")]
-    Starred(ExprStarred),
+    Starred(ExprStarred<'ast>),
     #[is(name = "name_expr")]
-    Name(ExprName),
+    Name(ExprName<'ast>),
     #[is(name = "list_expr")]
-    List(ExprList),
+    List(ExprList<'ast>),
     #[is(name = "tuple_expr")]
-    Tuple(ExprTuple),
+    Tuple(ExprTuple<'ast>),
     #[is(name = "slice_expr")]
-    Slice(ExprSlice),
+    Slice(ExprSlice<'ast>),
 
     // Jupyter notebook specific
     #[is(name = "ipy_escape_command_expr")]
-    IpyEscapeCommand(ExprIpyEscapeCommand),
+    IpyEscapeCommand(ExprIpyEscapeCommand<'ast>),
 }
 
-impl Expr {
+impl<'ast> Expr<'ast> {
     /// Returns `true` if the expression is a literal expression.
     ///
     /// A literal expression is either a string literal, bytes literal,
@@ -650,7 +650,7 @@ impl Expr {
     }
 
     /// Returns [`LiteralExpressionRef`] if the expression is a literal expression.
-    pub fn as_literal_expr(&self) -> Option<LiteralExpressionRef<'_>> {
+    pub fn as_literal_expr(&self) -> Option<LiteralExpressionRef<'_, 'ast>> {
         match self {
             Expr::StringLiteral(expr) => Some(LiteralExpressionRef::StringLiteral(expr)),
             Expr::BytesLiteral(expr) => Some(LiteralExpressionRef::BytesLiteral(expr)),
@@ -660,6 +660,12 @@ impl Expr {
             Expr::EllipsisLiteral(expr) => Some(LiteralExpressionRef::EllipsisLiteral(expr)),
             _ => None,
         }
+    }
+}
+
+impl<'ast> CloneIn<'ast> for Expr<'ast> {
+    fn clone_in(&self, allocator: &'ast Allocator) -> Self {
+        todo!();
     }
 }
 
@@ -674,101 +680,101 @@ impl Expr {
 ///
 /// For more information related to terminology and syntax of escape commands,
 /// see [`StmtIpyEscapeCommand`].
-#[derive(Clone, Debug, PartialEq)]
-pub struct ExprIpyEscapeCommand {
+#[derive(Debug, PartialEq)]
+pub struct ExprIpyEscapeCommand<'ast> {
     pub range: TextRange,
     pub kind: IpyEscapeKind,
-    pub value: Box<str>,
+    pub value: &'ast str,
 }
 
-impl From<ExprIpyEscapeCommand> for Expr {
-    fn from(payload: ExprIpyEscapeCommand) -> Self {
+impl<'ast> From<ExprIpyEscapeCommand<'ast>> for Expr<'ast> {
+    fn from(payload: ExprIpyEscapeCommand<'ast>) -> Self {
         Expr::IpyEscapeCommand(payload)
     }
 }
 
 /// See also [BoolOp](https://docs.python.org/3/library/ast.html#ast.BoolOp)
-#[derive(Clone, Debug, PartialEq)]
-pub struct ExprBoolOp {
+#[derive(Debug, PartialEq)]
+pub struct ExprBoolOp<'ast> {
     pub range: TextRange,
     pub op: BoolOp,
-    pub values: Vec<Expr>,
+    pub values: Vec<Expr<'ast>>,
 }
 
-impl From<ExprBoolOp> for Expr {
-    fn from(payload: ExprBoolOp) -> Self {
+impl<'ast> From<ExprBoolOp<'ast>> for Expr<'ast> {
+    fn from(payload: ExprBoolOp<'ast>) -> Self {
         Expr::BoolOp(payload)
     }
 }
 
 /// See also [NamedExpr](https://docs.python.org/3/library/ast.html#ast.NamedExpr)
-#[derive(Clone, Debug, PartialEq)]
-pub struct ExprNamed {
+#[derive(Debug, PartialEq)]
+pub struct ExprNamed<'ast> {
     pub range: TextRange,
-    pub target: Box<Expr>,
-    pub value: Box<Expr>,
+    pub target: Box<'ast, Expr<'ast>>,
+    pub value: Box<'ast, Expr<'ast>>,
 }
 
-impl From<ExprNamed> for Expr {
-    fn from(payload: ExprNamed) -> Self {
+impl<'ast> From<ExprNamed<'ast>> for Expr<'ast> {
+    fn from(payload: ExprNamed<'ast>) -> Self {
         Expr::Named(payload)
     }
 }
 
 /// See also [BinOp](https://docs.python.org/3/library/ast.html#ast.BinOp)
-#[derive(Clone, Debug, PartialEq)]
-pub struct ExprBinOp {
+#[derive(Debug, PartialEq)]
+pub struct ExprBinOp<'ast> {
     pub range: TextRange,
-    pub left: Box<Expr>,
+    pub left: Box<'ast, Expr<'ast>>,
     pub op: Operator,
-    pub right: Box<Expr>,
+    pub right: Box<'ast, Expr<'ast>>,
 }
 
-impl From<ExprBinOp> for Expr {
-    fn from(payload: ExprBinOp) -> Self {
+impl<'ast> From<ExprBinOp<'ast>> for Expr<'ast> {
+    fn from(payload: ExprBinOp<'ast>) -> Self {
         Expr::BinOp(payload)
     }
 }
 
 /// See also [UnaryOp](https://docs.python.org/3/library/ast.html#ast.UnaryOp)
-#[derive(Clone, Debug, PartialEq)]
-pub struct ExprUnaryOp {
+#[derive(Debug, PartialEq)]
+pub struct ExprUnaryOp<'ast> {
     pub range: TextRange,
     pub op: UnaryOp,
-    pub operand: Box<Expr>,
+    pub operand: Box<'ast, Expr<'ast>>,
 }
 
-impl From<ExprUnaryOp> for Expr {
-    fn from(payload: ExprUnaryOp) -> Self {
+impl<'ast> From<ExprUnaryOp<'ast>> for Expr<'ast> {
+    fn from(payload: ExprUnaryOp<'ast>) -> Self {
         Expr::UnaryOp(payload)
     }
 }
 
 /// See also [Lambda](https://docs.python.org/3/library/ast.html#ast.Lambda)
-#[derive(Clone, Debug, PartialEq)]
-pub struct ExprLambda {
+#[derive(Debug, PartialEq)]
+pub struct ExprLambda<'ast> {
     pub range: TextRange,
-    pub parameters: Option<Box<Parameters>>,
-    pub body: Box<Expr>,
+    pub parameters: Option<Box<'ast, Parameters<'ast>>>,
+    pub body: Box<'ast, Expr<'ast>>,
 }
 
-impl From<ExprLambda> for Expr {
-    fn from(payload: ExprLambda) -> Self {
+impl<'ast> From<ExprLambda<'ast>> for Expr<'ast> {
+    fn from(payload: ExprLambda<'ast>) -> Self {
         Expr::Lambda(payload)
     }
 }
 
 /// See also [IfExp](https://docs.python.org/3/library/ast.html#ast.IfExp)
-#[derive(Clone, Debug, PartialEq)]
-pub struct ExprIf {
+#[derive(Debug, PartialEq)]
+pub struct ExprIf<'ast> {
     pub range: TextRange,
-    pub test: Box<Expr>,
-    pub body: Box<Expr>,
-    pub orelse: Box<Expr>,
+    pub test: Box<'ast, Expr<'ast>>,
+    pub body: Box<'ast, Expr<'ast>>,
+    pub orelse: Box<'ast, Expr<'ast>>,
 }
 
-impl From<ExprIf> for Expr {
-    fn from(payload: ExprIf) -> Self {
+impl<'ast> From<ExprIf<'ast>> for Expr<'ast> {
+    fn from(payload: ExprIf<'ast>) -> Self {
         Expr::If(payload)
     }
 }
@@ -796,23 +802,23 @@ impl From<ExprIf> for Expr {
 /// ```
 ///
 /// [1]: https://docs.python.org/3/reference/expressions.html#displays-for-lists-sets-and-dictionaries
-#[derive(Debug, Clone, PartialEq)]
-pub struct DictItem {
-    pub key: Option<Expr>,
-    pub value: Expr,
+#[derive(Debug, PartialEq)]
+pub struct DictItem<'ast> {
+    pub key: Option<Expr<'ast>>,
+    pub value: Expr<'ast>,
 }
 
-impl DictItem {
-    fn key(&self) -> Option<&Expr> {
+impl<'ast> DictItem<'ast> {
+    fn key(&self) -> Option<&Expr<'ast>> {
         self.key.as_ref()
     }
 
-    fn value(&self) -> &Expr {
+    fn value(&self) -> &Expr<'ast> {
         &self.value
     }
 }
 
-impl Ranged for DictItem {
+impl Ranged for DictItem<'_> {
     fn range(&self) -> TextRange {
         TextRange::new(
             self.key.as_ref().map_or(self.value.start(), Ranged::start),
@@ -822,22 +828,22 @@ impl Ranged for DictItem {
 }
 
 /// See also [Dict](https://docs.python.org/3/library/ast.html#ast.Dict)
-#[derive(Clone, Debug, PartialEq)]
-pub struct ExprDict {
+#[derive(Debug, PartialEq)]
+pub struct ExprDict<'ast> {
     pub range: TextRange,
-    pub items: Vec<DictItem>,
+    pub items: Vec<DictItem<'ast>>,
 }
 
-impl ExprDict {
+impl<'ast> ExprDict<'ast> {
     /// Returns an `Iterator` over the AST nodes representing the
     /// dictionary's keys.
-    pub fn iter_keys(&self) -> DictKeyIterator {
+    pub fn iter_keys(&self) -> DictKeyIterator<'_, 'ast> {
         DictKeyIterator::new(&self.items)
     }
 
     /// Returns an `Iterator` over the AST nodes representing the
     /// dictionary's values.
-    pub fn iter_values(&self) -> DictValueIterator {
+    pub fn iter_values(&self) -> DictValueIterator<'_, 'ast> {
         DictValueIterator::new(&self.items)
     }
 
@@ -845,7 +851,7 @@ impl ExprDict {
     /// dictionary.
     ///
     /// Panics: If the index `n` is out of bounds.
-    pub fn key(&self, n: usize) -> Option<&Expr> {
+    pub fn key(&self, n: usize) -> Option<&Expr<'ast>> {
         self.items[n].key()
     }
 
@@ -853,24 +859,24 @@ impl ExprDict {
     /// dictionary.
     ///
     /// Panics: If the index `n` is out of bounds.
-    pub fn value(&self, n: usize) -> &Expr {
+    pub fn value(&self, n: usize) -> &Expr<'ast> {
         self.items[n].value()
     }
 }
 
-impl From<ExprDict> for Expr {
-    fn from(payload: ExprDict) -> Self {
+impl<'ast> From<ExprDict<'ast>> for Expr<'ast> {
+    fn from(payload: ExprDict<'ast>) -> Self {
         Expr::Dict(payload)
     }
 }
 
 #[derive(Debug, Clone)]
-pub struct DictKeyIterator<'a> {
-    items: Iter<'a, DictItem>,
+pub struct DictKeyIterator<'a, 'ast> {
+    items: Iter<'a, DictItem<'ast>>,
 }
 
-impl<'a> DictKeyIterator<'a> {
-    fn new(items: &'a [DictItem]) -> Self {
+impl<'a, 'ast> DictKeyIterator<'a, 'ast> {
+    fn new(items: &'a [DictItem<'ast>]) -> Self {
         Self {
             items: items.iter(),
         }
@@ -881,8 +887,8 @@ impl<'a> DictKeyIterator<'a> {
     }
 }
 
-impl<'a> Iterator for DictKeyIterator<'a> {
-    type Item = Option<&'a Expr>;
+impl<'a, 'ast> Iterator for DictKeyIterator<'a, 'ast> {
+    type Item = Option<&'a Expr<'ast>>;
 
     fn next(&mut self) -> Option<Self::Item> {
         self.items.next().map(DictItem::key)
@@ -897,22 +903,22 @@ impl<'a> Iterator for DictKeyIterator<'a> {
     }
 }
 
-impl<'a> DoubleEndedIterator for DictKeyIterator<'a> {
+impl DoubleEndedIterator for DictKeyIterator<'_, '_> {
     fn next_back(&mut self) -> Option<Self::Item> {
         self.items.next_back().map(DictItem::key)
     }
 }
 
-impl<'a> FusedIterator for DictKeyIterator<'a> {}
-impl<'a> ExactSizeIterator for DictKeyIterator<'a> {}
+impl FusedIterator for DictKeyIterator<'_, '_> {}
+impl ExactSizeIterator for DictKeyIterator<'_, '_> {}
 
 #[derive(Debug, Clone)]
-pub struct DictValueIterator<'a> {
-    items: Iter<'a, DictItem>,
+pub struct DictValueIterator<'a, 'ast> {
+    items: Iter<'a, DictItem<'ast>>,
 }
 
-impl<'a> DictValueIterator<'a> {
-    fn new(items: &'a [DictItem]) -> Self {
+impl<'a, 'ast> DictValueIterator<'a, 'ast> {
+    fn new(items: &'a [DictItem<'ast>]) -> Self {
         Self {
             items: items.iter(),
         }
@@ -923,8 +929,8 @@ impl<'a> DictValueIterator<'a> {
     }
 }
 
-impl<'a> Iterator for DictValueIterator<'a> {
-    type Item = &'a Expr;
+impl<'a, 'ast> Iterator for DictValueIterator<'a, 'ast> {
+    type Item = &'a Expr<'ast>;
 
     fn next(&mut self) -> Option<Self::Item> {
         self.items.next().map(DictItem::value)
@@ -939,202 +945,202 @@ impl<'a> Iterator for DictValueIterator<'a> {
     }
 }
 
-impl<'a> DoubleEndedIterator for DictValueIterator<'a> {
+impl DoubleEndedIterator for DictValueIterator<'_, '_> {
     fn next_back(&mut self) -> Option<Self::Item> {
         self.items.next_back().map(DictItem::value)
     }
 }
 
-impl<'a> FusedIterator for DictValueIterator<'a> {}
-impl<'a> ExactSizeIterator for DictValueIterator<'a> {}
+impl FusedIterator for DictValueIterator<'_, '_> {}
+impl ExactSizeIterator for DictValueIterator<'_, '_> {}
 
 /// See also [Set](https://docs.python.org/3/library/ast.html#ast.Set)
-#[derive(Clone, Debug, PartialEq)]
-pub struct ExprSet {
+#[derive(Debug, PartialEq)]
+pub struct ExprSet<'ast> {
     pub range: TextRange,
-    pub elts: Vec<Expr>,
+    pub elts: Vec<Expr<'ast>>,
 }
 
-impl From<ExprSet> for Expr {
-    fn from(payload: ExprSet) -> Self {
+impl<'ast> From<ExprSet<'ast>> for Expr<'ast> {
+    fn from(payload: ExprSet<'ast>) -> Self {
         Expr::Set(payload)
     }
 }
 
 /// See also [ListComp](https://docs.python.org/3/library/ast.html#ast.ListComp)
-#[derive(Clone, Debug, PartialEq)]
-pub struct ExprListComp {
+#[derive(Debug, PartialEq)]
+pub struct ExprListComp<'ast> {
     pub range: TextRange,
-    pub elt: Box<Expr>,
-    pub generators: Vec<Comprehension>,
+    pub elt: Box<'ast, Expr<'ast>>,
+    pub generators: Vec<Comprehension<'ast>>,
 }
 
-impl From<ExprListComp> for Expr {
-    fn from(payload: ExprListComp) -> Self {
+impl<'ast> From<ExprListComp<'ast>> for Expr<'ast> {
+    fn from(payload: ExprListComp<'ast>) -> Self {
         Expr::ListComp(payload)
     }
 }
 
 /// See also [SetComp](https://docs.python.org/3/library/ast.html#ast.SetComp)
-#[derive(Clone, Debug, PartialEq)]
-pub struct ExprSetComp {
+#[derive(Debug, PartialEq)]
+pub struct ExprSetComp<'ast> {
     pub range: TextRange,
-    pub elt: Box<Expr>,
-    pub generators: Vec<Comprehension>,
+    pub elt: Box<'ast, Expr<'ast>>,
+    pub generators: Vec<Comprehension<'ast>>,
 }
 
-impl From<ExprSetComp> for Expr {
-    fn from(payload: ExprSetComp) -> Self {
+impl<'ast> From<ExprSetComp<'ast>> for Expr<'ast> {
+    fn from(payload: ExprSetComp<'ast>) -> Self {
         Expr::SetComp(payload)
     }
 }
 
 /// See also [DictComp](https://docs.python.org/3/library/ast.html#ast.DictComp)
-#[derive(Clone, Debug, PartialEq)]
-pub struct ExprDictComp {
+#[derive(Debug, PartialEq)]
+pub struct ExprDictComp<'ast> {
     pub range: TextRange,
-    pub key: Box<Expr>,
-    pub value: Box<Expr>,
-    pub generators: Vec<Comprehension>,
+    pub key: Box<'ast, Expr<'ast>>,
+    pub value: Box<'ast, Expr<'ast>>,
+    pub generators: Vec<Comprehension<'ast>>,
 }
 
-impl From<ExprDictComp> for Expr {
-    fn from(payload: ExprDictComp) -> Self {
+impl<'ast> From<ExprDictComp<'ast>> for Expr<'ast> {
+    fn from(payload: ExprDictComp<'ast>) -> Self {
         Expr::DictComp(payload)
     }
 }
 
 /// See also [GeneratorExp](https://docs.python.org/3/library/ast.html#ast.GeneratorExp)
-#[derive(Clone, Debug, PartialEq)]
-pub struct ExprGenerator {
+#[derive(Debug, PartialEq)]
+pub struct ExprGenerator<'ast> {
     pub range: TextRange,
-    pub elt: Box<Expr>,
-    pub generators: Vec<Comprehension>,
+    pub elt: Box<'ast, Expr<'ast>>,
+    pub generators: Vec<Comprehension<'ast>>,
     pub parenthesized: bool,
 }
 
-impl From<ExprGenerator> for Expr {
-    fn from(payload: ExprGenerator) -> Self {
+impl<'ast> From<ExprGenerator<'ast>> for Expr<'ast> {
+    fn from(payload: ExprGenerator<'ast>) -> Self {
         Expr::Generator(payload)
     }
 }
 
 /// See also [Await](https://docs.python.org/3/library/ast.html#ast.Await)
-#[derive(Clone, Debug, PartialEq)]
-pub struct ExprAwait {
+#[derive(Debug, PartialEq)]
+pub struct ExprAwait<'ast> {
     pub range: TextRange,
-    pub value: Box<Expr>,
+    pub value: Box<'ast, Expr<'ast>>,
 }
 
-impl From<ExprAwait> for Expr {
-    fn from(payload: ExprAwait) -> Self {
+impl<'ast> From<ExprAwait<'ast>> for Expr<'ast> {
+    fn from(payload: ExprAwait<'ast>) -> Self {
         Expr::Await(payload)
     }
 }
 
 /// See also [Yield](https://docs.python.org/3/library/ast.html#ast.Yield)
-#[derive(Clone, Debug, PartialEq)]
-pub struct ExprYield {
+#[derive(Debug, PartialEq)]
+pub struct ExprYield<'ast> {
     pub range: TextRange,
-    pub value: Option<Box<Expr>>,
+    pub value: Option<Box<'ast, Expr<'ast>>>,
 }
 
-impl From<ExprYield> for Expr {
-    fn from(payload: ExprYield) -> Self {
+impl<'ast> From<ExprYield<'ast>> for Expr<'ast> {
+    fn from(payload: ExprYield<'ast>) -> Self {
         Expr::Yield(payload)
     }
 }
 
 /// See also [YieldFrom](https://docs.python.org/3/library/ast.html#ast.YieldFrom)
-#[derive(Clone, Debug, PartialEq)]
-pub struct ExprYieldFrom {
+#[derive(Debug, PartialEq)]
+pub struct ExprYieldFrom<'ast> {
     pub range: TextRange,
-    pub value: Box<Expr>,
+    pub value: Box<'ast, Expr<'ast>>,
 }
 
-impl From<ExprYieldFrom> for Expr {
-    fn from(payload: ExprYieldFrom) -> Self {
+impl<'ast> From<ExprYieldFrom<'ast>> for Expr<'ast> {
+    fn from(payload: ExprYieldFrom<'ast>) -> Self {
         Expr::YieldFrom(payload)
     }
 }
 
 /// See also [Compare](https://docs.python.org/3/library/ast.html#ast.Compare)
-#[derive(Clone, Debug, PartialEq)]
-pub struct ExprCompare {
+#[derive(Debug, PartialEq)]
+pub struct ExprCompare<'ast> {
     pub range: TextRange,
-    pub left: Box<Expr>,
-    pub ops: Box<[CmpOp]>,
-    pub comparators: Box<[Expr]>,
+    pub left: Box<'ast, Expr<'ast>>,
+    pub ops: &'ast mut [CmpOp],
+    pub comparators: &'ast mut [Expr<'ast>],
 }
 
-impl From<ExprCompare> for Expr {
-    fn from(payload: ExprCompare) -> Self {
+impl<'ast> From<ExprCompare<'ast>> for Expr<'ast> {
+    fn from(payload: ExprCompare<'ast>) -> Self {
         Expr::Compare(payload)
     }
 }
 
 /// See also [Call](https://docs.python.org/3/library/ast.html#ast.Call)
-#[derive(Clone, Debug, PartialEq)]
-pub struct ExprCall {
+#[derive(Debug, PartialEq)]
+pub struct ExprCall<'ast> {
     pub range: TextRange,
-    pub func: Box<Expr>,
-    pub arguments: Arguments,
+    pub func: Box<'ast, Expr<'ast>>,
+    pub arguments: Arguments<'ast>,
 }
 
-impl From<ExprCall> for Expr {
-    fn from(payload: ExprCall) -> Self {
+impl<'ast> From<ExprCall<'ast>> for Expr<'ast> {
+    fn from(payload: ExprCall<'ast>) -> Self {
         Expr::Call(payload)
     }
 }
 
-#[derive(Clone, Debug, PartialEq)]
-pub struct FStringFormatSpec {
+#[derive(Debug, PartialEq)]
+pub struct FStringFormatSpec<'ast> {
     pub range: TextRange,
-    pub elements: FStringElements,
+    pub elements: FStringElements<'ast>,
 }
 
-impl Ranged for FStringFormatSpec {
+impl Ranged for FStringFormatSpec<'_> {
     fn range(&self) -> TextRange {
         self.range
     }
 }
 
 /// See also [FormattedValue](https://docs.python.org/3/library/ast.html#ast.FormattedValue)
-#[derive(Clone, Debug, PartialEq)]
-pub struct FStringExpressionElement {
+#[derive(Debug, PartialEq)]
+pub struct FStringExpressionElement<'ast> {
     pub range: TextRange,
-    pub expression: Box<Expr>,
+    pub expression: Box<'ast, Expr<'ast>>,
     pub debug_text: Option<DebugText>,
     pub conversion: ConversionFlag,
-    pub format_spec: Option<Box<FStringFormatSpec>>,
+    pub format_spec: Option<Box<'ast, FStringFormatSpec<'ast>>>,
 }
 
-impl Ranged for FStringExpressionElement {
+impl Ranged for FStringExpressionElement<'_> {
     fn range(&self) -> TextRange {
         self.range
     }
 }
 
 /// An `FStringLiteralElement` with an empty `value` is an invalid f-string element.
-#[derive(Clone, Debug, PartialEq)]
-pub struct FStringLiteralElement {
+#[derive(Debug, PartialEq)]
+pub struct FStringLiteralElement<'ast> {
     pub range: TextRange,
-    pub value: Box<str>,
+    pub value: &'ast str,
 }
 
-impl FStringLiteralElement {
+impl FStringLiteralElement<'_> {
     pub fn is_valid(&self) -> bool {
         !self.value.is_empty()
     }
 }
 
-impl Ranged for FStringLiteralElement {
+impl Ranged for FStringLiteralElement<'_> {
     fn range(&self) -> TextRange {
         self.range
     }
 }
 
-impl Deref for FStringLiteralElement {
+impl Deref for FStringLiteralElement<'_> {
     type Target = str;
 
     fn deref(&self) -> &Self::Target {
@@ -1169,7 +1175,7 @@ impl ConversionFlag {
     }
 }
 
-#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+#[derive(Debug, PartialEq, Eq, Hash)]
 pub struct DebugText {
     /// The text between the `{` and the expression node.
     pub leading: String,
@@ -1184,27 +1190,27 @@ pub struct DebugText {
 /// it keeps them separate and provide various methods to access the parts.
 ///
 /// [JoinedStr]: https://docs.python.org/3/library/ast.html#ast.JoinedStr
-#[derive(Clone, Debug, PartialEq)]
-pub struct ExprFString {
+#[derive(Debug, PartialEq)]
+pub struct ExprFString<'ast> {
     pub range: TextRange,
-    pub value: FStringValue,
+    pub value: FStringValue<'ast>,
 }
 
-impl From<ExprFString> for Expr {
-    fn from(payload: ExprFString) -> Self {
+impl<'ast> From<ExprFString<'ast>> for Expr<'ast> {
+    fn from(payload: ExprFString<'ast>) -> Self {
         Expr::FString(payload)
     }
 }
 
 /// The value representing an [`ExprFString`].
-#[derive(Clone, Debug, PartialEq)]
-pub struct FStringValue {
-    inner: FStringValueInner,
+#[derive(Debug, PartialEq)]
+pub struct FStringValue<'ast> {
+    inner: FStringValueInner<'ast>,
 }
 
-impl FStringValue {
+impl<'ast> FStringValue<'ast> {
     /// Creates a new f-string with the given value.
-    pub fn single(value: FString) -> Self {
+    pub fn single(value: FString<'ast>) -> Self {
         Self {
             inner: FStringValueInner::Single(FStringPart::FString(value)),
         }
@@ -1216,7 +1222,7 @@ impl FStringValue {
     /// # Panics
     ///
     /// Panics if `values` is less than 2. Use [`FStringValue::single`] instead.
-    pub fn concatenated(values: Vec<FStringPart>) -> Self {
+    pub fn concatenated(values: Vec<FStringPart<'ast>>) -> Self {
         assert!(values.len() > 1);
         Self {
             inner: FStringValueInner::Concatenated(values),
@@ -1229,7 +1235,7 @@ impl FStringValue {
     }
 
     /// Returns a slice of all the [`FStringPart`]s contained in this value.
-    pub fn as_slice(&self) -> &[FStringPart] {
+    pub fn as_slice(&self) -> &[FStringPart<'ast>] {
         match &self.inner {
             FStringValueInner::Single(part) => std::slice::from_ref(part),
             FStringValueInner::Concatenated(parts) => parts,
@@ -1237,7 +1243,7 @@ impl FStringValue {
     }
 
     /// Returns a mutable slice of all the [`FStringPart`]s contained in this value.
-    fn as_mut_slice(&mut self) -> &mut [FStringPart] {
+    fn as_mut_slice(&mut self) -> &mut [FStringPart<'ast>] {
         match &mut self.inner {
             FStringValueInner::Single(part) => std::slice::from_mut(part),
             FStringValueInner::Concatenated(parts) => parts,
@@ -1245,13 +1251,13 @@ impl FStringValue {
     }
 
     /// Returns an iterator over all the [`FStringPart`]s contained in this value.
-    pub fn iter(&self) -> Iter<FStringPart> {
+    pub fn iter(&self) -> Iter<FStringPart<'ast>> {
         self.as_slice().iter()
     }
 
     /// Returns an iterator over all the [`FStringPart`]s contained in this value
     /// that allows modification.
-    pub(crate) fn iter_mut(&mut self) -> IterMut<FStringPart> {
+    pub(crate) fn iter_mut(&mut self) -> IterMut<FStringPart<'ast>> {
         self.as_mut_slice().iter_mut()
     }
 
@@ -1264,7 +1270,7 @@ impl FStringValue {
     /// ```
     ///
     /// Here, the string literal parts returned would be `"foo"` and `"baz"`.
-    pub fn literals(&self) -> impl Iterator<Item = &StringLiteral> {
+    pub fn literals(&self) -> impl Iterator<Item = &StringLiteral<'ast>> {
         self.iter().filter_map(|part| part.as_literal())
     }
 
@@ -1277,7 +1283,7 @@ impl FStringValue {
     /// ```
     ///
     /// Here, the f-string parts returned would be `f"bar {x}"` and `f"qux"`.
-    pub fn f_strings(&self) -> impl Iterator<Item = &FString> {
+    pub fn f_strings(&self) -> impl Iterator<Item = &FString<'ast>> {
         self.iter().filter_map(|part| part.as_f_string())
     }
 
@@ -1292,49 +1298,49 @@ impl FStringValue {
     ///
     /// The f-string elements returned would be string literal (`"bar "`),
     /// expression (`x`) and string literal (`"qux"`).
-    pub fn elements(&self) -> impl Iterator<Item = &FStringElement> {
+    pub fn elements(&self) -> impl Iterator<Item = &FStringElement<'ast>> {
         self.f_strings().flat_map(|fstring| fstring.elements.iter())
     }
 }
 
-impl<'a> IntoIterator for &'a FStringValue {
-    type Item = &'a FStringPart;
-    type IntoIter = Iter<'a, FStringPart>;
+impl<'a, 'ast> IntoIterator for &'a FStringValue<'ast> {
+    type Item = &'a FStringPart<'ast>;
+    type IntoIter = Iter<'a, FStringPart<'ast>>;
 
     fn into_iter(self) -> Self::IntoIter {
         self.iter()
     }
 }
 
-impl<'a> IntoIterator for &'a mut FStringValue {
-    type Item = &'a mut FStringPart;
-    type IntoIter = IterMut<'a, FStringPart>;
+impl<'a, 'ast> IntoIterator for &'a mut FStringValue<'ast> {
+    type Item = &'a mut FStringPart<'ast>;
+    type IntoIter = IterMut<'a, FStringPart<'ast>>;
     fn into_iter(self) -> Self::IntoIter {
         self.iter_mut()
     }
 }
 
 /// An internal representation of [`FStringValue`].
-#[derive(Clone, Debug, PartialEq)]
-enum FStringValueInner {
+#[derive(Debug, PartialEq)]
+enum FStringValueInner<'ast> {
     /// A single f-string i.e., `f"foo"`.
     ///
     /// This is always going to be `FStringPart::FString` variant which is
     /// maintained by the `FStringValue::single` constructor.
-    Single(FStringPart),
+    Single(FStringPart<'ast>),
 
     /// An implicitly concatenated f-string i.e., `"foo" f"bar {x}"`.
-    Concatenated(Vec<FStringPart>),
+    Concatenated(Vec<FStringPart<'ast>>),
 }
 
 /// An f-string part which is either a string literal or an f-string.
-#[derive(Clone, Debug, PartialEq, is_macro::Is)]
-pub enum FStringPart {
-    Literal(StringLiteral),
-    FString(FString),
+#[derive(Debug, PartialEq, is_macro::Is)]
+pub enum FStringPart<'ast> {
+    Literal(StringLiteral<'ast>),
+    FString(FString<'ast>),
 }
 
-impl FStringPart {
+impl FStringPart<'_> {
     pub fn quote_style(&self) -> Quote {
         match self {
             Self::Literal(string_literal) => string_literal.flags.quote_style(),
@@ -1343,7 +1349,7 @@ impl FStringPart {
     }
 }
 
-impl Ranged for FStringPart {
+impl Ranged for FStringPart<'_> {
     fn range(&self) -> TextRange {
         match self {
             FStringPart::Literal(string_literal) => string_literal.range(),
@@ -1411,7 +1417,7 @@ pub trait StringFlags: Copy {
 }
 
 bitflags! {
-    #[derive(Default, Copy, Clone, PartialEq, Eq, Hash)]
+    #[derive(Default, Copy,  Clone, PartialEq, Eq, Hash)]
     struct FStringFlagsInner: u8 {
         /// The f-string uses double quotes (`"`) for its opener and closer.
         /// If this flag is not set, the f-string uses single quotes (`'`)
@@ -1517,21 +1523,21 @@ impl fmt::Debug for FStringFlags {
 }
 
 /// An AST node that represents a single f-string which is part of an [`ExprFString`].
-#[derive(Clone, Debug, PartialEq)]
-pub struct FString {
+#[derive(Debug, PartialEq)]
+pub struct FString<'ast> {
     pub range: TextRange,
-    pub elements: FStringElements,
+    pub elements: FStringElements<'ast>,
     pub flags: FStringFlags,
 }
 
-impl Ranged for FString {
+impl Ranged for FString<'_> {
     fn range(&self) -> TextRange {
         self.range
     }
 }
 
-impl From<FString> for Expr {
-    fn from(payload: FString) -> Self {
+impl<'ast> From<FString<'ast>> for Expr<'ast> {
+    fn from(payload: FString<'ast>) -> Self {
         ExprFString {
             range: payload.range,
             value: FStringValue::single(payload),
@@ -1541,72 +1547,72 @@ impl From<FString> for Expr {
 }
 
 /// A newtype wrapper around a list of [`FStringElement`].
-#[derive(Clone, Default, PartialEq)]
-pub struct FStringElements(Vec<FStringElement>);
+#[derive(Default, PartialEq)]
+pub struct FStringElements<'ast>(Vec<FStringElement<'ast>>);
 
-impl FStringElements {
+impl<'ast> FStringElements<'ast> {
     /// Returns an iterator over all the [`FStringLiteralElement`] nodes contained in this f-string.
-    pub fn literals(&self) -> impl Iterator<Item = &FStringLiteralElement> {
+    pub fn literals(&self) -> impl Iterator<Item = &FStringLiteralElement<'ast>> {
         self.iter().filter_map(|element| element.as_literal())
     }
 
     /// Returns an iterator over all the [`FStringExpressionElement`] nodes contained in this f-string.
-    pub fn expressions(&self) -> impl Iterator<Item = &FStringExpressionElement> {
+    pub fn expressions(&self) -> impl Iterator<Item = &FStringExpressionElement<'ast>> {
         self.iter().filter_map(|element| element.as_expression())
     }
 }
 
-impl From<Vec<FStringElement>> for FStringElements {
-    fn from(elements: Vec<FStringElement>) -> Self {
+impl<'ast> From<Vec<FStringElement<'ast>>> for FStringElements<'ast> {
+    fn from(elements: Vec<FStringElement<'ast>>) -> Self {
         FStringElements(elements)
     }
 }
 
-impl<'a> IntoIterator for &'a FStringElements {
-    type IntoIter = Iter<'a, FStringElement>;
-    type Item = &'a FStringElement;
+impl<'a, 'ast> IntoIterator for &'a FStringElements<'ast> {
+    type Item = &'a FStringElement<'ast>;
+    type IntoIter = Iter<'a, FStringElement<'ast>>;
 
     fn into_iter(self) -> Self::IntoIter {
         self.iter()
     }
 }
 
-impl<'a> IntoIterator for &'a mut FStringElements {
-    type IntoIter = IterMut<'a, FStringElement>;
-    type Item = &'a mut FStringElement;
+impl<'a, 'ast> IntoIterator for &'a mut FStringElements<'ast> {
+    type Item = &'a mut FStringElement<'ast>;
+    type IntoIter = IterMut<'a, FStringElement<'ast>>;
 
     fn into_iter(self) -> Self::IntoIter {
         self.iter_mut()
     }
 }
 
-impl Deref for FStringElements {
-    type Target = [FStringElement];
+impl<'ast> Deref for FStringElements<'ast> {
+    type Target = [FStringElement<'ast>];
 
     fn deref(&self) -> &Self::Target {
         &self.0
     }
 }
 
-impl DerefMut for FStringElements {
+impl DerefMut for FStringElements<'_> {
     fn deref_mut(&mut self) -> &mut Self::Target {
         &mut self.0
     }
 }
 
-impl fmt::Debug for FStringElements {
+impl fmt::Debug for FStringElements<'_> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         fmt::Debug::fmt(&self.0, f)
     }
 }
 
-#[derive(Clone, Debug, PartialEq, is_macro::Is)]
-pub enum FStringElement {
-    Literal(FStringLiteralElement),
-    Expression(FStringExpressionElement),
+#[derive(Debug, PartialEq, is_macro::Is)]
+pub enum FStringElement<'ast> {
+    Literal(FStringLiteralElement<'ast>),
+    Expression(FStringExpressionElement<'ast>),
 }
 
-impl Ranged for FStringElement {
+impl Ranged for FStringElement<'_> {
     fn range(&self) -> TextRange {
         match self {
             FStringElement::Literal(node) => node.range(),
@@ -1617,33 +1623,33 @@ impl Ranged for FStringElement {
 
 /// An AST node that represents either a single string literal or an implicitly
 /// concatenated string literals.
-#[derive(Clone, Debug, Default, PartialEq)]
-pub struct ExprStringLiteral {
+#[derive(Debug, Default, PartialEq)]
+pub struct ExprStringLiteral<'ast> {
     pub range: TextRange,
-    pub value: StringLiteralValue,
+    pub value: StringLiteralValue<'ast>,
 }
 
-impl From<ExprStringLiteral> for Expr {
-    fn from(payload: ExprStringLiteral) -> Self {
+impl<'ast> From<ExprStringLiteral<'ast>> for Expr<'ast> {
+    fn from(payload: ExprStringLiteral<'ast>) -> Self {
         Expr::StringLiteral(payload)
     }
 }
 
-impl Ranged for ExprStringLiteral {
+impl Ranged for ExprStringLiteral<'_> {
     fn range(&self) -> TextRange {
         self.range
     }
 }
 
 /// The value representing a [`ExprStringLiteral`].
-#[derive(Clone, Debug, Default, PartialEq)]
-pub struct StringLiteralValue {
-    inner: StringLiteralValueInner,
+#[derive(Debug, Default, PartialEq)]
+pub struct StringLiteralValue<'ast> {
+    inner: StringLiteralValueInner<'ast>,
 }
 
-impl StringLiteralValue {
+impl<'ast> StringLiteralValue<'ast> {
     /// Creates a new single string literal with the given value.
-    pub fn single(string: StringLiteral) -> Self {
+    pub fn single(string: StringLiteral<'ast>) -> Self {
         Self {
             inner: StringLiteralValueInner::Single(string),
         }
@@ -1656,7 +1662,7 @@ impl StringLiteralValue {
     ///
     /// Panics if `strings` is less than 2. Use [`StringLiteralValue::single`]
     /// instead.
-    pub fn concatenated(strings: Vec<StringLiteral>) -> Self {
+    pub fn concatenated(strings: Vec<StringLiteral<'ast>>) -> Self {
         assert!(strings.len() > 1);
         Self {
             inner: StringLiteralValueInner::Concatenated(ConcatenatedStringLiteral {
@@ -1682,7 +1688,7 @@ impl StringLiteralValue {
     }
 
     /// Returns a slice of all the [`StringLiteral`] parts contained in this value.
-    pub fn as_slice(&self) -> &[StringLiteral] {
+    pub fn as_slice(&self) -> &[StringLiteral<'ast>] {
         match &self.inner {
             StringLiteralValueInner::Single(value) => std::slice::from_ref(value),
             StringLiteralValueInner::Concatenated(value) => value.strings.as_slice(),
@@ -1690,7 +1696,7 @@ impl StringLiteralValue {
     }
 
     /// Returns a mutable slice of all the [`StringLiteral`] parts contained in this value.
-    fn as_mut_slice(&mut self) -> &mut [StringLiteral] {
+    fn as_mut_slice(&mut self) -> &mut [StringLiteral<'ast>] {
         match &mut self.inner {
             StringLiteralValueInner::Single(value) => std::slice::from_mut(value),
             StringLiteralValueInner::Concatenated(value) => value.strings.as_mut_slice(),
@@ -1698,13 +1704,13 @@ impl StringLiteralValue {
     }
 
     /// Returns an iterator over all the [`StringLiteral`] parts contained in this value.
-    pub fn iter(&self) -> Iter<StringLiteral> {
+    pub fn iter(&self) -> Iter<StringLiteral<'ast>> {
         self.as_slice().iter()
     }
 
     /// Returns an iterator over all the [`StringLiteral`] parts contained in this value
     /// that allows modification.
-    pub(crate) fn iter_mut(&mut self) -> IterMut<StringLiteral> {
+    pub(crate) fn iter_mut(&mut self) -> IterMut<StringLiteral<'ast>> {
         self.as_mut_slice().iter_mut()
     }
 
@@ -1736,24 +1742,24 @@ impl StringLiteralValue {
     }
 }
 
-impl<'a> IntoIterator for &'a StringLiteralValue {
-    type Item = &'a StringLiteral;
-    type IntoIter = Iter<'a, StringLiteral>;
+impl<'a, 'ast> IntoIterator for &'a StringLiteralValue<'ast> {
+    type Item = &'a StringLiteral<'ast>;
+    type IntoIter = Iter<'a, StringLiteral<'ast>>;
 
     fn into_iter(self) -> Self::IntoIter {
         self.iter()
     }
 }
 
-impl<'a> IntoIterator for &'a mut StringLiteralValue {
-    type Item = &'a mut StringLiteral;
-    type IntoIter = IterMut<'a, StringLiteral>;
+impl<'a, 'ast> IntoIterator for &'a mut StringLiteralValue<'ast> {
+    type Item = &'a mut StringLiteral<'ast>;
+    type IntoIter = IterMut<'a, StringLiteral<'ast>>;
     fn into_iter(self) -> Self::IntoIter {
         self.iter_mut()
     }
 }
 
-impl PartialEq<str> for StringLiteralValue {
+impl PartialEq<str> for StringLiteralValue<'_> {
     fn eq(&self, other: &str) -> bool {
         if self.len() != other.len() {
             return false;
@@ -1763,23 +1769,23 @@ impl PartialEq<str> for StringLiteralValue {
     }
 }
 
-impl fmt::Display for StringLiteralValue {
+impl fmt::Display for StringLiteralValue<'_> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.write_str(self.to_str())
     }
 }
 
 /// An internal representation of [`StringLiteralValue`].
-#[derive(Clone, Debug, PartialEq)]
-enum StringLiteralValueInner {
+#[derive(Debug, PartialEq)]
+enum StringLiteralValueInner<'ast> {
     /// A single string literal i.e., `"foo"`.
-    Single(StringLiteral),
+    Single(StringLiteral<'ast>),
 
     /// An implicitly concatenated string literals i.e., `"foo" "bar"`.
-    Concatenated(ConcatenatedStringLiteral),
+    Concatenated(ConcatenatedStringLiteral<'ast>),
 }
 
-impl Default for StringLiteralValueInner {
+impl Default for StringLiteralValueInner<'_> {
     fn default() -> Self {
         Self::Single(StringLiteral::default())
     }
@@ -1928,20 +1934,20 @@ impl fmt::Debug for StringLiteralFlags {
 
 /// An AST node that represents a single string literal which is part of an
 /// [`ExprStringLiteral`].
-#[derive(Clone, Debug, Default, PartialEq)]
-pub struct StringLiteral {
+#[derive(Default, Debug, PartialEq)]
+pub struct StringLiteral<'ast> {
     pub range: TextRange,
-    pub value: Box<str>,
+    pub value: &'ast str,
     pub flags: StringLiteralFlags,
 }
 
-impl Ranged for StringLiteral {
+impl Ranged for StringLiteral<'_> {
     fn range(&self) -> TextRange {
         self.range
     }
 }
 
-impl Deref for StringLiteral {
+impl Deref for StringLiteral<'_> {
     type Target = str;
 
     fn deref(&self) -> &Self::Target {
@@ -1949,7 +1955,7 @@ impl Deref for StringLiteral {
     }
 }
 
-impl StringLiteral {
+impl<'ast> StringLiteral<'ast> {
     /// Extracts a string slice containing the entire `String`.
     pub fn as_str(&self) -> &str {
         self
@@ -1959,14 +1965,14 @@ impl StringLiteral {
     pub fn invalid(range: TextRange) -> Self {
         Self {
             range,
-            value: "".into(),
+            value: Default::default(),
             flags: StringLiteralFlags::default().with_invalid(),
         }
     }
 }
 
-impl From<StringLiteral> for Expr {
-    fn from(payload: StringLiteral) -> Self {
+impl<'ast> From<StringLiteral<'ast>> for Expr<'ast> {
+    fn from(payload: StringLiteral<'ast>) -> Self {
         ExprStringLiteral {
             range: payload.range,
             value: StringLiteralValue::single(payload),
@@ -1977,25 +1983,24 @@ impl From<StringLiteral> for Expr {
 
 /// An internal representation of [`StringLiteral`] that represents an
 /// implicitly concatenated string.
-#[derive(Clone)]
-struct ConcatenatedStringLiteral {
+struct ConcatenatedStringLiteral<'ast> {
     /// Each string literal that makes up the concatenated string.
-    strings: Vec<StringLiteral>,
+    strings: Vec<StringLiteral<'ast>>,
     /// The concatenated string value.
-    value: OnceLock<Box<str>>,
+    value: OnceLock<std::boxed::Box<str>>,
 }
 
-impl ConcatenatedStringLiteral {
+impl<'ast> ConcatenatedStringLiteral<'ast> {
     /// Extracts a string slice containing the entire concatenated string.
     fn to_str(&self) -> &str {
         self.value.get_or_init(|| {
             let concatenated: String = self.strings.iter().map(StringLiteral::as_str).collect();
-            concatenated.into_boxed_str()
+            std::boxed::Box::from(concatenated)
         })
     }
 }
 
-impl PartialEq for ConcatenatedStringLiteral {
+impl PartialEq for ConcatenatedStringLiteral<'_> {
     fn eq(&self, other: &Self) -> bool {
         if self.strings.len() != other.strings.len() {
             return false;
@@ -2008,7 +2013,7 @@ impl PartialEq for ConcatenatedStringLiteral {
     }
 }
 
-impl Debug for ConcatenatedStringLiteral {
+impl Debug for ConcatenatedStringLiteral<'_> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("ConcatenatedStringLiteral")
             .field("strings", &self.strings)
@@ -2019,33 +2024,33 @@ impl Debug for ConcatenatedStringLiteral {
 
 /// An AST node that represents either a single bytes literal or an implicitly
 /// concatenated bytes literals.
-#[derive(Clone, Debug, Default, PartialEq)]
-pub struct ExprBytesLiteral {
+#[derive(Debug, Default, PartialEq)]
+pub struct ExprBytesLiteral<'ast> {
     pub range: TextRange,
-    pub value: BytesLiteralValue,
+    pub value: BytesLiteralValue<'ast>,
 }
 
-impl From<ExprBytesLiteral> for Expr {
-    fn from(payload: ExprBytesLiteral) -> Self {
+impl<'ast> From<ExprBytesLiteral<'ast>> for Expr<'ast> {
+    fn from(payload: ExprBytesLiteral<'ast>) -> Self {
         Expr::BytesLiteral(payload)
     }
 }
 
-impl Ranged for ExprBytesLiteral {
+impl Ranged for ExprBytesLiteral<'_> {
     fn range(&self) -> TextRange {
         self.range
     }
 }
 
 /// The value representing a [`ExprBytesLiteral`].
-#[derive(Clone, Debug, Default, PartialEq)]
-pub struct BytesLiteralValue {
-    inner: BytesLiteralValueInner,
+#[derive(Debug, Default, PartialEq)]
+pub struct BytesLiteralValue<'ast> {
+    inner: BytesLiteralValueInner<'ast>,
 }
 
-impl BytesLiteralValue {
+impl<'ast> BytesLiteralValue<'ast> {
     /// Creates a new single bytes literal with the given value.
-    pub fn single(value: BytesLiteral) -> Self {
+    pub fn single(value: BytesLiteral<'ast>) -> Self {
         Self {
             inner: BytesLiteralValueInner::Single(value),
         }
@@ -2058,7 +2063,7 @@ impl BytesLiteralValue {
     ///
     /// Panics if `values` is less than 2. Use [`BytesLiteralValue::single`]
     /// instead.
-    pub fn concatenated(values: Vec<BytesLiteral>) -> Self {
+    pub fn concatenated(values: Vec<BytesLiteral<'ast>>) -> Self {
         assert!(values.len() > 1);
         Self {
             inner: BytesLiteralValueInner::Concatenated(values),
@@ -2071,7 +2076,7 @@ impl BytesLiteralValue {
     }
 
     /// Returns a slice of all the [`BytesLiteral`] parts contained in this value.
-    pub fn as_slice(&self) -> &[BytesLiteral] {
+    pub fn as_slice(&self) -> &[BytesLiteral<'ast>] {
         match &self.inner {
             BytesLiteralValueInner::Single(value) => std::slice::from_ref(value),
             BytesLiteralValueInner::Concatenated(value) => value.as_slice(),
@@ -2079,7 +2084,7 @@ impl BytesLiteralValue {
     }
 
     /// Returns a mutable slice of all the [`BytesLiteral`] parts contained in this value.
-    fn as_mut_slice(&mut self) -> &mut [BytesLiteral] {
+    fn as_mut_slice(&mut self) -> &mut [BytesLiteral<'ast>] {
         match &mut self.inner {
             BytesLiteralValueInner::Single(value) => std::slice::from_mut(value),
             BytesLiteralValueInner::Concatenated(value) => value.as_mut_slice(),
@@ -2087,13 +2092,13 @@ impl BytesLiteralValue {
     }
 
     /// Returns an iterator over all the [`BytesLiteral`] parts contained in this value.
-    pub fn iter(&self) -> Iter<BytesLiteral> {
+    pub fn iter(&self) -> Iter<BytesLiteral<'ast>> {
         self.as_slice().iter()
     }
 
     /// Returns an iterator over all the [`BytesLiteral`] parts contained in this value
     /// that allows modification.
-    pub(crate) fn iter_mut(&mut self) -> IterMut<BytesLiteral> {
+    pub(crate) fn iter_mut(&mut self) -> IterMut<BytesLiteral<'ast>> {
         self.as_mut_slice().iter_mut()
     }
 
@@ -2113,24 +2118,24 @@ impl BytesLiteralValue {
     }
 }
 
-impl<'a> IntoIterator for &'a BytesLiteralValue {
-    type Item = &'a BytesLiteral;
-    type IntoIter = Iter<'a, BytesLiteral>;
+impl<'a, 'ast> IntoIterator for &'a BytesLiteralValue<'ast> {
+    type Item = &'a BytesLiteral<'ast>;
+    type IntoIter = Iter<'a, BytesLiteral<'ast>>;
 
     fn into_iter(self) -> Self::IntoIter {
         self.iter()
     }
 }
 
-impl<'a> IntoIterator for &'a mut BytesLiteralValue {
-    type Item = &'a mut BytesLiteral;
-    type IntoIter = IterMut<'a, BytesLiteral>;
+impl<'a, 'ast> IntoIterator for &'a mut BytesLiteralValue<'ast> {
+    type Item = &'a mut BytesLiteral<'ast>;
+    type IntoIter = IterMut<'a, BytesLiteral<'ast>>;
     fn into_iter(self) -> Self::IntoIter {
         self.iter_mut()
     }
 }
 
-impl PartialEq<[u8]> for BytesLiteralValue {
+impl PartialEq<[u8]> for BytesLiteralValue<'_> {
     fn eq(&self, other: &[u8]) -> bool {
         if self.len() != other.len() {
             return false;
@@ -2143,16 +2148,16 @@ impl PartialEq<[u8]> for BytesLiteralValue {
 }
 
 /// An internal representation of [`BytesLiteralValue`].
-#[derive(Clone, Debug, PartialEq)]
-enum BytesLiteralValueInner {
+#[derive(Debug, PartialEq)]
+enum BytesLiteralValueInner<'ast> {
     /// A single bytes literal i.e., `b"foo"`.
-    Single(BytesLiteral),
+    Single(BytesLiteral<'ast>),
 
     /// An implicitly concatenated bytes literals i.e., `b"foo" b"bar"`.
-    Concatenated(Vec<BytesLiteral>),
+    Concatenated(Vec<BytesLiteral<'ast>>),
 }
 
-impl Default for BytesLiteralValueInner {
+impl Default for BytesLiteralValueInner<'_> {
     fn default() -> Self {
         Self::Single(BytesLiteral::default())
     }
@@ -2275,20 +2280,20 @@ impl fmt::Debug for BytesLiteralFlags {
 
 /// An AST node that represents a single bytes literal which is part of an
 /// [`ExprBytesLiteral`].
-#[derive(Clone, Debug, Default, PartialEq)]
-pub struct BytesLiteral {
+#[derive(Default, Debug, PartialEq)]
+pub struct BytesLiteral<'ast> {
     pub range: TextRange,
-    pub value: Box<[u8]>,
+    pub value: &'ast [u8],
     pub flags: BytesLiteralFlags,
 }
 
-impl Ranged for BytesLiteral {
+impl Ranged for BytesLiteral<'_> {
     fn range(&self) -> TextRange {
         self.range
     }
 }
 
-impl Deref for BytesLiteral {
+impl Deref for BytesLiteral<'_> {
     type Target = [u8];
 
     fn deref(&self) -> &Self::Target {
@@ -2296,7 +2301,7 @@ impl Deref for BytesLiteral {
     }
 }
 
-impl BytesLiteral {
+impl<'ast> BytesLiteral<'ast> {
     /// Extracts a byte slice containing the entire [`BytesLiteral`].
     pub fn as_slice(&self) -> &[u8] {
         self
@@ -2306,14 +2311,14 @@ impl BytesLiteral {
     pub fn invalid(range: TextRange) -> Self {
         Self {
             range,
-            value: Box::new([]),
+            value: Default::default(),
             flags: BytesLiteralFlags::default().with_invalid(),
         }
     }
 }
 
-impl From<BytesLiteral> for Expr {
-    fn from(payload: BytesLiteral) -> Self {
+impl<'ast> From<BytesLiteral<'ast>> for Expr<'ast> {
+    fn from(payload: BytesLiteral<'ast>) -> Self {
         ExprBytesLiteral {
             range: payload.range,
             value: BytesLiteralValue::single(payload),
@@ -2616,7 +2621,7 @@ pub struct ExprNumberLiteral {
     pub value: Number,
 }
 
-impl From<ExprNumberLiteral> for Expr {
+impl From<ExprNumberLiteral> for Expr<'_> {
     fn from(payload: ExprNumberLiteral) -> Self {
         Expr::NumberLiteral(payload)
     }
@@ -2641,7 +2646,7 @@ pub struct ExprBooleanLiteral {
     pub value: bool,
 }
 
-impl From<ExprBooleanLiteral> for Expr {
+impl From<ExprBooleanLiteral> for Expr<'_> {
     fn from(payload: ExprBooleanLiteral) -> Self {
         Expr::BooleanLiteral(payload)
     }
@@ -2658,7 +2663,7 @@ pub struct ExprNoneLiteral {
     pub range: TextRange,
 }
 
-impl From<ExprNoneLiteral> for Expr {
+impl From<ExprNoneLiteral> for Expr<'_> {
     fn from(payload: ExprNoneLiteral) -> Self {
         Expr::NoneLiteral(payload)
     }
@@ -2675,7 +2680,7 @@ pub struct ExprEllipsisLiteral {
     pub range: TextRange,
 }
 
-impl From<ExprEllipsisLiteral> for Expr {
+impl From<ExprEllipsisLiteral> for Expr<'_> {
     fn from(payload: ExprEllipsisLiteral) -> Self {
         Expr::EllipsisLiteral(payload)
     }
@@ -2688,111 +2693,111 @@ impl Ranged for ExprEllipsisLiteral {
 }
 
 /// See also [Attribute](https://docs.python.org/3/library/ast.html#ast.Attribute)
-#[derive(Clone, Debug, PartialEq)]
-pub struct ExprAttribute {
+#[derive(Debug, PartialEq)]
+pub struct ExprAttribute<'ast> {
     pub range: TextRange,
-    pub value: Box<Expr>,
-    pub attr: Identifier,
+    pub value: Box<'ast, Expr<'ast>>,
+    pub attr: Identifier<'ast>,
     pub ctx: ExprContext,
 }
 
-impl From<ExprAttribute> for Expr {
-    fn from(payload: ExprAttribute) -> Self {
+impl<'ast> From<ExprAttribute<'ast>> for Expr<'ast> {
+    fn from(payload: ExprAttribute<'ast>) -> Self {
         Expr::Attribute(payload)
     }
 }
 
 /// See also [Subscript](https://docs.python.org/3/library/ast.html#ast.Subscript)
-#[derive(Clone, Debug, PartialEq)]
-pub struct ExprSubscript {
+#[derive(Debug, PartialEq)]
+pub struct ExprSubscript<'ast> {
     pub range: TextRange,
-    pub value: Box<Expr>,
-    pub slice: Box<Expr>,
+    pub value: Box<'ast, Expr<'ast>>,
+    pub slice: Box<'ast, Expr<'ast>>,
     pub ctx: ExprContext,
 }
 
-impl From<ExprSubscript> for Expr {
-    fn from(payload: ExprSubscript) -> Self {
+impl<'ast> From<ExprSubscript<'ast>> for Expr<'ast> {
+    fn from(payload: ExprSubscript<'ast>) -> Self {
         Expr::Subscript(payload)
     }
 }
 
 /// See also [Starred](https://docs.python.org/3/library/ast.html#ast.Starred)
-#[derive(Clone, Debug, PartialEq)]
-pub struct ExprStarred {
+#[derive(Debug, PartialEq)]
+pub struct ExprStarred<'ast> {
     pub range: TextRange,
-    pub value: Box<Expr>,
+    pub value: Box<'ast, Expr<'ast>>,
     pub ctx: ExprContext,
 }
 
-impl From<ExprStarred> for Expr {
-    fn from(payload: ExprStarred) -> Self {
+impl<'ast> From<ExprStarred<'ast>> for Expr<'ast> {
+    fn from(payload: ExprStarred<'ast>) -> Self {
         Expr::Starred(payload)
     }
 }
 
 /// See also [Name](https://docs.python.org/3/library/ast.html#ast.Name)
 #[derive(Clone, Debug, PartialEq)]
-pub struct ExprName {
+pub struct ExprName<'ast> {
     pub range: TextRange,
-    pub id: Name,
+    pub id: &'ast str,
     pub ctx: ExprContext,
 }
 
-impl ExprName {
-    pub fn id(&self) -> &Name {
+impl<'ast> ExprName<'ast> {
+    pub fn id(&self) -> &'ast str {
         &self.id
     }
 }
 
-impl From<ExprName> for Expr {
-    fn from(payload: ExprName) -> Self {
+impl<'ast> From<ExprName<'ast>> for Expr<'ast> {
+    fn from(payload: ExprName<'ast>) -> Self {
         Expr::Name(payload)
     }
 }
 
 /// See also [List](https://docs.python.org/3/library/ast.html#ast.List)
-#[derive(Clone, Debug, PartialEq)]
-pub struct ExprList {
+#[derive(Debug, PartialEq)]
+pub struct ExprList<'ast> {
     pub range: TextRange,
-    pub elts: Vec<Expr>,
+    pub elts: Vec<Expr<'ast>>,
     pub ctx: ExprContext,
 }
 
-impl From<ExprList> for Expr {
-    fn from(payload: ExprList) -> Self {
+impl<'ast> From<ExprList<'ast>> for Expr<'ast> {
+    fn from(payload: ExprList<'ast>) -> Self {
         Expr::List(payload)
     }
 }
 
 /// See also [Tuple](https://docs.python.org/3/library/ast.html#ast.Tuple)
-#[derive(Clone, Debug, PartialEq)]
-pub struct ExprTuple {
+#[derive(Debug, PartialEq)]
+pub struct ExprTuple<'ast> {
     pub range: TextRange,
-    pub elts: Vec<Expr>,
+    pub elts: Vec<Expr<'ast>>,
     pub ctx: ExprContext,
 
     /// Whether the tuple is parenthesized in the source code.
     pub parenthesized: bool,
 }
 
-impl From<ExprTuple> for Expr {
-    fn from(payload: ExprTuple) -> Self {
+impl<'ast> From<ExprTuple<'ast>> for Expr<'ast> {
+    fn from(payload: ExprTuple<'ast>) -> Self {
         Expr::Tuple(payload)
     }
 }
 
 /// See also [Slice](https://docs.python.org/3/library/ast.html#ast.Slice)
-#[derive(Clone, Debug, PartialEq)]
-pub struct ExprSlice {
+#[derive(Debug, PartialEq)]
+pub struct ExprSlice<'ast> {
     pub range: TextRange,
-    pub lower: Option<Box<Expr>>,
-    pub upper: Option<Box<Expr>>,
-    pub step: Option<Box<Expr>>,
+    pub lower: Option<Box<'ast, Expr<'ast>>>,
+    pub upper: Option<Box<'ast, Expr<'ast>>>,
+    pub step: Option<Box<'ast, Expr<'ast>>>,
 }
 
-impl From<ExprSlice> for Expr {
-    fn from(payload: ExprSlice) -> Self {
+impl<'ast> From<ExprSlice<'ast>> for Expr<'ast> {
+    fn from(payload: ExprSlice<'ast>) -> Self {
         Expr::Slice(payload)
     }
 }
@@ -2937,91 +2942,91 @@ impl fmt::Display for CmpOp {
 }
 
 /// See also [comprehension](https://docs.python.org/3/library/ast.html#ast.comprehension)
-#[derive(Clone, Debug, PartialEq)]
-pub struct Comprehension {
+#[derive(Debug, PartialEq)]
+pub struct Comprehension<'ast> {
     pub range: TextRange,
-    pub target: Expr,
-    pub iter: Expr,
-    pub ifs: Vec<Expr>,
+    pub target: Expr<'ast>,
+    pub iter: Expr<'ast>,
+    pub ifs: Vec<Expr<'ast>>,
     pub is_async: bool,
 }
 
 /// See also [excepthandler](https://docs.python.org/3/library/ast.html#ast.excepthandler)
-#[derive(Clone, Debug, PartialEq, is_macro::Is)]
-pub enum ExceptHandler {
-    ExceptHandler(ExceptHandlerExceptHandler),
+#[derive(Debug, PartialEq, is_macro::Is)]
+pub enum ExceptHandler<'ast> {
+    ExceptHandler(ExceptHandlerExceptHandler<'ast>),
 }
 
 /// See also [ExceptHandler](https://docs.python.org/3/library/ast.html#ast.ExceptHandler)
-#[derive(Clone, Debug, PartialEq)]
-pub struct ExceptHandlerExceptHandler {
+#[derive(Debug, PartialEq)]
+pub struct ExceptHandlerExceptHandler<'ast> {
     pub range: TextRange,
-    pub type_: Option<Box<Expr>>,
-    pub name: Option<Identifier>,
-    pub body: Vec<Stmt>,
+    pub type_: Option<Box<'ast, Expr<'ast>>>,
+    pub name: Option<Identifier<'ast>>,
+    pub body: Vec<Stmt<'ast>>,
 }
 
-impl From<ExceptHandlerExceptHandler> for ExceptHandler {
-    fn from(payload: ExceptHandlerExceptHandler) -> Self {
+impl<'ast> From<ExceptHandlerExceptHandler<'ast>> for ExceptHandler<'ast> {
+    fn from(payload: ExceptHandlerExceptHandler<'ast>) -> Self {
         ExceptHandler::ExceptHandler(payload)
     }
 }
 
 /// See also [arg](https://docs.python.org/3/library/ast.html#ast.arg)
-#[derive(Clone, Debug, PartialEq)]
-pub struct Parameter {
+#[derive(Debug, PartialEq)]
+pub struct Parameter<'ast> {
     pub range: TextRange,
-    pub name: Identifier,
-    pub annotation: Option<Box<Expr>>,
+    pub name: Identifier<'ast>,
+    pub annotation: Option<Box<'ast, Expr<'ast>>>,
 }
 
 /// See also [keyword](https://docs.python.org/3/library/ast.html#ast.keyword)
-#[derive(Clone, Debug, PartialEq)]
-pub struct Keyword {
+#[derive(Debug, PartialEq)]
+pub struct Keyword<'ast> {
     pub range: TextRange,
-    pub arg: Option<Identifier>,
-    pub value: Expr,
+    pub arg: Option<Identifier<'ast>>,
+    pub value: Expr<'ast>,
 }
 
 /// See also [alias](https://docs.python.org/3/library/ast.html#ast.alias)
 #[derive(Clone, Debug, PartialEq)]
-pub struct Alias {
+pub struct Alias<'ast> {
     pub range: TextRange,
-    pub name: Identifier,
-    pub asname: Option<Identifier>,
+    pub name: Identifier<'ast>,
+    pub asname: Option<Identifier<'ast>>,
 }
 
 /// See also [withitem](https://docs.python.org/3/library/ast.html#ast.withitem)
-#[derive(Clone, Debug, PartialEq)]
-pub struct WithItem {
+#[derive(Debug, PartialEq)]
+pub struct WithItem<'ast> {
     pub range: TextRange,
-    pub context_expr: Expr,
-    pub optional_vars: Option<Box<Expr>>,
+    pub context_expr: Expr<'ast>,
+    pub optional_vars: Option<Box<'ast, Expr<'ast>>>,
 }
 
 /// See also [match_case](https://docs.python.org/3/library/ast.html#ast.match_case)
-#[derive(Clone, Debug, PartialEq)]
-pub struct MatchCase {
+#[derive(Debug, PartialEq)]
+pub struct MatchCase<'ast> {
     pub range: TextRange,
-    pub pattern: Pattern,
-    pub guard: Option<Box<Expr>>,
-    pub body: Vec<Stmt>,
+    pub pattern: Pattern<'ast>,
+    pub guard: Option<Box<'ast, Expr<'ast>>>,
+    pub body: Vec<Stmt<'ast>>,
 }
 
 /// See also [pattern](https://docs.python.org/3/library/ast.html#ast.pattern)
-#[derive(Clone, Debug, PartialEq, is_macro::Is)]
-pub enum Pattern {
-    MatchValue(PatternMatchValue),
+#[derive(Debug, PartialEq, is_macro::Is)]
+pub enum Pattern<'ast> {
+    MatchValue(PatternMatchValue<'ast>),
     MatchSingleton(PatternMatchSingleton),
-    MatchSequence(PatternMatchSequence),
-    MatchMapping(PatternMatchMapping),
-    MatchClass(PatternMatchClass),
-    MatchStar(PatternMatchStar),
-    MatchAs(PatternMatchAs),
-    MatchOr(PatternMatchOr),
+    MatchSequence(PatternMatchSequence<'ast>),
+    MatchMapping(PatternMatchMapping<'ast>),
+    MatchClass(PatternMatchClass<'ast>),
+    MatchStar(PatternMatchStar<'ast>),
+    MatchAs(PatternMatchAs<'ast>),
+    MatchOr(PatternMatchOr<'ast>),
 }
 
-impl Pattern {
+impl Pattern<'_> {
     /// Checks if the [`Pattern`] is an [irrefutable pattern].
     ///
     /// [irrefutable pattern]: https://peps.python.org/pep-0634/#irrefutable-case-blocks
@@ -3037,69 +3042,69 @@ impl Pattern {
 }
 
 /// See also [MatchValue](https://docs.python.org/3/library/ast.html#ast.MatchValue)
-#[derive(Clone, Debug, PartialEq)]
-pub struct PatternMatchValue {
+#[derive(Debug, PartialEq)]
+pub struct PatternMatchValue<'ast> {
     pub range: TextRange,
-    pub value: Box<Expr>,
+    pub value: Box<'ast, Expr<'ast>>,
 }
 
-impl From<PatternMatchValue> for Pattern {
-    fn from(payload: PatternMatchValue) -> Self {
+impl<'ast> From<PatternMatchValue<'ast>> for Pattern<'ast> {
+    fn from(payload: PatternMatchValue<'ast>) -> Self {
         Pattern::MatchValue(payload)
     }
 }
 
 /// See also [MatchSingleton](https://docs.python.org/3/library/ast.html#ast.MatchSingleton)
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Debug, PartialEq)]
 pub struct PatternMatchSingleton {
     pub range: TextRange,
     pub value: Singleton,
 }
 
-impl From<PatternMatchSingleton> for Pattern {
+impl From<PatternMatchSingleton> for Pattern<'_> {
     fn from(payload: PatternMatchSingleton) -> Self {
         Pattern::MatchSingleton(payload)
     }
 }
 
 /// See also [MatchSequence](https://docs.python.org/3/library/ast.html#ast.MatchSequence)
-#[derive(Clone, Debug, PartialEq)]
-pub struct PatternMatchSequence {
+#[derive(Debug, PartialEq)]
+pub struct PatternMatchSequence<'ast> {
     pub range: TextRange,
-    pub patterns: Vec<Pattern>,
+    pub patterns: Vec<Pattern<'ast>>,
 }
 
-impl From<PatternMatchSequence> for Pattern {
-    fn from(payload: PatternMatchSequence) -> Self {
+impl<'ast> From<PatternMatchSequence<'ast>> for Pattern<'ast> {
+    fn from(payload: PatternMatchSequence<'ast>) -> Self {
         Pattern::MatchSequence(payload)
     }
 }
 
 /// See also [MatchMapping](https://docs.python.org/3/library/ast.html#ast.MatchMapping)
-#[derive(Clone, Debug, PartialEq)]
-pub struct PatternMatchMapping {
+#[derive(Debug, PartialEq)]
+pub struct PatternMatchMapping<'ast> {
     pub range: TextRange,
-    pub keys: Vec<Expr>,
-    pub patterns: Vec<Pattern>,
-    pub rest: Option<Identifier>,
+    pub keys: Vec<Expr<'ast>>,
+    pub patterns: Vec<Pattern<'ast>>,
+    pub rest: Option<Identifier<'ast>>,
 }
 
-impl From<PatternMatchMapping> for Pattern {
-    fn from(payload: PatternMatchMapping) -> Self {
+impl<'ast> From<PatternMatchMapping<'ast>> for Pattern<'ast> {
+    fn from(payload: PatternMatchMapping<'ast>) -> Self {
         Pattern::MatchMapping(payload)
     }
 }
 
 /// See also [MatchClass](https://docs.python.org/3/library/ast.html#ast.MatchClass)
-#[derive(Clone, Debug, PartialEq)]
-pub struct PatternMatchClass {
+#[derive(Debug, PartialEq)]
+pub struct PatternMatchClass<'ast> {
     pub range: TextRange,
-    pub cls: Box<Expr>,
-    pub arguments: PatternArguments,
+    pub cls: Box<'ast, Expr<'ast>>,
+    pub arguments: PatternArguments<'ast>,
 }
 
-impl From<PatternMatchClass> for Pattern {
-    fn from(payload: PatternMatchClass) -> Self {
+impl<'ast> From<PatternMatchClass<'ast>> for Pattern<'ast> {
+    fn from(payload: PatternMatchClass<'ast>) -> Self {
         Pattern::MatchClass(payload)
     }
 }
@@ -3108,132 +3113,132 @@ impl From<PatternMatchClass> for Pattern {
 /// parenthesized contents in `case Point(1, x=0, y=0)`.
 ///
 /// Like [`Arguments`], but for [`PatternMatchClass`].
-#[derive(Clone, Debug, PartialEq)]
-pub struct PatternArguments {
+#[derive(Debug, PartialEq)]
+pub struct PatternArguments<'ast> {
     pub range: TextRange,
-    pub patterns: Vec<Pattern>,
-    pub keywords: Vec<PatternKeyword>,
+    pub patterns: Vec<Pattern<'ast>>,
+    pub keywords: Vec<PatternKeyword<'ast>>,
 }
 
 /// An AST node to represent the keyword arguments to a [`PatternMatchClass`], i.e., the
 /// `x=0` and `y=0` in `case Point(x=0, y=0)`.
 ///
 /// Like [`Keyword`], but for [`PatternMatchClass`].
-#[derive(Clone, Debug, PartialEq)]
-pub struct PatternKeyword {
+#[derive(Debug, PartialEq)]
+pub struct PatternKeyword<'ast> {
     pub range: TextRange,
-    pub attr: Identifier,
-    pub pattern: Pattern,
+    pub attr: Identifier<'ast>,
+    pub pattern: Pattern<'ast>,
 }
 
 /// See also [MatchStar](https://docs.python.org/3/library/ast.html#ast.MatchStar)
-#[derive(Clone, Debug, PartialEq)]
-pub struct PatternMatchStar {
+#[derive(Debug, PartialEq)]
+pub struct PatternMatchStar<'ast> {
     pub range: TextRange,
-    pub name: Option<Identifier>,
+    pub name: Option<Identifier<'ast>>,
 }
 
-impl From<PatternMatchStar> for Pattern {
-    fn from(payload: PatternMatchStar) -> Self {
+impl<'ast> From<PatternMatchStar<'ast>> for Pattern<'ast> {
+    fn from(payload: PatternMatchStar<'ast>) -> Self {
         Pattern::MatchStar(payload)
     }
 }
 
 /// See also [MatchAs](https://docs.python.org/3/library/ast.html#ast.MatchAs)
-#[derive(Clone, Debug, PartialEq)]
-pub struct PatternMatchAs {
+#[derive(Debug, PartialEq)]
+pub struct PatternMatchAs<'ast> {
     pub range: TextRange,
-    pub pattern: Option<Box<Pattern>>,
-    pub name: Option<Identifier>,
+    pub pattern: Option<Box<'ast, Pattern<'ast>>>,
+    pub name: Option<Identifier<'ast>>,
 }
 
-impl From<PatternMatchAs> for Pattern {
-    fn from(payload: PatternMatchAs) -> Self {
+impl<'ast> From<PatternMatchAs<'ast>> for Pattern<'ast> {
+    fn from(payload: PatternMatchAs<'ast>) -> Self {
         Pattern::MatchAs(payload)
     }
 }
 
 /// See also [MatchOr](https://docs.python.org/3/library/ast.html#ast.MatchOr)
-#[derive(Clone, Debug, PartialEq)]
-pub struct PatternMatchOr {
+#[derive(Debug, PartialEq)]
+pub struct PatternMatchOr<'ast> {
     pub range: TextRange,
-    pub patterns: Vec<Pattern>,
+    pub patterns: Vec<Pattern<'ast>>,
 }
 
-impl From<PatternMatchOr> for Pattern {
-    fn from(payload: PatternMatchOr) -> Self {
+impl<'ast> From<PatternMatchOr<'ast>> for Pattern<'ast> {
+    fn from(payload: PatternMatchOr<'ast>) -> Self {
         Pattern::MatchOr(payload)
     }
 }
 
 /// See also [type_param](https://docs.python.org/3/library/ast.html#ast.type_param)
-#[derive(Clone, Debug, PartialEq, is_macro::Is)]
-pub enum TypeParam {
-    TypeVar(TypeParamTypeVar),
-    ParamSpec(TypeParamParamSpec),
-    TypeVarTuple(TypeParamTypeVarTuple),
+#[derive(Debug, PartialEq, is_macro::Is)]
+pub enum TypeParam<'ast> {
+    TypeVar(TypeParamTypeVar<'ast>),
+    ParamSpec(TypeParamParamSpec<'ast>),
+    TypeVarTuple(TypeParamTypeVarTuple<'ast>),
 }
 
 /// See also [TypeVar](https://docs.python.org/3/library/ast.html#ast.TypeVar)
-#[derive(Clone, Debug, PartialEq)]
-pub struct TypeParamTypeVar {
+#[derive(Debug, PartialEq)]
+pub struct TypeParamTypeVar<'ast> {
     pub range: TextRange,
-    pub name: Identifier,
-    pub bound: Option<Box<Expr>>,
-    pub default: Option<Box<Expr>>,
+    pub name: Identifier<'ast>,
+    pub bound: Option<Box<'ast, Expr<'ast>>>,
+    pub default: Option<Box<'ast, Expr<'ast>>>,
 }
 
-impl From<TypeParamTypeVar> for TypeParam {
-    fn from(payload: TypeParamTypeVar) -> Self {
+impl<'ast> From<TypeParamTypeVar<'ast>> for TypeParam<'ast> {
+    fn from(payload: TypeParamTypeVar<'ast>) -> Self {
         TypeParam::TypeVar(payload)
     }
 }
 
 /// See also [ParamSpec](https://docs.python.org/3/library/ast.html#ast.ParamSpec)
-#[derive(Clone, Debug, PartialEq)]
-pub struct TypeParamParamSpec {
+#[derive(Debug, PartialEq)]
+pub struct TypeParamParamSpec<'ast> {
     pub range: TextRange,
-    pub name: Identifier,
-    pub default: Option<Box<Expr>>,
+    pub name: Identifier<'ast>,
+    pub default: Option<Box<'ast, Expr<'ast>>>,
 }
 
-impl From<TypeParamParamSpec> for TypeParam {
-    fn from(payload: TypeParamParamSpec) -> Self {
+impl<'ast> From<TypeParamParamSpec<'ast>> for TypeParam<'ast> {
+    fn from(payload: TypeParamParamSpec<'ast>) -> Self {
         TypeParam::ParamSpec(payload)
     }
 }
 
 /// See also [TypeVarTuple](https://docs.python.org/3/library/ast.html#ast.TypeVarTuple)
-#[derive(Clone, Debug, PartialEq)]
-pub struct TypeParamTypeVarTuple {
+#[derive(Debug, PartialEq)]
+pub struct TypeParamTypeVarTuple<'ast> {
     pub range: TextRange,
-    pub name: Identifier,
-    pub default: Option<Box<Expr>>,
+    pub name: Identifier<'ast>,
+    pub default: Option<Box<'ast, Expr<'ast>>>,
 }
 
-impl From<TypeParamTypeVarTuple> for TypeParam {
-    fn from(payload: TypeParamTypeVarTuple) -> Self {
+impl<'ast> From<TypeParamTypeVarTuple<'ast>> for TypeParam<'ast> {
+    fn from(payload: TypeParamTypeVarTuple<'ast>) -> Self {
         TypeParam::TypeVarTuple(payload)
     }
 }
 
 /// See also [decorator](https://docs.python.org/3/library/ast.html#ast.decorator)
-#[derive(Clone, Debug, PartialEq)]
-pub struct Decorator {
+#[derive(Debug, PartialEq)]
+pub struct Decorator<'ast> {
     pub range: TextRange,
-    pub expression: Expr,
+    pub expression: Expr<'ast>,
 }
 
 /// Enumeration of the two kinds of parameter
 #[derive(Debug, PartialEq, Clone, Copy)]
-pub enum AnyParameterRef<'a> {
+pub enum AnyParameterRef<'a, 'ast> {
     /// Variadic parameters cannot have default values,
     /// e.g. both `*args` and `**kwargs` in the following function:
     ///
     /// ```python
     /// def foo(*args, **kwargs): pass
     /// ```
-    Variadic(&'a Parameter),
+    Variadic(&'a Parameter<'ast>),
 
     /// Non-variadic parameters can have default values,
     /// though they won't necessarily always have them:
@@ -3241,18 +3246,18 @@ pub enum AnyParameterRef<'a> {
     /// ```python
     /// def bar(a=1, /, b=2, *, c=3): pass
     /// ```
-    NonVariadic(&'a ParameterWithDefault),
+    NonVariadic(&'a ParameterWithDefault<'ast>),
 }
 
-impl<'a> AnyParameterRef<'a> {
-    pub const fn as_parameter(self) -> &'a Parameter {
+impl<'a, 'ast> AnyParameterRef<'a, 'ast> {
+    pub const fn as_parameter(self) -> &'a Parameter<'ast> {
         match self {
             Self::NonVariadic(param) => &param.parameter,
             Self::Variadic(param) => param,
         }
     }
 
-    pub const fn name(self) -> &'a Identifier {
+    pub const fn name(self) -> &'a Identifier<'ast> {
         &self.as_parameter().name
     }
 
@@ -3260,11 +3265,11 @@ impl<'a> AnyParameterRef<'a> {
         matches!(self, Self::Variadic(_))
     }
 
-    pub fn annotation(self) -> Option<&'a Expr> {
+    pub fn annotation(self) -> Option<&'a Expr<'ast>> {
         self.as_parameter().annotation.as_deref()
     }
 
-    pub fn default(self) -> Option<&'a Expr> {
+    pub fn default(self) -> Option<&'a Expr<'ast>> {
         match self {
             Self::NonVariadic(param) => param.default.as_deref(),
             Self::Variadic(_) => None,
@@ -3272,7 +3277,7 @@ impl<'a> AnyParameterRef<'a> {
     }
 }
 
-impl Ranged for AnyParameterRef<'_> {
+impl Ranged for AnyParameterRef<'_, '_> {
     fn range(&self) -> TextRange {
         match self {
             Self::NonVariadic(param) => param.range,
@@ -3291,22 +3296,22 @@ impl Ranged for AnyParameterRef<'_> {
 ///
 /// NOTE: This type differs from the original Python AST. See: [arguments](https://docs.python.org/3/library/ast.html#ast.arguments).
 
-#[derive(Clone, Debug, PartialEq, Default)]
-pub struct Parameters {
+#[derive(Debug, PartialEq, Default)]
+pub struct Parameters<'ast> {
     pub range: TextRange,
-    pub posonlyargs: Vec<ParameterWithDefault>,
-    pub args: Vec<ParameterWithDefault>,
-    pub vararg: Option<Box<Parameter>>,
-    pub kwonlyargs: Vec<ParameterWithDefault>,
-    pub kwarg: Option<Box<Parameter>>,
+    pub posonlyargs: Vec<ParameterWithDefault<'ast>>,
+    pub args: Vec<ParameterWithDefault<'ast>>,
+    pub vararg: Option<Box<'ast, Parameter<'ast>>>,
+    pub kwonlyargs: Vec<ParameterWithDefault<'ast>>,
+    pub kwarg: Option<Box<'ast, Parameter<'ast>>>,
 }
 
-impl Parameters {
+impl<'ast> Parameters<'ast> {
     /// Returns an iterator over all non-variadic parameters included in this [`Parameters`] node.
     ///
     /// The variadic parameters (`.vararg` and `.kwarg`) can never have default values;
     /// non-variadic parameters sometimes will.
-    pub fn iter_non_variadic_params(&self) -> impl Iterator<Item = &ParameterWithDefault> {
+    pub fn iter_non_variadic_params(&self) -> impl Iterator<Item = &ParameterWithDefault<'ast>> {
         self.posonlyargs
             .iter()
             .chain(&self.args)
@@ -3314,13 +3319,13 @@ impl Parameters {
     }
 
     /// Returns the [`ParameterWithDefault`] with the given name, or `None` if no such [`ParameterWithDefault`] exists.
-    pub fn find(&self, name: &str) -> Option<&ParameterWithDefault> {
+    pub fn find(&self, name: &str) -> Option<&ParameterWithDefault<'ast>> {
         self.iter_non_variadic_params()
             .find(|arg| arg.parameter.name.as_str() == name)
     }
 
     /// Returns an iterator over all parameters included in this [`Parameters`] node.
-    pub fn iter(&self) -> ParametersIterator {
+    pub fn iter(&self) -> ParametersIterator<'_, 'ast> {
         ParametersIterator::new(self)
     }
 
@@ -3364,16 +3369,16 @@ impl Parameters {
     }
 }
 
-pub struct ParametersIterator<'a> {
-    posonlyargs: Iter<'a, ParameterWithDefault>,
-    args: Iter<'a, ParameterWithDefault>,
-    vararg: Option<&'a Parameter>,
-    kwonlyargs: Iter<'a, ParameterWithDefault>,
-    kwarg: Option<&'a Parameter>,
+pub struct ParametersIterator<'a, 'ast> {
+    posonlyargs: Iter<'a, ParameterWithDefault<'ast>>,
+    args: Iter<'a, ParameterWithDefault<'ast>>,
+    vararg: Option<&'a Parameter<'ast>>,
+    kwonlyargs: Iter<'a, ParameterWithDefault<'ast>>,
+    kwarg: Option<&'a Parameter<'ast>>,
 }
 
-impl<'a> ParametersIterator<'a> {
-    fn new(parameters: &'a Parameters) -> Self {
+impl<'a, 'ast> ParametersIterator<'a, 'ast> {
+    fn new(parameters: &'a Parameters<'ast>) -> Self {
         let Parameters {
             range: _,
             posonlyargs,
@@ -3392,8 +3397,8 @@ impl<'a> ParametersIterator<'a> {
     }
 }
 
-impl<'a> Iterator for ParametersIterator<'a> {
-    type Item = AnyParameterRef<'a>;
+impl<'a, 'ast> Iterator for ParametersIterator<'a, 'ast> {
+    type Item = AnyParameterRef<'a, 'ast>;
 
     fn next(&mut self) -> Option<Self::Item> {
         let ParametersIterator {
@@ -3454,7 +3459,7 @@ impl<'a> Iterator for ParametersIterator<'a> {
     }
 }
 
-impl<'a> DoubleEndedIterator for ParametersIterator<'a> {
+impl DoubleEndedIterator for ParametersIterator<'_, '_> {
     fn next_back(&mut self) -> Option<Self::Item> {
         let ParametersIterator {
             posonlyargs,
@@ -3480,15 +3485,15 @@ impl<'a> DoubleEndedIterator for ParametersIterator<'a> {
     }
 }
 
-impl<'a> FusedIterator for ParametersIterator<'a> {}
+impl FusedIterator for ParametersIterator<'_, '_> {}
 
 /// We rely on the same invariants outlined in the comment above `Parameters::len()`
 /// in order to implement `ExactSizeIterator` here
-impl<'a> ExactSizeIterator for ParametersIterator<'a> {}
+impl ExactSizeIterator for ParametersIterator<'_, '_> {}
 
-impl<'a> IntoIterator for &'a Parameters {
-    type IntoIter = ParametersIterator<'a>;
-    type Item = AnyParameterRef<'a>;
+impl<'a, 'ast> IntoIterator for &'a Parameters<'ast> {
+    type IntoIter = ParametersIterator<'a, 'ast>;
+    type Item = AnyParameterRef<'a, 'ast>;
     fn into_iter(self) -> Self::IntoIter {
         self.iter()
     }
@@ -3499,11 +3504,11 @@ impl<'a> IntoIterator for &'a Parameters {
 ///
 /// NOTE: This type is different from original Python AST.
 
-#[derive(Clone, Debug, PartialEq)]
-pub struct ParameterWithDefault {
+#[derive(Debug, PartialEq)]
+pub struct ParameterWithDefault<'ast> {
     pub range: TextRange,
-    pub parameter: Parameter,
-    pub default: Option<Box<Expr>>,
+    pub parameter: Parameter<'ast>,
+    pub default: Option<Box<'ast, Expr<'ast>>>,
 }
 
 /// An AST node used to represent the arguments passed to a function call or class definition.
@@ -3528,33 +3533,33 @@ pub struct ParameterWithDefault {
 /// as they represent the "explicitly specified base classes", while the keyword arguments are
 /// typically used for `metaclass`, with any additional arguments being passed to the `metaclass`.
 
-#[derive(Clone, Debug, PartialEq)]
-pub struct Arguments {
+#[derive(Debug, PartialEq)]
+pub struct Arguments<'ast> {
     pub range: TextRange,
-    pub args: Box<[Expr]>,
-    pub keywords: Box<[Keyword]>,
+    pub args: &'ast mut [Expr<'ast>],
+    pub keywords: &'ast mut [Keyword<'ast>],
 }
 
 /// An entry in the argument list of a function call.
-#[derive(Clone, Debug, PartialEq)]
-pub enum ArgOrKeyword<'a> {
-    Arg(&'a Expr),
-    Keyword(&'a Keyword),
+#[derive(Debug, PartialEq)]
+pub enum ArgOrKeyword<'a, 'ast> {
+    Arg(&'a Expr<'ast>),
+    Keyword(&'a Keyword<'ast>),
 }
 
-impl<'a> From<&'a Expr> for ArgOrKeyword<'a> {
-    fn from(arg: &'a Expr) -> Self {
+impl<'a, 'ast> From<&'a Expr<'ast>> for ArgOrKeyword<'a, 'ast> {
+    fn from(arg: &'a Expr<'ast>) -> Self {
         Self::Arg(arg)
     }
 }
 
-impl<'a> From<&'a Keyword> for ArgOrKeyword<'a> {
-    fn from(keyword: &'a Keyword) -> Self {
+impl<'a, 'ast> From<&'a Keyword<'ast>> for ArgOrKeyword<'a, 'ast> {
+    fn from(keyword: &'a Keyword<'ast>) -> Self {
         Self::Keyword(keyword)
     }
 }
 
-impl Ranged for ArgOrKeyword<'_> {
+impl Ranged for ArgOrKeyword<'_, '_> {
     fn range(&self) -> TextRange {
         match self {
             Self::Arg(arg) => arg.range(),
@@ -3563,7 +3568,7 @@ impl Ranged for ArgOrKeyword<'_> {
     }
 }
 
-impl Arguments {
+impl<'ast> Arguments<'ast> {
     /// Return the number of positional and keyword arguments.
     pub fn len(&self) -> usize {
         self.args.len() + self.keywords.len()
@@ -3575,7 +3580,7 @@ impl Arguments {
     }
 
     /// Return the [`Keyword`] with the given name, or `None` if no such [`Keyword`] exists.
-    pub fn find_keyword(&self, keyword_name: &str) -> Option<&Keyword> {
+    pub fn find_keyword(&self, keyword_name: &str) -> Option<&Keyword<'ast>> {
         self.keywords.iter().find(|keyword| {
             let Keyword { arg, .. } = keyword;
             arg.as_ref().is_some_and(|arg| arg == keyword_name)
@@ -3583,7 +3588,7 @@ impl Arguments {
     }
 
     /// Return the positional argument at the given index, or `None` if no such argument exists.
-    pub fn find_positional(&self, position: usize) -> Option<&Expr> {
+    pub fn find_positional(&self, position: usize) -> Option<&Expr<'ast>> {
         self.args
             .iter()
             .take_while(|expr| !expr.is_starred_expr())
@@ -3593,7 +3598,7 @@ impl Arguments {
     /// Return the argument with the given name or at the given position, or `None` if no such
     /// argument exists. Used to retrieve arguments that can be provided _either_ as keyword or
     /// positional arguments.
-    pub fn find_argument(&self, name: &str, position: usize) -> Option<&Expr> {
+    pub fn find_argument(&self, name: &str, position: usize) -> Option<&Expr<'ast>> {
         self.find_keyword(name)
             .map(|keyword| &keyword.value)
             .or_else(|| self.find_positional(position))
@@ -3633,7 +3638,7 @@ impl Arguments {
     /// 2
     /// {'4': 5}
     /// ```
-    pub fn arguments_source_order(&self) -> impl Iterator<Item = ArgOrKeyword<'_>> {
+    pub fn arguments_source_order(&self) -> impl Iterator<Item = ArgOrKeyword<'_, 'ast>> {
         let args = self.args.iter().map(ArgOrKeyword::Arg);
         let keywords = self.keywords.iter().map(ArgOrKeyword::Keyword);
         args.merge_by(keywords, |left, right| left.start() < right.start())
@@ -3649,14 +3654,14 @@ impl Arguments {
 /// The `TypeParams` node would span from the left to right brackets (inclusive), and contain
 /// the `T`, `U`, and `V` type parameters in the order they appear in the source code.
 
-#[derive(Clone, Debug, PartialEq)]
-pub struct TypeParams {
+#[derive(Debug, PartialEq)]
+pub struct TypeParams<'ast> {
     pub range: TextRange,
-    pub type_params: Vec<TypeParam>,
+    pub type_params: Vec<TypeParam<'ast>>,
 }
 
-impl Deref for TypeParams {
-    type Target = [TypeParam];
+impl<'ast> Deref for TypeParams<'ast> {
+    type Target = [TypeParam<'ast>];
 
     fn deref(&self) -> &Self::Target {
         &self.type_params
@@ -3666,7 +3671,7 @@ impl Deref for TypeParams {
 /// A suite represents a [Vec] of [Stmt].
 ///
 /// See: <https://docs.python.org/3/reference/compound_stmts.html#grammar-token-python-grammar-suite>
-pub type Suite = Vec<Stmt>;
+pub type Suite<'ast> = Vec<Stmt<'ast>>;
 
 /// The kind of escape command as defined in [IPython Syntax] in the IPython codebase.
 ///
@@ -3763,21 +3768,18 @@ impl IpyEscapeKind {
 ///     ...
 /// ```
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
-pub struct Identifier {
-    pub id: Name,
+pub struct Identifier<'ast> {
+    pub id: &'ast str,
     pub range: TextRange,
 }
 
-impl Identifier {
+impl<'ast> Identifier<'ast> {
     #[inline]
-    pub fn new(id: impl Into<Name>, range: TextRange) -> Self {
-        Self {
-            id: id.into(),
-            range,
-        }
+    pub fn new(id: &'ast str, range: TextRange) -> Self {
+        Self { id, range }
     }
 
-    pub fn id(&self) -> &Name {
+    pub fn id(&self) -> &'ast str {
         &self.id
     }
 
@@ -3786,62 +3788,55 @@ impl Identifier {
     }
 }
 
-impl Identifier {
+impl<'ast> Identifier<'ast> {
     #[inline]
-    pub fn as_str(&self) -> &str {
-        self.id.as_str()
+    pub fn as_str(&self) -> &'ast str {
+        self.id
     }
 }
 
-impl PartialEq<str> for Identifier {
+impl PartialEq<str> for Identifier<'_> {
     #[inline]
     fn eq(&self, other: &str) -> bool {
         self.id == other
     }
 }
 
-impl PartialEq<String> for Identifier {
+impl PartialEq<String> for Identifier<'_> {
     #[inline]
     fn eq(&self, other: &String) -> bool {
         self.id == other
     }
 }
 
-impl std::ops::Deref for Identifier {
+impl std::ops::Deref for Identifier<'_> {
     type Target = str;
     #[inline]
     fn deref(&self) -> &Self::Target {
-        self.id.as_str()
+        self.id
     }
 }
 
-impl AsRef<str> for Identifier {
+impl AsRef<str> for Identifier<'_> {
     #[inline]
     fn as_ref(&self) -> &str {
-        self.id.as_str()
+        self.id
     }
 }
 
-impl std::fmt::Display for Identifier {
+impl std::fmt::Display for Identifier<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         std::fmt::Display::fmt(&self.id, f)
     }
 }
 
-impl From<Identifier> for Name {
-    #[inline]
-    fn from(identifier: Identifier) -> Name {
-        identifier.id
-    }
-}
-
-impl Ranged for Identifier {
+impl Ranged for Identifier<'_> {
     fn range(&self) -> TextRange {
         self.range
     }
 }
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Copy, Clone, Debug, PartialEq)]
 pub enum Singleton {
     None,
     True,
@@ -3858,17 +3853,17 @@ impl From<bool> for Singleton {
     }
 }
 
-impl Ranged for crate::nodes::ModModule {
+impl Ranged for crate::nodes::ModModule<'_> {
     fn range(&self) -> TextRange {
         self.range
     }
 }
-impl Ranged for crate::nodes::ModExpression {
+impl Ranged for crate::nodes::ModExpression<'_> {
     fn range(&self) -> TextRange {
         self.range
     }
 }
-impl Ranged for crate::Mod {
+impl Ranged for crate::Mod<'_> {
     fn range(&self) -> TextRange {
         match self {
             Self::Module(node) => node.range(),
@@ -3877,112 +3872,112 @@ impl Ranged for crate::Mod {
     }
 }
 
-impl Ranged for crate::nodes::StmtFunctionDef {
+impl Ranged for crate::nodes::StmtFunctionDef<'_> {
     fn range(&self) -> TextRange {
         self.range
     }
 }
-impl Ranged for crate::nodes::StmtClassDef {
+impl Ranged for crate::nodes::StmtClassDef<'_> {
     fn range(&self) -> TextRange {
         self.range
     }
 }
-impl Ranged for crate::nodes::StmtReturn {
+impl Ranged for crate::nodes::StmtReturn<'_> {
     fn range(&self) -> TextRange {
         self.range
     }
 }
-impl Ranged for crate::nodes::StmtDelete {
+impl Ranged for crate::nodes::StmtDelete<'_> {
     fn range(&self) -> TextRange {
         self.range
     }
 }
-impl Ranged for crate::nodes::StmtTypeAlias {
+impl Ranged for crate::nodes::StmtTypeAlias<'_> {
     fn range(&self) -> TextRange {
         self.range
     }
 }
-impl Ranged for crate::nodes::StmtAssign {
+impl Ranged for crate::nodes::StmtAssign<'_> {
     fn range(&self) -> TextRange {
         self.range
     }
 }
-impl Ranged for crate::nodes::StmtAugAssign {
+impl Ranged for crate::nodes::StmtAugAssign<'_> {
     fn range(&self) -> TextRange {
         self.range
     }
 }
-impl Ranged for crate::nodes::StmtAnnAssign {
+impl Ranged for crate::nodes::StmtAnnAssign<'_> {
     fn range(&self) -> TextRange {
         self.range
     }
 }
-impl Ranged for crate::nodes::StmtFor {
+impl Ranged for crate::nodes::StmtFor<'_> {
     fn range(&self) -> TextRange {
         self.range
     }
 }
-impl Ranged for crate::nodes::StmtWhile {
+impl Ranged for crate::nodes::StmtWhile<'_> {
     fn range(&self) -> TextRange {
         self.range
     }
 }
-impl Ranged for crate::nodes::StmtIf {
+impl Ranged for crate::nodes::StmtIf<'_> {
     fn range(&self) -> TextRange {
         self.range
     }
 }
-impl Ranged for crate::nodes::ElifElseClause {
+impl Ranged for crate::nodes::ElifElseClause<'_> {
     fn range(&self) -> TextRange {
         self.range
     }
 }
-impl Ranged for crate::nodes::StmtWith {
+impl Ranged for crate::nodes::StmtWith<'_> {
     fn range(&self) -> TextRange {
         self.range
     }
 }
-impl Ranged for crate::nodes::StmtMatch {
+impl Ranged for crate::nodes::StmtMatch<'_> {
     fn range(&self) -> TextRange {
         self.range
     }
 }
-impl Ranged for crate::nodes::StmtRaise {
+impl Ranged for crate::nodes::StmtRaise<'_> {
     fn range(&self) -> TextRange {
         self.range
     }
 }
-impl Ranged for crate::nodes::StmtTry {
+impl Ranged for crate::nodes::StmtTry<'_> {
     fn range(&self) -> TextRange {
         self.range
     }
 }
-impl Ranged for crate::nodes::StmtAssert {
+impl Ranged for crate::nodes::StmtAssert<'_> {
     fn range(&self) -> TextRange {
         self.range
     }
 }
-impl Ranged for crate::nodes::StmtImport {
+impl Ranged for crate::nodes::StmtImport<'_> {
     fn range(&self) -> TextRange {
         self.range
     }
 }
-impl Ranged for crate::nodes::StmtImportFrom {
+impl Ranged for crate::nodes::StmtImportFrom<'_> {
     fn range(&self) -> TextRange {
         self.range
     }
 }
-impl Ranged for crate::nodes::StmtGlobal {
+impl Ranged for crate::nodes::StmtGlobal<'_> {
     fn range(&self) -> TextRange {
         self.range
     }
 }
-impl Ranged for crate::nodes::StmtNonlocal {
+impl Ranged for crate::nodes::StmtNonlocal<'_> {
     fn range(&self) -> TextRange {
         self.range
     }
 }
-impl Ranged for crate::nodes::StmtExpr {
+impl Ranged for crate::nodes::StmtExpr<'_> {
     fn range(&self) -> TextRange {
         self.range
     }
@@ -4002,12 +3997,12 @@ impl Ranged for crate::nodes::StmtContinue {
         self.range
     }
 }
-impl Ranged for crate::nodes::StmtIpyEscapeCommand {
+impl Ranged for crate::nodes::StmtIpyEscapeCommand<'_> {
     fn range(&self) -> TextRange {
         self.range
     }
 }
-impl Ranged for crate::Stmt {
+impl Ranged for crate::Stmt<'_> {
     fn range(&self) -> TextRange {
         match self {
             Self::FunctionDef(node) => node.range(),
@@ -4039,137 +4034,137 @@ impl Ranged for crate::Stmt {
     }
 }
 
-impl Ranged for crate::nodes::ExprBoolOp {
+impl Ranged for crate::nodes::ExprBoolOp<'_> {
     fn range(&self) -> TextRange {
         self.range
     }
 }
-impl Ranged for crate::nodes::ExprNamed {
+impl Ranged for crate::nodes::ExprNamed<'_> {
     fn range(&self) -> TextRange {
         self.range
     }
 }
-impl Ranged for crate::nodes::ExprBinOp {
+impl Ranged for crate::nodes::ExprBinOp<'_> {
     fn range(&self) -> TextRange {
         self.range
     }
 }
-impl Ranged for crate::nodes::ExprUnaryOp {
+impl Ranged for crate::nodes::ExprUnaryOp<'_> {
     fn range(&self) -> TextRange {
         self.range
     }
 }
-impl Ranged for crate::nodes::ExprLambda {
+impl Ranged for crate::nodes::ExprLambda<'_> {
     fn range(&self) -> TextRange {
         self.range
     }
 }
-impl Ranged for crate::nodes::ExprIf {
+impl Ranged for crate::nodes::ExprIf<'_> {
     fn range(&self) -> TextRange {
         self.range
     }
 }
-impl Ranged for crate::nodes::ExprDict {
+impl Ranged for crate::nodes::ExprDict<'_> {
     fn range(&self) -> TextRange {
         self.range
     }
 }
-impl Ranged for crate::nodes::ExprSet {
+impl Ranged for crate::nodes::ExprSet<'_> {
     fn range(&self) -> TextRange {
         self.range
     }
 }
-impl Ranged for crate::nodes::ExprListComp {
+impl Ranged for crate::nodes::ExprListComp<'_> {
     fn range(&self) -> TextRange {
         self.range
     }
 }
-impl Ranged for crate::nodes::ExprSetComp {
+impl Ranged for crate::nodes::ExprSetComp<'_> {
     fn range(&self) -> TextRange {
         self.range
     }
 }
-impl Ranged for crate::nodes::ExprDictComp {
+impl Ranged for crate::nodes::ExprDictComp<'_> {
     fn range(&self) -> TextRange {
         self.range
     }
 }
-impl Ranged for crate::nodes::ExprGenerator {
+impl Ranged for crate::nodes::ExprGenerator<'_> {
     fn range(&self) -> TextRange {
         self.range
     }
 }
-impl Ranged for crate::nodes::ExprAwait {
+impl Ranged for crate::nodes::ExprAwait<'_> {
     fn range(&self) -> TextRange {
         self.range
     }
 }
-impl Ranged for crate::nodes::ExprYield {
+impl Ranged for crate::nodes::ExprYield<'_> {
     fn range(&self) -> TextRange {
         self.range
     }
 }
-impl Ranged for crate::nodes::ExprYieldFrom {
+impl Ranged for crate::nodes::ExprYieldFrom<'_> {
     fn range(&self) -> TextRange {
         self.range
     }
 }
-impl Ranged for crate::nodes::ExprCompare {
+impl Ranged for crate::nodes::ExprCompare<'_> {
     fn range(&self) -> TextRange {
         self.range
     }
 }
-impl Ranged for crate::nodes::ExprCall {
+impl Ranged for crate::nodes::ExprCall<'_> {
     fn range(&self) -> TextRange {
         self.range
     }
 }
-impl Ranged for crate::nodes::ExprFString {
+impl Ranged for crate::nodes::ExprFString<'_> {
     fn range(&self) -> TextRange {
         self.range
     }
 }
-impl Ranged for crate::nodes::ExprAttribute {
+impl Ranged for crate::nodes::ExprAttribute<'_> {
     fn range(&self) -> TextRange {
         self.range
     }
 }
-impl Ranged for crate::nodes::ExprSubscript {
+impl Ranged for crate::nodes::ExprSubscript<'_> {
     fn range(&self) -> TextRange {
         self.range
     }
 }
-impl Ranged for crate::nodes::ExprStarred {
+impl Ranged for crate::nodes::ExprStarred<'_> {
     fn range(&self) -> TextRange {
         self.range
     }
 }
-impl Ranged for crate::nodes::ExprName {
+impl Ranged for crate::nodes::ExprName<'_> {
     fn range(&self) -> TextRange {
         self.range
     }
 }
-impl Ranged for crate::nodes::ExprList {
+impl Ranged for crate::nodes::ExprList<'_> {
     fn range(&self) -> TextRange {
         self.range
     }
 }
-impl Ranged for crate::nodes::ExprTuple {
+impl Ranged for crate::nodes::ExprTuple<'_> {
     fn range(&self) -> TextRange {
         self.range
     }
 }
-impl Ranged for crate::nodes::ExprSlice {
+impl Ranged for crate::nodes::ExprSlice<'_> {
     fn range(&self) -> TextRange {
         self.range
     }
 }
-impl Ranged for crate::nodes::ExprIpyEscapeCommand {
+impl Ranged for crate::nodes::ExprIpyEscapeCommand<'_> {
     fn range(&self) -> TextRange {
         self.range
     }
 }
-impl Ranged for crate::Expr {
+impl Ranged for crate::Expr<'_> {
     fn range(&self) -> TextRange {
         match self {
             Self::BoolOp(node) => node.range(),
@@ -4207,49 +4202,49 @@ impl Ranged for crate::Expr {
         }
     }
 }
-impl Ranged for crate::nodes::Comprehension {
+impl Ranged for crate::nodes::Comprehension<'_> {
     fn range(&self) -> TextRange {
         self.range
     }
 }
-impl Ranged for crate::nodes::ExceptHandlerExceptHandler {
+impl Ranged for crate::nodes::ExceptHandlerExceptHandler<'_> {
     fn range(&self) -> TextRange {
         self.range
     }
 }
-impl Ranged for crate::ExceptHandler {
+impl Ranged for crate::ExceptHandler<'_> {
     fn range(&self) -> TextRange {
         match self {
             Self::ExceptHandler(node) => node.range(),
         }
     }
 }
-impl Ranged for crate::nodes::Parameter {
+impl Ranged for crate::nodes::Parameter<'_> {
     fn range(&self) -> TextRange {
         self.range
     }
 }
-impl Ranged for crate::nodes::Keyword {
+impl Ranged for crate::nodes::Keyword<'_> {
     fn range(&self) -> TextRange {
         self.range
     }
 }
-impl Ranged for crate::nodes::Alias {
+impl Ranged for crate::nodes::Alias<'_> {
     fn range(&self) -> TextRange {
         self.range
     }
 }
-impl Ranged for crate::nodes::WithItem {
+impl Ranged for crate::nodes::WithItem<'_> {
     fn range(&self) -> TextRange {
         self.range
     }
 }
-impl Ranged for crate::nodes::MatchCase {
+impl Ranged for crate::nodes::MatchCase<'_> {
     fn range(&self) -> TextRange {
         self.range
     }
 }
-impl Ranged for crate::nodes::PatternMatchValue {
+impl Ranged for crate::nodes::PatternMatchValue<'_> {
     fn range(&self) -> TextRange {
         self.range
     }
@@ -4259,37 +4254,37 @@ impl Ranged for crate::nodes::PatternMatchSingleton {
         self.range
     }
 }
-impl Ranged for crate::nodes::PatternMatchSequence {
+impl Ranged for crate::nodes::PatternMatchSequence<'_> {
     fn range(&self) -> TextRange {
         self.range
     }
 }
-impl Ranged for crate::nodes::PatternMatchMapping {
+impl Ranged for crate::nodes::PatternMatchMapping<'_> {
     fn range(&self) -> TextRange {
         self.range
     }
 }
-impl Ranged for crate::nodes::PatternMatchClass {
+impl Ranged for crate::nodes::PatternMatchClass<'_> {
     fn range(&self) -> TextRange {
         self.range
     }
 }
-impl Ranged for crate::nodes::PatternMatchStar {
+impl Ranged for crate::nodes::PatternMatchStar<'_> {
     fn range(&self) -> TextRange {
         self.range
     }
 }
-impl Ranged for crate::nodes::PatternMatchAs {
+impl Ranged for crate::nodes::PatternMatchAs<'_> {
     fn range(&self) -> TextRange {
         self.range
     }
 }
-impl Ranged for crate::nodes::PatternMatchOr {
+impl Ranged for crate::nodes::PatternMatchOr<'_> {
     fn range(&self) -> TextRange {
         self.range
     }
 }
-impl Ranged for crate::Pattern {
+impl Ranged for crate::Pattern<'_> {
     fn range(&self) -> TextRange {
         match self {
             Self::MatchValue(node) => node.range(),
@@ -4303,38 +4298,38 @@ impl Ranged for crate::Pattern {
         }
     }
 }
-impl Ranged for crate::nodes::PatternArguments {
+impl Ranged for crate::nodes::PatternArguments<'_> {
     fn range(&self) -> TextRange {
         self.range
     }
 }
-impl Ranged for crate::nodes::PatternKeyword {
+impl Ranged for crate::nodes::PatternKeyword<'_> {
     fn range(&self) -> TextRange {
         self.range
     }
 }
 
-impl Ranged for crate::nodes::TypeParams {
+impl Ranged for crate::nodes::TypeParams<'_> {
     fn range(&self) -> TextRange {
         self.range
     }
 }
-impl Ranged for crate::nodes::TypeParamTypeVar {
+impl Ranged for crate::nodes::TypeParamTypeVar<'_> {
     fn range(&self) -> TextRange {
         self.range
     }
 }
-impl Ranged for crate::nodes::TypeParamTypeVarTuple {
+impl Ranged for crate::nodes::TypeParamTypeVarTuple<'_> {
     fn range(&self) -> TextRange {
         self.range
     }
 }
-impl Ranged for crate::nodes::TypeParamParamSpec {
+impl Ranged for crate::nodes::TypeParamParamSpec<'_> {
     fn range(&self) -> TextRange {
         self.range
     }
 }
-impl Ranged for crate::TypeParam {
+impl Ranged for crate::TypeParam<'_> {
     fn range(&self) -> TextRange {
         match self {
             Self::TypeVar(node) => node.range(),
@@ -4343,22 +4338,22 @@ impl Ranged for crate::TypeParam {
         }
     }
 }
-impl Ranged for crate::nodes::Decorator {
+impl Ranged for crate::nodes::Decorator<'_> {
     fn range(&self) -> TextRange {
         self.range
     }
 }
-impl Ranged for crate::nodes::Arguments {
+impl Ranged for crate::nodes::Arguments<'_> {
     fn range(&self) -> TextRange {
         self.range
     }
 }
-impl Ranged for crate::nodes::Parameters {
+impl Ranged for crate::nodes::Parameters<'_> {
     fn range(&self) -> TextRange {
         self.range
     }
 }
-impl Ranged for crate::nodes::ParameterWithDefault {
+impl Ranged for crate::nodes::ParameterWithDefault<'_> {
     fn range(&self) -> TextRange {
         self.range
     }

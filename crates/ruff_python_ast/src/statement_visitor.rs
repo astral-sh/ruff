@@ -3,31 +3,37 @@
 use crate::{self as ast, ElifElseClause, ExceptHandler, MatchCase, Stmt};
 
 /// A trait for AST visitors that only need to visit statements.
-pub trait StatementVisitor<'a> {
-    fn visit_body(&mut self, body: &'a [Stmt]) {
+pub trait StatementVisitor<'a, 'ast> {
+    fn visit_body(&mut self, body: &'a [Stmt<'ast>]) {
         walk_body(self, body);
     }
-    fn visit_stmt(&mut self, stmt: &'a Stmt) {
+    fn visit_stmt(&mut self, stmt: &'a Stmt<'ast>) {
         walk_stmt(self, stmt);
     }
-    fn visit_except_handler(&mut self, except_handler: &'a ExceptHandler) {
+    fn visit_except_handler(&mut self, except_handler: &'a ExceptHandler<'ast>) {
         walk_except_handler(self, except_handler);
     }
-    fn visit_elif_else_clause(&mut self, elif_else_clause: &'a ElifElseClause) {
+    fn visit_elif_else_clause(&mut self, elif_else_clause: &'a ElifElseClause<'ast>) {
         walk_elif_else_clause(self, elif_else_clause);
     }
-    fn visit_match_case(&mut self, match_case: &'a MatchCase) {
+    fn visit_match_case(&mut self, match_case: &'a MatchCase<'ast>) {
         walk_match_case(self, match_case);
     }
 }
 
-pub fn walk_body<'a, V: StatementVisitor<'a> + ?Sized>(visitor: &mut V, body: &'a [Stmt]) {
+pub fn walk_body<'a, 'ast, V: StatementVisitor<'a, 'ast> + ?Sized>(
+    visitor: &mut V,
+    body: &'a [Stmt<'ast>],
+) {
     for stmt in body {
         visitor.visit_stmt(stmt);
     }
 }
 
-pub fn walk_stmt<'a, V: StatementVisitor<'a> + ?Sized>(visitor: &mut V, stmt: &'a Stmt) {
+pub fn walk_stmt<'a, 'ast, V: StatementVisitor<'a, 'ast> + ?Sized>(
+    visitor: &mut V,
+    stmt: &'a Stmt<'ast>,
+) {
     match stmt {
         Stmt::FunctionDef(ast::StmtFunctionDef { body, .. }) => {
             visitor.visit_body(body);
@@ -79,9 +85,9 @@ pub fn walk_stmt<'a, V: StatementVisitor<'a> + ?Sized>(visitor: &mut V, stmt: &'
     }
 }
 
-pub fn walk_except_handler<'a, V: StatementVisitor<'a> + ?Sized>(
+pub fn walk_except_handler<'a, 'ast, V: StatementVisitor<'a, 'ast> + ?Sized>(
     visitor: &mut V,
-    except_handler: &'a ExceptHandler,
+    except_handler: &'a ExceptHandler<'ast>,
 ) {
     match except_handler {
         ExceptHandler::ExceptHandler(ast::ExceptHandlerExceptHandler { body, .. }) => {
@@ -90,16 +96,16 @@ pub fn walk_except_handler<'a, V: StatementVisitor<'a> + ?Sized>(
     }
 }
 
-pub fn walk_elif_else_clause<'a, V: StatementVisitor<'a> + ?Sized>(
+pub fn walk_elif_else_clause<'a, 'ast, V: StatementVisitor<'a, 'ast> + ?Sized>(
     visitor: &mut V,
-    elif_else_clause: &'a ElifElseClause,
+    elif_else_clause: &'a ElifElseClause<'ast>,
 ) {
     visitor.visit_body(&elif_else_clause.body);
 }
 
-pub fn walk_match_case<'a, V: StatementVisitor<'a> + ?Sized>(
+pub fn walk_match_case<'a, 'ast, V: StatementVisitor<'a, 'ast> + ?Sized>(
     visitor: &mut V,
-    match_case: &'a MatchCase,
+    match_case: &'a MatchCase<'ast>,
 ) {
     visitor.visit_body(&match_case.body);
 }

@@ -1,5 +1,6 @@
 //! This module takes care of parsing a type annotation.
 
+use ruff_allocator::Allocator;
 use ruff_python_ast::relocate::relocate_expr;
 use ruff_python_ast::str::raw_contents;
 use ruff_python_ast::{ExprStringLiteral, ModExpression, StringFlags, StringLiteral};
@@ -31,10 +32,11 @@ impl AnnotationKind {
 
 /// Parses the given string expression node as a type annotation. The given `source` is the entire
 /// source code.
-pub fn parse_type_annotation(
-    string_expr: &ExprStringLiteral,
-    source: &str,
-) -> Result<(Parsed<ModExpression>, AnnotationKind), ParseError> {
+pub fn parse_type_annotation<'a>(
+    string_expr: &ExprStringLiteral<'a>,
+    source: &'a str,
+    allocator: &'a Allocator,
+) -> Result<(Parsed<ModExpression<'a>>, AnnotationKind), ParseError> {
     let expr_text = &source[string_expr.range()];
 
     if let [string_literal] = string_expr.value.as_slice() {
@@ -43,22 +45,23 @@ pub fn parse_type_annotation(
         if raw_contents(expr_text)
             .is_some_and(|raw_contents| raw_contents == string_literal.as_str())
         {
-            parse_simple_type_annotation(string_literal, source)
+            parse_simple_type_annotation(string_literal, source, allocator)
         } else {
             // The raw contents of the string doesn't match the parsed content. This could be the
             // case for annotations that contain escaped quotes.
-            parse_complex_type_annotation(string_expr)
+            parse_complex_type_annotation(string_expr, allocator)
         }
     } else {
         // String is implicitly concatenated.
-        parse_complex_type_annotation(string_expr)
+        parse_complex_type_annotation(string_expr, allocator)
     }
 }
 
-fn parse_simple_type_annotation(
-    string_literal: &StringLiteral,
-    source: &str,
-) -> Result<(Parsed<ModExpression>, AnnotationKind), ParseError> {
+fn parse_simple_type_annotation<'a>(
+    string_literal: &StringLiteral<'a>,
+    source: &'a str,
+    allocator: &'a Allocator,
+) -> Result<(Parsed<ModExpression<'a>>, AnnotationKind), ParseError> {
     Ok((
         parse_expression_range(
             source,
@@ -66,15 +69,17 @@ fn parse_simple_type_annotation(
                 .range()
                 .add_start(string_literal.flags.opener_len())
                 .sub_end(string_literal.flags.closer_len()),
+            allocator,
         )?,
         AnnotationKind::Simple,
     ))
 }
 
-fn parse_complex_type_annotation(
-    string_expr: &ExprStringLiteral,
-) -> Result<(Parsed<ModExpression>, AnnotationKind), ParseError> {
-    let mut parsed = parse_expression(string_expr.value.to_str())?;
+fn parse_complex_type_annotation<'ast>(
+    string_expr: &ExprStringLiteral<'_>,
+    allocator: &'ast Allocator,
+) -> Result<(Parsed<ModExpression<'ast>>, AnnotationKind), ParseError> {
+    let mut parsed = parse_expression(string_expr.value.to_str(), allocator)?;
     relocate_expr(parsed.expr_mut(), string_expr.range());
     Ok((parsed, AnnotationKind::Complex))
 }

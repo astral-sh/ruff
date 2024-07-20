@@ -13,6 +13,7 @@ license = { workspace = true }
 [lib]
 
 [dependencies]
+ruff_allocator = { workspace = true }
 ruff_python_ast = { workspace = true }
 ruff_python_trivia = { workspace = true }
 ruff_text_size = { workspace = true }

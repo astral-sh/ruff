@@ -2,7 +2,7 @@
 use crate::{self as ast, ExceptHandler, Stmt, Suite};
 
 /// Given a [`Stmt`] and its parent, return the [`Suite`] that contains the [`Stmt`].
-pub fn suite<'a>(stmt: &'a Stmt, parent: &'a Stmt) -> Option<&'a Suite> {
+pub fn suite<'a, 'ast>(stmt: &'a Stmt<'ast>, parent: &'a Stmt<'ast>) -> Option<&'a Suite<'ast>> {
     // TODO: refactor this to work without a parent, ie when `stmt` is at the top level
     match parent {
         Stmt::FunctionDef(ast::StmtFunctionDef { body, .. }) => Some(body),
@@ -70,7 +70,10 @@ pub fn suite<'a>(stmt: &'a Stmt, parent: &'a Stmt) -> Option<&'a Suite> {
 }
 
 /// Given a [`Stmt`] and its containing [`Suite`], return the next [`Stmt`] in the [`Suite`].
-pub fn next_sibling<'a>(stmt: &'a Stmt, suite: &'a Suite) -> Option<&'a Stmt> {
+pub fn next_sibling<'a, 'ast>(
+    stmt: &'a Stmt<'ast>,
+    suite: &'a Suite<'ast>,
+) -> Option<&'a Stmt<'ast>> {
     let mut iter = suite.iter();
     while let Some(sibling) = iter.next() {
         if sibling == stmt {

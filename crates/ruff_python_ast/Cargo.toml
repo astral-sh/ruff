@@ -21,6 +21,7 @@ ruff_text_size = { workspace = true }
 
 aho-corasick = { workspace = true }
 bitflags = { workspace = true }
+ruff_allocator = { workspace = true }
 is-macro = { workspace = true }
 itertools = { workspace = true }
 once_cell = { workspace = true }

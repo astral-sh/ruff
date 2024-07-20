@@ -1,0 +1,17 @@
+[package]
+name = "ruff_allocator"
+version = "0.0.0"
+publish = false
+authors = { workspace = true }
+edition = { workspace = true }
+rust-version = { workspace = true }
+homepage = { workspace = true }
+documentation = { workspace = true }
+repository = { workspace = true }
+license = { workspace = true }
+
+[dependencies]
+bumpalo = { workspace = true, features = ["boxed", "collections"] }
+
+[lints]
+workspace = true

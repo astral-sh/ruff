@@ -20,7 +20,7 @@ pub trait Identifier {
     fn identifier(&self) -> TextRange;
 }
 
-impl Identifier for ast::StmtFunctionDef {
+impl Identifier for ast::StmtFunctionDef<'_> {
     /// Return the [`TextRange`] of the identifier in the given function definition.
     ///
     /// For example, return the range of `f` in:
@@ -33,7 +33,7 @@ impl Identifier for ast::StmtFunctionDef {
     }
 }
 
-impl Identifier for ast::StmtClassDef {
+impl Identifier for ast::StmtClassDef<'_> {
     /// Return the [`TextRange`] of the identifier in the given class definition.
     ///
     /// For example, return the range of `C` in:
@@ -46,7 +46,7 @@ impl Identifier for ast::StmtClassDef {
     }
 }
 
-impl Identifier for Stmt {
+impl Identifier for Stmt<'_> {
     /// Return the [`TextRange`] of the identifier in the given statement.
     ///
     /// For example, return the range of `f` in:
@@ -63,7 +63,7 @@ impl Identifier for Stmt {
     }
 }
 
-impl Identifier for Parameter {
+impl Identifier for Parameter<'_> {
     /// Return the [`TextRange`] for the identifier defining an [`Parameter`].
     ///
     /// For example, return the range of `x` in:
@@ -76,7 +76,7 @@ impl Identifier for Parameter {
     }
 }
 
-impl Identifier for ParameterWithDefault {
+impl Identifier for ParameterWithDefault<'_> {
     /// Return the [`TextRange`] for the identifier defining an [`ParameterWithDefault`].
     ///
     /// For example, return the range of `x` in:
@@ -89,7 +89,7 @@ impl Identifier for ParameterWithDefault {
     }
 }
 
-impl Identifier for Alias {
+impl Identifier for Alias<'_> {
     /// Return the [`TextRange`] for the identifier defining an [`Alias`].
     ///
     /// For example, return the range of `x` in:

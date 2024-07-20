@@ -1,0 +1,39 @@
+---
+source: crates/ruff_python_parser/src/string.rs
+assertion_line: 869
+expression: suite
+---
+[
+    Assign(
+        StmtAssign {
+            range: 0..16,
+            targets: [
+                Name(
+                    ExprName {
+                        range: 0..4,
+                        id: "bold",
+                        ctx: Store,
+                    },
+                ),
+            ],
+            value: StringLiteral(
+                ExprStringLiteral {
+                    range: 7..16,
+                    value: StringLiteralValue {
+                        inner: Single(
+                            StringLiteral {
+                                range: 7..16,
+                                value: "\u{3}8[1m",
+                                flags: StringLiteralFlags {
+                                    quote_style: Single,
+                                    prefix: Empty,
+                                    triple_quoted: false,
+                                },
+                            },
+                        ),
+                    },
+                },
+            ),
+        },
+    ),
+]

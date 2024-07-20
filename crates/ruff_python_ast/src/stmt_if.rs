@@ -20,20 +20,22 @@ pub enum BranchKind {
 }
 
 #[derive(Debug)]
-pub struct IfElifBranch<'a> {
+pub struct IfElifBranch<'a, 'ast> {
     pub kind: BranchKind,
-    pub test: &'a Expr,
-    pub body: &'a [Stmt],
+    pub test: &'a Expr<'ast>,
+    pub body: &'a [Stmt<'ast>],
     range: TextRange,
 }
 
-impl Ranged for IfElifBranch<'_> {
+impl Ranged for IfElifBranch<'_, '_> {
     fn range(&self) -> TextRange {
         self.range
     }
 }
 
-pub fn if_elif_branches(stmt_if: &StmtIf) -> impl Iterator<Item = IfElifBranch> {
+pub fn if_elif_branches<'a, 'ast>(
+    stmt_if: &'a StmtIf<'ast>,
+) -> impl Iterator<Item = IfElifBranch<'a, 'ast>> {
     iter::once(IfElifBranch {
         kind: BranchKind::If,
         test: stmt_if.test.as_ref(),

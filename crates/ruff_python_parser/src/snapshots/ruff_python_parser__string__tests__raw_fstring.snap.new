@@ -1,0 +1,50 @@
+---
+source: crates/ruff_python_parser/src/string.rs
+assertion_line: 827
+expression: suite
+---
+[
+    Expr(
+        StmtExpr {
+            range: 0..7,
+            value: FString(
+                ExprFString {
+                    range: 0..7,
+                    value: FStringValue {
+                        inner: Single(
+                            FString(
+                                FString {
+                                    range: 0..7,
+                                    elements: [
+                                        Expression(
+                                            FStringExpressionElement {
+                                                range: 3..6,
+                                                expression: Name(
+                                                    ExprName {
+                                                        range: 4..5,
+                                                        id: "x",
+                                                        ctx: Load,
+                                                    },
+                                                ),
+                                                debug_text: None,
+                                                conversion: None,
+                                                format_spec: None,
+                                            },
+                                        ),
+                                    ],
+                                    flags: FStringFlags {
+                                        quote_style: Double,
+                                        prefix: Raw {
+                                            uppercase_r: false,
+                                        },
+                                        triple_quoted: false,
+                                    },
+                                },
+                            ),
+                        ),
+                    },
+                },
+            ),
+        },
+    ),
+]
