@@ -1,3 +1,4 @@
+use itertools::Itertools;
 use ruff_diagnostics::Diagnostic;
 use ruff_diagnostics::Violation;
 use ruff_macros::{derive_message_formats, violation};
@@ -15,11 +16,12 @@ use crate::rules::pydocstyle::settings::Convention;
 
 /// ## What it does
 /// Checks for function docstrings that do not include documentation for all
-/// raised exceptions.
+/// explicitly-raised exceptions.
 ///
 /// ## Why is this bad?
-/// This rule helps prevent you from leaving docstrings unfinished or incomplete.
-/// Some conventions require all explicit exceptions to be documented.
+/// If a raise is mentioned in a docstring, but the function itself does not
+/// explicitly raise it, it can be misleading to users and/or a sign of
+/// incomplete documentation or refactors.
 ///
 /// ## Example
 /// ```python
@@ -77,7 +79,8 @@ impl Violation for DocstringMissingException {
 /// explicitly raised.
 ///
 /// ## Why is this bad?
-/// Some conventions prefer non-explicit exceptions be left out of the docstring.
+/// Some conventions prefer non-explicit exceptions be omitted from the
+/// docstring.
 ///
 /// ## Example
 /// ```python
@@ -120,37 +123,47 @@ impl Violation for DocstringExtraneousException {
     #[derive_message_formats]
     fn message(&self) -> String {
         let DocstringExtraneousException { ids } = self;
-        format!("{} not explicitly raised.", ids.join(", "))
+
+        if let [id] = ids.as_slice() {
+            format!("Raised exception is not explicitly raised: `{id}`")
+        } else {
+            format!(
+                "Raised exceptions are not explicitly raised: {}",
+                ids.iter().map(|id| format!("`{id}`")).join(", ")
+            )
+        }
     }
 }
 
-// Parse docstring
 #[derive(Debug)]
 struct DocstringEntries<'a> {
     raised_exceptions: Vec<QualifiedName<'a>>,
-    raised_exceptions_range: Option<TextRange>,
+    raised_exceptions_range: TextRange,
 }
 
 impl<'a> DocstringEntries<'a> {
-    fn new(sections: &'a SectionContexts, style: SectionStyle) -> Self {
-        let mut raised_exceptions: Vec<QualifiedName> = Vec::new();
-        let mut raised_exceptions_range = None;
-
+    /// Return the raised exceptions for the docstring, or `None` if the docstring does not contain
+    /// a `Raises` section.
+    fn from_sections(sections: &'a SectionContexts, style: SectionStyle) -> Option<Self> {
         for section in sections.iter() {
             if section.kind() == SectionKind::Raises {
-                raised_exceptions = parse_entries(section.following_lines_str(), style);
-                raised_exceptions_range = Some(section.range());
+                return Some(Self {
+                    raised_exceptions: parse_entries(section.following_lines_str(), style),
+                    raised_exceptions_range: section.range(),
+                });
             }
         }
-
-        Self {
-            raised_exceptions,
-            raised_exceptions_range,
-        }
+        None
     }
 }
 
-// Parses docstring sections of supported styles.
+impl Ranged for DocstringEntries<'_> {
+    fn range(&self) -> TextRange {
+        self.raised_exceptions_range
+    }
+}
+
+/// Parse the entries in a `Raises` section of a docstring.
 fn parse_entries(content: &str, style: SectionStyle) -> Vec<QualifiedName> {
     match style {
         SectionStyle::Google => parse_entries_google(content),
@@ -158,12 +171,13 @@ fn parse_entries(content: &str, style: SectionStyle) -> Vec<QualifiedName> {
     }
 }
 
-// Parses google style docstring sections of the form:
-//
-//     Raises:
-//         FasterThanLightError: If speed is greater than the speed of light.
-//         DivisionByZero: If attempting to divide by zero.
-//
+/// Parses Google-style docstring sections of the form:
+///
+/// ```python
+/// Raises:
+///     FasterThanLightError: If speed is greater than the speed of light.
+///     DivisionByZero: If attempting to divide by zero.
+/// ```
 fn parse_entries_google(content: &str) -> Vec<QualifiedName> {
     let mut entries: Vec<QualifiedName> = Vec::new();
     for potential in content.split('\n') {
@@ -176,15 +190,16 @@ fn parse_entries_google(content: &str) -> Vec<QualifiedName> {
     entries
 }
 
-// Parses numpy style docstring sections of the form:
-//
-//    Raises
-//    ------
-//    FasterThanLightError
-//        If speed is greater than the speed of light.
-//    DivisionByZero
-//        If attempting to divide by zero.
-//
+/// Parses NumPy-style docstring sections of the form:
+///
+/// ```python
+/// Raises
+/// ------
+/// FasterThanLightError
+///     If speed is greater than the speed of light.
+/// DivisionByZero
+///     If attempting to divide by zero.
+/// ```
 fn parse_entries_numpy(content: &str) -> Vec<QualifiedName> {
     let mut entries: Vec<QualifiedName> = Vec::new();
     let mut split = content.split('\n');
@@ -203,17 +218,26 @@ fn parse_entries_numpy(content: &str) -> Vec<QualifiedName> {
     entries
 }
 
-// Parse body
+/// An individual exception raised in a function body.
 #[derive(Debug)]
 struct Entry<'a> {
     qualified_name: QualifiedName<'a>,
     range: TextRange,
 }
 
+impl Ranged for Entry<'_> {
+    fn range(&self) -> TextRange {
+        self.range
+    }
+}
+
+/// The exceptions raised in a function body.
+#[derive(Debug)]
 struct BodyEntries<'a> {
     raised_exceptions: Vec<Entry<'a>>,
 }
 
+/// An AST visitor to extract the raised exceptions from a function body.
 struct BodyVisitor<'a> {
     raised_exceptions: Vec<Entry<'a>>,
     semantic: &'a SemanticModel<'a>,
@@ -283,32 +307,45 @@ pub(crate) fn check_docstring(
 
     // Prioritize the specified convention over the determined style.
     let docstring_entries = match convention {
-        Some(Convention::Google) => DocstringEntries::new(section_contexts, SectionStyle::Google),
-        Some(Convention::Numpy) => DocstringEntries::new(section_contexts, SectionStyle::Numpy),
-        _ => DocstringEntries::new(section_contexts, section_contexts.style()),
+        Some(Convention::Google) => {
+            DocstringEntries::from_sections(section_contexts, SectionStyle::Google)
+        }
+        Some(Convention::Numpy) => {
+            DocstringEntries::from_sections(section_contexts, SectionStyle::Numpy)
+        }
+        _ => DocstringEntries::from_sections(section_contexts, section_contexts.style()),
     };
 
-    let mut visitor = BodyVisitor::new(checker.semantic());
-    visitor::walk_body(&mut visitor, member.body());
-    let body_entries = visitor.finish();
+    let body_entries = {
+        let mut visitor = BodyVisitor::new(checker.semantic());
+        visitor::walk_body(&mut visitor, member.body());
+        visitor.finish()
+    };
 
     // DOC501
     if checker.enabled(Rule::DocstringMissingException) {
         for body_raise in &body_entries.raised_exceptions {
-            if *body_raise.qualified_name.segments().last().unwrap() == "NotImplementedError" {
+            let Some(name) = body_raise.qualified_name.segments().last() else {
+                continue;
+            };
+
+            if *name == "NotImplementedError" {
                 continue;
             }
 
-            if !docstring_entries
-                .raised_exceptions
-                .iter()
-                .any(|r| body_raise.qualified_name.segments().ends_with(r.segments()))
-            {
+            if !docstring_entries.as_ref().is_some_and(|entries| {
+                entries.raised_exceptions.iter().any(|exception| {
+                    body_raise
+                        .qualified_name
+                        .segments()
+                        .ends_with(exception.segments())
+                })
+            }) {
                 let diagnostic = Diagnostic::new(
                     DocstringMissingException {
-                        id: (*body_raise.qualified_name.segments().last().unwrap()).to_string(),
+                        id: (*name).to_string(),
                     },
-                    body_raise.range,
+                    body_raise.range(),
                 );
                 diagnostics.push(diagnostic);
             }
@@ -317,24 +354,27 @@ pub(crate) fn check_docstring(
 
     // DOC502
     if checker.enabled(Rule::DocstringExtraneousException) {
-        let mut extraneous_exceptions = Vec::new();
-        for docstring_raise in &docstring_entries.raised_exceptions {
-            if !body_entries.raised_exceptions.iter().any(|r| {
-                r.qualified_name
-                    .segments()
-                    .ends_with(docstring_raise.segments())
-            }) {
-                extraneous_exceptions.push(docstring_raise.to_string());
+        if let Some(docstring_entries) = docstring_entries {
+            let mut extraneous_exceptions = Vec::new();
+            for docstring_raise in &docstring_entries.raised_exceptions {
+                if !body_entries.raised_exceptions.iter().any(|exception| {
+                    exception
+                        .qualified_name
+                        .segments()
+                        .ends_with(docstring_raise.segments())
+                }) {
+                    extraneous_exceptions.push(docstring_raise.to_string());
+                }
             }
-        }
-        if !extraneous_exceptions.is_empty() {
-            let diagnostic = Diagnostic::new(
-                DocstringExtraneousException {
-                    ids: extraneous_exceptions,
-                },
-                docstring_entries.raised_exceptions_range.unwrap(),
-            );
-            diagnostics.push(diagnostic);
+            if !extraneous_exceptions.is_empty() {
+                let diagnostic = Diagnostic::new(
+                    DocstringExtraneousException {
+                        ids: extraneous_exceptions,
+                    },
+                    docstring_entries.range(),
+                );
+                diagnostics.push(diagnostic);
+            }
         }
     }
 

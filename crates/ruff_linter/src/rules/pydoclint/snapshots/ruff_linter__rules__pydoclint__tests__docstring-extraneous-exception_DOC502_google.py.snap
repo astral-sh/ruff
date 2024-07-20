@@ -1,7 +1,7 @@
 ---
 source: crates/ruff_linter/src/rules/pydoclint/mod.rs
 ---
-DOC502_google.py:16:1: DOC502 FasterThanLightError not explicitly raised.
+DOC502_google.py:16:1: DOC502 Raised exception is not explicitly raised: `FasterThanLightError`
    |
 14 |           Speed as distance divided by time.
 15 |   
@@ -12,7 +12,7 @@ DOC502_google.py:16:1: DOC502 FasterThanLightError not explicitly raised.
 19 |       return distance / time
    |
 
-DOC502_google.py:33:1: DOC502 FasterThanLightError, DivisionByZero not explicitly raised.
+DOC502_google.py:33:1: DOC502 Raised exceptions are not explicitly raised: `FasterThanLightError`, `DivisionByZero`
    |
 31 |           Speed as distance divided by time.
 32 |   
@@ -24,7 +24,7 @@ DOC502_google.py:33:1: DOC502 FasterThanLightError, DivisionByZero not explicitl
 37 |       return distance / time
    |
 
-DOC502_google.py:51:1: DOC502 DivisionByZero not explicitly raised.
+DOC502_google.py:51:1: DOC502 Raised exception is not explicitly raised: `DivisionByZero`
    |
 49 |           Speed as distance divided by time.
 50 |   
