@@ -1,5 +1,22 @@
 # Changelog
 
+## 0.5.4
+
+### Rule changes
+
+- \[`ruff`  \]   Rename `RUF007` to `zip-instead-of-pairwise` ([#12399](https://github.com/astral-sh/ruff/pull/12399))
+
+### Bug fixes
+
+- \[`flake8-  builtins`  \] A  void shadowing diagnostics for `@override` methods ([#12415](https://github.com/astral-sh/ruff/pull/12415))
+- \[`flake8-comprehensions`  \] Insert parentheses for multi-argument generators ([#12422](https://github.com/astral-sh/ruff/pull/12422))
+- \[`pydocstyle`\] Handle e  scaped docstrings within docstring (`D301`) ([#12192](https://github.com/astral-sh/ruff/pull/12192))
+
+### Documentation
+
+- Fix GitHub link to Neovim setup ([#12410](https://github.com/astral-sh/ruff/pull/12410))
+- Fix `output-format` default in settings reference ([#12409](https://github.com/astral-sh/ruff/pull/12409))
+
 ## 0.5.3
 
 **Ruff 0.5.3 marks the stable release of the Ruff language server and introduces revamped
