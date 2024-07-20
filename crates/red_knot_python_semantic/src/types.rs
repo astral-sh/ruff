@@ -236,7 +236,7 @@ impl<'db> ClassType<'db> {
 #[salsa::interned]
 pub struct UnionType<'db> {
     /// the union type includes values in any of these types
-    elements: FxOrderSet<Type<'db>>,
+    pub elements: FxOrderSet<Type<'db>>,
 }
 
 struct UnionTypeBuilder<'db> {

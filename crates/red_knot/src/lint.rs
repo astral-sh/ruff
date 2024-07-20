@@ -11,7 +11,7 @@ use ruff_db::files::File;
 use ruff_db::parsed::{parsed_module, ParsedModule};
 use ruff_db::source::{source_text, SourceText};
 use ruff_python_ast as ast;
-use ruff_python_ast::visitor::{walk_stmt, Visitor};
+use ruff_python_ast::visitor::{walk_expr, walk_stmt, Visitor};
 
 use crate::db::Db;
 
@@ -117,6 +117,25 @@ fn lint_unresolved_imports(context: &SemanticLintContext, import: AnyImportRef) 
                 }
             }
         }
+    }
+}
+
+fn lint_maybe_undefined(context: &SemanticLintContext, name: &ast::ExprName) {
+    if !matches!(name.ctx, ast::ExprContext::Load) {
+        return;
+    }
+    let semantic = &context.semantic;
+    match name.ty(semantic) {
+        Type::Unbound => {
+            context.push_diagnostic(format!("Name '{}' used when not defined.", &name.id));
+        }
+        Type::Union(union) if union.elements(semantic.db()).contains(&Type::Unbound) => {
+            context.push_diagnostic(format!(
+                "Name '{}' used when possibly not defined.",
+                &name.id
+            ));
+        }
+        _ => {}
     }
 }
 
@@ -232,6 +251,17 @@ impl Visitor<'_> for SemanticVisitor<'_> {
         }
 
         walk_stmt(self, stmt);
+    }
+
+    fn visit_expr(&mut self, expr: &ast::Expr) {
+        match expr {
+            ast::Expr::Name(name) if matches!(name.ctx, ast::ExprContext::Load) => {
+                lint_maybe_undefined(self.context, name);
+            }
+            _ => {}
+        }
+
+        walk_expr(self, expr);
     }
 }
 
