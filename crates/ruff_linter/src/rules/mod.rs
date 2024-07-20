@@ -48,6 +48,7 @@ pub mod pandas_vet;
 pub mod pep8_naming;
 pub mod perflint;
 pub mod pycodestyle;
+pub mod pydoclint;
 pub mod pydocstyle;
 pub mod pyflakes;
 pub mod pygrep_hooks;
