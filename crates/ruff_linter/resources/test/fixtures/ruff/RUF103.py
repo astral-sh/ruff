@@ -1,16 +1,31 @@
-from fastapi import FastAPI, APIRouter, Query, Path, Body, Cookie, Header, File, Form, Depends, Security
+from fastapi import (
+    FastAPI,
+    APIRouter,
+    Query,
+    Path,
+    Body,
+    Cookie,
+    Header,
+    File,
+    Form,
+    Depends,
+    Security,
+)
 from pydantic import BaseModel
 
 app = FastAPI()
 router = APIRouter()
 
-# Errors.
+
+# Errors
+
 @app.get("/items/")
 def get_items(
     current_user: User = Depends(get_current_user),
     some_security_param: str = Security(get_oauth2_user),
 ):
     pass
+
 
 @app.post("/stuff/")
 def do_stuff(
@@ -25,17 +40,20 @@ def do_stuff(
     # do stuff
     pass
 
-# Shouldn't change
+
+# Unchanged
+
 
 @app.post("/stuff/")
 def do_stuff(
     no_default: Body("foo"),
-    no_type_annotation = str,
+    no_type_annotation=str,
     no_fastapi_default: str = BaseModel(),
 ):
     pass
 
-# Ok.
+
+# OK
 
 @app.post("/stuff/")
 def do_stuff(
