@@ -210,7 +210,7 @@ fn parse_entries_numpy(content: &str) -> Vec<QualifiedName> {
     for potential in split {
         if let Some(first_char) = potential.chars().nth(indentation) {
             if !first_char.is_whitespace() {
-                let entry = potential[indentation..].trim();
+                let entry = potential.trim();
                 entries.push(QualifiedName::user_defined(entry));
             }
         }

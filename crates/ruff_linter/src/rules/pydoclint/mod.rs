@@ -15,6 +15,17 @@ mod tests {
     use crate::test::test_path;
     use crate::{assert_messages, settings};
 
+    #[test_case(Rule::DocstringMissingException, Path::new("DOC501.py"))]
+    fn rules(rule_code: Rule, path: &Path) -> Result<()> {
+        let snapshot = format!("{}_{}", rule_code.as_ref(), path.to_string_lossy());
+        let diagnostics = test_path(
+            Path::new("pydoclint").join(path).as_path(),
+            &settings::LinterSettings::for_rule(rule_code),
+        )?;
+        assert_messages!(snapshot, diagnostics);
+        Ok(())
+    }
+
     #[test_case(Rule::DocstringMissingException, Path::new("DOC501_google.py"))]
     #[test_case(Rule::DocstringExtraneousException, Path::new("DOC502_google.py"))]
     fn rules_google_style(rule_code: Rule, path: &Path) -> Result<()> {
