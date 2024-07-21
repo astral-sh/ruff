@@ -193,6 +193,9 @@ pub enum Linter {
     /// NumPy-specific rules
     #[prefix = "NPY"]
     Numpy,
+    /// [FastAPI](https://pypi.org/project/fastapi/)
+    #[prefix = "FAST"]
+    FastApi,
     /// [Airflow](https://pypi.org/project/apache-airflow/)
     #[prefix = "AIR"]
     Airflow,

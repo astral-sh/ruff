@@ -1,10 +1,10 @@
 ---
-source: crates/ruff_linter/src/rules/ruff/mod.rs
+source: crates/ruff_linter/src/rules/fastapi/mod.rs
 ---
-RUF102.py:17:22: RUF102 [*] FastAPI route with redundant `response_model` argument
+FAST001.py:17:22: FAST001 [*] FastAPI route with redundant `response_model` argument
    |
 17 | @app.post("/items/", response_model=Item)
-   |                      ^^^^^^^^^^^^^^^^^^^ RUF102
+   |                      ^^^^^^^^^^^^^^^^^^^ FAST001
 18 | async def create_item(item: Item) -> Item:
 19 |     return item
    |
@@ -20,10 +20,10 @@ RUF102.py:17:22: RUF102 [*] FastAPI route with redundant `response_model` argume
 19 19 |     return item
 20 20 | 
 
-RUF102.py:22:22: RUF102 [*] FastAPI route with redundant `response_model` argument
+FAST001.py:22:22: FAST001 [*] FastAPI route with redundant `response_model` argument
    |
 22 | @app.post("/items/", response_model=list[Item])
-   |                      ^^^^^^^^^^^^^^^^^^^^^^^^^ RUF102
+   |                      ^^^^^^^^^^^^^^^^^^^^^^^^^ FAST001
 23 | async def create_item(item: Item) -> list[Item]:
 24 |     return item
    |
@@ -39,10 +39,10 @@ RUF102.py:22:22: RUF102 [*] FastAPI route with redundant `response_model` argume
 24 24 |     return item
 25 25 | 
 
-RUF102.py:27:22: RUF102 [*] FastAPI route with redundant `response_model` argument
+FAST001.py:27:22: FAST001 [*] FastAPI route with redundant `response_model` argument
    |
 27 | @app.post("/items/", response_model=List[Item])
-   |                      ^^^^^^^^^^^^^^^^^^^^^^^^^ RUF102
+   |                      ^^^^^^^^^^^^^^^^^^^^^^^^^ FAST001
 28 | async def create_item(item: Item) -> List[Item]:
 29 |     return item
    |
@@ -58,10 +58,10 @@ RUF102.py:27:22: RUF102 [*] FastAPI route with redundant `response_model` argume
 29 29 |     return item
 30 30 | 
 
-RUF102.py:32:22: RUF102 [*] FastAPI route with redundant `response_model` argument
+FAST001.py:32:22: FAST001 [*] FastAPI route with redundant `response_model` argument
    |
 32 | @app.post("/items/", response_model=Dict[str, Item])
-   |                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF102
+   |                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ FAST001
 33 | async def create_item(item: Item) -> Dict[str, Item]:
 34 |     return item
    |
@@ -77,10 +77,10 @@ RUF102.py:32:22: RUF102 [*] FastAPI route with redundant `response_model` argume
 34 34 |     return item
 35 35 | 
 
-RUF102.py:37:22: RUF102 [*] FastAPI route with redundant `response_model` argument
+FAST001.py:37:22: FAST001 [*] FastAPI route with redundant `response_model` argument
    |
 37 | @app.post("/items/", response_model=str)
-   |                      ^^^^^^^^^^^^^^^^^^ RUF102
+   |                      ^^^^^^^^^^^^^^^^^^ FAST001
 38 | async def create_item(item: Item) -> str:
 39 |     return item
    |
@@ -96,10 +96,10 @@ RUF102.py:37:22: RUF102 [*] FastAPI route with redundant `response_model` argume
 39 39 |     return item
 40 40 | 
 
-RUF102.py:42:21: RUF102 [*] FastAPI route with redundant `response_model` argument
+FAST001.py:42:21: FAST001 [*] FastAPI route with redundant `response_model` argument
    |
 42 | @app.get("/items/", response_model=Item)
-   |                     ^^^^^^^^^^^^^^^^^^^ RUF102
+   |                     ^^^^^^^^^^^^^^^^^^^ FAST001
 43 | async def create_item(item: Item) -> Item:
 44 |     return item
    |
@@ -115,10 +115,10 @@ RUF102.py:42:21: RUF102 [*] FastAPI route with redundant `response_model` argume
 44 44 |     return item
 45 45 | 
 
-RUF102.py:47:21: RUF102 [*] FastAPI route with redundant `response_model` argument
+FAST001.py:47:21: FAST001 [*] FastAPI route with redundant `response_model` argument
    |
 47 | @app.get("/items/", response_model=Item)
-   |                     ^^^^^^^^^^^^^^^^^^^ RUF102
+   |                     ^^^^^^^^^^^^^^^^^^^ FAST001
 48 | @app.post("/items/", response_model=Item)
 49 | async def create_item(item: Item) -> Item:
    |
@@ -134,11 +134,11 @@ RUF102.py:47:21: RUF102 [*] FastAPI route with redundant `response_model` argume
 49 49 | async def create_item(item: Item) -> Item:
 50 50 |     return item
 
-RUF102.py:48:22: RUF102 [*] FastAPI route with redundant `response_model` argument
+FAST001.py:48:22: FAST001 [*] FastAPI route with redundant `response_model` argument
    |
 47 | @app.get("/items/", response_model=Item)
 48 | @app.post("/items/", response_model=Item)
-   |                      ^^^^^^^^^^^^^^^^^^^ RUF102
+   |                      ^^^^^^^^^^^^^^^^^^^ FAST001
 49 | async def create_item(item: Item) -> Item:
 50 |     return item
    |
@@ -154,10 +154,10 @@ RUF102.py:48:22: RUF102 [*] FastAPI route with redundant `response_model` argume
 50 50 |     return item
 51 51 | 
 
-RUF102.py:53:24: RUF102 [*] FastAPI route with redundant `response_model` argument
+FAST001.py:53:24: FAST001 [*] FastAPI route with redundant `response_model` argument
    |
 53 | @router.get("/items/", response_model=Item)
-   |                        ^^^^^^^^^^^^^^^^^^^ RUF102
+   |                        ^^^^^^^^^^^^^^^^^^^ FAST001
 54 | async def create_item(item: Item) -> Item:
 55 |     return item
    |

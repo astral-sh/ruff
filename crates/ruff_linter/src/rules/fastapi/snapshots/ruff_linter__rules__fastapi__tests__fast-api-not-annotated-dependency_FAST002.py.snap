@@ -1,12 +1,12 @@
 ---
-source: crates/ruff_linter/src/rules/ruff/mod.rs
+source: crates/ruff_linter/src/rules/fastapi/mod.rs
 ---
-RUF103.py:24:5: RUF103 [*] FastAPI dependency without `Annotated`
+FAST002.py:24:5: FAST002 [*] FastAPI dependency without `Annotated`
    |
 22 | @app.get("/items/")
 23 | def get_items(
 24 |     current_user: User = Depends(get_current_user),
-   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF103
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ FAST002
 25 |     some_security_param: str = Security(get_oauth2_user),
 26 | ):
    |
@@ -30,12 +30,12 @@ RUF103.py:24:5: RUF103 [*] FastAPI dependency without `Annotated`
 26 27 | ):
 27 28 |     pass
 
-RUF103.py:25:5: RUF103 [*] FastAPI dependency without `Annotated`
+FAST002.py:25:5: FAST002 [*] FastAPI dependency without `Annotated`
    |
 23 | def get_items(
 24 |     current_user: User = Depends(get_current_user),
 25 |     some_security_param: str = Security(get_oauth2_user),
-   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF103
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ FAST002
 26 | ):
 27 |     pass
    |
@@ -59,12 +59,12 @@ RUF103.py:25:5: RUF103 [*] FastAPI dependency without `Annotated`
 27 28 |     pass
 28 29 | 
 
-RUF103.py:32:5: RUF103 [*] FastAPI dependency without `Annotated`
+FAST002.py:32:5: FAST002 [*] FastAPI dependency without `Annotated`
    |
 30 | @app.post("/stuff/")
 31 | def do_stuff(
 32 |     some_query_param: str | None = Query(default=None),
-   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF103
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ FAST002
 33 |     some_path_param: str = Path(),
 34 |     some_body_param: str = Body("foo"),
    |
@@ -88,12 +88,12 @@ RUF103.py:32:5: RUF103 [*] FastAPI dependency without `Annotated`
 34 35 |     some_body_param: str = Body("foo"),
 35 36 |     some_cookie_param: str = Cookie(),
 
-RUF103.py:33:5: RUF103 [*] FastAPI dependency without `Annotated`
+FAST002.py:33:5: FAST002 [*] FastAPI dependency without `Annotated`
    |
 31 | def do_stuff(
 32 |     some_query_param: str | None = Query(default=None),
 33 |     some_path_param: str = Path(),
-   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF103
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ FAST002
 34 |     some_body_param: str = Body("foo"),
 35 |     some_cookie_param: str = Cookie(),
    |
@@ -117,12 +117,12 @@ RUF103.py:33:5: RUF103 [*] FastAPI dependency without `Annotated`
 35 36 |     some_cookie_param: str = Cookie(),
 36 37 |     some_header_param: int = Header(default=5),
 
-RUF103.py:34:5: RUF103 [*] FastAPI dependency without `Annotated`
+FAST002.py:34:5: FAST002 [*] FastAPI dependency without `Annotated`
    |
 32 |     some_query_param: str | None = Query(default=None),
 33 |     some_path_param: str = Path(),
 34 |     some_body_param: str = Body("foo"),
-   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF103
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ FAST002
 35 |     some_cookie_param: str = Cookie(),
 36 |     some_header_param: int = Header(default=5),
    |
@@ -146,12 +146,12 @@ RUF103.py:34:5: RUF103 [*] FastAPI dependency without `Annotated`
 36 37 |     some_header_param: int = Header(default=5),
 37 38 |     some_file_param: UploadFile = File(),
 
-RUF103.py:35:5: RUF103 [*] FastAPI dependency without `Annotated`
+FAST002.py:35:5: FAST002 [*] FastAPI dependency without `Annotated`
    |
 33 |     some_path_param: str = Path(),
 34 |     some_body_param: str = Body("foo"),
 35 |     some_cookie_param: str = Cookie(),
-   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF103
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ FAST002
 36 |     some_header_param: int = Header(default=5),
 37 |     some_file_param: UploadFile = File(),
    |
@@ -175,12 +175,12 @@ RUF103.py:35:5: RUF103 [*] FastAPI dependency without `Annotated`
 37 38 |     some_file_param: UploadFile = File(),
 38 39 |     some_form_param: str = Form(),
 
-RUF103.py:36:5: RUF103 [*] FastAPI dependency without `Annotated`
+FAST002.py:36:5: FAST002 [*] FastAPI dependency without `Annotated`
    |
 34 |     some_body_param: str = Body("foo"),
 35 |     some_cookie_param: str = Cookie(),
 36 |     some_header_param: int = Header(default=5),
-   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF103
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ FAST002
 37 |     some_file_param: UploadFile = File(),
 38 |     some_form_param: str = Form(),
    |
@@ -204,12 +204,12 @@ RUF103.py:36:5: RUF103 [*] FastAPI dependency without `Annotated`
 38 39 |     some_form_param: str = Form(),
 39 40 | ):
 
-RUF103.py:37:5: RUF103 [*] FastAPI dependency without `Annotated`
+FAST002.py:37:5: FAST002 [*] FastAPI dependency without `Annotated`
    |
 35 |     some_cookie_param: str = Cookie(),
 36 |     some_header_param: int = Header(default=5),
 37 |     some_file_param: UploadFile = File(),
-   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF103
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ FAST002
 38 |     some_form_param: str = Form(),
 39 | ):
    |
@@ -233,12 +233,12 @@ RUF103.py:37:5: RUF103 [*] FastAPI dependency without `Annotated`
 39 40 | ):
 40 41 |     # do stuff
 
-RUF103.py:38:5: RUF103 [*] FastAPI dependency without `Annotated`
+FAST002.py:38:5: FAST002 [*] FastAPI dependency without `Annotated`
    |
 36 |     some_header_param: int = Header(default=5),
 37 |     some_file_param: UploadFile = File(),
 38 |     some_form_param: str = Form(),
-   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF103
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ FAST002
 39 | ):
 40 |     # do stuff
    |

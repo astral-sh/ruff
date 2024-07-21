@@ -6,7 +6,7 @@ use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
 use crate::fix::edits::{remove_argument, Parentheses};
-use crate::rules::ruff::fastapi::is_fastapi_route_decorator;
+use crate::rules::fastapi::rules::is_fastapi_route_decorator;
 
 /// ## What it does
 /// Checks for FastAPI routes that use the optional `response_model` parameter

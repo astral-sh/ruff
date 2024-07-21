@@ -7,7 +7,7 @@ use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
 use crate::importer::ImportRequest;
-use crate::rules::ruff::fastapi::is_fastapi_route;
+use crate::rules::fastapi::rules::is_fastapi_route;
 use crate::settings::types::PythonVersion;
 
 /// ## What it does
@@ -116,7 +116,7 @@ pub(crate) fn fastapi_not_annotated_dependency(
                         "typing_extensions"
                     };
                     let (import_edit, binding) = checker.importer().get_or_import_symbol(
-                        &ImportRequest::import_from(&module, "Annotated"),
+                        &ImportRequest::import_from(module, "Annotated"),
                         function_def.start(),
                         checker.semantic(),
                     )?;

@@ -1,3 +1,9 @@
+pub(crate) use fastapi_not_annotated_dependency::*;
+pub(crate) use fastapi_redundant_response_model::*;
+
+mod fastapi_not_annotated_dependency;
+mod fastapi_redundant_response_model;
+
 use ruff_python_ast::{Decorator, ExprCall, StmtFunctionDef};
 use ruff_python_semantic::analyze::typing::resolve_assignment;
 use ruff_python_semantic::SemanticModel;
