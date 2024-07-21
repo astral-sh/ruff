@@ -32,9 +32,9 @@ use crate::checkers::ast::Checker;
 /// ## References
 /// - [Python documentation: `itertools.pairwise`](https://docs.python.org/3/library/itertools.html#itertools.pairwise)
 #[violation]
-pub struct PairwiseOverZipped;
+pub struct ZipInsteadOfPairwise;
 
-impl Violation for PairwiseOverZipped {
+impl Violation for ZipInsteadOfPairwise {
     #[derive_message_formats]
     fn message(&self) -> String {
         format!("Prefer `itertools.pairwise()` over `zip()` when iterating over successive pairs")
@@ -95,7 +95,7 @@ fn match_slice_info(expr: &Expr) -> Option<SliceInfo> {
 }
 
 /// RUF007
-pub(crate) fn pairwise_over_zipped(checker: &mut Checker, func: &Expr, args: &[Expr]) {
+pub(crate) fn zip_instead_of_pairwise(checker: &mut Checker, func: &Expr, args: &[Expr]) {
     // Require exactly two positional arguments.
     let [first, second] = args else {
         return;
@@ -141,5 +141,5 @@ pub(crate) fn pairwise_over_zipped(checker: &mut Checker, func: &Expr, args: &[E
 
     checker
         .diagnostics
-        .push(Diagnostic::new(PairwiseOverZipped, func.range()));
+        .push(Diagnostic::new(ZipInsteadOfPairwise, func.range()));
 }

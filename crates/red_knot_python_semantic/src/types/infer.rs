@@ -29,14 +29,17 @@ use ruff_db::parsed::parsed_module;
 use ruff_python_ast as ast;
 use ruff_python_ast::{ExprContext, TypeParams};
 
+use crate::builtins::builtins_scope;
 use crate::semantic_index::ast_ids::{HasScopedAstId, HasScopedUseId, ScopedExpressionId};
 use crate::semantic_index::definition::{Definition, DefinitionKind, DefinitionNodeKey};
 use crate::semantic_index::expression::Expression;
 use crate::semantic_index::semantic_index;
-use crate::semantic_index::symbol::NodeWithScopeKind;
-use crate::semantic_index::symbol::{NodeWithScopeRef, ScopeId};
+use crate::semantic_index::symbol::{FileScopeId, NodeWithScopeKind, NodeWithScopeRef, ScopeId};
 use crate::semantic_index::SemanticIndex;
-use crate::types::{definitions_ty, ClassType, FunctionType, Name, Type, UnionTypeBuilder};
+use crate::types::{
+    builtins_symbol_ty_by_name, definitions_ty, global_symbol_ty_by_name, ClassType, FunctionType,
+    Name, Type, UnionTypeBuilder,
+};
 use crate::Db;
 
 /// Infer all types for a [`ScopeId`], including all definitions and expressions in that scope.
@@ -44,9 +47,9 @@ use crate::Db;
 /// scope.
 #[salsa::tracked(return_ref)]
 pub(crate) fn infer_scope_types<'db>(db: &'db dyn Db, scope: ScopeId<'db>) -> TypeInference<'db> {
-    let _span = tracing::trace_span!("infer_scope_types", ?scope).entered();
-
     let file = scope.file(db);
+    let _span = tracing::trace_span!("infer_scope_types", ?scope, ?file).entered();
+
     // Using the index here is fine because the code below depends on the AST anyway.
     // The isolation of the query is by the return inferred types.
     let index = semantic_index(db, file);
@@ -61,9 +64,10 @@ pub(crate) fn infer_definition_types<'db>(
     db: &'db dyn Db,
     definition: Definition<'db>,
 ) -> TypeInference<'db> {
-    let _span = tracing::trace_span!("infer_definition_types", ?definition).entered();
+    let file = definition.file(db);
+    let _span = tracing::trace_span!("infer_definition_types", ?definition, ?file,).entered();
 
-    let index = semantic_index(db, definition.file(db));
+    let index = semantic_index(db, file);
 
     TypeInferenceBuilder::new(db, InferenceRegion::Definition(definition), index).finish()
 }
@@ -78,9 +82,10 @@ pub(crate) fn infer_expression_types<'db>(
     db: &'db dyn Db,
     expression: Expression<'db>,
 ) -> TypeInference<'db> {
-    let _span = tracing::trace_span!("infer_expression_types", ?expression).entered();
+    let file = expression.file(db);
+    let _span = tracing::trace_span!("infer_expression_types", ?expression, ?file).entered();
 
-    let index = semantic_index(db, expression.file(db));
+    let index = semantic_index(db, file);
 
     TypeInferenceBuilder::new(db, InferenceRegion::Expression(expression), index).finish()
 }
@@ -667,18 +672,41 @@ impl<'db> TypeInferenceBuilder<'db> {
     }
 
     fn infer_name_expression(&mut self, name: &ast::ExprName) -> Type<'db> {
-        let ast::ExprName {
-            range: _,
-            id: _,
-            ctx,
-        } = name;
+        let ast::ExprName { range: _, id, ctx } = name;
 
         match ctx {
             ExprContext::Load => {
-                let use_def = self.index.use_def_map(self.scope.file_scope_id(self.db));
+                let file_scope_id = self.scope.file_scope_id(self.db);
+                let use_def = self.index.use_def_map(file_scope_id);
                 let use_id = name.scoped_use_id(self.db, self.scope);
-                let definitions = use_def.use_definitions(use_id);
-                definitions_ty(self.db, definitions, use_def.use_may_be_unbound(use_id))
+                let may_be_unbound = use_def.use_may_be_unbound(use_id);
+
+                let unbound_ty = if may_be_unbound {
+                    let symbols = self.index.symbol_table(file_scope_id);
+                    // SAFETY: the symbol table always creates a symbol for every Name node.
+                    let symbol = symbols.symbol_by_name(id).unwrap();
+                    if !symbol.is_defined() || !self.scope.is_function_like(self.db) {
+                        // implicit global
+                        let mut unbound_ty = if file_scope_id == FileScopeId::global() {
+                            Type::Unbound
+                        } else {
+                            global_symbol_ty_by_name(self.db, self.file, id)
+                        };
+                        // fallback to builtins
+                        if matches!(unbound_ty, Type::Unbound)
+                            && Some(self.scope) != builtins_scope(self.db)
+                        {
+                            unbound_ty = builtins_symbol_ty_by_name(self.db, id);
+                        }
+                        Some(unbound_ty)
+                    } else {
+                        Some(Type::Unbound)
+                    }
+                } else {
+                    None
+                };
+
+                definitions_ty(self.db, use_def.use_definitions(use_id), unbound_ty)
             }
             ExprContext::Store | ExprContext::Del => Type::None,
             ExprContext::Invalid => Type::Unknown,
@@ -776,11 +804,14 @@ mod tests {
     use ruff_db::testing::assert_function_query_was_not_run;
     use ruff_python_ast::name::Name;
 
+    use crate::builtins::builtins_scope;
     use crate::db::tests::TestDb;
     use crate::semantic_index::definition::Definition;
+    use crate::semantic_index::semantic_index;
+    use crate::semantic_index::symbol::FileScopeId;
     use crate::types::{
-        infer_definition_types, module_global_scope, module_global_symbol_ty_by_name, symbol_table,
-        use_def_map, Type,
+        global_scope, global_symbol_ty_by_name, infer_definition_types, symbol_table,
+        symbol_ty_by_name, use_def_map, Type,
     };
     use crate::{HasTy, SemanticModel};
 
@@ -801,10 +832,27 @@ mod tests {
         db
     }
 
+    fn setup_db_with_custom_typeshed(typeshed: &str) -> TestDb {
+        let db = TestDb::new();
+
+        Program::new(
+            &db,
+            TargetVersion::Py38,
+            SearchPathSettings {
+                extra_paths: Vec::new(),
+                workspace_root: SystemPathBuf::from("/src"),
+                site_packages: None,
+                custom_typeshed: Some(SystemPathBuf::from(typeshed)),
+            },
+        );
+
+        db
+    }
+
     fn assert_public_ty(db: &TestDb, file_name: &str, symbol_name: &str, expected: &str) {
         let file = system_path_to_file(db, file_name).expect("Expected file to exist.");
 
-        let ty = module_global_symbol_ty_by_name(db, file, symbol_name);
+        let ty = global_symbol_ty_by_name(db, file, symbol_name);
         assert_eq!(ty.display(db).to_string(), expected);
     }
 
@@ -838,7 +886,7 @@ mod tests {
         )?;
 
         let mod_file = system_path_to_file(&db, "src/mod.py").expect("Expected file to exist.");
-        let ty = module_global_symbol_ty_by_name(&db, mod_file, "Sub");
+        let ty = global_symbol_ty_by_name(&db, mod_file, "Sub");
 
         let Type::Class(class) = ty else {
             panic!("Sub is not a Class")
@@ -868,7 +916,7 @@ mod tests {
         )?;
 
         let mod_file = system_path_to_file(&db, "src/mod.py").unwrap();
-        let ty = module_global_symbol_ty_by_name(&db, mod_file, "C");
+        let ty = global_symbol_ty_by_name(&db, mod_file, "C");
 
         let Type::Class(class_id) = ty else {
             panic!("C is not a Class");
@@ -1217,7 +1265,7 @@ mod tests {
         )?;
 
         let a = system_path_to_file(&db, "src/a.py").expect("Expected file to exist.");
-        let c_ty = module_global_symbol_ty_by_name(&db, a, "C");
+        let c_ty = global_symbol_ty_by_name(&db, a, "C");
         let Type::Class(c_class) = c_ty else {
             panic!("C is not a Class")
         };
@@ -1233,6 +1281,102 @@ mod tests {
             panic!("A is not a Class")
         };
         assert_eq!(a_class.name(&db), "A");
+
+        Ok(())
+    }
+
+    /// An unbound function local that has definitions in the scope does not fall back to globals.
+    #[test]
+    fn unbound_function_local() -> anyhow::Result<()> {
+        let mut db = setup_db();
+
+        db.write_dedented(
+            "src/a.py",
+            "
+            x = 1
+            def f():
+                y = x
+                x = 2
+            ",
+        )?;
+
+        let file = system_path_to_file(&db, "src/a.py").expect("Expected file to exist.");
+        let index = semantic_index(&db, file);
+        let function_scope = index
+            .child_scopes(FileScopeId::global())
+            .next()
+            .unwrap()
+            .0
+            .to_scope_id(&db, file);
+        let y_ty = symbol_ty_by_name(&db, function_scope, "y");
+        let x_ty = symbol_ty_by_name(&db, function_scope, "x");
+
+        assert_eq!(y_ty.display(&db).to_string(), "Unbound");
+        assert_eq!(x_ty.display(&db).to_string(), "Literal[2]");
+
+        Ok(())
+    }
+
+    /// A name reference to a never-defined symbol in a function is implicitly a global lookup.
+    #[test]
+    fn implicit_global_in_function() -> anyhow::Result<()> {
+        let mut db = setup_db();
+
+        db.write_dedented(
+            "src/a.py",
+            "
+            x = 1
+            def f():
+                y = x
+            ",
+        )?;
+
+        let file = system_path_to_file(&db, "src/a.py").expect("Expected file to exist.");
+        let index = semantic_index(&db, file);
+        let function_scope = index
+            .child_scopes(FileScopeId::global())
+            .next()
+            .unwrap()
+            .0
+            .to_scope_id(&db, file);
+        let y_ty = symbol_ty_by_name(&db, function_scope, "y");
+        let x_ty = symbol_ty_by_name(&db, function_scope, "x");
+
+        assert_eq!(x_ty.display(&db).to_string(), "Unbound");
+        assert_eq!(y_ty.display(&db).to_string(), "Literal[1]");
+
+        Ok(())
+    }
+
+    /// Class name lookups do fall back to globals, but the public type never does.
+    #[test]
+    fn unbound_class_local() -> anyhow::Result<()> {
+        let mut db = setup_db();
+
+        db.write_dedented(
+            "src/a.py",
+            "
+            x = 1
+            class C:
+                y = x
+                if flag:
+                    x = 2
+            ",
+        )?;
+
+        let file = system_path_to_file(&db, "src/a.py").expect("Expected file to exist.");
+        let index = semantic_index(&db, file);
+        let class_scope = index
+            .child_scopes(FileScopeId::global())
+            .next()
+            .unwrap()
+            .0
+            .to_scope_id(&db, file);
+        let y_ty = symbol_ty_by_name(&db, class_scope, "y");
+        let x_ty = symbol_ty_by_name(&db, class_scope, "x");
+
+        assert_eq!(x_ty.display(&db).to_string(), "Literal[2] | Unbound");
+        assert_eq!(y_ty.display(&db).to_string(), "Literal[1]");
 
         Ok(())
     }
@@ -1256,8 +1400,82 @@ mod tests {
         Ok(())
     }
 
+    #[test]
+    fn builtin_symbol_vendored_stdlib() -> anyhow::Result<()> {
+        let mut db = setup_db();
+
+        db.write_file("/src/a.py", "c = copyright")?;
+
+        assert_public_ty(&db, "/src/a.py", "c", "Literal[copyright]");
+
+        Ok(())
+    }
+
+    #[test]
+    fn builtin_symbol_custom_stdlib() -> anyhow::Result<()> {
+        let mut db = setup_db_with_custom_typeshed("/typeshed");
+
+        db.write_files([
+            ("/src/a.py", "c = copyright"),
+            (
+                "/typeshed/stdlib/builtins.pyi",
+                "def copyright() -> None: ...",
+            ),
+            ("/typeshed/stdlib/VERSIONS", "builtins: 3.8-"),
+        ])?;
+
+        assert_public_ty(&db, "/src/a.py", "c", "Literal[copyright]");
+
+        Ok(())
+    }
+
+    #[test]
+    fn unknown_global_later_defined() -> anyhow::Result<()> {
+        let mut db = setup_db();
+
+        db.write_file("/src/a.py", "x = foo; foo = 1")?;
+
+        assert_public_ty(&db, "/src/a.py", "x", "Unbound");
+
+        Ok(())
+    }
+
+    #[test]
+    fn unknown_builtin_later_defined() -> anyhow::Result<()> {
+        let mut db = setup_db_with_custom_typeshed("/typeshed");
+
+        db.write_files([
+            ("/src/a.py", "x = foo"),
+            ("/typeshed/stdlib/builtins.pyi", "foo = bar; bar = 1"),
+            ("/typeshed/stdlib/VERSIONS", "builtins: 3.8-"),
+        ])?;
+
+        assert_public_ty(&db, "/src/a.py", "x", "Unbound");
+
+        Ok(())
+    }
+
+    #[test]
+    fn import_builtins() -> anyhow::Result<()> {
+        let mut db = setup_db();
+
+        db.write_file("/src/a.py", "import builtins; x = builtins.copyright")?;
+
+        assert_public_ty(&db, "/src/a.py", "x", "Literal[copyright]");
+        // imported builtins module is the same file as the implicit builtins
+        let file = system_path_to_file(&db, "/src/a.py").expect("Expected file to exist.");
+        let builtins_ty = global_symbol_ty_by_name(&db, file, "builtins");
+        let Type::Module(builtins_file) = builtins_ty else {
+            panic!("Builtins are not a module?");
+        };
+        let implicit_builtins_file = builtins_scope(&db).expect("builtins to exist").file(&db);
+        assert_eq!(builtins_file, implicit_builtins_file);
+
+        Ok(())
+    }
+
     fn first_public_def<'db>(db: &'db TestDb, file: File, name: &str) -> Definition<'db> {
-        let scope = module_global_scope(db, file);
+        let scope = global_scope(db, file);
         *use_def_map(db, scope)
             .public_definitions(symbol_table(db, scope).symbol_id_by_name(name).unwrap())
             .first()
@@ -1274,7 +1492,7 @@ mod tests {
         ])?;
 
         let a = system_path_to_file(&db, "/src/a.py").unwrap();
-        let x_ty = module_global_symbol_ty_by_name(&db, a, "x");
+        let x_ty = global_symbol_ty_by_name(&db, a, "x");
 
         assert_eq!(x_ty.display(&db).to_string(), "Literal[10]");
 
@@ -1283,7 +1501,7 @@ mod tests {
 
         let a = system_path_to_file(&db, "/src/a.py").unwrap();
 
-        let x_ty_2 = module_global_symbol_ty_by_name(&db, a, "x");
+        let x_ty_2 = global_symbol_ty_by_name(&db, a, "x");
 
         assert_eq!(x_ty_2.display(&db).to_string(), "Literal[20]");
 
@@ -1300,7 +1518,7 @@ mod tests {
         ])?;
 
         let a = system_path_to_file(&db, "/src/a.py").unwrap();
-        let x_ty = module_global_symbol_ty_by_name(&db, a, "x");
+        let x_ty = global_symbol_ty_by_name(&db, a, "x");
 
         assert_eq!(x_ty.display(&db).to_string(), "Literal[10]");
 
@@ -1310,7 +1528,7 @@ mod tests {
 
         db.clear_salsa_events();
 
-        let x_ty_2 = module_global_symbol_ty_by_name(&db, a, "x");
+        let x_ty_2 = global_symbol_ty_by_name(&db, a, "x");
 
         assert_eq!(x_ty_2.display(&db).to_string(), "Literal[10]");
 
@@ -1336,7 +1554,7 @@ mod tests {
         ])?;
 
         let a = system_path_to_file(&db, "/src/a.py").unwrap();
-        let x_ty = module_global_symbol_ty_by_name(&db, a, "x");
+        let x_ty = global_symbol_ty_by_name(&db, a, "x");
 
         assert_eq!(x_ty.display(&db).to_string(), "Literal[10]");
 
@@ -1346,7 +1564,7 @@ mod tests {
 
         db.clear_salsa_events();
 
-        let x_ty_2 = module_global_symbol_ty_by_name(&db, a, "x");
+        let x_ty_2 = global_symbol_ty_by_name(&db, a, "x");
 
         assert_eq!(x_ty_2.display(&db).to_string(), "Literal[10]");
 

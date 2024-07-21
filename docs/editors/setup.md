@@ -28,9 +28,9 @@ For more documentation on the Ruff extension, refer to the
 
 ## Neovim
 
-The [`nvim-lspconfig`](https://github/neovim/nvim-lspconfig) plugin can be used to configure the
+The [`nvim-lspconfig`](https://github.com/neovim/nvim-lspconfig) plugin can be used to configure the
 Ruff Language Server in Neovim. To set it up, install
-[`nvim-lspconfig`](https://github/neovim/nvim-lspconfig) plugin, set it up as per the
+[`nvim-lspconfig`](https://github.com/neovim/nvim-lspconfig) plugin, set it up as per the
 [configuration](https://github.com/neovim/nvim-lspconfig#configuration) documentation, and add the
 following to your `init.lua`:
 

@@ -916,13 +916,17 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (FastApi, "001") => (RuleGroup::Preview, rules::fastapi::rules::FastApiRedundantResponseModel),
         (FastApi, "002") => (RuleGroup::Preview, rules::fastapi::rules::FastApiNotAnnotatedDependency),
 
+        // pydoclint
+        (Pydoclint, "501") => (RuleGroup::Preview, rules::pydoclint::rules::DocstringMissingException),
+        (Pydoclint, "502") => (RuleGroup::Preview, rules::pydoclint::rules::DocstringExtraneousException),
+
         // ruff
         (Ruff, "001") => (RuleGroup::Stable, rules::ruff::rules::AmbiguousUnicodeCharacterString),
         (Ruff, "002") => (RuleGroup::Stable, rules::ruff::rules::AmbiguousUnicodeCharacterDocstring),
         (Ruff, "003") => (RuleGroup::Stable, rules::ruff::rules::AmbiguousUnicodeCharacterComment),
         (Ruff, "005") => (RuleGroup::Stable, rules::ruff::rules::CollectionLiteralConcatenation),
         (Ruff, "006") => (RuleGroup::Stable, rules::ruff::rules::AsyncioDanglingTask),
-        (Ruff, "007") => (RuleGroup::Stable, rules::ruff::rules::PairwiseOverZipped),
+        (Ruff, "007") => (RuleGroup::Stable, rules::ruff::rules::ZipInsteadOfPairwise),
         (Ruff, "008") => (RuleGroup::Stable, rules::ruff::rules::MutableDataclassDefault),
         (Ruff, "009") => (RuleGroup::Stable, rules::ruff::rules::FunctionCallInDataclassDefaultArgument),
         (Ruff, "010") => (RuleGroup::Stable, rules::ruff::rules::ExplicitFStringTypeConversion),

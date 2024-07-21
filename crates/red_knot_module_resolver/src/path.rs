@@ -233,8 +233,14 @@ impl ModuleResolutionPathBuf {
         ModuleResolutionPathRef::from(self).is_directory(search_path, resolver)
     }
 
-    pub(crate) fn is_site_packages(&self) -> bool {
+    #[must_use]
+    pub(crate) const fn is_site_packages(&self) -> bool {
         matches!(self.0, ModuleResolutionPathBufInner::SitePackages(_))
+    }
+
+    #[must_use]
+    pub(crate) const fn is_standard_library(&self) -> bool {
+        matches!(self.0, ModuleResolutionPathBufInner::StandardLibrary(_))
     }
 
     #[must_use]
@@ -369,10 +375,9 @@ impl<'a> ModuleResolutionPathRefInner<'a> {
 
     #[must_use]
     fn is_regular_package(&self, search_path: Self, resolver: &ResolverState) -> bool {
-        fn is_non_stdlib_pkg(state: &ResolverState, path: &SystemPath) -> bool {
-            let file_system = state.system();
-            file_system.path_exists(&path.join("__init__.py"))
-                || file_system.path_exists(&path.join("__init__.pyi"))
+        fn is_non_stdlib_pkg(resolver: &ResolverState, path: &SystemPath) -> bool {
+            system_path_to_file(resolver.db.upcast(), path.join("__init__.py")).is_some()
+                || system_path_to_file(resolver.db.upcast(), path.join("__init__.py")).is_some()
         }
 
         match (self, search_path) {
@@ -387,8 +392,13 @@ impl<'a> ModuleResolutionPathRefInner<'a> {
                 match Self::query_stdlib_version( path, search_path, &stdlib_root, resolver) {
                     TypeshedVersionsQueryResult::DoesNotExist => false,
                     TypeshedVersionsQueryResult::Exists | TypeshedVersionsQueryResult::MaybeExists => match path {
-                        FilePathRef::System(path) => resolver.db.system().path_exists(&path.join("__init__.pyi")),
-                        FilePathRef::Vendored(path) => resolver.db.vendored().exists(path.join("__init__.pyi")),
+                        FilePathRef::System(path) => system_path_to_file(resolver.db.upcast(),path.join("__init__.pyi")).is_some(),
+                        // No need to use `vendored_path_to_file` here:
+                        // (1) The vendored filesystem is immutable, so we don't need to worry about Salsa invalidation
+                        // (2) The caching Salsa provides probably won't speed us up that much
+                        //     (TODO: check that assumption when we're able to run red-knot on larger code bases)
+                        // (3) We don't need the `File` object that `vendored_path_to_file` would return; we just need to know if the file exists
+                        FilePathRef::Vendored(path) => resolver.db.vendored().exists(path.join("__init__.pyi"))
                     },
                 }
             }

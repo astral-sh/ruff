@@ -3,10 +3,11 @@ use salsa::DbWithJar;
 use red_knot_module_resolver::Db as ResolverDb;
 use ruff_db::{Db as SourceDb, Upcast};
 
+use crate::builtins::builtins_scope;
 use crate::semantic_index::definition::Definition;
 use crate::semantic_index::expression::Expression;
 use crate::semantic_index::symbol::ScopeId;
-use crate::semantic_index::{module_global_scope, semantic_index, symbol_table, use_def_map};
+use crate::semantic_index::{global_scope, semantic_index, symbol_table, use_def_map};
 use crate::types::{
     infer_definition_types, infer_expression_types, infer_scope_types, ClassType, FunctionType,
     IntersectionType, UnionType,
@@ -23,11 +24,12 @@ pub struct Jar(
     IntersectionType<'_>,
     symbol_table,
     use_def_map,
-    module_global_scope,
+    global_scope,
     semantic_index,
     infer_definition_types,
     infer_expression_types,
     infer_scope_types,
+    builtins_scope,
 );
 
 /// Database giving access to semantic information about a Python program.

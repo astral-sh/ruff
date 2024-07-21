@@ -5,10 +5,11 @@ use red_knot::workspace::WorkspaceMetadata;
 use ruff_benchmark::criterion::{
     criterion_group, criterion_main, BatchSize, Criterion, Throughput,
 };
-use ruff_db::files::{system_path_to_file, File};
+use ruff_db::files::{system_path_to_file, vendored_path_to_file, File};
 use ruff_db::parsed::parsed_module;
 use ruff_db::program::{ProgramSettings, SearchPathSettings, TargetVersion};
 use ruff_db::system::{MemoryFileSystem, SystemPath, TestSystem};
+use ruff_db::vendored::VendoredPath;
 use ruff_db::Upcast;
 
 static FOO_CODE: &str = r#"
@@ -17,17 +18,17 @@ import typing
 from bar import Bar
 
 class Foo(Bar):
-    def foo() -> str:
+    def foo() -> object:
         return "foo"
 
     @typing.override
-    def bar() -> str:
+    def bar() -> object:
         return "foo_bar"
 "#;
 
 static BAR_CODE: &str = r#"
 class Bar:
-    def bar() -> str:
+    def bar() -> object:
         return "bar"
 
     def random(arg: int) -> int:
@@ -48,6 +49,7 @@ struct Case {
     foo: File,
     bar: File,
     typing: File,
+    builtins: File,
 }
 
 fn setup_case() -> Case {
@@ -56,6 +58,7 @@ fn setup_case() -> Case {
     let foo_path = SystemPath::new("/src/foo.py");
     let bar_path = SystemPath::new("/src/bar.py");
     let typing_path = SystemPath::new("/src/typing.pyi");
+    let builtins_path = VendoredPath::new("stdlib/builtins.pyi");
     fs.write_files([
         (foo_path, FOO_CODE),
         (bar_path, BAR_CODE),
@@ -82,6 +85,7 @@ fn setup_case() -> Case {
 
     let bar = system_path_to_file(&db, bar_path).unwrap();
     let typing = system_path_to_file(&db, typing_path).unwrap();
+    let builtins = vendored_path_to_file(&db, builtins_path).unwrap();
 
     Case {
         db,
@@ -89,6 +93,7 @@ fn setup_case() -> Case {
         foo,
         bar,
         typing,
+        builtins,
     }
 }
 
@@ -104,6 +109,7 @@ fn benchmark_without_parse(criterion: &mut Criterion) {
                 parsed_module(case.db.upcast(), case.foo);
                 parsed_module(case.db.upcast(), case.bar);
                 parsed_module(case.db.upcast(), case.typing);
+                parsed_module(case.db.upcast(), case.builtins);
                 case
             },
             |case| {
@@ -131,7 +137,7 @@ fn benchmark_incremental(criterion: &mut Criterion) {
 
                 case.fs
                     .write_file(
-                        SystemPath::new("/src/foo.py"),
+                        SystemPath::new("/src/bar.py"),
                         format!("{BAR_CODE}\n# A comment\n"),
                     )
                     .unwrap();
@@ -172,7 +178,7 @@ fn benchmark_cold(criterion: &mut Criterion) {
     group.finish();
 }
 
-criterion_group!(cold, benchmark_without_parse);
-criterion_group!(without_parse, benchmark_cold);
+criterion_group!(cold, benchmark_cold);
+criterion_group!(without_parse, benchmark_without_parse);
 criterion_group!(incremental, benchmark_incremental);
 criterion_main!(without_parse, cold, incremental);

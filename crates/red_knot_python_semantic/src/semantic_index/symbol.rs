@@ -103,6 +103,17 @@ pub struct ScopeId<'db> {
 }
 
 impl<'db> ScopeId<'db> {
+    pub(crate) fn is_function_like(self, db: &'db dyn Db) -> bool {
+        // Type parameter scopes behave like function scopes in terms of name resolution; CPython
+        // symbol table also uses the term "function-like" for these scopes.
+        matches!(
+            self.node(db),
+            NodeWithScopeKind::ClassTypeParameters(_)
+                | NodeWithScopeKind::FunctionTypeParameters(_)
+                | NodeWithScopeKind::Function(_)
+        )
+    }
+
     #[cfg(test)]
     pub(crate) fn name(self, db: &'db dyn Db) -> &'db str {
         match self.node(db) {
@@ -122,7 +133,7 @@ pub struct FileScopeId;
 
 impl FileScopeId {
     /// Returns the scope id of the module-global scope.
-    pub fn module_global() -> Self {
+    pub fn global() -> Self {
         FileScopeId::from_u32(0)
     }
 
@@ -193,7 +204,6 @@ impl SymbolTable {
     }
 
     /// Returns the symbol named `name`.
-    #[allow(unused)]
     pub(crate) fn symbol_by_name(&self, name: &str) -> Option<&Symbol> {
         let id = self.symbol_id_by_name(name)?;
         Some(self.symbol(id))

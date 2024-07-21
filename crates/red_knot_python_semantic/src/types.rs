@@ -1,9 +1,10 @@
 use ruff_db::files::File;
 use ruff_python_ast::name::Name;
 
+use crate::builtins::builtins_scope;
 use crate::semantic_index::definition::Definition;
 use crate::semantic_index::symbol::{ScopeId, ScopedSymbolId};
-use crate::semantic_index::{module_global_scope, symbol_table, use_def_map};
+use crate::semantic_index::{global_scope, symbol_table, use_def_map};
 use crate::{Db, FxOrderSet};
 
 mod display;
@@ -23,7 +24,9 @@ pub(crate) fn symbol_ty<'db>(
     definitions_ty(
         db,
         use_def.public_definitions(symbol),
-        use_def.public_may_be_unbound(symbol),
+        use_def
+            .public_may_be_unbound(symbol)
+            .then_some(Type::Unbound),
     )
 }
 
@@ -41,12 +44,17 @@ pub(crate) fn symbol_ty_by_name<'db>(
 }
 
 /// Shorthand for `symbol_ty` that looks up a module-global symbol in a file.
-pub(crate) fn module_global_symbol_ty_by_name<'db>(
-    db: &'db dyn Db,
-    file: File,
-    name: &str,
-) -> Type<'db> {
-    symbol_ty_by_name(db, module_global_scope(db, file), name)
+pub(crate) fn global_symbol_ty_by_name<'db>(db: &'db dyn Db, file: File, name: &str) -> Type<'db> {
+    symbol_ty_by_name(db, global_scope(db, file), name)
+}
+
+/// Shorthand for `symbol_ty` that looks up a symbol in the builtins.
+///
+/// Returns `None` if the builtins module isn't available for some reason.
+pub(crate) fn builtins_symbol_ty_by_name<'db>(db: &'db dyn Db, name: &str) -> Type<'db> {
+    builtins_scope(db)
+        .map(|builtins| symbol_ty_by_name(db, builtins, name))
+        .unwrap_or(Type::Unbound)
 }
 
 /// Infer the type of a [`Definition`].
@@ -55,24 +63,31 @@ pub(crate) fn definition_ty<'db>(db: &'db dyn Db, definition: Definition<'db>) -
     inference.definition_ty(definition)
 }
 
-/// Infer the combined type of an array of [`Definition`].
-/// Will return a union if there are more than definition, or at least one plus the possibility of
-/// Unbound.
+/// Infer the combined type of an array of [`Definition`]s, plus one optional "unbound type".
+///
+/// Will return a union if there is more than one definition, or at least one plus an unbound
+/// type.
+///
+/// The "unbound type" represents the type in case control flow may not have passed through any
+/// definitions in this scope. If this isn't possible, then it will be `None`. If it is possible,
+/// and the result in that case should be Unbound (e.g. an unbound function local), then it will be
+/// `Some(Type::Unbound)`. If it is possible and the result should be something else (e.g. an
+/// implicit global lookup), then `unbound_type` will be `Some(the_global_symbol_type)`.
+///
+/// # Panics
+/// Will panic if called with zero definitions and no `unbound_ty`. This is a logic error,
+/// as any symbol with zero visible definitions clearly may be unbound, and the caller should
+/// provide an `unbound_ty`.
 pub(crate) fn definitions_ty<'db>(
     db: &'db dyn Db,
     definitions: &[Definition<'db>],
-    may_be_unbound: bool,
+    unbound_ty: Option<Type<'db>>,
 ) -> Type<'db> {
-    let unbound_iter = if may_be_unbound {
-        [Type::Unbound].iter()
-    } else {
-        [].iter()
-    };
     let def_types = definitions.iter().map(|def| definition_ty(db, *def));
-    let mut all_types = unbound_iter.copied().chain(def_types);
+    let mut all_types = unbound_ty.into_iter().chain(def_types);
 
     let Some(first) = all_types.next() else {
-        return Type::Unbound;
+        panic!("definitions_ty should never be called with zero definitions and no unbound_ty.")
     };
 
     if let Some(second) = all_types.next() {
@@ -136,7 +151,7 @@ impl<'db> Type<'db> {
             Type::Unbound => Type::Unbound,
             Type::None => todo!("attribute lookup on None type"),
             Type::Function(_) => todo!("attribute lookup on Function type"),
-            Type::Module(file) => module_global_symbol_ty_by_name(db, *file, name),
+            Type::Module(file) => global_symbol_ty_by_name(db, *file, name),
             Type::Class(class) => class.class_member(db, name),
             Type::Instance(_) => {
                 // TODO MRO? get_own_instance_member, get_instance_member

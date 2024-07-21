@@ -2,6 +2,7 @@ use std::borrow::Cow;
 use std::iter::FusedIterator;
 use std::sync::Arc;
 
+use once_cell::sync::Lazy;
 use rustc_hash::{FxBuildHasher, FxHashSet};
 
 use ruff_db::files::{File, FilePath};
@@ -125,11 +126,11 @@ pub(crate) fn module_resolution_settings(db: &dyn Db) -> ModuleResolutionSetting
     } = program.search_paths(db.upcast());
 
     if let Some(custom_typeshed) = custom_typeshed {
-        tracing::debug!("Custom typeshed directory: {custom_typeshed}");
+        tracing::info!("Custom typeshed directory: {custom_typeshed}");
     }
 
     if !extra_paths.is_empty() {
-        tracing::debug!("extra search paths: {extra_paths:?}");
+        tracing::info!("extra search paths: {extra_paths:?}");
     }
 
     let current_directory = db.system().current_directory();
@@ -174,7 +175,7 @@ pub(crate) fn module_resolution_settings(db: &dyn Db) -> ModuleResolutionSetting
     // TODO vendor typeshed's third-party stubs as well as the stdlib and fallback to them as a final step
 
     let target_version = program.target_version(db.upcast());
-    tracing::debug!("Target version: {target_version}");
+    tracing::info!("Target version: {target_version}");
 
     // Filter out module resolution paths that point to the same directory on disk (the same invariant maintained by [`sys.path` at runtime]).
     // (Paths may, however, *overlap* -- e.g. you could have both `src/` and `src/foo`
@@ -442,6 +443,52 @@ pub(crate) mod internal {
     }
 }
 
+/// Modules that are builtin to the Python interpreter itself.
+///
+/// When these module names are imported, standard module resolution is bypassed:
+/// the module name always resolves to the stdlib module,
+/// even if there's a module of the same name in the workspace root
+/// (which would normally result in the stdlib module being overridden).
+///
+/// TODO(Alex): write a script to generate this list,
+/// similar to what we do in `crates/ruff_python_stdlib/src/sys.rs`
+static BUILTIN_MODULES: Lazy<FxHashSet<&str>> = Lazy::new(|| {
+    const BUILTIN_MODULE_NAMES: &[&str] = &[
+        "_abc",
+        "_ast",
+        "_codecs",
+        "_collections",
+        "_functools",
+        "_imp",
+        "_io",
+        "_locale",
+        "_operator",
+        "_signal",
+        "_sre",
+        "_stat",
+        "_string",
+        "_symtable",
+        "_thread",
+        "_tokenize",
+        "_tracemalloc",
+        "_typing",
+        "_warnings",
+        "_weakref",
+        "atexit",
+        "builtins",
+        "errno",
+        "faulthandler",
+        "gc",
+        "itertools",
+        "marshal",
+        "posix",
+        "pwd",
+        "sys",
+        "time",
+    ];
+    BUILTIN_MODULE_NAMES.iter().copied().collect()
+});
+
 /// Given a module name and a list of search paths in which to lookup modules,
 /// attempt to resolve the module name
 fn resolve_name(
@@ -450,8 +497,12 @@ fn resolve_name(
 ) -> Option<(Arc<ModuleResolutionPathBuf>, File, ModuleKind)> {
     let resolver_settings = module_resolution_settings(db);
     let resolver_state = ResolverState::new(db, resolver_settings.target_version());
+    let is_builtin_module = BUILTIN_MODULES.contains(&name.as_str());
 
     for search_path in resolver_settings.search_paths(db) {
+        if is_builtin_module && !search_path.is_standard_library() {
+            continue;
+        }
         let mut components = name.components();
         let module_name = components.next_back()?;
 
@@ -627,6 +678,40 @@ mod tests {
             Some(foo_module),
             path_to_module(&db, &FilePath::System(expected_foo_path))
         );
+    }
+
+    #[test]
+    fn builtins_vendored() {
+        let TestCase { db, stdlib, .. } = TestCaseBuilder::new()
+            .with_vendored_typeshed()
+            .with_src_files(&[("builtins.py", "FOOOO = 42")])
+            .build();
+
+        let builtins_module_name = ModuleName::new_static("builtins").unwrap();
+        let builtins = resolve_module(&db, builtins_module_name).expect("builtins to resolve");
+
+        assert_eq!(builtins.file().path(&db), &stdlib.join("builtins.pyi"));
+    }
+
+    #[test]
+    fn builtins_custom() {
+        const TYPESHED: MockedTypeshed = MockedTypeshed {
+            stdlib_files: &[("builtins.pyi", "def min(a, b): ...")],
+            versions: "builtins: 3.8-",
+        };
+
+        const SRC: &[FileSpec] = &[("builtins.py", "FOOOO = 42")];
+
+        let TestCase { db, stdlib, .. } = TestCaseBuilder::new()
+            .with_src_files(SRC)
+            .with_custom_typeshed(TYPESHED)
+            .with_target_version(TargetVersion::Py38)
+            .build();
+
+        let builtins_module_name = ModuleName::new_static("builtins").unwrap();
+        let builtins = resolve_module(&db, builtins_module_name).expect("builtins to resolve");
+
+        assert_eq!(builtins.file().path(&db), &stdlib.join("builtins.pyi"));
     }
 
     #[test]
