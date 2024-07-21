@@ -1,7 +1,7 @@
 ---
 source: crates/ruff_linter/src/rules/ruff/mod.rs
 ---
-RUF103.py:24:5: RUF103 [*] FastAPI dependency without Annotated
+RUF103.py:24:5: RUF103 [*] FastAPI dependency without `Annotated`
    |
 22 | @app.get("/items/")
 23 | def get_items(
@@ -10,13 +10,16 @@ RUF103.py:24:5: RUF103 [*] FastAPI dependency without Annotated
 25 |     some_security_param: str = Security(get_oauth2_user),
 26 | ):
    |
-   = help: Replace with `current_user: Annotated[User, Depends(get_current_user)]`
+   = help: Replace with `Annotated`
 
 ℹ Unsafe fix
-   1  |+from typing import Annotated
-1  2  | from fastapi import (
-2  3  |     FastAPI,
-3  4  |     APIRouter,
+12 12 |     Security,
+13 13 | )
+14 14 | from pydantic import BaseModel
+   15 |+from typing import Annotated
+15 16 | 
+16 17 | app = FastAPI()
+17 18 | router = APIRouter()
 --------------------------------------------------------------------------------
 21 22 | 
 22 23 | @app.get("/items/")
@@ -27,7 +30,7 @@ RUF103.py:24:5: RUF103 [*] FastAPI dependency without Annotated
 26 27 | ):
 27 28 |     pass
 
-RUF103.py:25:5: RUF103 [*] FastAPI dependency without Annotated
+RUF103.py:25:5: RUF103 [*] FastAPI dependency without `Annotated`
    |
 23 | def get_items(
 24 |     current_user: User = Depends(get_current_user),
@@ -36,13 +39,16 @@ RUF103.py:25:5: RUF103 [*] FastAPI dependency without Annotated
 26 | ):
 27 |     pass
    |
-   = help: Replace with `some_security_param: Annotated[str, Security(get_oauth2_user)]`
+   = help: Replace with `Annotated`
 
 ℹ Unsafe fix
-   1  |+from typing import Annotated
-1  2  | from fastapi import (
-2  3  |     FastAPI,
-3  4  |     APIRouter,
+12 12 |     Security,
+13 13 | )
+14 14 | from pydantic import BaseModel
+   15 |+from typing import Annotated
+15 16 | 
+16 17 | app = FastAPI()
+17 18 | router = APIRouter()
 --------------------------------------------------------------------------------
 22 23 | @app.get("/items/")
 23 24 | def get_items(
@@ -53,7 +59,7 @@ RUF103.py:25:5: RUF103 [*] FastAPI dependency without Annotated
 27 28 |     pass
 28 29 | 
 
-RUF103.py:32:5: RUF103 [*] FastAPI dependency without Annotated
+RUF103.py:32:5: RUF103 [*] FastAPI dependency without `Annotated`
    |
 30 | @app.post("/stuff/")
 31 | def do_stuff(
@@ -62,13 +68,16 @@ RUF103.py:32:5: RUF103 [*] FastAPI dependency without Annotated
 33 |     some_path_param: str = Path(),
 34 |     some_body_param: str = Body("foo"),
    |
-   = help: Replace with `some_query_param: Annotated[str | None, Query(default=None)]`
+   = help: Replace with `Annotated`
 
 ℹ Unsafe fix
-   1  |+from typing import Annotated
-1  2  | from fastapi import (
-2  3  |     FastAPI,
-3  4  |     APIRouter,
+12 12 |     Security,
+13 13 | )
+14 14 | from pydantic import BaseModel
+   15 |+from typing import Annotated
+15 16 | 
+16 17 | app = FastAPI()
+17 18 | router = APIRouter()
 --------------------------------------------------------------------------------
 29 30 | 
 30 31 | @app.post("/stuff/")
@@ -79,7 +88,7 @@ RUF103.py:32:5: RUF103 [*] FastAPI dependency without Annotated
 34 35 |     some_body_param: str = Body("foo"),
 35 36 |     some_cookie_param: str = Cookie(),
 
-RUF103.py:33:5: RUF103 [*] FastAPI dependency without Annotated
+RUF103.py:33:5: RUF103 [*] FastAPI dependency without `Annotated`
    |
 31 | def do_stuff(
 32 |     some_query_param: str | None = Query(default=None),
@@ -88,13 +97,16 @@ RUF103.py:33:5: RUF103 [*] FastAPI dependency without Annotated
 34 |     some_body_param: str = Body("foo"),
 35 |     some_cookie_param: str = Cookie(),
    |
-   = help: Replace with `some_path_param: Annotated[str, Path()]`
+   = help: Replace with `Annotated`
 
 ℹ Unsafe fix
-   1  |+from typing import Annotated
-1  2  | from fastapi import (
-2  3  |     FastAPI,
-3  4  |     APIRouter,
+12 12 |     Security,
+13 13 | )
+14 14 | from pydantic import BaseModel
+   15 |+from typing import Annotated
+15 16 | 
+16 17 | app = FastAPI()
+17 18 | router = APIRouter()
 --------------------------------------------------------------------------------
 30 31 | @app.post("/stuff/")
 31 32 | def do_stuff(
@@ -105,7 +117,7 @@ RUF103.py:33:5: RUF103 [*] FastAPI dependency without Annotated
 35 36 |     some_cookie_param: str = Cookie(),
 36 37 |     some_header_param: int = Header(default=5),
 
-RUF103.py:34:5: RUF103 [*] FastAPI dependency without Annotated
+RUF103.py:34:5: RUF103 [*] FastAPI dependency without `Annotated`
    |
 32 |     some_query_param: str | None = Query(default=None),
 33 |     some_path_param: str = Path(),
@@ -114,13 +126,16 @@ RUF103.py:34:5: RUF103 [*] FastAPI dependency without Annotated
 35 |     some_cookie_param: str = Cookie(),
 36 |     some_header_param: int = Header(default=5),
    |
-   = help: Replace with `some_body_param: Annotated[str, Body("foo")]`
+   = help: Replace with `Annotated`
 
 ℹ Unsafe fix
-   1  |+from typing import Annotated
-1  2  | from fastapi import (
-2  3  |     FastAPI,
-3  4  |     APIRouter,
+12 12 |     Security,
+13 13 | )
+14 14 | from pydantic import BaseModel
+   15 |+from typing import Annotated
+15 16 | 
+16 17 | app = FastAPI()
+17 18 | router = APIRouter()
 --------------------------------------------------------------------------------
 31 32 | def do_stuff(
 32 33 |     some_query_param: str | None = Query(default=None),
@@ -131,7 +146,7 @@ RUF103.py:34:5: RUF103 [*] FastAPI dependency without Annotated
 36 37 |     some_header_param: int = Header(default=5),
 37 38 |     some_file_param: UploadFile = File(),
 
-RUF103.py:35:5: RUF103 [*] FastAPI dependency without Annotated
+RUF103.py:35:5: RUF103 [*] FastAPI dependency without `Annotated`
    |
 33 |     some_path_param: str = Path(),
 34 |     some_body_param: str = Body("foo"),
@@ -140,13 +155,16 @@ RUF103.py:35:5: RUF103 [*] FastAPI dependency without Annotated
 36 |     some_header_param: int = Header(default=5),
 37 |     some_file_param: UploadFile = File(),
    |
-   = help: Replace with `some_cookie_param: Annotated[str, Cookie()]`
+   = help: Replace with `Annotated`
 
 ℹ Unsafe fix
-   1  |+from typing import Annotated
-1  2  | from fastapi import (
-2  3  |     FastAPI,
-3  4  |     APIRouter,
+12 12 |     Security,
+13 13 | )
+14 14 | from pydantic import BaseModel
+   15 |+from typing import Annotated
+15 16 | 
+16 17 | app = FastAPI()
+17 18 | router = APIRouter()
 --------------------------------------------------------------------------------
 32 33 |     some_query_param: str | None = Query(default=None),
 33 34 |     some_path_param: str = Path(),
@@ -157,7 +175,7 @@ RUF103.py:35:5: RUF103 [*] FastAPI dependency without Annotated
 37 38 |     some_file_param: UploadFile = File(),
 38 39 |     some_form_param: str = Form(),
 
-RUF103.py:36:5: RUF103 [*] FastAPI dependency without Annotated
+RUF103.py:36:5: RUF103 [*] FastAPI dependency without `Annotated`
    |
 34 |     some_body_param: str = Body("foo"),
 35 |     some_cookie_param: str = Cookie(),
@@ -166,13 +184,16 @@ RUF103.py:36:5: RUF103 [*] FastAPI dependency without Annotated
 37 |     some_file_param: UploadFile = File(),
 38 |     some_form_param: str = Form(),
    |
-   = help: Replace with `some_header_param: Annotated[int, Header(default=5)]`
+   = help: Replace with `Annotated`
 
 ℹ Unsafe fix
-   1  |+from typing import Annotated
-1  2  | from fastapi import (
-2  3  |     FastAPI,
-3  4  |     APIRouter,
+12 12 |     Security,
+13 13 | )
+14 14 | from pydantic import BaseModel
+   15 |+from typing import Annotated
+15 16 | 
+16 17 | app = FastAPI()
+17 18 | router = APIRouter()
 --------------------------------------------------------------------------------
 33 34 |     some_path_param: str = Path(),
 34 35 |     some_body_param: str = Body("foo"),
@@ -183,7 +204,7 @@ RUF103.py:36:5: RUF103 [*] FastAPI dependency without Annotated
 38 39 |     some_form_param: str = Form(),
 39 40 | ):
 
-RUF103.py:37:5: RUF103 [*] FastAPI dependency without Annotated
+RUF103.py:37:5: RUF103 [*] FastAPI dependency without `Annotated`
    |
 35 |     some_cookie_param: str = Cookie(),
 36 |     some_header_param: int = Header(default=5),
@@ -192,13 +213,16 @@ RUF103.py:37:5: RUF103 [*] FastAPI dependency without Annotated
 38 |     some_form_param: str = Form(),
 39 | ):
    |
-   = help: Replace with `some_file_param: Annotated[UploadFile, File()]`
+   = help: Replace with `Annotated`
 
 ℹ Unsafe fix
-   1  |+from typing import Annotated
-1  2  | from fastapi import (
-2  3  |     FastAPI,
-3  4  |     APIRouter,
+12 12 |     Security,
+13 13 | )
+14 14 | from pydantic import BaseModel
+   15 |+from typing import Annotated
+15 16 | 
+16 17 | app = FastAPI()
+17 18 | router = APIRouter()
 --------------------------------------------------------------------------------
 34 35 |     some_body_param: str = Body("foo"),
 35 36 |     some_cookie_param: str = Cookie(),
@@ -209,7 +233,7 @@ RUF103.py:37:5: RUF103 [*] FastAPI dependency without Annotated
 39 40 | ):
 40 41 |     # do stuff
 
-RUF103.py:38:5: RUF103 [*] FastAPI dependency without Annotated
+RUF103.py:38:5: RUF103 [*] FastAPI dependency without `Annotated`
    |
 36 |     some_header_param: int = Header(default=5),
 37 |     some_file_param: UploadFile = File(),
@@ -218,13 +242,16 @@ RUF103.py:38:5: RUF103 [*] FastAPI dependency without Annotated
 39 | ):
 40 |     # do stuff
    |
-   = help: Replace with `some_form_param: Annotated[str, Form()]`
+   = help: Replace with `Annotated`
 
 ℹ Unsafe fix
-   1  |+from typing import Annotated
-1  2  | from fastapi import (
-2  3  |     FastAPI,
-3  4  |     APIRouter,
+12 12 |     Security,
+13 13 | )
+14 14 | from pydantic import BaseModel
+   15 |+from typing import Annotated
+15 16 | 
+16 17 | app = FastAPI()
+17 18 | router = APIRouter()
 --------------------------------------------------------------------------------
 35 36 |     some_cookie_param: str = Cookie(),
 36 37 |     some_header_param: int = Header(default=5),

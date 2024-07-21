@@ -1,22 +1,24 @@
-use crate::checkers::ast::Checker;
-use crate::rules::ruff::fastapi::is_fastapi_route;
-use crate::settings::types::PythonVersion;
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast as ast;
 use ruff_python_ast::helpers::map_callable;
-use ruff_python_ast::imports::{AnyImport, ImportFrom};
 use ruff_python_semantic::Modules;
-use ruff_text_size::{Ranged, TextSize};
+use ruff_text_size::Ranged;
+
+use crate::checkers::ast::Checker;
+use crate::importer::ImportRequest;
+use crate::rules::ruff::fastapi::is_fastapi_route;
+use crate::settings::types::PythonVersion;
 
 /// ## What it does
-/// Identifies FastApi routes using the deprecated dependency style, which omits Annotated.
+/// Identifies FastAPI routes with deprecated uses of `Depends`.
 ///
 /// ## Why is this bad?
-/// The FastApi documentation recommends employing Annotated for dependencies.
+/// The FastAPI documentation recommends the use of `Annotated` for defining
+/// route dependencies and parameters, rather than using `Depends` directly
+/// with a default value.
+///
 /// This approach is also suggested for various route parameters, including Body and Cookie, as it helps ensure consistency and clarity in defining dependencies and parameters.
-/// By following these guidelines, developers can create more readable and maintainable FastApi applications.
-/// For more information, see the [FastAPI documentation](https://fastapi.tiangolo.com/tutorial/dependencies/#dependencies).
 ///
 /// ## Example
 ///
@@ -33,7 +35,6 @@ use ruff_text_size::{Ranged, TextSize};
 /// @app.get("/items/")
 /// async def read_items(commons: dict = Depends(common_parameters)):
 ///     return commons
-///
 /// ```
 ///
 /// Use instead:
@@ -56,18 +57,16 @@ use ruff_text_size::{Ranged, TextSize};
 /// ```
 
 #[violation]
-pub struct FastApiNotAnnotatedDependency {
-    annotated_style: String,
-}
+pub struct FastApiNotAnnotatedDependency;
 
 impl AlwaysFixableViolation for FastApiNotAnnotatedDependency {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("FastAPI dependency without Annotated")
+        format!("FastAPI dependency without `Annotated`")
     }
 
     fn fix_title(&self) -> String {
-        format!("Replace with `{}`", self.annotated_style)
+        "Replace with `Annotated`".to_string()
     }
 }
 
@@ -79,7 +78,7 @@ pub(crate) fn fastapi_not_annotated_dependency(
     if !checker.semantic().seen_module(Modules::FASTAPI) {
         return;
     }
-    if !is_fastapi_route(checker, function_def) {
+    if !is_fastapi_route(function_def, checker.semantic()) {
         return;
     }
     for parameter in &function_def.parameters.args {
@@ -107,32 +106,31 @@ pub(crate) fn fastapi_not_annotated_dependency(
                     )
                 })
             {
-                let fix_content = format!(
-                    "{}: Annotated[{}, {}]",
-                    parameter.parameter.name.id,
-                    checker.locator().slice(annotation.range()),
-                    checker.locator().slice(default.range())
-                );
-                let mut diagnostic = Diagnostic::new(
-                    FastApiNotAnnotatedDependency {
-                        annotated_style: fix_content.clone(),
-                    },
-                    parameter.range,
-                );
-                let required_import = AnyImport::ImportFrom(ImportFrom::member(
-                    if checker.settings.target_version >= PythonVersion::Py39 {
+                let mut diagnostic =
+                    Diagnostic::new(FastApiNotAnnotatedDependency, parameter.range);
+
+                diagnostic.try_set_fix(|| {
+                    let module = if checker.settings.target_version >= PythonVersion::Py39 {
                         "typing"
                     } else {
                         "typing_extensions"
-                    },
-                    "Annotated",
-                ));
-                diagnostic.set_fix(Fix::unsafe_edits(
-                    Edit::range_replacement(fix_content, parameter.range),
-                    [checker
-                        .importer()
-                        .add_import(&required_import, TextSize::default())],
-                ));
+                    };
+                    let (import_edit, binding) = checker.importer().get_or_import_symbol(
+                        &ImportRequest::import_from(&module, "Annotated"),
+                        function_def.start(),
+                        checker.semantic(),
+                    )?;
+                    let content = format!(
+                        "{}: {}[{}, {}]",
+                        parameter.parameter.name.id,
+                        binding,
+                        checker.locator().slice(annotation.range()),
+                        checker.locator().slice(default.range())
+                    );
+                    let parameter_edit = Edit::range_replacement(content, parameter.range());
+                    Ok(Fix::unsafe_edits(import_edit, [parameter_edit]))
+                });
+
                 checker.diagnostics.push(diagnostic);
             }
         }
