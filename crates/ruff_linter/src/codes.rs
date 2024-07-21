@@ -912,6 +912,10 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Numpy, "003") => (RuleGroup::Stable, rules::numpy::rules::NumpyDeprecatedFunction),
         (Numpy, "201") => (RuleGroup::Stable, rules::numpy::rules::Numpy2Deprecation),
 
+        // fastapi
+        (FastApi, "001") => (RuleGroup::Preview, rules::fastapi::rules::FastApiRedundantResponseModel),
+        (FastApi, "002") => (RuleGroup::Preview, rules::fastapi::rules::FastApiNonAnnotatedDependency),
+
         // pydoclint
         (Pydoclint, "501") => (RuleGroup::Preview, rules::pydoclint::rules::DocstringMissingException),
         (Pydoclint, "502") => (RuleGroup::Preview, rules::pydoclint::rules::DocstringExtraneousException),
@@ -947,6 +951,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Ruff, "030") => (RuleGroup::Preview, rules::ruff::rules::AssertWithPrintMessage),
         (Ruff, "100") => (RuleGroup::Stable, rules::ruff::rules::UnusedNOQA),
         (Ruff, "101") => (RuleGroup::Preview, rules::ruff::rules::RedirectedNOQA),
+
         (Ruff, "200") => (RuleGroup::Stable, rules::ruff::rules::InvalidPyprojectToml),
         #[cfg(any(feature = "test-rules", test))]
         (Ruff, "900") => (RuleGroup::Stable, rules::ruff::rules::StableTestRule),
