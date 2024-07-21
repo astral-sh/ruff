@@ -1,3 +1,4 @@
+use ruff_allocator::Allocator;
 use ruff_text_size::{Ranged, TextRange, TextSize};
 
 use crate::error::LexicalError;
@@ -7,9 +8,9 @@ use crate::Mode;
 
 /// Token source for the parser that skips over any trivia tokens.
 #[derive(Debug)]
-pub(crate) struct TokenSource<'src> {
+pub(crate) struct TokenSource<'src, 'ast> {
     /// The underlying source for the tokens.
-    lexer: Lexer<'src>,
+    lexer: Lexer<'src, 'ast>,
 
     /// A vector containing all the tokens emitted by the lexer. This is returned when the parser
     /// is finished consuming all the tokens. Note that unlike the emitted tokens, this vector
@@ -17,9 +18,9 @@ pub(crate) struct TokenSource<'src> {
     tokens: Vec<Token>,
 }
 
-impl<'src> TokenSource<'src> {
+impl<'src, 'ast> TokenSource<'src, 'ast> {
     /// Create a new token source for the given lexer.
-    pub(crate) fn new(lexer: Lexer<'src>) -> Self {
+    pub(crate) fn new(lexer: Lexer<'src, 'ast>) -> Self {
         // TODO(dhruvmanila): Use `allocate_tokens_vec`
         TokenSource {
             lexer,
@@ -28,8 +29,13 @@ impl<'src> TokenSource<'src> {
     }
 
     /// Create a new token source from the given source code which starts at the given offset.
-    pub(crate) fn from_source(source: &'src str, mode: Mode, start_offset: TextSize) -> Self {
-        let lexer = Lexer::new(source, mode, start_offset);
+    pub(crate) fn from_source(
+        source: &'src str,
+        mode: Mode,
+        start_offset: TextSize,
+        allocator: &'ast Allocator,
+    ) -> Self {
+        let lexer = Lexer::new(source, mode, start_offset, allocator);
         let mut source = TokenSource::new(lexer);
 
         // Initialize the token source so that the current token is set correctly.
@@ -56,7 +62,7 @@ impl<'src> TokenSource<'src> {
     /// for more info.
     ///
     /// [`take_value`]: Lexer::take_value
-    pub(crate) fn take_value(&mut self) -> TokenValue {
+    pub(crate) fn take_value(&mut self) -> TokenValue<'ast> {
         self.lexer.take_value()
     }
 
@@ -148,7 +154,7 @@ impl<'src> TokenSource<'src> {
     }
 
     /// Creates a checkpoint to which the token source can later return to using [`Self::rewind`].
-    pub(crate) fn checkpoint(&self) -> TokenSourceCheckpoint {
+    pub(crate) fn checkpoint(&self) -> TokenSourceCheckpoint<'ast> {
         TokenSourceCheckpoint {
             lexer_checkpoint: self.lexer.checkpoint(),
             tokens_position: self.tokens.len(),
@@ -156,7 +162,7 @@ impl<'src> TokenSource<'src> {
     }
 
     /// Restore the token source to the given checkpoint.
-    pub(crate) fn rewind(&mut self, checkpoint: TokenSourceCheckpoint) {
+    pub(crate) fn rewind(&mut self, checkpoint: TokenSourceCheckpoint<'ast>) {
         let TokenSourceCheckpoint {
             lexer_checkpoint,
             tokens_position,
@@ -186,8 +192,8 @@ impl<'src> TokenSource<'src> {
     }
 }
 
-pub(crate) struct TokenSourceCheckpoint {
-    lexer_checkpoint: LexerCheckpoint,
+pub(crate) struct TokenSourceCheckpoint<'ast> {
+    lexer_checkpoint: LexerCheckpoint<'ast>,
     tokens_position: usize,
 }
 

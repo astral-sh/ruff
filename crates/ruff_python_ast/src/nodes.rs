@@ -605,7 +605,7 @@ pub enum Expr<'ast> {
     #[is(name = "bytes_literal_expr")]
     BytesLiteral(ExprBytesLiteral<'ast>),
     #[is(name = "number_literal_expr")]
-    NumberLiteral(ExprNumberLiteral),
+    NumberLiteral(ExprNumberLiteral<'ast>),
     #[is(name = "boolean_literal_expr")]
     BooleanLiteral(ExprBooleanLiteral),
     #[is(name = "none_literal_expr")]
@@ -2616,26 +2616,26 @@ impl From<FStringFlags> for AnyStringFlags {
 }
 
 #[derive(Clone, Debug, PartialEq)]
-pub struct ExprNumberLiteral {
+pub struct ExprNumberLiteral<'ast> {
     pub range: TextRange,
-    pub value: Number,
+    pub value: Number<'ast>,
 }
 
-impl From<ExprNumberLiteral> for Expr<'_> {
-    fn from(payload: ExprNumberLiteral) -> Self {
+impl<'ast> From<ExprNumberLiteral<'ast>> for Expr<'ast> {
+    fn from(payload: ExprNumberLiteral<'ast>) -> Self {
         Expr::NumberLiteral(payload)
     }
 }
 
-impl Ranged for ExprNumberLiteral {
+impl Ranged for ExprNumberLiteral<'_> {
     fn range(&self) -> TextRange {
         self.range
     }
 }
 
 #[derive(Clone, Debug, PartialEq, is_macro::Is)]
-pub enum Number {
-    Int(int::Int),
+pub enum Number<'ast> {
+    Int(int::Int<'ast>),
     Float(f64),
     Complex { real: f64, imag: f64 },
 }

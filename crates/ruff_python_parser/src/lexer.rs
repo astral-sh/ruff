@@ -9,13 +9,12 @@
 use std::cmp::Ordering;
 use std::str::FromStr;
 
-use unicode_ident::{is_xid_continue, is_xid_start};
-use unicode_normalization::UnicodeNormalization;
-
-use ruff_python_ast::name::Name;
+use ruff_allocator::Allocator;
 use ruff_python_ast::{Int, IpyEscapeKind, StringFlags};
 use ruff_python_trivia::is_python_whitespace;
 use ruff_text_size::{TextLen, TextRange, TextSize};
+use unicode_ident::{is_xid_continue, is_xid_start};
+use unicode_normalization::UnicodeNormalization;
 
 use crate::error::{FStringErrorType, LexicalError, LexicalErrorType};
 use crate::lexer::cursor::{Cursor, EOF_CHAR};
@@ -32,9 +31,11 @@ const BOM: char = '\u{feff}';
 
 /// A lexer for Python source code.
 #[derive(Debug)]
-pub struct Lexer<'src> {
+pub struct Lexer<'src, 'ast> {
     /// Source code to be lexed.
     source: &'src str,
+
+    allocator: &'ast Allocator,
 
     /// A pointer to the current character of the source code which is being lexed.
     cursor: Cursor<'src>,
@@ -46,7 +47,7 @@ pub struct Lexer<'src> {
     current_range: TextRange,
 
     /// The value of the current token.
-    current_value: TokenValue,
+    current_value: TokenValue<'ast>,
 
     /// Flags for the current token.
     current_flags: TokenFlags,
@@ -72,13 +73,18 @@ pub struct Lexer<'src> {
     errors: Vec<LexicalError>,
 }
 
-impl<'src> Lexer<'src> {
+impl<'src, 'ast> Lexer<'src, 'ast> {
     /// Create a new lexer for the given input source which starts at the given offset.
     ///
     /// If the start offset is greater than 0, the cursor is moved ahead that many bytes.
     /// This means that the input source should be the complete source code and not the
     /// sliced version.
-    pub(crate) fn new(source: &'src str, mode: Mode, start_offset: TextSize) -> Self {
+    pub(crate) fn new(
+        source: &'src str,
+        mode: Mode,
+        start_offset: TextSize,
+        allocator: &'ast Allocator,
+    ) -> Self {
         assert!(
             u32::try_from(source.len()).is_ok(),
             "Lexer only supports files with a size up to 4GB"
@@ -87,6 +93,7 @@ impl<'src> Lexer<'src> {
         let mut lexer = Lexer {
             source,
             cursor: Cursor::new(source),
+            allocator,
             state: State::AfterNewline,
             current_kind: TokenKind::EndOfFile,
             current_range: TextRange::empty(start_offset),
@@ -130,7 +137,7 @@ impl<'src> Lexer<'src> {
     ///
     /// All the subsequent call to this method without moving the lexer would always return the
     /// default value which is [`TokenValue::None`].
-    pub(crate) fn take_value(&mut self) -> TokenValue {
+    pub(crate) fn take_value(&mut self) -> TokenValue<'ast> {
         std::mem::take(&mut self.current_value)
     }
 
@@ -644,7 +651,9 @@ impl<'src> Lexer<'src> {
         let text = self.token_text();
 
         if !is_ascii {
-            self.current_value = TokenValue::Name(text.nfkc().collect::<Name>());
+            let mut name = ruff_allocator::String::new_in(self.allocator);
+            name.extend(self.allocator.alloc(text.nfkc()));
+            self.current_value = TokenValue::Name(name.into_bump_str());
             return TokenKind::Name;
         }
 
@@ -688,7 +697,7 @@ impl<'src> Lexer<'src> {
             "with" => TokenKind::With,
             "yield" => TokenKind::Yield,
             _ => {
-                self.current_value = TokenValue::Name(Name::new(text));
+                self.current_value = TokenValue::Name(self.allocator.alloc_str(text));
                 TokenKind::Name
             }
         }
@@ -874,13 +883,13 @@ impl<'src> Lexer<'src> {
         }
 
         let value = if normalized.is_empty() {
-            self.source[range].to_string()
+            self.allocator.alloc_str(&self.source[range])
         } else {
             normalized.push_str(&self.source[TextRange::new(last_offset, self.offset())]);
-            normalized
+            self.allocator.alloc_str(&normalized)
         };
 
-        self.current_value = TokenValue::FStringMiddle(value.into_boxed_str());
+        self.current_value = TokenValue::FStringMiddle(value);
 
         self.current_flags = fstring.flags();
         Some(TokenKind::FStringMiddle)
@@ -994,9 +1003,8 @@ impl<'src> Lexer<'src> {
         };
 
         self.current_value = TokenValue::String(
-            self.source[TextRange::new(value_start, value_end)]
-                .to_string()
-                .into_boxed_str(),
+            self.allocator
+                .alloc_str(&self.source[TextRange::new(value_start, value_end)]),
         );
 
         TokenKind::String
@@ -1032,17 +1040,18 @@ impl<'src> Lexer<'src> {
         self.radix_run(&mut number, radix);
 
         // Extract the entire number, including the base prefix (e.g., `0x9D5`).
-        let token = &self.source[self.token_range()];
+        let token = self.allocator.alloc_str(&self.source[self.token_range()]);
 
-        let value = match Int::from_str_radix(number.as_str(), radix.as_u32(), token) {
-            Ok(int) => int,
-            Err(err) => {
-                return self.push_error(LexicalError::new(
-                    LexicalErrorType::OtherError(format!("{err:?}").into_boxed_str()),
-                    self.token_range(),
-                ));
-            }
-        };
+        let value =
+            match Int::from_str_radix(number.as_str(), radix.as_u32(), token, self.allocator) {
+                Ok(int) => int,
+                Err(err) => {
+                    return self.push_error(LexicalError::new(
+                        LexicalErrorType::OtherError(format!("{err:?}").into_boxed_str()),
+                        self.token_range(),
+                    ));
+                }
+            };
         self.current_value = TokenValue::Int(value);
         TokenKind::Int
     }
@@ -1121,7 +1130,7 @@ impl<'src> Lexer<'src> {
                 self.current_value = TokenValue::Complex { real: 0.0, imag };
                 TokenKind::Complex
             } else {
-                let value = match Int::from_str(number.as_str()) {
+                let value = match Int::from_str(number.as_str(), self.allocator) {
                     Ok(value) => {
                         if start_is_zero && value.as_u8() != Some(0) {
                             // Leading zeros in decimal integer literals are not permitted.
@@ -1277,7 +1286,7 @@ impl<'src> Lexer<'src> {
 
                     self.current_value = TokenValue::IpyEscapeCommand {
                         kind,
-                        value: value.into_boxed_str(),
+                        value: self.allocator.alloc_str(&value),
                     };
 
                     return TokenKind::IpyEscapeCommand;
@@ -1285,7 +1294,7 @@ impl<'src> Lexer<'src> {
                 '\n' | '\r' | EOF_CHAR => {
                     self.current_value = TokenValue::IpyEscapeCommand {
                         kind: escape_kind,
-                        value: value.into_boxed_str(),
+                        value: self.allocator.alloc_str(&value),
                     };
 
                     return TokenKind::IpyEscapeCommand;
@@ -1451,7 +1460,7 @@ impl<'src> Lexer<'src> {
     }
 
     /// Creates a checkpoint to which the lexer can later return to using [`Self::rewind`].
-    pub(crate) fn checkpoint(&self) -> LexerCheckpoint {
+    pub(crate) fn checkpoint(&self) -> LexerCheckpoint<'ast> {
         LexerCheckpoint {
             value: self.current_value.clone(),
             current_kind: self.current_kind,
@@ -1468,7 +1477,7 @@ impl<'src> Lexer<'src> {
     }
 
     /// Restore the lexer to the given checkpoint.
-    pub(crate) fn rewind(&mut self, checkpoint: LexerCheckpoint) {
+    pub(crate) fn rewind(&mut self, checkpoint: LexerCheckpoint<'ast>) {
         let LexerCheckpoint {
             value,
             current_kind,
@@ -1505,8 +1514,8 @@ impl<'src> Lexer<'src> {
     }
 }
 
-pub(crate) struct LexerCheckpoint {
-    value: TokenValue,
+pub(crate) struct LexerCheckpoint<'ast> {
+    value: TokenValue<'ast>,
     current_kind: TokenKind,
     current_range: TextRange,
     current_flags: TokenFlags,
@@ -1651,8 +1660,12 @@ impl<'a> LexedText<'a> {
 }
 
 /// Create a new [`Lexer`] for the given source code and [`Mode`].
-pub fn lex(source: &str, mode: Mode) -> Lexer {
-    Lexer::new(source, mode, TextSize::default())
+pub fn lex<'source, 'ast>(
+    source: &'source str,
+    mode: Mode,
+    allocator: &'ast Allocator,
+) -> Lexer<'source, 'ast> {
+    Lexer::new(source, mode, TextSize::default(), allocator)
 }
 
 #[cfg(test)]
@@ -1668,14 +1681,14 @@ mod tests {
     const UNIX_EOL: &str = "\n";
 
     /// Same as [`Token`] except that this includes the [`TokenValue`] as well.
-    struct TestToken {
+    struct TestToken<'ast> {
         kind: TokenKind,
-        value: TokenValue,
+        value: TokenValue<'ast>,
         range: TextRange,
         flags: TokenFlags,
     }
 
-    impl std::fmt::Debug for TestToken {
+    impl std::fmt::Debug for TestToken<'_> {
         fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
             let mut tuple = f.debug_tuple("");
             let mut tuple = if matches!(self.value, TokenValue::None) {
@@ -1692,12 +1705,12 @@ mod tests {
         }
     }
 
-    struct LexerOutput {
-        tokens: Vec<TestToken>,
+    struct LexerOutput<'ast> {
+        tokens: Vec<TestToken<'ast>>,
         errors: Vec<LexicalError>,
     }
 
-    impl std::fmt::Display for LexerOutput {
+    impl std::fmt::Display for LexerOutput<'_> {
         fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
             writeln!(f, "## Tokens")?;
             writeln!(f, "```\n{:#?}\n```", self.tokens)?;
@@ -1709,8 +1722,13 @@ mod tests {
         }
     }
 
-    fn lex(source: &str, mode: Mode, start_offset: TextSize) -> LexerOutput {
-        let mut lexer = Lexer::new(source, mode, start_offset);
+    fn lex<'source, 'ast>(
+        source: &'source str,
+        mode: Mode,
+        start_offset: TextSize,
+        allocator: &'ast Allocator,
+    ) -> LexerOutput<'ast> {
+        let mut lexer = Lexer::new(source, mode, start_offset, allocator);
         let mut tokens = Vec::new();
         loop {
             let kind = lexer.next_token();
@@ -1730,8 +1748,13 @@ mod tests {
         }
     }
 
-    fn lex_valid(source: &str, mode: Mode, start_offset: TextSize) -> LexerOutput {
-        let output = lex(source, mode, start_offset);
+    fn lex_valid<'ast>(
+        source: &str,
+        mode: Mode,
+        start_offset: TextSize,
+        allocator: &'ast Allocator,
+    ) -> LexerOutput<'ast> {
+        let output = lex(source, mode, start_offset, allocator);
 
         if !output.errors.is_empty() {
             let mut message = "Unexpected lexical errors for a valid source:\n".to_string();
@@ -1745,8 +1768,12 @@ mod tests {
         output
     }
 
-    fn lex_invalid(source: &str, mode: Mode) -> LexerOutput {
-        let output = lex(source, mode, TextSize::default());
+    fn lex_invalid<'ast>(
+        source: &str,
+        mode: Mode,
+        allocator: &'ast Allocator,
+    ) -> LexerOutput<'ast> {
+        let output = lex(source, mode, TextSize::default(), allocator);
 
         assert!(
             !output.errors.is_empty(),
@@ -1756,28 +1783,34 @@ mod tests {
         output
     }
 
-    fn lex_source(source: &str) -> LexerOutput {
-        lex_valid(source, Mode::Module, TextSize::default())
+    fn lex_source<'ast>(source: &str, allocator: &'ast Allocator) -> LexerOutput<'ast> {
+        lex_valid(source, Mode::Module, TextSize::default(), allocator)
     }
 
-    fn lex_source_with_offset(source: &str, start_offset: TextSize) -> LexerOutput {
-        lex_valid(source, Mode::Module, start_offset)
+    fn lex_source_with_offset<'ast>(
+        source: &str,
+        start_offset: TextSize,
+        allocator: &'ast Allocator,
+    ) -> LexerOutput<'ast> {
+        lex_valid(source, Mode::Module, start_offset, allocator)
     }
 
-    fn lex_jupyter_source(source: &str) -> LexerOutput {
-        lex_valid(source, Mode::Ipython, TextSize::default())
+    fn lex_jupyter_source<'ast>(source: &str, allocator: &'ast Allocator) -> LexerOutput<'ast> {
+        lex_valid(source, Mode::Ipython, TextSize::default(), allocator)
     }
 
     #[test]
     fn bom() {
+        let allocator = Allocator::new();
         let source = "\u{feff}x = 1";
-        assert_snapshot!(lex_source(source));
+        assert_snapshot!(lex_source(source, &allocator));
     }
 
     #[test]
     fn bom_with_offset() {
+        let allocator = Allocator::new();
         let source = "\u{feff}x + y + z";
-        assert_snapshot!(lex_source_with_offset(source, TextSize::new(7)));
+        assert_snapshot!(lex_source_with_offset(source, TextSize::new(7), &allocator));
     }
 
     #[test]
@@ -1785,59 +1818,85 @@ mod tests {
         // BOM offsets the first token by 3, so make sure that lexing from offset 11 (variable z)
         // doesn't panic. Refer https://github.com/astral-sh/ruff/issues/11731
         let source = "\u{feff}x + y + z";
-        assert_snapshot!(lex_source_with_offset(source, TextSize::new(11)));
+        let allocator = Allocator::new();
+        assert_snapshot!(lex_source_with_offset(
+            source,
+            TextSize::new(11),
+            &allocator
+        ));
     }
 
-    fn ipython_escape_command_line_continuation_eol(eol: &str) -> LexerOutput {
+    fn ipython_escape_command_line_continuation_eol<'ast>(
+        eol: &str,
+        allocator: &'ast Allocator,
+    ) -> LexerOutput<'ast> {
         let source = format!("%matplotlib \\{eol}  --inline");
-        lex_jupyter_source(&source)
+        lex_jupyter_source(&source, &allocator)
     }
 
     #[test]
     fn test_ipython_escape_command_line_continuation_unix_eol() {
-        assert_snapshot!(ipython_escape_command_line_continuation_eol(UNIX_EOL));
+        let allocator = Allocator::new();
+        assert_snapshot!(ipython_escape_command_line_continuation_eol(
+            UNIX_EOL, &allocator
+        ));
     }
 
     #[test]
     fn test_ipython_escape_command_line_continuation_mac_eol() {
-        assert_snapshot!(ipython_escape_command_line_continuation_eol(MAC_EOL));
+        let allocator = Allocator::new();
+        assert_snapshot!(ipython_escape_command_line_continuation_eol(
+            MAC_EOL, &allocator
+        ));
     }
 
     #[test]
     fn test_ipython_escape_command_line_continuation_windows_eol() {
-        assert_snapshot!(ipython_escape_command_line_continuation_eol(WINDOWS_EOL));
+        let allocator = Allocator::new();
+        assert_snapshot!(ipython_escape_command_line_continuation_eol(
+            WINDOWS_EOL,
+            &allocator
+        ));
     }
 
-    fn ipython_escape_command_line_continuation_with_eol_and_eof(eol: &str) -> LexerOutput {
+    fn ipython_escape_command_line_continuation_with_eol_and_eof<'ast>(
+        eol: &str,
+        allocator: &'ast Allocator,
+    ) -> LexerOutput<'ast> {
         let source = format!("%matplotlib \\{eol}");
-        lex_jupyter_source(&source)
+        lex_jupyter_source(&source, &allocator)
     }
 
     #[test]
     fn test_ipython_escape_command_line_continuation_with_unix_eol_and_eof() {
+        let allocator = Allocator::new();
         assert_snapshot!(ipython_escape_command_line_continuation_with_eol_and_eof(
-            UNIX_EOL
+            UNIX_EOL, &allocator
         ));
     }
 
     #[test]
     fn test_ipython_escape_command_line_continuation_with_mac_eol_and_eof() {
+        let allocator = Allocator::new();
         assert_snapshot!(ipython_escape_command_line_continuation_with_eol_and_eof(
-            MAC_EOL
+            MAC_EOL, &allocator
         ));
     }
 
     #[test]
     fn test_ipython_escape_command_line_continuation_with_windows_eol_and_eof() {
+        let allocator = Allocator::new();
         assert_snapshot!(ipython_escape_command_line_continuation_with_eol_and_eof(
-            WINDOWS_EOL
+            WINDOWS_EOL,
+            &allocator
         ));
     }
 
     #[test]
     fn test_empty_ipython_escape_command() {
         let source = "%\n%%\n!\n!!\n?\n??\n/\n,\n;";
-        assert_snapshot!(lex_jupyter_source(source));
+        let allocator = Allocator::new();
+        assert_snapshot!(lex_jupyter_source(source, &allocator));
     }
 
     #[test]
@@ -1858,7 +1917,8 @@ mod tests {
 !ls
 "
         .trim();
-        assert_snapshot!(lex_jupyter_source(source));
+        let allocator = Allocator::new();
+        assert_snapshot!(lex_jupyter_source(source, &allocator));
     }
 
     #[test]
@@ -1883,7 +1943,8 @@ mod tests {
 %%foo???
 !pwd?"
             .trim();
-        assert_snapshot!(lex_jupyter_source(source));
+        let allocator = Allocator::new();
+        assert_snapshot!(lex_jupyter_source(source, &allocator));
     }
 
     #[test]
@@ -1893,7 +1954,8 @@ if True:
     %matplotlib \
         --inline"
             .trim();
-        assert_snapshot!(lex_jupyter_source(source));
+        let allocator = Allocator::new();
+        assert_snapshot!(lex_jupyter_source(source, &allocator));
     }
 
     #[test]
@@ -1905,7 +1967,8 @@ bar = %timeit a % 3
 baz = %matplotlib \
         inline"
             .trim();
-        assert_snapshot!(lex_jupyter_source(source));
+        let allocator = Allocator::new();
+        assert_snapshot!(lex_jupyter_source(source, &allocator));
     }
 
     fn assert_no_ipython_escape_command(tokens: &[TestToken]) {
@@ -1929,7 +1992,8 @@ foo = ,func
 def f(arg=%timeit a = b):
     pass"
             .trim();
-        let output = lex(source, Mode::Ipython, TextSize::default());
+        let allocator = Allocator::new();
+        let output = lex(source, Mode::Ipython, TextSize::default(), &allocator);
         assert!(output.errors.is_empty());
         assert_no_ipython_escape_command(&output.tokens);
     }
@@ -1938,130 +2002,153 @@ def f(arg=%timeit a = b):
     fn test_numbers() {
         let source =
             "0x2f 0o12 0b1101 0 123 123_45_67_890 0.2 1e+2 2.1e3 2j 2.2j 000 0x995DC9BBDF1939FA 0x995DC9BBDF1939FA995DC9BBDF1939FA";
-        assert_snapshot!(lex_source(source));
+        let allocator = Allocator::new();
+        assert_snapshot!(lex_source(source, &allocator));
     }
 
     #[test]
     fn test_invalid_leading_zero_small() {
         let source = "025";
-        assert_snapshot!(lex_invalid(source, Mode::Module));
+        let allocator = Allocator::new();
+        assert_snapshot!(lex_invalid(source, Mode::Module, &allocator));
     }
 
     #[test]
     fn test_invalid_leading_zero_big() {
         let source =
             "0252222222222222522222222222225222222222222252222222222222522222222222225222222222222";
-        assert_snapshot!(lex_invalid(source, Mode::Module));
+        let allocator = Allocator::new();
+        assert_snapshot!(lex_invalid(source, Mode::Module, &allocator));
     }
 
     #[test]
     fn test_line_comment_long() {
         let source = "99232  # foo".to_string();
-        assert_snapshot!(lex_source(&source));
+        let allocator = Allocator::new();
+        assert_snapshot!(lex_source(&source, &allocator));
     }
 
     #[test]
     fn test_line_comment_whitespace() {
         let source = "99232  #  ".to_string();
-        assert_snapshot!(lex_source(&source));
+        let allocator = Allocator::new();
+        assert_snapshot!(lex_source(&source, &allocator));
     }
 
     #[test]
     fn test_line_comment_single_whitespace() {
         let source = "99232  # ".to_string();
-        assert_snapshot!(lex_source(&source));
+        let allocator = Allocator::new();
+        assert_snapshot!(lex_source(&source, &allocator));
     }
 
     #[test]
     fn test_line_comment_empty() {
         let source = "99232  #".to_string();
-        assert_snapshot!(lex_source(&source));
+        let allocator = Allocator::new();
+        assert_snapshot!(lex_source(&source, &allocator));
     }
 
-    fn comment_until_eol(eol: &str) -> LexerOutput {
+    fn comment_until_eol<'ast>(eol: &str, allocator: &'ast Allocator) -> LexerOutput<'ast> {
         let source = format!("123  # Foo{eol}456");
-        lex_source(&source)
+        lex_source(&source, &allocator)
     }
 
     #[test]
     fn test_comment_until_unix_eol() {
-        assert_snapshot!(comment_until_eol(UNIX_EOL));
+        let allocator = Allocator::new();
+        assert_snapshot!(comment_until_eol(UNIX_EOL, &allocator));
     }
 
     #[test]
     fn test_comment_until_mac_eol() {
-        assert_snapshot!(comment_until_eol(MAC_EOL));
+        let allocator = Allocator::new();
+        assert_snapshot!(comment_until_eol(MAC_EOL, &allocator));
     }
 
     #[test]
     fn test_comment_until_windows_eol() {
-        assert_snapshot!(comment_until_eol(WINDOWS_EOL));
+        let allocator = Allocator::new();
+        assert_snapshot!(comment_until_eol(WINDOWS_EOL, &allocator));
     }
 
     #[test]
     fn test_assignment() {
         let source = r"a_variable = 99 + 2-0";
-        assert_snapshot!(lex_source(source));
+        let allocator = Allocator::new();
+        assert_snapshot!(lex_source(source, &allocator));
     }
 
-    fn indentation_with_eol(eol: &str) -> LexerOutput {
+    fn indentation_with_eol<'ast>(eol: &str, allocator: &'ast Allocator) -> LexerOutput<'ast> {
         let source = format!("def foo():{eol}    return 99{eol}{eol}");
-        lex_source(&source)
+        lex_source(&source, &allocator)
     }
 
     #[test]
     fn test_indentation_with_unix_eol() {
-        assert_snapshot!(indentation_with_eol(UNIX_EOL));
+        let allocator = Allocator::new();
+        assert_snapshot!(indentation_with_eol(UNIX_EOL, &allocator));
     }
 
     #[test]
     fn test_indentation_with_mac_eol() {
-        assert_snapshot!(indentation_with_eol(MAC_EOL));
+        let allocator = Allocator::new();
+        assert_snapshot!(indentation_with_eol(MAC_EOL, &allocator));
     }
 
     #[test]
     fn test_indentation_with_windows_eol() {
-        assert_snapshot!(indentation_with_eol(WINDOWS_EOL));
+        let allocator = Allocator::new();
+        assert_snapshot!(indentation_with_eol(WINDOWS_EOL, &allocator));
     }
 
-    fn double_dedent_with_eol(eol: &str) -> LexerOutput {
+    fn double_dedent_with_eol<'ast>(eol: &str, allocator: &'ast Allocator) -> LexerOutput<'ast> {
         let source = format!("def foo():{eol} if x:{eol}{eol}  return 99{eol}{eol}");
-        lex_source(&source)
+        lex_source(&source, &allocator)
     }
 
     #[test]
     fn test_double_dedent_with_unix_eol() {
-        assert_snapshot!(double_dedent_with_eol(UNIX_EOL));
+        let allocator = Allocator::new();
+        assert_snapshot!(double_dedent_with_eol(UNIX_EOL, &allocator));
     }
 
     #[test]
     fn test_double_dedent_with_mac_eol() {
-        assert_snapshot!(double_dedent_with_eol(MAC_EOL));
+        let allocator = Allocator::new();
+        assert_snapshot!(double_dedent_with_eol(MAC_EOL, &allocator));
     }
 
     #[test]
     fn test_double_dedent_with_windows_eol() {
-        assert_snapshot!(double_dedent_with_eol(WINDOWS_EOL));
+        let allocator = Allocator::new();
+        assert_snapshot!(double_dedent_with_eol(WINDOWS_EOL, &allocator));
     }
 
-    fn double_dedent_with_tabs_eol(eol: &str) -> LexerOutput {
+    fn double_dedent_with_tabs_eol<'ast>(
+        eol: &str,
+        allocator: &'ast Allocator,
+    ) -> LexerOutput<'ast> {
         let source = format!("def foo():{eol}\tif x:{eol}{eol}\t\t return 99{eol}{eol}");
-        lex_source(&source)
+        lex_source(&source, &allocator)
     }
 
     #[test]
     fn test_double_dedent_with_tabs_unix_eol() {
-        assert_snapshot!(double_dedent_with_tabs_eol(UNIX_EOL));
+        let allocator = Allocator::new();
+        assert_snapshot!(double_dedent_with_tabs_eol(UNIX_EOL, &allocator));
     }
 
     #[test]
     fn test_double_dedent_with_tabs_mac_eol() {
-        assert_snapshot!(double_dedent_with_tabs_eol(MAC_EOL));
+        let allocator = Allocator::new();
+        assert_snapshot!(double_dedent_with_tabs_eol(MAC_EOL, &allocator));
     }
 
     #[test]
     fn test_double_dedent_with_tabs_windows_eol() {
-        assert_snapshot!(double_dedent_with_tabs_eol(WINDOWS_EOL));
+        let allocator = Allocator::new();
+        assert_snapshot!(double_dedent_with_tabs_eol(WINDOWS_EOL, &allocator));
     }
 
     #[test]
@@ -2072,10 +2159,11 @@ if first:
         pass
     foo
 ";
-        assert_snapshot!(lex_source(source));
+        let allocator = Allocator::new();
+        assert_snapshot!(lex_source(source, &allocator));
     }
 
-    fn newline_in_brackets_eol(eol: &str) -> LexerOutput {
+    fn newline_in_brackets_eol<'ast>(eol: &str, allocator: &'ast Allocator) -> LexerOutput<'ast> {
         let source = r"x = [
 
     1,2
@@ -2087,22 +2175,25 @@ if first:
 7}]
 "
         .replace('\n', eol);
-        lex_source(&source)
+        lex_source(&source, &allocator)
     }
 
     #[test]
     fn test_newline_in_brackets_unix_eol() {
-        assert_snapshot!(newline_in_brackets_eol(UNIX_EOL));
+        let allocator = Allocator::new();
+        assert_snapshot!(newline_in_brackets_eol(UNIX_EOL, &allocator));
     }
 
     #[test]
     fn test_newline_in_brackets_mac_eol() {
-        assert_snapshot!(newline_in_brackets_eol(MAC_EOL));
+        let allocator = Allocator::new();
+        assert_snapshot!(newline_in_brackets_eol(MAC_EOL, &allocator));
     }
 
     #[test]
     fn test_newline_in_brackets_windows_eol() {
-        assert_snapshot!(newline_in_brackets_eol(WINDOWS_EOL));
+        let allocator = Allocator::new();
+        assert_snapshot!(newline_in_brackets_eol(WINDOWS_EOL, &allocator));
     }
 
     #[test]
@@ -2114,55 +2205,67 @@ if first:
     'c' \
     'd'
 )";
-        assert_snapshot!(lex_source(source));
+        let allocator = Allocator::new();
+        assert_snapshot!(lex_source(source, &allocator));
     }
 
     #[test]
     fn test_logical_newline_line_comment() {
         let source = "#Hello\n#World\n";
-        assert_snapshot!(lex_source(source));
+        let allocator = Allocator::new();
+        assert_snapshot!(lex_source(source, &allocator));
     }
 
     #[test]
     fn test_operators() {
         let source = "//////=/ /";
-        assert_snapshot!(lex_source(source));
+        let allocator = Allocator::new();
+        assert_snapshot!(lex_source(source, &allocator));
     }
 
     #[test]
     fn test_string() {
         let source = r#""double" 'single' 'can\'t' "\\\"" '\t\r\n' '\g' r'raw\'' '\420' '\200\0a'"#;
-        assert_snapshot!(lex_source(source));
+        let allocator = Allocator::new();
+        assert_snapshot!(lex_source(source, &allocator));
     }
 
-    fn string_continuation_with_eol(eol: &str) -> LexerOutput {
+    fn string_continuation_with_eol<'ast>(
+        eol: &str,
+        allocator: &'ast Allocator,
+    ) -> LexerOutput<'ast> {
         let source = format!("\"abc\\{eol}def\"");
-        lex_source(&source)
+        lex_source(&source, &allocator)
     }
 
     #[test]
     fn test_string_continuation_with_unix_eol() {
-        assert_snapshot!(string_continuation_with_eol(UNIX_EOL));
+        let allocator = Allocator::new();
+        assert_snapshot!(string_continuation_with_eol(UNIX_EOL, &allocator));
     }
 
     #[test]
     fn test_string_continuation_with_mac_eol() {
-        assert_snapshot!(string_continuation_with_eol(MAC_EOL));
+        let allocator = Allocator::new();
+        assert_snapshot!(string_continuation_with_eol(MAC_EOL, &allocator));
     }
 
     #[test]
     fn test_string_continuation_with_windows_eol() {
-        assert_snapshot!(string_continuation_with_eol(WINDOWS_EOL));
+        let allocator = Allocator::new();
+        assert_snapshot!(string_continuation_with_eol(WINDOWS_EOL, &allocator));
     }
 
     #[test]
     fn test_escape_unicode_name() {
         let source = r#""\N{EN SPACE}""#;
-        assert_snapshot!(lex_source(source));
+        let allocator = Allocator::new();
+        assert_snapshot!(lex_source(source, &allocator));
     }
 
     fn get_tokens_only(source: &str) -> Vec<TokenKind> {
-        let output = lex(source, Mode::Module, TextSize::default());
+        let allocator = Allocator::new();
+        let output = lex(source, Mode::Module, TextSize::default(), &allocator);
         assert!(output.errors.is_empty());
         output.tokens.into_iter().map(|token| token.kind).collect()
     }
@@ -2174,24 +2277,27 @@ if first:
         assert_eq!(get_tokens_only(source1), get_tokens_only(source2));
     }
 
-    fn triple_quoted_eol(eol: &str) -> LexerOutput {
+    fn triple_quoted_eol<'ast>(eol: &str, allocator: &'ast Allocator) -> LexerOutput<'ast> {
         let source = format!("\"\"\"{eol} test string{eol} \"\"\"");
-        lex_source(&source)
+        lex_source(&source, &allocator)
     }
 
     #[test]
     fn test_triple_quoted_unix_eol() {
-        assert_snapshot!(triple_quoted_eol(UNIX_EOL));
+        let allocator = Allocator::new();
+        assert_snapshot!(triple_quoted_eol(UNIX_EOL, &allocator));
     }
 
     #[test]
     fn test_triple_quoted_mac_eol() {
-        assert_snapshot!(triple_quoted_eol(MAC_EOL));
+        let allocator = Allocator::new();
+        assert_snapshot!(triple_quoted_eol(MAC_EOL, &allocator));
     }
 
     #[test]
     fn test_triple_quoted_windows_eol() {
-        assert_snapshot!(triple_quoted_eol(WINDOWS_EOL));
+        let allocator = Allocator::new();
+        assert_snapshot!(triple_quoted_eol(WINDOWS_EOL, &allocator));
     }
 
     // This test case is to just make sure that the lexer doesn't go into
@@ -2199,14 +2305,16 @@ if first:
     #[test]
     fn test_infinite_loop() {
         let source = "[1";
-        lex_invalid(source, Mode::Module);
+        let allocator = Allocator::new();
+        lex_invalid(source, Mode::Module, &allocator);
     }
 
     /// Emoji identifiers are a non-standard python feature and are not supported by our lexer.
     #[test]
     fn test_emoji_identifier() {
         let source = "🐦";
-        assert_snapshot!(lex_invalid(source, Mode::Module));
+        let allocator = Allocator::new();
+        assert_snapshot!(lex_invalid(source, Mode::Module, &allocator));
     }
 
     #[test]
@@ -2214,95 +2322,113 @@ if first:
         let source = "if True:
     pass
   pass";
-        assert_snapshot!(lex_invalid(source, Mode::Module));
+        let allocator = Allocator::new();
+        assert_snapshot!(lex_invalid(source, Mode::Module, &allocator));
     }
 
     #[test]
     fn test_empty_fstrings() {
         let source = r#"f"" "" F"" f'' '' f"""""" f''''''"#;
-        assert_snapshot!(lex_source(source));
+        let allocator = Allocator::new();
+        assert_snapshot!(lex_source(source, &allocator));
     }
 
     #[test]
     fn test_fstring_prefix() {
         let source = r#"f"" F"" rf"" rF"" Rf"" RF"" fr"" Fr"" fR"" FR"""#;
-        assert_snapshot!(lex_source(source));
+        let allocator = Allocator::new();
+        assert_snapshot!(lex_source(source, &allocator));
     }
 
     #[test]
     fn test_fstring() {
         let source = r#"f"normal {foo} {{another}} {bar} {{{three}}}""#;
-        assert_snapshot!(lex_source(source));
+        let allocator = Allocator::new();
+        assert_snapshot!(lex_source(source, &allocator));
     }
 
     #[test]
     fn test_fstring_parentheses() {
         let source = r#"f"{}" f"{{}}" f" {}" f"{{{}}}" f"{{{{}}}}" f" {} {{}} {{{}}} {{{{}}}}  ""#;
-        assert_snapshot!(lex_source(source));
+        let allocator = Allocator::new();
+        assert_snapshot!(lex_source(source, &allocator));
     }
 
-    fn fstring_single_quote_escape_eol(eol: &str) -> LexerOutput {
+    fn fstring_single_quote_escape_eol<'ast>(
+        eol: &str,
+        allocator: &'ast Allocator,
+    ) -> LexerOutput<'ast> {
         let source = format!(r"f'text \{eol} more text'");
-        lex_source(&source)
+        lex_source(&source, &allocator)
     }
 
     #[test]
     fn test_fstring_single_quote_escape_unix_eol() {
-        assert_snapshot!(fstring_single_quote_escape_eol(UNIX_EOL));
+        let allocator = Allocator::new();
+        assert_snapshot!(fstring_single_quote_escape_eol(UNIX_EOL, &allocator));
     }
 
     #[test]
     fn test_fstring_single_quote_escape_mac_eol() {
-        assert_snapshot!(fstring_single_quote_escape_eol(MAC_EOL));
+        let allocator = Allocator::new();
+        assert_snapshot!(fstring_single_quote_escape_eol(MAC_EOL, &allocator));
     }
 
     #[test]
     fn test_fstring_single_quote_escape_windows_eol() {
-        assert_snapshot!(fstring_single_quote_escape_eol(WINDOWS_EOL));
+        let allocator = Allocator::new();
+        assert_snapshot!(fstring_single_quote_escape_eol(WINDOWS_EOL, &allocator));
     }
 
     #[test]
     fn test_fstring_escape() {
         let source = r#"f"\{x:\"\{x}} \"\"\
  end""#;
-        assert_snapshot!(lex_source(source));
+        let allocator = Allocator::new();
+        assert_snapshot!(lex_source(source, &allocator));
     }
 
     #[test]
     fn test_fstring_escape_braces() {
         let source = r"f'\{foo}' f'\\{foo}' f'\{{foo}}' f'\\{{foo}}'";
-        assert_snapshot!(lex_source(source));
+        let allocator = Allocator::new();
+        assert_snapshot!(lex_source(source, &allocator));
     }
 
     #[test]
     fn test_fstring_escape_raw() {
         let source = r#"rf"\{x:\"\{x}} \"\"\
  end""#;
-        assert_snapshot!(lex_source(source));
+        let allocator = Allocator::new();
+        assert_snapshot!(lex_source(source, &allocator));
     }
 
     #[test]
     fn test_fstring_named_unicode() {
         let source = r#"f"\N{BULLET} normal \Nope \N""#;
-        assert_snapshot!(lex_source(source));
+        let allocator = Allocator::new();
+        assert_snapshot!(lex_source(source, &allocator));
     }
 
     #[test]
     fn test_fstring_named_unicode_raw() {
         let source = r#"rf"\N{BULLET} normal""#;
-        assert_snapshot!(lex_source(source));
+        let allocator = Allocator::new();
+        assert_snapshot!(lex_source(source, &allocator));
     }
 
     #[test]
     fn test_fstring_with_named_expression() {
         let source = r#"f"{x:=10} {(x:=10)} {x,{y:=10}} {[x:=10]}""#;
-        assert_snapshot!(lex_source(source));
+        let allocator = Allocator::new();
+        assert_snapshot!(lex_source(source, &allocator));
     }
 
     #[test]
     fn test_fstring_with_format_spec() {
         let source = r#"f"{foo:} {x=!s:.3f} {x:.{y}f} {'':*^{1:{1}}} {x:{{1}.pop()}}""#;
-        assert_snapshot!(lex_source(source));
+        let allocator = Allocator::new();
+        assert_snapshot!(lex_source(source, &allocator));
     }
 
     #[test]
@@ -2325,19 +2451,22 @@ f'__{
         b
 }__'
 ";
-        assert_snapshot!(lex_source(source));
+        let allocator = Allocator::new();
+        assert_snapshot!(lex_source(source, &allocator));
     }
 
     #[test]
     fn test_fstring_conversion() {
         let source = r#"f"{x!s} {x=!r} {x:.3f!r} {{x!r}}""#;
-        assert_snapshot!(lex_source(source));
+        let allocator = Allocator::new();
+        assert_snapshot!(lex_source(source, &allocator));
     }
 
     #[test]
     fn test_fstring_nested() {
         let source = r#"f"foo {f"bar {x + f"{wow}"}"} baz" f'foo {f'bar'} some {f"another"}'"#;
-        assert_snapshot!(lex_source(source));
+        let allocator = Allocator::new();
+        assert_snapshot!(lex_source(source, &allocator));
     }
 
     #[test]
@@ -2347,7 +2476,8 @@ f'__{
         *
             y
 } second""#;
-        assert_snapshot!(lex_source(source));
+        let allocator = Allocator::new();
+        assert_snapshot!(lex_source(source, &allocator));
     }
 
     #[test]
@@ -2360,7 +2490,8 @@ hello
 hello
 ''' f"some {f"""multiline
 allowed {x}"""} string""#;
-        assert_snapshot!(lex_source(source));
+        let allocator = Allocator::new();
+        assert_snapshot!(lex_source(source, &allocator));
     }
 
     #[test]
@@ -2370,13 +2501,15 @@ allowed {x}"""} string""#;
     x
 } # not a comment
 """"#;
-        assert_snapshot!(lex_source(source));
+        let allocator = Allocator::new();
+        assert_snapshot!(lex_source(source, &allocator));
     }
 
     #[test]
     fn test_fstring_with_ipy_escape_command() {
         let source = r#"f"foo {!pwd} bar""#;
-        assert_snapshot!(lex_source(source));
+        let allocator = Allocator::new();
+        assert_snapshot!(lex_source(source, &allocator));
     }
 
     #[test]
@@ -2386,13 +2519,15 @@ f"{lambda x:{x}}"
 f"{(lambda x:{x})}"
 "#
         .trim();
-        assert_snapshot!(lex_source(source));
+        let allocator = Allocator::new();
+        assert_snapshot!(lex_source(source, &allocator));
     }
 
     #[test]
     fn test_fstring_with_nul_char() {
         let source = r"f'\0'";
-        assert_snapshot!(lex_source(source));
+        let allocator = Allocator::new();
+        assert_snapshot!(lex_source(source, &allocator));
     }
 
     #[test]
@@ -2400,11 +2535,13 @@ f"{(lambda x:{x})}"
         let source = r"match foo:
     case bar:
         pass";
-        assert_snapshot!(lex_jupyter_source(source));
+        let allocator = Allocator::new();
+        assert_snapshot!(lex_jupyter_source(source, &allocator));
     }
 
     fn lex_fstring_error(source: &str) -> FStringErrorType {
-        let output = lex(source, Mode::Module, TextSize::default());
+        let allocator = Allocator::new();
+        let output = lex(source, Mode::Module, TextSize::default(), &allocator);
         match output
             .errors
             .into_iter()

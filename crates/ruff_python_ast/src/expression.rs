@@ -27,7 +27,7 @@ pub enum ExpressionRef<'a, 'ast> {
     FString(&'a ast::ExprFString<'ast>),
     StringLiteral(&'a ast::ExprStringLiteral<'ast>),
     BytesLiteral(&'a ast::ExprBytesLiteral<'ast>),
-    NumberLiteral(&'a ast::ExprNumberLiteral),
+    NumberLiteral(&'a ast::ExprNumberLiteral<'ast>),
     BooleanLiteral(&'a ast::ExprBooleanLiteral),
     NoneLiteral(&'a ast::ExprNoneLiteral),
     EllipsisLiteral(&'a ast::ExprEllipsisLiteral),
@@ -186,8 +186,8 @@ impl<'a, 'ast> From<&'a ast::ExprBytesLiteral<'ast>> for ExpressionRef<'a, 'ast>
         Self::BytesLiteral(value)
     }
 }
-impl<'a> From<&'a ast::ExprNumberLiteral> for ExpressionRef<'a, '_> {
-    fn from(value: &'a ast::ExprNumberLiteral) -> Self {
+impl<'a, 'ast> From<&'a ast::ExprNumberLiteral<'ast>> for ExpressionRef<'a, 'ast> {
+    fn from(value: &'a ast::ExprNumberLiteral<'ast>) -> Self {
         Self::NumberLiteral(value)
     }
 }
@@ -335,7 +335,7 @@ impl Ranged for ExpressionRef<'_, '_> {
 pub enum LiteralExpressionRef<'a, 'ast> {
     StringLiteral(&'a ast::ExprStringLiteral<'ast>),
     BytesLiteral(&'a ast::ExprBytesLiteral<'ast>),
-    NumberLiteral(&'a ast::ExprNumberLiteral),
+    NumberLiteral(&'a ast::ExprNumberLiteral<'ast>),
     BooleanLiteral(&'a ast::ExprBooleanLiteral),
     NoneLiteral(&'a ast::ExprNoneLiteral),
     EllipsisLiteral(&'a ast::ExprEllipsisLiteral),

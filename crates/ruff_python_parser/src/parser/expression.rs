@@ -4,7 +4,6 @@ use std::ops::Deref;
 use bitflags::bitflags;
 use rustc_hash::{FxBuildHasher, FxHashSet};
 
-use ruff_python_ast::name::Name;
 use ruff_python_ast::{
     self as ast, BoolOp, CmpOp, ConversionFlag, Expr, ExprContext, FStringElement, FStringElements,
     IpyEscapeKind, Number, Operator, UnaryOp,
@@ -478,17 +477,14 @@ impl<'src, 'ast> Parser<'src, 'ast> {
             let TokenValue::Name(name) = self.bump_value(TokenKind::Name) else {
                 unreachable!();
             };
-            return ast::Identifier {
-                id: self.allocator.alloc_str(&name),
-                range,
-            };
+            return ast::Identifier { id: name, range };
         }
 
         if self.current_token_kind().is_soft_keyword() {
-            let id = Name::new(self.src_text(range));
+            let id = self.src_text(range);
             self.bump_soft_keyword_as_name();
             return ast::Identifier {
-                id: self.allocator.alloc_str(&id),
+                id: self.alloc_str(id),
                 range,
             };
         }
@@ -2287,7 +2283,7 @@ impl<'src, 'ast> Parser<'src, 'ast> {
         let command = ast::ExprIpyEscapeCommand {
             range: self.node_range(start),
             kind,
-            value: self.alloc_str(&value),
+            value,
         };
 
         if self.mode != Mode::Ipython {

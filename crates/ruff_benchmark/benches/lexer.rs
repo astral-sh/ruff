@@ -2,6 +2,7 @@ use codspeed_criterion_compat::{
     criterion_group, criterion_main, measurement::WallTime, BenchmarkId, Criterion, Throughput,
 };
 
+use ruff_allocator::Allocator;
 use ruff_benchmark::{TestCase, TestFile, TestFileDownloadError};
 use ruff_python_parser::{lexer, Mode, TokenKind};
 
@@ -48,7 +49,8 @@ fn benchmark_lexer(criterion: &mut Criterion<WallTime>) {
             &case,
             |b, case| {
                 b.iter(|| {
-                    let mut lexer = lexer::lex(case.code(), Mode::Module);
+                    let allocator = Allocator::new();
+                    let mut lexer = lexer::lex(case.code(), Mode::Module, &allocator);
                     loop {
                         let token = lexer.next_token();
                         match token {

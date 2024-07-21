@@ -346,14 +346,14 @@ impl From<&ast::Singleton> for ComparableSingleton {
 }
 
 #[derive(Debug, PartialEq, Eq, Hash)]
-pub enum ComparableNumber<'a> {
-    Int(&'a ast::Int),
+pub enum ComparableNumber<'a, 'ast> {
+    Int(&'a ast::Int<'ast>),
     Float(u64),
     Complex { real: u64, imag: u64 },
 }
 
-impl<'a, 'ast> From<&'a ast::Number> for ComparableNumber<'a> {
-    fn from(number: &'a ast::Number) -> Self {
+impl<'a, 'ast> From<&'a ast::Number<'ast>> for ComparableNumber<'a, 'ast> {
+    fn from(number: &'a ast::Number<'ast>) -> Self {
         match number {
             ast::Number::Int(value) => Self::Int(&value),
             ast::Number::Float(value) => Self::Float(value.to_bits()),
@@ -581,7 +581,7 @@ pub enum ComparableLiteral<'a, 'ast> {
     Bool(bool),
     Str(Vec<ComparableStringLiteral<'ast>>),
     Bytes(Vec<ComparableBytesLiteral<'ast>>),
-    Number(ComparableNumber<'a>),
+    Number(ComparableNumber<'a, 'ast>),
 }
 
 impl<'a, 'ast> From<ast::LiteralExpressionRef<'a, 'ast>> for ComparableLiteral<'a, 'ast> {
@@ -799,8 +799,8 @@ pub struct ExprBytesLiteral<'ast> {
 }
 
 #[derive(Debug, PartialEq, Eq, Hash)]
-pub struct ExprNumberLiteral<'a> {
-    value: ComparableNumber<'a>,
+pub struct ExprNumberLiteral<'a, 'ast> {
+    value: ComparableNumber<'a, 'ast>,
 }
 
 #[derive(Debug, PartialEq, Eq, Hash)]
@@ -876,7 +876,7 @@ pub enum ComparableExpr<'a, 'ast> {
     FString(ExprFString<'a, 'ast>),
     StringLiteral(ExprStringLiteral<'ast>),
     BytesLiteral(ExprBytesLiteral<'ast>),
-    NumberLiteral(ExprNumberLiteral<'a>),
+    NumberLiteral(ExprNumberLiteral<'a, 'ast>),
     BoolLiteral(ExprBoolLiteral),
     NoneLiteral,
     EllipsisLiteral,

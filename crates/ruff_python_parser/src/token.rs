@@ -9,7 +9,6 @@ use std::fmt;
 
 use bitflags::bitflags;
 
-use ruff_python_ast::name::Name;
 use ruff_python_ast::str::Quote;
 use ruff_python_ast::str_prefix::{
     AnyStringPrefix, ByteStringPrefix, FStringPrefix, StringLiteralPrefix,
@@ -774,16 +773,16 @@ impl TokenFlags {
 }
 
 #[derive(Clone, Debug, Default)]
-pub(crate) enum TokenValue {
+pub(crate) enum TokenValue<'ast> {
     #[default]
     None,
     /// Token value for a name, commonly known as an identifier.
     ///
     /// Unicode names are NFKC-normalized by the lexer,
     /// matching [the behaviour of Python's lexer](https://docs.python.org/3/reference/lexical_analysis.html#identifiers)
-    Name(Name),
+    Name(&'ast str),
     /// Token value for an integer.
-    Int(Int),
+    Int(Int<'ast>),
     /// Token value for a floating point number.
     Float(f64),
     /// Token value for a complex number.
@@ -794,15 +793,15 @@ pub(crate) enum TokenValue {
         imag: f64,
     },
     /// Token value for a string.
-    String(Box<str>),
+    String(&'ast str),
     /// Token value that includes the portion of text inside the f-string that's not
     /// part of the expression part and isn't an opening or closing brace.
-    FStringMiddle(Box<str>),
+    FStringMiddle(&'ast str),
     /// Token value for IPython escape commands. These are recognized by the lexer
     /// only when the mode is [`Mode::Ipython`].
     IpyEscapeCommand {
         /// The magic command value.
-        value: Box<str>,
+        value: &'ast str,
         /// The kind of magic command.
         kind: IpyEscapeKind,
     },

@@ -27,7 +27,7 @@ pub(crate) struct Parser<'src, 'ast> {
     source: &'src str,
 
     /// Token source for the parser that skips over any non-trivia token.
-    tokens: TokenSource<'src>,
+    tokens: TokenSource<'src, 'ast>,
 
     /// Stores all the syntax errors found during the parsing.
     errors: Vec<ParseError>,
@@ -64,7 +64,7 @@ impl<'src, 'ast> Parser<'src, 'ast> {
         start_offset: TextSize,
         allocator: &'ast Allocator,
     ) -> Self {
-        let tokens = TokenSource::from_source(source, mode, start_offset);
+        let tokens = TokenSource::from_source(source, mode, start_offset, allocator);
 
         Parser {
             mode,
@@ -355,7 +355,7 @@ impl<'src, 'ast> Parser<'src, 'ast> {
     /// # Panics
     ///
     /// If the current token is not of the given kind.
-    fn bump_value(&mut self, kind: TokenKind) -> TokenValue {
+    fn bump_value(&mut self, kind: TokenKind) -> TokenValue<'ast> {
         let value = self.tokens.take_value();
         self.bump(kind);
         value
@@ -668,7 +668,7 @@ impl<'src, 'ast> Parser<'src, 'ast> {
     }
 
     /// Creates a checkpoint to which the parser can later return to using [`Self::rewind`].
-    fn checkpoint(&self) -> ParserCheckpoint {
+    fn checkpoint(&self) -> ParserCheckpoint<'ast> {
         ParserCheckpoint {
             tokens: self.tokens.checkpoint(),
             errors_position: self.errors.len(),
@@ -679,7 +679,7 @@ impl<'src, 'ast> Parser<'src, 'ast> {
     }
 
     /// Restore the parser to the given checkpoint.
-    fn rewind(&mut self, checkpoint: ParserCheckpoint) {
+    fn rewind(&mut self, checkpoint: ParserCheckpoint<'ast>) {
         let ParserCheckpoint {
             tokens,
             errors_position,
@@ -696,8 +696,8 @@ impl<'src, 'ast> Parser<'src, 'ast> {
     }
 }
 
-struct ParserCheckpoint {
-    tokens: TokenSourceCheckpoint,
+struct ParserCheckpoint<'ast> {
+    tokens: TokenSourceCheckpoint<'ast>,
     errors_position: usize,
     current_token_id: TokenId,
     prev_token_end: TextSize,

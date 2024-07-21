@@ -920,11 +920,7 @@ impl<'src, 'ast> Parser<'src, 'ast> {
             self.add_error(ParseErrorType::UnexpectedIpythonEscapeCommand, range);
         }
 
-        ast::StmtIpyEscapeCommand {
-            range,
-            kind,
-            value: self.alloc_str(&value),
-        }
+        ast::StmtIpyEscapeCommand { range, kind, value }
     }
 
     /// Parses an IPython help end escape command at the statement level.

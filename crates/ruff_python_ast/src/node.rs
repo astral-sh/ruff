@@ -85,7 +85,7 @@ pub enum AnyNode<'ast> {
     ExprFString(ast::ExprFString<'ast>),
     ExprStringLiteral(ast::ExprStringLiteral<'ast>),
     ExprBytesLiteral(ast::ExprBytesLiteral<'ast>),
-    ExprNumberLiteral(ast::ExprNumberLiteral),
+    ExprNumberLiteral(ast::ExprNumberLiteral<'ast>),
     ExprBooleanLiteral(ast::ExprBooleanLiteral),
     ExprNoneLiteral(ast::ExprNoneLiteral),
     ExprEllipsisLiteral(ast::ExprEllipsisLiteral),
@@ -3103,7 +3103,7 @@ impl<'ast> AstNode<'ast> for ast::ExprBytesLiteral<'ast> {
         }
     }
 }
-impl<'ast> AstNode<'ast> for ast::ExprNumberLiteral {
+impl<'ast> AstNode<'ast> for ast::ExprNumberLiteral<'ast> {
     type Ref<'a> = &'a Self where 'ast: 'a;
     fn cast(kind: AnyNode<'ast>) -> Option<Self>
     where
@@ -3138,7 +3138,6 @@ impl<'ast> AstNode<'ast> for ast::ExprNumberLiteral {
 
     fn visit_source_order<'a, V>(&'a self, _visitor: &mut V)
     where
-        'ast: 'a,
         V: SourceOrderVisitor<'a, 'ast> + ?Sized,
     {
     }
@@ -5851,8 +5850,8 @@ impl<'ast> From<ast::ExprBytesLiteral<'ast>> for AnyNode<'ast> {
     }
 }
 
-impl<'ast> From<ast::ExprNumberLiteral> for AnyNode<'ast> {
-    fn from(node: ast::ExprNumberLiteral) -> Self {
+impl<'ast> From<ast::ExprNumberLiteral<'ast>> for AnyNode<'ast> {
+    fn from(node: ast::ExprNumberLiteral<'ast>) -> Self {
         AnyNode::ExprNumberLiteral(node)
     }
 }
@@ -6230,7 +6229,7 @@ pub enum AnyNodeRef<'a, 'ast> {
     ExprFString(&'a ast::ExprFString<'ast>),
     ExprStringLiteral(&'a ast::ExprStringLiteral<'ast>),
     ExprBytesLiteral(&'a ast::ExprBytesLiteral<'ast>),
-    ExprNumberLiteral(&'a ast::ExprNumberLiteral),
+    ExprNumberLiteral(&'a ast::ExprNumberLiteral<'ast>),
     ExprBooleanLiteral(&'a ast::ExprBooleanLiteral),
     ExprNoneLiteral(&'a ast::ExprNoneLiteral),
     ExprEllipsisLiteral(&'a ast::ExprEllipsisLiteral),
@@ -7548,8 +7547,8 @@ impl<'a, 'ast> From<&'a ast::ExprBytesLiteral<'ast>> for AnyNodeRef<'a, 'ast> {
     }
 }
 
-impl<'a, 'ast> From<&'a ast::ExprNumberLiteral> for AnyNodeRef<'a, 'ast> {
-    fn from(node: &'a ast::ExprNumberLiteral) -> Self {
+impl<'a, 'ast> From<&'a ast::ExprNumberLiteral<'ast>> for AnyNodeRef<'a, 'ast> {
+    fn from(node: &'a ast::ExprNumberLiteral<'ast>) -> Self {
         AnyNodeRef::ExprNumberLiteral(node)
     }
 }
