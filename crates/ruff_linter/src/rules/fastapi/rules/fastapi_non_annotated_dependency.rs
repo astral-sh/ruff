@@ -57,9 +57,9 @@ use crate::settings::types::PythonVersion;
 /// ```
 
 #[violation]
-pub struct FastApiNotAnnotatedDependency;
+pub struct FastApiNonAnnotatedDependency;
 
-impl AlwaysFixableViolation for FastApiNotAnnotatedDependency {
+impl AlwaysFixableViolation for FastApiNonAnnotatedDependency {
     #[derive_message_formats]
     fn message(&self) -> String {
         format!("FastAPI dependency without `Annotated`")
@@ -71,7 +71,7 @@ impl AlwaysFixableViolation for FastApiNotAnnotatedDependency {
 }
 
 /// RUF103
-pub(crate) fn fastapi_not_annotated_dependency(
+pub(crate) fn fastapi_non_annotated_dependency(
     checker: &mut Checker,
     function_def: &ast::StmtFunctionDef,
 ) {
@@ -107,7 +107,7 @@ pub(crate) fn fastapi_not_annotated_dependency(
                 })
             {
                 let mut diagnostic =
-                    Diagnostic::new(FastApiNotAnnotatedDependency, parameter.range);
+                    Diagnostic::new(FastApiNonAnnotatedDependency, parameter.range);
 
                 diagnostic.try_set_fix(|| {
                     let module = if checker.settings.target_version >= PythonVersion::Py39 {

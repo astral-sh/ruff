@@ -1826,7 +1826,6 @@ bitflags! {
         const CONTEXTVARS = 1 << 19;
         const ANYIO = 1 << 20;
         const FASTAPI = 1 << 21;
-
     }
 }
 
