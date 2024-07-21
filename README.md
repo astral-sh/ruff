@@ -434,6 +434,7 @@ Ruff is used by a number of major open-source projects and companies, including:
 - Hugging Face ([Transformers](https://github.com/huggingface/transformers),
     [Datasets](https://github.com/huggingface/datasets),
     [Diffusers](https://github.com/huggingface/diffusers))
+- IBM ([Qiskit](https://github.com/Qiskit/qiskit))
 - ING Bank ([popmon](https://github.com/ing-bank/popmon), [probatus](https://github.com/ing-bank/probatus))
 - [Ibis](https://github.com/ibis-project/ibis)
 - [ivy](https://github.com/unifyai/ivy)
