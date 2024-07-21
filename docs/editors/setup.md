@@ -333,7 +333,7 @@ IntelliJ Marketplace (maintained by [@koxudaxi](https://github.com/koxudaxi)).
 
 ## Emacs
 
-Ruff can be used via Eglot as language server with [`eglot`](https://github.com/joaotavora/eglot), which is in Emacs's core.
+Ruff can be used via Eglot as language server with [`Eglot`](https://github.com/joaotavora/eglot), which is in Emacs's core.
 You can enable it with automatic formatting on save as in code below.
 
 ```elisp
