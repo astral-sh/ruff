@@ -180,7 +180,7 @@ fn parse_entries(content: &str, style: SectionStyle) -> Vec<QualifiedName> {
 /// ```
 fn parse_entries_google(content: &str) -> Vec<QualifiedName> {
     let mut entries: Vec<QualifiedName> = Vec::new();
-    for potential in content.split('\n') {
+    for potential in content.lines() {
         let Some(colon_idx) = potential.find(':') else {
             continue;
         };
@@ -202,12 +202,12 @@ fn parse_entries_google(content: &str) -> Vec<QualifiedName> {
 /// ```
 fn parse_entries_numpy(content: &str) -> Vec<QualifiedName> {
     let mut entries: Vec<QualifiedName> = Vec::new();
-    let mut split = content.split('\n');
-    let Some(dashes) = split.next() else {
+    let mut lines = content.lines();
+    let Some(dashes) = lines.next() else {
         return entries;
     };
     let indentation = dashes.len() - dashes.trim_start().len();
-    for potential in split {
+    for potential in lines {
         if let Some(first_char) = potential.chars().nth(indentation) {
             if !first_char.is_whitespace() {
                 let entry = potential.trim();
