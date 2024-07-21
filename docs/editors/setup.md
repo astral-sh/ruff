@@ -333,6 +333,17 @@ IntelliJ Marketplace (maintained by [@koxudaxi](https://github.com/koxudaxi)).
 
 ## Emacs
 
+Ruff can be used via Eglot as language server with [`eglot`](https://github.com/joaotavora/eglot), which is in Emacs's core.
+You can enable it with automatic formatting on save as in code below.
+
+```elisp
+(add-hook 'python-mode-hook 'eglot-ensure)
+(with-eval-after-load 'eglot
+  (add-to-list 'eglot-server-programs
+               '(python-mode . ("ruff" "server")))
+  (add-hook 'after-save-hook 'eglot-format))
+```
+
 Ruff is available as [`flymake-ruff`](https://melpa.org/#/flymake-ruff) on MELPA:
 
 ```elisp
