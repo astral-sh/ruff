@@ -208,10 +208,11 @@ fn parse_entries_numpy(content: &str) -> Vec<QualifiedName> {
     };
     let indentation = dashes.len() - dashes.trim_start().len();
     for potential in lines {
-        if let Some(first_char) = potential.chars().nth(indentation) {
-            if !first_char.is_whitespace() {
-                let entry = potential.trim();
-                entries.push(QualifiedName::user_defined(entry));
+        if let Some(entry) = potential.strip_prefix(&dashes[..indentation]) {
+            if let Some(first_char) = entry.chars().next() {
+                if !first_char.is_whitespace() {
+                    entries.push(QualifiedName::user_defined(entry.trim_end()));
+                }
             }
         }
     }
