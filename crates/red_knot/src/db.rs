@@ -198,3 +198,93 @@ impl salsa::ParallelDatabase for RootDatabase {
         })
     }
 }
+
+#[cfg(test)]
+pub(crate) mod tests {
+    use red_knot_module_resolver::{vendored_typeshed_stubs, Db as ResolverDb, Jar as ResolverJar};
+    use red_knot_python_semantic::{Db as SemanticDb, Jar as SemanticJar};
+    use ruff_db::files::Files;
+    use ruff_db::system::{DbWithTestSystem, System, TestSystem};
+    use ruff_db::vendored::VendoredFileSystem;
+    use ruff_db::{Db as SourceDb, Jar as SourceJar, Upcast};
+
+    use super::{Db, Jar};
+
+    #[salsa::db(Jar, SemanticJar, ResolverJar, SourceJar)]
+    pub(crate) struct TestDb {
+        storage: salsa::Storage<Self>,
+        files: Files,
+        system: TestSystem,
+        vendored: VendoredFileSystem,
+    }
+
+    impl TestDb {
+        pub(crate) fn new() -> Self {
+            Self {
+                storage: salsa::Storage::default(),
+                system: TestSystem::default(),
+                vendored: vendored_typeshed_stubs().snapshot(),
+                files: Files::default(),
+            }
+        }
+    }
+
+    impl DbWithTestSystem for TestDb {
+        fn test_system(&self) -> &TestSystem {
+            &self.system
+        }
+
+        fn test_system_mut(&mut self) -> &mut TestSystem {
+            &mut self.system
+        }
+    }
+
+    impl SourceDb for TestDb {
+        fn vendored(&self) -> &VendoredFileSystem {
+            &self.vendored
+        }
+
+        fn system(&self) -> &dyn System {
+            &self.system
+        }
+
+        fn files(&self) -> &Files {
+            &self.files
+        }
+    }
+
+    impl Upcast<dyn SemanticDb> for TestDb {
+        fn upcast(&self) -> &(dyn SemanticDb + 'static) {
+            self
+        }
+    }
+
+    impl Upcast<dyn SourceDb> for TestDb {
+        fn upcast(&self) -> &(dyn SourceDb + 'static) {
+            self
+        }
+    }
+
+    impl Upcast<dyn ResolverDb> for TestDb {
+        fn upcast(&self) -> &(dyn ResolverDb + 'static) {
+            self
+        }
+    }
+
+    impl red_knot_module_resolver::Db for TestDb {}
+    impl red_knot_python_semantic::Db for TestDb {}
+    impl Db for TestDb {}
+
+    impl salsa::Database for TestDb {}
+
+    impl salsa::ParallelDatabase for TestDb {
+        fn snapshot(&self) -> salsa::Snapshot<Self> {
+            salsa::Snapshot::new(Self {
+                storage: self.storage.snapshot(),
+                files: self.files.snapshot(),
+                system: self.system.snapshot(),
+                vendored: self.vendored.snapshot(),
+            })
+        }
+    }
+}

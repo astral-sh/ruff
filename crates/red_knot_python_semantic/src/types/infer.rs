@@ -314,6 +314,7 @@ impl<'db> TypeInferenceBuilder<'db> {
             ast::Stmt::For(for_statement) => self.infer_for_statement(for_statement),
             ast::Stmt::Import(import) => self.infer_import_statement(import),
             ast::Stmt::ImportFrom(import) => self.infer_import_from_statement(import),
+            ast::Stmt::Return(ret) => self.infer_return_statement(ret),
             ast::Stmt::Break(_) | ast::Stmt::Continue(_) | ast::Stmt::Pass(_) => {
                 // No-op
             }
@@ -549,6 +550,12 @@ impl<'db> TypeInferenceBuilder<'db> {
         let ty = module_ty.member(self.db, &Name::new(&name.id));
 
         self.types.definitions.insert(definition, ty);
+    }
+
+    fn infer_return_statement(&mut self, ret: &ast::StmtReturn) {
+        if let Some(value) = &ret.value {
+            self.infer_expression(value);
+        }
     }
 
     fn module_ty_from_name(&self, name: &ast::Identifier) -> Type<'db> {

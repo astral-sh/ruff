@@ -11,7 +11,7 @@ use ruff_db::files::File;
 use ruff_db::parsed::{parsed_module, ParsedModule};
 use ruff_db::source::{source_text, SourceText};
 use ruff_python_ast as ast;
-use ruff_python_ast::visitor::{walk_stmt, Visitor};
+use ruff_python_ast::visitor::{walk_expr, walk_stmt, Visitor};
 
 use crate::db::Db;
 
@@ -117,6 +117,25 @@ fn lint_unresolved_imports(context: &SemanticLintContext, import: AnyImportRef) 
                 }
             }
         }
+    }
+}
+
+fn lint_maybe_undefined(context: &SemanticLintContext, name: &ast::ExprName) {
+    if !matches!(name.ctx, ast::ExprContext::Load) {
+        return;
+    }
+    let semantic = &context.semantic;
+    match name.ty(semantic) {
+        Type::Unbound => {
+            context.push_diagnostic(format!("Name '{}' used when not defined.", &name.id));
+        }
+        Type::Union(union) if union.contains(semantic.db(), Type::Unbound) => {
+            context.push_diagnostic(format!(
+                "Name '{}' used when possibly not defined.",
+                &name.id
+            ));
+        }
+        _ => {}
     }
 }
 
@@ -233,6 +252,17 @@ impl Visitor<'_> for SemanticVisitor<'_> {
 
         walk_stmt(self, stmt);
     }
+
+    fn visit_expr(&mut self, expr: &ast::Expr) {
+        match expr {
+            ast::Expr::Name(name) if matches!(name.ctx, ast::ExprContext::Load) => {
+                lint_maybe_undefined(self.context, name);
+            }
+            _ => {}
+        }
+
+        walk_expr(self, expr);
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -271,4 +301,60 @@ impl From<Vec<String>> for Diagnostics {
 enum AnyImportRef<'a> {
     Import(&'a ast::StmtImport),
     ImportFrom(&'a ast::StmtImportFrom),
+}
+
+#[cfg(test)]
+mod tests {
+    use ruff_db::files::system_path_to_file;
+    use ruff_db::program::{Program, SearchPathSettings, TargetVersion};
+    use ruff_db::system::{DbWithTestSystem, SystemPathBuf};
+
+    use super::{lint_semantic, Diagnostics};
+    use crate::db::tests::TestDb;
+
+    fn setup_db() -> TestDb {
+        let db = TestDb::new();
+
+        Program::new(
+            &db,
+            TargetVersion::Py38,
+            SearchPathSettings {
+                extra_paths: Vec::new(),
+                workspace_root: SystemPathBuf::from("/src"),
+                site_packages: None,
+                custom_typeshed: None,
+            },
+        );
+
+        db
+    }
+
+    #[test]
+    fn undefined_variable() {
+        let mut db = setup_db();
+
+        db.write_dedented(
+            "/src/a.py",
+            "
+            x = int
+            if flag:
+                y = x
+            y
+            ",
+        )
+        .unwrap();
+
+        let file = system_path_to_file(&db, "/src/a.py").expect("file to exist");
+        let Diagnostics::List(messages) = lint_semantic(&db, file) else {
+            panic!("expected some diagnostics");
+        };
+
+        assert_eq!(
+            *messages,
+            vec![
+                "Name 'flag' used when not defined.",
+                "Name 'y' used when possibly not defined."
+            ]
+        );
+    }
 }

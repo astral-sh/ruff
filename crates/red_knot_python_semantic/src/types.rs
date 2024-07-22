@@ -239,6 +239,12 @@ pub struct UnionType<'db> {
     elements: FxOrderSet<Type<'db>>,
 }
 
+impl<'db> UnionType<'db> {
+    pub fn contains(&self, db: &'db dyn Db, ty: Type<'db>) -> bool {
+        self.elements(db).contains(&ty)
+    }
+}
+
 struct UnionTypeBuilder<'db> {
     elements: FxOrderSet<Type<'db>>,
     db: &'db dyn Db,

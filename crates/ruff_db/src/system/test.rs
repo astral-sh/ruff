@@ -1,4 +1,5 @@
 use ruff_notebook::{Notebook, NotebookError};
+use ruff_python_trivia::textwrap;
 
 use crate::files::File;
 use crate::system::{DirectoryEntry, MemoryFileSystem, Metadata, Result, System, SystemPath};
@@ -148,6 +149,12 @@ pub trait DbWithTestSystem: Db + Sized {
         }
 
         result
+    }
+
+    /// Writes auto-dedented text to a file.
+    fn write_dedented(&mut self, path: &str, content: &str) -> crate::system::Result<()> {
+        self.write_file(path, textwrap::dedent(content))?;
+        Ok(())
     }
 
     /// Writes the content of the given files and notifies the Db about the change.
