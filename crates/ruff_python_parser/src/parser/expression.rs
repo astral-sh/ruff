@@ -2272,9 +2272,10 @@ impl<'src> Parser<'src> {
         command
     }
 
-    /// Validate that the given arguments doesn't have any duplicate keyword argument.
-    ///
-    /// Report errors for all the duplicate names found.
+    /// Performs the following validations on the function call arguments:
+    /// 1. There aren't any duplicate keyword argument
+    /// 2. If there are more than one argument (positional or keyword), all generator expressions
+    ///    present should be parenthesized.
     fn validate_arguments(&mut self, arguments: &ast::Arguments) {
         let mut all_arg_names =
             FxHashSet::with_capacity_and_hasher(arguments.keywords.len(), FxBuildHasher);
@@ -2290,6 +2291,25 @@ impl<'src> Parser<'src> {
                     ParseErrorType::DuplicateKeywordArgumentError(arg_name.to_string()),
                     range,
                 );
+            }
+        }
+
+        if arguments.len() > 1 {
+            for arg in arguments.args.iter() {
+                if let Some(ast::ExprGenerator {
+                    range,
+                    parenthesized: false,
+                    ..
+                }) = arg.as_generator_expr()
+                {
+                    // test_ok args_unparenthesized_generator
+                    // sum(x for x in range(10))
+
+                    // test_err args_unparenthesized_generator
+                    // sum(x for x in range(10), 5)
+                    // total(1, 2, x for x in range(5), 6)
+                    self.add_error(ParseErrorType::UnparenthesizedGeneratorExpression, range);
+                }
             }
         }
     }

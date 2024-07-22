@@ -106,6 +106,8 @@ pub enum ParseErrorType {
     UnparenthesizedNamedExpression,
     /// An unparenthesized tuple expression was found where it is not allowed.
     UnparenthesizedTupleExpression,
+    /// An unparenthesized generator expression was found where it is not allowed.
+    UnparenthesizedGeneratorExpression,
 
     /// An invalid usage of a lambda expression was found.
     InvalidLambdaExpressionUsage,
@@ -215,6 +217,9 @@ impl std::fmt::Display for ParseErrorType {
             }
             ParseErrorType::UnparenthesizedTupleExpression => {
                 f.write_str("Unparenthesized tuple expression cannot be used here")
+            }
+            ParseErrorType::UnparenthesizedGeneratorExpression => {
+                f.write_str("Unparenthesized generator expression cannot be used here")
             }
             ParseErrorType::InvalidYieldExpressionUsage => {
                 f.write_str("Yield expression cannot be used here")

@@ -7,7 +7,7 @@ sum([x.val for x in bar], 0)
 sum(x.val for x in bar)
 min(x.val for x in bar)
 max(x.val for x in bar)
-sum(x.val for x in bar, 0)
+sum((x.val for x in bar), 0)
 
 # Multi-line
 sum(
