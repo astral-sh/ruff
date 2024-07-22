@@ -426,13 +426,24 @@ where
             }
             ast::Stmt::While(node) => {
                 self.visit_expr(&node.test);
+
                 let pre_loop = self.flow_snapshot();
-                let mut break_states: Vec<FlowSnapshot> = vec![];
-                std::mem::swap(&mut self.loop_break_states, &mut break_states);
+
+                // Save aside any break states from an outer loop
+                let saved_break_states = std::mem::take(&mut self.loop_break_states);
                 self.visit_body(&node.body);
-                std::mem::swap(&mut self.loop_break_states, &mut break_states);
+                // Get the break states from the body of this loop, and restore the saved outer
+                // ones.
+                let break_states =
+                    std::mem::replace(&mut self.loop_break_states, saved_break_states);
+
+                // We may execute the `else` clause without ever executing the body, so merge in
+                // the pre-loop state before visiting `else`.
                 self.flow_merge(&pre_loop);
                 self.visit_body(&node.orelse);
+
+                // Breaking out of a while loop bypasses the `else` clause, so merge in the break
+                // states after visiting `else`.
                 for break_state in break_states {
                     self.flow_merge(&break_state);
                 }
