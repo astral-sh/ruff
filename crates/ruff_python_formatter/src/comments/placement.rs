@@ -1076,7 +1076,7 @@ fn handle_leading_function_with_decorators_comment(comment: DecoratedComment) ->
 
     let is_following_parameters = comment
         .following_node()
-        .is_some_and(|node| node.is_parameters());
+        .is_some_and(|node| node.is_parameters() || node.is_type_params());
 
     if comment.line_position().is_own_line() && is_preceding_decorator && is_following_parameters {
         CommentPlacement::dangling(comment.enclosing_node(), comment)
