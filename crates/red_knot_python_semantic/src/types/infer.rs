@@ -1481,6 +1481,79 @@ mod tests {
         Ok(())
     }
 
+    #[test]
+    fn while_loop() -> anyhow::Result<()> {
+        let mut db = setup_db();
+
+        db.write_dedented(
+            "/src/a.py",
+            "
+            x = 1
+            while flag:
+                x = 2
+            ",
+        )?;
+
+        // body of while loop may or may not run
+        assert_public_ty(&db, "/src/a.py", "x", "Literal[1, 2]");
+
+        Ok(())
+    }
+
+    #[test]
+    fn while_else_no_break() -> anyhow::Result<()> {
+        let mut db = setup_db();
+
+        db.write_dedented(
+            "/src/a.py",
+            "
+            x = 1
+            while flag:
+                x = 2
+            else:
+                y = x
+                x = 3
+            ",
+        )?;
+
+        // body of the loop can't break, so we can get else, or body+else
+        // x must be 3, because else will always run
+        assert_public_ty(&db, "/src/a.py", "x", "Literal[3]");
+        // y can be 1 or 2 because else always runs, and body may or may not run first
+        assert_public_ty(&db, "/src/a.py", "y", "Literal[1, 2]");
+
+        Ok(())
+    }
+
+    #[test]
+    fn while_else_may_break() -> anyhow::Result<()> {
+        let mut db = setup_db();
+
+        db.write_dedented(
+            "/src/a.py",
+            "
+            x = 1
+            y = 0
+            while flag:
+                x = 2
+                if flag2:
+                    y = 4
+                    break
+            else:
+                y = x
+                x = 3
+            ",
+        )?;
+
+        // body may break: we can get just-body (only if we break), just-else, or body+else
+        assert_public_ty(&db, "/src/a.py", "x", "Literal[2, 3]");
+        // if just-body were possible without the break, then 0 would be possible for y
+        // 1 and 2 both being possible for y shows that we can hit else with or without body
+        assert_public_ty(&db, "/src/a.py", "y", "Literal[1, 2, 4]");
+
+        Ok(())
+    }
+
     fn first_public_def<'db>(db: &'db TestDb, file: File, name: &str) -> Definition<'db> {
         let scope = global_scope(db, file);
         *use_def_map(db, scope)

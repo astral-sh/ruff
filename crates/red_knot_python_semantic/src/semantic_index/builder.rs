@@ -31,8 +31,10 @@ pub(super) struct SemanticIndexBuilder<'db> {
     file: File,
     module: &'db ParsedModule,
     scope_stack: Vec<FileScopeId>,
-    /// the assignment we're currently visiting
+    /// The assignment we're currently visiting.
     current_assignment: Option<CurrentAssignment<'db>>,
+    /// Flow states at each `break` in the current loop.
+    loop_break_states: Vec<FlowSnapshot>,
 
     // Semantic Index fields
     scopes: IndexVec<FileScopeId, Scope>,
@@ -54,6 +56,7 @@ impl<'db> SemanticIndexBuilder<'db> {
             module: parsed,
             scope_stack: Vec::new(),
             current_assignment: None,
+            loop_break_states: vec![],
 
             scopes: IndexVec::new(),
             symbol_tables: IndexVec::new(),
@@ -125,9 +128,14 @@ impl<'db> SemanticIndexBuilder<'db> {
         &mut self.symbol_tables[scope_id]
     }
 
-    fn current_use_def_map(&mut self) -> &mut UseDefMapBuilder<'db> {
+    fn current_use_def_map_mut(&mut self) -> &mut UseDefMapBuilder<'db> {
         let scope_id = self.current_scope();
         &mut self.use_def_maps[scope_id]
+    }
+
+    fn current_use_def_map(&self) -> &UseDefMapBuilder<'db> {
+        let scope_id = self.current_scope();
+        &self.use_def_maps[scope_id]
     }
 
     fn current_ast_ids(&mut self) -> &mut AstIdsBuilder {
@@ -135,23 +143,23 @@ impl<'db> SemanticIndexBuilder<'db> {
         &mut self.ast_ids[scope_id]
     }
 
-    fn flow_snapshot(&mut self) -> FlowSnapshot {
+    fn flow_snapshot(&self) -> FlowSnapshot {
         self.current_use_def_map().snapshot()
     }
 
     fn flow_restore(&mut self, state: FlowSnapshot) {
-        self.current_use_def_map().restore(state);
+        self.current_use_def_map_mut().restore(state);
     }
 
     fn flow_merge(&mut self, state: &FlowSnapshot) {
-        self.current_use_def_map().merge(state);
+        self.current_use_def_map_mut().merge(state);
     }
 
     fn add_or_update_symbol(&mut self, name: Name, flags: SymbolFlags) -> ScopedSymbolId {
         let symbol_table = self.current_symbol_table();
         let (symbol_id, added) = symbol_table.add_or_update_symbol(name, flags);
         if added {
-            let use_def_map = self.current_use_def_map();
+            let use_def_map = self.current_use_def_map_mut();
             use_def_map.add_symbol(symbol_id);
         }
         symbol_id
@@ -176,7 +184,7 @@ impl<'db> SemanticIndexBuilder<'db> {
 
         self.definitions_by_node
             .insert(definition_node.key(), definition);
-        self.current_use_def_map()
+        self.current_use_def_map_mut()
             .record_definition(symbol, definition);
 
         definition
@@ -416,6 +424,33 @@ where
                     self.flow_merge(&pre_if);
                 }
             }
+            ast::Stmt::While(node) => {
+                self.visit_expr(&node.test);
+
+                let pre_loop = self.flow_snapshot();
+
+                // Save aside any break states from an outer loop
+                let saved_break_states = std::mem::take(&mut self.loop_break_states);
+                self.visit_body(&node.body);
+                // Get the break states from the body of this loop, and restore the saved outer
+                // ones.
+                let break_states =
+                    std::mem::replace(&mut self.loop_break_states, saved_break_states);
+
+                // We may execute the `else` clause without ever executing the body, so merge in
+                // the pre-loop state before visiting `else`.
+                self.flow_merge(&pre_loop);
+                self.visit_body(&node.orelse);
+
+                // Breaking out of a while loop bypasses the `else` clause, so merge in the break
+                // states after visiting `else`.
+                for break_state in break_states {
+                    self.flow_merge(&break_state);
+                }
+            }
+            ast::Stmt::Break(_) => {
+                self.loop_break_states.push(self.flow_snapshot());
+            }
             _ => {
                 walk_stmt(self, stmt);
             }
@@ -460,7 +495,7 @@ where
 
                 if flags.contains(SymbolFlags::IS_USED) {
                     let use_id = self.current_ast_ids().record_use(expr);
-                    self.current_use_def_map().record_use(symbol, use_id);
+                    self.current_use_def_map_mut().record_use(symbol, use_id);
                 }
 
                 walk_expr(self, expr);
