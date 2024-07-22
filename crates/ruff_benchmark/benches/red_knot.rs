@@ -36,6 +36,8 @@ class Bar:
             return 48472783
         if arg < 10:
             return 20
+        while arg < 50:
+            arg += 1
         return 36673
 "#;
 
