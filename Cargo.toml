@@ -133,7 +133,7 @@ toml = { version = "0.8.11" }
 tracing = { version = "0.1.40" }
 tracing-indicatif = { version = "0.3.6" }
 tracing-subscriber = { version = "0.3.18", features = ["env-filter"] }
-tracing-tree = { version = "0.3.0" }
+tracing-tree = { version = "0.4.0" }
 typed-arena = { version = "2.0.2" }
 unic-ucd-category = { version = "0.9" }
 unicode-ident = { version = "1.0.12" }
