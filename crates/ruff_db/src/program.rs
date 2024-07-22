@@ -75,8 +75,8 @@ pub struct SearchPathSettings {
     /// The root of the workspace, used for finding first-party modules.
     pub workspace_root: SystemPathBuf,
 
-    /// Optional (already validated) path to standard-library typeshed stubs.
-    /// If this is not provided, we will fallback to our vendored typeshed stubs
+    /// Optional path to a "custom typeshed" directory on disk for us to use for standard-library types.
+    /// If this is not provided, we will fallback to our vendored typeshed stubs for the stdlib,
     /// bundled as a zip file in the binary
     pub custom_typeshed: Option<SystemPathBuf>,
 
