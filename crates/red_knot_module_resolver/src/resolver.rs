@@ -11,7 +11,7 @@ use ruff_db::system::{DirectoryEntry, System, SystemPath, SystemPathBuf};
 use crate::db::Db;
 use crate::module::{Module, ModuleKind};
 use crate::module_name::ModuleName;
-use crate::path::{ModuleResolutionPathBuf, ModuleSearchPath};
+use crate::path::{ModulePathBuf, ModuleSearchPath};
 use crate::state::ResolverState;
 
 /// Resolves a module name to a module.
@@ -594,7 +594,7 @@ where
 
 #[derive(Debug)]
 struct ResolvedPackage {
-    path: ModuleResolutionPathBuf,
+    path: ModulePathBuf,
     kind: PackageKind,
 }
 
