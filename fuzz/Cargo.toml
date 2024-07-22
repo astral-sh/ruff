@@ -20,15 +20,13 @@ cargo-fuzz = true
 ruff_linter = { path = "../crates/ruff_linter" }
 ruff_python_ast = { path = "../crates/ruff_python_ast" }
 ruff_python_codegen = { path = "../crates/ruff_python_codegen" }
-ruff_python_index = { path = "../crates/ruff_python_index" }
 ruff_python_parser = { path = "../crates/ruff_python_parser" }
 ruff_source_file = { path = "../crates/ruff_source_file" }
 ruff_python_formatter = { path = "../crates/ruff_python_formatter"}
 ruff_text_size = { path = "../crates/ruff_text_size" }
 
-arbitrary = { version = "1.3.0", features = ["derive"] }
 libfuzzer-sys = { git = "https://github.com/rust-fuzz/libfuzzer", default-features = false }
-similar = { version = "2.2.1" }
+similar = { version = "2.5.0" }
 
 # Prevent this from interfering with workspaces
 [workspace]
