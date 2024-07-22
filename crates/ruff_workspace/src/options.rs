@@ -1291,7 +1291,7 @@ pub struct Flake8ImportConventionsOptions {
     /// The conventional aliases for imports. These aliases can be extended by
     /// the [`extend-aliases`](#lint_flake8-import-conventions_extend-aliases) option.
     #[option(
-        default = r#"{"altair": "alt", "matplotlib": "mpl", "matplotlib.pyplot": "plt", "numpy": "np", "pandas": "pd", "seaborn": "sns", "tensorflow": "tf", "tkinter":  "tk", "holoviews": "hv", "panel": "pn", "plotly.express": "px", "polars": "pl", "pyarrow": "pa"}"#,
+        default = r#"{"altair": "alt", "matplotlib": "mpl", "matplotlib.pyplot": "plt", "numpy": "np", "pandas": "pd", "seaborn": "sns", "tensorflow": "tf", "tkinter":  "tk", "holoviews": "hv", "panel": "pn", "plotly.express": "px", "polars": "pl", "pyarrow": "pa", "xml.etree.ElementTree": "ET"}"#,
         value_type = "dict[str, str]",
         scope = "aliases",
         example = r#"
