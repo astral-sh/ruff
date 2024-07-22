@@ -905,7 +905,7 @@ There are three ways in which an import can be categorized as "first-party":
     package (e.g., `from foo import bar` or `import foo.bar`), they'll be classified as first-party
     automatically. This check is as simple as comparing the first segment of the current file's
     module path to the first segment of the import.
-1. **Source roots**: Ruff supports a `[src](https://docs.astral.sh/ruff/settings/#src)` setting, which
+1. **Source roots**: Ruff supports a [`src`](https://docs.astral.sh/ruff/settings/#src) setting, which
     sets the directories to scan when identifying first-party imports. The algorithm is
     straightforward: given an import, like `import foo`, iterate over the directories enumerated in
     the `src` setting and, for each directory, check for the existence of a subdirectory `foo` or a
