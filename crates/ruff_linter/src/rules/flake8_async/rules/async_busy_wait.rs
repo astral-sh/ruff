@@ -34,9 +34,10 @@ use crate::settings::types::PreviewMode;
 ///     await DONE.wait()
 /// ```
 ///
-/// [`asyncio` events]: https://docs.python.org/3/library/asyncio-sync.html#asyncio.Event
-/// [`anyio` events]: https://trio.readthedocs.io/en/latest/reference-core.html#trio.Event
-/// [`trio` events]: https://anyio.readthedocs.io/en/latest/api.html#anyio.Event
+/// ## References
+/// - [`asyncio` events](https://docs.python.org/3/library/asyncio-sync.html#asyncio.Event)
+/// - [`anyio` events](https://trio.readthedocs.io/en/latest/reference-core.html#trio.Event)
+/// - [`trio` events](https://anyio.readthedocs.io/en/latest/api.html#anyio.Event)
 #[violation]
 pub struct AsyncBusyWait {
     module: AsyncModule,

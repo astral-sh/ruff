@@ -37,9 +37,10 @@ use crate::settings::types::PreviewMode;
 ///         await long_running_task()
 /// ```
 ///
-/// [`asyncio` timeouts]: https://docs.python.org/3/library/asyncio-task.html#timeouts
-/// [`anyio` timeouts]: https://anyio.readthedocs.io/en/stable/cancellation.html
-/// [`trio` timeouts]: https://trio.readthedocs.io/en/stable/reference-core.html#cancellation-and-timeouts
+/// ## References
+/// - [`asyncio` timeouts](https://docs.python.org/3/library/asyncio-task.html#timeouts)
+/// - [`anyio` timeouts](https://anyio.readthedocs.io/en/stable/cancellation.html)
+/// - [`trio` timeouts](https://trio.readthedocs.io/en/stable/reference-core.html#cancellation-and-timeouts)
 #[violation]
 pub struct AsyncFunctionWithTimeout {
     module: AsyncModule,
