@@ -12,7 +12,7 @@ use ruff_db::vendored::VendoredFileSystem;
 use ruff_db::{Db as SourceDb, Jar as SourceJar, Upcast};
 
 use crate::lint::{lint_semantic, lint_syntax, unwind_if_cancelled, Diagnostics};
-use crate::workspace::{check_file, Package, Workspace, WorkspaceMetadata};
+use crate::workspace::{check_file, Package, Package_files, Workspace, WorkspaceMetadata};
 
 mod changes;
 
@@ -22,6 +22,7 @@ pub trait Db: DbWithJar<Jar> + SemanticDb + Upcast<dyn SemanticDb> {}
 pub struct Jar(
     Workspace,
     Package,
+    Package_files,
     lint_syntax,
     lint_semantic,
     unwind_if_cancelled,

@@ -9,7 +9,7 @@ use red_knot::watch;
 use red_knot::watch::{directory_watcher, Watcher};
 use red_knot::workspace::WorkspaceMetadata;
 use red_knot_module_resolver::{resolve_module, ModuleName};
-use ruff_db::files::system_path_to_file;
+use ruff_db::files::{system_path_to_file, File};
 use ruff_db::program::{ProgramSettings, SearchPathSettings, TargetVersion};
 use ruff_db::source::source_text;
 use ruff_db::system::{OsSystem, SystemPath, SystemPathBuf};
@@ -53,6 +53,19 @@ impl TestCase {
         }
 
         all_events
+    }
+
+    fn collect_package_files(&self, path: &SystemPath) -> Vec<File> {
+        let package = self.db().workspace().package(self.db(), path).unwrap();
+        let files = package.files(self.db());
+        let files = files.read();
+        let mut collected: Vec<_> = files.into_iter().collect();
+        collected.sort_unstable_by_key(|file| file.path(self.db()).as_system_path().unwrap());
+        collected
+    }
+
+    fn system_file(&self, path: impl AsRef<SystemPath>) -> Option<File> {
+        system_path_to_file(self.db(), path.as_ref())
     }
 }
 
@@ -135,9 +148,12 @@ where
 #[test]
 fn new_file() -> anyhow::Result<()> {
     let mut case = setup([("bar.py", "")])?;
+    let bar_path = case.workspace_path("bar.py");
+    let bar_file = case.system_file(&bar_path).unwrap();
     let foo_path = case.workspace_path("foo.py");
 
-    assert_eq!(system_path_to_file(case.db(), &foo_path), None);
+    assert_eq!(case.system_file(&foo_path), None);
+    assert_eq!(&case.collect_package_files(&bar_path), &[bar_file]);
 
     std::fs::write(foo_path.as_std_path(), "print('Hello')")?;
 
@@ -145,15 +161,9 @@ fn new_file() -> anyhow::Result<()> {
 
     case.db_mut().apply_changes(changes);
 
-    let foo = system_path_to_file(case.db(), &foo_path).expect("foo.py to exist.");
+    let foo = case.system_file(&foo_path).expect("foo.py to exist.");
 
-    let package = case
-        .db()
-        .workspace()
-        .package(case.db(), &foo_path)
-        .expect("foo.py to belong to a package.");
-
-    assert!(package.contains_file(case.db(), foo));
+    assert_eq!(&case.collect_package_files(&bar_path), &[bar_file, foo]);
 
     Ok(())
 }
@@ -161,9 +171,12 @@ fn new_file() -> anyhow::Result<()> {
 #[test]
 fn new_ignored_file() -> anyhow::Result<()> {
     let mut case = setup([("bar.py", ""), (".ignore", "foo.py")])?;
+    let bar_path = case.workspace_path("bar.py");
+    let bar_file = case.system_file(&bar_path).unwrap();
     let foo_path = case.workspace_path("foo.py");
 
-    assert_eq!(system_path_to_file(case.db(), &foo_path), None);
+    assert_eq!(case.system_file(&foo_path), None);
+    assert_eq!(&case.collect_package_files(&bar_path), &[bar_file]);
 
     std::fs::write(foo_path.as_std_path(), "print('Hello')")?;
 
@@ -171,15 +184,8 @@ fn new_ignored_file() -> anyhow::Result<()> {
 
     case.db_mut().apply_changes(changes);
 
-    let foo = system_path_to_file(case.db(), &foo_path).expect("foo.py to exist.");
-
-    let package = case
-        .db()
-        .workspace()
-        .package(case.db(), &foo_path)
-        .expect("foo.py to belong to a package.");
-
-    assert!(!package.contains_file(case.db(), foo));
+    assert!(case.system_file(&foo_path).is_some());
+    assert_eq!(&case.collect_package_files(&bar_path), &[bar_file]);
 
     Ok(())
 }
@@ -190,8 +196,11 @@ fn changed_file() -> anyhow::Result<()> {
     let mut case = setup([("foo.py", foo_source)])?;
     let foo_path = case.workspace_path("foo.py");
 
-    let foo = system_path_to_file(case.db(), &foo_path).ok_or_else(|| anyhow!("Foo not found"))?;
+    let foo = case
+        .system_file(&foo_path)
+        .ok_or_else(|| anyhow!("Foo not found"))?;
     assert_eq!(source_text(case.db(), foo).as_str(), foo_source);
+    assert_eq!(&case.collect_package_files(&foo_path), &[foo]);
 
     std::fs::write(foo_path.as_std_path(), "print('Version 2')")?;
 
@@ -200,6 +209,7 @@ fn changed_file() -> anyhow::Result<()> {
     case.db_mut().apply_changes(changes);
 
     assert_eq!(source_text(case.db(), foo).as_str(), "print('Version 2')");
+    assert_eq!(&case.collect_package_files(&foo_path), &[foo]);
 
     Ok(())
 }
@@ -212,7 +222,9 @@ fn changed_metadata() -> anyhow::Result<()> {
     let mut case = setup([("foo.py", "")])?;
     let foo_path = case.workspace_path("foo.py");
 
-    let foo = system_path_to_file(case.db(), &foo_path).ok_or_else(|| anyhow!("Foo not found"))?;
+    let foo = case
+        .system_file(&foo_path)
+        .ok_or_else(|| anyhow!("Foo not found"))?;
     assert_eq!(
         foo.permissions(case.db()),
         Some(
@@ -252,14 +264,12 @@ fn deleted_file() -> anyhow::Result<()> {
     let mut case = setup([("foo.py", foo_source)])?;
     let foo_path = case.workspace_path("foo.py");
 
-    let foo = system_path_to_file(case.db(), &foo_path).ok_or_else(|| anyhow!("Foo not found"))?;
-
-    let Some(package) = case.db().workspace().package(case.db(), &foo_path) else {
-        panic!("Expected foo.py to belong to a package.");
-    };
+    let foo = case
+        .system_file(&foo_path)
+        .ok_or_else(|| anyhow!("Foo not found"))?;
 
     assert!(foo.exists(case.db()));
-    assert!(package.contains_file(case.db(), foo));
+    assert_eq!(&case.collect_package_files(&foo_path), &[foo]);
 
     std::fs::remove_file(foo_path.as_std_path())?;
 
@@ -268,7 +278,7 @@ fn deleted_file() -> anyhow::Result<()> {
     case.db_mut().apply_changes(changes);
 
     assert!(!foo.exists(case.db()));
-    assert!(!package.contains_file(case.db(), foo));
+    assert_eq!(&case.collect_package_files(&foo_path), &[] as &[File]);
 
     Ok(())
 }
@@ -285,14 +295,12 @@ fn move_file_to_trash() -> anyhow::Result<()> {
     let trash_path = case.root_path().join(".trash");
     std::fs::create_dir_all(trash_path.as_std_path())?;
 
-    let foo = system_path_to_file(case.db(), &foo_path).ok_or_else(|| anyhow!("Foo not found"))?;
-
-    let Some(package) = case.db().workspace().package(case.db(), &foo_path) else {
-        panic!("Expected foo.py to belong to a package.");
-    };
+    let foo = case
+        .system_file(&foo_path)
+        .ok_or_else(|| anyhow!("Foo not found"))?;
 
     assert!(foo.exists(case.db()));
-    assert!(package.contains_file(case.db(), foo));
+    assert_eq!(&case.collect_package_files(&foo_path), &[foo]);
 
     std::fs::rename(
         foo_path.as_std_path(),
@@ -304,7 +312,7 @@ fn move_file_to_trash() -> anyhow::Result<()> {
     case.db_mut().apply_changes(changes);
 
     assert!(!foo.exists(case.db()));
-    assert!(!package.contains_file(case.db(), foo));
+    assert_eq!(&case.collect_package_files(&foo_path), &[] as &[File]);
 
     Ok(())
 }
@@ -313,13 +321,16 @@ fn move_file_to_trash() -> anyhow::Result<()> {
 #[test]
 fn move_file_to_workspace() -> anyhow::Result<()> {
     let mut case = setup([("bar.py", "")])?;
+    let bar_path = case.workspace_path("bar.py");
+    let bar = case.system_file(&bar_path).unwrap();
+
     let foo_path = case.root_path().join("foo.py");
     std::fs::write(foo_path.as_std_path(), "")?;
 
     let foo_in_workspace_path = case.workspace_path("foo.py");
 
-    assert!(system_path_to_file(case.db(), &foo_path).is_some());
-
+    assert!(case.system_file(&foo_path).is_some());
+    assert_eq!(&case.collect_package_files(&bar_path), &[bar]);
     assert!(case
         .db()
         .workspace()
@@ -332,19 +343,15 @@ fn move_file_to_workspace() -> anyhow::Result<()> {
 
     case.db_mut().apply_changes(changes);
 
-    let foo_in_workspace = system_path_to_file(case.db(), &foo_in_workspace_path)
+    let foo_in_workspace = case
+        .system_file(&foo_in_workspace_path)
         .ok_or_else(|| anyhow!("Foo not found"))?;
 
-    let Some(package) = case
-        .db()
-        .workspace()
-        .package(case.db(), &foo_in_workspace_path)
-    else {
-        panic!("Expected foo.py to belong to a package.");
-    };
-
     assert!(foo_in_workspace.exists(case.db()));
-    assert!(package.contains_file(case.db(), foo_in_workspace));
+    assert_eq!(
+        &case.collect_package_files(&foo_in_workspace_path),
+        &[bar, foo_in_workspace]
+    );
 
     Ok(())
 }
@@ -356,11 +363,11 @@ fn rename_file() -> anyhow::Result<()> {
     let foo_path = case.workspace_path("foo.py");
     let bar_path = case.workspace_path("bar.py");
 
-    let foo = system_path_to_file(case.db(), &foo_path).ok_or_else(|| anyhow!("Foo not found"))?;
+    let foo = case
+        .system_file(&foo_path)
+        .ok_or_else(|| anyhow!("Foo not found"))?;
 
-    let Some(package) = case.db().workspace().package(case.db(), &foo_path) else {
-        panic!("Expected foo.py to belong to a package.");
-    };
+    assert_eq!(case.collect_package_files(&foo_path), [foo]);
 
     std::fs::rename(foo_path.as_std_path(), bar_path.as_std_path())?;
 
@@ -369,16 +376,13 @@ fn rename_file() -> anyhow::Result<()> {
     case.db_mut().apply_changes(changes);
 
     assert!(!foo.exists(case.db()));
-    assert!(!package.contains_file(case.db(), foo));
 
-    let bar = system_path_to_file(case.db(), &bar_path).ok_or_else(|| anyhow!("Bar not found"))?;
-
-    let Some(package) = case.db().workspace().package(case.db(), &bar_path) else {
-        panic!("Expected bar.py to belong to a package.");
-    };
+    let bar = case
+        .system_file(&bar_path)
+        .ok_or_else(|| anyhow!("Bar not found"))?;
 
     assert!(bar.exists(case.db()));
-    assert!(package.contains_file(case.db(), bar));
+    assert_eq!(case.collect_package_files(&foo_path), [bar]);
 
     Ok(())
 }
@@ -386,6 +390,7 @@ fn rename_file() -> anyhow::Result<()> {
 #[test]
 fn directory_moved_to_workspace() -> anyhow::Result<()> {
     let mut case = setup([("bar.py", "import sub.a")])?;
+    let bar = case.system_file(case.workspace_path("bar.py")).unwrap();
 
     let sub_original_path = case.root_path().join("sub");
     let init_original_path = sub_original_path.join("__init__.py");
@@ -400,6 +405,10 @@ fn directory_moved_to_workspace() -> anyhow::Result<()> {
     let sub_a_module = resolve_module(case.db().upcast(), ModuleName::new_static("sub.a").unwrap());
 
     assert_eq!(sub_a_module, None);
+    assert_eq!(
+        case.collect_package_files(&case.workspace_path("bar.py")),
+        &[bar]
+    );
 
     let sub_new_path = case.workspace_path("sub");
     std::fs::rename(sub_original_path.as_std_path(), sub_new_path.as_std_path())
@@ -409,21 +418,20 @@ fn directory_moved_to_workspace() -> anyhow::Result<()> {
 
     case.db_mut().apply_changes(changes);
 
-    let init_file = system_path_to_file(case.db(), sub_new_path.join("__init__.py"))
+    let init_file = case
+        .system_file(sub_new_path.join("__init__.py"))
         .expect("__init__.py to exist");
-    let a_file = system_path_to_file(case.db(), sub_new_path.join("a.py")).expect("a.py to exist");
+    let a_file = case
+        .system_file(sub_new_path.join("a.py"))
+        .expect("a.py to exist");
 
     // `import sub.a` should now resolve
     assert!(resolve_module(case.db().upcast(), ModuleName::new_static("sub.a").unwrap()).is_some());
 
-    let package = case
-        .db()
-        .workspace()
-        .package(case.db(), &sub_new_path)
-        .expect("sub to belong to a package");
-
-    assert!(package.contains_file(case.db(), init_file));
-    assert!(package.contains_file(case.db(), a_file));
+    assert_eq!(
+        case.collect_package_files(&case.workspace_path("bar.py")),
+        &[bar, init_file, a_file]
+    );
 
     Ok(())
 }
@@ -435,23 +443,22 @@ fn directory_moved_to_trash() -> anyhow::Result<()> {
         ("sub/__init__.py", ""),
         ("sub/a.py", ""),
     ])?;
+    let bar = case.system_file(case.workspace_path("bar.py")).unwrap();
 
     assert!(resolve_module(case.db().upcast(), ModuleName::new_static("sub.a").unwrap()).is_some(),);
 
     let sub_path = case.workspace_path("sub");
+    let init_file = case
+        .system_file(sub_path.join("__init__.py"))
+        .expect("__init__.py to exist");
+    let a_file = case
+        .system_file(sub_path.join("a.py"))
+        .expect("a.py to exist");
 
-    let package = case
-        .db()
-        .workspace()
-        .package(case.db(), &sub_path)
-        .expect("sub to belong to a package");
-
-    let init_file =
-        system_path_to_file(case.db(), sub_path.join("__init__.py")).expect("__init__.py to exist");
-    let a_file = system_path_to_file(case.db(), sub_path.join("a.py")).expect("a.py to exist");
-
-    assert!(package.contains_file(case.db(), init_file));
-    assert!(package.contains_file(case.db(), a_file));
+    assert_eq!(
+        case.collect_package_files(&case.workspace_path("bar.py")),
+        &[bar, init_file, a_file]
+    );
 
     std::fs::create_dir(case.root_path().join(".trash").as_std_path())?;
     let trashed_sub = case.root_path().join(".trash/sub");
@@ -468,8 +475,10 @@ fn directory_moved_to_trash() -> anyhow::Result<()> {
     assert!(!init_file.exists(case.db()));
     assert!(!a_file.exists(case.db()));
 
-    assert!(!package.contains_file(case.db(), init_file));
-    assert!(!package.contains_file(case.db(), a_file));
+    assert_eq!(
+        case.collect_package_files(&case.workspace_path("bar.py")),
+        &[bar]
+    );
 
     Ok(())
 }
@@ -482,6 +491,8 @@ fn directory_renamed() -> anyhow::Result<()> {
         ("sub/a.py", ""),
     ])?;
 
+    let bar = case.system_file(case.workspace_path("bar.py")).unwrap();
+
     assert!(resolve_module(case.db().upcast(), ModuleName::new_static("sub.a").unwrap()).is_some());
     assert!(resolve_module(
         case.db().upcast(),
@@ -490,19 +501,17 @@ fn directory_renamed() -> anyhow::Result<()> {
     .is_none());
 
     let sub_path = case.workspace_path("sub");
+    let sub_init = case
+        .system_file(sub_path.join("__init__.py"))
+        .expect("__init__.py to exist");
+    let sub_a = case
+        .system_file(sub_path.join("a.py"))
+        .expect("a.py to exist");
 
-    let package = case
-        .db()
-        .workspace()
-        .package(case.db(), &sub_path)
-        .expect("sub to belong to a package");
-
-    let sub_init =
-        system_path_to_file(case.db(), sub_path.join("__init__.py")).expect("__init__.py to exist");
-    let sub_a = system_path_to_file(case.db(), sub_path.join("a.py")).expect("a.py to exist");
-
-    assert!(package.contains_file(case.db(), sub_init));
-    assert!(package.contains_file(case.db(), sub_a));
+    assert_eq!(
+        case.collect_package_files(&sub_path),
+        &[bar, sub_init, sub_a]
+    );
 
     let foo_baz = case.workspace_path("foo/baz");
 
@@ -527,20 +536,22 @@ fn directory_renamed() -> anyhow::Result<()> {
     assert!(!sub_init.exists(case.db()));
     assert!(!sub_a.exists(case.db()));
 
-    assert!(!package.contains_file(case.db(), sub_init));
-    assert!(!package.contains_file(case.db(), sub_a));
-
-    let foo_baz_init =
-        system_path_to_file(case.db(), foo_baz.join("__init__.py")).expect("__init__.py to exist");
-    let foo_baz_a = system_path_to_file(case.db(), foo_baz.join("a.py")).expect("a.py to exist");
+    let foo_baz_init = case
+        .system_file(foo_baz.join("__init__.py"))
+        .expect("__init__.py to exist");
+    let foo_baz_a = case
+        .system_file(foo_baz.join("a.py"))
+        .expect("a.py to exist");
 
     // The new paths are synced
 
     assert!(foo_baz_init.exists(case.db()));
     assert!(foo_baz_a.exists(case.db()));
 
-    assert!(package.contains_file(case.db(), foo_baz_init));
-    assert!(package.contains_file(case.db(), foo_baz_a));
+    assert_eq!(
+        case.collect_package_files(&sub_path),
+        &[bar, foo_baz_init, foo_baz_a]
+    );
 
     Ok(())
 }
@@ -553,22 +564,22 @@ fn directory_deleted() -> anyhow::Result<()> {
         ("sub/a.py", ""),
     ])?;
 
+    let bar = case.system_file(case.workspace_path("bar.py")).unwrap();
+
     assert!(resolve_module(case.db().upcast(), ModuleName::new_static("sub.a").unwrap()).is_some(),);
 
     let sub_path = case.workspace_path("sub");
 
-    let package = case
-        .db()
-        .workspace()
-        .package(case.db(), &sub_path)
-        .expect("sub to belong to a package");
-
-    let init_file =
-        system_path_to_file(case.db(), sub_path.join("__init__.py")).expect("__init__.py to exist");
-    let a_file = system_path_to_file(case.db(), sub_path.join("a.py")).expect("a.py to exist");
-
-    assert!(package.contains_file(case.db(), init_file));
-    assert!(package.contains_file(case.db(), a_file));
+    let init_file = case
+        .system_file(sub_path.join("__init__.py"))
+        .expect("__init__.py to exist");
+    let a_file = case
+        .system_file(sub_path.join("a.py"))
+        .expect("a.py to exist");
+    assert_eq!(
+        case.collect_package_files(&sub_path),
+        &[bar, init_file, a_file]
+    );
 
     std::fs::remove_dir_all(sub_path.as_std_path())
         .with_context(|| "Failed to remove the sub directory")?;
@@ -582,9 +593,7 @@ fn directory_deleted() -> anyhow::Result<()> {
 
     assert!(!init_file.exists(case.db()));
     assert!(!a_file.exists(case.db()));
-
-    assert!(!package.contains_file(case.db(), init_file));
-    assert!(!package.contains_file(case.db(), a_file));
+    assert_eq!(case.collect_package_files(&sub_path), &[bar]);
 
     Ok(())
 }
