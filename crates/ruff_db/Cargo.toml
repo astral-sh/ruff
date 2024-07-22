@@ -15,6 +15,7 @@ ruff_cache = { workspace = true, optional = true }
 ruff_notebook = { workspace = true }
 ruff_python_ast = { workspace = true }
 ruff_python_parser = { workspace = true }
+ruff_python_trivia = { workspace = true }
 ruff_source_file = { workspace = true }
 ruff_text_size = { workspace = true }
 

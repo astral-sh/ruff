@@ -236,7 +236,13 @@ impl<'db> ClassType<'db> {
 #[salsa::interned]
 pub struct UnionType<'db> {
     /// the union type includes values in any of these types
-    pub elements: FxOrderSet<Type<'db>>,
+    elements: FxOrderSet<Type<'db>>,
+}
+
+impl<'db> UnionType<'db> {
+    pub fn contains(&self, db: &'db dyn Db, ty: Type<'db>) -> bool {
+        self.elements(db).contains(&ty)
+    }
 }
 
 struct UnionTypeBuilder<'db> {
