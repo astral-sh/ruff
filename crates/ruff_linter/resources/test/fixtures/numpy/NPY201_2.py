@@ -41,7 +41,7 @@ def func():
 
     np.alltrue([True, True])
 
-    np.anytrue([True, False])
+    np.sometrue([True, False])
 
     np.cumproduct([1, 2, 3])
 
