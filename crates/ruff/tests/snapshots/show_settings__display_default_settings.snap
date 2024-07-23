@@ -259,6 +259,7 @@ linter.flake8_import_conventions.aliases = {
 	seaborn = sns,
 	tensorflow = tf,
 	tkinter = tk,
+	xml.etree.ElementTree = ET,
 }
 linter.flake8_import_conventions.banned_aliases = {}
 linter.flake8_import_conventions.banned_from = []
