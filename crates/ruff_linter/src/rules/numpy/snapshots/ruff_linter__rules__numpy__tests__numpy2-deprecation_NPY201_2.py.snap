@@ -313,7 +313,7 @@ NPY201_2.py:42:5: NPY201 [*] `np.alltrue` will be removed in NumPy 2.0. Use `num
 42 |     np.alltrue([True, True])
    |     ^^^^^^^^^^ NPY201
 43 | 
-44 |     np.anytrue([True, False])
+44 |     np.sometrue([True, False])
    |
    = help: Replace with `numpy.all`
 
@@ -324,12 +324,33 @@ NPY201_2.py:42:5: NPY201 [*] `np.alltrue` will be removed in NumPy 2.0. Use `num
 42    |-    np.alltrue([True, True])
    42 |+    np.all([True, True])
 43 43 | 
-44 44 |     np.anytrue([True, False])
+44 44 |     np.sometrue([True, False])
 45 45 | 
+
+NPY201_2.py:42:5: NPY201 [*] `np.sometrue` will be removed in NumPy 2.0. Use `numpy.any` instead.
+   |
+42 |     np.alltrue([True, True])
+43 | 
+44 |     np.sometrue([True, False])
+   |     ^^^^^^^^^^^ NPY201
+45 | 
+46 |     np.cumproduct([1, 2, 3])
+   |
+   = help: Replace with `numpy.any`
+
+ℹ Safe fix
+41 41 | 
+42 42 |     np.alltrue([True, True])
+43 43 | 
+44    |-    np.sometrue([True, False])
+   44 |+    np.any([True, False])
+45 45 | 
+46 46 |     np.cumproduct([1, 2, 3])
+47 47 | 
 
 NPY201_2.py:46:5: NPY201 [*] `np.cumproduct` will be removed in NumPy 2.0. Use `numpy.cumprod` instead.
    |
-44 |     np.anytrue([True, False])
+44 |     np.sometrue([True, False])
 45 | 
 46 |     np.cumproduct([1, 2, 3])
    |     ^^^^^^^^^^^^^ NPY201
@@ -340,7 +361,7 @@ NPY201_2.py:46:5: NPY201 [*] `np.cumproduct` will be removed in NumPy 2.0. Use `
 
 ℹ Safe fix
 43 43 | 
-44 44 |     np.anytrue([True, False])
+44 44 |     np.sometrue([True, False])
 45 45 | 
 46    |-    np.cumproduct([1, 2, 3])
    46 |+    np.cumprod([1, 2, 3])
