@@ -110,7 +110,7 @@ impl<'a> LazyFiles<'a> {
 /// The type is cheap clonable and allows for in-place mutation of the files. The in-place mutation requires
 /// extra care because the type is used as the result of Salsa queries and Salsa relies on a type's equality
 /// to determine if the output has changed. This is accomplished by using a `revision` that gets incremented
-/// whenever the files are changed. The revision ensures that salas's comparison of the
+/// whenever the files are changed. The revision ensures that salsa's comparison of the
 /// previous [`IndexedFiles`] with the next [`IndexedFiles`] returns false even though they both
 /// point to the same underlying hash set.
 ///
