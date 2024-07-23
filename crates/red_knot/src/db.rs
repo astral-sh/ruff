@@ -5,15 +5,16 @@ use salsa::{Cancelled, Database, DbWithJar};
 
 use red_knot_module_resolver::{vendored_typeshed_stubs, Db as ResolverDb, Jar as ResolverJar};
 use red_knot_python_semantic::{Db as SemanticDb, Jar as SemanticJar};
-use ruff_db::files::{system_path_to_file, File, Files};
+use ruff_db::files::{File, Files};
 use ruff_db::program::{Program, ProgramSettings};
 use ruff_db::system::System;
 use ruff_db::vendored::VendoredFileSystem;
 use ruff_db::{Db as SourceDb, Jar as SourceJar, Upcast};
 
 use crate::lint::{lint_semantic, lint_syntax, unwind_if_cancelled, Diagnostics};
-use crate::watch::{FileChangeKind, FileWatcherChange};
 use crate::workspace::{check_file, Package, Workspace, WorkspaceMetadata};
+
+mod changes;
 
 pub trait Db: DbWithJar<Jar> + SemanticDb + Upcast<dyn SemanticDb> {}
 
@@ -59,58 +60,6 @@ impl RootDatabase {
         self.workspace.unwrap()
     }
 
-    #[tracing::instrument(level = "debug", skip(self, changes))]
-    pub fn apply_changes(&mut self, changes: Vec<FileWatcherChange>) {
-        let workspace = self.workspace();
-        let workspace_path = workspace.root(self).to_path_buf();
-
-        // TODO: Optimize change tracking by only reloading a package if a file that is part of the package was changed.
-        let mut structural_change = false;
-        for change in changes {
-            if matches!(
-                change.path.file_name(),
-                Some(".gitignore" | ".ignore" | "ruff.toml" | ".ruff.toml" | "pyproject.toml")
-            ) {
-                // Changes to ignore files or settings can change the workspace structure or add/remove files
-                // from packages.
-                structural_change = true;
-            } else {
-                match change.kind {
-                    FileChangeKind::Created => {
-                        // Reload the package when a new file was added. This is necessary because the file might be excluded
-                        // by a gitignore.
-                        if workspace.package(self, &change.path).is_some() {
-                            structural_change = true;
-                        }
-                    }
-                    FileChangeKind::Modified => {}
-                    FileChangeKind::Deleted => {
-                        if let Some(package) = workspace.package(self, &change.path) {
-                            if let Some(file) = system_path_to_file(self, &change.path) {
-                                package.remove_file(self, file);
-                            }
-                        }
-                    }
-                }
-            }
-
-            File::touch_path(self, &change.path);
-        }
-
-        if structural_change {
-            match WorkspaceMetadata::from_path(&workspace_path, self.system()) {
-                Ok(metadata) => {
-                    tracing::debug!("Reload workspace after structural change.");
-                    // TODO: Handle changes in the program settings.
-                    workspace.reload(self, metadata);
-                }
-                Err(error) => {
-                    tracing::error!("Failed to load workspace, keep old workspace: {error}");
-                }
-            }
-        }
-    }
-
     /// Checks all open files in the workspace and its dependencies.
     pub fn check(&self) -> Result<Vec<String>, Cancelled> {
         self.with_db(|db| db.workspace().check(db))
@@ -152,16 +101,27 @@ impl Upcast<dyn SemanticDb> for RootDatabase {
     fn upcast(&self) -> &(dyn SemanticDb + 'static) {
         self
     }
+
+    fn upcast_mut(&mut self) -> &mut (dyn SemanticDb + 'static) {
+        self
+    }
 }
 
 impl Upcast<dyn SourceDb> for RootDatabase {
     fn upcast(&self) -> &(dyn SourceDb + 'static) {
         self
     }
+
+    fn upcast_mut(&mut self) -> &mut (dyn SourceDb + 'static) {
+        self
+    }
 }
 
 impl Upcast<dyn ResolverDb> for RootDatabase {
     fn upcast(&self) -> &(dyn ResolverDb + 'static) {
+        self
+    }
+    fn upcast_mut(&mut self) -> &mut (dyn ResolverDb + 'static) {
         self
     }
 }

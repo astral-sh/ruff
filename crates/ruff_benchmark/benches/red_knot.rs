@@ -144,7 +144,7 @@ fn benchmark_incremental(criterion: &mut Criterion) {
                     )
                     .unwrap();
 
-                case.bar.touch(&mut case.db);
+                case.bar.sync(&mut case.db);
                 case
             },
             |case| {

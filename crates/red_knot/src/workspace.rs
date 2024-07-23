@@ -117,6 +117,7 @@ impl Workspace {
         self.package_tree(db).values().copied()
     }
 
+    #[tracing::instrument(skip_all)]
     pub fn reload(self, db: &mut dyn Db, metadata: WorkspaceMetadata) {
         assert_eq!(self.root(db), metadata.root());
 
@@ -139,6 +140,7 @@ impl Workspace {
         self.set_package_tree(db).to(new_packages);
     }
 
+    #[tracing::instrument(level = "debug", skip_all)]
     pub fn update_package(self, db: &mut dyn Db, metadata: PackageMetadata) -> anyhow::Result<()> {
         let path = metadata.root().to_path_buf();
 
@@ -157,7 +159,7 @@ impl Workspace {
     pub fn package(self, db: &dyn Db, path: &SystemPath) -> Option<Package> {
         let packages = self.package_tree(db);
 
-        let (package_path, package) = packages.range(..path.to_path_buf()).next_back()?;
+        let (package_path, package) = packages.range(..=path.to_path_buf()).next_back()?;
 
         if path.starts_with(package_path) {
             Some(*package)
@@ -252,6 +254,7 @@ impl Package {
         self.file_set(db)
     }
 
+    #[tracing::instrument(level = "debug", skip(db))]
     pub fn remove_file(self, db: &mut dyn Db, file: File) -> bool {
         let mut files_arc = self.file_set(db).clone();
 
@@ -266,6 +269,22 @@ impl Package {
         removed
     }
 
+    #[tracing::instrument(level = "debug", skip(db))]
+    pub fn add_file(self, db: &mut dyn Db, file: File) -> bool {
+        let mut files_arc = self.file_set(db).clone();
+
+        // Set a dummy value. Salsa will cancel any pending queries and remove its own reference to `files`
+        // so that the reference counter to `files` now drops to 1.
+        self.set_file_set(db).to(Arc::new(FxHashSet::default()));
+
+        let files = Arc::get_mut(&mut files_arc).unwrap();
+        let added = files.insert(file);
+        self.set_file_set(db).to(files_arc);
+
+        added
+    }
+
+    #[tracing::instrument(level = "debug", skip(db))]
     pub(crate) fn check(self, db: &dyn Db) -> Vec<String> {
         let mut result = Vec::new();
         for file in self.files(db) {
@@ -286,9 +305,14 @@ impl Package {
         let root = self.root(db);
         assert_eq!(root, metadata.root());
 
-        let files = discover_package_files(db, root);
-
+        self.reload_files(db);
         self.set_name(db).to(metadata.name);
+    }
+
+    #[tracing::instrument(level = "debug", skip(db))]
+    pub fn reload_files(self, db: &mut dyn Db) {
+        let files = discover_package_files(db, self.root(db));
+
         self.set_file_set(db).to(Arc::new(files));
     }
 }

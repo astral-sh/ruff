@@ -76,6 +76,9 @@ pub(crate) mod tests {
         fn upcast(&self) -> &(dyn ruff_db::Db + 'static) {
             self
         }
+        fn upcast_mut(&mut self) -> &mut (dyn ruff_db::Db + 'static) {
+            self
+        }
     }
 
     impl ruff_db::Db for TestDb {

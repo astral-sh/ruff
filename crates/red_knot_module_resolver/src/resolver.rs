@@ -30,9 +30,8 @@ pub(crate) fn resolve_module_query<'db>(
     db: &'db dyn Db,
     module_name: internal::ModuleNameIngredient<'db>,
 ) -> Option<Module> {
-    let _span = tracing::trace_span!("resolve_module", ?module_name).entered();
-
     let name = module_name.name(db);
+    let _span = tracing::trace_span!("resolve_module", %name).entered();
 
     let (search_path, module_file, kind) = resolve_name(db, name)?;
 
@@ -1225,7 +1224,7 @@ mod tests {
 
         // Delete `bar.py`
         db.memory_file_system().remove_file(&bar_path).unwrap();
-        bar.touch(&mut db);
+        bar.sync(&mut db);
 
         // Re-query the foo module. The foo module should still be cached because `bar.py` isn't relevant
         // for resolving `foo`.
@@ -1277,7 +1276,7 @@ mod tests {
         db.memory_file_system().remove_file(&foo_init_path)?;
         db.memory_file_system()
             .remove_directory(foo_init_path.parent().unwrap())?;
-        File::touch_path(&mut db, &foo_init_path);
+        File::sync_path(&mut db, &foo_init_path);
 
         let foo_module = resolve_module(&db, foo_module_name).expect("Foo module to resolve");
         assert_eq!(&src.join("foo.py"), foo_module.file().path(&db));
@@ -1405,7 +1404,7 @@ mod tests {
         db.memory_file_system()
             .remove_file(&src_functools_path)
             .unwrap();
-        File::touch_path(&mut db, &src_functools_path);
+        File::sync_path(&mut db, &src_functools_path);
         let functools_module = resolve_module(&db, functools_module_name.clone()).unwrap();
         assert_eq!(functools_module.search_path(), &stdlib);
         assert_eq!(
@@ -1617,7 +1616,7 @@ not_a_directory
         // Salsa file forces a new revision.
         //
         // TODO: get rid of the `.report_untracked_read()` call...
-        File::touch_path(&mut db, SystemPath::new("/x/src/foo.py"));
+        File::sync_path(&mut db, SystemPath::new("/x/src/foo.py"));
 
         assert_eq!(resolve_module(&db, foo_module_name.clone()), None);
     }
@@ -1645,8 +1644,8 @@ not_a_directory
             .remove_file(src_path.join("foo.py"))
             .unwrap();
         db.memory_file_system().remove_directory(&src_path).unwrap();
-        File::touch_path(&mut db, &src_path.join("foo.py"));
-        File::touch_path(&mut db, &src_path);
+        File::sync_path(&mut db, &src_path.join("foo.py"));
+        File::sync_path(&mut db, &src_path);
         assert_eq!(resolve_module(&db, foo_module_name.clone()), None);
     }
 

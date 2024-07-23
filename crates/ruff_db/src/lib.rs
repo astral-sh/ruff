@@ -34,6 +34,7 @@ pub trait Db: DbWithJar<Jar> {
 /// Trait for upcasting a reference to a base trait object.
 pub trait Upcast<T: ?Sized> {
     fn upcast(&self) -> &T;
+    fn upcast_mut(&mut self) -> &mut T;
 }
 
 #[cfg(test)]

@@ -145,7 +145,7 @@ pub trait DbWithTestSystem: Db + Sized {
             .write_file(path, content);
 
         if result.is_ok() {
-            File::touch_path(self, path);
+            File::sync_path(self, path);
         }
 
         result
