@@ -130,13 +130,13 @@ fn apply_fixes<'a>(
 /// Compare two fixes.
 fn cmp_fix(rule1: Rule, rule2: Rule, fix1: &Fix, fix2: &Fix) -> std::cmp::Ordering {
     // Always apply `RedefinedWhileUnused` before `UnusedImport`, as the latter can end up fixing
-    // the former.
-    {
-        match (rule1, rule2) {
-            (Rule::RedefinedWhileUnused, Rule::UnusedImport) => return std::cmp::Ordering::Less,
-            (Rule::UnusedImport, Rule::RedefinedWhileUnused) => return std::cmp::Ordering::Greater,
-            _ => std::cmp::Ordering::Equal,
-        }
+    // the former. But we can't apply this just for `RedefinedWhileUnused` and `UnusedImport` because it violates
+    // `< is transitive: a < b and b < c implies a < c. The same must hold for both == and >.`
+    // See https://github.com/astral-sh/ruff/issues/12469#issuecomment-2244392085
+    match (rule1, rule2) {
+        (Rule::RedefinedWhileUnused, _) => std::cmp::Ordering::Less,
+        (_, Rule::RedefinedWhileUnused) => std::cmp::Ordering::Greater,
+        _ => std::cmp::Ordering::Equal,
     }
     // Apply fixes in order of their start position.
     .then_with(|| fix1.min_start().cmp(&fix2.min_start()))
