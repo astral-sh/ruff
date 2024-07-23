@@ -60,7 +60,7 @@ countme = { version = "3.0.1" }
 compact_str = "0.8.0"
 criterion = { version = "0.5.1", default-features = false }
 crossbeam = { version = "0.8.4" }
-dashmap = { version = "6.0.1" }
+dashmap = { version = "6.0.1", features = ["inline"] }
 drop_bomb = { version = "0.1.5" }
 env_logger = { version = "0.11.0" }
 etcetera = { version = "0.8.0" }
@@ -68,7 +68,7 @@ fern = { version = "0.6.1" }
 filetime = { version = "0.2.23" }
 glob = { version = "0.3.1" }
 globset = { version = "0.4.14" }
-hashbrown = "0.14.3"
+hashbrown = { version = "0.14.3", features = ["inline-more"] }
 ignore = { version = "0.4.22" }
 imara-diff = { version = "0.1.5" }
 imperative = { version = "1.0.4" }
