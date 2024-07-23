@@ -186,8 +186,10 @@ pub(crate) fn numpy_2_0_deprecation(checker: &mut Checker, expr: &Expr) {
             }),
             ["numpy", "alltrue"] => Some(Replacement {
                 existing: "alltrue",
-                details: Details::AutoPurePython {
-                    python_expr: "all",
+                details: Details::AutoImport {
+                    path: "numpy",
+                    name: "all",
+                    compatibility: Compatibility::BackwardsCompatible,
                 },
             }),
             ["numpy", "asfarray"] => Some(Replacement {
@@ -524,8 +526,10 @@ pub(crate) fn numpy_2_0_deprecation(checker: &mut Checker, expr: &Expr) {
             }),
             ["numpy", "sometrue"] => Some(Replacement {
                 existing: "sometrue",
-                details: Details::AutoPurePython {
-                    python_expr: "any",
+                details: Details::AutoImport {
+                    path: "numpy",
+                    name: "any",
+                    compatibility: Compatibility::BackwardsCompatible,
                 },
             }),
             ["numpy", "source"] => Some(Replacement {

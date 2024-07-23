@@ -306,7 +306,7 @@ NPY201_2.py:40:5: NPY201 [*] `np.row_stack` will be removed in NumPy 2.0. Use `n
 42 42 |     np.alltrue([True, True])
 43 43 | 
 
-NPY201_2.py:42:5: NPY201 [*] `np.alltrue` will be removed in NumPy 2.0. Use `all` instead.
+NPY201_2.py:42:5: NPY201 [*] `np.alltrue` will be removed in NumPy 2.0. Use `numpy.all` instead.
    |
 40 |     np.row_stack(([1,2], [3,4]))
 41 | 
@@ -315,14 +315,14 @@ NPY201_2.py:42:5: NPY201 [*] `np.alltrue` will be removed in NumPy 2.0. Use `all
 43 | 
 44 |     np.anytrue([True, False])
    |
-   = help: Replace with `all`
+   = help: Replace with `numpy.all`
 
 ℹ Safe fix
 39 39 | 
 40 40 |     np.row_stack(([1,2], [3,4]))
 41 41 | 
 42    |-    np.alltrue([True, True])
-   42 |+    all([True, True])
+   42 |+    np.all([True, True])
 43 43 | 
 44 44 |     np.anytrue([True, False])
 45 45 | 
