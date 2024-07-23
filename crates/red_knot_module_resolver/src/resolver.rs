@@ -11,7 +11,7 @@ use ruff_db::system::{DirectoryEntry, System, SystemPath, SystemPathBuf};
 use crate::db::Db;
 use crate::module::{Module, ModuleKind};
 use crate::module_name::ModuleName;
-use crate::path::{ModulePathBuf, ModuleSearchPath};
+use crate::path::{ModulePathBuf, ModuleSearchPath, SearchPathValidationError};
 use crate::state::ResolverState;
 
 /// Resolves a module name to a module.
@@ -102,16 +102,10 @@ pub(crate) fn file_to_module(db: &dyn Db, file: File) -> Option<Module> {
 ///
 /// This method also implements the typing spec's [module resolution order].
 ///
-/// TODO(Alex): this method does multiple `.unwrap()` calls when it should really return an error.
-/// Each `.unwrap()` call is a point where we're validating a setting that the user would pass
-/// and transforming it into an internal representation for a validated path.
-/// Rather than panicking if a path fails to validate, we should display an error message to the user
-/// and exit the process with a nonzero exit code.
-/// This validation should probably be done outside of Salsa?
-///
 /// [module resolution order]: https://typing.readthedocs.io/en/latest/spec/distributing.html#import-resolution-ordering
-#[salsa::tracked(return_ref)]
-pub(crate) fn module_resolution_settings(db: &dyn Db) -> ModuleResolutionSettings {
+fn try_resolve_module_resolution_settings(
+    db: &dyn Db,
+) -> Result<ModuleResolutionSettings, SearchPathValidationError> {
     let program = Program::get(db.upcast());
 
     let SearchPathSettings {
@@ -129,30 +123,30 @@ pub(crate) fn module_resolution_settings(db: &dyn Db) -> ModuleResolutionSetting
         tracing::info!("extra search paths: {extra_paths:?}");
     }
 
-    let current_directory = db.system().current_directory();
+    let system = db.system();
 
-    let mut static_search_paths: Vec<_> = extra_paths
-        .iter()
-        .map(|path| ModuleSearchPath::extra(SystemPath::absolute(path, current_directory)).unwrap())
-        .collect();
+    let mut static_search_paths = vec![];
 
-    static_search_paths.push(
-        ModuleSearchPath::first_party(SystemPath::absolute(workspace_root, current_directory))
-            .unwrap(),
-    );
+    for path in extra_paths {
+        static_search_paths.push(ModuleSearchPath::extra(system, path.to_owned())?);
+    }
 
-    static_search_paths.push(custom_typeshed.as_ref().map_or_else(
-        ModuleSearchPath::vendored_stdlib,
-        |custom| {
-            ModuleSearchPath::custom_stdlib(&SystemPath::absolute(custom, current_directory))
-                .unwrap()
-        },
-    ));
+    static_search_paths.push(ModuleSearchPath::first_party(
+        system,
+        workspace_root.to_owned(),
+    )?);
 
-    if let Some(path) = site_packages {
-        let site_packages_root =
-            ModuleSearchPath::site_packages(SystemPath::absolute(path, current_directory)).unwrap();
-        static_search_paths.push(site_packages_root);
+    static_search_paths.push(if let Some(custom_typeshed) = custom_typeshed.as_ref() {
+        ModuleSearchPath::custom_stdlib(db, custom_typeshed.to_owned())?
+    } else {
+        ModuleSearchPath::vendored_stdlib()
+    });
+
+    if let Some(site_packages) = site_packages {
+        static_search_paths.push(ModuleSearchPath::site_packages(
+            system,
+            site_packages.to_owned(),
+        )?);
     }
 
     // TODO vendor typeshed's third-party stubs as well as the stdlib and fallback to them as a final step
@@ -177,10 +171,16 @@ pub(crate) fn module_resolution_settings(db: &dyn Db) -> ModuleResolutionSetting
         }
     });
 
-    ModuleResolutionSettings {
+    Ok(ModuleResolutionSettings {
         target_version,
         static_search_paths,
-    }
+    })
+}
+
+#[salsa::tracked(return_ref)]
+pub(crate) fn module_resolution_settings(db: &dyn Db) -> ModuleResolutionSettings {
+    // TODO proper error handling if this returns an error:
+    try_resolve_module_resolution_settings(db).unwrap()
 }
 
 /// Collect all dynamic search paths:
@@ -319,7 +319,7 @@ impl<'db> PthFile<'db> {
                 return None;
             }
             let possible_editable_install = SystemPath::absolute(line, site_packages);
-            ModuleSearchPath::editable(*system, possible_editable_install)
+            ModuleSearchPath::editable(*system, possible_editable_install).ok()
         })
     }
 }
@@ -1009,6 +1009,7 @@ mod tests {
         let foo = resolve_module(&db, ModuleName::new_static("foo").unwrap()).unwrap();
         let foo_stub = src.join("foo.pyi");
 
+        assert_eq!(&src, foo.search_path());
         assert_eq!(&foo_stub, foo.file().path(&db));
 
         assert_eq!(Some(foo), path_to_module(&db, &FilePath::System(foo_stub)));
@@ -1165,7 +1166,8 @@ mod tests {
 
         std::fs::create_dir_all(src.as_std_path())?;
         std::fs::create_dir_all(site_packages.as_std_path())?;
-        std::fs::create_dir_all(custom_typeshed.as_std_path())?;
+        std::fs::create_dir_all(custom_typeshed.join("stdlib").as_std_path())?;
+        std::fs::File::create(custom_typeshed.join("stdlib/VERSIONS").as_std_path())?;
 
         std::fs::write(foo.as_std_path(), "")?;
         std::os::unix::fs::symlink(foo.as_std_path(), bar.as_std_path())?;
@@ -1659,11 +1661,10 @@ not_a_directory
         let search_paths: Vec<&ModuleSearchPath> =
             module_resolution_settings(&db).search_paths(&db).collect();
 
-        assert!(search_paths
-            .contains(&&ModuleSearchPath::first_party(SystemPathBuf::from("/src")).unwrap()));
+        assert!(
+            search_paths.contains(&&ModuleSearchPath::first_party(db.system(), "/src").unwrap())
+        );
 
-        assert!(!search_paths.contains(
-            &&ModuleSearchPath::editable(db.system(), SystemPathBuf::from("/src")).unwrap()
-        ));
+        assert!(!search_paths.contains(&&ModuleSearchPath::editable(db.system(), "/src").unwrap()));
     }
 }

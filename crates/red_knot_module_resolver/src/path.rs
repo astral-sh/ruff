@@ -14,7 +14,7 @@ use ruff_db::vendored::{VendoredPath, VendoredPathBuf};
 use crate::db::Db;
 use crate::module_name::ModuleName;
 use crate::state::ResolverState;
-use crate::typeshed::TypeshedVersionsQueryResult;
+use crate::typeshed::{TypeshedVersionsParseError, TypeshedVersionsQueryResult};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 enum FilePathRef<'a> {
@@ -154,6 +154,7 @@ impl ModulePathBufInner {
     }
 }
 
+/// An owned path that points to the source file for a Python module
 #[derive(Clone, PartialEq, Eq, Hash)]
 pub(crate) struct ModulePathBuf(ModulePathBufInner);
 
@@ -166,49 +167,6 @@ impl ModulePathBuf {
     /// If a component with an invalid extension is passed
     pub(crate) fn push(&mut self, component: &str) {
         self.0.push(component);
-    }
-
-    #[must_use]
-    pub(crate) fn extra(path: impl Into<SystemPathBuf>) -> Option<Self> {
-        let path = path.into();
-        path.extension()
-            .map_or(true, |ext| matches!(ext, "py" | "pyi"))
-            .then_some(Self(ModulePathBufInner::Extra(path)))
-    }
-
-    #[must_use]
-    pub(crate) fn first_party(path: impl Into<SystemPathBuf>) -> Option<Self> {
-        let path = path.into();
-        path.extension()
-            .map_or(true, |ext| matches!(ext, "pyi" | "py"))
-            .then_some(Self(ModulePathBufInner::FirstParty(path)))
-    }
-
-    #[must_use]
-    pub(crate) fn standard_library(path: FilePath) -> Option<Self> {
-        path.extension()
-            .map_or(true, |ext| ext == "pyi")
-            .then_some(Self(ModulePathBufInner::StandardLibrary(path)))
-    }
-
-    #[must_use]
-    pub(crate) fn site_packages(path: impl Into<SystemPathBuf>) -> Option<Self> {
-        let path = path.into();
-        path.extension()
-            .map_or(true, |ext| matches!(ext, "pyi" | "py"))
-            .then_some(Self(ModulePathBufInner::SitePackages(path)))
-    }
-
-    #[must_use]
-    pub(crate) fn editable_installation_root(
-        system: &dyn System,
-        path: impl Into<SystemPathBuf>,
-    ) -> Option<Self> {
-        let path = path.into();
-        // TODO: Add Salsa invalidation to this system call:
-        system
-            .is_directory(&path)
-            .then_some(Self(ModulePathBufInner::EditableInstall(path)))
     }
 
     #[must_use]
@@ -557,6 +515,7 @@ impl<'a> ModulePathRefInner<'a> {
     }
 }
 
+/// An borrowed path that points to the source file for a Python module
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub(crate) struct ModulePathRef<'a>(ModulePathRefInner<'a>);
 
@@ -715,22 +674,117 @@ impl PartialEq<ModulePathRef<'_>> for VendoredPathBuf {
     }
 }
 
+/// Enumeration describing the various ways in which validation of a search path might fail.
+///
+/// If validation fails for a search path derived from the user settings,
+/// a message must be displayed to the user,
+/// as type checking cannot be done reliably in these circumstances.
+#[derive(Debug, PartialEq, Eq)]
+pub(crate) enum SearchPathValidationError {
+    /// The path provided by the user was not a directory
+    NotADirectory(SystemPathBuf),
+
+    /// The path provided by the user is a directory,
+    /// but no `stdlib/` subdirectory exists.
+    /// (This is only relevant for stdlib search paths.)
+    NoStdlibSubdirectory(SystemPathBuf),
+
+    /// The path provided by the user is a directory,
+    /// but no `stdlib/VERSIONS` file exists.
+    /// (This is only relevant for stdlib search paths.)
+    NoVersionsFile(SystemPathBuf),
+
+    /// The path provided by the user is a directory,
+    /// and a `stdlib/VERSIONS` file exists, but it fails to parse.
+    /// (This is only relevant for stdlib search paths.)
+    VersionsParseError(TypeshedVersionsParseError),
+}
+
+impl fmt::Display for SearchPathValidationError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::NotADirectory(path) => write!(f, "{path} does not point to a directory"),
+            Self::NoStdlibSubdirectory(path) => {
+                write!(f, "The directory at {path} has no `stdlib/` subdirectory")
+            }
+            Self::NoVersionsFile(path) => write!(f, "Expected a file at {path}/stldib/VERSIONS"),
+            Self::VersionsParseError(underlying_error) => underlying_error.fmt(f),
+        }
+    }
+}
+
+impl std::error::Error for SearchPathValidationError {
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+        if let Self::VersionsParseError(underlying_error) = self {
+            Some(underlying_error)
+        } else {
+            None
+        }
+    }
+}
+
+type SearchPathResult = Result<ModuleSearchPath, SearchPathValidationError>;
+
+/// A module-resolution search path, from which [`ModulePath`]s can be derived.
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub(crate) struct ModuleSearchPath(Arc<ModulePathBuf>);
 
 impl ModuleSearchPath {
-    pub(crate) fn extra(path: SystemPathBuf) -> Option<Self> {
-        Some(Self(Arc::new(ModulePathBuf::extra(path)?)))
+    pub(crate) fn extra(system: &dyn System, root: impl Into<SystemPathBuf>) -> SearchPathResult {
+        let root = root.into();
+        if system.is_directory(&root) {
+            Ok(Self(Arc::new(ModulePathBuf(ModulePathBufInner::Extra(
+                SystemPath::absolute(root, system.current_directory()),
+            )))))
+        } else {
+            Err(SearchPathValidationError::NotADirectory(root))
+        }
     }
 
-    pub(crate) fn first_party(path: SystemPathBuf) -> Option<Self> {
-        Some(Self(Arc::new(ModulePathBuf::first_party(path)?)))
+    pub(crate) fn first_party(
+        system: &dyn System,
+        root: impl Into<SystemPathBuf>,
+    ) -> SearchPathResult {
+        let root = root.into();
+        if system.is_directory(&root) {
+            Ok(Self(Arc::new(ModulePathBuf(
+                ModulePathBufInner::FirstParty(SystemPath::absolute(
+                    root,
+                    system.current_directory(),
+                )),
+            ))))
+        } else {
+            Err(SearchPathValidationError::NotADirectory(root))
+        }
     }
-
-    pub(crate) fn custom_stdlib(path: &SystemPath) -> Option<Self> {
-        Some(Self(Arc::new(ModulePathBuf::standard_library(
-            FilePath::System(path.join("stdlib")),
-        )?)))
+    pub(crate) fn custom_stdlib(
+        db: &dyn Db,
+        typeshed: impl Into<SystemPathBuf>,
+    ) -> SearchPathResult {
+        let typeshed = typeshed.into();
+        let system = db.system();
+        if !system.is_directory(&typeshed) {
+            return Err(SearchPathValidationError::NotADirectory(typeshed));
+        }
+        let stdlib = typeshed.join("stdlib");
+        if !system.is_directory(&stdlib) {
+            return Err(SearchPathValidationError::NoStdlibSubdirectory(typeshed));
+        }
+        let Some(typeshed_versions) = system_path_to_file(db.upcast(), stdlib.join("VERSIONS"))
+        else {
+            return Err(SearchPathValidationError::NoVersionsFile(typeshed));
+        };
+        crate::typeshed::parse_typeshed_versions(db, typeshed_versions)
+            .as_ref()
+            .map_err(|validation_error| {
+                SearchPathValidationError::VersionsParseError(validation_error.clone())
+            })?;
+        Ok(Self(Arc::new(ModulePathBuf(
+            ModulePathBufInner::StandardLibrary(FilePath::System(SystemPath::absolute(
+                stdlib,
+                system.current_directory(),
+            ))),
+        ))))
     }
 
     pub(crate) fn vendored_stdlib() -> Self {
@@ -741,14 +795,38 @@ impl ModuleSearchPath {
         )))
     }
 
-    pub(crate) fn site_packages(path: SystemPathBuf) -> Option<Self> {
-        Some(Self(Arc::new(ModulePathBuf::site_packages(path)?)))
+    pub(crate) fn site_packages(
+        system: &dyn System,
+        root: impl Into<SystemPathBuf>,
+    ) -> SearchPathResult {
+        let root = root.into();
+        if system.is_directory(&root) {
+            Ok(Self(Arc::new(ModulePathBuf(
+                ModulePathBufInner::SitePackages(SystemPath::absolute(
+                    root,
+                    system.current_directory(),
+                )),
+            ))))
+        } else {
+            Err(SearchPathValidationError::NotADirectory(root))
+        }
     }
 
-    pub(crate) fn editable(system: &dyn System, path: SystemPathBuf) -> Option<Self> {
-        Some(Self(Arc::new(ModulePathBuf::editable_installation_root(
-            system, path,
-        )?)))
+    pub(crate) fn editable(
+        system: &dyn System,
+        root: impl Into<SystemPathBuf>,
+    ) -> SearchPathResult {
+        let root = root.into();
+        if system.is_directory(&root) {
+            Ok(Self(Arc::new(ModulePathBuf(
+                ModulePathBufInner::EditableInstall(SystemPath::absolute(
+                    root,
+                    system.current_directory(),
+                )),
+            ))))
+        } else {
+            Err(SearchPathValidationError::NotADirectory(root))
+        }
     }
 
     pub(crate) fn as_module_path(&self) -> &ModulePathBuf {
@@ -809,6 +887,26 @@ mod tests {
 
     impl ModulePathBuf {
         #[must_use]
+        pub(crate) fn extra(path: impl Into<SystemPathBuf>) -> Self {
+            Self(ModulePathBufInner::Extra(path.into()))
+        }
+
+        #[must_use]
+        pub(crate) fn first_party(path: impl Into<SystemPathBuf>) -> Self {
+            Self(ModulePathBufInner::FirstParty(path.into()))
+        }
+
+        #[must_use]
+        pub(crate) fn standard_library(path: FilePath) -> Self {
+            Self(ModulePathBufInner::StandardLibrary(path))
+        }
+
+        #[must_use]
+        pub(crate) fn site_packages(path: impl Into<SystemPathBuf>) -> Self {
+            Self(ModulePathBufInner::SitePackages(path.into()))
+        }
+
+        #[must_use]
         pub(crate) fn join(&self, component: &str) -> Self {
             ModulePathRef::from(self).join(component)
         }
@@ -854,21 +952,9 @@ mod tests {
     }
 
     #[test]
-    fn constructor_rejects_non_pyi_stdlib_paths() {
-        assert_eq!(
-            ModulePathBuf::standard_library(FilePath::system("foo.py")),
-            None
-        );
-        assert_eq!(
-            ModulePathBuf::standard_library(FilePath::system("foo/__init__.py")),
-            None
-        );
-    }
-
-    #[test]
     fn path_buf_debug_impl() {
         assert_debug_snapshot!(
-            ModulePathBuf::standard_library(FilePath::system("foo/bar.pyi")).unwrap(),
+            ModulePathBuf::standard_library(FilePath::system("foo/bar.pyi")),
             @r###"
         ModulePathBuf::StandardLibrary(
             System(
@@ -894,16 +980,12 @@ mod tests {
     #[test]
     fn with_extension_methods() {
         assert_eq!(
-            ModulePathBuf::standard_library(FilePath::system("foo"))
-                .unwrap()
-                .with_py_extension(),
+            ModulePathBuf::standard_library(FilePath::system("foo")).with_py_extension(),
             None
         );
 
         assert_eq!(
-            ModulePathBuf::standard_library(FilePath::system("foo"))
-                .unwrap()
-                .with_pyi_extension(),
+            ModulePathBuf::standard_library(FilePath::system("foo")).with_pyi_extension(),
             ModulePathBuf(ModulePathBufInner::StandardLibrary(FilePath::System(
                 SystemPathBuf::from("foo.pyi")
             )))
@@ -911,7 +993,6 @@ mod tests {
 
         assert_eq!(
             ModulePathBuf::first_party("foo/bar")
-                .unwrap()
                 .with_py_extension()
                 .unwrap(),
             ModulePathBuf(ModulePathBufInner::FirstParty(SystemPathBuf::from(
@@ -991,23 +1072,19 @@ mod tests {
     #[test]
     fn join() {
         assert_eq!(
-            ModulePathBuf::standard_library(FilePath::system("foo"))
-                .unwrap()
-                .join("bar"),
+            ModulePathBuf::standard_library(FilePath::system("foo")).join("bar"),
             ModulePathBuf(ModulePathBufInner::StandardLibrary(FilePath::system(
                 "foo/bar"
             )))
         );
         assert_eq!(
-            ModulePathBuf::standard_library(FilePath::system("foo"))
-                .unwrap()
-                .join("bar.pyi"),
+            ModulePathBuf::standard_library(FilePath::system("foo")).join("bar.pyi"),
             ModulePathBuf(ModulePathBufInner::StandardLibrary(FilePath::system(
                 "foo/bar.pyi"
             )))
         );
         assert_eq!(
-            ModulePathBuf::extra("foo").unwrap().join("bar.py"),
+            ModulePathBuf::extra("foo").join("bar.py"),
             ModulePathBuf(ModulePathBufInner::Extra(SystemPathBuf::from("foo/bar.py")))
         );
     }
@@ -1015,36 +1092,30 @@ mod tests {
     #[test]
     #[should_panic(expected = "Extension must be `pyi`; got `py`")]
     fn stdlib_path_invalid_join_py() {
-        ModulePathBuf::standard_library(FilePath::system("foo"))
-            .unwrap()
-            .push("bar.py");
+        ModulePathBuf::standard_library(FilePath::system("foo")).push("bar.py");
     }
 
     #[test]
     #[should_panic(expected = "Extension must be `pyi`; got `rs`")]
     fn stdlib_path_invalid_join_rs() {
-        ModulePathBuf::standard_library(FilePath::system("foo"))
-            .unwrap()
-            .push("bar.rs");
+        ModulePathBuf::standard_library(FilePath::system("foo")).push("bar.rs");
     }
 
     #[test]
     #[should_panic(expected = "Extension must be `py` or `pyi`; got `rs`")]
     fn non_stdlib_path_invalid_join_rs() {
-        ModulePathBuf::site_packages("foo").unwrap().push("bar.rs");
+        ModulePathBuf::site_packages("foo").push("bar.rs");
     }
 
     #[test]
     #[should_panic(expected = "already has an extension")]
     fn invalid_stdlib_join_too_many_extensions() {
-        ModulePathBuf::standard_library(FilePath::system("foo.pyi"))
-            .unwrap()
-            .push("bar.pyi");
+        ModulePathBuf::standard_library(FilePath::system("foo.pyi")).push("bar.pyi");
     }
 
     #[test]
     fn relativize_stdlib_path_errors() {
-        let root = ModulePathBuf::standard_library(FilePath::system("foo/stdlib")).unwrap();
+        let root = ModulePathBuf::standard_library(FilePath::system("foo/stdlib"));
 
         // Must have a `.pyi` extension or no extension:
         let bad_absolute_path = FilePath::system("foo/stdlib/x.py");
@@ -1059,7 +1130,7 @@ mod tests {
 
     #[test]
     fn relativize_non_stdlib_path_errors() {
-        let root = ModulePathBuf::extra("foo/stdlib").unwrap();
+        let root = ModulePathBuf::extra("foo/stdlib");
         // Must have a `.py` extension, a `.pyi` extension, or no extension:
         let bad_absolute_path = FilePath::system("foo/stdlib/x.rs");
         assert_eq!(root.relativize_path(&bad_absolute_path), None);
@@ -1072,7 +1143,6 @@ mod tests {
     fn relativize_path() {
         assert_eq!(
             ModulePathBuf::standard_library(FilePath::system("foo/baz"))
-                .unwrap()
                 .relativize_path(&FilePath::system("foo/baz/eggs/__init__.pyi"))
                 .unwrap(),
             ModulePathRef(ModulePathRefInner::StandardLibrary(FilePathRef::system(
@@ -1089,7 +1159,7 @@ mod tests {
             .with_custom_typeshed(typeshed)
             .with_target_version(target_version)
             .build();
-        let stdlib = ModulePathBuf::standard_library(FilePath::System(stdlib)).unwrap();
+        let stdlib = ModulePathBuf::standard_library(FilePath::System(stdlib));
         (db, stdlib)
     }
 
