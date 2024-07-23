@@ -56,3 +56,10 @@ def func():
     np.ComplexWarning
 
     np.compare_chararrays
+
+    try:
+        exc = np.exceptions.ComplexWarning
+    except AttributeError:
+        exc = np.ComplexWarning
+
+    raise exc
