@@ -12,7 +12,7 @@ use ruff_db::{
 };
 use ruff_python_ast::{name::Name, PySourceType};
 
-use crate::workspace::files::{Files, IndexedFiles, PackageFiles};
+use crate::workspace::files::{Index, IndexedFiles, PackageFiles};
 use crate::{
     db::Db,
     lint::{lint_semantic, lint_syntax, Diagnostics},
@@ -255,7 +255,7 @@ impl Package {
 
     #[tracing::instrument(level = "debug", skip(db))]
     pub fn remove_file(self, db: &mut dyn Db, file: File) {
-        let Some(mut index) = PackageFiles::index_mut(db, self) else {
+        let Some(mut index) = PackageFiles::indexed_mut(db, self) else {
             return;
         };
 
@@ -264,7 +264,7 @@ impl Package {
 
     #[tracing::instrument(level = "debug", skip(db))]
     pub fn add_file(self, db: &mut dyn Db, file: File) {
-        let Some(mut index) = PackageFiles::index_mut(db, self) else {
+        let Some(mut index) = PackageFiles::indexed_mut(db, self) else {
             return;
         };
 
@@ -288,11 +288,11 @@ impl Package {
         let files = self.file_set(db);
 
         let indexed = match files.get() {
-            Files::Lazy(vacant) => {
+            Index::Lazy(vacant) => {
                 let files = discover_package_files(db, self.root(db));
                 vacant.set(files)
             }
-            Files::Indexed(indexed) => indexed,
+            Index::Indexed(indexed) => indexed,
         };
 
         indexed

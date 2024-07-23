@@ -36,40 +36,36 @@ impl PackageFiles {
         }
     }
 
-    pub fn get(&self) -> Files {
+    pub fn get(&self) -> Index {
         let state = self.state.lock().unwrap();
 
         match &*state {
-            State::Lazy => Files::Lazy(LazyFiles { files: state }),
-            State::Indexed(files) => Files::Indexed(files.clone()),
+            State::Lazy => Index::Lazy(LazyFiles { files: state }),
+            State::Indexed(files) => Index::Indexed(files.clone()),
         }
     }
 
     /// Returns a mutable view on the index that allows cheap in-place mutations.
     ///
     /// The changes are automatically written back to the database once the view is dropped.
-    pub fn index_mut(db: &mut dyn Db, package: Package) -> Option<IndexedFilesMut> {
+    pub fn indexed_mut(db: &mut dyn Db, package: Package) -> Option<IndexedFilesMut> {
         // Calling `runtime_mut` cancels all pending salsa queries. This ensures that there are no pending
         // reads to the file set.
         let _ = db.runtime_mut();
 
         let files = package.file_set(db);
-        let state = files.state.lock().unwrap();
 
-        match &*state {
-            State::Lazy => None,
-            State::Indexed(indexed) => {
-                let indexed = indexed.clone();
-                drop(state);
+        let indexed = match &*files.state.lock().unwrap() {
+            State::Lazy => return None,
+            State::Indexed(indexed) => indexed.clone(),
+        };
 
-                Some(IndexedFilesMut {
-                    db,
-                    package,
-                    new_revision: indexed.revision,
-                    indexed,
-                })
-            }
-        }
+        Some(IndexedFilesMut {
+            db: Some(db),
+            package,
+            new_revision: indexed.revision,
+            indexed,
+        })
     }
 }
 
@@ -88,17 +84,20 @@ enum State {
     Indexed(IndexedFiles),
 }
 
-pub enum Files<'a> {
+pub enum Index<'a> {
+    /// The index has not yet been computed. Allows inserting the files.
     Lazy(LazyFiles<'a>),
+
     Indexed(IndexedFiles),
 }
 
+/// Package files that have not been indexed yet.
 pub struct LazyFiles<'a> {
     files: std::sync::MutexGuard<'a, State>,
 }
 
 impl<'a> LazyFiles<'a> {
-    /// Sets the files of a package to `files`.
+    /// Sets the indexed files of a package to `files`.
     pub fn set(mut self, files: FxHashSet<File>) -> IndexedFiles {
         let files = IndexedFiles::new(files);
         *self.files = State::Indexed(files.clone());
@@ -108,6 +107,7 @@ impl<'a> LazyFiles<'a> {
 
 /// The indexed files of a package.
 ///
+/// # Salsa integration
 /// The type is cheap clonable and allows for in-place mutation of the files. The in-place mutation requires
 /// extra care because the type is used as the result of Salsa queries and Salsa relies on a type's equality
 /// to determine if the output has changed. This is accomplished by using a `revision` that gets incremented
@@ -115,6 +115,7 @@ impl<'a> LazyFiles<'a> {
 /// previous [`IndexedFiles`] with the next [`IndexedFiles`] returns false even though they both
 /// point to the same underlying hash set.
 ///
+/// # Equality
 /// Two [`IndexedFiles`] are only equal if they have the same revision and point to the **same** (identity) hash set.
 #[derive(Debug, Clone)]
 pub struct IndexedFiles {
@@ -169,6 +170,10 @@ impl<'a> IntoIterator for &'a IndexedFilesGuard<'a> {
     }
 }
 
+/// Iterator over the indexed files.
+///
+/// # Locks
+/// Holding on to the iterator locks the file index for reading.
 pub struct IndexedFilesIter<'a> {
     inner: std::collections::hash_set::Iter<'a, File>,
 }
@@ -194,7 +199,7 @@ impl ExactSizeIterator for IndexedFilesIter<'_> {}
 /// Allows in-place mutation of the files without deep cloning the hash set.
 /// The changes are written back when the mutable view is dropped or by calling [`Self::set`] manually.
 pub struct IndexedFilesMut<'db> {
-    db: &'db mut dyn Db,
+    db: Option<&'db mut dyn Db>,
     package: Package,
     indexed: IndexedFiles,
     new_revision: u64,
@@ -225,9 +230,13 @@ impl IndexedFilesMut<'_> {
     }
 
     fn set_impl(&mut self) {
+        let Some(db) = self.db.take() else {
+            return;
+        };
+
         if self.indexed.revision != self.new_revision {
             self.package
-                .set_file_set(self.db)
+                .set_file_set(db)
                 .to(PackageFiles::indexed(IndexedFiles {
                     revision: self.new_revision,
                     files: self.indexed.files.clone(),
