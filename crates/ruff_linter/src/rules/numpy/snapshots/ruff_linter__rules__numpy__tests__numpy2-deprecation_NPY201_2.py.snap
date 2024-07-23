@@ -327,7 +327,7 @@ NPY201_2.py:42:5: NPY201 [*] `np.alltrue` will be removed in NumPy 2.0. Use `num
 44 44 |     np.sometrue([True, False])
 45 45 | 
 
-NPY201_2.py:42:5: NPY201 [*] `np.sometrue` will be removed in NumPy 2.0. Use `numpy.any` instead.
+NPY201_2.py:44:5: NPY201 [*] `np.sometrue` will be removed in NumPy 2.0. Use `numpy.any` instead.
    |
 42 |     np.alltrue([True, True])
 43 | 
