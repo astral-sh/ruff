@@ -12,17 +12,18 @@ use crate::checkers::ast::Checker;
 /// Parentheses are not necessary, may add clutter, and do not affect the semantics.
 ///
 /// ## Example
+///
 /// ```python
-/// directions = {(0,1):"North", (-1,0):"East", (0,-1):"South", (1,0):"West"}
-/// directions[(0,1)]
+/// directions = {(0, 1): "North", (-1, 0): "East", (0, -1): "South", (1, 0): "West"}
+/// directions[(0, 1)]
 /// ```
 ///
 /// Use instead:
-/// ```python
-/// directions = {(0,1):"North", (-1,0):"East", (0,-1):"South", (1,0):"West"}
-/// directions[0,1]
-/// ```
 ///
+/// ```python
+/// directions = {(0, 1): "North", (-1, 0): "East", (0, -1): "South", (1, 0): "West"}
+/// directions[0, 1]
+/// ```
 
 #[violation]
 pub struct ParenthesesInTupleSlices;
