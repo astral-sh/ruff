@@ -5,8 +5,9 @@ use bitflags::bitflags;
 
 use crate::all::DunderAllName;
 use ruff_index::{newtype_index, IndexSlice, IndexVec};
+use ruff_python_ast::helpers::extract_handled_exceptions;
 use ruff_python_ast::name::QualifiedName;
-use ruff_python_ast::Stmt;
+use ruff_python_ast::{self as ast, Stmt};
 use ruff_source_file::Locator;
 use ruff_text_size::{Ranged, TextRange};
 
@@ -579,6 +580,26 @@ bitflags! {
         const NAME_ERROR = 0b0000_0001;
         const MODULE_NOT_FOUND_ERROR = 0b0000_0010;
         const IMPORT_ERROR = 0b0000_0100;
+        const ATTRIBUTE_ERROR = 0b000_100;
+    }
+}
+
+impl Exceptions {
+    pub fn from_try_stmt(
+        ast::StmtTry { handlers, .. }: &ast::StmtTry,
+        semantic: &SemanticModel,
+    ) -> Self {
+        let mut handled_exceptions = Self::empty();
+        for type_ in extract_handled_exceptions(handlers) {
+            handled_exceptions |= match semantic.resolve_builtin_symbol(type_) {
+                Some("NameError") => Self::NAME_ERROR,
+                Some("ModuleNotFoundError") => Self::MODULE_NOT_FOUND_ERROR,
+                Some("ImportError") => Self::IMPORT_ERROR,
+                Some("AttributeError") => Self::ATTRIBUTE_ERROR,
+                _ => continue,
+            }
+        }
+        handled_exceptions
     }
 }
 

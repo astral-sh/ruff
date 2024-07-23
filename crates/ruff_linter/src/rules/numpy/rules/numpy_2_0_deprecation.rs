@@ -1,7 +1,9 @@
 use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::Expr;
-use ruff_python_semantic::Modules;
+use ruff_python_ast::name::{QualifiedName, QualifiedNameBuilder};
+use ruff_python_ast::visitor::Visitor;
+use ruff_python_ast::{self as ast, Expr};
+use ruff_python_semantic::{Exceptions, Modules, SemanticModel};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
@@ -665,6 +667,10 @@ pub(crate) fn numpy_2_0_deprecation(checker: &mut Checker, expr: &Expr) {
         _ => return,
     };
 
+    if is_guarded_by_try_except(expr, &replacement, semantic) {
+        return;
+    }
+
     let mut diagnostic = Diagnostic::new(
         Numpy2Deprecation {
             existing: replacement.existing.to_string(),
@@ -700,4 +706,101 @@ pub(crate) fn numpy_2_0_deprecation(checker: &mut Checker, expr: &Expr) {
         Details::Manual { guideline: _ } => {}
     };
     checker.diagnostics.push(diagnostic);
+}
+
+fn is_guarded_by_try_except(
+    expr: &Expr,
+    replacement: &Replacement,
+    semantic: &SemanticModel,
+) -> bool {
+    if !semantic.in_exception_handler() {
+        return false;
+    }
+
+    match expr {
+        Expr::Attribute(_) => {
+            let Some(try_node) = find_try_node(semantic) else {
+                return false;
+            };
+            let handled_exceptions = Exceptions::from_try_stmt(try_node, semantic);
+            if !handled_exceptions.contains(Exceptions::ATTRIBUTE_ERROR) {
+                return false;
+            }
+            try_block_contains_undeprecated_attribute(try_node, &replacement.details, semantic)
+        }
+        _ => false,
+    }
+}
+
+fn find_try_node<'a>(semantic: &'a SemanticModel) -> Option<&'a ast::StmtTry> {
+    semantic
+        .current_statements()
+        .find_map(|stmt| stmt.as_try_stmt())
+}
+
+fn undeprecated_qualified_name<'a>(path: &'a str, name: &'a str) -> QualifiedName<'a> {
+    let mut builder = QualifiedNameBuilder::default();
+    for part in path.split('.') {
+        builder.push(part);
+    }
+    builder.push(name);
+    builder.build()
+}
+
+fn try_block_contains_undeprecated_attribute(
+    try_node: &ast::StmtTry,
+    replacement_details: &Details,
+    semantic: &SemanticModel,
+) -> bool {
+    let Details::AutoImport {
+        path,
+        name,
+        compatibility: _,
+    } = replacement_details
+    else {
+        return false;
+    };
+    let undeprecated_qualified_name = undeprecated_qualified_name(path, name);
+    let mut attribute_searcher = AttributeSearcher::new(undeprecated_qualified_name, semantic);
+    for stmt in &try_node.body {
+        attribute_searcher.visit_stmt(stmt);
+        if attribute_searcher.found_attribute {
+            return true;
+        }
+    }
+    false
+}
+
+struct AttributeSearcher<'a> {
+    attribute_to_find: QualifiedName<'a>,
+    semantic: &'a SemanticModel<'a>,
+    found_attribute: bool,
+}
+
+impl<'a> AttributeSearcher<'a> {
+    fn new(attribute_to_find: QualifiedName<'a>, semantic: &'a SemanticModel<'a>) -> Self {
+        Self {
+            attribute_to_find,
+            semantic,
+            found_attribute: false,
+        }
+    }
+}
+
+impl Visitor<'_> for AttributeSearcher<'_> {
+    fn visit_expr(&mut self, expr: &'_ Expr) {
+        if self.found_attribute {
+            return;
+        }
+        if expr.is_attribute_expr()
+            && self
+                .semantic
+                .resolve_qualified_name(expr)
+                .is_some_and(|qualified_name| qualified_name == self.attribute_to_find)
+        {
+            self.found_attribute = true;
+            return;
+        }
+        ast::visitor::walk_expr(self, expr);
+    }
 }

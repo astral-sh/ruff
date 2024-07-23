@@ -58,8 +58,19 @@ def func():
     np.compare_chararrays
 
     try:
+        np.all([True, True])
+    except TypeError:
+        np.alltrue([True, True])  # Should emit a warning here (`except TypeError`, not `except AttributeError`)
+
+    try:
+        np.anyyyy([True, True])
+    except AttributeError:
+        np.sometrue([True, True])  # Should emit a warning here
+                                   # (must have an attribute access of the undeprecated name in the `try` body for it to be ignored)
+
+    try:
         exc = np.exceptions.ComplexWarning
     except AttributeError:
-        exc = np.ComplexWarning
+        exc = np.ComplexWarning   # `except AttributeError` means that this is okay
 
     raise exc

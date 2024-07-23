@@ -482,6 +482,7 @@ NPY201_2.py:56:5: NPY201 [*] `np.ComplexWarning` will be removed in NumPy 2.0. U
    57 |+    ComplexWarning
 57 58 | 
 58 59 |     np.compare_chararrays
+59 60 | 
 
 NPY201_2.py:58:5: NPY201 [*] `np.compare_chararrays` will be removed in NumPy 2.0. Use `numpy.char.compare_chararrays` instead.
    |
@@ -489,6 +490,8 @@ NPY201_2.py:58:5: NPY201 [*] `np.compare_chararrays` will be removed in NumPy 2.
 57 | 
 58 |     np.compare_chararrays
    |     ^^^^^^^^^^^^^^^^^^^^^ NPY201
+59 | 
+60 |     try:
    |
    = help: Replace with `numpy.char.compare_chararrays`
 
@@ -503,3 +506,47 @@ NPY201_2.py:58:5: NPY201 [*] `np.compare_chararrays` will be removed in NumPy 2.
 57 58 | 
 58    |-    np.compare_chararrays
    59 |+    compare_chararrays
+59 60 | 
+60 61 |     try:
+61 62 |         np.all([True, True])
+
+NPY201_2.py:63:9: NPY201 [*] `np.alltrue` will be removed in NumPy 2.0. Use `numpy.all` instead.
+   |
+61 |         np.all([True, True])
+62 |     except TypeError:
+63 |         np.alltrue([True, True])  # Should emit a warning here (`except TypeError`, not `except AttributeError`)
+   |         ^^^^^^^^^^ NPY201
+64 | 
+65 |     try:
+   |
+   = help: Replace with `numpy.all`
+
+ℹ Safe fix
+60 60 |     try:
+61 61 |         np.all([True, True])
+62 62 |     except TypeError:
+63    |-        np.alltrue([True, True])  # Should emit a warning here (`except TypeError`, not `except AttributeError`)
+   63 |+        np.all([True, True])  # Should emit a warning here (`except TypeError`, not `except AttributeError`)
+64 64 | 
+65 65 |     try:
+66 66 |         np.anyyyy([True, True])
+
+NPY201_2.py:68:9: NPY201 [*] `np.sometrue` will be removed in NumPy 2.0. Use `numpy.any` instead.
+   |
+66 |         np.anyyyy([True, True])
+67 |     except AttributeError:
+68 |         np.sometrue([True, True])  # Should emit a warning here
+   |         ^^^^^^^^^^^ NPY201
+69 |                                    # (must have an attribute access of the undeprecated name in the `try` body for it to be ignored)
+   |
+   = help: Replace with `numpy.any`
+
+ℹ Safe fix
+65 65 |     try:
+66 66 |         np.anyyyy([True, True])
+67 67 |     except AttributeError:
+68    |-        np.sometrue([True, True])  # Should emit a warning here
+   68 |+        np.any([True, True])  # Should emit a warning here
+69 69 |                                    # (must have an attribute access of the undeprecated name in the `try` body for it to be ignored)
+70 70 | 
+71 71 |     try:
