@@ -19,7 +19,8 @@ pub mod system;
 pub mod testing;
 pub mod vendored;
 
-pub(crate) type FxDashMap<K, V> = dashmap::DashMap<K, V, BuildHasherDefault<FxHasher>>;
+pub type FxDashMap<K, V> = dashmap::DashMap<K, V, BuildHasherDefault<FxHasher>>;
+pub type FxDashSet<K> = dashmap::DashSet<K, BuildHasherDefault<FxHasher>>;
 
 #[salsa::jar(db=Db)]
 pub struct Jar(File, Program, source_text, line_index, parsed_module);

@@ -1,5 +1,5 @@
 // TODO: Fix clippy warnings created by salsa macros
-#![allow(clippy::used_underscore_binding)]
+#![allow(clippy::used_underscore_binding, unreachable_pub)]
 
 use std::{collections::BTreeMap, sync::Arc};
 
@@ -12,11 +12,13 @@ use ruff_db::{
 };
 use ruff_python_ast::{name::Name, PySourceType};
 
+use crate::workspace::files::{Index, IndexedFiles, PackageFiles};
 use crate::{
     db::Db,
     lint::{lint_semantic, lint_syntax, Diagnostics},
 };
 
+mod files;
 mod metadata;
 
 /// The project workspace as a Salsa ingredient.
@@ -93,7 +95,7 @@ pub struct Package {
 
     /// The files that are part of this package.
     #[return_ref]
-    file_set: Arc<FxHashSet<File>>,
+    file_set: PackageFiles,
     // TODO: Add the loaded settings.
 }
 
@@ -240,6 +242,7 @@ impl Workspace {
     }
 }
 
+#[salsa::tracked]
 impl Package {
     pub fn root(self, db: &dyn Db) -> &SystemPath {
         self.root_buf(db)
@@ -247,73 +250,69 @@ impl Package {
 
     /// Returns `true` if `file` is a first-party file part of this package.
     pub fn contains_file(self, db: &dyn Db, file: File) -> bool {
-        self.files(db).contains(&file)
-    }
-
-    pub fn files(self, db: &dyn Db) -> &FxHashSet<File> {
-        self.file_set(db)
+        self.files(db).read().contains(&file)
     }
 
     #[tracing::instrument(level = "debug", skip(db))]
-    pub fn remove_file(self, db: &mut dyn Db, file: File) -> bool {
-        let mut files_arc = self.file_set(db).clone();
+    pub fn remove_file(self, db: &mut dyn Db, file: File) {
+        let Some(mut index) = PackageFiles::indexed_mut(db, self) else {
+            return;
+        };
 
-        // Set a dummy value. Salsa will cancel any pending queries and remove its own reference to `files`
-        // so that the reference counter to `files` now drops to 1.
-        self.set_file_set(db).to(Arc::new(FxHashSet::default()));
-
-        let files = Arc::get_mut(&mut files_arc).unwrap();
-        let removed = files.remove(&file);
-        self.set_file_set(db).to(files_arc);
-
-        removed
+        index.remove(file);
     }
 
     #[tracing::instrument(level = "debug", skip(db))]
-    pub fn add_file(self, db: &mut dyn Db, file: File) -> bool {
-        let mut files_arc = self.file_set(db).clone();
+    pub fn add_file(self, db: &mut dyn Db, file: File) {
+        let Some(mut index) = PackageFiles::indexed_mut(db, self) else {
+            return;
+        };
 
-        // Set a dummy value. Salsa will cancel any pending queries and remove its own reference to `files`
-        // so that the reference counter to `files` now drops to 1.
-        self.set_file_set(db).to(Arc::new(FxHashSet::default()));
-
-        let files = Arc::get_mut(&mut files_arc).unwrap();
-        let added = files.insert(file);
-        self.set_file_set(db).to(files_arc);
-
-        added
+        index.insert(file);
     }
 
     #[tracing::instrument(level = "debug", skip(db))]
     pub(crate) fn check(self, db: &dyn Db) -> Vec<String> {
         let mut result = Vec::new();
-        for file in self.files(db) {
-            let diagnostics = check_file(db, *file);
+        for file in &self.files(db).read() {
+            let diagnostics = check_file(db, file);
             result.extend_from_slice(&diagnostics);
         }
 
         result
     }
 
-    fn from_metadata(db: &dyn Db, metadata: PackageMetadata) -> Self {
-        let files = discover_package_files(db, metadata.root());
+    /// Returns the files belonging to this package.
+    #[salsa::tracked]
+    pub fn files(self, db: &dyn Db) -> IndexedFiles {
+        let files = self.file_set(db);
 
-        Self::new(db, metadata.name, metadata.root, Arc::new(files))
+        let indexed = match files.get() {
+            Index::Lazy(vacant) => {
+                let files = discover_package_files(db, self.root(db));
+                vacant.set(files)
+            }
+            Index::Indexed(indexed) => indexed,
+        };
+
+        indexed
+    }
+
+    fn from_metadata(db: &dyn Db, metadata: PackageMetadata) -> Self {
+        Self::new(db, metadata.name, metadata.root, PackageFiles::default())
     }
 
     fn update(self, db: &mut dyn Db, metadata: PackageMetadata) {
         let root = self.root(db);
         assert_eq!(root, metadata.root());
 
-        self.reload_files(db);
         self.set_name(db).to(metadata.name);
     }
 
     #[tracing::instrument(level = "debug", skip(db))]
     pub fn reload_files(self, db: &mut dyn Db) {
-        let files = discover_package_files(db, self.root(db));
-
-        self.set_file_set(db).to(Arc::new(files));
+        // Force a re-index of the files in the next revision.
+        self.set_file_set(db).to(PackageFiles::lazy());
     }
 }
 
