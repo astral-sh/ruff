@@ -14,9 +14,10 @@ use ruff_db::files::File;
 ///
 /// ## Implementation
 /// The implementation uses internal mutability to transition between the lazy and indexed state
-/// without triggering a new salsa revision. The internal mutability **must not** be used for any
-/// other state transition that requires invalidating dependent salsa queries (e.g. adding or removing
-/// files from the index **must** go through the salsa setter to let salsa know about the input change).
+/// without triggering a new salsa revision. This is safe because the initial indexing happens on first access,
+/// so no query can be depending on the contents of the indexed files before that. All subsequent mutations to
+/// the indexed files must go through `IndexedFilesMut`, which uses the Salsa setter `package.set_file_set` to
+/// ensure that Salsa always knows when the set of indexed files have changed.
 #[derive(Debug)]
 pub struct PackageFiles {
     state: std::sync::Mutex<State>,
