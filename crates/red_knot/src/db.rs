@@ -217,16 +217,25 @@ pub(crate) mod tests {
         fn upcast(&self) -> &(dyn SemanticDb + 'static) {
             self
         }
+        fn upcast_mut(&mut self) -> &mut (dyn SemanticDb + 'static) {
+            self
+        }
     }
 
     impl Upcast<dyn SourceDb> for TestDb {
         fn upcast(&self) -> &(dyn SourceDb + 'static) {
             self
         }
+        fn upcast_mut(&mut self) -> &mut (dyn SourceDb + 'static) {
+            self
+        }
     }
 
     impl Upcast<dyn ResolverDb> for TestDb {
         fn upcast(&self) -> &(dyn ResolverDb + 'static) {
+            self
+        }
+        fn upcast_mut(&mut self) -> &mut (dyn ResolverDb + 'static) {
             self
         }
     }
