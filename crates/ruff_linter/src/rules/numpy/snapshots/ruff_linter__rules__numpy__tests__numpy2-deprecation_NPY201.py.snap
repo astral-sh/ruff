@@ -570,6 +570,8 @@ NPY201.py:72:5: NPY201 [*] `np.NAN` will be removed in NumPy 2.0. Use `numpy.nan
 71 | 
 72 |     np.NAN
    |     ^^^^^^ NPY201
+73 | 
+74 |     try:
    |
    = help: Replace with `numpy.nan`
 
@@ -579,3 +581,6 @@ NPY201.py:72:5: NPY201 [*] `np.NAN` will be removed in NumPy 2.0. Use `numpy.nan
 71 71 | 
 72    |-    np.NAN
    72 |+    np.nan
+73 73 | 
+74 74 |     try:
+75 75 |         from numpy.lib.npyio import DataSource

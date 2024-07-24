@@ -33,9 +33,7 @@ use log::debug;
 
 use ruff_diagnostics::{Diagnostic, IsolationLevel};
 use ruff_notebook::{CellOffsets, NotebookIndex};
-use ruff_python_ast::helpers::{
-    collect_import_from_member, extract_handled_exceptions, is_docstring_stmt, to_module_path,
-};
+use ruff_python_ast::helpers::{collect_import_from_member, is_docstring_stmt, to_module_path};
 use ruff_python_ast::identifier::Identifier;
 use ruff_python_ast::name::QualifiedName;
 use ruff_python_ast::str::Quote;
@@ -834,32 +832,22 @@ impl<'a> Visitor<'a> for Checker<'a> {
                 self.semantic.pop_scope();
                 self.visit_expr(name);
             }
-            Stmt::Try(ast::StmtTry {
-                body,
-                handlers,
-                orelse,
-                finalbody,
-                ..
-            }) => {
-                let mut handled_exceptions = Exceptions::empty();
-                for type_ in extract_handled_exceptions(handlers) {
-                    if let Some(builtins_name) = self.semantic.resolve_builtin_symbol(type_) {
-                        match builtins_name {
-                            "NameError" => handled_exceptions |= Exceptions::NAME_ERROR,
-                            "ModuleNotFoundError" => {
-                                handled_exceptions |= Exceptions::MODULE_NOT_FOUND_ERROR;
-                            }
-                            "ImportError" => handled_exceptions |= Exceptions::IMPORT_ERROR,
-                            _ => {}
-                        }
-                    }
-                }
-
+            Stmt::Try(
+                try_node @ ast::StmtTry {
+                    body,
+                    handlers,
+                    orelse,
+                    finalbody,
+                    ..
+                },
+            ) => {
                 // Iterate over the `body`, then the `handlers`, then the `orelse`, then the
                 // `finalbody`, but treat the body and the `orelse` as a single branch for
                 // flow analysis purposes.
                 let branch = self.semantic.push_branch();
-                self.semantic.handled_exceptions.push(handled_exceptions);
+                self.semantic
+                    .handled_exceptions
+                    .push(Exceptions::from_try_stmt(try_node, &self.semantic));
                 self.visit_body(body);
                 self.semantic.handled_exceptions.pop();
                 self.semantic.pop_branch();
@@ -1837,7 +1825,7 @@ impl<'a> Checker<'a> {
         name: &'a str,
         range: TextRange,
         kind: BindingKind<'a>,
-        flags: BindingFlags,
+        mut flags: BindingFlags,
     ) -> BindingId {
         // Determine the scope to which the binding belongs.
         // Per [PEP 572](https://peps.python.org/pep-0572/#scope-of-the-target), named
@@ -1852,6 +1840,10 @@ impl<'a> Checker<'a> {
         } else {
             self.semantic.scope_id
         };
+
+        if self.semantic.in_exception_handler() {
+            flags |= BindingFlags::IN_EXCEPT_HANDLER;
+        }
 
         // Create the `Binding`.
         let binding_id = self.semantic.push_binding(range, kind, flags);

@@ -1,7 +1,10 @@
 use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::Expr;
-use ruff_python_semantic::Modules;
+use ruff_python_ast::name::{QualifiedName, QualifiedNameBuilder};
+use ruff_python_ast::statement_visitor::StatementVisitor;
+use ruff_python_ast::visitor::Visitor;
+use ruff_python_ast::{self as ast, Expr};
+use ruff_python_semantic::{Exceptions, Modules, SemanticModel};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
@@ -665,6 +668,10 @@ pub(crate) fn numpy_2_0_deprecation(checker: &mut Checker, expr: &Expr) {
         _ => return,
     };
 
+    if is_guarded_by_try_except(expr, &replacement, semantic) {
+        return;
+    }
+
     let mut diagnostic = Diagnostic::new(
         Numpy2Deprecation {
             existing: replacement.existing.to_string(),
@@ -700,4 +707,234 @@ pub(crate) fn numpy_2_0_deprecation(checker: &mut Checker, expr: &Expr) {
         Details::Manual { guideline: _ } => {}
     };
     checker.diagnostics.push(diagnostic);
+}
+
+/// Ignore attempts to access a `numpy` member via its deprecated name
+/// if the access takes place in an `except` block that provides compatibility
+/// with older numpy versions.
+///
+/// For attribute accesses (e.g. `np.ComplexWarning`), we only ignore the violation
+/// if it's inside an `except AttributeError` block, and the member is accessed
+/// through its non-deprecated name in the associated `try` block.
+///
+/// For uses of the `numpy` member where it's simply an `ExprName` node,
+/// we check to see how the `numpy` member was bound. If it was bound via a
+/// `from numpy import foo` statement, we check to see if that import statement
+/// took place inside an `except ImportError` or `except ModuleNotFoundError` block.
+/// If so, and if the `numpy` member was imported through its non-deprecated name
+/// in the associated try block, we ignore the violation in the same way.
+///
+/// Examples:
+///
+/// ```py
+/// import numpy as np
+///
+/// try:
+///     np.all([True, True])
+/// except AttributeError:
+///     np.alltrue([True, True])  # Okay
+///
+/// try:
+///     from numpy.exceptions import ComplexWarning
+/// except ImportError:
+///     from numpy import ComplexWarning
+///
+/// x = ComplexWarning()  # Okay
+/// ```
+fn is_guarded_by_try_except(
+    expr: &Expr,
+    replacement: &Replacement,
+    semantic: &SemanticModel,
+) -> bool {
+    match expr {
+        Expr::Attribute(_) => {
+            if !semantic.in_exception_handler() {
+                return false;
+            }
+            let Some(try_node) = semantic
+                .current_statements()
+                .find_map(|stmt| stmt.as_try_stmt())
+            else {
+                return false;
+            };
+            let suspended_exceptions = Exceptions::from_try_stmt(try_node, semantic);
+            if !suspended_exceptions.contains(Exceptions::ATTRIBUTE_ERROR) {
+                return false;
+            }
+            try_block_contains_undeprecated_attribute(try_node, &replacement.details, semantic)
+        }
+        Expr::Name(ast::ExprName { id, .. }) => {
+            let Some(binding_id) = semantic.lookup_symbol(id.as_str()) else {
+                return false;
+            };
+            let binding = semantic.binding(binding_id);
+            if !binding.is_external() {
+                return false;
+            }
+            if !binding.in_exception_handler() {
+                return false;
+            }
+            let Some(try_node) = binding.source.and_then(|import_id| {
+                semantic
+                    .statements(import_id)
+                    .find_map(|stmt| stmt.as_try_stmt())
+            }) else {
+                return false;
+            };
+            let suspended_exceptions = Exceptions::from_try_stmt(try_node, semantic);
+            if !suspended_exceptions
+                .intersects(Exceptions::IMPORT_ERROR | Exceptions::MODULE_NOT_FOUND_ERROR)
+            {
+                return false;
+            }
+            try_block_contains_undeprecated_import(try_node, &replacement.details)
+        }
+        _ => false,
+    }
+}
+
+/// Given an [`ast::StmtTry`] node, does the `try` branch of that node
+/// contain any [`ast::ExprAttribute`] nodes that indicate the numpy
+/// member is being accessed from the non-deprecated location?
+fn try_block_contains_undeprecated_attribute(
+    try_node: &ast::StmtTry,
+    replacement_details: &Details,
+    semantic: &SemanticModel,
+) -> bool {
+    let Details::AutoImport {
+        path,
+        name,
+        compatibility: _,
+    } = replacement_details
+    else {
+        return false;
+    };
+    let undeprecated_qualified_name = {
+        let mut builder = QualifiedNameBuilder::default();
+        for part in path.split('.') {
+            builder.push(part);
+        }
+        builder.push(name);
+        builder.build()
+    };
+    let mut attribute_searcher = AttributeSearcher::new(undeprecated_qualified_name, semantic);
+    attribute_searcher.visit_body(&try_node.body);
+    attribute_searcher.found_attribute
+}
+
+/// AST visitor that searches an AST tree for [`ast::ExprAttribute`] nodes
+/// that match a certain [`QualifiedName`].
+struct AttributeSearcher<'a> {
+    attribute_to_find: QualifiedName<'a>,
+    semantic: &'a SemanticModel<'a>,
+    found_attribute: bool,
+}
+
+impl<'a> AttributeSearcher<'a> {
+    fn new(attribute_to_find: QualifiedName<'a>, semantic: &'a SemanticModel<'a>) -> Self {
+        Self {
+            attribute_to_find,
+            semantic,
+            found_attribute: false,
+        }
+    }
+}
+
+impl Visitor<'_> for AttributeSearcher<'_> {
+    fn visit_expr(&mut self, expr: &'_ Expr) {
+        if self.found_attribute {
+            return;
+        }
+        if expr.is_attribute_expr()
+            && self
+                .semantic
+                .resolve_qualified_name(expr)
+                .is_some_and(|qualified_name| qualified_name == self.attribute_to_find)
+        {
+            self.found_attribute = true;
+            return;
+        }
+        ast::visitor::walk_expr(self, expr);
+    }
+
+    fn visit_stmt(&mut self, stmt: &ruff_python_ast::Stmt) {
+        if !self.found_attribute {
+            ast::visitor::walk_stmt(self, stmt);
+        }
+    }
+
+    fn visit_body(&mut self, body: &[ruff_python_ast::Stmt]) {
+        for stmt in body {
+            self.visit_stmt(stmt);
+            if self.found_attribute {
+                return;
+            }
+        }
+    }
+}
+
+/// Given an [`ast::StmtTry`] node, does the `try` branch of that node
+/// contain any [`ast::StmtImportFrom`] nodes that indicate the numpy
+/// member is being imported from the non-deprecated location?
+fn try_block_contains_undeprecated_import(
+    try_node: &ast::StmtTry,
+    replacement_details: &Details,
+) -> bool {
+    let Details::AutoImport {
+        path,
+        name,
+        compatibility: _,
+    } = replacement_details
+    else {
+        return false;
+    };
+    let mut import_searcher = ImportSearcher::new(path, name);
+    import_searcher.visit_body(&try_node.body);
+    import_searcher.found_import
+}
+
+/// AST visitor that searches an AST tree for [`ast::StmtImportFrom`] nodes
+/// that match a certain [`QualifiedName`].
+struct ImportSearcher<'a> {
+    module: &'a str,
+    name: &'a str,
+    found_import: bool,
+}
+
+impl<'a> ImportSearcher<'a> {
+    fn new(module: &'a str, name: &'a str) -> Self {
+        Self {
+            module,
+            name,
+            found_import: false,
+        }
+    }
+}
+
+impl StatementVisitor<'_> for ImportSearcher<'_> {
+    fn visit_stmt(&mut self, stmt: &ast::Stmt) {
+        if self.found_import {
+            return;
+        }
+        if let ast::Stmt::ImportFrom(ast::StmtImportFrom { module, names, .. }) = stmt {
+            if module.as_ref().is_some_and(|module| module == self.module)
+                && names
+                    .iter()
+                    .any(|ast::Alias { name, .. }| name == self.name)
+            {
+                self.found_import = true;
+                return;
+            }
+        }
+        ast::statement_visitor::walk_stmt(self, stmt);
+    }
+
+    fn visit_body(&mut self, body: &[ruff_python_ast::Stmt]) {
+        for stmt in body {
+            self.visit_stmt(stmt);
+            if self.found_import {
+                return;
+            }
+        }
+    }
 }

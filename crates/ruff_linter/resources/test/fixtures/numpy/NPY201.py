@@ -70,3 +70,20 @@ def func():
     np.lookfor
 
     np.NAN
+
+    try:
+        from numpy.lib.npyio import DataSource
+    except ImportError:
+        from numpy import DataSource
+
+    DataSource("foo").abspath()  # fine (`except ImportError` branch)
+
+    try:
+        from numpy.rec import format_parser
+        from numpy import clongdouble
+    except ModuleNotFoundError:
+        from numpy import format_parser
+        from numpy import longcomplex as clongdouble
+
+    format_parser("foo")  # fine (`except ModuleNotFoundError` branch)
+    clongdouble(42)  # fine (`except ModuleNotFoundError` branch)

@@ -124,7 +124,21 @@ pub struct SemanticModel<'a> {
     /// Modules that have been seen by the semantic model.
     pub seen: Modules,
 
-    /// Exceptions that have been handled by the current scope.
+    /// Exceptions that are handled by the current `try` block.
+    ///
+    /// For example, if we're visiting the `x = 1` assignment below,
+    /// `AttributeError` is considered to be a "handled exception",
+    /// but `TypeError` is not:
+    ///
+    /// ```py
+    /// try:
+    ///     try:
+    ///         foo()
+    ///     except TypeError:
+    ///         pass
+    /// except AttributeError:
+    ///     pass
+    /// ```
     pub handled_exceptions: Vec<Exceptions>,
 
     /// Map from [`ast::ExprName`] node (represented as a [`NameId`]) to the [`Binding`] to which
@@ -1191,6 +1205,14 @@ impl<'a> SemanticModel<'a> {
             .ancestor_ids(node_id)
             .find_map(|id| self.nodes[id].as_statement())
             .expect("No statement found")
+    }
+
+    /// Returns an [`Iterator`] over the statements, starting from the given [`NodeId`].
+    /// through to any parents.
+    pub fn statements(&self, node_id: NodeId) -> impl Iterator<Item = &'a Stmt> + '_ {
+        self.nodes
+            .ancestor_ids(node_id)
+            .filter_map(move |id| self.nodes[id].as_statement())
     }
 
     /// Given a [`Stmt`], return its parent, if any.
