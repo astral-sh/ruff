@@ -1207,6 +1207,14 @@ impl<'a> SemanticModel<'a> {
             .expect("No statement found")
     }
 
+    /// Returns an [`Iterator`] over the statements, starting from the given [`NodeId`].
+    /// through to any parents.
+    pub fn statements(&self, node_id: NodeId) -> impl Iterator<Item = &'a Stmt> + '_ {
+        self.nodes
+            .ancestor_ids(node_id)
+            .filter_map(move |id| self.nodes[id].as_statement())
+    }
+
     /// Given a [`Stmt`], return its parent, if any.
     #[inline]
     pub fn parent_statement(&self, node_id: NodeId) -> Option<&'a Stmt> {

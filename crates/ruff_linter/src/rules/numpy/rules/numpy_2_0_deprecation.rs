@@ -4,7 +4,7 @@ use ruff_python_ast::name::{QualifiedName, QualifiedNameBuilder};
 use ruff_python_ast::statement_visitor::StatementVisitor;
 use ruff_python_ast::visitor::Visitor;
 use ruff_python_ast::{self as ast, Expr};
-use ruff_python_semantic::{Exceptions, Modules, NodeId, SemanticModel};
+use ruff_python_semantic::{Exceptions, Modules, SemanticModel};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
@@ -774,10 +774,11 @@ fn is_guarded_by_try_except(
             if !binding.in_exception_handler() {
                 return false;
             }
-            let Some(try_node) = binding
-                .source
-                .and_then(|import_id| enclosing_try_node(import_id, semantic))
-            else {
+            let Some(try_node) = binding.source.and_then(|import_id| {
+                semantic
+                    .statements(import_id)
+                    .find_map(|stmt| stmt.as_try_stmt())
+            }) else {
                 return false;
             };
             let suspended_exceptions = Exceptions::from_try_stmt(try_node, semantic);
@@ -789,21 +790,6 @@ fn is_guarded_by_try_except(
             try_block_contains_undeprecated_import(try_node, &replacement.details)
         }
         _ => false,
-    }
-}
-
-/// Given the `NodeId` of a node that is known to be inside an exception handler,
-/// find the [`ast::StmtTry`] node in which the node resides.
-fn enclosing_try_node<'a>(
-    node_id: NodeId,
-    semantic: &'a SemanticModel,
-) -> Option<&'a ast::StmtTry> {
-    let mut node_id = node_id;
-    loop {
-        node_id = semantic.parent_statement_id(node_id)?;
-        if let ast::Stmt::Try(try_node) = semantic.statement(node_id) {
-            return Some(try_node);
-        }
     }
 }
 
@@ -832,13 +818,8 @@ fn try_block_contains_undeprecated_attribute(
         builder.build()
     };
     let mut attribute_searcher = AttributeSearcher::new(undeprecated_qualified_name, semantic);
-    for stmt in &try_node.body {
-        attribute_searcher.visit_stmt(stmt);
-        if attribute_searcher.found_attribute {
-            return true;
-        }
-    }
-    false
+    attribute_searcher.visit_body(&try_node.body);
+    attribute_searcher.found_attribute
 }
 
 /// AST visitor that searches an AST tree for [`ast::ExprAttribute`] nodes
@@ -877,10 +858,18 @@ impl Visitor<'_> for AttributeSearcher<'_> {
     }
 
     fn visit_stmt(&mut self, stmt: &ruff_python_ast::Stmt) {
-        if self.found_attribute {
-            return;
+        if !self.found_attribute {
+            ast::visitor::walk_stmt(self, stmt);
         }
-        ast::visitor::walk_stmt(self, stmt);
+    }
+
+    fn visit_body(&mut self, body: &[ruff_python_ast::Stmt]) {
+        for stmt in body {
+            self.visit_stmt(stmt);
+            if self.found_attribute {
+                return;
+            }
+        }
     }
 }
 
@@ -900,13 +889,8 @@ fn try_block_contains_undeprecated_import(
         return false;
     };
     let mut import_searcher = ImportSearcher::new(path, name);
-    for stmt in &try_node.body {
-        import_searcher.visit_stmt(stmt);
-        if import_searcher.found_import {
-            return true;
-        }
-    }
-    false
+    import_searcher.visit_body(&try_node.body);
+    import_searcher.found_import
 }
 
 /// AST visitor that searches an AST tree for [`ast::StmtImportFrom`] nodes
@@ -943,5 +927,14 @@ impl StatementVisitor<'_> for ImportSearcher<'_> {
             }
         }
         ast::statement_visitor::walk_stmt(self, stmt);
+    }
+
+    fn visit_body(&mut self, body: &[ruff_python_ast::Stmt]) {
+        for stmt in body {
+            self.visit_stmt(stmt);
+            if self.found_import {
+                return;
+            }
+        }
     }
 }
