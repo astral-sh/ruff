@@ -62,9 +62,8 @@ impl Violation for DocstringMissingReturns {
 /// needing one.
 ///
 /// ## Why is this bad?
-/// Some functions should not have a returns section in their docstrings.
-/// This includes methods with a `@property` decorator and functions without
-/// an explicit return.
+/// Functions without an explicit return should not have a returns section
+/// in their docstrings.
 ///
 /// ## Example
 /// ```python
