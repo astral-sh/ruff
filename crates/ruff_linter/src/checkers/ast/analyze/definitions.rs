@@ -84,6 +84,8 @@ pub(crate) fn definitions(checker: &mut Checker) {
         Rule::UndocumentedPublicPackage,
     ]);
     let enforce_pydoclint = checker.any_enabled(&[
+        Rule::DocstringMissingReturns,
+        Rule::DocstringExtraneousReturns,
         Rule::DocstringMissingException,
         Rule::DocstringExtraneousException,
     ]);
