@@ -890,24 +890,24 @@ impl ModuleSearchPath {
     #[must_use]
     pub(crate) fn as_system_path(&self) -> Option<&SystemPathBuf> {
         match &self.0 {
-            ModuleSearchPathInner::Extra(path) => Some(&*path.0),
-            ModuleSearchPathInner::FirstParty(path) => Some(&*path.0),
-            ModuleSearchPathInner::StandardLibraryCustom(path) => Some(&*path.0),
+            ModuleSearchPathInner::Extra(path)
+            | ModuleSearchPathInner::FirstParty(path)
+            | ModuleSearchPathInner::StandardLibraryCustom(path)
+            | ModuleSearchPathInner::SitePackages(path)
+            | ModuleSearchPathInner::Editable(path) => Some(&*path.0),
             ModuleSearchPathInner::StandardLibraryVendored(_) => None,
-            ModuleSearchPathInner::SitePackages(path) => Some(&*path.0),
-            ModuleSearchPathInner::Editable(path) => Some(&*path.0),
         }
     }
 
     #[must_use]
     pub(crate) fn as_vendored_path(&self) -> Option<&VendoredPathBuf> {
         match &self.0 {
-            ModuleSearchPathInner::Extra(_) => None,
-            ModuleSearchPathInner::FirstParty(_) => None,
-            ModuleSearchPathInner::StandardLibraryCustom(_) => None,
             ModuleSearchPathInner::StandardLibraryVendored(path) => Some(&*path.0),
-            ModuleSearchPathInner::SitePackages(_) => None,
-            ModuleSearchPathInner::Editable(_) => None,
+            ModuleSearchPathInner::Extra(_)
+            | ModuleSearchPathInner::FirstParty(_)
+            | ModuleSearchPathInner::StandardLibraryCustom(_)
+            | ModuleSearchPathInner::SitePackages(_)
+            | ModuleSearchPathInner::Editable(_) => None,
         }
     }
 }
