@@ -15,6 +15,94 @@ use crate::registry::Rule;
 use crate::rules::pydocstyle::settings::Convention;
 
 /// ## What it does
+/// Checks for function docstrings that do not have a returns section.
+///
+/// ## Why is this bad?
+/// Docstrings missing return sections are a sign of incomplete documentation
+/// or refactors.
+///
+/// ## Example
+/// ```python
+/// def calculate_speed(distance: float, time: float) -> float:
+///     """Calculate speed as distance divided by time.
+///
+///     Args:
+///         distance: Distance traveled.
+///         time: Time spent traveling.
+///     """
+///     return distance / time
+/// ```
+///
+/// Use instead:
+/// ```python
+/// def calculate_speed(distance: float, time: float) -> float:
+///     """Calculate speed as distance divided by time.
+///
+///     Args:
+///         distance: Distance traveled.
+///         time: Time spent traveling.
+///
+///     Returns:
+///         Speed as distance divided by time.
+///     """
+///     return distance / time
+/// ```
+#[violation]
+pub struct DocstringMissingReturns;
+
+impl Violation for DocstringMissingReturns {
+    #[derive_message_formats]
+    fn message(&self) -> String {
+        format!("Returns section missing from docstring")
+    }
+}
+
+/// ## What it does
+/// Checks for function docstrings that have a returns section without
+/// needing one.
+///
+/// ## Why is this bad?
+/// Some functions should not have a returns section in their docstrings.
+/// This include `__init__` methods, methods with a `@property` decorator,
+/// and functions without an explicit return.
+///
+/// ## Example
+/// ```python
+/// def say_hello(n: int) -> None:
+///     """Says hello to the user.
+///
+///     Args:
+///         n: Number of times to say hello.
+///
+///     Returns:
+///         Doesn't return anything.
+///     """
+///     for _ in range(n):
+///         print("Hello!")
+/// ```
+///
+/// Use instead:
+/// ```python
+/// def say_hello(n: int) -> None:
+///     """Says hello to the user.
+///
+///     Args:
+///         n: Number of times to say hello.
+///     """
+///     for _ in range(n):
+///         print("Hello!")
+/// ```
+#[violation]
+pub struct DocstringExtraneousReturns;
+
+impl Violation for DocstringExtraneousReturns {
+    #[derive_message_formats]
+    fn message(&self) -> String {
+        format!("Docstring should not have a returns section")
+    }
+}
+
+/// ## What it does
 /// Checks for function docstrings that do not include documentation for all
 /// explicitly-raised exceptions.
 ///
