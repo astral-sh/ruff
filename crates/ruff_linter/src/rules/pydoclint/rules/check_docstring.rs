@@ -406,7 +406,7 @@ impl<'a> Visitor<'a> for BodyVisitor<'a> {
                 if let Some(qualified_name) = extract_raised_exception(self.semantic, exc.as_ref())
                 {
                     self.raised_exceptions.push(ExceptionEntry {
-                        qualified_name: qualified_name,
+                        qualified_name,
                         range: exc.as_ref().range(),
                     });
                 }
