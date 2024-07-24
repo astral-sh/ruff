@@ -19,9 +19,9 @@ use crate::rules::pydocstyle::settings::Convention;
 /// explicitly-raised exceptions.
 ///
 /// ## Why is this bad?
-/// If a raise is mentioned in a docstring, but the function itself does not
-/// explicitly raise it, it can be misleading to users and/or a sign of
-/// incomplete documentation or refactors.
+/// If a function raises an exception without documenting it in its docstring,
+/// it can be misleading to users and/or a sign of incomplete documentation or
+/// refactors.
 ///
 /// ## Example
 /// ```python
