@@ -1,6 +1,5 @@
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::helpers::map_starred;
 use ruff_python_ast::{self as ast, ExceptHandler, Expr};
 use ruff_text_size::Ranged;
 
