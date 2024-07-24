@@ -28,6 +28,7 @@
 
 use std::path::Path;
 
+use ast::StmtFunctionDef;
 use itertools::Itertools;
 use log::debug;
 
@@ -51,7 +52,7 @@ use ruff_python_index::Indexer;
 use ruff_python_parser::typing::{parse_type_annotation, AnnotationKind};
 use ruff_python_parser::{Parsed, Tokens};
 use ruff_python_semantic::all::{DunderAllDefinition, DunderAllFlags};
-use ruff_python_semantic::analyze::{imports, typing};
+use ruff_python_semantic::analyze::{function_type, imports, typing};
 use ruff_python_semantic::{
     BindingFlags, BindingId, BindingKind, Exceptions, Export, FromImport, Globals, Import, Module,
     ModuleKind, ModuleSource, NodeId, ScopeId, ScopeKind, SemanticModel, SemanticModelFlags,
@@ -268,6 +269,59 @@ impl<'a> Checker<'a> {
             last_stmt_end: TextSize::default(),
             docstring_state: DocstringState::default(),
         }
+    }
+
+    // Determines whether a member access expression is referring to a
+    // member of a class (either a class or instance member). This will
+    // typically take the form "self.x" or "cls.x".
+    fn get_member_access_info(&self, value: &Expr) -> Option<(bool, ScopeId)> {
+        let value_name = value.as_name_expr()?;
+        let current_scope = &self.semantic.scopes[self.semantic.scope_id];
+
+        let StmtFunctionDef {
+            decorator_list,
+            name,
+            parameters,
+            ..
+        } = current_scope.kind.as_function()?;
+
+        let parent_scope_id = self
+            .semantic
+            .first_non_type_parent_scope_id(self.semantic.scope_id)?;
+        let parent = self.semantic.scopes.get(parent_scope_id)?;
+
+        let enclosing_class = parent.kind.as_class()?;
+
+        let first_parameter_name = parameters
+            .args
+            .first()
+            .map(|parameter| parameter.parameter.name.as_str())?;
+
+        let is_class_method = match function_type::classify(
+            name,
+            decorator_list,
+            parent,
+            &self.semantic,
+            &self.settings.pep8_naming.classmethod_decorators,
+            &self.settings.pep8_naming.staticmethod_decorators,
+        ) {
+            function_type::FunctionType::ClassMethod => true,
+            function_type::FunctionType::Method => false,
+            // Static methods cannot assign to `self` or `cls`.
+            _ => return None,
+        };
+
+        let is_instance_member = if value_name.id == enclosing_class.name.as_str() {
+            false
+        } else {
+            if value_name.id == first_parameter_name {
+                !is_class_method
+            } else {
+                return None;
+            }
+        };
+
+        Some((is_instance_member, parent_scope_id))
     }
 }
 
@@ -1088,6 +1142,36 @@ impl<'a> Visitor<'a> for Checker<'a> {
                 ExprContext::Del => self.handle_node_delete(expr),
                 ExprContext::Invalid => {}
             },
+            Expr::Attribute(ast::ExprAttribute {
+                value,
+                attr,
+                ctx,
+                range,
+            }) => {
+                if let Some((is_instance_attribute, class_scope_id)) =
+                    self.get_member_access_info(value)
+                {
+                    if is_instance_attribute {
+                        match ctx {
+                            // behavior: load the x in self.x from the class scope
+                            ExprContext::Load => {
+                                self.semantic.resolve_load_attribute(attr, class_scope_id);
+                            }
+                            // behavior: store the x in self.x in the class scope
+                            ExprContext::Store => {
+                                let bit_flags = BindingFlags::INSTANCE_ATTRIBUTE;
+                                self.add_binding(
+                                    attr.as_str(),
+                                    *range,
+                                    BindingKind::Assignment,
+                                    bit_flags,
+                                );
+                            }
+                            ExprContext::Invalid | ExprContext::Del => {}
+                        };
+                    };
+                };
+            }
             _ => {}
         }
 
@@ -1701,7 +1785,7 @@ impl<'a> Visitor<'a> for Checker<'a> {
 }
 
 impl<'a> Checker<'a> {
-    /// Visit a [`Module`]. Returns `true` if the module contains a module-level docstring.
+    /// Visit a [`Module`]. Run lint rules over module-level docstring.
     fn visit_module(&mut self, python_ast: &'a Suite) {
         analyze::module(python_ast, self);
     }
@@ -1849,6 +1933,12 @@ impl<'a> Checker<'a> {
                 .ancestor_ids(self.semantic.scope_id)
                 .find_or_last(|scope_id| !self.semantic.scopes[*scope_id].kind.is_generator())
                 .unwrap_or(self.semantic.scope_id)
+        } else if flags.contains(BindingFlags::INSTANCE_ATTRIBUTE) {
+            self.semantic
+                .scopes
+                .ancestor_ids(self.semantic.scope_id)
+                .find(|scope_id| self.semantic.scopes[*scope_id].kind.is_class())
+                .expect("Attribute bindings must be in a class scope")
         } else {
             self.semantic.scope_id
         };
