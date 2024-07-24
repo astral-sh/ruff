@@ -11,7 +11,7 @@ use ruff_db::system::{DirectoryEntry, System, SystemPath, SystemPathBuf};
 use crate::db::Db;
 use crate::module::{Module, ModuleKind};
 use crate::module_name::ModuleName;
-use crate::path::{ModulePathBuf, ModuleSearchPath, SearchPathValidationError};
+use crate::path::{ModulePath, ModuleSearchPath, SearchPathValidationError};
 use crate::state::ResolverState;
 
 /// Resolves a module name to a module.
@@ -128,25 +128,19 @@ fn try_resolve_module_resolution_settings(
     let mut static_search_paths = vec![];
 
     for path in extra_paths {
-        static_search_paths.push(ModuleSearchPath::extra(system, path.to_owned())?);
+        static_search_paths.push(ModuleSearchPath::extra(system, path)?);
     }
 
-    static_search_paths.push(ModuleSearchPath::first_party(
-        system,
-        workspace_root.to_owned(),
-    )?);
+    static_search_paths.push(ModuleSearchPath::first_party(system, workspace_root)?);
 
     static_search_paths.push(if let Some(custom_typeshed) = custom_typeshed.as_ref() {
-        ModuleSearchPath::custom_stdlib(db, custom_typeshed.to_owned())?
+        ModuleSearchPath::custom_stdlib(db, custom_typeshed)?
     } else {
         ModuleSearchPath::vendored_stdlib()
     });
 
     if let Some(site_packages) = site_packages {
-        static_search_paths.push(ModuleSearchPath::site_packages(
-            system,
-            site_packages.to_owned(),
-        )?);
+        static_search_paths.push(ModuleSearchPath::site_packages(system, site_packages)?);
     }
 
     // TODO vendor typeshed's third-party stubs as well as the stdlib and fallback to them as a final step
@@ -493,7 +487,7 @@ fn resolve_name(db: &dyn Db, name: &ModuleName) -> Option<(ModuleSearchPath, Fil
                 package_path.push(module_name);
 
                 // Must be a `__init__.pyi` or `__init__.py` or it isn't a package.
-                let kind = if package_path.is_directory(search_path, &resolver_state) {
+                let kind = if package_path.is_directory(&resolver_state) {
                     package_path.push("__init__");
                     ModuleKind::Package
                 } else {
@@ -501,16 +495,13 @@ fn resolve_name(db: &dyn Db, name: &ModuleName) -> Option<(ModuleSearchPath, Fil
                 };
 
                 // TODO Implement full https://peps.python.org/pep-0561/#type-checker-module-resolution-order resolution
-                if let Some(stub) = package_path
-                    .with_pyi_extension()
-                    .to_file(search_path, &resolver_state)
-                {
+                if let Some(stub) = package_path.with_pyi_extension().to_file(&resolver_state) {
                     return Some((search_path.clone(), stub, kind));
                 }
 
                 if let Some(module) = package_path
                     .with_py_extension()
-                    .and_then(|path| path.to_file(search_path, &resolver_state))
+                    .and_then(|path| path.to_file(&resolver_state))
                 {
                     return Some((search_path.clone(), module, kind));
                 }
@@ -541,7 +532,7 @@ fn resolve_package<'a, 'db, I>(
 where
     I: Iterator<Item = &'a str>,
 {
-    let mut package_path = module_search_path.as_module_path().clone();
+    let mut package_path = module_search_path.to_module_path();
 
     // `true` if inside a folder that is a namespace package (has no `__init__.py`).
     // Namespace packages are special because they can be spread across multiple search paths.
@@ -555,12 +546,11 @@ where
     for folder in components {
         package_path.push(folder);
 
-        let is_regular_package =
-            package_path.is_regular_package(module_search_path, resolver_state);
+        let is_regular_package = package_path.is_regular_package(resolver_state);
 
         if is_regular_package {
             in_namespace_package = false;
-        } else if package_path.is_directory(module_search_path, resolver_state) {
+        } else if package_path.is_directory(resolver_state) {
             // A directory without an `__init__.py` is a namespace package, continue with the next folder.
             in_namespace_package = true;
         } else if in_namespace_package {
@@ -593,7 +583,7 @@ where
 
 #[derive(Debug)]
 struct ResolvedPackage {
-    path: ModulePathBuf,
+    path: ModulePath<'static>,
     kind: PackageKind,
 }
 
