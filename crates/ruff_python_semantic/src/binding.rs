@@ -115,6 +115,18 @@ impl<'a> Binding<'a> {
         self.flags.contains(BindingFlags::PRIVATE_DECLARATION)
     }
 
+    /// Return `true` if this [`Binding`] took place inside an exception handler,
+    /// e.g. `y` in:
+    /// ```python
+    /// try:
+    ///      x = 42
+    /// except RuntimeError:
+    ///      y = 42
+    /// ```
+    pub const fn in_exception_handler(&self) -> bool {
+        self.flags.contains(BindingFlags::IN_EXCEPT_HANDLER)
+    }
+
     /// Return `true` if this binding "redefines" the given binding, as per Pyflake's definition of
     /// redefinition.
     pub fn redefines(&self, existing: &Binding) -> bool {
@@ -334,6 +346,18 @@ bitflags! {
         /// (x, y) = 1, 2
         /// ```
         const UNPACKED_ASSIGNMENT = 1 << 9;
+
+        /// The binding took place inside an exception handling.
+        ///
+        /// For example, the `x` binding in the following example
+        /// would *not* have this flag set, but the `y` binding *would*:
+        /// ```python
+        /// try:
+        ///     x = 42
+        /// except RuntimeError:
+        ///     y = 42
+        /// ```
+        const IN_EXCEPT_HANDLER = 1 << 10;
     }
 }
 

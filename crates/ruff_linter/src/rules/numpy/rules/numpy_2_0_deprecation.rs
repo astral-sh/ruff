@@ -3,7 +3,7 @@ use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::name::{QualifiedName, QualifiedNameBuilder};
 use ruff_python_ast::visitor::Visitor;
 use ruff_python_ast::{self as ast, Expr};
-use ruff_python_semantic::{Exceptions, Modules, SemanticModel};
+use ruff_python_semantic::{Exceptions, Modules, NodeId, SemanticModel};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
@@ -713,29 +713,63 @@ fn is_guarded_by_try_except(
     replacement: &Replacement,
     semantic: &SemanticModel,
 ) -> bool {
-    if !semantic.in_exception_handler() {
-        return false;
-    }
-
     match expr {
         Expr::Attribute(_) => {
-            let Some(try_node) = find_try_node(semantic) else {
+            if !semantic.in_exception_handler() {
+                return false;
+            }
+            let Some(try_node) = semantic
+                .current_statements()
+                .find_map(|stmt| stmt.as_try_stmt())
+            else {
                 return false;
             };
-            let handled_exceptions = Exceptions::from_try_stmt(try_node, semantic);
-            if !handled_exceptions.contains(Exceptions::ATTRIBUTE_ERROR) {
+            let suspended_exceptions = Exceptions::from_try_stmt(try_node, semantic);
+            if !suspended_exceptions.contains(Exceptions::ATTRIBUTE_ERROR) {
                 return false;
             }
             try_block_contains_undeprecated_attribute(try_node, &replacement.details, semantic)
+        }
+        Expr::Name(ast::ExprName { id, .. }) => {
+            let Some(binding_id) = semantic.lookup_symbol(id.as_str()) else {
+                return false;
+            };
+            let binding = semantic.binding(binding_id);
+            if !binding.is_external() {
+                return false;
+            }
+            if !binding.in_exception_handler() {
+                return false;
+            }
+            let Some(try_node) = binding
+                .source
+                .and_then(|import_id| try_node_parent_of_import_stmt(import_id, semantic))
+            else {
+                return false;
+            };
+            let suspended_exceptions = Exceptions::from_try_stmt(try_node, semantic);
+            if !suspended_exceptions
+                .intersects(Exceptions::IMPORT_ERROR | Exceptions::MODULE_NOT_FOUND_ERROR)
+            {
+                return false;
+            }
+            try_block_contains_undeprecated_import(try_node, &replacement.details)
         }
         _ => false,
     }
 }
 
-fn find_try_node<'a>(semantic: &'a SemanticModel) -> Option<&'a ast::StmtTry> {
-    semantic
-        .current_statements()
-        .find_map(|stmt| stmt.as_try_stmt())
+fn try_node_parent_of_import_stmt<'a>(
+    import_id: NodeId,
+    semantic: &'a SemanticModel,
+) -> Option<&'a ast::StmtTry> {
+    let mut node_id = import_id;
+    loop {
+        node_id = semantic.parent_statement_id(node_id)?;
+        if let ast::Stmt::Try(try_node) = semantic.statement(node_id) {
+            return Some(try_node);
+        }
+    }
 }
 
 fn undeprecated_qualified_name<'a>(path: &'a str, name: &'a str) -> QualifiedName<'a> {
@@ -802,5 +836,62 @@ impl Visitor<'_> for AttributeSearcher<'_> {
             return;
         }
         ast::visitor::walk_expr(self, expr);
+    }
+}
+
+fn try_block_contains_undeprecated_import(
+    try_node: &ast::StmtTry,
+    replacement_details: &Details,
+) -> bool {
+    let Details::AutoImport {
+        path,
+        name,
+        compatibility: _,
+    } = replacement_details
+    else {
+        return false;
+    };
+    let mut import_searcher = ImportSearcher::new(path, name);
+    for stmt in &try_node.body {
+        import_searcher.visit_stmt(stmt);
+        if import_searcher.found_import {
+            return true;
+        }
+    }
+    false
+}
+
+struct ImportSearcher<'a> {
+    module: &'a str,
+    name: &'a str,
+    found_import: bool,
+}
+
+impl<'a> ImportSearcher<'a> {
+    fn new(module: &'a str, name: &'a str) -> Self {
+        Self {
+            module,
+            name,
+            found_import: false,
+        }
+    }
+}
+
+impl Visitor<'_> for ImportSearcher<'_> {
+    fn visit_stmt(&mut self, stmt: &ast::Stmt) {
+        if self.found_import {
+            return;
+        }
+        if let ast::Stmt::ImportFrom(ast::StmtImportFrom { module, names, .. }) = stmt {
+            if module.as_ref().is_some_and(|module| module == self.module)
+                && names
+                    .iter()
+                    .any(|ast::Alias { name, .. }| name == self.name)
+            {
+                self.found_import = true;
+                return;
+            }
+        }
+        ast::visitor::walk_stmt(self, stmt);
     }
 }

@@ -1825,7 +1825,7 @@ impl<'a> Checker<'a> {
         name: &'a str,
         range: TextRange,
         kind: BindingKind<'a>,
-        flags: BindingFlags,
+        mut flags: BindingFlags,
     ) -> BindingId {
         // Determine the scope to which the binding belongs.
         // Per [PEP 572](https://peps.python.org/pep-0572/#scope-of-the-target), named
@@ -1840,6 +1840,10 @@ impl<'a> Checker<'a> {
         } else {
             self.semantic.scope_id
         };
+
+        if self.semantic.in_exception_handler() {
+            flags |= BindingFlags::IN_EXCEPT_HANDLER;
+        }
 
         // Create the `Binding`.
         let binding_id = self.semantic.push_binding(range, kind, flags);

@@ -124,7 +124,21 @@ pub struct SemanticModel<'a> {
     /// Modules that have been seen by the semantic model.
     pub seen: Modules,
 
-    /// Exceptions that have been handled by the current scope.
+    /// Exceptions that are handled by the current `try` block.
+    ///
+    /// For example, if we're visiting the `x = 1` assignment below,
+    /// `AttributeError` is considered to be a "handled exception",
+    /// but `TypeError` is not:
+    ///
+    /// ```py
+    /// try:
+    ///     try:
+    ///         foo()
+    ///     except TypeError:
+    ///         pass
+    /// except AttributeError:
+    ///     pass
+    /// ```
     pub handled_exceptions: Vec<Exceptions>,
 
     /// Map from [`ast::ExprName`] node (represented as a [`NameId`]) to the [`Binding`] to which
