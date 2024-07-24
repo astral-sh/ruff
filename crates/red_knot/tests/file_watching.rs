@@ -6,18 +6,18 @@ use anyhow::{anyhow, Context};
 
 use red_knot::db::RootDatabase;
 use red_knot::watch;
-use red_knot::watch::{directory_watcher, Watcher};
+use red_knot::watch::{directory_watcher, WorkspaceWatcher};
 use red_knot::workspace::WorkspaceMetadata;
 use red_knot_module_resolver::{resolve_module, ModuleName};
 use ruff_db::files::{system_path_to_file, File};
-use ruff_db::program::{ProgramSettings, SearchPathSettings, TargetVersion};
+use ruff_db::program::{Program, ProgramSettings, SearchPathSettings, TargetVersion};
 use ruff_db::source::source_text;
 use ruff_db::system::{OsSystem, SystemPath, SystemPathBuf};
 use ruff_db::Upcast;
 
 struct TestCase {
     db: RootDatabase,
-    watcher: Option<Watcher>,
+    watcher: Option<WorkspaceWatcher>,
     changes_receiver: crossbeam::channel::Receiver<Vec<watch::ChangeEvent>>,
     temp_dir: tempfile::TempDir,
 }
@@ -55,6 +55,23 @@ impl TestCase {
         all_events
     }
 
+    fn update_search_path_settings(
+        &mut self,
+        f: impl FnOnce(&SearchPathSettings) -> SearchPathSettings,
+    ) {
+        let program = Program::get(self.db());
+        let search_path_settings = program.search_paths(self.db());
+
+        let new_settings = f(search_path_settings);
+
+        program.set_search_paths(&mut self.db).to(new_settings);
+
+        if let Some(watcher) = &mut self.watcher {
+            watcher.update(&self.db);
+            assert!(!watcher.has_errored_paths());
+        }
+    }
+
     fn collect_package_files(&self, path: &SystemPath) -> Vec<File> {
         let package = self.db().workspace().package(self.db(), path).unwrap();
         let files = package.files(self.db());
@@ -74,7 +91,32 @@ where
     I: IntoIterator<Item = (P, &'static str)>,
     P: AsRef<SystemPath>,
 {
+    setup_with_search_paths(workspace_files, |_root, workspace_path| {
+        SearchPathSettings {
+            extra_paths: vec![],
+            workspace_root: workspace_path.to_path_buf(),
+            custom_typeshed: None,
+            site_packages: None,
+        }
+    })
+}
+
+fn setup_with_search_paths<I, P>(
+    workspace_files: I,
+    create_search_paths: impl FnOnce(&SystemPath, &SystemPath) -> SearchPathSettings,
+) -> anyhow::Result<TestCase>
+where
+    I: IntoIterator<Item = (P, &'static str)>,
+    P: AsRef<SystemPath>,
+{
     let temp_dir = tempfile::tempdir()?;
+
+    let root_path = SystemPath::from_std_path(temp_dir.path()).ok_or_else(|| {
+        anyhow!(
+            "Temp directory '{}' is not a valid UTF-8 path.",
+            temp_dir.path().display()
+        )
+    })?;
 
     let workspace_path = temp_dir.path().join("workspace");
 
@@ -96,7 +138,7 @@ where
         workspace_path
             .as_utf8_path()
             .canonicalize_utf8()
-            .with_context(|| "Failed to canonzialize workspace path.")?,
+            .with_context(|| "Failed to canonicalize workspace path.")?,
     );
 
     for (relative_path, content) in workspace_files {
@@ -115,25 +157,31 @@ where
     let system = OsSystem::new(&workspace_path);
 
     let workspace = WorkspaceMetadata::from_path(&workspace_path, &system)?;
+    let search_paths = create_search_paths(root_path, workspace.root());
+
+    for path in search_paths
+        .extra_paths
+        .iter()
+        .chain(search_paths.site_packages.iter())
+        .chain(search_paths.custom_typeshed.iter())
+    {
+        std::fs::create_dir_all(path.as_std_path())
+            .with_context(|| format!("Failed to create search path '{path}'"))?;
+    }
+
     let settings = ProgramSettings {
         target_version: TargetVersion::default(),
-        search_paths: SearchPathSettings {
-            extra_paths: vec![],
-            workspace_root: workspace.root().to_path_buf(),
-            custom_typeshed: None,
-            site_packages: None,
-        },
+        search_paths,
     };
 
     let db = RootDatabase::new(workspace, settings, system);
 
     let (sender, receiver) = crossbeam::channel::unbounded();
-    let mut watcher = directory_watcher(move |events| sender.send(events).unwrap())
+    let watcher = directory_watcher(move |events| sender.send(events).unwrap())
         .with_context(|| "Failed to create directory watcher")?;
 
-    watcher
-        .watch(&workspace_path)
-        .with_context(|| "Failed to set up watcher for workspace directory.")?;
+    let watcher = WorkspaceWatcher::new(watcher, &db);
+    assert!(!watcher.has_errored_paths());
 
     let test_case = TestCase {
         db,
@@ -594,6 +642,96 @@ fn directory_deleted() -> anyhow::Result<()> {
     assert!(!init_file.exists(case.db()));
     assert!(!a_file.exists(case.db()));
     assert_eq!(case.collect_package_files(&sub_path), &[bar]);
+
+    Ok(())
+}
+
+#[test]
+fn search_path() -> anyhow::Result<()> {
+    let mut case =
+        setup_with_search_paths([("bar.py", "import sub.a")], |root_path, workspace_path| {
+            SearchPathSettings {
+                extra_paths: vec![],
+                workspace_root: workspace_path.to_path_buf(),
+                custom_typeshed: None,
+                site_packages: Some(root_path.join("site_packages")),
+            }
+        })?;
+
+    let site_packages = case.root_path().join("site_packages");
+
+    assert_eq!(
+        resolve_module(case.db(), ModuleName::new("a").unwrap()),
+        None
+    );
+
+    std::fs::write(site_packages.join("a.py").as_std_path(), "class A: ...")?;
+    std::fs::write(site_packages.join("__init__.py").as_std_path(), "")?;
+
+    let changes = case.stop_watch();
+
+    case.db_mut().apply_changes(changes);
+
+    assert!(resolve_module(case.db().upcast(), ModuleName::new_static("a").unwrap()).is_some());
+    assert_eq!(
+        case.collect_package_files(&case.workspace_path("bar.py")),
+        &[case.system_file(case.workspace_path("bar.py")).unwrap()]
+    );
+
+    Ok(())
+}
+
+#[test]
+fn add_search_path() -> anyhow::Result<()> {
+    let mut case = setup([("bar.py", "import sub.a")])?;
+
+    let site_packages = case.workspace_path("site_packages");
+    std::fs::create_dir_all(site_packages.as_std_path())?;
+
+    assert!(resolve_module(case.db().upcast(), ModuleName::new_static("a").unwrap()).is_none());
+
+    // Register site-packages as a search path.
+    case.update_search_path_settings(|settings| SearchPathSettings {
+        site_packages: Some(site_packages.clone()),
+        ..settings.clone()
+    });
+
+    std::fs::write(site_packages.join("a.py").as_std_path(), "class A: ...")?;
+    std::fs::write(site_packages.join("__init__.py").as_std_path(), "")?;
+
+    let changes = case.stop_watch();
+
+    case.db_mut().apply_changes(changes);
+
+    assert!(resolve_module(case.db().upcast(), ModuleName::new_static("a").unwrap()).is_some());
+
+    Ok(())
+}
+
+#[test]
+fn remove_search_path() -> anyhow::Result<()> {
+    let mut case =
+        setup_with_search_paths([("bar.py", "import sub.a")], |root_path, workspace_path| {
+            SearchPathSettings {
+                extra_paths: vec![],
+                workspace_root: workspace_path.to_path_buf(),
+                custom_typeshed: None,
+                site_packages: Some(root_path.join("site_packages")),
+            }
+        })?;
+
+    // Remove site packages from the search path settings.
+    let site_packages = case.root_path().join("site_packages");
+    case.update_search_path_settings(|settings| SearchPathSettings {
+        site_packages: None,
+        ..settings.clone()
+    });
+
+    std::fs::write(site_packages.join("a.py").as_std_path(), "class A: ...")?;
+
+    let changes = case.stop_watch();
+
+    assert_eq!(changes, &[]);
 
     Ok(())
 }

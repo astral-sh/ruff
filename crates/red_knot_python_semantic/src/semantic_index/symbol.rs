@@ -100,6 +100,9 @@ pub struct ScopeId<'db> {
     #[no_eq]
     #[return_ref]
     pub node: NodeWithScopeKind,
+
+    #[no_eq]
+    count: countme::Count<ScopeId<'static>>,
 }
 
 impl<'db> ScopeId<'db> {

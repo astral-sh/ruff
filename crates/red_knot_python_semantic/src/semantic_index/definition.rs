@@ -24,6 +24,9 @@ pub struct Definition<'db> {
     #[no_eq]
     #[return_ref]
     pub(crate) node: DefinitionKind,
+
+    #[no_eq]
+    count: countme::Count<Definition<'static>>,
 }
 
 impl<'db> Definition<'db> {

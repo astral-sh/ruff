@@ -258,7 +258,7 @@ pub(crate) fn editable_install_resolution_paths(db: &dyn Db) -> Vec<ModuleSearch
 /// are only calculated lazily.
 ///
 /// [`sys.path` at runtime]: https://docs.python.org/3/library/site.html#module-site
-struct SearchPathIterator<'db> {
+pub(crate) struct SearchPathIterator<'db> {
     db: &'db dyn Db,
     static_paths: std::slice::Iter<'db, ModuleSearchPath>,
     dynamic_paths: Option<std::slice::Iter<'db, ModuleSearchPath>>,
@@ -399,7 +399,7 @@ impl ModuleResolutionSettings {
         self.target_version
     }
 
-    fn search_paths<'db>(&'db self, db: &'db dyn Db) -> SearchPathIterator<'db> {
+    pub(crate) fn search_paths<'db>(&'db self, db: &'db dyn Db) -> SearchPathIterator<'db> {
         SearchPathIterator {
             db,
             static_paths: self.static_search_paths.iter(),

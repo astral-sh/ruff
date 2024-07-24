@@ -103,9 +103,13 @@ impl<'db> SemanticIndexBuilder<'db> {
 
         #[allow(unsafe_code)]
         // SAFETY: `node` is guaranteed to be a child of `self.module`
-        let scope_id = ScopeId::new(self.db, self.file, file_scope_id, unsafe {
-            node.to_kind(self.module.clone())
-        });
+        let scope_id = ScopeId::new(
+            self.db,
+            self.file,
+            file_scope_id,
+            unsafe { node.to_kind(self.module.clone()) },
+            countme::Count::default(),
+        );
 
         self.scope_ids_by_scope.push(scope_id);
         self.scopes_by_node.insert(node.node_key(), file_scope_id);
@@ -180,6 +184,7 @@ impl<'db> SemanticIndexBuilder<'db> {
             unsafe {
                 definition_node.into_owned(self.module.clone())
             },
+            countme::Count::default(),
         );
 
         self.definitions_by_node
@@ -201,6 +206,7 @@ impl<'db> SemanticIndexBuilder<'db> {
             unsafe {
                 AstNodeRef::new(self.module.clone(), expression_node)
             },
+            countme::Count::default(),
         );
         self.expressions_by_node
             .insert(expression_node.into(), expression);

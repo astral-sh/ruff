@@ -9,7 +9,9 @@ use walk_directory::WalkDirectoryBuilder;
 
 use crate::file_revision::FileRevision;
 
-pub use self::path::{SystemPath, SystemPathBuf};
+pub use self::path::{
+    deduplicate_nested_paths, DeduplicatedNestedPathsIter, SystemPath, SystemPathBuf,
+};
 
 mod memory_fs;
 #[cfg(feature = "os")]
