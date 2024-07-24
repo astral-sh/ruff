@@ -63,8 +63,8 @@ impl Violation for DocstringMissingReturns {
 ///
 /// ## Why is this bad?
 /// Some functions should not have a returns section in their docstrings.
-/// This include `__init__` methods, methods with a `@property` decorator,
-/// and functions without an explicit return.
+/// This includes methods with a `@property` decorator and functions without
+/// an explicit return.
 ///
 /// ## Example
 /// ```python
@@ -474,6 +474,27 @@ pub(crate) fn check_docstring(
         visitor::walk_body(&mut visitor, member.body());
         visitor.finish()
     };
+
+    // DOC201
+    if checker.enabled(Rule::DocstringMissingReturns) {
+        if docstring_sections.returns.is_none() {
+            for body_return in &body_entries.returns {
+                let diagnostic = Diagnostic::new(DocstringMissingReturns, body_return.range());
+                diagnostics.push(diagnostic);
+            }
+        }
+    }
+
+    // DOC202
+    if checker.enabled(Rule::DocstringExtraneousReturns) {
+        if let Some(docstring_returns) = docstring_sections.returns {
+            if body_entries.returns.is_empty() {
+                let diagnostic =
+                    Diagnostic::new(DocstringExtraneousReturns, docstring_returns.range());
+                diagnostics.push(diagnostic);
+            }
+        }
+    }
 
     // DOC501
     if checker.enabled(Rule::DocstringMissingException) {
