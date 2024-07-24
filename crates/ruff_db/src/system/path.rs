@@ -591,7 +591,9 @@ impl<'a> DeduplicatedNestedPathsIter<'a> {
         I: IntoIterator<Item = &'a SystemPath>,
     {
         let mut paths = paths.into_iter().collect::<Vec<_>>();
+        // Sort the path to ensure that e.g. `/a/b/c`, comes right after `/a/b`.
         paths.sort_unstable();
+
         let mut iter = paths.into_iter();
 
         Self {

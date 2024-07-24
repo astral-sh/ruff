@@ -55,6 +55,23 @@ impl TestCase {
         all_events
     }
 
+    fn update_search_path_settings(
+        &mut self,
+        f: impl FnOnce(&SearchPathSettings) -> SearchPathSettings,
+    ) {
+        let program = Program::get(self.db());
+        let search_path_settings = program.search_paths(self.db());
+
+        let new_settings = f(search_path_settings);
+
+        program.set_search_paths(&mut self.db).to(new_settings);
+
+        if let Some(watcher) = &mut self.watcher {
+            watcher.update(&self.db);
+            assert!(!watcher.has_errored_paths());
+        }
+    }
+
     fn collect_package_files(&self, path: &SystemPath) -> Vec<File> {
         let package = self.db().workspace().package(self.db(), path).unwrap();
         let files = package.files(self.db());
@@ -673,22 +690,11 @@ fn add_search_path() -> anyhow::Result<()> {
 
     assert!(resolve_module(case.db().upcast(), ModuleName::new_static("a").unwrap()).is_none());
 
-    let program = Program::get(case.db());
-    let search_path_settings = program.search_paths(case.db()).clone();
-
     // Register site-packages as a search path.
-    program
-        .set_search_paths(&mut case.db)
-        .to(SearchPathSettings {
-            site_packages: Some(site_packages.clone()),
-            ..search_path_settings
-        });
-
-    // Start observing the site-packages folder
-    let watcher = case.watcher.as_mut().unwrap();
-    watcher.update(&case.db);
-
-    assert!(!watcher.has_errored_paths());
+    case.update_search_path_settings(|settings| SearchPathSettings {
+        site_packages: Some(site_packages.clone()),
+        ..settings.clone()
+    });
 
     std::fs::write(site_packages.join("a.py").as_std_path(), "class A: ...")?;
     std::fs::write(site_packages.join("__init__.py").as_std_path(), "")?;
@@ -714,22 +720,12 @@ fn remove_search_path() -> anyhow::Result<()> {
             }
         })?;
 
+    // Remove site packages from the search path settings.
     let site_packages = case.root_path().join("site_packages");
-
-    let program = Program::get(case.db());
-    let search_path_settings = program.search_paths(case.db()).clone();
-
-    // Register site-packages from the search paths.
-    program
-        .set_search_paths(&mut case.db)
-        .to(SearchPathSettings {
-            site_packages: None,
-            ..search_path_settings
-        });
-
-    let watcher = case.watcher.as_mut().unwrap();
-    watcher.update(&case.db);
-    assert!(!watcher.has_errored_paths());
+    case.update_search_path_settings(|settings| SearchPathSettings {
+        site_packages: None,
+        ..settings.clone()
+    });
 
     std::fs::write(site_packages.join("a.py").as_std_path(), "class A: ...")?;
 

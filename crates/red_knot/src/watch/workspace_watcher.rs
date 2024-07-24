@@ -32,7 +32,7 @@ impl WorkspaceWatcher {
     }
 
     pub fn update(&mut self, db: &RootDatabase) {
-        let new_watch_paths = db.workspace().watch_paths(db);
+        let new_watch_paths = db.workspace().paths_to_watch(db);
 
         let mut added_folders = new_watch_paths.difference(&self.watched_paths).peekable();
         let mut removed_folders = self.watched_paths.difference(&new_watch_paths).peekable();
