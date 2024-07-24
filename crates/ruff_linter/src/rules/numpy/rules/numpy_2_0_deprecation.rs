@@ -1,6 +1,7 @@
 use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::name::{QualifiedName, QualifiedNameBuilder};
+use ruff_python_ast::statement_visitor::StatementVisitor;
 use ruff_python_ast::visitor::Visitor;
 use ruff_python_ast::{self as ast, Expr};
 use ruff_python_semantic::{Exceptions, Modules, NodeId, SemanticModel};
@@ -874,6 +875,13 @@ impl Visitor<'_> for AttributeSearcher<'_> {
         }
         ast::visitor::walk_expr(self, expr);
     }
+
+    fn visit_stmt(&mut self, stmt: &ruff_python_ast::Stmt) {
+        if self.found_attribute {
+            return;
+        }
+        ast::visitor::walk_stmt(self, stmt);
+    }
 }
 
 /// Given an [`ast::StmtTry`] node, does the `try` branch of that node
@@ -919,7 +927,7 @@ impl<'a> ImportSearcher<'a> {
     }
 }
 
-impl Visitor<'_> for ImportSearcher<'_> {
+impl StatementVisitor<'_> for ImportSearcher<'_> {
     fn visit_stmt(&mut self, stmt: &ast::Stmt) {
         if self.found_import {
             return;
@@ -934,6 +942,6 @@ impl Visitor<'_> for ImportSearcher<'_> {
                 return;
             }
         }
-        ast::visitor::walk_stmt(self, stmt);
+        ast::statement_visitor::walk_stmt(self, stmt);
     }
 }
