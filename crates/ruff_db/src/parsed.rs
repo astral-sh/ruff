@@ -32,6 +32,8 @@ pub fn parsed_module(db: &dyn Db, file: File) -> ParsedModule {
             .extension()
             .map_or(PySourceType::Python, PySourceType::from_extension),
         FilePath::Vendored(_) => PySourceType::Stub,
+        // TODO(dhruvmanila): Virtual paths can be Jupyter Notebooks as well
+        FilePath::SystemVirtual(_) => PySourceType::Python,
     };
 
     ParsedModule::new(parse_unchecked_source(&source, ty))

@@ -5,8 +5,11 @@ use std::sync::{Arc, RwLock, RwLockWriteGuard};
 use camino::{Utf8Path, Utf8PathBuf};
 use filetime::FileTime;
 
+use ruff_notebook::{Notebook, NotebookError};
+
 use crate::system::{
     walk_directory, DirectoryEntry, FileType, Metadata, Result, SystemPath, SystemPathBuf,
+    SystemVirtualPath,
 };
 
 use super::walk_directory::{
@@ -132,6 +135,21 @@ impl MemoryFileSystem {
     ) -> std::result::Result<ruff_notebook::Notebook, ruff_notebook::NotebookError> {
         let content = self.read_to_string(path)?;
         ruff_notebook::Notebook::from_source_code(&content)
+    }
+
+    pub(crate) fn virtual_path_metadata(&self, _path: &SystemVirtualPath) -> Result<Metadata> {
+        Err(not_found())
+    }
+
+    pub(crate) fn read_virtual_path_to_string(&self, _path: &SystemVirtualPath) -> Result<String> {
+        Err(not_found())
+    }
+
+    pub(crate) fn read_virtual_path_to_notebook(
+        &self,
+        _path: &SystemVirtualPath,
+    ) -> std::result::Result<Notebook, NotebookError> {
+        Err(NotebookError::from(not_found()))
     }
 
     pub fn exists(&self, path: &SystemPath) -> bool {

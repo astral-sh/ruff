@@ -7,6 +7,7 @@ use rustc_hash::{FxBuildHasher, FxHashSet};
 use ruff_db::files::{File, FilePath};
 use ruff_db::program::{Program, SearchPathSettings, TargetVersion};
 use ruff_db::system::{DirectoryEntry, System, SystemPath, SystemPathBuf};
+use ruff_db::vendored::VendoredPath;
 
 use crate::db::Db;
 use crate::module::{Module, ModuleKind};
@@ -57,6 +58,12 @@ pub(crate) fn path_to_module(db: &dyn Db, path: &FilePath) -> Option<Module> {
     file_to_module(db, file)
 }
 
+#[derive(Debug, Clone, Copy)]
+enum SystemOrVendoredPathRef<'a> {
+    System(&'a SystemPath),
+    Vendored(&'a VendoredPath),
+}
+
 /// Resolves the module for the file with the given id.
 ///
 /// Returns `None` if the file is not a module locatable via any of the known search paths.
@@ -64,7 +71,11 @@ pub(crate) fn path_to_module(db: &dyn Db, path: &FilePath) -> Option<Module> {
 pub(crate) fn file_to_module(db: &dyn Db, file: File) -> Option<Module> {
     let _span = tracing::trace_span!("file_to_module", ?file).entered();
 
-    let path = file.path(db.upcast());
+    let path = match file.path(db.upcast()) {
+        FilePath::System(system) => SystemOrVendoredPathRef::System(system),
+        FilePath::Vendored(vendored) => SystemOrVendoredPathRef::Vendored(vendored),
+        FilePath::SystemVirtual(_) => return None,
+    };
 
     let settings = module_resolution_settings(db);
 
@@ -72,7 +83,11 @@ pub(crate) fn file_to_module(db: &dyn Db, file: File) -> Option<Module> {
 
     let module_name = loop {
         let candidate = search_paths.next()?;
-        if let Some(relative_path) = candidate.relativize_path(path) {
+        let relative_path = match path {
+            SystemOrVendoredPathRef::System(path) => candidate.relativize_system_path(path),
+            SystemOrVendoredPathRef::Vendored(path) => candidate.relativize_vendored_path(path),
+        };
+        if let Some(relative_path) = relative_path {
             break relative_path.to_module_name()?;
         }
     };
