@@ -144,17 +144,6 @@ impl salsa::Database for RootDatabase {}
 
 #[salsa::db]
 impl Db for RootDatabase {}
-//
-// impl salsa::ParallelDatabase for RootDatabase {
-//     fn snapshot(&self) -> salsa::Snapshot<Self> {
-//         salsa::Snapshot::new(Self {
-//             workspace: self.workspace,
-//             storage: self.storage.snapshot(),
-//             files: self.files.snapshot(),
-//             system: self.system.clone(),
-//         })
-//     }
-// }
 
 #[cfg(test)]
 pub(crate) mod tests {
@@ -246,15 +235,4 @@ pub(crate) mod tests {
 
     #[salsa::db]
     impl salsa::Database for TestDb {}
-
-    // impl salsa::ParallelDatabase for TestDb {
-    //     fn snapshot(&self) -> salsa::Snapshot<Self> {
-    //         salsa::Snapshot::new(Self {
-    //             storage: self.storage.snapshot(),
-    //             files: self.files.snapshot(),
-    //             system: self.system.snapshot(),
-    //             vendored: self.vendored.snapshot(),
-    //         })
-    //     }
-    // }
 }
