@@ -2,8 +2,6 @@
 
 use std::borrow::Cow;
 use std::fmt;
-use std::hash::Hash;
-use std::path::StripPrefixError;
 use std::sync::Arc;
 
 use ruff_db::files::{system_path_to_file, vendored_path_to_file, File, FilePath};
@@ -304,19 +302,17 @@ impl<'a> ModulePath<'a> {
     #[must_use]
     pub(crate) fn is_directory(&self, resolver: &ResolverState) -> bool {
         match &self.0 {
-            ModulePathInner::Extra(path) => {
-                resolver.system().is_directory(&path.to_absolute_path_buf())
-            }
-            ModulePathInner::FirstParty(path) => {
+            ModulePathInner::Extra(path)
+            | ModulePathInner::FirstParty(path)
+            | ModulePathInner::SitePackages(path)
+            | ModulePathInner::Editable(path) => {
                 resolver.system().is_directory(&path.to_absolute_path_buf())
             }
             ModulePathInner::StandardLibraryCustom(path) => {
                 match query_custom_stdlib_version(path, resolver) {
                     TypeshedVersionsQueryResult::DoesNotExist => false,
-                    TypeshedVersionsQueryResult::Exists => {
-                        resolver.system().is_directory(&path.to_absolute_path_buf())
-                    }
-                    TypeshedVersionsQueryResult::MaybeExists => {
+                    TypeshedVersionsQueryResult::Exists
+                    | TypeshedVersionsQueryResult::MaybeExists => {
                         resolver.system().is_directory(&path.to_absolute_path_buf())
                     }
                 }
@@ -324,19 +320,11 @@ impl<'a> ModulePath<'a> {
             ModulePathInner::StandardLibraryVendored(path) => {
                 match query_vendored_stdlib_version(path, resolver) {
                     TypeshedVersionsQueryResult::DoesNotExist => false,
-                    TypeshedVersionsQueryResult::Exists => resolver
-                        .vendored()
-                        .is_directory(path.to_absolute_path_buf()),
-                    TypeshedVersionsQueryResult::MaybeExists => resolver
+                    TypeshedVersionsQueryResult::Exists
+                    | TypeshedVersionsQueryResult::MaybeExists => resolver
                         .vendored()
                         .is_directory(path.to_absolute_path_buf()),
                 }
-            }
-            ModulePathInner::SitePackages(path) => {
-                resolver.system().is_directory(&path.to_absolute_path_buf())
-            }
-            ModulePathInner::Editable(path) => {
-                resolver.system().is_directory(&path.to_absolute_path_buf())
             }
         }
     }
@@ -443,6 +431,10 @@ impl<'a> ModulePath<'a> {
             ModulePathInner::StandardLibraryCustom(path) => {
                 ModulePath::custom_stdlib(path.with_extension("pyi"))
             }
+            ModulePathInner::SitePackages(path) => {
+                ModulePath::site_packages(path.with_extension("pyi"))
+            }
+            ModulePathInner::Editable(path) => ModulePath::editable(path.with_extension("pyi")),
             ModulePathInner::StandardLibraryVendored(VendoredModulePathData {
                 search_path,
                 relative_path,
@@ -450,10 +442,6 @@ impl<'a> ModulePath<'a> {
                 search_path: search_path.clone(),
                 relative_path: Cow::Owned(relative_path.with_pyi_extension()),
             }),
-            ModulePathInner::SitePackages(path) => {
-                ModulePath::site_packages(path.with_extension("pyi"))
-            }
-            ModulePathInner::Editable(path) => ModulePath::editable(path.with_extension("pyi")),
         }
     }
 
@@ -464,12 +452,12 @@ impl<'a> ModulePath<'a> {
             ModulePathInner::FirstParty(path) => {
                 ModulePathInner::FirstParty(path.with_extension("py"))
             }
-            ModulePathInner::StandardLibraryCustom(_) => return None,
-            ModulePathInner::StandardLibraryVendored(_) => return None,
             ModulePathInner::SitePackages(path) => {
                 ModulePathInner::SitePackages(path.with_extension("py"))
             }
             ModulePathInner::Editable(path) => ModulePathInner::Editable(path.with_extension("py")),
+            ModulePathInner::StandardLibraryCustom(_) => return None,
+            ModulePathInner::StandardLibraryVendored(_) => return None,
         };
         Some(ModulePath(inner))
     }
@@ -583,13 +571,14 @@ impl SystemSearchPathData {
     fn relativize_path<'a>(
         &self,
         absolute_path: &'a SystemPath,
-    ) -> Result<SystemModulePathData<'a>, StripPrefixError> {
+    ) -> Option<SystemModulePathData<'a>> {
         absolute_path
             .strip_prefix(&*self.0)
             .map(|relative_path| SystemModulePathData {
                 search_path: self.clone(),
                 relative_path: Cow::Borrowed(relative_path),
             })
+            .ok()
     }
 }
 
@@ -601,13 +590,14 @@ impl VendoredSearchPathData {
     fn relativize_path<'a>(
         &self,
         absolute_path: &'a VendoredPath,
-    ) -> Result<VendoredModulePathData<'a>, StripPrefixError> {
+    ) -> Option<VendoredModulePathData<'a>> {
         absolute_path
             .strip_prefix(&*self.0)
             .map(|relative_path| VendoredModulePathData {
                 search_path: self.clone(),
                 relative_path: Cow::Borrowed(relative_path),
             })
+            .ok()
     }
 }
 
@@ -788,14 +778,12 @@ impl ModuleSearchPath {
             (ModuleSearchPathInner::Extra(search_path), FilePath::System(absolute_path)) => {
                 search_path
                     .relativize_path(absolute_path)
-                    .ok()
                     .map(ModulePath::extra)
             }
             (ModuleSearchPathInner::Extra(_), FilePath::Vendored(_)) => None,
             (ModuleSearchPathInner::FirstParty(search_path), FilePath::System(absolute_path)) => {
                 search_path
                     .relativize_path(absolute_path)
-                    .ok()
                     .map(ModulePath::first_party)
             }
             (ModuleSearchPathInner::FirstParty(_), FilePath::Vendored(_)) => None,
@@ -804,7 +792,6 @@ impl ModuleSearchPath {
                 FilePath::System(absolute_path),
             ) => search_path
                 .relativize_path(absolute_path)
-                .ok()
                 .map(ModulePath::custom_stdlib),
             (ModuleSearchPathInner::StandardLibraryCustom(_), FilePath::Vendored(_)) => None,
             (
@@ -812,20 +799,17 @@ impl ModuleSearchPath {
                 FilePath::Vendored(absolute_path),
             ) => search_path
                 .relativize_path(absolute_path)
-                .ok()
                 .map(ModulePath::vendored_stdlib),
             (ModuleSearchPathInner::StandardLibraryVendored(_), FilePath::System(_)) => None,
             (ModuleSearchPathInner::SitePackages(search_path), FilePath::System(absolute_path)) => {
                 search_path
                     .relativize_path(absolute_path)
-                    .ok()
                     .map(ModulePath::site_packages)
             }
             (ModuleSearchPathInner::SitePackages(_), FilePath::Vendored(_)) => None,
             (ModuleSearchPathInner::Editable(search_path), FilePath::System(absolute_path)) => {
                 search_path
                     .relativize_path(absolute_path)
-                    .ok()
                     .map(ModulePath::editable)
             }
             (ModuleSearchPathInner::Editable(_), FilePath::Vendored(_)) => None,
