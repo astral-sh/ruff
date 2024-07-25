@@ -76,9 +76,8 @@ where
 
     let event = events.iter().find(|event| {
         if let salsa::EventKind::WillExecute { database_key } = event.kind {
-            dbg!(db
-                .lookup_ingredient(database_key.ingredient_index())
-                .debug_name())
+            db.lookup_ingredient(database_key.ingredient_index())
+                .debug_name()
                 == query_name
                 && database_key.key_index() == input.as_id()
         } else {
@@ -190,7 +189,6 @@ fn const_query_was_not_run_fails_if_query_was_run() {
 
     assert_eq!(len(&db), 5);
     let events = db.take_salsa_events();
-    dbg!(&events);
 
     assert_const_function_query_was_not_run(&db, len, &events);
 }

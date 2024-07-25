@@ -4,15 +4,18 @@ use countme::Count;
 use dashmap::mapref::entry::Entry;
 use salsa::Setter;
 
+pub use file_root::{FileRoot, FileRootKind};
 pub use path::FilePath;
 use ruff_notebook::{Notebook, NotebookError};
 
 use crate::file_revision::FileRevision;
+use crate::files::file_root::FileRoots;
 use crate::files::private::FileStatus;
 use crate::system::{Metadata, SystemPath, SystemPathBuf, SystemVirtualPath, SystemVirtualPathBuf};
 use crate::vendored::{VendoredPath, VendoredPathBuf};
 use crate::{Db, FxDashMap};
 
+mod file_root;
 mod path;
 
 /// Interns a file system path and returns a salsa `File` ingredient.
@@ -54,6 +57,9 @@ struct FilesInner {
 
     /// Lookup table that maps vendored files to the salsa [`File`] ingredients.
     vendored_by_path: FxDashMap<VendoredPathBuf, File>,
+
+    /// Lookup table that maps file paths to their [`FileRoot`].
+    roots: std::sync::RwLock<FileRoots>,
 }
 
 impl Files {
@@ -72,6 +78,7 @@ impl Files {
             .system_by_path
             .entry(absolute.clone())
             .or_insert_with(|| {
+                // TODO: Set correct durability according to source root.
                 let metadata = db.system().path_metadata(path);
 
                 match metadata {
@@ -161,6 +168,33 @@ impl Files {
         Some(file)
     }
 
+    /// Looks up the closest  root for `path`. Returns `None` if `path` isn't enclosed by any source root.
+    ///
+    /// Roots can be nested, in which case the closest root is returned.
+    pub fn root(&self, db: &dyn Db, path: &SystemPath) -> Option<FileRoot> {
+        let roots = self.inner.roots.read().unwrap();
+
+        let absolute = SystemPath::absolute(path, db.system().current_directory());
+        roots.at(&absolute)
+    }
+
+    /// Adds a new root for `path` and returns the root.
+    ///
+    /// The root isn't added nor is the file root's kind updated if a root for `path` already exists.
+    pub fn try_add_root(&self, db: &dyn Db, path: &SystemPath, kind: FileRootKind) -> FileRoot {
+        let mut roots = self.inner.roots.write().unwrap();
+
+        let absolute = SystemPath::absolute(path, db.system().current_directory());
+        roots.try_add(db, absolute, kind)
+    }
+
+    /// Updates the revision of the root for `path`.
+    pub fn touch_root(db: &mut dyn Db, path: &SystemPath) {
+        if let Some(root) = db.files().root(db, path) {
+            root.set_revision(db).to(FileRevision::now());
+        }
+    }
+
     /// Refreshes the state of all known files under `path` recursively.
     ///
     /// The most common use case is to update the [`Files`] state after removing or moving a directory.
@@ -180,6 +214,14 @@ impl Files {
                 file.sync(db);
             }
         }
+
+        let roots = inner.roots.read().unwrap();
+
+        for root in roots.all() {
+            if root.path(db).starts_with(&path) {
+                root.set_revision(db).to(FileRevision::now());
+            }
+        }
     }
 
     /// Refreshes the state of all known files.
@@ -196,6 +238,12 @@ impl Files {
         for entry in inner.system_by_path.iter_mut() {
             let file = entry.value();
             file.sync(db);
+        }
+
+        let roots = inner.roots.read().unwrap();
+
+        for root in roots.all() {
+            root.set_revision(db).to(FileRevision::now());
         }
     }
 }
@@ -309,6 +357,7 @@ impl File {
     }
 
     fn sync_system_path(db: &mut dyn Db, path: &SystemPath, file: Option<File>) {
+        Files::touch_root(db, path);
         let Some(file) = file.or_else(|| db.files().try_system(db, path)) else {
             return;
         };

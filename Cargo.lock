@@ -2173,6 +2173,8 @@ dependencies = [
  "filetime",
  "ignore",
  "insta",
+ "matchit",
+ "path-slash",
  "ruff_cache",
  "ruff_notebook",
  "ruff_python_ast",
