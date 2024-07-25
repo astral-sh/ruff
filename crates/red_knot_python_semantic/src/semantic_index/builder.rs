@@ -214,30 +214,38 @@ impl<'db> SemanticIndexBuilder<'db> {
 
     fn with_type_params(
         &mut self,
-        with_params: &WithTypeParams,
+        with_scope: NodeWithScopeRef,
+        type_params: Option<&'db ast::TypeParams>,
         nested: impl FnOnce(&mut Self) -> FileScopeId,
     ) -> FileScopeId {
-        let type_params = with_params.type_parameters();
-
         if let Some(type_params) = type_params {
-            let with_scope = match with_params {
-                WithTypeParams::ClassDef { node, .. } => {
-                    NodeWithScopeRef::ClassTypeParameters(node)
-                }
-                WithTypeParams::FunctionDef { node, .. } => {
-                    NodeWithScopeRef::FunctionTypeParameters(node)
-                }
-            };
-
             self.push_scope(with_scope);
 
             for type_param in &type_params.type_params {
-                let name = match type_param {
-                    ast::TypeParam::TypeVar(ast::TypeParamTypeVar { name, .. }) => name,
-                    ast::TypeParam::ParamSpec(ast::TypeParamParamSpec { name, .. }) => name,
-                    ast::TypeParam::TypeVarTuple(ast::TypeParamTypeVarTuple { name, .. }) => name,
+                let (name, bound, default) = match type_param {
+                    ast::TypeParam::TypeVar(ast::TypeParamTypeVar {
+                        name,
+                        bound,
+                        default,
+                        ..
+                    }) => (name, bound, default),
+                    ast::TypeParam::ParamSpec(ast::TypeParamParamSpec {
+                        name, default, ..
+                    }) => (name, &None, default),
+                    ast::TypeParam::TypeVarTuple(ast::TypeParamTypeVarTuple {
+                        name,
+                        default,
+                        ..
+                    }) => (name, &None, default),
                 };
+                // TODO create Definition for typevars
                 self.add_or_update_symbol(name.id.clone(), SymbolFlags::IS_DEFINED);
+                if let Some(bound) = bound {
+                    self.visit_expr(bound);
+                }
+                if let Some(default) = default {
+                    self.visit_expr(default);
+                }
             }
         }
 
@@ -318,7 +326,8 @@ where
                 self.add_definition(symbol, function_def);
 
                 self.with_type_params(
-                    &WithTypeParams::FunctionDef { node: function_def },
+                    NodeWithScopeRef::FunctionTypeParameters(function_def),
+                    function_def.type_params.as_deref(),
                     |builder| {
                         builder.visit_parameters(&function_def.parameters);
                         for expr in &function_def.returns {
@@ -340,16 +349,20 @@ where
                     self.add_or_update_symbol(class.name.id.clone(), SymbolFlags::IS_DEFINED);
                 self.add_definition(symbol, class);
 
-                self.with_type_params(&WithTypeParams::ClassDef { node: class }, |builder| {
-                    if let Some(arguments) = &class.arguments {
-                        builder.visit_arguments(arguments);
-                    }
+                self.with_type_params(
+                    NodeWithScopeRef::ClassTypeParameters(class),
+                    class.type_params.as_deref(),
+                    |builder| {
+                        if let Some(arguments) = &class.arguments {
+                            builder.visit_arguments(arguments);
+                        }
 
-                    builder.push_scope(NodeWithScopeRef::Class(class));
-                    builder.visit_body(&class.body);
+                        builder.push_scope(NodeWithScopeRef::Class(class));
+                        builder.visit_body(&class.body);
 
-                    builder.pop_scope()
-                });
+                        builder.pop_scope()
+                    },
+                );
             }
             ast::Stmt::Import(node) => {
                 for alias in &node.names {
@@ -390,18 +403,12 @@ where
                 debug_assert!(self.current_assignment.is_none());
                 // TODO deferred annotation visiting
                 self.visit_expr(&node.annotation);
-                match &node.value {
-                    Some(value) => {
-                        self.visit_expr(value);
-                        self.current_assignment = Some(node.into());
-                        self.visit_expr(&node.target);
-                        self.current_assignment = None;
-                    }
-                    None => {
-                        // TODO annotation-only assignments
-                        self.visit_expr(&node.target);
-                    }
+                if let Some(value) = &node.value {
+                    self.visit_expr(value);
                 }
+                self.current_assignment = Some(node.into());
+                self.visit_expr(&node.target);
+                self.current_assignment = None;
             }
             ast::Stmt::If(node) => {
                 self.visit_expr(&node.test);
@@ -514,6 +521,14 @@ where
                 self.current_assignment = None;
                 self.visit_expr(&node.value);
             }
+            ast::Expr::Lambda(lambda) => {
+                if let Some(parameters) = &lambda.parameters {
+                    self.visit_parameters(parameters);
+                }
+                self.push_scope(NodeWithScopeRef::Lambda(lambda));
+                self.visit_expr(lambda.body.as_ref());
+                self.pop_scope();
+            }
             ast::Expr::If(ast::ExprIf {
                 body, test, orelse, ..
             }) => {
@@ -531,20 +546,6 @@ where
             _ => {
                 walk_expr(self, expr);
             }
-        }
-    }
-}
-
-enum WithTypeParams<'node> {
-    ClassDef { node: &'node ast::StmtClassDef },
-    FunctionDef { node: &'node ast::StmtFunctionDef },
-}
-
-impl<'node> WithTypeParams<'node> {
-    fn type_parameters(&self) -> Option<&'node ast::TypeParams> {
-        match self {
-            WithTypeParams::ClassDef { node, .. } => node.type_params.as_deref(),
-            WithTypeParams::FunctionDef { node, .. } => node.type_params.as_deref(),
         }
     }
 }
