@@ -704,7 +704,7 @@ impl<'db> TypeInferenceBuilder<'db> {
             let _ = self.infer_expression(value);
         }
 
-        let annotation_ty = self.infer_expression(annotation);
+        let annotation_ty = self.infer_type_expression(annotation);
 
         self.infer_expression(target);
 
@@ -902,6 +902,24 @@ impl<'db> TypeInferenceBuilder<'db> {
         types
     }
 
+    /// Infer a type for a type expression (e.g. an annotation).
+    ///
+    /// This is distinct from a normal value expression, and results in
+    /// different inference. E.g. "str" as a value expression has type
+    /// `Type[str]`, whereas "str" as a type expression denotes the type `str`.
+    fn infer_type_expression(&mut self, expression: &ast::Expr) -> Type<'db> {
+        let ty = match expression {
+            ast::Expr::Name(name_expr)=> self.infer_name_type_expression(name_expr),
+            _ => Type::Unknown, // TODO
+        };
+
+        let expr_id = expression.scoped_ast_id(self.db, self.scope);
+        self.types.expressions.insert(expr_id, ty);
+
+        ty
+    }
+
+    /// Infer a type for a value expression.
     fn infer_expression(&mut self, expression: &ast::Expr) -> Type<'db> {
         let ty = match expression {
             ast::Expr::NoneLiteral(ast::ExprNoneLiteral { range: _ }) => Type::None,
@@ -1286,10 +1304,7 @@ impl<'db> TypeInferenceBuilder<'db> {
     }
 
     fn infer_name_type_expression(&mut self, name: &ast::ExprName) -> Type<'db> {
-        assert!()
-        if !name.ctx.is_load() {
-            panic!("unexpected non-Load context in type expression")
-        }
+        assert!(name.ctx.is_load(), "unexpected non-Load context in type expression");
 
         let value_ty = self.infer_name_expression(name);
 
@@ -1322,6 +1337,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                             && Some(self.scope) != builtins_scope(self.db)
                         {
                             unbound_ty = builtins_symbol_ty_by_name(self.db, id);
+                            dbg!(unbound_ty);
                         }
                         Some(unbound_ty)
                     } else {
