@@ -48,6 +48,7 @@ pub(crate) fn normalize_imports<'a>(
                 level,
                 atop,
                 inline,
+                trailing,
                 trailing_comma,
             } => {
                 // Whether to track each member of the import as a separate entry.
@@ -80,9 +81,12 @@ pub(crate) fn normalize_imports<'a>(
                             }
                         }
 
-                        // Replicate the inline comments onto every member.
+                        // Replicate the inline (and after) comments onto every member.
                         for comment in &inline {
                             import_from.comments.inline.push(comment.value.clone());
+                        }
+                        for comment in &trailing {
+                            import_from.comments.trailing.push(comment.value.clone());
                         }
                     }
                 } else {
@@ -113,9 +117,11 @@ pub(crate) fn normalize_imports<'a>(
                         for comment in atop {
                             import_from.comments.atop.push(comment.value);
                         }
-
                         for comment in inline {
                             import_from.comments.inline.push(comment.value);
+                        }
+                        for comment in trailing {
+                            import_from.comments.trailing.push(comment.value);
                         }
                     }
                 }
@@ -160,6 +166,9 @@ pub(crate) fn normalize_imports<'a>(
                     }
                     for comment in alias.inline {
                         comment_set.inline.push(comment.value);
+                    }
+                    for comment in alias.trailing {
+                        comment_set.trailing.push(comment.value);
                     }
 
                     // Propagate trailing commas.

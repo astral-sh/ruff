@@ -41,6 +41,7 @@ pub(crate) struct AnnotatedAliasData<'a> {
     pub(crate) asname: Option<&'a str>,
     pub(crate) atop: Vec<Comment<'a>>,
     pub(crate) inline: Vec<Comment<'a>>,
+    pub(crate) trailing: Vec<Comment<'a>>,
 }
 
 #[derive(Debug)]
@@ -56,6 +57,7 @@ pub(crate) enum AnnotatedImport<'a> {
         level: u32,
         atop: Vec<Comment<'a>>,
         inline: Vec<Comment<'a>>,
+        trailing: Vec<Comment<'a>>,
         trailing_comma: TrailingComma,
     },
 }
@@ -342,6 +344,7 @@ mod tests {
     #[test_case(Path::new("sort_similar_imports.py"))]
     #[test_case(Path::new("split.py"))]
     #[test_case(Path::new("star_before_others.py"))]
+    #[test_case(Path::new("trailing_comment.py"))]
     #[test_case(Path::new("trailing_suffix.py"))]
     #[test_case(Path::new("two_space.py"))]
     #[test_case(Path::new("type_comments.py"))]
