@@ -1,9 +1,8 @@
 //! Internal abstractions for differentiating between different kinds of search paths.
 
-use std::borrow::{Borrow, Cow};
+use std::borrow::Cow;
 use std::fmt;
 use std::hash::Hash;
-use std::ops::Deref;
 use std::path::StripPrefixError;
 use std::sync::Arc;
 
@@ -16,105 +15,117 @@ use crate::module_name::ModuleName;
 use crate::state::ResolverState;
 use crate::typeshed::{TypeshedVersionsParseError, TypeshedVersionsQueryResult};
 
-/// Trait describing fully owned, mutable paths such as `SystemPathBuf` or `VendoredPathBuf`
-trait OwnedPath: Default + fmt::Debug + Clone + PartialEq + Eq + Hash {
-    fn push(&mut self, component: &str);
-}
-
-impl OwnedPath for VendoredPathBuf {
-    fn push(&mut self, component: &str) {
-        self.push(component);
-    }
-}
-
-impl OwnedPath for SystemPathBuf {
-    fn push(&mut self, component: &str) {
-        self.push(component);
-    }
-}
-
-/// Trait describing unsized, borrowed paths such as `SystemPath` or `VendoredPath`
-trait BorrowedPath<T>: ToOwned<Owned = T> + fmt::Debug + PartialEq + Eq + Hash {
-    fn extension(&self) -> Option<&str>;
-    fn join(&self, other: &Self) -> T;
-    fn strip_prefix(&self, prefix: &Self) -> Result<&Self, StripPrefixError>;
-}
-
-impl BorrowedPath<VendoredPathBuf> for VendoredPath {
-    fn extension(&self) -> Option<&str> {
-        self.extension()
-    }
-
-    fn join(&self, other: &Self) -> VendoredPathBuf {
-        self.join(other)
-    }
-
-    fn strip_prefix(&self, prefix: &Self) -> Result<&Self, StripPrefixError> {
-        self.strip_prefix(prefix)
-    }
-}
-
-impl BorrowedPath<SystemPathBuf> for SystemPath {
-    fn extension(&self) -> Option<&str> {
-        self.extension()
-    }
-
-    fn join(&self, other: &Self) -> SystemPathBuf {
-        self.join(other)
-    }
-
-    fn strip_prefix(&self, prefix: &Self) -> Result<&Self, StripPrefixError> {
-        self.strip_prefix(prefix)
-    }
-}
-
-/// A `ModulePathData` is made up of two elements:
-/// - The [`SearchPath`] that was used to find this module.
+/// Inner data for a [`ModulePath`] that points to a location on disk.
+///
+/// A `SystemModulePathData` is made up of two elements:
+/// - The [`SystemSearchPathData`] underlying the [`ModuleSearchPath`]
+///   that was used to find this module.
 /// - A relative path from the search path to the file
 ///   that contains the source code of the Python module in question.
 ///
-/// `ModulePathData` is generic over three parameters:
-/// (1) A lifetime parameter. `ModulePathData` has copy-on-write semantics:
-///     it will borrow data without allocating whenever possible.
-/// (2) A parameter indicating the underlying data type of the
-///     [`SearchPath`]: this will be [`SystemPathBuf`] or [`VendoredPathBuf`].
-/// (3) A parameter indicating the underlying data type of the
-///     relative path from the search path to the module file:
-///     this will be [`SystemPath`] or [`VendoredPath`].
-#[derive(Debug, PartialEq, Eq, Hash)]
-struct ModulePathData<'a, A, B>
-where
-    A: OwnedPath + Borrow<B> + Deref<Target = B>,
-    B: BorrowedPath<A> + ?Sized,
-{
-    search_path: SearchPathData<A>,
-    relative_path: Cow<'a, B>,
+/// `SystemModulePathData` is generic over a lifetime parameter because
+/// it has copy-on-write semantics: it will borrow data without allocating
+/// whenever possible.
+#[derive(Debug, PartialEq, Eq, Hash, Clone)]
+struct SystemModulePathData<'a> {
+    search_path: SystemSearchPathData,
+    relative_path: Cow<'a, SystemPath>,
 }
 
-impl<'a, A, B> ModulePathData<'a, A, B>
-where
-    A: OwnedPath + Borrow<B> + Deref<Target = B>,
-    B: BorrowedPath<A> + ?Sized,
-{
+impl<'a> SystemModulePathData<'a> {
     #[must_use]
-    fn to_absolute_path_buf(&self) -> A {
-        let ModulePathData {
-            search_path: SearchPathData(search_path),
+    fn to_absolute_path_buf(&self) -> SystemPathBuf {
+        let SystemModulePathData {
+            search_path: SystemSearchPathData(search_path),
             relative_path,
         } = self;
-        search_path.join(&**relative_path)
+        search_path.join(relative_path)
     }
 
     #[must_use]
-    fn from_search_path(search_path: SearchPathData<A>) -> ModulePathData<'static, A, B> {
-        ModulePathData {
+    fn from_search_path(search_path: SystemSearchPathData) -> SystemModulePathData<'static> {
+        SystemModulePathData {
             search_path,
-            relative_path: Cow::Owned(A::default()),
+            relative_path: Cow::Owned(SystemPathBuf::new()),
         }
     }
 
     fn push(&mut self, component: &str) {
-        let ModulePathData {
+        let SystemModulePathData {
+            search_path: _,
+            relative_path,
+        } = self;
+        assert!(
+            relative_path.extension().is_none(),
+            "Cannot push part {component} to {self:?}, which already has an extension"
+        );
+        relative_path.to_mut().push(component);
+    }
+
+    #[must_use]
+    fn with_extension(&self, extension: &str) -> SystemModulePathData<'static> {
+        let SystemModulePathData {
+            search_path,
+            relative_path,
+        } = self;
+        SystemModulePathData {
+            search_path: search_path.clone(),
+            relative_path: Cow::Owned(relative_path.with_extension(extension)),
+        }
+    }
+}
+
+impl PartialEq<SystemPathBuf> for SystemModulePathData<'_> {
+    fn eq(&self, other: &SystemPathBuf) -> bool {
+        self.to_absolute_path_buf() == *other
+    }
+}
+
+impl PartialEq<SystemModulePathData<'_>> for SystemPathBuf {
+    fn eq(&self, other: &SystemModulePathData<'_>) -> bool {
+        other.eq(self)
+    }
+}
+
+/// Inner data for a [`ModulePath`] that points to a module that
+/// exists in the vendored zip archive.
+///
+/// A `VendoredModulePathData` is made up of two elements:
+/// - The [`VendoredSearchPathData`] underlying the [`ModuleSearchPath`]
+///   that was used to find this module.
+/// - A relative path from the search path to the file
+///   in the zip directory that contains the source code
+///   of the Python module in question.
+///
+/// `VendoredModulePathData` is generic over a lifetime parameter because
+/// it has copy-on-write semantics: it will borrow data without allocating
+/// whenever possible.
+#[derive(Debug, PartialEq, Eq, Hash, Clone)]
+struct VendoredModulePathData<'a> {
+    search_path: VendoredSearchPathData,
+    relative_path: Cow<'a, VendoredPath>,
+}
+
+impl<'a> VendoredModulePathData<'a> {
+    #[must_use]
+    fn to_absolute_path_buf(&self) -> VendoredPathBuf {
+        let VendoredModulePathData {
+            search_path: VendoredSearchPathData(search_path),
+            relative_path,
+        } = self;
+        search_path.join(relative_path)
+    }
+
+    #[must_use]
+    fn from_search_path(search_path: VendoredSearchPathData) -> VendoredModulePathData<'static> {
+        VendoredModulePathData {
+            search_path,
+            relative_path: Cow::Owned(VendoredPathBuf::new()),
+        }
+    }
+
+    fn push(&mut self, component: &str) {
+        let VendoredModulePathData {
             search_path: _,
             relative_path,
         } = self;
@@ -126,76 +137,15 @@ where
     }
 }
 
-impl<'a, A, B> Clone for ModulePathData<'a, A, B>
-where
-    A: OwnedPath + Borrow<B> + Deref<Target = B>,
-    B: BorrowedPath<A> + ?Sized,
-{
-    fn clone(&self) -> Self {
-        let ModulePathData {
-            search_path,
-            relative_path,
-        } = self;
-        Self {
-            search_path: search_path.clone(),
-            relative_path: relative_path.clone(),
-        }
-    }
-}
-
-impl<A, B> PartialEq<A> for ModulePathData<'_, A, B>
-where
-    A: OwnedPath + Borrow<B> + Deref<Target = B>,
-    B: BorrowedPath<A> + ?Sized,
-{
-    fn eq(&self, other: &A) -> bool {
+impl PartialEq<VendoredPathBuf> for VendoredModulePathData<'_> {
+    fn eq(&self, other: &VendoredPathBuf) -> bool {
         self.to_absolute_path_buf() == *other
-    }
-}
-
-impl PartialEq<SystemModulePathData<'_>> for SystemPathBuf {
-    fn eq(&self, other: &SystemModulePathData<'_>) -> bool {
-        other.eq(self)
     }
 }
 
 impl PartialEq<VendoredModulePathData<'_>> for VendoredPathBuf {
     fn eq(&self, other: &VendoredModulePathData<'_>) -> bool {
         other.eq(self)
-    }
-}
-
-/// A path to a Python module that exists on disk
-type VendoredModulePathData<'a> = ModulePathData<'a, VendoredPathBuf, VendoredPath>;
-
-/// A path to a Python module that exists in the vendored zip archive
-type SystemModulePathData<'a> = ModulePathData<'a, SystemPathBuf, SystemPath>;
-
-impl<'a> VendoredModulePathData<'a> {
-    #[must_use]
-    fn with_pyi_extension(&self) -> VendoredModulePathData<'static> {
-        let ModulePathData {
-            search_path,
-            relative_path,
-        } = self;
-        ModulePathData {
-            search_path: search_path.clone(),
-            relative_path: Cow::Owned(relative_path.with_pyi_extension()),
-        }
-    }
-}
-
-impl<'a> SystemModulePathData<'a> {
-    #[must_use]
-    fn with_extension(&self, extension: &str) -> SystemModulePathData<'static> {
-        let ModulePathData {
-            search_path,
-            relative_path,
-        } = self;
-        ModulePathData {
-            search_path: search_path.clone(),
-            relative_path: Cow::Owned(relative_path.with_extension(extension)),
-        }
     }
 }
 
@@ -211,11 +161,12 @@ enum ModulePathInner<'a> {
 
 /// A path that points to a Python module.
 ///
-/// `ModulePath` is generic over a lifetime.
-/// This is because `ModulePath` has copy-on-write semantics:
-/// it will borrow data without allocating whenever possible.
+/// `ModulePath` is generic over a lifetime because it has
+/// copy-on-write semantics: it will borrow data without
+/// allocating whenever possible.
 ///
-/// See [`ModulePathData`] for more details about the internal representation.
+/// See [`SystemModulePathData`] and [`VendoredModulePathData`]
+/// for more details about the internal representation.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub(crate) struct ModulePath<'a>(ModulePathInner<'a>);
 
@@ -492,9 +443,13 @@ impl<'a> ModulePath<'a> {
             ModulePathInner::StandardLibraryCustom(path) => {
                 ModulePath::custom_stdlib(path.with_extension("pyi"))
             }
-            ModulePathInner::StandardLibraryVendored(path) => {
-                ModulePath::vendored_stdlib(path.with_pyi_extension())
-            }
+            ModulePathInner::StandardLibraryVendored(VendoredModulePathData {
+                search_path,
+                relative_path,
+            }) => ModulePath::vendored_stdlib(VendoredModulePathData {
+                search_path: search_path.clone(),
+                relative_path: Cow::Owned(relative_path.with_pyi_extension()),
+            }),
             ModulePathInner::SitePackages(path) => {
                 ModulePath::site_packages(path.with_extension("pyi"))
             }
@@ -609,36 +564,9 @@ impl std::error::Error for SearchPathValidationError {
 
 type SearchPathResult<T> = Result<T, SearchPathValidationError>;
 
-/// A search path, from which [`ModulePath`]s can be derived.
+/// Inner data for a search path that points to a location on disk
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
-struct SearchPathData<A: OwnedPath>(Arc<A>);
-
-impl<A> SearchPathData<A>
-where
-    A: OwnedPath,
-{
-    fn relativize_path<'a, B>(
-        &self,
-        absolute_path: &'a B,
-    ) -> Result<ModulePathData<'a, A, B>, StripPrefixError>
-    where
-        A: Borrow<B> + Deref<Target = B>,
-        B: BorrowedPath<A> + ?Sized,
-    {
-        absolute_path
-            .strip_prefix(&self.0)
-            .map(|relative_path| ModulePathData {
-                search_path: self.clone(),
-                relative_path: Cow::Borrowed(relative_path),
-            })
-    }
-}
-
-/// A search path that points to a location on disk
-type SystemSearchPathData = SearchPathData<SystemPathBuf>;
-
-/// A search path that points to a directory in the vendored zip archive
-type VendoredSearchPathData = SearchPathData<VendoredPathBuf>;
+struct SystemSearchPathData(Arc<SystemPathBuf>);
 
 impl SystemSearchPathData {
     fn new(system: &dyn System, root: &SystemPath) -> SearchPathResult<SystemSearchPathData> {
@@ -650,6 +578,36 @@ impl SystemSearchPathData {
         } else {
             Err(SearchPathValidationError::NotADirectory(root.to_path_buf()))
         }
+    }
+
+    fn relativize_path<'a>(
+        &self,
+        absolute_path: &'a SystemPath,
+    ) -> Result<SystemModulePathData<'a>, StripPrefixError> {
+        absolute_path
+            .strip_prefix(&*self.0)
+            .map(|relative_path| SystemModulePathData {
+                search_path: self.clone(),
+                relative_path: Cow::Borrowed(relative_path),
+            })
+    }
+}
+
+/// Inner data for a search path that points to a directory in the vendored zip archive
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+struct VendoredSearchPathData(Arc<VendoredPathBuf>);
+
+impl VendoredSearchPathData {
+    fn relativize_path<'a>(
+        &self,
+        absolute_path: &'a VendoredPath,
+    ) -> Result<VendoredModulePathData<'a>, StripPrefixError> {
+        absolute_path
+            .strip_prefix(&*self.0)
+            .map(|relative_path| VendoredModulePathData {
+                search_path: self.clone(),
+                relative_path: Cow::Borrowed(relative_path),
+            })
     }
 }
 
@@ -697,7 +655,7 @@ impl ModuleSearchPath {
         system: &dyn System,
         root: impl AsRef<SystemPath>,
     ) -> SearchPathResult<Self> {
-        SearchPathData::new(system, root.as_ref())
+        SystemSearchPathData::new(system, root.as_ref())
             .map(|path| Self(ModuleSearchPathInner::Extra(path)))
     }
 
@@ -706,7 +664,7 @@ impl ModuleSearchPath {
         system: &dyn System,
         root: impl AsRef<SystemPath>,
     ) -> SearchPathResult<Self> {
-        SearchPathData::new(system, root.as_ref())
+        SystemSearchPathData::new(system, root.as_ref())
             .map(|path| Self(ModuleSearchPathInner::FirstParty(path)))
     }
 
@@ -740,7 +698,7 @@ impl ModuleSearchPath {
                 SearchPathValidationError::VersionsParseError(validation_error.clone())
             })?;
         Ok(Self(ModuleSearchPathInner::StandardLibraryCustom(
-            SearchPathData(Arc::new(stdlib)),
+            SystemSearchPathData(Arc::new(stdlib)),
         )))
     }
 
@@ -748,7 +706,7 @@ impl ModuleSearchPath {
     #[must_use]
     pub(crate) fn vendored_stdlib() -> Self {
         Self(ModuleSearchPathInner::StandardLibraryVendored(
-            SearchPathData(Arc::new(VendoredPathBuf::from("stdlib"))),
+            VendoredSearchPathData(Arc::new(VendoredPathBuf::from("stdlib"))),
         ))
     }
 
@@ -757,7 +715,7 @@ impl ModuleSearchPath {
         system: &dyn System,
         root: impl AsRef<SystemPath>,
     ) -> SearchPathResult<Self> {
-        SearchPathData::new(system, root.as_ref())
+        SystemSearchPathData::new(system, root.as_ref())
             .map(|path| Self(ModuleSearchPathInner::SitePackages(path)))
     }
 
@@ -766,7 +724,7 @@ impl ModuleSearchPath {
         system: &dyn System,
         root: impl AsRef<SystemPath>,
     ) -> SearchPathResult<Self> {
-        SearchPathData::new(system, root.as_ref())
+        SystemSearchPathData::new(system, root.as_ref())
             .map(|path| Self(ModuleSearchPathInner::Editable(path)))
     }
 
@@ -774,22 +732,24 @@ impl ModuleSearchPath {
     pub(crate) fn to_module_path(&self) -> ModulePath<'static> {
         match &self.0 {
             ModuleSearchPathInner::Extra(search_path) => {
-                ModulePath::extra(ModulePathData::from_search_path(search_path.clone()))
+                ModulePath::extra(SystemModulePathData::from_search_path(search_path.clone()))
             }
             ModuleSearchPathInner::FirstParty(search_path) => {
-                ModulePath::first_party(ModulePathData::from_search_path(search_path.clone()))
+                ModulePath::first_party(SystemModulePathData::from_search_path(search_path.clone()))
             }
-            ModuleSearchPathInner::StandardLibraryCustom(search_path) => {
-                ModulePath::custom_stdlib(ModulePathData::from_search_path(search_path.clone()))
-            }
+            ModuleSearchPathInner::StandardLibraryCustom(search_path) => ModulePath::custom_stdlib(
+                SystemModulePathData::from_search_path(search_path.clone()),
+            ),
             ModuleSearchPathInner::StandardLibraryVendored(search_path) => {
-                ModulePath::vendored_stdlib(ModulePathData::from_search_path(search_path.clone()))
+                ModulePath::vendored_stdlib(VendoredModulePathData::from_search_path(
+                    search_path.clone(),
+                ))
             }
-            ModuleSearchPathInner::SitePackages(search_path) => {
-                ModulePath::site_packages(ModulePathData::from_search_path(search_path.clone()))
-            }
+            ModuleSearchPathInner::SitePackages(search_path) => ModulePath::site_packages(
+                SystemModulePathData::from_search_path(search_path.clone()),
+            ),
             ModuleSearchPathInner::Editable(search_path) => {
-                ModulePath::editable(ModulePathData::from_search_path(search_path.clone()))
+                ModulePath::editable(SystemModulePathData::from_search_path(search_path.clone()))
             }
         }
     }
