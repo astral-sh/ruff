@@ -1,5 +1,40 @@
 # Changelog
 
+## 0.5.5
+
+### Preview features
+
+- \[`fastapi`\] Implement `fastapi-redundant-response-model` (`FAST001`) and `fastapi-non-annotated-dependency`(`FAST002`) ([#11579](https://github.com/astral-sh/ruff/pull/11579))
+- \[`pydoclint`\] Implement `docstring-missing-exception` (`DOC501`) and `docstring-extraneous-exception` (`DOC502`) ([#11471](https://github.com/astral-sh/ruff/pull/11471))
+
+### Rule changes
+
+- \[`numpy`\] Fix NumPy 2.0 rule for `np.alltrue` and `np.sometrue` ([#12473](https://github.com/astral-sh/ruff/pull/12473))
+- \[`numpy`\] Ignore `NPY201` inside `except` blocks for compatibility with older numpy versions ([#12490](https://github.com/astral-sh/ruff/pull/12490))
+- \[`pep8-naming`\] Avoid applying `ignore-names` to `self` and `cls` function names (`N804`, `N805`) ([#12497](https://github.com/astral-sh/ruff/pull/12497))
+
+### Formatter
+
+- Fix incorrect placement of leading function comment with type params ([#12447](https://github.com/astral-sh/ruff/pull/12447))
+
+### Server
+
+- Do not bail code action resolution when a quick fix is requested ([#12462](https://github.com/astral-sh/ruff/pull/12462))
+
+### Bug fixes
+
+- Fix `Ord` implementation of `cmp_fix` ([#12471](https://github.com/astral-sh/ruff/pull/12471))
+- Raise syntax error for unparenthesized generator expression in multi-argument call ([#12445](https://github.com/astral-sh/ruff/pull/12445))
+- \[`pydoclint`\] Fix panic in `DOC501` reported in [#12428](https://github.com/astral-sh/ruff/pull/12428) ([#12435](https://github.com/astral-sh/ruff/pull/12435))
+- \[`flake8-bugbear`\] Allow singleton tuples with starred expressions in `B013` ([#12484](https://github.com/astral-sh/ruff/pull/12484))
+
+### Documentation
+
+- Add Eglot setup guide for Emacs editor ([#12426](https://github.com/astral-sh/ruff/pull/12426))
+- Add note about the breaking change in `nvim-lspconfig` ([#12507](https://github.com/astral-sh/ruff/pull/12507))
+- Add note to include notebook files for native server ([#12449](https://github.com/astral-sh/ruff/pull/12449))
+- Add setup docs for Zed editor ([#12501](https://github.com/astral-sh/ruff/pull/12501))
+
 ## 0.5.4
 
 ### Rule changes
