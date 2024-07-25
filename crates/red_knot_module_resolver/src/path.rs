@@ -224,7 +224,7 @@ impl PartialEq<SystemPathBuf> for ModulePath {
             relative_path,
         } = self;
         search_path
-            .as_system_path_buf()
+            .as_system_path()
             .and_then(|search_path| other.strip_prefix(search_path).ok())
             .is_some_and(|other_relative_path| other_relative_path.as_utf8_path() == relative_path)
     }
@@ -243,7 +243,7 @@ impl PartialEq<VendoredPathBuf> for ModulePath {
             relative_path,
         } = self;
         search_path
-            .as_vendored_path_buf()
+            .as_vendored_path()
             .and_then(|search_path| other.strip_prefix(search_path).ok())
             .is_some_and(|other_relative_path| other_relative_path.as_utf8_path() == relative_path)
     }
@@ -511,7 +511,7 @@ impl SearchPath {
     }
 
     #[must_use]
-    pub(crate) fn as_system_path_buf(&self) -> Option<&SystemPath> {
+    pub(crate) fn as_system_path(&self) -> Option<&SystemPath> {
         match &*self.0 {
             SearchPathInner::Extra(path)
             | SearchPathInner::FirstParty(path)
@@ -523,7 +523,7 @@ impl SearchPath {
     }
 
     #[must_use]
-    pub(crate) fn as_vendored_path_buf(&self) -> Option<&VendoredPath> {
+    pub(crate) fn as_vendored_path(&self) -> Option<&VendoredPath> {
         match &*self.0 {
             SearchPathInner::StandardLibraryVendored(path) => Some(path),
             SearchPathInner::Extra(_)
@@ -537,7 +537,7 @@ impl SearchPath {
 
 impl PartialEq<SystemPath> for SearchPath {
     fn eq(&self, other: &SystemPath) -> bool {
-        self.as_system_path_buf().is_some_and(|path| path == other)
+        self.as_system_path().is_some_and(|path| path == other)
     }
 }
 
@@ -561,8 +561,7 @@ impl PartialEq<SearchPath> for SystemPathBuf {
 
 impl PartialEq<VendoredPath> for SearchPath {
     fn eq(&self, other: &VendoredPath) -> bool {
-        self.as_vendored_path_buf()
-            .is_some_and(|path| path == other)
+        self.as_vendored_path().is_some_and(|path| path == other)
     }
 }
 

@@ -158,7 +158,7 @@ fn try_resolve_module_resolution_settings(
         FxHashSet::with_capacity_and_hasher(static_search_paths.len(), FxBuildHasher);
 
     static_search_paths.retain(|path| {
-        if let Some(path) = path.as_system_path_buf() {
+        if let Some(path) = path.as_system_path() {
             seen_paths.insert(path.to_path_buf())
         } else {
             true
@@ -204,7 +204,7 @@ pub(crate) fn editable_install_resolution_paths(db: &dyn Db) -> Vec<SearchPath> 
 
     if let Some(site_packages) = site_packages {
         let site_packages = site_packages
-            .as_system_path_buf()
+            .as_system_path()
             .expect("Expected site-packages never to be a VendoredPath!");
 
         // As well as modules installed directly into `site-packages`,
@@ -225,7 +225,7 @@ pub(crate) fn editable_install_resolution_paths(db: &dyn Db) -> Vec<SearchPath> 
 
         let mut existing_paths: FxHashSet<_> = static_search_paths
             .iter()
-            .filter_map(|path| path.as_system_path_buf())
+            .filter_map(|path| path.as_system_path())
             .map(Cow::Borrowed)
             .collect();
 
@@ -234,7 +234,7 @@ pub(crate) fn editable_install_resolution_paths(db: &dyn Db) -> Vec<SearchPath> 
         for pth_file in &all_pth_files {
             for installation in pth_file.editable_installations() {
                 if existing_paths.insert(Cow::Owned(
-                    installation.as_system_path_buf().unwrap().to_path_buf(),
+                    installation.as_system_path().unwrap().to_path_buf(),
                 )) {
                     dynamic_paths.push(installation);
                 }

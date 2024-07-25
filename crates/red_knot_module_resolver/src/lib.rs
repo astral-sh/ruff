@@ -40,7 +40,7 @@ impl<'db> Iterator for SystemModuleSearchPathsIter<'db> {
         loop {
             let next = self.inner.next()?;
 
-            if let Some(system_path) = next.as_system_path_buf() {
+            if let Some(system_path) = next.as_system_path() {
                 return Some(system_path);
             }
         }
