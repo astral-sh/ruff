@@ -97,6 +97,7 @@ impl Violation for RawStringInException {
 ///
 /// Which will produce a traceback like:
 /// ```console
+/// Traceback (most recent call last):
 ///   File "tmp.py", line 3, in <module>
 ///     raise RuntimeError(msg)
 /// RuntimeError: 'Some value' is incorrect
