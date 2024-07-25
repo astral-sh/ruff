@@ -2283,6 +2283,22 @@ mod tests {
         Ok(())
     }
 
+    #[test]
+    fn module_dunder_name() -> anyhow::Result<()> {
+        let mut db = setup_db();
+
+        db.write_dedented(
+            "/src/a.py",
+            "
+            x = __name__
+            "
+        )?;
+
+        assert_public_ty(&db, "/src/a.py", "x", "builtins.str");
+
+        Ok(())
+    }
+
     fn first_public_def<'db>(db: &'db TestDb, file: File, name: &str) -> Definition<'db> {
         let scope = global_scope(db, file);
         *use_def_map(db, scope)
