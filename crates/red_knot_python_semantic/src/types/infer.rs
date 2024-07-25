@@ -1285,6 +1285,17 @@ impl<'db> TypeInferenceBuilder<'db> {
         Type::Unknown
     }
 
+    fn infer_name_type_expression(&mut self, name: &ast::ExprName) -> Type<'db> {
+        assert!()
+        if !name.ctx.is_load() {
+            panic!("unexpected non-Load context in type expression")
+        }
+
+        let value_ty = self.infer_name_expression(name);
+
+        value_ty
+    }
+
     fn infer_name_expression(&mut self, name: &ast::ExprName) -> Type<'db> {
         let ast::ExprName { range: _, id, ctx } = name;
 
@@ -2279,6 +2290,20 @@ mod tests {
         // if just-body were possible without the break, then 0 would be possible for y
         // 1 and 2 both being possible for y shows that we can hit else with or without body
         assert_public_ty(&db, "/src/a.py", "y", "Literal[1, 2, 4]");
+
+        Ok(())
+    }
+
+    #[test]
+    fn annotated_type() -> anyhow::Result<()> {
+        let mut db = setup_db();
+
+        db.write_dedented(
+            "/src/a.pyi",
+            "x: str"
+        )?;
+
+        assert_public_ty(&db, "/src/a.pyi", "x", "builtins.str");
 
         Ok(())
     }
