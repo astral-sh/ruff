@@ -23,6 +23,10 @@ impl VendoredPath {
         self.0.as_str()
     }
 
+    pub fn as_utf8_path(&self) -> &camino::Utf8Path {
+        &self.0
+    }
+
     pub fn as_std_path(&self) -> &path::Path {
         self.0.as_std_path()
     }
@@ -103,6 +107,20 @@ impl AsRef<VendoredPath> for VendoredPath {
     #[inline]
     fn as_ref(&self) -> &VendoredPath {
         self
+    }
+}
+
+impl AsRef<VendoredPath> for Utf8Path {
+    #[inline]
+    fn as_ref(&self) -> &VendoredPath {
+        VendoredPath::new(self)
+    }
+}
+
+impl AsRef<VendoredPath> for Utf8PathBuf {
+    #[inline]
+    fn as_ref(&self) -> &VendoredPath {
+        VendoredPath::new(self.as_path())
     }
 }
 

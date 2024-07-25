@@ -496,6 +496,20 @@ impl AsRef<SystemPath> for SystemPath {
     }
 }
 
+impl AsRef<SystemPath> for Utf8Path {
+    #[inline]
+    fn as_ref(&self) -> &SystemPath {
+        SystemPath::new(self)
+    }
+}
+
+impl AsRef<SystemPath> for Utf8PathBuf {
+    #[inline]
+    fn as_ref(&self) -> &SystemPath {
+        SystemPath::new(self.as_path())
+    }
+}
+
 impl AsRef<SystemPath> for str {
     #[inline]
     fn as_ref(&self) -> &SystemPath {

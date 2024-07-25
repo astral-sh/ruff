@@ -127,20 +127,20 @@ fn try_resolve_module_resolution_settings(
 
     let mut static_search_paths = vec![];
 
-    for path in extra_paths {
+    for path in extra_paths.iter().cloned() {
         static_search_paths.push(SearchPath::extra(system, path)?);
     }
 
-    static_search_paths.push(SearchPath::first_party(system, workspace_root)?);
+    static_search_paths.push(SearchPath::first_party(system, workspace_root.clone())?);
 
     static_search_paths.push(if let Some(custom_typeshed) = custom_typeshed.as_ref() {
-        SearchPath::custom_stdlib(db, custom_typeshed)?
+        SearchPath::custom_stdlib(db, custom_typeshed.clone())?
     } else {
         SearchPath::vendored_stdlib()
     });
 
     if let Some(site_packages) = site_packages {
-        static_search_paths.push(SearchPath::site_packages(system, site_packages)?);
+        static_search_paths.push(SearchPath::site_packages(system, site_packages.clone())?);
     }
 
     // TODO vendor typeshed's third-party stubs as well as the stdlib and fallback to them as a final step
@@ -1651,7 +1651,10 @@ not_a_directory
         let search_paths: Vec<&SearchPath> =
             module_resolution_settings(&db).search_paths(&db).collect();
 
-        assert!(search_paths.contains(&&SearchPath::first_party(db.system(), "/src").unwrap()));
-        assert!(!search_paths.contains(&&SearchPath::editable(db.system(), "/src").unwrap()));
+        assert!(search_paths.contains(
+            &&SearchPath::first_party(db.system(), SystemPathBuf::from("/src")).unwrap()
+        ));
+        assert!(!search_paths
+            .contains(&&SearchPath::editable(db.system(), SystemPathBuf::from("/src")).unwrap()));
     }
 }
