@@ -583,7 +583,7 @@ where
 
 #[derive(Debug)]
 struct ResolvedPackage {
-    path: ModulePath<'static>,
+    path: ModulePath,
     kind: PackageKind,
 }
 

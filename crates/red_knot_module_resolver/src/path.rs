@@ -1,6 +1,5 @@
 //! Internal abstractions for differentiating between different kinds of search paths.
 
-use std::borrow::Cow;
 use std::fmt;
 use std::sync::Arc;
 
@@ -20,17 +19,13 @@ use crate::typeshed::{TypeshedVersionsParseError, TypeshedVersionsQueryResult};
 ///   that was used to find this module.
 /// - A relative path from the search path to the file
 ///   that contains the source code of the Python module in question.
-///
-/// `SystemModulePathData` is generic over a lifetime parameter because
-/// it has copy-on-write semantics: it will borrow data without allocating
-/// whenever possible.
 #[derive(Debug, PartialEq, Eq, Hash, Clone)]
-struct SystemModulePathData<'a> {
+struct SystemModulePathData {
     search_path: SystemSearchPathData,
-    relative_path: Cow<'a, SystemPath>,
+    relative_path: SystemPathBuf,
 }
 
-impl<'a> SystemModulePathData<'a> {
+impl SystemModulePathData {
     #[must_use]
     fn to_absolute_path_buf(&self) -> SystemPathBuf {
         let SystemModulePathData {
@@ -41,10 +36,10 @@ impl<'a> SystemModulePathData<'a> {
     }
 
     #[must_use]
-    fn from_search_path(search_path: SystemSearchPathData) -> SystemModulePathData<'static> {
-        SystemModulePathData {
+    fn from_search_path(search_path: SystemSearchPathData) -> Self {
+        Self {
             search_path,
-            relative_path: Cow::Owned(SystemPathBuf::new()),
+            relative_path: SystemPathBuf::new(),
         }
     }
 
@@ -57,30 +52,30 @@ impl<'a> SystemModulePathData<'a> {
             relative_path.extension().is_none(),
             "Cannot push part {component} to {self:?}, which already has an extension"
         );
-        relative_path.to_mut().push(component);
+        relative_path.push(component);
     }
 
     #[must_use]
-    fn with_extension(&self, extension: &str) -> SystemModulePathData<'static> {
+    fn with_extension(&self, extension: &str) -> Self {
         let SystemModulePathData {
             search_path,
             relative_path,
         } = self;
         SystemModulePathData {
             search_path: search_path.clone(),
-            relative_path: Cow::Owned(relative_path.with_extension(extension)),
+            relative_path: relative_path.with_extension(extension),
         }
     }
 }
 
-impl PartialEq<SystemPathBuf> for SystemModulePathData<'_> {
+impl PartialEq<SystemPathBuf> for SystemModulePathData {
     fn eq(&self, other: &SystemPathBuf) -> bool {
         self.to_absolute_path_buf() == *other
     }
 }
 
-impl PartialEq<SystemModulePathData<'_>> for SystemPathBuf {
-    fn eq(&self, other: &SystemModulePathData<'_>) -> bool {
+impl PartialEq<SystemModulePathData> for SystemPathBuf {
+    fn eq(&self, other: &SystemModulePathData) -> bool {
         other.eq(self)
     }
 }
@@ -94,17 +89,13 @@ impl PartialEq<SystemModulePathData<'_>> for SystemPathBuf {
 /// - A relative path from the search path to the file
 ///   in the zip directory that contains the source code
 ///   of the Python module in question.
-///
-/// `VendoredModulePathData` is generic over a lifetime parameter because
-/// it has copy-on-write semantics: it will borrow data without allocating
-/// whenever possible.
 #[derive(Debug, PartialEq, Eq, Hash, Clone)]
-struct VendoredModulePathData<'a> {
+struct VendoredModulePathData {
     search_path: VendoredSearchPathData,
-    relative_path: Cow<'a, VendoredPath>,
+    relative_path: VendoredPathBuf,
 }
 
-impl<'a> VendoredModulePathData<'a> {
+impl VendoredModulePathData {
     #[must_use]
     fn to_absolute_path_buf(&self) -> VendoredPathBuf {
         let VendoredModulePathData {
@@ -115,10 +106,10 @@ impl<'a> VendoredModulePathData<'a> {
     }
 
     #[must_use]
-    fn from_search_path(search_path: VendoredSearchPathData) -> VendoredModulePathData<'static> {
-        VendoredModulePathData {
+    fn from_search_path(search_path: VendoredSearchPathData) -> Self {
+        Self {
             search_path,
-            relative_path: Cow::Owned(VendoredPathBuf::new()),
+            relative_path: VendoredPathBuf::new(),
         }
     }
 
@@ -131,42 +122,38 @@ impl<'a> VendoredModulePathData<'a> {
             relative_path.extension().is_none(),
             "Cannot push part {component} to {self:?}, which already has an extension"
         );
-        relative_path.to_mut().push(component);
+        relative_path.push(component);
     }
 }
 
-impl PartialEq<VendoredPathBuf> for VendoredModulePathData<'_> {
+impl PartialEq<VendoredPathBuf> for VendoredModulePathData {
     fn eq(&self, other: &VendoredPathBuf) -> bool {
         self.to_absolute_path_buf() == *other
     }
 }
 
-impl PartialEq<VendoredModulePathData<'_>> for VendoredPathBuf {
-    fn eq(&self, other: &VendoredModulePathData<'_>) -> bool {
+impl PartialEq<VendoredModulePathData> for VendoredPathBuf {
+    fn eq(&self, other: &VendoredModulePathData) -> bool {
         other.eq(self)
     }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
-enum ModulePathInner<'a> {
-    Extra(SystemModulePathData<'a>),
-    FirstParty(SystemModulePathData<'a>),
-    StandardLibraryCustom(SystemModulePathData<'a>),
-    StandardLibraryVendored(VendoredModulePathData<'a>),
-    SitePackages(SystemModulePathData<'a>),
-    Editable(SystemModulePathData<'a>),
+enum ModulePathInner {
+    Extra(SystemModulePathData),
+    FirstParty(SystemModulePathData),
+    StandardLibraryCustom(SystemModulePathData),
+    StandardLibraryVendored(VendoredModulePathData),
+    SitePackages(SystemModulePathData),
+    Editable(SystemModulePathData),
 }
 
 /// A path that points to a Python module.
 ///
-/// `ModulePath` is generic over a lifetime because it has
-/// copy-on-write semantics: it will borrow data without
-/// allocating whenever possible.
-///
 /// See [`SystemModulePathData`] and [`VendoredModulePathData`]
 /// for more details about the internal representation.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub(crate) struct ModulePath<'a>(ModulePathInner<'a>);
+pub(crate) struct ModulePath(ModulePathInner);
 
 #[must_use]
 fn custom_stdlib_path_to_module_name(relative_path: &SystemPath) -> Option<ModuleName> {
@@ -236,34 +223,34 @@ fn query_vendored_stdlib_version(
     typeshed_versions.query_module(*db, &module_name, None, *target_version)
 }
 
-impl<'a> ModulePath<'a> {
+impl ModulePath {
     #[must_use]
-    fn extra(module_path: SystemModulePathData<'a>) -> Self {
+    fn extra(module_path: SystemModulePathData) -> Self {
         Self(ModulePathInner::Extra(module_path))
     }
 
     #[must_use]
-    fn first_party(module_path: SystemModulePathData<'a>) -> Self {
+    fn first_party(module_path: SystemModulePathData) -> Self {
         Self(ModulePathInner::FirstParty(module_path))
     }
 
     #[must_use]
-    fn custom_stdlib(module_path: SystemModulePathData<'a>) -> Self {
+    fn custom_stdlib(module_path: SystemModulePathData) -> Self {
         Self(ModulePathInner::StandardLibraryCustom(module_path))
     }
 
     #[must_use]
-    fn vendored_stdlib(module_path: VendoredModulePathData<'a>) -> Self {
+    fn vendored_stdlib(module_path: VendoredModulePathData) -> Self {
         Self(ModulePathInner::StandardLibraryVendored(module_path))
     }
 
     #[must_use]
-    fn site_packages(module_path: SystemModulePathData<'a>) -> Self {
+    fn site_packages(module_path: SystemModulePathData) -> Self {
         Self(ModulePathInner::SitePackages(module_path))
     }
 
     #[must_use]
-    fn editable(module_path: SystemModulePathData<'a>) -> Self {
+    fn editable(module_path: SystemModulePathData) -> Self {
         Self(ModulePathInner::Editable(module_path))
     }
 
@@ -422,31 +409,27 @@ impl<'a> ModulePath<'a> {
     }
 
     #[must_use]
-    pub(crate) fn with_pyi_extension(&self) -> ModulePath<'static> {
+    pub(crate) fn with_pyi_extension(&self) -> Self {
         match &self.0 {
-            ModulePathInner::Extra(path) => ModulePath::extra(path.with_extension("pyi")),
-            ModulePathInner::FirstParty(path) => {
-                ModulePath::first_party(path.with_extension("pyi"))
-            }
+            ModulePathInner::Extra(path) => Self::extra(path.with_extension("pyi")),
+            ModulePathInner::FirstParty(path) => Self::first_party(path.with_extension("pyi")),
             ModulePathInner::StandardLibraryCustom(path) => {
-                ModulePath::custom_stdlib(path.with_extension("pyi"))
+                Self::custom_stdlib(path.with_extension("pyi"))
             }
-            ModulePathInner::SitePackages(path) => {
-                ModulePath::site_packages(path.with_extension("pyi"))
-            }
-            ModulePathInner::Editable(path) => ModulePath::editable(path.with_extension("pyi")),
+            ModulePathInner::SitePackages(path) => Self::site_packages(path.with_extension("pyi")),
+            ModulePathInner::Editable(path) => Self::editable(path.with_extension("pyi")),
             ModulePathInner::StandardLibraryVendored(VendoredModulePathData {
                 search_path,
                 relative_path,
-            }) => ModulePath::vendored_stdlib(VendoredModulePathData {
+            }) => Self::vendored_stdlib(VendoredModulePathData {
                 search_path: search_path.clone(),
-                relative_path: Cow::Owned(relative_path.with_pyi_extension()),
+                relative_path: relative_path.with_pyi_extension(),
             }),
         }
     }
 
     #[must_use]
-    pub(crate) fn with_py_extension(&self) -> Option<ModulePath<'static>> {
+    pub(crate) fn with_py_extension(&self) -> Option<Self> {
         let inner = match &self.0 {
             ModulePathInner::Extra(path) => ModulePathInner::Extra(path.with_extension("py")),
             ModulePathInner::FirstParty(path) => {
@@ -459,11 +442,11 @@ impl<'a> ModulePath<'a> {
             ModulePathInner::StandardLibraryCustom(_) => return None,
             ModulePathInner::StandardLibraryVendored(_) => return None,
         };
-        Some(ModulePath(inner))
+        Some(Self(inner))
     }
 }
 
-impl PartialEq<SystemPathBuf> for ModulePath<'_> {
+impl PartialEq<SystemPathBuf> for ModulePath {
     fn eq(&self, other: &SystemPathBuf) -> bool {
         match &self.0 {
             ModulePathInner::Extra(path)
@@ -476,13 +459,13 @@ impl PartialEq<SystemPathBuf> for ModulePath<'_> {
     }
 }
 
-impl PartialEq<ModulePath<'_>> for SystemPathBuf {
-    fn eq(&self, other: &ModulePath<'_>) -> bool {
+impl PartialEq<ModulePath> for SystemPathBuf {
+    fn eq(&self, other: &ModulePath) -> bool {
         other.eq(self)
     }
 }
 
-impl PartialEq<VendoredPathBuf> for ModulePath<'_> {
+impl PartialEq<VendoredPathBuf> for ModulePath {
     fn eq(&self, other: &VendoredPathBuf) -> bool {
         match &self.0 {
             ModulePathInner::StandardLibraryVendored(path) => path == other,
@@ -495,8 +478,8 @@ impl PartialEq<VendoredPathBuf> for ModulePath<'_> {
     }
 }
 
-impl PartialEq<ModulePath<'_>> for VendoredPathBuf {
-    fn eq(&self, other: &ModulePath<'_>) -> bool {
+impl PartialEq<ModulePath> for VendoredPathBuf {
+    fn eq(&self, other: &ModulePath) -> bool {
         other.eq(self)
     }
 }
@@ -557,7 +540,7 @@ type SearchPathResult<T> = Result<T, SearchPathValidationError>;
 struct SystemSearchPathData(Arc<SystemPathBuf>);
 
 impl SystemSearchPathData {
-    fn new(system: &dyn System, root: &SystemPath) -> SearchPathResult<SystemSearchPathData> {
+    fn new(system: &dyn System, root: &SystemPath) -> SearchPathResult<Self> {
         if system.is_directory(root) {
             Ok(Self(Arc::new(SystemPath::absolute(
                 root,
@@ -568,15 +551,12 @@ impl SystemSearchPathData {
         }
     }
 
-    fn relativize_path<'a>(
-        &self,
-        absolute_path: &'a SystemPath,
-    ) -> Option<SystemModulePathData<'a>> {
+    fn relativize_path(&self, absolute_path: &SystemPath) -> Option<SystemModulePathData> {
         absolute_path
             .strip_prefix(&*self.0)
             .map(|relative_path| SystemModulePathData {
                 search_path: self.clone(),
-                relative_path: Cow::Borrowed(relative_path),
+                relative_path: relative_path.to_path_buf(),
             })
             .ok()
     }
@@ -587,15 +567,12 @@ impl SystemSearchPathData {
 struct VendoredSearchPathData(Arc<VendoredPathBuf>);
 
 impl VendoredSearchPathData {
-    fn relativize_path<'a>(
-        &self,
-        absolute_path: &'a VendoredPath,
-    ) -> Option<VendoredModulePathData<'a>> {
+    fn relativize_path(&self, absolute_path: &VendoredPath) -> Option<VendoredModulePathData> {
         absolute_path
             .strip_prefix(&*self.0)
             .map(|relative_path| VendoredModulePathData {
                 search_path: self.clone(),
-                relative_path: Cow::Borrowed(relative_path),
+                relative_path: relative_path.to_path_buf(),
             })
             .ok()
     }
@@ -719,7 +696,7 @@ impl SearchPath {
     }
 
     #[must_use]
-    pub(crate) fn to_module_path(&self) -> ModulePath<'static> {
+    pub(crate) fn to_module_path(&self) -> ModulePath {
         match &self.0 {
             SearchPathInner::Extra(search_path) => {
                 ModulePath::extra(SystemModulePathData::from_search_path(search_path.clone()))
@@ -758,7 +735,7 @@ impl SearchPath {
     }
 
     #[must_use]
-    pub(crate) fn relativize_path<'a>(&self, path: &'a FilePath) -> Option<ModulePath<'a>> {
+    pub(crate) fn relativize_path(&self, path: &FilePath) -> Option<ModulePath> {
         let extension = path.extension();
 
         if self.is_standard_library() {
@@ -871,11 +848,11 @@ mod tests {
 
     use super::*;
 
-    impl<'a> ModulePath<'a> {
+    impl ModulePath {
         #[must_use]
-        fn join(&self, component: &'a (impl AsRef<SystemPath> + ?Sized)) -> ModulePath<'a> {
+        fn join(&self, component: &str) -> ModulePath {
             let mut result = self.clone();
-            result.push(component.as_ref().as_str());
+            result.push(component);
             result
         }
     }
@@ -890,7 +867,7 @@ mod tests {
             )
         }
 
-        fn join<'a>(&'a self, component: &'a str) -> ModulePath<'a> {
+        fn join(&self, component: &str) -> ModulePath {
             self.to_module_path().join(component)
         }
     }
