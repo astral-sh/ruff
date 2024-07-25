@@ -72,11 +72,9 @@ impl BorrowedPath<SystemPathBuf> for SystemPath {
 /// - A relative path from the search path to the file
 ///   that contains the source code of the Python module in question.
 ///
-/// `ModulePath` is generic over three parameters:
-/// (1) A lifetime parameter.
-///     If this is `'static`, the module path will be owned and mutable.
-///     For anything else, it will be borrowed and immutable;
-///     the [`ModulePath::push()`] method will not be available.
+/// `ModulePathData` is generic over three parameters:
+/// (1) A lifetime parameter. `ModulePathData` has copy-on-write semantics:
+///     it will borrow data without allocating whenever possible.
 /// (2) A parameter indicating the underlying data type of the
 ///     [`SearchPath`]: this will be [`SystemPathBuf`] or [`VendoredPathBuf`].
 /// (3) A parameter indicating the underlying data type of the
@@ -105,16 +103,10 @@ where
         } = self;
         A::borrow(search_path).join(&**relative_path)
     }
-}
 
-impl<A, B> ModulePathData<'static, A, B>
-where
-    A: OwnedPath + Borrow<B>,
-    B: BorrowedPath<A> + ?Sized,
-{
     #[must_use]
-    fn from_search_path(search_path: SearchPathData<A>) -> Self {
-        Self {
+    fn from_search_path(search_path: SearchPathData<A>) -> ModulePathData<'static, A, B> {
+        ModulePathData {
             search_path,
             relative_path: Cow::Owned(A::default()),
         }
@@ -218,40 +210,13 @@ enum ModulePathInner<'a> {
 
 /// A path that points to a Python module.
 ///
-/// The [`ModulePath`] struct is generic over a lifetime.
-/// Owned module paths are represented as `ModulePath<'static>`;
-/// some methods, such as [`ModulePath::push()`], are only
-/// present on owned instances.
+/// `ModulePath` is generic over a lifetime.
+/// This is because `ModulePath` has copy-on-write semantics:
+/// it will borrow data without allocating whenever possible.
 ///
 /// See [`ModulePathData`] for more details about the internal representation.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub(crate) struct ModulePath<'a>(ModulePathInner<'a>);
-
-impl ModulePath<'static> {
-    pub(crate) fn push(&mut self, component: &str) {
-        if let Some(component_extension) = camino::Utf8Path::new(component).extension() {
-            if self.is_standard_library() {
-                assert_eq!(
-                    component_extension, "pyi",
-                    "Extension must be `pyi`; got `{component_extension}`"
-                );
-            } else {
-                assert!(
-                    matches!(component_extension, "pyi" | "py"),
-                    "Extension must be `py` or `pyi`; got `{component_extension}`"
-                );
-            }
-        }
-        match &mut self.0 {
-            ModulePathInner::Extra(path) => path.push(component),
-            ModulePathInner::FirstParty(path) => path.push(component),
-            ModulePathInner::StandardLibraryCustom(path) => path.push(component),
-            ModulePathInner::StandardLibraryVendored(path) => path.push(component),
-            ModulePathInner::SitePackages(path) => path.push(component),
-            ModulePathInner::Editable(path) => path.push(component),
-        }
-    }
-}
 
 #[must_use]
 fn custom_stdlib_path_to_module_name(relative_path: &SystemPath) -> Option<ModuleName> {
@@ -358,6 +323,30 @@ impl<'a> ModulePath<'a> {
             &self.0,
             ModulePathInner::StandardLibraryCustom(_) | ModulePathInner::StandardLibraryVendored(_)
         )
+    }
+
+    pub(crate) fn push(&mut self, component: &str) {
+        if let Some(component_extension) = camino::Utf8Path::new(component).extension() {
+            if self.is_standard_library() {
+                assert_eq!(
+                    component_extension, "pyi",
+                    "Extension must be `pyi`; got `{component_extension}`"
+                );
+            } else {
+                assert!(
+                    matches!(component_extension, "pyi" | "py"),
+                    "Extension must be `py` or `pyi`; got `{component_extension}`"
+                );
+            }
+        }
+        match &mut self.0 {
+            ModulePathInner::Extra(path) => path.push(component),
+            ModulePathInner::FirstParty(path) => path.push(component),
+            ModulePathInner::StandardLibraryCustom(path) => path.push(component),
+            ModulePathInner::StandardLibraryVendored(path) => path.push(component),
+            ModulePathInner::SitePackages(path) => path.push(component),
+            ModulePathInner::Editable(path) => path.push(component),
+        }
     }
 
     #[must_use]
@@ -946,52 +935,12 @@ mod tests {
 
     use super::*;
 
-    impl<'a, A, B> ModulePathData<'a, A, B>
-    where
-        A: OwnedPath + Borrow<B>,
-        B: BorrowedPath<A> + ?Sized,
-    {
-        fn into_static(self) -> ModulePathData<'static, A, B> {
-            let ModulePathData {
-                search_path,
-                relative_path,
-            } = self;
-            ModulePathData {
-                search_path,
-                relative_path: Cow::Owned(relative_path.into_owned()),
-            }
-        }
-    }
-
     impl<'a> ModulePath<'a> {
         #[must_use]
-        fn join(&self, component: &'a (impl AsRef<SystemPath> + ?Sized)) -> ModulePath<'static> {
-            let mut result = self.to_static();
+        fn join(&self, component: &'a (impl AsRef<SystemPath> + ?Sized)) -> ModulePath<'a> {
+            let mut result = self.clone();
             result.push(component.as_ref().as_str());
             result
-        }
-
-        #[must_use]
-        pub(crate) fn to_static(&self) -> ModulePath<'static> {
-            let inner = match &self.0 {
-                ModulePathInner::Extra(path) => ModulePathInner::Extra(path.clone().into_static()),
-                ModulePathInner::FirstParty(path) => {
-                    ModulePathInner::FirstParty(path.clone().into_static())
-                }
-                ModulePathInner::StandardLibraryCustom(path) => {
-                    ModulePathInner::StandardLibraryCustom(path.clone().into_static())
-                }
-                ModulePathInner::StandardLibraryVendored(path) => {
-                    ModulePathInner::StandardLibraryVendored(path.clone().into_static())
-                }
-                ModulePathInner::SitePackages(path) => {
-                    ModulePathInner::SitePackages(path.clone().into_static())
-                }
-                ModulePathInner::Editable(path) => {
-                    ModulePathInner::Editable(path.clone().into_static())
-                }
-            };
-            ModulePath(inner)
         }
     }
 
@@ -1005,7 +954,7 @@ mod tests {
             )
         }
 
-        fn join(&self, component: &str) -> ModulePath<'static> {
+        fn join<'a>(&'a self, component: &'a str) -> ModulePath<'a> {
             self.to_module_path().join(component)
         }
     }
