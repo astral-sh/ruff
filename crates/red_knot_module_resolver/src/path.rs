@@ -3,6 +3,7 @@
 use std::borrow::{Borrow, Cow};
 use std::fmt;
 use std::hash::Hash;
+use std::ops::Deref;
 use std::path::StripPrefixError;
 use std::sync::Arc;
 
@@ -83,7 +84,7 @@ impl BorrowedPath<SystemPathBuf> for SystemPath {
 #[derive(Debug, PartialEq, Eq, Hash)]
 struct ModulePathData<'a, A, B>
 where
-    A: OwnedPath + Borrow<B>,
+    A: OwnedPath + Borrow<B> + Deref<Target = B>,
     B: BorrowedPath<A> + ?Sized,
 {
     search_path: SearchPathData<A>,
@@ -92,7 +93,7 @@ where
 
 impl<'a, A, B> ModulePathData<'a, A, B>
 where
-    A: OwnedPath + Borrow<B>,
+    A: OwnedPath + Borrow<B> + Deref<Target = B>,
     B: BorrowedPath<A> + ?Sized,
 {
     #[must_use]
@@ -101,7 +102,7 @@ where
             search_path: SearchPathData(search_path),
             relative_path,
         } = self;
-        A::borrow(search_path).join(&**relative_path)
+        search_path.join(&**relative_path)
     }
 
     #[must_use]
@@ -127,7 +128,7 @@ where
 
 impl<'a, A, B> Clone for ModulePathData<'a, A, B>
 where
-    A: OwnedPath + Borrow<B>,
+    A: OwnedPath + Borrow<B> + Deref<Target = B>,
     B: BorrowedPath<A> + ?Sized,
 {
     fn clone(&self) -> Self {
@@ -144,7 +145,7 @@ where
 
 impl<A, B> PartialEq<A> for ModulePathData<'_, A, B>
 where
-    A: OwnedPath + Borrow<B>,
+    A: OwnedPath + Borrow<B> + Deref<Target = B>,
     B: BorrowedPath<A> + ?Sized,
 {
     fn eq(&self, other: &A) -> bool {
@@ -340,12 +341,12 @@ impl<'a> ModulePath<'a> {
             }
         }
         match &mut self.0 {
-            ModulePathInner::Extra(path) => path.push(component),
-            ModulePathInner::FirstParty(path) => path.push(component),
-            ModulePathInner::StandardLibraryCustom(path) => path.push(component),
+            ModulePathInner::Extra(path)
+            | ModulePathInner::FirstParty(path)
+            | ModulePathInner::StandardLibraryCustom(path)
+            | ModulePathInner::SitePackages(path)
+            | ModulePathInner::Editable(path) => path.push(component),
             ModulePathInner::StandardLibraryVendored(path) => path.push(component),
-            ModulePathInner::SitePackages(path) => path.push(component),
-            ModulePathInner::Editable(path) => path.push(component),
         }
     }
 
@@ -391,15 +392,15 @@ impl<'a> ModulePath<'a> {
 
     #[must_use]
     pub(crate) fn is_regular_package(&self, resolver: &ResolverState) -> bool {
-        fn is_non_stdlib_pkg(resolver: &ResolverState, path: &SystemModulePathData) -> bool {
-            let path = path.to_absolute_path_buf();
-            system_path_to_file(resolver.db.upcast(), path.join("__init__.py")).is_some()
-                || system_path_to_file(resolver.db.upcast(), path.join("__init__.py")).is_some()
-        }
-
         match &self.0 {
-            ModulePathInner::Extra(path) => is_non_stdlib_pkg(resolver, path),
-            ModulePathInner::FirstParty(path) => is_non_stdlib_pkg(resolver, path),
+            ModulePathInner::Extra(path)
+            | ModulePathInner::FirstParty(path)
+            | ModulePathInner::SitePackages(path)
+            | ModulePathInner::Editable(path) => {
+                let path = path.to_absolute_path_buf();
+                system_path_to_file(resolver.db.upcast(), path.join("__init__.py")).is_some()
+                    || system_path_to_file(resolver.db.upcast(), path.join("__init__.py")).is_some()
+            }
             ModulePathInner::StandardLibraryCustom(path) => {
                 match query_custom_stdlib_version(path, resolver) {
                     TypeshedVersionsQueryResult::DoesNotExist => false,
@@ -420,8 +421,6 @@ impl<'a> ModulePath<'a> {
                         .exists(path.to_absolute_path_buf().join("__init__.pyi")),
                 }
             }
-            ModulePathInner::SitePackages(path) => is_non_stdlib_pkg(resolver, path),
-            ModulePathInner::Editable(path) => is_non_stdlib_pkg(resolver, path),
         }
     }
 
@@ -429,8 +428,10 @@ impl<'a> ModulePath<'a> {
     pub(crate) fn to_file(&self, resolver: &ResolverState) -> Option<File> {
         let db = resolver.db.upcast();
         match &self.0 {
-            ModulePathInner::Extra(path) => system_path_to_file(db, path.to_absolute_path_buf()),
-            ModulePathInner::FirstParty(path) => {
+            ModulePathInner::Extra(path)
+            | ModulePathInner::FirstParty(path)
+            | ModulePathInner::SitePackages(path)
+            | ModulePathInner::Editable(path) => {
                 system_path_to_file(db, path.to_absolute_path_buf())
             }
             ModulePathInner::StandardLibraryCustom(path) => {
@@ -451,10 +452,6 @@ impl<'a> ModulePath<'a> {
                     }
                 }
             }
-            ModulePathInner::SitePackages(path) => {
-                system_path_to_file(db, path.to_absolute_path_buf())
-            }
-            ModulePathInner::Editable(path) => system_path_to_file(db, path.to_absolute_path_buf()),
         }
     }
 
@@ -526,12 +523,12 @@ impl<'a> ModulePath<'a> {
 impl PartialEq<SystemPathBuf> for ModulePath<'_> {
     fn eq(&self, other: &SystemPathBuf) -> bool {
         match &self.0 {
-            ModulePathInner::Extra(path) => path == other,
-            ModulePathInner::FirstParty(path) => path == other,
-            ModulePathInner::StandardLibraryCustom(path) => path == other,
+            ModulePathInner::Extra(path)
+            | ModulePathInner::FirstParty(path)
+            | ModulePathInner::StandardLibraryCustom(path)
+            | ModulePathInner::SitePackages(path)
+            | ModulePathInner::Editable(path) => path == other,
             ModulePathInner::StandardLibraryVendored(_) => false,
-            ModulePathInner::SitePackages(path) => path == other,
-            ModulePathInner::Editable(path) => path == other,
         }
     }
 }
@@ -545,12 +542,12 @@ impl PartialEq<ModulePath<'_>> for SystemPathBuf {
 impl PartialEq<VendoredPathBuf> for ModulePath<'_> {
     fn eq(&self, other: &VendoredPathBuf) -> bool {
         match &self.0 {
-            ModulePathInner::Extra(_) => false,
-            ModulePathInner::FirstParty(_) => false,
-            ModulePathInner::StandardLibraryCustom(_) => false,
             ModulePathInner::StandardLibraryVendored(path) => path == other,
-            ModulePathInner::SitePackages(_) => false,
-            ModulePathInner::Editable(_) => false,
+            ModulePathInner::Extra(_)
+            | ModulePathInner::FirstParty(_)
+            | ModulePathInner::StandardLibraryCustom(_)
+            | ModulePathInner::SitePackages(_)
+            | ModulePathInner::Editable(_) => false,
         }
     }
 }
@@ -625,12 +622,11 @@ where
         absolute_path: &'a B,
     ) -> Result<ModulePathData<'a, A, B>, StripPrefixError>
     where
-        A: Borrow<B>,
+        A: Borrow<B> + Deref<Target = B>,
         B: BorrowedPath<A> + ?Sized,
     {
-        let inner_path = A::borrow(&self.0);
         absolute_path
-            .strip_prefix(inner_path)
+            .strip_prefix(&self.0)
             .map(|relative_path| ModulePathData {
                 search_path: self.clone(),
                 relative_path: Cow::Borrowed(relative_path),
@@ -831,14 +827,14 @@ impl ModuleSearchPath {
         match (&self.0, path) {
             (ModuleSearchPathInner::Extra(search_path), FilePath::System(absolute_path)) => {
                 search_path
-                    .relativize_path(&**absolute_path)
+                    .relativize_path(absolute_path)
                     .ok()
                     .map(ModulePath::extra)
             }
             (ModuleSearchPathInner::Extra(_), FilePath::Vendored(_)) => None,
             (ModuleSearchPathInner::FirstParty(search_path), FilePath::System(absolute_path)) => {
                 search_path
-                    .relativize_path(&**absolute_path)
+                    .relativize_path(absolute_path)
                     .ok()
                     .map(ModulePath::first_party)
             }
@@ -847,7 +843,7 @@ impl ModuleSearchPath {
                 ModuleSearchPathInner::StandardLibraryCustom(search_path),
                 FilePath::System(absolute_path),
             ) => search_path
-                .relativize_path(&**absolute_path)
+                .relativize_path(absolute_path)
                 .ok()
                 .map(ModulePath::custom_stdlib),
             (ModuleSearchPathInner::StandardLibraryCustom(_), FilePath::Vendored(_)) => None,
@@ -855,20 +851,20 @@ impl ModuleSearchPath {
                 ModuleSearchPathInner::StandardLibraryVendored(search_path),
                 FilePath::Vendored(absolute_path),
             ) => search_path
-                .relativize_path(&**absolute_path)
+                .relativize_path(absolute_path)
                 .ok()
                 .map(ModulePath::vendored_stdlib),
             (ModuleSearchPathInner::StandardLibraryVendored(_), FilePath::System(_)) => None,
             (ModuleSearchPathInner::SitePackages(search_path), FilePath::System(absolute_path)) => {
                 search_path
-                    .relativize_path(&**absolute_path)
+                    .relativize_path(absolute_path)
                     .ok()
                     .map(ModulePath::site_packages)
             }
             (ModuleSearchPathInner::SitePackages(_), FilePath::Vendored(_)) => None,
             (ModuleSearchPathInner::Editable(search_path), FilePath::System(absolute_path)) => {
                 search_path
-                    .relativize_path(&**absolute_path)
+                    .relativize_path(absolute_path)
                     .ok()
                     .map(ModulePath::editable)
             }
