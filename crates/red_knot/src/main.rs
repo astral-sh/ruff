@@ -170,9 +170,8 @@ impl MainLoop {
             sender.send(MainLoopMessage::ApplyChanges(event)).unwrap();
         })?;
 
-        self.watcher = Some(WorkspaceWatcher::new(watcher, &*db));
+        self.watcher = Some(WorkspaceWatcher::new(watcher, db));
         self.run(db);
-
         Ok(())
     }
     fn run(mut self, db: &mut salsa::Handle<RootDatabase>) {

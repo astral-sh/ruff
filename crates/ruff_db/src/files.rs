@@ -198,14 +198,6 @@ impl Files {
             file.sync(db);
         }
     }
-
-    /// Creates a salsa like snapshot. The instances share
-    /// the same path-to-file mapping.
-    pub fn snapshot(&self) -> Self {
-        Self {
-            inner: self.inner.clone(),
-        }
-    }
 }
 
 impl std::fmt::Debug for Files {

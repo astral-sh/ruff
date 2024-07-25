@@ -49,12 +49,6 @@ impl OsSystem {
     fn permissions(_metadata: &std::fs::Metadata) -> Option<u32> {
         None
     }
-
-    pub fn snapshot(&self) -> Self {
-        Self {
-            inner: self.inner.clone(),
-        }
-    }
 }
 
 impl System for OsSystem {
