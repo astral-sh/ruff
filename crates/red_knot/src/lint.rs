@@ -307,12 +307,18 @@ enum AnyImportRef<'a> {
 mod tests {
     use ruff_db::files::system_path_to_file;
     use ruff_db::program::{Program, SearchPathSettings, TargetVersion};
-    use ruff_db::system::{DbWithTestSystem, SystemPathBuf};
+    use ruff_db::system::{DbWithTestSystem, OsSystem, SystemPathBuf};
 
     use super::{lint_semantic, Diagnostics};
     use crate::db::tests::TestDb;
+    use std::fs;
+    use std::path::PathBuf;
 
     fn setup_db() -> TestDb {
+        setup_db_with_root(SystemPathBuf::from("/src"))
+    }
+
+    fn setup_db_with_root(workspace_root: SystemPathBuf) -> TestDb {
         let db = TestDb::new();
 
         Program::new(
@@ -320,7 +326,7 @@ mod tests {
             TargetVersion::Py38,
             SearchPathSettings {
                 extra_paths: Vec::new(),
-                workspace_root: SystemPathBuf::from("/src"),
+                workspace_root,
                 site_packages: None,
                 custom_typeshed: None,
             },
@@ -356,5 +362,25 @@ mod tests {
                 "Name 'y' used when possibly not defined."
             ]
         );
+    }
+
+    /// Test that all snippets in testcorpus can be linted without panic
+    #[test]
+    #[allow(clippy::print_stdout)]
+    fn corpus_no_panic() {
+        let corpus = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("resources/test/corpus");
+        let system_corpus =
+            SystemPathBuf::from_path_buf(corpus.clone()).expect("corpus path to be UTF8");
+        let mut db = setup_db_with_root(system_corpus.clone());
+        db.use_system(OsSystem::new(&system_corpus));
+
+        for path in fs::read_dir(&corpus).expect("corpus to be a directory") {
+            let path = path.expect("path to not be an error").path();
+            println!("checking {path:?}");
+            let path = SystemPathBuf::from_path_buf(path.clone()).expect("path to be UTF-8");
+            // this test is only asserting that we can run the lint without a panic
+            let file = system_path_to_file(&db, path).expect("file to exist");
+            lint_semantic(&db, file);
+        }
     }
 }
