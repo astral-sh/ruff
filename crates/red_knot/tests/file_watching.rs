@@ -118,28 +118,17 @@ where
         )
     })?;
 
-    let workspace_path = temp_dir.path().join("workspace");
-
-    std::fs::create_dir_all(&workspace_path).with_context(|| {
-        format!(
-            "Failed to create workspace directory '{}'",
-            workspace_path.display()
-        )
-    })?;
-
-    let workspace_path = SystemPath::from_std_path(&workspace_path).ok_or_else(|| {
-        anyhow!(
-            "Workspace root '{}' in temp directory is not a valid UTF-8 path.",
-            workspace_path.display()
-        )
-    })?;
-
-    let workspace_path = SystemPathBuf::from_utf8_path_buf(
-        workspace_path
+    let root_path = SystemPathBuf::from_utf8_path_buf(
+        root_path
             .as_utf8_path()
             .canonicalize_utf8()
-            .with_context(|| "Failed to canonicalize workspace path.")?,
+            .with_context(|| "Failed to canonicalize root path.")?,
     );
+
+    let workspace_path = root_path.join("workspace");
+
+    std::fs::create_dir_all(workspace_path.as_std_path())
+        .with_context(|| format!("Failed to create workspace directory '{workspace_path}'",))?;
 
     for (relative_path, content) in workspace_files {
         let relative_path = relative_path.as_ref();
@@ -157,7 +146,7 @@ where
     let system = OsSystem::new(&workspace_path);
 
     let workspace = WorkspaceMetadata::from_path(&workspace_path, &system)?;
-    let search_paths = create_search_paths(root_path, workspace.root());
+    let search_paths = create_search_paths(&root_path, workspace.root());
 
     for path in search_paths
         .extra_paths
