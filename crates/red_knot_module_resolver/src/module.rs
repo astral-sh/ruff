@@ -5,7 +5,7 @@ use ruff_db::files::File;
 
 use crate::db::Db;
 use crate::module_name::ModuleName;
-use crate::path::ModuleSearchPath;
+use crate::path::SearchPath;
 
 /// Representation of a Python module.
 #[derive(Clone, PartialEq, Eq)]
@@ -17,7 +17,7 @@ impl Module {
     pub(crate) fn new(
         name: ModuleName,
         kind: ModuleKind,
-        search_path: ModuleSearchPath,
+        search_path: SearchPath,
         file: File,
     ) -> Self {
         Self {
@@ -41,7 +41,7 @@ impl Module {
     }
 
     /// The search path from which the module was resolved.
-    pub(crate) fn search_path(&self) -> &ModuleSearchPath {
+    pub(crate) fn search_path(&self) -> &SearchPath {
         &self.inner.search_path
     }
 
@@ -77,7 +77,7 @@ impl salsa::DebugWithDb<dyn Db> for Module {
 struct ModuleInner {
     name: ModuleName,
     kind: ModuleKind,
-    search_path: ModuleSearchPath,
+    search_path: SearchPath,
     file: File,
 }
 

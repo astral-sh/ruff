@@ -11,7 +11,7 @@ use ruff_db::system::{DirectoryEntry, System, SystemPath, SystemPathBuf};
 use crate::db::Db;
 use crate::module::{Module, ModuleKind};
 use crate::module_name::ModuleName;
-use crate::path::{ModulePathBuf, ModuleSearchPath, SearchPathValidationError};
+use crate::path::{ModulePath, SearchPath, SearchPathValidationError};
 use crate::state::ResolverState;
 
 /// Resolves a module name to a module.
@@ -127,26 +127,20 @@ fn try_resolve_module_resolution_settings(
 
     let mut static_search_paths = vec![];
 
-    for path in extra_paths {
-        static_search_paths.push(ModuleSearchPath::extra(system, path.to_owned())?);
+    for path in extra_paths.iter().cloned() {
+        static_search_paths.push(SearchPath::extra(system, path)?);
     }
 
-    static_search_paths.push(ModuleSearchPath::first_party(
-        system,
-        workspace_root.to_owned(),
-    )?);
+    static_search_paths.push(SearchPath::first_party(system, workspace_root.clone())?);
 
     static_search_paths.push(if let Some(custom_typeshed) = custom_typeshed.as_ref() {
-        ModuleSearchPath::custom_stdlib(db, custom_typeshed.to_owned())?
+        SearchPath::custom_stdlib(db, custom_typeshed.clone())?
     } else {
-        ModuleSearchPath::vendored_stdlib()
+        SearchPath::vendored_stdlib()
     });
 
     if let Some(site_packages) = site_packages {
-        static_search_paths.push(ModuleSearchPath::site_packages(
-            system,
-            site_packages.to_owned(),
-        )?);
+        static_search_paths.push(SearchPath::site_packages(system, site_packages.clone())?);
     }
 
     // TODO vendor typeshed's third-party stubs as well as the stdlib and fallback to them as a final step
@@ -164,7 +158,7 @@ fn try_resolve_module_resolution_settings(
         FxHashSet::with_capacity_and_hasher(static_search_paths.len(), FxBuildHasher);
 
     static_search_paths.retain(|path| {
-        if let Some(path) = path.as_system_path() {
+        if let Some(path) = path.as_system_path_buf() {
             seen_paths.insert(path.to_path_buf())
         } else {
             true
@@ -187,7 +181,7 @@ pub(crate) fn module_resolution_settings(db: &dyn Db) -> ModuleResolutionSetting
 /// search paths listed in `.pth` files in the `site-packages` directory
 /// due to editable installations of third-party packages.
 #[salsa::tracked(return_ref)]
-pub(crate) fn editable_install_resolution_paths(db: &dyn Db) -> Vec<ModuleSearchPath> {
+pub(crate) fn editable_install_resolution_paths(db: &dyn Db) -> Vec<SearchPath> {
     // This query needs to be re-executed each time a `.pth` file
     // is added, modified or removed from the `site-packages` directory.
     // However, we don't use Salsa queries to read the source text of `.pth` files;
@@ -210,7 +204,7 @@ pub(crate) fn editable_install_resolution_paths(db: &dyn Db) -> Vec<ModuleSearch
 
     if let Some(site_packages) = site_packages {
         let site_packages = site_packages
-            .as_system_path()
+            .as_system_path_buf()
             .expect("Expected site-packages never to be a VendoredPath!");
 
         // As well as modules installed directly into `site-packages`,
@@ -231,7 +225,7 @@ pub(crate) fn editable_install_resolution_paths(db: &dyn Db) -> Vec<ModuleSearch
 
         let mut existing_paths: FxHashSet<_> = static_search_paths
             .iter()
-            .filter_map(|path| path.as_system_path())
+            .filter_map(|path| path.as_system_path_buf())
             .map(Cow::Borrowed)
             .collect();
 
@@ -240,7 +234,7 @@ pub(crate) fn editable_install_resolution_paths(db: &dyn Db) -> Vec<ModuleSearch
         for pth_file in &all_pth_files {
             for installation in pth_file.editable_installations() {
                 if existing_paths.insert(Cow::Owned(
-                    installation.as_system_path().unwrap().to_path_buf(),
+                    installation.as_system_path_buf().unwrap().to_path_buf(),
                 )) {
                     dynamic_paths.push(installation);
                 }
@@ -260,12 +254,12 @@ pub(crate) fn editable_install_resolution_paths(db: &dyn Db) -> Vec<ModuleSearch
 /// [`sys.path` at runtime]: https://docs.python.org/3/library/site.html#module-site
 pub(crate) struct SearchPathIterator<'db> {
     db: &'db dyn Db,
-    static_paths: std::slice::Iter<'db, ModuleSearchPath>,
-    dynamic_paths: Option<std::slice::Iter<'db, ModuleSearchPath>>,
+    static_paths: std::slice::Iter<'db, SearchPath>,
+    dynamic_paths: Option<std::slice::Iter<'db, SearchPath>>,
 }
 
 impl<'db> Iterator for SearchPathIterator<'db> {
-    type Item = &'db ModuleSearchPath;
+    type Item = &'db SearchPath;
 
     fn next(&mut self) -> Option<Self::Item> {
         let SearchPathIterator {
@@ -297,7 +291,7 @@ struct PthFile<'db> {
 impl<'db> PthFile<'db> {
     /// Yield paths in this `.pth` file that appear to represent editable installations,
     /// and should therefore be added as module-resolution search paths.
-    fn editable_installations(&'db self) -> impl Iterator<Item = ModuleSearchPath> + 'db {
+    fn editable_installations(&'db self) -> impl Iterator<Item = SearchPath> + 'db {
         let PthFile {
             system,
             path: _,
@@ -319,7 +313,7 @@ impl<'db> PthFile<'db> {
                 return None;
             }
             let possible_editable_install = SystemPath::absolute(line, site_packages);
-            ModuleSearchPath::editable(*system, possible_editable_install).ok()
+            SearchPath::editable(*system, possible_editable_install).ok()
         })
     }
 }
@@ -391,7 +385,7 @@ pub(crate) struct ModuleResolutionSettings {
     ///
     /// Note that `site-packages` *is included* as a search path in this sequence,
     /// but it is also stored separately so that we're able to find editable installs later.
-    static_search_paths: Vec<ModuleSearchPath>,
+    static_search_paths: Vec<SearchPath>,
 }
 
 impl ModuleResolutionSettings {
@@ -474,7 +468,7 @@ static BUILTIN_MODULES: Lazy<FxHashSet<&str>> = Lazy::new(|| {
 
 /// Given a module name and a list of search paths in which to lookup modules,
 /// attempt to resolve the module name
-fn resolve_name(db: &dyn Db, name: &ModuleName) -> Option<(ModuleSearchPath, File, ModuleKind)> {
+fn resolve_name(db: &dyn Db, name: &ModuleName) -> Option<(SearchPath, File, ModuleKind)> {
     let resolver_settings = module_resolution_settings(db);
     let resolver_state = ResolverState::new(db, resolver_settings.target_version());
     let is_builtin_module = BUILTIN_MODULES.contains(&name.as_str());
@@ -493,7 +487,7 @@ fn resolve_name(db: &dyn Db, name: &ModuleName) -> Option<(ModuleSearchPath, Fil
                 package_path.push(module_name);
 
                 // Must be a `__init__.pyi` or `__init__.py` or it isn't a package.
-                let kind = if package_path.is_directory(search_path, &resolver_state) {
+                let kind = if package_path.is_directory(&resolver_state) {
                     package_path.push("__init__");
                     ModuleKind::Package
                 } else {
@@ -501,16 +495,13 @@ fn resolve_name(db: &dyn Db, name: &ModuleName) -> Option<(ModuleSearchPath, Fil
                 };
 
                 // TODO Implement full https://peps.python.org/pep-0561/#type-checker-module-resolution-order resolution
-                if let Some(stub) = package_path
-                    .with_pyi_extension()
-                    .to_file(search_path, &resolver_state)
-                {
+                if let Some(stub) = package_path.with_pyi_extension().to_file(&resolver_state) {
                     return Some((search_path.clone(), stub, kind));
                 }
 
                 if let Some(module) = package_path
                     .with_py_extension()
-                    .and_then(|path| path.to_file(search_path, &resolver_state))
+                    .and_then(|path| path.to_file(&resolver_state))
                 {
                     return Some((search_path.clone(), module, kind));
                 }
@@ -534,14 +525,14 @@ fn resolve_name(db: &dyn Db, name: &ModuleName) -> Option<(ModuleSearchPath, Fil
 }
 
 fn resolve_package<'a, 'db, I>(
-    module_search_path: &ModuleSearchPath,
+    module_search_path: &SearchPath,
     components: I,
     resolver_state: &ResolverState<'db>,
 ) -> Result<ResolvedPackage, PackageKind>
 where
     I: Iterator<Item = &'a str>,
 {
-    let mut package_path = module_search_path.as_module_path().clone();
+    let mut package_path = module_search_path.to_module_path();
 
     // `true` if inside a folder that is a namespace package (has no `__init__.py`).
     // Namespace packages are special because they can be spread across multiple search paths.
@@ -555,12 +546,11 @@ where
     for folder in components {
         package_path.push(folder);
 
-        let is_regular_package =
-            package_path.is_regular_package(module_search_path, resolver_state);
+        let is_regular_package = package_path.is_regular_package(resolver_state);
 
         if is_regular_package {
             in_namespace_package = false;
-        } else if package_path.is_directory(module_search_path, resolver_state) {
+        } else if package_path.is_directory(resolver_state) {
             // A directory without an `__init__.py` is a namespace package, continue with the next folder.
             in_namespace_package = true;
         } else if in_namespace_package {
@@ -593,7 +583,7 @@ where
 
 #[derive(Debug)]
 struct ResolvedPackage {
-    path: ModulePathBuf,
+    path: ModulePath,
     kind: PackageKind,
 }
 
@@ -1658,13 +1648,13 @@ not_a_directory
             .with_site_packages_files(&[("_foo.pth", "/src")])
             .build();
 
-        let search_paths: Vec<&ModuleSearchPath> =
+        let search_paths: Vec<&SearchPath> =
             module_resolution_settings(&db).search_paths(&db).collect();
 
-        assert!(
-            search_paths.contains(&&ModuleSearchPath::first_party(db.system(), "/src").unwrap())
-        );
-
-        assert!(!search_paths.contains(&&ModuleSearchPath::editable(db.system(), "/src").unwrap()));
+        assert!(search_paths.contains(
+            &&SearchPath::first_party(db.system(), SystemPathBuf::from("/src")).unwrap()
+        ));
+        assert!(!search_paths
+            .contains(&&SearchPath::editable(db.system(), SystemPathBuf::from("/src")).unwrap()));
     }
 }
