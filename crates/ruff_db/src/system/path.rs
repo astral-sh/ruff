@@ -3,6 +3,7 @@
 //    but there's no compile time guarantee that a [`OsSystem`] never gets an untitled file path.
 
 use camino::{Utf8Path, Utf8PathBuf};
+use std::borrow::Borrow;
 use std::fmt::Formatter;
 use std::ops::Deref;
 use std::path::{Path, StripPrefixError};
@@ -402,6 +403,14 @@ impl SystemPath {
     }
 }
 
+impl ToOwned for SystemPath {
+    type Owned = SystemPathBuf;
+
+    fn to_owned(&self) -> Self::Owned {
+        self.to_path_buf()
+    }
+}
+
 /// An owned, mutable path on [`System`](`super::System`) (akin to [`String`]).
 ///
 /// The path is guaranteed to be valid UTF-8.
@@ -467,6 +476,12 @@ impl SystemPathBuf {
     #[inline]
     pub fn as_path(&self) -> &SystemPath {
         SystemPath::new(&self.0)
+    }
+}
+
+impl Borrow<SystemPath> for SystemPathBuf {
+    fn borrow(&self) -> &SystemPath {
+        self.as_path()
     }
 }
 

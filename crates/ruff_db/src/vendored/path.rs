@@ -1,3 +1,4 @@
+use std::borrow::Borrow;
 use std::ops::Deref;
 use std::path;
 
@@ -73,6 +74,14 @@ impl VendoredPath {
     }
 }
 
+impl ToOwned for VendoredPath {
+    type Owned = VendoredPathBuf;
+
+    fn to_owned(&self) -> VendoredPathBuf {
+        self.to_path_buf()
+    }
+}
+
 #[repr(transparent)]
 #[derive(Debug, Eq, PartialEq, Clone, Hash)]
 pub struct VendoredPathBuf(Utf8PathBuf);
@@ -88,12 +97,19 @@ impl VendoredPathBuf {
         Self(Utf8PathBuf::new())
     }
 
+    #[inline]
     pub fn as_path(&self) -> &VendoredPath {
         VendoredPath::new(&self.0)
     }
 
     pub fn push(&mut self, component: impl AsRef<VendoredPath>) {
         self.0.push(component.as_ref())
+    }
+}
+
+impl Borrow<VendoredPath> for VendoredPathBuf {
+    fn borrow(&self) -> &VendoredPath {
+        self.as_path()
     }
 }
 

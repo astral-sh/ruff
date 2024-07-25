@@ -7,7 +7,7 @@ use camino::{Utf8Path, Utf8PathBuf};
 
 use ruff_db::files::{system_path_to_file, vendored_path_to_file, File, FilePath};
 use ruff_db::system::{System, SystemPath, SystemPathBuf};
-use ruff_db::vendored::VendoredPathBuf;
+use ruff_db::vendored::{VendoredPath, VendoredPathBuf};
 
 use crate::db::Db;
 use crate::module_name::ModuleName;
@@ -26,37 +26,6 @@ use crate::typeshed::{TypeshedVersionsParseError, TypeshedVersionsQueryResult};
 pub(crate) struct ModulePath {
     search_path: SearchPath,
     relative_path: Utf8PathBuf,
-}
-
-#[must_use]
-fn stdlib_path_to_module_name(relative_path: &Utf8Path) -> Option<ModuleName> {
-    let parent_components = relative_path
-        .parent()?
-        .components()
-        .map(|component| component.as_str());
-    let skip_final_part = relative_path.ends_with("__init__.pyi");
-    if skip_final_part {
-        ModuleName::from_components(parent_components)
-    } else {
-        ModuleName::from_components(parent_components.chain(relative_path.file_stem()))
-    }
-}
-
-#[must_use]
-fn query_stdlib_version(
-    custom_stdlib_root: Option<&SystemPath>,
-    relative_path: &Utf8Path,
-    resolver: &ResolverState,
-) -> TypeshedVersionsQueryResult {
-    let Some(module_name) = stdlib_path_to_module_name(relative_path) else {
-        return TypeshedVersionsQueryResult::DoesNotExist;
-    };
-    let ResolverState {
-        db,
-        typeshed_versions,
-        target_version,
-    } = resolver;
-    typeshed_versions.query_module(*db, &module_name, custom_stdlib_root, *target_version)
 }
 
 impl ModulePath {
@@ -256,7 +225,8 @@ impl PartialEq<SystemPathBuf> for ModulePath {
         } = self;
         search_path
             .as_system_path_buf()
-            .is_some_and(|search_path| search_path.join(relative_path) == *other)
+            .and_then(|search_path| other.strip_prefix(search_path).ok())
+            .is_some_and(|other_relative_path| other_relative_path.as_utf8_path() == relative_path)
     }
 }
 
@@ -274,7 +244,8 @@ impl PartialEq<VendoredPathBuf> for ModulePath {
         } = self;
         search_path
             .as_vendored_path_buf()
-            .is_some_and(|search_path| search_path.join(relative_path) == *other)
+            .and_then(|search_path| other.strip_prefix(search_path).ok())
+            .is_some_and(|other_relative_path| other_relative_path.as_utf8_path() == relative_path)
     }
 }
 
@@ -282,6 +253,37 @@ impl PartialEq<ModulePath> for VendoredPathBuf {
     fn eq(&self, other: &ModulePath) -> bool {
         other.eq(self)
     }
+}
+
+#[must_use]
+fn stdlib_path_to_module_name(relative_path: &Utf8Path) -> Option<ModuleName> {
+    let parent_components = relative_path
+        .parent()?
+        .components()
+        .map(|component| component.as_str());
+    let skip_final_part = relative_path.ends_with("__init__.pyi");
+    if skip_final_part {
+        ModuleName::from_components(parent_components)
+    } else {
+        ModuleName::from_components(parent_components.chain(relative_path.file_stem()))
+    }
+}
+
+#[must_use]
+fn query_stdlib_version(
+    custom_stdlib_root: Option<&SystemPath>,
+    relative_path: &Utf8Path,
+    resolver: &ResolverState,
+) -> TypeshedVersionsQueryResult {
+    let Some(module_name) = stdlib_path_to_module_name(relative_path) else {
+        return TypeshedVersionsQueryResult::DoesNotExist;
+    };
+    let ResolverState {
+        db,
+        typeshed_versions,
+        target_version,
+    } = resolver;
+    typeshed_versions.query_module(*db, &module_name, custom_stdlib_root, *target_version)
 }
 
 /// Enumeration describing the various ways in which validation of a search path might fail.
@@ -486,72 +488,30 @@ impl SearchPath {
             }
         }
 
-        match (&*self.0, path) {
-            (SearchPathInner::Extra(search_path), FilePath::System(absolute_path)) => absolute_path
-                .strip_prefix(search_path)
-                .ok()
+        match &*self.0 {
+            SearchPathInner::Extra(search_path)
+            | SearchPathInner::FirstParty(search_path)
+            | SearchPathInner::StandardLibraryCustom(search_path)
+            | SearchPathInner::SitePackages(search_path)
+            | SearchPathInner::Editable(search_path) => path
+                .as_system_path()
+                .and_then(|absolute_path| absolute_path.strip_prefix(search_path).ok())
                 .map(|relative_path| ModulePath {
                     search_path: self.clone(),
                     relative_path: relative_path.as_utf8_path().to_path_buf(),
                 }),
-            (SearchPathInner::Extra(_), FilePath::Vendored(_)) => None,
-            (SearchPathInner::FirstParty(search_path), FilePath::System(absolute_path)) => {
-                absolute_path
-                    .strip_prefix(search_path)
-                    .ok()
-                    .map(|relative_path| ModulePath {
-                        search_path: self.clone(),
-                        relative_path: relative_path.as_utf8_path().to_path_buf(),
-                    })
-            }
-            (SearchPathInner::FirstParty(_), FilePath::Vendored(_)) => None,
-            (
-                SearchPathInner::StandardLibraryCustom(search_path),
-                FilePath::System(absolute_path),
-            ) => absolute_path
-                .strip_prefix(search_path)
-                .ok()
+            SearchPathInner::StandardLibraryVendored(search_path) => path
+                .as_vendored_path()
+                .and_then(|absolute_path| absolute_path.strip_prefix(search_path).ok())
                 .map(|relative_path| ModulePath {
                     search_path: self.clone(),
                     relative_path: relative_path.as_utf8_path().to_path_buf(),
                 }),
-            (SearchPathInner::StandardLibraryCustom(_), FilePath::Vendored(_)) => None,
-            (
-                SearchPathInner::StandardLibraryVendored(search_path),
-                FilePath::Vendored(absolute_path),
-            ) => absolute_path
-                .strip_prefix(search_path)
-                .ok()
-                .map(|relative_path| ModulePath {
-                    search_path: self.clone(),
-                    relative_path: relative_path.as_utf8_path().to_path_buf(),
-                }),
-            (SearchPathInner::StandardLibraryVendored(_), FilePath::System(_)) => None,
-            (SearchPathInner::SitePackages(search_path), FilePath::System(absolute_path)) => {
-                absolute_path
-                    .strip_prefix(search_path)
-                    .ok()
-                    .map(|relative_path| ModulePath {
-                        search_path: self.clone(),
-                        relative_path: relative_path.as_utf8_path().to_path_buf(),
-                    })
-            }
-            (SearchPathInner::SitePackages(_), FilePath::Vendored(_)) => None,
-            (SearchPathInner::Editable(search_path), FilePath::System(absolute_path)) => {
-                absolute_path
-                    .strip_prefix(search_path)
-                    .ok()
-                    .map(|relative_path| ModulePath {
-                        search_path: self.clone(),
-                        relative_path: relative_path.as_utf8_path().to_path_buf(),
-                    })
-            }
-            (SearchPathInner::Editable(_), FilePath::Vendored(_)) => None,
         }
     }
 
     #[must_use]
-    pub(crate) fn as_system_path_buf(&self) -> Option<&SystemPathBuf> {
+    pub(crate) fn as_system_path_buf(&self) -> Option<&SystemPath> {
         match &*self.0 {
             SearchPathInner::Extra(path)
             | SearchPathInner::FirstParty(path)
@@ -563,7 +523,7 @@ impl SearchPath {
     }
 
     #[must_use]
-    pub(crate) fn as_vendored_path_buf(&self) -> Option<&VendoredPathBuf> {
+    pub(crate) fn as_vendored_path_buf(&self) -> Option<&VendoredPath> {
         match &*self.0 {
             SearchPathInner::StandardLibraryVendored(path) => Some(path),
             SearchPathInner::Extra(_)
@@ -575,9 +535,21 @@ impl SearchPath {
     }
 }
 
+impl PartialEq<SystemPath> for SearchPath {
+    fn eq(&self, other: &SystemPath) -> bool {
+        self.as_system_path_buf().is_some_and(|path| path == other)
+    }
+}
+
+impl PartialEq<SearchPath> for SystemPath {
+    fn eq(&self, other: &SearchPath) -> bool {
+        other.eq(self)
+    }
+}
+
 impl PartialEq<SystemPathBuf> for SearchPath {
     fn eq(&self, other: &SystemPathBuf) -> bool {
-        self.as_system_path_buf().is_some_and(|path| path == other)
+        self.eq(&**other)
     }
 }
 
@@ -587,10 +559,22 @@ impl PartialEq<SearchPath> for SystemPathBuf {
     }
 }
 
-impl PartialEq<VendoredPathBuf> for SearchPath {
-    fn eq(&self, other: &VendoredPathBuf) -> bool {
+impl PartialEq<VendoredPath> for SearchPath {
+    fn eq(&self, other: &VendoredPath) -> bool {
         self.as_vendored_path_buf()
             .is_some_and(|path| path == other)
+    }
+}
+
+impl PartialEq<SearchPath> for VendoredPath {
+    fn eq(&self, other: &SearchPath) -> bool {
+        other.eq(self)
+    }
+}
+
+impl PartialEq<VendoredPathBuf> for SearchPath {
+    fn eq(&self, other: &VendoredPathBuf) -> bool {
+        self.eq(&**other)
     }
 }
 
