@@ -44,6 +44,11 @@ require('lspconfig').ruff.setup({
 })
 ```
 
+!!! note
+    If the installed version of `nvim-lspconfig` includes the changes from
+    [neovim/nvim-lspconfig@`70d1c2c`](https://github.com/neovim/nvim-lspconfig/commit/70d1c2c31a88af4b36019dc1551be16bffb8f9db),
+    you will need to use Ruff version `0.5.3` or later.
+
 If you're using Ruff alongside another language server (like Pyright), you may want to defer to that
 language server for certain capabilities, like [`textDocument/hover`](./features.md#hover):
 
