@@ -90,6 +90,7 @@ impl Server {
                 .log_level
                 .unwrap_or(crate::trace::LogLevel::Info),
             global_settings.tracing.log_file.as_deref(),
+            &init_params.client_info,
         );
 
         let mut workspace_for_url = |url: lsp_types::Url| {

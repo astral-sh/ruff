@@ -14,11 +14,11 @@
 //!
 //! Tracing will write to `stderr` by default, which should appear in the logs for most LSP clients.
 //! A `logFile` path can also be specified in the settings, and output will be directed there instead.
-use core::{fmt, str};
+use core::str;
 use lsp_server::{Message, Notification};
 use lsp_types::{
     notification::{LogTrace, Notification as _},
-    TraceValue,
+    ClientInfo, TraceValue,
 };
 use serde::Deserialize;
 use std::{
@@ -85,6 +85,7 @@ pub(crate) fn init_tracing(
     sender: ClientSender,
     log_level: LogLevel,
     log_file: Option<&std::path::Path>,
+    client: &Option<ClientInfo>,
 ) {
     LOGGING_SENDER
         .set(sender.clone())
@@ -122,7 +123,16 @@ pub(crate) fn init_tracing(
 
     let logger = match log_file {
         Some(file) => BoxMakeWriter::new(Arc::new(file)),
-        None => BoxMakeWriter::new(TraceLogWriter),
+        None => {
+            if client
+                .as_ref()
+                .is_some_and(|client| client.name.starts_with("Zed ") || client.name == "Zed")
+            {
+                BoxMakeWriter::new(TraceLogWriter)
+            } else {
+                BoxMakeWriter::new(std::io::stderr)
+            }
+        }
     };
     let subscriber = tracing_subscriber::Registry::default().with(
         tracing_subscriber::fmt::layer()
