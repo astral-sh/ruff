@@ -60,3 +60,14 @@ class Bar:
             num (int): A number
         """
         return 'test'
+
+
+# OK
+def test():
+    """Do something."""
+    # DOC201
+    def nested():
+        """Do something nested."""
+        return 5
+
+    print("I never return")

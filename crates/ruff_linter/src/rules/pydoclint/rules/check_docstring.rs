@@ -418,6 +418,7 @@ impl<'a> Visitor<'a> for BodyVisitor<'a> {
             }) => {
                 self.returns.push(Entry { range: *range });
             }
+            Stmt::FunctionDef(_) | Stmt::ClassDef(_) => return,
             _ => {}
         }
 
