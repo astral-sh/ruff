@@ -495,7 +495,7 @@ pub(crate) fn check_docstring(
     // DOC201
     if checker.enabled(Rule::DocstringMissingReturns) {
         if !is_property(definition, checker) && docstring_sections.returns.is_none() {
-            for body_return in &body_entries.returns {
+            if let Some(body_return) = body_entries.returns.first() {
                 let diagnostic = Diagnostic::new(DocstringMissingReturns, body_return.range());
                 diagnostics.push(diagnostic);
             }
