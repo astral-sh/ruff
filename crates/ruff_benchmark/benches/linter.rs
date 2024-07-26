@@ -1,6 +1,8 @@
-use ruff_benchmark::criterion::{
-    criterion_group, criterion_main, BenchmarkGroup, BenchmarkId, Criterion, Throughput,
+use codspeed_criterion_compat::{
+    self as criterion, criterion_group, criterion_main, BenchmarkGroup, BenchmarkId, Criterion,
+    Throughput,
 };
+use criterion::measurement;
 use ruff_benchmark::{TestCase, TestFile, TestFileDownloadError};
 use ruff_linter::linter::{lint_only, ParseSource};
 use ruff_linter::rule_selector::PreviewOptions;
@@ -44,7 +46,7 @@ fn create_test_cases() -> Result<Vec<TestCase>, TestFileDownloadError> {
     ])
 }
 
-fn benchmark_linter(mut group: BenchmarkGroup, settings: &LinterSettings) {
+fn benchmark_linter(mut group: BenchmarkGroup<measurement::WallTime>, settings: &LinterSettings) {
     let test_cases = create_test_cases().unwrap();
 
     for case in test_cases {
