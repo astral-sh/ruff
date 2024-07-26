@@ -289,9 +289,10 @@ impl<'db> TypeInferenceBuilder<'db> {
     }
 
     fn infer_class_type_params(&mut self, class: &ast::StmtClassDef) {
-        let Some(type_params) = class.type_params.as_deref() else {
-            panic!("class type params scope without type params");
-        };
+        let type_params = class
+            .type_params
+            .as_deref()
+            .expect("class type params scope without type params");
 
         self.infer_type_parameters(type_params);
 
@@ -310,10 +311,7 @@ impl<'db> TypeInferenceBuilder<'db> {
         };
         self.infer_type_parameters(type_params);
         self.infer_parameters(&function.parameters);
-
-        if let Some(return_expr) = &function.returns {
-            self.infer_expression(return_expr);
-        }
+        self.infer_optional_expression(function.returns.as_deref());
     }
 
     fn infer_function_body(&mut self, function: &ast::StmtFunctionDef) {
@@ -396,10 +394,7 @@ impl<'db> TypeInferenceBuilder<'db> {
         // If there are type params, parameters and returns are evaluated in that scope.
         if type_params.is_none() {
             self.infer_parameters(parameters);
-
-            if let Some(return_expr) = returns {
-                self.infer_expression(return_expr);
-            }
+            self.infer_optional_expression(returns.as_deref());
         }
 
         let function_ty =
@@ -411,24 +406,18 @@ impl<'db> TypeInferenceBuilder<'db> {
     fn infer_parameters(&mut self, parameters: &ast::Parameters) {
         let ast::Parameters {
             range: _,
-            posonlyargs,
-            args,
+            posonlyargs: _,
+            args: _,
             vararg,
-            kwonlyargs,
+            kwonlyargs: _,
             kwarg,
         } = parameters;
 
-        for param_with_default in posonlyargs {
-            self.infer_parameter_with_default(param_with_default);
-        }
-        for param_with_default in args {
+        for param_with_default in parameters.iter_non_variadic_params() {
             self.infer_parameter_with_default(param_with_default);
         }
         if let Some(vararg) = vararg {
             self.infer_parameter(vararg);
-        }
-        for param_with_default in kwonlyargs {
-            self.infer_parameter_with_default(param_with_default);
         }
         if let Some(kwarg) = kwarg {
             self.infer_parameter(kwarg);
@@ -442,9 +431,7 @@ impl<'db> TypeInferenceBuilder<'db> {
             default,
         } = parameter_with_default;
         self.infer_parameter(parameter);
-        if let Some(default) = default {
-            self.infer_expression(default);
-        }
+        self.infer_optional_expression(default.as_deref());
     }
 
     fn infer_parameter(&mut self, parameter: &ast::Parameter) {
@@ -453,9 +440,7 @@ impl<'db> TypeInferenceBuilder<'db> {
             name: _,
             annotation,
         } = parameter;
-        if let Some(annotation) = annotation {
-            self.infer_expression(annotation);
-        }
+        self.infer_optional_expression(annotation.as_deref());
     }
 
     fn infer_class_definition_statement(&mut self, class: &ast::StmtClassDef) {
@@ -511,9 +496,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                 body,
             } = clause;
 
-            if let Some(test) = &test {
-                self.infer_expression(test);
-            }
+            self.infer_optional_expression(test.as_ref());
 
             self.infer_body(body);
         }
@@ -532,9 +515,7 @@ impl<'db> TypeInferenceBuilder<'db> {
         self.infer_body(body);
         for handler in handlers {
             let ast::ExceptHandler::ExceptHandler(handler) = handler;
-            if let Some(type_) = &handler.type_ {
-                self.infer_expression(type_);
-            }
+            self.infer_optional_expression(handler.type_.as_deref());
             self.infer_body(&handler.body);
         }
         self.infer_body(orelse);
@@ -551,9 +532,7 @@ impl<'db> TypeInferenceBuilder<'db> {
 
         for item in items {
             self.infer_expression(&item.context_expr);
-            if let Some(var) = &item.optional_vars {
-                self.infer_expression(var);
-            }
+            self.infer_optional_expression(item.optional_vars.as_deref());
         }
 
         self.infer_body(body);
@@ -576,9 +555,7 @@ impl<'db> TypeInferenceBuilder<'db> {
             } = case;
             // TODO infer case patterns; they aren't normal expressions
             self.infer_match_pattern(pattern);
-            if let Some(guard) = guard {
-                self.infer_expression(guard);
-            }
+            self.infer_optional_expression(guard.as_deref());
             self.infer_body(body);
         }
     }
@@ -700,9 +677,7 @@ impl<'db> TypeInferenceBuilder<'db> {
             simple: _,
         } = assignment;
 
-        if let Some(value) = value {
-            let _ = self.infer_expression(value);
-        }
+        self.infer_optional_expression(value.as_deref());
 
         let annotation_ty = self.infer_expression(annotation);
 
@@ -806,9 +781,7 @@ impl<'db> TypeInferenceBuilder<'db> {
         } = assert;
 
         self.infer_expression(test);
-        if let Some(msg) = msg {
-            self.infer_expression(msg);
-        }
+        self.infer_optional_expression(msg.as_deref());
     }
 
     fn infer_raise_statement(&mut self, raise: &ast::StmtRaise) {
@@ -817,12 +790,8 @@ impl<'db> TypeInferenceBuilder<'db> {
             exc,
             cause,
         } = raise;
-        if let Some(exc) = exc {
-            self.infer_expression(exc);
-        };
-        if let Some(cause) = cause {
-            self.infer_expression(cause);
-        };
+        self.infer_optional_expression(exc.as_deref());
+        self.infer_optional_expression(cause.as_deref());
     }
 
     fn infer_import_from_definition(
@@ -851,9 +820,7 @@ impl<'db> TypeInferenceBuilder<'db> {
     }
 
     fn infer_return_statement(&mut self, ret: &ast::StmtReturn) {
-        if let Some(value) = &ret.value {
-            self.infer_expression(value);
-        }
+        self.infer_optional_expression(ret.value.as_deref());
     }
 
     fn infer_delete_statement(&mut self, delete: &ast::StmtDelete) {
@@ -900,6 +867,10 @@ impl<'db> TypeInferenceBuilder<'db> {
         ));
 
         types
+    }
+
+    fn infer_optional_expression(&mut self, expression: Option<&ast::Expr>) -> Option<Type<'db>> {
+        expression.map(|expr| self.infer_expression(expr))
     }
 
     fn infer_expression(&mut self, expression: &ast::Expr) -> Type<'db> {
@@ -1067,9 +1038,7 @@ impl<'db> TypeInferenceBuilder<'db> {
         let ast::ExprDict { range: _, items } = dict;
 
         for item in items {
-            if let Some(key) = &item.key {
-                self.infer_expression(key);
-            }
+            self.infer_optional_expression(item.key.as_ref());
             self.infer_expression(&item.value);
         }
 
@@ -1259,9 +1228,7 @@ impl<'db> TypeInferenceBuilder<'db> {
     fn infer_yield_expression(&mut self, yield_expression: &ast::ExprYield) -> Type<'db> {
         let ast::ExprYield { range: _, value } = yield_expression;
 
-        if let Some(value) = value {
-            self.infer_expression(value);
-        }
+        self.infer_optional_expression(value.as_deref());
 
         // TODO awaitable type
         Type::Unknown
@@ -1465,15 +1432,9 @@ impl<'db> TypeInferenceBuilder<'db> {
             step,
         } = slice;
 
-        if let Some(lower) = lower {
-            self.infer_expression(lower);
-        }
-        if let Some(upper) = upper {
-            self.infer_expression(upper);
-        }
-        if let Some(step) = step {
-            self.infer_expression(step);
-        }
+        self.infer_optional_expression(lower.as_deref());
+        self.infer_optional_expression(upper.as_deref());
+        self.infer_optional_expression(step.as_deref());
 
         // TODO builtins.slice
         Type::Unknown
@@ -1493,12 +1454,8 @@ impl<'db> TypeInferenceBuilder<'db> {
                         bound,
                         default,
                     } = typevar;
-                    if let Some(bound) = bound {
-                        self.infer_expression(bound);
-                    }
-                    if let Some(default) = default {
-                        self.infer_expression(default);
-                    }
+                    self.infer_optional_expression(bound.as_deref());
+                    self.infer_optional_expression(default.as_deref());
                 }
                 ast::TypeParam::ParamSpec(param_spec) => {
                     let ast::TypeParamParamSpec {
@@ -1506,9 +1463,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                         name: _,
                         default,
                     } = param_spec;
-                    if let Some(default) = default {
-                        self.infer_expression(default);
-                    }
+                    self.infer_optional_expression(default.as_deref());
                 }
                 ast::TypeParam::TypeVarTuple(typevar_tuple) => {
                     let ast::TypeParamTypeVarTuple {
@@ -1516,9 +1471,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                         name: _,
                         default,
                     } = typevar_tuple;
-                    if let Some(default) = default {
-                        self.infer_expression(default);
-                    }
+                    self.infer_optional_expression(default.as_deref());
                 }
             }
         }

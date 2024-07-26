@@ -224,10 +224,10 @@ impl<'db> SemanticIndexBuilder<'db> {
             for type_param in &type_params.type_params {
                 let (name, bound, default) = match type_param {
                     ast::TypeParam::TypeVar(ast::TypeParamTypeVar {
+                        range: _,
                         name,
                         bound,
                         default,
-                        ..
                     }) => (name, bound, default),
                     ast::TypeParam::ParamSpec(ast::TypeParamParamSpec {
                         name, default, ..
