@@ -617,6 +617,13 @@ impl PackageKind {
 
 #[cfg(test)]
 mod tests {
+    use ruff_db::files::{system_path_to_file, File, FilePath};
+    use ruff_db::system::{DbWithTestSystem, OsSystem, SystemPath};
+    use ruff_db::testing::{
+        assert_const_function_query_was_not_run, assert_function_query_was_not_run,
+    };
+    use ruff_db::Db;
+
     use crate::db::tests::TestDb;
     use crate::module::ModuleKind;
     use crate::module_name::ModuleName;

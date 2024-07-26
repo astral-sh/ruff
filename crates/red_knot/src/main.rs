@@ -174,9 +174,9 @@ impl MainLoop {
         self.run(db);
         Ok(())
     }
-    fn run(mut self, db: &mut salsa::Handle<RootDatabase>) {
+
     #[allow(clippy::print_stderr)]
-    fn run(mut self, mut db: salsa::Handle<RootDatabase>) {
+    fn run(mut self, db: &mut salsa::Handle<RootDatabase>) {
         // Schedule the first check.
         self.sender.send(MainLoopMessage::CheckWorkspace).unwrap();
         let mut revision = 0usize;
@@ -223,8 +223,8 @@ impl MainLoop {
                     // Automatically cancels any pending queries and waits for them to complete.
                     db.get_mut().apply_changes(changes);
                     if let Some(watcher) = self.watcher.as_mut() {
-                        watcher.update(&db);
                         watcher.update(db);
+                    }
                     self.sender.send(MainLoopMessage::CheckWorkspace).unwrap();
                 }
                 MainLoopMessage::Exit => {
@@ -299,6 +299,9 @@ impl LoggingFilter {
     fn is_enabled(&self, meta: &Metadata<'_>) -> bool {
         let filter = if meta.target().starts_with("red_knot") || meta.target().starts_with("ruff") {
             self.trace_level
+        } else if meta.target().starts_with("salsa") {
+            // Salsa now emits very verbose will execute query traces with warn, let's not show these to the user.
+            Level::WARN
         } else {
             Level::INFO
         };

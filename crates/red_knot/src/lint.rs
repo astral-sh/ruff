@@ -76,7 +76,7 @@ fn lint_lines(source: &str, diagnostics: &mut Vec<String>) {
 #[allow(unreachable_pub)]
 #[salsa::tracked(return_ref)]
 pub fn lint_semantic(db: &dyn Db, file_id: File) -> Diagnostics {
-    let _span = trace_span!("lint_semantic", ?file_id).entered();
+    let _span = trace_span!("lint_semantic", file=?file_id.path(db)).entered();
 
     let source = source_text(db.upcast(), file_id);
     let parsed = parsed_module(db.upcast(), file_id);

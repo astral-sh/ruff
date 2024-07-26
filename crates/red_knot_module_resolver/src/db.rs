@@ -29,7 +29,7 @@ pub(crate) mod tests {
             Self {
                 storage: salsa::Storage::default(),
                 system: TestSystem::default(),
-                vendored: vendored_typeshed_stubs().snapshot(),
+                vendored: vendored_typeshed_stubs().clone(),
                 events: sync::Arc::default(),
                 files: Files::default(),
             }

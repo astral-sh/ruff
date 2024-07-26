@@ -63,7 +63,7 @@ impl Files {
     ///
     /// The operation always succeeds even if the path doesn't exist on disk, isn't accessible or if the path points to a directory.
     /// In these cases, a file with status [`FileStatus::Deleted`] is returned.
-    #[tracing::instrument(level = "trace", skip(self, db), ret)]
+    #[tracing::instrument(level = "trace", skip(self, db))]
     fn system(&self, db: &dyn Db, path: &SystemPath) -> File {
         let absolute = SystemPath::absolute(path, db.system().current_directory());
 
@@ -106,7 +106,7 @@ impl Files {
 
     /// Looks up a vendored file by its path. Returns `Some` if a vendored file for the given path
     /// exists and `None` otherwise.
-    #[tracing::instrument(level = "trace", skip(self, db), ret)]
+    #[tracing::instrument(level = "trace", skip(self, db))]
     fn vendored(&self, db: &dyn Db, path: &VendoredPath) -> Option<File> {
         let file = match self.inner.vendored_by_path.entry(path.to_path_buf()) {
             Entry::Occupied(entry) => *entry.get(),

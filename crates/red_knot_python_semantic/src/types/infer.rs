@@ -22,6 +22,7 @@
 //! holds types for every [`Definition`] and expression within the inferred region.
 use rustc_hash::FxHashMap;
 use salsa;
+use salsa::plumbing::AsId;
 
 use red_knot_module_resolver::{resolve_module, ModuleName};
 use ruff_db::files::File;
@@ -48,7 +49,9 @@ use crate::Db;
 #[salsa::tracked(return_ref)]
 pub(crate) fn infer_scope_types<'db>(db: &'db dyn Db, scope: ScopeId<'db>) -> TypeInference<'db> {
     let file = scope.file(db);
-    let _span = tracing::trace_span!("infer_scope_types", ?scope, ?file).entered();
+    let _span =
+        tracing::trace_span!("infer_scope_types", scope=?scope.as_id(), file=?file.path(db))
+            .entered();
 
     // Using the index here is fine because the code below depends on the AST anyway.
     // The isolation of the query is by the return inferred types.
@@ -77,7 +80,12 @@ pub(crate) fn infer_definition_types<'db>(
     definition: Definition<'db>,
 ) -> TypeInference<'db> {
     let file = definition.file(db);
-    let _span = tracing::trace_span!("infer_definition_types", ?definition, ?file,).entered();
+    let _span = tracing::trace_span!(
+        "infer_definition_types",
+        definition = ?definition.as_id(),
+        file = ?file.path(db)
+    )
+    .entered();
 
     let index = semantic_index(db, file);
 
@@ -95,7 +103,9 @@ pub(crate) fn infer_expression_types<'db>(
     expression: Expression<'db>,
 ) -> TypeInference<'db> {
     let file = expression.file(db);
-    let _span = tracing::trace_span!("infer_expression_types", ?expression, ?file).entered();
+    let _span =
+        tracing::trace_span!("infer_expression_types", expression=?expression.as_id(), file=?file.path(db))
+            .entered();
 
     let index = semantic_index(db, file);
 
@@ -2226,6 +2236,14 @@ mod tests {
         assert_public_ty(&db, "/src/a.py", "y", "Literal[1, 2, 4]");
 
         Ok(())
+    }
+
+    fn first_public_def<'db>(db: &'db TestDb, file: File, name: &str) -> Definition<'db> {
+        let scope = global_scope(db, file);
+        *use_def_map(db, scope)
+            .public_definitions(symbol_table(db, scope).symbol_id_by_name(name).unwrap())
+            .first()
+            .unwrap()
     }
 
     #[test]

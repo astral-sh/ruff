@@ -13,9 +13,10 @@ use crate::Db;
 /// Reads the source text of a python text file (must be valid UTF8) or notebook.
 #[salsa::tracked]
 pub fn source_text(db: &dyn Db, file: File) -> SourceText {
-    let _span = tracing::trace_span!("source_text", ?file).entered();
+    let path = file.path(db);
+    let _span = tracing::trace_span!("source_text", file=?path).entered();
 
-    let is_notebook = match file.path(db) {
+    let is_notebook = match path {
         FilePath::System(system) => system.extension().is_some_and(|extension| {
             PySourceType::try_from_extension(extension) == Some(PySourceType::Ipynb)
         }),
