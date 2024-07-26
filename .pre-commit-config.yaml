@@ -9,7 +9,8 @@ exclude: |
     crates/ruff_python_formatter/resources/.*|
     crates/ruff_python_formatter/tests/snapshots/.*|
     crates/ruff_python_resolver/resources/.*|
-    crates/ruff_python_resolver/tests/snapshots/.*
+    crates/ruff_python_resolver/tests/snapshots/.*|
+    crates/red_knot/resources/.*
   )$
 
 repos:
@@ -63,11 +64,6 @@ repos:
         args: [--fix, --exit-non-zero-on-fix]
         types_or: [python, pyi]
         require_serial: true
-        exclude: |
-          (?x)^(
-            crates/ruff_linter/resources/.*|
-            crates/ruff_python_formatter/resources/.*
-          )$
 
   # Prettier
   - repo: https://github.com/pre-commit/mirrors-prettier

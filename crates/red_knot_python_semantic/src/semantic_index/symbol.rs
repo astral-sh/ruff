@@ -126,6 +126,7 @@ impl<'db> ScopeId<'db> {
             }
             NodeWithScopeKind::Function(function)
             | NodeWithScopeKind::FunctionTypeParameters(function) => function.name.as_str(),
+            NodeWithScopeKind::Lambda(_) => "<lambda>",
         }
     }
 }
@@ -296,6 +297,7 @@ pub(crate) enum NodeWithScopeRef<'a> {
     Module,
     Class(&'a ast::StmtClassDef),
     Function(&'a ast::StmtFunctionDef),
+    Lambda(&'a ast::ExprLambda),
     FunctionTypeParameters(&'a ast::StmtFunctionDef),
     ClassTypeParameters(&'a ast::StmtClassDef),
 }
@@ -315,11 +317,14 @@ impl NodeWithScopeRef<'_> {
             NodeWithScopeRef::Function(function) => {
                 NodeWithScopeKind::Function(AstNodeRef::new(module, function))
             }
+            NodeWithScopeRef::Lambda(lambda) => {
+                NodeWithScopeKind::Lambda(AstNodeRef::new(module, lambda))
+            }
             NodeWithScopeRef::FunctionTypeParameters(function) => {
                 NodeWithScopeKind::FunctionTypeParameters(AstNodeRef::new(module, function))
             }
             NodeWithScopeRef::ClassTypeParameters(class) => {
-                NodeWithScopeKind::Class(AstNodeRef::new(module, class))
+                NodeWithScopeKind::ClassTypeParameters(AstNodeRef::new(module, class))
             }
         }
     }
@@ -329,6 +334,7 @@ impl NodeWithScopeRef<'_> {
             NodeWithScopeRef::Module => ScopeKind::Module,
             NodeWithScopeRef::Class(_) => ScopeKind::Class,
             NodeWithScopeRef::Function(_) => ScopeKind::Function,
+            NodeWithScopeRef::Lambda(_) => ScopeKind::Function,
             NodeWithScopeRef::FunctionTypeParameters(_)
             | NodeWithScopeRef::ClassTypeParameters(_) => ScopeKind::Annotation,
         }
@@ -340,6 +346,9 @@ impl NodeWithScopeRef<'_> {
             NodeWithScopeRef::Class(class) => NodeWithScopeKey::Class(NodeKey::from_node(class)),
             NodeWithScopeRef::Function(function) => {
                 NodeWithScopeKey::Function(NodeKey::from_node(function))
+            }
+            NodeWithScopeRef::Lambda(lambda) => {
+                NodeWithScopeKey::Lambda(NodeKey::from_node(lambda))
             }
             NodeWithScopeRef::FunctionTypeParameters(function) => {
                 NodeWithScopeKey::FunctionTypeParameters(NodeKey::from_node(function))
@@ -359,6 +368,7 @@ pub enum NodeWithScopeKind {
     ClassTypeParameters(AstNodeRef<ast::StmtClassDef>),
     Function(AstNodeRef<ast::StmtFunctionDef>),
     FunctionTypeParameters(AstNodeRef<ast::StmtFunctionDef>),
+    Lambda(AstNodeRef<ast::ExprLambda>),
 }
 
 #[derive(Copy, Clone, Debug, Eq, PartialEq, Hash)]
@@ -368,4 +378,5 @@ pub(crate) enum NodeWithScopeKey {
     ClassTypeParameters(NodeKey),
     Function(NodeKey),
     FunctionTypeParameters(NodeKey),
+    Lambda(NodeKey),
 }

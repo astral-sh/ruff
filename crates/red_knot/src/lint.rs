@@ -73,8 +73,9 @@ fn lint_lines(source: &str, diagnostics: &mut Vec<String>) {
     }
 }
 
+#[allow(unreachable_pub)]
 #[salsa::tracked(return_ref)]
-pub(crate) fn lint_semantic(db: &dyn Db, file_id: File) -> Diagnostics {
+pub fn lint_semantic(db: &dyn Db, file_id: File) -> Diagnostics {
     let _span = trace_span!("lint_semantic", ?file_id).entered();
 
     let source = source_text(db.upcast(), file_id);
@@ -313,6 +314,10 @@ mod tests {
     use crate::db::tests::TestDb;
 
     fn setup_db() -> TestDb {
+        setup_db_with_root(SystemPathBuf::from("/src"))
+    }
+
+    fn setup_db_with_root(workspace_root: SystemPathBuf) -> TestDb {
         let db = TestDb::new();
 
         Program::new(
@@ -320,7 +325,7 @@ mod tests {
             TargetVersion::Py38,
             SearchPathSettings {
                 extra_paths: Vec::new(),
-                workspace_root: SystemPathBuf::from("/src"),
+                workspace_root,
                 site_packages: None,
                 custom_typeshed: None,
             },

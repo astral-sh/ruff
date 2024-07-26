@@ -1,0 +1,3 @@
+"docstring"
+
+a = 1
