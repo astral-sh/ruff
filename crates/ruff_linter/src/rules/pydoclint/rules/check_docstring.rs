@@ -15,7 +15,8 @@ use crate::registry::Rule;
 use crate::rules::pydocstyle::settings::Convention;
 
 /// ## What it does
-/// Checks for function docstrings that do not have a returns section.
+/// Checks for functions with explicit returns missing a returns section in
+/// their docstring.
 ///
 /// ## Why is this bad?
 /// Docstrings missing return sections are a sign of incomplete documentation
