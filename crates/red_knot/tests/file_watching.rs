@@ -655,7 +655,6 @@ fn search_path() -> anyhow::Result<()> {
     );
 
     std::fs::write(site_packages.join("a.py").as_std_path(), "class A: ...")?;
-    std::fs::write(site_packages.join("__init__.py").as_std_path(), "")?;
 
     let changes = case.stop_watch();
 
@@ -686,7 +685,6 @@ fn add_search_path() -> anyhow::Result<()> {
     });
 
     std::fs::write(site_packages.join("a.py").as_std_path(), "class A: ...")?;
-    std::fs::write(site_packages.join("__init__.py").as_std_path(), "")?;
 
     let changes = case.stop_watch();
 
