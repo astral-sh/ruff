@@ -75,6 +75,10 @@ mod tests {
         Rule::InvalidModuleName,
         Path::new("N999/module/invalid_name/import.py")
     )]
+    #[test_case(
+        Rule::InvalidModuleName,
+        Path::new("N999/module/file without package.py")
+    )]
     fn rules(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!("{}_{}", rule_code.noqa_code(), path.to_string_lossy());
         let diagnostics = test_path(

@@ -59,34 +59,33 @@ pub(crate) fn invalid_module_name(
         return None;
     }
 
-    if let Some(package) = package {
-        let module_name = if is_module_file(path) {
-            package.file_name().unwrap().to_string_lossy()
-        } else {
-            path.file_stem().unwrap().to_string_lossy()
-        };
+    let module_name = match package {
+        Some(package) if is_module_file(path) => package.file_name(),
+        _ => path.file_stem(),
+    }
+    .unwrap()
+    .to_string_lossy();
 
-        // As a special case, we allow files in `versions` and `migrations` directories to start
-        // with a digit (e.g., `0001_initial.py`), to support common conventions used by Django
-        // and other frameworks.
-        let is_valid_module_name = if is_migration_file(path) {
-            is_migration_name(&module_name)
-        } else {
-            is_module_name(&module_name)
-        };
+    // As a special case, we allow files in `versions` and `migrations` directories to start
+    // with a digit (e.g., `0001_initial.py`), to support common conventions used by Django
+    // and other frameworks.
+    let is_valid_module_name = if is_migration_file(path) {
+        is_migration_name(&module_name)
+    } else {
+        is_module_name(&module_name)
+    };
 
-        if !is_valid_module_name {
-            // Ignore any explicitly-allowed names.
-            if ignore_names.matches(&module_name) {
-                return None;
-            }
-            return Some(Diagnostic::new(
-                InvalidModuleName {
-                    name: module_name.to_string(),
-                },
-                TextRange::default(),
-            ));
+    if !is_valid_module_name {
+        // Ignore any explicitly-allowed names.
+        if ignore_names.matches(&module_name) {
+            return None;
         }
+        return Some(Diagnostic::new(
+            InvalidModuleName {
+                name: module_name.to_string(),
+            },
+            TextRange::default(),
+        ));
     }
 
     None
