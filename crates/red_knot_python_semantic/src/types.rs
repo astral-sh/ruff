@@ -43,14 +43,14 @@ pub(crate) fn symbol_ty_by_name<'db>(
         .unwrap_or(Type::Unbound)
 }
 
-/// Shorthand for `symbol_ty` that looks up a module-global symbol in a file.
+/// Shorthand for `symbol_ty` that looks up a module-global symbol by name in a file.
 pub(crate) fn global_symbol_ty_by_name<'db>(db: &'db dyn Db, file: File, name: &str) -> Type<'db> {
     symbol_ty_by_name(db, global_scope(db, file), name)
 }
 
 /// Shorthand for `symbol_ty` that looks up a symbol in the builtins.
 ///
-/// Returns `None` if the builtins module isn't available for some reason.
+/// Returns `Unbound` if the builtins module isn't available for some reason.
 pub(crate) fn builtins_symbol_ty_by_name<'db>(db: &'db dyn Db, name: &str) -> Type<'db> {
     builtins_scope(db)
         .map(|builtins| symbol_ty_by_name(db, builtins, name))

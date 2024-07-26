@@ -553,7 +553,6 @@ impl<'db> TypeInferenceBuilder<'db> {
                 pattern,
                 guard,
             } = case;
-            // TODO infer case patterns; they aren't normal expressions
             self.infer_match_pattern(pattern);
             self.infer_optional_expression(guard.as_deref());
             self.infer_body(body);
@@ -920,10 +919,10 @@ impl<'db> TypeInferenceBuilder<'db> {
         let ast::ExprNumberLiteral { range: _, value } = literal;
 
         match value {
-            ast::Number::Int(n) => {
-                // TODO support big int literals
-                n.as_i64().map(Type::IntLiteral).unwrap_or(Type::Unknown)
-            }
+            ast::Number::Int(n) => n
+                .as_i64()
+                .map(Type::IntLiteral)
+                .unwrap_or_else(|| builtins_symbol_ty_by_name(self.db, "int")),
             // TODO builtins.float or builtins.complex
             _ => Type::Unknown,
         }
@@ -1004,8 +1003,8 @@ impl<'db> TypeInferenceBuilder<'db> {
             self.infer_expression(elt);
         }
 
-        // TODO tuple type
-        Type::Unknown
+        // TODO generic
+        builtins_symbol_ty_by_name(self.db, "tuple")
     }
 
     fn infer_list_expression(&mut self, list: &ast::ExprList) -> Type<'db> {
@@ -1019,8 +1018,8 @@ impl<'db> TypeInferenceBuilder<'db> {
             self.infer_expression(elt);
         }
 
-        // TODO list type
-        Type::Unknown
+        // TODO generic
+        builtins_symbol_ty_by_name(self.db, "list")
     }
 
     fn infer_set_expression(&mut self, set: &ast::ExprSet) -> Type<'db> {
@@ -1030,8 +1029,8 @@ impl<'db> TypeInferenceBuilder<'db> {
             self.infer_expression(elt);
         }
 
-        // TODO set type
-        Type::Unknown
+        // TODO generic
+        builtins_symbol_ty_by_name(self.db, "set")
     }
 
     fn infer_dict_expression(&mut self, dict: &ast::ExprDict) -> Type<'db> {
@@ -1042,8 +1041,8 @@ impl<'db> TypeInferenceBuilder<'db> {
             self.infer_expression(&item.value);
         }
 
-        // TODO dict type
-        Type::Unknown
+        // TODO generic
+        builtins_symbol_ty_by_name(self.db, "dict")
     }
 
     fn infer_generator_expression(&mut self, generator: &ast::ExprGenerator) -> Type<'db> {
@@ -1346,23 +1345,19 @@ impl<'db> TypeInferenceBuilder<'db> {
                             ast::Operator::Add => n
                                 .checked_add(m)
                                 .map(Type::IntLiteral)
-                                // TODO builtins.int
-                                .unwrap_or(Type::Unknown),
+                                .unwrap_or_else(|| builtins_symbol_ty_by_name(self.db, "int")),
                             ast::Operator::Sub => n
                                 .checked_sub(m)
                                 .map(Type::IntLiteral)
-                                // TODO builtins.int
-                                .unwrap_or(Type::Unknown),
+                                .unwrap_or_else(|| builtins_symbol_ty_by_name(self.db, "int")),
                             ast::Operator::Mult => n
                                 .checked_mul(m)
                                 .map(Type::IntLiteral)
-                                // TODO builtins.int
-                                .unwrap_or(Type::Unknown),
+                                .unwrap_or_else(|| builtins_symbol_ty_by_name(self.db, "int")),
                             ast::Operator::Div => n
                                 .checked_div(m)
                                 .map(Type::IntLiteral)
-                                // TODO builtins.int
-                                .unwrap_or(Type::Unknown),
+                                .unwrap_or_else(|| builtins_symbol_ty_by_name(self.db, "int")),
                             ast::Operator::Mod => n
                                 .checked_rem(m)
                                 .map(Type::IntLiteral)
@@ -2232,6 +2227,90 @@ mod tests {
         // if just-body were possible without the break, then 0 would be possible for y
         // 1 and 2 both being possible for y shows that we can hit else with or without body
         assert_public_ty(&db, "/src/a.py", "y", "Literal[1, 2, 4]");
+
+        Ok(())
+    }
+
+    #[test]
+    fn big_int() -> anyhow::Result<()> {
+        let mut db = setup_db();
+
+        db.write_dedented(
+            "/src/a.py",
+            "
+            x = 10_000_000_000_000_000_000
+            ",
+        )?;
+
+        assert_public_ty(&db, "/src/a.py", "x", "Literal[int]");
+
+        Ok(())
+    }
+
+    #[test]
+    fn tuple_literal() -> anyhow::Result<()> {
+        let mut db = setup_db();
+
+        db.write_dedented(
+            "/src/a.py",
+            "
+            x = ()
+            ",
+        )?;
+
+        // TODO should be a generic type
+        assert_public_ty(&db, "/src/a.py", "x", "Literal[tuple]");
+
+        Ok(())
+    }
+
+    #[test]
+    fn list_literal() -> anyhow::Result<()> {
+        let mut db = setup_db();
+
+        db.write_dedented(
+            "/src/a.py",
+            "
+            x = []
+            ",
+        )?;
+
+        // TODO should be a generic type
+        assert_public_ty(&db, "/src/a.py", "x", "Literal[list]");
+
+        Ok(())
+    }
+
+    #[test]
+    fn set_literal() -> anyhow::Result<()> {
+        let mut db = setup_db();
+
+        db.write_dedented(
+            "/src/a.py",
+            "
+            x = {1, 2}
+            ",
+        )?;
+
+        // TODO should be a generic type
+        assert_public_ty(&db, "/src/a.py", "x", "Literal[set]");
+
+        Ok(())
+    }
+
+    #[test]
+    fn dict_literal() -> anyhow::Result<()> {
+        let mut db = setup_db();
+
+        db.write_dedented(
+            "/src/a.py",
+            "
+            x = {}
+            ",
+        )?;
+
+        // TODO should be a generic type
+        assert_public_ty(&db, "/src/a.py", "x", "Literal[dict]");
 
         Ok(())
     }
