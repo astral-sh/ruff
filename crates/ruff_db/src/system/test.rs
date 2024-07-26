@@ -177,6 +177,14 @@ pub trait DbWithTestSystem: Db + Sized {
         result
     }
 
+    /// Writes the content of the given virtual file.
+    fn write_virtual_file(&mut self, path: impl AsRef<SystemVirtualPath>, content: impl ToString) {
+        let path = path.as_ref();
+        self.test_system()
+            .memory_file_system()
+            .write_virtual_file(path, content);
+    }
+
     /// Writes auto-dedented text to a file.
     fn write_dedented(&mut self, path: &str, content: &str) -> crate::system::Result<()> {
         self.write_file(path, textwrap::dedent(content))?;

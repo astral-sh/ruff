@@ -609,6 +609,23 @@ impl SystemVirtualPath {
         SystemVirtualPathBuf(self.0.to_string())
     }
 
+    /// Extracts the file extension, if possible.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use ruff_db::system::SystemVirtualPath;
+    ///
+    /// assert_eq!(None, SystemVirtualPath::new("untitled:Untitled-1").extension());
+    /// assert_eq!("ipynb", SystemVirtualPath::new("untitled:Untitled-1.ipynb").extension().unwrap());
+    /// assert_eq!("ipynb", SystemVirtualPath::new("vscode-notebook-cell:Untitled-1.ipynb").extension().unwrap());
+    /// ```
+    ///
+    /// See [`Path::extension`] for more details.
+    pub fn extension(&self) -> Option<&str> {
+        Path::new(&self.0).extension().and_then(|ext| ext.to_str())
+    }
+
     /// Returns the path as a string slice.
     #[inline]
     pub fn as_str(&self) -> &str {
