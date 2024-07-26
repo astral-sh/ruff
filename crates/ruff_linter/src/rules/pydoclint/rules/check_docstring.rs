@@ -98,7 +98,7 @@ pub struct DocstringExtraneousReturns;
 impl Violation for DocstringExtraneousReturns {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Docstring should not have a returns section")
+        format!("Docstring should not have a returns section because the function doesn't return anything")
     }
 }
 

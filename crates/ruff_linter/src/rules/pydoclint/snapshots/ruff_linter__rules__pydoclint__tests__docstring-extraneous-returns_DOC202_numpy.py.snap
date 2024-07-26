@@ -1,7 +1,7 @@
 ---
 source: crates/ruff_linter/src/rules/pydoclint/mod.rs
 ---
-DOC202_numpy.py:24:1: DOC202 Docstring should not have a returns section
+DOC202_numpy.py:24:1: DOC202 Docstring should not have a returns section because the function doesn't return anything
    |
 22 |           A number
 23 |   
@@ -14,7 +14,7 @@ DOC202_numpy.py:24:1: DOC202 Docstring should not have a returns section
 29 |       print('test')
    |
 
-DOC202_numpy.py:44:1: DOC202 Docstring should not have a returns section
+DOC202_numpy.py:44:1: DOC202 Docstring should not have a returns section because the function doesn't return anything
    |
 42 |               A number
 43 |   
