@@ -1,6 +1,7 @@
-use ruff_benchmark::criterion::{
+use codspeed_criterion_compat::{
     criterion_group, criterion_main, measurement::WallTime, BenchmarkId, Criterion, Throughput,
 };
+
 use ruff_benchmark::{TestCase, TestFile, TestFileDownloadError};
 use ruff_python_parser::{lexer, Mode, TokenKind};
 
