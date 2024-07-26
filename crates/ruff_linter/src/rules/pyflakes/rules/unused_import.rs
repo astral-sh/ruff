@@ -242,8 +242,22 @@ pub(crate) fn unused_import(checker: &Checker, scope: &Scope, diagnostics: &mut 
             continue;
         };
 
+        let name = binding.name(checker.locator());
+
+        // If an import is marked as required, avoid treating it as unused, regardless of whether
+        // it was _actually_ used.
+        if checker
+            .settings
+            .isort
+            .required_imports
+            .iter()
+            .any(|required_import| required_import.matches(name, &import))
+        {
+            continue;
+        }
+
         let import = ImportBinding {
-            name: binding.name(checker.locator()),
+            name,
             import,
             range: binding.range(),
             parent_range: binding.parent_range(checker.semantic()),

@@ -1,4 +1,8 @@
 use ruff_macros::CacheKey;
+use ruff_python_ast::helpers::collect_import_from_member;
+use ruff_python_ast::name::QualifiedName;
+
+use crate::{AnyImport, Imported};
 
 /// A list of names imported via any import statement.
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, CacheKey)]
@@ -37,6 +41,41 @@ impl NameImports {
     }
 }
 
+impl NameImport {
+    /// Returns the name under which the member is bound (e.g., given `from foo import bar as baz`, returns `baz`).
+    fn bound_name(&self) -> &str {
+        match self {
+            NameImport::Import(import) => {
+                import.name.as_name.as_deref().unwrap_or(&import.name.name)
+            }
+            NameImport::ImportFrom(import_from) => import_from
+                .name
+                .as_name
+                .as_deref()
+                .unwrap_or(&import_from.name.name),
+        }
+    }
+
+    /// Returns the [`QualifiedName`] of the imported name (e.g., given `import foo import bar as baz`, returns `["foo", "bar"]`).
+    fn qualified_name(&self) -> QualifiedName {
+        match self {
+            NameImport::Import(import) => QualifiedName::user_defined(&import.name.name),
+            NameImport::ImportFrom(import_from) => collect_import_from_member(
+                import_from.level,
+                import_from.module.as_deref(),
+                import_from.name.name.as_str(),
+            ),
+        }
+    }
+}
+
+impl NameImport {
+    /// Returns `true` if the [`NameImport`] matches the specified name and binding.
+    pub fn matches(&self, name: &str, binding: &AnyImport) -> bool {
+        name == self.bound_name() && self.qualified_name() == *binding.qualified_name()
+    }
+}
+
 impl ModuleNameImport {
     /// Creates a new `Import` to import the specified module.
     pub fn module(name: String) -> Self {
@@ -44,6 +83,15 @@ impl ModuleNameImport {
             name: Alias {
                 name,
                 as_name: None,
+            },
+        }
+    }
+
+    pub fn alias(name: String, as_name: String) -> Self {
+        Self {
+            name: Alias {
+                name,
+                as_name: Some(as_name),
             },
         }
     }

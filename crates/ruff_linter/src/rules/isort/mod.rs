@@ -906,6 +906,40 @@ mod tests {
         Ok(())
     }
 
+    #[test_case(Path::new("unused.py"))]
+    fn required_import_unused(path: &Path) -> Result<()> {
+        let snapshot = format!("required_import_{}", path.to_string_lossy());
+        let diagnostics = test_path(
+            Path::new("isort/required_imports").join(path).as_path(),
+            &LinterSettings {
+                src: vec![test_resource_path("fixtures/isort")],
+                isort: super::settings::Settings {
+                    required_imports: BTreeSet::from_iter([
+                        NameImport::Import(ModuleNameImport::module("os".to_string())),
+                        NameImport::Import(ModuleNameImport::alias(
+                            "shelve".to_string(),
+                            "alias".to_string(),
+                        )),
+                        NameImport::ImportFrom(MemberNameImport::member(
+                            "typing".to_string(),
+                            "List".to_string(),
+                        )),
+                        NameImport::ImportFrom(MemberNameImport::alias(
+                            "typing".to_string(),
+                            "Set".to_string(),
+                            "SetAlias".to_string(),
+                        )),
+                        NameImport::Import(ModuleNameImport::module("urllib.parse".to_string())),
+                    ]),
+                    ..super::settings::Settings::default()
+                },
+                ..LinterSettings::for_rules([Rule::MissingRequiredImport, Rule::UnusedImport])
+            },
+        )?;
+        assert_messages!(snapshot, diagnostics);
+        Ok(())
+    }
+
     #[test_case(Path::new("from_first.py"))]
     fn from_first(path: &Path) -> Result<()> {
         let snapshot = format!("from_first_{}", path.to_string_lossy());
