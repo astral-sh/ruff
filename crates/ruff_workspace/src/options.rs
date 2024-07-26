@@ -1260,10 +1260,11 @@ pub struct Flake8ImplicitStrConcatOptions {
     /// allowed (but continuation lines, delimited with a backslash, are
     /// prohibited).
     ///
-    /// Note that setting `allow-multiline = false` should typically be coupled
-    /// with disabling `explicit-string-concatenation` (`ISC003`). Otherwise,
-    /// both explicit and implicit multiline string concatenations will be seen
-    /// as violations.
+    /// Setting `allow-multiline = false` will automatically disable the
+    /// `explicit-string-concatenation` (`ISC003`) rule. Otherwise, both
+    /// implicit and explicit multiline string concatenations would be seen
+    /// as violations, making it impossible to write a linter-compliant multiline
+    /// string.
     #[option(
         default = r#"true"#,
         value_type = "bool",

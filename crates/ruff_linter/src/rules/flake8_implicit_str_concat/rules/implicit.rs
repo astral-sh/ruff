@@ -93,9 +93,9 @@ impl Violation for MultiLineImplicitStringConcatenation {
 pub(crate) fn implicit(
     diagnostics: &mut Vec<Diagnostic>,
     tokens: &Tokens,
-    settings: &LinterSettings,
     locator: &Locator,
     indexer: &Indexer,
+    settings: &LinterSettings,
 ) {
     for (a_token, b_token) in tokens
         .iter()
