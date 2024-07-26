@@ -229,13 +229,11 @@ impl Workspace {
     ///
     /// This changes the behavior of `check` to check all files in the workspace instead of just the open files.
     pub fn take_open_files(self, db: &mut dyn Db) -> FxHashSet<File> {
-        let open_files = self.open_file_set(db).clone();
+        // Salsa will cancel any pending queries and remove its own reference to `open_files`
+        // so that the reference counter to `open_files` now drops to 1.
+        let open_files = self.set_open_file_set(db).to(None);
 
         if let Some(open_files) = open_files {
-            // Salsa will cancel any pending queries and remove its own reference to `open_files`
-            // so that the reference counter to `open_files` now drops to 1.
-            self.set_open_file_set(db).to(None);
-
             Arc::try_unwrap(open_files).unwrap()
         } else {
             FxHashSet::default()
