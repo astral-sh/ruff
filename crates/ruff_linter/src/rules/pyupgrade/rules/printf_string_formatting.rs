@@ -150,8 +150,19 @@ fn handle_part(part: &CFormatPart<String>) -> Cow<'_, str> {
                     match precision {
                         CFormatPrecision::Quantity(quantity) => match quantity {
                             CFormatQuantity::Amount(amount) => {
-                                format_string.push('.');
-                                format_string.push_str(&amount.to_string());
+                                // Integer-only presentation types.
+                                //
+                                // See: https://docs.python.org/3/library/string.html#format-specification-mini-language
+                                if matches!(
+                                    spec.format_char,
+                                    'b' | 'c' | 'd' | 'o' | 'x' | 'X' | 'n'
+                                ) {
+                                    format_string.push('0');
+                                    format_string.push_str(&amount.to_string());
+                                } else {
+                                    format_string.push('.');
+                                    format_string.push_str(&amount.to_string());
+                                }
                             }
                             CFormatQuantity::FromValuesTuple => {
                                 unreachable!("Width should be a usize")
