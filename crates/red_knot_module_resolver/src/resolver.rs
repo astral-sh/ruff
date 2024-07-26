@@ -60,8 +60,9 @@ pub(crate) fn path_to_module(db: &dyn Db, path: &FilePath) -> Option<Module> {
 /// Resolves the module for the file with the given id.
 ///
 /// Returns `None` if the file is not a module locatable via any of the known search paths.
+#[allow(unreachable_pub)]
 #[salsa::tracked]
-pub(crate) fn file_to_module(db: &dyn Db, file: File) -> Option<Module> {
+pub fn file_to_module(db: &dyn Db, file: File) -> Option<Module> {
     let _span = tracing::trace_span!("file_to_module", ?file).entered();
 
     let path = file.path(db.upcast());

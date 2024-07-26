@@ -28,10 +28,31 @@ impl Display for DisplayType<'_> {
             Type::Module(file) => {
                 write!(f, "<module '{:?}'>", file.path(self.db.upcast()))
             }
-            // TODO functions and classes should display using a fully qualified name
-            Type::Class(class) => write!(f, "Literal[{}]", class.name(self.db)),
+            Type::Class(class) => {
+                if let Some(module) = class.module(self.db) {
+                    write!(f, "Literal[{}.{}]", module.name(), class.name(self.db))
+                } else {
+                    write!(
+                        f,
+                        "Literal[<{}>.{}]",
+                        class.file(self.db).path(self.db.upcast()).as_ref(),
+                        class.name(self.db)
+                    )
+                }
+            }
             Type::Instance(class) => f.write_str(&class.name(self.db)),
-            Type::Function(function) => write!(f, "Literal[{}]", function.name(self.db)),
+            Type::Function(function) => {
+                if let Some(module) = function.module(self.db) {
+                    write!(f, "Literal[{}.{}]", module.name(), function.name(self.db))
+                } else {
+                    write!(
+                        f,
+                        "Literal[<{}>.{}]",
+                        function.file(self.db).path(self.db.upcast()).as_ref(),
+                        function.name(self.db)
+                    )
+                }
+            }
             Type::Union(union) => union.display(self.db).fmt(f),
             Type::Intersection(intersection) => intersection.display(self.db).fmt(f),
             Type::IntLiteral(n) => write!(f, "Literal[{n}]"),

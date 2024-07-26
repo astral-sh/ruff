@@ -1,3 +1,4 @@
+use red_knot_module_resolver::{file_to_module, Module};
 use ruff_db::files::File;
 use ruff_python_ast::name::Name;
 
@@ -181,11 +182,18 @@ pub struct FunctionType<'db> {
     /// name of the function at definition
     pub name: Name,
 
+    /// file in which the function is defined
+    pub file: File,
+
     /// types of all decorators on this function
     decorators: Vec<Type<'db>>,
 }
 
 impl<'db> FunctionType<'db> {
+    pub fn module(self, db: &dyn Db) -> Option<Module> {
+        file_to_module(db.upcast(), self.file(db))
+    }
+
     pub fn has_decorator(self, db: &dyn Db, decorator: Type<'_>) -> bool {
         self.decorators(db).contains(&decorator)
     }
@@ -196,6 +204,9 @@ pub struct ClassType<'db> {
     /// Name of the class at definition
     pub name: Name,
 
+    /// file in which the class is defined
+    pub file: File,
+
     /// Types of all class bases
     bases: Vec<Type<'db>>,
 
@@ -203,6 +214,10 @@ pub struct ClassType<'db> {
 }
 
 impl<'db> ClassType<'db> {
+    pub fn module(self, db: &dyn Db) -> Option<Module> {
+        file_to_module(db.upcast(), self.file(db))
+    }
+
     /// Returns the class member of this class named `name`.
     ///
     /// The member resolves to a member of the class itself or any of its bases.

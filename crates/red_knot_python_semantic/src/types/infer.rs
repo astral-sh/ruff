@@ -397,8 +397,12 @@ impl<'db> TypeInferenceBuilder<'db> {
             self.infer_optional_expression(returns.as_deref());
         }
 
-        let function_ty =
-            Type::Function(FunctionType::new(self.db, name.id.clone(), decorator_tys));
+        let function_ty = Type::Function(FunctionType::new(
+            self.db,
+            name.id.clone(),
+            self.file,
+            decorator_tys,
+        ));
 
         self.types.definitions.insert(definition, function_ty);
     }
@@ -473,7 +477,13 @@ impl<'db> TypeInferenceBuilder<'db> {
             .node_scope(NodeWithScopeRef::Class(class))
             .to_scope_id(self.db, self.file);
 
-        let class_ty = Type::Class(ClassType::new(self.db, name.id.clone(), bases, body_scope));
+        let class_ty = Type::Class(ClassType::new(
+            self.db,
+            name.id.clone(),
+            self.file,
+            bases,
+            body_scope,
+        ));
 
         self.types.definitions.insert(definition, class_ty);
     }
@@ -1554,7 +1564,7 @@ mod tests {
             ("src/b.py", "class C: pass"),
         ])?;
 
-        assert_public_ty(&db, "src/a.py", "E", "Literal[C]");
+        assert_public_ty(&db, "src/a.py", "E", "Literal[b.C]");
 
         Ok(())
     }
@@ -1587,7 +1597,31 @@ mod tests {
             .map(|base_ty| format!("{}", base_ty.display(&db)))
             .collect();
 
-        assert_eq!(base_names, vec!["Literal[Base]"]);
+        assert_eq!(base_names, vec!["Literal[mod.Base]"]);
+
+        Ok(())
+    }
+
+    #[test]
+    fn class_name_not_in_module() -> anyhow::Result<()> {
+        let mut db = setup_db();
+
+        db.write_file("/src/a.py", "")?; // we have to create /src or the resolver errors
+        db.write_file("/not-a-module", "class C: pass")?;
+
+        assert_public_ty(&db, "not-a-module", "C", "Literal[</not-a-module>.C]");
+
+        Ok(())
+    }
+
+    #[test]
+    fn function_name_not_in_module() -> anyhow::Result<()> {
+        let mut db = setup_db();
+
+        db.write_file("/src/a.py", "")?; // we have to create /src or the resolver errors
+        db.write_file("/not-a-module", "def f(): pass")?;
+
+        assert_public_ty(&db, "not-a-module", "f", "Literal[</not-a-module>.f]");
 
         Ok(())
     }
@@ -1631,7 +1665,7 @@ mod tests {
             ("src/b.py", "class C: pass"),
         ])?;
 
-        assert_public_ty(&db, "src/a.py", "D", "Literal[C]");
+        assert_public_ty(&db, "src/a.py", "D", "Literal[b.C]");
 
         Ok(())
     }
@@ -2095,7 +2129,7 @@ mod tests {
 
         db.write_file("/src/a.py", "c = copyright")?;
 
-        assert_public_ty(&db, "/src/a.py", "c", "Literal[copyright]");
+        assert_public_ty(&db, "/src/a.py", "c", "Literal[builtins.copyright]");
 
         Ok(())
     }
@@ -2113,7 +2147,7 @@ mod tests {
             ("/typeshed/stdlib/VERSIONS", "builtins: 3.8-"),
         ])?;
 
-        assert_public_ty(&db, "/src/a.py", "c", "Literal[copyright]");
+        assert_public_ty(&db, "/src/a.py", "c", "Literal[builtins.copyright]");
 
         Ok(())
     }
@@ -2150,7 +2184,7 @@ mod tests {
 
         db.write_file("/src/a.py", "import builtins; x = builtins.copyright")?;
 
-        assert_public_ty(&db, "/src/a.py", "x", "Literal[copyright]");
+        assert_public_ty(&db, "/src/a.py", "x", "Literal[builtins.copyright]");
         // imported builtins module is the same file as the implicit builtins
         let file = system_path_to_file(&db, "/src/a.py").expect("Expected file to exist.");
         let builtins_ty = global_symbol_ty_by_name(&db, file, "builtins");

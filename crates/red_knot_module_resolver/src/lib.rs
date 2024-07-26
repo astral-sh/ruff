@@ -3,7 +3,7 @@ use std::iter::FusedIterator;
 pub use db::{Db, Jar};
 pub use module::{Module, ModuleKind};
 pub use module_name::ModuleName;
-pub use resolver::resolve_module;
+pub use resolver::{file_to_module, resolve_module};
 use ruff_db::system::SystemPath;
 pub use typeshed::{
     vendored_typeshed_stubs, TypeshedVersionsParseError, TypeshedVersionsParseErrorKind,
