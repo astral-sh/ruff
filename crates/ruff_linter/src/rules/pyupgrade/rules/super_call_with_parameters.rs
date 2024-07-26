@@ -102,7 +102,9 @@ pub(crate) fn super_call_with_parameters(checker: &mut Checker, call: &ast::Expr
 
     // Find the enclosing class definition (if any).
     let Some(Stmt::ClassDef(ast::StmtClassDef {
-        name: parent_name, ..
+        name: parent_name,
+        decorator_list,
+        ..
     })) = parents.find(|stmt| stmt.is_class_def_stmt())
     else {
         return;
@@ -125,6 +127,36 @@ pub(crate) fn super_call_with_parameters(checker: &mut Checker, call: &ast::Expr
     }
 
     drop(parents);
+
+    // If the class is an `@dataclass` with `slots=True`, calling `super()` without arguments raises
+    // a `TypeError`.
+    //
+    // See: https://docs.python.org/3/library/dataclasses.html#dataclasses.dataclass
+    if decorator_list.iter().any(|decorator| {
+        let Expr::Call(ast::ExprCall {
+            func, arguments, ..
+        }) = &decorator.expression
+        else {
+            return false;
+        };
+
+        if checker
+            .semantic()
+            .resolve_qualified_name(func)
+            .is_some_and(|name| name.segments() == ["dataclasses", "dataclass"])
+        {
+            arguments.find_keyword("slots").map_or(false, |keyword| {
+                matches!(
+                    keyword.value,
+                    Expr::BooleanLiteral(ast::ExprBooleanLiteral { value: true, .. })
+                )
+            })
+        } else {
+            false
+        }
+    }) {
+        return;
+    }
 
     let mut diagnostic = Diagnostic::new(SuperCallWithParameters, call.arguments.range());
     diagnostic.set_fix(Fix::unsafe_edit(Edit::deletion(
