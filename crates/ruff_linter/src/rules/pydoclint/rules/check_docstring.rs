@@ -452,7 +452,12 @@ fn is_property(definition: &Definition, checker: &Checker) -> bool {
     checker
         .semantic()
         .resolve_qualified_name(&last_decorator.expression)
-        .is_some_and(|qualified_name| matches!(qualified_name.segments(), ["", "property"]))
+        .is_some_and(|qualified_name| {
+            matches!(
+                qualified_name.segments(),
+                ["", "property"] | ["functools", "cached_property"]
+            )
+        })
 }
 
 /// DOC201, DOC202, DOC501, DOC502
