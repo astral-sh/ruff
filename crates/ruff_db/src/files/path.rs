@@ -3,8 +3,6 @@ use crate::system::{SystemPath, SystemPathBuf, SystemVirtualPath, SystemVirtualP
 use crate::vendored::{VendoredPath, VendoredPathBuf};
 use crate::Db;
 
-use super::system_virtual_path_to_file;
-
 /// Path to a file.
 ///
 /// The path abstracts that files in Ruff can come from different sources:
@@ -92,14 +90,14 @@ impl FilePath {
     ///
     /// Returns `Some` if a file for `path` exists and is accessible by the user. Returns `None` otherwise.
     ///
-    /// See [`system_path_to_file`], [`vendored_path_to_file`], or [`system_virtual_path_to_file`]
-    /// if you always have either a file system path, vendored path, or virtual path respectively.
+    /// See [`system_path_to_file`] or [`vendored_path_to_file`] if you always have either a file
+    /// system or vendored path.
     #[inline]
     pub fn to_file(&self, db: &dyn Db) -> Option<File> {
         match self {
             FilePath::System(path) => system_path_to_file(db, path),
             FilePath::Vendored(path) => vendored_path_to_file(db, path),
-            FilePath::SystemVirtual(path) => Some(system_virtual_path_to_file(db, path)),
+            FilePath::SystemVirtual(_) => None,
         }
     }
 

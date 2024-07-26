@@ -27,12 +27,6 @@ pub fn system_path_to_file(db: &dyn Db, path: impl AsRef<SystemPath>) -> Option<
     file.exists(db).then_some(file)
 }
 
-/// Interns a virtual file system path and returns a salsa [`File`] ingredient.
-#[inline]
-pub fn system_virtual_path_to_file(db: &dyn Db, path: impl AsRef<SystemVirtualPath>) -> File {
-    db.files().system_virtual(db, path.as_ref())
-}
-
 /// Interns a vendored file path. Returns `Some` if the vendored file for `path` exists and `None` otherwise.
 #[inline]
 pub fn vendored_path_to_file(db: &dyn Db, path: impl AsRef<VendoredPath>) -> Option<File> {
@@ -108,37 +102,6 @@ impl Files {
             .map(|entry| *entry.value())
     }
 
-    #[tracing::instrument(level = "trace", skip(self, db), ret)]
-    fn system_virtual(&self, db: &dyn Db, path: &SystemVirtualPath) -> File {
-        *self
-            .inner
-            .system_virtual_by_path
-            .entry(path.to_path_buf())
-            .or_insert_with(|| {
-                let path_buf = path.to_path_buf();
-                let metadata = db.system().virtual_path_metadata(&path_buf);
-
-                match metadata {
-                    Ok(metadata) => File::new(
-                        db,
-                        FilePath::SystemVirtual(path_buf),
-                        metadata.permissions(),
-                        metadata.revision(),
-                        FileStatus::Exists,
-                        Count::default(),
-                    ),
-                    _ => File::new(
-                        db,
-                        FilePath::SystemVirtual(path_buf),
-                        None,
-                        FileRevision::zero(),
-                        FileStatus::Deleted,
-                        Count::default(),
-                    ),
-                }
-            })
-    }
-
     /// Looks up a vendored file by its path. Returns `Some` if a vendored file for the given path
     /// exists and `None` otherwise.
     #[tracing::instrument(level = "trace", skip(self, db), ret)]
@@ -152,6 +115,36 @@ impl Files {
                     db,
                     FilePath::Vendored(path.to_path_buf()),
                     Some(0o444),
+                    metadata.revision(),
+                    FileStatus::Exists,
+                    Count::default(),
+                );
+
+                entry.insert(file);
+
+                file
+            }
+        };
+
+        Some(file)
+    }
+
+    /// Looks up a virtual file by its `path`.
+    ///
+    /// For a non-existing file, creates a new salsa [`File`] ingredient and stores it for future lookups.
+    ///
+    /// The operations fails if the system failed to provide a metadata for the path.
+    #[tracing::instrument(level = "trace", skip(self, db), ret)]
+    pub fn add_virtual_file(&self, db: &dyn Db, path: &SystemVirtualPath) -> Option<File> {
+        let file = match self.inner.system_virtual_by_path.entry(path.to_path_buf()) {
+            Entry::Occupied(entry) => *entry.get(),
+            Entry::Vacant(entry) => {
+                let metadata = db.system().virtual_path_metadata(path).ok()?;
+
+                let file = File::new(
+                    db,
+                    FilePath::SystemVirtual(path.to_path_buf()),
+                    metadata.permissions(),
                     metadata.revision(),
                     FileStatus::Exists,
                     Count::default(),
@@ -335,7 +328,8 @@ impl File {
         Self::sync_impl(db, metadata, file);
     }
 
-    /// Private method providing the implementation for [`Self::sync_path`] and [`Self::sync`].
+    /// Private method providing the implementation for [`Self::sync_system_path`] and
+    /// [`Self::sync_system_virtual_path`].
     fn sync_impl(db: &mut dyn Db, metadata: crate::system::Result<Metadata>, file: File) {
         let (status, revision, permission) = match metadata {
             Ok(metadata) if metadata.file_type().is_file() => (
