@@ -3,8 +3,8 @@ use ruff_diagnostics::Diagnostic;
 use ruff_diagnostics::Violation;
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::name::QualifiedName;
-use ruff_python_ast::visitor::{self, Visitor};
-use ruff_python_ast::{self as ast, Expr, Stmt};
+use ruff_python_ast::statement_visitor::StatementVisitor;
+use ruff_python_ast::{self as ast, statement_visitor, Expr, Stmt};
 use ruff_python_semantic::{Definition, MemberKind, SemanticModel};
 use ruff_text_size::{Ranged, TextRange};
 
@@ -400,7 +400,7 @@ impl<'a> BodyVisitor<'a> {
     }
 }
 
-impl<'a> Visitor<'a> for BodyVisitor<'a> {
+impl<'a> StatementVisitor<'a> for BodyVisitor<'a> {
     fn visit_stmt(&mut self, stmt: &'a Stmt) {
         match stmt {
             Stmt::Raise(ast::StmtRaise { exc: Some(exc), .. }) => {
@@ -422,7 +422,7 @@ impl<'a> Visitor<'a> for BodyVisitor<'a> {
             _ => {}
         }
 
-        visitor::walk_stmt(self, stmt);
+        statement_visitor::walk_stmt(self, stmt);
     }
 }
 
@@ -493,7 +493,7 @@ pub(crate) fn check_docstring(
 
     let body_entries = {
         let mut visitor = BodyVisitor::new(checker.semantic());
-        visitor::walk_body(&mut visitor, member.body());
+        visitor.visit_body(member.body());
         visitor.finish()
     };
 
