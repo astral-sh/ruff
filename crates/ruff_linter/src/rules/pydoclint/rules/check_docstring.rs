@@ -3,16 +3,104 @@ use ruff_diagnostics::Diagnostic;
 use ruff_diagnostics::Violation;
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::name::QualifiedName;
-use ruff_python_ast::visitor::{self, Visitor};
-use ruff_python_ast::{self as ast, Expr, Stmt};
+use ruff_python_ast::statement_visitor::StatementVisitor;
+use ruff_python_ast::{self as ast, statement_visitor, Expr, Stmt};
 use ruff_python_semantic::{Definition, MemberKind, SemanticModel};
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
-use crate::docstrings::sections::{SectionContexts, SectionKind};
+use crate::docstrings::sections::{SectionContext, SectionContexts, SectionKind};
 use crate::docstrings::styles::SectionStyle;
 use crate::registry::Rule;
 use crate::rules::pydocstyle::settings::Convention;
+
+/// ## What it does
+/// Checks for functions with explicit returns missing a returns section in
+/// their docstring.
+///
+/// ## Why is this bad?
+/// Docstrings missing return sections are a sign of incomplete documentation
+/// or refactors.
+///
+/// ## Example
+/// ```python
+/// def calculate_speed(distance: float, time: float) -> float:
+///     """Calculate speed as distance divided by time.
+///
+///     Args:
+///         distance: Distance traveled.
+///         time: Time spent traveling.
+///     """
+///     return distance / time
+/// ```
+///
+/// Use instead:
+/// ```python
+/// def calculate_speed(distance: float, time: float) -> float:
+///     """Calculate speed as distance divided by time.
+///
+///     Args:
+///         distance: Distance traveled.
+///         time: Time spent traveling.
+///
+///     Returns:
+///         Speed as distance divided by time.
+///     """
+///     return distance / time
+/// ```
+#[violation]
+pub struct DocstringMissingReturns;
+
+impl Violation for DocstringMissingReturns {
+    #[derive_message_formats]
+    fn message(&self) -> String {
+        format!("`return` is not documented in docstring")
+    }
+}
+
+/// ## What it does
+/// Checks for function docstrings that have a returns section without
+/// needing one.
+///
+/// ## Why is this bad?
+/// Functions without an explicit return should not have a returns section
+/// in their docstrings.
+///
+/// ## Example
+/// ```python
+/// def say_hello(n: int) -> None:
+///     """Says hello to the user.
+///
+///     Args:
+///         n: Number of times to say hello.
+///
+///     Returns:
+///         Doesn't return anything.
+///     """
+///     for _ in range(n):
+///         print("Hello!")
+/// ```
+///
+/// Use instead:
+/// ```python
+/// def say_hello(n: int) -> None:
+///     """Says hello to the user.
+///
+///     Args:
+///         n: Number of times to say hello.
+///     """
+///     for _ in range(n):
+///         print("Hello!")
+/// ```
+#[violation]
+pub struct DocstringExtraneousReturns;
+
+impl Violation for DocstringExtraneousReturns {
+    #[derive_message_formats]
+    fn message(&self) -> String {
+        format!("Docstring should not have a returns section because the function doesn't return anything")
+    }
+}
 
 /// ## What it does
 /// Checks for function docstrings that do not include documentation for all
@@ -135,31 +223,68 @@ impl Violation for DocstringExtraneousException {
     }
 }
 
+// A generic docstring section.
 #[derive(Debug)]
-struct DocstringEntries<'a> {
-    raised_exceptions: Vec<QualifiedName<'a>>,
-    raised_exceptions_range: TextRange,
+struct GenericSection {
+    range: TextRange,
 }
 
-impl<'a> DocstringEntries<'a> {
-    /// Return the raised exceptions for the docstring, or `None` if the docstring does not contain
-    /// a `Raises` section.
-    fn from_sections(sections: &'a SectionContexts, style: SectionStyle) -> Option<Self> {
-        for section in sections.iter() {
-            if section.kind() == SectionKind::Raises {
-                return Some(Self {
-                    raised_exceptions: parse_entries(section.following_lines_str(), style),
-                    raised_exceptions_range: section.range(),
-                });
-            }
-        }
-        None
+impl Ranged for GenericSection {
+    fn range(&self) -> TextRange {
+        self.range
     }
 }
 
-impl Ranged for DocstringEntries<'_> {
+impl GenericSection {
+    fn from_section(section: &SectionContext) -> Self {
+        Self {
+            range: section.range(),
+        }
+    }
+}
+
+// A Raises docstring section.
+#[derive(Debug)]
+struct RaisesSection<'a> {
+    raised_exceptions: Vec<QualifiedName<'a>>,
+    range: TextRange,
+}
+
+impl Ranged for RaisesSection<'_> {
     fn range(&self) -> TextRange {
-        self.raised_exceptions_range
+        self.range
+    }
+}
+
+impl<'a> RaisesSection<'a> {
+    /// Return the raised exceptions for the docstring, or `None` if the docstring does not contain
+    /// a `Raises` section.
+    fn from_section(section: &SectionContext<'a>, style: SectionStyle) -> Self {
+        Self {
+            raised_exceptions: parse_entries(section.following_lines_str(), style),
+            range: section.range(),
+        }
+    }
+}
+
+#[derive(Debug)]
+struct DocstringSections<'a> {
+    returns: Option<GenericSection>,
+    raises: Option<RaisesSection<'a>>,
+}
+
+impl<'a> DocstringSections<'a> {
+    fn from_sections(sections: &'a SectionContexts, style: SectionStyle) -> Self {
+        let mut returns: Option<GenericSection> = None;
+        let mut raises: Option<RaisesSection> = None;
+        for section in sections.iter() {
+            match section.kind() {
+                SectionKind::Raises => raises = Some(RaisesSection::from_section(&section, style)),
+                SectionKind::Returns => returns = Some(GenericSection::from_section(&section)),
+                _ => continue,
+            }
+        }
+        Self { returns, raises }
     }
 }
 
@@ -219,34 +344,49 @@ fn parse_entries_numpy(content: &str) -> Vec<QualifiedName> {
     entries
 }
 
-/// An individual exception raised in a function body.
+/// An individual documentable statement in a function body.
 #[derive(Debug)]
-struct Entry<'a> {
-    qualified_name: QualifiedName<'a>,
+struct Entry {
     range: TextRange,
 }
 
-impl Ranged for Entry<'_> {
+impl Ranged for Entry {
     fn range(&self) -> TextRange {
         self.range
     }
 }
 
-/// The exceptions raised in a function body.
+/// An individual exception raised in a function body.
 #[derive(Debug)]
-struct BodyEntries<'a> {
-    raised_exceptions: Vec<Entry<'a>>,
+struct ExceptionEntry<'a> {
+    qualified_name: QualifiedName<'a>,
+    range: TextRange,
 }
 
-/// An AST visitor to extract the raised exceptions from a function body.
+impl Ranged for ExceptionEntry<'_> {
+    fn range(&self) -> TextRange {
+        self.range
+    }
+}
+
+/// A summary of documentable statements from the function body
+#[derive(Debug)]
+struct BodyEntries<'a> {
+    returns: Vec<Entry>,
+    raised_exceptions: Vec<ExceptionEntry<'a>>,
+}
+
+/// An AST visitor to extract a summary of documentable statements from a function body.
 struct BodyVisitor<'a> {
-    raised_exceptions: Vec<Entry<'a>>,
+    returns: Vec<Entry>,
+    raised_exceptions: Vec<ExceptionEntry<'a>>,
     semantic: &'a SemanticModel<'a>,
 }
 
 impl<'a> BodyVisitor<'a> {
     fn new(semantic: &'a SemanticModel) -> Self {
         Self {
+            returns: Vec::new(),
             raised_exceptions: Vec::new(),
             semantic,
         }
@@ -254,22 +394,35 @@ impl<'a> BodyVisitor<'a> {
 
     fn finish(self) -> BodyEntries<'a> {
         BodyEntries {
+            returns: self.returns,
             raised_exceptions: self.raised_exceptions,
         }
     }
 }
 
-impl<'a> Visitor<'a> for BodyVisitor<'a> {
+impl<'a> StatementVisitor<'a> for BodyVisitor<'a> {
     fn visit_stmt(&mut self, stmt: &'a Stmt) {
-        if let Stmt::Raise(ast::StmtRaise { exc: Some(exc), .. }) = stmt {
-            if let Some(qualified_name) = extract_raised_exception(self.semantic, exc.as_ref()) {
-                self.raised_exceptions.push(Entry {
-                    qualified_name,
-                    range: exc.as_ref().range(),
-                });
+        match stmt {
+            Stmt::Raise(ast::StmtRaise { exc: Some(exc), .. }) => {
+                if let Some(qualified_name) = extract_raised_exception(self.semantic, exc.as_ref())
+                {
+                    self.raised_exceptions.push(ExceptionEntry {
+                        qualified_name,
+                        range: exc.as_ref().range(),
+                    });
+                }
             }
+            Stmt::Return(ast::StmtReturn {
+                range,
+                value: Some(_),
+            }) => {
+                self.returns.push(Entry { range: *range });
+            }
+            Stmt::FunctionDef(_) | Stmt::ClassDef(_) => return,
+            _ => {}
         }
-        visitor::walk_stmt(self, stmt);
+
+        statement_visitor::walk_stmt(self, stmt);
     }
 }
 
@@ -286,7 +439,28 @@ fn extract_raised_exception<'a>(
     None
 }
 
-/// DOC501, DOC502
+// Checks if a function has a `@property` decorator
+fn is_property(definition: &Definition, checker: &Checker) -> bool {
+    let Some(function) = definition.as_function_def() else {
+        return false;
+    };
+
+    let Some(last_decorator) = function.decorator_list.last() else {
+        return false;
+    };
+
+    checker
+        .semantic()
+        .resolve_qualified_name(&last_decorator.expression)
+        .is_some_and(|qualified_name| {
+            matches!(
+                qualified_name.segments(),
+                ["", "property"] | ["functools", "cached_property"]
+            )
+        })
+}
+
+/// DOC201, DOC202, DOC501, DOC502
 pub(crate) fn check_docstring(
     checker: &mut Checker,
     definition: &Definition,
@@ -307,21 +481,42 @@ pub(crate) fn check_docstring(
     }
 
     // Prioritize the specified convention over the determined style.
-    let docstring_entries = match convention {
+    let docstring_sections = match convention {
         Some(Convention::Google) => {
-            DocstringEntries::from_sections(section_contexts, SectionStyle::Google)
+            DocstringSections::from_sections(section_contexts, SectionStyle::Google)
         }
         Some(Convention::Numpy) => {
-            DocstringEntries::from_sections(section_contexts, SectionStyle::Numpy)
+            DocstringSections::from_sections(section_contexts, SectionStyle::Numpy)
         }
-        _ => DocstringEntries::from_sections(section_contexts, section_contexts.style()),
+        _ => DocstringSections::from_sections(section_contexts, section_contexts.style()),
     };
 
     let body_entries = {
         let mut visitor = BodyVisitor::new(checker.semantic());
-        visitor::walk_body(&mut visitor, member.body());
+        visitor.visit_body(member.body());
         visitor.finish()
     };
+
+    // DOC201
+    if checker.enabled(Rule::DocstringMissingReturns) {
+        if !is_property(definition, checker) && docstring_sections.returns.is_none() {
+            if let Some(body_return) = body_entries.returns.first() {
+                let diagnostic = Diagnostic::new(DocstringMissingReturns, body_return.range());
+                diagnostics.push(diagnostic);
+            }
+        }
+    }
+
+    // DOC202
+    if checker.enabled(Rule::DocstringExtraneousReturns) {
+        if let Some(docstring_returns) = docstring_sections.returns {
+            if body_entries.returns.is_empty() {
+                let diagnostic =
+                    Diagnostic::new(DocstringExtraneousReturns, docstring_returns.range());
+                diagnostics.push(diagnostic);
+            }
+        }
+    }
 
     // DOC501
     if checker.enabled(Rule::DocstringMissingException) {
@@ -334,8 +529,8 @@ pub(crate) fn check_docstring(
                 continue;
             }
 
-            if !docstring_entries.as_ref().is_some_and(|entries| {
-                entries.raised_exceptions.iter().any(|exception| {
+            if !docstring_sections.raises.as_ref().is_some_and(|section| {
+                section.raised_exceptions.iter().any(|exception| {
                     body_raise
                         .qualified_name
                         .segments()
@@ -355,9 +550,9 @@ pub(crate) fn check_docstring(
 
     // DOC502
     if checker.enabled(Rule::DocstringExtraneousException) {
-        if let Some(docstring_entries) = docstring_entries {
+        if let Some(docstring_raises) = docstring_sections.raises {
             let mut extraneous_exceptions = Vec::new();
-            for docstring_raise in &docstring_entries.raised_exceptions {
+            for docstring_raise in &docstring_raises.raised_exceptions {
                 if !body_entries.raised_exceptions.iter().any(|exception| {
                     exception
                         .qualified_name
@@ -372,7 +567,7 @@ pub(crate) fn check_docstring(
                     DocstringExtraneousException {
                         ids: extraneous_exceptions,
                     },
-                    docstring_entries.range(),
+                    docstring_raises.range(),
                 );
                 diagnostics.push(diagnostic);
             }
