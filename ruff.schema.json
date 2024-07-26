@@ -1676,7 +1676,7 @@
             "null"
           ],
           "items": {
-            "type": "string"
+            "$ref": "#/definitions/NameImports"
           }
         },
         "section-order": {
@@ -2292,6 +2292,9 @@
         }
       },
       "additionalProperties": false
+    },
+    "NameImports": {
+      "type": "string"
     },
     "OutputFormat": {
       "oneOf": [

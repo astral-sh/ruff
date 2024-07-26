@@ -5,6 +5,8 @@ use rustc_hash::{FxBuildHasher, FxHashMap, FxHashSet};
 use serde::{Deserialize, Serialize};
 use strum::IntoEnumIterator;
 
+use crate::options_base::{OptionsMetadata, Visit};
+use crate::settings::LineEnding;
 use ruff_formatter::IndentStyle;
 use ruff_linter::line_width::{IndentWidth, LineLength};
 use ruff_linter::rules::flake8_import_conventions::settings::BannedAliases;
@@ -30,9 +32,7 @@ use ruff_linter::{warn_user_once, RuleSelector};
 use ruff_macros::{CombineOptions, OptionsMetadata};
 use ruff_python_ast::name::Name;
 use ruff_python_formatter::{DocstringCodeLineWidth, QuoteStyle};
-
-use crate::options_base::{OptionsMetadata, Visit};
-use crate::settings::LineEnding;
+use ruff_python_semantic::NameImports;
 
 #[derive(Clone, Debug, PartialEq, Eq, Default, OptionsMetadata, Serialize, Deserialize)]
 #[serde(deny_unknown_fields, rename_all = "kebab-case")]
@@ -481,12 +481,12 @@ impl OptionsMetadata for DeprecatedTopLevelLintOptions {
 
 #[cfg(feature = "schemars")]
 impl schemars::JsonSchema for DeprecatedTopLevelLintOptions {
-    fn schema_name() -> std::string::String {
+    fn schema_name() -> String {
         "DeprecatedTopLevelLintOptions".to_owned()
     }
     fn schema_id() -> std::borrow::Cow<'static, str> {
-        std::borrow::Cow::Borrowed(std::concat!(
-            std::module_path!(),
+        std::borrow::Cow::Borrowed(concat!(
+            module_path!(),
             "::",
             "DeprecatedTopLevelLintOptions"
         ))
@@ -2034,7 +2034,7 @@ pub struct IsortOptions {
             required-imports = ["from __future__ import annotations"]
         "#
     )]
-    pub required_imports: Option<Vec<String>>,
+    pub required_imports: Option<Vec<NameImports>>,
 
     /// An override list of tokens to always recognize as a Class for
     /// [`order-by-type`](#lint_isort_order-by-type) regardless of casing.
@@ -2434,7 +2434,12 @@ impl IsortOptions {
         }
 
         Ok(isort::settings::Settings {
-            required_imports: BTreeSet::from_iter(self.required_imports.unwrap_or_default()),
+            required_imports: self
+                .required_imports
+                .unwrap_or_default()
+                .into_iter()
+                .flat_map(NameImports::into_imports)
+                .collect(),
             combine_as_imports: self.combine_as_imports.unwrap_or(false),
             force_single_line: self.force_single_line.unwrap_or(false),
             force_sort_within_sections,
