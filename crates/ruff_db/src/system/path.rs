@@ -593,6 +593,137 @@ impl ruff_cache::CacheKey for SystemPathBuf {
     }
 }
 
+/// A slice of a virtual path on [`System`](super::System) (akin to [`str`]).
+#[repr(transparent)]
+pub struct SystemVirtualPath(str);
+
+impl SystemVirtualPath {
+    pub fn new(path: &str) -> &SystemVirtualPath {
+        // SAFETY: SystemVirtualPath is marked as #[repr(transparent)] so the conversion from a
+        // *const str to a *const SystemVirtualPath is valid.
+        unsafe { &*(path as *const str as *const SystemVirtualPath) }
+    }
+
+    /// Converts the path to an owned [`SystemVirtualPathBuf`].
+    pub fn to_path_buf(&self) -> SystemVirtualPathBuf {
+        SystemVirtualPathBuf(self.0.to_string())
+    }
+
+    /// Extracts the file extension, if possible.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use ruff_db::system::SystemVirtualPath;
+    ///
+    /// assert_eq!(None, SystemVirtualPath::new("untitled:Untitled-1").extension());
+    /// assert_eq!("ipynb", SystemVirtualPath::new("untitled:Untitled-1.ipynb").extension().unwrap());
+    /// assert_eq!("ipynb", SystemVirtualPath::new("vscode-notebook-cell:Untitled-1.ipynb").extension().unwrap());
+    /// ```
+    ///
+    /// See [`Path::extension`] for more details.
+    pub fn extension(&self) -> Option<&str> {
+        Path::new(&self.0).extension().and_then(|ext| ext.to_str())
+    }
+
+    /// Returns the path as a string slice.
+    #[inline]
+    pub fn as_str(&self) -> &str {
+        &self.0
+    }
+}
+
+/// An owned, virtual path on [`System`](`super::System`) (akin to [`String`]).
+#[derive(Eq, PartialEq, Clone, Hash, PartialOrd, Ord)]
+pub struct SystemVirtualPathBuf(String);
+
+impl SystemVirtualPathBuf {
+    #[inline]
+    pub fn as_path(&self) -> &SystemVirtualPath {
+        SystemVirtualPath::new(&self.0)
+    }
+}
+
+impl From<String> for SystemVirtualPathBuf {
+    fn from(value: String) -> Self {
+        SystemVirtualPathBuf(value)
+    }
+}
+
+impl AsRef<SystemVirtualPath> for SystemVirtualPathBuf {
+    #[inline]
+    fn as_ref(&self) -> &SystemVirtualPath {
+        self.as_path()
+    }
+}
+
+impl AsRef<SystemVirtualPath> for SystemVirtualPath {
+    #[inline]
+    fn as_ref(&self) -> &SystemVirtualPath {
+        self
+    }
+}
+
+impl AsRef<SystemVirtualPath> for str {
+    #[inline]
+    fn as_ref(&self) -> &SystemVirtualPath {
+        SystemVirtualPath::new(self)
+    }
+}
+
+impl AsRef<SystemVirtualPath> for String {
+    #[inline]
+    fn as_ref(&self) -> &SystemVirtualPath {
+        SystemVirtualPath::new(self)
+    }
+}
+
+impl Deref for SystemVirtualPathBuf {
+    type Target = SystemVirtualPath;
+
+    fn deref(&self) -> &Self::Target {
+        self.as_path()
+    }
+}
+
+impl std::fmt::Debug for SystemVirtualPath {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        self.0.fmt(f)
+    }
+}
+
+impl std::fmt::Display for SystemVirtualPath {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        self.0.fmt(f)
+    }
+}
+
+impl std::fmt::Debug for SystemVirtualPathBuf {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        self.0.fmt(f)
+    }
+}
+
+impl std::fmt::Display for SystemVirtualPathBuf {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        self.0.fmt(f)
+    }
+}
+
+#[cfg(feature = "cache")]
+impl ruff_cache::CacheKey for SystemVirtualPath {
+    fn cache_key(&self, hasher: &mut ruff_cache::CacheKeyHasher) {
+        self.as_str().cache_key(hasher);
+    }
+}
+
+#[cfg(feature = "cache")]
+impl ruff_cache::CacheKey for SystemVirtualPathBuf {
+    fn cache_key(&self, hasher: &mut ruff_cache::CacheKeyHasher) {
+        self.as_path().cache_key(hasher);
+    }
+}
+
 /// Deduplicates identical paths and removes nested paths.
 ///
 /// # Examples

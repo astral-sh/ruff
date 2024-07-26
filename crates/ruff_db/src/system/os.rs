@@ -7,6 +7,7 @@ use ruff_notebook::{Notebook, NotebookError};
 
 use crate::system::{
     DirectoryEntry, FileType, Metadata, Result, System, SystemPath, SystemPathBuf,
+    SystemVirtualPath,
 };
 
 use super::walk_directory::{
@@ -74,6 +75,21 @@ impl System for OsSystem {
 
     fn read_to_notebook(&self, path: &SystemPath) -> std::result::Result<Notebook, NotebookError> {
         Notebook::from_path(path.as_std_path())
+    }
+
+    fn virtual_path_metadata(&self, _path: &SystemVirtualPath) -> Result<Metadata> {
+        Err(not_found())
+    }
+
+    fn read_virtual_path_to_string(&self, _path: &SystemVirtualPath) -> Result<String> {
+        Err(not_found())
+    }
+
+    fn read_virtual_path_to_notebook(
+        &self,
+        _path: &SystemVirtualPath,
+    ) -> std::result::Result<Notebook, NotebookError> {
+        Err(NotebookError::from(not_found()))
     }
 
     fn path_exists(&self, path: &SystemPath) -> bool {
@@ -273,6 +289,10 @@ impl From<WalkState> for ignore::WalkState {
             WalkState::Quit => ignore::WalkState::Quit,
         }
     }
+}
+
+fn not_found() -> std::io::Error {
+    std::io::Error::new(std::io::ErrorKind::NotFound, "No such file or directory")
 }
 
 #[cfg(test)]
