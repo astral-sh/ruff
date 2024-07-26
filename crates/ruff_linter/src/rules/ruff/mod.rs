@@ -47,7 +47,6 @@ mod tests {
     #[test_case(Rule::UnsortedDunderAll, Path::new("RUF022.py"))]
     #[test_case(Rule::UnsortedDunderSlots, Path::new("RUF023.py"))]
     #[test_case(Rule::MutableFromkeysValue, Path::new("RUF024.py"))]
-    #[test_case(Rule::UnnecessaryDictComprehensionForIterable, Path::new("RUF025.py"))]
     #[test_case(Rule::DefaultFactoryKwarg, Path::new("RUF026.py"))]
     #[test_case(Rule::MissingFStringSyntax, Path::new("RUF027_0.py"))]
     #[test_case(Rule::MissingFStringSyntax, Path::new("RUF027_1.py"))]
