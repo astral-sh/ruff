@@ -2,8 +2,8 @@ name: Ecosystem check comment
 
 on:
   workflow_run:
-    workflows: [CI]
-    types: [completed]
+    workflows: [ CI ]
+    types: [ completed ]
   workflow_dispatch:
     inputs:
       workflow_run_id:
@@ -23,6 +23,7 @@ jobs:
           name: pr-number
           run_id: ${{ github.event.workflow_run.id ||  github.event.inputs.workflow_run_id }}
           if_no_artifact_found: ignore
+          allow_forks: true
 
       - name: Parse pull request number
         id: pr-number
@@ -43,6 +44,7 @@ jobs:
           path: pr/ecosystem
           workflow_conclusion: completed
           if_no_artifact_found: ignore
+          allow_forks: true
 
       - name: Generate comment content
         id: generate-comment
