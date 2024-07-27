@@ -2,8 +2,8 @@ name: Ecosystem check comment
 
 on:
   workflow_run:
-    workflows: [ CI ]
-    types: [ completed ]
+    workflows: [CI]
+    types: [completed]
   workflow_dispatch:
     inputs:
       workflow_run_id:
