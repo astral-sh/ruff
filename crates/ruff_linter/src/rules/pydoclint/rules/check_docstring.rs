@@ -3,8 +3,8 @@ use ruff_diagnostics::Diagnostic;
 use ruff_diagnostics::Violation;
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::name::QualifiedName;
-use ruff_python_ast::statement_visitor::StatementVisitor;
-use ruff_python_ast::{self as ast, statement_visitor, Expr, Stmt};
+use ruff_python_ast::visitor::Visitor;
+use ruff_python_ast::{self as ast, visitor, Expr, Stmt};
 use ruff_python_semantic::{Definition, MemberKind, SemanticModel};
 use ruff_text_size::{Ranged, TextRange};
 
@@ -358,21 +358,28 @@ impl<'a> RaisesSection<'a> {
 #[derive(Debug)]
 struct DocstringSections<'a> {
     returns: Option<GenericSection>,
+    yields: Option<GenericSection>,
     raises: Option<RaisesSection<'a>>,
 }
 
 impl<'a> DocstringSections<'a> {
     fn from_sections(sections: &'a SectionContexts, style: SectionStyle) -> Self {
         let mut returns: Option<GenericSection> = None;
+        let mut yields: Option<GenericSection> = None;
         let mut raises: Option<RaisesSection> = None;
         for section in sections.iter() {
             match section.kind() {
                 SectionKind::Raises => raises = Some(RaisesSection::from_section(&section, style)),
                 SectionKind::Returns => returns = Some(GenericSection::from_section(&section)),
+                SectionKind::Yields => yields = Some(GenericSection::from_section(&section)),
                 _ => continue,
             }
         }
-        Self { returns, raises }
+        Self {
+            returns,
+            yields,
+            raises,
+        }
     }
 }
 
@@ -461,12 +468,14 @@ impl Ranged for ExceptionEntry<'_> {
 #[derive(Debug)]
 struct BodyEntries<'a> {
     returns: Vec<Entry>,
+    yields: Vec<Entry>,
     raised_exceptions: Vec<ExceptionEntry<'a>>,
 }
 
 /// An AST visitor to extract a summary of documentable statements from a function body.
 struct BodyVisitor<'a> {
     returns: Vec<Entry>,
+    yields: Vec<Entry>,
     raised_exceptions: Vec<ExceptionEntry<'a>>,
     semantic: &'a SemanticModel<'a>,
 }
@@ -475,6 +484,7 @@ impl<'a> BodyVisitor<'a> {
     fn new(semantic: &'a SemanticModel) -> Self {
         Self {
             returns: Vec::new(),
+            yields: Vec::new(),
             raised_exceptions: Vec::new(),
             semantic,
         }
@@ -483,12 +493,13 @@ impl<'a> BodyVisitor<'a> {
     fn finish(self) -> BodyEntries<'a> {
         BodyEntries {
             returns: self.returns,
+            yields: self.yields,
             raised_exceptions: self.raised_exceptions,
         }
     }
 }
 
-impl<'a> StatementVisitor<'a> for BodyVisitor<'a> {
+impl<'a> Visitor<'a> for BodyVisitor<'a> {
     fn visit_stmt(&mut self, stmt: &'a Stmt) {
         match stmt {
             Stmt::Raise(ast::StmtRaise { exc: Some(exc), .. }) => {
@@ -510,7 +521,24 @@ impl<'a> StatementVisitor<'a> for BodyVisitor<'a> {
             _ => {}
         }
 
-        statement_visitor::walk_stmt(self, stmt);
+        visitor::walk_stmt(self, stmt);
+    }
+
+    fn visit_expr(&mut self, expr: &'a Expr) {
+        match expr {
+            Expr::Yield(ast::ExprYield {
+                range,
+                value: Some(_),
+            }) => {
+                self.yields.push(Entry { range: *range });
+            }
+            Expr::YieldFrom(ast::ExprYieldFrom { range, .. }) => {
+                self.yields.push(Entry { range: *range });
+            }
+            Expr::Lambda(_) => return,
+            _ => {}
+        }
+        visitor::walk_expr(self, expr);
     }
 }
 
@@ -548,7 +576,7 @@ fn is_property(definition: &Definition, checker: &Checker) -> bool {
         })
 }
 
-/// DOC201, DOC202, DOC501, DOC502
+/// DOC201, DOC202, DOC402, DOC403, DOC501, DOC502
 pub(crate) fn check_docstring(
     checker: &mut Checker,
     definition: &Definition,
@@ -601,6 +629,27 @@ pub(crate) fn check_docstring(
             if body_entries.returns.is_empty() {
                 let diagnostic =
                     Diagnostic::new(DocstringExtraneousReturns, docstring_returns.range());
+                diagnostics.push(diagnostic);
+            }
+        }
+    }
+
+    // DOC402
+    if checker.enabled(Rule::DocstringMissingYields) {
+        if docstring_sections.yields.is_none() {
+            if let Some(body_yield) = body_entries.yields.first() {
+                let diagnostic = Diagnostic::new(DocstringMissingYields, body_yield.range());
+                diagnostics.push(diagnostic);
+            }
+        }
+    }
+
+    // DOC403
+    if checker.enabled(Rule::DocstringExtraneousYields) {
+        if let Some(docstring_yields) = docstring_sections.yields {
+            if body_entries.yields.is_empty() {
+                let diagnostic =
+                    Diagnostic::new(DocstringExtraneousYields, docstring_yields.range());
                 diagnostics.push(diagnostic);
             }
         }
