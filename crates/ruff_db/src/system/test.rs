@@ -2,7 +2,9 @@ use ruff_notebook::{Notebook, NotebookError};
 use ruff_python_trivia::textwrap;
 
 use crate::files::File;
-use crate::system::{DirectoryEntry, MemoryFileSystem, Metadata, Result, System, SystemPath};
+use crate::system::{
+    DirectoryEntry, MemoryFileSystem, Metadata, Result, System, SystemPath, SystemVirtualPath,
+};
 use crate::Db;
 use std::any::Any;
 use std::panic::RefUnwindSafe;
@@ -68,6 +70,30 @@ impl System for TestSystem {
         match &self.inner {
             TestSystemInner::Stub(fs) => fs.read_to_notebook(path),
             TestSystemInner::System(system) => system.read_to_notebook(path),
+        }
+    }
+
+    fn virtual_path_metadata(&self, path: &SystemVirtualPath) -> Result<Metadata> {
+        match &self.inner {
+            TestSystemInner::Stub(fs) => fs.virtual_path_metadata(path),
+            TestSystemInner::System(system) => system.virtual_path_metadata(path),
+        }
+    }
+
+    fn read_virtual_path_to_string(&self, path: &SystemVirtualPath) -> Result<String> {
+        match &self.inner {
+            TestSystemInner::Stub(fs) => fs.read_virtual_path_to_string(path),
+            TestSystemInner::System(system) => system.read_virtual_path_to_string(path),
+        }
+    }
+
+    fn read_virtual_path_to_notebook(
+        &self,
+        path: &SystemVirtualPath,
+    ) -> std::result::Result<Notebook, NotebookError> {
+        match &self.inner {
+            TestSystemInner::Stub(fs) => fs.read_virtual_path_to_notebook(path),
+            TestSystemInner::System(system) => system.read_virtual_path_to_notebook(path),
         }
     }
 
@@ -149,6 +175,14 @@ pub trait DbWithTestSystem: Db + Sized {
         }
 
         result
+    }
+
+    /// Writes the content of the given virtual file.
+    fn write_virtual_file(&mut self, path: impl AsRef<SystemVirtualPath>, content: impl ToString) {
+        let path = path.as_ref();
+        self.test_system()
+            .memory_file_system()
+            .write_virtual_file(path, content);
     }
 
     /// Writes auto-dedented text to a file.

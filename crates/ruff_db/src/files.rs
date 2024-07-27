@@ -5,7 +5,7 @@ use dashmap::mapref::entry::Entry;
 
 use crate::file_revision::FileRevision;
 use crate::files::private::FileStatus;
-use crate::system::{SystemPath, SystemPathBuf};
+use crate::system::{Metadata, SystemPath, SystemPathBuf, SystemVirtualPath, SystemVirtualPathBuf};
 use crate::vendored::{VendoredPath, VendoredPathBuf};
 use crate::{Db, FxDashMap};
 pub use path::FilePath;
@@ -46,6 +46,9 @@ struct FilesInner {
     /// The map also stores entries for files that don't exist on the file system. This is necessary
     /// so that queries that depend on the existence of a file are re-executed when the file is created.
     system_by_path: FxDashMap<SystemPathBuf, File>,
+
+    /// Lookup table that maps [`SystemVirtualPathBuf`]s to salsa interned [`File`] instances.
+    system_virtual_by_path: FxDashMap<SystemVirtualPathBuf, File>,
 
     /// Lookup table that maps vendored files to the salsa [`File`] ingredients.
     vendored_by_path: FxDashMap<VendoredPathBuf, File>,
@@ -112,6 +115,36 @@ impl Files {
                     db,
                     FilePath::Vendored(path.to_path_buf()),
                     Some(0o444),
+                    metadata.revision(),
+                    FileStatus::Exists,
+                    Count::default(),
+                );
+
+                entry.insert(file);
+
+                file
+            }
+        };
+
+        Some(file)
+    }
+
+    /// Looks up a virtual file by its `path`.
+    ///
+    /// For a non-existing file, creates a new salsa [`File`] ingredient and stores it for future lookups.
+    ///
+    /// The operations fails if the system failed to provide a metadata for the path.
+    #[tracing::instrument(level = "trace", skip(self, db), ret)]
+    pub fn add_virtual_file(&self, db: &dyn Db, path: &SystemVirtualPath) -> Option<File> {
+        let file = match self.inner.system_virtual_by_path.entry(path.to_path_buf()) {
+            Entry::Occupied(entry) => *entry.get(),
+            Entry::Vacant(entry) => {
+                let metadata = db.system().virtual_path_metadata(path).ok()?;
+
+                let file = File::new(
+                    db,
+                    FilePath::SystemVirtual(path.to_path_buf()),
+                    metadata.permissions(),
                     metadata.revision(),
                     FileStatus::Exists,
                     Count::default(),
@@ -227,6 +260,9 @@ impl File {
                 db.system().read_to_string(system)
             }
             FilePath::Vendored(vendored) => db.vendored().read_to_string(vendored),
+            FilePath::SystemVirtual(system_virtual) => {
+                db.system().read_virtual_path_to_string(system_virtual)
+            }
         }
     }
 
@@ -248,6 +284,9 @@ impl File {
                 std::io::ErrorKind::InvalidInput,
                 "Reading a notebook from the vendored file system is not supported.",
             ))),
+            FilePath::SystemVirtual(system_virtual) => {
+                db.system().read_virtual_path_to_notebook(system_virtual)
+            }
         }
     }
 
@@ -255,7 +294,7 @@ impl File {
     #[tracing::instrument(level = "debug", skip(db))]
     pub fn sync_path(db: &mut dyn Db, path: &SystemPath) {
         let absolute = SystemPath::absolute(path, db.system().current_directory());
-        Self::sync_impl(db, &absolute, None);
+        Self::sync_system_path(db, &absolute, None);
     }
 
     /// Syncs the [`File`]'s state with the state of the file on the system.
@@ -265,22 +304,33 @@ impl File {
 
         match path {
             FilePath::System(system) => {
-                Self::sync_impl(db, &system, Some(self));
+                Self::sync_system_path(db, &system, Some(self));
             }
             FilePath::Vendored(_) => {
                 // Readonly, can never be out of date.
             }
+            FilePath::SystemVirtual(system_virtual) => {
+                Self::sync_system_virtual_path(db, &system_virtual, self);
+            }
         }
     }
 
-    /// Private method providing the implementation for [`Self::sync_path`] and [`Self::sync_path`].
-    fn sync_impl(db: &mut dyn Db, path: &SystemPath, file: Option<File>) {
+    fn sync_system_path(db: &mut dyn Db, path: &SystemPath, file: Option<File>) {
         let Some(file) = file.or_else(|| db.files().try_system(db, path)) else {
             return;
         };
-
         let metadata = db.system().path_metadata(path);
+        Self::sync_impl(db, metadata, file);
+    }
 
+    fn sync_system_virtual_path(db: &mut dyn Db, path: &SystemVirtualPath, file: File) {
+        let metadata = db.system().virtual_path_metadata(path);
+        Self::sync_impl(db, metadata, file);
+    }
+
+    /// Private method providing the implementation for [`Self::sync_system_path`] and
+    /// [`Self::sync_system_virtual_path`].
+    fn sync_impl(db: &mut dyn Db, metadata: crate::system::Result<Metadata>, file: File) {
         let (status, revision, permission) = match metadata {
             Ok(metadata) if metadata.file_type().is_file() => (
                 FileStatus::Exists,

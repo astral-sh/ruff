@@ -17,6 +17,7 @@ ruff_linter = { workspace = true }
 ruff_formatter = { workspace = true }
 ruff_python_formatter = { workspace = true, features = ["serde"] }
 ruff_python_ast = { workspace = true }
+ruff_python_semantic = { workspace = true, features = ["serde"] }
 ruff_source_file = { workspace = true }
 ruff_cache = { workspace = true }
 ruff_macros = { workspace = true }
@@ -55,7 +56,7 @@ ignored = ["colored"]
 
 [features]
 default = []
-schemars = ["dep:schemars", "ruff_formatter/schemars", "ruff_python_formatter/schemars"]
+schemars = ["dep:schemars", "ruff_formatter/schemars", "ruff_python_formatter/schemars", "ruff_python_semantic/schemars"]
 
 [lints]
 workspace = true

@@ -32,6 +32,9 @@ pub fn parsed_module(db: &dyn Db, file: File) -> ParsedModule {
             .extension()
             .map_or(PySourceType::Python, PySourceType::from_extension),
         FilePath::Vendored(_) => PySourceType::Stub,
+        FilePath::SystemVirtual(path) => path
+            .extension()
+            .map_or(PySourceType::Python, PySourceType::from_extension),
     };
 
     ParsedModule::new(parse_unchecked_source(&source, ty))
@@ -74,9 +77,10 @@ impl std::fmt::Debug for ParsedModule {
 mod tests {
     use crate::files::{system_path_to_file, vendored_path_to_file};
     use crate::parsed::parsed_module;
-    use crate::system::{DbWithTestSystem, SystemPath};
+    use crate::system::{DbWithTestSystem, SystemPath, SystemVirtualPath};
     use crate::tests::TestDb;
     use crate::vendored::{tests::VendoredFileSystemBuilder, VendoredPath};
+    use crate::Db;
 
     #[test]
     fn python_file() -> crate::system::Result<()> {
@@ -102,6 +106,38 @@ mod tests {
         db.write_file(path, "%timeit a = b".to_string())?;
 
         let file = system_path_to_file(&db, path).unwrap();
+
+        let parsed = parsed_module(&db, file);
+
+        assert!(parsed.is_valid());
+
+        Ok(())
+    }
+
+    #[test]
+    fn virtual_python_file() -> crate::system::Result<()> {
+        let mut db = TestDb::new();
+        let path = SystemVirtualPath::new("untitled:Untitled-1");
+
+        db.write_virtual_file(path, "x = 10");
+
+        let file = db.files().add_virtual_file(&db, path).unwrap();
+
+        let parsed = parsed_module(&db, file);
+
+        assert!(parsed.is_valid());
+
+        Ok(())
+    }
+
+    #[test]
+    fn virtual_ipynb_file() -> crate::system::Result<()> {
+        let mut db = TestDb::new();
+        let path = SystemVirtualPath::new("untitled:Untitled-1.ipynb");
+
+        db.write_virtual_file(path, "%timeit a = b");
+
+        let file = db.files().add_virtual_file(&db, path).unwrap();
 
         let parsed = parsed_module(&db, file);
 

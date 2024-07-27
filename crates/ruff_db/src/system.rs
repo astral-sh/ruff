@@ -11,6 +11,7 @@ use crate::file_revision::FileRevision;
 
 pub use self::path::{
     deduplicate_nested_paths, DeduplicatedNestedPathsIter, SystemPath, SystemPathBuf,
+    SystemVirtualPath, SystemVirtualPathBuf,
 };
 
 mod memory_fs;
@@ -49,6 +50,18 @@ pub trait System: Debug {
     /// allowing to skip the notebook deserialization. Systems that don't use a structured
     /// representation fall-back to deserializing the notebook from a string.
     fn read_to_notebook(&self, path: &SystemPath) -> std::result::Result<Notebook, NotebookError>;
+
+    /// Reads the metadata of the virtual file at `path`.
+    fn virtual_path_metadata(&self, path: &SystemVirtualPath) -> Result<Metadata>;
+
+    /// Reads the content of the virtual file at `path` into a [`String`].
+    fn read_virtual_path_to_string(&self, path: &SystemVirtualPath) -> Result<String>;
+
+    /// Reads the content of the virtual file at `path` as a [`Notebook`].
+    fn read_virtual_path_to_notebook(
+        &self,
+        path: &SystemVirtualPath,
+    ) -> std::result::Result<Notebook, NotebookError>;
 
     /// Returns `true` if `path` exists.
     fn path_exists(&self, path: &SystemPath) -> bool {

@@ -1,5 +1,6 @@
 use ruff_python_ast::{self as ast, Expr, Operator};
 
+use crate::settings::LinterSettings;
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_source_file::Locator;
@@ -40,7 +41,19 @@ impl Violation for ExplicitStringConcatenation {
 }
 
 /// ISC003
-pub(crate) fn explicit(expr: &Expr, locator: &Locator) -> Option<Diagnostic> {
+pub(crate) fn explicit(
+    expr: &Expr,
+    locator: &Locator,
+    settings: &LinterSettings,
+) -> Option<Diagnostic> {
+    // If the user sets `allow-multiline` to `false`, then we should allow explicitly concatenated
+    // strings that span multiple lines even if this rule is enabled. Otherwise, there's no way
+    // for the user to write multiline strings, and that setting is "more explicit" than this rule
+    // being enabled.
+    if !settings.flake8_implicit_str_concat.allow_multiline {
+        return None;
+    }
+
     if let Expr::BinOp(ast::ExprBinOp {
         left,
         op,

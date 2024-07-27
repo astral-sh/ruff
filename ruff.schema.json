@@ -1033,7 +1033,7 @@
       "type": "object",
       "properties": {
         "allow-multiline": {
-          "description": "Whether to allow implicit string concatenations for multiline strings. By default, implicit concatenations of multiline strings are allowed (but continuation lines, delimited with a backslash, are prohibited).\n\nNote that setting `allow-multiline = false` should typically be coupled with disabling `explicit-string-concatenation` (`ISC003`). Otherwise, both explicit and implicit multiline string concatenations will be seen as violations.",
+          "description": "Whether to allow implicit string concatenations for multiline strings. By default, implicit concatenations of multiline strings are allowed (but continuation lines, delimited with a backslash, are prohibited).\n\nSetting `allow-multiline = false` will automatically disable the `explicit-string-concatenation` (`ISC003`) rule. Otherwise, both implicit and explicit multiline string concatenations would be seen as violations, making it impossible to write a linter-compliant multiline string.",
           "type": [
             "boolean",
             "null"
@@ -1676,7 +1676,7 @@
             "null"
           ],
           "items": {
-            "type": "string"
+            "$ref": "#/definitions/NameImports"
           }
         },
         "section-order": {
@@ -2292,6 +2292,9 @@
         }
       },
       "additionalProperties": false
+    },
+    "NameImports": {
+      "type": "string"
     },
     "OutputFormat": {
       "oneOf": [

@@ -41,8 +41,7 @@ serde = { workspace = true }
 serde_json = { workspace = true }
 url = { workspace = true }
 ureq = { workspace = true }
-criterion = { workspace = true, default-features = false }
-codspeed-criterion-compat = { workspace = true, default-features = false, optional = true }
+codspeed-criterion-compat = { workspace = true, default-features = false }
 
 [dev-dependencies]
 ruff_db = { workspace = true }
@@ -55,9 +54,6 @@ red_knot = { workspace = true }
 
 [lints]
 workspace = true
-
-[features]
-codspeed = ["codspeed-criterion-compat"]
 
 [target.'cfg(target_os = "windows")'.dev-dependencies]
 mimalloc = { workspace = true }

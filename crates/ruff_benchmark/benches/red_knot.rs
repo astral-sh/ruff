@@ -1,10 +1,9 @@
 #![allow(clippy::disallowed_names)]
 
+use codspeed_criterion_compat::{criterion_group, criterion_main, BatchSize, Criterion};
+
 use red_knot::db::RootDatabase;
 use red_knot::workspace::WorkspaceMetadata;
-use ruff_benchmark::criterion::{
-    criterion_group, criterion_main, BatchSize, Criterion, Throughput,
-};
 use ruff_db::files::{system_path_to_file, vendored_path_to_file, File};
 use ruff_db::parsed::parsed_module;
 use ruff_db::program::{ProgramSettings, SearchPathSettings, TargetVersion};
@@ -100,10 +99,7 @@ fn setup_case() -> Case {
 }
 
 fn benchmark_without_parse(criterion: &mut Criterion) {
-    let mut group = criterion.benchmark_group("red_knot/check_file");
-    group.throughput(Throughput::Bytes(FOO_CODE.len() as u64));
-
-    group.bench_function("red_knot_check_file[without_parse]", |b| {
+    criterion.bench_function("red_knot_check_file[without_parse]", |b| {
         b.iter_batched_ref(
             || {
                 let case = setup_case();
@@ -123,15 +119,10 @@ fn benchmark_without_parse(criterion: &mut Criterion) {
             BatchSize::SmallInput,
         );
     });
-
-    group.finish();
 }
 
 fn benchmark_incremental(criterion: &mut Criterion) {
-    let mut group = criterion.benchmark_group("red_knot/check_file");
-    group.throughput(Throughput::Bytes(FOO_CODE.len() as u64));
-
-    group.bench_function("red_knot_check_file[incremental]", |b| {
+    criterion.bench_function("red_knot_check_file[incremental]", |b| {
         b.iter_batched_ref(
             || {
                 let mut case = setup_case();
@@ -156,15 +147,10 @@ fn benchmark_incremental(criterion: &mut Criterion) {
             BatchSize::SmallInput,
         );
     });
-
-    group.finish();
 }
 
 fn benchmark_cold(criterion: &mut Criterion) {
-    let mut group = criterion.benchmark_group("red_knot/check_file");
-    group.throughput(Throughput::Bytes(FOO_CODE.len() as u64));
-
-    group.bench_function("red_knot_check_file[cold]", |b| {
+    criterion.bench_function("red_knot_check_file[cold]", |b| {
         b.iter_batched_ref(
             setup_case,
             |case| {
@@ -176,11 +162,12 @@ fn benchmark_cold(criterion: &mut Criterion) {
             BatchSize::SmallInput,
         );
     });
-
-    group.finish();
 }
 
-criterion_group!(cold, benchmark_cold);
-criterion_group!(without_parse, benchmark_without_parse);
-criterion_group!(incremental, benchmark_incremental);
-criterion_main!(without_parse, cold, incremental);
+criterion_group!(
+    check_file,
+    benchmark_cold,
+    benchmark_without_parse,
+    benchmark_incremental
+);
+criterion_main!(check_file);

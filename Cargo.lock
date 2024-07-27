@@ -2048,7 +2048,6 @@ name = "ruff_benchmark"
 version = "0.0.0"
 dependencies = [
  "codspeed-criterion-compat",
- "criterion",
  "mimalloc",
  "once_cell",
  "red_knot",
@@ -2401,13 +2400,17 @@ version = "0.0.0"
 dependencies = [
  "bitflags 2.6.0",
  "is-macro",
+ "ruff_cache",
  "ruff_index",
+ "ruff_macros",
  "ruff_python_ast",
  "ruff_python_parser",
  "ruff_python_stdlib",
  "ruff_source_file",
  "ruff_text_size",
  "rustc-hash 2.0.0",
+ "schemars",
+ "serde",
 ]
 
 [[package]]
@@ -2540,6 +2543,7 @@ dependencies = [
  "ruff_macros",
  "ruff_python_ast",
  "ruff_python_formatter",
+ "ruff_python_semantic",
  "ruff_source_file",
  "rustc-hash 2.0.0",
  "schemars",

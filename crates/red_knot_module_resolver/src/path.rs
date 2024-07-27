@@ -5,7 +5,7 @@ use std::sync::Arc;
 
 use camino::{Utf8Path, Utf8PathBuf};
 
-use ruff_db::files::{system_path_to_file, vendored_path_to_file, File, FilePath};
+use ruff_db::files::{system_path_to_file, vendored_path_to_file, File};
 use ruff_db::system::{System, SystemPath, SystemPathBuf};
 use ruff_db::vendored::{VendoredPath, VendoredPathBuf};
 
@@ -474,18 +474,21 @@ impl SearchPath {
         matches!(&*self.0, SearchPathInner::SitePackages(_))
     }
 
-    #[must_use]
-    pub(crate) fn relativize_path(&self, path: &FilePath) -> Option<ModulePath> {
-        let extension = path.extension();
-
+    fn is_valid_extension(&self, extension: &str) -> bool {
         if self.is_standard_library() {
-            if extension.is_some_and(|extension| extension != "pyi") {
-                return None;
-            }
+            extension == "pyi"
         } else {
-            if extension.is_some_and(|extension| !matches!(extension, "pyi" | "py")) {
-                return None;
-            }
+            matches!(extension, "pyi" | "py")
+        }
+    }
+
+    #[must_use]
+    pub(crate) fn relativize_system_path(&self, path: &SystemPath) -> Option<ModulePath> {
+        if path
+            .extension()
+            .is_some_and(|extension| !self.is_valid_extension(extension))
+        {
+            return None;
         }
 
         match &*self.0 {
@@ -493,16 +496,36 @@ impl SearchPath {
             | SearchPathInner::FirstParty(search_path)
             | SearchPathInner::StandardLibraryCustom(search_path)
             | SearchPathInner::SitePackages(search_path)
-            | SearchPathInner::Editable(search_path) => path
-                .as_system_path()
-                .and_then(|absolute_path| absolute_path.strip_prefix(search_path).ok())
-                .map(|relative_path| ModulePath {
-                    search_path: self.clone(),
-                    relative_path: relative_path.as_utf8_path().to_path_buf(),
-                }),
+            | SearchPathInner::Editable(search_path) => {
+                path.strip_prefix(search_path)
+                    .ok()
+                    .map(|relative_path| ModulePath {
+                        search_path: self.clone(),
+                        relative_path: relative_path.as_utf8_path().to_path_buf(),
+                    })
+            }
+            SearchPathInner::StandardLibraryVendored(_) => None,
+        }
+    }
+
+    #[must_use]
+    pub(crate) fn relativize_vendored_path(&self, path: &VendoredPath) -> Option<ModulePath> {
+        if path
+            .extension()
+            .is_some_and(|extension| !self.is_valid_extension(extension))
+        {
+            return None;
+        }
+
+        match &*self.0 {
+            SearchPathInner::Extra(_)
+            | SearchPathInner::FirstParty(_)
+            | SearchPathInner::StandardLibraryCustom(_)
+            | SearchPathInner::SitePackages(_)
+            | SearchPathInner::Editable(_) => None,
             SearchPathInner::StandardLibraryVendored(search_path) => path
-                .as_vendored_path()
-                .and_then(|absolute_path| absolute_path.strip_prefix(search_path).ok())
+                .strip_prefix(search_path)
+                .ok()
                 .map(|relative_path| ModulePath {
                     search_path: self.clone(),
                     relative_path: relative_path.as_utf8_path().to_path_buf(),
@@ -792,14 +815,14 @@ mod tests {
         let root = SearchPath::custom_stdlib(&db, stdlib.parent().unwrap().to_path_buf()).unwrap();
 
         // Must have a `.pyi` extension or no extension:
-        let bad_absolute_path = FilePath::system("foo/stdlib/x.py");
-        assert_eq!(root.relativize_path(&bad_absolute_path), None);
-        let second_bad_absolute_path = FilePath::system("foo/stdlib/x.rs");
-        assert_eq!(root.relativize_path(&second_bad_absolute_path), None);
+        let bad_absolute_path = SystemPath::new("foo/stdlib/x.py");
+        assert_eq!(root.relativize_system_path(bad_absolute_path), None);
+        let second_bad_absolute_path = SystemPath::new("foo/stdlib/x.rs");
+        assert_eq!(root.relativize_system_path(second_bad_absolute_path), None);
 
         // Must be a path that is a child of `root`:
-        let third_bad_absolute_path = FilePath::system("bar/stdlib/x.pyi");
-        assert_eq!(root.relativize_path(&third_bad_absolute_path), None);
+        let third_bad_absolute_path = SystemPath::new("bar/stdlib/x.pyi");
+        assert_eq!(root.relativize_system_path(third_bad_absolute_path), None);
     }
 
     #[test]
@@ -808,19 +831,21 @@ mod tests {
 
         let root = SearchPath::extra(db.system(), src.clone()).unwrap();
         // Must have a `.py` extension, a `.pyi` extension, or no extension:
-        let bad_absolute_path = FilePath::System(src.join("x.rs"));
-        assert_eq!(root.relativize_path(&bad_absolute_path), None);
+        let bad_absolute_path = src.join("x.rs");
+        assert_eq!(root.relativize_system_path(&bad_absolute_path), None);
         // Must be a path that is a child of `root`:
-        let second_bad_absolute_path = FilePath::system("bar/src/x.pyi");
-        assert_eq!(root.relativize_path(&second_bad_absolute_path), None);
+        let second_bad_absolute_path = SystemPath::new("bar/src/x.pyi");
+        assert_eq!(root.relativize_system_path(second_bad_absolute_path), None);
     }
 
     #[test]
     fn relativize_path() {
         let TestCase { db, src, .. } = TestCaseBuilder::new().build();
         let src_search_path = SearchPath::first_party(db.system(), src.clone()).unwrap();
-        let eggs_package = FilePath::System(src.join("eggs/__init__.pyi"));
-        let module_path = src_search_path.relativize_path(&eggs_package).unwrap();
+        let eggs_package = src.join("eggs/__init__.pyi");
+        let module_path = src_search_path
+            .relativize_system_path(&eggs_package)
+            .unwrap();
         assert_eq!(
             &module_path.relative_path,
             Utf8Path::new("eggs/__init__.pyi")

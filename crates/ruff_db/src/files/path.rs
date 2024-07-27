@@ -1,5 +1,5 @@
 use crate::files::{system_path_to_file, vendored_path_to_file, File};
-use crate::system::{SystemPath, SystemPathBuf};
+use crate::system::{SystemPath, SystemPathBuf, SystemVirtualPath, SystemVirtualPathBuf};
 use crate::vendored::{VendoredPath, VendoredPathBuf};
 use crate::Db;
 
@@ -8,11 +8,14 @@ use crate::Db;
 /// The path abstracts that files in Ruff can come from different sources:
 ///
 /// * a file stored on the [host system](crate::system::System).
+/// * a virtual file stored on the [host system](crate::system::System).
 /// * a vendored file stored in the [vendored file system](crate::vendored::VendoredFileSystem).
 #[derive(Clone, Debug, Eq, PartialEq, Hash)]
 pub enum FilePath {
     /// Path to a file on the [host system](crate::system::System).
     System(SystemPathBuf),
+    /// Path to a virtual file on the [host system](crate::system::System).
+    SystemVirtual(SystemVirtualPathBuf),
     /// Path to a file vendored as part of Ruff. Stored in the [vendored file system](crate::vendored::VendoredFileSystem).
     Vendored(VendoredPathBuf),
 }
@@ -30,7 +33,7 @@ impl FilePath {
     pub fn into_system_path_buf(self) -> Option<SystemPathBuf> {
         match self {
             FilePath::System(path) => Some(path),
-            FilePath::Vendored(_) => None,
+            FilePath::Vendored(_) | FilePath::SystemVirtual(_) => None,
         }
     }
 
@@ -39,7 +42,7 @@ impl FilePath {
     pub fn as_system_path(&self) -> Option<&SystemPath> {
         match self {
             FilePath::System(path) => Some(path.as_path()),
-            FilePath::Vendored(_) => None,
+            FilePath::Vendored(_) | FilePath::SystemVirtual(_) => None,
         }
     }
 
@@ -48,6 +51,14 @@ impl FilePath {
     #[inline]
     pub const fn is_system_path(&self) -> bool {
         matches!(self, FilePath::System(_))
+    }
+
+    /// Returns `true` if the path is a file system path that is virtual i.e., it doesn't exists on
+    /// disk.
+    #[must_use]
+    #[inline]
+    pub const fn is_system_virtual_path(&self) -> bool {
+        matches!(self, FilePath::SystemVirtual(_))
     }
 
     /// Returns `true` if the path is a vendored path.
@@ -62,7 +73,7 @@ impl FilePath {
     pub fn as_vendored_path(&self) -> Option<&VendoredPath> {
         match self {
             FilePath::Vendored(path) => Some(path.as_path()),
-            FilePath::System(_) => None,
+            FilePath::System(_) | FilePath::SystemVirtual(_) => None,
         }
     }
 
@@ -71,6 +82,7 @@ impl FilePath {
         match self {
             FilePath::System(path) => path.as_str(),
             FilePath::Vendored(path) => path.as_str(),
+            FilePath::SystemVirtual(path) => path.as_str(),
         }
     }
 
@@ -78,12 +90,14 @@ impl FilePath {
     ///
     /// Returns `Some` if a file for `path` exists and is accessible by the user. Returns `None` otherwise.
     ///
-    /// See [`system_path_to_file`] and [`vendored_path_to_file`] if you always have either a file system or vendored path.
+    /// See [`system_path_to_file`] or [`vendored_path_to_file`] if you always have either a file
+    /// system or vendored path.
     #[inline]
     pub fn to_file(&self, db: &dyn Db) -> Option<File> {
         match self {
             FilePath::System(path) => system_path_to_file(db, path),
             FilePath::Vendored(path) => vendored_path_to_file(db, path),
+            FilePath::SystemVirtual(_) => None,
         }
     }
 
@@ -92,6 +106,7 @@ impl FilePath {
         match self {
             FilePath::System(path) => path.extension(),
             FilePath::Vendored(path) => path.extension(),
+            FilePath::SystemVirtual(_) => None,
         }
     }
 }
@@ -123,6 +138,18 @@ impl From<VendoredPathBuf> for FilePath {
 impl From<&VendoredPath> for FilePath {
     fn from(value: &VendoredPath) -> Self {
         Self::Vendored(value.to_path_buf())
+    }
+}
+
+impl From<&SystemVirtualPath> for FilePath {
+    fn from(value: &SystemVirtualPath) -> Self {
+        FilePath::SystemVirtual(value.to_path_buf())
+    }
+}
+
+impl From<SystemVirtualPathBuf> for FilePath {
+    fn from(value: SystemVirtualPathBuf) -> Self {
+        FilePath::SystemVirtual(value)
     }
 }
 
