@@ -103,6 +103,94 @@ impl Violation for DocstringExtraneousReturns {
 }
 
 /// ## What it does
+/// Checks for functions with yield statements missing a yields section in
+/// their docstring.
+///
+/// ## Why is this bad?
+/// Docstrings missing yields sections are a sign of incomplete documentation
+/// or refactors.
+///
+/// ## Example
+/// ```python
+/// def count_to_n(n: int) -> int:
+///     """Generate integers up to n.
+///
+///     Args:
+///         n: Max integer.
+///     """
+///     for i in range(n):
+///         yield i
+/// ```
+///
+/// Use instead:
+/// ```python
+/// def count_to_n(n: int) -> int:
+///     """Generate integers up to n.
+///
+///     Args:
+///         n: Max integer.
+///
+///     Yields:
+///         int: The ith integer.
+///     """
+///     for i in range(n):
+///         yield i
+/// ```
+#[violation]
+pub struct DocstringMissingYields;
+
+impl Violation for DocstringMissingYields {
+    #[derive_message_formats]
+    fn message(&self) -> String {
+        format!("`yield` is not documented in docstring")
+    }
+}
+
+/// ## What it does
+/// Checks for function docstrings that have a yields section without
+/// needing one.
+///
+/// ## Why is this bad?
+/// Functions which don't yield anything should not have a yields section
+/// in their docstrings.
+///
+/// ## Example
+/// ```python
+/// def say_hello(n: int) -> None:
+///     """Says hello to the user.
+///
+///     Args:
+///         n: Number of times to say hello.
+///
+///     Yields:
+///         Doesn't yield anything.
+///     """
+///     for _ in range(n):
+///         print("Hello!")
+/// ```
+///
+/// Use instead:
+/// ```python
+/// def say_hello(n: int) -> None:
+///     """Says hello to the user.
+///
+///     Args:
+///         n: Number of times to say hello.
+///     """
+///     for _ in range(n):
+///         print("Hello!")
+/// ```
+#[violation]
+pub struct DocstringExtraneousYields;
+
+impl Violation for DocstringExtraneousYields {
+    #[derive_message_formats]
+    fn message(&self) -> String {
+        format!("Docstring should not have a yields section because the function doesn't yield anything")
+    }
+}
+
+/// ## What it does
 /// Checks for function docstrings that do not include documentation for all
 /// explicitly-raised exceptions.
 ///
