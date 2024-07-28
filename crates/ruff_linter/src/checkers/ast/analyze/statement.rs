@@ -1474,6 +1474,9 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                     checker, stmt, body, handlers, orelse, finalbody,
                 );
             }
+            if checker.enabled(Rule::SupressedException) {
+                flake8_bugbear::rules::supressed_exception(checker, handlers);
+            }
             if checker.enabled(Rule::ReturnInTryExceptFinally) {
                 flake8_simplify::rules::return_in_try_except_finally(
                     checker, body, handlers, finalbody,
@@ -1497,6 +1500,7 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
             if checker.enabled(Rule::ErrorInsteadOfException) {
                 tryceratops::rules::error_instead_of_exception(checker, handlers);
             }
+            
         }
         Stmt::Assign(assign @ ast::StmtAssign { targets, value, .. }) => {
             if checker.enabled(Rule::SelfOrClsAssignment) {
