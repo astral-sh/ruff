@@ -299,8 +299,8 @@ impl LoggingFilter {
     fn is_enabled(&self, meta: &Metadata<'_>) -> bool {
         let filter = if meta.target().starts_with("red_knot") || meta.target().starts_with("ruff") {
             self.trace_level
-        } else if meta.target().starts_with("salsa") {
-            // Salsa now emits very verbose will execute query traces with warn, let's not show these to the user.
+        } else if meta.target().starts_with("salsa") && self.trace_level <= Level::INFO {
+            // Salsa emits very verbose query traces with level info. Let's not show these to the user.
             Level::WARN
         } else {
             Level::INFO
