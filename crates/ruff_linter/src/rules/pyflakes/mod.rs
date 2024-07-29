@@ -248,6 +248,10 @@ mod tests {
             &LinterSettings {
                 preview: PreviewMode::Enabled,
                 isort: isort::settings::Settings {
+                    // This case specifically tests the scenario where
+                    // the unused import is a first-party submodule import;
+                    // use the isort settings to ensure that the `submodule.a` import
+                    // is recognised as first-party in the test:
                     known_modules: isort::categorize::KnownModules::new(
                         vec!["submodule".parse().unwrap()],
                         vec![],
