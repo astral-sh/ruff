@@ -619,7 +619,7 @@ jobs:
         run: cargo codspeed build -p ruff_benchmark
 
       - name: "Run benchmarks"
-        uses: CodSpeedHQ/action@v2
+        uses: CodSpeedHQ/action@v3
         with:
           run: cargo codspeed run
           token: ${{ secrets.CODSPEED_TOKEN }}
