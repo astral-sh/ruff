@@ -244,7 +244,7 @@ mod tests {
     fn f401_preview_first_party_submodule(contents: &str, snapshot: &str) {
         let diagnostics = test_contents(
             &SourceKind::Python(dedent(contents).to_string()),
-            Path::new("__init__.py"),
+            Path::new("f401_preview_first_party_submodule/__init__.py"),
             &LinterSettings {
                 preview: PreviewMode::Enabled,
                 isort: isort::settings::Settings {

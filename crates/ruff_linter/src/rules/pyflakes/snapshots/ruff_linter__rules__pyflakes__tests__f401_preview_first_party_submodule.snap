@@ -1,0 +1,17 @@
+---
+source: crates/ruff_linter/src/rules/pyflakes/mod.rs
+---
+__init__.py:2:8: F401 [*] `submodule.a` imported but unused
+  |
+2 | import submodule.a
+  |        ^^^^^^^^^^^ F401
+3 | __all__ = ['FOO']
+4 | FOO = 42
+  |
+  = help: Remove unused import: `submodule.a`
+
+ℹ Unsafe fix
+1 1 | 
+2   |-import submodule.a
+3 2 | __all__ = ['FOO']
+4 3 | FOO = 42

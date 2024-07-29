@@ -305,7 +305,7 @@ pub(crate) fn unused_import(checker: &Checker, scope: &Scope, diagnostics: &mut 
             .map(|binding| {
                 let context = if in_except_handler {
                     Some(UnusedImportContext::ExceptHandler)
-                } else if in_init {
+                } else if in_init && !binding.import.is_submodule_import() {
                     Some(UnusedImportContext::Init {
                         first_party: is_first_party(
                             &binding.import.qualified_name().to_string(),
