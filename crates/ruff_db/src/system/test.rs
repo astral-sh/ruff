@@ -6,9 +6,6 @@ use crate::system::{
     DirectoryEntry, MemoryFileSystem, Metadata, Result, System, SystemPath, SystemVirtualPath,
 };
 use crate::Db;
-use std::any::Any;
-use std::panic::RefUnwindSafe;
-use std::sync::Arc;
 
 use super::walk_directory::WalkDirectoryBuilder;
 

@@ -396,13 +396,21 @@ impl File {
 
         let durability = durability.unwrap_or_default();
 
-        file.set_status(db).with_durability(durability).to(status);
-        file.set_revision(db)
-            .with_durability(durability)
-            .to(revision);
-        file.set_permissions(db)
-            .with_durability(durability)
-            .to(permission);
+        if file.status(db) != status {
+            file.set_status(db).with_durability(durability).to(status);
+        }
+
+        if file.revision(db) != revision {
+            file.set_revision(db)
+                .with_durability(durability)
+                .to(revision);
+        }
+
+        if file.permissions(db) != permission {
+            file.set_permissions(db)
+                .with_durability(durability)
+                .to(permission);
+        }
     }
 
     /// Returns `true` if the file exists.
