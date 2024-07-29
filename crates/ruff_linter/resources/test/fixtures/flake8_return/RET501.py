@@ -1,3 +1,6 @@
+from functools import cached_property
+
+
 def x(y):
     if not y:
         return
@@ -14,6 +17,11 @@ class BaseCache:
         return None
 
     @property
+    def prop(self) -> None:
+        print("Property not found")
+        return None
+
+    @cached_property
     def prop(self) -> None:
         print("Property not found")
         return None
