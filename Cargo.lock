@@ -1031,9 +1031,9 @@ dependencies = [
 
 [[package]]
 name = "imperative"
-version = "1.0.5"
+version = "1.0.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8b70798296d538cdaa6d652941fcc795963f8b9878b9e300c9fab7a522bd2fc0"
+checksum = "29a1f6526af721f9aec9ceed7ab8ebfca47f3399d08b80056c2acca3fcb694a9"
 dependencies = [
  "phf",
  "rust-stemmers",
