@@ -5,7 +5,7 @@ use anyhow::Result;
 use ruff_diagnostics::{AlwaysFixableViolation, FixAvailability, Violation};
 use ruff_diagnostics::{Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::helpers::{is_const_false, is_const_true};
+use ruff_python_ast::helpers::{is_const_false, is_const_true, map_callable};
 use ruff_python_ast::stmt_if::elif_else_range;
 use ruff_python_ast::visitor::Visitor;
 use ruff_python_ast::whitespace::indentation;
@@ -373,11 +373,17 @@ fn unnecessary_return_none(checker: &mut Checker, decorator_list: &[Decorator], 
             continue;
         }
 
-        // Skip properties.
+        // Skip properties and cached properties.
         if decorator_list.iter().any(|decorator| {
             checker
                 .semantic()
-                .match_builtin_expr(&decorator.expression, "property")
+                .resolve_qualified_name(map_callable(&decorator.expression))
+                .is_some_and(|qualified_name| {
+                    matches!(
+                        qualified_name.segments(),
+                        ["" | "builtins", "property"] | ["functools", "cached_property"]
+                    )
+                })
         }) {
             return;
         }
