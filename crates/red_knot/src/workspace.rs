@@ -318,15 +318,19 @@ impl Package {
         let root = self.root(db);
         assert_eq!(root, metadata.root());
 
-        self.set_name(db)
-            .with_durability(Durability::HIGH)
-            .to(metadata.name);
+        if self.name(db) != metadata.name() {
+            self.set_name(db)
+                .with_durability(Durability::HIGH)
+                .to(metadata.name);
+        }
     }
 
     #[tracing::instrument(level = "debug", skip(db))]
     pub fn reload_files(self, db: &mut dyn Db) {
-        // Force a re-index of the files in the next revision.
-        self.set_file_set(db).to(PackageFiles::lazy());
+        if !self.file_set(db).is_lazy() {
+            // Force a re-index of the files in the next revision.
+            self.set_file_set(db).to(PackageFiles::lazy());
+        }
     }
 }
 
@@ -372,7 +376,7 @@ fn discover_package_files(db: &dyn Db, path: &SystemPath) -> FxHashSet<File> {
     for path in paths {
         // If this returns `None`, then the file was deleted between the `walk_directory` call and now.
         // We can ignore this.
-        if let Some(file) = system_path_to_file(db.upcast(), &path) {
+        if let Ok(file) = system_path_to_file(db.upcast(), &path) {
             files.insert(file);
         }
     }

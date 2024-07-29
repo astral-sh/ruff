@@ -1,3 +1,4 @@
+use std::fmt::Formatter;
 use std::sync::Arc;
 
 use countme::Count;
@@ -20,16 +21,23 @@ mod path;
 
 /// Interns a file system path and returns a salsa `File` ingredient.
 ///
-/// Returns `None` if the path doesn't exist, isn't accessible, or if the path points to a directory.
+/// Returns `Err` if the path doesn't exist, isn't accessible, or if the path points to a directory.
 #[inline]
-pub fn system_path_to_file(db: &dyn Db, path: impl AsRef<SystemPath>) -> Option<File> {
+pub fn system_path_to_file(
+    db: &dyn Db,
+    path: impl AsRef<SystemPath>,
+) -> Result<File, SystemPathError> {
     let file = db.files().system(db, path.as_ref());
 
     // It's important that `vfs.file_system` creates a `VfsFile` even for files that don't exist or don't
     // exist anymore so that Salsa can track that the caller of this function depends on the existence of
     // that file. This function filters out files that don't exist, but Salsa will know that it must
     // re-run the calling query whenever the `file`'s status changes (because of the `.status` call here).
-    file.exists(db).then_some(file)
+    match file.status(db) {
+        FileStatus::Exists => Ok(file),
+        FileStatus::IsADirectory => Err(SystemPathError::IsADirectory),
+        FileStatus::NotFound => Err(SystemPathError::NotFound),
+    }
 }
 
 /// Interns a vendored file path. Returns `Some` if the vendored file for `path` exists and `None` otherwise.
@@ -68,7 +76,7 @@ impl Files {
     /// For a non-existing file, creates a new salsa [`File`] ingredient and stores it for future lookups.
     ///
     /// The operation always succeeds even if the path doesn't exist on disk, isn't accessible or if the path points to a directory.
-    /// In these cases, a file with status [`FileStatus::Deleted`] is returned.
+    /// In these cases, a file with status [`FileStatus::NotFound`] is returned.
     #[tracing::instrument(level = "trace", skip(self, db))]
     fn system(&self, db: &dyn Db, path: &SystemPath) -> File {
         let absolute = SystemPath::absolute(path, db.system().current_directory());
@@ -89,7 +97,10 @@ impl Files {
                         metadata.revision(),
                         FileStatus::Exists,
                     ),
-                    _ => (None, FileRevision::zero(), FileStatus::Deleted),
+                    Ok(metadata) if metadata.file_type().is_directory() => {
+                        (None, FileRevision::zero(), FileStatus::IsADirectory)
+                    }
+                    _ => (None, FileRevision::zero(), FileStatus::NotFound),
                 };
 
                 File::builder(
@@ -391,7 +402,10 @@ impl File {
                 metadata.revision(),
                 metadata.permissions(),
             ),
-            _ => (FileStatus::Deleted, FileRevision::zero(), None),
+            Ok(metadata) if metadata.file_type().is_directory() => {
+                (FileStatus::IsADirectory, FileRevision::zero(), None)
+            }
+            _ => (FileStatus::NotFound, FileRevision::zero(), None),
         };
 
         let durability = durability.unwrap_or_default();
@@ -427,15 +441,35 @@ mod private {
         /// The file exists.
         Exists,
 
-        /// The file was deleted, didn't exist to begin with or the path isn't a file.
-        Deleted,
+        /// The path isn't a file and instead points to a directory.
+        IsADirectory,
+
+        /// The path doesn't exist, isn't accessible, or no longer exists.
+        NotFound,
     }
 }
+
+#[derive(Copy, Clone, Debug, Eq, PartialEq)]
+pub enum SystemPathError {
+    IsADirectory,
+    NotFound,
+}
+
+impl std::fmt::Display for SystemPathError {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        match self {
+            SystemPathError::IsADirectory => f.write_str("Is a directory"),
+            SystemPathError::NotFound => f.write_str("Not found"),
+        }
+    }
+}
+
+impl std::error::Error for SystemPathError {}
 
 #[cfg(test)]
 mod tests {
     use crate::file_revision::FileRevision;
-    use crate::files::{system_path_to_file, vendored_path_to_file};
+    use crate::files::{system_path_to_file, vendored_path_to_file, SystemPathError};
     use crate::system::DbWithTestSystem;
     use crate::tests::TestDb;
     use crate::vendored::tests::VendoredFileSystemBuilder;
@@ -461,7 +495,7 @@ mod tests {
 
         let test = system_path_to_file(&db, "test.py");
 
-        assert_eq!(test, None);
+        assert_eq!(test, Err(SystemPathError::NotFound));
     }
 
     #[test]

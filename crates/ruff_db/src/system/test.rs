@@ -1,3 +1,7 @@
+use std::any::Any;
+use std::panic::RefUnwindSafe;
+use std::sync::Arc;
+
 use ruff_notebook::{Notebook, NotebookError};
 use ruff_python_trivia::textwrap;
 

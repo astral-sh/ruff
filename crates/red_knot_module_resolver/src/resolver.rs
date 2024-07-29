@@ -489,6 +489,7 @@ fn resolve_name(db: &dyn Db, name: &ModuleName) -> Option<(SearchPath, File, Mod
         if is_builtin_module && !search_path.is_standard_library() {
             continue;
         }
+
         let mut components = name.components();
         let module_name = components.next_back()?;
 
@@ -1282,6 +1283,7 @@ mod tests {
         db.memory_file_system()
             .remove_directory(foo_init_path.parent().unwrap())?;
         File::sync_path(&mut db, &foo_init_path);
+        File::sync_path(&mut db, foo_init_path.parent().unwrap());
 
         let foo_module = resolve_module(&db, foo_module_name).expect("Foo module to resolve");
         assert_eq!(&src.join("foo.py"), foo_module.file().path(&db));
@@ -1312,7 +1314,7 @@ mod tests {
         let functools_module = resolve_module(&db, functools_module_name.clone()).unwrap();
         assert_eq!(functools_module.search_path(), &stdlib);
         assert_eq!(
-            Some(functools_module.file()),
+            Ok(functools_module.file()),
             system_path_to_file(&db, &stdlib_functools_path)
         );
 
@@ -1332,7 +1334,7 @@ mod tests {
         );
         assert_eq!(functools_module.search_path(), &stdlib);
         assert_eq!(
-            Some(functools_module.file()),
+            Ok(functools_module.file()),
             system_path_to_file(&db, &stdlib_functools_path)
         );
     }
@@ -1358,7 +1360,7 @@ mod tests {
         let functools_module = resolve_module(&db, functools_module_name.clone()).unwrap();
         assert_eq!(functools_module.search_path(), &stdlib);
         assert_eq!(
-            Some(functools_module.file()),
+            Ok(functools_module.file()),
             system_path_to_file(&db, stdlib.join("functools.pyi"))
         );
 
@@ -1369,7 +1371,7 @@ mod tests {
         let functools_module = resolve_module(&db, functools_module_name.clone()).unwrap();
         assert_eq!(functools_module.search_path(), &src);
         assert_eq!(
-            Some(functools_module.file()),
+            Ok(functools_module.file()),
             system_path_to_file(&db, &src_functools_path)
         );
     }
@@ -1400,7 +1402,7 @@ mod tests {
         let functools_module = resolve_module(&db, functools_module_name.clone()).unwrap();
         assert_eq!(functools_module.search_path(), &src);
         assert_eq!(
-            Some(functools_module.file()),
+            Ok(functools_module.file()),
             system_path_to_file(&db, &src_functools_path)
         );
 
@@ -1413,7 +1415,7 @@ mod tests {
         let functools_module = resolve_module(&db, functools_module_name.clone()).unwrap();
         assert_eq!(functools_module.search_path(), &stdlib);
         assert_eq!(
-            Some(functools_module.file()),
+            Ok(functools_module.file()),
             system_path_to_file(&db, stdlib.join("functools.pyi"))
         );
     }

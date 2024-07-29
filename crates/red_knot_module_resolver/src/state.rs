@@ -1,5 +1,4 @@
 use ruff_db::program::TargetVersion;
-use ruff_db::system::System;
 use ruff_db::vendored::VendoredFileSystem;
 
 use crate::db::Db;
@@ -18,10 +17,6 @@ impl<'db> ResolverState<'db> {
             typeshed_versions: LazyTypeshedVersions::new(),
             target_version,
         }
-    }
-
-    pub(crate) fn system(&self) -> &dyn System {
-        self.db.system()
     }
 
     pub(crate) fn vendored(&self) -> &VendoredFileSystem {
