@@ -170,33 +170,35 @@ pub(crate) fn retain_imports(
     Ok(tree.codegen_stylist(stylist))
 }
 
-fn collect_segments<'a>(expr: &'a Expression, parts: &mut SmallVec<[&'a str; 8]>) {
-    match expr {
-        Expression::Call(expr) => {
-            collect_segments(&expr.func, parts);
-        }
-        Expression::Attribute(expr) => {
-            collect_segments(&expr.value, parts);
-            parts.push(expr.attr.value);
-        }
-        Expression::Name(expr) => {
-            parts.push(expr.value);
-        }
-        _ => {}
-    }
-}
-
-fn unqualified_name_from_expression<'a>(expr: &'a Expression<'a>) -> Option<UnqualifiedName<'a>> {
-    let mut segments = smallvec![];
-    collect_segments(expr, &mut segments);
-    if segments.is_empty() {
-        None
-    } else {
-        Some(segments.into_iter().collect())
-    }
-}
-
 fn qualified_name_from_name_or_attribute(module: &NameOrAttribute) -> String {
+    fn collect_segments<'a>(expr: &'a Expression, parts: &mut SmallVec<[&'a str; 8]>) {
+        match expr {
+            Expression::Call(expr) => {
+                collect_segments(&expr.func, parts);
+            }
+            Expression::Attribute(expr) => {
+                collect_segments(&expr.value, parts);
+                parts.push(expr.attr.value);
+            }
+            Expression::Name(expr) => {
+                parts.push(expr.value);
+            }
+            _ => {}
+        }
+    }
+
+    fn unqualified_name_from_expression<'a>(
+        expr: &'a Expression<'a>,
+    ) -> Option<UnqualifiedName<'a>> {
+        let mut segments = smallvec![];
+        collect_segments(expr, &mut segments);
+        if segments.is_empty() {
+            None
+        } else {
+            Some(segments.into_iter().collect())
+        }
+    }
+
     let unnormalized = match module {
         NameOrAttribute::N(name) => Cow::Borrowed(name.value),
         NameOrAttribute::A(attr) => {
@@ -208,5 +210,6 @@ fn qualified_name_from_name_or_attribute(module: &NameOrAttribute) -> String {
             )
         }
     };
+
     unnormalized.nfkc().collect()
 }

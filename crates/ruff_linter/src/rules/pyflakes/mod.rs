@@ -258,6 +258,7 @@ mod tests {
     #[test_case(Rule::UnusedImport, Path::new("F401_27__all_mistyped/__init__.py"))]
     #[test_case(Rule::UnusedImport, Path::new("F401_28__all_multiple/__init__.py"))]
     #[test_case(Rule::UnusedImport, Path::new("F401_29__all_conditional/__init__.py"))]
+    #[test_case(Rule::UnusedImport, Path::new("F401_30.py"))]
     fn f401_deprecated_option(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!(
             "{}_deprecated_option_{}",
