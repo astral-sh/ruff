@@ -107,7 +107,7 @@ rand = { version = "0.8.5" }
 rayon = { version = "1.10.0" }
 regex = { version = "1.10.2" }
 rustc-hash = { version = "2.0.0" }
-salsa = { git = "https://github.com/salsa-rs/salsa.git", rev = "e4ce917f6eda0d775ef654742a6f3cdc710f7d1a" }
+salsa = { git = "https://github.com/salsa-rs/salsa.git", rev = "cd339fc1c9a6ea0ffb1d09bd3bffb5633f776ef3" }
 schemars = { version = "0.8.16" }
 seahash = { version = "4.1.0" }
 serde = { version = "1.0.197", features = ["derive"] }

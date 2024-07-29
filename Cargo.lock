@@ -1538,63 +1538,77 @@ dependencies = [
 ]
 
 [[package]]
-name = "orx-concurrent-bag"
-version = "1.16.0"
+name = "orx-concurrent-ordered-bag"
+version = "2.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "626ac9e207af7af7c638c1dbaa89f9eb164de9a5df7834d2cd3bae603e9ec8d9"
+checksum = "9aa866e2be4aa03927eddb481e7c479d5109fe3121324fb7db6d97f91adf9876"
 dependencies = [
  "orx-fixed-vec",
  "orx-pinned-concurrent-col",
  "orx-pinned-vec",
+ "orx-pseudo-default",
  "orx-split-vec",
 ]
 
 [[package]]
 name = "orx-concurrent-vec"
-version = "1.10.0"
+version = "2.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "560e3d819a361775846793bd3453d4ad92ead343d78a032218524d810a10f03f"
+checksum = "c5912426ffb660f8b61e8f0812a1d07400803cd5513969d2c7af4d69602ba8a1"
 dependencies = [
- "orx-concurrent-bag",
+ "orx-concurrent-ordered-bag",
  "orx-fixed-vec",
  "orx-pinned-concurrent-col",
  "orx-pinned-vec",
+ "orx-pseudo-default",
  "orx-split-vec",
 ]
 
 [[package]]
 name = "orx-fixed-vec"
-version = "2.12.0"
+version = "3.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "92b1feab17e804565dc7203abe7010f2923c6bebbcd2ea44ce539a6b14aba7d7"
+checksum = "7f69466c7c1fc2e1f00b58e39059b78c438b9fad144d1937ef177ecfc413e997"
 dependencies = [
  "orx-pinned-vec",
+ "orx-pseudo-default",
 ]
 
 [[package]]
 name = "orx-pinned-concurrent-col"
-version = "1.6.1"
+version = "2.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a8090454a4719b3d663d5fd0fead482ece27573ef70a6217514f0526c6486990"
+checksum = "fdbcb1fa05dc1676f1c9cf19f443b3d2d2ca5835911477d22fa77cad8b79208d"
 dependencies = [
  "orx-fixed-vec",
  "orx-pinned-vec",
+ "orx-pseudo-default",
  "orx-split-vec",
 ]
 
 [[package]]
 name = "orx-pinned-vec"
-version = "2.12.0"
+version = "3.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "10d7e4bbaaf315d1b3d4b574a005b09659c3a696ee87791f8d50115bf7a7efe7"
+checksum = "c1071baf586de45722668234bddf56c52c1ece6a6153d16541bbb0505f0ac055"
+dependencies = [
+ "orx-pseudo-default",
+]
+
+[[package]]
+name = "orx-pseudo-default"
+version = "1.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a2f627c439e723fa78e410a0faba89047a8a47d0dc013da5c0e05806e8a6cddb"
 
 [[package]]
 name = "orx-split-vec"
-version = "2.14.0"
+version = "3.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "492b61b2cc2fdd3d06ebe34acdbe8670c21452f06b42d025136aaef994c5b4da"
+checksum = "52b9dbfa8c7069ae73a890870d3aa9097a897d616751d3d0278f2b42d5214730"
 dependencies = [
  "orx-pinned-vec",
+ "orx-pseudo-default",
 ]
 
 [[package]]
@@ -2708,7 +2722,7 @@ checksum = "e86697c916019a8588c99b5fac3cead74ec0b4b819707a682fd4d23fa0ce1ba1"
 [[package]]
 name = "salsa"
 version = "0.18.0"
-source = "git+https://github.com/salsa-rs/salsa.git?rev=e4ce917f6eda0d775ef654742a6f3cdc710f7d1a#e4ce917f6eda0d775ef654742a6f3cdc710f7d1a"
+source = "git+https://github.com/salsa-rs/salsa.git?rev=cd339fc1c9a6ea0ffb1d09bd3bffb5633f776ef3#cd339fc1c9a6ea0ffb1d09bd3bffb5633f776ef3"
 dependencies = [
  "arc-swap",
  "boomphf",
@@ -2728,12 +2742,12 @@ dependencies = [
 [[package]]
 name = "salsa-macro-rules"
 version = "0.1.0"
-source = "git+https://github.com/salsa-rs/salsa.git?rev=e4ce917f6eda0d775ef654742a6f3cdc710f7d1a#e4ce917f6eda0d775ef654742a6f3cdc710f7d1a"
+source = "git+https://github.com/salsa-rs/salsa.git?rev=cd339fc1c9a6ea0ffb1d09bd3bffb5633f776ef3#cd339fc1c9a6ea0ffb1d09bd3bffb5633f776ef3"
 
 [[package]]
 name = "salsa-macros"
 version = "0.18.0"
-source = "git+https://github.com/salsa-rs/salsa.git?rev=e4ce917f6eda0d775ef654742a6f3cdc710f7d1a#e4ce917f6eda0d775ef654742a6f3cdc710f7d1a"
+source = "git+https://github.com/salsa-rs/salsa.git?rev=cd339fc1c9a6ea0ffb1d09bd3bffb5633f776ef3#cd339fc1c9a6ea0ffb1d09bd3bffb5633f776ef3"
 dependencies = [
  "heck",
  "proc-macro2",
