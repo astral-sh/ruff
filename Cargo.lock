@@ -2319,6 +2319,7 @@ dependencies = [
  "thiserror",
  "toml",
  "typed-arena",
+ "unicode-normalization",
  "unicode-width",
  "unicode_names2",
  "url",

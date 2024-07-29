@@ -1,13 +1,16 @@
 //! Interface for editing code snippets. These functions take statements or expressions as input,
 //! and return the modified code snippet as output.
+use std::borrow::Cow;
+
 use anyhow::{bail, Result};
 use libcst_native::{
     Codegen, CodegenState, Expression, ImportNames, NameOrAttribute, ParenthesizableWhitespace,
     SmallStatement, Statement,
 };
-use ruff_python_ast::name::UnqualifiedName;
 use smallvec::{smallvec, SmallVec};
+use unicode_normalization::UnicodeNormalization;
 
+use ruff_python_ast::name::UnqualifiedName;
 use ruff_python_ast::Stmt;
 use ruff_python_codegen::Stylist;
 use ruff_source_file::Locator;
@@ -194,12 +197,16 @@ fn unqualified_name_from_expression<'a>(expr: &'a Expression<'a>) -> Option<Unqu
 }
 
 fn qualified_name_from_name_or_attribute(module: &NameOrAttribute) -> String {
-    match module {
-        NameOrAttribute::N(name) => name.value.to_string(),
+    let unnormalized = match module {
+        NameOrAttribute::N(name) => Cow::Borrowed(name.value),
         NameOrAttribute::A(attr) => {
             let name = attr.attr.value;
             let prefix = unqualified_name_from_expression(&attr.value);
-            prefix.map_or_else(|| name.to_string(), |prefix| format!("{prefix}.{name}"))
+            prefix.map_or_else(
+                || Cow::Borrowed(name),
+                |prefix| Cow::Owned(format!("{prefix}.{name}")),
+            )
         }
-    }
+    };
+    unnormalized.nfkc().collect()
 }
