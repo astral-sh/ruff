@@ -1104,12 +1104,20 @@ pub struct Flake8BuiltinsOptions {
     )]
     /// Ignore list of builtins.
     pub builtins_ignorelist: Option<Vec<String>>,
+    #[option(
+        default = r#"[]"#,
+        value_type = "list[str]",
+        example = "builtins-allowed-modules = [\"id\"]"
+    )]
+    /// List of builtin module names to allow.
+    pub builtins_allowed_modules: Option<Vec<String>>,
 }
 
 impl Flake8BuiltinsOptions {
     pub fn into_settings(self) -> ruff_linter::rules::flake8_builtins::settings::Settings {
         ruff_linter::rules::flake8_builtins::settings::Settings {
             builtins_ignorelist: self.builtins_ignorelist.unwrap_or_default(),
+            builtins_allowed_modules: self.builtins_allowed_modules.unwrap_or_default(),
         }
     }
 }

@@ -304,7 +304,9 @@ impl Rule {
             | Rule::UTF8EncodingDeclaration => LintSource::Tokens,
             Rule::IOError => LintSource::Io,
             Rule::UnsortedImports | Rule::MissingRequiredImport => LintSource::Imports,
-            Rule::ImplicitNamespacePackage | Rule::InvalidModuleName => LintSource::Filesystem,
+            Rule::ImplicitNamespacePackage
+            | Rule::InvalidModuleName
+            | Rule::BuiltinModuleShadowing => LintSource::Filesystem,
             Rule::IndentationWithInvalidMultiple
             | Rule::IndentationWithInvalidMultipleComment
             | Rule::MissingWhitespace

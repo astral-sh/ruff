@@ -1,15 +1,14 @@
-use ruff_text_size::TextRange;
-
 use ruff_diagnostics::Diagnostic;
 use ruff_diagnostics::Violation;
 use ruff_macros::{derive_message_formats, violation};
+use ruff_text_size::TextRange;
 
 use crate::checkers::ast::Checker;
 use crate::rules::flake8_builtins::helpers::shadows_builtin;
 
 /// ## What it does
-/// Checks for variable (and function) assignments that use the same name
-/// as a builtin.
+/// Checks for variable (and function) assignments that use the same names
+/// as builtins.
 ///
 /// ## Why is this bad?
 /// Reusing a builtin name for the name of a variable increases the
