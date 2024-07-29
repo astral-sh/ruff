@@ -1,4 +1,4 @@
-use salsa::Setter as _;
+use salsa::{Durability, Setter as _};
 use std::{collections::BTreeMap, sync::Arc};
 
 use rustc_hash::{FxBuildHasher, FxHashSet};
@@ -105,7 +105,9 @@ impl Workspace {
             packages.insert(package.root.clone(), Package::from_metadata(db, package));
         }
 
-        Workspace::new(db, metadata.root, None, packages)
+        Workspace::builder(metadata.root, None, packages)
+            .durability(Durability::HIGH)
+            .new(db)
     }
 
     pub fn root(self, db: &dyn Db) -> &SystemPath {
@@ -136,7 +138,9 @@ impl Workspace {
             new_packages.insert(path, package);
         }
 
-        self.set_package_tree(db).to(new_packages);
+        self.set_package_tree(db)
+            .with_durability(Durability::HIGH)
+            .to(new_packages);
     }
 
     #[tracing::instrument(level = "debug", skip_all)]
@@ -305,14 +309,18 @@ impl Package {
     }
 
     fn from_metadata(db: &dyn Db, metadata: PackageMetadata) -> Self {
-        Self::new(db, metadata.name, metadata.root, PackageFiles::default())
+        Self::builder(metadata.name, metadata.root, PackageFiles::default())
+            .durability(Durability::HIGH)
+            .new(db)
     }
 
     fn update(self, db: &mut dyn Db, metadata: PackageMetadata) {
         let root = self.root(db);
         assert_eq!(root, metadata.root());
 
-        self.set_name(db).to(metadata.name);
+        self.set_name(db)
+            .with_durability(Durability::HIGH)
+            .to(metadata.name);
     }
 
     #[tracing::instrument(level = "debug", skip(db))]

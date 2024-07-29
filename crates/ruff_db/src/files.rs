@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use countme::Count;
 use dashmap::mapref::entry::Entry;
-use salsa::Setter;
+use salsa::{Durability, Setter};
 
 pub use file_root::{FileRoot, FileRootKind};
 pub use path::FilePath;
@@ -78,27 +78,29 @@ impl Files {
             .system_by_path
             .entry(absolute.clone())
             .or_insert_with(|| {
-                // TODO: Set correct durability according to source root.
                 let metadata = db.system().path_metadata(path);
+                let durability = self
+                    .root(db, path)
+                    .map_or(Durability::default(), |root| root.durability(db));
 
-                match metadata {
-                    Ok(metadata) if metadata.file_type().is_file() => File::new(
-                        db,
-                        FilePath::System(absolute),
+                let (permissions, revision, status) = match metadata {
+                    Ok(metadata) if metadata.file_type().is_file() => (
                         metadata.permissions(),
                         metadata.revision(),
                         FileStatus::Exists,
-                        Count::default(),
                     ),
-                    _ => File::new(
-                        db,
-                        FilePath::System(absolute),
-                        None,
-                        FileRevision::zero(),
-                        FileStatus::Deleted,
-                        Count::default(),
-                    ),
-                }
+                    _ => (None, FileRevision::zero(), FileStatus::Deleted),
+                };
+
+                File::builder(
+                    FilePath::System(absolute),
+                    permissions,
+                    revision,
+                    status,
+                    Count::default(),
+                )
+                .durability(durability)
+                .new(db)
             })
     }
 
@@ -120,14 +122,15 @@ impl Files {
             Entry::Vacant(entry) => {
                 let metadata = db.vendored().metadata(path).ok()?;
 
-                let file = File::new(
-                    db,
+                let file = File::builder(
                     FilePath::Vendored(path.to_path_buf()),
                     Some(0o444),
                     metadata.revision(),
                     FileStatus::Exists,
                     Count::default(),
-                );
+                )
+                .durability(Durability::HIGH)
+                .new(db);
 
                 entry.insert(file);
 
@@ -210,8 +213,7 @@ impl Files {
         let inner = Arc::clone(&db.files().inner);
         for entry in inner.system_by_path.iter_mut() {
             if entry.key().starts_with(&path) {
-                let file = entry.value();
-                file.sync(db);
+                File::sync_system_path(db, entry.key(), Some(*entry.value()));
             }
         }
 
@@ -219,7 +221,9 @@ impl Files {
 
         for root in roots.all() {
             if root.path(db).starts_with(&path) {
-                root.set_revision(db).to(FileRevision::now());
+                root.set_revision(db)
+                    .with_durability(Durability::HIGH)
+                    .to(FileRevision::now());
             }
         }
     }
@@ -236,14 +240,15 @@ impl Files {
     pub fn sync_all(db: &mut dyn Db) {
         let inner = Arc::clone(&db.files().inner);
         for entry in inner.system_by_path.iter_mut() {
-            let file = entry.value();
-            file.sync(db);
+            File::sync_system_path(db, entry.key(), Some(*entry.value()));
         }
 
         let roots = inner.roots.read().unwrap();
 
         for root in roots.all() {
-            root.set_revision(db).to(FileRevision::now());
+            root.set_revision(db)
+                .with_durability(Durability::HIGH)
+                .to(FileRevision::now());
         }
     }
 }
@@ -335,6 +340,7 @@ impl File {
     #[tracing::instrument(level = "debug", skip(db))]
     pub fn sync_path(db: &mut dyn Db, path: &SystemPath) {
         let absolute = SystemPath::absolute(path, db.system().current_directory());
+        Files::touch_root(db, &absolute);
         Self::sync_system_path(db, &absolute, None);
     }
 
@@ -345,6 +351,7 @@ impl File {
 
         match path {
             FilePath::System(system) => {
+                Files::touch_root(db, &system);
                 Self::sync_system_path(db, &system, Some(self));
             }
             FilePath::Vendored(_) => {
@@ -357,22 +364,27 @@ impl File {
     }
 
     fn sync_system_path(db: &mut dyn Db, path: &SystemPath, file: Option<File>) {
-        Files::touch_root(db, path);
         let Some(file) = file.or_else(|| db.files().try_system(db, path)) else {
             return;
         };
         let metadata = db.system().path_metadata(path);
-        Self::sync_impl(db, metadata, file);
+        let durability = db.files().root(db, path).map(|root| root.durability(db));
+        Self::sync_impl(db, metadata, file, durability);
     }
 
     fn sync_system_virtual_path(db: &mut dyn Db, path: &SystemVirtualPath, file: File) {
         let metadata = db.system().virtual_path_metadata(path);
-        Self::sync_impl(db, metadata, file);
+        Self::sync_impl(db, metadata, file, None);
     }
 
     /// Private method providing the implementation for [`Self::sync_system_path`] and
     /// [`Self::sync_system_virtual_path`].
-    fn sync_impl(db: &mut dyn Db, metadata: crate::system::Result<Metadata>, file: File) {
+    fn sync_impl(
+        db: &mut dyn Db,
+        metadata: crate::system::Result<Metadata>,
+        file: File,
+        durability: Option<Durability>,
+    ) {
         let (status, revision, permission) = match metadata {
             Ok(metadata) if metadata.file_type().is_file() => (
                 FileStatus::Exists,
@@ -382,9 +394,15 @@ impl File {
             _ => (FileStatus::Deleted, FileRevision::zero(), None),
         };
 
-        file.set_status(db).to(status);
-        file.set_revision(db).to(revision);
-        file.set_permissions(db).to(permission);
+        let durability = durability.unwrap_or_default();
+
+        file.set_status(db).with_durability(durability).to(status);
+        file.set_revision(db)
+            .with_durability(durability)
+            .to(revision);
+        file.set_permissions(db)
+            .with_durability(durability)
+            .to(permission);
     }
 
     /// Returns `true` if the file exists.

@@ -1,4 +1,5 @@
 use crate::{system::SystemPathBuf, Db};
+use salsa::Durability;
 
 #[salsa::input(singleton)]
 pub struct Program {
@@ -10,7 +11,9 @@ pub struct Program {
 
 impl Program {
     pub fn from_settings(db: &dyn Db, settings: ProgramSettings) -> Self {
-        Program::new(db, settings.target_version, settings.search_paths)
+        Program::builder(settings.target_version, settings.search_paths)
+            .durability(Durability::HIGH)
+            .new(db)
     }
 }
 
