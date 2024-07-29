@@ -101,8 +101,6 @@ impl FileRoots {
     pub(super) fn at(&self, path: &SystemPath) -> Option<FileRoot> {
         // SAFETY: Guaranteed to succeed because `path` is a UTF-8 that only contains Unicode characters.
         let normalized_path = path.as_std_path().to_slash().unwrap();
-        dbg!(&normalized_path);
-        dbg!(&self.roots);
         let entry = self.by_path.at(&normalized_path).ok()?;
         Some(*entry.value)
     }
