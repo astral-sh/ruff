@@ -11,6 +11,7 @@ mod tests {
 
     use anyhow::Result;
     use regex::Regex;
+    use rustc_hash::FxHashMap;
 
     use test_case::test_case;
 
@@ -24,11 +25,12 @@ mod tests {
 
     use crate::linter::check_path;
     use crate::registry::{AsRule, Linter, Rule};
+    use crate::rules::isort;
     use crate::rules::pyflakes;
     use crate::settings::types::PreviewMode;
     use crate::settings::{flags, LinterSettings};
     use crate::source_kind::SourceKind;
-    use crate::test::{test_path, test_snippet};
+    use crate::test::{test_contents, test_path, test_snippet};
     use crate::{assert_messages, directives};
 
     #[test_case(Rule::UnusedImport, Path::new("F401_0.py"))]
@@ -230,6 +232,36 @@ mod tests {
         )?;
         assert_messages!(snapshot, diagnostics);
         Ok(())
+    }
+
+    #[test_case(
+        r"
+        import submodule.a
+        __all__ = ['FOO']
+        FOO = 42",
+        "f401_preview_first_party_submodule"
+    )]
+    fn f401_preview_first_party_submodule(contents: &str, snapshot: &str) {
+        let diagnostics = test_contents(
+            &SourceKind::Python(dedent(contents).to_string()),
+            Path::new("__init__.py"),
+            &LinterSettings {
+                preview: PreviewMode::Enabled,
+                isort: isort::settings::Settings {
+                    known_modules: isort::categorize::KnownModules::new(
+                        vec!["submodule".parse().unwrap()],
+                        vec![],
+                        vec![],
+                        vec![],
+                        FxHashMap::default(),
+                    ),
+                    ..isort::settings::Settings::default()
+                },
+                ..LinterSettings::for_rule(Rule::UnusedImport)
+            },
+        )
+        .0;
+        assert_messages!(snapshot, diagnostics);
     }
 
     #[test_case(Rule::UnusedImport, Path::new("F401_24/__init__.py"))]
