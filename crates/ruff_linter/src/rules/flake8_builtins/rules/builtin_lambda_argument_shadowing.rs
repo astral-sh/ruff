@@ -1,12 +1,13 @@
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::ExprLambda;
+use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
 use crate::rules::flake8_builtins::helpers::shadows_builtin;
 
 /// ## What it does
-/// Checks for any lambda argument that use the same name as a builtin.
+/// Checks for lambda arguments that use the same names as Python builtins.
 ///
 /// ## Why is this bad?
 /// Reusing a builtin name for the name of a lambda argument increases the
@@ -28,7 +29,7 @@ impl Violation for BuiltinLambdaArgumentShadowing {
     #[derive_message_formats]
     fn message(&self) -> String {
         let BuiltinLambdaArgumentShadowing { name } = self;
-        format!("Lambda argument `{name}` is shadowing Python builtin")
+        format!("Lambda argument `{name}` is shadowing a Python builtin")
     }
 }
 
@@ -48,7 +49,7 @@ pub(crate) fn builtin_lambda_argument_shadowing(checker: &mut Checker, lambda: &
                 BuiltinLambdaArgumentShadowing {
                     name: name.to_string(),
                 },
-                name.range,
+                name.range(),
             ));
         }
     }

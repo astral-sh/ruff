@@ -1,17 +1,17 @@
-use crate::checkers::ast::Checker;
-use crate::rules::flake8_builtins::helpers::shadows_builtin;
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::Alias;
 
+use crate::checkers::ast::Checker;
+use crate::rules::flake8_builtins::helpers::shadows_builtin;
+
 /// ## What it does
-/// Checks for any import statement that use the same name as a builtin.
+/// Checks for imports that use the same names as builtins.
 ///
 /// ## Why is this bad?
-/// Reusing a builtin name for the name of an import increases the
-/// difficulty of reading and maintaining the code, and can cause
-/// non-obvious errors, as readers may mistake the variable for the
-/// builtin and vice versa.
+/// Reusing a builtin for the name of an import increases the difficulty
+/// of reading and maintaining the code, and can cause non-obvious errors,
+/// as readers may mistake the variable for the builtin and vice versa.
 ///
 /// Builtins can be marked as exceptions to this rule via the
 /// [`lint.flake8-builtins.builtins-ignorelist`] configuration option.
@@ -27,7 +27,7 @@ impl Violation for BuiltinImportShadowing {
     #[derive_message_formats]
     fn message(&self) -> String {
         let BuiltinImportShadowing { name } = self;
-        format!("Import `{name}` is shadowing Python builtin")
+        format!("Import `{name}` is shadowing a Python builtin")
     }
 }
 

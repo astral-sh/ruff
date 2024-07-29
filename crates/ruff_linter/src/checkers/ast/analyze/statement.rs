@@ -597,7 +597,7 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                 if checker.enabled(Rule::NonAsciiImportName) {
                     pylint::rules::non_ascii_module_import(checker, alias);
                 }
-                // TODO: remove once A004 is stable
+                // TODO(charlie): Remove when stabilizing A004.
                 if let Some(asname) = &alias.asname {
                     if checker.settings.preview.is_disabled()
                         && checker.enabled(Rule::BuiltinVariableShadowing)
@@ -923,7 +923,7 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                         ));
                     }
                 } else {
-                    // TODO: remove once A004 is stable
+                    // TODO(charlie): Remove when stabilizing A004.
                     if let Some(asname) = &alias.asname {
                         if checker.settings.preview.is_disabled()
                             && checker.enabled(Rule::BuiltinVariableShadowing)

@@ -9,7 +9,7 @@ use ruff_text_size::TextRange;
 use crate::settings::types::PythonVersion;
 
 /// ## What it does
-/// Checks for any module that use the same name as a builtin module.
+/// Checks for modules that use the same names as Python builtin modules.
 ///
 /// ## Why is this bad?
 /// Reusing a builtin module name for the name of a module increases the
@@ -31,7 +31,7 @@ impl Violation for BuiltinModuleShadowing {
     #[derive_message_formats]
     fn message(&self) -> String {
         let BuiltinModuleShadowing { name } = self;
-        format!("Module `{name}` is shadowing Python builtin module")
+        format!("Module `{name}` is shadowing a Python builtin module")
     }
 }
 
@@ -51,12 +51,10 @@ pub(crate) fn builtin_module_shadowing(
 
     if let Some(package) = package {
         let module_name = if is_module_file(path) {
-            package.file_name()
+            package.file_name().unwrap().to_string_lossy()
         } else {
-            path.file_stem()
-        }
-        .unwrap()
-        .to_string_lossy();
+            path.file_stem().unwrap().to_string_lossy()
+        };
 
         if is_known_standard_library(target_version.minor(), &module_name)
             && allowed_modules
