@@ -2,7 +2,6 @@ use std::ops::Deref;
 use std::sync::Arc;
 
 use countme::Count;
-use salsa::DebugWithDb;
 
 use ruff_notebook::Notebook;
 use ruff_python_ast::PySourceType;
@@ -14,9 +13,10 @@ use crate::Db;
 /// Reads the source text of a python text file (must be valid UTF8) or notebook.
 #[salsa::tracked]
 pub fn source_text(db: &dyn Db, file: File) -> SourceText {
-    let _span = tracing::trace_span!("source_text", ?file).entered();
+    let path = file.path(db);
+    let _span = tracing::trace_span!("source_text", file=?path).entered();
 
-    let is_notebook = match file.path(db) {
+    let is_notebook = match path {
         FilePath::System(system) => system.extension().is_some_and(|extension| {
             PySourceType::try_from_extension(extension) == Some(PySourceType::Ipynb)
         }),
@@ -129,7 +129,7 @@ enum SourceTextKind {
 /// Computes the [`LineIndex`] for `file`.
 #[salsa::tracked]
 pub fn line_index(db: &dyn Db, file: File) -> LineIndex {
-    let _span = tracing::trace_span!("line_index", file = ?file.debug(db)).entered();
+    let _span = tracing::trace_span!("line_index", file = ?file).entered();
 
     let source = source_text(db, file);
 
@@ -139,6 +139,7 @@ pub fn line_index(db: &dyn Db, file: File) -> LineIndex {
 #[cfg(test)]
 mod tests {
     use salsa::EventKind;
+    use salsa::Setter as _;
 
     use ruff_source_file::OneIndexed;
     use ruff_text_size::TextSize;

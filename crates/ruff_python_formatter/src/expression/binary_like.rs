@@ -573,7 +573,8 @@ impl<'a> FlatBinaryExpressionSlice<'a> {
         #[allow(unsafe_code)]
         unsafe {
             // SAFETY: `BinaryChainSlice` has the same layout as a slice because it uses `repr(transparent)`
-            &*(slice as *const [OperandOrOperator<'a>] as *const FlatBinaryExpressionSlice<'a>)
+            &*(std::ptr::from_ref::<[OperandOrOperator<'a>]>(slice)
+                as *const FlatBinaryExpressionSlice<'a>)
         }
     }
 

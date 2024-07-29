@@ -10,7 +10,7 @@ use crate::{Db, FxOrderSet};
 mod display;
 mod infer;
 
-pub(crate) use self::infer::{infer_definition_types, infer_expression_types, infer_scope_types};
+pub(crate) use self::infer::{infer_definition_types, infer_scope_types};
 
 /// Infer the public type of a symbol (its type as seen from outside its scope).
 pub(crate) fn symbol_ty<'db>(

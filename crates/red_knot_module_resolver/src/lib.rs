@@ -1,6 +1,6 @@
 use std::iter::FusedIterator;
 
-pub use db::{Db, Jar};
+pub use db::Db;
 pub use module::{Module, ModuleKind};
 pub use module_name::ModuleName;
 pub use resolver::resolve_module;

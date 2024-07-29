@@ -3,6 +3,7 @@
 use std::time::Duration;
 
 use anyhow::{anyhow, Context};
+use salsa::Setter;
 
 use red_knot::db::RootDatabase;
 use red_knot::watch;

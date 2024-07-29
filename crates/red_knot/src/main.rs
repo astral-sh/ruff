@@ -2,7 +2,6 @@ use std::sync::Mutex;
 
 use clap::Parser;
 use crossbeam::channel as crossbeam_channel;
-use salsa::ParallelDatabase;
 use tracing::subscriber::Interest;
 use tracing::{Level, Metadata};
 use tracing_subscriber::filter::LevelFilter;
@@ -111,7 +110,7 @@ pub fn main() -> anyhow::Result<()> {
 
     // TODO: Use the `program_settings` to compute the key for the database's persistent
     //   cache and load the cache if it exists.
-    let mut db = RootDatabase::new(workspace_metadata, program_settings, system);
+    let db = RootDatabase::new(workspace_metadata, program_settings, system);
 
     let (main_loop, main_loop_cancellation_token) = MainLoop::new(verbosity);
 
@@ -125,11 +124,14 @@ pub fn main() -> anyhow::Result<()> {
         }
     })?;
 
+    let mut db = salsa::Handle::new(db);
     if watch {
         main_loop.watch(&mut db)?;
     } else {
         main_loop.run(&mut db);
-    }
+    };
+
+    std::mem::forget(db);
 
     Ok(())
 }
@@ -162,7 +164,7 @@ impl MainLoop {
         )
     }
 
-    fn watch(mut self, db: &mut RootDatabase) -> anyhow::Result<()> {
+    fn watch(mut self, db: &mut salsa::Handle<RootDatabase>) -> anyhow::Result<()> {
         let sender = self.sender.clone();
         let watcher = watch::directory_watcher(move |event| {
             sender.send(MainLoopMessage::ApplyChanges(event)).unwrap();
@@ -170,12 +172,11 @@ impl MainLoop {
 
         self.watcher = Some(WorkspaceWatcher::new(watcher, db));
         self.run(db);
-
         Ok(())
     }
 
     #[allow(clippy::print_stderr)]
-    fn run(mut self, db: &mut RootDatabase) {
+    fn run(mut self, db: &mut salsa::Handle<RootDatabase>) {
         // Schedule the first check.
         self.sender.send(MainLoopMessage::CheckWorkspace).unwrap();
         let mut revision = 0usize;
@@ -185,7 +186,7 @@ impl MainLoop {
 
             match message {
                 MainLoopMessage::CheckWorkspace => {
-                    let db = db.snapshot();
+                    let db = db.clone();
                     let sender = self.sender.clone();
 
                     // Spawn a new task that checks the workspace. This needs to be done in a separate thread
@@ -220,7 +221,7 @@ impl MainLoop {
                 MainLoopMessage::ApplyChanges(changes) => {
                     revision += 1;
                     // Automatically cancels any pending queries and waits for them to complete.
-                    db.apply_changes(changes);
+                    db.get_mut().apply_changes(changes);
                     if let Some(watcher) = self.watcher.as_mut() {
                         watcher.update(db);
                     }
@@ -231,6 +232,8 @@ impl MainLoop {
                 }
             }
         }
+
+        self.exit();
     }
 
     #[allow(clippy::print_stderr, clippy::unused_self)]
@@ -296,6 +299,9 @@ impl LoggingFilter {
     fn is_enabled(&self, meta: &Metadata<'_>) -> bool {
         let filter = if meta.target().starts_with("red_knot") || meta.target().starts_with("ruff") {
             self.trace_level
+        } else if meta.target().starts_with("salsa") && self.trace_level <= Level::INFO {
+            // Salsa emits very verbose query traces with level info. Let's not show these to the user.
+            Level::WARN
         } else {
             Level::INFO
         };

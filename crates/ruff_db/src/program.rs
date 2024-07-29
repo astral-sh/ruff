@@ -1,6 +1,3 @@
-// TODO: Fix clippy warnings in Salsa macros
-#![allow(clippy::needless_lifetimes, clippy::clone_on_copy)]
-
 use crate::{system::SystemPathBuf, Db};
 
 #[salsa::input(singleton)]

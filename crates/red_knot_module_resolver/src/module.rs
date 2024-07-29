@@ -3,7 +3,6 @@ use std::sync::Arc;
 
 use ruff_db::files::File;
 
-use crate::db::Db;
 use crate::module_name::ModuleName;
 use crate::path::SearchPath;
 
@@ -57,17 +56,6 @@ impl std::fmt::Debug for Module {
             .field("name", &self.name())
             .field("kind", &self.kind())
             .field("file", &self.file())
-            .field("search_path", &self.search_path())
-            .finish()
-    }
-}
-
-impl salsa::DebugWithDb<dyn Db> for Module {
-    fn fmt(&self, f: &mut Formatter<'_>, db: &dyn Db) -> std::fmt::Result {
-        f.debug_struct("Module")
-            .field("name", &self.name())
-            .field("kind", &self.kind())
-            .field("file", &self.file().debug(db.upcast()))
             .field("search_path", &self.search_path())
             .finish()
     }

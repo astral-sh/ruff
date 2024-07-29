@@ -1,55 +1,23 @@
-use salsa::DbWithJar;
-
 use red_knot_module_resolver::Db as ResolverDb;
-use ruff_db::{Db as SourceDb, Upcast};
-
-use crate::builtins::builtins_scope;
-use crate::semantic_index::definition::Definition;
-use crate::semantic_index::expression::Expression;
-use crate::semantic_index::symbol::ScopeId;
-use crate::semantic_index::{global_scope, semantic_index, symbol_table, use_def_map};
-use crate::types::{
-    infer_definition_types, infer_expression_types, infer_scope_types, ClassType, FunctionType,
-    IntersectionType, UnionType,
-};
-
-#[salsa::jar(db=Db)]
-pub struct Jar(
-    ScopeId<'_>,
-    Definition<'_>,
-    Expression<'_>,
-    FunctionType<'_>,
-    ClassType<'_>,
-    UnionType<'_>,
-    IntersectionType<'_>,
-    symbol_table,
-    use_def_map,
-    global_scope,
-    semantic_index,
-    infer_definition_types,
-    infer_expression_types,
-    infer_scope_types,
-    builtins_scope,
-);
+use ruff_db::Upcast;
 
 /// Database giving access to semantic information about a Python program.
-pub trait Db: SourceDb + ResolverDb + DbWithJar<Jar> + Upcast<dyn ResolverDb> {}
+#[salsa::db]
+pub trait Db: ResolverDb + Upcast<dyn ResolverDb> {}
 
 #[cfg(test)]
 pub(crate) mod tests {
     use std::sync::Arc;
 
-    use salsa::DebugWithDb;
-
-    use red_knot_module_resolver::{vendored_typeshed_stubs, Db as ResolverDb, Jar as ResolverJar};
+    use red_knot_module_resolver::{vendored_typeshed_stubs, Db as ResolverDb};
     use ruff_db::files::Files;
     use ruff_db::system::{DbWithTestSystem, System, TestSystem};
     use ruff_db::vendored::VendoredFileSystem;
-    use ruff_db::{Db as SourceDb, Jar as SourceJar, Upcast};
+    use ruff_db::{Db as SourceDb, Upcast};
 
-    use super::{Db, Jar};
+    use super::Db;
 
-    #[salsa::db(Jar, ResolverJar, SourceJar)]
+    #[salsa::db]
     pub(crate) struct TestDb {
         storage: salsa::Storage<Self>,
         files: Files,
@@ -63,7 +31,7 @@ pub(crate) mod tests {
             Self {
                 storage: salsa::Storage::default(),
                 system: TestSystem::default(),
-                vendored: vendored_typeshed_stubs().snapshot(),
+                vendored: vendored_typeshed_stubs().clone(),
                 events: std::sync::Arc::default(),
                 files: Files::default(),
             }
@@ -99,6 +67,7 @@ pub(crate) mod tests {
         }
     }
 
+    #[salsa::db]
     impl SourceDb for TestDb {
         fn vendored(&self) -> &VendoredFileSystem {
             &self.vendored
@@ -131,26 +100,20 @@ pub(crate) mod tests {
         }
     }
 
+    #[salsa::db]
     impl red_knot_module_resolver::Db for TestDb {}
+
+    #[salsa::db]
     impl Db for TestDb {}
 
+    #[salsa::db]
     impl salsa::Database for TestDb {
         fn salsa_event(&self, event: salsa::Event) {
-            tracing::trace!("event: {:?}", event.debug(self));
-            let mut events = self.events.lock().unwrap();
-            events.push(event);
-        }
-    }
-
-    impl salsa::ParallelDatabase for TestDb {
-        fn snapshot(&self) -> salsa::Snapshot<Self> {
-            salsa::Snapshot::new(Self {
-                storage: self.storage.snapshot(),
-                files: self.files.snapshot(),
-                system: self.system.snapshot(),
-                vendored: self.vendored.snapshot(),
-                events: self.events.clone(),
-            })
+            self.attach(|_| {
+                tracing::trace!("event: {event:?}");
+                let mut events = self.events.lock().unwrap();
+                events.push(event);
+            });
         }
     }
 }
