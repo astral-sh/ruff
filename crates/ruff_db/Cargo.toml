@@ -24,7 +24,9 @@ countme = { workspace = true }
 dashmap = { workspace = true }
 filetime = { workspace = true }
 ignore = { workspace = true, optional = true }
+matchit = { workspace = true }
 salsa = { workspace = true }
+path-slash = { workspace = true }
 tracing = { workspace = true }
 rustc-hash = { workspace = true }
 zip = { workspace = true }

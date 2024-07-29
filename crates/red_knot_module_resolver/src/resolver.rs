@@ -4,7 +4,7 @@ use std::iter::FusedIterator;
 use once_cell::sync::Lazy;
 use rustc_hash::{FxBuildHasher, FxHashSet};
 
-use ruff_db::files::{File, FilePath};
+use ruff_db::files::{File, FilePath, FileRootKind};
 use ruff_db::program::{Program, SearchPathSettings, TargetVersion};
 use ruff_db::system::{DirectoryEntry, System, SystemPath, SystemPathBuf};
 use ruff_db::vendored::VendoredPath;
@@ -139,24 +139,33 @@ fn try_resolve_module_resolution_settings(
     }
 
     let system = db.system();
+    let files = db.files();
 
     let mut static_search_paths = vec![];
 
-    for path in extra_paths.iter().cloned() {
-        static_search_paths.push(SearchPath::extra(system, path)?);
+    for path in extra_paths {
+        files.try_add_root(db.upcast(), path, FileRootKind::LibrarySearchPath);
+        static_search_paths.push(SearchPath::extra(system, path.clone())?);
     }
 
     static_search_paths.push(SearchPath::first_party(system, workspace_root.clone())?);
 
     static_search_paths.push(if let Some(custom_typeshed) = custom_typeshed.as_ref() {
+        files.try_add_root(
+            db.upcast(),
+            custom_typeshed,
+            FileRootKind::LibrarySearchPath,
+        );
         SearchPath::custom_stdlib(db, custom_typeshed.clone())?
     } else {
         SearchPath::vendored_stdlib()
     });
 
     if let Some(site_packages) = site_packages {
+        files.try_add_root(db.upcast(), site_packages, FileRootKind::LibrarySearchPath);
+
         static_search_paths.push(SearchPath::site_packages(system, site_packages.clone())?);
-    }
+    };
 
     // TODO vendor typeshed's third-party stubs as well as the stdlib and fallback to them as a final step
 
@@ -197,62 +206,62 @@ pub(crate) fn module_resolution_settings(db: &dyn Db) -> ModuleResolutionSetting
 /// due to editable installations of third-party packages.
 #[salsa::tracked(return_ref)]
 pub(crate) fn editable_install_resolution_paths(db: &dyn Db) -> Vec<SearchPath> {
-    // This query needs to be re-executed each time a `.pth` file
-    // is added, modified or removed from the `site-packages` directory.
-    // However, we don't use Salsa queries to read the source text of `.pth` files;
-    // we use the APIs on the `System` trait directly. As such, for now we simply ask
-    // Salsa to recompute this query on each new revision.
-    //
-    // TODO: add some kind of watcher for the `site-packages` directory that looks
-    // for `site-packages/*.pth` files being added/modified/removed; get rid of this.
-    // When doing so, also make the test
-    // `deleting_pth_file_on_which_module_resolution_depends_invalidates_cache()`
-    // more principled!
-    db.report_untracked_read();
+    let settings = module_resolution_settings(db);
+    let static_search_paths = &settings.static_search_paths;
 
-    let static_search_paths = &module_resolution_settings(db).static_search_paths;
     let site_packages = static_search_paths
         .iter()
         .find(|path| path.is_site_packages());
 
+    let Some(site_packages) = site_packages else {
+        return Vec::new();
+    };
+
+    let site_packages = site_packages
+        .as_system_path()
+        .expect("Expected site-packages never to be a VendoredPath!");
+
     let mut dynamic_paths = Vec::default();
 
-    if let Some(site_packages) = site_packages {
-        let site_packages = site_packages
-            .as_system_path()
-            .expect("Expected site-packages never to be a VendoredPath!");
+    // This query needs to be re-executed each time a `.pth` file
+    // is added, modified or removed from the `site-packages` directory.
+    // However, we don't use Salsa queries to read the source text of `.pth` files;
+    // we use the APIs on the `System` trait directly. As such, add a dependency on the
+    // site-package directory's revision.
+    if let Some(site_packages_root) = db.files().root(db.upcast(), site_packages) {
+        let _ = site_packages_root.revision(db.upcast());
+    }
 
-        // As well as modules installed directly into `site-packages`,
-        // the directory may also contain `.pth` files.
-        // Each `.pth` file in `site-packages` may contain one or more lines
-        // containing a (relative or absolute) path.
-        // Each of these paths may point to an editable install of a package,
-        // so should be considered an additional search path.
-        let Ok(pth_file_iterator) = PthFileIterator::new(db, site_packages) else {
-            return dynamic_paths;
-        };
+    // As well as modules installed directly into `site-packages`,
+    // the directory may also contain `.pth` files.
+    // Each `.pth` file in `site-packages` may contain one or more lines
+    // containing a (relative or absolute) path.
+    // Each of these paths may point to an editable install of a package,
+    // so should be considered an additional search path.
+    let Ok(pth_file_iterator) = PthFileIterator::new(db, site_packages) else {
+        return dynamic_paths;
+    };
 
-        // The Python documentation specifies that `.pth` files in `site-packages`
-        // are processed in alphabetical order, so collecting and then sorting is necessary.
-        // https://docs.python.org/3/library/site.html#module-site
-        let mut all_pth_files: Vec<PthFile> = pth_file_iterator.collect();
-        all_pth_files.sort_by(|a, b| a.path.cmp(&b.path));
+    // The Python documentation specifies that `.pth` files in `site-packages`
+    // are processed in alphabetical order, so collecting and then sorting is necessary.
+    // https://docs.python.org/3/library/site.html#module-site
+    let mut all_pth_files: Vec<PthFile> = pth_file_iterator.collect();
+    all_pth_files.sort_by(|a, b| a.path.cmp(&b.path));
 
-        let mut existing_paths: FxHashSet<_> = static_search_paths
-            .iter()
-            .filter_map(|path| path.as_system_path())
-            .map(Cow::Borrowed)
-            .collect();
+    let mut existing_paths: FxHashSet<_> = static_search_paths
+        .iter()
+        .filter_map(|path| path.as_system_path())
+        .map(Cow::Borrowed)
+        .collect();
 
-        dynamic_paths.reserve(all_pth_files.len());
+    dynamic_paths.reserve(all_pth_files.len());
 
-        for pth_file in &all_pth_files {
-            for installation in pth_file.editable_installations() {
-                if existing_paths.insert(Cow::Owned(
-                    installation.as_system_path().unwrap().to_path_buf(),
-                )) {
-                    dynamic_paths.push(installation);
-                }
+    for pth_file in &all_pth_files {
+        for installation in pth_file.editable_installations() {
+            if existing_paths.insert(Cow::Owned(
+                installation.as_system_path().unwrap().to_path_buf(),
+            )) {
+                dynamic_paths.push(installation);
             }
         }
     }
@@ -397,9 +406,6 @@ pub(crate) struct ModuleResolutionSettings {
     target_version: TargetVersion,
     /// Search paths that have been statically determined purely from reading Ruff's configuration settings.
     /// These shouldn't ever change unless the config settings themselves change.
-    ///
-    /// Note that `site-packages` *is included* as a search path in this sequence,
-    /// but it is also stored separately so that we're able to find editable installs later.
     static_search_paths: Vec<SearchPath>,
 }
 
@@ -1599,18 +1605,7 @@ not_a_directory
             .remove_file(site_packages.join("_foo.pth"))
             .unwrap();
 
-        // Why are we touching a random file in the path that's been editably installed,
-        // rather than the `.pth` file, when the `.pth` file is the one that has been deleted?
-        // It's because the `.pth` file isn't directly tracked as a dependency by Salsa
-        // currently (we don't use `system_path_to_file()` to get the file, and we don't use
-        // `source_text()` to read the source of the file). Instead of using these APIs which
-        // would automatically add the existence and contents of the file as a Salsa-tracked
-        // dependency, we use `.report_untracked_read()` to force Salsa to re-parse all
-        // `.pth` files on each new "revision". Making a random modification to a tracked
-        // Salsa file forces a new revision.
-        //
-        // TODO: get rid of the `.report_untracked_read()` call...
-        File::sync_path(&mut db, SystemPath::new("/x/src/foo.py"));
+        File::sync_path(&mut db, &site_packages.join("_foo.pth"));
 
         assert_eq!(resolve_module(&db, foo_module_name.clone()), None);
     }
