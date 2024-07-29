@@ -84,7 +84,7 @@ impl Server {
         } = all_settings;
 
         crate::trace::init_tracing(
-            connection.make_sender(),
+            &connection.make_sender(),
             global_settings
                 .tracing
                 .log_level

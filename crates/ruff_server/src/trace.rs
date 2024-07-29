@@ -82,7 +82,7 @@ impl<'a> MakeWriter<'a> for TraceLogWriter {
 }
 
 pub(crate) fn init_tracing(
-    sender: ClientSender,
+    sender: &ClientSender,
     log_level: LogLevel,
     log_file: Option<&std::path::Path>,
     client: &Option<ClientInfo>,
