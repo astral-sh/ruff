@@ -135,7 +135,7 @@ pub(crate) fn non_self_return_type(
     };
 
     // PEP 673 forbids the use of `typing(_extensions).Self` in metaclasses.
-    if is_metaclass(class_def, semantic) {
+    if analyze::class::is_metaclass(class_def, semantic) {
         return;
     }
 
@@ -217,16 +217,6 @@ pub(crate) fn non_self_return_type(
         }
         _ => {}
     }
-}
-
-/// Returns `true` if the given class is a metaclass.
-fn is_metaclass(class_def: &ast::StmtClassDef, semantic: &SemanticModel) -> bool {
-    analyze::class::any_qualified_name(class_def, semantic, &|qualified_name| {
-        matches!(
-            qualified_name.segments(),
-            ["" | "builtins", "type"] | ["abc", "ABCMeta"] | ["enum", "EnumMeta" | "EnumType"]
-        )
-    })
 }
 
 /// Returns `true` if the method is an in-place binary operator.

@@ -5,6 +5,7 @@ use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast as ast;
 use ruff_python_ast::ParameterWithDefault;
 use ruff_python_codegen::Stylist;
+use ruff_python_semantic::analyze::class::is_metaclass;
 use ruff_python_semantic::analyze::function_type;
 use ruff_python_semantic::{Scope, ScopeKind, SemanticModel};
 use ruff_text_size::Ranged;
@@ -190,22 +191,34 @@ pub(crate) fn invalid_first_argument_name(
         panic!("Expected ScopeKind::Function")
     };
 
-    let Some(parent) = checker.semantic().first_non_type_parent_scope(scope) else {
+    let semantic = checker.semantic();
+
+    let Some(parent_scope) = semantic.first_non_type_parent_scope(scope) else {
+        return;
+    };
+
+    let ScopeKind::Class(parent) = parent_scope.kind else {
         return;
     };
 
     let function_type = match function_type::classify(
         name,
         decorator_list,
-        parent,
-        checker.semantic(),
+        parent_scope,
+        semantic,
         &checker.settings.pep8_naming.classmethod_decorators,
         &checker.settings.pep8_naming.staticmethod_decorators,
     ) {
         function_type::FunctionType::Function | function_type::FunctionType::StaticMethod => {
             return;
         }
-        function_type::FunctionType::Method => FunctionType::Method,
+        function_type::FunctionType::Method => {
+            if is_metaclass(parent, semantic) {
+                FunctionType::ClassMethod
+            } else {
+                FunctionType::Method
+            }
+        }
         function_type::FunctionType::ClassMethod => FunctionType::ClassMethod,
     };
     if !checker.enabled(function_type.rule()) {
