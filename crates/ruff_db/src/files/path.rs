@@ -95,8 +95,8 @@ impl FilePath {
     #[inline]
     pub fn to_file(&self, db: &dyn Db) -> Option<File> {
         match self {
-            FilePath::System(path) => system_path_to_file(db, path),
-            FilePath::Vendored(path) => vendored_path_to_file(db, path),
+            FilePath::System(path) => system_path_to_file(db, path).ok(),
+            FilePath::Vendored(path) => vendored_path_to_file(db, path).ok(),
             FilePath::SystemVirtual(_) => None,
         }
     }

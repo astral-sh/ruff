@@ -1,6 +1,7 @@
 use std::fmt::Formatter;
 
 use path_slash::PathExt;
+use salsa::Durability;
 
 use crate::file_revision::FileRevision;
 use crate::system::{SystemPath, SystemPathBuf};
@@ -83,7 +84,9 @@ impl FileRoots {
         let mut route = normalized_path.replace('{', "{{").replace('}', "}}");
 
         // Insert a new source root
-        let root = FileRoot::new(db, path, kind, FileRevision::now());
+        let root = FileRoot::builder(path, kind, FileRevision::now())
+            .durability(Durability::HIGH)
+            .new(db);
 
         // Insert a path that matches the root itself
         self.by_path.insert(route.clone(), root).unwrap();

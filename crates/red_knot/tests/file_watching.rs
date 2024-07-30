@@ -10,7 +10,7 @@ use red_knot::watch;
 use red_knot::watch::{directory_watcher, WorkspaceWatcher};
 use red_knot::workspace::WorkspaceMetadata;
 use red_knot_module_resolver::{resolve_module, ModuleName};
-use ruff_db::files::{system_path_to_file, File};
+use ruff_db::files::{system_path_to_file, File, FileError};
 use ruff_db::program::{Program, ProgramSettings, SearchPathSettings, TargetVersion};
 use ruff_db::source::source_text;
 use ruff_db::system::{OsSystem, SystemPath, SystemPathBuf};
@@ -82,7 +82,7 @@ impl TestCase {
         collected
     }
 
-    fn system_file(&self, path: impl AsRef<SystemPath>) -> Option<File> {
+    fn system_file(&self, path: impl AsRef<SystemPath>) -> Result<File, FileError> {
         system_path_to_file(self.db(), path.as_ref())
     }
 }
@@ -190,7 +190,7 @@ fn new_file() -> anyhow::Result<()> {
     let bar_file = case.system_file(&bar_path).unwrap();
     let foo_path = case.workspace_path("foo.py");
 
-    assert_eq!(case.system_file(&foo_path), None);
+    assert_eq!(case.system_file(&foo_path), Err(FileError::NotFound));
     assert_eq!(&case.collect_package_files(&bar_path), &[bar_file]);
 
     std::fs::write(foo_path.as_std_path(), "print('Hello')")?;
@@ -213,7 +213,7 @@ fn new_ignored_file() -> anyhow::Result<()> {
     let bar_file = case.system_file(&bar_path).unwrap();
     let foo_path = case.workspace_path("foo.py");
 
-    assert_eq!(case.system_file(&foo_path), None);
+    assert_eq!(case.system_file(&foo_path), Err(FileError::NotFound));
     assert_eq!(&case.collect_package_files(&bar_path), &[bar_file]);
 
     std::fs::write(foo_path.as_std_path(), "print('Hello')")?;
@@ -222,7 +222,7 @@ fn new_ignored_file() -> anyhow::Result<()> {
 
     case.db_mut().apply_changes(changes);
 
-    assert!(case.system_file(&foo_path).is_some());
+    assert!(case.system_file(&foo_path).is_ok());
     assert_eq!(&case.collect_package_files(&bar_path), &[bar_file]);
 
     Ok(())
@@ -234,9 +234,7 @@ fn changed_file() -> anyhow::Result<()> {
     let mut case = setup([("foo.py", foo_source)])?;
     let foo_path = case.workspace_path("foo.py");
 
-    let foo = case
-        .system_file(&foo_path)
-        .ok_or_else(|| anyhow!("Foo not found"))?;
+    let foo = case.system_file(&foo_path)?;
     assert_eq!(source_text(case.db(), foo).as_str(), foo_source);
     assert_eq!(&case.collect_package_files(&foo_path), &[foo]);
 
@@ -260,9 +258,7 @@ fn changed_metadata() -> anyhow::Result<()> {
     let mut case = setup([("foo.py", "")])?;
     let foo_path = case.workspace_path("foo.py");
 
-    let foo = case
-        .system_file(&foo_path)
-        .ok_or_else(|| anyhow!("Foo not found"))?;
+    let foo = case.system_file(&foo_path)?;
     assert_eq!(
         foo.permissions(case.db()),
         Some(
@@ -302,9 +298,7 @@ fn deleted_file() -> anyhow::Result<()> {
     let mut case = setup([("foo.py", foo_source)])?;
     let foo_path = case.workspace_path("foo.py");
 
-    let foo = case
-        .system_file(&foo_path)
-        .ok_or_else(|| anyhow!("Foo not found"))?;
+    let foo = case.system_file(&foo_path)?;
 
     assert!(foo.exists(case.db()));
     assert_eq!(&case.collect_package_files(&foo_path), &[foo]);
@@ -333,9 +327,7 @@ fn move_file_to_trash() -> anyhow::Result<()> {
     let trash_path = case.root_path().join(".trash");
     std::fs::create_dir_all(trash_path.as_std_path())?;
 
-    let foo = case
-        .system_file(&foo_path)
-        .ok_or_else(|| anyhow!("Foo not found"))?;
+    let foo = case.system_file(&foo_path)?;
 
     assert!(foo.exists(case.db()));
     assert_eq!(&case.collect_package_files(&foo_path), &[foo]);
@@ -367,7 +359,7 @@ fn move_file_to_workspace() -> anyhow::Result<()> {
 
     let foo_in_workspace_path = case.workspace_path("foo.py");
 
-    assert!(case.system_file(&foo_path).is_some());
+    assert!(case.system_file(&foo_path).is_ok());
     assert_eq!(&case.collect_package_files(&bar_path), &[bar]);
     assert!(case
         .db()
@@ -381,9 +373,7 @@ fn move_file_to_workspace() -> anyhow::Result<()> {
 
     case.db_mut().apply_changes(changes);
 
-    let foo_in_workspace = case
-        .system_file(&foo_in_workspace_path)
-        .ok_or_else(|| anyhow!("Foo not found"))?;
+    let foo_in_workspace = case.system_file(&foo_in_workspace_path)?;
 
     assert!(foo_in_workspace.exists(case.db()));
     assert_eq!(
@@ -401,9 +391,7 @@ fn rename_file() -> anyhow::Result<()> {
     let foo_path = case.workspace_path("foo.py");
     let bar_path = case.workspace_path("bar.py");
 
-    let foo = case
-        .system_file(&foo_path)
-        .ok_or_else(|| anyhow!("Foo not found"))?;
+    let foo = case.system_file(&foo_path)?;
 
     assert_eq!(case.collect_package_files(&foo_path), [foo]);
 
@@ -415,9 +403,7 @@ fn rename_file() -> anyhow::Result<()> {
 
     assert!(!foo.exists(case.db()));
 
-    let bar = case
-        .system_file(&bar_path)
-        .ok_or_else(|| anyhow!("Bar not found"))?;
+    let bar = case.system_file(&bar_path)?;
 
     assert!(bar.exists(case.db()));
     assert_eq!(case.collect_package_files(&foo_path), [bar]);

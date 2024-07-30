@@ -47,6 +47,10 @@ impl PackageFiles {
         }
     }
 
+    pub fn is_lazy(&self) -> bool {
+        matches!(*self.state.lock().unwrap(), State::Lazy)
+    }
+
     /// Returns a mutable view on the index that allows cheap in-place mutations.
     ///
     /// The changes are automatically written back to the database once the view is dropped.

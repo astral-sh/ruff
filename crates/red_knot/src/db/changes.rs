@@ -173,7 +173,7 @@ impl RootDatabase {
                 let package = workspace.package(self, &path);
                 let file = system_path_to_file(self, &path);
 
-                if let (Some(package), Some(file)) = (package, file) {
+                if let (Some(package), Ok(file)) = (package, file) {
                     package.add_file(self, file);
                 }
             }
