@@ -74,7 +74,10 @@ pub fn is_property(
             .is_some_and(|qualified_name| {
                 matches!(
                     qualified_name.segments(),
-                    ["" | "builtins", "property"] | ["functools", "cached_property"]
+                    ["" | "builtins" | "enum", "property"]
+                        | ["functools", "cached_property"]
+                        | ["abc", "abstractproperty"]
+                        | ["types", "DynamicClassAttribute"]
                 ) || extra_properties
                     .iter()
                     .any(|extra_property| extra_property.segments() == qualified_name.segments())
