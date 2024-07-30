@@ -324,8 +324,8 @@ impl fmt::Display for SearchPathValidationError {
             Self::NoStdlibSubdirectory(path) => {
                 write!(f, "The directory at {path} has no `stdlib/` subdirectory")
             }
-            Self::NoVersionsFile(path) => write!(f, "Expected a file at {path}/stldib/VERSIONS"),
-            Self::VersionsIsADirectory(path) => write!(f, "{path}/stldib/VERSIONS is a directory."),
+            Self::NoVersionsFile(path) => write!(f, "Expected a file at {path}/stdlib/VERSIONS"),
+            Self::VersionsIsADirectory(path) => write!(f, "{path}/stdlib/VERSIONS is a directory."),
             Self::VersionsParseError(underlying_error) => underlying_error.fmt(f),
         }
     }
