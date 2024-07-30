@@ -183,6 +183,15 @@ where
     Ok(test_case)
 }
 
+/// The precision of the last modified time is platform dependent and not arbitrarily precise.
+/// This method sets the current thread to sleep for a duration that
+/// is larger than the [last-modified precision on all platforms](https://doc.rust-lang.org/nightly/std/time/struct.SystemTime.html#platform-specific-behavior).
+///
+/// Calling the function is only necessary when making changes to an **existing** file.
+fn next_io_tick() {
+    std::thread::sleep(Duration::from_nanos(200));
+}
+
 #[test]
 fn new_file() -> anyhow::Result<()> {
     let mut case = setup([("bar.py", "")])?;
@@ -238,6 +247,7 @@ fn changed_file() -> anyhow::Result<()> {
     assert_eq!(source_text(case.db(), foo).as_str(), foo_source);
     assert_eq!(&case.collect_package_files(&foo_path), &[foo]);
 
+    next_io_tick();
     std::fs::write(foo_path.as_std_path(), "print('Version 2')")?;
 
     let changes = case.stop_watch();
@@ -269,6 +279,7 @@ fn changed_metadata() -> anyhow::Result<()> {
         )
     );
 
+    next_io_tick();
     std::fs::set_permissions(
         foo_path.as_std_path(),
         std::fs::Permissions::from_mode(0o777),
