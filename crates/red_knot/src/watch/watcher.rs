@@ -240,7 +240,7 @@ impl Debouncer {
                 }
 
                 ModifyKind::Data(_) => ChangeEvent::Changed {
-                    kind: ChangedKind::FileMetadata,
+                    kind: ChangedKind::FileContent,
                     path,
                 },
 
