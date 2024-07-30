@@ -5,7 +5,7 @@ use std::sync::Arc;
 
 use camino::{Utf8Path, Utf8PathBuf};
 
-use ruff_db::files::{system_path_to_file, vendored_path_to_file, File, SystemPathError};
+use ruff_db::files::{system_path_to_file, vendored_path_to_file, File, FileError};
 use ruff_db::system::{System, SystemPath, SystemPathBuf};
 use ruff_db::vendored::{VendoredPath, VendoredPathBuf};
 
@@ -70,7 +70,7 @@ impl ModulePath {
             | SearchPathInner::SitePackages(search_path)
             | SearchPathInner::Editable(search_path) => {
                 system_path_to_file(resolver.db.upcast(), search_path.join(relative_path))
-                    == Err(SystemPathError::IsADirectory)
+                    == Err(FileError::IsADirectory)
             }
             SearchPathInner::StandardLibraryCustom(stdlib_root) => {
                 match query_stdlib_version(Some(stdlib_root), relative_path, resolver) {
@@ -78,7 +78,7 @@ impl ModulePath {
                     TypeshedVersionsQueryResult::Exists
                     | TypeshedVersionsQueryResult::MaybeExists => {
                         system_path_to_file(resolver.db.upcast(), stdlib_root.join(relative_path))
-                            == Err(SystemPathError::IsADirectory)
+                            == Err(FileError::IsADirectory)
                     }
                 }
             }
@@ -162,7 +162,7 @@ impl ModulePath {
                     TypeshedVersionsQueryResult::DoesNotExist => None,
                     TypeshedVersionsQueryResult::Exists
                     | TypeshedVersionsQueryResult::MaybeExists => {
-                        vendored_path_to_file(db, stdlib_root.join(relative_path))
+                        vendored_path_to_file(db, stdlib_root.join(relative_path)).ok()
                     }
                 }
             }
@@ -302,10 +302,14 @@ pub(crate) enum SearchPathValidationError {
     /// (This is only relevant for stdlib search paths.)
     NoStdlibSubdirectory(SystemPathBuf),
 
-    /// The path provided by the user is a directory,
+    /// The typeshed path provided by the user is a directory,
     /// but no `stdlib/VERSIONS` file exists.
     /// (This is only relevant for stdlib search paths.)
     NoVersionsFile(SystemPathBuf),
+
+    /// `stdlib/VERSIONS` is a directory.
+    /// (This is only relevant for stdlib search paths.)
+    VersionsIsADirectory(SystemPathBuf),
 
     /// The path provided by the user is a directory,
     /// and a `stdlib/VERSIONS` file exists, but it fails to parse.
@@ -321,6 +325,7 @@ impl fmt::Display for SearchPathValidationError {
                 write!(f, "The directory at {path} has no `stdlib/` subdirectory")
             }
             Self::NoVersionsFile(path) => write!(f, "Expected a file at {path}/stldib/VERSIONS"),
+            Self::VersionsIsADirectory(path) => write!(f, "{path}/stldib/VERSIONS is a directory."),
             Self::VersionsParseError(underlying_error) => underlying_error.fmt(f),
         }
     }
@@ -409,10 +414,13 @@ impl SearchPath {
                 typeshed.to_path_buf(),
             ));
         }
-        let Ok(typeshed_versions) = system_path_to_file(db.upcast(), stdlib.join("VERSIONS"))
-        else {
-            return Err(SearchPathValidationError::NoVersionsFile(typeshed));
-        };
+        let typeshed_versions =
+            system_path_to_file(db.upcast(), stdlib.join("VERSIONS")).map_err(|err| match err {
+                FileError::NotFound => SearchPathValidationError::NoVersionsFile(typeshed),
+                FileError::IsADirectory => {
+                    SearchPathValidationError::VersionsIsADirectory(typeshed)
+                }
+            })?;
         crate::typeshed::parse_typeshed_versions(db, typeshed_versions)
             .as_ref()
             .map_err(|validation_error| {

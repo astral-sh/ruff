@@ -14,7 +14,7 @@ use crate::files::file_root::FileRoots;
 use crate::files::private::FileStatus;
 use crate::system::{Metadata, SystemPath, SystemPathBuf, SystemVirtualPath, SystemVirtualPathBuf};
 use crate::vendored::{VendoredPath, VendoredPathBuf};
-use crate::{Db, FxDashMap};
+use crate::{vendored, Db, FxDashMap};
 
 mod file_root;
 mod path;
@@ -23,10 +23,7 @@ mod path;
 ///
 /// Returns `Err` if the path doesn't exist, isn't accessible, or if the path points to a directory.
 #[inline]
-pub fn system_path_to_file(
-    db: &dyn Db,
-    path: impl AsRef<SystemPath>,
-) -> Result<File, SystemPathError> {
+pub fn system_path_to_file(db: &dyn Db, path: impl AsRef<SystemPath>) -> Result<File, FileError> {
     let file = db.files().system(db, path.as_ref());
 
     // It's important that `vfs.file_system` creates a `VfsFile` even for files that don't exist or don't
@@ -35,14 +32,17 @@ pub fn system_path_to_file(
     // re-run the calling query whenever the `file`'s status changes (because of the `.status` call here).
     match file.status(db) {
         FileStatus::Exists => Ok(file),
-        FileStatus::IsADirectory => Err(SystemPathError::IsADirectory),
-        FileStatus::NotFound => Err(SystemPathError::NotFound),
+        FileStatus::IsADirectory => Err(FileError::IsADirectory),
+        FileStatus::NotFound => Err(FileError::NotFound),
     }
 }
 
 /// Interns a vendored file path. Returns `Some` if the vendored file for `path` exists and `None` otherwise.
 #[inline]
-pub fn vendored_path_to_file(db: &dyn Db, path: impl AsRef<VendoredPath>) -> Option<File> {
+pub fn vendored_path_to_file(
+    db: &dyn Db,
+    path: impl AsRef<VendoredPath>,
+) -> Result<File, FileError> {
     db.files().vendored(db, path.as_ref())
 }
 
@@ -127,11 +127,17 @@ impl Files {
     /// Looks up a vendored file by its path. Returns `Some` if a vendored file for the given path
     /// exists and `None` otherwise.
     #[tracing::instrument(level = "trace", skip(self, db))]
-    fn vendored(&self, db: &dyn Db, path: &VendoredPath) -> Option<File> {
+    fn vendored(&self, db: &dyn Db, path: &VendoredPath) -> Result<File, FileError> {
         let file = match self.inner.vendored_by_path.entry(path.to_path_buf()) {
             Entry::Occupied(entry) => *entry.get(),
             Entry::Vacant(entry) => {
-                let metadata = db.vendored().metadata(path).ok()?;
+                let metadata = match db.vendored().metadata(path) {
+                    Ok(metadata) => match metadata.kind() {
+                        vendored::FileType::File => metadata,
+                        vendored::FileType::Directory => return Err(FileError::IsADirectory),
+                    },
+                    Err(_) => return Err(FileError::NotFound),
+                };
 
                 let file = File::builder(
                     FilePath::Vendored(path.to_path_buf()),
@@ -149,7 +155,7 @@ impl Files {
             }
         };
 
-        Some(file)
+        Ok(file)
     }
 
     /// Looks up a virtual file by its `path`.
@@ -450,26 +456,26 @@ mod private {
 }
 
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
-pub enum SystemPathError {
+pub enum FileError {
     IsADirectory,
     NotFound,
 }
 
-impl std::fmt::Display for SystemPathError {
+impl std::fmt::Display for FileError {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match self {
-            SystemPathError::IsADirectory => f.write_str("Is a directory"),
-            SystemPathError::NotFound => f.write_str("Not found"),
+            FileError::IsADirectory => f.write_str("Is a directory"),
+            FileError::NotFound => f.write_str("Not found"),
         }
     }
 }
 
-impl std::error::Error for SystemPathError {}
+impl std::error::Error for FileError {}
 
 #[cfg(test)]
 mod tests {
     use crate::file_revision::FileRevision;
-    use crate::files::{system_path_to_file, vendored_path_to_file, SystemPathError};
+    use crate::files::{system_path_to_file, vendored_path_to_file, FileError};
     use crate::system::DbWithTestSystem;
     use crate::tests::TestDb;
     use crate::vendored::tests::VendoredFileSystemBuilder;
@@ -495,7 +501,7 @@ mod tests {
 
         let test = system_path_to_file(&db, "test.py");
 
-        assert_eq!(test, Err(SystemPathError::NotFound));
+        assert_eq!(test, Err(FileError::NotFound));
     }
 
     #[test]
@@ -537,6 +543,9 @@ mod tests {
     fn stubbed_vendored_file_non_existing() {
         let db = TestDb::new();
 
-        assert_eq!(vendored_path_to_file(&db, "test.py"), None);
+        assert_eq!(
+            vendored_path_to_file(&db, "test.py"),
+            Err(FileError::NotFound)
+        );
     }
 }

@@ -10,7 +10,7 @@ use red_knot::watch;
 use red_knot::watch::{directory_watcher, WorkspaceWatcher};
 use red_knot::workspace::WorkspaceMetadata;
 use red_knot_module_resolver::{resolve_module, ModuleName};
-use ruff_db::files::{system_path_to_file, File, SystemPathError};
+use ruff_db::files::{system_path_to_file, File, FileError};
 use ruff_db::program::{Program, ProgramSettings, SearchPathSettings, TargetVersion};
 use ruff_db::source::source_text;
 use ruff_db::system::{OsSystem, SystemPath, SystemPathBuf};
@@ -82,7 +82,7 @@ impl TestCase {
         collected
     }
 
-    fn system_file(&self, path: impl AsRef<SystemPath>) -> Result<File, SystemPathError> {
+    fn system_file(&self, path: impl AsRef<SystemPath>) -> Result<File, FileError> {
         system_path_to_file(self.db(), path.as_ref())
     }
 }
@@ -190,7 +190,7 @@ fn new_file() -> anyhow::Result<()> {
     let bar_file = case.system_file(&bar_path).unwrap();
     let foo_path = case.workspace_path("foo.py");
 
-    assert_eq!(case.system_file(&foo_path), Err(SystemPathError::NotFound));
+    assert_eq!(case.system_file(&foo_path), Err(FileError::NotFound));
     assert_eq!(&case.collect_package_files(&bar_path), &[bar_file]);
 
     std::fs::write(foo_path.as_std_path(), "print('Hello')")?;
@@ -213,7 +213,7 @@ fn new_ignored_file() -> anyhow::Result<()> {
     let bar_file = case.system_file(&bar_path).unwrap();
     let foo_path = case.workspace_path("foo.py");
 
-    assert_eq!(case.system_file(&foo_path), Err(SystemPathError::NotFound));
+    assert_eq!(case.system_file(&foo_path), Err(FileError::NotFound));
     assert_eq!(&case.collect_package_files(&bar_path), &[bar_file]);
 
     std::fs::write(foo_path.as_std_path(), "print('Hello')")?;

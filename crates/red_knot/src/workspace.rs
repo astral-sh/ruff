@@ -106,7 +106,7 @@ impl Workspace {
         }
 
         Workspace::builder(metadata.root, None, packages)
-            .durability(Durability::HIGH)
+            .durability(Durability::MEDIUM)
             .new(db)
     }
 
@@ -139,7 +139,7 @@ impl Workspace {
         }
 
         self.set_package_tree(db)
-            .with_durability(Durability::HIGH)
+            .with_durability(Durability::MEDIUM)
             .to(new_packages);
     }
 
@@ -310,7 +310,7 @@ impl Package {
 
     fn from_metadata(db: &dyn Db, metadata: PackageMetadata) -> Self {
         Self::builder(metadata.name, metadata.root, PackageFiles::default())
-            .durability(Durability::HIGH)
+            .durability(Durability::MEDIUM)
             .new(db)
     }
 
@@ -320,7 +320,7 @@ impl Package {
 
         if self.name(db) != metadata.name() {
             self.set_name(db)
-                .with_durability(Durability::HIGH)
+                .with_durability(Durability::MEDIUM)
                 .to(metadata.name);
         }
     }
