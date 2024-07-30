@@ -38,3 +38,12 @@ class VariadicParameters:
     @property
     def attribute_var_kwargs(self, **kwargs):  #[property-with-parameters]
         return {key: value * 2 for key, value in kwargs.items()}
+
+
+from functools import cached_property
+
+
+class Cached:
+    @cached_property
+    def cached_prop(self, value):  # [property-with-parameters]
+        ...

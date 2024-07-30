@@ -42,3 +42,12 @@ property_with_parameters.py:39:9: PLR0206 Cannot have defined parameters for pro
    |         ^^^^^^^^^^^^^^^^^^^^ PLR0206
 40 |         return {key: value * 2 for key, value in kwargs.items()}
    |
+
+property_with_parameters.py:48:9: PLR0206 Cannot have defined parameters for properties
+   |
+46 | class Cached:
+47 |     @cached_property
+48 |     def cached_prop(self, value):  # [property-with-parameters]
+   |         ^^^^^^^^^^^ PLR0206
+49 |         ...
+   |
