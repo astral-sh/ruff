@@ -180,8 +180,8 @@ fn is_type(expr: &Expr, semantic: &SemanticModel) -> bool {
 /// Returns `true` if the [`Expr`] appears to be a reference to a NumPy dtype, since:
 /// > `dtype` are a bit of a strange beast, but definitely best thought of as instances, not
 /// > classes, and they are meant to be comparable not just to their own class, but also to the
-/// corresponding scalar types (e.g., `x.dtype == np.float32`) and strings (e.g.,
-/// `x.dtype == ['i1,i4']`; basically, __eq__ always tries to do `dtype(other)`).
+/// > corresponding scalar types (e.g., `x.dtype == np.float32`) and strings (e.g.,
+/// > `x.dtype == ['i1,i4']`; basically, __eq__ always tries to do `dtype(other)`).
 fn is_dtype(expr: &Expr, semantic: &SemanticModel) -> bool {
     match expr {
         // Ex) `np.dtype(obj)`

@@ -156,6 +156,7 @@ zip = { version = "0.6.6", default-features = false, features = ["zstd"] }
 [workspace.lints.rust]
 unsafe_code = "warn"
 unreachable_pub = "warn"
+unexpected_cfgs = { level = "warn", check-cfg = ['cfg(fuzzing)'] }
 
 [workspace.lints.clippy]
 pedantic = { level = "warn", priority = -2 }

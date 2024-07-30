@@ -785,7 +785,7 @@ impl AstNode for ast::StmtFunctionDef {
 
         visitor.visit_parameters(parameters);
 
-        for expr in returns {
+        if let Some(expr) = returns {
             visitor.visit_annotation(expr);
         }
 
