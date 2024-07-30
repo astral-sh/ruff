@@ -5,7 +5,7 @@ use anyhow::Result;
 use ruff_diagnostics::{AlwaysFixableViolation, FixAvailability, Violation};
 use ruff_diagnostics::{Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::helpers::{is_const_false, is_const_true, map_callable};
+use ruff_python_ast::helpers::{is_const_false, is_const_true};
 use ruff_python_ast::stmt_if::elif_else_range;
 use ruff_python_ast::visitor::Visitor;
 use ruff_python_ast::whitespace::indentation;
@@ -373,18 +373,11 @@ fn unnecessary_return_none(checker: &mut Checker, decorator_list: &[Decorator], 
             continue;
         }
 
-        // Skip properties and cached properties.
-        if decorator_list.iter().any(|decorator| {
-            checker
-                .semantic()
-                .resolve_qualified_name(map_callable(&decorator.expression))
-                .is_some_and(|qualified_name| {
-                    matches!(
-                        qualified_name.segments(),
-                        ["" | "builtins", "property"] | ["functools", "cached_property"]
-                    )
-                })
-        }) {
+        // Skip properties and other stdlib property-like decorators.
+        if decorator_list
+            .iter()
+            .any(|decorator| is_property_like_decorator(decorator, checker.semantic()))
+        {
             return;
         }
 
@@ -395,6 +388,25 @@ fn unnecessary_return_none(checker: &mut Checker, decorator_list: &[Decorator], 
         )));
         checker.diagnostics.push(diagnostic);
     }
+}
+
+/// Determine whether `decorator` is `@property`,
+/// or another stdlib decorator similar to `@property.
+///
+/// TODO: be more principled here once we have type inference;
+/// hardcoding these is a little hacky.
+fn is_property_like_decorator(decorator: &Decorator, semantic: &SemanticModel) -> bool {
+    semantic
+        .resolve_qualified_name(&decorator.expression)
+        .is_some_and(|qualified_name| {
+            matches!(
+                qualified_name.segments(),
+                ["" | "builtins" | "enum", "property"]
+                    | ["functools", "cached_property"]
+                    | ["abc", "abstractproperty"]
+                    | ["types", "DynamicClassAttribute"]
+            )
+        })
 }
 
 /// RET502
