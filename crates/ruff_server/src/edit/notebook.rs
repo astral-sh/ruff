@@ -114,10 +114,20 @@ impl NotebookDocument {
                 let start = structure.array.start as usize;
                 let delete = structure.array.delete_count as usize;
 
+                // This is required because of the way the `NotebookCell` is modelled. We include
+                // the `TextDocument` within the `NotebookCell` so when it's deleted, the
+                // corresponding `TextDocument` is removed as well. But, when cells are
+                // re-oredered, the change request doesn't provide the actual contents of the cell.
+                // Instead, it only provides that (a) these cell URIs were removed, and (b) these
+                // cell URIs were added.
+                // https://github.com/astral-sh/ruff/issues/12573
+                let mut deleted_cells = FxHashMap::default();
+
                 // First, delete the cells and remove them from the index.
                 if delete > 0 {
                     for cell in self.cells.drain(start..start + delete) {
                         self.cell_index.remove(&cell.url);
+                        deleted_cells.insert(cell.url, cell.document);
                     }
                 }
 
@@ -125,8 +135,17 @@ impl NotebookDocument {
                 // provide the actual contents of the cells, so we'll initialize them with empty
                 // contents.
                 for cell in structure.array.cells.into_iter().flatten().rev() {
-                    self.cells
-                        .insert(start, NotebookCell::new(cell, String::new(), 0));
+                    if let Some(text_document) = deleted_cells.remove(&cell.document) {
+                        let version = text_document.version();
+                        self.cells.push(NotebookCell::new(
+                            cell,
+                            text_document.into_contents(),
+                            version,
+                        ));
+                    } else {
+                        self.cells
+                            .insert(start, NotebookCell::new(cell, String::new(), 0));
+                    }
                 }
 
                 // Third, register the new cells in the index and update existing ones that came

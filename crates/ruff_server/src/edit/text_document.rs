@@ -32,6 +32,10 @@ impl TextDocument {
         }
     }
 
+    pub fn into_contents(self) -> String {
+        self.contents
+    }
+
     pub fn contents(&self) -> &str {
         &self.contents
     }
