@@ -3729,20 +3729,6 @@ impl fmt::Display for IpyEscapeKind {
 }
 
 impl IpyEscapeKind {
-    /// Returns the length of the escape kind token.
-    pub fn prefix_len(self) -> TextSize {
-        let len = match self {
-            IpyEscapeKind::Shell
-            | IpyEscapeKind::Magic
-            | IpyEscapeKind::Help
-            | IpyEscapeKind::Quote
-            | IpyEscapeKind::Quote2
-            | IpyEscapeKind::Paren => 1,
-            IpyEscapeKind::ShCap | IpyEscapeKind::Magic2 | IpyEscapeKind::Help2 => 2,
-        };
-        len.into()
-    }
-
     /// Returns `true` if the escape kind is help i.e., `?` or `??`.
     pub const fn is_help(self) -> bool {
         matches!(self, IpyEscapeKind::Help | IpyEscapeKind::Help2)
