@@ -119,7 +119,7 @@ fn function_def_visit_preorder_except_body<'a, V>(
 
     visitor.visit_parameters(parameters);
 
-    for expr in returns {
+    if let Some(expr) = returns {
         visitor.visit_annotation(expr);
     }
 }

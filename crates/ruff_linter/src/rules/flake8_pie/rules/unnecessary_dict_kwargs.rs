@@ -58,7 +58,7 @@ impl Violation for UnnecessaryDictKwargs {
 /// PIE804
 pub(crate) fn unnecessary_dict_kwargs(checker: &mut Checker, call: &ast::ExprCall) {
     let mut duplicate_keywords = None;
-    for keyword in call.arguments.keywords.iter() {
+    for keyword in &*call.arguments.keywords {
         // keyword is a spread operator (indicated by None).
         if keyword.arg.is_some() {
             continue;
@@ -152,7 +152,7 @@ fn duplicates(call: &ast::ExprCall) -> FxHashSet<&str> {
         FxHashSet::with_capacity_and_hasher(call.arguments.keywords.len(), FxBuildHasher);
     let mut duplicates =
         FxHashSet::with_capacity_and_hasher(call.arguments.keywords.len(), FxBuildHasher);
-    for keyword in call.arguments.keywords.iter() {
+    for keyword in &*call.arguments.keywords {
         if let Some(name) = &keyword.arg {
             if !seen.insert(name.as_str()) {
                 duplicates.insert(name.as_str());

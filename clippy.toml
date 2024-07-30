@@ -11,3 +11,11 @@ doc-valid-idents = [
   "SQLAlchemy",
   "StackOverflow",
 ]
+
+ignore-interior-mutability = [
+  # Interned is read-only. The wrapped `Rc` never gets updated.
+  "ruff_formatter::format_element::Interned",
+  
+  # The expression is read-only. 
+  "ruff_python_ast::hashable::HashableExpr",
+]
