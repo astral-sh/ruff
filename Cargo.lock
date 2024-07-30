@@ -1944,6 +1944,7 @@ dependencies = [
  "countme",
  "crossbeam",
  "ctrlc",
+ "filetime",
  "notify",
  "rayon",
  "red_knot_module_resolver",
