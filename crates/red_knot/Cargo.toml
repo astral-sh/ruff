@@ -27,6 +27,7 @@ notify = { workspace = true }
 rayon = { workspace = true }
 rustc-hash = { workspace = true }
 salsa = { workspace = true }
+filetime = { workspace = true }
 tracing = { workspace = true }
 tracing-subscriber = { workspace = true }
 tracing-tree = { workspace = true }
