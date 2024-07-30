@@ -6,12 +6,14 @@ use ruff_diagnostics::{AlwaysFixableViolation, FixAvailability, Violation};
 use ruff_diagnostics::{Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::helpers::{is_const_false, is_const_true};
+use ruff_python_ast::name::QualifiedName;
 use ruff_python_ast::stmt_if::elif_else_range;
 use ruff_python_ast::visitor::Visitor;
 use ruff_python_ast::whitespace::indentation;
 use ruff_python_ast::{self as ast, Decorator, ElifElseClause, Expr, Stmt};
 use ruff_python_codegen::Stylist;
 use ruff_python_index::Indexer;
+use ruff_python_semantic::analyze::visibility::is_property;
 use ruff_python_semantic::SemanticModel;
 use ruff_python_trivia::{is_python_whitespace, SimpleTokenKind, SimpleTokenizer};
 use ruff_source_file::Locator;
@@ -373,12 +375,20 @@ fn unnecessary_return_none(checker: &mut Checker, decorator_list: &[Decorator], 
             continue;
         }
 
-        // Skip properties.
-        if decorator_list.iter().any(|decorator| {
-            checker
-                .semantic()
-                .match_builtin_expr(&decorator.expression, "property")
-        }) {
+        let extra_property_decorators = checker
+            .settings
+            .pydocstyle
+            .property_decorators
+            .iter()
+            .map(|decorator| QualifiedName::from_dotted_name(decorator))
+            .collect::<Vec<QualifiedName>>();
+
+        // Skip property functions
+        if is_property(
+            decorator_list,
+            &extra_property_decorators,
+            checker.semantic(),
+        ) {
             return;
         }
 

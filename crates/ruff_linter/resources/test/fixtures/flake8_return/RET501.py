@@ -17,3 +17,13 @@ class BaseCache:
     def prop(self) -> None:
         print("Property not found")
         return None
+
+
+from functools import cached_property
+
+
+class BaseCache2:
+    @cached_property
+    def prop(self) -> None:
+        print("Property not found")
+        return None
