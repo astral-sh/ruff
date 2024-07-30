@@ -391,7 +391,7 @@ fn unnecessary_return_none(checker: &mut Checker, decorator_list: &[Decorator], 
 }
 
 /// Determine whether `decorator` is `@property`,
-/// or another stdlib decorator similar to `@property.
+/// or another stdlib decorator similar to `@property`.
 ///
 /// TODO: be more principled here once we have type inference;
 /// hardcoding these is a little hacky.
