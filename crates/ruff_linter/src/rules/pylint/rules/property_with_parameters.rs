@@ -1,6 +1,5 @@
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::name::QualifiedName;
 use ruff_python_ast::{identifier::Identifier, Decorator, Parameters, Stmt};
 use ruff_python_semantic::analyze::visibility::is_property;
 
@@ -57,14 +56,8 @@ pub(crate) fn property_with_parameters(
         return;
     }
     let semantic = checker.semantic();
-    let extra_property_decorators = checker
-        .settings
-        .pydocstyle
-        .property_decorators
-        .iter()
-        .map(|decorator| QualifiedName::from_dotted_name(decorator))
-        .collect::<Vec<QualifiedName>>();
-    if is_property(decorator_list, &extra_property_decorators, semantic) {
+    let extra_property_decorators = checker.settings.pydocstyle.property_decorators();
+    if is_property(decorator_list, extra_property_decorators, semantic) {
         checker
             .diagnostics
             .push(Diagnostic::new(PropertyWithParameters, stmt.identifier()));

@@ -1,5 +1,3 @@
-use std::collections::BTreeSet;
-
 use regex::Regex;
 use rustc_hash::{FxBuildHasher, FxHashMap, FxHashSet};
 use serde::{Deserialize, Serialize};
@@ -2762,11 +2760,16 @@ pub struct PydocstyleOptions {
 
 impl PydocstyleOptions {
     pub fn into_settings(self) -> pydocstyle::settings::Settings {
-        pydocstyle::settings::Settings {
-            convention: self.convention,
-            ignore_decorators: BTreeSet::from_iter(self.ignore_decorators.unwrap_or_default()),
-            property_decorators: BTreeSet::from_iter(self.property_decorators.unwrap_or_default()),
-        }
+        let PydocstyleOptions {
+            convention,
+            ignore_decorators,
+            property_decorators,
+        } = self;
+        pydocstyle::settings::Settings::new(
+            convention,
+            ignore_decorators.unwrap_or_default(),
+            property_decorators.unwrap_or_default(),
+        )
     }
 }
 

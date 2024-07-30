@@ -3,7 +3,6 @@ pub(crate) mod rules;
 
 #[cfg(test)]
 mod tests {
-    use std::collections::BTreeSet;
     use std::convert::AsRef;
     use std::path::Path;
 
@@ -11,7 +10,8 @@ mod tests {
     use test_case::test_case;
 
     use crate::registry::Rule;
-    use crate::rules::pydocstyle::settings::{Convention, Settings};
+    use crate::rules::pydocstyle;
+    use crate::rules::pydocstyle::settings::Convention;
     use crate::test::test_path;
     use crate::{assert_messages, settings};
 
@@ -35,11 +35,7 @@ mod tests {
         let diagnostics = test_path(
             Path::new("pydoclint").join(path).as_path(),
             &settings::LinterSettings {
-                pydocstyle: Settings {
-                    convention: Some(Convention::Google),
-                    ignore_decorators: BTreeSet::new(),
-                    property_decorators: BTreeSet::new(),
-                },
+                pydocstyle: pydocstyle::settings::Settings::new(Some(Convention::Google), [], []),
                 ..settings::LinterSettings::for_rule(rule_code)
             },
         )?;
@@ -56,11 +52,7 @@ mod tests {
         let diagnostics = test_path(
             Path::new("pydoclint").join(path).as_path(),
             &settings::LinterSettings {
-                pydocstyle: Settings {
-                    convention: Some(Convention::Numpy),
-                    ignore_decorators: BTreeSet::new(),
-                    property_decorators: BTreeSet::new(),
-                },
+                pydocstyle: pydocstyle::settings::Settings::new(Some(Convention::Numpy), [], []),
                 ..settings::LinterSettings::for_rule(rule_code)
             },
         )?;

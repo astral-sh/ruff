@@ -63,11 +63,16 @@ pub fn is_abstract(decorator_list: &[Decorator], semantic: &SemanticModel) -> bo
 /// Returns `true` if a function definition is a `@property`.
 /// `extra_properties` can be used to check additional non-standard
 /// `@property`-like decorators.
-pub fn is_property(
+pub fn is_property<'a, P, I>(
     decorator_list: &[Decorator],
-    extra_properties: &[QualifiedName],
+    extra_properties: P,
     semantic: &SemanticModel,
-) -> bool {
+) -> bool
+where
+    P: IntoIterator<IntoIter = I>,
+    I: Iterator<Item = QualifiedName<'a>> + Clone,
+{
+    let extra_properties = extra_properties.into_iter();
     decorator_list.iter().any(|decorator| {
         semantic
             .resolve_qualified_name(map_callable(&decorator.expression))
@@ -76,8 +81,8 @@ pub fn is_property(
                     qualified_name.segments(),
                     ["" | "builtins", "property"] | ["functools", "cached_property"]
                 ) || extra_properties
-                    .iter()
-                    .any(|extra_property| extra_property.segments() == qualified_name.segments())
+                    .clone()
+                    .any(|extra_property| extra_property == qualified_name)
             })
     })
 }

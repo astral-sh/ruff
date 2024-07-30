@@ -174,7 +174,7 @@ pub(crate) fn definitions(checker: &mut Checker) {
         if enforce_docstrings || enforce_pydoclint {
             if pydocstyle::helpers::should_ignore_definition(
                 definition,
-                &checker.settings.pydocstyle.ignore_decorators,
+                &checker.settings.pydocstyle,
                 &checker.semantic,
             ) {
                 continue;
@@ -271,7 +271,7 @@ pub(crate) fn definitions(checker: &mut Checker) {
                 pydocstyle::rules::non_imperative_mood(
                     checker,
                     &docstring,
-                    &checker.settings.pydocstyle.property_decorators,
+                    &checker.settings.pydocstyle,
                 );
             }
             if checker.enabled(Rule::NoSignature) {
@@ -310,7 +310,7 @@ pub(crate) fn definitions(checker: &mut Checker) {
             if enforce_sections || enforce_pydoclint {
                 let section_contexts = pydocstyle::helpers::get_section_contexts(
                     &docstring,
-                    checker.settings.pydocstyle.convention.as_ref(),
+                    checker.settings.pydocstyle.convention(),
                 );
 
                 if enforce_sections {
@@ -318,7 +318,7 @@ pub(crate) fn definitions(checker: &mut Checker) {
                         checker,
                         &docstring,
                         &section_contexts,
-                        checker.settings.pydocstyle.convention.as_ref(),
+                        checker.settings.pydocstyle.convention(),
                     );
                 }
 
@@ -327,7 +327,7 @@ pub(crate) fn definitions(checker: &mut Checker) {
                         checker,
                         definition,
                         &section_contexts,
-                        checker.settings.pydocstyle.convention.as_ref(),
+                        checker.settings.pydocstyle.convention(),
                     );
                 }
             }

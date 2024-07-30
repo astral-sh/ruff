@@ -6,7 +6,6 @@ use ruff_diagnostics::{AlwaysFixableViolation, FixAvailability, Violation};
 use ruff_diagnostics::{Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::helpers::{is_const_false, is_const_true};
-use ruff_python_ast::name::QualifiedName;
 use ruff_python_ast::stmt_if::elif_else_range;
 use ruff_python_ast::visitor::Visitor;
 use ruff_python_ast::whitespace::indentation;
@@ -375,18 +374,10 @@ fn unnecessary_return_none(checker: &mut Checker, decorator_list: &[Decorator], 
             continue;
         }
 
-        let extra_property_decorators = checker
-            .settings
-            .pydocstyle
-            .property_decorators
-            .iter()
-            .map(|decorator| QualifiedName::from_dotted_name(decorator))
-            .collect::<Vec<QualifiedName>>();
-
         // Skip property functions
         if is_property(
             decorator_list,
-            &extra_property_decorators,
+            checker.settings.pydocstyle.property_decorators(),
             checker.semantic(),
         ) {
             return;
