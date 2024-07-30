@@ -17,3 +17,15 @@ class BaseCache:
     def prop(self) -> None:
         print("Property not found")
         return None
+
+
+class Parent:
+    def get(self, key: str) -> str | None:
+        print(f"{key} not found")
+        return None
+
+
+class Child(Parent):
+    def get(self, key: str) -> None:
+        print(f"{key} not found")
+        return None
