@@ -6,12 +6,14 @@ use ruff_diagnostics::{AlwaysFixableViolation, FixAvailability, Violation};
 use ruff_diagnostics::{Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::helpers::{is_const_false, is_const_true};
+use ruff_python_ast::name::QualifiedName;
 use ruff_python_ast::stmt_if::elif_else_range;
 use ruff_python_ast::visitor::Visitor;
 use ruff_python_ast::whitespace::indentation;
 use ruff_python_ast::{self as ast, Decorator, ElifElseClause, Expr, Stmt};
 use ruff_python_codegen::Stylist;
 use ruff_python_index::Indexer;
+use ruff_python_semantic::analyze::visibility::is_property;
 use ruff_python_semantic::SemanticModel;
 use ruff_python_trivia::{is_python_whitespace, SimpleTokenKind, SimpleTokenizer};
 use ruff_source_file::Locator;
@@ -373,11 +375,20 @@ fn unnecessary_return_none(checker: &mut Checker, decorator_list: &[Decorator], 
             continue;
         }
 
-        // Skip properties and other stdlib property-like decorators.
-        if decorator_list
+        let extra_property_decorators = checker
+            .settings
+            .pydocstyle
+            .property_decorators
             .iter()
-            .any(|decorator| is_property_like_decorator(decorator, checker.semantic()))
-        {
+            .map(|decorator| QualifiedName::from_dotted_name(decorator))
+            .collect::<Vec<QualifiedName>>();
+
+        // Skip property functions
+        if is_property(
+            decorator_list,
+            &extra_property_decorators,
+            checker.semantic(),
+        ) {
             return;
         }
 
@@ -388,25 +399,6 @@ fn unnecessary_return_none(checker: &mut Checker, decorator_list: &[Decorator], 
         )));
         checker.diagnostics.push(diagnostic);
     }
-}
-
-/// Determine whether `decorator` is `@property`,
-/// or another stdlib decorator similar to `@property`.
-///
-/// TODO: be more principled here once we have type inference;
-/// hardcoding these is a little hacky.
-fn is_property_like_decorator(decorator: &Decorator, semantic: &SemanticModel) -> bool {
-    semantic
-        .resolve_qualified_name(&decorator.expression)
-        .is_some_and(|qualified_name| {
-            matches!(
-                qualified_name.segments(),
-                ["" | "builtins" | "enum", "property"]
-                    | ["functools", "cached_property"]
-                    | ["abc", "abstractproperty"]
-                    | ["types", "DynamicClassAttribute"]
-            )
-        })
 }
 
 /// RET502
