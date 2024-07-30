@@ -1,7 +1,4 @@
 use std::panic::{AssertUnwindSafe, RefUnwindSafe};
-use std::sync::Arc;
-
-use salsa::Cancelled;
 
 use red_knot_module_resolver::{vendored_typeshed_stubs, Db as ResolverDb};
 use red_knot_python_semantic::Db as SemanticDb;
@@ -10,6 +7,7 @@ use ruff_db::program::{Program, ProgramSettings};
 use ruff_db::system::System;
 use ruff_db::vendored::VendoredFileSystem;
 use ruff_db::{Db as SourceDb, Upcast};
+use salsa::Cancelled;
 
 use crate::lint::Diagnostics;
 use crate::workspace::{check_file, Workspace, WorkspaceMetadata};
@@ -24,7 +22,7 @@ pub struct RootDatabase {
     workspace: Option<Workspace>,
     storage: salsa::Storage<RootDatabase>,
     files: Files,
-    system: Arc<dyn System + Send + Sync + RefUnwindSafe>,
+    system: Box<dyn System + Send + Sync + RefUnwindSafe>,
 }
 
 impl RootDatabase {
@@ -36,7 +34,7 @@ impl RootDatabase {
             workspace: None,
             storage: salsa::Storage::default(),
             files: Files::default(),
-            system: Arc::new(system),
+            system: Box::new(system),
         };
 
         let workspace = Workspace::from_metadata(&db, workspace);

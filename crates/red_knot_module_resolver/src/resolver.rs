@@ -2,12 +2,11 @@ use std::borrow::Cow;
 use std::iter::FusedIterator;
 
 use once_cell::sync::Lazy;
-use rustc_hash::{FxBuildHasher, FxHashSet};
-
 use ruff_db::files::{File, FilePath, FileRootKind};
 use ruff_db::program::{Program, SearchPathSettings, TargetVersion};
 use ruff_db::system::{DirectoryEntry, System, SystemPath, SystemPathBuf};
 use ruff_db::vendored::VendoredPath;
+use rustc_hash::{FxBuildHasher, FxHashSet};
 
 use crate::db::Db;
 use crate::module::{Module, ModuleKind};
@@ -625,13 +624,12 @@ impl PackageKind {
 #[cfg(test)]
 mod tests {
     use ruff_db::files::{system_path_to_file, File, FilePath};
-    use ruff_db::system::{DbWithTestSystem, OsSystem, SystemPath};
+    use ruff_db::system::DbWithTestSystem;
     use ruff_db::testing::{
         assert_const_function_query_was_not_run, assert_function_query_was_not_run,
     };
     use ruff_db::Db;
 
-    use crate::db::tests::TestDb;
     use crate::module::ModuleKind;
     use crate::module_name::ModuleName;
     use crate::testing::{FileSpec, MockedTypeshed, TestCase, TestCaseBuilder};
@@ -1153,7 +1151,9 @@ mod tests {
     #[test]
     #[cfg(target_family = "unix")]
     fn symlink() -> anyhow::Result<()> {
+        use crate::db::tests::TestDb;
         use ruff_db::program::Program;
+        use ruff_db::system::{OsSystem, SystemPath};
 
         let mut db = TestDb::new();
 
