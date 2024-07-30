@@ -14,16 +14,22 @@
 //!
 //! Tracing will write to `stderr` by default, which should appear in the logs for most LSP clients.
 //! A `logFile` path can also be specified in the settings, and output will be directed there instead.
-use lsp_types::TraceValue;
+use core::str;
+use lsp_server::{Message, Notification};
+use lsp_types::{
+    notification::{LogTrace, Notification as _},
+    ClientInfo, TraceValue,
+};
 use serde::Deserialize;
 use std::{
+    io::{Error as IoError, ErrorKind, Write},
     path::PathBuf,
     str::FromStr,
     sync::{Arc, Mutex, OnceLock},
 };
 use tracing::level_filters::LevelFilter;
 use tracing_subscriber::{
-    fmt::{time::Uptime, writer::BoxMakeWriter},
+    fmt::{time::Uptime, writer::BoxMakeWriter, MakeWriter},
     layer::SubscriberExt,
     Layer,
 };
@@ -43,10 +49,43 @@ pub(crate) fn set_trace_value(trace_value: TraceValue) {
     *global_trace_value = trace_value;
 }
 
+// A tracing writer that uses LSPs logTrace method.
+struct TraceLogWriter;
+
+impl Write for TraceLogWriter {
+    fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
+        let message = str::from_utf8(buf).map_err(|e| IoError::new(ErrorKind::InvalidData, e))?;
+        LOGGING_SENDER
+            .get()
+            .expect("logging sender should be initialized at this point")
+            .send(Message::Notification(Notification {
+                method: LogTrace::METHOD.to_owned(),
+                params: serde_json::json!({
+                    "message": message
+                }),
+            }))
+            .map_err(|e| IoError::new(ErrorKind::Other, e))?;
+        Ok(buf.len())
+    }
+
+    fn flush(&mut self) -> std::io::Result<()> {
+        Ok(())
+    }
+}
+
+impl<'a> MakeWriter<'a> for TraceLogWriter {
+    type Writer = Self;
+
+    fn make_writer(&'a self) -> Self::Writer {
+        Self
+    }
+}
+
 pub(crate) fn init_tracing(
     sender: ClientSender,
     log_level: LogLevel,
     log_file: Option<&std::path::Path>,
+    client: Option<&ClientInfo>,
 ) {
     LOGGING_SENDER
         .set(sender)
@@ -82,15 +121,24 @@ pub(crate) fn init_tracing(
                 .ok()
         });
 
+    let logger = match log_file {
+        Some(file) => BoxMakeWriter::new(Arc::new(file)),
+        None => {
+            if client.is_some_and(|client| {
+                client.name.starts_with("Zed") || client.name.starts_with("Visual Studio Code")
+            }) {
+                BoxMakeWriter::new(TraceLogWriter)
+            } else {
+                BoxMakeWriter::new(std::io::stderr)
+            }
+        }
+    };
     let subscriber = tracing_subscriber::Registry::default().with(
         tracing_subscriber::fmt::layer()
             .with_timer(Uptime::default())
             .with_thread_names(true)
             .with_ansi(false)
-            .with_writer(match log_file {
-                Some(file) => BoxMakeWriter::new(Arc::new(file)),
-                None => BoxMakeWriter::new(std::io::stderr),
-            })
+            .with_writer(logger)
             .with_filter(TraceLevelFilter)
             .with_filter(LogLevelFilter { filter: log_level }),
     );
