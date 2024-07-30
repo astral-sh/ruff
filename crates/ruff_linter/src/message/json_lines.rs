@@ -29,13 +29,21 @@ mod tests {
     use crate::message::json_lines::JsonLinesEmitter;
     use crate::message::tests::{
         capture_emitter_notebook_output, capture_emitter_output, create_messages,
-        create_notebook_messages,
+        create_notebook_messages, create_syntax_error_messages,
     };
 
     #[test]
     fn output() {
         let mut emitter = JsonLinesEmitter;
         let content = capture_emitter_output(&mut emitter, &create_messages());
+
+        assert_snapshot!(content);
+    }
+
+    #[test]
+    fn syntax_errors() {
+        let mut emitter = JsonLinesEmitter;
+        let content = capture_emitter_output(&mut emitter, &create_syntax_error_messages());
 
         assert_snapshot!(content);
     }

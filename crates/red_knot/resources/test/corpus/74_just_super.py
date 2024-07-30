@@ -1,0 +1,4 @@
+super
+
+def foo():
+    super

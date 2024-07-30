@@ -1,6 +1,8 @@
-use ruff_benchmark::criterion::{
-    criterion_group, criterion_main, BenchmarkGroup, BenchmarkId, Criterion, Throughput,
+use codspeed_criterion_compat::{
+    self as criterion, criterion_group, criterion_main, BenchmarkGroup, BenchmarkId, Criterion,
+    Throughput,
 };
+use criterion::measurement;
 use ruff_benchmark::{TestCase, TestFile, TestFileDownloadError};
 use ruff_linter::linter::{lint_only, ParseSource};
 use ruff_linter::rule_selector::PreviewOptions;
@@ -10,7 +12,7 @@ use ruff_linter::settings::{flags, LinterSettings};
 use ruff_linter::source_kind::SourceKind;
 use ruff_linter::{registry::Rule, RuleSelector};
 use ruff_python_ast::PySourceType;
-use ruff_python_parser::{parse_program_tokens, tokenize, Mode};
+use ruff_python_parser::parse_module;
 
 #[cfg(target_os = "windows")]
 #[global_allocator]
@@ -44,7 +46,7 @@ fn create_test_cases() -> Result<Vec<TestCase>, TestFileDownloadError> {
     ])
 }
 
-fn benchmark_linter(mut group: BenchmarkGroup, settings: &LinterSettings) {
+fn benchmark_linter(mut group: BenchmarkGroup<measurement::WallTime>, settings: &LinterSettings) {
     let test_cases = create_test_cases().unwrap();
 
     for case in test_cases {
@@ -54,30 +56,29 @@ fn benchmark_linter(mut group: BenchmarkGroup, settings: &LinterSettings) {
             BenchmarkId::from_parameter(case.name()),
             &case,
             |b, case| {
-                // Tokenize the source.
-                let tokens = tokenize(case.code(), Mode::Module);
-
                 // Parse the source.
-                let ast = parse_program_tokens(tokens.clone(), case.code(), false).unwrap();
+                let parsed =
+                    parse_module(case.code()).expect("Input should be a valid Python code");
 
-                b.iter(|| {
-                    let path = case.path();
-                    let result = lint_only(
-                        &path,
-                        None,
-                        settings,
-                        flags::Noqa::Enabled,
-                        &SourceKind::Python(case.code().to_string()),
-                        PySourceType::from(path.as_path()),
-                        ParseSource::Precomputed {
-                            tokens: &tokens,
-                            ast: &ast,
-                        },
-                    );
+                b.iter_batched(
+                    || parsed.clone(),
+                    |parsed| {
+                        let path = case.path();
+                        let result = lint_only(
+                            &path,
+                            None,
+                            settings,
+                            flags::Noqa::Enabled,
+                            &SourceKind::Python(case.code().to_string()),
+                            PySourceType::from(path.as_path()),
+                            ParseSource::Precomputed(parsed),
+                        );
 
-                    // Assert that file contains no parse errors
-                    assert_eq!(result.error, None);
-                });
+                        // Assert that file contains no parse errors
+                        assert!(!result.has_syntax_error);
+                    },
+                    criterion::BatchSize::SmallInput,
+                );
             },
         );
     }

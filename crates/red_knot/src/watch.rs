@@ -1,77 +1,94 @@
-use std::path::Path;
+use ruff_db::system::{SystemPath, SystemPathBuf};
+pub use watcher::{directory_watcher, EventHandler, Watcher};
+pub use workspace_watcher::WorkspaceWatcher;
 
-use anyhow::Context;
-use notify::event::{CreateKind, RemoveKind};
-use notify::{recommended_watcher, Event, EventKind, RecommendedWatcher, RecursiveMode, Watcher};
+mod watcher;
+mod workspace_watcher;
 
-use crate::program::{FileChangeKind, FileWatcherChange};
+/// Classification of a file system change event.
+///
+/// ## Renaming a path
+/// Renaming a path creates a [`ChangeEvent::Deleted`] event for the old path and/or a [`ChangeEvent::Created`] for the new location.
+/// Whether both events are created or just one of them depends from where to where the path was moved:
+///
+/// * Inside the watched directory: Both events are created.
+/// * From a watched directory to a non-watched directory: Only a [`ChangeEvent::Deleted`] event is created.
+/// * From a non-watched directory to a watched directory: Only a [`ChangeEvent::Created`] event is created.
+///
+/// ## Renaming a directory
+/// It's up to the file watcher implementation to aggregate the rename event for a directory to a single rename
+/// event instead of emitting an event for each file or subdirectory in that path.
+#[derive(Debug, PartialEq, Eq)]
+pub enum ChangeEvent {
+    /// A new path was created
+    Created {
+        path: SystemPathBuf,
+        kind: CreatedKind,
+    },
 
-pub struct FileWatcher {
-    watcher: RecommendedWatcher,
+    /// The content or metadata of a path was changed.
+    Changed {
+        path: SystemPathBuf,
+        kind: ChangedKind,
+    },
+
+    /// A path was deleted.
+    Deleted {
+        path: SystemPathBuf,
+        kind: DeletedKind,
+    },
+
+    /// The file watcher failed to observe some changes and now is out of sync with the file system.
+    ///
+    /// This can happen if many files are changed at once. The consumer should rescan all files to catch up
+    /// with the file system.
+    Rescan,
 }
 
-pub trait EventHandler: Send + 'static {
-    fn handle(&self, changes: Vec<FileWatcherChange>);
-}
+impl ChangeEvent {
+    pub fn file_name(&self) -> Option<&str> {
+        self.path().and_then(|path| path.file_name())
+    }
 
-impl<F> EventHandler for F
-where
-    F: Fn(Vec<FileWatcherChange>) + Send + 'static,
-{
-    fn handle(&self, changes: Vec<FileWatcherChange>) {
-        let f = self;
-        f(changes);
+    pub fn path(&self) -> Option<&SystemPath> {
+        match self {
+            ChangeEvent::Created { path, .. }
+            | ChangeEvent::Changed { path, .. }
+            | ChangeEvent::Deleted { path, .. } => Some(path),
+            ChangeEvent::Rescan => None,
+        }
     }
 }
 
-impl FileWatcher {
-    pub fn new<E>(handler: E) -> anyhow::Result<Self>
-    where
-        E: EventHandler,
-    {
-        Self::from_handler(Box::new(handler))
-    }
+/// Classification of an event that creates a new path.
+#[derive(Copy, Clone, Debug, Eq, PartialEq)]
+pub enum CreatedKind {
+    /// A file was created.
+    File,
 
-    fn from_handler(handler: Box<dyn EventHandler>) -> anyhow::Result<Self> {
-        let watcher = recommended_watcher(move |changes: notify::Result<Event>| {
-            match changes {
-                Ok(event) => {
-                    // TODO verify that this handles all events correctly
-                    let change_kind = match event.kind {
-                        EventKind::Create(CreateKind::File) => FileChangeKind::Created,
-                        EventKind::Modify(_) => FileChangeKind::Modified,
-                        EventKind::Remove(RemoveKind::File) => FileChangeKind::Deleted,
-                        _ => {
-                            return;
-                        }
-                    };
+    /// A directory was created.
+    Directory,
 
-                    let mut changes = Vec::new();
+    /// A file, directory, or any other kind of path was created.
+    Any,
+}
 
-                    for path in event.paths {
-                        if path.is_file() {
-                            changes.push(FileWatcherChange::new(path, change_kind));
-                        }
-                    }
+/// Classification of an event related to a content or metadata change.
+#[derive(Copy, Clone, Debug, Eq, PartialEq)]
+pub enum ChangedKind {
+    /// The content of a file was changed.
+    FileContent,
 
-                    if !changes.is_empty() {
-                        handler.handle(changes);
-                    }
-                }
-                // TODO proper error handling
-                Err(err) => {
-                    panic!("Error: {err}");
-                }
-            }
-        })
-        .context("Failed to create file watcher.")?;
+    /// The metadata of a file was changed.
+    FileMetadata,
 
-        Ok(Self { watcher })
-    }
+    /// Either the content or metadata of a path was changed.
+    Any,
+}
 
-    pub fn watch_folder(&mut self, path: &Path) -> anyhow::Result<()> {
-        self.watcher.watch(path, RecursiveMode::Recursive)?;
-
-        Ok(())
-    }
+#[derive(Copy, Clone, Debug, Eq, PartialEq)]
+pub enum DeletedKind {
+    File,
+    Directory,
+    Any,
 }

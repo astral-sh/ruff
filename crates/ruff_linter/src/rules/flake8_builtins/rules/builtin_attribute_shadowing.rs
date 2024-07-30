@@ -10,8 +10,8 @@ use crate::checkers::ast::Checker;
 use crate::rules::flake8_builtins::helpers::shadows_builtin;
 
 /// ## What it does
-/// Checks for any class attributes or methods that use the same name as a
-/// builtin.
+/// Checks for class attributes and methods that use the same names as
+/// Python builtins.
 ///
 /// ## Why is this bad?
 /// Reusing a builtin name for the name of an attribute increases the

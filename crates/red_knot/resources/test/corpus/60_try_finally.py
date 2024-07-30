@@ -1,0 +1,4 @@
+try:
+    a
+finally:
+    b

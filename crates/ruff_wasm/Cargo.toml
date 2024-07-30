@@ -1,6 +1,6 @@
 [package]
 name = "ruff_wasm"
-version = "0.0.0"
+version = "0.5.5"
 publish = false
 authors = { workspace = true }
 edition = { workspace = true }
@@ -26,9 +26,9 @@ ruff_formatter = { workspace = true }
 ruff_python_formatter = { workspace = true }
 ruff_python_index = { workspace = true }
 ruff_python_parser = { workspace = true }
+ruff_python_trivia = { workspace = true }
 ruff_source_file = { workspace = true }
 ruff_text_size = { workspace = true }
-ruff_python_trivia = { workspace = true }
 ruff_workspace = { workspace = true }
 
 console_error_panic_hook = { workspace = true, optional = true }

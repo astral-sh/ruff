@@ -1,0 +1,91 @@
+---
+source: crates/ruff_python_parser/tests/fixtures.rs
+input_file: crates/ruff_python_parser/resources/inline/ok/args_unparenthesized_generator.py
+---
+## AST
+
+```
+Module(
+    ModModule {
+        range: 0..26,
+        body: [
+            Expr(
+                StmtExpr {
+                    range: 0..25,
+                    value: Call(
+                        ExprCall {
+                            range: 0..25,
+                            func: Name(
+                                ExprName {
+                                    range: 0..3,
+                                    id: Name("sum"),
+                                    ctx: Load,
+                                },
+                            ),
+                            arguments: Arguments {
+                                range: 3..25,
+                                args: [
+                                    Generator(
+                                        ExprGenerator {
+                                            range: 4..24,
+                                            elt: Name(
+                                                ExprName {
+                                                    range: 4..5,
+                                                    id: Name("x"),
+                                                    ctx: Load,
+                                                },
+                                            ),
+                                            generators: [
+                                                Comprehension {
+                                                    range: 6..24,
+                                                    target: Name(
+                                                        ExprName {
+                                                            range: 10..11,
+                                                            id: Name("x"),
+                                                            ctx: Store,
+                                                        },
+                                                    ),
+                                                    iter: Call(
+                                                        ExprCall {
+                                                            range: 15..24,
+                                                            func: Name(
+                                                                ExprName {
+                                                                    range: 15..20,
+                                                                    id: Name("range"),
+                                                                    ctx: Load,
+                                                                },
+                                                            ),
+                                                            arguments: Arguments {
+                                                                range: 20..24,
+                                                                args: [
+                                                                    NumberLiteral(
+                                                                        ExprNumberLiteral {
+                                                                            range: 21..23,
+                                                                            value: Int(
+                                                                                10,
+                                                                            ),
+                                                                        },
+                                                                    ),
+                                                                ],
+                                                                keywords: [],
+                                                            },
+                                                        },
+                                                    ),
+                                                    ifs: [],
+                                                    is_async: false,
+                                                },
+                                            ],
+                                            parenthesized: false,
+                                        },
+                                    ),
+                                ],
+                                keywords: [],
+                            },
+                        },
+                    ),
+                },
+            ),
+        ],
+    },
+)
+```

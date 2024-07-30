@@ -1,4 +1,5 @@
-use ruff_python_ast::{self as ast, PySourceType, Stmt};
+use ruff_python_ast::{self as ast, Stmt};
+use ruff_python_parser::Tokens;
 use ruff_text_size::{Ranged, TextRange};
 
 use ruff_source_file::Locator;
@@ -13,7 +14,7 @@ pub(crate) fn annotate_imports<'a>(
     comments: Vec<Comment<'a>>,
     locator: &Locator<'a>,
     split_on_trailing_comma: bool,
-    source_type: PySourceType,
+    tokens: &Tokens,
 ) -> Vec<AnnotatedImport<'a>> {
     let mut comments_iter = comments.into_iter().peekable();
 
@@ -86,7 +87,7 @@ pub(crate) fn annotate_imports<'a>(
                     }
 
                     // Capture names.
-                    let aliases = names
+                    let mut aliases: Vec<_> = names
                         .iter()
                         .map(|alias| {
                             // Find comments above.
@@ -111,21 +112,52 @@ pub(crate) fn annotate_imports<'a>(
                                 asname: alias.asname.as_ref().map(|asname| locator.slice(asname)),
                                 atop: alias_atop,
                                 inline: alias_inline,
+                                trailing: vec![],
                             }
                         })
                         .collect();
+
+                    // Capture trailing comments on the _last_ alias, as in:
+                    // ```python
+                    // from foo import (
+                    //     bar,
+                    //     # noqa
+                    // )
+                    // ```
+                    if let Some(last_alias) = aliases.last_mut() {
+                        while let Some(comment) =
+                            comments_iter.next_if(|comment| comment.start() < import.end())
+                        {
+                            last_alias.trailing.push(comment);
+                        }
+                    }
+
+                    // Capture trailing comments, as in:
+                    // ```python
+                    // from foo import (
+                    //     bar,
+                    // )  # noqa
+                    // ```
+                    let mut trailing = vec![];
+                    let import_line_end = locator.line_end(import.end());
+                    while let Some(comment) =
+                        comments_iter.next_if(|comment| comment.start() < import_line_end)
+                    {
+                        trailing.push(comment);
+                    }
 
                     AnnotatedImport::ImportFrom {
                         module: module.as_ref().map(|module| locator.slice(module)),
                         names: aliases,
                         level: *level,
                         trailing_comma: if split_on_trailing_comma {
-                            trailing_comma(import, locator, source_type)
+                            trailing_comma(import, tokens)
                         } else {
                             TrailingComma::default()
                         },
                         atop,
                         inline,
+                        trailing,
                     }
                 }
                 _ => panic!("Expected Stmt::Import | Stmt::ImportFrom"),

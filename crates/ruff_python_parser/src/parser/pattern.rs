@@ -1,10 +1,12 @@
+use ruff_python_ast::name::Name;
 use ruff_python_ast::{self as ast, Expr, ExprContext, Number, Operator, Pattern, Singleton};
 use ruff_text_size::{Ranged, TextSize};
 
 use crate::parser::progress::ParserProgress;
 use crate::parser::{recovery, Parser, RecoveryContextKind, SequenceMatchPatternParentheses};
+use crate::token::{TokenKind, TokenValue};
 use crate::token_set::TokenSet;
-use crate::{ParseErrorType, Tok, TokenKind};
+use crate::ParseErrorType;
 
 use super::expression::ExpressionContext;
 
@@ -50,12 +52,12 @@ const MAPPING_PATTERN_START_SET: TokenSet = TokenSet::new([
 impl<'src> Parser<'src> {
     /// Returns `true` if the current token is a valid start of a pattern.
     pub(super) fn at_pattern_start(&self) -> bool {
-        self.at_ts(PATTERN_START_SET)
+        self.at_ts(PATTERN_START_SET) || self.at_soft_keyword()
     }
 
     /// Returns `true` if the current token is a valid start of a mapping pattern.
     pub(super) fn at_mapping_pattern_start(&self) -> bool {
-        self.at_ts(MAPPING_PATTERN_START_SET)
+        self.at_ts(MAPPING_PATTERN_START_SET) || self.at_soft_keyword()
     }
 
     /// Entry point to start parsing a pattern.
@@ -397,7 +399,7 @@ impl<'src> Parser<'src> {
                 })
             }
             TokenKind::Complex => {
-                let (Tok::Complex { real, imag }, _) = self.bump(TokenKind::Complex) else {
+                let TokenValue::Complex { real, imag } = self.bump_value(TokenKind::Complex) else {
                     unreachable!()
                 };
                 let range = self.node_range(start);
@@ -411,7 +413,7 @@ impl<'src> Parser<'src> {
                 })
             }
             TokenKind::Int => {
-                let (Tok::Int { value }, _) = self.bump(TokenKind::Int) else {
+                let TokenValue::Int(value) = self.bump_value(TokenKind::Int) else {
                     unreachable!()
                 };
                 let range = self.node_range(start);
@@ -425,7 +427,7 @@ impl<'src> Parser<'src> {
                 })
             }
             TokenKind::Float => {
-                let (Tok::Float { value }, _) = self.bump(TokenKind::Float) else {
+                let TokenValue::Float(value) = self.bump_value(TokenKind::Float) else {
                     unreachable!()
                 };
                 let range = self.node_range(start);
@@ -436,46 +438,6 @@ impl<'src> Parser<'src> {
                         range,
                     })),
                     range,
-                })
-            }
-            TokenKind::Name if self.peek() == TokenKind::Dot => {
-                let (Tok::Name { name }, _) = self.bump(TokenKind::Name) else {
-                    unreachable!()
-                };
-                let id = Expr::Name(ast::ExprName {
-                    id: name.to_string(),
-                    ctx: ExprContext::Load,
-                    range: self.node_range(start),
-                });
-
-                let attribute = self.parse_attr_expr_for_match_pattern(id, start);
-
-                Pattern::MatchValue(ast::PatternMatchValue {
-                    value: Box::new(attribute),
-                    range: self.node_range(start),
-                })
-            }
-            TokenKind::Name => {
-                let (Tok::Name { name }, _) = self.bump(TokenKind::Name) else {
-                    unreachable!()
-                };
-                let range = self.node_range(start);
-
-                // test_ok match_as_pattern
-                // match foo:
-                //     case foo_bar: ...
-                //     case _: ...
-                Pattern::MatchAs(ast::PatternMatchAs {
-                    range,
-                    pattern: None,
-                    name: if &*name == "_" {
-                        None
-                    } else {
-                        Some(ast::Identifier {
-                            id: name.to_string(),
-                            range,
-                        })
-                    },
                 })
             }
             kind => {
@@ -506,26 +468,57 @@ impl<'src> Parser<'src> {
                     }
                 }
 
-                // Upon encountering an unexpected token, return a `Pattern::MatchValue` containing
-                // an empty `Expr::Name`.
-                let invalid_node = if kind.is_keyword() {
-                    Expr::Name(self.parse_name())
+                if self.at_name_or_keyword() {
+                    if self.peek() == TokenKind::Dot {
+                        // test_ok match_attr_pattern_soft_keyword
+                        // match foo:
+                        //     case match.bar: ...
+                        //     case case.bar: ...
+                        //     case type.bar: ...
+                        //     case match.case.type.bar.type.case.match: ...
+                        let id = Expr::Name(self.parse_name());
+
+                        let attribute = self.parse_attr_expr_for_match_pattern(id, start);
+
+                        Pattern::MatchValue(ast::PatternMatchValue {
+                            value: Box::new(attribute),
+                            range: self.node_range(start),
+                        })
+                    } else {
+                        // test_ok match_as_pattern_soft_keyword
+                        // match foo:
+                        //     case case: ...
+                        //     case match: ...
+                        //     case type: ...
+                        let ident = self.parse_identifier();
+
+                        // test_ok match_as_pattern
+                        // match foo:
+                        //     case foo_bar: ...
+                        //     case _: ...
+                        Pattern::MatchAs(ast::PatternMatchAs {
+                            range: ident.range,
+                            pattern: None,
+                            name: if &ident == "_" { None } else { Some(ident) },
+                        })
+                    }
                 } else {
+                    // Upon encountering an unexpected token, return a `Pattern::MatchValue` containing
+                    // an empty `Expr::Name`.
                     self.add_error(
                         ParseErrorType::OtherError("Expected a pattern".to_string()),
                         self.current_token_range(),
                     );
-                    Expr::Name(ast::ExprName {
+                    let invalid_node = Expr::Name(ast::ExprName {
                         range: self.missing_node_range(),
-                        id: String::new(),
+                        id: Name::empty(),
                         ctx: ExprContext::Invalid,
+                    });
+                    Pattern::MatchValue(ast::PatternMatchValue {
+                        range: invalid_node.range(),
+                        value: Box::new(invalid_node),
                     })
-                };
-
-                Pattern::MatchValue(ast::PatternMatchValue {
-                    range: invalid_node.range(),
-                    value: Box::new(invalid_node),
-                })
+                }
             }
         }
     }
@@ -624,7 +617,7 @@ impl<'src> Parser<'src> {
                 } else {
                     Box::new(Expr::Name(ast::ExprName {
                         range: ident.range(),
-                        id: String::new(),
+                        id: Name::empty(),
                         ctx: ExprContext::Invalid,
                     }))
                 }
@@ -675,7 +668,7 @@ impl<'src> Parser<'src> {
                             &pattern,
                         );
                         ast::Identifier {
-                            id: String::new(),
+                            id: Name::empty(),
                             range: parser.missing_node_range(),
                         }
                     };

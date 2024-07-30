@@ -1,248 +1,238 @@
+use std::panic::{AssertUnwindSafe, RefUnwindSafe};
 use std::sync::Arc;
 
-pub use jars::{HasJar, HasJars};
-pub use query::{QueryError, QueryResult};
-pub use runtime::DbRuntime;
-pub use storage::JarsStorage;
+use salsa::Cancelled;
 
-use crate::files::FileId;
-use crate::lint::{LintSemanticStorage, LintSyntaxStorage};
-use crate::module::ModuleResolver;
-use crate::parse::ParsedStorage;
-use crate::source::SourceStorage;
-use crate::symbols::SymbolTablesStorage;
-use crate::types::TypeStore;
+use red_knot_module_resolver::{vendored_typeshed_stubs, Db as ResolverDb};
+use red_knot_python_semantic::Db as SemanticDb;
+use ruff_db::files::{File, Files};
+use ruff_db::program::{Program, ProgramSettings};
+use ruff_db::system::System;
+use ruff_db::vendored::VendoredFileSystem;
+use ruff_db::{Db as SourceDb, Upcast};
 
-mod jars;
-mod query;
-mod runtime;
-mod storage;
+use crate::lint::Diagnostics;
+use crate::workspace::{check_file, Workspace, WorkspaceMetadata};
 
-pub trait Database {
-    /// Returns a reference to the runtime of the current worker.
-    fn runtime(&self) -> &DbRuntime;
+mod changes;
 
-    /// Returns a mutable reference to the runtime. Only one worker can hold a mutable reference to the runtime.
-    fn runtime_mut(&mut self) -> &mut DbRuntime;
+#[salsa::db]
+pub trait Db: SemanticDb + Upcast<dyn SemanticDb> {}
 
-    /// Returns `Ok` if the queries have not been cancelled and `Err(QueryError::Cancelled)` otherwise.
-    fn cancelled(&self) -> QueryResult<()> {
-        self.runtime().cancelled()
+#[salsa::db]
+pub struct RootDatabase {
+    workspace: Option<Workspace>,
+    storage: salsa::Storage<RootDatabase>,
+    files: Files,
+    system: Arc<dyn System + Send + Sync + RefUnwindSafe>,
+}
+
+impl RootDatabase {
+    pub fn new<S>(workspace: WorkspaceMetadata, settings: ProgramSettings, system: S) -> Self
+    where
+        S: System + 'static + Send + Sync + RefUnwindSafe,
+    {
+        let mut db = Self {
+            workspace: None,
+            storage: salsa::Storage::default(),
+            files: Files::default(),
+            system: Arc::new(system),
+        };
+
+        let workspace = Workspace::from_metadata(&db, workspace);
+        // Initialize the `Program` singleton
+        Program::from_settings(&db, settings);
+
+        db.workspace = Some(workspace);
+        db
     }
 
-    /// Returns `true` if the queries have been cancelled.
-    fn is_cancelled(&self) -> bool {
-        self.runtime().is_cancelled()
+    pub fn workspace(&self) -> Workspace {
+        // SAFETY: The workspace is always initialized in `new`.
+        self.workspace.unwrap()
     }
-}
 
-/// Database that supports running queries from multiple threads.
-pub trait ParallelDatabase: Database + Send {
-    /// Creates a snapshot of the database state that can be used to query the database in another thread.
-    ///
-    /// The snapshot is a read-only view of the database but query results are shared between threads.
-    /// All queries will be automatically cancelled when applying any mutations (calling [`HasJars::jars_mut`])
-    /// to the database (not the snapshot, because they're readonly).
-    ///
-    /// ## Creating a snapshot
-    ///
-    /// Creating a snapshot of the database's jars is cheap but creating a snapshot of
-    /// other state stored on the database might require deep-cloning data. That's why you should
-    /// avoid creating snapshots in a hot function (e.g. don't create a snapshot for each file, instead
-    /// create a snapshot when scheduling the check of an entire program).
-    ///
-    /// ## Salsa compatibility
-    /// Salsa prohibits creating a snapshot while running a local query (it's fine if other workers run a query) [[source](https://github.com/salsa-rs/salsa/issues/80)].
-    /// We should avoid creating snapshots while running a query because we might want to adopt Salsa in the future (if we can figure out persistent caching).
-    /// Unfortunately, the infrastructure doesn't provide an automated way of knowing when a query is run, that's
-    /// why we have to "enforce" this constraint manually.
-    #[must_use]
-    fn snapshot(&self) -> Snapshot<Self>;
-}
-
-pub trait DbWithJar<Jar>: Database + HasJar<Jar> {}
-
-/// Readonly snapshot of a database.
-///
-/// ## Dead locks
-/// A snapshot should always be dropped as soon as it is no longer necessary to run queries.
-/// Storing the snapshot without running a query or periodically checking if cancellation was requested
-/// can lead to deadlocks because mutating the [`Database`] requires cancels all pending queries
-/// and waiting for all [`Snapshot`]s to be dropped.
-#[derive(Debug)]
-pub struct Snapshot<DB: ?Sized>
-where
-    DB: ParallelDatabase,
-{
-    db: DB,
-}
-
-impl<DB> Snapshot<DB>
-where
-    DB: ParallelDatabase,
-{
-    pub fn new(db: DB) -> Self {
-        Snapshot { db }
+    /// Checks all open files in the workspace and its dependencies.
+    pub fn check(&self) -> Result<Vec<String>, Cancelled> {
+        self.with_db(|db| db.workspace().check(db))
     }
-}
 
-impl<DB> std::ops::Deref for Snapshot<DB>
-where
-    DB: ParallelDatabase,
-{
-    type Target = DB;
+    pub fn check_file(&self, file: File) -> Result<Diagnostics, Cancelled> {
+        self.with_db(|db| check_file(db, file))
+    }
 
-    fn deref(&self) -> &DB {
-        &self.db
+    pub(crate) fn with_db<F, T>(&self, f: F) -> Result<T, Cancelled>
+    where
+        F: FnOnce(&RootDatabase) -> T + std::panic::UnwindSafe,
+    {
+        // The `AssertUnwindSafe` here looks scary, but is a consequence of Salsa's design.
+        // Salsa uses panics to implement cancellation and to recover from cycles. However, the Salsa
+        // storage isn't `UnwindSafe` or `RefUnwindSafe` because its dependencies `DashMap` and `parking_lot::*` aren't
+        // unwind safe.
+        //
+        // Having to use `AssertUnwindSafe` isn't as big as a deal as it might seem because
+        // the `UnwindSafe` and `RefUnwindSafe` traits are designed to catch logical bugs.
+        // They don't protect against [UB](https://internals.rust-lang.org/t/pre-rfc-deprecating-unwindsafe/15974).
+        // On top of that, `Cancelled` only catches specific Salsa-panics and propagates all other panics.
+        //
+        // That still leaves us with possible logical bugs in two sources:
+        // * In Salsa itself: This must be considered a bug in Salsa and needs fixing upstream.
+        //   Reviewing Salsa code specifically around unwind safety seems doable.
+        // * Our code: This is the main concern. Luckily, it only involves code that uses internal mutability
+        //     and calls into Salsa queries when mutating the internal state. Using `AssertUnwindSafe`
+        //     certainly makes it harder to catch these issues in our user code.
+        //
+        // For now, this is the only solution at hand unless Salsa decides to change its design.
+        // [Zulip support thread](https://salsa.zulipchat.com/#narrow/stream/145099-general/topic/How.20to.20use.20.60Cancelled.3A.3Acatch.60)
+        let db = &AssertUnwindSafe(self);
+        Cancelled::catch(|| f(db))
     }
 }
 
-pub trait Upcast<T: ?Sized> {
-    fn upcast(&self) -> &T;
+impl Upcast<dyn SemanticDb> for RootDatabase {
+    fn upcast(&self) -> &(dyn SemanticDb + 'static) {
+        self
+    }
+
+    fn upcast_mut(&mut self) -> &mut (dyn SemanticDb + 'static) {
+        self
+    }
 }
 
-// Red knot specific databases code.
+impl Upcast<dyn SourceDb> for RootDatabase {
+    fn upcast(&self) -> &(dyn SourceDb + 'static) {
+        self
+    }
 
-pub trait SourceDb: DbWithJar<SourceJar> {
-    // queries
-    fn file_id(&self, path: &std::path::Path) -> FileId;
-
-    fn file_path(&self, file_id: FileId) -> Arc<std::path::Path>;
+    fn upcast_mut(&mut self) -> &mut (dyn SourceDb + 'static) {
+        self
+    }
 }
 
-pub trait SemanticDb: SourceDb + DbWithJar<SemanticJar> + Upcast<dyn SourceDb> {}
-
-pub trait LintDb: SemanticDb + DbWithJar<LintJar> + Upcast<dyn SemanticDb> {}
-
-pub trait Db: LintDb + Upcast<dyn LintDb> {}
-
-#[derive(Debug, Default)]
-pub struct SourceJar {
-    pub sources: SourceStorage,
-    pub parsed: ParsedStorage,
+impl Upcast<dyn ResolverDb> for RootDatabase {
+    fn upcast(&self) -> &(dyn ResolverDb + 'static) {
+        self
+    }
+    fn upcast_mut(&mut self) -> &mut (dyn ResolverDb + 'static) {
+        self
+    }
 }
 
-#[derive(Debug, Default)]
-pub struct SemanticJar {
-    pub module_resolver: ModuleResolver,
-    pub symbol_tables: SymbolTablesStorage,
-    pub type_store: TypeStore,
+#[salsa::db]
+impl ResolverDb for RootDatabase {}
+
+#[salsa::db]
+impl SemanticDb for RootDatabase {}
+
+#[salsa::db]
+impl SourceDb for RootDatabase {
+    fn vendored(&self) -> &VendoredFileSystem {
+        vendored_typeshed_stubs()
+    }
+
+    fn system(&self) -> &dyn System {
+        &*self.system
+    }
+
+    fn files(&self) -> &Files {
+        &self.files
+    }
 }
 
-#[derive(Debug, Default)]
-pub struct LintJar {
-    pub lint_syntax: LintSyntaxStorage,
-    pub lint_semantic: LintSemanticStorage,
-}
+#[salsa::db]
+impl salsa::Database for RootDatabase {}
+
+#[salsa::db]
+impl Db for RootDatabase {}
 
 #[cfg(test)]
 pub(crate) mod tests {
-    use std::path::Path;
-    use std::sync::Arc;
+    use crate::db::Db;
+    use red_knot_module_resolver::{vendored_typeshed_stubs, Db as ResolverDb};
+    use red_knot_python_semantic::Db as SemanticDb;
+    use ruff_db::files::Files;
+    use ruff_db::system::{DbWithTestSystem, System, TestSystem};
+    use ruff_db::vendored::VendoredFileSystem;
+    use ruff_db::{Db as SourceDb, Upcast};
 
-    use crate::db::{
-        Database, DbRuntime, DbWithJar, HasJar, HasJars, JarsStorage, LintDb, LintJar, QueryResult,
-        SourceDb, SourceJar, Upcast,
-    };
-    use crate::files::{FileId, Files};
-
-    use super::{SemanticDb, SemanticJar};
-
-    // This can be a partial database used in a single crate for testing.
-    // It would hold fewer data than the full database.
-    #[derive(Debug, Default)]
+    #[salsa::db]
     pub(crate) struct TestDb {
+        storage: salsa::Storage<Self>,
         files: Files,
-        jars: JarsStorage<Self>,
+        system: TestSystem,
+        vendored: VendoredFileSystem,
     }
 
-    impl HasJar<SourceJar> for TestDb {
-        fn jar(&self) -> QueryResult<&SourceJar> {
-            Ok(&self.jars()?.0)
-        }
-
-        fn jar_mut(&mut self) -> &mut SourceJar {
-            &mut self.jars_mut().0
-        }
-    }
-
-    impl HasJar<SemanticJar> for TestDb {
-        fn jar(&self) -> QueryResult<&SemanticJar> {
-            Ok(&self.jars()?.1)
-        }
-
-        fn jar_mut(&mut self) -> &mut SemanticJar {
-            &mut self.jars_mut().1
+    impl TestDb {
+        pub(crate) fn new() -> Self {
+            Self {
+                storage: salsa::Storage::default(),
+                system: TestSystem::default(),
+                vendored: vendored_typeshed_stubs().clone(),
+                files: Files::default(),
+            }
         }
     }
 
-    impl HasJar<LintJar> for TestDb {
-        fn jar(&self) -> QueryResult<&LintJar> {
-            Ok(&self.jars()?.2)
+    impl DbWithTestSystem for TestDb {
+        fn test_system(&self) -> &TestSystem {
+            &self.system
         }
 
-        fn jar_mut(&mut self) -> &mut LintJar {
-            &mut self.jars_mut().2
+        fn test_system_mut(&mut self) -> &mut TestSystem {
+            &mut self.system
         }
     }
 
+    #[salsa::db]
     impl SourceDb for TestDb {
-        fn file_id(&self, path: &Path) -> FileId {
-            self.files.intern(path)
+        fn vendored(&self) -> &VendoredFileSystem {
+            &self.vendored
         }
 
-        fn file_path(&self, file_id: FileId) -> Arc<Path> {
-            self.files.path(file_id)
+        fn system(&self) -> &dyn System {
+            &self.system
         }
-    }
 
-    impl DbWithJar<SourceJar> for TestDb {}
-
-    impl Upcast<dyn SourceDb> for TestDb {
-        fn upcast(&self) -> &(dyn SourceDb + 'static) {
-            self
+        fn files(&self) -> &Files {
+            &self.files
         }
     }
-
-    impl SemanticDb for TestDb {}
-
-    impl DbWithJar<SemanticJar> for TestDb {}
 
     impl Upcast<dyn SemanticDb> for TestDb {
         fn upcast(&self) -> &(dyn SemanticDb + 'static) {
             self
         }
-    }
-
-    impl LintDb for TestDb {}
-
-    impl Upcast<dyn LintDb> for TestDb {
-        fn upcast(&self) -> &(dyn LintDb + 'static) {
+        fn upcast_mut(&mut self) -> &mut (dyn SemanticDb + 'static) {
             self
         }
     }
 
-    impl DbWithJar<LintJar> for TestDb {}
-
-    impl HasJars for TestDb {
-        type Jars = (SourceJar, SemanticJar, LintJar);
-
-        fn jars(&self) -> QueryResult<&Self::Jars> {
-            self.jars.jars()
+    impl Upcast<dyn SourceDb> for TestDb {
+        fn upcast(&self) -> &(dyn SourceDb + 'static) {
+            self
         }
-
-        fn jars_mut(&mut self) -> &mut Self::Jars {
-            self.jars.jars_mut()
+        fn upcast_mut(&mut self) -> &mut (dyn SourceDb + 'static) {
+            self
         }
     }
 
-    impl Database for TestDb {
-        fn runtime(&self) -> &DbRuntime {
-            self.jars.runtime()
+    impl Upcast<dyn ResolverDb> for TestDb {
+        fn upcast(&self) -> &(dyn ResolverDb + 'static) {
+            self
         }
-
-        fn runtime_mut(&mut self) -> &mut DbRuntime {
-            self.jars.runtime_mut()
+        fn upcast_mut(&mut self) -> &mut (dyn ResolverDb + 'static) {
+            self
         }
     }
+
+    #[salsa::db]
+    impl red_knot_module_resolver::Db for TestDb {}
+    #[salsa::db]
+    impl red_knot_python_semantic::Db for TestDb {}
+    #[salsa::db]
+    impl Db for TestDb {}
+
+    #[salsa::db]
+    impl salsa::Database for TestDb {}
 }

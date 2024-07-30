@@ -79,7 +79,7 @@ def update_schemastore(
 
     # Run npm install
     src = schemastore_path.joinpath("src")
-    check_call(["npm", "install"], cwd=src)
+    check_call(["npm", "install"], cwd=schemastore_path)
 
     # Update the schema and format appropriately
     schema = json.loads(root.joinpath("ruff.schema.json").read_text())
@@ -89,7 +89,7 @@ def update_schemastore(
     )
     check_call(
         [
-            "node_modules/.bin/prettier",
+            "../node_modules/prettier/bin/prettier.cjs",
             "--plugin",
             "prettier-plugin-sort-json",
             "--write",
@@ -121,7 +121,7 @@ def update_schemastore(
         )
         # This should show the link to create a PR
         check_call(
-            ["git", "push", "--set-upstream", "origin", branch],
+            ["git", "push", "--set-upstream", "origin", branch, "--force"],
             cwd=schemastore_path,
         )
     else:
@@ -136,9 +136,9 @@ def determine_git_protocol(argv: list[str] | None = None) -> GitProtocol:
     )
     parser.add_argument(
         "--proto",
-        required=True,
         choices=[proto.value for proto in GitProtocol],
-        help="Protocol to use for cloning git repos",
+        default="https",
+        help="Protocol to use for git authentication",
     )
     args = parser.parse_args(argv)
     return GitProtocol(args.proto)

@@ -311,4 +311,24 @@ class ComplexStatements:
 ```
 
 
-
+## Preview changes
+```diff
+--- Stable
++++ Preview
+@@ -132,6 +132,7 @@
+     if sys.version_info >= (3, 12):
+         @classmethod
+         def fromtimestamp(cls, timestamp: float, tz: float | None = ...) -> Self: ...
++
+     else:
+         @classmethod
+         def fromtimestamp(cls, __timestamp: float, tz: float | None = ...) -> Self: ...
+@@ -141,6 +142,7 @@
+     if sys.version_info >= (3, 8):
+         @classmethod
+         def now(cls, tz: float | None = None) -> Self: ...
++
+     else:
+         @classmethod
+         def now(cls, tz: None = None) -> Self: ...
+```

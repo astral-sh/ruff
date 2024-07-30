@@ -21,7 +21,7 @@ impl super::SyncNotificationHandler for DidChangeWatchedFiles {
         params: types::DidChangeWatchedFilesParams,
     ) -> Result<()> {
         for change in &params.changes {
-            session.reload_settings(&change.uri.to_file_path().unwrap());
+            session.reload_settings(&change.uri);
         }
 
         if !params.changes.is_empty() {
@@ -33,7 +33,7 @@ impl super::SyncNotificationHandler for DidChangeWatchedFiles {
                 // publish diagnostics for text documents
                 for url in session.text_document_urls() {
                     let snapshot = session
-                        .take_snapshot(&url)
+                        .take_snapshot(url.clone())
                         .expect("snapshot should be available");
                     publish_diagnostics_for_document(&snapshot, &notifier)?;
                 }
@@ -42,7 +42,7 @@ impl super::SyncNotificationHandler for DidChangeWatchedFiles {
             // always publish diagnostics for notebook files (since they don't use pull diagnostics)
             for url in session.notebook_document_urls() {
                 let snapshot = session
-                    .take_snapshot(&url)
+                    .take_snapshot(url.clone())
                     .expect("snapshot should be available");
                 publish_diagnostics_for_document(&snapshot, &notifier)?;
             }

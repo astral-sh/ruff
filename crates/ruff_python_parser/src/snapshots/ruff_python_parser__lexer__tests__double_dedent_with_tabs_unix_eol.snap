@@ -2,15 +2,17 @@
 source: crates/ruff_python_parser/src/lexer.rs
 expression: double_dedent_with_tabs_eol(UNIX_EOL)
 ---
+## Tokens
+```
 [
     (
         Def,
         0..3,
     ),
     (
-        Name {
-            name: "foo",
-        },
+        Name(
+            Name("foo"),
+        ),
         4..7,
     ),
     (
@@ -38,9 +40,9 @@ expression: double_dedent_with_tabs_eol(UNIX_EOL)
         12..14,
     ),
     (
-        Name {
-            name: "x",
-        },
+        Name(
+            Name("x"),
+        ),
         15..16,
     ),
     (
@@ -64,9 +66,9 @@ expression: double_dedent_with_tabs_eol(UNIX_EOL)
         22..28,
     ),
     (
-        Int {
-            value: 99,
-        },
+        Int(
+            99,
+        ),
         29..31,
     ),
     (
@@ -86,3 +88,4 @@ expression: double_dedent_with_tabs_eol(UNIX_EOL)
         33..33,
     ),
 ]
+```

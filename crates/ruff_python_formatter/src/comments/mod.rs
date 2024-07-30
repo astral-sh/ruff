@@ -406,11 +406,11 @@ impl<'a> Comments<'a> {
     /// normally if `node` is the first or last node of a suppression range.
     #[cfg(debug_assertions)]
     pub(crate) fn mark_verbatim_node_comments_formatted(&self, node: AnyNodeRef) {
-        use ruff_python_ast::visitor::preorder::{PreorderVisitor, TraversalSignal};
+        use ruff_python_ast::visitor::source_order::{SourceOrderVisitor, TraversalSignal};
 
         struct MarkVerbatimCommentsAsFormattedVisitor<'a>(&'a Comments<'a>);
 
-        impl<'a> PreorderVisitor<'a> for MarkVerbatimCommentsAsFormattedVisitor<'a> {
+        impl<'a> SourceOrderVisitor<'a> for MarkVerbatimCommentsAsFormattedVisitor<'a> {
             fn enter_node(&mut self, node: AnyNodeRef<'a>) -> TraversalSignal {
                 for comment in self.0.leading_dangling_trailing(node) {
                     comment.mark_formatted();
@@ -481,14 +481,13 @@ mod tests {
 
     use ruff_formatter::SourceCode;
     use ruff_python_ast::{Mod, PySourceType};
-    use ruff_python_index::tokens_and_ranges;
-    use ruff_python_parser::{parse_tokens, AsMode};
+    use ruff_python_parser::{parse, AsMode, Parsed};
     use ruff_python_trivia::CommentRanges;
 
     use crate::comments::Comments;
 
     struct CommentsTestCase<'a> {
-        module: Mod,
+        parsed: Parsed<Mod>,
         comment_ranges: CommentRanges,
         source_code: SourceCode<'a>,
     }
@@ -497,20 +496,19 @@ mod tests {
         fn from_code(source: &'a str) -> Self {
             let source_code = SourceCode::new(source);
             let source_type = PySourceType::Python;
-            let (tokens, comment_ranges) =
-                tokens_and_ranges(source, source_type).expect("Expect source to be valid Python");
-            let parsed = parse_tokens(tokens, source, source_type.as_mode())
-                .expect("Expect source to be valid Python");
+            let parsed =
+                parse(source, source_type.as_mode()).expect("Expect source to be valid Python");
+            let comment_ranges = CommentRanges::from(parsed.tokens());
 
             CommentsTestCase {
-                source_code,
-                module: parsed,
+                parsed,
                 comment_ranges,
+                source_code,
             }
         }
 
         fn to_comments(&self) -> Comments {
-            Comments::from_ast(&self.module, self.source_code, &self.comment_ranges)
+            Comments::from_ast(self.parsed.syntax(), self.source_code, &self.comment_ranges)
         }
     }
 

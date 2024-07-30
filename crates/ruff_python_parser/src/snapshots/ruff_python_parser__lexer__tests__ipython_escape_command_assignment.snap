@@ -2,11 +2,13 @@
 source: crates/ruff_python_parser/src/lexer.rs
 expression: lex_jupyter_source(source)
 ---
+## Tokens
+```
 [
     (
-        Name {
-            name: "pwd",
-        },
+        Name(
+            Name("pwd"),
+        ),
         0..3,
     ),
     (
@@ -25,9 +27,9 @@ expression: lex_jupyter_source(source)
         10..11,
     ),
     (
-        Name {
-            name: "foo",
-        },
+        Name(
+            Name("foo"),
+        ),
         11..14,
     ),
     (
@@ -46,9 +48,9 @@ expression: lex_jupyter_source(source)
         30..31,
     ),
     (
-        Name {
-            name: "bar",
-        },
+        Name(
+            Name("bar"),
+        ),
         31..34,
     ),
     (
@@ -67,9 +69,9 @@ expression: lex_jupyter_source(source)
         50..51,
     ),
     (
-        Name {
-            name: "baz",
-        },
+        Name(
+            Name("baz"),
+        ),
         51..54,
     ),
     (
@@ -88,3 +90,4 @@ expression: lex_jupyter_source(source)
         85..85,
     ),
 ]
+```

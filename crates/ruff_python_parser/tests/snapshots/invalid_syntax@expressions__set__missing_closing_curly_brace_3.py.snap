@@ -43,7 +43,7 @@ Module(
                     is_async: false,
                     decorator_list: [],
                     name: Identifier {
-                        id: "foo",
+                        id: Name("foo"),
                         range: 129..132,
                     },
                     type_params: None,
@@ -72,16 +72,11 @@ Module(
 ## Errors
 
   |
+2 | # token starts a statement.
+3 | 
 4 | {1, 2
+  |      ^ Syntax Error: Expected '}', found newline
 5 | 
 6 | def foo():
-  | ^^^ Syntax Error: Expected ',', found 'def'
 7 |     pass
-  |
-
-
-  |
-6 | def foo():
-7 |     pass
-  |          Syntax Error: unexpected EOF while parsing
   |

@@ -5,14 +5,46 @@ pub enum FixMode {
     Diff,
 }
 
-#[derive(Debug, Copy, Clone, Hash, result_like::BoolLike)]
+#[derive(Debug, Copy, Clone, Hash)]
 pub enum Noqa {
     Enabled,
     Disabled,
 }
 
-#[derive(Debug, Copy, Clone, Hash, result_like::BoolLike)]
+impl Noqa {
+    pub const fn is_enabled(self) -> bool {
+        matches!(self, Noqa::Enabled)
+    }
+}
+
+impl From<bool> for Noqa {
+    fn from(value: bool) -> Self {
+        if value {
+            Noqa::Enabled
+        } else {
+            Noqa::Disabled
+        }
+    }
+}
+
+#[derive(Debug, Copy, Clone, Hash)]
 pub enum Cache {
     Enabled,
     Disabled,
+}
+
+impl Cache {
+    pub const fn is_enabled(self) -> bool {
+        matches!(self, Cache::Enabled)
+    }
+}
+
+impl From<bool> for Cache {
+    fn from(value: bool) -> Self {
+        if value {
+            Cache::Enabled
+        } else {
+            Cache::Disabled
+        }
+    }
 }

@@ -208,9 +208,7 @@ pub(crate) fn invalid_first_argument_name(
         function_type::FunctionType::Method => FunctionType::Method,
         function_type::FunctionType::ClassMethod => FunctionType::ClassMethod,
     };
-    if !checker.enabled(function_type.rule())
-        || checker.settings.pep8_naming.ignore_names.matches(name)
-    {
+    if !checker.enabled(function_type.rule()) {
         return;
     }
 
@@ -225,7 +223,13 @@ pub(crate) fn invalid_first_argument_name(
         return;
     };
 
-    if &self_or_cls.name == function_type.valid_first_argument_name() {
+    if &self_or_cls.name == function_type.valid_first_argument_name()
+        || checker
+            .settings
+            .pep8_naming
+            .ignore_names
+            .matches(&self_or_cls.name)
+    {
         return;
     }
 

@@ -10,7 +10,7 @@ use crate::checkers::ast::Checker;
 use crate::codes::Rule;
 use crate::docstrings::Docstring;
 use crate::fs::relativize_path;
-use crate::rules::{flake8_annotations, flake8_pyi, pydocstyle, pylint};
+use crate::rules::{flake8_annotations, flake8_pyi, pydoclint, pydocstyle, pylint};
 use crate::{docstrings, warn_user};
 
 /// Run lint rules over all [`Definition`] nodes in the [`SemanticModel`].
@@ -83,12 +83,19 @@ pub(crate) fn definitions(checker: &mut Checker) {
         Rule::UndocumentedPublicNestedClass,
         Rule::UndocumentedPublicPackage,
     ]);
+    let enforce_pydoclint = checker.any_enabled(&[
+        Rule::DocstringMissingReturns,
+        Rule::DocstringExtraneousReturns,
+        Rule::DocstringMissingException,
+        Rule::DocstringExtraneousException,
+    ]);
 
     if !enforce_annotations
         && !enforce_docstrings
         && !enforce_stubs
         && !enforce_stubs_and_runtime
         && !enforce_dunder_method
+        && !enforce_pydoclint
     {
         return;
     }
@@ -146,31 +153,25 @@ pub(crate) fn definitions(checker: &mut Checker) {
 
         // flake8-pyi
         if enforce_stubs {
-            if checker.enabled(Rule::DocstringInStub) {
-                flake8_pyi::rules::docstring_in_stubs(checker, docstring);
-            }
+            flake8_pyi::rules::docstring_in_stubs(checker, docstring);
         }
         if enforce_stubs_and_runtime {
-            if checker.enabled(Rule::IterMethodReturnIterable) {
-                flake8_pyi::rules::iter_method_return_iterable(checker, definition);
-            }
+            flake8_pyi::rules::iter_method_return_iterable(checker, definition);
         }
 
         // pylint
         if enforce_dunder_method {
-            if checker.enabled(Rule::BadDunderMethodName) {
-                if let Definition::Member(Member {
-                    kind: MemberKind::Method(method),
-                    ..
-                }) = definition
-                {
-                    pylint::rules::bad_dunder_method_name(checker, method);
-                }
+            if let Definition::Member(Member {
+                kind: MemberKind::Method(method),
+                ..
+            }) = definition
+            {
+                pylint::rules::bad_dunder_method_name(checker, method);
             }
         }
 
-        // pydocstyle
-        if enforce_docstrings {
+        // pydocstyle, pydoclint
+        if enforce_docstrings || enforce_pydoclint {
             if pydocstyle::helpers::should_ignore_definition(
                 definition,
                 &checker.settings.pydocstyle.ignore_decorators,
@@ -288,7 +289,8 @@ pub(crate) fn definitions(checker: &mut Checker) {
             if checker.enabled(Rule::OverloadWithDocstring) {
                 pydocstyle::rules::if_needed(checker, &docstring);
             }
-            if checker.any_enabled(&[
+
+            let enforce_sections = checker.any_enabled(&[
                 Rule::BlankLineAfterLastSection,
                 Rule::BlankLinesBetweenHeaderAndContent,
                 Rule::CapitalizeSectionName,
@@ -304,12 +306,30 @@ pub(crate) fn definitions(checker: &mut Checker) {
                 Rule::SectionUnderlineMatchesSectionLength,
                 Rule::SectionUnderlineNotOverIndented,
                 Rule::UndocumentedParam,
-            ]) {
-                pydocstyle::rules::sections(
-                    checker,
+            ]);
+            if enforce_sections || enforce_pydoclint {
+                let section_contexts = pydocstyle::helpers::get_section_contexts(
                     &docstring,
                     checker.settings.pydocstyle.convention.as_ref(),
                 );
+
+                if enforce_sections {
+                    pydocstyle::rules::sections(
+                        checker,
+                        &docstring,
+                        &section_contexts,
+                        checker.settings.pydocstyle.convention.as_ref(),
+                    );
+                }
+
+                if enforce_pydoclint {
+                    pydoclint::rules::check_docstring(
+                        checker,
+                        definition,
+                        &section_contexts,
+                        checker.settings.pydocstyle.convention.as_ref(),
+                    );
+                }
             }
         }
     }

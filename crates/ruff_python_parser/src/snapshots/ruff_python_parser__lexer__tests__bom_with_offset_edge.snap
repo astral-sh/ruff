@@ -1,0 +1,19 @@
+---
+source: crates/ruff_python_parser/src/lexer.rs
+expression: "lex_source_with_offset(source, TextSize::new(11))"
+---
+## Tokens
+```
+[
+    (
+        Name(
+            Name("z"),
+        ),
+        11..12,
+    ),
+    (
+        Newline,
+        12..12,
+    ),
+]
+```

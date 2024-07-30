@@ -17,7 +17,7 @@ Settings path: "[BASEPATH]/pyproject.toml"
 cache_dir = "[BASEPATH]/.ruff_cache"
 fix = false
 fix_only = false
-output_format = concise
+output_format = full
 show_fixes = false
 unsafe_fixes = hint
 
@@ -50,7 +50,7 @@ file_resolver.exclude = [
 	"venv",
 ]
 file_resolver.extend_exclude = [
-	"crates/red_knot/vendor/",
+	"crates/red_knot_module_resolver/vendor/",
 	"crates/ruff/resources/",
 	"crates/ruff_linter/resources/",
 	"crates/ruff_python_formatter/resources/",
@@ -232,6 +232,7 @@ linter.flake8_bandit.hardcoded_tmp_directory = [
 ]
 linter.flake8_bandit.check_typed_exception = false
 linter.flake8_bugbear.extend_immutable_calls = []
+linter.flake8_builtins.builtins_allowed_modules = []
 linter.flake8_builtins.builtins_ignorelist = []
 linter.flake8_comprehensions.allow_dict_calls_with_keyword_arguments = false
 linter.flake8_copyright.notice_rgx = (?i)Copyright\s+((?:\(C\)|©)\s+)?\d{4}((-|,\s)\d{4})*

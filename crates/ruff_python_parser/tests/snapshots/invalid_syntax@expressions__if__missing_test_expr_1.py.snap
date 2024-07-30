@@ -18,21 +18,21 @@ Module(
                             test: Name(
                                 ExprName {
                                     range: 57..57,
-                                    id: "",
+                                    id: Name(""),
                                     ctx: Invalid,
                                 },
                             ),
                             body: Name(
                                 ExprName {
                                     range: 53..54,
-                                    id: "x",
+                                    id: Name("x"),
                                     ctx: Load,
                                 },
                             ),
                             orelse: Name(
                                 ExprName {
                                     range: 57..57,
-                                    id: "",
+                                    id: Name(""),
                                     ctx: Invalid,
                                 },
                             ),

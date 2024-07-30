@@ -93,6 +93,9 @@ pub(super) fn notification<'a>(notif: server::Notification) -> Task<'a> {
         notification::DidCloseNotebook::METHOD => {
             local_notification_task::<notification::DidCloseNotebook>(notif)
         }
+        notification::SetTrace::METHOD => {
+            local_notification_task::<notification::SetTrace>(notif)
+        }
         method => {
             tracing::warn!("Received notification {method} which does not have a handler.");
             return Task::nothing();
@@ -122,7 +125,7 @@ fn background_request_task<'a, R: traits::BackgroundDocumentRequestHandler>(
     let (id, params) = cast_request::<R>(req)?;
     Ok(Task::background(schedule, move |session: &Session| {
         // TODO(jane): we should log an error if we can't take a snapshot.
-        let Some(snapshot) = session.take_snapshot(&R::document_url(&params)) else {
+        let Some(snapshot) = session.take_snapshot(R::document_url(&params).into_owned()) else {
             return Box::new(|_, _| {});
         };
         Box::new(move |notifier, responder| {
@@ -152,7 +155,7 @@ fn background_notification_thread<'a, N: traits::BackgroundDocumentNotificationH
     let (id, params) = cast_notification::<N>(req)?;
     Ok(Task::background(schedule, move |session: &Session| {
         // TODO(jane): we should log an error if we can't take a snapshot.
-        let Some(snapshot) = session.take_snapshot(&N::document_url(&params)) else {
+        let Some(snapshot) = session.take_snapshot(N::document_url(&params).into_owned()) else {
             return Box::new(|_, _| {});
         };
         Box::new(move |notifier, _| {

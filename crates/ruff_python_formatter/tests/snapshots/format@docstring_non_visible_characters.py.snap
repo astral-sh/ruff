@@ -1,0 +1,23 @@
+---
+source: crates/ruff_python_formatter/tests/fixtures.rs
+input_file: crates/ruff_python_formatter/resources/test/fixtures/ruff/docstring_non_visible_characters.py
+---
+## Input
+```python
+# Regresssion test for https://github.com/astral-sh/ruff/issues/11724
+
+'''
+
+
+'''
+```
+
+## Output
+```python
+# Regresssion test for https://github.com/astral-sh/ruff/issues/11724
+
+"""
+
+
+"""
+```

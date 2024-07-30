@@ -57,9 +57,6 @@ pub enum RuleGroup {
     Deprecated,
     /// The rule has been removed, errors will be displayed on use.
     Removed,
-    /// Legacy category for unstable rules, supports backwards compatible selection.
-    #[deprecated(note = "Use `RuleGroup::Preview` for new rules instead")]
-    Nursery,
 }
 
 #[ruff_macros::map_codes]
@@ -71,72 +68,40 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
     Some(match (linter, code) {
         // pycodestyle errors
         (Pycodestyle, "E101") => (RuleGroup::Stable, rules::pycodestyle::rules::MixedSpacesAndTabs),
-        #[allow(deprecated)]
-        (Pycodestyle, "E111") => (RuleGroup::Nursery, rules::pycodestyle::rules::logical_lines::IndentationWithInvalidMultiple),
-        #[allow(deprecated)]
-        (Pycodestyle, "E112") => (RuleGroup::Nursery, rules::pycodestyle::rules::logical_lines::NoIndentedBlock),
-        #[allow(deprecated)]
-        (Pycodestyle, "E113") => (RuleGroup::Nursery, rules::pycodestyle::rules::logical_lines::UnexpectedIndentation),
-        #[allow(deprecated)]
-        (Pycodestyle, "E114") => (RuleGroup::Nursery, rules::pycodestyle::rules::logical_lines::IndentationWithInvalidMultipleComment),
-        #[allow(deprecated)]
-        (Pycodestyle, "E115") => (RuleGroup::Nursery, rules::pycodestyle::rules::logical_lines::NoIndentedBlockComment),
-        #[allow(deprecated)]
-        (Pycodestyle, "E116") => (RuleGroup::Nursery, rules::pycodestyle::rules::logical_lines::UnexpectedIndentationComment),
-        #[allow(deprecated)]
-        (Pycodestyle, "E117") => (RuleGroup::Nursery, rules::pycodestyle::rules::logical_lines::OverIndented),
-        #[allow(deprecated)]
-        (Pycodestyle, "E201") => (RuleGroup::Nursery, rules::pycodestyle::rules::logical_lines::WhitespaceAfterOpenBracket),
-        #[allow(deprecated)]
-        (Pycodestyle, "E202") => (RuleGroup::Nursery, rules::pycodestyle::rules::logical_lines::WhitespaceBeforeCloseBracket),
-        #[allow(deprecated)]
-        (Pycodestyle, "E203") => (RuleGroup::Nursery, rules::pycodestyle::rules::logical_lines::WhitespaceBeforePunctuation),
-        #[allow(deprecated)]
-        (Pycodestyle, "E211") => (RuleGroup::Nursery, rules::pycodestyle::rules::logical_lines::WhitespaceBeforeParameters),
-        #[allow(deprecated)]
-        (Pycodestyle, "E221") => (RuleGroup::Nursery, rules::pycodestyle::rules::logical_lines::MultipleSpacesBeforeOperator),
-        #[allow(deprecated)]
-        (Pycodestyle, "E222") => (RuleGroup::Nursery, rules::pycodestyle::rules::logical_lines::MultipleSpacesAfterOperator),
-        #[allow(deprecated)]
-        (Pycodestyle, "E223") => (RuleGroup::Nursery, rules::pycodestyle::rules::logical_lines::TabBeforeOperator),
-        #[allow(deprecated)]
-        (Pycodestyle, "E224") => (RuleGroup::Nursery, rules::pycodestyle::rules::logical_lines::TabAfterOperator),
-        #[allow(deprecated)]
-        (Pycodestyle, "E225") => (RuleGroup::Nursery, rules::pycodestyle::rules::logical_lines::MissingWhitespaceAroundOperator),
-        #[allow(deprecated)]
-        (Pycodestyle, "E226") => (RuleGroup::Nursery, rules::pycodestyle::rules::logical_lines::MissingWhitespaceAroundArithmeticOperator),
-        #[allow(deprecated)]
-        (Pycodestyle, "E227") => (RuleGroup::Nursery, rules::pycodestyle::rules::logical_lines::MissingWhitespaceAroundBitwiseOrShiftOperator),
-        #[allow(deprecated)]
-        (Pycodestyle, "E228") => (RuleGroup::Nursery, rules::pycodestyle::rules::logical_lines::MissingWhitespaceAroundModuloOperator),
-        #[allow(deprecated)]
-        (Pycodestyle, "E231") => (RuleGroup::Nursery, rules::pycodestyle::rules::logical_lines::MissingWhitespace),
-        #[allow(deprecated)]
-        (Pycodestyle, "E241") => (RuleGroup::Nursery, rules::pycodestyle::rules::logical_lines::MultipleSpacesAfterComma),
-        #[allow(deprecated)]
-        (Pycodestyle, "E242") => (RuleGroup::Nursery, rules::pycodestyle::rules::logical_lines::TabAfterComma),
-        #[allow(deprecated)]
-        (Pycodestyle, "E251") => (RuleGroup::Nursery, rules::pycodestyle::rules::logical_lines::UnexpectedSpacesAroundKeywordParameterEquals),
-        #[allow(deprecated)]
-        (Pycodestyle, "E252") => (RuleGroup::Nursery, rules::pycodestyle::rules::logical_lines::MissingWhitespaceAroundParameterEquals),
-        #[allow(deprecated)]
-        (Pycodestyle, "E261") => (RuleGroup::Nursery, rules::pycodestyle::rules::logical_lines::TooFewSpacesBeforeInlineComment),
-        #[allow(deprecated)]
-        (Pycodestyle, "E262") => (RuleGroup::Nursery, rules::pycodestyle::rules::logical_lines::NoSpaceAfterInlineComment),
-        #[allow(deprecated)]
-        (Pycodestyle, "E265") => (RuleGroup::Nursery, rules::pycodestyle::rules::logical_lines::NoSpaceAfterBlockComment),
-        #[allow(deprecated)]
-        (Pycodestyle, "E266") => (RuleGroup::Nursery, rules::pycodestyle::rules::logical_lines::MultipleLeadingHashesForBlockComment),
-        #[allow(deprecated)]
-        (Pycodestyle, "E271") => (RuleGroup::Nursery, rules::pycodestyle::rules::logical_lines::MultipleSpacesAfterKeyword),
-        #[allow(deprecated)]
-        (Pycodestyle, "E272") => (RuleGroup::Nursery, rules::pycodestyle::rules::logical_lines::MultipleSpacesBeforeKeyword),
-        #[allow(deprecated)]
-        (Pycodestyle, "E273") => (RuleGroup::Nursery, rules::pycodestyle::rules::logical_lines::TabAfterKeyword),
-        #[allow(deprecated)]
-        (Pycodestyle, "E274") => (RuleGroup::Nursery, rules::pycodestyle::rules::logical_lines::TabBeforeKeyword),
-        #[allow(deprecated)]
-        (Pycodestyle, "E275") => (RuleGroup::Nursery, rules::pycodestyle::rules::logical_lines::MissingWhitespaceAfterKeyword),
+        (Pycodestyle, "E111") => (RuleGroup::Preview, rules::pycodestyle::rules::logical_lines::IndentationWithInvalidMultiple),
+        (Pycodestyle, "E112") => (RuleGroup::Preview, rules::pycodestyle::rules::logical_lines::NoIndentedBlock),
+        (Pycodestyle, "E113") => (RuleGroup::Preview, rules::pycodestyle::rules::logical_lines::UnexpectedIndentation),
+        (Pycodestyle, "E114") => (RuleGroup::Preview, rules::pycodestyle::rules::logical_lines::IndentationWithInvalidMultipleComment),
+        (Pycodestyle, "E115") => (RuleGroup::Preview, rules::pycodestyle::rules::logical_lines::NoIndentedBlockComment),
+        (Pycodestyle, "E116") => (RuleGroup::Preview, rules::pycodestyle::rules::logical_lines::UnexpectedIndentationComment),
+        (Pycodestyle, "E117") => (RuleGroup::Preview, rules::pycodestyle::rules::logical_lines::OverIndented),
+        (Pycodestyle, "E201") => (RuleGroup::Preview, rules::pycodestyle::rules::logical_lines::WhitespaceAfterOpenBracket),
+        (Pycodestyle, "E202") => (RuleGroup::Preview, rules::pycodestyle::rules::logical_lines::WhitespaceBeforeCloseBracket),
+        (Pycodestyle, "E203") => (RuleGroup::Preview, rules::pycodestyle::rules::logical_lines::WhitespaceBeforePunctuation),
+        (Pycodestyle, "E204") => (RuleGroup::Preview, rules::pycodestyle::rules::WhitespaceAfterDecorator),
+        (Pycodestyle, "E211") => (RuleGroup::Preview, rules::pycodestyle::rules::logical_lines::WhitespaceBeforeParameters),
+        (Pycodestyle, "E221") => (RuleGroup::Preview, rules::pycodestyle::rules::logical_lines::MultipleSpacesBeforeOperator),
+        (Pycodestyle, "E222") => (RuleGroup::Preview, rules::pycodestyle::rules::logical_lines::MultipleSpacesAfterOperator),
+        (Pycodestyle, "E223") => (RuleGroup::Preview, rules::pycodestyle::rules::logical_lines::TabBeforeOperator),
+        (Pycodestyle, "E224") => (RuleGroup::Preview, rules::pycodestyle::rules::logical_lines::TabAfterOperator),
+        (Pycodestyle, "E225") => (RuleGroup::Preview, rules::pycodestyle::rules::logical_lines::MissingWhitespaceAroundOperator),
+        (Pycodestyle, "E226") => (RuleGroup::Preview, rules::pycodestyle::rules::logical_lines::MissingWhitespaceAroundArithmeticOperator),
+        (Pycodestyle, "E227") => (RuleGroup::Preview, rules::pycodestyle::rules::logical_lines::MissingWhitespaceAroundBitwiseOrShiftOperator),
+        (Pycodestyle, "E228") => (RuleGroup::Preview, rules::pycodestyle::rules::logical_lines::MissingWhitespaceAroundModuloOperator),
+        (Pycodestyle, "E231") => (RuleGroup::Preview, rules::pycodestyle::rules::logical_lines::MissingWhitespace),
+        (Pycodestyle, "E241") => (RuleGroup::Preview, rules::pycodestyle::rules::logical_lines::MultipleSpacesAfterComma),
+        (Pycodestyle, "E242") => (RuleGroup::Preview, rules::pycodestyle::rules::logical_lines::TabAfterComma),
+        (Pycodestyle, "E251") => (RuleGroup::Preview, rules::pycodestyle::rules::logical_lines::UnexpectedSpacesAroundKeywordParameterEquals),
+        (Pycodestyle, "E252") => (RuleGroup::Preview, rules::pycodestyle::rules::logical_lines::MissingWhitespaceAroundParameterEquals),
+        (Pycodestyle, "E261") => (RuleGroup::Preview, rules::pycodestyle::rules::logical_lines::TooFewSpacesBeforeInlineComment),
+        (Pycodestyle, "E262") => (RuleGroup::Preview, rules::pycodestyle::rules::logical_lines::NoSpaceAfterInlineComment),
+        (Pycodestyle, "E265") => (RuleGroup::Preview, rules::pycodestyle::rules::logical_lines::NoSpaceAfterBlockComment),
+        (Pycodestyle, "E266") => (RuleGroup::Preview, rules::pycodestyle::rules::logical_lines::MultipleLeadingHashesForBlockComment),
+        (Pycodestyle, "E271") => (RuleGroup::Preview, rules::pycodestyle::rules::logical_lines::MultipleSpacesAfterKeyword),
+        (Pycodestyle, "E272") => (RuleGroup::Preview, rules::pycodestyle::rules::logical_lines::MultipleSpacesBeforeKeyword),
+        (Pycodestyle, "E273") => (RuleGroup::Preview, rules::pycodestyle::rules::logical_lines::TabAfterKeyword),
+        (Pycodestyle, "E274") => (RuleGroup::Preview, rules::pycodestyle::rules::logical_lines::TabBeforeKeyword),
+        (Pycodestyle, "E275") => (RuleGroup::Preview, rules::pycodestyle::rules::logical_lines::MissingWhitespaceAfterKeyword),
         (Pycodestyle, "E301") => (RuleGroup::Preview, rules::pycodestyle::rules::BlankLineBetweenMethods),
         (Pycodestyle, "E302") => (RuleGroup::Preview, rules::pycodestyle::rules::BlankLinesTopLevel),
         (Pycodestyle, "E303") => (RuleGroup::Preview, rules::pycodestyle::rules::TooManyBlankLines),
@@ -161,7 +126,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Pycodestyle, "E742") => (RuleGroup::Stable, rules::pycodestyle::rules::AmbiguousClassName),
         (Pycodestyle, "E743") => (RuleGroup::Stable, rules::pycodestyle::rules::AmbiguousFunctionName),
         (Pycodestyle, "E902") => (RuleGroup::Stable, rules::pycodestyle::rules::IOError),
-        (Pycodestyle, "E999") => (RuleGroup::Stable, rules::pycodestyle::rules::SyntaxError),
+        (Pycodestyle, "E999") => (RuleGroup::Deprecated, rules::pycodestyle::rules::SyntaxError),
 
         // pycodestyle warnings
         (Pycodestyle, "W191") => (RuleGroup::Stable, rules::pycodestyle::rules::TabIndentation),
@@ -222,19 +187,19 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Pylint, "C0131") => (RuleGroup::Stable, rules::pylint::rules::TypeBivariance),
         (Pylint, "C0132") => (RuleGroup::Stable, rules::pylint::rules::TypeParamNameMismatch),
         (Pylint, "C0205") => (RuleGroup::Stable, rules::pylint::rules::SingleStringSlots),
+        (Pylint, "C0206") => (RuleGroup::Preview, rules::pylint::rules::DictIndexMissingItems),
         (Pylint, "C0208") => (RuleGroup::Stable, rules::pylint::rules::IterationOverSet),
         (Pylint, "C0414") => (RuleGroup::Stable, rules::pylint::rules::UselessImportAlias),
         (Pylint, "C0415") => (RuleGroup::Preview, rules::pylint::rules::ImportOutsideTopLevel),
-        #[allow(deprecated)]
-        (Pylint, "C1901") => (RuleGroup::Nursery, rules::pylint::rules::CompareToEmptyString),
-        (Pylint, "C2401") => (RuleGroup::Preview, rules::pylint::rules::NonAsciiName),
-        (Pylint, "C2403") => (RuleGroup::Preview, rules::pylint::rules::NonAsciiImportName),
+        (Pylint, "C1901") => (RuleGroup::Preview, rules::pylint::rules::CompareToEmptyString),
+        (Pylint, "C2401") => (RuleGroup::Stable, rules::pylint::rules::NonAsciiName),
+        (Pylint, "C2403") => (RuleGroup::Stable, rules::pylint::rules::NonAsciiImportName),
         (Pylint, "C2701") => (RuleGroup::Preview, rules::pylint::rules::ImportPrivateName),
         (Pylint, "C2801") => (RuleGroup::Preview, rules::pylint::rules::UnnecessaryDunderCall),
         (Pylint, "C3002") => (RuleGroup::Stable, rules::pylint::rules::UnnecessaryDirectLambdaCall),
         (Pylint, "E0100") => (RuleGroup::Stable, rules::pylint::rules::YieldInInit),
         (Pylint, "E0101") => (RuleGroup::Stable, rules::pylint::rules::ReturnInInit),
-        (Pylint, "E0115") => (RuleGroup::Preview, rules::pylint::rules::NonlocalAndGlobal),
+        (Pylint, "E0115") => (RuleGroup::Stable, rules::pylint::rules::NonlocalAndGlobal),
         (Pylint, "E0116") => (RuleGroup::Stable, rules::pylint::rules::ContinueInFinally),
         (Pylint, "E0117") => (RuleGroup::Stable, rules::pylint::rules::NonlocalWithoutBinding),
         (Pylint, "E0118") => (RuleGroup::Stable, rules::pylint::rules::LoadBeforeGlobalDeclaration),
@@ -249,9 +214,9 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Pylint, "E0309") => (RuleGroup::Preview, rules::pylint::rules::InvalidHashReturnType),
         (Pylint, "E0604") => (RuleGroup::Stable, rules::pylint::rules::InvalidAllObject),
         (Pylint, "E0605") => (RuleGroup::Stable, rules::pylint::rules::InvalidAllFormat),
-        (Pylint, "E0643") => (RuleGroup::Preview, rules::pylint::rules::PotentialIndexError),
-        (Pylint, "E0704") => (RuleGroup::Preview, rules::pylint::rules::MisplacedBareRaise),
-        (Pylint, "E1132") => (RuleGroup::Preview, rules::pylint::rules::RepeatedKeywordArgument),
+        (Pylint, "E0643") => (RuleGroup::Stable, rules::pylint::rules::PotentialIndexError),
+        (Pylint, "E0704") => (RuleGroup::Stable, rules::pylint::rules::MisplacedBareRaise),
+        (Pylint, "E1132") => (RuleGroup::Stable, rules::pylint::rules::RepeatedKeywordArgument),
         (Pylint, "E1141") => (RuleGroup::Preview, rules::pylint::rules::DictIterMissingItems),
         (Pylint, "E1142") => (RuleGroup::Stable, rules::pylint::rules::AwaitOutsideAsync),
         (Pylint, "E1205") => (RuleGroup::Stable, rules::pylint::rules::LoggingTooManyArgs),
@@ -284,69 +249,71 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Pylint, "R0915") => (RuleGroup::Stable, rules::pylint::rules::TooManyStatements),
         (Pylint, "R0916") => (RuleGroup::Preview, rules::pylint::rules::TooManyBooleanExpressions),
         (Pylint, "R0917") => (RuleGroup::Preview, rules::pylint::rules::TooManyPositional),
-        (Pylint, "R1701") => (RuleGroup::Stable, rules::pylint::rules::RepeatedIsinstanceCalls),
+        (Pylint, "R1701") => (RuleGroup::Removed, rules::pylint::rules::RepeatedIsinstanceCalls),
         (Pylint, "R1702") => (RuleGroup::Preview, rules::pylint::rules::TooManyNestedBlocks),
-        (Pylint, "R1704") => (RuleGroup::Preview, rules::pylint::rules::RedefinedArgumentFromLocal),
+        (Pylint, "R1704") => (RuleGroup::Stable, rules::pylint::rules::RedefinedArgumentFromLocal),
         (Pylint, "R1706") => (RuleGroup::Removed, rules::pylint::rules::AndOrTernary),
         (Pylint, "R1711") => (RuleGroup::Stable, rules::pylint::rules::UselessReturn),
         (Pylint, "R1714") => (RuleGroup::Stable, rules::pylint::rules::RepeatedEqualityComparison),
         (Pylint, "R1722") => (RuleGroup::Stable, rules::pylint::rules::SysExitAlias),
         (Pylint, "R1730") => (RuleGroup::Preview, rules::pylint::rules::IfStmtMinMax),
         (Pylint, "R1733") => (RuleGroup::Preview, rules::pylint::rules::UnnecessaryDictIndexLookup),
-        (Pylint, "R1736") => (RuleGroup::Preview, rules::pylint::rules::UnnecessaryListIndexLookup),
+        (Pylint, "R1736") => (RuleGroup::Stable, rules::pylint::rules::UnnecessaryListIndexLookup),
         (Pylint, "R2004") => (RuleGroup::Stable, rules::pylint::rules::MagicValueComparison),
-        (Pylint, "R2044") => (RuleGroup::Preview, rules::pylint::rules::EmptyComment),
+        (Pylint, "R2044") => (RuleGroup::Stable, rules::pylint::rules::EmptyComment),
         (Pylint, "R5501") => (RuleGroup::Stable, rules::pylint::rules::CollapsibleElseIf),
         (Pylint, "R6104") => (RuleGroup::Preview, rules::pylint::rules::NonAugmentedAssignment),
         (Pylint, "R6201") => (RuleGroup::Preview, rules::pylint::rules::LiteralMembership),
-        #[allow(deprecated)]
-        (Pylint, "R6301") => (RuleGroup::Nursery, rules::pylint::rules::NoSelfUse),
+        (Pylint, "R6301") => (RuleGroup::Preview, rules::pylint::rules::NoSelfUse),
         (Pylint, "W0108") => (RuleGroup::Preview, rules::pylint::rules::UnnecessaryLambda),
         (Pylint, "W0177") => (RuleGroup::Preview, rules::pylint::rules::NanComparison),
         (Pylint, "W0120") => (RuleGroup::Stable, rules::pylint::rules::UselessElseOnLoop),
         (Pylint, "W0127") => (RuleGroup::Stable, rules::pylint::rules::SelfAssigningVariable),
-        (Pylint, "W0128") => (RuleGroup::Preview, rules::pylint::rules::RedeclaredAssignedName),
+        (Pylint, "W0128") => (RuleGroup::Stable, rules::pylint::rules::RedeclaredAssignedName),
         (Pylint, "W0129") => (RuleGroup::Stable, rules::pylint::rules::AssertOnStringLiteral),
         (Pylint, "W0131") => (RuleGroup::Stable, rules::pylint::rules::NamedExprWithoutContext),
-        (Pylint, "W0133") => (RuleGroup::Preview, rules::pylint::rules::UselessExceptionStatement),
+        (Pylint, "W0133") => (RuleGroup::Stable, rules::pylint::rules::UselessExceptionStatement),
         (Pylint, "W0211") => (RuleGroup::Preview, rules::pylint::rules::BadStaticmethodArgument),
-        (Pylint, "W0245") => (RuleGroup::Preview, rules::pylint::rules::SuperWithoutBrackets),
+        (Pylint, "W0245") => (RuleGroup::Stable, rules::pylint::rules::SuperWithoutBrackets),
         (Pylint, "W0406") => (RuleGroup::Stable, rules::pylint::rules::ImportSelf),
         (Pylint, "W0602") => (RuleGroup::Stable, rules::pylint::rules::GlobalVariableNotAssigned),
         (Pylint, "W0603") => (RuleGroup::Stable, rules::pylint::rules::GlobalStatement),
-        (Pylint, "W0604") => (RuleGroup::Preview, rules::pylint::rules::GlobalAtModuleLevel),
+        (Pylint, "W0604") => (RuleGroup::Stable, rules::pylint::rules::GlobalAtModuleLevel),
         (Pylint, "W0642") => (RuleGroup::Preview, rules::pylint::rules::SelfOrClsAssignment),
         (Pylint, "W0711") => (RuleGroup::Stable, rules::pylint::rules::BinaryOpException),
-        (Pylint, "W1501") => (RuleGroup::Preview, rules::pylint::rules::BadOpenMode),
+        (Pylint, "W1501") => (RuleGroup::Stable, rules::pylint::rules::BadOpenMode),
         (Pylint, "W1508") => (RuleGroup::Stable, rules::pylint::rules::InvalidEnvvarDefault),
         (Pylint, "W1509") => (RuleGroup::Stable, rules::pylint::rules::SubprocessPopenPreexecFn),
         (Pylint, "W1510") => (RuleGroup::Stable, rules::pylint::rules::SubprocessRunWithoutCheck),
         (Pylint, "W1514") => (RuleGroup::Preview, rules::pylint::rules::UnspecifiedEncoding),
-        #[allow(deprecated)]
-        (Pylint, "W1641") => (RuleGroup::Nursery, rules::pylint::rules::EqWithoutHash),
-        (Pylint, "W2101") => (RuleGroup::Preview, rules::pylint::rules::UselessWithLock),
+        (Pylint, "W1641") => (RuleGroup::Preview, rules::pylint::rules::EqWithoutHash),
+        (Pylint, "W2101") => (RuleGroup::Stable, rules::pylint::rules::UselessWithLock),
         (Pylint, "W2901") => (RuleGroup::Stable, rules::pylint::rules::RedefinedLoopName),
-        #[allow(deprecated)]
-        (Pylint, "W3201") => (RuleGroup::Nursery, rules::pylint::rules::BadDunderMethodName),
+        (Pylint, "W3201") => (RuleGroup::Preview, rules::pylint::rules::BadDunderMethodName),
         (Pylint, "W3301") => (RuleGroup::Stable, rules::pylint::rules::NestedMinMax),
 
         // flake8-async
-        (Flake8Async, "100") => (RuleGroup::Stable, rules::flake8_async::rules::BlockingHttpCallInAsyncFunction),
-        (Flake8Async, "101") => (RuleGroup::Stable, rules::flake8_async::rules::OpenSleepOrSubprocessInAsyncFunction),
-        (Flake8Async, "102") => (RuleGroup::Stable, rules::flake8_async::rules::BlockingOsCallInAsyncFunction),
-        (Flake8Async, "116") => (RuleGroup::Preview, rules::flake8_async::rules::SleepForeverCall),
-
-        // flake8-trio
-        (Flake8Trio, "100") => (RuleGroup::Stable, rules::flake8_trio::rules::TrioTimeoutWithoutAwait),
-        (Flake8Trio, "105") => (RuleGroup::Stable, rules::flake8_trio::rules::TrioSyncCall),
-        (Flake8Trio, "109") => (RuleGroup::Stable, rules::flake8_trio::rules::TrioAsyncFunctionWithTimeout),
-        (Flake8Trio, "110") => (RuleGroup::Stable, rules::flake8_trio::rules::TrioUnneededSleep),
-        (Flake8Trio, "115") => (RuleGroup::Stable, rules::flake8_trio::rules::TrioZeroSleepCall),
+        (Flake8Async, "100") => (RuleGroup::Stable, rules::flake8_async::rules::CancelScopeNoCheckpoint),
+        (Flake8Async, "105") => (RuleGroup::Stable, rules::flake8_async::rules::TrioSyncCall),
+        (Flake8Async, "109") => (RuleGroup::Stable, rules::flake8_async::rules::AsyncFunctionWithTimeout),
+        (Flake8Async, "110") => (RuleGroup::Stable, rules::flake8_async::rules::AsyncBusyWait),
+        (Flake8Async, "115") => (RuleGroup::Stable, rules::flake8_async::rules::AsyncZeroSleep),
+        (Flake8Async, "116") => (RuleGroup::Preview, rules::flake8_async::rules::LongSleepNotForever),
+        (Flake8Async, "210") => (RuleGroup::Stable, rules::flake8_async::rules::BlockingHttpCallInAsyncFunction),
+        (Flake8Async, "220") => (RuleGroup::Stable, rules::flake8_async::rules::CreateSubprocessInAsyncFunction),
+        (Flake8Async, "221") => (RuleGroup::Stable, rules::flake8_async::rules::RunProcessInAsyncFunction),
+        (Flake8Async, "222") => (RuleGroup::Stable, rules::flake8_async::rules::WaitForProcessInAsyncFunction),
+        (Flake8Async, "230") => (RuleGroup::Stable, rules::flake8_async::rules::BlockingOpenCallInAsyncFunction),
+        (Flake8Async, "251") => (RuleGroup::Stable, rules::flake8_async::rules::BlockingSleepInAsyncFunction),
 
         // flake8-builtins
         (Flake8Builtins, "001") => (RuleGroup::Stable, rules::flake8_builtins::rules::BuiltinVariableShadowing),
         (Flake8Builtins, "002") => (RuleGroup::Stable, rules::flake8_builtins::rules::BuiltinArgumentShadowing),
         (Flake8Builtins, "003") => (RuleGroup::Stable, rules::flake8_builtins::rules::BuiltinAttributeShadowing),
+        // TODO(charlie): When stabilizing, remove preview gating for A001's treatment of imports.
+        (Flake8Builtins, "004") => (RuleGroup::Preview, rules::flake8_builtins::rules::BuiltinImportShadowing),
+        (Flake8Builtins, "005") => (RuleGroup::Preview, rules::flake8_builtins::rules::BuiltinModuleShadowing),
+        (Flake8Builtins, "006") => (RuleGroup::Preview, rules::flake8_builtins::rules::BuiltinLambdaArgumentShadowing),
 
         // flake8-bugbear
         (Flake8Bugbear, "002") => (RuleGroup::Stable, rules::flake8_bugbear::rules::UnaryPrefixIncrementDecrement),
@@ -383,6 +350,8 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Flake8Bugbear, "033") => (RuleGroup::Stable, rules::flake8_bugbear::rules::DuplicateValue),
         (Flake8Bugbear, "034") => (RuleGroup::Stable, rules::flake8_bugbear::rules::ReSubPositionalArgs),
         (Flake8Bugbear, "035") => (RuleGroup::Stable, rules::flake8_bugbear::rules::StaticKeyDictComprehension),
+        (Flake8Bugbear, "039") => (RuleGroup::Preview, rules::flake8_bugbear::rules::MutableContextvarDefault),
+        (Flake8Bugbear, "901") => (RuleGroup::Preview, rules::flake8_bugbear::rules::ReturnInGenerator),
         (Flake8Bugbear, "904") => (RuleGroup::Stable, rules::flake8_bugbear::rules::RaiseWithoutFromInsideExcept),
         (Flake8Bugbear, "905") => (RuleGroup::Stable, rules::flake8_bugbear::rules::ZipWithoutExplicitStrict),
         (Flake8Bugbear, "909") => (RuleGroup::Preview, rules::flake8_bugbear::rules::LoopIteratorMutation),
@@ -513,8 +482,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Flake8Simplify, "911") => (RuleGroup::Stable, rules::flake8_simplify::rules::ZipDictKeysAndValues),
 
         // flake8-copyright
-        #[allow(deprecated)]
-        (Flake8Copyright, "001") => (RuleGroup::Nursery, rules::flake8_copyright::rules::MissingCopyrightNotice),
+        (Flake8Copyright, "001") => (RuleGroup::Preview, rules::flake8_copyright::rules::MissingCopyrightNotice),
 
         // pyupgrade
         (Pyupgrade, "001") => (RuleGroup::Stable, rules::pyupgrade::rules::UselessMetaclassType),
@@ -557,6 +525,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Pyupgrade, "040") => (RuleGroup::Stable, rules::pyupgrade::rules::NonPEP695TypeAlias),
         (Pyupgrade, "041") => (RuleGroup::Stable, rules::pyupgrade::rules::TimeoutErrorAlias),
         (Pyupgrade, "042") => (RuleGroup::Preview, rules::pyupgrade::rules::ReplaceStrEnum),
+        (Pyupgrade, "043") => (RuleGroup::Preview, rules::pyupgrade::rules::UnnecessaryDefaultTypeArgs),
 
         // pydocstyle
         (Pydocstyle, "100") => (RuleGroup::Stable, rules::pydocstyle::rules::UndocumentedPublicModule),
@@ -699,7 +668,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Flake8Bandit, "607") => (RuleGroup::Stable, rules::flake8_bandit::rules::StartProcessWithPartialPath),
         (Flake8Bandit, "608") => (RuleGroup::Stable, rules::flake8_bandit::rules::HardcodedSQLExpression),
         (Flake8Bandit, "609") => (RuleGroup::Stable, rules::flake8_bandit::rules::UnixCommandWildcardInjection),
-        (Flake8Bandit, "610") => (RuleGroup::Preview, rules::flake8_bandit::rules::DjangoExtra),
+        (Flake8Bandit, "610") => (RuleGroup::Stable, rules::flake8_bandit::rules::DjangoExtra),
         (Flake8Bandit, "611") => (RuleGroup::Stable, rules::flake8_bandit::rules::DjangoRawSql),
         (Flake8Bandit, "612") => (RuleGroup::Stable, rules::flake8_bandit::rules::LoggingConfigInsecureListen),
         (Flake8Bandit, "701") => (RuleGroup::Stable, rules::flake8_bandit::rules::Jinja2AutoescapeFalse),
@@ -809,8 +778,12 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Flake8Pyi, "055") => (RuleGroup::Stable, rules::flake8_pyi::rules::UnnecessaryTypeUnion),
         (Flake8Pyi, "056") => (RuleGroup::Stable, rules::flake8_pyi::rules::UnsupportedMethodCallOnAll),
         (Flake8Pyi, "058") => (RuleGroup::Stable, rules::flake8_pyi::rules::GeneratorReturnFromIterMethod),
+        (Flake8Pyi, "057") => (RuleGroup::Preview, rules::flake8_pyi::rules::ByteStringUsage),
         (Flake8Pyi, "059") => (RuleGroup::Preview, rules::flake8_pyi::rules::GenericNotLastBaseClass),
         (Flake8Pyi, "062") => (RuleGroup::Preview, rules::flake8_pyi::rules::DuplicateLiteralMember),
+        (Flake8Pyi, "063") => (RuleGroup::Preview, rules::flake8_pyi::rules::PrePep570PositionalArgument),
+        (Flake8Pyi, "064") => (RuleGroup::Preview, rules::flake8_pyi::rules::RedundantFinalLiteral),
+        (Flake8Pyi, "066") => (RuleGroup::Preview, rules::flake8_pyi::rules::BadVersionInfoOrder),
 
         // flake8-pytest-style
         (Flake8PytestStyle, "001") => (RuleGroup::Stable, rules::flake8_pytest_style::rules::PytestFixtureIncorrectParenthesesStyle),
@@ -943,13 +916,23 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Numpy, "003") => (RuleGroup::Stable, rules::numpy::rules::NumpyDeprecatedFunction),
         (Numpy, "201") => (RuleGroup::Stable, rules::numpy::rules::Numpy2Deprecation),
 
+        // fastapi
+        (FastApi, "001") => (RuleGroup::Preview, rules::fastapi::rules::FastApiRedundantResponseModel),
+        (FastApi, "002") => (RuleGroup::Preview, rules::fastapi::rules::FastApiNonAnnotatedDependency),
+
+        // pydoclint
+        (Pydoclint, "201") => (RuleGroup::Preview, rules::pydoclint::rules::DocstringMissingReturns),
+        (Pydoclint, "202") => (RuleGroup::Preview, rules::pydoclint::rules::DocstringExtraneousReturns),
+        (Pydoclint, "501") => (RuleGroup::Preview, rules::pydoclint::rules::DocstringMissingException),
+        (Pydoclint, "502") => (RuleGroup::Preview, rules::pydoclint::rules::DocstringExtraneousException),
+
         // ruff
         (Ruff, "001") => (RuleGroup::Stable, rules::ruff::rules::AmbiguousUnicodeCharacterString),
         (Ruff, "002") => (RuleGroup::Stable, rules::ruff::rules::AmbiguousUnicodeCharacterDocstring),
         (Ruff, "003") => (RuleGroup::Stable, rules::ruff::rules::AmbiguousUnicodeCharacterComment),
         (Ruff, "005") => (RuleGroup::Stable, rules::ruff::rules::CollectionLiteralConcatenation),
         (Ruff, "006") => (RuleGroup::Stable, rules::ruff::rules::AsyncioDanglingTask),
-        (Ruff, "007") => (RuleGroup::Stable, rules::ruff::rules::PairwiseOverZipped),
+        (Ruff, "007") => (RuleGroup::Stable, rules::ruff::rules::ZipInsteadOfPairwise),
         (Ruff, "008") => (RuleGroup::Stable, rules::ruff::rules::MutableDataclassDefault),
         (Ruff, "009") => (RuleGroup::Stable, rules::ruff::rules::FunctionCallInDataclassDefaultArgument),
         (Ruff, "010") => (RuleGroup::Stable, rules::ruff::rules::ExplicitFStringTypeConversion),
@@ -965,15 +948,17 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Ruff, "021") => (RuleGroup::Preview, rules::ruff::rules::ParenthesizeChainedOperators),
         (Ruff, "022") => (RuleGroup::Preview, rules::ruff::rules::UnsortedDunderAll),
         (Ruff, "023") => (RuleGroup::Preview, rules::ruff::rules::UnsortedDunderSlots),
-        (Ruff, "024") => (RuleGroup::Preview, rules::ruff::rules::MutableFromkeysValue),
+        (Ruff, "024") => (RuleGroup::Stable, rules::ruff::rules::MutableFromkeysValue),
         (Ruff, "025") => (RuleGroup::Preview, rules::ruff::rules::UnnecessaryDictComprehensionForIterable),
-        (Ruff, "026") => (RuleGroup::Preview, rules::ruff::rules::DefaultFactoryKwarg),
+        (Ruff, "026") => (RuleGroup::Stable, rules::ruff::rules::DefaultFactoryKwarg),
         (Ruff, "027") => (RuleGroup::Preview, rules::ruff::rules::MissingFStringSyntax),
         (Ruff, "028") => (RuleGroup::Preview, rules::ruff::rules::InvalidFormatterSuppressionComment),
         (Ruff, "029") => (RuleGroup::Preview, rules::ruff::rules::UnusedAsync),
-        (Ruff, "030") => (RuleGroup::Stable, rules::ruff::rules::ControlVarUsedAfterBlock),
+        (Ruff, "030") => (RuleGroup::Preview, rules::ruff::rules::AssertWithPrintMessage),
+        (Ruff, "031") => (RuleGroup::Stable, rules::ruff::rules::ControlVarUsedAfterBlock),
         (Ruff, "100") => (RuleGroup::Stable, rules::ruff::rules::UnusedNOQA),
         (Ruff, "101") => (RuleGroup::Preview, rules::ruff::rules::RedirectedNOQA),
+
         (Ruff, "200") => (RuleGroup::Stable, rules::ruff::rules::InvalidPyprojectToml),
         #[cfg(any(feature = "test-rules", test))]
         (Ruff, "900") => (RuleGroup::Stable, rules::ruff::rules::StableTestRule),
@@ -985,9 +970,6 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Ruff, "903") => (RuleGroup::Stable, rules::ruff::rules::StableTestRuleDisplayOnlyFix),
         #[cfg(any(feature = "test-rules", test))]
         (Ruff, "911") => (RuleGroup::Preview, rules::ruff::rules::PreviewTestRule),
-        #[cfg(any(feature = "test-rules", test))]
-        #[allow(deprecated)]
-        (Ruff, "912") => (RuleGroup::Nursery, rules::ruff::rules::NurseryTestRule),
         #[cfg(any(feature = "test-rules", test))]
         (Ruff, "920") => (RuleGroup::Deprecated, rules::ruff::rules::DeprecatedTestRule),
         #[cfg(any(feature = "test-rules", test))]
@@ -1035,7 +1017,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Perflint, "203") => (RuleGroup::Stable, rules::perflint::rules::TryExceptInLoop),
         (Perflint, "401") => (RuleGroup::Stable, rules::perflint::rules::ManualListComprehension),
         (Perflint, "402") => (RuleGroup::Stable, rules::perflint::rules::ManualListCopy),
-        (Perflint, "403") => (RuleGroup::Preview, rules::perflint::rules::ManualDictComprehension),
+        (Perflint, "403") => (RuleGroup::Stable, rules::perflint::rules::ManualDictComprehension),
 
         // flake8-fixme
         (Flake8Fixme, "001") => (RuleGroup::Stable, rules::flake8_fixme::rules::LineContainsFixme),
@@ -1051,36 +1033,34 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         // refurb
         (Refurb, "101") => (RuleGroup::Preview, rules::refurb::rules::ReadWholeFile),
         (Refurb, "103") => (RuleGroup::Preview, rules::refurb::rules::WriteWholeFile),
-        (Refurb, "105") => (RuleGroup::Preview, rules::refurb::rules::PrintEmptyString),
+        (Refurb, "105") => (RuleGroup::Stable, rules::refurb::rules::PrintEmptyString),
         (Refurb, "110") => (RuleGroup::Preview, rules::refurb::rules::IfExpInsteadOfOrOperator),
-        #[allow(deprecated)]
-        (Refurb, "113") => (RuleGroup::Nursery, rules::refurb::rules::RepeatedAppend),
+        (Refurb, "113") => (RuleGroup::Preview, rules::refurb::rules::RepeatedAppend),
         (Refurb, "116") => (RuleGroup::Preview, rules::refurb::rules::FStringNumberFormat),
         (Refurb, "118") => (RuleGroup::Preview, rules::refurb::rules::ReimplementedOperator),
-        (Refurb, "129") => (RuleGroup::Preview, rules::refurb::rules::ReadlinesInFor),
-        #[allow(deprecated)]
-        (Refurb, "131") => (RuleGroup::Nursery, rules::refurb::rules::DeleteFullSlice),
-        #[allow(deprecated)]
-        (Refurb, "132") => (RuleGroup::Nursery, rules::refurb::rules::CheckAndRemoveFromSet),
-        (Refurb, "136") => (RuleGroup::Preview, rules::refurb::rules::IfExprMinMax),
+        (Refurb, "129") => (RuleGroup::Stable, rules::refurb::rules::ReadlinesInFor),
+        (Refurb, "131") => (RuleGroup::Preview, rules::refurb::rules::DeleteFullSlice),
+        (Refurb, "132") => (RuleGroup::Preview, rules::refurb::rules::CheckAndRemoveFromSet),
+        (Refurb, "136") => (RuleGroup::Stable, rules::refurb::rules::IfExprMinMax),
         (Refurb, "140") => (RuleGroup::Preview, rules::refurb::rules::ReimplementedStarmap),
         (Refurb, "142") => (RuleGroup::Preview, rules::refurb::rules::ForLoopSetMutations),
         (Refurb, "145") => (RuleGroup::Preview, rules::refurb::rules::SliceCopy),
         (Refurb, "148") => (RuleGroup::Preview, rules::refurb::rules::UnnecessaryEnumerate),
         (Refurb, "152") => (RuleGroup::Preview, rules::refurb::rules::MathConstant),
+        (Refurb, "154") => (RuleGroup::Preview, rules::refurb::rules::RepeatedGlobal),
         (Refurb, "157") => (RuleGroup::Preview, rules::refurb::rules::VerboseDecimalConstructor),
-        (Refurb, "161") => (RuleGroup::Preview, rules::refurb::rules::BitCount),
-        (Refurb, "163") => (RuleGroup::Preview, rules::refurb::rules::RedundantLogBase),
+        (Refurb, "161") => (RuleGroup::Stable, rules::refurb::rules::BitCount),
+        (Refurb, "163") => (RuleGroup::Stable, rules::refurb::rules::RedundantLogBase),
         (Refurb, "164") => (RuleGroup::Preview, rules::refurb::rules::UnnecessaryFromFloat),
         (Refurb, "166") => (RuleGroup::Preview, rules::refurb::rules::IntOnSlicedStr),
-        (Refurb, "167") => (RuleGroup::Preview, rules::refurb::rules::RegexFlagAlias),
-        (Refurb, "168") => (RuleGroup::Preview, rules::refurb::rules::IsinstanceTypeNone),
-        (Refurb, "169") => (RuleGroup::Preview, rules::refurb::rules::TypeNoneComparison),
+        (Refurb, "167") => (RuleGroup::Stable, rules::refurb::rules::RegexFlagAlias),
+        (Refurb, "168") => (RuleGroup::Stable, rules::refurb::rules::IsinstanceTypeNone),
+        (Refurb, "169") => (RuleGroup::Stable, rules::refurb::rules::TypeNoneComparison),
         (Refurb, "171") => (RuleGroup::Preview, rules::refurb::rules::SingleItemMembershipTest),
-        (Refurb, "177") => (RuleGroup::Preview, rules::refurb::rules::ImplicitCwd),
+        (Refurb, "177") => (RuleGroup::Stable, rules::refurb::rules::ImplicitCwd),
         (Refurb, "180") => (RuleGroup::Preview, rules::refurb::rules::MetaClassABCMeta),
-        (Refurb, "181") => (RuleGroup::Preview, rules::refurb::rules::HashlibDigestHex),
-        (Refurb, "187") => (RuleGroup::Preview, rules::refurb::rules::ListReverseCopy),
+        (Refurb, "181") => (RuleGroup::Stable, rules::refurb::rules::HashlibDigestHex),
+        (Refurb, "187") => (RuleGroup::Stable, rules::refurb::rules::ListReverseCopy),
         (Refurb, "192") => (RuleGroup::Preview, rules::refurb::rules::SortedMinMax),
 
         // flake8-logging

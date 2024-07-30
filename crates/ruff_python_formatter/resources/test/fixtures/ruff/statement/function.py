@@ -436,3 +436,25 @@ def function_with_variadic_generics(*args: *tuple[int],): ...
 
 # Generic arguments (PEP 695)
 def func[T](lotsoflongargs: T, lotsoflongargs2: T, lotsoflongargs3: T, lotsoflongargs4: T, lotsoflongargs5: T) -> T: ...
+
+
+# Decorators
+@decorator
+# comment
+def foo[S](x: S) -> S: ...
+
+@decorator
+# comment
+def foo(x: S) -> S: ...
+
+@decorator
+# comment
+def foo() -> S: ...
+
+@decorator
+# comment
+@decorator2
+def foo(x: S) -> S: ...
+
+@decorator # comment
+def foo(x: S) -> S: ...

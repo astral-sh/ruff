@@ -5,10 +5,10 @@ mod range;
 mod replacement;
 mod text_document;
 
-use std::{collections::HashMap, path::PathBuf};
+use std::collections::HashMap;
 
-use lsp_types::PositionEncodingKind;
-pub(crate) use notebook::NotebookDocument;
+use lsp_types::{PositionEncodingKind, Url};
+pub use notebook::NotebookDocument;
 pub(crate) use range::{NotebookRange, RangeExt, ToRangeExt};
 pub(crate) use replacement::Replacement;
 pub(crate) use text_document::DocumentVersion;
@@ -34,21 +34,19 @@ pub enum PositionEncoding {
 /// A unique document ID, derived from a URL passed as part of an LSP request.
 /// This document ID can point to either be a standalone Python file, a full notebook, or a cell within a notebook.
 #[derive(Clone, Debug)]
-pub(crate) enum DocumentKey {
-    Notebook(PathBuf),
-    NotebookCell(lsp_types::Url),
-    Text(PathBuf),
+pub enum DocumentKey {
+    Notebook(Url),
+    NotebookCell(Url),
+    Text(Url),
 }
 
 impl DocumentKey {
     /// Converts the key back into its original URL.
-    pub(crate) fn into_url(self) -> lsp_types::Url {
+    pub(crate) fn into_url(self) -> Url {
         match self {
-            DocumentKey::NotebookCell(url) => url,
-            DocumentKey::Notebook(path) | DocumentKey::Text(path) => {
-                lsp_types::Url::from_file_path(path)
-                    .expect("file path originally from URL should convert back to URL")
-            }
+            DocumentKey::NotebookCell(url)
+            | DocumentKey::Notebook(url)
+            | DocumentKey::Text(url) => url,
         }
     }
 }
@@ -56,8 +54,7 @@ impl DocumentKey {
 impl std::fmt::Display for DocumentKey {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Self::NotebookCell(url) => url.fmt(f),
-            Self::Notebook(path) | Self::Text(path) => path.display().fmt(f),
+            Self::NotebookCell(url) | Self::Notebook(url) | Self::Text(url) => url.fmt(f),
         }
     }
 }
@@ -67,7 +64,7 @@ impl std::fmt::Display for DocumentKey {
 #[derive(Debug)]
 pub(crate) enum WorkspaceEditTracker {
     DocumentChanges(Vec<lsp_types::TextDocumentEdit>),
-    Changes(HashMap<lsp_types::Url, Vec<lsp_types::TextEdit>>),
+    Changes(HashMap<Url, Vec<lsp_types::TextEdit>>),
 }
 
 impl From<PositionEncoding> for lsp_types::PositionEncodingKind {
@@ -122,7 +119,7 @@ impl WorkspaceEditTracker {
     /// multiple times.
     pub(crate) fn set_edits_for_document(
         &mut self,
-        uri: lsp_types::Url,
+        uri: Url,
         _version: DocumentVersion,
         edits: Vec<lsp_types::TextEdit>,
     ) -> crate::Result<()> {

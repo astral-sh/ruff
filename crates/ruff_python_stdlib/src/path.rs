@@ -16,6 +16,16 @@ pub fn is_jupyter_notebook(path: &Path) -> bool {
     path.extension().is_some_and(|ext| ext == "ipynb")
 }
 
+/// Return `true` if a [`Path`] should use the name of its parent directory as its module name.
+pub fn is_module_file(path: &Path) -> bool {
+    path.file_name().is_some_and(|file_name| {
+        file_name == "__init__.py"
+            || file_name == "__init__.pyi"
+            || file_name == "__main__.py"
+            || file_name == "__main__.pyi"
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use std::path::Path;

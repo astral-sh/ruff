@@ -1,6 +1,6 @@
 //! AST visitor trait and walk functions.
 
-pub mod preorder;
+pub mod source_order;
 pub mod transformer;
 
 use crate::{
@@ -16,8 +16,8 @@ use crate::{
 /// Prefer [`crate::statement_visitor::StatementVisitor`] for visitors that only need to visit
 /// statements.
 ///
-/// Use the [`PreorderVisitor`](preorder::PreorderVisitor) if you want to visit the nodes
-/// in pre-order rather than evaluation order.
+/// Use the [`PreorderVisitor`](source_order::SourceOrderVisitor) if you want to visit the nodes
+/// in source-order rather than evaluation order.
 ///
 /// Use the [`Transformer`](transformer::Transformer) if you want to modify the nodes.
 pub trait Visitor<'a> {

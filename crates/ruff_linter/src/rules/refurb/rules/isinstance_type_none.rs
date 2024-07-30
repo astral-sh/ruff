@@ -66,7 +66,7 @@ pub(crate) fn isinstance_type_none(checker: &mut Checker, call: &ast::ExprCall) 
         };
         let mut diagnostic = Diagnostic::new(IsinstanceTypeNone, call.range());
         let replacement =
-            generate_none_identity_comparison(object_name, false, checker.generator());
+            generate_none_identity_comparison(object_name.clone(), false, checker.generator());
         diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
             pad(replacement, call.range(), checker.locator()),
             call.range(),

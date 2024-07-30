@@ -1,0 +1,319 @@
+---
+source: crates/ruff_python_parser/tests/fixtures.rs
+input_file: crates/ruff_python_parser/resources/inline/ok/match_classify_as_identifier_2.py
+---
+## AST
+
+```
+Module(
+    ModModule {
+        range: 0..149,
+        body: [
+            Expr(
+                StmtExpr {
+                    range: 0..5,
+                    value: Name(
+                        ExprName {
+                            range: 0..5,
+                            id: Name("match"),
+                            ctx: Load,
+                        },
+                    ),
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    range: 6..18,
+                    value: Compare(
+                        ExprCompare {
+                            range: 6..18,
+                            left: Name(
+                                ExprName {
+                                    range: 6..11,
+                                    id: Name("match"),
+                                    ctx: Load,
+                                },
+                            ),
+                            ops: [
+                                NotEq,
+                            ],
+                            comparators: [
+                                Name(
+                                    ExprName {
+                                        range: 15..18,
+                                        id: Name("foo"),
+                                        ctx: Load,
+                                    },
+                                ),
+                            ],
+                        },
+                    ),
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    range: 19..31,
+                    value: Tuple(
+                        ExprTuple {
+                            range: 19..31,
+                            elts: [
+                                Name(
+                                    ExprName {
+                                        range: 20..23,
+                                        id: Name("foo"),
+                                        ctx: Load,
+                                    },
+                                ),
+                                Name(
+                                    ExprName {
+                                        range: 25..30,
+                                        id: Name("match"),
+                                        ctx: Load,
+                                    },
+                                ),
+                            ],
+                            ctx: Load,
+                            parenthesized: true,
+                        },
+                    ),
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    range: 32..44,
+                    value: List(
+                        ExprList {
+                            range: 32..44,
+                            elts: [
+                                Name(
+                                    ExprName {
+                                        range: 33..36,
+                                        id: Name("foo"),
+                                        ctx: Load,
+                                    },
+                                ),
+                                Name(
+                                    ExprName {
+                                        range: 38..43,
+                                        id: Name("match"),
+                                        ctx: Load,
+                                    },
+                                ),
+                            ],
+                            ctx: Load,
+                        },
+                    ),
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    range: 45..57,
+                    value: Set(
+                        ExprSet {
+                            range: 45..57,
+                            elts: [
+                                Name(
+                                    ExprName {
+                                        range: 46..49,
+                                        id: Name("foo"),
+                                        ctx: Load,
+                                    },
+                                ),
+                                Name(
+                                    ExprName {
+                                        range: 51..56,
+                                        id: Name("match"),
+                                        ctx: Load,
+                                    },
+                                ),
+                            ],
+                        },
+                    ),
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    range: 58..63,
+                    value: Name(
+                        ExprName {
+                            range: 58..63,
+                            id: Name("match"),
+                            ctx: Load,
+                        },
+                    ),
+                },
+            ),
+            AnnAssign(
+                StmtAnnAssign {
+                    range: 65..75,
+                    target: Name(
+                        ExprName {
+                            range: 65..70,
+                            id: Name("match"),
+                            ctx: Store,
+                        },
+                    ),
+                    annotation: Name(
+                        ExprName {
+                            range: 72..75,
+                            id: Name("int"),
+                            ctx: Load,
+                        },
+                    ),
+                    value: None,
+                    simple: true,
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    range: 76..82,
+                    value: Tuple(
+                        ExprTuple {
+                            range: 76..82,
+                            elts: [
+                                Name(
+                                    ExprName {
+                                        range: 76..81,
+                                        id: Name("match"),
+                                        ctx: Load,
+                                    },
+                                ),
+                            ],
+                            ctx: Load,
+                            parenthesized: false,
+                        },
+                    ),
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    range: 83..92,
+                    value: Attribute(
+                        ExprAttribute {
+                            range: 83..92,
+                            value: Name(
+                                ExprName {
+                                    range: 83..88,
+                                    id: Name("match"),
+                                    ctx: Load,
+                                },
+                            ),
+                            attr: Identifier {
+                                id: Name("foo"),
+                                range: 89..92,
+                            },
+                            ctx: Load,
+                        },
+                    ),
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    range: 93..104,
+                    value: BinOp(
+                        ExprBinOp {
+                            range: 93..104,
+                            left: Name(
+                                ExprName {
+                                    range: 93..98,
+                                    id: Name("match"),
+                                    ctx: Load,
+                                },
+                            ),
+                            op: Div,
+                            right: Name(
+                                ExprName {
+                                    range: 101..104,
+                                    id: Name("foo"),
+                                    ctx: Load,
+                                },
+                            ),
+                        },
+                    ),
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    range: 105..117,
+                    value: BinOp(
+                        ExprBinOp {
+                            range: 105..117,
+                            left: Name(
+                                ExprName {
+                                    range: 105..110,
+                                    id: Name("match"),
+                                    ctx: Load,
+                                },
+                            ),
+                            op: LShift,
+                            right: Name(
+                                ExprName {
+                                    range: 114..117,
+                                    id: Name("foo"),
+                                    ctx: Load,
+                                },
+                            ),
+                        },
+                    ),
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    range: 118..131,
+                    value: BoolOp(
+                        ExprBoolOp {
+                            range: 118..131,
+                            op: And,
+                            values: [
+                                Name(
+                                    ExprName {
+                                        range: 118..123,
+                                        id: Name("match"),
+                                        ctx: Load,
+                                    },
+                                ),
+                                Name(
+                                    ExprName {
+                                        range: 128..131,
+                                        id: Name("foo"),
+                                        ctx: Load,
+                                    },
+                                ),
+                            ],
+                        },
+                    ),
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    range: 132..148,
+                    value: Compare(
+                        ExprCompare {
+                            range: 132..148,
+                            left: Name(
+                                ExprName {
+                                    range: 132..137,
+                                    id: Name("match"),
+                                    ctx: Load,
+                                },
+                            ),
+                            ops: [
+                                IsNot,
+                            ],
+                            comparators: [
+                                Name(
+                                    ExprName {
+                                        range: 145..148,
+                                        id: Name("foo"),
+                                        ctx: Load,
+                                    },
+                                ),
+                            ],
+                        },
+                    ),
+                },
+            ),
+        ],
+    },
+)
+```

@@ -250,7 +250,7 @@ impl Violation for OverIndented {
     }
 }
 
-/// E111, E114, E112, E113, E115, E116, E117
+/// E111, E112, E113, E114, E115, E116, E117
 pub(crate) fn indentation(
     logical_line: &LogicalLine,
     prev_logical_line: Option<&LogicalLine>,

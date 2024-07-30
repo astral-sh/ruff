@@ -1,12 +1,10 @@
-use log::error;
-
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::helpers::is_docstring_stmt;
-use ruff_python_ast::imports::{Alias, AnyImport, FutureImport, Import, ImportFrom};
-use ruff_python_ast::{self as ast, PySourceType, Stmt, Suite};
+use ruff_python_ast::{self as ast, ModModule, PySourceType, Stmt};
 use ruff_python_codegen::Stylist;
-use ruff_python_parser::parse_suite;
+use ruff_python_parser::Parsed;
+use ruff_python_semantic::{FutureImport, NameImport};
 use ruff_source_file::Locator;
 use ruff_text_size::{TextRange, TextSize};
 
@@ -53,18 +51,19 @@ impl AlwaysFixableViolation for MissingRequiredImport {
     }
 }
 
-/// Return `true` if the [`Stmt`] includes the given [`AnyImport`].
-fn includes_import(stmt: &Stmt, target: &AnyImport) -> bool {
+/// Return `true` if the [`Stmt`] includes the given [`AnyImportRef`].
+fn includes_import(stmt: &Stmt, target: &NameImport) -> bool {
     match target {
-        AnyImport::Import(target) => {
+        NameImport::Import(target) => {
             let Stmt::Import(ast::StmtImport { names, range: _ }) = &stmt else {
                 return false;
             };
             names.iter().any(|alias| {
-                &alias.name == target.name.name && alias.asname.as_deref() == target.name.as_name
+                alias.name == target.name.name
+                    && alias.asname.as_deref() == target.name.as_name.as_deref()
             })
         }
-        AnyImport::ImportFrom(target) => {
+        NameImport::ImportFrom(target) => {
             let Stmt::ImportFrom(ast::StmtImportFrom {
                 module,
                 names,
@@ -74,11 +73,11 @@ fn includes_import(stmt: &Stmt, target: &AnyImport) -> bool {
             else {
                 return false;
             };
-            module.as_deref() == target.module
+            module.as_deref() == target.module.as_deref()
                 && *level == target.level
                 && names.iter().any(|alias| {
-                    &alias.name == target.name.name
-                        && alias.asname.as_deref() == target.name.as_name
+                    alias.name == target.name.name
+                        && alias.asname.as_deref() == target.name.as_name.as_deref()
                 })
         }
     }
@@ -86,14 +85,14 @@ fn includes_import(stmt: &Stmt, target: &AnyImport) -> bool {
 
 #[allow(clippy::too_many_arguments)]
 fn add_required_import(
-    required_import: &AnyImport,
-    python_ast: &Suite,
+    required_import: &NameImport,
+    parsed: &Parsed<ModModule>,
     locator: &Locator,
     stylist: &Stylist,
     source_type: PySourceType,
 ) -> Option<Diagnostic> {
     // Don't add imports to semantically-empty files.
-    if python_ast.iter().all(is_docstring_stmt) {
+    if parsed.suite().iter().all(is_docstring_stmt) {
         return None;
     }
 
@@ -103,7 +102,8 @@ fn add_required_import(
     }
 
     // If the import is already present in a top-level block, don't add it.
-    if python_ast
+    if parsed
+        .suite()
         .iter()
         .any(|stmt| includes_import(stmt, required_import))
     {
@@ -116,15 +116,14 @@ fn add_required_import(
         TextRange::default(),
     );
     diagnostic.set_fix(Fix::safe_edit(
-        Importer::new(python_ast, locator, stylist)
-            .add_import(required_import, TextSize::default()),
+        Importer::new(parsed, locator, stylist).add_import(required_import, TextSize::default()),
     ));
     Some(diagnostic)
 }
 
 /// I002
 pub(crate) fn add_required_imports(
-    python_ast: &Suite,
+    parsed: &Parsed<ModModule>,
     locator: &Locator,
     stylist: &Stylist,
     settings: &LinterSettings,
@@ -134,69 +133,8 @@ pub(crate) fn add_required_imports(
         .isort
         .required_imports
         .iter()
-        .flat_map(|required_import| {
-            let Ok(body) = parse_suite(required_import) else {
-                error!("Failed to parse required import: `{}`", required_import);
-                return vec![];
-            };
-            if body.is_empty() || body.len() > 1 {
-                error!(
-                    "Expected require import to contain a single statement: `{}`",
-                    required_import
-                );
-                return vec![];
-            }
-            let stmt = &body[0];
-            match stmt {
-                Stmt::ImportFrom(ast::StmtImportFrom {
-                    module,
-                    names,
-                    level,
-                    range: _,
-                }) => names
-                    .iter()
-                    .filter_map(|name| {
-                        add_required_import(
-                            &AnyImport::ImportFrom(ImportFrom {
-                                module: module.as_deref(),
-                                name: Alias {
-                                    name: name.name.as_str(),
-                                    as_name: name.asname.as_deref(),
-                                },
-                                level: *level,
-                            }),
-                            python_ast,
-                            locator,
-                            stylist,
-                            source_type,
-                        )
-                    })
-                    .collect(),
-                Stmt::Import(ast::StmtImport { names, range: _ }) => names
-                    .iter()
-                    .filter_map(|name| {
-                        add_required_import(
-                            &AnyImport::Import(Import {
-                                name: Alias {
-                                    name: name.name.as_str(),
-                                    as_name: name.asname.as_deref(),
-                                },
-                            }),
-                            python_ast,
-                            locator,
-                            stylist,
-                            source_type,
-                        )
-                    })
-                    .collect(),
-                _ => {
-                    error!(
-                        "Expected required import to be in import-from style: `{}`",
-                        required_import
-                    );
-                    vec![]
-                }
-            }
+        .filter_map(|required_import| {
+            add_required_import(required_import, parsed, locator, stylist, source_type)
         })
         .collect()
 }

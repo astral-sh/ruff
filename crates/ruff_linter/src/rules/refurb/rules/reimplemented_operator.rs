@@ -212,6 +212,12 @@ fn slice_expr_to_slice_call(slice: &ExprSlice, locator: &Locator) -> String {
 fn subscript_slice_to_string<'a>(expr: &Expr, locator: &Locator<'a>) -> Cow<'a, str> {
     if let Expr::Slice(expr_slice) = expr {
         Cow::Owned(slice_expr_to_slice_call(expr_slice, locator))
+    } else if let Expr::Tuple(tuple) = expr {
+        if tuple.parenthesized {
+            Cow::Borrowed(locator.slice(expr))
+        } else {
+            Cow::Owned(format!("({})", locator.slice(tuple)))
+        }
     } else {
         Cow::Borrowed(locator.slice(expr))
     }

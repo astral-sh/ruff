@@ -163,6 +163,7 @@ impl SectionKind {
 pub(crate) struct SectionContexts<'a> {
     contexts: Vec<SectionContextData>,
     docstring: &'a Docstring<'a>,
+    style: SectionStyle,
 }
 
 impl<'a> SectionContexts<'a> {
@@ -221,7 +222,12 @@ impl<'a> SectionContexts<'a> {
         Self {
             contexts,
             docstring,
+            style,
         }
+    }
+
+    pub(crate) fn style(&self) -> SectionStyle {
+        self.style
     }
 
     pub(crate) fn len(&self) -> usize {
@@ -396,7 +402,7 @@ impl<'a> SectionContext<'a> {
         NewlineWithTrailingNewline::with_offset(lines, self.offset() + self.data.summary_full_end)
     }
 
-    fn following_lines_str(&self) -> &'a str {
+    pub(crate) fn following_lines_str(&self) -> &'a str {
         &self.docstring_body.as_str()[self.following_range_relative()]
     }
 

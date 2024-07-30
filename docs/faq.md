@@ -64,7 +64,7 @@ natively, including:
 - [flake8-executable](https://pypi.org/project/flake8-executable/)
 - [flake8-gettext](https://pypi.org/project/flake8-gettext/)
 - [flake8-implicit-str-concat](https://pypi.org/project/flake8-implicit-str-concat/)
-- [flake8-import-conventions](https://github.com/joaopalmeiro/flake8-import-conventions)
+- [flake8-import-conventions](https://pypi.org/project/flake8-import-conventions/)
 - [flake8-logging](https://pypi.org/project/flake8-logging-format/)
 - [flake8-logging-format](https://pypi.org/project/flake8-logging-format/)
 - [flake8-no-pep420](https://pypi.org/project/flake8-no-pep420)
@@ -81,7 +81,6 @@ natively, including:
 - [flake8-super](https://pypi.org/project/flake8-super/)
 - [flake8-tidy-imports](https://pypi.org/project/flake8-tidy-imports/)
 - [flake8-todos](https://pypi.org/project/flake8-todos/)
-- [flake8-trio](https://pypi.org/project/flake8-trio/) ([#8451](https://github.com/astral-sh/ruff/issues/8451))
 - [flake8-type-checking](https://pypi.org/project/flake8-type-checking/)
 - [flake8-use-pathlib](https://pypi.org/project/flake8-use-pathlib/)
 - [flynt](https://pypi.org/project/flynt/) ([#2102](https://github.com/astral-sh/ruff/issues/2102))
@@ -94,7 +93,7 @@ natively, including:
 - [pygrep-hooks](https://github.com/pre-commit/pygrep-hooks)
 - [pyupgrade](https://pypi.org/project/pyupgrade/)
 - [tryceratops](https://pypi.org/project/tryceratops/)
-- [yesqa](https://github.com/asottile/yesqa)
+- [yesqa](https://pypi.org/project/yesqa/)
 
 Note that, in some cases, Ruff uses different rule codes and prefixes than would be found in the
 originating Flake8 plugins. For example, Ruff uses `TID252` to represent the `I252` rule from
@@ -178,7 +177,7 @@ Today, Ruff can be used to replace Flake8 when used with any of the following pl
 - [flake8-executable](https://pypi.org/project/flake8-executable/)
 - [flake8-gettext](https://pypi.org/project/flake8-gettext/)
 - [flake8-implicit-str-concat](https://pypi.org/project/flake8-implicit-str-concat/)
-- [flake8-import-conventions](https://github.com/joaopalmeiro/flake8-import-conventions)
+- [flake8-import-conventions](https://pypi.org/project/flake8-import-conventions/)
 - [flake8-logging](https://pypi.org/project/flake8-logging/)
 - [flake8-logging-format](https://pypi.org/project/flake8-logging-format/)
 - [flake8-no-pep420](https://pypi.org/project/flake8-no-pep420)
@@ -194,7 +193,6 @@ Today, Ruff can be used to replace Flake8 when used with any of the following pl
 - [flake8-super](https://pypi.org/project/flake8-super/)
 - [flake8-tidy-imports](https://pypi.org/project/flake8-tidy-imports/)
 - [flake8-todos](https://pypi.org/project/flake8-todos/)
-- [flake8-trio](https://pypi.org/project/flake8-trio/) ([#8451](https://github.com/astral-sh/ruff/issues/8451))
 - [flake8-type-checking](https://pypi.org/project/flake8-type-checking/)
 - [flake8-use-pathlib](https://pypi.org/project/flake8-use-pathlib/)
 - [flynt](https://pypi.org/project/flynt/) ([#2102](https://github.com/astral-sh/ruff/issues/2102))
@@ -206,7 +204,7 @@ Today, Ruff can be used to replace Flake8 when used with any of the following pl
 - [tryceratops](https://pypi.org/project/tryceratops/)
 
 Ruff can also replace [Black](https://pypi.org/project/black/), [isort](https://pypi.org/project/isort/),
-[yesqa](https://github.com/asottile/yesqa), [eradicate](https://pypi.org/project/eradicate/), and
+[yesqa](https://pypi.org/project/yesqa/), [eradicate](https://pypi.org/project/eradicate/), and
 most of the rules implemented in [pyupgrade](https://pypi.org/project/pyupgrade/).
 
 If you're looking to use Ruff, but rely on an unsupported Flake8 plugin, feel free to file an
@@ -219,7 +217,7 @@ Ruff as a formatter, but not a linter, or vice versa.
 
 ## What versions of Python does Ruff support?
 
-Ruff can lint code for any Python version from 3.7 onwards, including Python 3.12.
+Ruff can lint code for any Python version from 3.7 onwards, including Python 3.13.
 
 Ruff does not support Python 2. Ruff _may_ run on pre-Python 3.7 code, although such versions
 are not officially supported (e.g., Ruff does _not_ respect type comments).
@@ -266,58 +264,14 @@ from numpy import sin as np_sin
 from numpy import tan, uint8, uint16, uint32, uint64
 ```
 
+Ruff also correctly classifies some modules as standard-library that aren't recognized
+by isort, like `_string` and `idlelib`.
+
 Like isort, Ruff's import sorting is compatible with Black.
-
-Ruff does not yet support all of isort's configuration options, though it does support many of
-them. You can find the supported settings in the [API reference](settings.md#lintisort).
-For example, you can set [`known-first-party`](settings.md#lint_isort_known-first-party)
-like so:
-
-=== "pyproject.toml"
-
-    ```toml
-    [tool.ruff.lint]
-    select = [
-        # Pyflakes
-        "F",
-        # Pycodestyle
-        "E",
-        "W",
-        # isort
-        "I001"
-    ]
-
-    # Note: Ruff supports a top-level `src` option in lieu of isort's `src_paths` setting.
-    src = ["src", "tests"]
-
-    [tool.ruff.lint.isort]
-    known-first-party = ["my_module1", "my_module2"]
-    ```
-
-=== "ruff.toml"
-
-    ```toml
-    [lint]
-    select = [
-        # Pyflakes
-        "F",
-        # Pycodestyle
-        "E",
-        "W",
-        # isort
-        "I001"
-    ]
-
-    # Note: Ruff supports a top-level `src` option in lieu of isort's `src_paths` setting.
-    src = ["src", "tests"]
-
-    [lint.isort]
-    known-first-party = ["my_module1", "my_module2"]
-    ```
 
 ## How does Ruff determine which of my imports are first-party, third-party, etc.?
 
-Ruff accepts a `src` option that in your `pyproject.toml`, `ruff.toml`, or `.ruff.toml` file, which
+Ruff accepts a `src` option that in your `pyproject.toml`, `ruff.toml`, or `.ruff.toml` file,
 specifies the directories that Ruff should consider when determining whether an import is
 first-party.
 
@@ -350,6 +304,7 @@ consider `src` as a first-party source like so:
 
     ```toml
     [tool.ruff]
+    # Ruff supports a top-level `src` option in lieu of isort's `src_paths` setting.
     # All paths are relative to the project root, which is the directory containing the pyproject.toml.
     src = ["src"]
     ```
@@ -357,6 +312,7 @@ consider `src` as a first-party source like so:
 === "ruff.toml"
 
     ```toml
+    # Ruff supports a top-level `src` option in lieu of isort's `src_paths` setting.
     # All paths are relative to the project root, which is the directory containing the pyproject.toml.
     src = ["src"]
     ```
@@ -389,7 +345,55 @@ above, `baz.py` would be identified as part of the Python package beginning at
 `./my_project/src/foo`, and so any imports in `baz.py` that begin with `foo` (like `import foo.bar`)
 would be considered first-party based on this same-package heuristic.
 
-For a detailed explanation, see the [contributing guide](contributing.md).
+For a detailed explanation of `src` resolution, see the [contributing guide](contributing.md).
+
+Ruff can also be configured to treat certain modules as (e.g.) always first-party, regardless of
+their location on the filesystem. For example, you can set [`known-first-party`](settings.md#lint_isort_known-first-party)
+like so:
+
+=== "pyproject.toml"
+
+    ```toml
+    [tool.ruff]
+    src = ["src", "tests"]
+
+    [tool.ruff.lint]
+    select = [
+        # Pyflakes
+        "F",
+        # Pycodestyle
+        "E",
+        "W",
+        # isort
+        "I001"
+    ]
+
+    [tool.ruff.lint.isort]
+    known-first-party = ["my_module1", "my_module2"]
+    ```
+
+=== "ruff.toml"
+
+    ```toml
+    src = ["src", "tests"]
+
+    [lint]
+    select = [
+        # Pyflakes
+        "F",
+        # Pycodestyle
+        "E",
+        "W",
+        # isort
+        "I001"
+    ]
+
+    [lint.isort]
+    known-first-party = ["my_module1", "my_module2"]
+    ```
+
+Ruff does not yet support all of isort's configuration options, though it does support many of
+them. You can find the supported settings in the [API reference](settings.md#lintisort).
 
 ## Does Ruff support Jupyter Notebooks?
 
@@ -598,7 +602,7 @@ convention = "google"
 ```toml
 line-length = 88
 
-[pydocstyle]
+[lint.pydocstyle]
 convention = "google"
 ```
 
@@ -606,23 +610,27 @@ Ruff doesn't currently support INI files, like `setup.cfg` or `tox.ini`.
 
 ## How can I change Ruff's default configuration?
 
-When no configuration file is found, Ruff will look for a user-specific `pyproject.toml` or
-`ruff.toml` file as a last resort. This behavior is similar to Flake8's `~/.config/flake8`.
+When no configuration file is found, Ruff will look for a user-specific `ruff.toml` file as a
+last resort. This behavior is similar to Flake8's `~/.config/flake8`.
 
-On macOS, Ruff expects that file to be located at `/Users/Alice/Library/Application Support/ruff/ruff.toml`.
+On macOS and Linux, Ruff expects that file to be located at `~/.config/ruff/ruff.toml`,
+and respects the `XDG_CONFIG_HOME` specification.
 
-On Linux, Ruff expects that file to be located at `/home/alice/.config/ruff/ruff.toml`.
+On Windows, Ruff expects that file to be located at `~\AppData\Roaming\ruff\ruff.toml`.
 
-On Windows, Ruff expects that file to be located at `C:\Users\Alice\AppData\Roaming\ruff\ruff.toml`.
+!!! note
+    Prior to `v0.5.0`, Ruff would read user-specific configuration from
+    `~/Library/Application Support/ruff/ruff.toml` on macOS. While Ruff will still respect
+    such configuration files, the use of `~/Library/Application Support` is considered deprecated.
 
-For more, see the [`dirs`](https://docs.rs/dirs/4.0.0/dirs/fn.config_dir.html) crate.
+For more, see the [`etcetera`](https://crates.io/crates/etcetera) crate.
 
 ## Ruff tried to fix something — but it broke my code. What's going on?
 
 Ruff labels fixes as "safe" and "unsafe". By default, Ruff will fix all violations for which safe
 fixes are available, while unsafe fixes can be enabled via the [`unsafe-fixes`](settings.md#unsafe-fixes)
 setting, or passing the [`--unsafe-fixes`](settings.md#unsafe-fixes) flag to `ruff check`. For
-more, see [the fix documentation](configuration.md#fixes).
+more, see [the fix documentation](linter.md#fixes).
 
 Even still, given the dynamic nature of Python, it's difficult to have _complete_ certainty when
 making changes to code, even for seemingly trivial fixes. If a "safe" fix breaks your code, please

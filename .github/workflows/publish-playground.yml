@@ -1,0 +1,55 @@
+# Publish the Ruff playground.
+#
+# Assumed to run as a subworkflow of .github/workflows/release.yml; specifically, as a post-announce
+# job within `cargo-dist`.
+name: "[Playground] Release"
+
+on:
+  workflow_dispatch:
+  workflow_call:
+    inputs:
+      plan:
+        required: true
+        type: string
+
+env:
+  CARGO_INCREMENTAL: 0
+  CARGO_NET_RETRY: 10
+  CARGO_TERM_COLOR: always
+  RUSTUP_MAX_RETRIES: 10
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    env:
+      CF_API_TOKEN_EXISTS: ${{ secrets.CF_API_TOKEN != '' }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: "Install Rust toolchain"
+        run: rustup target add wasm32-unknown-unknown
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 18
+          cache: "npm"
+          cache-dependency-path: playground/package-lock.json
+      - uses: jetli/wasm-pack-action@v0.4.0
+      - uses: jetli/wasm-bindgen-action@v0.2.0
+      - name: "Run wasm-pack"
+        run: wasm-pack build --target web --out-dir ../../playground/src/pkg crates/ruff_wasm
+      - name: "Install Node dependencies"
+        run: npm ci
+        working-directory: playground
+      - name: "Run TypeScript checks"
+        run: npm run check
+        working-directory: playground
+      - name: "Build JavaScript bundle"
+        run: npm run build
+        working-directory: playground
+      - name: "Deploy to Cloudflare Pages"
+        if: ${{ env.CF_API_TOKEN_EXISTS == 'true' }}
+        uses: cloudflare/wrangler-action@v3.7.0
+        with:
+          apiToken: ${{ secrets.CF_API_TOKEN }}
+          accountId: ${{ secrets.CF_ACCOUNT_ID }}
+          # `github.head_ref` is only set during pull requests and for manual runs or tags we use `main` to deploy to production
+          command: pages deploy playground/dist --project-name=ruff-playground --branch ${{ github.head_ref || 'main' }} --commit-hash ${GITHUB_SHA}

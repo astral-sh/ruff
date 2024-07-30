@@ -1,24 +1,26 @@
-use globset::Candidate;
+use std::collections::BTreeMap;
+use std::path::{Path, PathBuf};
+use std::sync::Arc;
+
+use ignore::{WalkBuilder, WalkState};
+
 use ruff_linter::{
     display_settings, fs::normalize_path_to, settings::types::FilePattern,
     settings::types::PreviewMode,
 };
-use ruff_workspace::resolver::match_candidate_exclusion;
+use ruff_workspace::resolver::match_exclusion;
 use ruff_workspace::{
     configuration::{Configuration, FormatConfiguration, LintConfiguration, RuleSelection},
     pyproject::{find_user_settings_toml, settings_toml},
     resolver::{ConfigurationTransformer, Relativity},
 };
-use std::{
-    collections::BTreeMap,
-    path::{Path, PathBuf},
-    sync::Arc,
-};
-use walkdir::WalkDir;
 
 use crate::session::settings::{ConfigurationPreference, ResolvedEditorSettings};
 
-pub(crate) struct RuffSettings {
+pub struct RuffSettings {
+    /// The path to this configuration file, used for debugging.
+    /// The default fallback configuration does not have a file path.
+    path: Option<PathBuf>,
     /// Settings used to manage file inclusion and exclusion.
     file_resolver: ruff_workspace::FileResolverSettings,
     /// Settings to pass into the Ruff linter.
@@ -28,6 +30,7 @@ pub(crate) struct RuffSettings {
 }
 
 pub(super) struct RuffSettingsIndex {
+    /// Index from folder to the resolved ruff settings.
     index: BTreeMap<PathBuf, Arc<RuffSettings>>,
     fallback: Arc<RuffSettings>,
 }
@@ -37,6 +40,7 @@ impl std::fmt::Display for RuffSettings {
         display_settings! {
             formatter = f,
             fields = [
+                self.file_resolver,
                 self.linter,
                 self.formatter
             ]
@@ -47,14 +51,17 @@ impl std::fmt::Display for RuffSettings {
 
 impl RuffSettings {
     pub(crate) fn fallback(editor_settings: &ResolvedEditorSettings, root: &Path) -> RuffSettings {
+        let mut path = None;
         let fallback = find_user_settings_toml()
             .and_then(|user_settings| {
-                ruff_workspace::resolver::resolve_root_settings(
+                let settings = ruff_workspace::resolver::resolve_root_settings(
                     &user_settings,
                     Relativity::Cwd,
                     &EditorConfigurationTransformer(editor_settings, root),
                 )
-                .ok()
+                .ok();
+                path = Some(user_settings);
+                settings
             })
             .unwrap_or_else(|| {
                 let default_configuration = Configuration::default();
@@ -67,16 +74,24 @@ impl RuffSettings {
             });
 
         RuffSettings {
+            path,
             file_resolver: fallback.file_resolver,
             formatter: fallback.formatter,
             linter: fallback.linter,
         }
     }
 
+    /// Return the [`ruff_workspace::FileResolverSettings`] for this [`RuffSettings`].
+    pub(crate) fn file_resolver(&self) -> &ruff_workspace::FileResolverSettings {
+        &self.file_resolver
+    }
+
+    /// Return the [`ruff_linter::settings::LinterSettings`] for this [`RuffSettings`].
     pub(crate) fn linter(&self) -> &ruff_linter::settings::LinterSettings {
         &self.linter
     }
 
+    /// Return the [`ruff_workspace::FormatterSettings`] for this [`RuffSettings`].
     pub(crate) fn formatter(&self) -> &ruff_workspace::FormatterSettings {
         &self.formatter
     }
@@ -85,6 +100,7 @@ impl RuffSettings {
 impl RuffSettingsIndex {
     pub(super) fn new(root: &Path, editor_settings: &ResolvedEditorSettings) -> Self {
         let mut index = BTreeMap::default();
+        let mut respect_gitignore = None;
 
         // Add any settings from above the workspace root.
         for directory in root.ancestors() {
@@ -97,9 +113,12 @@ impl RuffSettingsIndex {
                     continue;
                 };
 
+                respect_gitignore = Some(settings.file_resolver.respect_gitignore);
+
                 index.insert(
                     directory.to_path_buf(),
                     Arc::new(RuffSettings {
+                        path: Some(pyproject),
                         file_resolver: settings.file_resolver,
                         linter: settings.linter,
                         formatter: settings.formatter,
@@ -109,87 +128,109 @@ impl RuffSettingsIndex {
             }
         }
 
+        let fallback = Arc::new(RuffSettings::fallback(editor_settings, root));
+
         // Add any settings within the workspace itself
-        let mut walker = WalkDir::new(root).into_iter();
+        let mut builder = WalkBuilder::new(root);
+        builder.standard_filters(
+            respect_gitignore.unwrap_or_else(|| fallback.file_resolver().respect_gitignore),
+        );
+        builder.hidden(false);
+        builder.threads(
+            std::thread::available_parallelism()
+                .map_or(1, std::num::NonZeroUsize::get)
+                .min(12),
+        );
+        let walker = builder.build_parallel();
 
-        while let Some(entry) = walker.next() {
-            let Ok(entry) = entry else {
-                continue;
-            };
+        let index = std::sync::RwLock::new(index);
+        walker.run(|| {
+            Box::new(|result| {
+                let Ok(entry) = result else {
+                    return WalkState::Continue;
+                };
 
-            // Skip non-directories.
-            if !entry.file_type().is_dir() {
-                continue;
-            }
-
-            let directory = entry.into_path();
-
-            // If the directory is excluded from the workspace, skip it.
-            if let Some(file_name) = directory.file_name() {
-                if let Some((_, settings)) = index
-                    .range(..directory.clone())
-                    .rfind(|(path, _)| directory.starts_with(path))
+                // Skip non-directories.
+                if !entry
+                    .file_type()
+                    .is_some_and(|file_type| file_type.is_dir())
                 {
-                    let candidate = Candidate::new(&directory);
-                    let basename = Candidate::new(file_name);
-                    if match_candidate_exclusion(
-                        &candidate,
-                        &basename,
-                        &settings.file_resolver.exclude,
-                    ) {
-                        tracing::debug!("Ignored path via `exclude`: {}", directory.display());
+                    return WalkState::Continue;
+                }
 
-                        walker.skip_current_dir();
-                        continue;
-                    } else if match_candidate_exclusion(
-                        &candidate,
-                        &basename,
+                let directory = entry.into_path();
+
+                // If the directory is excluded from the workspace, skip it.
+                if let Some(file_name) = directory.file_name() {
+                    let settings = index
+                        .read()
+                        .unwrap()
+                        .range(..directory.clone())
+                        .rfind(|(path, _)| directory.starts_with(path))
+                        .map(|(_, settings)| settings.clone())
+                        .unwrap_or_else(|| fallback.clone());
+
+                    if match_exclusion(&directory, file_name, &settings.file_resolver.exclude) {
+                        tracing::debug!("Ignored path via `exclude`: {}", directory.display());
+                        return WalkState::Skip;
+                    } else if match_exclusion(
+                        &directory,
+                        file_name,
                         &settings.file_resolver.extend_exclude,
                     ) {
                         tracing::debug!(
                             "Ignored path via `extend-exclude`: {}",
                             directory.display()
                         );
-
-                        walker.skip_current_dir();
-                        continue;
+                        return WalkState::Skip;
                     }
                 }
-            }
 
-            if let Some(pyproject) = settings_toml(&directory).ok().flatten() {
-                let Ok(settings) = ruff_workspace::resolver::resolve_root_settings(
-                    &pyproject,
-                    Relativity::Parent,
-                    &EditorConfigurationTransformer(editor_settings, root),
-                ) else {
-                    continue;
-                };
-                index.insert(
-                    directory,
-                    Arc::new(RuffSettings {
-                        file_resolver: settings.file_resolver,
-                        linter: settings.linter,
-                        formatter: settings.formatter,
-                    }),
-                );
-            }
+                if let Some(pyproject) = settings_toml(&directory).ok().flatten() {
+                    let Ok(settings) = ruff_workspace::resolver::resolve_root_settings(
+                        &pyproject,
+                        Relativity::Parent,
+                        &EditorConfigurationTransformer(editor_settings, root),
+                    ) else {
+                        return WalkState::Continue;
+                    };
+                    index.write().unwrap().insert(
+                        directory,
+                        Arc::new(RuffSettings {
+                            path: Some(pyproject),
+                            file_resolver: settings.file_resolver,
+                            linter: settings.linter,
+                            formatter: settings.formatter,
+                        }),
+                    );
+                }
+
+                WalkState::Continue
+            })
+        });
+
+        Self {
+            index: index.into_inner().unwrap(),
+            fallback,
         }
-
-        let fallback = Arc::new(RuffSettings::fallback(editor_settings, root));
-
-        Self { index, fallback }
     }
 
     pub(super) fn get(&self, document_path: &Path) -> Arc<RuffSettings> {
-        if let Some((_, settings)) = self
-            .index
+        self.index
             .range(..document_path.to_path_buf())
             .rfind(|(path, _)| document_path.starts_with(path))
-        {
-            return settings.clone();
-        }
+            .map(|(_, settings)| settings)
+            .unwrap_or_else(|| &self.fallback)
+            .clone()
+    }
 
+    pub(crate) fn list_files(&self) -> impl Iterator<Item = &Path> {
+        self.index
+            .values()
+            .filter_map(|settings| settings.path.as_deref())
+    }
+
+    pub(super) fn fallback(&self) -> Arc<RuffSettings> {
         self.fallback.clone()
     }
 }

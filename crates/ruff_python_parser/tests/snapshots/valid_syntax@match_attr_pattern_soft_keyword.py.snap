@@ -1,0 +1,231 @@
+---
+source: crates/ruff_python_parser/tests/fixtures.rs
+input_file: crates/ruff_python_parser/resources/inline/ok/match_attr_pattern_soft_keyword.py
+---
+## AST
+
+```
+Module(
+    ModModule {
+        range: 0..131,
+        body: [
+            Match(
+                StmtMatch {
+                    range: 0..130,
+                    subject: Name(
+                        ExprName {
+                            range: 6..9,
+                            id: Name("foo"),
+                            ctx: Load,
+                        },
+                    ),
+                    cases: [
+                        MatchCase {
+                            range: 15..34,
+                            pattern: MatchValue(
+                                PatternMatchValue {
+                                    range: 20..29,
+                                    value: Attribute(
+                                        ExprAttribute {
+                                            range: 20..29,
+                                            value: Name(
+                                                ExprName {
+                                                    range: 20..25,
+                                                    id: Name("match"),
+                                                    ctx: Load,
+                                                },
+                                            ),
+                                            attr: Identifier {
+                                                id: Name("bar"),
+                                                range: 26..29,
+                                            },
+                                            ctx: Load,
+                                        },
+                                    ),
+                                },
+                            ),
+                            guard: None,
+                            body: [
+                                Expr(
+                                    StmtExpr {
+                                        range: 31..34,
+                                        value: EllipsisLiteral(
+                                            ExprEllipsisLiteral {
+                                                range: 31..34,
+                                            },
+                                        ),
+                                    },
+                                ),
+                            ],
+                        },
+                        MatchCase {
+                            range: 39..57,
+                            pattern: MatchValue(
+                                PatternMatchValue {
+                                    range: 44..52,
+                                    value: Attribute(
+                                        ExprAttribute {
+                                            range: 44..52,
+                                            value: Name(
+                                                ExprName {
+                                                    range: 44..48,
+                                                    id: Name("case"),
+                                                    ctx: Load,
+                                                },
+                                            ),
+                                            attr: Identifier {
+                                                id: Name("bar"),
+                                                range: 49..52,
+                                            },
+                                            ctx: Load,
+                                        },
+                                    ),
+                                },
+                            ),
+                            guard: None,
+                            body: [
+                                Expr(
+                                    StmtExpr {
+                                        range: 54..57,
+                                        value: EllipsisLiteral(
+                                            ExprEllipsisLiteral {
+                                                range: 54..57,
+                                            },
+                                        ),
+                                    },
+                                ),
+                            ],
+                        },
+                        MatchCase {
+                            range: 62..80,
+                            pattern: MatchValue(
+                                PatternMatchValue {
+                                    range: 67..75,
+                                    value: Attribute(
+                                        ExprAttribute {
+                                            range: 67..75,
+                                            value: Name(
+                                                ExprName {
+                                                    range: 67..71,
+                                                    id: Name("type"),
+                                                    ctx: Load,
+                                                },
+                                            ),
+                                            attr: Identifier {
+                                                id: Name("bar"),
+                                                range: 72..75,
+                                            },
+                                            ctx: Load,
+                                        },
+                                    ),
+                                },
+                            ),
+                            guard: None,
+                            body: [
+                                Expr(
+                                    StmtExpr {
+                                        range: 77..80,
+                                        value: EllipsisLiteral(
+                                            ExprEllipsisLiteral {
+                                                range: 77..80,
+                                            },
+                                        ),
+                                    },
+                                ),
+                            ],
+                        },
+                        MatchCase {
+                            range: 85..130,
+                            pattern: MatchValue(
+                                PatternMatchValue {
+                                    range: 90..125,
+                                    value: Attribute(
+                                        ExprAttribute {
+                                            range: 90..125,
+                                            value: Attribute(
+                                                ExprAttribute {
+                                                    range: 90..119,
+                                                    value: Attribute(
+                                                        ExprAttribute {
+                                                            range: 90..114,
+                                                            value: Attribute(
+                                                                ExprAttribute {
+                                                                    range: 90..109,
+                                                                    value: Attribute(
+                                                                        ExprAttribute {
+                                                                            range: 90..105,
+                                                                            value: Attribute(
+                                                                                ExprAttribute {
+                                                                                    range: 90..100,
+                                                                                    value: Name(
+                                                                                        ExprName {
+                                                                                            range: 90..95,
+                                                                                            id: Name("match"),
+                                                                                            ctx: Load,
+                                                                                        },
+                                                                                    ),
+                                                                                    attr: Identifier {
+                                                                                        id: Name("case"),
+                                                                                        range: 96..100,
+                                                                                    },
+                                                                                    ctx: Load,
+                                                                                },
+                                                                            ),
+                                                                            attr: Identifier {
+                                                                                id: Name("type"),
+                                                                                range: 101..105,
+                                                                            },
+                                                                            ctx: Load,
+                                                                        },
+                                                                    ),
+                                                                    attr: Identifier {
+                                                                        id: Name("bar"),
+                                                                        range: 106..109,
+                                                                    },
+                                                                    ctx: Load,
+                                                                },
+                                                            ),
+                                                            attr: Identifier {
+                                                                id: Name("type"),
+                                                                range: 110..114,
+                                                            },
+                                                            ctx: Load,
+                                                        },
+                                                    ),
+                                                    attr: Identifier {
+                                                        id: Name("case"),
+                                                        range: 115..119,
+                                                    },
+                                                    ctx: Load,
+                                                },
+                                            ),
+                                            attr: Identifier {
+                                                id: Name("match"),
+                                                range: 120..125,
+                                            },
+                                            ctx: Load,
+                                        },
+                                    ),
+                                },
+                            ),
+                            guard: None,
+                            body: [
+                                Expr(
+                                    StmtExpr {
+                                        range: 127..130,
+                                        value: EllipsisLiteral(
+                                            ExprEllipsisLiteral {
+                                                range: 127..130,
+                                            },
+                                        ),
+                                    },
+                                ),
+                            ],
+                        },
+                    ],
+                },
+            ),
+        ],
+    },
+)
+```

@@ -59,7 +59,7 @@ pub(crate) fn bad_open_mode(checker: &mut Checker, call: &ast::ExprCall) {
         return;
     };
 
-    let Some(ast::ExprStringLiteral { value, .. }) = mode.as_string_literal_expr() else {
+    let ast::Expr::StringLiteral(ast::ExprStringLiteral { value, .. }) = mode else {
         return;
     };
 

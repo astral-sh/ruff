@@ -1,0 +1,6 @@
+---
+source: crates/ruff_linter/src/message/json_lines.rs
+expression: content
+---
+{"cell":null,"code":null,"end_location":{"column":1,"row":2},"filename":"syntax_errors.py","fix":null,"location":{"column":15,"row":1},"message":"SyntaxError: Expected one or more symbol names after import","noqa_row":null,"url":null}
+{"cell":null,"code":null,"end_location":{"column":1,"row":4},"filename":"syntax_errors.py","fix":null,"location":{"column":12,"row":3},"message":"SyntaxError: Expected ')', found newline","noqa_row":null,"url":null}

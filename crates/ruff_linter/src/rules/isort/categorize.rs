@@ -1,11 +1,10 @@
 use std::collections::BTreeMap;
 use std::fmt;
-use std::hash::BuildHasherDefault;
 use std::path::{Path, PathBuf};
 use std::{fs, iter};
 
 use log::debug;
-use rustc_hash::{FxHashMap, FxHashSet};
+use rustc_hash::{FxBuildHasher, FxHashMap, FxHashSet};
 use serde::{Deserialize, Serialize};
 use strum_macros::EnumIter;
 
@@ -316,8 +315,7 @@ impl KnownModules {
             .collect();
 
         // Warn in the case of duplicate modules.
-        let mut seen =
-            FxHashSet::with_capacity_and_hasher(known.len(), BuildHasherDefault::default());
+        let mut seen = FxHashSet::with_capacity_and_hasher(known.len(), FxBuildHasher);
         for (module, _) in &known {
             if !seen.insert(module) {
                 warn_user_once!("One or more modules are part of multiple import sections, including: `{module}`");

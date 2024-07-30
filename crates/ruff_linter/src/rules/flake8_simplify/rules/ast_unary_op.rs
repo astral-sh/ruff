@@ -3,6 +3,7 @@ use ruff_text_size::{Ranged, TextRange};
 
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::name::Name;
 use ruff_python_semantic::ScopeKind;
 
 use crate::checkers::ast::Checker;
@@ -272,7 +273,7 @@ pub(crate) fn double_negation(checker: &mut Checker, expr: &Expr, op: UnaryOp, o
         )));
     } else if checker.semantic().has_builtin_binding("bool") {
         let node = ast::ExprName {
-            id: "bool".into(),
+            id: Name::new_static("bool"),
             ctx: ExprContext::Load,
             range: TextRange::default(),
         };

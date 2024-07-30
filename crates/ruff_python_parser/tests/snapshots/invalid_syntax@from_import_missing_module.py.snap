@@ -25,7 +25,7 @@ Module(
                         Alias {
                             range: 17..18,
                             name: Identifier {
-                                id: "x",
+                                id: Name("x"),
                                 range: 17..18,
                             },
                             asname: None,

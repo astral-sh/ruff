@@ -15,11 +15,11 @@ Module(
                     is_async: false,
                     items: [
                         WithItem {
-                            range: 6..6,
+                            range: 5..6,
                             context_expr: Name(
                                 ExprName {
                                     range: 6..6,
-                                    id: "",
+                                    id: Name(""),
                                     ctx: Invalid,
                                 },
                             ),

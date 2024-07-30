@@ -3,6 +3,7 @@ use log::debug;
 use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::helpers::is_dunder;
+use ruff_python_ast::name::Name;
 use ruff_python_ast::{self as ast, Arguments, Expr, ExprContext, Identifier, Keyword, Stmt};
 use ruff_python_codegen::Generator;
 use ruff_python_semantic::SemanticModel;
@@ -148,11 +149,11 @@ fn match_named_tuple_assign<'a>(
 }
 
 /// Generate a [`Stmt::AnnAssign`] representing the provided field definition.
-fn create_field_assignment_stmt(field: &str, annotation: &Expr) -> Stmt {
+fn create_field_assignment_stmt(field: Name, annotation: &Expr) -> Stmt {
     ast::StmtAnnAssign {
         target: Box::new(
             ast::ExprName {
-                id: field.into(),
+                id: field,
                 ctx: ExprContext::Load,
                 range: TextRange::default(),
             }
@@ -191,7 +192,10 @@ fn create_fields_from_fields_arg(fields: &Expr) -> Option<Vec<Stmt>> {
                 if is_dunder(field.to_str()) {
                     return None;
                 }
-                Some(create_field_assignment_stmt(field.to_str(), annotation))
+                Some(create_field_assignment_stmt(
+                    Name::new(field.to_str()),
+                    annotation,
+                ))
             })
             .collect()
     }
@@ -205,7 +209,7 @@ fn create_fields_from_keywords(keywords: &[Keyword]) -> Option<Vec<Stmt>> {
             keyword
                 .arg
                 .as_ref()
-                .map(|field| create_field_assignment_stmt(field.as_str(), &keyword.value))
+                .map(|field| create_field_assignment_stmt(field.id.clone(), &keyword.value))
         })
         .collect()
 }

@@ -160,11 +160,17 @@ def f():
     pass
 
 
+if True:
+    def a():
+        return 1
+else:
+    pass
 
 
 # comment
 
 x = 1
+
 ```
 
 ## Output
@@ -302,10 +308,28 @@ x = 1
 def f():
     pass
 
+if True:
+    def a():
+        return 1
+else:
+    pass
+
 # comment
 
 x = 1
 ```
 
 
-
+## Preview changes
+```diff
+--- Stable
++++ Preview
+@@ -134,6 +134,7 @@
+ if True:
+     def a():
+         return 1
++
+ else:
+     pass
+ 
+```

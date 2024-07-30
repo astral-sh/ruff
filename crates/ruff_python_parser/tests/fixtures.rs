@@ -6,9 +6,9 @@ use std::path::Path;
 use annotate_snippets::display_list::{DisplayList, FormatOptions};
 use annotate_snippets::snippet::{AnnotationType, Slice, Snippet, SourceAnnotation};
 
-use ruff_python_ast::visitor::preorder::{walk_module, PreorderVisitor, TraversalSignal};
+use ruff_python_ast::visitor::source_order::{walk_module, SourceOrderVisitor, TraversalSignal};
 use ruff_python_ast::{AnyNodeRef, Mod};
-use ruff_python_parser::{Mode, ParseErrorType, Program};
+use ruff_python_parser::{parse_unchecked, Mode, ParseErrorType, Token};
 use ruff_source_file::{LineIndex, OneIndexed, SourceCode};
 use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 
@@ -36,15 +36,15 @@ fn inline_err() {
 /// Snapshots the AST.
 fn test_valid_syntax(input_path: &Path) {
     let source = fs::read_to_string(input_path).expect("Expected test file to exist");
-    let program = Program::parse_str(&source, Mode::Module);
+    let parsed = parse_unchecked(&source, Mode::Module);
 
-    if !program.is_valid() {
+    if !parsed.is_valid() {
         let line_index = LineIndex::from_source_text(&source);
         let source_code = SourceCode::new(&source, &line_index);
 
         let mut message = "Expected no syntax errors for a valid program but the parser generated the following errors:\n".to_string();
 
-        for error in program.errors() {
+        for error in parsed.errors() {
             writeln!(
                 &mut message,
                 "{}\n",
@@ -60,11 +60,12 @@ fn test_valid_syntax(input_path: &Path) {
         panic!("{input_path:?}: {message}");
     }
 
-    validate_ast(program.ast(), source.text_len(), input_path);
+    validate_tokens(parsed.tokens(), source.text_len(), input_path);
+    validate_ast(parsed.syntax(), source.text_len(), input_path);
 
     let mut output = String::new();
     writeln!(&mut output, "## AST").unwrap();
-    writeln!(&mut output, "\n```\n{:#?}\n```", program.ast()).unwrap();
+    writeln!(&mut output, "\n```\n{:#?}\n```", parsed.syntax()).unwrap();
 
     insta::with_settings!({
         omit_expression => true,
@@ -79,25 +80,26 @@ fn test_valid_syntax(input_path: &Path) {
 /// Snapshots the AST and the error messages.
 fn test_invalid_syntax(input_path: &Path) {
     let source = fs::read_to_string(input_path).expect("Expected test file to exist");
-    let program = Program::parse_str(&source, Mode::Module);
+    let parsed = parse_unchecked(&source, Mode::Module);
 
     assert!(
-        !program.is_valid(),
+        !parsed.is_valid(),
         "{input_path:?}: Expected parser to generate at least one syntax error for a program containing syntax errors."
     );
 
-    validate_ast(program.ast(), source.text_len(), input_path);
+    validate_tokens(parsed.tokens(), source.text_len(), input_path);
+    validate_ast(parsed.syntax(), source.text_len(), input_path);
 
     let mut output = String::new();
     writeln!(&mut output, "## AST").unwrap();
-    writeln!(&mut output, "\n```\n{:#?}\n```", program.ast()).unwrap();
+    writeln!(&mut output, "\n```\n{:#?}\n```", parsed.syntax()).unwrap();
 
     writeln!(&mut output, "## Errors\n").unwrap();
 
     let line_index = LineIndex::from_source_text(&source);
     let source_code = SourceCode::new(&source, &line_index);
 
-    for error in program.errors() {
+    for error in parsed.errors() {
         writeln!(
             &mut output,
             "{}\n",
@@ -126,20 +128,22 @@ fn test_invalid_syntax(input_path: &Path) {
 #[allow(clippy::print_stdout)]
 fn parser_quick_test() {
     let source = "\
-data[*x,]
+f'{'
+f'{foo!r'
 ";
 
-    let program = Program::parse_str(source, Mode::Module);
+    let parsed = parse_unchecked(source, Mode::Module);
 
-    println!("AST:\n----\n{:#?}", program.ast());
+    println!("AST:\n----\n{:#?}", parsed.syntax());
+    println!("Tokens:\n-------\n{:#?}", parsed.tokens());
 
-    if !program.is_valid() {
+    if !parsed.is_valid() {
         println!("Errors:\n-------");
 
         let line_index = LineIndex::from_source_text(source);
         let source_code = SourceCode::new(source, &line_index);
 
-        for error in program.errors() {
+        for error in parsed.errors() {
             // Sometimes the code frame doesn't show the error message, so we print
             // the message as well.
             println!("Syntax Error: {error}");
@@ -230,6 +234,36 @@ impl std::fmt::Display for CodeFrame<'_> {
 }
 
 /// Verifies that:
+/// * the ranges are strictly increasing when loop the tokens in insertion order
+/// * all ranges are within the length of the source code
+fn validate_tokens(tokens: &[Token], source_length: TextSize, test_path: &Path) {
+    let mut previous: Option<&Token> = None;
+
+    for token in tokens {
+        assert!(
+            token.end() <= source_length,
+            "{path}: Token range exceeds the source code length. Token: {token:#?}",
+            path = test_path.display()
+        );
+
+        if let Some(previous) = previous {
+            assert_eq!(
+                previous.range().ordering(token.range()),
+                Ordering::Less,
+                "{path}: Token ranges are not in increasing order
+Previous token: {previous:#?}
+Current token: {token:#?}
+Tokens: {tokens:#?}
+",
+                path = test_path.display(),
+            );
+        }
+
+        previous = Some(token);
+    }
+}
+
+/// Verifies that:
 /// * the range of the parent node fully encloses all its child nodes
 /// * the ranges are strictly increasing when traversing the nodes in pre-order.
 /// * all ranges are within the length of the source code.
@@ -256,7 +290,7 @@ impl<'a> ValidateAstVisitor<'a> {
     }
 }
 
-impl<'ast> PreorderVisitor<'ast> for ValidateAstVisitor<'ast> {
+impl<'ast> SourceOrderVisitor<'ast> for ValidateAstVisitor<'ast> {
     fn enter_node(&mut self, node: AnyNodeRef<'ast>) -> TraversalSignal {
         assert!(
             node.end() <= self.source_length,

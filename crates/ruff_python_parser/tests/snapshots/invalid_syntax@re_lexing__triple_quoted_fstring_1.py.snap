@@ -1,0 +1,96 @@
+---
+source: crates/ruff_python_parser/tests/fixtures.rs
+input_file: crates/ruff_python_parser/resources/invalid/re_lexing/triple_quoted_fstring_1.py
+---
+## AST
+
+```
+Module(
+    ModModule {
+        range: 0..198,
+        body: [
+            Expr(
+                StmtExpr {
+                    range: 166..178,
+                    value: FString(
+                        ExprFString {
+                            range: 166..178,
+                            value: FStringValue {
+                                inner: Single(
+                                    FString(
+                                        FString {
+                                            range: 166..178,
+                                            elements: [
+                                                Literal(
+                                                    FStringLiteralElement {
+                                                        range: 170..176,
+                                                        value: "hello ",
+                                                    },
+                                                ),
+                                                Expression(
+                                                    FStringExpressionElement {
+                                                        range: 176..178,
+                                                        expression: Name(
+                                                            ExprName {
+                                                                range: 177..178,
+                                                                id: Name("x"),
+                                                                ctx: Load,
+                                                            },
+                                                        ),
+                                                        debug_text: None,
+                                                        conversion: None,
+                                                        format_spec: None,
+                                                    },
+                                                ),
+                                            ],
+                                            flags: FStringFlags {
+                                                quote_style: Double,
+                                                prefix: Regular,
+                                                triple_quoted: true,
+                                            },
+                                        },
+                                    ),
+                                ),
+                            },
+                        },
+                    ),
+                },
+            ),
+        ],
+    },
+)
+```
+## Errors
+
+  |
+3 |   # https://github.com/astral-sh/ruff/issues/11929
+4 |   
+5 |   f"""hello {x # comment    
+  |  ___________________________^
+6 | | y = 1
+  | |_____^ Syntax Error: f-string: unterminated triple-quoted string
+  |
+
+
+  |
+5 | f"""hello {x # comment    
+6 | y = 1
+  | ^ Syntax Error: f-string: expecting '}'
+  |
+
+
+  |
+3 |   # https://github.com/astral-sh/ruff/issues/11929
+4 |   
+5 |   f"""hello {x # comment    
+  |  ___________________________^
+6 | | y = 1
+  | |_____^ Syntax Error: Expected FStringEnd, found Unknown
+  |
+
+
+  |
+5 | f"""hello {x # comment    
+6 | y = 1
+  |       Syntax Error: Expected a statement
+  |

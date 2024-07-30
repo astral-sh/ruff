@@ -15,7 +15,7 @@ Module(
                     subject: Name(
                         ExprName {
                             range: 6..25,
-                            id: "invalid_lhs_pattern",
+                            id: Name("invalid_lhs_pattern"),
                             ctx: Load,
                         },
                     ),
@@ -34,7 +34,7 @@ Module(
                                                     func: Name(
                                                         ExprName {
                                                             range: 36..39,
-                                                            id: "Foo",
+                                                            id: Name("Foo"),
                                                             ctx: Load,
                                                         },
                                                     ),
@@ -79,7 +79,7 @@ Module(
                                             left: Name(
                                                 ExprName {
                                                     range: 70..71,
-                                                    id: "x",
+                                                    id: Name("x"),
                                                     ctx: Store,
                                                 },
                                             ),
@@ -117,7 +117,7 @@ Module(
                                             left: Name(
                                                 ExprName {
                                                     range: 100..101,
-                                                    id: "_",
+                                                    id: Name("_"),
                                                     ctx: Store,
                                                 },
                                             ),
@@ -408,7 +408,7 @@ Module(
                                                     func: Name(
                                                         ExprName {
                                                             range: 302..305,
-                                                            id: "Foo",
+                                                            id: Name("Foo"),
                                                             ctx: Load,
                                                         },
                                                     ),
@@ -418,7 +418,7 @@ Module(
                                                             Name(
                                                                 ExprName {
                                                                     range: 306..312,
-                                                                    id: "",
+                                                                    id: Name(""),
                                                                     ctx: Invalid,
                                                                 },
                                                             ),
@@ -459,7 +459,7 @@ Module(
                     subject: Name(
                         ExprName {
                             range: 340..359,
-                            id: "invalid_rhs_pattern",
+                            id: Name("invalid_rhs_pattern"),
                             ctx: Load,
                         },
                     ),
@@ -487,7 +487,7 @@ Module(
                                                     func: Name(
                                                         ExprName {
                                                             range: 374..377,
-                                                            id: "Foo",
+                                                            id: Name("Foo"),
                                                             ctx: Load,
                                                         },
                                                     ),
@@ -531,7 +531,7 @@ Module(
                                             right: Name(
                                                 ExprName {
                                                     range: 407..408,
-                                                    id: "x",
+                                                    id: Name("x"),
                                                     ctx: Store,
                                                 },
                                             ),
@@ -568,7 +568,7 @@ Module(
                                             right: Name(
                                                 ExprName {
                                                     range: 436..437,
-                                                    id: "_",
+                                                    id: Name("_"),
                                                     ctx: Store,
                                                 },
                                             ),
@@ -807,7 +807,7 @@ Module(
                                                     func: Name(
                                                         ExprName {
                                                             range: 600..603,
-                                                            id: "Foo",
+                                                            id: Name("Foo"),
                                                             ctx: Load,
                                                         },
                                                     ),
@@ -817,7 +817,7 @@ Module(
                                                             Name(
                                                                 ExprName {
                                                                     range: 604..610,
-                                                                    id: "",
+                                                                    id: Name(""),
                                                                     ctx: Invalid,
                                                                 },
                                                             ),
@@ -848,7 +848,7 @@ Module(
                     subject: Name(
                         ExprName {
                             range: 633..656,
-                            id: "invalid_lhs_rhs_pattern",
+                            id: Name("invalid_lhs_rhs_pattern"),
                             ctx: Load,
                         },
                     ),
@@ -867,7 +867,7 @@ Module(
                                                     func: Name(
                                                         ExprName {
                                                             range: 667..670,
-                                                            id: "Foo",
+                                                            id: Name("Foo"),
                                                             ctx: Load,
                                                         },
                                                     ),
@@ -885,7 +885,7 @@ Module(
                                                     func: Name(
                                                         ExprName {
                                                             range: 675..678,
-                                                            id: "Bar",
+                                                            id: Name("Bar"),
                                                             ctx: Load,
                                                         },
                                                     ),

@@ -8,6 +8,8 @@ use crate::settings::LinterSettings;
 /// ## What it does
 /// Checks for the absence of copyright notices within Python files.
 ///
+/// Note that this check only searches within the first 4096 bytes of the file.
+///
 /// ## Why is this bad?
 /// In some codebases, it's common to have a license header at the top of every
 /// file. This rule ensures that the license header is present.
@@ -31,8 +33,8 @@ pub(crate) fn missing_copyright_notice(
         return None;
     }
 
-    // Only search the first 1024 bytes in the file.
-    let contents = locator.up_to(locator.floor_char_boundary(TextSize::new(1024)));
+    // Only search the first 4096 bytes in the file.
+    let contents = locator.up_to(locator.floor_char_boundary(TextSize::new(4096)));
 
     // Locate the copyright notice.
     if let Some(match_) = settings.flake8_copyright.notice_rgx.find(contents) {

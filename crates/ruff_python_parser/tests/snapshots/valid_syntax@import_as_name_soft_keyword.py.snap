@@ -1,0 +1,75 @@
+---
+source: crates/ruff_python_parser/tests/fixtures.rs
+input_file: crates/ruff_python_parser/resources/inline/ok/import_as_name_soft_keyword.py
+---
+## AST
+
+```
+Module(
+    ModModule {
+        range: 0..58,
+        body: [
+            Import(
+                StmtImport {
+                    range: 0..19,
+                    names: [
+                        Alias {
+                            range: 7..19,
+                            name: Identifier {
+                                id: Name("foo"),
+                                range: 7..10,
+                            },
+                            asname: Some(
+                                Identifier {
+                                    id: Name("match"),
+                                    range: 14..19,
+                                },
+                            ),
+                        },
+                    ],
+                },
+            ),
+            Import(
+                StmtImport {
+                    range: 20..38,
+                    names: [
+                        Alias {
+                            range: 27..38,
+                            name: Identifier {
+                                id: Name("bar"),
+                                range: 27..30,
+                            },
+                            asname: Some(
+                                Identifier {
+                                    id: Name("case"),
+                                    range: 34..38,
+                                },
+                            ),
+                        },
+                    ],
+                },
+            ),
+            Import(
+                StmtImport {
+                    range: 39..57,
+                    names: [
+                        Alias {
+                            range: 46..57,
+                            name: Identifier {
+                                id: Name("baz"),
+                                range: 46..49,
+                            },
+                            asname: Some(
+                                Identifier {
+                                    id: Name("type"),
+                                    range: 53..57,
+                                },
+                            ),
+                        },
+                    ],
+                },
+            ),
+        ],
+    },
+)
+```

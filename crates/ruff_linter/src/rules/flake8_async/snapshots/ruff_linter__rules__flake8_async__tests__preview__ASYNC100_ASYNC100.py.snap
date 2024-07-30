@@ -1,0 +1,74 @@
+---
+source: crates/ruff_linter/src/rules/flake8_async/mod.rs
+---
+ASYNC100.py:7:5: ASYNC100 A `with trio.fail_after(...):` context does not contain any `await` statements. This makes it pointless, as the timeout can only be triggered by a checkpoint.
+  |
+6 |   async def func():
+7 |       with trio.fail_after():
+  |  _____^
+8 | |         ...
+  | |___________^ ASYNC100
+  |
+
+ASYNC100.py:17:5: ASYNC100 A `with trio.move_on_after(...):` context does not contain any `await` statements. This makes it pointless, as the timeout can only be triggered by a checkpoint.
+   |
+16 |   async def func():
+17 |       with trio.move_on_after():
+   |  _____^
+18 | |         ...
+   | |___________^ ASYNC100
+   |
+
+ASYNC100.py:33:5: ASYNC100 A `with anyio.move_on_after(...):` context does not contain any `await` statements. This makes it pointless, as the timeout can only be triggered by a checkpoint.
+   |
+32 |   async def func():
+33 |       with anyio.move_on_after():
+   |  _____^
+34 | |         ...
+   | |___________^ ASYNC100
+   |
+
+ASYNC100.py:38:5: ASYNC100 A `with anyio.fail_after(...):` context does not contain any `await` statements. This makes it pointless, as the timeout can only be triggered by a checkpoint.
+   |
+37 |   async def func():
+38 |       with anyio.fail_after():
+   |  _____^
+39 | |         ...
+   | |___________^ ASYNC100
+   |
+
+ASYNC100.py:43:5: ASYNC100 A `with anyio.CancelScope(...):` context does not contain any `await` statements. This makes it pointless, as the timeout can only be triggered by a checkpoint.
+   |
+42 |   async def func():
+43 |       with anyio.CancelScope():
+   |  _____^
+44 | |         ...
+   | |___________^ ASYNC100
+   |
+
+ASYNC100.py:48:5: ASYNC100 A `with anyio.CancelScope(...):` context does not contain any `await` statements. This makes it pointless, as the timeout can only be triggered by a checkpoint.
+   |
+47 |   async def func():
+48 |       with anyio.CancelScope():
+   |  _____^
+49 | |         ...
+   | |___________^ ASYNC100
+   |
+
+ASYNC100.py:53:5: ASYNC100 A `with asyncio.timeout(...):` context does not contain any `await` statements. This makes it pointless, as the timeout can only be triggered by a checkpoint.
+   |
+52 |   async def func():
+53 |       with asyncio.timeout():
+   |  _____^
+54 | |         ...
+   | |___________^ ASYNC100
+   |
+
+ASYNC100.py:58:5: ASYNC100 A `with asyncio.timeout_at(...):` context does not contain any `await` statements. This makes it pointless, as the timeout can only be triggered by a checkpoint.
+   |
+57 |   async def func():
+58 |       with asyncio.timeout_at():
+   |  _____^
+59 | |         ...
+   | |___________^ ASYNC100
+   |

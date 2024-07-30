@@ -5,7 +5,7 @@ use itertools::Itertools;
 use super::settings::Settings;
 use super::sorting::{MemberKey, ModuleKey};
 use super::types::EitherImport::{self, Import, ImportFrom};
-use super::types::{AliasData, CommentSet, ImportBlock, ImportFromStatement};
+use super::types::{AliasData, ImportBlock, ImportFromCommentSet, ImportFromStatement};
 
 pub(crate) fn order_imports<'a>(
     block: ImportBlock<'a>,
@@ -49,7 +49,7 @@ pub(crate) fn order_imports<'a>(
                             .sorted_by_cached_key(|(alias, _)| {
                                 MemberKey::from_member(alias.name, alias.asname, settings)
                             })
-                            .collect::<Vec<(AliasData, CommentSet)>>(),
+                            .collect::<Vec<(AliasData, ImportFromCommentSet)>>(),
                     )
                 },
             );

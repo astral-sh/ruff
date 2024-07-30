@@ -1,0 +1,65 @@
+---
+source: crates/ruff_python_parser/tests/fixtures.rs
+input_file: crates/ruff_python_parser/resources/inline/err/match_classify_as_keyword_or_identifier.py
+---
+## AST
+
+```
+Module(
+    ModModule {
+        range: 0..39,
+        body: [
+            Match(
+                StmtMatch {
+                    range: 0..38,
+                    subject: Starred(
+                        ExprStarred {
+                            range: 6..10,
+                            value: Name(
+                                ExprName {
+                                    range: 7..10,
+                                    id: Name("foo"),
+                                    ctx: Load,
+                                },
+                            ),
+                            ctx: Load,
+                        },
+                    ),
+                    cases: [
+                        MatchCase {
+                            range: 27..38,
+                            pattern: MatchAs(
+                                PatternMatchAs {
+                                    range: 32..33,
+                                    pattern: None,
+                                    name: None,
+                                },
+                            ),
+                            guard: None,
+                            body: [
+                                Expr(
+                                    StmtExpr {
+                                        range: 35..38,
+                                        value: EllipsisLiteral(
+                                            ExprEllipsisLiteral {
+                                                range: 35..38,
+                                            },
+                                        ),
+                                    },
+                                ),
+                            ],
+                        },
+                    ],
+                },
+            ),
+        ],
+    },
+)
+```
+## Errors
+
+  |
+1 | match *foo:  # Keyword
+  |       ^^^^ Syntax Error: Starred expression cannot be used here
+2 |     case _: ...
+  |

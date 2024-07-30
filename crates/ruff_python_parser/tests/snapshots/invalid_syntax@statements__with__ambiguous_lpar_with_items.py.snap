@@ -23,14 +23,14 @@ Module(
                                         Name(
                                             ExprName {
                                                 range: 169..174,
-                                                id: "item1",
+                                                id: Name("item1"),
                                                 ctx: Load,
                                             },
                                         ),
                                         Name(
                                             ExprName {
                                                 range: 176..181,
-                                                id: "item2",
+                                                id: Name("item2"),
                                                 ctx: Load,
                                             },
                                         ),
@@ -70,14 +70,14 @@ Module(
                                         Name(
                                             ExprName {
                                                 range: 195..200,
-                                                id: "item1",
+                                                id: Name("item1"),
                                                 ctx: Load,
                                             },
                                         ),
                                         Name(
                                             ExprName {
                                                 range: 202..207,
-                                                id: "item2",
+                                                id: Name("item2"),
                                                 ctx: Load,
                                             },
                                         ),
@@ -93,7 +93,7 @@ Module(
                             context_expr: Name(
                                 ExprName {
                                     range: 213..214,
-                                    id: "f",
+                                    id: Name("f"),
                                     ctx: Load,
                                 },
                             ),
@@ -128,14 +128,14 @@ Module(
                                         Name(
                                             ExprName {
                                                 range: 226..231,
-                                                id: "item1",
+                                                id: Name("item1"),
                                                 ctx: Load,
                                             },
                                         ),
                                         Name(
                                             ExprName {
                                                 range: 233..238,
-                                                id: "item2",
+                                                id: Name("item2"),
                                                 ctx: Load,
                                             },
                                         ),
@@ -151,7 +151,7 @@ Module(
                             context_expr: Name(
                                 ExprName {
                                     range: 241..246,
-                                    id: "item3",
+                                    id: Name("item3"),
                                     ctx: Load,
                                 },
                             ),
@@ -185,7 +185,7 @@ Module(
                                     value: Name(
                                         ExprName {
                                             range: 260..264,
-                                            id: "item",
+                                            id: Name("item"),
                                             ctx: Load,
                                         },
                                     ),
@@ -222,7 +222,7 @@ Module(
                                     value: Name(
                                         ExprName {
                                             range: 278..282,
-                                            id: "item",
+                                            id: Name("item"),
                                             ctx: Load,
                                         },
                                     ),
@@ -233,7 +233,7 @@ Module(
                                 Name(
                                     ExprName {
                                         range: 287..288,
-                                        id: "f",
+                                        id: Name("f"),
                                         ctx: Store,
                                     },
                                 ),
@@ -267,7 +267,7 @@ Module(
                                     target: Name(
                                         ExprName {
                                             range: 300..304,
-                                            id: "item",
+                                            id: Name("item"),
                                             ctx: Store,
                                         },
                                     ),
@@ -285,7 +285,7 @@ Module(
                                 Name(
                                     ExprName {
                                         range: 314..315,
-                                        id: "f",
+                                        id: Name("f"),
                                         ctx: Store,
                                     },
                                 ),
@@ -316,7 +316,7 @@ Module(
                             context_expr: Name(
                                 ExprName {
                                     range: 328..333,
-                                    id: "item1",
+                                    id: Name("item1"),
                                     ctx: Load,
                                 },
                             ),
@@ -330,7 +330,7 @@ Module(
                                     target: Name(
                                         ExprName {
                                             range: 335..340,
-                                            id: "item2",
+                                            id: Name("item2"),
                                             ctx: Store,
                                         },
                                     ),
@@ -348,7 +348,7 @@ Module(
                                 Name(
                                     ExprName {
                                         range: 350..351,
-                                        id: "f",
+                                        id: Name("f"),
                                         ctx: Store,
                                     },
                                 ),
@@ -375,14 +375,14 @@ Module(
                     is_async: false,
                     items: [
                         WithItem {
-                            range: 364..384,
+                            range: 363..384,
                             context_expr: Generator(
                                 ExprGenerator {
-                                    range: 364..384,
+                                    range: 363..384,
                                     elt: Name(
                                         ExprName {
                                             range: 364..365,
-                                            id: "x",
+                                            id: Name("x"),
                                             ctx: Load,
                                         },
                                     ),
@@ -392,7 +392,7 @@ Module(
                                             target: Name(
                                                 ExprName {
                                                     range: 370..371,
-                                                    id: "x",
+                                                    id: Name("x"),
                                                     ctx: Store,
                                                 },
                                             ),
@@ -402,7 +402,7 @@ Module(
                                                     func: Name(
                                                         ExprName {
                                                             range: 375..380,
-                                                            id: "range",
+                                                            id: Name("range"),
                                                             ctx: Load,
                                                         },
                                                     ),
@@ -426,7 +426,7 @@ Module(
                                             is_async: false,
                                         },
                                     ],
-                                    parenthesized: false,
+                                    parenthesized: true,
                                 },
                             ),
                             optional_vars: None,
@@ -436,7 +436,7 @@ Module(
                             context_expr: Name(
                                 ExprName {
                                     range: 386..390,
-                                    id: "item",
+                                    id: Name("item"),
                                     ctx: Load,
                                 },
                             ),
@@ -459,90 +459,89 @@ Module(
             ),
             With(
                 StmtWith {
-                    range: 397..435,
+                    range: 397..410,
                     is_async: false,
                     items: [
                         WithItem {
-                            range: 403..407,
-                            context_expr: Name(
+                            range: 402..410,
+                            context_expr: Tuple(
+                                ExprTuple {
+                                    range: 402..410,
+                                    elts: [
+                                        Name(
+                                            ExprName {
+                                                range: 403..407,
+                                                id: Name("item"),
+                                                ctx: Load,
+                                            },
+                                        ),
+                                        Name(
+                                            ExprName {
+                                                range: 409..410,
+                                                id: Name("x"),
+                                                ctx: Load,
+                                            },
+                                        ),
+                                    ],
+                                    ctx: Load,
+                                    parenthesized: true,
+                                },
+                            ),
+                            optional_vars: None,
+                        },
+                    ],
+                    body: [],
+                },
+            ),
+            For(
+                StmtFor {
+                    range: 411..429,
+                    is_async: false,
+                    target: Name(
+                        ExprName {
+                            range: 415..416,
+                            id: Name("x"),
+                            ctx: Store,
+                        },
+                    ),
+                    iter: Call(
+                        ExprCall {
+                            range: 420..429,
+                            func: Name(
                                 ExprName {
-                                    range: 403..407,
-                                    id: "item",
+                                    range: 420..425,
+                                    id: Name("range"),
                                     ctx: Load,
                                 },
                             ),
-                            optional_vars: None,
-                        },
-                        WithItem {
-                            range: 409..429,
-                            context_expr: Generator(
-                                ExprGenerator {
-                                    range: 409..429,
-                                    elt: Name(
-                                        ExprName {
-                                            range: 409..410,
-                                            id: "x",
-                                            ctx: Load,
+                            arguments: Arguments {
+                                range: 425..429,
+                                args: [
+                                    NumberLiteral(
+                                        ExprNumberLiteral {
+                                            range: 426..428,
+                                            value: Int(
+                                                10,
+                                            ),
                                         },
                                     ),
-                                    generators: [
-                                        Comprehension {
-                                            range: 411..429,
-                                            target: Name(
-                                                ExprName {
-                                                    range: 415..416,
-                                                    id: "x",
-                                                    ctx: Store,
-                                                },
-                                            ),
-                                            iter: Call(
-                                                ExprCall {
-                                                    range: 420..429,
-                                                    func: Name(
-                                                        ExprName {
-                                                            range: 420..425,
-                                                            id: "range",
-                                                            ctx: Load,
-                                                        },
-                                                    ),
-                                                    arguments: Arguments {
-                                                        range: 425..429,
-                                                        args: [
-                                                            NumberLiteral(
-                                                                ExprNumberLiteral {
-                                                                    range: 426..428,
-                                                                    value: Int(
-                                                                        10,
-                                                                    ),
-                                                                },
-                                                            ),
-                                                        ],
-                                                        keywords: [],
-                                                    },
-                                                },
-                                            ),
-                                            ifs: [],
-                                            is_async: false,
-                                        },
-                                    ],
-                                    parenthesized: false,
-                                },
-                            ),
-                            optional_vars: None,
-                        },
-                    ],
-                    body: [
-                        Expr(
-                            StmtExpr {
-                                range: 432..435,
-                                value: EllipsisLiteral(
-                                    ExprEllipsisLiteral {
-                                        range: 432..435,
-                                    },
-                                ),
+                                ],
+                                keywords: [],
                             },
-                        ),
-                    ],
+                        },
+                    ),
+                    body: [],
+                    orelse: [],
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    range: 432..435,
+                    value: EllipsisLiteral(
+                        ExprEllipsisLiteral {
+                            range: 432..435,
+                        },
+                    ),
                 },
             ),
             With(
@@ -558,7 +557,7 @@ Module(
                                     value: Name(
                                         ExprName {
                                             range: 504..508,
-                                            id: "item",
+                                            id: Name("item"),
                                             ctx: Load,
                                         },
                                     ),
@@ -588,17 +587,17 @@ Module(
                     is_async: false,
                     items: [
                         WithItem {
-                            range: 523..539,
+                            range: 522..539,
                             context_expr: Generator(
                                 ExprGenerator {
-                                    range: 523..539,
+                                    range: 522..539,
                                     elt: Starred(
                                         ExprStarred {
                                             range: 523..525,
                                             value: Name(
                                                 ExprName {
                                                     range: 524..525,
-                                                    id: "x",
+                                                    id: Name("x"),
                                                     ctx: Load,
                                                 },
                                             ),
@@ -611,14 +610,14 @@ Module(
                                             target: Name(
                                                 ExprName {
                                                     range: 530..531,
-                                                    id: "x",
+                                                    id: Name("x"),
                                                     ctx: Store,
                                                 },
                                             ),
                                             iter: Name(
                                                 ExprName {
                                                     range: 535..539,
-                                                    id: "iter",
+                                                    id: Name("iter"),
                                                     ctx: Load,
                                                 },
                                             ),
@@ -626,7 +625,7 @@ Module(
                                             is_async: false,
                                         },
                                     ],
-                                    parenthesized: false,
+                                    parenthesized: true,
                                 },
                             ),
                             optional_vars: None,
@@ -636,7 +635,7 @@ Module(
                             context_expr: Name(
                                 ExprName {
                                     range: 541..545,
-                                    id: "item",
+                                    id: Name("item"),
                                     ctx: Load,
                                 },
                             ),
@@ -659,88 +658,92 @@ Module(
             ),
             With(
                 StmtWith {
-                    range: 552..594,
+                    range: 552..567,
                     is_async: false,
                     items: [
                         WithItem {
-                            range: 558..563,
-                            context_expr: Name(
-                                ExprName {
-                                    range: 558..563,
-                                    id: "item1",
-                                    ctx: Load,
-                                },
-                            ),
-                            optional_vars: None,
-                        },
-                        WithItem {
-                            range: 565..581,
-                            context_expr: Generator(
-                                ExprGenerator {
-                                    range: 565..581,
-                                    elt: Starred(
-                                        ExprStarred {
-                                            range: 565..567,
-                                            value: Name(
-                                                ExprName {
-                                                    range: 566..567,
-                                                    id: "x",
-                                                    ctx: Load,
-                                                },
-                                            ),
-                                            ctx: Load,
-                                        },
-                                    ),
-                                    generators: [
-                                        Comprehension {
-                                            range: 568..581,
-                                            target: Name(
-                                                ExprName {
-                                                    range: 572..573,
-                                                    id: "x",
-                                                    ctx: Store,
-                                                },
-                                            ),
-                                            iter: Name(
-                                                ExprName {
-                                                    range: 577..581,
-                                                    id: "iter",
-                                                    ctx: Load,
-                                                },
-                                            ),
-                                            ifs: [],
-                                            is_async: false,
-                                        },
+                            range: 557..567,
+                            context_expr: Tuple(
+                                ExprTuple {
+                                    range: 557..567,
+                                    elts: [
+                                        Name(
+                                            ExprName {
+                                                range: 558..563,
+                                                id: Name("item1"),
+                                                ctx: Load,
+                                            },
+                                        ),
+                                        Starred(
+                                            ExprStarred {
+                                                range: 565..567,
+                                                value: Name(
+                                                    ExprName {
+                                                        range: 566..567,
+                                                        id: Name("x"),
+                                                        ctx: Load,
+                                                    },
+                                                ),
+                                                ctx: Load,
+                                            },
+                                        ),
                                     ],
-                                    parenthesized: false,
-                                },
-                            ),
-                            optional_vars: None,
-                        },
-                        WithItem {
-                            range: 583..588,
-                            context_expr: Name(
-                                ExprName {
-                                    range: 583..588,
-                                    id: "item2",
                                     ctx: Load,
+                                    parenthesized: true,
                                 },
                             ),
                             optional_vars: None,
                         },
                     ],
-                    body: [
-                        Expr(
-                            StmtExpr {
-                                range: 591..594,
-                                value: EllipsisLiteral(
-                                    ExprEllipsisLiteral {
-                                        range: 591..594,
+                    body: [],
+                },
+            ),
+            For(
+                StmtFor {
+                    range: 568..588,
+                    is_async: false,
+                    target: Name(
+                        ExprName {
+                            range: 572..573,
+                            id: Name("x"),
+                            ctx: Store,
+                        },
+                    ),
+                    iter: Tuple(
+                        ExprTuple {
+                            range: 577..588,
+                            elts: [
+                                Name(
+                                    ExprName {
+                                        range: 577..581,
+                                        id: Name("iter"),
+                                        ctx: Load,
                                     },
                                 ),
-                            },
-                        ),
-                    ],
+                                Name(
+                                    ExprName {
+                                        range: 583..588,
+                                        id: Name("item2"),
+                                        ctx: Load,
+                                    },
+                                ),
+                            ],
+                            ctx: Load,
+                            parenthesized: false,
+                        },
+                    ),
+                    body: [],
+                    orelse: [],
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    range: 591..594,
+                    value: EllipsisLiteral(
+                        ExprEllipsisLiteral {
+                            range: 591..594,
+                        },
+                    ),
                 },
             ),
             With(
@@ -753,7 +756,7 @@ Module(
                             context_expr: Name(
                                 ExprName {
                                     range: 601..602,
-                                    id: "x",
+                                    id: Name("x"),
                                     ctx: Load,
                                 },
                             ),
@@ -761,7 +764,7 @@ Module(
                                 Name(
                                     ExprName {
                                         range: 606..607,
-                                        id: "f",
+                                        id: Name("f"),
                                         ctx: Store,
                                     },
                                 ),
@@ -775,7 +778,7 @@ Module(
                                     value: Name(
                                         ExprName {
                                             range: 610..611,
-                                            id: "y",
+                                            id: Name("y"),
                                             ctx: Load,
                                         },
                                     ),
@@ -812,7 +815,7 @@ Module(
                                     value: Name(
                                         ExprName {
                                             range: 625..626,
-                                            id: "x",
+                                            id: Name("x"),
                                             ctx: Load,
                                         },
                                     ),
@@ -826,7 +829,7 @@ Module(
                             context_expr: Name(
                                 ExprName {
                                     range: 628..629,
-                                    id: "y",
+                                    id: Name("y"),
                                     ctx: Load,
                                 },
                             ),
@@ -834,7 +837,7 @@ Module(
                                 Name(
                                     ExprName {
                                         range: 633..634,
-                                        id: "f",
+                                        id: Name("f"),
                                         ctx: Store,
                                     },
                                 ),
@@ -869,7 +872,7 @@ Module(
                                         Name(
                                             ExprName {
                                                 range: 647..648,
-                                                id: "x",
+                                                id: Name("x"),
                                                 ctx: Load,
                                             },
                                         ),
@@ -880,7 +883,7 @@ Module(
                                                     Name(
                                                         ExprName {
                                                             range: 656..657,
-                                                            id: "y",
+                                                            id: Name("y"),
                                                             ctx: Load,
                                                         },
                                                     ),
@@ -923,7 +926,7 @@ Module(
                                         Name(
                                             ExprName {
                                                 range: 670..671,
-                                                id: "x",
+                                                id: Name("x"),
                                                 ctx: Load,
                                             },
                                         ),
@@ -938,14 +941,14 @@ Module(
                                                                 Name(
                                                                     ExprName {
                                                                         range: 679..680,
-                                                                        id: "y",
+                                                                        id: Name("y"),
                                                                         ctx: Load,
                                                                     },
                                                                 ),
                                                                 Name(
                                                                     ExprName {
                                                                         range: 682..683,
-                                                                        id: "z",
+                                                                        id: Name("z"),
                                                                         ctx: Load,
                                                                     },
                                                                 ),
@@ -993,7 +996,7 @@ Module(
                                         Name(
                                             ExprName {
                                                 range: 696..697,
-                                                id: "x",
+                                                id: Name("x"),
                                                 ctx: Load,
                                             },
                                         ),
@@ -1003,7 +1006,7 @@ Module(
                                                 value: Name(
                                                     ExprName {
                                                         range: 710..711,
-                                                        id: "y",
+                                                        id: Name("y"),
                                                         ctx: Load,
                                                     },
                                                 ),
@@ -1041,7 +1044,7 @@ Module(
                             context_expr: Name(
                                 ExprName {
                                     range: 724..725,
-                                    id: "x",
+                                    id: Name("x"),
                                     ctx: Load,
                                 },
                             ),
@@ -1049,7 +1052,7 @@ Module(
                                 Name(
                                     ExprName {
                                         range: 729..730,
-                                        id: "f",
+                                        id: Name("f"),
                                         ctx: Store,
                                     },
                                 ),
@@ -1060,7 +1063,7 @@ Module(
                             context_expr: Name(
                                 ExprName {
                                     range: 732..733,
-                                    id: "y",
+                                    id: Name("y"),
                                     ctx: Load,
                                 },
                             ),
@@ -1076,7 +1079,7 @@ Module(
                     target: Name(
                         ExprName {
                             range: 738..739,
-                            id: "f",
+                            id: Name("f"),
                             ctx: Store,
                         },
                     ),
@@ -1095,14 +1098,14 @@ Module(
                     is_async: false,
                     items: [
                         WithItem {
-                            range: 751..771,
+                            range: 750..771,
                             context_expr: Generator(
                                 ExprGenerator {
-                                    range: 751..766,
+                                    range: 750..766,
                                     elt: Name(
                                         ExprName {
                                             range: 751..752,
-                                            id: "x",
+                                            id: Name("x"),
                                             ctx: Load,
                                         },
                                     ),
@@ -1112,14 +1115,14 @@ Module(
                                             target: Name(
                                                 ExprName {
                                                     range: 757..758,
-                                                    id: "x",
+                                                    id: Name("x"),
                                                     ctx: Store,
                                                 },
                                             ),
                                             iter: Name(
                                                 ExprName {
                                                     range: 762..766,
-                                                    id: "iter",
+                                                    id: Name("iter"),
                                                     ctx: Load,
                                                 },
                                             ),
@@ -1127,14 +1130,14 @@ Module(
                                             is_async: false,
                                         },
                                     ],
-                                    parenthesized: false,
+                                    parenthesized: true,
                                 },
                             ),
                             optional_vars: Some(
                                 Name(
                                     ExprName {
                                         range: 770..771,
-                                        id: "y",
+                                        id: Name("y"),
                                         ctx: Store,
                                     },
                                 ),
@@ -1165,7 +1168,7 @@ Module(
                             context_expr: Name(
                                 ExprName {
                                     range: 844..848,
-                                    id: "item",
+                                    id: Name("item"),
                                     ctx: Load,
                                 },
                             ),
@@ -1173,7 +1176,7 @@ Module(
                                 Name(
                                     ExprName {
                                         range: 852..853,
-                                        id: "f",
+                                        id: Name("f"),
                                         ctx: Store,
                                     },
                                 ),
@@ -1203,7 +1206,7 @@ Module(
                             context_expr: Name(
                                 ExprName {
                                     range: 868..872,
-                                    id: "item",
+                                    id: Name("item"),
                                     ctx: Load,
                                 },
                             ),
@@ -1211,7 +1214,7 @@ Module(
                                 Name(
                                     ExprName {
                                         range: 876..877,
-                                        id: "f",
+                                        id: Name("f"),
                                         ctx: Store,
                                     },
                                 ),
@@ -1227,7 +1230,7 @@ Module(
                     target: Name(
                         ExprName {
                             range: 880..881,
-                            id: "x",
+                            id: Name("x"),
                             ctx: Store,
                         },
                     ),
@@ -1250,7 +1253,7 @@ Module(
                             context_expr: Name(
                                 ExprName {
                                     range: 893..897,
-                                    id: "item",
+                                    id: Name("item"),
                                     ctx: Load,
                                 },
                             ),
@@ -1258,7 +1261,7 @@ Module(
                                 Name(
                                     ExprName {
                                         range: 901..903,
-                                        id: "f1",
+                                        id: Name("f1"),
                                         ctx: Store,
                                     },
                                 ),
@@ -1274,7 +1277,7 @@ Module(
                     target: Name(
                         ExprName {
                             range: 908..910,
-                            id: "f2",
+                            id: Name("f2"),
                             ctx: Store,
                         },
                     ),
@@ -1297,7 +1300,7 @@ Module(
                             context_expr: Name(
                                 ExprName {
                                     range: 922..927,
-                                    id: "item1",
+                                    id: Name("item1"),
                                     ctx: Load,
                                 },
                             ),
@@ -1305,7 +1308,7 @@ Module(
                                 Name(
                                     ExprName {
                                         range: 931..932,
-                                        id: "f",
+                                        id: Name("f"),
                                         ctx: Store,
                                     },
                                 ),
@@ -1319,7 +1322,7 @@ Module(
                                     target: Name(
                                         ExprName {
                                             range: 934..939,
-                                            id: "item2",
+                                            id: Name("item2"),
                                             ctx: Store,
                                         },
                                     ),
@@ -1360,7 +1363,7 @@ Module(
 2 | # These cases should raise the correct syntax error and recover properly.
 3 | 
 4 | with (item1, item2),: ...
-  |                     ^ Syntax Error: Expected an expression
+  |                    ^ Syntax Error: Trailing comma not allowed
 5 | with (item1, item2), as f: ...
 6 | with (item1, item2), item3,: ...
   |
@@ -1369,7 +1372,7 @@ Module(
   |
 4 | with (item1, item2),: ...
 5 | with (item1, item2), as f: ...
-  |                      ^^ Syntax Error: Expected an expression
+  |                      ^^ Syntax Error: Expected ',', found 'as'
 6 | with (item1, item2), item3,: ...
 7 | with (*item): ...
   |
@@ -1429,7 +1432,16 @@ Module(
  9 | with (item := 10 as f): ...
 10 | with (item1, item2 := 10 as f): ...
 11 | with (x for x in range(10), item): ...
-   |       ^^^^^^^^^^^^^^^^^^^^ Syntax Error: Unparenthesized generator expression cannot be used here
+   |                           ^ Syntax Error: Expected ')', found ','
+12 | with (item, x for x in range(10)): ...
+   |
+
+
+   |
+ 9 | with (item := 10 as f): ...
+10 | with (item1, item2 := 10 as f): ...
+11 | with (x for x in range(10), item): ...
+   |                                 ^ Syntax Error: Expected ',', found ')'
 12 | with (item, x for x in range(10)): ...
    |
 
@@ -1438,7 +1450,27 @@ Module(
 10 | with (item1, item2 := 10 as f): ...
 11 | with (x for x in range(10), item): ...
 12 | with (item, x for x in range(10)): ...
-   |             ^^^^^^^^^^^^^^^^^^^^ Syntax Error: Unparenthesized generator expression cannot be used here
+   |               ^^^ Syntax Error: Expected ')', found 'for'
+13 | 
+14 | # Make sure the parser doesn't report the same error twice
+   |
+
+
+   |
+10 | with (item1, item2 := 10 as f): ...
+11 | with (x for x in range(10), item): ...
+12 | with (item, x for x in range(10)): ...
+   |                                 ^ Syntax Error: Expected ':', found ')'
+13 | 
+14 | # Make sure the parser doesn't report the same error twice
+   |
+
+
+   |
+10 | with (item1, item2 := 10 as f): ...
+11 | with (x for x in range(10), item): ...
+12 | with (item, x for x in range(10)): ...
+   |                                  ^ Syntax Error: Expected a statement
 13 | 
 14 | # Make sure the parser doesn't report the same error twice
    |
@@ -1464,9 +1496,47 @@ Module(
 
 
    |
+15 | with ((*item)): ...
+16 | 
+17 | with (*x for x in iter, item): ...
+   |                       ^ Syntax Error: Expected ')', found ','
+18 | with (item1, *x for x in iter, item2): ...
+19 | with (x as f, *y): ...
+   |
+
+
+   |
+15 | with ((*item)): ...
+16 | 
+17 | with (*x for x in iter, item): ...
+   |                             ^ Syntax Error: Expected ',', found ')'
+18 | with (item1, *x for x in iter, item2): ...
+19 | with (x as f, *y): ...
+   |
+
+
+   |
 17 | with (*x for x in iter, item): ...
 18 | with (item1, *x for x in iter, item2): ...
-   |              ^^ Syntax Error: Iterable unpacking cannot be used in a comprehension
+   |                 ^^^ Syntax Error: Expected ')', found 'for'
+19 | with (x as f, *y): ...
+20 | with (*x, y as f): ...
+   |
+
+
+   |
+17 | with (*x for x in iter, item): ...
+18 | with (item1, *x for x in iter, item2): ...
+   |                                     ^ Syntax Error: Expected ':', found ')'
+19 | with (x as f, *y): ...
+20 | with (*x, y as f): ...
+   |
+
+
+   |
+17 | with (*x for x in iter, item): ...
+18 | with (item1, *x for x in iter, item2): ...
+   |                                      ^ Syntax Error: Expected a statement
 19 | with (x as f, *y): ...
 20 | with (*x, y as f): ...
    |
@@ -1535,7 +1605,17 @@ Module(
 23 | with (x, yield from y): ...
 24 | with (x as f, y) as f: ...
 25 | with (x for x in iter as y): ...
-   |       ^^^^^^^^^^^^^^^ Syntax Error: Unparenthesized generator expression cannot be used here
+   |                       ^^ Syntax Error: Expected ')', found 'as'
+26 | 
+27 | # The inner `(...)` is parsed as parenthesized expression
+   |
+
+
+   |
+23 | with (x, yield from y): ...
+24 | with (x as f, y) as f: ...
+25 | with (x for x in iter as y): ...
+   |                           ^ Syntax Error: Expected ',', found ')'
 26 | 
 27 | # The inner `(...)` is parsed as parenthesized expression
    |

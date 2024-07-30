@@ -69,48 +69,21 @@ def func():
 
     np.lookfor
 
-    np.obj2sctype(int)
+    np.NAN
 
-    np.PINF
+    try:
+        from numpy.lib.npyio import DataSource
+    except ImportError:
+        from numpy import DataSource
 
-    np.PZERO
+    DataSource("foo").abspath()  # fine (`except ImportError` branch)
 
-    np.recfromcsv
+    try:
+        from numpy.rec import format_parser
+        from numpy import clongdouble
+    except ModuleNotFoundError:
+        from numpy import format_parser
+        from numpy import longcomplex as clongdouble
 
-    np.recfromtxt
-
-    np.round_(12.34)
-
-    np.safe_eval
-
-    np.sctype2char
-
-    np.sctypes
-
-    np.seterrobj
-
-    np.set_numeric_ops
-
-    np.set_string_function
-
-    np.singlecomplex(12+1j)
-
-    np.string_("asdf")
-
-    np.source
-
-    np.tracemalloc_domain
-
-    np.unicode_("asf")
-
-    np.who()
-
-    np.row_stack(([1,2], [3,4]))
-
-    np.alltrue([True, True])
-
-    np.anytrue([True, False])
-
-    np.cumproduct([1, 2, 3])
-
-    np.product([1, 2, 3])
+    format_parser("foo")  # fine (`except ModuleNotFoundError` branch)
+    clongdouble(42)  # fine (`except ModuleNotFoundError` branch)

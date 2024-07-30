@@ -1,0 +1,34 @@
+[package]
+name = "red_knot_python_semantic"
+version = "0.0.0"
+publish = false
+authors = { workspace = true }
+edition = { workspace = true }
+rust-version = { workspace = true }
+homepage = { workspace = true }
+documentation = { workspace = true }
+repository = { workspace = true }
+license = { workspace = true }
+
+[dependencies]
+red_knot_module_resolver = { workspace = true }
+ruff_db = { workspace = true }
+ruff_index = { workspace = true }
+ruff_python_ast = { workspace = true }
+ruff_text_size = { workspace = true }
+
+bitflags = { workspace = true }
+countme = { workspace = true }
+ordermap = { workspace = true }
+salsa = { workspace = true }
+tracing = { workspace = true }
+rustc-hash = { workspace = true }
+hashbrown = { workspace = true }
+
+[dev-dependencies]
+anyhow = { workspace = true }
+ruff_python_parser = { workspace = true }
+
+[lints]
+workspace = true
+

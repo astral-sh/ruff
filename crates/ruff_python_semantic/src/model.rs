@@ -1,5 +1,3 @@
-pub mod all;
-
 use std::path::Path;
 
 use bitflags::bitflags;
@@ -26,6 +24,8 @@ use crate::reference::{
 };
 use crate::scope::{Scope, ScopeId, ScopeKind, Scopes};
 use crate::Imported;
+
+pub mod all;
 
 /// A semantic model for a Python module, to enable querying the module's semantic information.
 pub struct SemanticModel<'a> {
@@ -124,7 +124,21 @@ pub struct SemanticModel<'a> {
     /// Modules that have been seen by the semantic model.
     pub seen: Modules,
 
-    /// Exceptions that have been handled by the current scope.
+    /// Exceptions that are handled by the current `try` block.
+    ///
+    /// For example, if we're visiting the `x = 1` assignment below,
+    /// `AttributeError` is considered to be a "handled exception",
+    /// but `TypeError` is not:
+    ///
+    /// ```py
+    /// try:
+    ///     try:
+    ///         foo()
+    ///     except TypeError:
+    ///         pass
+    /// except AttributeError:
+    ///     pass
+    /// ```
     pub handled_exceptions: Vec<Exceptions>,
 
     /// Map from [`ast::ExprName`] node (represented as a [`NameId`]) to the [`Binding`] to which
@@ -540,6 +554,23 @@ impl<'a> SemanticModel<'a> {
                         return ReadResult::Resolved(binding_id);
                     }
 
+                    BindingKind::Global(Some(binding_id))
+                    | BindingKind::Nonlocal(binding_id, _) => {
+                        // Mark the shadowed binding as used.
+                        let reference_id = self.resolved_references.push(
+                            self.scope_id,
+                            self.node_id,
+                            ExprContext::Load,
+                            self.flags,
+                            name.range,
+                        );
+                        self.bindings[binding_id].references.push(reference_id);
+
+                        // Treat it as resolved.
+                        self.resolved_names.insert(name.into(), binding_id);
+                        return ReadResult::Resolved(binding_id);
+                    }
+
                     _ => {
                         // Otherwise, treat it as resolved.
                         self.resolved_names.insert(name.into(), binding_id);
@@ -919,7 +950,7 @@ impl<'a> SemanticModel<'a> {
                                             .all(|scope| !scope.has(name))
                                         {
                                             return Some(ImportedName {
-                                                name: (*name).to_string(),
+                                                name: name.to_string(),
                                                 source,
                                                 range: self.nodes[source].range(),
                                                 context: binding.context,
@@ -1185,6 +1216,14 @@ impl<'a> SemanticModel<'a> {
             .expect("No statement found")
     }
 
+    /// Returns an [`Iterator`] over the statements, starting from the given [`NodeId`].
+    /// through to any parents.
+    pub fn statements(&self, node_id: NodeId) -> impl Iterator<Item = &'a Stmt> + '_ {
+        self.nodes
+            .ancestor_ids(node_id)
+            .filter_map(move |id| self.nodes[id].as_statement())
+    }
+
     /// Given a [`Stmt`], return its parent, if any.
     #[inline]
     pub fn parent_statement(&self, node_id: NodeId) -> Option<&'a Stmt> {
@@ -1230,11 +1269,14 @@ impl<'a> SemanticModel<'a> {
     pub fn add_module(&mut self, module: &str) {
         match module {
             "_typeshed" => self.seen.insert(Modules::TYPESHED),
+            "anyio" => self.seen.insert(Modules::ANYIO),
             "builtins" => self.seen.insert(Modules::BUILTINS),
             "collections" => self.seen.insert(Modules::COLLECTIONS),
+            "contextvars" => self.seen.insert(Modules::CONTEXTVARS),
             "dataclasses" => self.seen.insert(Modules::DATACLASSES),
             "datetime" => self.seen.insert(Modules::DATETIME),
             "django" => self.seen.insert(Modules::DJANGO),
+            "fastapi" => self.seen.insert(Modules::FASTAPI),
             "logging" => self.seen.insert(Modules::LOGGING),
             "mock" => self.seen.insert(Modules::MOCK),
             "numpy" => self.seen.insert(Modules::NUMPY),
@@ -1819,6 +1861,9 @@ bitflags! {
         const TYPESHED = 1 << 16;
         const DATACLASSES = 1 << 17;
         const BUILTINS = 1 << 18;
+        const CONTEXTVARS = 1 << 19;
+        const ANYIO = 1 << 20;
+        const FASTAPI = 1 << 21;
     }
 }
 

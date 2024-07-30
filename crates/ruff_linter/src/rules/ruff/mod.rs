@@ -36,7 +36,7 @@ mod tests {
     #[test_case(Rule::ImplicitOptional, Path::new("RUF013_3.py"))]
     #[test_case(Rule::MutableClassDefault, Path::new("RUF012.py"))]
     #[test_case(Rule::MutableDataclassDefault, Path::new("RUF008.py"))]
-    #[test_case(Rule::PairwiseOverZipped, Path::new("RUF007.py"))]
+    #[test_case(Rule::ZipInsteadOfPairwise, Path::new("RUF007.py"))]
     #[test_case(
         Rule::UnnecessaryIterableAllocationForFirstElement,
         Path::new("RUF015.py")
@@ -58,6 +58,7 @@ mod tests {
     #[test_case(Rule::MissingFStringSyntax, Path::new("RUF027_2.py"))]
     #[test_case(Rule::InvalidFormatterSuppressionComment, Path::new("RUF028.py"))]
     #[test_case(Rule::UnusedAsync, Path::new("RUF029.py"))]
+    #[test_case(Rule::AssertWithPrintMessage, Path::new("RUF030.py"))]
     #[test_case(Rule::RedirectedNOQA, Path::new("RUF101.py"))]
     fn rules(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!("{}_{}", rule_code.noqa_code(), path.to_string_lossy());

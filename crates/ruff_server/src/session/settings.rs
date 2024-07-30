@@ -7,7 +7,7 @@ use serde::Deserialize;
 use ruff_linter::{line_width::LineLength, RuleSelector};
 
 /// Maps a workspace URI to its associated client settings. Used during server initialization.
-pub(crate) type WorkspaceSettingsMap = FxHashMap<PathBuf, ClientSettings>;
+pub(crate) type WorkspaceSettingsMap = FxHashMap<Url, ClientSettings>;
 
 /// Resolved client settings for a specific document. These settings are meant to be
 /// used directly by the server, and are *not* a 1:1 representation with how the client
@@ -21,6 +21,7 @@ pub(crate) struct ResolvedClientSettings {
     lint_enable: bool,
     disable_rule_comment_enable: bool,
     fix_violation_enable: bool,
+    show_syntax_errors: bool,
     editor_settings: ResolvedEditorSettings,
 }
 
@@ -60,7 +61,7 @@ pub(crate) enum ConfigurationPreference {
 #[derive(Debug, Deserialize, Default)]
 #[cfg_attr(test, derive(PartialEq, Eq))]
 #[serde(rename_all = "camelCase")]
-pub(crate) struct ClientSettings {
+pub struct ClientSettings {
     configuration: Option<String>,
     fix_all: Option<bool>,
     organize_imports: Option<bool>,
@@ -70,6 +71,42 @@ pub(crate) struct ClientSettings {
     exclude: Option<Vec<String>>,
     line_length: Option<LineLength>,
     configuration_preference: Option<ConfigurationPreference>,
+
+    /// If `true` or [`None`], show syntax errors as diagnostics.
+    ///
+    /// This is useful when using Ruff with other language servers, allowing the user to refer
+    /// to syntax errors from only one source.
+    show_syntax_errors: Option<bool>,
+
+    // These settings are only needed for tracing, and are only read from the global configuration.
+    // These will not be in the resolved settings.
+    #[serde(flatten)]
+    pub(crate) tracing: TracingSettings,
+}
+
+impl ClientSettings {
+    /// Update the preview flag for the linter and the formatter with the given value.
+    pub(crate) fn set_preview(&mut self, preview: bool) {
+        match self.lint.as_mut() {
+            None => self.lint = Some(LintOptions::default().with_preview(preview)),
+            Some(lint) => lint.set_preview(preview),
+        }
+        match self.format.as_mut() {
+            None => self.format = Some(FormatOptions::default().with_preview(preview)),
+            Some(format) => format.set_preview(preview),
+        }
+    }
+}
+
+/// Settings needed to initialize tracing. These will only be
+/// read from the global configuration.
+#[derive(Debug, Deserialize, Default)]
+#[cfg_attr(test, derive(PartialEq, Eq))]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct TracingSettings {
+    pub(crate) log_level: Option<crate::trace::LogLevel>,
+    /// Path to the log file - tildes and environment variables are supported.
+    pub(crate) log_file: Option<PathBuf>,
 }
 
 /// This is a direct representation of the workspace settings schema,
@@ -84,7 +121,7 @@ struct WorkspaceSettings {
     workspace: Url,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Default, Deserialize)]
 #[cfg_attr(test, derive(PartialEq, Eq))]
 #[serde(rename_all = "camelCase")]
 struct LintOptions {
@@ -95,11 +132,33 @@ struct LintOptions {
     ignore: Option<Vec<String>>,
 }
 
+impl LintOptions {
+    fn with_preview(mut self, preview: bool) -> LintOptions {
+        self.preview = Some(preview);
+        self
+    }
+
+    fn set_preview(&mut self, preview: bool) {
+        self.preview = Some(preview);
+    }
+}
+
 #[derive(Debug, Default, Deserialize)]
 #[cfg_attr(test, derive(PartialEq, Eq))]
 #[serde(rename_all = "camelCase")]
 struct FormatOptions {
     preview: Option<bool>,
+}
+
+impl FormatOptions {
+    fn with_preview(mut self, preview: bool) -> FormatOptions {
+        self.preview = Some(preview);
+        self
+    }
+
+    fn set_preview(&mut self, preview: bool) {
+        self.preview = Some(preview);
+    }
 }
 
 #[derive(Debug, Default, Deserialize)]
@@ -136,6 +195,7 @@ enum InitializationOptions {
 }
 
 /// Built from the initialization options provided by the client.
+#[derive(Debug)]
 pub(crate) struct AllSettings {
     pub(crate) global_settings: ClientSettings,
     /// If this is `None`, the client only passed in global settings.
@@ -156,6 +216,16 @@ impl AllSettings {
         )
     }
 
+    /// Update the preview flag for both the global and all workspace settings.
+    pub(crate) fn set_preview(&mut self, preview: bool) {
+        self.global_settings.set_preview(preview);
+        if let Some(workspace_settings) = self.workspace_settings.as_mut() {
+            for settings in workspace_settings.values_mut() {
+                settings.set_preview(preview);
+            }
+        }
+    }
+
     fn from_init_options(options: InitializationOptions) -> Self {
         let (global_settings, workspace_settings) = match options {
             InitializationOptions::GlobalOnly { settings } => (settings, None),
@@ -170,12 +240,7 @@ impl AllSettings {
             workspace_settings: workspace_settings.map(|workspace_settings| {
                 workspace_settings
                     .into_iter()
-                    .map(|settings| {
-                        (
-                            settings.workspace.to_file_path().unwrap(),
-                            settings.settings,
-                        )
-                    })
+                    .map(|settings| (settings.workspace, settings.settings))
                     .collect()
             }),
         }
@@ -232,6 +297,11 @@ impl ResolvedClientSettings {
                         .as_ref()?
                         .enable
                 },
+                true,
+            ),
+            show_syntax_errors: Self::resolve_or(
+                all_settings,
+                |settings| settings.show_syntax_errors,
                 true,
             ),
             editor_settings: ResolvedEditorSettings {
@@ -335,6 +405,10 @@ impl ResolvedClientSettings {
         self.fix_violation_enable
     }
 
+    pub(crate) fn show_syntax_errors(&self) -> bool {
+        self.show_syntax_errors
+    }
+
     pub(crate) fn editor_settings(&self) -> &ResolvedEditorSettings {
         &self.editor_settings
     }
@@ -353,10 +427,12 @@ mod tests {
     use insta::assert_debug_snapshot;
     use serde::de::DeserializeOwned;
 
+    #[cfg(not(windows))]
     use ruff_linter::registry::Linter;
 
     use super::*;
 
+    #[cfg(not(windows))]
     const VS_CODE_INIT_OPTIONS_FIXTURE: &str =
         include_str!("../../resources/test/fixtures/settings/vs_code_initialization_options.json");
     const GLOBAL_ONLY_INIT_OPTIONS_FIXTURE: &str =
@@ -364,11 +440,17 @@ mod tests {
     const EMPTY_INIT_OPTIONS_FIXTURE: &str =
         include_str!("../../resources/test/fixtures/settings/empty.json");
 
+    // This fixture contains multiple workspaces with empty initialization options. It only sets
+    // the `cwd` and the `workspace` value.
+    const EMPTY_MULTIPLE_WORKSPACE_INIT_OPTIONS_FIXTURE: &str =
+        include_str!("../../resources/test/fixtures/settings/empty_multiple_workspace.json");
+
     fn deserialize_fixture<T: DeserializeOwned>(content: &str) -> T {
         serde_json::from_str(content).expect("test fixture JSON should deserialize")
     }
 
-    #[cfg_attr(not(windows), test)]
+    #[cfg(not(windows))]
+    #[test]
     fn test_vs_code_init_options_deserialize() {
         let options: InitializationOptions = deserialize_fixture(VS_CODE_INIT_OPTIONS_FIXTURE);
 
@@ -426,6 +508,13 @@ mod tests {
                 exclude: None,
                 line_length: None,
                 configuration_preference: None,
+                show_syntax_errors: Some(
+                    true,
+                ),
+                tracing: TracingSettings {
+                    log_level: None,
+                    log_file: None,
+                },
             },
             workspace_settings: [
                 WorkspaceSettings {
@@ -474,6 +563,13 @@ mod tests {
                         exclude: None,
                         line_length: None,
                         configuration_preference: None,
+                        show_syntax_errors: Some(
+                            true,
+                        ),
+                        tracing: TracingSettings {
+                            log_level: None,
+                            log_file: None,
+                        },
                     },
                     workspace: Url {
                         scheme: "file",
@@ -535,6 +631,13 @@ mod tests {
                         exclude: None,
                         line_length: None,
                         configuration_preference: None,
+                        show_syntax_errors: Some(
+                            true,
+                        ),
+                        tracing: TracingSettings {
+                            log_level: None,
+                            log_file: None,
+                        },
                     },
                     workspace: Url {
                         scheme: "file",
@@ -553,14 +656,16 @@ mod tests {
         "###);
     }
 
-    #[cfg_attr(not(windows), test)]
+    #[cfg(not(windows))]
+    #[test]
     fn test_vs_code_workspace_settings_resolve() {
         let options = deserialize_fixture(VS_CODE_INIT_OPTIONS_FIXTURE);
         let AllSettings {
             global_settings,
             workspace_settings,
         } = AllSettings::from_init_options(options);
-        let path = PathBuf::from_str("/Users/test/projects/pandas").expect("path should be valid");
+        let path =
+            Url::from_str("file:///Users/test/projects/pandas").expect("path should be valid");
         let workspace_settings = workspace_settings.expect("workspace settings should exist");
         assert_eq!(
             ResolvedClientSettings::with_workspace(
@@ -575,6 +680,7 @@ mod tests {
                 lint_enable: true,
                 disable_rule_comment_enable: false,
                 fix_violation_enable: false,
+                show_syntax_errors: true,
                 editor_settings: ResolvedEditorSettings {
                     configuration: None,
                     lint_preview: Some(true),
@@ -588,10 +694,11 @@ mod tests {
                     exclude: None,
                     line_length: None,
                     configuration_preference: ConfigurationPreference::default(),
-                }
+                },
             }
         );
-        let path = PathBuf::from_str("/Users/test/projects/scipy").expect("path should be valid");
+        let path =
+            Url::from_str("file:///Users/test/projects/scipy").expect("path should be valid");
         assert_eq!(
             ResolvedClientSettings::with_workspace(
                 workspace_settings
@@ -605,6 +712,7 @@ mod tests {
                 lint_enable: true,
                 disable_rule_comment_enable: true,
                 fix_violation_enable: false,
+                show_syntax_errors: true,
                 editor_settings: ResolvedEditorSettings {
                     configuration: None,
                     lint_preview: Some(false),
@@ -618,7 +726,7 @@ mod tests {
                     exclude: None,
                     line_length: None,
                     configuration_preference: ConfigurationPreference::EditorFirst,
-                }
+                },
             }
         );
     }
@@ -672,6 +780,13 @@ mod tests {
                     ),
                 ),
                 configuration_preference: None,
+                show_syntax_errors: None,
+                tracing: TracingSettings {
+                    log_level: Some(
+                        Warn,
+                    ),
+                    log_file: None,
+                },
             },
         }
         "###);
@@ -692,6 +807,7 @@ mod tests {
                 lint_enable: true,
                 disable_rule_comment_enable: false,
                 fix_violation_enable: true,
+                show_syntax_errors: true,
                 editor_settings: ResolvedEditorSettings {
                     configuration: None,
                     lint_preview: None,
@@ -702,7 +818,7 @@ mod tests {
                     exclude: Some(vec!["third_party".into()]),
                     line_length: Some(LineLength::try_from(80).unwrap()),
                     configuration_preference: ConfigurationPreference::EditorFirst,
-                }
+                },
             }
         );
     }
@@ -712,5 +828,31 @@ mod tests {
         let options: InitializationOptions = deserialize_fixture(EMPTY_INIT_OPTIONS_FIXTURE);
 
         assert_eq!(options, InitializationOptions::default());
+    }
+
+    fn assert_preview_client_settings(settings: &ClientSettings, preview: bool) {
+        assert_eq!(settings.lint.as_ref().unwrap().preview.unwrap(), preview);
+        assert_eq!(settings.format.as_ref().unwrap().preview.unwrap(), preview);
+    }
+
+    fn assert_preview_all_settings(all_settings: &AllSettings, preview: bool) {
+        assert_preview_client_settings(&all_settings.global_settings, preview);
+        if let Some(workspace_settings) = all_settings.workspace_settings.as_ref() {
+            for settings in workspace_settings.values() {
+                assert_preview_client_settings(settings, preview);
+            }
+        }
+    }
+
+    #[test]
+    fn test_preview_flag() {
+        let options = deserialize_fixture(EMPTY_MULTIPLE_WORKSPACE_INIT_OPTIONS_FIXTURE);
+        let mut all_settings = AllSettings::from_init_options(options);
+
+        all_settings.set_preview(false);
+        assert_preview_all_settings(&all_settings, false);
+
+        all_settings.set_preview(true);
+        assert_preview_all_settings(&all_settings, true);
     }
 }

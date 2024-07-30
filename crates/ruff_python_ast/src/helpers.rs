@@ -7,7 +7,7 @@ use ruff_python_trivia::{indentation_at_offset, CommentRanges, SimpleTokenKind, 
 use ruff_source_file::Locator;
 use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 
-use crate::name::{QualifiedName, QualifiedNameBuilder};
+use crate::name::{Name, QualifiedName, QualifiedNameBuilder};
 use crate::parenthesize::parenthesized_range;
 use crate::statement_visitor::StatementVisitor;
 use crate::visitor::Visitor;
@@ -657,15 +657,14 @@ pub fn map_callable(decorator: &Expr) -> &Expr {
     }
 }
 
-/// Given an [`Expr`] that can be callable or not (like a decorator, which could
-/// be used with or without explicit call syntax), return the underlying
-/// callable.
+/// Given an [`Expr`] that can be a [`ExprSubscript`][ast::ExprSubscript] or not
+/// (like an annotation that may be generic or not), return the underlying expr.
 pub fn map_subscript(expr: &Expr) -> &Expr {
     if let Expr::Subscript(ast::ExprSubscript { value, .. }) = expr {
-        // Ex) `Iterable[T]`
+        // Ex) `Iterable[T]`  => return `Iterable`
         value
     } else {
-        // Ex) `Iterable`
+        // Ex) `Iterable`  => return `Iterable`
         expr
     }
 }
@@ -1404,7 +1403,7 @@ pub fn pep_604_union(elts: &[Expr]) -> Expr {
 }
 
 /// Format the expression as a `typing.Optional`-style optional.
-pub fn typing_optional(elt: Expr, binding: String) -> Expr {
+pub fn typing_optional(elt: Expr, binding: Name) -> Expr {
     Expr::Subscript(ast::ExprSubscript {
         value: Box::new(Expr::Name(ast::ExprName {
             id: binding,
@@ -1418,8 +1417,8 @@ pub fn typing_optional(elt: Expr, binding: String) -> Expr {
 }
 
 /// Format the expressions as a `typing.Union`-style union.
-pub fn typing_union(elts: &[Expr], binding: String) -> Expr {
-    fn tuple(elts: &[Expr], binding: String) -> Expr {
+pub fn typing_union(elts: &[Expr], binding: Name) -> Expr {
+    fn tuple(elts: &[Expr], binding: Name) -> Expr {
         match elts {
             [] => Expr::Tuple(ast::ExprTuple {
                 elts: vec![],

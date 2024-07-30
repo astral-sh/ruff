@@ -1,8 +1,9 @@
-use ruff_benchmark::criterion::{
+use codspeed_criterion_compat::{
     criterion_group, criterion_main, measurement::WallTime, BenchmarkId, Criterion, Throughput,
 };
+
 use ruff_benchmark::{TestCase, TestFile, TestFileDownloadError};
-use ruff_python_parser::{lexer, Mode};
+use ruff_python_parser::{lexer, Mode, TokenKind};
 
 #[cfg(target_os = "windows")]
 #[global_allocator]
@@ -47,9 +48,15 @@ fn benchmark_lexer(criterion: &mut Criterion<WallTime>) {
             &case,
             |b, case| {
                 b.iter(|| {
-                    let result =
-                        lexer::lex(case.code(), Mode::Module).find(std::result::Result::is_err);
-                    assert_eq!(result, None, "Input to be a valid Python program");
+                    let mut lexer = lexer::lex(case.code(), Mode::Module);
+                    loop {
+                        let token = lexer.next_token();
+                        match token {
+                            TokenKind::EndOfFile => break,
+                            TokenKind::Unknown => panic!("Input to be a valid Python source code"),
+                            _ => {}
+                        }
+                    }
                 });
             },
         );

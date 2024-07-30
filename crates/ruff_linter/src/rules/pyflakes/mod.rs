@@ -17,12 +17,12 @@ mod tests {
     use ruff_python_ast::PySourceType;
     use ruff_python_codegen::Stylist;
     use ruff_python_index::Indexer;
-    use ruff_python_parser::AsMode;
+
     use ruff_python_trivia::textwrap::dedent;
     use ruff_source_file::Locator;
     use ruff_text_size::Ranged;
 
-    use crate::linter::{check_path, LinterResult, TokenSource};
+    use crate::linter::check_path;
     use crate::registry::{AsRule, Linter, Rule};
     use crate::rules::pyflakes;
     use crate::settings::types::PreviewMode;
@@ -125,6 +125,8 @@ mod tests {
     #[test_case(Rule::RedefinedWhileUnused, Path::new("F811_27.py"))]
     #[test_case(Rule::RedefinedWhileUnused, Path::new("F811_28.py"))]
     #[test_case(Rule::RedefinedWhileUnused, Path::new("F811_29.pyi"))]
+    #[test_case(Rule::RedefinedWhileUnused, Path::new("F811_30.py"))]
+    #[test_case(Rule::RedefinedWhileUnused, Path::new("F811_31.py"))]
     #[test_case(Rule::UndefinedName, Path::new("F821_0.py"))]
     #[test_case(Rule::UndefinedName, Path::new("F821_1.py"))]
     #[test_case(Rule::UndefinedName, Path::new("F821_2.py"))]
@@ -212,6 +214,7 @@ mod tests {
     #[test_case(Rule::UnusedImport, Path::new("F401_27__all_mistyped/__init__.py"))]
     #[test_case(Rule::UnusedImport, Path::new("F401_28__all_multiple/__init__.py"))]
     #[test_case(Rule::UnusedImport, Path::new("F401_29__all_conditional/__init__.py"))]
+    #[test_case(Rule::UndefinedExport, Path::new("__init__.py"))]
     fn preview_rules(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!(
             "preview__{}_{}",
@@ -637,20 +640,18 @@ mod tests {
         let source_type = PySourceType::default();
         let source_kind = SourceKind::Python(contents.to_string());
         let settings = LinterSettings::for_rules(Linter::Pyflakes.rules());
-        let tokens = ruff_python_parser::tokenize(&contents, source_type.as_mode());
+        let parsed =
+            ruff_python_parser::parse_unchecked_source(source_kind.source_code(), source_type);
         let locator = Locator::new(&contents);
-        let stylist = Stylist::from_tokens(&tokens, &locator);
-        let indexer = Indexer::from_tokens(&tokens, &locator);
+        let stylist = Stylist::from_tokens(parsed.tokens(), &locator);
+        let indexer = Indexer::from_tokens(parsed.tokens(), &locator);
         let directives = directives::extract_directives(
-            &tokens,
+            parsed.tokens(),
             directives::Flags::from_settings(&settings),
             &locator,
             &indexer,
         );
-        let LinterResult {
-            data: mut diagnostics,
-            ..
-        } = check_path(
+        let mut diagnostics = check_path(
             Path::new("<filename>"),
             None,
             &locator,
@@ -661,7 +662,7 @@ mod tests {
             flags::Noqa::Enabled,
             &source_kind,
             source_type,
-            TokenSource::Tokens(tokens),
+            &parsed,
         );
         diagnostics.sort_by_key(Ranged::start);
         let actual = diagnostics
@@ -2411,7 +2412,7 @@ mod tests {
     fn used_in_lambda() {
         flakes(
             r"import fu;
-        lambda: fu
+lambda: fu
         ",
             &[],
         );
@@ -2430,7 +2431,7 @@ mod tests {
     fn used_in_slice_obj() {
         flakes(
             r#"import fu;
-        "meow"[::fu]
+"meow"[::fu]
         "#,
             &[],
         );
@@ -3031,16 +3032,6 @@ mod tests {
             r#"
         from interior import decorate
         @decorate
-        def f():
-            return "hello"
-        "#,
-            &[],
-        );
-
-        flakes(
-            r#"
-        from interior import decorate
-        @decorate('value", &[]);
         def f():
             return "hello"
         "#,
