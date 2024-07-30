@@ -170,6 +170,7 @@ pub(crate) fn retain_imports(
     Ok(tree.codegen_stylist(stylist))
 }
 
+/// Create an NFKC-normalized qualified name from a libCST node.
 fn qualified_name_from_name_or_attribute(module: &NameOrAttribute) -> String {
     fn collect_segments<'a>(expr: &'a Expression, parts: &mut SmallVec<[&'a str; 8]>) {
         match expr {
@@ -187,6 +188,14 @@ fn qualified_name_from_name_or_attribute(module: &NameOrAttribute) -> String {
         }
     }
 
+    /// Attempt to create an [`UnqualifiedName`] from a libCST expression.
+    ///
+    /// Strictly speaking, the `UnqualifiedName` returned by this function may be invalid,
+    /// since it hasn't been NFKC-normalized. In order for an `UnqualifiedName` to be
+    /// comparable to one constructed from a `ruff_python_ast` node, it has to undergo
+    /// NFKC normalization. As a local function, however, this is fine;
+    /// the outer function always performs NFKC normalization before returning the
+    /// qualified name to the caller.
     fn unqualified_name_from_expression<'a>(
         expr: &'a Expression<'a>,
     ) -> Option<UnqualifiedName<'a>> {
