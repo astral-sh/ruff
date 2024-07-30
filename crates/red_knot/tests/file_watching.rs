@@ -265,6 +265,8 @@ fn changed_file() -> anyhow::Result<()> {
 
     let changes = case.stop_watch();
 
+    assert!(!changes.is_empty());
+
     case.db_mut().apply_changes(changes);
 
     assert_eq!(source_text(case.db(), foo).as_str(), "print('Version 2')");
