@@ -439,27 +439,6 @@ fn extract_raised_exception<'a>(
     None
 }
 
-// Checks if a function has a `@property` decorator
-fn is_property(definition: &Definition, checker: &Checker) -> bool {
-    let Some(function) = definition.as_function_def() else {
-        return false;
-    };
-
-    let Some(last_decorator) = function.decorator_list.last() else {
-        return false;
-    };
-
-    checker
-        .semantic()
-        .resolve_qualified_name(&last_decorator.expression)
-        .is_some_and(|qualified_name| {
-            matches!(
-                qualified_name.segments(),
-                ["", "property"] | ["functools", "cached_property"]
-            )
-        })
-}
-
 /// DOC201, DOC202, DOC501, DOC502
 pub(crate) fn check_docstring(
     checker: &mut Checker,
@@ -498,8 +477,15 @@ pub(crate) fn check_docstring(
     };
 
     // DOC201
-    if checker.enabled(Rule::DocstringMissingReturns) {
-        if !is_property(definition, checker) && docstring_sections.returns.is_none() {
+    if checker.enabled(Rule::DocstringMissingReturns) && docstring_sections.returns.is_none() {
+        let extra_property_decorators = checker
+            .settings
+            .pydocstyle
+            .property_decorators
+            .iter()
+            .map(|decorator| QualifiedName::from_dotted_name(decorator))
+            .collect::<Vec<QualifiedName>>();
+        if !definition.is_property(&extra_property_decorators, checker.semantic()) {
             if let Some(body_return) = body_entries.returns.first() {
                 let diagnostic = Diagnostic::new(DocstringMissingReturns, body_return.range());
                 diagnostics.push(diagnostic);
