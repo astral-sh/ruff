@@ -63,28 +63,4 @@ def foo():
     _ = e
     _ = f
 
-    # with statement
-    with None as w:
-        _ = w
-        pass
-
-    # ❌
-    _ = w
-
-    # Nested blocks
-    with None as q:
-        _ = q
-
-        for n in []:
-            _ = n
-            _ = q
-            pass
-
-        # ❌
-        _ = n
-
-    # ❌
-    _ = q
-    _ = n
-
 

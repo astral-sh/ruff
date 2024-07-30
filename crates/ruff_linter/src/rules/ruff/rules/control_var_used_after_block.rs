@@ -9,17 +9,17 @@ use ruff_text_size::Ranged;
 use crate::checkers::ast::Checker;
 
 /// ## What it does
-/// Checks for variables defined in `for` loops and `with` statements that are used
-/// outside of their respective blocks.
+/// Checks for variables defined in `for` loops that are used outside of their
+/// respective blocks.
 ///
 /// ## Why is this bad?
 /// Usage of of a control variable outside of the block they're defined in will probably
 /// lead to flawed logic in a way that will likely cause bugs. The variable might not
 /// contain what you expect.
 ///
-/// In Python, unlike many other languages, `for` loops and `with` statements don't
-/// define their own scopes. Therefore, usage of the control variables outside of the
-/// block will be the the value from the last iteration until re-assigned.
+/// In Python, unlike many other languages, `for` loops don't define their own scopes.
+/// Therefore, usage of the control variables outside of the block will be the the value
+/// from the last iteration until re-assigned.
 ///
 /// While this mistake is easy to spot in small examples, it can be hidden in larger
 /// blocks of code, where the the loop and downstream usage may not be visible at the
@@ -31,11 +31,6 @@ use crate::checkers::ast::Checker;
 ///     pass
 ///
 /// print(x)  # prints 9
-///
-/// with path.open() as f:
-///     pass
-///
-/// print(f.readline())  # prints a line from a file that is already closed (error)
 /// ```
 #[violation]
 pub struct ControlVarUsedAfterBlock {
@@ -58,19 +53,17 @@ impl Violation for ControlVarUsedAfterBlock {
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]
 enum BlockKind {
     For,
-    With,
 }
 
 impl fmt::Display for BlockKind {
     fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
         match self {
             BlockKind::For => fmt.write_str("`for` loop"),
-            BlockKind::With => fmt.write_str("`with` statement"),
         }
     }
 }
 
-/// WPS441: Forbid control variables after the block body.
+/// Based on wemake-python-styleguide (WPS441) to forbid control variables after the block body.
 pub(crate) fn control_var_used_after_block(
     checker: &Checker,
     scope: &Scope,
@@ -85,11 +78,11 @@ pub(crate) fn control_var_used_after_block(
     // bindings come first.
     let reversed_bindings = all_bindings.iter().rev();
 
-    // Find for-loop and with-statement variable bindings
+    // Find for-loop variable bindings
     for (&name, binding) in reversed_bindings
         .map(|(name, binding_id)| (name, checker.semantic().binding(*binding_id)))
         .filter_map(|(name, binding)| {
-            if binding.kind.is_loop_var() || binding.kind.is_with_item_var() {
+            if binding.kind.is_loop_var() {
                 return Some((name, binding));
             }
 
@@ -132,7 +125,6 @@ pub(crate) fn control_var_used_after_block(
             if !is_used_in_block && !known_good_reference_node_ids.contains(&reference_node_id) {
                 let block_kind = match binding_statement {
                     Stmt::For(_) => BlockKind::For,
-                    Stmt::With(_) => BlockKind::With,
                     _ => {
                         panic!("Unexpected block item. This is a problem with ruff itself. Fix the `filter_map` above.")
                     }

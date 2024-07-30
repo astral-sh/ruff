@@ -8,7 +8,7 @@ use crate::codes::Rule;
 use crate::fix;
 use crate::rules::{
     flake8_builtins, flake8_pyi, flake8_type_checking, flake8_unused_arguments, pep8_naming,
-    pyflakes, pylint, ruff, wemake_python_styleguide,
+    pyflakes, pylint, ruff,
 };
 
 /// Run lint rules over all deferred scopes in the [`SemanticModel`].
@@ -88,11 +88,7 @@ pub(crate) fn deferred_scopes(checker: &mut Checker) {
         let scope = &checker.semantic.scopes[scope_id];
 
         if checker.enabled(Rule::ControlVarUsedAfterBlock) {
-            wemake_python_styleguide::rules::control_var_used_after_block(
-                checker,
-                scope,
-                &mut diagnostics,
-            );
+            ruff::rules::control_var_used_after_block(checker, scope, &mut diagnostics);
         }
 
         if checker.enabled(Rule::UndefinedLocal) {
