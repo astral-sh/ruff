@@ -82,13 +82,13 @@ impl<'a> MakeWriter<'a> for TraceLogWriter {
 }
 
 pub(crate) fn init_tracing(
-    sender: &ClientSender,
+    sender: ClientSender,
     log_level: LogLevel,
     log_file: Option<&std::path::Path>,
-    client: &Option<ClientInfo>,
+    client: Option<&ClientInfo>,
 ) {
     LOGGING_SENDER
-        .set(sender.clone())
+        .set(sender)
         .expect("logging sender should only be initialized once");
 
     let log_file = log_file
@@ -124,10 +124,9 @@ pub(crate) fn init_tracing(
     let logger = match log_file {
         Some(file) => BoxMakeWriter::new(Arc::new(file)),
         None => {
-            if client
-                .as_ref()
-                .is_some_and(|client| client.name.starts_with("Zed ") || client.name == "Zed")
-            {
+            if client.is_some_and(|client| {
+                client.name.starts_with("Zed") || client.name.starts_with("Visual Studio Code")
+            }) {
                 BoxMakeWriter::new(TraceLogWriter)
             } else {
                 BoxMakeWriter::new(std::io::stderr)
