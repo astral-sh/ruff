@@ -32,7 +32,7 @@ use crate::fix::edits::add_argument;
 ///
 /// ## Fix safety
 /// This rule's fix is marked as unsafe for `zip` calls that contain
-/// `**kwargs`, as adding a `check` keyword argument to such a call may lead
+/// `**kwargs`, as adding a `strict` keyword argument to such a call may lead
 /// to a duplicate keyword argument error.
 ///
 /// ## References
