@@ -296,16 +296,6 @@ SIM118.py:34:1: SIM118 [*] Use `key in dict` instead of `key in dict.keys()`
    |
    = help: Remove `.keys()`
 
-31 31 | 
-32 32 | (k for k in obj.keys())  # SIM118
-33 33 | 
-34    |-key in (obj or {}).keys()  # SIM118
-   34 |+key in (obj or {})  # SIM118
-35 35 | 
-36 36 | (key) in (obj or {}).keys()  # SIM118
-37 37 | 
-
-    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 SIM118.py:36:1: SIM118 [*] Use `key in dict` instead of `key in dict.keys()`
    |
@@ -318,16 +308,6 @@ SIM118.py:36:1: SIM118 [*] Use `key in dict` instead of `key in dict.keys()`
    |
    = help: Remove `.keys()`
 
-33 33 | 
-34 34 | key in (obj or {}).keys()  # SIM118
-35 35 | 
-36    |-(key) in (obj or {}).keys()  # SIM118
-   36 |+(key) in (obj or {})  # SIM118
-37 37 | 
-38 38 | from typing import KeysView
-39 39 | 
-
-    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 SIM118.py:50:1: SIM118 [*] Use `key in dict` instead of `key in dict.keys()`
    |
@@ -407,16 +387,6 @@ SIM118.py:55:5: SIM118 [*] Use `key in dict` instead of `key in dict.keys()`
    |
    = help: Remove `.keys()`
 
-55 55 | for key in (
-56 56 |     self.experiment.surveys[0]
-57 57 |         .stations[0]
-58    |-        .keys()
-   58 |+        
-59 59 | ):
-60 60 |     continue
-61 61 | 
-
-    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 SIM118.py:65:1: SIM118 [*] Use `key in dict` instead of `key in dict.keys()`
    |

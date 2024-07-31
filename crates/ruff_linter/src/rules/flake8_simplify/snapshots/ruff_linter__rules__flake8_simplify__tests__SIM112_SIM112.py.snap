@@ -11,16 +11,6 @@ SIM112.py:4:12: SIM112 [*] Use capitalized environment variable `FOO` instead of
   |
   = help: Replace `foo` with `FOO`
 
-1 1 | import os
-2 2 | 
-3 3 | # Bad
-4   |-os.environ['foo']
-  4 |+os.environ['FOO']
-5 5 | 
-6 6 | os.environ.get('foo')
-7 7 | 
-
-    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 SIM112.py:6:16: SIM112 Use capitalized environment variable `FOO` instead of `foo`
   |
@@ -77,16 +67,6 @@ SIM112.py:14:18: SIM112 [*] Use capitalized environment variable `FOO` instead o
    |
    = help: Replace `foo` with `FOO`
 
-11 11 | 
-12 12 | env = os.environ.get('foo')
-13 13 | 
-14    |-env = os.environ['foo']
-   14 |+env = os.environ['FOO']
-15 15 | 
-16 16 | if env := os.environ.get('foo'):
-17 17 |     pass
-
-    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 SIM112.py:16:26: SIM112 Use capitalized environment variable `FOO` instead of `foo`
    |
@@ -107,14 +87,3 @@ SIM112.py:19:22: SIM112 [*] Use capitalized environment variable `FOO` instead o
 20 |     pass
    |
    = help: Replace `foo` with `FOO`
-
-16 16 | if env := os.environ.get('foo'):
-17 17 |     pass
-18 18 | 
-19    |-if env := os.environ['foo']:
-   19 |+if env := os.environ['FOO']:
-20 20 |     pass
-21 21 | 
-22 22 | 
-
-    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.

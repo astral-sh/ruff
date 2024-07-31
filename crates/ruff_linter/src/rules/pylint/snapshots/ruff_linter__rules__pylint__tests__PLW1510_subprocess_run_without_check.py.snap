@@ -76,14 +76,3 @@ subprocess_run_without_check.py:10:1: PLW1510 [*] `subprocess.run` without expli
 12 | # Non-errors.
    |
    = help: Add explicit `check=False`
-
-7  7  |     ["ls"],
-8  8  |     shell=False,
-9  9  | )
-10    |-subprocess.run(["ls"], **kwargs)
-   10 |+subprocess.run(["ls"], **kwargs, check=False)
-11 11 | 
-12 12 | # Non-errors.
-13 13 | subprocess.run("ls", check=True)
-
-    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.

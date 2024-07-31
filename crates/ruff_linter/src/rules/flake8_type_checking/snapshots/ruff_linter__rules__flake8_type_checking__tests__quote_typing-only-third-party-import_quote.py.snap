@@ -11,20 +11,6 @@ quote.py:2:24: TCH002 [*] Move third-party import `pandas.DataFrame` into a type
   |
   = help: Move into type-checking block
 
-1   |-def f():
-  1 |+from typing import TYPE_CHECKING
-  2 |+
-  3 |+if TYPE_CHECKING:
-2 4 |     from pandas import DataFrame
-  5 |+def f():
-3 6 | 
-4   |-    def baz() -> DataFrame:
-  7 |+    def baz() -> "DataFrame":
-5 8 |         ...
-6 9 | 
-7 10 | 
-
-    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 quote.py:9:24: TCH002 [*] Move third-party import `pandas.DataFrame` into a type-checking block
    |
@@ -36,26 +22,6 @@ quote.py:9:24: TCH002 [*] Move third-party import `pandas.DataFrame` into a type
    |
    = help: Move into type-checking block
 
-   1  |+from typing import TYPE_CHECKING
-   2  |+
-   3  |+if TYPE_CHECKING:
-   4  |+    from pandas import DataFrame
-1  5  | def f():
-2  6  |     from pandas import DataFrame
-3  7  | 
---------------------------------------------------------------------------------
-6  10 | 
-7  11 | 
-8  12 | def f():
-9     |-    from pandas import DataFrame
-10 13 | 
-11    |-    def baz() -> DataFrame[int]:
-   14 |+    def baz() -> "DataFrame[int]":
-12 15 |         ...
-13 16 | 
-14 17 | 
-
-    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 quote.py:16:24: TCH002 Move third-party import `pandas.DataFrame` into a type-checking block
    |
@@ -77,26 +43,6 @@ quote.py:23:22: TCH002 [*] Move third-party import `pandas` into a type-checking
    |
    = help: Move into type-checking block
 
-   1  |+from typing import TYPE_CHECKING
-   2  |+
-   3  |+if TYPE_CHECKING:
-   4  |+    import pandas as pd
-1  5  | def f():
-2  6  |     from pandas import DataFrame
-3  7  | 
---------------------------------------------------------------------------------
-20 24 | 
-21 25 | 
-22 26 | def f():
-23    |-    import pandas as pd
-24 27 | 
-25    |-    def baz() -> pd.DataFrame:
-   28 |+    def baz() -> "pd.DataFrame":
-26 29 |         ...
-27 30 | 
-28 31 | 
-
-    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 quote.py:30:22: TCH002 [*] Move third-party import `pandas` into a type-checking block
    |
@@ -108,26 +54,6 @@ quote.py:30:22: TCH002 [*] Move third-party import `pandas` into a type-checking
    |
    = help: Move into type-checking block
 
-   1  |+from typing import TYPE_CHECKING
-   2  |+
-   3  |+if TYPE_CHECKING:
-   4  |+    import pandas as pd
-1  5  | def f():
-2  6  |     from pandas import DataFrame
-3  7  | 
---------------------------------------------------------------------------------
-27 31 | 
-28 32 | 
-29 33 | def f():
-30    |-    import pandas as pd
-31 34 | 
-32    |-    def baz() -> pd.DataFrame.Extra:
-   35 |+    def baz() -> "pd.DataFrame.Extra":
-33 36 |         ...
-34 37 | 
-35 38 | 
-
-    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 quote.py:37:22: TCH002 [*] Move third-party import `pandas` into a type-checking block
    |
@@ -139,26 +65,6 @@ quote.py:37:22: TCH002 [*] Move third-party import `pandas` into a type-checking
    |
    = help: Move into type-checking block
 
-   1  |+from typing import TYPE_CHECKING
-   2  |+
-   3  |+if TYPE_CHECKING:
-   4  |+    import pandas as pd
-1  5  | def f():
-2  6  |     from pandas import DataFrame
-3  7  | 
---------------------------------------------------------------------------------
-34 38 | 
-35 39 | 
-36 40 | def f():
-37    |-    import pandas as pd
-38 41 | 
-39    |-    def baz() -> pd.DataFrame | int:
-   42 |+    def baz() -> "pd.DataFrame | int":
-40 43 |         ...
-41 44 | 
-42 45 | 
-
-    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 quote.py:45:24: TCH002 [*] Move third-party import `pandas.DataFrame` into a type-checking block
    |
@@ -170,26 +76,6 @@ quote.py:45:24: TCH002 [*] Move third-party import `pandas.DataFrame` into a typ
    |
    = help: Move into type-checking block
 
-   1  |+from typing import TYPE_CHECKING
-   2  |+
-   3  |+if TYPE_CHECKING:
-   4  |+    from pandas import DataFrame
-1  5  | def f():
-2  6  |     from pandas import DataFrame
-3  7  | 
---------------------------------------------------------------------------------
-42 46 | 
-43 47 | 
-44 48 | def f():
-45    |-    from pandas import DataFrame
-46 49 | 
-47    |-    def baz() -> DataFrame():
-   50 |+    def baz() -> "DataFrame()":
-48 51 |         ...
-49 52 | 
-50 53 | 
-
-    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 quote.py:54:24: TCH002 Move third-party import `pandas.DataFrame` into a type-checking block
    |
@@ -212,26 +98,6 @@ quote.py:71:24: TCH002 [*] Move third-party import `pandas.DataFrame` into a typ
    |
    = help: Move into type-checking block
 
-   1  |+from typing import TYPE_CHECKING
-   2  |+
-   3  |+if TYPE_CHECKING:
-   4  |+    from pandas import DataFrame, Series
-1  5  | def f():
-2  6  |     from pandas import DataFrame
-3  7  | 
---------------------------------------------------------------------------------
-68 72 | 
-69 73 | 
-70 74 | def f():
-71    |-    from pandas import DataFrame, Series
-72 75 | 
-73    |-    def baz() -> DataFrame | Series:
-   76 |+    def baz() -> "DataFrame | Series":
-74 77 |         ...
-75 78 | 
-76 79 | 
-
-    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 quote.py:71:35: TCH002 [*] Move third-party import `pandas.Series` into a type-checking block
    |
@@ -243,26 +109,6 @@ quote.py:71:35: TCH002 [*] Move third-party import `pandas.Series` into a type-c
    |
    = help: Move into type-checking block
 
-   1  |+from typing import TYPE_CHECKING
-   2  |+
-   3  |+if TYPE_CHECKING:
-   4  |+    from pandas import DataFrame, Series
-1  5  | def f():
-2  6  |     from pandas import DataFrame
-3  7  | 
---------------------------------------------------------------------------------
-68 72 | 
-69 73 | 
-70 74 | def f():
-71    |-    from pandas import DataFrame, Series
-72 75 | 
-73    |-    def baz() -> DataFrame | Series:
-   76 |+    def baz() -> "DataFrame | Series":
-74 77 |         ...
-75 78 | 
-76 79 | 
-
-    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 quote.py:78:24: TCH002 [*] Move third-party import `pandas.DataFrame` into a type-checking block
    |
@@ -274,39 +120,6 @@ quote.py:78:24: TCH002 [*] Move third-party import `pandas.DataFrame` into a typ
    |
    = help: Move into type-checking block
 
-   1  |+from typing import TYPE_CHECKING
-   2  |+
-   3  |+if TYPE_CHECKING:
-   4  |+    from pandas import DataFrame, Series
-1  5  | def f():
-2  6  |     from pandas import DataFrame
-3  7  | 
---------------------------------------------------------------------------------
-75 79 | 
-76 80 | 
-77 81 | def f():
-78    |-    from pandas import DataFrame, Series
-79 82 | 
-80 83 |     def baz() -> (
-81    |-        DataFrame |
-82    |-        Series
-   84 |+        "DataFrame | Series"
-83 85 |     ):
-84 86 |         ...
-85 87 | 
-86 88 |     class C:
-87    |-        x: DataFrame[
-88    |-            int
-89    |-        ] = 1
-   89 |+        x: "DataFrame[int]" = 1
-90 90 | 
-91    |-    def func() -> DataFrame[[DataFrame[_P, _R]], DataFrame[_P, _R]]:
-   91 |+    def func() -> "DataFrame[[DataFrame[_P, _R]], DataFrame[_P, _R]]":
-92 92 |         ...
-93 93 | 
-94 94 | 
-
-    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 quote.py:78:35: TCH002 [*] Move third-party import `pandas.Series` into a type-checking block
    |
@@ -318,39 +131,6 @@ quote.py:78:35: TCH002 [*] Move third-party import `pandas.Series` into a type-c
    |
    = help: Move into type-checking block
 
-   1  |+from typing import TYPE_CHECKING
-   2  |+
-   3  |+if TYPE_CHECKING:
-   4  |+    from pandas import DataFrame, Series
-1  5  | def f():
-2  6  |     from pandas import DataFrame
-3  7  | 
---------------------------------------------------------------------------------
-75 79 | 
-76 80 | 
-77 81 | def f():
-78    |-    from pandas import DataFrame, Series
-79 82 | 
-80 83 |     def baz() -> (
-81    |-        DataFrame |
-82    |-        Series
-   84 |+        "DataFrame | Series"
-83 85 |     ):
-84 86 |         ...
-85 87 | 
-86 88 |     class C:
-87    |-        x: DataFrame[
-88    |-            int
-89    |-        ] = 1
-   89 |+        x: "DataFrame[int]" = 1
-90 90 | 
-91    |-    def func() -> DataFrame[[DataFrame[_P, _R]], DataFrame[_P, _R]]:
-   91 |+    def func() -> "DataFrame[[DataFrame[_P, _R]], DataFrame[_P, _R]]":
-92 92 |         ...
-93 93 | 
-94 94 | 
-
-    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 quote.py:96:24: TCH002 [*] Move third-party import `pandas.DataFrame` into a type-checking block
    |
@@ -362,24 +142,6 @@ quote.py:96:24: TCH002 [*] Move third-party import `pandas.DataFrame` into a typ
    |
    = help: Move into type-checking block
 
-    1   |+from typing import TYPE_CHECKING
-    2   |+
-    3   |+if TYPE_CHECKING:
-    4   |+    from pandas import DataFrame, Series
-1   5   | def f():
-2   6   |     from pandas import DataFrame
-3   7   | 
---------------------------------------------------------------------------------
-93  97  | 
-94  98  | 
-95  99  | def f():
-96      |-    from pandas import DataFrame, Series
-97  100 | 
-98      |-    def func(self) -> DataFrame | list[Series]:
-    101 |+    def func(self) -> "DataFrame | list[Series]":
-99  102 |         pass
-
-    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 quote.py:96:35: TCH002 [*] Move third-party import `pandas.Series` into a type-checking block
    |
@@ -390,22 +152,3 @@ quote.py:96:35: TCH002 [*] Move third-party import `pandas.Series` into a type-c
 98 |     def func(self) -> DataFrame | list[Series]:
    |
    = help: Move into type-checking block
-
-    1   |+from typing import TYPE_CHECKING
-    2   |+
-    3   |+if TYPE_CHECKING:
-    4   |+    from pandas import DataFrame, Series
-1   5   | def f():
-2   6   |     from pandas import DataFrame
-3   7   | 
---------------------------------------------------------------------------------
-93  97  | 
-94  98  | 
-95  99  | def f():
-96      |-    from pandas import DataFrame, Series
-97  100 | 
-98      |-    def func(self) -> DataFrame | list[Series]:
-    101 |+    def func(self) -> "DataFrame | list[Series]":
-99  102 |         pass
-
-    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.

@@ -11,15 +11,6 @@ B011.py:8:8: B011 [*] Do not `assert False` (`python -O` removes these calls), r
    |
    = help: Replace `assert False`
 
-5 5 | """
-6 6 | 
-7 7 | assert 1 != 2
-8   |-assert False
-  8 |+raise AssertionError()
-9 9 | assert 1 != 2, "message"
-10 10 | assert False, "message"
-
-    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 B011.py:10:8: B011 [*] Do not `assert False` (`python -O` removes these calls), raise `AssertionError()`
    |
@@ -29,11 +20,3 @@ B011.py:10:8: B011 [*] Do not `assert False` (`python -O` removes these calls), 
    |        ^^^^^ B011
    |
    = help: Replace `assert False`
-
-7  7  | assert 1 != 2
-8  8  | assert False
-9  9  | assert 1 != 2, "message"
-10    |-assert False, "message"
-   10 |+raise AssertionError("message")
-
-    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.

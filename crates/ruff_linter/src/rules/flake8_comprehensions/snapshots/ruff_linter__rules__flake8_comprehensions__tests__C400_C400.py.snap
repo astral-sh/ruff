@@ -11,14 +11,6 @@ C400.py:2:13: C400 [*] Unnecessary generator (rewrite as a `list` comprehension)
   |
   = help: Rewrite as a `list` comprehension
 
-1 1 | # Cannot combine with C416. Should use list comprehension here.
-2   |-even_nums = list(2 * x for x in range(3))
-  2 |+even_nums = [2 * x for x in range(3)]
-3 3 | odd_nums = list(
-4 4 |     2 * x + 1 for x in range(3)
-5 5 | )
-
-    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 C400.py:3:12: C400 [*] Unnecessary generator (rewrite as a `list` comprehension)
   |
@@ -32,18 +24,6 @@ C400.py:3:12: C400 [*] Unnecessary generator (rewrite as a `list` comprehension)
   |
   = help: Rewrite as a `list` comprehension
 
-1 1 | # Cannot combine with C416. Should use list comprehension here.
-2 2 | even_nums = list(2 * x for x in range(3))
-3   |-odd_nums = list(
-  3 |+odd_nums = [
-4 4 |     2 * x + 1 for x in range(3)
-5   |-)
-  5 |+]
-6 6 | 
-7 7 | 
-8 8 | # Short-circuit case, combine with C416 and should produce x = list(range(3))
-
-    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 C400.py:9:5: C400 [*] Unnecessary generator (rewrite using `list()`)
    |
@@ -55,16 +35,6 @@ C400.py:9:5: C400 [*] Unnecessary generator (rewrite using `list()`)
    |
    = help: Rewrite using `list()`
 
-6  6  | 
-7  7  | 
-8  8  | # Short-circuit case, combine with C416 and should produce x = list(range(3))
-9     |-x = list(x for x in range(3))
-   9  |+x = list(range(3))
-10 10 | x = list(
-11 11 |     x for x in range(3)
-12 12 | )
-
-    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 C400.py:10:5: C400 [*] Unnecessary generator (rewrite using `list()`)
    |
@@ -80,18 +50,6 @@ C400.py:10:5: C400 [*] Unnecessary generator (rewrite using `list()`)
    |
    = help: Rewrite using `list()`
 
-7  7  | 
-8  8  | # Short-circuit case, combine with C416 and should produce x = list(range(3))
-9  9  | x = list(x for x in range(3))
-10    |-x = list(
-11    |-    x for x in range(3)
-12    |-)
-   10 |+x = list(range(3))
-13 11 | 
-14 12 | # Strip parentheses from inner generators.
-15 13 | list((2 * x for x in range(3)))
-
-    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 C400.py:15:1: C400 [*] Unnecessary generator (rewrite as a `list` comprehension)
    |
@@ -103,16 +61,6 @@ C400.py:15:1: C400 [*] Unnecessary generator (rewrite as a `list` comprehension)
    |
    = help: Rewrite as a `list` comprehension
 
-12 12 | )
-13 13 | 
-14 14 | # Strip parentheses from inner generators.
-15    |-list((2 * x for x in range(3)))
-   15 |+[2 * x for x in range(3)]
-16 16 | list(((2 * x for x in range(3))))
-17 17 | list((((2 * x for x in range(3)))))
-18 18 | 
-
-    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 C400.py:16:1: C400 [*] Unnecessary generator (rewrite as a `list` comprehension)
    |
@@ -124,16 +72,6 @@ C400.py:16:1: C400 [*] Unnecessary generator (rewrite as a `list` comprehension)
    |
    = help: Rewrite as a `list` comprehension
 
-13 13 | 
-14 14 | # Strip parentheses from inner generators.
-15 15 | list((2 * x for x in range(3)))
-16    |-list(((2 * x for x in range(3))))
-   16 |+[2 * x for x in range(3)]
-17 17 | list((((2 * x for x in range(3)))))
-18 18 | 
-19 19 | # Not built-in list.
-
-    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 C400.py:17:1: C400 [*] Unnecessary generator (rewrite as a `list` comprehension)
    |
@@ -145,14 +83,3 @@ C400.py:17:1: C400 [*] Unnecessary generator (rewrite as a `list` comprehension)
 19 | # Not built-in list.
    |
    = help: Rewrite as a `list` comprehension
-
-14 14 | # Strip parentheses from inner generators.
-15 15 | list((2 * x for x in range(3)))
-16 16 | list(((2 * x for x in range(3))))
-17    |-list((((2 * x for x in range(3)))))
-   17 |+[2 * x for x in range(3)]
-18 18 | 
-19 19 | # Not built-in list.
-20 20 | def list(*args, **kwargs):
-
-    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.

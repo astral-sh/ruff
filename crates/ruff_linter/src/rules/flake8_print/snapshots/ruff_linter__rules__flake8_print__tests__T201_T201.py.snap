@@ -12,15 +12,6 @@ T201.py:4:1: T201 [*] `print` found
   |
   = help: Remove `print`
 
-1 1 | import sys
-2 2 | import tempfile
-3 3 | 
-4   |-print("Hello, world!")  # T201
-5 4 | print("Hello, world!", file=None)  # T201
-6 5 | print("Hello, world!", file=sys.stdout)  # T201
-7 6 | print("Hello, world!", file=sys.stderr)  # T201
-
-    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 T201.py:5:1: T201 [*] `print` found
   |
@@ -32,15 +23,6 @@ T201.py:5:1: T201 [*] `print` found
   |
   = help: Remove `print`
 
-2 2 | import tempfile
-3 3 | 
-4 4 | print("Hello, world!")  # T201
-5   |-print("Hello, world!", file=None)  # T201
-6 5 | print("Hello, world!", file=sys.stdout)  # T201
-7 6 | print("Hello, world!", file=sys.stderr)  # T201
-8 7 | 
-
-    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 T201.py:6:1: T201 [*] `print` found
   |
@@ -52,15 +34,6 @@ T201.py:6:1: T201 [*] `print` found
   |
   = help: Remove `print`
 
-3 3 | 
-4 4 | print("Hello, world!")  # T201
-5 5 | print("Hello, world!", file=None)  # T201
-6   |-print("Hello, world!", file=sys.stdout)  # T201
-7 6 | print("Hello, world!", file=sys.stderr)  # T201
-8 7 | 
-9 8 | with tempfile.NamedTemporaryFile() as fp:
-
-    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 T201.py:7:1: T201 [*] `print` found
   |
@@ -72,13 +45,3 @@ T201.py:7:1: T201 [*] `print` found
 9 | with tempfile.NamedTemporaryFile() as fp:
   |
   = help: Remove `print`
-
-4 4 | print("Hello, world!")  # T201
-5 5 | print("Hello, world!", file=None)  # T201
-6 6 | print("Hello, world!", file=sys.stdout)  # T201
-7   |-print("Hello, world!", file=sys.stderr)  # T201
-8 7 | 
-9 8 | with tempfile.NamedTemporaryFile() as fp:
-10 9 |     print("Hello, world!", file=fp)  # OK
-
-    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.

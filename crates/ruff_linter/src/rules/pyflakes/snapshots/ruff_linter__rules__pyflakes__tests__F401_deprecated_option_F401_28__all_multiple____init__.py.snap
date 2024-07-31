@@ -8,15 +8,6 @@ __init__.py:5:15: F401 [*] `.unused` imported but unused; consider removing, add
   |
   = help: Remove unused import
 
-2 2 | """
-3 3 | 
-4 4 | 
-5   |-from . import unused, renamed as bees  # F401: add to __all__
-6 5 | 
-7 6 | 
-8 7 | __all__ = [];
-
-    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 __init__.py:5:34: F401 [*] `.renamed` imported but unused; consider removing, adding to `__all__`, or using a redundant alias
   |
@@ -24,13 +15,3 @@ __init__.py:5:34: F401 [*] `.renamed` imported but unused; consider removing, ad
   |                                  ^^^^ F401
   |
   = help: Remove unused import
-
-2 2 | """
-3 3 | 
-4 4 | 
-5   |-from . import unused, renamed as bees  # F401: add to __all__
-6 5 | 
-7 6 | 
-8 7 | __all__ = [];
-
-    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.

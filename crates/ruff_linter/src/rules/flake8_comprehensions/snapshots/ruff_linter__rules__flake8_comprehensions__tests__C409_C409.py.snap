@@ -10,13 +10,6 @@ C409.py:1:6: C409 [*] Unnecessary `list` literal passed to `tuple()` (rewrite as
   |
   = help: Rewrite as a `tuple` literal
 
-1   |-t1 = tuple([])
-  1 |+t1 = ()
-2 2 | t2 = tuple([1, 2])
-3 3 | t3 = tuple((1, 2))
-4 4 | t4 = tuple([
-
-    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 C409.py:2:6: C409 [*] Unnecessary `list` literal passed to `tuple()` (rewrite as a `tuple` literal)
   |
@@ -28,14 +21,6 @@ C409.py:2:6: C409 [*] Unnecessary `list` literal passed to `tuple()` (rewrite as
   |
   = help: Rewrite as a `tuple` literal
 
-1 1 | t1 = tuple([])
-2   |-t2 = tuple([1, 2])
-  2 |+t2 = (1, 2)
-3 3 | t3 = tuple((1, 2))
-4 4 | t4 = tuple([
-5 5 |     1,
-
-    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 C409.py:3:6: C409 [*] Unnecessary `tuple` literal passed to `tuple()` (remove the outer call to `tuple()`)
   |
@@ -48,15 +33,6 @@ C409.py:3:6: C409 [*] Unnecessary `tuple` literal passed to `tuple()` (remove th
   |
   = help: Remove outer `tuple` call
 
-1 1 | t1 = tuple([])
-2 2 | t2 = tuple([1, 2])
-3   |-t3 = tuple((1, 2))
-  3 |+t3 = (1, 2)
-4 4 | t4 = tuple([
-5 5 |     1,
-6 6 |     2
-
-    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 C409.py:4:6: C409 [*] Unnecessary `list` literal passed to `tuple()` (rewrite as a `tuple` literal)
   |
@@ -73,20 +49,6 @@ C409.py:4:6: C409 [*] Unnecessary `list` literal passed to `tuple()` (rewrite as
   |
   = help: Rewrite as a `tuple` literal
 
-1 1 | t1 = tuple([])
-2 2 | t2 = tuple([1, 2])
-3 3 | t3 = tuple((1, 2))
-4   |-t4 = tuple([
-  4 |+t4 = (
-5 5 |     1,
-6 6 |     2
-7   |-])
-  7 |+)
-8 8 | t5 = tuple(
-9 9 |     (1, 2)
-10 10 | )
-
-    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 C409.py:8:6: C409 [*] Unnecessary `tuple` literal passed to `tuple()` (remove the outer call to `tuple()`)
    |
@@ -102,18 +64,6 @@ C409.py:8:6: C409 [*] Unnecessary `tuple` literal passed to `tuple()` (remove th
    |
    = help: Remove outer `tuple` call
 
-5  5  |     1,
-6  6  |     2
-7  7  | ])
-8     |-t5 = tuple(
-9     |-    (1, 2)
-10    |-)
-   8  |+t5 = (1, 2)
-11 9  | 
-12 10 | tuple(  # comment
-13 11 |     [1, 2]
-
-    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 C409.py:12:1: C409 [*] Unnecessary `list` literal passed to `tuple()` (rewrite as a `tuple` literal)
    |
@@ -128,18 +78,6 @@ C409.py:12:1: C409 [*] Unnecessary `list` literal passed to `tuple()` (rewrite a
    |
    = help: Rewrite as a `tuple` literal
 
-9  9  |     (1, 2)
-10 10 | )
-11 11 | 
-12    |-tuple(  # comment
-13    |-    [1, 2]
-14    |-)
-   12 |+(1, 2)
-15 13 | 
-16 14 | tuple([  # comment
-17 15 |     1, 2
-
-    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 C409.py:16:1: C409 [*] Unnecessary `list` literal passed to `tuple()` (rewrite as a `tuple` literal)
    |
@@ -154,19 +92,6 @@ C409.py:16:1: C409 [*] Unnecessary `list` literal passed to `tuple()` (rewrite a
    |
    = help: Rewrite as a `tuple` literal
 
-13 13 |     [1, 2]
-14 14 | )
-15 15 | 
-16    |-tuple([  # comment
-   16 |+(  # comment
-17 17 |     1, 2
-18    |-])
-   18 |+)
-19 19 | 
-20 20 | tuple((
-21 21 |     1,
-
-    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 C409.py:20:1: C409 [*] Unnecessary `tuple` literal passed to `tuple()` (remove the outer call to `tuple()`)
    |
@@ -181,19 +106,6 @@ C409.py:20:1: C409 [*] Unnecessary `tuple` literal passed to `tuple()` (remove t
    |
    = help: Remove outer `tuple` call
 
-17 17 |     1, 2
-18 18 | ])
-19 19 | 
-20    |-tuple((
-   20 |+(
-21 21 |     1,
-22    |-))
-   22 |+)
-23 23 | 
-24 24 | t6 = tuple([1])
-25 25 | t7 = tuple((1,))
-
-    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 C409.py:24:6: C409 [*] Unnecessary `list` literal passed to `tuple()` (rewrite as a `tuple` literal)
    |
@@ -206,15 +118,6 @@ C409.py:24:6: C409 [*] Unnecessary `list` literal passed to `tuple()` (rewrite a
    |
    = help: Rewrite as a `tuple` literal
 
-21 21 |     1,
-22 22 | ))
-23 23 | 
-24    |-t6 = tuple([1])
-   24 |+t6 = (1,)
-25 25 | t7 = tuple((1,))
-26 26 | t8 = tuple([1,])
-
-    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 C409.py:25:6: C409 [*] Unnecessary `tuple` literal passed to `tuple()` (remove the outer call to `tuple()`)
    |
@@ -225,14 +128,6 @@ C409.py:25:6: C409 [*] Unnecessary `tuple` literal passed to `tuple()` (remove t
    |
    = help: Remove outer `tuple` call
 
-22 22 | ))
-23 23 | 
-24 24 | t6 = tuple([1])
-25    |-t7 = tuple((1,))
-   25 |+t7 = (1,)
-26 26 | t8 = tuple([1,])
-
-    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 C409.py:26:6: C409 [*] Unnecessary `list` literal passed to `tuple()` (rewrite as a `tuple` literal)
    |
@@ -242,11 +137,3 @@ C409.py:26:6: C409 [*] Unnecessary `list` literal passed to `tuple()` (rewrite a
    |      ^^^^^^^^^^^ C409
    |
    = help: Rewrite as a `tuple` literal
-
-23 23 | 
-24 24 | t6 = tuple([1])
-25 25 | t7 = tuple((1,))
-26    |-t8 = tuple([1,])
-   26 |+t8 = (1,)
-
-    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.

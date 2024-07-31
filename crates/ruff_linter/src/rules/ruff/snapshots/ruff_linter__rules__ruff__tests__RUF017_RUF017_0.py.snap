@@ -11,19 +11,6 @@ RUF017_0.py:5:1: RUF017 [*] Avoid quadratic list summation
   |
   = help: Replace with `functools.reduce`
 
-  1 |+import functools
-  2 |+import operator
-1 3 | x = [1, 2, 3]
-2 4 | y = [4, 5, 6]
-3 5 | 
-4 6 | # RUF017
-5   |-sum([x, y], start=[])
-  7 |+functools.reduce(operator.iadd, [x, y], [])
-6 8 | sum([x, y], [])
-7 9 | sum([[1, 2, 3], [4, 5, 6]], start=[])
-8 10 | sum([[1, 2, 3], [4, 5, 6]], [])
-
-    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 RUF017_0.py:6:1: RUF017 [*] Avoid quadratic list summation
   |
@@ -36,20 +23,6 @@ RUF017_0.py:6:1: RUF017 [*] Avoid quadratic list summation
   |
   = help: Replace with `functools.reduce`
 
-  1 |+import functools
-  2 |+import operator
-1 3 | x = [1, 2, 3]
-2 4 | y = [4, 5, 6]
-3 5 | 
-4 6 | # RUF017
-5 7 | sum([x, y], start=[])
-6   |-sum([x, y], [])
-  8 |+functools.reduce(operator.iadd, [x, y], [])
-7 9 | sum([[1, 2, 3], [4, 5, 6]], start=[])
-8 10 | sum([[1, 2, 3], [4, 5, 6]], [])
-9 11 | sum([[1, 2, 3], [4, 5, 6]],
-
-    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 RUF017_0.py:7:1: RUF017 [*] Avoid quadratic list summation
   |
@@ -62,21 +35,6 @@ RUF017_0.py:7:1: RUF017 [*] Avoid quadratic list summation
   |
   = help: Replace with `functools.reduce`
 
-   1  |+import functools
-   2  |+import operator
-1  3  | x = [1, 2, 3]
-2  4  | y = [4, 5, 6]
-3  5  | 
-4  6  | # RUF017
-5  7  | sum([x, y], start=[])
-6  8  | sum([x, y], [])
-7     |-sum([[1, 2, 3], [4, 5, 6]], start=[])
-   9  |+functools.reduce(operator.iadd, [[1, 2, 3], [4, 5, 6]], [])
-8  10 | sum([[1, 2, 3], [4, 5, 6]], [])
-9  11 | sum([[1, 2, 3], [4, 5, 6]],
-10 12 |     [])
-
-    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 RUF017_0.py:8:1: RUF017 [*] Avoid quadratic list summation
    |
@@ -89,22 +47,6 @@ RUF017_0.py:8:1: RUF017 [*] Avoid quadratic list summation
    |
    = help: Replace with `functools.reduce`
 
-   1  |+import functools
-   2  |+import operator
-1  3  | x = [1, 2, 3]
-2  4  | y = [4, 5, 6]
-3  5  | 
---------------------------------------------------------------------------------
-5  7  | sum([x, y], start=[])
-6  8  | sum([x, y], [])
-7  9  | sum([[1, 2, 3], [4, 5, 6]], start=[])
-8     |-sum([[1, 2, 3], [4, 5, 6]], [])
-   10 |+functools.reduce(operator.iadd, [[1, 2, 3], [4, 5, 6]], [])
-9  11 | sum([[1, 2, 3], [4, 5, 6]],
-10 12 |     [])
-11 13 | 
-
-    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 RUF017_0.py:9:1: RUF017 [*] Avoid quadratic list summation
    |
@@ -118,23 +60,6 @@ RUF017_0.py:9:1: RUF017 [*] Avoid quadratic list summation
    |
    = help: Replace with `functools.reduce`
 
-   1  |+import functools
-   2  |+import operator
-1  3  | x = [1, 2, 3]
-2  4  | y = [4, 5, 6]
-3  5  | 
---------------------------------------------------------------------------------
-6  8  | sum([x, y], [])
-7  9  | sum([[1, 2, 3], [4, 5, 6]], start=[])
-8  10 | sum([[1, 2, 3], [4, 5, 6]], [])
-9     |-sum([[1, 2, 3], [4, 5, 6]],
-10    |-    [])
-   11 |+functools.reduce(operator.iadd, [[1, 2, 3], [4, 5, 6]], [])
-11 12 | 
-12 13 | # OK
-13 14 | sum([x, y])
-
-    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 RUF017_0.py:21:5: RUF017 [*] Avoid quadratic list summation
    |
@@ -145,16 +70,6 @@ RUF017_0.py:21:5: RUF017 [*] Avoid quadratic list summation
    |
    = help: Replace with `functools.reduce`
 
-18 18 | def func():
-19 19 |     import functools, operator
-20 20 | 
-21    |-    sum([x, y], [])
-   21 |+    functools.reduce(operator.iadd, [x, y], [])
-22 22 | 
-23 23 | 
-24 24 | # Regression test for: https://github.com/astral-sh/ruff/issues/7718
-
-    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 RUF017_0.py:26:5: RUF017 [*] Avoid quadratic list summation
    |
@@ -164,17 +79,3 @@ RUF017_0.py:26:5: RUF017 [*] Avoid quadratic list summation
    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF017
    |
    = help: Replace with `functools.reduce`
-
-   1  |+import functools
-   2  |+import operator
-1  3  | x = [1, 2, 3]
-2  4  | y = [4, 5, 6]
-3  5  | 
---------------------------------------------------------------------------------
-23 25 | 
-24 26 | # Regression test for: https://github.com/astral-sh/ruff/issues/7718
-25 27 | def func():
-26    |-    sum((factor.dims for factor in bases), [])
-   28 |+    functools.reduce(operator.iadd, (factor.dims for factor in bases), [])
-
-    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.

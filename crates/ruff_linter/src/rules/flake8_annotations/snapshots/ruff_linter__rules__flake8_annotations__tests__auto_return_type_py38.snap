@@ -9,13 +9,6 @@ auto_return_type.py:1:5: ANN201 [*] Missing return type annotation for public fu
   |
   = help: Add return type annotation: `int`
 
-1   |-def func():
-  1 |+def func() -> int:
-2 2 |     return 1
-3 3 | 
-4 4 | 
-
-    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 auto_return_type.py:5:5: ANN201 [*] Missing return type annotation for public function `func`
   |
@@ -25,16 +18,6 @@ auto_return_type.py:5:5: ANN201 [*] Missing return type annotation for public fu
   |
   = help: Add return type annotation: `float`
 
-2 2 |     return 1
-3 3 | 
-4 4 | 
-5   |-def func():
-  5 |+def func() -> float:
-6 6 |     return 1.5
-7 7 | 
-8 8 | 
-
-    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 auto_return_type.py:9:5: ANN201 [*] Missing return type annotation for public function `func`
    |
@@ -45,16 +28,6 @@ auto_return_type.py:9:5: ANN201 [*] Missing return type annotation for public fu
    |
    = help: Add return type annotation: `float`
 
-6  6  |     return 1.5
-7  7  | 
-8  8  | 
-9     |-def func(x: int):
-   9  |+def func(x: int) -> float:
-10 10 |     if x > 0:
-11 11 |         return 1
-12 12 |     else:
-
-    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 auto_return_type.py:16:5: ANN201 [*] Missing return type annotation for public function `func`
    |
@@ -64,16 +37,6 @@ auto_return_type.py:16:5: ANN201 [*] Missing return type annotation for public f
    |
    = help: Add return type annotation: `bool`
 
-13 13 |         return 1.5
-14 14 | 
-15 15 | 
-16    |-def func():
-   16 |+def func() -> bool:
-17 17 |     return True
-18 18 | 
-19 19 | 
-
-    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 auto_return_type.py:20:5: ANN201 [*] Missing return type annotation for public function `func`
    |
@@ -84,16 +47,6 @@ auto_return_type.py:20:5: ANN201 [*] Missing return type annotation for public f
    |
    = help: Add return type annotation: `None`
 
-17 17 |     return True
-18 18 | 
-19 19 | 
-20    |-def func(x: int):
-   20 |+def func(x: int) -> None:
-21 21 |     if x > 0:
-22 22 |         return None
-23 23 |     else:
-
-    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 auto_return_type.py:27:5: ANN201 [*] Missing return type annotation for public function `func`
    |
@@ -103,21 +56,6 @@ auto_return_type.py:27:5: ANN201 [*] Missing return type annotation for public f
    |
    = help: Add return type annotation: `Union[str | float]`
 
-   1  |+from typing import Union
-1  2  | def func():
-2  3  |     return 1
-3  4  | 
---------------------------------------------------------------------------------
-24 25 |         return
-25 26 | 
-26 27 | 
-27    |-def func(x: int):
-   28 |+def func(x: int) -> Union[str | float]:
-28 29 |     return 1 or 2.5 if x > 0 else 1.5 or "str"
-29 30 | 
-30 31 | 
-
-    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 auto_return_type.py:31:5: ANN201 [*] Missing return type annotation for public function `func`
    |
@@ -127,21 +65,6 @@ auto_return_type.py:31:5: ANN201 [*] Missing return type annotation for public f
    |
    = help: Add return type annotation: `Union[str | float]`
 
-   1  |+from typing import Union
-1  2  | def func():
-2  3  |     return 1
-3  4  | 
---------------------------------------------------------------------------------
-28 29 |     return 1 or 2.5 if x > 0 else 1.5 or "str"
-29 30 | 
-30 31 | 
-31    |-def func(x: int):
-   32 |+def func(x: int) -> Union[str | float]:
-32 33 |     return 1 + 2.5 if x > 0 else 1.5 or "str"
-33 34 | 
-34 35 | 
-
-    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 auto_return_type.py:35:5: ANN201 Missing return type annotation for public function `func`
    |
@@ -169,16 +92,6 @@ auto_return_type.py:45:5: ANN201 [*] Missing return type annotation for public f
    |
    = help: Add return type annotation: `int`
 
-42 42 |     return {"foo": 1}
-43 43 | 
-44 44 | 
-45    |-def func(x: int):
-   45 |+def func(x: int) -> int:
-46 46 |     if not x:
-47 47 |         return 1
-48 48 |     else:
-
-    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 auto_return_type.py:52:5: ANN201 [*] Missing return type annotation for public function `func`
    |
@@ -189,21 +102,6 @@ auto_return_type.py:52:5: ANN201 [*] Missing return type annotation for public f
    |
    = help: Add return type annotation: `Optional[int]`
 
-   1  |+from typing import Optional
-1  2  | def func():
-2  3  |     return 1
-3  4  | 
---------------------------------------------------------------------------------
-49 50 |         return True
-50 51 | 
-51 52 | 
-52    |-def func(x: int):
-   53 |+def func(x: int) -> Optional[int]:
-53 54 |     if not x:
-54 55 |         return 1
-55 56 |     else:
-
-    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 auto_return_type.py:59:5: ANN201 [*] Missing return type annotation for public function `func`
    |
@@ -214,21 +112,6 @@ auto_return_type.py:59:5: ANN201 [*] Missing return type annotation for public f
    |
    = help: Add return type annotation: `Union[str | int | None]`
 
-   1  |+from typing import Union
-1  2  | def func():
-2  3  |     return 1
-3  4  | 
---------------------------------------------------------------------------------
-56 57 |         return None
-57 58 | 
-58 59 | 
-59    |-def func(x: int):
-   60 |+def func(x: int) -> Union[str | int | None]:
-60 61 |     if not x:
-61 62 |         return 1
-62 63 |     elif x > 5:
-
-    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 auto_return_type.py:68:5: ANN201 [*] Missing return type annotation for public function `func`
    |
@@ -239,21 +122,6 @@ auto_return_type.py:68:5: ANN201 [*] Missing return type annotation for public f
    |
    = help: Add return type annotation: `Optional[int]`
 
-   1  |+from typing import Optional
-1  2  | def func():
-2  3  |     return 1
-3  4  | 
---------------------------------------------------------------------------------
-65 66 |         return None
-66 67 | 
-67 68 | 
-68    |-def func(x: int):
-   69 |+def func(x: int) -> Optional[int]:
-69 70 |     if x:
-70 71 |         return 1
-71 72 | 
-
-    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 auto_return_type.py:73:5: ANN201 [*] Missing return type annotation for public function `func`
    |
@@ -263,16 +131,6 @@ auto_return_type.py:73:5: ANN201 [*] Missing return type annotation for public f
    |
    = help: Add return type annotation: `None`
 
-70 70 |         return 1
-71 71 | 
-72 72 | 
-73    |-def func():
-   73 |+def func() -> None:
-74 74 |     x = 1
-75 75 | 
-76 76 | 
-
-    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 auto_return_type.py:77:5: ANN201 [*] Missing return type annotation for public function `func`
    |
@@ -283,21 +141,6 @@ auto_return_type.py:77:5: ANN201 [*] Missing return type annotation for public f
    |
    = help: Add return type annotation: `Optional[int]`
 
-   1  |+from typing import Optional
-1  2  | def func():
-2  3  |     return 1
-3  4  | 
---------------------------------------------------------------------------------
-74 75 |     x = 1
-75 76 | 
-76 77 | 
-77    |-def func(x: int):
-   78 |+def func(x: int) -> Optional[int]:
-78 79 |     if x > 0:
-79 80 |         return 1
-80 81 | 
-
-    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 auto_return_type.py:82:5: ANN201 [*] Missing return type annotation for public function `func`
    |
@@ -308,21 +151,6 @@ auto_return_type.py:82:5: ANN201 [*] Missing return type annotation for public f
    |
    = help: Add return type annotation: `Union[str | int | None]`
 
-   1  |+from typing import Union
-1  2  | def func():
-2  3  |     return 1
-3  4  | 
---------------------------------------------------------------------------------
-79 80 |         return 1
-80 81 | 
-81 82 | 
-82    |-def func(x: int):
-   83 |+def func(x: int) -> Union[str | int | None]:
-83 84 |     match x:
-84 85 |         case [1, 2, 3]:
-85 86 |             return 1
-
-    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 auto_return_type.py:90:5: ANN201 [*] Missing return type annotation for public function `func`
    |
@@ -333,21 +161,6 @@ auto_return_type.py:90:5: ANN201 [*] Missing return type annotation for public f
    |
    = help: Add return type annotation: `Optional[int]`
 
-   1  |+from typing import Optional
-1  2  | def func():
-2  3  |     return 1
-3  4  | 
---------------------------------------------------------------------------------
-87 88 |             return "foo"
-88 89 | 
-89 90 | 
-90    |-def func(x: int):
-   91 |+def func(x: int) -> Optional[int]:
-91 92 |     for i in range(5):
-92 93 |         if i > 0:
-93 94 |             return 1
-
-    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 auto_return_type.py:96:5: ANN201 [*] Missing return type annotation for public function `func`
    |
@@ -358,16 +171,6 @@ auto_return_type.py:96:5: ANN201 [*] Missing return type annotation for public f
    |
    = help: Add return type annotation: `int`
 
-93 93 |             return 1
-94 94 | 
-95 95 | 
-96    |-def func(x: int):
-   96 |+def func(x: int) -> int:
-97 97 |     for i in range(5):
-98 98 |         if i > 0:
-99 99 |             return 1
-
-    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 auto_return_type.py:104:5: ANN201 [*] Missing return type annotation for public function `func`
     |
@@ -378,21 +181,6 @@ auto_return_type.py:104:5: ANN201 [*] Missing return type annotation for public 
     |
     = help: Add return type annotation: `Optional[int]`
 
-    1   |+from typing import Optional
-1   2   | def func():
-2   3   |     return 1
-3   4   | 
---------------------------------------------------------------------------------
-101 102 |         return 4
-102 103 | 
-103 104 | 
-104     |-def func(x: int):
-    105 |+def func(x: int) -> Optional[int]:
-105 106 |     for i in range(5):
-106 107 |         if i > 0:
-107 108 |             break
-
-    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 auto_return_type.py:112:5: ANN201 [*] Missing return type annotation for public function `func`
     |
@@ -403,21 +191,6 @@ auto_return_type.py:112:5: ANN201 [*] Missing return type annotation for public 
     |
     = help: Add return type annotation: `Optional[int]`
 
-    1   |+from typing import Optional
-1   2   | def func():
-2   3   |     return 1
-3   4   | 
---------------------------------------------------------------------------------
-109 110 |         return 4
-110 111 | 
-111 112 | 
-112     |-def func(x: int):
-    113 |+def func(x: int) -> Optional[int]:
-113 114 |     try:
-114 115 |         pass
-115 116 |     except:
-
-    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 auto_return_type.py:119:5: ANN201 [*] Missing return type annotation for public function `func`
     |
@@ -428,16 +201,6 @@ auto_return_type.py:119:5: ANN201 [*] Missing return type annotation for public 
     |
     = help: Add return type annotation: `int`
 
-116 116 |         return 1
-117 117 | 
-118 118 | 
-119     |-def func(x: int):
-    119 |+def func(x: int) -> int:
-120 120 |     try:
-121 121 |         pass
-122 122 |     except:
-
-    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 auto_return_type.py:128:5: ANN201 [*] Missing return type annotation for public function `func`
     |
@@ -448,16 +211,6 @@ auto_return_type.py:128:5: ANN201 [*] Missing return type annotation for public 
     |
     = help: Add return type annotation: `int`
 
-125 125 |         return 2
-126 126 | 
-127 127 | 
-128     |-def func(x: int):
-    128 |+def func(x: int) -> int:
-129 129 |     try:
-130 130 |         pass
-131 131 |     except:
-
-    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 auto_return_type.py:137:5: ANN201 [*] Missing return type annotation for public function `func`
     |
@@ -468,21 +221,6 @@ auto_return_type.py:137:5: ANN201 [*] Missing return type annotation for public 
     |
     = help: Add return type annotation: `Optional[int]`
 
-    1   |+from typing import Optional
-1   2   | def func():
-2   3   |     return 1
-3   4   | 
---------------------------------------------------------------------------------
-134 135 |         return 2
-135 136 | 
-136 137 | 
-137     |-def func(x: int):
-    138 |+def func(x: int) -> Optional[int]:
-138 139 |     try:
-139 140 |         return 1
-140 141 |     except:
-
-    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 auto_return_type.py:146:5: ANN201 [*] Missing return type annotation for public function `func`
     |
@@ -493,21 +231,6 @@ auto_return_type.py:146:5: ANN201 [*] Missing return type annotation for public 
     |
     = help: Add return type annotation: `Optional[int]`
 
-    1   |+from typing import Optional
-1   2   | def func():
-2   3   |     return 1
-3   4   | 
---------------------------------------------------------------------------------
-143 144 |         pass
-144 145 | 
-145 146 | 
-146     |-def func(x: int):
-    147 |+def func(x: int) -> Optional[int]:
-147 148 |     while x > 0:
-148 149 |         break
-149 150 |         return 1
-
-    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 auto_return_type.py:158:9: ANN201 Missing return type annotation for public function `method`
     |
@@ -567,16 +290,6 @@ auto_return_type.py:180:9: ANN201 [*] Missing return type annotation for public 
     |
     = help: Add return type annotation: `float`
 
-177 177 |         pass
-178 178 | 
-179 179 |     @abstractmethod
-180     |-    def method(self):
-    180 |+    def method(self) -> float:
-181 181 |         if self.x > 0:
-182 182 |             return 1
-183 183 |         else:
-
-    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 auto_return_type.py:187:5: ANN201 [*] Missing return type annotation for public function `func`
     |
@@ -587,24 +300,6 @@ auto_return_type.py:187:5: ANN201 [*] Missing return type annotation for public 
     |
     = help: Add return type annotation: `Optional[int]`
 
-151 151 | 
-152 152 | import abc
-153 153 | from abc import abstractmethod
-    154 |+from typing import Optional
-154 155 | 
-155 156 | 
-156 157 | class Foo(abc.ABC):
---------------------------------------------------------------------------------
-184 185 |             return 1.5
-185 186 | 
-186 187 | 
-187     |-def func(x: int):
-    188 |+def func(x: int) -> Optional[int]:
-188 189 |     try:
-189 190 |         pass
-190 191 |     except:
-
-    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 auto_return_type.py:194:5: ANN201 [*] Missing return type annotation for public function `func`
     |
@@ -615,16 +310,6 @@ auto_return_type.py:194:5: ANN201 [*] Missing return type annotation for public 
     |
     = help: Add return type annotation: `int`
 
-191 191 |         return 2
-192 192 | 
-193 193 | 
-194     |-def func(x: int):
-    194 |+def func(x: int) -> int:
-195 195 |     try:
-196 196 |         pass
-197 197 |     except:
-
-    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 auto_return_type.py:203:5: ANN201 [*] Missing return type annotation for public function `func`
     |
@@ -635,24 +320,6 @@ auto_return_type.py:203:5: ANN201 [*] Missing return type annotation for public 
     |
     = help: Add return type annotation: `NoReturn`
 
-151 151 | 
-152 152 | import abc
-153 153 | from abc import abstractmethod
-    154 |+from typing import NoReturn
-154 155 | 
-155 156 | 
-156 157 | class Foo(abc.ABC):
---------------------------------------------------------------------------------
-200 201 |         return 3
-201 202 | 
-202 203 | 
-203     |-def func(x: int):
-    204 |+def func(x: int) -> NoReturn:
-204 205 |     if not x:
-205 206 |         raise ValueError
-206 207 |     else:
-
-    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 auto_return_type.py:210:5: ANN201 [*] Missing return type annotation for public function `func`
     |
@@ -663,16 +330,6 @@ auto_return_type.py:210:5: ANN201 [*] Missing return type annotation for public 
     |
     = help: Add return type annotation: `int`
 
-207 207 |         raise TypeError
-208 208 | 
-209 209 | 
-210     |-def func(x: int):
-    210 |+def func(x: int) -> int:
-211 211 |     if not x:
-212 212 |         raise ValueError
-213 213 |     else:
-
-    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 auto_return_type.py:234:5: ANN201 [*] Missing return type annotation for public function `func`
     |
@@ -683,16 +340,6 @@ auto_return_type.py:234:5: ANN201 [*] Missing return type annotation for public 
     |
     = help: Add return type annotation: `int`
 
-231 231 |     return i
-232 232 | 
-233 233 | 
-234     |-def func(x: int):
-    234 |+def func(x: int) -> int:
-235 235 |     if not x:
-236 236 |         return 1
-237 237 |     raise ValueError
-
-    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 auto_return_type.py:240:5: ANN201 [*] Missing return type annotation for public function `func`
     |
@@ -703,16 +350,6 @@ auto_return_type.py:240:5: ANN201 [*] Missing return type annotation for public 
     |
     = help: Add return type annotation: `int`
 
-237 237 |     raise ValueError
-238 238 | 
-239 239 | 
-240     |-def func(x: int):
-    240 |+def func(x: int) -> int:
-241 241 |     if not x:
-242 242 |         return 1
-243 243 |     else:
-
-    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 auto_return_type.py:248:5: ANN201 [*] Missing return type annotation for public function `func`
     |
@@ -723,25 +360,6 @@ auto_return_type.py:248:5: ANN201 [*] Missing return type annotation for public 
     |
     = help: Add return type annotation: `Optional[int]`
 
-214 214 |         return 1
-215 215 | 
-216 216 | 
-217     |-from typing import overload
-    217 |+from typing import overload, Optional
-218 218 | 
-219 219 | 
-220 220 | @overload
---------------------------------------------------------------------------------
-245 245 |     raise ValueError
-246 246 | 
-247 247 | 
-248     |-def func():
-    248 |+def func() -> Optional[int]:
-249 249 |     try:
-250 250 |         raise ValueError
-251 251 |     except:
-
-    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 auto_return_type.py:255:5: ANN201 [*] Missing return type annotation for public function `func`
     |
@@ -752,25 +370,6 @@ auto_return_type.py:255:5: ANN201 [*] Missing return type annotation for public 
     |
     = help: Add return type annotation: `Optional[int]`
 
-214 214 |         return 1
-215 215 | 
-216 216 | 
-217     |-from typing import overload
-    217 |+from typing import overload, Optional
-218 218 | 
-219 219 | 
-220 220 | @overload
---------------------------------------------------------------------------------
-252 252 |         return 2
-253 253 | 
-254 254 | 
-255     |-def func():
-    255 |+def func() -> Optional[int]:
-256 256 |     try:
-257 257 |         return 1
-258 258 |     except:
-
-    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 auto_return_type.py:262:5: ANN201 [*] Missing return type annotation for public function `func`
     |
@@ -781,16 +380,6 @@ auto_return_type.py:262:5: ANN201 [*] Missing return type annotation for public 
     |
     = help: Add return type annotation: `int`
 
-259 259 |         pass
-260 260 | 
-261 261 | 
-262     |-def func(x: int):
-    262 |+def func(x: int) -> int:
-263 263 |     for _ in range(3):
-264 264 |         if x > 0:
-265 265 |             return 1
-
-    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 auto_return_type.py:269:5: ANN201 [*] Missing return type annotation for public function `func`
     |
@@ -801,16 +390,6 @@ auto_return_type.py:269:5: ANN201 [*] Missing return type annotation for public 
     |
     = help: Add return type annotation: `None`
 
-266 266 |     raise ValueError
-267 267 | 
-268 268 | 
-269     |-def func(x: int):
-    269 |+def func(x: int) -> None:
-270 270 |     if x > 5:
-271 271 |         raise ValueError
-272 272 |     else:
-
-    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 auto_return_type.py:276:5: ANN201 [*] Missing return type annotation for public function `func`
     |
@@ -821,16 +400,6 @@ auto_return_type.py:276:5: ANN201 [*] Missing return type annotation for public 
     |
     = help: Add return type annotation: `None`
 
-273 273 |         pass
-274 274 | 
-275 275 | 
-276     |-def func(x: int):
-    276 |+def func(x: int) -> None:
-277 277 |     if x > 5:
-278 278 |         raise ValueError
-279 279 |     elif x > 10:
-
-    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 auto_return_type.py:283:5: ANN201 [*] Missing return type annotation for public function `func`
     |
@@ -841,25 +410,6 @@ auto_return_type.py:283:5: ANN201 [*] Missing return type annotation for public 
     |
     = help: Add return type annotation: `Optional[int]`
 
-214 214 |         return 1
-215 215 | 
-216 216 | 
-217     |-from typing import overload
-    217 |+from typing import overload, Optional
-218 218 | 
-219 219 | 
-220 220 | @overload
---------------------------------------------------------------------------------
-280 280 |         pass
-281 281 | 
-282 282 | 
-283     |-def func(x: int):
-    283 |+def func(x: int) -> Optional[int]:
-284 284 |     if x > 5:
-285 285 |         raise ValueError
-286 286 |     elif x > 10:
-
-    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 auto_return_type.py:290:5: ANN201 [*] Missing return type annotation for public function `func`
     |
@@ -870,16 +420,6 @@ auto_return_type.py:290:5: ANN201 [*] Missing return type annotation for public 
     |
     = help: Add return type annotation: `int`
 
-287 287 |         return 5
-288 288 | 
-289 289 | 
-290     |-def func():
-    290 |+def func() -> int:
-291 291 |     try:
-292 292 |         return 5
-293 293 |     except:
-
-    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 auto_return_type.py:299:5: ANN201 [*] Missing return type annotation for public function `func`
     |
@@ -889,23 +429,3 @@ auto_return_type.py:299:5: ANN201 [*] Missing return type annotation for public 
 301 |         case [1, 2, 3]:
     |
     = help: Add return type annotation: `Union[str | int]`
-
-214 214 |         return 1
-215 215 | 
-216 216 | 
-217     |-from typing import overload
-    217 |+from typing import overload, Union
-218 218 | 
-219 219 | 
-220 220 | @overload
---------------------------------------------------------------------------------
-296 296 |     raise ValueError
-297 297 | 
-298 298 | 
-299     |-def func(x: int):
-    299 |+def func(x: int) -> Union[str | int]:
-300 300 |     match x:
-301 301 |         case [1, 2, 3]:
-302 302 |             return 1
-
-    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.

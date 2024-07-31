@@ -11,14 +11,6 @@ PIE810.py:2:1: PIE810 [*] Call `startswith` once with a `tuple`
   |
   = help: Merge into a single `startswith` call
 
-1 1 | # error
-2   |-obj.startswith("foo") or obj.startswith("bar")
-  2 |+obj.startswith(("foo", "bar"))
-3 3 | # error
-4 4 | obj.endswith("foo") or obj.endswith("bar")
-5 5 | # error
-
-    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 PIE810.py:4:1: PIE810 [*] Call `endswith` once with a `tuple`
   |
@@ -31,16 +23,6 @@ PIE810.py:4:1: PIE810 [*] Call `endswith` once with a `tuple`
   |
   = help: Merge into a single `endswith` call
 
-1 1 | # error
-2 2 | obj.startswith("foo") or obj.startswith("bar")
-3 3 | # error
-4   |-obj.endswith("foo") or obj.endswith("bar")
-  4 |+obj.endswith(("foo", "bar"))
-5 5 | # error
-6 6 | obj.startswith(foo) or obj.startswith(bar)
-7 7 | # error
-
-    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 PIE810.py:6:1: PIE810 [*] Call `startswith` once with a `tuple`
   |
@@ -53,16 +35,6 @@ PIE810.py:6:1: PIE810 [*] Call `startswith` once with a `tuple`
   |
   = help: Merge into a single `startswith` call
 
-3 3 | # error
-4 4 | obj.endswith("foo") or obj.endswith("bar")
-5 5 | # error
-6   |-obj.startswith(foo) or obj.startswith(bar)
-  6 |+obj.startswith((foo, bar))
-7 7 | # error
-8 8 | obj.startswith(foo) or obj.startswith("foo")
-9 9 | # error
-
-    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 PIE810.py:8:1: PIE810 [*] Call `startswith` once with a `tuple`
    |
@@ -75,16 +47,6 @@ PIE810.py:8:1: PIE810 [*] Call `startswith` once with a `tuple`
    |
    = help: Merge into a single `startswith` call
 
-5 5 | # error
-6 6 | obj.startswith(foo) or obj.startswith(bar)
-7 7 | # error
-8   |-obj.startswith(foo) or obj.startswith("foo")
-  8 |+obj.startswith((foo, "foo"))
-9 9 | # error
-10 10 | obj.endswith(foo) or obj.startswith(foo) or obj.startswith("foo")
-11 11 | 
-
-    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 PIE810.py:10:1: PIE810 [*] Call `startswith` once with a `tuple`
    |
@@ -97,16 +59,6 @@ PIE810.py:10:1: PIE810 [*] Call `startswith` once with a `tuple`
    |
    = help: Merge into a single `startswith` call
 
-7  7  | # error
-8  8  | obj.startswith(foo) or obj.startswith("foo")
-9  9  | # error
-10    |-obj.endswith(foo) or obj.startswith(foo) or obj.startswith("foo")
-   10 |+obj.endswith(foo) or obj.startswith((foo, "foo"))
-11 11 | 
-12 12 | def func():
-13 13 |     msg = "hello world"
-
-    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 PIE810.py:19:8: PIE810 [*] Call `startswith` once with a `tuple`
    |
@@ -118,16 +70,6 @@ PIE810.py:19:8: PIE810 [*] Call `startswith` once with a `tuple`
    |
    = help: Merge into a single `startswith` call
 
-16 16 |     y = ("h", "e", "l", "l", "o")  
-17 17 |     z = "w"
-18 18 | 
-19    |-    if msg.startswith(x) or msg.startswith(y) or msg.startswith(z): # Error
-   19 |+    if msg.startswith((x, z)) or msg.startswith(y): # Error
-20 20 |         print("yes") 
-21 21 | 
-22 22 | def func():
-
-    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 PIE810.py:25:8: PIE810 [*] Call `startswith` once with a `tuple`
    |
@@ -138,14 +80,3 @@ PIE810.py:25:8: PIE810 [*] Call `startswith` once with a `tuple`
 26 |         print("yes") 
    |
    = help: Merge into a single `startswith` call
-
-22 22 | def func():
-23 23 |     msg = "hello world"
-24 24 | 
-25    |-    if msg.startswith(("h", "e", "l", "l", "o")) or msg.startswith("h") or msg.startswith("w"): # Error
-   25 |+    if msg.startswith(("h", "e", "l", "l", "o", "h", "w")): # Error
-26 26 |         print("yes") 
-27 27 | 
-28 28 | # ok
-
-    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.

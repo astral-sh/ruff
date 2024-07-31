@@ -80,21 +80,6 @@ NPY201.py:12:5: NPY201 [*] `np.byte_bounds` will be removed in NumPy 2.0. Use `n
    |
    = help: Replace with `numpy.lib.array_utils.byte_bounds` (requires NumPy 2.0 or greater)
 
-   1  |+from numpy.lib.array_utils import byte_bounds
-1  2  | def func():
-2  3  |     import numpy as np
-3  4  | 
---------------------------------------------------------------------------------
-9  10 | 
-10 11 |     np.asfarray([1,2,3])
-11 12 | 
-12    |-    np.byte_bounds(np.array([1,2,3]))
-   13 |+    byte_bounds(np.array([1,2,3]))
-13 14 | 
-14 15 |     np.cast
-15 16 | 
-
-    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 NPY201.py:14:5: NPY201 `np.cast` will be removed in NumPy 2.0. Use `np.asarray(arr, dtype=dtype)` instead.
    |

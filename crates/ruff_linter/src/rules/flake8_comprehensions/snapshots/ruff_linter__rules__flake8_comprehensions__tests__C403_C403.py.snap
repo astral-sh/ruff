@@ -10,13 +10,6 @@ C403.py:1:5: C403 [*] Unnecessary `list` comprehension (rewrite as a `set` compr
   |
   = help: Rewrite as a `set` comprehension
 
-1   |-s = set([x for x in range(3)])
-  1 |+s = {x for x in range(3)}
-2 2 | s = set(
-3 3 |     [x for x in range(3)]
-4 4 | )
-
-    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 C403.py:2:5: C403 [*] Unnecessary `list` comprehension (rewrite as a `set` comprehension)
   |
@@ -31,18 +24,6 @@ C403.py:2:5: C403 [*] Unnecessary `list` comprehension (rewrite as a `set` compr
   |
   = help: Rewrite as a `set` comprehension
 
-1 1 | s = set([x for x in range(3)])
-2   |-s = set(
-3   |-    [x for x in range(3)]
-4   |-)
-  2 |+s = {
-  3 |+    x for x in range(3)
-  4 |+}
-5 5 | 
-6 6 | s = f"{set([x for x in 'ab'])}"
-7 7 | s = f'{set([x for x in "ab"])}'
-
-    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 C403.py:6:8: C403 [*] Unnecessary `list` comprehension (rewrite as a `set` comprehension)
   |
@@ -54,16 +35,6 @@ C403.py:6:8: C403 [*] Unnecessary `list` comprehension (rewrite as a `set` compr
   |
   = help: Rewrite as a `set` comprehension
 
-3 3 |     [x for x in range(3)]
-4 4 | )
-5 5 | 
-6   |-s = f"{set([x for x in 'ab'])}"
-  6 |+s = f"{ {x for x in 'ab'} }"
-7 7 | s = f'{set([x for x in "ab"])}'
-8 8 | 
-9 9 | def f(x):
-
-    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 C403.py:7:8: C403 [*] Unnecessary `list` comprehension (rewrite as a `set` comprehension)
   |
@@ -75,16 +46,6 @@ C403.py:7:8: C403 [*] Unnecessary `list` comprehension (rewrite as a `set` compr
   |
   = help: Rewrite as a `set` comprehension
 
-4 4 | )
-5 5 | 
-6 6 | s = f"{set([x for x in 'ab'])}"
-7   |-s = f'{set([x for x in "ab"])}'
-  7 |+s = f'{ {x for x in "ab"} }'
-8 8 | 
-9 9 | def f(x):
-10 10 |     return x
-
-    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 C403.py:12:8: C403 [*] Unnecessary `list` comprehension (rewrite as a `set` comprehension)
    |
@@ -97,16 +58,6 @@ C403.py:12:8: C403 [*] Unnecessary `list` comprehension (rewrite as a `set` comp
    |
    = help: Rewrite as a `set` comprehension
 
-9  9  | def f(x):
-10 10 |     return x
-11 11 | 
-12    |-s = f"{set([f(x) for x in 'ab'])}"
-   12 |+s = f"{ {f(x) for x in 'ab'} }"
-13 13 | 
-14 14 | s = f"{ set([x for x in 'ab']) | set([x for x in 'ab']) }"
-15 15 | s = f"{set([x for x in 'ab']) | set([x for x in 'ab'])}"
-
-    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 C403.py:14:9: C403 [*] Unnecessary `list` comprehension (rewrite as a `set` comprehension)
    |
@@ -118,16 +69,6 @@ C403.py:14:9: C403 [*] Unnecessary `list` comprehension (rewrite as a `set` comp
    |
    = help: Rewrite as a `set` comprehension
 
-11 11 | 
-12 12 | s = f"{set([f(x) for x in 'ab'])}"
-13 13 | 
-14    |-s = f"{ set([x for x in 'ab']) | set([x for x in 'ab']) }"
-   14 |+s = f"{ {x for x in 'ab'} | set([x for x in 'ab']) }"
-15 15 | s = f"{set([x for x in 'ab']) | set([x for x in 'ab'])}"
-16 16 | 
-17 17 | s = set(  # comment
-
-    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 C403.py:14:34: C403 [*] Unnecessary `list` comprehension (rewrite as a `set` comprehension)
    |
@@ -139,16 +80,6 @@ C403.py:14:34: C403 [*] Unnecessary `list` comprehension (rewrite as a `set` com
    |
    = help: Rewrite as a `set` comprehension
 
-11 11 | 
-12 12 | s = f"{set([f(x) for x in 'ab'])}"
-13 13 | 
-14    |-s = f"{ set([x for x in 'ab']) | set([x for x in 'ab']) }"
-   14 |+s = f"{ set([x for x in 'ab']) | {x for x in 'ab'} }"
-15 15 | s = f"{set([x for x in 'ab']) | set([x for x in 'ab'])}"
-16 16 | 
-17 17 | s = set(  # comment
-
-    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 C403.py:15:8: C403 [*] Unnecessary `list` comprehension (rewrite as a `set` comprehension)
    |
@@ -160,16 +91,6 @@ C403.py:15:8: C403 [*] Unnecessary `list` comprehension (rewrite as a `set` comp
    |
    = help: Rewrite as a `set` comprehension
 
-12 12 | s = f"{set([f(x) for x in 'ab'])}"
-13 13 | 
-14 14 | s = f"{ set([x for x in 'ab']) | set([x for x in 'ab']) }"
-15    |-s = f"{set([x for x in 'ab']) | set([x for x in 'ab'])}"
-   15 |+s = f"{ {x for x in 'ab'} | set([x for x in 'ab'])}"
-16 16 | 
-17 17 | s = set(  # comment
-18 18 |     [x for x in range(3)]
-
-    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 C403.py:15:33: C403 [*] Unnecessary `list` comprehension (rewrite as a `set` comprehension)
    |
@@ -181,16 +102,6 @@ C403.py:15:33: C403 [*] Unnecessary `list` comprehension (rewrite as a `set` com
    |
    = help: Rewrite as a `set` comprehension
 
-12 12 | s = f"{set([f(x) for x in 'ab'])}"
-13 13 | 
-14 14 | s = f"{ set([x for x in 'ab']) | set([x for x in 'ab']) }"
-15    |-s = f"{set([x for x in 'ab']) | set([x for x in 'ab'])}"
-   15 |+s = f"{set([x for x in 'ab']) | {x for x in 'ab'} }"
-16 16 | 
-17 17 | s = set(  # comment
-18 18 |     [x for x in range(3)]
-
-    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 C403.py:17:5: C403 [*] Unnecessary `list` comprehension (rewrite as a `set` comprehension)
    |
@@ -206,20 +117,6 @@ C403.py:17:5: C403 [*] Unnecessary `list` comprehension (rewrite as a `set` comp
    |
    = help: Rewrite as a `set` comprehension
 
-14 14 | s = f"{ set([x for x in 'ab']) | set([x for x in 'ab']) }"
-15 15 | s = f"{set([x for x in 'ab']) | set([x for x in 'ab'])}"
-16 16 | 
-17    |-s = set(  # comment
-18    |-    [x for x in range(3)]
-19    |-)
-   17 |+s = {  # comment
-   18 |+    x for x in range(3)
-   19 |+}
-20 20 | 
-21 21 | s = set([  # comment
-22 22 |     x for x in range(3)
-
-    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 C403.py:21:5: C403 [*] Unnecessary `list` comprehension (rewrite as a `set` comprehension)
    |
@@ -232,14 +129,3 @@ C403.py:21:5: C403 [*] Unnecessary `list` comprehension (rewrite as a `set` comp
    | |__^ C403
    |
    = help: Rewrite as a `set` comprehension
-
-18 18 |     [x for x in range(3)]
-19 19 | )
-20 20 | 
-21    |-s = set([  # comment
-   21 |+s = {  # comment
-22 22 |     x for x in range(3)
-23    |-])
-   23 |+}
-
-    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.

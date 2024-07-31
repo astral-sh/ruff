@@ -8,15 +8,6 @@ __init__.py:19:8: F401 [*] `sys` imported but unused
    |
    = help: Remove unused import: `sys`
 
-16 16 | import argparse as argparse  # Ok: is redundant alias
-17 17 | 
-18 18 | 
-19    |-import sys  # F401: remove unused
-20 19 | 
-21 20 | 
-22 21 | # first-party
-
-    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 __init__.py:33:15: F401 [*] `.unused` imported but unused; consider removing, adding to `__all__`, or using a redundant alias
    |
@@ -25,15 +16,6 @@ __init__.py:33:15: F401 [*] `.unused` imported but unused; consider removing, ad
    |
    = help: Remove unused import: `.unused`
 
-30 30 | from . import aliased as aliased  # Ok: is redundant alias
-31 31 | 
-32 32 | 
-33    |-from . import unused  # F401: change to redundant alias
-34 33 | 
-35 34 | 
-36 35 | from . import renamed as bees  # F401: no fix
-
-    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 __init__.py:36:26: F401 [*] `.renamed` imported but unused; consider removing, adding to `__all__`, or using a redundant alias
    |
@@ -41,10 +23,3 @@ __init__.py:36:26: F401 [*] `.renamed` imported but unused; consider removing, a
    |                          ^^^^ F401
    |
    = help: Remove unused import: `.renamed`
-
-33 33 | from . import unused  # F401: change to redundant alias
-34 34 | 
-35 35 | 
-36    |-from . import renamed as bees  # F401: no fix
-
-    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.

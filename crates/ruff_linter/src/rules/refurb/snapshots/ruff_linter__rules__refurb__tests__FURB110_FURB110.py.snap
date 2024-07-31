@@ -80,16 +80,6 @@ FURB110.py:10:5: FURB110 [*] Replace ternary `if` expression with `or` operator
    |
    = help: Replace with `or` operator
 
-7  7  |     else  \
-8  8  |         y  # FURB110
-9  9  | 
-10    |-z = x() if x() else y()  # FURB110
-   10 |+z = x() or y()  # FURB110
-11 11 | 
-12 12 | # FURB110
-13 13 | z = x if (
-
-    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 FURB110.py:13:5: FURB110 [*] Replace ternary `if` expression with `or` operator
    |

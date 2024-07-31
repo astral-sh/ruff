@@ -10,15 +10,6 @@ F841_3.py:5:5: F841 [*] Local variable `x` is assigned to but never used
   |
   = help: Remove assignment to unused variable `x`
 
-2 2 | 
-3 3 | 
-4 4 | def f():
-5   |-    x = 1
-6 5 |     y = 2
-7 6 | 
-8 7 |     z = 3
-
-    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 F841_3.py:6:5: F841 [*] Local variable `y` is assigned to but never used
   |
@@ -31,15 +22,6 @@ F841_3.py:6:5: F841 [*] Local variable `y` is assigned to but never used
   |
   = help: Remove assignment to unused variable `y`
 
-3 3 | 
-4 4 | def f():
-5 5 |     x = 1
-6   |-    y = 2
-7 6 | 
-8 7 |     z = 3
-9 8 |     print(z)
-
-    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 F841_3.py:13:5: F841 [*] Local variable `x` is assigned to but never used
    |
@@ -50,15 +32,6 @@ F841_3.py:13:5: F841 [*] Local variable `x` is assigned to but never used
    |
    = help: Remove assignment to unused variable `x`
 
-10 10 | 
-11 11 | 
-12 12 | def f():
-13    |-    x: int = 1
-14 13 |     y: int = 2
-15 14 | 
-16 15 |     z: int = 3
-
-    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 F841_3.py:14:5: F841 [*] Local variable `y` is assigned to but never used
    |
@@ -71,15 +44,6 @@ F841_3.py:14:5: F841 [*] Local variable `y` is assigned to but never used
    |
    = help: Remove assignment to unused variable `y`
 
-11 11 | 
-12 12 | def f():
-13 13 |     x: int = 1
-14    |-    y: int = 2
-15 14 | 
-16 15 |     z: int = 3
-17 16 |     print(z)
-
-    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 F841_3.py:21:19: F841 [*] Local variable `x1` is assigned to but never used
    |
@@ -90,16 +54,6 @@ F841_3.py:21:19: F841 [*] Local variable `x1` is assigned to but never used
    |
    = help: Remove assignment to unused variable `x1`
 
-18 18 | 
-19 19 | 
-20 20 | def f():
-21    |-    with foo() as x1:
-   21 |+    with foo():
-22 22 |         pass
-23 23 | 
-24 24 |     with foo() as (x2, y2):
-
-    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 F841_3.py:27:20: F841 [*] Local variable `x3` is assigned to but never used
    |
@@ -111,16 +65,6 @@ F841_3.py:27:20: F841 [*] Local variable `x3` is assigned to but never used
    |
    = help: Remove assignment to unused variable `x3`
 
-24 24 |     with foo() as (x2, y2):
-25 25 |         pass
-26 26 | 
-27    |-    with (foo() as x3, foo() as y3, foo() as z3):
-   27 |+    with (foo(), foo() as y3, foo() as z3):
-28 28 |         pass
-29 29 | 
-30 30 | 
-
-    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 F841_3.py:27:33: F841 [*] Local variable `y3` is assigned to but never used
    |
@@ -132,16 +76,6 @@ F841_3.py:27:33: F841 [*] Local variable `y3` is assigned to but never used
    |
    = help: Remove assignment to unused variable `y3`
 
-24 24 |     with foo() as (x2, y2):
-25 25 |         pass
-26 26 | 
-27    |-    with (foo() as x3, foo() as y3, foo() as z3):
-   27 |+    with (foo() as x3, foo(), foo() as z3):
-28 28 |         pass
-29 29 | 
-30 30 | 
-
-    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 F841_3.py:27:46: F841 [*] Local variable `z3` is assigned to but never used
    |
@@ -153,16 +87,6 @@ F841_3.py:27:46: F841 [*] Local variable `z3` is assigned to but never used
    |
    = help: Remove assignment to unused variable `z3`
 
-24 24 |     with foo() as (x2, y2):
-25 25 |         pass
-26 26 | 
-27    |-    with (foo() as x3, foo() as y3, foo() as z3):
-   27 |+    with (foo() as x3, foo() as y3, foo()):
-28 28 |         pass
-29 29 | 
-30 30 | 
-
-    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 F841_3.py:32:6: F841 [*] Local variable `x1` is assigned to but never used
    |
@@ -174,16 +98,6 @@ F841_3.py:32:6: F841 [*] Local variable `x1` is assigned to but never used
    |
    = help: Remove assignment to unused variable `x1`
 
-29 29 | 
-30 30 | 
-31 31 | def f():
-32    |-    (x1, y1) = (1, 2)
-   32 |+    (_x1, y1) = (1, 2)
-33 33 |     (x2, y2) = coords2 = (1, 2)
-34 34 |     coords3 = (x3, y3) = (1, 2)
-35 35 | 
-
-    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 F841_3.py:32:10: F841 [*] Local variable `y1` is assigned to but never used
    |
@@ -195,16 +109,6 @@ F841_3.py:32:10: F841 [*] Local variable `y1` is assigned to but never used
    |
    = help: Remove assignment to unused variable `y1`
 
-29 29 | 
-30 30 | 
-31 31 | def f():
-32    |-    (x1, y1) = (1, 2)
-   32 |+    (x1, _y1) = (1, 2)
-33 33 |     (x2, y2) = coords2 = (1, 2)
-34 34 |     coords3 = (x3, y3) = (1, 2)
-35 35 | 
-
-    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 F841_3.py:33:16: F841 [*] Local variable `coords2` is assigned to but never used
    |
@@ -216,16 +120,6 @@ F841_3.py:33:16: F841 [*] Local variable `coords2` is assigned to but never used
    |
    = help: Remove assignment to unused variable `coords2`
 
-30 30 | 
-31 31 | def f():
-32 32 |     (x1, y1) = (1, 2)
-33    |-    (x2, y2) = coords2 = (1, 2)
-   33 |+    (x2, y2) = (1, 2)
-34 34 |     coords3 = (x3, y3) = (1, 2)
-35 35 | 
-36 36 | 
-
-    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 F841_3.py:34:5: F841 [*] Local variable `coords3` is assigned to but never used
    |
@@ -236,16 +130,6 @@ F841_3.py:34:5: F841 [*] Local variable `coords3` is assigned to but never used
    |
    = help: Remove assignment to unused variable `coords3`
 
-31 31 | def f():
-32 32 |     (x1, y1) = (1, 2)
-33 33 |     (x2, y2) = coords2 = (1, 2)
-34    |-    coords3 = (x3, y3) = (1, 2)
-   34 |+    (x3, y3) = (1, 2)
-35 35 | 
-36 36 | 
-37 37 | def f():
-
-    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 F841_3.py:40:26: F841 [*] Local variable `x1` is assigned to but never used
    |
@@ -299,16 +183,6 @@ F841_3.py:50:5: F841 [*] Local variable `x` is assigned to but never used
    |
    = help: Remove assignment to unused variable `x`
 
-47 47 | 
-48 48 | 
-49 49 | def f(a, b):
-50    |-    x = (
-   50 |+    (
-51 51 |         a()
-52 52 |         if a is not None
-53 53 |         else b
-
-    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 F841_3.py:56:5: F841 [*] Local variable `y` is assigned to but never used
    |
@@ -320,17 +194,6 @@ F841_3.py:56:5: F841 [*] Local variable `y` is assigned to but never used
    |
    = help: Remove assignment to unused variable `y`
 
-53 53 |         else b
-54 54 |     )
-55 55 | 
-56    |-    y = \
-57    |-        a() if a is not None else b
-   56 |+    a() if a is not None else b
-58 57 | 
-59 58 | 
-60 59 | def f(a, b):
-
-    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 F841_3.py:61:5: F841 [*] Local variable `x` is assigned to but never used
    |
@@ -342,19 +205,6 @@ F841_3.py:61:5: F841 [*] Local variable `x` is assigned to but never used
    |
    = help: Remove assignment to unused variable `x`
 
-58 58 | 
-59 59 | 
-60 60 | def f(a, b):
-61    |-    x = (
-62    |-        a
-63    |-        if a is not None
-64    |-        else b
-65    |-    )
-66 61 | 
-67 62 |     y = \
-68 63 |         a if a is not None else b
-
-    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 F841_3.py:67:5: F841 [*] Local variable `y` is assigned to but never used
    |
@@ -366,16 +216,6 @@ F841_3.py:67:5: F841 [*] Local variable `y` is assigned to but never used
    |
    = help: Remove assignment to unused variable `y`
 
-64 64 |         else b
-65 65 |     )
-66 66 | 
-67    |-    y = \
-68    |-        a if a is not None else b
-69 67 | 
-70 68 | 
-71 69 | def f():
-
-    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 F841_3.py:72:24: F841 [*] Local variable `cm` is assigned to but never used
    |
@@ -386,16 +226,6 @@ F841_3.py:72:24: F841 [*] Local variable `cm` is assigned to but never used
    |
    = help: Remove assignment to unused variable `cm`
 
-69 69 | 
-70 70 | 
-71 71 | def f():
-72    |-    with Nested(m) as (cm):
-   72 |+    with Nested(m):
-73 73 |         pass
-74 74 | 
-75 75 | 
-
-    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 F841_3.py:77:25: F841 [*] Local variable `cm` is assigned to but never used
    |
@@ -406,16 +236,6 @@ F841_3.py:77:25: F841 [*] Local variable `cm` is assigned to but never used
    |
    = help: Remove assignment to unused variable `cm`
 
-74 74 | 
-75 75 | 
-76 76 | def f():
-77    |-    with (Nested(m) as (cm),):
-   77 |+    with (Nested(m),):
-78 78 |         pass
-79 79 | 
-80 80 | 
-
-    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 F841_3.py:87:26: F841 [*] Local variable `cm` is assigned to but never used
    |
@@ -426,16 +246,6 @@ F841_3.py:87:26: F841 [*] Local variable `cm` is assigned to but never used
    |
    = help: Remove assignment to unused variable `cm`
 
-84 84 | 
-85 85 | 
-86 86 | def f():
-87    |-    with (Nested(m)) as (cm):
-   87 |+    with (Nested(m)):
-88 88 |         pass
-89 89 | 
-90 90 | 
-
-    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 F841_3.py:92:5: F841 [*] Local variable `toplevel` is assigned to but never used
    |
@@ -447,16 +257,6 @@ F841_3.py:92:5: F841 [*] Local variable `toplevel` is assigned to but never used
    |
    = help: Remove assignment to unused variable `toplevel`
 
-89 89 | 
-90 90 | 
-91 91 | def f():
-92    |-    toplevel = tt = lexer.get_token()
-   92 |+    tt = lexer.get_token()
-93 93 |     if not tt:
-94 94 |         break
-95 95 | 
-
-    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 F841_3.py:98:5: F841 [*] Local variable `toplevel` is assigned to but never used
    |
@@ -466,16 +266,6 @@ F841_3.py:98:5: F841 [*] Local variable `toplevel` is assigned to but never used
    |
    = help: Remove assignment to unused variable `toplevel`
 
-95 95 | 
-96 96 | 
-97 97 | def f():
-98    |-    toplevel = tt = lexer.get_token()
-   98 |+    tt = lexer.get_token()
-99 99 | 
-100 100 | 
-101 101 | def f():
-
-    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 F841_3.py:98:16: F841 [*] Local variable `tt` is assigned to but never used
    |
@@ -485,16 +275,6 @@ F841_3.py:98:16: F841 [*] Local variable `tt` is assigned to but never used
    |
    = help: Remove assignment to unused variable `tt`
 
-95 95 | 
-96 96 | 
-97 97 | def f():
-98    |-    toplevel = tt = lexer.get_token()
-   98 |+    toplevel = lexer.get_token()
-99 99 | 
-100 100 | 
-101 101 | def f():
-
-    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 F841_3.py:102:5: F841 [*] Local variable `toplevel` is assigned to but never used
     |
@@ -504,16 +284,6 @@ F841_3.py:102:5: F841 [*] Local variable `toplevel` is assigned to but never use
     |
     = help: Remove assignment to unused variable `toplevel`
 
-99  99  | 
-100 100 | 
-101 101 | def f():
-102     |-    toplevel = (a, b) = lexer.get_token()
-    102 |+    (a, b) = lexer.get_token()
-103 103 | 
-104 104 | 
-105 105 | def f():
-
-    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 F841_3.py:106:14: F841 [*] Local variable `toplevel` is assigned to but never used
     |
@@ -523,16 +293,6 @@ F841_3.py:106:14: F841 [*] Local variable `toplevel` is assigned to but never us
     |
     = help: Remove assignment to unused variable `toplevel`
 
-103 103 | 
-104 104 | 
-105 105 | def f():
-106     |-    (a, b) = toplevel = lexer.get_token()
-    106 |+    (a, b) = lexer.get_token()
-107 107 | 
-108 108 | 
-109 109 | def f():
-
-    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 F841_3.py:110:5: F841 [*] Local variable `toplevel` is assigned to but never used
     |
@@ -542,16 +302,6 @@ F841_3.py:110:5: F841 [*] Local variable `toplevel` is assigned to but never use
     |
     = help: Remove assignment to unused variable `toplevel`
 
-107 107 | 
-108 108 | 
-109 109 | def f():
-110     |-    toplevel = tt = 1
-    110 |+    tt = 1
-111 111 | 
-112 112 | 
-113 113 | def f(provided: int) -> int:
-
-    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 F841_3.py:110:16: F841 [*] Local variable `tt` is assigned to but never used
     |
@@ -561,16 +311,6 @@ F841_3.py:110:16: F841 [*] Local variable `tt` is assigned to but never used
     |
     = help: Remove assignment to unused variable `tt`
 
-107 107 | 
-108 108 | 
-109 109 | def f():
-110     |-    toplevel = tt = 1
-    110 |+    toplevel = 1
-111 111 | 
-112 112 | 
-113 113 | def f(provided: int) -> int:
-
-    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 F841_3.py:115:19: F841 Local variable `x` is assigned to but never used
     |
@@ -662,15 +402,6 @@ F841_3.py:160:5: F841 [*] Local variable `x` is assigned to but never used
     |
     = help: Remove assignment to unused variable `x`
 
-157 157 | 
-158 158 | 
-159 159 | def f():
-160     |-    x = 1
-161 160 |     y = 2
-162 161 | 
-163 162 | 
-
-    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 F841_3.py:161:5: F841 [*] Local variable `y` is assigned to but never used
     |
@@ -681,15 +412,6 @@ F841_3.py:161:5: F841 [*] Local variable `y` is assigned to but never used
     |
     = help: Remove assignment to unused variable `y`
 
-158 158 | 
-159 159 | def f():
-160 160 |     x = 1
-161     |-    y = 2
-162 161 | 
-163 162 | 
-164 163 | def f():
-
-    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 F841_3.py:165:5: F841 [*] Local variable `x` is assigned to but never used
     |
@@ -701,15 +423,6 @@ F841_3.py:165:5: F841 [*] Local variable `x` is assigned to but never used
     |
     = help: Remove assignment to unused variable `x`
 
-162 162 | 
-163 163 | 
-164 164 | def f():
-165     |-    x = 1
-166 165 | 
-167 166 |     y = 2
-168 167 | 
-
-    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 F841_3.py:167:5: F841 [*] Local variable `y` is assigned to but never used
     |
@@ -720,15 +433,6 @@ F841_3.py:167:5: F841 [*] Local variable `y` is assigned to but never used
     |
     = help: Remove assignment to unused variable `y`
 
-164 164 | def f():
-165 165 |     x = 1
-166 166 | 
-167     |-    y = 2
-168 167 | 
-169 168 | 
-170 169 | def f():
-
-    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 F841_3.py:173:6: F841 [*] Local variable `x` is assigned to but never used
     |
@@ -738,11 +442,3 @@ F841_3.py:173:6: F841 [*] Local variable `x` is assigned to but never used
     |      ^ F841
     |
     = help: Remove assignment to unused variable `x`
-
-170 170 | def f():
-171 171 |     (x) = foo()
-172 172 |     ((x)) = foo()
-173     |-    (x) = (y.z) = foo()
-    173 |+    (y.z) = foo()
-
-    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.

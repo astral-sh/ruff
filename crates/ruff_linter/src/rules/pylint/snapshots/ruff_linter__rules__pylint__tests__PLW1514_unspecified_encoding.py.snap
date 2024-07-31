@@ -11,16 +11,6 @@ unspecified_encoding.py:8:1: PLW1514 [*] `open` in text mode without explicit `e
    |
    = help: Add explicit `encoding` argument
 
-5 5 | import codecs
-6 6 | 
-7 7 | # Errors.
-8   |-open("test.txt")
-  8 |+open("test.txt", encoding="utf-8")
-9 9 | io.TextIOWrapper(io.FileIO("test.txt"))
-10 10 | hugo.TextIOWrapper(hugo.FileIO("test.txt"))
-11 11 | tempfile.NamedTemporaryFile("w")
-
-    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 unspecified_encoding.py:9:1: PLW1514 [*] `io.TextIOWrapper` without explicit `encoding` argument
    |
@@ -33,16 +23,6 @@ unspecified_encoding.py:9:1: PLW1514 [*] `io.TextIOWrapper` without explicit `en
    |
    = help: Add explicit `encoding` argument
 
-6  6  | 
-7  7  | # Errors.
-8  8  | open("test.txt")
-9     |-io.TextIOWrapper(io.FileIO("test.txt"))
-   9  |+io.TextIOWrapper(io.FileIO("test.txt"), encoding="utf-8")
-10 10 | hugo.TextIOWrapper(hugo.FileIO("test.txt"))
-11 11 | tempfile.NamedTemporaryFile("w")
-12 12 | tempfile.TemporaryFile("w")
-
-    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 unspecified_encoding.py:10:1: PLW1514 [*] `io.TextIOWrapper` without explicit `encoding` argument
    |
@@ -55,16 +35,6 @@ unspecified_encoding.py:10:1: PLW1514 [*] `io.TextIOWrapper` without explicit `e
    |
    = help: Add explicit `encoding` argument
 
-7  7  | # Errors.
-8  8  | open("test.txt")
-9  9  | io.TextIOWrapper(io.FileIO("test.txt"))
-10    |-hugo.TextIOWrapper(hugo.FileIO("test.txt"))
-   10 |+hugo.TextIOWrapper(hugo.FileIO("test.txt"), encoding="utf-8")
-11 11 | tempfile.NamedTemporaryFile("w")
-12 12 | tempfile.TemporaryFile("w")
-13 13 | codecs.open("test.txt")
-
-    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 unspecified_encoding.py:11:1: PLW1514 [*] `tempfile.NamedTemporaryFile` in text mode without explicit `encoding` argument
    |
@@ -77,16 +47,6 @@ unspecified_encoding.py:11:1: PLW1514 [*] `tempfile.NamedTemporaryFile` in text 
    |
    = help: Add explicit `encoding` argument
 
-8  8  | open("test.txt")
-9  9  | io.TextIOWrapper(io.FileIO("test.txt"))
-10 10 | hugo.TextIOWrapper(hugo.FileIO("test.txt"))
-11    |-tempfile.NamedTemporaryFile("w")
-   11 |+tempfile.NamedTemporaryFile("w", encoding="utf-8")
-12 12 | tempfile.TemporaryFile("w")
-13 13 | codecs.open("test.txt")
-14 14 | tempfile.SpooledTemporaryFile(0, "w")
-
-    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 unspecified_encoding.py:12:1: PLW1514 [*] `tempfile.TemporaryFile` in text mode without explicit `encoding` argument
    |
@@ -99,16 +59,6 @@ unspecified_encoding.py:12:1: PLW1514 [*] `tempfile.TemporaryFile` in text mode 
    |
    = help: Add explicit `encoding` argument
 
-9  9  | io.TextIOWrapper(io.FileIO("test.txt"))
-10 10 | hugo.TextIOWrapper(hugo.FileIO("test.txt"))
-11 11 | tempfile.NamedTemporaryFile("w")
-12    |-tempfile.TemporaryFile("w")
-   12 |+tempfile.TemporaryFile("w", encoding="utf-8")
-13 13 | codecs.open("test.txt")
-14 14 | tempfile.SpooledTemporaryFile(0, "w")
-15 15 | 
-
-    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 unspecified_encoding.py:13:1: PLW1514 [*] `codecs.open` in text mode without explicit `encoding` argument
    |
@@ -120,16 +70,6 @@ unspecified_encoding.py:13:1: PLW1514 [*] `codecs.open` in text mode without exp
    |
    = help: Add explicit `encoding` argument
 
-10 10 | hugo.TextIOWrapper(hugo.FileIO("test.txt"))
-11 11 | tempfile.NamedTemporaryFile("w")
-12 12 | tempfile.TemporaryFile("w")
-13    |-codecs.open("test.txt")
-   13 |+codecs.open("test.txt", encoding="utf-8")
-14 14 | tempfile.SpooledTemporaryFile(0, "w")
-15 15 | 
-16 16 | # Non-errors.
-
-    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 unspecified_encoding.py:14:1: PLW1514 [*] `tempfile.SpooledTemporaryFile` in text mode without explicit `encoding` argument
    |
@@ -142,16 +82,6 @@ unspecified_encoding.py:14:1: PLW1514 [*] `tempfile.SpooledTemporaryFile` in tex
    |
    = help: Add explicit `encoding` argument
 
-11 11 | tempfile.NamedTemporaryFile("w")
-12 12 | tempfile.TemporaryFile("w")
-13 13 | codecs.open("test.txt")
-14    |-tempfile.SpooledTemporaryFile(0, "w")
-   14 |+tempfile.SpooledTemporaryFile(0, "w", encoding="utf-8")
-15 15 | 
-16 16 | # Non-errors.
-17 17 | open("test.txt", encoding="utf-8")
-
-    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 unspecified_encoding.py:46:1: PLW1514 [*] `open` in text mode without explicit `encoding` argument
    |
@@ -164,16 +94,6 @@ unspecified_encoding.py:46:1: PLW1514 [*] `open` in text mode without explicit `
    |
    = help: Add explicit `encoding` argument
 
-43 43 | tempfile.SpooledTemporaryFile(0, "wb")
-44 44 | tempfile.SpooledTemporaryFile(0, )
-45 45 | 
-46    |-open("test.txt",)
-   46 |+open("test.txt", encoding="utf-8",)
-47 47 | open()
-48 48 | open(
-49 49 |     "test.txt",  # comment
-
-    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 unspecified_encoding.py:47:1: PLW1514 [*] `open` in text mode without explicit `encoding` argument
    |
@@ -185,16 +105,6 @@ unspecified_encoding.py:47:1: PLW1514 [*] `open` in text mode without explicit `
    |
    = help: Add explicit `encoding` argument
 
-44 44 | tempfile.SpooledTemporaryFile(0, )
-45 45 | 
-46 46 | open("test.txt",)
-47    |-open()
-   47 |+open(encoding="utf-8")
-48 48 | open(
-49 49 |     "test.txt",  # comment
-50 50 | )
-
-    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 unspecified_encoding.py:48:1: PLW1514 [*] `open` in text mode without explicit `encoding` argument
    |
@@ -207,16 +117,6 @@ unspecified_encoding.py:48:1: PLW1514 [*] `open` in text mode without explicit `
    |
    = help: Add explicit `encoding` argument
 
-46 46 | open("test.txt",)
-47 47 | open()
-48 48 | open(
-49    |-    "test.txt",  # comment
-   49 |+    "test.txt", encoding="utf-8",  # comment
-50 50 | )
-51 51 | open(
-52 52 |     "test.txt",
-
-    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 unspecified_encoding.py:51:1: PLW1514 [*] `open` in text mode without explicit `encoding` argument
    |
@@ -229,16 +129,6 @@ unspecified_encoding.py:51:1: PLW1514 [*] `open` in text mode without explicit `
    |
    = help: Add explicit `encoding` argument
 
-49 49 |     "test.txt",  # comment
-50 50 | )
-51 51 | open(
-52    |-    "test.txt",
-   52 |+    "test.txt", encoding="utf-8",
-53 53 |     # comment
-54 54 | )
-55 55 | open(("test.txt"),)
-
-    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 unspecified_encoding.py:55:1: PLW1514 [*] `open` in text mode without explicit `encoding` argument
    |
@@ -251,16 +141,6 @@ unspecified_encoding.py:55:1: PLW1514 [*] `open` in text mode without explicit `
    |
    = help: Add explicit `encoding` argument
 
-52 52 |     "test.txt",
-53 53 |     # comment
-54 54 | )
-55    |-open(("test.txt"),)
-   55 |+open(("test.txt"), encoding="utf-8",)
-56 56 | open(
-57 57 |     ("test.txt"),  # comment
-58 58 | )
-
-    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 unspecified_encoding.py:56:1: PLW1514 [*] `open` in text mode without explicit `encoding` argument
    |
@@ -273,16 +153,6 @@ unspecified_encoding.py:56:1: PLW1514 [*] `open` in text mode without explicit `
    |
    = help: Add explicit `encoding` argument
 
-54 54 | )
-55 55 | open(("test.txt"),)
-56 56 | open(
-57    |-    ("test.txt"),  # comment
-   57 |+    ("test.txt"), encoding="utf-8",  # comment
-58 58 | )
-59 59 | open(
-60 60 |     ("test.txt"),
-
-    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 unspecified_encoding.py:59:1: PLW1514 [*] `open` in text mode without explicit `encoding` argument
    |
@@ -295,16 +165,6 @@ unspecified_encoding.py:59:1: PLW1514 [*] `open` in text mode without explicit `
    |
    = help: Add explicit `encoding` argument
 
-57 57 |     ("test.txt"),  # comment
-58 58 | )
-59 59 | open(
-60    |-    ("test.txt"),
-   60 |+    ("test.txt"), encoding="utf-8",
-61 61 |     # comment
-62 62 | )
-63 63 | 
-
-    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 unspecified_encoding.py:64:1: PLW1514 [*] `open` in text mode without explicit `encoding` argument
    |
@@ -317,16 +177,6 @@ unspecified_encoding.py:64:1: PLW1514 [*] `open` in text mode without explicit `
    |
    = help: Add explicit `encoding` argument
 
-61 61 |     # comment
-62 62 | )
-63 63 | 
-64    |-open((("test.txt")),)
-   64 |+open((("test.txt")), encoding="utf-8",)
-65 65 | open(
-66 66 |     (("test.txt")),  # comment
-67 67 | )
-
-    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 unspecified_encoding.py:65:1: PLW1514 [*] `open` in text mode without explicit `encoding` argument
    |
@@ -338,16 +188,6 @@ unspecified_encoding.py:65:1: PLW1514 [*] `open` in text mode without explicit `
    |
    = help: Add explicit `encoding` argument
 
-63 63 | 
-64 64 | open((("test.txt")),)
-65 65 | open(
-66    |-    (("test.txt")),  # comment
-   66 |+    (("test.txt")), encoding="utf-8",  # comment
-67 67 | )
-68 68 | open(
-69 69 |     (("test.txt")),
-
-    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 unspecified_encoding.py:68:1: PLW1514 [*] `open` in text mode without explicit `encoding` argument
    |
@@ -360,16 +200,6 @@ unspecified_encoding.py:68:1: PLW1514 [*] `open` in text mode without explicit `
    |
    = help: Add explicit `encoding` argument
 
-66 66 |     (("test.txt")),  # comment
-67 67 | )
-68 68 | open(
-69    |-    (("test.txt")),
-   69 |+    (("test.txt")), encoding="utf-8",
-70 70 |     # comment
-71 71 | )
-72 72 | 
-
-    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 unspecified_encoding.py:77:1: PLW1514 [*] `pathlib.Path(...).open` in text mode without explicit `encoding` argument
    |
@@ -381,16 +211,6 @@ unspecified_encoding.py:77:1: PLW1514 [*] `pathlib.Path(...).open` in text mode 
    |
    = help: Add explicit `encoding` argument
 
-74 74 | from pathlib import Path
-75 75 | 
-76 76 | # Errors.
-77    |-Path("foo.txt").open()
-   77 |+Path("foo.txt").open(encoding="utf-8")
-78 78 | Path("foo.txt").open("w")
-79 79 | text = Path("foo.txt").read_text()
-80 80 | Path("foo.txt").write_text(text)
-
-    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 unspecified_encoding.py:78:1: PLW1514 [*] `pathlib.Path(...).open` in text mode without explicit `encoding` argument
    |
@@ -403,16 +223,6 @@ unspecified_encoding.py:78:1: PLW1514 [*] `pathlib.Path(...).open` in text mode 
    |
    = help: Add explicit `encoding` argument
 
-75 75 | 
-76 76 | # Errors.
-77 77 | Path("foo.txt").open()
-78    |-Path("foo.txt").open("w")
-   78 |+Path("foo.txt").open("w", encoding="utf-8")
-79 79 | text = Path("foo.txt").read_text()
-80 80 | Path("foo.txt").write_text(text)
-81 81 | 
-
-    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 unspecified_encoding.py:79:8: PLW1514 [*] `pathlib.Path(...).read_text` without explicit `encoding` argument
    |
@@ -424,16 +234,6 @@ unspecified_encoding.py:79:8: PLW1514 [*] `pathlib.Path(...).read_text` without 
    |
    = help: Add explicit `encoding` argument
 
-76 76 | # Errors.
-77 77 | Path("foo.txt").open()
-78 78 | Path("foo.txt").open("w")
-79    |-text = Path("foo.txt").read_text()
-   79 |+text = Path("foo.txt").read_text(encoding="utf-8")
-80 80 | Path("foo.txt").write_text(text)
-81 81 | 
-82 82 | # Non-errors.
-
-    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 unspecified_encoding.py:80:1: PLW1514 [*] `pathlib.Path(...).write_text` without explicit `encoding` argument
    |
@@ -445,14 +245,3 @@ unspecified_encoding.py:80:1: PLW1514 [*] `pathlib.Path(...).write_text` without
 82 | # Non-errors.
    |
    = help: Add explicit `encoding` argument
-
-77 77 | Path("foo.txt").open()
-78 78 | Path("foo.txt").open("w")
-79 79 | text = Path("foo.txt").read_text()
-80    |-Path("foo.txt").write_text(text)
-   80 |+Path("foo.txt").write_text(text, encoding="utf-8")
-81 81 | 
-82 82 | # Non-errors.
-83 83 | Path("foo.txt").open(encoding="utf-8")
-
-    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.

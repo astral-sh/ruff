@@ -10,16 +10,6 @@ PT014.py:4:35: PT014 [*] Duplicate of test case at index 0 in `@pytest_mark.para
   |
   = help: Remove duplicate test case
 
-1 1 | import pytest
-2 2 | 
-3 3 | 
-4   |-@pytest.mark.parametrize("x", [1, 1, 2])
-  4 |+@pytest.mark.parametrize("x", [1, 2])
-5 5 | def test_error_literal(x):
-6 6 |     ...
-7 7 | 
-
-    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 PT014.py:14:35: PT014 [*] Duplicate of test case at index 0 in `@pytest_mark.parametrize`
    |
@@ -30,16 +20,6 @@ PT014.py:14:35: PT014 [*] Duplicate of test case at index 0 in `@pytest_mark.par
    |
    = help: Remove duplicate test case
 
-11 11 | c = 3
-12 12 | 
-13 13 | 
-14    |-@pytest.mark.parametrize("x", [a, a, b, b, b, c])
-   14 |+@pytest.mark.parametrize("x", [a, b, b, b, c])
-15 15 | def test_error_expr_simple(x):
-16 16 |     ...
-17 17 | 
-
-    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 PT014.py:14:41: PT014 [*] Duplicate of test case at index 2 in `@pytest_mark.parametrize`
    |
@@ -50,16 +30,6 @@ PT014.py:14:41: PT014 [*] Duplicate of test case at index 2 in `@pytest_mark.par
    |
    = help: Remove duplicate test case
 
-11 11 | c = 3
-12 12 | 
-13 13 | 
-14    |-@pytest.mark.parametrize("x", [a, a, b, b, b, c])
-   14 |+@pytest.mark.parametrize("x", [a, a, b, b, c])
-15 15 | def test_error_expr_simple(x):
-16 16 |     ...
-17 17 | 
-
-    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 PT014.py:14:44: PT014 [*] Duplicate of test case at index 2 in `@pytest_mark.parametrize`
    |
@@ -70,16 +40,6 @@ PT014.py:14:44: PT014 [*] Duplicate of test case at index 2 in `@pytest_mark.par
    |
    = help: Remove duplicate test case
 
-11 11 | c = 3
-12 12 | 
-13 13 | 
-14    |-@pytest.mark.parametrize("x", [a, a, b, b, b, c])
-   14 |+@pytest.mark.parametrize("x", [a, a, b, b, c])
-15 15 | def test_error_expr_simple(x):
-16 16 |     ...
-17 17 | 
-
-    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 PT014.py:24:9: PT014 Duplicate of test case at index 0 in `@pytest_mark.parametrize`
    |
@@ -101,16 +61,6 @@ PT014.py:32:39: PT014 [*] Duplicate of test case at index 0 in `@pytest_mark.par
    |
    = help: Remove duplicate test case
 
-29 29 |     ...
-30 30 | 
-31 31 | 
-32    |-@pytest.mark.parametrize("x", [a, b, (a), c, ((a))])
-   32 |+@pytest.mark.parametrize("x", [a, b, c, ((a))])
-33 33 | def test_error_parentheses(x):
-34 34 |     ...
-35 35 | 
-
-    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 PT014.py:32:48: PT014 [*] Duplicate of test case at index 0 in `@pytest_mark.parametrize`
    |
@@ -121,16 +71,6 @@ PT014.py:32:48: PT014 [*] Duplicate of test case at index 0 in `@pytest_mark.par
    |
    = help: Remove duplicate test case
 
-29 29 |     ...
-30 30 | 
-31 31 | 
-32    |-@pytest.mark.parametrize("x", [a, b, (a), c, ((a))])
-   32 |+@pytest.mark.parametrize("x", [a, b, (a), c])
-33 33 | def test_error_parentheses(x):
-34 34 |     ...
-35 35 | 
-
-    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 PT014.py:42:10: PT014 [*] Duplicate of test case at index 0 in `@pytest_mark.parametrize`
    |
@@ -143,15 +83,6 @@ PT014.py:42:10: PT014 [*] Duplicate of test case at index 0 in `@pytest_mark.par
    |
    = help: Remove duplicate test case
 
-39 39 |     [
-40 40 |         a,
-41 41 |         b,
-42    |-        (a),
-43 42 |         c,
-44 43 |         ((a)),
-45 44 |     ],
-
-    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 PT014.py:44:11: PT014 [*] Duplicate of test case at index 0 in `@pytest_mark.parametrize`
    |
@@ -164,15 +95,6 @@ PT014.py:44:11: PT014 [*] Duplicate of test case at index 0 in `@pytest_mark.par
    |
    = help: Remove duplicate test case
 
-41 41 |         b,
-42 42 |         (a),
-43 43 |         c,
-44    |-        ((a)),
-45 44 |     ],
-46 45 | )
-47 46 | def test_error_parentheses_trailing_comma(x):
-
-    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 PT014.py:56:53: PT014 [*] Duplicate of test case at index 0 in `@pytest_mark.parametrize`
    |
@@ -182,13 +104,3 @@ PT014.py:56:53: PT014 [*] Duplicate of test case at index 0 in `@pytest_mark.par
 58 |     ...
    |
    = help: Remove duplicate test case
-
-53 53 |     ...
-54 54 | 
-55 55 | 
-56    |-@pytest.mark.parametrize('data, spec', [(1.0, 1.0), (1.0, 1.0)])
-   56 |+@pytest.mark.parametrize('data, spec', [(1.0, 1.0)])
-57 57 | def test_numbers(data, spec):
-58 58 |     ...
-
-    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.

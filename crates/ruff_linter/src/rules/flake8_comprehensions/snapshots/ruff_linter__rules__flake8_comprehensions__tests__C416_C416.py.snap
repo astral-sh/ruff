@@ -12,16 +12,6 @@ C416.py:6:1: C416 [*] Unnecessary `list` comprehension (rewrite using `list()`)
   |
   = help: Rewrite using `list()`
 
-3 3 | z = [(1,), (2,), (3,)]
-4 4 | d = {"a": 1, "b": 2, "c": 3}
-5 5 | 
-6   |-[i for i in x]
-  6 |+list(x)
-7 7 | {i for i in x}
-8 8 | {k: v for k, v in y}
-9 9 | {k: v for k, v in d.items()}
-
-    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 C416.py:7:1: C416 [*] Unnecessary `set` comprehension (rewrite using `set()`)
   |
@@ -33,16 +23,6 @@ C416.py:7:1: C416 [*] Unnecessary `set` comprehension (rewrite using `set()`)
   |
   = help: Rewrite using `set()`
 
-4 4 | d = {"a": 1, "b": 2, "c": 3}
-5 5 | 
-6 6 | [i for i in x]
-7   |-{i for i in x}
-  7 |+set(x)
-8 8 | {k: v for k, v in y}
-9 9 | {k: v for k, v in d.items()}
-10 10 | [(k, v) for k, v in d.items()]
-
-    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 C416.py:8:1: C416 [*] Unnecessary `dict` comprehension (rewrite using `dict()`)
    |
@@ -55,16 +35,6 @@ C416.py:8:1: C416 [*] Unnecessary `dict` comprehension (rewrite using `dict()`)
    |
    = help: Rewrite using `dict()`
 
-5 5 | 
-6 6 | [i for i in x]
-7 7 | {i for i in x}
-8   |-{k: v for k, v in y}
-  8 |+dict(y)
-9 9 | {k: v for k, v in d.items()}
-10 10 | [(k, v) for k, v in d.items()]
-11 11 | {k: (a, b) for k, (a, b) in d.items()}
-
-    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 C416.py:9:1: C416 [*] Unnecessary `dict` comprehension (rewrite using `dict()`)
    |
@@ -77,16 +47,6 @@ C416.py:9:1: C416 [*] Unnecessary `dict` comprehension (rewrite using `dict()`)
    |
    = help: Rewrite using `dict()`
 
-6  6  | [i for i in x]
-7  7  | {i for i in x}
-8  8  | {k: v for k, v in y}
-9     |-{k: v for k, v in d.items()}
-   9  |+dict(d.items())
-10 10 | [(k, v) for k, v in d.items()]
-11 11 | {k: (a, b) for k, (a, b) in d.items()}
-12 12 | 
-
-    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 C416.py:10:1: C416 [*] Unnecessary `list` comprehension (rewrite using `list()`)
    |
@@ -98,16 +58,6 @@ C416.py:10:1: C416 [*] Unnecessary `list` comprehension (rewrite using `list()`)
    |
    = help: Rewrite using `list()`
 
-7  7  | {i for i in x}
-8  8  | {k: v for k, v in y}
-9  9  | {k: v for k, v in d.items()}
-10    |-[(k, v) for k, v in d.items()]
-   10 |+list(d.items())
-11 11 | {k: (a, b) for k, (a, b) in d.items()}
-12 12 | 
-13 13 | [i for i, in z]
-
-    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 C416.py:11:1: C416 [*] Unnecessary `dict` comprehension (rewrite using `dict()`)
    |
@@ -120,16 +70,6 @@ C416.py:11:1: C416 [*] Unnecessary `dict` comprehension (rewrite using `dict()`)
    |
    = help: Rewrite using `dict()`
 
-8  8  | {k: v for k, v in y}
-9  9  | {k: v for k, v in d.items()}
-10 10 | [(k, v) for k, v in d.items()]
-11    |-{k: (a, b) for k, (a, b) in d.items()}
-   11 |+dict(d.items())
-12 12 | 
-13 13 | [i for i, in z]
-14 14 | [i for i, j in y]
-
-    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 C416.py:24:70: C416 [*] Unnecessary `list` comprehension (rewrite using `list()`)
    |
@@ -138,11 +78,3 @@ C416.py:24:70: C416 [*] Unnecessary `list` comprehension (rewrite using `list()`
    |                                                                      ^^^^^^^^^^^^^^^^^^^^^^^ C416
    |
    = help: Rewrite using `list()`
-
-21 21 | {k: v if v else None for k, v in y}
-22 22 | 
-23 23 | # Regression test for: https://github.com/astral-sh/ruff/issues/7196
-24    |-any(len(symbol_table.get_by_type(symbol_type)) > 0 for symbol_type in[t for t in SymbolType])
-   24 |+any(len(symbol_table.get_by_type(symbol_type)) > 0 for symbol_type in list(SymbolType))
-
-    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.

@@ -11,16 +11,3 @@ singledispatch.py:11:20: TCH002 [*] Move third-party import `pandas.DataFrame` i
 13 | if TYPE_CHECKING:
    |
    = help: Move into type-checking block
-
-8  8  | from numpy import asarray
-9  9  | from numpy.typing import ArrayLike
-10 10 | from scipy.sparse import spmatrix
-11    |-from pandas import DataFrame
-12 11 | 
-13 12 | if TYPE_CHECKING:
-   13 |+    from pandas import DataFrame
-14 14 |     from numpy import ndarray
-15 15 | 
-16 16 | 
-
-    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.

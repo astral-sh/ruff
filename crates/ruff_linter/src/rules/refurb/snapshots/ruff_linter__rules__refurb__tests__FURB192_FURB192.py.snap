@@ -143,16 +143,6 @@ FURB192.py:17:1: FURB192 [*] Prefer `min` over `sorted()` to compute the minimum
    |
    = help: Replace with `min`
 
-14 14 | 
-15 15 | # Unsafe
-16 16 | 
-17    |-sorted(l, key=key_fn, reverse=True)[-1]
-   17 |+min(l, key=key_fn)
-18 18 | 
-19 19 | sorted(l, reverse=True)[0]
-20 20 | 
-
-    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 FURB192.py:19:1: FURB192 [*] Prefer `max` over `sorted()` to compute the maximum value in a sequence
    |
@@ -165,16 +155,6 @@ FURB192.py:19:1: FURB192 [*] Prefer `max` over `sorted()` to compute the maximum
    |
    = help: Replace with `max`
 
-16 16 | 
-17 17 | sorted(l, key=key_fn, reverse=True)[-1]
-18 18 | 
-19    |-sorted(l, reverse=True)[0]
-   19 |+max(l)
-20 20 | 
-21 21 | sorted(l, reverse=True)[-1]
-22 22 | 
-
-    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 FURB192.py:21:1: FURB192 [*] Prefer `min` over `sorted()` to compute the minimum value in a sequence
    |
@@ -186,14 +166,3 @@ FURB192.py:21:1: FURB192 [*] Prefer `min` over `sorted()` to compute the minimum
 23 | # Non-errors
    |
    = help: Replace with `min`
-
-18 18 | 
-19 19 | sorted(l, reverse=True)[0]
-20 20 | 
-21    |-sorted(l, reverse=True)[-1]
-   21 |+min(l)
-22 22 | 
-23 23 | # Non-errors
-24 24 | 
-
-    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.

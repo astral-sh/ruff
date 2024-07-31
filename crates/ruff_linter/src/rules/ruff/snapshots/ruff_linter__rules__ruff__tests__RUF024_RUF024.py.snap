@@ -11,16 +11,6 @@ RUF024.py:9:1: RUF024 [*] Do not pass mutable objects as values to `dict.fromkey
    |
    = help: Replace with comprehension
 
-6  6  | ]
-7  7  | 
-8  8  | # Errors.
-9     |-dict.fromkeys(pierogi_fillings, [])
-   9  |+{key: [] for key in pierogi_fillings}
-10 10 | dict.fromkeys(pierogi_fillings, list())
-11 11 | dict.fromkeys(pierogi_fillings, {})
-12 12 | dict.fromkeys(pierogi_fillings, set())
-
-    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 RUF024.py:10:1: RUF024 [*] Do not pass mutable objects as values to `dict.fromkeys`
    |
@@ -33,16 +23,6 @@ RUF024.py:10:1: RUF024 [*] Do not pass mutable objects as values to `dict.fromke
    |
    = help: Replace with comprehension
 
-7  7  | 
-8  8  | # Errors.
-9  9  | dict.fromkeys(pierogi_fillings, [])
-10    |-dict.fromkeys(pierogi_fillings, list())
-   10 |+{key: list() for key in pierogi_fillings}
-11 11 | dict.fromkeys(pierogi_fillings, {})
-12 12 | dict.fromkeys(pierogi_fillings, set())
-13 13 | dict.fromkeys(pierogi_fillings, {"pre": "populated!"})
-
-    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 RUF024.py:11:1: RUF024 [*] Do not pass mutable objects as values to `dict.fromkeys`
    |
@@ -55,16 +35,6 @@ RUF024.py:11:1: RUF024 [*] Do not pass mutable objects as values to `dict.fromke
    |
    = help: Replace with comprehension
 
-8  8  | # Errors.
-9  9  | dict.fromkeys(pierogi_fillings, [])
-10 10 | dict.fromkeys(pierogi_fillings, list())
-11    |-dict.fromkeys(pierogi_fillings, {})
-   11 |+{key: {} for key in pierogi_fillings}
-12 12 | dict.fromkeys(pierogi_fillings, set())
-13 13 | dict.fromkeys(pierogi_fillings, {"pre": "populated!"})
-14 14 | dict.fromkeys(pierogi_fillings, dict())
-
-    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 RUF024.py:12:1: RUF024 [*] Do not pass mutable objects as values to `dict.fromkeys`
    |
@@ -77,16 +47,6 @@ RUF024.py:12:1: RUF024 [*] Do not pass mutable objects as values to `dict.fromke
    |
    = help: Replace with comprehension
 
-9  9  | dict.fromkeys(pierogi_fillings, [])
-10 10 | dict.fromkeys(pierogi_fillings, list())
-11 11 | dict.fromkeys(pierogi_fillings, {})
-12    |-dict.fromkeys(pierogi_fillings, set())
-   12 |+{key: set() for key in pierogi_fillings}
-13 13 | dict.fromkeys(pierogi_fillings, {"pre": "populated!"})
-14 14 | dict.fromkeys(pierogi_fillings, dict())
-15 15 | import builtins
-
-    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 RUF024.py:13:1: RUF024 [*] Do not pass mutable objects as values to `dict.fromkeys`
    |
@@ -99,16 +59,6 @@ RUF024.py:13:1: RUF024 [*] Do not pass mutable objects as values to `dict.fromke
    |
    = help: Replace with comprehension
 
-10 10 | dict.fromkeys(pierogi_fillings, list())
-11 11 | dict.fromkeys(pierogi_fillings, {})
-12 12 | dict.fromkeys(pierogi_fillings, set())
-13    |-dict.fromkeys(pierogi_fillings, {"pre": "populated!"})
-   13 |+{key: {"pre": "populated!"} for key in pierogi_fillings}
-14 14 | dict.fromkeys(pierogi_fillings, dict())
-15 15 | import builtins
-16 16 | builtins.dict.fromkeys(pierogi_fillings, dict())
-
-    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 RUF024.py:14:1: RUF024 [*] Do not pass mutable objects as values to `dict.fromkeys`
    |
@@ -121,16 +71,6 @@ RUF024.py:14:1: RUF024 [*] Do not pass mutable objects as values to `dict.fromke
    |
    = help: Replace with comprehension
 
-11 11 | dict.fromkeys(pierogi_fillings, {})
-12 12 | dict.fromkeys(pierogi_fillings, set())
-13 13 | dict.fromkeys(pierogi_fillings, {"pre": "populated!"})
-14    |-dict.fromkeys(pierogi_fillings, dict())
-   14 |+{key: dict() for key in pierogi_fillings}
-15 15 | import builtins
-16 16 | builtins.dict.fromkeys(pierogi_fillings, dict())
-17 17 | 
-
-    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 RUF024.py:16:1: RUF024 [*] Do not pass mutable objects as values to `dict.fromkeys`
    |
@@ -142,14 +82,3 @@ RUF024.py:16:1: RUF024 [*] Do not pass mutable objects as values to `dict.fromke
 18 | # Okay.
    |
    = help: Replace with comprehension
-
-13 13 | dict.fromkeys(pierogi_fillings, {"pre": "populated!"})
-14 14 | dict.fromkeys(pierogi_fillings, dict())
-15 15 | import builtins
-16    |-builtins.dict.fromkeys(pierogi_fillings, dict())
-   16 |+{key: dict() for key in pierogi_fillings}
-17 17 | 
-18 18 | # Okay.
-19 19 | dict.fromkeys(pierogi_fillings)
-
-    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.

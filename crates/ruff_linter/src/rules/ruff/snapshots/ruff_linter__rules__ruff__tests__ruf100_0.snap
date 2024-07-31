@@ -157,15 +157,6 @@ RUF100_0.py:32:5: F841 [*] Local variable `d` is assigned to but never used
    |
    = help: Remove assignment to unused variable `d`
 
-29 29 |     d = 1  # noqa: E501
-30 30 | 
-31 31 |     # Invalid - many spaces before #
-32    |-    d = 1  # noqa: E501
-33 32 |     # fmt: on
-34 33 | 
-35 34 | 
-
-    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 RUF100_0.py:32:12: RUF100 [*] Unused `noqa` directive (unused: `E501`)
    |
@@ -328,15 +319,6 @@ RUF100_0.py:108:5: F841 [*] Local variable `e` is assigned to but never used
     |
     = help: Remove assignment to unused variable `e`
 
-105 105 | def f():
-106 106 |     # Invalid - nonexistent error code with multibyte character
-107 107 |     d = 1  # noqa: F841, E50
-108     |-    e = 1  # noqa: E50
-109 108 | 
-110 109 | 
-111 110 | def f():
-
-    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 RUF100_0.py:108:12: RUF100 [*] Unused `noqa` directive (unknown: `E50`)
     |

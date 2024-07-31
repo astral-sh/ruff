@@ -11,16 +11,6 @@ N804.py:30:27: N804 [*] First argument of a class method should be named `cls`
    |
    = help: Rename `self` to `cls`
 
-27 27 |     def __new__(cls, *args, **kwargs):
-28 28 |         ...
-29 29 | 
-30    |-    def __init_subclass__(self, default_name, **kwargs):
-   30 |+    def __init_subclass__(cls, default_name, **kwargs):
-31 31 |         ...
-32 32 | 
-33 33 |     @classmethod
-
-    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 N804.py:38:56: N804 [*] First argument of a class method should be named `cls`
    |
@@ -31,16 +21,6 @@ N804.py:38:56: N804 [*] First argument of a class method should be named `cls`
    |
    = help: Rename `self` to `cls`
 
-35 35 |         ...
-36 36 | 
-37 37 |     @classmethod
-38    |-    def bad_class_method_with_positional_only_argument(self, x, /, other):
-   38 |+    def bad_class_method_with_positional_only_argument(cls, x, /, other):
-39 39 |         ...
-40 40 | 
-41 41 | 
-
-    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 N804.py:43:20: N804 [*] First argument of a class method should be named `cls`
    |
@@ -51,16 +31,6 @@ N804.py:43:20: N804 [*] First argument of a class method should be named `cls`
    |
    = help: Rename `self` to `cls`
 
-40 40 | 
-41 41 | 
-42 42 | class MetaClass(ABCMeta):
-43    |-    def bad_method(self):
-   43 |+    def bad_method(cls):
-44 44 |         pass
-45 45 | 
-46 46 |     def good_method(cls):
-
-    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 N804.py:54:25: N804 First argument of a class method should be named `cls`
    |
@@ -121,20 +91,6 @@ N804.py:70:20: N804 [*] First argument of a class method should be named `cls`
    |
    = help: Rename `this` to `cls`
 
-67 67 |         pass
-68 68 | 
-69 69 | class RenamingInMethodBodyClass(ABCMeta):
-70    |-    def bad_method(this):
-71    |-        this = this
-72    |-        this
-   70 |+    def bad_method(cls):
-   71 |+        cls = cls
-   72 |+        cls
-73 73 | 
-74 74 |     def bad_method(this):
-75 75 |         self = this
-
-    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 N804.py:74:20: N804 [*] First argument of a class method should be named `cls`
    |
@@ -145,16 +101,3 @@ N804.py:74:20: N804 [*] First argument of a class method should be named `cls`
 75 |         self = this
    |
    = help: Rename `this` to `cls`
-
-71 71 |         this = this
-72 72 |         this
-73 73 | 
-74    |-    def bad_method(this):
-75    |-        self = this
-   74 |+    def bad_method(cls):
-   75 |+        self = cls
-76 76 | 
-77 77 | def func(x):
-78 78 |     return x
-
-    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.

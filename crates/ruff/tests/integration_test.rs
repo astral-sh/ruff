@@ -1576,9 +1576,6 @@ fn check_hints_hidden_unsafe_fixes() {
         Run `ruff check --fix` to apply this fix.
 
     -:1:1: RUF902 Hey this is a stable test rule with an unsafe fix.
-      1 |+# fix from stable-test-rule-unsafe-fix
-
-        Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
     Found 2 errors.
     [*] 1 fixable with the `--fix` option (1 hidden fix can be enabled with the `--unsafe-fixes` option).
@@ -1597,10 +1594,6 @@ fn check_hints_hidden_unsafe_fixes_with_no_safe_fixes() {
     exit_code: 1
     ----- stdout -----
     -:1:1: RUF902 Hey this is a stable test rule with an unsafe fix.
-      1 |+# fix from stable-test-rule-unsafe-fix
-    1 2 | x = {'a': 1, 'a': 1}
-
-        Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
     Found 1 error.
     No fixes available (1 hidden fix can be enabled with the `--unsafe-fixes` option).
@@ -1625,9 +1618,6 @@ fn check_no_hint_for_hidden_unsafe_fixes_when_disabled() {
         Run `ruff check --fix` to apply this fix.
 
     -:1:1: RUF902 Hey this is a stable test rule with an unsafe fix.
-      1 |+# fix from stable-test-rule-unsafe-fix
-
-        Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
     Found 2 errors.
     [*] 1 fixable with the --fix option.
@@ -1648,10 +1638,6 @@ fn check_no_hint_for_hidden_unsafe_fixes_with_no_safe_fixes_when_disabled() {
     exit_code: 1
     ----- stdout -----
     -:1:1: RUF902 Hey this is a stable test rule with an unsafe fix.
-      1 |+# fix from stable-test-rule-unsafe-fix
-    1 2 | x = {'a': 1, 'a': 1}
-
-        Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
     Found 1 error.
 
@@ -1675,9 +1661,6 @@ fn check_shows_unsafe_fixes_with_opt_in() {
         Run `ruff check --fix` to apply this fix.
 
     -:1:1: RUF902 [*] Hey this is a stable test rule with an unsafe fix.
-      1 |+# fix from stable-test-rule-unsafe-fix
-
-        Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
     Found 2 errors.
     [*] 2 fixable with the --fix option.
@@ -1700,10 +1683,6 @@ fn fix_applies_safe_fixes_by_default() {
 
     ----- stderr -----
     -:1:1: RUF902 Hey this is a stable test rule with an unsafe fix.
-      1 |+# fix from stable-test-rule-unsafe-fix
-    1 2 | # fix from stable-test-rule-safe-fix
-
-        Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
     Found 2 errors (1 fixed, 1 remaining).
     No fixes available (1 hidden fix can be enabled with the `--unsafe-fixes` option).
@@ -1742,10 +1721,6 @@ fn fix_does_not_apply_display_only_fixes() {
     def add_to_list(item, some_list=[]): ...
     ----- stderr -----
     -:1:1: RUF903 Hey this is a stable test rule with a display only fix.
-      1 |+# fix from stable-test-rule-display-only-fix
-    1 2 | def add_to_list(item, some_list=[]): ...
-
-        Ruff cannot safely apply this fix.
 
     Found 1 error.
     "###);
@@ -1765,10 +1740,6 @@ fn fix_does_not_apply_display_only_fixes_with_unsafe_fixes_enabled() {
     def add_to_list(item, some_list=[]): ...
     ----- stderr -----
     -:1:1: RUF903 Hey this is a stable test rule with a display only fix.
-      1 |+# fix from stable-test-rule-display-only-fix
-    1 2 | def add_to_list(item, some_list=[]): ...
-
-        Ruff cannot safely apply this fix.
 
     Found 1 error.
     "###);
@@ -1787,9 +1758,6 @@ fn fix_only_unsafe_fixes_available() {
 
     ----- stderr -----
     -:1:1: RUF902 Hey this is a stable test rule with an unsafe fix.
-      1 |+# fix from stable-test-rule-unsafe-fix
-
-        Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
     Found 1 error.
     No fixes available (1 hidden fix can be enabled with the `--unsafe-fixes` option).
@@ -1927,14 +1895,8 @@ extend-unsafe-fixes = ["RUF901"]
     exit_code: 1
     ----- stdout -----
     -:1:1: RUF901 Hey this is a stable test rule with a safe fix.
-      1 |+# fix from stable-test-rule-safe-fix
-
-        Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
     -:1:1: RUF902 Hey this is a stable test rule with an unsafe fix.
-      1 |+# fix from stable-test-rule-unsafe-fix
-
-        Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
     Found 2 errors.
     No fixes available (2 hidden fixes can be enabled with the `--unsafe-fixes` option).
@@ -2014,9 +1976,6 @@ extend-safe-fixes = ["RUF902"]
         Run `ruff check --fix` to apply this fix.
 
     -:1:1: RUF902 Hey this is a stable test rule with an unsafe fix.
-      1 |+# fix from stable-test-rule-unsafe-fix
-
-        Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
     Found 2 errors.
     [*] 1 fixable with the `--fix` option (1 hidden fix can be enabled with the `--unsafe-fixes` option).
@@ -2054,12 +2013,6 @@ extend-safe-fixes = ["RUF9"]
     ----- stdout -----
     -:1:1: RUF900 Hey this is a stable test rule.
     -:1:1: RUF901 Hey this is a stable test rule with a safe fix.
-      1 |+# fix from stable-test-rule-safe-fix
-    1 2 | x = {'a': 1, 'a': 1}
-    2 3 | print(('foo'))
-    3 4 | print(str('foo'))
-
-        Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
     -:1:1: RUF902 [*] Hey this is a stable test rule with an unsafe fix.
       1 |+# fix from stable-test-rule-unsafe-fix
@@ -2070,12 +2023,6 @@ extend-safe-fixes = ["RUF9"]
         Run `ruff check --fix` to apply this fix.
 
     -:1:1: RUF903 Hey this is a stable test rule with a display only fix.
-      1 |+# fix from stable-test-rule-display-only-fix
-    1 2 | x = {'a': 1, 'a': 1}
-    2 3 | print(('foo'))
-    3 4 | print(str('foo'))
-
-        Ruff cannot safely apply this fix.
 
     -:1:1: RUF920 Hey this is a deprecated test rule.
     -:1:1: RUF921 Hey this is another deprecated test rule.
@@ -2185,14 +2132,6 @@ select = ["RUF017"]
       |
       = help: Replace with `functools.reduce`
 
-      1 |+import functools
-      2 |+import operator
-    1 3 | x = [1, 2, 3]
-    2 4 | y = [4, 5, 6]
-    3   |-sum([x, y], [])
-      5 |+functools.reduce(operator.iadd, [x, y], [])
-
-        Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
     Found 1 error.
     No fixes available (1 hidden fix can be enabled with the `--unsafe-fixes` option).

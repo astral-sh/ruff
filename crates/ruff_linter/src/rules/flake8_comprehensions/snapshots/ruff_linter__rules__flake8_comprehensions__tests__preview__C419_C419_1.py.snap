@@ -10,13 +10,6 @@ C419_1.py:1:5: C419 [*] Unnecessary list comprehension
   |
   = help: Remove unnecessary list comprehension
 
-1   |-sum([x.val for x in bar])
-  1 |+sum(x.val for x in bar)
-2 2 | min([x.val for x in bar])
-3 3 | max([x.val for x in bar])
-4 4 | sum([x.val for x in bar], 0)
-
-    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 C419_1.py:2:5: C419 [*] Unnecessary list comprehension
   |
@@ -28,14 +21,6 @@ C419_1.py:2:5: C419 [*] Unnecessary list comprehension
   |
   = help: Remove unnecessary list comprehension
 
-1 1 | sum([x.val for x in bar])
-2   |-min([x.val for x in bar])
-  2 |+min(x.val for x in bar)
-3 3 | max([x.val for x in bar])
-4 4 | sum([x.val for x in bar], 0)
-5 5 | 
-
-    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 C419_1.py:3:5: C419 [*] Unnecessary list comprehension
   |
@@ -47,15 +32,6 @@ C419_1.py:3:5: C419 [*] Unnecessary list comprehension
   |
   = help: Remove unnecessary list comprehension
 
-1 1 | sum([x.val for x in bar])
-2 2 | min([x.val for x in bar])
-3   |-max([x.val for x in bar])
-  3 |+max(x.val for x in bar)
-4 4 | sum([x.val for x in bar], 0)
-5 5 | 
-6 6 | # OK
-
-    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 C419_1.py:4:5: C419 [*] Unnecessary list comprehension
   |
@@ -68,16 +44,6 @@ C419_1.py:4:5: C419 [*] Unnecessary list comprehension
   |
   = help: Remove unnecessary list comprehension
 
-1 1 | sum([x.val for x in bar])
-2 2 | min([x.val for x in bar])
-3 3 | max([x.val for x in bar])
-4   |-sum([x.val for x in bar], 0)
-  4 |+sum((x.val for x in bar), 0)
-5 5 | 
-6 6 | # OK
-7 7 | sum(x.val for x in bar)
-
-    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 C419_1.py:14:5: C419 [*] Unnecessary list comprehension
    |
@@ -94,18 +60,3 @@ C419_1.py:14:5: C419 [*] Unnecessary list comprehension
 20 |   )
    |
    = help: Remove unnecessary list comprehension
-
-11 11 | 
-12 12 | # Multi-line
-13 13 | sum(
-14    |-    [
-   14 |+    (
-15 15 |         delta
-16 16 |         for delta in timedelta_list
-17 17 |         if delta
-18    |-    ],
-   18 |+    ),
-19 19 |     dt.timedelta(),
-20 20 | )
-
-    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.

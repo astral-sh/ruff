@@ -28,10 +28,3 @@ D209_D400.py:2:5: D400 [*] First line should end with a period
   | |________________________________________________________________________^ D400
   |
   = help: Add period
-
-1 1 | def lorem():
-2 2 |     """lorem ipsum dolor sit amet consectetur adipiscing elit
-3   |-    sed do eiusmod tempor incididunt ut labore et dolore magna aliqua"""
-  3 |+    sed do eiusmod tempor incididunt ut labore et dolore magna aliqua."""
-
-    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.

@@ -122,16 +122,6 @@ constant_literals.py:14:4: E712 [*] Avoid equality comparisons to `False`; use `
    |
    = help: Replace with `not None`
 
-11 11 |     pass
-12 12 | if False is "abc":  # F632 (fix, but leaves behind unfixable E712)
-13 13 |     pass
-14    |-if False == None:  # E711, E712 (fix)
-   14 |+if False is None:  # E711, E712 (fix)
-15 15 |     pass
-16 16 | if None == False:  # E711, E712 (fix)
-17 17 |     pass
-
-    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 constant_literals.py:14:13: E711 [*] Comparison to `None` should be `cond is None`
    |
@@ -144,16 +134,6 @@ constant_literals.py:14:13: E711 [*] Comparison to `None` should be `cond is Non
    |
    = help: Replace with `cond is None`
 
-11 11 |     pass
-12 12 | if False is "abc":  # F632 (fix, but leaves behind unfixable E712)
-13 13 |     pass
-14    |-if False == None:  # E711, E712 (fix)
-   14 |+if False is None:  # E711, E712 (fix)
-15 15 |     pass
-16 16 | if None == False:  # E711, E712 (fix)
-17 17 |     pass
-
-    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 constant_literals.py:16:4: E711 [*] Comparison to `None` should be `cond is None`
    |
@@ -165,16 +145,6 @@ constant_literals.py:16:4: E711 [*] Comparison to `None` should be `cond is None
    |
    = help: Replace with `cond is None`
 
-13 13 |     pass
-14 14 | if False == None:  # E711, E712 (fix)
-15 15 |     pass
-16    |-if None == False:  # E711, E712 (fix)
-   16 |+if None is False:  # E711, E712 (fix)
-17 17 |     pass
-18 18 | 
-19 19 | named_var = []
-
-    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 constant_literals.py:16:4: E712 [*] Avoid equality comparisons to `False`; use `if not None:` for false checks
    |
@@ -186,16 +156,6 @@ constant_literals.py:16:4: E712 [*] Avoid equality comparisons to `False`; use `
    |
    = help: Replace with `not None`
 
-13 13 |     pass
-14 14 | if False == None:  # E711, E712 (fix)
-15 15 |     pass
-16    |-if None == False:  # E711, E712 (fix)
-   16 |+if None is False:  # E711, E712 (fix)
-17 17 |     pass
-18 18 | 
-19 19 | named_var = []
-
-    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 constant_literals.py:20:4: F632 [*] Use `==` to compare constant literals
    |

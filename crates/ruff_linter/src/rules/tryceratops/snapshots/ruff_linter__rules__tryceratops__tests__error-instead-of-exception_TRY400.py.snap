@@ -53,16 +53,6 @@ TRY400.py:27:9: TRY400 [*] Use `logging.exception` instead of `logging.error`
    |
    = help: Replace with `exception`
 
-24 24 |     try:
-25 25 |         a = 1
-26 26 |     except Exception:
-27    |-        logger.error("Context message here")
-   27 |+        logger.exception("Context message here")
-28 28 | 
-29 29 |         if True:
-30 30 |             logger.error("Context message here")
-
-    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 TRY400.py:30:13: TRY400 [*] Use `logging.exception` instead of `logging.error`
    |
@@ -72,16 +62,6 @@ TRY400.py:30:13: TRY400 [*] Use `logging.exception` instead of `logging.error`
    |
    = help: Replace with `exception`
 
-27 27 |         logger.error("Context message here")
-28 28 | 
-29 29 |         if True:
-30    |-            logger.error("Context message here")
-   30 |+            logger.exception("Context message here")
-31 31 | 
-32 32 | 
-33 33 | def bad():
-
-    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 TRY400.py:37:9: TRY400 [*] Use `logging.exception` instead of `logging.error`
    |
@@ -94,16 +74,6 @@ TRY400.py:37:9: TRY400 [*] Use `logging.exception` instead of `logging.error`
    |
    = help: Replace with `exception`
 
-34 34 |     try:
-35 35 |         a = 1
-36 36 |     except Exception:
-37    |-        log.error("Context message here")
-   37 |+        log.exception("Context message here")
-38 38 | 
-39 39 |         if True:
-40 40 |             log.error("Context message here")
-
-    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 TRY400.py:40:13: TRY400 [*] Use `logging.exception` instead of `logging.error`
    |
@@ -113,16 +83,6 @@ TRY400.py:40:13: TRY400 [*] Use `logging.exception` instead of `logging.error`
    |
    = help: Replace with `exception`
 
-37 37 |         log.error("Context message here")
-38 38 | 
-39 39 |         if True:
-40    |-            log.error("Context message here")
-   40 |+            log.exception("Context message here")
-41 41 | 
-42 42 | 
-43 43 | def bad():
-
-    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 TRY400.py:47:9: TRY400 [*] Use `logging.exception` instead of `logging.error`
    |
@@ -135,16 +95,6 @@ TRY400.py:47:9: TRY400 [*] Use `logging.exception` instead of `logging.error`
    |
    = help: Replace with `exception`
 
-44 44 |     try:
-45 45 |         a = 1
-46 46 |     except Exception:
-47    |-        self.logger.error("Context message here")
-   47 |+        self.logger.exception("Context message here")
-48 48 | 
-49 49 |         if True:
-50 50 |             self.logger.error("Context message here")
-
-    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 TRY400.py:50:13: TRY400 [*] Use `logging.exception` instead of `logging.error`
    |
@@ -154,16 +104,6 @@ TRY400.py:50:13: TRY400 [*] Use `logging.exception` instead of `logging.error`
    |
    = help: Replace with `exception`
 
-47 47 |         self.logger.error("Context message here")
-48 48 | 
-49 49 |         if True:
-50    |-            self.logger.error("Context message here")
-   50 |+            self.logger.exception("Context message here")
-51 51 | 
-52 52 | 
-53 53 | def good():
-
-    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 TRY400.py:100:9: TRY400 [*] Use `logging.exception` instead of `logging.error`
     |

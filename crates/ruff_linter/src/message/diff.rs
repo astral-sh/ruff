@@ -36,6 +36,16 @@ impl<'a> Diff<'a> {
 
 impl Display for Diff<'_> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        // TODO: Instead of hard-coding this in, the `TextEmitter` should be
+        // handling it. See https://github.com/astral-sh/ruff/issues/12597 for
+        // further discussion.
+        if matches!(
+            self.fix.applicability(),
+            Applicability::Unsafe | Applicability::DisplayOnly
+        ) {
+            return Ok(());
+        }
+
         // TODO(dhruvmanila): Add support for Notebook cells once it's user-facing
         let mut output = String::with_capacity(self.source_code.source_text().len());
         let mut last_end = TextSize::default();
@@ -108,14 +118,11 @@ impl Display for Diff<'_> {
             }
         }
 
-        let action_message = match self.fix.applicability() {
-            Applicability::Safe => "Run `ruff check --fix` to apply this fix.",
-            Applicability::Unsafe => {
-                "Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix."
-            }
-            Applicability::DisplayOnly => "Ruff cannot safely apply this fix.",
+        // TODO: https://github.com/astral-sh/ruff/issues/12598
+        match self.fix.applicability() {
+            Applicability::Safe => writeln!(f, "\n    Run `ruff check --fix` to apply this fix.")?,
+            Applicability::Unsafe | Applicability::DisplayOnly => {}
         };
-        writeln!(f, "\n    {action_message}")?;
 
         Ok(())
     }

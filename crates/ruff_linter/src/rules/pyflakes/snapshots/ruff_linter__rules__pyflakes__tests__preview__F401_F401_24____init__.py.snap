@@ -8,15 +8,6 @@ __init__.py:19:8: F401 [*] `sys` imported but unused
    |
    = help: Remove unused import: `sys`
 
-16 16 | import argparse as argparse  # Ok: is redundant alias
-17 17 | 
-18 18 | 
-19    |-import sys  # F401: remove unused
-20 19 | 
-21 20 | 
-22 21 | # first-party
-
-    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 __init__.py:33:15: F401 [*] `.unused` imported but unused; consider removing, adding to `__all__`, or using a redundant alias
    |

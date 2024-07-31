@@ -10,13 +10,6 @@ C405.py:1:1: C405 [*] Unnecessary `list` literal (rewrite as a `set` literal)
   |
   = help: Rewrite as a `set` literal
 
-1   |-set([1, 2])
-  1 |+{1, 2}
-2 2 | set((1, 2))
-3 3 | set([])
-4 4 | set(())
-
-    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 C405.py:2:1: C405 [*] Unnecessary `tuple` literal (rewrite as a `set` literal)
   |
@@ -28,14 +21,6 @@ C405.py:2:1: C405 [*] Unnecessary `tuple` literal (rewrite as a `set` literal)
   |
   = help: Rewrite as a `set` literal
 
-1 1 | set([1, 2])
-2   |-set((1, 2))
-  2 |+{1, 2}
-3 3 | set([])
-4 4 | set(())
-5 5 | set()
-
-    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 C405.py:3:1: C405 [*] Unnecessary `list` literal (rewrite as a `set` literal)
   |
@@ -48,15 +33,6 @@ C405.py:3:1: C405 [*] Unnecessary `list` literal (rewrite as a `set` literal)
   |
   = help: Rewrite as a `set` literal
 
-1 1 | set([1, 2])
-2 2 | set((1, 2))
-3   |-set([])
-  3 |+set()
-4 4 | set(())
-5 5 | set()
-6 6 | set((1,))
-
-    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 C405.py:4:1: C405 [*] Unnecessary `tuple` literal (rewrite as a `set` literal)
   |
@@ -69,17 +45,6 @@ C405.py:4:1: C405 [*] Unnecessary `tuple` literal (rewrite as a `set` literal)
   |
   = help: Rewrite as a `set` literal
 
-1 1 | set([1, 2])
-2 2 | set((1, 2))
-3 3 | set([])
-4   |-set(())
-5 4 | set()
-  5 |+set()
-6 6 | set((1,))
-7 7 | set((
-8 8 |     1,
-
-    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 C405.py:6:1: C405 [*] Unnecessary `tuple` literal (rewrite as a `set` literal)
   |
@@ -92,16 +57,6 @@ C405.py:6:1: C405 [*] Unnecessary `tuple` literal (rewrite as a `set` literal)
   |
   = help: Rewrite as a `set` literal
 
-3 3 | set([])
-4 4 | set(())
-5 5 | set()
-6   |-set((1,))
-  6 |+{1}
-7 7 | set((
-8 8 |     1,
-9 9 | ))
-
-    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 C405.py:7:1: C405 [*] Unnecessary `tuple` literal (rewrite as a `set` literal)
    |
@@ -116,19 +71,6 @@ C405.py:7:1: C405 [*] Unnecessary `tuple` literal (rewrite as a `set` literal)
    |
    = help: Rewrite as a `set` literal
 
-4  4  | set(())
-5  5  | set()
-6  6  | set((1,))
-7     |-set((
-   7  |+{
-8  8  |     1,
-9     |-))
-   9  |+}
-10 10 | set([
-11 11 |     1,
-12 12 | ])
-
-    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 C405.py:10:1: C405 [*] Unnecessary `list` literal (rewrite as a `set` literal)
    |
@@ -143,19 +85,6 @@ C405.py:10:1: C405 [*] Unnecessary `list` literal (rewrite as a `set` literal)
    |
    = help: Rewrite as a `set` literal
 
-7  7  | set((
-8  8  |     1,
-9  9  | ))
-10    |-set([
-   10 |+{
-11 11 |     1,
-12    |-])
-   12 |+}
-13 13 | set(
-14 14 |     (1,)
-15 15 | )
-
-    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 C405.py:13:1: C405 [*] Unnecessary `tuple` literal (rewrite as a `set` literal)
    |
@@ -170,18 +99,6 @@ C405.py:13:1: C405 [*] Unnecessary `tuple` literal (rewrite as a `set` literal)
    |
    = help: Rewrite as a `set` literal
 
-10 10 | set([
-11 11 |     1,
-12 12 | ])
-13    |-set(
-14    |-    (1,)
-15    |-)
-   13 |+{1}
-16 14 | set(
-17 15 |     [1,]
-18 16 | )
-
-    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 C405.py:16:1: C405 [*] Unnecessary `list` literal (rewrite as a `set` literal)
    |
@@ -196,18 +113,6 @@ C405.py:16:1: C405 [*] Unnecessary `list` literal (rewrite as a `set` literal)
    |
    = help: Rewrite as a `set` literal
 
-13 13 | set(
-14 14 |     (1,)
-15 15 | )
-16    |-set(
-17    |-    [1,]
-18    |-)
-   16 |+{1,}
-19 17 | f"{set([1,2,3])}"
-20 18 | f"{set(['a', 'b'])}"
-21 19 | f'{set(["a", "b"])}'
-
-    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 C405.py:19:4: C405 [*] Unnecessary `list` literal (rewrite as a `set` literal)
    |
@@ -220,16 +125,6 @@ C405.py:19:4: C405 [*] Unnecessary `list` literal (rewrite as a `set` literal)
    |
    = help: Rewrite as a `set` literal
 
-16 16 | set(
-17 17 |     [1,]
-18 18 | )
-19    |-f"{set([1,2,3])}"
-   19 |+f"{ {1,2,3} }"
-20 20 | f"{set(['a', 'b'])}"
-21 21 | f'{set(["a", "b"])}'
-22 22 | 
-
-    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 C405.py:20:4: C405 [*] Unnecessary `list` literal (rewrite as a `set` literal)
    |
@@ -241,16 +136,6 @@ C405.py:20:4: C405 [*] Unnecessary `list` literal (rewrite as a `set` literal)
    |
    = help: Rewrite as a `set` literal
 
-17 17 |     [1,]
-18 18 | )
-19 19 | f"{set([1,2,3])}"
-20    |-f"{set(['a', 'b'])}"
-   20 |+f"{ {'a', 'b'} }"
-21 21 | f'{set(["a", "b"])}'
-22 22 | 
-23 23 | f"{set(['a', 'b']) - set(['a'])}"
-
-    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 C405.py:21:4: C405 [*] Unnecessary `list` literal (rewrite as a `set` literal)
    |
@@ -263,16 +148,6 @@ C405.py:21:4: C405 [*] Unnecessary `list` literal (rewrite as a `set` literal)
    |
    = help: Rewrite as a `set` literal
 
-18 18 | )
-19 19 | f"{set([1,2,3])}"
-20 20 | f"{set(['a', 'b'])}"
-21    |-f'{set(["a", "b"])}'
-   21 |+f'{ {"a", "b"} }'
-22 22 | 
-23 23 | f"{set(['a', 'b']) - set(['a'])}"
-24 24 | f"{ set(['a', 'b']) - set(['a']) }"
-
-    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 C405.py:23:4: C405 [*] Unnecessary `list` literal (rewrite as a `set` literal)
    |
@@ -285,16 +160,6 @@ C405.py:23:4: C405 [*] Unnecessary `list` literal (rewrite as a `set` literal)
    |
    = help: Rewrite as a `set` literal
 
-20 20 | f"{set(['a', 'b'])}"
-21 21 | f'{set(["a", "b"])}'
-22 22 | 
-23    |-f"{set(['a', 'b']) - set(['a'])}"
-   23 |+f"{ {'a', 'b'} - set(['a'])}"
-24 24 | f"{ set(['a', 'b']) - set(['a']) }"
-25 25 | f"a {set(['a', 'b']) - set(['a'])} b"
-26 26 | f"a { set(['a', 'b']) - set(['a']) } b"
-
-    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 C405.py:23:22: C405 [*] Unnecessary `list` literal (rewrite as a `set` literal)
    |
@@ -307,16 +172,6 @@ C405.py:23:22: C405 [*] Unnecessary `list` literal (rewrite as a `set` literal)
    |
    = help: Rewrite as a `set` literal
 
-20 20 | f"{set(['a', 'b'])}"
-21 21 | f'{set(["a", "b"])}'
-22 22 | 
-23    |-f"{set(['a', 'b']) - set(['a'])}"
-   23 |+f"{set(['a', 'b']) - {'a'} }"
-24 24 | f"{ set(['a', 'b']) - set(['a']) }"
-25 25 | f"a {set(['a', 'b']) - set(['a'])} b"
-26 26 | f"a { set(['a', 'b']) - set(['a']) } b"
-
-    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 C405.py:24:5: C405 [*] Unnecessary `list` literal (rewrite as a `set` literal)
    |
@@ -328,15 +183,6 @@ C405.py:24:5: C405 [*] Unnecessary `list` literal (rewrite as a `set` literal)
    |
    = help: Rewrite as a `set` literal
 
-21 21 | f'{set(["a", "b"])}'
-22 22 | 
-23 23 | f"{set(['a', 'b']) - set(['a'])}"
-24    |-f"{ set(['a', 'b']) - set(['a']) }"
-   24 |+f"{ {'a', 'b'} - set(['a']) }"
-25 25 | f"a {set(['a', 'b']) - set(['a'])} b"
-26 26 | f"a { set(['a', 'b']) - set(['a']) } b"
-
-    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 C405.py:24:23: C405 [*] Unnecessary `list` literal (rewrite as a `set` literal)
    |
@@ -348,15 +194,6 @@ C405.py:24:23: C405 [*] Unnecessary `list` literal (rewrite as a `set` literal)
    |
    = help: Rewrite as a `set` literal
 
-21 21 | f'{set(["a", "b"])}'
-22 22 | 
-23 23 | f"{set(['a', 'b']) - set(['a'])}"
-24    |-f"{ set(['a', 'b']) - set(['a']) }"
-   24 |+f"{ set(['a', 'b']) - {'a'} }"
-25 25 | f"a {set(['a', 'b']) - set(['a'])} b"
-26 26 | f"a { set(['a', 'b']) - set(['a']) } b"
-
-    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 C405.py:25:6: C405 [*] Unnecessary `list` literal (rewrite as a `set` literal)
    |
@@ -368,14 +205,6 @@ C405.py:25:6: C405 [*] Unnecessary `list` literal (rewrite as a `set` literal)
    |
    = help: Rewrite as a `set` literal
 
-22 22 | 
-23 23 | f"{set(['a', 'b']) - set(['a'])}"
-24 24 | f"{ set(['a', 'b']) - set(['a']) }"
-25    |-f"a {set(['a', 'b']) - set(['a'])} b"
-   25 |+f"a { {'a', 'b'} - set(['a'])} b"
-26 26 | f"a { set(['a', 'b']) - set(['a']) } b"
-
-    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 C405.py:25:24: C405 [*] Unnecessary `list` literal (rewrite as a `set` literal)
    |
@@ -387,14 +216,6 @@ C405.py:25:24: C405 [*] Unnecessary `list` literal (rewrite as a `set` literal)
    |
    = help: Rewrite as a `set` literal
 
-22 22 | 
-23 23 | f"{set(['a', 'b']) - set(['a'])}"
-24 24 | f"{ set(['a', 'b']) - set(['a']) }"
-25    |-f"a {set(['a', 'b']) - set(['a'])} b"
-   25 |+f"a {set(['a', 'b']) - {'a'} } b"
-26 26 | f"a { set(['a', 'b']) - set(['a']) } b"
-
-    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 C405.py:26:7: C405 [*] Unnecessary `list` literal (rewrite as a `set` literal)
    |
@@ -405,13 +226,6 @@ C405.py:26:7: C405 [*] Unnecessary `list` literal (rewrite as a `set` literal)
    |
    = help: Rewrite as a `set` literal
 
-23 23 | f"{set(['a', 'b']) - set(['a'])}"
-24 24 | f"{ set(['a', 'b']) - set(['a']) }"
-25 25 | f"a {set(['a', 'b']) - set(['a'])} b"
-26    |-f"a { set(['a', 'b']) - set(['a']) } b"
-   26 |+f"a { {'a', 'b'} - set(['a']) } b"
-
-    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 C405.py:26:25: C405 [*] Unnecessary `list` literal (rewrite as a `set` literal)
    |
@@ -421,11 +235,3 @@ C405.py:26:25: C405 [*] Unnecessary `list` literal (rewrite as a `set` literal)
    |                         ^^^^^^^^^^ C405
    |
    = help: Rewrite as a `set` literal
-
-23 23 | f"{set(['a', 'b']) - set(['a'])}"
-24 24 | f"{ set(['a', 'b']) - set(['a']) }"
-25 25 | f"a {set(['a', 'b']) - set(['a'])} b"
-26    |-f"a { set(['a', 'b']) - set(['a']) } b"
-   26 |+f"a { set(['a', 'b']) - {'a'} } b"
-
-    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.

@@ -9,14 +9,6 @@ D301.py:2:5: D301 [*] Use `r"""` if any backslashes in a docstring
   |
   = help: Add `r` prefix
 
-1 1 | def double_quotes_backslash():
-2   |-    """Sum\\mary."""
-  2 |+    r"""Sum\\mary."""
-3 3 | 
-4 4 | 
-5 5 | def double_quotes_backslash_raw():
-
-    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 D301.py:37:5: D301 Use `r"""` if any backslashes in a docstring
    |
@@ -37,16 +29,6 @@ D301.py:93:5: D301 [*] Use `r"""` if any backslashes in a docstring
    |
    = help: Add `r` prefix
 
-90 90 | 
-91 91 | 
-92 92 | def should_add_raw_for_single_double_quote_escape():
-93    |-    """
-   93 |+    r"""
-94 94 |     This is single quote escape \".
-95 95 |     """
-96 96 | 
-
-    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 D301.py:99:5: D301 [*] Use `r"""` if any backslashes in a docstring
     |
@@ -58,13 +40,3 @@ D301.py:99:5: D301 [*] Use `r"""` if any backslashes in a docstring
     | |_______^ D301
     |
     = help: Add `r` prefix
-
-96  96  | 
-97  97  | 
-98  98  | def should_add_raw_for_single_single_quote_escape():
-99      |-    '''
-    99  |+    r'''
-100 100 |     This is single quote escape \'.
-101 101 |     '''
-
-    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.

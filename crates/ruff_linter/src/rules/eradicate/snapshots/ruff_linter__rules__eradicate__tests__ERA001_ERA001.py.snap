@@ -10,12 +10,6 @@ ERA001.py:1:1: ERA001 Found commented-out code
   |
   = help: Remove commented-out code
 
-1   |-#import os
-2 1 | # from foo import junk
-3 2 | #a = 3
-4 3 | a = 4
-
-    Ruff cannot safely apply this fix.
 
 ERA001.py:2:1: ERA001 Found commented-out code
   |
@@ -27,13 +21,6 @@ ERA001.py:2:1: ERA001 Found commented-out code
   |
   = help: Remove commented-out code
 
-1 1 | #import os
-2   |-# from foo import junk
-3 2 | #a = 3
-4 3 | a = 4
-5 4 | #foo(1, 2, 3)
-
-    Ruff cannot safely apply this fix.
 
 ERA001.py:3:1: ERA001 Found commented-out code
   |
@@ -46,14 +33,6 @@ ERA001.py:3:1: ERA001 Found commented-out code
   |
   = help: Remove commented-out code
 
-1 1 | #import os
-2 2 | # from foo import junk
-3   |-#a = 3
-4 3 | a = 4
-5 4 | #foo(1, 2, 3)
-6 5 | 
-
-    Ruff cannot safely apply this fix.
 
 ERA001.py:5:1: ERA001 Found commented-out code
   |
@@ -66,15 +45,6 @@ ERA001.py:5:1: ERA001 Found commented-out code
   |
   = help: Remove commented-out code
 
-2 2 | # from foo import junk
-3 3 | #a = 3
-4 4 | a = 4
-5   |-#foo(1, 2, 3)
-6 5 | 
-7 6 | def foo(x, y, z):
-8 7 |     content = 1 # print('hello')
-
-    Ruff cannot safely apply this fix.
 
 ERA001.py:13:5: ERA001 Found commented-out code
    |
@@ -86,15 +56,6 @@ ERA001.py:13:5: ERA001 Found commented-out code
    |
    = help: Remove commented-out code
 
-10 10 | 
-11 11 |     # This is a real comment.
-12 12 |     # # This is a (nested) comment.
-13    |-    #return True
-14 13 |     return False
-15 14 | 
-16 15 | #import os  # noqa: ERA001
-
-    Ruff cannot safely apply this fix.
 
 ERA001.py:21:5: ERA001 Found commented-out code
    |
@@ -105,15 +66,6 @@ ERA001.py:21:5: ERA001 Found commented-out code
    |
    = help: Remove commented-out code
 
-18 18 | 
-19 19 | class A():
-20 20 |     pass
-21    |-    # b = c
-22 21 | 
-23 22 | 
-24 23 | dictionary = {
-
-    Ruff cannot safely apply this fix.
 
 ERA001.py:26:5: ERA001 Found commented-out code
    |
@@ -126,15 +78,6 @@ ERA001.py:26:5: ERA001 Found commented-out code
    |
    = help: Remove commented-out code
 
-23 23 | 
-24 24 | dictionary = {
-25 25 |     # "key1": 123,  # noqa: ERA001
-26    |-    # "key2": 456,
-27 26 |     # "key3": 789,  # test
-28 27 | }
-29 28 | 
-
-    Ruff cannot safely apply this fix.
 
 ERA001.py:27:5: ERA001 Found commented-out code
    |
@@ -146,15 +89,6 @@ ERA001.py:27:5: ERA001 Found commented-out code
    |
    = help: Remove commented-out code
 
-24 24 | dictionary = {
-25 25 |     # "key1": 123,  # noqa: ERA001
-26 26 |     # "key2": 456,
-27    |-    # "key3": 789,  # test
-28 27 | }
-29 28 | 
-30 29 | #import os  # noqa
-
-    Ruff cannot safely apply this fix.
 
 ERA001.py:32:1: ERA001 Found commented-out code
    |
@@ -167,15 +101,6 @@ ERA001.py:32:1: ERA001 Found commented-out code
    |
    = help: Remove commented-out code
 
-29 29 | 
-30 30 | #import os  # noqa
-31 31 | 
-32    |-# case 1:
-33 32 | # try:
-34 33 | # try:  # with comment
-35 34 | # try: print()
-
-    Ruff cannot safely apply this fix.
 
 ERA001.py:33:1: ERA001 Found commented-out code
    |
@@ -187,15 +112,6 @@ ERA001.py:33:1: ERA001 Found commented-out code
    |
    = help: Remove commented-out code
 
-30 30 | #import os  # noqa
-31 31 | 
-32 32 | # case 1:
-33    |-# try:
-34 33 | # try:  # with comment
-35 34 | # try: print()
-36 35 | # except:
-
-    Ruff cannot safely apply this fix.
 
 ERA001.py:34:1: ERA001 Found commented-out code
    |
@@ -208,15 +124,6 @@ ERA001.py:34:1: ERA001 Found commented-out code
    |
    = help: Remove commented-out code
 
-31 31 | 
-32 32 | # case 1:
-33 33 | # try:
-34    |-# try:  # with comment
-35 34 | # try: print()
-36 35 | # except:
-37 36 | # except Foo:
-
-    Ruff cannot safely apply this fix.
 
 ERA001.py:35:1: ERA001 Found commented-out code
    |
@@ -229,15 +136,6 @@ ERA001.py:35:1: ERA001 Found commented-out code
    |
    = help: Remove commented-out code
 
-32 32 | # case 1:
-33 33 | # try:
-34 34 | # try:  # with comment
-35    |-# try: print()
-36 35 | # except:
-37 36 | # except Foo:
-38 37 | # except Exception as e: print(e)
-
-    Ruff cannot safely apply this fix.
 
 ERA001.py:36:1: ERA001 Found commented-out code
    |
@@ -250,15 +148,6 @@ ERA001.py:36:1: ERA001 Found commented-out code
    |
    = help: Remove commented-out code
 
-33 33 | # try:
-34 34 | # try:  # with comment
-35 35 | # try: print()
-36    |-# except:
-37 36 | # except Foo:
-38 37 | # except Exception as e: print(e)
-39 38 | 
-
-    Ruff cannot safely apply this fix.
 
 ERA001.py:37:1: ERA001 Found commented-out code
    |
@@ -270,15 +159,6 @@ ERA001.py:37:1: ERA001 Found commented-out code
    |
    = help: Remove commented-out code
 
-34 34 | # try:  # with comment
-35 35 | # try: print()
-36 36 | # except:
-37    |-# except Foo:
-38 37 | # except Exception as e: print(e)
-39 38 | 
-40 39 | 
-
-    Ruff cannot safely apply this fix.
 
 ERA001.py:38:1: ERA001 Found commented-out code
    |
@@ -289,15 +169,6 @@ ERA001.py:38:1: ERA001 Found commented-out code
    |
    = help: Remove commented-out code
 
-35 35 | # try: print()
-36 36 | # except:
-37 37 | # except Foo:
-38    |-# except Exception as e: print(e)
-39 38 | 
-40 39 | 
-41 40 | # Script tag without an opening tag (Error)
-
-    Ruff cannot safely apply this fix.
 
 ERA001.py:44:1: ERA001 Found commented-out code
    |
@@ -309,15 +180,6 @@ ERA001.py:44:1: ERA001 Found commented-out code
    |
    = help: Remove commented-out code
 
-41 41 | # Script tag without an opening tag (Error)
-42 42 | 
-43 43 | # requires-python = ">=3.11"
-44    |-# dependencies = [
-45 44 | #   "requests<3",
-46 45 | #   "rich",
-47 46 | # ]
-
-    Ruff cannot safely apply this fix.
 
 ERA001.py:47:1: ERA001 Found commented-out code
    |
@@ -328,13 +190,3 @@ ERA001.py:47:1: ERA001 Found commented-out code
 48 | # ///
    |
    = help: Remove commented-out code
-
-44 44 | # dependencies = [
-45 45 | #   "requests<3",
-46 46 | #   "rich",
-47    |-# ]
-48 47 | # ///
-49 48 | 
-50 49 | # Script tag (OK)
-
-    Ruff cannot safely apply this fix.

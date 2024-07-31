@@ -12,16 +12,6 @@ non_augmented_assignment.py:16:1: PLR6104 [*] Use `+=` to perform an augmented a
    |
    = help: Replace with augmented assignment
 
-13 13 | some_set = {"elem"}
-14 14 | mat1, mat2 = None, None
-15 15 | 
-16    |-some_string = some_string + "a very long end of string"
-   16 |+some_string += "a very long end of string"
-17 17 | index = index - 1
-18 18 | a_list = a_list + ["to concat"]
-19 19 | some_set = some_set | {"to concat"}
-
-    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 non_augmented_assignment.py:17:1: PLR6104 [*] Use `-=` to perform an augmented assignment directly
    |
@@ -33,16 +23,6 @@ non_augmented_assignment.py:17:1: PLR6104 [*] Use `-=` to perform an augmented a
    |
    = help: Replace with augmented assignment
 
-14 14 | mat1, mat2 = None, None
-15 15 | 
-16 16 | some_string = some_string + "a very long end of string"
-17    |-index = index - 1
-   17 |+index -= 1
-18 18 | a_list = a_list + ["to concat"]
-19 19 | some_set = some_set | {"to concat"}
-20 20 | to_multiply = to_multiply * 5
-
-    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 non_augmented_assignment.py:18:1: PLR6104 [*] Use `+=` to perform an augmented assignment directly
    |
@@ -55,16 +35,6 @@ non_augmented_assignment.py:18:1: PLR6104 [*] Use `+=` to perform an augmented a
    |
    = help: Replace with augmented assignment
 
-15 15 | 
-16 16 | some_string = some_string + "a very long end of string"
-17 17 | index = index - 1
-18    |-a_list = a_list + ["to concat"]
-   18 |+a_list += ["to concat"]
-19 19 | some_set = some_set | {"to concat"}
-20 20 | to_multiply = to_multiply * 5
-21 21 | to_multiply = 5 * to_multiply
-
-    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 non_augmented_assignment.py:19:1: PLR6104 [*] Use `|=` to perform an augmented assignment directly
    |
@@ -77,16 +47,6 @@ non_augmented_assignment.py:19:1: PLR6104 [*] Use `|=` to perform an augmented a
    |
    = help: Replace with augmented assignment
 
-16 16 | some_string = some_string + "a very long end of string"
-17 17 | index = index - 1
-18 18 | a_list = a_list + ["to concat"]
-19    |-some_set = some_set | {"to concat"}
-   19 |+some_set |= {"to concat"}
-20 20 | to_multiply = to_multiply * 5
-21 21 | to_multiply = 5 * to_multiply
-22 22 | to_multiply = to_multiply * to_multiply
-
-    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 non_augmented_assignment.py:20:1: PLR6104 [*] Use `*=` to perform an augmented assignment directly
    |
@@ -99,16 +59,6 @@ non_augmented_assignment.py:20:1: PLR6104 [*] Use `*=` to perform an augmented a
    |
    = help: Replace with augmented assignment
 
-17 17 | index = index - 1
-18 18 | a_list = a_list + ["to concat"]
-19 19 | some_set = some_set | {"to concat"}
-20    |-to_multiply = to_multiply * 5
-   20 |+to_multiply *= 5
-21 21 | to_multiply = 5 * to_multiply
-22 22 | to_multiply = to_multiply * to_multiply
-23 23 | to_divide = to_divide / 5
-
-    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 non_augmented_assignment.py:21:1: PLR6104 [*] Use `*=` to perform an augmented assignment directly
    |
@@ -121,16 +71,6 @@ non_augmented_assignment.py:21:1: PLR6104 [*] Use `*=` to perform an augmented a
    |
    = help: Replace with augmented assignment
 
-18 18 | a_list = a_list + ["to concat"]
-19 19 | some_set = some_set | {"to concat"}
-20 20 | to_multiply = to_multiply * 5
-21    |-to_multiply = 5 * to_multiply
-   21 |+to_multiply *= 5
-22 22 | to_multiply = to_multiply * to_multiply
-23 23 | to_divide = to_divide / 5
-24 24 | to_divide = to_divide // 5
-
-    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 non_augmented_assignment.py:22:1: PLR6104 [*] Use `*=` to perform an augmented assignment directly
    |
@@ -143,16 +83,6 @@ non_augmented_assignment.py:22:1: PLR6104 [*] Use `*=` to perform an augmented a
    |
    = help: Replace with augmented assignment
 
-19 19 | some_set = some_set | {"to concat"}
-20 20 | to_multiply = to_multiply * 5
-21 21 | to_multiply = 5 * to_multiply
-22    |-to_multiply = to_multiply * to_multiply
-   22 |+to_multiply *= to_multiply
-23 23 | to_divide = to_divide / 5
-24 24 | to_divide = to_divide // 5
-25 25 | to_cube = to_cube**3
-
-    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 non_augmented_assignment.py:23:1: PLR6104 [*] Use `/=` to perform an augmented assignment directly
    |
@@ -165,16 +95,6 @@ non_augmented_assignment.py:23:1: PLR6104 [*] Use `/=` to perform an augmented a
    |
    = help: Replace with augmented assignment
 
-20 20 | to_multiply = to_multiply * 5
-21 21 | to_multiply = 5 * to_multiply
-22 22 | to_multiply = to_multiply * to_multiply
-23    |-to_divide = to_divide / 5
-   23 |+to_divide /= 5
-24 24 | to_divide = to_divide // 5
-25 25 | to_cube = to_cube**3
-26 26 | to_cube = 3**to_cube
-
-    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 non_augmented_assignment.py:24:1: PLR6104 [*] Use `//=` to perform an augmented assignment directly
    |
@@ -187,16 +107,6 @@ non_augmented_assignment.py:24:1: PLR6104 [*] Use `//=` to perform an augmented 
    |
    = help: Replace with augmented assignment
 
-21 21 | to_multiply = 5 * to_multiply
-22 22 | to_multiply = to_multiply * to_multiply
-23 23 | to_divide = to_divide / 5
-24    |-to_divide = to_divide // 5
-   24 |+to_divide //= 5
-25 25 | to_cube = to_cube**3
-26 26 | to_cube = 3**to_cube
-27 27 | to_cube = to_cube**to_cube
-
-    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 non_augmented_assignment.py:25:1: PLR6104 [*] Use `**=` to perform an augmented assignment directly
    |
@@ -209,16 +119,6 @@ non_augmented_assignment.py:25:1: PLR6104 [*] Use `**=` to perform an augmented 
    |
    = help: Replace with augmented assignment
 
-22 22 | to_multiply = to_multiply * to_multiply
-23 23 | to_divide = to_divide / 5
-24 24 | to_divide = to_divide // 5
-25    |-to_cube = to_cube**3
-   25 |+to_cube **= 3
-26 26 | to_cube = 3**to_cube
-27 27 | to_cube = to_cube**to_cube
-28 28 | timeDiffSeconds = timeDiffSeconds % 60
-
-    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 non_augmented_assignment.py:27:1: PLR6104 [*] Use `**=` to perform an augmented assignment directly
    |
@@ -231,16 +131,6 @@ non_augmented_assignment.py:27:1: PLR6104 [*] Use `**=` to perform an augmented 
    |
    = help: Replace with augmented assignment
 
-24 24 | to_divide = to_divide // 5
-25 25 | to_cube = to_cube**3
-26 26 | to_cube = 3**to_cube
-27    |-to_cube = to_cube**to_cube
-   27 |+to_cube **= to_cube
-28 28 | timeDiffSeconds = timeDiffSeconds % 60
-29 29 | flags = flags & 0x1
-30 30 | flags = flags | 0x1
-
-    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 non_augmented_assignment.py:28:1: PLR6104 [*] Use `%=` to perform an augmented assignment directly
    |
@@ -253,16 +143,6 @@ non_augmented_assignment.py:28:1: PLR6104 [*] Use `%=` to perform an augmented a
    |
    = help: Replace with augmented assignment
 
-25 25 | to_cube = to_cube**3
-26 26 | to_cube = 3**to_cube
-27 27 | to_cube = to_cube**to_cube
-28    |-timeDiffSeconds = timeDiffSeconds % 60
-   28 |+timeDiffSeconds %= 60
-29 29 | flags = flags & 0x1
-30 30 | flags = flags | 0x1
-31 31 | flags = flags ^ 0x1
-
-    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 non_augmented_assignment.py:29:1: PLR6104 [*] Use `&=` to perform an augmented assignment directly
    |
@@ -275,16 +155,6 @@ non_augmented_assignment.py:29:1: PLR6104 [*] Use `&=` to perform an augmented a
    |
    = help: Replace with augmented assignment
 
-26 26 | to_cube = 3**to_cube
-27 27 | to_cube = to_cube**to_cube
-28 28 | timeDiffSeconds = timeDiffSeconds % 60
-29    |-flags = flags & 0x1
-   29 |+flags &= 1
-30 30 | flags = flags | 0x1
-31 31 | flags = flags ^ 0x1
-32 32 | flags = flags << 1
-
-    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 non_augmented_assignment.py:30:1: PLR6104 [*] Use `|=` to perform an augmented assignment directly
    |
@@ -297,16 +167,6 @@ non_augmented_assignment.py:30:1: PLR6104 [*] Use `|=` to perform an augmented a
    |
    = help: Replace with augmented assignment
 
-27 27 | to_cube = to_cube**to_cube
-28 28 | timeDiffSeconds = timeDiffSeconds % 60
-29 29 | flags = flags & 0x1
-30    |-flags = flags | 0x1
-   30 |+flags |= 1
-31 31 | flags = flags ^ 0x1
-32 32 | flags = flags << 1
-33 33 | flags = flags >> 1
-
-    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 non_augmented_assignment.py:31:1: PLR6104 [*] Use `^=` to perform an augmented assignment directly
    |
@@ -319,16 +179,6 @@ non_augmented_assignment.py:31:1: PLR6104 [*] Use `^=` to perform an augmented a
    |
    = help: Replace with augmented assignment
 
-28 28 | timeDiffSeconds = timeDiffSeconds % 60
-29 29 | flags = flags & 0x1
-30 30 | flags = flags | 0x1
-31    |-flags = flags ^ 0x1
-   31 |+flags ^= 1
-32 32 | flags = flags << 1
-33 33 | flags = flags >> 1
-34 34 | mat1 = mat1 @ mat2
-
-    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 non_augmented_assignment.py:32:1: PLR6104 [*] Use `<<=` to perform an augmented assignment directly
    |
@@ -341,16 +191,6 @@ non_augmented_assignment.py:32:1: PLR6104 [*] Use `<<=` to perform an augmented 
    |
    = help: Replace with augmented assignment
 
-29 29 | flags = flags & 0x1
-30 30 | flags = flags | 0x1
-31 31 | flags = flags ^ 0x1
-32    |-flags = flags << 1
-   32 |+flags <<= 1
-33 33 | flags = flags >> 1
-34 34 | mat1 = mat1 @ mat2
-35 35 | a_list[1] = a_list[1] + 1
-
-    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 non_augmented_assignment.py:33:1: PLR6104 [*] Use `>>=` to perform an augmented assignment directly
    |
@@ -363,16 +203,6 @@ non_augmented_assignment.py:33:1: PLR6104 [*] Use `>>=` to perform an augmented 
    |
    = help: Replace with augmented assignment
 
-30 30 | flags = flags | 0x1
-31 31 | flags = flags ^ 0x1
-32 32 | flags = flags << 1
-33    |-flags = flags >> 1
-   33 |+flags >>= 1
-34 34 | mat1 = mat1 @ mat2
-35 35 | a_list[1] = a_list[1] + 1
-36 36 | 
-
-    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 non_augmented_assignment.py:34:1: PLR6104 [*] Use `@=` to perform an augmented assignment directly
    |
@@ -384,16 +214,6 @@ non_augmented_assignment.py:34:1: PLR6104 [*] Use `@=` to perform an augmented a
    |
    = help: Replace with augmented assignment
 
-31 31 | flags = flags ^ 0x1
-32 32 | flags = flags << 1
-33 33 | flags = flags >> 1
-34    |-mat1 = mat1 @ mat2
-   34 |+mat1 @= mat2
-35 35 | a_list[1] = a_list[1] + 1
-36 36 | 
-37 37 | a_list[0:2] = a_list[0:2] * 3
-
-    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 non_augmented_assignment.py:35:1: PLR6104 [*] Use `+=` to perform an augmented assignment directly
    |
@@ -406,16 +226,6 @@ non_augmented_assignment.py:35:1: PLR6104 [*] Use `+=` to perform an augmented a
    |
    = help: Replace with augmented assignment
 
-32 32 | flags = flags << 1
-33 33 | flags = flags >> 1
-34 34 | mat1 = mat1 @ mat2
-35    |-a_list[1] = a_list[1] + 1
-   35 |+a_list[1] += 1
-36 36 | 
-37 37 | a_list[0:2] = a_list[0:2] * 3
-38 38 | a_list[:2] = a_list[:2] * 3
-
-    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 non_augmented_assignment.py:37:1: PLR6104 [*] Use `*=` to perform an augmented assignment directly
    |
@@ -428,16 +238,6 @@ non_augmented_assignment.py:37:1: PLR6104 [*] Use `*=` to perform an augmented a
    |
    = help: Replace with augmented assignment
 
-34 34 | mat1 = mat1 @ mat2
-35 35 | a_list[1] = a_list[1] + 1
-36 36 | 
-37    |-a_list[0:2] = a_list[0:2] * 3
-   37 |+a_list[0:2] *= 3
-38 38 | a_list[:2] = a_list[:2] * 3
-39 39 | a_list[1:] = a_list[1:] * 3
-40 40 | a_list[:] = a_list[:] * 3
-
-    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 non_augmented_assignment.py:38:1: PLR6104 [*] Use `*=` to perform an augmented assignment directly
    |
@@ -449,16 +249,6 @@ non_augmented_assignment.py:38:1: PLR6104 [*] Use `*=` to perform an augmented a
    |
    = help: Replace with augmented assignment
 
-35 35 | a_list[1] = a_list[1] + 1
-36 36 | 
-37 37 | a_list[0:2] = a_list[0:2] * 3
-38    |-a_list[:2] = a_list[:2] * 3
-   38 |+a_list[:2] *= 3
-39 39 | a_list[1:] = a_list[1:] * 3
-40 40 | a_list[:] = a_list[:] * 3
-41 41 | 
-
-    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 non_augmented_assignment.py:39:1: PLR6104 [*] Use `*=` to perform an augmented assignment directly
    |
@@ -470,16 +260,6 @@ non_augmented_assignment.py:39:1: PLR6104 [*] Use `*=` to perform an augmented a
    |
    = help: Replace with augmented assignment
 
-36 36 | 
-37 37 | a_list[0:2] = a_list[0:2] * 3
-38 38 | a_list[:2] = a_list[:2] * 3
-39    |-a_list[1:] = a_list[1:] * 3
-   39 |+a_list[1:] *= 3
-40 40 | a_list[:] = a_list[:] * 3
-41 41 | 
-42 42 | index = index * (index + 10)
-
-    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 non_augmented_assignment.py:40:1: PLR6104 [*] Use `*=` to perform an augmented assignment directly
    |
@@ -492,16 +272,6 @@ non_augmented_assignment.py:40:1: PLR6104 [*] Use `*=` to perform an augmented a
    |
    = help: Replace with augmented assignment
 
-37 37 | a_list[0:2] = a_list[0:2] * 3
-38 38 | a_list[:2] = a_list[:2] * 3
-39 39 | a_list[1:] = a_list[1:] * 3
-40    |-a_list[:] = a_list[:] * 3
-   40 |+a_list[:] *= 3
-41 41 | 
-42 42 | index = index * (index + 10)
-43 43 | 
-
-    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 non_augmented_assignment.py:42:1: PLR6104 [*] Use `*=` to perform an augmented assignment directly
    |
@@ -512,16 +282,6 @@ non_augmented_assignment.py:42:1: PLR6104 [*] Use `*=` to perform an augmented a
    |
    = help: Replace with augmented assignment
 
-39 39 | a_list[1:] = a_list[1:] * 3
-40 40 | a_list[:] = a_list[:] * 3
-41 41 | 
-42    |-index = index * (index + 10)
-   42 |+index *= index + 10
-43 43 | 
-44 44 | 
-45 45 | class T:
-
-    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 non_augmented_assignment.py:47:9: PLR6104 [*] Use `+=` to perform an augmented assignment directly
    |
@@ -532,16 +292,6 @@ non_augmented_assignment.py:47:9: PLR6104 [*] Use `+=` to perform an augmented a
    |
    = help: Replace with augmented assignment
 
-44 44 | 
-45 45 | class T:
-46 46 |     def t(self):
-47    |-        self.a = self.a + 1
-   47 |+        self.a += 1
-48 48 | 
-49 49 | 
-50 50 | obj = T()
-
-    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 non_augmented_assignment.py:51:1: PLR6104 [*] Use `+=` to perform an augmented assignment directly
    |
@@ -552,14 +302,3 @@ non_augmented_assignment.py:51:1: PLR6104 [*] Use `+=` to perform an augmented a
 53 | # OK
    |
    = help: Replace with augmented assignment
-
-48 48 | 
-49 49 | 
-50 50 | obj = T()
-51    |-obj.a = obj.a + 1
-   51 |+obj.a += 1
-52 52 | 
-53 53 | # OK
-54 54 | a_list[0] = a_list[:] * 3
-
-    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.

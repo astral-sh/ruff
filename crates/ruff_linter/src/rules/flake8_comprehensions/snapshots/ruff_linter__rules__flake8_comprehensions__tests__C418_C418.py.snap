@@ -10,13 +10,6 @@ C418.py:1:1: C418 [*] Unnecessary `dict` literal passed to `dict()` (remove the 
   |
   = help: Remove outer `dict` call
 
-1   |-dict({})
-  1 |+{}
-2 2 | dict({'a': 1})
-3 3 | dict({'x': 1 for x in range(10)})
-4 4 | dict(
-
-    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 C418.py:2:1: C418 [*] Unnecessary `dict` literal passed to `dict()` (remove the outer call to `dict()`)
   |
@@ -28,14 +21,6 @@ C418.py:2:1: C418 [*] Unnecessary `dict` literal passed to `dict()` (remove the 
   |
   = help: Remove outer `dict` call
 
-1 1 | dict({})
-2   |-dict({'a': 1})
-  2 |+{'a': 1}
-3 3 | dict({'x': 1 for x in range(10)})
-4 4 | dict(
-5 5 |     {'x': 1 for x in range(10)}
-
-    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 C418.py:3:1: C418 [*] Unnecessary `dict` comprehension passed to `dict()` (remove the outer call to `dict()`)
   |
@@ -48,15 +33,6 @@ C418.py:3:1: C418 [*] Unnecessary `dict` comprehension passed to `dict()` (remov
   |
   = help: Remove outer `dict` call
 
-1 1 | dict({})
-2 2 | dict({'a': 1})
-3   |-dict({'x': 1 for x in range(10)})
-  3 |+{'x': 1 for x in range(10)}
-4 4 | dict(
-5 5 |     {'x': 1 for x in range(10)}
-6 6 | )
-
-    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 C418.py:4:1: C418 [*] Unnecessary `dict` comprehension passed to `dict()` (remove the outer call to `dict()`)
   |
@@ -70,16 +46,3 @@ C418.py:4:1: C418 [*] Unnecessary `dict` comprehension passed to `dict()` (remov
 8 |   dict({}, a=1)
   |
   = help: Remove outer `dict` call
-
-1 1 | dict({})
-2 2 | dict({'a': 1})
-3 3 | dict({'x': 1 for x in range(10)})
-4   |-dict(
-5   |-    {'x': 1 for x in range(10)}
-6   |-)
-  4 |+{'x': 1 for x in range(10)}
-7 5 | 
-8 6 | dict({}, a=1)
-9 7 | dict({x: 1 for x in range(1)}, a=1)
-
-    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.

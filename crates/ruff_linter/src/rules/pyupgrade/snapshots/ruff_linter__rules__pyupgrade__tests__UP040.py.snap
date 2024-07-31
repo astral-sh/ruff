@@ -10,16 +10,6 @@ UP040.py:5:1: UP040 [*] Type alias `x` uses `TypeAlias` annotation instead of th
   |
   = help: Use the `type` keyword
 
-2 2 | from typing import TypeAlias
-3 3 | 
-4 4 | # UP040
-5   |-x: typing.TypeAlias = int
-  5 |+type x = int
-6 6 | x: TypeAlias = int
-7 7 | 
-8 8 | # UP040 simple generic
-
-    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 UP040.py:6:1: UP040 [*] Type alias `x` uses `TypeAlias` annotation instead of the `type` keyword
   |
@@ -32,16 +22,6 @@ UP040.py:6:1: UP040 [*] Type alias `x` uses `TypeAlias` annotation instead of th
   |
   = help: Use the `type` keyword
 
-3 3 | 
-4 4 | # UP040
-5 5 | x: typing.TypeAlias = int
-6   |-x: TypeAlias = int
-  6 |+type x = int
-7 7 | 
-8 8 | # UP040 simple generic
-9 9 | T = typing.TypeVar["T"]
-
-    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 UP040.py:10:1: UP040 [*] Type alias `x` uses `TypeAlias` annotation instead of the `type` keyword
    |
@@ -54,16 +34,6 @@ UP040.py:10:1: UP040 [*] Type alias `x` uses `TypeAlias` annotation instead of t
    |
    = help: Use the `type` keyword
 
-7  7  | 
-8  8  | # UP040 simple generic
-9  9  | T = typing.TypeVar["T"]
-10    |-x: typing.TypeAlias = list[T]
-   10 |+type x[T] = list[T]
-11 11 | 
-12 12 | # UP040 call style generic
-13 13 | T = typing.TypeVar("T")
-
-    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 UP040.py:14:1: UP040 [*] Type alias `x` uses `TypeAlias` annotation instead of the `type` keyword
    |
@@ -76,16 +46,6 @@ UP040.py:14:1: UP040 [*] Type alias `x` uses `TypeAlias` annotation instead of t
    |
    = help: Use the `type` keyword
 
-11 11 | 
-12 12 | # UP040 call style generic
-13 13 | T = typing.TypeVar("T")
-14    |-x: typing.TypeAlias = list[T]
-   14 |+type x[T] = list[T]
-15 15 | 
-16 16 | # UP040 bounded generic
-17 17 | T = typing.TypeVar("T", bound=int)
-
-    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 UP040.py:18:1: UP040 [*] Type alias `x` uses `TypeAlias` annotation instead of the `type` keyword
    |
@@ -98,16 +58,6 @@ UP040.py:18:1: UP040 [*] Type alias `x` uses `TypeAlias` annotation instead of t
    |
    = help: Use the `type` keyword
 
-15 15 | 
-16 16 | # UP040 bounded generic
-17 17 | T = typing.TypeVar("T", bound=int)
-18    |-x: typing.TypeAlias = list[T]
-   18 |+type x[T: int] = list[T]
-19 19 | 
-20 20 | # UP040 constrained generic
-21 21 | T = typing.TypeVar("T", int, str)
-
-    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 UP040.py:22:1: UP040 [*] Type alias `x` uses `TypeAlias` annotation instead of the `type` keyword
    |
@@ -120,16 +70,6 @@ UP040.py:22:1: UP040 [*] Type alias `x` uses `TypeAlias` annotation instead of t
    |
    = help: Use the `type` keyword
 
-19 19 | 
-20 20 | # UP040 constrained generic
-21 21 | T = typing.TypeVar("T", int, str)
-22    |-x: typing.TypeAlias = list[T]
-   22 |+type x[T: (int, str)] = list[T]
-23 23 | 
-24 24 | # UP040 contravariant generic
-25 25 | T = typing.TypeVar("T", contravariant=True)
-
-    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 UP040.py:26:1: UP040 [*] Type alias `x` uses `TypeAlias` annotation instead of the `type` keyword
    |
@@ -142,16 +82,6 @@ UP040.py:26:1: UP040 [*] Type alias `x` uses `TypeAlias` annotation instead of t
    |
    = help: Use the `type` keyword
 
-23 23 | 
-24 24 | # UP040 contravariant generic
-25 25 | T = typing.TypeVar("T", contravariant=True)
-26    |-x: typing.TypeAlias = list[T]
-   26 |+type x[T] = list[T]
-27 27 | 
-28 28 | # UP040 covariant generic
-29 29 | T = typing.TypeVar("T", covariant=True)
-
-    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 UP040.py:30:1: UP040 [*] Type alias `x` uses `TypeAlias` annotation instead of the `type` keyword
    |
@@ -164,16 +94,6 @@ UP040.py:30:1: UP040 [*] Type alias `x` uses `TypeAlias` annotation instead of t
    |
    = help: Use the `type` keyword
 
-27 27 | 
-28 28 | # UP040 covariant generic
-29 29 | T = typing.TypeVar("T", covariant=True)
-30    |-x: typing.TypeAlias = list[T]
-   30 |+type x[T] = list[T]
-31 31 | 
-32 32 | # UP040 in class scope
-33 33 | T = typing.TypeVar["T"]
-
-    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 UP040.py:36:5: UP040 [*] Type alias `x` uses `TypeAlias` annotation instead of the `type` keyword
    |
@@ -186,16 +106,6 @@ UP040.py:36:5: UP040 [*] Type alias `x` uses `TypeAlias` annotation instead of t
    |
    = help: Use the `type` keyword
 
-33 33 | T = typing.TypeVar["T"]
-34 34 | class Foo:
-35 35 |     # reference to global variable
-36    |-    x: typing.TypeAlias = list[T]
-   36 |+    type x[T] = list[T]
-37 37 | 
-38 38 |     # reference to class variable
-39 39 |     TCLS = typing.TypeVar["TCLS"]
-
-    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 UP040.py:40:5: UP040 [*] Type alias `y` uses `TypeAlias` annotation instead of the `type` keyword
    |
@@ -208,16 +118,6 @@ UP040.py:40:5: UP040 [*] Type alias `y` uses `TypeAlias` annotation instead of t
    |
    = help: Use the `type` keyword
 
-37 37 | 
-38 38 |     # reference to class variable
-39 39 |     TCLS = typing.TypeVar["TCLS"]
-40    |-    y: typing.TypeAlias = list[TCLS]
-   40 |+    type y[TCLS] = list[TCLS]
-41 41 | 
-42 42 | # UP040 won't add generics in fix
-43 43 | T = typing.TypeVar(*args)
-
-    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 UP040.py:44:1: UP040 [*] Type alias `x` uses `TypeAlias` annotation instead of the `type` keyword
    |
@@ -230,16 +130,6 @@ UP040.py:44:1: UP040 [*] Type alias `x` uses `TypeAlias` annotation instead of t
    |
    = help: Use the `type` keyword
 
-41 41 | 
-42 42 | # UP040 won't add generics in fix
-43 43 | T = typing.TypeVar(*args)
-44    |-x: typing.TypeAlias = list[T]
-   44 |+type x = list[T]
-45 45 | 
-46 46 | # OK
-47 47 | x: TypeAlias
-
-    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 UP040.py:53:1: UP040 [*] Type alias `Decorator` uses `TypeAlias` annotation instead of the `type` keyword
    |
@@ -250,16 +140,6 @@ UP040.py:53:1: UP040 [*] Type alias `Decorator` uses `TypeAlias` annotation inst
    |
    = help: Use the `type` keyword
 
-50 50 | # Ensure that "T" appears only once  in the type parameters for the modernized
-51 51 | # type alias.
-52 52 | T = typing.TypeVar["T"]
-53    |-Decorator: TypeAlias = typing.Callable[[T], T]
-   53 |+type Decorator[T] = typing.Callable[[T], T]
-54 54 | 
-55 55 | 
-56 56 | from typing import TypeVar, Annotated, TypeAliasType
-
-    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 UP040.py:63:1: UP040 [*] Type alias `PositiveList` uses `TypeAliasType` assignment instead of the `type` keyword
    |

@@ -12,24 +12,6 @@ strict.py:54:25: TCH002 [*] Move third-party import `pkg.bar.A` into a type-chec
    |
    = help: Move into type-checking block
 
-1  1  | from __future__ import annotations
-   2  |+from typing import TYPE_CHECKING
-   3  |+
-   4  |+if TYPE_CHECKING:
-   5  |+    from pkg.bar import A
-2  6  | 
-3  7  | 
-4  8  | def f():
---------------------------------------------------------------------------------
-51 55 | def f():
-52 56 |     # In un-strict mode, this _should_ raise an error, since `pkg.bar` isn't used at runtime
-53 57 |     import pkg
-54    |-    from pkg.bar import A
-55 58 | 
-56 59 |     def test(value: A):
-57 60 |         return pkg.B()
-
-    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 strict.py:91:12: TCH002 [*] Move third-party import `pkg` into a type-checking block
    |
@@ -40,22 +22,3 @@ strict.py:91:12: TCH002 [*] Move third-party import `pkg` into a type-checking b
 92 |     import pkgfoo.bar as B
    |
    = help: Move into type-checking block
-
-1  1  | from __future__ import annotations
-   2  |+from typing import TYPE_CHECKING
-   3  |+
-   4  |+if TYPE_CHECKING:
-   5  |+    import pkg
-2  6  | 
-3  7  | 
-4  8  | def f():
---------------------------------------------------------------------------------
-88 92 |     # In un-strict mode, this _should_ raise an error, since `pkg` isn't used at runtime.
-89 93 |     # Note that `pkg` is a prefix of `pkgfoo` which are both different modules. This is
-90 94 |     # testing the implementation.
-91    |-    import pkg
-92 95 |     import pkgfoo.bar as B
-93 96 | 
-94 97 |     def test(value: pkg.A):
-
-    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.

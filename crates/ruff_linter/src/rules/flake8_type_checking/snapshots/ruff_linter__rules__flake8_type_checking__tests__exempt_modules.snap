@@ -10,20 +10,3 @@ exempt_modules.py:14:12: TCH002 [*] Move third-party import `flask` into a type-
 16 |     x: flask
    |
    = help: Move into type-checking block
-
-   1  |+from typing import TYPE_CHECKING
-   2  |+
-   3  |+if TYPE_CHECKING:
-   4  |+    import flask
-1  5  | def f():
-2  6  |     import pandas as pd
-3  7  | 
---------------------------------------------------------------------------------
-11 15 | 
-12 16 | 
-13 17 | def f():
-14    |-    import flask
-15 18 | 
-16 19 |     x: flask
-
-    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.

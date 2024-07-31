@@ -22,16 +22,6 @@ application.py:6:1: TID252 [*] Prefer absolute imports over relative imports fro
   |
   = help: Replace relative imports from parent modules with absolute imports
 
-3 3 | import attrs
-4 4 | 
-5 5 | from ....import unknown
-6   |-from ..protocol import commands, definitions, responses
-  6 |+from my_package.sublib.protocol import commands, definitions, responses
-7 7 | from ..server import example
-8 8 | from .. import server
-9 9 | from . import logger, models
-
-    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 application.py:6:1: TID252 [*] Prefer absolute imports over relative imports from parent modules
   |
@@ -43,16 +33,6 @@ application.py:6:1: TID252 [*] Prefer absolute imports over relative imports fro
   |
   = help: Replace relative imports from parent modules with absolute imports
 
-3 3 | import attrs
-4 4 | 
-5 5 | from ....import unknown
-6   |-from ..protocol import commands, definitions, responses
-  6 |+from my_package.sublib.protocol import commands, definitions, responses
-7 7 | from ..server import example
-8 8 | from .. import server
-9 9 | from . import logger, models
-
-    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 application.py:6:1: TID252 [*] Prefer absolute imports over relative imports from parent modules
   |
@@ -64,16 +44,6 @@ application.py:6:1: TID252 [*] Prefer absolute imports over relative imports fro
   |
   = help: Replace relative imports from parent modules with absolute imports
 
-3 3 | import attrs
-4 4 | 
-5 5 | from ....import unknown
-6   |-from ..protocol import commands, definitions, responses
-  6 |+from my_package.sublib.protocol import commands, definitions, responses
-7 7 | from ..server import example
-8 8 | from .. import server
-9 9 | from . import logger, models
-
-    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 application.py:7:1: TID252 [*] Prefer absolute imports over relative imports from parent modules
   |
@@ -86,16 +56,6 @@ application.py:7:1: TID252 [*] Prefer absolute imports over relative imports fro
   |
   = help: Replace relative imports from parent modules with absolute imports
 
-4 4 | 
-5 5 | from ....import unknown
-6 6 | from ..protocol import commands, definitions, responses
-7   |-from ..server import example
-  7 |+from my_package.sublib.server import example
-8 8 | from .. import server
-9 9 | from . import logger, models
-10 10 | from ..protocol.UpperCaseModule import some_function
-
-    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 application.py:8:1: TID252 [*] Prefer absolute imports over relative imports from parent modules
    |
@@ -108,15 +68,6 @@ application.py:8:1: TID252 [*] Prefer absolute imports over relative imports fro
    |
    = help: Replace relative imports from parent modules with absolute imports
 
-5 5 | from ....import unknown
-6 6 | from ..protocol import commands, definitions, responses
-7 7 | from ..server import example
-8   |-from .. import server
-  8 |+from my_package.sublib import server
-9 9 | from . import logger, models
-10 10 | from ..protocol.UpperCaseModule import some_function
-
-    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 application.py:10:1: TID252 [*] Prefer absolute imports over relative imports from parent modules
    |
@@ -126,11 +77,3 @@ application.py:10:1: TID252 [*] Prefer absolute imports over relative imports fr
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ TID252
    |
    = help: Replace relative imports from parent modules with absolute imports
-
-7  7  | from ..server import example
-8  8  | from .. import server
-9  9  | from . import logger, models
-10    |-from ..protocol.UpperCaseModule import some_function
-   10 |+from my_package.sublib.protocol.UpperCaseModule import some_function
-
-    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.

@@ -13,15 +13,6 @@ RET503.py:21:5: RET503 [*] Missing explicit `return` at the end of function able
    |
    = help: Add explicit `return` statement
 
-20 20 | def x(y):
-21 21 |     if not y:
-22 22 |         return 1
-   23 |+    return None
-23 24 |     # error
-24 25 | 
-25 26 | 
-
-    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 RET503.py:28:9: RET503 [*] Missing explicit `return` at the end of function able to return non-`None` value
    |
@@ -34,15 +25,6 @@ RET503.py:28:9: RET503 [*] Missing explicit `return` at the end of function able
    |
    = help: Add explicit `return` statement
 
-26 26 | def x(y):
-27 27 |     if not y:
-28 28 |         print()  # error
-   29 |+        return None
-29 30 |     else:
-30 31 |         return 2
-31 32 | 
-
-    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 RET503.py:37:5: RET503 [*] Missing explicit `return` at the end of function able to return non-`None` value
    |
@@ -53,15 +35,6 @@ RET503.py:37:5: RET503 [*] Missing explicit `return` at the end of function able
    |
    = help: Add explicit `return` statement
 
-35 35 |         return 1
-36 36 | 
-37 37 |     print()  # error
-   38 |+    return None
-38 39 | 
-39 40 | 
-40 41 | # for
-
-    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 RET503.py:42:5: RET503 [*] Missing explicit `return` at the end of function able to return non-`None` value
    |
@@ -76,15 +49,6 @@ RET503.py:42:5: RET503 [*] Missing explicit `return` at the end of function able
    |
    = help: Add explicit `return` statement
 
-42 42 |     for i in range(10):
-43 43 |         if i > 10:
-44 44 |             return i
-   45 |+    return None
-45 46 |     # error
-46 47 | 
-47 48 | 
-
-    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 RET503.py:53:9: RET503 [*] Missing explicit `return` at the end of function able to return non-`None` value
    |
@@ -95,15 +59,6 @@ RET503.py:53:9: RET503 [*] Missing explicit `return` at the end of function able
    |
    = help: Add explicit `return` statement
 
-51 51 |             return i
-52 52 |     else:
-53 53 |         print()  # error
-   54 |+        return None
-54 55 | 
-55 56 | 
-56 57 | # A nonexistent function
-
-    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 RET503.py:60:5: RET503 [*] Missing explicit `return` at the end of function able to return non-`None` value
    |
@@ -114,15 +69,6 @@ RET503.py:60:5: RET503 [*] Missing explicit `return` at the end of function able
    |
    = help: Add explicit `return` statement
 
-58 58 |     if x > 0:
-59 59 |         return False
-60 60 |     no_such_function()  # error
-   61 |+    return None
-61 62 | 
-62 63 | 
-63 64 | # A function that does return the control
-
-    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 RET503.py:67:5: RET503 [*] Missing explicit `return` at the end of function able to return non-`None` value
    |
@@ -133,15 +79,6 @@ RET503.py:67:5: RET503 [*] Missing explicit `return` at the end of function able
    |
    = help: Add explicit `return` statement
 
-65 65 |     if x > 0:
-66 66 |         return False
-67 67 |     print("", end="")  # error
-   68 |+    return None
-68 69 | 
-69 70 | 
-70 71 | ###
-
-    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 RET503.py:83:5: RET503 [*] Missing explicit `return` at the end of function able to return non-`None` value
    |
@@ -156,15 +93,6 @@ RET503.py:83:5: RET503 [*] Missing explicit `return` at the end of function able
    |
    = help: Add explicit `return` statement
 
-84 84 |         if y > 0:
-85 85 |             return 1
-86 86 |         y += 1
-   87 |+    return None
-87 88 | 
-88 89 | 
-89 90 | # exclude empty functions
-
-    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 RET503.py:114:5: RET503 [*] Missing explicit `return` at the end of function able to return non-`None` value
     |
@@ -179,15 +107,6 @@ RET503.py:114:5: RET503 [*] Missing explicit `return` at the end of function abl
     |
     = help: Add explicit `return` statement
 
-115 115 |         if i > y:
-116 116 |             break
-117 117 |         return z
-    118 |+    return None
-118 119 | 
-119 120 | 
-120 121 | def bar3(x, y, z):
-
-    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 RET503.py:121:5: RET503 [*] Missing explicit `return` at the end of function able to return non-`None` value
     |
@@ -204,15 +123,6 @@ RET503.py:121:5: RET503 [*] Missing explicit `return` at the end of function abl
     |
     = help: Add explicit `return` statement
 
-125 125 |         else:
-126 126 |             return z
-127 127 |         return None
-    128 |+    return None
-128 129 | 
-129 130 | 
-130 131 | def bar1(x, y, z):
-
-    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 RET503.py:131:5: RET503 [*] Missing explicit `return` at the end of function able to return non-`None` value
     |
@@ -226,15 +136,6 @@ RET503.py:131:5: RET503 [*] Missing explicit `return` at the end of function abl
     |
     = help: Add explicit `return` statement
 
-132 132 |         if i < y:
-133 133 |             continue
-134 134 |         return z
-    135 |+    return None
-135 136 | 
-136 137 | 
-137 138 | def bar3(x, y, z):
-
-    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 RET503.py:138:5: RET503 [*] Missing explicit `return` at the end of function able to return non-`None` value
     |
@@ -251,15 +152,6 @@ RET503.py:138:5: RET503 [*] Missing explicit `return` at the end of function abl
     |
     = help: Add explicit `return` statement
 
-142 142 |         else:
-143 143 |             return z
-144 144 |         return None
-    145 |+    return None
-145 146 | 
-146 147 | 
-147 148 | def prompts(self, foo):
-
-    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 RET503.py:275:5: RET503 [*] Missing explicit `return` at the end of function able to return non-`None` value
     |
@@ -272,15 +164,6 @@ RET503.py:275:5: RET503 [*] Missing explicit `return` at the end of function abl
     |
     = help: Add explicit `return` statement
 
-274 274 | 
-275 275 |     for value in values:
-276 276 |         print(value)
-    277 |+    return None
-277 278 | 
-278 279 | 
-279 280 | def while_true():
-
-    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 RET503.py:292:13: RET503 [*] Missing explicit `return` at the end of function able to return non-`None` value
     |
@@ -291,15 +174,6 @@ RET503.py:292:13: RET503 [*] Missing explicit `return` at the end of function ab
     |
     = help: Add explicit `return` statement
 
-290 290 |             return 1
-291 291 |         case 1:
-292 292 |             print()  # error
-    293 |+            return None
-293 294 | 
-294 295 | 
-295 296 | def foo(baz: str) -> str:
-
-    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 RET503.py:301:9: RET503 [*] Missing explicit `return` at the end of function able to return non-`None` value
     |
@@ -312,15 +186,6 @@ RET503.py:301:9: RET503 [*] Missing explicit `return` at the end of function abl
     |
     = help: Add explicit `return` statement
 
-300 300 |     def example():
-301 301 |         if True:
-302 302 |             return ""
-    303 |+        return None
-303 304 | 
-304 305 | 
-305 306 |     def example():
-
-    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 RET503.py:306:9: RET503 [*] Missing explicit `return` at the end of function able to return non-`None` value
     |
@@ -332,15 +197,6 @@ RET503.py:306:9: RET503 [*] Missing explicit `return` at the end of function abl
     |
     = help: Add explicit `return` statement
 
-305 305 |     def example():
-306 306 |         if True:
-307 307 |             return ""
-    308 |+        return None
-308 309 | 
-309 310 | 
-310 311 |     def example():
-
-    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 RET503.py:311:9: RET503 [*] Missing explicit `return` at the end of function able to return non-`None` value
     |
@@ -352,15 +208,6 @@ RET503.py:311:9: RET503 [*] Missing explicit `return` at the end of function abl
     |
     = help: Add explicit `return` statement
 
-310 310 |     def example():
-311 311 |         if True:
-312 312 |             return ""  # type: ignore
-    313 |+        return None
-313 314 | 
-314 315 | 
-315 316 |     def example():
-
-    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 RET503.py:316:9: RET503 [*] Missing explicit `return` at the end of function able to return non-`None` value
     |
@@ -372,15 +219,6 @@ RET503.py:316:9: RET503 [*] Missing explicit `return` at the end of function abl
     |
     = help: Add explicit `return` statement
 
-315 315 |     def example():
-316 316 |         if True:
-317 317 |             return ""  ;
-    318 |+        return None
-318 319 | 
-319 320 | 
-320 321 |     def example():
-
-    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 RET503.py:321:9: RET503 [*] Missing explicit `return` at the end of function able to return non-`None` value
     |
@@ -393,15 +231,6 @@ RET503.py:321:9: RET503 [*] Missing explicit `return` at the end of function abl
     |
     = help: Add explicit `return` statement
 
-321 321 |         if True:
-322 322 |             return "" \
-323 323 |                 ;  # type: ignore
-    324 |+        return None
-324 325 | 
-325 326 | 
-326 327 | def end_of_file():
-
-    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 RET503.py:329:5: RET503 [*] Missing explicit `return` at the end of function able to return non-`None` value
     |
@@ -412,15 +241,6 @@ RET503.py:329:5: RET503 [*] Missing explicit `return` at the end of function abl
     |
     = help: Add explicit `return` statement
 
-328 328 |         return 1
-329 329 |     x = 2 \
-330 330 | 
-    331 |+    return None
-331 332 | 
-332 333 | 
-333 334 | # function return type annotation NoReturn
-
-    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 RET503.py:339:5: RET503 [*] Missing explicit `return` at the end of function able to return non-`None` value
     |
@@ -431,15 +251,6 @@ RET503.py:339:5: RET503 [*] Missing explicit `return` at the end of function abl
     |
     = help: Add explicit `return` statement
 
-337 337 |     if x == 5:
-338 338 |         return 5
-339 339 |     bar()
-    340 |+    return None
-340 341 | 
-341 342 | 
-342 343 | def foo(string: str) -> str:
-
-    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 RET503.py:354:13: RET503 [*] Missing explicit `return` at the end of function able to return non-`None` value
     |
@@ -450,15 +261,6 @@ RET503.py:354:13: RET503 [*] Missing explicit `return` at the end of function ab
     |
     = help: Add explicit `return` statement
 
-352 352 |             return "third"
-353 353 |         case _:
-354 354 |             raises(string)
-    355 |+            return None
-355 356 | 
-356 357 | 
-357 358 | def foo() -> int:
-
-    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 RET503.py:370:5: RET503 [*] Missing explicit `return` at the end of function able to return non-`None` value
     |
@@ -468,10 +270,3 @@ RET503.py:370:5: RET503 [*] Missing explicit `return` at the end of function abl
     |     ^^^^^ RET503
     |
     = help: Add explicit `return` statement
-
-368 368 |     if baz() > 3:
-369 369 |         return 1
-370 370 |     bar()
-    371 |+    return None
-
-    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.

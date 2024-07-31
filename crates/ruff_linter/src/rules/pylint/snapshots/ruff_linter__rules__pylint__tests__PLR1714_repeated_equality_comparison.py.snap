@@ -11,14 +11,6 @@ repeated_equality_comparison.py:2:1: PLR1714 [*] Consider merging multiple compa
   |
   = help: Merge multiple comparisons
 
-1 1 | # Errors.
-2   |-foo == "a" or foo == "b"
-  2 |+foo in ("a", "b")
-3 3 | 
-4 4 | foo != "a" and foo != "b"
-5 5 | 
-
-    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 repeated_equality_comparison.py:4:1: PLR1714 [*] Consider merging multiple comparisons: `foo not in ("a", "b")`. Use a `set` if the elements are hashable.
   |
@@ -31,16 +23,6 @@ repeated_equality_comparison.py:4:1: PLR1714 [*] Consider merging multiple compa
   |
   = help: Merge multiple comparisons
 
-1 1 | # Errors.
-2 2 | foo == "a" or foo == "b"
-3 3 | 
-4   |-foo != "a" and foo != "b"
-  4 |+foo not in ("a", "b")
-5 5 | 
-6 6 | foo == "a" or foo == "b" or foo == "c"
-7 7 | 
-
-    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 repeated_equality_comparison.py:6:1: PLR1714 [*] Consider merging multiple comparisons: `foo in ("a", "b", "c")`. Use a `set` if the elements are hashable.
   |
@@ -53,16 +35,6 @@ repeated_equality_comparison.py:6:1: PLR1714 [*] Consider merging multiple compa
   |
   = help: Merge multiple comparisons
 
-3 3 | 
-4 4 | foo != "a" and foo != "b"
-5 5 | 
-6   |-foo == "a" or foo == "b" or foo == "c"
-  6 |+foo in ("a", "b", "c")
-7 7 | 
-8 8 | foo != "a" and foo != "b" and foo != "c"
-9 9 | 
-
-    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 repeated_equality_comparison.py:8:1: PLR1714 [*] Consider merging multiple comparisons: `foo not in ("a", "b", "c")`. Use a `set` if the elements are hashable.
    |
@@ -75,16 +47,6 @@ repeated_equality_comparison.py:8:1: PLR1714 [*] Consider merging multiple compa
    |
    = help: Merge multiple comparisons
 
-5 5 | 
-6 6 | foo == "a" or foo == "b" or foo == "c"
-7 7 | 
-8   |-foo != "a" and foo != "b" and foo != "c"
-  8 |+foo not in ("a", "b", "c")
-9 9 | 
-10 10 | foo == a or foo == "b" or foo == 3  # Mixed types.
-11 11 | 
-
-    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 repeated_equality_comparison.py:10:1: PLR1714 [*] Consider merging multiple comparisons: `foo in (a, "b", 3)`. Use a `set` if the elements are hashable.
    |
@@ -97,16 +59,6 @@ repeated_equality_comparison.py:10:1: PLR1714 [*] Consider merging multiple comp
    |
    = help: Merge multiple comparisons
 
-7  7  | 
-8  8  | foo != "a" and foo != "b" and foo != "c"
-9  9  | 
-10    |-foo == a or foo == "b" or foo == 3  # Mixed types.
-   10 |+foo in (a, "b", 3)  # Mixed types.
-11 11 | 
-12 12 | "a" == foo or "b" == foo or "c" == foo
-13 13 | 
-
-    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 repeated_equality_comparison.py:12:1: PLR1714 [*] Consider merging multiple comparisons: `foo in ("a", "b", "c")`. Use a `set` if the elements are hashable.
    |
@@ -119,16 +71,6 @@ repeated_equality_comparison.py:12:1: PLR1714 [*] Consider merging multiple comp
    |
    = help: Merge multiple comparisons
 
-9  9  | 
-10 10 | foo == a or foo == "b" or foo == 3  # Mixed types.
-11 11 | 
-12    |-"a" == foo or "b" == foo or "c" == foo
-   12 |+foo in ("a", "b", "c")
-13 13 | 
-14 14 | "a" != foo and "b" != foo and "c" != foo
-15 15 | 
-
-    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 repeated_equality_comparison.py:14:1: PLR1714 [*] Consider merging multiple comparisons: `foo not in ("a", "b", "c")`. Use a `set` if the elements are hashable.
    |
@@ -141,16 +83,6 @@ repeated_equality_comparison.py:14:1: PLR1714 [*] Consider merging multiple comp
    |
    = help: Merge multiple comparisons
 
-11 11 | 
-12 12 | "a" == foo or "b" == foo or "c" == foo
-13 13 | 
-14    |-"a" != foo and "b" != foo and "c" != foo
-   14 |+foo not in ("a", "b", "c")
-15 15 | 
-16 16 | "a" == foo or foo == "b" or "c" == foo
-17 17 | 
-
-    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 repeated_equality_comparison.py:16:1: PLR1714 [*] Consider merging multiple comparisons: `foo in ("a", "b", "c")`. Use a `set` if the elements are hashable.
    |
@@ -163,16 +95,6 @@ repeated_equality_comparison.py:16:1: PLR1714 [*] Consider merging multiple comp
    |
    = help: Merge multiple comparisons
 
-13 13 | 
-14 14 | "a" != foo and "b" != foo and "c" != foo
-15 15 | 
-16    |-"a" == foo or foo == "b" or "c" == foo
-   16 |+foo in ("a", "b", "c")
-17 17 | 
-18 18 | foo == bar or baz == foo or qux == foo
-19 19 | 
-
-    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 repeated_equality_comparison.py:18:1: PLR1714 [*] Consider merging multiple comparisons: `foo in (bar, baz, qux)`. Use a `set` if the elements are hashable.
    |
@@ -185,16 +107,6 @@ repeated_equality_comparison.py:18:1: PLR1714 [*] Consider merging multiple comp
    |
    = help: Merge multiple comparisons
 
-15 15 | 
-16 16 | "a" == foo or foo == "b" or "c" == foo
-17 17 | 
-18    |-foo == bar or baz == foo or qux == foo
-   18 |+foo in (bar, baz, qux)
-19 19 | 
-20 20 | foo == "a" or "b" == foo or foo == "c"
-21 21 | 
-
-    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 repeated_equality_comparison.py:20:1: PLR1714 [*] Consider merging multiple comparisons: `foo in ("a", "b", "c")`. Use a `set` if the elements are hashable.
    |
@@ -207,16 +119,6 @@ repeated_equality_comparison.py:20:1: PLR1714 [*] Consider merging multiple comp
    |
    = help: Merge multiple comparisons
 
-17 17 | 
-18 18 | foo == bar or baz == foo or qux == foo
-19 19 | 
-20    |-foo == "a" or "b" == foo or foo == "c"
-   20 |+foo in ("a", "b", "c")
-21 21 | 
-22 22 | foo != "a" and "b" != foo and foo != "c"
-23 23 | 
-
-    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 repeated_equality_comparison.py:22:1: PLR1714 [*] Consider merging multiple comparisons: `foo not in ("a", "b", "c")`. Use a `set` if the elements are hashable.
    |
@@ -229,16 +131,6 @@ repeated_equality_comparison.py:22:1: PLR1714 [*] Consider merging multiple comp
    |
    = help: Merge multiple comparisons
 
-19 19 | 
-20 20 | foo == "a" or "b" == foo or foo == "c"
-21 21 | 
-22    |-foo != "a" and "b" != foo and foo != "c"
-   22 |+foo not in ("a", "b", "c")
-23 23 | 
-24 24 | foo == "a" or foo == "b" or "c" == bar or "d" == bar  # Multiple targets
-25 25 | 
-
-    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 repeated_equality_comparison.py:24:1: PLR1714 [*] Consider merging multiple comparisons: `foo in ("a", "b")`. Use a `set` if the elements are hashable.
    |
@@ -251,16 +143,6 @@ repeated_equality_comparison.py:24:1: PLR1714 [*] Consider merging multiple comp
    |
    = help: Merge multiple comparisons
 
-21 21 | 
-22 22 | foo != "a" and "b" != foo and foo != "c"
-23 23 | 
-24    |-foo == "a" or foo == "b" or "c" == bar or "d" == bar  # Multiple targets
-   24 |+foo in ("a", "b") or "c" == bar or "d" == bar  # Multiple targets
-25 25 | 
-26 26 | foo.bar == "a" or foo.bar == "b"  # Attributes.
-27 27 | 
-
-    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 repeated_equality_comparison.py:24:1: PLR1714 [*] Consider merging multiple comparisons: `bar in ("c", "d")`. Use a `set` if the elements are hashable.
    |
@@ -273,16 +155,6 @@ repeated_equality_comparison.py:24:1: PLR1714 [*] Consider merging multiple comp
    |
    = help: Merge multiple comparisons
 
-21 21 | 
-22 22 | foo != "a" and "b" != foo and foo != "c"
-23 23 | 
-24    |-foo == "a" or foo == "b" or "c" == bar or "d" == bar  # Multiple targets
-   24 |+foo == "a" or foo == "b" or bar in ("c", "d")  # Multiple targets
-25 25 | 
-26 26 | foo.bar == "a" or foo.bar == "b"  # Attributes.
-27 27 | 
-
-    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 repeated_equality_comparison.py:26:1: PLR1714 [*] Consider merging multiple comparisons: `foo.bar in ("a", "b")`. Use a `set` if the elements are hashable.
    |
@@ -295,16 +167,6 @@ repeated_equality_comparison.py:26:1: PLR1714 [*] Consider merging multiple comp
    |
    = help: Merge multiple comparisons
 
-23 23 | 
-24 24 | foo == "a" or foo == "b" or "c" == bar or "d" == bar  # Multiple targets
-25 25 | 
-26    |-foo.bar == "a" or foo.bar == "b"  # Attributes.
-   26 |+foo.bar in ("a", "b")  # Attributes.
-27 27 | 
-28 28 | # OK
-29 29 | foo == "a" and foo == "b" and foo == "c"  # `and` mixed with `==`.
-
-    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 repeated_equality_comparison.py:61:16: PLR1714 [*] Consider merging multiple comparisons: `bar in ("c", "d")`. Use a `set` if the elements are hashable.
    |
@@ -317,16 +179,6 @@ repeated_equality_comparison.py:61:16: PLR1714 [*] Consider merging multiple com
    |
    = help: Merge multiple comparisons
 
-58 58 | 
-59 59 | foo == "a" or "c" == bar or foo == "b" or "d" == bar  # Multiple targets
-60 60 | 
-61    |-foo == "a" or ("c" == bar or "d" == bar) or foo == "b"  # Multiple targets
-   61 |+foo == "a" or (bar in ("c", "d")) or foo == "b"  # Multiple targets
-62 62 | 
-63 63 | foo == "a" or foo == "b" or "c" != bar and "d" != bar  # Multiple targets
-64 64 | 
-
-    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 repeated_equality_comparison.py:63:1: PLR1714 [*] Consider merging multiple comparisons: `foo in ("a", "b")`. Use a `set` if the elements are hashable.
    |
@@ -339,16 +191,6 @@ repeated_equality_comparison.py:63:1: PLR1714 [*] Consider merging multiple comp
    |
    = help: Merge multiple comparisons
 
-60 60 | 
-61 61 | foo == "a" or ("c" == bar or "d" == bar) or foo == "b"  # Multiple targets
-62 62 | 
-63    |-foo == "a" or foo == "b" or "c" != bar and "d" != bar  # Multiple targets
-   63 |+foo in ("a", "b") or "c" != bar and "d" != bar  # Multiple targets
-64 64 | 
-65 65 | foo == "a" or ("c" != bar and "d" != bar) or foo == "b"  # Multiple targets
-66 66 | 
-
-    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 repeated_equality_comparison.py:63:29: PLR1714 [*] Consider merging multiple comparisons: `bar not in ("c", "d")`. Use a `set` if the elements are hashable.
    |
@@ -361,16 +203,6 @@ repeated_equality_comparison.py:63:29: PLR1714 [*] Consider merging multiple com
    |
    = help: Merge multiple comparisons
 
-60 60 | 
-61 61 | foo == "a" or ("c" == bar or "d" == bar) or foo == "b"  # Multiple targets
-62 62 | 
-63    |-foo == "a" or foo == "b" or "c" != bar and "d" != bar  # Multiple targets
-   63 |+foo == "a" or foo == "b" or bar not in ("c", "d")  # Multiple targets
-64 64 | 
-65 65 | foo == "a" or ("c" != bar and "d" != bar) or foo == "b"  # Multiple targets
-66 66 | 
-
-    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 repeated_equality_comparison.py:65:16: PLR1714 [*] Consider merging multiple comparisons: `bar not in ("c", "d")`. Use a `set` if the elements are hashable.
    |
@@ -382,13 +214,3 @@ repeated_equality_comparison.py:65:16: PLR1714 [*] Consider merging multiple com
 67 | foo == "a" and "c" != bar or foo == "b" and "d" != bar  # Multiple targets
    |
    = help: Merge multiple comparisons
-
-62 62 | 
-63 63 | foo == "a" or foo == "b" or "c" != bar and "d" != bar  # Multiple targets
-64 64 | 
-65    |-foo == "a" or ("c" != bar and "d" != bar) or foo == "b"  # Multiple targets
-   65 |+foo == "a" or (bar not in ("c", "d")) or foo == "b"  # Multiple targets
-66 66 | 
-67 67 | foo == "a" and "c" != bar or foo == "b" and "d" != bar  # Multiple targets
-
-    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.

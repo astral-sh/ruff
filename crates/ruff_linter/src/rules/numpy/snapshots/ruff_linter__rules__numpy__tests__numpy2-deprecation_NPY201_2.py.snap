@@ -415,16 +415,6 @@ NPY201_2.py:50:5: NPY201 [*] `np.trapz` will be removed in NumPy 2.0. Use `numpy
    |
    = help: Replace with `numpy.trapezoid` (requires NumPy 2.0 or greater)
 
-47 47 | 
-48 48 |     np.product([1, 2, 3])
-49 49 | 
-50    |-    np.trapz([1, 2, 3])
-   50 |+    np.trapezoid([1, 2, 3])
-51 51 | 
-52 52 |     np.in1d([1, 2], [1, 3, 5])
-53 53 | 
-
-    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 NPY201_2.py:52:5: NPY201 [*] `np.in1d` will be removed in NumPy 2.0. Use `numpy.isin` instead.
    |
