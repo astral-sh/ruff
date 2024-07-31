@@ -12,7 +12,7 @@ C413.py:3:1: C413 [*] Unnecessary `list` call around `sorted()`
   |
   = help: Remove unnecessary `list` call
 
-ℹ Safe fix
+Suggested fix:
 1 1 | x = [2, 3, 1]
 2 2 | list(x)
 3   |-list(sorted(x))
@@ -20,6 +20,8 @@ C413.py:3:1: C413 [*] Unnecessary `list` call around `sorted()`
 4 4 | reversed(sorted(x))
 5 5 | reversed(sorted(x, key=lambda e: e))
 6 6 | reversed(sorted(x, reverse=True))
+
+    Run `ruff check --fix` to apply this fix.
 
 C413.py:4:1: C413 [*] Unnecessary `reversed` call around `sorted()`
   |
@@ -32,7 +34,7 @@ C413.py:4:1: C413 [*] Unnecessary `reversed` call around `sorted()`
   |
   = help: Remove unnecessary `reversed` call
 
-ℹ Unsafe fix
+Suggested fix:
 1 1 | x = [2, 3, 1]
 2 2 | list(x)
 3 3 | list(sorted(x))
@@ -41,6 +43,8 @@ C413.py:4:1: C413 [*] Unnecessary `reversed` call around `sorted()`
 5 5 | reversed(sorted(x, key=lambda e: e))
 6 6 | reversed(sorted(x, reverse=True))
 7 7 | reversed(sorted(x, key=lambda e: e, reverse=True))
+
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 C413.py:5:1: C413 [*] Unnecessary `reversed` call around `sorted()`
   |
@@ -53,7 +57,7 @@ C413.py:5:1: C413 [*] Unnecessary `reversed` call around `sorted()`
   |
   = help: Remove unnecessary `reversed` call
 
-ℹ Unsafe fix
+Suggested fix:
 2 2 | list(x)
 3 3 | list(sorted(x))
 4 4 | reversed(sorted(x))
@@ -62,6 +66,8 @@ C413.py:5:1: C413 [*] Unnecessary `reversed` call around `sorted()`
 6 6 | reversed(sorted(x, reverse=True))
 7 7 | reversed(sorted(x, key=lambda e: e, reverse=True))
 8 8 | reversed(sorted(x, reverse=True, key=lambda e: e))
+
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 C413.py:6:1: C413 [*] Unnecessary `reversed` call around `sorted()`
   |
@@ -74,7 +80,7 @@ C413.py:6:1: C413 [*] Unnecessary `reversed` call around `sorted()`
   |
   = help: Remove unnecessary `reversed` call
 
-ℹ Unsafe fix
+Suggested fix:
 3 3 | list(sorted(x))
 4 4 | reversed(sorted(x))
 5 5 | reversed(sorted(x, key=lambda e: e))
@@ -83,6 +89,8 @@ C413.py:6:1: C413 [*] Unnecessary `reversed` call around `sorted()`
 7 7 | reversed(sorted(x, key=lambda e: e, reverse=True))
 8 8 | reversed(sorted(x, reverse=True, key=lambda e: e))
 9 9 | reversed(sorted(x, reverse=False))
+
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 C413.py:7:1: C413 [*] Unnecessary `reversed` call around `sorted()`
   |
@@ -95,7 +103,7 @@ C413.py:7:1: C413 [*] Unnecessary `reversed` call around `sorted()`
   |
   = help: Remove unnecessary `reversed` call
 
-ℹ Unsafe fix
+Suggested fix:
 4 4 | reversed(sorted(x))
 5 5 | reversed(sorted(x, key=lambda e: e))
 6 6 | reversed(sorted(x, reverse=True))
@@ -104,6 +112,8 @@ C413.py:7:1: C413 [*] Unnecessary `reversed` call around `sorted()`
 8 8 | reversed(sorted(x, reverse=True, key=lambda e: e))
 9 9 | reversed(sorted(x, reverse=False))
 10 10 | reversed(sorted(x, reverse=x))
+
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 C413.py:8:1: C413 [*] Unnecessary `reversed` call around `sorted()`
    |
@@ -116,7 +126,7 @@ C413.py:8:1: C413 [*] Unnecessary `reversed` call around `sorted()`
    |
    = help: Remove unnecessary `reversed` call
 
-ℹ Unsafe fix
+Suggested fix:
 5 5 | reversed(sorted(x, key=lambda e: e))
 6 6 | reversed(sorted(x, reverse=True))
 7 7 | reversed(sorted(x, key=lambda e: e, reverse=True))
@@ -125,6 +135,8 @@ C413.py:8:1: C413 [*] Unnecessary `reversed` call around `sorted()`
 9 9 | reversed(sorted(x, reverse=False))
 10 10 | reversed(sorted(x, reverse=x))
 11 11 | reversed(sorted(x, reverse=not x))
+
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 C413.py:9:1: C413 [*] Unnecessary `reversed` call around `sorted()`
    |
@@ -137,7 +149,7 @@ C413.py:9:1: C413 [*] Unnecessary `reversed` call around `sorted()`
    |
    = help: Remove unnecessary `reversed` call
 
-ℹ Unsafe fix
+Suggested fix:
 6  6  | reversed(sorted(x, reverse=True))
 7  7  | reversed(sorted(x, key=lambda e: e, reverse=True))
 8  8  | reversed(sorted(x, reverse=True, key=lambda e: e))
@@ -146,6 +158,8 @@ C413.py:9:1: C413 [*] Unnecessary `reversed` call around `sorted()`
 10 10 | reversed(sorted(x, reverse=x))
 11 11 | reversed(sorted(x, reverse=not x))
 12 12 | 
+
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 C413.py:10:1: C413 [*] Unnecessary `reversed` call around `sorted()`
    |
@@ -157,7 +171,7 @@ C413.py:10:1: C413 [*] Unnecessary `reversed` call around `sorted()`
    |
    = help: Remove unnecessary `reversed` call
 
-ℹ Unsafe fix
+Suggested fix:
 7  7  | reversed(sorted(x, key=lambda e: e, reverse=True))
 8  8  | reversed(sorted(x, reverse=True, key=lambda e: e))
 9  9  | reversed(sorted(x, reverse=False))
@@ -166,6 +180,8 @@ C413.py:10:1: C413 [*] Unnecessary `reversed` call around `sorted()`
 11 11 | reversed(sorted(x, reverse=not x))
 12 12 | 
 13 13 | # Regression test for: https://github.com/astral-sh/ruff/issues/7289
+
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 C413.py:11:1: C413 [*] Unnecessary `reversed` call around `sorted()`
    |
@@ -178,7 +194,7 @@ C413.py:11:1: C413 [*] Unnecessary `reversed` call around `sorted()`
    |
    = help: Remove unnecessary `reversed` call
 
-ℹ Unsafe fix
+Suggested fix:
 8  8  | reversed(sorted(x, reverse=True, key=lambda e: e))
 9  9  | reversed(sorted(x, reverse=False))
 10 10 | reversed(sorted(x, reverse=x))
@@ -187,6 +203,8 @@ C413.py:11:1: C413 [*] Unnecessary `reversed` call around `sorted()`
 12 12 | 
 13 13 | # Regression test for: https://github.com/astral-sh/ruff/issues/7289
 14 14 | reversed(sorted(i for i in range(42)))
+
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 C413.py:14:1: C413 [*] Unnecessary `reversed` call around `sorted()`
    |
@@ -197,7 +215,7 @@ C413.py:14:1: C413 [*] Unnecessary `reversed` call around `sorted()`
    |
    = help: Remove unnecessary `reversed` call
 
-ℹ Unsafe fix
+Suggested fix:
 11 11 | reversed(sorted(x, reverse=not x))
 12 12 | 
 13 13 | # Regression test for: https://github.com/astral-sh/ruff/issues/7289
@@ -206,6 +224,8 @@ C413.py:14:1: C413 [*] Unnecessary `reversed` call around `sorted()`
 15 15 | reversed(sorted((i for i in range(42)), reverse=True))
 16 16 | 
 17 17 | # Regression test for: https://github.com/astral-sh/ruff/issues/10335
+
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 C413.py:15:1: C413 [*] Unnecessary `reversed` call around `sorted()`
    |
@@ -218,7 +238,7 @@ C413.py:15:1: C413 [*] Unnecessary `reversed` call around `sorted()`
    |
    = help: Remove unnecessary `reversed` call
 
-ℹ Unsafe fix
+Suggested fix:
 12 12 | 
 13 13 | # Regression test for: https://github.com/astral-sh/ruff/issues/7289
 14 14 | reversed(sorted(i for i in range(42)))
@@ -227,6 +247,8 @@ C413.py:15:1: C413 [*] Unnecessary `reversed` call around `sorted()`
 16 16 | 
 17 17 | # Regression test for: https://github.com/astral-sh/ruff/issues/10335
 18 18 | reversed(sorted([1, 2, 3], reverse=False or True))
+
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 C413.py:18:1: C413 [*] Unnecessary `reversed` call around `sorted()`
    |
@@ -237,13 +259,15 @@ C413.py:18:1: C413 [*] Unnecessary `reversed` call around `sorted()`
    |
    = help: Remove unnecessary `reversed` call
 
-ℹ Unsafe fix
+Suggested fix:
 15 15 | reversed(sorted((i for i in range(42)), reverse=True))
 16 16 | 
 17 17 | # Regression test for: https://github.com/astral-sh/ruff/issues/10335
 18    |-reversed(sorted([1, 2, 3], reverse=False or True))
    18 |+sorted([1, 2, 3], reverse=not (False or True))
 19 19 | reversed(sorted([1, 2, 3], reverse=(False or True)))
+
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 C413.py:19:1: C413 [*] Unnecessary `reversed` call around `sorted()`
    |
@@ -254,9 +278,11 @@ C413.py:19:1: C413 [*] Unnecessary `reversed` call around `sorted()`
    |
    = help: Remove unnecessary `reversed` call
 
-ℹ Unsafe fix
+Suggested fix:
 16 16 | 
 17 17 | # Regression test for: https://github.com/astral-sh/ruff/issues/10335
 18 18 | reversed(sorted([1, 2, 3], reverse=False or True))
 19    |-reversed(sorted([1, 2, 3], reverse=(False or True)))
    19 |+sorted([1, 2, 3], reverse=not (False or True))
+
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.

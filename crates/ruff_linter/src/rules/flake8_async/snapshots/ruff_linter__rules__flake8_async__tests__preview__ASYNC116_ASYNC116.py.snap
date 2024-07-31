@@ -11,7 +11,7 @@ ASYNC116.py:11:11: ASYNC116 [*] `trio.sleep()` with >24 hour interval should usu
    |
    = help: Replace with `trio.sleep_forever()`
 
-ℹ Unsafe fix
+Suggested fix:
 8  8  |     import trio
 9  9  | 
 10 10 |     # These examples are probably not meant to ever wake up:
@@ -20,6 +20,8 @@ ASYNC116.py:11:11: ASYNC116 [*] `trio.sleep()` with >24 hour interval should usu
 12 12 | 
 13 13 |     # 'inf literal' overflow trick
 14 14 |     await trio.sleep(1e999)  # error: 116, "async"
+
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 ASYNC116.py:14:11: ASYNC116 [*] `trio.sleep()` with >24 hour interval should usually be `trio.sleep_forever()`
    |
@@ -31,7 +33,7 @@ ASYNC116.py:14:11: ASYNC116 [*] `trio.sleep()` with >24 hour interval should usu
    |
    = help: Replace with `trio.sleep_forever()`
 
-ℹ Unsafe fix
+Suggested fix:
 11 11 |     await trio.sleep(100000)  # error: 116, "async"
 12 12 | 
 13 13 |     # 'inf literal' overflow trick
@@ -40,6 +42,8 @@ ASYNC116.py:14:11: ASYNC116 [*] `trio.sleep()` with >24 hour interval should usu
 15 15 | 
 16 16 |     await trio.sleep(86399)
 17 17 |     await trio.sleep(86400)
+
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 ASYNC116.py:18:11: ASYNC116 [*] `trio.sleep()` with >24 hour interval should usually be `trio.sleep_forever()`
    |
@@ -51,7 +55,7 @@ ASYNC116.py:18:11: ASYNC116 [*] `trio.sleep()` with >24 hour interval should usu
    |
    = help: Replace with `trio.sleep_forever()`
 
-ℹ Unsafe fix
+Suggested fix:
 15 15 | 
 16 16 |     await trio.sleep(86399)
 17 17 |     await trio.sleep(86400)
@@ -60,6 +64,8 @@ ASYNC116.py:18:11: ASYNC116 [*] `trio.sleep()` with >24 hour interval should usu
 19 19 |     await trio.sleep(86401)  # error: 116, "async"
 20 20 | 
 21 21 |     await trio.sleep(-1)  # will raise a runtime error
+
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 ASYNC116.py:19:11: ASYNC116 [*] `trio.sleep()` with >24 hour interval should usually be `trio.sleep_forever()`
    |
@@ -72,7 +78,7 @@ ASYNC116.py:19:11: ASYNC116 [*] `trio.sleep()` with >24 hour interval should usu
    |
    = help: Replace with `trio.sleep_forever()`
 
-ℹ Unsafe fix
+Suggested fix:
 16 16 |     await trio.sleep(86399)
 17 17 |     await trio.sleep(86400)
 18 18 |     await trio.sleep(86400.01)  # error: 116, "async"
@@ -81,6 +87,8 @@ ASYNC116.py:19:11: ASYNC116 [*] `trio.sleep()` with >24 hour interval should usu
 20 20 | 
 21 21 |     await trio.sleep(-1)  # will raise a runtime error
 22 22 |     await trio.sleep(0)  # handled by different check
+
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 ASYNC116.py:48:5: ASYNC116 [*] `trio.sleep()` with >24 hour interval should usually be `trio.sleep_forever()`
    |
@@ -92,7 +100,7 @@ ASYNC116.py:48:5: ASYNC116 [*] `trio.sleep()` with >24 hour interval should usua
    |
    = help: Replace with `trio.sleep_forever()`
 
-ℹ Unsafe fix
+Suggested fix:
 45 45 |     import trio
 46 46 | 
 47 47 |     # does not require the call to be awaited, nor in an async fun
@@ -101,6 +109,8 @@ ASYNC116.py:48:5: ASYNC116 [*] `trio.sleep()` with >24 hour interval should usua
 49 49 |     # also checks that we don't break visit_Call
 50 50 |     trio.run(trio.sleep(86401))  # error: 116, "async"
 51 51 | 
+
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 ASYNC116.py:50:14: ASYNC116 [*] `trio.sleep()` with >24 hour interval should usually be `trio.sleep_forever()`
    |
@@ -111,7 +121,7 @@ ASYNC116.py:50:14: ASYNC116 [*] `trio.sleep()` with >24 hour interval should usu
    |
    = help: Replace with `trio.sleep_forever()`
 
-ℹ Unsafe fix
+Suggested fix:
 47 47 |     # does not require the call to be awaited, nor in an async fun
 48 48 |     trio.sleep(86401)  # error: 116, "async"
 49 49 |     # also checks that we don't break visit_Call
@@ -121,6 +131,8 @@ ASYNC116.py:50:14: ASYNC116 [*] `trio.sleep()` with >24 hour interval should usu
 52 52 | 
 53 53 | async def import_from_trio():
 
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
+
 ASYNC116.py:57:11: ASYNC116 [*] `trio.sleep()` with >24 hour interval should usually be `trio.sleep_forever()`
    |
 56 |     # catch from import
@@ -129,7 +141,7 @@ ASYNC116.py:57:11: ASYNC116 [*] `trio.sleep()` with >24 hour interval should usu
    |
    = help: Replace with `trio.sleep_forever()`
 
-ℹ Unsafe fix
+Suggested fix:
 2  2  | # ASYNCIO_NO_ERROR - no asyncio.sleep_forever, so check intentionally doesn't trigger.
 3  3  | import math
 4  4  | from math import inf
@@ -147,6 +159,8 @@ ASYNC116.py:57:11: ASYNC116 [*] `trio.sleep()` with >24 hour interval should usu
 59 60 | 
 60 61 | async def import_anyio():
 
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
+
 ASYNC116.py:64:11: ASYNC116 [*] `asyncio.sleep()` with >24 hour interval should usually be `asyncio.sleep_forever()`
    |
 63 |     # These examples are probably not meant to ever wake up:
@@ -157,7 +171,7 @@ ASYNC116.py:64:11: ASYNC116 [*] `asyncio.sleep()` with >24 hour interval should 
    |
    = help: Replace with `asyncio.sleep_forever()`
 
-ℹ Unsafe fix
+Suggested fix:
 2  2  | # ASYNCIO_NO_ERROR - no asyncio.sleep_forever, so check intentionally doesn't trigger.
 3  3  | import math
 4  4  | from math import inf
@@ -175,6 +189,8 @@ ASYNC116.py:64:11: ASYNC116 [*] `asyncio.sleep()` with >24 hour interval should 
 66 67 |     # 'inf literal' overflow trick
 67 68 |     await anyio.sleep(1e999)  # error: 116, "async"
 
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
+
 ASYNC116.py:67:11: ASYNC116 [*] `asyncio.sleep()` with >24 hour interval should usually be `asyncio.sleep_forever()`
    |
 66 |     # 'inf literal' overflow trick
@@ -185,7 +201,7 @@ ASYNC116.py:67:11: ASYNC116 [*] `asyncio.sleep()` with >24 hour interval should 
    |
    = help: Replace with `asyncio.sleep_forever()`
 
-ℹ Unsafe fix
+Suggested fix:
 2  2  | # ASYNCIO_NO_ERROR - no asyncio.sleep_forever, so check intentionally doesn't trigger.
 3  3  | import math
 4  4  | from math import inf
@@ -203,6 +219,8 @@ ASYNC116.py:67:11: ASYNC116 [*] `asyncio.sleep()` with >24 hour interval should 
 69 70 |     await anyio.sleep(86399)
 70 71 |     await anyio.sleep(86400)
 
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
+
 ASYNC116.py:71:11: ASYNC116 [*] `asyncio.sleep()` with >24 hour interval should usually be `asyncio.sleep_forever()`
    |
 69 |     await anyio.sleep(86399)
@@ -213,7 +231,7 @@ ASYNC116.py:71:11: ASYNC116 [*] `asyncio.sleep()` with >24 hour interval should 
    |
    = help: Replace with `asyncio.sleep_forever()`
 
-ℹ Unsafe fix
+Suggested fix:
 2  2  | # ASYNCIO_NO_ERROR - no asyncio.sleep_forever, so check intentionally doesn't trigger.
 3  3  | import math
 4  4  | from math import inf
@@ -231,6 +249,8 @@ ASYNC116.py:71:11: ASYNC116 [*] `asyncio.sleep()` with >24 hour interval should 
 73 74 | 
 74 75 |     await anyio.sleep(-1)  # will raise a runtime error
 
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
+
 ASYNC116.py:72:11: ASYNC116 [*] `asyncio.sleep()` with >24 hour interval should usually be `asyncio.sleep_forever()`
    |
 70 |     await anyio.sleep(86400)
@@ -242,7 +262,7 @@ ASYNC116.py:72:11: ASYNC116 [*] `asyncio.sleep()` with >24 hour interval should 
    |
    = help: Replace with `asyncio.sleep_forever()`
 
-ℹ Unsafe fix
+Suggested fix:
 2  2  | # ASYNCIO_NO_ERROR - no asyncio.sleep_forever, so check intentionally doesn't trigger.
 3  3  | import math
 4  4  | from math import inf
@@ -260,6 +280,8 @@ ASYNC116.py:72:11: ASYNC116 [*] `asyncio.sleep()` with >24 hour interval should 
 74 75 |     await anyio.sleep(-1)  # will raise a runtime error
 75 76 |     await anyio.sleep(0)  # handled by different check
 
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
+
 ASYNC116.py:101:5: ASYNC116 [*] `asyncio.sleep()` with >24 hour interval should usually be `asyncio.sleep_forever()`
     |
 100 |     # does not require the call to be awaited, nor in an async fun
@@ -270,7 +292,7 @@ ASYNC116.py:101:5: ASYNC116 [*] `asyncio.sleep()` with >24 hour interval should 
     |
     = help: Replace with `asyncio.sleep_forever()`
 
-ℹ Unsafe fix
+Suggested fix:
 2   2   | # ASYNCIO_NO_ERROR - no asyncio.sleep_forever, so check intentionally doesn't trigger.
 3   3   | import math
 4   4   | from math import inf
@@ -288,6 +310,8 @@ ASYNC116.py:101:5: ASYNC116 [*] `asyncio.sleep()` with >24 hour interval should 
 103 104 |     anyio.run(anyio.sleep(86401))  # error: 116, "async"
 104 105 | 
 
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
+
 ASYNC116.py:103:15: ASYNC116 [*] `asyncio.sleep()` with >24 hour interval should usually be `asyncio.sleep_forever()`
     |
 101 |     anyio.sleep(86401)  # error: 116, "async"
@@ -297,7 +321,7 @@ ASYNC116.py:103:15: ASYNC116 [*] `asyncio.sleep()` with >24 hour interval should
     |
     = help: Replace with `asyncio.sleep_forever()`
 
-ℹ Unsafe fix
+Suggested fix:
 2   2   | # ASYNCIO_NO_ERROR - no asyncio.sleep_forever, so check intentionally doesn't trigger.
 3   3   | import math
 4   4   | from math import inf
@@ -315,6 +339,8 @@ ASYNC116.py:103:15: ASYNC116 [*] `asyncio.sleep()` with >24 hour interval should
 105 106 | 
 106 107 | async def import_from_anyio():
 
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
+
 ASYNC116.py:110:11: ASYNC116 [*] `asyncio.sleep()` with >24 hour interval should usually be `asyncio.sleep_forever()`
     |
 109 |     # catch from import
@@ -323,7 +349,7 @@ ASYNC116.py:110:11: ASYNC116 [*] `asyncio.sleep()` with >24 hour interval should
     |
     = help: Replace with `asyncio.sleep_forever()`
 
-ℹ Unsafe fix
+Suggested fix:
 2   2   | # ASYNCIO_NO_ERROR - no asyncio.sleep_forever, so check intentionally doesn't trigger.
 3   3   | import math
 4   4   | from math import inf
@@ -337,3 +363,5 @@ ASYNC116.py:110:11: ASYNC116 [*] `asyncio.sleep()` with >24 hour interval should
 109 110 |     # catch from import
 110     |-    await sleep(86401)  # error: 116, "async"
     111 |+    await sleep_forever()  # error: 116, "async"
+
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.

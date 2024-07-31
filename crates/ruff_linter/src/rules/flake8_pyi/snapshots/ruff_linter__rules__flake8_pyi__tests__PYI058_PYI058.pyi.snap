@@ -11,7 +11,7 @@ PYI058.pyi:5:13: PYI058 [*] Use `Iterator` as the return value for simple `__ite
   |
   = help: Convert the return annotation of your `__iter__` method to `Iterator`
 
-ℹ Safe fix
+Suggested fix:
   1 |+from collections.abc import Iterator
 1 2 | def scope():
 2 3 |     from collections.abc import Generator
@@ -23,6 +23,8 @@ PYI058.pyi:5:13: PYI058 [*] Use `Iterator` as the return value for simple `__ite
 7 8 | def scope():
 8 9 |     import typing
 
+    Run `ruff check --fix` to apply this fix.
+
 PYI058.pyi:11:13: PYI058 [*] Use `Iterator` as the return value for simple `__iter__` methods
    |
 10 |     class IteratorReturningSimpleGenerator2:
@@ -33,7 +35,7 @@ PYI058.pyi:11:13: PYI058 [*] Use `Iterator` as the return value for simple `__it
    |
    = help: Convert the return annotation of your `__iter__` method to `Iterator`
 
-ℹ Safe fix
+Suggested fix:
 8  8  |     import typing
 9  9  | 
 10 10 |     class IteratorReturningSimpleGenerator2:
@@ -42,6 +44,8 @@ PYI058.pyi:11:13: PYI058 [*] Use `Iterator` as the return value for simple `__it
 12 12 | 
 13 13 | def scope():
 14 14 |     import collections.abc
+
+    Run `ruff check --fix` to apply this fix.
 
 PYI058.pyi:17:13: PYI058 [*] Use `Iterator` as the return value for simple `__iter__` methods
    |
@@ -53,7 +57,7 @@ PYI058.pyi:17:13: PYI058 [*] Use `Iterator` as the return value for simple `__it
    |
    = help: Convert the return annotation of your `__iter__` method to `Iterator`
 
-ℹ Safe fix
+Suggested fix:
 14 14 |     import collections.abc
 15 15 | 
 16 16 |     class IteratorReturningSimpleGenerator3:
@@ -62,6 +66,8 @@ PYI058.pyi:17:13: PYI058 [*] Use `Iterator` as the return value for simple `__it
 18 18 | 
 19 19 | def scope():
 20 20 |     import collections.abc
+
+    Run `ruff check --fix` to apply this fix.
 
 PYI058.pyi:24:13: PYI058 [*] Use `Iterator` as the return value for simple `__iter__` methods
    |
@@ -73,7 +79,7 @@ PYI058.pyi:24:13: PYI058 [*] Use `Iterator` as the return value for simple `__it
    |
    = help: Convert the return annotation of your `__iter__` method to `Iterator`
 
-ℹ Safe fix
+Suggested fix:
 21 21 |     from typing import Any
 22 22 | 
 23 23 |     class IteratorReturningSimpleGenerator4:
@@ -82,6 +88,8 @@ PYI058.pyi:24:13: PYI058 [*] Use `Iterator` as the return value for simple `__it
 25 25 | 
 26 26 | def scope():
 27 27 |     import collections.abc
+
+    Run `ruff check --fix` to apply this fix.
 
 PYI058.pyi:31:13: PYI058 [*] Use `Iterator` as the return value for simple `__iter__` methods
    |
@@ -93,7 +101,7 @@ PYI058.pyi:31:13: PYI058 [*] Use `Iterator` as the return value for simple `__it
    |
    = help: Convert the return annotation of your `__iter__` method to `Iterator`
 
-ℹ Safe fix
+Suggested fix:
 28 28 |     import typing
 29 29 | 
 30 30 |     class IteratorReturningSimpleGenerator5:
@@ -102,6 +110,8 @@ PYI058.pyi:31:13: PYI058 [*] Use `Iterator` as the return value for simple `__it
 32 32 | 
 33 33 | def scope():
 34 34 |     from collections.abc import Generator
+
+    Run `ruff check --fix` to apply this fix.
 
 PYI058.pyi:37:13: PYI058 [*] Use `Iterator` as the return value for simple `__iter__` methods
    |
@@ -113,7 +123,7 @@ PYI058.pyi:37:13: PYI058 [*] Use `Iterator` as the return value for simple `__it
    |
    = help: Convert the return annotation of your `__iter__` method to `Iterator`
 
-ℹ Safe fix
+Suggested fix:
    1  |+from collections.abc import Iterator
 1  2  | def scope():
 2  3  |     from collections.abc import Generator
@@ -128,6 +138,8 @@ PYI058.pyi:37:13: PYI058 [*] Use `Iterator` as the return value for simple `__it
 39 40 | def scope():
 40 41 |     import typing_extensions
 
+    Run `ruff check --fix` to apply this fix.
+
 PYI058.pyi:43:13: PYI058 [*] Use `AsyncIterator` as the return value for simple `__aiter__` methods
    |
 42 |     class AsyncIteratorReturningSimpleAsyncGenerator1:
@@ -138,7 +150,7 @@ PYI058.pyi:43:13: PYI058 [*] Use `AsyncIterator` as the return value for simple 
    |
    = help: Convert the return annotation of your `__aiter__` method to `AsyncIterator`
 
-ℹ Safe fix
+Suggested fix:
 40 40 |     import typing_extensions
 41 41 | 
 42 42 |     class AsyncIteratorReturningSimpleAsyncGenerator1:
@@ -147,6 +159,8 @@ PYI058.pyi:43:13: PYI058 [*] Use `AsyncIterator` as the return value for simple 
 44 44 | 
 45 45 | def scope():
 46 46 |     import collections.abc
+
+    Run `ruff check --fix` to apply this fix.
 
 PYI058.pyi:49:13: PYI058 [*] Use `AsyncIterator` as the return value for simple `__aiter__` methods
    |
@@ -157,7 +171,7 @@ PYI058.pyi:49:13: PYI058 [*] Use `AsyncIterator` as the return value for simple 
    |
    = help: Convert the return annotation of your `__aiter__` method to `AsyncIterator`
 
-ℹ Safe fix
+Suggested fix:
 46 46 |     import collections.abc
 47 47 | 
 48 48 |     class AsyncIteratorReturningSimpleAsyncGenerator3:
@@ -166,6 +180,8 @@ PYI058.pyi:49:13: PYI058 [*] Use `AsyncIterator` as the return value for simple 
 50 50 |             ...  # PYI058 (Use `AsyncIterator`)
 51 51 | 
 52 52 | def scope():
+
+    Run `ruff check --fix` to apply this fix.
 
 PYI058.pyi:56:13: PYI058 [*] Use `AsyncIterator` as the return value for simple `__aiter__` methods
    |
@@ -177,7 +193,7 @@ PYI058.pyi:56:13: PYI058 [*] Use `AsyncIterator` as the return value for simple 
    |
    = help: Convert the return annotation of your `__aiter__` method to `AsyncIterator`
 
-ℹ Safe fix
+Suggested fix:
 53 53 |     import collections.abc
 54 54 | 
 55 55 |     class AsyncIteratorReturningSimpleAsyncGenerator3:
@@ -187,4 +203,4 @@ PYI058.pyi:56:13: PYI058 [*] Use `AsyncIterator` as the return value for simple 
 58 58 | def scope():
 59 59 |     from typing import Iterator
 
-
+    Run `ruff check --fix` to apply this fix.

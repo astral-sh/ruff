@@ -11,7 +11,7 @@ source: crates/ruff_linter/src/rules/pyflakes/mod.rs
   |
   = help: Remove assignment to unused variable `x`
 
-ℹ Safe fix
+Suggested fix:
 4 4 | def f():
 5 5 |     try:
 6 6 |         pass
@@ -21,4 +21,4 @@ source: crates/ruff_linter/src/rules/pyflakes/mod.rs
 9 9 | 
 10 10 |     # This should resolve to the `x` in `x = 1`.
 
-
+    Run `ruff check --fix` to apply this fix.

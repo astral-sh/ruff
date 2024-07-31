@@ -12,7 +12,7 @@ PYI025_2.py:3:29: PYI025 [*] Use `from collections.abc import Set as AbstractSet
   |
   = help: Alias `Set` to `AbstractSet`
 
-ℹ Unsafe fix
+Suggested fix:
 1  1  | """Tests to ensure we correctly rename references inside `__all__`"""
 2  2  | 
 3     |-from collections.abc import Set
@@ -32,3 +32,5 @@ PYI025_2.py:3:29: PYI025 [*] Use `from collections.abc import Set as AbstractSet
 13 13 | if not False:
 14    |-    __all__ += ["Se" 't']
    14 |+    __all__ += ["AbstractSet"]
+
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.

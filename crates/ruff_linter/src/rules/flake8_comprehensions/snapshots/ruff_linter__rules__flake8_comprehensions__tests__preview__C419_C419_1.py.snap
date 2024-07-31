@@ -10,12 +10,14 @@ C419_1.py:1:5: C419 [*] Unnecessary list comprehension
   |
   = help: Remove unnecessary list comprehension
 
-ℹ Unsafe fix
+Suggested fix:
 1   |-sum([x.val for x in bar])
   1 |+sum(x.val for x in bar)
 2 2 | min([x.val for x in bar])
 3 3 | max([x.val for x in bar])
 4 4 | sum([x.val for x in bar], 0)
+
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 C419_1.py:2:5: C419 [*] Unnecessary list comprehension
   |
@@ -27,13 +29,15 @@ C419_1.py:2:5: C419 [*] Unnecessary list comprehension
   |
   = help: Remove unnecessary list comprehension
 
-ℹ Unsafe fix
+Suggested fix:
 1 1 | sum([x.val for x in bar])
 2   |-min([x.val for x in bar])
   2 |+min(x.val for x in bar)
 3 3 | max([x.val for x in bar])
 4 4 | sum([x.val for x in bar], 0)
 5 5 | 
+
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 C419_1.py:3:5: C419 [*] Unnecessary list comprehension
   |
@@ -45,7 +49,7 @@ C419_1.py:3:5: C419 [*] Unnecessary list comprehension
   |
   = help: Remove unnecessary list comprehension
 
-ℹ Unsafe fix
+Suggested fix:
 1 1 | sum([x.val for x in bar])
 2 2 | min([x.val for x in bar])
 3   |-max([x.val for x in bar])
@@ -53,6 +57,8 @@ C419_1.py:3:5: C419 [*] Unnecessary list comprehension
 4 4 | sum([x.val for x in bar], 0)
 5 5 | 
 6 6 | # OK
+
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 C419_1.py:4:5: C419 [*] Unnecessary list comprehension
   |
@@ -65,7 +71,7 @@ C419_1.py:4:5: C419 [*] Unnecessary list comprehension
   |
   = help: Remove unnecessary list comprehension
 
-ℹ Unsafe fix
+Suggested fix:
 1 1 | sum([x.val for x in bar])
 2 2 | min([x.val for x in bar])
 3 3 | max([x.val for x in bar])
@@ -74,6 +80,8 @@ C419_1.py:4:5: C419 [*] Unnecessary list comprehension
 5 5 | 
 6 6 | # OK
 7 7 | sum(x.val for x in bar)
+
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 C419_1.py:14:5: C419 [*] Unnecessary list comprehension
    |
@@ -91,7 +99,7 @@ C419_1.py:14:5: C419 [*] Unnecessary list comprehension
    |
    = help: Remove unnecessary list comprehension
 
-ℹ Unsafe fix
+Suggested fix:
 11 11 | 
 12 12 | # Multi-line
 13 13 | sum(
@@ -104,3 +112,5 @@ C419_1.py:14:5: C419 [*] Unnecessary list comprehension
    18 |+    ),
 19 19 |     dt.timedelta(),
 20 20 | )
+
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.

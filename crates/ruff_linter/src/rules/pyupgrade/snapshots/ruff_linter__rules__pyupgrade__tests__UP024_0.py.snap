@@ -11,7 +11,7 @@ UP024_0.py:6:8: UP024 [*] Replace aliased errors with `OSError`
   |
   = help: Replace `EnvironmentError` with builtin `OSError`
 
-ℹ Safe fix
+Suggested fix:
 3 3 | # These should be fixed
 4 4 | try:
 5 5 |     pass
@@ -20,6 +20,8 @@ UP024_0.py:6:8: UP024 [*] Replace aliased errors with `OSError`
 7 7 |     pass
 8 8 | 
 9 9 | try:
+
+    Run `ruff check --fix` to apply this fix.
 
 UP024_0.py:11:8: UP024 [*] Replace aliased errors with `OSError`
    |
@@ -31,7 +33,7 @@ UP024_0.py:11:8: UP024 [*] Replace aliased errors with `OSError`
    |
    = help: Replace `IOError` with builtin `OSError`
 
-ℹ Safe fix
+Suggested fix:
 8  8  | 
 9  9  | try:
 10 10 |     pass
@@ -40,6 +42,8 @@ UP024_0.py:11:8: UP024 [*] Replace aliased errors with `OSError`
 12 12 |     pass
 13 13 | 
 14 14 | try:
+
+    Run `ruff check --fix` to apply this fix.
 
 UP024_0.py:16:8: UP024 [*] Replace aliased errors with `OSError`
    |
@@ -51,7 +55,7 @@ UP024_0.py:16:8: UP024 [*] Replace aliased errors with `OSError`
    |
    = help: Replace `WindowsError` with builtin `OSError`
 
-ℹ Safe fix
+Suggested fix:
 13 13 | 
 14 14 | try:
 15 15 |     pass
@@ -60,6 +64,8 @@ UP024_0.py:16:8: UP024 [*] Replace aliased errors with `OSError`
 17 17 |     pass
 18 18 | 
 19 19 | try:
+
+    Run `ruff check --fix` to apply this fix.
 
 UP024_0.py:21:8: UP024 [*] Replace aliased errors with `OSError`
    |
@@ -71,7 +77,7 @@ UP024_0.py:21:8: UP024 [*] Replace aliased errors with `OSError`
    |
    = help: Replace `mmap.error` with builtin `OSError`
 
-ℹ Safe fix
+Suggested fix:
 18 18 | 
 19 19 | try:
 20 20 |     pass
@@ -80,6 +86,8 @@ UP024_0.py:21:8: UP024 [*] Replace aliased errors with `OSError`
 22 22 |     pass
 23 23 | 
 24 24 | try:
+
+    Run `ruff check --fix` to apply this fix.
 
 UP024_0.py:26:8: UP024 [*] Replace aliased errors with `OSError`
    |
@@ -91,7 +99,7 @@ UP024_0.py:26:8: UP024 [*] Replace aliased errors with `OSError`
    |
    = help: Replace `select.error` with builtin `OSError`
 
-ℹ Safe fix
+Suggested fix:
 23 23 | 
 24 24 | try:
 25 25 |     pass
@@ -100,6 +108,8 @@ UP024_0.py:26:8: UP024 [*] Replace aliased errors with `OSError`
 27 27 |     pass
 28 28 | 
 29 29 | try:
+
+    Run `ruff check --fix` to apply this fix.
 
 UP024_0.py:31:8: UP024 [*] Replace aliased errors with `OSError`
    |
@@ -111,7 +121,7 @@ UP024_0.py:31:8: UP024 [*] Replace aliased errors with `OSError`
    |
    = help: Replace `socket.error` with builtin `OSError`
 
-ℹ Safe fix
+Suggested fix:
 28 28 | 
 29 29 | try:
 30 30 |     pass
@@ -120,6 +130,8 @@ UP024_0.py:31:8: UP024 [*] Replace aliased errors with `OSError`
 32 32 |     pass
 33 33 | 
 34 34 | try:
+
+    Run `ruff check --fix` to apply this fix.
 
 UP024_0.py:36:8: UP024 [*] Replace aliased errors with `OSError`
    |
@@ -131,7 +143,7 @@ UP024_0.py:36:8: UP024 [*] Replace aliased errors with `OSError`
    |
    = help: Replace `error` with builtin `OSError`
 
-ℹ Safe fix
+Suggested fix:
 33 33 | 
 34 34 | try:
 35 35 |     pass
@@ -140,6 +152,8 @@ UP024_0.py:36:8: UP024 [*] Replace aliased errors with `OSError`
 37 37 |     pass
 38 38 | 
 39 39 | # Should NOT be in parentheses when replaced
+
+    Run `ruff check --fix` to apply this fix.
 
 UP024_0.py:43:8: UP024 [*] Replace aliased errors with `OSError`
    |
@@ -152,7 +166,7 @@ UP024_0.py:43:8: UP024 [*] Replace aliased errors with `OSError`
    |
    = help: Replace with builtin `OSError`
 
-ℹ Safe fix
+Suggested fix:
 40 40 | 
 41 41 | try:
 42 42 |     pass
@@ -161,6 +175,8 @@ UP024_0.py:43:8: UP024 [*] Replace aliased errors with `OSError`
 44 44 |     pass
 45 45 | try:
 46 46 |     pass
+
+    Run `ruff check --fix` to apply this fix.
 
 UP024_0.py:47:8: UP024 [*] Replace aliased errors with `OSError`
    |
@@ -173,7 +189,7 @@ UP024_0.py:47:8: UP024 [*] Replace aliased errors with `OSError`
    |
    = help: Replace with builtin `OSError`
 
-ℹ Safe fix
+Suggested fix:
 44 44 |     pass
 45 45 | try:
 46 46 |     pass
@@ -182,6 +198,8 @@ UP024_0.py:47:8: UP024 [*] Replace aliased errors with `OSError`
 48 48 |     pass
 49 49 | try:
 50 50 |     pass
+
+    Run `ruff check --fix` to apply this fix.
 
 UP024_0.py:51:8: UP024 [*] Replace aliased errors with `OSError`
    |
@@ -193,7 +211,7 @@ UP024_0.py:51:8: UP024 [*] Replace aliased errors with `OSError`
    |
    = help: Replace with builtin `OSError`
 
-ℹ Safe fix
+Suggested fix:
 48 48 |     pass
 49 49 | try:
 50 50 |     pass
@@ -202,6 +220,8 @@ UP024_0.py:51:8: UP024 [*] Replace aliased errors with `OSError`
 52 52 |     pass
 53 53 | 
 54 54 | # Should be kept in parentheses (because multiple)
+
+    Run `ruff check --fix` to apply this fix.
 
 UP024_0.py:58:8: UP024 [*] Replace aliased errors with `OSError`
    |
@@ -213,7 +233,7 @@ UP024_0.py:58:8: UP024 [*] Replace aliased errors with `OSError`
    |
    = help: Replace with builtin `OSError`
 
-ℹ Safe fix
+Suggested fix:
 55 55 | 
 56 56 | try:
 57 57 |     pass
@@ -222,6 +242,8 @@ UP024_0.py:58:8: UP024 [*] Replace aliased errors with `OSError`
 59 59 |     pass
 60 60 | 
 61 61 | # First should change, second should not
+
+    Run `ruff check --fix` to apply this fix.
 
 UP024_0.py:65:8: UP024 [*] Replace aliased errors with `OSError`
    |
@@ -234,7 +256,7 @@ UP024_0.py:65:8: UP024 [*] Replace aliased errors with `OSError`
    |
    = help: Replace with builtin `OSError`
 
-ℹ Safe fix
+Suggested fix:
 62 62 | from .mmap import error
 63 63 | try:
 64 64 |     pass
@@ -243,6 +265,8 @@ UP024_0.py:65:8: UP024 [*] Replace aliased errors with `OSError`
 66 66 |     pass
 67 67 | # These should not change
 68 68 | 
+
+    Run `ruff check --fix` to apply this fix.
 
 UP024_0.py:87:8: UP024 [*] Replace aliased errors with `OSError`
    |
@@ -254,7 +278,7 @@ UP024_0.py:87:8: UP024 [*] Replace aliased errors with `OSError`
    |
    = help: Replace `mmap.error` with builtin `OSError`
 
-ℹ Safe fix
+Suggested fix:
 84 84 |     pass
 85 85 | try:
 86 86 |     pass
@@ -263,6 +287,8 @@ UP024_0.py:87:8: UP024 [*] Replace aliased errors with `OSError`
 88 88 |     pass
 89 89 | 
 90 90 | try:
+
+    Run `ruff check --fix` to apply this fix.
 
 UP024_0.py:105:11: UP024 [*] Replace aliased errors with `OSError`
     |
@@ -274,7 +300,7 @@ UP024_0.py:105:11: UP024 [*] Replace aliased errors with `OSError`
     |
     = help: Replace with builtin `OSError`
 
-ℹ Safe fix
+Suggested fix:
 102 102 | def get_owner_id_from_mac_address():
 103 103 |     try:
 104 104 |         mac_address = get_primary_mac_address()
@@ -283,6 +309,8 @@ UP024_0.py:105:11: UP024 [*] Replace aliased errors with `OSError`
 106 106 |         msg = 'Unable to query URL to get Owner ID: {u}\n{e}'.format(u=owner_id_url, e=ex)
 107 107 | 
 108 108 | 
+
+    Run `ruff check --fix` to apply this fix.
 
 UP024_0.py:114:8: UP024 [*] Replace aliased errors with `OSError`
     |
@@ -294,7 +322,7 @@ UP024_0.py:114:8: UP024 [*] Replace aliased errors with `OSError`
     |
     = help: Replace `os.error` with builtin `OSError`
 
-ℹ Safe fix
+Suggested fix:
 111 111 | 
 112 112 | try:
 113 113 |     pass
@@ -302,4 +330,4 @@ UP024_0.py:114:8: UP024 [*] Replace aliased errors with `OSError`
     114 |+except OSError:
 115 115 |     pass
 
-
+    Run `ruff check --fix` to apply this fix.

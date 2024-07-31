@@ -9,7 +9,7 @@ RUF026.py:11:5: RUF026 [*] `default_factory` is a positional-only argument to `d
    |
    = help: Replace with `defaultdict(default_factory=int)`
 
-ℹ Unsafe fix
+Suggested fix:
 8  8  | 
 9  9  | 
 10 10 | def func():
@@ -19,6 +19,8 @@ RUF026.py:11:5: RUF026 [*] `default_factory` is a positional-only argument to `d
 13 13 | 
 14 14 | def func():
 
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
+
 RUF026.py:15:5: RUF026 [*] `default_factory` is a positional-only argument to `defaultdict`
    |
 14 | def func():
@@ -27,7 +29,7 @@ RUF026.py:15:5: RUF026 [*] `default_factory` is a positional-only argument to `d
    |
    = help: Replace with `defaultdict(default_factory=float)`
 
-ℹ Unsafe fix
+Suggested fix:
 12 12 | 
 13 13 | 
 14 14 | def func():
@@ -37,6 +39,8 @@ RUF026.py:15:5: RUF026 [*] `default_factory` is a positional-only argument to `d
 17 17 | 
 18 18 | def func():
 
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
+
 RUF026.py:19:5: RUF026 [*] `default_factory` is a positional-only argument to `defaultdict`
    |
 18 | def func():
@@ -45,7 +49,7 @@ RUF026.py:19:5: RUF026 [*] `default_factory` is a positional-only argument to `d
    |
    = help: Replace with `defaultdict(default_factory=dict)`
 
-ℹ Unsafe fix
+Suggested fix:
 16 16 | 
 17 17 | 
 18 18 | def func():
@@ -55,6 +59,8 @@ RUF026.py:19:5: RUF026 [*] `default_factory` is a positional-only argument to `d
 21 21 | 
 22 22 | def func():
 
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
+
 RUF026.py:23:5: RUF026 [*] `default_factory` is a positional-only argument to `defaultdict`
    |
 22 | def func():
@@ -63,7 +69,7 @@ RUF026.py:23:5: RUF026 [*] `default_factory` is a positional-only argument to `d
    |
    = help: Replace with `defaultdict(default_factory=list)`
 
-ℹ Unsafe fix
+Suggested fix:
 20 20 | 
 21 21 | 
 22 22 | def func():
@@ -73,6 +79,8 @@ RUF026.py:23:5: RUF026 [*] `default_factory` is a positional-only argument to `d
 25 25 | 
 26 26 | def func():
 
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
+
 RUF026.py:27:5: RUF026 [*] `default_factory` is a positional-only argument to `defaultdict`
    |
 26 | def func():
@@ -81,7 +89,7 @@ RUF026.py:27:5: RUF026 [*] `default_factory` is a positional-only argument to `d
    |
    = help: Replace with `defaultdict(default_factory=tuple)`
 
-ℹ Unsafe fix
+Suggested fix:
 24 24 | 
 25 25 | 
 26 26 | def func():
@@ -90,6 +98,8 @@ RUF026.py:27:5: RUF026 [*] `default_factory` is a positional-only argument to `d
 28 28 | 
 29 29 | 
 30 30 | def func():
+
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 RUF026.py:34:5: RUF026 [*] `default_factory` is a positional-only argument to `defaultdict`
    |
@@ -100,7 +110,7 @@ RUF026.py:34:5: RUF026 [*] `default_factory` is a positional-only argument to `d
    |
    = help: Replace with `defaultdict(default_factory=foo)`
 
-ℹ Unsafe fix
+Suggested fix:
 31 31 |     def foo():
 32 32 |         pass
 33 33 | 
@@ -110,6 +120,8 @@ RUF026.py:34:5: RUF026 [*] `default_factory` is a positional-only argument to `d
 36 36 | 
 37 37 | def func():
 
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
+
 RUF026.py:38:5: RUF026 [*] `default_factory` is a positional-only argument to `defaultdict`
    |
 37 | def func():
@@ -118,7 +130,7 @@ RUF026.py:38:5: RUF026 [*] `default_factory` is a positional-only argument to `d
    |
    = help: Replace with `defaultdict(default_factory=lambda: 1)`
 
-ℹ Unsafe fix
+Suggested fix:
 35 35 | 
 36 36 | 
 37 37 | def func():
@@ -127,6 +139,8 @@ RUF026.py:38:5: RUF026 [*] `default_factory` is a positional-only argument to `d
 39 39 | 
 40 40 | 
 41 41 | def func():
+
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 RUF026.py:44:5: RUF026 [*] `default_factory` is a positional-only argument to `defaultdict`
    |
@@ -137,7 +151,7 @@ RUF026.py:44:5: RUF026 [*] `default_factory` is a positional-only argument to `d
    |
    = help: Replace with `defaultdict(default_factory=deque)`
 
-ℹ Unsafe fix
+Suggested fix:
 41 41 | def func():
 42 42 |     from collections import deque
 43 43 | 
@@ -146,6 +160,8 @@ RUF026.py:44:5: RUF026 [*] `default_factory` is a positional-only argument to `d
 45 45 | 
 46 46 | 
 47 47 | def func():
+
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 RUF026.py:52:5: RUF026 [*] `default_factory` is a positional-only argument to `defaultdict`
    |
@@ -156,7 +172,7 @@ RUF026.py:52:5: RUF026 [*] `default_factory` is a positional-only argument to `d
    |
    = help: Replace with `defaultdict(default_factory=MyCallable())`
 
-ℹ Unsafe fix
+Suggested fix:
 49 49 |         def __call__(self):
 50 50 |             pass
 51 51 | 
@@ -166,6 +182,8 @@ RUF026.py:52:5: RUF026 [*] `default_factory` is a positional-only argument to `d
 54 54 | 
 55 55 | def func():
 
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
+
 RUF026.py:56:5: RUF026 [*] `default_factory` is a positional-only argument to `defaultdict`
    |
 55 | def func():
@@ -174,7 +192,7 @@ RUF026.py:56:5: RUF026 [*] `default_factory` is a positional-only argument to `d
    |
    = help: Replace with `defaultdict(default_factory=tuple)`
 
-ℹ Unsafe fix
+Suggested fix:
 53 53 | 
 54 54 | 
 55 55 | def func():
@@ -184,6 +202,8 @@ RUF026.py:56:5: RUF026 [*] `default_factory` is a positional-only argument to `d
 58 58 | 
 59 59 | def func():
 
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
+
 RUF026.py:60:5: RUF026 [*] `default_factory` is a positional-only argument to `defaultdict`
    |
 59 | def func():
@@ -192,7 +212,7 @@ RUF026.py:60:5: RUF026 [*] `default_factory` is a positional-only argument to `d
    |
    = help: Replace with `defaultdict(default_factory=tuple)`
 
-ℹ Unsafe fix
+Suggested fix:
 57 57 | 
 58 58 | 
 59 59 | def func():
@@ -202,6 +222,8 @@ RUF026.py:60:5: RUF026 [*] `default_factory` is a positional-only argument to `d
 62 62 | 
 63 63 | def func():
 
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
+
 RUF026.py:64:5: RUF026 [*] `default_factory` is a positional-only argument to `defaultdict`
    |
 63 | def func():
@@ -210,7 +232,7 @@ RUF026.py:64:5: RUF026 [*] `default_factory` is a positional-only argument to `d
    |
    = help: Replace with `defaultdict(default_factory=tuple)`
 
-ℹ Unsafe fix
+Suggested fix:
 61 61 | 
 62 62 | 
 63 63 | def func():
@@ -219,6 +241,8 @@ RUF026.py:64:5: RUF026 [*] `default_factory` is a positional-only argument to `d
 65 65 | 
 66 66 | 
 67 67 | def func():
+
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 RUF026.py:68:5: RUF026 [*] `default_factory` is a positional-only argument to `defaultdict`
    |
@@ -232,7 +256,7 @@ RUF026.py:68:5: RUF026 [*] `default_factory` is a positional-only argument to `d
    |
    = help: Replace with `defaultdict(default_factory=tuple)`
 
-ℹ Unsafe fix
+Suggested fix:
 66 66 | 
 67 67 | def func():
 68 68 |     defaultdict(
@@ -242,6 +266,8 @@ RUF026.py:68:5: RUF026 [*] `default_factory` is a positional-only argument to `d
 71 70 |     )  # RUF026
 72 71 | 
 73 72 | 
+
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 RUF026.py:75:5: RUF026 [*] `default_factory` is a positional-only argument to `defaultdict`
    |
@@ -255,7 +281,7 @@ RUF026.py:75:5: RUF026 [*] `default_factory` is a positional-only argument to `d
    |
    = help: Replace with `defaultdict(default_factory=tuple)`
 
-ℹ Unsafe fix
+Suggested fix:
 73 73 | 
 74 74 | def func():
 75 75 |     defaultdict(
@@ -266,4 +292,4 @@ RUF026.py:75:5: RUF026 [*] `default_factory` is a positional-only argument to `d
 79 78 | 
 80 79 | 
 
-
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.

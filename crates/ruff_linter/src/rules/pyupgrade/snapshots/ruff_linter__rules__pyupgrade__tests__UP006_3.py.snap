@@ -9,7 +9,7 @@ UP006_3.py:7:11: UP006 [*] Use `collections.defaultdict` instead of `typing.Defa
   |
   = help: Replace with `collections.defaultdict`
 
-ℹ Safe fix
+Suggested fix:
 4 4 |     from collections import defaultdict
 5 5 | 
 6 6 | 
@@ -17,4 +17,4 @@ UP006_3.py:7:11: UP006 [*] Use `collections.defaultdict` instead of `typing.Defa
   7 |+def f(x: "defaultdict[str, str]") -> None:
 8 8 |     ...
 
-
+    Run `ruff check --fix` to apply this fix.

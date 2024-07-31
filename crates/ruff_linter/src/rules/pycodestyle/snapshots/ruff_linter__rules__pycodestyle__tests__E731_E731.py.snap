@@ -10,7 +10,7 @@ E731.py:3:5: E731 [*] Do not assign a `lambda` expression, use a `def`
   |
   = help: Rewrite `f` as a `def`
 
-ℹ Unsafe fix
+Suggested fix:
 1 1 | def scope():
 2 2 |     # E731
 3   |-    f = lambda x: 2 * x
@@ -19,6 +19,8 @@ E731.py:3:5: E731 [*] Do not assign a `lambda` expression, use a `def`
 4 5 | 
 5 6 | 
 6 7 | def scope():
+
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 E731.py:8:5: E731 [*] Do not assign a `lambda` expression, use a `def`
   |
@@ -29,7 +31,7 @@ E731.py:8:5: E731 [*] Do not assign a `lambda` expression, use a `def`
   |
   = help: Rewrite `f` as a `def`
 
-ℹ Unsafe fix
+Suggested fix:
 5  5  | 
 6  6  | def scope():
 7  7  |     # E731
@@ -40,6 +42,8 @@ E731.py:8:5: E731 [*] Do not assign a `lambda` expression, use a `def`
 10 11 | 
 11 12 | def scope():
 
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
+
 E731.py:14:9: E731 [*] Do not assign a `lambda` expression, use a `def`
    |
 12 |     # E731
@@ -49,7 +53,7 @@ E731.py:14:9: E731 [*] Do not assign a `lambda` expression, use a `def`
    |
    = help: Rewrite `this` as a `def`
 
-ℹ Unsafe fix
+Suggested fix:
 11 11 | def scope():
 12 12 |     # E731
 13 13 |     while False:
@@ -60,6 +64,8 @@ E731.py:14:9: E731 [*] Do not assign a `lambda` expression, use a `def`
 16 17 | 
 17 18 | def scope():
 
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
+
 E731.py:19:5: E731 [*] Do not assign a `lambda` expression, use a `def`
    |
 17 | def scope():
@@ -69,7 +75,7 @@ E731.py:19:5: E731 [*] Do not assign a `lambda` expression, use a `def`
    |
    = help: Rewrite `f` as a `def`
 
-ℹ Unsafe fix
+Suggested fix:
 16 16 | 
 17 17 | def scope():
 18 18 |     # E731
@@ -80,6 +86,8 @@ E731.py:19:5: E731 [*] Do not assign a `lambda` expression, use a `def`
 21 22 | 
 22 23 | def scope():
 
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
+
 E731.py:24:5: E731 [*] Do not assign a `lambda` expression, use a `def`
    |
 22 | def scope():
@@ -89,7 +97,7 @@ E731.py:24:5: E731 [*] Do not assign a `lambda` expression, use a `def`
    |
    = help: Rewrite `f` as a `def`
 
-ℹ Unsafe fix
+Suggested fix:
 21 21 | 
 22 22 | def scope():
 23 23 |     # E731
@@ -100,6 +108,8 @@ E731.py:24:5: E731 [*] Do not assign a `lambda` expression, use a `def`
 26 27 | 
 27 28 | def scope():
 
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
+
 E731.py:57:5: E731 Do not assign a `lambda` expression, use a `def`
    |
 55 | class Scope:
@@ -109,7 +119,7 @@ E731.py:57:5: E731 Do not assign a `lambda` expression, use a `def`
    |
    = help: Rewrite `f` as a `def`
 
-ℹ Display-only fix
+Suggested fix:
 54 54 | 
 55 55 | class Scope:
 56 56 |     # E731
@@ -119,6 +129,8 @@ E731.py:57:5: E731 Do not assign a `lambda` expression, use a `def`
 58 59 | 
 59 60 | 
 60 61 | class Scope:
+
+    Ruff cannot safely apply this fix.
 
 E731.py:73:9: E731 Do not assign a `lambda` expression, use a `def`
    |
@@ -131,7 +143,7 @@ E731.py:73:9: E731 Do not assign a `lambda` expression, use a `def`
    |
    = help: Rewrite `x` as a `def`
 
-ℹ Display-only fix
+Suggested fix:
 70 70 | 
 71 71 |     x: Callable[[int], int]
 72 72 |     if True:
@@ -141,6 +153,8 @@ E731.py:73:9: E731 Do not assign a `lambda` expression, use a `def`
 74 75 |     else:
 75 76 |         x = lambda: 2
 76 77 |     return x
+
+    Ruff cannot safely apply this fix.
 
 E731.py:75:9: E731 Do not assign a `lambda` expression, use a `def`
    |
@@ -152,7 +166,7 @@ E731.py:75:9: E731 Do not assign a `lambda` expression, use a `def`
    |
    = help: Rewrite `x` as a `def`
 
-ℹ Display-only fix
+Suggested fix:
 72 72 |     if True:
 73 73 |         x = lambda: 1
 74 74 |     else:
@@ -163,6 +177,8 @@ E731.py:75:9: E731 Do not assign a `lambda` expression, use a `def`
 77 78 | 
 78 79 | 
 
+    Ruff cannot safely apply this fix.
+
 E731.py:86:5: E731 [*] Do not assign a `lambda` expression, use a `def`
    |
 84 |     # ParamSpec cannot be used in this context, so do not preserve the annotation.
@@ -172,7 +188,7 @@ E731.py:86:5: E731 [*] Do not assign a `lambda` expression, use a `def`
    |
    = help: Rewrite `f` as a `def`
 
-ℹ Unsafe fix
+Suggested fix:
 83 83 | 
 84 84 |     # ParamSpec cannot be used in this context, so do not preserve the annotation.
 85 85 |     P = ParamSpec("P")
@@ -183,6 +199,8 @@ E731.py:86:5: E731 [*] Do not assign a `lambda` expression, use a `def`
 88 89 | 
 89 90 | def scope():
 
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
+
 E731.py:94:5: E731 [*] Do not assign a `lambda` expression, use a `def`
    |
 92 |     from typing import Callable
@@ -192,7 +210,7 @@ E731.py:94:5: E731 [*] Do not assign a `lambda` expression, use a `def`
    |
    = help: Rewrite `f` as a `def`
 
-ℹ Unsafe fix
+Suggested fix:
 91 91 | 
 92 92 |     from typing import Callable
 93 93 | 
@@ -203,6 +221,8 @@ E731.py:94:5: E731 [*] Do not assign a `lambda` expression, use a `def`
 96 97 | 
 97 98 | def scope():
 
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
+
 E731.py:102:5: E731 [*] Do not assign a `lambda` expression, use a `def`
     |
 100 |     from typing import Callable
@@ -212,7 +232,7 @@ E731.py:102:5: E731 [*] Do not assign a `lambda` expression, use a `def`
     |
     = help: Rewrite `f` as a `def`
 
-ℹ Unsafe fix
+Suggested fix:
 99  99  | 
 100 100 |     from typing import Callable
 101 101 | 
@@ -223,6 +243,8 @@ E731.py:102:5: E731 [*] Do not assign a `lambda` expression, use a `def`
 104 105 | 
 105 106 | def scope():
 
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
+
 E731.py:110:5: E731 [*] Do not assign a `lambda` expression, use a `def`
     |
 108 |     from typing import Callable
@@ -232,7 +254,7 @@ E731.py:110:5: E731 [*] Do not assign a `lambda` expression, use a `def`
     |
     = help: Rewrite `f` as a `def`
 
-ℹ Unsafe fix
+Suggested fix:
 107 107 | 
 108 108 |     from typing import Callable
 109 109 | 
@@ -243,6 +265,8 @@ E731.py:110:5: E731 [*] Do not assign a `lambda` expression, use a `def`
 112 113 | 
 113 114 | # Let's use the `Callable` type from `collections.abc` instead.
 
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
+
 E731.py:119:5: E731 [*] Do not assign a `lambda` expression, use a `def`
     |
 117 |     from collections.abc import Callable
@@ -252,7 +276,7 @@ E731.py:119:5: E731 [*] Do not assign a `lambda` expression, use a `def`
     |
     = help: Rewrite `f` as a `def`
 
-ℹ Unsafe fix
+Suggested fix:
 116 116 | 
 117 117 |     from collections.abc import Callable
 118 118 | 
@@ -263,6 +287,8 @@ E731.py:119:5: E731 [*] Do not assign a `lambda` expression, use a `def`
 121 122 | 
 122 123 | def scope():
 
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
+
 E731.py:127:5: E731 [*] Do not assign a `lambda` expression, use a `def`
     |
 125 |     from collections.abc import Callable
@@ -272,7 +298,7 @@ E731.py:127:5: E731 [*] Do not assign a `lambda` expression, use a `def`
     |
     = help: Rewrite `f` as a `def`
 
-ℹ Unsafe fix
+Suggested fix:
 124 124 | 
 125 125 |     from collections.abc import Callable
 126 126 | 
@@ -283,6 +309,8 @@ E731.py:127:5: E731 [*] Do not assign a `lambda` expression, use a `def`
 129 130 | 
 130 131 | def scope():
 
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
+
 E731.py:135:5: E731 [*] Do not assign a `lambda` expression, use a `def`
     |
 133 |     from collections.abc import Callable
@@ -292,7 +320,7 @@ E731.py:135:5: E731 [*] Do not assign a `lambda` expression, use a `def`
     |
     = help: Rewrite `f` as a `def`
 
-ℹ Unsafe fix
+Suggested fix:
 132 132 | 
 133 133 |     from collections.abc import Callable
 134 134 | 
@@ -303,6 +331,8 @@ E731.py:135:5: E731 [*] Do not assign a `lambda` expression, use a `def`
 137 138 | 
 138 139 | class TemperatureScales(Enum):
 
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
+
 E731.py:139:5: E731 Do not assign a `lambda` expression, use a `def`
     |
 138 | class TemperatureScales(Enum):
@@ -312,7 +342,7 @@ E731.py:139:5: E731 Do not assign a `lambda` expression, use a `def`
     |
     = help: Rewrite `CELSIUS` as a `def`
 
-ℹ Display-only fix
+Suggested fix:
 136 136 | 
 137 137 | 
 138 138 | class TemperatureScales(Enum):
@@ -323,6 +353,8 @@ E731.py:139:5: E731 Do not assign a `lambda` expression, use a `def`
 141 142 | 
 142 143 | 
 
+    Ruff cannot safely apply this fix.
+
 E731.py:140:5: E731 Do not assign a `lambda` expression, use a `def`
     |
 138 | class TemperatureScales(Enum):
@@ -332,7 +364,7 @@ E731.py:140:5: E731 Do not assign a `lambda` expression, use a `def`
     |
     = help: Rewrite `FAHRENHEIT` as a `def`
 
-ℹ Display-only fix
+Suggested fix:
 137 137 | 
 138 138 | class TemperatureScales(Enum):
 139 139 |     CELSIUS = (lambda deg_c: deg_c)
@@ -342,6 +374,8 @@ E731.py:140:5: E731 Do not assign a `lambda` expression, use a `def`
 141 142 | 
 142 143 | 
 143 144 | # Regression test for: https://github.com/astral-sh/ruff/issues/7141
+
+    Ruff cannot safely apply this fix.
 
 E731.py:147:5: E731 [*] Do not assign a `lambda` expression, use a `def`
     |
@@ -355,7 +389,7 @@ E731.py:147:5: E731 [*] Do not assign a `lambda` expression, use a `def`
     |
     = help: Rewrite `f` as a `def`
 
-ℹ Unsafe fix
+Suggested fix:
 144 144 | def scope():
 145 145 |     # E731
 146 146 | 
@@ -367,3 +401,5 @@ E731.py:147:5: E731 [*] Do not assign a `lambda` expression, use a `def`
 150 149 | 
 151 150 | 
 152 151 | from dataclasses import dataclass
+
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.

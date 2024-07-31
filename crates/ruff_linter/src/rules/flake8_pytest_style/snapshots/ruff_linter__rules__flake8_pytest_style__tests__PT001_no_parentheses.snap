@@ -10,7 +10,7 @@ PT001.py:14:1: PT001 [*] Use `@pytest.fixture` over `@pytest.fixture()`
    |
    = help: Remove parentheses
 
-ℹ Safe fix
+Suggested fix:
 11 11 |     return 42
 12 12 | 
 13 13 | 
@@ -19,6 +19,8 @@ PT001.py:14:1: PT001 [*] Use `@pytest.fixture` over `@pytest.fixture()`
 15 15 | def parentheses_no_params():
 16 16 |     return 42
 17 17 | 
+
+    Run `ruff check --fix` to apply this fix.
 
 PT001.py:24:1: PT001 [*] Use `@pytest.fixture` over `@pytest.fixture()`
    |
@@ -31,7 +33,7 @@ PT001.py:24:1: PT001 [*] Use `@pytest.fixture` over `@pytest.fixture()`
    |
    = help: Remove parentheses
 
-ℹ Safe fix
+Suggested fix:
 21 21 |     return 42
 22 22 | 
 23 23 | 
@@ -43,6 +45,8 @@ PT001.py:24:1: PT001 [*] Use `@pytest.fixture` over `@pytest.fixture()`
 28 26 |     return 42
 29 27 | 
 
+    Run `ruff check --fix` to apply this fix.
+
 PT001.py:39:1: PT001 [*] Use `@pytest.fixture` over `@pytest.fixture()`
    |
 39 | @fixture()
@@ -52,7 +56,7 @@ PT001.py:39:1: PT001 [*] Use `@pytest.fixture` over `@pytest.fixture()`
    |
    = help: Remove parentheses
 
-ℹ Safe fix
+Suggested fix:
 36 36 |     return 42
 37 37 | 
 38 38 | 
@@ -61,6 +65,8 @@ PT001.py:39:1: PT001 [*] Use `@pytest.fixture` over `@pytest.fixture()`
 40 40 | def imported_from_parentheses_no_params():
 41 41 |     return 42
 42 42 | 
+
+    Run `ruff check --fix` to apply this fix.
 
 PT001.py:49:1: PT001 [*] Use `@pytest.fixture` over `@pytest.fixture()`
    |
@@ -73,7 +79,7 @@ PT001.py:49:1: PT001 [*] Use `@pytest.fixture` over `@pytest.fixture()`
    |
    = help: Remove parentheses
 
-ℹ Safe fix
+Suggested fix:
 46 46 |     return 42
 47 47 | 
 48 48 | 
@@ -85,6 +91,8 @@ PT001.py:49:1: PT001 [*] Use `@pytest.fixture` over `@pytest.fixture()`
 53 51 |     return 42
 54 52 | 
 
+    Run `ruff check --fix` to apply this fix.
+
 PT001.py:64:1: PT001 [*] Use `@pytest.fixture` over `@pytest.fixture()`
    |
 64 | @aliased()
@@ -94,7 +102,7 @@ PT001.py:64:1: PT001 [*] Use `@pytest.fixture` over `@pytest.fixture()`
    |
    = help: Remove parentheses
 
-ℹ Safe fix
+Suggested fix:
 61 61 |     return 42
 62 62 | 
 63 63 | 
@@ -103,6 +111,8 @@ PT001.py:64:1: PT001 [*] Use `@pytest.fixture` over `@pytest.fixture()`
 65 65 | def aliased_parentheses_no_params():
 66 66 |     return 42
 67 67 | 
+
+    Run `ruff check --fix` to apply this fix.
 
 PT001.py:74:1: PT001 [*] Use `@pytest.fixture` over `@pytest.fixture()`
    |
@@ -115,7 +125,7 @@ PT001.py:74:1: PT001 [*] Use `@pytest.fixture` over `@pytest.fixture()`
    |
    = help: Remove parentheses
 
-ℹ Safe fix
+Suggested fix:
 71 71 |     return 42
 72 72 | 
 73 73 | 
@@ -126,4 +136,4 @@ PT001.py:74:1: PT001 [*] Use `@pytest.fixture` over `@pytest.fixture()`
 77 75 | def aliased_parentheses_no_params_multiline():
 78 76 |     return 42
 
-
+    Run `ruff check --fix` to apply this fix.

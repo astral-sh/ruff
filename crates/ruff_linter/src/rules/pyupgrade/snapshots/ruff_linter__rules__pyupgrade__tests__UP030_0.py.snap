@@ -12,7 +12,7 @@ UP030_0.py:3:1: UP030 [*] Use implicit references for positional format fields
   |
   = help: Remove explicit positional indices
 
-ℹ Unsafe fix
+Suggested fix:
 1 1 | # Invalid calls; errors expected.
 2 2 | 
 3   |-"{0}" "{1}" "{2}".format(1, 2, 3)
@@ -20,6 +20,8 @@ UP030_0.py:3:1: UP030 [*] Use implicit references for positional format fields
 4 4 | 
 5 5 | "a {3} complicated {1} string with {0} {2}".format(
 6 6 |     "first", "second", "third", "fourth"
+
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 UP030_0.py:5:1: UP030 [*] Use implicit references for positional format fields
   |
@@ -34,7 +36,7 @@ UP030_0.py:5:1: UP030 [*] Use implicit references for positional format fields
   |
   = help: Remove explicit positional indices
 
-ℹ Unsafe fix
+Suggested fix:
 2 2 | 
 3 3 | "{0}" "{1}" "{2}".format(1, 2, 3)
 4 4 | 
@@ -45,6 +47,8 @@ UP030_0.py:5:1: UP030 [*] Use implicit references for positional format fields
 7 7 | )
 8 8 | 
 9 9 | '{0}'.format(1)
+
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 UP030_0.py:9:1: UP030 [*] Use implicit references for positional format fields
    |
@@ -57,7 +61,7 @@ UP030_0.py:9:1: UP030 [*] Use implicit references for positional format fields
    |
    = help: Remove explicit positional indices
 
-ℹ Unsafe fix
+Suggested fix:
 6  6  |     "first", "second", "third", "fourth"
 7  7  | )
 8  8  | 
@@ -66,6 +70,8 @@ UP030_0.py:9:1: UP030 [*] Use implicit references for positional format fields
 10 10 | 
 11 11 | '{0:x}'.format(30)
 12 12 | 
+
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 UP030_0.py:11:1: UP030 [*] Use implicit references for positional format fields
    |
@@ -78,7 +84,7 @@ UP030_0.py:11:1: UP030 [*] Use implicit references for positional format fields
    |
    = help: Remove explicit positional indices
 
-ℹ Unsafe fix
+Suggested fix:
 8  8  | 
 9  9  | '{0}'.format(1)
 10 10 | 
@@ -87,6 +93,8 @@ UP030_0.py:11:1: UP030 [*] Use implicit references for positional format fields
 12 12 | 
 13 13 | x = '{0}'.format(1)
 14 14 | 
+
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 UP030_0.py:13:5: UP030 [*] Use implicit references for positional format fields
    |
@@ -99,7 +107,7 @@ UP030_0.py:13:5: UP030 [*] Use implicit references for positional format fields
    |
    = help: Remove explicit positional indices
 
-ℹ Unsafe fix
+Suggested fix:
 10 10 | 
 11 11 | '{0:x}'.format(30)
 12 12 | 
@@ -108,6 +116,8 @@ UP030_0.py:13:5: UP030 [*] Use implicit references for positional format fields
 14 14 | 
 15 15 | '''{0}\n{1}\n'''.format(1, 2)
 16 16 | 
+
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 UP030_0.py:15:1: UP030 [*] Use implicit references for positional format fields
    |
@@ -120,7 +130,7 @@ UP030_0.py:15:1: UP030 [*] Use implicit references for positional format fields
    |
    = help: Remove explicit positional indices
 
-ℹ Unsafe fix
+Suggested fix:
 12 12 | 
 13 13 | x = '{0}'.format(1)
 14 14 | 
@@ -129,6 +139,8 @@ UP030_0.py:15:1: UP030 [*] Use implicit references for positional format fields
 16 16 | 
 17 17 | x = "foo {0}" \
 18 18 |     "bar {1}".format(1, 2)
+
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 UP030_0.py:17:5: UP030 [*] Use implicit references for positional format fields
    |
@@ -143,7 +155,7 @@ UP030_0.py:17:5: UP030 [*] Use implicit references for positional format fields
    |
    = help: Remove explicit positional indices
 
-ℹ Unsafe fix
+Suggested fix:
 14 14 | 
 15 15 | '''{0}\n{1}\n'''.format(1, 2)
 16 16 | 
@@ -154,6 +166,8 @@ UP030_0.py:17:5: UP030 [*] Use implicit references for positional format fields
 19 19 | 
 20 20 | ("{0}").format(1)
 21 21 | 
+
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 UP030_0.py:20:1: UP030 [*] Use implicit references for positional format fields
    |
@@ -166,7 +180,7 @@ UP030_0.py:20:1: UP030 [*] Use implicit references for positional format fields
    |
    = help: Remove explicit positional indices
 
-ℹ Unsafe fix
+Suggested fix:
 17 17 | x = "foo {0}" \
 18 18 |     "bar {1}".format(1, 2)
 19 19 | 
@@ -175,6 +189,8 @@ UP030_0.py:20:1: UP030 [*] Use implicit references for positional format fields
 21 21 | 
 22 22 | "\N{snowman} {0}".format(1)
 23 23 | 
+
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 UP030_0.py:22:1: UP030 [*] Use implicit references for positional format fields
    |
@@ -187,7 +203,7 @@ UP030_0.py:22:1: UP030 [*] Use implicit references for positional format fields
    |
    = help: Remove explicit positional indices
 
-ℹ Unsafe fix
+Suggested fix:
 19 19 | 
 20 20 | ("{0}").format(1)
 21 21 | 
@@ -196,6 +212,8 @@ UP030_0.py:22:1: UP030 [*] Use implicit references for positional format fields
 23 23 | 
 24 24 | print(
 25 25 |     'foo{0}'
+
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 UP030_0.py:25:5: UP030 [*] Use implicit references for positional format fields
    |
@@ -208,7 +226,7 @@ UP030_0.py:25:5: UP030 [*] Use implicit references for positional format fields
    |
    = help: Remove explicit positional indices
 
-ℹ Unsafe fix
+Suggested fix:
 22 22 | "\N{snowman} {0}".format(1)
 23 23 | 
 24 24 | print(
@@ -219,6 +237,8 @@ UP030_0.py:25:5: UP030 [*] Use implicit references for positional format fields
 27 27 | )
 28 28 | 
 29 29 | print(
+
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 UP030_0.py:30:5: UP030 [*] Use implicit references for positional format fields
    |
@@ -231,7 +251,7 @@ UP030_0.py:30:5: UP030 [*] Use implicit references for positional format fields
    |
    = help: Remove explicit positional indices
 
-ℹ Unsafe fix
+Suggested fix:
 27 27 | )
 28 28 | 
 29 29 | print(
@@ -242,6 +262,8 @@ UP030_0.py:30:5: UP030 [*] Use implicit references for positional format fields
 32 32 | )
 33 33 | 
 34 34 | '{' '0}'.format(1)
+
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 UP030_0.py:34:1: UP030 Use implicit references for positional format fields
    |
@@ -265,7 +287,7 @@ UP030_0.py:39:1: UP030 [*] Use implicit references for positional format fields
    |
    = help: Remove explicit positional indices
 
-ℹ Unsafe fix
+Suggested fix:
 36 36 | args = list(range(10))
 37 37 | kwargs = {x: x for x in range(10)}
 38 38 | 
@@ -274,6 +296,8 @@ UP030_0.py:39:1: UP030 [*] Use implicit references for positional format fields
 40 40 | 
 41 41 | "{0}".format(**kwargs)
 42 42 | 
+
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 UP030_0.py:41:1: UP030 [*] Use implicit references for positional format fields
    |
@@ -286,7 +310,7 @@ UP030_0.py:41:1: UP030 [*] Use implicit references for positional format fields
    |
    = help: Remove explicit positional indices
 
-ℹ Unsafe fix
+Suggested fix:
 38 38 | 
 39 39 | "{0}".format(*args)
 40 40 | 
@@ -295,6 +319,8 @@ UP030_0.py:41:1: UP030 [*] Use implicit references for positional format fields
 42 42 | 
 43 43 | "{0}_{1}".format(*args)
 44 44 | 
+
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 UP030_0.py:43:1: UP030 [*] Use implicit references for positional format fields
    |
@@ -307,7 +333,7 @@ UP030_0.py:43:1: UP030 [*] Use implicit references for positional format fields
    |
    = help: Remove explicit positional indices
 
-ℹ Unsafe fix
+Suggested fix:
 40 40 | 
 41 41 | "{0}".format(**kwargs)
 42 42 | 
@@ -316,6 +342,8 @@ UP030_0.py:43:1: UP030 [*] Use implicit references for positional format fields
 44 44 | 
 45 45 | "{0}_{1}".format(1, *args)
 46 46 | 
+
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 UP030_0.py:45:1: UP030 [*] Use implicit references for positional format fields
    |
@@ -328,7 +356,7 @@ UP030_0.py:45:1: UP030 [*] Use implicit references for positional format fields
    |
    = help: Remove explicit positional indices
 
-ℹ Unsafe fix
+Suggested fix:
 42 42 | 
 43 43 | "{0}_{1}".format(*args)
 44 44 | 
@@ -337,6 +365,8 @@ UP030_0.py:45:1: UP030 [*] Use implicit references for positional format fields
 46 46 | 
 47 47 | "{0}_{1}".format(1, 2, *args)
 48 48 | 
+
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 UP030_0.py:47:1: UP030 [*] Use implicit references for positional format fields
    |
@@ -349,7 +379,7 @@ UP030_0.py:47:1: UP030 [*] Use implicit references for positional format fields
    |
    = help: Remove explicit positional indices
 
-ℹ Unsafe fix
+Suggested fix:
 44 44 | 
 45 45 | "{0}_{1}".format(1, *args)
 46 46 | 
@@ -358,6 +388,8 @@ UP030_0.py:47:1: UP030 [*] Use implicit references for positional format fields
 48 48 | 
 49 49 | "{0}_{1}".format(*args, 1, 2)
 50 50 | 
+
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 UP030_0.py:49:1: UP030 [*] Use implicit references for positional format fields
    |
@@ -370,7 +402,7 @@ UP030_0.py:49:1: UP030 [*] Use implicit references for positional format fields
    |
    = help: Remove explicit positional indices
 
-ℹ Unsafe fix
+Suggested fix:
 46 46 | 
 47 47 | "{0}_{1}".format(1, 2, *args)
 48 48 | 
@@ -379,6 +411,8 @@ UP030_0.py:49:1: UP030 [*] Use implicit references for positional format fields
 50 50 | 
 51 51 | "{0}_{1}_{2}".format(1, **kwargs)
 52 52 | 
+
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 UP030_0.py:51:1: UP030 [*] Use implicit references for positional format fields
    |
@@ -391,7 +425,7 @@ UP030_0.py:51:1: UP030 [*] Use implicit references for positional format fields
    |
    = help: Remove explicit positional indices
 
-ℹ Unsafe fix
+Suggested fix:
 48 48 | 
 49 49 | "{0}_{1}".format(*args, 1, 2)
 50 50 | 
@@ -400,6 +434,8 @@ UP030_0.py:51:1: UP030 [*] Use implicit references for positional format fields
 52 52 | 
 53 53 | "{0}_{1}_{2}".format(1, 2, **kwargs)
 54 54 | 
+
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 UP030_0.py:53:1: UP030 [*] Use implicit references for positional format fields
    |
@@ -412,7 +448,7 @@ UP030_0.py:53:1: UP030 [*] Use implicit references for positional format fields
    |
    = help: Remove explicit positional indices
 
-ℹ Unsafe fix
+Suggested fix:
 50 50 | 
 51 51 | "{0}_{1}_{2}".format(1, **kwargs)
 52 52 | 
@@ -421,6 +457,8 @@ UP030_0.py:53:1: UP030 [*] Use implicit references for positional format fields
 54 54 | 
 55 55 | "{0}_{1}_{2}".format(1, 2, 3, **kwargs)
 56 56 | 
+
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 UP030_0.py:55:1: UP030 [*] Use implicit references for positional format fields
    |
@@ -433,7 +471,7 @@ UP030_0.py:55:1: UP030 [*] Use implicit references for positional format fields
    |
    = help: Remove explicit positional indices
 
-ℹ Unsafe fix
+Suggested fix:
 52 52 | 
 53 53 | "{0}_{1}_{2}".format(1, 2, **kwargs)
 54 54 | 
@@ -442,6 +480,8 @@ UP030_0.py:55:1: UP030 [*] Use implicit references for positional format fields
 56 56 | 
 57 57 | "{0}_{1}_{2}".format(1, 2, 3, *args, **kwargs)
 58 58 | 
+
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 UP030_0.py:57:1: UP030 [*] Use implicit references for positional format fields
    |
@@ -454,7 +494,7 @@ UP030_0.py:57:1: UP030 [*] Use implicit references for positional format fields
    |
    = help: Remove explicit positional indices
 
-ℹ Unsafe fix
+Suggested fix:
 54 54 | 
 55 55 | "{0}_{1}_{2}".format(1, 2, 3, **kwargs)
 56 56 | 
@@ -463,6 +503,8 @@ UP030_0.py:57:1: UP030 [*] Use implicit references for positional format fields
 58 58 | 
 59 59 | "{1}_{0}".format(1, 2, *args)
 60 60 | 
+
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 UP030_0.py:59:1: UP030 [*] Use implicit references for positional format fields
    |
@@ -475,7 +517,7 @@ UP030_0.py:59:1: UP030 [*] Use implicit references for positional format fields
    |
    = help: Remove explicit positional indices
 
-ℹ Unsafe fix
+Suggested fix:
 56 56 | 
 57 57 | "{0}_{1}_{2}".format(1, 2, 3, *args, **kwargs)
 58 58 | 
@@ -483,6 +525,8 @@ UP030_0.py:59:1: UP030 [*] Use implicit references for positional format fields
    59 |+"{}_{}".format(2, 1, )
 60 60 | 
 61 61 | "{1}_{0}".format(1, 2)
+
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 UP030_0.py:61:1: UP030 [*] Use implicit references for positional format fields
    |
@@ -493,11 +537,11 @@ UP030_0.py:61:1: UP030 [*] Use implicit references for positional format fields
    |
    = help: Remove explicit positional indices
 
-ℹ Unsafe fix
+Suggested fix:
 58 58 | 
 59 59 | "{1}_{0}".format(1, 2, *args)
 60 60 | 
 61    |-"{1}_{0}".format(1, 2)
    61 |+"{}_{}".format(2, 1)
 
-
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.

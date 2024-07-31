@@ -11,7 +11,7 @@ ASYNC105.py:30:5: ASYNC105 [*] Call to `trio.aclose_forcefully` is not immediate
    |
    = help: Add `await`
 
-ℹ Unsafe fix
+Suggested fix:
 27 27 |     await trio.lowlevel.wait_writable(foo)
 28 28 | 
 29 29 |     # ASYNC105
@@ -20,6 +20,8 @@ ASYNC105.py:30:5: ASYNC105 [*] Call to `trio.aclose_forcefully` is not immediate
 31 31 |     trio.open_file(foo)
 32 32 |     trio.open_ssl_over_tcp_listeners(foo, foo)
 33 33 |     trio.open_ssl_over_tcp_stream(foo, foo)
+
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 ASYNC105.py:31:5: ASYNC105 [*] Call to `trio.open_file` is not immediately awaited
    |
@@ -32,7 +34,7 @@ ASYNC105.py:31:5: ASYNC105 [*] Call to `trio.open_file` is not immediately await
    |
    = help: Add `await`
 
-ℹ Unsafe fix
+Suggested fix:
 28 28 | 
 29 29 |     # ASYNC105
 30 30 |     trio.aclose_forcefully(foo)
@@ -41,6 +43,8 @@ ASYNC105.py:31:5: ASYNC105 [*] Call to `trio.open_file` is not immediately await
 32 32 |     trio.open_ssl_over_tcp_listeners(foo, foo)
 33 33 |     trio.open_ssl_over_tcp_stream(foo, foo)
 34 34 |     trio.open_tcp_listeners(foo)
+
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 ASYNC105.py:32:5: ASYNC105 [*] Call to `trio.open_ssl_over_tcp_listeners` is not immediately awaited
    |
@@ -53,7 +57,7 @@ ASYNC105.py:32:5: ASYNC105 [*] Call to `trio.open_ssl_over_tcp_listeners` is not
    |
    = help: Add `await`
 
-ℹ Unsafe fix
+Suggested fix:
 29 29 |     # ASYNC105
 30 30 |     trio.aclose_forcefully(foo)
 31 31 |     trio.open_file(foo)
@@ -62,6 +66,8 @@ ASYNC105.py:32:5: ASYNC105 [*] Call to `trio.open_ssl_over_tcp_listeners` is not
 33 33 |     trio.open_ssl_over_tcp_stream(foo, foo)
 34 34 |     trio.open_tcp_listeners(foo)
 35 35 |     trio.open_tcp_stream(foo, foo)
+
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 ASYNC105.py:33:5: ASYNC105 [*] Call to `trio.open_ssl_over_tcp_stream` is not immediately awaited
    |
@@ -74,7 +80,7 @@ ASYNC105.py:33:5: ASYNC105 [*] Call to `trio.open_ssl_over_tcp_stream` is not im
    |
    = help: Add `await`
 
-ℹ Unsafe fix
+Suggested fix:
 30 30 |     trio.aclose_forcefully(foo)
 31 31 |     trio.open_file(foo)
 32 32 |     trio.open_ssl_over_tcp_listeners(foo, foo)
@@ -83,6 +89,8 @@ ASYNC105.py:33:5: ASYNC105 [*] Call to `trio.open_ssl_over_tcp_stream` is not im
 34 34 |     trio.open_tcp_listeners(foo)
 35 35 |     trio.open_tcp_stream(foo, foo)
 36 36 |     trio.open_unix_socket(foo)
+
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 ASYNC105.py:34:5: ASYNC105 [*] Call to `trio.open_tcp_listeners` is not immediately awaited
    |
@@ -95,7 +103,7 @@ ASYNC105.py:34:5: ASYNC105 [*] Call to `trio.open_tcp_listeners` is not immediat
    |
    = help: Add `await`
 
-ℹ Unsafe fix
+Suggested fix:
 31 31 |     trio.open_file(foo)
 32 32 |     trio.open_ssl_over_tcp_listeners(foo, foo)
 33 33 |     trio.open_ssl_over_tcp_stream(foo, foo)
@@ -104,6 +112,8 @@ ASYNC105.py:34:5: ASYNC105 [*] Call to `trio.open_tcp_listeners` is not immediat
 35 35 |     trio.open_tcp_stream(foo, foo)
 36 36 |     trio.open_unix_socket(foo)
 37 37 |     trio.run_process(foo)
+
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 ASYNC105.py:35:5: ASYNC105 [*] Call to `trio.open_tcp_stream` is not immediately awaited
    |
@@ -116,7 +126,7 @@ ASYNC105.py:35:5: ASYNC105 [*] Call to `trio.open_tcp_stream` is not immediately
    |
    = help: Add `await`
 
-ℹ Unsafe fix
+Suggested fix:
 32 32 |     trio.open_ssl_over_tcp_listeners(foo, foo)
 33 33 |     trio.open_ssl_over_tcp_stream(foo, foo)
 34 34 |     trio.open_tcp_listeners(foo)
@@ -125,6 +135,8 @@ ASYNC105.py:35:5: ASYNC105 [*] Call to `trio.open_tcp_stream` is not immediately
 36 36 |     trio.open_unix_socket(foo)
 37 37 |     trio.run_process(foo)
 38 38 |     trio.serve_listeners(foo, foo)
+
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 ASYNC105.py:36:5: ASYNC105 [*] Call to `trio.open_unix_socket` is not immediately awaited
    |
@@ -137,7 +149,7 @@ ASYNC105.py:36:5: ASYNC105 [*] Call to `trio.open_unix_socket` is not immediatel
    |
    = help: Add `await`
 
-ℹ Unsafe fix
+Suggested fix:
 33 33 |     trio.open_ssl_over_tcp_stream(foo, foo)
 34 34 |     trio.open_tcp_listeners(foo)
 35 35 |     trio.open_tcp_stream(foo, foo)
@@ -146,6 +158,8 @@ ASYNC105.py:36:5: ASYNC105 [*] Call to `trio.open_unix_socket` is not immediatel
 37 37 |     trio.run_process(foo)
 38 38 |     trio.serve_listeners(foo, foo)
 39 39 |     trio.serve_ssl_over_tcp(foo, foo, foo)
+
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 ASYNC105.py:37:5: ASYNC105 [*] Call to `trio.run_process` is not immediately awaited
    |
@@ -158,7 +172,7 @@ ASYNC105.py:37:5: ASYNC105 [*] Call to `trio.run_process` is not immediately awa
    |
    = help: Add `await`
 
-ℹ Unsafe fix
+Suggested fix:
 34 34 |     trio.open_tcp_listeners(foo)
 35 35 |     trio.open_tcp_stream(foo, foo)
 36 36 |     trio.open_unix_socket(foo)
@@ -167,6 +181,8 @@ ASYNC105.py:37:5: ASYNC105 [*] Call to `trio.run_process` is not immediately awa
 38 38 |     trio.serve_listeners(foo, foo)
 39 39 |     trio.serve_ssl_over_tcp(foo, foo, foo)
 40 40 |     trio.serve_tcp(foo, foo)
+
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 ASYNC105.py:38:5: ASYNC105 [*] Call to `trio.serve_listeners` is not immediately awaited
    |
@@ -179,7 +195,7 @@ ASYNC105.py:38:5: ASYNC105 [*] Call to `trio.serve_listeners` is not immediately
    |
    = help: Add `await`
 
-ℹ Unsafe fix
+Suggested fix:
 35 35 |     trio.open_tcp_stream(foo, foo)
 36 36 |     trio.open_unix_socket(foo)
 37 37 |     trio.run_process(foo)
@@ -188,6 +204,8 @@ ASYNC105.py:38:5: ASYNC105 [*] Call to `trio.serve_listeners` is not immediately
 39 39 |     trio.serve_ssl_over_tcp(foo, foo, foo)
 40 40 |     trio.serve_tcp(foo, foo)
 41 41 |     trio.sleep(foo)
+
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 ASYNC105.py:39:5: ASYNC105 [*] Call to `trio.serve_ssl_over_tcp` is not immediately awaited
    |
@@ -200,7 +218,7 @@ ASYNC105.py:39:5: ASYNC105 [*] Call to `trio.serve_ssl_over_tcp` is not immediat
    |
    = help: Add `await`
 
-ℹ Unsafe fix
+Suggested fix:
 36 36 |     trio.open_unix_socket(foo)
 37 37 |     trio.run_process(foo)
 38 38 |     trio.serve_listeners(foo, foo)
@@ -209,6 +227,8 @@ ASYNC105.py:39:5: ASYNC105 [*] Call to `trio.serve_ssl_over_tcp` is not immediat
 40 40 |     trio.serve_tcp(foo, foo)
 41 41 |     trio.sleep(foo)
 42 42 |     trio.sleep_forever()
+
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 ASYNC105.py:40:5: ASYNC105 [*] Call to `trio.serve_tcp` is not immediately awaited
    |
@@ -221,7 +241,7 @@ ASYNC105.py:40:5: ASYNC105 [*] Call to `trio.serve_tcp` is not immediately await
    |
    = help: Add `await`
 
-ℹ Unsafe fix
+Suggested fix:
 37 37 |     trio.run_process(foo)
 38 38 |     trio.serve_listeners(foo, foo)
 39 39 |     trio.serve_ssl_over_tcp(foo, foo, foo)
@@ -230,6 +250,8 @@ ASYNC105.py:40:5: ASYNC105 [*] Call to `trio.serve_tcp` is not immediately await
 41 41 |     trio.sleep(foo)
 42 42 |     trio.sleep_forever()
 43 43 |     trio.sleep_until(foo)
+
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 ASYNC105.py:41:5: ASYNC105 [*] Call to `trio.sleep` is not immediately awaited
    |
@@ -242,7 +264,7 @@ ASYNC105.py:41:5: ASYNC105 [*] Call to `trio.sleep` is not immediately awaited
    |
    = help: Add `await`
 
-ℹ Unsafe fix
+Suggested fix:
 38 38 |     trio.serve_listeners(foo, foo)
 39 39 |     trio.serve_ssl_over_tcp(foo, foo, foo)
 40 40 |     trio.serve_tcp(foo, foo)
@@ -251,6 +273,8 @@ ASYNC105.py:41:5: ASYNC105 [*] Call to `trio.sleep` is not immediately awaited
 42 42 |     trio.sleep_forever()
 43 43 |     trio.sleep_until(foo)
 44 44 |     trio.lowlevel.cancel_shielded_checkpoint()
+
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 ASYNC105.py:42:5: ASYNC105 [*] Call to `trio.sleep_forever` is not immediately awaited
    |
@@ -263,7 +287,7 @@ ASYNC105.py:42:5: ASYNC105 [*] Call to `trio.sleep_forever` is not immediately a
    |
    = help: Add `await`
 
-ℹ Unsafe fix
+Suggested fix:
 39 39 |     trio.serve_ssl_over_tcp(foo, foo, foo)
 40 40 |     trio.serve_tcp(foo, foo)
 41 41 |     trio.sleep(foo)
@@ -272,6 +296,8 @@ ASYNC105.py:42:5: ASYNC105 [*] Call to `trio.sleep_forever` is not immediately a
 43 43 |     trio.sleep_until(foo)
 44 44 |     trio.lowlevel.cancel_shielded_checkpoint()
 45 45 |     trio.lowlevel.checkpoint()
+
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 ASYNC105.py:44:5: ASYNC105 [*] Call to `trio.lowlevel.cancel_shielded_checkpoint` is not immediately awaited
    |
@@ -284,7 +310,7 @@ ASYNC105.py:44:5: ASYNC105 [*] Call to `trio.lowlevel.cancel_shielded_checkpoint
    |
    = help: Add `await`
 
-ℹ Unsafe fix
+Suggested fix:
 41 41 |     trio.sleep(foo)
 42 42 |     trio.sleep_forever()
 43 43 |     trio.sleep_until(foo)
@@ -293,6 +319,8 @@ ASYNC105.py:44:5: ASYNC105 [*] Call to `trio.lowlevel.cancel_shielded_checkpoint
 45 45 |     trio.lowlevel.checkpoint()
 46 46 |     trio.lowlevel.checkpoint_if_cancelled()
 47 47 |     trio.lowlevel.open_process()
+
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 ASYNC105.py:45:5: ASYNC105 [*] Call to `trio.lowlevel.checkpoint` is not immediately awaited
    |
@@ -305,7 +333,7 @@ ASYNC105.py:45:5: ASYNC105 [*] Call to `trio.lowlevel.checkpoint` is not immedia
    |
    = help: Add `await`
 
-ℹ Unsafe fix
+Suggested fix:
 42 42 |     trio.sleep_forever()
 43 43 |     trio.sleep_until(foo)
 44 44 |     trio.lowlevel.cancel_shielded_checkpoint()
@@ -314,6 +342,8 @@ ASYNC105.py:45:5: ASYNC105 [*] Call to `trio.lowlevel.checkpoint` is not immedia
 46 46 |     trio.lowlevel.checkpoint_if_cancelled()
 47 47 |     trio.lowlevel.open_process()
 48 48 |     trio.lowlevel.permanently_detach_coroutine_object(foo)
+
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 ASYNC105.py:46:5: ASYNC105 [*] Call to `trio.lowlevel.checkpoint_if_cancelled` is not immediately awaited
    |
@@ -326,7 +356,7 @@ ASYNC105.py:46:5: ASYNC105 [*] Call to `trio.lowlevel.checkpoint_if_cancelled` i
    |
    = help: Add `await`
 
-ℹ Unsafe fix
+Suggested fix:
 43 43 |     trio.sleep_until(foo)
 44 44 |     trio.lowlevel.cancel_shielded_checkpoint()
 45 45 |     trio.lowlevel.checkpoint()
@@ -335,6 +365,8 @@ ASYNC105.py:46:5: ASYNC105 [*] Call to `trio.lowlevel.checkpoint_if_cancelled` i
 47 47 |     trio.lowlevel.open_process()
 48 48 |     trio.lowlevel.permanently_detach_coroutine_object(foo)
 49 49 |     trio.lowlevel.reattach_detached_coroutine_object(foo, foo)
+
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 ASYNC105.py:47:5: ASYNC105 [*] Call to `trio.lowlevel.open_process` is not immediately awaited
    |
@@ -347,7 +379,7 @@ ASYNC105.py:47:5: ASYNC105 [*] Call to `trio.lowlevel.open_process` is not immed
    |
    = help: Add `await`
 
-ℹ Unsafe fix
+Suggested fix:
 44 44 |     trio.lowlevel.cancel_shielded_checkpoint()
 45 45 |     trio.lowlevel.checkpoint()
 46 46 |     trio.lowlevel.checkpoint_if_cancelled()
@@ -356,6 +388,8 @@ ASYNC105.py:47:5: ASYNC105 [*] Call to `trio.lowlevel.open_process` is not immed
 48 48 |     trio.lowlevel.permanently_detach_coroutine_object(foo)
 49 49 |     trio.lowlevel.reattach_detached_coroutine_object(foo, foo)
 50 50 |     trio.lowlevel.temporarily_detach_coroutine_object(foo)
+
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 ASYNC105.py:48:5: ASYNC105 [*] Call to `trio.lowlevel.permanently_detach_coroutine_object` is not immediately awaited
    |
@@ -368,7 +402,7 @@ ASYNC105.py:48:5: ASYNC105 [*] Call to `trio.lowlevel.permanently_detach_corouti
    |
    = help: Add `await`
 
-ℹ Unsafe fix
+Suggested fix:
 45 45 |     trio.lowlevel.checkpoint()
 46 46 |     trio.lowlevel.checkpoint_if_cancelled()
 47 47 |     trio.lowlevel.open_process()
@@ -377,6 +411,8 @@ ASYNC105.py:48:5: ASYNC105 [*] Call to `trio.lowlevel.permanently_detach_corouti
 49 49 |     trio.lowlevel.reattach_detached_coroutine_object(foo, foo)
 50 50 |     trio.lowlevel.temporarily_detach_coroutine_object(foo)
 51 51 |     trio.lowlevel.wait_readable(foo)
+
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 ASYNC105.py:49:5: ASYNC105 [*] Call to `trio.lowlevel.reattach_detached_coroutine_object` is not immediately awaited
    |
@@ -389,7 +425,7 @@ ASYNC105.py:49:5: ASYNC105 [*] Call to `trio.lowlevel.reattach_detached_coroutin
    |
    = help: Add `await`
 
-ℹ Unsafe fix
+Suggested fix:
 46 46 |     trio.lowlevel.checkpoint_if_cancelled()
 47 47 |     trio.lowlevel.open_process()
 48 48 |     trio.lowlevel.permanently_detach_coroutine_object(foo)
@@ -398,6 +434,8 @@ ASYNC105.py:49:5: ASYNC105 [*] Call to `trio.lowlevel.reattach_detached_coroutin
 50 50 |     trio.lowlevel.temporarily_detach_coroutine_object(foo)
 51 51 |     trio.lowlevel.wait_readable(foo)
 52 52 |     trio.lowlevel.wait_task_rescheduled(foo)
+
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 ASYNC105.py:50:5: ASYNC105 [*] Call to `trio.lowlevel.temporarily_detach_coroutine_object` is not immediately awaited
    |
@@ -410,7 +448,7 @@ ASYNC105.py:50:5: ASYNC105 [*] Call to `trio.lowlevel.temporarily_detach_corouti
    |
    = help: Add `await`
 
-ℹ Unsafe fix
+Suggested fix:
 47 47 |     trio.lowlevel.open_process()
 48 48 |     trio.lowlevel.permanently_detach_coroutine_object(foo)
 49 49 |     trio.lowlevel.reattach_detached_coroutine_object(foo, foo)
@@ -419,6 +457,8 @@ ASYNC105.py:50:5: ASYNC105 [*] Call to `trio.lowlevel.temporarily_detach_corouti
 51 51 |     trio.lowlevel.wait_readable(foo)
 52 52 |     trio.lowlevel.wait_task_rescheduled(foo)
 53 53 |     trio.lowlevel.wait_writable(foo)
+
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 ASYNC105.py:51:5: ASYNC105 [*] Call to `trio.lowlevel.wait_readable` is not immediately awaited
    |
@@ -431,7 +471,7 @@ ASYNC105.py:51:5: ASYNC105 [*] Call to `trio.lowlevel.wait_readable` is not imme
    |
    = help: Add `await`
 
-ℹ Unsafe fix
+Suggested fix:
 48 48 |     trio.lowlevel.permanently_detach_coroutine_object(foo)
 49 49 |     trio.lowlevel.reattach_detached_coroutine_object(foo, foo)
 50 50 |     trio.lowlevel.temporarily_detach_coroutine_object(foo)
@@ -440,6 +480,8 @@ ASYNC105.py:51:5: ASYNC105 [*] Call to `trio.lowlevel.wait_readable` is not imme
 52 52 |     trio.lowlevel.wait_task_rescheduled(foo)
 53 53 |     trio.lowlevel.wait_writable(foo)
 54 54 | 
+
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 ASYNC105.py:52:5: ASYNC105 [*] Call to `trio.lowlevel.wait_task_rescheduled` is not immediately awaited
    |
@@ -451,7 +493,7 @@ ASYNC105.py:52:5: ASYNC105 [*] Call to `trio.lowlevel.wait_task_rescheduled` is 
    |
    = help: Add `await`
 
-ℹ Unsafe fix
+Suggested fix:
 49 49 |     trio.lowlevel.reattach_detached_coroutine_object(foo, foo)
 50 50 |     trio.lowlevel.temporarily_detach_coroutine_object(foo)
 51 51 |     trio.lowlevel.wait_readable(foo)
@@ -460,6 +502,8 @@ ASYNC105.py:52:5: ASYNC105 [*] Call to `trio.lowlevel.wait_task_rescheduled` is 
 53 53 |     trio.lowlevel.wait_writable(foo)
 54 54 | 
 55 55 |     async with await trio.open_file(foo):  # Ok
+
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 ASYNC105.py:53:5: ASYNC105 [*] Call to `trio.lowlevel.wait_writable` is not immediately awaited
    |
@@ -472,7 +516,7 @@ ASYNC105.py:53:5: ASYNC105 [*] Call to `trio.lowlevel.wait_writable` is not imme
    |
    = help: Add `await`
 
-ℹ Unsafe fix
+Suggested fix:
 50 50 |     trio.lowlevel.temporarily_detach_coroutine_object(foo)
 51 51 |     trio.lowlevel.wait_readable(foo)
 52 52 |     trio.lowlevel.wait_task_rescheduled(foo)
@@ -481,6 +525,8 @@ ASYNC105.py:53:5: ASYNC105 [*] Call to `trio.lowlevel.wait_writable` is not imme
 54 54 | 
 55 55 |     async with await trio.open_file(foo):  # Ok
 56 56 |         pass
+
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 ASYNC105.py:58:16: ASYNC105 [*] Call to `trio.open_file` is not immediately awaited
    |
@@ -492,7 +538,7 @@ ASYNC105.py:58:16: ASYNC105 [*] Call to `trio.open_file` is not immediately awai
    |
    = help: Add `await`
 
-ℹ Unsafe fix
+Suggested fix:
 55 55 |     async with await trio.open_file(foo):  # Ok
 56 56 |         pass
 57 57 | 
@@ -501,6 +547,8 @@ ASYNC105.py:58:16: ASYNC105 [*] Call to `trio.open_file` is not immediately awai
 59 59 |         pass
 60 60 | 
 61 61 | 
+
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 ASYNC105.py:64:5: ASYNC105 Call to `trio.open_file` is not immediately awaited
    |

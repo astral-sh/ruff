@@ -12,7 +12,7 @@ E22.py:3:6: E221 [*] Multiple spaces before operator
   |
   = help: Replace with single space
 
-ℹ Safe fix
+Suggested fix:
 1 1 | #: E221
 2 2 | a = 12 + 3
 3   |-b = 4  + 5
@@ -20,6 +20,8 @@ E22.py:3:6: E221 [*] Multiple spaces before operator
 4 4 | #: E221 E221
 5 5 | x             = 1
 6 6 | y             = 2
+
+    Run `ruff check --fix` to apply this fix.
 
 E22.py:5:2: E221 [*] Multiple spaces before operator
   |
@@ -32,7 +34,7 @@ E22.py:5:2: E221 [*] Multiple spaces before operator
   |
   = help: Replace with single space
 
-ℹ Safe fix
+Suggested fix:
 2 2 | a = 12 + 3
 3 3 | b = 4  + 5
 4 4 | #: E221 E221
@@ -41,6 +43,8 @@ E22.py:5:2: E221 [*] Multiple spaces before operator
 6 6 | y             = 2
 7 7 | long_variable = 3
 8 8 | #: E221 E221
+
+    Run `ruff check --fix` to apply this fix.
 
 E22.py:6:2: E221 [*] Multiple spaces before operator
   |
@@ -53,7 +57,7 @@ E22.py:6:2: E221 [*] Multiple spaces before operator
   |
   = help: Replace with single space
 
-ℹ Safe fix
+Suggested fix:
 3 3 | b = 4  + 5
 4 4 | #: E221 E221
 5 5 | x             = 1
@@ -62,6 +66,8 @@ E22.py:6:2: E221 [*] Multiple spaces before operator
 7 7 | long_variable = 3
 8 8 | #: E221 E221
 9 9 | x[0]          = 1
+
+    Run `ruff check --fix` to apply this fix.
 
 E22.py:9:5: E221 [*] Multiple spaces before operator
    |
@@ -74,7 +80,7 @@ E22.py:9:5: E221 [*] Multiple spaces before operator
    |
    = help: Replace with single space
 
-ℹ Safe fix
+Suggested fix:
 6  6  | y             = 2
 7  7  | long_variable = 3
 8  8  | #: E221 E221
@@ -83,6 +89,8 @@ E22.py:9:5: E221 [*] Multiple spaces before operator
 10 10 | x[1]          = 2
 11 11 | long_variable = 3
 12 12 | #: E221 E221
+
+    Run `ruff check --fix` to apply this fix.
 
 E22.py:10:5: E221 [*] Multiple spaces before operator
    |
@@ -95,7 +103,7 @@ E22.py:10:5: E221 [*] Multiple spaces before operator
    |
    = help: Replace with single space
 
-ℹ Safe fix
+Suggested fix:
 7  7  | long_variable = 3
 8  8  | #: E221 E221
 9  9  | x[0]          = 1
@@ -104,6 +112,8 @@ E22.py:10:5: E221 [*] Multiple spaces before operator
 11 11 | long_variable = 3
 12 12 | #: E221 E221
 13 13 | x = f(x)          + 1
+
+    Run `ruff check --fix` to apply this fix.
 
 E22.py:13:9: E221 [*] Multiple spaces before operator
    |
@@ -116,7 +126,7 @@ E22.py:13:9: E221 [*] Multiple spaces before operator
    |
    = help: Replace with single space
 
-ℹ Safe fix
+Suggested fix:
 10 10 | x[1]          = 2
 11 11 | long_variable = 3
 12 12 | #: E221 E221
@@ -125,6 +135,8 @@ E22.py:13:9: E221 [*] Multiple spaces before operator
 14 14 | y = long_variable + 2
 15 15 | z = x[0]          + 3
 16 16 | #: E221:3:14
+
+    Run `ruff check --fix` to apply this fix.
 
 E22.py:15:9: E221 [*] Multiple spaces before operator
    |
@@ -137,7 +149,7 @@ E22.py:15:9: E221 [*] Multiple spaces before operator
    |
    = help: Replace with single space
 
-ℹ Safe fix
+Suggested fix:
 12 12 | #: E221 E221
 13 13 | x = f(x)          + 1
 14 14 | y = long_variable + 2
@@ -146,6 +158,8 @@ E22.py:15:9: E221 [*] Multiple spaces before operator
 16 16 | #: E221:3:14
 17 17 | text = """
 18 18 |     bar
+
+    Run `ruff check --fix` to apply this fix.
 
 E22.py:19:14: E221 [*] Multiple spaces before operator
    |
@@ -158,7 +172,7 @@ E22.py:19:14: E221 [*] Multiple spaces before operator
    |
    = help: Replace with single space
 
-ℹ Safe fix
+Suggested fix:
 16 16 | #: E221:3:14
 17 17 | text = """
 18 18 |     bar
@@ -168,4 +182,4 @@ E22.py:19:14: E221 [*] Multiple spaces before operator
 21 21 | x = 1
 22 22 | y = 2
 
-
+    Run `ruff check --fix` to apply this fix.

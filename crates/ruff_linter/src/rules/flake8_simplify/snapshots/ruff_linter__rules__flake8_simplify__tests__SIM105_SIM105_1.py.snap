@@ -12,7 +12,7 @@ SIM105_1.py:5:1: SIM105 [*] Use `contextlib.suppress(ValueError)` instead of `tr
   |
   = help: Replace with `contextlib.suppress(ValueError)`
 
-ℹ Unsafe fix
+Suggested fix:
 1 1 | """Case: There's a random import, so it should add `contextlib` after it."""
 2 2 | import math
   3 |+import contextlib
@@ -24,4 +24,4 @@ SIM105_1.py:5:1: SIM105 [*] Use `contextlib.suppress(ValueError)` instead of `tr
 7   |-except ValueError:
 8   |-    pass
 
-
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.

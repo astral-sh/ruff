@@ -11,7 +11,7 @@ FURB140.py:7:1: FURB140 [*] Use `itertools.starmap` instead of the generator
   |
   = help: Replace with `itertools.starmap`
 
-ℹ Safe fix
+Suggested fix:
   1 |+from itertools import starmap
 1 2 | def zipped():
 2 3 |     return zip([1, 2, 3], "ABC")
@@ -25,6 +25,8 @@ FURB140.py:7:1: FURB140 [*] Use `itertools.starmap` instead of the generator
 9 10 | # FURB140
 10 11 | (print(x, y) for x, y in zipped())
 
+    Run `ruff check --fix` to apply this fix.
+
 FURB140.py:10:1: FURB140 [*] Use `itertools.starmap` instead of the generator
    |
  9 | # FURB140
@@ -35,7 +37,7 @@ FURB140.py:10:1: FURB140 [*] Use `itertools.starmap` instead of the generator
    |
    = help: Replace with `itertools.starmap`
 
-ℹ Safe fix
+Suggested fix:
    1  |+from itertools import starmap
 1  2  | def zipped():
 2  3  |     return zip([1, 2, 3], "ABC")
@@ -50,6 +52,8 @@ FURB140.py:10:1: FURB140 [*] Use `itertools.starmap` instead of the generator
 12 13 | # FURB140
 13 14 | {print(x, y) for x, y in zipped()}
 
+    Run `ruff check --fix` to apply this fix.
+
 FURB140.py:13:1: FURB140 [*] Use `itertools.starmap` instead of the generator
    |
 12 | # FURB140
@@ -58,7 +62,7 @@ FURB140.py:13:1: FURB140 [*] Use `itertools.starmap` instead of the generator
    |
    = help: Replace with `itertools.starmap`
 
-ℹ Safe fix
+Suggested fix:
    1  |+from itertools import starmap
 1  2  | def zipped():
 2  3  |     return zip([1, 2, 3], "ABC")
@@ -73,6 +77,8 @@ FURB140.py:13:1: FURB140 [*] Use `itertools.starmap` instead of the generator
 15 16 | 
 16 17 | from itertools import starmap as sm
 
+    Run `ruff check --fix` to apply this fix.
+
 FURB140.py:19:1: FURB140 [*] Use `itertools.starmap` instead of the generator
    |
 18 | # FURB140
@@ -83,7 +89,7 @@ FURB140.py:19:1: FURB140 [*] Use `itertools.starmap` instead of the generator
    |
    = help: Replace with `itertools.starmap`
 
-ℹ Safe fix
+Suggested fix:
 16 16 | from itertools import starmap as sm
 17 17 | 
 18 18 | # FURB140
@@ -92,6 +98,8 @@ FURB140.py:19:1: FURB140 [*] Use `itertools.starmap` instead of the generator
 20 20 | 
 21 21 | # FURB140
 22 22 | (print(x, y) for x, y in zipped())
+
+    Run `ruff check --fix` to apply this fix.
 
 FURB140.py:22:1: FURB140 [*] Use `itertools.starmap` instead of the generator
    |
@@ -103,7 +111,7 @@ FURB140.py:22:1: FURB140 [*] Use `itertools.starmap` instead of the generator
    |
    = help: Replace with `itertools.starmap`
 
-ℹ Safe fix
+Suggested fix:
 19 19 | [print(x, y) for x, y in zipped()]
 20 20 | 
 21 21 | # FURB140
@@ -112,6 +120,8 @@ FURB140.py:22:1: FURB140 [*] Use `itertools.starmap` instead of the generator
 23 23 | 
 24 24 | # FURB140
 25 25 | {print(x, y) for x, y in zipped()}
+
+    Run `ruff check --fix` to apply this fix.
 
 FURB140.py:25:1: FURB140 [*] Use `itertools.starmap` instead of the generator
    |
@@ -123,7 +133,7 @@ FURB140.py:25:1: FURB140 [*] Use `itertools.starmap` instead of the generator
    |
    = help: Replace with `itertools.starmap`
 
-ℹ Safe fix
+Suggested fix:
 22 22 | (print(x, y) for x, y in zipped())
 23 23 | 
 24 24 | # FURB140
@@ -132,6 +142,8 @@ FURB140.py:25:1: FURB140 [*] Use `itertools.starmap` instead of the generator
 26 26 | 
 27 27 | # FURB140 (check it still flags starred arguments).
 28 28 | # See https://github.com/astral-sh/ruff/issues/7636
+
+    Run `ruff check --fix` to apply this fix.
 
 FURB140.py:29:1: FURB140 [*] Use `itertools.starmap` instead of the generator
    |
@@ -144,7 +156,7 @@ FURB140.py:29:1: FURB140 [*] Use `itertools.starmap` instead of the generator
    |
    = help: Replace with `itertools.starmap`
 
-ℹ Safe fix
+Suggested fix:
 26 26 | 
 27 27 | # FURB140 (check it still flags starred arguments).
 28 28 | # See https://github.com/astral-sh/ruff/issues/7636
@@ -153,6 +165,8 @@ FURB140.py:29:1: FURB140 [*] Use `itertools.starmap` instead of the generator
 30 30 | (foo(*t) for t in [(85, 60), (100, 80)])
 31 31 | {foo(*t) for t in [(85, 60), (100, 80)]}
 32 32 | 
+
+    Run `ruff check --fix` to apply this fix.
 
 FURB140.py:30:1: FURB140 [*] Use `itertools.starmap` instead of the generator
    |
@@ -164,7 +178,7 @@ FURB140.py:30:1: FURB140 [*] Use `itertools.starmap` instead of the generator
    |
    = help: Replace with `itertools.starmap`
 
-ℹ Safe fix
+Suggested fix:
 27 27 | # FURB140 (check it still flags starred arguments).
 28 28 | # See https://github.com/astral-sh/ruff/issues/7636
 29 29 | [foo(*t) for t in [(85, 60), (100, 80)]]
@@ -173,6 +187,8 @@ FURB140.py:30:1: FURB140 [*] Use `itertools.starmap` instead of the generator
 31 31 | {foo(*t) for t in [(85, 60), (100, 80)]}
 32 32 | 
 33 33 | # Non-errors.
+
+    Run `ruff check --fix` to apply this fix.
 
 FURB140.py:31:1: FURB140 [*] Use `itertools.starmap` instead of the generator
    |
@@ -185,7 +201,7 @@ FURB140.py:31:1: FURB140 [*] Use `itertools.starmap` instead of the generator
    |
    = help: Replace with `itertools.starmap`
 
-ℹ Safe fix
+Suggested fix:
 28 28 | # See https://github.com/astral-sh/ruff/issues/7636
 29 29 | [foo(*t) for t in [(85, 60), (100, 80)]]
 30 30 | (foo(*t) for t in [(85, 60), (100, 80)])
@@ -195,4 +211,4 @@ FURB140.py:31:1: FURB140 [*] Use `itertools.starmap` instead of the generator
 33 33 | # Non-errors.
 34 34 | 
 
-
+    Run `ruff check --fix` to apply this fix.

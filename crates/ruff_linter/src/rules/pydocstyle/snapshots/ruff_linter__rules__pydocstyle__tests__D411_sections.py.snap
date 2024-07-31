@@ -11,7 +11,7 @@ sections.py:80:5: D411 [*] Missing blank line before section ("Yields")
    |
    = help: Add blank line before "Yields"
 
-ℹ Safe fix
+Suggested fix:
 77 77 | 
 78 78 |     Returns
 79 79 |     -------
@@ -19,6 +19,8 @@ sections.py:80:5: D411 [*] Missing blank line before section ("Yields")
 80 81 |     Yields
 81 82 |     ------
 82 83 | 
+
+    Run `ruff check --fix` to apply this fix.
 
 sections.py:134:5: D411 [*] Missing blank line before section ("Returns")
     |
@@ -30,7 +32,7 @@ sections.py:134:5: D411 [*] Missing blank line before section ("Returns")
     |
     = help: Add blank line before "Returns"
 
-ℹ Safe fix
+Suggested fix:
 131 131 |     """Toggle the gizmo.
 132 132 | 
 133 133 |     The function's description.
@@ -38,6 +40,8 @@ sections.py:134:5: D411 [*] Missing blank line before section ("Returns")
 134 135 |     Returns
 135 136 |     -------
 136 137 |     A value of some sort.
+
+    Run `ruff check --fix` to apply this fix.
 
 sections.py:227:5: D411 [*] Missing blank line before section ("Raises")
     |
@@ -49,11 +53,13 @@ sections.py:227:5: D411 [*] Missing blank line before section ("Raises")
     |
     = help: Add blank line before "Raises"
 
-ℹ Safe fix
+Suggested fix:
 224 224 |     Returns
 225 225 |     ------
 226 226 |     Many many wonderful things.
     227 |+
 227 228 |     Raises:
 228 229 |     My attention.
-229 230 |
+229 230 | 
+
+    Run `ruff check --fix` to apply this fix.

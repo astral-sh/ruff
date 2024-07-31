@@ -12,7 +12,7 @@ source: crates/ruff_linter/src/rules/pyflakes/mod.rs
   |
   = help: Remove assignment to unused variable `x`
 
-ℹ Safe fix
+Suggested fix:
 4 4 | 
 5 5 |     try:
 6 6 |         1 / 0
@@ -21,6 +21,8 @@ source: crates/ruff_linter/src/rules/pyflakes/mod.rs
 8 8 |         pass
 9 9 |     except ImportError as x:
 10 10 |         pass
+
+    Run `ruff check --fix` to apply this fix.
 
 <filename>:9:27: F841 [*] Local variable `x` is assigned to but never used
    |
@@ -32,7 +34,7 @@ source: crates/ruff_linter/src/rules/pyflakes/mod.rs
    |
    = help: Remove assignment to unused variable `x`
 
-ℹ Safe fix
+Suggested fix:
 6  6  |         1 / 0
 7  7  |     except ValueError as x:
 8  8  |         pass
@@ -42,4 +44,4 @@ source: crates/ruff_linter/src/rules/pyflakes/mod.rs
 11 11 | 
 12 12 |     # No error here, though it should arguably be an F821 error. `x` will
 
-
+    Run `ruff check --fix` to apply this fix.

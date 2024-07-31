@@ -2,9 +2,11 @@
 source: crates/ruff_linter/src/rules/isort/mod.rs
 ---
 multiline_docstring.py:1:1: I002 [*] Missing required import: `from __future__ import annotations as _annotations`
-ℹ Safe fix
+Suggested fix:
 1 1 | """a
 2 2 | b"""
 3 3 | # b
   4 |+from __future__ import annotations as _annotations
 4 5 | import os
+
+    Run `ruff check --fix` to apply this fix.

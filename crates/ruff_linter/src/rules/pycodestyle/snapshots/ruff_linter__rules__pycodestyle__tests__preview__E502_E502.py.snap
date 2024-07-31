@@ -12,7 +12,7 @@ E502.py:9:9: E502 [*] Redundant backslash
    |
    = help: Remove redundant backslash
 
-ℹ Safe fix
+Suggested fix:
 6  6  |     3 \
 7  7  |     + 4
 8  8  | 
@@ -21,6 +21,8 @@ E502.py:9:9: E502 [*] Redundant backslash
 10 10 |     2 +   \
 11 11 |     7)
 12 12 | 
+
+    Run `ruff check --fix` to apply this fix.
 
 E502.py:10:11: E502 [*] Redundant backslash
    |
@@ -31,7 +33,7 @@ E502.py:10:11: E502 [*] Redundant backslash
    |
    = help: Remove redundant backslash
 
-ℹ Safe fix
+Suggested fix:
 7  7  |     + 4
 8  8  | 
 9  9  | a = (3 -\
@@ -40,6 +42,8 @@ E502.py:10:11: E502 [*] Redundant backslash
 11 11 |     7)
 12 12 | 
 13 13 | z = 5 + \
+
+    Run `ruff check --fix` to apply this fix.
 
 E502.py:14:9: E502 [*] Redundant backslash
    |
@@ -51,7 +55,7 @@ E502.py:14:9: E502 [*] Redundant backslash
    |
    = help: Remove redundant backslash
 
-ℹ Safe fix
+Suggested fix:
 11 11 |     7)
 12 12 | 
 13 13 | z = 5 + \
@@ -60,6 +64,8 @@ E502.py:14:9: E502 [*] Redundant backslash
 15 15 |     2 +   \
 16 16 |     7) + \
 17 17 |     4
+
+    Run `ruff check --fix` to apply this fix.
 
 E502.py:15:11: E502 [*] Redundant backslash
    |
@@ -72,7 +78,7 @@ E502.py:15:11: E502 [*] Redundant backslash
    |
    = help: Remove redundant backslash
 
-ℹ Safe fix
+Suggested fix:
 12 12 | 
 13 13 | z = 5 + \
 14 14 |     (3 -\
@@ -81,6 +87,8 @@ E502.py:15:11: E502 [*] Redundant backslash
 16 16 |     7) + \
 17 17 |     4
 18 18 | 
+
+    Run `ruff check --fix` to apply this fix.
 
 E502.py:23:17: E502 [*] Redundant backslash
    |
@@ -92,7 +100,7 @@ E502.py:23:17: E502 [*] Redundant backslash
    |
    = help: Remove redundant backslash
 
-ℹ Safe fix
+Suggested fix:
 20 20 |     2]
 21 21 | 
 22 22 | b = [
@@ -101,6 +109,8 @@ E502.py:23:17: E502 [*] Redundant backslash
 24 24 |     44 \
 25 25 |     - 5
 26 26 | ]
+
+    Run `ruff check --fix` to apply this fix.
 
 E502.py:24:8: E502 [*] Redundant backslash
    |
@@ -113,7 +123,7 @@ E502.py:24:8: E502 [*] Redundant backslash
    |
    = help: Remove redundant backslash
 
-ℹ Safe fix
+Suggested fix:
 21 21 | 
 22 22 | b = [
 23 23 |     2 + 4 + 5 + \
@@ -122,6 +132,8 @@ E502.py:24:8: E502 [*] Redundant backslash
 25 25 |     - 5
 26 26 | ]
 27 27 | 
+
+    Run `ruff check --fix` to apply this fix.
 
 E502.py:29:11: E502 [*] Redundant backslash
    |
@@ -133,7 +145,7 @@ E502.py:29:11: E502 [*] Redundant backslash
    |
    = help: Remove redundant backslash
 
-ℹ Safe fix
+Suggested fix:
 26 26 | ]
 27 27 | 
 28 28 | c = (True and
@@ -142,6 +154,8 @@ E502.py:29:11: E502 [*] Redundant backslash
 30 30 |     or False \
 31 31 |     and True \
 32 32 | )
+
+    Run `ruff check --fix` to apply this fix.
 
 E502.py:30:14: E502 [*] Redundant backslash
    |
@@ -154,7 +168,7 @@ E502.py:30:14: E502 [*] Redundant backslash
    |
    = help: Remove redundant backslash
 
-ℹ Safe fix
+Suggested fix:
 27 27 | 
 28 28 | c = (True and
 29 29 |     False \
@@ -163,6 +177,8 @@ E502.py:30:14: E502 [*] Redundant backslash
 31 31 |     and True \
 32 32 | )
 33 33 | 
+
+    Run `ruff check --fix` to apply this fix.
 
 E502.py:31:14: E502 [*] Redundant backslash
    |
@@ -174,7 +190,7 @@ E502.py:31:14: E502 [*] Redundant backslash
    |
    = help: Remove redundant backslash
 
-ℹ Safe fix
+Suggested fix:
 28 28 | c = (True and
 29 29 |     False \
 30 30 |     or False \
@@ -183,6 +199,8 @@ E502.py:31:14: E502 [*] Redundant backslash
 32 32 | )
 33 33 | 
 34 34 | c = (True and
+
+    Run `ruff check --fix` to apply this fix.
 
 E502.py:44:14: E502 [*] Redundant backslash
    |
@@ -194,7 +212,7 @@ E502.py:44:14: E502 [*] Redundant backslash
    |
    = help: Remove redundant backslash
 
-ℹ Safe fix
+Suggested fix:
 41 41 | 
 42 42 | 
 43 43 | s = {
@@ -204,6 +222,8 @@ E502.py:44:14: E502 [*] Redundant backslash
 46 46 | }
 47 47 | 
 
+    Run `ruff check --fix` to apply this fix.
+
 E502.py:55:12: E502 [*] Redundant backslash
    |
 55 | x = {2 + 4 \
@@ -212,7 +232,7 @@ E502.py:55:12: E502 [*] Redundant backslash
    |
    = help: Remove redundant backslash
 
-ℹ Safe fix
+Suggested fix:
 52 52 | }
 53 53 | 
 54 54 | 
@@ -221,6 +241,8 @@ E502.py:55:12: E502 [*] Redundant backslash
 56 56 |   + 3}
 57 57 | 
 58 58 | y = (
+
+    Run `ruff check --fix` to apply this fix.
 
 E502.py:61:9: E502 [*] Redundant backslash
    |
@@ -233,7 +255,7 @@ E502.py:61:9: E502 [*] Redundant backslash
    |
    = help: Remove redundant backslash
 
-ℹ Safe fix
+Suggested fix:
 58 58 | y = (
 59 59 |     2 + 2  # \
 60 60 |     + 3  # \
@@ -242,6 +264,8 @@ E502.py:61:9: E502 [*] Redundant backslash
 62 62 |     + 3
 63 63 | )
 64 64 | 
+
+    Run `ruff check --fix` to apply this fix.
 
 E502.py:82:12: E502 [*] Redundant backslash
    |
@@ -253,7 +277,7 @@ E502.py:82:12: E502 [*] Redundant backslash
    |
    = help: Remove redundant backslash
 
-ℹ Safe fix
+Suggested fix:
 79 79 | x = "abc" \
 80 80 |     "xyz"
 81 81 | 
@@ -262,6 +286,8 @@ E502.py:82:12: E502 [*] Redundant backslash
 83 83 |     "xyz")
 84 84 | 
 85 85 | 
+
+    Run `ruff check --fix` to apply this fix.
 
 E502.py:87:14: E502 [*] Redundant backslash
    |
@@ -272,10 +298,12 @@ E502.py:87:14: E502 [*] Redundant backslash
    |
    = help: Remove redundant backslash
 
-ℹ Safe fix
+Suggested fix:
 84 84 | 
 85 85 | 
 86 86 | def foo():
 87    |-    x = (a + \
    87 |+    x = (a + 
 88 88 |         2)
+
+    Run `ruff check --fix` to apply this fix.

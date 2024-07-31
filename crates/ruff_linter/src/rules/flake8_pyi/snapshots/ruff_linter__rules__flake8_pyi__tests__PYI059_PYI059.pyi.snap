@@ -12,7 +12,7 @@ PYI059.pyi:8:17: PYI059 [*] `Generic[]` should always be the last base class
    |
    = help: Move `Generic[]` to the end
 
-ℹ Safe fix
+Suggested fix:
 5 5 | K = TypeVar('K')
 6 6 | V = TypeVar('V')
 7 7 | 
@@ -21,6 +21,8 @@ PYI059.pyi:8:17: PYI059 [*] `Generic[]` should always be the last base class
 9 9 |     def __init__(self) -> None: ...
 10 10 |     def push(self, item: T) -> None: ...
 11 11 | 
+
+    Run `ruff check --fix` to apply this fix.
 
 PYI059.pyi:12:16: PYI059 [*] `Generic[]` should always be the last base class
    |
@@ -37,7 +39,7 @@ PYI059.pyi:12:16: PYI059 [*] `Generic[]` should always be the last base class
    |
    = help: Move `Generic[]` to the end
 
-ℹ Safe fix
+Suggested fix:
 10 10 |     def push(self, item: T) -> None: ...
 11 11 | 
 12 12 | class MyMapping(  # PYI059
@@ -49,6 +51,8 @@ PYI059.pyi:12:16: PYI059 [*] `Generic[]` should always be the last base class
 17 16 |     ...
 18 17 | 
 
+    Run `ruff check --fix` to apply this fix.
+
 PYI059.pyi:22:10: PYI059 [*] `Generic[]` should always be the last base class
    |
 20 | # to flag this issue in this case as well, since after fixing the error
@@ -58,7 +62,7 @@ PYI059.pyi:22:10: PYI059 [*] `Generic[]` should always be the last base class
    |
    = help: Move `Generic[]` to the end
 
-ℹ Safe fix
+Suggested fix:
 19 19 | # Inheriting from just `Generic` is a TypeError, but it's probably fine
 20 20 | # to flag this issue in this case as well, since after fixing the error
 21 21 | # the Generic's position issue persists.
@@ -67,6 +71,8 @@ PYI059.pyi:22:10: PYI059 [*] `Generic[]` should always be the last base class
 23 23 | 
 24 24 | 
 25 25 | class Foo(  # comment about the bracket
+
+    Run `ruff check --fix` to apply this fix.
 
 PYI059.pyi:25:10: PYI059 [*] `Generic[]` should always be the last base class
    |
@@ -87,7 +93,7 @@ PYI059.pyi:25:10: PYI059 [*] `Generic[]` should always be the last base class
    |
    = help: Move `Generic[]` to the end
 
-ℹ Safe fix
+Suggested fix:
 25 25 | class Foo(  # comment about the bracket
 26 26 |     # Part 1 of multiline comment 1
 27 27 |     # Part 2 of multiline comment 1
@@ -102,6 +108,8 @@ PYI059.pyi:25:10: PYI059 [*] `Generic[]` should always be the last base class
 34 32 |     # yet another comment?
 35 33 | ):  # and another one for good measure
 36 34 |     ...
+
+    Run `ruff check --fix` to apply this fix.
 
 PYI059.pyi:40:8: PYI059 `Generic[]` should always be the last base class
    |

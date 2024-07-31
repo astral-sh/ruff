@@ -12,7 +12,7 @@ C417.py:3:1: C417 [*] Unnecessary `map` usage (rewrite using a generator express
   |
   = help: Replace `map` with a generator expression
 
-ℹ Unsafe fix
+Suggested fix:
 1 1 | # Errors.
 2 2 | nums = [1, 2, 3]
 3   |-map(lambda x: x + 1, nums)
@@ -20,6 +20,8 @@ C417.py:3:1: C417 [*] Unnecessary `map` usage (rewrite using a generator express
 4 4 | map(lambda x: str(x), nums)
 5 5 | list(map(lambda x: x * 2, nums))
 6 6 | set(map(lambda x: x % 2 == 0, nums))
+
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 C417.py:4:1: C417 [*] Unnecessary `map` usage (rewrite using a generator expression)
   |
@@ -32,7 +34,7 @@ C417.py:4:1: C417 [*] Unnecessary `map` usage (rewrite using a generator express
   |
   = help: Replace `map` with a generator expression
 
-ℹ Unsafe fix
+Suggested fix:
 1 1 | # Errors.
 2 2 | nums = [1, 2, 3]
 3 3 | map(lambda x: x + 1, nums)
@@ -41,6 +43,8 @@ C417.py:4:1: C417 [*] Unnecessary `map` usage (rewrite using a generator express
 5 5 | list(map(lambda x: x * 2, nums))
 6 6 | set(map(lambda x: x % 2 == 0, nums))
 7 7 | dict(map(lambda v: (v, v**2), nums))
+
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 C417.py:5:1: C417 [*] Unnecessary `map` usage (rewrite using a `list` comprehension)
   |
@@ -53,7 +57,7 @@ C417.py:5:1: C417 [*] Unnecessary `map` usage (rewrite using a `list` comprehens
   |
   = help: Replace `map` with a `list` comprehension
 
-ℹ Unsafe fix
+Suggested fix:
 2 2 | nums = [1, 2, 3]
 3 3 | map(lambda x: x + 1, nums)
 4 4 | map(lambda x: str(x), nums)
@@ -62,6 +66,8 @@ C417.py:5:1: C417 [*] Unnecessary `map` usage (rewrite using a `list` comprehens
 6 6 | set(map(lambda x: x % 2 == 0, nums))
 7 7 | dict(map(lambda v: (v, v**2), nums))
 8 8 | dict(map(lambda v: [v, v**2], nums))
+
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 C417.py:6:1: C417 [*] Unnecessary `map` usage (rewrite using a `set` comprehension)
   |
@@ -74,7 +80,7 @@ C417.py:6:1: C417 [*] Unnecessary `map` usage (rewrite using a `set` comprehensi
   |
   = help: Replace `map` with a `set` comprehension
 
-ℹ Unsafe fix
+Suggested fix:
 3 3 | map(lambda x: x + 1, nums)
 4 4 | map(lambda x: str(x), nums)
 5 5 | list(map(lambda x: x * 2, nums))
@@ -83,6 +89,8 @@ C417.py:6:1: C417 [*] Unnecessary `map` usage (rewrite using a `set` comprehensi
 7 7 | dict(map(lambda v: (v, v**2), nums))
 8 8 | dict(map(lambda v: [v, v**2], nums))
 9 9 | map(lambda: "const", nums)
+
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 C417.py:7:1: C417 [*] Unnecessary `map` usage (rewrite using a `dict` comprehension)
   |
@@ -95,7 +103,7 @@ C417.py:7:1: C417 [*] Unnecessary `map` usage (rewrite using a `dict` comprehens
   |
   = help: Replace `map` with a `dict` comprehension
 
-ℹ Unsafe fix
+Suggested fix:
 4 4 | map(lambda x: str(x), nums)
 5 5 | list(map(lambda x: x * 2, nums))
 6 6 | set(map(lambda x: x % 2 == 0, nums))
@@ -104,6 +112,8 @@ C417.py:7:1: C417 [*] Unnecessary `map` usage (rewrite using a `dict` comprehens
 8 8 | dict(map(lambda v: [v, v**2], nums))
 9 9 | map(lambda: "const", nums)
 10 10 | map(lambda _: 3.0, nums)
+
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 C417.py:8:1: C417 [*] Unnecessary `map` usage (rewrite using a `dict` comprehension)
    |
@@ -116,7 +126,7 @@ C417.py:8:1: C417 [*] Unnecessary `map` usage (rewrite using a `dict` comprehens
    |
    = help: Replace `map` with a `dict` comprehension
 
-ℹ Unsafe fix
+Suggested fix:
 5 5 | list(map(lambda x: x * 2, nums))
 6 6 | set(map(lambda x: x % 2 == 0, nums))
 7 7 | dict(map(lambda v: (v, v**2), nums))
@@ -125,6 +135,8 @@ C417.py:8:1: C417 [*] Unnecessary `map` usage (rewrite using a `dict` comprehens
 9 9 | map(lambda: "const", nums)
 10 10 | map(lambda _: 3.0, nums)
 11 11 | _ = "".join(map(lambda x: x in nums and "1" or "0", range(123)))
+
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 C417.py:9:1: C417 [*] Unnecessary `map` usage (rewrite using a generator expression)
    |
@@ -137,7 +149,7 @@ C417.py:9:1: C417 [*] Unnecessary `map` usage (rewrite using a generator express
    |
    = help: Replace `map` with a generator expression
 
-ℹ Unsafe fix
+Suggested fix:
 6  6  | set(map(lambda x: x % 2 == 0, nums))
 7  7  | dict(map(lambda v: (v, v**2), nums))
 8  8  | dict(map(lambda v: [v, v**2], nums))
@@ -146,6 +158,8 @@ C417.py:9:1: C417 [*] Unnecessary `map` usage (rewrite using a generator express
 10 10 | map(lambda _: 3.0, nums)
 11 11 | _ = "".join(map(lambda x: x in nums and "1" or "0", range(123)))
 12 12 | all(map(lambda v: isinstance(v, dict), nums))
+
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 C417.py:10:1: C417 [*] Unnecessary `map` usage (rewrite using a generator expression)
    |
@@ -158,7 +172,7 @@ C417.py:10:1: C417 [*] Unnecessary `map` usage (rewrite using a generator expres
    |
    = help: Replace `map` with a generator expression
 
-ℹ Unsafe fix
+Suggested fix:
 7  7  | dict(map(lambda v: (v, v**2), nums))
 8  8  | dict(map(lambda v: [v, v**2], nums))
 9  9  | map(lambda: "const", nums)
@@ -167,6 +181,8 @@ C417.py:10:1: C417 [*] Unnecessary `map` usage (rewrite using a generator expres
 11 11 | _ = "".join(map(lambda x: x in nums and "1" or "0", range(123)))
 12 12 | all(map(lambda v: isinstance(v, dict), nums))
 13 13 | filter(func, map(lambda v: v, nums))
+
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 C417.py:11:13: C417 [*] Unnecessary `map` usage (rewrite using a generator expression)
    |
@@ -179,7 +195,7 @@ C417.py:11:13: C417 [*] Unnecessary `map` usage (rewrite using a generator expre
    |
    = help: Replace `map` with a generator expression
 
-ℹ Unsafe fix
+Suggested fix:
 8  8  | dict(map(lambda v: [v, v**2], nums))
 9  9  | map(lambda: "const", nums)
 10 10 | map(lambda _: 3.0, nums)
@@ -188,6 +204,8 @@ C417.py:11:13: C417 [*] Unnecessary `map` usage (rewrite using a generator expre
 12 12 | all(map(lambda v: isinstance(v, dict), nums))
 13 13 | filter(func, map(lambda v: v, nums))
 14 14 | list(map(lambda x, y: x * y, nums))
+
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 C417.py:12:5: C417 [*] Unnecessary `map` usage (rewrite using a generator expression)
    |
@@ -200,7 +218,7 @@ C417.py:12:5: C417 [*] Unnecessary `map` usage (rewrite using a generator expres
    |
    = help: Replace `map` with a generator expression
 
-ℹ Unsafe fix
+Suggested fix:
 9  9  | map(lambda: "const", nums)
 10 10 | map(lambda _: 3.0, nums)
 11 11 | _ = "".join(map(lambda x: x in nums and "1" or "0", range(123)))
@@ -209,6 +227,8 @@ C417.py:12:5: C417 [*] Unnecessary `map` usage (rewrite using a generator expres
 13 13 | filter(func, map(lambda v: v, nums))
 14 14 | list(map(lambda x, y: x * y, nums))
 15 15 | 
+
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 C417.py:13:14: C417 [*] Unnecessary `map` usage (rewrite using a generator expression)
    |
@@ -220,7 +240,7 @@ C417.py:13:14: C417 [*] Unnecessary `map` usage (rewrite using a generator expre
    |
    = help: Replace `map` with a generator expression
 
-ℹ Unsafe fix
+Suggested fix:
 10 10 | map(lambda _: 3.0, nums)
 11 11 | _ = "".join(map(lambda x: x in nums and "1" or "0", range(123)))
 12 12 | all(map(lambda v: isinstance(v, dict), nums))
@@ -229,6 +249,8 @@ C417.py:13:14: C417 [*] Unnecessary `map` usage (rewrite using a generator expre
 14 14 | list(map(lambda x, y: x * y, nums))
 15 15 | 
 16 16 | # When inside f-string, then the fix should be surrounded by whitespace
+
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 C417.py:14:1: C417 [*] Unnecessary `map` usage (rewrite using a `list` comprehension)
    |
@@ -241,7 +263,7 @@ C417.py:14:1: C417 [*] Unnecessary `map` usage (rewrite using a `list` comprehen
    |
    = help: Replace `map` with a `list` comprehension
 
-ℹ Unsafe fix
+Suggested fix:
 11 11 | _ = "".join(map(lambda x: x in nums and "1" or "0", range(123)))
 12 12 | all(map(lambda v: isinstance(v, dict), nums))
 13 13 | filter(func, map(lambda v: v, nums))
@@ -250,6 +272,8 @@ C417.py:14:1: C417 [*] Unnecessary `map` usage (rewrite using a `list` comprehen
 15 15 | 
 16 16 | # When inside f-string, then the fix should be surrounded by whitespace
 17 17 | _ = f"{set(map(lambda x: x % 2 == 0, nums))}"
+
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 C417.py:17:8: C417 [*] Unnecessary `map` usage (rewrite using a `set` comprehension)
    |
@@ -260,7 +284,7 @@ C417.py:17:8: C417 [*] Unnecessary `map` usage (rewrite using a `set` comprehens
    |
    = help: Replace `map` with a `set` comprehension
 
-ℹ Unsafe fix
+Suggested fix:
 14 14 | list(map(lambda x, y: x * y, nums))
 15 15 | 
 16 16 | # When inside f-string, then the fix should be surrounded by whitespace
@@ -269,6 +293,8 @@ C417.py:17:8: C417 [*] Unnecessary `map` usage (rewrite using a `set` comprehens
 18 18 | _ = f"{dict(map(lambda v: (v, v**2), nums))}"
 19 19 | 
 20 20 | # False negatives.
+
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 C417.py:18:8: C417 [*] Unnecessary `map` usage (rewrite using a `dict` comprehension)
    |
@@ -281,7 +307,7 @@ C417.py:18:8: C417 [*] Unnecessary `map` usage (rewrite using a `dict` comprehen
    |
    = help: Replace `map` with a `dict` comprehension
 
-ℹ Unsafe fix
+Suggested fix:
 15 15 | 
 16 16 | # When inside f-string, then the fix should be surrounded by whitespace
 17 17 | _ = f"{set(map(lambda x: x % 2 == 0, nums))}"
@@ -290,6 +316,8 @@ C417.py:18:8: C417 [*] Unnecessary `map` usage (rewrite using a `dict` comprehen
 19 19 | 
 20 20 | # False negatives.
 21 21 | map(lambda x=2, y=1: x + y, nums, nums)
+
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 C417.py:36:1: C417 [*] Unnecessary `map` usage (rewrite using a generator expression)
    |
@@ -301,7 +329,7 @@ C417.py:36:1: C417 [*] Unnecessary `map` usage (rewrite using a generator expres
    |
    = help: Replace `map` with a generator expression
 
-ℹ Unsafe fix
+Suggested fix:
 33 33 | map(lambda x: lambda: x, range(4))
 34 34 | 
 35 35 | # Error: the `x` is overridden by the inner lambda.
@@ -310,6 +338,8 @@ C417.py:36:1: C417 [*] Unnecessary `map` usage (rewrite using a generator expres
 37 37 | 
 38 38 | # Ok because of the default parameters, and variadic arguments.
 39 39 | map(lambda x=1: x, nums)
+
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 C417.py:47:1: C417 [*] Unnecessary `map` usage (rewrite using a generator expression)
    |
@@ -321,7 +351,7 @@ C417.py:47:1: C417 [*] Unnecessary `map` usage (rewrite using a generator expres
    |
    = help: Replace `map` with a generator expression
 
-ℹ Unsafe fix
+Suggested fix:
 44 44 | dict(map(lambda k, v: (k, v), keys, values))
 45 45 | 
 46 46 | # Regression test for: https://github.com/astral-sh/ruff/issues/7121
@@ -329,6 +359,8 @@ C417.py:47:1: C417 [*] Unnecessary `map` usage (rewrite using a generator expres
    47 |+(x for x in (y if y else z))
 48 48 | map(lambda x: x, (y if y else z))
 49 49 | map(lambda x: x, (x, y, z))
+
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 C417.py:48:1: C417 [*] Unnecessary `map` usage (rewrite using a generator expression)
    |
@@ -340,13 +372,15 @@ C417.py:48:1: C417 [*] Unnecessary `map` usage (rewrite using a generator expres
    |
    = help: Replace `map` with a generator expression
 
-ℹ Unsafe fix
+Suggested fix:
 45 45 | 
 46 46 | # Regression test for: https://github.com/astral-sh/ruff/issues/7121
 47 47 | map(lambda x: x, y if y else z)
 48    |-map(lambda x: x, (y if y else z))
    48 |+(x for x in (y if y else z))
 49 49 | map(lambda x: x, (x, y, z))
+
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 C417.py:49:1: C417 [*] Unnecessary `map` usage (rewrite using a generator expression)
    |
@@ -357,11 +391,11 @@ C417.py:49:1: C417 [*] Unnecessary `map` usage (rewrite using a generator expres
    |
    = help: Replace `map` with a generator expression
 
-ℹ Unsafe fix
+Suggested fix:
 46 46 | # Regression test for: https://github.com/astral-sh/ruff/issues/7121
 47 47 | map(lambda x: x, y if y else z)
 48 48 | map(lambda x: x, (y if y else z))
 49    |-map(lambda x: x, (x, y, z))
    49 |+(x for x in (x, y, z))
 
-
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.

@@ -10,7 +10,7 @@ D.py:288:5: D210 [*] No whitespaces allowed surrounding docstring text
     |
     = help: Trim surrounding whitespace
 
-ℹ Safe fix
+Suggested fix:
 285 285 | 
 286 286 | @expect('D210: No whitespaces allowed surrounding docstring text')
 287 287 | def endswith():
@@ -19,6 +19,8 @@ D.py:288:5: D210 [*] No whitespaces allowed surrounding docstring text
 289 289 | 
 290 290 | 
 291 291 | @expect('D210: No whitespaces allowed surrounding docstring text')
+
+    Run `ruff check --fix` to apply this fix.
 
 D.py:293:5: D210 [*] No whitespaces allowed surrounding docstring text
     |
@@ -29,7 +31,7 @@ D.py:293:5: D210 [*] No whitespaces allowed surrounding docstring text
     |
     = help: Trim surrounding whitespace
 
-ℹ Safe fix
+Suggested fix:
 290 290 | 
 291 291 | @expect('D210: No whitespaces allowed surrounding docstring text')
 292 292 | def around():
@@ -38,6 +40,8 @@ D.py:293:5: D210 [*] No whitespaces allowed surrounding docstring text
 294 294 | 
 295 295 | 
 296 296 | @expect('D210: No whitespaces allowed surrounding docstring text')
+
+    Run `ruff check --fix` to apply this fix.
 
 D.py:299:5: D210 [*] No whitespaces allowed surrounding docstring text
     |
@@ -52,7 +56,7 @@ D.py:299:5: D210 [*] No whitespaces allowed surrounding docstring text
     |
     = help: Trim surrounding whitespace
 
-ℹ Safe fix
+Suggested fix:
 296 296 | @expect('D210: No whitespaces allowed surrounding docstring text')
 297 297 | @expect('D213: Multi-line docstring summary should start at the second line')
 298 298 | def multiline():
@@ -62,6 +66,8 @@ D.py:299:5: D210 [*] No whitespaces allowed surrounding docstring text
 301 301 |     This is the end.
 302 302 |     """
 
+    Run `ruff check --fix` to apply this fix.
+
 D.py:581:5: D210 No whitespaces allowed surrounding docstring text
     |
 579 |         "or exclamation point (not '\"')")
@@ -70,5 +76,3 @@ D.py:581:5: D210 No whitespaces allowed surrounding docstring text
     |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ D210
     |
     = help: Trim surrounding whitespace
-
-

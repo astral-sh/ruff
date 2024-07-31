@@ -17,10 +17,12 @@ singles_would_be_triple_quotes.py:1:33: Q000 [*] Single quotes found but double 
   |
   = help: Replace single quotes with double quotes
 
-ℹ Safe fix
+Suggested fix:
 1   |-s = ''"Start with empty string" ' and lint docstring safely'
   1 |+s = ''"Start with empty string" " and lint docstring safely"
 2 2 | s = 'Do not'" start with empty string" ' and lint docstring safely'
+
+    Run `ruff check --fix` to apply this fix.
 
 singles_would_be_triple_quotes.py:2:5: Q000 [*] Single quotes found but double quotes preferred
   |
@@ -30,10 +32,12 @@ singles_would_be_triple_quotes.py:2:5: Q000 [*] Single quotes found but double q
   |
   = help: Replace single quotes with double quotes
 
-ℹ Safe fix
+Suggested fix:
 1 1 | s = ''"Start with empty string" ' and lint docstring safely'
 2   |-s = 'Do not'" start with empty string" ' and lint docstring safely'
   2 |+s = "Do not"" start with empty string" ' and lint docstring safely'
+
+    Run `ruff check --fix` to apply this fix.
 
 singles_would_be_triple_quotes.py:2:40: Q000 [*] Single quotes found but double quotes preferred
   |
@@ -43,7 +47,9 @@ singles_would_be_triple_quotes.py:2:40: Q000 [*] Single quotes found but double 
   |
   = help: Replace single quotes with double quotes
 
-ℹ Safe fix
+Suggested fix:
 1 1 | s = ''"Start with empty string" ' and lint docstring safely'
 2   |-s = 'Do not'" start with empty string" ' and lint docstring safely'
   2 |+s = 'Do not'" start with empty string" " and lint docstring safely"
+
+    Run `ruff check --fix` to apply this fix.

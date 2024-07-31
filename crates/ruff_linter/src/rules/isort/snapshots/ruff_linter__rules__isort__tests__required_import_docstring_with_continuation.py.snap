@@ -2,7 +2,9 @@
 source: crates/ruff_linter/src/rules/isort/mod.rs
 ---
 docstring_with_continuation.py:1:1: I002 [*] Missing required import: `from __future__ import annotations`
-ℹ Safe fix
+Suggested fix:
 1   |-"""Hello, world!"""; x = \
   1 |+"""Hello, world!"""; from __future__ import annotations; x = \
 2 2 |     1; y = 2
+
+    Run `ruff check --fix` to apply this fix.

@@ -14,7 +14,7 @@ forced_separate.py:3:1: I001 [*] Import block is un-sorted or un-formatted
   |
   = help: Organize imports
 
-ℹ Safe fix
+Suggested fix:
 1  1  | # office_helper and tests are both first-party,
 2  2  | # but we want tests and experiments to be separated, in that order
    3  |+from office_helper.assistants import entity_registry as er
@@ -27,4 +27,4 @@ forced_separate.py:3:1: I001 [*] Import block is un-sorted or un-formatted
 7  10 | from experiments.weird import varieties
 8     |-from office_helper.assistants import entity_registry as er
 
-
+    Run `ruff check --fix` to apply this fix.

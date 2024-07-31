@@ -10,7 +10,7 @@ sections.py:67:5: D413 [*] Missing blank line after last section ("Returns")
    |
    = help: Add blank line after "Returns"
 
-ℹ Safe fix
+Suggested fix:
 64 64 | def no_underline_and_no_newline():  # noqa: D416
 65 65 |     """Toggle the gizmo.
 66 66 | 
@@ -21,6 +21,8 @@ sections.py:67:5: D413 [*] Missing blank line after last section ("Returns")
 68 70 | 
 69 71 | 
 70 72 | @expect(_D213)
+
+    Run `ruff check --fix` to apply this fix.
 
 sections.py:122:5: D413 [*] Missing blank line after last section ("Returns")
     |
@@ -33,7 +35,7 @@ sections.py:122:5: D413 [*] Missing blank line after last section ("Returns")
     |
     = help: Add blank line after "Returns"
 
-ℹ Safe fix
+Suggested fix:
 122 122 |     Returns
 123 123 |     -------
 124 124 |     A value of some sort.
@@ -41,6 +43,8 @@ sections.py:122:5: D413 [*] Missing blank line after last section ("Returns")
 125 126 |     """
 126 127 | 
 127 128 | 
+
+    Run `ruff check --fix` to apply this fix.
 
 sections.py:172:5: D413 [*] Missing blank line after last section ("Returns")
     |
@@ -53,7 +57,7 @@ sections.py:172:5: D413 [*] Missing blank line after last section ("Returns")
     |
     = help: Add blank line after "Returns"
 
-ℹ Safe fix
+Suggested fix:
 171 171 | 
 172 172 |     Returns
 173 173 |         -------
@@ -61,6 +65,8 @@ sections.py:172:5: D413 [*] Missing blank line after last section ("Returns")
 174 175 |     """
 175 176 | 
 176 177 | 
+
+    Run `ruff check --fix` to apply this fix.
 
 sections.py:521:5: D413 [*] Missing blank line after last section ("Parameters")
     |
@@ -73,7 +79,7 @@ sections.py:521:5: D413 [*] Missing blank line after last section ("Parameters")
     |
     = help: Add blank line after "Parameters"
 
-ℹ Safe fix
+Suggested fix:
 520 520 | 
 521 521 |     Parameters
 522 522 |     ==========
@@ -81,6 +87,8 @@ sections.py:521:5: D413 [*] Missing blank line after last section ("Parameters")
 523 524 |     """
 524 525 | 
 525 526 | 
+
+    Run `ruff check --fix` to apply this fix.
 
 sections.py:529:5: D413 [*] Missing blank line after last section ("Parameters")
     |
@@ -93,7 +101,7 @@ sections.py:529:5: D413 [*] Missing blank line after last section ("Parameters")
     |
     = help: Add blank line after "Parameters"
 
-ℹ Safe fix
+Suggested fix:
 528 528 | 
 529 529 |     Parameters
 530 530 |     ===========
@@ -101,6 +109,8 @@ sections.py:529:5: D413 [*] Missing blank line after last section ("Parameters")
 531 532 |     """
 532 533 | 
 533 534 | 
+
+    Run `ruff check --fix` to apply this fix.
 
 sections.py:550:5: D413 [*] Missing blank line after last section ("Args")
     |
@@ -112,7 +122,7 @@ sections.py:550:5: D413 [*] Missing blank line after last section ("Args")
     |
     = help: Add blank line after "Args"
 
-ℹ Safe fix
+Suggested fix:
 551 551 |         Here's a note.
 552 552 | 
 553 553 |         returns:
@@ -120,6 +130,8 @@ sections.py:550:5: D413 [*] Missing blank line after last section ("Args")
 554 555 |     """
 555 556 | 
 556 557 | 
+
+    Run `ruff check --fix` to apply this fix.
 
 sections.py:563:9: D413 [*] Missing blank line after last section ("Returns")
     |
@@ -131,7 +143,7 @@ sections.py:563:9: D413 [*] Missing blank line after last section ("Returns")
     |
     = help: Add blank line after "Returns"
 
-ℹ Safe fix
+Suggested fix:
 561 561 |         Here's a note.
 562 562 | 
 563 563 |         Returns:
@@ -139,6 +151,8 @@ sections.py:563:9: D413 [*] Missing blank line after last section ("Returns")
 564 565 |     """
 565 566 | 
 566 567 | 
+
+    Run `ruff check --fix` to apply this fix.
 
 sections.py:590:5: D413 [*] Missing blank line after last section ("Parameters")
     |
@@ -151,11 +165,13 @@ sections.py:590:5: D413 [*] Missing blank line after last section ("Parameters")
     |
     = help: Add blank line after "Parameters"
 
-ℹ Safe fix
+Suggested fix:
 593 593 |         A list of string parameters
 594 594 |     value:
 595 595 |         Some value
     596 |+
 596 597 |     """
 597 598 | 
-598 599 |
+598 599 | 
+
+    Run `ruff check --fix` to apply this fix.

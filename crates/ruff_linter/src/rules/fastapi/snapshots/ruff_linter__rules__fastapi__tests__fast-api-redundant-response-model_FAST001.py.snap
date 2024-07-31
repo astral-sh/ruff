@@ -10,7 +10,7 @@ FAST001.py:17:22: FAST001 [*] FastAPI route with redundant `response_model` argu
    |
    = help: Remove argument
 
-ℹ Unsafe fix
+Suggested fix:
 14 14 | # Errors
 15 15 | 
 16 16 | 
@@ -19,6 +19,8 @@ FAST001.py:17:22: FAST001 [*] FastAPI route with redundant `response_model` argu
 18 18 | async def create_item(item: Item) -> Item:
 19 19 |     return item
 20 20 | 
+
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 FAST001.py:22:22: FAST001 [*] FastAPI route with redundant `response_model` argument
    |
@@ -29,7 +31,7 @@ FAST001.py:22:22: FAST001 [*] FastAPI route with redundant `response_model` argu
    |
    = help: Remove argument
 
-ℹ Unsafe fix
+Suggested fix:
 19 19 |     return item
 20 20 | 
 21 21 | 
@@ -38,6 +40,8 @@ FAST001.py:22:22: FAST001 [*] FastAPI route with redundant `response_model` argu
 23 23 | async def create_item(item: Item) -> list[Item]:
 24 24 |     return item
 25 25 | 
+
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 FAST001.py:27:22: FAST001 [*] FastAPI route with redundant `response_model` argument
    |
@@ -48,7 +52,7 @@ FAST001.py:27:22: FAST001 [*] FastAPI route with redundant `response_model` argu
    |
    = help: Remove argument
 
-ℹ Unsafe fix
+Suggested fix:
 24 24 |     return item
 25 25 | 
 26 26 | 
@@ -57,6 +61,8 @@ FAST001.py:27:22: FAST001 [*] FastAPI route with redundant `response_model` argu
 28 28 | async def create_item(item: Item) -> List[Item]:
 29 29 |     return item
 30 30 | 
+
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 FAST001.py:32:22: FAST001 [*] FastAPI route with redundant `response_model` argument
    |
@@ -67,7 +73,7 @@ FAST001.py:32:22: FAST001 [*] FastAPI route with redundant `response_model` argu
    |
    = help: Remove argument
 
-ℹ Unsafe fix
+Suggested fix:
 29 29 |     return item
 30 30 | 
 31 31 | 
@@ -76,6 +82,8 @@ FAST001.py:32:22: FAST001 [*] FastAPI route with redundant `response_model` argu
 33 33 | async def create_item(item: Item) -> Dict[str, Item]:
 34 34 |     return item
 35 35 | 
+
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 FAST001.py:37:22: FAST001 [*] FastAPI route with redundant `response_model` argument
    |
@@ -86,7 +94,7 @@ FAST001.py:37:22: FAST001 [*] FastAPI route with redundant `response_model` argu
    |
    = help: Remove argument
 
-ℹ Unsafe fix
+Suggested fix:
 34 34 |     return item
 35 35 | 
 36 36 | 
@@ -95,6 +103,8 @@ FAST001.py:37:22: FAST001 [*] FastAPI route with redundant `response_model` argu
 38 38 | async def create_item(item: Item) -> str:
 39 39 |     return item
 40 40 | 
+
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 FAST001.py:42:21: FAST001 [*] FastAPI route with redundant `response_model` argument
    |
@@ -105,7 +115,7 @@ FAST001.py:42:21: FAST001 [*] FastAPI route with redundant `response_model` argu
    |
    = help: Remove argument
 
-ℹ Unsafe fix
+Suggested fix:
 39 39 |     return item
 40 40 | 
 41 41 | 
@@ -114,6 +124,8 @@ FAST001.py:42:21: FAST001 [*] FastAPI route with redundant `response_model` argu
 43 43 | async def create_item(item: Item) -> Item:
 44 44 |     return item
 45 45 | 
+
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 FAST001.py:47:21: FAST001 [*] FastAPI route with redundant `response_model` argument
    |
@@ -124,7 +136,7 @@ FAST001.py:47:21: FAST001 [*] FastAPI route with redundant `response_model` argu
    |
    = help: Remove argument
 
-ℹ Unsafe fix
+Suggested fix:
 44 44 |     return item
 45 45 | 
 46 46 | 
@@ -133,6 +145,8 @@ FAST001.py:47:21: FAST001 [*] FastAPI route with redundant `response_model` argu
 48 48 | @app.post("/items/", response_model=Item)
 49 49 | async def create_item(item: Item) -> Item:
 50 50 |     return item
+
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 FAST001.py:48:22: FAST001 [*] FastAPI route with redundant `response_model` argument
    |
@@ -144,7 +158,7 @@ FAST001.py:48:22: FAST001 [*] FastAPI route with redundant `response_model` argu
    |
    = help: Remove argument
 
-ℹ Unsafe fix
+Suggested fix:
 45 45 | 
 46 46 | 
 47 47 | @app.get("/items/", response_model=Item)
@@ -153,6 +167,8 @@ FAST001.py:48:22: FAST001 [*] FastAPI route with redundant `response_model` argu
 49 49 | async def create_item(item: Item) -> Item:
 50 50 |     return item
 51 51 | 
+
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 FAST001.py:53:24: FAST001 [*] FastAPI route with redundant `response_model` argument
    |
@@ -163,7 +179,7 @@ FAST001.py:53:24: FAST001 [*] FastAPI route with redundant `response_model` argu
    |
    = help: Remove argument
 
-ℹ Unsafe fix
+Suggested fix:
 50 50 |     return item
 51 51 | 
 52 52 | 
@@ -171,4 +187,6 @@ FAST001.py:53:24: FAST001 [*] FastAPI route with redundant `response_model` argu
    53 |+@router.get("/items/")
 54 54 | async def create_item(item: Item) -> Item:
 55 55 |     return item
-56 56 |
+56 56 | 
+
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.

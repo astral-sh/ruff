@@ -10,7 +10,7 @@ UP036_4.py:4:8: UP036 [*] Version block is outdated for minimum Python version
   |
   = help: Remove outdated version block
 
-ℹ Unsafe fix
+Suggested fix:
 1 1 | import sys
 2 2 | 
 3 3 | if True:
@@ -20,6 +20,8 @@ UP036_4.py:4:8: UP036 [*] Version block is outdated for minimum Python version
 6 5 | 
 7 6 | 
 8 7 | if True:
+
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 UP036_4.py:11:10: UP036 [*] Version block is outdated for minimum Python version
    |
@@ -31,7 +33,7 @@ UP036_4.py:11:10: UP036 [*] Version block is outdated for minimum Python version
    |
    = help: Remove outdated version block
 
-ℹ Unsafe fix
+Suggested fix:
 8  8  | if True:
 9  9  |     if foo:
 10 10 |         print()
@@ -41,6 +43,8 @@ UP036_4.py:11:10: UP036 [*] Version block is outdated for minimum Python version
 13 12 | 
 14 13 | if True:
 15 14 |     if foo:
+
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 UP036_4.py:17:10: UP036 [*] Version block is outdated for minimum Python version
    |
@@ -53,7 +57,7 @@ UP036_4.py:17:10: UP036 [*] Version block is outdated for minimum Python version
    |
    = help: Remove outdated version block
 
-ℹ Unsafe fix
+Suggested fix:
 14 14 | if True:
 15 15 |     if foo:
 16 16 |         print()
@@ -62,6 +66,8 @@ UP036_4.py:17:10: UP036 [*] Version block is outdated for minimum Python version
 19 17 |     elif foo:
 20 18 |         cmd = [sys.executable, "-m", "test", "-j0"]
 21 19 | 
+
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 UP036_4.py:24:10: UP036 [*] Version block is outdated for minimum Python version
    |
@@ -73,7 +79,7 @@ UP036_4.py:24:10: UP036 [*] Version block is outdated for minimum Python version
    |
    = help: Remove outdated version block
 
-ℹ Unsafe fix
+Suggested fix:
 21 21 | 
 22 22 |     if foo:
 23 23 |         print()
@@ -83,6 +89,8 @@ UP036_4.py:24:10: UP036 [*] Version block is outdated for minimum Python version
 26 25 | 
 27 26 |     if sys.version_info < (3, 3):
 28 27 |         cmd = [sys.executable, "-m", "test.regrtest"]
+
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 UP036_4.py:27:8: UP036 [*] Version block is outdated for minimum Python version
    |
@@ -94,7 +102,7 @@ UP036_4.py:27:8: UP036 [*] Version block is outdated for minimum Python version
    |
    = help: Remove outdated version block
 
-ℹ Unsafe fix
+Suggested fix:
 24 24 |     elif sys.version_info < (3, 3):
 25 25 |         cmd = [sys.executable, "-m", "test.regrtest"]
 26 26 | 
@@ -103,6 +111,8 @@ UP036_4.py:27:8: UP036 [*] Version block is outdated for minimum Python version
 29 27 | 
 30 28 |     if foo:
 31 29 |         print()
+
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 UP036_4.py:32:10: UP036 [*] Version block is outdated for minimum Python version
    |
@@ -115,7 +125,7 @@ UP036_4.py:32:10: UP036 [*] Version block is outdated for minimum Python version
    |
    = help: Remove outdated version block
 
-ℹ Unsafe fix
+Suggested fix:
 29 29 | 
 30 30 |     if foo:
 31 31 |         print()
@@ -124,6 +134,8 @@ UP036_4.py:32:10: UP036 [*] Version block is outdated for minimum Python version
 34 32 |     else:
 35 33 |         cmd = [sys.executable, "-m", "test", "-j0"]
 36 34 | 
+
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 UP036_4.py:37:8: UP036 [*] Version block is outdated for minimum Python version
    |
@@ -136,7 +148,7 @@ UP036_4.py:37:8: UP036 [*] Version block is outdated for minimum Python version
    |
    = help: Remove outdated version block
 
-ℹ Unsafe fix
+Suggested fix:
 34 34 |     else:
 35 35 |         cmd = [sys.executable, "-m", "test", "-j0"]
 36 36 | 
@@ -149,6 +161,8 @@ UP036_4.py:37:8: UP036 [*] Version block is outdated for minimum Python version
 42 39 |     if sys.version_info < (3, 3):
 43 40 |         cmd = [sys.executable, "-m", "test.regrtest"]
 
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
+
 UP036_4.py:42:8: UP036 [*] Version block is outdated for minimum Python version
    |
 40 |         cmd = [sys.executable, "-m", "test", "-j0"]
@@ -160,7 +174,7 @@ UP036_4.py:42:8: UP036 [*] Version block is outdated for minimum Python version
    |
    = help: Remove outdated version block
 
-ℹ Unsafe fix
+Suggested fix:
 39 39 |     else:
 40 40 |         cmd = [sys.executable, "-m", "test", "-j0"]
 41 41 | 
@@ -170,4 +184,4 @@ UP036_4.py:42:8: UP036 [*] Version block is outdated for minimum Python version
    42 |+    if foo:
 45 43 |         cmd = [sys.executable, "-m", "test", "-j0"]
 
-
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.

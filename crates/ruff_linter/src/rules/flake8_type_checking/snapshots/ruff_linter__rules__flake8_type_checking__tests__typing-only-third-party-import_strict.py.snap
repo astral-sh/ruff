@@ -12,7 +12,7 @@ strict.py:54:25: TCH002 [*] Move third-party import `pkg.bar.A` into a type-chec
    |
    = help: Move into type-checking block
 
-ℹ Unsafe fix
+Suggested fix:
 1  1  | from __future__ import annotations
    2  |+from typing import TYPE_CHECKING
    3  |+
@@ -30,6 +30,8 @@ strict.py:54:25: TCH002 [*] Move third-party import `pkg.bar.A` into a type-chec
 56 59 |     def test(value: A):
 57 60 |         return pkg.B()
 
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
+
 strict.py:91:12: TCH002 [*] Move third-party import `pkg` into a type-checking block
    |
 89 |     # Note that `pkg` is a prefix of `pkgfoo` which are both different modules. This is
@@ -40,7 +42,7 @@ strict.py:91:12: TCH002 [*] Move third-party import `pkg` into a type-checking b
    |
    = help: Move into type-checking block
 
-ℹ Unsafe fix
+Suggested fix:
 1  1  | from __future__ import annotations
    2  |+from typing import TYPE_CHECKING
    3  |+
@@ -58,4 +60,4 @@ strict.py:91:12: TCH002 [*] Move third-party import `pkg` into a type-checking b
 93 96 | 
 94 97 |     def test(value: pkg.A):
 
-
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.

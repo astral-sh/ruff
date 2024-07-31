@@ -287,6 +287,9 @@ pub fn check(args: CheckCommand, global_options: GlobalConfigArgs) -> Result<Exi
     if show_fixes {
         printer_flags |= PrinterFlags::SHOW_FIX_SUMMARY;
     }
+    if output_format == OutputFormat::Full {
+        printer_flags |= PrinterFlags::SHOW_FIX_DIFF;
+    }
 
     #[cfg(debug_assertions)]
     if cache {

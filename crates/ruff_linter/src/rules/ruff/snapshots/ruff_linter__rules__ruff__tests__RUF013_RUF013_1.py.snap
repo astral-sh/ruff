@@ -9,10 +9,12 @@ RUF013_1.py:4:12: RUF013 [*] PEP 484 prohibits implicit `Optional`
   |
   = help: Convert to `T | None`
 
-ℹ Unsafe fix
+Suggested fix:
 1 1 | # No `typing.Optional` import
 2 2 | 
 3 3 | 
 4   |-def f(arg: int = None):  # RUF013
   4 |+def f(arg: int | None = None):  # RUF013
 5 5 |     pass
+
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.

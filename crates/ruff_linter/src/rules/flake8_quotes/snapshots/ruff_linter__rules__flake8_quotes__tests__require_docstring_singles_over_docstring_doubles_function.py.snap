@@ -11,13 +11,15 @@ docstring_doubles_function.py:2:5: Q002 [*] Double quote docstring found but sin
   |
   = help: Replace double quotes docstring with single quotes
 
-ℹ Safe fix
+Suggested fix:
 1 1 | def foo():
 2   |-    """function without params, single line docstring"""
   2 |+    '''function without params, single line docstring'''
 3 3 |     """ not a docstring"""
 4 4 |     return
 5 5 | 
+
+    Run `ruff check --fix` to apply this fix.
 
 docstring_doubles_function.py:8:5: Q002 [*] Double quote docstring found but single quotes preferred
    |
@@ -32,7 +34,7 @@ docstring_doubles_function.py:8:5: Q002 [*] Double quote docstring found but sin
    |
    = help: Replace double quotes docstring with single quotes
 
-ℹ Safe fix
+Suggested fix:
 5  5  | 
 6  6  | 
 7  7  | def foo2():
@@ -45,6 +47,8 @@ docstring_doubles_function.py:8:5: Q002 [*] Double quote docstring found but sin
 12 12 |     return
 13 13 | 
 
+    Run `ruff check --fix` to apply this fix.
+
 docstring_doubles_function.py:27:5: Q002 [*] Double quote docstring found but single quotes preferred
    |
 26 | def function_with_single_docstring(a):
@@ -53,7 +57,7 @@ docstring_doubles_function.py:27:5: Q002 [*] Double quote docstring found but si
    |
    = help: Replace double quotes docstring with single quotes
 
-ℹ Safe fix
+Suggested fix:
 24 24 | 
 25 25 | 
 26 26 | def function_with_single_docstring(a):
@@ -63,4 +67,4 @@ docstring_doubles_function.py:27:5: Q002 [*] Double quote docstring found but si
 29 29 | 
 30 30 | def double_inside_single(a):
 
-
+    Run `ruff check --fix` to apply this fix.

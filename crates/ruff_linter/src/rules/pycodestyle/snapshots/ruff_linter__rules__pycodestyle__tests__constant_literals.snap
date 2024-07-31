@@ -12,7 +12,7 @@ constant_literals.py:4:4: F632 [*] Use `==` to compare constant literals
   |
   = help: Replace `is` with `==`
 
-ℹ Safe fix
+Suggested fix:
 1 1 | ###
 2 2 | # Errors
 3 3 | ###
@@ -21,6 +21,8 @@ constant_literals.py:4:4: F632 [*] Use `==` to compare constant literals
 5 5 |     pass
 6 6 | if "abc" is None:  # F632 (fix, but leaves behind unfixable E711)
 7 7 |     pass
+
+    Run `ruff check --fix` to apply this fix.
 
 constant_literals.py:6:4: F632 [*] Use `==` to compare constant literals
   |
@@ -33,7 +35,7 @@ constant_literals.py:6:4: F632 [*] Use `==` to compare constant literals
   |
   = help: Replace `is` with `==`
 
-ℹ Safe fix
+Suggested fix:
 3 3 | ###
 4 4 | if "abc" is "def":  # F632 (fix)
 5 5 |     pass
@@ -42,6 +44,8 @@ constant_literals.py:6:4: F632 [*] Use `==` to compare constant literals
 7 7 |     pass
 8 8 | if None is "abc":  # F632 (fix, but leaves behind unfixable E711)
 9 9 |     pass
+
+    Run `ruff check --fix` to apply this fix.
 
 constant_literals.py:8:4: F632 [*] Use `==` to compare constant literals
    |
@@ -54,7 +58,7 @@ constant_literals.py:8:4: F632 [*] Use `==` to compare constant literals
    |
    = help: Replace `is` with `==`
 
-ℹ Safe fix
+Suggested fix:
 5 5 |     pass
 6 6 | if "abc" is None:  # F632 (fix, but leaves behind unfixable E711)
 7 7 |     pass
@@ -63,6 +67,8 @@ constant_literals.py:8:4: F632 [*] Use `==` to compare constant literals
 9 9 |     pass
 10 10 | if "abc" is False:  # F632 (fix, but leaves behind unfixable E712)
 11 11 |     pass
+
+    Run `ruff check --fix` to apply this fix.
 
 constant_literals.py:10:4: F632 [*] Use `==` to compare constant literals
    |
@@ -75,7 +81,7 @@ constant_literals.py:10:4: F632 [*] Use `==` to compare constant literals
    |
    = help: Replace `is` with `==`
 
-ℹ Safe fix
+Suggested fix:
 7  7  |     pass
 8  8  | if None is "abc":  # F632 (fix, but leaves behind unfixable E711)
 9  9  |     pass
@@ -84,6 +90,8 @@ constant_literals.py:10:4: F632 [*] Use `==` to compare constant literals
 11 11 |     pass
 12 12 | if False is "abc":  # F632 (fix, but leaves behind unfixable E712)
 13 13 |     pass
+
+    Run `ruff check --fix` to apply this fix.
 
 constant_literals.py:12:4: F632 [*] Use `==` to compare constant literals
    |
@@ -96,7 +104,7 @@ constant_literals.py:12:4: F632 [*] Use `==` to compare constant literals
    |
    = help: Replace `is` with `==`
 
-ℹ Safe fix
+Suggested fix:
 9  9  |     pass
 10 10 | if "abc" is False:  # F632 (fix, but leaves behind unfixable E712)
 11 11 |     pass
@@ -105,6 +113,8 @@ constant_literals.py:12:4: F632 [*] Use `==` to compare constant literals
 13 13 |     pass
 14 14 | if False == None:  # E711, E712 (fix)
 15 15 |     pass
+
+    Run `ruff check --fix` to apply this fix.
 
 constant_literals.py:14:4: E712 [*] Avoid equality comparisons to `False`; use `if not None:` for false checks
    |
@@ -117,7 +127,7 @@ constant_literals.py:14:4: E712 [*] Avoid equality comparisons to `False`; use `
    |
    = help: Replace with `not None`
 
-ℹ Unsafe fix
+Suggested fix:
 11 11 |     pass
 12 12 | if False is "abc":  # F632 (fix, but leaves behind unfixable E712)
 13 13 |     pass
@@ -126,6 +136,8 @@ constant_literals.py:14:4: E712 [*] Avoid equality comparisons to `False`; use `
 15 15 |     pass
 16 16 | if None == False:  # E711, E712 (fix)
 17 17 |     pass
+
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 constant_literals.py:14:13: E711 [*] Comparison to `None` should be `cond is None`
    |
@@ -138,7 +150,7 @@ constant_literals.py:14:13: E711 [*] Comparison to `None` should be `cond is Non
    |
    = help: Replace with `cond is None`
 
-ℹ Unsafe fix
+Suggested fix:
 11 11 |     pass
 12 12 | if False is "abc":  # F632 (fix, but leaves behind unfixable E712)
 13 13 |     pass
@@ -147,6 +159,8 @@ constant_literals.py:14:13: E711 [*] Comparison to `None` should be `cond is Non
 15 15 |     pass
 16 16 | if None == False:  # E711, E712 (fix)
 17 17 |     pass
+
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 constant_literals.py:16:4: E711 [*] Comparison to `None` should be `cond is None`
    |
@@ -158,7 +172,7 @@ constant_literals.py:16:4: E711 [*] Comparison to `None` should be `cond is None
    |
    = help: Replace with `cond is None`
 
-ℹ Unsafe fix
+Suggested fix:
 13 13 |     pass
 14 14 | if False == None:  # E711, E712 (fix)
 15 15 |     pass
@@ -167,6 +181,8 @@ constant_literals.py:16:4: E711 [*] Comparison to `None` should be `cond is None
 17 17 |     pass
 18 18 | 
 19 19 | named_var = []
+
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 constant_literals.py:16:4: E712 [*] Avoid equality comparisons to `False`; use `if not None:` for false checks
    |
@@ -178,7 +194,7 @@ constant_literals.py:16:4: E712 [*] Avoid equality comparisons to `False`; use `
    |
    = help: Replace with `not None`
 
-ℹ Unsafe fix
+Suggested fix:
 13 13 |     pass
 14 14 | if False == None:  # E711, E712 (fix)
 15 15 |     pass
@@ -187,6 +203,8 @@ constant_literals.py:16:4: E712 [*] Avoid equality comparisons to `False`; use `
 17 17 |     pass
 18 18 | 
 19 19 | named_var = []
+
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 constant_literals.py:20:4: F632 [*] Use `==` to compare constant literals
    |
@@ -198,7 +216,7 @@ constant_literals.py:20:4: F632 [*] Use `==` to compare constant literals
    |
    = help: Replace `is` with `==`
 
-ℹ Safe fix
+Suggested fix:
 17 17 |     pass
 18 18 | 
 19 19 | named_var = []
@@ -207,6 +225,8 @@ constant_literals.py:20:4: F632 [*] Use `==` to compare constant literals
 21 21 |     pass
 22 22 | if named_var is []:  # F632 (fix)
 23 23 |     pass
+
+    Run `ruff check --fix` to apply this fix.
 
 constant_literals.py:22:4: F632 [*] Use `==` to compare constant literals
    |
@@ -219,7 +239,7 @@ constant_literals.py:22:4: F632 [*] Use `==` to compare constant literals
    |
    = help: Replace `is` with `==`
 
-ℹ Safe fix
+Suggested fix:
 19 19 | named_var = []
 20 20 | if [] is []:  # F632 (fix)
 21 21 |     pass
@@ -228,6 +248,8 @@ constant_literals.py:22:4: F632 [*] Use `==` to compare constant literals
 23 23 |     pass
 24 24 | if [] is named_var:  # F632 (fix)
 25 25 |     pass
+
+    Run `ruff check --fix` to apply this fix.
 
 constant_literals.py:24:4: F632 [*] Use `==` to compare constant literals
    |
@@ -240,7 +262,7 @@ constant_literals.py:24:4: F632 [*] Use `==` to compare constant literals
    |
    = help: Replace `is` with `==`
 
-ℹ Safe fix
+Suggested fix:
 21 21 |     pass
 22 22 | if named_var is []:  # F632 (fix)
 23 23 |     pass
@@ -249,6 +271,8 @@ constant_literals.py:24:4: F632 [*] Use `==` to compare constant literals
 25 25 |     pass
 26 26 | if named_var is [1]:  # F632 (fix)
 27 27 |     pass
+
+    Run `ruff check --fix` to apply this fix.
 
 constant_literals.py:26:4: F632 [*] Use `==` to compare constant literals
    |
@@ -261,7 +285,7 @@ constant_literals.py:26:4: F632 [*] Use `==` to compare constant literals
    |
    = help: Replace `is` with `==`
 
-ℹ Safe fix
+Suggested fix:
 23 23 |     pass
 24 24 | if [] is named_var:  # F632 (fix)
 25 25 |     pass
@@ -270,6 +294,8 @@ constant_literals.py:26:4: F632 [*] Use `==` to compare constant literals
 27 27 |     pass
 28 28 | if [1] is named_var:  # F632 (fix)
 29 29 |     pass
+
+    Run `ruff check --fix` to apply this fix.
 
 constant_literals.py:28:4: F632 [*] Use `==` to compare constant literals
    |
@@ -282,7 +308,7 @@ constant_literals.py:28:4: F632 [*] Use `==` to compare constant literals
    |
    = help: Replace `is` with `==`
 
-ℹ Safe fix
+Suggested fix:
 25 25 |     pass
 26 26 | if named_var is [1]:  # F632 (fix)
 27 27 |     pass
@@ -291,6 +317,8 @@ constant_literals.py:28:4: F632 [*] Use `==` to compare constant literals
 29 29 |     pass
 30 30 | if named_var is [i for i in [1]]:  # F632 (fix)
 31 31 |     pass
+
+    Run `ruff check --fix` to apply this fix.
 
 constant_literals.py:30:4: F632 [*] Use `==` to compare constant literals
    |
@@ -302,7 +330,7 @@ constant_literals.py:30:4: F632 [*] Use `==` to compare constant literals
    |
    = help: Replace `is` with `==`
 
-ℹ Safe fix
+Suggested fix:
 27 27 |     pass
 28 28 | if [1] is named_var:  # F632 (fix)
 29 29 |     pass
@@ -311,6 +339,8 @@ constant_literals.py:30:4: F632 [*] Use `==` to compare constant literals
 31 31 |     pass
 32 32 | 
 33 33 | named_var = {}
+
+    Run `ruff check --fix` to apply this fix.
 
 constant_literals.py:34:4: F632 [*] Use `==` to compare constant literals
    |
@@ -322,7 +352,7 @@ constant_literals.py:34:4: F632 [*] Use `==` to compare constant literals
    |
    = help: Replace `is` with `==`
 
-ℹ Safe fix
+Suggested fix:
 31 31 |     pass
 32 32 | 
 33 33 | named_var = {}
@@ -331,6 +361,8 @@ constant_literals.py:34:4: F632 [*] Use `==` to compare constant literals
 35 35 |     pass
 36 36 | if named_var is {}:  # F632 (fix)
 37 37 |     pass
+
+    Run `ruff check --fix` to apply this fix.
 
 constant_literals.py:36:4: F632 [*] Use `==` to compare constant literals
    |
@@ -343,7 +375,7 @@ constant_literals.py:36:4: F632 [*] Use `==` to compare constant literals
    |
    = help: Replace `is` with `==`
 
-ℹ Safe fix
+Suggested fix:
 33 33 | named_var = {}
 34 34 | if {} is {}:  # F632 (fix)
 35 35 |     pass
@@ -352,6 +384,8 @@ constant_literals.py:36:4: F632 [*] Use `==` to compare constant literals
 37 37 |     pass
 38 38 | if {} is named_var:  # F632 (fix)
 39 39 |     pass
+
+    Run `ruff check --fix` to apply this fix.
 
 constant_literals.py:38:4: F632 [*] Use `==` to compare constant literals
    |
@@ -364,7 +398,7 @@ constant_literals.py:38:4: F632 [*] Use `==` to compare constant literals
    |
    = help: Replace `is` with `==`
 
-ℹ Safe fix
+Suggested fix:
 35 35 |     pass
 36 36 | if named_var is {}:  # F632 (fix)
 37 37 |     pass
@@ -373,6 +407,8 @@ constant_literals.py:38:4: F632 [*] Use `==` to compare constant literals
 39 39 |     pass
 40 40 | if named_var is {1}:  # F632 (fix)
 41 41 |     pass
+
+    Run `ruff check --fix` to apply this fix.
 
 constant_literals.py:40:4: F632 [*] Use `==` to compare constant literals
    |
@@ -385,7 +421,7 @@ constant_literals.py:40:4: F632 [*] Use `==` to compare constant literals
    |
    = help: Replace `is` with `==`
 
-ℹ Safe fix
+Suggested fix:
 37 37 |     pass
 38 38 | if {} is named_var:  # F632 (fix)
 39 39 |     pass
@@ -394,6 +430,8 @@ constant_literals.py:40:4: F632 [*] Use `==` to compare constant literals
 41 41 |     pass
 42 42 | if {1} is named_var:  # F632 (fix)
 43 43 |     pass
+
+    Run `ruff check --fix` to apply this fix.
 
 constant_literals.py:42:4: F632 [*] Use `==` to compare constant literals
    |
@@ -406,7 +444,7 @@ constant_literals.py:42:4: F632 [*] Use `==` to compare constant literals
    |
    = help: Replace `is` with `==`
 
-ℹ Safe fix
+Suggested fix:
 39 39 |     pass
 40 40 | if named_var is {1}:  # F632 (fix)
 41 41 |     pass
@@ -415,6 +453,8 @@ constant_literals.py:42:4: F632 [*] Use `==` to compare constant literals
 43 43 |     pass
 44 44 | if named_var is {i for i in [1]}:  # F632 (fix)
 45 45 |     pass
+
+    Run `ruff check --fix` to apply this fix.
 
 constant_literals.py:44:4: F632 [*] Use `==` to compare constant literals
    |
@@ -426,7 +466,7 @@ constant_literals.py:44:4: F632 [*] Use `==` to compare constant literals
    |
    = help: Replace `is` with `==`
 
-ℹ Safe fix
+Suggested fix:
 41 41 |     pass
 42 42 | if {1} is named_var:  # F632 (fix)
 43 43 |     pass
@@ -435,6 +475,8 @@ constant_literals.py:44:4: F632 [*] Use `==` to compare constant literals
 45 45 |     pass
 46 46 | 
 47 47 | named_var = {1: 1}
+
+    Run `ruff check --fix` to apply this fix.
 
 constant_literals.py:48:4: F632 [*] Use `==` to compare constant literals
    |
@@ -446,7 +488,7 @@ constant_literals.py:48:4: F632 [*] Use `==` to compare constant literals
    |
    = help: Replace `is` with `==`
 
-ℹ Safe fix
+Suggested fix:
 45 45 |     pass
 46 46 | 
 47 47 | named_var = {1: 1}
@@ -455,6 +497,8 @@ constant_literals.py:48:4: F632 [*] Use `==` to compare constant literals
 49 49 |     pass
 50 50 | if named_var is {1: 1}:  # F632 (fix)
 51 51 |     pass
+
+    Run `ruff check --fix` to apply this fix.
 
 constant_literals.py:50:4: F632 [*] Use `==` to compare constant literals
    |
@@ -467,7 +511,7 @@ constant_literals.py:50:4: F632 [*] Use `==` to compare constant literals
    |
    = help: Replace `is` with `==`
 
-ℹ Safe fix
+Suggested fix:
 47 47 | named_var = {1: 1}
 48 48 | if {1: 1} is {1: 1}:  # F632 (fix)
 49 49 |     pass
@@ -476,6 +520,8 @@ constant_literals.py:50:4: F632 [*] Use `==` to compare constant literals
 51 51 |     pass
 52 52 | if {1: 1} is named_var:  # F632 (fix)
 53 53 |     pass
+
+    Run `ruff check --fix` to apply this fix.
 
 constant_literals.py:52:4: F632 [*] Use `==` to compare constant literals
    |
@@ -488,7 +534,7 @@ constant_literals.py:52:4: F632 [*] Use `==` to compare constant literals
    |
    = help: Replace `is` with `==`
 
-ℹ Safe fix
+Suggested fix:
 49 49 |     pass
 50 50 | if named_var is {1: 1}:  # F632 (fix)
 51 51 |     pass
@@ -497,6 +543,8 @@ constant_literals.py:52:4: F632 [*] Use `==` to compare constant literals
 53 53 |     pass
 54 54 | if named_var is {1: 1}:  # F632 (fix)
 55 55 |     pass
+
+    Run `ruff check --fix` to apply this fix.
 
 constant_literals.py:54:4: F632 [*] Use `==` to compare constant literals
    |
@@ -509,7 +557,7 @@ constant_literals.py:54:4: F632 [*] Use `==` to compare constant literals
    |
    = help: Replace `is` with `==`
 
-ℹ Safe fix
+Suggested fix:
 51 51 |     pass
 52 52 | if {1: 1} is named_var:  # F632 (fix)
 53 53 |     pass
@@ -518,6 +566,8 @@ constant_literals.py:54:4: F632 [*] Use `==` to compare constant literals
 55 55 |     pass
 56 56 | if {1: 1} is named_var:  # F632 (fix)
 57 57 |     pass
+
+    Run `ruff check --fix` to apply this fix.
 
 constant_literals.py:56:4: F632 [*] Use `==` to compare constant literals
    |
@@ -530,7 +580,7 @@ constant_literals.py:56:4: F632 [*] Use `==` to compare constant literals
    |
    = help: Replace `is` with `==`
 
-ℹ Safe fix
+Suggested fix:
 53 53 |     pass
 54 54 | if named_var is {1: 1}:  # F632 (fix)
 55 55 |     pass
@@ -539,6 +589,8 @@ constant_literals.py:56:4: F632 [*] Use `==` to compare constant literals
 57 57 |     pass
 58 58 | if named_var is {i: 1 for i in [1]}:  # F632 (fix)
 59 59 |     pass
+
+    Run `ruff check --fix` to apply this fix.
 
 constant_literals.py:58:4: F632 [*] Use `==` to compare constant literals
    |
@@ -550,7 +602,7 @@ constant_literals.py:58:4: F632 [*] Use `==` to compare constant literals
    |
    = help: Replace `is` with `==`
 
-ℹ Safe fix
+Suggested fix:
 55 55 |     pass
 56 56 | if {1: 1} is named_var:  # F632 (fix)
 57 57 |     pass
@@ -559,3 +611,5 @@ constant_literals.py:58:4: F632 [*] Use `==` to compare constant literals
 59 59 |     pass
 60 60 | 
 61 61 | ###
+
+    Run `ruff check --fix` to apply this fix.

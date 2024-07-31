@@ -11,7 +11,7 @@ TCH001.py:20:19: TCH001 [*] Move application import `.TYP001` into a type-checki
    |
    = help: Move into type-checking block
 
-ℹ Unsafe fix
+Suggested fix:
 2  2  | 
 3  3  | For typing-only import detection tests, see `TCH002.py`.
 4  4  | """
@@ -31,4 +31,4 @@ TCH001.py:20:19: TCH001 [*] Move application import `.TYP001` into a type-checki
 22 25 |     x: TYP001
 23 26 | 
 
-
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.

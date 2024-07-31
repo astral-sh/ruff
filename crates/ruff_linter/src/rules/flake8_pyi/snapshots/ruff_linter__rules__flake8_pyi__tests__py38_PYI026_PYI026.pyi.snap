@@ -12,7 +12,7 @@ PYI026.pyi:3:1: PYI026 [*] Use `typing_extensions.TypeAlias` for type alias, e.g
   |
   = help: Add `TypeAlias` annotation
 
-ℹ Safe fix
+Suggested fix:
 1 1 | from typing import Literal, Any
   2 |+import typing_extensions
 2 3 | 
@@ -21,6 +21,8 @@ PYI026.pyi:3:1: PYI026 [*] Use `typing_extensions.TypeAlias` for type alias, e.g
 4 5 | OptionalStr = typing.Optional[str]
 5 6 | Foo = Literal["foo"]
 6 7 | IntOrStr = int | str
+
+    Run `ruff check --fix` to apply this fix.
 
 PYI026.pyi:4:1: PYI026 [*] Use `typing_extensions.TypeAlias` for type alias, e.g., `OptionalStr: TypeAlias = typing.Optional[str]`
   |
@@ -32,7 +34,7 @@ PYI026.pyi:4:1: PYI026 [*] Use `typing_extensions.TypeAlias` for type alias, e.g
   |
   = help: Add `TypeAlias` annotation
 
-ℹ Safe fix
+Suggested fix:
 1 1 | from typing import Literal, Any
   2 |+import typing_extensions
 2 3 | 
@@ -42,6 +44,8 @@ PYI026.pyi:4:1: PYI026 [*] Use `typing_extensions.TypeAlias` for type alias, e.g
 5 6 | Foo = Literal["foo"]
 6 7 | IntOrStr = int | str
 7 8 | AliasNone = None
+
+    Run `ruff check --fix` to apply this fix.
 
 PYI026.pyi:5:1: PYI026 [*] Use `typing_extensions.TypeAlias` for type alias, e.g., `Foo: TypeAlias = Literal["foo"]`
   |
@@ -54,7 +58,7 @@ PYI026.pyi:5:1: PYI026 [*] Use `typing_extensions.TypeAlias` for type alias, e.g
   |
   = help: Add `TypeAlias` annotation
 
-ℹ Safe fix
+Suggested fix:
 1 1 | from typing import Literal, Any
   2 |+import typing_extensions
 2 3 | 
@@ -66,6 +70,8 @@ PYI026.pyi:5:1: PYI026 [*] Use `typing_extensions.TypeAlias` for type alias, e.g
 7 8 | AliasNone = None
 8 9 | 
 
+    Run `ruff check --fix` to apply this fix.
+
 PYI026.pyi:6:1: PYI026 [*] Use `typing_extensions.TypeAlias` for type alias, e.g., `IntOrStr: TypeAlias = int | str`
   |
 4 | OptionalStr = typing.Optional[str]
@@ -76,7 +82,7 @@ PYI026.pyi:6:1: PYI026 [*] Use `typing_extensions.TypeAlias` for type alias, e.g
   |
   = help: Add `TypeAlias` annotation
 
-ℹ Safe fix
+Suggested fix:
 1 1 | from typing import Literal, Any
   2 |+import typing_extensions
 2 3 | 
@@ -89,6 +95,8 @@ PYI026.pyi:6:1: PYI026 [*] Use `typing_extensions.TypeAlias` for type alias, e.g
 8 9 | 
 9 10 | NewAny: typing.TypeAlias = Any
 
+    Run `ruff check --fix` to apply this fix.
+
 PYI026.pyi:7:1: PYI026 [*] Use `typing_extensions.TypeAlias` for type alias, e.g., `AliasNone: TypeAlias = None`
   |
 5 | Foo = Literal["foo"]
@@ -100,7 +108,7 @@ PYI026.pyi:7:1: PYI026 [*] Use `typing_extensions.TypeAlias` for type alias, e.g
   |
   = help: Add `TypeAlias` annotation
 
-ℹ Safe fix
+Suggested fix:
 1 1 | from typing import Literal, Any
   2 |+import typing_extensions
 2 3 | 
@@ -114,6 +122,8 @@ PYI026.pyi:7:1: PYI026 [*] Use `typing_extensions.TypeAlias` for type alias, e.g
 9 10 | NewAny: typing.TypeAlias = Any
 10 11 | OptionalStr: TypeAlias = typing.Optional[str]
 
+    Run `ruff check --fix` to apply this fix.
+
 PYI026.pyi:17:5: PYI026 [*] Use `typing_extensions.TypeAlias` for type alias, e.g., `FLAG_THIS: TypeAlias = None`
    |
 16 | class NotAnEnum:
@@ -124,7 +134,7 @@ PYI026.pyi:17:5: PYI026 [*] Use `typing_extensions.TypeAlias` for type alias, e.
    |
    = help: Add `TypeAlias` annotation
 
-ℹ Safe fix
+Suggested fix:
 1  1  | from typing import Literal, Any
    2  |+import typing_extensions
 2  3  | 
@@ -139,3 +149,5 @@ PYI026.pyi:17:5: PYI026 [*] Use `typing_extensions.TypeAlias` for type alias, e.
 18 19 | 
 19 20 | # these are ok
 20 21 | from enum import Enum
+
+    Run `ruff check --fix` to apply this fix.

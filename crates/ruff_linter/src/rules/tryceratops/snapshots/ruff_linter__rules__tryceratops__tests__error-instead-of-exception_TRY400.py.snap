@@ -12,7 +12,7 @@ TRY400.py:13:9: TRY400 [*] Use `logging.exception` instead of `logging.error`
    |
    = help: Replace with `exception`
 
-ℹ Safe fix
+Suggested fix:
 10 10 |     try:
 11 11 |         a = 1
 12 12 |     except Exception:
@@ -22,6 +22,8 @@ TRY400.py:13:9: TRY400 [*] Use `logging.exception` instead of `logging.error`
 15 15 |         if True:
 16 16 |             logging.error("Context message here")
 
+    Run `ruff check --fix` to apply this fix.
+
 TRY400.py:16:13: TRY400 [*] Use `logging.exception` instead of `logging.error`
    |
 15 |         if True:
@@ -30,7 +32,7 @@ TRY400.py:16:13: TRY400 [*] Use `logging.exception` instead of `logging.error`
    |
    = help: Replace with `exception`
 
-ℹ Safe fix
+Suggested fix:
 13 13 |         logging.error("Context message here")
 14 14 | 
 15 15 |         if True:
@@ -39,6 +41,8 @@ TRY400.py:16:13: TRY400 [*] Use `logging.exception` instead of `logging.error`
 17 17 | 
 18 18 | 
 19 19 | def bad():
+
+    Run `ruff check --fix` to apply this fix.
 
 TRY400.py:27:9: TRY400 [*] Use `logging.exception` instead of `logging.error`
    |
@@ -51,7 +55,7 @@ TRY400.py:27:9: TRY400 [*] Use `logging.exception` instead of `logging.error`
    |
    = help: Replace with `exception`
 
-ℹ Unsafe fix
+Suggested fix:
 24 24 |     try:
 25 25 |         a = 1
 26 26 |     except Exception:
@@ -61,6 +65,8 @@ TRY400.py:27:9: TRY400 [*] Use `logging.exception` instead of `logging.error`
 29 29 |         if True:
 30 30 |             logger.error("Context message here")
 
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
+
 TRY400.py:30:13: TRY400 [*] Use `logging.exception` instead of `logging.error`
    |
 29 |         if True:
@@ -69,7 +75,7 @@ TRY400.py:30:13: TRY400 [*] Use `logging.exception` instead of `logging.error`
    |
    = help: Replace with `exception`
 
-ℹ Unsafe fix
+Suggested fix:
 27 27 |         logger.error("Context message here")
 28 28 | 
 29 29 |         if True:
@@ -78,6 +84,8 @@ TRY400.py:30:13: TRY400 [*] Use `logging.exception` instead of `logging.error`
 31 31 | 
 32 32 | 
 33 33 | def bad():
+
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 TRY400.py:37:9: TRY400 [*] Use `logging.exception` instead of `logging.error`
    |
@@ -90,7 +98,7 @@ TRY400.py:37:9: TRY400 [*] Use `logging.exception` instead of `logging.error`
    |
    = help: Replace with `exception`
 
-ℹ Unsafe fix
+Suggested fix:
 34 34 |     try:
 35 35 |         a = 1
 36 36 |     except Exception:
@@ -100,6 +108,8 @@ TRY400.py:37:9: TRY400 [*] Use `logging.exception` instead of `logging.error`
 39 39 |         if True:
 40 40 |             log.error("Context message here")
 
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
+
 TRY400.py:40:13: TRY400 [*] Use `logging.exception` instead of `logging.error`
    |
 39 |         if True:
@@ -108,7 +118,7 @@ TRY400.py:40:13: TRY400 [*] Use `logging.exception` instead of `logging.error`
    |
    = help: Replace with `exception`
 
-ℹ Unsafe fix
+Suggested fix:
 37 37 |         log.error("Context message here")
 38 38 | 
 39 39 |         if True:
@@ -117,6 +127,8 @@ TRY400.py:40:13: TRY400 [*] Use `logging.exception` instead of `logging.error`
 41 41 | 
 42 42 | 
 43 43 | def bad():
+
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 TRY400.py:47:9: TRY400 [*] Use `logging.exception` instead of `logging.error`
    |
@@ -129,7 +141,7 @@ TRY400.py:47:9: TRY400 [*] Use `logging.exception` instead of `logging.error`
    |
    = help: Replace with `exception`
 
-ℹ Unsafe fix
+Suggested fix:
 44 44 |     try:
 45 45 |         a = 1
 46 46 |     except Exception:
@@ -139,6 +151,8 @@ TRY400.py:47:9: TRY400 [*] Use `logging.exception` instead of `logging.error`
 49 49 |         if True:
 50 50 |             self.logger.error("Context message here")
 
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
+
 TRY400.py:50:13: TRY400 [*] Use `logging.exception` instead of `logging.error`
    |
 49 |         if True:
@@ -147,7 +161,7 @@ TRY400.py:50:13: TRY400 [*] Use `logging.exception` instead of `logging.error`
    |
    = help: Replace with `exception`
 
-ℹ Unsafe fix
+Suggested fix:
 47 47 |         self.logger.error("Context message here")
 48 48 | 
 49 49 |         if True:
@@ -156,6 +170,8 @@ TRY400.py:50:13: TRY400 [*] Use `logging.exception` instead of `logging.error`
 51 51 | 
 52 52 | 
 53 53 | def good():
+
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 TRY400.py:100:9: TRY400 [*] Use `logging.exception` instead of `logging.error`
     |
@@ -168,7 +184,7 @@ TRY400.py:100:9: TRY400 [*] Use `logging.exception` instead of `logging.error`
     |
     = help: Replace with `exception`
 
-ℹ Safe fix
+Suggested fix:
 97  97  |     try:
 98  98  |         a = 1
 99  99  |     except Exception:
@@ -178,6 +194,8 @@ TRY400.py:100:9: TRY400 [*] Use `logging.exception` instead of `logging.error`
 102 102 |         if True:
 103 103 |             error("Context message here")
 
+    Run `ruff check --fix` to apply this fix.
+
 TRY400.py:103:13: TRY400 [*] Use `logging.exception` instead of `logging.error`
     |
 102 |         if True:
@@ -186,7 +204,7 @@ TRY400.py:103:13: TRY400 [*] Use `logging.exception` instead of `logging.error`
     |
     = help: Replace with `exception`
 
-ℹ Safe fix
+Suggested fix:
 100 100 |         error("Context message here")
 101 101 | 
 102 102 |         if True:
@@ -195,6 +213,8 @@ TRY400.py:103:13: TRY400 [*] Use `logging.exception` instead of `logging.error`
 104 104 | 
 105 105 | 
 106 106 | def good():
+
+    Run `ruff check --fix` to apply this fix.
 
 TRY400.py:143:13: TRY400 [*] Use `logging.exception` instead of `logging.error`
     |
@@ -205,9 +225,11 @@ TRY400.py:143:13: TRY400 [*] Use `logging.exception` instead of `logging.error`
     |
     = help: Replace with `exception`
 
-ℹ Safe fix
+Suggested fix:
 140 140 |         try:
 141 141 |             b = 2
 142 142 |         except Exception:
 143     |-            error("Context message here")
     143 |+            exception("Context message here")
+
+    Run `ruff check --fix` to apply this fix.

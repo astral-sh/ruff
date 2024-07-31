@@ -12,7 +12,7 @@ PYI012.pyi:5:5: PYI012 [*] Class body must not contain `pass`
   |
   = help: Remove unnecessary `pass`
 
-ℹ Safe fix
+Suggested fix:
 2 2 | 
 3 3 | class OneAttributeClass:
 4 4 |     value: int
@@ -20,6 +20,8 @@ PYI012.pyi:5:5: PYI012 [*] Class body must not contain `pass`
 6 5 | 
 7 6 | class OneAttributeClassRev:
 8 7 |     pass  # PYI012 Class body must not contain `pass`
+
+    Run `ruff check --fix` to apply this fix.
 
 PYI012.pyi:8:5: PYI012 [*] Class body must not contain `pass`
   |
@@ -30,7 +32,7 @@ PYI012.pyi:8:5: PYI012 [*] Class body must not contain `pass`
   |
   = help: Remove unnecessary `pass`
 
-ℹ Safe fix
+Suggested fix:
 5 5 |     pass  # PYI012 Class body must not contain `pass`
 6 6 | 
 7 7 | class OneAttributeClassRev:
@@ -38,6 +40,8 @@ PYI012.pyi:8:5: PYI012 [*] Class body must not contain `pass`
 9 8 |     value: int
 10 9 | 
 11 10 | class DocstringClass:
+
+    Run `ruff check --fix` to apply this fix.
 
 PYI012.pyi:16:5: PYI012 [*] Class body must not contain `pass`
    |
@@ -50,7 +54,7 @@ PYI012.pyi:16:5: PYI012 [*] Class body must not contain `pass`
    |
    = help: Remove unnecessary `pass`
 
-ℹ Safe fix
+Suggested fix:
 13 13 |     My body only contains pass.
 14 14 |     """
 15 15 | 
@@ -58,6 +62,8 @@ PYI012.pyi:16:5: PYI012 [*] Class body must not contain `pass`
 17 16 | 
 18 17 | class NonEmptyChild(Exception):
 19 18 |     value: int
+
+    Run `ruff check --fix` to apply this fix.
 
 PYI012.pyi:20:5: PYI012 [*] Class body must not contain `pass`
    |
@@ -70,7 +76,7 @@ PYI012.pyi:20:5: PYI012 [*] Class body must not contain `pass`
    |
    = help: Remove unnecessary `pass`
 
-ℹ Safe fix
+Suggested fix:
 17 17 | 
 18 18 | class NonEmptyChild(Exception):
 19 19 |     value: int
@@ -78,6 +84,8 @@ PYI012.pyi:20:5: PYI012 [*] Class body must not contain `pass`
 21 20 | 
 22 21 | class NonEmptyChild2(Exception):
 23 22 |     pass  # PYI012 Class body must not contain `pass`
+
+    Run `ruff check --fix` to apply this fix.
 
 PYI012.pyi:23:5: PYI012 [*] Class body must not contain `pass`
    |
@@ -88,7 +96,7 @@ PYI012.pyi:23:5: PYI012 [*] Class body must not contain `pass`
    |
    = help: Remove unnecessary `pass`
 
-ℹ Safe fix
+Suggested fix:
 20 20 |     pass  # PYI012 Class body must not contain `pass`
 21 21 | 
 22 22 | class NonEmptyChild2(Exception):
@@ -96,6 +104,8 @@ PYI012.pyi:23:5: PYI012 [*] Class body must not contain `pass`
 24 23 |     value: int
 25 24 | 
 26 25 | class NonEmptyWithInit:
+
+    Run `ruff check --fix` to apply this fix.
 
 PYI012.pyi:28:5: PYI012 [*] Class body must not contain `pass`
    |
@@ -108,7 +118,7 @@ PYI012.pyi:28:5: PYI012 [*] Class body must not contain `pass`
    |
    = help: Remove unnecessary `pass`
 
-ℹ Safe fix
+Suggested fix:
 25 25 | 
 26 26 | class NonEmptyWithInit:
 27 27 |     value: int
@@ -117,4 +127,4 @@ PYI012.pyi:28:5: PYI012 [*] Class body must not contain `pass`
 30 29 |     def __init__():
 31 30 |         pass
 
-
+    Run `ruff check --fix` to apply this fix.

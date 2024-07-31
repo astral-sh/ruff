@@ -10,7 +10,7 @@ future_annotations.py:40:4: UP007 [*] Use `X | Y` for type annotations
    |
    = help: Convert to `X | Y`
 
-ℹ Safe fix
+Suggested fix:
 37 37 |     return y
 38 38 | 
 39 39 | 
@@ -18,6 +18,8 @@ future_annotations.py:40:4: UP007 [*] Use `X | Y` for type annotations
    40 |+x: int | None = None
 41 41 | 
 42 42 | MyList: TypeAlias = Union[List[int], List[str]]
+
+    Run `ruff check --fix` to apply this fix.
 
 future_annotations.py:42:21: UP007 [*] Use `X | Y` for type annotations
    |
@@ -28,11 +30,11 @@ future_annotations.py:42:21: UP007 [*] Use `X | Y` for type annotations
    |
    = help: Convert to `X | Y`
 
-ℹ Safe fix
+Suggested fix:
 39 39 | 
 40 40 | x: Optional[int] = None
 41 41 | 
 42    |-MyList: TypeAlias = Union[List[int], List[str]]
    42 |+MyList: TypeAlias = List[int] | List[str]
 
-
+    Run `ruff check --fix` to apply this fix.

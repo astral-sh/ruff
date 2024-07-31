@@ -10,7 +10,7 @@ PYI036.py:54:31: PYI036 [*] Star-args in `__exit__` should be annotated with `ob
    |
    = help: Annotate star-args with `object`
 
-ℹ Safe fix
+Suggested fix:
 51 51 | 
 52 52 | 
 53 53 | class BadOne:
@@ -19,6 +19,8 @@ PYI036.py:54:31: PYI036 [*] Star-args in `__exit__` should be annotated with `ob
 55 55 |     async def __aexit__(self) -> None: ... # PYI036: Missing args
 56 56 | 
 57 57 | class BadTwo:
+
+    Run `ruff check --fix` to apply this fix.
 
 PYI036.py:55:24: PYI036 If there are no star-args, `__aexit__` should have at least 3 non-keyword-only args (excluding `self`)
    |
@@ -111,7 +113,7 @@ PYI036.py:70:58: PYI036 [*] Star-args in `__exit__` should be annotated with `ob
    |
    = help: Annotate star-args with `object`
 
-ℹ Safe fix
+Suggested fix:
 67 67 |     async def __aexit__(self, __typ: type[BaseException] | None, __exc: BaseException | None, __tb: typing.Union[TracebackType, None, int]) -> bool | None: ... # PYI036: Third arg has bad annotation
 68 68 | 
 69 69 | class BadFive:
@@ -120,6 +122,8 @@ PYI036.py:70:58: PYI036 [*] Star-args in `__exit__` should be annotated with `ob
 71 71 |     async def __aexit__(self, /, typ: type[BaseException] | None, *args: Any) -> Awaitable[None]: ... # PYI036: Bad star-args annotation
 72 72 | 
 73 73 | class BadSix:
+
+    Run `ruff check --fix` to apply this fix.
 
 PYI036.py:71:74: PYI036 [*] Star-args in `__aexit__` should be annotated with `object`
    |
@@ -132,7 +136,7 @@ PYI036.py:71:74: PYI036 [*] Star-args in `__aexit__` should be annotated with `o
    |
    = help: Annotate star-args with `object`
 
-ℹ Safe fix
+Suggested fix:
 68 68 | 
 69 69 | class BadFive:
 70 70 |     def __exit__(self, typ: BaseException | None, *args: list[str]) -> bool: ... # PYI036: Bad star-args annotation
@@ -141,6 +145,8 @@ PYI036.py:71:74: PYI036 [*] Star-args in `__aexit__` should be annotated with `o
 72 72 | 
 73 73 | class BadSix:
 74 74 |     def __exit__(self, typ, exc, tb, weird_extra_arg, extra_arg2 = None) -> None: ... # PYI036: Extra arg must have default
+
+    Run `ruff check --fix` to apply this fix.
 
 PYI036.py:74:38: PYI036 All arguments after the first four in `__exit__` must have a default value
    |

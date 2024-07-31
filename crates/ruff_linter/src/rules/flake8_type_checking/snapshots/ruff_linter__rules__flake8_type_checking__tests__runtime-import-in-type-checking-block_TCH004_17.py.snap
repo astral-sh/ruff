@@ -9,7 +9,7 @@ TCH004_17.py:6:24: TCH004 [*] Move import `pandas.DataFrame` out of type-checkin
   |
   = help: Move out of type-checking block
 
-ℹ Unsafe fix
+Suggested fix:
 1 1 | from __future__ import annotations
 2 2 | 
 3 3 | from typing_extensions import TYPE_CHECKING
@@ -22,4 +22,4 @@ TCH004_17.py:6:24: TCH004 [*] Move import `pandas.DataFrame` out of type-checkin
 8 9 | 
 9 10 | def example() -> DataFrame:
 
-
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.

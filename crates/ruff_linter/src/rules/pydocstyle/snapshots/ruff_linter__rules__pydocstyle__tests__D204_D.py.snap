@@ -11,7 +11,7 @@ D.py:181:5: D204 [*] 1 blank line required after class docstring
     |
     = help: Insert 1 blank line after class docstring
 
-ℹ Safe fix
+Suggested fix:
 179 179 | class TrailingSpace:
 180 180 | 
 181 181 |     """TrailingSpace."""
@@ -19,6 +19,8 @@ D.py:181:5: D204 [*] 1 blank line required after class docstring
 182 183 |     pass
 183 184 | 
 184 185 | 
+
+    Run `ruff check --fix` to apply this fix.
 
 D.py:192:5: D204 [*] 1 blank line required after class docstring
     |
@@ -29,7 +31,7 @@ D.py:192:5: D204 [*] 1 blank line required after class docstring
     |
     = help: Insert 1 blank line after class docstring
 
-ℹ Safe fix
+Suggested fix:
 190 190 | 
 191 191 | class LeadingAndTrailingSpaceMissing:
 192 192 |     """Leading and trailing space missing."""
@@ -37,6 +39,8 @@ D.py:192:5: D204 [*] 1 blank line required after class docstring
 193 194 |     pass
 194 195 | 
 195 196 | 
+
+    Run `ruff check --fix` to apply this fix.
 
 D.py:649:5: D204 [*] 1 blank line required after class docstring
     |
@@ -48,7 +52,7 @@ D.py:649:5: D204 [*] 1 blank line required after class docstring
     |
     = help: Insert 1 blank line after class docstring
 
-ℹ Safe fix
+Suggested fix:
 646 646 |     "
 647 647 | 
 648 648 | class StatementOnSameLineAsDocstring:
@@ -60,6 +64,8 @@ D.py:649:5: D204 [*] 1 blank line required after class docstring
 651 653 |         pass
 652 654 | 
 
+    Run `ruff check --fix` to apply this fix.
+
 D.py:654:5: D204 [*] 1 blank line required after class docstring
     |
 653 | class StatementOnSameLineAsDocstring:
@@ -68,7 +74,7 @@ D.py:654:5: D204 [*] 1 blank line required after class docstring
     |
     = help: Insert 1 blank line after class docstring
 
-ℹ Safe fix
+Suggested fix:
 651 651 |         pass
 652 652 | 
 653 653 | class StatementOnSameLineAsDocstring:
@@ -80,6 +86,8 @@ D.py:654:5: D204 [*] 1 blank line required after class docstring
 656 658 | 
 657 659 | class CommentAfterDocstring:
 
+    Run `ruff check --fix` to apply this fix.
+
 D.py:658:5: D204 [*] 1 blank line required after class docstring
     |
 657 | class CommentAfterDocstring:
@@ -90,7 +98,7 @@ D.py:658:5: D204 [*] 1 blank line required after class docstring
     |
     = help: Insert 1 blank line after class docstring
 
-ℹ Safe fix
+Suggested fix:
 656 656 | 
 657 657 | class CommentAfterDocstring:
 658 658 |     "After this docstring there's a comment."  # priorities=1
@@ -99,4 +107,4 @@ D.py:658:5: D204 [*] 1 blank line required after class docstring
 660 661 |         pass
 661 662 | 
 
-
+    Run `ruff check --fix` to apply this fix.

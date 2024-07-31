@@ -12,7 +12,7 @@ B014.py:17:8: B014 [*] Exception handler with duplicate exception: `OSError`
    |
    = help: De-duplicate exceptions
 
-ℹ Safe fix
+Suggested fix:
 14 14 | 
 15 15 | try:
 16 16 |     pass
@@ -21,6 +21,8 @@ B014.py:17:8: B014 [*] Exception handler with duplicate exception: `OSError`
 18 18 |     # Duplicate exception types are useless
 19 19 |     pass
 20 20 | 
+
+    Run `ruff check --fix` to apply this fix.
 
 B014.py:28:8: B014 [*] Exception handler with duplicate exception: `MyError`
    |
@@ -33,7 +35,7 @@ B014.py:28:8: B014 [*] Exception handler with duplicate exception: `MyError`
    |
    = help: De-duplicate exceptions
 
-ℹ Safe fix
+Suggested fix:
 25 25 | 
 26 26 | try:
 27 27 |     pass
@@ -42,6 +44,8 @@ B014.py:28:8: B014 [*] Exception handler with duplicate exception: `MyError`
 29 29 |     # Detect duplicate non-builtin errors
 30 30 |     pass
 31 31 | 
+
+    Run `ruff check --fix` to apply this fix.
 
 B014.py:49:8: B014 [*] Exception handler with duplicate exception: `re.error`
    |
@@ -54,7 +58,7 @@ B014.py:49:8: B014 [*] Exception handler with duplicate exception: `re.error`
    |
    = help: De-duplicate exceptions
 
-ℹ Safe fix
+Suggested fix:
 46 46 | 
 47 47 | try:
 48 48 |     pass
@@ -63,6 +67,8 @@ B014.py:49:8: B014 [*] Exception handler with duplicate exception: `re.error`
 50 50 |     # Duplicate exception types as attributes
 51 51 |     pass
 52 52 | 
+
+    Run `ruff check --fix` to apply this fix.
 
 B014.py:82:8: B014 [*] Exception handler with duplicate exception: `ValueError`
    |
@@ -74,7 +80,7 @@ B014.py:82:8: B014 [*] Exception handler with duplicate exception: `ValueError`
    |
    = help: De-duplicate exceptions
 
-ℹ Safe fix
+Suggested fix:
 79 79 | # Regression test for: https://github.com/astral-sh/ruff/issues/6412
 80 80 | try:
 81 81 |     pass
@@ -83,6 +89,8 @@ B014.py:82:8: B014 [*] Exception handler with duplicate exception: `ValueError`
 83 83 |     pass
 84 84 | 
 85 85 | 
+
+    Run `ruff check --fix` to apply this fix.
 
 B014.py:89:7: B014 [*] Exception handler with duplicate exception: `re.error`
    |
@@ -94,7 +102,7 @@ B014.py:89:7: B014 [*] Exception handler with duplicate exception: `re.error`
    |
    = help: De-duplicate exceptions
 
-ℹ Safe fix
+Suggested fix:
 86 86 | # Regression test for: https://github.com/astral-sh/ruff/issues/7455#issuecomment-1739801758
 87 87 | try:
 88 88 |     pas
@@ -102,4 +110,4 @@ B014.py:89:7: B014 [*] Exception handler with duplicate exception: `re.error`
    89 |+except re.error:
 90 90 |     p
 
-
+    Run `ruff check --fix` to apply this fix.

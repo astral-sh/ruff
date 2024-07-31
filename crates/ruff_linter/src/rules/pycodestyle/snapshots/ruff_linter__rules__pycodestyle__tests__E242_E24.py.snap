@@ -12,7 +12,7 @@ E24.py:6:8: E242 [*] Tab after comma
   |
   = help: Replace with single space
 
-ℹ Safe fix
+Suggested fix:
 3 3 | #: Okay
 4 4 | b = (1, 20)
 5 5 | #: E242
@@ -22,4 +22,4 @@ E24.py:6:8: E242 [*] Tab after comma
 8 8 | b = (1, 20)  # space before 20
 9 9 | #: E241 E241 E241
 
-
+    Run `ruff check --fix` to apply this fix.

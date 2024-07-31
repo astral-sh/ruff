@@ -11,7 +11,7 @@ UP021.py:5:25: UP021 [*] `universal_newlines` is deprecated, use `text`
   |
   = help: Replace with `text` keyword argument
 
-ℹ Safe fix
+Suggested fix:
 2 2 | from subprocess import run
 3 3 | 
 4 4 | # Errors
@@ -20,6 +20,8 @@ UP021.py:5:25: UP021 [*] `universal_newlines` is deprecated, use `text`
 6 6 | subprocess.run(["foo"], universal_newlines=True, text=True)
 7 7 | run(["foo"], universal_newlines=True, check=False)
 8 8 | 
+
+    Run `ruff check --fix` to apply this fix.
 
 UP021.py:6:25: UP021 [*] `universal_newlines` is deprecated, use `text`
   |
@@ -31,7 +33,7 @@ UP021.py:6:25: UP021 [*] `universal_newlines` is deprecated, use `text`
   |
   = help: Replace with `text` keyword argument
 
-ℹ Safe fix
+Suggested fix:
 3 3 | 
 4 4 | # Errors
 5 5 | subprocess.run(["foo"], universal_newlines=True, check=True)
@@ -40,6 +42,8 @@ UP021.py:6:25: UP021 [*] `universal_newlines` is deprecated, use `text`
 7 7 | run(["foo"], universal_newlines=True, check=False)
 8 8 | 
 9 9 | # OK
+
+    Run `ruff check --fix` to apply this fix.
 
 UP021.py:7:14: UP021 [*] `universal_newlines` is deprecated, use `text`
   |
@@ -52,7 +56,7 @@ UP021.py:7:14: UP021 [*] `universal_newlines` is deprecated, use `text`
   |
   = help: Replace with `text` keyword argument
 
-ℹ Safe fix
+Suggested fix:
 4 4 | # Errors
 5 5 | subprocess.run(["foo"], universal_newlines=True, check=True)
 6 6 | subprocess.run(["foo"], universal_newlines=True, text=True)
@@ -62,4 +66,4 @@ UP021.py:7:14: UP021 [*] `universal_newlines` is deprecated, use `text`
 9 9 | # OK
 10 10 | subprocess.run(["foo"], check=True)
 
-
+    Run `ruff check --fix` to apply this fix.

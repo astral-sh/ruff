@@ -11,7 +11,7 @@ UP028_0.py:2:5: UP028 [*] Replace `yield` over `for` loop with `yield from`
   |
   = help: Replace with `yield from`
 
-ℹ Unsafe fix
+Suggested fix:
 1 1 | def f():
 2   |-    for x in y:
 3   |-        yield x
@@ -19,6 +19,8 @@ UP028_0.py:2:5: UP028 [*] Replace `yield` over `for` loop with `yield from`
 4 3 | 
 5 4 | 
 6 5 | def g():
+
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 UP028_0.py:7:5: UP028 [*] Replace `yield` over `for` loop with `yield from`
   |
@@ -30,7 +32,7 @@ UP028_0.py:7:5: UP028 [*] Replace `yield` over `for` loop with `yield from`
   |
   = help: Replace with `yield from`
 
-ℹ Unsafe fix
+Suggested fix:
 4 4 | 
 5 5 | 
 6 6 | def g():
@@ -40,6 +42,8 @@ UP028_0.py:7:5: UP028 [*] Replace `yield` over `for` loop with `yield from`
 9 8 | 
 10 9 | 
 11 10 | def h():
+
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 UP028_0.py:12:5: UP028 [*] Replace `yield` over `for` loop with `yield from`
    |
@@ -51,7 +55,7 @@ UP028_0.py:12:5: UP028 [*] Replace `yield` over `for` loop with `yield from`
    |
    = help: Replace with `yield from`
 
-ℹ Unsafe fix
+Suggested fix:
 9  9  | 
 10 10 | 
 11 11 | def h():
@@ -61,6 +65,8 @@ UP028_0.py:12:5: UP028 [*] Replace `yield` over `for` loop with `yield from`
 14 13 | 
 15 14 | 
 16 15 | def i():
+
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 UP028_0.py:17:5: UP028 [*] Replace `yield` over `for` loop with `yield from`
    |
@@ -72,7 +78,7 @@ UP028_0.py:17:5: UP028 [*] Replace `yield` over `for` loop with `yield from`
    |
    = help: Replace with `yield from`
 
-ℹ Unsafe fix
+Suggested fix:
 14 14 | 
 15 15 | 
 16 16 | def i():
@@ -82,6 +88,8 @@ UP028_0.py:17:5: UP028 [*] Replace `yield` over `for` loop with `yield from`
 19 18 | 
 20 19 | 
 21 20 | def j():
+
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 UP028_0.py:22:5: UP028 [*] Replace `yield` over `for` loop with `yield from`
    |
@@ -93,7 +101,7 @@ UP028_0.py:22:5: UP028 [*] Replace `yield` over `for` loop with `yield from`
    |
    = help: Replace with `yield from`
 
-ℹ Unsafe fix
+Suggested fix:
 19 19 | 
 20 20 | 
 21 21 | def j():
@@ -103,6 +111,8 @@ UP028_0.py:22:5: UP028 [*] Replace `yield` over `for` loop with `yield from`
 24 23 | 
 25 24 | 
 26 25 | def k():
+
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 UP028_0.py:27:5: UP028 [*] Replace `yield` over `for` loop with `yield from`
    |
@@ -114,7 +124,7 @@ UP028_0.py:27:5: UP028 [*] Replace `yield` over `for` loop with `yield from`
    |
    = help: Replace with `yield from`
 
-ℹ Unsafe fix
+Suggested fix:
 24 24 | 
 25 25 | 
 26 26 | def k():
@@ -124,6 +134,8 @@ UP028_0.py:27:5: UP028 [*] Replace `yield` over `for` loop with `yield from`
 29 28 | 
 30 29 | 
 31 30 | def f():  # Comment one\n'
+
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 UP028_0.py:33:5: UP028 [*] Replace `yield` over `for` loop with `yield from`
    |
@@ -142,7 +154,7 @@ UP028_0.py:33:5: UP028 [*] Replace `yield` over `for` loop with `yield from`
    |
    = help: Replace with `yield from`
 
-ℹ Unsafe fix
+Suggested fix:
 30 30 | 
 31 31 | def f():  # Comment one\n'
 32 32 |     # Comment two\n'
@@ -159,6 +171,8 @@ UP028_0.py:33:5: UP028 [*] Replace `yield` over `for` loop with `yield from`
 41 39 | 
 42 40 | 
 
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
+
 UP028_0.py:44:5: UP028 [*] Replace `yield` over `for` loop with `yield from`
    |
 43 |   def f():
@@ -169,7 +183,7 @@ UP028_0.py:44:5: UP028 [*] Replace `yield` over `for` loop with `yield from`
    |
    = help: Replace with `yield from`
 
-ℹ Unsafe fix
+Suggested fix:
 41 41 | 
 42 42 | 
 43 43 | def f():
@@ -179,6 +193,8 @@ UP028_0.py:44:5: UP028 [*] Replace `yield` over `for` loop with `yield from`
 46 45 | 
 47 46 | 
 48 47 | def f():
+
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 UP028_0.py:49:5: UP028 [*] Replace `yield` over `for` loop with `yield from`
    |
@@ -192,7 +208,7 @@ UP028_0.py:49:5: UP028 [*] Replace `yield` over `for` loop with `yield from`
    |
    = help: Replace with `yield from`
 
-ℹ Unsafe fix
+Suggested fix:
 46 46 | 
 47 47 | 
 48 48 | def f():
@@ -202,6 +218,8 @@ UP028_0.py:49:5: UP028 [*] Replace `yield` over `for` loop with `yield from`
 51 50 | 
 52 51 | def f():
 53 52 |     def func():
+
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 UP028_0.py:55:9: UP028 [*] Replace `yield` over `for` loop with `yield from`
    |
@@ -217,7 +235,7 @@ UP028_0.py:55:9: UP028 [*] Replace `yield` over `for` loop with `yield from`
    |
    = help: Replace with `yield from`
 
-ℹ Unsafe fix
+Suggested fix:
 52 52 | def f():
 53 53 |     def func():
 54 54 |         # This comment is preserved\n'
@@ -228,6 +246,8 @@ UP028_0.py:55:9: UP028 [*] Replace `yield` over `for` loop with `yield from`
 58 56 |             # Comment four\n'
 59 57 | # Comment\n'
 60 58 | def g():
+
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 UP028_0.py:67:5: UP028 [*] Replace `yield` over `for` loop with `yield from`
    |
@@ -240,7 +260,7 @@ UP028_0.py:67:5: UP028 [*] Replace `yield` over `for` loop with `yield from`
    |
    = help: Replace with `yield from`
 
-ℹ Unsafe fix
+Suggested fix:
 64 64 | def f():
 65 65 |     for x in y:
 66 66 |         yield x
@@ -250,6 +270,8 @@ UP028_0.py:67:5: UP028 [*] Replace `yield` over `for` loop with `yield from`
 69 68 | 
 70 69 | 
 71 70 | def f():
+
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 UP028_0.py:72:5: UP028 [*] Replace `yield` over `for` loop with `yield from`
    |
@@ -262,7 +284,7 @@ UP028_0.py:72:5: UP028 [*] Replace `yield` over `for` loop with `yield from`
    |
    = help: Replace with `yield from`
 
-ℹ Unsafe fix
+Suggested fix:
 69 69 | 
 70 70 | 
 71 71 | def f():
@@ -272,6 +294,8 @@ UP028_0.py:72:5: UP028 [*] Replace `yield` over `for` loop with `yield from`
 74 73 |     x = 1
 75 74 | 
 76 75 | 
+
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 UP028_0.py:79:5: UP028 [*] Replace `yield` over `for` loop with `yield from`
    |
@@ -287,7 +311,7 @@ UP028_0.py:79:5: UP028 [*] Replace `yield` over `for` loop with `yield from`
    |
    = help: Replace with `yield from`
 
-ℹ Unsafe fix
+Suggested fix:
 76 76 | 
 77 77 | # Regression test for: https://github.com/astral-sh/ruff/issues/7103
 78 78 | def _serve_method(fn):
@@ -299,4 +323,4 @@ UP028_0.py:79:5: UP028 [*] Replace `yield` over `for` loop with `yield from`
 83    |-        yield h
    82 |+    )
 
-
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.

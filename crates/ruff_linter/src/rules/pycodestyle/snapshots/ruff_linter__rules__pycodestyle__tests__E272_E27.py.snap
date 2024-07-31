@@ -12,7 +12,7 @@ E27.py:21:2: E272 [*] Multiple spaces before keyword
    |
    = help: Replace with single space
 
-ℹ Safe fix
+Suggested fix:
 18 18 | #: E271
 19 19 | a and  2
 20 20 | #: E271 E272
@@ -21,6 +21,8 @@ E27.py:21:2: E272 [*] Multiple spaces before keyword
 22 22 | #: E271 E272
 23 23 | a  and  2
 24 24 | #: E272
+
+    Run `ruff check --fix` to apply this fix.
 
 E27.py:23:2: E272 [*] Multiple spaces before keyword
    |
@@ -33,7 +35,7 @@ E27.py:23:2: E272 [*] Multiple spaces before keyword
    |
    = help: Replace with single space
 
-ℹ Safe fix
+Suggested fix:
 20 20 | #: E271 E272
 21 21 | 1  and  b
 22 22 | #: E271 E272
@@ -42,6 +44,8 @@ E27.py:23:2: E272 [*] Multiple spaces before keyword
 24 24 | #: E272
 25 25 | this  and False
 26 26 | #: E273
+
+    Run `ruff check --fix` to apply this fix.
 
 E27.py:25:5: E272 [*] Multiple spaces before keyword
    |
@@ -54,7 +58,7 @@ E27.py:25:5: E272 [*] Multiple spaces before keyword
    |
    = help: Replace with single space
 
-ℹ Safe fix
+Suggested fix:
 22 22 | #: E271 E272
 23 23 | a  and  2
 24 24 | #: E272
@@ -63,3 +67,5 @@ E27.py:25:5: E272 [*] Multiple spaces before keyword
 26 26 | #: E273
 27 27 | a and	b
 28 28 | #: E274
+
+    Run `ruff check --fix` to apply this fix.

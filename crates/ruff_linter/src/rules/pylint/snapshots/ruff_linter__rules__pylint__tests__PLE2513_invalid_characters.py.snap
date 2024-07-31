@@ -11,7 +11,7 @@ invalid_characters.py:30:16: PLE2513 [*] Invalid unescaped character ESC, use "\
    |
    = help: Replace with escape sequence
 
-ℹ Safe fix
+Suggested fix:
 27 27 | sub_ok = '\x1a'
 28 28 | sub_ok = f'\x1a'
 29 29 | 
@@ -20,6 +20,8 @@ invalid_characters.py:30:16: PLE2513 [*] Invalid unescaped character ESC, use "\
 31 31 | esc = f'esc esc ␛'
 32 32 | 
 33 33 | esc_ok = '\x1b'
+
+    Run `ruff check --fix` to apply this fix.
 
 invalid_characters.py:31:17: PLE2513 [*] Invalid unescaped character ESC, use "\x1B" instead
    |
@@ -31,7 +33,7 @@ invalid_characters.py:31:17: PLE2513 [*] Invalid unescaped character ESC, use "\
    |
    = help: Replace with escape sequence
 
-ℹ Safe fix
+Suggested fix:
 28 28 | sub_ok = f'\x1a'
 29 29 | 
 30 30 | esc = 'esc esc ␛'
@@ -40,6 +42,8 @@ invalid_characters.py:31:17: PLE2513 [*] Invalid unescaped character ESC, use "\
 32 32 | 
 33 33 | esc_ok = '\x1b'
 34 34 | esc_ok = f'\x1b'
+
+    Run `ruff check --fix` to apply this fix.
 
 invalid_characters.py:55:29: PLE2513 [*] Invalid unescaped character ESC, use "\x1B" instead
    |
@@ -52,7 +56,7 @@ invalid_characters.py:55:29: PLE2513 [*] Invalid unescaped character ESC, use "\
    |
    = help: Replace with escape sequence
 
-ℹ Safe fix
+Suggested fix:
 52 52 | zwsp_after_multicharacter_grapheme_cluster = "ಫ್ರಾನ್ಸಿಸ್ಕೊ ​​"
 53 53 | zwsp_after_multicharacter_grapheme_cluster = f"ಫ್ರಾನ್ಸಿಸ್ಕೊ ​​"
 54 54 | 
@@ -61,6 +65,8 @@ invalid_characters.py:55:29: PLE2513 [*] Invalid unescaped character ESC, use "\
 56 56 | 
 57 57 | # https://github.com/astral-sh/ruff/issues/7455#issuecomment-1741998106
 58 58 | x = f"""}}ab"""
+
+    Run `ruff check --fix` to apply this fix.
 
 invalid_characters.py:60:12: PLE2513 [*] Invalid unescaped character ESC, use "\x1B" instead
    |
@@ -71,9 +77,11 @@ invalid_characters.py:60:12: PLE2513 [*] Invalid unescaped character ESC, use "\
    |
    = help: Replace with escape sequence
 
-ℹ Safe fix
+Suggested fix:
 57 57 | # https://github.com/astral-sh/ruff/issues/7455#issuecomment-1741998106
 58 58 | x = f"""}}ab"""
 59 59 | # https://github.com/astral-sh/ruff/issues/7455#issuecomment-1741998256
 60    |-x = f"""}}a␛b"""
    60 |+x = f"""}}a\x1Bb"""
+
+    Run `ruff check --fix` to apply this fix.

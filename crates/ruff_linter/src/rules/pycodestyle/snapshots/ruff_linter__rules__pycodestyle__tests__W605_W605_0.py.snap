@@ -11,13 +11,15 @@ W605_0.py:2:10: W605 [*] Invalid escape sequence: `\.`
   |
   = help: Use a raw string literal
 
-ℹ Safe fix
+Suggested fix:
 1 1 | #: W605:1:10
 2   |-regex = '\.png$'
   2 |+regex = r'\.png$'
 3 3 | 
 4 4 | #: W605:2:1
 5 5 | regex = '''
+
+    Run `ruff check --fix` to apply this fix.
 
 W605_0.py:6:1: W605 [*] Invalid escape sequence: `\.`
   |
@@ -29,7 +31,7 @@ W605_0.py:6:1: W605 [*] Invalid escape sequence: `\.`
   |
   = help: Use a raw string literal
 
-ℹ Safe fix
+Suggested fix:
 2 2 | regex = '\.png$'
 3 3 | 
 4 4 | #: W605:2:1
@@ -38,6 +40,8 @@ W605_0.py:6:1: W605 [*] Invalid escape sequence: `\.`
 6 6 | \.png$
 7 7 | '''
 8 8 | 
+
+    Run `ruff check --fix` to apply this fix.
 
 W605_0.py:11:6: W605 [*] Invalid escape sequence: `\_`
    |
@@ -49,7 +53,7 @@ W605_0.py:11:6: W605 [*] Invalid escape sequence: `\_`
    |
    = help: Use a raw string literal
 
-ℹ Safe fix
+Suggested fix:
 8  8  | 
 9  9  | #: W605:2:6
 10 10 | f(
@@ -58,6 +62,8 @@ W605_0.py:11:6: W605 [*] Invalid escape sequence: `\_`
 12 12 | )
 13 13 | 
 14 14 | #: W605:4:6
+
+    Run `ruff check --fix` to apply this fix.
 
 W605_0.py:18:6: W605 [*] Invalid escape sequence: `\_`
    |
@@ -70,7 +76,7 @@ W605_0.py:18:6: W605 [*] Invalid escape sequence: `\_`
    |
    = help: Use a raw string literal
 
-ℹ Safe fix
+Suggested fix:
 12 12 | )
 13 13 | 
 14 14 | #: W605:4:6
@@ -80,6 +86,8 @@ W605_0.py:18:6: W605 [*] Invalid escape sequence: `\_`
 17 17 | literal
 18 18 | with \_ somewhere
 
+    Run `ruff check --fix` to apply this fix.
+
 W605_0.py:23:39: W605 [*] Invalid escape sequence: `\_`
    |
 22 | #: W605:1:38
@@ -88,7 +96,7 @@ W605_0.py:23:39: W605 [*] Invalid escape sequence: `\_`
    |
    = help: Add backslash to escape sequence
 
-ℹ Safe fix
+Suggested fix:
 20 20 | """
 21 21 | 
 22 22 | #: W605:1:38
@@ -97,6 +105,8 @@ W605_0.py:23:39: W605 [*] Invalid escape sequence: `\_`
 24 24 | 
 25 25 | 
 26 26 | def f():
+
+    Run `ruff check --fix` to apply this fix.
 
 W605_0.py:28:12: W605 [*] Invalid escape sequence: `\.`
    |
@@ -109,7 +119,7 @@ W605_0.py:28:12: W605 [*] Invalid escape sequence: `\.`
    |
    = help: Use a raw string literal
 
-ℹ Safe fix
+Suggested fix:
 25 25 | 
 26 26 | def f():
 27 27 |     #: W605:1:11
@@ -118,6 +128,8 @@ W605_0.py:28:12: W605 [*] Invalid escape sequence: `\.`
 29 29 | 
 30 30 | #: Okay
 31 31 | regex = r'\.png$'
+
+    Run `ruff check --fix` to apply this fix.
 
 W605_0.py:45:12: W605 [*] Invalid escape sequence: `\_`
    |
@@ -130,7 +142,7 @@ W605_0.py:45:12: W605 [*] Invalid escape sequence: `\_`
    |
    = help: Add backslash to escape sequence
 
-ℹ Safe fix
+Suggested fix:
 42 42 | \w
 43 43 | '''  # noqa
 44 44 | 
@@ -139,6 +151,8 @@ W605_0.py:45:12: W605 [*] Invalid escape sequence: `\_`
 46 46 | 
 47 47 | #: W605:1:7
 48 48 | u'foo\ bar'
+
+    Run `ruff check --fix` to apply this fix.
 
 W605_0.py:48:6: W605 [*] Invalid escape sequence: `\ `
    |
@@ -150,7 +164,7 @@ W605_0.py:48:6: W605 [*] Invalid escape sequence: `\ `
    |
    = help: Use a raw string literal
 
-ℹ Safe fix
+Suggested fix:
 45 45 | regex = '\\\_'
 46 46 | 
 47 47 | #: W605:1:7
@@ -159,6 +173,8 @@ W605_0.py:48:6: W605 [*] Invalid escape sequence: `\ `
 49 49 | 
 50 50 | #: W605:1:13
 51 51 | (
+
+    Run `ruff check --fix` to apply this fix.
 
 W605_0.py:53:9: W605 [*] Invalid escape sequence: `\.`
    |
@@ -170,7 +186,7 @@ W605_0.py:53:9: W605 [*] Invalid escape sequence: `\.`
    |
    = help: Add backslash to escape sequence
 
-ℹ Safe fix
+Suggested fix:
 50 50 | #: W605:1:13
 51 51 | (
 52 52 |     "foo \
@@ -179,6 +195,8 @@ W605_0.py:53:9: W605 [*] Invalid escape sequence: `\.`
 54 54 | )
 55 55 | 
 56 56 | #: W605:1:6
+
+    Run `ruff check --fix` to apply this fix.
 
 W605_0.py:57:6: W605 [*] Invalid escape sequence: `\.`
    |
@@ -190,7 +208,7 @@ W605_0.py:57:6: W605 [*] Invalid escape sequence: `\.`
    |
    = help: Add backslash to escape sequence
 
-ℹ Safe fix
+Suggested fix:
 54 54 | )
 55 55 | 
 56 56 | #: W605:1:6
@@ -200,6 +218,8 @@ W605_0.py:57:6: W605 [*] Invalid escape sequence: `\.`
 59 59 | #: W605:1:13
 60 60 | "foo \t bar \."
 
+    Run `ruff check --fix` to apply this fix.
+
 W605_0.py:60:13: W605 [*] Invalid escape sequence: `\.`
    |
 59 | #: W605:1:13
@@ -208,9 +228,11 @@ W605_0.py:60:13: W605 [*] Invalid escape sequence: `\.`
    |
    = help: Add backslash to escape sequence
 
-ℹ Safe fix
+Suggested fix:
 57 57 | "foo \. bar \t"
 58 58 | 
 59 59 | #: W605:1:13
 60    |-"foo \t bar \."
    60 |+"foo \t bar \\."
+
+    Run `ruff check --fix` to apply this fix.

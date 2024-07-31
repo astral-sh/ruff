@@ -8,7 +8,7 @@ UP042.py:4:7: UP042 [*] Class A inherits from both `str` and `enum.Enum`
   |
   = help: Inherit from `enum.StrEnum`
 
-ℹ Unsafe fix
+Suggested fix:
 1   |-from enum import Enum
   1 |+from enum import Enum, StrEnum
 2 2 | 
@@ -19,6 +19,8 @@ UP042.py:4:7: UP042 [*] Class A inherits from both `str` and `enum.Enum`
 6 6 | 
 7 7 | class B(Enum, str): ...
 
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
+
 UP042.py:7:7: UP042 [*] Class B inherits from both `str` and `enum.Enum`
   |
 7 | class B(Enum, str): ...
@@ -26,7 +28,7 @@ UP042.py:7:7: UP042 [*] Class B inherits from both `str` and `enum.Enum`
   |
   = help: Inherit from `enum.StrEnum`
 
-ℹ Unsafe fix
+Suggested fix:
 1   |-from enum import Enum
   1 |+from enum import Enum, StrEnum
 2 2 | 
@@ -39,6 +41,8 @@ UP042.py:7:7: UP042 [*] Class B inherits from both `str` and `enum.Enum`
 8 8 | 
 9 9 | 
 10 10 | class D(int, str, Enum): ...
+
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 UP042.py:10:7: UP042 Class D inherits from both `str` and `enum.Enum`
    |

@@ -11,7 +11,7 @@ invalid_characters.py:24:12: PLE2512 [*] Invalid unescaped character SUB, use "\
    |
    = help: Replace with escape sequence
 
-ℹ Safe fix
+Suggested fix:
 21 21 | cr_ok = '\\r'
 22 22 | cr_ok = f'\\r'
 23 23 | 
@@ -20,6 +20,8 @@ invalid_characters.py:24:12: PLE2512 [*] Invalid unescaped character SUB, use "\
 25 25 | sub = f'sub '
 26 26 | 
 27 27 | sub_ok = '\x1a'
+
+    Run `ruff check --fix` to apply this fix.
 
 invalid_characters.py:25:13: PLE2512 [*] Invalid unescaped character SUB, use "\x1A" instead
    |
@@ -31,7 +33,7 @@ invalid_characters.py:25:13: PLE2512 [*] Invalid unescaped character SUB, use "\
    |
    = help: Replace with escape sequence
 
-ℹ Safe fix
+Suggested fix:
 22 22 | cr_ok = f'\\r'
 23 23 | 
 24 24 | sub = 'sub '
@@ -40,6 +42,8 @@ invalid_characters.py:25:13: PLE2512 [*] Invalid unescaped character SUB, use "\
 26 26 | 
 27 27 | sub_ok = '\x1a'
 28 28 | sub_ok = f'\x1a'
+
+    Run `ruff check --fix` to apply this fix.
 
 invalid_characters.py:55:25: PLE2512 [*] Invalid unescaped character SUB, use "\x1A" instead
    |
@@ -52,7 +56,7 @@ invalid_characters.py:55:25: PLE2512 [*] Invalid unescaped character SUB, use "\
    |
    = help: Replace with escape sequence
 
-ℹ Safe fix
+Suggested fix:
 52 52 | zwsp_after_multicharacter_grapheme_cluster = "ಫ್ರಾನ್ಸಿಸ್ಕೊ ​​"
 53 53 | zwsp_after_multicharacter_grapheme_cluster = f"ಫ್ರಾನ್ಸಿಸ್ಕೊ ​​"
 54 54 | 
@@ -61,6 +65,8 @@ invalid_characters.py:55:25: PLE2512 [*] Invalid unescaped character SUB, use "\
 56 56 | 
 57 57 | # https://github.com/astral-sh/ruff/issues/7455#issuecomment-1741998106
 58 58 | x = f"""}}ab"""
+
+    Run `ruff check --fix` to apply this fix.
 
 invalid_characters.py:58:12: PLE2512 [*] Invalid unescaped character SUB, use "\x1A" instead
    |
@@ -72,7 +78,7 @@ invalid_characters.py:58:12: PLE2512 [*] Invalid unescaped character SUB, use "\
    |
    = help: Replace with escape sequence
 
-ℹ Safe fix
+Suggested fix:
 55 55 | nested_fstrings = f'␈{f'{f'␛'}'}'
 56 56 | 
 57 57 | # https://github.com/astral-sh/ruff/issues/7455#issuecomment-1741998106
@@ -80,3 +86,5 @@ invalid_characters.py:58:12: PLE2512 [*] Invalid unescaped character SUB, use "\
    58 |+x = f"""}}a\x1Ab"""
 59 59 | # https://github.com/astral-sh/ruff/issues/7455#issuecomment-1741998256
 60 60 | x = f"""}}a␛b"""
+
+    Run `ruff check --fix` to apply this fix.

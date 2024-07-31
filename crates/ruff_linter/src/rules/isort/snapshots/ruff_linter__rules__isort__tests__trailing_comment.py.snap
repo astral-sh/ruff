@@ -19,7 +19,7 @@ trailing_comment.py:8:1: I001 [*] Import block is un-sorted or un-formatted
    |
    = help: Organize imports
 
-ℹ Safe fix
+Suggested fix:
 5  5  | 
 6  6  | pass
 7  7  | 
@@ -34,6 +34,8 @@ trailing_comment.py:8:1: I001 [*] Import block is un-sorted or un-formatted
 14 13 | 
 15 14 | pass
 16 15 | 
+
+    Run `ruff check --fix` to apply this fix.
 
 trailing_comment.py:17:1: I001 [*] Import block is un-sorted or un-formatted
    |
@@ -55,7 +57,7 @@ trailing_comment.py:17:1: I001 [*] Import block is un-sorted or un-formatted
    |
    = help: Organize imports
 
-ℹ Safe fix
+Suggested fix:
 14 14 | 
 15 15 | pass
 16 16 | 
@@ -66,6 +68,8 @@ trailing_comment.py:17:1: I001 [*] Import block is un-sorted or un-formatted
 20 18 | from mylib import (
 21 19 |     MyClient,
 22 20 |     MyMgmtClient,
+
+    Run `ruff check --fix` to apply this fix.
 
 trailing_comment.py:35:1: I001 [*] Import block is un-sorted or un-formatted
    |
@@ -83,7 +87,7 @@ trailing_comment.py:35:1: I001 [*] Import block is un-sorted or un-formatted
    |
    = help: Organize imports
 
-ℹ Safe fix
+Suggested fix:
 32 32 | 
 33 33 | pass
 34 34 | 
@@ -95,6 +99,8 @@ trailing_comment.py:35:1: I001 [*] Import block is un-sorted or un-formatted
 39 36 | 
 40 37 | pass
 41 38 | 
+
+    Run `ruff check --fix` to apply this fix.
 
 trailing_comment.py:42:1: I001 [*] Import block is un-sorted or un-formatted
    |
@@ -112,7 +118,7 @@ trailing_comment.py:42:1: I001 [*] Import block is un-sorted or un-formatted
    |
    = help: Organize imports
 
-ℹ Safe fix
+Suggested fix:
 39 39 | 
 40 40 | pass
 41 41 | 
@@ -125,6 +131,8 @@ trailing_comment.py:42:1: I001 [*] Import block is un-sorted or un-formatted
 47 44 | pass
 48 45 | 
 
+    Run `ruff check --fix` to apply this fix.
+
 trailing_comment.py:50:1: I001 [*] Import block is un-sorted or un-formatted
    |
 49 |   # a
@@ -136,7 +144,7 @@ trailing_comment.py:50:1: I001 [*] Import block is un-sorted or un-formatted
    |
    = help: Organize imports
 
-ℹ Safe fix
+Suggested fix:
 47 47 | pass
 48 48 | 
 49 49 | # a
@@ -146,3 +154,5 @@ trailing_comment.py:50:1: I001 [*] Import block is un-sorted or un-formatted
 53    |-    # e
 54    |-) # f
    50 |+from mylib import MyClient  # b  # c  # d  # e  # f
+
+    Run `ruff check --fix` to apply this fix.

@@ -10,7 +10,7 @@ FURB187.py:6:5: FURB187 [*] Use of assignment of `reversed` on list `l`
   |
   = help: Replace with `l.reverse()`
 
-ℹ Unsafe fix
+Suggested fix:
 3 3 | 
 4 4 | def a():
 5 5 |     l = []
@@ -19,6 +19,8 @@ FURB187.py:6:5: FURB187 [*] Use of assignment of `reversed` on list `l`
 7 7 | 
 8 8 | 
 9 9 | def b():
+
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 FURB187.py:11:5: FURB187 [*] Use of assignment of `reversed` on list `l`
    |
@@ -29,7 +31,7 @@ FURB187.py:11:5: FURB187 [*] Use of assignment of `reversed` on list `l`
    |
    = help: Replace with `l.reverse()`
 
-ℹ Unsafe fix
+Suggested fix:
 8  8  | 
 9  9  | def b():
 10 10 |     l = []
@@ -38,6 +40,8 @@ FURB187.py:11:5: FURB187 [*] Use of assignment of `reversed` on list `l`
 12 12 | 
 13 13 | 
 14 14 | def c():
+
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 FURB187.py:16:5: FURB187 [*] Use of assignment of `reversed` on list `l`
    |
@@ -48,7 +52,7 @@ FURB187.py:16:5: FURB187 [*] Use of assignment of `reversed` on list `l`
    |
    = help: Replace with `l.reverse()`
 
-ℹ Unsafe fix
+Suggested fix:
 13 13 | 
 14 14 | def c():
 15 15 |     l = []
@@ -57,3 +61,5 @@ FURB187.py:16:5: FURB187 [*] Use of assignment of `reversed` on list `l`
 17 17 | 
 18 18 | 
 19 19 | # False negative
+
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.

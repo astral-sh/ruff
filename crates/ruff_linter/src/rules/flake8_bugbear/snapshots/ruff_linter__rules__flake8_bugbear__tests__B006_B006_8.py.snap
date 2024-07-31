@@ -9,12 +9,14 @@ B006_8.py:1:19: B006 [*] Do not use mutable data structures for argument default
   |
   = help: Replace with `None`; initialize within function
 
-ℹ Unsafe fix
+Suggested fix:
 1   |-def foo(a: list = []):
   1 |+def foo(a: list = None):
 2 2 |     raise NotImplementedError("")
 3 3 | 
 4 4 | 
+
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 B006_8.py:5:19: B006 [*] Do not use mutable data structures for argument defaults
   |
@@ -25,7 +27,7 @@ B006_8.py:5:19: B006 [*] Do not use mutable data structures for argument default
   |
   = help: Replace with `None`; initialize within function
 
-ℹ Unsafe fix
+Suggested fix:
 2 2 |     raise NotImplementedError("")
 3 3 | 
 4 4 | 
@@ -34,6 +36,8 @@ B006_8.py:5:19: B006 [*] Do not use mutable data structures for argument default
 6 6 |     """ This one also has a docstring"""
 7 7 |     raise NotImplementedError("and has some text in here")
 8 8 | 
+
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 B006_8.py:10:19: B006 [*] Do not use mutable data structures for argument defaults
    |
@@ -44,7 +48,7 @@ B006_8.py:10:19: B006 [*] Do not use mutable data structures for argument defaul
    |
    = help: Replace with `None`; initialize within function
 
-ℹ Unsafe fix
+Suggested fix:
 7  7  |     raise NotImplementedError("and has some text in here")
 8  8  | 
 9  9  | 
@@ -57,6 +61,8 @@ B006_8.py:10:19: B006 [*] Do not use mutable data structures for argument defaul
 13 15 | 
 14 16 | 
 
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
+
 B006_8.py:15:19: B006 [*] Do not use mutable data structures for argument defaults
    |
 15 | def qux(a: list = []):
@@ -65,7 +71,7 @@ B006_8.py:15:19: B006 [*] Do not use mutable data structures for argument defaul
    |
    = help: Replace with `None`; initialize within function
 
-ℹ Unsafe fix
+Suggested fix:
 12 12 |     raise IndexError()
 13 13 | 
 14 14 | 
@@ -75,6 +81,8 @@ B006_8.py:15:19: B006 [*] Do not use mutable data structures for argument defaul
 17 17 | 
 18 18 | 
 
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
+
 B006_8.py:19:20: B006 [*] Do not use mutable data structures for argument defaults
    |
 19 | def quux(a: list = []):
@@ -83,10 +91,12 @@ B006_8.py:19:20: B006 [*] Do not use mutable data structures for argument defaul
    |
    = help: Replace with `None`; initialize within function
 
-ℹ Unsafe fix
+Suggested fix:
 16 16 |     raise NotImplementedError
 17 17 | 
 18 18 | 
 19    |-def quux(a: list = []):
    19 |+def quux(a: list = None):
 20 20 |     raise NotImplemented
+
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.

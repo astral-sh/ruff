@@ -12,7 +12,7 @@ sections.py:78:5: D410 [*] Missing blank line after section ("Returns")
    |
    = help: Add blank line after "Returns"
 
-ℹ Safe fix
+Suggested fix:
 77 77 | 
 78 78 |     Returns
 79 79 |     -------
@@ -20,6 +20,8 @@ sections.py:78:5: D410 [*] Missing blank line after section ("Returns")
 80 81 |     Yields
 81 82 |     ------
 82 83 | 
+
+    Run `ruff check --fix` to apply this fix.
 
 sections.py:224:5: D410 [*] Missing blank line after section ("Returns")
     |
@@ -32,11 +34,13 @@ sections.py:224:5: D410 [*] Missing blank line after section ("Returns")
     |
     = help: Add blank line after "Returns"
 
-ℹ Safe fix
+Suggested fix:
 224 224 |     Returns
 225 225 |     ------
 226 226 |     Many many wonderful things.
     227 |+
 227 228 |     Raises:
 228 229 |     My attention.
-229 230 |
+229 230 | 
+
+    Run `ruff check --fix` to apply this fix.

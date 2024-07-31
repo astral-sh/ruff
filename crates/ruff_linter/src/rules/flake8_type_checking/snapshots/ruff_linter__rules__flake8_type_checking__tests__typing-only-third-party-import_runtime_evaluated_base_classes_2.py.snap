@@ -12,7 +12,7 @@ runtime_evaluated_base_classes_2.py:3:21: TCH002 [*] Move third-party import `ge
   |
   = help: Move into type-checking block
 
-ℹ Unsafe fix
+Suggested fix:
 1  1  | from __future__ import annotations
 2  2  | 
 3     |-import geopandas as gpd  # TCH002
@@ -29,6 +29,8 @@ runtime_evaluated_base_classes_2.py:3:21: TCH002 [*] Move third-party import `ge
 10 13 | 
 11 14 | class A(BaseModel):
 
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
+
 runtime_evaluated_base_classes_2.py:5:8: TCH002 [*] Move third-party import `pyproj` into a type-checking block
   |
 3 | import geopandas as gpd  # TCH002
@@ -39,7 +41,7 @@ runtime_evaluated_base_classes_2.py:5:8: TCH002 [*] Move third-party import `pyp
   |
   = help: Move into type-checking block
 
-ℹ Unsafe fix
+Suggested fix:
 2  2  | 
 3  3  | import geopandas as gpd  # TCH002
 4  4  | import pydantic
@@ -55,4 +57,4 @@ runtime_evaluated_base_classes_2.py:5:8: TCH002 [*] Move third-party import `pyp
 10 13 | 
 11 14 | class A(BaseModel):
 
-
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.

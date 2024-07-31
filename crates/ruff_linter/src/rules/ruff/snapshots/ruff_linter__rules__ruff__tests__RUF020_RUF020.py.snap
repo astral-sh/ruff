@@ -12,7 +12,7 @@ RUF020.py:3:7: RUF020 [*] `Union[Never, T]` is equivalent to `T`
   |
   = help: Remove `Never`
 
-ℹ Safe fix
+Suggested fix:
 1 1 | from typing import Never, NoReturn, Union
 2 2 | 
 3   |-Union[Never, int]
@@ -20,6 +20,8 @@ RUF020.py:3:7: RUF020 [*] `Union[Never, T]` is equivalent to `T`
 4 4 | Union[NoReturn, int]
 5 5 | Never | int
 6 6 | NoReturn | int
+
+    Run `ruff check --fix` to apply this fix.
 
 RUF020.py:4:7: RUF020 [*] `Union[NoReturn, T]` is equivalent to `T`
   |
@@ -31,7 +33,7 @@ RUF020.py:4:7: RUF020 [*] `Union[NoReturn, T]` is equivalent to `T`
   |
   = help: Remove `NoReturn`
 
-ℹ Safe fix
+Suggested fix:
 1 1 | from typing import Never, NoReturn, Union
 2 2 | 
 3 3 | Union[Never, int]
@@ -40,6 +42,8 @@ RUF020.py:4:7: RUF020 [*] `Union[NoReturn, T]` is equivalent to `T`
 5 5 | Never | int
 6 6 | NoReturn | int
 7 7 | Union[Union[Never, int], Union[NoReturn, int]]
+
+    Run `ruff check --fix` to apply this fix.
 
 RUF020.py:5:1: RUF020 [*] `Never | T` is equivalent to `T`
   |
@@ -52,7 +56,7 @@ RUF020.py:5:1: RUF020 [*] `Never | T` is equivalent to `T`
   |
   = help: Remove `Never`
 
-ℹ Safe fix
+Suggested fix:
 2 2 | 
 3 3 | Union[Never, int]
 4 4 | Union[NoReturn, int]
@@ -61,6 +65,8 @@ RUF020.py:5:1: RUF020 [*] `Never | T` is equivalent to `T`
 6 6 | NoReturn | int
 7 7 | Union[Union[Never, int], Union[NoReturn, int]]
 8 8 | Union[NoReturn, int, float]
+
+    Run `ruff check --fix` to apply this fix.
 
 RUF020.py:6:1: RUF020 [*] `NoReturn | T` is equivalent to `T`
   |
@@ -73,7 +79,7 @@ RUF020.py:6:1: RUF020 [*] `NoReturn | T` is equivalent to `T`
   |
   = help: Remove `NoReturn`
 
-ℹ Safe fix
+Suggested fix:
 3 3 | Union[Never, int]
 4 4 | Union[NoReturn, int]
 5 5 | Never | int
@@ -81,6 +87,8 @@ RUF020.py:6:1: RUF020 [*] `NoReturn | T` is equivalent to `T`
   6 |+int
 7 7 | Union[Union[Never, int], Union[NoReturn, int]]
 8 8 | Union[NoReturn, int, float]
+
+    Run `ruff check --fix` to apply this fix.
 
 RUF020.py:7:13: RUF020 [*] `Union[Never, T]` is equivalent to `T`
   |
@@ -92,13 +100,15 @@ RUF020.py:7:13: RUF020 [*] `Union[Never, T]` is equivalent to `T`
   |
   = help: Remove `Never`
 
-ℹ Safe fix
+Suggested fix:
 4 4 | Union[NoReturn, int]
 5 5 | Never | int
 6 6 | NoReturn | int
 7   |-Union[Union[Never, int], Union[NoReturn, int]]
   7 |+Union[int, Union[NoReturn, int]]
 8 8 | Union[NoReturn, int, float]
+
+    Run `ruff check --fix` to apply this fix.
 
 RUF020.py:7:32: RUF020 [*] `Union[NoReturn, T]` is equivalent to `T`
   |
@@ -110,13 +120,15 @@ RUF020.py:7:32: RUF020 [*] `Union[NoReturn, T]` is equivalent to `T`
   |
   = help: Remove `NoReturn`
 
-ℹ Safe fix
+Suggested fix:
 4 4 | Union[NoReturn, int]
 5 5 | Never | int
 6 6 | NoReturn | int
 7   |-Union[Union[Never, int], Union[NoReturn, int]]
   7 |+Union[Union[Never, int], int]
 8 8 | Union[NoReturn, int, float]
+
+    Run `ruff check --fix` to apply this fix.
 
 RUF020.py:8:7: RUF020 [*] `Union[NoReturn, T]` is equivalent to `T`
   |
@@ -127,11 +139,11 @@ RUF020.py:8:7: RUF020 [*] `Union[NoReturn, T]` is equivalent to `T`
   |
   = help: Remove `NoReturn`
 
-ℹ Safe fix
+Suggested fix:
 5 5 | Never | int
 6 6 | NoReturn | int
 7 7 | Union[Union[Never, int], Union[NoReturn, int]]
 8   |-Union[NoReturn, int, float]
   8 |+Union[int, float]
 
-
+    Run `ruff check --fix` to apply this fix.

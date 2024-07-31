@@ -8,7 +8,7 @@ __init__.py:5:15: F401 [*] `.unused` imported but unused; consider removing, add
   |
   = help: Remove unused import
 
-ℹ Unsafe fix
+Suggested fix:
 2 2 | """
 3 3 | 
 4 4 | 
@@ -16,6 +16,8 @@ __init__.py:5:15: F401 [*] `.unused` imported but unused; consider removing, add
 6 5 | 
 7 6 | 
 8 7 | __all__ = [];
+
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 __init__.py:5:34: F401 [*] `.renamed` imported but unused; consider removing, adding to `__all__`, or using a redundant alias
   |
@@ -24,7 +26,7 @@ __init__.py:5:34: F401 [*] `.renamed` imported but unused; consider removing, ad
   |
   = help: Remove unused import
 
-ℹ Unsafe fix
+Suggested fix:
 2 2 | """
 3 3 | 
 4 4 | 
@@ -32,3 +34,5 @@ __init__.py:5:34: F401 [*] `.renamed` imported but unused; consider removing, ad
 6 5 | 
 7 6 | 
 8 7 | __all__ = [];
+
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.

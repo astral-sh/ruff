@@ -10,13 +10,15 @@ SIM201.py:2:4: SIM201 [*] Use `a != b` instead of `not a == b`
   |
   = help: Replace with `!=` operator
 
-ℹ Safe fix
+Suggested fix:
 1 1 | # SIM201
 2   |-if not a == b:
   2 |+if a != b:
 3 3 |     pass
 4 4 | 
 5 5 | # SIM201
+
+    Run `ruff check --fix` to apply this fix.
 
 SIM201.py:6:4: SIM201 [*] Use `a != b + c` instead of `not a == b + c`
   |
@@ -27,7 +29,7 @@ SIM201.py:6:4: SIM201 [*] Use `a != b + c` instead of `not a == b + c`
   |
   = help: Replace with `!=` operator
 
-ℹ Safe fix
+Suggested fix:
 3 3 |     pass
 4 4 | 
 5 5 | # SIM201
@@ -36,6 +38,8 @@ SIM201.py:6:4: SIM201 [*] Use `a != b + c` instead of `not a == b + c`
 7 7 |     pass
 8 8 | 
 9 9 | # SIM201
+
+    Run `ruff check --fix` to apply this fix.
 
 SIM201.py:10:4: SIM201 [*] Use `a + b != c` instead of `not a + b == c`
    |
@@ -46,7 +50,7 @@ SIM201.py:10:4: SIM201 [*] Use `a + b != c` instead of `not a + b == c`
    |
    = help: Replace with `!=` operator
 
-ℹ Safe fix
+Suggested fix:
 7  7  |     pass
 8  8  | 
 9  9  | # SIM201
@@ -56,4 +60,4 @@ SIM201.py:10:4: SIM201 [*] Use `a + b != c` instead of `not a + b == c`
 12 12 | 
 13 13 | # OK
 
-
+    Run `ruff check --fix` to apply this fix.

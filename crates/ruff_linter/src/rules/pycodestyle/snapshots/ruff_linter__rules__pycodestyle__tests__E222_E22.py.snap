@@ -11,7 +11,7 @@ E22.py:28:8: E222 [*] Multiple spaces after operator
    |
    = help: Replace with single space
 
-ℹ Safe fix
+Suggested fix:
 25 25 | 
 26 26 | 
 27 27 | #: E222
@@ -20,6 +20,8 @@ E22.py:28:8: E222 [*] Multiple spaces after operator
 29 29 | b = b + 10
 30 30 | #: E222 E222
 31 31 | x =            -1
+
+    Run `ruff check --fix` to apply this fix.
 
 E22.py:31:4: E222 [*] Multiple spaces after operator
    |
@@ -32,7 +34,7 @@ E22.py:31:4: E222 [*] Multiple spaces after operator
    |
    = help: Replace with single space
 
-ℹ Safe fix
+Suggested fix:
 28 28 | a = a +  1
 29 29 | b = b + 10
 30 30 | #: E222 E222
@@ -41,6 +43,8 @@ E22.py:31:4: E222 [*] Multiple spaces after operator
 32 32 | y =            -2
 33 33 | long_variable = 3
 34 34 | #: E222 E222
+
+    Run `ruff check --fix` to apply this fix.
 
 E22.py:32:4: E222 [*] Multiple spaces after operator
    |
@@ -53,7 +57,7 @@ E22.py:32:4: E222 [*] Multiple spaces after operator
    |
    = help: Replace with single space
 
-ℹ Safe fix
+Suggested fix:
 29 29 | b = b + 10
 30 30 | #: E222 E222
 31 31 | x =            -1
@@ -62,6 +66,8 @@ E22.py:32:4: E222 [*] Multiple spaces after operator
 33 33 | long_variable = 3
 34 34 | #: E222 E222
 35 35 | x[0] =          1
+
+    Run `ruff check --fix` to apply this fix.
 
 E22.py:35:7: E222 [*] Multiple spaces after operator
    |
@@ -74,7 +80,7 @@ E22.py:35:7: E222 [*] Multiple spaces after operator
    |
    = help: Replace with single space
 
-ℹ Safe fix
+Suggested fix:
 32 32 | y =            -2
 33 33 | long_variable = 3
 34 34 | #: E222 E222
@@ -83,6 +89,8 @@ E22.py:35:7: E222 [*] Multiple spaces after operator
 36 36 | x[1] =          2
 37 37 | long_variable = 3
 38 38 | #:
+
+    Run `ruff check --fix` to apply this fix.
 
 E22.py:36:7: E222 [*] Multiple spaces after operator
    |
@@ -95,7 +103,7 @@ E22.py:36:7: E222 [*] Multiple spaces after operator
    |
    = help: Replace with single space
 
-ℹ Safe fix
+Suggested fix:
 33 33 | long_variable = 3
 34 34 | #: E222 E222
 35 35 | x[0] =          1
@@ -105,4 +113,4 @@ E22.py:36:7: E222 [*] Multiple spaces after operator
 38 38 | #:
 39 39 | 
 
-
+    Run `ruff check --fix` to apply this fix.

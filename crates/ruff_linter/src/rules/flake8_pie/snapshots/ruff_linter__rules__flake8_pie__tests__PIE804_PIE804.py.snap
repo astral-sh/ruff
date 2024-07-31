@@ -10,12 +10,14 @@ PIE804.py:1:5: PIE804 [*] Unnecessary `dict` kwargs
   |
   = help: Remove unnecessary kwargs
 
-ℹ Safe fix
+Suggested fix:
 1   |-foo(**{"bar": True})  # PIE804
   1 |+foo(bar=True)  # PIE804
 2 2 | 
 3 3 | foo(**{"r2d2": True})  # PIE804
 4 4 | 
+
+    Run `ruff check --fix` to apply this fix.
 
 PIE804.py:3:5: PIE804 [*] Unnecessary `dict` kwargs
   |
@@ -28,7 +30,7 @@ PIE804.py:3:5: PIE804 [*] Unnecessary `dict` kwargs
   |
   = help: Remove unnecessary kwargs
 
-ℹ Safe fix
+Suggested fix:
 1 1 | foo(**{"bar": True})  # PIE804
 2 2 | 
 3   |-foo(**{"r2d2": True})  # PIE804
@@ -36,6 +38,8 @@ PIE804.py:3:5: PIE804 [*] Unnecessary `dict` kwargs
 4 4 | 
 5 5 | Foo.objects.create(**{"bar": True})  # PIE804
 6 6 | 
+
+    Run `ruff check --fix` to apply this fix.
 
 PIE804.py:5:20: PIE804 [*] Unnecessary `dict` kwargs
   |
@@ -48,7 +52,7 @@ PIE804.py:5:20: PIE804 [*] Unnecessary `dict` kwargs
   |
   = help: Remove unnecessary kwargs
 
-ℹ Safe fix
+Suggested fix:
 2 2 | 
 3 3 | foo(**{"r2d2": True})  # PIE804
 4 4 | 
@@ -57,6 +61,8 @@ PIE804.py:5:20: PIE804 [*] Unnecessary `dict` kwargs
 6 6 | 
 7 7 | Foo.objects.create(**{"_id": some_id})  # PIE804
 8 8 | 
+
+    Run `ruff check --fix` to apply this fix.
 
 PIE804.py:7:20: PIE804 [*] Unnecessary `dict` kwargs
   |
@@ -69,7 +75,7 @@ PIE804.py:7:20: PIE804 [*] Unnecessary `dict` kwargs
   |
   = help: Remove unnecessary kwargs
 
-ℹ Safe fix
+Suggested fix:
 4 4 | 
 5 5 | Foo.objects.create(**{"bar": True})  # PIE804
 6 6 | 
@@ -78,6 +84,8 @@ PIE804.py:7:20: PIE804 [*] Unnecessary `dict` kwargs
 8 8 | 
 9 9 | Foo.objects.create(**{**bar})  # PIE804
 10 10 | 
+
+    Run `ruff check --fix` to apply this fix.
 
 PIE804.py:9:20: PIE804 [*] Unnecessary `dict` kwargs
    |
@@ -90,7 +98,7 @@ PIE804.py:9:20: PIE804 [*] Unnecessary `dict` kwargs
    |
    = help: Remove unnecessary kwargs
 
-ℹ Safe fix
+Suggested fix:
 6  6  | 
 7  7  | Foo.objects.create(**{"_id": some_id})  # PIE804
 8  8  | 
@@ -99,6 +107,8 @@ PIE804.py:9:20: PIE804 [*] Unnecessary `dict` kwargs
 10 10 | 
 11 11 | foo(**{})
 12 12 | 
+
+    Run `ruff check --fix` to apply this fix.
 
 PIE804.py:11:5: PIE804 [*] Unnecessary `dict` kwargs
    |
@@ -111,7 +121,7 @@ PIE804.py:11:5: PIE804 [*] Unnecessary `dict` kwargs
    |
    = help: Remove unnecessary kwargs
 
-ℹ Safe fix
+Suggested fix:
 8  8  | 
 9  9  | Foo.objects.create(**{**bar})  # PIE804
 10 10 | 
@@ -120,6 +130,8 @@ PIE804.py:11:5: PIE804 [*] Unnecessary `dict` kwargs
 12 12 | 
 13 13 | foo(**{**data, "foo": "buzz"})
 14 14 | foo(**buzz)
+
+    Run `ruff check --fix` to apply this fix.
 
 PIE804.py:22:5: PIE804 [*] Unnecessary `dict` kwargs
    |
@@ -132,7 +144,7 @@ PIE804.py:22:5: PIE804 [*] Unnecessary `dict` kwargs
    |
    = help: Remove unnecessary kwargs
 
-ℹ Safe fix
+Suggested fix:
 19 19 | foo(**{"": True})
 20 20 | foo(**{f"buzz__{bar}": True})
 21 21 | abc(**{"for": 3})
@@ -141,6 +153,8 @@ PIE804.py:22:5: PIE804 [*] Unnecessary `dict` kwargs
 23 23 | 
 24 24 | # Duplicated key names won't be fixed, to avoid syntax errors.
 25 25 | abc(**{'a': b}, **{'a': c})  # PIE804
+
+    Run `ruff check --fix` to apply this fix.
 
 PIE804.py:25:5: PIE804 Unnecessary `dict` kwargs
    |
@@ -182,7 +196,7 @@ PIE804.py:26:22: PIE804 [*] Unnecessary `dict` kwargs
    |
    = help: Remove unnecessary kwargs
 
-ℹ Safe fix
+Suggested fix:
 23 23 | 
 24 24 | # Duplicated key names won't be fixed, to avoid syntax errors.
 25 25 | abc(**{'a': b}, **{'a': c})  # PIE804
@@ -191,6 +205,8 @@ PIE804.py:26:22: PIE804 [*] Unnecessary `dict` kwargs
 27 27 | 
 28 28 | # Some values need to be parenthesized.
 29 29 | abc(foo=1, **{'bar': (bar := 1)})  # PIE804
+
+    Run `ruff check --fix` to apply this fix.
 
 PIE804.py:29:12: PIE804 [*] Unnecessary `dict` kwargs
    |
@@ -201,13 +217,15 @@ PIE804.py:29:12: PIE804 [*] Unnecessary `dict` kwargs
    |
    = help: Remove unnecessary kwargs
 
-ℹ Safe fix
+Suggested fix:
 26 26 | abc(a=1, **{'a': c}, **{'b': c})  # PIE804
 27 27 | 
 28 28 | # Some values need to be parenthesized.
 29    |-abc(foo=1, **{'bar': (bar := 1)})  # PIE804
    29 |+abc(foo=1, bar=(bar := 1))  # PIE804
 30 30 | abc(foo=1, **{'bar': (yield 1)})  # PIE804
+
+    Run `ruff check --fix` to apply this fix.
 
 PIE804.py:30:12: PIE804 [*] Unnecessary `dict` kwargs
    |
@@ -218,9 +236,11 @@ PIE804.py:30:12: PIE804 [*] Unnecessary `dict` kwargs
    |
    = help: Remove unnecessary kwargs
 
-ℹ Safe fix
+Suggested fix:
 27 27 | 
 28 28 | # Some values need to be parenthesized.
 29 29 | abc(foo=1, **{'bar': (bar := 1)})  # PIE804
 30    |-abc(foo=1, **{'bar': (yield 1)})  # PIE804
    30 |+abc(foo=1, bar=(yield 1))  # PIE804
+
+    Run `ruff check --fix` to apply this fix.

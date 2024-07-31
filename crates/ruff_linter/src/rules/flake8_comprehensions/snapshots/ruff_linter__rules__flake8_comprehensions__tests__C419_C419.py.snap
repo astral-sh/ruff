@@ -10,12 +10,14 @@ C419.py:1:5: C419 [*] Unnecessary list comprehension
   |
   = help: Remove unnecessary list comprehension
 
-ℹ Unsafe fix
+Suggested fix:
 1   |-any([x.id for x in bar])
   1 |+any(x.id for x in bar)
 2 2 | all([x.id for x in bar])
 3 3 | any(  # first comment
 4 4 |     [x.id for x in bar],  # second comment
+
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 C419.py:2:5: C419 [*] Unnecessary list comprehension
   |
@@ -27,13 +29,15 @@ C419.py:2:5: C419 [*] Unnecessary list comprehension
   |
   = help: Remove unnecessary list comprehension
 
-ℹ Unsafe fix
+Suggested fix:
 1 1 | any([x.id for x in bar])
 2   |-all([x.id for x in bar])
   2 |+all(x.id for x in bar)
 3 3 | any(  # first comment
 4 4 |     [x.id for x in bar],  # second comment
 5 5 | )  # third comment
+
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 C419.py:4:5: C419 [*] Unnecessary list comprehension
   |
@@ -46,7 +50,7 @@ C419.py:4:5: C419 [*] Unnecessary list comprehension
   |
   = help: Remove unnecessary list comprehension
 
-ℹ Unsafe fix
+Suggested fix:
 1 1 | any([x.id for x in bar])
 2 2 | all([x.id for x in bar])
 3 3 | any(  # first comment
@@ -55,6 +59,8 @@ C419.py:4:5: C419 [*] Unnecessary list comprehension
 5 5 | )  # third comment
 6 6 | all(  # first comment
 7 7 |     [x.id for x in bar],  # second comment
+
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 C419.py:7:5: C419 [*] Unnecessary list comprehension
   |
@@ -67,7 +73,7 @@ C419.py:7:5: C419 [*] Unnecessary list comprehension
   |
   = help: Remove unnecessary list comprehension
 
-ℹ Unsafe fix
+Suggested fix:
 4 4 |     [x.id for x in bar],  # second comment
 5 5 | )  # third comment
 6 6 | all(  # first comment
@@ -76,6 +82,8 @@ C419.py:7:5: C419 [*] Unnecessary list comprehension
 8 8 | )  # third comment
 9 9 | any({x.id for x in bar})
 10 10 | 
+
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 C419.py:9:5: C419 [*] Unnecessary list comprehension
    |
@@ -88,7 +96,7 @@ C419.py:9:5: C419 [*] Unnecessary list comprehension
    |
    = help: Remove unnecessary list comprehension
 
-ℹ Unsafe fix
+Suggested fix:
 6  6  | all(  # first comment
 7  7  |     [x.id for x in bar],  # second comment
 8  8  | )  # third comment
@@ -97,6 +105,8 @@ C419.py:9:5: C419 [*] Unnecessary list comprehension
 10 10 | 
 11 11 | # OK
 12 12 | all(x.id for x in bar)
+
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 C419.py:28:5: C419 [*] Unnecessary list comprehension
    |
@@ -115,7 +125,7 @@ C419.py:28:5: C419 [*] Unnecessary list comprehension
    |
    = help: Remove unnecessary list comprehension
 
-ℹ Unsafe fix
+Suggested fix:
 25 25 | 
 26 26 | # Special comment handling
 27 27 | any(
@@ -133,6 +143,8 @@ C419.py:28:5: C419 [*] Unnecessary list comprehension
 35 34 | )
 36 35 | 
 
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
+
 C419.py:39:5: C419 [*] Unnecessary list comprehension
    |
 37 |   # Weird case where the function call, opening bracket, and comment are all
@@ -147,7 +159,7 @@ C419.py:39:5: C419 [*] Unnecessary list comprehension
    |
    = help: Remove unnecessary list comprehension
 
-ℹ Unsafe fix
+Suggested fix:
 36 36 | 
 37 37 | # Weird case where the function call, opening bracket, and comment are all
 38 38 | # on the same line.
@@ -160,3 +172,5 @@ C419.py:39:5: C419 [*] Unnecessary list comprehension
    41 |+# second line comment
    42 |+i.bit_count() for i in range(5)  # rbracket comment  # rpar comment
 43 43 | )
+
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.

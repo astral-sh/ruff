@@ -9,7 +9,7 @@ B006_B008.py:63:25: B006 [*] Do not use mutable data structures for argument def
    |
    = help: Replace with `None`; initialize within function
 
-ℹ Unsafe fix
+Suggested fix:
 60 60 | # Flag mutable literals/comprehensions
 61 61 | 
 62 62 | 
@@ -19,6 +19,8 @@ B006_B008.py:63:25: B006 [*] Do not use mutable data structures for argument def
 65 65 | 
 66 66 | 
 
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
+
 B006_B008.py:67:30: B006 [*] Do not use mutable data structures for argument defaults
    |
 67 | def this_is_also_wrong(value={}):
@@ -27,7 +29,7 @@ B006_B008.py:67:30: B006 [*] Do not use mutable data structures for argument def
    |
    = help: Replace with `None`; initialize within function
 
-ℹ Unsafe fix
+Suggested fix:
 64 64 |     ...
 65 65 | 
 66 66 | 
@@ -36,6 +38,8 @@ B006_B008.py:67:30: B006 [*] Do not use mutable data structures for argument def
 68 68 |     ...
 69 69 | 
 70 70 | 
+
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 B006_B008.py:73:52: B006 [*] Do not use mutable data structures for argument defaults
    |
@@ -47,7 +51,7 @@ B006_B008.py:73:52: B006 [*] Do not use mutable data structures for argument def
    |
    = help: Replace with `None`; initialize within function
 
-ℹ Unsafe fix
+Suggested fix:
 70 70 | 
 71 71 | class Foo:
 72 72 |     @staticmethod
@@ -56,6 +60,8 @@ B006_B008.py:73:52: B006 [*] Do not use mutable data structures for argument def
 74 74 |         pass
 75 75 | 
 76 76 | 
+
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 B006_B008.py:77:31: B006 [*] Do not use mutable data structures for argument defaults
    |
@@ -68,7 +74,7 @@ B006_B008.py:77:31: B006 [*] Do not use mutable data structures for argument def
    |
    = help: Replace with `None`; initialize within function
 
-ℹ Unsafe fix
+Suggested fix:
 74 74 |         pass
 75 75 | 
 76 76 | 
@@ -79,6 +85,8 @@ B006_B008.py:77:31: B006 [*] Do not use mutable data structures for argument def
 80 78 |     ...
 81 79 | 
 82 80 | def single_line_func_wrong(value = {}): ...
+
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 B006_B008.py:82:36: B006 Do not use mutable data structures for argument defaults
    |
@@ -97,7 +105,7 @@ B006_B008.py:85:20: B006 [*] Do not use mutable data structures for argument def
    |
    = help: Replace with `None`; initialize within function
 
-ℹ Unsafe fix
+Suggested fix:
 82 82 | def single_line_func_wrong(value = {}): ...
 83 83 | 
 84 84 | 
@@ -107,6 +115,8 @@ B006_B008.py:85:20: B006 [*] Do not use mutable data structures for argument def
 87 87 | 
 88 88 | 
 
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
+
 B006_B008.py:89:20: B006 [*] Do not use mutable data structures for argument defaults
    |
 89 | def this_too(value=collections.OrderedDict()):
@@ -115,7 +125,7 @@ B006_B008.py:89:20: B006 [*] Do not use mutable data structures for argument def
    |
    = help: Replace with `None`; initialize within function
 
-ℹ Unsafe fix
+Suggested fix:
 86 86 |     ...
 87 87 | 
 88 88 | 
@@ -125,6 +135,8 @@ B006_B008.py:89:20: B006 [*] Do not use mutable data structures for argument def
 91 91 | 
 92 92 | 
 
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
+
 B006_B008.py:93:32: B006 [*] Do not use mutable data structures for argument defaults
    |
 93 | async def async_this_too(value=collections.defaultdict()):
@@ -133,7 +145,7 @@ B006_B008.py:93:32: B006 [*] Do not use mutable data structures for argument def
    |
    = help: Replace with `None`; initialize within function
 
-ℹ Unsafe fix
+Suggested fix:
 90 90 |     ...
 91 91 | 
 92 92 | 
@@ -143,6 +155,8 @@ B006_B008.py:93:32: B006 [*] Do not use mutable data structures for argument def
 95 95 | 
 96 96 | 
 
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
+
 B006_B008.py:97:26: B006 [*] Do not use mutable data structures for argument defaults
    |
 97 | def dont_forget_me(value=collections.deque()):
@@ -151,7 +165,7 @@ B006_B008.py:97:26: B006 [*] Do not use mutable data structures for argument def
    |
    = help: Replace with `None`; initialize within function
 
-ℹ Unsafe fix
+Suggested fix:
 94 94 |     ...
 95 95 | 
 96 96 | 
@@ -160,6 +174,8 @@ B006_B008.py:97:26: B006 [*] Do not use mutable data structures for argument def
 98 98 |     ...
 99 99 | 
 100 100 | 
+
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 B006_B008.py:102:46: B006 [*] Do not use mutable data structures for argument defaults
     |
@@ -170,7 +186,7 @@ B006_B008.py:102:46: B006 [*] Do not use mutable data structures for argument de
     |
     = help: Replace with `None`; initialize within function
 
-ℹ Unsafe fix
+Suggested fix:
 99  99  | 
 100 100 | 
 101 101 | # N.B. we're also flagging the function call in the comprehension
@@ -180,6 +196,8 @@ B006_B008.py:102:46: B006 [*] Do not use mutable data structures for argument de
 104 104 | 
 105 105 | 
 
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
+
 B006_B008.py:106:46: B006 [*] Do not use mutable data structures for argument defaults
     |
 106 | def dict_comprehension_also_not_okay(default={i: i**2 for i in range(3)}):
@@ -188,7 +206,7 @@ B006_B008.py:106:46: B006 [*] Do not use mutable data structures for argument de
     |
     = help: Replace with `None`; initialize within function
 
-ℹ Unsafe fix
+Suggested fix:
 103 103 |     pass
 104 104 | 
 105 105 | 
@@ -198,6 +216,8 @@ B006_B008.py:106:46: B006 [*] Do not use mutable data structures for argument de
 108 108 | 
 109 109 | 
 
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
+
 B006_B008.py:110:45: B006 [*] Do not use mutable data structures for argument defaults
     |
 110 | def set_comprehension_also_not_okay(default={i**2 for i in range(3)}):
@@ -206,7 +226,7 @@ B006_B008.py:110:45: B006 [*] Do not use mutable data structures for argument de
     |
     = help: Replace with `None`; initialize within function
 
-ℹ Unsafe fix
+Suggested fix:
 107 107 |     pass
 108 108 | 
 109 109 | 
@@ -216,6 +236,8 @@ B006_B008.py:110:45: B006 [*] Do not use mutable data structures for argument de
 112 112 | 
 113 113 | 
 
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
+
 B006_B008.py:114:33: B006 [*] Do not use mutable data structures for argument defaults
     |
 114 | def kwonlyargs_mutable(*, value=[]):
@@ -224,7 +246,7 @@ B006_B008.py:114:33: B006 [*] Do not use mutable data structures for argument de
     |
     = help: Replace with `None`; initialize within function
 
-ℹ Unsafe fix
+Suggested fix:
 111 111 |     pass
 112 112 | 
 113 113 | 
@@ -233,6 +255,8 @@ B006_B008.py:114:33: B006 [*] Do not use mutable data structures for argument de
 115 115 |     ...
 116 116 | 
 117 117 | 
+
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 B006_B008.py:239:20: B006 [*] Do not use mutable data structures for argument defaults
     |
@@ -244,7 +268,7 @@ B006_B008.py:239:20: B006 [*] Do not use mutable data structures for argument de
     |
     = help: Replace with `None`; initialize within function
 
-ℹ Unsafe fix
+Suggested fix:
 236 236 | 
 237 237 | # B006 and B008
 238 238 | # We should handle arbitrary nesting of these B008.
@@ -253,6 +277,8 @@ B006_B008.py:239:20: B006 [*] Do not use mutable data structures for argument de
 240 240 |     pass
 241 241 | 
 242 242 | 
+
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 B006_B008.py:276:27: B006 [*] Do not use mutable data structures for argument defaults
     |
@@ -264,7 +290,7 @@ B006_B008.py:276:27: B006 [*] Do not use mutable data structures for argument de
     |
     = help: Replace with `None`; initialize within function
 
-ℹ Unsafe fix
+Suggested fix:
 273 273 | 
 274 274 | 
 275 275 | def mutable_annotations(
@@ -273,6 +299,8 @@ B006_B008.py:276:27: B006 [*] Do not use mutable data structures for argument de
 277 277 |     b: Optional[Dict[int, int]] = {},
 278 278 |     c: Annotated[Union[Set[str], abc.Sized], "annotation"] = set(),
 279 279 |     d: typing_extensions.Annotated[Union[Set[str], abc.Sized], "annotation"] = set(),
+
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 B006_B008.py:277:35: B006 [*] Do not use mutable data structures for argument defaults
     |
@@ -285,7 +313,7 @@ B006_B008.py:277:35: B006 [*] Do not use mutable data structures for argument de
     |
     = help: Replace with `None`; initialize within function
 
-ℹ Unsafe fix
+Suggested fix:
 274 274 | 
 275 275 | def mutable_annotations(
 276 276 |     a: list[int] | None = [],
@@ -294,6 +322,8 @@ B006_B008.py:277:35: B006 [*] Do not use mutable data structures for argument de
 278 278 |     c: Annotated[Union[Set[str], abc.Sized], "annotation"] = set(),
 279 279 |     d: typing_extensions.Annotated[Union[Set[str], abc.Sized], "annotation"] = set(),
 280 280 | ):
+
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 B006_B008.py:278:62: B006 [*] Do not use mutable data structures for argument defaults
     |
@@ -306,7 +336,7 @@ B006_B008.py:278:62: B006 [*] Do not use mutable data structures for argument de
     |
     = help: Replace with `None`; initialize within function
 
-ℹ Unsafe fix
+Suggested fix:
 275 275 | def mutable_annotations(
 276 276 |     a: list[int] | None = [],
 277 277 |     b: Optional[Dict[int, int]] = {},
@@ -315,6 +345,8 @@ B006_B008.py:278:62: B006 [*] Do not use mutable data structures for argument de
 279 279 |     d: typing_extensions.Annotated[Union[Set[str], abc.Sized], "annotation"] = set(),
 280 280 | ):
 281 281 |     pass
+
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 B006_B008.py:279:80: B006 [*] Do not use mutable data structures for argument defaults
     |
@@ -327,7 +359,7 @@ B006_B008.py:279:80: B006 [*] Do not use mutable data structures for argument de
     |
     = help: Replace with `None`; initialize within function
 
-ℹ Unsafe fix
+Suggested fix:
 276 276 |     a: list[int] | None = [],
 277 277 |     b: Optional[Dict[int, int]] = {},
 278 278 |     c: Annotated[Union[Set[str], abc.Sized], "annotation"] = set(),
@@ -337,6 +369,8 @@ B006_B008.py:279:80: B006 [*] Do not use mutable data structures for argument de
 281 281 |     pass
 282 282 | 
 
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
+
 B006_B008.py:284:52: B006 [*] Do not use mutable data structures for argument defaults
     |
 284 | def single_line_func_wrong(value: dict[str, str] = {}):
@@ -345,7 +379,7 @@ B006_B008.py:284:52: B006 [*] Do not use mutable data structures for argument de
     |
     = help: Replace with `None`; initialize within function
 
-ℹ Unsafe fix
+Suggested fix:
 281 281 |     pass
 282 282 | 
 283 283 | 
@@ -354,6 +388,8 @@ B006_B008.py:284:52: B006 [*] Do not use mutable data structures for argument de
 285 285 |     """Docstring"""
 286 286 | 
 287 287 | 
+
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 B006_B008.py:288:52: B006 [*] Do not use mutable data structures for argument defaults
     |
@@ -364,7 +400,7 @@ B006_B008.py:288:52: B006 [*] Do not use mutable data structures for argument de
     |
     = help: Replace with `None`; initialize within function
 
-ℹ Unsafe fix
+Suggested fix:
 285 285 |     """Docstring"""
 286 286 | 
 287 287 | 
@@ -374,6 +410,8 @@ B006_B008.py:288:52: B006 [*] Do not use mutable data structures for argument de
 290 290 |     ...
 291 291 | 
 
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
+
 B006_B008.py:293:52: B006 [*] Do not use mutable data structures for argument defaults
     |
 293 | def single_line_func_wrong(value: dict[str, str] = {}):
@@ -382,7 +420,7 @@ B006_B008.py:293:52: B006 [*] Do not use mutable data structures for argument de
     |
     = help: Replace with `None`; initialize within function
 
-ℹ Unsafe fix
+Suggested fix:
 290 290 |     ...
 291 291 | 
 292 292 | 
@@ -391,6 +429,8 @@ B006_B008.py:293:52: B006 [*] Do not use mutable data structures for argument de
 294 294 |     """Docstring"""; ...
 295 295 | 
 296 296 | 
+
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 B006_B008.py:297:52: B006 [*] Do not use mutable data structures for argument defaults
     |
@@ -401,7 +441,7 @@ B006_B008.py:297:52: B006 [*] Do not use mutable data structures for argument de
     |
     = help: Replace with `None`; initialize within function
 
-ℹ Unsafe fix
+Suggested fix:
 294 294 |     """Docstring"""; ...
 295 295 | 
 296 296 | 
@@ -410,6 +450,8 @@ B006_B008.py:297:52: B006 [*] Do not use mutable data structures for argument de
 298 298 |     """Docstring"""; \
 299 299 |         ...
 300 300 | 
+
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 B006_B008.py:302:52: B006 [*] Do not use mutable data structures for argument defaults
     |
@@ -422,7 +464,7 @@ B006_B008.py:302:52: B006 [*] Do not use mutable data structures for argument de
     |
     = help: Replace with `None`; initialize within function
 
-ℹ Unsafe fix
+Suggested fix:
 299 299 |         ...
 300 300 | 
 301 301 | 
@@ -433,6 +475,8 @@ B006_B008.py:302:52: B006 [*] Do not use mutable data structures for argument de
 305 303 |     """Docstring"""
 306 304 | 
 307 305 | 
+
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 B006_B008.py:308:52: B006 Do not use mutable data structures for argument defaults
     |
@@ -451,10 +495,12 @@ B006_B008.py:313:52: B006 [*] Do not use mutable data structures for argument de
     |
     = help: Replace with `None`; initialize within function
 
-ℹ Unsafe fix
+Suggested fix:
 310 310 |     """Docstring"""
 311 311 | 
 312 312 | 
 313     |-def single_line_func_wrong(value: dict[str, str] = {}):
     313 |+def single_line_func_wrong(value: dict[str, str] = None):
 314 314 |     """Docstring without newline"""
+
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.

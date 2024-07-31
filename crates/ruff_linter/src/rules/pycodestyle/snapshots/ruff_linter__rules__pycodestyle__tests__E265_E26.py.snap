@@ -12,7 +12,7 @@ E26.py:10:1: E265 [*] Block comment should start with `# `
    |
    = help: Format space
 
-ℹ Safe fix
+Suggested fix:
 7  7  | #: E262:1:12
 8  8  | x = y + 1  #:  Increment x
 9  9  | #: E265:1:1
@@ -21,6 +21,8 @@ E26.py:10:1: E265 [*] Block comment should start with `# `
 11 11 | a = 1
 12 12 | #: E265:2:1
 13 13 | m = 42
+
+    Run `ruff check --fix` to apply this fix.
 
 E26.py:14:1: E265 [*] Block comment should start with `# `
    |
@@ -33,7 +35,7 @@ E26.py:14:1: E265 [*] Block comment should start with `# `
    |
    = help: Format space
 
-ℹ Safe fix
+Suggested fix:
 11 11 | a = 1
 12 12 | #: E265:2:1
 13 13 | m = 42
@@ -42,6 +44,8 @@ E26.py:14:1: E265 [*] Block comment should start with `# `
 15 15 | mx = 42 - 42
 16 16 | #: E266:3:5 E266:6:5
 17 17 | def how_it_feel(r):
+
+    Run `ruff check --fix` to apply this fix.
 
 E26.py:25:1: E265 [*] Block comment should start with `# `
    |
@@ -54,7 +58,7 @@ E26.py:25:1: E265 [*] Block comment should start with `# `
    |
    = help: Format space
 
-ℹ Safe fix
+Suggested fix:
 22 22 |     ### Of course it is unused
 23 23 |     return
 24 24 | #: E265:1:1 E266:2:1
@@ -63,6 +67,8 @@ E26.py:25:1: E265 [*] Block comment should start with `# `
 26 26 | ##    logging.error()
 27 27 | #: W291:1:42
 28 28 | #########################################
+
+    Run `ruff check --fix` to apply this fix.
 
 E26.py:32:1: E265 [*] Block comment should start with `# `
    |
@@ -74,7 +80,7 @@ E26.py:32:1: E265 [*] Block comment should start with `# `
    |
    = help: Format space
 
-ℹ Safe fix
+Suggested fix:
 29 29 | #:
 30 30 | 
 31 31 | #: Okay
@@ -83,6 +89,8 @@ E26.py:32:1: E265 [*] Block comment should start with `# `
 33 33 | 
 34 34 | pass  # an inline comment
 35 35 | x = x + 1   # Increment x
+
+    Run `ruff check --fix` to apply this fix.
 
 E26.py:73:1: E265 [*] Block comment should start with `# `
    |
@@ -94,7 +102,7 @@ E26.py:73:1: E265 [*] Block comment should start with `# `
    |
    = help: Format space
 
-ℹ Safe fix
+Suggested fix:
 70 70 | # E   Means test is giving error (E)
 71 71 | # F   Means test is failing (F)
 72 72 | # EF  Means test is giving error and Failing
@@ -103,6 +111,8 @@ E26.py:73:1: E265 [*] Block comment should start with `# `
 74 74 | # 8   Means test runs forever
 75 75 | 
 76 76 | #: Colon prefix is okay
+
+    Run `ruff check --fix` to apply this fix.
 
 E26.py:78:1: E265 [*] Block comment should start with `# `
    |
@@ -115,7 +125,7 @@ E26.py:78:1: E265 [*] Block comment should start with `# `
    |
    = help: Format space
 
-ℹ Safe fix
+Suggested fix:
 75 75 | 
 76 76 | #: Colon prefix is okay
 77 77 | 
@@ -125,4 +135,4 @@ E26.py:78:1: E265 [*] Block comment should start with `# `
 80 80 | # We should strip the space, but preserve the hashes.
 81 81 | #: E266:1:3
 
-
+    Run `ruff check --fix` to apply this fix.

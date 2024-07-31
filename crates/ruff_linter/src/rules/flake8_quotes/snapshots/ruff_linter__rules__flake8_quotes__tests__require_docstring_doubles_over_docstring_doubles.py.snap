@@ -14,7 +14,7 @@ docstring_doubles.py:5:1: Q001 [*] Double quote multiline found but single quote
   |
   = help: Replace double multiline quotes with single quotes
 
-ℹ Safe fix
+Suggested fix:
 2 2 | Double quotes multiline module docstring
 3 3 | """
 4 4 | 
@@ -26,6 +26,8 @@ docstring_doubles.py:5:1: Q001 [*] Double quote multiline found but single quote
 8 8 | 
 9 9 | l = []
 10 10 | 
+
+    Run `ruff check --fix` to apply this fix.
 
 docstring_doubles.py:16:5: Q001 [*] Double quote multiline found but single quotes preferred
    |
@@ -41,7 +43,7 @@ docstring_doubles.py:16:5: Q001 [*] Double quote multiline found but single quot
    |
    = help: Replace double multiline quotes with single quotes
 
-ℹ Safe fix
+Suggested fix:
 13 13 |     Double quotes multiline class docstring
 14 14 |     """
 15 15 | 
@@ -53,6 +55,8 @@ docstring_doubles.py:16:5: Q001 [*] Double quote multiline found but single quot
 19 19 | 
 20 20 |     # The colon in the list indexing below is an edge case for the docstring scanner
 21 21 |     def f(self, bar="""
+
+    Run `ruff check --fix` to apply this fix.
 
 docstring_doubles.py:21:21: Q001 [*] Double quote multiline found but single quotes preferred
    |
@@ -66,7 +70,7 @@ docstring_doubles.py:21:21: Q001 [*] Double quote multiline found but single quo
    |
    = help: Replace double multiline quotes with single quotes
 
-ℹ Safe fix
+Suggested fix:
 18 18 |     """
 19 19 | 
 20 20 |     # The colon in the list indexing below is an edge case for the docstring scanner
@@ -77,6 +81,8 @@ docstring_doubles.py:21:21: Q001 [*] Double quote multiline found but single quo
 23 23 |         val=l[Cls():3]):
 24 24 |         """
 25 25 |         Double quotes multiline function docstring
+
+    Run `ruff check --fix` to apply this fix.
 
 docstring_doubles.py:30:9: Q001 [*] Double quote multiline found but single quotes preferred
    |
@@ -92,7 +98,7 @@ docstring_doubles.py:30:9: Q001 [*] Double quote multiline found but single quot
    |
    = help: Replace double multiline quotes with single quotes
 
-ℹ Safe fix
+Suggested fix:
 27 27 | 
 28 28 |         some_expression = 'hello world'
 29 29 | 
@@ -104,6 +110,8 @@ docstring_doubles.py:30:9: Q001 [*] Double quote multiline found but single quot
 33 33 | 
 34 34 |         if l:
 35 35 |             """
+
+    Run `ruff check --fix` to apply this fix.
 
 docstring_doubles.py:35:13: Q001 [*] Double quote multiline found but single quotes preferred
    |
@@ -117,7 +125,7 @@ docstring_doubles.py:35:13: Q001 [*] Double quote multiline found but single quo
    |
    = help: Replace double multiline quotes with single quotes
 
-ℹ Safe fix
+Suggested fix:
 32 32 |         """
 33 33 | 
 34 34 |         if l:
@@ -128,4 +136,4 @@ docstring_doubles.py:35:13: Q001 [*] Double quote multiline found but single quo
    37 |+            '''
 38 38 |             pass
 
-
+    Run `ruff check --fix` to apply this fix.

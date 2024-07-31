@@ -12,7 +12,7 @@ E27.py:4:9: E271 [*] Multiple spaces after keyword
   |
   = help: Replace with single space
 
-ℹ Safe fix
+Suggested fix:
 1 1 | #: Okay
 2 2 | True and False
 3 3 | #: E271
@@ -21,6 +21,8 @@ E27.py:4:9: E271 [*] Multiple spaces after keyword
 5 5 | #: E272
 6 6 | True  and False
 7 7 | #: E271
+
+    Run `ruff check --fix` to apply this fix.
 
 E27.py:6:5: E271 [*] Multiple spaces after keyword
   |
@@ -33,7 +35,7 @@ E27.py:6:5: E271 [*] Multiple spaces after keyword
   |
   = help: Replace with single space
 
-ℹ Safe fix
+Suggested fix:
 3 3 | #: E271
 4 4 | True and  False
 5 5 | #: E272
@@ -42,6 +44,8 @@ E27.py:6:5: E271 [*] Multiple spaces after keyword
 7 7 | #: E271
 8 8 | if   1:
 9 9 |     pass
+
+    Run `ruff check --fix` to apply this fix.
 
 E27.py:8:3: E271 [*] Multiple spaces after keyword
    |
@@ -54,7 +58,7 @@ E27.py:8:3: E271 [*] Multiple spaces after keyword
    |
    = help: Replace with single space
 
-ℹ Safe fix
+Suggested fix:
 5 5 | #: E272
 6 6 | True  and False
 7 7 | #: E271
@@ -63,6 +67,8 @@ E27.py:8:3: E271 [*] Multiple spaces after keyword
 9 9 |     pass
 10 10 | #: E273
 11 11 | True and		False
+
+    Run `ruff check --fix` to apply this fix.
 
 E27.py:15:6: E271 [*] Multiple spaces after keyword
    |
@@ -75,7 +81,7 @@ E27.py:15:6: E271 [*] Multiple spaces after keyword
    |
    = help: Replace with single space
 
-ℹ Safe fix
+Suggested fix:
 12 12 | #: E273 E274
 13 13 | True		and	False
 14 14 | #: E271
@@ -84,6 +90,8 @@ E27.py:15:6: E271 [*] Multiple spaces after keyword
 16 16 | #: E271
 17 17 | 1 and  b
 18 18 | #: E271
+
+    Run `ruff check --fix` to apply this fix.
 
 E27.py:17:6: E271 [*] Multiple spaces after keyword
    |
@@ -96,7 +104,7 @@ E27.py:17:6: E271 [*] Multiple spaces after keyword
    |
    = help: Replace with single space
 
-ℹ Safe fix
+Suggested fix:
 14 14 | #: E271
 15 15 | a and  b
 16 16 | #: E271
@@ -105,6 +113,8 @@ E27.py:17:6: E271 [*] Multiple spaces after keyword
 18 18 | #: E271
 19 19 | a and  2
 20 20 | #: E271 E272
+
+    Run `ruff check --fix` to apply this fix.
 
 E27.py:19:6: E271 [*] Multiple spaces after keyword
    |
@@ -117,7 +127,7 @@ E27.py:19:6: E271 [*] Multiple spaces after keyword
    |
    = help: Replace with single space
 
-ℹ Safe fix
+Suggested fix:
 16 16 | #: E271
 17 17 | 1 and  b
 18 18 | #: E271
@@ -126,6 +136,8 @@ E27.py:19:6: E271 [*] Multiple spaces after keyword
 20 20 | #: E271 E272
 21 21 | 1  and  b
 22 22 | #: E271 E272
+
+    Run `ruff check --fix` to apply this fix.
 
 E27.py:21:7: E271 [*] Multiple spaces after keyword
    |
@@ -138,7 +150,7 @@ E27.py:21:7: E271 [*] Multiple spaces after keyword
    |
    = help: Replace with single space
 
-ℹ Safe fix
+Suggested fix:
 18 18 | #: E271
 19 19 | a and  2
 20 20 | #: E271 E272
@@ -147,6 +159,8 @@ E27.py:21:7: E271 [*] Multiple spaces after keyword
 22 22 | #: E271 E272
 23 23 | a  and  2
 24 24 | #: E272
+
+    Run `ruff check --fix` to apply this fix.
 
 E27.py:23:7: E271 [*] Multiple spaces after keyword
    |
@@ -159,7 +173,7 @@ E27.py:23:7: E271 [*] Multiple spaces after keyword
    |
    = help: Replace with single space
 
-ℹ Safe fix
+Suggested fix:
 20 20 | #: E271 E272
 21 21 | 1  and  b
 22 22 | #: E271 E272
@@ -168,6 +182,8 @@ E27.py:23:7: E271 [*] Multiple spaces after keyword
 24 24 | #: E272
 25 25 | this  and False
 26 26 | #: E273
+
+    Run `ruff check --fix` to apply this fix.
 
 E27.py:36:14: E271 [*] Multiple spaces after keyword
    |
@@ -180,7 +196,7 @@ E27.py:36:14: E271 [*] Multiple spaces after keyword
    |
    = help: Replace with single space
 
-ℹ Safe fix
+Suggested fix:
 33 33 | from u import (a, b)
 34 34 | from v import c, d
 35 35 | #: E271
@@ -189,6 +205,8 @@ E27.py:36:14: E271 [*] Multiple spaces after keyword
 37 37 | #: E275
 38 38 | from w import(e, f)
 39 39 | #: E275
+
+    Run `ruff check --fix` to apply this fix.
 
 E27.py:71:5: E271 [*] Multiple spaces after keyword
    |
@@ -200,7 +218,7 @@ E27.py:71:5: E271 [*] Multiple spaces after keyword
    |
    = help: Replace with single space
 
-ℹ Safe fix
+Suggested fix:
 68 68 | # Soft keywords
 69 69 | 
 70 70 | #: E271
@@ -209,3 +227,5 @@ E27.py:71:5: E271 [*] Multiple spaces after keyword
 72 72 | 
 73 73 | #: E273
 74 74 | type	Number = int
+
+    Run `ruff check --fix` to apply this fix.

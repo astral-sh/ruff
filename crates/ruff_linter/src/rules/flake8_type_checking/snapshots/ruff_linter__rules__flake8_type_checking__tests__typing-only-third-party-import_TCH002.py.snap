@@ -11,7 +11,7 @@ TCH002.py:5:22: TCH002 [*] Move third-party import `pandas` into a type-checking
   |
   = help: Move into type-checking block
 
-ℹ Unsafe fix
+Suggested fix:
 1 1 | """Tests to determine accurate detection of typing-only imports."""
   2 |+from typing import TYPE_CHECKING
   3 |+
@@ -25,6 +25,8 @@ TCH002.py:5:22: TCH002 [*] Move third-party import `pandas` into a type-checking
 7 10 |     x: pd.DataFrame
 8 11 | 
 
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
+
 TCH002.py:11:24: TCH002 [*] Move third-party import `pandas.DataFrame` into a type-checking block
    |
 10 | def f():
@@ -35,7 +37,7 @@ TCH002.py:11:24: TCH002 [*] Move third-party import `pandas.DataFrame` into a ty
    |
    = help: Move into type-checking block
 
-ℹ Unsafe fix
+Suggested fix:
 1  1  | """Tests to determine accurate detection of typing-only imports."""
    2  |+from typing import TYPE_CHECKING
    3  |+
@@ -53,6 +55,8 @@ TCH002.py:11:24: TCH002 [*] Move third-party import `pandas.DataFrame` into a ty
 13 16 |     x: DataFrame
 14 17 | 
 
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
+
 TCH002.py:17:37: TCH002 [*] Move third-party import `pandas.DataFrame` into a type-checking block
    |
 16 | def f():
@@ -63,7 +67,7 @@ TCH002.py:17:37: TCH002 [*] Move third-party import `pandas.DataFrame` into a ty
    |
    = help: Move into type-checking block
 
-ℹ Unsafe fix
+Suggested fix:
 1  1  | """Tests to determine accurate detection of typing-only imports."""
    2  |+from typing import TYPE_CHECKING
    3  |+
@@ -81,6 +85,8 @@ TCH002.py:17:37: TCH002 [*] Move third-party import `pandas.DataFrame` into a ty
 19 22 |     x: df
 20 23 | 
 
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
+
 TCH002.py:23:22: TCH002 [*] Move third-party import `pandas` into a type-checking block
    |
 22 | def f():
@@ -91,7 +97,7 @@ TCH002.py:23:22: TCH002 [*] Move third-party import `pandas` into a type-checkin
    |
    = help: Move into type-checking block
 
-ℹ Unsafe fix
+Suggested fix:
 1  1  | """Tests to determine accurate detection of typing-only imports."""
    2  |+from typing import TYPE_CHECKING
    3  |+
@@ -109,6 +115,8 @@ TCH002.py:23:22: TCH002 [*] Move third-party import `pandas` into a type-checkin
 25 28 |     x: pd.DataFrame = 1
 26 29 | 
 
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
+
 TCH002.py:29:24: TCH002 [*] Move third-party import `pandas.DataFrame` into a type-checking block
    |
 28 | def f():
@@ -119,7 +127,7 @@ TCH002.py:29:24: TCH002 [*] Move third-party import `pandas.DataFrame` into a ty
    |
    = help: Move into type-checking block
 
-ℹ Unsafe fix
+Suggested fix:
 1  1  | """Tests to determine accurate detection of typing-only imports."""
    2  |+from typing import TYPE_CHECKING
    3  |+
@@ -137,6 +145,8 @@ TCH002.py:29:24: TCH002 [*] Move third-party import `pandas.DataFrame` into a ty
 31 34 |     x: DataFrame = 2
 32 35 | 
 
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
+
 TCH002.py:35:37: TCH002 [*] Move third-party import `pandas.DataFrame` into a type-checking block
    |
 34 | def f():
@@ -147,7 +157,7 @@ TCH002.py:35:37: TCH002 [*] Move third-party import `pandas.DataFrame` into a ty
    |
    = help: Move into type-checking block
 
-ℹ Unsafe fix
+Suggested fix:
 1  1  | """Tests to determine accurate detection of typing-only imports."""
    2  |+from typing import TYPE_CHECKING
    3  |+
@@ -165,6 +175,8 @@ TCH002.py:35:37: TCH002 [*] Move third-party import `pandas.DataFrame` into a ty
 37 40 |     x: df = 3
 38 41 | 
 
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
+
 TCH002.py:41:22: TCH002 [*] Move third-party import `pandas` into a type-checking block
    |
 40 | def f():
@@ -175,7 +187,7 @@ TCH002.py:41:22: TCH002 [*] Move third-party import `pandas` into a type-checkin
    |
    = help: Move into type-checking block
 
-ℹ Unsafe fix
+Suggested fix:
 1  1  | """Tests to determine accurate detection of typing-only imports."""
    2  |+from typing import TYPE_CHECKING
    3  |+
@@ -193,6 +205,8 @@ TCH002.py:41:22: TCH002 [*] Move third-party import `pandas` into a type-checkin
 43 46 |     x: "pd.DataFrame" = 1
 44 47 | 
 
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
+
 TCH002.py:47:22: TCH002 [*] Move third-party import `pandas` into a type-checking block
    |
 46 | def f():
@@ -203,7 +217,7 @@ TCH002.py:47:22: TCH002 [*] Move third-party import `pandas` into a type-checkin
    |
    = help: Move into type-checking block
 
-ℹ Unsafe fix
+Suggested fix:
 1  1  | """Tests to determine accurate detection of typing-only imports."""
    2  |+from typing import TYPE_CHECKING
    3  |+
@@ -221,6 +235,8 @@ TCH002.py:47:22: TCH002 [*] Move third-party import `pandas` into a type-checkin
 49 52 |     x = dict["pd.DataFrame", "pd.DataFrame"]
 50 53 | 
 
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
+
 TCH002.py:172:24: TCH002 [*] Move third-party import `module.Member` into a type-checking block
     |
 170 |     global Member
@@ -232,7 +248,7 @@ TCH002.py:172:24: TCH002 [*] Move third-party import `module.Member` into a type
     |
     = help: Move into type-checking block
 
-ℹ Unsafe fix
+Suggested fix:
 1   1   | """Tests to determine accurate detection of typing-only imports."""
     2   |+from typing import TYPE_CHECKING
     3   |+
@@ -250,4 +266,4 @@ TCH002.py:172:24: TCH002 [*] Move third-party import `module.Member` into a type
 174 177 |     x: Member = 1
 175 178 | 
 
-
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.

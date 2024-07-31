@@ -11,7 +11,7 @@ SIM117.py:2:1: SIM117 [*] Use a single `with` statement with multiple contexts i
   |
   = help: Combine `with` statements
 
-ℹ Unsafe fix
+Suggested fix:
 1 1 | # SIM117
 2   |-with A() as a:
 3   |-    with B() as b:
@@ -21,6 +21,8 @@ SIM117.py:2:1: SIM117 [*] Use a single `with` statement with multiple contexts i
 5 4 | 
 6 5 | # SIM117
 7 6 | with A():
+
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 SIM117.py:7:1: SIM117 [*] Use a single `with` statement with multiple contexts instead of nested `with` statements
    |
@@ -33,7 +35,7 @@ SIM117.py:7:1: SIM117 [*] Use a single `with` statement with multiple contexts i
    |
    = help: Combine `with` statements
 
-ℹ Unsafe fix
+Suggested fix:
 4  4  |         print("hello")
 5  5  | 
 6  6  | # SIM117
@@ -47,6 +49,8 @@ SIM117.py:7:1: SIM117 [*] Use a single `with` statement with multiple contexts i
 11 10 | 
 12 11 | # SIM117
 13 12 | with A() as a:
+
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 SIM117.py:13:1: SIM117 Use a single `with` statement with multiple contexts instead of nested `with` statements
    |
@@ -70,7 +74,7 @@ SIM117.py:19:1: SIM117 [*] Use a single `with` statement with multiple contexts 
    |
    = help: Combine `with` statements
 
-ℹ Unsafe fix
+Suggested fix:
 16 16 |         print("hello")
 17 17 | 
 18 18 | # SIM117
@@ -85,6 +89,8 @@ SIM117.py:19:1: SIM117 [*] Use a single `with` statement with multiple contexts 
 24 23 | # OK
 25 24 | with A() as a:
 
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
+
 SIM117.py:47:1: SIM117 [*] Use a single `with` statement with multiple contexts instead of nested `with` statements
    |
 46 |   # SIM117
@@ -95,7 +101,7 @@ SIM117.py:47:1: SIM117 [*] Use a single `with` statement with multiple contexts 
    |
    = help: Combine `with` statements
 
-ℹ Unsafe fix
+Suggested fix:
 44 44 |         print("hello")
 45 45 | 
 46 46 | # SIM117
@@ -107,6 +113,8 @@ SIM117.py:47:1: SIM117 [*] Use a single `with` statement with multiple contexts 
 50 49 | 
 51 50 | while True:
 52 51 |     # SIM117
+
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 SIM117.py:53:5: SIM117 [*] Use a single `with` statement with multiple contexts instead of nested `with` statements
    |
@@ -121,7 +129,7 @@ SIM117.py:53:5: SIM117 [*] Use a single `with` statement with multiple contexts 
    |
    = help: Combine `with` statements
 
-ℹ Unsafe fix
+Suggested fix:
 50 50 | 
 51 51 | while True:
 52 52 |     # SIM117
@@ -146,6 +154,8 @@ SIM117.py:53:5: SIM117 [*] Use a single `with` statement with multiple contexts 
 66 65 | 
 67 66 | # SIM117
 
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
+
 SIM117.py:68:1: SIM117 [*] Use a single `with` statement with multiple contexts instead of nested `with` statements
    |
 67 |   # SIM117
@@ -159,7 +169,7 @@ SIM117.py:68:1: SIM117 [*] Use a single `with` statement with multiple contexts 
    |
    = help: Combine `with` statements
 
-ℹ Unsafe fix
+Suggested fix:
 67 67 | # SIM117
 68 68 | with (
 69 69 |     A() as a,
@@ -172,6 +182,8 @@ SIM117.py:68:1: SIM117 [*] Use a single `with` statement with multiple contexts 
 74 73 | 
 75 74 | # SIM117
 76 75 | with A() as a:
+
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 SIM117.py:76:1: SIM117 [*] Use a single `with` statement with multiple contexts instead of nested `with` statements
    |
@@ -186,7 +198,7 @@ SIM117.py:76:1: SIM117 [*] Use a single `with` statement with multiple contexts 
    |
    = help: Combine `with` statements
 
-ℹ Unsafe fix
+Suggested fix:
 73 73 |         print("hello")
 74 74 | 
 75 75 | # SIM117
@@ -205,6 +217,8 @@ SIM117.py:76:1: SIM117 [*] Use a single `with` statement with multiple contexts 
 83 82 | # SIM117
 84 83 | with (
 
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
+
 SIM117.py:84:1: SIM117 [*] Use a single `with` statement with multiple contexts instead of nested `with` statements
    |
 83 |   # SIM117
@@ -221,7 +235,7 @@ SIM117.py:84:1: SIM117 [*] Use a single `with` statement with multiple contexts 
    |
    = help: Combine `with` statements
 
-ℹ Unsafe fix
+Suggested fix:
 83 83 | # SIM117
 84 84 | with (
 85 85 |     A() as a,
@@ -239,6 +253,8 @@ SIM117.py:84:1: SIM117 [*] Use a single `with` statement with multiple contexts 
 94 91 | # SIM117 (auto-fixable)
 95 92 | with A("01ß9💣2ℝ8901ß9💣2ℝ8901ß9💣2ℝ89") as a:
 
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
+
 SIM117.py:95:1: SIM117 [*] Use a single `with` statement with multiple contexts instead of nested `with` statements
    |
 94 |   # SIM117 (auto-fixable)
@@ -249,7 +265,7 @@ SIM117.py:95:1: SIM117 [*] Use a single `with` statement with multiple contexts 
    |
    = help: Combine `with` statements
 
-ℹ Unsafe fix
+Suggested fix:
 92 92 |         print("hello")
 93 93 | 
 94 94 | # SIM117 (auto-fixable)
@@ -261,6 +277,8 @@ SIM117.py:95:1: SIM117 [*] Use a single `with` statement with multiple contexts 
 98 97 | 
 99 98 | # SIM117 (not auto-fixable too long)
 100 99 | with A("01ß9💣2ℝ8901ß9💣2ℝ8901ß9💣2ℝ890") as a:
+
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 SIM117.py:100:1: SIM117 Use a single `with` statement with multiple contexts instead of nested `with` statements
     |
@@ -294,7 +312,7 @@ SIM117.py:126:1: SIM117 [*] Use a single `with` statement with multiple contexts
     |
     = help: Combine `with` statements
 
-ℹ Unsafe fix
+Suggested fix:
 123 123 |             f(b2, c2, d2)
 124 124 | 
 125 125 | # SIM117
@@ -320,6 +338,8 @@ SIM117.py:126:1: SIM117 [*] Use a single `with` statement with multiple contexts
 138 137 | # Allow cascading for some statements.
 139 138 | import anyio
 
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
+
 SIM117.py:163:1: SIM117 [*] Use a single `with` statement with multiple contexts instead of nested `with` statements
     |
 162 |   # Do not suppress combination, if a context manager is already combined with another.
@@ -330,7 +350,7 @@ SIM117.py:163:1: SIM117 [*] Use a single `with` statement with multiple contexts
     |
     = help: Combine `with` statements
 
-ℹ Unsafe fix
+Suggested fix:
 160 160 |                                     pass
 161 161 | 
 162 162 | # Do not suppress combination, if a context manager is already combined with another.
@@ -340,4 +360,4 @@ SIM117.py:163:1: SIM117 [*] Use a single `with` statement with multiple contexts
     163 |+async with asyncio.timeout(1), A(), B():
     164 |+    pass
 
-
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.

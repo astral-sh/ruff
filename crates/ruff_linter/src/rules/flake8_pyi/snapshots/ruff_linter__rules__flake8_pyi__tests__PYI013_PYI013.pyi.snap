@@ -12,7 +12,7 @@ PYI013.pyi:5:5: PYI013 [*] Non-empty class body must not contain `...`
   |
   = help: Remove unnecessary `...`
 
-ℹ Safe fix
+Suggested fix:
 2 2 | 
 3 3 | class OneAttributeClass:
 4 4 |     value: int
@@ -20,6 +20,8 @@ PYI013.pyi:5:5: PYI013 [*] Non-empty class body must not contain `...`
 6 5 | 
 7 6 | class OneAttributeClass2:
 8 7 |     ...  # Error
+
+    Run `ruff check --fix` to apply this fix.
 
 PYI013.pyi:8:5: PYI013 [*] Non-empty class body must not contain `...`
   |
@@ -30,7 +32,7 @@ PYI013.pyi:8:5: PYI013 [*] Non-empty class body must not contain `...`
   |
   = help: Remove unnecessary `...`
 
-ℹ Safe fix
+Suggested fix:
 5 5 |     ...  # Error
 6 6 | 
 7 7 | class OneAttributeClass2:
@@ -38,6 +40,8 @@ PYI013.pyi:8:5: PYI013 [*] Non-empty class body must not contain `...`
 9 8 |     value: int
 10 9 | 
 11 10 | class MyClass:
+
+    Run `ruff check --fix` to apply this fix.
 
 PYI013.pyi:12:5: PYI013 [*] Non-empty class body must not contain `...`
    |
@@ -48,7 +52,7 @@ PYI013.pyi:12:5: PYI013 [*] Non-empty class body must not contain `...`
    |
    = help: Remove unnecessary `...`
 
-ℹ Safe fix
+Suggested fix:
 9  9  |     value: int
 10 10 | 
 11 11 | class MyClass:
@@ -56,6 +60,8 @@ PYI013.pyi:12:5: PYI013 [*] Non-empty class body must not contain `...`
 13 12 |     value: int
 14 13 | 
 15 14 | class TwoEllipsesClass:
+
+    Run `ruff check --fix` to apply this fix.
 
 PYI013.pyi:16:5: PYI013 [*] Non-empty class body must not contain `...`
    |
@@ -66,7 +72,7 @@ PYI013.pyi:16:5: PYI013 [*] Non-empty class body must not contain `...`
    |
    = help: Remove unnecessary `...`
 
-ℹ Safe fix
+Suggested fix:
 13 13 |     value: int
 14 14 | 
 15 15 | class TwoEllipsesClass:
@@ -74,6 +80,8 @@ PYI013.pyi:16:5: PYI013 [*] Non-empty class body must not contain `...`
 17 16 |     ...  # Error
 18 17 | 
 19 18 | class DocstringClass:
+
+    Run `ruff check --fix` to apply this fix.
 
 PYI013.pyi:17:5: PYI013 [*] Non-empty class body must not contain `...`
    |
@@ -86,7 +94,7 @@ PYI013.pyi:17:5: PYI013 [*] Non-empty class body must not contain `...`
    |
    = help: Remove unnecessary `...`
 
-ℹ Safe fix
+Suggested fix:
 14 14 | 
 15 15 | class TwoEllipsesClass:
 16 16 |     ...
@@ -94,6 +102,8 @@ PYI013.pyi:17:5: PYI013 [*] Non-empty class body must not contain `...`
 18 17 | 
 19 18 | class DocstringClass:
 20 19 |     """
+
+    Run `ruff check --fix` to apply this fix.
 
 PYI013.pyi:24:5: PYI013 [*] Non-empty class body must not contain `...`
    |
@@ -106,7 +116,7 @@ PYI013.pyi:24:5: PYI013 [*] Non-empty class body must not contain `...`
    |
    = help: Remove unnecessary `...`
 
-ℹ Safe fix
+Suggested fix:
 21 21 |     My body only contains an ellipsis.
 22 22 |     """
 23 23 | 
@@ -114,6 +124,8 @@ PYI013.pyi:24:5: PYI013 [*] Non-empty class body must not contain `...`
 25 24 | 
 26 25 | class NonEmptyChild(Exception):
 27 26 |     value: int
+
+    Run `ruff check --fix` to apply this fix.
 
 PYI013.pyi:28:5: PYI013 [*] Non-empty class body must not contain `...`
    |
@@ -126,7 +138,7 @@ PYI013.pyi:28:5: PYI013 [*] Non-empty class body must not contain `...`
    |
    = help: Remove unnecessary `...`
 
-ℹ Safe fix
+Suggested fix:
 25 25 | 
 26 26 | class NonEmptyChild(Exception):
 27 27 |     value: int
@@ -134,6 +146,8 @@ PYI013.pyi:28:5: PYI013 [*] Non-empty class body must not contain `...`
 29 28 | 
 30 29 | class NonEmptyChild2(Exception):
 31 30 |     ...  # Error
+
+    Run `ruff check --fix` to apply this fix.
 
 PYI013.pyi:31:5: PYI013 [*] Non-empty class body must not contain `...`
    |
@@ -144,7 +158,7 @@ PYI013.pyi:31:5: PYI013 [*] Non-empty class body must not contain `...`
    |
    = help: Remove unnecessary `...`
 
-ℹ Safe fix
+Suggested fix:
 28 28 |     ...  # Error
 29 29 | 
 30 30 | class NonEmptyChild2(Exception):
@@ -152,6 +166,8 @@ PYI013.pyi:31:5: PYI013 [*] Non-empty class body must not contain `...`
 32 31 |     value: int
 33 32 | 
 34 33 | class NonEmptyWithInit:
+
+    Run `ruff check --fix` to apply this fix.
 
 PYI013.pyi:36:5: PYI013 [*] Non-empty class body must not contain `...`
    |
@@ -164,7 +180,7 @@ PYI013.pyi:36:5: PYI013 [*] Non-empty class body must not contain `...`
    |
    = help: Remove unnecessary `...`
 
-ℹ Safe fix
+Suggested fix:
 33 33 | 
 34 34 | class NonEmptyWithInit:
 35 35 |     value: int
@@ -173,4 +189,4 @@ PYI013.pyi:36:5: PYI013 [*] Non-empty class body must not contain `...`
 38 37 |     def __init__():
 39 38 |         pass
 
-
+    Run `ruff check --fix` to apply this fix.

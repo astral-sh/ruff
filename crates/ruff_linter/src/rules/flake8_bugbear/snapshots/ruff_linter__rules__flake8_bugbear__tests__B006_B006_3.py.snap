@@ -10,7 +10,7 @@ B006_3.py:4:22: B006 [*] Do not use mutable data structures for argument default
   |
   = help: Replace with `None`; initialize within function
 
-ℹ Unsafe fix
+Suggested fix:
 1 1 | # Docstring with no newline
 2 2 | 
 3 3 | 
@@ -18,3 +18,5 @@ B006_3.py:4:22: B006 [*] Do not use mutable data structures for argument default
   4 |+def foobar(foor, bar=None):    
 5 5 |     """
 6 6 |     """
+
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.

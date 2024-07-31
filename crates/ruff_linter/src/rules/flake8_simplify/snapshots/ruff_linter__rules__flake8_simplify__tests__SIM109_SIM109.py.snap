@@ -10,13 +10,15 @@ SIM109.py:2:4: SIM109 [*] Use `a in (b, c)` instead of multiple equality compari
   |
   = help: Replace with `a in (b, c)`
 
-ℹ Unsafe fix
+Suggested fix:
 1 1 | # SIM109
 2   |-if a == b or a == c:
   2 |+if a in (b, c):
 3 3 |     d
 4 4 | 
 5 5 | # SIM109
+
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 SIM109.py:6:5: SIM109 [*] Use `a in (b, c)` instead of multiple equality comparisons
   |
@@ -27,7 +29,7 @@ SIM109.py:6:5: SIM109 [*] Use `a in (b, c)` instead of multiple equality compari
   |
   = help: Replace with `a in (b, c)`
 
-ℹ Unsafe fix
+Suggested fix:
 3 3 |     d
 4 4 | 
 5 5 | # SIM109
@@ -36,6 +38,8 @@ SIM109.py:6:5: SIM109 [*] Use `a in (b, c)` instead of multiple equality compari
 7 7 |     d
 8 8 | 
 9 9 | # SIM109
+
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 SIM109.py:10:4: SIM109 [*] Use `a in (b, c)` instead of multiple equality comparisons
    |
@@ -46,7 +50,7 @@ SIM109.py:10:4: SIM109 [*] Use `a in (b, c)` instead of multiple equality compar
    |
    = help: Replace with `a in (b, c)`
 
-ℹ Unsafe fix
+Suggested fix:
 7  7  |     d
 8  8  | 
 9  9  | # SIM109
@@ -55,6 +59,8 @@ SIM109.py:10:4: SIM109 [*] Use `a in (b, c)` instead of multiple equality compar
 11 11 |     d
 12 12 | 
 13 13 | # SIM109
+
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 SIM109.py:14:4: SIM109 [*] Use `a in (b, c)` instead of multiple equality comparisons
    |
@@ -65,7 +71,7 @@ SIM109.py:14:4: SIM109 [*] Use `a in (b, c)` instead of multiple equality compar
    |
    = help: Replace with `a in (b, c)`
 
-ℹ Unsafe fix
+Suggested fix:
 11 11 |     d
 12 12 | 
 13 13 | # SIM109
@@ -75,4 +81,4 @@ SIM109.py:14:4: SIM109 [*] Use `a in (b, c)` instead of multiple equality compar
 16 16 | 
 17 17 | # OK
 
-
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.

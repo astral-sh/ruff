@@ -10,12 +10,14 @@ SIM211.py:1:5: SIM211 [*] Use `not ...` instead of `False if ... else True`
   |
   = help: Replace with `not ...`
 
-ℹ Unsafe fix
+Suggested fix:
 1   |-a = False if b else True  # SIM211
   1 |+a = not b  # SIM211
 2 2 | 
 3 3 | a = False if b != c else True  # SIM211
 4 4 | 
+
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 SIM211.py:3:5: SIM211 [*] Use `not ...` instead of `False if ... else True`
   |
@@ -28,7 +30,7 @@ SIM211.py:3:5: SIM211 [*] Use `not ...` instead of `False if ... else True`
   |
   = help: Replace with `not ...`
 
-ℹ Unsafe fix
+Suggested fix:
 1 1 | a = False if b else True  # SIM211
 2 2 | 
 3   |-a = False if b != c else True  # SIM211
@@ -36,6 +38,8 @@ SIM211.py:3:5: SIM211 [*] Use `not ...` instead of `False if ... else True`
 4 4 | 
 5 5 | a = False if b + c else True  # SIM211
 6 6 | 
+
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 SIM211.py:5:5: SIM211 [*] Use `not ...` instead of `False if ... else True`
   |
@@ -48,7 +52,7 @@ SIM211.py:5:5: SIM211 [*] Use `not ...` instead of `False if ... else True`
   |
   = help: Replace with `not ...`
 
-ℹ Unsafe fix
+Suggested fix:
 2 2 | 
 3 3 | a = False if b != c else True  # SIM211
 4 4 | 
@@ -57,4 +61,4 @@ SIM211.py:5:5: SIM211 [*] Use `not ...` instead of `False if ... else True`
 6 6 | 
 7 7 | a = True if b else False  # OK
 
-
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.

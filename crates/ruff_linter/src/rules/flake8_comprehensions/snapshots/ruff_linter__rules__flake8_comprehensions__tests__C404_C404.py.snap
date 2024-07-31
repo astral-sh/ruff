@@ -9,12 +9,14 @@ C404.py:1:1: C404 [*] Unnecessary `list` comprehension (rewrite as a `dict` comp
   |
   = help: Rewrite as a `dict` comprehension
 
-ℹ Unsafe fix
+Suggested fix:
 1   |-dict([(i, i) for i in range(3)])
   1 |+{i: i for i in range(3)}
 2 2 | dict([(i, i) for i in range(3)], z=4)
 3 3 | 
 4 4 | def f(x):
+
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 C404.py:7:4: C404 [*] Unnecessary `list` comprehension (rewrite as a `dict` comprehension)
   |
@@ -27,7 +29,7 @@ C404.py:7:4: C404 [*] Unnecessary `list` comprehension (rewrite as a `dict` comp
   |
   = help: Rewrite as a `dict` comprehension
 
-ℹ Unsafe fix
+Suggested fix:
 4 4 | def f(x):
 5 5 |     return x
 6 6 | 
@@ -36,6 +38,8 @@ C404.py:7:4: C404 [*] Unnecessary `list` comprehension (rewrite as a `dict` comp
 8 8 | f"{dict([(s,s) for s in 'ab'])}"
 9 9 | f"{dict([(s, s) for s in 'ab'])}"
 10 10 | f"{dict([(s,f(s)) for s in 'ab'])}"
+
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 C404.py:8:4: C404 [*] Unnecessary `list` comprehension (rewrite as a `dict` comprehension)
    |
@@ -47,7 +51,7 @@ C404.py:8:4: C404 [*] Unnecessary `list` comprehension (rewrite as a `dict` comp
    |
    = help: Rewrite as a `dict` comprehension
 
-ℹ Unsafe fix
+Suggested fix:
 5 5 |     return x
 6 6 | 
 7 7 | f'{dict([(s,s) for s in "ab"])}'
@@ -56,6 +60,8 @@ C404.py:8:4: C404 [*] Unnecessary `list` comprehension (rewrite as a `dict` comp
 9 9 | f"{dict([(s, s) for s in 'ab'])}"
 10 10 | f"{dict([(s,f(s)) for s in 'ab'])}"
 11 11 | 
+
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 C404.py:9:4: C404 [*] Unnecessary `list` comprehension (rewrite as a `dict` comprehension)
    |
@@ -67,7 +73,7 @@ C404.py:9:4: C404 [*] Unnecessary `list` comprehension (rewrite as a `dict` comp
    |
    = help: Rewrite as a `dict` comprehension
 
-ℹ Unsafe fix
+Suggested fix:
 6  6  | 
 7  7  | f'{dict([(s,s) for s in "ab"])}'
 8  8  | f"{dict([(s,s) for s in 'ab'])}"
@@ -76,6 +82,8 @@ C404.py:9:4: C404 [*] Unnecessary `list` comprehension (rewrite as a `dict` comp
 10 10 | f"{dict([(s,f(s)) for s in 'ab'])}"
 11 11 | 
 12 12 | f'{dict([(s,s) for s in "ab"]) | dict([(s,s) for s in "ab"])}'
+
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 C404.py:10:4: C404 [*] Unnecessary `list` comprehension (rewrite as a `dict` comprehension)
    |
@@ -88,7 +96,7 @@ C404.py:10:4: C404 [*] Unnecessary `list` comprehension (rewrite as a `dict` com
    |
    = help: Rewrite as a `dict` comprehension
 
-ℹ Unsafe fix
+Suggested fix:
 7  7  | f'{dict([(s,s) for s in "ab"])}'
 8  8  | f"{dict([(s,s) for s in 'ab'])}"
 9  9  | f"{dict([(s, s) for s in 'ab'])}"
@@ -97,6 +105,8 @@ C404.py:10:4: C404 [*] Unnecessary `list` comprehension (rewrite as a `dict` com
 11 11 | 
 12 12 | f'{dict([(s,s) for s in "ab"]) | dict([(s,s) for s in "ab"])}'
 13 13 | f'{ dict([(s,s) for s in "ab"]) | dict([(s,s) for s in "ab"]) }'
+
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 C404.py:12:4: C404 [*] Unnecessary `list` comprehension (rewrite as a `dict` comprehension)
    |
@@ -108,7 +118,7 @@ C404.py:12:4: C404 [*] Unnecessary `list` comprehension (rewrite as a `dict` com
    |
    = help: Rewrite as a `dict` comprehension
 
-ℹ Unsafe fix
+Suggested fix:
 9  9  | f"{dict([(s, s) for s in 'ab'])}"
 10 10 | f"{dict([(s,f(s)) for s in 'ab'])}"
 11 11 | 
@@ -117,6 +127,8 @@ C404.py:12:4: C404 [*] Unnecessary `list` comprehension (rewrite as a `dict` com
 13 13 | f'{ dict([(s,s) for s in "ab"]) | dict([(s,s) for s in "ab"]) }'
 14 14 | 
 15 15 | # Regression test for: https://github.com/astral-sh/ruff/issues/7087
+
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 C404.py:12:34: C404 [*] Unnecessary `list` comprehension (rewrite as a `dict` comprehension)
    |
@@ -128,7 +140,7 @@ C404.py:12:34: C404 [*] Unnecessary `list` comprehension (rewrite as a `dict` co
    |
    = help: Rewrite as a `dict` comprehension
 
-ℹ Unsafe fix
+Suggested fix:
 9  9  | f"{dict([(s, s) for s in 'ab'])}"
 10 10 | f"{dict([(s,f(s)) for s in 'ab'])}"
 11 11 | 
@@ -137,6 +149,8 @@ C404.py:12:34: C404 [*] Unnecessary `list` comprehension (rewrite as a `dict` co
 13 13 | f'{ dict([(s,s) for s in "ab"]) | dict([(s,s) for s in "ab"]) }'
 14 14 | 
 15 15 | # Regression test for: https://github.com/astral-sh/ruff/issues/7087
+
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 C404.py:13:5: C404 [*] Unnecessary `list` comprehension (rewrite as a `dict` comprehension)
    |
@@ -148,7 +162,7 @@ C404.py:13:5: C404 [*] Unnecessary `list` comprehension (rewrite as a `dict` com
    |
    = help: Rewrite as a `dict` comprehension
 
-ℹ Unsafe fix
+Suggested fix:
 10 10 | f"{dict([(s,f(s)) for s in 'ab'])}"
 11 11 | 
 12 12 | f'{dict([(s,s) for s in "ab"]) | dict([(s,s) for s in "ab"])}'
@@ -157,6 +171,8 @@ C404.py:13:5: C404 [*] Unnecessary `list` comprehension (rewrite as a `dict` com
 14 14 | 
 15 15 | # Regression test for: https://github.com/astral-sh/ruff/issues/7087
 16 16 | saved.append(dict([(k, v)for k,v in list(unique_instance.__dict__.items()) if k in [f.name for f in unique_instance._meta.fields]]))
+
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 C404.py:13:35: C404 [*] Unnecessary `list` comprehension (rewrite as a `dict` comprehension)
    |
@@ -168,7 +184,7 @@ C404.py:13:35: C404 [*] Unnecessary `list` comprehension (rewrite as a `dict` co
    |
    = help: Rewrite as a `dict` comprehension
 
-ℹ Unsafe fix
+Suggested fix:
 10 10 | f"{dict([(s,f(s)) for s in 'ab'])}"
 11 11 | 
 12 12 | f'{dict([(s,s) for s in "ab"]) | dict([(s,s) for s in "ab"])}'
@@ -178,6 +194,8 @@ C404.py:13:35: C404 [*] Unnecessary `list` comprehension (rewrite as a `dict` co
 15 15 | # Regression test for: https://github.com/astral-sh/ruff/issues/7087
 16 16 | saved.append(dict([(k, v)for k,v in list(unique_instance.__dict__.items()) if k in [f.name for f in unique_instance._meta.fields]]))
 
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
+
 C404.py:16:14: C404 [*] Unnecessary `list` comprehension (rewrite as a `dict` comprehension)
    |
 15 | # Regression test for: https://github.com/astral-sh/ruff/issues/7087
@@ -186,11 +204,11 @@ C404.py:16:14: C404 [*] Unnecessary `list` comprehension (rewrite as a `dict` co
    |
    = help: Rewrite as a `dict` comprehension
 
-ℹ Unsafe fix
+Suggested fix:
 13 13 | f'{ dict([(s,s) for s in "ab"]) | dict([(s,s) for s in "ab"]) }'
 14 14 | 
 15 15 | # Regression test for: https://github.com/astral-sh/ruff/issues/7087
 16    |-saved.append(dict([(k, v)for k,v in list(unique_instance.__dict__.items()) if k in [f.name for f in unique_instance._meta.fields]]))
    16 |+saved.append({k: v for k,v in list(unique_instance.__dict__.items()) if k in [f.name for f in unique_instance._meta.fields]})
 
-
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.

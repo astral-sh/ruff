@@ -12,7 +12,7 @@ W29.py:7:1: W293 [*] Blank line contains whitespace
   |
   = help: Remove whitespace from blank line
 
-ℹ Safe fix
+Suggested fix:
 4 4 | print 
 5 5 | #: W293:2:1
 6 6 | class Foo(object):
@@ -22,4 +22,4 @@ W29.py:7:1: W293 [*] Blank line contains whitespace
 9 9 | #: W291:2:35
 10 10 | '''multiline
 
-
+    Run `ruff check --fix` to apply this fix.

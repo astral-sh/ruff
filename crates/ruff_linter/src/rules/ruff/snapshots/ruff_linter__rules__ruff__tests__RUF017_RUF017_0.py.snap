@@ -11,7 +11,7 @@ RUF017_0.py:5:1: RUF017 [*] Avoid quadratic list summation
   |
   = help: Replace with `functools.reduce`
 
-ℹ Unsafe fix
+Suggested fix:
   1 |+import functools
   2 |+import operator
 1 3 | x = [1, 2, 3]
@@ -24,6 +24,8 @@ RUF017_0.py:5:1: RUF017 [*] Avoid quadratic list summation
 7 9 | sum([[1, 2, 3], [4, 5, 6]], start=[])
 8 10 | sum([[1, 2, 3], [4, 5, 6]], [])
 
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
+
 RUF017_0.py:6:1: RUF017 [*] Avoid quadratic list summation
   |
 4 | # RUF017
@@ -35,7 +37,7 @@ RUF017_0.py:6:1: RUF017 [*] Avoid quadratic list summation
   |
   = help: Replace with `functools.reduce`
 
-ℹ Unsafe fix
+Suggested fix:
   1 |+import functools
   2 |+import operator
 1 3 | x = [1, 2, 3]
@@ -49,6 +51,8 @@ RUF017_0.py:6:1: RUF017 [*] Avoid quadratic list summation
 8 10 | sum([[1, 2, 3], [4, 5, 6]], [])
 9 11 | sum([[1, 2, 3], [4, 5, 6]],
 
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
+
 RUF017_0.py:7:1: RUF017 [*] Avoid quadratic list summation
   |
 5 | sum([x, y], start=[])
@@ -60,7 +64,7 @@ RUF017_0.py:7:1: RUF017 [*] Avoid quadratic list summation
   |
   = help: Replace with `functools.reduce`
 
-ℹ Unsafe fix
+Suggested fix:
    1  |+import functools
    2  |+import operator
 1  3  | x = [1, 2, 3]
@@ -75,6 +79,8 @@ RUF017_0.py:7:1: RUF017 [*] Avoid quadratic list summation
 9  11 | sum([[1, 2, 3], [4, 5, 6]],
 10 12 |     [])
 
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
+
 RUF017_0.py:8:1: RUF017 [*] Avoid quadratic list summation
    |
  6 | sum([x, y], [])
@@ -86,7 +92,7 @@ RUF017_0.py:8:1: RUF017 [*] Avoid quadratic list summation
    |
    = help: Replace with `functools.reduce`
 
-ℹ Unsafe fix
+Suggested fix:
    1  |+import functools
    2  |+import operator
 1  3  | x = [1, 2, 3]
@@ -102,6 +108,8 @@ RUF017_0.py:8:1: RUF017 [*] Avoid quadratic list summation
 10 12 |     [])
 11 13 | 
 
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
+
 RUF017_0.py:9:1: RUF017 [*] Avoid quadratic list summation
    |
  7 |   sum([[1, 2, 3], [4, 5, 6]], start=[])
@@ -114,7 +122,7 @@ RUF017_0.py:9:1: RUF017 [*] Avoid quadratic list summation
    |
    = help: Replace with `functools.reduce`
 
-ℹ Unsafe fix
+Suggested fix:
    1  |+import functools
    2  |+import operator
 1  3  | x = [1, 2, 3]
@@ -131,6 +139,8 @@ RUF017_0.py:9:1: RUF017 [*] Avoid quadratic list summation
 12 13 | # OK
 13 14 | sum([x, y])
 
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
+
 RUF017_0.py:21:5: RUF017 [*] Avoid quadratic list summation
    |
 19 |     import functools, operator
@@ -140,7 +150,7 @@ RUF017_0.py:21:5: RUF017 [*] Avoid quadratic list summation
    |
    = help: Replace with `functools.reduce`
 
-ℹ Unsafe fix
+Suggested fix:
 18 18 | def func():
 19 19 |     import functools, operator
 20 20 | 
@@ -149,6 +159,8 @@ RUF017_0.py:21:5: RUF017 [*] Avoid quadratic list summation
 22 22 | 
 23 23 | 
 24 24 | # Regression test for: https://github.com/astral-sh/ruff/issues/7718
+
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 RUF017_0.py:26:5: RUF017 [*] Avoid quadratic list summation
    |
@@ -159,7 +171,7 @@ RUF017_0.py:26:5: RUF017 [*] Avoid quadratic list summation
    |
    = help: Replace with `functools.reduce`
 
-ℹ Unsafe fix
+Suggested fix:
    1  |+import functools
    2  |+import operator
 1  3  | x = [1, 2, 3]
@@ -172,4 +184,4 @@ RUF017_0.py:26:5: RUF017 [*] Avoid quadratic list summation
 26    |-    sum((factor.dims for factor in bases), [])
    28 |+    functools.reduce(operator.iadd, (factor.dims for factor in bases), [])
 
-
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.

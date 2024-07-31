@@ -11,7 +11,7 @@ F401_17.py:12:27: F401 [*] `threading.Thread` imported but unused
    |
    = help: Remove unused import: `threading.Thread`
 
-ℹ Safe fix
+Suggested fix:
 9  9  | 
 10 10 | 
 11 11 | def fn(thread: Thread):
@@ -19,6 +19,8 @@ F401_17.py:12:27: F401 [*] `threading.Thread` imported but unused
 13 12 | 
 14 13 |     # The `Thread` on the left-hand side should resolve to the `Thread` imported at the
 15 14 |     # top level.
+
+    Run `ruff check --fix` to apply this fix.
 
 F401_17.py:20:27: F401 [*] `threading.Thread` imported but unused
    |
@@ -30,7 +32,7 @@ F401_17.py:20:27: F401 [*] `threading.Thread` imported but unused
    |
    = help: Remove unused import: `threading.Thread`
 
-ℹ Safe fix
+Suggested fix:
 17 17 | 
 18 18 | 
 19 19 | def fn(thread: Thread):
@@ -39,4 +41,4 @@ F401_17.py:20:27: F401 [*] `threading.Thread` imported but unused
 22 21 |     # The `Thread` on the left-hand side should resolve to the `Thread` imported at the
 23 22 |     # top level.
 
-
+    Run `ruff check --fix` to apply this fix.

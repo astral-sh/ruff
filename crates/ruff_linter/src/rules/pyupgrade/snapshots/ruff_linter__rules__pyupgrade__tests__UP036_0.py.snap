@@ -12,7 +12,7 @@ UP036_0.py:3:4: UP036 [*] Version block is outdated for minimum Python version
   |
   = help: Remove outdated version block
 
-ℹ Unsafe fix
+Suggested fix:
 1 1 | import sys
 2 2 | 
 3   |-if sys.version_info < (3,0):
@@ -23,6 +23,8 @@ UP036_0.py:3:4: UP036 [*] Version block is outdated for minimum Python version
 7 4 | 
 8 5 | if sys.version_info < (3,0):
 9 6 |     if True:
+
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 UP036_0.py:8:4: UP036 [*] Version block is outdated for minimum Python version
    |
@@ -35,7 +37,7 @@ UP036_0.py:8:4: UP036 [*] Version block is outdated for minimum Python version
    |
    = help: Remove outdated version block
 
-ℹ Unsafe fix
+Suggested fix:
 5  5  | else:
 6  6  |     print("py3")
 7  7  | 
@@ -51,6 +53,8 @@ UP036_0.py:8:4: UP036 [*] Version block is outdated for minimum Python version
 16 10 | if sys.version_info < (3,0): print("PY2!")
 17 11 | else: print("PY3!")
 
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
+
 UP036_0.py:16:4: UP036 [*] Version block is outdated for minimum Python version
    |
 14 |     print("py3")
@@ -61,7 +65,7 @@ UP036_0.py:16:4: UP036 [*] Version block is outdated for minimum Python version
    |
    = help: Remove outdated version block
 
-ℹ Unsafe fix
+Suggested fix:
 13 13 | else:
 14 14 |     print("py3")
 15 15 | 
@@ -71,6 +75,8 @@ UP036_0.py:16:4: UP036 [*] Version block is outdated for minimum Python version
 18 17 | 
 19 18 | if True:
 20 19 |     if sys.version_info < (3,0):
+
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 UP036_0.py:20:8: UP036 [*] Version block is outdated for minimum Python version
    |
@@ -82,7 +88,7 @@ UP036_0.py:20:8: UP036 [*] Version block is outdated for minimum Python version
    |
    = help: Remove outdated version block
 
-ℹ Unsafe fix
+Suggested fix:
 17 17 | else: print("PY3!")
 18 18 | 
 19 19 | if True:
@@ -95,6 +101,8 @@ UP036_0.py:20:8: UP036 [*] Version block is outdated for minimum Python version
 25 22 | if sys.version_info < (3,0): print(1 if True else 3)
 26 23 | else:
 
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
+
 UP036_0.py:25:4: UP036 [*] Version block is outdated for minimum Python version
    |
 23 |         print("PY3")
@@ -106,7 +114,7 @@ UP036_0.py:25:4: UP036 [*] Version block is outdated for minimum Python version
    |
    = help: Remove outdated version block
 
-ℹ Unsafe fix
+Suggested fix:
 22 22 |     else:
 23 23 |         print("PY3")
 24 24 | 
@@ -117,6 +125,8 @@ UP036_0.py:25:4: UP036 [*] Version block is outdated for minimum Python version
 28 26 | 
 29 27 | if sys.version_info < (3,0):
 30 28 |     def f():
+
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 UP036_0.py:29:4: UP036 [*] Version block is outdated for minimum Python version
    |
@@ -129,7 +139,7 @@ UP036_0.py:29:4: UP036 [*] Version block is outdated for minimum Python version
    |
    = help: Remove outdated version block
 
-ℹ Unsafe fix
+Suggested fix:
 26 26 | else:
 27 27 |     print("py3")
 28 28 | 
@@ -147,6 +157,8 @@ UP036_0.py:29:4: UP036 [*] Version block is outdated for minimum Python version
 37 33 | if sys.version_info > (3,0):
 38 34 |     print("py3")
 
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
+
 UP036_0.py:37:4: UP036 [*] Version block is outdated for minimum Python version
    |
 35 |         print("This the next")
@@ -158,7 +170,7 @@ UP036_0.py:37:4: UP036 [*] Version block is outdated for minimum Python version
    |
    = help: Remove outdated version block
 
-ℹ Unsafe fix
+Suggested fix:
 34 34 |         print("py3")
 35 35 |         print("This the next")
 36 36 | 
@@ -171,6 +183,8 @@ UP036_0.py:37:4: UP036 [*] Version block is outdated for minimum Python version
 42 39 | 
 43 40 | x = 1
 
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
+
 UP036_0.py:45:4: UP036 [*] Version block is outdated for minimum Python version
    |
 43 | x = 1
@@ -182,7 +196,7 @@ UP036_0.py:45:4: UP036 [*] Version block is outdated for minimum Python version
    |
    = help: Remove outdated version block
 
-ℹ Unsafe fix
+Suggested fix:
 42 42 | 
 43 43 | x = 1
 44 44 | 
@@ -195,6 +209,8 @@ UP036_0.py:45:4: UP036 [*] Version block is outdated for minimum Python version
 50 47 | 
 51 48 | x = 1
 
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
+
 UP036_0.py:53:4: UP036 [*] Version block is outdated for minimum Python version
    |
 51 | x = 1
@@ -205,7 +221,7 @@ UP036_0.py:53:4: UP036 [*] Version block is outdated for minimum Python version
    |
    = help: Remove outdated version block
 
-ℹ Unsafe fix
+Suggested fix:
 50 50 | 
 51 51 | x = 1
 52 52 | 
@@ -215,6 +231,8 @@ UP036_0.py:53:4: UP036 [*] Version block is outdated for minimum Python version
 55 54 | 
 56 55 | if sys.version_info > (3,):
 57 56 |     print("py3")
+
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 UP036_0.py:56:4: UP036 [*] Version block is outdated for minimum Python version
    |
@@ -227,7 +245,7 @@ UP036_0.py:56:4: UP036 [*] Version block is outdated for minimum Python version
    |
    = help: Remove outdated version block
 
-ℹ Unsafe fix
+Suggested fix:
 53 53 | if sys.version_info > (3,0): print("py3")
 54 54 | else: print("py2")
 55 55 | 
@@ -240,6 +258,8 @@ UP036_0.py:56:4: UP036 [*] Version block is outdated for minimum Python version
 61 58 | if True:
 62 59 |     if sys.version_info > (3,):
 
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
+
 UP036_0.py:62:8: UP036 [*] Version block is outdated for minimum Python version
    |
 61 | if True:
@@ -250,7 +270,7 @@ UP036_0.py:62:8: UP036 [*] Version block is outdated for minimum Python version
    |
    = help: Remove outdated version block
 
-ℹ Unsafe fix
+Suggested fix:
 59 59 |     print("py2")
 60 60 | 
 61 61 | if True:
@@ -263,6 +283,8 @@ UP036_0.py:62:8: UP036 [*] Version block is outdated for minimum Python version
 67 64 | if sys.version_info < (3,):
 68 65 |     print("py2")
 
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
+
 UP036_0.py:67:4: UP036 [*] Version block is outdated for minimum Python version
    |
 65 |         print("py2")
@@ -274,7 +296,7 @@ UP036_0.py:67:4: UP036 [*] Version block is outdated for minimum Python version
    |
    = help: Remove outdated version block
 
-ℹ Unsafe fix
+Suggested fix:
 64 64 |     else:
 65 65 |         print("py2")
 66 66 | 
@@ -287,6 +309,8 @@ UP036_0.py:67:4: UP036 [*] Version block is outdated for minimum Python version
 72 69 | def f():
 73 70 |     if sys.version_info < (3,0):
 
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
+
 UP036_0.py:73:8: UP036 [*] Version block is outdated for minimum Python version
    |
 72 | def f():
@@ -297,7 +321,7 @@ UP036_0.py:73:8: UP036 [*] Version block is outdated for minimum Python version
    |
    = help: Remove outdated version block
 
-ℹ Unsafe fix
+Suggested fix:
 70 70 |     print("py3")
 71 71 | 
 72 72 | def f():
@@ -313,6 +337,8 @@ UP036_0.py:73:8: UP036 [*] Version block is outdated for minimum Python version
 81 75 | 
 82 76 | class C:
 
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
+
 UP036_0.py:86:8: UP036 [*] Version block is outdated for minimum Python version
    |
 84 |         pass
@@ -324,7 +350,7 @@ UP036_0.py:86:8: UP036 [*] Version block is outdated for minimum Python version
    |
    = help: Remove outdated version block
 
-ℹ Unsafe fix
+Suggested fix:
 83 83 |     def g():
 84 84 |         pass
 85 85 | 
@@ -340,6 +366,8 @@ UP036_0.py:86:8: UP036 [*] Version block is outdated for minimum Python version
 93 89 |     def h():
 94 90 |         pass
 
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
+
 UP036_0.py:97:8: UP036 [*] Version block is outdated for minimum Python version
    |
 96 | if True:
@@ -350,7 +378,7 @@ UP036_0.py:97:8: UP036 [*] Version block is outdated for minimum Python version
    |
    = help: Remove outdated version block
 
-ℹ Unsafe fix
+Suggested fix:
 94  94  |         pass
 95  95  | 
 96  96  | if True:
@@ -363,6 +391,8 @@ UP036_0.py:97:8: UP036 [*] Version block is outdated for minimum Python version
 102 99  |     # comment
 103 100 | 
 
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
+
 UP036_0.py:104:4: UP036 [*] Version block is outdated for minimum Python version
     |
 102 |     # comment
@@ -374,7 +404,7 @@ UP036_0.py:104:4: UP036 [*] Version block is outdated for minimum Python version
     |
     = help: Remove outdated version block
 
-ℹ Unsafe fix
+Suggested fix:
 101 101 | 
 102 102 |     # comment
 103 103 | 
@@ -396,6 +426,8 @@ UP036_0.py:104:4: UP036 [*] Version block is outdated for minimum Python version
 115 109 | if True:
 116 110 |     if sys.version_info > (3,):
 
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
+
 UP036_0.py:116:8: UP036 [*] Version block is outdated for minimum Python version
     |
 115 | if True:
@@ -406,7 +438,7 @@ UP036_0.py:116:8: UP036 [*] Version block is outdated for minimum Python version
     |
     = help: Remove outdated version block
 
-ℹ Unsafe fix
+Suggested fix:
 113 113 |         print("py3")
 114 114 | 
 115 115 | if True:
@@ -416,6 +448,8 @@ UP036_0.py:116:8: UP036 [*] Version block is outdated for minimum Python version
 118 117 |     # comment
 119 118 |     print(2+3)
 120 119 | 
+
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 UP036_0.py:122:8: UP036 [*] Version block is outdated for minimum Python version
     |
@@ -427,7 +461,7 @@ UP036_0.py:122:8: UP036 [*] Version block is outdated for minimum Python version
     |
     = help: Remove outdated version block
 
-ℹ Unsafe fix
+Suggested fix:
 119 119 |     print(2+3)
 120 120 | 
 121 121 | if True:
@@ -436,6 +470,8 @@ UP036_0.py:122:8: UP036 [*] Version block is outdated for minimum Python version
 123 123 | 
 124 124 | if True:
 125 125 |     if sys.version_info > (3,):
+
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 UP036_0.py:125:8: UP036 [*] Version block is outdated for minimum Python version
     |
@@ -446,7 +482,7 @@ UP036_0.py:125:8: UP036 [*] Version block is outdated for minimum Python version
     |
     = help: Remove outdated version block
 
-ℹ Unsafe fix
+Suggested fix:
 122 122 |     if sys.version_info > (3,): print(3)
 123 123 | 
 124 124 | if True:
@@ -456,6 +492,8 @@ UP036_0.py:125:8: UP036 [*] Version block is outdated for minimum Python version
 127 126 | 
 128 127 | 
 129 128 | if True:
+
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 UP036_0.py:130:8: UP036 [*] Version block is outdated for minimum Python version
     |
@@ -467,7 +505,7 @@ UP036_0.py:130:8: UP036 [*] Version block is outdated for minimum Python version
     |
     = help: Remove outdated version block
 
-ℹ Unsafe fix
+Suggested fix:
 127 127 | 
 128 128 | 
 129 129 | if True:
@@ -485,6 +523,8 @@ UP036_0.py:130:8: UP036 [*] Version block is outdated for minimum Python version
 139 136 | 
 140 137 | if sys.version_info <= (3, 0):
 
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
+
 UP036_0.py:140:4: UP036 [*] Version block is outdated for minimum Python version
     |
 140 | if sys.version_info <= (3, 0):
@@ -494,7 +534,7 @@ UP036_0.py:140:4: UP036 [*] Version block is outdated for minimum Python version
     |
     = help: Remove outdated version block
 
-ℹ Unsafe fix
+Suggested fix:
 137 137 |         ]
 138 138 | 
 139 139 | 
@@ -512,6 +552,8 @@ UP036_0.py:140:4: UP036 [*] Version block is outdated for minimum Python version
 149 146 | 
 150 147 | if sys.version_info > (3,0):
 
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
+
 UP036_0.py:150:4: UP036 [*] Version block is outdated for minimum Python version
     |
 150 | if sys.version_info > (3,0):
@@ -521,7 +563,7 @@ UP036_0.py:150:4: UP036 [*] Version block is outdated for minimum Python version
     |
     = help: Remove outdated version block
 
-ℹ Unsafe fix
+Suggested fix:
 147 147 |     ]
 148 148 | 
 149 149 | 
@@ -546,6 +588,8 @@ UP036_0.py:150:4: UP036 [*] Version block is outdated for minimum Python version
 163 162 | if sys.version_info > (3, 0): expected_error = \
 164 163 |     []
 
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
+
 UP036_0.py:163:4: UP036 [*] Version block is outdated for minimum Python version
     |
 161 |      "this for some reason")
@@ -556,7 +600,7 @@ UP036_0.py:163:4: UP036 [*] Version block is outdated for minimum Python version
     |
     = help: Remove outdated version block
 
-ℹ Unsafe fix
+Suggested fix:
 160 160 |     ("so is"
 161 161 |      "this for some reason")
 162 162 | 
@@ -565,6 +609,8 @@ UP036_0.py:163:4: UP036 [*] Version block is outdated for minimum Python version
 164 164 |     []
 165 165 | 
 166 166 | if sys.version_info > (3, 0): expected_error = []
+
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 UP036_0.py:166:4: UP036 [*] Version block is outdated for minimum Python version
     |
@@ -577,7 +623,7 @@ UP036_0.py:166:4: UP036 [*] Version block is outdated for minimum Python version
     |
     = help: Remove outdated version block
 
-ℹ Unsafe fix
+Suggested fix:
 163 163 | if sys.version_info > (3, 0): expected_error = \
 164 164 |     []
 165 165 | 
@@ -586,6 +632,8 @@ UP036_0.py:166:4: UP036 [*] Version block is outdated for minimum Python version
 167 167 | 
 168 168 | if sys.version_info > (3, 0): \
 169 169 |     expected_error = []
+
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 UP036_0.py:168:4: UP036 [*] Version block is outdated for minimum Python version
     |
@@ -597,7 +645,7 @@ UP036_0.py:168:4: UP036 [*] Version block is outdated for minimum Python version
     |
     = help: Remove outdated version block
 
-ℹ Unsafe fix
+Suggested fix:
 165 165 | 
 166 166 | if sys.version_info > (3, 0): expected_error = []
 167 167 | 
@@ -608,6 +656,8 @@ UP036_0.py:168:4: UP036 [*] Version block is outdated for minimum Python version
 171 170 | if True:
 172 171 |     if sys.version_info > (3, 0): expected_error = \
 
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
+
 UP036_0.py:172:8: UP036 [*] Version block is outdated for minimum Python version
     |
 171 | if True:
@@ -617,7 +667,7 @@ UP036_0.py:172:8: UP036 [*] Version block is outdated for minimum Python version
     |
     = help: Remove outdated version block
 
-ℹ Unsafe fix
+Suggested fix:
 169 169 |     expected_error = []
 170 170 | 
 171 171 | if True:
@@ -626,6 +676,8 @@ UP036_0.py:172:8: UP036 [*] Version block is outdated for minimum Python version
 173 173 |     []
 174 174 | 
 175 175 | if True:
+
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 UP036_0.py:176:8: UP036 [*] Version block is outdated for minimum Python version
     |
@@ -637,7 +689,7 @@ UP036_0.py:176:8: UP036 [*] Version block is outdated for minimum Python version
     |
     = help: Remove outdated version block
 
-ℹ Unsafe fix
+Suggested fix:
 173 173 |     []
 174 174 | 
 175 175 | if True:
@@ -646,6 +698,8 @@ UP036_0.py:176:8: UP036 [*] Version block is outdated for minimum Python version
 177 177 | 
 178 178 | if True:
 179 179 |     if sys.version_info > (3, 0): \
+
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 UP036_0.py:179:8: UP036 [*] Version block is outdated for minimum Python version
     |
@@ -656,7 +710,7 @@ UP036_0.py:179:8: UP036 [*] Version block is outdated for minimum Python version
     |
     = help: Remove outdated version block
 
-ℹ Unsafe fix
+Suggested fix:
 176 176 |     if sys.version_info > (3, 0): expected_error = []
 177 177 | 
 178 178 | if True:
@@ -664,6 +718,8 @@ UP036_0.py:179:8: UP036 [*] Version block is outdated for minimum Python version
 180 179 |     expected_error = []
 181 180 | 
 182 181 | if sys.version_info < (3,13):
+
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 UP036_0.py:182:4: UP036 [*] Version block is outdated for minimum Python version
     |
@@ -675,7 +731,7 @@ UP036_0.py:182:4: UP036 [*] Version block is outdated for minimum Python version
     |
     = help: Remove outdated version block
 
-ℹ Unsafe fix
+Suggested fix:
 179 179 |     if sys.version_info > (3, 0): \
 180 180 |     expected_error = []
 181 181 | 
@@ -684,6 +740,8 @@ UP036_0.py:182:4: UP036 [*] Version block is outdated for minimum Python version
 184 182 | 
 185 183 | if sys.version_info <= (3,13):
 186 184 |     print("py3")
+
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 UP036_0.py:191:24: UP036 Version specifier is invalid
     |
@@ -722,7 +780,7 @@ UP036_0.py:203:4: UP036 [*] Version block is outdated for minimum Python version
     |
     = help: Remove outdated version block
 
-ℹ Unsafe fix
+Suggested fix:
 200 200 | if sys.version_info > (3,13):
 201 201 |     print("py3")
 202 202 | 
@@ -733,6 +791,8 @@ UP036_0.py:203:4: UP036 [*] Version block is outdated for minimum Python version
 206 205 | # Slices on `sys.version_info` should be treated equivalently.
 207 206 | if sys.version_info[:2] >= (3,0):
 
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
+
 UP036_0.py:207:4: UP036 [*] Version block is outdated for minimum Python version
     |
 206 | # Slices on `sys.version_info` should be treated equivalently.
@@ -742,7 +802,7 @@ UP036_0.py:207:4: UP036 [*] Version block is outdated for minimum Python version
     |
     = help: Remove outdated version block
 
-ℹ Unsafe fix
+Suggested fix:
 204 204 |     print("py3")
 205 205 | 
 206 206 | # Slices on `sys.version_info` should be treated equivalently.
@@ -752,6 +812,8 @@ UP036_0.py:207:4: UP036 [*] Version block is outdated for minimum Python version
 209 208 | 
 210 209 | if sys.version_info[:3] >= (3,0):
 211 210 |     print("py3")
+
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 UP036_0.py:210:4: UP036 [*] Version block is outdated for minimum Python version
     |
@@ -763,7 +825,7 @@ UP036_0.py:210:4: UP036 [*] Version block is outdated for minimum Python version
     |
     = help: Remove outdated version block
 
-ℹ Unsafe fix
+Suggested fix:
 207 207 | if sys.version_info[:2] >= (3,0):
 208 208 |     print("py3")
 209 209 | 
@@ -773,6 +835,8 @@ UP036_0.py:210:4: UP036 [*] Version block is outdated for minimum Python version
 212 211 | 
 213 212 | if sys.version_info[:2] > (3,14):
 214 213 |     print("py3")
+
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 UP036_0.py:219:4: UP036 [*] Version block is outdated for minimum Python version
     |
@@ -785,7 +849,7 @@ UP036_0.py:219:4: UP036 [*] Version block is outdated for minimum Python version
     |
     = help: Remove outdated version block
 
-ℹ Unsafe fix
+Suggested fix:
 216 216 | if sys.version_info[:3] > (3,14):
 217 217 |     print("py3")
 218 218 | 
@@ -801,3 +865,5 @@ UP036_0.py:219:4: UP036 [*] Version block is outdated for minimum Python version
 226     |-    "this is\
     225 |+"this is\
 227 226 |     allowed too"
+
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.

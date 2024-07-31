@@ -11,7 +11,7 @@ quote.py:64:28: TCH004 [*] Quote references to `pandas.DataFrame`. Import is in 
    |
    = help: Quote references
 
-ℹ Unsafe fix
+Suggested fix:
 63 63 |     if TYPE_CHECKING:
 64 64 |         from pandas import DataFrame
 65 65 | 
@@ -21,4 +21,4 @@ quote.py:64:28: TCH004 [*] Quote references to `pandas.DataFrame`. Import is in 
 68 68 | 
 69 69 | 
 
-
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.

@@ -9,7 +9,7 @@ EM.py:5:24: EM101 [*] Exception must not use a string literal, assign to variabl
   |
   = help: Assign to variable; remove string literal
 
-ℹ Unsafe fix
+Suggested fix:
 2 2 | 
 3 3 | 
 4 4 | def f_a():
@@ -20,6 +20,8 @@ EM.py:5:24: EM101 [*] Exception must not use a string literal, assign to variabl
 7 8 | 
 8 9 | def f_a_short():
 
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
+
 EM.py:18:24: EM102 [*] Exception must not use an f-string literal, assign to variable first
    |
 16 | def f_b():
@@ -29,7 +31,7 @@ EM.py:18:24: EM102 [*] Exception must not use an f-string literal, assign to var
    |
    = help: Assign to variable; remove f-string literal
 
-ℹ Unsafe fix
+Suggested fix:
 15 15 | 
 16 16 | def f_b():
 17 17 |     example = "example"
@@ -40,6 +42,8 @@ EM.py:18:24: EM102 [*] Exception must not use an f-string literal, assign to var
 20 21 | 
 21 22 | def f_c():
 
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
+
 EM.py:22:24: EM103 [*] Exception must not use a `.format()` string directly, assign to variable first
    |
 21 | def f_c():
@@ -48,7 +52,7 @@ EM.py:22:24: EM103 [*] Exception must not use a `.format()` string directly, ass
    |
    = help: Assign to variable; remove `.format()` string
 
-ℹ Unsafe fix
+Suggested fix:
 19 19 | 
 20 20 | 
 21 21 | def f_c():
@@ -59,6 +63,8 @@ EM.py:22:24: EM103 [*] Exception must not use a `.format()` string directly, ass
 24 25 | 
 25 26 | def f_ok():
 
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
+
 EM.py:32:24: EM101 [*] Exception must not use a string literal, assign to variable first
    |
 30 | def f_msg_defined():
@@ -68,7 +74,7 @@ EM.py:32:24: EM101 [*] Exception must not use a string literal, assign to variab
    |
    = help: Assign to variable; remove string literal
 
-ℹ Unsafe fix
+Suggested fix:
 29 29 | 
 30 30 | def f_msg_defined():
 31 31 |     msg = "hello"
@@ -79,6 +85,8 @@ EM.py:32:24: EM101 [*] Exception must not use a string literal, assign to variab
 34 35 | 
 35 36 | def f_msg_in_nested_scope():
 
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
+
 EM.py:39:24: EM101 [*] Exception must not use a string literal, assign to variable first
    |
 37 |         msg = "hello"
@@ -88,7 +96,7 @@ EM.py:39:24: EM101 [*] Exception must not use a string literal, assign to variab
    |
    = help: Assign to variable; remove string literal
 
-ℹ Unsafe fix
+Suggested fix:
 36 36 |     def nested():
 37 37 |         msg = "hello"
 38 38 | 
@@ -99,6 +107,8 @@ EM.py:39:24: EM101 [*] Exception must not use a string literal, assign to variab
 41 42 | 
 42 43 | def f_msg_in_parent_scope():
 
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
+
 EM.py:46:28: EM101 [*] Exception must not use a string literal, assign to variable first
    |
 45 |     def nested():
@@ -107,7 +117,7 @@ EM.py:46:28: EM101 [*] Exception must not use a string literal, assign to variab
    |
    = help: Assign to variable; remove string literal
 
-ℹ Unsafe fix
+Suggested fix:
 43 43 |     msg = "hello"
 44 44 | 
 45 45 |     def nested():
@@ -117,6 +127,8 @@ EM.py:46:28: EM101 [*] Exception must not use a string literal, assign to variab
 47 48 | 
 48 49 | 
 49 50 | def f_fix_indentation_check(foo):
+
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 EM.py:51:28: EM101 [*] Exception must not use a string literal, assign to variable first
    |
@@ -129,7 +141,7 @@ EM.py:51:28: EM101 [*] Exception must not use a string literal, assign to variab
    |
    = help: Assign to variable; remove string literal
 
-ℹ Unsafe fix
+Suggested fix:
 48 48 | 
 49 49 | def f_fix_indentation_check(foo):
 50 50 |     if foo:
@@ -139,6 +151,8 @@ EM.py:51:28: EM101 [*] Exception must not use a string literal, assign to variab
 52 53 |     else:
 53 54 |         if foo == "foo":
 54 55 |             raise RuntimeError(f"This is an exception: {foo}")
+
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 EM.py:54:32: EM102 [*] Exception must not use an f-string literal, assign to variable first
    |
@@ -150,7 +164,7 @@ EM.py:54:32: EM102 [*] Exception must not use an f-string literal, assign to var
    |
    = help: Assign to variable; remove f-string literal
 
-ℹ Unsafe fix
+Suggested fix:
 51 51 |         raise RuntimeError("This is an example exception")
 52 52 |     else:
 53 53 |         if foo == "foo":
@@ -161,6 +175,8 @@ EM.py:54:32: EM102 [*] Exception must not use an f-string literal, assign to var
 56 57 | 
 57 58 | 
 
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
+
 EM.py:55:24: EM103 [*] Exception must not use a `.format()` string directly, assign to variable first
    |
 53 |         if foo == "foo":
@@ -170,7 +186,7 @@ EM.py:55:24: EM103 [*] Exception must not use a `.format()` string directly, ass
    |
    = help: Assign to variable; remove `.format()` string
 
-ℹ Unsafe fix
+Suggested fix:
 52 52 |     else:
 53 53 |         if foo == "foo":
 54 54 |             raise RuntimeError(f"This is an exception: {foo}")
@@ -180,6 +196,8 @@ EM.py:55:24: EM103 [*] Exception must not use a `.format()` string directly, ass
 56 57 | 
 57 58 | 
 58 59 | # Report these, but don't fix them
+
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 EM.py:59:28: EM101 Exception must not use a string literal, assign to variable first
    |
@@ -207,7 +225,7 @@ EM.py:64:24: EM102 [*] Exception must not use an f-string literal, assign to var
    |
    = help: Assign to variable; remove f-string literal
 
-ℹ Unsafe fix
+Suggested fix:
 61 61 | 
 62 62 | 
 63 63 | def f_triple_quoted_string():
@@ -217,6 +235,8 @@ EM.py:64:24: EM102 [*] Exception must not use an f-string literal, assign to var
 65 66 | 
 66 67 | 
 67 68 | def f_multi_line_string():
+
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 EM.py:76:9: EM103 [*] Exception must not use a `.format()` string directly, assign to variable first
    |
@@ -231,7 +251,7 @@ EM.py:76:9: EM103 [*] Exception must not use a `.format()` string directly, assi
    |
    = help: Assign to variable; remove `.format()` string
 
-ℹ Unsafe fix
+Suggested fix:
 72 72 | 
 73 73 | 
 74 74 | def f_multi_line_string2():
@@ -247,6 +267,8 @@ EM.py:76:9: EM103 [*] Exception must not use a `.format()` string directly, assi
 80 83 | 
 81 84 | 
 82 85 | def f_multi_line_string2():
+
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 EM.py:84:9: EM103 [*] Exception must not use a `.format()` string directly, assign to variable first
    |
@@ -264,7 +286,7 @@ EM.py:84:9: EM103 [*] Exception must not use a `.format()` string directly, assi
    |
    = help: Assign to variable; remove `.format()` string
 
-ℹ Unsafe fix
+Suggested fix:
 80 80 | 
 81 81 | 
 82 82 | def f_multi_line_string2():
@@ -281,4 +303,4 @@ EM.py:84:9: EM103 [*] Exception must not use a `.format()` string directly, assi
    92 |+        msg
    93 |+    )
 
-
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.

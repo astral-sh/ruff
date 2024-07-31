@@ -11,13 +11,15 @@ doubles_implicit.py:2:5: Q000 [*] Double quotes found but single quotes preferre
   |
   = help: Replace double quotes with single quotes
 
-ℹ Safe fix
+Suggested fix:
 1 1 | x = (
 2   |-    "This"
   2 |+    'This'
 3 3 |     "is"
 4 4 |     "not"
 5 5 | )
+
+    Run `ruff check --fix` to apply this fix.
 
 doubles_implicit.py:3:5: Q000 [*] Double quotes found but single quotes preferred
   |
@@ -30,7 +32,7 @@ doubles_implicit.py:3:5: Q000 [*] Double quotes found but single quotes preferre
   |
   = help: Replace double quotes with single quotes
 
-ℹ Safe fix
+Suggested fix:
 1 1 | x = (
 2 2 |     "This"
 3   |-    "is"
@@ -38,6 +40,8 @@ doubles_implicit.py:3:5: Q000 [*] Double quotes found but single quotes preferre
 4 4 |     "not"
 5 5 | )
 6 6 | 
+
+    Run `ruff check --fix` to apply this fix.
 
 doubles_implicit.py:4:5: Q000 [*] Double quotes found but single quotes preferred
   |
@@ -49,7 +53,7 @@ doubles_implicit.py:4:5: Q000 [*] Double quotes found but single quotes preferre
   |
   = help: Replace double quotes with single quotes
 
-ℹ Safe fix
+Suggested fix:
 1 1 | x = (
 2 2 |     "This"
 3 3 |     "is"
@@ -58,6 +62,8 @@ doubles_implicit.py:4:5: Q000 [*] Double quotes found but single quotes preferre
 5 5 | )
 6 6 | 
 7 7 | x = (
+
+    Run `ruff check --fix` to apply this fix.
 
 doubles_implicit.py:8:5: Q000 [*] Double quotes found but single quotes preferred
    |
@@ -69,7 +75,7 @@ doubles_implicit.py:8:5: Q000 [*] Double quotes found but single quotes preferre
    |
    = help: Replace double quotes with single quotes
 
-ℹ Safe fix
+Suggested fix:
 5 5 | )
 6 6 | 
 7 7 | x = (
@@ -78,6 +84,8 @@ doubles_implicit.py:8:5: Q000 [*] Double quotes found but single quotes preferre
 9 9 |     "is" \
 10 10 |     "not"
 11 11 | )
+
+    Run `ruff check --fix` to apply this fix.
 
 doubles_implicit.py:9:5: Q000 [*] Double quotes found but single quotes preferred
    |
@@ -90,7 +98,7 @@ doubles_implicit.py:9:5: Q000 [*] Double quotes found but single quotes preferre
    |
    = help: Replace double quotes with single quotes
 
-ℹ Safe fix
+Suggested fix:
 6  6  | 
 7  7  | x = (
 8  8  |     "This" \
@@ -99,6 +107,8 @@ doubles_implicit.py:9:5: Q000 [*] Double quotes found but single quotes preferre
 10 10 |     "not"
 11 11 | )
 12 12 | 
+
+    Run `ruff check --fix` to apply this fix.
 
 doubles_implicit.py:10:5: Q000 [*] Double quotes found but single quotes preferred
    |
@@ -110,7 +120,7 @@ doubles_implicit.py:10:5: Q000 [*] Double quotes found but single quotes preferr
    |
    = help: Replace double quotes with single quotes
 
-ℹ Safe fix
+Suggested fix:
 7  7  | x = (
 8  8  |     "This" \
 9  9  |     "is" \
@@ -119,6 +129,8 @@ doubles_implicit.py:10:5: Q000 [*] Double quotes found but single quotes preferr
 11 11 | )
 12 12 | 
 13 13 | x = (
+
+    Run `ruff check --fix` to apply this fix.
 
 doubles_implicit.py:27:1: Q000 [*] Double quotes found but single quotes preferred
    |
@@ -129,11 +141,11 @@ doubles_implicit.py:27:1: Q000 [*] Double quotes found but single quotes preferr
    |
    = help: Replace double quotes with single quotes
 
-ℹ Safe fix
+Suggested fix:
 24 24 | 
 25 25 | if True:
 26 26 |     "This can use 'double' quotes"
 27    |-"But this needs to be changed"
    27 |+'But this needs to be changed'
 
-
+    Run `ruff check --fix` to apply this fix.

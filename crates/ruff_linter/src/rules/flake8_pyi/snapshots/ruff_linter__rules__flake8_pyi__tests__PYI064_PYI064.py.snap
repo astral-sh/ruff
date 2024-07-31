@@ -12,7 +12,7 @@ PYI064.py:3:1: PYI064 [*] `Final[Literal[True]]` can be replaced with a bare `Fi
   |
   = help: Replace with `Final`
 
-ℹ Safe fix
+Suggested fix:
 1 1 | from typing import Final, Literal
 2 2 | 
 3   |-x: Final[Literal[True]] = True  # PYI064
@@ -20,6 +20,8 @@ PYI064.py:3:1: PYI064 [*] `Final[Literal[True]]` can be replaced with a bare `Fi
 4 4 | y: Final[Literal[None]] = None  # PYI064
 5 5 | z: Final[Literal[  # PYI064
 6 6 |     "this is a really long literal, that won't be rendered in the issue text"
+
+    Run `ruff check --fix` to apply this fix.
 
 PYI064.py:4:1: PYI064 [*] `Final[Literal[None]]` can be replaced with a bare `Final`
   |
@@ -31,7 +33,7 @@ PYI064.py:4:1: PYI064 [*] `Final[Literal[None]]` can be replaced with a bare `Fi
   |
   = help: Replace with `Final`
 
-ℹ Safe fix
+Suggested fix:
 1 1 | from typing import Final, Literal
 2 2 | 
 3 3 | x: Final[Literal[True]] = True  # PYI064
@@ -40,6 +42,8 @@ PYI064.py:4:1: PYI064 [*] `Final[Literal[None]]` can be replaced with a bare `Fi
 5 5 | z: Final[Literal[  # PYI064
 6 6 |     "this is a really long literal, that won't be rendered in the issue text"
 7 7 | ]] = "this is a really long literal, that won't be rendered in the issue text"
+
+    Run `ruff check --fix` to apply this fix.
 
 PYI064.py:5:1: PYI064 [*] `Final[Literal[...]]` can be replaced with a bare `Final`
   |
@@ -54,7 +58,7 @@ PYI064.py:5:1: PYI064 [*] `Final[Literal[...]]` can be replaced with a bare `Fin
   |
   = help: Replace with `Final`
 
-ℹ Safe fix
+Suggested fix:
 2 2 | 
 3 3 | x: Final[Literal[True]] = True  # PYI064
 4 4 | y: Final[Literal[None]] = None  # PYI064
@@ -66,6 +70,8 @@ PYI064.py:5:1: PYI064 [*] `Final[Literal[...]]` can be replaced with a bare `Fin
 9 7 | # This should be fixable, and marked as safe
 10 8 | w1: Final[Literal[123]]  # PYI064
 
+    Run `ruff check --fix` to apply this fix.
+
 PYI064.py:10:1: PYI064 [*] `Final[Literal[123]]` can be replaced with a bare `Final`
    |
  9 | # This should be fixable, and marked as safe
@@ -76,7 +82,7 @@ PYI064.py:10:1: PYI064 [*] `Final[Literal[123]]` can be replaced with a bare `Fi
    |
    = help: Replace with `Final`
 
-ℹ Safe fix
+Suggested fix:
 7  7  | ]] = "this is a really long literal, that won't be rendered in the issue text"
 8  8  | 
 9  9  | # This should be fixable, and marked as safe
@@ -85,6 +91,8 @@ PYI064.py:10:1: PYI064 [*] `Final[Literal[123]]` can be replaced with a bare `Fi
 11 11 | 
 12 12 | # This should not be fixable
 13 13 | w2: Final[Literal[123]] = "random value"  # PYI064
+
+    Run `ruff check --fix` to apply this fix.
 
 PYI064.py:13:1: PYI064 `Final[Literal[123]]` can be replaced with a bare `Final`
    |

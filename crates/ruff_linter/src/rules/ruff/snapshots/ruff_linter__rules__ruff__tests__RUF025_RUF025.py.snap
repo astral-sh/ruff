@@ -10,7 +10,7 @@ RUF025.py:6:5: RUF025 [*] Unnecessary dict comprehension for iterable; use `dict
   |
   = help: Replace with `dict.fromkeys(iterable, value)`)
 
-ℹ Safe fix
+Suggested fix:
 3 3 | 
 4 4 | def func():
 5 5 |     numbers = [1, 2, 3]
@@ -19,6 +19,8 @@ RUF025.py:6:5: RUF025 [*] Unnecessary dict comprehension for iterable; use `dict
 7 7 | 
 8 8 | 
 9 9 | def func():
+
+    Run `ruff check --fix` to apply this fix.
 
 RUF025.py:10:23: RUF025 [*] Unnecessary dict comprehension for iterable; use `dict.fromkeys` instead
    |
@@ -29,7 +31,7 @@ RUF025.py:10:23: RUF025 [*] Unnecessary dict comprehension for iterable; use `di
    |
    = help: Replace with `dict.fromkeys(iterable)`)
 
-ℹ Safe fix
+Suggested fix:
 7  7  | 
 8  8  | 
 9  9  | def func():
@@ -39,6 +41,8 @@ RUF025.py:10:23: RUF025 [*] Unnecessary dict comprehension for iterable; use `di
 12 12 | 
 13 13 | 
 
+    Run `ruff check --fix` to apply this fix.
+
 RUF025.py:15:5: RUF025 [*] Unnecessary dict comprehension for iterable; use `dict.fromkeys` instead
    |
 14 | def func():
@@ -47,7 +51,7 @@ RUF025.py:15:5: RUF025 [*] Unnecessary dict comprehension for iterable; use `dic
    |
    = help: Replace with `dict.fromkeys(iterable)`)
 
-ℹ Safe fix
+Suggested fix:
 12 12 | 
 13 13 | 
 14 14 | def func():
@@ -56,6 +60,8 @@ RUF025.py:15:5: RUF025 [*] Unnecessary dict comprehension for iterable; use `dic
 16 16 | 
 17 17 | 
 18 18 | def func():
+
+    Run `ruff check --fix` to apply this fix.
 
 RUF025.py:26:7: RUF025 [*] Unnecessary dict comprehension for iterable; use `dict.fromkeys` instead
    |
@@ -66,7 +72,7 @@ RUF025.py:26:7: RUF025 [*] Unnecessary dict comprehension for iterable; use `dic
    |
    = help: Replace with `dict.fromkeys(iterable)`)
 
-ℹ Safe fix
+Suggested fix:
 23 23 |     def f(data):
 24 24 |         return data
 25 25 | 
@@ -76,6 +82,8 @@ RUF025.py:26:7: RUF025 [*] Unnecessary dict comprehension for iterable; use `dic
 28 28 | 
 29 29 | def func():
 
+    Run `ruff check --fix` to apply this fix.
+
 RUF025.py:30:5: RUF025 [*] Unnecessary dict comprehension for iterable; use `dict.fromkeys` instead
    |
 29 | def func():
@@ -84,7 +92,7 @@ RUF025.py:30:5: RUF025 [*] Unnecessary dict comprehension for iterable; use `dic
    |
    = help: Replace with `dict.fromkeys(iterable)`)
 
-ℹ Safe fix
+Suggested fix:
 27 27 | 
 28 28 | 
 29 29 | def func():
@@ -94,6 +102,8 @@ RUF025.py:30:5: RUF025 [*] Unnecessary dict comprehension for iterable; use `dic
 32 32 | 
 33 33 | def func():
 
+    Run `ruff check --fix` to apply this fix.
+
 RUF025.py:34:5: RUF025 [*] Unnecessary dict comprehension for iterable; use `dict.fromkeys` instead
    |
 33 | def func():
@@ -102,7 +112,7 @@ RUF025.py:34:5: RUF025 [*] Unnecessary dict comprehension for iterable; use `dic
    |
    = help: Replace with `dict.fromkeys(iterable)`)
 
-ℹ Safe fix
+Suggested fix:
 31 31 | 
 32 32 | 
 33 33 | def func():
@@ -112,6 +122,8 @@ RUF025.py:34:5: RUF025 [*] Unnecessary dict comprehension for iterable; use `dic
 36 36 | 
 37 37 | def func():
 
+    Run `ruff check --fix` to apply this fix.
+
 RUF025.py:38:5: RUF025 [*] Unnecessary dict comprehension for iterable; use `dict.fromkeys` instead
    |
 37 | def func():
@@ -120,7 +132,7 @@ RUF025.py:38:5: RUF025 [*] Unnecessary dict comprehension for iterable; use `dic
    |
    = help: Replace with `dict.fromkeys(iterable)`)
 
-ℹ Safe fix
+Suggested fix:
 35 35 | 
 36 36 | 
 37 37 | def func():
@@ -130,6 +142,8 @@ RUF025.py:38:5: RUF025 [*] Unnecessary dict comprehension for iterable; use `dic
 40 40 | 
 41 41 | def func():
 
+    Run `ruff check --fix` to apply this fix.
+
 RUF025.py:42:5: RUF025 [*] Unnecessary dict comprehension for iterable; use `dict.fromkeys` instead
    |
 41 | def func():
@@ -138,7 +152,7 @@ RUF025.py:42:5: RUF025 [*] Unnecessary dict comprehension for iterable; use `dic
    |
    = help: Replace with `dict.fromkeys(iterable)`)
 
-ℹ Safe fix
+Suggested fix:
 39 39 | 
 40 40 | 
 41 41 | def func():
@@ -148,6 +162,8 @@ RUF025.py:42:5: RUF025 [*] Unnecessary dict comprehension for iterable; use `dic
 44 44 | 
 45 45 | def func():
 
+    Run `ruff check --fix` to apply this fix.
+
 RUF025.py:46:5: RUF025 [*] Unnecessary dict comprehension for iterable; use `dict.fromkeys` instead
    |
 45 | def func():
@@ -156,7 +172,7 @@ RUF025.py:46:5: RUF025 [*] Unnecessary dict comprehension for iterable; use `dic
    |
    = help: Replace with `dict.fromkeys(iterable)`)
 
-ℹ Safe fix
+Suggested fix:
 43 43 | 
 44 44 | 
 45 45 | def func():
@@ -166,6 +182,8 @@ RUF025.py:46:5: RUF025 [*] Unnecessary dict comprehension for iterable; use `dic
 48 48 | 
 49 49 | def func():
 
+    Run `ruff check --fix` to apply this fix.
+
 RUF025.py:54:5: RUF025 [*] Unnecessary dict comprehension for iterable; use `dict.fromkeys` instead
    |
 53 |     a = f()
@@ -174,7 +192,7 @@ RUF025.py:54:5: RUF025 [*] Unnecessary dict comprehension for iterable; use `dic
    |
    = help: Replace with `dict.fromkeys(iterable)`)
 
-ℹ Safe fix
+Suggested fix:
 51 51 |         return 1
 52 52 | 
 53 53 |     a = f()
@@ -183,6 +201,8 @@ RUF025.py:54:5: RUF025 [*] Unnecessary dict comprehension for iterable; use `dic
 55 55 | 
 56 56 | 
 57 57 | def func():
+
+    Run `ruff check --fix` to apply this fix.
 
 RUF025.py:59:6: RUF025 [*] Unnecessary dict comprehension for iterable; use `dict.fromkeys` instead
    |
@@ -193,7 +213,7 @@ RUF025.py:59:6: RUF025 [*] Unnecessary dict comprehension for iterable; use `dic
    |
    = help: Replace with `dict.fromkeys(iterable)`)
 
-ℹ Safe fix
+Suggested fix:
 56 56 | 
 57 57 | def func():
 58 58 |     values = ["a", "b", "c"]
@@ -203,4 +223,4 @@ RUF025.py:59:6: RUF025 [*] Unnecessary dict comprehension for iterable; use `dic
 61 61 | 
 62 62 | # Non-violation cases: RUF025
 
-
+    Run `ruff check --fix` to apply this fix.

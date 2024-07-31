@@ -11,7 +11,7 @@ B009_B010.py:50:1: B010 [*] Do not call `setattr` with a constant attribute valu
    |
    = help: Replace `setattr` with assignment
 
-ℹ Safe fix
+Suggested fix:
 47 47 |     pass
 48 48 | 
 49 49 | # Invalid usage
@@ -20,6 +20,8 @@ B009_B010.py:50:1: B010 [*] Do not call `setattr` with a constant attribute valu
 51 51 | setattr(foo, "_123abc", None)
 52 52 | setattr(foo, "__123abc__", None)
 53 53 | setattr(foo, "abc123", None)
+
+    Run `ruff check --fix` to apply this fix.
 
 B009_B010.py:51:1: B010 [*] Do not call `setattr` with a constant attribute value. It is not any safer than normal property access.
    |
@@ -32,7 +34,7 @@ B009_B010.py:51:1: B010 [*] Do not call `setattr` with a constant attribute valu
    |
    = help: Replace `setattr` with assignment
 
-ℹ Safe fix
+Suggested fix:
 48 48 | 
 49 49 | # Invalid usage
 50 50 | setattr(foo, "bar", None)
@@ -41,6 +43,8 @@ B009_B010.py:51:1: B010 [*] Do not call `setattr` with a constant attribute valu
 52 52 | setattr(foo, "__123abc__", None)
 53 53 | setattr(foo, "abc123", None)
 54 54 | setattr(foo, r"abc123", None)
+
+    Run `ruff check --fix` to apply this fix.
 
 B009_B010.py:52:1: B010 [*] Do not call `setattr` with a constant attribute value. It is not any safer than normal property access.
    |
@@ -53,7 +57,7 @@ B009_B010.py:52:1: B010 [*] Do not call `setattr` with a constant attribute valu
    |
    = help: Replace `setattr` with assignment
 
-ℹ Safe fix
+Suggested fix:
 49 49 | # Invalid usage
 50 50 | setattr(foo, "bar", None)
 51 51 | setattr(foo, "_123abc", None)
@@ -62,6 +66,8 @@ B009_B010.py:52:1: B010 [*] Do not call `setattr` with a constant attribute valu
 53 53 | setattr(foo, "abc123", None)
 54 54 | setattr(foo, r"abc123", None)
 55 55 | setattr(foo.bar, r"baz", None)
+
+    Run `ruff check --fix` to apply this fix.
 
 B009_B010.py:53:1: B010 [*] Do not call `setattr` with a constant attribute value. It is not any safer than normal property access.
    |
@@ -74,7 +80,7 @@ B009_B010.py:53:1: B010 [*] Do not call `setattr` with a constant attribute valu
    |
    = help: Replace `setattr` with assignment
 
-ℹ Safe fix
+Suggested fix:
 50 50 | setattr(foo, "bar", None)
 51 51 | setattr(foo, "_123abc", None)
 52 52 | setattr(foo, "__123abc__", None)
@@ -83,6 +89,8 @@ B009_B010.py:53:1: B010 [*] Do not call `setattr` with a constant attribute valu
 54 54 | setattr(foo, r"abc123", None)
 55 55 | setattr(foo.bar, r"baz", None)
 56 56 | 
+
+    Run `ruff check --fix` to apply this fix.
 
 B009_B010.py:54:1: B010 [*] Do not call `setattr` with a constant attribute value. It is not any safer than normal property access.
    |
@@ -94,7 +102,7 @@ B009_B010.py:54:1: B010 [*] Do not call `setattr` with a constant attribute valu
    |
    = help: Replace `setattr` with assignment
 
-ℹ Safe fix
+Suggested fix:
 51 51 | setattr(foo, "_123abc", None)
 52 52 | setattr(foo, "__123abc__", None)
 53 53 | setattr(foo, "abc123", None)
@@ -103,6 +111,8 @@ B009_B010.py:54:1: B010 [*] Do not call `setattr` with a constant attribute valu
 55 55 | setattr(foo.bar, r"baz", None)
 56 56 | 
 57 57 | # Regression test for: https://github.com/astral-sh/ruff/issues/7455#issuecomment-1722458885
+
+    Run `ruff check --fix` to apply this fix.
 
 B009_B010.py:55:1: B010 [*] Do not call `setattr` with a constant attribute value. It is not any safer than normal property access.
    |
@@ -115,7 +125,7 @@ B009_B010.py:55:1: B010 [*] Do not call `setattr` with a constant attribute valu
    |
    = help: Replace `setattr` with assignment
 
-ℹ Safe fix
+Suggested fix:
 52 52 | setattr(foo, "__123abc__", None)
 53 53 | setattr(foo, "abc123", None)
 54 54 | setattr(foo, r"abc123", None)
@@ -125,4 +135,4 @@ B009_B010.py:55:1: B010 [*] Do not call `setattr` with a constant attribute valu
 57 57 | # Regression test for: https://github.com/astral-sh/ruff/issues/7455#issuecomment-1722458885
 58 58 | assert getattr(func, '_rpc')is True
 
-
+    Run `ruff check --fix` to apply this fix.

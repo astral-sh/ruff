@@ -11,7 +11,7 @@ quote.py:64:28: TCH004 [*] Move import `pandas.DataFrame` out of type-checking b
    |
    = help: Move out of type-checking block
 
-ℹ Unsafe fix
+Suggested fix:
    1  |+from pandas import DataFrame
 1  2  | def f():
 2  3  |     from pandas import DataFrame
@@ -26,4 +26,4 @@ quote.py:64:28: TCH004 [*] Move import `pandas.DataFrame` out of type-checking b
 66 67 |     def func(value: DataFrame):
 67 68 |         ...
 
-
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.

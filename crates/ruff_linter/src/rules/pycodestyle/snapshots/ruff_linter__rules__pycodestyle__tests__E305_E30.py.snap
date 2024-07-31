@@ -10,7 +10,7 @@ E30.py:798:1: E305 [*] Expected 2 blank lines after class or function definition
     |
     = help: Add missing blank line(s)
 
-ℹ Safe fix
+Suggested fix:
 795 795 |     # comment
 796 796 | 
 797 797 |     # another comment
@@ -19,6 +19,8 @@ E30.py:798:1: E305 [*] Expected 2 blank lines after class or function definition
 798 800 | fn()
 799 801 | # end
 800 802 | 
+
+    Run `ruff check --fix` to apply this fix.
 
 E30.py:809:1: E305 [*] Expected 2 blank lines after class or function definition, found (1)
     |
@@ -29,7 +31,7 @@ E30.py:809:1: E305 [*] Expected 2 blank lines after class or function definition
     |
     = help: Add missing blank line(s)
 
-ℹ Safe fix
+Suggested fix:
 806 806 |     # comment
 807 807 | 
 808 808 |     # another comment
@@ -38,6 +40,8 @@ E30.py:809:1: E305 [*] Expected 2 blank lines after class or function definition
 809 811 | a = 1
 810 812 | # end
 811 813 | 
+
+    Run `ruff check --fix` to apply this fix.
 
 E30.py:821:1: E305 [*] Expected 2 blank lines after class or function definition, found (1)
     |
@@ -50,7 +54,7 @@ E30.py:821:1: E305 [*] Expected 2 blank lines after class or function definition
     |
     = help: Add missing blank line(s)
 
-ℹ Safe fix
+Suggested fix:
 818 818 | 
 819 819 |     # another comment
 820 820 | 
@@ -58,6 +62,8 @@ E30.py:821:1: E305 [*] Expected 2 blank lines after class or function definition
 821 822 | try:
 822 823 |     fn()
 823 824 | except Exception:
+
+    Run `ruff check --fix` to apply this fix.
 
 E30.py:833:1: E305 [*] Expected 2 blank lines after class or function definition, found (1)
     |
@@ -69,7 +75,7 @@ E30.py:833:1: E305 [*] Expected 2 blank lines after class or function definition
     |
     = help: Add missing blank line(s)
 
-ℹ Safe fix
+Suggested fix:
 830 830 |     print()
 831 831 | 
 832 832 | # Two spaces before comments, too.
@@ -78,6 +84,8 @@ E30.py:833:1: E305 [*] Expected 2 blank lines after class or function definition
 833 835 | if a():
 834 836 |     a()
 835 837 | # end
+
+    Run `ruff check --fix` to apply this fix.
 
 E30.py:846:1: E305 [*] Expected 2 blank lines after class or function definition, found (1)
     |
@@ -90,7 +98,7 @@ E30.py:846:1: E305 [*] Expected 2 blank lines after class or function definition
     |
     = help: Add missing blank line(s)
 
-ℹ Safe fix
+Suggested fix:
 843 843 | def main():
 844 844 |     blah, blah
 845 845 | 
@@ -98,3 +106,5 @@ E30.py:846:1: E305 [*] Expected 2 blank lines after class or function definition
 846 847 | if __name__ == '__main__':
 847 848 |     main()
 848 849 | # end
+
+    Run `ruff check --fix` to apply this fix.

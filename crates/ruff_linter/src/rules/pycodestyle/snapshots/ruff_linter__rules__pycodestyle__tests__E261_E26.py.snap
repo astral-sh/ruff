@@ -11,7 +11,7 @@ E26.py:2:5: E261 [*] Insert at least two spaces before an inline comment
   |
   = help: Insert spaces
 
-ℹ Safe fix
+Suggested fix:
 1 1 | #: E261:1:5
 2   |-pass # an inline comment
   2 |+pass  # an inline comment
@@ -19,4 +19,4 @@ E26.py:2:5: E261 [*] Insert at least two spaces before an inline comment
 4 4 | x = x + 1  #Increment x
 5 5 | #: E262:1:12
 
-
+    Run `ruff check --fix` to apply this fix.

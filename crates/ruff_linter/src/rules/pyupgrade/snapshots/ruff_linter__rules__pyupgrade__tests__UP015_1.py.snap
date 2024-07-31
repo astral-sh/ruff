@@ -10,9 +10,11 @@ UP015_1.py:3:5: UP015 [*] Unnecessary open mode parameters
   |
   = help: Remove open mode parameters
 
-ℹ Safe fix
+Suggested fix:
 1 1 | # Not a valid type annotation but this test shouldn't result in a panic.
 2 2 | # Refer: https://github.com/astral-sh/ruff/issues/11736
 3   |-x: 'open("foo", "r")'
   3 |+x: 'open("foo")'
-4 4 |
+4 4 | 
+
+    Run `ruff check --fix` to apply this fix.

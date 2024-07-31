@@ -10,7 +10,7 @@ E30.py:617:2: E303 [*] Too many blank lines (2)
     |
     = help: Remove extraneous blank line(s)
 
-ℹ Safe fix
+Suggested fix:
 613 613 | 	def method1():
 614 614 | 		return 1
 615 615 | 
@@ -18,6 +18,8 @@ E30.py:617:2: E303 [*] Too many blank lines (2)
 617 616 | 	def method2():
 618 617 | 		return 22
 619 618 | # end
+
+    Run `ruff check --fix` to apply this fix.
 
 E30.py:644:5: E303 [*] Too many blank lines (2)
     |
@@ -28,7 +30,7 @@ E30.py:644:5: E303 [*] Too many blank lines (2)
     |
     = help: Remove extraneous blank line(s)
 
-ℹ Safe fix
+Suggested fix:
 640 640 | def fn():
 641 641 |     _ = None
 642 642 | 
@@ -36,6 +38,8 @@ E30.py:644:5: E303 [*] Too many blank lines (2)
 644 643 |     # arbitrary comment
 645 644 | 
 646 645 |     def inner():  # E306 not expected (pycodestyle detects E306)
+
+    Run `ruff check --fix` to apply this fix.
 
 E30.py:656:5: E303 [*] Too many blank lines (2)
     |
@@ -46,7 +50,7 @@ E30.py:656:5: E303 [*] Too many blank lines (2)
     |
     = help: Remove extraneous blank line(s)
 
-ℹ Safe fix
+Suggested fix:
 652 652 | def fn():
 653 653 |     _ = None
 654 654 | 
@@ -54,6 +58,8 @@ E30.py:656:5: E303 [*] Too many blank lines (2)
 656 655 |     # arbitrary comment
 657 656 |     def inner():  # E306 not expected (pycodestyle detects E306)
 658 657 |         pass
+
+    Run `ruff check --fix` to apply this fix.
 
 E30.py:667:1: E303 [*] Too many blank lines (3)
     |
@@ -63,7 +69,7 @@ E30.py:667:1: E303 [*] Too many blank lines (3)
     |
     = help: Remove extraneous blank line(s)
 
-ℹ Safe fix
+Suggested fix:
 663 663 | print()
 664 664 | 
 665 665 | 
@@ -71,6 +77,8 @@ E30.py:667:1: E303 [*] Too many blank lines (3)
 667 666 | print()
 668 667 | # end
 669 668 | 
+
+    Run `ruff check --fix` to apply this fix.
 
 E30.py:676:1: E303 [*] Too many blank lines (3)
     |
@@ -81,7 +89,7 @@ E30.py:676:1: E303 [*] Too many blank lines (3)
     |
     = help: Remove extraneous blank line(s)
 
-ℹ Safe fix
+Suggested fix:
 672 672 | print()
 673 673 | 
 674 674 | 
@@ -90,6 +98,8 @@ E30.py:676:1: E303 [*] Too many blank lines (3)
 677 676 | 
 678 677 | print()
 
+    Run `ruff check --fix` to apply this fix.
+
 E30.py:687:5: E303 [*] Too many blank lines (2)
     |
 687 |     # comment
@@ -97,7 +107,7 @@ E30.py:687:5: E303 [*] Too many blank lines (2)
     |
     = help: Remove extraneous blank line(s)
 
-ℹ Safe fix
+Suggested fix:
 683 683 | def a():
 684 684 |     print()
 685 685 | 
@@ -105,6 +115,8 @@ E30.py:687:5: E303 [*] Too many blank lines (2)
 687 686 |     # comment
 688 687 | 
 689 688 | 
+
+    Run `ruff check --fix` to apply this fix.
 
 E30.py:690:5: E303 [*] Too many blank lines (2)
     |
@@ -115,7 +127,7 @@ E30.py:690:5: E303 [*] Too many blank lines (2)
     |
     = help: Remove extraneous blank line(s)
 
-ℹ Safe fix
+Suggested fix:
 686 686 | 
 687 687 |     # comment
 688 688 | 
@@ -123,6 +135,8 @@ E30.py:690:5: E303 [*] Too many blank lines (2)
 690 689 |     # another comment
 691 690 | 
 692 691 |     print()
+
+    Run `ruff check --fix` to apply this fix.
 
 E30.py:701:1: E303 [*] Too many blank lines (3)
     |
@@ -134,7 +148,7 @@ E30.py:701:1: E303 [*] Too many blank lines (3)
     |
     = help: Remove extraneous blank line(s)
 
-ℹ Safe fix
+Suggested fix:
 697 697 | #!python
 698 698 | 
 699 699 | 
@@ -142,6 +156,8 @@ E30.py:701:1: E303 [*] Too many blank lines (3)
 701 700 | """This class docstring comes on line 5.
 702 701 | It gives error E303: too many blank lines (3)
 703 702 | """
+
+    Run `ruff check --fix` to apply this fix.
 
 E30.py:713:5: E303 [*] Too many blank lines (2)
     |
@@ -152,7 +168,7 @@ E30.py:713:5: E303 [*] Too many blank lines (2)
     |
     = help: Remove extraneous blank line(s)
 
-ℹ Safe fix
+Suggested fix:
 709 709 |     def a(self):
 710 710 |         pass
 711 711 | 
@@ -160,6 +176,8 @@ E30.py:713:5: E303 [*] Too many blank lines (2)
 713 712 |     def b(self):
 714 713 |         pass
 715 714 | # end
+
+    Run `ruff check --fix` to apply this fix.
 
 E30.py:723:5: E303 [*] Too many blank lines (2)
     |
@@ -169,7 +187,7 @@ E30.py:723:5: E303 [*] Too many blank lines (2)
     |
     = help: Remove extraneous blank line(s)
 
-ℹ Safe fix
+Suggested fix:
 719 719 | if True:
 720 720 |     a = 1
 721 721 | 
@@ -178,6 +196,8 @@ E30.py:723:5: E303 [*] Too many blank lines (2)
 724 723 | # end
 725 724 | 
 
+    Run `ruff check --fix` to apply this fix.
+
 E30.py:731:5: E303 [*] Too many blank lines (2)
     |
 731 |     # comment
@@ -185,7 +205,7 @@ E30.py:731:5: E303 [*] Too many blank lines (2)
     |
     = help: Remove extraneous blank line(s)
 
-ℹ Safe fix
+Suggested fix:
 727 727 | # E303
 728 728 | class Test:
 729 729 | 
@@ -193,6 +213,8 @@ E30.py:731:5: E303 [*] Too many blank lines (2)
 731 730 |     # comment
 732 731 | 
 733 732 | 
+
+    Run `ruff check --fix` to apply this fix.
 
 E30.py:734:5: E303 [*] Too many blank lines (2)
     |
@@ -203,7 +225,7 @@ E30.py:734:5: E303 [*] Too many blank lines (2)
     |
     = help: Remove extraneous blank line(s)
 
-ℹ Safe fix
+Suggested fix:
 730 730 | 
 731 731 |     # comment
 732 732 | 
@@ -211,6 +233,8 @@ E30.py:734:5: E303 [*] Too many blank lines (2)
 734 733 |     # another comment
 735 734 | 
 736 735 |     def test(self): pass
+
+    Run `ruff check --fix` to apply this fix.
 
 E30.py:748:5: E303 [*] Too many blank lines (2)
     |
@@ -221,7 +245,7 @@ E30.py:748:5: E303 [*] Too many blank lines (2)
     |
     = help: Remove extraneous blank line(s)
 
-ℹ Safe fix
+Suggested fix:
 744 744 | 
 745 745 | # wrongly indented comment
 746 746 | 
@@ -229,6 +253,8 @@ E30.py:748:5: E303 [*] Too many blank lines (2)
 748 747 |     def b(self):
 749 748 |         pass
 750 749 | # end
+
+    Run `ruff check --fix` to apply this fix.
 
 E30.py:758:5: E303 [*] Too many blank lines (2)
     |
@@ -238,11 +264,13 @@ E30.py:758:5: E303 [*] Too many blank lines (2)
     |
     = help: Remove extraneous blank line(s)
 
-ℹ Safe fix
+Suggested fix:
 754 754 | def fn():
 755 755 |     pass
 756 756 | 
 757     |-
 758 757 |     pass
 759 758 | # end
-760 759 |
+760 759 | 
+
+    Run `ruff check --fix` to apply this fix.

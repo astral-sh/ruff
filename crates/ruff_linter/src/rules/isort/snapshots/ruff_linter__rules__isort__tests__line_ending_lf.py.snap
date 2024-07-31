@@ -9,7 +9,7 @@ line_ending_lf.py:1:1: I001 [*] Import block is un-sorted or un-formatted
   |
   = help: Organize imports
 
-ℹ Safe fix
+Suggested fix:
 1   |-from long_module_name import member_one, member_two, member_three, member_four, member_five
   1 |+from long_module_name import (
   2 |+    member_five,
@@ -20,4 +20,4 @@ line_ending_lf.py:1:1: I001 [*] Import block is un-sorted or un-formatted
   7 |+)
 2 8 | 
 
-
+    Run `ruff check --fix` to apply this fix.

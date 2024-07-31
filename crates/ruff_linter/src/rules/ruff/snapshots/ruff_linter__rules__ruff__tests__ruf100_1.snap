@@ -11,7 +11,7 @@ RUF100_1.py:37:9: F401 [*] `typing.Union` imported but unused
    |
    = help: Remove unused import: `typing.Union`
 
-ℹ Safe fix
+Suggested fix:
 34 34 |     # This should ignore the first error.
 35 35 |     from typing import (
 36 36 |         Mapping,  # noqa: F401
@@ -21,6 +21,8 @@ RUF100_1.py:37:9: F401 [*] `typing.Union` imported but unused
 39 38 | 
 40 39 | 
 41 40 | def f():
+
+    Run `ruff check --fix` to apply this fix.
 
 RUF100_1.py:52:20: RUF100 [*] Unused `noqa` directive (unused: `F401`)
    |
@@ -32,7 +34,7 @@ RUF100_1.py:52:20: RUF100 [*] Unused `noqa` directive (unused: `F401`)
    |
    = help: Remove unused `noqa` directive
 
-ℹ Safe fix
+Suggested fix:
 49 49 | def f():
 50 50 |     # This should ignore the error, but the inner noqa should be marked as unused.
 51 51 |     from typing import (  # noqa: F401
@@ -41,6 +43,8 @@ RUF100_1.py:52:20: RUF100 [*] Unused `noqa` directive (unused: `F401`)
 53 53 |     )
 54 54 | 
 55 55 | 
+
+    Run `ruff check --fix` to apply this fix.
 
 RUF100_1.py:59:20: RUF100 [*] Unused `noqa` directive (unused: `F401`)
    |
@@ -52,7 +56,7 @@ RUF100_1.py:59:20: RUF100 [*] Unused `noqa` directive (unused: `F401`)
    |
    = help: Remove unused `noqa` directive
 
-ℹ Safe fix
+Suggested fix:
 56 56 | def f():
 57 57 |     # This should ignore the error, but the inner noqa should be marked as unused.
 58 58 |     from typing import (  # noqa
@@ -61,6 +65,8 @@ RUF100_1.py:59:20: RUF100 [*] Unused `noqa` directive (unused: `F401`)
 60 60 |     )
 61 61 | 
 62 62 | 
+
+    Run `ruff check --fix` to apply this fix.
 
 RUF100_1.py:66:16: RUF100 [*] Unused `noqa` directive (non-enabled: `F501`)
    |
@@ -72,7 +78,7 @@ RUF100_1.py:66:16: RUF100 [*] Unused `noqa` directive (non-enabled: `F501`)
    |
    = help: Remove unused `noqa` directive
 
-ℹ Safe fix
+Suggested fix:
 63 63 | def f():
 64 64 |     # This should ignore the error, but mark F501 as unused.
 65 65 |     from typing import (  # noqa: F401
@@ -81,6 +87,8 @@ RUF100_1.py:66:16: RUF100 [*] Unused `noqa` directive (non-enabled: `F501`)
 67 67 |     )
 68 68 | 
 69 69 | 
+
+    Run `ruff check --fix` to apply this fix.
 
 RUF100_1.py:72:27: RUF100 [*] Unused `noqa` directive (non-enabled: `F501`)
    |
@@ -93,7 +101,7 @@ RUF100_1.py:72:27: RUF100 [*] Unused `noqa` directive (non-enabled: `F501`)
    |
    = help: Remove unused `noqa` directive
 
-ℹ Safe fix
+Suggested fix:
 69 69 | 
 70 70 | def f():
 71 71 |     # This should ignore the error, but mark F501 as unused.
@@ -102,6 +110,8 @@ RUF100_1.py:72:27: RUF100 [*] Unused `noqa` directive (non-enabled: `F501`)
 73 73 |         Tuple,  # noqa: F401
 74 74 |     )
 75 75 | 
+
+    Run `ruff check --fix` to apply this fix.
 
 RUF100_1.py:89:24: F401 [*] `typing.Awaitable` imported but unused
    |
@@ -112,12 +122,14 @@ RUF100_1.py:89:24: F401 [*] `typing.Awaitable` imported but unused
    |
    = help: Remove unused import
 
-ℹ Safe fix
+Suggested fix:
 86 86 | 
 87 87 | def f():
 88 88 |     # This should mark F501 as unused.
 89    |-    from typing import Awaitable, AwaitableGenerator  # noqa: F501
    89 |+    pass  # noqa: F501
+
+    Run `ruff check --fix` to apply this fix.
 
 RUF100_1.py:89:35: F401 [*] `typing.AwaitableGenerator` imported but unused
    |
@@ -128,12 +140,14 @@ RUF100_1.py:89:35: F401 [*] `typing.AwaitableGenerator` imported but unused
    |
    = help: Remove unused import
 
-ℹ Safe fix
+Suggested fix:
 86 86 | 
 87 87 | def f():
 88 88 |     # This should mark F501 as unused.
 89    |-    from typing import Awaitable, AwaitableGenerator  # noqa: F501
    89 |+    pass  # noqa: F501
+
+    Run `ruff check --fix` to apply this fix.
 
 RUF100_1.py:89:55: RUF100 [*] Unused `noqa` directive (non-enabled: `F501`)
    |
@@ -144,11 +158,11 @@ RUF100_1.py:89:55: RUF100 [*] Unused `noqa` directive (non-enabled: `F501`)
    |
    = help: Remove unused `noqa` directive
 
-ℹ Safe fix
+Suggested fix:
 86 86 | 
 87 87 | def f():
 88 88 |     # This should mark F501 as unused.
 89    |-    from typing import Awaitable, AwaitableGenerator  # noqa: F501
    89 |+    from typing import Awaitable, AwaitableGenerator
 
-
+    Run `ruff check --fix` to apply this fix.

@@ -11,13 +11,15 @@ E711.py:2:11: E711 [*] Comparison to `None` should be `cond is None`
   |
   = help: Replace with `cond is None`
 
-ℹ Unsafe fix
+Suggested fix:
 1 1 | #: E711
 2   |-if res == None:
   2 |+if res is None:
 3 3 |     pass
 4 4 | #: E711
 5 5 | if res != None:
+
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 E711.py:5:11: E711 [*] Comparison to `None` should be `cond is not None`
   |
@@ -30,7 +32,7 @@ E711.py:5:11: E711 [*] Comparison to `None` should be `cond is not None`
   |
   = help: Replace with `cond is not None`
 
-ℹ Unsafe fix
+Suggested fix:
 2 2 | if res == None:
 3 3 |     pass
 4 4 | #: E711
@@ -39,6 +41,8 @@ E711.py:5:11: E711 [*] Comparison to `None` should be `cond is not None`
 6 6 |     pass
 7 7 | #: E711
 8 8 | if None == res:
+
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 E711.py:8:4: E711 [*] Comparison to `None` should be `cond is None`
    |
@@ -51,7 +55,7 @@ E711.py:8:4: E711 [*] Comparison to `None` should be `cond is None`
    |
    = help: Replace with `cond is None`
 
-ℹ Unsafe fix
+Suggested fix:
 5 5 | if res != None:
 6 6 |     pass
 7 7 | #: E711
@@ -60,6 +64,8 @@ E711.py:8:4: E711 [*] Comparison to `None` should be `cond is None`
 9 9 |     pass
 10 10 | #: E711
 11 11 | if None != res:
+
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 E711.py:11:4: E711 [*] Comparison to `None` should be `cond is not None`
    |
@@ -72,7 +78,7 @@ E711.py:11:4: E711 [*] Comparison to `None` should be `cond is not None`
    |
    = help: Replace with `cond is not None`
 
-ℹ Unsafe fix
+Suggested fix:
 8  8  | if None == res:
 9  9  |     pass
 10 10 | #: E711
@@ -81,6 +87,8 @@ E711.py:11:4: E711 [*] Comparison to `None` should be `cond is not None`
 12 12 |     pass
 13 13 | #: E711
 14 14 | if res[1] == None:
+
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 E711.py:14:14: E711 [*] Comparison to `None` should be `cond is None`
    |
@@ -93,7 +101,7 @@ E711.py:14:14: E711 [*] Comparison to `None` should be `cond is None`
    |
    = help: Replace with `cond is None`
 
-ℹ Unsafe fix
+Suggested fix:
 11 11 | if None != res:
 12 12 |     pass
 13 13 | #: E711
@@ -102,6 +110,8 @@ E711.py:14:14: E711 [*] Comparison to `None` should be `cond is None`
 15 15 |     pass
 16 16 | #: E711
 17 17 | if res[1] != None:
+
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 E711.py:17:14: E711 [*] Comparison to `None` should be `cond is not None`
    |
@@ -114,7 +124,7 @@ E711.py:17:14: E711 [*] Comparison to `None` should be `cond is not None`
    |
    = help: Replace with `cond is not None`
 
-ℹ Unsafe fix
+Suggested fix:
 14 14 | if res[1] == None:
 15 15 |     pass
 16 16 | #: E711
@@ -123,6 +133,8 @@ E711.py:17:14: E711 [*] Comparison to `None` should be `cond is not None`
 18 18 |     pass
 19 19 | #: E711
 20 20 | if None != res[1]:
+
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 E711.py:20:4: E711 [*] Comparison to `None` should be `cond is not None`
    |
@@ -135,7 +147,7 @@ E711.py:20:4: E711 [*] Comparison to `None` should be `cond is not None`
    |
    = help: Replace with `cond is not None`
 
-ℹ Unsafe fix
+Suggested fix:
 17 17 | if res[1] != None:
 18 18 |     pass
 19 19 | #: E711
@@ -144,6 +156,8 @@ E711.py:20:4: E711 [*] Comparison to `None` should be `cond is not None`
 21 21 |     pass
 22 22 | #: E711
 23 23 | if None == res[1]:
+
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 E711.py:23:4: E711 [*] Comparison to `None` should be `cond is None`
    |
@@ -155,7 +169,7 @@ E711.py:23:4: E711 [*] Comparison to `None` should be `cond is None`
    |
    = help: Replace with `cond is None`
 
-ℹ Unsafe fix
+Suggested fix:
 20 20 | if None != res[1]:
 21 21 |     pass
 22 22 | #: E711
@@ -164,6 +178,8 @@ E711.py:23:4: E711 [*] Comparison to `None` should be `cond is None`
 24 24 |     pass
 25 25 | 
 26 26 | if x == None != None:
+
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 E711.py:26:9: E711 [*] Comparison to `None` should be `cond is None`
    |
@@ -175,7 +191,7 @@ E711.py:26:9: E711 [*] Comparison to `None` should be `cond is None`
    |
    = help: Replace with `cond is None`
 
-ℹ Unsafe fix
+Suggested fix:
 23 23 | if None == res[1]:
 24 24 |     pass
 25 25 | 
@@ -184,6 +200,8 @@ E711.py:26:9: E711 [*] Comparison to `None` should be `cond is None`
 27 27 |     pass
 28 28 | 
 29 29 | #: Okay
+
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 E711.py:26:17: E711 [*] Comparison to `None` should be `cond is not None`
    |
@@ -195,7 +213,7 @@ E711.py:26:17: E711 [*] Comparison to `None` should be `cond is not None`
    |
    = help: Replace with `cond is not None`
 
-ℹ Unsafe fix
+Suggested fix:
 23 23 | if None == res[1]:
 24 24 |     pass
 25 25 | 
@@ -205,4 +223,4 @@ E711.py:26:17: E711 [*] Comparison to `None` should be `cond is not None`
 28 28 | 
 29 29 | #: Okay
 
-
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.

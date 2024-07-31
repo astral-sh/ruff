@@ -11,13 +11,15 @@ E25.py:2:12: E251 [*] Unexpected spaces around keyword / parameter equals
   |
   = help: Remove whitespace
 
-ℹ Safe fix
+Suggested fix:
 1 1 | #: E251 E251
 2   |-def foo(bar = False):
   2 |+def foo(bar= False):
 3 3 |     '''Test function with an error in declaration'''
 4 4 |     pass
 5 5 | #: E251
+
+    Run `ruff check --fix` to apply this fix.
 
 E25.py:2:14: E251 [*] Unexpected spaces around keyword / parameter equals
   |
@@ -29,13 +31,15 @@ E25.py:2:14: E251 [*] Unexpected spaces around keyword / parameter equals
   |
   = help: Remove whitespace
 
-ℹ Safe fix
+Suggested fix:
 1 1 | #: E251 E251
 2   |-def foo(bar = False):
   2 |+def foo(bar =False):
 3 3 |     '''Test function with an error in declaration'''
 4 4 |     pass
 5 5 | #: E251
+
+    Run `ruff check --fix` to apply this fix.
 
 E25.py:6:9: E251 [*] Unexpected spaces around keyword / parameter equals
   |
@@ -48,7 +52,7 @@ E25.py:6:9: E251 [*] Unexpected spaces around keyword / parameter equals
   |
   = help: Remove whitespace
 
-ℹ Safe fix
+Suggested fix:
 3 3 |     '''Test function with an error in declaration'''
 4 4 |     pass
 5 5 | #: E251
@@ -57,6 +61,8 @@ E25.py:6:9: E251 [*] Unexpected spaces around keyword / parameter equals
 7 7 | #: E251
 8 8 | foo(bar =True)
 9 9 | #: E251 E251
+
+    Run `ruff check --fix` to apply this fix.
 
 E25.py:8:8: E251 [*] Unexpected spaces around keyword / parameter equals
    |
@@ -69,7 +75,7 @@ E25.py:8:8: E251 [*] Unexpected spaces around keyword / parameter equals
    |
    = help: Remove whitespace
 
-ℹ Safe fix
+Suggested fix:
 5 5 | #: E251
 6 6 | foo(bar= True)
 7 7 | #: E251
@@ -78,6 +84,8 @@ E25.py:8:8: E251 [*] Unexpected spaces around keyword / parameter equals
 9 9 | #: E251 E251
 10 10 | foo(bar = True)
 11 11 | #: E251
+
+    Run `ruff check --fix` to apply this fix.
 
 E25.py:10:8: E251 [*] Unexpected spaces around keyword / parameter equals
    |
@@ -90,7 +98,7 @@ E25.py:10:8: E251 [*] Unexpected spaces around keyword / parameter equals
    |
    = help: Remove whitespace
 
-ℹ Safe fix
+Suggested fix:
 7  7  | #: E251
 8  8  | foo(bar =True)
 9  9  | #: E251 E251
@@ -99,6 +107,8 @@ E25.py:10:8: E251 [*] Unexpected spaces around keyword / parameter equals
 11 11 | #: E251
 12 12 | y = bar(root= "sdasd")
 13 13 | #: E251:2:29
+
+    Run `ruff check --fix` to apply this fix.
 
 E25.py:10:10: E251 [*] Unexpected spaces around keyword / parameter equals
    |
@@ -111,7 +121,7 @@ E25.py:10:10: E251 [*] Unexpected spaces around keyword / parameter equals
    |
    = help: Remove whitespace
 
-ℹ Safe fix
+Suggested fix:
 7  7  | #: E251
 8  8  | foo(bar =True)
 9  9  | #: E251 E251
@@ -120,6 +130,8 @@ E25.py:10:10: E251 [*] Unexpected spaces around keyword / parameter equals
 11 11 | #: E251
 12 12 | y = bar(root= "sdasd")
 13 13 | #: E251:2:29
+
+    Run `ruff check --fix` to apply this fix.
 
 E25.py:12:14: E251 [*] Unexpected spaces around keyword / parameter equals
    |
@@ -132,7 +144,7 @@ E25.py:12:14: E251 [*] Unexpected spaces around keyword / parameter equals
    |
    = help: Remove whitespace
 
-ℹ Safe fix
+Suggested fix:
 9  9  | #: E251 E251
 10 10 | foo(bar = True)
 11 11 | #: E251
@@ -141,6 +153,8 @@ E25.py:12:14: E251 [*] Unexpected spaces around keyword / parameter equals
 13 13 | #: E251:2:29
 14 14 | parser.add_argument('--long-option',
 15 15 |                     default=
+
+    Run `ruff check --fix` to apply this fix.
 
 E25.py:15:29: E251 [*] Unexpected spaces around keyword / parameter equals
    |
@@ -155,7 +169,7 @@ E25.py:15:29: E251 [*] Unexpected spaces around keyword / parameter equals
    |
    = help: Remove whitespace
 
-ℹ Safe fix
+Suggested fix:
 12 12 | y = bar(root= "sdasd")
 13 13 | #: E251:2:29
 14 14 | parser.add_argument('--long-option',
@@ -165,6 +179,8 @@ E25.py:15:29: E251 [*] Unexpected spaces around keyword / parameter equals
 17 16 | #: E251:1:45
 18 17 | parser.add_argument('--long-option', default
 19 18 |                     ="/rather/long/filesystem/path/here/blah/blah/blah")
+
+    Run `ruff check --fix` to apply this fix.
 
 E25.py:18:45: E251 [*] Unexpected spaces around keyword / parameter equals
    |
@@ -179,7 +195,7 @@ E25.py:18:45: E251 [*] Unexpected spaces around keyword / parameter equals
    |
    = help: Remove whitespace
 
-ℹ Safe fix
+Suggested fix:
 15 15 |                     default=
 16 16 |                     "/rather/long/filesystem/path/here/blah/blah/blah")
 17 17 | #: E251:1:45
@@ -189,6 +205,8 @@ E25.py:18:45: E251 [*] Unexpected spaces around keyword / parameter equals
 20 19 | #: E251:3:8 E251:3:10
 21 20 | foo(True,
 22 21 |     baz=(1, 2),
+
+    Run `ruff check --fix` to apply this fix.
 
 E25.py:23:8: E251 [*] Unexpected spaces around keyword / parameter equals
    |
@@ -201,7 +219,7 @@ E25.py:23:8: E251 [*] Unexpected spaces around keyword / parameter equals
    |
    = help: Remove whitespace
 
-ℹ Safe fix
+Suggested fix:
 20 20 | #: E251:3:8 E251:3:10
 21 21 | foo(True,
 22 22 |     baz=(1, 2),
@@ -210,6 +228,8 @@ E25.py:23:8: E251 [*] Unexpected spaces around keyword / parameter equals
 24 24 |     )
 25 25 | #: Okay
 26 26 | foo(bar=(1 == 1))
+
+    Run `ruff check --fix` to apply this fix.
 
 E25.py:23:10: E251 [*] Unexpected spaces around keyword / parameter equals
    |
@@ -222,7 +242,7 @@ E25.py:23:10: E251 [*] Unexpected spaces around keyword / parameter equals
    |
    = help: Remove whitespace
 
-ℹ Safe fix
+Suggested fix:
 20 20 | #: E251:3:8 E251:3:10
 21 21 | foo(True,
 22 22 |     baz=(1, 2),
@@ -232,4 +252,4 @@ E25.py:23:10: E251 [*] Unexpected spaces around keyword / parameter equals
 25 25 | #: Okay
 26 26 | foo(bar=(1 == 1))
 
-
+    Run `ruff check --fix` to apply this fix.

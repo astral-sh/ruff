@@ -12,7 +12,7 @@ FURB180.py:7:10: FURB180 [*] Use of `metaclass=abc.ABCMeta` to define abstract b
   |
   = help: Replace with `abc.ABC`
 
-ℹ Safe fix
+Suggested fix:
 4 4 | 
 5 5 | # Errors
 6 6 | 
@@ -21,6 +21,8 @@ FURB180.py:7:10: FURB180 [*] Use of `metaclass=abc.ABCMeta` to define abstract b
 8 8 |     @abstractmethod
 9 9 |     def foo(self): pass
 10 10 | 
+
+    Run `ruff check --fix` to apply this fix.
 
 FURB180.py:12:10: FURB180 [*] Use of `metaclass=abc.ABCMeta` to define abstract base class
    |
@@ -31,7 +33,7 @@ FURB180.py:12:10: FURB180 [*] Use of `metaclass=abc.ABCMeta` to define abstract 
    |
    = help: Replace with `abc.ABC`
 
-ℹ Safe fix
+Suggested fix:
 9  9  |     def foo(self): pass
 10 10 | 
 11 11 | 
@@ -40,6 +42,8 @@ FURB180.py:12:10: FURB180 [*] Use of `metaclass=abc.ABCMeta` to define abstract 
 13 13 |     @abstractmethod
 14 14 |     def foo(self): pass
 15 15 | 
+
+    Run `ruff check --fix` to apply this fix.
 
 FURB180.py:26:18: FURB180 [*] Use of `metaclass=abc.ABCMeta` to define abstract base class
    |
@@ -50,7 +54,7 @@ FURB180.py:26:18: FURB180 [*] Use of `metaclass=abc.ABCMeta` to define abstract 
    |
    = help: Replace with `abc.ABC`
 
-ℹ Safe fix
+Suggested fix:
 23 23 |     pass
 24 24 | 
 25 25 | 
@@ -60,6 +64,8 @@ FURB180.py:26:18: FURB180 [*] Use of `metaclass=abc.ABCMeta` to define abstract 
 28 28 |     def foo(self): pass
 29 29 | 
 
+    Run `ruff check --fix` to apply this fix.
+
 FURB180.py:31:34: FURB180 [*] Use of `metaclass=abc.ABCMeta` to define abstract base class
    |
 31 | class A3(B0, before_metaclass=1, metaclass=abc.ABCMeta):
@@ -68,7 +74,7 @@ FURB180.py:31:34: FURB180 [*] Use of `metaclass=abc.ABCMeta` to define abstract 
    |
    = help: Replace with `abc.ABC`
 
-ℹ Safe fix
+Suggested fix:
 28 28 |     def foo(self): pass
 29 29 | 
 30 30 | 
@@ -78,4 +84,4 @@ FURB180.py:31:34: FURB180 [*] Use of `metaclass=abc.ABCMeta` to define abstract 
 33 33 | 
 34 34 | 
 
-
+    Run `ruff check --fix` to apply this fix.

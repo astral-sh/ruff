@@ -44,7 +44,7 @@ F602.py:13:5: F602 [*] Dictionary key `a` repeated
    |
    = help: Remove repeated key `a`
 
-ℹ Unsafe fix
+Suggested fix:
 10 10 |     a: 1,
 11 11 |     a: 2,
 12 12 |     a: 3,
@@ -52,6 +52,8 @@ F602.py:13:5: F602 [*] Dictionary key `a` repeated
 14 13 | }
 15 14 | 
 16 15 | x = {
+
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 F602.py:18:5: F602 Dictionary key `a` repeated
    |
@@ -86,7 +88,7 @@ F602.py:20:5: F602 [*] Dictionary key `a` repeated
    |
    = help: Remove repeated key `a`
 
-ℹ Unsafe fix
+Suggested fix:
 17 17 |     a: 1,
 18 18 |     a: 2,
 19 19 |     a: 3,
@@ -94,6 +96,8 @@ F602.py:20:5: F602 [*] Dictionary key `a` repeated
 21 20 |     a: 4,
 22 21 | }
 23 22 | 
+
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 F602.py:21:5: F602 Dictionary key `a` repeated
    |
@@ -116,7 +120,7 @@ F602.py:26:5: F602 [*] Dictionary key `a` repeated
    |
    = help: Remove repeated key `a`
 
-ℹ Unsafe fix
+Suggested fix:
 23 23 | 
 24 24 | x = {
 25 25 |     a: 1,
@@ -124,6 +128,8 @@ F602.py:26:5: F602 [*] Dictionary key `a` repeated
 27 26 |     a: 2,
 28 27 |     a: 3,
 29 28 |     a: 4,
+
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 F602.py:27:5: F602 Dictionary key `a` repeated
    |
@@ -168,7 +174,7 @@ F602.py:35:5: F602 [*] Dictionary key `a` repeated
    |
    = help: Remove repeated key `a`
 
-ℹ Unsafe fix
+Suggested fix:
 32 32 | x = {
 33 33 |     a: 1,
 34 34 |     "a": 1,
@@ -176,6 +182,8 @@ F602.py:35:5: F602 [*] Dictionary key `a` repeated
 36 35 |     "a": 2,
 37 36 |     a: 2,
 38 37 |     "a": 3,
+
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 F602.py:37:5: F602 Dictionary key `a` repeated
    |
@@ -219,13 +227,15 @@ F602.py:44:12: F602 [*] Dictionary key `a` repeated
    |
    = help: Remove repeated key `a`
 
-ℹ Unsafe fix
+Suggested fix:
 41 41 |     a: 4,
 42 42 | }
 43 43 | 
 44    |-x = {a: 1, a: 1}
    44 |+x = {a: 1}
 45 45 | x = {a: 1, b: 2, a: 1}
+
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 F602.py:45:18: F602 [*] Dictionary key `a` repeated
    |
@@ -235,11 +245,11 @@ F602.py:45:18: F602 [*] Dictionary key `a` repeated
    |
    = help: Remove repeated key `a`
 
-ℹ Unsafe fix
+Suggested fix:
 42 42 | }
 43 43 | 
 44 44 | x = {a: 1, a: 1}
 45    |-x = {a: 1, b: 2, a: 1}
    45 |+x = {a: 1, b: 2}
 
-
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.

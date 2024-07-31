@@ -10,7 +10,7 @@ D.py:170:5: D211 [*] No blank lines allowed before class docstring
     |
     = help: Remove blank line(s) before class docstring
 
-ℹ Safe fix
+Suggested fix:
 166 166 | 
 167 167 | 
 168 168 | class WithLeadingSpace:
@@ -18,6 +18,8 @@ D.py:170:5: D211 [*] No blank lines allowed before class docstring
 170 169 |     """With leading space."""
 171 170 | 
 172 171 | 
+
+    Run `ruff check --fix` to apply this fix.
 
 D.py:181:5: D211 [*] No blank lines allowed before class docstring
     |
@@ -29,7 +31,7 @@ D.py:181:5: D211 [*] No blank lines allowed before class docstring
     |
     = help: Remove blank line(s) before class docstring
 
-ℹ Safe fix
+Suggested fix:
 177 177 | 
 178 178 | 
 179 179 | class TrailingSpace:
@@ -38,4 +40,4 @@ D.py:181:5: D211 [*] No blank lines allowed before class docstring
 182 181 |     pass
 183 182 | 
 
-
+    Run `ruff check --fix` to apply this fix.

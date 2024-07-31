@@ -12,7 +12,7 @@ if_stmt_min_max.py:8:1: PLR1730 [*] Replace `if` statement with `value = max(val
    |
    = help: Replace with `value = max(value, 10)`
 
-ℹ Safe fix
+Suggested fix:
 5  5  | value3 = 3
 6  6  | 
 7  7  | # Positive
@@ -22,6 +22,8 @@ if_stmt_min_max.py:8:1: PLR1730 [*] Replace `if` statement with `value = max(val
 10 9  | 
 11 10 | if value <= 10:  # [max-instead-of-if]
 12 11 |     value = 10
+
+    Run `ruff check --fix` to apply this fix.
 
 if_stmt_min_max.py:11:1: PLR1730 [*] Replace `if` statement with `value = max(10, value)`
    |
@@ -35,7 +37,7 @@ if_stmt_min_max.py:11:1: PLR1730 [*] Replace `if` statement with `value = max(10
    |
    = help: Replace with `value = max(10, value)`
 
-ℹ Safe fix
+Suggested fix:
 8  8  | if value < 10:  # [max-instead-of-if]
 9  9  |     value = 10
 10 10 | 
@@ -45,6 +47,8 @@ if_stmt_min_max.py:11:1: PLR1730 [*] Replace `if` statement with `value = max(10
 13 12 | 
 14 13 | if value < value2:  # [max-instead-of-if]
 15 14 |     value = value2
+
+    Run `ruff check --fix` to apply this fix.
 
 if_stmt_min_max.py:14:1: PLR1730 [*] Replace `if` statement with `value = max(value, value2)`
    |
@@ -58,7 +62,7 @@ if_stmt_min_max.py:14:1: PLR1730 [*] Replace `if` statement with `value = max(va
    |
    = help: Replace with `value = max(value, value2)`
 
-ℹ Safe fix
+Suggested fix:
 11 11 | if value <= 10:  # [max-instead-of-if]
 12 12 |     value = 10
 13 13 | 
@@ -68,6 +72,8 @@ if_stmt_min_max.py:14:1: PLR1730 [*] Replace `if` statement with `value = max(va
 16 15 | 
 17 16 | if value > 10:  # [min-instead-of-if]
 18 17 |     value = 10
+
+    Run `ruff check --fix` to apply this fix.
 
 if_stmt_min_max.py:17:1: PLR1730 [*] Replace `if` statement with `value = min(value, 10)`
    |
@@ -81,7 +87,7 @@ if_stmt_min_max.py:17:1: PLR1730 [*] Replace `if` statement with `value = min(va
    |
    = help: Replace with `value = min(value, 10)`
 
-ℹ Safe fix
+Suggested fix:
 14 14 | if value < value2:  # [max-instead-of-if]
 15 15 |     value = value2
 16 16 | 
@@ -91,6 +97,8 @@ if_stmt_min_max.py:17:1: PLR1730 [*] Replace `if` statement with `value = min(va
 19 18 | 
 20 19 | if value >= 10:  # [min-instead-of-if]
 21 20 |     value = 10
+
+    Run `ruff check --fix` to apply this fix.
 
 if_stmt_min_max.py:20:1: PLR1730 [*] Replace `if` statement with `value = min(10, value)`
    |
@@ -104,7 +112,7 @@ if_stmt_min_max.py:20:1: PLR1730 [*] Replace `if` statement with `value = min(10
    |
    = help: Replace with `value = min(10, value)`
 
-ℹ Safe fix
+Suggested fix:
 17 17 | if value > 10:  # [min-instead-of-if]
 18 18 |     value = 10
 19 19 | 
@@ -114,6 +122,8 @@ if_stmt_min_max.py:20:1: PLR1730 [*] Replace `if` statement with `value = min(10
 22 21 | 
 23 22 | if value > value2:  # [min-instead-of-if]
 24 23 |     value = value2
+
+    Run `ruff check --fix` to apply this fix.
 
 if_stmt_min_max.py:23:1: PLR1730 [*] Replace `if` statement with `value = min(value, value2)`
    |
@@ -125,7 +135,7 @@ if_stmt_min_max.py:23:1: PLR1730 [*] Replace `if` statement with `value = min(va
    |
    = help: Replace with `value = min(value, value2)`
 
-ℹ Safe fix
+Suggested fix:
 20 20 | if value >= 10:  # [min-instead-of-if]
 21 21 |     value = 10
 22 22 | 
@@ -135,6 +145,8 @@ if_stmt_min_max.py:23:1: PLR1730 [*] Replace `if` statement with `value = min(va
 25 24 | 
 26 25 | 
 27 26 | class A:
+
+    Run `ruff check --fix` to apply this fix.
 
 if_stmt_min_max.py:33:1: PLR1730 [*] Replace `if` statement with `A1.value = max(A1.value, 10)`
    |
@@ -147,7 +159,7 @@ if_stmt_min_max.py:33:1: PLR1730 [*] Replace `if` statement with `A1.value = max
    |
    = help: Replace with `A1.value = max(A1.value, 10)`
 
-ℹ Safe fix
+Suggested fix:
 30 30 | 
 31 31 | 
 32 32 | A1 = A()
@@ -157,6 +169,8 @@ if_stmt_min_max.py:33:1: PLR1730 [*] Replace `if` statement with `A1.value = max
 35 34 | 
 36 35 | if A1.value > 10:  # [min-instead-of-if]
 37 36 |     A1.value = 10
+
+    Run `ruff check --fix` to apply this fix.
 
 if_stmt_min_max.py:36:1: PLR1730 [*] Replace `if` statement with `A1.value = min(A1.value, 10)`
    |
@@ -168,7 +182,7 @@ if_stmt_min_max.py:36:1: PLR1730 [*] Replace `if` statement with `A1.value = min
    |
    = help: Replace with `A1.value = min(A1.value, 10)`
 
-ℹ Safe fix
+Suggested fix:
 33 33 | if A1.value < 10:  # [max-instead-of-if]
 34 34 |     A1.value = 10
 35 35 | 
@@ -178,6 +192,8 @@ if_stmt_min_max.py:36:1: PLR1730 [*] Replace `if` statement with `A1.value = min
 38 37 | 
 39 38 | 
 40 39 | class AA:
+
+    Run `ruff check --fix` to apply this fix.
 
 if_stmt_min_max.py:60:1: PLR1730 [*] Replace `if` statement with `A2 = max(A2, A1)`
    |
@@ -191,7 +207,7 @@ if_stmt_min_max.py:60:1: PLR1730 [*] Replace `if` statement with `A2 = max(A2, A
    |
    = help: Replace with `A2 = max(A2, A1)`
 
-ℹ Safe fix
+Suggested fix:
 57 57 | A1 = AA(0)
 58 58 | A2 = AA(3)
 59 59 | 
@@ -201,6 +217,8 @@ if_stmt_min_max.py:60:1: PLR1730 [*] Replace `if` statement with `A2 = max(A2, A
 62 61 | 
 63 62 | if A2 <= A1:  # [max-instead-of-if]
 64 63 |     A2 = A1
+
+    Run `ruff check --fix` to apply this fix.
 
 if_stmt_min_max.py:63:1: PLR1730 [*] Replace `if` statement with `A2 = max(A1, A2)`
    |
@@ -214,7 +232,7 @@ if_stmt_min_max.py:63:1: PLR1730 [*] Replace `if` statement with `A2 = max(A1, A
    |
    = help: Replace with `A2 = max(A1, A2)`
 
-ℹ Safe fix
+Suggested fix:
 60 60 | if A2 < A1:  # [max-instead-of-if]
 61 61 |     A2 = A1
 62 62 | 
@@ -224,6 +242,8 @@ if_stmt_min_max.py:63:1: PLR1730 [*] Replace `if` statement with `A2 = max(A1, A
 65 64 | 
 66 65 | if A2 > A1:  # [min-instead-of-if]
 67 66 |     A2 = A1
+
+    Run `ruff check --fix` to apply this fix.
 
 if_stmt_min_max.py:66:1: PLR1730 [*] Replace `if` statement with `A2 = min(A2, A1)`
    |
@@ -237,7 +257,7 @@ if_stmt_min_max.py:66:1: PLR1730 [*] Replace `if` statement with `A2 = min(A2, A
    |
    = help: Replace with `A2 = min(A2, A1)`
 
-ℹ Safe fix
+Suggested fix:
 63 63 | if A2 <= A1:  # [max-instead-of-if]
 64 64 |     A2 = A1
 65 65 | 
@@ -247,6 +267,8 @@ if_stmt_min_max.py:66:1: PLR1730 [*] Replace `if` statement with `A2 = min(A2, A
 68 67 | 
 69 68 | if A2 >= A1:  # [min-instead-of-if]
 70 69 |     A2 = A1
+
+    Run `ruff check --fix` to apply this fix.
 
 if_stmt_min_max.py:69:1: PLR1730 [*] Replace `if` statement with `A2 = min(A1, A2)`
    |
@@ -260,7 +282,7 @@ if_stmt_min_max.py:69:1: PLR1730 [*] Replace `if` statement with `A2 = min(A1, A
    |
    = help: Replace with `A2 = min(A1, A2)`
 
-ℹ Safe fix
+Suggested fix:
 66 66 | if A2 > A1:  # [min-instead-of-if]
 67 67 |     A2 = A1
 68 68 | 
@@ -270,6 +292,8 @@ if_stmt_min_max.py:69:1: PLR1730 [*] Replace `if` statement with `A2 = min(A1, A
 71 70 | 
 72 71 | # Negative
 73 72 | if value < 10:
+
+    Run `ruff check --fix` to apply this fix.
 
 if_stmt_min_max.py:132:1: PLR1730 [*] Replace `if` statement with `min` call
     |
@@ -285,7 +309,7 @@ if_stmt_min_max.py:132:1: PLR1730 [*] Replace `if` statement with `min` call
     |
     = help: Replace with `min` call
 
-ℹ Safe fix
+Suggested fix:
 129 129 |     value = 2
 130 130 | 
 131 131 | # Parenthesized expressions
@@ -300,6 +324,8 @@ if_stmt_min_max.py:132:1: PLR1730 [*] Replace `if` statement with `min` call
 138 137 | class Foo:
 139 138 |     _min = 0
 
+    Run `ruff check --fix` to apply this fix.
+
 if_stmt_min_max.py:143:9: PLR1730 [*] Replace `if` statement with `self._min = min(value, self._min)`
     |
 142 |       def foo(self, value) -> None:
@@ -312,7 +338,7 @@ if_stmt_min_max.py:143:9: PLR1730 [*] Replace `if` statement with `self._min = m
     |
     = help: Replace with `self._min = min(value, self._min)`
 
-ℹ Safe fix
+Suggested fix:
 140 140 |     _max = 0
 141 141 | 
 142 142 |     def foo(self, value) -> None:
@@ -322,6 +348,8 @@ if_stmt_min_max.py:143:9: PLR1730 [*] Replace `if` statement with `self._min = m
 145 144 |         if value > self._max:
 146 145 |             self._max = value
 147 146 | 
+
+    Run `ruff check --fix` to apply this fix.
 
 if_stmt_min_max.py:145:9: PLR1730 [*] Replace `if` statement with `self._max = max(value, self._max)`
     |
@@ -336,7 +364,7 @@ if_stmt_min_max.py:145:9: PLR1730 [*] Replace `if` statement with `self._max = m
     |
     = help: Replace with `self._max = max(value, self._max)`
 
-ℹ Safe fix
+Suggested fix:
 142 142 |     def foo(self, value) -> None:
 143 143 |         if value < self._min:
 144 144 |             self._min = value
@@ -346,6 +374,8 @@ if_stmt_min_max.py:145:9: PLR1730 [*] Replace `if` statement with `self._max = m
 147 146 | 
 148 147 |         if self._min < value:
 149 148 |             self._min = value
+
+    Run `ruff check --fix` to apply this fix.
 
 if_stmt_min_max.py:148:9: PLR1730 [*] Replace `if` statement with `self._min = max(self._min, value)`
     |
@@ -360,7 +390,7 @@ if_stmt_min_max.py:148:9: PLR1730 [*] Replace `if` statement with `self._min = m
     |
     = help: Replace with `self._min = max(self._min, value)`
 
-ℹ Safe fix
+Suggested fix:
 145 145 |         if value > self._max:
 146 146 |             self._max = value
 147 147 | 
@@ -370,6 +400,8 @@ if_stmt_min_max.py:148:9: PLR1730 [*] Replace `if` statement with `self._min = m
 150 149 |         if self._max > value:
 151 150 |             self._max = value
 152 151 | 
+
+    Run `ruff check --fix` to apply this fix.
 
 if_stmt_min_max.py:150:9: PLR1730 [*] Replace `if` statement with `self._max = min(self._max, value)`
     |
@@ -384,7 +416,7 @@ if_stmt_min_max.py:150:9: PLR1730 [*] Replace `if` statement with `self._max = m
     |
     = help: Replace with `self._max = min(self._max, value)`
 
-ℹ Safe fix
+Suggested fix:
 147 147 | 
 148 148 |         if self._min < value:
 149 149 |             self._min = value
@@ -394,6 +426,8 @@ if_stmt_min_max.py:150:9: PLR1730 [*] Replace `if` statement with `self._max = m
 152 151 | 
 153 152 |         if value <= self._min:
 154 153 |             self._min = value
+
+    Run `ruff check --fix` to apply this fix.
 
 if_stmt_min_max.py:153:9: PLR1730 [*] Replace `if` statement with `self._min = min(self._min, value)`
     |
@@ -408,7 +442,7 @@ if_stmt_min_max.py:153:9: PLR1730 [*] Replace `if` statement with `self._min = m
     |
     = help: Replace with `self._min = min(self._min, value)`
 
-ℹ Safe fix
+Suggested fix:
 150 150 |         if self._max > value:
 151 151 |             self._max = value
 152 152 | 
@@ -418,6 +452,8 @@ if_stmt_min_max.py:153:9: PLR1730 [*] Replace `if` statement with `self._min = m
 155 154 |         if value >= self._max:
 156 155 |             self._max = value
 157 156 | 
+
+    Run `ruff check --fix` to apply this fix.
 
 if_stmt_min_max.py:155:9: PLR1730 [*] Replace `if` statement with `self._max = max(self._max, value)`
     |
@@ -432,7 +468,7 @@ if_stmt_min_max.py:155:9: PLR1730 [*] Replace `if` statement with `self._max = m
     |
     = help: Replace with `self._max = max(self._max, value)`
 
-ℹ Safe fix
+Suggested fix:
 152 152 | 
 153 153 |         if value <= self._min:
 154 154 |             self._min = value
@@ -442,6 +478,8 @@ if_stmt_min_max.py:155:9: PLR1730 [*] Replace `if` statement with `self._max = m
 157 156 | 
 158 157 |         if self._min <= value:
 159 158 |             self._min = value
+
+    Run `ruff check --fix` to apply this fix.
 
 if_stmt_min_max.py:158:9: PLR1730 [*] Replace `if` statement with `self._min = max(value, self._min)`
     |
@@ -456,7 +494,7 @@ if_stmt_min_max.py:158:9: PLR1730 [*] Replace `if` statement with `self._min = m
     |
     = help: Replace with `self._min = max(value, self._min)`
 
-ℹ Safe fix
+Suggested fix:
 155 155 |         if value >= self._max:
 156 156 |             self._max = value
 157 157 | 
@@ -465,6 +503,8 @@ if_stmt_min_max.py:158:9: PLR1730 [*] Replace `if` statement with `self._min = m
     158 |+        self._min = max(value, self._min)
 160 159 |         if self._max >= value:
 161 160 |             self._max = value
+
+    Run `ruff check --fix` to apply this fix.
 
 if_stmt_min_max.py:160:9: PLR1730 [*] Replace `if` statement with `self._max = min(value, self._max)`
     |
@@ -477,10 +517,12 @@ if_stmt_min_max.py:160:9: PLR1730 [*] Replace `if` statement with `self._max = m
     |
     = help: Replace with `self._max = min(value, self._max)`
 
-ℹ Safe fix
+Suggested fix:
 157 157 | 
 158 158 |         if self._min <= value:
 159 159 |             self._min = value
 160     |-        if self._max >= value:
 161     |-            self._max = value
     160 |+        self._max = min(value, self._max)
+
+    Run `ruff check --fix` to apply this fix.

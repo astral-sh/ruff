@@ -10,11 +10,13 @@ UP029.py:1:1: UP029 [*] Unnecessary builtin import: `*`
   |
   = help: Remove unnecessary builtin import
 
-ℹ Unsafe fix
+Suggested fix:
 1   |-from builtins import *
 2 1 | from builtins import ascii, bytes, compile
 3 2 | from builtins import str as _str
 4 3 | from six.moves import filter, zip, zip_longest
+
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 UP029.py:2:1: UP029 [*] Unnecessary builtin imports: `ascii`, `bytes`
   |
@@ -26,13 +28,15 @@ UP029.py:2:1: UP029 [*] Unnecessary builtin imports: `ascii`, `bytes`
   |
   = help: Remove unnecessary builtin import
 
-ℹ Unsafe fix
+Suggested fix:
 1 1 | from builtins import *
 2   |-from builtins import ascii, bytes, compile
   2 |+from builtins import compile
 3 3 | from builtins import str as _str
 4 4 | from six.moves import filter, zip, zip_longest
 5 5 | from io import open
+
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 UP029.py:4:1: UP029 [*] Unnecessary builtin imports: `filter`, `zip`
   |
@@ -45,7 +49,7 @@ UP029.py:4:1: UP029 [*] Unnecessary builtin imports: `filter`, `zip`
   |
   = help: Remove unnecessary builtin import
 
-ℹ Unsafe fix
+Suggested fix:
 1 1 | from builtins import *
 2 2 | from builtins import ascii, bytes, compile
 3 3 | from builtins import str as _str
@@ -54,6 +58,8 @@ UP029.py:4:1: UP029 [*] Unnecessary builtin imports: `filter`, `zip`
 5 5 | from io import open
 6 6 | import io
 7 7 | import six
+
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 UP029.py:5:1: UP029 [*] Unnecessary builtin import: `open`
   |
@@ -66,7 +72,7 @@ UP029.py:5:1: UP029 [*] Unnecessary builtin import: `open`
   |
   = help: Remove unnecessary builtin import
 
-ℹ Unsafe fix
+Suggested fix:
 2 2 | from builtins import ascii, bytes, compile
 3 3 | from builtins import str as _str
 4 4 | from six.moves import filter, zip, zip_longest
@@ -75,4 +81,4 @@ UP029.py:5:1: UP029 [*] Unnecessary builtin import: `open`
 7 6 | import six
 8 7 | import six.moves
 
-
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.

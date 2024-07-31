@@ -10,12 +10,14 @@ UP015.py:1:1: UP015 [*] Unnecessary open mode parameters
   |
   = help: Remove open mode parameters
 
-ℹ Safe fix
+Suggested fix:
 1   |-open("foo", "U")
   1 |+open("foo")
 2 2 | open("foo", "Ur")
 3 3 | open("foo", "Ub")
 4 4 | open("foo", "rUb")
+
+    Run `ruff check --fix` to apply this fix.
 
 UP015.py:2:1: UP015 [*] Unnecessary open mode parameters
   |
@@ -27,13 +29,15 @@ UP015.py:2:1: UP015 [*] Unnecessary open mode parameters
   |
   = help: Remove open mode parameters
 
-ℹ Safe fix
+Suggested fix:
 1 1 | open("foo", "U")
 2   |-open("foo", "Ur")
   2 |+open("foo")
 3 3 | open("foo", "Ub")
 4 4 | open("foo", "rUb")
 5 5 | open("foo", "r")
+
+    Run `ruff check --fix` to apply this fix.
 
 UP015.py:3:1: UP015 [*] Unnecessary open mode parameters, use ""rb""
   |
@@ -46,7 +50,7 @@ UP015.py:3:1: UP015 [*] Unnecessary open mode parameters, use ""rb""
   |
   = help: Replace with ""rb""
 
-ℹ Safe fix
+Suggested fix:
 1 1 | open("foo", "U")
 2 2 | open("foo", "Ur")
 3   |-open("foo", "Ub")
@@ -54,6 +58,8 @@ UP015.py:3:1: UP015 [*] Unnecessary open mode parameters, use ""rb""
 4 4 | open("foo", "rUb")
 5 5 | open("foo", "r")
 6 6 | open("foo", "rt")
+
+    Run `ruff check --fix` to apply this fix.
 
 UP015.py:4:1: UP015 [*] Unnecessary open mode parameters, use ""rb""
   |
@@ -66,7 +72,7 @@ UP015.py:4:1: UP015 [*] Unnecessary open mode parameters, use ""rb""
   |
   = help: Replace with ""rb""
 
-ℹ Safe fix
+Suggested fix:
 1 1 | open("foo", "U")
 2 2 | open("foo", "Ur")
 3 3 | open("foo", "Ub")
@@ -75,6 +81,8 @@ UP015.py:4:1: UP015 [*] Unnecessary open mode parameters, use ""rb""
 5 5 | open("foo", "r")
 6 6 | open("foo", "rt")
 7 7 | open("f", "r", encoding="UTF-8")
+
+    Run `ruff check --fix` to apply this fix.
 
 UP015.py:5:1: UP015 [*] Unnecessary open mode parameters
   |
@@ -87,7 +95,7 @@ UP015.py:5:1: UP015 [*] Unnecessary open mode parameters
   |
   = help: Remove open mode parameters
 
-ℹ Safe fix
+Suggested fix:
 2 2 | open("foo", "Ur")
 3 3 | open("foo", "Ub")
 4 4 | open("foo", "rUb")
@@ -96,6 +104,8 @@ UP015.py:5:1: UP015 [*] Unnecessary open mode parameters
 6 6 | open("foo", "rt")
 7 7 | open("f", "r", encoding="UTF-8")
 8 8 | open("f", "wt")
+
+    Run `ruff check --fix` to apply this fix.
 
 UP015.py:6:1: UP015 [*] Unnecessary open mode parameters
   |
@@ -108,7 +118,7 @@ UP015.py:6:1: UP015 [*] Unnecessary open mode parameters
   |
   = help: Remove open mode parameters
 
-ℹ Safe fix
+Suggested fix:
 3 3 | open("foo", "Ub")
 4 4 | open("foo", "rUb")
 5 5 | open("foo", "r")
@@ -117,6 +127,8 @@ UP015.py:6:1: UP015 [*] Unnecessary open mode parameters
 7 7 | open("f", "r", encoding="UTF-8")
 8 8 | open("f", "wt")
 9 9 | 
+
+    Run `ruff check --fix` to apply this fix.
 
 UP015.py:7:1: UP015 [*] Unnecessary open mode parameters
   |
@@ -128,7 +140,7 @@ UP015.py:7:1: UP015 [*] Unnecessary open mode parameters
   |
   = help: Remove open mode parameters
 
-ℹ Safe fix
+Suggested fix:
 4 4 | open("foo", "rUb")
 5 5 | open("foo", "r")
 6 6 | open("foo", "rt")
@@ -137,6 +149,8 @@ UP015.py:7:1: UP015 [*] Unnecessary open mode parameters
 8 8 | open("f", "wt")
 9 9 | 
 10 10 | with open("foo", "U") as f:
+
+    Run `ruff check --fix` to apply this fix.
 
 UP015.py:8:1: UP015 [*] Unnecessary open mode parameters, use ""w""
    |
@@ -149,7 +163,7 @@ UP015.py:8:1: UP015 [*] Unnecessary open mode parameters, use ""w""
    |
    = help: Replace with ""w""
 
-ℹ Safe fix
+Suggested fix:
 5 5 | open("foo", "r")
 6 6 | open("foo", "rt")
 7 7 | open("f", "r", encoding="UTF-8")
@@ -158,6 +172,8 @@ UP015.py:8:1: UP015 [*] Unnecessary open mode parameters, use ""w""
 9 9 | 
 10 10 | with open("foo", "U") as f:
 11 11 |     pass
+
+    Run `ruff check --fix` to apply this fix.
 
 UP015.py:10:6: UP015 [*] Unnecessary open mode parameters
    |
@@ -170,7 +186,7 @@ UP015.py:10:6: UP015 [*] Unnecessary open mode parameters
    |
    = help: Remove open mode parameters
 
-ℹ Safe fix
+Suggested fix:
 7  7  | open("f", "r", encoding="UTF-8")
 8  8  | open("f", "wt")
 9  9  | 
@@ -179,6 +195,8 @@ UP015.py:10:6: UP015 [*] Unnecessary open mode parameters
 11 11 |     pass
 12 12 | with open("foo", "Ur") as f:
 13 13 |     pass
+
+    Run `ruff check --fix` to apply this fix.
 
 UP015.py:12:6: UP015 [*] Unnecessary open mode parameters
    |
@@ -191,7 +209,7 @@ UP015.py:12:6: UP015 [*] Unnecessary open mode parameters
    |
    = help: Remove open mode parameters
 
-ℹ Safe fix
+Suggested fix:
 9  9  | 
 10 10 | with open("foo", "U") as f:
 11 11 |     pass
@@ -200,6 +218,8 @@ UP015.py:12:6: UP015 [*] Unnecessary open mode parameters
 13 13 |     pass
 14 14 | with open("foo", "Ub") as f:
 15 15 |     pass
+
+    Run `ruff check --fix` to apply this fix.
 
 UP015.py:14:6: UP015 [*] Unnecessary open mode parameters, use ""rb""
    |
@@ -212,7 +232,7 @@ UP015.py:14:6: UP015 [*] Unnecessary open mode parameters, use ""rb""
    |
    = help: Replace with ""rb""
 
-ℹ Safe fix
+Suggested fix:
 11 11 |     pass
 12 12 | with open("foo", "Ur") as f:
 13 13 |     pass
@@ -221,6 +241,8 @@ UP015.py:14:6: UP015 [*] Unnecessary open mode parameters, use ""rb""
 15 15 |     pass
 16 16 | with open("foo", "rUb") as f:
 17 17 |     pass
+
+    Run `ruff check --fix` to apply this fix.
 
 UP015.py:16:6: UP015 [*] Unnecessary open mode parameters, use ""rb""
    |
@@ -233,7 +255,7 @@ UP015.py:16:6: UP015 [*] Unnecessary open mode parameters, use ""rb""
    |
    = help: Replace with ""rb""
 
-ℹ Safe fix
+Suggested fix:
 13 13 |     pass
 14 14 | with open("foo", "Ub") as f:
 15 15 |     pass
@@ -242,6 +264,8 @@ UP015.py:16:6: UP015 [*] Unnecessary open mode parameters, use ""rb""
 17 17 |     pass
 18 18 | with open("foo", "r") as f:
 19 19 |     pass
+
+    Run `ruff check --fix` to apply this fix.
 
 UP015.py:18:6: UP015 [*] Unnecessary open mode parameters
    |
@@ -254,7 +278,7 @@ UP015.py:18:6: UP015 [*] Unnecessary open mode parameters
    |
    = help: Remove open mode parameters
 
-ℹ Safe fix
+Suggested fix:
 15 15 |     pass
 16 16 | with open("foo", "rUb") as f:
 17 17 |     pass
@@ -263,6 +287,8 @@ UP015.py:18:6: UP015 [*] Unnecessary open mode parameters
 19 19 |     pass
 20 20 | with open("foo", "rt") as f:
 21 21 |     pass
+
+    Run `ruff check --fix` to apply this fix.
 
 UP015.py:20:6: UP015 [*] Unnecessary open mode parameters
    |
@@ -275,7 +301,7 @@ UP015.py:20:6: UP015 [*] Unnecessary open mode parameters
    |
    = help: Remove open mode parameters
 
-ℹ Safe fix
+Suggested fix:
 17 17 |     pass
 18 18 | with open("foo", "r") as f:
 19 19 |     pass
@@ -284,6 +310,8 @@ UP015.py:20:6: UP015 [*] Unnecessary open mode parameters
 21 21 |     pass
 22 22 | with open("foo", "r", encoding="UTF-8") as f:
 23 23 |     pass
+
+    Run `ruff check --fix` to apply this fix.
 
 UP015.py:22:6: UP015 [*] Unnecessary open mode parameters
    |
@@ -296,7 +324,7 @@ UP015.py:22:6: UP015 [*] Unnecessary open mode parameters
    |
    = help: Remove open mode parameters
 
-ℹ Safe fix
+Suggested fix:
 19 19 |     pass
 20 20 | with open("foo", "rt") as f:
 21 21 |     pass
@@ -305,6 +333,8 @@ UP015.py:22:6: UP015 [*] Unnecessary open mode parameters
 23 23 |     pass
 24 24 | with open("foo", "wt") as f:
 25 25 |     pass
+
+    Run `ruff check --fix` to apply this fix.
 
 UP015.py:24:6: UP015 [*] Unnecessary open mode parameters, use ""w""
    |
@@ -316,7 +346,7 @@ UP015.py:24:6: UP015 [*] Unnecessary open mode parameters, use ""w""
    |
    = help: Replace with ""w""
 
-ℹ Safe fix
+Suggested fix:
 21 21 |     pass
 22 22 | with open("foo", "r", encoding="UTF-8") as f:
 23 23 |     pass
@@ -325,6 +355,8 @@ UP015.py:24:6: UP015 [*] Unnecessary open mode parameters, use ""w""
 25 25 |     pass
 26 26 | 
 27 27 | open(f("a", "b", "c"), "U")
+
+    Run `ruff check --fix` to apply this fix.
 
 UP015.py:27:1: UP015 [*] Unnecessary open mode parameters
    |
@@ -336,7 +368,7 @@ UP015.py:27:1: UP015 [*] Unnecessary open mode parameters
    |
    = help: Remove open mode parameters
 
-ℹ Safe fix
+Suggested fix:
 24 24 | with open("foo", "wt") as f:
 25 25 |     pass
 26 26 | 
@@ -345,6 +377,8 @@ UP015.py:27:1: UP015 [*] Unnecessary open mode parameters
 28 28 | open(f("a", "b", "c"), "Ub")
 29 29 | 
 30 30 | with open(f("a", "b", "c"), "U") as f:
+
+    Run `ruff check --fix` to apply this fix.
 
 UP015.py:28:1: UP015 [*] Unnecessary open mode parameters, use ""rb""
    |
@@ -356,7 +390,7 @@ UP015.py:28:1: UP015 [*] Unnecessary open mode parameters, use ""rb""
    |
    = help: Replace with ""rb""
 
-ℹ Safe fix
+Suggested fix:
 25 25 |     pass
 26 26 | 
 27 27 | open(f("a", "b", "c"), "U")
@@ -365,6 +399,8 @@ UP015.py:28:1: UP015 [*] Unnecessary open mode parameters, use ""rb""
 29 29 | 
 30 30 | with open(f("a", "b", "c"), "U") as f:
 31 31 |     pass
+
+    Run `ruff check --fix` to apply this fix.
 
 UP015.py:30:6: UP015 [*] Unnecessary open mode parameters
    |
@@ -377,7 +413,7 @@ UP015.py:30:6: UP015 [*] Unnecessary open mode parameters
    |
    = help: Remove open mode parameters
 
-ℹ Safe fix
+Suggested fix:
 27 27 | open(f("a", "b", "c"), "U")
 28 28 | open(f("a", "b", "c"), "Ub")
 29 29 | 
@@ -386,6 +422,8 @@ UP015.py:30:6: UP015 [*] Unnecessary open mode parameters
 31 31 |     pass
 32 32 | with open(f("a", "b", "c"), "Ub") as f:
 33 33 |     pass
+
+    Run `ruff check --fix` to apply this fix.
 
 UP015.py:32:6: UP015 [*] Unnecessary open mode parameters, use ""rb""
    |
@@ -397,7 +435,7 @@ UP015.py:32:6: UP015 [*] Unnecessary open mode parameters, use ""rb""
    |
    = help: Replace with ""rb""
 
-ℹ Safe fix
+Suggested fix:
 29 29 | 
 30 30 | with open(f("a", "b", "c"), "U") as f:
 31 31 |     pass
@@ -406,6 +444,8 @@ UP015.py:32:6: UP015 [*] Unnecessary open mode parameters, use ""rb""
 33 33 |     pass
 34 34 | 
 35 35 | with open("foo", "U") as fa, open("bar", "U") as fb:
+
+    Run `ruff check --fix` to apply this fix.
 
 UP015.py:35:6: UP015 [*] Unnecessary open mode parameters
    |
@@ -418,7 +458,7 @@ UP015.py:35:6: UP015 [*] Unnecessary open mode parameters
    |
    = help: Remove open mode parameters
 
-ℹ Safe fix
+Suggested fix:
 32 32 | with open(f("a", "b", "c"), "Ub") as f:
 33 33 |     pass
 34 34 | 
@@ -427,6 +467,8 @@ UP015.py:35:6: UP015 [*] Unnecessary open mode parameters
 36 36 |     pass
 37 37 | with open("foo", "Ub") as fa, open("bar", "Ub") as fb:
 38 38 |     pass
+
+    Run `ruff check --fix` to apply this fix.
 
 UP015.py:35:30: UP015 [*] Unnecessary open mode parameters
    |
@@ -439,7 +481,7 @@ UP015.py:35:30: UP015 [*] Unnecessary open mode parameters
    |
    = help: Remove open mode parameters
 
-ℹ Safe fix
+Suggested fix:
 32 32 | with open(f("a", "b", "c"), "Ub") as f:
 33 33 |     pass
 34 34 | 
@@ -448,6 +490,8 @@ UP015.py:35:30: UP015 [*] Unnecessary open mode parameters
 36 36 |     pass
 37 37 | with open("foo", "Ub") as fa, open("bar", "Ub") as fb:
 38 38 |     pass
+
+    Run `ruff check --fix` to apply this fix.
 
 UP015.py:37:6: UP015 [*] Unnecessary open mode parameters, use ""rb""
    |
@@ -459,7 +503,7 @@ UP015.py:37:6: UP015 [*] Unnecessary open mode parameters, use ""rb""
    |
    = help: Replace with ""rb""
 
-ℹ Safe fix
+Suggested fix:
 34 34 | 
 35 35 | with open("foo", "U") as fa, open("bar", "U") as fb:
 36 36 |     pass
@@ -468,6 +512,8 @@ UP015.py:37:6: UP015 [*] Unnecessary open mode parameters, use ""rb""
 38 38 |     pass
 39 39 | 
 40 40 | open("foo", mode="U")
+
+    Run `ruff check --fix` to apply this fix.
 
 UP015.py:37:31: UP015 [*] Unnecessary open mode parameters, use ""rb""
    |
@@ -479,7 +525,7 @@ UP015.py:37:31: UP015 [*] Unnecessary open mode parameters, use ""rb""
    |
    = help: Replace with ""rb""
 
-ℹ Safe fix
+Suggested fix:
 34 34 | 
 35 35 | with open("foo", "U") as fa, open("bar", "U") as fb:
 36 36 |     pass
@@ -488,6 +534,8 @@ UP015.py:37:31: UP015 [*] Unnecessary open mode parameters, use ""rb""
 38 38 |     pass
 39 39 | 
 40 40 | open("foo", mode="U")
+
+    Run `ruff check --fix` to apply this fix.
 
 UP015.py:40:1: UP015 [*] Unnecessary open mode parameters
    |
@@ -500,7 +548,7 @@ UP015.py:40:1: UP015 [*] Unnecessary open mode parameters
    |
    = help: Remove open mode parameters
 
-ℹ Safe fix
+Suggested fix:
 37 37 | with open("foo", "Ub") as fa, open("bar", "Ub") as fb:
 38 38 |     pass
 39 39 | 
@@ -509,6 +557,8 @@ UP015.py:40:1: UP015 [*] Unnecessary open mode parameters
 41 41 | open(name="foo", mode="U")
 42 42 | open(mode="U", name="foo")
 43 43 | 
+
+    Run `ruff check --fix` to apply this fix.
 
 UP015.py:41:1: UP015 [*] Unnecessary open mode parameters
    |
@@ -519,7 +569,7 @@ UP015.py:41:1: UP015 [*] Unnecessary open mode parameters
    |
    = help: Remove open mode parameters
 
-ℹ Safe fix
+Suggested fix:
 38 38 |     pass
 39 39 | 
 40 40 | open("foo", mode="U")
@@ -528,6 +578,8 @@ UP015.py:41:1: UP015 [*] Unnecessary open mode parameters
 42 42 | open(mode="U", name="foo")
 43 43 | 
 44 44 | with open("foo", mode="U") as f:
+
+    Run `ruff check --fix` to apply this fix.
 
 UP015.py:42:1: UP015 [*] Unnecessary open mode parameters
    |
@@ -540,7 +592,7 @@ UP015.py:42:1: UP015 [*] Unnecessary open mode parameters
    |
    = help: Remove open mode parameters
 
-ℹ Safe fix
+Suggested fix:
 39 39 | 
 40 40 | open("foo", mode="U")
 41 41 | open(name="foo", mode="U")
@@ -549,6 +601,8 @@ UP015.py:42:1: UP015 [*] Unnecessary open mode parameters
 43 43 | 
 44 44 | with open("foo", mode="U") as f:
 45 45 |     pass
+
+    Run `ruff check --fix` to apply this fix.
 
 UP015.py:44:6: UP015 [*] Unnecessary open mode parameters
    |
@@ -561,7 +615,7 @@ UP015.py:44:6: UP015 [*] Unnecessary open mode parameters
    |
    = help: Remove open mode parameters
 
-ℹ Safe fix
+Suggested fix:
 41 41 | open(name="foo", mode="U")
 42 42 | open(mode="U", name="foo")
 43 43 | 
@@ -570,6 +624,8 @@ UP015.py:44:6: UP015 [*] Unnecessary open mode parameters
 45 45 |     pass
 46 46 | with open(name="foo", mode="U") as f:
 47 47 |     pass
+
+    Run `ruff check --fix` to apply this fix.
 
 UP015.py:46:6: UP015 [*] Unnecessary open mode parameters
    |
@@ -582,7 +638,7 @@ UP015.py:46:6: UP015 [*] Unnecessary open mode parameters
    |
    = help: Remove open mode parameters
 
-ℹ Safe fix
+Suggested fix:
 43 43 | 
 44 44 | with open("foo", mode="U") as f:
 45 45 |     pass
@@ -591,6 +647,8 @@ UP015.py:46:6: UP015 [*] Unnecessary open mode parameters
 47 47 |     pass
 48 48 | with open(mode="U", name="foo") as f:
 49 49 |     pass
+
+    Run `ruff check --fix` to apply this fix.
 
 UP015.py:48:6: UP015 [*] Unnecessary open mode parameters
    |
@@ -602,7 +660,7 @@ UP015.py:48:6: UP015 [*] Unnecessary open mode parameters
    |
    = help: Remove open mode parameters
 
-ℹ Safe fix
+Suggested fix:
 45 45 |     pass
 46 46 | with open(name="foo", mode="U") as f:
 47 47 |     pass
@@ -611,6 +669,8 @@ UP015.py:48:6: UP015 [*] Unnecessary open mode parameters
 49 49 |     pass
 50 50 | 
 51 51 | open("foo", mode="Ub")
+
+    Run `ruff check --fix` to apply this fix.
 
 UP015.py:51:1: UP015 [*] Unnecessary open mode parameters, use ""rb""
    |
@@ -623,7 +683,7 @@ UP015.py:51:1: UP015 [*] Unnecessary open mode parameters, use ""rb""
    |
    = help: Replace with ""rb""
 
-ℹ Safe fix
+Suggested fix:
 48 48 | with open(mode="U", name="foo") as f:
 49 49 |     pass
 50 50 | 
@@ -632,6 +692,8 @@ UP015.py:51:1: UP015 [*] Unnecessary open mode parameters, use ""rb""
 52 52 | open(name="foo", mode="Ub")
 53 53 | open(mode="Ub", name="foo")
 54 54 | 
+
+    Run `ruff check --fix` to apply this fix.
 
 UP015.py:52:1: UP015 [*] Unnecessary open mode parameters, use ""rb""
    |
@@ -642,7 +704,7 @@ UP015.py:52:1: UP015 [*] Unnecessary open mode parameters, use ""rb""
    |
    = help: Replace with ""rb""
 
-ℹ Safe fix
+Suggested fix:
 49 49 |     pass
 50 50 | 
 51 51 | open("foo", mode="Ub")
@@ -651,6 +713,8 @@ UP015.py:52:1: UP015 [*] Unnecessary open mode parameters, use ""rb""
 53 53 | open(mode="Ub", name="foo")
 54 54 | 
 55 55 | with open("foo", mode="Ub") as f:
+
+    Run `ruff check --fix` to apply this fix.
 
 UP015.py:53:1: UP015 [*] Unnecessary open mode parameters, use ""rb""
    |
@@ -663,7 +727,7 @@ UP015.py:53:1: UP015 [*] Unnecessary open mode parameters, use ""rb""
    |
    = help: Replace with ""rb""
 
-ℹ Safe fix
+Suggested fix:
 50 50 | 
 51 51 | open("foo", mode="Ub")
 52 52 | open(name="foo", mode="Ub")
@@ -672,6 +736,8 @@ UP015.py:53:1: UP015 [*] Unnecessary open mode parameters, use ""rb""
 54 54 | 
 55 55 | with open("foo", mode="Ub") as f:
 56 56 |     pass
+
+    Run `ruff check --fix` to apply this fix.
 
 UP015.py:55:6: UP015 [*] Unnecessary open mode parameters, use ""rb""
    |
@@ -684,7 +750,7 @@ UP015.py:55:6: UP015 [*] Unnecessary open mode parameters, use ""rb""
    |
    = help: Replace with ""rb""
 
-ℹ Safe fix
+Suggested fix:
 52 52 | open(name="foo", mode="Ub")
 53 53 | open(mode="Ub", name="foo")
 54 54 | 
@@ -693,6 +759,8 @@ UP015.py:55:6: UP015 [*] Unnecessary open mode parameters, use ""rb""
 56 56 |     pass
 57 57 | with open(name="foo", mode="Ub") as f:
 58 58 |     pass
+
+    Run `ruff check --fix` to apply this fix.
 
 UP015.py:57:6: UP015 [*] Unnecessary open mode parameters, use ""rb""
    |
@@ -705,7 +773,7 @@ UP015.py:57:6: UP015 [*] Unnecessary open mode parameters, use ""rb""
    |
    = help: Replace with ""rb""
 
-ℹ Safe fix
+Suggested fix:
 54 54 | 
 55 55 | with open("foo", mode="Ub") as f:
 56 56 |     pass
@@ -714,6 +782,8 @@ UP015.py:57:6: UP015 [*] Unnecessary open mode parameters, use ""rb""
 58 58 |     pass
 59 59 | with open(mode="Ub", name="foo") as f:
 60 60 |     pass
+
+    Run `ruff check --fix` to apply this fix.
 
 UP015.py:59:6: UP015 [*] Unnecessary open mode parameters, use ""rb""
    |
@@ -725,7 +795,7 @@ UP015.py:59:6: UP015 [*] Unnecessary open mode parameters, use ""rb""
    |
    = help: Replace with ""rb""
 
-ℹ Safe fix
+Suggested fix:
 56 56 |     pass
 57 57 | with open(name="foo", mode="Ub") as f:
 58 58 |     pass
@@ -734,6 +804,8 @@ UP015.py:59:6: UP015 [*] Unnecessary open mode parameters, use ""rb""
 60 60 |     pass
 61 61 | 
 62 62 | open(file="foo", mode='U', buffering=-1, encoding=None, errors=None, newline=None, closefd=True, opener=None)
+
+    Run `ruff check --fix` to apply this fix.
 
 UP015.py:62:1: UP015 [*] Unnecessary open mode parameters
    |
@@ -746,7 +818,7 @@ UP015.py:62:1: UP015 [*] Unnecessary open mode parameters
    |
    = help: Remove open mode parameters
 
-ℹ Safe fix
+Suggested fix:
 59 59 | with open(mode="Ub", name="foo") as f:
 60 60 |     pass
 61 61 | 
@@ -755,6 +827,8 @@ UP015.py:62:1: UP015 [*] Unnecessary open mode parameters
 63 63 | open(file="foo", buffering=-1, encoding=None, errors=None, newline=None, closefd=True, opener=None, mode='U')
 64 64 | open(file="foo", buffering=-1, encoding=None, errors=None, mode='U', newline=None, closefd=True, opener=None)
 65 65 | open(mode='U', file="foo", buffering=-1, encoding=None, errors=None, newline=None, closefd=True, opener=None)
+
+    Run `ruff check --fix` to apply this fix.
 
 UP015.py:63:1: UP015 [*] Unnecessary open mode parameters
    |
@@ -766,7 +840,7 @@ UP015.py:63:1: UP015 [*] Unnecessary open mode parameters
    |
    = help: Remove open mode parameters
 
-ℹ Safe fix
+Suggested fix:
 60 60 |     pass
 61 61 | 
 62 62 | open(file="foo", mode='U', buffering=-1, encoding=None, errors=None, newline=None, closefd=True, opener=None)
@@ -775,6 +849,8 @@ UP015.py:63:1: UP015 [*] Unnecessary open mode parameters
 64 64 | open(file="foo", buffering=-1, encoding=None, errors=None, mode='U', newline=None, closefd=True, opener=None)
 65 65 | open(mode='U', file="foo", buffering=-1, encoding=None, errors=None, newline=None, closefd=True, opener=None)
 66 66 | 
+
+    Run `ruff check --fix` to apply this fix.
 
 UP015.py:64:1: UP015 [*] Unnecessary open mode parameters
    |
@@ -786,7 +862,7 @@ UP015.py:64:1: UP015 [*] Unnecessary open mode parameters
    |
    = help: Remove open mode parameters
 
-ℹ Safe fix
+Suggested fix:
 61 61 | 
 62 62 | open(file="foo", mode='U', buffering=-1, encoding=None, errors=None, newline=None, closefd=True, opener=None)
 63 63 | open(file="foo", buffering=-1, encoding=None, errors=None, newline=None, closefd=True, opener=None, mode='U')
@@ -795,6 +871,8 @@ UP015.py:64:1: UP015 [*] Unnecessary open mode parameters
 65 65 | open(mode='U', file="foo", buffering=-1, encoding=None, errors=None, newline=None, closefd=True, opener=None)
 66 66 | 
 67 67 | open(file="foo", mode='Ub', buffering=-1, encoding=None, errors=None, newline=None, closefd=True, opener=None)
+
+    Run `ruff check --fix` to apply this fix.
 
 UP015.py:65:1: UP015 [*] Unnecessary open mode parameters
    |
@@ -807,7 +885,7 @@ UP015.py:65:1: UP015 [*] Unnecessary open mode parameters
    |
    = help: Remove open mode parameters
 
-ℹ Safe fix
+Suggested fix:
 62 62 | open(file="foo", mode='U', buffering=-1, encoding=None, errors=None, newline=None, closefd=True, opener=None)
 63 63 | open(file="foo", buffering=-1, encoding=None, errors=None, newline=None, closefd=True, opener=None, mode='U')
 64 64 | open(file="foo", buffering=-1, encoding=None, errors=None, mode='U', newline=None, closefd=True, opener=None)
@@ -816,6 +894,8 @@ UP015.py:65:1: UP015 [*] Unnecessary open mode parameters
 66 66 | 
 67 67 | open(file="foo", mode='Ub', buffering=-1, encoding=None, errors=None, newline=None, closefd=True, opener=None)
 68 68 | open(file="foo", buffering=-1, encoding=None, errors=None, newline=None, closefd=True, opener=None, mode='Ub')
+
+    Run `ruff check --fix` to apply this fix.
 
 UP015.py:67:1: UP015 [*] Unnecessary open mode parameters, use ""rb""
    |
@@ -828,7 +908,7 @@ UP015.py:67:1: UP015 [*] Unnecessary open mode parameters, use ""rb""
    |
    = help: Replace with ""rb""
 
-ℹ Safe fix
+Suggested fix:
 64 64 | open(file="foo", buffering=-1, encoding=None, errors=None, mode='U', newline=None, closefd=True, opener=None)
 65 65 | open(mode='U', file="foo", buffering=-1, encoding=None, errors=None, newline=None, closefd=True, opener=None)
 66 66 | 
@@ -837,6 +917,8 @@ UP015.py:67:1: UP015 [*] Unnecessary open mode parameters, use ""rb""
 68 68 | open(file="foo", buffering=-1, encoding=None, errors=None, newline=None, closefd=True, opener=None, mode='Ub')
 69 69 | open(file="foo", buffering=-1, encoding=None, errors=None, mode='Ub', newline=None, closefd=True, opener=None)
 70 70 | open(mode='Ub', file="foo", buffering=-1, encoding=None, errors=None, newline=None, closefd=True, opener=None)
+
+    Run `ruff check --fix` to apply this fix.
 
 UP015.py:68:1: UP015 [*] Unnecessary open mode parameters, use ""rb""
    |
@@ -848,7 +930,7 @@ UP015.py:68:1: UP015 [*] Unnecessary open mode parameters, use ""rb""
    |
    = help: Replace with ""rb""
 
-ℹ Safe fix
+Suggested fix:
 65 65 | open(mode='U', file="foo", buffering=-1, encoding=None, errors=None, newline=None, closefd=True, opener=None)
 66 66 | 
 67 67 | open(file="foo", mode='Ub', buffering=-1, encoding=None, errors=None, newline=None, closefd=True, opener=None)
@@ -857,6 +939,8 @@ UP015.py:68:1: UP015 [*] Unnecessary open mode parameters, use ""rb""
 69 69 | open(file="foo", buffering=-1, encoding=None, errors=None, mode='Ub', newline=None, closefd=True, opener=None)
 70 70 | open(mode='Ub', file="foo", buffering=-1, encoding=None, errors=None, newline=None, closefd=True, opener=None)
 71 71 | 
+
+    Run `ruff check --fix` to apply this fix.
 
 UP015.py:69:1: UP015 [*] Unnecessary open mode parameters, use ""rb""
    |
@@ -868,7 +952,7 @@ UP015.py:69:1: UP015 [*] Unnecessary open mode parameters, use ""rb""
    |
    = help: Replace with ""rb""
 
-ℹ Safe fix
+Suggested fix:
 66 66 | 
 67 67 | open(file="foo", mode='Ub', buffering=-1, encoding=None, errors=None, newline=None, closefd=True, opener=None)
 68 68 | open(file="foo", buffering=-1, encoding=None, errors=None, newline=None, closefd=True, opener=None, mode='Ub')
@@ -877,6 +961,8 @@ UP015.py:69:1: UP015 [*] Unnecessary open mode parameters, use ""rb""
 70 70 | open(mode='Ub', file="foo", buffering=-1, encoding=None, errors=None, newline=None, closefd=True, opener=None)
 71 71 | 
 72 72 | open = 1
+
+    Run `ruff check --fix` to apply this fix.
 
 UP015.py:70:1: UP015 [*] Unnecessary open mode parameters, use ""rb""
    |
@@ -889,7 +975,7 @@ UP015.py:70:1: UP015 [*] Unnecessary open mode parameters, use ""rb""
    |
    = help: Replace with ""rb""
 
-ℹ Safe fix
+Suggested fix:
 67 67 | open(file="foo", mode='Ub', buffering=-1, encoding=None, errors=None, newline=None, closefd=True, opener=None)
 68 68 | open(file="foo", buffering=-1, encoding=None, errors=None, newline=None, closefd=True, opener=None, mode='Ub')
 69 69 | open(file="foo", buffering=-1, encoding=None, errors=None, mode='Ub', newline=None, closefd=True, opener=None)
@@ -899,4 +985,4 @@ UP015.py:70:1: UP015 [*] Unnecessary open mode parameters, use ""rb""
 72 72 | open = 1
 73 73 | open("foo", "U")
 
-
+    Run `ruff check --fix` to apply this fix.

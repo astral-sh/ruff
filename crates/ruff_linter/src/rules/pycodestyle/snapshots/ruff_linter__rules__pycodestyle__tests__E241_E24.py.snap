@@ -11,13 +11,15 @@ E24.py:2:8: E241 [*] Multiple spaces after comma
   |
   = help: Replace with single space
 
-ℹ Safe fix
+Suggested fix:
 1 1 | #: E241
 2   |-a = (1,  2)
   2 |+a = (1, 2)
 3 3 | #: Okay
 4 4 | b = (1, 20)
 5 5 | #: E242
+
+    Run `ruff check --fix` to apply this fix.
 
 E24.py:11:18: E241 [*] Multiple spaces after comma
    |
@@ -30,7 +32,7 @@ E24.py:11:18: E241 [*] Multiple spaces after comma
    |
    = help: Replace with single space
 
-ℹ Safe fix
+Suggested fix:
 8  8  | b = (1, 20)  # space before 20
 9  9  | #: E241 E241 E241
 10 10 | # issue 135
@@ -38,6 +40,8 @@ E24.py:11:18: E241 [*] Multiple spaces after comma
    11 |+more_spaces = [a, b,
 12 12 |                ef,  +h,
 13 13 |                c,   -d]
+
+    Run `ruff check --fix` to apply this fix.
 
 E24.py:12:19: E241 [*] Multiple spaces after comma
    |
@@ -49,13 +53,15 @@ E24.py:12:19: E241 [*] Multiple spaces after comma
    |
    = help: Replace with single space
 
-ℹ Safe fix
+Suggested fix:
 9  9  | #: E241 E241 E241
 10 10 | # issue 135
 11 11 | more_spaces = [a,    b,
 12    |-               ef,  +h,
    12 |+               ef, +h,
 13 13 |                c,   -d]
+
+    Run `ruff check --fix` to apply this fix.
 
 E24.py:13:18: E241 [*] Multiple spaces after comma
    |
@@ -66,11 +72,11 @@ E24.py:13:18: E241 [*] Multiple spaces after comma
    |
    = help: Replace with single space
 
-ℹ Safe fix
+Suggested fix:
 10 10 | # issue 135
 11 11 | more_spaces = [a,    b,
 12 12 |                ef,  +h,
 13    |-               c,   -d]
    13 |+               c, -d]
 
-
+    Run `ruff check --fix` to apply this fix.

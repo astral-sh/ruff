@@ -21,7 +21,7 @@ B007.py:18:13: B007 [*] Loop control variable `k` not used within loop body
    |
    = help: Rename unused `k` to `_k`
 
-ℹ Unsafe fix
+Suggested fix:
 15 15 | 
 16 16 | for i in range(10):
 17 17 |     for j in range(10):
@@ -30,6 +30,8 @@ B007.py:18:13: B007 [*] Loop control variable `k` not used within loop body
 19 19 |             print(i + j)
 20 20 | 
 21 21 | 
+
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 B007.py:30:5: B007 Loop control variable `i` not used within loop body
    |
@@ -47,7 +49,7 @@ B007.py:30:13: B007 [*] Loop control variable `k` not used within loop body
    |
    = help: Rename unused `k` to `_k`
 
-ℹ Unsafe fix
+Suggested fix:
 27 27 |                     yield i, (j, (k, l))
 28 28 | 
 29 29 | 
@@ -56,6 +58,8 @@ B007.py:30:13: B007 [*] Loop control variable `k` not used within loop body
 31 31 |     print(j, l)
 32 32 | 
 33 33 | FMT = "{foo} {bar}"
+
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 B007.py:34:10: B007 Loop control variable `bar` may not be used within loop body
    |
@@ -110,7 +114,7 @@ B007.py:52:14: B007 [*] Loop control variable `bar` not used within loop body
    |
    = help: Rename unused `bar` to `_bar`
 
-ℹ Unsafe fix
+Suggested fix:
 49 49 | 
 50 50 | def f():
 51 51 |     # Fixable.
@@ -119,6 +123,8 @@ B007.py:52:14: B007 [*] Loop control variable `bar` not used within loop body
 53 53 |         if foo or baz:
 54 54 |             break
 55 55 | 
+
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 B007.py:59:14: B007 Loop control variable `bar` not used within loop body
    |
@@ -142,7 +148,7 @@ B007.py:68:14: B007 [*] Loop control variable `bar` not used within loop body
    |
    = help: Rename unused `bar` to `_bar`
 
-ℹ Unsafe fix
+Suggested fix:
 65 65 | 
 66 66 | def f():
 67 67 |     # Fixable.
@@ -151,6 +157,8 @@ B007.py:68:14: B007 [*] Loop control variable `bar` not used within loop body
 69 69 |         if foo or baz:
 70 70 |             break
 71 71 | 
+
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 B007.py:77:14: B007 Loop control variable `bar` not used within loop body
    |
@@ -182,5 +190,3 @@ B007.py:98:5: B007 Loop control variable `line_` not used within loop body
    |     ^^^^^ B007
 99 |     fp.readline()
    |
-
-

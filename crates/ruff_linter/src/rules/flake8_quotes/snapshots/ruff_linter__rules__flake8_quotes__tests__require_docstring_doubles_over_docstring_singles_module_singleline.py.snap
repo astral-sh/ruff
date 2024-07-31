@@ -9,11 +9,11 @@ docstring_singles_module_singleline.py:1:1: Q002 [*] Single quote docstring foun
   |
   = help: Replace single quotes docstring with double quotes
 
-ℹ Safe fix
+Suggested fix:
 1   |-''' Double quotes singleline module docstring '''
   1 |+""" Double quotes singleline module docstring """
 2 2 | ''' this is not a docstring '''
 3 3 | 
 4 4 | def foo():
 
-
+    Run `ruff check --fix` to apply this fix.

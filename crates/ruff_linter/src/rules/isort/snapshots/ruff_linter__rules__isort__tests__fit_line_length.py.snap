@@ -15,7 +15,7 @@ fit_line_length.py:7:1: I001 [*] Import block is un-sorted or un-formatted
    |
    = help: Organize imports
 
-ℹ Safe fix
+Suggested fix:
 5  5  | 
 6  6  | if indented:
 7  7  |     from line_with_88 import aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
@@ -39,4 +39,4 @@ fit_line_length.py:7:1: I001 [*] Import block is un-sorted or un-formatted
 13 21 |         aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa,
 14 22 |     )
 
-
+    Run `ruff check --fix` to apply this fix.

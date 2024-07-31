@@ -13,7 +13,7 @@ isort.ipynb:cell 1:1:1: I001 [*] Import block is un-sorted or un-formatted
   |
   = help: Organize imports
 
-ℹ Safe fix
+Suggested fix:
   1 |+import math
   2 |+import random
 1 3 | from pathlib import Path
@@ -22,6 +22,8 @@ isort.ipynb:cell 1:1:1: I001 [*] Import block is un-sorted or un-formatted
 4 4 | from typing import Any
 5 5 | import collections
 6 6 | # Newline should be added here
+
+    Run `ruff check --fix` to apply this fix.
 
 isort.ipynb:cell 2:1:1: I001 [*] Import block is un-sorted or un-formatted
   |
@@ -34,7 +36,7 @@ isort.ipynb:cell 2:1:1: I001 [*] Import block is un-sorted or un-formatted
   |
   = help: Organize imports
 
-ℹ Safe fix
+Suggested fix:
 1 1 | from pathlib import Path
 2 2 | import random
 3 3 | import math
@@ -47,6 +49,8 @@ isort.ipynb:cell 2:1:1: I001 [*] Import block is un-sorted or un-formatted
 7 9 | def foo():
 8 10 |     pass
 
+    Run `ruff check --fix` to apply this fix.
+
 isort.ipynb:cell 3:1:1: I001 [*] Import block is un-sorted or un-formatted
   |
 1 | / from pathlib import Path
@@ -58,7 +62,7 @@ isort.ipynb:cell 3:1:1: I001 [*] Import block is un-sorted or un-formatted
   |
   = help: Organize imports
 
-ℹ Safe fix
+Suggested fix:
 6  6  | # Newline should be added here
 7  7  | def foo():
 8  8  |     pass
@@ -69,6 +73,8 @@ isort.ipynb:cell 3:1:1: I001 [*] Import block is un-sorted or un-formatted
 12 12 | %matplotlib \
 13 13 |     --inline
 
+    Run `ruff check --fix` to apply this fix.
+
 isort.ipynb:cell 3:7:1: I001 [*] Import block is un-sorted or un-formatted
   |
 5 |       --inline
@@ -78,7 +84,7 @@ isort.ipynb:cell 3:7:1: I001 [*] Import block is un-sorted or un-formatted
   |
   = help: Organize imports
 
-ℹ Safe fix
+Suggested fix:
 12 12 | %matplotlib \
 13 13 |     --inline
 14 14 | 
@@ -86,4 +92,4 @@ isort.ipynb:cell 3:7:1: I001 [*] Import block is un-sorted or un-formatted
 15 16 | import math
 16    |-import abc
 
-
+    Run `ruff check --fix` to apply this fix.

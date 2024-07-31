@@ -11,7 +11,7 @@ SIM105_4.py:2:1: SIM105 [*] Use `contextlib.suppress(ImportError)` instead of `t
   |
   = help: Replace with `contextlib.suppress(ImportError)`
 
-ℹ Unsafe fix
+Suggested fix:
 1 1 | ﻿#!/usr/bin/env python
 2   |-try:
   2 |+import contextlib
@@ -19,4 +19,4 @@ SIM105_4.py:2:1: SIM105 [*] Use `contextlib.suppress(ImportError)` instead of `t
 3 4 |    from __builtin__ import bytes, str, open, super, range, zip, round, int, pow, object, input
 4   |-except ImportError:    pass
 
-
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.

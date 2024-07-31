@@ -11,7 +11,7 @@ RUF015.py:4:1: RUF015 [*] Prefer `next(iter(x))` over single element slice
   |
   = help: Replace with `next(iter(x))`
 
-ℹ Unsafe fix
+Suggested fix:
 1 1 | x = range(10)
 2 2 | 
 3 3 | # RUF015
@@ -20,6 +20,8 @@ RUF015.py:4:1: RUF015 [*] Prefer `next(iter(x))` over single element slice
 5 5 | tuple(x)[0]
 6 6 | list(i for i in x)[0]
 7 7 | [i for i in x][0]
+
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 RUF015.py:5:1: RUF015 [*] Prefer `next(iter(x))` over single element slice
   |
@@ -32,7 +34,7 @@ RUF015.py:5:1: RUF015 [*] Prefer `next(iter(x))` over single element slice
   |
   = help: Replace with `next(iter(x))`
 
-ℹ Unsafe fix
+Suggested fix:
 2 2 | 
 3 3 | # RUF015
 4 4 | list(x)[0]
@@ -41,6 +43,8 @@ RUF015.py:5:1: RUF015 [*] Prefer `next(iter(x))` over single element slice
 6 6 | list(i for i in x)[0]
 7 7 | [i for i in x][0]
 8 8 | 
+
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 RUF015.py:6:1: RUF015 [*] Prefer `next(iter(x))` over single element slice
   |
@@ -52,7 +56,7 @@ RUF015.py:6:1: RUF015 [*] Prefer `next(iter(x))` over single element slice
   |
   = help: Replace with `next(iter(x))`
 
-ℹ Unsafe fix
+Suggested fix:
 3 3 | # RUF015
 4 4 | list(x)[0]
 5 5 | tuple(x)[0]
@@ -61,6 +65,8 @@ RUF015.py:6:1: RUF015 [*] Prefer `next(iter(x))` over single element slice
 7 7 | [i for i in x][0]
 8 8 | 
 9 9 | # OK (not indexing (solely) the first element)
+
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 RUF015.py:7:1: RUF015 [*] Prefer `next(iter(x))` over single element slice
   |
@@ -73,7 +79,7 @@ RUF015.py:7:1: RUF015 [*] Prefer `next(iter(x))` over single element slice
   |
   = help: Replace with `next(iter(x))`
 
-ℹ Unsafe fix
+Suggested fix:
 4 4 | list(x)[0]
 5 5 | tuple(x)[0]
 6 6 | list(i for i in x)[0]
@@ -82,6 +88,8 @@ RUF015.py:7:1: RUF015 [*] Prefer `next(iter(x))` over single element slice
 8 8 | 
 9 9 | # OK (not indexing (solely) the first element)
 10 10 | list(x)
+
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 RUF015.py:29:1: RUF015 [*] Prefer `next(i + 1 for i in x)` over single element slice
    |
@@ -93,7 +101,7 @@ RUF015.py:29:1: RUF015 [*] Prefer `next(i + 1 for i in x)` over single element s
    |
    = help: Replace with `next(i + 1 for i in x)`
 
-ℹ Unsafe fix
+Suggested fix:
 26 26 | [i for i in x][::]
 27 27 | 
 28 28 | # RUF015 (doesn't mirror the underlying list)
@@ -102,6 +110,8 @@ RUF015.py:29:1: RUF015 [*] Prefer `next(i + 1 for i in x)` over single element s
 30 30 | [i for i in x if i > 5][0]
 31 31 | [(i, i + 1) for i in x][0]
 32 32 | 
+
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 RUF015.py:30:1: RUF015 [*] Prefer `next(i for i in x if i > 5)` over single element slice
    |
@@ -113,7 +123,7 @@ RUF015.py:30:1: RUF015 [*] Prefer `next(i for i in x if i > 5)` over single elem
    |
    = help: Replace with `next(i for i in x if i > 5)`
 
-ℹ Unsafe fix
+Suggested fix:
 27 27 | 
 28 28 | # RUF015 (doesn't mirror the underlying list)
 29 29 | [i + 1 for i in x][0]
@@ -122,6 +132,8 @@ RUF015.py:30:1: RUF015 [*] Prefer `next(i for i in x if i > 5)` over single elem
 31 31 | [(i, i + 1) for i in x][0]
 32 32 | 
 33 33 | # RUF015 (multiple generators)
+
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 RUF015.py:31:1: RUF015 [*] Prefer `next((i, i + 1) for i in x)` over single element slice
    |
@@ -134,7 +146,7 @@ RUF015.py:31:1: RUF015 [*] Prefer `next((i, i + 1) for i in x)` over single elem
    |
    = help: Replace with `next((i, i + 1) for i in x)`
 
-ℹ Unsafe fix
+Suggested fix:
 28 28 | # RUF015 (doesn't mirror the underlying list)
 29 29 | [i + 1 for i in x][0]
 30 30 | [i for i in x if i > 5][0]
@@ -143,6 +155,8 @@ RUF015.py:31:1: RUF015 [*] Prefer `next((i, i + 1) for i in x)` over single elem
 32 32 | 
 33 33 | # RUF015 (multiple generators)
 34 34 | y = range(10)
+
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 RUF015.py:35:1: RUF015 [*] Prefer `next(i + j for i in x for j in y)` over single element slice
    |
@@ -155,7 +169,7 @@ RUF015.py:35:1: RUF015 [*] Prefer `next(i + j for i in x for j in y)` over singl
    |
    = help: Replace with `next(i + j for i in x for j in y)`
 
-ℹ Unsafe fix
+Suggested fix:
 32 32 | 
 33 33 | # RUF015 (multiple generators)
 34 34 | y = range(10)
@@ -164,6 +178,8 @@ RUF015.py:35:1: RUF015 [*] Prefer `next(i + j for i in x for j in y)` over singl
 36 36 | 
 37 37 | # RUF015
 38 38 | list(range(10))[0]
+
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 RUF015.py:38:1: RUF015 [*] Prefer `next(iter(range(10)))` over single element slice
    |
@@ -175,7 +191,7 @@ RUF015.py:38:1: RUF015 [*] Prefer `next(iter(range(10)))` over single element sl
    |
    = help: Replace with `next(iter(range(10)))`
 
-ℹ Unsafe fix
+Suggested fix:
 35 35 | [i + j for i in x for j in y][0]
 36 36 | 
 37 37 | # RUF015
@@ -184,6 +200,8 @@ RUF015.py:38:1: RUF015 [*] Prefer `next(iter(range(10)))` over single element sl
 39 39 | list(x.y)[0]
 40 40 | list(x["y"])[0]
 41 41 | [*range(10)][0]
+
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 RUF015.py:39:1: RUF015 [*] Prefer `next(iter(x.y))` over single element slice
    |
@@ -196,7 +214,7 @@ RUF015.py:39:1: RUF015 [*] Prefer `next(iter(x.y))` over single element slice
    |
    = help: Replace with `next(iter(x.y))`
 
-ℹ Unsafe fix
+Suggested fix:
 36 36 | 
 37 37 | # RUF015
 38 38 | list(range(10))[0]
@@ -205,6 +223,8 @@ RUF015.py:39:1: RUF015 [*] Prefer `next(iter(x.y))` over single element slice
 40 40 | list(x["y"])[0]
 41 41 | [*range(10)][0]
 42 42 | [*x["y"]][0]
+
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 RUF015.py:40:1: RUF015 [*] Prefer `next(iter(x["y"]))` over single element slice
    |
@@ -217,7 +237,7 @@ RUF015.py:40:1: RUF015 [*] Prefer `next(iter(x["y"]))` over single element slice
    |
    = help: Replace with `next(iter(x["y"]))`
 
-ℹ Unsafe fix
+Suggested fix:
 37 37 | # RUF015
 38 38 | list(range(10))[0]
 39 39 | list(x.y)[0]
@@ -226,6 +246,8 @@ RUF015.py:40:1: RUF015 [*] Prefer `next(iter(x["y"]))` over single element slice
 41 41 | [*range(10)][0]
 42 42 | [*x["y"]][0]
 43 43 | [*x.y][0]
+
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 RUF015.py:41:1: RUF015 [*] Prefer `next(iter(range(10)))` over single element slice
    |
@@ -238,7 +260,7 @@ RUF015.py:41:1: RUF015 [*] Prefer `next(iter(range(10)))` over single element sl
    |
    = help: Replace with `next(iter(range(10)))`
 
-ℹ Unsafe fix
+Suggested fix:
 38 38 | list(range(10))[0]
 39 39 | list(x.y)[0]
 40 40 | list(x["y"])[0]
@@ -247,6 +269,8 @@ RUF015.py:41:1: RUF015 [*] Prefer `next(iter(range(10)))` over single element sl
 42 42 | [*x["y"]][0]
 43 43 | [*x.y][0]
 44 44 | [* x.y][0]
+
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 RUF015.py:42:1: RUF015 [*] Prefer `next(iter(x["y"]))` over single element slice
    |
@@ -259,7 +283,7 @@ RUF015.py:42:1: RUF015 [*] Prefer `next(iter(x["y"]))` over single element slice
    |
    = help: Replace with `next(iter(x["y"]))`
 
-ℹ Unsafe fix
+Suggested fix:
 39 39 | list(x.y)[0]
 40 40 | list(x["y"])[0]
 41 41 | [*range(10)][0]
@@ -268,6 +292,8 @@ RUF015.py:42:1: RUF015 [*] Prefer `next(iter(x["y"]))` over single element slice
 43 43 | [*x.y][0]
 44 44 | [* x.y][0]
 45 45 | [
+
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 RUF015.py:43:1: RUF015 [*] Prefer `next(iter(x.y))` over single element slice
    |
@@ -280,7 +306,7 @@ RUF015.py:43:1: RUF015 [*] Prefer `next(iter(x.y))` over single element slice
    |
    = help: Replace with `next(iter(x.y))`
 
-ℹ Unsafe fix
+Suggested fix:
 40 40 | list(x["y"])[0]
 41 41 | [*range(10)][0]
 42 42 | [*x["y"]][0]
@@ -289,6 +315,8 @@ RUF015.py:43:1: RUF015 [*] Prefer `next(iter(x.y))` over single element slice
 44 44 | [* x.y][0]
 45 45 | [
 46 46 |     *x.y
+
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 RUF015.py:44:1: RUF015 [*] Prefer `next(iter(x.y))` over single element slice
    |
@@ -301,7 +329,7 @@ RUF015.py:44:1: RUF015 [*] Prefer `next(iter(x.y))` over single element slice
    |
    = help: Replace with `next(iter(x.y))`
 
-ℹ Unsafe fix
+Suggested fix:
 41 41 | [*range(10)][0]
 42 42 | [*x["y"]][0]
 43 43 | [*x.y][0]
@@ -310,6 +338,8 @@ RUF015.py:44:1: RUF015 [*] Prefer `next(iter(x.y))` over single element slice
 45 45 | [
 46 46 |     *x.y
 47 47 | ][0]
+
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 RUF015.py:45:1: RUF015 [*] Prefer `next(iter(x.y))` over single element slice
    |
@@ -324,7 +354,7 @@ RUF015.py:45:1: RUF015 [*] Prefer `next(iter(x.y))` over single element slice
    |
    = help: Replace with `next(iter(x.y))`
 
-ℹ Unsafe fix
+Suggested fix:
 42 42 | [*x["y"]][0]
 43 43 | [*x.y][0]
 44 44 | [* x.y][0]
@@ -335,6 +365,8 @@ RUF015.py:45:1: RUF015 [*] Prefer `next(iter(x.y))` over single element slice
 48 46 | 
 49 47 | # RUF015 (multi-line)
 50 48 | revision_heads_map_ast = [
+
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 RUF015.py:50:26: RUF015 [*] Prefer `next(...)` over single element slice
    |
@@ -351,7 +383,7 @@ RUF015.py:50:26: RUF015 [*] Prefer `next(...)` over single element slice
    |
    = help: Replace with `next(...)`
 
-ℹ Unsafe fix
+Suggested fix:
 47 47 | ][0]
 48 48 | 
 49 49 | # RUF015 (multi-line)
@@ -366,6 +398,8 @@ RUF015.py:50:26: RUF015 [*] Prefer `next(...)` over single element slice
 56 56 | # RUF015 (zip)
 57 57 | list(zip(x, y))[0]
 
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
+
 RUF015.py:57:1: RUF015 [*] Prefer `next(zip(x, y))` over single element slice
    |
 56 | # RUF015 (zip)
@@ -375,7 +409,7 @@ RUF015.py:57:1: RUF015 [*] Prefer `next(zip(x, y))` over single element slice
    |
    = help: Replace with `next(zip(x, y))`
 
-ℹ Unsafe fix
+Suggested fix:
 54 54 | ][0]
 55 55 | 
 56 56 | # RUF015 (zip)
@@ -384,6 +418,8 @@ RUF015.py:57:1: RUF015 [*] Prefer `next(zip(x, y))` over single element slice
 58 58 | [*zip(x, y)][0]
 59 59 | 
 60 60 | # RUF015 (pop)
+
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 RUF015.py:58:1: RUF015 [*] Prefer `next(zip(x, y))` over single element slice
    |
@@ -396,7 +432,7 @@ RUF015.py:58:1: RUF015 [*] Prefer `next(zip(x, y))` over single element slice
    |
    = help: Replace with `next(zip(x, y))`
 
-ℹ Unsafe fix
+Suggested fix:
 55 55 | 
 56 56 | # RUF015 (zip)
 57 57 | list(zip(x, y))[0]
@@ -405,6 +441,8 @@ RUF015.py:58:1: RUF015 [*] Prefer `next(zip(x, y))` over single element slice
 59 59 | 
 60 60 | # RUF015 (pop)
 61 61 | list(x).pop(0)
+
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 RUF015.py:61:1: RUF015 [*] Prefer `next(iter(x))` over single element slice
    |
@@ -416,7 +454,7 @@ RUF015.py:61:1: RUF015 [*] Prefer `next(iter(x))` over single element slice
    |
    = help: Replace with `next(iter(x))`
 
-ℹ Unsafe fix
+Suggested fix:
 58 58 | [*zip(x, y)][0]
 59 59 | 
 60 60 | # RUF015 (pop)
@@ -425,6 +463,8 @@ RUF015.py:61:1: RUF015 [*] Prefer `next(iter(x))` over single element slice
 62 62 | [i for i in x].pop(0)
 63 63 | list(i for i in x).pop(0)
 64 64 | 
+
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 RUF015.py:62:1: RUF015 [*] Prefer `next(iter(x))` over single element slice
    |
@@ -436,7 +476,7 @@ RUF015.py:62:1: RUF015 [*] Prefer `next(iter(x))` over single element slice
    |
    = help: Replace with `next(iter(x))`
 
-ℹ Unsafe fix
+Suggested fix:
 59 59 | 
 60 60 | # RUF015 (pop)
 61 61 | list(x).pop(0)
@@ -445,6 +485,8 @@ RUF015.py:62:1: RUF015 [*] Prefer `next(iter(x))` over single element slice
 63 63 | list(i for i in x).pop(0)
 64 64 | 
 65 65 | # OK
+
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 RUF015.py:63:1: RUF015 [*] Prefer `next(iter(x))` over single element slice
    |
@@ -457,7 +499,7 @@ RUF015.py:63:1: RUF015 [*] Prefer `next(iter(x))` over single element slice
    |
    = help: Replace with `next(iter(x))`
 
-ℹ Unsafe fix
+Suggested fix:
 60 60 | # RUF015 (pop)
 61 61 | list(x).pop(0)
 62 62 | [i for i in x].pop(0)
@@ -466,6 +508,8 @@ RUF015.py:63:1: RUF015 [*] Prefer `next(iter(x))` over single element slice
 64 64 | 
 65 65 | # OK
 66 66 | list(x).pop(1)
+
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 RUF015.py:73:5: RUF015 [*] Prefer `next(iter(zip(x, y)))` over single element slice
    |
@@ -476,9 +520,11 @@ RUF015.py:73:5: RUF015 [*] Prefer `next(iter(zip(x, y)))` over single element sl
    |
    = help: Replace with `next(iter(zip(x, y)))`
 
-ℹ Unsafe fix
+Suggested fix:
 70 70 | 
 71 71 | def test():
 72 72 |     zip = list  # Overwrite the builtin zip
 73    |-    list(zip(x, y))[0]
    73 |+    next(iter(zip(x, y)))
+
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.

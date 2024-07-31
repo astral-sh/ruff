@@ -10,7 +10,7 @@ TCH004_1.py:4:26: TCH004 [*] Move import `datetime.datetime` out of type-checkin
   |
   = help: Move out of type-checking block
 
-ℹ Unsafe fix
+Suggested fix:
 1 1 | from typing import TYPE_CHECKING
   2 |+from datetime import datetime
 2 3 | 
@@ -19,4 +19,4 @@ TCH004_1.py:4:26: TCH004 [*] Move import `datetime.datetime` out of type-checkin
   5 |+    pass
 5 6 | x = datetime
 
-
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.

@@ -11,7 +11,7 @@ E22.py:48:5: E224 [*] Tab after operator
    |
    = help: Replace with single space
 
-ℹ Safe fix
+Suggested fix:
 45 45 | 
 46 46 | 
 47 47 | #: E224
@@ -21,4 +21,4 @@ E22.py:48:5: E224 [*] Tab after operator
 50 50 | #:
 51 51 | 
 
-
+    Run `ruff check --fix` to apply this fix.

@@ -52,7 +52,7 @@ RUF005.py:39:7: RUF005 [*] Consider `[1, 2, 3, *foo]` instead of concatenation
    |
    = help: Replace with `[1, 2, 3, *foo]`
 
-ℹ Unsafe fix
+Suggested fix:
 36 36 | yay = Fun().yay
 37 37 | 
 38 38 | foo = [4, 5, 6]
@@ -61,6 +61,8 @@ RUF005.py:39:7: RUF005 [*] Consider `[1, 2, 3, *foo]` instead of concatenation
 40 40 | zoob = tuple(bar)
 41 41 | quux = (7, 8, 9) + zoob
 42 42 | spam = quux + (10, 11, 12)
+
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 RUF005.py:41:8: RUF005 [*] Consider `(7, 8, 9, *zoob)` instead of concatenation
    |
@@ -73,7 +75,7 @@ RUF005.py:41:8: RUF005 [*] Consider `(7, 8, 9, *zoob)` instead of concatenation
    |
    = help: Replace with `(7, 8, 9, *zoob)`
 
-ℹ Unsafe fix
+Suggested fix:
 38 38 | foo = [4, 5, 6]
 39 39 | bar = [1, 2, 3] + foo
 40 40 | zoob = tuple(bar)
@@ -82,6 +84,8 @@ RUF005.py:41:8: RUF005 [*] Consider `(7, 8, 9, *zoob)` instead of concatenation
 42 42 | spam = quux + (10, 11, 12)
 43 43 | spom = list(spam)
 44 44 | eggs = spom + [13, 14, 15]
+
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 RUF005.py:42:8: RUF005 [*] Consider `(*quux, 10, 11, 12)` instead of concatenation
    |
@@ -94,7 +98,7 @@ RUF005.py:42:8: RUF005 [*] Consider `(*quux, 10, 11, 12)` instead of concatenati
    |
    = help: Replace with `(*quux, 10, 11, 12)`
 
-ℹ Unsafe fix
+Suggested fix:
 39 39 | bar = [1, 2, 3] + foo
 40 40 | zoob = tuple(bar)
 41 41 | quux = (7, 8, 9) + zoob
@@ -103,6 +107,8 @@ RUF005.py:42:8: RUF005 [*] Consider `(*quux, 10, 11, 12)` instead of concatenati
 43 43 | spom = list(spam)
 44 44 | eggs = spom + [13, 14, 15]
 45 45 | elatement = ("we all say",) + yay()
+
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 RUF005.py:44:8: RUF005 [*] Consider `[*spom, 13, 14, 15]` instead of concatenation
    |
@@ -115,7 +121,7 @@ RUF005.py:44:8: RUF005 [*] Consider `[*spom, 13, 14, 15]` instead of concatenati
    |
    = help: Replace with `[*spom, 13, 14, 15]`
 
-ℹ Unsafe fix
+Suggested fix:
 41 41 | quux = (7, 8, 9) + zoob
 42 42 | spam = quux + (10, 11, 12)
 43 43 | spom = list(spam)
@@ -124,6 +130,8 @@ RUF005.py:44:8: RUF005 [*] Consider `[*spom, 13, 14, 15]` instead of concatenati
 45 45 | elatement = ("we all say",) + yay()
 46 46 | excitement = ("we all think",) + Fun().yay()
 47 47 | astonishment = ("we all feel",) + Fun.words
+
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 RUF005.py:45:13: RUF005 [*] Consider `("we all say", *yay())` instead of concatenation
    |
@@ -136,7 +144,7 @@ RUF005.py:45:13: RUF005 [*] Consider `("we all say", *yay())` instead of concate
    |
    = help: Replace with `("we all say", *yay())`
 
-ℹ Unsafe fix
+Suggested fix:
 42 42 | spam = quux + (10, 11, 12)
 43 43 | spom = list(spam)
 44 44 | eggs = spom + [13, 14, 15]
@@ -145,6 +153,8 @@ RUF005.py:45:13: RUF005 [*] Consider `("we all say", *yay())` instead of concate
 46 46 | excitement = ("we all think",) + Fun().yay()
 47 47 | astonishment = ("we all feel",) + Fun.words
 48 48 | 
+
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 RUF005.py:46:14: RUF005 [*] Consider `("we all think", *Fun().yay())` instead of concatenation
    |
@@ -156,7 +166,7 @@ RUF005.py:46:14: RUF005 [*] Consider `("we all think", *Fun().yay())` instead of
    |
    = help: Replace with `("we all think", *Fun().yay())`
 
-ℹ Unsafe fix
+Suggested fix:
 43 43 | spom = list(spam)
 44 44 | eggs = spom + [13, 14, 15]
 45 45 | elatement = ("we all say",) + yay()
@@ -165,6 +175,8 @@ RUF005.py:46:14: RUF005 [*] Consider `("we all think", *Fun().yay())` instead of
 47 47 | astonishment = ("we all feel",) + Fun.words
 48 48 | 
 49 49 | chain = ["a", "b", "c"] + eggs + list(("yes", "no", "pants") + zoob)
+
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 RUF005.py:47:16: RUF005 [*] Consider `("we all feel", *Fun.words)` instead of concatenation
    |
@@ -177,7 +189,7 @@ RUF005.py:47:16: RUF005 [*] Consider `("we all feel", *Fun.words)` instead of co
    |
    = help: Replace with `("we all feel", *Fun.words)`
 
-ℹ Unsafe fix
+Suggested fix:
 44 44 | eggs = spom + [13, 14, 15]
 45 45 | elatement = ("we all say",) + yay()
 46 46 | excitement = ("we all think",) + Fun().yay()
@@ -186,6 +198,8 @@ RUF005.py:47:16: RUF005 [*] Consider `("we all feel", *Fun.words)` instead of co
 48 48 | 
 49 49 | chain = ["a", "b", "c"] + eggs + list(("yes", "no", "pants") + zoob)
 50 50 | 
+
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 RUF005.py:49:9: RUF005 [*] Consider iterable unpacking instead of concatenation
    |
@@ -198,7 +212,7 @@ RUF005.py:49:9: RUF005 [*] Consider iterable unpacking instead of concatenation
    |
    = help: Replace with iterable unpacking
 
-ℹ Unsafe fix
+Suggested fix:
 46 46 | excitement = ("we all think",) + Fun().yay()
 47 47 | astonishment = ("we all feel",) + Fun.words
 48 48 | 
@@ -207,6 +221,8 @@ RUF005.py:49:9: RUF005 [*] Consider iterable unpacking instead of concatenation
 50 50 | 
 51 51 | baz = () + zoob
 52 52 | 
+
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 RUF005.py:49:39: RUF005 [*] Consider `("yes", "no", "pants", *zoob)` instead of concatenation
    |
@@ -219,7 +235,7 @@ RUF005.py:49:39: RUF005 [*] Consider `("yes", "no", "pants", *zoob)` instead of 
    |
    = help: Replace with `("yes", "no", "pants", *zoob)`
 
-ℹ Unsafe fix
+Suggested fix:
 46 46 | excitement = ("we all think",) + Fun().yay()
 47 47 | astonishment = ("we all feel",) + Fun.words
 48 48 | 
@@ -228,6 +244,8 @@ RUF005.py:49:39: RUF005 [*] Consider `("yes", "no", "pants", *zoob)` instead of 
 50 50 | 
 51 51 | baz = () + zoob
 52 52 | 
+
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 RUF005.py:51:7: RUF005 [*] Consider `(*zoob,)` instead of concatenation
    |
@@ -240,7 +258,7 @@ RUF005.py:51:7: RUF005 [*] Consider `(*zoob,)` instead of concatenation
    |
    = help: Replace with `(*zoob,)`
 
-ℹ Unsafe fix
+Suggested fix:
 48 48 | 
 49 49 | chain = ["a", "b", "c"] + eggs + list(("yes", "no", "pants") + zoob)
 50 50 | 
@@ -249,6 +267,8 @@ RUF005.py:51:7: RUF005 [*] Consider `(*zoob,)` instead of concatenation
 52 52 | 
 53 53 | [] + foo + [
 54 54 | ]
+
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 RUF005.py:53:1: RUF005 [*] Consider `[*foo]` instead of concatenation
    |
@@ -262,7 +282,7 @@ RUF005.py:53:1: RUF005 [*] Consider `[*foo]` instead of concatenation
    |
    = help: Replace with `[*foo]`
 
-ℹ Unsafe fix
+Suggested fix:
 50 50 | 
 51 51 | baz = () + zoob
 52 52 | 
@@ -272,6 +292,8 @@ RUF005.py:53:1: RUF005 [*] Consider `[*foo]` instead of concatenation
 55 54 | 
 56 55 | pylint_call = [sys.executable, "-m", "pylint"] + args + [path]
 57 56 | pylint_call_tuple = (sys.executable, "-m", "pylint") + args + (path, path2)
+
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 RUF005.py:56:15: RUF005 [*] Consider `[sys.executable, "-m", "pylint", *args, path]` instead of concatenation
    |
@@ -284,7 +306,7 @@ RUF005.py:56:15: RUF005 [*] Consider `[sys.executable, "-m", "pylint", *args, pa
    |
    = help: Replace with `[sys.executable, "-m", "pylint", *args, path]`
 
-ℹ Unsafe fix
+Suggested fix:
 53 53 | [] + foo + [
 54 54 | ]
 55 55 | 
@@ -293,6 +315,8 @@ RUF005.py:56:15: RUF005 [*] Consider `[sys.executable, "-m", "pylint", *args, pa
 57 57 | pylint_call_tuple = (sys.executable, "-m", "pylint") + args + (path, path2)
 58 58 | b = a + [2, 3] + [4]
 59 59 | 
+
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 RUF005.py:57:21: RUF005 [*] Consider iterable unpacking instead of concatenation
    |
@@ -303,7 +327,7 @@ RUF005.py:57:21: RUF005 [*] Consider iterable unpacking instead of concatenation
    |
    = help: Replace with iterable unpacking
 
-ℹ Unsafe fix
+Suggested fix:
 54 54 | ]
 55 55 | 
 56 56 | pylint_call = [sys.executable, "-m", "pylint"] + args + [path]
@@ -312,6 +336,8 @@ RUF005.py:57:21: RUF005 [*] Consider iterable unpacking instead of concatenation
 58 58 | b = a + [2, 3] + [4]
 59 59 | 
 60 60 | # Uses the non-preferred quote style, which should be retained.
+
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 RUF005.py:58:5: RUF005 [*] Consider `[*a, 2, 3, 4]` instead of concatenation
    |
@@ -324,7 +350,7 @@ RUF005.py:58:5: RUF005 [*] Consider `[*a, 2, 3, 4]` instead of concatenation
    |
    = help: Replace with `[*a, 2, 3, 4]`
 
-ℹ Unsafe fix
+Suggested fix:
 55 55 | 
 56 56 | pylint_call = [sys.executable, "-m", "pylint"] + args + [path]
 57 57 | pylint_call_tuple = (sys.executable, "-m", "pylint") + args + (path, path2)
@@ -333,6 +359,8 @@ RUF005.py:58:5: RUF005 [*] Consider `[*a, 2, 3, 4]` instead of concatenation
 59 59 | 
 60 60 | # Uses the non-preferred quote style, which should be retained.
 61 61 | f"{a() + ['b']}"
+
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 RUF005.py:61:4: RUF005 [*] Consider `[*a(), 'b']` instead of concatenation
    |
@@ -344,7 +372,7 @@ RUF005.py:61:4: RUF005 [*] Consider `[*a(), 'b']` instead of concatenation
    |
    = help: Replace with `[*a(), 'b']`
 
-ℹ Unsafe fix
+Suggested fix:
 58 58 | b = a + [2, 3] + [4]
 59 59 | 
 60 60 | # Uses the non-preferred quote style, which should be retained.
@@ -354,4 +382,4 @@ RUF005.py:61:4: RUF005 [*] Consider `[*a(), 'b']` instead of concatenation
 63 63 | ###
 64 64 | # Non-errors.
 
-
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.

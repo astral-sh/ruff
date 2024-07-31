@@ -10,9 +10,11 @@ doubles_all.py:1:1: Q002 [*] Double quote docstring found but single quotes pref
   |
   = help: Replace double quotes docstring with single quotes
 
-ℹ Safe fix
+Suggested fix:
 1   |-"""This is a docstring."""
   1 |+'''This is a docstring.'''
 2 2 | 
 3 3 | this_is_an_inline_string = "double quote string"
-4 4 |
+4 4 | 
+
+    Run `ruff check --fix` to apply this fix.

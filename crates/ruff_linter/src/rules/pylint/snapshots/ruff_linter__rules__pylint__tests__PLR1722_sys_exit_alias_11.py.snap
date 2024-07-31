@@ -10,11 +10,11 @@ sys_exit_alias_11.py:3:1: PLR1722 [*] Use `sys.exit()` instead of `exit`
   |
   = help: Replace `exit` with `sys.exit()`
 
-ℹ Unsafe fix
+Suggested fix:
 1 1 | from sys import *
   2 |+import sys
 2 3 | 
 3   |-exit(0)
   4 |+sys.exit(0)
 
-
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.

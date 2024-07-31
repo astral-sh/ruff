@@ -10,7 +10,7 @@ UP017.py:10:11: UP017 [*] Use `datetime.UTC` alias
    |
    = help: Convert to `datetime.UTC` alias
 
-ℹ Safe fix
+Suggested fix:
    1  |+from datetime import UTC
 1  2  | def func():
 2  3  |     import datetime
@@ -25,6 +25,8 @@ UP017.py:10:11: UP017 [*] Use `datetime.UTC` alias
 12 13 | 
 13 14 | def func():
 
+    Run `ruff check --fix` to apply this fix.
+
 UP017.py:16:11: UP017 [*] Use `datetime.UTC` alias
    |
 14 |     from datetime import timezone as tz
@@ -34,7 +36,7 @@ UP017.py:16:11: UP017 [*] Use `datetime.UTC` alias
    |
    = help: Convert to `datetime.UTC` alias
 
-ℹ Safe fix
+Suggested fix:
    1  |+from datetime import UTC
 1  2  | def func():
 2  3  |     import datetime
@@ -49,6 +51,8 @@ UP017.py:16:11: UP017 [*] Use `datetime.UTC` alias
 18 19 | 
 19 20 | def func():
 
+    Run `ruff check --fix` to apply this fix.
+
 UP017.py:22:11: UP017 [*] Use `datetime.UTC` alias
    |
 20 |     import datetime
@@ -58,7 +62,7 @@ UP017.py:22:11: UP017 [*] Use `datetime.UTC` alias
    |
    = help: Convert to `datetime.UTC` alias
 
-ℹ Safe fix
+Suggested fix:
 19 19 | def func():
 20 20 |     import datetime
 21 21 | 
@@ -67,6 +71,8 @@ UP017.py:22:11: UP017 [*] Use `datetime.UTC` alias
 23 23 | 
 24 24 | 
 25 25 | def func():
+
+    Run `ruff check --fix` to apply this fix.
 
 UP017.py:28:11: UP017 [*] Use `datetime.UTC` alias
    |
@@ -77,9 +83,11 @@ UP017.py:28:11: UP017 [*] Use `datetime.UTC` alias
    |
    = help: Convert to `datetime.UTC` alias
 
-ℹ Safe fix
+Suggested fix:
 25 25 | def func():
 26 26 |     import datetime as dt
 27 27 | 
 28    |-    print(dt.timezone.utc)
    28 |+    print(dt.UTC)
+
+    Run `ruff check --fix` to apply this fix.

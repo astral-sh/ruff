@@ -12,7 +12,7 @@ D410.py:4:5: D410 [*] Missing blank line after section ("Parameters")
   |
   = help: Add blank line after "Parameters"
 
-ℹ Safe fix
+Suggested fix:
 7  7  |         _description_
 8  8  |     b : int
 9  9  |         _description_
@@ -20,6 +20,8 @@ D410.py:4:5: D410 [*] Missing blank line after section ("Parameters")
 10 11 |     Returns
 11 12 |     -------
 12 13 |     int
+
+    Run `ruff check --fix` to apply this fix.
 
 D410.py:21:5: D410 [*] Missing blank line after section ("Parameters")
    |
@@ -32,7 +34,7 @@ D410.py:21:5: D410 [*] Missing blank line after section ("Parameters")
    |
    = help: Add blank line after "Parameters"
 
-ℹ Safe fix
+Suggested fix:
 20 20 | 
 21 21 |     Parameters
 22 22 |     ----------
@@ -40,3 +42,5 @@ D410.py:21:5: D410 [*] Missing blank line after section ("Parameters")
 23 24 |     Returns
 24 25 |     -------
 25 26 |     """
+
+    Run `ruff check --fix` to apply this fix.

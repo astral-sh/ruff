@@ -10,8 +10,10 @@ __init__.py:1:8: F401 [*] `os` imported but unused
   |
   = help: Remove unused import: `os`
 
-ℹ Unsafe fix
+Suggested fix:
 1   |-import os
 2 1 | 
 3 2 | print(__path__)
-4 3 |
+4 3 | 
+
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.

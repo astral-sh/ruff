@@ -10,7 +10,7 @@ D.py:333:5: D301 [*] Use `r"""` if any backslashes in a docstring
     |
     = help: Add `r` prefix
 
-ℹ Unsafe fix
+Suggested fix:
 330 330 | 
 331 331 | @expect('D301: Use r""" if any backslashes in a docstring')
 332 332 | def double_quotes_backslash():
@@ -20,4 +20,4 @@ D.py:333:5: D301 [*] Use `r"""` if any backslashes in a docstring
 335 335 | 
 336 336 | @expect('D301: Use r""" if any backslashes in a docstring')
 
-
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.

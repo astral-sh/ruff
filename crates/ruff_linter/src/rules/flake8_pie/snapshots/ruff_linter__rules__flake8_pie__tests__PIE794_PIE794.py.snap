@@ -12,7 +12,7 @@ PIE794.py:4:5: PIE794 [*] Class field `name` is defined multiple times
   |
   = help: Remove duplicate field definition for `name`
 
-ℹ Unsafe fix
+Suggested fix:
 1 1 | class Foo(BaseModel):
 2 2 |     name = StringField()
 3 3 |     # ....
@@ -20,6 +20,8 @@ PIE794.py:4:5: PIE794 [*] Class field `name` is defined multiple times
 5 4 | 
 6 5 |     def remove(self) -> None:
 7 6 |         ...
+
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 PIE794.py:13:5: PIE794 [*] Class field `name` is defined multiple times
    |
@@ -32,7 +34,7 @@ PIE794.py:13:5: PIE794 [*] Class field `name` is defined multiple times
    |
    = help: Remove duplicate field definition for `name`
 
-ℹ Unsafe fix
+Suggested fix:
 10 10 | class Foo(BaseModel):
 11 11 |     name: str = StringField()
 12 12 |     # ....
@@ -40,6 +42,8 @@ PIE794.py:13:5: PIE794 [*] Class field `name` is defined multiple times
 14 13 | 
 15 14 |     def foo(self) -> None:
 16 15 |         ...
+
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 PIE794.py:23:5: PIE794 [*] Class field `bar` is defined multiple times
    |
@@ -50,7 +54,7 @@ PIE794.py:23:5: PIE794 [*] Class field `bar` is defined multiple times
    |
    = help: Remove duplicate field definition for `bar`
 
-ℹ Unsafe fix
+Suggested fix:
 20 20 |     bar: str = StringField()
 21 21 |     foo: bool = BooleanField()
 22 22 |     # ...
@@ -58,6 +62,8 @@ PIE794.py:23:5: PIE794 [*] Class field `bar` is defined multiple times
 24 23 | 
 25 24 | 
 26 25 | class User(BaseModel):
+
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 PIE794.py:40:5: PIE794 [*] Class field `bar` is defined multiple times
    |
@@ -68,7 +74,7 @@ PIE794.py:40:5: PIE794 [*] Class field `bar` is defined multiple times
    |
    = help: Remove duplicate field definition for `bar`
 
-ℹ Unsafe fix
+Suggested fix:
 37 37 |     bar: str = StringField()
 38 38 |     foo: bool = BooleanField()
 39 39 |     # ...
@@ -76,6 +82,8 @@ PIE794.py:40:5: PIE794 [*] Class field `bar` is defined multiple times
 41 40 | 
 42 41 | 
 43 42 | class Person:
+
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 PIE794.py:46:5: PIE794 [*] Class field `name` is defined multiple times
    |
@@ -86,7 +94,7 @@ PIE794.py:46:5: PIE794 [*] Class field `name` is defined multiple times
    |
    = help: Remove duplicate field definition for `name`
 
-ℹ Unsafe fix
+Suggested fix:
 43 43 | class Person:
 44 44 |     name = "Foo"
 45 45 |     name = name + " Bar"
@@ -94,6 +102,8 @@ PIE794.py:46:5: PIE794 [*] Class field `name` is defined multiple times
 47 46 | 
 48 47 | 
 49 48 | class Person:
+
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 PIE794.py:52:5: PIE794 [*] Class field `name` is defined multiple times
    |
@@ -104,10 +114,10 @@ PIE794.py:52:5: PIE794 [*] Class field `name` is defined multiple times
    |
    = help: Remove duplicate field definition for `name`
 
-ℹ Unsafe fix
+Suggested fix:
 49 49 | class Person:
 50 50 |     name: str = "Foo"
 51 51 |     name: str = name + " Bar"
 52    |-    name: str = "Bar"  # PIE794
 
-
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.

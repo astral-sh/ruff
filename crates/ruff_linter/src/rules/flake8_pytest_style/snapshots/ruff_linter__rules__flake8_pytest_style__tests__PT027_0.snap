@@ -12,7 +12,7 @@ PT027_0.py:6:14: PT027 [*] Use `pytest.raises` instead of unittest-style `assert
   |
   = help: Replace `assertRaises` with `pytest.raises`
 
-ℹ Unsafe fix
+Suggested fix:
 1 1 | import unittest
   2 |+import pytest
 2 3 | 
@@ -25,6 +25,8 @@ PT027_0.py:6:14: PT027 [*] Use `pytest.raises` instead of unittest-style `assert
 8 9 |         with self.assertRaises(expected_exception=ValueError):
 9 10 |             raise ValueError
 
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
+
 PT027_0.py:8:14: PT027 [*] Use `pytest.raises` instead of unittest-style `assertRaises`
   |
 6 |         with self.assertRaises(ValueError):
@@ -35,7 +37,7 @@ PT027_0.py:8:14: PT027 [*] Use `pytest.raises` instead of unittest-style `assert
   |
   = help: Replace `assertRaises` with `pytest.raises`
 
-ℹ Unsafe fix
+Suggested fix:
 1  1  | import unittest
    2  |+import pytest
 2  3  | 
@@ -50,6 +52,8 @@ PT027_0.py:8:14: PT027 [*] Use `pytest.raises` instead of unittest-style `assert
 10 11 | 
 11 12 |         with self.failUnlessRaises(ValueError):
 
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
+
 PT027_0.py:11:14: PT027 [*] Use `pytest.raises` instead of unittest-style `failUnlessRaises`
    |
  9 |             raise ValueError
@@ -60,7 +64,7 @@ PT027_0.py:11:14: PT027 [*] Use `pytest.raises` instead of unittest-style `failU
    |
    = help: Replace `failUnlessRaises` with `pytest.raises`
 
-ℹ Unsafe fix
+Suggested fix:
 1  1  | import unittest
    2  |+import pytest
 2  3  | 
@@ -76,6 +80,8 @@ PT027_0.py:11:14: PT027 [*] Use `pytest.raises` instead of unittest-style `failU
 13 14 | 
 14 15 |         with self.assertRaisesRegex(ValueError, "test"):
 
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
+
 PT027_0.py:14:14: PT027 [*] Use `pytest.raises` instead of unittest-style `assertRaisesRegex`
    |
 12 |             raise ValueError
@@ -86,7 +92,7 @@ PT027_0.py:14:14: PT027 [*] Use `pytest.raises` instead of unittest-style `asser
    |
    = help: Replace `assertRaisesRegex` with `pytest.raises`
 
-ℹ Unsafe fix
+Suggested fix:
 1  1  | import unittest
    2  |+import pytest
 2  3  | 
@@ -102,6 +108,8 @@ PT027_0.py:14:14: PT027 [*] Use `pytest.raises` instead of unittest-style `asser
 16 17 | 
 17 18 |         with self.assertRaisesRegex(ValueError, expected_regex="test"):
 
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
+
 PT027_0.py:17:14: PT027 [*] Use `pytest.raises` instead of unittest-style `assertRaisesRegex`
    |
 15 |             raise ValueError("test")
@@ -112,7 +120,7 @@ PT027_0.py:17:14: PT027 [*] Use `pytest.raises` instead of unittest-style `asser
    |
    = help: Replace `assertRaisesRegex` with `pytest.raises`
 
-ℹ Unsafe fix
+Suggested fix:
 1  1  | import unittest
    2  |+import pytest
 2  3  | 
@@ -128,6 +136,8 @@ PT027_0.py:17:14: PT027 [*] Use `pytest.raises` instead of unittest-style `asser
 19 20 | 
 20 21 |         with self.assertRaisesRegex(
 
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
+
 PT027_0.py:20:14: PT027 [*] Use `pytest.raises` instead of unittest-style `assertRaisesRegex`
    |
 18 |             raise ValueError("test")
@@ -139,7 +149,7 @@ PT027_0.py:20:14: PT027 [*] Use `pytest.raises` instead of unittest-style `asser
    |
    = help: Replace `assertRaisesRegex` with `pytest.raises`
 
-ℹ Unsafe fix
+Suggested fix:
 1  1  | import unittest
    2  |+import pytest
 2  3  | 
@@ -157,6 +167,8 @@ PT027_0.py:20:14: PT027 [*] Use `pytest.raises` instead of unittest-style `asser
 24 23 | 
 25 24 |         with self.assertRaisesRegex(
 
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
+
 PT027_0.py:25:14: PT027 [*] Use `pytest.raises` instead of unittest-style `assertRaisesRegex`
    |
 23 |             raise ValueError("test")
@@ -168,7 +180,7 @@ PT027_0.py:25:14: PT027 [*] Use `pytest.raises` instead of unittest-style `asser
    |
    = help: Replace `assertRaisesRegex` with `pytest.raises`
 
-ℹ Unsafe fix
+Suggested fix:
 1  1  | import unittest
    2  |+import pytest
 2  3  | 
@@ -186,6 +198,8 @@ PT027_0.py:25:14: PT027 [*] Use `pytest.raises` instead of unittest-style `asser
 29 28 | 
 30 29 |         with self.assertRaisesRegexp(ValueError, "test"):
 
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
+
 PT027_0.py:30:14: PT027 [*] Use `pytest.raises` instead of unittest-style `assertRaisesRegexp`
    |
 28 |             raise ValueError("test")
@@ -196,7 +210,7 @@ PT027_0.py:30:14: PT027 [*] Use `pytest.raises` instead of unittest-style `asser
    |
    = help: Replace `assertRaisesRegexp` with `pytest.raises`
 
-ℹ Unsafe fix
+Suggested fix:
 1  1  | import unittest
    2  |+import pytest
 2  3  | 
@@ -211,6 +225,8 @@ PT027_0.py:30:14: PT027 [*] Use `pytest.raises` instead of unittest-style `asser
 31 32 |             raise ValueError("test")
 32 33 | 
 33 34 |     def test_unfixable_errors(self):
+
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 PT027_0.py:34:14: PT027 Use `pytest.raises` instead of unittest-style `assertRaises`
    |
@@ -244,5 +260,3 @@ PT027_0.py:44:13: PT027 Use `pytest.raises` instead of unittest-style `assertRai
 48 |               raise ValueError
    |
    = help: Replace `assertRaises` with `pytest.raises`
-
-

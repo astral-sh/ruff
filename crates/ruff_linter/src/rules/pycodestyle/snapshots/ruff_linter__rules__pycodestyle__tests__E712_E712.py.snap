@@ -11,13 +11,15 @@ E712.py:2:4: E712 [*] Avoid equality comparisons to `True`; use `if res:` for tr
   |
   = help: Replace with `res`
 
-ℹ Unsafe fix
+Suggested fix:
 1 1 | #: E712
 2   |-if res == True:
   2 |+if res is True:
 3 3 |     pass
 4 4 | #: E712
 5 5 | if res != False:
+
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 E712.py:5:4: E712 [*] Avoid inequality comparisons to `False`; use `if res:` for truth checks
   |
@@ -30,7 +32,7 @@ E712.py:5:4: E712 [*] Avoid inequality comparisons to `False`; use `if res:` for
   |
   = help: Replace with `res`
 
-ℹ Unsafe fix
+Suggested fix:
 2 2 | if res == True:
 3 3 |     pass
 4 4 | #: E712
@@ -39,6 +41,8 @@ E712.py:5:4: E712 [*] Avoid inequality comparisons to `False`; use `if res:` for
 6 6 |     pass
 7 7 | #: E712
 8 8 | if True != res:
+
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 E712.py:8:4: E712 [*] Avoid inequality comparisons to `True`; use `if not res:` for false checks
    |
@@ -51,7 +55,7 @@ E712.py:8:4: E712 [*] Avoid inequality comparisons to `True`; use `if not res:` 
    |
    = help: Replace with `not res`
 
-ℹ Unsafe fix
+Suggested fix:
 5 5 | if res != False:
 6 6 |     pass
 7 7 | #: E712
@@ -60,6 +64,8 @@ E712.py:8:4: E712 [*] Avoid inequality comparisons to `True`; use `if not res:` 
 9 9 |     pass
 10 10 | #: E712
 11 11 | if False == res:
+
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 E712.py:11:4: E712 [*] Avoid equality comparisons to `False`; use `if not res:` for false checks
    |
@@ -72,7 +78,7 @@ E712.py:11:4: E712 [*] Avoid equality comparisons to `False`; use `if not res:` 
    |
    = help: Replace with `not res`
 
-ℹ Unsafe fix
+Suggested fix:
 8  8  | if True != res:
 9  9  |     pass
 10 10 | #: E712
@@ -81,6 +87,8 @@ E712.py:11:4: E712 [*] Avoid equality comparisons to `False`; use `if not res:` 
 12 12 |     pass
 13 13 | #: E712
 14 14 | if res[1] == True:
+
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 E712.py:14:4: E712 [*] Avoid equality comparisons to `True`; use `if res[1]:` for truth checks
    |
@@ -93,7 +101,7 @@ E712.py:14:4: E712 [*] Avoid equality comparisons to `True`; use `if res[1]:` fo
    |
    = help: Replace with `res[1]`
 
-ℹ Unsafe fix
+Suggested fix:
 11 11 | if False == res:
 12 12 |     pass
 13 13 | #: E712
@@ -102,6 +110,8 @@ E712.py:14:4: E712 [*] Avoid equality comparisons to `True`; use `if res[1]:` fo
 15 15 |     pass
 16 16 | #: E712
 17 17 | if res[1] != False:
+
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 E712.py:17:4: E712 [*] Avoid inequality comparisons to `False`; use `if res[1]:` for truth checks
    |
@@ -114,7 +124,7 @@ E712.py:17:4: E712 [*] Avoid inequality comparisons to `False`; use `if res[1]:`
    |
    = help: Replace with `res[1]`
 
-ℹ Unsafe fix
+Suggested fix:
 14 14 | if res[1] == True:
 15 15 |     pass
 16 16 | #: E712
@@ -123,6 +133,8 @@ E712.py:17:4: E712 [*] Avoid inequality comparisons to `False`; use `if res[1]:`
 18 18 |     pass
 19 19 | #: E712
 20 20 | var = 1 if cond == True else -1 if cond == False else cond
+
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 E712.py:20:12: E712 [*] Avoid equality comparisons to `True`; use `if cond:` for truth checks
    |
@@ -135,7 +147,7 @@ E712.py:20:12: E712 [*] Avoid equality comparisons to `True`; use `if cond:` for
    |
    = help: Replace with `cond`
 
-ℹ Unsafe fix
+Suggested fix:
 17 17 | if res[1] != False:
 18 18 |     pass
 19 19 | #: E712
@@ -144,6 +156,8 @@ E712.py:20:12: E712 [*] Avoid equality comparisons to `True`; use `if cond:` for
 21 21 | #: E712
 22 22 | if (True) == TrueElement or x == TrueElement:
 23 23 |     pass
+
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 E712.py:20:36: E712 [*] Avoid equality comparisons to `False`; use `if not cond:` for false checks
    |
@@ -156,7 +170,7 @@ E712.py:20:36: E712 [*] Avoid equality comparisons to `False`; use `if not cond:
    |
    = help: Replace with `not cond`
 
-ℹ Unsafe fix
+Suggested fix:
 17 17 | if res[1] != False:
 18 18 |     pass
 19 19 | #: E712
@@ -165,6 +179,8 @@ E712.py:20:36: E712 [*] Avoid equality comparisons to `False`; use `if not cond:
 21 21 | #: E712
 22 22 | if (True) == TrueElement or x == TrueElement:
 23 23 |     pass
+
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 E712.py:22:4: E712 [*] Avoid equality comparisons to `True`; use `if TrueElement:` for truth checks
    |
@@ -176,7 +192,7 @@ E712.py:22:4: E712 [*] Avoid equality comparisons to `True`; use `if TrueElement
    |
    = help: Replace with `TrueElement`
 
-ℹ Unsafe fix
+Suggested fix:
 19 19 | #: E712
 20 20 | var = 1 if cond == True else -1 if cond == False else cond
 21 21 | #: E712
@@ -186,25 +202,7 @@ E712.py:22:4: E712 [*] Avoid equality comparisons to `True`; use `if TrueElement
 24 24 | 
 25 25 | if res == True != False:
 
-E712.py:25:4: E712 [*] Avoid equality comparisons to `True` or `False`
-   |
-23 |     pass
-24 | 
-25 | if res == True != False:
-   |    ^^^^^^^^^^^^^^^^^^^^ E712
-26 |     pass
-   |
-   = help: Replace comparison
-
-ℹ Unsafe fix
-22 22 | if (True) == TrueElement or x == TrueElement:
-23 23 |     pass
-24 24 | 
-25    |-if res == True != False:
-   25 |+if res is True is not False:
-26 26 |     pass
-27 27 | 
-28 28 | if(True) == TrueElement or x == TrueElement:
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 E712.py:25:4: E712 [*] Avoid equality comparisons to `True` or `False`
    |
@@ -216,7 +214,7 @@ E712.py:25:4: E712 [*] Avoid equality comparisons to `True` or `False`
    |
    = help: Replace comparison
 
-ℹ Unsafe fix
+Suggested fix:
 22 22 | if (True) == TrueElement or x == TrueElement:
 23 23 |     pass
 24 24 | 
@@ -225,6 +223,30 @@ E712.py:25:4: E712 [*] Avoid equality comparisons to `True` or `False`
 26 26 |     pass
 27 27 | 
 28 28 | if(True) == TrueElement or x == TrueElement:
+
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
+
+E712.py:25:4: E712 [*] Avoid equality comparisons to `True` or `False`
+   |
+23 |     pass
+24 | 
+25 | if res == True != False:
+   |    ^^^^^^^^^^^^^^^^^^^^ E712
+26 |     pass
+   |
+   = help: Replace comparison
+
+Suggested fix:
+22 22 | if (True) == TrueElement or x == TrueElement:
+23 23 |     pass
+24 24 | 
+25    |-if res == True != False:
+   25 |+if res is True is not False:
+26 26 |     pass
+27 27 | 
+28 28 | if(True) == TrueElement or x == TrueElement:
+
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 E712.py:28:3: E712 [*] Avoid equality comparisons to `True`; use `if TrueElement:` for truth checks
    |
@@ -236,7 +258,7 @@ E712.py:28:3: E712 [*] Avoid equality comparisons to `True`; use `if TrueElement
    |
    = help: Replace with `TrueElement`
 
-ℹ Unsafe fix
+Suggested fix:
 25 25 | if res == True != False:
 26 26 |     pass
 27 27 | 
@@ -245,6 +267,8 @@ E712.py:28:3: E712 [*] Avoid equality comparisons to `True`; use `if TrueElement
 29 29 |     pass
 30 30 | 
 31 31 | if (yield i) == True:
+
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 E712.py:31:4: E712 [*] Avoid equality comparisons to `True`; use `if yield i:` for truth checks
    |
@@ -256,7 +280,7 @@ E712.py:31:4: E712 [*] Avoid equality comparisons to `True`; use `if yield i:` f
    |
    = help: Replace with `yield i`
 
-ℹ Unsafe fix
+Suggested fix:
 28 28 | if(True) == TrueElement or x == TrueElement:
 29 29 |     pass
 30 30 | 
@@ -265,3 +289,5 @@ E712.py:31:4: E712 [*] Avoid equality comparisons to `True`; use `if yield i:` f
 32 32 |       print("even")
 33 33 | 
 34 34 | #: Okay
+
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.

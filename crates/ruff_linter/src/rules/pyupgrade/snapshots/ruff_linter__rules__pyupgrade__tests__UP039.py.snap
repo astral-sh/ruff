@@ -10,13 +10,15 @@ UP039.py:2:8: UP039 [*] Unnecessary parentheses after class definition
   |
   = help: Remove parentheses
 
-ℹ Safe fix
+Suggested fix:
 1 1 | # Errors
 2   |-class A():
   2 |+class A:
 3 3 |     pass
 4 4 | 
 5 5 | 
+
+    Run `ruff check --fix` to apply this fix.
 
 UP039.py:6:8: UP039 [*] Unnecessary parentheses after class definition
   |
@@ -27,7 +29,7 @@ UP039.py:6:8: UP039 [*] Unnecessary parentheses after class definition
   |
   = help: Remove parentheses
 
-ℹ Safe fix
+Suggested fix:
 3 3 |     pass
 4 4 | 
 5 5 | 
@@ -36,6 +38,8 @@ UP039.py:6:8: UP039 [*] Unnecessary parentheses after class definition
 7 7 |     :
 8 8 |     pass
 9 9 | 
+
+    Run `ruff check --fix` to apply this fix.
 
 UP039.py:12:9: UP039 [*] Unnecessary parentheses after class definition
    |
@@ -46,7 +50,7 @@ UP039.py:12:9: UP039 [*] Unnecessary parentheses after class definition
    |
    = help: Remove parentheses
 
-ℹ Safe fix
+Suggested fix:
 9  9  | 
 10 10 | 
 11 11 | class A \
@@ -55,6 +59,8 @@ UP039.py:12:9: UP039 [*] Unnecessary parentheses after class definition
 13 13 |     pass
 14 14 | 
 15 15 | 
+
+    Run `ruff check --fix` to apply this fix.
 
 UP039.py:17:8: UP039 [*] Unnecessary parentheses after class definition
    |
@@ -65,7 +71,7 @@ UP039.py:17:8: UP039 [*] Unnecessary parentheses after class definition
    |
    = help: Remove parentheses
 
-ℹ Safe fix
+Suggested fix:
 14 14 | 
 15 15 | 
 16 16 | @decorator()
@@ -74,6 +80,8 @@ UP039.py:17:8: UP039 [*] Unnecessary parentheses after class definition
 18 18 |     pass
 19 19 | 
 20 20 | @decorator
+
+    Run `ruff check --fix` to apply this fix.
 
 UP039.py:21:8: UP039 [*] Unnecessary parentheses after class definition
    |
@@ -84,7 +92,7 @@ UP039.py:21:8: UP039 [*] Unnecessary parentheses after class definition
    |
    = help: Remove parentheses
 
-ℹ Safe fix
+Suggested fix:
 18 18 |     pass
 19 19 | 
 20 20 | @decorator
@@ -94,4 +102,4 @@ UP039.py:21:8: UP039 [*] Unnecessary parentheses after class definition
 23 23 | 
 24 24 | # OK
 
-
+    Run `ruff check --fix` to apply this fix.

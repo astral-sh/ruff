@@ -12,7 +12,7 @@ source: crates/ruff_linter/src/rules/flake8_type_checking/mod.rs
   |
   = help: Move into type-checking block
 
-ℹ Unsafe fix
+Suggested fix:
 3  3  | 
 4  4  | from typing import TYPE_CHECKING
 5  5  | 
@@ -25,4 +25,4 @@ source: crates/ruff_linter/src/rules/flake8_type_checking/mod.rs
 11 11 | 
 12 12 | def f(x: pd.DataFrame):
 
-
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.

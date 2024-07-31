@@ -10,7 +10,7 @@ future_annotations.py:40:4: UP007 [*] Use `X | Y` for type annotations
    |
    = help: Convert to `X | Y`
 
-ℹ Unsafe fix
+Suggested fix:
 37 37 |     return y
 38 38 | 
 39 39 | 
@@ -19,4 +19,4 @@ future_annotations.py:40:4: UP007 [*] Use `X | Y` for type annotations
 41 41 | 
 42 42 | MyList: TypeAlias = Union[List[int], List[str]]
 
-
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.

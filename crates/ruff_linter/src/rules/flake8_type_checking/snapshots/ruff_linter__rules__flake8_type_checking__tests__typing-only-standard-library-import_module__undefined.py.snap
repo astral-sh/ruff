@@ -10,7 +10,7 @@ undefined.py:3:29: TCH003 [*] Move standard library import `collections.abc.Sequ
   |
   = help: Move into type-checking block
 
-ℹ Unsafe fix
+Suggested fix:
 1 1 | from __future__ import annotations
 2 2 | 
 3   |-from collections.abc import Sequence
@@ -22,4 +22,4 @@ undefined.py:3:29: TCH003 [*] Move standard library import `collections.abc.Sequ
 5 8 | 
 6 9 | class Foo(MyBaseClass):
 
-
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.

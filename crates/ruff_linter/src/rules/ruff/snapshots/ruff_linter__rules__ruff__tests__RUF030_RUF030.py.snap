@@ -12,7 +12,7 @@ RUF030.py:6:14: RUF030 [*] `print()` expression in `assert` statement is likely 
   |
   = help: Remove `print`
 
-ℹ Unsafe fix
+Suggested fix:
 3 3 | # Standard Case
 4 4 | # Expects:
 5 5 | # - single StringLiteral
@@ -21,6 +21,8 @@ RUF030.py:6:14: RUF030 [*] `print()` expression in `assert` statement is likely 
 7 7 | 
 8 8 | # Concatenated string literals
 9 9 | # Expects:
+
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 RUF030.py:11:14: RUF030 [*] `print()` expression in `assert` statement is likely unintentional
    |
@@ -33,7 +35,7 @@ RUF030.py:11:14: RUF030 [*] `print()` expression in `assert` statement is likely
    |
    = help: Remove `print`
 
-ℹ Unsafe fix
+Suggested fix:
 8  8  | # Concatenated string literals
 9  9  | # Expects:
 10 10 | # - single StringLiteral
@@ -42,6 +44,8 @@ RUF030.py:11:14: RUF030 [*] `print()` expression in `assert` statement is likely
 12 12 | 
 13 13 | # Positional arguments, string literals
 14 14 | # Expects:
+
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 RUF030.py:16:14: RUF030 [*] `print()` expression in `assert` statement is likely unintentional
    |
@@ -54,7 +58,7 @@ RUF030.py:16:14: RUF030 [*] `print()` expression in `assert` statement is likely
    |
    = help: Remove `print`
 
-ℹ Unsafe fix
+Suggested fix:
 13 13 | # Positional arguments, string literals
 14 14 | # Expects:
 15 15 | # - single StringLiteral concatenated with " "
@@ -63,6 +67,8 @@ RUF030.py:16:14: RUF030 [*] `print()` expression in `assert` statement is likely
 17 17 | 
 18 18 | # Concatenated string literals combined with Positional arguments
 19 19 | # Expects:
+
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 RUF030.py:21:14: RUF030 [*] `print()` expression in `assert` statement is likely unintentional
    |
@@ -75,7 +81,7 @@ RUF030.py:21:14: RUF030 [*] `print()` expression in `assert` statement is likely
    |
    = help: Remove `print`
 
-ℹ Unsafe fix
+Suggested fix:
 18 18 | # Concatenated string literals combined with Positional arguments
 19 19 | # Expects:
 20 20 | # - single stringliteral concatenated with " " only between `print` and `is`
@@ -84,6 +90,8 @@ RUF030.py:21:14: RUF030 [*] `print()` expression in `assert` statement is likely
 22 22 | 
 23 23 | # Positional arguments, string literals with a variable
 24 24 | # Expects:
+
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 RUF030.py:26:14: RUF030 [*] `print()` expression in `assert` statement is likely unintentional
    |
@@ -96,7 +104,7 @@ RUF030.py:26:14: RUF030 [*] `print()` expression in `assert` statement is likely
    |
    = help: Remove `print`
 
-ℹ Unsafe fix
+Suggested fix:
 23 23 | # Positional arguments, string literals with a variable
 24 24 | # Expects:
 25 25 | # - single FString concatenated with " "
@@ -105,6 +113,8 @@ RUF030.py:26:14: RUF030 [*] `print()` expression in `assert` statement is likely
 27 27 | 
 28 28 | # Mixed brackets string literals
 29 29 | # Expects:
+
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 RUF030.py:31:14: RUF030 [*] `print()` expression in `assert` statement is likely unintentional
    |
@@ -117,7 +127,7 @@ RUF030.py:31:14: RUF030 [*] `print()` expression in `assert` statement is likely
    |
    = help: Remove `print`
 
-ℹ Unsafe fix
+Suggested fix:
 28 28 | # Mixed brackets string literals
 29 29 | # Expects:
 30 30 | # - single StringLiteral concatenated with " "
@@ -126,6 +136,8 @@ RUF030.py:31:14: RUF030 [*] `print()` expression in `assert` statement is likely
 32 32 | 
 33 33 | # Mixed brackets with other brackets inside
 34 34 | # Expects:
+
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 RUF030.py:36:14: RUF030 [*] `print()` expression in `assert` statement is likely unintentional
    |
@@ -138,7 +150,7 @@ RUF030.py:36:14: RUF030 [*] `print()` expression in `assert` statement is likely
    |
    = help: Remove `print`
 
-ℹ Unsafe fix
+Suggested fix:
 33 33 | # Mixed brackets with other brackets inside
 34 34 | # Expects:
 35 35 | # - single StringLiteral concatenated with " " and escaped brackets
@@ -147,6 +159,8 @@ RUF030.py:36:14: RUF030 [*] `print()` expression in `assert` statement is likely
 37 37 | 
 38 38 | # Positional arguments, string literals with a separator
 39 39 | # Expects:
+
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 RUF030.py:41:14: RUF030 [*] `print()` expression in `assert` statement is likely unintentional
    |
@@ -159,7 +173,7 @@ RUF030.py:41:14: RUF030 [*] `print()` expression in `assert` statement is likely
    |
    = help: Remove `print`
 
-ℹ Unsafe fix
+Suggested fix:
 38 38 | # Positional arguments, string literals with a separator
 39 39 | # Expects:
 40 40 | # - single StringLiteral concatenated with "|"
@@ -168,6 +182,8 @@ RUF030.py:41:14: RUF030 [*] `print()` expression in `assert` statement is likely
 42 42 | 
 43 43 | # Positional arguments, string literals with None as separator
 44 44 | # Expects:
+
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 RUF030.py:46:14: RUF030 [*] `print()` expression in `assert` statement is likely unintentional
    |
@@ -180,7 +196,7 @@ RUF030.py:46:14: RUF030 [*] `print()` expression in `assert` statement is likely
    |
    = help: Remove `print`
 
-ℹ Unsafe fix
+Suggested fix:
 43 43 | # Positional arguments, string literals with None as separator
 44 44 | # Expects:
 45 45 | # - single StringLiteral concatenated with " "
@@ -189,6 +205,8 @@ RUF030.py:46:14: RUF030 [*] `print()` expression in `assert` statement is likely
 47 47 | 
 48 48 | # Positional arguments, string literals with variable as separator, needs f-string
 49 49 | # Expects:
+
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 RUF030.py:51:14: RUF030 [*] `print()` expression in `assert` statement is likely unintentional
    |
@@ -201,7 +219,7 @@ RUF030.py:51:14: RUF030 [*] `print()` expression in `assert` statement is likely
    |
    = help: Remove `print`
 
-ℹ Unsafe fix
+Suggested fix:
 48 48 | # Positional arguments, string literals with variable as separator, needs f-string
 49 49 | # Expects:
 50 50 | # - single FString concatenated with "{U00A0}"
@@ -210,6 +228,8 @@ RUF030.py:51:14: RUF030 [*] `print()` expression in `assert` statement is likely
 52 52 | 
 53 53 | # Unnecessary f-string
 54 54 | # Expects:
+
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 RUF030.py:56:14: RUF030 [*] `print()` expression in `assert` statement is likely unintentional
    |
@@ -222,7 +242,7 @@ RUF030.py:56:14: RUF030 [*] `print()` expression in `assert` statement is likely
    |
    = help: Remove `print`
 
-ℹ Unsafe fix
+Suggested fix:
 53 53 | # Unnecessary f-string
 54 54 | # Expects:
 55 55 | # - single StringLiteral
@@ -231,6 +251,8 @@ RUF030.py:56:14: RUF030 [*] `print()` expression in `assert` statement is likely
 57 57 | 
 58 58 | # Positional arguments, string literals and f-strings
 59 59 | # Expects:
+
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 RUF030.py:61:14: RUF030 [*] `print()` expression in `assert` statement is likely unintentional
    |
@@ -243,7 +265,7 @@ RUF030.py:61:14: RUF030 [*] `print()` expression in `assert` statement is likely
    |
    = help: Remove `print`
 
-ℹ Unsafe fix
+Suggested fix:
 58 58 | # Positional arguments, string literals and f-strings
 59 59 | # Expects:
 60 60 | # - single FString concatenated with " "
@@ -252,6 +274,8 @@ RUF030.py:61:14: RUF030 [*] `print()` expression in `assert` statement is likely
 62 62 | 
 63 63 | # Positional arguments, string literals and f-strings with a separator
 64 64 | # Expects:
+
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 RUF030.py:66:14: RUF030 [*] `print()` expression in `assert` statement is likely unintentional
    |
@@ -264,7 +288,7 @@ RUF030.py:66:14: RUF030 [*] `print()` expression in `assert` statement is likely
    |
    = help: Remove `print`
 
-ℹ Unsafe fix
+Suggested fix:
 63 63 | # Positional arguments, string literals and f-strings with a separator
 64 64 | # Expects:
 65 65 | # - single FString concatenated with "|"
@@ -273,6 +297,8 @@ RUF030.py:66:14: RUF030 [*] `print()` expression in `assert` statement is likely
 67 67 | 
 68 68 | # A single f-string
 69 69 | # Expects:
+
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 RUF030.py:71:14: RUF030 [*] `print()` expression in `assert` statement is likely unintentional
    |
@@ -285,7 +311,7 @@ RUF030.py:71:14: RUF030 [*] `print()` expression in `assert` statement is likely
    |
    = help: Remove `print`
 
-ℹ Unsafe fix
+Suggested fix:
 68 68 | # A single f-string
 69 69 | # Expects:
 70 70 | # - single FString
@@ -294,6 +320,8 @@ RUF030.py:71:14: RUF030 [*] `print()` expression in `assert` statement is likely
 72 72 | 
 73 73 | # A single f-string with a redundant separator
 74 74 | # Expects:
+
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 RUF030.py:76:14: RUF030 [*] `print()` expression in `assert` statement is likely unintentional
    |
@@ -306,7 +334,7 @@ RUF030.py:76:14: RUF030 [*] `print()` expression in `assert` statement is likely
    |
    = help: Remove `print`
 
-ℹ Unsafe fix
+Suggested fix:
 73 73 | # A single f-string with a redundant separator
 74 74 | # Expects:
 75 75 | # - single FString
@@ -315,6 +343,8 @@ RUF030.py:76:14: RUF030 [*] `print()` expression in `assert` statement is likely
 77 77 | 
 78 78 | # Complex f-string with variable as separator
 79 79 | # Expects:
+
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 RUF030.py:83:14: RUF030 [*] `print()` expression in `assert` statement is likely unintentional
    |
@@ -327,7 +357,7 @@ RUF030.py:83:14: RUF030 [*] `print()` expression in `assert` statement is likely
    |
    = help: Remove `print`
 
-ℹ Unsafe fix
+Suggested fix:
 80 80 | # - single FString concatenated with "{U00A0}", all placeholders preserved
 81 81 | condition = "True is True"
 82 82 | maintainer = "John Doe"
@@ -336,6 +366,8 @@ RUF030.py:83:14: RUF030 [*] `print()` expression in `assert` statement is likely
 84 84 | 
 85 85 | # Empty print
 86 86 | # Expects:
+
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 RUF030.py:88:14: RUF030 [*] `print()` expression in `assert` statement is likely unintentional
    |
@@ -348,7 +380,7 @@ RUF030.py:88:14: RUF030 [*] `print()` expression in `assert` statement is likely
    |
    = help: Remove `print`
 
-ℹ Unsafe fix
+Suggested fix:
 85 85 | # Empty print
 86 86 | # Expects:
 87 87 | # - `msg` entirely removed from assertion
@@ -357,6 +389,8 @@ RUF030.py:88:14: RUF030 [*] `print()` expression in `assert` statement is likely
 89 89 | 
 90 90 | # Empty print with separator
 91 91 | # Expects:
+
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 RUF030.py:93:14: RUF030 [*] `print()` expression in `assert` statement is likely unintentional
    |
@@ -369,7 +403,7 @@ RUF030.py:93:14: RUF030 [*] `print()` expression in `assert` statement is likely
    |
    = help: Remove `print`
 
-ℹ Unsafe fix
+Suggested fix:
 90 90 | # Empty print with separator
 91 91 | # Expects:
 92 92 | # - `msg` entirely removed from assertion
@@ -378,6 +412,8 @@ RUF030.py:93:14: RUF030 [*] `print()` expression in `assert` statement is likely
 94 94 | 
 95 95 | # Custom print function that actually returns a string
 96 96 | # Expects:
+
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 RUF030.py:108:14: RUF030 [*] `print()` expression in `assert` statement is likely unintentional
     |
@@ -388,9 +424,11 @@ RUF030.py:108:14: RUF030 [*] `print()` expression in `assert` statement is likel
     |
     = help: Remove `print`
 
-ℹ Unsafe fix
+Suggested fix:
 105 105 | # Use of `builtins.print`
 106 106 | # Expects:
 107 107 | # - single StringLiteral
 108     |-assert True, builtins.print("This print should be removed.")
     108 |+assert True, "This print should be removed."
+
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.

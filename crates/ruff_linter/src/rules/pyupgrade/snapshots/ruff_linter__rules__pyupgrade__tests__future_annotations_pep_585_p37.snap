@@ -10,7 +10,7 @@ future_annotations.py:34:18: UP006 [*] Use `list` instead of `List` for type ann
    |
    = help: Replace with `list`
 
-ℹ Unsafe fix
+Suggested fix:
 31 31 |         return cls(x=0, y=0)
 32 32 | 
 33 33 | 
@@ -20,4 +20,4 @@ future_annotations.py:34:18: UP006 [*] Use `list` instead of `List` for type ann
 36 36 |     y.append(x)
 37 37 |     return y
 
-
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.

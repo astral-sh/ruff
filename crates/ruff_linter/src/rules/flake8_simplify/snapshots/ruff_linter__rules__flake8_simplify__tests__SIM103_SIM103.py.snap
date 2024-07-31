@@ -14,7 +14,7 @@ SIM103.py:3:5: SIM103 [*] Return the condition `bool(a)` directly
   |
   = help: Replace with `return bool(a)`
 
-ℹ Unsafe fix
+Suggested fix:
 1 1 | def f():
 2 2 |     # SIM103
 3   |-    if a:
@@ -25,6 +25,8 @@ SIM103.py:3:5: SIM103 [*] Return the condition `bool(a)` directly
 7 4 | 
 8 5 | 
 9 6 | def f():
+
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 SIM103.py:11:5: SIM103 [*] Return the condition `a == b` directly
    |
@@ -39,7 +41,7 @@ SIM103.py:11:5: SIM103 [*] Return the condition `a == b` directly
    |
    = help: Replace with `return a == b`
 
-ℹ Unsafe fix
+Suggested fix:
 8  8  | 
 9  9  | def f():
 10 10 |     # SIM103
@@ -51,6 +53,8 @@ SIM103.py:11:5: SIM103 [*] Return the condition `a == b` directly
 15 12 | 
 16 13 | 
 17 14 | def f():
+
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 SIM103.py:21:5: SIM103 [*] Return the condition `bool(b)` directly
    |
@@ -65,7 +69,7 @@ SIM103.py:21:5: SIM103 [*] Return the condition `bool(b)` directly
    |
    = help: Replace with `return bool(b)`
 
-ℹ Unsafe fix
+Suggested fix:
 18 18 |     # SIM103
 19 19 |     if a:
 20 20 |         return 1
@@ -77,6 +81,8 @@ SIM103.py:21:5: SIM103 [*] Return the condition `bool(b)` directly
 25 22 | 
 26 23 | 
 27 24 | def f():
+
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 SIM103.py:32:9: SIM103 [*] Return the condition `bool(b)` directly
    |
@@ -91,7 +97,7 @@ SIM103.py:32:9: SIM103 [*] Return the condition `bool(b)` directly
    |
    = help: Replace with `return bool(b)`
 
-ℹ Unsafe fix
+Suggested fix:
 29 29 |     if a:
 30 30 |         return 1
 31 31 |     else:
@@ -103,6 +109,8 @@ SIM103.py:32:9: SIM103 [*] Return the condition `bool(b)` directly
 36 33 | 
 37 34 | 
 38 35 | def f():
+
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 SIM103.py:57:5: SIM103 [*] Return the condition `not a` directly
    |
@@ -117,7 +125,7 @@ SIM103.py:57:5: SIM103 [*] Return the condition `not a` directly
    |
    = help: Replace with `return not a`
 
-ℹ Unsafe fix
+Suggested fix:
 54 54 | 
 55 55 | def f():
 56 56 |     # SIM103
@@ -129,6 +137,8 @@ SIM103.py:57:5: SIM103 [*] Return the condition `not a` directly
 61 58 | 
 62 59 | 
 63 60 | def f():
+
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 SIM103.py:83:5: SIM103 Return the condition directly
    |
@@ -156,7 +166,7 @@ SIM103.py:91:5: SIM103 [*] Return the condition `not (keys is not None and notic
    |
    = help: Replace with `return not (keys is not None and notice.key not in keys)`
 
-ℹ Unsafe fix
+Suggested fix:
 88 88 | 
 89 89 | def f():
 90 90 |     # SIM103
@@ -168,6 +178,8 @@ SIM103.py:91:5: SIM103 [*] Return the condition `not (keys is not None and notic
 95 92 | 
 96 93 | 
 97 94 | ###
+
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 SIM103.py:104:5: SIM103 [*] Return the condition `bool(a)` directly
     |
@@ -181,7 +193,7 @@ SIM103.py:104:5: SIM103 [*] Return the condition `bool(a)` directly
     |
     = help: Replace with `return bool(a)`
 
-ℹ Unsafe fix
+Suggested fix:
 101 101 | 
 102 102 | def f():
 103 103 |     # SIM103
@@ -192,6 +204,8 @@ SIM103.py:104:5: SIM103 [*] Return the condition `bool(a)` directly
 107 105 | 
 108 106 | 
 109 107 | def f():
+
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 SIM103.py:111:5: SIM103 [*] Return the condition `not a` directly
     |
@@ -205,7 +219,7 @@ SIM103.py:111:5: SIM103 [*] Return the condition `not a` directly
     |
     = help: Replace with `return not a`
 
-ℹ Unsafe fix
+Suggested fix:
 108 108 | 
 109 109 | def f():
 110 110 |     # SIM103
@@ -216,6 +230,8 @@ SIM103.py:111:5: SIM103 [*] Return the condition `not a` directly
 114 112 | 
 115 113 | 
 116 114 | def f():
+
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 SIM103.py:117:5: SIM103 [*] Return the condition `10 < a` directly
     |
@@ -228,7 +244,7 @@ SIM103.py:117:5: SIM103 [*] Return the condition `10 < a` directly
     |
     = help: Replace with `return 10 < a`
 
-ℹ Unsafe fix
+Suggested fix:
 114 114 | 
 115 115 | 
 116 116 | def f():
@@ -239,6 +255,8 @@ SIM103.py:117:5: SIM103 [*] Return the condition `10 < a` directly
 120 118 | 
 121 119 | 
 122 120 | def f():
+
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 SIM103.py:123:5: SIM103 [*] Return the condition `not 10 < a` directly
     |
@@ -251,7 +269,7 @@ SIM103.py:123:5: SIM103 [*] Return the condition `not 10 < a` directly
     |
     = help: Replace with `return not 10 < a`
 
-ℹ Unsafe fix
+Suggested fix:
 120 120 | 
 121 121 | 
 122 122 | def f():
@@ -259,3 +277,5 @@ SIM103.py:123:5: SIM103 [*] Return the condition `not 10 < a` directly
 124     |-        return False
 125     |-    return True
     123 |+    return not 10 < a
+
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.

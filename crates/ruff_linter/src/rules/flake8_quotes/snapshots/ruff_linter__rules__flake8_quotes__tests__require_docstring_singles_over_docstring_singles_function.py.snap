@@ -11,7 +11,7 @@ docstring_singles_function.py:3:5: Q001 [*] Single quote multiline found but dou
   |
   = help: Replace single multiline quotes with double quotes
 
-ℹ Safe fix
+Suggested fix:
 1 1 | def foo():
 2 2 |     '''function without params, single line docstring'''
 3   |-    ''' not a docstring'''
@@ -19,6 +19,8 @@ docstring_singles_function.py:3:5: Q001 [*] Single quote multiline found but dou
 4 4 |     return
 5 5 | 
 6 6 | 
+
+    Run `ruff check --fix` to apply this fix.
 
 docstring_singles_function.py:11:5: Q001 [*] Single quote multiline found but double quotes preferred
    |
@@ -30,7 +32,7 @@ docstring_singles_function.py:11:5: Q001 [*] Single quote multiline found but do
    |
    = help: Replace single multiline quotes with double quotes
 
-ℹ Safe fix
+Suggested fix:
 8  8  |     '''
 9  9  |         function without params, multiline docstring
 10 10 |     '''
@@ -39,6 +41,8 @@ docstring_singles_function.py:11:5: Q001 [*] Single quote multiline found but do
 12 12 |     return
 13 13 | 
 14 14 | 
+
+    Run `ruff check --fix` to apply this fix.
 
 docstring_singles_function.py:15:39: Q001 [*] Single quote multiline found but double quotes preferred
    |
@@ -51,7 +55,7 @@ docstring_singles_function.py:15:39: Q001 [*] Single quote multiline found but d
    |
    = help: Replace single multiline quotes with double quotes
 
-ℹ Safe fix
+Suggested fix:
 12 12 |     return
 13 13 | 
 14 14 | 
@@ -64,6 +68,8 @@ docstring_singles_function.py:15:39: Q001 [*] Single quote multiline found but d
 19 19 | 
 20 20 | 
 
+    Run `ruff check --fix` to apply this fix.
+
 docstring_singles_function.py:17:5: Q001 [*] Single quote multiline found but double quotes preferred
    |
 15 | def fun_with_params_no_docstring(a, b='''
@@ -74,7 +80,7 @@ docstring_singles_function.py:17:5: Q001 [*] Single quote multiline found but do
    |
    = help: Replace single multiline quotes with double quotes
 
-ℹ Safe fix
+Suggested fix:
 14 14 | 
 15 15 | def fun_with_params_no_docstring(a, b='''
 16 16 |     not a
@@ -83,6 +89,8 @@ docstring_singles_function.py:17:5: Q001 [*] Single quote multiline found but do
 18 18 |     pass
 19 19 | 
 20 20 | 
+
+    Run `ruff check --fix` to apply this fix.
 
 docstring_singles_function.py:22:5: Q001 [*] Single quote multiline found but double quotes preferred
    |
@@ -93,7 +101,7 @@ docstring_singles_function.py:22:5: Q001 [*] Single quote multiline found but do
    |
    = help: Replace single multiline quotes with double quotes
 
-ℹ Safe fix
+Suggested fix:
 19 19 | 
 20 20 | 
 21 21 | def fun_with_params_no_docstring2(a, b=c[foo():], c=\
@@ -103,4 +111,4 @@ docstring_singles_function.py:22:5: Q001 [*] Single quote multiline found but do
 24 24 | 
 25 25 | 
 
-
+    Run `ruff check --fix` to apply this fix.

@@ -12,7 +12,7 @@ exempt_type_checking_2.py:5:20: TCH003 [*] Move standard library import `typing.
   |
   = help: Move into type-checking block
 
-ℹ Unsafe fix
+Suggested fix:
 2 2 | 
 3 3 | from __future__ import annotations
 4 4 | 
@@ -24,4 +24,4 @@ exempt_type_checking_2.py:5:20: TCH003 [*] Move standard library import `typing.
 6 9 | 
 7 10 | Const: Final[dict] = {}
 
-
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.

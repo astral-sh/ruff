@@ -10,12 +10,14 @@ F522.py:1:1: F522 [*] `.format` call has unused named argument(s): bar
   |
   = help: Remove extra named arguments: bar
 
-ℹ Safe fix
+Suggested fix:
 1   |-"{}".format(1, bar=2)  # F522
   1 |+"{}".format(1, )  # F522
 2 2 | "{bar}{}".format(1, bar=2, spam=3)  # F522
 3 3 | "{bar:{spam}}".format(bar=2, spam=3)  # No issues
 4 4 | "{bar:{spam}}".format(bar=2, spam=3, eggs=4, ham=5)  # F522
+
+    Run `ruff check --fix` to apply this fix.
 
 F522.py:2:1: F522 [*] `.format` call has unused named argument(s): spam
   |
@@ -27,13 +29,15 @@ F522.py:2:1: F522 [*] `.format` call has unused named argument(s): spam
   |
   = help: Remove extra named arguments: spam
 
-ℹ Safe fix
+Suggested fix:
 1 1 | "{}".format(1, bar=2)  # F522
 2   |-"{bar}{}".format(1, bar=2, spam=3)  # F522
   2 |+"{bar}{}".format(1, bar=2, )  # F522
 3 3 | "{bar:{spam}}".format(bar=2, spam=3)  # No issues
 4 4 | "{bar:{spam}}".format(bar=2, spam=3, eggs=4, ham=5)  # F522
 5 5 | (''
+
+    Run `ruff check --fix` to apply this fix.
 
 F522.py:4:1: F522 [*] `.format` call has unused named argument(s): eggs, ham
   |
@@ -46,7 +50,7 @@ F522.py:4:1: F522 [*] `.format` call has unused named argument(s): eggs, ham
   |
   = help: Remove extra named arguments: eggs, ham
 
-ℹ Safe fix
+Suggested fix:
 1 1 | "{}".format(1, bar=2)  # F522
 2 2 | "{bar}{}".format(1, bar=2, spam=3)  # F522
 3 3 | "{bar:{spam}}".format(bar=2, spam=3)  # No issues
@@ -54,6 +58,8 @@ F522.py:4:1: F522 [*] `.format` call has unused named argument(s): eggs, ham
   4 |+"{bar:{spam}}".format(bar=2, spam=3, )  # F522
 5 5 | (''
 6 6 |  .format(x=2))  # F522
+
+    Run `ruff check --fix` to apply this fix.
 
 F522.py:5:2: F522 [*] `.format` call has unused named argument(s): x
   |
@@ -66,11 +72,11 @@ F522.py:5:2: F522 [*] `.format` call has unused named argument(s): x
   |
   = help: Remove extra named arguments: x
 
-ℹ Safe fix
+Suggested fix:
 3 3 | "{bar:{spam}}".format(bar=2, spam=3)  # No issues
 4 4 | "{bar:{spam}}".format(bar=2, spam=3, eggs=4, ham=5)  # F522
 5 5 | (''
 6   |- .format(x=2))  # F522
   6 |+ .format())  # F522
 
-
+    Run `ruff check --fix` to apply this fix.

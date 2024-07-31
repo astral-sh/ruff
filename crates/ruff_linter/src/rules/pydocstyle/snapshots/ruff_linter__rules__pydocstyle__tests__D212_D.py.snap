@@ -13,7 +13,7 @@ D.py:129:5: D212 [*] Multi-line docstring summary should start at the first line
     |
     = help: Remove whitespace after opening quotes
 
-ℹ Safe fix
+Suggested fix:
 126 126 |         '(found 3)')
 127 127 | @expect('D212: Multi-line docstring summary should start at the first line')
 128 128 | def asdlkfasd():
@@ -23,6 +23,8 @@ D.py:129:5: D212 [*] Multi-line docstring summary should start at the first line
 131 130 |     """
 132 131 | 
 133 132 | 
+
+    Run `ruff check --fix` to apply this fix.
 
 D.py:597:5: D212 [*] Multi-line docstring summary should start at the first line
     |
@@ -36,7 +38,7 @@ D.py:597:5: D212 [*] Multi-line docstring summary should start at the first line
     |
     = help: Remove whitespace after opening quotes
 
-ℹ Safe fix
+Suggested fix:
 594 594 |         '(found 3)')
 595 595 | @expect('D212: Multi-line docstring summary should start at the first line')
 596 596 | def one_liner():
@@ -47,6 +49,8 @@ D.py:597:5: D212 [*] Multi-line docstring summary should start at the first line
 600 598 | 
 601 599 | 
 602 600 | @expect('D200: One-line docstring should fit on one line with quotes '
+
+    Run `ruff check --fix` to apply this fix.
 
 D.py:624:5: D212 [*] Multi-line docstring summary should start at the first line
     |
@@ -60,7 +64,7 @@ D.py:624:5: D212 [*] Multi-line docstring summary should start at the first line
     |
     = help: Remove whitespace after opening quotes
 
-ℹ Safe fix
+Suggested fix:
 621 621 |         '(found 3)')
 622 622 | @expect('D212: Multi-line docstring summary should start at the first line')
 623 623 | def one_liner():
@@ -72,4 +76,4 @@ D.py:624:5: D212 [*] Multi-line docstring summary should start at the first line
 628 626 | 
 629 627 | @expect('D404: First word of the docstring should not be "This"')
 
-
+    Run `ruff check --fix` to apply this fix.

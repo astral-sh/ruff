@@ -12,7 +12,7 @@ E30.py:765:1: E304 [*] Blank lines found after function decorator (1)
     |
     = help: Remove extraneous blank line(s)
 
-ℹ Safe fix
+Suggested fix:
 761 761 | 
 762 762 | # E304
 763 763 | @decorator
@@ -20,6 +20,8 @@ E30.py:765:1: E304 [*] Blank lines found after function decorator (1)
 765 764 | def function():
 766 765 |     pass
 767 766 | # end
+
+    Run `ruff check --fix` to apply this fix.
 
 E30.py:774:1: E304 [*] Blank lines found after function decorator (1)
     |
@@ -31,7 +33,7 @@ E30.py:774:1: E304 [*] Blank lines found after function decorator (1)
     |
     = help: Remove extraneous blank line(s)
 
-ℹ Safe fix
+Suggested fix:
 769 769 | 
 770 770 | # E304
 771 771 | @decorator
@@ -39,6 +41,8 @@ E30.py:774:1: E304 [*] Blank lines found after function decorator (1)
 773 772 | # comment    E304 not expected
 774 773 | def function():
 775 774 |     pass
+
+    Run `ruff check --fix` to apply this fix.
 
 E30.py:786:1: E304 [*] Blank lines found after function decorator (2)
     |
@@ -50,7 +54,7 @@ E30.py:786:1: E304 [*] Blank lines found after function decorator (2)
     |
     = help: Remove extraneous blank line(s)
 
-ℹ Safe fix
+Suggested fix:
 778 778 | 
 779 779 | # E304
 780 780 | @decorator
@@ -61,3 +65,5 @@ E30.py:786:1: E304 [*] Blank lines found after function decorator (2)
 785 782 | # second comment  E304 not expected
 786 783 | def function():
 787 784 |     pass
+
+    Run `ruff check --fix` to apply this fix.

@@ -12,7 +12,7 @@ strict.py:27:21: TCH002 [*] Move third-party import `pkg.A` into a type-checking
    |
    = help: Move into type-checking block
 
-ℹ Unsafe fix
+Suggested fix:
 1  1  | from __future__ import annotations
    2  |+from typing import TYPE_CHECKING
    3  |+
@@ -30,6 +30,8 @@ strict.py:27:21: TCH002 [*] Move third-party import `pkg.A` into a type-checking
 29 32 |     def test(value: A):
 30 33 |         return pkg.B()
 
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
+
 strict.py:35:21: TCH002 [*] Move third-party import `pkg.A` into a type-checking block
    |
 33 | def f():
@@ -41,7 +43,7 @@ strict.py:35:21: TCH002 [*] Move third-party import `pkg.A` into a type-checking
    |
    = help: Move into type-checking block
 
-ℹ Unsafe fix
+Suggested fix:
 1  1  | from __future__ import annotations
    2  |+from typing import TYPE_CHECKING
    3  |+
@@ -60,6 +62,8 @@ strict.py:35:21: TCH002 [*] Move third-party import `pkg.A` into a type-checking
 37 41 |     def test(value: A):
 38 42 |         return B()
 
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
+
 strict.py:54:25: TCH002 [*] Move third-party import `pkg.bar.A` into a type-checking block
    |
 52 |     # In un-strict mode, this _should_ raise an error, since `pkg.bar` isn't used at runtime
@@ -71,7 +75,7 @@ strict.py:54:25: TCH002 [*] Move third-party import `pkg.bar.A` into a type-chec
    |
    = help: Move into type-checking block
 
-ℹ Unsafe fix
+Suggested fix:
 1  1  | from __future__ import annotations
    2  |+from typing import TYPE_CHECKING
    3  |+
@@ -89,6 +93,8 @@ strict.py:54:25: TCH002 [*] Move third-party import `pkg.bar.A` into a type-chec
 56 59 |     def test(value: A):
 57 60 |         return pkg.B()
 
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
+
 strict.py:62:12: TCH002 [*] Move third-party import `pkg` into a type-checking block
    |
 60 | def f():
@@ -99,7 +105,7 @@ strict.py:62:12: TCH002 [*] Move third-party import `pkg` into a type-checking b
    |
    = help: Move into type-checking block
 
-ℹ Unsafe fix
+Suggested fix:
 1  1  | from __future__ import annotations
    2  |+from typing import TYPE_CHECKING
    3  |+
@@ -117,6 +123,8 @@ strict.py:62:12: TCH002 [*] Move third-party import `pkg` into a type-checking b
 64 67 | 
 65 68 |     def test(value: pkg.A):
 
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
+
 strict.py:71:23: TCH002 [*] Move third-party import `pkg.foo` into a type-checking block
    |
 69 | def f():
@@ -127,7 +135,7 @@ strict.py:71:23: TCH002 [*] Move third-party import `pkg.foo` into a type-checki
    |
    = help: Move into type-checking block
 
-ℹ Unsafe fix
+Suggested fix:
 1  1  | from __future__ import annotations
    2  |+from typing import TYPE_CHECKING
    3  |+
@@ -145,6 +153,8 @@ strict.py:71:23: TCH002 [*] Move third-party import `pkg.foo` into a type-checki
 73 76 | 
 74 77 |     def test(value: F.Foo):
 
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
+
 strict.py:80:12: TCH002 [*] Move third-party import `pkg` into a type-checking block
    |
 78 | def f():
@@ -155,7 +165,7 @@ strict.py:80:12: TCH002 [*] Move third-party import `pkg` into a type-checking b
    |
    = help: Move into type-checking block
 
-ℹ Unsafe fix
+Suggested fix:
 1  1  | from __future__ import annotations
    2  |+from typing import TYPE_CHECKING
    3  |+
@@ -173,6 +183,8 @@ strict.py:80:12: TCH002 [*] Move third-party import `pkg` into a type-checking b
 82 85 | 
 83 86 |     def test(value: pkg.A):
 
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
+
 strict.py:91:12: TCH002 [*] Move third-party import `pkg` into a type-checking block
    |
 89 |     # Note that `pkg` is a prefix of `pkgfoo` which are both different modules. This is
@@ -183,7 +195,7 @@ strict.py:91:12: TCH002 [*] Move third-party import `pkg` into a type-checking b
    |
    = help: Move into type-checking block
 
-ℹ Unsafe fix
+Suggested fix:
 1  1  | from __future__ import annotations
    2  |+from typing import TYPE_CHECKING
    3  |+
@@ -201,6 +213,8 @@ strict.py:91:12: TCH002 [*] Move third-party import `pkg` into a type-checking b
 93 96 | 
 94 97 |     def test(value: pkg.A):
 
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
+
 strict.py:101:23: TCH002 [*] Move third-party import `pkg.foo` into a type-checking block
     |
  99 |     # In un-strict mode, this shouldn't raise an error, since `pkg` is used at runtime.
@@ -212,7 +226,7 @@ strict.py:101:23: TCH002 [*] Move third-party import `pkg.foo` into a type-check
     |
     = help: Move into type-checking block
 
-ℹ Unsafe fix
+Suggested fix:
 1   1   | from __future__ import annotations
     2   |+from typing import TYPE_CHECKING
     3   |+
@@ -230,4 +244,4 @@ strict.py:101:23: TCH002 [*] Move third-party import `pkg.foo` into a type-check
 103 106 |     def test(value: F.Foo):
 104 107 |         return B.Bar()
 
-
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.

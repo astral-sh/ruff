@@ -10,7 +10,7 @@ N805.py:7:20: N805 [*] First argument of a method should be named `self`
   |
   = help: Rename `this` to `self`
 
-ℹ Unsafe fix
+Suggested fix:
 4 4 | 
 5 5 | 
 6 6 | class Class:
@@ -19,6 +19,8 @@ N805.py:7:20: N805 [*] First argument of a method should be named `self`
 8 8 |         pass
 9 9 | 
 10 10 |     def stillBad(this):
+
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 N805.py:10:18: N805 [*] First argument of a method should be named `self`
    |
@@ -30,7 +32,7 @@ N805.py:10:18: N805 [*] First argument of a method should be named `self`
    |
    = help: Rename `this` to `self`
 
-ℹ Unsafe fix
+Suggested fix:
 7  7  |     def badAllowed(this):
 8  8  |         pass
 9  9  | 
@@ -39,6 +41,8 @@ N805.py:10:18: N805 [*] First argument of a method should be named `self`
 11 11 |         pass
 12 12 | 
 13 13 |     if False:
+
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 N805.py:15:24: N805 [*] First argument of a method should be named `self`
    |
@@ -50,7 +54,7 @@ N805.py:15:24: N805 [*] First argument of a method should be named `self`
    |
    = help: Rename `this` to `self`
 
-ℹ Unsafe fix
+Suggested fix:
 12 12 | 
 13 13 |     if False:
 14 14 | 
@@ -59,6 +63,8 @@ N805.py:15:24: N805 [*] First argument of a method should be named `self`
 16 16 |             pass
 17 17 | 
 18 18 |         def stillBad(this):
+
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 N805.py:18:22: N805 [*] First argument of a method should be named `self`
    |
@@ -70,7 +76,7 @@ N805.py:18:22: N805 [*] First argument of a method should be named `self`
    |
    = help: Rename `this` to `self`
 
-ℹ Unsafe fix
+Suggested fix:
 15 15 |         def badAllowed(this):
 16 16 |             pass
 17 17 | 
@@ -79,6 +85,8 @@ N805.py:18:22: N805 [*] First argument of a method should be named `self`
 19 19 |             pass
 20 20 | 
 21 21 |     @pydantic.validator
+
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 N805.py:22:20: N805 [*] First argument of a method should be named `self`
    |
@@ -89,7 +97,7 @@ N805.py:22:20: N805 [*] First argument of a method should be named `self`
    |
    = help: Rename `cls` to `self`
 
-ℹ Unsafe fix
+Suggested fix:
 19 19 |             pass
 20 20 | 
 21 21 |     @pydantic.validator
@@ -98,6 +106,8 @@ N805.py:22:20: N805 [*] First argument of a method should be named `self`
 23 23 |         pass
 24 24 | 
 25 25 |     @pydantic.validator
+
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 N805.py:26:18: N805 [*] First argument of a method should be named `self`
    |
@@ -108,7 +118,7 @@ N805.py:26:18: N805 [*] First argument of a method should be named `self`
    |
    = help: Rename `cls` to `self`
 
-ℹ Unsafe fix
+Suggested fix:
 23 23 |         pass
 24 24 | 
 25 25 |     @pydantic.validator
@@ -117,6 +127,8 @@ N805.py:26:18: N805 [*] First argument of a method should be named `self`
 27 27 |         pass
 28 28 | 
 29 29 |     @pydantic.validator("my_field")
+
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 N805.py:30:20: N805 [*] First argument of a method should be named `self`
    |
@@ -127,7 +139,7 @@ N805.py:30:20: N805 [*] First argument of a method should be named `self`
    |
    = help: Rename `cls` to `self`
 
-ℹ Unsafe fix
+Suggested fix:
 27 27 |         pass
 28 28 | 
 29 29 |     @pydantic.validator("my_field")
@@ -136,6 +148,8 @@ N805.py:30:20: N805 [*] First argument of a method should be named `self`
 31 31 |         pass
 32 32 | 
 33 33 |     @pydantic.validator("my_field")
+
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 N805.py:34:18: N805 [*] First argument of a method should be named `self`
    |
@@ -146,7 +160,7 @@ N805.py:34:18: N805 [*] First argument of a method should be named `self`
    |
    = help: Rename `cls` to `self`
 
-ℹ Unsafe fix
+Suggested fix:
 31 31 |         pass
 32 32 | 
 33 33 |     @pydantic.validator("my_field")
@@ -155,6 +169,8 @@ N805.py:34:18: N805 [*] First argument of a method should be named `self`
 35 35 |         pass
 36 36 | 
 37 37 |     @classmethod
+
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 N805.py:55:20: N805 First argument of a method should be named `self`
    |

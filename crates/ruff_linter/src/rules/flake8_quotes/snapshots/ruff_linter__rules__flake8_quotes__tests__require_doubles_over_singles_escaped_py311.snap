@@ -10,12 +10,14 @@ singles_escaped.py:1:26: Q003 [*] Change outer quotes to avoid escaping inner qu
   |
   = help: Change outer quotes to avoid escaping inner quotes
 
-ℹ Safe fix
+Suggested fix:
 1   |-this_should_raise_Q003 = "This is a \"string\""
   1 |+this_should_raise_Q003 = 'This is a "string"'
 2 2 | this_is_fine = "'This' is a \"string\""
 3 3 | this_is_fine = 'This is a "string"'
 4 4 | this_is_fine = '\'This\' is a "string"'
+
+    Run `ruff check --fix` to apply this fix.
 
 singles_escaped.py:9:5: Q003 [*] Change outer quotes to avoid escaping inner quotes
    |
@@ -27,7 +29,7 @@ singles_escaped.py:9:5: Q003 [*] Change outer quotes to avoid escaping inner quo
    |
    = help: Change outer quotes to avoid escaping inner quotes
 
-ℹ Safe fix
+Suggested fix:
 6  6  | this_is_fine = R"This is a \"string\""
 7  7  | this_should_raise = (
 8  8  |     "This is a"
@@ -36,6 +38,8 @@ singles_escaped.py:9:5: Q003 [*] Change outer quotes to avoid escaping inner quo
 10 10 | )
 11 11 | 
 12 12 | # Same as above, but with f-strings
+
+    Run `ruff check --fix` to apply this fix.
 
 singles_escaped.py:13:1: Q003 [*] Change outer quotes to avoid escaping inner quotes
    |
@@ -47,7 +51,7 @@ singles_escaped.py:13:1: Q003 [*] Change outer quotes to avoid escaping inner qu
    |
    = help: Change outer quotes to avoid escaping inner quotes
 
-ℹ Safe fix
+Suggested fix:
 10 10 | )
 11 11 | 
 12 12 | # Same as above, but with f-strings
@@ -56,6 +60,8 @@ singles_escaped.py:13:1: Q003 [*] Change outer quotes to avoid escaping inner qu
 14 14 | f"'This' is a \"string\""
 15 15 | f'This is a "string"'
 16 16 | f'\'This\' is a "string"'
+
+    Run `ruff check --fix` to apply this fix.
 
 singles_escaped.py:21:5: Q003 [*] Change outer quotes to avoid escaping inner quotes
    |
@@ -67,7 +73,7 @@ singles_escaped.py:21:5: Q003 [*] Change outer quotes to avoid escaping inner qu
    |
    = help: Change outer quotes to avoid escaping inner quotes
 
-ℹ Safe fix
+Suggested fix:
 18 18 | fR"This is a \"string\""
 19 19 | foo = (
 20 20 |     f"This is a"
@@ -77,4 +83,4 @@ singles_escaped.py:21:5: Q003 [*] Change outer quotes to avoid escaping inner qu
 23 23 | 
 24 24 | # Nested f-strings (Python 3.12+)
 
-
+    Run `ruff check --fix` to apply this fix.

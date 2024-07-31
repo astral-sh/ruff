@@ -12,7 +12,7 @@ SIM105_0.py:6:1: SIM105 [*] Use `contextlib.suppress(ValueError)` instead of `tr
   |
   = help: Replace with `contextlib.suppress(ValueError)`
 
-ℹ Unsafe fix
+Suggested fix:
    1  |+import contextlib
 1  2  | def foo():
 2  3  |     pass
@@ -28,6 +28,8 @@ SIM105_0.py:6:1: SIM105 [*] Use `contextlib.suppress(ValueError)` instead of `tr
 11 10 | 
 12 11 | # SIM105
 
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
+
 SIM105_0.py:13:1: SIM105 [*] Use `contextlib.suppress(ValueError, OSError)` instead of `try`-`except`-`pass`
    |
 12 |   # SIM105
@@ -41,7 +43,7 @@ SIM105_0.py:13:1: SIM105 [*] Use `contextlib.suppress(ValueError, OSError)` inst
    |
    = help: Replace with `contextlib.suppress(ValueError, OSError)`
 
-ℹ Unsafe fix
+Suggested fix:
    1  |+import contextlib
 1  2  | def foo():
 2  3  |     pass
@@ -59,6 +61,8 @@ SIM105_0.py:13:1: SIM105 [*] Use `contextlib.suppress(ValueError, OSError)` inst
 18 17 | # SIM105
 19 18 | try:
 
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
+
 SIM105_0.py:19:1: SIM105 [*] Use `contextlib.suppress(ValueError, OSError)` instead of `try`-`except`-`pass`
    |
 18 |   # SIM105
@@ -72,7 +76,7 @@ SIM105_0.py:19:1: SIM105 [*] Use `contextlib.suppress(ValueError, OSError)` inst
    |
    = help: Replace with `contextlib.suppress(ValueError, OSError)`
 
-ℹ Unsafe fix
+Suggested fix:
    1  |+import contextlib
 1  2  | def foo():
 2  3  |     pass
@@ -90,6 +94,8 @@ SIM105_0.py:19:1: SIM105 [*] Use `contextlib.suppress(ValueError, OSError)` inst
 24 23 | # SIM105
 25 24 | try:
 
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
+
 SIM105_0.py:25:1: SIM105 [*] Use `contextlib.suppress(Exception)` instead of `try`-`except`-`pass`
    |
 24 |   # SIM105
@@ -103,7 +109,7 @@ SIM105_0.py:25:1: SIM105 [*] Use `contextlib.suppress(Exception)` instead of `tr
    |
    = help: Replace with `contextlib.suppress(Exception)`
 
-ℹ Unsafe fix
+Suggested fix:
    1  |+import contextlib
 1  2  | def foo():
 2  3  |     pass
@@ -121,6 +127,8 @@ SIM105_0.py:25:1: SIM105 [*] Use `contextlib.suppress(Exception)` instead of `tr
 30 29 | # SIM105
 31 30 | try:
 
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
+
 SIM105_0.py:31:1: SIM105 [*] Use `contextlib.suppress(a.Error, b.Error)` instead of `try`-`except`-`pass`
    |
 30 |   # SIM105
@@ -134,7 +142,7 @@ SIM105_0.py:31:1: SIM105 [*] Use `contextlib.suppress(a.Error, b.Error)` instead
    |
    = help: Replace with `contextlib.suppress(a.Error, b.Error)`
 
-ℹ Unsafe fix
+Suggested fix:
    1  |+import contextlib
 1  2  | def foo():
 2  3  |     pass
@@ -152,6 +160,8 @@ SIM105_0.py:31:1: SIM105 [*] Use `contextlib.suppress(a.Error, b.Error)` instead
 36 35 | # OK
 37 36 | try:
 
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
+
 SIM105_0.py:85:5: SIM105 [*] Use `contextlib.suppress(ValueError)` instead of `try`-`except`-`pass`
    |
 83 |   def with_ellipsis():
@@ -165,7 +175,7 @@ SIM105_0.py:85:5: SIM105 [*] Use `contextlib.suppress(ValueError)` instead of `t
    |
    = help: Replace with `contextlib.suppress(ValueError)`
 
-ℹ Unsafe fix
+Suggested fix:
    1  |+import contextlib
 1  2  | def foo():
 2  3  |     pass
@@ -182,6 +192,8 @@ SIM105_0.py:85:5: SIM105 [*] Use `contextlib.suppress(ValueError)` instead of `t
 89 88 | 
 90 89 | 
 91 90 | def with_ellipsis_and_return():
+
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 SIM105_0.py:100:5: SIM105 Use `contextlib.suppress(ValueError, OSError)` instead of `try`-`except`-`pass`
     |
@@ -212,7 +224,7 @@ SIM105_0.py:117:5: SIM105 [*] Use `contextlib.suppress(OSError)` instead of `try
     |
     = help: Replace with `contextlib.suppress(OSError)`
 
-ℹ Unsafe fix
+Suggested fix:
     1   |+import contextlib
 1   2   | def foo():
 2   3   |     pass
@@ -230,6 +242,8 @@ SIM105_0.py:117:5: SIM105 [*] Use `contextlib.suppress(OSError)` instead of `try
 122 121 |     try: os.makedirs(model_dir);
 123 122 |     except OSError:
 
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
+
 SIM105_0.py:122:5: SIM105 [*] Use `contextlib.suppress(OSError)` instead of `try`-`except`-`pass`
     |
 120 |           pass;
@@ -244,7 +258,7 @@ SIM105_0.py:122:5: SIM105 [*] Use `contextlib.suppress(OSError)` instead of `try
     |
     = help: Replace with `contextlib.suppress(OSError)`
 
-ℹ Unsafe fix
+Suggested fix:
     1   |+import contextlib
 1   2   | def foo():
 2   3   |     pass
@@ -261,6 +275,8 @@ SIM105_0.py:122:5: SIM105 [*] Use `contextlib.suppress(OSError)` instead of `try
 126 125 |     try: os.makedirs(model_dir);
 127 126 |     except OSError:
 
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
+
 SIM105_0.py:126:5: SIM105 [*] Use `contextlib.suppress(OSError)` instead of `try`-`except`-`pass`
     |
 124 |           pass;
@@ -275,7 +291,7 @@ SIM105_0.py:126:5: SIM105 [*] Use `contextlib.suppress(OSError)` instead of `try
     |
     = help: Replace with `contextlib.suppress(OSError)`
 
-ℹ Unsafe fix
+Suggested fix:
     1   |+import contextlib
 1   2   | def foo():
 2   3   |     pass
@@ -291,4 +307,4 @@ SIM105_0.py:126:5: SIM105 [*] Use `contextlib.suppress(OSError)` instead of `try
 129 128 |             \
 130 129 |             #
 
-
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.

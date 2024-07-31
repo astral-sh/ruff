@@ -10,7 +10,7 @@ D.py:137:5: D201 [*] No blank lines allowed before function docstring (found 1)
     |
     = help: Remove blank line(s) before function docstring
 
-ℹ Safe fix
+Suggested fix:
 133 133 | 
 134 134 | @expect('D201: No blank lines allowed before function docstring (found 1)')
 135 135 | def leading_space():
@@ -18,6 +18,8 @@ D.py:137:5: D201 [*] No blank lines allowed before function docstring (found 1)
 137 136 |     """Leading space."""
 138 137 | 
 139 138 | 
+
+    Run `ruff check --fix` to apply this fix.
 
 D.py:151:5: D201 [*] No blank lines allowed before function docstring (found 1)
     |
@@ -30,7 +32,7 @@ D.py:151:5: D201 [*] No blank lines allowed before function docstring (found 1)
     |
     = help: Remove blank line(s) before function docstring
 
-ℹ Safe fix
+Suggested fix:
 147 147 | @expect('D201: No blank lines allowed before function docstring (found 1)')
 148 148 | @expect('D202: No blank lines allowed after function docstring (found 1)')
 149 149 | def trailing_and_leading_space():
@@ -38,6 +40,8 @@ D.py:151:5: D201 [*] No blank lines allowed before function docstring (found 1)
 151 150 |     """Trailing and leading space."""
 152 151 | 
 153 152 |     pass
+
+    Run `ruff check --fix` to apply this fix.
 
 D.py:546:5: D201 [*] No blank lines allowed before function docstring (found 1)
     |
@@ -52,7 +56,7 @@ D.py:546:5: D201 [*] No blank lines allowed before function docstring (found 1)
     |
     = help: Remove blank line(s) before function docstring
 
-ℹ Safe fix
+Suggested fix:
 542 542 | @expect('D201: No blank lines allowed before function docstring (found 1)')
 543 543 | @expect('D213: Multi-line docstring summary should start at the second line')
 544 544 | def multiline_leading_space():
@@ -60,6 +64,8 @@ D.py:546:5: D201 [*] No blank lines allowed before function docstring (found 1)
 546 545 |     """Leading space.
 547 546 | 
 548 547 |     More content.
+
+    Run `ruff check --fix` to apply this fix.
 
 D.py:568:5: D201 [*] No blank lines allowed before function docstring (found 1)
     |
@@ -76,7 +82,7 @@ D.py:568:5: D201 [*] No blank lines allowed before function docstring (found 1)
     |
     = help: Remove blank line(s) before function docstring
 
-ℹ Safe fix
+Suggested fix:
 564 564 | @expect('D202: No blank lines allowed after function docstring (found 1)')
 565 565 | @expect('D213: Multi-line docstring summary should start at the second line')
 566 566 | def multiline_trailing_and_leading_space():
@@ -85,4 +91,4 @@ D.py:568:5: D201 [*] No blank lines allowed before function docstring (found 1)
 569 568 | 
 570 569 |     More content.
 
-
+    Run `ruff check --fix` to apply this fix.

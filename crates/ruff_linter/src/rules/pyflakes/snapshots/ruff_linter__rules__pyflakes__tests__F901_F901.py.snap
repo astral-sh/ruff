@@ -9,13 +9,15 @@ F901.py:2:11: F901 [*] `raise NotImplemented` should be `raise NotImplementedErr
   |
   = help: Use `raise NotImplementedError`
 
-ℹ Safe fix
+Suggested fix:
 1 1 | def f() -> None:
 2   |-    raise NotImplemented()
   2 |+    raise NotImplementedError()
 3 3 | 
 4 4 | 
 5 5 | def g() -> None:
+
+    Run `ruff check --fix` to apply this fix.
 
 F901.py:6:11: F901 [*] `raise NotImplemented` should be `raise NotImplementedError`
   |
@@ -25,7 +27,7 @@ F901.py:6:11: F901 [*] `raise NotImplemented` should be `raise NotImplementedErr
   |
   = help: Use `raise NotImplementedError`
 
-ℹ Safe fix
+Suggested fix:
 3 3 | 
 4 4 | 
 5 5 | def g() -> None:
@@ -34,6 +36,8 @@ F901.py:6:11: F901 [*] `raise NotImplemented` should be `raise NotImplementedErr
 7 7 | 
 8 8 | 
 9 9 | def h() -> None:
+
+    Run `ruff check --fix` to apply this fix.
 
 F901.py:11:11: F901 [*] `raise NotImplemented` should be `raise NotImplementedError`
    |
@@ -44,7 +48,7 @@ F901.py:11:11: F901 [*] `raise NotImplemented` should be `raise NotImplementedEr
    |
    = help: Use `raise NotImplementedError`
 
-ℹ Safe fix
+Suggested fix:
    1  |+import builtins
 1  2  | def f() -> None:
 2  3  |     raise NotImplemented()
@@ -55,3 +59,5 @@ F901.py:11:11: F901 [*] `raise NotImplemented` should be `raise NotImplementedEr
 10 11 |     NotImplementedError = "foo"
 11    |-    raise NotImplemented
    12 |+    raise builtins.NotImplementedError
+
+    Run `ruff check --fix` to apply this fix.

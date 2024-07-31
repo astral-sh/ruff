@@ -11,7 +11,7 @@ init_var.py:5:25: TCH003 [*] Move standard library import `dataclasses.FrozenIns
   |
   = help: Move into type-checking block
 
-ℹ Unsafe fix
+Suggested fix:
 2  2  | 
 3  3  | from __future__ import annotations
 4  4  | 
@@ -26,6 +26,8 @@ init_var.py:5:25: TCH003 [*] Move standard library import `dataclasses.FrozenIns
 8  12 | 
 9  13 | @dataclass
 
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
+
 init_var.py:6:21: TCH003 [*] Move standard library import `pathlib.Path` into a type-checking block
   |
 5 | from dataclasses import FrozenInstanceError, InitVar, dataclass
@@ -34,7 +36,7 @@ init_var.py:6:21: TCH003 [*] Move standard library import `pathlib.Path` into a 
   |
   = help: Move into type-checking block
 
-ℹ Unsafe fix
+Suggested fix:
 3  3  | from __future__ import annotations
 4  4  | 
 5  5  | from dataclasses import FrozenInstanceError, InitVar, dataclass
@@ -47,4 +49,4 @@ init_var.py:6:21: TCH003 [*] Move standard library import `pathlib.Path` into a 
 8  11 | 
 9  12 | @dataclass
 
-
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.

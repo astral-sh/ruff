@@ -12,7 +12,7 @@ COM81.py:4:18: COM812 [*] Trailing comma missing
   |
   = help: Add trailing comma
 
-ℹ Safe fix
+Suggested fix:
 1 1 | # ==> bad_function_call.py <==
 2 2 | bad_function_call(
 3 3 |     param1='test',
@@ -21,6 +21,8 @@ COM81.py:4:18: COM812 [*] Trailing comma missing
 5 5 | )
 6 6 | # ==> bad_list.py <==
 7 7 | bad_list = [
+
+    Run `ruff check --fix` to apply this fix.
 
 COM81.py:10:6: COM812 [*] Trailing comma missing
    |
@@ -32,7 +34,7 @@ COM81.py:10:6: COM812 [*] Trailing comma missing
    |
    = help: Add trailing comma
 
-ℹ Safe fix
+Suggested fix:
 7  7  | bad_list = [
 8  8  |     1,
 9  9  |     2,
@@ -41,6 +43,8 @@ COM81.py:10:6: COM812 [*] Trailing comma missing
 11 11 | ]
 12 12 | 
 13 13 | bad_list_with_comment = [
+
+    Run `ruff check --fix` to apply this fix.
 
 COM81.py:16:6: COM812 [*] Trailing comma missing
    |
@@ -53,7 +57,7 @@ COM81.py:16:6: COM812 [*] Trailing comma missing
    |
    = help: Add trailing comma
 
-ℹ Safe fix
+Suggested fix:
 13 13 | bad_list_with_comment = [
 14 14 |     1,
 15 15 |     2,
@@ -62,6 +66,8 @@ COM81.py:16:6: COM812 [*] Trailing comma missing
 17 17 |     # still needs a comma!
 18 18 | ]
 19 19 | 
+
+    Run `ruff check --fix` to apply this fix.
 
 COM81.py:23:6: COM812 [*] Trailing comma missing
    |
@@ -72,7 +78,7 @@ COM81.py:23:6: COM812 [*] Trailing comma missing
    |
    = help: Add trailing comma
 
-ℹ Safe fix
+Suggested fix:
 20 20 | bad_list_with_extra_empty = [
 21 21 |     1,
 22 22 |     2,
@@ -81,6 +87,8 @@ COM81.py:23:6: COM812 [*] Trailing comma missing
 24 24 | 
 25 25 | 
 26 26 | 
+
+    Run `ruff check --fix` to apply this fix.
 
 COM81.py:36:8: COM818 Trailing comma on bare tuple prohibited
    |
@@ -159,7 +167,7 @@ COM81.py:70:8: COM812 [*] Trailing comma missing
    |
    = help: Add trailing comma
 
-ℹ Safe fix
+Suggested fix:
 67 67 |     pass
 68 68 | 
 69 69 | {'foo': foo}['foo'](
@@ -168,6 +176,8 @@ COM81.py:70:8: COM812 [*] Trailing comma missing
 71 71 | )
 72 72 | 
 73 73 | {'foo': foo}['foo'](
+
+    Run `ruff check --fix` to apply this fix.
 
 COM81.py:78:8: COM812 [*] Trailing comma missing
    |
@@ -178,7 +188,7 @@ COM81.py:78:8: COM812 [*] Trailing comma missing
    |
    = help: Add trailing comma
 
-ℹ Safe fix
+Suggested fix:
 75 75 | )
 76 76 | 
 77 77 | (foo)(
@@ -187,6 +197,8 @@ COM81.py:78:8: COM812 [*] Trailing comma missing
 79 79 | )
 80 80 | 
 81 81 | (foo)[0](
+
+    Run `ruff check --fix` to apply this fix.
 
 COM81.py:86:8: COM812 [*] Trailing comma missing
    |
@@ -197,7 +209,7 @@ COM81.py:86:8: COM812 [*] Trailing comma missing
    |
    = help: Add trailing comma
 
-ℹ Safe fix
+Suggested fix:
 83 83 | )
 84 84 | 
 85 85 | [foo][0](
@@ -206,6 +218,8 @@ COM81.py:86:8: COM812 [*] Trailing comma missing
 87 87 | )
 88 88 | 
 89 89 | [foo][0](
+
+    Run `ruff check --fix` to apply this fix.
 
 COM81.py:152:6: COM812 [*] Trailing comma missing
     |
@@ -217,7 +231,7 @@ COM81.py:152:6: COM812 [*] Trailing comma missing
     |
     = help: Add trailing comma
 
-ℹ Safe fix
+Suggested fix:
 149 149 | 
 150 150 | # ==> keyword_before_parenth_form/base_bad.py <==
 151 151 | from x import (
@@ -226,6 +240,8 @@ COM81.py:152:6: COM812 [*] Trailing comma missing
 153 153 | )
 154 154 | 
 155 155 | assert(
+
+    Run `ruff check --fix` to apply this fix.
 
 COM81.py:158:11: COM812 [*] Trailing comma missing
     |
@@ -237,7 +253,7 @@ COM81.py:158:11: COM812 [*] Trailing comma missing
     |
     = help: Add trailing comma
 
-ℹ Safe fix
+Suggested fix:
 155 155 | assert(
 156 156 |     SyntaxWarning,
 157 157 |     ThrownHere,
@@ -246,6 +262,8 @@ COM81.py:158:11: COM812 [*] Trailing comma missing
 159 159 | )
 160 160 | 
 161 161 | # async await is fine outside an async def
+
+    Run `ruff check --fix` to apply this fix.
 
 COM81.py:293:15: COM812 [*] Trailing comma missing
     |
@@ -258,7 +276,7 @@ COM81.py:293:15: COM812 [*] Trailing comma missing
     |
     = help: Add trailing comma
 
-ℹ Safe fix
+Suggested fix:
 290 290 | 
 291 291 | # ==> multiline_bad_dict.py <==
 292 292 | multiline_bad_dict = {
@@ -267,6 +285,8 @@ COM81.py:293:15: COM812 [*] Trailing comma missing
 294 294 | }
 295 295 | # ==> multiline_bad_function_def.py <==
 296 296 | def func_good(
+
+    Run `ruff check --fix` to apply this fix.
 
 COM81.py:304:14: COM812 [*] Trailing comma missing
     |
@@ -279,7 +299,7 @@ COM81.py:304:14: COM812 [*] Trailing comma missing
     |
     = help: Add trailing comma
 
-ℹ Safe fix
+Suggested fix:
 301 301 | 
 302 302 | def func_bad(
 303 303 |         a = 3,
@@ -288,6 +308,8 @@ COM81.py:304:14: COM812 [*] Trailing comma missing
 305 305 |     ):
 306 306 |     pass
 307 307 | 
+
+    Run `ruff check --fix` to apply this fix.
 
 COM81.py:310:14: COM812 [*] Trailing comma missing
     |
@@ -300,7 +322,7 @@ COM81.py:310:14: COM812 [*] Trailing comma missing
     |
     = help: Add trailing comma
 
-ℹ Safe fix
+Suggested fix:
 307 307 | 
 308 308 | # ==> multiline_bad_function_one_param.py <==
 309 309 | def func(
@@ -309,6 +331,8 @@ COM81.py:310:14: COM812 [*] Trailing comma missing
 311 311 |     ):
 312 312 |     pass
 313 313 | 
+
+    Run `ruff check --fix` to apply this fix.
 
 COM81.py:316:10: COM812 [*] Trailing comma missing
     |
@@ -319,7 +343,7 @@ COM81.py:316:10: COM812 [*] Trailing comma missing
     |
     = help: Add trailing comma
 
-ℹ Safe fix
+Suggested fix:
 313 313 | 
 314 314 | 
 315 315 | func(
@@ -328,6 +352,8 @@ COM81.py:316:10: COM812 [*] Trailing comma missing
 317 317 | )
 318 318 | 
 319 319 | # ==> multiline_bad_or_dict.py <==
+
+    Run `ruff check --fix` to apply this fix.
 
 COM81.py:322:15: COM812 [*] Trailing comma missing
     |
@@ -339,7 +365,7 @@ COM81.py:322:15: COM812 [*] Trailing comma missing
     |
     = help: Add trailing comma
 
-ℹ Safe fix
+Suggested fix:
 319 319 | # ==> multiline_bad_or_dict.py <==
 320 320 | multiline_bad_or_dict = {
 321 321 |     "good": True or False,
@@ -348,6 +374,8 @@ COM81.py:322:15: COM812 [*] Trailing comma missing
 323 323 | }
 324 324 | 
 325 325 | # ==> multiline_good_dict.py <==
+
+    Run `ruff check --fix` to apply this fix.
 
 COM81.py:368:15: COM812 [*] Trailing comma missing
     |
@@ -359,7 +387,7 @@ COM81.py:368:15: COM812 [*] Trailing comma missing
     |
     = help: Add trailing comma
 
-ℹ Safe fix
+Suggested fix:
 365 365 | 
 366 366 | multiline_index_access[
 367 367 |     "probably fine",
@@ -368,6 +396,8 @@ COM81.py:368:15: COM812 [*] Trailing comma missing
 369 369 | ]
 370 370 | 
 371 371 | multiline_index_access[
+
+    Run `ruff check --fix` to apply this fix.
 
 COM81.py:375:15: COM812 [*] Trailing comma missing
     |
@@ -379,7 +409,7 @@ COM81.py:375:15: COM812 [*] Trailing comma missing
     |
     = help: Add trailing comma
 
-ℹ Safe fix
+Suggested fix:
 372 372 |     "fine",
 373 373 |     "fine",
 374 374 |     :
@@ -388,6 +418,8 @@ COM81.py:375:15: COM812 [*] Trailing comma missing
 376 376 | ]
 377 377 | 
 378 378 | # ==> multiline_string.py <==
+
+    Run `ruff check --fix` to apply this fix.
 
 COM81.py:404:15: COM812 [*] Trailing comma missing
     |
@@ -399,7 +431,7 @@ COM81.py:404:15: COM812 [*] Trailing comma missing
     |
     = help: Add trailing comma
 
-ℹ Safe fix
+Suggested fix:
 401 401 |     "fine",
 402 402 |     "fine"
 403 403 |     :
@@ -408,6 +440,8 @@ COM81.py:404:15: COM812 [*] Trailing comma missing
 405 405 | ]
 406 406 | 
 407 407 | multiline_index_access[
+
+    Run `ruff check --fix` to apply this fix.
 
 COM81.py:432:15: COM812 [*] Trailing comma missing
     |
@@ -419,7 +453,7 @@ COM81.py:432:15: COM812 [*] Trailing comma missing
     |
     = help: Add trailing comma
 
-ℹ Safe fix
+Suggested fix:
 429 429 |     "fine"
 430 430 |     :
 431 431 |     "fine",
@@ -428,6 +462,8 @@ COM81.py:432:15: COM812 [*] Trailing comma missing
 433 433 | ]
 434 434 | 
 435 435 | multiline_index_access[
+
+    Run `ruff check --fix` to apply this fix.
 
 COM81.py:485:21: COM819 [*] Trailing comma prohibited
     |
@@ -439,7 +475,7 @@ COM81.py:485:21: COM819 [*] Trailing comma prohibited
     |
     = help: Remove trailing comma
 
-ℹ Safe fix
+Suggested fix:
 482 482 | )
 483 483 | 
 484 484 | # ==> prohibited.py <==
@@ -448,6 +484,8 @@ COM81.py:485:21: COM819 [*] Trailing comma prohibited
 486 486 | 
 487 487 | bar = { a: b,}
 488 488 | 
+
+    Run `ruff check --fix` to apply this fix.
 
 COM81.py:487:13: COM819 [*] Trailing comma prohibited
     |
@@ -460,7 +498,7 @@ COM81.py:487:13: COM819 [*] Trailing comma prohibited
     |
     = help: Remove trailing comma
 
-ℹ Safe fix
+Suggested fix:
 484 484 | # ==> prohibited.py <==
 485 485 | foo = ['a', 'b', 'c',]
 486 486 | 
@@ -469,6 +507,8 @@ COM81.py:487:13: COM819 [*] Trailing comma prohibited
 488 488 | 
 489 489 | def bah(ham, spam,):
 490 490 |     pass
+
+    Run `ruff check --fix` to apply this fix.
 
 COM81.py:489:18: COM819 [*] Trailing comma prohibited
     |
@@ -480,7 +520,7 @@ COM81.py:489:18: COM819 [*] Trailing comma prohibited
     |
     = help: Remove trailing comma
 
-ℹ Safe fix
+Suggested fix:
 486 486 | 
 487 487 | bar = { a: b,}
 488 488 | 
@@ -489,6 +529,8 @@ COM81.py:489:18: COM819 [*] Trailing comma prohibited
 490 490 |     pass
 491 491 | 
 492 492 | (0,)
+
+    Run `ruff check --fix` to apply this fix.
 
 COM81.py:494:6: COM819 [*] Trailing comma prohibited
     |
@@ -501,7 +543,7 @@ COM81.py:494:6: COM819 [*] Trailing comma prohibited
     |
     = help: Remove trailing comma
 
-ℹ Safe fix
+Suggested fix:
 491 491 | 
 492 492 | (0,)
 493 493 | 
@@ -510,6 +552,8 @@ COM81.py:494:6: COM819 [*] Trailing comma prohibited
 495 495 | 
 496 496 | foo = ['a', 'b', 'c', ]
 497 497 | 
+
+    Run `ruff check --fix` to apply this fix.
 
 COM81.py:496:21: COM819 [*] Trailing comma prohibited
     |
@@ -522,7 +566,7 @@ COM81.py:496:21: COM819 [*] Trailing comma prohibited
     |
     = help: Remove trailing comma
 
-ℹ Safe fix
+Suggested fix:
 493 493 | 
 494 494 | (0, 1,)
 495 495 | 
@@ -531,6 +575,8 @@ COM81.py:496:21: COM819 [*] Trailing comma prohibited
 497 497 | 
 498 498 | bar = { a: b, }
 499 499 | 
+
+    Run `ruff check --fix` to apply this fix.
 
 COM81.py:498:13: COM819 [*] Trailing comma prohibited
     |
@@ -543,7 +589,7 @@ COM81.py:498:13: COM819 [*] Trailing comma prohibited
     |
     = help: Remove trailing comma
 
-ℹ Safe fix
+Suggested fix:
 495 495 | 
 496 496 | foo = ['a', 'b', 'c', ]
 497 497 | 
@@ -552,6 +598,8 @@ COM81.py:498:13: COM819 [*] Trailing comma prohibited
 499 499 | 
 500 500 | def bah(ham, spam, ):
 501 501 |     pass
+
+    Run `ruff check --fix` to apply this fix.
 
 COM81.py:500:18: COM819 [*] Trailing comma prohibited
     |
@@ -563,7 +611,7 @@ COM81.py:500:18: COM819 [*] Trailing comma prohibited
     |
     = help: Remove trailing comma
 
-ℹ Safe fix
+Suggested fix:
 497 497 | 
 498 498 | bar = { a: b, }
 499 499 | 
@@ -572,6 +620,8 @@ COM81.py:500:18: COM819 [*] Trailing comma prohibited
 501 501 |     pass
 502 502 | 
 503 503 | (0, )
+
+    Run `ruff check --fix` to apply this fix.
 
 COM81.py:505:6: COM819 [*] Trailing comma prohibited
     |
@@ -584,7 +634,7 @@ COM81.py:505:6: COM819 [*] Trailing comma prohibited
     |
     = help: Remove trailing comma
 
-ℹ Safe fix
+Suggested fix:
 502 502 | 
 503 503 | (0, )
 504 504 | 
@@ -593,6 +643,8 @@ COM81.py:505:6: COM819 [*] Trailing comma prohibited
 506 506 | 
 507 507 | image[:, :, 0]
 508 508 | 
+
+    Run `ruff check --fix` to apply this fix.
 
 COM81.py:511:10: COM819 [*] Trailing comma prohibited
     |
@@ -605,7 +657,7 @@ COM81.py:511:10: COM819 [*] Trailing comma prohibited
     |
     = help: Remove trailing comma
 
-ℹ Safe fix
+Suggested fix:
 508 508 | 
 509 509 | image[:,]
 510 510 | 
@@ -614,6 +666,8 @@ COM81.py:511:10: COM819 [*] Trailing comma prohibited
 512 512 | 
 513 513 | lambda x, : x
 514 514 | 
+
+    Run `ruff check --fix` to apply this fix.
 
 COM81.py:513:9: COM819 [*] Trailing comma prohibited
     |
@@ -626,7 +680,7 @@ COM81.py:513:9: COM819 [*] Trailing comma prohibited
     |
     = help: Remove trailing comma
 
-ℹ Safe fix
+Suggested fix:
 510 510 | 
 511 511 | image[:,:,]
 512 512 | 
@@ -635,6 +689,8 @@ COM81.py:513:9: COM819 [*] Trailing comma prohibited
 514 514 | 
 515 515 | # ==> unpack.py <==
 516 516 | def function(
+
+    Run `ruff check --fix` to apply this fix.
 
 COM81.py:519:13: COM812 [*] Trailing comma missing
     |
@@ -647,7 +703,7 @@ COM81.py:519:13: COM812 [*] Trailing comma missing
     |
     = help: Add trailing comma
 
-ℹ Safe fix
+Suggested fix:
 516 516 | def function(
 517 517 |     foo,
 518 518 |     bar,
@@ -656,6 +712,8 @@ COM81.py:519:13: COM812 [*] Trailing comma missing
 520 520 | ):
 521 521 |     pass
 522 522 | 
+
+    Run `ruff check --fix` to apply this fix.
 
 COM81.py:526:10: COM812 [*] Trailing comma missing
     |
@@ -668,7 +726,7 @@ COM81.py:526:10: COM812 [*] Trailing comma missing
     |
     = help: Add trailing comma
 
-ℹ Safe fix
+Suggested fix:
 523 523 | def function(
 524 524 |     foo,
 525 525 |     bar,
@@ -677,6 +735,8 @@ COM81.py:526:10: COM812 [*] Trailing comma missing
 527 527 | ):
 528 528 |     pass
 529 529 | 
+
+    Run `ruff check --fix` to apply this fix.
 
 COM81.py:534:16: COM812 [*] Trailing comma missing
     |
@@ -689,7 +749,7 @@ COM81.py:534:16: COM812 [*] Trailing comma missing
     |
     = help: Add trailing comma
 
-ℹ Safe fix
+Suggested fix:
 531 531 |     foo,
 532 532 |     bar,
 533 533 |     *args,
@@ -698,6 +758,8 @@ COM81.py:534:16: COM812 [*] Trailing comma missing
 535 535 |     ):
 536 536 |     pass
 537 537 | 
+
+    Run `ruff check --fix` to apply this fix.
 
 COM81.py:541:13: COM812 [*] Trailing comma missing
     |
@@ -709,7 +771,7 @@ COM81.py:541:13: COM812 [*] Trailing comma missing
     |
     = help: Add trailing comma
 
-ℹ Safe fix
+Suggested fix:
 538 538 | result = function(
 539 539 |     foo,
 540 540 |     bar,
@@ -718,6 +780,8 @@ COM81.py:541:13: COM812 [*] Trailing comma missing
 542 542 | )
 543 543 | 
 544 544 | result = function(
+
+    Run `ruff check --fix` to apply this fix.
 
 COM81.py:547:24: COM812 [*] Trailing comma missing
     |
@@ -729,7 +793,7 @@ COM81.py:547:24: COM812 [*] Trailing comma missing
     |
     = help: Add trailing comma
 
-ℹ Safe fix
+Suggested fix:
 544 544 | result = function(
 545 545 |     foo,
 546 546 |     bar,
@@ -738,6 +802,8 @@ COM81.py:547:24: COM812 [*] Trailing comma missing
 548 548 | )
 549 549 | 
 550 550 | def foo(
+
+    Run `ruff check --fix` to apply this fix.
 
 COM81.py:554:15: COM812 [*] Trailing comma missing
     |
@@ -750,7 +816,7 @@ COM81.py:554:15: COM812 [*] Trailing comma missing
     |
     = help: Add trailing comma
 
-ℹ Safe fix
+Suggested fix:
 551 551 |     ham,
 552 552 |     spam,
 553 553 |     *args,
@@ -759,6 +825,8 @@ COM81.py:554:15: COM812 [*] Trailing comma missing
 555 555 |     ):
 556 556 |     pass
 557 557 | 
+
+    Run `ruff check --fix` to apply this fix.
 
 COM81.py:561:13: COM812 [*] Trailing comma missing
     |
@@ -769,7 +837,7 @@ COM81.py:561:13: COM812 [*] Trailing comma missing
     |
     = help: Add trailing comma
 
-ℹ Safe fix
+Suggested fix:
 558 558 | # In python 3.5 if it's not a function def, commas are mandatory.
 559 559 | 
 560 560 | foo(
@@ -778,6 +846,8 @@ COM81.py:561:13: COM812 [*] Trailing comma missing
 562 562 | )
 563 563 | 
 564 564 | {
+
+    Run `ruff check --fix` to apply this fix.
 
 COM81.py:565:13: COM812 [*] Trailing comma missing
     |
@@ -788,7 +858,7 @@ COM81.py:565:13: COM812 [*] Trailing comma missing
     |
     = help: Add trailing comma
 
-ℹ Safe fix
+Suggested fix:
 562 562 | )
 563 563 | 
 564 564 | {
@@ -797,6 +867,8 @@ COM81.py:565:13: COM812 [*] Trailing comma missing
 566 566 | }
 567 567 | 
 568 568 | {
+
+    Run `ruff check --fix` to apply this fix.
 
 COM81.py:569:10: COM812 [*] Trailing comma missing
     |
@@ -807,7 +879,7 @@ COM81.py:569:10: COM812 [*] Trailing comma missing
     |
     = help: Add trailing comma
 
-ℹ Safe fix
+Suggested fix:
 566 566 | }
 567 567 | 
 568 568 | {
@@ -816,6 +888,8 @@ COM81.py:569:10: COM812 [*] Trailing comma missing
 570 570 | }
 571 571 | 
 572 572 | [
+
+    Run `ruff check --fix` to apply this fix.
 
 COM81.py:573:10: COM812 [*] Trailing comma missing
     |
@@ -826,7 +900,7 @@ COM81.py:573:10: COM812 [*] Trailing comma missing
     |
     = help: Add trailing comma
 
-ℹ Safe fix
+Suggested fix:
 570 570 | }
 571 571 | 
 572 572 | [
@@ -835,6 +909,8 @@ COM81.py:573:10: COM812 [*] Trailing comma missing
 574 574 | ]
 575 575 | 
 576 576 | def foo(
+
+    Run `ruff check --fix` to apply this fix.
 
 COM81.py:579:10: COM812 [*] Trailing comma missing
     |
@@ -847,7 +923,7 @@ COM81.py:579:10: COM812 [*] Trailing comma missing
     |
     = help: Add trailing comma
 
-ℹ Safe fix
+Suggested fix:
 576 576 | def foo(
 577 577 |     ham,
 578 578 |     spam,
@@ -856,6 +932,8 @@ COM81.py:579:10: COM812 [*] Trailing comma missing
 580 580 |     ):
 581 581 |     pass
 582 582 | 
+
+    Run `ruff check --fix` to apply this fix.
 
 COM81.py:586:13: COM812 [*] Trailing comma missing
     |
@@ -868,7 +946,7 @@ COM81.py:586:13: COM812 [*] Trailing comma missing
     |
     = help: Add trailing comma
 
-ℹ Safe fix
+Suggested fix:
 583 583 | def foo(
 584 584 |     ham,
 585 585 |     spam,
@@ -877,6 +955,8 @@ COM81.py:586:13: COM812 [*] Trailing comma missing
 587 587 |     ):
 588 588 |     pass
 589 589 | 
+
+    Run `ruff check --fix` to apply this fix.
 
 COM81.py:594:15: COM812 [*] Trailing comma missing
     |
@@ -889,7 +969,7 @@ COM81.py:594:15: COM812 [*] Trailing comma missing
     |
     = help: Add trailing comma
 
-ℹ Safe fix
+Suggested fix:
 591 591 |     ham,
 592 592 |     spam,
 593 593 |     *args,
@@ -898,6 +978,8 @@ COM81.py:594:15: COM812 [*] Trailing comma missing
 595 595 |     ):
 596 596 |     pass
 597 597 | 
+
+    Run `ruff check --fix` to apply this fix.
 
 COM81.py:623:20: COM812 [*] Trailing comma missing
     |
@@ -909,7 +991,7 @@ COM81.py:623:20: COM812 [*] Trailing comma missing
     |
     = help: Add trailing comma
 
-ℹ Safe fix
+Suggested fix:
 620 620 | result = function(
 621 621 |     foo,
 622 622 |     bar,
@@ -918,6 +1000,8 @@ COM81.py:623:20: COM812 [*] Trailing comma missing
 624 624 | )
 625 625 | 
 626 626 | # Make sure the COM812 and UP034 rules don't fix simultaneously and cause a syntax error.
+
+    Run `ruff check --fix` to apply this fix.
 
 COM81.py:628:42: COM812 [*] Trailing comma missing
     |
@@ -929,7 +1013,7 @@ COM81.py:628:42: COM812 [*] Trailing comma missing
     |
     = help: Add trailing comma
 
-ℹ Safe fix
+Suggested fix:
 625 625 | 
 626 626 | # Make sure the COM812 and UP034 rules don't fix simultaneously and cause a syntax error.
 627 627 | the_first_one = next(
@@ -938,6 +1022,8 @@ COM81.py:628:42: COM812 [*] Trailing comma missing
 629 629 | )
 630 630 | 
 631 631 | foo = namedtuple(
+
+    Run `ruff check --fix` to apply this fix.
 
 COM81.py:640:46: COM819 [*] Trailing comma prohibited
     |
@@ -949,7 +1035,7 @@ COM81.py:640:46: COM819 [*] Trailing comma prohibited
     |
     = help: Remove trailing comma
 
-ℹ Safe fix
+Suggested fix:
 637 637 | )
 638 638 | 
 639 639 | # F-strings
@@ -958,6 +1044,8 @@ COM81.py:640:46: COM819 [*] Trailing comma prohibited
 641 641 | 
 642 642 | raise Exception(
 643 643 |     "first", extra=f"Add trailing comma here ->"
+
+    Run `ruff check --fix` to apply this fix.
 
 COM81.py:643:49: COM812 [*] Trailing comma missing
     |
@@ -968,7 +1056,7 @@ COM81.py:643:49: COM812 [*] Trailing comma missing
     |
     = help: Add trailing comma
 
-ℹ Safe fix
+Suggested fix:
 640 640 | kwargs.pop("remove", f"this {trailing_comma}",)
 641 641 | 
 642 642 | raise Exception(
@@ -977,3 +1065,5 @@ COM81.py:643:49: COM812 [*] Trailing comma missing
 644 644 | )
 645 645 | 
 646 646 | assert False, f"<- This is not a trailing comma"
+
+    Run `ruff check --fix` to apply this fix.

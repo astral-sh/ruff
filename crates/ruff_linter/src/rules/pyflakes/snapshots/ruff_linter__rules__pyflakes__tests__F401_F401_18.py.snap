@@ -9,7 +9,7 @@ F401_18.py:5:12: F401 [*] `__future__` imported but unused
   |
   = help: Remove unused import: `__future__`
 
-ℹ Safe fix
+Suggested fix:
 2 2 | 
 3 3 | 
 4 4 | def f():
@@ -19,4 +19,4 @@ F401_18.py:5:12: F401 [*] `__future__` imported but unused
 7 7 | 
 8 8 | def f():
 
-
+    Run `ruff check --fix` to apply this fix.

@@ -12,7 +12,7 @@ E30.ipynb:45:1: E304 [*] Blank lines found after function decorator (1)
    |
    = help: Remove extraneous blank line(s)
 
-ℹ Safe fix
+Suggested fix:
 41 41 | # end
 42 42 | # E304
 43 43 | @decorator
@@ -20,3 +20,5 @@ E30.ipynb:45:1: E304 [*] Blank lines found after function decorator (1)
 45 44 | def function():
 46 45 |     pass
 47 46 | # end
+
+    Run `ruff check --fix` to apply this fix.

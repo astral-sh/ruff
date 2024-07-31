@@ -53,14 +53,6 @@ impl Display for Diff<'_> {
 
         let diff = TextDiff::from_lines(self.source_code.source_text(), &output);
 
-        let message = match self.fix.applicability() {
-            // TODO(zanieb): Adjust this messaging once it's user-facing
-            Applicability::Safe => "Safe fix",
-            Applicability::Unsafe => "Unsafe fix",
-            Applicability::DisplayOnly => "Display-only fix",
-        };
-        writeln!(f, "ℹ {}", message.blue())?;
-
         let (largest_old, largest_new) = diff
             .ops()
             .last()
@@ -69,6 +61,8 @@ impl Display for Diff<'_> {
 
         let digit_with =
             calculate_print_width(OneIndexed::from_zero_indexed(largest_new.max(largest_old)));
+
+        writeln!(f, "{}", "Suggested fix:".blue())?;
 
         for (idx, group) in diff.grouped_ops(3).iter().enumerate() {
             if idx > 0 {
@@ -115,6 +109,15 @@ impl Display for Diff<'_> {
                 }
             }
         }
+
+        let action_message = match self.fix.applicability() {
+            Applicability::Safe => "Run `ruff check --fix` to apply this fix.",
+            Applicability::Unsafe => {
+                "Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix."
+            }
+            Applicability::DisplayOnly => "Ruff cannot safely apply this fix.",
+        };
+        writeln!(f, "\n    {action_message}")?;
 
         Ok(())
     }

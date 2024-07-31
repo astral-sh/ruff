@@ -12,7 +12,7 @@ tricky.py:7:16: ICN001 [*] `pandas` should be imported as `pd`
   |
   = help: Alias `pandas` to `pd`
 
-ℹ Unsafe fix
+Suggested fix:
 3 3 | 
 4 4 | def rename_global():
 5 5 |     try:
@@ -23,4 +23,4 @@ tricky.py:7:16: ICN001 [*] `pandas` should be imported as `pd`
 8 8 |     except ImportError:
 9 9 |         return False
 
-
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.

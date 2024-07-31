@@ -10,7 +10,7 @@ PT006.py:24:26: PT006 [*] Wrong type passed to first argument of `@pytest.mark.p
    |
    = help: Use a string of comma-separated values for the first argument
 
-ℹ Unsafe fix
+Suggested fix:
 21 21 |     ...
 22 22 | 
 23 23 | 
@@ -19,6 +19,8 @@ PT006.py:24:26: PT006 [*] Wrong type passed to first argument of `@pytest.mark.p
 25 25 | def test_tuple(param1, param2):
 26 26 |     ...
 27 27 | 
+
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 PT006.py:29:26: PT006 [*] Wrong type passed to first argument of `@pytest.mark.parametrize`; expected `str`
    |
@@ -29,7 +31,7 @@ PT006.py:29:26: PT006 [*] Wrong type passed to first argument of `@pytest.mark.p
    |
    = help: Use a string for the first argument
 
-ℹ Safe fix
+Suggested fix:
 26 26 |     ...
 27 27 | 
 28 28 | 
@@ -38,6 +40,8 @@ PT006.py:29:26: PT006 [*] Wrong type passed to first argument of `@pytest.mark.p
 30 30 | def test_tuple_one_elem(param1, param2):
 31 31 |     ...
 32 32 | 
+
+    Run `ruff check --fix` to apply this fix.
 
 PT006.py:34:26: PT006 [*] Wrong type passed to first argument of `@pytest.mark.parametrize`; expected a string of comma-separated values
    |
@@ -48,7 +52,7 @@ PT006.py:34:26: PT006 [*] Wrong type passed to first argument of `@pytest.mark.p
    |
    = help: Use a string of comma-separated values for the first argument
 
-ℹ Unsafe fix
+Suggested fix:
 31 31 |     ...
 32 32 | 
 33 33 | 
@@ -57,6 +61,8 @@ PT006.py:34:26: PT006 [*] Wrong type passed to first argument of `@pytest.mark.p
 35 35 | def test_list(param1, param2):
 36 36 |     ...
 37 37 | 
+
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 PT006.py:39:26: PT006 [*] Wrong type passed to first argument of `@pytest.mark.parametrize`; expected `str`
    |
@@ -67,7 +73,7 @@ PT006.py:39:26: PT006 [*] Wrong type passed to first argument of `@pytest.mark.p
    |
    = help: Use a string for the first argument
 
-ℹ Safe fix
+Suggested fix:
 36 36 |     ...
 37 37 | 
 38 38 | 
@@ -76,6 +82,8 @@ PT006.py:39:26: PT006 [*] Wrong type passed to first argument of `@pytest.mark.p
 40 40 | def test_list_one_elem(param1, param2):
 41 41 |     ...
 42 42 | 
+
+    Run `ruff check --fix` to apply this fix.
 
 PT006.py:44:26: PT006 Wrong type passed to first argument of `@pytest.mark.parametrize`; expected a string of comma-separated values
    |

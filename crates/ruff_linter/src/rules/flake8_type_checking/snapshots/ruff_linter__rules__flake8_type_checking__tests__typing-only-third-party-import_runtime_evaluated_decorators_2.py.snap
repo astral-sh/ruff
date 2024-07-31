@@ -10,7 +10,7 @@ runtime_evaluated_decorators_2.py:10:8: TCH002 [*] Move third-party import `nump
    |
    = help: Move into type-checking block
 
-ℹ Unsafe fix
+Suggested fix:
 7  7  | import pyproj
 8  8  | from attrs import frozen
 9  9  | 
@@ -23,4 +23,4 @@ runtime_evaluated_decorators_2.py:10:8: TCH002 [*] Move third-party import `nump
 12 15 | 
 13 16 | @attrs.define(auto_attribs=True)
 
-
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.

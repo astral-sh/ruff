@@ -9,12 +9,14 @@ SIM208.py:1:4: SIM208 [*] Use `a` instead of `not (not a)`
   |
   = help: Replace with `a`
 
-ℹ Safe fix
+Suggested fix:
 1   |-if not (not a):  # SIM208
   1 |+if a:  # SIM208
 2 2 |     pass
 3 3 | 
 4 4 | if not (not (a == b)):  # SIM208
+
+    Run `ruff check --fix` to apply this fix.
 
 SIM208.py:4:4: SIM208 [*] Use `a == b` instead of `not (not a == b)`
   |
@@ -26,7 +28,7 @@ SIM208.py:4:4: SIM208 [*] Use `a == b` instead of `not (not a == b)`
   |
   = help: Replace with `a == b`
 
-ℹ Safe fix
+Suggested fix:
 1 1 | if not (not a):  # SIM208
 2 2 |     pass
 3 3 | 
@@ -35,6 +37,8 @@ SIM208.py:4:4: SIM208 [*] Use `a == b` instead of `not (not a == b)`
 5 5 |     pass
 6 6 | 
 7 7 | if not a:  # OK
+
+    Run `ruff check --fix` to apply this fix.
 
 SIM208.py:16:5: SIM208 [*] Use `b` instead of `not (not b)`
    |
@@ -47,7 +51,7 @@ SIM208.py:16:5: SIM208 [*] Use `b` instead of `not (not b)`
    |
    = help: Replace with `b`
 
-ℹ Safe fix
+Suggested fix:
 13 13 | if not a != b:  # OK
 14 14 |     pass
 15 15 | 
@@ -56,6 +60,8 @@ SIM208.py:16:5: SIM208 [*] Use `b` instead of `not (not b)`
 17 17 | 
 18 18 | f(not not a)  # SIM208
 19 19 | 
+
+    Run `ruff check --fix` to apply this fix.
 
 SIM208.py:18:3: SIM208 [*] Use `a` instead of `not (not a)`
    |
@@ -68,7 +74,7 @@ SIM208.py:18:3: SIM208 [*] Use `a` instead of `not (not a)`
    |
    = help: Replace with `a`
 
-ℹ Safe fix
+Suggested fix:
 15 15 | 
 16 16 | a = not not b  # SIM208
 17 17 | 
@@ -77,6 +83,8 @@ SIM208.py:18:3: SIM208 [*] Use `a` instead of `not (not a)`
 19 19 | 
 20 20 | if 1 + (not (not a)):  # SIM208
 21 21 |     pass
+
+    Run `ruff check --fix` to apply this fix.
 
 SIM208.py:20:9: SIM208 [*] Use `a` instead of `not (not a)`
    |
@@ -88,7 +96,7 @@ SIM208.py:20:9: SIM208 [*] Use `a` instead of `not (not a)`
    |
    = help: Replace with `a`
 
-ℹ Safe fix
+Suggested fix:
 17 17 | 
 18 18 | f(not not a)  # SIM208
 19 19 | 
@@ -96,4 +104,4 @@ SIM208.py:20:9: SIM208 [*] Use `a` instead of `not (not a)`
    20 |+if 1 + (bool(a)):  # SIM208
 21 21 |     pass
 
-
+    Run `ruff check --fix` to apply this fix.

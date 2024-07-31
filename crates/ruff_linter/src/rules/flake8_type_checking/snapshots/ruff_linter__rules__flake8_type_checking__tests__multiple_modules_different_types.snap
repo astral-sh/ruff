@@ -12,7 +12,7 @@ source: crates/ruff_linter/src/rules/flake8_type_checking/mod.rs
   |
   = help: Move into type-checking block
 
-ℹ Unsafe fix
+Suggested fix:
 3  3  | 
 4  4  | from typing import TYPE_CHECKING
 5  5  | 
@@ -25,6 +25,8 @@ source: crates/ruff_linter/src/rules/flake8_type_checking/mod.rs
 8  11 | def f(x: os, y: pandas):
 9  12 |     pass
 
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
+
 <filename>:6:12: TCH002 [*] Move third-party import `pandas` into a type-checking block
   |
 4 | from typing import TYPE_CHECKING
@@ -36,7 +38,7 @@ source: crates/ruff_linter/src/rules/flake8_type_checking/mod.rs
   |
   = help: Move into type-checking block
 
-ℹ Unsafe fix
+Suggested fix:
 3  3  | 
 4  4  | from typing import TYPE_CHECKING
 5  5  | 
@@ -49,4 +51,4 @@ source: crates/ruff_linter/src/rules/flake8_type_checking/mod.rs
 8  11 | def f(x: os, y: pandas):
 9  12 |     pass
 
-
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.

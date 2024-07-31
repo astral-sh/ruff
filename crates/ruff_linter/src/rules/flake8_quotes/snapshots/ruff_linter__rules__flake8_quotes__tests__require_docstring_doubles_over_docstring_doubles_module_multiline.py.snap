@@ -14,7 +14,7 @@ docstring_doubles_module_multiline.py:4:1: Q001 [*] Double quote multiline found
   |
   = help: Replace double multiline quotes with single quotes
 
-ℹ Safe fix
+Suggested fix:
 1 1 | """
 2 2 | Double quotes multiline module docstring
 3 3 | """
@@ -27,6 +27,8 @@ docstring_doubles_module_multiline.py:4:1: Q001 [*] Double quote multiline found
 8 8 |     pass
 9 9 | """
 
+    Run `ruff check --fix` to apply this fix.
+
 docstring_doubles_module_multiline.py:9:1: Q001 [*] Double quote multiline found but single quotes preferred
    |
  7 |   def foo():
@@ -38,7 +40,7 @@ docstring_doubles_module_multiline.py:9:1: Q001 [*] Double quote multiline found
    |
    = help: Replace double multiline quotes with single quotes
 
-ℹ Safe fix
+Suggested fix:
 6  6  | """
 7  7  | def foo():
 8  8  |     pass
@@ -48,4 +50,4 @@ docstring_doubles_module_multiline.py:9:1: Q001 [*] Double quote multiline found
 11    |-"""
    11 |+'''
 
-
+    Run `ruff check --fix` to apply this fix.

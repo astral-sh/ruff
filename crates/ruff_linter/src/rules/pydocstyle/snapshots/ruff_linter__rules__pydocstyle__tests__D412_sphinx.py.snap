@@ -10,7 +10,7 @@ sphinx.py:13:5: D412 [*] No blank lines allowed between a section header and its
    |
    = help: Remove blank line(s)
 
-ℹ Safe fix
+Suggested fix:
 12 12 |     """
 13 13 |     Example:
 14 14 | 
@@ -18,6 +18,8 @@ sphinx.py:13:5: D412 [*] No blank lines allowed between a section header and its
 16 15 |     .. code-block:: python
 17 16 | 
 18 17 |         import foo
+
+    Run `ruff check --fix` to apply this fix.
 
 sphinx.py:24:5: D412 [*] No blank lines allowed between a section header and its content ("Example")
    |
@@ -28,7 +30,7 @@ sphinx.py:24:5: D412 [*] No blank lines allowed between a section header and its
    |
    = help: Remove blank line(s)
 
-ℹ Safe fix
+Suggested fix:
 23 23 |     """
 24 24 |     Example:
 25 25 | 
@@ -37,6 +39,8 @@ sphinx.py:24:5: D412 [*] No blank lines allowed between a section header and its
 28 26 |     .. code-block:: python
 29 27 | 
 30 28 |         import foo
+
+    Run `ruff check --fix` to apply this fix.
 
 sphinx.py:47:5: D412 [*] No blank lines allowed between a section header and its content ("Example")
    |
@@ -48,7 +52,7 @@ sphinx.py:47:5: D412 [*] No blank lines allowed between a section header and its
    |
    = help: Remove blank line(s)
 
-ℹ Safe fix
+Suggested fix:
 47 47 |     Example
 48 48 |     -------
 49 49 | 
@@ -56,6 +60,8 @@ sphinx.py:47:5: D412 [*] No blank lines allowed between a section header and its
 51 50 |     .. code-block:: python
 52 51 | 
 53 52 |         import foo
+
+    Run `ruff check --fix` to apply this fix.
 
 sphinx.py:59:5: D412 [*] No blank lines allowed between a section header and its content ("Example")
    |
@@ -67,7 +73,7 @@ sphinx.py:59:5: D412 [*] No blank lines allowed between a section header and its
    |
    = help: Remove blank line(s)
 
-ℹ Safe fix
+Suggested fix:
 59 59 |     Example
 60 60 |     -------
 61 61 | 
@@ -76,3 +82,5 @@ sphinx.py:59:5: D412 [*] No blank lines allowed between a section header and its
 64 62 |     .. code-block:: python
 65 63 | 
 66 64 |         import foo
+
+    Run `ruff check --fix` to apply this fix.

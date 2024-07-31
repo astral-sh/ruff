@@ -2,10 +2,12 @@
 source: crates/ruff_linter/src/rules/isort/mod.rs
 ---
 comments_and_newlines.py:1:1: I002 [*] Missing required import: `from __future__ import annotations as _annotations`
-ℹ Safe fix
+Suggested fix:
 2 2 | # A copyright notice could go here
 3 3 | 
 4 4 | # A linter directive could go here
   5 |+from __future__ import annotations as _annotations
 5 6 | 
 6 7 | x = 1
+
+    Run `ruff check --fix` to apply this fix.

@@ -10,7 +10,7 @@ UP033_0.py:4:21: UP033 [*] Use `@functools.cache` instead of `@functools.lru_cac
   |
   = help: Rewrite with `@functools.cache
 
-ℹ Safe fix
+Suggested fix:
 1 1 | import functools
 2 2 | 
 3 3 | 
@@ -19,6 +19,8 @@ UP033_0.py:4:21: UP033 [*] Use `@functools.cache` instead of `@functools.lru_cac
 5 5 | def fixme():
 6 6 |     pass
 7 7 | 
+
+    Run `ruff check --fix` to apply this fix.
 
 UP033_0.py:10:21: UP033 [*] Use `@functools.cache` instead of `@functools.lru_cache(maxsize=None)`
    |
@@ -30,7 +32,7 @@ UP033_0.py:10:21: UP033 [*] Use `@functools.cache` instead of `@functools.lru_ca
    |
    = help: Rewrite with `@functools.cache
 
-ℹ Safe fix
+Suggested fix:
 7  7  | 
 8  8  | 
 9  9  | @other_decorator
@@ -39,6 +41,8 @@ UP033_0.py:10:21: UP033 [*] Use `@functools.cache` instead of `@functools.lru_ca
 11 11 | def fixme():
 12 12 |     pass
 13 13 | 
+
+    Run `ruff check --fix` to apply this fix.
 
 UP033_0.py:15:21: UP033 [*] Use `@functools.cache` instead of `@functools.lru_cache(maxsize=None)`
    |
@@ -49,7 +53,7 @@ UP033_0.py:15:21: UP033 [*] Use `@functools.cache` instead of `@functools.lru_ca
    |
    = help: Rewrite with `@functools.cache
 
-ℹ Safe fix
+Suggested fix:
 12 12 |     pass
 13 13 | 
 14 14 | 
@@ -59,4 +63,4 @@ UP033_0.py:15:21: UP033 [*] Use `@functools.cache` instead of `@functools.lru_ca
 17 17 | def fixme():
 18 18 |     pass
 
-
+    Run `ruff check --fix` to apply this fix.

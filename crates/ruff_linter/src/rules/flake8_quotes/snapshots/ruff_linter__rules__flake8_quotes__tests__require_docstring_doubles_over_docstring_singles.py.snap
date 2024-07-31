@@ -12,7 +12,7 @@ docstring_singles.py:1:1: Q002 [*] Single quote docstring found but double quote
   |
   = help: Replace single quotes docstring with double quotes
 
-ℹ Safe fix
+Suggested fix:
 1   |-'''
   1 |+"""
 2 2 | Single quotes multiline module docstring
@@ -21,6 +21,8 @@ docstring_singles.py:1:1: Q002 [*] Single quote docstring found but double quote
 4 4 | 
 5 5 | '''
 6 6 | this is not a docstring
+
+    Run `ruff check --fix` to apply this fix.
 
 docstring_singles.py:14:5: Q002 [*] Single quote docstring found but double quotes preferred
    |
@@ -36,7 +38,7 @@ docstring_singles.py:14:5: Q002 [*] Single quote docstring found but double quot
    |
    = help: Replace single quotes docstring with double quotes
 
-ℹ Safe fix
+Suggested fix:
 11 11 | class Cls(MakeKlass('''
 12 12 |     class params \t not a docstring
 13 13 | ''')):
@@ -48,6 +50,8 @@ docstring_singles.py:14:5: Q002 [*] Single quote docstring found but double quot
 17 17 | 
 18 18 |     '''
 19 19 |     this is not a docstring
+
+    Run `ruff check --fix` to apply this fix.
 
 docstring_singles.py:26:9: Q002 [*] Single quote docstring found but double quotes preferred
    |
@@ -63,7 +67,7 @@ docstring_singles.py:26:9: Q002 [*] Single quote docstring found but double quot
    |
    = help: Replace single quotes docstring with double quotes
 
-ℹ Safe fix
+Suggested fix:
 23 23 |     def f(self, bar='''
 24 24 |         definitely not a docstring''',
 25 25 |         val=l[Cls():3]):
@@ -76,4 +80,4 @@ docstring_singles.py:26:9: Q002 [*] Single quote docstring found but double quot
 30 30 |         some_expression = 'hello world'
 31 31 | 
 
-
+    Run `ruff check --fix` to apply this fix.

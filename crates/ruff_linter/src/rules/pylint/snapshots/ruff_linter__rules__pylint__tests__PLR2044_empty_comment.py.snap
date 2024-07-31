@@ -12,13 +12,15 @@ empty_comment.py:3:1: PLR2044 [*] Line with empty comment
   |
   = help: Delete the empty comment
 
-ℹ Safe fix
+Suggested fix:
 1 1 | # this line has a non-empty comment and is OK
 2 2 |     # this line is also OK, but the three following lines are not
 3   |-#
 4 3 |     #
 5 4 |         #
 6 5 | 
+
+    Run `ruff check --fix` to apply this fix.
 
 empty_comment.py:4:5: PLR2044 [*] Line with empty comment
   |
@@ -30,7 +32,7 @@ empty_comment.py:4:5: PLR2044 [*] Line with empty comment
   |
   = help: Delete the empty comment
 
-ℹ Safe fix
+Suggested fix:
 1 1 | # this line has a non-empty comment and is OK
 2 2 |     # this line is also OK, but the three following lines are not
 3 3 | #
@@ -38,6 +40,8 @@ empty_comment.py:4:5: PLR2044 [*] Line with empty comment
 5 4 |         #
 6 5 | 
 7 6 | # this non-empty comment has trailing whitespace and is OK
+
+    Run `ruff check --fix` to apply this fix.
 
 empty_comment.py:5:9: PLR2044 [*] Line with empty comment
   |
@@ -50,7 +54,7 @@ empty_comment.py:5:9: PLR2044 [*] Line with empty comment
   |
   = help: Delete the empty comment
 
-ℹ Safe fix
+Suggested fix:
 2 2 |     # this line is also OK, but the three following lines are not
 3 3 | #
 4 4 |     #
@@ -58,6 +62,8 @@ empty_comment.py:5:9: PLR2044 [*] Line with empty comment
 6 5 | 
 7 6 | # this non-empty comment has trailing whitespace and is OK
 8 7 | 
+
+    Run `ruff check --fix` to apply this fix.
 
 empty_comment.py:18:11: PLR2044 [*] Line with empty comment
    |
@@ -67,7 +73,7 @@ empty_comment.py:18:11: PLR2044 [*] Line with empty comment
    |
    = help: Delete the empty comment
 
-ℹ Safe fix
+Suggested fix:
 15 15 | 
 16 16 | 
 17 17 | def foo():  # this comment is OK, the one below is not
@@ -76,6 +82,8 @@ empty_comment.py:18:11: PLR2044 [*] Line with empty comment
 19 19 | 
 20 20 | 
 21 21 | # the lines below have no comments and are OK
+
+    Run `ruff check --fix` to apply this fix.
 
 empty_comment.py:44:1: PLR2044 [*] Line with empty comment
    |
@@ -87,7 +95,7 @@ empty_comment.py:44:1: PLR2044 [*] Line with empty comment
    |
    = help: Delete the empty comment
 
-ℹ Safe fix
+Suggested fix:
 42 42 | # These should be removed, despite being an empty "block comment".
 43 43 | 
 44 44 | #
@@ -95,6 +103,8 @@ empty_comment.py:44:1: PLR2044 [*] Line with empty comment
 46 45 | 
 47 46 | # These should also be removed.
 48 47 | 
+
+    Run `ruff check --fix` to apply this fix.
 
 empty_comment.py:45:1: PLR2044 [*] Line with empty comment
    |
@@ -106,7 +116,7 @@ empty_comment.py:45:1: PLR2044 [*] Line with empty comment
    |
    = help: Delete the empty comment
 
-ℹ Safe fix
+Suggested fix:
 42 42 | # These should be removed, despite being an empty "block comment".
 43 43 | 
 44 44 | #
@@ -114,6 +124,8 @@ empty_comment.py:45:1: PLR2044 [*] Line with empty comment
 46 45 | 
 47 46 | # These should also be removed.
 48 47 | 
+
+    Run `ruff check --fix` to apply this fix.
 
 empty_comment.py:58:2: PLR2044 [*] Line with empty comment
    |
@@ -123,11 +135,11 @@ empty_comment.py:58:2: PLR2044 [*] Line with empty comment
    |
    = help: Delete the empty comment
 
-ℹ Safe fix
+Suggested fix:
 55 55 | # This should be removed.
 56 56 | 
 57 57 | α = 1
 58    |-α#
    58 |+α
 
-
+    Run `ruff check --fix` to apply this fix.

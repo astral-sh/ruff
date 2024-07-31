@@ -11,7 +11,7 @@ PT018.py:14:5: PT018 [*] Assertion should be broken down into multiple parts
    |
    = help: Break down assertion into multiple parts
 
-ℹ Unsafe fix
+Suggested fix:
 11 11 | 
 12 12 | 
 13 13 | def test_error():
@@ -21,6 +21,8 @@ PT018.py:14:5: PT018 [*] Assertion should be broken down into multiple parts
 15 16 |     assert something and something_else and something_third
 16 17 |     assert something and not something_else
 17 18 |     assert something and (something_else or something_third)
+
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 PT018.py:15:5: PT018 [*] Assertion should be broken down into multiple parts
    |
@@ -33,7 +35,7 @@ PT018.py:15:5: PT018 [*] Assertion should be broken down into multiple parts
    |
    = help: Break down assertion into multiple parts
 
-ℹ Unsafe fix
+Suggested fix:
 12 12 | 
 13 13 | def test_error():
 14 14 |     assert something and something_else
@@ -43,6 +45,8 @@ PT018.py:15:5: PT018 [*] Assertion should be broken down into multiple parts
 16 17 |     assert something and not something_else
 17 18 |     assert something and (something_else or something_third)
 18 19 |     assert not something and something_else
+
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 PT018.py:16:5: PT018 [*] Assertion should be broken down into multiple parts
    |
@@ -55,7 +59,7 @@ PT018.py:16:5: PT018 [*] Assertion should be broken down into multiple parts
    |
    = help: Break down assertion into multiple parts
 
-ℹ Unsafe fix
+Suggested fix:
 13 13 | def test_error():
 14 14 |     assert something and something_else
 15 15 |     assert something and something_else and something_third
@@ -65,6 +69,8 @@ PT018.py:16:5: PT018 [*] Assertion should be broken down into multiple parts
 17 18 |     assert something and (something_else or something_third)
 18 19 |     assert not something and something_else
 19 20 |     assert not (something or something_else)
+
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 PT018.py:17:5: PT018 [*] Assertion should be broken down into multiple parts
    |
@@ -77,7 +83,7 @@ PT018.py:17:5: PT018 [*] Assertion should be broken down into multiple parts
    |
    = help: Break down assertion into multiple parts
 
-ℹ Unsafe fix
+Suggested fix:
 14 14 |     assert something and something_else
 15 15 |     assert something and something_else and something_third
 16 16 |     assert something and not something_else
@@ -87,6 +93,8 @@ PT018.py:17:5: PT018 [*] Assertion should be broken down into multiple parts
 18 19 |     assert not something and something_else
 19 20 |     assert not (something or something_else)
 20 21 |     assert not (something or something_else or something_third)
+
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 PT018.py:18:5: PT018 [*] Assertion should be broken down into multiple parts
    |
@@ -99,7 +107,7 @@ PT018.py:18:5: PT018 [*] Assertion should be broken down into multiple parts
    |
    = help: Break down assertion into multiple parts
 
-ℹ Unsafe fix
+Suggested fix:
 15 15 |     assert something and something_else and something_third
 16 16 |     assert something and not something_else
 17 17 |     assert something and (something_else or something_third)
@@ -109,6 +117,8 @@ PT018.py:18:5: PT018 [*] Assertion should be broken down into multiple parts
 19 20 |     assert not (something or something_else)
 20 21 |     assert not (something or something_else or something_third)
 21 22 |     assert something and something_else == """error
+
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 PT018.py:19:5: PT018 [*] Assertion should be broken down into multiple parts
    |
@@ -121,7 +131,7 @@ PT018.py:19:5: PT018 [*] Assertion should be broken down into multiple parts
    |
    = help: Break down assertion into multiple parts
 
-ℹ Unsafe fix
+Suggested fix:
 16 16 |     assert something and not something_else
 17 17 |     assert something and (something_else or something_third)
 18 18 |     assert not something and something_else
@@ -131,6 +141,8 @@ PT018.py:19:5: PT018 [*] Assertion should be broken down into multiple parts
 20 21 |     assert not (something or something_else or something_third)
 21 22 |     assert something and something_else == """error
 22 23 |     message
+
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 PT018.py:20:5: PT018 [*] Assertion should be broken down into multiple parts
    |
@@ -143,7 +155,7 @@ PT018.py:20:5: PT018 [*] Assertion should be broken down into multiple parts
    |
    = help: Break down assertion into multiple parts
 
-ℹ Unsafe fix
+Suggested fix:
 17 17 |     assert something and (something_else or something_third)
 18 18 |     assert not something and something_else
 19 19 |     assert not (something or something_else)
@@ -153,6 +165,8 @@ PT018.py:20:5: PT018 [*] Assertion should be broken down into multiple parts
 21 22 |     assert something and something_else == """error
 22 23 |     message
 23 24 |     """
+
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 PT018.py:21:5: PT018 [*] Assertion should be broken down into multiple parts
    |
@@ -168,7 +182,7 @@ PT018.py:21:5: PT018 [*] Assertion should be broken down into multiple parts
    |
    = help: Break down assertion into multiple parts
 
-ℹ Unsafe fix
+Suggested fix:
 18 18 |     assert not something and something_else
 19 19 |     assert not (something or something_else)
 20 20 |     assert not (something or something_else or something_third)
@@ -178,6 +192,8 @@ PT018.py:21:5: PT018 [*] Assertion should be broken down into multiple parts
 22 23 |     message
 23 24 |     """
 24 25 |     assert (
+
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 PT018.py:24:5: PT018 [*] Assertion should be broken down into multiple parts
    |
@@ -197,7 +213,7 @@ PT018.py:24:5: PT018 [*] Assertion should be broken down into multiple parts
    |
    = help: Break down assertion into multiple parts
 
-ℹ Unsafe fix
+Suggested fix:
 21 21 |     assert something and something_else == """error
 22 22 |     message
 23 23 |     """
@@ -210,6 +226,8 @@ PT018.py:24:5: PT018 [*] Assertion should be broken down into multiple parts
 28 28 | message
 29 29 | """
 
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
+
 PT018.py:33:5: PT018 [*] Assertion should be broken down into multiple parts
    |
 32 |     # recursive case
@@ -219,7 +237,7 @@ PT018.py:33:5: PT018 [*] Assertion should be broken down into multiple parts
    |
    = help: Break down assertion into multiple parts
 
-ℹ Unsafe fix
+Suggested fix:
 30 30 |     )
 31 31 | 
 32 32 |     # recursive case
@@ -229,6 +247,8 @@ PT018.py:33:5: PT018 [*] Assertion should be broken down into multiple parts
 34 35 |     assert not (a or not (b and c))
 35 36 | 
 36 37 |     # detected, but no fix for messages
+
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 PT018.py:34:5: PT018 [*] Assertion should be broken down into multiple parts
    |
@@ -241,7 +261,7 @@ PT018.py:34:5: PT018 [*] Assertion should be broken down into multiple parts
    |
    = help: Break down assertion into multiple parts
 
-ℹ Unsafe fix
+Suggested fix:
 31 31 | 
 32 32 |     # recursive case
 33 33 |     assert not (a or not (b or c))
@@ -251,6 +271,8 @@ PT018.py:34:5: PT018 [*] Assertion should be broken down into multiple parts
 35 36 | 
 36 37 |     # detected, but no fix for messages
 37 38 |     assert something and something_else, "error message"
+
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 PT018.py:37:5: PT018 Assertion should be broken down into multiple parts
    |
@@ -291,7 +313,7 @@ PT018.py:44:1: PT018 [*] Assertion should be broken down into multiple parts
    |
    = help: Break down assertion into multiple parts
 
-ℹ Unsafe fix
+Suggested fix:
 41 41 | 
 42 42 | 
 43 43 | assert something  # OK
@@ -302,6 +324,8 @@ PT018.py:44:1: PT018 [*] Assertion should be broken down into multiple parts
 46 47 | 
 47 48 | 
 
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
+
 PT018.py:45:1: PT018 [*] Assertion should be broken down into multiple parts
    |
 43 | assert something  # OK
@@ -311,7 +335,7 @@ PT018.py:45:1: PT018 [*] Assertion should be broken down into multiple parts
    |
    = help: Break down assertion into multiple parts
 
-ℹ Unsafe fix
+Suggested fix:
 42 42 | 
 43 43 | assert something  # OK
 44 44 | assert something and something_else  # Error
@@ -321,6 +345,8 @@ PT018.py:45:1: PT018 [*] Assertion should be broken down into multiple parts
 46 47 | 
 47 48 | 
 48 49 | def test_multiline():
+
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 PT018.py:49:5: PT018 Assertion should be broken down into multiple parts
    |
@@ -367,7 +393,7 @@ PT018.py:59:5: PT018 [*] Assertion should be broken down into multiple parts
    |
    = help: Break down assertion into multiple parts
 
-ℹ Unsafe fix
+Suggested fix:
 59 59 |     assert not (
 60 60 |         self.find_graph_output(node.output[0])
 61 61 |         or self.find_graph_input(node.input[0])
@@ -379,6 +405,8 @@ PT018.py:59:5: PT018 [*] Assertion should be broken down into multiple parts
 64 66 | 
 65 67 |     assert (not (
 66 68 |         self.find_graph_output(node.output[0])
+
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 PT018.py:65:5: PT018 [*] Assertion should be broken down into multiple parts
    |
@@ -396,7 +424,7 @@ PT018.py:65:5: PT018 [*] Assertion should be broken down into multiple parts
    |
    = help: Break down assertion into multiple parts
 
-ℹ Unsafe fix
+Suggested fix:
 62 62 |         or self.find_graph_output(node.input[0])
 63 63 |     )
 64 64 | 
@@ -413,3 +441,5 @@ PT018.py:65:5: PT018 [*] Assertion should be broken down into multiple parts
 70 72 | 
 71 73 |     assert (not self.find_graph_output(node.output[0]) or
 72 74 |             self.find_graph_input(node.input[0]))
+
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.

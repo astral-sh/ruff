@@ -10,7 +10,7 @@ singledispatchmethod_function.py:4:1: PLE1520 [*] `@singledispatchmethod` decora
   |
   = help: Replace with `@singledispatch`
 
-ℹ Unsafe fix
+Suggested fix:
 1   |-from functools import singledispatchmethod
   1 |+from functools import singledispatchmethod, singledispatch
 2 2 | 
@@ -19,4 +19,6 @@ singledispatchmethod_function.py:4:1: PLE1520 [*] `@singledispatchmethod` decora
   4 |+@singledispatch  # [singledispatchmethod-function]
 5 5 | def convert_position(position):
 6 6 |     pass
-7 7 |
+7 7 | 
+
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.

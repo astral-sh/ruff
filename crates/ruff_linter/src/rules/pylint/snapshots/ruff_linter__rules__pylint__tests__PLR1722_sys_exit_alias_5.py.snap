@@ -11,7 +11,7 @@ sys_exit_alias_5.py:3:1: PLR1722 [*] Use `sys.exit()` instead of `exit`
   |
   = help: Replace `exit` with `sys.exit()`
 
-ℹ Unsafe fix
+Suggested fix:
 1 1 | from sys import *
   2 |+import sys
 2 3 | 
@@ -21,6 +21,8 @@ sys_exit_alias_5.py:3:1: PLR1722 [*] Use `sys.exit()` instead of `exit`
 5 6 | 
 6 7 | 
 
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
+
 sys_exit_alias_5.py:4:1: PLR1722 [*] Use `sys.exit()` instead of `quit`
   |
 3 | exit(0)
@@ -29,7 +31,7 @@ sys_exit_alias_5.py:4:1: PLR1722 [*] Use `sys.exit()` instead of `quit`
   |
   = help: Replace `quit` with `sys.exit()`
 
-ℹ Unsafe fix
+Suggested fix:
 1 1 | from sys import *
   2 |+import sys
 2 3 | 
@@ -40,6 +42,8 @@ sys_exit_alias_5.py:4:1: PLR1722 [*] Use `sys.exit()` instead of `quit`
 6 7 | 
 7 8 | def main():
 
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
+
 sys_exit_alias_5.py:8:5: PLR1722 [*] Use `sys.exit()` instead of `exit`
   |
 7 | def main():
@@ -49,7 +53,7 @@ sys_exit_alias_5.py:8:5: PLR1722 [*] Use `sys.exit()` instead of `exit`
   |
   = help: Replace `exit` with `sys.exit()`
 
-ℹ Unsafe fix
+Suggested fix:
 1  1  | from sys import *
    2  |+import sys
 2  3  | 
@@ -62,6 +66,8 @@ sys_exit_alias_5.py:8:5: PLR1722 [*] Use `sys.exit()` instead of `exit`
    9  |+    sys.exit(1)
 9  10 |     quit(1)
 
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
+
 sys_exit_alias_5.py:9:5: PLR1722 [*] Use `sys.exit()` instead of `quit`
   |
 7 | def main():
@@ -71,7 +77,7 @@ sys_exit_alias_5.py:9:5: PLR1722 [*] Use `sys.exit()` instead of `quit`
   |
   = help: Replace `quit` with `sys.exit()`
 
-ℹ Unsafe fix
+Suggested fix:
 1  1  | from sys import *
    2  |+import sys
 2  3  | 
@@ -84,4 +90,4 @@ sys_exit_alias_5.py:9:5: PLR1722 [*] Use `sys.exit()` instead of `quit`
 9     |-    quit(1)
    10 |+    sys.exit(1)
 
-
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.

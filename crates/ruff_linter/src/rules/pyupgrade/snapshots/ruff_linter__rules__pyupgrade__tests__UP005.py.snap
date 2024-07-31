@@ -12,7 +12,7 @@ UP005.py:6:9: UP005 [*] `assertEquals` is deprecated, use `assertEqual`
   |
   = help: Replace `assertEqual` with `assertEquals`
 
-ℹ Safe fix
+Suggested fix:
 3 3 | 
 4 4 | class Suite(unittest.TestCase):
 5 5 |     def test(self) -> None:
@@ -21,6 +21,8 @@ UP005.py:6:9: UP005 [*] `assertEquals` is deprecated, use `assertEqual`
 7 7 |         self.assertEquals(1, 2)
 8 8 |         self.assertEqual(3, 4)
 9 9 |         self.failUnlessAlmostEqual(1, 1.1)
+
+    Run `ruff check --fix` to apply this fix.
 
 UP005.py:7:9: UP005 [*] `assertEquals` is deprecated, use `assertEqual`
   |
@@ -33,7 +35,7 @@ UP005.py:7:9: UP005 [*] `assertEquals` is deprecated, use `assertEqual`
   |
   = help: Replace `assertEqual` with `assertEquals`
 
-ℹ Safe fix
+Suggested fix:
 4 4 | class Suite(unittest.TestCase):
 5 5 |     def test(self) -> None:
 6 6 |         self.assertEquals (1, 2)
@@ -42,6 +44,8 @@ UP005.py:7:9: UP005 [*] `assertEquals` is deprecated, use `assertEqual`
 8 8 |         self.assertEqual(3, 4)
 9 9 |         self.failUnlessAlmostEqual(1, 1.1)
 10 10 |         self.assertNotRegexpMatches("a", "b")
+
+    Run `ruff check --fix` to apply this fix.
 
 UP005.py:9:9: UP005 [*] `failUnlessAlmostEqual` is deprecated, use `assertAlmostEqual`
    |
@@ -53,13 +57,15 @@ UP005.py:9:9: UP005 [*] `failUnlessAlmostEqual` is deprecated, use `assertAlmost
    |
    = help: Replace `assertAlmostEqual` with `failUnlessAlmostEqual`
 
-ℹ Safe fix
+Suggested fix:
 6  6  |         self.assertEquals (1, 2)
 7  7  |         self.assertEquals(1, 2)
 8  8  |         self.assertEqual(3, 4)
 9     |-        self.failUnlessAlmostEqual(1, 1.1)
    9  |+        self.assertAlmostEqual(1, 1.1)
 10 10 |         self.assertNotRegexpMatches("a", "b")
+
+    Run `ruff check --fix` to apply this fix.
 
 UP005.py:10:9: UP005 [*] `assertNotRegexpMatches` is deprecated, use `assertNotRegex`
    |
@@ -70,11 +76,11 @@ UP005.py:10:9: UP005 [*] `assertNotRegexpMatches` is deprecated, use `assertNotR
    |
    = help: Replace `assertNotRegex` with `assertNotRegexpMatches`
 
-ℹ Safe fix
+Suggested fix:
 7  7  |         self.assertEquals(1, 2)
 8  8  |         self.assertEqual(3, 4)
 9  9  |         self.failUnlessAlmostEqual(1, 1.1)
 10    |-        self.assertNotRegexpMatches("a", "b")
    10 |+        self.assertNotRegex("a", "b")
 
-
+    Run `ruff check --fix` to apply this fix.

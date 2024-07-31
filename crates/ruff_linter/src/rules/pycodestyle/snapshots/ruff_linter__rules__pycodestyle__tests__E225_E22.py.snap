@@ -11,7 +11,7 @@ E22.py:54:11: E225 [*] Missing whitespace around operator
    |
    = help: Add missing whitespace
 
-ℹ Safe fix
+Suggested fix:
 51 51 | 
 52 52 | 
 53 53 | #: E225
@@ -20,6 +20,8 @@ E22.py:54:11: E225 [*] Missing whitespace around operator
 55 55 | #: E225
 56 56 | submitted+= 1
 57 57 | #: E225
+
+    Run `ruff check --fix` to apply this fix.
 
 E22.py:56:10: E225 [*] Missing whitespace around operator
    |
@@ -32,7 +34,7 @@ E22.py:56:10: E225 [*] Missing whitespace around operator
    |
    = help: Add missing whitespace
 
-ℹ Safe fix
+Suggested fix:
 53 53 | #: E225
 54 54 | submitted +=1
 55 55 | #: E225
@@ -41,6 +43,8 @@ E22.py:56:10: E225 [*] Missing whitespace around operator
 57 57 | #: E225
 58 58 | c =-1
 59 59 | #: E225
+
+    Run `ruff check --fix` to apply this fix.
 
 E22.py:58:3: E225 [*] Missing whitespace around operator
    |
@@ -53,7 +57,7 @@ E22.py:58:3: E225 [*] Missing whitespace around operator
    |
    = help: Add missing whitespace
 
-ℹ Safe fix
+Suggested fix:
 55 55 | #: E225
 56 56 | submitted+= 1
 57 57 | #: E225
@@ -62,6 +66,8 @@ E22.py:58:3: E225 [*] Missing whitespace around operator
 59 59 | #: E225
 60 60 | x = x /2 - 1
 61 61 | #: E225
+
+    Run `ruff check --fix` to apply this fix.
 
 E22.py:76:2: E225 [*] Missing whitespace around operator
    |
@@ -74,7 +80,7 @@ E22.py:76:2: E225 [*] Missing whitespace around operator
    |
    = help: Add missing whitespace
 
-ℹ Safe fix
+Suggested fix:
 73 73 | #: E225
 74 74 | _1kB = _1MB>> 10
 75 75 | #: E225 E225
@@ -83,6 +89,8 @@ E22.py:76:2: E225 [*] Missing whitespace around operator
 77 77 | #: E225 E225
 78 78 | i=i +1
 79 79 | #: E225
+
+    Run `ruff check --fix` to apply this fix.
 
 E22.py:78:2: E225 [*] Missing whitespace around operator
    |
@@ -95,7 +103,7 @@ E22.py:78:2: E225 [*] Missing whitespace around operator
    |
    = help: Add missing whitespace
 
-ℹ Safe fix
+Suggested fix:
 75 75 | #: E225 E225
 76 76 | i=i+ 1
 77 77 | #: E225 E225
@@ -104,6 +112,8 @@ E22.py:78:2: E225 [*] Missing whitespace around operator
 79 79 | #: E225
 80 80 | i = 1and 1
 81 81 | #: E225
+
+    Run `ruff check --fix` to apply this fix.
 
 E22.py:80:6: E225 [*] Missing whitespace around operator
    |
@@ -116,7 +126,7 @@ E22.py:80:6: E225 [*] Missing whitespace around operator
    |
    = help: Add missing whitespace
 
-ℹ Safe fix
+Suggested fix:
 77 77 | #: E225 E225
 78 78 | i=i +1
 79 79 | #: E225
@@ -125,6 +135,8 @@ E22.py:80:6: E225 [*] Missing whitespace around operator
 81 81 | #: E225
 82 82 | i = 1or 0
 83 83 | #: E225
+
+    Run `ruff check --fix` to apply this fix.
 
 E22.py:82:6: E225 [*] Missing whitespace around operator
    |
@@ -137,7 +149,7 @@ E22.py:82:6: E225 [*] Missing whitespace around operator
    |
    = help: Add missing whitespace
 
-ℹ Safe fix
+Suggested fix:
 79 79 | #: E225
 80 80 | i = 1and 1
 81 81 | #: E225
@@ -146,6 +158,8 @@ E22.py:82:6: E225 [*] Missing whitespace around operator
 83 83 | #: E225
 84 84 | 1is 1
 85 85 | #: E225
+
+    Run `ruff check --fix` to apply this fix.
 
 E22.py:84:2: E225 [*] Missing whitespace around operator
    |
@@ -158,7 +172,7 @@ E22.py:84:2: E225 [*] Missing whitespace around operator
    |
    = help: Add missing whitespace
 
-ℹ Safe fix
+Suggested fix:
 81 81 | #: E225
 82 82 | i = 1or 0
 83 83 | #: E225
@@ -167,6 +181,8 @@ E22.py:84:2: E225 [*] Missing whitespace around operator
 85 85 | #: E225
 86 86 | 1in []
 87 87 | #: E225
+
+    Run `ruff check --fix` to apply this fix.
 
 E22.py:86:2: E225 [*] Missing whitespace around operator
    |
@@ -179,7 +195,7 @@ E22.py:86:2: E225 [*] Missing whitespace around operator
    |
    = help: Add missing whitespace
 
-ℹ Safe fix
+Suggested fix:
 83 83 | #: E225
 84 84 | 1is 1
 85 85 | #: E225
@@ -188,6 +204,8 @@ E22.py:86:2: E225 [*] Missing whitespace around operator
 87 87 | #: E225
 88 88 | i = 1 @2
 89 89 | #: E225
+
+    Run `ruff check --fix` to apply this fix.
 
 E22.py:92:2: E225 [*] Missing whitespace around operator
    |
@@ -200,7 +218,7 @@ E22.py:92:2: E225 [*] Missing whitespace around operator
    |
    = help: Add missing whitespace
 
-ℹ Safe fix
+Suggested fix:
 89 89 | #: E225
 90 90 | i = 1@ 2
 91 91 | #: E225 E226
@@ -209,6 +227,8 @@ E22.py:92:2: E225 [*] Missing whitespace around operator
 93 93 | #: E225 E226
 94 94 | i =i+1
 95 95 | #: E225 E226
+
+    Run `ruff check --fix` to apply this fix.
 
 E22.py:94:3: E225 [*] Missing whitespace around operator
    |
@@ -221,7 +241,7 @@ E22.py:94:3: E225 [*] Missing whitespace around operator
    |
    = help: Add missing whitespace
 
-ℹ Safe fix
+Suggested fix:
 91 91 | #: E225 E226
 92 92 | i=i+1
 93 93 | #: E225 E226
@@ -230,6 +250,8 @@ E22.py:94:3: E225 [*] Missing whitespace around operator
 95 95 | #: E225 E226
 96 96 | i= i+1
 97 97 | #: E225 E226
+
+    Run `ruff check --fix` to apply this fix.
 
 E22.py:96:2: E225 [*] Missing whitespace around operator
    |
@@ -242,7 +264,7 @@ E22.py:96:2: E225 [*] Missing whitespace around operator
    |
    = help: Add missing whitespace
 
-ℹ Safe fix
+Suggested fix:
 93 93 | #: E225 E226
 94 94 | i =i+1
 95 95 | #: E225 E226
@@ -252,4 +274,4 @@ E22.py:96:2: E225 [*] Missing whitespace around operator
 98 98 | c = (a +b)*(a - b)
 99 99 | #: E225 E226
 
-
+    Run `ruff check --fix` to apply this fix.

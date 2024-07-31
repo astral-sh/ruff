@@ -2,9 +2,11 @@
 source: crates/ruff_linter/src/rules/isort/mod.rs
 ---
 off.py:1:1: I002 [*] Missing required import: `from __future__ import annotations`
-ℹ Safe fix
+Suggested fix:
 1 1 | # isort: off
   2 |+from __future__ import annotations
 2 3 | 
 3 4 | x = 1
 4 5 | # isort: on
+
+    Run `ruff check --fix` to apply this fix.

@@ -9,7 +9,7 @@ RUF013_0.py:20:12: RUF013 [*] PEP 484 prohibits implicit `Optional`
    |
    = help: Convert to `Optional[T]`
 
-ℹ Unsafe fix
+Suggested fix:
 17 17 |     pass
 18 18 | 
 19 19 | 
@@ -19,6 +19,8 @@ RUF013_0.py:20:12: RUF013 [*] PEP 484 prohibits implicit `Optional`
 22 22 | 
 23 23 | 
 
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
+
 RUF013_0.py:24:12: RUF013 [*] PEP 484 prohibits implicit `Optional`
    |
 24 | def f(arg: str = None):  # RUF013
@@ -27,7 +29,7 @@ RUF013_0.py:24:12: RUF013 [*] PEP 484 prohibits implicit `Optional`
    |
    = help: Convert to `Optional[T]`
 
-ℹ Unsafe fix
+Suggested fix:
 21 21 |     pass
 22 22 | 
 23 23 | 
@@ -37,6 +39,8 @@ RUF013_0.py:24:12: RUF013 [*] PEP 484 prohibits implicit `Optional`
 26 26 | 
 27 27 | 
 
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
+
 RUF013_0.py:28:12: RUF013 [*] PEP 484 prohibits implicit `Optional`
    |
 28 | def f(arg: Tuple[str] = None):  # RUF013
@@ -45,7 +49,7 @@ RUF013_0.py:28:12: RUF013 [*] PEP 484 prohibits implicit `Optional`
    |
    = help: Convert to `Optional[T]`
 
-ℹ Unsafe fix
+Suggested fix:
 25 25 |     pass
 26 26 | 
 27 27 | 
@@ -55,6 +59,8 @@ RUF013_0.py:28:12: RUF013 [*] PEP 484 prohibits implicit `Optional`
 30 30 | 
 31 31 | 
 
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
+
 RUF013_0.py:58:12: RUF013 [*] PEP 484 prohibits implicit `Optional`
    |
 58 | def f(arg: Union = None):  # RUF013
@@ -63,7 +69,7 @@ RUF013_0.py:58:12: RUF013 [*] PEP 484 prohibits implicit `Optional`
    |
    = help: Convert to `Optional[T]`
 
-ℹ Unsafe fix
+Suggested fix:
 55 55 |     pass
 56 56 | 
 57 57 | 
@@ -73,6 +79,8 @@ RUF013_0.py:58:12: RUF013 [*] PEP 484 prohibits implicit `Optional`
 60 60 | 
 61 61 | 
 
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
+
 RUF013_0.py:62:12: RUF013 [*] PEP 484 prohibits implicit `Optional`
    |
 62 | def f(arg: Union[int] = None):  # RUF013
@@ -81,7 +89,7 @@ RUF013_0.py:62:12: RUF013 [*] PEP 484 prohibits implicit `Optional`
    |
    = help: Convert to `Optional[T]`
 
-ℹ Unsafe fix
+Suggested fix:
 59 59 |     pass
 60 60 | 
 61 61 | 
@@ -91,6 +99,8 @@ RUF013_0.py:62:12: RUF013 [*] PEP 484 prohibits implicit `Optional`
 64 64 | 
 65 65 | 
 
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
+
 RUF013_0.py:66:12: RUF013 [*] PEP 484 prohibits implicit `Optional`
    |
 66 | def f(arg: Union[int, str] = None):  # RUF013
@@ -99,7 +109,7 @@ RUF013_0.py:66:12: RUF013 [*] PEP 484 prohibits implicit `Optional`
    |
    = help: Convert to `Optional[T]`
 
-ℹ Unsafe fix
+Suggested fix:
 63 63 |     pass
 64 64 | 
 65 65 | 
@@ -109,6 +119,8 @@ RUF013_0.py:66:12: RUF013 [*] PEP 484 prohibits implicit `Optional`
 68 68 | 
 69 69 | 
 
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
+
 RUF013_0.py:85:12: RUF013 [*] PEP 484 prohibits implicit `Optional`
    |
 85 | def f(arg: int | float = None):  # RUF013
@@ -117,7 +129,7 @@ RUF013_0.py:85:12: RUF013 [*] PEP 484 prohibits implicit `Optional`
    |
    = help: Convert to `Optional[T]`
 
-ℹ Unsafe fix
+Suggested fix:
 82 82 |     pass
 83 83 | 
 84 84 | 
@@ -127,6 +139,8 @@ RUF013_0.py:85:12: RUF013 [*] PEP 484 prohibits implicit `Optional`
 87 87 | 
 88 88 | 
 
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
+
 RUF013_0.py:89:12: RUF013 [*] PEP 484 prohibits implicit `Optional`
    |
 89 | def f(arg: int | float | str | bytes = None):  # RUF013
@@ -135,7 +149,7 @@ RUF013_0.py:89:12: RUF013 [*] PEP 484 prohibits implicit `Optional`
    |
    = help: Convert to `Optional[T]`
 
-ℹ Unsafe fix
+Suggested fix:
 86 86 |     pass
 87 87 | 
 88 88 | 
@@ -145,6 +159,8 @@ RUF013_0.py:89:12: RUF013 [*] PEP 484 prohibits implicit `Optional`
 91 91 | 
 92 92 | 
 
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
+
 RUF013_0.py:108:12: RUF013 [*] PEP 484 prohibits implicit `Optional`
     |
 108 | def f(arg: Literal[1] = None):  # RUF013
@@ -153,7 +169,7 @@ RUF013_0.py:108:12: RUF013 [*] PEP 484 prohibits implicit `Optional`
     |
     = help: Convert to `Optional[T]`
 
-ℹ Unsafe fix
+Suggested fix:
 105 105 |     pass
 106 106 | 
 107 107 | 
@@ -163,6 +179,8 @@ RUF013_0.py:108:12: RUF013 [*] PEP 484 prohibits implicit `Optional`
 110 110 | 
 111 111 | 
 
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
+
 RUF013_0.py:112:12: RUF013 [*] PEP 484 prohibits implicit `Optional`
     |
 112 | def f(arg: Literal[1, "foo"] = None):  # RUF013
@@ -171,7 +189,7 @@ RUF013_0.py:112:12: RUF013 [*] PEP 484 prohibits implicit `Optional`
     |
     = help: Convert to `Optional[T]`
 
-ℹ Unsafe fix
+Suggested fix:
 109 109 |     pass
 110 110 | 
 111 111 | 
@@ -181,6 +199,8 @@ RUF013_0.py:112:12: RUF013 [*] PEP 484 prohibits implicit `Optional`
 114 114 | 
 115 115 | 
 
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
+
 RUF013_0.py:131:22: RUF013 [*] PEP 484 prohibits implicit `Optional`
     |
 131 | def f(arg: Annotated[int, ...] = None):  # RUF013
@@ -189,7 +209,7 @@ RUF013_0.py:131:22: RUF013 [*] PEP 484 prohibits implicit `Optional`
     |
     = help: Convert to `Optional[T]`
 
-ℹ Unsafe fix
+Suggested fix:
 128 128 |     pass
 129 129 | 
 130 130 | 
@@ -199,6 +219,8 @@ RUF013_0.py:131:22: RUF013 [*] PEP 484 prohibits implicit `Optional`
 133 133 | 
 134 134 | 
 
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
+
 RUF013_0.py:135:32: RUF013 [*] PEP 484 prohibits implicit `Optional`
     |
 135 | def f(arg: Annotated[Annotated[int | str, ...], ...] = None):  # RUF013
@@ -207,7 +229,7 @@ RUF013_0.py:135:32: RUF013 [*] PEP 484 prohibits implicit `Optional`
     |
     = help: Convert to `Optional[T]`
 
-ℹ Unsafe fix
+Suggested fix:
 132 132 |     pass
 133 133 | 
 134 134 | 
@@ -216,6 +238,8 @@ RUF013_0.py:135:32: RUF013 [*] PEP 484 prohibits implicit `Optional`
 136 136 |     pass
 137 137 | 
 138 138 | 
+
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 RUF013_0.py:151:11: RUF013 [*] PEP 484 prohibits implicit `Optional`
     |
@@ -227,7 +251,7 @@ RUF013_0.py:151:11: RUF013 [*] PEP 484 prohibits implicit `Optional`
     |
     = help: Convert to `Optional[T]`
 
-ℹ Unsafe fix
+Suggested fix:
 148 148 | 
 149 149 | 
 150 150 | def f(
@@ -236,6 +260,8 @@ RUF013_0.py:151:11: RUF013 [*] PEP 484 prohibits implicit `Optional`
 152 152 |     arg2: Union[int, float] = None,  # RUF013
 153 153 |     arg3: Literal[1, 2, 3] = None,  # RUF013
 154 154 | ):
+
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 RUF013_0.py:152:11: RUF013 [*] PEP 484 prohibits implicit `Optional`
     |
@@ -248,7 +274,7 @@ RUF013_0.py:152:11: RUF013 [*] PEP 484 prohibits implicit `Optional`
     |
     = help: Convert to `Optional[T]`
 
-ℹ Unsafe fix
+Suggested fix:
 149 149 | 
 150 150 | def f(
 151 151 |     arg1: int = None,  # RUF013
@@ -257,6 +283,8 @@ RUF013_0.py:152:11: RUF013 [*] PEP 484 prohibits implicit `Optional`
 153 153 |     arg3: Literal[1, 2, 3] = None,  # RUF013
 154 154 | ):
 155 155 |     pass
+
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 RUF013_0.py:153:11: RUF013 [*] PEP 484 prohibits implicit `Optional`
     |
@@ -269,7 +297,7 @@ RUF013_0.py:153:11: RUF013 [*] PEP 484 prohibits implicit `Optional`
     |
     = help: Convert to `Optional[T]`
 
-ℹ Unsafe fix
+Suggested fix:
 150 150 | def f(
 151 151 |     arg1: int = None,  # RUF013
 152 152 |     arg2: Union[int, float] = None,  # RUF013
@@ -279,6 +307,8 @@ RUF013_0.py:153:11: RUF013 [*] PEP 484 prohibits implicit `Optional`
 155 155 |     pass
 156 156 | 
 
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
+
 RUF013_0.py:181:12: RUF013 [*] PEP 484 prohibits implicit `Optional`
     |
 181 | def f(arg: Union[Annotated[int, ...], Union[str, bytes]] = None):  # RUF013
@@ -287,7 +317,7 @@ RUF013_0.py:181:12: RUF013 [*] PEP 484 prohibits implicit `Optional`
     |
     = help: Convert to `Optional[T]`
 
-ℹ Unsafe fix
+Suggested fix:
 178 178 |     pass
 179 179 | 
 180 180 | 
@@ -297,6 +327,8 @@ RUF013_0.py:181:12: RUF013 [*] PEP 484 prohibits implicit `Optional`
 183 183 | 
 184 184 | 
 
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
+
 RUF013_0.py:188:13: RUF013 [*] PEP 484 prohibits implicit `Optional`
     |
 188 | def f(arg: "int" = None):  # RUF013
@@ -305,7 +337,7 @@ RUF013_0.py:188:13: RUF013 [*] PEP 484 prohibits implicit `Optional`
     |
     = help: Convert to `Optional[T]`
 
-ℹ Unsafe fix
+Suggested fix:
 185 185 | # Quoted
 186 186 | 
 187 187 | 
@@ -315,6 +347,8 @@ RUF013_0.py:188:13: RUF013 [*] PEP 484 prohibits implicit `Optional`
 190 190 | 
 191 191 | 
 
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
+
 RUF013_0.py:192:13: RUF013 [*] PEP 484 prohibits implicit `Optional`
     |
 192 | def f(arg: "str" = None):  # RUF013
@@ -323,7 +357,7 @@ RUF013_0.py:192:13: RUF013 [*] PEP 484 prohibits implicit `Optional`
     |
     = help: Convert to `Optional[T]`
 
-ℹ Unsafe fix
+Suggested fix:
 189 189 |     pass
 190 190 | 
 191 191 | 
@@ -332,6 +366,8 @@ RUF013_0.py:192:13: RUF013 [*] PEP 484 prohibits implicit `Optional`
 193 193 |     pass
 194 194 | 
 195 195 | 
+
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 RUF013_0.py:196:12: RUF013 PEP 484 prohibits implicit `Optional`
     |
@@ -349,7 +385,7 @@ RUF013_0.py:204:12: RUF013 [*] PEP 484 prohibits implicit `Optional`
     |
     = help: Convert to `Optional[T]`
 
-ℹ Unsafe fix
+Suggested fix:
 201 201 |     pass
 202 202 | 
 203 203 | 
@@ -357,4 +393,6 @@ RUF013_0.py:204:12: RUF013 [*] PEP 484 prohibits implicit `Optional`
     204 |+def f(arg: Optional[Union["int", "str"]] = None):  # RUF013
 205 205 |     pass
 206 206 | 
-207 207 |
+207 207 | 
+
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.

@@ -11,7 +11,7 @@ RUF100_5.py:7:5: ERA001 Found commented-out code
   |
   = help: Remove commented-out code
 
-ℹ Display-only fix
+Suggested fix:
 4 4 | dictionary = {
 5 5 |     # "key1": 123,  # noqa: ERA001
 6 6 |     # "key2": 456,  # noqa
@@ -20,6 +20,8 @@ RUF100_5.py:7:5: ERA001 Found commented-out code
 9 8 | 
 10 9 | 
 
+    Ruff cannot safely apply this fix.
+
 RUF100_5.py:11:1: ERA001 Found commented-out code
    |
 11 | #import os  # noqa: E501
@@ -27,11 +29,13 @@ RUF100_5.py:11:1: ERA001 Found commented-out code
    |
    = help: Remove commented-out code
 
-ℹ Display-only fix
+Suggested fix:
 8  8  | }
 9  9  | 
 10 10 | 
 11    |-#import os  # noqa: E501
+
+    Ruff cannot safely apply this fix.
 
 RUF100_5.py:11:13: RUF100 [*] Unused `noqa` directive (unused: `E501`)
    |
@@ -40,11 +44,11 @@ RUF100_5.py:11:13: RUF100 [*] Unused `noqa` directive (unused: `E501`)
    |
    = help: Remove unused `noqa` directive
 
-ℹ Safe fix
+Suggested fix:
 8  8  | }
 9  9  | 
 10 10 | 
 11    |-#import os  # noqa: E501
    11 |+#import os
 
-
+    Run `ruff check --fix` to apply this fix.

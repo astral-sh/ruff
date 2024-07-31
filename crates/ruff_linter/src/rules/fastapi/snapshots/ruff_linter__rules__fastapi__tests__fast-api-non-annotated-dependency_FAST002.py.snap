@@ -12,7 +12,7 @@ FAST002.py:24:5: FAST002 [*] FastAPI dependency without `Annotated`
    |
    = help: Replace with `Annotated`
 
-ℹ Unsafe fix
+Suggested fix:
 12 12 |     Security,
 13 13 | )
 14 14 | from pydantic import BaseModel
@@ -30,6 +30,8 @@ FAST002.py:24:5: FAST002 [*] FastAPI dependency without `Annotated`
 26 27 | ):
 27 28 |     pass
 
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
+
 FAST002.py:25:5: FAST002 [*] FastAPI dependency without `Annotated`
    |
 23 | def get_items(
@@ -41,7 +43,7 @@ FAST002.py:25:5: FAST002 [*] FastAPI dependency without `Annotated`
    |
    = help: Replace with `Annotated`
 
-ℹ Unsafe fix
+Suggested fix:
 12 12 |     Security,
 13 13 | )
 14 14 | from pydantic import BaseModel
@@ -59,6 +61,8 @@ FAST002.py:25:5: FAST002 [*] FastAPI dependency without `Annotated`
 27 28 |     pass
 28 29 | 
 
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
+
 FAST002.py:32:5: FAST002 [*] FastAPI dependency without `Annotated`
    |
 30 | @app.post("/stuff/")
@@ -70,7 +74,7 @@ FAST002.py:32:5: FAST002 [*] FastAPI dependency without `Annotated`
    |
    = help: Replace with `Annotated`
 
-ℹ Unsafe fix
+Suggested fix:
 12 12 |     Security,
 13 13 | )
 14 14 | from pydantic import BaseModel
@@ -88,6 +92,8 @@ FAST002.py:32:5: FAST002 [*] FastAPI dependency without `Annotated`
 34 35 |     some_body_param: str = Body("foo"),
 35 36 |     some_cookie_param: str = Cookie(),
 
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
+
 FAST002.py:33:5: FAST002 [*] FastAPI dependency without `Annotated`
    |
 31 | def do_stuff(
@@ -99,7 +105,7 @@ FAST002.py:33:5: FAST002 [*] FastAPI dependency without `Annotated`
    |
    = help: Replace with `Annotated`
 
-ℹ Unsafe fix
+Suggested fix:
 12 12 |     Security,
 13 13 | )
 14 14 | from pydantic import BaseModel
@@ -117,6 +123,8 @@ FAST002.py:33:5: FAST002 [*] FastAPI dependency without `Annotated`
 35 36 |     some_cookie_param: str = Cookie(),
 36 37 |     some_header_param: int = Header(default=5),
 
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
+
 FAST002.py:34:5: FAST002 [*] FastAPI dependency without `Annotated`
    |
 32 |     some_query_param: str | None = Query(default=None),
@@ -128,7 +136,7 @@ FAST002.py:34:5: FAST002 [*] FastAPI dependency without `Annotated`
    |
    = help: Replace with `Annotated`
 
-ℹ Unsafe fix
+Suggested fix:
 12 12 |     Security,
 13 13 | )
 14 14 | from pydantic import BaseModel
@@ -146,6 +154,8 @@ FAST002.py:34:5: FAST002 [*] FastAPI dependency without `Annotated`
 36 37 |     some_header_param: int = Header(default=5),
 37 38 |     some_file_param: UploadFile = File(),
 
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
+
 FAST002.py:35:5: FAST002 [*] FastAPI dependency without `Annotated`
    |
 33 |     some_path_param: str = Path(),
@@ -157,7 +167,7 @@ FAST002.py:35:5: FAST002 [*] FastAPI dependency without `Annotated`
    |
    = help: Replace with `Annotated`
 
-ℹ Unsafe fix
+Suggested fix:
 12 12 |     Security,
 13 13 | )
 14 14 | from pydantic import BaseModel
@@ -175,6 +185,8 @@ FAST002.py:35:5: FAST002 [*] FastAPI dependency without `Annotated`
 37 38 |     some_file_param: UploadFile = File(),
 38 39 |     some_form_param: str = Form(),
 
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
+
 FAST002.py:36:5: FAST002 [*] FastAPI dependency without `Annotated`
    |
 34 |     some_body_param: str = Body("foo"),
@@ -186,7 +198,7 @@ FAST002.py:36:5: FAST002 [*] FastAPI dependency without `Annotated`
    |
    = help: Replace with `Annotated`
 
-ℹ Unsafe fix
+Suggested fix:
 12 12 |     Security,
 13 13 | )
 14 14 | from pydantic import BaseModel
@@ -204,6 +216,8 @@ FAST002.py:36:5: FAST002 [*] FastAPI dependency without `Annotated`
 38 39 |     some_form_param: str = Form(),
 39 40 | ):
 
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
+
 FAST002.py:37:5: FAST002 [*] FastAPI dependency without `Annotated`
    |
 35 |     some_cookie_param: str = Cookie(),
@@ -215,7 +229,7 @@ FAST002.py:37:5: FAST002 [*] FastAPI dependency without `Annotated`
    |
    = help: Replace with `Annotated`
 
-ℹ Unsafe fix
+Suggested fix:
 12 12 |     Security,
 13 13 | )
 14 14 | from pydantic import BaseModel
@@ -233,6 +247,8 @@ FAST002.py:37:5: FAST002 [*] FastAPI dependency without `Annotated`
 39 40 | ):
 40 41 |     # do stuff
 
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
+
 FAST002.py:38:5: FAST002 [*] FastAPI dependency without `Annotated`
    |
 36 |     some_header_param: int = Header(default=5),
@@ -244,7 +260,7 @@ FAST002.py:38:5: FAST002 [*] FastAPI dependency without `Annotated`
    |
    = help: Replace with `Annotated`
 
-ℹ Unsafe fix
+Suggested fix:
 12 12 |     Security,
 13 13 | )
 14 14 | from pydantic import BaseModel
@@ -261,3 +277,5 @@ FAST002.py:38:5: FAST002 [*] FastAPI dependency without `Annotated`
 39 40 | ):
 40 41 |     # do stuff
 41 42 |     pass
+
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.

@@ -10,7 +10,7 @@ runtime_evaluated_decorators_1.py:12:12: TCH004 [*] Move import `datetime` out o
    |
    = help: Move out of type-checking block
 
-ℹ Unsafe fix
+Suggested fix:
 7  7  | from attrs import frozen
 8  8  | 
 9  9  | import numpy
@@ -21,6 +21,8 @@ runtime_evaluated_decorators_1.py:12:12: TCH004 [*] Move import `datetime` out o
 13 13 |     from array import array  # TCH004
 14 14 | 
 15 15 |     import pandas  # TCH004
+
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 runtime_evaluated_decorators_1.py:13:23: TCH004 [*] Move import `array.array` out of type-checking block. Import is used for more than type hinting.
    |
@@ -33,7 +35,7 @@ runtime_evaluated_decorators_1.py:13:23: TCH004 [*] Move import `array.array` ou
    |
    = help: Move out of type-checking block
 
-ℹ Unsafe fix
+Suggested fix:
 7  7  | from attrs import frozen
 8  8  | 
 9  9  | import numpy
@@ -46,6 +48,8 @@ runtime_evaluated_decorators_1.py:13:23: TCH004 [*] Move import `array.array` ou
 15 15 |     import pandas  # TCH004
 16 16 |     import pyproj
 
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
+
 runtime_evaluated_decorators_1.py:15:12: TCH004 [*] Move import `pandas` out of type-checking block. Import is used for more than type hinting.
    |
 13 |     from array import array  # TCH004
@@ -56,7 +60,7 @@ runtime_evaluated_decorators_1.py:15:12: TCH004 [*] Move import `pandas` out of 
    |
    = help: Move out of type-checking block
 
-ℹ Unsafe fix
+Suggested fix:
 7  7  | from attrs import frozen
 8  8  | 
 9  9  | import numpy
@@ -71,4 +75,4 @@ runtime_evaluated_decorators_1.py:15:12: TCH004 [*] Move import `pandas` out of 
 17 17 | 
 18 18 | 
 
-
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.

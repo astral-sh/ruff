@@ -14,7 +14,7 @@ docstring_singles.py:5:1: Q001 [*] Single quote multiline found but double quote
   |
   = help: Replace single multiline quotes with double quotes
 
-ℹ Safe fix
+Suggested fix:
 2 2 | Single quotes multiline module docstring
 3 3 | '''
 4 4 | 
@@ -26,6 +26,8 @@ docstring_singles.py:5:1: Q001 [*] Single quote multiline found but double quote
 8 8 | 
 9 9 | l = []
 10 10 | 
+
+    Run `ruff check --fix` to apply this fix.
 
 docstring_singles.py:11:21: Q001 [*] Single quote multiline found but double quotes preferred
    |
@@ -41,7 +43,7 @@ docstring_singles.py:11:21: Q001 [*] Single quote multiline found but double quo
    |
    = help: Replace single multiline quotes with double quotes
 
-ℹ Safe fix
+Suggested fix:
 8  8  | 
 9  9  | l = []
 10 10 | 
@@ -53,6 +55,8 @@ docstring_singles.py:11:21: Q001 [*] Single quote multiline found but double quo
 14 14 |     '''
 15 15 |     Single quotes multiline class docstring
 16 16 |     '''
+
+    Run `ruff check --fix` to apply this fix.
 
 docstring_singles.py:18:5: Q001 [*] Single quote multiline found but double quotes preferred
    |
@@ -68,7 +72,7 @@ docstring_singles.py:18:5: Q001 [*] Single quote multiline found but double quot
    |
    = help: Replace single multiline quotes with double quotes
 
-ℹ Safe fix
+Suggested fix:
 15 15 |     Single quotes multiline class docstring
 16 16 |     '''
 17 17 | 
@@ -80,6 +84,8 @@ docstring_singles.py:18:5: Q001 [*] Single quote multiline found but double quot
 21 21 | 
 22 22 |     # The colon in the list indexing below is an edge case for the docstring scanner
 23 23 |     def f(self, bar='''
+
+    Run `ruff check --fix` to apply this fix.
 
 docstring_singles.py:23:21: Q001 [*] Single quote multiline found but double quotes preferred
    |
@@ -93,7 +99,7 @@ docstring_singles.py:23:21: Q001 [*] Single quote multiline found but double quo
    |
    = help: Replace single multiline quotes with double quotes
 
-ℹ Safe fix
+Suggested fix:
 20 20 |     '''
 21 21 | 
 22 22 |     # The colon in the list indexing below is an edge case for the docstring scanner
@@ -104,6 +110,8 @@ docstring_singles.py:23:21: Q001 [*] Single quote multiline found but double quo
 25 25 |         val=l[Cls():3]):
 26 26 |         '''
 27 27 |         Single quotes multiline function docstring
+
+    Run `ruff check --fix` to apply this fix.
 
 docstring_singles.py:32:9: Q001 [*] Single quote multiline found but double quotes preferred
    |
@@ -119,7 +127,7 @@ docstring_singles.py:32:9: Q001 [*] Single quote multiline found but double quot
    |
    = help: Replace single multiline quotes with double quotes
 
-ℹ Safe fix
+Suggested fix:
 29 29 | 
 30 30 |         some_expression = 'hello world'
 31 31 | 
@@ -131,6 +139,8 @@ docstring_singles.py:32:9: Q001 [*] Single quote multiline found but double quot
 35 35 | 
 36 36 |         if l:
 37 37 |             '''
+
+    Run `ruff check --fix` to apply this fix.
 
 docstring_singles.py:37:13: Q001 [*] Single quote multiline found but double quotes preferred
    |
@@ -144,7 +154,7 @@ docstring_singles.py:37:13: Q001 [*] Single quote multiline found but double quo
    |
    = help: Replace single multiline quotes with double quotes
 
-ℹ Safe fix
+Suggested fix:
 34 34 |         '''
 35 35 | 
 36 36 |         if l:
@@ -155,4 +165,4 @@ docstring_singles.py:37:13: Q001 [*] Single quote multiline found but double quo
    39 |+            """
 40 40 |             pass
 
-
+    Run `ruff check --fix` to apply this fix.

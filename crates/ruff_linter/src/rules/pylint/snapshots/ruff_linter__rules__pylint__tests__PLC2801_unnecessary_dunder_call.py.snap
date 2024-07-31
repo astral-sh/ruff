@@ -11,7 +11,7 @@ unnecessary_dunder_call.py:4:7: PLC2801 [*] Unnecessary dunder call to `__add__`
   |
   = help: Use `+` operator
 
-ℹ Unsafe fix
+Suggested fix:
 1 1 | from typing import Any
 2 2 | 
 3 3 | a = 2
@@ -20,6 +20,8 @@ unnecessary_dunder_call.py:4:7: PLC2801 [*] Unnecessary dunder call to `__add__`
 5 5 | print((3.0).__sub__(4.0))  # PLC2801
 6 6 | print((3.0).__mul__(4.0))  # PLC2801
 7 7 | print((3.0).__truediv__(4.0))  # PLC2801
+
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 unnecessary_dunder_call.py:5:7: PLC2801 [*] Unnecessary dunder call to `__sub__`. Use `-` operator.
   |
@@ -32,7 +34,7 @@ unnecessary_dunder_call.py:5:7: PLC2801 [*] Unnecessary dunder call to `__sub__`
   |
   = help: Use `-` operator
 
-ℹ Unsafe fix
+Suggested fix:
 2 2 | 
 3 3 | a = 2
 4 4 | print((3.0).__add__(4.0))  # PLC2801
@@ -41,6 +43,8 @@ unnecessary_dunder_call.py:5:7: PLC2801 [*] Unnecessary dunder call to `__sub__`
 6 6 | print((3.0).__mul__(4.0))  # PLC2801
 7 7 | print((3.0).__truediv__(4.0))  # PLC2801
 8 8 | print((3.0).__floordiv__(4.0))  # PLC2801
+
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 unnecessary_dunder_call.py:6:7: PLC2801 [*] Unnecessary dunder call to `__mul__`. Use `*` operator.
   |
@@ -53,7 +57,7 @@ unnecessary_dunder_call.py:6:7: PLC2801 [*] Unnecessary dunder call to `__mul__`
   |
   = help: Use `*` operator
 
-ℹ Unsafe fix
+Suggested fix:
 3 3 | a = 2
 4 4 | print((3.0).__add__(4.0))  # PLC2801
 5 5 | print((3.0).__sub__(4.0))  # PLC2801
@@ -62,6 +66,8 @@ unnecessary_dunder_call.py:6:7: PLC2801 [*] Unnecessary dunder call to `__mul__`
 7 7 | print((3.0).__truediv__(4.0))  # PLC2801
 8 8 | print((3.0).__floordiv__(4.0))  # PLC2801
 9 9 | print((3.0).__mod__(4.0))  # PLC2801
+
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 unnecessary_dunder_call.py:7:7: PLC2801 [*] Unnecessary dunder call to `__truediv__`. Use `/` operator.
   |
@@ -74,7 +80,7 @@ unnecessary_dunder_call.py:7:7: PLC2801 [*] Unnecessary dunder call to `__truedi
   |
   = help: Use `/` operator
 
-ℹ Unsafe fix
+Suggested fix:
 4 4 | print((3.0).__add__(4.0))  # PLC2801
 5 5 | print((3.0).__sub__(4.0))  # PLC2801
 6 6 | print((3.0).__mul__(4.0))  # PLC2801
@@ -83,6 +89,8 @@ unnecessary_dunder_call.py:7:7: PLC2801 [*] Unnecessary dunder call to `__truedi
 8 8 | print((3.0).__floordiv__(4.0))  # PLC2801
 9 9 | print((3.0).__mod__(4.0))  # PLC2801
 10 10 | print((3.0).__eq__(4.0))  # PLC2801
+
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 unnecessary_dunder_call.py:8:7: PLC2801 [*] Unnecessary dunder call to `__floordiv__`. Use `//` operator.
    |
@@ -95,7 +103,7 @@ unnecessary_dunder_call.py:8:7: PLC2801 [*] Unnecessary dunder call to `__floord
    |
    = help: Use `//` operator
 
-ℹ Unsafe fix
+Suggested fix:
 5 5 | print((3.0).__sub__(4.0))  # PLC2801
 6 6 | print((3.0).__mul__(4.0))  # PLC2801
 7 7 | print((3.0).__truediv__(4.0))  # PLC2801
@@ -104,6 +112,8 @@ unnecessary_dunder_call.py:8:7: PLC2801 [*] Unnecessary dunder call to `__floord
 9 9 | print((3.0).__mod__(4.0))  # PLC2801
 10 10 | print((3.0).__eq__(4.0))  # PLC2801
 11 11 | print((3.0).__ne__(4.0))  # PLC2801
+
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 unnecessary_dunder_call.py:9:7: PLC2801 [*] Unnecessary dunder call to `__mod__`. Use `%` operator.
    |
@@ -116,7 +126,7 @@ unnecessary_dunder_call.py:9:7: PLC2801 [*] Unnecessary dunder call to `__mod__`
    |
    = help: Use `%` operator
 
-ℹ Unsafe fix
+Suggested fix:
 6  6  | print((3.0).__mul__(4.0))  # PLC2801
 7  7  | print((3.0).__truediv__(4.0))  # PLC2801
 8  8  | print((3.0).__floordiv__(4.0))  # PLC2801
@@ -125,6 +135,8 @@ unnecessary_dunder_call.py:9:7: PLC2801 [*] Unnecessary dunder call to `__mod__`
 10 10 | print((3.0).__eq__(4.0))  # PLC2801
 11 11 | print((3.0).__ne__(4.0))  # PLC2801
 12 12 | print((3.0).__lt__(4.0))  # PLC2801
+
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 unnecessary_dunder_call.py:10:7: PLC2801 [*] Unnecessary dunder call to `__eq__`. Use `==` operator.
    |
@@ -137,7 +149,7 @@ unnecessary_dunder_call.py:10:7: PLC2801 [*] Unnecessary dunder call to `__eq__`
    |
    = help: Use `==` operator
 
-ℹ Unsafe fix
+Suggested fix:
 7  7  | print((3.0).__truediv__(4.0))  # PLC2801
 8  8  | print((3.0).__floordiv__(4.0))  # PLC2801
 9  9  | print((3.0).__mod__(4.0))  # PLC2801
@@ -146,6 +158,8 @@ unnecessary_dunder_call.py:10:7: PLC2801 [*] Unnecessary dunder call to `__eq__`
 11 11 | print((3.0).__ne__(4.0))  # PLC2801
 12 12 | print((3.0).__lt__(4.0))  # PLC2801
 13 13 | print((3.0).__le__(4.0))  # PLC2801
+
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 unnecessary_dunder_call.py:11:7: PLC2801 [*] Unnecessary dunder call to `__ne__`. Use `!=` operator.
    |
@@ -158,7 +172,7 @@ unnecessary_dunder_call.py:11:7: PLC2801 [*] Unnecessary dunder call to `__ne__`
    |
    = help: Use `!=` operator
 
-ℹ Unsafe fix
+Suggested fix:
 8  8  | print((3.0).__floordiv__(4.0))  # PLC2801
 9  9  | print((3.0).__mod__(4.0))  # PLC2801
 10 10 | print((3.0).__eq__(4.0))  # PLC2801
@@ -167,6 +181,8 @@ unnecessary_dunder_call.py:11:7: PLC2801 [*] Unnecessary dunder call to `__ne__`
 12 12 | print((3.0).__lt__(4.0))  # PLC2801
 13 13 | print((3.0).__le__(4.0))  # PLC2801
 14 14 | print((3.0).__gt__(4.0))  # PLC2801
+
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 unnecessary_dunder_call.py:12:7: PLC2801 [*] Unnecessary dunder call to `__lt__`. Use `<` operator.
    |
@@ -179,7 +195,7 @@ unnecessary_dunder_call.py:12:7: PLC2801 [*] Unnecessary dunder call to `__lt__`
    |
    = help: Use `<` operator
 
-ℹ Unsafe fix
+Suggested fix:
 9  9  | print((3.0).__mod__(4.0))  # PLC2801
 10 10 | print((3.0).__eq__(4.0))  # PLC2801
 11 11 | print((3.0).__ne__(4.0))  # PLC2801
@@ -188,6 +204,8 @@ unnecessary_dunder_call.py:12:7: PLC2801 [*] Unnecessary dunder call to `__lt__`
 13 13 | print((3.0).__le__(4.0))  # PLC2801
 14 14 | print((3.0).__gt__(4.0))  # PLC2801
 15 15 | print((3.0).__ge__(4.0))  # PLC2801
+
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 unnecessary_dunder_call.py:13:7: PLC2801 [*] Unnecessary dunder call to `__le__`. Use `<=` operator.
    |
@@ -200,7 +218,7 @@ unnecessary_dunder_call.py:13:7: PLC2801 [*] Unnecessary dunder call to `__le__`
    |
    = help: Use `<=` operator
 
-ℹ Unsafe fix
+Suggested fix:
 10 10 | print((3.0).__eq__(4.0))  # PLC2801
 11 11 | print((3.0).__ne__(4.0))  # PLC2801
 12 12 | print((3.0).__lt__(4.0))  # PLC2801
@@ -209,6 +227,8 @@ unnecessary_dunder_call.py:13:7: PLC2801 [*] Unnecessary dunder call to `__le__`
 14 14 | print((3.0).__gt__(4.0))  # PLC2801
 15 15 | print((3.0).__ge__(4.0))  # PLC2801
 16 16 | print((3.0).__str__())  # PLC2801
+
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 unnecessary_dunder_call.py:14:7: PLC2801 [*] Unnecessary dunder call to `__gt__`. Use `>` operator.
    |
@@ -221,7 +241,7 @@ unnecessary_dunder_call.py:14:7: PLC2801 [*] Unnecessary dunder call to `__gt__`
    |
    = help: Use `>` operator
 
-ℹ Unsafe fix
+Suggested fix:
 11 11 | print((3.0).__ne__(4.0))  # PLC2801
 12 12 | print((3.0).__lt__(4.0))  # PLC2801
 13 13 | print((3.0).__le__(4.0))  # PLC2801
@@ -230,6 +250,8 @@ unnecessary_dunder_call.py:14:7: PLC2801 [*] Unnecessary dunder call to `__gt__`
 15 15 | print((3.0).__ge__(4.0))  # PLC2801
 16 16 | print((3.0).__str__())  # PLC2801
 17 17 | print((3.0).__repr__())  # PLC2801
+
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 unnecessary_dunder_call.py:15:7: PLC2801 [*] Unnecessary dunder call to `__ge__`. Use `>=` operator.
    |
@@ -242,7 +264,7 @@ unnecessary_dunder_call.py:15:7: PLC2801 [*] Unnecessary dunder call to `__ge__`
    |
    = help: Use `>=` operator
 
-ℹ Unsafe fix
+Suggested fix:
 12 12 | print((3.0).__lt__(4.0))  # PLC2801
 13 13 | print((3.0).__le__(4.0))  # PLC2801
 14 14 | print((3.0).__gt__(4.0))  # PLC2801
@@ -251,6 +273,8 @@ unnecessary_dunder_call.py:15:7: PLC2801 [*] Unnecessary dunder call to `__ge__`
 16 16 | print((3.0).__str__())  # PLC2801
 17 17 | print((3.0).__repr__())  # PLC2801
 18 18 | print([1, 2, 3].__len__())  # PLC2801
+
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 unnecessary_dunder_call.py:16:7: PLC2801 [*] Unnecessary dunder call to `__str__`. Use `str()` builtin.
    |
@@ -263,7 +287,7 @@ unnecessary_dunder_call.py:16:7: PLC2801 [*] Unnecessary dunder call to `__str__
    |
    = help: Use `str()` builtin
 
-ℹ Unsafe fix
+Suggested fix:
 13 13 | print((3.0).__le__(4.0))  # PLC2801
 14 14 | print((3.0).__gt__(4.0))  # PLC2801
 15 15 | print((3.0).__ge__(4.0))  # PLC2801
@@ -272,6 +296,8 @@ unnecessary_dunder_call.py:16:7: PLC2801 [*] Unnecessary dunder call to `__str__
 17 17 | print((3.0).__repr__())  # PLC2801
 18 18 | print([1, 2, 3].__len__())  # PLC2801
 19 19 | print((1).__neg__())  # PLC2801
+
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 unnecessary_dunder_call.py:17:7: PLC2801 [*] Unnecessary dunder call to `__repr__`. Use `repr()` builtin.
    |
@@ -284,7 +310,7 @@ unnecessary_dunder_call.py:17:7: PLC2801 [*] Unnecessary dunder call to `__repr_
    |
    = help: Use `repr()` builtin
 
-ℹ Unsafe fix
+Suggested fix:
 14 14 | print((3.0).__gt__(4.0))  # PLC2801
 15 15 | print((3.0).__ge__(4.0))  # PLC2801
 16 16 | print((3.0).__str__())  # PLC2801
@@ -293,6 +319,8 @@ unnecessary_dunder_call.py:17:7: PLC2801 [*] Unnecessary dunder call to `__repr_
 18 18 | print([1, 2, 3].__len__())  # PLC2801
 19 19 | print((1).__neg__())  # PLC2801
 20 20 | print(-a.__sub__(1))  # PLC2801
+
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 unnecessary_dunder_call.py:18:7: PLC2801 [*] Unnecessary dunder call to `__len__`. Use `len()` builtin.
    |
@@ -305,7 +333,7 @@ unnecessary_dunder_call.py:18:7: PLC2801 [*] Unnecessary dunder call to `__len__
    |
    = help: Use `len()` builtin
 
-ℹ Unsafe fix
+Suggested fix:
 15 15 | print((3.0).__ge__(4.0))  # PLC2801
 16 16 | print((3.0).__str__())  # PLC2801
 17 17 | print((3.0).__repr__())  # PLC2801
@@ -314,6 +342,8 @@ unnecessary_dunder_call.py:18:7: PLC2801 [*] Unnecessary dunder call to `__len__
 19 19 | print((1).__neg__())  # PLC2801
 20 20 | print(-a.__sub__(1))  # PLC2801
 21 21 | print(-(a).__sub__(1))  # PLC2801
+
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 unnecessary_dunder_call.py:19:7: PLC2801 Unnecessary dunder call to `__neg__`. Multiply by -1 instead.
    |
@@ -337,7 +367,7 @@ unnecessary_dunder_call.py:20:8: PLC2801 [*] Unnecessary dunder call to `__sub__
    |
    = help: Use `-` operator
 
-ℹ Unsafe fix
+Suggested fix:
 17 17 | print((3.0).__repr__())  # PLC2801
 18 18 | print([1, 2, 3].__len__())  # PLC2801
 19 19 | print((1).__neg__())  # PLC2801
@@ -346,6 +376,8 @@ unnecessary_dunder_call.py:20:8: PLC2801 [*] Unnecessary dunder call to `__sub__
 21 21 | print(-(a).__sub__(1))  # PLC2801
 22 22 | print(-(-a.__sub__(1)))  # PLC2801
 23 23 | print((5 - a).__sub__(1))  # PLC2801
+
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 unnecessary_dunder_call.py:21:8: PLC2801 [*] Unnecessary dunder call to `__sub__`. Use `-` operator.
    |
@@ -358,7 +390,7 @@ unnecessary_dunder_call.py:21:8: PLC2801 [*] Unnecessary dunder call to `__sub__
    |
    = help: Use `-` operator
 
-ℹ Unsafe fix
+Suggested fix:
 18 18 | print([1, 2, 3].__len__())  # PLC2801
 19 19 | print((1).__neg__())  # PLC2801
 20 20 | print(-a.__sub__(1))  # PLC2801
@@ -367,6 +399,8 @@ unnecessary_dunder_call.py:21:8: PLC2801 [*] Unnecessary dunder call to `__sub__
 22 22 | print(-(-a.__sub__(1)))  # PLC2801
 23 23 | print((5 - a).__sub__(1))  # PLC2801
 24 24 | print(-(5 - a).__sub__(1))  # PLC2801
+
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 unnecessary_dunder_call.py:22:10: PLC2801 [*] Unnecessary dunder call to `__sub__`. Use `-` operator.
    |
@@ -379,7 +413,7 @@ unnecessary_dunder_call.py:22:10: PLC2801 [*] Unnecessary dunder call to `__sub_
    |
    = help: Use `-` operator
 
-ℹ Unsafe fix
+Suggested fix:
 19 19 | print((1).__neg__())  # PLC2801
 20 20 | print(-a.__sub__(1))  # PLC2801
 21 21 | print(-(a).__sub__(1))  # PLC2801
@@ -388,6 +422,8 @@ unnecessary_dunder_call.py:22:10: PLC2801 [*] Unnecessary dunder call to `__sub_
 23 23 | print((5 - a).__sub__(1))  # PLC2801
 24 24 | print(-(5 - a).__sub__(1))  # PLC2801
 25 25 | print(-(-5 - a).__sub__(1))  # PLC2801
+
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 unnecessary_dunder_call.py:23:7: PLC2801 [*] Unnecessary dunder call to `__sub__`. Use `-` operator.
    |
@@ -400,7 +436,7 @@ unnecessary_dunder_call.py:23:7: PLC2801 [*] Unnecessary dunder call to `__sub__
    |
    = help: Use `-` operator
 
-ℹ Unsafe fix
+Suggested fix:
 20 20 | print(-a.__sub__(1))  # PLC2801
 21 21 | print(-(a).__sub__(1))  # PLC2801
 22 22 | print(-(-a.__sub__(1)))  # PLC2801
@@ -409,6 +445,8 @@ unnecessary_dunder_call.py:23:7: PLC2801 [*] Unnecessary dunder call to `__sub__
 24 24 | print(-(5 - a).__sub__(1))  # PLC2801
 25 25 | print(-(-5 - a).__sub__(1))  # PLC2801
 26 26 | print(+-+-+-a.__sub__(1))  # PLC2801
+
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 unnecessary_dunder_call.py:24:8: PLC2801 [*] Unnecessary dunder call to `__sub__`. Use `-` operator.
    |
@@ -421,7 +459,7 @@ unnecessary_dunder_call.py:24:8: PLC2801 [*] Unnecessary dunder call to `__sub__
    |
    = help: Use `-` operator
 
-ℹ Unsafe fix
+Suggested fix:
 21 21 | print(-(a).__sub__(1))  # PLC2801
 22 22 | print(-(-a.__sub__(1)))  # PLC2801
 23 23 | print((5 - a).__sub__(1))  # PLC2801
@@ -430,6 +468,8 @@ unnecessary_dunder_call.py:24:8: PLC2801 [*] Unnecessary dunder call to `__sub__
 25 25 | print(-(-5 - a).__sub__(1))  # PLC2801
 26 26 | print(+-+-+-a.__sub__(1))  # PLC2801
 27 27 | print(a.__rsub__(2 - 1))  # PLC2801
+
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 unnecessary_dunder_call.py:25:8: PLC2801 [*] Unnecessary dunder call to `__sub__`. Use `-` operator.
    |
@@ -442,7 +482,7 @@ unnecessary_dunder_call.py:25:8: PLC2801 [*] Unnecessary dunder call to `__sub__
    |
    = help: Use `-` operator
 
-ℹ Unsafe fix
+Suggested fix:
 22 22 | print(-(-a.__sub__(1)))  # PLC2801
 23 23 | print((5 - a).__sub__(1))  # PLC2801
 24 24 | print(-(5 - a).__sub__(1))  # PLC2801
@@ -451,6 +491,8 @@ unnecessary_dunder_call.py:25:8: PLC2801 [*] Unnecessary dunder call to `__sub__
 26 26 | print(+-+-+-a.__sub__(1))  # PLC2801
 27 27 | print(a.__rsub__(2 - 1))  # PLC2801
 28 28 | print(a.__sub__(((((1))))))  # PLC2801
+
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 unnecessary_dunder_call.py:26:13: PLC2801 [*] Unnecessary dunder call to `__sub__`. Use `-` operator.
    |
@@ -463,7 +505,7 @@ unnecessary_dunder_call.py:26:13: PLC2801 [*] Unnecessary dunder call to `__sub_
    |
    = help: Use `-` operator
 
-ℹ Unsafe fix
+Suggested fix:
 23 23 | print((5 - a).__sub__(1))  # PLC2801
 24 24 | print(-(5 - a).__sub__(1))  # PLC2801
 25 25 | print(-(-5 - a).__sub__(1))  # PLC2801
@@ -472,6 +514,8 @@ unnecessary_dunder_call.py:26:13: PLC2801 [*] Unnecessary dunder call to `__sub_
 27 27 | print(a.__rsub__(2 - 1))  # PLC2801
 28 28 | print(a.__sub__(((((1))))))  # PLC2801
 29 29 | print(a.__sub__(((((2 - 1))))))  # PLC2801
+
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 unnecessary_dunder_call.py:27:7: PLC2801 [*] Unnecessary dunder call to `__rsub__`. Use `-` operator.
    |
@@ -484,7 +528,7 @@ unnecessary_dunder_call.py:27:7: PLC2801 [*] Unnecessary dunder call to `__rsub_
    |
    = help: Use `-` operator
 
-ℹ Unsafe fix
+Suggested fix:
 24 24 | print(-(5 - a).__sub__(1))  # PLC2801
 25 25 | print(-(-5 - a).__sub__(1))  # PLC2801
 26 26 | print(+-+-+-a.__sub__(1))  # PLC2801
@@ -493,6 +537,8 @@ unnecessary_dunder_call.py:27:7: PLC2801 [*] Unnecessary dunder call to `__rsub_
 28 28 | print(a.__sub__(((((1))))))  # PLC2801
 29 29 | print(a.__sub__(((((2 - 1))))))  # PLC2801
 30 30 | print(a.__sub__(
+
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 unnecessary_dunder_call.py:28:7: PLC2801 [*] Unnecessary dunder call to `__sub__`. Use `-` operator.
    |
@@ -505,7 +551,7 @@ unnecessary_dunder_call.py:28:7: PLC2801 [*] Unnecessary dunder call to `__sub__
    |
    = help: Use `-` operator
 
-ℹ Unsafe fix
+Suggested fix:
 25 25 | print(-(-5 - a).__sub__(1))  # PLC2801
 26 26 | print(+-+-+-a.__sub__(1))  # PLC2801
 27 27 | print(a.__rsub__(2 - 1))  # PLC2801
@@ -514,6 +560,8 @@ unnecessary_dunder_call.py:28:7: PLC2801 [*] Unnecessary dunder call to `__sub__
 29 29 | print(a.__sub__(((((2 - 1))))))  # PLC2801
 30 30 | print(a.__sub__(
 31 31 |     3
+
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 unnecessary_dunder_call.py:29:7: PLC2801 [*] Unnecessary dunder call to `__sub__`. Use `-` operator.
    |
@@ -526,7 +574,7 @@ unnecessary_dunder_call.py:29:7: PLC2801 [*] Unnecessary dunder call to `__sub__
    |
    = help: Use `-` operator
 
-ℹ Unsafe fix
+Suggested fix:
 26 26 | print(+-+-+-a.__sub__(1))  # PLC2801
 27 27 | print(a.__rsub__(2 - 1))  # PLC2801
 28 28 | print(a.__sub__(((((1))))))  # PLC2801
@@ -535,6 +583,8 @@ unnecessary_dunder_call.py:29:7: PLC2801 [*] Unnecessary dunder call to `__sub__
 30 30 | print(a.__sub__(
 31 31 |     3
 32 32 |     +
+
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 unnecessary_dunder_call.py:30:7: PLC2801 [*] Unnecessary dunder call to `__sub__`. Use `-` operator.
    |
@@ -552,7 +602,7 @@ unnecessary_dunder_call.py:30:7: PLC2801 [*] Unnecessary dunder call to `__sub__
    |
    = help: Use `-` operator
 
-ℹ Unsafe fix
+Suggested fix:
 27 27 | print(a.__rsub__(2 - 1))  # PLC2801
 28 28 | print(a.__sub__(((((1))))))  # PLC2801
 29 29 | print(a.__sub__(((((2 - 1))))))  # PLC2801
@@ -566,6 +616,8 @@ unnecessary_dunder_call.py:30:7: PLC2801 [*] Unnecessary dunder call to `__sub__
 35 33 | print(a.__rsub__(
 36 34 |     3
 37 35 |     +
+
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 unnecessary_dunder_call.py:35:7: PLC2801 [*] Unnecessary dunder call to `__rsub__`. Use `-` operator.
    |
@@ -583,7 +635,7 @@ unnecessary_dunder_call.py:35:7: PLC2801 [*] Unnecessary dunder call to `__rsub_
    |
    = help: Use `-` operator
 
-ℹ Unsafe fix
+Suggested fix:
 32 32 |     +
 33 33 |     4
 34 34 | ))
@@ -598,6 +650,8 @@ unnecessary_dunder_call.py:35:7: PLC2801 [*] Unnecessary dunder call to `__rsub_
 41 39 | x = 2 * a.__add__(3)  # PLC2801
 42 40 | x = 2 * -a.__add__(3)  # PLC2801
 
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
+
 unnecessary_dunder_call.py:40:11: PLC2801 [*] Unnecessary dunder call to `__add__`. Use `+` operator.
    |
 38 |     4
@@ -609,7 +663,7 @@ unnecessary_dunder_call.py:40:11: PLC2801 [*] Unnecessary dunder call to `__add_
    |
    = help: Use `+` operator
 
-ℹ Unsafe fix
+Suggested fix:
 37 37 |     +
 38 38 |     4
 39 39 | ))
@@ -618,6 +672,8 @@ unnecessary_dunder_call.py:40:11: PLC2801 [*] Unnecessary dunder call to `__add_
 41 41 | x = 2 * a.__add__(3)  # PLC2801
 42 42 | x = 2 * -a.__add__(3)  # PLC2801
 43 43 | x = a.__add__(3)  # PLC2801
+
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 unnecessary_dunder_call.py:41:9: PLC2801 [*] Unnecessary dunder call to `__add__`. Use `+` operator.
    |
@@ -630,7 +686,7 @@ unnecessary_dunder_call.py:41:9: PLC2801 [*] Unnecessary dunder call to `__add__
    |
    = help: Use `+` operator
 
-ℹ Unsafe fix
+Suggested fix:
 38 38 |     4
 39 39 | ))
 40 40 | print(2 * a.__add__(3))  # PLC2801
@@ -639,6 +695,8 @@ unnecessary_dunder_call.py:41:9: PLC2801 [*] Unnecessary dunder call to `__add__
 42 42 | x = 2 * -a.__add__(3)  # PLC2801
 43 43 | x = a.__add__(3)  # PLC2801
 44 44 | x = -a.__add__(3)  # PLC2801
+
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 unnecessary_dunder_call.py:42:10: PLC2801 [*] Unnecessary dunder call to `__add__`. Use `+` operator.
    |
@@ -651,7 +709,7 @@ unnecessary_dunder_call.py:42:10: PLC2801 [*] Unnecessary dunder call to `__add_
    |
    = help: Use `+` operator
 
-ℹ Unsafe fix
+Suggested fix:
 39 39 | ))
 40 40 | print(2 * a.__add__(3))  # PLC2801
 41 41 | x = 2 * a.__add__(3)  # PLC2801
@@ -660,6 +718,8 @@ unnecessary_dunder_call.py:42:10: PLC2801 [*] Unnecessary dunder call to `__add_
 43 43 | x = a.__add__(3)  # PLC2801
 44 44 | x = -a.__add__(3)  # PLC2801
 45 45 | x = (-a).__add__(3)  # PLC2801
+
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 unnecessary_dunder_call.py:43:5: PLC2801 [*] Unnecessary dunder call to `__add__`. Use `+` operator.
    |
@@ -672,7 +732,7 @@ unnecessary_dunder_call.py:43:5: PLC2801 [*] Unnecessary dunder call to `__add__
    |
    = help: Use `+` operator
 
-ℹ Unsafe fix
+Suggested fix:
 40 40 | print(2 * a.__add__(3))  # PLC2801
 41 41 | x = 2 * a.__add__(3)  # PLC2801
 42 42 | x = 2 * -a.__add__(3)  # PLC2801
@@ -681,6 +741,8 @@ unnecessary_dunder_call.py:43:5: PLC2801 [*] Unnecessary dunder call to `__add__
 44 44 | x = -a.__add__(3)  # PLC2801
 45 45 | x = (-a).__add__(3)  # PLC2801
 46 46 | x = -(-a).__add__(3)  # PLC2801
+
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 unnecessary_dunder_call.py:44:6: PLC2801 [*] Unnecessary dunder call to `__add__`. Use `+` operator.
    |
@@ -693,7 +755,7 @@ unnecessary_dunder_call.py:44:6: PLC2801 [*] Unnecessary dunder call to `__add__
    |
    = help: Use `+` operator
 
-ℹ Unsafe fix
+Suggested fix:
 41 41 | x = 2 * a.__add__(3)  # PLC2801
 42 42 | x = 2 * -a.__add__(3)  # PLC2801
 43 43 | x = a.__add__(3)  # PLC2801
@@ -702,6 +764,8 @@ unnecessary_dunder_call.py:44:6: PLC2801 [*] Unnecessary dunder call to `__add__
 45 45 | x = (-a).__add__(3)  # PLC2801
 46 46 | x = -(-a).__add__(3)  # PLC2801
 47 47 | 
+
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 unnecessary_dunder_call.py:45:5: PLC2801 [*] Unnecessary dunder call to `__add__`. Use `+` operator.
    |
@@ -713,7 +777,7 @@ unnecessary_dunder_call.py:45:5: PLC2801 [*] Unnecessary dunder call to `__add__
    |
    = help: Use `+` operator
 
-ℹ Unsafe fix
+Suggested fix:
 42 42 | x = 2 * -a.__add__(3)  # PLC2801
 43 43 | x = a.__add__(3)  # PLC2801
 44 44 | x = -a.__add__(3)  # PLC2801
@@ -722,6 +786,8 @@ unnecessary_dunder_call.py:45:5: PLC2801 [*] Unnecessary dunder call to `__add__
 46 46 | x = -(-a).__add__(3)  # PLC2801
 47 47 | 
 48 48 | # Calls
+
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 unnecessary_dunder_call.py:46:6: PLC2801 [*] Unnecessary dunder call to `__add__`. Use `+` operator.
    |
@@ -734,7 +800,7 @@ unnecessary_dunder_call.py:46:6: PLC2801 [*] Unnecessary dunder call to `__add__
    |
    = help: Use `+` operator
 
-ℹ Unsafe fix
+Suggested fix:
 43 43 | x = a.__add__(3)  # PLC2801
 44 44 | x = -a.__add__(3)  # PLC2801
 45 45 | x = (-a).__add__(3)  # PLC2801
@@ -743,6 +809,8 @@ unnecessary_dunder_call.py:46:6: PLC2801 [*] Unnecessary dunder call to `__add__
 47 47 | 
 48 48 | # Calls
 49 49 | print(a.__call__())  # PLC2801 (no fix, intentional)
+
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 unnecessary_dunder_call.py:49:7: PLC2801 Unnecessary dunder call to `__call__`
    |
@@ -763,7 +831,7 @@ unnecessary_dunder_call.py:52:16: PLC2801 [*] Unnecessary dunder call to `__add_
    |
    = help: Use `+` operator
 
-ℹ Unsafe fix
+Suggested fix:
 49 49 | print(a.__call__())  # PLC2801 (no fix, intentional)
 50 50 | 
 51 51 | # Lambda expressions
@@ -772,6 +840,8 @@ unnecessary_dunder_call.py:52:16: PLC2801 [*] Unnecessary dunder call to `__add_
 53 53 | 
 54 54 | # If expressions
 55 55 | print(a.__add__(1) if a > 0 else a.__sub__(1))  # PLC2801
+
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 unnecessary_dunder_call.py:55:7: PLC2801 [*] Unnecessary dunder call to `__add__`. Use `+` operator.
    |
@@ -783,7 +853,7 @@ unnecessary_dunder_call.py:55:7: PLC2801 [*] Unnecessary dunder call to `__add__
    |
    = help: Use `+` operator
 
-ℹ Unsafe fix
+Suggested fix:
 52 52 | blah = lambda: a.__add__(1)  # PLC2801
 53 53 | 
 54 54 | # If expressions
@@ -792,6 +862,8 @@ unnecessary_dunder_call.py:55:7: PLC2801 [*] Unnecessary dunder call to `__add__
 56 56 | 
 57 57 | # Dict/Set/List/Tuple
 58 58 | print({"a": a.__add__(1)})  # PLC2801
+
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 unnecessary_dunder_call.py:55:34: PLC2801 [*] Unnecessary dunder call to `__sub__`. Use `-` operator.
    |
@@ -803,7 +875,7 @@ unnecessary_dunder_call.py:55:34: PLC2801 [*] Unnecessary dunder call to `__sub_
    |
    = help: Use `-` operator
 
-ℹ Unsafe fix
+Suggested fix:
 52 52 | blah = lambda: a.__add__(1)  # PLC2801
 53 53 | 
 54 54 | # If expressions
@@ -812,6 +884,8 @@ unnecessary_dunder_call.py:55:34: PLC2801 [*] Unnecessary dunder call to `__sub_
 56 56 | 
 57 57 | # Dict/Set/List/Tuple
 58 58 | print({"a": a.__add__(1)})  # PLC2801
+
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 unnecessary_dunder_call.py:58:13: PLC2801 [*] Unnecessary dunder call to `__add__`. Use `+` operator.
    |
@@ -823,7 +897,7 @@ unnecessary_dunder_call.py:58:13: PLC2801 [*] Unnecessary dunder call to `__add_
    |
    = help: Use `+` operator
 
-ℹ Unsafe fix
+Suggested fix:
 55 55 | print(a.__add__(1) if a > 0 else a.__sub__(1))  # PLC2801
 56 56 | 
 57 57 | # Dict/Set/List/Tuple
@@ -832,6 +906,8 @@ unnecessary_dunder_call.py:58:13: PLC2801 [*] Unnecessary dunder call to `__add_
 59 59 | print({a.__add__(1)})  # PLC2801
 60 60 | print([a.__add__(1)])  # PLC2801
 61 61 | print((a.__add__(1),))  # PLC2801
+
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 unnecessary_dunder_call.py:59:8: PLC2801 [*] Unnecessary dunder call to `__add__`. Use `+` operator.
    |
@@ -844,7 +920,7 @@ unnecessary_dunder_call.py:59:8: PLC2801 [*] Unnecessary dunder call to `__add__
    |
    = help: Use `+` operator
 
-ℹ Unsafe fix
+Suggested fix:
 56 56 | 
 57 57 | # Dict/Set/List/Tuple
 58 58 | print({"a": a.__add__(1)})  # PLC2801
@@ -853,6 +929,8 @@ unnecessary_dunder_call.py:59:8: PLC2801 [*] Unnecessary dunder call to `__add__
 60 60 | print([a.__add__(1)])  # PLC2801
 61 61 | print((a.__add__(1),))  # PLC2801
 62 62 | 
+
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 unnecessary_dunder_call.py:60:8: PLC2801 [*] Unnecessary dunder call to `__add__`. Use `+` operator.
    |
@@ -864,7 +942,7 @@ unnecessary_dunder_call.py:60:8: PLC2801 [*] Unnecessary dunder call to `__add__
    |
    = help: Use `+` operator
 
-ℹ Unsafe fix
+Suggested fix:
 57 57 | # Dict/Set/List/Tuple
 58 58 | print({"a": a.__add__(1)})  # PLC2801
 59 59 | print({a.__add__(1)})  # PLC2801
@@ -873,6 +951,8 @@ unnecessary_dunder_call.py:60:8: PLC2801 [*] Unnecessary dunder call to `__add__
 61 61 | print((a.__add__(1),))  # PLC2801
 62 62 | 
 63 63 | # Comprehension variants
+
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 unnecessary_dunder_call.py:61:8: PLC2801 [*] Unnecessary dunder call to `__add__`. Use `+` operator.
    |
@@ -885,7 +965,7 @@ unnecessary_dunder_call.py:61:8: PLC2801 [*] Unnecessary dunder call to `__add__
    |
    = help: Use `+` operator
 
-ℹ Unsafe fix
+Suggested fix:
 58 58 | print({"a": a.__add__(1)})  # PLC2801
 59 59 | print({a.__add__(1)})  # PLC2801
 60 60 | print([a.__add__(1)])  # PLC2801
@@ -894,6 +974,8 @@ unnecessary_dunder_call.py:61:8: PLC2801 [*] Unnecessary dunder call to `__add__
 62 62 | 
 63 63 | # Comprehension variants
 64 64 | print({i: i.__add__(1) for i in range(5)})  # PLC2801
+
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 unnecessary_dunder_call.py:64:11: PLC2801 [*] Unnecessary dunder call to `__add__`. Use `+` operator.
    |
@@ -905,7 +987,7 @@ unnecessary_dunder_call.py:64:11: PLC2801 [*] Unnecessary dunder call to `__add_
    |
    = help: Use `+` operator
 
-ℹ Unsafe fix
+Suggested fix:
 61 61 | print((a.__add__(1),))  # PLC2801
 62 62 | 
 63 63 | # Comprehension variants
@@ -914,6 +996,8 @@ unnecessary_dunder_call.py:64:11: PLC2801 [*] Unnecessary dunder call to `__add_
 65 65 | print({i.__add__(1) for i in range(5)})  # PLC2801
 66 66 | print([i.__add__(1) for i in range(5)])  # PLC2801
 67 67 | print((i.__add__(1) for i in range(5)))  # PLC2801
+
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 unnecessary_dunder_call.py:65:8: PLC2801 [*] Unnecessary dunder call to `__add__`. Use `+` operator.
    |
@@ -926,7 +1010,7 @@ unnecessary_dunder_call.py:65:8: PLC2801 [*] Unnecessary dunder call to `__add__
    |
    = help: Use `+` operator
 
-ℹ Unsafe fix
+Suggested fix:
 62 62 | 
 63 63 | # Comprehension variants
 64 64 | print({i: i.__add__(1) for i in range(5)})  # PLC2801
@@ -935,6 +1019,8 @@ unnecessary_dunder_call.py:65:8: PLC2801 [*] Unnecessary dunder call to `__add__
 66 66 | print([i.__add__(1) for i in range(5)])  # PLC2801
 67 67 | print((i.__add__(1) for i in range(5)))  # PLC2801
 68 68 | 
+
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 unnecessary_dunder_call.py:66:8: PLC2801 [*] Unnecessary dunder call to `__add__`. Use `+` operator.
    |
@@ -946,7 +1032,7 @@ unnecessary_dunder_call.py:66:8: PLC2801 [*] Unnecessary dunder call to `__add__
    |
    = help: Use `+` operator
 
-ℹ Unsafe fix
+Suggested fix:
 63 63 | # Comprehension variants
 64 64 | print({i: i.__add__(1) for i in range(5)})  # PLC2801
 65 65 | print({i.__add__(1) for i in range(5)})  # PLC2801
@@ -955,6 +1041,8 @@ unnecessary_dunder_call.py:66:8: PLC2801 [*] Unnecessary dunder call to `__add__
 67 67 | print((i.__add__(1) for i in range(5)))  # PLC2801
 68 68 | 
 69 69 | # Generators
+
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 unnecessary_dunder_call.py:67:8: PLC2801 [*] Unnecessary dunder call to `__add__`. Use `+` operator.
    |
@@ -967,7 +1055,7 @@ unnecessary_dunder_call.py:67:8: PLC2801 [*] Unnecessary dunder call to `__add__
    |
    = help: Use `+` operator
 
-ℹ Unsafe fix
+Suggested fix:
 64 64 | print({i: i.__add__(1) for i in range(5)})  # PLC2801
 65 65 | print({i.__add__(1) for i in range(5)})  # PLC2801
 66 66 | print([i.__add__(1) for i in range(5)])  # PLC2801
@@ -976,6 +1064,8 @@ unnecessary_dunder_call.py:67:8: PLC2801 [*] Unnecessary dunder call to `__add__
 68 68 | 
 69 69 | # Generators
 70 70 | gen = (i.__add__(1) for i in range(5))  # PLC2801
+
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 unnecessary_dunder_call.py:70:8: PLC2801 [*] Unnecessary dunder call to `__add__`. Use `+` operator.
    |
@@ -986,7 +1076,7 @@ unnecessary_dunder_call.py:70:8: PLC2801 [*] Unnecessary dunder call to `__add__
    |
    = help: Use `+` operator
 
-ℹ Unsafe fix
+Suggested fix:
 67 67 | print((i.__add__(1) for i in range(5)))  # PLC2801
 68 68 | 
 69 69 | # Generators
@@ -995,6 +1085,8 @@ unnecessary_dunder_call.py:70:8: PLC2801 [*] Unnecessary dunder call to `__add__
 71 71 | print(next(gen))
 72 72 | 
 73 73 | # Subscripts
+
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 unnecessary_dunder_call.py:74:13: PLC2801 [*] Unnecessary dunder call to `__add__`. Use `+` operator.
    |
@@ -1006,7 +1098,7 @@ unnecessary_dunder_call.py:74:13: PLC2801 [*] Unnecessary dunder call to `__add_
    |
    = help: Use `+` operator
 
-ℹ Unsafe fix
+Suggested fix:
 71 71 | print(next(gen))
 72 72 | 
 73 73 | # Subscripts
@@ -1015,6 +1107,8 @@ unnecessary_dunder_call.py:74:13: PLC2801 [*] Unnecessary dunder call to `__add_
 75 75 | 
 76 76 | # Starred
 77 77 | print(*[a.__add__(1)])  # PLC2801
+
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 unnecessary_dunder_call.py:77:9: PLC2801 [*] Unnecessary dunder call to `__add__`. Use `+` operator.
    |
@@ -1026,7 +1120,7 @@ unnecessary_dunder_call.py:77:9: PLC2801 [*] Unnecessary dunder call to `__add__
    |
    = help: Use `+` operator
 
-ℹ Unsafe fix
+Suggested fix:
 74 74 | print({"a": a.__add__(1)}["a"])  # PLC2801
 75 75 | 
 76 76 | # Starred
@@ -1036,6 +1130,8 @@ unnecessary_dunder_call.py:77:9: PLC2801 [*] Unnecessary dunder call to `__add__
 79 79 | # Slices
 80 80 | print([a.__add__(1), a.__sub__(1)][0:1])  # PLC2801
 
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
+
 unnecessary_dunder_call.py:80:8: PLC2801 [*] Unnecessary dunder call to `__add__`. Use `+` operator.
    |
 79 | # Slices
@@ -1044,7 +1140,7 @@ unnecessary_dunder_call.py:80:8: PLC2801 [*] Unnecessary dunder call to `__add__
    |
    = help: Use `+` operator
 
-ℹ Unsafe fix
+Suggested fix:
 77 77 | print(*[a.__add__(1)])  # PLC2801
 78 78 | 
 79 79 | # Slices
@@ -1054,6 +1150,8 @@ unnecessary_dunder_call.py:80:8: PLC2801 [*] Unnecessary dunder call to `__add__
 82 82 | 
 83 83 | class Thing:
 
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
+
 unnecessary_dunder_call.py:80:22: PLC2801 [*] Unnecessary dunder call to `__sub__`. Use `-` operator.
    |
 79 | # Slices
@@ -1062,7 +1160,7 @@ unnecessary_dunder_call.py:80:22: PLC2801 [*] Unnecessary dunder call to `__sub_
    |
    = help: Use `-` operator
 
-ℹ Unsafe fix
+Suggested fix:
 77 77 | print(*[a.__add__(1)])  # PLC2801
 78 78 | 
 79 79 | # Slices
@@ -1071,6 +1169,8 @@ unnecessary_dunder_call.py:80:22: PLC2801 [*] Unnecessary dunder call to `__sub_
 81 81 | 
 82 82 | 
 83 83 | class Thing:
+
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 unnecessary_dunder_call.py:92:16: PLC2801 Unnecessary dunder call to `__getattribute__`. Access attribute directly or use getattr built-in function.
    |
@@ -1081,5 +1181,3 @@ unnecessary_dunder_call.py:92:16: PLC2801 Unnecessary dunder call to `__getattri
 94 |     def use_descriptor(self, item):
    |
    = help: Access attribute directly or use getattr built-in function
-
-

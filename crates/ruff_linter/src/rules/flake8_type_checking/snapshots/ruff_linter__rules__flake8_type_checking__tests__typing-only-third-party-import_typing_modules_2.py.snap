@@ -11,7 +11,7 @@ typing_modules_2.py:7:24: TCH002 [*] Move third-party import `pandas.DataFrame` 
   |
   = help: Move into type-checking block
 
-ℹ Unsafe fix
+Suggested fix:
 2  2  | 
 3  3  | import typing_extensions
 4  4  | 
@@ -24,4 +24,4 @@ typing_modules_2.py:7:24: TCH002 [*] Move third-party import `pandas.DataFrame` 
 8  10 | 
 9  11 |     df: DataFrame
 
-
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.

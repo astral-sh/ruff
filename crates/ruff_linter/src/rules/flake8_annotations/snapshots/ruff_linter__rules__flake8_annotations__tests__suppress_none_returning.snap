@@ -10,7 +10,7 @@ suppress_none_returning.py:45:5: ANN201 [*] Missing return type annotation for p
    |
    = help: Add return type annotation: `bool`
 
-ℹ Unsafe fix
+Suggested fix:
 42 42 | 
 43 43 | 
 44 44 | # Error
@@ -19,6 +19,8 @@ suppress_none_returning.py:45:5: ANN201 [*] Missing return type annotation for p
 46 46 |     return True
 47 47 | 
 48 48 | 
+
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 suppress_none_returning.py:50:5: ANN201 [*] Missing return type annotation for public function `foo`
    |
@@ -30,7 +32,7 @@ suppress_none_returning.py:50:5: ANN201 [*] Missing return type annotation for p
    |
    = help: Add return type annotation: `bool | None`
 
-ℹ Unsafe fix
+Suggested fix:
 47 47 | 
 48 48 | 
 49 49 | # Error
@@ -40,6 +42,8 @@ suppress_none_returning.py:50:5: ANN201 [*] Missing return type annotation for p
 52 52 |     if a == 4:
 53 53 |         return True
 
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
+
 suppress_none_returning.py:59:9: ANN001 Missing type annotation for function argument `a`
    |
 58 | # Error (on the argument, but not the return type)
@@ -47,5 +51,3 @@ suppress_none_returning.py:59:9: ANN001 Missing type annotation for function arg
    |         ^ ANN001
 60 |     a = 2 + 2
    |
-
-

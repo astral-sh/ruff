@@ -10,7 +10,7 @@ D.py:307:5: D300 [*] Use triple double quotes `"""`
     |
     = help: Convert to triple double quotes
 
-ℹ Safe fix
+Suggested fix:
 304 304 | 
 305 305 | @expect('D300: Use """triple double quotes""" (found \'\'\'-quotes)')
 306 306 | def triple_single_quotes_raw():
@@ -19,6 +19,8 @@ D.py:307:5: D300 [*] Use triple double quotes `"""`
 308 308 | 
 309 309 | 
 310 310 | @expect('D300: Use """triple double quotes""" (found \'\'\'-quotes)')
+
+    Run `ruff check --fix` to apply this fix.
 
 D.py:312:5: D300 [*] Use triple double quotes `"""`
     |
@@ -29,7 +31,7 @@ D.py:312:5: D300 [*] Use triple double quotes `"""`
     |
     = help: Convert to triple double quotes
 
-ℹ Safe fix
+Suggested fix:
 309 309 | 
 310 310 | @expect('D300: Use """triple double quotes""" (found \'\'\'-quotes)')
 311 311 | def triple_single_quotes_raw_uppercase():
@@ -38,6 +40,8 @@ D.py:312:5: D300 [*] Use triple double quotes `"""`
 313 313 | 
 314 314 | 
 315 315 | @expect('D300: Use """triple double quotes""" (found \'-quotes)')
+
+    Run `ruff check --fix` to apply this fix.
 
 D.py:317:5: D300 [*] Use triple double quotes `"""`
     |
@@ -48,7 +52,7 @@ D.py:317:5: D300 [*] Use triple double quotes `"""`
     |
     = help: Convert to triple double quotes
 
-ℹ Safe fix
+Suggested fix:
 314 314 | 
 315 315 | @expect('D300: Use """triple double quotes""" (found \'-quotes)')
 316 316 | def single_quotes_raw():
@@ -57,6 +61,8 @@ D.py:317:5: D300 [*] Use triple double quotes `"""`
 318 318 | 
 319 319 | 
 320 320 | @expect('D300: Use """triple double quotes""" (found \'-quotes)')
+
+    Run `ruff check --fix` to apply this fix.
 
 D.py:322:5: D300 [*] Use triple double quotes `"""`
     |
@@ -67,7 +73,7 @@ D.py:322:5: D300 [*] Use triple double quotes `"""`
     |
     = help: Convert to triple double quotes
 
-ℹ Safe fix
+Suggested fix:
 319 319 | 
 320 320 | @expect('D300: Use """triple double quotes""" (found \'-quotes)')
 321 321 | def single_quotes_raw_uppercase():
@@ -76,6 +82,8 @@ D.py:322:5: D300 [*] Use triple double quotes `"""`
 323 323 | 
 324 324 | 
 325 325 | @expect('D300: Use """triple double quotes""" (found \'-quotes)')
+
+    Run `ruff check --fix` to apply this fix.
 
 D.py:328:5: D300 [*] Use triple double quotes `"""`
     |
@@ -86,7 +94,7 @@ D.py:328:5: D300 [*] Use triple double quotes `"""`
     |
     = help: Convert to triple double quotes
 
-ℹ Safe fix
+Suggested fix:
 325 325 | @expect('D300: Use """triple double quotes""" (found \'-quotes)')
 326 326 | @expect('D301: Use r""" if any backslashes in a docstring')
 327 327 | def single_quotes_raw_uppercase_backslash():
@@ -95,6 +103,8 @@ D.py:328:5: D300 [*] Use triple double quotes `"""`
 329 329 | 
 330 330 | 
 331 331 | @expect('D301: Use r""" if any backslashes in a docstring')
+
+    Run `ruff check --fix` to apply this fix.
 
 D.py:645:5: D300 [*] Use triple double quotes `"""`
     |
@@ -108,7 +118,7 @@ D.py:645:5: D300 [*] Use triple double quotes `"""`
     |
     = help: Convert to triple double quotes
 
-ℹ Safe fix
+Suggested fix:
 642 642 | 
 643 643 | 
 644 644 | def single_line_docstring_with_an_escaped_backslash():
@@ -120,6 +130,8 @@ D.py:645:5: D300 [*] Use triple double quotes `"""`
 648 648 | class StatementOnSameLineAsDocstring:
 649 649 |     "After this docstring there's another statement on the same line separated by a semicolon." ; priorities=1
 
+    Run `ruff check --fix` to apply this fix.
+
 D.py:649:5: D300 [*] Use triple double quotes `"""`
     |
 648 | class StatementOnSameLineAsDocstring:
@@ -130,7 +142,7 @@ D.py:649:5: D300 [*] Use triple double quotes `"""`
     |
     = help: Convert to triple double quotes
 
-ℹ Safe fix
+Suggested fix:
 646 646 |     "
 647 647 | 
 648 648 | class StatementOnSameLineAsDocstring:
@@ -140,6 +152,8 @@ D.py:649:5: D300 [*] Use triple double quotes `"""`
 651 651 |         pass
 652 652 | 
 
+    Run `ruff check --fix` to apply this fix.
+
 D.py:654:5: D300 [*] Use triple double quotes `"""`
     |
 653 | class StatementOnSameLineAsDocstring:
@@ -148,7 +162,7 @@ D.py:654:5: D300 [*] Use triple double quotes `"""`
     |
     = help: Convert to triple double quotes
 
-ℹ Safe fix
+Suggested fix:
 651 651 |         pass
 652 652 | 
 653 653 | class StatementOnSameLineAsDocstring:
@@ -157,6 +171,8 @@ D.py:654:5: D300 [*] Use triple double quotes `"""`
 655 655 | 
 656 656 | 
 657 657 | class CommentAfterDocstring:
+
+    Run `ruff check --fix` to apply this fix.
 
 D.py:658:5: D300 [*] Use triple double quotes `"""`
     |
@@ -168,7 +184,7 @@ D.py:658:5: D300 [*] Use triple double quotes `"""`
     |
     = help: Convert to triple double quotes
 
-ℹ Safe fix
+Suggested fix:
 655 655 | 
 656 656 | 
 657 657 | class CommentAfterDocstring:
@@ -177,6 +193,8 @@ D.py:658:5: D300 [*] Use triple double quotes `"""`
 659 659 |     def sort_services(self):
 660 660 |         pass
 661 661 | 
+
+    Run `ruff check --fix` to apply this fix.
 
 D.py:664:5: D300 [*] Use triple double quotes `"""`
     |
@@ -188,7 +206,7 @@ D.py:664:5: D300 [*] Use triple double quotes `"""`
     |
     = help: Convert to triple double quotes
 
-ℹ Safe fix
+Suggested fix:
 661 661 | 
 662 662 | 
 663 663 | def newline_after_closing_quote(self):
@@ -200,4 +218,4 @@ D.py:664:5: D300 [*] Use triple double quotes `"""`
 667 667 | 
 668 668 | 
 
-
+    Run `ruff check --fix` to apply this fix.
