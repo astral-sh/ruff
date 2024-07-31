@@ -2238,6 +2238,28 @@ mod tests {
         Ok(())
     }
 
+    #[test]
+    fn attribute_of_union() -> anyhow::Result<()> {
+        let mut db = setup_db();
+
+        db.write_dedented(
+            "/src/a.py",
+            "
+            if flag:
+                class C:
+                    x = 1
+            else:
+                class C:
+                    x = 2
+            y = C.x
+            ",
+        )?;
+
+        assert_public_ty(&db, "/src/a.py", "y", "Literal[1, 2]");
+
+        Ok(())
+    }
+
     fn first_public_def<'db>(db: &'db TestDb, file: File, name: &str) -> Definition<'db> {
         let scope = global_scope(db, file);
         *use_def_map(db, scope)
