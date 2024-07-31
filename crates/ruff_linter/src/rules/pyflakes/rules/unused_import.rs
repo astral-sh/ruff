@@ -9,7 +9,7 @@ use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast as ast;
 use ruff_python_ast::{Stmt, StmtImportFrom};
 use ruff_python_semantic::{
-    AnyImport, BindingKind, Exceptions, Imported, NodeId, Scope, SemanticModel,
+    AnyImport, BindingKind, Exceptions, Imported, NodeId, Scope, SemanticModel, SubmoduleImport,
 };
 use ruff_text_size::{Ranged, TextRange};
 
@@ -17,16 +17,6 @@ use crate::checkers::ast::Checker;
 use crate::fix;
 use crate::registry::Rule;
 use crate::rules::{isort, isort::ImportSection, isort::ImportType};
-
-#[derive(Debug, Copy, Clone, Eq, PartialEq)]
-enum UnusedImportContext {
-    ExceptHandler,
-    Init {
-        first_party: bool,
-        dunder_all_count: usize,
-        ignore_init_module_imports: bool,
-    },
-}
 
 /// ## What it does
 /// Checks for unused imports.
@@ -111,8 +101,9 @@ pub struct UnusedImport {
     module: String,
     /// Name of the import binding
     binding: String,
-    context: Option<UnusedImportContext>,
+    context: UnusedImportContext,
     multiple: bool,
+    ignore_init_module_imports: bool,
 }
 
 impl Violation for UnusedImport {
@@ -122,17 +113,17 @@ impl Violation for UnusedImport {
     fn message(&self) -> String {
         let UnusedImport { name, context, .. } = self;
         match context {
-            Some(UnusedImportContext::ExceptHandler) => {
+            UnusedImportContext::ExceptHandler => {
                 format!(
                     "`{name}` imported but unused; consider using `importlib.util.find_spec` to test for availability"
                 )
             }
-            Some(UnusedImportContext::Init { .. }) => {
+            UnusedImportContext::DunderInitFirstParty { .. } => {
                 format!(
                     "`{name}` imported but unused; consider removing, adding to `__all__`, or using a redundant alias"
                 )
             }
-            None => format!("`{name}` imported but unused"),
+            UnusedImportContext::Other => format!("`{name}` imported but unused"),
         }
     }
 
@@ -142,28 +133,89 @@ impl Violation for UnusedImport {
             module,
             binding,
             multiple,
-            ..
+            ignore_init_module_imports,
+            context,
         } = self;
-        match self.context {
-            Some(UnusedImportContext::Init {
-                first_party: true,
-                dunder_all_count: 1,
-                ignore_init_module_imports: true,
-            }) => Some(format!("Add unused import `{binding}` to __all__")),
+        if *ignore_init_module_imports {
+            match context {
+                UnusedImportContext::DunderInitFirstParty {
+                    dunder_all_count: DunderAllCount::Zero,
+                    submodule_import: false,
+                } => return Some(format!("Use an explicit re-export: `{module} as {module}`")),
+                UnusedImportContext::DunderInitFirstParty {
+                    dunder_all_count: DunderAllCount::Zero,
+                    submodule_import: true,
+                } => {
+                    return Some(format!(
+                    "Use an explicit re-export: `import {parent} as {parent}; import {binding}`",
+                    parent = binding
+                        .split('.')
+                        .next()
+                        .expect("Expected all submodule imports to contain a '.'")
+                    ))
+                }
+                UnusedImportContext::DunderInitFirstParty {
+                    dunder_all_count: DunderAllCount::One,
+                    submodule_import: false,
+                } => return Some(format!("Add unused import `{binding}` to __all__")),
+                UnusedImportContext::DunderInitFirstParty {
+                    dunder_all_count: DunderAllCount::One,
+                    submodule_import: true,
+                } => {
+                    return Some(format!(
+                        "Add `{}` to __all__",
+                        binding
+                            .split('.')
+                            .next()
+                            .expect("Expected all submodule imports to contain a '.'")
+                    ))
+                }
+                UnusedImportContext::DunderInitFirstParty {
+                    dunder_all_count: DunderAllCount::Many,
+                    submodule_import: _,
+                }
+                | UnusedImportContext::ExceptHandler
+                | UnusedImportContext::Other => {}
+            }
+        }
+        Some(if *multiple {
+            "Remove unused import".to_string()
+        } else {
+            format!("Remove unused import: `{name}`")
+        })
+    }
+}
 
-            Some(UnusedImportContext::Init {
-                first_party: true,
-                dunder_all_count: 0,
-                ignore_init_module_imports: true,
-            }) => Some(format!("Use an explicit re-export: `{module} as {module}`")),
+/// Enumeration providing three possible answers to the question:
+/// "How many `__all__` definitions are there in this file?"
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum DunderAllCount {
+    Zero,
+    One,
+    Many,
+}
 
-            _ => Some(if *multiple {
-                "Remove unused import".to_string()
-            } else {
-                format!("Remove unused import: `{name}`")
-            }),
+impl From<usize> for DunderAllCount {
+    fn from(value: usize) -> Self {
+        match value {
+            0 => Self::Zero,
+            1 => Self::One,
+            _ => Self::Many,
         }
     }
+}
+
+#[derive(Debug, Copy, Clone, Eq, PartialEq, is_macro::Is)]
+enum UnusedImportContext {
+    /// The unused import occurs inside an except handler
+    ExceptHandler,
+    /// The unused import is a first-party import in an `__init__.py` file
+    DunderInitFirstParty {
+        dunder_all_count: DunderAllCount,
+        submodule_import: bool,
+    },
+    /// The unused import is something else
+    Other,
 }
 
 fn is_first_party(qualified_name: &str, level: u32, checker: &Checker) -> bool {
@@ -304,31 +356,20 @@ pub(crate) fn unused_import(checker: &Checker, scope: &Scope, diagnostics: &mut 
             .into_iter()
             .map(|binding| {
                 let context = if in_except_handler {
-                    Some(UnusedImportContext::ExceptHandler)
-                } else if in_init && !binding.import.is_submodule_import() {
-                    Some(UnusedImportContext::Init {
-                        first_party: is_first_party(
-                            &binding.import.qualified_name().to_string(),
-                            level,
-                            checker,
-                        ),
-                        dunder_all_count: dunder_all_exprs.len(),
-                        ignore_init_module_imports: !fix_init,
-                    })
+                    UnusedImportContext::ExceptHandler
+                } else if in_init
+                    && is_first_party(&binding.import.qualified_name().to_string(), level, checker)
+                {
+                    UnusedImportContext::DunderInitFirstParty {
+                        dunder_all_count: DunderAllCount::from(dunder_all_exprs.len()),
+                        submodule_import: binding.import.is_submodule_import(),
+                    }
                 } else {
-                    None
+                    UnusedImportContext::Other
                 };
                 (binding, context)
             })
-            .partition(|(_, context)| {
-                matches!(
-                    context,
-                    Some(UnusedImportContext::Init {
-                        first_party: true,
-                        ..
-                    })
-                ) && preview_mode
-            });
+            .partition(|(_, context)| context.is_dunder_init_first_party() && preview_mode);
 
         // generate fixes that are shared across bindings in the statement
         let (fix_remove, fix_reexport) =
@@ -344,7 +385,7 @@ pub(crate) fn unused_import(checker: &Checker, scope: &Scope, diagnostics: &mut 
                     fix_by_reexporting(
                         checker,
                         import_statement,
-                        to_reexport.iter().map(|(b, _)| b).collect::<Vec<_>>(),
+                        to_reexport.iter().map(|(b, _)| b),
                         &dunder_all_exprs,
                     )
                     .ok(),
@@ -364,6 +405,7 @@ pub(crate) fn unused_import(checker: &Checker, scope: &Scope, diagnostics: &mut 
                     binding: binding.name.to_string(),
                     context,
                     multiple,
+                    ignore_init_module_imports: !fix_init,
                 },
                 binding.range,
             );
@@ -387,8 +429,9 @@ pub(crate) fn unused_import(checker: &Checker, scope: &Scope, diagnostics: &mut 
                 name: binding.import.qualified_name().to_string(),
                 module: binding.import.member_name().to_string(),
                 binding: binding.name.to_string(),
-                context: None,
+                context: UnusedImportContext::Other,
                 multiple: false,
+                ignore_init_module_imports: !fix_init,
             },
             binding.range,
         );
@@ -410,6 +453,31 @@ struct ImportBinding<'a> {
     range: TextRange,
     /// The range of the import's parent statement.
     parent_range: Option<TextRange>,
+}
+
+impl<'a> ImportBinding<'a> {
+    /// The symbol that is stored in the outer scope as a result of this import.
+    ///
+    /// For example:
+    /// - `import foo` => `foo` symbol stored in outer scope
+    /// - `import foo as bar` => `bar` symbol stored in outer scope
+    /// - `from foo import bar` => `bar` symbol stored in outer scope
+    /// - `from foo import bar as baz` => `baz` symbol stored in outer scope
+    /// - `import foo.bar` => `foo` symbol stored in outer scope
+    fn symbol_stored_in_outer_scope(&self) -> &str {
+        match &self.import {
+            AnyImport::FromImport(_) => self.name,
+            AnyImport::Import(_) => self.name,
+            AnyImport::SubmoduleImport(SubmoduleImport { qualified_name }) => {
+                qualified_name.segments().first().unwrap_or_else(|| {
+                    panic!(
+                        "Expected an import binding to have a non-empty qualified name;
+                        got {qualified_name}"
+                    )
+                })
+            }
+        }
+    }
 }
 
 impl Ranged for ImportBinding<'_> {
@@ -461,29 +529,31 @@ fn fix_by_removing_imports<'a>(
 
 /// Generate a [`Fix`] to make bindings in a statement explicit, either by adding them to `__all__`
 /// or changing them from `import a` to `import a as a`.
-fn fix_by_reexporting(
+fn fix_by_reexporting<'a>(
     checker: &Checker,
     node_id: NodeId,
-    mut imports: Vec<&ImportBinding>,
+    imports: impl IntoIterator<Item = &'a ImportBinding<'a>>,
     dunder_all_exprs: &[&ast::Expr],
 ) -> Result<Fix> {
     let statement = checker.semantic().statement(node_id);
-    if imports.is_empty() {
-        bail!("Expected import bindings");
-    }
 
-    imports.sort_by_key(|b| b.name);
+    let imports = {
+        let mut imports: Vec<&str> = imports
+            .into_iter()
+            .map(ImportBinding::symbol_stored_in_outer_scope)
+            .collect();
+        if imports.is_empty() {
+            bail!("Expected import bindings");
+        }
+        imports.sort_unstable();
+        imports
+    };
 
     let edits = match dunder_all_exprs {
-        [] => fix::edits::make_redundant_alias(
-            imports.iter().map(|b| b.import.member_name()),
-            statement,
-        ),
-        [dunder_all] => fix::edits::add_to_dunder_all(
-            imports.iter().map(|b| b.name),
-            dunder_all,
-            checker.stylist(),
-        ),
+        [] => fix::edits::make_redundant_alias(imports.into_iter(), statement),
+        [dunder_all] => {
+            fix::edits::add_to_dunder_all(imports.into_iter(), dunder_all, checker.stylist())
+        }
         _ => bail!("Cannot offer a fix when there are multiple __all__ definitions"),
     };
 

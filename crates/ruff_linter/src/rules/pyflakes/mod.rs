@@ -235,11 +235,15 @@ mod tests {
     }
 
     #[test_case(
+        r"import submodule.a",
+        "f401_preview_first_party_submodule_no_dunder_all"
+    )]
+    #[test_case(
         r"
         import submodule.a
         __all__ = ['FOO']
         FOO = 42",
-        "f401_preview_first_party_submodule"
+        "f401_preview_first_party_submodule_dunder_all"
     )]
     fn f401_preview_first_party_submodule(contents: &str, snapshot: &str) {
         let diagnostics = test_contents(
