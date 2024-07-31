@@ -20,8 +20,6 @@ D410.py:4:5: D410 [*] Missing blank line after section ("Parameters")
 11 12 |     -------
 12 13 |     int
 
-    Run `ruff check --fix` to apply this fix.
-
 D410.py:21:5: D410 [*] Missing blank line after section ("Parameters")
    |
 19 |     """Showcase function.
@@ -40,5 +38,3 @@ D410.py:21:5: D410 [*] Missing blank line after section ("Parameters")
 23 24 |     Returns
 24 25 |     -------
 25 26 |     """
-
-    Run `ruff check --fix` to apply this fix.

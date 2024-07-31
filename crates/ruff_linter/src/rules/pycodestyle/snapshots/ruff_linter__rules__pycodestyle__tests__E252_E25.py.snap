@@ -21,8 +21,6 @@ E25.py:46:15: E252 [*] Missing whitespace around parameter equals
 48 48 | #: Okay
 49 49 | def add(a: int = _default(name='f')):
 
-    Run `ruff check --fix` to apply this fix.
-
 E25.py:46:15: E252 [*] Missing whitespace around parameter equals
    |
 44 |     return a + b
@@ -42,8 +40,6 @@ E25.py:46:15: E252 [*] Missing whitespace around parameter equals
 47 47 |     return a + b + c
 48 48 | #: Okay
 49 49 | def add(a: int = _default(name='f')):
-
-    Run `ruff check --fix` to apply this fix.
 
 E25.py:46:26: E252 [*] Missing whitespace around parameter equals
    |
@@ -65,8 +61,6 @@ E25.py:46:26: E252 [*] Missing whitespace around parameter equals
 48 48 | #: Okay
 49 49 | def add(a: int = _default(name='f')):
 
-    Run `ruff check --fix` to apply this fix.
-
 E25.py:46:36: E252 [*] Missing whitespace around parameter equals
    |
 44 |     return a + b
@@ -86,5 +80,3 @@ E25.py:46:36: E252 [*] Missing whitespace around parameter equals
 47 47 |     return a + b + c
 48 48 | #: Okay
 49 49 | def add(a: int = _default(name='f')):
-
-    Run `ruff check --fix` to apply this fix.

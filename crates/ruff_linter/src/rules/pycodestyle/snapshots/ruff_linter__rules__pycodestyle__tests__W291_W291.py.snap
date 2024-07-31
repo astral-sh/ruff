@@ -40,8 +40,6 @@ W291.py:8:8: W291 [*] Trailing whitespace
 10 10 | }'
 11 11 | 
 
-    Run `ruff check --fix` to apply this fix.
-
 W291.py:14:10: W291 [*] Trailing whitespace
    |
 12 | # Trailing whitespace after `2`
@@ -58,5 +56,3 @@ W291.py:14:10: W291 [*] Trailing whitespace
 14    |-    1 + 2 
    14 |+    1 + 2
 15 15 | }'
-
-    Run `ruff check --fix` to apply this fix.

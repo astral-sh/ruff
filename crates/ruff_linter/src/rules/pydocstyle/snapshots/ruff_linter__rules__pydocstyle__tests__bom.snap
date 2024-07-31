@@ -10,5 +10,3 @@ bom.py:1:1: D300 [*] Use triple double quotes `"""`
 
 1   |-﻿''' SAM macro definitions '''
   1 |+﻿""" SAM macro definitions """
-
-    Run `ruff check --fix` to apply this fix.

@@ -25,8 +25,6 @@ no_method_decorator.py:15:5: PLR0203 [*] Static method defined without decorator
 21 21 | class Class:
 22 22 |     def class_method(cls):
 
-    Run `ruff check --fix` to apply this fix.
-
 no_method_decorator.py:27:5: PLR0203 [*] Static method defined without decorator
    |
 25 |     class_method = classmethod(class_method);another_statement
@@ -45,6 +43,4 @@ no_method_decorator.py:27:5: PLR0203 [*] Static method defined without decorator
 28 29 |         pass
 29 30 | 
 30    |-    static_method = staticmethod(static_method);
-   31 |+    
-
-    Run `ruff check --fix` to apply this fix.
+   31 |+

@@ -13,5 +13,3 @@ UP009_6.py:1:2: UP009 [*] UTF-8 encoding declaration is unnecessary
 2 1 | print("Hello world")
 3 2 | 
 4 3 | """
-
-    Run `ruff check --fix` to apply this fix.

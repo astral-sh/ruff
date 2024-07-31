@@ -20,8 +20,6 @@ invalid_characters.py:30:16: PLE2513 [*] Invalid unescaped character ESC, use "\
 32 32 | 
 33 33 | esc_ok = '\x1b'
 
-    Run `ruff check --fix` to apply this fix.
-
 invalid_characters.py:31:17: PLE2513 [*] Invalid unescaped character ESC, use "\x1B" instead
    |
 30 | esc = 'esc esc ␛'
@@ -40,8 +38,6 @@ invalid_characters.py:31:17: PLE2513 [*] Invalid unescaped character ESC, use "\
 32 32 | 
 33 33 | esc_ok = '\x1b'
 34 34 | esc_ok = f'\x1b'
-
-    Run `ruff check --fix` to apply this fix.
 
 invalid_characters.py:55:29: PLE2513 [*] Invalid unescaped character ESC, use "\x1B" instead
    |
@@ -63,8 +59,6 @@ invalid_characters.py:55:29: PLE2513 [*] Invalid unescaped character ESC, use "\
 57 57 | # https://github.com/astral-sh/ruff/issues/7455#issuecomment-1741998106
 58 58 | x = f"""}}ab"""
 
-    Run `ruff check --fix` to apply this fix.
-
 invalid_characters.py:60:12: PLE2513 [*] Invalid unescaped character ESC, use "\x1B" instead
    |
 58 | x = f"""}}ab"""
@@ -79,5 +73,3 @@ invalid_characters.py:60:12: PLE2513 [*] Invalid unescaped character ESC, use "\
 59 59 | # https://github.com/astral-sh/ruff/issues/7455#issuecomment-1741998256
 60    |-x = f"""}}a␛b"""
    60 |+x = f"""}}a\x1Bb"""
-
-    Run `ruff check --fix` to apply this fix.

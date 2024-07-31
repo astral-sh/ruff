@@ -18,8 +18,6 @@ future_annotations.py:40:4: UP007 [*] Use `X | Y` for type annotations
 41 41 | 
 42 42 | MyList: TypeAlias = Union[List[int], List[str]]
 
-    Run `ruff check --fix` to apply this fix.
-
 future_annotations.py:42:21: UP007 [*] Use `X | Y` for type annotations
    |
 40 | x: Optional[int] = None
@@ -34,5 +32,3 @@ future_annotations.py:42:21: UP007 [*] Use `X | Y` for type annotations
 41 41 | 
 42    |-MyList: TypeAlias = Union[List[int], List[str]]
    42 |+MyList: TypeAlias = List[int] | List[str]
-
-    Run `ruff check --fix` to apply this fix.

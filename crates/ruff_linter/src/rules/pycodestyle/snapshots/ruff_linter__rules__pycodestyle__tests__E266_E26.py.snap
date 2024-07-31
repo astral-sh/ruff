@@ -20,8 +20,6 @@ E26.py:19:5: E266 [*] Too many leading `#` before block comment
 21 21 | 
 22 22 |     ### Of course it is unused
 
-    Run `ruff check --fix` to apply this fix.
-
 E26.py:22:5: E266 [*] Too many leading `#` before block comment
    |
 20 |     a = 42
@@ -41,8 +39,6 @@ E26.py:22:5: E266 [*] Too many leading `#` before block comment
 23 23 |     return
 24 24 | #: E265:1:1 E266:2:1
 25 25 | ##if DEBUG:
-
-    Run `ruff check --fix` to apply this fix.
 
 E26.py:26:1: E266 [*] Too many leading `#` before block comment
    |
@@ -64,8 +60,6 @@ E26.py:26:1: E266 [*] Too many leading `#` before block comment
 28 28 | #########################################
 29 29 | #:
 
-    Run `ruff check --fix` to apply this fix.
-
 E26.py:69:1: E266 [*] Too many leading `#` before block comment
    |
 68 | #: E265:5:1
@@ -85,8 +79,6 @@ E26.py:69:1: E266 [*] Too many leading `#` before block comment
 71 71 | # F   Means test is failing (F)
 72 72 | # EF  Means test is giving error and Failing
 
-    Run `ruff check --fix` to apply this fix.
-
 E26.py:82:1: E266 [*] Too many leading `#` before block comment
    |
 80 | # We should strip the space, but preserve the hashes.
@@ -105,6 +97,4 @@ E26.py:82:1: E266 [*] Too many leading `#` before block comment
    82 |+# Foo
 83 83 | 
 84 84 | a = 1  ## Foo
-85 85 | 
-
-    Run `ruff check --fix` to apply this fix.
+85 85 |

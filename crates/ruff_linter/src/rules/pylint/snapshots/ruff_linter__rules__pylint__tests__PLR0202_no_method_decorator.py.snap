@@ -25,8 +25,6 @@ no_method_decorator.py:9:5: PLR0202 [*] Class method defined without decorator
 15 15 |     def pick_one_color():  # [no-staticmethod-decorator]
 16 16 |         """staticmethod to pick one fruit color"""
 
-    Run `ruff check --fix` to apply this fix.
-
 no_method_decorator.py:22:5: PLR0202 [*] Class method defined without decorator
    |
 21 | class Class:
@@ -48,5 +46,3 @@ no_method_decorator.py:22:5: PLR0202 [*] Class method defined without decorator
 26 27 | 
 27 28 |     def static_method():
 28 29 |         pass
-
-    Run `ruff check --fix` to apply this fix.

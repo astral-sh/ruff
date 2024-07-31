@@ -31,8 +31,6 @@ NPY201_2.py:6:5: NPY201 [*] `np.PINF` will be removed in NumPy 2.0. Use `numpy.i
 8 8 |     np.PZERO
 9 9 | 
 
-    Run `ruff check --fix` to apply this fix.
-
 NPY201_2.py:8:5: NPY201 [*] `np.PZERO` will be removed in NumPy 2.0. Use `0.0` instead.
    |
  6 |     np.PINF
@@ -52,8 +50,6 @@ NPY201_2.py:8:5: NPY201 [*] `np.PZERO` will be removed in NumPy 2.0. Use `0.0` i
 9 9 | 
 10 10 |     np.recfromcsv
 11 11 | 
-
-    Run `ruff check --fix` to apply this fix.
 
 NPY201_2.py:10:5: NPY201 `np.recfromcsv` will be removed in NumPy 2.0. Use `np.genfromtxt` with comma delimiter instead.
    |
@@ -95,8 +91,6 @@ NPY201_2.py:14:5: NPY201 [*] `np.round_` will be removed in NumPy 2.0. Use `nump
 16 16 |     np.safe_eval
 17 17 | 
 
-    Run `ruff check --fix` to apply this fix.
-
 NPY201_2.py:16:5: NPY201 [*] `np.safe_eval` will be removed in NumPy 2.0. Use `ast.literal_eval` instead.
    |
 14 |     np.round_(12.34)
@@ -121,8 +115,6 @@ NPY201_2.py:16:5: NPY201 [*] `np.safe_eval` will be removed in NumPy 2.0. Use `a
 17 18 | 
 18 19 |     np.sctype2char
 19 20 | 
-
-    Run `ruff check --fix` to apply this fix.
 
 NPY201_2.py:18:5: NPY201 `np.sctype2char` will be removed without replacement in NumPy 2.0
    |
@@ -184,8 +176,6 @@ NPY201_2.py:28:5: NPY201 [*] `np.singlecomplex` will be removed in NumPy 2.0. Us
 30 30 |     np.string_("asdf")
 31 31 | 
 
-    Run `ruff check --fix` to apply this fix.
-
 NPY201_2.py:30:5: NPY201 [*] `np.string_` will be removed in NumPy 2.0. Use `numpy.bytes_` instead.
    |
 28 |     np.singlecomplex(12+1j)
@@ -205,8 +195,6 @@ NPY201_2.py:30:5: NPY201 [*] `np.string_` will be removed in NumPy 2.0. Use `num
 31 31 | 
 32 32 |     np.source
 33 33 | 
-
-    Run `ruff check --fix` to apply this fix.
 
 NPY201_2.py:32:5: NPY201 [*] `np.source` will be removed in NumPy 2.0. Use `inspect.getsource` instead.
    |
@@ -233,8 +221,6 @@ NPY201_2.py:32:5: NPY201 [*] `np.source` will be removed in NumPy 2.0. Use `insp
 34 35 |     np.tracemalloc_domain
 35 36 | 
 
-    Run `ruff check --fix` to apply this fix.
-
 NPY201_2.py:34:5: NPY201 [*] `np.tracemalloc_domain` will be removed in NumPy 2.0. Use `numpy.lib.tracemalloc_domain` instead.
    |
 32 |     np.source
@@ -260,8 +246,6 @@ NPY201_2.py:34:5: NPY201 [*] `np.tracemalloc_domain` will be removed in NumPy 2.
 36 37 |     np.unicode_("asf")
 37 38 | 
 
-    Run `ruff check --fix` to apply this fix.
-
 NPY201_2.py:36:5: NPY201 [*] `np.unicode_` will be removed in NumPy 2.0. Use `numpy.str_` instead.
    |
 34 |     np.tracemalloc_domain
@@ -281,8 +265,6 @@ NPY201_2.py:36:5: NPY201 [*] `np.unicode_` will be removed in NumPy 2.0. Use `nu
 37 37 | 
 38 38 |     np.who()
 39 39 | 
-
-    Run `ruff check --fix` to apply this fix.
 
 NPY201_2.py:38:5: NPY201 `np.who` will be removed in NumPy 2.0. Use an IDE variable explorer or `locals()` instead.
    |
@@ -314,8 +296,6 @@ NPY201_2.py:40:5: NPY201 [*] `np.row_stack` will be removed in NumPy 2.0. Use `n
 42 42 |     np.alltrue([True, True])
 43 43 | 
 
-    Run `ruff check --fix` to apply this fix.
-
 NPY201_2.py:42:5: NPY201 [*] `np.alltrue` will be removed in NumPy 2.0. Use `numpy.all` instead.
    |
 40 |     np.row_stack(([1,2], [3,4]))
@@ -335,8 +315,6 @@ NPY201_2.py:42:5: NPY201 [*] `np.alltrue` will be removed in NumPy 2.0. Use `num
 43 43 | 
 44 44 |     np.sometrue([True, False])
 45 45 | 
-
-    Run `ruff check --fix` to apply this fix.
 
 NPY201_2.py:44:5: NPY201 [*] `np.sometrue` will be removed in NumPy 2.0. Use `numpy.any` instead.
    |
@@ -358,8 +336,6 @@ NPY201_2.py:44:5: NPY201 [*] `np.sometrue` will be removed in NumPy 2.0. Use `nu
 46 46 |     np.cumproduct([1, 2, 3])
 47 47 | 
 
-    Run `ruff check --fix` to apply this fix.
-
 NPY201_2.py:46:5: NPY201 [*] `np.cumproduct` will be removed in NumPy 2.0. Use `numpy.cumprod` instead.
    |
 44 |     np.sometrue([True, False])
@@ -380,8 +356,6 @@ NPY201_2.py:46:5: NPY201 [*] `np.cumproduct` will be removed in NumPy 2.0. Use `
 48 48 |     np.product([1, 2, 3])
 49 49 | 
 
-    Run `ruff check --fix` to apply this fix.
-
 NPY201_2.py:48:5: NPY201 [*] `np.product` will be removed in NumPy 2.0. Use `numpy.prod` instead.
    |
 46 |     np.cumproduct([1, 2, 3])
@@ -401,8 +375,6 @@ NPY201_2.py:48:5: NPY201 [*] `np.product` will be removed in NumPy 2.0. Use `num
 49 49 | 
 50 50 |     np.trapz([1, 2, 3])
 51 51 | 
-
-    Run `ruff check --fix` to apply this fix.
 
 NPY201_2.py:50:5: NPY201 [*] `np.trapz` will be removed in NumPy 2.0. Use `numpy.trapezoid` on NumPy 2.0, or ignore this warning on earlier versions.
    |
@@ -436,8 +408,6 @@ NPY201_2.py:52:5: NPY201 [*] `np.in1d` will be removed in NumPy 2.0. Use `numpy.
 54 54 |     np.AxisError
 55 55 | 
 
-    Run `ruff check --fix` to apply this fix.
-
 NPY201_2.py:54:5: NPY201 [*] `np.AxisError` will be removed in NumPy 2.0. Use `numpy.exceptions.AxisError` instead.
    |
 52 |     np.in1d([1, 2], [1, 3, 5])
@@ -462,8 +432,6 @@ NPY201_2.py:54:5: NPY201 [*] `np.AxisError` will be removed in NumPy 2.0. Use `n
 55 56 | 
 56 57 |     np.ComplexWarning
 57 58 | 
-
-    Run `ruff check --fix` to apply this fix.
 
 NPY201_2.py:56:5: NPY201 [*] `np.ComplexWarning` will be removed in NumPy 2.0. Use `numpy.exceptions.ComplexWarning` instead.
    |
@@ -490,8 +458,6 @@ NPY201_2.py:56:5: NPY201 [*] `np.ComplexWarning` will be removed in NumPy 2.0. U
 58 59 |     np.compare_chararrays
 59 60 | 
 
-    Run `ruff check --fix` to apply this fix.
-
 NPY201_2.py:58:5: NPY201 [*] `np.compare_chararrays` will be removed in NumPy 2.0. Use `numpy.char.compare_chararrays` instead.
    |
 56 |     np.ComplexWarning
@@ -517,8 +483,6 @@ NPY201_2.py:58:5: NPY201 [*] `np.compare_chararrays` will be removed in NumPy 2.
 60 61 |     try:
 61 62 |         np.all([True, True])
 
-    Run `ruff check --fix` to apply this fix.
-
 NPY201_2.py:63:9: NPY201 [*] `np.alltrue` will be removed in NumPy 2.0. Use `numpy.all` instead.
    |
 61 |         np.all([True, True])
@@ -539,8 +503,6 @@ NPY201_2.py:63:9: NPY201 [*] `np.alltrue` will be removed in NumPy 2.0. Use `num
 65 65 |     try:
 66 66 |         np.anyyyy([True, True])
 
-    Run `ruff check --fix` to apply this fix.
-
 NPY201_2.py:68:9: NPY201 [*] `np.sometrue` will be removed in NumPy 2.0. Use `numpy.any` instead.
    |
 66 |         np.anyyyy([True, True])
@@ -559,5 +521,3 @@ NPY201_2.py:68:9: NPY201 [*] `np.sometrue` will be removed in NumPy 2.0. Use `nu
 69 69 |                                    # (must have an attribute access of the undeprecated name in the `try` body for it to be ignored)
 70 70 | 
 71 71 |     try:
-
-    Run `ruff check --fix` to apply this fix.

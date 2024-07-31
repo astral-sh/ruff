@@ -20,8 +20,6 @@ B905.py:4:1: B905 [*] `zip()` without an explicit `strict=` parameter
 6 6 | zip("a", "b")
 7 7 | zip("a", "b", *zip("c"))
 
-    Run `ruff check --fix` to apply this fix.
-
 B905.py:5:1: B905 [*] `zip()` without an explicit `strict=` parameter
   |
 3 | # Errors
@@ -41,8 +39,6 @@ B905.py:5:1: B905 [*] `zip()` without an explicit `strict=` parameter
 6 6 | zip("a", "b")
 7 7 | zip("a", "b", *zip("c"))
 8 8 | zip(zip("a"), strict=False)
-
-    Run `ruff check --fix` to apply this fix.
 
 B905.py:6:1: B905 [*] `zip()` without an explicit `strict=` parameter
   |
@@ -64,8 +60,6 @@ B905.py:6:1: B905 [*] `zip()` without an explicit `strict=` parameter
 8 8 | zip(zip("a"), strict=False)
 9 9 | zip(zip("a", strict=True))
 
-    Run `ruff check --fix` to apply this fix.
-
 B905.py:7:1: B905 [*] `zip()` without an explicit `strict=` parameter
   |
 5 | zip(range(3))
@@ -85,8 +79,6 @@ B905.py:7:1: B905 [*] `zip()` without an explicit `strict=` parameter
 8 8 | zip(zip("a"), strict=False)
 9 9 | zip(zip("a", strict=True))
 10 10 | 
-
-    Run `ruff check --fix` to apply this fix.
 
 B905.py:7:16: B905 [*] `zip()` without an explicit `strict=` parameter
   |
@@ -108,8 +100,6 @@ B905.py:7:16: B905 [*] `zip()` without an explicit `strict=` parameter
 9 9 | zip(zip("a", strict=True))
 10 10 | 
 
-    Run `ruff check --fix` to apply this fix.
-
 B905.py:8:5: B905 [*] `zip()` without an explicit `strict=` parameter
   |
 6 | zip("a", "b")
@@ -128,8 +118,6 @@ B905.py:8:5: B905 [*] `zip()` without an explicit `strict=` parameter
 9 9 | zip(zip("a", strict=True))
 10 10 | 
 11 11 | # OK
-
-    Run `ruff check --fix` to apply this fix.
 
 B905.py:9:1: B905 [*] `zip()` without an explicit `strict=` parameter
    |
@@ -151,8 +139,6 @@ B905.py:9:1: B905 [*] `zip()` without an explicit `strict=` parameter
 11 11 | # OK
 12 12 | zip(range(3), strict=True)
 
-    Run `ruff check --fix` to apply this fix.
-
 B905.py:24:1: B905 [*] `zip()` without an explicit `strict=` parameter
    |
 23 | # Errors (limited iterators).
@@ -170,8 +156,6 @@ B905.py:24:1: B905 [*] `zip()` without an explicit `strict=` parameter
 25 25 | zip([1, 2, 3], repeat(1, times=4))
 26 26 | 
 27 27 | import builtins
-
-    Run `ruff check --fix` to apply this fix.
 
 B905.py:25:1: B905 [*] `zip()` without an explicit `strict=` parameter
    |
@@ -193,8 +177,6 @@ B905.py:25:1: B905 [*] `zip()` without an explicit `strict=` parameter
 27 27 | import builtins
 28 28 | # Still an error even though it uses the qualified name
 
-    Run `ruff check --fix` to apply this fix.
-
 B905.py:29:1: B905 [*] `zip()` without an explicit `strict=` parameter
    |
 27 | import builtins
@@ -209,5 +191,3 @@ B905.py:29:1: B905 [*] `zip()` without an explicit `strict=` parameter
 28 28 | # Still an error even though it uses the qualified name
 29    |-builtins.zip([1, 2, 3])
    29 |+builtins.zip([1, 2, 3], strict=False)
-
-    Run `ruff check --fix` to apply this fix.

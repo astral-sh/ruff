@@ -18,8 +18,6 @@ PT024.py:14:1: PT024 [*] `pytest.mark.asyncio` is unnecessary for fixtures
 16 15 | async def my_fixture():  # Error before
 17 16 |     return 0
 
-    Run `ruff check --fix` to apply this fix.
-
 PT024.py:20:1: PT024 [*] `pytest.mark.asyncio` is unnecessary for fixtures
    |
 20 | @pytest.mark.asyncio
@@ -36,8 +34,6 @@ PT024.py:20:1: PT024 [*] `pytest.mark.asyncio` is unnecessary for fixtures
 21 20 | @pytest.fixture()
 22 21 | async def my_fixture():  # Error before no parens
 23 22 |     return 0
-
-    Run `ruff check --fix` to apply this fix.
 
 PT024.py:27:1: PT024 [*] `pytest.mark.asyncio` is unnecessary for fixtures
    |
@@ -57,8 +53,6 @@ PT024.py:27:1: PT024 [*] `pytest.mark.asyncio` is unnecessary for fixtures
 29 28 |     return 0
 30 29 | 
 
-    Run `ruff check --fix` to apply this fix.
-
 PT024.py:33:1: PT024 [*] `pytest.mark.asyncio` is unnecessary for fixtures
    |
 32 | @pytest.fixture()
@@ -75,5 +69,3 @@ PT024.py:33:1: PT024 [*] `pytest.mark.asyncio` is unnecessary for fixtures
 33    |-@pytest.mark.asyncio
 34 33 | async def my_fixture():  # Error after no parens
 35 34 |     return 0
-
-    Run `ruff check --fix` to apply this fix.

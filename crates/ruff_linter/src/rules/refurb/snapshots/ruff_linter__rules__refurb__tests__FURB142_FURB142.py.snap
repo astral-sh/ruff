@@ -23,8 +23,6 @@ FURB142.py:5:1: FURB142 [*] Use of `set.add()` in a for loop
 8 7 | for x in {1, 2, 3}:
 9 8 |     s.add(x)
 
-    Run `ruff check --fix` to apply this fix.
-
 FURB142.py:8:1: FURB142 [*] Use of `set.add()` in a for loop
    |
  6 |       s.add(x)
@@ -46,8 +44,6 @@ FURB142.py:8:1: FURB142 [*] Use of `set.add()` in a for loop
 10 9  | 
 11 10 | for x in (1, 2, 3):
 12 11 |     s.add(x)
-
-    Run `ruff check --fix` to apply this fix.
 
 FURB142.py:11:1: FURB142 [*] Use of `set.add()` in a for loop
    |
@@ -71,8 +67,6 @@ FURB142.py:11:1: FURB142 [*] Use of `set.add()` in a for loop
 14 13 | for x in (1, 2, 3):
 15 14 |     s.discard(x)
 
-    Run `ruff check --fix` to apply this fix.
-
 FURB142.py:14:1: FURB142 [*] Use of `set.discard()` in a for loop
    |
 12 |       s.add(x)
@@ -94,8 +88,6 @@ FURB142.py:14:1: FURB142 [*] Use of `set.discard()` in a for loop
 16 15 | 
 17 16 | for x in (1, 2, 3):
 18 17 |     s.add(x + 1)
-
-    Run `ruff check --fix` to apply this fix.
 
 FURB142.py:17:1: FURB142 [*] Use of `set.add()` in a for loop
    |
@@ -119,8 +111,6 @@ FURB142.py:17:1: FURB142 [*] Use of `set.add()` in a for loop
 20 19 | for x, y in ((1, 2), (3, 4)):
 21 20 |     s.add((x, y))
 
-    Run `ruff check --fix` to apply this fix.
-
 FURB142.py:20:1: FURB142 [*] Use of `set.add()` in a for loop
    |
 18 |       s.add(x + 1)
@@ -142,8 +132,6 @@ FURB142.py:20:1: FURB142 [*] Use of `set.add()` in a for loop
 22 21 | 
 23 22 | num = 123
 24 23 | 
-
-    Run `ruff check --fix` to apply this fix.
 
 FURB142.py:25:1: FURB142 [*] Use of `set.add()` in a for loop
    |
@@ -167,8 +155,6 @@ FURB142.py:25:1: FURB142 [*] Use of `set.add()` in a for loop
 28 27 | for x in (1, 2, 3):
 29 28 |     s.add((num, x))
 
-    Run `ruff check --fix` to apply this fix.
-
 FURB142.py:28:1: FURB142 [*] Use of `set.add()` in a for loop
    |
 26 |       s.add(num)
@@ -191,8 +177,6 @@ FURB142.py:28:1: FURB142 [*] Use of `set.add()` in a for loop
 31 30 | for x in (1, 2, 3):
 32 31 |     s.add(x + num)
 
-    Run `ruff check --fix` to apply this fix.
-
 FURB142.py:31:1: FURB142 [*] Use of `set.add()` in a for loop
    |
 29 |       s.add((num, x))
@@ -213,6 +197,4 @@ FURB142.py:31:1: FURB142 [*] Use of `set.add()` in a for loop
    31 |+s.update(x + num for x in (1, 2, 3))
 33 32 | 
 34 33 | # False negative
-35 34 | 
-
-    Run `ruff check --fix` to apply this fix.
+35 34 |

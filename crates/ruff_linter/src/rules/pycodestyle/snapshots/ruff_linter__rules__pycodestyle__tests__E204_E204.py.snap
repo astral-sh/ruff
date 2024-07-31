@@ -20,8 +20,6 @@ E204.py:14:2: E204 [*] Whitespace after decorator
 16 16 |     print('baz')
 17 17 | 
 
-    Run `ruff check --fix` to apply this fix.
-
 E204.py:25:6: E204 [*] Whitespace after decorator
    |
 24 |     # E204
@@ -40,8 +38,6 @@ E204.py:25:6: E204 [*] Whitespace after decorator
 26 26 |     def baz(self):
 27 27 |         print('baz')
 28 28 | 
-
-    Run `ruff check --fix` to apply this fix.
 
 E204.py:31:2: E204 [*] Whitespace after decorator
    |
@@ -63,5 +59,3 @@ E204.py:31:2: E204 [*] Whitespace after decorator
    31 |+@foo
 33 32 | def baz():
 34 33 |     print('baz')
-
-    Run `ruff check --fix` to apply this fix.

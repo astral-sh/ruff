@@ -20,8 +20,6 @@ PYI030.pyi:9:9: PYI030 [*] Multiple literal members in a union. Use a single lit
 11 11 | # Should emit for union types in arguments.
 12 12 | def func1(arg1: Literal[1] | Literal[2]):  # Error
 
-    Run `ruff check --fix` to apply this fix.
-
 PYI030.pyi:12:17: PYI030 [*] Multiple literal members in a union. Use a single literal, e.g. `Literal[1, 2]`
    |
 11 | # Should emit for union types in arguments.
@@ -39,8 +37,6 @@ PYI030.pyi:12:17: PYI030 [*] Multiple literal members in a union. Use a single l
 13 13 |     print(arg1)
 14 14 | 
 15 15 | 
-
-    Run `ruff check --fix` to apply this fix.
 
 PYI030.pyi:17:16: PYI030 [*] Multiple literal members in a union. Use a single literal, e.g. `Literal[1, 2]`
    |
@@ -60,8 +56,6 @@ PYI030.pyi:17:16: PYI030 [*] Multiple literal members in a union. Use a single l
 19 19 | 
 20 20 | 
 
-    Run `ruff check --fix` to apply this fix.
-
 PYI030.pyi:22:9: PYI030 [*] Multiple literal members in a union. Use a single literal, e.g. `Literal[1, 2]`
    |
 21 | # Should emit in longer unions, even if not directly adjacent.
@@ -80,8 +74,6 @@ PYI030.pyi:22:9: PYI030 [*] Multiple literal members in a union. Use a single li
 23 23 | field4: str | Literal[1] | Literal[2]  # Error
 24 24 | field5: Literal[1] | str | Literal[2]  # Error
 25 25 | field6: Literal[1] | bool | Literal[2] | str  # Error
-
-    Run `ruff check --fix` to apply this fix.
 
 PYI030.pyi:23:9: PYI030 [*] Multiple literal members in a union. Use a single literal, e.g. `Literal[1, 2]`
    |
@@ -103,8 +95,6 @@ PYI030.pyi:23:9: PYI030 [*] Multiple literal members in a union. Use a single li
 25 25 | field6: Literal[1] | bool | Literal[2] | str  # Error
 26 26 | 
 
-    Run `ruff check --fix` to apply this fix.
-
 PYI030.pyi:24:9: PYI030 [*] Multiple literal members in a union. Use a single literal, e.g. `Literal[1, 2]`
    |
 22 | field3: Literal[1] | Literal[2] | str  # Error
@@ -123,8 +113,6 @@ PYI030.pyi:24:9: PYI030 [*] Multiple literal members in a union. Use a single li
 25 25 | field6: Literal[1] | bool | Literal[2] | str  # Error
 26 26 | 
 27 27 | # Should emit for non-type unions.
-
-    Run `ruff check --fix` to apply this fix.
 
 PYI030.pyi:25:9: PYI030 [*] Multiple literal members in a union. Use a single literal, e.g. `Literal[1, 2]`
    |
@@ -146,8 +134,6 @@ PYI030.pyi:25:9: PYI030 [*] Multiple literal members in a union. Use a single li
 27 27 | # Should emit for non-type unions.
 28 28 | field7 = Literal[1] | Literal[2]  # Error
 
-    Run `ruff check --fix` to apply this fix.
-
 PYI030.pyi:28:10: PYI030 [*] Multiple literal members in a union. Use a single literal, e.g. `Literal[1, 2]`
    |
 27 | # Should emit for non-type unions.
@@ -166,8 +152,6 @@ PYI030.pyi:28:10: PYI030 [*] Multiple literal members in a union. Use a single l
 29 29 | 
 30 30 | # Should emit for parenthesized unions.
 31 31 | field8: Literal[1] | (Literal[2] | str)  # Error
-
-    Run `ruff check --fix` to apply this fix.
 
 PYI030.pyi:31:9: PYI030 [*] Multiple literal members in a union. Use a single literal, e.g. `Literal[1, 2]`
    |
@@ -188,8 +172,6 @@ PYI030.pyi:31:9: PYI030 [*] Multiple literal members in a union. Use a single li
 33 33 | # Should handle user parentheses when fixing.
 34 34 | field9: Literal[1] | (Literal[2] | str)  # Error
 
-    Run `ruff check --fix` to apply this fix.
-
 PYI030.pyi:34:9: PYI030 [*] Multiple literal members in a union. Use a single literal, e.g. `Literal[1, 2]`
    |
 33 | # Should handle user parentheses when fixing.
@@ -207,8 +189,6 @@ PYI030.pyi:34:9: PYI030 [*] Multiple literal members in a union. Use a single li
 35 35 | field10: (Literal[1] | str) | Literal[2]  # Error
 36 36 | 
 37 37 | # Should emit for union in generic parent type.
-
-    Run `ruff check --fix` to apply this fix.
 
 PYI030.pyi:35:10: PYI030 [*] Multiple literal members in a union. Use a single literal, e.g. `Literal[1, 2]`
    |
@@ -230,8 +210,6 @@ PYI030.pyi:35:10: PYI030 [*] Multiple literal members in a union. Use a single l
 37 37 | # Should emit for union in generic parent type.
 38 38 | field11: dict[Literal[1] | Literal[2], str]  # Error
 
-    Run `ruff check --fix` to apply this fix.
-
 PYI030.pyi:38:15: PYI030 [*] Multiple literal members in a union. Use a single literal, e.g. `Literal[1, 2]`
    |
 37 | # Should emit for union in generic parent type.
@@ -251,8 +229,6 @@ PYI030.pyi:38:15: PYI030 [*] Multiple literal members in a union. Use a single l
 40 40 | # Should emit for unions with more than two cases
 41 41 | field12: Literal[1] | Literal[2] | Literal[3]  # Error
 
-    Run `ruff check --fix` to apply this fix.
-
 PYI030.pyi:41:10: PYI030 [*] Multiple literal members in a union. Use a single literal, e.g. `Literal[1, 2, 3]`
    |
 40 | # Should emit for unions with more than two cases
@@ -270,8 +246,6 @@ PYI030.pyi:41:10: PYI030 [*] Multiple literal members in a union. Use a single l
 42 42 | field13: Literal[1] | Literal[2] | Literal[3] | Literal[4]  # Error
 43 43 | 
 44 44 | # Should emit for unions with more than two cases, even if not directly adjacent
-
-    Run `ruff check --fix` to apply this fix.
 
 PYI030.pyi:42:10: PYI030 [*] Multiple literal members in a union. Use a single literal, e.g. `Literal[1, 2, 3, 4]`
    |
@@ -293,8 +267,6 @@ PYI030.pyi:42:10: PYI030 [*] Multiple literal members in a union. Use a single l
 44 44 | # Should emit for unions with more than two cases, even if not directly adjacent
 45 45 | field14: Literal[1] | Literal[2] | str | Literal[3]  # Error
 
-    Run `ruff check --fix` to apply this fix.
-
 PYI030.pyi:45:10: PYI030 [*] Multiple literal members in a union. Use a single literal, e.g. `Literal[1, 2, 3]`
    |
 44 | # Should emit for unions with more than two cases, even if not directly adjacent
@@ -313,8 +285,6 @@ PYI030.pyi:45:10: PYI030 [*] Multiple literal members in a union. Use a single l
 46 46 | 
 47 47 | # Should emit for unions with mixed literal internal types
 48 48 | field15: Literal[1] | Literal["foo"] | Literal[True]  # Error
-
-    Run `ruff check --fix` to apply this fix.
 
 PYI030.pyi:48:10: PYI030 [*] Multiple literal members in a union. Use a single literal, e.g. `Literal[1, "foo", True]`
    |
@@ -335,8 +305,6 @@ PYI030.pyi:48:10: PYI030 [*] Multiple literal members in a union. Use a single l
 50 50 | # Shouldn't emit for duplicate field types with same value; covered by Y016
 51 51 | field16: Literal[1] | Literal[1]  # OK
 
-    Run `ruff check --fix` to apply this fix.
-
 PYI030.pyi:51:10: PYI030 [*] Multiple literal members in a union. Use a single literal, e.g. `Literal[1, 1]`
    |
 50 | # Shouldn't emit for duplicate field types with same value; covered by Y016
@@ -356,8 +324,6 @@ PYI030.pyi:51:10: PYI030 [*] Multiple literal members in a union. Use a single l
 53 53 | # Shouldn't emit if in new parent type
 54 54 | field17: Literal[1] | dict[Literal[2], str]  # OK
 
-    Run `ruff check --fix` to apply this fix.
-
 PYI030.pyi:60:10: PYI030 [*] Multiple literal members in a union. Use a single literal, e.g. `Literal[1, 2]`
    |
 59 | # Should respect name of literal type used
@@ -376,8 +342,6 @@ PYI030.pyi:60:10: PYI030 [*] Multiple literal members in a union. Use a single l
 61 61 | 
 62 62 | # Should emit in cases with newlines
 63 63 | field20: typing.Union[
-
-    Run `ruff check --fix` to apply this fix.
 
 PYI030.pyi:63:10: PYI030 [*] Multiple literal members in a union. Use a single literal, e.g. `Literal[1, 2]`
    |
@@ -409,8 +373,6 @@ PYI030.pyi:63:10: PYI030 [*] Multiple literal members in a union. Use a single l
 70 65 | # Should handle multiple unions with multiple members
 71 66 | field21: Literal[1, 2] | Literal[3, 4]  # Error
 
-    Run `ruff check --fix` to apply this fix.
-
 PYI030.pyi:71:10: PYI030 [*] Multiple literal members in a union. Use a single literal, e.g. `Literal[1, 2, 3, 4]`
    |
 70 | # Should handle multiple unions with multiple members
@@ -429,8 +391,6 @@ PYI030.pyi:71:10: PYI030 [*] Multiple literal members in a union. Use a single l
 72 72 | 
 73 73 | # Should emit in cases with `typing.Union` instead of `|`
 74 74 | field22: typing.Union[Literal[1], Literal[2]]  # Error
-
-    Run `ruff check --fix` to apply this fix.
 
 PYI030.pyi:74:10: PYI030 [*] Multiple literal members in a union. Use a single literal, e.g. `Literal[1, 2]`
    |
@@ -451,8 +411,6 @@ PYI030.pyi:74:10: PYI030 [*] Multiple literal members in a union. Use a single l
 76 76 | # Should emit in cases with `typing_extensions.Literal`
 77 77 | field23: typing_extensions.Literal[1] | typing_extensions.Literal[2]  # Error
 
-    Run `ruff check --fix` to apply this fix.
-
 PYI030.pyi:77:10: PYI030 [*] Multiple literal members in a union. Use a single literal, e.g. `Literal[1, 2]`
    |
 76 | # Should emit in cases with `typing_extensions.Literal`
@@ -471,8 +429,6 @@ PYI030.pyi:77:10: PYI030 [*] Multiple literal members in a union. Use a single l
 78 78 | 
 79 79 | # Should emit in cases with nested `typing.Union`
 80 80 | field24: typing.Union[Literal[1], typing.Union[Literal[2], str]]  # Error
-
-    Run `ruff check --fix` to apply this fix.
 
 PYI030.pyi:80:10: PYI030 [*] Multiple literal members in a union. Use a single literal, e.g. `Literal[1, 2]`
    |
@@ -493,8 +449,6 @@ PYI030.pyi:80:10: PYI030 [*] Multiple literal members in a union. Use a single l
 82 82 | # Should emit in cases with mixed `typing.Union` and `|`
 83 83 | field25: typing.Union[Literal[1], Literal[2] | str]  # Error
 
-    Run `ruff check --fix` to apply this fix.
-
 PYI030.pyi:83:10: PYI030 [*] Multiple literal members in a union. Use a single literal, e.g. `Literal[1, 2]`
    |
 82 | # Should emit in cases with mixed `typing.Union` and `|`
@@ -513,8 +467,6 @@ PYI030.pyi:83:10: PYI030 [*] Multiple literal members in a union. Use a single l
 84 84 | 
 85 85 | # Should emit only once in cases with multiple nested `typing.Union`
 86 86 | field24: typing.Union[Literal[1], typing.Union[Literal[2], typing.Union[Literal[3], Literal[4]]]]  # Error
-
-    Run `ruff check --fix` to apply this fix.
 
 PYI030.pyi:86:10: PYI030 [*] Multiple literal members in a union. Use a single literal, e.g. `Literal[1, 2, 3, 4]`
    |
@@ -535,8 +487,6 @@ PYI030.pyi:86:10: PYI030 [*] Multiple literal members in a union. Use a single l
 88 88 | # Should use the first literal subscript attribute when fixing
 89 89 | field25: typing.Union[typing_extensions.Literal[1], typing.Union[Literal[2], typing.Union[Literal[3], Literal[4]]], str]  # Error
 
-    Run `ruff check --fix` to apply this fix.
-
 PYI030.pyi:89:10: PYI030 [*] Multiple literal members in a union. Use a single literal, e.g. `Literal[1, 2, 3, 4]`
    |
 88 | # Should use the first literal subscript attribute when fixing
@@ -550,5 +500,3 @@ PYI030.pyi:89:10: PYI030 [*] Multiple literal members in a union. Use a single l
 88 88 | # Should use the first literal subscript attribute when fixing
 89    |-field25: typing.Union[typing_extensions.Literal[1], typing.Union[Literal[2], typing.Union[Literal[3], Literal[4]]], str]  # Error
    89 |+field25: typing.Union[typing_extensions.Literal[1, 2, 3, 4], str]  # Error
-
-    Run `ruff check --fix` to apply this fix.

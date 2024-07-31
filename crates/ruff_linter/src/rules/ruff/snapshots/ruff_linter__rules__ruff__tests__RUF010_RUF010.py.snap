@@ -19,8 +19,6 @@ RUF010.py:9:4: RUF010 [*] Use explicit conversion flag
 11 11 | f"{str(d['a'])}, {repr(d['b'])}, {ascii(d['c'])}"  # RUF010
 12 12 | 
 
-    Run `ruff check --fix` to apply this fix.
-
 RUF010.py:9:16: RUF010 [*] Use explicit conversion flag
    |
  9 | f"{str(bla)}, {repr(bla)}, {ascii(bla)}"  # RUF010
@@ -39,8 +37,6 @@ RUF010.py:9:16: RUF010 [*] Use explicit conversion flag
 11 11 | f"{str(d['a'])}, {repr(d['b'])}, {ascii(d['c'])}"  # RUF010
 12 12 | 
 
-    Run `ruff check --fix` to apply this fix.
-
 RUF010.py:9:29: RUF010 [*] Use explicit conversion flag
    |
  9 | f"{str(bla)}, {repr(bla)}, {ascii(bla)}"  # RUF010
@@ -58,8 +54,6 @@ RUF010.py:9:29: RUF010 [*] Use explicit conversion flag
 10 10 | 
 11 11 | f"{str(d['a'])}, {repr(d['b'])}, {ascii(d['c'])}"  # RUF010
 12 12 | 
-
-    Run `ruff check --fix` to apply this fix.
 
 RUF010.py:11:4: RUF010 [*] Use explicit conversion flag
    |
@@ -81,8 +75,6 @@ RUF010.py:11:4: RUF010 [*] Use explicit conversion flag
 13 13 | f"{(str(bla))}, {(repr(bla))}, {(ascii(bla))}"  # RUF010
 14 14 | 
 
-    Run `ruff check --fix` to apply this fix.
-
 RUF010.py:11:19: RUF010 [*] Use explicit conversion flag
    |
  9 | f"{str(bla)}, {repr(bla)}, {ascii(bla)}"  # RUF010
@@ -102,8 +94,6 @@ RUF010.py:11:19: RUF010 [*] Use explicit conversion flag
 12 12 | 
 13 13 | f"{(str(bla))}, {(repr(bla))}, {(ascii(bla))}"  # RUF010
 14 14 | 
-
-    Run `ruff check --fix` to apply this fix.
 
 RUF010.py:11:35: RUF010 [*] Use explicit conversion flag
    |
@@ -125,8 +115,6 @@ RUF010.py:11:35: RUF010 [*] Use explicit conversion flag
 13 13 | f"{(str(bla))}, {(repr(bla))}, {(ascii(bla))}"  # RUF010
 14 14 | 
 
-    Run `ruff check --fix` to apply this fix.
-
 RUF010.py:13:5: RUF010 [*] Use explicit conversion flag
    |
 11 | f"{str(d['a'])}, {repr(d['b'])}, {ascii(d['c'])}"  # RUF010
@@ -146,8 +134,6 @@ RUF010.py:13:5: RUF010 [*] Use explicit conversion flag
 14 14 | 
 15 15 | f"{bla!s}, {(repr(bla))}, {(ascii(bla))}"  # RUF010
 16 16 | 
-
-    Run `ruff check --fix` to apply this fix.
 
 RUF010.py:13:19: RUF010 [*] Use explicit conversion flag
    |
@@ -169,8 +155,6 @@ RUF010.py:13:19: RUF010 [*] Use explicit conversion flag
 15 15 | f"{bla!s}, {(repr(bla))}, {(ascii(bla))}"  # RUF010
 16 16 | 
 
-    Run `ruff check --fix` to apply this fix.
-
 RUF010.py:13:34: RUF010 [*] Use explicit conversion flag
    |
 11 | f"{str(d['a'])}, {repr(d['b'])}, {ascii(d['c'])}"  # RUF010
@@ -190,8 +174,6 @@ RUF010.py:13:34: RUF010 [*] Use explicit conversion flag
 14 14 | 
 15 15 | f"{bla!s}, {(repr(bla))}, {(ascii(bla))}"  # RUF010
 16 16 | 
-
-    Run `ruff check --fix` to apply this fix.
 
 RUF010.py:15:14: RUF010 [*] Use explicit conversion flag
    |
@@ -213,8 +195,6 @@ RUF010.py:15:14: RUF010 [*] Use explicit conversion flag
 17 17 | f"{foo(bla)}"  # OK
 18 18 | 
 
-    Run `ruff check --fix` to apply this fix.
-
 RUF010.py:15:29: RUF010 [*] Use explicit conversion flag
    |
 13 | f"{(str(bla))}, {(repr(bla))}, {(ascii(bla))}"  # RUF010
@@ -235,8 +215,6 @@ RUF010.py:15:29: RUF010 [*] Use explicit conversion flag
 17 17 | f"{foo(bla)}"  # OK
 18 18 | 
 
-    Run `ruff check --fix` to apply this fix.
-
 RUF010.py:35:20: RUF010 [*] Use explicit conversion flag
    |
 33 |     f"Member of tuple mismatches type at index {i}. Expected {of_shape_i}. Got "
@@ -254,6 +232,4 @@ RUF010.py:35:20: RUF010 [*] Use explicit conversion flag
    35 |+    f" that flows {obj!r} of type {type(obj)}.{additional_message}"  # RUF010
 36 36 | )
 37 37 | 
-38 38 | 
-
-    Run `ruff check --fix` to apply this fix.
+38 38 |

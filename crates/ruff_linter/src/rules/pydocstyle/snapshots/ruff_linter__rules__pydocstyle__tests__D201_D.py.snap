@@ -18,8 +18,6 @@ D.py:137:5: D201 [*] No blank lines allowed before function docstring (found 1)
 138 137 | 
 139 138 | 
 
-    Run `ruff check --fix` to apply this fix.
-
 D.py:151:5: D201 [*] No blank lines allowed before function docstring (found 1)
     |
 149 | def trailing_and_leading_space():
@@ -38,8 +36,6 @@ D.py:151:5: D201 [*] No blank lines allowed before function docstring (found 1)
 151 150 |     """Trailing and leading space."""
 152 151 | 
 153 152 |     pass
-
-    Run `ruff check --fix` to apply this fix.
 
 D.py:546:5: D201 [*] No blank lines allowed before function docstring (found 1)
     |
@@ -61,8 +57,6 @@ D.py:546:5: D201 [*] No blank lines allowed before function docstring (found 1)
 546 545 |     """Leading space.
 547 546 | 
 548 547 |     More content.
-
-    Run `ruff check --fix` to apply this fix.
 
 D.py:568:5: D201 [*] No blank lines allowed before function docstring (found 1)
     |
@@ -86,5 +80,3 @@ D.py:568:5: D201 [*] No blank lines allowed before function docstring (found 1)
 568 567 |     """Trailing and leading space.
 569 568 | 
 570 569 |     More content.
-
-    Run `ruff check --fix` to apply this fix.

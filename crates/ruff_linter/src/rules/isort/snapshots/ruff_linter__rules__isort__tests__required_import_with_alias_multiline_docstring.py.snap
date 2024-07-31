@@ -7,5 +7,3 @@ multiline_docstring.py:1:1: I002 [*] Missing required import: `from __future__ i
 3 3 | # b
   4 |+from __future__ import annotations as _annotations
 4 5 | import os
-
-    Run `ruff check --fix` to apply this fix.

@@ -18,8 +18,6 @@ PYI025_1.py:10:33: PYI025 [*] Use `from collections.abc import Set as AbstractSe
 12 12 | 
 13 13 | def f():
 
-    Run `ruff check --fix` to apply this fix.
-
 PYI025_1.py:14:51: PYI025 [*] Use `from collections.abc import Set as AbstractSet` to avoid confusion with the `set` builtin
    |
 13 | def f():
@@ -42,5 +40,3 @@ PYI025_1.py:14:51: PYI025 [*] Use `from collections.abc import Set as AbstractSe
 18 18 |     class Class:
 19    |-        member: Set[int]
    19 |+        member: AbstractSet[int]
-
-    Run `ruff check --fix` to apply this fix.

@@ -20,8 +20,6 @@ PYI016.pyi:7:15: PYI016 [*] Duplicate union member `str`
 9 9 | # Should emit for union types in arguments.
 10 10 | def func1(arg1: int | int):  # PYI016: Duplicate union member `int`
 
-    Run `ruff check --fix` to apply this fix.
-
 PYI016.pyi:10:23: PYI016 [*] Duplicate union member `int`
    |
  9 | # Should emit for union types in arguments.
@@ -39,8 +37,6 @@ PYI016.pyi:10:23: PYI016 [*] Duplicate union member `int`
 11 11 |     print(arg1)
 12 12 | 
 13 13 | # Should emit for unions in return types.
-
-    Run `ruff check --fix` to apply this fix.
 
 PYI016.pyi:14:22: PYI016 [*] Duplicate union member `str`
    |
@@ -60,8 +56,6 @@ PYI016.pyi:14:22: PYI016 [*] Duplicate union member `str`
 16 16 | 
 17 17 | # Should emit in longer unions, even if not directly adjacent.
 
-    Run `ruff check --fix` to apply this fix.
-
 PYI016.pyi:18:15: PYI016 [*] Duplicate union member `str`
    |
 17 | # Should emit in longer unions, even if not directly adjacent.
@@ -80,8 +74,6 @@ PYI016.pyi:18:15: PYI016 [*] Duplicate union member `str`
 19 19 | field4: int | int | str  # PYI016: Duplicate union member `int`
 20 20 | field5: str | int | str  # PYI016: Duplicate union member `str`
 21 21 | field6: int | bool | str | int  # PYI016: Duplicate union member `int`
-
-    Run `ruff check --fix` to apply this fix.
 
 PYI016.pyi:19:15: PYI016 [*] Duplicate union member `int`
    |
@@ -103,8 +95,6 @@ PYI016.pyi:19:15: PYI016 [*] Duplicate union member `int`
 21 21 | field6: int | bool | str | int  # PYI016: Duplicate union member `int`
 22 22 | 
 
-    Run `ruff check --fix` to apply this fix.
-
 PYI016.pyi:20:21: PYI016 [*] Duplicate union member `str`
    |
 18 | field3: str | str | int  # PYI016: Duplicate union member `str`
@@ -123,8 +113,6 @@ PYI016.pyi:20:21: PYI016 [*] Duplicate union member `str`
 21 21 | field6: int | bool | str | int  # PYI016: Duplicate union member `int`
 22 22 | 
 23 23 | # Shouldn't emit for non-type unions.
-
-    Run `ruff check --fix` to apply this fix.
 
 PYI016.pyi:21:28: PYI016 [*] Duplicate union member `int`
    |
@@ -146,8 +134,6 @@ PYI016.pyi:21:28: PYI016 [*] Duplicate union member `int`
 23 23 | # Shouldn't emit for non-type unions.
 24 24 | field7 = str | str
 
-    Run `ruff check --fix` to apply this fix.
-
 PYI016.pyi:27:22: PYI016 [*] Duplicate union member `int`
    |
 26 | # Should emit for strangely-bracketed unions.
@@ -167,8 +153,6 @@ PYI016.pyi:27:22: PYI016 [*] Duplicate union member `int`
 29 29 | # Should handle user brackets when fixing.
 30 30 | field9: int | (int | str)  # PYI016: Duplicate union member `int`
 
-    Run `ruff check --fix` to apply this fix.
-
 PYI016.pyi:30:16: PYI016 [*] Duplicate union member `int`
    |
 29 | # Should handle user brackets when fixing.
@@ -186,8 +170,6 @@ PYI016.pyi:30:16: PYI016 [*] Duplicate union member `int`
 31 31 | field10: (str | int) | str  # PYI016: Duplicate union member `str`
 32 32 | 
 33 33 | # Should emit for nested unions.
-
-    Run `ruff check --fix` to apply this fix.
 
 PYI016.pyi:31:24: PYI016 [*] Duplicate union member `str`
    |
@@ -209,8 +191,6 @@ PYI016.pyi:31:24: PYI016 [*] Duplicate union member `str`
 33 33 | # Should emit for nested unions.
 34 34 | field11: dict[int | int, str]
 
-    Run `ruff check --fix` to apply this fix.
-
 PYI016.pyi:34:21: PYI016 [*] Duplicate union member `int`
    |
 33 | # Should emit for nested unions.
@@ -230,8 +210,6 @@ PYI016.pyi:34:21: PYI016 [*] Duplicate union member `int`
 36 36 | # Should emit for unions with more than two cases
 37 37 | field12: int | int | int  # Error
 
-    Run `ruff check --fix` to apply this fix.
-
 PYI016.pyi:37:16: PYI016 [*] Duplicate union member `int`
    |
 36 | # Should emit for unions with more than two cases
@@ -250,8 +228,6 @@ PYI016.pyi:37:16: PYI016 [*] Duplicate union member `int`
 39 39 | 
 40 40 | # Should emit for unions with more than two cases, even if not directly adjacent
 
-    Run `ruff check --fix` to apply this fix.
-
 PYI016.pyi:37:22: PYI016 [*] Duplicate union member `int`
    |
 36 | # Should emit for unions with more than two cases
@@ -269,8 +245,6 @@ PYI016.pyi:37:22: PYI016 [*] Duplicate union member `int`
 38 38 | field13: int | int | int | int  # Error
 39 39 | 
 40 40 | # Should emit for unions with more than two cases, even if not directly adjacent
-
-    Run `ruff check --fix` to apply this fix.
 
 PYI016.pyi:38:16: PYI016 [*] Duplicate union member `int`
    |
@@ -292,8 +266,6 @@ PYI016.pyi:38:16: PYI016 [*] Duplicate union member `int`
 40 40 | # Should emit for unions with more than two cases, even if not directly adjacent
 41 41 | field14: int | int | str | int  # Error
 
-    Run `ruff check --fix` to apply this fix.
-
 PYI016.pyi:38:22: PYI016 [*] Duplicate union member `int`
    |
 36 | # Should emit for unions with more than two cases
@@ -313,8 +285,6 @@ PYI016.pyi:38:22: PYI016 [*] Duplicate union member `int`
 39 39 | 
 40 40 | # Should emit for unions with more than two cases, even if not directly adjacent
 41 41 | field14: int | int | str | int  # Error
-
-    Run `ruff check --fix` to apply this fix.
 
 PYI016.pyi:38:28: PYI016 [*] Duplicate union member `int`
    |
@@ -336,8 +306,6 @@ PYI016.pyi:38:28: PYI016 [*] Duplicate union member `int`
 40 40 | # Should emit for unions with more than two cases, even if not directly adjacent
 41 41 | field14: int | int | str | int  # Error
 
-    Run `ruff check --fix` to apply this fix.
-
 PYI016.pyi:41:16: PYI016 [*] Duplicate union member `int`
    |
 40 | # Should emit for unions with more than two cases, even if not directly adjacent
@@ -356,8 +324,6 @@ PYI016.pyi:41:16: PYI016 [*] Duplicate union member `int`
 42 42 | 
 43 43 | # Should emit for duplicate literal types; also covered by PYI030
 44 44 | field15: typing.Literal[1] | typing.Literal[1]  # Error
-
-    Run `ruff check --fix` to apply this fix.
 
 PYI016.pyi:41:28: PYI016 [*] Duplicate union member `int`
    |
@@ -378,8 +344,6 @@ PYI016.pyi:41:28: PYI016 [*] Duplicate union member `int`
 43 43 | # Should emit for duplicate literal types; also covered by PYI030
 44 44 | field15: typing.Literal[1] | typing.Literal[1]  # Error
 
-    Run `ruff check --fix` to apply this fix.
-
 PYI016.pyi:44:30: PYI016 [*] Duplicate union member `typing.Literal[1]`
    |
 43 | # Should emit for duplicate literal types; also covered by PYI030
@@ -398,8 +362,6 @@ PYI016.pyi:44:30: PYI016 [*] Duplicate union member `typing.Literal[1]`
 45 45 | 
 46 46 | # Shouldn't emit if in new parent type
 47 47 | field16: int | dict[int, str]  # OK
-
-    Run `ruff check --fix` to apply this fix.
 
 PYI016.pyi:57:5: PYI016 Duplicate union member `set[int]`
    |
@@ -453,8 +415,6 @@ PYI016.pyi:69:28: PYI016 [*] Duplicate union member `int`
 71 71 | # Should emit only once in cases with multiple nested `typing.Union`
 72 72 | field22: typing.Union[int, typing.Union[int, typing.Union[int, int]]]  # Error
 
-    Run `ruff check --fix` to apply this fix.
-
 PYI016.pyi:72:41: PYI016 Duplicate union member `int`
    |
 71 | # Should emit only once in cases with multiple nested `typing.Union`
@@ -505,8 +465,6 @@ PYI016.pyi:76:12: PYI016 [*] Duplicate union member `set[int]`
 78 78 | # Should emit twice (once for each `int` in the nested union, both of which are
 79 79 | # duplicates of the outer `int`), but not three times (which would indicate that
 
-    Run `ruff check --fix` to apply this fix.
-
 PYI016.pyi:81:41: PYI016 Duplicate union member `int`
    |
 79 | # duplicates of the outer `int`), but not three times (which would indicate that
@@ -544,8 +502,6 @@ PYI016.pyi:86:28: PYI016 [*] Duplicate union member `int`
 86    |-field25: typing.Union[int, int | int]  # PYI016: Duplicate union member `int`
    86 |+field25: typing.Union[int, int]  # PYI016: Duplicate union member `int`
 
-    Run `ruff check --fix` to apply this fix.
-
 PYI016.pyi:86:34: PYI016 [*] Duplicate union member `int`
    |
 84 | # duplicates of the outer `int`), but not three times (which would indicate that
@@ -560,5 +516,3 @@ PYI016.pyi:86:34: PYI016 [*] Duplicate union member `int`
 85 85 | # we incorrectly re-checked the nested union).
 86    |-field25: typing.Union[int, int | int]  # PYI016: Duplicate union member `int`
    86 |+field25: typing.Union[int, int]  # PYI016: Duplicate union member `int`
-
-    Run `ruff check --fix` to apply this fix.

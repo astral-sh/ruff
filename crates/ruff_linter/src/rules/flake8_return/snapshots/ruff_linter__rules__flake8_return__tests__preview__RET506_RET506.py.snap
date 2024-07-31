@@ -21,8 +21,6 @@ RET506.py:8:5: RET506 [*] Unnecessary `elif` after `raise` statement
 10 10 |         raise Exception(w)
 11 11 |     else:
 
-    Run `ruff check --fix` to apply this fix.
-
 RET506.py:23:5: RET506 [*] Unnecessary `elif` after `raise` statement
    |
 21 |             b = 2
@@ -42,8 +40,6 @@ RET506.py:23:5: RET506 [*] Unnecessary `elif` after `raise` statement
 24 24 |         raise Exception(y)
 25 25 |     else:
 26 26 |         c = 3
-
-    Run `ruff check --fix` to apply this fix.
 
 RET506.py:34:5: RET506 [*] Unnecessary `else` after `raise` statement
    |
@@ -68,8 +64,6 @@ RET506.py:34:5: RET506 [*] Unnecessary `else` after `raise` statement
 38 37 | 
 39 38 | def foo3(x, y, z):
 
-    Run `ruff check --fix` to apply this fix.
-
 RET506.py:45:9: RET506 [*] Unnecessary `else` after `raise` statement
    |
 43 |             b = 2
@@ -93,8 +87,6 @@ RET506.py:45:9: RET506 [*] Unnecessary `else` after `raise` statement
 49 48 |         d = 4
 50 49 |         raise Exception(z)
 
-    Run `ruff check --fix` to apply this fix.
-
 RET506.py:60:5: RET506 [*] Unnecessary `else` after `raise` statement
    |
 58 |             b = 2
@@ -116,8 +108,6 @@ RET506.py:60:5: RET506 [*] Unnecessary `else` after `raise` statement
 63 62 | 
 64 63 | 
 
-    Run `ruff check --fix` to apply this fix.
-
 RET506.py:70:9: RET506 [*] Unnecessary `else` after `raise` statement
    |
 68 |             a = 4
@@ -138,8 +128,6 @@ RET506.py:70:9: RET506 [*] Unnecessary `else` after `raise` statement
 72 71 |     else:
 73 72 |         c = 3
 74 73 |     raise Exception(y)
-
-    Run `ruff check --fix` to apply this fix.
 
 RET506.py:80:5: RET506 [*] Unnecessary `else` after `raise` statement
    |
@@ -167,5 +155,3 @@ RET506.py:80:5: RET506 [*] Unnecessary `else` after `raise` statement
 85 84 | 
 86 85 | 
 87 86 | ###
-
-    Run `ruff check --fix` to apply this fix.

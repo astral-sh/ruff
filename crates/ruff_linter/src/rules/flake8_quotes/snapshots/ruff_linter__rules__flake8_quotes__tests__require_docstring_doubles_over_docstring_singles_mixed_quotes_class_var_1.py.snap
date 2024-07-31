@@ -26,8 +26,6 @@ docstring_singles_mixed_quotes_class_var_1.py:2:33: Q002 [*] Single quote docstr
 4 4 | 
 5 5 |     def foo(self, bar='''not a docstring'''):
 
-    Run `ruff check --fix` to apply this fix.
-
 docstring_singles_mixed_quotes_class_var_1.py:6:9: Q002 Single quote docstring found but double quotes preferred
   |
 5 |     def foo(self, bar='''not a docstring'''):
@@ -55,8 +53,6 @@ docstring_singles_mixed_quotes_class_var_1.py:6:37: Q002 [*] Single quote docstr
 8 8 | 
 9 9 |     class Nested(foo()[:]): ''"Start with empty string" ' and lint docstring safely'; pass
 
-    Run `ruff check --fix` to apply this fix.
-
 docstring_singles_mixed_quotes_class_var_1.py:9:29: Q002 Single quote docstring found but double quotes preferred
   |
 7 |         pass
@@ -80,5 +76,3 @@ docstring_singles_mixed_quotes_class_var_1.py:9:57: Q002 [*] Single quote docstr
 8 8 | 
 9   |-    class Nested(foo()[:]): ''"Start with empty string" ' and lint docstring safely'; pass
   9 |+    class Nested(foo()[:]): ''"Start with empty string" " and lint docstring safely"; pass
-
-    Run `ruff check --fix` to apply this fix.

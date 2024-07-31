@@ -26,8 +26,6 @@ docstring_doubles.py:5:1: Q001 [*] Double quote multiline found but single quote
 9 9 | l = []
 10 10 | 
 
-    Run `ruff check --fix` to apply this fix.
-
 docstring_doubles.py:16:5: Q001 [*] Double quote multiline found but single quotes preferred
    |
 14 |       """
@@ -54,8 +52,6 @@ docstring_doubles.py:16:5: Q001 [*] Double quote multiline found but single quot
 20 20 |     # The colon in the list indexing below is an edge case for the docstring scanner
 21 21 |     def f(self, bar="""
 
-    Run `ruff check --fix` to apply this fix.
-
 docstring_doubles.py:21:21: Q001 [*] Double quote multiline found but single quotes preferred
    |
 20 |       # The colon in the list indexing below is an edge case for the docstring scanner
@@ -78,8 +74,6 @@ docstring_doubles.py:21:21: Q001 [*] Double quote multiline found but single quo
 23 23 |         val=l[Cls():3]):
 24 24 |         """
 25 25 |         Double quotes multiline function docstring
-
-    Run `ruff check --fix` to apply this fix.
 
 docstring_doubles.py:30:9: Q001 [*] Double quote multiline found but single quotes preferred
    |
@@ -107,8 +101,6 @@ docstring_doubles.py:30:9: Q001 [*] Double quote multiline found but single quot
 34 34 |         if l:
 35 35 |             """
 
-    Run `ruff check --fix` to apply this fix.
-
 docstring_doubles.py:35:13: Q001 [*] Double quote multiline found but single quotes preferred
    |
 34 |           if l:
@@ -130,5 +122,3 @@ docstring_doubles.py:35:13: Q001 [*] Double quote multiline found but single quo
 37    |-            """
    37 |+            '''
 38 38 |             pass
-
-    Run `ruff check --fix` to apply this fix.

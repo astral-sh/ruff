@@ -19,8 +19,6 @@ RUF100_0.py:9:12: RUF100 [*] Unused blanket `noqa` directive
 11 11 | 
 12 12 |     # Invalid
 
-    Run `ruff check --fix` to apply this fix.
-
 RUF100_0.py:13:12: RUF100 [*] Unused `noqa` directive (unused: `E501`)
    |
 12 |     # Invalid
@@ -39,8 +37,6 @@ RUF100_0.py:13:12: RUF100 [*] Unused `noqa` directive (unused: `E501`)
 14 14 | 
 15 15 |     # Invalid
 16 16 |     d = 1  # noqa: F841, E501
-
-    Run `ruff check --fix` to apply this fix.
 
 RUF100_0.py:16:12: RUF100 [*] Unused `noqa` directive (unused: `F841`, `E501`)
    |
@@ -61,8 +57,6 @@ RUF100_0.py:16:12: RUF100 [*] Unused `noqa` directive (unused: `F841`, `E501`)
 18 18 |     # Invalid (and unimplemented or not enabled)
 19 19 |     d = 1  # noqa: F841, W191, F821
 
-    Run `ruff check --fix` to apply this fix.
-
 RUF100_0.py:19:12: RUF100 [*] Unused `noqa` directive (unused: `F841`, `W191`; non-enabled: `F821`)
    |
 18 |     # Invalid (and unimplemented or not enabled)
@@ -81,8 +75,6 @@ RUF100_0.py:19:12: RUF100 [*] Unused `noqa` directive (unused: `F841`, `W191`; n
 20 20 | 
 21 21 |     # Invalid (but external)
 22 22 |     d = 1  # noqa: F841, V101
-
-    Run `ruff check --fix` to apply this fix.
 
 RUF100_0.py:22:12: RUF100 [*] Unused `noqa` directive (unused: `F841`)
    |
@@ -103,8 +95,6 @@ RUF100_0.py:22:12: RUF100 [*] Unused `noqa` directive (unused: `F841`)
 24 24 |     # Invalid (but external)
 25 25 |     d = 1  # noqa: V500
 
-    Run `ruff check --fix` to apply this fix.
-
 RUF100_0.py:29:12: RUF100 [*] Unused `noqa` directive (unused: `E501`)
    |
 27 |     # fmt: off
@@ -124,8 +114,6 @@ RUF100_0.py:29:12: RUF100 [*] Unused `noqa` directive (unused: `E501`)
 30 30 | 
 31 31 |     # Invalid - many spaces before #
 32 32 |     d = 1  # noqa: E501
-
-    Run `ruff check --fix` to apply this fix.
 
 RUF100_0.py:32:5: F841 [*] Local variable `d` is assigned to but never used
    |
@@ -155,8 +143,6 @@ RUF100_0.py:32:12: RUF100 [*] Unused `noqa` directive (unused: `E501`)
 34 34 | 
 35 35 | 
 
-    Run `ruff check --fix` to apply this fix.
-
 RUF100_0.py:58:6: RUF100 [*] Unused `noqa` directive (unused: `F841`)
    |
 57 | Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.
@@ -175,8 +161,6 @@ RUF100_0.py:58:6: RUF100 [*] Unused `noqa` directive (unused: `F841`)
 59 59 | 
 60 60 | # Invalid
 61 61 | _ = """Lorem ipsum dolor sit amet.
-
-    Run `ruff check --fix` to apply this fix.
 
 RUF100_0.py:66:6: RUF100 [*] Unused `noqa` directive (unused: `E501`)
    |
@@ -197,8 +181,6 @@ RUF100_0.py:66:6: RUF100 [*] Unused `noqa` directive (unused: `E501`)
 68 68 | # Invalid
 69 69 | _ = """Lorem ipsum dolor sit amet.
 
-    Run `ruff check --fix` to apply this fix.
-
 RUF100_0.py:74:6: RUF100 [*] Unused blanket `noqa` directive
    |
 73 | Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor.
@@ -218,8 +200,6 @@ RUF100_0.py:74:6: RUF100 [*] Unused blanket `noqa` directive
 76 76 | # Valid
 77 77 | # this is a veryyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyy long comment  # noqa: E501
 
-    Run `ruff check --fix` to apply this fix.
-
 RUF100_0.py:88:8: F401 [*] `shelve` imported but unused
    |
 86 | import collections  # noqa
@@ -237,8 +217,6 @@ RUF100_0.py:88:8: F401 [*] `shelve` imported but unused
 89 88 | import sys  # noqa: F401, RUF100
 90 89 | 
 91 90 | print(sys.path)
-
-    Run `ruff check --fix` to apply this fix.
 
 RUF100_0.py:93:89: E501 Line too long (89 > 88)
    |
@@ -266,8 +244,6 @@ RUF100_0.py:93:92: RUF100 [*] Unused `noqa` directive (unused: `F401`)
 95 95 | 
 96 96 | def f():
 
-    Run `ruff check --fix` to apply this fix.
-
 RUF100_0.py:107:12: RUF100 [*] Unused `noqa` directive (unknown: `E50`)
     |
 105 | def f():
@@ -286,8 +262,6 @@ RUF100_0.py:107:12: RUF100 [*] Unused `noqa` directive (unknown: `E50`)
 108 108 |     e = 1  # noqa: E50
 109 109 | 
 110 110 | 
-
-    Run `ruff check --fix` to apply this fix.
 
 RUF100_0.py:108:5: F841 [*] Local variable `e` is assigned to but never used
     |
@@ -317,8 +291,6 @@ RUF100_0.py:108:12: RUF100 [*] Unused `noqa` directive (unknown: `E50`)
 110 110 | 
 111 111 | def f():
 
-    Run `ruff check --fix` to apply this fix.
-
 RUF100_0.py:118:12: RUF100 [*] Unused `noqa` directive (duplicated: `F841`; unknown: `X200`)
     |
 116 | # Check duplicate code detection
@@ -338,8 +310,6 @@ RUF100_0.py:118:12: RUF100 [*] Unused `noqa` directive (duplicated: `F841`; unkn
 119 119 | 
 120 120 |     y = 2 == bar  # noqa: SIM300, F841, SIM300, SIM300
 121 121 | 
-
-    Run `ruff check --fix` to apply this fix.
 
 RUF100_0.py:120:19: RUF100 [*] Unused `noqa` directive (duplicated: `SIM300`, `SIM300`)
     |
@@ -361,8 +331,6 @@ RUF100_0.py:120:19: RUF100 [*] Unused `noqa` directive (duplicated: `SIM300`, `S
 122 122 |     z = 2  # noqa: F841 F841  F841, F841, F841
 123 123 | 
 
-    Run `ruff check --fix` to apply this fix.
-
 RUF100_0.py:122:12: RUF100 [*] Unused `noqa` directive (duplicated: `F841`, `F841`, `F841`, `F841`)
     |
 120 |     y = 2 == bar  # noqa: SIM300, F841, SIM300, SIM300
@@ -383,8 +351,6 @@ RUF100_0.py:122:12: RUF100 [*] Unused `noqa` directive (duplicated: `F841`, `F84
 124 124 |     return
 125 125 | 
 
-    Run `ruff check --fix` to apply this fix.
-
 RUF100_0.py:129:20: RUF100 [*] Unused `noqa` directive (duplicated: `S307`, `S307`, `S307`)
     |
 127 | # Allow code redirects
@@ -404,8 +370,6 @@ RUF100_0.py:129:20: RUF100 [*] Unused `noqa` directive (duplicated: `S307`, `S30
 130 130 | x = eval(command)  # noqa: PGH001, S307, PGH001
 131 131 | x = eval(command)  # noqa: PGH001, S307, PGH001, S307
 
-    Run `ruff check --fix` to apply this fix.
-
 RUF100_0.py:130:20: RUF100 [*] Unused `noqa` directive (duplicated: `PGH001`)
     |
 128 | x = eval(command)  # noqa: PGH001, S307
@@ -423,8 +387,6 @@ RUF100_0.py:130:20: RUF100 [*] Unused `noqa` directive (duplicated: `PGH001`)
     130 |+x = eval(command)  # noqa: PGH001, S307
 131 131 | x = eval(command)  # noqa: PGH001, S307, PGH001, S307
 
-    Run `ruff check --fix` to apply this fix.
-
 RUF100_0.py:131:20: RUF100 [*] Unused `noqa` directive (duplicated: `PGH001`, `S307`)
     |
 129 | x = eval(command)  # noqa: S307, PGH001, S307, S307, S307
@@ -439,5 +401,3 @@ RUF100_0.py:131:20: RUF100 [*] Unused `noqa` directive (duplicated: `PGH001`, `S
 130 130 | x = eval(command)  # noqa: PGH001, S307, PGH001
 131     |-x = eval(command)  # noqa: PGH001, S307, PGH001, S307
     131 |+x = eval(command)  # noqa: PGH001, S307
-
-    Run `ruff check --fix` to apply this fix.

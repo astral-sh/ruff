@@ -20,8 +20,6 @@ source: crates/ruff_linter/src/rules/pyflakes/mod.rs
 9 9 | 
 10 10 |     def g():
 
-    Run `ruff check --fix` to apply this fix.
-
 <filename>:13:30: F841 [*] Local variable `x` is assigned to but never used
    |
 11 |         try:
@@ -40,5 +38,3 @@ source: crates/ruff_linter/src/rules/pyflakes/mod.rs
 14 14 |             pass
 15 15 | 
 16 16 |         # This should resolve to the `x` in `x = 1`.
-
-    Run `ruff check --fix` to apply this fix.

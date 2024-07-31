@@ -18,8 +18,6 @@ UP040.pyi:6:1: UP040 [*] Type alias `x` uses `TypeAlias` annotation instead of t
   6 |+type x = int
 7 7 | x: TypeAlias = int
 
-    Run `ruff check --fix` to apply this fix.
-
 UP040.pyi:7:1: UP040 [*] Type alias `x` uses `TypeAlias` annotation instead of the `type` keyword
   |
 5 | # Fixes in type stub files should be safe to apply unlike in regular code where runtime behavior could change
@@ -34,5 +32,3 @@ UP040.pyi:7:1: UP040 [*] Type alias `x` uses `TypeAlias` annotation instead of t
 6 6 | x: typing.TypeAlias = int
 7   |-x: TypeAlias = int
   7 |+type x = int
-
-    Run `ruff check --fix` to apply this fix.

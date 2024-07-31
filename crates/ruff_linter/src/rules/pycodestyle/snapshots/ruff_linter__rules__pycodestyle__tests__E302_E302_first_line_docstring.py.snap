@@ -16,5 +16,3 @@ E302_first_line_docstring.py:3:1: E302 [*] Expected 2 blank lines, found 1
   3 |+
 3 4 | def fn():
 4 5 |     pass
-
-    Run `ruff check --fix` to apply this fix.

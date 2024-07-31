@@ -21,5 +21,3 @@ unicode.py:1:1: I001 [*] Import block is un-sorted or un-formatted
 4   |-import numpy as CƐgHHHhIILlNZΩZKÅBCeEFio
 5 5 | 
 6 6 | h = 2 * π * ℏ
-
-    Run `ruff check --fix` to apply this fix.

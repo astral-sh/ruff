@@ -17,8 +17,6 @@ UP023.py:2:1: UP023 [*] `cElementTree` is deprecated, use `ElementTree`
 4 4 | 
 5 5 | # Weird spacing should not cause issues.
 
-    Run `ruff check --fix` to apply this fix.
-
 UP023.py:3:8: UP023 [*] `cElementTree` is deprecated, use `ElementTree`
   |
 1 | # These two imports have something after cElementTree, so they should be fixed.
@@ -38,8 +36,6 @@ UP023.py:3:8: UP023 [*] `cElementTree` is deprecated, use `ElementTree`
 5 5 | # Weird spacing should not cause issues.
 6 6 | from   xml.etree.cElementTree    import  XML
 
-    Run `ruff check --fix` to apply this fix.
-
 UP023.py:6:1: UP023 [*] `cElementTree` is deprecated, use `ElementTree`
   |
 5 | # Weird spacing should not cause issues.
@@ -57,8 +53,6 @@ UP023.py:6:1: UP023 [*] `cElementTree` is deprecated, use `ElementTree`
 7 7 | import    xml.etree.cElementTree       as      ET
 8 8 | 
 9 9 | # Multi line imports should also work fine.
-
-    Run `ruff check --fix` to apply this fix.
 
 UP023.py:7:11: UP023 [*] `cElementTree` is deprecated, use `ElementTree`
   |
@@ -79,8 +73,6 @@ UP023.py:7:11: UP023 [*] `cElementTree` is deprecated, use `ElementTree`
 8 8 | 
 9 9 | # Multi line imports should also work fine.
 10 10 | from xml.etree.cElementTree import (
-
-    Run `ruff check --fix` to apply this fix.
 
 UP023.py:10:1: UP023 [*] `cElementTree` is deprecated, use `ElementTree`
    |
@@ -105,8 +97,6 @@ UP023.py:10:1: UP023 [*] `cElementTree` is deprecated, use `ElementTree`
 12 12 |     Element,
 13 13 |     SubElement,
 
-    Run `ruff check --fix` to apply this fix.
-
 UP023.py:16:12: UP023 [*] `cElementTree` is deprecated, use `ElementTree`
    |
 14 | )
@@ -125,8 +115,6 @@ UP023.py:16:12: UP023 [*] `cElementTree` is deprecated, use `ElementTree`
 17 17 |     from xml.etree import cElementTree as CET
 18 18 | 
 19 19 | from xml.etree import cElementTree as ET
-
-    Run `ruff check --fix` to apply this fix.
 
 UP023.py:17:27: UP023 [*] `cElementTree` is deprecated, use `ElementTree`
    |
@@ -148,8 +136,6 @@ UP023.py:17:27: UP023 [*] `cElementTree` is deprecated, use `ElementTree`
 19 19 | from xml.etree import cElementTree as ET
 20 20 | 
 
-    Run `ruff check --fix` to apply this fix.
-
 UP023.py:19:23: UP023 [*] `cElementTree` is deprecated, use `ElementTree`
    |
 17 |     from xml.etree import cElementTree as CET
@@ -169,8 +155,6 @@ UP023.py:19:23: UP023 [*] `cElementTree` is deprecated, use `ElementTree`
 20 20 | 
 21 21 | import contextlib, xml.etree.cElementTree as ET
 22 22 | 
-
-    Run `ruff check --fix` to apply this fix.
 
 UP023.py:21:20: UP023 [*] `cElementTree` is deprecated, use `ElementTree`
    |
@@ -192,8 +176,6 @@ UP023.py:21:20: UP023 [*] `cElementTree` is deprecated, use `ElementTree`
 23 23 | # This should fix the second, but not the first invocation.
 24 24 | import xml.etree.cElementTree, xml.etree.cElementTree as ET
 
-    Run `ruff check --fix` to apply this fix.
-
 UP023.py:24:32: UP023 [*] `cElementTree` is deprecated, use `ElementTree`
    |
 23 | # This should fix the second, but not the first invocation.
@@ -212,5 +194,3 @@ UP023.py:24:32: UP023 [*] `cElementTree` is deprecated, use `ElementTree`
 25 25 | 
 26 26 | # The below items should NOT be changed.
 27 27 | import xml.etree.cElementTree
-
-    Run `ruff check --fix` to apply this fix.

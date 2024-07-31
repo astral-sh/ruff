@@ -16,8 +16,6 @@ UP001.py:2:5: UP001 [*] `__metaclass__ = type` is implied
 4 4 | 
 5 5 | class B:
 
-    Run `ruff check --fix` to apply this fix.
-
 UP001.py:6:5: UP001 [*] `__metaclass__ = type` is implied
   |
 5 | class B:
@@ -35,5 +33,3 @@ UP001.py:6:5: UP001 [*] `__metaclass__ = type` is implied
 7 6 | 
 8 7 |     def __init__(self) -> None:
 9 8 |         pass
-
-    Run `ruff check --fix` to apply this fix.

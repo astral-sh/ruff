@@ -19,8 +19,6 @@ sections.py:111:5: D409 [*] Section underline should match the length of its nam
 113 113 | 
 114 114 |     """
 
-    Run `ruff check --fix` to apply this fix.
-
 sections.py:225:5: D409 [*] Section underline should match the length of its name ("Returns")
     |
 224 |     Returns
@@ -40,8 +38,6 @@ sections.py:225:5: D409 [*] Section underline should match the length of its nam
 227 227 |     Raises:
 228 228 |     My attention.
 
-    Run `ruff check --fix` to apply this fix.
-
 sections.py:578:5: D409 [*] Section underline should match the length of its name ("Other Parameters")
     |
 577 |     Other Parameters
@@ -60,5 +56,3 @@ sections.py:578:5: D409 [*] Section underline should match the length of its nam
 579 579 |     other_parameters:
 580 580 |         A dictionary of string attributes
 581 581 |     parameters:
-
-    Run `ruff check --fix` to apply this fix.

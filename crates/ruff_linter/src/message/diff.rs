@@ -118,12 +118,6 @@ impl Display for Diff<'_> {
             }
         }
 
-        // TODO: https://github.com/astral-sh/ruff/issues/12598
-        match self.fix.applicability() {
-            Applicability::Safe => writeln!(f, "\n    Run `ruff check --fix` to apply this fix.")?,
-            Applicability::Unsafe | Applicability::DisplayOnly => {}
-        };
-
         Ok(())
     }
 }

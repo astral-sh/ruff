@@ -16,5 +16,3 @@ D215.py:3:5: D215 [*] Section underline is over-indented ("TODO")
 3   |-    -
   3 |+
 4 4 | """
-
-    Run `ruff check --fix` to apply this fix.

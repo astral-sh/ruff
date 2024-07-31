@@ -20,8 +20,6 @@ PYI009.pyi:3:5: PYI009 [*] Empty body should contain `...`, not `pass`
 5 5 | class Bar: ...  # OK
 6 6 | 
 
-    Run `ruff check --fix` to apply this fix.
-
 PYI009.pyi:8:5: PYI009 [*] Empty body should contain `...`, not `pass`
   |
 7 | class Foo:
@@ -35,5 +33,3 @@ PYI009.pyi:8:5: PYI009 [*] Empty body should contain `...`, not `pass`
 7 7 | class Foo:
 8   |-    pass  # ERROR PYI009, since we're in a stub file
   8 |+    ...  # ERROR PYI009, since we're in a stub file
-
-    Run `ruff check --fix` to apply this fix.

@@ -17,8 +17,6 @@ D208.py:2:1: D208 [*] Docstring is over-indented
 4 4 | 
 5 5 | 
 
-    Run `ruff check --fix` to apply this fix.
-
 D208.py:8:1: D208 [*] Docstring is over-indented
    |
  6 | class Platform:
@@ -39,8 +37,6 @@ D208.py:8:1: D208 [*] Docstring is over-indented
 10 10 |             """
 11 11 | 
 
-    Run `ruff check --fix` to apply this fix.
-
 D208.py:9:1: D208 [*] Docstring is over-indented
    |
  7 |     """ Remove sampler
@@ -60,8 +56,6 @@ D208.py:9:1: D208 [*] Docstring is over-indented
 11 11 | 
 12 12 | 
 
-    Run `ruff check --fix` to apply this fix.
-
 D208.py:10:1: D208 [*] Docstring is over-indented
    |
  8 |             Args:
@@ -79,5 +73,3 @@ D208.py:10:1: D208 [*] Docstring is over-indented
 11 11 | 
 12 12 | 
 13 13 | def memory_test():
-
-    Run `ruff check --fix` to apply this fix.

@@ -15,5 +15,3 @@ UP006_1.py:9:10: UP006 [*] Use `collections.defaultdict` instead of `typing.Defa
 9     |-def f(x: typing.DefaultDict[str, str]) -> None:
    9  |+def f(x: defaultdict[str, str]) -> None:
 10 10 |     ...
-
-    Run `ruff check --fix` to apply this fix.

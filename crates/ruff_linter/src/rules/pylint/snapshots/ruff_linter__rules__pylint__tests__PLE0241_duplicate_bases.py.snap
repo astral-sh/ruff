@@ -19,8 +19,6 @@ duplicate_bases.py:13:13: PLE0241 [*] Duplicate base `A` for class `F1`
 15 15 | 
 16 16 | 
 
-    Run `ruff check --fix` to apply this fix.
-
 duplicate_bases.py:17:13: PLE0241 [*] Duplicate base `A` for class `F2`
    |
 17 | class F2(A, A,):
@@ -37,8 +35,6 @@ duplicate_bases.py:17:13: PLE0241 [*] Duplicate base `A` for class `F2`
 18 18 |     ...
 19 19 | 
 20 20 | 
-
-    Run `ruff check --fix` to apply this fix.
 
 duplicate_bases.py:23:5: PLE0241 [*] Duplicate base `A` for class `F3`
    |
@@ -59,8 +55,6 @@ duplicate_bases.py:23:5: PLE0241 [*] Duplicate base `A` for class `F3`
 24 23 | ):
 25 24 |     ...
 
-    Run `ruff check --fix` to apply this fix.
-
 duplicate_bases.py:30:5: PLE0241 [*] Duplicate base `A` for class `F4`
    |
 28 | class F4(
@@ -80,8 +74,6 @@ duplicate_bases.py:30:5: PLE0241 [*] Duplicate base `A` for class `F4`
 32 31 |     ...
 33 32 | 
 
-    Run `ruff check --fix` to apply this fix.
-
 duplicate_bases.py:36:13: PLE0241 [*] Duplicate base `A` for class `G1`
    |
 35 | # Duplicate base class is not last.
@@ -100,8 +92,6 @@ duplicate_bases.py:36:13: PLE0241 [*] Duplicate base `A` for class `G1`
 38 38 | 
 39 39 | 
 
-    Run `ruff check --fix` to apply this fix.
-
 duplicate_bases.py:40:13: PLE0241 [*] Duplicate base `A` for class `G2`
    |
 40 | class G2(A, A, B,):
@@ -118,8 +108,6 @@ duplicate_bases.py:40:13: PLE0241 [*] Duplicate base `A` for class `G2`
 41 41 |     ...
 42 42 | 
 43 43 | 
-
-    Run `ruff check --fix` to apply this fix.
 
 duplicate_bases.py:46:5: PLE0241 [*] Duplicate base `A` for class `G3`
    |
@@ -140,8 +128,6 @@ duplicate_bases.py:46:5: PLE0241 [*] Duplicate base `A` for class `G3`
 48 47 | ):
 49 48 |     ...
 
-    Run `ruff check --fix` to apply this fix.
-
 duplicate_bases.py:54:5: PLE0241 [*] Duplicate base `A` for class `G4`
    |
 52 | class G4(
@@ -160,5 +146,3 @@ duplicate_bases.py:54:5: PLE0241 [*] Duplicate base `A` for class `G4`
 55 54 |     B,
 56 55 | ):
 57 56 |     ...
-
-    Run `ruff check --fix` to apply this fix.

@@ -15,8 +15,6 @@ UP010.py:1:1: UP010 [*] Unnecessary `__future__` imports `generators`, `nested_s
 3 2 | from __future__ import absolute_import, division
 4 3 | from __future__ import generator_stop
 
-    Run `ruff check --fix` to apply this fix.
-
 UP010.py:2:1: UP010 [*] Unnecessary `__future__` imports `unicode_literals`, `with_statement` for target Python version
   |
 1 | from __future__ import nested_scopes, generators
@@ -32,8 +30,6 @@ UP010.py:2:1: UP010 [*] Unnecessary `__future__` imports `unicode_literals`, `wi
 3 2 | from __future__ import absolute_import, division
 4 3 | from __future__ import generator_stop
 5 4 | from __future__ import print_function, generator_stop
-
-    Run `ruff check --fix` to apply this fix.
 
 UP010.py:3:1: UP010 [*] Unnecessary `__future__` imports `absolute_import`, `division` for target Python version
   |
@@ -52,8 +48,6 @@ UP010.py:3:1: UP010 [*] Unnecessary `__future__` imports `absolute_import`, `div
 4 3 | from __future__ import generator_stop
 5 4 | from __future__ import print_function, generator_stop
 6 5 | from __future__ import invalid_module, generators
-
-    Run `ruff check --fix` to apply this fix.
 
 UP010.py:4:1: UP010 [*] Unnecessary `__future__` import `generator_stop` for target Python version
   |
@@ -74,8 +68,6 @@ UP010.py:4:1: UP010 [*] Unnecessary `__future__` import `generator_stop` for tar
 6 5 | from __future__ import invalid_module, generators
 7 6 | 
 
-    Run `ruff check --fix` to apply this fix.
-
 UP010.py:5:1: UP010 [*] Unnecessary `__future__` imports `generator_stop`, `print_function` for target Python version
   |
 3 | from __future__ import absolute_import, division
@@ -93,8 +85,6 @@ UP010.py:5:1: UP010 [*] Unnecessary `__future__` imports `generator_stop`, `prin
 6 5 | from __future__ import invalid_module, generators
 7 6 | 
 8 7 | if True:
-
-    Run `ruff check --fix` to apply this fix.
 
 UP010.py:6:1: UP010 [*] Unnecessary `__future__` import `generators` for target Python version
   |
@@ -116,8 +106,6 @@ UP010.py:6:1: UP010 [*] Unnecessary `__future__` import `generators` for target 
 8 8 | if True:
 9 9 |     from __future__ import generator_stop
 
-    Run `ruff check --fix` to apply this fix.
-
 UP010.py:9:5: UP010 [*] Unnecessary `__future__` import `generator_stop` for target Python version
    |
  8 | if True:
@@ -134,8 +122,6 @@ UP010.py:9:5: UP010 [*] Unnecessary `__future__` import `generator_stop` for tar
 10 9  |     from __future__ import generators
 11 10 | 
 12 11 | if True:
-
-    Run `ruff check --fix` to apply this fix.
 
 UP010.py:10:5: UP010 [*] Unnecessary `__future__` import `generators` for target Python version
    |
@@ -156,8 +142,6 @@ UP010.py:10:5: UP010 [*] Unnecessary `__future__` import `generators` for target
 12 11 | if True:
 13 12 |     from __future__ import generator_stop
 
-    Run `ruff check --fix` to apply this fix.
-
 UP010.py:13:5: UP010 [*] Unnecessary `__future__` import `generator_stop` for target Python version
    |
 12 | if True:
@@ -173,8 +157,6 @@ UP010.py:13:5: UP010 [*] Unnecessary `__future__` import `generator_stop` for ta
 13    |-    from __future__ import generator_stop
 14 13 |     from __future__ import invalid_module, generators
 
-    Run `ruff check --fix` to apply this fix.
-
 UP010.py:14:5: UP010 [*] Unnecessary `__future__` import `generators` for target Python version
    |
 12 | if True:
@@ -189,5 +171,3 @@ UP010.py:14:5: UP010 [*] Unnecessary `__future__` import `generators` for target
 13 13 |     from __future__ import generator_stop
 14    |-    from __future__ import invalid_module, generators
    14 |+    from __future__ import invalid_module
-
-    Run `ruff check --fix` to apply this fix.

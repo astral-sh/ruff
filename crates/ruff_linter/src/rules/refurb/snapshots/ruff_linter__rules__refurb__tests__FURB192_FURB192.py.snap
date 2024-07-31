@@ -20,8 +20,6 @@ FURB192.py:3:1: FURB192 [*] Prefer `min` over `sorted()` to compute the minimum 
 5 5 | sorted(l)[-1]
 6 6 | 
 
-    Run `ruff check --fix` to apply this fix.
-
 FURB192.py:5:1: FURB192 [*] Prefer `max` over `sorted()` to compute the maximum value in a sequence
   |
 3 | sorted(l)[0]
@@ -41,8 +39,6 @@ FURB192.py:5:1: FURB192 [*] Prefer `max` over `sorted()` to compute the maximum 
 6 6 | 
 7 7 | sorted(l, reverse=False)[-1]
 8 8 | 
-
-    Run `ruff check --fix` to apply this fix.
 
 FURB192.py:7:1: FURB192 [*] Prefer `max` over `sorted()` to compute the maximum value in a sequence
   |
@@ -64,8 +60,6 @@ FURB192.py:7:1: FURB192 [*] Prefer `max` over `sorted()` to compute the maximum 
 9 9 | sorted(l, key=lambda x: x)[0]
 10 10 | 
 
-    Run `ruff check --fix` to apply this fix.
-
 FURB192.py:9:1: FURB192 [*] Prefer `min` over `sorted()` to compute the minimum value in a sequence
    |
  7 | sorted(l, reverse=False)[-1]
@@ -85,8 +79,6 @@ FURB192.py:9:1: FURB192 [*] Prefer `min` over `sorted()` to compute the minimum 
 10 10 | 
 11 11 | sorted(l, key=key_fn)[0]
 12 12 | 
-
-    Run `ruff check --fix` to apply this fix.
 
 FURB192.py:11:1: FURB192 [*] Prefer `min` over `sorted()` to compute the minimum value in a sequence
    |
@@ -108,8 +100,6 @@ FURB192.py:11:1: FURB192 [*] Prefer `min` over `sorted()` to compute the minimum
 13 13 | sorted([1, 2, 3])[0]
 14 14 | 
 
-    Run `ruff check --fix` to apply this fix.
-
 FURB192.py:13:1: FURB192 [*] Prefer `min` over `sorted()` to compute the minimum value in a sequence
    |
 11 | sorted(l, key=key_fn)[0]
@@ -129,8 +119,6 @@ FURB192.py:13:1: FURB192 [*] Prefer `min` over `sorted()` to compute the minimum
 14 14 | 
 15 15 | # Unsafe
 16 16 | 
-
-    Run `ruff check --fix` to apply this fix.
 
 FURB192.py:17:1: FURB192 [*] Prefer `min` over `sorted()` to compute the minimum value in a sequence
    |

@@ -20,8 +20,6 @@ F504.py:3:1: F504 [*] `%`-format string has unused named argument(s): b
 5 5 | hidden = {"a": "!"}
 6 6 | "%(a)s %(c)s" % {"x": 1, **hidden}  # Ok (cannot see through splat)
 
-    Run `ruff check --fix` to apply this fix.
-
 F504.py:8:1: F504 [*] `%`-format string has unused named argument(s): b
   |
 6 | "%(a)s %(c)s" % {"x": 1, **hidden}  # Ok (cannot see through splat)
@@ -41,8 +39,6 @@ F504.py:8:1: F504 [*] `%`-format string has unused named argument(s): b
 10 10 | 
 11 11 | '' % {'a''b' : ''}  # F504 ("ab" not used)
 
-    Run `ruff check --fix` to apply this fix.
-
 F504.py:9:1: F504 [*] `%`-format string has unused named argument(s): b
    |
  8 | "%(a)s" % {"a": 1, r"b": "!"}  # F504 ("b" not used)
@@ -61,8 +57,6 @@ F504.py:9:1: F504 [*] `%`-format string has unused named argument(s): b
 10 10 | 
 11 11 | '' % {'a''b' : ''}  # F504 ("ab" not used)
 12 12 | 
-
-    Run `ruff check --fix` to apply this fix.
 
 F504.py:11:1: F504 [*] `%`-format string has unused named argument(s): ab
    |
@@ -84,8 +78,6 @@ F504.py:11:1: F504 [*] `%`-format string has unused named argument(s): ab
 13 13 | # https://github.com/astral-sh/ruff/issues/4899
 14 14 | "" % {
 
-    Run `ruff check --fix` to apply this fix.
-
 F504.py:14:1: F504 [*] `%`-format string has unused named argument(s): test1, test2
    |
 13 |   # https://github.com/astral-sh/ruff/issues/4899
@@ -102,5 +94,3 @@ F504.py:14:1: F504 [*] `%`-format string has unused named argument(s): test1, te
 15    |-  'test1': '',16    |-  'test2': '',
    15 |+  
 17 16 | }
-
-    Run `ruff check --fix` to apply this fix.

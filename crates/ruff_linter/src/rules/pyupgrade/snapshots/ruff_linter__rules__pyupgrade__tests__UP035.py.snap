@@ -18,8 +18,6 @@ UP035.py:2:1: UP035 [*] Import from `collections.abc` instead: `Mapping`
 4 4 | from collections import Mapping as MAP
 5 5 | 
 
-    Run `ruff check --fix` to apply this fix.
-
 UP035.py:4:1: UP035 [*] Import from `collections.abc` instead: `Mapping`
   |
 2 | from collections import Mapping
@@ -40,8 +38,6 @@ UP035.py:4:1: UP035 [*] Import from `collections.abc` instead: `Mapping`
 6 6 | from collections import Mapping, Sequence
 7 7 | 
 
-    Run `ruff check --fix` to apply this fix.
-
 UP035.py:6:1: UP035 [*] Import from `collections.abc` instead: `Mapping`, `Sequence`
   |
 4 | from collections import Mapping as MAP
@@ -61,8 +57,6 @@ UP035.py:6:1: UP035 [*] Import from `collections.abc` instead: `Mapping`, `Seque
 7 7 | 
 8 8 | from collections import Counter, Mapping
 9 9 | 
-
-    Run `ruff check --fix` to apply this fix.
 
 UP035.py:8:1: UP035 [*] Import from `collections.abc` instead: `Mapping`
    |
@@ -85,8 +79,6 @@ UP035.py:8:1: UP035 [*] Import from `collections.abc` instead: `Mapping`
 10 11 | from collections import (Counter, Mapping)
 11 12 | 
 
-    Run `ruff check --fix` to apply this fix.
-
 UP035.py:10:1: UP035 [*] Import from `collections.abc` instead: `Mapping`
    |
  8 | from collections import Counter, Mapping
@@ -107,8 +99,6 @@ UP035.py:10:1: UP035 [*] Import from `collections.abc` instead: `Mapping`
 11 12 | 
 12 13 | from collections import (Counter,
 13 14 |                          Mapping)
-
-    Run `ruff check --fix` to apply this fix.
 
 UP035.py:12:1: UP035 [*] Import from `collections.abc` instead: `Mapping`
    |
@@ -133,8 +123,6 @@ UP035.py:12:1: UP035 [*] Import from `collections.abc` instead: `Mapping`
 15 15 | from collections import Counter, \
 16 16 |                          Mapping
 
-    Run `ruff check --fix` to apply this fix.
-
 UP035.py:15:1: UP035 [*] Import from `collections.abc` instead: `Mapping`
    |
 13 |                            Mapping)
@@ -158,8 +146,6 @@ UP035.py:15:1: UP035 [*] Import from `collections.abc` instead: `Mapping`
 18 18 | from collections import Counter, Mapping, Sequence
 19 19 | 
 
-    Run `ruff check --fix` to apply this fix.
-
 UP035.py:18:1: UP035 [*] Import from `collections.abc` instead: `Mapping`, `Sequence`
    |
 16 |                          Mapping
@@ -180,8 +166,6 @@ UP035.py:18:1: UP035 [*] Import from `collections.abc` instead: `Mapping`, `Sequ
 19 20 | 
 20 21 | from collections import Mapping as mapping, Counter
 21 22 | 
-
-    Run `ruff check --fix` to apply this fix.
 
 UP035.py:20:1: UP035 [*] Import from `collections.abc` instead: `Mapping`
    |
@@ -204,8 +188,6 @@ UP035.py:20:1: UP035 [*] Import from `collections.abc` instead: `Mapping`
 22 23 | if True:
 23 24 |     from collections import Mapping, Counter
 
-    Run `ruff check --fix` to apply this fix.
-
 UP035.py:23:5: UP035 [*] Import from `collections.abc` instead: `Mapping`
    |
 22 | if True:
@@ -225,8 +207,6 @@ UP035.py:23:5: UP035 [*] Import from `collections.abc` instead: `Mapping`
 24 25 | 
 25 26 | if True:
 26 27 |     if True:
-
-    Run `ruff check --fix` to apply this fix.
 
 UP035.py:28:5: UP035 [*] Import from `collections.abc` instead: `Mapping`
    |
@@ -249,8 +229,6 @@ UP035.py:28:5: UP035 [*] Import from `collections.abc` instead: `Mapping`
 30 31 | if True: from collections import Mapping
 31 32 | 
 
-    Run `ruff check --fix` to apply this fix.
-
 UP035.py:30:10: UP035 [*] Import from `collections.abc` instead: `Mapping`
    |
 28 |     from collections import Mapping, Counter
@@ -271,8 +249,6 @@ UP035.py:30:10: UP035 [*] Import from `collections.abc` instead: `Mapping`
 32 32 | import os
 33 33 | from collections import Counter, Mapping
 
-    Run `ruff check --fix` to apply this fix.
-
 UP035.py:33:1: UP035 [*] Import from `collections.abc` instead: `Mapping`
    |
 32 | import os
@@ -291,8 +267,6 @@ UP035.py:33:1: UP035 [*] Import from `collections.abc` instead: `Mapping`
 34 35 | import sys
 35 36 | 
 36 37 | if True:
-
-    Run `ruff check --fix` to apply this fix.
 
 UP035.py:37:5: UP035 [*] Import from `collections.abc` instead: `Mapping`, `Callable`
    |
@@ -323,8 +297,6 @@ UP035.py:37:5: UP035 [*] Import from `collections.abc` instead: `Mapping`, `Call
 44 43 | from typing import Callable, Match, Pattern, List, OrderedDict, AbstractSet, ContextManager
 45 44 | 
 
-    Run `ruff check --fix` to apply this fix.
-
 UP035.py:44:1: UP035 [*] Import from `collections.abc` instead: `Callable`
    |
 42 |     )
@@ -345,8 +317,6 @@ UP035.py:44:1: UP035 [*] Import from `collections.abc` instead: `Callable`
 45 46 | 
 46 47 | if True: from collections import (
 47 48 |     Mapping, Counter)
-
-    Run `ruff check --fix` to apply this fix.
 
 UP035.py:44:1: UP035 [*] Import from `collections` instead: `OrderedDict`
    |
@@ -369,8 +339,6 @@ UP035.py:44:1: UP035 [*] Import from `collections` instead: `OrderedDict`
 46 47 | if True: from collections import (
 47 48 |     Mapping, Counter)
 
-    Run `ruff check --fix` to apply this fix.
-
 UP035.py:44:1: UP035 [*] Import from `re` instead: `Match`, `Pattern`
    |
 42 |     )
@@ -391,8 +359,6 @@ UP035.py:44:1: UP035 [*] Import from `re` instead: `Match`, `Pattern`
 45 46 | 
 46 47 | if True: from collections import (
 47 48 |     Mapping, Counter)
-
-    Run `ruff check --fix` to apply this fix.
 
 UP035.py:44:1: UP035 `typing.List` is deprecated, use `list` instead
    |
@@ -466,8 +432,6 @@ UP035.py:51:1: UP035 [*] Import from `collections` instead: `OrderedDict`
 53 53 | from typing import Callable
 54 54 | from typing import ByteString
 
-    Run `ruff check --fix` to apply this fix.
-
 UP035.py:52:1: UP035 [*] Import from `typing` instead: `OrderedDict`
    |
 50 | from typing import ContextManager
@@ -487,8 +451,6 @@ UP035.py:52:1: UP035 [*] Import from `typing` instead: `OrderedDict`
 53 53 | from typing import Callable
 54 54 | from typing import ByteString
 55 55 | from typing import Container
-
-    Run `ruff check --fix` to apply this fix.
 
 UP035.py:53:1: UP035 [*] Import from `collections.abc` instead: `Callable`
    |
@@ -510,8 +472,6 @@ UP035.py:53:1: UP035 [*] Import from `collections.abc` instead: `Callable`
 55 55 | from typing import Container
 56 56 | from typing import Hashable
 
-    Run `ruff check --fix` to apply this fix.
-
 UP035.py:54:1: UP035 [*] Import from `collections.abc` instead: `ByteString`
    |
 52 | from typing_extensions import OrderedDict
@@ -531,8 +491,6 @@ UP035.py:54:1: UP035 [*] Import from `collections.abc` instead: `ByteString`
 55 55 | from typing import Container
 56 56 | from typing import Hashable
 57 57 | from typing import ItemsView
-
-    Run `ruff check --fix` to apply this fix.
 
 UP035.py:55:1: UP035 [*] Import from `collections.abc` instead: `Container`
    |
@@ -554,8 +512,6 @@ UP035.py:55:1: UP035 [*] Import from `collections.abc` instead: `Container`
 57 57 | from typing import ItemsView
 58 58 | from typing import Iterable
 
-    Run `ruff check --fix` to apply this fix.
-
 UP035.py:56:1: UP035 [*] Import from `collections.abc` instead: `Hashable`
    |
 54 | from typing import ByteString
@@ -575,8 +531,6 @@ UP035.py:56:1: UP035 [*] Import from `collections.abc` instead: `Hashable`
 57 57 | from typing import ItemsView
 58 58 | from typing import Iterable
 59 59 | from typing import Iterator
-
-    Run `ruff check --fix` to apply this fix.
 
 UP035.py:57:1: UP035 [*] Import from `collections.abc` instead: `ItemsView`
    |
@@ -598,8 +552,6 @@ UP035.py:57:1: UP035 [*] Import from `collections.abc` instead: `ItemsView`
 59 59 | from typing import Iterator
 60 60 | from typing import KeysView
 
-    Run `ruff check --fix` to apply this fix.
-
 UP035.py:58:1: UP035 [*] Import from `collections.abc` instead: `Iterable`
    |
 56 | from typing import Hashable
@@ -619,8 +571,6 @@ UP035.py:58:1: UP035 [*] Import from `collections.abc` instead: `Iterable`
 59 59 | from typing import Iterator
 60 60 | from typing import KeysView
 61 61 | from typing import Mapping
-
-    Run `ruff check --fix` to apply this fix.
 
 UP035.py:59:1: UP035 [*] Import from `collections.abc` instead: `Iterator`
    |
@@ -642,8 +592,6 @@ UP035.py:59:1: UP035 [*] Import from `collections.abc` instead: `Iterator`
 61 61 | from typing import Mapping
 62 62 | from typing import MappingView
 
-    Run `ruff check --fix` to apply this fix.
-
 UP035.py:60:1: UP035 [*] Import from `collections.abc` instead: `KeysView`
    |
 58 | from typing import Iterable
@@ -663,8 +611,6 @@ UP035.py:60:1: UP035 [*] Import from `collections.abc` instead: `KeysView`
 61 61 | from typing import Mapping
 62 62 | from typing import MappingView
 63 63 | from typing import MutableMapping
-
-    Run `ruff check --fix` to apply this fix.
 
 UP035.py:61:1: UP035 [*] Import from `collections.abc` instead: `Mapping`
    |
@@ -686,8 +632,6 @@ UP035.py:61:1: UP035 [*] Import from `collections.abc` instead: `Mapping`
 63 63 | from typing import MutableMapping
 64 64 | from typing import MutableSequence
 
-    Run `ruff check --fix` to apply this fix.
-
 UP035.py:62:1: UP035 [*] Import from `collections.abc` instead: `MappingView`
    |
 60 | from typing import KeysView
@@ -707,8 +651,6 @@ UP035.py:62:1: UP035 [*] Import from `collections.abc` instead: `MappingView`
 63 63 | from typing import MutableMapping
 64 64 | from typing import MutableSequence
 65 65 | from typing import MutableSet
-
-    Run `ruff check --fix` to apply this fix.
 
 UP035.py:63:1: UP035 [*] Import from `collections.abc` instead: `MutableMapping`
    |
@@ -730,8 +672,6 @@ UP035.py:63:1: UP035 [*] Import from `collections.abc` instead: `MutableMapping`
 65 65 | from typing import MutableSet
 66 66 | from typing import Sequence
 
-    Run `ruff check --fix` to apply this fix.
-
 UP035.py:64:1: UP035 [*] Import from `collections.abc` instead: `MutableSequence`
    |
 62 | from typing import MappingView
@@ -751,8 +691,6 @@ UP035.py:64:1: UP035 [*] Import from `collections.abc` instead: `MutableSequence
 65 65 | from typing import MutableSet
 66 66 | from typing import Sequence
 67 67 | from typing import Sized
-
-    Run `ruff check --fix` to apply this fix.
 
 UP035.py:65:1: UP035 [*] Import from `collections.abc` instead: `MutableSet`
    |
@@ -774,8 +712,6 @@ UP035.py:65:1: UP035 [*] Import from `collections.abc` instead: `MutableSet`
 67 67 | from typing import Sized
 68 68 | from typing import ValuesView
 
-    Run `ruff check --fix` to apply this fix.
-
 UP035.py:66:1: UP035 [*] Import from `collections.abc` instead: `Sequence`
    |
 64 | from typing import MutableSequence
@@ -795,8 +731,6 @@ UP035.py:66:1: UP035 [*] Import from `collections.abc` instead: `Sequence`
 67 67 | from typing import Sized
 68 68 | from typing import ValuesView
 69 69 | from typing import Awaitable
-
-    Run `ruff check --fix` to apply this fix.
 
 UP035.py:67:1: UP035 [*] Import from `collections.abc` instead: `Sized`
    |
@@ -818,8 +752,6 @@ UP035.py:67:1: UP035 [*] Import from `collections.abc` instead: `Sized`
 69 69 | from typing import Awaitable
 70 70 | from typing import AsyncIterator
 
-    Run `ruff check --fix` to apply this fix.
-
 UP035.py:68:1: UP035 [*] Import from `collections.abc` instead: `ValuesView`
    |
 66 | from typing import Sequence
@@ -839,8 +771,6 @@ UP035.py:68:1: UP035 [*] Import from `collections.abc` instead: `ValuesView`
 69 69 | from typing import Awaitable
 70 70 | from typing import AsyncIterator
 71 71 | from typing import AsyncIterable
-
-    Run `ruff check --fix` to apply this fix.
 
 UP035.py:69:1: UP035 [*] Import from `collections.abc` instead: `Awaitable`
    |
@@ -862,8 +792,6 @@ UP035.py:69:1: UP035 [*] Import from `collections.abc` instead: `Awaitable`
 71 71 | from typing import AsyncIterable
 72 72 | from typing import Coroutine
 
-    Run `ruff check --fix` to apply this fix.
-
 UP035.py:70:1: UP035 [*] Import from `collections.abc` instead: `AsyncIterator`
    |
 68 | from typing import ValuesView
@@ -883,8 +811,6 @@ UP035.py:70:1: UP035 [*] Import from `collections.abc` instead: `AsyncIterator`
 71 71 | from typing import AsyncIterable
 72 72 | from typing import Coroutine
 73 73 | from typing import Collection
-
-    Run `ruff check --fix` to apply this fix.
 
 UP035.py:71:1: UP035 [*] Import from `collections.abc` instead: `AsyncIterable`
    |
@@ -906,8 +832,6 @@ UP035.py:71:1: UP035 [*] Import from `collections.abc` instead: `AsyncIterable`
 73 73 | from typing import Collection
 74 74 | from typing import AsyncGenerator
 
-    Run `ruff check --fix` to apply this fix.
-
 UP035.py:72:1: UP035 [*] Import from `collections.abc` instead: `Coroutine`
    |
 70 | from typing import AsyncIterator
@@ -927,8 +851,6 @@ UP035.py:72:1: UP035 [*] Import from `collections.abc` instead: `Coroutine`
 73 73 | from typing import Collection
 74 74 | from typing import AsyncGenerator
 75 75 | from typing import Reversible
-
-    Run `ruff check --fix` to apply this fix.
 
 UP035.py:73:1: UP035 [*] Import from `collections.abc` instead: `Collection`
    |
@@ -950,8 +872,6 @@ UP035.py:73:1: UP035 [*] Import from `collections.abc` instead: `Collection`
 75 75 | from typing import Reversible
 76 76 | from typing import Generator
 
-    Run `ruff check --fix` to apply this fix.
-
 UP035.py:74:1: UP035 [*] Import from `collections.abc` instead: `AsyncGenerator`
    |
 72 | from typing import Coroutine
@@ -971,8 +891,6 @@ UP035.py:74:1: UP035 [*] Import from `collections.abc` instead: `AsyncGenerator`
 75 75 | from typing import Reversible
 76 76 | from typing import Generator
 77 77 | from typing import Callable
-
-    Run `ruff check --fix` to apply this fix.
 
 UP035.py:75:1: UP035 [*] Import from `collections.abc` instead: `Reversible`
    |
@@ -994,8 +912,6 @@ UP035.py:75:1: UP035 [*] Import from `collections.abc` instead: `Reversible`
 77 77 | from typing import Callable
 78 78 | from typing import cast
 
-    Run `ruff check --fix` to apply this fix.
-
 UP035.py:76:1: UP035 [*] Import from `collections.abc` instead: `Generator`
    |
 74 | from typing import AsyncGenerator
@@ -1016,8 +932,6 @@ UP035.py:76:1: UP035 [*] Import from `collections.abc` instead: `Generator`
 78 78 | from typing import cast
 79 79 | 
 
-    Run `ruff check --fix` to apply this fix.
-
 UP035.py:77:1: UP035 [*] Import from `collections.abc` instead: `Callable`
    |
 75 | from typing import Reversible
@@ -1036,8 +950,6 @@ UP035.py:77:1: UP035 [*] Import from `collections.abc` instead: `Callable`
 78 78 | from typing import cast
 79 79 | 
 80 80 | # OK
-
-    Run `ruff check --fix` to apply this fix.
 
 UP035.py:84:1: UP035 [*] Import from `typing` instead: `SupportsIndex`
    |
@@ -1058,8 +970,6 @@ UP035.py:84:1: UP035 [*] Import from `typing` instead: `SupportsIndex`
 86 86 | # UP035 on py312+ only
 87 87 | from typing_extensions import NamedTuple
 
-    Run `ruff check --fix` to apply this fix.
-
 UP035.py:87:1: UP035 [*] Import from `typing` instead: `NamedTuple`
    |
 86 | # UP035 on py312+ only
@@ -1078,8 +988,6 @@ UP035.py:87:1: UP035 [*] Import from `typing` instead: `NamedTuple`
 88 88 | 
 89 89 | # UP035 on py312+ only: `typing_extensions` supports `frozen_default` (backported from 3.12).
 90 90 | from typing_extensions import dataclass_transform
-
-    Run `ruff check --fix` to apply this fix.
 
 UP035.py:90:1: UP035 [*] Import from `typing` instead: `dataclass_transform`
    |
@@ -1100,8 +1008,6 @@ UP035.py:90:1: UP035 [*] Import from `typing` instead: `dataclass_transform`
 92 92 | # UP035
 93 93 | from backports.strenum import StrEnum
 
-    Run `ruff check --fix` to apply this fix.
-
 UP035.py:93:1: UP035 [*] Import from `enum` instead: `StrEnum`
    |
 92 | # UP035
@@ -1120,8 +1026,6 @@ UP035.py:93:1: UP035 [*] Import from `enum` instead: `StrEnum`
 94 94 | 
 95 95 | # UP035
 96 96 | from typing_extensions import override
-
-    Run `ruff check --fix` to apply this fix.
 
 UP035.py:96:1: UP035 [*] Import from `typing` instead: `override`
    |
@@ -1142,8 +1046,6 @@ UP035.py:96:1: UP035 [*] Import from `typing` instead: `override`
 98 98 | # UP035
 99 99 | from typing_extensions import Buffer
 
-    Run `ruff check --fix` to apply this fix.
-
 UP035.py:99:1: UP035 [*] Import from `collections.abc` instead: `Buffer`
     |
  98 | # UP035
@@ -1162,8 +1064,6 @@ UP035.py:99:1: UP035 [*] Import from `collections.abc` instead: `Buffer`
 100 100 | 
 101 101 | # UP035
 102 102 | from typing_extensions import get_original_bases
-
-    Run `ruff check --fix` to apply this fix.
 
 UP035.py:102:1: UP035 [*] Import from `types` instead: `get_original_bases`
     |
@@ -1184,8 +1084,6 @@ UP035.py:102:1: UP035 [*] Import from `types` instead: `get_original_bases`
 104 104 | # UP035 on py313+ only
 105 105 | from typing_extensions import TypeVar
 
-    Run `ruff check --fix` to apply this fix.
-
 UP035.py:105:1: UP035 [*] Import from `typing` instead: `TypeVar`
     |
 104 | # UP035 on py313+ only
@@ -1204,8 +1102,6 @@ UP035.py:105:1: UP035 [*] Import from `typing` instead: `TypeVar`
 106 106 | 
 107 107 | # UP035 on py313+ only
 108 108 | from typing_extensions import CapsuleType
-
-    Run `ruff check --fix` to apply this fix.
 
 UP035.py:108:1: UP035 [*] Import from `types` instead: `CapsuleType`
     |
@@ -1226,8 +1122,6 @@ UP035.py:108:1: UP035 [*] Import from `types` instead: `CapsuleType`
 110 110 | # UP035 on py313+ only
 111 111 | from typing_extensions import deprecated
 
-    Run `ruff check --fix` to apply this fix.
-
 UP035.py:111:1: UP035 [*] Import from `warnings` instead: `deprecated`
     |
 110 | # UP035 on py313+ only
@@ -1241,5 +1135,3 @@ UP035.py:111:1: UP035 [*] Import from `warnings` instead: `deprecated`
 110 110 | # UP035 on py313+ only
 111     |-from typing_extensions import deprecated
     111 |+from warnings import deprecated
-
-    Run `ruff check --fix` to apply this fix.

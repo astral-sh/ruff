@@ -21,8 +21,6 @@ B013.py:5:8: B013 [*] A length-one tuple literal is redundant in exception handl
 7 7 | except AttributeError:
 8 8 |     pass
 
-    Run `ruff check --fix` to apply this fix.
-
 B013.py:13:7: B013 [*] A length-one tuple literal is redundant in exception handlers
    |
 11 | except (*retriable_exceptions,):
@@ -41,5 +39,3 @@ B013.py:13:7: B013 [*] A length-one tuple literal is redundant in exception hand
 14 14 |     pass
 15 15 | 
 16 16 | list_exceptions = [FileExistsError, FileNotFoundError]
-
-    Run `ruff check --fix` to apply this fix.

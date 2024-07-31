@@ -19,8 +19,6 @@ PYI036.pyi:54:31: PYI036 [*] Star-args in `__exit__` should be annotated with `o
 56 56 | 
 57 57 | class BadTwo:
 
-    Run `ruff check --fix` to apply this fix.
-
 PYI036.pyi:55:24: PYI036 If there are no star-args, `__aexit__` should have at least 3 non-keyword-only args (excluding `self`)
    |
 53 | class BadOne:
@@ -131,8 +129,6 @@ PYI036.pyi:70:58: PYI036 [*] Star-args in `__exit__` should be annotated with `o
 72 72 | 
 73 73 | class BadSix:
 
-    Run `ruff check --fix` to apply this fix.
-
 PYI036.pyi:71:74: PYI036 [*] Star-args in `__aexit__` should be annotated with `object`
    |
 69 | class BadFive:
@@ -152,8 +148,6 @@ PYI036.pyi:71:74: PYI036 [*] Star-args in `__aexit__` should be annotated with `
 72 72 | 
 73 73 | class BadSix:
 74 74 |     def __exit__(self, typ, exc, tb, weird_extra_arg, extra_arg2 = None) -> None: ... # PYI036: Extra arg must have default
-
-    Run `ruff check --fix` to apply this fix.
 
 PYI036.pyi:74:38: PYI036 All arguments after the first four in `__exit__` must have a default value
    |

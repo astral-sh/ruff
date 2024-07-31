@@ -19,8 +19,6 @@ PT022.py:17:5: PT022 [*] No teardown in fixture `error`, use `return` instead of
 19 19 | 
 20 20 | import typing
 
-    Run `ruff check --fix` to apply this fix.
-
 PT022.py:37:5: PT022 [*] No teardown in fixture `error`, use `return` instead of `yield`
    |
 35 | def error() -> typing.Generator[typing.Any, None, None]:
@@ -42,8 +40,6 @@ PT022.py:37:5: PT022 [*] No teardown in fixture `error`, use `return` instead of
 39 39 | 
 40 40 | @pytest.fixture()
 
-    Run `ruff check --fix` to apply this fix.
-
 PT022.py:43:5: PT022 [*] No teardown in fixture `error`, use `return` instead of `yield`
    |
 41 | def error() -> Generator[Resource, None, None]:
@@ -61,5 +57,3 @@ PT022.py:43:5: PT022 [*] No teardown in fixture `error`, use `return` instead of
 42 42 |     resource = acquire_resource()
 43    |-    yield resource
    43 |+    return resource
-
-    Run `ruff check --fix` to apply this fix.

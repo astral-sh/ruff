@@ -21,8 +21,6 @@ UP024_1.py:5:8: UP024 [*] Replace aliased errors with `OSError`
 7 7 | except (OSError, socket.error, KeyError):
 8 8 |     pass
 
-    Run `ruff check --fix` to apply this fix.
-
 UP024_1.py:7:8: UP024 [*] Replace aliased errors with `OSError`
   |
 5 | except (OSError, mmap.error, IOError):
@@ -41,8 +39,6 @@ UP024_1.py:7:8: UP024 [*] Replace aliased errors with `OSError`
 8 8 |     pass
 9 9 | 
 10 10 | try:
-
-    Run `ruff check --fix` to apply this fix.
 
 UP024_1.py:12:8: UP024 [*] Replace aliased errors with `OSError`
    |
@@ -69,5 +65,3 @@ UP024_1.py:12:8: UP024 [*] Replace aliased errors with `OSError`
 16    |-):
    12 |+except OSError:
 17 13 |     pass
-
-    Run `ruff check --fix` to apply this fix.

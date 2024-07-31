@@ -19,8 +19,6 @@ sections.py:159:9: D215 [*] Section underline is over-indented ("Returns")
 161 161 | 
 162 162 |     """
 
-    Run `ruff check --fix` to apply this fix.
-
 sections.py:173:9: D215 [*] Section underline is over-indented ("Returns")
     |
 172 |     Returns
@@ -37,6 +35,4 @@ sections.py:173:9: D215 [*] Section underline is over-indented ("Returns")
     173 |+    ------
 174 174 |     """
 175 175 | 
-176 176 | 
-
-    Run `ruff check --fix` to apply this fix.
+176 176 |

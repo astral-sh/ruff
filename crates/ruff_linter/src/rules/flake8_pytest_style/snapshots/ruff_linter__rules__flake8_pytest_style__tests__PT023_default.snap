@@ -19,8 +19,6 @@ PT023.py:12:1: PT023 [*] Use `@pytest.mark.foo()` over `@pytest.mark.foo`
 14 14 |     pass
 15 15 | 
 
-    Run `ruff check --fix` to apply this fix.
-
 PT023.py:17:1: PT023 [*] Use `@pytest.mark.foo()` over `@pytest.mark.foo`
    |
 17 | @pytest.mark.foo
@@ -38,8 +36,6 @@ PT023.py:17:1: PT023 [*] Use `@pytest.mark.foo()` over `@pytest.mark.foo`
 18 18 | class TestClass:
 19 19 |     def test_something():
 20 20 |         pass
-
-    Run `ruff check --fix` to apply this fix.
 
 PT023.py:24:5: PT023 [*] Use `@pytest.mark.foo()` over `@pytest.mark.foo`
    |
@@ -60,8 +56,6 @@ PT023.py:24:5: PT023 [*] Use `@pytest.mark.foo()` over `@pytest.mark.foo`
 26 26 |         pass
 27 27 | 
 
-    Run `ruff check --fix` to apply this fix.
-
 PT023.py:30:5: PT023 [*] Use `@pytest.mark.foo()` over `@pytest.mark.foo`
    |
 29 | class TestClass:
@@ -81,8 +75,6 @@ PT023.py:30:5: PT023 [*] Use `@pytest.mark.foo()` over `@pytest.mark.foo`
 32 32 |         def test_something():
 33 33 |             pass
 
-    Run `ruff check --fix` to apply this fix.
-
 PT023.py:38:9: PT023 [*] Use `@pytest.mark.foo()` over `@pytest.mark.foo`
    |
 36 | class TestClass:
@@ -101,6 +93,4 @@ PT023.py:38:9: PT023 [*] Use `@pytest.mark.foo()` over `@pytest.mark.foo`
    38 |+        @pytest.mark.foo()
 39 39 |         def test_something():
 40 40 |             pass
-41 41 | 
-
-    Run `ruff check --fix` to apply this fix.
+41 41 |

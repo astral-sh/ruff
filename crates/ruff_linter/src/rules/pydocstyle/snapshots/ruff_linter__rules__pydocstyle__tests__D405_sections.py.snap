@@ -21,8 +21,6 @@ sections.py:19:5: D405 [*] Section name should be properly capitalized ("returns
 21 21 |     A value of some sort.
 22 22 | 
 
-    Run `ruff check --fix` to apply this fix.
-
 sections.py:218:5: D405 [*] Section name should be properly capitalized ("Short summary")
     |
 216 |     """Toggle the gizmo.
@@ -41,5 +39,3 @@ sections.py:218:5: D405 [*] Section name should be properly capitalized ("Short 
 219 219 |     -------------
 220 220 | 
 221 221 |     This is the function's description, which will also specify what it
-
-    Run `ruff check --fix` to apply this fix.

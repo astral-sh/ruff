@@ -20,8 +20,6 @@ E20.py:51:10: E203 [*] Whitespace before ':'
 53 53 |     x, y = y, x
 54 54 | #: E203:1:10
 
-    Run `ruff check --fix` to apply this fix.
-
 E20.py:55:10: E203 [*] Whitespace before ':'
    |
 53 |     x, y = y, x
@@ -41,8 +39,6 @@ E20.py:55:10: E203 [*] Whitespace before ':'
 56 56 |     print(x, y)
 57 57 |     x, y = y, x
 58 58 | #: E203:2:15 E702:2:16
-
-    Run `ruff check --fix` to apply this fix.
 
 E20.py:60:16: E203 [*] Whitespace before ';'
    |
@@ -64,8 +60,6 @@ E20.py:60:16: E203 [*] Whitespace before ';'
 62 62 | if x == 4:
 63 63 |     print(x, y)	; x, y = y, x
 
-    Run `ruff check --fix` to apply this fix.
-
 E20.py:63:16: E203 [*] Whitespace before ';'
    |
 61 | #: E203:2:15 E702:2:16
@@ -85,8 +79,6 @@ E20.py:63:16: E203 [*] Whitespace before ';'
 64 64 | #: E203:3:13
 65 65 | if x == 4:
 66 66 |     print(x, y)
-
-    Run `ruff check --fix` to apply this fix.
 
 E20.py:67:13: E203 [*] Whitespace before ','
    |
@@ -108,8 +100,6 @@ E20.py:67:13: E203 [*] Whitespace before ','
 69 69 | if x == 4:
 70 70 |     print(x, y)
 
-    Run `ruff check --fix` to apply this fix.
-
 E20.py:71:13: E203 [*] Whitespace before ','
    |
 69 | if x == 4:
@@ -130,8 +120,6 @@ E20.py:71:13: E203 [*] Whitespace before ','
 73 73 | if x == 4:
 74 74 |     print(x, y)
 
-    Run `ruff check --fix` to apply this fix.
-
 E20.py:86:61: E203 [*] Whitespace before ':'
    |
 84 | #: E203 multi whitespace before :
@@ -150,8 +138,6 @@ E20.py:86:61: E203 [*] Whitespace before ':'
 87 87 | ]
 88 88 | 
 89 89 | #: E203 tab before :
-
-    Run `ruff check --fix` to apply this fix.
 
 E20.py:91:61: E203 [*] Whitespace before ':'
    |
@@ -172,8 +158,6 @@ E20.py:91:61: E203 [*] Whitespace before ':'
 93 93 | 
 94 94 | #: E203 single whitespace before : with line a comment
 
-    Run `ruff check --fix` to apply this fix.
-
 E20.py:101:61: E203 [*] Whitespace before ':'
     |
  99 | #: E203 multi whitespace before : with line a comment
@@ -192,8 +176,6 @@ E20.py:101:61: E203 [*] Whitespace before ':'
 102 102 | ]
 103 103 | 
 104 104 | #:
-
-    Run `ruff check --fix` to apply this fix.
 
 E20.py:126:16: E203 [*] Whitespace before ':'
     |
@@ -214,8 +196,6 @@ E20.py:126:16: E203 [*] Whitespace before ':'
 128 128 | #: E203:1:19
 129 129 | ham[lower + offset  : upper + offset]
 
-    Run `ruff check --fix` to apply this fix.
-
 E20.py:129:19: E203 [*] Whitespace before ':'
     |
 128 | #: E203:1:19
@@ -234,8 +214,6 @@ E20.py:129:19: E203 [*] Whitespace before ':'
 130 130 | 
 131 131 | #: Okay
 132 132 | release_lines = history_file_lines[history_file_lines.index('## Unreleased') + 1: -1]
-
-    Run `ruff check --fix` to apply this fix.
 
 E20.py:157:21: E203 [*] Whitespace before ':'
     |
@@ -256,8 +234,6 @@ E20.py:157:21: E203 [*] Whitespace before ':'
 159 159 | #: E203:1:20
 160 160 | ham[lower + offset: :upper + offset]
 
-    Run `ruff check --fix` to apply this fix.
-
 E20.py:160:20: E203 [*] Whitespace before ':'
     |
 159 | #: E203:1:20
@@ -276,8 +252,6 @@ E20.py:160:20: E203 [*] Whitespace before ':'
 161 161 | 
 162 162 | #: E203:1:20
 163 163 | ham[{lower + offset : upper + offset} : upper + offset]
-
-    Run `ruff check --fix` to apply this fix.
 
 E20.py:163:20: E203 [*] Whitespace before ':'
     |
@@ -298,8 +272,6 @@ E20.py:163:20: E203 [*] Whitespace before ':'
 165 165 | #: Okay
 166 166 | ham[upper:]
 
-    Run `ruff check --fix` to apply this fix.
-
 E20.py:175:10: E203 [*] Whitespace before ':'
     |
 174 | #: E203:1:10
@@ -318,8 +290,6 @@ E20.py:175:10: E203 [*] Whitespace before ':'
 176 176 | 
 177 177 | #: Okay
 178 178 | ham[lower +1 :, "columnname"]
-
-    Run `ruff check --fix` to apply this fix.
 
 E20.py:181:14: E203 [*] Whitespace before ':'
     |
@@ -340,8 +310,6 @@ E20.py:181:14: E203 [*] Whitespace before ':'
 183 183 | #: Okay
 184 184 | f"{ham[lower +1 :, "columnname"]}"
 
-    Run `ruff check --fix` to apply this fix.
-
 E20.py:187:17: E203 [*] Whitespace before ':'
     |
 186 | #: E203:1:13
@@ -360,5 +328,3 @@ E20.py:187:17: E203 [*] Whitespace before ':'
 188 188 | 
 189 189 | #: Okay: https://github.com/astral-sh/ruff/issues/12023
 190 190 | f"{x = :.2f}"
-
-    Run `ruff check --fix` to apply this fix.

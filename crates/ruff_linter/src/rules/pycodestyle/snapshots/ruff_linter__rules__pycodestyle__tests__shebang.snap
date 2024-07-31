@@ -16,5 +16,3 @@ shebang.py:3:1: E265 [*] Block comment should start with `# `
 3   |-#!
   3 |+# !
 4 4 | #:
-
-    Run `ruff check --fix` to apply this fix.

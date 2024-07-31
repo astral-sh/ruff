@@ -21,8 +21,6 @@ RSE102.py:5:21: RSE102 [*] Unnecessary parentheses on raised exception
 7 7 | try:
 8 8 |     x = 1 / 0
 
-    Run `ruff check --fix` to apply this fix.
-
 RSE102.py:13:16: RSE102 [*] Unnecessary parentheses on raised exception
    |
 12 | # RSE102
@@ -42,8 +40,6 @@ RSE102.py:13:16: RSE102 [*] Unnecessary parentheses on raised exception
 15 15 | # RSE102
 16 16 | raise TypeError ()
 
-    Run `ruff check --fix` to apply this fix.
-
 RSE102.py:16:17: RSE102 [*] Unnecessary parentheses on raised exception
    |
 15 | # RSE102
@@ -62,8 +58,6 @@ RSE102.py:16:17: RSE102 [*] Unnecessary parentheses on raised exception
 17 17 | 
 18 18 | # RSE102
 19 19 | raise TypeError \
-
-    Run `ruff check --fix` to apply this fix.
 
 RSE102.py:20:5: RSE102 [*] Unnecessary parentheses on raised exception
    |
@@ -85,8 +79,6 @@ RSE102.py:20:5: RSE102 [*] Unnecessary parentheses on raised exception
 22 22 | # RSE102
 23 23 | raise TypeError \
 
-    Run `ruff check --fix` to apply this fix.
-
 RSE102.py:24:5: RSE102 [*] Unnecessary parentheses on raised exception
    |
 22 | # RSE102
@@ -106,8 +98,6 @@ RSE102.py:24:5: RSE102 [*] Unnecessary parentheses on raised exception
 25 25 | 
 26 26 | # RSE102
 27 27 | raise TypeError(
-
-    Run `ruff check --fix` to apply this fix.
 
 RSE102.py:27:16: RSE102 [*] Unnecessary parentheses on raised exception
    |
@@ -133,8 +123,6 @@ RSE102.py:27:16: RSE102 [*] Unnecessary parentheses on raised exception
 31 29 | # RSE102
 32 30 | raise (TypeError) (
 
-    Run `ruff check --fix` to apply this fix.
-
 RSE102.py:32:19: RSE102 [*] Unnecessary parentheses on raised exception
    |
 31 |   # RSE102
@@ -158,8 +146,6 @@ RSE102.py:32:19: RSE102 [*] Unnecessary parentheses on raised exception
 35 33 | 
 36 34 | # RSE102
 37 35 | raise TypeError(
-
-    Run `ruff check --fix` to apply this fix.
 
 RSE102.py:37:16: RSE102 [*] Unnecessary parentheses on raised exception
    |
@@ -185,8 +171,6 @@ RSE102.py:37:16: RSE102 [*] Unnecessary parentheses on raised exception
 41 39 | # OK
 42 40 | raise AssertionError
 
-    Run `ruff check --fix` to apply this fix.
-
 RSE102.py:74:17: RSE102 [*] Unnecessary parentheses on raised exception
    |
 73 | # RSE102
@@ -206,8 +190,6 @@ RSE102.py:74:17: RSE102 [*] Unnecessary parentheses on raised exception
 76 76 | raise IndexError()\
 77 77 | from ZeroDivisionError
 
-    Run `ruff check --fix` to apply this fix.
-
 RSE102.py:76:17: RSE102 [*] Unnecessary parentheses on raised exception
    |
 74 | raise IndexError()from ZeroDivisionError
@@ -226,8 +208,6 @@ RSE102.py:76:17: RSE102 [*] Unnecessary parentheses on raised exception
 77 77 | from ZeroDivisionError
 78 78 | 
 79 79 | raise IndexError() from ZeroDivisionError
-
-    Run `ruff check --fix` to apply this fix.
 
 RSE102.py:79:17: RSE102 [*] Unnecessary parentheses on raised exception
    |
@@ -249,8 +229,6 @@ RSE102.py:79:17: RSE102 [*] Unnecessary parentheses on raised exception
 81 81 | raise IndexError();
 82 82 | 
 
-    Run `ruff check --fix` to apply this fix.
-
 RSE102.py:81:17: RSE102 [*] Unnecessary parentheses on raised exception
    |
 79 | raise IndexError() from ZeroDivisionError
@@ -270,8 +248,6 @@ RSE102.py:81:17: RSE102 [*] Unnecessary parentheses on raised exception
 82 82 | 
 83 83 | # RSE102
 84 84 | raise Foo()
-
-    Run `ruff check --fix` to apply this fix.
 
 RSE102.py:84:10: RSE102 [*] Unnecessary parentheses on raised exception
    |

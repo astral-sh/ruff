@@ -18,8 +18,6 @@ E21.py:2:5: E211 [*] Whitespace before '('
 4 4 | dict ['key'] = list [index]
 5 5 | #: E211
 
-    Run `ruff check --fix` to apply this fix.
-
 E21.py:4:5: E211 [*] Whitespace before '['
   |
 2 | spam (1)
@@ -39,8 +37,6 @@ E21.py:4:5: E211 [*] Whitespace before '['
 5 5 | #: E211
 6 6 | dict['key'] ['subkey'] = list[index]
 7 7 | #: Okay
-
-    Run `ruff check --fix` to apply this fix.
 
 E21.py:4:20: E211 [*] Whitespace before '['
   |
@@ -62,8 +58,6 @@ E21.py:4:20: E211 [*] Whitespace before '['
 6 6 | dict['key'] ['subkey'] = list[index]
 7 7 | #: Okay
 
-    Run `ruff check --fix` to apply this fix.
-
 E21.py:6:12: E211 [*] Whitespace before '['
   |
 4 | dict ['key'] = list [index]
@@ -84,8 +78,6 @@ E21.py:6:12: E211 [*] Whitespace before '['
 8 8 | spam(1)
 9 9 | dict['key'] = list[index]
 
-    Run `ruff check --fix` to apply this fix.
-
 E21.py:17:15: E211 [*] Whitespace before '('
    |
 17 | def fetch_name () -> Union[str, None]:
@@ -102,8 +94,6 @@ E21.py:17:15: E211 [*] Whitespace before '('
 18 18 |     """Fetch name from --person-name in sys.argv.
 19 19 | 
 20 20 |    Returns:
-
-    Run `ruff check --fix` to apply this fix.
 
 E21.py:27:19: E211 [*] Whitespace before '('
    |
@@ -125,8 +115,6 @@ E21.py:27:19: E211 [*] Whitespace before '('
 29 29 |             return sys.argv[i + 1]
 30 30 |     return None
 
-    Run `ruff check --fix` to apply this fix.
-
 E21.py:27:27: E211 [*] Whitespace before '('
    |
 25 |     # test commented code
@@ -146,5 +134,3 @@ E21.py:27:27: E211 [*] Whitespace before '('
 28 28 |         if sys.argv[i] == "--name" :
 29 29 |             return sys.argv[i + 1]
 30 30 |     return None
-
-    Run `ruff check --fix` to apply this fix.

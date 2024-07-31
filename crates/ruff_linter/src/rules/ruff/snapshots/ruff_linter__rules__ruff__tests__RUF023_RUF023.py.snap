@@ -19,8 +19,6 @@ RUF023.py:6:17: RUF023 [*] `Klass.__slots__` is not sorted
 8 8 | 
 9 9 |     # Quoting style is retained,
 
-    Run `ruff check --fix` to apply this fix.
-
 RUF023.py:7:17: RUF023 [*] `Klass.__slots__` is not sorted
   |
 5 | class Klass:
@@ -40,8 +38,6 @@ RUF023.py:7:17: RUF023 [*] `Klass.__slots__` is not sorted
 8 8 | 
 9 9 |     # Quoting style is retained,
 10 10 |     # but unnecessary parens are not
-
-    Run `ruff check --fix` to apply this fix.
 
 RUF023.py:11:22: RUF023 [*] `Klass.__slots__` is not sorted
    |
@@ -63,8 +59,6 @@ RUF023.py:11:22: RUF023 [*] `Klass.__slots__` is not sorted
 13 13 |     # (but they are in multiline definitions)
 14 14 |     __slots__: tuple = ("b", "c", "a",)
 
-    Run `ruff check --fix` to apply this fix.
-
 RUF023.py:14:24: RUF023 [*] `Klass.__slots__` is not sorted
    |
 12 |     # Trailing commas are also not retained for single-line definitions
@@ -84,8 +78,6 @@ RUF023.py:14:24: RUF023 [*] `Klass.__slots__` is not sorted
 15 15 | 
 16 16 | class Klass2:
 17 17 |     if bool():
-
-    Run `ruff check --fix` to apply this fix.
 
 RUF023.py:18:21: RUF023 [*] `Klass2.__slots__` is not sorted
    |
@@ -107,8 +99,6 @@ RUF023.py:18:21: RUF023 [*] `Klass2.__slots__` is not sorted
 20 20 |         __slots__ = "foo3", "foo2", "foo1"  # NB: an implicit tuple (without parens)
 21 21 | 
 
-    Run `ruff check --fix` to apply this fix.
-
 RUF023.py:20:21: RUF023 [*] `Klass2.__slots__` is not sorted
    |
 18 |         __slots__ = {"x": "docs for x", "m": "docs for m", "a": "docs for a"}
@@ -128,8 +118,6 @@ RUF023.py:20:21: RUF023 [*] `Klass2.__slots__` is not sorted
 21 21 | 
 22 22 |     __slots__: list[str] = ["the", "three", "little", "pigs"]
 23 23 |     __slots__ = ("parenthesized_item"), "in", ("an_unparenthesized_tuple")
-
-    Run `ruff check --fix` to apply this fix.
 
 RUF023.py:22:28: RUF023 [*] `Klass2.__slots__` is not sorted
    |
@@ -151,8 +139,6 @@ RUF023.py:22:28: RUF023 [*] `Klass2.__slots__` is not sorted
 24 24 |     # we use natural sort,
 25 25 |     # not alphabetical sort or "isort-style" sort
 
-    Run `ruff check --fix` to apply this fix.
-
 RUF023.py:23:17: RUF023 [*] `Klass2.__slots__` is not sorted
    |
 22 |     __slots__: list[str] = ["the", "three", "little", "pigs"]
@@ -171,8 +157,6 @@ RUF023.py:23:17: RUF023 [*] `Klass2.__slots__` is not sorted
 24 24 |     # we use natural sort,
 25 25 |     # not alphabetical sort or "isort-style" sort
 26 26 |     __slots__ = {"aadvark237", "aadvark10092", "aadvark174", "aadvark532"}
-
-    Run `ruff check --fix` to apply this fix.
 
 RUF023.py:26:17: RUF023 [*] `Klass2.__slots__` is not sorted
    |
@@ -193,8 +177,6 @@ RUF023.py:26:17: RUF023 [*] `Klass2.__slots__` is not sorted
 27 27 | 
 28 28 | ############################
 29 29 | # Neat multiline definitions
-
-    Run `ruff check --fix` to apply this fix.
 
 RUF023.py:33:17: RUF023 [*] `Klass3.__slots__` is not sorted
    |
@@ -229,8 +211,6 @@ RUF023.py:33:17: RUF023 [*] `Klass3.__slots__` is not sorted
 40 40 |     __slots__ = [
 41 41 |         "d",
 
-    Run `ruff check --fix` to apply this fix.
-
 RUF023.py:40:17: RUF023 [*] `Klass3.__slots__` is not sorted
    |
 38 |           "a0"
@@ -264,8 +244,6 @@ RUF023.py:40:17: RUF023 [*] `Klass3.__slots__` is not sorted
 46 46 |     ]
 47 47 | 
 48 48 | ##################################
-
-    Run `ruff check --fix` to apply this fix.
 
 RUF023.py:54:17: RUF023 [*] `Klass4.__slots__` is not sorted
    |
@@ -306,8 +284,6 @@ RUF023.py:54:17: RUF023 [*] `Klass4.__slots__` is not sorted
 61 64 |     )  # comment6
 62 65 |     # comment7
 
-    Run `ruff check --fix` to apply this fix.
-
 RUF023.py:64:17: RUF023 [*] `Klass4.__slots__` is not sorted
    |
 62 |       # comment7
@@ -340,8 +316,6 @@ RUF023.py:64:17: RUF023 [*] `Klass4.__slots__` is not sorted
 68 71 |         # comment4
 69 72 |         # comment5
 70 73 |         # comment6
-
-    Run `ruff check --fix` to apply this fix.
 
 RUF023.py:75:17: RUF023 [*] `PurePath.__slots__` is not sorted
     |
@@ -443,8 +417,6 @@ RUF023.py:75:17: RUF023 [*] `PurePath.__slots__` is not sorted
 110 107 | 
 111 108 | # From cpython/Lib/pickletools.py
 
-    Run `ruff check --fix` to apply this fix.
-
 RUF023.py:113:17: RUF023 [*] `ArgumentDescriptor.__slots__` is not sorted
     |
 111 |   # From cpython/Lib/pickletools.py
@@ -498,8 +470,6 @@ RUF023.py:113:17: RUF023 [*] `ArgumentDescriptor.__slots__` is not sorted
 129 126 |     )
 130 127 | 
 131 128 | ####################################
-
-    Run `ruff check --fix` to apply this fix.
 
 RUF023.py:138:17: RUF023 `SlotUser.__slots__` is not sorted
     |
@@ -584,8 +554,6 @@ RUF023.py:162:17: RUF023 [*] `BezierBuilder.__slots__` is not sorted
 165 168 | class BezierBuilder2:
 166 169 |     __slots__ = {'xp', 'yp',
 
-    Run `ruff check --fix` to apply this fix.
-
 RUF023.py:166:17: RUF023 [*] `BezierBuilder2.__slots__` is not sorted
     |
 165 |   class BezierBuilder2:
@@ -610,8 +578,6 @@ RUF023.py:166:17: RUF023 [*] `BezierBuilder2.__slots__` is not sorted
 168 170 | 
 169 171 | class BezierBuilder3:
 170 172 |     __slots__ = ['xp', 'yp',
-
-    Run `ruff check --fix` to apply this fix.
 
 RUF023.py:170:17: RUF023 [*] `BezierBuilder3.__slots__` is not sorted
     |
@@ -644,8 +610,6 @@ RUF023.py:170:17: RUF023 [*] `BezierBuilder3.__slots__` is not sorted
 172 174 | 
 173 175 |                  # very strangely placed comment
 174 176 | 
-
-    Run `ruff check --fix` to apply this fix.
 
 RUF023.py:181:17: RUF023 [*] `BezierBuilder4.__slots__` is not sorted
     |
@@ -680,8 +644,6 @@ RUF023.py:181:17: RUF023 [*] `BezierBuilder4.__slots__` is not sorted
 188 187 |         ,
 189 188 |     )
 
-    Run `ruff check --fix` to apply this fix.
-
 RUF023.py:191:17: RUF023 [*] `BezierBuilder4.__slots__` is not sorted
     |
 189 |       )
@@ -711,5 +673,3 @@ RUF023.py:191:17: RUF023 [*] `BezierBuilder4.__slots__` is not sorted
 194 197 | 
 195 198 | ###################################
 196 199 | # These should all not get flagged:
-
-    Run `ruff check --fix` to apply this fix.

@@ -21,8 +21,6 @@ FURB169.py:5:1: FURB169 [*] Compare the identities of `foo` and `None` instead o
 7 7 | type(None) is type(foo)
 8 8 | 
 
-    Run `ruff check --fix` to apply this fix.
-
 FURB169.py:7:1: FURB169 [*] Compare the identities of `foo` and `None` instead of their respective types
   |
 5 | type(foo) is type(None)
@@ -42,8 +40,6 @@ FURB169.py:7:1: FURB169 [*] Compare the identities of `foo` and `None` instead o
 8 8 | 
 9 9 | type(None) is type(None)
 10 10 | 
-
-    Run `ruff check --fix` to apply this fix.
 
 FURB169.py:9:1: FURB169 [*] Compare the identities of `None` and `None` instead of their respective types
    |
@@ -65,8 +61,6 @@ FURB169.py:9:1: FURB169 [*] Compare the identities of `None` and `None` instead 
 11 11 | type(foo) is not type(None)
 12 12 | 
 
-    Run `ruff check --fix` to apply this fix.
-
 FURB169.py:11:1: FURB169 [*] Compare the identities of `foo` and `None` instead of their respective types
    |
  9 | type(None) is type(None)
@@ -86,8 +80,6 @@ FURB169.py:11:1: FURB169 [*] Compare the identities of `foo` and `None` instead 
 12 12 | 
 13 13 | type(None) is not type(foo)
 14 14 | 
-
-    Run `ruff check --fix` to apply this fix.
 
 FURB169.py:13:1: FURB169 [*] Compare the identities of `foo` and `None` instead of their respective types
    |
@@ -109,8 +101,6 @@ FURB169.py:13:1: FURB169 [*] Compare the identities of `foo` and `None` instead 
 15 15 | type(None) is not type(None)
 16 16 | 
 
-    Run `ruff check --fix` to apply this fix.
-
 FURB169.py:15:1: FURB169 [*] Compare the identities of `None` and `None` instead of their respective types
    |
 13 | type(None) is not type(foo)
@@ -130,8 +120,6 @@ FURB169.py:15:1: FURB169 [*] Compare the identities of `None` and `None` instead
 16 16 | 
 17 17 | type(foo) == type(None)
 18 18 | 
-
-    Run `ruff check --fix` to apply this fix.
 
 FURB169.py:17:1: FURB169 [*] Compare the identities of `foo` and `None` instead of their respective types
    |
@@ -153,8 +141,6 @@ FURB169.py:17:1: FURB169 [*] Compare the identities of `foo` and `None` instead 
 19 19 | type(None) == type(foo)
 20 20 | 
 
-    Run `ruff check --fix` to apply this fix.
-
 FURB169.py:19:1: FURB169 [*] Compare the identities of `foo` and `None` instead of their respective types
    |
 17 | type(foo) == type(None)
@@ -174,8 +160,6 @@ FURB169.py:19:1: FURB169 [*] Compare the identities of `foo` and `None` instead 
 20 20 | 
 21 21 | type(None) == type(None)
 22 22 | 
-
-    Run `ruff check --fix` to apply this fix.
 
 FURB169.py:21:1: FURB169 [*] Compare the identities of `None` and `None` instead of their respective types
    |
@@ -197,8 +181,6 @@ FURB169.py:21:1: FURB169 [*] Compare the identities of `None` and `None` instead
 23 23 | type(foo) != type(None)
 24 24 | 
 
-    Run `ruff check --fix` to apply this fix.
-
 FURB169.py:23:1: FURB169 [*] Compare the identities of `foo` and `None` instead of their respective types
    |
 21 | type(None) == type(None)
@@ -218,8 +200,6 @@ FURB169.py:23:1: FURB169 [*] Compare the identities of `foo` and `None` instead 
 24 24 | 
 25 25 | type(None) != type(foo)
 26 26 | 
-
-    Run `ruff check --fix` to apply this fix.
 
 FURB169.py:25:1: FURB169 [*] Compare the identities of `foo` and `None` instead of their respective types
    |
@@ -241,8 +221,6 @@ FURB169.py:25:1: FURB169 [*] Compare the identities of `foo` and `None` instead 
 27 27 | type(None) != type(None)
 28 28 | 
 
-    Run `ruff check --fix` to apply this fix.
-
 FURB169.py:27:1: FURB169 [*] Compare the identities of `None` and `None` instead of their respective types
    |
 25 | type(None) != type(foo)
@@ -261,6 +239,4 @@ FURB169.py:27:1: FURB169 [*] Compare the identities of `None` and `None` instead
    27 |+None is not None
 28 28 | 
 29 29 | # Ok.
-30 30 | 
-
-    Run `ruff check --fix` to apply this fix.
+30 30 |

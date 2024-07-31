@@ -18,8 +18,6 @@ UP019.py:7:22: UP019 [*] `typing.Text` is deprecated, use `str`
 9 9 | 
 10 10 | 
 
-    Run `ruff check --fix` to apply this fix.
-
 UP019.py:11:29: UP019 [*] `typing.Text` is deprecated, use `str`
    |
 11 | def print_second_word(word: typing.Text) -> None:
@@ -36,8 +34,6 @@ UP019.py:11:29: UP019 [*] `typing.Text` is deprecated, use `str`
 12 12 |     print(word)
 13 13 | 
 14 14 | 
-
-    Run `ruff check --fix` to apply this fix.
 
 UP019.py:15:28: UP019 [*] `typing.Text` is deprecated, use `str`
    |
@@ -56,8 +52,6 @@ UP019.py:15:28: UP019 [*] `typing.Text` is deprecated, use `str`
 17 17 | 
 18 18 | 
 
-    Run `ruff check --fix` to apply this fix.
-
 UP019.py:19:29: UP019 [*] `typing.Text` is deprecated, use `str`
    |
 19 | def print_fourth_word(word: Goodbye) -> None:
@@ -72,5 +66,3 @@ UP019.py:19:29: UP019 [*] `typing.Text` is deprecated, use `str`
 19    |-def print_fourth_word(word: Goodbye) -> None:
    19 |+def print_fourth_word(word: str) -> None:
 20 20 |     print(word)
-
-    Run `ruff check --fix` to apply this fix.

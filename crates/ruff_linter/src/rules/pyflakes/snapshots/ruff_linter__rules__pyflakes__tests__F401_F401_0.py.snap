@@ -18,8 +18,6 @@ F401_0.py:2:8: F401 [*] `functools` imported but unused
 4 4 | from collections import (
 5 5 |     Counter,
 
-    Run `ruff check --fix` to apply this fix.
-
 F401_0.py:6:5: F401 [*] `collections.OrderedDict` imported but unused
   |
 4 | from collections import (
@@ -38,8 +36,6 @@ F401_0.py:6:5: F401 [*] `collections.OrderedDict` imported but unused
 7 6 |     namedtuple,
 8 7 | )
 9 8 | import multiprocessing.pool
-
-    Run `ruff check --fix` to apply this fix.
 
 F401_0.py:12:8: F401 [*] `logging.handlers` imported but unused
    |
@@ -60,8 +56,6 @@ F401_0.py:12:8: F401 [*] `logging.handlers` imported but unused
 14 13 |     TYPE_CHECKING,
 15 14 |     NamedTuple,
 
-    Run `ruff check --fix` to apply this fix.
-
 F401_0.py:32:12: F401 [*] `shelve` imported but unused
    |
 31 | if TYPE_CHECKING:
@@ -78,8 +72,6 @@ F401_0.py:32:12: F401 [*] `shelve` imported but unused
 33 32 |     import importlib
 34 33 | 
 35 34 | if TYPE_CHECKING:
-
-    Run `ruff check --fix` to apply this fix.
 
 F401_0.py:33:12: F401 [*] `importlib` imported but unused
    |
@@ -100,8 +92,6 @@ F401_0.py:33:12: F401 [*] `importlib` imported but unused
 35 34 | if TYPE_CHECKING:
 36 35 |     """Hello, world!"""
 
-    Run `ruff check --fix` to apply this fix.
-
 F401_0.py:37:12: F401 [*] `pathlib` imported but unused
    |
 35 | if TYPE_CHECKING:
@@ -121,8 +111,6 @@ F401_0.py:37:12: F401 [*] `pathlib` imported but unused
 39 38 |     z = 1
 40 39 | 
 
-    Run `ruff check --fix` to apply this fix.
-
 F401_0.py:52:16: F401 [*] `pickle` imported but unused
    |
 51 |     def b(self) -> None:
@@ -139,8 +127,6 @@ F401_0.py:52:16: F401 [*] `pickle` imported but unused
 53 53 | 
 54 54 | 
 55 55 | __all__ = ["ClassA"] + ["ClassB"]
-
-    Run `ruff check --fix` to apply this fix.
 
 F401_0.py:93:16: F401 [*] `x` imported but unused
    |
@@ -160,8 +146,6 @@ F401_0.py:93:16: F401 [*] `x` imported but unused
 95 94 | 
 96 95 | 
 
-    Run `ruff check --fix` to apply this fix.
-
 F401_0.py:94:16: F401 [*] `y` imported but unused
    |
 92 |     case 0,:
@@ -178,8 +162,6 @@ F401_0.py:94:16: F401 [*] `y` imported but unused
 95 94 | 
 96 95 | 
 97 96 | # Test: access a sub-importation via an alias.
-
-    Run `ruff check --fix` to apply this fix.
 
 F401_0.py:99:8: F401 [*] `foo.bar.baz` imported but unused
     |
@@ -200,8 +182,6 @@ F401_0.py:99:8: F401 [*] `foo.bar.baz` imported but unused
 101 100 | print(bop.baz.read_csv("test.csv"))
 102 101 | 
 
-    Run `ruff check --fix` to apply this fix.
-
 F401_0.py:105:12: F401 [*] `a1` imported but unused
     |
 103 | # Test: isolated deletions.
@@ -221,8 +201,6 @@ F401_0.py:105:12: F401 [*] `a1` imported but unused
 107 106 |     import a2
 108 107 | 
 
-    Run `ruff check --fix` to apply this fix.
-
 F401_0.py:107:12: F401 [*] `a2` imported but unused
     |
 105 |     import a1
@@ -239,8 +217,6 @@ F401_0.py:107:12: F401 [*] `a2` imported but unused
 108 107 | 
 109 108 | 
 110 109 | match *0, 1, *2:
-
-    Run `ruff check --fix` to apply this fix.
 
 F401_0.py:112:16: F401 [*] `b1` imported but unused
     |
@@ -261,8 +237,6 @@ F401_0.py:112:16: F401 [*] `b1` imported but unused
 114 113 |         import b2
 115 114 | 
 
-    Run `ruff check --fix` to apply this fix.
-
 F401_0.py:114:16: F401 [*] `b2` imported but unused
     |
 112 |         import b1
@@ -280,8 +254,6 @@ F401_0.py:114:16: F401 [*] `b2` imported but unused
 116 115 | 
 117 116 | # Regression test for: https://github.com/astral-sh/ruff/issues/7244
 
-    Run `ruff check --fix` to apply this fix.
-
 F401_0.py:122:1: F401 [*] `datameta_client_lib.model_helpers.noqa` imported but unused
     |
 121 | from datameta_client_lib.model_helpers import (
@@ -295,5 +267,3 @@ F401_0.py:122:1: F401 [*] `datameta_client_lib.model_helpers.noqa` imported but 
 120 120 | 
 121     |-from datameta_client_lib.model_helpers import (
 122     |-noqa )
-
-    Run `ruff check --fix` to apply this fix.

@@ -20,8 +20,6 @@ D214_module.py:3:5: D214 [*] Section is over-indented ("Returns")
 5 5 |     valid returns
 6 6 | 
 
-    Run `ruff check --fix` to apply this fix.
-
 D214_module.py:7:5: D214 [*] Section is over-indented ("Args")
   |
 5 |     valid returns
@@ -41,5 +39,3 @@ D214_module.py:7:5: D214 [*] Section is over-indented ("Args")
 8 8 | -----
 9 9 |     valid args
 10 10 | """
-
-    Run `ruff check --fix` to apply this fix.

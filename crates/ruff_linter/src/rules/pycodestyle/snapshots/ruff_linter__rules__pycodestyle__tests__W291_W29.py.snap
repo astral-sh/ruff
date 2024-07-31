@@ -21,8 +21,6 @@ W29.py:4:6: W291 [*] Trailing whitespace
 6 6 | class Foo(object):
 7 7 |     
 
-    Run `ruff check --fix` to apply this fix.
-
 W29.py:11:35: W291 [*] Trailing whitespace
    |
  9 | #: W291:2:35
@@ -43,8 +41,6 @@ W29.py:11:35: W291 [*] Trailing whitespace
 13 13 | x = 1   
 14 14 | #: W191 W292 noeol
 
-    Run `ruff check --fix` to apply this fix.
-
 W29.py:13:6: W291 [*] Trailing whitespace
    |
 11 | string with trailing whitespace'''   
@@ -64,5 +60,3 @@ W29.py:13:6: W291 [*] Trailing whitespace
 14 14 | #: W191 W292 noeol
 15 15 | if False:
 16 16 | 	pass  # indented with tabs
-
-    Run `ruff check --fix` to apply this fix.

@@ -17,8 +17,6 @@ docstring_singles_class.py:2:5: Q002 [*] Single quote docstring found but double
 4 4 | 
 5 5 |     def foo(self, bar='''not a docstring'''):
 
-    Run `ruff check --fix` to apply this fix.
-
 docstring_singles_class.py:6:9: Q002 [*] Single quote docstring found but double quotes preferred
   |
 5 |     def foo(self, bar='''not a docstring'''):
@@ -37,8 +35,6 @@ docstring_singles_class.py:6:9: Q002 [*] Single quote docstring found but double
 8 8 | 
 9 9 |     class Nested(foo()[:]): ''' inline docstring '''; pass
 
-    Run `ruff check --fix` to apply this fix.
-
 docstring_singles_class.py:9:29: Q002 [*] Single quote docstring found but double quotes preferred
   |
 7 |         pass
@@ -53,5 +49,3 @@ docstring_singles_class.py:9:29: Q002 [*] Single quote docstring found but doubl
 8 8 | 
 9   |-    class Nested(foo()[:]): ''' inline docstring '''; pass
   9 |+    class Nested(foo()[:]): """ inline docstring """; pass
-
-    Run `ruff check --fix` to apply this fix.

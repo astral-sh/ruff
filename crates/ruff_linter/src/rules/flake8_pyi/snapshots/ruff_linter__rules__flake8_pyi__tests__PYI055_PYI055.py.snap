@@ -20,8 +20,6 @@ PYI055.py:31:8: PYI055 [*] Multiple `type` members in a union. Combine them into
 33 33 | 
 34 34 | 
 
-    Run `ruff check --fix` to apply this fix.
-
 PYI055.py:32:8: PYI055 [*] Multiple `type` members in a union. Combine them into one, e.g., `type[Union[requests_mock.Mocker, httpretty, str]]`.
    |
 30 |     # PYI055
@@ -40,8 +38,6 @@ PYI055.py:32:8: PYI055 [*] Multiple `type` members in a union. Combine them into
 34 34 | 
 35 35 | def func():
 
-    Run `ruff check --fix` to apply this fix.
-
 PYI055.py:39:8: PYI055 [*] Multiple `type` members in a union. Combine them into one, e.g., `type[Union[requests_mock.Mocker, httpretty, str]]`.
    |
 38 |     # PYI055
@@ -58,8 +54,6 @@ PYI055.py:39:8: PYI055 [*] Multiple `type` members in a union. Combine them into
 40 40 | 
 41 41 | 
 42 42 | def convert_union(union: UnionType) -> _T | None:
-
-    Run `ruff check --fix` to apply this fix.
 
 PYI055.py:44:9: PYI055 [*] Multiple `type` members in a union. Combine them into one, e.g., `type[_T | Converter[_T]]`.
    |
@@ -81,8 +75,6 @@ PYI055.py:44:9: PYI055 [*] Multiple `type` members in a union. Combine them into
 46 46 |     ...
 47 47 | 
 
-    Run `ruff check --fix` to apply this fix.
-
 PYI055.py:50:15: PYI055 [*] Multiple `type` members in a union. Combine them into one, e.g., `type[_T | Converter[_T]]`.
    |
 48 | def convert_union(union: UnionType) -> _T | None:
@@ -102,8 +94,6 @@ PYI055.py:50:15: PYI055 [*] Multiple `type` members in a union. Combine them int
 51 51 |     ] = union.__args__
 52 52 |     ...
 53 53 | 
-
-    Run `ruff check --fix` to apply this fix.
 
 PYI055.py:56:15: PYI055 [*] Multiple `type` members in a union. Combine them into one, e.g., `type[_T | Converter[_T]]`.
    |
@@ -125,8 +115,6 @@ PYI055.py:56:15: PYI055 [*] Multiple `type` members in a union. Combine them int
 58 58 |     ...
 59 59 | 
 
-    Run `ruff check --fix` to apply this fix.
-
 PYI055.py:62:15: PYI055 [*] Multiple `type` members in a union. Combine them into one, e.g., `type[_T | Converter[_T]]`.
    |
 60 | def convert_union(union: UnionType) -> _T | None:
@@ -145,5 +133,3 @@ PYI055.py:62:15: PYI055 [*] Multiple `type` members in a union. Combine them int
    62 |+        Union[type[_T | Converter[_T]] | str] | Converter[_T] | Callable[[str], _T], ...  # PYI055
 63 63 |     ] = union.__args__
 64 64 |     ...
-
-    Run `ruff check --fix` to apply this fix.

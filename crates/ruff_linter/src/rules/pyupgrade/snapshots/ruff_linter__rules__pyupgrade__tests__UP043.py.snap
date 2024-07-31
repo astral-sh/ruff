@@ -18,8 +18,6 @@ UP043.py:4:15: UP043 [*] Unnecessary default type arguments
 6 6 | 
 7 7 | 
 
-    Run `ruff check --fix` to apply this fix.
-
 UP043.py:8:15: UP043 [*] Unnecessary default type arguments
   |
 8 | def func() -> Generator[int, None]:
@@ -36,8 +34,6 @@ UP043.py:8:15: UP043 [*] Unnecessary default type arguments
 9 9 |     yield 42
 10 10 | 
 11 11 | 
-
-    Run `ruff check --fix` to apply this fix.
 
 UP043.py:21:15: UP043 [*] Unnecessary default type arguments
    |
@@ -57,8 +53,6 @@ UP043.py:21:15: UP043 [*] Unnecessary default type arguments
 23 23 |     return None
 24 24 | 
 
-    Run `ruff check --fix` to apply this fix.
-
 UP043.py:31:21: UP043 [*] Unnecessary default type arguments
    |
 31 | async def func() -> AsyncGenerator[int, None]:
@@ -74,6 +68,4 @@ UP043.py:31:21: UP043 [*] Unnecessary default type arguments
    31 |+async def func() -> AsyncGenerator[int]:
 32 32 |     yield 42
 33 33 | 
-34 34 | 
-
-    Run `ruff check --fix` to apply this fix.
+34 34 |

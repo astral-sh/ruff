@@ -17,8 +17,6 @@ PYI013.py:3:5: PYI013 [*] Non-empty class body must not contain `...`
 5 4 | 
 6 5 | class OneAttributeClass2:
 
-    Run `ruff check --fix` to apply this fix.
-
 PYI013.py:7:5: PYI013 [*] Non-empty class body must not contain `...`
   |
 6 | class OneAttributeClass2:
@@ -35,8 +33,6 @@ PYI013.py:7:5: PYI013 [*] Non-empty class body must not contain `...`
 8 7 |     value: int
 9 8 | 
 10 9 | 
-
-    Run `ruff check --fix` to apply this fix.
 
 PYI013.py:12:5: PYI013 [*] Non-empty class body must not contain `...`
    |
@@ -55,8 +51,6 @@ PYI013.py:12:5: PYI013 [*] Non-empty class body must not contain `...`
 15 14 | 
 16 15 | class DocstringClass:
 
-    Run `ruff check --fix` to apply this fix.
-
 PYI013.py:13:5: PYI013 [*] Non-empty class body must not contain `...`
    |
 11 | class TwoEllipsesClass:
@@ -73,8 +67,6 @@ PYI013.py:13:5: PYI013 [*] Non-empty class body must not contain `...`
 14 13 | 
 15 14 | 
 16 15 | class DocstringClass:
-
-    Run `ruff check --fix` to apply this fix.
 
 PYI013.py:21:5: PYI013 [*] Non-empty class body must not contain `...`
    |
@@ -93,8 +85,6 @@ PYI013.py:21:5: PYI013 [*] Non-empty class body must not contain `...`
 23 22 | 
 24 23 | class NonEmptyChild(Exception):
 
-    Run `ruff check --fix` to apply this fix.
-
 PYI013.py:26:5: PYI013 [*] Non-empty class body must not contain `...`
    |
 24 | class NonEmptyChild(Exception):
@@ -112,8 +102,6 @@ PYI013.py:26:5: PYI013 [*] Non-empty class body must not contain `...`
 28 27 | 
 29 28 | class NonEmptyChild2(Exception):
 
-    Run `ruff check --fix` to apply this fix.
-
 PYI013.py:30:5: PYI013 [*] Non-empty class body must not contain `...`
    |
 29 | class NonEmptyChild2(Exception):
@@ -130,8 +118,6 @@ PYI013.py:30:5: PYI013 [*] Non-empty class body must not contain `...`
 31 30 |     value: int
 32 31 | 
 33 32 | 
-
-    Run `ruff check --fix` to apply this fix.
 
 PYI013.py:36:5: PYI013 [*] Non-empty class body must not contain `...`
    |
@@ -151,5 +137,3 @@ PYI013.py:36:5: PYI013 [*] Non-empty class body must not contain `...`
 37 36 | 
 38 37 |     def __init__():
 39 38 |         pass
-
-    Run `ruff check --fix` to apply this fix.

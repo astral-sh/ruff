@@ -19,8 +19,6 @@ PT001.py:9:1: PT001 [*] Use `@pytest.fixture()` over `@pytest.fixture`
 11 11 |     return 42
 12 12 | 
 
-    Run `ruff check --fix` to apply this fix.
-
 PT001.py:34:1: PT001 [*] Use `@pytest.fixture()` over `@pytest.fixture`
    |
 34 | @fixture
@@ -39,8 +37,6 @@ PT001.py:34:1: PT001 [*] Use `@pytest.fixture()` over `@pytest.fixture`
 36 36 |     return 42
 37 37 | 
 
-    Run `ruff check --fix` to apply this fix.
-
 PT001.py:59:1: PT001 [*] Use `@pytest.fixture()` over `@pytest.fixture`
    |
 59 | @aliased
@@ -57,6 +53,4 @@ PT001.py:59:1: PT001 [*] Use `@pytest.fixture()` over `@pytest.fixture`
    59 |+@aliased()
 60 60 | def aliased_no_parentheses():
 61 61 |     return 42
-62 62 | 
-
-    Run `ruff check --fix` to apply this fix.
+62 62 |

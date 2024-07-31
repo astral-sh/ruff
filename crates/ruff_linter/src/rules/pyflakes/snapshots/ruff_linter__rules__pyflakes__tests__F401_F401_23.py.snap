@@ -17,5 +17,3 @@ F401_23.py:4:16: F401 [*] `re.RegexFlag` imported but unused
 5 4 | from typing import Annotated
 6 5 | 
 7 6 | p: Annotated["Path", int] = 1
-
-    Run `ruff check --fix` to apply this fix.

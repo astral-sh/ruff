@@ -22,8 +22,6 @@ __init__.py:36:15: F401 [*] `.unused` imported but unused; consider removing, ad
 42    |-__all__ = ["argparse", "exported"]
    42 |+__all__ = ["argparse", "exported", "unused"]
 
-    Run `ruff check --fix` to apply this fix.
-
 __init__.py:39:26: F401 [*] `.renamed` imported but unused; consider removing, adding to `__all__`, or using a redundant alias
    |
 39 | from . import renamed as bees  # F401: add to __all__
@@ -36,5 +34,3 @@ __init__.py:39:26: F401 [*] `.renamed` imported but unused; consider removing, a
 41 41 | 
 42    |-__all__ = ["argparse", "exported"]
    42 |+__all__ = ["argparse", "exported", "bees"]
-
-    Run `ruff check --fix` to apply this fix.

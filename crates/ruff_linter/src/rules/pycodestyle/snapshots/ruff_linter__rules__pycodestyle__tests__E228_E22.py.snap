@@ -21,8 +21,6 @@ E22.py:131:6: E228 [*] Missing whitespace around modulo operator
 133 133 | msg = fmt%(errno, errmsg)
 134 134 | #: E228
 
-    Run `ruff check --fix` to apply this fix.
-
 E22.py:133:10: E228 [*] Missing whitespace around modulo operator
     |
 131 | a = b%c
@@ -43,8 +41,6 @@ E22.py:133:10: E228 [*] Missing whitespace around modulo operator
 135 135 | msg = "Error %d occurred"%errno
 136 136 | #:
 
-    Run `ruff check --fix` to apply this fix.
-
 E22.py:135:26: E228 [*] Missing whitespace around modulo operator
     |
 133 | msg = fmt%(errno, errmsg)
@@ -63,5 +59,3 @@ E22.py:135:26: E228 [*] Missing whitespace around modulo operator
 136 136 | #:
 137 137 | 
 138 138 | #: Okay
-
-    Run `ruff check --fix` to apply this fix.

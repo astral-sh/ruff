@@ -18,8 +18,6 @@ UP027.py:2:17: UP027 [*] Replace unpacked list comprehension with a generator ex
 4 4 | foo, bar, baz =[fn(x) for x in items]
 5 5 | 
 
-    Run `ruff check --fix` to apply this fix.
-
 UP027.py:4:16: UP027 [*] Replace unpacked list comprehension with a generator expression
   |
 2 | foo, bar, baz = [fn(x) for x in items]
@@ -39,8 +37,6 @@ UP027.py:4:16: UP027 [*] Replace unpacked list comprehension with a generator ex
 5 5 | 
 6 6 | foo, bar, baz =          [fn(x) for x in items]
 7 7 | 
-
-    Run `ruff check --fix` to apply this fix.
 
 UP027.py:6:26: UP027 [*] Replace unpacked list comprehension with a generator expression
   |
@@ -62,8 +58,6 @@ UP027.py:6:26: UP027 [*] Replace unpacked list comprehension with a generator ex
 8 8 | foo, bar, baz = [[i for i in fn(x)] for x in items]
 9 9 | 
 
-    Run `ruff check --fix` to apply this fix.
-
 UP027.py:8:17: UP027 [*] Replace unpacked list comprehension with a generator expression
    |
  6 | foo, bar, baz =          [fn(x) for x in items]
@@ -83,8 +77,6 @@ UP027.py:8:17: UP027 [*] Replace unpacked list comprehension with a generator ex
 9 9 | 
 10 10 | foo, bar, baz = [
 11 11 |     fn(x)
-
-    Run `ruff check --fix` to apply this fix.
 
 UP027.py:10:17: UP027 [*] Replace unpacked list comprehension with a generator expression
    |
@@ -113,5 +105,3 @@ UP027.py:10:17: UP027 [*] Replace unpacked list comprehension with a generator e
 14 14 | 
 15 15 | # Should not change
 16 16 | foo = [fn(x) for x in items]
-
-    Run `ruff check --fix` to apply this fix.

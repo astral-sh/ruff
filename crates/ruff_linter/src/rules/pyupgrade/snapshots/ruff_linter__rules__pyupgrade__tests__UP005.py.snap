@@ -21,8 +21,6 @@ UP005.py:6:9: UP005 [*] `assertEquals` is deprecated, use `assertEqual`
 8 8 |         self.assertEqual(3, 4)
 9 9 |         self.failUnlessAlmostEqual(1, 1.1)
 
-    Run `ruff check --fix` to apply this fix.
-
 UP005.py:7:9: UP005 [*] `assertEquals` is deprecated, use `assertEqual`
   |
 5 |     def test(self) -> None:
@@ -43,8 +41,6 @@ UP005.py:7:9: UP005 [*] `assertEquals` is deprecated, use `assertEqual`
 9 9 |         self.failUnlessAlmostEqual(1, 1.1)
 10 10 |         self.assertNotRegexpMatches("a", "b")
 
-    Run `ruff check --fix` to apply this fix.
-
 UP005.py:9:9: UP005 [*] `failUnlessAlmostEqual` is deprecated, use `assertAlmostEqual`
    |
  7 |         self.assertEquals(1, 2)
@@ -62,8 +58,6 @@ UP005.py:9:9: UP005 [*] `failUnlessAlmostEqual` is deprecated, use `assertAlmost
    9  |+        self.assertAlmostEqual(1, 1.1)
 10 10 |         self.assertNotRegexpMatches("a", "b")
 
-    Run `ruff check --fix` to apply this fix.
-
 UP005.py:10:9: UP005 [*] `assertNotRegexpMatches` is deprecated, use `assertNotRegex`
    |
  8 |         self.assertEqual(3, 4)
@@ -78,5 +72,3 @@ UP005.py:10:9: UP005 [*] `assertNotRegexpMatches` is deprecated, use `assertNotR
 9  9  |         self.failUnlessAlmostEqual(1, 1.1)
 10    |-        self.assertNotRegexpMatches("a", "b")
    10 |+        self.assertNotRegex("a", "b")
-
-    Run `ruff check --fix` to apply this fix.

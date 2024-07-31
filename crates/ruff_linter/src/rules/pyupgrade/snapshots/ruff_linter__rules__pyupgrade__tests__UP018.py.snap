@@ -20,8 +20,6 @@ UP018.py:37:1: UP018 [*] Unnecessary `str` call (rewrite as a literal)
 39 39 | str("""
 40 40 | foo""")
 
-    Run `ruff check --fix` to apply this fix.
-
 UP018.py:38:1: UP018 [*] Unnecessary `str` call (rewrite as a literal)
    |
 36 | # These become literals
@@ -41,8 +39,6 @@ UP018.py:38:1: UP018 [*] Unnecessary `str` call (rewrite as a literal)
 39 39 | str("""
 40 40 | foo""")
 41 41 | bytes()
-
-    Run `ruff check --fix` to apply this fix.
 
 UP018.py:39:1: UP018 [*] Unnecessary `str` call (rewrite as a literal)
    |
@@ -67,8 +63,6 @@ UP018.py:39:1: UP018 [*] Unnecessary `str` call (rewrite as a literal)
 42 42 | bytes(b"foo")
 43 43 | bytes(b"""
 
-    Run `ruff check --fix` to apply this fix.
-
 UP018.py:41:1: UP018 [*] Unnecessary `bytes` call (rewrite as a literal)
    |
 39 | str("""
@@ -89,8 +83,6 @@ UP018.py:41:1: UP018 [*] Unnecessary `bytes` call (rewrite as a literal)
 43 43 | bytes(b"""
 44 44 | foo""")
 
-    Run `ruff check --fix` to apply this fix.
-
 UP018.py:42:1: UP018 [*] Unnecessary `bytes` call (rewrite as a literal)
    |
 40 | foo""")
@@ -110,8 +102,6 @@ UP018.py:42:1: UP018 [*] Unnecessary `bytes` call (rewrite as a literal)
 43 43 | bytes(b"""
 44 44 | foo""")
 45 45 | f"{str()}"
-
-    Run `ruff check --fix` to apply this fix.
 
 UP018.py:43:1: UP018 [*] Unnecessary `bytes` call (rewrite as a literal)
    |
@@ -136,8 +126,6 @@ UP018.py:43:1: UP018 [*] Unnecessary `bytes` call (rewrite as a literal)
 46 46 | int()
 47 47 | int(1)
 
-    Run `ruff check --fix` to apply this fix.
-
 UP018.py:45:4: UP018 [*] Unnecessary `str` call (rewrite as a literal)
    |
 43 | bytes(b"""
@@ -157,8 +145,6 @@ UP018.py:45:4: UP018 [*] Unnecessary `str` call (rewrite as a literal)
 46 46 | int()
 47 47 | int(1)
 48 48 | float()
-
-    Run `ruff check --fix` to apply this fix.
 
 UP018.py:46:1: UP018 [*] Unnecessary `int` call (rewrite as a literal)
    |
@@ -180,8 +166,6 @@ UP018.py:46:1: UP018 [*] Unnecessary `int` call (rewrite as a literal)
 48 48 | float()
 49 49 | float(1.0)
 
-    Run `ruff check --fix` to apply this fix.
-
 UP018.py:47:1: UP018 [*] Unnecessary `int` call (rewrite as a literal)
    |
 45 | f"{str()}"
@@ -201,8 +185,6 @@ UP018.py:47:1: UP018 [*] Unnecessary `int` call (rewrite as a literal)
 48 48 | float()
 49 49 | float(1.0)
 50 50 | bool()
-
-    Run `ruff check --fix` to apply this fix.
 
 UP018.py:48:1: UP018 [*] Unnecessary `float` call (rewrite as a literal)
    |
@@ -224,8 +206,6 @@ UP018.py:48:1: UP018 [*] Unnecessary `float` call (rewrite as a literal)
 50 50 | bool()
 51 51 | bool(True)
 
-    Run `ruff check --fix` to apply this fix.
-
 UP018.py:49:1: UP018 [*] Unnecessary `float` call (rewrite as a literal)
    |
 47 | int(1)
@@ -245,8 +225,6 @@ UP018.py:49:1: UP018 [*] Unnecessary `float` call (rewrite as a literal)
 50 50 | bool()
 51 51 | bool(True)
 52 52 | bool(False)
-
-    Run `ruff check --fix` to apply this fix.
 
 UP018.py:50:1: UP018 [*] Unnecessary `bool` call (rewrite as a literal)
    |
@@ -268,8 +246,6 @@ UP018.py:50:1: UP018 [*] Unnecessary `bool` call (rewrite as a literal)
 52 52 | bool(False)
 53 53 | 
 
-    Run `ruff check --fix` to apply this fix.
-
 UP018.py:51:1: UP018 [*] Unnecessary `bool` call (rewrite as a literal)
    |
 49 | float(1.0)
@@ -288,8 +264,6 @@ UP018.py:51:1: UP018 [*] Unnecessary `bool` call (rewrite as a literal)
 52 52 | bool(False)
 53 53 | 
 54 54 | # These become a literal but retain parentheses
-
-    Run `ruff check --fix` to apply this fix.
 
 UP018.py:52:1: UP018 [*] Unnecessary `bool` call (rewrite as a literal)
    |
@@ -311,8 +285,6 @@ UP018.py:52:1: UP018 [*] Unnecessary `bool` call (rewrite as a literal)
 54 54 | # These become a literal but retain parentheses
 55 55 | int(1).denominator
 
-    Run `ruff check --fix` to apply this fix.
-
 UP018.py:55:1: UP018 [*] Unnecessary `int` call (rewrite as a literal)
    |
 54 | # These become a literal but retain parentheses
@@ -331,8 +303,6 @@ UP018.py:55:1: UP018 [*] Unnecessary `int` call (rewrite as a literal)
 56 56 | 
 57 57 | # These too are literals in spirit
 58 58 | int(+1)
-
-    Run `ruff check --fix` to apply this fix.
 
 UP018.py:58:1: UP018 [*] Unnecessary `int` call (rewrite as a literal)
    |
@@ -353,8 +323,6 @@ UP018.py:58:1: UP018 [*] Unnecessary `int` call (rewrite as a literal)
 60 60 | float(+1.0)
 61 61 | float(-1.0)
 
-    Run `ruff check --fix` to apply this fix.
-
 UP018.py:59:1: UP018 [*] Unnecessary `int` call (rewrite as a literal)
    |
 57 | # These too are literals in spirit
@@ -374,8 +342,6 @@ UP018.py:59:1: UP018 [*] Unnecessary `int` call (rewrite as a literal)
 60 60 | float(+1.0)
 61 61 | float(-1.0)
 
-    Run `ruff check --fix` to apply this fix.
-
 UP018.py:60:1: UP018 [*] Unnecessary `float` call (rewrite as a literal)
    |
 58 | int(+1)
@@ -393,8 +359,6 @@ UP018.py:60:1: UP018 [*] Unnecessary `float` call (rewrite as a literal)
    60 |++1.0
 61 61 | float(-1.0)
 
-    Run `ruff check --fix` to apply this fix.
-
 UP018.py:61:1: UP018 [*] Unnecessary `float` call (rewrite as a literal)
    |
 59 | int(-1)
@@ -409,5 +373,3 @@ UP018.py:61:1: UP018 [*] Unnecessary `float` call (rewrite as a literal)
 60 60 | float(+1.0)
 61    |-float(-1.0)
    61 |+-1.0
-
-    Run `ruff check --fix` to apply this fix.

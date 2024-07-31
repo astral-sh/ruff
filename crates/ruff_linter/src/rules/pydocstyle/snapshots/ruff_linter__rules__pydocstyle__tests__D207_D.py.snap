@@ -21,8 +21,6 @@ D.py:232:1: D207 [*] Docstring is under-indented
 234 234 |     """
 235 235 | 
 
-    Run `ruff check --fix` to apply this fix.
-
 D.py:244:1: D207 [*] Docstring is under-indented
     |
 242 |     Description.
@@ -40,8 +38,6 @@ D.py:244:1: D207 [*] Docstring is under-indented
 245 245 | 
 246 246 | 
 247 247 | @expect('D208: Docstring is over-indented')
-
-    Run `ruff check --fix` to apply this fix.
 
 D.py:440:1: D207 [*] Docstring is under-indented
     |
@@ -62,8 +58,6 @@ D.py:440:1: D207 [*] Docstring is under-indented
 442 442 | 
 443 443 | 
 
-    Run `ruff check --fix` to apply this fix.
-
 D.py:441:1: D207 [*] Docstring is under-indented
     |
 440 |     Second Line
@@ -80,5 +74,3 @@ D.py:441:1: D207 [*] Docstring is under-indented
 442 442 | 
 443 443 | 
 444 444 | def function_with_lambda_arg(x=lambda y: y):
-
-    Run `ruff check --fix` to apply this fix.

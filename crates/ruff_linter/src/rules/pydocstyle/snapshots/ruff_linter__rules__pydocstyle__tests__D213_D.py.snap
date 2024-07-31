@@ -24,8 +24,6 @@ D.py:200:5: D213 [*] Multi-line docstring summary should start at the second lin
 202 203 | 
 203 204 |     """
 
-    Run `ruff check --fix` to apply this fix.
-
 D.py:210:5: D213 [*] Multi-line docstring summary should start at the second line
     |
 208 |   @expect('D213: Multi-line docstring summary should start at the second line')
@@ -51,8 +49,6 @@ D.py:210:5: D213 [*] Multi-line docstring summary should start at the second lin
 212 213 | 
 213 214 |     Description.
 
-    Run `ruff check --fix` to apply this fix.
-
 D.py:220:5: D213 [*] Multi-line docstring summary should start at the second line
     |
 218 |   @expect('D213: Multi-line docstring summary should start at the second line')
@@ -76,8 +72,6 @@ D.py:220:5: D213 [*] Multi-line docstring summary should start at the second lin
 221 222 | 
 222 223 |     Description.
 223 224 | 
-
-    Run `ruff check --fix` to apply this fix.
 
 D.py:230:5: D213 [*] Multi-line docstring summary should start at the second line
     |
@@ -103,8 +97,6 @@ D.py:230:5: D213 [*] Multi-line docstring summary should start at the second lin
 232 233 | Description.
 233 234 | 
 
-    Run `ruff check --fix` to apply this fix.
-
 D.py:240:5: D213 [*] Multi-line docstring summary should start at the second line
     |
 238 |   @expect('D213: Multi-line docstring summary should start at the second line')
@@ -128,8 +120,6 @@ D.py:240:5: D213 [*] Multi-line docstring summary should start at the second lin
 241 242 | 
 242 243 |     Description.
 243 244 | 
-
-    Run `ruff check --fix` to apply this fix.
 
 D.py:250:5: D213 [*] Multi-line docstring summary should start at the second line
     |
@@ -155,8 +145,6 @@ D.py:250:5: D213 [*] Multi-line docstring summary should start at the second lin
 252 253 |        Description.
 253 254 | 
 
-    Run `ruff check --fix` to apply this fix.
-
 D.py:260:5: D213 [*] Multi-line docstring summary should start at the second line
     |
 258 |   @expect('D213: Multi-line docstring summary should start at the second line')
@@ -180,8 +168,6 @@ D.py:260:5: D213 [*] Multi-line docstring summary should start at the second lin
 261 262 | 
 262 263 |     Description.
 263 264 | 
-
-    Run `ruff check --fix` to apply this fix.
 
 D.py:270:5: D213 [*] Multi-line docstring summary should start at the second line
     |
@@ -207,8 +193,6 @@ D.py:270:5: D213 [*] Multi-line docstring summary should start at the second lin
 272 273 |         Description.
 273 274 | 
 
-    Run `ruff check --fix` to apply this fix.
-
 D.py:281:5: D213 [*] Multi-line docstring summary should start at the second line
     |
 279 |   @expect('D213: Multi-line docstring summary should start at the second line')
@@ -230,8 +214,6 @@ D.py:281:5: D213 [*] Multi-line docstring summary should start at the second lin
 282 283 | 
 283 284 |     Description."""
 284 285 | 
-
-    Run `ruff check --fix` to apply this fix.
 
 D.py:299:5: D213 [*] Multi-line docstring summary should start at the second line
     |
@@ -255,8 +237,6 @@ D.py:299:5: D213 [*] Multi-line docstring summary should start at the second lin
 300 301 | 
 301 302 |     This is the end.
 302 303 |     """
-
-    Run `ruff check --fix` to apply this fix.
 
 D.py:343:5: D213 [*] Multi-line docstring summary should start at the second line
     |
@@ -283,8 +263,6 @@ D.py:343:5: D213 [*] Multi-line docstring summary should start at the second lin
 345 346 |     In particular, line continuations \
 346 347 |     and unicode literals \u0394 and \N{GREEK CAPITAL LETTER DELTA}.
 
-    Run `ruff check --fix` to apply this fix.
-
 D.py:383:5: D213 [*] Multi-line docstring summary should start at the second line
     |
 381 |   @expect('D213: Multi-line docstring summary should start at the second line')
@@ -308,8 +286,6 @@ D.py:383:5: D213 [*] Multi-line docstring summary should start at the second lin
 384 385 | 
 385 386 |     More lines.
 386 387 |     """
-
-    Run `ruff check --fix` to apply this fix.
 
 D.py:392:5: D213 [*] Multi-line docstring summary should start at the second line
     |
@@ -335,8 +311,6 @@ D.py:392:5: D213 [*] Multi-line docstring summary should start at the second lin
 394 395 |     Multi-line comments. OK to have extra blank line
 395 396 | 
 
-    Run `ruff check --fix` to apply this fix.
-
 D.py:438:37: D213 [*] Multi-line docstring summary should start at the second line
     |
 436 |   @expect("D207: Docstring is under-indented")
@@ -359,8 +333,6 @@ D.py:438:37: D213 [*] Multi-line docstring summary should start at the second li
 439 440 | 
 440 441 |     Second Line
 441 442 |     """
-
-    Run `ruff check --fix` to apply this fix.
 
 D.py:450:5: D213 [*] Multi-line docstring summary should start at the second line
     |
@@ -385,8 +357,6 @@ D.py:450:5: D213 [*] Multi-line docstring summary should start at the second lin
 451 452 | 
 452 453 |     The assertion was caused in the next function, so this one is necessary.
 453 454 | 
-
-    Run `ruff check --fix` to apply this fix.
 
 D.py:526:5: D213 [*] Multi-line docstring summary should start at the second line
     |
@@ -416,8 +386,6 @@ D.py:526:5: D213 [*] Multi-line docstring summary should start at the second lin
 528 529 |     Parameters
 529 530 |     ----------
 
-    Run `ruff check --fix` to apply this fix.
-
 D.py:546:5: D213 [*] Multi-line docstring summary should start at the second line
     |
 544 |   def multiline_leading_space():
@@ -440,8 +408,6 @@ D.py:546:5: D213 [*] Multi-line docstring summary should start at the second lin
 547 548 | 
 548 549 |     More content.
 549 550 |     """
-
-    Run `ruff check --fix` to apply this fix.
 
 D.py:555:5: D213 [*] Multi-line docstring summary should start at the second line
     |
@@ -468,8 +434,6 @@ D.py:555:5: D213 [*] Multi-line docstring summary should start at the second lin
 557 558 |     More content.
 558 559 |     """
 
-    Run `ruff check --fix` to apply this fix.
-
 D.py:568:5: D213 [*] Multi-line docstring summary should start at the second line
     |
 566 |   def multiline_trailing_and_leading_space():
@@ -495,8 +459,6 @@ D.py:568:5: D213 [*] Multi-line docstring summary should start at the second lin
 570 571 |     More content.
 571 572 |     """
 
-    Run `ruff check --fix` to apply this fix.
-
 D.py:588:5: D213 [*] Multi-line docstring summary should start at the second line
     |
 586 |   @expect('D213: Multi-line docstring summary should start at the second line')
@@ -518,8 +480,6 @@ D.py:588:5: D213 [*] Multi-line docstring summary should start at the second lin
 589 590 | 
 590 591 |     Description.  """
 591 592 | 
-
-    Run `ruff check --fix` to apply this fix.
 
 D.py:606:5: D213 [*] Multi-line docstring summary should start at the second line
     |
@@ -543,8 +503,6 @@ D.py:606:5: D213 [*] Multi-line docstring summary should start at the second lin
 608 609 |     """
 609 610 | 
 
-    Run `ruff check --fix` to apply this fix.
-
 D.py:615:5: D213 [*] Multi-line docstring summary should start at the second line
     |
 613 |   @expect('D212: Multi-line docstring summary should start at the first line')
@@ -566,8 +524,6 @@ D.py:615:5: D213 [*] Multi-line docstring summary should start at the second lin
 616 617 | 
 617 618 |     """
 618 619 | 
-
-    Run `ruff check --fix` to apply this fix.
 
 D.py:671:5: D213 [*] Multi-line docstring summary should start at the second line
     |
@@ -592,8 +548,6 @@ D.py:671:5: D213 [*] Multi-line docstring summary should start at the second lin
 672 673 | 
 673 674 |         This is overindented
 674 675 |             And so is this, but it we should preserve the extra space on this line relative
-
-    Run `ruff check --fix` to apply this fix.
 
 D.py:680:5: D213 [*] Multi-line docstring summary should start at the second line
     |
@@ -622,8 +576,6 @@ D.py:680:5: D213 [*] Multi-line docstring summary should start at the second lin
 682 683 |         This is overindented
 683 684 |             And so is this, but it we should preserve the extra space on this line relative
 
-    Run `ruff check --fix` to apply this fix.
-
 D.py:693:5: D213 [*] Multi-line docstring summary should start at the second line
     |
 692 |   def retain_extra_whitespace_deeper():
@@ -651,8 +603,6 @@ D.py:693:5: D213 [*] Multi-line docstring summary should start at the second lin
 695 696 |         This is overindented
 696 697 |             And so is this, but it we should preserve the extra space on this line relative
 
-    Run `ruff check --fix` to apply this fix.
-
 D.py:702:5: D213 [*] Multi-line docstring summary should start at the second line
     |
 701 |   def retain_extra_whitespace_followed_by_same_offset():
@@ -678,8 +628,6 @@ D.py:702:5: D213 [*] Multi-line docstring summary should start at the second lin
 704 705 |         This is overindented
 705 706 |             And so is this, but it we should preserve the extra space on this line relative
 
-    Run `ruff check --fix` to apply this fix.
-
 D.py:712:5: D213 [*] Multi-line docstring summary should start at the second line
     |
 711 |   def retain_extra_whitespace_not_overindented():
@@ -704,8 +652,6 @@ D.py:712:5: D213 [*] Multi-line docstring summary should start at the second lin
 714 715 |     This is not overindented
 715 716 |         This is overindented, but since one line is not overindented this should not raise
 
-    Run `ruff check --fix` to apply this fix.
-
 D.py:721:5: D213 [*] Multi-line docstring summary should start at the second line
     |
 720 |   def inconsistent_indent_byte_size():
@@ -727,5 +673,3 @@ D.py:721:5: D213 [*] Multi-line docstring summary should start at the second lin
 722 723 | 
 723 724 |        Returns:
 724 725 |     """
-
-    Run `ruff check --fix` to apply this fix.

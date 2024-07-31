@@ -20,8 +20,6 @@ TD006.py:4:3: TD006 [*] Invalid TODO capitalization: `ToDo` should be `TODO`
 5 5 | # todo (evanrittenhouse): another invalid capitalization
 6 6 | # foo # todo: invalid capitalization
 
-    Run `ruff check --fix` to apply this fix.
-
 TD006.py:5:3: TD006 [*] Invalid TODO capitalization: `todo` should be `TODO`
   |
 3 | # TDO006 - error
@@ -39,8 +37,6 @@ TD006.py:5:3: TD006 [*] Invalid TODO capitalization: `todo` should be `TODO`
   5 |+# TODO (evanrittenhouse): another invalid capitalization
 6 6 | # foo # todo: invalid capitalization
 
-    Run `ruff check --fix` to apply this fix.
-
 TD006.py:6:9: TD006 [*] Invalid TODO capitalization: `todo` should be `TODO`
   |
 4 | # ToDo (evanrittenhouse): invalid capitalization
@@ -55,5 +51,3 @@ TD006.py:6:9: TD006 [*] Invalid TODO capitalization: `todo` should be `TODO`
 5 5 | # todo (evanrittenhouse): another invalid capitalization
 6   |-# foo # todo: invalid capitalization
   6 |+# foo # TODO: invalid capitalization
-
-    Run `ruff check --fix` to apply this fix.

@@ -21,8 +21,6 @@ PYI055.pyi:4:4: PYI055 [*] Multiple `type` members in a union. Combine them into
 6 6 | y: builtins.type[int] | type[str] | builtins.type[complex]
 7 7 | z: Union[type[float], type[complex]]
 
-    Run `ruff check --fix` to apply this fix.
-
 PYI055.pyi:5:4: PYI055 [*] Multiple `type` members in a union. Combine them into one, e.g., `type[int | str | float]`.
   |
 4 | w: builtins.type[int] | builtins.type[str] | builtins.type[complex]
@@ -41,8 +39,6 @@ PYI055.pyi:5:4: PYI055 [*] Multiple `type` members in a union. Combine them into
 6 6 | y: builtins.type[int] | type[str] | builtins.type[complex]
 7 7 | z: Union[type[float], type[complex]]
 8 8 | z: Union[type[float, int], type[complex]]
-
-    Run `ruff check --fix` to apply this fix.
 
 PYI055.pyi:6:4: PYI055 [*] Multiple `type` members in a union. Combine them into one, e.g., `type[int | str | complex]`.
   |
@@ -64,8 +60,6 @@ PYI055.pyi:6:4: PYI055 [*] Multiple `type` members in a union. Combine them into
 8 8 | z: Union[type[float, int], type[complex]]
 9 9 | 
 
-    Run `ruff check --fix` to apply this fix.
-
 PYI055.pyi:7:4: PYI055 [*] Multiple `type` members in a union. Combine them into one, e.g., `type[Union[float, complex]]`.
   |
 5 | x: type[int] | type[str] | type[float]
@@ -84,8 +78,6 @@ PYI055.pyi:7:4: PYI055 [*] Multiple `type` members in a union. Combine them into
 8 8 | z: Union[type[float, int], type[complex]]
 9 9 | 
 10 10 | def func(arg: type[int] | str | type[float]) -> None: ...
-
-    Run `ruff check --fix` to apply this fix.
 
 PYI055.pyi:8:4: PYI055 [*] Multiple `type` members in a union. Combine them into one, e.g., `type[Union[float, int, complex]]`.
    |
@@ -107,8 +99,6 @@ PYI055.pyi:8:4: PYI055 [*] Multiple `type` members in a union. Combine them into
 10 10 | def func(arg: type[int] | str | type[float]) -> None: ...
 11 11 | 
 
-    Run `ruff check --fix` to apply this fix.
-
 PYI055.pyi:10:15: PYI055 [*] Multiple `type` members in a union. Combine them into one, e.g., `type[int | float]`.
    |
  8 | z: Union[type[float, int], type[complex]]
@@ -129,8 +119,6 @@ PYI055.pyi:10:15: PYI055 [*] Multiple `type` members in a union. Combine them in
 12 12 | # OK
 13 13 | x: type[int, str, float]
 
-    Run `ruff check --fix` to apply this fix.
-
 PYI055.pyi:20:7: PYI055 [*] Multiple `type` members in a union. Combine them into one, e.g., `type[requests_mock.Mocker | httpretty]`.
    |
 19 | # OK
@@ -150,8 +138,6 @@ PYI055.pyi:20:7: PYI055 [*] Multiple `type` members in a union. Combine them int
 22 22 | def func():
 23 23 |     # PYI055
 
-    Run `ruff check --fix` to apply this fix.
-
 PYI055.pyi:24:11: PYI055 [*] Multiple `type` members in a union. Combine them into one, e.g., `type[requests_mock.Mocker | httpretty | str]`.
    |
 22 | def func():
@@ -169,8 +155,6 @@ PYI055.pyi:24:11: PYI055 [*] Multiple `type` members in a union. Combine them in
    24 |+    item: type[requests_mock.Mocker | httpretty | str] = requests_mock.Mocker
 25 25 |     item2: Union[type[requests_mock.Mocker], type[httpretty], type[str]] = requests_mock.Mocker
 
-    Run `ruff check --fix` to apply this fix.
-
 PYI055.pyi:25:12: PYI055 [*] Multiple `type` members in a union. Combine them into one, e.g., `type[Union[requests_mock.Mocker, httpretty, str]]`.
    |
 23 |     # PYI055
@@ -185,5 +169,3 @@ PYI055.pyi:25:12: PYI055 [*] Multiple `type` members in a union. Combine them in
 24 24 |     item: type[requests_mock.Mocker] | type[httpretty] | type[str] = requests_mock.Mocker
 25    |-    item2: Union[type[requests_mock.Mocker], type[httpretty], type[str]] = requests_mock.Mocker
    25 |+    item2: type[Union[requests_mock.Mocker, httpretty, str]] = requests_mock.Mocker
-
-    Run `ruff check --fix` to apply this fix.

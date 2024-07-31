@@ -19,8 +19,6 @@ E40.py:2:1: E401 [*] Multiple imports on one line
 4 5 | #: Okay
 5 6 | import os
 
-    Run `ruff check --fix` to apply this fix.
-
 E40.py:65:1: E401 [*] Multiple imports on one line
    |
 64 | #: E401
@@ -39,8 +37,6 @@ E40.py:65:1: E401 [*] Multiple imports on one line
 66 67 | import re as regex, string; x = 1
 67 68 | 
 68 69 | x = 1; import re as regex, string
-
-    Run `ruff check --fix` to apply this fix.
 
 E40.py:66:1: E401 [*] Multiple imports on one line
    |
@@ -62,8 +58,6 @@ E40.py:66:1: E401 [*] Multiple imports on one line
 68 68 | x = 1; import re as regex, string
 69 69 | 
 
-    Run `ruff check --fix` to apply this fix.
-
 E40.py:68:8: E401 [*] Multiple imports on one line
    |
 66 | import re as regex, string; x = 1
@@ -81,8 +75,6 @@ E40.py:68:8: E401 [*] Multiple imports on one line
 69 69 | 
 70 70 | 
 71 71 | def blah():
-
-    Run `ruff check --fix` to apply this fix.
 
 E40.py:72:5: E401 [*] Multiple imports on one line
    |
@@ -104,8 +96,6 @@ E40.py:72:5: E401 [*] Multiple imports on one line
 74 75 |     def nested_and_tested():
 75 76 |         import builtins, textwrap as tw
 
-    Run `ruff check --fix` to apply this fix.
-
 E40.py:75:9: E401 [*] Multiple imports on one line
    |
 74 |     def nested_and_tested():
@@ -126,8 +116,6 @@ E40.py:75:9: E401 [*] Multiple imports on one line
 77 78 |         x = 1; import re as regex, string
 78 79 |         import re as regex, string; x = 1
 
-    Run `ruff check --fix` to apply this fix.
-
 E40.py:77:16: E401 [*] Multiple imports on one line
    |
 75 |         import builtins, textwrap as tw
@@ -147,8 +135,6 @@ E40.py:77:16: E401 [*] Multiple imports on one line
 79 79 | 
 80 80 |     if True: import re as regex, string
 
-    Run `ruff check --fix` to apply this fix.
-
 E40.py:78:9: E401 [*] Multiple imports on one line
    |
 77 |         x = 1; import re as regex, string
@@ -167,8 +153,6 @@ E40.py:78:9: E401 [*] Multiple imports on one line
 79 79 | 
 80 80 |     if True: import re as regex, string
 
-    Run `ruff check --fix` to apply this fix.
-
 E40.py:80:14: E401 [*] Multiple imports on one line
    |
 78 |         import re as regex, string; x = 1
@@ -183,5 +167,3 @@ E40.py:80:14: E401 [*] Multiple imports on one line
 79 79 | 
 80    |-    if True: import re as regex, string
    80 |+    if True: import re as regex; import string
-
-    Run `ruff check --fix` to apply this fix.

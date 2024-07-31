@@ -18,8 +18,6 @@ D403.py:2:5: D403 [*] First word of the first line should be capitalized: `this`
 4 4 | def good_function():
 5 5 |     """This docstring is capitalized."""
 
-    Run `ruff check --fix` to apply this fix.
-
 D403.py:30:5: D403 [*] First word of the first line should be capitalized: `singleword` -> `Singleword`
    |
 29 | def single_word():
@@ -39,8 +37,6 @@ D403.py:30:5: D403 [*] First word of the first line should be capitalized: `sing
 32 32 | def single_word_no_dot():
 33 33 |     """singleword"""
 
-    Run `ruff check --fix` to apply this fix.
-
 D403.py:33:5: D403 [*] First word of the first line should be capitalized: `singleword` -> `Singleword`
    |
 32 | def single_word_no_dot():
@@ -54,5 +50,3 @@ D403.py:33:5: D403 [*] First word of the first line should be capitalized: `sing
 32 32 | def single_word_no_dot():
 33    |-    """singleword"""
    33 |+    """Singleword"""
-
-    Run `ruff check --fix` to apply this fix.

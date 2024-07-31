@@ -20,8 +20,6 @@ PYI029.pyi:10:9: PYI029 [*] Defining `__str__` in a stub is almost always redund
 12 12 | class ShouldRemove:
 13 13 |     def __repr__(self) -> str: ...  # Error: PYI029
 
-    Run `ruff check --fix` to apply this fix.
-
 PYI029.pyi:13:9: PYI029 [*] Defining `__repr__` in a stub is almost always redundant
    |
 12 | class ShouldRemove:
@@ -38,8 +36,6 @@ PYI029.pyi:13:9: PYI029 [*] Defining `__repr__` in a stub is almost always redun
 14 13 |     def __str__(self) -> builtins.str: ...  # Error: PYI029
 15 14 | 
 16 15 | class NoReturnSpecified:
-
-    Run `ruff check --fix` to apply this fix.
 
 PYI029.pyi:14:9: PYI029 [*] Defining `__str__` in a stub is almost always redundant
    |
@@ -59,5 +55,3 @@ PYI029.pyi:14:9: PYI029 [*] Defining `__str__` in a stub is almost always redund
 15 14 | 
 16 15 | class NoReturnSpecified:
 17 16 |     def __str__(self): ...
-
-    Run `ruff check --fix` to apply this fix.

@@ -18,8 +18,6 @@ docstring_doubles_function.py:2:5: Q002 [*] Double quote docstring found but sin
 4 4 |     return
 5 5 | 
 
-    Run `ruff check --fix` to apply this fix.
-
 docstring_doubles_function.py:8:5: Q002 [*] Double quote docstring found but single quotes preferred
    |
  7 |   def foo2():
@@ -45,8 +43,6 @@ docstring_doubles_function.py:8:5: Q002 [*] Double quote docstring found but sin
 12 12 |     return
 13 13 | 
 
-    Run `ruff check --fix` to apply this fix.
-
 docstring_doubles_function.py:27:5: Q002 [*] Double quote docstring found but single quotes preferred
    |
 26 | def function_with_single_docstring(a):
@@ -63,5 +59,3 @@ docstring_doubles_function.py:27:5: Q002 [*] Double quote docstring found but si
 28 28 | 
 29 29 | 
 30 30 | def double_inside_single(a):
-
-    Run `ruff check --fix` to apply this fix.

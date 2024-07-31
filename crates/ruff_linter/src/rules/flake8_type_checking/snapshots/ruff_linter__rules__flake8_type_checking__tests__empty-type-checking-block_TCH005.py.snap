@@ -17,8 +17,6 @@ TCH005.py:4:5: TCH005 [*] Found empty type-checking block
 6 4 | 
 7 5 | if False:
 
-    Run `ruff check --fix` to apply this fix.
-
 TCH005.py:8:5: TCH005 [*] Found empty type-checking block
    |
  7 | if False:
@@ -38,8 +36,6 @@ TCH005.py:8:5: TCH005 [*] Found empty type-checking block
 10 8 | if 0:
 11 9 |     pass  # TCH005
 
-    Run `ruff check --fix` to apply this fix.
-
 TCH005.py:11:5: TCH005 [*] Found empty type-checking block
    |
 10 | if 0:
@@ -56,8 +52,6 @@ TCH005.py:11:5: TCH005 [*] Found empty type-checking block
 12 10 | 
 13 11 | 
 14 12 | def example():
-
-    Run `ruff check --fix` to apply this fix.
 
 TCH005.py:16:9: TCH005 [*] Found empty type-checking block
    |
@@ -78,8 +72,6 @@ TCH005.py:16:9: TCH005 [*] Found empty type-checking block
 18 16 | 
 19 17 | 
 
-    Run `ruff check --fix` to apply this fix.
-
 TCH005.py:22:9: TCH005 [*] Found empty type-checking block
    |
 20 | class Test:
@@ -99,8 +91,6 @@ TCH005.py:22:9: TCH005 [*] Found empty type-checking block
 24 22 | 
 25 23 | 
 
-    Run `ruff check --fix` to apply this fix.
-
 TCH005.py:45:5: TCH005 [*] Found empty type-checking block
    |
 44 | if TYPE_CHECKING:
@@ -119,5 +109,3 @@ TCH005.py:45:5: TCH005 [*] Found empty type-checking block
 46 44 | 
 47 45 | # https://github.com/astral-sh/ruff/issues/11368
 48 46 | if TYPE_CHECKING:
-
-    Run `ruff check --fix` to apply this fix.

@@ -21,8 +21,6 @@ sections.py:32:5: D406 [*] Section name should end with a newline ("Returns")
 34 34 |     A value of some sort.
 35 35 | 
 
-    Run `ruff check --fix` to apply this fix.
-
 sections.py:227:5: D406 [*] Section name should end with a newline ("Raises")
     |
 225 |     ------
@@ -41,8 +39,6 @@ sections.py:227:5: D406 [*] Section name should end with a newline ("Raises")
 228 228 |     My attention.
 229 229 | 
 230 230 |     """
-
-    Run `ruff check --fix` to apply this fix.
 
 sections.py:590:5: D406 [*] Section name should end with a newline ("Parameters")
     |
@@ -63,5 +59,3 @@ sections.py:590:5: D406 [*] Section name should end with a newline ("Parameters"
 591 591 |     ----------
 592 592 |     parameters:
 593 593 |         A list of string parameters
-
-    Run `ruff check --fix` to apply this fix.

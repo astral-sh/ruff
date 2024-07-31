@@ -18,8 +18,6 @@ PIE808.py:2:7: PIE808 [*] Unnecessary `start` argument in `range`
 4 4 | import builtins
 5 5 | builtins.range(0, 10)
 
-    Run `ruff check --fix` to apply this fix.
-
 PIE808.py:5:16: PIE808 [*] Unnecessary `start` argument in `range`
   |
 4 | import builtins
@@ -38,5 +36,3 @@ PIE808.py:5:16: PIE808 [*] Unnecessary `start` argument in `range`
 6 6 | 
 7 7 | # OK
 8 8 | range(x, 10)
-
-    Run `ruff check --fix` to apply this fix.

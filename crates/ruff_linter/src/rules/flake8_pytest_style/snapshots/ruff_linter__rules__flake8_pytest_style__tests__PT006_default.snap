@@ -49,8 +49,6 @@ PT006.py:29:26: PT006 [*] Wrong type passed to first argument of `@pytest.mark.p
 31 31 |     ...
 32 32 | 
 
-    Run `ruff check --fix` to apply this fix.
-
 PT006.py:34:26: PT006 [*] Wrong type passed to first argument of `@pytest.mark.parametrize`; expected `tuple`
    |
 34 | @pytest.mark.parametrize(["param1", "param2"], [(1, 2), (3, 4)])
@@ -78,8 +76,6 @@ PT006.py:39:26: PT006 [*] Wrong type passed to first argument of `@pytest.mark.p
 40 40 | def test_list_one_elem(param1, param2):
 41 41 |     ...
 42 42 | 
-
-    Run `ruff check --fix` to apply this fix.
 
 PT006.py:44:26: PT006 [*] Wrong type passed to first argument of `@pytest.mark.parametrize`; expected `tuple`
    |

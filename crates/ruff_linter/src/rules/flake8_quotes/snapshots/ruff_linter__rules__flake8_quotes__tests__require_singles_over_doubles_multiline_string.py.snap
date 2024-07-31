@@ -21,5 +21,3 @@ doubles_multiline_string.py:1:5: Q001 [*] Double quote multiline found but singl
 4 4 | 
 5 5 | s = ''' This "should"
 6 6 | "not" be
-
-    Run `ruff check --fix` to apply this fix.

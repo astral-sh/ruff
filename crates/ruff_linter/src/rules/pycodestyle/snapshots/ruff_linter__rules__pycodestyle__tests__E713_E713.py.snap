@@ -18,8 +18,6 @@ E713.py:2:8: E713 [*] Test for membership should be `not in`
 4 4 | #: E713
 5 5 | if not X.B in Y:
 
-    Run `ruff check --fix` to apply this fix.
-
 E713.py:5:8: E713 [*] Test for membership should be `not in`
   |
 3 |     pass
@@ -39,8 +37,6 @@ E713.py:5:8: E713 [*] Test for membership should be `not in`
 6 6 |     pass
 7 7 | #: E713
 8 8 | if not X in Y and Z == "zero":
-
-    Run `ruff check --fix` to apply this fix.
 
 E713.py:8:8: E713 [*] Test for membership should be `not in`
    |
@@ -62,8 +58,6 @@ E713.py:8:8: E713 [*] Test for membership should be `not in`
 10 10 | #: E713
 11 11 | if X == "zero" or not Y in Z:
 
-    Run `ruff check --fix` to apply this fix.
-
 E713.py:11:23: E713 [*] Test for membership should be `not in`
    |
  9 |     pass
@@ -84,8 +78,6 @@ E713.py:11:23: E713 [*] Test for membership should be `not in`
 13 13 | #: E713
 14 14 | if not (X in Y):
 
-    Run `ruff check --fix` to apply this fix.
-
 E713.py:14:9: E713 [*] Test for membership should be `not in`
    |
 12 |     pass
@@ -105,8 +97,6 @@ E713.py:14:9: E713 [*] Test for membership should be `not in`
 16 16 | 
 17 17 | #: Okay
 
-    Run `ruff check --fix` to apply this fix.
-
 E713.py:40:12: E713 [*] Test for membership should be `not in`
    |
 38 | assert [42, not foo] in bar
@@ -121,5 +111,3 @@ E713.py:40:12: E713 [*] Test for membership should be `not in`
 39 39 | assert not (re.search(r"^.:\\Users\\[^\\]*\\Downloads\\.*") is None)
 40    |-assert not('name' in request)or not request['name']
    40 |+assert 'name' not in request or not request['name']
-
-    Run `ruff check --fix` to apply this fix.

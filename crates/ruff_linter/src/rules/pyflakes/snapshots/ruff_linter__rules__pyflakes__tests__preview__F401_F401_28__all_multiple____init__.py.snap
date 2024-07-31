@@ -14,8 +14,6 @@ __init__.py:5:15: F401 [*] `.unused` imported but unused; consider removing, add
 8   |-__all__ = [];
   8 |+__all__ = ["bees", "unused"];
 
-    Run `ruff check --fix` to apply this fix.
-
 __init__.py:5:34: F401 [*] `.renamed` imported but unused; consider removing, adding to `__all__`, or using a redundant alias
   |
 5 | from . import unused, renamed as bees  # F401: add to __all__
@@ -28,5 +26,3 @@ __init__.py:5:34: F401 [*] `.renamed` imported but unused; consider removing, ad
 7 7 | 
 8   |-__all__ = [];
   8 |+__all__ = ["bees", "unused"];
-
-    Run `ruff check --fix` to apply this fix.

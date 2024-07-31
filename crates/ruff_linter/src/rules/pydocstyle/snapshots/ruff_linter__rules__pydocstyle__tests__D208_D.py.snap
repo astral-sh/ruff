@@ -21,8 +21,6 @@ D.py:252:1: D208 [*] Docstring is over-indented
 254 254 |     """
 255 255 | 
 
-    Run `ruff check --fix` to apply this fix.
-
 D.py:264:1: D208 [*] Docstring is over-indented
     |
 262 |     Description.
@@ -40,8 +38,6 @@ D.py:264:1: D208 [*] Docstring is over-indented
 265 265 | 
 266 266 | 
 267 267 | @expect('D208: Docstring is over-indented')
-
-    Run `ruff check --fix` to apply this fix.
 
 D.py:272:1: D208 [*] Docstring is over-indented
     |
@@ -63,8 +59,6 @@ D.py:272:1: D208 [*] Docstring is over-indented
 274 274 |     """
 275 275 | 
 
-    Run `ruff check --fix` to apply this fix.
-
 D.py:673:1: D208 [*] Docstring is over-indented
     |
 671 |     """Summary.
@@ -85,8 +79,6 @@ D.py:673:1: D208 [*] Docstring is over-indented
 675 675 |             to the one before
 676 676 |     """
 
-    Run `ruff check --fix` to apply this fix.
-
 D.py:674:1: D208 [*] Docstring is over-indented
     |
 673 |         This is overindented
@@ -106,8 +98,6 @@ D.py:674:1: D208 [*] Docstring is over-indented
 676 676 |     """
 677 677 | 
 
-    Run `ruff check --fix` to apply this fix.
-
 D.py:675:1: D208 [*] Docstring is over-indented
     |
 673 |         This is overindented
@@ -126,8 +116,6 @@ D.py:675:1: D208 [*] Docstring is over-indented
 676 676 |     """
 677 677 | 
 678 678 | 
-
-    Run `ruff check --fix` to apply this fix.
 
 D.py:682:1: D208 [*] Docstring is over-indented
     |
@@ -149,8 +137,6 @@ D.py:682:1: D208 [*] Docstring is over-indented
 684 684 |             to the one before
 685 685 |         This is also overindented
 
-    Run `ruff check --fix` to apply this fix.
-
 D.py:683:1: D208 [*] Docstring is over-indented
     |
 682 |         This is overindented
@@ -169,8 +155,6 @@ D.py:683:1: D208 [*] Docstring is over-indented
 684 684 |             to the one before
 685 685 |         This is also overindented
 686 686 |             And so is this, but it we should preserve the extra space on this line relative
-
-    Run `ruff check --fix` to apply this fix.
 
 D.py:684:1: D208 [*] Docstring is over-indented
     |
@@ -192,8 +176,6 @@ D.py:684:1: D208 [*] Docstring is over-indented
 686 686 |             And so is this, but it we should preserve the extra space on this line relative
 687 687 |             to the one before
 
-    Run `ruff check --fix` to apply this fix.
-
 D.py:685:1: D208 [*] Docstring is over-indented
     |
 683 |             And so is this, but it we should preserve the extra space on this line relative
@@ -213,8 +195,6 @@ D.py:685:1: D208 [*] Docstring is over-indented
 686 686 |             And so is this, but it we should preserve the extra space on this line relative
 687 687 |             to the one before
 688 688 |     """
-
-    Run `ruff check --fix` to apply this fix.
 
 D.py:686:1: D208 [*] Docstring is over-indented
     |
@@ -236,8 +216,6 @@ D.py:686:1: D208 [*] Docstring is over-indented
 688 688 |     """
 689 689 | 
 
-    Run `ruff check --fix` to apply this fix.
-
 D.py:687:1: D208 [*] Docstring is over-indented
     |
 685 |         This is also overindented
@@ -256,8 +234,6 @@ D.py:687:1: D208 [*] Docstring is over-indented
 688 688 |     """
 689 689 | 
 690 690 | 
-
-    Run `ruff check --fix` to apply this fix.
 
 D.py:695:1: D208 [*] Docstring is over-indented
     |
@@ -279,8 +255,6 @@ D.py:695:1: D208 [*] Docstring is over-indented
 697 697 |             to the one before
 698 698 |                 And the relative indent here should be preserved too
 
-    Run `ruff check --fix` to apply this fix.
-
 D.py:696:1: D208 [*] Docstring is over-indented
     |
 695 |         This is overindented
@@ -299,8 +273,6 @@ D.py:696:1: D208 [*] Docstring is over-indented
 697 697 |             to the one before
 698 698 |                 And the relative indent here should be preserved too
 699 699 |     """
-
-    Run `ruff check --fix` to apply this fix.
 
 D.py:697:1: D208 [*] Docstring is over-indented
     |
@@ -322,8 +294,6 @@ D.py:697:1: D208 [*] Docstring is over-indented
 699 699 |     """
 700 700 | 
 
-    Run `ruff check --fix` to apply this fix.
-
 D.py:698:1: D208 [*] Docstring is over-indented
     |
 696 |             And so is this, but it we should preserve the extra space on this line relative
@@ -342,8 +312,6 @@ D.py:698:1: D208 [*] Docstring is over-indented
 699 699 |     """
 700 700 | 
 701 701 | def retain_extra_whitespace_followed_by_same_offset():
-
-    Run `ruff check --fix` to apply this fix.
 
 D.py:704:1: D208 [*] Docstring is over-indented
     |
@@ -365,8 +333,6 @@ D.py:704:1: D208 [*] Docstring is over-indented
 706 706 |         This is overindented
 707 707 |         This is overindented
 
-    Run `ruff check --fix` to apply this fix.
-
 D.py:705:1: D208 [*] Docstring is over-indented
     |
 704 |         This is overindented
@@ -385,8 +351,6 @@ D.py:705:1: D208 [*] Docstring is over-indented
 706 706 |         This is overindented
 707 707 |         This is overindented
 708 708 |     """
-
-    Run `ruff check --fix` to apply this fix.
 
 D.py:706:1: D208 [*] Docstring is over-indented
     |
@@ -408,8 +372,6 @@ D.py:706:1: D208 [*] Docstring is over-indented
 708 708 |     """
 709 709 | 
 
-    Run `ruff check --fix` to apply this fix.
-
 D.py:707:1: D208 [*] Docstring is over-indented
     |
 705 |             And so is this, but it we should preserve the extra space on this line relative
@@ -429,8 +391,6 @@ D.py:707:1: D208 [*] Docstring is over-indented
 709 709 | 
 710 710 | 
 
-    Run `ruff check --fix` to apply this fix.
-
 D.py:723:1: D208 [*] Docstring is over-indented
     |
 721 |     """There's a non-breaking space (2-bytes) after 3 spaces (https://github.com/astral-sh/ruff/issues/9080).
@@ -447,5 +407,3 @@ D.py:723:1: D208 [*] Docstring is over-indented
 723     |-       Returns:
     723 |+    Returns:
 724 724 |     """
-
-    Run `ruff check --fix` to apply this fix.

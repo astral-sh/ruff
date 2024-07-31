@@ -23,8 +23,6 @@ match_case.py:3:1: I001 [*] Import block is un-sorted or un-formatted
 6 6 |         import collections
 7 7 |         import abc
 
-    Run `ruff check --fix` to apply this fix.
-
 match_case.py:6:1: I001 [*] Import block is un-sorted or un-formatted
   |
 4 |           import os
@@ -40,5 +38,3 @@ match_case.py:6:1: I001 [*] Import block is un-sorted or un-formatted
   6 |+        import abc
 6 7 |         import collections
 7   |-        import abc
-
-    Run `ruff check --fix` to apply this fix.

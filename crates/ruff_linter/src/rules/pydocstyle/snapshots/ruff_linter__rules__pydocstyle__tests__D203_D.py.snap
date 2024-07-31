@@ -17,8 +17,6 @@ D.py:161:5: D203 [*] 1 blank line required before class docstring
 162 163 | 
 163 164 | 
 
-    Run `ruff check --fix` to apply this fix.
-
 D.py:192:5: D203 [*] 1 blank line required before class docstring
     |
 191 | class LeadingAndTrailingSpaceMissing:
@@ -35,8 +33,6 @@ D.py:192:5: D203 [*] 1 blank line required before class docstring
 192 193 |     """Leading and trailing space missing."""
 193 194 |     pass
 194 195 | 
-
-    Run `ruff check --fix` to apply this fix.
 
 D.py:526:5: D203 [*] 1 blank line required before class docstring
     |
@@ -64,8 +60,6 @@ D.py:526:5: D203 [*] 1 blank line required before class docstring
 527 528 | 
 528 529 |     Parameters
 
-    Run `ruff check --fix` to apply this fix.
-
 D.py:649:5: D203 [*] 1 blank line required before class docstring
     |
 648 | class StatementOnSameLineAsDocstring:
@@ -84,8 +78,6 @@ D.py:649:5: D203 [*] 1 blank line required before class docstring
 650 651 |     def sort_services(self):
 651 652 |         pass
 
-    Run `ruff check --fix` to apply this fix.
-
 D.py:654:5: D203 [*] 1 blank line required before class docstring
     |
 653 | class StatementOnSameLineAsDocstring:
@@ -101,8 +93,6 @@ D.py:654:5: D203 [*] 1 blank line required before class docstring
 654 655 |     "After this docstring there's another statement on the same line separated by a semicolon."; priorities=1
 655 656 | 
 656 657 | 
-
-    Run `ruff check --fix` to apply this fix.
 
 D.py:658:5: D203 [*] 1 blank line required before class docstring
     |
@@ -121,5 +111,3 @@ D.py:658:5: D203 [*] 1 blank line required before class docstring
 658 659 |     "After this docstring there's a comment."  # priorities=1
 659 660 |     def sort_services(self):
 660 661 |         pass
-
-    Run `ruff check --fix` to apply this fix.

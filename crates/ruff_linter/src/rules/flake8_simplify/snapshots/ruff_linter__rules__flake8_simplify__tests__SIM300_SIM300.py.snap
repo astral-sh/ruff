@@ -18,8 +18,6 @@ SIM300.py:2:1: SIM300 [*] Yoda condition detected
 4 4 | ("a", "b") == compare  # SIM300
 5 5 | "yoda" <= compare  # SIM300
 
-    Run `ruff check --fix` to apply this fix.
-
 SIM300.py:3:1: SIM300 [*] Yoda condition detected
   |
 1 | # Errors
@@ -38,8 +36,6 @@ SIM300.py:3:1: SIM300 [*] Yoda condition detected
 4 4 | ("a", "b") == compare  # SIM300
 5 5 | "yoda" <= compare  # SIM300
 6 6 | "yoda" < compare  # SIM300
-
-    Run `ruff check --fix` to apply this fix.
 
 SIM300.py:4:1: SIM300 [*] Yoda condition detected
   |
@@ -61,8 +57,6 @@ SIM300.py:4:1: SIM300 [*] Yoda condition detected
 6 6 | "yoda" < compare  # SIM300
 7 7 | 42 > age  # SIM300
 
-    Run `ruff check --fix` to apply this fix.
-
 SIM300.py:5:1: SIM300 [*] Yoda condition detected
   |
 3 | 42 == age  # SIM300
@@ -82,8 +76,6 @@ SIM300.py:5:1: SIM300 [*] Yoda condition detected
 6 6 | "yoda" < compare  # SIM300
 7 7 | 42 > age  # SIM300
 8 8 | -42 > age  # SIM300
-
-    Run `ruff check --fix` to apply this fix.
 
 SIM300.py:6:1: SIM300 [*] Yoda condition detected
   |
@@ -105,8 +97,6 @@ SIM300.py:6:1: SIM300 [*] Yoda condition detected
 8 8 | -42 > age  # SIM300
 9 9 | +42 > age  # SIM300
 
-    Run `ruff check --fix` to apply this fix.
-
 SIM300.py:7:1: SIM300 [*] Yoda condition detected
   |
 5 | "yoda" <= compare  # SIM300
@@ -126,8 +116,6 @@ SIM300.py:7:1: SIM300 [*] Yoda condition detected
 8 8 | -42 > age  # SIM300
 9 9 | +42 > age  # SIM300
 10 10 | YODA == age  # SIM300
-
-    Run `ruff check --fix` to apply this fix.
 
 SIM300.py:8:1: SIM300 [*] Yoda condition detected
    |
@@ -149,8 +137,6 @@ SIM300.py:8:1: SIM300 [*] Yoda condition detected
 10 10 | YODA == age  # SIM300
 11 11 | YODA > age  # SIM300
 
-    Run `ruff check --fix` to apply this fix.
-
 SIM300.py:9:1: SIM300 [*] Yoda condition detected
    |
  7 | 42 > age  # SIM300
@@ -170,8 +156,6 @@ SIM300.py:9:1: SIM300 [*] Yoda condition detected
 10 10 | YODA == age  # SIM300
 11 11 | YODA > age  # SIM300
 12 12 | YODA >= age  # SIM300
-
-    Run `ruff check --fix` to apply this fix.
 
 SIM300.py:10:1: SIM300 [*] Yoda condition detected
    |
@@ -193,8 +177,6 @@ SIM300.py:10:1: SIM300 [*] Yoda condition detected
 12 12 | YODA >= age  # SIM300
 13 13 | JediOrder.YODA == age  # SIM300
 
-    Run `ruff check --fix` to apply this fix.
-
 SIM300.py:11:1: SIM300 [*] Yoda condition detected
    |
  9 | +42 > age  # SIM300
@@ -214,8 +196,6 @@ SIM300.py:11:1: SIM300 [*] Yoda condition detected
 12 12 | YODA >= age  # SIM300
 13 13 | JediOrder.YODA == age  # SIM300
 14 14 | 0 < (number - 100)  # SIM300
-
-    Run `ruff check --fix` to apply this fix.
 
 SIM300.py:12:1: SIM300 [*] Yoda condition detected
    |
@@ -237,8 +217,6 @@ SIM300.py:12:1: SIM300 [*] Yoda condition detected
 14 14 | 0 < (number - 100)  # SIM300
 15 15 | B<A[0][0]or B
 
-    Run `ruff check --fix` to apply this fix.
-
 SIM300.py:13:1: SIM300 [*] Yoda condition detected
    |
 11 | YODA > age  # SIM300
@@ -258,8 +236,6 @@ SIM300.py:13:1: SIM300 [*] Yoda condition detected
 14 14 | 0 < (number - 100)  # SIM300
 15 15 | B<A[0][0]or B
 16 16 | B or(B)<A[0][0]
-
-    Run `ruff check --fix` to apply this fix.
 
 SIM300.py:14:1: SIM300 [*] Yoda condition detected
    |
@@ -281,8 +257,6 @@ SIM300.py:14:1: SIM300 [*] Yoda condition detected
 16 16 | B or(B)<A[0][0]
 17 17 | 
 
-    Run `ruff check --fix` to apply this fix.
-
 SIM300.py:15:1: SIM300 [*] Yoda condition detected
    |
 13 | JediOrder.YODA == age  # SIM300
@@ -301,8 +275,6 @@ SIM300.py:15:1: SIM300 [*] Yoda condition detected
 16 16 | B or(B)<A[0][0]
 17 17 | 
 18 18 | # Errors in preview
-
-    Run `ruff check --fix` to apply this fix.
 
 SIM300.py:16:5: SIM300 [*] Yoda condition detected
    |
@@ -324,8 +296,6 @@ SIM300.py:16:5: SIM300 [*] Yoda condition detected
 18 18 | # Errors in preview
 19 19 | ['upper'] == UPPER_LIST
 
-    Run `ruff check --fix` to apply this fix.
-
 SIM300.py:19:1: SIM300 [*] Yoda condition detected
    |
 18 | # Errors in preview
@@ -343,8 +313,6 @@ SIM300.py:19:1: SIM300 [*] Yoda condition detected
 20 20 | {} == DummyHandler.CONFIG
 21 21 | 
 22 22 | # Errors in stable
-
-    Run `ruff check --fix` to apply this fix.
 
 SIM300.py:20:1: SIM300 [*] Yoda condition detected
    |
@@ -365,5 +333,3 @@ SIM300.py:20:1: SIM300 [*] Yoda condition detected
 21 21 | 
 22 22 | # Errors in stable
 23 23 | UPPER_LIST == ['upper']
-
-    Run `ruff check --fix` to apply this fix.

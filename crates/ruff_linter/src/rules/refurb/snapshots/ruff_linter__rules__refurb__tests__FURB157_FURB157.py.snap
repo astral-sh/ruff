@@ -20,8 +20,6 @@ FURB157.py:5:9: FURB157 [*] Verbose expression in `Decimal` constructor
 7 7 | Decimal(float("Infinity"))
 8 8 | Decimal(float("-Infinity"))
 
-    Run `ruff check --fix` to apply this fix.
-
 FURB157.py:6:9: FURB157 [*] Verbose expression in `Decimal` constructor
   |
 4 | # Errors
@@ -41,8 +39,6 @@ FURB157.py:6:9: FURB157 [*] Verbose expression in `Decimal` constructor
 7 7 | Decimal(float("Infinity"))
 8 8 | Decimal(float("-Infinity"))
 9 9 | Decimal(float("inf"))
-
-    Run `ruff check --fix` to apply this fix.
 
 FURB157.py:7:9: FURB157 [*] Verbose expression in `Decimal` constructor
   |
@@ -64,8 +60,6 @@ FURB157.py:7:9: FURB157 [*] Verbose expression in `Decimal` constructor
 9 9 | Decimal(float("inf"))
 10 10 | Decimal(float("-inf"))
 
-    Run `ruff check --fix` to apply this fix.
-
 FURB157.py:8:9: FURB157 [*] Verbose expression in `Decimal` constructor
    |
  6 | Decimal("-42")
@@ -85,8 +79,6 @@ FURB157.py:8:9: FURB157 [*] Verbose expression in `Decimal` constructor
 9 9 | Decimal(float("inf"))
 10 10 | Decimal(float("-inf"))
 11 11 | Decimal(float("nan"))
-
-    Run `ruff check --fix` to apply this fix.
 
 FURB157.py:9:9: FURB157 [*] Verbose expression in `Decimal` constructor
    |
@@ -108,8 +100,6 @@ FURB157.py:9:9: FURB157 [*] Verbose expression in `Decimal` constructor
 11 11 | Decimal(float("nan"))
 12 12 | decimal.Decimal("0")
 
-    Run `ruff check --fix` to apply this fix.
-
 FURB157.py:10:9: FURB157 [*] Verbose expression in `Decimal` constructor
    |
  8 | Decimal(float("-Infinity"))
@@ -130,8 +120,6 @@ FURB157.py:10:9: FURB157 [*] Verbose expression in `Decimal` constructor
 12 12 | decimal.Decimal("0")
 13 13 | 
 
-    Run `ruff check --fix` to apply this fix.
-
 FURB157.py:11:9: FURB157 [*] Verbose expression in `Decimal` constructor
    |
  9 | Decimal(float("inf"))
@@ -150,8 +138,6 @@ FURB157.py:11:9: FURB157 [*] Verbose expression in `Decimal` constructor
 12 12 | decimal.Decimal("0")
 13 13 | 
 14 14 | # OK
-
-    Run `ruff check --fix` to apply this fix.
 
 FURB157.py:12:17: FURB157 [*] Verbose expression in `Decimal` constructor
    |
@@ -172,5 +158,3 @@ FURB157.py:12:17: FURB157 [*] Verbose expression in `Decimal` constructor
 13 13 | 
 14 14 | # OK
 15 15 | Decimal(0)
-
-    Run `ruff check --fix` to apply this fix.

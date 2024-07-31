@@ -17,8 +17,6 @@ SIM202.py:2:4: SIM202 [*] Use `a == b` instead of `not a != b`
 4 4 | 
 5 5 | # SIM202
 
-    Run `ruff check --fix` to apply this fix.
-
 SIM202.py:6:4: SIM202 [*] Use `a == b + c` instead of `not a != b + c`
   |
 5 | # SIM202
@@ -37,8 +35,6 @@ SIM202.py:6:4: SIM202 [*] Use `a == b + c` instead of `not a != b + c`
 8 8 | 
 9 9 | # SIM202
 
-    Run `ruff check --fix` to apply this fix.
-
 SIM202.py:10:4: SIM202 [*] Use `a + b == c` instead of `not a + b != c`
    |
  9 | # SIM202
@@ -56,5 +52,3 @@ SIM202.py:10:4: SIM202 [*] Use `a + b == c` instead of `not a + b != c`
 11 11 |     pass
 12 12 | 
 13 13 | # OK
-
-    Run `ruff check --fix` to apply this fix.

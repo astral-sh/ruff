@@ -17,6 +17,4 @@ sections.py:218:5: D412 [*] No blank lines allowed between a section header and 
 220     |-
 221 220 |     This is the function's description, which will also specify what it
 222 221 |     returns.
-223 222 | 
-
-    Run `ruff check --fix` to apply this fix.
+223 222 |

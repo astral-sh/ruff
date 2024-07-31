@@ -20,8 +20,6 @@ PTH201.py:5:10: PTH201 [*] Do not pass the current directory explicitly to `Path
 7 7 | _ = PurePath(".")
 8 8 | _ = Path("")
 
-    Run `ruff check --fix` to apply this fix.
-
 PTH201.py:6:9: PTH201 [*] Do not pass the current directory explicitly to `Path`
   |
 4 | # match
@@ -42,8 +40,6 @@ PTH201.py:6:9: PTH201 [*] Do not pass the current directory explicitly to `Path`
 8 8 | _ = Path("")
 9 9 | 
 
-    Run `ruff check --fix` to apply this fix.
-
 PTH201.py:7:14: PTH201 [*] Do not pass the current directory explicitly to `Path`
   |
 5 | _ = Path(".")
@@ -62,8 +58,6 @@ PTH201.py:7:14: PTH201 [*] Do not pass the current directory explicitly to `Path
 8 8 | _ = Path("")
 9 9 | 
 10 10 | # no match
-
-    Run `ruff check --fix` to apply this fix.
 
 PTH201.py:8:10: PTH201 [*] Do not pass the current directory explicitly to `Path`
    |
@@ -84,5 +78,3 @@ PTH201.py:8:10: PTH201 [*] Do not pass the current directory explicitly to `Path
 9 9 | 
 10 10 | # no match
 11 11 | _ = Path()
-
-    Run `ruff check --fix` to apply this fix.

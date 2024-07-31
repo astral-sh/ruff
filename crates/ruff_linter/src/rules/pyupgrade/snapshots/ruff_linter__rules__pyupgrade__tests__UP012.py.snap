@@ -18,8 +18,6 @@ UP012.py:2:1: UP012 [*] Unnecessary call to `encode` as UTF-8
 4 4 | "foo".encode()  # b"foo"
 5 5 | "foo".encode("UTF8")  # b"foo"
 
-    Run `ruff check --fix` to apply this fix.
-
 UP012.py:3:1: UP012 [*] Unnecessary call to `encode` as UTF-8
   |
 1 | # ASCII literals should be replaced by a bytes literal
@@ -38,8 +36,6 @@ UP012.py:3:1: UP012 [*] Unnecessary call to `encode` as UTF-8
 4 4 | "foo".encode()  # b"foo"
 5 5 | "foo".encode("UTF8")  # b"foo"
 6 6 | U"foo".encode("utf-8")  # b"foo"
-
-    Run `ruff check --fix` to apply this fix.
 
 UP012.py:4:1: UP012 [*] Unnecessary call to `encode` as UTF-8
   |
@@ -61,8 +57,6 @@ UP012.py:4:1: UP012 [*] Unnecessary call to `encode` as UTF-8
 6 6 | U"foo".encode("utf-8")  # b"foo"
 7 7 | "foo".encode(encoding="utf-8")  # b"foo"
 
-    Run `ruff check --fix` to apply this fix.
-
 UP012.py:5:1: UP012 [*] Unnecessary call to `encode` as UTF-8
   |
 3 | "foo".encode("u8")  # b"foo"
@@ -82,8 +76,6 @@ UP012.py:5:1: UP012 [*] Unnecessary call to `encode` as UTF-8
 6 6 | U"foo".encode("utf-8")  # b"foo"
 7 7 | "foo".encode(encoding="utf-8")  # b"foo"
 8 8 | """
-
-    Run `ruff check --fix` to apply this fix.
 
 UP012.py:6:1: UP012 [*] Unnecessary call to `encode` as UTF-8
   |
@@ -105,8 +97,6 @@ UP012.py:6:1: UP012 [*] Unnecessary call to `encode` as UTF-8
 8 8 | """
 9 9 | Lorem
 
-    Run `ruff check --fix` to apply this fix.
-
 UP012.py:7:1: UP012 [*] Unnecessary call to `encode` as UTF-8
   |
 5 | "foo".encode("UTF8")  # b"foo"
@@ -126,8 +116,6 @@ UP012.py:7:1: UP012 [*] Unnecessary call to `encode` as UTF-8
 8 8 | """
 9 9 | Lorem
 10 10 | 
-
-    Run `ruff check --fix` to apply this fix.
 
 UP012.py:8:1: UP012 [*] Unnecessary call to `encode` as UTF-8
    |
@@ -162,8 +150,6 @@ UP012.py:8:1: UP012 [*] Unnecessary call to `encode` as UTF-8
 16 14 |     "Lorem "
 17 15 |     "Ipsum".encode()
 
-    Run `ruff check --fix` to apply this fix.
-
 UP012.py:16:5: UP012 [*] Unnecessary call to `encode` as UTF-8
    |
 14 |   )
@@ -187,8 +173,6 @@ UP012.py:16:5: UP012 [*] Unnecessary call to `encode` as UTF-8
 18 18 | )
 19 19 | (
 20 20 |     "Lorem "  # Comment
-
-    Run `ruff check --fix` to apply this fix.
 
 UP012.py:20:5: UP012 [*] Unnecessary call to `encode` as UTF-8
    |
@@ -214,8 +198,6 @@ UP012.py:20:5: UP012 [*] Unnecessary call to `encode` as UTF-8
 23 23 | (
 24 24 |     "Lorem " "Ipsum".encode()
 
-    Run `ruff check --fix` to apply this fix.
-
 UP012.py:24:5: UP012 [*] Unnecessary call to `encode` as UTF-8
    |
 22 | )
@@ -235,8 +217,6 @@ UP012.py:24:5: UP012 [*] Unnecessary call to `encode` as UTF-8
 26 26 | 
 27 27 | # `encode` on variables should not be processed.
 
-    Run `ruff check --fix` to apply this fix.
-
 UP012.py:32:1: UP012 [*] Unnecessary UTF-8 `encoding` argument to `encode`
    |
 31 | bar = "bar"
@@ -255,8 +235,6 @@ UP012.py:32:1: UP012 [*] Unnecessary UTF-8 `encoding` argument to `encode`
 33 33 | encoding = "latin"
 34 34 | "foo".encode(encoding)
 35 35 | f"foo{bar}".encode(encoding)
-
-    Run `ruff check --fix` to apply this fix.
 
 UP012.py:36:1: UP012 [*] Unnecessary UTF-8 `encoding` argument to `encode`
    |
@@ -282,8 +260,6 @@ UP012.py:36:1: UP012 [*] Unnecessary UTF-8 `encoding` argument to `encode`
 40 38 | # `encode` with custom args and kwargs should not be processed.
 41 39 | "foo".encode("utf-8", errors="replace")
 
-    Run `ruff check --fix` to apply this fix.
-
 UP012.py:53:1: UP012 [*] Unnecessary UTF-8 `encoding` argument to `encode`
    |
 52 | # Unicode literals should only be stripped of default encoding.
@@ -302,8 +278,6 @@ UP012.py:53:1: UP012 [*] Unnecessary UTF-8 `encoding` argument to `encode`
 54 54 | "unicode text©".encode()
 55 55 | "unicode text©".encode(encoding="UTF8")  # "unicode text©".encode()
 56 56 | 
-
-    Run `ruff check --fix` to apply this fix.
 
 UP012.py:55:1: UP012 [*] Unnecessary UTF-8 `encoding` argument to `encode`
    |
@@ -325,8 +299,6 @@ UP012.py:55:1: UP012 [*] Unnecessary UTF-8 `encoding` argument to `encode`
 57 57 | r"foo\o".encode("utf-8")  # br"foo\o"
 58 58 | u"foo".encode("utf-8")  # b"foo"
 
-    Run `ruff check --fix` to apply this fix.
-
 UP012.py:57:1: UP012 [*] Unnecessary call to `encode` as UTF-8
    |
 55 | "unicode text©".encode(encoding="UTF8")  # "unicode text©".encode()
@@ -347,8 +319,6 @@ UP012.py:57:1: UP012 [*] Unnecessary call to `encode` as UTF-8
 59 59 | R"foo\o".encode("utf-8")  # br"foo\o"
 60 60 | U"foo".encode("utf-8")  # b"foo"
 
-    Run `ruff check --fix` to apply this fix.
-
 UP012.py:58:1: UP012 [*] Unnecessary call to `encode` as UTF-8
    |
 57 | r"foo\o".encode("utf-8")  # br"foo\o"
@@ -367,8 +337,6 @@ UP012.py:58:1: UP012 [*] Unnecessary call to `encode` as UTF-8
 59 59 | R"foo\o".encode("utf-8")  # br"foo\o"
 60 60 | U"foo".encode("utf-8")  # b"foo"
 61 61 | print("foo".encode())  # print(b"foo")
-
-    Run `ruff check --fix` to apply this fix.
 
 UP012.py:59:1: UP012 [*] Unnecessary call to `encode` as UTF-8
    |
@@ -390,8 +358,6 @@ UP012.py:59:1: UP012 [*] Unnecessary call to `encode` as UTF-8
 61 61 | print("foo".encode())  # print(b"foo")
 62 62 | 
 
-    Run `ruff check --fix` to apply this fix.
-
 UP012.py:60:1: UP012 [*] Unnecessary call to `encode` as UTF-8
    |
 58 | u"foo".encode("utf-8")  # b"foo"
@@ -410,8 +376,6 @@ UP012.py:60:1: UP012 [*] Unnecessary call to `encode` as UTF-8
 61 61 | print("foo".encode())  # print(b"foo")
 62 62 | 
 63 63 | # `encode` on parenthesized strings.
-
-    Run `ruff check --fix` to apply this fix.
 
 UP012.py:61:7: UP012 [*] Unnecessary call to `encode` as UTF-8
    |
@@ -432,8 +396,6 @@ UP012.py:61:7: UP012 [*] Unnecessary call to `encode` as UTF-8
 62 62 | 
 63 63 | # `encode` on parenthesized strings.
 64 64 | (
-
-    Run `ruff check --fix` to apply this fix.
 
 UP012.py:64:1: UP012 [*] Unnecessary call to `encode` as UTF-8
    |
@@ -460,8 +422,6 @@ UP012.py:64:1: UP012 [*] Unnecessary call to `encode` as UTF-8
 68 68 | 
 69 69 | ((
 70 70 |     "abc"
-
-    Run `ruff check --fix` to apply this fix.
 
 UP012.py:69:1: UP012 [*] Unnecessary call to `encode` as UTF-8
    |
@@ -490,8 +450,6 @@ UP012.py:69:1: UP012 [*] Unnecessary call to `encode` as UTF-8
 74 74 | (f"foo{bar}").encode("utf-8")
 75 75 | (f"foo{bar}").encode(encoding="utf-8")
 
-    Run `ruff check --fix` to apply this fix.
-
 UP012.py:74:1: UP012 [*] Unnecessary UTF-8 `encoding` argument to `encode`
    |
 72 | )).encode()
@@ -512,8 +470,6 @@ UP012.py:74:1: UP012 [*] Unnecessary UTF-8 `encoding` argument to `encode`
 76 76 | ("unicode text©").encode("utf-8")
 77 77 | ("unicode text©").encode(encoding="utf-8")
 
-    Run `ruff check --fix` to apply this fix.
-
 UP012.py:75:1: UP012 [*] Unnecessary UTF-8 `encoding` argument to `encode`
    |
 74 | (f"foo{bar}").encode("utf-8")
@@ -532,8 +488,6 @@ UP012.py:75:1: UP012 [*] Unnecessary UTF-8 `encoding` argument to `encode`
 76 76 | ("unicode text©").encode("utf-8")
 77 77 | ("unicode text©").encode(encoding="utf-8")
 78 78 | 
-
-    Run `ruff check --fix` to apply this fix.
 
 UP012.py:76:1: UP012 [*] Unnecessary UTF-8 `encoding` argument to `encode`
    |
@@ -554,8 +508,6 @@ UP012.py:76:1: UP012 [*] Unnecessary UTF-8 `encoding` argument to `encode`
 78 78 | 
 79 79 | 
 
-    Run `ruff check --fix` to apply this fix.
-
 UP012.py:77:1: UP012 [*] Unnecessary UTF-8 `encoding` argument to `encode`
    |
 75 | (f"foo{bar}").encode(encoding="utf-8")
@@ -573,8 +525,6 @@ UP012.py:77:1: UP012 [*] Unnecessary UTF-8 `encoding` argument to `encode`
 78 78 | 
 79 79 | 
 80 80 | # Regression test for: https://github.com/astral-sh/ruff/issues/7455#issuecomment-1722459882
-
-    Run `ruff check --fix` to apply this fix.
 
 UP012.py:82:17: UP012 [*] Unnecessary call to `encode` as UTF-8
    |
@@ -596,8 +546,6 @@ UP012.py:82:17: UP012 [*] Unnecessary call to `encode` as UTF-8
 84 84 | # Not a valid type annotation but this test shouldn't result in a panic.
 85 85 | # Refer: https://github.com/astral-sh/ruff/issues/11736
 
-    Run `ruff check --fix` to apply this fix.
-
 UP012.py:86:5: UP012 [*] Unnecessary call to `encode` as UTF-8
    |
 84 | # Not a valid type annotation but this test shouldn't result in a panic.
@@ -612,5 +560,3 @@ UP012.py:86:5: UP012 [*] Unnecessary call to `encode` as UTF-8
 85 85 | # Refer: https://github.com/astral-sh/ruff/issues/11736
 86    |-x: '"foo".encode("utf-8")'
    86 |+x: 'b"foo"'
-
-    Run `ruff check --fix` to apply this fix.

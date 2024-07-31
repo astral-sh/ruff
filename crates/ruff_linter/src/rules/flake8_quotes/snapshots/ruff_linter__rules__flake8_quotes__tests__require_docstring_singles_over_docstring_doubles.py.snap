@@ -21,8 +21,6 @@ docstring_doubles.py:1:1: Q002 [*] Double quote docstring found but single quote
 5 5 | """
 6 6 | this is not a docstring
 
-    Run `ruff check --fix` to apply this fix.
-
 docstring_doubles.py:12:5: Q002 [*] Double quote docstring found but single quotes preferred
    |
 11 |   class Cls:
@@ -48,8 +46,6 @@ docstring_doubles.py:12:5: Q002 [*] Double quote docstring found but single quot
 16 16 |     """
 17 17 |     this is not a docstring
 
-    Run `ruff check --fix` to apply this fix.
-
 docstring_doubles.py:24:9: Q002 [*] Double quote docstring found but single quotes preferred
    |
 22 |           definitely not a docstring""",
@@ -74,6 +70,4 @@ docstring_doubles.py:24:9: Q002 [*] Double quote docstring found but single quot
    26 |+        '''
 27 27 | 
 28 28 |         some_expression = 'hello world'
-29 29 | 
-
-    Run `ruff check --fix` to apply this fix.
+29 29 |

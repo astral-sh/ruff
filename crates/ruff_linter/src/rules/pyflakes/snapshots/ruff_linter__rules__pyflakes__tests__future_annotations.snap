@@ -19,8 +19,6 @@ future_annotations.py:8:5: F401 [*] `models.Nut` imported but unused
 10 9 | 
 11 10 | 
 
-    Run `ruff check --fix` to apply this fix.
-
 future_annotations.py:26:19: F821 Undefined name `Bar`
    |
 25 |     @classmethod

@@ -18,8 +18,6 @@ sphinx.py:13:5: D412 [*] No blank lines allowed between a section header and its
 17 16 | 
 18 17 |         import foo
 
-    Run `ruff check --fix` to apply this fix.
-
 sphinx.py:24:5: D412 [*] No blank lines allowed between a section header and its content ("Example")
    |
 22 | def func():
@@ -37,8 +35,6 @@ sphinx.py:24:5: D412 [*] No blank lines allowed between a section header and its
 28 26 |     .. code-block:: python
 29 27 | 
 30 28 |         import foo
-
-    Run `ruff check --fix` to apply this fix.
 
 sphinx.py:47:5: D412 [*] No blank lines allowed between a section header and its content ("Example")
    |
@@ -58,8 +54,6 @@ sphinx.py:47:5: D412 [*] No blank lines allowed between a section header and its
 52 51 | 
 53 52 |         import foo
 
-    Run `ruff check --fix` to apply this fix.
-
 sphinx.py:59:5: D412 [*] No blank lines allowed between a section header and its content ("Example")
    |
 57 | def func():
@@ -78,5 +72,3 @@ sphinx.py:59:5: D412 [*] No blank lines allowed between a section header and its
 64 62 |     .. code-block:: python
 65 63 | 
 66 64 |         import foo
-
-    Run `ruff check --fix` to apply this fix.

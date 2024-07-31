@@ -21,8 +21,6 @@ PYI059.py:8:17: PYI059 [*] `Generic[]` should always be the last base class
 10 10 |         self._items: List[T] = []
 11 11 | 
 
-    Run `ruff check --fix` to apply this fix.
-
 PYI059.py:15:16: PYI059 [*] `Generic[]` should always be the last base class
    |
 13 |           self._items.append(item)
@@ -49,8 +47,6 @@ PYI059.py:15:16: PYI059 [*] `Generic[]` should always be the last base class
 20 19 |     ...
 21 20 | 
 
-    Run `ruff check --fix` to apply this fix.
-
 PYI059.py:26:10: PYI059 [*] `Generic[]` should always be the last base class
    |
 24 | # to flag this issue in this case as well, since after fixing the error
@@ -69,8 +65,6 @@ PYI059.py:26:10: PYI059 [*] `Generic[]` should always be the last base class
 27 27 |     pass
 28 28 | 
 29 29 | 
-
-    Run `ruff check --fix` to apply this fix.
 
 PYI059.py:30:10: PYI059 [*] `Generic[]` should always be the last base class
    |
@@ -105,8 +99,6 @@ PYI059.py:30:10: PYI059 [*] `Generic[]` should always be the last base class
 39 37 |     # yet another comment?
 40 38 | ):  # and another one for good measure
 41 39 |     ...
-
-    Run `ruff check --fix` to apply this fix.
 
 PYI059.py:45:8: PYI059 `Generic[]` should always be the last base class
    |

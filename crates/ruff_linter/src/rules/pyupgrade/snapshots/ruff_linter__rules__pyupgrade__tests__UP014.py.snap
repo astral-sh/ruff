@@ -22,8 +22,6 @@ UP014.py:5:1: UP014 [*] Convert `MyType` from `NamedTuple` functional to class s
 7 9 | # with namespace
 8 10 | MyType = typing.NamedTuple("MyType", [("a", int), ("b", str)])
 
-    Run `ruff check --fix` to apply this fix.
-
 UP014.py:8:1: UP014 [*] Convert `MyType` from `NamedTuple` functional to class syntax
    |
  7 | # with namespace
@@ -45,8 +43,6 @@ UP014.py:8:1: UP014 [*] Convert `MyType` from `NamedTuple` functional to class s
 10 12 | # invalid identifiers (OK)
 11 13 | MyType = NamedTuple("MyType", [("x-y", int), ("b", tuple[str, ...])])
 
-    Run `ruff check --fix` to apply this fix.
-
 UP014.py:14:1: UP014 [*] Convert `MyType` from `NamedTuple` functional to class syntax
    |
 13 | # no fields
@@ -66,8 +62,6 @@ UP014.py:14:1: UP014 [*] Convert `MyType` from `NamedTuple` functional to class 
 15 16 | 
 16 17 | # empty fields
 17 18 | MyType = typing.NamedTuple("MyType", [])
-
-    Run `ruff check --fix` to apply this fix.
 
 UP014.py:17:1: UP014 [*] Convert `MyType` from `NamedTuple` functional to class syntax
    |
@@ -89,8 +83,6 @@ UP014.py:17:1: UP014 [*] Convert `MyType` from `NamedTuple` functional to class 
 19 20 | # keywords
 20 21 | MyType = typing.NamedTuple("MyType", a=int, b=tuple[str, ...])
 
-    Run `ruff check --fix` to apply this fix.
-
 UP014.py:20:1: UP014 [*] Convert `MyType` from `NamedTuple` functional to class syntax
    |
 19 | # keywords
@@ -111,5 +103,3 @@ UP014.py:20:1: UP014 [*] Convert `MyType` from `NamedTuple` functional to class 
 21 23 | 
 22 24 | # unfixable
 23 25 | MyType = typing.NamedTuple("MyType", [("a", int)], [("b", str)])
-
-    Run `ruff check --fix` to apply this fix.

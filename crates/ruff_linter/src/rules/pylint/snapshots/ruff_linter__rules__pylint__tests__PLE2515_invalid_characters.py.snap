@@ -20,8 +20,6 @@ invalid_characters.py:44:13: PLE2515 [*] Invalid unescaped character zero-width-
 46 46 | 
 47 47 | zwsp_ok = '\u200b'
 
-    Run `ruff check --fix` to apply this fix.
-
 invalid_characters.py:45:14: PLE2515 [*] Invalid unescaped character zero-width-space, use "\u200B" instead
    |
 44 | zwsp = 'zero​width'
@@ -40,8 +38,6 @@ invalid_characters.py:45:14: PLE2515 [*] Invalid unescaped character zero-width-
 46 46 | 
 47 47 | zwsp_ok = '\u200b'
 48 48 | zwsp_ok = f'\u200b'
-
-    Run `ruff check --fix` to apply this fix.
 
 invalid_characters.py:50:36: PLE2515 [*] Invalid unescaped character zero-width-space, use "\u200B" instead
    |
@@ -63,8 +59,6 @@ invalid_characters.py:50:36: PLE2515 [*] Invalid unescaped character zero-width-
 52 52 | zwsp_after_multicharacter_grapheme_cluster = "ಫ್ರಾನ್ಸಿಸ್ಕೊ ​​"
 53 53 | zwsp_after_multicharacter_grapheme_cluster = f"ಫ್ರಾನ್ಸಿಸ್ಕೊ ​​"
 
-    Run `ruff check --fix` to apply this fix.
-
 invalid_characters.py:51:37: PLE2515 [*] Invalid unescaped character zero-width-space, use "\u200B" instead
    |
 50 | zwsp_after_multibyte_character = "ಫ​"
@@ -83,8 +77,6 @@ invalid_characters.py:51:37: PLE2515 [*] Invalid unescaped character zero-width-
 52 52 | zwsp_after_multicharacter_grapheme_cluster = "ಫ್ರಾನ್ಸಿಸ್ಕೊ ​​"
 53 53 | zwsp_after_multicharacter_grapheme_cluster = f"ಫ್ರಾನ್ಸಿಸ್ಕೊ ​​"
 54 54 | 
-
-    Run `ruff check --fix` to apply this fix.
 
 invalid_characters.py:52:60: PLE2515 [*] Invalid unescaped character zero-width-space, use "\u200B" instead
    |
@@ -105,8 +97,6 @@ invalid_characters.py:52:60: PLE2515 [*] Invalid unescaped character zero-width-
 54 54 | 
 55 55 | nested_fstrings = f'␈{f'{f'␛'}'}'
 
-    Run `ruff check --fix` to apply this fix.
-
 invalid_characters.py:52:61: PLE2515 [*] Invalid unescaped character zero-width-space, use "\u200B" instead
    |
 50 | zwsp_after_multibyte_character = "ಫ​"
@@ -125,8 +115,6 @@ invalid_characters.py:52:61: PLE2515 [*] Invalid unescaped character zero-width-
 53 53 | zwsp_after_multicharacter_grapheme_cluster = f"ಫ್ರಾನ್ಸಿಸ್ಕೊ ​​"
 54 54 | 
 55 55 | nested_fstrings = f'␈{f'{f'␛'}'}'
-
-    Run `ruff check --fix` to apply this fix.
 
 invalid_characters.py:53:61: PLE2515 [*] Invalid unescaped character zero-width-space, use "\u200B" instead
    |
@@ -148,8 +136,6 @@ invalid_characters.py:53:61: PLE2515 [*] Invalid unescaped character zero-width-
 55 55 | nested_fstrings = f'␈{f'{f'␛'}'}'
 56 56 | 
 
-    Run `ruff check --fix` to apply this fix.
-
 invalid_characters.py:53:62: PLE2515 [*] Invalid unescaped character zero-width-space, use "\u200B" instead
    |
 51 | zwsp_after_multibyte_character = f"ಫ​"
@@ -168,6 +154,4 @@ invalid_characters.py:53:62: PLE2515 [*] Invalid unescaped character zero-width-
    53 |+zwsp_after_multicharacter_grapheme_cluster = f"ಫ್ರಾನ್ಸಿಸ್ಕೊ ​\u200b"
 54 54 | 
 55 55 | nested_fstrings = f'␈{f'{f'␛'}'}'
-56 56 | 
-
-    Run `ruff check --fix` to apply this fix.
+56 56 |

@@ -6,5 +6,3 @@ comment.py:1:1: I002 [*] Missing required import: `from __future__ import annota
   2 |+from __future__ import annotations as _annotations
 2 3 | 
 3 4 | x = 1
-
-    Run `ruff check --fix` to apply this fix.

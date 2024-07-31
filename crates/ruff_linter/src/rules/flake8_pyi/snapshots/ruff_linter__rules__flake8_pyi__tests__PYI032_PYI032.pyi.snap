@@ -19,8 +19,6 @@ PYI032.pyi:6:29: PYI032 [*] Prefer `object` to `Any` for the second parameter to
 8 8 | 
 9 9 | 
 
-    Run `ruff check --fix` to apply this fix.
-
 PYI032.pyi:7:29: PYI032 [*] Prefer `object` to `Any` for the second parameter to `__ne__`
   |
 5 | class Bad:
@@ -38,5 +36,3 @@ PYI032.pyi:7:29: PYI032 [*] Prefer `object` to `Any` for the second parameter to
 8 8 | 
 9 9 | 
 10 10 | class Good:
-
-    Run `ruff check --fix` to apply this fix.

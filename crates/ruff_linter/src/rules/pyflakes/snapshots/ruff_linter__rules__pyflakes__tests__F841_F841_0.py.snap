@@ -19,8 +19,6 @@ F841_0.py:3:22: F841 [*] Local variable `e` is assigned to but never used
 5 5 | 
 6 6 | 
 
-    Run `ruff check --fix` to apply this fix.
-
 F841_0.py:16:5: F841 [*] Local variable `z` is assigned to but never used
    |
 14 |     x = 1

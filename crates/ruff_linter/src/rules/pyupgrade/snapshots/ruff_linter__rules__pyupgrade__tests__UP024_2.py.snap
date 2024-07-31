@@ -21,8 +21,6 @@ UP024_2.py:10:7: UP024 [*] Replace aliased errors with `OSError`
 12 12 | raise select.error
 13 13 | 
 
-    Run `ruff check --fix` to apply this fix.
-
 UP024_2.py:11:7: UP024 [*] Replace aliased errors with `OSError`
    |
  9 | import socket, mmap, select
@@ -41,8 +39,6 @@ UP024_2.py:11:7: UP024 [*] Replace aliased errors with `OSError`
 12 12 | raise select.error
 13 13 | 
 14 14 | raise socket.error()
-
-    Run `ruff check --fix` to apply this fix.
 
 UP024_2.py:12:7: UP024 [*] Replace aliased errors with `OSError`
    |
@@ -64,8 +60,6 @@ UP024_2.py:12:7: UP024 [*] Replace aliased errors with `OSError`
 14 14 | raise socket.error()
 15 15 | raise mmap.error(1)
 
-    Run `ruff check --fix` to apply this fix.
-
 UP024_2.py:14:7: UP024 [*] Replace aliased errors with `OSError`
    |
 12 | raise select.error
@@ -86,8 +80,6 @@ UP024_2.py:14:7: UP024 [*] Replace aliased errors with `OSError`
 16 16 | raise select.error(1, 2)
 17 17 | 
 
-    Run `ruff check --fix` to apply this fix.
-
 UP024_2.py:15:7: UP024 [*] Replace aliased errors with `OSError`
    |
 14 | raise socket.error()
@@ -105,8 +97,6 @@ UP024_2.py:15:7: UP024 [*] Replace aliased errors with `OSError`
 16 16 | raise select.error(1, 2)
 17 17 | 
 18 18 | raise socket.error(
-
-    Run `ruff check --fix` to apply this fix.
 
 UP024_2.py:16:7: UP024 [*] Replace aliased errors with `OSError`
    |
@@ -128,8 +118,6 @@ UP024_2.py:16:7: UP024 [*] Replace aliased errors with `OSError`
 18 18 | raise socket.error(
 19 19 |     1,
 
-    Run `ruff check --fix` to apply this fix.
-
 UP024_2.py:18:7: UP024 [*] Replace aliased errors with `OSError`
    |
 16 | raise select.error(1, 2)
@@ -150,8 +138,6 @@ UP024_2.py:18:7: UP024 [*] Replace aliased errors with `OSError`
 20 20 |     2,
 21 21 |     3,
 
-    Run `ruff check --fix` to apply this fix.
-
 UP024_2.py:25:7: UP024 [*] Replace aliased errors with `OSError`
    |
 24 | from mmap import error
@@ -170,8 +156,6 @@ UP024_2.py:25:7: UP024 [*] Replace aliased errors with `OSError`
 26 26 | 
 27 27 | from socket import error
 28 28 | raise error(1)
-
-    Run `ruff check --fix` to apply this fix.
 
 UP024_2.py:28:7: UP024 [*] Replace aliased errors with `OSError`
    |
@@ -192,8 +176,6 @@ UP024_2.py:28:7: UP024 [*] Replace aliased errors with `OSError`
 30 30 | from select import error
 31 31 | raise error(1, 2)
 
-    Run `ruff check --fix` to apply this fix.
-
 UP024_2.py:31:7: UP024 [*] Replace aliased errors with `OSError`
    |
 30 | from select import error
@@ -212,8 +194,6 @@ UP024_2.py:31:7: UP024 [*] Replace aliased errors with `OSError`
 32 32 | 
 33 33 | # Testing the names
 34 34 | raise EnvironmentError
-
-    Run `ruff check --fix` to apply this fix.
 
 UP024_2.py:34:7: UP024 [*] Replace aliased errors with `OSError`
    |
@@ -234,8 +214,6 @@ UP024_2.py:34:7: UP024 [*] Replace aliased errors with `OSError`
 36 36 | raise WindowsError
 37 37 | 
 
-    Run `ruff check --fix` to apply this fix.
-
 UP024_2.py:35:7: UP024 [*] Replace aliased errors with `OSError`
    |
 33 | # Testing the names
@@ -254,8 +232,6 @@ UP024_2.py:35:7: UP024 [*] Replace aliased errors with `OSError`
 36 36 | raise WindowsError
 37 37 | 
 38 38 | raise EnvironmentError()
-
-    Run `ruff check --fix` to apply this fix.
 
 UP024_2.py:36:7: UP024 [*] Replace aliased errors with `OSError`
    |
@@ -277,8 +253,6 @@ UP024_2.py:36:7: UP024 [*] Replace aliased errors with `OSError`
 38 38 | raise EnvironmentError()
 39 39 | raise IOError(1)
 
-    Run `ruff check --fix` to apply this fix.
-
 UP024_2.py:38:7: UP024 [*] Replace aliased errors with `OSError`
    |
 36 | raise WindowsError
@@ -299,8 +273,6 @@ UP024_2.py:38:7: UP024 [*] Replace aliased errors with `OSError`
 40 40 | raise WindowsError(1, 2)
 41 41 | 
 
-    Run `ruff check --fix` to apply this fix.
-
 UP024_2.py:39:7: UP024 [*] Replace aliased errors with `OSError`
    |
 38 | raise EnvironmentError()
@@ -318,8 +290,6 @@ UP024_2.py:39:7: UP024 [*] Replace aliased errors with `OSError`
 40 40 | raise WindowsError(1, 2)
 41 41 | 
 42 42 | raise EnvironmentError(
-
-    Run `ruff check --fix` to apply this fix.
 
 UP024_2.py:40:7: UP024 [*] Replace aliased errors with `OSError`
    |
@@ -341,8 +311,6 @@ UP024_2.py:40:7: UP024 [*] Replace aliased errors with `OSError`
 42 42 | raise EnvironmentError(
 43 43 |     1,
 
-    Run `ruff check --fix` to apply this fix.
-
 UP024_2.py:42:7: UP024 [*] Replace aliased errors with `OSError`
    |
 40 | raise WindowsError(1, 2)
@@ -363,8 +331,6 @@ UP024_2.py:42:7: UP024 [*] Replace aliased errors with `OSError`
 44 44 |     2,
 45 45 |     3,
 
-    Run `ruff check --fix` to apply this fix.
-
 UP024_2.py:48:7: UP024 [*] Replace aliased errors with `OSError`
    |
 46 | )
@@ -384,8 +350,6 @@ UP024_2.py:48:7: UP024 [*] Replace aliased errors with `OSError`
 49 49 | raise EnvironmentError(1)
 50 50 | raise IOError(1, 2)
 
-    Run `ruff check --fix` to apply this fix.
-
 UP024_2.py:49:7: UP024 [*] Replace aliased errors with `OSError`
    |
 48 | raise WindowsError
@@ -402,8 +366,6 @@ UP024_2.py:49:7: UP024 [*] Replace aliased errors with `OSError`
    49 |+raise OSError(1)
 50 50 | raise IOError(1, 2)
 
-    Run `ruff check --fix` to apply this fix.
-
 UP024_2.py:50:7: UP024 [*] Replace aliased errors with `OSError`
    |
 48 | raise WindowsError
@@ -418,5 +380,3 @@ UP024_2.py:50:7: UP024 [*] Replace aliased errors with `OSError`
 49 49 | raise EnvironmentError(1)
 50    |-raise IOError(1, 2)
    50 |+raise OSError(1, 2)
-
-    Run `ruff check --fix` to apply this fix.

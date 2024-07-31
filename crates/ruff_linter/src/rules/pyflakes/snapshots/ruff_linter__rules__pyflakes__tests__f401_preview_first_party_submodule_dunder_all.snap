@@ -15,5 +15,3 @@ __init__.py:2:8: F401 [*] `submodule.a` imported but unused; consider removing, 
 3   |-__all__ = ['FOO']
   3 |+__all__ = ['FOO', 'submodule']
 4 4 | FOO = 42
-
-    Run `ruff check --fix` to apply this fix.

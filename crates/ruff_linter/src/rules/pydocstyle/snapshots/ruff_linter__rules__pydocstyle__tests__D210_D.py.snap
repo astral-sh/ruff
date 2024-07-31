@@ -19,8 +19,6 @@ D.py:288:5: D210 [*] No whitespaces allowed surrounding docstring text
 290 290 | 
 291 291 | @expect('D210: No whitespaces allowed surrounding docstring text')
 
-    Run `ruff check --fix` to apply this fix.
-
 D.py:293:5: D210 [*] No whitespaces allowed surrounding docstring text
     |
 291 | @expect('D210: No whitespaces allowed surrounding docstring text')
@@ -38,8 +36,6 @@ D.py:293:5: D210 [*] No whitespaces allowed surrounding docstring text
 294 294 | 
 295 295 | 
 296 296 | @expect('D210: No whitespaces allowed surrounding docstring text')
-
-    Run `ruff check --fix` to apply this fix.
 
 D.py:299:5: D210 [*] No whitespaces allowed surrounding docstring text
     |
@@ -62,8 +58,6 @@ D.py:299:5: D210 [*] No whitespaces allowed surrounding docstring text
 300 300 | 
 301 301 |     This is the end.
 302 302 |     """
-
-    Run `ruff check --fix` to apply this fix.
 
 D.py:581:5: D210 No whitespaces allowed surrounding docstring text
     |

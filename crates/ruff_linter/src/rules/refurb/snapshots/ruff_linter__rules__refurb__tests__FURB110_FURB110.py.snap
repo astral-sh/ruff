@@ -16,8 +16,6 @@ FURB110.py:1:5: FURB110 [*] Replace ternary `if` expression with `or` operator
 3 3 | z = x \
 4 4 |     if x else y  # FURB110
 
-    Run `ruff check --fix` to apply this fix.
-
 FURB110.py:3:5: FURB110 [*] Replace ternary `if` expression with `or` operator
   |
 1 |   z = x if x else y  # FURB110
@@ -39,8 +37,6 @@ FURB110.py:3:5: FURB110 [*] Replace ternary `if` expression with `or` operator
 5 4 | 
 6 5 | z = x if x \
 7 6 |     else  \
-
-    Run `ruff check --fix` to apply this fix.
 
 FURB110.py:6:5: FURB110 [*] Replace ternary `if` expression with `or` operator
    |
@@ -66,8 +62,6 @@ FURB110.py:6:5: FURB110 [*] Replace ternary `if` expression with `or` operator
 9 7 | 
 10 8 | z = x() if x() else y()  # FURB110
 11 9 | 
-
-    Run `ruff check --fix` to apply this fix.
 
 FURB110.py:10:5: FURB110 [*] Replace ternary `if` expression with `or` operator
    |
@@ -111,8 +105,6 @@ FURB110.py:13:5: FURB110 [*] Replace ternary `if` expression with `or` operator
 18 18 |     y
 19 19 | )
 
-    Run `ruff check --fix` to apply this fix.
-
 FURB110.py:23:5: FURB110 [*] Replace ternary `if` expression with `or` operator
    |
 21 |   # FURB110
@@ -142,8 +134,6 @@ FURB110.py:23:5: FURB110 [*] Replace ternary `if` expression with `or` operator
 27 27 |         # Test for y.
 28 28 |         y
 29 29 |     )
-
-    Run `ruff check --fix` to apply this fix.
 
 FURB110.py:34:5: FURB110 [*] Replace ternary `if` expression with `or` operator
    |
@@ -175,8 +165,6 @@ FURB110.py:34:5: FURB110 [*] Replace ternary `if` expression with `or` operator
 41 36 | 
 42 37 | # FURB110
 
-    Run `ruff check --fix` to apply this fix.
-
 FURB110.py:44:5: FURB110 [*] Replace ternary `if` expression with `or` operator
    |
 42 |   # FURB110
@@ -203,5 +191,3 @@ FURB110.py:44:5: FURB110 [*] Replace ternary `if` expression with `or` operator
 48    |-    else None
    46 |+    else None)
 49 47 | )
-
-    Run `ruff check --fix` to apply this fix.

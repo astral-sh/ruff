@@ -150,8 +150,6 @@ F841_3.py:40:26: F841 [*] Local variable `x1` is assigned to but never used
 42 42 | 
 43 43 |     try:
 
-    Run `ruff check --fix` to apply this fix.
-
 F841_3.py:45:47: F841 [*] Local variable `x2` is assigned to but never used
    |
 43 |     try:
@@ -170,8 +168,6 @@ F841_3.py:45:47: F841 [*] Local variable `x2` is assigned to but never used
 46 46 |         pass
 47 47 | 
 48 48 | 
-
-    Run `ruff check --fix` to apply this fix.
 
 F841_3.py:50:5: F841 [*] Local variable `x` is assigned to but never used
    |
@@ -390,8 +386,6 @@ F841_3.py:155:17: F841 [*] Local variable `e` is assigned to but never used
 156 156 |         print("oh no!")
 157 157 | 
 158 158 | 
-
-    Run `ruff check --fix` to apply this fix.
 
 F841_3.py:160:5: F841 [*] Local variable `x` is assigned to but never used
     |

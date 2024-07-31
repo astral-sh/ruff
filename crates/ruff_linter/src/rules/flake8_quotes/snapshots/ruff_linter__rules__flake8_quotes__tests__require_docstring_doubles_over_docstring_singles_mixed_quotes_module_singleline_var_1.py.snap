@@ -25,8 +25,6 @@ docstring_singles_mixed_quotes_module_singleline_var_1.py:1:29: Q002 [*] Single 
 3 3 | def foo():
 4 4 |     pass
 
-    Run `ruff check --fix` to apply this fix.
-
 docstring_singles_mixed_quotes_module_singleline_var_1.py:5:1: Q001 [*] Double quote multiline found but single quotes preferred
   |
 3 | def foo():
@@ -41,5 +39,3 @@ docstring_singles_mixed_quotes_module_singleline_var_1.py:5:1: Q001 [*] Double q
 4 4 |     pass
 5   |-""" this is not a docstring """
   5 |+''' this is not a docstring '''
-
-    Run `ruff check --fix` to apply this fix.

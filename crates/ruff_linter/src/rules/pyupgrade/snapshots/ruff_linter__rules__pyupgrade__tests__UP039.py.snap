@@ -17,8 +17,6 @@ UP039.py:2:8: UP039 [*] Unnecessary parentheses after class definition
 4 4 | 
 5 5 | 
 
-    Run `ruff check --fix` to apply this fix.
-
 UP039.py:6:8: UP039 [*] Unnecessary parentheses after class definition
   |
 6 | class A() \
@@ -36,8 +34,6 @@ UP039.py:6:8: UP039 [*] Unnecessary parentheses after class definition
 7 7 |     :
 8 8 |     pass
 9 9 | 
-
-    Run `ruff check --fix` to apply this fix.
 
 UP039.py:12:9: UP039 [*] Unnecessary parentheses after class definition
    |
@@ -57,8 +53,6 @@ UP039.py:12:9: UP039 [*] Unnecessary parentheses after class definition
 14 14 | 
 15 15 | 
 
-    Run `ruff check --fix` to apply this fix.
-
 UP039.py:17:8: UP039 [*] Unnecessary parentheses after class definition
    |
 16 | @decorator()
@@ -77,8 +71,6 @@ UP039.py:17:8: UP039 [*] Unnecessary parentheses after class definition
 19 19 | 
 20 20 | @decorator
 
-    Run `ruff check --fix` to apply this fix.
-
 UP039.py:21:8: UP039 [*] Unnecessary parentheses after class definition
    |
 20 | @decorator
@@ -96,5 +88,3 @@ UP039.py:21:8: UP039 [*] Unnecessary parentheses after class definition
 22 22 |     pass
 23 23 | 
 24 24 | # OK
-
-    Run `ruff check --fix` to apply this fix.

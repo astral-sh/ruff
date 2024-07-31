@@ -20,8 +20,6 @@ SIM118.py:3:1: SIM118 [*] Use `key in dict` instead of `key in dict.keys()`
 5 5 | key not in obj.keys()  # SIM118
 6 6 | 
 
-    Run `ruff check --fix` to apply this fix.
-
 SIM118.py:5:1: SIM118 [*] Use `key not in dict` instead of `key not in dict.keys()`
   |
 3 | key in obj.keys()  # SIM118
@@ -41,8 +39,6 @@ SIM118.py:5:1: SIM118 [*] Use `key not in dict` instead of `key not in dict.keys
 6 6 | 
 7 7 | foo["bar"] in obj.keys()  # SIM118
 8 8 | 
-
-    Run `ruff check --fix` to apply this fix.
 
 SIM118.py:7:1: SIM118 [*] Use `key in dict` instead of `key in dict.keys()`
   |
@@ -64,8 +60,6 @@ SIM118.py:7:1: SIM118 [*] Use `key in dict` instead of `key in dict.keys()`
 9 9 | foo["bar"] not in obj.keys()  # SIM118
 10 10 | 
 
-    Run `ruff check --fix` to apply this fix.
-
 SIM118.py:9:1: SIM118 [*] Use `key not in dict` instead of `key not in dict.keys()`
    |
  7 | foo["bar"] in obj.keys()  # SIM118
@@ -85,8 +79,6 @@ SIM118.py:9:1: SIM118 [*] Use `key not in dict` instead of `key not in dict.keys
 10 10 | 
 11 11 | foo['bar'] in obj.keys()  # SIM118
 12 12 | 
-
-    Run `ruff check --fix` to apply this fix.
 
 SIM118.py:11:1: SIM118 [*] Use `key in dict` instead of `key in dict.keys()`
    |
@@ -108,8 +100,6 @@ SIM118.py:11:1: SIM118 [*] Use `key in dict` instead of `key in dict.keys()`
 13 13 | foo['bar'] not in obj.keys()  # SIM118
 14 14 | 
 
-    Run `ruff check --fix` to apply this fix.
-
 SIM118.py:13:1: SIM118 [*] Use `key not in dict` instead of `key not in dict.keys()`
    |
 11 | foo['bar'] in obj.keys()  # SIM118
@@ -129,8 +119,6 @@ SIM118.py:13:1: SIM118 [*] Use `key not in dict` instead of `key not in dict.key
 14 14 | 
 15 15 | foo() in obj.keys()  # SIM118
 16 16 | 
-
-    Run `ruff check --fix` to apply this fix.
 
 SIM118.py:15:1: SIM118 [*] Use `key in dict` instead of `key in dict.keys()`
    |
@@ -152,8 +140,6 @@ SIM118.py:15:1: SIM118 [*] Use `key in dict` instead of `key in dict.keys()`
 17 17 | foo() not in obj.keys()  # SIM118
 18 18 | 
 
-    Run `ruff check --fix` to apply this fix.
-
 SIM118.py:17:1: SIM118 [*] Use `key not in dict` instead of `key not in dict.keys()`
    |
 15 | foo() in obj.keys()  # SIM118
@@ -174,8 +160,6 @@ SIM118.py:17:1: SIM118 [*] Use `key not in dict` instead of `key not in dict.key
 19 19 | for key in obj.keys():  # SIM118
 20 20 |     pass
 
-    Run `ruff check --fix` to apply this fix.
-
 SIM118.py:19:5: SIM118 [*] Use `key in dict` instead of `key in dict.keys()`
    |
 17 | foo() not in obj.keys()  # SIM118
@@ -194,8 +178,6 @@ SIM118.py:19:5: SIM118 [*] Use `key in dict` instead of `key in dict.keys()`
 20 20 |     pass
 21 21 | 
 22 22 | for key in list(obj.keys()):
-
-    Run `ruff check --fix` to apply this fix.
 
 SIM118.py:26:8: SIM118 [*] Use `key in dict` instead of `key in dict.keys()`
    |
@@ -217,8 +199,6 @@ SIM118.py:26:8: SIM118 [*] Use `key in dict` instead of `key in dict.keys()`
 28 28 | {k for k in obj.keys()}  # SIM118
 29 29 | 
 
-    Run `ruff check --fix` to apply this fix.
-
 SIM118.py:28:8: SIM118 [*] Use `key in dict` instead of `key in dict.keys()`
    |
 26 | [k for k in obj.keys()]  # SIM118
@@ -238,8 +218,6 @@ SIM118.py:28:8: SIM118 [*] Use `key in dict` instead of `key in dict.keys()`
 29 29 | 
 30 30 | {k: k for k in obj.keys()}  # SIM118
 31 31 | 
-
-    Run `ruff check --fix` to apply this fix.
 
 SIM118.py:30:11: SIM118 [*] Use `key in dict` instead of `key in dict.keys()`
    |
@@ -261,8 +239,6 @@ SIM118.py:30:11: SIM118 [*] Use `key in dict` instead of `key in dict.keys()`
 32 32 | (k for k in obj.keys())  # SIM118
 33 33 | 
 
-    Run `ruff check --fix` to apply this fix.
-
 SIM118.py:32:8: SIM118 [*] Use `key in dict` instead of `key in dict.keys()`
    |
 30 | {k: k for k in obj.keys()}  # SIM118
@@ -282,8 +258,6 @@ SIM118.py:32:8: SIM118 [*] Use `key in dict` instead of `key in dict.keys()`
 33 33 | 
 34 34 | key in (obj or {}).keys()  # SIM118
 35 35 | 
-
-    Run `ruff check --fix` to apply this fix.
 
 SIM118.py:34:1: SIM118 [*] Use `key in dict` instead of `key in dict.keys()`
    |
@@ -328,8 +302,6 @@ SIM118.py:50:1: SIM118 [*] Use `key in dict` instead of `key in dict.keys()`
 52 52 | key in (obj.keys())and foo
 53 53 | 
 
-    Run `ruff check --fix` to apply this fix.
-
 SIM118.py:51:2: SIM118 [*] Use `key in dict` instead of `key in dict.keys()`
    |
 49 | # Regression test for: https://github.com/astral-sh/ruff/issues/7124
@@ -348,8 +320,6 @@ SIM118.py:51:2: SIM118 [*] Use `key in dict` instead of `key in dict.keys()`
 52 52 | key in (obj.keys())and foo
 53 53 | 
 54 54 | # Regression test for: https://github.com/astral-sh/ruff/issues/7200
-
-    Run `ruff check --fix` to apply this fix.
 
 SIM118.py:52:1: SIM118 [*] Use `key in dict` instead of `key in dict.keys()`
    |
@@ -370,8 +340,6 @@ SIM118.py:52:1: SIM118 [*] Use `key in dict` instead of `key in dict.keys()`
 53 53 | 
 54 54 | # Regression test for: https://github.com/astral-sh/ruff/issues/7200
 55 55 | for key in (
-
-    Run `ruff check --fix` to apply this fix.
 
 SIM118.py:55:5: SIM118 [*] Use `key in dict` instead of `key in dict.keys()`
    |
@@ -401,5 +369,3 @@ SIM118.py:65:1: SIM118 [*] Use `key in dict` instead of `key in dict.keys()`
 64 64 | d = SneakyDict()
 65    |-key in d.keys()  # SIM118
    65 |+key in d  # SIM118
-
-    Run `ruff check --fix` to apply this fix.

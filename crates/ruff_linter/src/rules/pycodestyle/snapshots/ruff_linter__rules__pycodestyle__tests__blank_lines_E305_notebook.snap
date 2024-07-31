@@ -19,5 +19,3 @@ E30.ipynb:55:1: E305 [*] Expected 2 blank lines after class or function definiti
 55 57 | fn()
 56 58 | # end
 57 59 | # E306:3:5
-
-    Run `ruff check --fix` to apply this fix.

@@ -21,8 +21,6 @@ RET508.py:8:9: RET508 [*] Unnecessary `elif` after `break` statement
 10 10 |         else:
 11 11 |             a = z
 
-    Run `ruff check --fix` to apply this fix.
-
 RET508.py:22:9: RET508 [*] Unnecessary `elif` after `break` statement
    |
 20 |                 b = 2
@@ -43,8 +41,6 @@ RET508.py:22:9: RET508 [*] Unnecessary `elif` after `break` statement
 24 24 |         else:
 25 25 |             c = 3
 
-    Run `ruff check --fix` to apply this fix.
-
 RET508.py:33:9: RET508 [*] Unnecessary `else` after `break` statement
    |
 31 |         if i > y:  # [no-else-break]
@@ -64,8 +60,6 @@ RET508.py:33:9: RET508 [*] Unnecessary `else` after `break` statement
 35 34 | 
 36 35 | 
 37 36 | def foo3(x, y, z):
-
-    Run `ruff check --fix` to apply this fix.
 
 RET508.py:44:13: RET508 [*] Unnecessary `else` after `break` statement
    |
@@ -90,8 +84,6 @@ RET508.py:44:13: RET508 [*] Unnecessary `else` after `break` statement
 48 47 |             d = 4
 49 48 |             break
 
-    Run `ruff check --fix` to apply this fix.
-
 RET508.py:60:9: RET508 [*] Unnecessary `else` after `break` statement
    |
 58 |                 b = 2
@@ -113,8 +105,6 @@ RET508.py:60:9: RET508 [*] Unnecessary `else` after `break` statement
 63 62 | 
 64 63 | 
 
-    Run `ruff check --fix` to apply this fix.
-
 RET508.py:71:13: RET508 [*] Unnecessary `else` after `break` statement
    |
 69 |                 a = 4
@@ -135,8 +125,6 @@ RET508.py:71:13: RET508 [*] Unnecessary `else` after `break` statement
 73 72 |         else:
 74 73 |             c = 3
 75 74 |         break
-
-    Run `ruff check --fix` to apply this fix.
 
 RET508.py:82:9: RET508 [*] Unnecessary `else` after `break` statement
    |
@@ -165,8 +153,6 @@ RET508.py:82:9: RET508 [*] Unnecessary `else` after `break` statement
 88 87 | 
 89 88 | ###
 
-    Run `ruff check --fix` to apply this fix.
-
 RET508.py:158:13: RET508 [*] Unnecessary `else` after `break` statement
     |
 156 |             if i > w:
@@ -183,5 +169,3 @@ RET508.py:158:13: RET508 [*] Unnecessary `else` after `break` statement
 158     |-            else:
 159     |-                a = z
     158 |+            a = z
-
-    Run `ruff check --fix` to apply this fix.

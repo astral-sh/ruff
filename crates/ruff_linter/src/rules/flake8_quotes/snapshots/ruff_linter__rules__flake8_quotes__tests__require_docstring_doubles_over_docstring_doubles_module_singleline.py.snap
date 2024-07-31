@@ -18,8 +18,6 @@ docstring_doubles_module_singleline.py:2:1: Q001 [*] Double quote multiline foun
 4 4 | def foo():
 5 5 |     pass
 
-    Run `ruff check --fix` to apply this fix.
-
 docstring_doubles_module_singleline.py:6:1: Q001 [*] Double quote multiline found but single quotes preferred
   |
 4 | def foo():
@@ -34,5 +32,3 @@ docstring_doubles_module_singleline.py:6:1: Q001 [*] Double quote multiline foun
 5 5 |     pass
 6   |-""" this is not a docstring """
   6 |+''' this is not a docstring '''
-
-    Run `ruff check --fix` to apply this fix.

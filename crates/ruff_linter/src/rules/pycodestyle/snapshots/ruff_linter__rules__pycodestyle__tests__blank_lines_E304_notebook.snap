@@ -19,5 +19,3 @@ E30.ipynb:45:1: E304 [*] Blank lines found after function decorator (1)
 45 44 | def function():
 46 45 |     pass
 47 46 | # end
-
-    Run `ruff check --fix` to apply this fix.

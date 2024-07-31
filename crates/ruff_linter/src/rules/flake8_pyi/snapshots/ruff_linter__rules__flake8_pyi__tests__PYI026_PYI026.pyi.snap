@@ -21,8 +21,6 @@ PYI026.pyi:3:1: PYI026 [*] Use `typing.TypeAlias` for type alias, e.g., `NewAny:
 5 5 | Foo = Literal["foo"]
 6 6 | IntOrStr = int | str
 
-    Run `ruff check --fix` to apply this fix.
-
 PYI026.pyi:4:1: PYI026 [*] Use `typing.TypeAlias` for type alias, e.g., `OptionalStr: TypeAlias = typing.Optional[str]`
   |
 3 | NewAny = Any
@@ -42,8 +40,6 @@ PYI026.pyi:4:1: PYI026 [*] Use `typing.TypeAlias` for type alias, e.g., `Optiona
 5 5 | Foo = Literal["foo"]
 6 6 | IntOrStr = int | str
 7 7 | AliasNone = None
-
-    Run `ruff check --fix` to apply this fix.
 
 PYI026.pyi:5:1: PYI026 [*] Use `typing.TypeAlias` for type alias, e.g., `Foo: TypeAlias = Literal["foo"]`
   |
@@ -67,8 +63,6 @@ PYI026.pyi:5:1: PYI026 [*] Use `typing.TypeAlias` for type alias, e.g., `Foo: Ty
 7 7 | AliasNone = None
 8 8 | 
 
-    Run `ruff check --fix` to apply this fix.
-
 PYI026.pyi:6:1: PYI026 [*] Use `typing.TypeAlias` for type alias, e.g., `IntOrStr: TypeAlias = int | str`
   |
 4 | OptionalStr = typing.Optional[str]
@@ -90,8 +84,6 @@ PYI026.pyi:6:1: PYI026 [*] Use `typing.TypeAlias` for type alias, e.g., `IntOrSt
 7 7 | AliasNone = None
 8 8 | 
 9 9 | NewAny: typing.TypeAlias = Any
-
-    Run `ruff check --fix` to apply this fix.
 
 PYI026.pyi:7:1: PYI026 [*] Use `typing.TypeAlias` for type alias, e.g., `AliasNone: TypeAlias = None`
   |
@@ -117,8 +109,6 @@ PYI026.pyi:7:1: PYI026 [*] Use `typing.TypeAlias` for type alias, e.g., `AliasNo
 9 9 | NewAny: typing.TypeAlias = Any
 10 10 | OptionalStr: TypeAlias = typing.Optional[str]
 
-    Run `ruff check --fix` to apply this fix.
-
 PYI026.pyi:17:5: PYI026 [*] Use `typing.TypeAlias` for type alias, e.g., `FLAG_THIS: TypeAlias = None`
    |
 16 | class NotAnEnum:
@@ -143,5 +133,3 @@ PYI026.pyi:17:5: PYI026 [*] Use `typing.TypeAlias` for type alias, e.g., `FLAG_T
 18 18 | 
 19 19 | # these are ok
 20 20 | from enum import Enum
-
-    Run `ruff check --fix` to apply this fix.

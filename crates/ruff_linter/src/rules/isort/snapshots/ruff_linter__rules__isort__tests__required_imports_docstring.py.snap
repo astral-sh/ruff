@@ -7,12 +7,8 @@ docstring.py:1:1: I002 [*] Missing required import: `from __future__ import anno
 2 3 | 
 3 4 | x = 1
 
-    Run `ruff check --fix` to apply this fix.
-
 docstring.py:1:1: I002 [*] Missing required import: `from __future__ import generator_stop`
 1 1 | """Hello, world!"""
   2 |+from __future__ import generator_stop
 2 3 | 
 3 4 | x = 1
-
-    Run `ruff check --fix` to apply this fix.

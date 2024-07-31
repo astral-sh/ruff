@@ -16,8 +16,6 @@ ISC.py:1:5: ISC001 [*] Implicitly concatenated string literals on one line
 3 3 | _ = "abc" + "def"
 4 4 | 
 
-    Run `ruff check --fix` to apply this fix.
-
 ISC.py:1:9: ISC001 [*] Implicitly concatenated string literals on one line
   |
 1 | _ = "a" "b" "c"
@@ -32,8 +30,6 @@ ISC.py:1:9: ISC001 [*] Implicitly concatenated string literals on one line
 2 2 | 
 3 3 | _ = "abc" + "def"
 4 4 | 
-
-    Run `ruff check --fix` to apply this fix.
 
 ISC.py:38:5: ISC001 [*] Implicitly concatenated string literals on one line
    |
@@ -54,8 +50,6 @@ ISC.py:38:5: ISC001 [*] Implicitly concatenated string literals on one line
 39 39 | 
 40 40 | _ = """a
 41 41 | b""" """c
-
-    Run `ruff check --fix` to apply this fix.
 
 ISC.py:40:5: ISC001 [*] Implicitly concatenated string literals on one line
    |
@@ -80,8 +74,6 @@ ISC.py:40:5: ISC001 [*] Implicitly concatenated string literals on one line
 43 43 | 
 44 44 | _ = f"""a""" f"""b"""
 
-    Run `ruff check --fix` to apply this fix.
-
 ISC.py:44:5: ISC001 [*] Implicitly concatenated string literals on one line
    |
 42 | d"""
@@ -101,8 +93,6 @@ ISC.py:44:5: ISC001 [*] Implicitly concatenated string literals on one line
 45 45 | 
 46 46 | _ = f"a" "b"
 47 47 | 
-
-    Run `ruff check --fix` to apply this fix.
 
 ISC.py:46:5: ISC001 Implicitly concatenated string literals on one line
    |
@@ -157,8 +147,6 @@ ISC.py:52:5: ISC001 [*] Implicitly concatenated string literals on one line
 54 54 | # Single-line explicit concatenation should be ignored.
 55 55 | _ = "abc" + "def" + "ghi"
 
-    Run `ruff check --fix` to apply this fix.
-
 ISC.py:64:10: ISC001 [*] Implicitly concatenated string literals on one line
    |
 63 | # Multiple strings nested inside a f-string
@@ -177,8 +165,6 @@ ISC.py:64:10: ISC001 [*] Implicitly concatenated string literals on one line
 65 65 | _ = f"""abc {"def" "ghi"} jkl"""
 66 66 | _ = f"""abc {
 67 67 |     "def"
-
-    Run `ruff check --fix` to apply this fix.
 
 ISC.py:64:14: ISC001 [*] Implicitly concatenated string literals on one line
    |
@@ -199,8 +185,6 @@ ISC.py:64:14: ISC001 [*] Implicitly concatenated string literals on one line
 66 66 | _ = f"""abc {
 67 67 |     "def"
 
-    Run `ruff check --fix` to apply this fix.
-
 ISC.py:65:14: ISC001 [*] Implicitly concatenated string literals on one line
    |
 63 | # Multiple strings nested inside a f-string
@@ -220,8 +204,6 @@ ISC.py:65:14: ISC001 [*] Implicitly concatenated string literals on one line
 66 66 | _ = f"""abc {
 67 67 |     "def"
 68 68 |     "ghi"
-
-    Run `ruff check --fix` to apply this fix.
 
 ISC.py:72:5: ISC001 Implicitly concatenated string literals on one line
    |
@@ -262,8 +244,6 @@ ISC.py:72:14: ISC001 [*] Implicitly concatenated string literals on one line
 74 74 | _ = f"b {f"abc" \
 75 75 |     f"def"} g"
 
-    Run `ruff check --fix` to apply this fix.
-
 ISC.py:73:10: ISC001 [*] Implicitly concatenated string literals on one line
    |
 71 | # Nested f-strings
@@ -284,8 +264,6 @@ ISC.py:73:10: ISC001 [*] Implicitly concatenated string literals on one line
 75 75 |     f"def"} g"
 76 76 | 
 
-    Run `ruff check --fix` to apply this fix.
-
 ISC.py:73:20: ISC001 [*] Implicitly concatenated string literals on one line
    |
 71 | # Nested f-strings
@@ -304,6 +282,4 @@ ISC.py:73:20: ISC001 [*] Implicitly concatenated string literals on one line
    73 |+_ = f"b {f"c" f"d {f"ef"} g"} h"
 74 74 | _ = f"b {f"abc" \
 75 75 |     f"def"} g"
-76 76 | 
-
-    Run `ruff check --fix` to apply this fix.
+76 76 |

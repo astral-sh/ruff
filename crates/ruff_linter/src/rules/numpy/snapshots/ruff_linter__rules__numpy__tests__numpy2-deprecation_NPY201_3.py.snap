@@ -22,8 +22,6 @@ NPY201_3.py:4:5: NPY201 [*] `np.DTypePromotionError` will be removed in NumPy 2.
 6 7 |     np.ModuleDeprecationWarning
 7 8 | 
 
-    Run `ruff check --fix` to apply this fix.
-
 NPY201_3.py:6:5: NPY201 [*] `np.ModuleDeprecationWarning` will be removed in NumPy 2.0. Use `numpy.exceptions.ModuleDeprecationWarning` instead.
   |
 4 |     np.DTypePromotionError
@@ -46,8 +44,6 @@ NPY201_3.py:6:5: NPY201 [*] `np.ModuleDeprecationWarning` will be removed in Num
 7 8 | 
 8 9 |     np.RankWarning
 9 10 | 
-
-    Run `ruff check --fix` to apply this fix.
 
 NPY201_3.py:8:5: NPY201 [*] `np.RankWarning` will be removed in NumPy 2.0. Use `numpy.exceptions.RankWarning` on NumPy 2.0, or ignore this warning on earlier versions.
    |
@@ -86,8 +82,6 @@ NPY201_3.py:10:5: NPY201 [*] `np.TooHardError` will be removed in NumPy 2.0. Use
 12 13 |     np.VisibleDeprecationWarning
 13 14 | 
 
-    Run `ruff check --fix` to apply this fix.
-
 NPY201_3.py:12:5: NPY201 [*] `np.VisibleDeprecationWarning` will be removed in NumPy 2.0. Use `numpy.exceptions.VisibleDeprecationWarning` instead.
    |
 10 |     np.TooHardError
@@ -113,8 +107,6 @@ NPY201_3.py:12:5: NPY201 [*] `np.VisibleDeprecationWarning` will be removed in N
 14 15 |     np.chararray
 15 16 | 
 
-    Run `ruff check --fix` to apply this fix.
-
 NPY201_3.py:14:5: NPY201 [*] `np.chararray` will be removed in NumPy 2.0. Use `numpy.char.chararray` instead.
    |
 12 |     np.VisibleDeprecationWarning
@@ -139,8 +131,6 @@ NPY201_3.py:14:5: NPY201 [*] `np.chararray` will be removed in NumPy 2.0. Use `n
 15 16 | 
 16 17 |     np.format_parser
 
-    Run `ruff check --fix` to apply this fix.
-
 NPY201_3.py:16:5: NPY201 [*] `np.format_parser` will be removed in NumPy 2.0. Use `numpy.rec.format_parser` instead.
    |
 14 |     np.chararray
@@ -160,5 +150,3 @@ NPY201_3.py:16:5: NPY201 [*] `np.format_parser` will be removed in NumPy 2.0. Us
 15 16 | 
 16    |-    np.format_parser
    17 |+    format_parser
-
-    Run `ruff check --fix` to apply this fix.

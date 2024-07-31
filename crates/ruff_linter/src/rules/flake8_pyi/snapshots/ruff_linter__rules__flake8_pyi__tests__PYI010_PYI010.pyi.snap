@@ -20,8 +20,6 @@ PYI010.pyi:6:5: PYI010 [*] Function body must contain only `...`
 8 8 | def foo2():
 9 9 |     123  # ERROR PYI010
 
-    Run `ruff check --fix` to apply this fix.
-
 PYI010.pyi:9:5: PYI010 [*] Function body must contain only `...`
    |
  8 | def foo2():
@@ -41,8 +39,6 @@ PYI010.pyi:9:5: PYI010 [*] Function body must contain only `...`
 11 11 | def bizz():
 12 12 |     x = 123  # ERROR PYI010
 
-    Run `ruff check --fix` to apply this fix.
-
 PYI010.pyi:12:5: PYI010 [*] Function body must contain only `...`
    |
 11 | def bizz():
@@ -61,5 +57,3 @@ PYI010.pyi:12:5: PYI010 [*] Function body must contain only `...`
 13 13 | 
 14 14 | def foo3():
 15 15 |     pass  # OK, pass is handled by another rule
-
-    Run `ruff check --fix` to apply this fix.

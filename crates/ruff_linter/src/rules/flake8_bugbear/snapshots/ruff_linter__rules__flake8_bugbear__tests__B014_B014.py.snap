@@ -21,8 +21,6 @@ B014.py:17:8: B014 [*] Exception handler with duplicate exception: `OSError`
 19 19 |     pass
 20 20 | 
 
-    Run `ruff check --fix` to apply this fix.
-
 B014.py:28:8: B014 [*] Exception handler with duplicate exception: `MyError`
    |
 26 | try:
@@ -42,8 +40,6 @@ B014.py:28:8: B014 [*] Exception handler with duplicate exception: `MyError`
 29 29 |     # Detect duplicate non-builtin errors
 30 30 |     pass
 31 31 | 
-
-    Run `ruff check --fix` to apply this fix.
 
 B014.py:49:8: B014 [*] Exception handler with duplicate exception: `re.error`
    |
@@ -65,8 +61,6 @@ B014.py:49:8: B014 [*] Exception handler with duplicate exception: `re.error`
 51 51 |     pass
 52 52 | 
 
-    Run `ruff check --fix` to apply this fix.
-
 B014.py:82:8: B014 [*] Exception handler with duplicate exception: `ValueError`
    |
 80 | try:
@@ -86,8 +80,6 @@ B014.py:82:8: B014 [*] Exception handler with duplicate exception: `ValueError`
 84 84 | 
 85 85 | 
 
-    Run `ruff check --fix` to apply this fix.
-
 B014.py:89:7: B014 [*] Exception handler with duplicate exception: `re.error`
    |
 87 | try:
@@ -104,5 +96,3 @@ B014.py:89:7: B014 [*] Exception handler with duplicate exception: `re.error`
 89    |-except(re.error, re.error):
    89 |+except re.error:
 90 90 |     p
-
-    Run `ruff check --fix` to apply this fix.

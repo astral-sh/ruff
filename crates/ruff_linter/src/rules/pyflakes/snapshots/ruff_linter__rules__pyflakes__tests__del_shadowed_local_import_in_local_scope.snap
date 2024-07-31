@@ -19,5 +19,3 @@ source: crates/ruff_linter/src/rules/pyflakes/mod.rs
 5 4 | 
 6 5 |     # Despite this `del`, `import os` should still be flagged as shadowing an unused
 7 6 |     # import.
-
-    Run `ruff check --fix` to apply this fix.

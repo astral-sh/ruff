@@ -21,5 +21,3 @@ doubles_all.py:5:30: Q001 [*] Double quote multiline found but single quotes pre
 6 6 | double quote string
 7   |-"""
   7 |+'''
-
-    Run `ruff check --fix` to apply this fix.

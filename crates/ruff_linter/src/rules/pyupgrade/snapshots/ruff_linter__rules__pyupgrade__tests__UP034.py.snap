@@ -18,8 +18,6 @@ UP034.py:2:7: UP034 [*] Avoid extraneous parentheses
 4 4 | # UP034
 5 5 | print(("hell((goodybe))o"))
 
-    Run `ruff check --fix` to apply this fix.
-
 UP034.py:5:7: UP034 [*] Avoid extraneous parentheses
   |
 4 | # UP034
@@ -38,8 +36,6 @@ UP034.py:5:7: UP034 [*] Avoid extraneous parentheses
 6 6 | 
 7 7 | # UP034
 8 8 | print((("foo")))
-
-    Run `ruff check --fix` to apply this fix.
 
 UP034.py:8:7: UP034 [*] Avoid extraneous parentheses
    |
@@ -60,8 +56,6 @@ UP034.py:8:7: UP034 [*] Avoid extraneous parentheses
 10 10 | # UP034
 11 11 | print((((1))))
 
-    Run `ruff check --fix` to apply this fix.
-
 UP034.py:11:7: UP034 [*] Avoid extraneous parentheses
    |
 10 | # UP034
@@ -80,8 +74,6 @@ UP034.py:11:7: UP034 [*] Avoid extraneous parentheses
 12 12 | 
 13 13 | # UP034
 14 14 | print(("foo{}".format(1)))
-
-    Run `ruff check --fix` to apply this fix.
 
 UP034.py:14:7: UP034 [*] Avoid extraneous parentheses
    |
@@ -102,8 +94,6 @@ UP034.py:14:7: UP034 [*] Avoid extraneous parentheses
 16 16 | # UP034
 17 17 | print(
 
-    Run `ruff check --fix` to apply this fix.
-
 UP034.py:18:5: UP034 [*] Avoid extraneous parentheses
    |
 16 | # UP034
@@ -122,8 +112,6 @@ UP034.py:18:5: UP034 [*] Avoid extraneous parentheses
 19 19 | )
 20 20 | 
 21 21 | # UP034
-
-    Run `ruff check --fix` to apply this fix.
 
 UP034.py:23:5: UP034 [*] Avoid extraneous parentheses
    |
@@ -150,8 +138,6 @@ UP034.py:23:5: UP034 [*] Avoid extraneous parentheses
 27 27 | 
 28 28 | # UP034
 
-    Run `ruff check --fix` to apply this fix.
-
 UP034.py:30:13: UP034 [*] Avoid extraneous parentheses
    |
 28 | # UP034
@@ -172,8 +158,6 @@ UP034.py:30:13: UP034 [*] Avoid extraneous parentheses
 32 32 | # UP034
 33 33 | if True:
 
-    Run `ruff check --fix` to apply this fix.
-
 UP034.py:35:9: UP034 [*] Avoid extraneous parentheses
    |
 33 | if True:
@@ -193,8 +177,6 @@ UP034.py:35:9: UP034 [*] Avoid extraneous parentheses
 37 37 | 
 38 38 | # UP034
 
-    Run `ruff check --fix` to apply this fix.
-
 UP034.py:39:7: UP034 [*] Avoid extraneous parentheses
    |
 38 | # UP034
@@ -213,5 +195,3 @@ UP034.py:39:7: UP034 [*] Avoid extraneous parentheses
 40 40 | 
 41 41 | # OK
 42 42 | print("foo")
-
-    Run `ruff check --fix` to apply this fix.

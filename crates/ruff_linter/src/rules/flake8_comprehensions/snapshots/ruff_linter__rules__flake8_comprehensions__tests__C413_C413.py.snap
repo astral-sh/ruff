@@ -20,8 +20,6 @@ C413.py:3:1: C413 [*] Unnecessary `list` call around `sorted()`
 5 5 | reversed(sorted(x, key=lambda e: e))
 6 6 | reversed(sorted(x, reverse=True))
 
-    Run `ruff check --fix` to apply this fix.
-
 C413.py:4:1: C413 [*] Unnecessary `reversed` call around `sorted()`
   |
 2 | list(x)

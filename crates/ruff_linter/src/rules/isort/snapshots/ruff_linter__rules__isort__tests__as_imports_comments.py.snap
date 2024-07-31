@@ -40,5 +40,3 @@ as_imports_comments.py:1:1: I001 [*] Import block is un-sorted or un-formatted
    6  |+from foo import (  # Comment on `foo`
    7  |+    Member as Alias,  # Comment on `Alias`
 15 8  | )
-
-    Run `ruff check --fix` to apply this fix.

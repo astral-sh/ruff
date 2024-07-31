@@ -19,8 +19,6 @@ unused.py:5:8: F401 [*] `sys` imported but unused
 7 6 | # Unused, _not_ marked as required (due to the alias).
 8 7 | import pathlib as non_alias
 
-    Run `ruff check --fix` to apply this fix.
-
 unused.py:8:19: F401 [*] `pathlib` imported but unused
    |
  7 | # Unused, _not_ marked as required (due to the alias).
@@ -38,5 +36,3 @@ unused.py:8:19: F401 [*] `pathlib` imported but unused
 9 8 | 
 10 9 | # Unused, marked as required.
 11 10 | import shelve as alias
-
-    Run `ruff check --fix` to apply this fix.

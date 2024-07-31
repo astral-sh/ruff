@@ -23,8 +23,6 @@ SIM114.py:2:1: SIM114 [*] Combine `if` branches using logical `or` operator
 6 4 | 
 7 5 | if a:  # we preserve comments, too!
 
-    Run `ruff check --fix` to apply this fix.
-
 SIM114.py:7:1: SIM114 [*] Combine `if` branches using logical `or` operator
    |
  5 |       b
@@ -49,8 +47,6 @@ SIM114.py:7:1: SIM114 [*] Combine `if` branches using logical `or` operator
 10 8  |     b
 11 9  | 
 12 10 | if x == 1:
-
-    Run `ruff check --fix` to apply this fix.
 
 SIM114.py:12:1: SIM114 [*] Combine `if` branches using logical `or` operator
    |
@@ -79,8 +75,6 @@ SIM114.py:12:1: SIM114 [*] Combine `if` branches using logical `or` operator
 16 13 |     for _ in range(20):
 17 14 |         print("hello")
 18 15 | 
-
-    Run `ruff check --fix` to apply this fix.
 
 SIM114.py:19:1: SIM114 [*] Combine `if` branches using logical `or` operator
    |
@@ -112,8 +106,6 @@ SIM114.py:19:1: SIM114 [*] Combine `if` branches using logical `or` operator
 24 20 |     if True:
 25 21 |         for _ in range(20):
 26 22 |             print("hello")
-
-    Run `ruff check --fix` to apply this fix.
 
 SIM114.py:28:1: SIM114 [*] Combine `if` branches using logical `or` operator
    |
@@ -155,8 +147,6 @@ SIM114.py:28:1: SIM114 [*] Combine `if` branches using logical `or` operator
 37 30 |         for _ in range(20):
 38 31 |             print("hello")
 
-    Run `ruff check --fix` to apply this fix.
-
 SIM114.py:29:5: SIM114 [*] Combine `if` branches using logical `or` operator
    |
 28 |   if x == 1:
@@ -184,8 +174,6 @@ SIM114.py:29:5: SIM114 [*] Combine `if` branches using logical `or` operator
 33 30 |         for _ in range(20):
 34 31 |             print("hello")
 35 32 | elif x == 2:
-
-    Run `ruff check --fix` to apply this fix.
 
 SIM114.py:36:5: SIM114 [*] Combine `if` branches using logical `or` operator
    |
@@ -215,8 +203,6 @@ SIM114.py:36:5: SIM114 [*] Combine `if` branches using logical `or` operator
 40 37 |         for _ in range(20):
 41 38 |             print("hello")
 42 39 | 
-
-    Run `ruff check --fix` to apply this fix.
 
 SIM114.py:43:1: SIM114 [*] Combine `if` branches using logical `or` operator
    |
@@ -258,8 +244,6 @@ SIM114.py:43:1: SIM114 [*] Combine `if` branches using logical `or` operator
 62 60 | 
 63 61 | if result.eofs == "O":
 
-    Run `ruff check --fix` to apply this fix.
-
 SIM114.py:67:1: SIM114 [*] Combine `if` branches using logical `or` operator
    |
 65 |   elif result.eofs == "S":
@@ -284,8 +268,6 @@ SIM114.py:67:1: SIM114 [*] Combine `if` branches using logical `or` operator
 70 68 |     errors = 1
 71 69 | elif result.eofs == "X":
 72 70 |     errors = 1
-
-    Run `ruff check --fix` to apply this fix.
 
 SIM114.py:69:1: SIM114 [*] Combine `if` branches using logical `or` operator
    |
@@ -312,8 +294,6 @@ SIM114.py:69:1: SIM114 [*] Combine `if` branches using logical `or` operator
 73 71 | elif result.eofs == "C":
 74 72 |     errors = 1
 
-    Run `ruff check --fix` to apply this fix.
-
 SIM114.py:71:1: SIM114 [*] Combine `if` branches using logical `or` operator
    |
 69 |   elif result.eofs == "E":
@@ -336,8 +316,6 @@ SIM114.py:71:1: SIM114 [*] Combine `if` branches using logical `or` operator
 74 72 |     errors = 1
 75 73 | 
 76 74 | 
-
-    Run `ruff check --fix` to apply this fix.
 
 SIM114.py:118:5: SIM114 [*] Combine `if` branches using logical `or` operator
     |
@@ -365,8 +343,6 @@ SIM114.py:118:5: SIM114 [*] Combine `if` branches using logical `or` operator
 122 120 |     elif a < b:  # end-of-line
 123 121 |         return 4
 
-    Run `ruff check --fix` to apply this fix.
-
 SIM114.py:122:5: SIM114 [*] Combine `if` branches using logical `or` operator
     |
 120 |       elif a == b:
@@ -390,8 +366,6 @@ SIM114.py:122:5: SIM114 [*] Combine `if` branches using logical `or` operator
 125 123 |         return 4
 126 124 | 
 127 125 | 
-
-    Run `ruff check --fix` to apply this fix.
 
 SIM114.py:132:5: SIM114 [*] Combine `if` branches using logical `or` operator
     |
@@ -417,8 +391,6 @@ SIM114.py:132:5: SIM114 [*] Combine `if` branches using logical `or` operator
 136 134 | 
 137 135 | 
 
-    Run `ruff check --fix` to apply this fix.
-
 SIM114.py:138:1: SIM114 [*] Combine `if` branches using logical `or` operator
     |
 138 | / if a:  # we preserve comments, too!
@@ -440,8 +412,6 @@ SIM114.py:138:1: SIM114 [*] Combine `if` branches using logical `or` operator
 142 140 | 
 143 141 | 
 
-    Run `ruff check --fix` to apply this fix.
-
 SIM114.py:144:1: SIM114 [*] Combine `if` branches using logical `or` operator
     |
 144 | / if a: b  # here's a comment
@@ -460,8 +430,6 @@ SIM114.py:144:1: SIM114 [*] Combine `if` branches using logical `or` operator
 147 146 | 
 148 147 | if(x > 200): pass
 
-    Run `ruff check --fix` to apply this fix.
-
 SIM114.py:148:1: SIM114 [*] Combine `if` branches using logical `or` operator
     |
 148 | / if(x > 200): pass
@@ -478,5 +446,3 @@ SIM114.py:148:1: SIM114 [*] Combine `if` branches using logical `or` operator
 149     |-elif(100 < x and x < 200 and 300 < y and y < 800):
 150     |-	pass
     148 |+if(x > 200) or (100 < x and x < 200 and 300 < y and y < 800): pass
-
-    Run `ruff check --fix` to apply this fix.

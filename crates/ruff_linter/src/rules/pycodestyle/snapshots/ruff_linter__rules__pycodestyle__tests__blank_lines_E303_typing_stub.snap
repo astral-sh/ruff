@@ -18,8 +18,6 @@ E30.pyi:17:1: E303 [*] Too many blank lines (2)
 18 17 | def grouped2(): ...
 19 18 | def grouped3( ): ...
 
-    Run `ruff check --fix` to apply this fix.
-
 E30.pyi:22:1: E303 [*] Too many blank lines (2)
    |
 22 | class BackendProxy:
@@ -37,8 +35,6 @@ E30.pyi:22:1: E303 [*] Too many blank lines (2)
 23 22 |     backend_module: str
 24 23 |     backend_object: str | None
 
-    Run `ruff check --fix` to apply this fix.
-
 E30.pyi:35:5: E303 [*] Too many blank lines (2)
    |
 35 |     def ungrouped(): ...
@@ -54,8 +50,6 @@ E30.pyi:35:5: E303 [*] Too many blank lines (2)
 35 34 |     def ungrouped(): ...
 36 35 | a = "test"
 37 36 | 
-
-    Run `ruff check --fix` to apply this fix.
 
 E30.pyi:43:1: E303 [*] Too many blank lines (2)
    |
@@ -73,5 +67,3 @@ E30.pyi:43:1: E303 [*] Too many blank lines (2)
 43 42 | def outer():
 44 43 |      def inner():
 45 44 |          pass
-
-    Run `ruff check --fix` to apply this fix.

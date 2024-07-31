@@ -22,8 +22,6 @@ useless_else_on_loop.py:9:5: PLW0120 [*] `else` clause on loop without a `break`
 12 11 | 
 13 12 | 
 
-    Run `ruff check --fix` to apply this fix.
-
 useless_else_on_loop.py:18:5: PLW0120 [*] `else` clause on loop without a `break` statement; remove the `else` and dedent its contents
    |
 16 |     while True:
@@ -45,8 +43,6 @@ useless_else_on_loop.py:18:5: PLW0120 [*] `else` clause on loop without a `break
 21 20 | 
 22 21 | 
 
-    Run `ruff check --fix` to apply this fix.
-
 useless_else_on_loop.py:30:1: PLW0120 [*] `else` clause on loop without a `break` statement; remove the `else` and dedent its contents
    |
 28 |             break
@@ -67,8 +63,6 @@ useless_else_on_loop.py:30:1: PLW0120 [*] `else` clause on loop without a `break
 33 32 | 
 34 33 | while True:
 
-    Run `ruff check --fix` to apply this fix.
-
 useless_else_on_loop.py:37:1: PLW0120 [*] `else` clause on loop without a `break` statement; remove the `else` and dedent its contents
    |
 35 |     while False:
@@ -88,8 +82,6 @@ useless_else_on_loop.py:37:1: PLW0120 [*] `else` clause on loop without a `break
 39 38 | 
 40 39 | for j in range(10):
 41 40 |     pass
-
-    Run `ruff check --fix` to apply this fix.
 
 useless_else_on_loop.py:42:1: PLW0120 [*] `else` clause on loop without a `break` statement; remove the `else` and dedent its contents
    |
@@ -116,8 +108,6 @@ useless_else_on_loop.py:42:1: PLW0120 [*] `else` clause on loop without a `break
 47 46 | 
 48 47 | def test_return_for2():
 
-    Run `ruff check --fix` to apply this fix.
-
 useless_else_on_loop.py:88:5: PLW0120 [*] `else` clause on loop without a `break` statement; remove the `else` and dedent its contents
    |
 86 |             else:
@@ -138,8 +128,6 @@ useless_else_on_loop.py:88:5: PLW0120 [*] `else` clause on loop without a `break
 90 89 |     return False
 91 90 | 
 92 91 | 
-
-    Run `ruff check --fix` to apply this fix.
 
 useless_else_on_loop.py:98:9: PLW0120 [*] `else` clause on loop without a `break` statement; remove the `else` and dedent its contents
     |
@@ -164,8 +152,6 @@ useless_else_on_loop.py:98:9: PLW0120 [*] `else` clause on loop without a `break
 102 101 |         return True
 103 102 |     return False
 
-    Run `ruff check --fix` to apply this fix.
-
 useless_else_on_loop.py:144:5: PLW0120 [*] `else` clause on loop without a `break` statement; remove the `else` and dedent its contents
     |
 142 |     for j in range(10):
@@ -189,5 +175,3 @@ useless_else_on_loop.py:144:5: PLW0120 [*] `else` clause on loop without a `brea
     145 |+    print("fat chance")
     146 |+    for j in range(10):
     147 |+        break
-
-    Run `ruff check --fix` to apply this fix.

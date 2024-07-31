@@ -19,8 +19,6 @@ docstring_doubles_function.py:3:5: Q001 [*] Double quote multiline found but sin
 5 5 | 
 6 6 | 
 
-    Run `ruff check --fix` to apply this fix.
-
 docstring_doubles_function.py:11:5: Q001 [*] Double quote multiline found but single quotes preferred
    |
  9 |         function without params, multiline docstring
@@ -39,8 +37,6 @@ docstring_doubles_function.py:11:5: Q001 [*] Double quote multiline found but si
 12 12 |     return
 13 13 | 
 14 14 | 
-
-    Run `ruff check --fix` to apply this fix.
 
 docstring_doubles_function.py:15:39: Q001 [*] Double quote multiline found but single quotes preferred
    |
@@ -65,8 +61,6 @@ docstring_doubles_function.py:15:39: Q001 [*] Double quote multiline found but s
 19 19 | 
 20 20 | 
 
-    Run `ruff check --fix` to apply this fix.
-
 docstring_doubles_function.py:17:5: Q001 [*] Double quote multiline found but single quotes preferred
    |
 15 | def fun_with_params_no_docstring(a, b="""
@@ -86,8 +80,6 @@ docstring_doubles_function.py:17:5: Q001 [*] Double quote multiline found but si
 19 19 | 
 20 20 | 
 
-    Run `ruff check --fix` to apply this fix.
-
 docstring_doubles_function.py:22:5: Q001 [*] Double quote multiline found but single quotes preferred
    |
 21 | def fun_with_params_no_docstring2(a, b=c[foo():], c=\
@@ -104,6 +96,4 @@ docstring_doubles_function.py:22:5: Q001 [*] Double quote multiline found but si
    22 |+    ''' not a docstring '''):
 23 23 |     pass
 24 24 | 
-25 25 | 
-
-    Run `ruff check --fix` to apply this fix.
+25 25 |

@@ -21,8 +21,6 @@ E27.py:29:2: E274 [*] Tab before keyword
 31 31 | this		and	False
 32 32 | #: Okay
 
-    Run `ruff check --fix` to apply this fix.
-
 E27.py:31:5: E274 [*] Tab before keyword
    |
 29 | a       and b
@@ -42,5 +40,3 @@ E27.py:31:5: E274 [*] Tab before keyword
 32 32 | #: Okay
 33 33 | from u import (a, b)
 34 34 | from v import c, d
-
-    Run `ruff check --fix` to apply this fix.

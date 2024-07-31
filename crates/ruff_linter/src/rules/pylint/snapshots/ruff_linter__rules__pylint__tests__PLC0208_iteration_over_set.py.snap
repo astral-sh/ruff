@@ -19,8 +19,6 @@ iteration_over_set.py:3:13: PLC0208 [*] Use a sequence type instead of a `set` w
 5 5 | 
 6 6 | for item in {"apples", "lemons", "water"}:  # flags in-line set literals
 
-    Run `ruff check --fix` to apply this fix.
-
 iteration_over_set.py:6:13: PLC0208 [*] Use a sequence type instead of a `set` when iterating over values
   |
 4 |     print(f"I can count to {item}!")
@@ -40,8 +38,6 @@ iteration_over_set.py:6:13: PLC0208 [*] Use a sequence type instead of a `set` w
 8 8 | 
 9 9 | for item in {1,}:
 
-    Run `ruff check --fix` to apply this fix.
-
 iteration_over_set.py:9:13: PLC0208 [*] Use a sequence type instead of a `set` when iterating over values
    |
  7 |     print(f"I like {item}.")
@@ -60,8 +56,6 @@ iteration_over_set.py:9:13: PLC0208 [*] Use a sequence type instead of a `set` w
 10 10 |     print(f"I can count to {item}!")
 11 11 | 
 12 12 | for item in {
-
-    Run `ruff check --fix` to apply this fix.
 
 iteration_over_set.py:12:13: PLC0208 [*] Use a sequence type instead of a `set` when iterating over values
    |
@@ -88,8 +82,6 @@ iteration_over_set.py:12:13: PLC0208 [*] Use a sequence type instead of a `set` 
 16 16 | 
 17 17 | numbers_list = [i for i in {1, 2, 3}]  # flags sets in list comprehensions
 
-    Run `ruff check --fix` to apply this fix.
-
 iteration_over_set.py:17:28: PLC0208 [*] Use a sequence type instead of a `set` when iterating over values
    |
 15 |     print(f"I like {item}.")
@@ -109,8 +101,6 @@ iteration_over_set.py:17:28: PLC0208 [*] Use a sequence type instead of a `set` 
 18 18 | 
 19 19 | numbers_set = {i for i in {1, 2, 3}}  # flags sets in set comprehensions
 20 20 | 
-
-    Run `ruff check --fix` to apply this fix.
 
 iteration_over_set.py:19:27: PLC0208 [*] Use a sequence type instead of a `set` when iterating over values
    |
@@ -132,8 +122,6 @@ iteration_over_set.py:19:27: PLC0208 [*] Use a sequence type instead of a `set` 
 21 21 | numbers_dict = {str(i): i for i in {1, 2, 3}}  # flags sets in dict comprehensions
 22 22 | 
 
-    Run `ruff check --fix` to apply this fix.
-
 iteration_over_set.py:21:36: PLC0208 [*] Use a sequence type instead of a `set` when iterating over values
    |
 19 | numbers_set = {i for i in {1, 2, 3}}  # flags sets in set comprehensions
@@ -154,8 +142,6 @@ iteration_over_set.py:21:36: PLC0208 [*] Use a sequence type instead of a `set` 
 23 23 | numbers_gen = (i for i in {1, 2, 3})  # flags sets in generator expressions
 24 24 | 
 
-    Run `ruff check --fix` to apply this fix.
-
 iteration_over_set.py:23:27: PLC0208 [*] Use a sequence type instead of a `set` when iterating over values
    |
 21 | numbers_dict = {str(i): i for i in {1, 2, 3}}  # flags sets in dict comprehensions
@@ -174,6 +160,4 @@ iteration_over_set.py:23:27: PLC0208 [*] Use a sequence type instead of a `set` 
    23 |+numbers_gen = (i for i in (1, 2, 3))  # flags sets in generator expressions
 24 24 | 
 25 25 | # Non-errors
-26 26 | 
-
-    Run `ruff check --fix` to apply this fix.
+26 26 |

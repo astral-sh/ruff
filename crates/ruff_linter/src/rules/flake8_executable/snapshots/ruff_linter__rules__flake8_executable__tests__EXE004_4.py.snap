@@ -12,5 +12,3 @@ EXE004_4.py:1:1: EXE004 [*] Avoid whitespace before shebang
 1   |-
 2   |-    #!/usr/bin/env python
   1 |+#!/usr/bin/env python
-
-    Run `ruff check --fix` to apply this fix.

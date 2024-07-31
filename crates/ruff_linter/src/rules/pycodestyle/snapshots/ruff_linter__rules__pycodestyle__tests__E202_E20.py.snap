@@ -20,8 +20,6 @@ E20.py:19:23: E202 [*] Whitespace before ')'
 21 21 | spam(ham[1], {eggs: 2 })
 22 22 | #: E202:1:11
 
-    Run `ruff check --fix` to apply this fix.
-
 E20.py:21:22: E202 [*] Whitespace before '}'
    |
 19 | spam(ham[1], {eggs: 2} )
@@ -41,8 +39,6 @@ E20.py:21:22: E202 [*] Whitespace before '}'
 22 22 | #: E202:1:11
 23 23 | spam(ham[1 ], {eggs: 2})
 24 24 | #: E202:1:23
-
-    Run `ruff check --fix` to apply this fix.
 
 E20.py:23:11: E202 [*] Whitespace before ']'
    |
@@ -64,8 +60,6 @@ E20.py:23:11: E202 [*] Whitespace before ']'
 25 25 | spam(ham[1], {eggs: 2}	)
 26 26 | #: E202:1:22
 
-    Run `ruff check --fix` to apply this fix.
-
 E20.py:25:23: E202 [*] Whitespace before ')'
    |
 23 | spam(ham[1 ], {eggs: 2})
@@ -85,8 +79,6 @@ E20.py:25:23: E202 [*] Whitespace before ')'
 26 26 | #: E202:1:22
 27 27 | spam(ham[1], {eggs: 2	})
 28 28 | #: E202:1:11
-
-    Run `ruff check --fix` to apply this fix.
 
 E20.py:27:22: E202 [*] Whitespace before '}'
    |
@@ -108,8 +100,6 @@ E20.py:27:22: E202 [*] Whitespace before '}'
 29 29 | spam(ham[1	], {eggs: 2})
 30 30 | #: Okay
 
-    Run `ruff check --fix` to apply this fix.
-
 E20.py:29:11: E202 [*] Whitespace before ']'
    |
 27 | spam(ham[1], {eggs: 2   })
@@ -130,8 +120,6 @@ E20.py:29:11: E202 [*] Whitespace before ']'
 31 31 | spam(ham[1], {eggs: 2})
 32 32 | 
 
-    Run `ruff check --fix` to apply this fix.
-
 E20.py:116:18: E202 [*] Whitespace before ']'
     |
 114 | # F-strings
@@ -151,8 +139,6 @@ E20.py:116:18: E202 [*] Whitespace before ']'
 118 118 | 
 119 119 | #: Okay
 
-    Run `ruff check --fix` to apply this fix.
-
 E20.py:172:12: E202 [*] Whitespace before ']'
     |
 171 | #: E202:1:12
@@ -171,5 +157,3 @@ E20.py:172:12: E202 [*] Whitespace before ']'
 173 173 | 
 174 174 | #: E203:1:10
 175 175 | ham[upper  :]
-
-    Run `ruff check --fix` to apply this fix.

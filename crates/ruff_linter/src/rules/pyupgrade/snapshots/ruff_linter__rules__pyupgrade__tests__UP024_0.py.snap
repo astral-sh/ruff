@@ -20,8 +20,6 @@ UP024_0.py:6:8: UP024 [*] Replace aliased errors with `OSError`
 8 8 | 
 9 9 | try:
 
-    Run `ruff check --fix` to apply this fix.
-
 UP024_0.py:11:8: UP024 [*] Replace aliased errors with `OSError`
    |
  9 | try:
@@ -40,8 +38,6 @@ UP024_0.py:11:8: UP024 [*] Replace aliased errors with `OSError`
 12 12 |     pass
 13 13 | 
 14 14 | try:
-
-    Run `ruff check --fix` to apply this fix.
 
 UP024_0.py:16:8: UP024 [*] Replace aliased errors with `OSError`
    |
@@ -62,8 +58,6 @@ UP024_0.py:16:8: UP024 [*] Replace aliased errors with `OSError`
 18 18 | 
 19 19 | try:
 
-    Run `ruff check --fix` to apply this fix.
-
 UP024_0.py:21:8: UP024 [*] Replace aliased errors with `OSError`
    |
 19 | try:
@@ -82,8 +76,6 @@ UP024_0.py:21:8: UP024 [*] Replace aliased errors with `OSError`
 22 22 |     pass
 23 23 | 
 24 24 | try:
-
-    Run `ruff check --fix` to apply this fix.
 
 UP024_0.py:26:8: UP024 [*] Replace aliased errors with `OSError`
    |
@@ -104,8 +96,6 @@ UP024_0.py:26:8: UP024 [*] Replace aliased errors with `OSError`
 28 28 | 
 29 29 | try:
 
-    Run `ruff check --fix` to apply this fix.
-
 UP024_0.py:31:8: UP024 [*] Replace aliased errors with `OSError`
    |
 29 | try:
@@ -125,8 +115,6 @@ UP024_0.py:31:8: UP024 [*] Replace aliased errors with `OSError`
 33 33 | 
 34 34 | try:
 
-    Run `ruff check --fix` to apply this fix.
-
 UP024_0.py:36:8: UP024 [*] Replace aliased errors with `OSError`
    |
 34 | try:
@@ -145,8 +133,6 @@ UP024_0.py:36:8: UP024 [*] Replace aliased errors with `OSError`
 37 37 |     pass
 38 38 | 
 39 39 | # Should NOT be in parentheses when replaced
-
-    Run `ruff check --fix` to apply this fix.
 
 UP024_0.py:43:8: UP024 [*] Replace aliased errors with `OSError`
    |
@@ -168,8 +154,6 @@ UP024_0.py:43:8: UP024 [*] Replace aliased errors with `OSError`
 45 45 | try:
 46 46 |     pass
 
-    Run `ruff check --fix` to apply this fix.
-
 UP024_0.py:47:8: UP024 [*] Replace aliased errors with `OSError`
    |
 45 | try:
@@ -190,8 +174,6 @@ UP024_0.py:47:8: UP024 [*] Replace aliased errors with `OSError`
 49 49 | try:
 50 50 |     pass
 
-    Run `ruff check --fix` to apply this fix.
-
 UP024_0.py:51:8: UP024 [*] Replace aliased errors with `OSError`
    |
 49 | try:
@@ -211,8 +193,6 @@ UP024_0.py:51:8: UP024 [*] Replace aliased errors with `OSError`
 53 53 | 
 54 54 | # Should be kept in parentheses (because multiple)
 
-    Run `ruff check --fix` to apply this fix.
-
 UP024_0.py:58:8: UP024 [*] Replace aliased errors with `OSError`
    |
 56 | try:
@@ -231,8 +211,6 @@ UP024_0.py:58:8: UP024 [*] Replace aliased errors with `OSError`
 59 59 |     pass
 60 60 | 
 61 61 | # First should change, second should not
-
-    Run `ruff check --fix` to apply this fix.
 
 UP024_0.py:65:8: UP024 [*] Replace aliased errors with `OSError`
    |
@@ -254,8 +232,6 @@ UP024_0.py:65:8: UP024 [*] Replace aliased errors with `OSError`
 67 67 | # These should not change
 68 68 | 
 
-    Run `ruff check --fix` to apply this fix.
-
 UP024_0.py:87:8: UP024 [*] Replace aliased errors with `OSError`
    |
 85 | try:
@@ -274,8 +250,6 @@ UP024_0.py:87:8: UP024 [*] Replace aliased errors with `OSError`
 88 88 |     pass
 89 89 | 
 90 90 | try:
-
-    Run `ruff check --fix` to apply this fix.
 
 UP024_0.py:105:11: UP024 [*] Replace aliased errors with `OSError`
     |
@@ -296,8 +270,6 @@ UP024_0.py:105:11: UP024 [*] Replace aliased errors with `OSError`
 107 107 | 
 108 108 | 
 
-    Run `ruff check --fix` to apply this fix.
-
 UP024_0.py:114:8: UP024 [*] Replace aliased errors with `OSError`
     |
 112 | try:
@@ -314,5 +286,3 @@ UP024_0.py:114:8: UP024 [*] Replace aliased errors with `OSError`
 114     |-except os.error:
     114 |+except OSError:
 115 115 |     pass
-
-    Run `ruff check --fix` to apply this fix.

@@ -32,5 +32,3 @@ RUF100_5.py:11:13: RUF100 [*] Unused `noqa` directive (unused: `E501`)
 10 10 | 
 11    |-#import os  # noqa: E501
    11 |+#import os
-
-    Run `ruff check --fix` to apply this fix.

@@ -20,5 +20,3 @@ doubles_would_be_triple_quotes.py:2:5: Q000 [*] Double quotes found but single q
 1 1 | s = ""'Start with empty string' ' and lint docstring safely'
 2   |-s = "Do not"' start with empty string' ' and lint docstring safely'
   2 |+s = 'Do not'' start with empty string' ' and lint docstring safely'
-
-    Run `ruff check --fix` to apply this fix.

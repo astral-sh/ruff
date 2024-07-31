@@ -19,8 +19,6 @@ RET501.py:4:5: RET501 [*] Do not explicitly `return None` in function if it is t
 6 6 | 
 7 7 | class BaseCache:
 
-    Run `ruff check --fix` to apply this fix.
-
 RET501.py:14:9: RET501 [*] Do not explicitly `return None` in function if it is the only possible return value
    |
 12 |     def get(self, key: str) -> None:
@@ -40,5 +38,3 @@ RET501.py:14:9: RET501 [*] Do not explicitly `return None` in function if it is 
 15 15 | 
 16 16 |     @property
 17 17 |     def prop(self) -> None:
-
-    Run `ruff check --fix` to apply this fix.

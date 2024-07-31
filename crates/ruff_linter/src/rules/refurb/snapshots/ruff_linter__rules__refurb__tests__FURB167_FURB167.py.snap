@@ -19,8 +19,6 @@ FURB167.py:13:42: FURB167 [*] Use of regular expression alias `re.I`
 15 15 | 
 16 16 | 
 
-    Run `ruff check --fix` to apply this fix.
-
 FURB167.py:21:39: FURB167 [*] Use of regular expression alias `re.I`
    |
 20 |     # FURB167
@@ -41,5 +39,3 @@ FURB167.py:21:39: FURB167 [*] Use of regular expression alias `re.I`
 21    |-    if match("^hello", "hello world", I):
    22 |+    if match("^hello", "hello world", re.IGNORECASE):
 22 23 |         pass
-
-    Run `ruff check --fix` to apply this fix.

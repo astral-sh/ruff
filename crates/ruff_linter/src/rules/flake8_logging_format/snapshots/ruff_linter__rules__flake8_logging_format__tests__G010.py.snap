@@ -21,8 +21,6 @@ G010.py:6:9: G010 [*] Logging statement uses `warn` instead of `warning`
 8 8 | logger.warn("Hello world!")
 9 9 | 
 
-    Run `ruff check --fix` to apply this fix.
-
 G010.py:8:8: G010 [*] Logging statement uses `warn` instead of `warning`
    |
  6 | logging.warn("Hello World!")
@@ -42,8 +40,6 @@ G010.py:8:8: G010 [*] Logging statement uses `warn` instead of `warning`
 9 9 | 
 10 10 | logging . warn("Hello World!")
 11 11 | 
-
-    Run `ruff check --fix` to apply this fix.
 
 G010.py:10:11: G010 [*] Logging statement uses `warn` instead of `warning`
    |
@@ -65,8 +61,6 @@ G010.py:10:11: G010 [*] Logging statement uses `warn` instead of `warning`
 12 12 | from logging import warn, warning, exception
 13 13 | warn("foo")
 
-    Run `ruff check --fix` to apply this fix.
-
 G010.py:13:1: G010 [*] Logging statement uses `warn` instead of `warning`
    |
 12 | from logging import warn, warning, exception
@@ -84,5 +78,3 @@ G010.py:13:1: G010 [*] Logging statement uses `warn` instead of `warning`
 14 13 | warning("foo")
    14 |+warning("foo")
 15 15 | exception("foo")
-
-    Run `ruff check --fix` to apply this fix.

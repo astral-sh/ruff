@@ -20,8 +20,6 @@ FURB168.py:5:4: FURB168 [*] Prefer `is` operator over `isinstance` to check if a
 7 7 | 
 8 8 | if isinstance(foo, (type(None))):
 
-    Run `ruff check --fix` to apply this fix.
-
 FURB168.py:8:4: FURB168 [*] Prefer `is` operator over `isinstance` to check if an object is `None`
   |
 6 |     pass
@@ -40,8 +38,6 @@ FURB168.py:8:4: FURB168 [*] Prefer `is` operator over `isinstance` to check if a
 9 9 |     pass
 10 10 | 
 11 11 | if isinstance(foo, (type(None), type(None), type(None))):
-
-    Run `ruff check --fix` to apply this fix.
 
 FURB168.py:11:4: FURB168 [*] Prefer `is` operator over `isinstance` to check if an object is `None`
    |
@@ -62,8 +58,6 @@ FURB168.py:11:4: FURB168 [*] Prefer `is` operator over `isinstance` to check if 
 13 13 | 
 14 14 | if isinstance(foo, None | None):
 
-    Run `ruff check --fix` to apply this fix.
-
 FURB168.py:14:4: FURB168 [*] Prefer `is` operator over `isinstance` to check if an object is `None`
    |
 12 |     pass
@@ -82,8 +76,6 @@ FURB168.py:14:4: FURB168 [*] Prefer `is` operator over `isinstance` to check if 
 15 15 |     pass
 16 16 | 
 17 17 | if isinstance(foo, (None | None)):
-
-    Run `ruff check --fix` to apply this fix.
 
 FURB168.py:17:4: FURB168 [*] Prefer `is` operator over `isinstance` to check if an object is `None`
    |
@@ -104,8 +96,6 @@ FURB168.py:17:4: FURB168 [*] Prefer `is` operator over `isinstance` to check if 
 19 19 | 
 20 20 | if isinstance(foo, None | type(None)):
 
-    Run `ruff check --fix` to apply this fix.
-
 FURB168.py:20:4: FURB168 [*] Prefer `is` operator over `isinstance` to check if an object is `None`
    |
 18 |     pass
@@ -124,8 +114,6 @@ FURB168.py:20:4: FURB168 [*] Prefer `is` operator over `isinstance` to check if 
 21 21 |     pass
 22 22 | 
 23 23 | if isinstance(foo, (None | type(None))):
-
-    Run `ruff check --fix` to apply this fix.
 
 FURB168.py:23:4: FURB168 [*] Prefer `is` operator over `isinstance` to check if an object is `None`
    |
@@ -146,8 +134,6 @@ FURB168.py:23:4: FURB168 [*] Prefer `is` operator over `isinstance` to check if 
 25 25 | 
 26 26 | # A bit contrived, but is both technically valid and equivalent to the above.
 
-    Run `ruff check --fix` to apply this fix.
-
 FURB168.py:27:4: FURB168 [*] Prefer `is` operator over `isinstance` to check if an object is `None`
    |
 26 | # A bit contrived, but is both technically valid and equivalent to the above.
@@ -164,6 +150,4 @@ FURB168.py:27:4: FURB168 [*] Prefer `is` operator over `isinstance` to check if 
    27 |+if foo is None:
 28 28 |     pass
 29 29 | 
-30 30 | 
-
-    Run `ruff check --fix` to apply this fix.
+30 30 |

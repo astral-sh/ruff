@@ -90,5 +90,3 @@ magic_trailing_comma.py:2:1: I001 [*] Import block is un-sorted or un-formatted
 37    |-    member3,
 38    |-)
    19 |+from module2 import member1, member2, member3
-
-    Run `ruff check --fix` to apply this fix.

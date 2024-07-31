@@ -23,5 +23,3 @@ length_sort_with_relative_imports.py:1:1: I001 [*] Import block is un-sorted or 
 7 5 | from ......short import b
   6 |+from ...mediuuuum import b
   7 |+from ..looooooooooooooong import a
-
-    Run `ruff check --fix` to apply this fix.

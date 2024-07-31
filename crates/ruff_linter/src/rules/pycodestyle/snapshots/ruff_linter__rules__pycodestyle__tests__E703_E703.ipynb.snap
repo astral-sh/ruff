@@ -21,8 +21,6 @@ E703.ipynb:5:2: E703 [*] Statement ends with an unnecessary semicolon
 7 7 | # Nested expressions isn't relevant
 8 8 | if True:
 
-    Run `ruff check --fix` to apply this fix.
-
 E703.ipynb:9:6: E703 [*] Statement ends with an unnecessary semicolon
    |
  7 | # Nested expressions isn't relevant
@@ -42,5 +40,3 @@ E703.ipynb:9:6: E703 [*] Statement ends with an unnecessary semicolon
 10 10 | # Semicolons with multiple expressions
 11 11 | x; x;
 12 12 | # Comments, newlines and whitespace
-
-    Run `ruff check --fix` to apply this fix.

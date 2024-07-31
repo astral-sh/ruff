@@ -21,8 +21,6 @@ E27.py:38:8: E275 [*] Missing whitespace after keyword
 40 40 | from importable.module import(e, f)
 41 41 | #: E275
 
-    Run `ruff check --fix` to apply this fix.
-
 E27.py:40:24: E275 [*] Missing whitespace after keyword
    |
 38 | from w import(e, f)
@@ -42,8 +40,6 @@ E27.py:40:24: E275 [*] Missing whitespace after keyword
 41 41 | #: E275
 42 42 | try:
 43 43 |     from importable.module import(e, f)
-
-    Run `ruff check --fix` to apply this fix.
 
 E27.py:43:28: E275 [*] Missing whitespace after keyword
    |
@@ -65,8 +61,6 @@ E27.py:43:28: E275 [*] Missing whitespace after keyword
 45 45 |     pass
 46 46 | #: E275
 
-    Run `ruff check --fix` to apply this fix.
-
 E27.py:47:1: E275 [*] Missing whitespace after keyword
    |
 45 |     pass
@@ -86,8 +80,6 @@ E27.py:47:1: E275 [*] Missing whitespace after keyword
 48 48 |     pass
 49 49 | else:
 50 50 |     pass
-
-    Run `ruff check --fix` to apply this fix.
 
 E27.py:55:5: E275 [*] Missing whitespace after keyword
    |
@@ -109,8 +101,6 @@ E27.py:55:5: E275 [*] Missing whitespace after keyword
 57 57 | def f():
 58 58 |     print((yield))
 
-    Run `ruff check --fix` to apply this fix.
-
 E27.py:77:1: E275 [*] Missing whitespace after keyword
    |
 76 | #: E275
@@ -130,8 +120,6 @@ E27.py:77:1: E275 [*] Missing whitespace after keyword
 79 79 |         pass
 80 80 | 
 
-    Run `ruff check --fix` to apply this fix.
-
 E27.py:78:5: E275 [*] Missing whitespace after keyword
    |
 76 | #: E275
@@ -150,5 +138,3 @@ E27.py:78:5: E275 [*] Missing whitespace after keyword
 79 79 |         pass
 80 80 | 
 81 81 | # https://github.com/astral-sh/ruff/issues/12094
-
-    Run `ruff check --fix` to apply this fix.

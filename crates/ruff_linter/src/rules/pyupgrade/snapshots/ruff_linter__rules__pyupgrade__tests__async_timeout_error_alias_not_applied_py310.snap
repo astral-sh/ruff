@@ -20,8 +20,6 @@ UP041.py:10:8: UP041 [*] Replace aliased errors with `TimeoutError`
 12 12 | 
 13 13 | # Should NOT be in parentheses when replaced
 
-    Run `ruff check --fix` to apply this fix.
-
 UP041.py:22:8: UP041 [*] Replace aliased errors with `TimeoutError`
    |
 20 | try:
@@ -40,8 +38,6 @@ UP041.py:22:8: UP041 [*] Replace aliased errors with `TimeoutError`
 23 23 |     pass
 24 24 | 
 25 25 | try:
-
-    Run `ruff check --fix` to apply this fix.
 
 UP041.py:27:8: UP041 [*] Replace aliased errors with `TimeoutError`
    |
@@ -62,8 +58,6 @@ UP041.py:27:8: UP041 [*] Replace aliased errors with `TimeoutError`
 29 29 | 
 30 30 | # Should be kept in parentheses (because multiple)
 
-    Run `ruff check --fix` to apply this fix.
-
 UP041.py:34:8: UP041 [*] Replace aliased errors with `TimeoutError`
    |
 32 | try:
@@ -82,5 +76,3 @@ UP041.py:34:8: UP041 [*] Replace aliased errors with `TimeoutError`
 35 35 |     pass
 36 36 | 
 37 37 | # First should change, second should not
-
-    Run `ruff check --fix` to apply this fix.

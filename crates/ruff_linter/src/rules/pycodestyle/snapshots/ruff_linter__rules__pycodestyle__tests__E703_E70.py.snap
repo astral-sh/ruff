@@ -21,8 +21,6 @@ E70.py:10:13: E703 [*] Statement ends with an unnecessary semicolon
 12 12 | del a[:]; a.append(42);
 13 13 | #: E704:1:1
 
-    Run `ruff check --fix` to apply this fix.
-
 E70.py:12:23: E703 [*] Statement ends with an unnecessary semicolon
    |
 10 | import shlex;
@@ -43,8 +41,6 @@ E70.py:12:23: E703 [*] Statement ends with an unnecessary semicolon
 14 14 | def f(x): return 2
 15 15 | #: E704:1:1
 
-    Run `ruff check --fix` to apply this fix.
-
 E70.py:25:14: E703 [*] Statement ends with an unnecessary semicolon
    |
 23 |     def f(x): return 2*x
@@ -64,8 +60,6 @@ E70.py:25:14: E703 [*] Statement ends with an unnecessary semicolon
 26 26 | #: E701:1:8
 27 27 | if True: lambda a: b
 28 28 | #: E701:1:10
-
-    Run `ruff check --fix` to apply this fix.
 
 E70.py:68:1: E703 [*] Statement ends with an unnecessary semicolon
    |
@@ -88,8 +82,6 @@ E70.py:68:1: E703 [*] Statement ends with an unnecessary semicolon
 70 69 | a = \
 71 70 |   5;
 
-    Run `ruff check --fix` to apply this fix.
-
 E70.py:71:4: E703 [*] Statement ends with an unnecessary semicolon
    |
 69 | #: E701:2:3
@@ -108,5 +100,3 @@ E70.py:71:4: E703 [*] Statement ends with an unnecessary semicolon
    71 |+  5
 72 72 | #:
 73 73 | with x(y) as z: ...
-
-    Run `ruff check --fix` to apply this fix.

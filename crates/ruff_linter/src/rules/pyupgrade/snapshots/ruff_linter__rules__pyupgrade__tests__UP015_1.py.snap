@@ -14,6 +14,4 @@ UP015_1.py:3:5: UP015 [*] Unnecessary open mode parameters
 2 2 | # Refer: https://github.com/astral-sh/ruff/issues/11736
 3   |-x: 'open("foo", "r")'
   3 |+x: 'open("foo")'
-4 4 | 
-
-    Run `ruff check --fix` to apply this fix.
+4 4 |

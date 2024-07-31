@@ -32,8 +32,6 @@ W293.py:10:1: W293 [*] Blank line contains whitespace
 12 10 | 
 13 11 | "abc\
 
-    Run `ruff check --fix` to apply this fix.
-
 W293.py:16:1: W293 [*] Blank line contains whitespace
    |
 14 |  " \
@@ -54,8 +52,6 @@ W293.py:16:1: W293 [*] Blank line contains whitespace
 17 15 | '''blank line with whitespace
 18 16 |  
 19 17 | inside a multiline string'''
-
-    Run `ruff check --fix` to apply this fix.
 
 W293.py:18:1: W293 [*] Blank line contains whitespace
    |

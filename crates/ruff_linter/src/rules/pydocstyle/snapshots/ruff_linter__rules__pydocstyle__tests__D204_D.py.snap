@@ -19,8 +19,6 @@ D.py:181:5: D204 [*] 1 blank line required after class docstring
 183 184 | 
 184 185 | 
 
-    Run `ruff check --fix` to apply this fix.
-
 D.py:192:5: D204 [*] 1 blank line required after class docstring
     |
 191 | class LeadingAndTrailingSpaceMissing:
@@ -37,8 +35,6 @@ D.py:192:5: D204 [*] 1 blank line required after class docstring
 193 194 |     pass
 194 195 | 
 195 196 | 
-
-    Run `ruff check --fix` to apply this fix.
 
 D.py:649:5: D204 [*] 1 blank line required after class docstring
     |
@@ -61,8 +57,6 @@ D.py:649:5: D204 [*] 1 blank line required after class docstring
 651 653 |         pass
 652 654 | 
 
-    Run `ruff check --fix` to apply this fix.
-
 D.py:654:5: D204 [*] 1 blank line required after class docstring
     |
 653 | class StatementOnSameLineAsDocstring:
@@ -82,8 +76,6 @@ D.py:654:5: D204 [*] 1 blank line required after class docstring
 656 658 | 
 657 659 | class CommentAfterDocstring:
 
-    Run `ruff check --fix` to apply this fix.
-
 D.py:658:5: D204 [*] 1 blank line required after class docstring
     |
 657 | class CommentAfterDocstring:
@@ -100,6 +92,4 @@ D.py:658:5: D204 [*] 1 blank line required after class docstring
     659 |+
 659 660 |     def sort_services(self):
 660 661 |         pass
-661 662 | 
-
-    Run `ruff check --fix` to apply this fix.
+661 662 |

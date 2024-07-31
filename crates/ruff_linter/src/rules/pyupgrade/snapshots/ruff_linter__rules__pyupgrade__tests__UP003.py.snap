@@ -16,8 +16,6 @@ UP003.py:1:1: UP003 [*] Use `str` instead of `type(...)`
 3 3 | type(0)
 4 4 | type(0.0)
 
-    Run `ruff check --fix` to apply this fix.
-
 UP003.py:2:1: UP003 [*] Use `bytes` instead of `type(...)`
   |
 1 | type("")
@@ -34,8 +32,6 @@ UP003.py:2:1: UP003 [*] Use `bytes` instead of `type(...)`
 3 3 | type(0)
 4 4 | type(0.0)
 5 5 | type(0j)
-
-    Run `ruff check --fix` to apply this fix.
 
 UP003.py:3:1: UP003 [*] Use `int` instead of `type(...)`
   |
@@ -56,8 +52,6 @@ UP003.py:3:1: UP003 [*] Use `int` instead of `type(...)`
 5 5 | type(0j)
 6 6 | 
 
-    Run `ruff check --fix` to apply this fix.
-
 UP003.py:4:1: UP003 [*] Use `float` instead of `type(...)`
   |
 2 | type(b"")
@@ -76,8 +70,6 @@ UP003.py:4:1: UP003 [*] Use `float` instead of `type(...)`
 5 5 | type(0j)
 6 6 | 
 7 7 | # OK
-
-    Run `ruff check --fix` to apply this fix.
 
 UP003.py:5:1: UP003 [*] Use `complex` instead of `type(...)`
   |
@@ -99,8 +91,6 @@ UP003.py:5:1: UP003 [*] Use `complex` instead of `type(...)`
 7 7 | # OK
 8 8 | type(arg)(" ")
 
-    Run `ruff check --fix` to apply this fix.
-
 UP003.py:14:29: UP003 [*] Use `str` instead of `type(...)`
    |
 13 | # Regression test for: https://github.com/astral-sh/ruff/issues/7455#issuecomment-1722459841
@@ -114,5 +104,3 @@ UP003.py:14:29: UP003 [*] Use `str` instead of `type(...)`
 13 13 | # Regression test for: https://github.com/astral-sh/ruff/issues/7455#issuecomment-1722459841
 14    |-assert isinstance(fullname, type("")is not True)
    14 |+assert isinstance(fullname, str is not True)
-
-    Run `ruff check --fix` to apply this fix.

@@ -22,8 +22,6 @@ NPY201.py:4:5: NPY201 [*] `np.add_docstring` will be removed in NumPy 2.0. Use `
 6 7 |     np.add_newdoc
 7 8 | 
 
-    Run `ruff check --fix` to apply this fix.
-
 NPY201.py:6:5: NPY201 [*] `np.add_newdoc` will be removed in NumPy 2.0. Use `numpy.lib.add_newdoc` instead.
   |
 4 |     np.add_docstring
@@ -46,8 +44,6 @@ NPY201.py:6:5: NPY201 [*] `np.add_newdoc` will be removed in NumPy 2.0. Use `num
 7 8 | 
 8 9 |     np.add_newdoc_ufunc
 9 10 | 
-
-    Run `ruff check --fix` to apply this fix.
 
 NPY201.py:8:5: NPY201 `np.add_newdoc_ufunc` will be removed in NumPy 2.0. `add_newdoc_ufunc` is an internal function.
    |
@@ -111,8 +107,6 @@ NPY201.py:16:5: NPY201 [*] `np.cfloat` will be removed in NumPy 2.0. Use `numpy.
 18 18 |     np.clongfloat(12+34j)
 19 19 | 
 
-    Run `ruff check --fix` to apply this fix.
-
 NPY201.py:18:5: NPY201 [*] `np.clongfloat` will be removed in NumPy 2.0. Use `numpy.clongdouble` instead.
    |
 16 |     np.cfloat(12+34j)
@@ -132,8 +126,6 @@ NPY201.py:18:5: NPY201 [*] `np.clongfloat` will be removed in NumPy 2.0. Use `nu
 19 19 | 
 20 20 |     np.compat
 21 21 | 
-
-    Run `ruff check --fix` to apply this fix.
 
 NPY201.py:20:5: NPY201 `np.compat` will be removed in NumPy 2.0. Python 2 is no longer supported.
    |
@@ -165,8 +157,6 @@ NPY201.py:22:5: NPY201 [*] `np.complex_` will be removed in NumPy 2.0. Use `nump
 24 24 |     np.DataSource
 25 25 | 
 
-    Run `ruff check --fix` to apply this fix.
-
 NPY201.py:24:5: NPY201 [*] `np.DataSource` will be removed in NumPy 2.0. Use `numpy.lib.npyio.DataSource` instead.
    |
 22 |     np.complex_(12+34j)
@@ -191,8 +181,6 @@ NPY201.py:24:5: NPY201 [*] `np.DataSource` will be removed in NumPy 2.0. Use `nu
 25 26 | 
 26 27 |     np.deprecate
 27 28 | 
-
-    Run `ruff check --fix` to apply this fix.
 
 NPY201.py:26:5: NPY201 `np.deprecate` will be removed in NumPy 2.0. Emit `DeprecationWarning` with `warnings.warn` directly, or use `typing.deprecated`.
    |
@@ -274,8 +262,6 @@ NPY201.py:38:5: NPY201 [*] `np.float_` will be removed in NumPy 2.0. Use `numpy.
 40 40 |     np.geterrobj
 41 41 | 
 
-    Run `ruff check --fix` to apply this fix.
-
 NPY201.py:40:5: NPY201 `np.geterrobj` will be removed in NumPy 2.0. Use the `np.errstate` context manager instead.
    |
 38 |     np.float_
@@ -306,8 +292,6 @@ NPY201.py:42:5: NPY201 [*] `np.Inf` will be removed in NumPy 2.0. Use `numpy.inf
 44 44 |     np.Infinity
 45 45 | 
 
-    Run `ruff check --fix` to apply this fix.
-
 NPY201.py:44:5: NPY201 [*] `np.Infinity` will be removed in NumPy 2.0. Use `numpy.inf` instead.
    |
 42 |     np.Inf
@@ -328,8 +312,6 @@ NPY201.py:44:5: NPY201 [*] `np.Infinity` will be removed in NumPy 2.0. Use `nump
 46 46 |     np.infty
 47 47 | 
 
-    Run `ruff check --fix` to apply this fix.
-
 NPY201.py:46:5: NPY201 [*] `np.infty` will be removed in NumPy 2.0. Use `numpy.inf` instead.
    |
 44 |     np.Infinity
@@ -349,8 +331,6 @@ NPY201.py:46:5: NPY201 [*] `np.infty` will be removed in NumPy 2.0. Use `numpy.i
 47 47 | 
 48 48 |     np.issctype
 49 49 | 
-
-    Run `ruff check --fix` to apply this fix.
 
 NPY201.py:48:5: NPY201 `np.issctype` will be removed without replacement in NumPy 2.0
    |
@@ -382,8 +362,6 @@ NPY201.py:50:5: NPY201 [*] `np.issubclass_` will be removed in NumPy 2.0. Use `i
 52 52 |     np.issubsctype
 53 53 | 
 
-    Run `ruff check --fix` to apply this fix.
-
 NPY201.py:52:5: NPY201 [*] `np.issubsctype` will be removed in NumPy 2.0. Use `numpy.issubdtype` instead.
    |
 50 |     np.issubclass_(np.int32, np.integer)
@@ -404,8 +382,6 @@ NPY201.py:52:5: NPY201 [*] `np.issubsctype` will be removed in NumPy 2.0. Use `n
 54 54 |     np.mat
 55 55 | 
 
-    Run `ruff check --fix` to apply this fix.
-
 NPY201.py:54:5: NPY201 [*] `np.mat` will be removed in NumPy 2.0. Use `numpy.asmatrix` instead.
    |
 52 |     np.issubsctype
@@ -425,8 +401,6 @@ NPY201.py:54:5: NPY201 [*] `np.mat` will be removed in NumPy 2.0. Use `numpy.asm
 55 55 | 
 56 56 |     np.maximum_sctype
 57 57 | 
-
-    Run `ruff check --fix` to apply this fix.
 
 NPY201.py:56:5: NPY201 `np.maximum_sctype` will be removed without replacement in NumPy 2.0
    |
@@ -458,8 +432,6 @@ NPY201.py:58:5: NPY201 [*] `np.NaN` will be removed in NumPy 2.0. Use `numpy.nan
 60 60 |     np.nbytes[np.int64]
 61 61 | 
 
-    Run `ruff check --fix` to apply this fix.
-
 NPY201.py:60:5: NPY201 `np.nbytes` will be removed in NumPy 2.0. Use `np.dtype(<dtype>).itemsize` instead.
    |
 58 |     np.NaN
@@ -490,8 +462,6 @@ NPY201.py:62:5: NPY201 [*] `np.NINF` will be removed in NumPy 2.0. Use `-np.inf`
 64 64 |     np.NZERO
 65 65 | 
 
-    Run `ruff check --fix` to apply this fix.
-
 NPY201.py:64:5: NPY201 [*] `np.NZERO` will be removed in NumPy 2.0. Use `-0.0` instead.
    |
 62 |     np.NINF
@@ -511,8 +481,6 @@ NPY201.py:64:5: NPY201 [*] `np.NZERO` will be removed in NumPy 2.0. Use `-0.0` i
 65 65 | 
 66 66 |     np.longcomplex(12+34j)
 67 67 | 
-
-    Run `ruff check --fix` to apply this fix.
 
 NPY201.py:66:5: NPY201 [*] `np.longcomplex` will be removed in NumPy 2.0. Use `numpy.clongdouble` instead.
    |
@@ -534,8 +502,6 @@ NPY201.py:66:5: NPY201 [*] `np.longcomplex` will be removed in NumPy 2.0. Use `n
 68 68 |     np.longfloat(12+34j)
 69 69 | 
 
-    Run `ruff check --fix` to apply this fix.
-
 NPY201.py:68:5: NPY201 [*] `np.longfloat` will be removed in NumPy 2.0. Use `numpy.longdouble` instead.
    |
 66 |     np.longcomplex(12+34j)
@@ -555,8 +521,6 @@ NPY201.py:68:5: NPY201 [*] `np.longfloat` will be removed in NumPy 2.0. Use `num
 69 69 | 
 70 70 |     np.lookfor
 71 71 | 
-
-    Run `ruff check --fix` to apply this fix.
 
 NPY201.py:70:5: NPY201 `np.lookfor` will be removed in NumPy 2.0. Search NumPy’s documentation directly.
    |
@@ -587,5 +551,3 @@ NPY201.py:72:5: NPY201 [*] `np.NAN` will be removed in NumPy 2.0. Use `numpy.nan
 73 73 | 
 74 74 |     try:
 75 75 |         from numpy.lib.npyio import DataSource
-
-    Run `ruff check --fix` to apply this fix.

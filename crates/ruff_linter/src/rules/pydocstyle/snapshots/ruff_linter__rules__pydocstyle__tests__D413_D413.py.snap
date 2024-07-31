@@ -20,8 +20,6 @@ D413.py:7:1: D413 [*] Missing blank line after last section ("Returns")
 10 11 | 
 11 12 | 
 
-    Run `ruff check --fix` to apply this fix.
-
 D413.py:19:5: D413 [*] Missing blank line after last section ("Returns")
    |
 17 |             with a hanging indent
@@ -40,8 +38,6 @@ D413.py:19:5: D413 [*] Missing blank line after last section ("Returns")
 21 22 |     """
 22 23 | 
 23 24 | 
-
-    Run `ruff check --fix` to apply this fix.
 
 D413.py:58:5: D413 [*] Missing blank line after last section ("Returns")
    |
@@ -64,8 +60,6 @@ D413.py:58:5: D413 [*] Missing blank line after last section ("Returns")
 61 63 | 
 62 64 | def func():
 
-    Run `ruff check --fix` to apply this fix.
-
 D413.py:69:5: D413 [*] Missing blank line after last section ("Returns")
    |
 67 |             with a hanging indent
@@ -83,5 +77,3 @@ D413.py:69:5: D413 [*] Missing blank line after last section ("Returns")
 71    |-        """
    71 |+
    72 |+    """
-
-    Run `ruff check --fix` to apply this fix.

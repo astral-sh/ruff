@@ -20,8 +20,6 @@ E30.py:765:1: E304 [*] Blank lines found after function decorator (1)
 766 765 |     pass
 767 766 | # end
 
-    Run `ruff check --fix` to apply this fix.
-
 E30.py:774:1: E304 [*] Blank lines found after function decorator (1)
     |
 773 | # comment    E304 not expected
@@ -39,8 +37,6 @@ E30.py:774:1: E304 [*] Blank lines found after function decorator (1)
 773 772 | # comment    E304 not expected
 774 773 | def function():
 775 774 |     pass
-
-    Run `ruff check --fix` to apply this fix.
 
 E30.py:786:1: E304 [*] Blank lines found after function decorator (2)
     |
@@ -62,5 +58,3 @@ E30.py:786:1: E304 [*] Blank lines found after function decorator (2)
 785 782 | # second comment  E304 not expected
 786 783 | def function():
 787 784 |     pass
-
-    Run `ruff check --fix` to apply this fix.

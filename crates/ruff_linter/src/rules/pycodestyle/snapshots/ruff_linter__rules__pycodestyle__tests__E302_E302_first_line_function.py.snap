@@ -17,5 +17,3 @@ E302_first_line_function.py:4:1: E302 [*] Expected 2 blank lines, found 1
   4 |+
 4 5 | def fn2():
 5 6 |     pass
-
-    Run `ruff check --fix` to apply this fix.

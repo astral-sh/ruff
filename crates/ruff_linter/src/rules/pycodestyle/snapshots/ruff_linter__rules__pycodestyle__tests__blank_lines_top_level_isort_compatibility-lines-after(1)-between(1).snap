@@ -25,8 +25,6 @@ E30_isort.py:1:1: I001 [*] Import block is un-sorted or un-formatted
 8 5 | class MissingCommand(TypeError): ...  # noqa: N818
 9 6 | 
 
-    Run `ruff check --fix` to apply this fix.
-
 E30_isort.py:23:1: E302 [*] Expected 2 blank lines, found 1
    |
 21 |     abcd.foo()
@@ -45,8 +43,6 @@ E30_isort.py:23:1: E302 [*] Expected 2 blank lines, found 1
 23 24 | def __init__(self, backend_module: str, backend_obj: str | None) -> None: ...
 24 25 | 
 25 26 | if TYPE_CHECKING:
-
-    Run `ruff check --fix` to apply this fix.
 
 E30_isort.py:26:1: I001 [*] Import block is un-sorted or un-formatted
    |
@@ -72,8 +68,6 @@ E30_isort.py:26:1: I001 [*] Import block is un-sorted or un-formatted
 31 29 | 
 32 30 | 
 
-    Run `ruff check --fix` to apply this fix.
-
 E30_isort.py:35:1: E302 [*] Expected 2 blank lines, found 1
    |
 33 |     abcd.foo()
@@ -92,8 +86,6 @@ E30_isort.py:35:1: E302 [*] Expected 2 blank lines, found 1
 36 37 |     ...
 37 38 | 
 
-    Run `ruff check --fix` to apply this fix.
-
 E30_isort.py:41:1: E302 [*] Expected 2 blank lines, found 1
    |
 39 |     from typing_extensions import TypeAlias
@@ -110,6 +102,4 @@ E30_isort.py:41:1: E302 [*] Expected 2 blank lines, found 1
    41 |+
 41 42 | def __call__2(self, name: str, *args: Any, **kwargs: Any) -> Any:
 42 43 |     ...
-43 44 | 
-
-    Run `ruff check --fix` to apply this fix.
+43 44 |
