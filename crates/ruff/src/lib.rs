@@ -287,13 +287,6 @@ pub fn check(args: CheckCommand, global_options: GlobalConfigArgs) -> Result<Exi
     if show_fixes {
         printer_flags |= PrinterFlags::SHOW_FIX_SUMMARY;
     }
-    if cli.ecosystem_ci {
-        warn_user!(
-            "The formatting of fixes emitted by this option is a work-in-progress, subject to \
-            change at any time, and intended only for internal use."
-        );
-        printer_flags |= PrinterFlags::SHOW_FIX_DIFF;
-    }
 
     #[cfg(debug_assertions)]
     if cache {
