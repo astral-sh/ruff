@@ -11,7 +11,6 @@ F811_21.py:32:5: F811 [*] Redefinition of unused `Sequence` from line 26
    |
    = help: Remove definition: `Sequence`
 
-Suggested fix:
 29 29 | # This should ignore the first error.
 30 30 | from typing import (
 31 31 |     List,  # noqa: F811

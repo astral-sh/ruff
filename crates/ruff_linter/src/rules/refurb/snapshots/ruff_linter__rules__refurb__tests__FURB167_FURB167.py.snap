@@ -10,7 +10,6 @@ FURB167.py:13:42: FURB167 [*] Use of regular expression alias `re.I`
    |
    = help: Replace with `re.IGNORECASE`
 
-Suggested fix:
 10 10 |     import re
 11 11 | 
 12 12 |     # FURB167
@@ -31,7 +30,6 @@ FURB167.py:21:39: FURB167 [*] Use of regular expression alias `re.I`
    |
    = help: Replace with `re.IGNORECASE`
 
-Suggested fix:
    1  |+import re
 1  2  | def func():
 2  3  |     import re

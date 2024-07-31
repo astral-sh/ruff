@@ -10,7 +10,6 @@ PT026.py:19:1: PT026 [*] Useless `pytest.mark.usefixtures` without parameters
    |
    = help: Remove `usefixtures` decorator or pass parameters
 
-Suggested fix:
 16 16 |     pass
 17 17 | 
 18 18 | 
@@ -31,7 +30,6 @@ PT026.py:24:1: PT026 [*] Useless `pytest.mark.usefixtures` without parameters
    |
    = help: Remove `usefixtures` decorator or pass parameters
 
-Suggested fix:
 21 21 |     pass
 22 22 | 
 23 23 | 

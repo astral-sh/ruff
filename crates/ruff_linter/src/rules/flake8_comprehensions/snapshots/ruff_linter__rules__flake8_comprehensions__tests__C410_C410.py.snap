@@ -10,7 +10,6 @@ C410.py:1:6: C410 [*] Unnecessary `list` literal passed to `list()` (remove the 
   |
   = help: Remove outer `list` call
 
-Suggested fix:
 1   |-l1 = list([1, 2])
   1 |+l1 = [1, 2]
 2 2 | l2 = list((1, 2))
@@ -29,7 +28,6 @@ C410.py:2:6: C410 [*] Unnecessary `tuple` literal passed to `list()` (rewrite as
   |
   = help: Rewrite as a `list` literal
 
-Suggested fix:
 1 1 | l1 = list([1, 2])
 2   |-l2 = list((1, 2))
   2 |+l2 = [1, 2]
@@ -49,7 +47,6 @@ C410.py:3:6: C410 [*] Unnecessary `list` literal passed to `list()` (remove the 
   |
   = help: Remove outer `list` call
 
-Suggested fix:
 1 1 | l1 = list([1, 2])
 2 2 | l2 = list((1, 2))
 3   |-l3 = list([])
@@ -69,7 +66,6 @@ C410.py:4:6: C410 [*] Unnecessary `tuple` literal passed to `list()` (rewrite as
   |
   = help: Rewrite as a `list` literal
 
-Suggested fix:
 1 1 | l1 = list([1, 2])
 2 2 | l2 = list((1, 2))
 3 3 | l3 = list([])
@@ -92,7 +88,6 @@ C410.py:7:1: C410 [*] Unnecessary `list` literal passed to `list()` (remove the 
    |
    = help: Remove outer `list` call
 
-Suggested fix:
 4  4  | l4 = list(())
 5  5  | 
 6  6  | 
@@ -117,7 +112,6 @@ C410.py:11:1: C410 [*] Unnecessary `list` literal passed to `list()` (remove the
    |
    = help: Remove outer `list` call
 
-Suggested fix:
 8  8  |     [1, 2]
 9  9  | )
 10 10 | 

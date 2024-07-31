@@ -10,7 +10,6 @@ runtime_evaluated_decorators_1.py:12:12: TCH004 [*] Move import `datetime` out o
    |
    = help: Move out of type-checking block
 
-Suggested fix:
 7  7  | from attrs import frozen
 8  8  | 
 9  9  | import numpy
@@ -35,7 +34,6 @@ runtime_evaluated_decorators_1.py:13:23: TCH004 [*] Move import `array.array` ou
    |
    = help: Move out of type-checking block
 
-Suggested fix:
 7  7  | from attrs import frozen
 8  8  | 
 9  9  | import numpy
@@ -60,7 +58,6 @@ runtime_evaluated_decorators_1.py:15:12: TCH004 [*] Move import `pandas` out of 
    |
    = help: Move out of type-checking block
 
-Suggested fix:
 7  7  | from attrs import frozen
 8  8  | 
 9  9  | import numpy

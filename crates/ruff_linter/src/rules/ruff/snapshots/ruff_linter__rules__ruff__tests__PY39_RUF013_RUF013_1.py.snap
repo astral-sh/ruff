@@ -9,7 +9,6 @@ RUF013_1.py:4:12: RUF013 [*] PEP 484 prohibits implicit `Optional`
   |
   = help: Convert to `Optional[T]`
 
-Suggested fix:
 1 1 | # No `typing.Optional` import
   2 |+from typing import Optional
 2 3 | 

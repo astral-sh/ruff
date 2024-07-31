@@ -12,7 +12,6 @@ PYI011.pyi:10:14: PYI011 [*] Only simple default values allowed for typed argume
    |
    = help: Replace default value with `...`
 
-Suggested fix:
 7  7  | 
 8  8  | def f12(
 9  9  |     x,
@@ -39,7 +38,6 @@ PYI011.pyi:38:9: PYI011 [*] Only simple default values allowed for typed argumen
    |
    = help: Replace default value with `...`
 
-Suggested fix:
 35 35 | def f152(
 36 36 |     x: dict[
 37 37 |         int, int
@@ -78,7 +76,6 @@ PYI011.pyi:46:9: PYI011 [*] Only simple default values allowed for typed argumen
    |
    = help: Replace default value with `...`
 
-Suggested fix:
 43 43 | def f153(
 44 44 |     x: list[
 45 45 |         int
@@ -117,7 +114,6 @@ PYI011.pyi:63:9: PYI011 [*] Only simple default values allowed for typed argumen
    |
    = help: Replace default value with `...`
 
-Suggested fix:
 60 60 | def f154(
 61 61 |     x: tuple[
 62 62 |         str, tuple[str, ...]
@@ -146,7 +142,6 @@ PYI011.pyi:71:9: PYI011 [*] Only simple default values allowed for typed argumen
    |
    = help: Replace default value with `...`
 
-Suggested fix:
 68 68 | def f141(
 69 69 |     x: list[
 70 70 |         int
@@ -174,7 +169,6 @@ PYI011.pyi:78:9: PYI011 [*] Only simple default values allowed for typed argumen
    |
    = help: Replace default value with `...`
 
-Suggested fix:
 75 75 | def f142(
 76 76 |     x: list[
 77 77 |         int
@@ -202,7 +196,6 @@ PYI011.pyi:85:9: PYI011 [*] Only simple default values allowed for typed argumen
    |
    = help: Replace default value with `...`
 
-Suggested fix:
 82 82 | def f16(
 83 83 |     x: frozenset[
 84 84 |         bytes
@@ -229,7 +222,6 @@ PYI011.pyi:90:14: PYI011 [*] Only simple default values allowed for typed argume
    |
    = help: Replace default value with `...`
 
-Suggested fix:
 87 87 |     )
 88 88 | ) -> None: ...
 89 89 | def f17(
@@ -255,7 +247,6 @@ PYI011.pyi:94:14: PYI011 [*] Only simple default values allowed for typed argume
    |
    = help: Replace default value with `...`
 
-Suggested fix:
 91 91 |     + "bar",
 92 92 | ) -> None: ...
 93 93 | def f18(
@@ -281,7 +272,6 @@ PYI011.pyi:98:17: PYI011 [*] Only simple default values allowed for typed argume
     |
     = help: Replace default value with `...`
 
-Suggested fix:
 95  95  |     + b"bar",
 96  96  | ) -> None: ...
 97  97  | def f19(
@@ -307,7 +297,6 @@ PYI011.pyi:102:14: PYI011 [*] Only simple default values allowed for typed argum
     |
     = help: Replace default value with `...`
 
-Suggested fix:
 99  99  |     + 4,
 100 100 | ) -> None: ...
 101 101 | def f20(
@@ -333,7 +322,6 @@ PYI011.pyi:106:18: PYI011 [*] Only simple default values allowed for typed argum
     |
     = help: Replace default value with `...`
 
-Suggested fix:
 103 103 |     + 5,  # Error PYI011 Only simple default values allowed for typed arguments
 104 104 | ) -> None: ...
 105 105 | def f21(
@@ -359,7 +347,6 @@ PYI011.pyi:110:18: PYI011 [*] Only simple default values allowed for typed argum
     |
     = help: Replace default value with `...`
 
-Suggested fix:
 107 107 |     - 3j,  # Error PYI011 Only simple default values allowed for typed arguments
 108 108 | ) -> None: ...
 109 109 | def f22(
@@ -383,7 +370,6 @@ PYI011.pyi:138:16: PYI011 [*] Only simple default values allowed for typed argum
     |
     = help: Replace default value with `...`
 
-Suggested fix:
 135 135 |     x: float = -math.inf,  # OK
 136 136 | ) -> None: ...
 137 137 | def f31(
@@ -406,7 +392,6 @@ PYI011.pyi:141:16: PYI011 [*] Only simple default values allowed for typed argum
     |
     = help: Replace default value with `...`
 
-Suggested fix:
 138 138 |     x: float = inf,  # Error PYI011 Only simple default values allowed for typed arguments
 139 139 | ) -> None: ...
 140 140 | def f32(
@@ -429,7 +414,6 @@ PYI011.pyi:147:16: PYI011 [*] Only simple default values allowed for typed argum
     |
     = help: Replace default value with `...`
 
-Suggested fix:
 144 144 |     x: float = math.nan,  # OK
 145 145 | ) -> None: ...
 146 146 | def f34(
@@ -454,7 +438,6 @@ PYI011.pyi:150:18: PYI011 [*] Only simple default values allowed for typed argum
     |
     = help: Replace default value with `...`
 
-Suggested fix:
 147 147 |     x: float = -math.nan,  # Error PYI011 Only simple default values allowed for typed arguments
 148 148 | ) -> None: ...
 149 149 | def f35(
@@ -479,7 +462,6 @@ PYI011.pyi:159:14: PYI011 [*] Only simple default values allowed for typed argum
     |
     = help: Replace default value with `...`
 
-Suggested fix:
 156 156 | ) -> None: ...
 157 157 | def f37(
 158 158 |     *,

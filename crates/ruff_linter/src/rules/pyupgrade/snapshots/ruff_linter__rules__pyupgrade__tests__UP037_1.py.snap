@@ -11,7 +11,6 @@ UP037_1.py:9:8: UP037 [*] Remove quotes from type annotation
    |
    = help: Remove quotes
 
-Suggested fix:
 6  6  | 
 7  7  | def foo():
 8  8  |     # UP037

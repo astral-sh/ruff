@@ -10,7 +10,6 @@ annotation_presence.py:5:5: ANN201 [*] Missing return type annotation for public
   |
   = help: Add return type annotation: `None`
 
-Suggested fix:
 2 2 | from typing_extensions import override
 3 3 | 
 4 4 | # Error
@@ -47,7 +46,6 @@ annotation_presence.py:10:5: ANN201 [*] Missing return type annotation for publi
    |
    = help: Add return type annotation: `None`
 
-Suggested fix:
 7  7  | 
 8  8  | 
 9  9  | # Error
@@ -84,7 +82,6 @@ annotation_presence.py:20:5: ANN201 [*] Missing return type annotation for publi
    |
    = help: Add return type annotation: `None`
 
-Suggested fix:
 17 17 | 
 18 18 | 
 19 19 | # Error
@@ -105,7 +102,6 @@ annotation_presence.py:25:5: ANN201 [*] Missing return type annotation for publi
    |
    = help: Add return type annotation: `None`
 
-Suggested fix:
 22 22 | 
 23 23 | 
 24 24 | # Error
@@ -304,7 +300,6 @@ annotation_presence.py:159:9: ANN204 [*] Missing return type annotation for spec
     |
     = help: Add return type annotation: `None`
 
-Suggested fix:
 156 156 | 
 157 157 | class Foo:
 158 158 |     @decorator()
@@ -326,7 +321,6 @@ annotation_presence.py:165:9: ANN204 [*] Missing return type annotation for spec
     |
     = help: Add return type annotation: `None`
 
-Suggested fix:
 162 162 | 
 163 163 | # Regression test for: https://github.com/astral-sh/ruff/issues/7711
 164 164 | class Class:

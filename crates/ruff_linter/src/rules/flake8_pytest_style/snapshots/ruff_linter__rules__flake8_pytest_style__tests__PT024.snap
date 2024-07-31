@@ -10,7 +10,6 @@ PT024.py:14:1: PT024 [*] `pytest.mark.asyncio` is unnecessary for fixtures
    |
    = help: Remove `pytest.mark.asyncio`
 
-Suggested fix:
 11 11 |     pass
 12 12 | 
 13 13 | 
@@ -30,7 +29,6 @@ PT024.py:20:1: PT024 [*] `pytest.mark.asyncio` is unnecessary for fixtures
    |
    = help: Remove `pytest.mark.asyncio`
 
-Suggested fix:
 17 17 |     return 0
 18 18 | 
 19 19 | 
@@ -51,7 +49,6 @@ PT024.py:27:1: PT024 [*] `pytest.mark.asyncio` is unnecessary for fixtures
    |
    = help: Remove `pytest.mark.asyncio`
 
-Suggested fix:
 24 24 | 
 25 25 | 
 26 26 | @pytest.fixture()
@@ -72,7 +69,6 @@ PT024.py:33:1: PT024 [*] `pytest.mark.asyncio` is unnecessary for fixtures
    |
    = help: Remove `pytest.mark.asyncio`
 
-Suggested fix:
 30 30 | 
 31 31 | 
 32 32 | @pytest.fixture()

@@ -9,7 +9,6 @@ same_name.py:10:41: ICN001 [*] `django.conf.settings` should be imported as `set
    |
    = help: Alias `django.conf.settings` to `settings`
 
-Suggested fix:
 7  7  | 
 8  8  | 
 9  9  | def unconventional_alias():

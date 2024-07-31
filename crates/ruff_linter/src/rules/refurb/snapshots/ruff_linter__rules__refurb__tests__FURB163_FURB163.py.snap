@@ -11,7 +11,6 @@ FURB163.py:4:1: FURB163 [*] Prefer `math.log2(1)` over `math.log` with a redunda
   |
   = help: Replace with `math.log2(1)`
 
-Suggested fix:
 1 1 | import math
 2 2 | 
 3 3 | # Errors
@@ -34,7 +33,6 @@ FURB163.py:5:1: FURB163 [*] Prefer `math.log10(1)` over `math.log` with a redund
   |
   = help: Replace with `math.log10(1)`
 
-Suggested fix:
 2 2 | 
 3 3 | # Errors
 4 4 | math.log(1, 2)
@@ -57,7 +55,6 @@ FURB163.py:6:1: FURB163 [*] Prefer `math.log(1)` over `math.log` with a redundan
   |
   = help: Replace with `math.log(1)`
 
-Suggested fix:
 3 3 | # Errors
 4 4 | math.log(1, 2)
 5 5 | math.log(1, 10)
@@ -80,7 +77,6 @@ FURB163.py:8:1: FURB163 [*] Prefer `math.log2(foo)` over `math.log` with a redun
    |
    = help: Replace with `math.log2(foo)`
 
-Suggested fix:
 5 5 | math.log(1, 10)
 6 6 | math.log(1, math.e)
 7 7 | foo = ...
@@ -103,7 +99,6 @@ FURB163.py:9:1: FURB163 [*] Prefer `math.log10(foo)` over `math.log` with a redu
    |
    = help: Replace with `math.log10(foo)`
 
-Suggested fix:
 6  6  | math.log(1, math.e)
 7  7  | foo = ...
 8  8  | math.log(foo, 2)
@@ -126,7 +121,6 @@ FURB163.py:10:1: FURB163 [*] Prefer `math.log(foo)` over `math.log` with a redun
    |
    = help: Replace with `math.log(foo)`
 
-Suggested fix:
 7  7  | foo = ...
 8  8  | math.log(foo, 2)
 9  9  | math.log(foo, 10)
@@ -148,7 +142,6 @@ FURB163.py:11:1: FURB163 [*] Prefer `math.log2(1)` over `math.log` with a redund
    |
    = help: Replace with `math.log2(1)`
 
-Suggested fix:
 8  8  | math.log(foo, 2)
 9  9  | math.log(foo, 10)
 10 10 | math.log(foo, math.e)
@@ -171,7 +164,6 @@ FURB163.py:12:1: FURB163 [*] Prefer `math.log10(1)` over `math.log` with a redun
    |
    = help: Replace with `math.log10(1)`
 
-Suggested fix:
 9  9  | math.log(foo, 10)
 10 10 | math.log(foo, math.e)
 11 11 | math.log(1, 2.0)

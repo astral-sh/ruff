@@ -11,7 +11,6 @@ E26.py:19:5: E266 [*] Too many leading `#` before block comment
    |
    = help: Remove leading `#`
 
-Suggested fix:
 16 16 | #: E266:3:5 E266:6:5
 17 17 | def how_it_feel(r):
 18 18 | 
@@ -34,7 +33,6 @@ E26.py:22:5: E266 [*] Too many leading `#` before block comment
    |
    = help: Remove leading `#`
 
-Suggested fix:
 19 19 |     ### This is a variable ###
 20 20 |     a = 42
 21 21 | 
@@ -57,7 +55,6 @@ E26.py:26:1: E266 [*] Too many leading `#` before block comment
    |
    = help: Remove leading `#`
 
-Suggested fix:
 23 23 |     return
 24 24 | #: E265:1:1 E266:2:1
 25 25 | ##if DEBUG:
@@ -79,7 +76,6 @@ E26.py:69:1: E266 [*] Too many leading `#` before block comment
    |
    = help: Remove leading `#`
 
-Suggested fix:
 66 66 | a = 42  #  (Two spaces)
 67 67 | 
 68 68 | #: E265:5:1
@@ -102,7 +98,6 @@ E26.py:82:1: E266 [*] Too many leading `#` before block comment
    |
    = help: Remove leading `#`
 
-Suggested fix:
 79 79 | 
 80 80 | # We should strip the space, but preserve the hashes.
 81 81 | #: E266:1:3

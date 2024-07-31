@@ -12,7 +12,6 @@ E24.py:6:8: E242 [*] Tab after comma
   |
   = help: Replace with single space
 
-Suggested fix:
 3 3 | #: Okay
 4 4 | b = (1, 20)
 5 5 | #: E242

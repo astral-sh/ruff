@@ -10,7 +10,6 @@ PT006.py:9:26: PT006 [*] Wrong type passed to first argument of `@pytest.mark.pa
    |
    = help: Use a `tuple` for the first argument
 
-Suggested fix:
 6  6  |     ...
 7  7  | 
 8  8  | 
@@ -31,7 +30,6 @@ PT006.py:14:26: PT006 [*] Wrong type passed to first argument of `@pytest.mark.p
    |
    = help: Use a `tuple` for the first argument
 
-Suggested fix:
 11 11 |     ...
 12 12 | 
 13 13 | 
@@ -52,7 +50,6 @@ PT006.py:19:26: PT006 [*] Wrong type passed to first argument of `@pytest.mark.p
    |
    = help: Use a `tuple` for the first argument
 
-Suggested fix:
 16 16 |     ...
 17 17 | 
 18 18 | 
@@ -73,7 +70,6 @@ PT006.py:29:26: PT006 [*] Wrong type passed to first argument of `@pytest.mark.p
    |
    = help: Use a string for the first argument
 
-Suggested fix:
 26 26 |     ...
 27 27 | 
 28 28 | 
@@ -94,7 +90,6 @@ PT006.py:34:26: PT006 [*] Wrong type passed to first argument of `@pytest.mark.p
    |
    = help: Use a `tuple` for the first argument
 
-Suggested fix:
 31 31 |     ...
 32 32 | 
 33 33 | 
@@ -115,7 +110,6 @@ PT006.py:39:26: PT006 [*] Wrong type passed to first argument of `@pytest.mark.p
    |
    = help: Use a string for the first argument
 
-Suggested fix:
 36 36 |     ...
 37 37 | 
 38 38 | 
@@ -136,7 +130,6 @@ PT006.py:44:26: PT006 [*] Wrong type passed to first argument of `@pytest.mark.p
    |
    = help: Use a `tuple` for the first argument
 
-Suggested fix:
 41 41 |     ...
 42 42 | 
 43 43 | 
@@ -157,7 +150,6 @@ PT006.py:49:26: PT006 [*] Wrong type passed to first argument of `@pytest.mark.p
    |
    = help: Use a `tuple` for the first argument
 
-Suggested fix:
 46 46 |     ...
 47 47 | 
 48 48 | 
@@ -178,7 +170,6 @@ PT006.py:54:26: PT006 [*] Wrong type passed to first argument of `@pytest.mark.p
    |
    = help: Use a `tuple` for the first argument
 
-Suggested fix:
 51 51 |     ...
 52 52 | 
 53 53 | 
@@ -199,7 +190,6 @@ PT006.py:59:26: PT006 [*] Wrong type passed to first argument of `@pytest.mark.p
    |
    = help: Use a `tuple` for the first argument
 
-Suggested fix:
 56 56 |     ...
 57 57 | 
 58 58 | 
@@ -220,7 +210,6 @@ PT006.py:64:26: PT006 [*] Wrong type passed to first argument of `@pytest.mark.p
    |
    = help: Use a `tuple` for the first argument
 
-Suggested fix:
 61 61 |     ...
 62 62 | 
 63 63 | 
@@ -241,7 +230,6 @@ PT006.py:69:26: PT006 [*] Wrong type passed to first argument of `@pytest.mark.p
    |
    = help: Use a `tuple` for the first argument
 
-Suggested fix:
 66 66 |     ...
 67 67 | 
 68 68 | 

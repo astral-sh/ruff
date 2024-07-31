@@ -10,7 +10,6 @@ F841_4.py:12:5: F841 [*] Local variable `a` is assigned to but never used
    |
    = help: Remove assignment to unused variable `a`
 
-Suggested fix:
 9  9  | 
 10 10 | 
 11 11 | def bar():
@@ -31,7 +30,6 @@ F841_4.py:13:5: F841 [*] Local variable `b` is assigned to but never used
    |
    = help: Remove assignment to unused variable `b`
 
-Suggested fix:
 10 10 | 
 11 11 | def bar():
 12 12 |     a = foo()
@@ -52,7 +50,6 @@ F841_4.py:13:8: F841 [*] Local variable `c` is assigned to but never used
    |
    = help: Remove assignment to unused variable `c`
 
-Suggested fix:
 10 10 | 
 11 11 | def bar():
 12 12 |     a = foo()

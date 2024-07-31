@@ -10,7 +10,6 @@ PIE800.py:1:14: PIE800 [*] Unnecessary spread `**`
   |
   = help: Remove unnecessary dict
 
-Suggested fix:
 1   |-{"foo": 1, **{"bar": 1}}  # PIE800
   1 |+{"foo": 1, "bar": 1}  # PIE800
 2 2 | 
@@ -30,7 +29,6 @@ PIE800.py:3:4: PIE800 [*] Unnecessary spread `**`
   |
   = help: Remove unnecessary dict
 
-Suggested fix:
 1 1 | {"foo": 1, **{"bar": 1}}  # PIE800
 2 2 | 
 3   |-{**{"bar": 10}, "a": "b"}  # PIE800
@@ -52,7 +50,6 @@ PIE800.py:5:15: PIE800 [*] Unnecessary spread `**`
   |
   = help: Remove unnecessary dict
 
-Suggested fix:
 2 2 | 
 3 3 | {**{"bar": 10}, "a": "b"}  # PIE800
 4 4 | 
@@ -75,7 +72,6 @@ PIE800.py:7:11: PIE800 [*] Unnecessary spread `**`
   |
   = help: Remove unnecessary dict
 
-Suggested fix:
 4 4 | 
 5 5 | foo({**foo, **{"bar": True}})  # PIE800
 6 6 | 
@@ -102,7 +98,6 @@ PIE800.py:12:7: PIE800 [*] Unnecessary spread `**`
    |
    = help: Remove unnecessary dict
 
-Suggested fix:
 9  9  | { # PIE800
 10 10 |     "a": "b",
 11 11 |     # Preserve
@@ -131,7 +126,6 @@ PIE800.py:19:19: PIE800 [*] Unnecessary spread `**`
    |
    = help: Remove unnecessary dict
 
-Suggested fix:
 16 16 |     },
 17 17 | }
 18 18 | 

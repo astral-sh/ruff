@@ -21,7 +21,6 @@ D200.py:7:5: D200 [*] One-line docstring should fit on one line
   |
   = help: Reformat to one line
 
-Suggested fix:
 4 4 | 
 5 5 | 
 6 6 | def func():

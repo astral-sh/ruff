@@ -9,7 +9,6 @@ TCH004_4.py:4:24: TCH004 [*] Move import `typing.Any` out of type-checking block
   |
   = help: Move out of type-checking block
 
-Suggested fix:
 1 1 | from typing import TYPE_CHECKING, Type
   2 |+from typing import Any
 2 3 | 

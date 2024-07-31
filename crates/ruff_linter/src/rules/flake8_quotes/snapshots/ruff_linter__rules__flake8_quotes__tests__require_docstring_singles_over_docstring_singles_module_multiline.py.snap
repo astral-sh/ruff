@@ -14,7 +14,6 @@ docstring_singles_module_multiline.py:4:1: Q001 [*] Single quote multiline found
   |
   = help: Replace single multiline quotes with double quotes
 
-Suggested fix:
 1 1 | '''
 2 2 | Double quotes multiline module docstring
 3 3 | '''
@@ -40,7 +39,6 @@ docstring_singles_module_multiline.py:9:1: Q001 [*] Single quote multiline found
    |
    = help: Replace single multiline quotes with double quotes
 
-Suggested fix:
 6  6  | '''
 7  7  | def foo():
 8  8  |     pass

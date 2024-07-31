@@ -13,7 +13,6 @@ collapsible_else_if.py:37:5: PLR5501 [*] Use `elif` instead of `else` then `if`,
    |
    = help: Convert to `elif`
 
-Suggested fix:
 34 34 | def not_ok0():
 35 35 |     if 1:
 36 36 |         pass
@@ -41,7 +40,6 @@ collapsible_else_if.py:45:5: PLR5501 [*] Use `elif` instead of `else` then `if`,
    |
    = help: Convert to `elif`
 
-Suggested fix:
 42 42 | def not_ok1():
 43 43 |     if 1:
 44 44 |         pass
@@ -73,7 +71,6 @@ collapsible_else_if.py:55:5: PLR5501 [*] Use `elif` instead of `else` then `if`,
    |
    = help: Convert to `elif`
 
-Suggested fix:
 52 52 | def not_ok1_with_comments():
 53 53 |     if 1:
 54 54 |         pass
@@ -105,7 +102,6 @@ collapsible_else_if.py:69:5: PLR5501 [*] Use `elif` instead of `else` then `if`,
    |
    = help: Convert to `elif`
 
-Suggested fix:
 66 66 |         print(1)
 67 67 |     elif True:
 68 68 |         print(2)
@@ -135,7 +131,6 @@ collapsible_else_if.py:79:5: PLR5501 [*] Use `elif` instead of `else` then `if`,
    |
    = help: Convert to `elif`
 
-Suggested fix:
 76 76 | def not_ok3():
 77 77 |     if 1:
 78 78 |         pass
@@ -163,7 +158,6 @@ collapsible_else_if.py:87:5: PLR5501 [*] Use `elif` instead of `else` then `if`,
    |
    = help: Convert to `elif`
 
-Suggested fix:
 84 84 | def not_ok4():
 85 85 |     if 1:
 86 86 |         pass
@@ -192,7 +186,6 @@ collapsible_else_if.py:96:5: PLR5501 [*] Use `elif` instead of `else` then `if`,
    |
    = help: Convert to `elif`
 
-Suggested fix:
 93 93 | def not_ok5():
 94 94 |     if 1:
 95 95 |         pass

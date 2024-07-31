@@ -12,7 +12,6 @@ E30.py:854:5: E306 [*] Expected 1 blank line before a nested definition, found 0
     |
     = help: Add missing blank line
 
-Suggested fix:
 851 851 | # E306:3:5
 852 852 | def a():
 853 853 |     x = 1
@@ -34,7 +33,6 @@ E30.py:862:5: E306 [*] Expected 1 blank line before a nested definition, found 0
     |
     = help: Add missing blank line
 
-Suggested fix:
 859 859 | #: E306:3:5
 860 860 | async def a():
 861 861 |     x = 1
@@ -56,7 +54,6 @@ E30.py:870:5: E306 [*] Expected 1 blank line before a nested definition, found 0
     |
     = help: Add missing blank line
 
-Suggested fix:
 867 867 | #: E306:3:5 E306:5:9
 868 868 | def a():
 869 869 |     x = 2
@@ -78,7 +75,6 @@ E30.py:872:9: E306 [*] Expected 1 blank line before a nested definition, found 0
     |
     = help: Add missing blank line
 
-Suggested fix:
 869 869 |     x = 2
 870 870 |     def b():
 871 871 |         x = 1
@@ -100,7 +96,6 @@ E30.py:880:5: E306 [*] Expected 1 blank line before a nested definition, found 0
     |
     = help: Add missing blank line
 
-Suggested fix:
 877 877 | # E306:3:5 E306:6:5
 878 878 | def a():
 879 879 |     x = 1
@@ -122,7 +117,6 @@ E30.py:883:5: E306 [*] Expected 1 blank line before a nested definition, found 0
     |
     = help: Add missing blank line
 
-Suggested fix:
 880 880 |     class C:
 881 881 |         pass
 882 882 |     x = 2
@@ -143,7 +137,6 @@ E30.py:892:5: E306 [*] Expected 1 blank line before a nested definition, found 0
     |
     = help: Add missing blank line
 
-Suggested fix:
 889 889 | def foo():
 890 890 |     def bar():
 891 891 |         pass
@@ -165,7 +158,6 @@ E30.py:899:5: E306 [*] Expected 1 blank line before a nested definition, found 0
     |
     = help: Add missing blank line
 
-Suggested fix:
 896 896 | # E306:3:5
 897 897 | def foo():
 898 898 |     def bar(): pass
@@ -187,7 +179,6 @@ E30.py:907:5: E306 [*] Expected 1 blank line before a nested definition, found 0
     |
     = help: Add missing blank line
 
-Suggested fix:
 904 904 | # E306
 905 905 | def a():
 906 906 |     x = 2
@@ -209,7 +200,6 @@ E30.py:916:5: E306 [*] Expected 1 blank line before a nested definition, found 0
     |
     = help: Add missing blank line
 
-Suggested fix:
 913 913 | # E306
 914 914 | def a():
 915 915 |     x = 2
@@ -231,7 +221,6 @@ E30.py:925:5: E306 [*] Expected 1 blank line before a nested definition, found 0
     |
     = help: Add missing blank line
 
-Suggested fix:
 922 922 | # E306
 923 923 | def a():
 924 924 |     x = 2

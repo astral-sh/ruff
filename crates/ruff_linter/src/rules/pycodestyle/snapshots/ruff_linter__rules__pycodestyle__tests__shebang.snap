@@ -11,7 +11,6 @@ shebang.py:3:1: E265 [*] Block comment should start with `# `
   |
   = help: Format space
 
-Suggested fix:
 1 1 | #!/usr/bin/python
 2 2 | #
 3   |-#!

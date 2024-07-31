@@ -8,7 +8,6 @@ W292_4.py:1:2: W292 [*] No newline at end of file
   |
   = help: Add trailing newline
 
-Suggested fix:
 1   |- 
   1 |+ 
 

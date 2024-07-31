@@ -12,7 +12,6 @@ B013.py:5:8: B013 [*] A length-one tuple literal is redundant in exception handl
   |
   = help: Replace with `except ValueError`
 
-Suggested fix:
 2 2 | 
 3 3 | try:
 4 4 |     pass
@@ -34,7 +33,6 @@ B013.py:13:7: B013 [*] A length-one tuple literal is redundant in exception hand
    |
    = help: Replace with `except ValueError`
 
-Suggested fix:
 10 10 |     pass
 11 11 | except (*retriable_exceptions,):
 12 12 |     pass

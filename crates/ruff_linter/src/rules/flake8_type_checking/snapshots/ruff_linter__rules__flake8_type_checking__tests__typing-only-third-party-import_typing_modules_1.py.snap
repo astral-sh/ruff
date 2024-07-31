@@ -11,7 +11,6 @@ typing_modules_1.py:7:24: TCH002 [*] Move third-party import `pandas.DataFrame` 
   |
   = help: Move into type-checking block
 
-Suggested fix:
 1  1  | from __future__ import annotations
 2  2  | 
 3  3  | from typing_extensions import Self

@@ -11,7 +11,6 @@ PYI025_1.pyi:8:33: PYI025 [*] Use `from collections.abc import Set as AbstractSe
    |
    = help: Alias `Set` to `AbstractSet`
 
-Suggested fix:
 5 5 |     from collections.abc import Container, Sized, Set as AbstractSet, ValuesView  # Ok
 6 6 | 
 7 7 | def f():
@@ -33,7 +32,6 @@ PYI025_1.pyi:11:51: PYI025 [*] Use `from collections.abc import Set as AbstractS
    |
    = help: Alias `Set` to `AbstractSet`
 
-Suggested fix:
 8  8  |     from collections.abc import Set  # PYI025
 9  9  | 
 10 10 | def f():
@@ -56,7 +54,6 @@ PYI025_1.pyi:16:37: PYI025 [*] Use `from collections.abc import Set as AbstractS
    |
    = help: Alias `Set` to `AbstractSet`
 
-Suggested fix:
 13 13 | def f():
 14 14 |     """Test: local symbol renaming."""
 15 15 |     if True:
@@ -93,7 +90,6 @@ PYI025_1.pyi:33:29: PYI025 [*] Use `from collections.abc import Set as AbstractS
    |
    = help: Alias `Set` to `AbstractSet`
 
-Suggested fix:
 17 17 |     else:
 18 18 |         Set = 1
 19 19 | 
@@ -138,7 +134,6 @@ PYI025_1.pyi:44:33: PYI025 [*] Use `from collections.abc import Set as AbstractS
    |
    = help: Alias `Set` to `AbstractSet`
 
-Suggested fix:
 41 41 | 
 42 42 | def f():
 43 43 |     """Test: nonlocal symbol renaming."""

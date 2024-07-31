@@ -13,7 +13,6 @@ RET503.py:21:5: RET503 [*] Missing explicit `return` at the end of function able
    |
    = help: Add explicit `return` statement
 
-Suggested fix:
 20 20 | def x(y):
 21 21 |     if not y:
 22 22 |         return 1
@@ -35,7 +34,6 @@ RET503.py:28:9: RET503 [*] Missing explicit `return` at the end of function able
    |
    = help: Add explicit `return` statement
 
-Suggested fix:
 26 26 | def x(y):
 27 27 |     if not y:
 28 28 |         print()  # error
@@ -55,7 +53,6 @@ RET503.py:37:5: RET503 [*] Missing explicit `return` at the end of function able
    |
    = help: Add explicit `return` statement
 
-Suggested fix:
 35 35 |         return 1
 36 36 | 
 37 37 |     print()  # error
@@ -79,7 +76,6 @@ RET503.py:42:5: RET503 [*] Missing explicit `return` at the end of function able
    |
    = help: Add explicit `return` statement
 
-Suggested fix:
 42 42 |     for i in range(10):
 43 43 |         if i > 10:
 44 44 |             return i
@@ -99,7 +95,6 @@ RET503.py:53:9: RET503 [*] Missing explicit `return` at the end of function able
    |
    = help: Add explicit `return` statement
 
-Suggested fix:
 51 51 |             return i
 52 52 |     else:
 53 53 |         print()  # error
@@ -119,7 +114,6 @@ RET503.py:60:5: RET503 [*] Missing explicit `return` at the end of function able
    |
    = help: Add explicit `return` statement
 
-Suggested fix:
 58 58 |     if x > 0:
 59 59 |         return False
 60 60 |     no_such_function()  # error
@@ -139,7 +133,6 @@ RET503.py:67:5: RET503 [*] Missing explicit `return` at the end of function able
    |
    = help: Add explicit `return` statement
 
-Suggested fix:
 65 65 |     if x > 0:
 66 66 |         return False
 67 67 |     print("", end="")  # error
@@ -163,7 +156,6 @@ RET503.py:83:5: RET503 [*] Missing explicit `return` at the end of function able
    |
    = help: Add explicit `return` statement
 
-Suggested fix:
 84 84 |         if y > 0:
 85 85 |             return 1
 86 86 |         y += 1
@@ -187,7 +179,6 @@ RET503.py:114:5: RET503 [*] Missing explicit `return` at the end of function abl
     |
     = help: Add explicit `return` statement
 
-Suggested fix:
 115 115 |         if i > y:
 116 116 |             break
 117 117 |         return z
@@ -213,7 +204,6 @@ RET503.py:121:5: RET503 [*] Missing explicit `return` at the end of function abl
     |
     = help: Add explicit `return` statement
 
-Suggested fix:
 125 125 |         else:
 126 126 |             return z
 127 127 |         return None
@@ -236,7 +226,6 @@ RET503.py:131:5: RET503 [*] Missing explicit `return` at the end of function abl
     |
     = help: Add explicit `return` statement
 
-Suggested fix:
 132 132 |         if i < y:
 133 133 |             continue
 134 134 |         return z
@@ -262,7 +251,6 @@ RET503.py:138:5: RET503 [*] Missing explicit `return` at the end of function abl
     |
     = help: Add explicit `return` statement
 
-Suggested fix:
 142 142 |         else:
 143 143 |             return z
 144 144 |         return None
@@ -284,7 +272,6 @@ RET503.py:275:5: RET503 [*] Missing explicit `return` at the end of function abl
     |
     = help: Add explicit `return` statement
 
-Suggested fix:
 274 274 | 
 275 275 |     for value in values:
 276 276 |         print(value)
@@ -304,7 +291,6 @@ RET503.py:292:13: RET503 [*] Missing explicit `return` at the end of function ab
     |
     = help: Add explicit `return` statement
 
-Suggested fix:
 290 290 |             return 1
 291 291 |         case 1:
 292 292 |             print()  # error
@@ -326,7 +312,6 @@ RET503.py:301:9: RET503 [*] Missing explicit `return` at the end of function abl
     |
     = help: Add explicit `return` statement
 
-Suggested fix:
 300 300 |     def example():
 301 301 |         if True:
 302 302 |             return ""
@@ -347,7 +332,6 @@ RET503.py:306:9: RET503 [*] Missing explicit `return` at the end of function abl
     |
     = help: Add explicit `return` statement
 
-Suggested fix:
 305 305 |     def example():
 306 306 |         if True:
 307 307 |             return ""
@@ -368,7 +352,6 @@ RET503.py:311:9: RET503 [*] Missing explicit `return` at the end of function abl
     |
     = help: Add explicit `return` statement
 
-Suggested fix:
 310 310 |     def example():
 311 311 |         if True:
 312 312 |             return ""  # type: ignore
@@ -389,7 +372,6 @@ RET503.py:316:9: RET503 [*] Missing explicit `return` at the end of function abl
     |
     = help: Add explicit `return` statement
 
-Suggested fix:
 315 315 |     def example():
 316 316 |         if True:
 317 317 |             return ""  ;
@@ -411,7 +393,6 @@ RET503.py:321:9: RET503 [*] Missing explicit `return` at the end of function abl
     |
     = help: Add explicit `return` statement
 
-Suggested fix:
 321 321 |         if True:
 322 322 |             return "" \
 323 323 |                 ;  # type: ignore
@@ -431,7 +412,6 @@ RET503.py:329:5: RET503 [*] Missing explicit `return` at the end of function abl
     |
     = help: Add explicit `return` statement
 
-Suggested fix:
 328 328 |         return 1
 329 329 |     x = 2 \
 330 330 | 
@@ -451,7 +431,6 @@ RET503.py:339:5: RET503 [*] Missing explicit `return` at the end of function abl
     |
     = help: Add explicit `return` statement
 
-Suggested fix:
 337 337 |     if x == 5:
 338 338 |         return 5
 339 339 |     bar()
@@ -471,7 +450,6 @@ RET503.py:354:13: RET503 [*] Missing explicit `return` at the end of function ab
     |
     = help: Add explicit `return` statement
 
-Suggested fix:
 352 352 |             return "third"
 353 353 |         case _:
 354 354 |             raises(string)
@@ -491,7 +469,6 @@ RET503.py:370:5: RET503 [*] Missing explicit `return` at the end of function abl
     |
     = help: Add explicit `return` statement
 
-Suggested fix:
 368 368 |     if baz() > 3:
 369 369 |         return 1
 370 370 |     bar()

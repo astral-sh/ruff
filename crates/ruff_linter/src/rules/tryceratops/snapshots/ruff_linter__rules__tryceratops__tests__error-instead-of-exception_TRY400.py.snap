@@ -12,7 +12,6 @@ TRY400.py:13:9: TRY400 [*] Use `logging.exception` instead of `logging.error`
    |
    = help: Replace with `exception`
 
-Suggested fix:
 10 10 |     try:
 11 11 |         a = 1
 12 12 |     except Exception:
@@ -32,7 +31,6 @@ TRY400.py:16:13: TRY400 [*] Use `logging.exception` instead of `logging.error`
    |
    = help: Replace with `exception`
 
-Suggested fix:
 13 13 |         logging.error("Context message here")
 14 14 | 
 15 15 |         if True:
@@ -55,7 +53,6 @@ TRY400.py:27:9: TRY400 [*] Use `logging.exception` instead of `logging.error`
    |
    = help: Replace with `exception`
 
-Suggested fix:
 24 24 |     try:
 25 25 |         a = 1
 26 26 |     except Exception:
@@ -75,7 +72,6 @@ TRY400.py:30:13: TRY400 [*] Use `logging.exception` instead of `logging.error`
    |
    = help: Replace with `exception`
 
-Suggested fix:
 27 27 |         logger.error("Context message here")
 28 28 | 
 29 29 |         if True:
@@ -98,7 +94,6 @@ TRY400.py:37:9: TRY400 [*] Use `logging.exception` instead of `logging.error`
    |
    = help: Replace with `exception`
 
-Suggested fix:
 34 34 |     try:
 35 35 |         a = 1
 36 36 |     except Exception:
@@ -118,7 +113,6 @@ TRY400.py:40:13: TRY400 [*] Use `logging.exception` instead of `logging.error`
    |
    = help: Replace with `exception`
 
-Suggested fix:
 37 37 |         log.error("Context message here")
 38 38 | 
 39 39 |         if True:
@@ -141,7 +135,6 @@ TRY400.py:47:9: TRY400 [*] Use `logging.exception` instead of `logging.error`
    |
    = help: Replace with `exception`
 
-Suggested fix:
 44 44 |     try:
 45 45 |         a = 1
 46 46 |     except Exception:
@@ -161,7 +154,6 @@ TRY400.py:50:13: TRY400 [*] Use `logging.exception` instead of `logging.error`
    |
    = help: Replace with `exception`
 
-Suggested fix:
 47 47 |         self.logger.error("Context message here")
 48 48 | 
 49 49 |         if True:
@@ -184,7 +176,6 @@ TRY400.py:100:9: TRY400 [*] Use `logging.exception` instead of `logging.error`
     |
     = help: Replace with `exception`
 
-Suggested fix:
 97  97  |     try:
 98  98  |         a = 1
 99  99  |     except Exception:
@@ -204,7 +195,6 @@ TRY400.py:103:13: TRY400 [*] Use `logging.exception` instead of `logging.error`
     |
     = help: Replace with `exception`
 
-Suggested fix:
 100 100 |         error("Context message here")
 101 101 | 
 102 102 |         if True:
@@ -225,7 +215,6 @@ TRY400.py:143:13: TRY400 [*] Use `logging.exception` instead of `logging.error`
     |
     = help: Replace with `exception`
 
-Suggested fix:
 140 140 |         try:
 141 141 |             b = 2
 142 142 |         except Exception:

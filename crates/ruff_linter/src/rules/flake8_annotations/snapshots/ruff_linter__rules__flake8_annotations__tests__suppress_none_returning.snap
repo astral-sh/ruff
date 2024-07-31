@@ -10,7 +10,6 @@ suppress_none_returning.py:45:5: ANN201 [*] Missing return type annotation for p
    |
    = help: Add return type annotation: `bool`
 
-Suggested fix:
 42 42 | 
 43 43 | 
 44 44 | # Error
@@ -32,7 +31,6 @@ suppress_none_returning.py:50:5: ANN201 [*] Missing return type annotation for p
    |
    = help: Add return type annotation: `bool | None`
 
-Suggested fix:
 47 47 | 
 48 48 | 
 49 49 | # Error

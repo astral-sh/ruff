@@ -10,7 +10,6 @@ docstring_doubles_mixed_quotes_class_var_2.py:2:5: Q002 [*] Double quote docstri
   |
   = help: Replace double quotes docstring with single quotes
 
-Suggested fix:
 1 1 | class SingleLineDocstrings():
 2   |-    "Do not"' start with empty string' ' and lint docstring safely'
   2 |+    'Do not'' start with empty string' ' and lint docstring safely'
@@ -29,7 +28,6 @@ docstring_doubles_mixed_quotes_class_var_2.py:6:9: Q002 [*] Double quote docstri
   |
   = help: Replace double quotes docstring with single quotes
 
-Suggested fix:
 3 3 |     """ Not a docstring """
 4 4 | 
 5 5 |     def foo(self, bar="""not a docstring"""):
@@ -50,7 +48,6 @@ docstring_doubles_mixed_quotes_class_var_2.py:9:29: Q002 [*] Double quote docstr
   |
   = help: Replace double quotes docstring with single quotes
 
-Suggested fix:
 6 6 |         "Do not"' start with empty string' ' and lint docstring safely'
 7 7 |         pass
 8 8 | 

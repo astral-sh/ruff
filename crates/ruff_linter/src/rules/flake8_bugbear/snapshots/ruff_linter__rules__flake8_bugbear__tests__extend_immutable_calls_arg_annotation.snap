@@ -9,7 +9,6 @@ B006_extended.py:17:55: B006 [*] Do not use mutable data structures for argument
    |
    = help: Replace with `None`; initialize within function
 
-Suggested fix:
 14 14 |     ...
 15 15 | 
 16 16 | 

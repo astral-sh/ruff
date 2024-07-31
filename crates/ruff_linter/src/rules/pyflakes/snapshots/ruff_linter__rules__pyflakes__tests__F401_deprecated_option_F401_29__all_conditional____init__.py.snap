@@ -12,7 +12,6 @@ __init__.py:8:15: F401 [*] `.unused` imported but unused; consider removing, add
    |
    = help: Remove unused import
 
-Suggested fix:
 5 5 | 
 6 6 | import sys
 7 7 | 
@@ -35,7 +34,6 @@ __init__.py:8:44: F401 [*] `.renamed` imported but unused; consider removing, ad
    |
    = help: Remove unused import
 
-Suggested fix:
 5 5 | 
 6 6 | import sys
 7 7 | 

@@ -9,7 +9,6 @@ F401_9.py:4:22: F401 [*] `foo.baz` imported but unused
   |
   = help: Remove unused import: `foo.baz`
 
-Suggested fix:
 1 1 | """Test: late-binding of `__all__`."""
 2 2 | 
 3 3 | __all__ = ("bar",)

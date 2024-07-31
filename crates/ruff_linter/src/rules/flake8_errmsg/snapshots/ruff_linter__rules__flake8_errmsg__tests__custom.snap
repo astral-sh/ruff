@@ -9,7 +9,6 @@ EM.py:5:24: EM101 [*] Exception must not use a string literal, assign to variabl
   |
   = help: Assign to variable; remove string literal
 
-Suggested fix:
 2 2 | 
 3 3 | 
 4 4 | def f_a():
@@ -31,7 +30,6 @@ EM.py:18:24: EM102 [*] Exception must not use an f-string literal, assign to var
    |
    = help: Assign to variable; remove f-string literal
 
-Suggested fix:
 15 15 | 
 16 16 | def f_b():
 17 17 |     example = "example"
@@ -52,7 +50,6 @@ EM.py:22:24: EM103 [*] Exception must not use a `.format()` string directly, ass
    |
    = help: Assign to variable; remove `.format()` string
 
-Suggested fix:
 19 19 | 
 20 20 | 
 21 21 | def f_c():
@@ -74,7 +71,6 @@ EM.py:32:24: EM101 [*] Exception must not use a string literal, assign to variab
    |
    = help: Assign to variable; remove string literal
 
-Suggested fix:
 29 29 | 
 30 30 | def f_msg_defined():
 31 31 |     msg = "hello"
@@ -96,7 +92,6 @@ EM.py:39:24: EM101 [*] Exception must not use a string literal, assign to variab
    |
    = help: Assign to variable; remove string literal
 
-Suggested fix:
 36 36 |     def nested():
 37 37 |         msg = "hello"
 38 38 | 
@@ -117,7 +112,6 @@ EM.py:46:28: EM101 [*] Exception must not use a string literal, assign to variab
    |
    = help: Assign to variable; remove string literal
 
-Suggested fix:
 43 43 |     msg = "hello"
 44 44 | 
 45 45 |     def nested():
@@ -141,7 +135,6 @@ EM.py:51:28: EM101 [*] Exception must not use a string literal, assign to variab
    |
    = help: Assign to variable; remove string literal
 
-Suggested fix:
 48 48 | 
 49 49 | def f_fix_indentation_check(foo):
 50 50 |     if foo:
@@ -164,7 +157,6 @@ EM.py:54:32: EM102 [*] Exception must not use an f-string literal, assign to var
    |
    = help: Assign to variable; remove f-string literal
 
-Suggested fix:
 51 51 |         raise RuntimeError("This is an example exception")
 52 52 |     else:
 53 53 |         if foo == "foo":
@@ -186,7 +178,6 @@ EM.py:55:24: EM103 [*] Exception must not use a `.format()` string directly, ass
    |
    = help: Assign to variable; remove `.format()` string
 
-Suggested fix:
 52 52 |     else:
 53 53 |         if foo == "foo":
 54 54 |             raise RuntimeError(f"This is an exception: {foo}")
@@ -225,7 +216,6 @@ EM.py:64:24: EM102 [*] Exception must not use an f-string literal, assign to var
    |
    = help: Assign to variable; remove f-string literal
 
-Suggested fix:
 61 61 | 
 62 62 | 
 63 63 | def f_triple_quoted_string():
@@ -251,7 +241,6 @@ EM.py:76:9: EM103 [*] Exception must not use a `.format()` string directly, assi
    |
    = help: Assign to variable; remove `.format()` string
 
-Suggested fix:
 72 72 | 
 73 73 | 
 74 74 | def f_multi_line_string2():
@@ -286,7 +275,6 @@ EM.py:84:9: EM103 [*] Exception must not use a `.format()` string directly, assi
    |
    = help: Assign to variable; remove `.format()` string
 
-Suggested fix:
 80 80 | 
 81 81 | 
 82 82 | def f_multi_line_string2():

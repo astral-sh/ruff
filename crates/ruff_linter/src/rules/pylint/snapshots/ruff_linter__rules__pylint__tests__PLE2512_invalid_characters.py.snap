@@ -11,7 +11,6 @@ invalid_characters.py:24:12: PLE2512 [*] Invalid unescaped character SUB, use "\
    |
    = help: Replace with escape sequence
 
-Suggested fix:
 21 21 | cr_ok = '\\r'
 22 22 | cr_ok = f'\\r'
 23 23 | 
@@ -33,7 +32,6 @@ invalid_characters.py:25:13: PLE2512 [*] Invalid unescaped character SUB, use "\
    |
    = help: Replace with escape sequence
 
-Suggested fix:
 22 22 | cr_ok = f'\\r'
 23 23 | 
 24 24 | sub = 'sub '
@@ -56,7 +54,6 @@ invalid_characters.py:55:25: PLE2512 [*] Invalid unescaped character SUB, use "\
    |
    = help: Replace with escape sequence
 
-Suggested fix:
 52 52 | zwsp_after_multicharacter_grapheme_cluster = "ಫ್ರಾನ್ಸಿಸ್ಕೊ ​​"
 53 53 | zwsp_after_multicharacter_grapheme_cluster = f"ಫ್ರಾನ್ಸಿಸ್ಕೊ ​​"
 54 54 | 
@@ -78,7 +75,6 @@ invalid_characters.py:58:12: PLE2512 [*] Invalid unescaped character SUB, use "\
    |
    = help: Replace with escape sequence
 
-Suggested fix:
 55 55 | nested_fstrings = f'␈{f'{f'␛'}'}'
 56 56 | 
 57 57 | # https://github.com/astral-sh/ruff/issues/7455#issuecomment-1741998106

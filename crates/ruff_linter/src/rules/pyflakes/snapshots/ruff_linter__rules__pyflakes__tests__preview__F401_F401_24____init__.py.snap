@@ -8,7 +8,6 @@ __init__.py:19:8: F401 [*] `sys` imported but unused
    |
    = help: Remove unused import: `sys`
 
-Suggested fix:
 16 16 | import argparse as argparse  # Ok: is redundant alias
 17 17 | 
 18 18 | 
@@ -26,7 +25,6 @@ __init__.py:33:15: F401 [*] `.unused` imported but unused; consider removing, ad
    |
    = help: Use an explicit re-export: `unused as unused`
 
-Suggested fix:
 30 30 | from . import aliased as aliased  # Ok: is redundant alias
 31 31 | 
 32 32 | 

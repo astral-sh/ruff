@@ -10,7 +10,6 @@ PERF102.py:5:21: PERF102 [*] When using only the values of a dict use the `value
   |
   = help: Replace `.items()` with `.values()`
 
-Suggested fix:
 2 2 | 
 3 3 | 
 4 4 | def f():
@@ -31,7 +30,6 @@ PERF102.py:10:19: PERF102 [*] When using only the keys of a dict use the `keys()
    |
    = help: Replace `.items()` with `.keys()`
 
-Suggested fix:
 7  7  | 
 8  8  | 
 9  9  | def f():
@@ -52,7 +50,6 @@ PERF102.py:15:30: PERF102 [*] When using only the keys of a dict use the `keys()
    |
    = help: Replace `.items()` with `.keys()`
 
-Suggested fix:
 12 12 | 
 13 13 | 
 14 14 | def f():
@@ -73,7 +70,6 @@ PERF102.py:20:25: PERF102 [*] When using only the keys of a dict use the `keys()
    |
    = help: Replace `.items()` with `.keys()`
 
-Suggested fix:
 17 17 | 
 18 18 | 
 19 19 | def f():
@@ -94,7 +90,6 @@ PERF102.py:30:30: PERF102 [*] When using only the keys of a dict use the `keys()
    |
    = help: Replace `.items()` with `.keys()`
 
-Suggested fix:
 27 27 | 
 28 28 | 
 29 29 | def f():
@@ -115,7 +110,6 @@ PERF102.py:35:36: PERF102 [*] When using only the values of a dict use the `valu
    |
    = help: Replace `.items()` with `.values()`
 
-Suggested fix:
 32 32 | 
 33 33 | 
 34 34 | def f():
@@ -136,7 +130,6 @@ PERF102.py:50:32: PERF102 [*] When using only the keys of a dict use the `keys()
    |
    = help: Replace `.items()` with `.keys()`
 
-Suggested fix:
 47 47 | 
 48 48 | 
 49 49 | def f():
@@ -157,7 +150,6 @@ PERF102.py:85:25: PERF102 [*] When using only the keys of a dict use the `keys()
    |
    = help: Replace `.items()` with `.keys()`
 
-Suggested fix:
 82 82 | 
 83 83 | 
 84 84 | def f():
@@ -178,7 +170,6 @@ PERF102.py:90:25: PERF102 [*] When using only the keys of a dict use the `keys()
    |
    = help: Replace `.items()` with `.keys()`
 
-Suggested fix:
 87 87 | 
 88 88 | 
 89 89 | def f():
@@ -199,7 +190,6 @@ PERF102.py:95:31: PERF102 [*] When using only the keys of a dict use the `keys()
    |
    = help: Replace `.items()` with `.keys()`
 
-Suggested fix:
 92 92 | 
 93 93 | 
 94 94 | def f():
@@ -220,7 +210,6 @@ PERF102.py:100:31: PERF102 [*] When using only the values of a dict use the `val
     |
     = help: Replace `.items()` with `.values()`
 
-Suggested fix:
 97  97  | 
 98  98  | 
 99  99  | def f():
@@ -242,7 +231,6 @@ PERF102.py:106:16: PERF102 [*] When using only the keys of a dict use the `keys(
     |
     = help: Replace `.items()` with `.keys()`
 
-Suggested fix:
 103 103 | 
 104 104 | # Regression test for: https://github.com/astral-sh/ruff/issues/7097
 105 105 | def _create_context(name_to_value):

@@ -11,7 +11,6 @@ mypy_init_return.py:5:9: ANN204 [*] Missing return type annotation for special m
   |
   = help: Add return type annotation: `None`
 
-Suggested fix:
 2 2 | 
 3 3 | # Error
 4 4 | class Foo:
@@ -33,7 +32,6 @@ mypy_init_return.py:11:9: ANN204 [*] Missing return type annotation for special 
    |
    = help: Add return type annotation: `None`
 
-Suggested fix:
 8  8  | 
 9  9  | # Error
 10 10 | class Foo:
@@ -54,7 +52,6 @@ mypy_init_return.py:40:5: ANN202 [*] Missing return type annotation for private 
    |
    = help: Add return type annotation: `None`
 
-Suggested fix:
 37 37 | 
 38 38 | 
 39 39 | # Error
@@ -76,7 +73,6 @@ mypy_init_return.py:47:9: ANN204 [*] Missing return type annotation for special 
    |
    = help: Add return type annotation: `None`
 
-Suggested fix:
 44 44 | # Error – used to be ok for a moment since the mere presence
 45 45 | # of a vararg falsely indicated that the function has a typed argument.
 46 46 | class Foo:

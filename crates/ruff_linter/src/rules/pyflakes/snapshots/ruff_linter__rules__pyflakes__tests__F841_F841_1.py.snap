@@ -9,7 +9,6 @@ F841_1.py:6:5: F841 [*] Local variable `x` is assigned to but never used
   |
   = help: Remove assignment to unused variable `x`
 
-Suggested fix:
 3 3 | 
 4 4 | 
 5 5 | def f():
@@ -29,7 +28,6 @@ F841_1.py:6:8: F841 [*] Local variable `y` is assigned to but never used
   |
   = help: Remove assignment to unused variable `y`
 
-Suggested fix:
 3 3 | 
 4 4 | 
 5 5 | def f():
@@ -49,7 +47,6 @@ F841_1.py:16:14: F841 [*] Local variable `coords` is assigned to but never used
    |
    = help: Remove assignment to unused variable `coords`
 
-Suggested fix:
 13 13 | 
 14 14 | 
 15 15 | def f():
@@ -69,7 +66,6 @@ F841_1.py:20:5: F841 [*] Local variable `coords` is assigned to but never used
    |
    = help: Remove assignment to unused variable `coords`
 
-Suggested fix:
 17 17 | 
 18 18 | 
 19 19 | def f():
@@ -89,7 +85,6 @@ F841_1.py:24:6: F841 [*] Local variable `a` is assigned to but never used
    |
    = help: Remove assignment to unused variable `a`
 
-Suggested fix:
 21 21 | 
 22 22 | 
 23 23 | def f():
@@ -106,7 +101,6 @@ F841_1.py:24:9: F841 [*] Local variable `b` is assigned to but never used
    |
    = help: Remove assignment to unused variable `b`
 
-Suggested fix:
 21 21 | 
 22 22 | 
 23 23 | def f():
@@ -123,7 +117,6 @@ F841_1.py:24:15: F841 [*] Local variable `x` is assigned to but never used
    |
    = help: Remove assignment to unused variable `x`
 
-Suggested fix:
 21 21 | 
 22 22 | 
 23 23 | def f():
@@ -140,7 +133,6 @@ F841_1.py:24:18: F841 [*] Local variable `y` is assigned to but never used
    |
    = help: Remove assignment to unused variable `y`
 
-Suggested fix:
 21 21 | 
 22 22 | 
 23 23 | def f():

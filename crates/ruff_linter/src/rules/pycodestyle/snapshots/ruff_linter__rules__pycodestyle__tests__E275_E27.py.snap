@@ -12,7 +12,6 @@ E27.py:38:8: E275 [*] Missing whitespace after keyword
    |
    = help: Added missing whitespace after keyword
 
-Suggested fix:
 35 35 | #: E271
 36 36 | from w import  (e, f)
 37 37 | #: E275
@@ -35,7 +34,6 @@ E27.py:40:24: E275 [*] Missing whitespace after keyword
    |
    = help: Added missing whitespace after keyword
 
-Suggested fix:
 37 37 | #: E275
 38 38 | from w import(e, f)
 39 39 | #: E275
@@ -58,7 +56,6 @@ E27.py:43:28: E275 [*] Missing whitespace after keyword
    |
    = help: Added missing whitespace after keyword
 
-Suggested fix:
 40 40 | from importable.module import(e, f)
 41 41 | #: E275
 42 42 | try:
@@ -81,7 +78,6 @@ E27.py:47:1: E275 [*] Missing whitespace after keyword
    |
    = help: Added missing whitespace after keyword
 
-Suggested fix:
 44 44 | except ImportError:
 45 45 |     pass
 46 46 | #: E275
@@ -104,7 +100,6 @@ E27.py:55:5: E275 [*] Missing whitespace after keyword
    |
    = help: Added missing whitespace after keyword
 
-Suggested fix:
 52 52 | matched = {"true": True, "false": False}
 53 53 | #: E275:2:11
 54 54 | if True:
@@ -126,7 +121,6 @@ E27.py:77:1: E275 [*] Missing whitespace after keyword
    |
    = help: Added missing whitespace after keyword
 
-Suggested fix:
 74 74 | type	Number = int
 75 75 | 
 76 76 | #: E275
@@ -148,7 +142,6 @@ E27.py:78:5: E275 [*] Missing whitespace after keyword
    |
    = help: Added missing whitespace after keyword
 
-Suggested fix:
 75 75 | 
 76 76 | #: E275
 77 77 | match(foo):

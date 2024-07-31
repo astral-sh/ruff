@@ -12,7 +12,6 @@ sections.py:146:9: D214 [*] Section is over-indented ("Returns")
     |
     = help: Remove over-indentation from "Returns"
 
-Suggested fix:
 143 143 | def section_overindented():  # noqa: D416
 144 144 |     """Toggle the gizmo.
 145 145 | 
@@ -34,7 +33,6 @@ sections.py:563:9: D214 [*] Section is over-indented ("Returns")
     |
     = help: Remove over-indentation from "Returns"
 
-Suggested fix:
 560 560 |     Args:
 561 561 |         Here's a note.
 562 562 | 

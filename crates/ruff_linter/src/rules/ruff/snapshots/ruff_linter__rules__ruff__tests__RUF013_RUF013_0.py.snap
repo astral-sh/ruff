@@ -9,7 +9,6 @@ RUF013_0.py:20:12: RUF013 [*] PEP 484 prohibits implicit `Optional`
    |
    = help: Convert to `T | None`
 
-Suggested fix:
 17 17 |     pass
 18 18 | 
 19 19 | 
@@ -29,7 +28,6 @@ RUF013_0.py:24:12: RUF013 [*] PEP 484 prohibits implicit `Optional`
    |
    = help: Convert to `T | None`
 
-Suggested fix:
 21 21 |     pass
 22 22 | 
 23 23 | 
@@ -49,7 +47,6 @@ RUF013_0.py:28:12: RUF013 [*] PEP 484 prohibits implicit `Optional`
    |
    = help: Convert to `T | None`
 
-Suggested fix:
 25 25 |     pass
 26 26 | 
 27 27 | 
@@ -69,7 +66,6 @@ RUF013_0.py:58:12: RUF013 [*] PEP 484 prohibits implicit `Optional`
    |
    = help: Convert to `T | None`
 
-Suggested fix:
 55 55 |     pass
 56 56 | 
 57 57 | 
@@ -89,7 +85,6 @@ RUF013_0.py:62:12: RUF013 [*] PEP 484 prohibits implicit `Optional`
    |
    = help: Convert to `T | None`
 
-Suggested fix:
 59 59 |     pass
 60 60 | 
 61 61 | 
@@ -109,7 +104,6 @@ RUF013_0.py:66:12: RUF013 [*] PEP 484 prohibits implicit `Optional`
    |
    = help: Convert to `T | None`
 
-Suggested fix:
 63 63 |     pass
 64 64 | 
 65 65 | 
@@ -129,7 +123,6 @@ RUF013_0.py:85:12: RUF013 [*] PEP 484 prohibits implicit `Optional`
    |
    = help: Convert to `T | None`
 
-Suggested fix:
 82 82 |     pass
 83 83 | 
 84 84 | 
@@ -149,7 +142,6 @@ RUF013_0.py:89:12: RUF013 [*] PEP 484 prohibits implicit `Optional`
    |
    = help: Convert to `T | None`
 
-Suggested fix:
 86 86 |     pass
 87 87 | 
 88 88 | 
@@ -169,7 +161,6 @@ RUF013_0.py:108:12: RUF013 [*] PEP 484 prohibits implicit `Optional`
     |
     = help: Convert to `T | None`
 
-Suggested fix:
 105 105 |     pass
 106 106 | 
 107 107 | 
@@ -189,7 +180,6 @@ RUF013_0.py:112:12: RUF013 [*] PEP 484 prohibits implicit `Optional`
     |
     = help: Convert to `T | None`
 
-Suggested fix:
 109 109 |     pass
 110 110 | 
 111 111 | 
@@ -209,7 +199,6 @@ RUF013_0.py:131:22: RUF013 [*] PEP 484 prohibits implicit `Optional`
     |
     = help: Convert to `T | None`
 
-Suggested fix:
 128 128 |     pass
 129 129 | 
 130 130 | 
@@ -229,7 +218,6 @@ RUF013_0.py:135:32: RUF013 [*] PEP 484 prohibits implicit `Optional`
     |
     = help: Convert to `T | None`
 
-Suggested fix:
 132 132 |     pass
 133 133 | 
 134 134 | 
@@ -251,7 +239,6 @@ RUF013_0.py:151:11: RUF013 [*] PEP 484 prohibits implicit `Optional`
     |
     = help: Convert to `T | None`
 
-Suggested fix:
 148 148 | 
 149 149 | 
 150 150 | def f(
@@ -274,7 +261,6 @@ RUF013_0.py:152:11: RUF013 [*] PEP 484 prohibits implicit `Optional`
     |
     = help: Convert to `T | None`
 
-Suggested fix:
 149 149 | 
 150 150 | def f(
 151 151 |     arg1: int = None,  # RUF013
@@ -297,7 +283,6 @@ RUF013_0.py:153:11: RUF013 [*] PEP 484 prohibits implicit `Optional`
     |
     = help: Convert to `T | None`
 
-Suggested fix:
 150 150 | def f(
 151 151 |     arg1: int = None,  # RUF013
 152 152 |     arg2: Union[int, float] = None,  # RUF013
@@ -317,7 +302,6 @@ RUF013_0.py:181:12: RUF013 [*] PEP 484 prohibits implicit `Optional`
     |
     = help: Convert to `T | None`
 
-Suggested fix:
 178 178 |     pass
 179 179 | 
 180 180 | 
@@ -337,7 +321,6 @@ RUF013_0.py:188:13: RUF013 [*] PEP 484 prohibits implicit `Optional`
     |
     = help: Convert to `T | None`
 
-Suggested fix:
 185 185 | # Quoted
 186 186 | 
 187 187 | 
@@ -357,7 +340,6 @@ RUF013_0.py:192:13: RUF013 [*] PEP 484 prohibits implicit `Optional`
     |
     = help: Convert to `T | None`
 
-Suggested fix:
 189 189 |     pass
 190 190 | 
 191 191 | 
@@ -385,7 +367,6 @@ RUF013_0.py:204:12: RUF013 [*] PEP 484 prohibits implicit `Optional`
     |
     = help: Convert to `T | None`
 
-Suggested fix:
 201 201 |     pass
 202 202 | 
 203 203 | 

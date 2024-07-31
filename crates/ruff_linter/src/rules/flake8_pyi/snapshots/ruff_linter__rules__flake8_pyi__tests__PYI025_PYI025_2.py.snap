@@ -12,7 +12,6 @@ PYI025_2.py:3:29: PYI025 [*] Use `from collections.abc import Set as AbstractSet
   |
   = help: Alias `Set` to `AbstractSet`
 
-Suggested fix:
 1  1  | """Tests to ensure we correctly rename references inside `__all__`"""
 2  2  | 
 3     |-from collections.abc import Set

@@ -12,7 +12,6 @@ T203.py:3:1: T203 [*] `pprint` found
   |
   = help: Remove `pprint`
 
-Suggested fix:
 1 1 | from pprint import pprint
 2 2 | 
 3   |-pprint("Hello, world!")  # T203
@@ -33,7 +32,6 @@ T203.py:7:1: T203 [*] `pprint` found
   |
   = help: Remove `pprint`
 
-Suggested fix:
 4 4 | 
 5 5 | import pprint
 6 6 | 

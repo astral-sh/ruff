@@ -12,7 +12,6 @@ PYI009.pyi:3:5: PYI009 [*] Empty body should contain `...`, not `pass`
   |
   = help: Replace `pass` with `...`
 
-Suggested fix:
 1 1 | def bar(): ...  # OK
 2 2 | def foo():
 3   |-    pass  # ERROR PYI009, since we're in a stub file
@@ -31,7 +30,6 @@ PYI009.pyi:8:5: PYI009 [*] Empty body should contain `...`, not `pass`
   |
   = help: Replace `pass` with `...`
 
-Suggested fix:
 5 5 | class Bar: ...  # OK
 6 6 | 
 7 7 | class Foo:

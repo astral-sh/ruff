@@ -10,7 +10,6 @@ E30.py:617:2: E303 [*] Too many blank lines (2)
     |
     = help: Remove extraneous blank line(s)
 
-Suggested fix:
 613 613 | 	def method1():
 614 614 | 		return 1
 615 615 | 
@@ -30,7 +29,6 @@ E30.py:644:5: E303 [*] Too many blank lines (2)
     |
     = help: Remove extraneous blank line(s)
 
-Suggested fix:
 640 640 | def fn():
 641 641 |     _ = None
 642 642 | 
@@ -50,7 +48,6 @@ E30.py:656:5: E303 [*] Too many blank lines (2)
     |
     = help: Remove extraneous blank line(s)
 
-Suggested fix:
 652 652 | def fn():
 653 653 |     _ = None
 654 654 | 
@@ -69,7 +66,6 @@ E30.py:667:1: E303 [*] Too many blank lines (3)
     |
     = help: Remove extraneous blank line(s)
 
-Suggested fix:
 663 663 | print()
 664 664 | 
 665 665 | 
@@ -89,7 +85,6 @@ E30.py:676:1: E303 [*] Too many blank lines (3)
     |
     = help: Remove extraneous blank line(s)
 
-Suggested fix:
 672 672 | print()
 673 673 | 
 674 674 | 
@@ -107,7 +102,6 @@ E30.py:687:5: E303 [*] Too many blank lines (2)
     |
     = help: Remove extraneous blank line(s)
 
-Suggested fix:
 683 683 | def a():
 684 684 |     print()
 685 685 | 
@@ -127,7 +121,6 @@ E30.py:690:5: E303 [*] Too many blank lines (2)
     |
     = help: Remove extraneous blank line(s)
 
-Suggested fix:
 686 686 | 
 687 687 |     # comment
 688 688 | 
@@ -148,7 +141,6 @@ E30.py:701:1: E303 [*] Too many blank lines (3)
     |
     = help: Remove extraneous blank line(s)
 
-Suggested fix:
 697 697 | #!python
 698 698 | 
 699 699 | 
@@ -168,7 +160,6 @@ E30.py:713:5: E303 [*] Too many blank lines (2)
     |
     = help: Remove extraneous blank line(s)
 
-Suggested fix:
 709 709 |     def a(self):
 710 710 |         pass
 711 711 | 
@@ -187,7 +178,6 @@ E30.py:723:5: E303 [*] Too many blank lines (2)
     |
     = help: Remove extraneous blank line(s)
 
-Suggested fix:
 719 719 | if True:
 720 720 |     a = 1
 721 721 | 
@@ -205,7 +195,6 @@ E30.py:731:5: E303 [*] Too many blank lines (2)
     |
     = help: Remove extraneous blank line(s)
 
-Suggested fix:
 727 727 | # E303
 728 728 | class Test:
 729 729 | 
@@ -225,7 +214,6 @@ E30.py:734:5: E303 [*] Too many blank lines (2)
     |
     = help: Remove extraneous blank line(s)
 
-Suggested fix:
 730 730 | 
 731 731 |     # comment
 732 732 | 
@@ -245,7 +233,6 @@ E30.py:748:5: E303 [*] Too many blank lines (2)
     |
     = help: Remove extraneous blank line(s)
 
-Suggested fix:
 744 744 | 
 745 745 | # wrongly indented comment
 746 746 | 
@@ -264,7 +251,6 @@ E30.py:758:5: E303 [*] Too many blank lines (2)
     |
     = help: Remove extraneous blank line(s)
 
-Suggested fix:
 754 754 | def fn():
 755 755 |     pass
 756 756 | 

@@ -10,7 +10,6 @@ PT027_1.py:11:14: PT027 [*] Use `pytest.raises` instead of unittest-style `asser
    |
    = help: Replace `assertRaises` with `pytest.raises`
 
-Suggested fix:
 8  8  |             raise ValueError
 9  9  | 
 10 10 |     def test_errors(self):

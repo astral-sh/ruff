@@ -11,7 +11,6 @@ E21.py:2:5: E211 [*] Whitespace before '('
   |
   = help: Removed whitespace before '('
 
-Suggested fix:
 1 1 | #: E211
 2   |-spam (1)
   2 |+spam(1)
@@ -32,7 +31,6 @@ E21.py:4:5: E211 [*] Whitespace before '['
   |
   = help: Removed whitespace before '['
 
-Suggested fix:
 1 1 | #: E211
 2 2 | spam (1)
 3 3 | #: E211 E211
@@ -55,7 +53,6 @@ E21.py:4:20: E211 [*] Whitespace before '['
   |
   = help: Removed whitespace before '['
 
-Suggested fix:
 1 1 | #: E211
 2 2 | spam (1)
 3 3 | #: E211 E211
@@ -78,7 +75,6 @@ E21.py:6:12: E211 [*] Whitespace before '['
   |
   = help: Removed whitespace before '['
 
-Suggested fix:
 3 3 | #: E211 E211
 4 4 | dict ['key'] = list [index]
 5 5 | #: E211
@@ -98,7 +94,6 @@ E21.py:17:15: E211 [*] Whitespace before '('
    |
    = help: Removed whitespace before '('
 
-Suggested fix:
 14 14 |     pass
 15 15 | 
 16 16 | 
@@ -121,7 +116,6 @@ E21.py:27:19: E211 [*] Whitespace before '('
    |
    = help: Removed whitespace before '('
 
-Suggested fix:
 24 24 |     Logger.info(test)
 25 25 |     # test commented code
 26 26 |     # Logger.info("test code")
@@ -144,7 +138,6 @@ E21.py:27:27: E211 [*] Whitespace before '('
    |
    = help: Removed whitespace before '('
 
-Suggested fix:
 24 24 |     Logger.info(test)
 25 25 |     # test commented code
 26 26 |     # Logger.info("test code")

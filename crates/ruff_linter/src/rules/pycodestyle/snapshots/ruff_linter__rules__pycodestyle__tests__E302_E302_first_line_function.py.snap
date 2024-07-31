@@ -11,7 +11,6 @@ E302_first_line_function.py:4:1: E302 [*] Expected 2 blank lines, found 1
   |
   = help: Add missing blank line(s)
 
-Suggested fix:
 1 1 | def fn1():
 2 2 |     pass
 3 3 | 

@@ -9,7 +9,6 @@ TCH004_17.py:6:24: TCH004 [*] Move import `pandas.DataFrame` out of type-checkin
   |
   = help: Move out of type-checking block
 
-Suggested fix:
 1 1 | from __future__ import annotations
 2 2 | 
 3 3 | from typing_extensions import TYPE_CHECKING

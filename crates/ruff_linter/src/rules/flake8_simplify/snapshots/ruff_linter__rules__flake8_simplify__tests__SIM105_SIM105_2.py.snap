@@ -12,7 +12,6 @@ SIM105_2.py:10:1: SIM105 [*] Use `contextlib.suppress(ValueError)` instead of `t
    |
    = help: Replace with `contextlib.suppress(ValueError)`
 
-Suggested fix:
 7  7  | 
 8  8  | 
 9  9  | # SIM105

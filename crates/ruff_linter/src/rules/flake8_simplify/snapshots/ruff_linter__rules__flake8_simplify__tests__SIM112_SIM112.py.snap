@@ -11,7 +11,6 @@ SIM112.py:4:12: SIM112 [*] Use capitalized environment variable `FOO` instead of
   |
   = help: Replace `foo` with `FOO`
 
-Suggested fix:
 1 1 | import os
 2 2 | 
 3 3 | # Bad
@@ -78,7 +77,6 @@ SIM112.py:14:18: SIM112 [*] Use capitalized environment variable `FOO` instead o
    |
    = help: Replace `foo` with `FOO`
 
-Suggested fix:
 11 11 | 
 12 12 | env = os.environ.get('foo')
 13 13 | 
@@ -110,7 +108,6 @@ SIM112.py:19:22: SIM112 [*] Use capitalized environment variable `FOO` instead o
    |
    = help: Replace `foo` with `FOO`
 
-Suggested fix:
 16 16 | if env := os.environ.get('foo'):
 17 17 |     pass
 18 18 | 

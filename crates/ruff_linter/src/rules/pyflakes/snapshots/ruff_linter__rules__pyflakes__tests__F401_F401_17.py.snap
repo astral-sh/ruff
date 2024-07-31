@@ -11,7 +11,6 @@ F401_17.py:12:27: F401 [*] `threading.Thread` imported but unused
    |
    = help: Remove unused import: `threading.Thread`
 
-Suggested fix:
 9  9  | 
 10 10 | 
 11 11 | def fn(thread: Thread):
@@ -32,7 +31,6 @@ F401_17.py:20:27: F401 [*] `threading.Thread` imported but unused
    |
    = help: Remove unused import: `threading.Thread`
 
-Suggested fix:
 17 17 | 
 18 18 | 
 19 19 | def fn(thread: Thread):

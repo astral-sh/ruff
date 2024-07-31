@@ -12,7 +12,6 @@ FURB129.py:7:18: FURB129 [*] Instead of calling `readlines()`, iterate over file
   |
   = help: Remove `readlines()`
 
-Suggested fix:
 4 4 | 
 5 5 | # Errors
 6 6 | with open("FURB129.py") as f:
@@ -35,7 +34,6 @@ FURB129.py:9:35: FURB129 [*] Instead of calling `readlines()`, iterate over file
    |
    = help: Remove `readlines()`
 
-Suggested fix:
 6  6  | with open("FURB129.py") as f:
 7  7  |     for _line in f.readlines():
 8  8  |         pass
@@ -57,7 +55,6 @@ FURB129.py:10:35: FURB129 [*] Instead of calling `readlines()`, iterate over fil
    |
    = help: Remove `readlines()`
 
-Suggested fix:
 7  7  |     for _line in f.readlines():
 8  8  |         pass
 9  9  |     a = [line.lower() for line in f.readlines()]
@@ -80,7 +77,6 @@ FURB129.py:11:49: FURB129 [*] Instead of calling `readlines()`, iterate over fil
    |
    = help: Remove `readlines()`
 
-Suggested fix:
 8  8  |         pass
 9  9  |     a = [line.lower() for line in f.readlines()]
 10 10 |     b = {line.upper() for line in f.readlines()}
@@ -101,7 +97,6 @@ FURB129.py:14:18: FURB129 [*] Instead of calling `readlines()`, iterate over fil
    |
    = help: Remove `readlines()`
 
-Suggested fix:
 11 11 |     c = {line.lower(): line.upper() for line in f.readlines()}
 12 12 | 
 13 13 | with Path("FURB129.py").open() as f:
@@ -123,7 +118,6 @@ FURB129.py:17:14: FURB129 [*] Instead of calling `readlines()`, iterate over fil
    |
    = help: Remove `readlines()`
 
-Suggested fix:
 14 14 |     for _line in f.readlines():
 15 15 |         pass
 16 16 | 
@@ -145,7 +139,6 @@ FURB129.py:20:14: FURB129 [*] Instead of calling `readlines()`, iterate over fil
    |
    = help: Remove `readlines()`
 
-Suggested fix:
 17 17 | for _line in open("FURB129.py").readlines():
 18 18 |     pass
 19 19 | 
@@ -168,7 +161,6 @@ FURB129.py:26:18: FURB129 [*] Instead of calling `readlines()`, iterate over fil
    |
    = help: Remove `readlines()`
 
-Suggested fix:
 23 23 | 
 24 24 | def func():
 25 25 |     f = Path("FURB129.py").open()
@@ -189,7 +181,6 @@ FURB129.py:32:18: FURB129 [*] Instead of calling `readlines()`, iterate over fil
    |
    = help: Remove `readlines()`
 
-Suggested fix:
 29 29 | 
 30 30 | 
 31 31 | def func(f: io.BytesIO):
@@ -212,7 +203,6 @@ FURB129.py:38:22: FURB129 [*] Instead of calling `readlines()`, iterate over fil
    |
    = help: Remove `readlines()`
 
-Suggested fix:
 35 35 | 
 36 36 | def func():
 37 37 |     with (open("FURB129.py") as f, foo as bar):
@@ -233,7 +223,6 @@ FURB129.py:48:17: FURB129 [*] Instead of calling `readlines()`, iterate over fil
    |
    = help: Remove `readlines()`
 
-Suggested fix:
 45 45 | 
 46 46 | 
 47 47 | with builtins.open("FURB129.py") as f:
@@ -254,7 +243,6 @@ FURB129.py:56:17: FURB129 [*] Instead of calling `readlines()`, iterate over fil
    |
    = help: Remove `readlines()`
 
-Suggested fix:
 53 53 | 
 54 54 | 
 55 55 | with o("FURB129.py") as f:

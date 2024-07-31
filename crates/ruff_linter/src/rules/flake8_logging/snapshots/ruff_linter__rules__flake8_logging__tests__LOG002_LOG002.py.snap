@@ -10,7 +10,6 @@ LOG002.py:11:11: LOG002 [*] Use `__name__` with `logging.getLogger()`
    |
    = help: Replace with `__name__`
 
-Suggested fix:
 8  8  | logging.getLogger(name="custom")
 9  9  | 
 10 10 | # LOG002
@@ -33,7 +32,6 @@ LOG002.py:12:24: LOG002 [*] Use `__name__` with `logging.getLogger()`
    |
    = help: Replace with `__name__`
 
-Suggested fix:
 9  9  | 
 10 10 | # LOG002
 11 11 | getLogger(__file__)
@@ -55,7 +53,6 @@ LOG002.py:14:19: LOG002 [*] Use `__name__` with `logging.getLogger()`
    |
    = help: Replace with `__name__`
 
-Suggested fix:
 11 11 | getLogger(__file__)
 12 12 | logging.getLogger(name=__file__)
 13 13 | 
@@ -75,7 +72,6 @@ LOG002.py:15:16: LOG002 [*] Use `__name__` with `logging.getLogger()`
    |
    = help: Replace with `__name__`
 
-Suggested fix:
 12 12 | logging.getLogger(name=__file__)
 13 13 | 
 14 14 | logging.getLogger(__cached__)

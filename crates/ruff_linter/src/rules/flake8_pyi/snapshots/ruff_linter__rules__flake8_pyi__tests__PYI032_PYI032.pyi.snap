@@ -10,7 +10,6 @@ PYI032.pyi:6:29: PYI032 [*] Prefer `object` to `Any` for the second parameter to
   |
   = help: Replace with `object`
 
-Suggested fix:
 3 3 | 
 4 4 | 
 5 5 | class Bad:
@@ -31,7 +30,6 @@ PYI032.pyi:7:29: PYI032 [*] Prefer `object` to `Any` for the second parameter to
   |
   = help: Replace with `object`
 
-Suggested fix:
 4 4 | 
 5 5 | class Bad:
 6 6 |     def __eq__(self, other: Any) -> bool: ...  # Y032

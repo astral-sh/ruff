@@ -9,7 +9,6 @@ F401_18.py:5:12: F401 [*] `__future__` imported but unused
   |
   = help: Remove unused import: `__future__`
 
-Suggested fix:
 2 2 | 
 3 3 | 
 4 4 | def f():

@@ -11,7 +11,6 @@ TCH002.py:5:22: TCH002 [*] Move third-party import `pandas` into a type-checking
   |
   = help: Move into type-checking block
 
-Suggested fix:
 1 1 | """Tests to determine accurate detection of typing-only imports."""
   2 |+from typing import TYPE_CHECKING
   3 |+
@@ -37,7 +36,6 @@ TCH002.py:11:24: TCH002 [*] Move third-party import `pandas.DataFrame` into a ty
    |
    = help: Move into type-checking block
 
-Suggested fix:
 1  1  | """Tests to determine accurate detection of typing-only imports."""
    2  |+from typing import TYPE_CHECKING
    3  |+
@@ -67,7 +65,6 @@ TCH002.py:17:37: TCH002 [*] Move third-party import `pandas.DataFrame` into a ty
    |
    = help: Move into type-checking block
 
-Suggested fix:
 1  1  | """Tests to determine accurate detection of typing-only imports."""
    2  |+from typing import TYPE_CHECKING
    3  |+
@@ -97,7 +94,6 @@ TCH002.py:23:22: TCH002 [*] Move third-party import `pandas` into a type-checkin
    |
    = help: Move into type-checking block
 
-Suggested fix:
 1  1  | """Tests to determine accurate detection of typing-only imports."""
    2  |+from typing import TYPE_CHECKING
    3  |+
@@ -127,7 +123,6 @@ TCH002.py:29:24: TCH002 [*] Move third-party import `pandas.DataFrame` into a ty
    |
    = help: Move into type-checking block
 
-Suggested fix:
 1  1  | """Tests to determine accurate detection of typing-only imports."""
    2  |+from typing import TYPE_CHECKING
    3  |+
@@ -157,7 +152,6 @@ TCH002.py:35:37: TCH002 [*] Move third-party import `pandas.DataFrame` into a ty
    |
    = help: Move into type-checking block
 
-Suggested fix:
 1  1  | """Tests to determine accurate detection of typing-only imports."""
    2  |+from typing import TYPE_CHECKING
    3  |+
@@ -187,7 +181,6 @@ TCH002.py:41:22: TCH002 [*] Move third-party import `pandas` into a type-checkin
    |
    = help: Move into type-checking block
 
-Suggested fix:
 1  1  | """Tests to determine accurate detection of typing-only imports."""
    2  |+from typing import TYPE_CHECKING
    3  |+
@@ -217,7 +210,6 @@ TCH002.py:47:22: TCH002 [*] Move third-party import `pandas` into a type-checkin
    |
    = help: Move into type-checking block
 
-Suggested fix:
 1  1  | """Tests to determine accurate detection of typing-only imports."""
    2  |+from typing import TYPE_CHECKING
    3  |+
@@ -248,7 +240,6 @@ TCH002.py:172:24: TCH002 [*] Move third-party import `module.Member` into a type
     |
     = help: Move into type-checking block
 
-Suggested fix:
 1   1   | """Tests to determine accurate detection of typing-only imports."""
     2   |+from typing import TYPE_CHECKING
     3   |+

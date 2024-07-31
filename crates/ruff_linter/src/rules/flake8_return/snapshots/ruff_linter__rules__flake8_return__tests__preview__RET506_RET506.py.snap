@@ -12,7 +12,6 @@ RET506.py:8:5: RET506 [*] Unnecessary `elif` after `raise` statement
    |
    = help: Remove unnecessary `elif`
 
-Suggested fix:
 5 5 |     if x:  # [no-else-raise]
 6 6 |         a = 1
 7 7 |         raise Exception(y)
@@ -35,7 +34,6 @@ RET506.py:23:5: RET506 [*] Unnecessary `elif` after `raise` statement
    |
    = help: Remove unnecessary `elif`
 
-Suggested fix:
 20 20 |         else:
 21 21 |             b = 2
 22 22 |         raise Exception(x)
@@ -58,7 +56,6 @@ RET506.py:34:5: RET506 [*] Unnecessary `else` after `raise` statement
    |
    = help: Remove unnecessary `else`
 
-Suggested fix:
 31 31 |     if x:  # [no-else-raise]
 32 32 |         a = 1
 33 33 |         raise Exception(y)
@@ -84,7 +81,6 @@ RET506.py:45:9: RET506 [*] Unnecessary `else` after `raise` statement
    |
    = help: Remove unnecessary `else`
 
-Suggested fix:
 42 42 |         if y:  # [no-else-raise]
 43 43 |             b = 2
 44 44 |             raise Exception(y)
@@ -110,7 +106,6 @@ RET506.py:60:5: RET506 [*] Unnecessary `else` after `raise` statement
    |
    = help: Remove unnecessary `else`
 
-Suggested fix:
 57 57 |         else:
 58 58 |             b = 2
 59 59 |         raise Exception(x)
@@ -134,7 +129,6 @@ RET506.py:70:9: RET506 [*] Unnecessary `else` after `raise` statement
    |
    = help: Remove unnecessary `else`
 
-Suggested fix:
 67 67 |         if y:  # [no-else-raise]
 68 68 |             a = 4
 69 69 |             raise Exception(x)
@@ -158,7 +152,6 @@ RET506.py:80:5: RET506 [*] Unnecessary `else` after `raise` statement
    |
    = help: Remove unnecessary `else`
 
-Suggested fix:
 77 77 | def bar4(x):
 78 78 |     if x:  # [no-else-raise]
 79 79 |         raise Exception(True)

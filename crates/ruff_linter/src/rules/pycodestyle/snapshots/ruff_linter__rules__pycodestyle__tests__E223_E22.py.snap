@@ -11,7 +11,6 @@ E22.py:43:2: E223 [*] Tab before operator
    |
    = help: Replace with single space
 
-Suggested fix:
 40 40 | 
 41 41 | #: E223
 42 42 | foobart = 4

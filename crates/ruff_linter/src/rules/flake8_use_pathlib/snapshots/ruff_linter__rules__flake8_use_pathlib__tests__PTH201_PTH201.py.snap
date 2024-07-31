@@ -11,7 +11,6 @@ PTH201.py:5:10: PTH201 [*] Do not pass the current directory explicitly to `Path
   |
   = help: Remove the current directory argument
 
-Suggested fix:
 2 2 | from pathlib import Path as pth
 3 3 | 
 4 4 | # match
@@ -34,7 +33,6 @@ PTH201.py:6:9: PTH201 [*] Do not pass the current directory explicitly to `Path`
   |
   = help: Remove the current directory argument
 
-Suggested fix:
 3 3 | 
 4 4 | # match
 5 5 | _ = Path(".")
@@ -56,7 +54,6 @@ PTH201.py:7:14: PTH201 [*] Do not pass the current directory explicitly to `Path
   |
   = help: Remove the current directory argument
 
-Suggested fix:
 4 4 | # match
 5 5 | _ = Path(".")
 6 6 | _ = pth(".")
@@ -79,7 +76,6 @@ PTH201.py:8:10: PTH201 [*] Do not pass the current directory explicitly to `Path
    |
    = help: Remove the current directory argument
 
-Suggested fix:
 5 5 | _ = Path(".")
 6 6 | _ = pth(".")
 7 7 | _ = PurePath(".")

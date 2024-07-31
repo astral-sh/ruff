@@ -12,7 +12,6 @@ runtime_evaluated_decorators_3.py:6:18: TCH003 [*] Move standard library import 
   |
   = help: Move into type-checking block
 
-Suggested fix:
 3  3  | import datetime
 4  4  | from array import array
 5  5  | from dataclasses import dataclass

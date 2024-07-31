@@ -10,7 +10,6 @@ future_annotations.py:34:18: UP006 [*] Use `list` instead of `List` for type ann
    |
    = help: Replace with `list`
 
-Suggested fix:
 31 31 |         return cls(x=0, y=0)
 32 32 | 
 33 33 | 

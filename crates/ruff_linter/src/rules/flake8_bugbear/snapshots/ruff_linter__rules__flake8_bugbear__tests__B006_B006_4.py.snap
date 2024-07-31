@@ -10,7 +10,6 @@ B006_4.py:7:26: B006 [*] Do not use mutable data structures for argument default
   |
   = help: Replace with `None`; initialize within function
 
-Suggested fix:
 4  4  | 
 5  5  | 
 6  6  | class FormFeedIndent:

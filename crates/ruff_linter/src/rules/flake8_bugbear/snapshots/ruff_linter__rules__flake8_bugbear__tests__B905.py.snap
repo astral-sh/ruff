@@ -11,7 +11,6 @@ B905.py:4:1: B905 [*] `zip()` without an explicit `strict=` parameter
   |
   = help: Add explicit `strict=False`
 
-Suggested fix:
 1 1 | from itertools import count, cycle, repeat
 2 2 | 
 3 3 | # Errors
@@ -34,7 +33,6 @@ B905.py:5:1: B905 [*] `zip()` without an explicit `strict=` parameter
   |
   = help: Add explicit `strict=False`
 
-Suggested fix:
 2 2 | 
 3 3 | # Errors
 4 4 | zip()
@@ -57,7 +55,6 @@ B905.py:6:1: B905 [*] `zip()` without an explicit `strict=` parameter
   |
   = help: Add explicit `strict=False`
 
-Suggested fix:
 3 3 | # Errors
 4 4 | zip()
 5 5 | zip(range(3))
@@ -80,7 +77,6 @@ B905.py:7:1: B905 [*] `zip()` without an explicit `strict=` parameter
   |
   = help: Add explicit `strict=False`
 
-Suggested fix:
 4 4 | zip()
 5 5 | zip(range(3))
 6 6 | zip("a", "b")
@@ -103,7 +99,6 @@ B905.py:7:16: B905 [*] `zip()` without an explicit `strict=` parameter
   |
   = help: Add explicit `strict=False`
 
-Suggested fix:
 4 4 | zip()
 5 5 | zip(range(3))
 6 6 | zip("a", "b")
@@ -125,7 +120,6 @@ B905.py:8:5: B905 [*] `zip()` without an explicit `strict=` parameter
   |
   = help: Add explicit `strict=False`
 
-Suggested fix:
 5 5 | zip(range(3))
 6 6 | zip("a", "b")
 7 7 | zip("a", "b", *zip("c"))
@@ -148,7 +142,6 @@ B905.py:9:1: B905 [*] `zip()` without an explicit `strict=` parameter
    |
    = help: Add explicit `strict=False`
 
-Suggested fix:
 6  6  | zip("a", "b")
 7  7  | zip("a", "b", *zip("c"))
 8  8  | zip(zip("a"), strict=False)
@@ -169,7 +162,6 @@ B905.py:24:1: B905 [*] `zip()` without an explicit `strict=` parameter
    |
    = help: Add explicit `strict=False`
 
-Suggested fix:
 21 21 | zip([1, 2, 3], repeat(1, times=None))
 22 22 | 
 23 23 | # Errors (limited iterators).
@@ -192,7 +184,6 @@ B905.py:25:1: B905 [*] `zip()` without an explicit `strict=` parameter
    |
    = help: Add explicit `strict=False`
 
-Suggested fix:
 22 22 | 
 23 23 | # Errors (limited iterators).
 24 24 | zip([1, 2, 3], repeat(1, 1))
@@ -213,7 +204,6 @@ B905.py:29:1: B905 [*] `zip()` without an explicit `strict=` parameter
    |
    = help: Add explicit `strict=False`
 
-Suggested fix:
 26 26 | 
 27 27 | import builtins
 28 28 | # Still an error even though it uses the qualified name

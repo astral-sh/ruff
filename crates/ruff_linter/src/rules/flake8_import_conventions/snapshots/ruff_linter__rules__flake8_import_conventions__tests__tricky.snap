@@ -12,7 +12,6 @@ tricky.py:7:16: ICN001 [*] `pandas` should be imported as `pd`
   |
   = help: Alias `pandas` to `pd`
 
-Suggested fix:
 3 3 | 
 4 4 | def rename_global():
 5 5 |     try:

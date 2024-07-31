@@ -11,7 +11,6 @@ E20.py:51:10: E203 [*] Whitespace before ':'
    |
    = help: Remove whitespace before ':'
 
-Suggested fix:
 48 48 | 
 49 49 | 
 50 50 | #: E203:1:10
@@ -34,7 +33,6 @@ E20.py:55:10: E203 [*] Whitespace before ':'
    |
    = help: Remove whitespace before ':'
 
-Suggested fix:
 52 52 |     print(x, y)
 53 53 |     x, y = y, x
 54 54 | #: E203:1:10
@@ -57,7 +55,6 @@ E20.py:60:16: E203 [*] Whitespace before ';'
    |
    = help: Remove whitespace before ';'
 
-Suggested fix:
 57 57 |     x, y = y, x
 58 58 | #: E203:2:15 E702:2:16
 59 59 | if x == 4:
@@ -80,7 +77,6 @@ E20.py:63:16: E203 [*] Whitespace before ';'
    |
    = help: Remove whitespace before ';'
 
-Suggested fix:
 60 60 |     print(x, y) ; x, y = y, x
 61 61 | #: E203:2:15 E702:2:16
 62 62 | if x == 4:
@@ -103,7 +99,6 @@ E20.py:67:13: E203 [*] Whitespace before ','
    |
    = help: Remove whitespace before ','
 
-Suggested fix:
 64 64 | #: E203:3:13
 65 65 | if x == 4:
 66 66 |     print(x, y)
@@ -126,7 +121,6 @@ E20.py:71:13: E203 [*] Whitespace before ','
    |
    = help: Remove whitespace before ','
 
-Suggested fix:
 68 68 | #: E203:3:13
 69 69 | if x == 4:
 70 70 |     print(x, y)
@@ -148,7 +142,6 @@ E20.py:86:61: E203 [*] Whitespace before ':'
    |
    = help: Remove whitespace before ':'
 
-Suggested fix:
 83 83 | 
 84 84 | #: E203 multi whitespace before :
 85 85 | predictions = predictions[
@@ -170,7 +163,6 @@ E20.py:91:61: E203 [*] Whitespace before ':'
    |
    = help: Remove whitespace before ':'
 
-Suggested fix:
 88 88 | 
 89 89 | #: E203 tab before :
 90 90 | predictions = predictions[
@@ -192,7 +184,6 @@ E20.py:101:61: E203 [*] Whitespace before ':'
     |
     = help: Remove whitespace before ':'
 
-Suggested fix:
 98  98  | 
 99  99  | #: E203 multi whitespace before : with line a comment
 100 100 | predictions = predictions[
@@ -214,7 +205,6 @@ E20.py:126:16: E203 [*] Whitespace before ':'
     |
     = help: Remove whitespace before ':'
 
-Suggested fix:
 123 123 | ham[(lower + offset) : upper + offset]
 124 124 | 
 125 125 | #: E203:1:19
@@ -236,7 +226,6 @@ E20.py:129:19: E203 [*] Whitespace before ':'
     |
     = help: Remove whitespace before ':'
 
-Suggested fix:
 126 126 | {lower + offset : upper + offset}
 127 127 | 
 128 128 | #: E203:1:19
@@ -258,7 +247,6 @@ E20.py:157:21: E203 [*] Whitespace before ':'
     |
     = help: Remove whitespace before ':'
 
-Suggested fix:
 154 154 | ham[lower + offset::upper + offset]
 155 155 | 
 156 156 | #: E203:1:21
@@ -280,7 +268,6 @@ E20.py:160:20: E203 [*] Whitespace before ':'
     |
     = help: Remove whitespace before ':'
 
-Suggested fix:
 157 157 | ham[lower + offset : : upper + offset]
 158 158 | 
 159 159 | #: E203:1:20
@@ -302,7 +289,6 @@ E20.py:163:20: E203 [*] Whitespace before ':'
     |
     = help: Remove whitespace before ':'
 
-Suggested fix:
 160 160 | ham[lower + offset: :upper + offset]
 161 161 | 
 162 162 | #: E203:1:20
@@ -324,7 +310,6 @@ E20.py:175:10: E203 [*] Whitespace before ':'
     |
     = help: Remove whitespace before ':'
 
-Suggested fix:
 172 172 | ham[upper : ]
 173 173 | 
 174 174 | #: E203:1:10
@@ -346,7 +331,6 @@ E20.py:181:14: E203 [*] Whitespace before ':'
     |
     = help: Remove whitespace before ':'
 
-Suggested fix:
 178 178 | ham[lower +1 :, "columnname"]
 179 179 | 
 180 180 | #: E203:1:13
@@ -368,7 +352,6 @@ E20.py:187:17: E203 [*] Whitespace before ':'
     |
     = help: Remove whitespace before ':'
 
-Suggested fix:
 184 184 | f"{ham[lower +1 :, "columnname"]}"
 185 185 | 
 186 186 | #: E203:1:13

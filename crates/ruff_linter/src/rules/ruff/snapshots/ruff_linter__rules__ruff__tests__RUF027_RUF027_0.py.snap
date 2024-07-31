@@ -10,7 +10,6 @@ RUF027_0.py:5:7: RUF027 [*] Possible f-string without an `f` prefix
   |
   = help: Add `f` prefix
 
-Suggested fix:
 2 2 | 
 3 3 | "always ignore this: {val}"
 4 4 | 
@@ -32,7 +31,6 @@ RUF027_0.py:10:9: RUF027 [*] Possible f-string without an `f` prefix
    |
    = help: Add `f` prefix
 
-Suggested fix:
 7  7  | 
 8  8  | def simple_cases():
 9  9  |     a = 4
@@ -53,7 +51,6 @@ RUF027_0.py:11:9: RUF027 [*] Possible f-string without an `f` prefix
    |
    = help: Add `f` prefix
 
-Suggested fix:
 8  8  | def simple_cases():
 9  9  |     a = 4
 10 10 |     b = "{a}"  # RUF027
@@ -75,7 +72,6 @@ RUF027_0.py:21:9: RUF027 [*] Possible f-string without an `f` prefix
    |
    = help: Add `f` prefix
 
-Suggested fix:
 18 18 | 
 19 19 | def raw_string():
 20 20 |     a = 4
@@ -96,7 +92,6 @@ RUF027_0.py:22:9: RUF027 [*] Possible f-string without an `f` prefix
    |
    = help: Add `f` prefix
 
-Suggested fix:
 19 19 | def raw_string():
 20 20 |     a = 4
 21 21 |     b = r"raw string with formatting: {a}"  # RUF027
@@ -118,7 +113,6 @@ RUF027_0.py:27:11: RUF027 [*] Possible f-string without an `f` prefix
    |
    = help: Add `f` prefix
 
-Suggested fix:
 24 24 | 
 25 25 | def print_name(name: str):
 26 26 |     a = 4
@@ -139,7 +133,6 @@ RUF027_0.py:28:11: RUF027 [*] Possible f-string without an `f` prefix
    |
    = help: Add `f` prefix
 
-Suggested fix:
 25 25 | def print_name(name: str):
 26 26 |     a = 4
 27 27 |     print("Hello, {name}!")  # RUF027
@@ -160,7 +153,6 @@ RUF027_0.py:33:33: RUF027 [*] Possible f-string without an `f` prefix
    |
    = help: Add `f` prefix
 
-Suggested fix:
 30 30 | 
 31 31 | def nested_funcs():
 32 32 |     a = 4
@@ -183,7 +175,6 @@ RUF027_0.py:39:19: RUF027 [*] Possible f-string without an `f` prefix
    |
    = help: Add `f` prefix
 
-Suggested fix:
 36 36 | def tripled_quoted():
 37 37 |     a = 4
 38 38 |     c = a
@@ -207,7 +198,6 @@ RUF027_0.py:41:22: RUF027 [*] Possible f-string without an `f` prefix
    |
    = help: Add `f` prefix
 
-Suggested fix:
 38 38 |     c = a
 39 39 |     single_line = """ {a} """  # RUF027
 40 40 |     # RUF027
@@ -231,7 +221,6 @@ RUF027_0.py:49:9: RUF027 [*] Possible f-string without an `f` prefix
    |
    = help: Add `f` prefix
 
-Suggested fix:
 46 46 | def single_quoted_multi_line():
 47 47 |     a = 4
 48 48 |     # RUF027
@@ -253,7 +242,6 @@ RUF027_0.py:56:9: RUF027 [*] Possible f-string without an `f` prefix
    |
    = help: Add `f` prefix
 
-Suggested fix:
 53 53 | 
 54 54 | def implicit_concat():
 55 55 |     a = 4
@@ -274,7 +262,6 @@ RUF027_0.py:57:18: RUF027 [*] Possible f-string without an `f` prefix
    |
    = help: Add `f` prefix
 
-Suggested fix:
 54 54 | def implicit_concat():
 55 55 |     a = 4
 56 56 |     b = "{a}" "+" "{b}" r" \\ "  # RUF027 for the first part only
@@ -295,7 +282,6 @@ RUF027_0.py:62:9: RUF027 [*] Possible f-string without an `f` prefix
    |
    = help: Add `f` prefix
 
-Suggested fix:
 59 59 | 
 60 60 | def escaped_chars():
 61 61 |     a = 4
@@ -318,7 +304,6 @@ RUF027_0.py:70:18: RUF027 [*] Possible f-string without an `f` prefix
    |
    = help: Add `f` prefix
 
-Suggested fix:
 67 67 |     value.method = print_name
 68 68 |     first = "Wendy"
 69 69 |     last = "Appleseed"
@@ -339,7 +324,6 @@ RUF027_0.py:74:9: RUF027 [*] Possible f-string without an `f` prefix
    |
    = help: Add `f` prefix
 
-Suggested fix:
 71 71 | 
 72 72 | def format_specifiers():
 73 73 |     a = 4

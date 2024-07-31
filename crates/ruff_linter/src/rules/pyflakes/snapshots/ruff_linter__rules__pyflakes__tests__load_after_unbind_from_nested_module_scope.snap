@@ -11,7 +11,6 @@ source: crates/ruff_linter/src/rules/pyflakes/mod.rs
   |
   = help: Remove assignment to unused variable `x`
 
-Suggested fix:
 4 4 | def f():
 5 5 |     try:
 6 6 |         pass
@@ -33,7 +32,6 @@ Suggested fix:
    |
    = help: Remove assignment to unused variable `x`
 
-Suggested fix:
 10 10 |     def g():
 11 11 |         try:
 12 12 |             pass

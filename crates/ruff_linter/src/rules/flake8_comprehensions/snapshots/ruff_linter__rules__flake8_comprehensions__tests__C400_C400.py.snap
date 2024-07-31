@@ -11,7 +11,6 @@ C400.py:2:13: C400 [*] Unnecessary generator (rewrite as a `list` comprehension)
   |
   = help: Rewrite as a `list` comprehension
 
-Suggested fix:
 1 1 | # Cannot combine with C416. Should use list comprehension here.
 2   |-even_nums = list(2 * x for x in range(3))
   2 |+even_nums = [2 * x for x in range(3)]
@@ -33,7 +32,6 @@ C400.py:3:12: C400 [*] Unnecessary generator (rewrite as a `list` comprehension)
   |
   = help: Rewrite as a `list` comprehension
 
-Suggested fix:
 1 1 | # Cannot combine with C416. Should use list comprehension here.
 2 2 | even_nums = list(2 * x for x in range(3))
 3   |-odd_nums = list(
@@ -57,7 +55,6 @@ C400.py:9:5: C400 [*] Unnecessary generator (rewrite using `list()`)
    |
    = help: Rewrite using `list()`
 
-Suggested fix:
 6  6  | 
 7  7  | 
 8  8  | # Short-circuit case, combine with C416 and should produce x = list(range(3))
@@ -83,7 +80,6 @@ C400.py:10:5: C400 [*] Unnecessary generator (rewrite using `list()`)
    |
    = help: Rewrite using `list()`
 
-Suggested fix:
 7  7  | 
 8  8  | # Short-circuit case, combine with C416 and should produce x = list(range(3))
 9  9  | x = list(x for x in range(3))
@@ -107,7 +103,6 @@ C400.py:15:1: C400 [*] Unnecessary generator (rewrite as a `list` comprehension)
    |
    = help: Rewrite as a `list` comprehension
 
-Suggested fix:
 12 12 | )
 13 13 | 
 14 14 | # Strip parentheses from inner generators.
@@ -129,7 +124,6 @@ C400.py:16:1: C400 [*] Unnecessary generator (rewrite as a `list` comprehension)
    |
    = help: Rewrite as a `list` comprehension
 
-Suggested fix:
 13 13 | 
 14 14 | # Strip parentheses from inner generators.
 15 15 | list((2 * x for x in range(3)))
@@ -152,7 +146,6 @@ C400.py:17:1: C400 [*] Unnecessary generator (rewrite as a `list` comprehension)
    |
    = help: Rewrite as a `list` comprehension
 
-Suggested fix:
 14 14 | # Strip parentheses from inner generators.
 15 15 | list((2 * x for x in range(3)))
 16 16 | list(((2 * x for x in range(3))))

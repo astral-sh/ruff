@@ -9,7 +9,6 @@ sys_exit_alias_0.py:1:1: PLR1722 [*] Use `sys.exit()` instead of `exit`
   |
   = help: Replace `exit` with `sys.exit()`
 
-Suggested fix:
 1   |-exit(0)
   1 |+import sys
   2 |+sys.exit(0)
@@ -27,7 +26,6 @@ sys_exit_alias_0.py:2:1: PLR1722 [*] Use `sys.exit()` instead of `quit`
   |
   = help: Replace `quit` with `sys.exit()`
 
-Suggested fix:
   1 |+import sys
 1 2 | exit(0)
 2   |-quit(0)
@@ -47,7 +45,6 @@ sys_exit_alias_0.py:6:5: PLR1722 [*] Use `sys.exit()` instead of `exit`
   |
   = help: Replace `exit` with `sys.exit()`
 
-Suggested fix:
   1 |+import sys
 1 2 | exit(0)
 2 3 | quit(0)
@@ -69,7 +66,6 @@ sys_exit_alias_0.py:7:5: PLR1722 [*] Use `sys.exit()` instead of `quit`
   |
   = help: Replace `quit` with `sys.exit()`
 
-Suggested fix:
   1 |+import sys
 1 2 | exit(0)
 2 3 | quit(0)

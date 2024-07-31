@@ -11,7 +11,6 @@ SIM117.py:2:1: SIM117 [*] Use a single `with` statement with multiple contexts i
   |
   = help: Combine `with` statements
 
-Suggested fix:
 1 1 | # SIM117
 2   |-with A() as a:
 3   |-    with B() as b:
@@ -35,7 +34,6 @@ SIM117.py:7:1: SIM117 [*] Use a single `with` statement with multiple contexts i
    |
    = help: Combine `with` statements
 
-Suggested fix:
 4  4  |         print("hello")
 5  5  | 
 6  6  | # SIM117
@@ -74,7 +72,6 @@ SIM117.py:19:1: SIM117 [*] Use a single `with` statement with multiple contexts 
    |
    = help: Combine `with` statements
 
-Suggested fix:
 16 16 |         print("hello")
 17 17 | 
 18 18 | # SIM117
@@ -101,7 +98,6 @@ SIM117.py:47:1: SIM117 [*] Use a single `with` statement with multiple contexts 
    |
    = help: Combine `with` statements
 
-Suggested fix:
 44 44 |         print("hello")
 45 45 | 
 46 46 | # SIM117
@@ -129,7 +125,6 @@ SIM117.py:53:5: SIM117 [*] Use a single `with` statement with multiple contexts 
    |
    = help: Combine `with` statements
 
-Suggested fix:
 50 50 | 
 51 51 | while True:
 52 52 |     # SIM117
@@ -169,7 +164,6 @@ SIM117.py:68:1: SIM117 [*] Use a single `with` statement with multiple contexts 
    |
    = help: Combine `with` statements
 
-Suggested fix:
 67 67 | # SIM117
 68 68 | with (
 69 69 |     A() as a,
@@ -198,7 +192,6 @@ SIM117.py:76:1: SIM117 [*] Use a single `with` statement with multiple contexts 
    |
    = help: Combine `with` statements
 
-Suggested fix:
 73 73 |         print("hello")
 74 74 | 
 75 75 | # SIM117
@@ -235,7 +228,6 @@ SIM117.py:84:1: SIM117 [*] Use a single `with` statement with multiple contexts 
    |
    = help: Combine `with` statements
 
-Suggested fix:
 83 83 | # SIM117
 84 84 | with (
 85 85 |     A() as a,
@@ -265,7 +257,6 @@ SIM117.py:95:1: SIM117 [*] Use a single `with` statement with multiple contexts 
    |
    = help: Combine `with` statements
 
-Suggested fix:
 92 92 |         print("hello")
 93 93 | 
 94 94 | # SIM117 (auto-fixable)
@@ -312,7 +303,6 @@ SIM117.py:126:1: SIM117 [*] Use a single `with` statement with multiple contexts
     |
     = help: Combine `with` statements
 
-Suggested fix:
 123 123 |             f(b2, c2, d2)
 124 124 | 
 125 125 | # SIM117
@@ -350,7 +340,6 @@ SIM117.py:163:1: SIM117 [*] Use a single `with` statement with multiple contexts
     |
     = help: Combine `with` statements
 
-Suggested fix:
 160 160 |                                     pass
 161 161 | 
 162 162 | # Do not suppress combination, if a context manager is already combined with another.

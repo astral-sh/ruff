@@ -10,7 +10,6 @@ PT007.py:4:35: PT007 [*] Wrong values type in `@pytest.mark.parametrize` expecte
   |
   = help: Use `list` of `tuple` for parameter values
 
-Suggested fix:
 1 1 | import pytest
 2 2 | 
 3 3 | 
@@ -37,7 +36,6 @@ PT007.py:11:5: PT007 [*] Wrong values type in `@pytest.mark.parametrize` expecte
    |
    = help: Use `list` of `tuple` for parameter values
 
-Suggested fix:
 8  8  | 
 9  9  | @pytest.mark.parametrize(
 10 10 |     ("param1", "param2"),
@@ -68,7 +66,6 @@ PT007.py:22:5: PT007 [*] Wrong values type in `@pytest.mark.parametrize` expecte
    |
    = help: Use `list` of `tuple` for parameter values
 
-Suggested fix:
 19 19 | 
 20 20 | @pytest.mark.parametrize(
 21 21 |     ("param1", "param2"),
@@ -95,7 +92,6 @@ PT007.py:23:9: PT007 [*] Wrong values type in `@pytest.mark.parametrize` expecte
    |
    = help: Use `list` of `tuple` for parameter values
 
-Suggested fix:
 20 20 | @pytest.mark.parametrize(
 21 21 |     ("param1", "param2"),
 22 22 |     (
@@ -118,7 +114,6 @@ PT007.py:24:9: PT007 [*] Wrong values type in `@pytest.mark.parametrize` expecte
    |
    = help: Use `list` of `tuple` for parameter values
 
-Suggested fix:
 21 21 |     ("param1", "param2"),
 22 22 |     (
 23 23 |         [1, 2],
@@ -141,7 +136,6 @@ PT007.py:50:9: PT007 [*] Wrong values type in `@pytest.mark.parametrize` expecte
    |
    = help: Use `list` of `tuple` for parameter values
 
-Suggested fix:
 47 47 | @pytest.mark.parametrize(
 48 48 |     ("param1", "param2"),
 49 49 |     [
@@ -164,7 +158,6 @@ PT007.py:51:9: PT007 [*] Wrong values type in `@pytest.mark.parametrize` expecte
    |
    = help: Use `list` of `tuple` for parameter values
 
-Suggested fix:
 48 48 |     ("param1", "param2"),
 49 49 |     [
 50 50 |         [1, 2],
@@ -187,7 +180,6 @@ PT007.py:61:9: PT007 [*] Wrong values type in `@pytest.mark.parametrize` expecte
    |
    = help: Use `list` of `tuple` for parameter values
 
-Suggested fix:
 58 58 | @pytest.mark.parametrize(
 59 59 |     "param1,param2",
 60 60 |     [
@@ -210,7 +202,6 @@ PT007.py:62:9: PT007 [*] Wrong values type in `@pytest.mark.parametrize` expecte
    |
    = help: Use `list` of `tuple` for parameter values
 
-Suggested fix:
 59 59 |     "param1,param2",
 60 60 |     [
 61 61 |         [1, 2],
@@ -232,7 +223,6 @@ PT007.py:81:38: PT007 [*] Wrong values type in `@pytest.mark.parametrize` expect
    |
    = help: Use `list` of `tuple` for parameter values
 
-Suggested fix:
 78 78 | 
 79 79 | 
 80 80 | @pytest.mark.parametrize("a", [1, 2])

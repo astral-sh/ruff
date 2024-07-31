@@ -122,7 +122,6 @@ fn stdin_error() {
       |
       = help: Remove unused import: `os`
 
-    Suggested fix:
     1   |-import os
 
         Run `ruff check --fix` to apply this fix.
@@ -151,7 +150,6 @@ fn stdin_filename() {
       |
       = help: Remove unused import: `os`
 
-    Suggested fix:
     1   |-import os
 
         Run `ruff check --fix` to apply this fix.
@@ -191,7 +189,6 @@ import bar   # unused import
       |
       = help: Remove unused import: `bar`
 
-    Suggested fix:
     1 1 | 
     2   |-import bar   # unused import
 
@@ -204,7 +201,6 @@ import bar   # unused import
       |
       = help: Remove unused import: `foo`
 
-    Suggested fix:
     1 1 | 
     2   |-import foo   # unused import
 
@@ -237,7 +233,6 @@ fn check_warn_stdin_filename_with_files() {
       |
       = help: Remove unused import: `os`
 
-    Suggested fix:
     1   |-import os
 
         Run `ruff check --fix` to apply this fix.
@@ -268,7 +263,6 @@ fn stdin_source_type_py() {
       |
       = help: Remove unused import: `os`
 
-    Suggested fix:
     1   |-import os
 
         Run `ruff check --fix` to apply this fix.
@@ -608,7 +602,6 @@ fn stdin_override_parser_ipynb() {
       |
       = help: Remove unused import: `os`
 
-    Suggested fix:
     1   |-import os
     2 1 | import sys
     3 2 | print(1)
@@ -623,7 +616,6 @@ fn stdin_override_parser_ipynb() {
       |
       = help: Remove unused import: `sys`
 
-    Suggested fix:
     1 1 | import os
     2   |-import sys
     3 2 | print(1)
@@ -660,7 +652,6 @@ fn stdin_override_parser_py() {
       |
       = help: Remove unused import: `os`
 
-    Suggested fix:
     1   |-import os
 
         Run `ruff check --fix` to apply this fix.
@@ -1555,7 +1546,6 @@ fn check_input_from_argfile() -> Result<()> {
           |
           = help: Remove unused import: `os`
 
-        Suggested fix:
         1   |-import os
 
             Run `ruff check --fix` to apply this fix.
@@ -1581,13 +1571,11 @@ fn check_hints_hidden_unsafe_fixes() {
     exit_code: 1
     ----- stdout -----
     -:1:1: RUF901 [*] Hey this is a stable test rule with a safe fix.
-    Suggested fix:
       1 |+# fix from stable-test-rule-safe-fix
 
         Run `ruff check --fix` to apply this fix.
 
     -:1:1: RUF902 Hey this is a stable test rule with an unsafe fix.
-    Suggested fix:
       1 |+# fix from stable-test-rule-unsafe-fix
 
         Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
@@ -1609,7 +1597,6 @@ fn check_hints_hidden_unsafe_fixes_with_no_safe_fixes() {
     exit_code: 1
     ----- stdout -----
     -:1:1: RUF902 Hey this is a stable test rule with an unsafe fix.
-    Suggested fix:
       1 |+# fix from stable-test-rule-unsafe-fix
     1 2 | x = {'a': 1, 'a': 1}
 
@@ -1633,13 +1620,11 @@ fn check_no_hint_for_hidden_unsafe_fixes_when_disabled() {
     exit_code: 1
     ----- stdout -----
     -:1:1: RUF901 [*] Hey this is a stable test rule with a safe fix.
-    Suggested fix:
       1 |+# fix from stable-test-rule-safe-fix
 
         Run `ruff check --fix` to apply this fix.
 
     -:1:1: RUF902 Hey this is a stable test rule with an unsafe fix.
-    Suggested fix:
       1 |+# fix from stable-test-rule-unsafe-fix
 
         Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
@@ -1663,7 +1648,6 @@ fn check_no_hint_for_hidden_unsafe_fixes_with_no_safe_fixes_when_disabled() {
     exit_code: 1
     ----- stdout -----
     -:1:1: RUF902 Hey this is a stable test rule with an unsafe fix.
-    Suggested fix:
       1 |+# fix from stable-test-rule-unsafe-fix
     1 2 | x = {'a': 1, 'a': 1}
 
@@ -1686,13 +1670,11 @@ fn check_shows_unsafe_fixes_with_opt_in() {
     exit_code: 1
     ----- stdout -----
     -:1:1: RUF901 [*] Hey this is a stable test rule with a safe fix.
-    Suggested fix:
       1 |+# fix from stable-test-rule-safe-fix
 
         Run `ruff check --fix` to apply this fix.
 
     -:1:1: RUF902 [*] Hey this is a stable test rule with an unsafe fix.
-    Suggested fix:
       1 |+# fix from stable-test-rule-unsafe-fix
 
         Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
@@ -1718,7 +1700,6 @@ fn fix_applies_safe_fixes_by_default() {
 
     ----- stderr -----
     -:1:1: RUF902 Hey this is a stable test rule with an unsafe fix.
-    Suggested fix:
       1 |+# fix from stable-test-rule-unsafe-fix
     1 2 | # fix from stable-test-rule-safe-fix
 
@@ -1761,7 +1742,6 @@ fn fix_does_not_apply_display_only_fixes() {
     def add_to_list(item, some_list=[]): ...
     ----- stderr -----
     -:1:1: RUF903 Hey this is a stable test rule with a display only fix.
-    Suggested fix:
       1 |+# fix from stable-test-rule-display-only-fix
     1 2 | def add_to_list(item, some_list=[]): ...
 
@@ -1785,7 +1765,6 @@ fn fix_does_not_apply_display_only_fixes_with_unsafe_fixes_enabled() {
     def add_to_list(item, some_list=[]): ...
     ----- stderr -----
     -:1:1: RUF903 Hey this is a stable test rule with a display only fix.
-    Suggested fix:
       1 |+# fix from stable-test-rule-display-only-fix
     1 2 | def add_to_list(item, some_list=[]): ...
 
@@ -1808,7 +1787,6 @@ fn fix_only_unsafe_fixes_available() {
 
     ----- stderr -----
     -:1:1: RUF902 Hey this is a stable test rule with an unsafe fix.
-    Suggested fix:
       1 |+# fix from stable-test-rule-unsafe-fix
 
         Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
@@ -1949,13 +1927,11 @@ extend-unsafe-fixes = ["RUF901"]
     exit_code: 1
     ----- stdout -----
     -:1:1: RUF901 Hey this is a stable test rule with a safe fix.
-    Suggested fix:
       1 |+# fix from stable-test-rule-safe-fix
 
         Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
     -:1:1: RUF902 Hey this is a stable test rule with an unsafe fix.
-    Suggested fix:
       1 |+# fix from stable-test-rule-unsafe-fix
 
         Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
@@ -1991,13 +1967,11 @@ extend-safe-fixes = ["RUF902"]
     exit_code: 1
     ----- stdout -----
     -:1:1: RUF901 [*] Hey this is a stable test rule with a safe fix.
-    Suggested fix:
       1 |+# fix from stable-test-rule-safe-fix
 
         Run `ruff check --fix` to apply this fix.
 
     -:1:1: RUF902 [*] Hey this is a stable test rule with an unsafe fix.
-    Suggested fix:
       1 |+# fix from stable-test-rule-unsafe-fix
 
         Run `ruff check --fix` to apply this fix.
@@ -2035,13 +2009,11 @@ extend-safe-fixes = ["RUF902"]
     exit_code: 1
     ----- stdout -----
     -:1:1: RUF901 [*] Hey this is a stable test rule with a safe fix.
-    Suggested fix:
       1 |+# fix from stable-test-rule-safe-fix
 
         Run `ruff check --fix` to apply this fix.
 
     -:1:1: RUF902 Hey this is a stable test rule with an unsafe fix.
-    Suggested fix:
       1 |+# fix from stable-test-rule-unsafe-fix
 
         Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
@@ -2082,7 +2054,6 @@ extend-safe-fixes = ["RUF9"]
     ----- stdout -----
     -:1:1: RUF900 Hey this is a stable test rule.
     -:1:1: RUF901 Hey this is a stable test rule with a safe fix.
-    Suggested fix:
       1 |+# fix from stable-test-rule-safe-fix
     1 2 | x = {'a': 1, 'a': 1}
     2 3 | print(('foo'))
@@ -2091,7 +2062,6 @@ extend-safe-fixes = ["RUF9"]
         Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
     -:1:1: RUF902 [*] Hey this is a stable test rule with an unsafe fix.
-    Suggested fix:
       1 |+# fix from stable-test-rule-unsafe-fix
     1 2 | x = {'a': 1, 'a': 1}
     2 3 | print(('foo'))
@@ -2100,7 +2070,6 @@ extend-safe-fixes = ["RUF9"]
         Run `ruff check --fix` to apply this fix.
 
     -:1:1: RUF903 Hey this is a stable test rule with a display only fix.
-    Suggested fix:
       1 |+# fix from stable-test-rule-display-only-fix
     1 2 | x = {'a': 1, 'a': 1}
     2 3 | print(('foo'))
@@ -2216,7 +2185,6 @@ select = ["RUF017"]
       |
       = help: Replace with `functools.reduce`
 
-    Suggested fix:
       1 |+import functools
       2 |+import operator
     1 3 | x = [1, 2, 3]

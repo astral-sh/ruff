@@ -12,7 +12,6 @@ FURB192.py:3:1: FURB192 [*] Prefer `min` over `sorted()` to compute the minimum 
   |
   = help: Replace with `min`
 
-Suggested fix:
 1 1 | # Errors
 2 2 | 
 3   |-sorted(l)[0]
@@ -34,7 +33,6 @@ FURB192.py:5:1: FURB192 [*] Prefer `max` over `sorted()` to compute the maximum 
   |
   = help: Replace with `max`
 
-Suggested fix:
 2 2 | 
 3 3 | sorted(l)[0]
 4 4 | 
@@ -57,7 +55,6 @@ FURB192.py:7:1: FURB192 [*] Prefer `max` over `sorted()` to compute the maximum 
   |
   = help: Replace with `max`
 
-Suggested fix:
 4 4 | 
 5 5 | sorted(l)[-1]
 6 6 | 
@@ -80,7 +77,6 @@ FURB192.py:9:1: FURB192 [*] Prefer `min` over `sorted()` to compute the minimum 
    |
    = help: Replace with `min`
 
-Suggested fix:
 6  6  | 
 7  7  | sorted(l, reverse=False)[-1]
 8  8  | 
@@ -103,7 +99,6 @@ FURB192.py:11:1: FURB192 [*] Prefer `min` over `sorted()` to compute the minimum
    |
    = help: Replace with `min`
 
-Suggested fix:
 8  8  | 
 9  9  | sorted(l, key=lambda x: x)[0]
 10 10 | 
@@ -126,7 +121,6 @@ FURB192.py:13:1: FURB192 [*] Prefer `min` over `sorted()` to compute the minimum
    |
    = help: Replace with `min`
 
-Suggested fix:
 10 10 | 
 11 11 | sorted(l, key=key_fn)[0]
 12 12 | 
@@ -149,7 +143,6 @@ FURB192.py:17:1: FURB192 [*] Prefer `min` over `sorted()` to compute the minimum
    |
    = help: Replace with `min`
 
-Suggested fix:
 14 14 | 
 15 15 | # Unsafe
 16 16 | 
@@ -172,7 +165,6 @@ FURB192.py:19:1: FURB192 [*] Prefer `max` over `sorted()` to compute the maximum
    |
    = help: Replace with `max`
 
-Suggested fix:
 16 16 | 
 17 17 | sorted(l, key=key_fn, reverse=True)[-1]
 18 18 | 
@@ -195,7 +187,6 @@ FURB192.py:21:1: FURB192 [*] Prefer `min` over `sorted()` to compute the minimum
    |
    = help: Replace with `min`
 
-Suggested fix:
 18 18 | 
 19 19 | sorted(l, reverse=True)[0]
 20 20 | 

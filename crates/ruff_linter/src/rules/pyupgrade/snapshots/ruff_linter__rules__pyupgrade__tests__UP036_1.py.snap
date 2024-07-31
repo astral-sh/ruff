@@ -12,7 +12,6 @@ UP036_1.py:3:4: UP036 [*] Version block is outdated for minimum Python version
   |
   = help: Remove outdated version block
 
-Suggested fix:
 1 1 | import sys
 2 2 | 
 3   |-if sys.version_info == 2:
@@ -37,7 +36,6 @@ UP036_1.py:8:4: UP036 [*] Version block is outdated for minimum Python version
    |
    = help: Remove outdated version block
 
-Suggested fix:
 5  5  | else:
 6  6  |     3
 7  7  | 
@@ -63,7 +61,6 @@ UP036_1.py:13:4: UP036 [*] Version block is outdated for minimum Python version
    |
    = help: Remove outdated version block
 
-Suggested fix:
 10 10 | else:
 11 11 |     3
 12 12 | 
@@ -89,7 +86,6 @@ UP036_1.py:18:4: UP036 [*] Version block is outdated for minimum Python version
    |
    = help: Remove outdated version block
 
-Suggested fix:
 15 15 | else:
 16 16 |     3
 17 17 | 
@@ -115,7 +111,6 @@ UP036_1.py:23:4: UP036 [*] Version block is outdated for minimum Python version
    |
    = help: Remove outdated version block
 
-Suggested fix:
 20 20 | else:
 21 21 |     2
 22 22 | 
@@ -141,7 +136,6 @@ UP036_1.py:28:4: UP036 [*] Version block is outdated for minimum Python version
    |
    = help: Remove outdated version block
 
-Suggested fix:
 25 25 | else:
 26 26 |     2
 27 27 | 
@@ -167,7 +161,6 @@ UP036_1.py:35:4: UP036 [*] Version block is outdated for minimum Python version
    |
    = help: Remove outdated version block
 
-Suggested fix:
 32 32 | 
 33 33 | from sys import version_info
 34 34 | 
@@ -193,7 +186,6 @@ UP036_1.py:42:6: UP036 [*] Version block is outdated for minimum Python version
    |
    = help: Remove outdated version block
 
-Suggested fix:
 39 39 | 
 40 40 | if True:
 41 41 |     print(1)
@@ -216,7 +208,6 @@ UP036_1.py:49:6: UP036 [*] Version block is outdated for minimum Python version
    |
    = help: Remove outdated version block
 
-Suggested fix:
 46 46 | 
 47 47 | if True:
 48 48 |     print(1)
@@ -241,7 +232,6 @@ UP036_1.py:56:6: UP036 [*] Version block is outdated for minimum Python version
    |
    = help: Remove outdated version block
 
-Suggested fix:
 53 53 | 
 54 54 | if True:
 55 55 |     print(1)
@@ -263,7 +253,6 @@ UP036_1.py:62:10: UP036 [*] Version block is outdated for minimum Python version
    |
    = help: Remove outdated version block
 
-Suggested fix:
 59 59 | def f():
 60 60 |     if True:
 61 61 |         print(1)
@@ -286,7 +275,6 @@ UP036_1.py:67:6: UP036 [*] Version block is outdated for minimum Python version
    |
    = help: Remove outdated version block
 
-Suggested fix:
 64 64 | 
 65 65 | if True:
 66 66 |     print(1)
@@ -308,7 +296,6 @@ UP036_1.py:75:10: UP036 [*] Version block is outdated for minimum Python version
    |
    = help: Remove outdated version block
 
-Suggested fix:
 72 72 | def f():
 73 73 |     if True:
 74 74 |         print(1)

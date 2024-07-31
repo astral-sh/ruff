@@ -12,7 +12,6 @@ E27.py:29:2: E274 [*] Tab before keyword
    |
    = help: Replace with single space
 
-Suggested fix:
 26 26 | #: E273
 27 27 | a and	b
 28 28 | #: E274
@@ -35,7 +34,6 @@ E27.py:31:5: E274 [*] Tab before keyword
    |
    = help: Replace with single space
 
-Suggested fix:
 28 28 | #: E274
 29 29 | a		and b
 30 30 | #: E273 E274

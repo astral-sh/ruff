@@ -12,7 +12,6 @@ PYI026.pyi:3:1: PYI026 [*] Use `typing_extensions.TypeAlias` for type alias, e.g
   |
   = help: Add `TypeAlias` annotation
 
-Suggested fix:
 1 1 | from typing import Literal, Any
   2 |+import typing_extensions
 2 3 | 
@@ -34,7 +33,6 @@ PYI026.pyi:4:1: PYI026 [*] Use `typing_extensions.TypeAlias` for type alias, e.g
   |
   = help: Add `TypeAlias` annotation
 
-Suggested fix:
 1 1 | from typing import Literal, Any
   2 |+import typing_extensions
 2 3 | 
@@ -58,7 +56,6 @@ PYI026.pyi:5:1: PYI026 [*] Use `typing_extensions.TypeAlias` for type alias, e.g
   |
   = help: Add `TypeAlias` annotation
 
-Suggested fix:
 1 1 | from typing import Literal, Any
   2 |+import typing_extensions
 2 3 | 
@@ -82,7 +79,6 @@ PYI026.pyi:6:1: PYI026 [*] Use `typing_extensions.TypeAlias` for type alias, e.g
   |
   = help: Add `TypeAlias` annotation
 
-Suggested fix:
 1 1 | from typing import Literal, Any
   2 |+import typing_extensions
 2 3 | 
@@ -108,7 +104,6 @@ PYI026.pyi:7:1: PYI026 [*] Use `typing_extensions.TypeAlias` for type alias, e.g
   |
   = help: Add `TypeAlias` annotation
 
-Suggested fix:
 1 1 | from typing import Literal, Any
   2 |+import typing_extensions
 2 3 | 
@@ -134,7 +129,6 @@ PYI026.pyi:17:5: PYI026 [*] Use `typing_extensions.TypeAlias` for type alias, e.
    |
    = help: Add `TypeAlias` annotation
 
-Suggested fix:
 1  1  | from typing import Literal, Any
    2  |+import typing_extensions
 2  3  | 

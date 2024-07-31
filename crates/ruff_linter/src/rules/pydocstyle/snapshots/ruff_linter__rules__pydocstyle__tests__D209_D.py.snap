@@ -13,7 +13,6 @@ D.py:281:5: D209 [*] Multi-line docstring closing quotes should be on a separate
     |
     = help: Move closing quotes to new line
 
-Suggested fix:
 280 280 | def asdfljdf24():
 281 281 |     """Summary.
 282 282 | 
@@ -38,7 +37,6 @@ D.py:588:5: D209 [*] Multi-line docstring closing quotes should be on a separate
     |
     = help: Move closing quotes to new line
 
-Suggested fix:
 587 587 | def asdfljdjgf24():
 588 588 |     """Summary.
 589 589 | 

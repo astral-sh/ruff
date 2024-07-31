@@ -10,7 +10,6 @@ RUF010.py:9:4: RUF010 [*] Use explicit conversion flag
    |
    = help: Replace with conversion flag
 
-Suggested fix:
 6  6  |     pass
 7  7  | 
 8  8  | 
@@ -31,7 +30,6 @@ RUF010.py:9:16: RUF010 [*] Use explicit conversion flag
    |
    = help: Replace with conversion flag
 
-Suggested fix:
 6  6  |     pass
 7  7  | 
 8  8  | 
@@ -52,7 +50,6 @@ RUF010.py:9:29: RUF010 [*] Use explicit conversion flag
    |
    = help: Replace with conversion flag
 
-Suggested fix:
 6  6  |     pass
 7  7  | 
 8  8  | 
@@ -75,7 +72,6 @@ RUF010.py:11:4: RUF010 [*] Use explicit conversion flag
    |
    = help: Replace with conversion flag
 
-Suggested fix:
 8  8  | 
 9  9  | f"{str(bla)}, {repr(bla)}, {ascii(bla)}"  # RUF010
 10 10 | 
@@ -98,7 +94,6 @@ RUF010.py:11:19: RUF010 [*] Use explicit conversion flag
    |
    = help: Replace with conversion flag
 
-Suggested fix:
 8  8  | 
 9  9  | f"{str(bla)}, {repr(bla)}, {ascii(bla)}"  # RUF010
 10 10 | 
@@ -121,7 +116,6 @@ RUF010.py:11:35: RUF010 [*] Use explicit conversion flag
    |
    = help: Replace with conversion flag
 
-Suggested fix:
 8  8  | 
 9  9  | f"{str(bla)}, {repr(bla)}, {ascii(bla)}"  # RUF010
 10 10 | 
@@ -144,7 +138,6 @@ RUF010.py:13:5: RUF010 [*] Use explicit conversion flag
    |
    = help: Replace with conversion flag
 
-Suggested fix:
 10 10 | 
 11 11 | f"{str(d['a'])}, {repr(d['b'])}, {ascii(d['c'])}"  # RUF010
 12 12 | 
@@ -167,7 +160,6 @@ RUF010.py:13:19: RUF010 [*] Use explicit conversion flag
    |
    = help: Replace with conversion flag
 
-Suggested fix:
 10 10 | 
 11 11 | f"{str(d['a'])}, {repr(d['b'])}, {ascii(d['c'])}"  # RUF010
 12 12 | 
@@ -190,7 +182,6 @@ RUF010.py:13:34: RUF010 [*] Use explicit conversion flag
    |
    = help: Replace with conversion flag
 
-Suggested fix:
 10 10 | 
 11 11 | f"{str(d['a'])}, {repr(d['b'])}, {ascii(d['c'])}"  # RUF010
 12 12 | 
@@ -213,7 +204,6 @@ RUF010.py:15:14: RUF010 [*] Use explicit conversion flag
    |
    = help: Replace with conversion flag
 
-Suggested fix:
 12 12 | 
 13 13 | f"{(str(bla))}, {(repr(bla))}, {(ascii(bla))}"  # RUF010
 14 14 | 
@@ -236,7 +226,6 @@ RUF010.py:15:29: RUF010 [*] Use explicit conversion flag
    |
    = help: Replace with conversion flag
 
-Suggested fix:
 12 12 | 
 13 13 | f"{(str(bla))}, {(repr(bla))}, {(ascii(bla))}"  # RUF010
 14 14 | 
@@ -258,7 +247,6 @@ RUF010.py:35:20: RUF010 [*] Use explicit conversion flag
    |
    = help: Replace with conversion flag
 
-Suggested fix:
 32 32 | (
 33 33 |     f"Member of tuple mismatches type at index {i}. Expected {of_shape_i}. Got "
 34 34 |     " intermediary content "

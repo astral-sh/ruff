@@ -12,7 +12,6 @@ E30.ipynb:45:1: E304 [*] Blank lines found after function decorator (1)
    |
    = help: Remove extraneous blank line(s)
 
-Suggested fix:
 41 41 | # end
 42 42 | # E304
 43 43 | @decorator

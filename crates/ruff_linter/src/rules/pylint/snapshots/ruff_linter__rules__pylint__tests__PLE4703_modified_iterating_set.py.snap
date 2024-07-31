@@ -12,7 +12,6 @@ modified_iterating_set.py:4:1: PLE4703 [*] Iterated set `nums` is modified withi
   |
   = help: Iterate over a copy of `nums`
 
-Suggested fix:
 1 1 | # Errors
 2 2 | 
 3 3 | nums = {1, 2, 3}
@@ -35,7 +34,6 @@ modified_iterating_set.py:8:1: PLE4703 [*] Iterated set `animals` is modified wi
    |
    = help: Iterate over a copy of `animals`
 
-Suggested fix:
 5 5 |     nums.add(num + 1)
 6 6 | 
 7 7 | animals = {"dog", "cat", "cow"}
@@ -58,7 +56,6 @@ modified_iterating_set.py:12:1: PLE4703 [*] Iterated set `fruits` is modified wi
    |
    = help: Iterate over a copy of `fruits`
 
-Suggested fix:
 9  9  |     animals.pop("cow")
 10 10 | 
 11 11 | fruits = {"apple", "orange", "grape"}
@@ -81,7 +78,6 @@ modified_iterating_set.py:16:1: PLE4703 [*] Iterated set `planets` is modified w
    |
    = help: Iterate over a copy of `planets`
 
-Suggested fix:
 13 13 |     fruits.clear()
 14 14 | 
 15 15 | planets = {"mercury", "venus", "earth"}
@@ -104,7 +100,6 @@ modified_iterating_set.py:20:1: PLE4703 [*] Iterated set `colors` is modified wi
    |
    = help: Iterate over a copy of `colors`
 
-Suggested fix:
 17 17 |     planets.discard("mercury")
 18 18 | 
 19 19 | colors = {"red", "green", "blue"}
@@ -128,7 +123,6 @@ modified_iterating_set.py:24:1: PLE4703 [*] Iterated set `odds` is modified with
    |
    = help: Iterate over a copy of `odds`
 
-Suggested fix:
 21 21 |     colors.remove("red")
 22 22 | 
 23 23 | odds = {1, 3, 5}

@@ -12,7 +12,6 @@ E22.py:131:6: E228 [*] Missing whitespace around modulo operator
     |
     = help: Add missing whitespace
 
-Suggested fix:
 128 128 | #: E227
 129 129 | c = b^a
 130 130 | #: E228
@@ -35,7 +34,6 @@ E22.py:133:10: E228 [*] Missing whitespace around modulo operator
     |
     = help: Add missing whitespace
 
-Suggested fix:
 130 130 | #: E228
 131 131 | a = b%c
 132 132 | #: E228
@@ -57,7 +55,6 @@ E22.py:135:26: E228 [*] Missing whitespace around modulo operator
     |
     = help: Add missing whitespace
 
-Suggested fix:
 132 132 | #: E228
 133 133 | msg = fmt%(errno, errmsg)
 134 134 | #: E228

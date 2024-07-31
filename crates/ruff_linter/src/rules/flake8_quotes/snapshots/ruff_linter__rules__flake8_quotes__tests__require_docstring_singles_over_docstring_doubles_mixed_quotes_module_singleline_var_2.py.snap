@@ -10,7 +10,6 @@ docstring_doubles_mixed_quotes_module_singleline_var_2.py:1:1: Q002 [*] Double q
   |
   = help: Replace double quotes docstring with single quotes
 
-Suggested fix:
 1   |-"Do not"' start with empty string' ' and lint docstring safely'
   1 |+'Do not'' start with empty string' ' and lint docstring safely'
 2 2 | 

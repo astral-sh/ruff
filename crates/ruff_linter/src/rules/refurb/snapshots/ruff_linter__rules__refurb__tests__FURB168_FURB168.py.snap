@@ -11,7 +11,6 @@ FURB168.py:5:4: FURB168 [*] Prefer `is` operator over `isinstance` to check if a
   |
   = help: Replace with `is` operator
 
-Suggested fix:
 2 2 | 
 3 3 | # Errors.
 4 4 | 
@@ -33,7 +32,6 @@ FURB168.py:8:4: FURB168 [*] Prefer `is` operator over `isinstance` to check if a
   |
   = help: Replace with `is` operator
 
-Suggested fix:
 5 5 | if isinstance(foo, type(None)):
 6 6 |     pass
 7 7 | 
@@ -55,7 +53,6 @@ FURB168.py:11:4: FURB168 [*] Prefer `is` operator over `isinstance` to check if 
    |
    = help: Replace with `is` operator
 
-Suggested fix:
 8  8  | if isinstance(foo, (type(None))):
 9  9  |     pass
 10 10 | 
@@ -77,7 +74,6 @@ FURB168.py:14:4: FURB168 [*] Prefer `is` operator over `isinstance` to check if 
    |
    = help: Replace with `is` operator
 
-Suggested fix:
 11 11 | if isinstance(foo, (type(None), type(None), type(None))):
 12 12 |     pass
 13 13 | 
@@ -99,7 +95,6 @@ FURB168.py:17:4: FURB168 [*] Prefer `is` operator over `isinstance` to check if 
    |
    = help: Replace with `is` operator
 
-Suggested fix:
 14 14 | if isinstance(foo, None | None):
 15 15 |     pass
 16 16 | 
@@ -121,7 +116,6 @@ FURB168.py:20:4: FURB168 [*] Prefer `is` operator over `isinstance` to check if 
    |
    = help: Replace with `is` operator
 
-Suggested fix:
 17 17 | if isinstance(foo, (None | None)):
 18 18 |     pass
 19 19 | 
@@ -143,7 +137,6 @@ FURB168.py:23:4: FURB168 [*] Prefer `is` operator over `isinstance` to check if 
    |
    = help: Replace with `is` operator
 
-Suggested fix:
 20 20 | if isinstance(foo, None | type(None)):
 21 21 |     pass
 22 22 | 
@@ -164,7 +157,6 @@ FURB168.py:27:4: FURB168 [*] Prefer `is` operator over `isinstance` to check if 
    |
    = help: Replace with `is` operator
 
-Suggested fix:
 24 24 |     pass
 25 25 | 
 26 26 | # A bit contrived, but is both technically valid and equivalent to the above.

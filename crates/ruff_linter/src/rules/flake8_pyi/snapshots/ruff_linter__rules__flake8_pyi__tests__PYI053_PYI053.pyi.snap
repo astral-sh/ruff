@@ -12,7 +12,6 @@ PYI053.pyi:7:14: PYI053 [*] String and bytes literals longer than 50 characters 
   |
   = help: Replace with `...`
 
-Suggested fix:
 4 4 | 
 5 5 | def f1(x: str = "50 character stringggggggggggggggggggggggggggggggg") -> None: ...  # OK
 6 6 | def f2(
@@ -35,7 +34,6 @@ PYI053.pyi:13:14: PYI053 [*] String and bytes literals longer than 50 characters
    |
    = help: Replace with `...`
 
-Suggested fix:
 10 10 |     x: str = "50 character stringgggggggggggggggggggggggggggggg\U0001f600",  # OK
 11 11 | ) -> None: ...
 12 12 | def f4(
@@ -57,7 +55,6 @@ PYI053.pyi:25:16: PYI053 [*] String and bytes literals longer than 50 characters
    |
    = help: Replace with `...`
 
-Suggested fix:
 22 22 |     x: bytes = b"50 character byte stringggggggggggggggggggggggggg\xff",  # OK
 23 23 | ) -> None: ...
 24 24 | def f8(
@@ -80,7 +77,6 @@ PYI053.pyi:30:12: PYI053 [*] String and bytes literals longer than 50 characters
    |
    = help: Replace with `...`
 
-Suggested fix:
 27 27 | 
 28 28 | foo: str = "50 character stringggggggggggggggggggggggggggggggg"  # OK
 29 29 | 
@@ -103,7 +99,6 @@ PYI053.pyi:34:14: PYI053 [*] String and bytes literals longer than 50 characters
    |
    = help: Replace with `...`
 
-Suggested fix:
 31 31 | 
 32 32 | baz: bytes = b"50 character byte stringgggggggggggggggggggggggggg"  # OK
 33 33 | 
@@ -126,7 +121,6 @@ PYI053.pyi:38:13: PYI053 [*] String and bytes literals longer than 50 characters
    |
    = help: Replace with `...`
 
-Suggested fix:
 35 35 | 
 36 36 | ffoo: str = f"50 character stringggggggggggggggggggggggggggggggg"  # OK
 37 37 | 
@@ -148,7 +142,6 @@ PYI053.pyi:64:5: PYI053 [*] String and bytes literals longer than 50 characters 
    |
    = help: Replace with `...`
 
-Suggested fix:
 61 61 | ) -> Callable[[Callable[[], None]], Callable[[], None]]: ...
 62 62 | 
 63 63 | @not_warnings_dot_deprecated(
@@ -169,7 +162,6 @@ PYI053.pyi:68:13: PYI053 [*] String and bytes literals longer than 50 characters
    |
    = help: Replace with `...`
 
-Suggested fix:
 65 65 | )
 66 66 | def not_a_deprecated_function() -> None: ...
 67 67 | 

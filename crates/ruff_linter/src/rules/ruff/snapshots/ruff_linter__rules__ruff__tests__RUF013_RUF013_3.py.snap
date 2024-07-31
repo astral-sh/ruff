@@ -9,7 +9,6 @@ RUF013_3.py:4:12: RUF013 [*] PEP 484 prohibits implicit `Optional`
   |
   = help: Convert to `T | None`
 
-Suggested fix:
 1 1 | import typing
 2 2 | 
 3 3 | 
@@ -29,7 +28,6 @@ RUF013_3.py:22:12: RUF013 [*] PEP 484 prohibits implicit `Optional`
    |
    = help: Convert to `T | None`
 
-Suggested fix:
 19 19 |     pass
 20 20 | 
 21 21 | 
@@ -49,7 +47,6 @@ RUF013_3.py:29:12: RUF013 [*] PEP 484 prohibits implicit `Optional`
    |
    = help: Convert to `T | None`
 
-Suggested fix:
 26 26 | # Literal
 27 27 | 
 28 28 | 

@@ -11,7 +11,6 @@ LOG009.py:4:5: LOG009 [*] Use of undocumented `logging.WARN` constant
   |
   = help: Replace `logging.WARN` with `logging.WARNING`
 
-Suggested fix:
 1 1 | def func():
 2 2 |     import logging
 3 3 | 
@@ -33,7 +32,6 @@ LOG009.py:11:5: LOG009 [*] Use of undocumented `logging.WARN` constant
    |
    = help: Replace `logging.WARN` with `logging.WARNING`
 
-Suggested fix:
 8  8  | def func():
 9  9  |     from logging import WARN, WARNING
 10 10 | 

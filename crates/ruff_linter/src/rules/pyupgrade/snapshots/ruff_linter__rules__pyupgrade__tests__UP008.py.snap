@@ -11,7 +11,6 @@ UP008.py:17:23: UP008 [*] Use `super()` instead of `super(__class__, self)`
    |
    = help: Remove `__super__` parameters
 
-ℹ Unsafe fix
 14 14 |         Parent.super(1, 2)  # ok
 15 15 | 
 16 16 |     def wrong(self):
@@ -20,6 +19,8 @@ UP008.py:17:23: UP008 [*] Use `super()` instead of `super(__class__, self)`
 18 18 |         super(Child, self).method  # wrong
 19 19 |         super(
 20 20 |             Child,
+
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 UP008.py:18:14: UP008 [*] Use `super()` instead of `super(__class__, self)`
    |
@@ -32,7 +33,6 @@ UP008.py:18:14: UP008 [*] Use `super()` instead of `super(__class__, self)`
    |
    = help: Remove `__super__` parameters
 
-ℹ Unsafe fix
 15 15 | 
 16 16 |     def wrong(self):
 17 17 |         parent = super(Child, self)  # wrong
@@ -41,6 +41,8 @@ UP008.py:18:14: UP008 [*] Use `super()` instead of `super(__class__, self)`
 19 19 |         super(
 20 20 |             Child,
 21 21 |             self,
+
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 UP008.py:19:14: UP008 [*] Use `super()` instead of `super(__class__, self)`
    |
@@ -55,7 +57,6 @@ UP008.py:19:14: UP008 [*] Use `super()` instead of `super(__class__, self)`
    |
    = help: Remove `__super__` parameters
 
-ℹ Unsafe fix
 16 16 |     def wrong(self):
 17 17 |         parent = super(Child, self)  # wrong
 18 18 |         super(Child, self).method  # wrong
@@ -68,6 +69,8 @@ UP008.py:19:14: UP008 [*] Use `super()` instead of `super(__class__, self)`
 24 21 | 
 25 22 | class BaseClass:
 
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
+
 UP008.py:36:14: UP008 [*] Use `super()` instead of `super(__class__, self)`
    |
 34 | class MyClass(BaseClass):
@@ -78,7 +81,6 @@ UP008.py:36:14: UP008 [*] Use `super()` instead of `super(__class__, self)`
    |
    = help: Remove `__super__` parameters
 
-ℹ Unsafe fix
 33 33 | 
 34 34 | class MyClass(BaseClass):
 35 35 |     def normal(self):
@@ -87,6 +89,8 @@ UP008.py:36:14: UP008 [*] Use `super()` instead of `super(__class__, self)`
 37 37 |         super().f()
 38 38 | 
 39 39 |     def different_argument(self, other):
+
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 UP008.py:50:18: UP008 [*] Use `super()` instead of `super(__class__, self)`
    |
@@ -97,7 +101,6 @@ UP008.py:50:18: UP008 [*] Use `super()` instead of `super(__class__, self)`
    |
    = help: Remove `__super__` parameters
 
-ℹ Unsafe fix
 47 47 |             super(MyClass, self).f()  # CANNOT use super()
 48 48 | 
 49 49 |         def inner_argument(self):
@@ -106,6 +109,8 @@ UP008.py:50:18: UP008 [*] Use `super()` instead of `super(__class__, self)`
 51 51 |             super().f()
 52 52 | 
 53 53 |         outer_argument()
+
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.
 
 UP008.py:74:14: UP008 [*] Use `super()` instead of `super(__class__, self)`
    |
@@ -117,7 +122,6 @@ UP008.py:74:14: UP008 [*] Use `super()` instead of `super(__class__, self)`
    |
    = help: Remove `__super__` parameters
 
-ℹ Unsafe fix
 71 71 | @dataclass
 72 72 | class DataClass:
 73 73 |     def normal(self):
@@ -125,4 +129,6 @@ UP008.py:74:14: UP008 [*] Use `super()` instead of `super(__class__, self)`
    74 |+        super().f()  # Error
 75 75 |         super().f()  # OK
 76 76 | 
-77 77 |
+77 77 | 
+
+    Run `ruff check --fix --unsafe-fixes` to apply this unsafe fix.

@@ -22,7 +22,6 @@ NPY201_2.py:6:5: NPY201 [*] `np.PINF` will be removed in NumPy 2.0. Use `numpy.i
   |
   = help: Replace with `numpy.inf`
 
-Suggested fix:
 3 3 | 
 4 4 |     np.obj2sctype(int)
 5 5 | 
@@ -45,7 +44,6 @@ NPY201_2.py:8:5: NPY201 [*] `np.PZERO` will be removed in NumPy 2.0. Use `0.0` i
    |
    = help: Replace with `0.0`
 
-Suggested fix:
 5 5 | 
 6 6 |     np.PINF
 7 7 | 
@@ -88,7 +86,6 @@ NPY201_2.py:14:5: NPY201 [*] `np.round_` will be removed in NumPy 2.0. Use `nump
    |
    = help: Replace with `numpy.round`
 
-Suggested fix:
 11 11 | 
 12 12 |     np.recfromtxt
 13 13 | 
@@ -111,7 +108,6 @@ NPY201_2.py:16:5: NPY201 [*] `np.safe_eval` will be removed in NumPy 2.0. Use `a
    |
    = help: Replace with `ast.literal_eval`
 
-Suggested fix:
    1  |+from ast import literal_eval
 1  2  | def func():
 2  3  |     import numpy as np
@@ -179,7 +175,6 @@ NPY201_2.py:28:5: NPY201 [*] `np.singlecomplex` will be removed in NumPy 2.0. Us
    |
    = help: Replace with `numpy.complex64`
 
-Suggested fix:
 25 25 | 
 26 26 |     np.set_string_function
 27 27 | 
@@ -202,7 +197,6 @@ NPY201_2.py:30:5: NPY201 [*] `np.string_` will be removed in NumPy 2.0. Use `num
    |
    = help: Replace with `numpy.bytes_`
 
-Suggested fix:
 27 27 | 
 28 28 |     np.singlecomplex(12+1j)
 29 29 | 
@@ -225,7 +219,6 @@ NPY201_2.py:32:5: NPY201 [*] `np.source` will be removed in NumPy 2.0. Use `insp
    |
    = help: Replace with `inspect.getsource`
 
-Suggested fix:
    1  |+from inspect import getsource
 1  2  | def func():
 2  3  |     import numpy as np
@@ -253,7 +246,6 @@ NPY201_2.py:34:5: NPY201 [*] `np.tracemalloc_domain` will be removed in NumPy 2.
    |
    = help: Replace with `numpy.lib.tracemalloc_domain`
 
-Suggested fix:
    1  |+from numpy.lib import tracemalloc_domain
 1  2  | def func():
 2  3  |     import numpy as np
@@ -281,7 +273,6 @@ NPY201_2.py:36:5: NPY201 [*] `np.unicode_` will be removed in NumPy 2.0. Use `nu
    |
    = help: Replace with `numpy.str_`
 
-Suggested fix:
 33 33 | 
 34 34 |     np.tracemalloc_domain
 35 35 | 
@@ -314,7 +305,6 @@ NPY201_2.py:40:5: NPY201 [*] `np.row_stack` will be removed in NumPy 2.0. Use `n
    |
    = help: Replace with `numpy.vstack`
 
-Suggested fix:
 37 37 | 
 38 38 |     np.who()
 39 39 | 
@@ -337,7 +327,6 @@ NPY201_2.py:42:5: NPY201 [*] `np.alltrue` will be removed in NumPy 2.0. Use `num
    |
    = help: Replace with `numpy.all`
 
-Suggested fix:
 39 39 | 
 40 40 |     np.row_stack(([1,2], [3,4]))
 41 41 | 
@@ -360,7 +349,6 @@ NPY201_2.py:44:5: NPY201 [*] `np.sometrue` will be removed in NumPy 2.0. Use `nu
    |
    = help: Replace with `numpy.any`
 
-Suggested fix:
 41 41 | 
 42 42 |     np.alltrue([True, True])
 43 43 | 
@@ -383,7 +371,6 @@ NPY201_2.py:46:5: NPY201 [*] `np.cumproduct` will be removed in NumPy 2.0. Use `
    |
    = help: Replace with `numpy.cumprod`
 
-Suggested fix:
 43 43 | 
 44 44 |     np.sometrue([True, False])
 45 45 | 
@@ -406,7 +393,6 @@ NPY201_2.py:48:5: NPY201 [*] `np.product` will be removed in NumPy 2.0. Use `num
    |
    = help: Replace with `numpy.prod`
 
-Suggested fix:
 45 45 | 
 46 46 |     np.cumproduct([1, 2, 3])
 47 47 | 
@@ -429,7 +415,6 @@ NPY201_2.py:50:5: NPY201 [*] `np.trapz` will be removed in NumPy 2.0. Use `numpy
    |
    = help: Replace with `numpy.trapezoid` (requires NumPy 2.0 or greater)
 
-Suggested fix:
 47 47 | 
 48 48 |     np.product([1, 2, 3])
 49 49 | 
@@ -452,7 +437,6 @@ NPY201_2.py:52:5: NPY201 [*] `np.in1d` will be removed in NumPy 2.0. Use `numpy.
    |
    = help: Replace with `numpy.isin`
 
-Suggested fix:
 49 49 | 
 50 50 |     np.trapz([1, 2, 3])
 51 51 | 
@@ -475,7 +459,6 @@ NPY201_2.py:54:5: NPY201 [*] `np.AxisError` will be removed in NumPy 2.0. Use `n
    |
    = help: Replace with `numpy.exceptions.AxisError`
 
-Suggested fix:
    1  |+from numpy.exceptions import AxisError
 1  2  | def func():
 2  3  |     import numpy as np
@@ -503,7 +486,6 @@ NPY201_2.py:56:5: NPY201 [*] `np.ComplexWarning` will be removed in NumPy 2.0. U
    |
    = help: Replace with `numpy.exceptions.ComplexWarning`
 
-Suggested fix:
    1  |+from numpy.exceptions import ComplexWarning
 1  2  | def func():
 2  3  |     import numpy as np
@@ -531,7 +513,6 @@ NPY201_2.py:58:5: NPY201 [*] `np.compare_chararrays` will be removed in NumPy 2.
    |
    = help: Replace with `numpy.char.compare_chararrays`
 
-Suggested fix:
    1  |+from numpy.char import compare_chararrays
 1  2  | def func():
 2  3  |     import numpy as np
@@ -559,7 +540,6 @@ NPY201_2.py:63:9: NPY201 [*] `np.alltrue` will be removed in NumPy 2.0. Use `num
    |
    = help: Replace with `numpy.all`
 
-Suggested fix:
 60 60 |     try:
 61 61 |         np.all([True, True])
 62 62 |     except TypeError:
@@ -581,7 +561,6 @@ NPY201_2.py:68:9: NPY201 [*] `np.sometrue` will be removed in NumPy 2.0. Use `nu
    |
    = help: Replace with `numpy.any`
 
-Suggested fix:
 65 65 |     try:
 66 66 |         np.anyyyy([True, True])
 67 67 |     except AttributeError:

@@ -8,7 +8,6 @@ UP032_1.py:1:1: UP032 [*] Use f-string instead of `format` call
   |
   = help: Convert to f-string
 
-Suggested fix:
 1   |-"{} {}".format(a, b)  # Intentionally at start-of-file, to ensure graceful handling.
   1 |+f"{a} {b}"  # Intentionally at start-of-file, to ensure graceful handling.
 

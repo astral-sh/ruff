@@ -10,7 +10,6 @@ useless_return.py:6:5: PLR1711 [*] Useless `return` statement at end of function
   |
   = help: Remove useless `return` statement
 
-Suggested fix:
 3 3 | 
 4 4 | def print_python_version():
 5 5 |     print(sys.version)
@@ -30,7 +29,6 @@ useless_return.py:11:5: PLR1711 [*] Useless `return` statement at end of functio
    |
    = help: Remove useless `return` statement
 
-Suggested fix:
 8  8  | 
 9  9  | def print_python_version():
 10 10 |     print(sys.version)
@@ -50,7 +48,6 @@ useless_return.py:16:5: PLR1711 [*] Useless `return` statement at end of functio
    |
    = help: Remove useless `return` statement
 
-Suggested fix:
 13 13 | 
 14 14 | def print_python_version():
 15 15 |     print(sys.version)
@@ -70,7 +67,6 @@ useless_return.py:22:9: PLR1711 [*] Useless `return` statement at end of functio
    |
    = help: Remove useless `return` statement
 
-Suggested fix:
 19 19 | class SomeClass:
 20 20 |     def print_python_version(self):
 21 21 |         print(sys.version)
@@ -90,7 +86,6 @@ useless_return.py:50:5: PLR1711 [*] Useless `return` statement at end of functio
    |
    = help: Remove useless `return` statement
 
-Suggested fix:
 47 47 | def print_python_version():
 48 48 |     """This function returns None."""
 49 49 |     print(sys.version)
@@ -110,7 +105,6 @@ useless_return.py:60:9: PLR1711 [*] Useless `return` statement at end of functio
    |
    = help: Remove useless `return` statement
 
-Suggested fix:
 57 57 | 
 58 58 |     def get(self, key: str) -> None:
 59 59 |         print(f"{key} not found")

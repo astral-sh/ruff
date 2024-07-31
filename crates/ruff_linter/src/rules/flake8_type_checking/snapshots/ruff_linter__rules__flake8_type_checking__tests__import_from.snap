@@ -11,7 +11,6 @@ source: crates/ruff_linter/src/rules/flake8_type_checking/mod.rs
   |
   = help: Move into type-checking block
 
-Suggested fix:
 2  2  | from __future__ import annotations
 3  3  | 
 4  4  | from pandas import (

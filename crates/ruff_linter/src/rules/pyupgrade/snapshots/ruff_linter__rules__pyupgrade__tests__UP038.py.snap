@@ -9,7 +9,6 @@ UP038.py:1:1: UP038 [*] Use `X | Y` in `isinstance` call instead of `(X, Y)`
   |
   = help: Convert to `X | Y`
 
-Suggested fix:
 1   |-isinstance(1, (int, float))  # UP038
   1 |+isinstance(1, int | float)  # UP038
 2 2 | issubclass("yes", (int, float, str))  # UP038
@@ -28,7 +27,6 @@ UP038.py:2:1: UP038 [*] Use `X | Y` in `issubclass` call instead of `(X, Y)`
   |
   = help: Convert to `X | Y`
 
-Suggested fix:
 1 1 | isinstance(1, (int, float))  # UP038
 2   |-issubclass("yes", (int, float, str))  # UP038
   2 |+issubclass("yes", int | float | str)  # UP038

@@ -10,7 +10,6 @@ PYI013.py:3:5: PYI013 [*] Non-empty class body must not contain `...`
   |
   = help: Remove unnecessary `...`
 
-Suggested fix:
 1 1 | class OneAttributeClass:
 2 2 |     value: int
 3   |-    ...
@@ -29,7 +28,6 @@ PYI013.py:7:5: PYI013 [*] Non-empty class body must not contain `...`
   |
   = help: Remove unnecessary `...`
 
-Suggested fix:
 4 4 | 
 5 5 | 
 6 6 | class OneAttributeClass2:
@@ -49,7 +47,6 @@ PYI013.py:12:5: PYI013 [*] Non-empty class body must not contain `...`
    |
    = help: Remove unnecessary `...`
 
-Suggested fix:
 10 10 | 
 11 11 | class TwoEllipsesClass:
 12 12 |     ...
@@ -69,7 +66,6 @@ PYI013.py:13:5: PYI013 [*] Non-empty class body must not contain `...`
    |
    = help: Remove unnecessary `...`
 
-Suggested fix:
 10 10 | 
 11 11 | class TwoEllipsesClass:
 12 12 |     ...
@@ -89,7 +85,6 @@ PYI013.py:21:5: PYI013 [*] Non-empty class body must not contain `...`
    |
    = help: Remove unnecessary `...`
 
-Suggested fix:
 18 18 |     My body only contains an ellipsis.
 19 19 |     """
 20 20 | 
@@ -109,7 +104,6 @@ PYI013.py:26:5: PYI013 [*] Non-empty class body must not contain `...`
    |
    = help: Remove unnecessary `...`
 
-Suggested fix:
 23 23 | 
 24 24 | class NonEmptyChild(Exception):
 25 25 |     value: int
@@ -129,7 +123,6 @@ PYI013.py:30:5: PYI013 [*] Non-empty class body must not contain `...`
    |
    = help: Remove unnecessary `...`
 
-Suggested fix:
 27 27 | 
 28 28 | 
 29 29 | class NonEmptyChild2(Exception):
@@ -151,7 +144,6 @@ PYI013.py:36:5: PYI013 [*] Non-empty class body must not contain `...`
    |
    = help: Remove unnecessary `...`
 
-Suggested fix:
 33 33 | 
 34 34 | class NonEmptyWithInit:
 35 35 |     value: int

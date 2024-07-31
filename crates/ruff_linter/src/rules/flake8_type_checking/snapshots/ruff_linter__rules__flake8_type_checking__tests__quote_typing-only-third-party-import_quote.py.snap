@@ -11,7 +11,6 @@ quote.py:2:24: TCH002 [*] Move third-party import `pandas.DataFrame` into a type
   |
   = help: Move into type-checking block
 
-Suggested fix:
 1   |-def f():
   1 |+from typing import TYPE_CHECKING
   2 |+
@@ -37,7 +36,6 @@ quote.py:9:24: TCH002 [*] Move third-party import `pandas.DataFrame` into a type
    |
    = help: Move into type-checking block
 
-Suggested fix:
    1  |+from typing import TYPE_CHECKING
    2  |+
    3  |+if TYPE_CHECKING:
@@ -79,7 +77,6 @@ quote.py:23:22: TCH002 [*] Move third-party import `pandas` into a type-checking
    |
    = help: Move into type-checking block
 
-Suggested fix:
    1  |+from typing import TYPE_CHECKING
    2  |+
    3  |+if TYPE_CHECKING:
@@ -111,7 +108,6 @@ quote.py:30:22: TCH002 [*] Move third-party import `pandas` into a type-checking
    |
    = help: Move into type-checking block
 
-Suggested fix:
    1  |+from typing import TYPE_CHECKING
    2  |+
    3  |+if TYPE_CHECKING:
@@ -143,7 +139,6 @@ quote.py:37:22: TCH002 [*] Move third-party import `pandas` into a type-checking
    |
    = help: Move into type-checking block
 
-Suggested fix:
    1  |+from typing import TYPE_CHECKING
    2  |+
    3  |+if TYPE_CHECKING:
@@ -175,7 +170,6 @@ quote.py:45:24: TCH002 [*] Move third-party import `pandas.DataFrame` into a typ
    |
    = help: Move into type-checking block
 
-Suggested fix:
    1  |+from typing import TYPE_CHECKING
    2  |+
    3  |+if TYPE_CHECKING:
@@ -218,7 +212,6 @@ quote.py:71:24: TCH002 [*] Move third-party import `pandas.DataFrame` into a typ
    |
    = help: Move into type-checking block
 
-Suggested fix:
    1  |+from typing import TYPE_CHECKING
    2  |+
    3  |+if TYPE_CHECKING:
@@ -250,7 +243,6 @@ quote.py:71:35: TCH002 [*] Move third-party import `pandas.Series` into a type-c
    |
    = help: Move into type-checking block
 
-Suggested fix:
    1  |+from typing import TYPE_CHECKING
    2  |+
    3  |+if TYPE_CHECKING:
@@ -282,7 +274,6 @@ quote.py:78:24: TCH002 [*] Move third-party import `pandas.DataFrame` into a typ
    |
    = help: Move into type-checking block
 
-Suggested fix:
    1  |+from typing import TYPE_CHECKING
    2  |+
    3  |+if TYPE_CHECKING:
@@ -327,7 +318,6 @@ quote.py:78:35: TCH002 [*] Move third-party import `pandas.Series` into a type-c
    |
    = help: Move into type-checking block
 
-Suggested fix:
    1  |+from typing import TYPE_CHECKING
    2  |+
    3  |+if TYPE_CHECKING:
@@ -372,7 +362,6 @@ quote.py:96:24: TCH002 [*] Move third-party import `pandas.DataFrame` into a typ
    |
    = help: Move into type-checking block
 
-Suggested fix:
     1   |+from typing import TYPE_CHECKING
     2   |+
     3   |+if TYPE_CHECKING:
@@ -402,7 +391,6 @@ quote.py:96:35: TCH002 [*] Move third-party import `pandas.Series` into a type-c
    |
    = help: Move into type-checking block
 
-Suggested fix:
     1   |+from typing import TYPE_CHECKING
     2   |+
     3   |+if TYPE_CHECKING:

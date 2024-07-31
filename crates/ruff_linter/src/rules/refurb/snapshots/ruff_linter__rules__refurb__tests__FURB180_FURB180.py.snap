@@ -12,7 +12,6 @@ FURB180.py:7:10: FURB180 [*] Use of `metaclass=abc.ABCMeta` to define abstract b
   |
   = help: Replace with `abc.ABC`
 
-Suggested fix:
 4 4 | 
 5 5 | # Errors
 6 6 | 
@@ -33,7 +32,6 @@ FURB180.py:12:10: FURB180 [*] Use of `metaclass=abc.ABCMeta` to define abstract 
    |
    = help: Replace with `abc.ABC`
 
-Suggested fix:
 9  9  |     def foo(self): pass
 10 10 | 
 11 11 | 
@@ -54,7 +52,6 @@ FURB180.py:26:18: FURB180 [*] Use of `metaclass=abc.ABCMeta` to define abstract 
    |
    = help: Replace with `abc.ABC`
 
-Suggested fix:
 23 23 |     pass
 24 24 | 
 25 25 | 
@@ -74,7 +71,6 @@ FURB180.py:31:34: FURB180 [*] Use of `metaclass=abc.ABCMeta` to define abstract 
    |
    = help: Replace with `abc.ABC`
 
-Suggested fix:
 28 28 |     def foo(self): pass
 29 29 | 
 30 30 | 

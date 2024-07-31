@@ -10,7 +10,6 @@ RUF025.py:6:5: RUF025 [*] Unnecessary dict comprehension for iterable; use `dict
   |
   = help: Replace with `dict.fromkeys(iterable, value)`)
 
-Suggested fix:
 3 3 | 
 4 4 | def func():
 5 5 |     numbers = [1, 2, 3]
@@ -31,7 +30,6 @@ RUF025.py:10:23: RUF025 [*] Unnecessary dict comprehension for iterable; use `di
    |
    = help: Replace with `dict.fromkeys(iterable)`)
 
-Suggested fix:
 7  7  | 
 8  8  | 
 9  9  | def func():
@@ -51,7 +49,6 @@ RUF025.py:15:5: RUF025 [*] Unnecessary dict comprehension for iterable; use `dic
    |
    = help: Replace with `dict.fromkeys(iterable)`)
 
-Suggested fix:
 12 12 | 
 13 13 | 
 14 14 | def func():
@@ -72,7 +69,6 @@ RUF025.py:26:7: RUF025 [*] Unnecessary dict comprehension for iterable; use `dic
    |
    = help: Replace with `dict.fromkeys(iterable)`)
 
-Suggested fix:
 23 23 |     def f(data):
 24 24 |         return data
 25 25 | 
@@ -92,7 +88,6 @@ RUF025.py:30:5: RUF025 [*] Unnecessary dict comprehension for iterable; use `dic
    |
    = help: Replace with `dict.fromkeys(iterable)`)
 
-Suggested fix:
 27 27 | 
 28 28 | 
 29 29 | def func():
@@ -112,7 +107,6 @@ RUF025.py:34:5: RUF025 [*] Unnecessary dict comprehension for iterable; use `dic
    |
    = help: Replace with `dict.fromkeys(iterable)`)
 
-Suggested fix:
 31 31 | 
 32 32 | 
 33 33 | def func():
@@ -132,7 +126,6 @@ RUF025.py:38:5: RUF025 [*] Unnecessary dict comprehension for iterable; use `dic
    |
    = help: Replace with `dict.fromkeys(iterable)`)
 
-Suggested fix:
 35 35 | 
 36 36 | 
 37 37 | def func():
@@ -152,7 +145,6 @@ RUF025.py:42:5: RUF025 [*] Unnecessary dict comprehension for iterable; use `dic
    |
    = help: Replace with `dict.fromkeys(iterable)`)
 
-Suggested fix:
 39 39 | 
 40 40 | 
 41 41 | def func():
@@ -172,7 +164,6 @@ RUF025.py:46:5: RUF025 [*] Unnecessary dict comprehension for iterable; use `dic
    |
    = help: Replace with `dict.fromkeys(iterable)`)
 
-Suggested fix:
 43 43 | 
 44 44 | 
 45 45 | def func():
@@ -192,7 +183,6 @@ RUF025.py:54:5: RUF025 [*] Unnecessary dict comprehension for iterable; use `dic
    |
    = help: Replace with `dict.fromkeys(iterable)`)
 
-Suggested fix:
 51 51 |         return 1
 52 52 | 
 53 53 |     a = f()
@@ -213,7 +203,6 @@ RUF025.py:59:6: RUF025 [*] Unnecessary dict comprehension for iterable; use `dic
    |
    = help: Replace with `dict.fromkeys(iterable)`)
 
-Suggested fix:
 56 56 | 
 57 57 | def func():
 58 58 |     values = ["a", "b", "c"]

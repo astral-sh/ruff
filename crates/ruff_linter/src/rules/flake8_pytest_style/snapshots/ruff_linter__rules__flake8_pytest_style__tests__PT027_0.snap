@@ -12,7 +12,6 @@ PT027_0.py:6:14: PT027 [*] Use `pytest.raises` instead of unittest-style `assert
   |
   = help: Replace `assertRaises` with `pytest.raises`
 
-Suggested fix:
 1 1 | import unittest
   2 |+import pytest
 2 3 | 
@@ -37,7 +36,6 @@ PT027_0.py:8:14: PT027 [*] Use `pytest.raises` instead of unittest-style `assert
   |
   = help: Replace `assertRaises` with `pytest.raises`
 
-Suggested fix:
 1  1  | import unittest
    2  |+import pytest
 2  3  | 
@@ -64,7 +62,6 @@ PT027_0.py:11:14: PT027 [*] Use `pytest.raises` instead of unittest-style `failU
    |
    = help: Replace `failUnlessRaises` with `pytest.raises`
 
-Suggested fix:
 1  1  | import unittest
    2  |+import pytest
 2  3  | 
@@ -92,7 +89,6 @@ PT027_0.py:14:14: PT027 [*] Use `pytest.raises` instead of unittest-style `asser
    |
    = help: Replace `assertRaisesRegex` with `pytest.raises`
 
-Suggested fix:
 1  1  | import unittest
    2  |+import pytest
 2  3  | 
@@ -120,7 +116,6 @@ PT027_0.py:17:14: PT027 [*] Use `pytest.raises` instead of unittest-style `asser
    |
    = help: Replace `assertRaisesRegex` with `pytest.raises`
 
-Suggested fix:
 1  1  | import unittest
    2  |+import pytest
 2  3  | 
@@ -149,7 +144,6 @@ PT027_0.py:20:14: PT027 [*] Use `pytest.raises` instead of unittest-style `asser
    |
    = help: Replace `assertRaisesRegex` with `pytest.raises`
 
-Suggested fix:
 1  1  | import unittest
    2  |+import pytest
 2  3  | 
@@ -180,7 +174,6 @@ PT027_0.py:25:14: PT027 [*] Use `pytest.raises` instead of unittest-style `asser
    |
    = help: Replace `assertRaisesRegex` with `pytest.raises`
 
-Suggested fix:
 1  1  | import unittest
    2  |+import pytest
 2  3  | 
@@ -210,7 +203,6 @@ PT027_0.py:30:14: PT027 [*] Use `pytest.raises` instead of unittest-style `asser
    |
    = help: Replace `assertRaisesRegexp` with `pytest.raises`
 
-Suggested fix:
 1  1  | import unittest
    2  |+import pytest
 2  3  | 

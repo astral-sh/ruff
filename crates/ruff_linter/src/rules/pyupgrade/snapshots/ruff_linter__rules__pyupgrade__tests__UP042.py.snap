@@ -8,7 +8,6 @@ UP042.py:4:7: UP042 [*] Class A inherits from both `str` and `enum.Enum`
   |
   = help: Inherit from `enum.StrEnum`
 
-Suggested fix:
 1   |-from enum import Enum
   1 |+from enum import Enum, StrEnum
 2 2 | 
@@ -28,7 +27,6 @@ UP042.py:7:7: UP042 [*] Class B inherits from both `str` and `enum.Enum`
   |
   = help: Inherit from `enum.StrEnum`
 
-Suggested fix:
 1   |-from enum import Enum
   1 |+from enum import Enum, StrEnum
 2 2 | 

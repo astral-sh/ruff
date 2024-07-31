@@ -11,7 +11,6 @@ B011.py:8:8: B011 [*] Do not `assert False` (`python -O` removes these calls), r
    |
    = help: Replace `assert False`
 
-Suggested fix:
 5 5 | """
 6 6 | 
 7 7 | assert 1 != 2
@@ -31,7 +30,6 @@ B011.py:10:8: B011 [*] Do not `assert False` (`python -O` removes these calls), 
    |
    = help: Replace `assert False`
 
-Suggested fix:
 7  7  | assert 1 != 2
 8  8  | assert False
 9  9  | assert 1 != 2, "message"

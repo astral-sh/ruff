@@ -12,7 +12,6 @@ FAST002.py:24:5: FAST002 [*] FastAPI dependency without `Annotated`
    |
    = help: Replace with `Annotated`
 
-Suggested fix:
 12 12 |     Security,
 13 13 | )
 14 14 | from pydantic import BaseModel
@@ -43,7 +42,6 @@ FAST002.py:25:5: FAST002 [*] FastAPI dependency without `Annotated`
    |
    = help: Replace with `Annotated`
 
-Suggested fix:
 12 12 |     Security,
 13 13 | )
 14 14 | from pydantic import BaseModel
@@ -74,7 +72,6 @@ FAST002.py:32:5: FAST002 [*] FastAPI dependency without `Annotated`
    |
    = help: Replace with `Annotated`
 
-Suggested fix:
 12 12 |     Security,
 13 13 | )
 14 14 | from pydantic import BaseModel
@@ -105,7 +102,6 @@ FAST002.py:33:5: FAST002 [*] FastAPI dependency without `Annotated`
    |
    = help: Replace with `Annotated`
 
-Suggested fix:
 12 12 |     Security,
 13 13 | )
 14 14 | from pydantic import BaseModel
@@ -136,7 +132,6 @@ FAST002.py:34:5: FAST002 [*] FastAPI dependency without `Annotated`
    |
    = help: Replace with `Annotated`
 
-Suggested fix:
 12 12 |     Security,
 13 13 | )
 14 14 | from pydantic import BaseModel
@@ -167,7 +162,6 @@ FAST002.py:35:5: FAST002 [*] FastAPI dependency without `Annotated`
    |
    = help: Replace with `Annotated`
 
-Suggested fix:
 12 12 |     Security,
 13 13 | )
 14 14 | from pydantic import BaseModel
@@ -198,7 +192,6 @@ FAST002.py:36:5: FAST002 [*] FastAPI dependency without `Annotated`
    |
    = help: Replace with `Annotated`
 
-Suggested fix:
 12 12 |     Security,
 13 13 | )
 14 14 | from pydantic import BaseModel
@@ -229,7 +222,6 @@ FAST002.py:37:5: FAST002 [*] FastAPI dependency without `Annotated`
    |
    = help: Replace with `Annotated`
 
-Suggested fix:
 12 12 |     Security,
 13 13 | )
 14 14 | from pydantic import BaseModel
@@ -260,7 +252,6 @@ FAST002.py:38:5: FAST002 [*] FastAPI dependency without `Annotated`
    |
    = help: Replace with `Annotated`
 
-Suggested fix:
 12 12 |     Security,
 13 13 | )
 14 14 | from pydantic import BaseModel

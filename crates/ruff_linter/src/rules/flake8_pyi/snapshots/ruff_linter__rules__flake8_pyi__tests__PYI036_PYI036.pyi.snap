@@ -10,7 +10,6 @@ PYI036.pyi:54:31: PYI036 [*] Star-args in `__exit__` should be annotated with `o
    |
    = help: Annotate star-args with `object`
 
-Suggested fix:
 51 51 | 
 52 52 | 
 53 53 | class BadOne:
@@ -123,7 +122,6 @@ PYI036.pyi:70:58: PYI036 [*] Star-args in `__exit__` should be annotated with `o
    |
    = help: Annotate star-args with `object`
 
-Suggested fix:
 67 67 |     async def __aexit__(self, __typ: type[BaseException] | None, __exc: BaseException | None, __tb: typing.Union[TracebackType, None, int]) -> bool | None: ... # PYI036: Third arg has bad annotation
 68 68 | 
 69 69 | class BadFive:
@@ -146,7 +144,6 @@ PYI036.pyi:71:74: PYI036 [*] Star-args in `__aexit__` should be annotated with `
    |
    = help: Annotate star-args with `object`
 
-Suggested fix:
 68 68 | 
 69 69 | class BadFive:
 70 70 |     def __exit__(self, typ: BaseException | None, *args: list[str]) -> bool: ... # PYI036: Bad star-args annotation

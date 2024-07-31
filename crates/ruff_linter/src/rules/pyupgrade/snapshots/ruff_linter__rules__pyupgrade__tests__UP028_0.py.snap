@@ -11,7 +11,6 @@ UP028_0.py:2:5: UP028 [*] Replace `yield` over `for` loop with `yield from`
   |
   = help: Replace with `yield from`
 
-Suggested fix:
 1 1 | def f():
 2   |-    for x in y:
 3   |-        yield x
@@ -32,7 +31,6 @@ UP028_0.py:7:5: UP028 [*] Replace `yield` over `for` loop with `yield from`
   |
   = help: Replace with `yield from`
 
-Suggested fix:
 4 4 | 
 5 5 | 
 6 6 | def g():
@@ -55,7 +53,6 @@ UP028_0.py:12:5: UP028 [*] Replace `yield` over `for` loop with `yield from`
    |
    = help: Replace with `yield from`
 
-Suggested fix:
 9  9  | 
 10 10 | 
 11 11 | def h():
@@ -78,7 +75,6 @@ UP028_0.py:17:5: UP028 [*] Replace `yield` over `for` loop with `yield from`
    |
    = help: Replace with `yield from`
 
-Suggested fix:
 14 14 | 
 15 15 | 
 16 16 | def i():
@@ -101,7 +97,6 @@ UP028_0.py:22:5: UP028 [*] Replace `yield` over `for` loop with `yield from`
    |
    = help: Replace with `yield from`
 
-Suggested fix:
 19 19 | 
 20 20 | 
 21 21 | def j():
@@ -124,7 +119,6 @@ UP028_0.py:27:5: UP028 [*] Replace `yield` over `for` loop with `yield from`
    |
    = help: Replace with `yield from`
 
-Suggested fix:
 24 24 | 
 25 25 | 
 26 26 | def k():
@@ -154,7 +148,6 @@ UP028_0.py:33:5: UP028 [*] Replace `yield` over `for` loop with `yield from`
    |
    = help: Replace with `yield from`
 
-Suggested fix:
 30 30 | 
 31 31 | def f():  # Comment one\n'
 32 32 |     # Comment two\n'
@@ -183,7 +176,6 @@ UP028_0.py:44:5: UP028 [*] Replace `yield` over `for` loop with `yield from`
    |
    = help: Replace with `yield from`
 
-Suggested fix:
 41 41 | 
 42 42 | 
 43 43 | def f():
@@ -208,7 +200,6 @@ UP028_0.py:49:5: UP028 [*] Replace `yield` over `for` loop with `yield from`
    |
    = help: Replace with `yield from`
 
-Suggested fix:
 46 46 | 
 47 47 | 
 48 48 | def f():
@@ -235,7 +226,6 @@ UP028_0.py:55:9: UP028 [*] Replace `yield` over `for` loop with `yield from`
    |
    = help: Replace with `yield from`
 
-Suggested fix:
 52 52 | def f():
 53 53 |     def func():
 54 54 |         # This comment is preserved\n'
@@ -260,7 +250,6 @@ UP028_0.py:67:5: UP028 [*] Replace `yield` over `for` loop with `yield from`
    |
    = help: Replace with `yield from`
 
-Suggested fix:
 64 64 | def f():
 65 65 |     for x in y:
 66 66 |         yield x
@@ -284,7 +273,6 @@ UP028_0.py:72:5: UP028 [*] Replace `yield` over `for` loop with `yield from`
    |
    = help: Replace with `yield from`
 
-Suggested fix:
 69 69 | 
 70 70 | 
 71 71 | def f():
@@ -311,7 +299,6 @@ UP028_0.py:79:5: UP028 [*] Replace `yield` over `for` loop with `yield from`
    |
    = help: Replace with `yield from`
 
-Suggested fix:
 76 76 | 
 77 77 | # Regression test for: https://github.com/astral-sh/ruff/issues/7103
 78 78 | def _serve_method(fn):

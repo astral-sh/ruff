@@ -11,7 +11,6 @@ ASYNC116.py:11:11: ASYNC116 [*] `trio.sleep()` with >24 hour interval should usu
    |
    = help: Replace with `trio.sleep_forever()`
 
-Suggested fix:
 8  8  |     import trio
 9  9  | 
 10 10 |     # These examples are probably not meant to ever wake up:
@@ -33,7 +32,6 @@ ASYNC116.py:14:11: ASYNC116 [*] `trio.sleep()` with >24 hour interval should usu
    |
    = help: Replace with `trio.sleep_forever()`
 
-Suggested fix:
 11 11 |     await trio.sleep(100000)  # error: 116, "async"
 12 12 | 
 13 13 |     # 'inf literal' overflow trick
@@ -55,7 +53,6 @@ ASYNC116.py:18:11: ASYNC116 [*] `trio.sleep()` with >24 hour interval should usu
    |
    = help: Replace with `trio.sleep_forever()`
 
-Suggested fix:
 15 15 | 
 16 16 |     await trio.sleep(86399)
 17 17 |     await trio.sleep(86400)
@@ -78,7 +75,6 @@ ASYNC116.py:19:11: ASYNC116 [*] `trio.sleep()` with >24 hour interval should usu
    |
    = help: Replace with `trio.sleep_forever()`
 
-Suggested fix:
 16 16 |     await trio.sleep(86399)
 17 17 |     await trio.sleep(86400)
 18 18 |     await trio.sleep(86400.01)  # error: 116, "async"
@@ -100,7 +96,6 @@ ASYNC116.py:48:5: ASYNC116 [*] `trio.sleep()` with >24 hour interval should usua
    |
    = help: Replace with `trio.sleep_forever()`
 
-Suggested fix:
 45 45 |     import trio
 46 46 | 
 47 47 |     # does not require the call to be awaited, nor in an async fun
@@ -121,7 +116,6 @@ ASYNC116.py:50:14: ASYNC116 [*] `trio.sleep()` with >24 hour interval should usu
    |
    = help: Replace with `trio.sleep_forever()`
 
-Suggested fix:
 47 47 |     # does not require the call to be awaited, nor in an async fun
 48 48 |     trio.sleep(86401)  # error: 116, "async"
 49 49 |     # also checks that we don't break visit_Call
@@ -141,7 +135,6 @@ ASYNC116.py:57:11: ASYNC116 [*] `trio.sleep()` with >24 hour interval should usu
    |
    = help: Replace with `trio.sleep_forever()`
 
-Suggested fix:
 2  2  | # ASYNCIO_NO_ERROR - no asyncio.sleep_forever, so check intentionally doesn't trigger.
 3  3  | import math
 4  4  | from math import inf

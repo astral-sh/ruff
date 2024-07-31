@@ -8,7 +8,6 @@ bom.py:1:1: D300 [*] Use triple double quotes `"""`
   |
   = help: Convert to triple double quotes
 
-Suggested fix:
 1   |-﻿''' SAM macro definitions '''
   1 |+﻿""" SAM macro definitions """
 

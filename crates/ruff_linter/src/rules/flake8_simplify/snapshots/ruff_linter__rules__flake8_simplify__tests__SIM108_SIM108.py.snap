@@ -14,7 +14,6 @@ SIM108.py:2:1: SIM108 [*] Use ternary operator `b = c if a else d` instead of `i
   |
   = help: Replace `if`-`else`-block with `b = c if a else d`
 
-Suggested fix:
 1 1 | # SIM108
 2   |-if a:
 3   |-    b = c
@@ -40,7 +39,6 @@ SIM108.py:30:5: SIM108 [*] Use ternary operator `b = 1 if a else 2` instead of `
    |
    = help: Replace `if`-`else`-block with `b = 1 if a else 2`
 
-Suggested fix:
 27 27 | if True:
 28 28 |     pass
 29 29 | else:
@@ -79,7 +77,6 @@ SIM108.py:82:1: SIM108 [*] Use ternary operator `b = "cccccccccccccccccccccccccc
    |
    = help: Replace `if`-`else`-block with `b = "cccccccccccccccccccccccccccccccccß" if a else "ddddddddddddddddddddddddddddddddd💣"`
 
-Suggested fix:
 79 79 | 
 80 80 | 
 81 81 | # SIM108

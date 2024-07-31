@@ -10,7 +10,6 @@ TCH004_1.py:4:26: TCH004 [*] Move import `datetime.datetime` out of type-checkin
   |
   = help: Move out of type-checking block
 
-Suggested fix:
 1 1 | from typing import TYPE_CHECKING
   2 |+from datetime import datetime
 2 3 | 

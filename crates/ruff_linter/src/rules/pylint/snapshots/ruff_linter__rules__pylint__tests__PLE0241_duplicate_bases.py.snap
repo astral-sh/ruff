@@ -10,7 +10,6 @@ duplicate_bases.py:13:13: PLE0241 [*] Duplicate base `A` for class `F1`
    |
    = help: Remove duplicate base
 
-Suggested fix:
 10 10 | 
 11 11 | 
 12 12 | # Duplicate base class is last.
@@ -30,7 +29,6 @@ duplicate_bases.py:17:13: PLE0241 [*] Duplicate base `A` for class `F2`
    |
    = help: Remove duplicate base
 
-Suggested fix:
 14 14 |     ...
 15 15 | 
 16 16 | 
@@ -53,7 +51,6 @@ duplicate_bases.py:23:5: PLE0241 [*] Duplicate base `A` for class `F3`
    |
    = help: Remove duplicate base
 
-Suggested fix:
 19 19 | 
 20 20 | 
 21 21 | class F3(
@@ -75,7 +72,6 @@ duplicate_bases.py:30:5: PLE0241 [*] Duplicate base `A` for class `F4`
    |
    = help: Remove duplicate base
 
-Suggested fix:
 27 27 | 
 28 28 | class F4(
 29 29 |     A,
@@ -95,7 +91,6 @@ duplicate_bases.py:36:13: PLE0241 [*] Duplicate base `A` for class `G1`
    |
    = help: Remove duplicate base
 
-Suggested fix:
 33 33 | 
 34 34 | 
 35 35 | # Duplicate base class is not last.
@@ -115,7 +110,6 @@ duplicate_bases.py:40:13: PLE0241 [*] Duplicate base `A` for class `G2`
    |
    = help: Remove duplicate base
 
-Suggested fix:
 37 37 |     ...
 38 38 | 
 39 39 | 
@@ -138,7 +132,6 @@ duplicate_bases.py:46:5: PLE0241 [*] Duplicate base `A` for class `G3`
    |
    = help: Remove duplicate base
 
-Suggested fix:
 43 43 | 
 44 44 | class G3(
 45 45 |     A,
@@ -160,7 +153,6 @@ duplicate_bases.py:54:5: PLE0241 [*] Duplicate base `A` for class `G4`
    |
    = help: Remove duplicate base
 
-Suggested fix:
 51 51 | 
 52 52 | class G4(
 53 53 |     A,

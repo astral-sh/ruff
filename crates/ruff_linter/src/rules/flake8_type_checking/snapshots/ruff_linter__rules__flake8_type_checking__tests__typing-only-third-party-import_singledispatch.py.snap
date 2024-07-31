@@ -12,7 +12,6 @@ singledispatch.py:11:20: TCH002 [*] Move third-party import `pandas.DataFrame` i
    |
    = help: Move into type-checking block
 
-Suggested fix:
 8  8  | from numpy import asarray
 9  9  | from numpy.typing import ArrayLike
 10 10 | from scipy.sparse import spmatrix

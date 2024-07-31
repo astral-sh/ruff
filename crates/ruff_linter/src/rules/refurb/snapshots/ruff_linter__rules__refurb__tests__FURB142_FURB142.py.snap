@@ -13,7 +13,6 @@ FURB142.py:5:1: FURB142 [*] Use of `set.add()` in a for loop
   |
   = help: Replace with `.update()`
 
-Suggested fix:
 2 2 | 
 3 3 | s = set()
 4 4 | 
@@ -38,7 +37,6 @@ FURB142.py:8:1: FURB142 [*] Use of `set.add()` in a for loop
    |
    = help: Replace with `.update()`
 
-Suggested fix:
 5  5  | for x in [1, 2, 3]:
 6  6  |     s.add(x)
 7  7  | 
@@ -63,7 +61,6 @@ FURB142.py:11:1: FURB142 [*] Use of `set.add()` in a for loop
    |
    = help: Replace with `.update()`
 
-Suggested fix:
 8  8  | for x in {1, 2, 3}:
 9  9  |     s.add(x)
 10 10 | 
@@ -88,7 +85,6 @@ FURB142.py:14:1: FURB142 [*] Use of `set.discard()` in a for loop
    |
    = help: Replace with `.difference_update()`
 
-Suggested fix:
 11 11 | for x in (1, 2, 3):
 12 12 |     s.add(x)
 13 13 | 
@@ -113,7 +109,6 @@ FURB142.py:17:1: FURB142 [*] Use of `set.add()` in a for loop
    |
    = help: Replace with `.update()`
 
-Suggested fix:
 14 14 | for x in (1, 2, 3):
 15 15 |     s.discard(x)
 16 16 | 
@@ -138,7 +133,6 @@ FURB142.py:20:1: FURB142 [*] Use of `set.add()` in a for loop
    |
    = help: Replace with `.update()`
 
-Suggested fix:
 17 17 | for x in (1, 2, 3):
 18 18 |     s.add(x + 1)
 19 19 | 
@@ -163,7 +157,6 @@ FURB142.py:25:1: FURB142 [*] Use of `set.add()` in a for loop
    |
    = help: Replace with `.update()`
 
-Suggested fix:
 22 22 | 
 23 23 | num = 123
 24 24 | 
@@ -188,7 +181,6 @@ FURB142.py:28:1: FURB142 [*] Use of `set.add()` in a for loop
    |
    = help: Replace with `.update()`
 
-Suggested fix:
 25 25 | for x in (1, 2, 3):
 26 26 |     s.add(num)
 27 27 | 
@@ -213,7 +205,6 @@ FURB142.py:31:1: FURB142 [*] Use of `set.add()` in a for loop
    |
    = help: Replace with `.update()`
 
-Suggested fix:
 28 28 | for x in (1, 2, 3):
 29 29 |     s.add((num, x))
 30 30 | 

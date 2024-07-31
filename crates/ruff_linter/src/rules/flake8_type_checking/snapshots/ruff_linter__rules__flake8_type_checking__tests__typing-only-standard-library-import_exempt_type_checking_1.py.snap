@@ -12,7 +12,6 @@ exempt_type_checking_1.py:5:20: TCH003 [*] Move standard library import `typing.
   |
   = help: Move into type-checking block
 
-Suggested fix:
 2 2 | 
 3 3 | from __future__ import annotations
 4 4 | 

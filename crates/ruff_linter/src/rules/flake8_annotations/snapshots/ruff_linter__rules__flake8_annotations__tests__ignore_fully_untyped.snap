@@ -9,7 +9,6 @@ ignore_fully_untyped.py:24:5: ANN201 [*] Missing return type annotation for publ
    |
    = help: Add return type annotation: `None`
 
-Suggested fix:
 21 21 |     pass
 22 22 | 
 23 23 | 
@@ -43,7 +42,6 @@ ignore_fully_untyped.py:32:5: ANN201 [*] Missing return type annotation for publ
    |
    = help: Add return type annotation: `None`
 
-Suggested fix:
 29 29 |     pass
 30 30 | 
 31 31 | 
@@ -65,7 +63,6 @@ ignore_fully_untyped.py:43:9: ANN201 [*] Missing return type annotation for publ
    |
    = help: Add return type annotation: `None`
 
-Suggested fix:
 40 40 |     def ok_untyped_method(self):
 41 41 |         pass
 42 42 | 

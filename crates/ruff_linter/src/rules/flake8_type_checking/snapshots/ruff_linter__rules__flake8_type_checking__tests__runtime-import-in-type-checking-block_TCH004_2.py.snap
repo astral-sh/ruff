@@ -9,7 +9,6 @@ TCH004_2.py:4:26: TCH004 [*] Move import `datetime.date` out of type-checking bl
   |
   = help: Move out of type-checking block
 
-Suggested fix:
 1 1 | from typing import TYPE_CHECKING
   2 |+from datetime import date
 2 3 | 

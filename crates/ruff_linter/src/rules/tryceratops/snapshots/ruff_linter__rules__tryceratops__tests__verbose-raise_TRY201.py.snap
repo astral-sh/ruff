@@ -10,7 +10,6 @@ TRY201.py:20:15: TRY201 [*] Use `raise` without specifying exception name
    |
    = help: Remove exception name
 
-Suggested fix:
 17 17 |         process()
 18 18 |     except MyException as e:
 19 19 |         logger.exception("process failed")
@@ -31,7 +30,6 @@ TRY201.py:63:19: TRY201 [*] Use `raise` without specifying exception name
    |
    = help: Remove exception name
 
-Suggested fix:
 60 60 |     except MyException as e:
 61 61 |         logger.exception("process failed")
 62 62 |         if True:
@@ -51,7 +49,6 @@ TRY201.py:74:23: TRY201 [*] Use `raise` without specifying exception name
    |
    = help: Remove exception name
 
-Suggested fix:
 71 71 |         if True:
 72 72 | 
 73 73 |             def foo():

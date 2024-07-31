@@ -10,7 +10,6 @@ UP039.py:2:8: UP039 [*] Unnecessary parentheses after class definition
   |
   = help: Remove parentheses
 
-Suggested fix:
 1 1 | # Errors
 2   |-class A():
   2 |+class A:
@@ -29,7 +28,6 @@ UP039.py:6:8: UP039 [*] Unnecessary parentheses after class definition
   |
   = help: Remove parentheses
 
-Suggested fix:
 3 3 |     pass
 4 4 | 
 5 5 | 
@@ -50,7 +48,6 @@ UP039.py:12:9: UP039 [*] Unnecessary parentheses after class definition
    |
    = help: Remove parentheses
 
-Suggested fix:
 9  9  | 
 10 10 | 
 11 11 | class A \
@@ -71,7 +68,6 @@ UP039.py:17:8: UP039 [*] Unnecessary parentheses after class definition
    |
    = help: Remove parentheses
 
-Suggested fix:
 14 14 | 
 15 15 | 
 16 16 | @decorator()
@@ -92,7 +88,6 @@ UP039.py:21:8: UP039 [*] Unnecessary parentheses after class definition
    |
    = help: Remove parentheses
 
-Suggested fix:
 18 18 |     pass
 19 19 | 
 20 20 | @decorator

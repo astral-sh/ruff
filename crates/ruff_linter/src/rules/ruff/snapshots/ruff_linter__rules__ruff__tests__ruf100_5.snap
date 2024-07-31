@@ -11,7 +11,6 @@ RUF100_5.py:7:5: ERA001 Found commented-out code
   |
   = help: Remove commented-out code
 
-Suggested fix:
 4 4 | dictionary = {
 5 5 |     # "key1": 123,  # noqa: ERA001
 6 6 |     # "key2": 456,  # noqa
@@ -29,7 +28,6 @@ RUF100_5.py:11:1: ERA001 Found commented-out code
    |
    = help: Remove commented-out code
 
-Suggested fix:
 8  8  | }
 9  9  | 
 10 10 | 
@@ -44,7 +42,6 @@ RUF100_5.py:11:13: RUF100 [*] Unused `noqa` directive (unused: `E501`)
    |
    = help: Remove unused `noqa` directive
 
-Suggested fix:
 8  8  | }
 9  9  | 
 10 10 | 

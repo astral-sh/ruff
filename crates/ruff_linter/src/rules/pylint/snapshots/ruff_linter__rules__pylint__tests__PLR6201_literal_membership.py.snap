@@ -11,7 +11,6 @@ literal_membership.py:2:6: PLR6201 [*] Use a set literal when testing for member
   |
   = help: Convert to `set`
 
-Suggested fix:
 1 1 | # Errors
 2   |-1 in [1, 2, 3]
   2 |+1 in {1, 2, 3}
@@ -32,7 +31,6 @@ literal_membership.py:3:6: PLR6201 [*] Use a set literal when testing for member
   |
   = help: Convert to `set`
 
-Suggested fix:
 1 1 | # Errors
 2 2 | 1 in [1, 2, 3]
 3   |-1 in (1, 2, 3)
@@ -57,7 +55,6 @@ literal_membership.py:4:6: PLR6201 [*] Use a set literal when testing for member
   |
   = help: Convert to `set`
 
-Suggested fix:
 1 1 | # Errors
 2 2 | 1 in [1, 2, 3]
 3 3 | 1 in (1, 2, 3)
@@ -83,7 +80,6 @@ literal_membership.py:9:70: PLR6201 [*] Use a set literal when testing for membe
    |
    = help: Convert to `set`
 
-Suggested fix:
 6  6  | )
 7  7  | fruits = ["cherry", "grapes"]
 8  8  | "cherry" in fruits

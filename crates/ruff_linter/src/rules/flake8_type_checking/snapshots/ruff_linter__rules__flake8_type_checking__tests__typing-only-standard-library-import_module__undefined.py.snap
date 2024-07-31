@@ -10,7 +10,6 @@ undefined.py:3:29: TCH003 [*] Move standard library import `collections.abc.Sequ
   |
   = help: Move into type-checking block
 
-Suggested fix:
 1 1 | from __future__ import annotations
 2 2 | 
 3   |-from collections.abc import Sequence

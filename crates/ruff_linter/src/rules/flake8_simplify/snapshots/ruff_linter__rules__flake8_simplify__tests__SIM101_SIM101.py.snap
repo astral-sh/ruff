@@ -9,7 +9,6 @@ SIM101.py:1:4: SIM101 [*] Multiple `isinstance` calls for `a`, merge into a sing
   |
   = help: Merge `isinstance` calls for `a`
 
-Suggested fix:
 1   |-if isinstance(a, int) or isinstance(a, float):  # SIM101
   1 |+if isinstance(a, (int, float)):  # SIM101
 2 2 |     pass
@@ -28,7 +27,6 @@ SIM101.py:4:4: SIM101 [*] Multiple `isinstance` calls for `a`, merge into a sing
   |
   = help: Merge `isinstance` calls for `a`
 
-Suggested fix:
 1 1 | if isinstance(a, int) or isinstance(a, float):  # SIM101
 2 2 |     pass
 3 3 | 
@@ -50,7 +48,6 @@ SIM101.py:7:4: SIM101 [*] Multiple `isinstance` calls for `a`, merge into a sing
   |
   = help: Merge `isinstance` calls for `a`
 
-Suggested fix:
 4 4 | if isinstance(a, (int, float)) or isinstance(a, bool):  # SIM101
 5 5 |     pass
 6 6 | 
@@ -72,7 +69,6 @@ SIM101.py:10:4: SIM101 [*] Multiple `isinstance` calls for `a`, merge into a sin
    |
    = help: Merge `isinstance` calls for `a`
 
-Suggested fix:
 7  7  | if isinstance(a, int) or isinstance(a, float) or isinstance(b, bool):  # SIM101
 8  8  |     pass
 9  9  | 
@@ -94,7 +90,6 @@ SIM101.py:16:5: SIM101 [*] Multiple `isinstance` calls for `a`, merge into a sin
    |
    = help: Merge `isinstance` calls for `a`
 
-Suggested fix:
 13 13 | if isinstance(a, int) or isinstance(b, bool) or isinstance(a, float):  # SIM101
 14 14 |     pass
 15 15 | 
@@ -116,7 +111,6 @@ SIM101.py:19:4: SIM101 [*] Multiple `isinstance` calls for expression, merge int
    |
    = help: Merge `isinstance` calls
 
-Suggested fix:
 16 16 | if (isinstance(a, int) or isinstance(a, float)) and isinstance(b, bool):  # SIM101
 17 17 |     pass
 18 18 | 
@@ -148,7 +142,6 @@ SIM101.py:38:4: SIM101 [*] Multiple `isinstance` calls for `a`, merge into a sin
    |
    = help: Merge `isinstance` calls for `a`
 
-Suggested fix:
 35 35 | if isinstance(a, int) or unrelated_condition or isinstance(a, float):
 36 36 |     pass
 37 37 | 
@@ -170,7 +163,6 @@ SIM101.py:41:4: SIM101 [*] Multiple `isinstance` calls for `a`, merge into a sin
    |
    = help: Merge `isinstance` calls for `a`
 
-Suggested fix:
 38 38 | if x or isinstance(a, int) or isinstance(a, float):
 39 39 |     pass
 40 40 | 
@@ -191,7 +183,6 @@ SIM101.py:53:3: SIM101 [*] Multiple `isinstance` calls for `a`, merge into a sin
    |
    = help: Merge `isinstance` calls for `a`
 
-Suggested fix:
 50 50 |         pass
 51 51 | 
 52 52 | # Regression test for: https://github.com/astral-sh/ruff/issues/7455#issuecomment-1722460483

@@ -12,7 +12,6 @@ B004.py:3:8: B004 [*] Using `hasattr(x, "__call__")` to test if x is callable is
   |
   = help: Replace with `callable()`
 
-Suggested fix:
 1 1 | def this_is_a_bug():
 2 2 |     o = object()
 3   |-    if hasattr(o, "__call__"):
@@ -44,7 +43,6 @@ B004.py:12:8: B004 [*] Using `hasattr(x, "__call__")` to test if x is callable i
    |
    = help: Replace with `callable()`
 
-Suggested fix:
 9  9  | def still_a_bug():
 10 10 |     import builtins
 11 11 |     o = object()
@@ -76,7 +74,6 @@ B004.py:24:8: B004 [*] Using `hasattr(x, "__call__")` to test if x is callable i
    |
    = help: Replace with `callable()`
 
-Suggested fix:
    1  |+import builtins
 1  2  | def this_is_a_bug():
 2  3  |     o = object()

@@ -10,7 +10,6 @@ PYI025_3.pyi:6:36: PYI025 [*] Use `from collections.abc import Set as AbstractSe
   |
   = help: Alias `Set` to `AbstractSet`
 
-Suggested fix:
 3 3 | through usage of a "redundant" `import Set as Set` alias
 4 4 | """
 5 5 | 

@@ -76,7 +76,6 @@ F601.py:18:5: F601 [*] Dictionary key literal `"a"` repeated
    |
    = help: Remove repeated key literal `"a"`
 
-Suggested fix:
 15 15 |     "a": 1,
 16 16 |     "a": 2,
 17 17 |     "a": 3,
@@ -120,7 +119,6 @@ F601.py:25:5: F601 [*] Dictionary key literal `"a"` repeated
    |
    = help: Remove repeated key literal `"a"`
 
-Suggested fix:
 22 22 |     "a": 1,
 23 23 |     "a": 2,
 24 24 |     "a": 3,
@@ -152,7 +150,6 @@ F601.py:31:5: F601 [*] Dictionary key literal `"a"` repeated
    |
    = help: Remove repeated key literal `"a"`
 
-Suggested fix:
 28 28 | 
 29 29 | x = {
 30 30 |     "a": 1,
@@ -228,7 +225,6 @@ F601.py:45:5: F601 [*] Dictionary key literal `"a"` repeated
    |
    = help: Remove repeated key literal `"a"`
 
-Suggested fix:
 42 42 |     a: 2,
 43 43 |     "a": 3,
 44 44 |     a: 3,
@@ -249,7 +245,6 @@ F601.py:49:14: F601 [*] Dictionary key literal `"a"` repeated
    |
    = help: Remove repeated key literal `"a"`
 
-Suggested fix:
 46 46 |     a: 4,
 47 47 | }
 48 48 | 
@@ -271,7 +266,6 @@ F601.py:50:22: F601 [*] Dictionary key literal `"a"` repeated
    |
    = help: Remove repeated key literal `"a"`
 
-Suggested fix:
 47 47 | }
 48 48 | 
 49 49 | x = {"a": 1, "a": 1}
@@ -303,7 +297,6 @@ F601.py:58:19: F601 [*] Dictionary key literal `"x"` repeated
    |
    = help: Remove repeated key literal `"x"`
 
-Suggested fix:
 55 55 | }
 56 56 | 
 57 57 | # Regression test for: https://github.com/astral-sh/ruff/issues/4897
@@ -323,7 +316,6 @@ F601.py:60:21: F601 [*] Dictionary key literal `"x"` repeated
    |
    = help: Remove repeated key literal `"x"`
 
-Suggested fix:
 57 57 | # Regression test for: https://github.com/astral-sh/ruff/issues/4897
 58 58 | t={"x":"test123", "x":("test123")}
 59 59 | 

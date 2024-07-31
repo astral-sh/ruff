@@ -12,7 +12,6 @@ strict.py:54:25: TCH002 [*] Move third-party import `pkg.bar.A` into a type-chec
    |
    = help: Move into type-checking block
 
-Suggested fix:
 1  1  | from __future__ import annotations
    2  |+from typing import TYPE_CHECKING
    3  |+
@@ -42,7 +41,6 @@ strict.py:91:12: TCH002 [*] Move third-party import `pkg` into a type-checking b
    |
    = help: Move into type-checking block
 
-Suggested fix:
 1  1  | from __future__ import annotations
    2  |+from typing import TYPE_CHECKING
    3  |+

@@ -9,7 +9,6 @@ init_var.py:6:21: TCH003 [*] Move standard library import `pathlib.Path` into a 
   |
   = help: Move into type-checking block
 
-Suggested fix:
 3  3  | from __future__ import annotations
 4  4  | 
 5  5  | from dataclasses import FrozenInstanceError, InitVar, dataclass

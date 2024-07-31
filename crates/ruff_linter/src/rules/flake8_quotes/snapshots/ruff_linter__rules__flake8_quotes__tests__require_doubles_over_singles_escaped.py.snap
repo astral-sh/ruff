@@ -10,7 +10,6 @@ singles_escaped.py:1:26: Q003 [*] Change outer quotes to avoid escaping inner qu
   |
   = help: Change outer quotes to avoid escaping inner quotes
 
-Suggested fix:
 1   |-this_should_raise_Q003 = "This is a \"string\""
   1 |+this_should_raise_Q003 = 'This is a "string"'
 2 2 | this_is_fine = "'This' is a \"string\""
@@ -29,7 +28,6 @@ singles_escaped.py:9:5: Q003 [*] Change outer quotes to avoid escaping inner quo
    |
    = help: Change outer quotes to avoid escaping inner quotes
 
-Suggested fix:
 6  6  | this_is_fine = R"This is a \"string\""
 7  7  | this_should_raise = (
 8  8  |     "This is a"
@@ -51,7 +49,6 @@ singles_escaped.py:13:1: Q003 [*] Change outer quotes to avoid escaping inner qu
    |
    = help: Change outer quotes to avoid escaping inner quotes
 
-Suggested fix:
 10 10 | )
 11 11 | 
 12 12 | # Same as above, but with f-strings
@@ -73,7 +70,6 @@ singles_escaped.py:21:5: Q003 [*] Change outer quotes to avoid escaping inner qu
    |
    = help: Change outer quotes to avoid escaping inner quotes
 
-Suggested fix:
 18 18 | fR"This is a \"string\""
 19 19 | foo = (
 20 20 |     f"This is a"
@@ -96,7 +92,6 @@ singles_escaped.py:31:1: Q003 [*] Change outer quotes to avoid escaping inner qu
    |
    = help: Change outer quotes to avoid escaping inner quotes
 
-Suggested fix:
 28 28 | #   f'"foo" {"nested"}'
 29 29 | #
 30 30 | # but as the actual string itself is invalid pre 3.12, we don't catch it.
@@ -118,7 +113,6 @@ singles_escaped.py:32:1: Q003 [*] Change outer quotes to avoid escaping inner qu
    |
    = help: Change outer quotes to avoid escaping inner quotes
 
-Suggested fix:
 29 29 | #
 30 30 | # but as the actual string itself is invalid pre 3.12, we don't catch it.
 31 31 | f"\"foo\" {"foo"}"  # Q003
@@ -141,7 +135,6 @@ singles_escaped.py:33:1: Q003 [*] Change outer quotes to avoid escaping inner qu
    |
    = help: Change outer quotes to avoid escaping inner quotes
 
-Suggested fix:
 30 30 | # but as the actual string itself is invalid pre 3.12, we don't catch it.
 31 31 | f"\"foo\" {"foo"}"  # Q003
 32 32 | f"\"foo\" {f"foo"}"  # Q003
@@ -164,7 +157,6 @@ singles_escaped.py:33:12: Q003 [*] Change outer quotes to avoid escaping inner q
    |
    = help: Change outer quotes to avoid escaping inner quotes
 
-Suggested fix:
 30 30 | # but as the actual string itself is invalid pre 3.12, we don't catch it.
 31 31 | f"\"foo\" {"foo"}"  # Q003
 32 32 | f"\"foo\" {f"foo"}"  # Q003
@@ -186,7 +178,6 @@ singles_escaped.py:36:1: Q003 [*] Change outer quotes to avoid escaping inner qu
    |
    = help: Change outer quotes to avoid escaping inner quotes
 
-Suggested fix:
 33 33 | f"\"foo\" {f"\"foo\""} \"\""  # Q003
 34 34 | 
 35 35 | f"normal {f"nested"} normal"
@@ -208,7 +199,6 @@ singles_escaped.py:38:15: Q003 [*] Change outer quotes to avoid escaping inner q
    |
    = help: Change outer quotes to avoid escaping inner quotes
 
-Suggested fix:
 35 35 | f"normal {f"nested"} normal"
 36 36 | f"\"normal\" {f"nested"} normal"  # Q003
 37 37 | f"\"normal\" {f"nested"} 'single quotes'"
@@ -227,7 +217,6 @@ singles_escaped.py:39:1: Q003 [*] Change outer quotes to avoid escaping inner qu
    |
    = help: Change outer quotes to avoid escaping inner quotes
 
-Suggested fix:
 36 36 | f"\"normal\" {f"nested"} normal"  # Q003
 37 37 | f"\"normal\" {f"nested"} 'single quotes'"
 38 38 | f"\"normal\" {f"\"nested\" {"other"} normal"} 'single quotes'"  # Q003

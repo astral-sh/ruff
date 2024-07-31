@@ -11,7 +11,6 @@ F401_5.py:2:17: F401 [*] `a.b.c` imported but unused
   |
   = help: Remove unused import: `a.b.c`
 
-Suggested fix:
 1 1 | """Test: removal of multi-segment and aliases imports."""
 2   |-from a.b import c
 3 2 | from d.e import f as g
@@ -31,7 +30,6 @@ F401_5.py:3:22: F401 [*] `d.e.f` imported but unused
   |
   = help: Remove unused import: `d.e.f`
 
-Suggested fix:
 1 1 | """Test: removal of multi-segment and aliases imports."""
 2 2 | from a.b import c
 3   |-from d.e import f as g
@@ -50,7 +48,6 @@ F401_5.py:4:8: F401 [*] `h.i` imported but unused
   |
   = help: Remove unused import: `h.i`
 
-Suggested fix:
 1 1 | """Test: removal of multi-segment and aliases imports."""
 2 2 | from a.b import c
 3 3 | from d.e import f as g
@@ -68,7 +65,6 @@ F401_5.py:5:15: F401 [*] `j.k` imported but unused
   |
   = help: Remove unused import: `j.k`
 
-Suggested fix:
 2 2 | from a.b import c
 3 3 | from d.e import f as g
 4 4 | import h.i

@@ -8,7 +8,6 @@ __init__.py:19:8: F401 [*] `sys` imported but unused
    |
    = help: Remove unused import: `sys`
 
-Suggested fix:
 16 16 | import argparse  # Ok: is exported in __all__
 17 17 | 
 18 18 | 
@@ -26,7 +25,6 @@ __init__.py:36:15: F401 [*] `.unused` imported but unused; consider removing, ad
    |
    = help: Add unused import `unused` to __all__
 
-Suggested fix:
 39 39 | from . import renamed as bees  # F401: add to __all__
 40 40 | 
 41 41 | 
@@ -42,7 +40,6 @@ __init__.py:39:26: F401 [*] `.renamed` imported but unused; consider removing, a
    |
    = help: Add unused import `bees` to __all__
 
-Suggested fix:
 39 39 | from . import renamed as bees  # F401: add to __all__
 40 40 | 
 41 41 | 

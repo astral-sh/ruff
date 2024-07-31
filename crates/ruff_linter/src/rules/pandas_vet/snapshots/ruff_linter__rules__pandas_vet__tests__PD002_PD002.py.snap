@@ -12,7 +12,6 @@ PD002.py:5:23: PD002 [*] `inplace=True` should be avoided; it has inconsistent b
   |
   = help: Assign to variable; remove `inplace` arg
 
-Suggested fix:
 2 2 | 
 3 3 | x = pd.DataFrame()
 4 4 | 
@@ -35,7 +34,6 @@ PD002.py:7:25: PD002 [*] `inplace=True` should be avoided; it has inconsistent b
   |
   = help: Assign to variable; remove `inplace` arg
 
-Suggested fix:
 4 4 | 
 5 5 | x.drop(["a"], axis=1, inplace=True)
 6 6 | 
@@ -58,7 +56,6 @@ PD002.py:9:28: PD002 [*] `inplace=True` should be avoided; it has inconsistent b
    |
    = help: Assign to variable; remove `inplace` arg
 
-Suggested fix:
 6  6  | 
 7  7  | x.y.drop(["a"], axis=1, inplace=True)
 8  8  | 
@@ -80,7 +77,6 @@ PD002.py:12:5: PD002 [*] `inplace=True` should be avoided; it has inconsistent b
    |
    = help: Assign to variable; remove `inplace` arg
 
-Suggested fix:
 8  8  | 
 9  9  | x["y"].drop(["a"], axis=1, inplace=True)
 10 10 | 
@@ -104,7 +100,6 @@ PD002.py:19:9: PD002 [*] `inplace=True` should be avoided; it has inconsistent b
    |
    = help: Assign to variable; remove `inplace` arg
 
-Suggested fix:
 15 15 | )
 16 16 | 
 17 17 | if True:
@@ -128,7 +123,6 @@ PD002.py:24:33: PD002 [*] `inplace=True` should be avoided; it has inconsistent 
    |
    = help: Assign to variable; remove `inplace` arg
 
-Suggested fix:
 21 21 |         axis=1,
 22 22 |     )
 23 23 | 
@@ -181,7 +175,6 @@ PD002.py:33:24: PD002 [*] `inplace=True` should be avoided; it has inconsistent 
    |
    = help: Assign to variable; remove `inplace` arg
 
-Suggested fix:
 30 30 | 
 31 31 | torch.m.ReLU(inplace=True)  # safe because this isn't a pandas call
 32 32 | 

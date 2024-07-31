@@ -11,7 +11,6 @@ TCH004_9.py:4:24: TCH004 [*] Move import `typing.Tuple` out of type-checking blo
   |
   = help: Move out of type-checking block
 
-Suggested fix:
 1 1 | from typing import TYPE_CHECKING
   2 |+from typing import Tuple, List
 2 3 | 
@@ -34,7 +33,6 @@ TCH004_9.py:4:31: TCH004 [*] Move import `typing.List` out of type-checking bloc
   |
   = help: Move out of type-checking block
 
-Suggested fix:
 1 1 | from typing import TYPE_CHECKING
   2 |+from typing import Tuple, List
 2 3 | 

@@ -10,7 +10,6 @@ sphinx.py:13:5: D412 [*] No blank lines allowed between a section header and its
    |
    = help: Remove blank line(s)
 
-Suggested fix:
 12 12 |     """
 13 13 |     Example:
 14 14 | 
@@ -30,7 +29,6 @@ sphinx.py:24:5: D412 [*] No blank lines allowed between a section header and its
    |
    = help: Remove blank line(s)
 
-Suggested fix:
 23 23 |     """
 24 24 |     Example:
 25 25 | 
@@ -52,7 +50,6 @@ sphinx.py:47:5: D412 [*] No blank lines allowed between a section header and its
    |
    = help: Remove blank line(s)
 
-Suggested fix:
 47 47 |     Example
 48 48 |     -------
 49 49 | 
@@ -73,7 +70,6 @@ sphinx.py:59:5: D412 [*] No blank lines allowed between a section header and its
    |
    = help: Remove blank line(s)
 
-Suggested fix:
 59 59 |     Example
 60 60 |     -------
 61 61 | 

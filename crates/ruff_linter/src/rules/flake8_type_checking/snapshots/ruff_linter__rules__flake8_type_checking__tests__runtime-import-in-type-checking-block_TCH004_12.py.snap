@@ -11,7 +11,6 @@ TCH004_12.py:6:33: TCH004 [*] Move import `collections.abc.Callable` out of type
   |
   = help: Move out of type-checking block
 
-Suggested fix:
 1 1 | from __future__ import annotations
 2 2 | 
 3 3 | from typing import Any, TYPE_CHECKING, TypeAlias

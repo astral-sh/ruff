@@ -11,7 +11,6 @@ UP020.py:3:6: UP020 [*] Use builtin `open`
   |
   = help: Replace with builtin `open`
 
-Suggested fix:
 1 1 | import io
 2 2 | 
 3   |-with io.open("f.txt", mode="r", buffering=-1, **kwargs) as f:
@@ -32,7 +31,6 @@ UP020.py:8:6: UP020 [*] Use builtin `open`
   |
   = help: Replace with builtin `open`
 
-Suggested fix:
 4  4  |     print(f.read())
 5  5  | 
 6  6  | from io import open

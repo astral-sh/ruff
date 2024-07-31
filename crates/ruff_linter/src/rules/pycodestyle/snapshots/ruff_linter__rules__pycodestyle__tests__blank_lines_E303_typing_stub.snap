@@ -10,7 +10,6 @@ E30.pyi:17:1: E303 [*] Too many blank lines (2)
    |
    = help: Remove extraneous blank line(s)
 
-Suggested fix:
 13 13 | @overload
 14 14 | def a(arg: int, name: str): ...
 15 15 | 
@@ -30,7 +29,6 @@ E30.pyi:22:1: E303 [*] Too many blank lines (2)
    |
    = help: Remove extraneous blank line(s)
 
-Suggested fix:
 18 18 | def grouped2(): ...
 19 19 | def grouped3( ): ...
 20 20 | 
@@ -49,7 +47,6 @@ E30.pyi:35:5: E303 [*] Too many blank lines (2)
    |
    = help: Remove extraneous blank line(s)
 
-Suggested fix:
 31 31 |     
 32 32 |     def with_blank_line(): ...
 33 33 |     
@@ -69,7 +66,6 @@ E30.pyi:43:1: E303 [*] Too many blank lines (2)
    |
    = help: Remove extraneous blank line(s)
 
-Suggested fix:
 39 39 |     pass
 40 40 | b = "test"
 41 41 | 

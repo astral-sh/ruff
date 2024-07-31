@@ -10,7 +10,6 @@ C403.py:1:5: C403 [*] Unnecessary `list` comprehension (rewrite as a `set` compr
   |
   = help: Rewrite as a `set` comprehension
 
-Suggested fix:
 1   |-s = set([x for x in range(3)])
   1 |+s = {x for x in range(3)}
 2 2 | s = set(
@@ -32,7 +31,6 @@ C403.py:2:5: C403 [*] Unnecessary `list` comprehension (rewrite as a `set` compr
   |
   = help: Rewrite as a `set` comprehension
 
-Suggested fix:
 1 1 | s = set([x for x in range(3)])
 2   |-s = set(
 3   |-    [x for x in range(3)]
@@ -56,7 +54,6 @@ C403.py:6:8: C403 [*] Unnecessary `list` comprehension (rewrite as a `set` compr
   |
   = help: Rewrite as a `set` comprehension
 
-Suggested fix:
 3 3 |     [x for x in range(3)]
 4 4 | )
 5 5 | 
@@ -78,7 +75,6 @@ C403.py:7:8: C403 [*] Unnecessary `list` comprehension (rewrite as a `set` compr
   |
   = help: Rewrite as a `set` comprehension
 
-Suggested fix:
 4 4 | )
 5 5 | 
 6 6 | s = f"{set([x for x in 'ab'])}"
@@ -101,7 +97,6 @@ C403.py:12:8: C403 [*] Unnecessary `list` comprehension (rewrite as a `set` comp
    |
    = help: Rewrite as a `set` comprehension
 
-Suggested fix:
 9  9  | def f(x):
 10 10 |     return x
 11 11 | 
@@ -123,7 +118,6 @@ C403.py:14:9: C403 [*] Unnecessary `list` comprehension (rewrite as a `set` comp
    |
    = help: Rewrite as a `set` comprehension
 
-Suggested fix:
 11 11 | 
 12 12 | s = f"{set([f(x) for x in 'ab'])}"
 13 13 | 
@@ -145,7 +139,6 @@ C403.py:14:34: C403 [*] Unnecessary `list` comprehension (rewrite as a `set` com
    |
    = help: Rewrite as a `set` comprehension
 
-Suggested fix:
 11 11 | 
 12 12 | s = f"{set([f(x) for x in 'ab'])}"
 13 13 | 
@@ -167,7 +160,6 @@ C403.py:15:8: C403 [*] Unnecessary `list` comprehension (rewrite as a `set` comp
    |
    = help: Rewrite as a `set` comprehension
 
-Suggested fix:
 12 12 | s = f"{set([f(x) for x in 'ab'])}"
 13 13 | 
 14 14 | s = f"{ set([x for x in 'ab']) | set([x for x in 'ab']) }"
@@ -189,7 +181,6 @@ C403.py:15:33: C403 [*] Unnecessary `list` comprehension (rewrite as a `set` com
    |
    = help: Rewrite as a `set` comprehension
 
-Suggested fix:
 12 12 | s = f"{set([f(x) for x in 'ab'])}"
 13 13 | 
 14 14 | s = f"{ set([x for x in 'ab']) | set([x for x in 'ab']) }"
@@ -215,7 +206,6 @@ C403.py:17:5: C403 [*] Unnecessary `list` comprehension (rewrite as a `set` comp
    |
    = help: Rewrite as a `set` comprehension
 
-Suggested fix:
 14 14 | s = f"{ set([x for x in 'ab']) | set([x for x in 'ab']) }"
 15 15 | s = f"{set([x for x in 'ab']) | set([x for x in 'ab'])}"
 16 16 | 
@@ -243,7 +233,6 @@ C403.py:21:5: C403 [*] Unnecessary `list` comprehension (rewrite as a `set` comp
    |
    = help: Rewrite as a `set` comprehension
 
-Suggested fix:
 18 18 |     [x for x in range(3)]
 19 19 | )
 20 20 | 

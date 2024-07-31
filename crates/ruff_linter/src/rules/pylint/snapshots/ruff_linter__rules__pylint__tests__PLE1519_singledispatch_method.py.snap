@@ -11,7 +11,6 @@ singledispatch_method.py:10:5: PLE1519 [*] `@singledispatch` decorator should no
    |
    = help: Replace with `@singledispatchmethod`
 
-Suggested fix:
 7  7  | 
 8  8  | 
 9  9  | class Board:
@@ -34,7 +33,6 @@ singledispatch_method.py:15:5: PLE1519 [*] `@singledispatch` decorator should no
    |
    = help: Replace with `@singledispatchmethod`
 
-Suggested fix:
 12 12 |     def convert_position(cls, position):
 13 13 |         pass
 14 14 | 
@@ -57,7 +55,6 @@ singledispatch_method.py:23:5: PLE1519 [*] `@singledispatch` decorator should no
    |
    = help: Replace with `@singledispatchmethod`
 
-Suggested fix:
 20 20 |     def place(self, position):
 21 21 |         pass
 22 22 | 

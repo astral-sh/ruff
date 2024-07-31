@@ -12,7 +12,6 @@ UP036_5.py:3:4: UP036 [*] Version block is outdated for minimum Python version
   |
   = help: Remove outdated version block
 
-Suggested fix:
 1  1  | import sys
 2  2  | 
 3     |-if sys.version_info < (3, 8):
@@ -43,7 +42,6 @@ UP036_5.py:18:4: UP036 [*] Version block is outdated for minimum Python version
    |
    = help: Remove outdated version block
 
-Suggested fix:
 15 15 | 
 16 16 | import sys
 17 17 | 

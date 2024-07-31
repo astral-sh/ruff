@@ -12,7 +12,6 @@ RET508.py:8:9: RET508 [*] Unnecessary `elif` after `break` statement
    |
    = help: Remove unnecessary `elif`
 
-Suggested fix:
 5 5 |     for i in x:
 6 6 |         if i > y:  # [no-else-break]
 7 7 |             break
@@ -35,7 +34,6 @@ RET508.py:22:9: RET508 [*] Unnecessary `elif` after `break` statement
    |
    = help: Remove unnecessary `elif`
 
-Suggested fix:
 19 19 |             else:
 20 20 |                 b = 2
 21 21 |             break
@@ -57,7 +55,6 @@ RET508.py:33:9: RET508 [*] Unnecessary `else` after `break` statement
    |
    = help: Remove unnecessary `else`
 
-Suggested fix:
 30 30 |     for i in x:
 31 31 |         if i > y:  # [no-else-break]
 32 32 |             break
@@ -81,7 +78,6 @@ RET508.py:44:13: RET508 [*] Unnecessary `else` after `break` statement
    |
    = help: Remove unnecessary `else`
 
-Suggested fix:
 41 41 |             if z:  # [no-else-break]
 42 42 |                 b = 2
 43 43 |                 break
@@ -107,7 +103,6 @@ RET508.py:60:9: RET508 [*] Unnecessary `else` after `break` statement
    |
    = help: Remove unnecessary `else`
 
-Suggested fix:
 57 57 |             else:
 58 58 |                 b = 2
 59 59 |             break
@@ -131,7 +126,6 @@ RET508.py:71:13: RET508 [*] Unnecessary `else` after `break` statement
    |
    = help: Remove unnecessary `else`
 
-Suggested fix:
 68 68 |             if y:  # [no-else-break]
 69 69 |                 a = 4
 70 70 |                 break
@@ -155,7 +149,6 @@ RET508.py:82:9: RET508 [*] Unnecessary `else` after `break` statement
    |
    = help: Remove unnecessary `else`
 
-Suggested fix:
 79 79 |     for i in range(10):
 80 80 |         if x:  # [no-else-break]
 81 81 |             break
@@ -184,7 +177,6 @@ RET508.py:158:13: RET508 [*] Unnecessary `else` after `break` statement
     |
     = help: Remove unnecessary `else`
 
-Suggested fix:
 155 155 |         else:
 156 156 |             if i > w:
 157 157 |                 break

@@ -13,7 +13,6 @@ D.py:129:5: D200 [*] One-line docstring should fit on one line
     |
     = help: Reformat to one line
 
-Suggested fix:
 126 126 |         '(found 3)')
 127 127 | @expect('D212: Multi-line docstring summary should start at the first line')
 128 128 | def asdlkfasd():
@@ -39,7 +38,6 @@ D.py:597:5: D200 [*] One-line docstring should fit on one line
     |
     = help: Reformat to one line
 
-Suggested fix:
 594 594 |         '(found 3)')
 595 595 | @expect('D212: Multi-line docstring summary should start at the first line')
 596 596 | def one_liner():
@@ -65,7 +63,6 @@ D.py:606:5: D200 [*] One-line docstring should fit on one line
     |
     = help: Reformat to one line
 
-Suggested fix:
 603 603 |         '(found 3)')
 604 604 | @expect('D212: Multi-line docstring summary should start at the first line')
 605 605 | def one_liner():

@@ -10,7 +10,6 @@ singledispatchmethod_function.py:4:1: PLE1520 [*] `@singledispatchmethod` decora
   |
   = help: Replace with `@singledispatch`
 
-Suggested fix:
 1   |-from functools import singledispatchmethod
   1 |+from functools import singledispatchmethod, singledispatch
 2 2 | 

@@ -11,7 +11,6 @@ TCH004_11.py:4:24: TCH004 [*] Move import `typing.List` out of type-checking blo
   |
   = help: Move out of type-checking block
 
-Suggested fix:
 1 1 | from typing import TYPE_CHECKING
   2 |+from typing import List
 2 3 | 

@@ -10,7 +10,6 @@ runtime_evaluated_base_classes_1.py:10:12: TCH004 [*] Move import `datetime` out
    |
    = help: Move out of type-checking block
 
-Suggested fix:
 5  5  | 
 6  6  | import pydantic
 7  7  | from pydantic import BaseModel
@@ -35,7 +34,6 @@ runtime_evaluated_base_classes_1.py:11:23: TCH004 [*] Move import `array.array` 
    |
    = help: Move out of type-checking block
 
-Suggested fix:
 5  5  | 
 6  6  | import pydantic
 7  7  | from pydantic import BaseModel
@@ -60,7 +58,6 @@ runtime_evaluated_base_classes_1.py:13:12: TCH004 [*] Move import `pandas` out o
    |
    = help: Move out of type-checking block
 
-Suggested fix:
 5  5  | 
 6  6  | import pydantic
 7  7  | from pydantic import BaseModel

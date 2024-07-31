@@ -10,7 +10,6 @@ sections.py:111:5: D409 [*] Section underline should match the length of its nam
     |
     = help: Adjust underline length to match "Returns"
 
-Suggested fix:
 108 108 |     """Toggle the gizmo.
 109 109 | 
 110 110 |     Returns
@@ -32,7 +31,6 @@ sections.py:225:5: D409 [*] Section underline should match the length of its nam
     |
     = help: Adjust underline length to match "Returns"
 
-Suggested fix:
 222 222 |     returns.
 223 223 | 
 224 224 |     Returns
@@ -54,7 +52,6 @@ sections.py:578:5: D409 [*] Section underline should match the length of its nam
     |
     = help: Adjust underline length to match "Other Parameters"
 
-Suggested fix:
 575 575 |         A dictionary of string attributes
 576 576 | 
 577 577 |     Other Parameters

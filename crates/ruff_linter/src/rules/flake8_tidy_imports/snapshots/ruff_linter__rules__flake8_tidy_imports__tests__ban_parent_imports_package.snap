@@ -22,7 +22,6 @@ application.py:6:1: TID252 [*] Prefer absolute imports over relative imports fro
   |
   = help: Replace relative imports from parent modules with absolute imports
 
-Suggested fix:
 3 3 | import attrs
 4 4 | 
 5 5 | from ....import unknown
@@ -44,7 +43,6 @@ application.py:6:1: TID252 [*] Prefer absolute imports over relative imports fro
   |
   = help: Replace relative imports from parent modules with absolute imports
 
-Suggested fix:
 3 3 | import attrs
 4 4 | 
 5 5 | from ....import unknown
@@ -66,7 +64,6 @@ application.py:6:1: TID252 [*] Prefer absolute imports over relative imports fro
   |
   = help: Replace relative imports from parent modules with absolute imports
 
-Suggested fix:
 3 3 | import attrs
 4 4 | 
 5 5 | from ....import unknown
@@ -89,7 +86,6 @@ application.py:7:1: TID252 [*] Prefer absolute imports over relative imports fro
   |
   = help: Replace relative imports from parent modules with absolute imports
 
-Suggested fix:
 4 4 | 
 5 5 | from ....import unknown
 6 6 | from ..protocol import commands, definitions, responses
@@ -112,7 +108,6 @@ application.py:8:1: TID252 [*] Prefer absolute imports over relative imports fro
    |
    = help: Replace relative imports from parent modules with absolute imports
 
-Suggested fix:
 5 5 | from ....import unknown
 6 6 | from ..protocol import commands, definitions, responses
 7 7 | from ..server import example
@@ -132,7 +127,6 @@ application.py:10:1: TID252 [*] Prefer absolute imports over relative imports fr
    |
    = help: Replace relative imports from parent modules with absolute imports
 
-Suggested fix:
 7  7  | from ..server import example
 8  8  | from .. import server
 9  9  | from . import logger, models

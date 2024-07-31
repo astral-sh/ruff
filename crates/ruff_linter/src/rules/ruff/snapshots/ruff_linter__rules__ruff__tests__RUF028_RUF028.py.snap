@@ -12,7 +12,6 @@ RUF028.py:3:9: RUF028 [*] This suppression comment is invalid because it cannot 
   |
   = help: Remove this comment
 
-Suggested fix:
 1 1 | def fmt_off_between_lists():
 2 2 |     test_list = [
 3   |-        # fmt: off
@@ -32,7 +31,6 @@ RUF028.py:12:5: RUF028 [*] This suppression comment is invalid because it cannot
    |
    = help: Remove this comment
 
-Suggested fix:
 9  9  | 
 10 10 | # note: the second `fmt: skip`` should be OK
 11 11 | def fmt_skip_on_own_line():
@@ -53,7 +51,6 @@ RUF028.py:17:1: RUF028 [*] This suppression comment is invalid because it cannot
    |
    = help: Remove this comment
 
-Suggested fix:
 14 14 | 
 15 15 | 
 16 16 | @fmt_skip_on_own_line
@@ -74,7 +71,6 @@ RUF028.py:24:1: RUF028 [*] This suppression comment is invalid because it cannot
    |
    = help: Remove this comment
 
-Suggested fix:
 21 21 | 
 22 22 | 
 23 23 | @fmt_off_between_decorators
@@ -96,7 +92,6 @@ RUF028.py:33:5: RUF028 [*] This suppression comment is invalid because it cannot
    |
    = help: Remove this comment
 
-Suggested fix:
 30 30 |     x = [1, 2, 3]
 31 31 |     for val in x:
 32 32 |         print(x)
@@ -118,7 +113,6 @@ RUF028.py:39:5: RUF028 [*] This suppression comment is invalid because it cannot
    |
    = help: Remove this comment
 
-Suggested fix:
 36 36 |     while False:
 37 37 |         print("while")
 38 38 |         # fmt: off
@@ -140,7 +134,6 @@ RUF028.py:45:5: RUF028 [*] This suppression comment is invalid because it cannot
    |
    = help: Remove this comment
 
-Suggested fix:
 42 42 |     if len(x) > 3:
 43 43 |         print("huh?")
 44 44 |     # fmt: on
@@ -162,7 +155,6 @@ RUF028.py:52:5: RUF028 [*] This suppression comment is invalid because it cannot
    |
    = help: Remove this comment
 
-Suggested fix:
 49 49 | 
 50 50 | class Test:
 51 51 |     @classmethod
@@ -184,7 +176,6 @@ RUF028.py:54:9: RUF028 [*] This suppression comment is invalid because it cannot
    |
    = help: Remove this comment
 
-Suggested fix:
 51 51 |     @classmethod
 52 52 |     # fmt: off
 53 53 |     def cls_method_a(
@@ -205,7 +196,6 @@ RUF028.py:62:13: RUF028 [*] This suppression comment is invalid because it canno
    |
    = help: Remove this comment
 
-Suggested fix:
 59 59 | 
 60 60 | def fmt_on_trailing():
 61 61 |     # fmt: off
@@ -226,7 +216,6 @@ RUF028.py:63:10: RUF028 [*] This suppression comment is invalid because it canno
    |
    = help: Remove this comment
 
-Suggested fix:
 60 60 | def fmt_on_trailing():
 61 61 |     # fmt: off
 62 62 |     val = 5 # fmt: on

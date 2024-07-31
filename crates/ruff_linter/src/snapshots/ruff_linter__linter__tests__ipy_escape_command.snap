@@ -12,7 +12,6 @@ ipy_escape_command.ipynb:cell 1:5:8: F401 [*] `os` imported but unused
   |
   = help: Remove unused import: `os`
 
-Suggested fix:
 2 2 | 
 3 3 | %matplotlib inline
 4 4 | 
@@ -31,7 +30,6 @@ ipy_escape_command.ipynb:cell 2:2:8: F401 [*] `sys` imported but unused
   |
   = help: Remove unused import: `sys`
 
-Suggested fix:
 6 6 | 
 7 7 | _ = math.pi
 8 8 | %%timeit

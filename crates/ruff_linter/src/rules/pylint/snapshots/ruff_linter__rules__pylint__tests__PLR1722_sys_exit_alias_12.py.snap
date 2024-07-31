@@ -10,7 +10,6 @@ sys_exit_alias_12.py:3:1: PLR1722 [*] Use `sys.exit()` instead of `exit`
   |
   = help: Replace `exit` with `sys.exit()`
 
-Suggested fix:
 1   |-import os \
   1 |+import os; import sys \
 2 2 | 

@@ -11,7 +11,6 @@ FLY002.py:5:7: FLY002 [*] Consider `f"{a}  World"` instead of string join
   |
   = help: Replace with `f"{a}  World"`
 
-Suggested fix:
 2 2 | from random import random, choice
 3 3 | 
 4 4 | a = "Hello"
@@ -34,7 +33,6 @@ FLY002.py:6:7: FLY002 [*] Consider `f"Finally, {a} World"` instead of string joi
   |
   = help: Replace with `f"Finally, {a} World"`
 
-Suggested fix:
 3 3 | 
 4 4 | a = "Hello"
 5 5 | ok1 = " ".join([a, " World"])  # OK
@@ -57,7 +55,6 @@ FLY002.py:7:7: FLY002 [*] Consider `"1x2x3"` instead of string join
   |
   = help: Replace with `"1x2x3"`
 
-Suggested fix:
 4 4 | a = "Hello"
 5 5 | ok1 = " ".join([a, " World"])  # OK
 6 6 | ok2 = "".join(["Finally, ", a, " World"])  # OK
@@ -80,7 +77,6 @@ FLY002.py:8:7: FLY002 [*] Consider `f"{1}y{2}y{3}"` instead of string join
    |
    = help: Replace with `f"{1}y{2}y{3}"`
 
-Suggested fix:
 5 5 | ok1 = " ".join([a, " World"])  # OK
 6 6 | ok2 = "".join(["Finally, ", a, " World"])  # OK
 7 7 | ok3 = "x".join(("1", "2", "3"))  # OK
@@ -102,7 +98,6 @@ FLY002.py:9:7: FLY002 [*] Consider `f"{random()}a{random()}"` instead of string 
    |
    = help: Replace with `f"{random()}a{random()}"`
 
-Suggested fix:
 6  6  | ok2 = "".join(["Finally, ", a, " World"])  # OK
 7  7  | ok3 = "x".join(("1", "2", "3"))  # OK
 8  8  | ok4 = "y".join([1, 2, 3])  # Technically OK, though would've been an error originally
@@ -125,7 +120,6 @@ FLY002.py:10:7: FLY002 [*] Consider `f"{secrets.token_urlsafe()}a{secrets.token_
    |
    = help: Replace with `f"{secrets.token_urlsafe()}a{secrets.token_hex()}"`
 
-Suggested fix:
 7  7  | ok3 = "x".join(("1", "2", "3"))  # OK
 8  8  | ok4 = "y".join([1, 2, 3])  # Technically OK, though would've been an error originally
 9  9  | ok5 = "a".join([random(), random()])  # OK (simple calls)
@@ -146,7 +140,6 @@ FLY002.py:23:11: FLY002 [*] Consider `f"{url}{filename}"` instead of string join
    |
    = help: Replace with `f"{url}{filename}"`
 
-Suggested fix:
 20 20 | 
 21 21 | # Regression test for: https://github.com/astral-sh/ruff/issues/7197
 22 22 | def create_file_public_url(url, filename):

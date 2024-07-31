@@ -12,7 +12,6 @@ E30.ipynb:60:5: E306 [*] Expected 1 blank line before a nested definition, found
    |
    = help: Add missing blank line
 
-Suggested fix:
 57 57 | # E306:3:5
 58 58 | def a():
 59 59 |     x = 1

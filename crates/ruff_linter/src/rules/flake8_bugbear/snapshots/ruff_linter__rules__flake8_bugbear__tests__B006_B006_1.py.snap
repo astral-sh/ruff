@@ -12,7 +12,6 @@ B006_1.py:3:22: B006 [*] Do not use mutable data structures for argument default
   |
   = help: Replace with `None`; initialize within function
 
-Suggested fix:
 1 1 | # Docstring followed by a newline
 2 2 | 
 3   |-def foobar(foor, bar={}):    

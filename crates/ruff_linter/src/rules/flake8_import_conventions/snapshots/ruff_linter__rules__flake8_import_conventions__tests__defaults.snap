@@ -11,7 +11,6 @@ defaults.py:6:12: ICN001 [*] `altair` should be imported as `alt`
   |
   = help: Alias `altair` to `alt`
 
-Suggested fix:
 3 3 | 
 4 4 | 
 5 5 | def unconventional():
@@ -45,7 +44,6 @@ defaults.py:8:12: ICN001 [*] `numpy` should be imported as `np`
    |
    = help: Alias `numpy` to `np`
 
-Suggested fix:
 5 5 | def unconventional():
 6 6 |     import altair
 7 7 |     import matplotlib.pyplot
@@ -68,7 +66,6 @@ defaults.py:9:12: ICN001 [*] `pandas` should be imported as `pd`
    |
    = help: Alias `pandas` to `pd`
 
-Suggested fix:
 6  6  |     import altair
 7  7  |     import matplotlib.pyplot
 8  8  |     import numpy
@@ -91,7 +88,6 @@ defaults.py:10:12: ICN001 [*] `seaborn` should be imported as `sns`
    |
    = help: Alias `seaborn` to `sns`
 
-Suggested fix:
 7  7  |     import matplotlib.pyplot
 8  8  |     import numpy
 9  9  |     import pandas
@@ -113,7 +109,6 @@ defaults.py:11:12: ICN001 [*] `tkinter` should be imported as `tk`
    |
    = help: Alias `tkinter` to `tk`
 
-Suggested fix:
 8  8  |     import numpy
 9  9  |     import pandas
 10 10 |     import seaborn
@@ -134,7 +129,6 @@ defaults.py:12:12: ICN001 [*] `networkx` should be imported as `nx`
    |
    = help: Alias `networkx` to `nx`
 
-Suggested fix:
 9  9  |     import pandas
 10 10 |     import seaborn
 11 11 |     import tkinter
@@ -156,7 +150,6 @@ defaults.py:16:22: ICN001 [*] `altair` should be imported as `alt`
    |
    = help: Alias `altair` to `alt`
 
-Suggested fix:
 13 13 | 
 14 14 | 
 15 15 | def unconventional_aliases():
@@ -179,7 +172,6 @@ defaults.py:17:33: ICN001 [*] `matplotlib.pyplot` should be imported as `plt`
    |
    = help: Alias `matplotlib.pyplot` to `plt`
 
-Suggested fix:
 14 14 | 
 15 15 | def unconventional_aliases():
 16 16 |     import altair as altr
@@ -202,7 +194,6 @@ defaults.py:18:21: ICN001 [*] `numpy` should be imported as `np`
    |
    = help: Alias `numpy` to `np`
 
-Suggested fix:
 15 15 | def unconventional_aliases():
 16 16 |     import altair as altr
 17 17 |     import matplotlib.pyplot as plot
@@ -225,7 +216,6 @@ defaults.py:19:22: ICN001 [*] `pandas` should be imported as `pd`
    |
    = help: Alias `pandas` to `pd`
 
-Suggested fix:
 16 16 |     import altair as altr
 17 17 |     import matplotlib.pyplot as plot
 18 18 |     import numpy as nmp
@@ -248,7 +238,6 @@ defaults.py:20:23: ICN001 [*] `seaborn` should be imported as `sns`
    |
    = help: Alias `seaborn` to `sns`
 
-Suggested fix:
 17 17 |     import matplotlib.pyplot as plot
 18 18 |     import numpy as nmp
 19 19 |     import pandas as pdas
@@ -270,7 +259,6 @@ defaults.py:21:23: ICN001 [*] `tkinter` should be imported as `tk`
    |
    = help: Alias `tkinter` to `tk`
 
-Suggested fix:
 18 18 |     import numpy as nmp
 19 19 |     import pandas as pdas
 20 20 |     import seaborn as sbrn
@@ -291,7 +279,6 @@ defaults.py:22:24: ICN001 [*] `networkx` should be imported as `nx`
    |
    = help: Alias `networkx` to `nx`
 
-Suggested fix:
 19 19 |     import pandas as pdas
 20 20 |     import seaborn as sbrn
 21 21 |     import tkinter as tkr

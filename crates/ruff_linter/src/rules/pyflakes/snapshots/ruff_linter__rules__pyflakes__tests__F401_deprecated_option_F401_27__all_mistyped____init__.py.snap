@@ -8,7 +8,6 @@ __init__.py:5:15: F401 [*] `.unused` imported but unused; consider removing, add
   |
   = help: Remove unused import: `.unused`
 
-Suggested fix:
 2 2 | """
 3 3 | 
 4 4 | 
@@ -26,7 +25,6 @@ __init__.py:8:26: F401 [*] `.renamed` imported but unused; consider removing, ad
   |
   = help: Remove unused import: `.renamed`
 
-Suggested fix:
 5 5 | from . import unused  # F401: recommend add to all w/o fix
 6 6 | 
 7 7 | 

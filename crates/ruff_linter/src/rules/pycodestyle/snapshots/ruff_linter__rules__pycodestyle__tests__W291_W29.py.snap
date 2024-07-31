@@ -12,7 +12,6 @@ W29.py:4:6: W291 [*] Trailing whitespace
   |
   = help: Remove trailing whitespace
 
-Suggested fix:
 1 1 | #: Okay
 2 2 | # 情
 3 3 | #: W291:1:6
@@ -35,7 +34,6 @@ W29.py:11:35: W291 [*] Trailing whitespace
    |
    = help: Remove trailing whitespace
 
-Suggested fix:
 8  8  |     bang = 12
 9  9  | #: W291:2:35
 10 10 | '''multiline
@@ -58,7 +56,6 @@ W29.py:13:6: W291 [*] Trailing whitespace
    |
    = help: Remove trailing whitespace
 
-Suggested fix:
 10 10 | '''multiline
 11 11 | string with trailing whitespace'''   
 12 12 | #: W291 W292 noeol

@@ -11,7 +11,6 @@ PIE810.py:2:1: PIE810 [*] Call `startswith` once with a `tuple`
   |
   = help: Merge into a single `startswith` call
 
-Suggested fix:
 1 1 | # error
 2   |-obj.startswith("foo") or obj.startswith("bar")
   2 |+obj.startswith(("foo", "bar"))
@@ -32,7 +31,6 @@ PIE810.py:4:1: PIE810 [*] Call `endswith` once with a `tuple`
   |
   = help: Merge into a single `endswith` call
 
-Suggested fix:
 1 1 | # error
 2 2 | obj.startswith("foo") or obj.startswith("bar")
 3 3 | # error
@@ -55,7 +53,6 @@ PIE810.py:6:1: PIE810 [*] Call `startswith` once with a `tuple`
   |
   = help: Merge into a single `startswith` call
 
-Suggested fix:
 3 3 | # error
 4 4 | obj.endswith("foo") or obj.endswith("bar")
 5 5 | # error
@@ -78,7 +75,6 @@ PIE810.py:8:1: PIE810 [*] Call `startswith` once with a `tuple`
    |
    = help: Merge into a single `startswith` call
 
-Suggested fix:
 5 5 | # error
 6 6 | obj.startswith(foo) or obj.startswith(bar)
 7 7 | # error
@@ -101,7 +97,6 @@ PIE810.py:10:1: PIE810 [*] Call `startswith` once with a `tuple`
    |
    = help: Merge into a single `startswith` call
 
-Suggested fix:
 7  7  | # error
 8  8  | obj.startswith(foo) or obj.startswith("foo")
 9  9  | # error
@@ -123,7 +118,6 @@ PIE810.py:19:8: PIE810 [*] Call `startswith` once with a `tuple`
    |
    = help: Merge into a single `startswith` call
 
-Suggested fix:
 16 16 |     y = ("h", "e", "l", "l", "o")  
 17 17 |     z = "w"
 18 18 | 
@@ -145,7 +139,6 @@ PIE810.py:25:8: PIE810 [*] Call `startswith` once with a `tuple`
    |
    = help: Merge into a single `startswith` call
 
-Suggested fix:
 22 22 | def func():
 23 23 |     msg = "hello world"
 24 24 | 

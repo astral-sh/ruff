@@ -10,7 +10,6 @@ E30.ipynb:29:5: E303 [*] Too many blank lines (2)
    |
    = help: Remove extraneous blank line(s)
 
-Suggested fix:
 25 25 | def fn():
 26 26 |     _ = None
 27 27 | 
@@ -30,7 +29,6 @@ E30.ipynb:39:1: E303 [*] Too many blank lines (4)
    |
    = help: Remove extraneous blank line(s)
 
-Suggested fix:
 34 34 | # E303
 35 35 | 
 36 36 | 

@@ -11,7 +11,6 @@ E40.py:2:1: E401 [*] Multiple imports on one line
   |
   = help: Split imports
 
-Suggested fix:
 1 1 | #: E401
 2   |-import os, sys
   2 |+import os
@@ -31,7 +30,6 @@ E40.py:65:1: E401 [*] Multiple imports on one line
    |
    = help: Split imports
 
-Suggested fix:
 62 62 | import bar
 63 63 | 
 64 64 | #: E401
@@ -55,7 +53,6 @@ E40.py:66:1: E401 [*] Multiple imports on one line
    |
    = help: Split imports
 
-Suggested fix:
 63 63 | 
 64 64 | #: E401
 65 65 | import re as regex, string  # also with a comment!
@@ -76,7 +73,6 @@ E40.py:68:8: E401 [*] Multiple imports on one line
    |
    = help: Split imports
 
-Suggested fix:
 65 65 | import re as regex, string  # also with a comment!
 66 66 | import re as regex, string; x = 1
 67 67 | 
@@ -98,7 +94,6 @@ E40.py:72:5: E401 [*] Multiple imports on one line
    |
    = help: Split imports
 
-Suggested fix:
 69 69 | 
 70 70 | 
 71 71 | def blah():
@@ -121,7 +116,6 @@ E40.py:75:9: E401 [*] Multiple imports on one line
    |
    = help: Split imports
 
-Suggested fix:
 72 72 |     import datetime as dt, copy
 73 73 | 
 74 74 |     def nested_and_tested():
@@ -144,7 +138,6 @@ E40.py:77:16: E401 [*] Multiple imports on one line
    |
    = help: Split imports
 
-Suggested fix:
 74 74 |     def nested_and_tested():
 75 75 |         import builtins, textwrap as tw
 76 76 | 
@@ -166,7 +159,6 @@ E40.py:78:9: E401 [*] Multiple imports on one line
    |
    = help: Split imports
 
-Suggested fix:
 75 75 |         import builtins, textwrap as tw
 76 76 | 
 77 77 |         x = 1; import re as regex, string
@@ -186,7 +178,6 @@ E40.py:80:14: E401 [*] Multiple imports on one line
    |
    = help: Split imports
 
-Suggested fix:
 77 77 |         x = 1; import re as regex, string
 78 78 |         import re as regex, string; x = 1
 79 79 | 

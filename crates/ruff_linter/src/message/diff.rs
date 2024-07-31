@@ -62,8 +62,6 @@ impl Display for Diff<'_> {
         let digit_with =
             calculate_print_width(OneIndexed::from_zero_indexed(largest_new.max(largest_old)));
 
-        writeln!(f, "{}", "Suggested fix:".blue())?;
-
         for (idx, group) in diff.grouped_ops(3).iter().enumerate() {
             if idx > 0 {
                 writeln!(f, "{:-^1$}", "-", 80)?;
