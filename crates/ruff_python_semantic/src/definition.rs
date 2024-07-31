@@ -151,11 +151,11 @@ impl<'a> Definition<'a> {
         )
     }
 
-    pub fn is_property(
-        &self,
-        extra_properties: &[QualifiedName],
-        semantic: &SemanticModel,
-    ) -> bool {
+    pub fn is_property<P, I>(&self, extra_properties: P, semantic: &SemanticModel) -> bool
+    where
+        P: IntoIterator<IntoIter = I>,
+        I: Iterator<Item = QualifiedName<'a>> + Clone,
+    {
         self.as_function_def()
             .is_some_and(|StmtFunctionDef { decorator_list, .. }| {
                 is_property(decorator_list, extra_properties, semantic)

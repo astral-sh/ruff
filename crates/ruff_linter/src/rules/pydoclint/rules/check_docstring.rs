@@ -444,7 +444,7 @@ pub(crate) fn check_docstring(
     checker: &mut Checker,
     definition: &Definition,
     section_contexts: &SectionContexts,
-    convention: Option<&Convention>,
+    convention: Option<Convention>,
 ) {
     let mut diagnostics = Vec::new();
     let Definition::Member(member) = definition else {
@@ -478,14 +478,8 @@ pub(crate) fn check_docstring(
 
     // DOC201
     if checker.enabled(Rule::DocstringMissingReturns) && docstring_sections.returns.is_none() {
-        let extra_property_decorators = checker
-            .settings
-            .pydocstyle
-            .property_decorators
-            .iter()
-            .map(|decorator| QualifiedName::from_dotted_name(decorator))
-            .collect::<Vec<QualifiedName>>();
-        if !definition.is_property(&extra_property_decorators, checker.semantic()) {
+        let extra_property_decorators = checker.settings.pydocstyle.property_decorators();
+        if !definition.is_property(extra_property_decorators, checker.semantic()) {
             if let Some(body_return) = body_entries.returns.first() {
                 let diagnostic = Diagnostic::new(DocstringMissingReturns, body_return.range());
                 diagnostics.push(diagnostic);
