@@ -14,7 +14,6 @@ SIM114.py:2:1: SIM114 [*] Combine `if` branches using logical `or` operator
   |
   = help: Combine `if` branches
 
-ℹ Safe fix
 1 1 | # Errors
 2   |-if a:
 3   |-    b
@@ -38,7 +37,6 @@ SIM114.py:7:1: SIM114 [*] Combine `if` branches using logical `or` operator
    |
    = help: Combine `if` branches
 
-ℹ Safe fix
 4  4  | elif c:
 5  5  |     b
 6  6  | 
@@ -66,7 +64,6 @@ SIM114.py:12:1: SIM114 [*] Combine `if` branches using logical `or` operator
    |
    = help: Combine `if` branches
 
-ℹ Safe fix
 9  9  | elif c:  # but not on the second branch
 10 10 |     b
 11 11 | 
@@ -97,7 +94,6 @@ SIM114.py:19:1: SIM114 [*] Combine `if` branches using logical `or` operator
    |
    = help: Combine `if` branches
 
-ℹ Safe fix
 16 16 |     for _ in range(20):
 17 17 |         print("hello")
 18 18 | 
@@ -135,7 +131,6 @@ SIM114.py:28:1: SIM114 [*] Combine `if` branches using logical `or` operator
    |
    = help: Combine `if` branches
 
-ℹ Safe fix
 25 25 |         for _ in range(20):
 26 26 |             print("hello")
 27 27 | 
@@ -168,7 +163,6 @@ SIM114.py:29:5: SIM114 [*] Combine `if` branches using logical `or` operator
    |
    = help: Combine `if` branches
 
-ℹ Safe fix
 26 26 |             print("hello")
 27 27 | 
 28 28 | if x == 1:
@@ -198,7 +192,6 @@ SIM114.py:36:5: SIM114 [*] Combine `if` branches using logical `or` operator
    |
    = help: Combine `if` branches
 
-ℹ Safe fix
 33 33 |         for _ in range(20):
 34 34 |             print("hello")
 35 35 | elif x == 2:
@@ -240,7 +233,6 @@ SIM114.py:43:1: SIM114 [*] Combine `if` branches using logical `or` operator
    |
    = help: Combine `if` branches
 
-ℹ Safe fix
 55 55 |     and i == 12
 56 56 |     and j == 13
 57 57 |     and k == 14
@@ -266,7 +258,6 @@ SIM114.py:67:1: SIM114 [*] Combine `if` branches using logical `or` operator
    |
    = help: Combine `if` branches
 
-ℹ Safe fix
 64 64 |     pass
 65 65 | elif result.eofs == "S":
 66 66 |     skipped = 1
@@ -292,7 +283,6 @@ SIM114.py:69:1: SIM114 [*] Combine `if` branches using logical `or` operator
    |
    = help: Combine `if` branches
 
-ℹ Safe fix
 66 66 |     skipped = 1
 67 67 | elif result.eofs == "F":
 68 68 |     errors = 1
@@ -316,7 +306,6 @@ SIM114.py:71:1: SIM114 [*] Combine `if` branches using logical `or` operator
    |
    = help: Combine `if` branches
 
-ℹ Safe fix
 68 68 |     errors = 1
 69 69 | elif result.eofs == "E":
 70 70 |     errors = 1
@@ -343,7 +332,6 @@ SIM114.py:118:5: SIM114 [*] Combine `if` branches using logical `or` operator
     |
     = help: Combine `if` branches
 
-ℹ Safe fix
 115 115 | def func():
 116 116 |     a = True
 117 117 |     b = False
@@ -368,7 +356,6 @@ SIM114.py:122:5: SIM114 [*] Combine `if` branches using logical `or` operator
     |
     = help: Combine `if` branches
 
-ℹ Safe fix
 119 119 |         return 3
 120 120 |     elif a == b:
 121 121 |         return 3
@@ -393,7 +380,6 @@ SIM114.py:132:5: SIM114 [*] Combine `if` branches using logical `or` operator
     |
     = help: Combine `if` branches
 
-ℹ Safe fix
 129 129 |     """Ensure that the named expression is parenthesized when merged."""
 130 130 |     a = True
 131 131 |     b = False
@@ -415,7 +401,6 @@ SIM114.py:138:1: SIM114 [*] Combine `if` branches using logical `or` operator
     |
     = help: Combine `if` branches
 
-ℹ Safe fix
 135 135 |         return 3
 136 136 | 
 137 137 | 
@@ -435,7 +420,6 @@ SIM114.py:144:1: SIM114 [*] Combine `if` branches using logical `or` operator
     |
     = help: Combine `if` branches
 
-ℹ Safe fix
 141 141 |     b
 142 142 | 
 143 143 | 
@@ -455,7 +439,6 @@ SIM114.py:148:1: SIM114 [*] Combine `if` branches using logical `or` operator
     |
     = help: Combine `if` branches
 
-ℹ Safe fix
 145 145 | elif c: b
 146 146 | 
 147 147 | 
@@ -463,5 +446,3 @@ SIM114.py:148:1: SIM114 [*] Combine `if` branches using logical `or` operator
 149     |-elif(100 < x and x < 200 and 300 < y and y < 800):
 150     |-	pass
     148 |+if(x > 200) or (100 < x and x < 200 and 300 < y and y < 800): pass
-
-

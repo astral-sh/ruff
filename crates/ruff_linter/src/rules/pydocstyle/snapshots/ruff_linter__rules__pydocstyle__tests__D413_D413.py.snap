@@ -12,7 +12,6 @@ D413.py:7:1: D413 [*] Missing blank line after last section ("Returns")
   |
   = help: Add blank line after "Returns"
 
-ℹ Safe fix
 6  6  | 
 7  7  | Returns:
 8  8  |     the value
@@ -32,7 +31,6 @@ D413.py:19:5: D413 [*] Missing blank line after last section ("Returns")
    |
    = help: Add blank line after "Returns"
 
-ℹ Safe fix
 18 18 | 
 19 19 |     Returns:
 20 20 |         the value
@@ -51,7 +49,6 @@ D413.py:58:5: D413 [*] Missing blank line after last section ("Returns")
    |
    = help: Add blank line after "Returns"
 
-ℹ Safe fix
 56 56 |             with a hanging indent
 57 57 | 
 58 58 |     Returns:
@@ -74,7 +71,6 @@ D413.py:69:5: D413 [*] Missing blank line after last section ("Returns")
    |
    = help: Add blank line after "Returns"
 
-ℹ Safe fix
 68 68 | 
 69 69 |     Returns:
 70 70 |         the value

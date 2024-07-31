@@ -12,7 +12,6 @@ UP032_0.py:5:1: UP032 [*] Use f-string instead of `format` call
   |
   = help: Convert to f-string
 
-ℹ Safe fix
 2 2 | # Errors
 3 3 | ###
 4 4 | 
@@ -33,7 +32,6 @@ UP032_0.py:7:1: UP032 [*] Use f-string instead of `format` call
   |
   = help: Convert to f-string
 
-ℹ Safe fix
 4 4 | 
 5 5 | "{} {}".format(a, b)
 6 6 | 
@@ -54,7 +52,6 @@ UP032_0.py:9:1: UP032 [*] Use f-string instead of `format` call
    |
    = help: Convert to f-string
 
-ℹ Safe fix
 6  6  | 
 7  7  | "{1} {0}".format(a, b)
 8  8  | 
@@ -75,7 +72,6 @@ UP032_0.py:11:1: UP032 [*] Use f-string instead of `format` call
    |
    = help: Convert to f-string
 
-ℹ Safe fix
 8  8  | 
 9  9  | "{0} {1} {0}".format(a, b)
 10 10 | 
@@ -96,7 +92,6 @@ UP032_0.py:13:1: UP032 [*] Use f-string instead of `format` call
    |
    = help: Convert to f-string
 
-ℹ Safe fix
 10 10 | 
 11 11 | "{x.y}".format(x=z)
 12 12 | 
@@ -117,7 +112,6 @@ UP032_0.py:15:1: UP032 [*] Use f-string instead of `format` call
    |
    = help: Convert to f-string
 
-ℹ Safe fix
 12 12 | 
 13 13 | "{x} {y} {x}".format(x=a, y=b)
 14 14 | 
@@ -138,7 +132,6 @@ UP032_0.py:17:1: UP032 [*] Use f-string instead of `format` call
    |
    = help: Convert to f-string
 
-ℹ Safe fix
 14 14 | 
 15 15 | "{.x} {.y}".format(a, b)
 16 16 | 
@@ -159,7 +152,6 @@ UP032_0.py:19:1: UP032 [*] Use f-string instead of `format` call
    |
    = help: Convert to f-string
 
-ℹ Safe fix
 16 16 | 
 17 17 | "{} {}".format(a.b, c.d)
 18 18 | 
@@ -180,7 +172,6 @@ UP032_0.py:21:1: UP032 [*] Use f-string instead of `format` call
    |
    = help: Convert to f-string
 
-ℹ Safe fix
 18 18 | 
 19 19 | "{}".format(a())
 20 20 | 
@@ -201,7 +192,6 @@ UP032_0.py:23:1: UP032 [*] Use f-string instead of `format` call
    |
    = help: Convert to f-string
 
-ℹ Safe fix
 20 20 | 
 21 21 | "{}".format(a.b())
 22 22 | 
@@ -222,7 +212,6 @@ UP032_0.py:25:1: UP032 [*] Use f-string instead of `format` call
    |
    = help: Convert to f-string
 
-ℹ Safe fix
 22 22 | 
 23 23 | "{}".format(a.b().c())
 24 24 | 
@@ -243,7 +232,6 @@ UP032_0.py:27:1: UP032 [*] Use f-string instead of `format` call
    |
    = help: Convert to f-string
 
-ℹ Safe fix
 24 24 | 
 25 25 | "hello {}!".format(name)
 26 26 | 
@@ -264,7 +252,6 @@ UP032_0.py:29:1: UP032 [*] Use f-string instead of `format` call
    |
    = help: Convert to f-string
 
-ℹ Safe fix
 26 26 | 
 27 27 | "{}{b}{}".format(a, c, b=b)
 28 28 | 
@@ -285,7 +272,6 @@ UP032_0.py:31:1: UP032 [*] Use f-string instead of `format` call
    |
    = help: Convert to f-string
 
-ℹ Safe fix
 28 28 | 
 29 29 | "{}".format(0x0)
 30 30 | 
@@ -306,7 +292,6 @@ UP032_0.py:33:1: UP032 [*] Use f-string instead of `format` call
    |
    = help: Convert to f-string
 
-ℹ Safe fix
 30 30 | 
 31 31 | "{} {}".format(a, b)
 32 32 | 
@@ -327,7 +312,6 @@ UP032_0.py:35:1: UP032 [*] Use f-string instead of `format` call
    |
    = help: Convert to f-string
 
-ℹ Safe fix
 32 32 | 
 33 33 | """{} {}""".format(a, b)
 34 34 | 
@@ -348,7 +332,6 @@ UP032_0.py:37:1: UP032 [*] Use f-string instead of `format` call
    |
    = help: Convert to f-string
 
-ℹ Safe fix
 34 34 | 
 35 35 | "foo{}".format(1)
 36 36 | 
@@ -369,7 +352,6 @@ UP032_0.py:39:5: UP032 [*] Use f-string instead of `format` call
    |
    = help: Convert to f-string
 
-ℹ Safe fix
 36 36 | 
 37 37 | r"foo{}".format(1)
 38 38 | 
@@ -390,7 +372,6 @@ UP032_0.py:41:7: UP032 [*] Use f-string instead of `format` call
    |
    = help: Convert to f-string
 
-ℹ Safe fix
 38 38 | 
 39 39 | x = "{a}".format(a=1)
 40 40 | 
@@ -411,7 +392,6 @@ UP032_0.py:43:1: UP032 [*] Use f-string instead of `format` call
    |
    = help: Convert to f-string
 
-ℹ Safe fix
 40 40 | 
 41 41 | print("foo {} ".format(x))
 42 42 | 
@@ -432,7 +412,6 @@ UP032_0.py:45:1: UP032 [*] Use f-string instead of `format` call
    |
    = help: Convert to f-string
 
-ℹ Safe fix
 42 42 | 
 43 43 | "{a[b]}".format(a=a)
 44 44 | 
@@ -453,7 +432,6 @@ UP032_0.py:47:1: UP032 [*] Use f-string instead of `format` call
    |
    = help: Convert to f-string
 
-ℹ Safe fix
 44 44 | 
 45 45 | "{a.a[b]}".format(a=a)
 46 46 | 
@@ -474,7 +452,6 @@ UP032_0.py:49:1: UP032 [*] Use f-string instead of `format` call
    |
    = help: Convert to f-string
 
-ℹ Safe fix
 46 46 | 
 47 47 | "{}{{}}{}".format(escaped, y)
 48 48 | 
@@ -495,7 +472,6 @@ UP032_0.py:51:1: UP032 [*] Use f-string instead of `format` call
    |
    = help: Convert to f-string
 
-ℹ Safe fix
 48 48 | 
 49 49 | "{}".format(a)
 50 50 | 
@@ -516,7 +492,6 @@ UP032_0.py:53:1: UP032 [*] Use f-string instead of `format` call
    |
    = help: Convert to f-string
 
-ℹ Safe fix
 50 50 | 
 51 51 | '({}={{0!e}})'.format(a)
 52 52 | 
@@ -537,7 +512,6 @@ UP032_0.py:55:1: UP032 [*] Use f-string instead of `format` call
    |
    = help: Convert to f-string
 
-ℹ Safe fix
 52 52 | 
 53 53 | "{[b]}".format(a)
 54 54 | 
@@ -558,7 +532,6 @@ UP032_0.py:57:1: UP032 [*] Use f-string instead of `format` call
    |
    = help: Convert to f-string
 
-ℹ Safe fix
 54 54 | 
 55 55 | '{[b]}'.format(a)
 56 56 | 
@@ -579,7 +552,6 @@ UP032_0.py:59:1: UP032 [*] Use f-string instead of `format` call
    |
    = help: Convert to f-string
 
-ℹ Safe fix
 56 56 | 
 57 57 | """{[b]}""".format(a)
 58 58 | 
@@ -602,7 +574,6 @@ UP032_0.py:61:1: UP032 [*] Use f-string instead of `format` call
    |
    = help: Convert to f-string
 
-ℹ Safe fix
 58 58 | 
 59 59 | '''{[b]}'''.format(a)
 60 60 | 
@@ -627,7 +598,6 @@ UP032_0.py:65:1: UP032 [*] Use f-string instead of `format` call
    |
    = help: Convert to f-string
 
-ℹ Safe fix
 62 62 |     1
 63 63 | )
 64 64 | 
@@ -652,7 +622,6 @@ UP032_0.py:69:1: UP032 [*] Use f-string instead of `format` call
    |
    = help: Convert to f-string
 
-ℹ Safe fix
 66 66 |     1111111111111111111111111111111111111111111111111111111111111111111111111,
 67 67 | )
 68 68 | 
@@ -681,7 +650,6 @@ UP032_0.py:73:85: UP032 [*] Use f-string instead of `format` call
    |
    = help: Convert to f-string
 
-ℹ Safe fix
 70 70 | {}
 71 71 | """.format(1)
 72 72 | 
@@ -708,7 +676,6 @@ UP032_0.py:79:1: UP032 [*] Use f-string instead of `format` call
    |
    = help: Convert to f-string
 
-ℹ Safe fix
 76 76 |     111111
 77 77 | )
 78 78 | 
@@ -732,7 +699,6 @@ UP032_0.py:81:1: UP032 [*] Use f-string instead of `format` call
    |
    = help: Convert to f-string
 
-ℹ Safe fix
 79 79 | "{a}" "{b}".format(a=1, b=1)
 80 80 | 
 81 81 | (
@@ -762,7 +728,6 @@ UP032_0.py:86:1: UP032 [*] Use f-string instead of `format` call
    |
    = help: Convert to f-string
 
-ℹ Safe fix
 84 84 | ).format(a=1, b=1)
 85 85 | 
 86 86 | (
@@ -795,7 +760,6 @@ UP032_0.py:94:5: UP032 [*] Use f-string instead of `format` call
     |
     = help: Convert to f-string
 
-ℹ Safe fix
 93  93  | (
 94  94  |     (
 95  95  |         # comment
@@ -824,7 +788,6 @@ UP032_0.py:104:1: UP032 [*] Use f-string instead of `format` call
     |
     = help: Convert to f-string
 
-ℹ Safe fix
 102 102 | )
 103 103 | 
 104 104 | (
@@ -845,7 +808,6 @@ UP032_0.py:111:11: UP032 [*] Use f-string instead of `format` call
     |
     = help: Convert to f-string
 
-ℹ Safe fix
 108 108 | 
 109 109 | 
 110 110 | def d(osname, version, release):
@@ -863,7 +825,6 @@ UP032_0.py:115:10: UP032 [*] Use f-string instead of `format` call
     |
     = help: Convert to f-string
 
-ℹ Safe fix
 112 112 | 
 113 113 | 
 114 114 | def e():
@@ -880,7 +841,6 @@ UP032_0.py:118:7: UP032 [*] Use f-string instead of `format` call
     |
     = help: Convert to f-string
 
-ℹ Safe fix
 115 115 |     yield"{}".format(1)
 116 116 | 
 117 117 | 
@@ -898,7 +858,6 @@ UP032_0.py:122:12: UP032 [*] Use f-string instead of `format` call
     |
     = help: Convert to f-string
 
-ℹ Safe fix
 119 119 | 
 120 120 | 
 121 121 | async def c():
@@ -916,7 +875,6 @@ UP032_0.py:126:12: UP032 [*] Use f-string instead of `format` call
     |
     = help: Convert to f-string
 
-ℹ Safe fix
 123 123 | 
 124 124 | 
 125 125 | async def c():
@@ -935,7 +893,6 @@ UP032_0.py:129:1: UP032 [*] Use f-string instead of `format` call
     |
     = help: Convert to f-string
 
-ℹ Safe fix
 126 126 |     return "{}".format(1 + await 3)
 127 127 | 
 128 128 | 
@@ -958,7 +915,6 @@ UP032_0.py:160:1: UP032 [*] Use f-string instead of `format` call
     |
     = help: Convert to f-string
 
-ℹ Safe fix
 157 157 | 
 158 158 | r'"\N{snowman} {}".format(a)'
 159 159 | 
@@ -989,7 +945,6 @@ UP032_0.py:164:1: UP032 [*] Use f-string instead of `format` call
     |
     = help: Convert to f-string
 
-ℹ Safe fix
 161 161 |     11111111111111111111111111111111111111111111111111111111111111111111111111,
 162 162 | )
 163 163 | 
@@ -1025,7 +980,6 @@ UP032_0.py:174:84: UP032 [*] Use f-string instead of `format` call
     |
     = help: Convert to f-string
 
-ℹ Safe fix
 171 171 | 111111111111111111111111111111111111111111111111111111111111111111111111111111111111111,
 172 172 | )
 173 173 | 
@@ -1061,7 +1015,6 @@ UP032_0.py:209:1: UP032 [*] Use f-string instead of `format` call
     |
     = help: Convert to f-string
 
-ℹ Safe fix
 206 206 | 
 207 207 | # The fixed string will exceed the line length, but it's still smaller than the
 208 208 | # existing line length, so it's fine.
@@ -1083,7 +1036,6 @@ UP032_0.py:212:18: UP032 [*] Use f-string instead of `format` call
     |
     = help: Convert to f-string
 
-ℹ Safe fix
 209 209 | "<Customer: {}, {}, {}, {}, {}>".format(self.internal_ids, self.external_ids, self.properties, self.tags, self.others)
 210 210 | 
 211 211 | # When fixing, trim the trailing empty string.
@@ -1106,7 +1058,6 @@ UP032_0.py:216:18: UP032 [*] Use f-string instead of `format` call
     |
     = help: Convert to f-string
 
-ℹ Safe fix
 213 213 |                  "".format(new_dict, d))
 214 214 | 
 215 215 | # When fixing, trim the trailing empty string.
@@ -1129,7 +1080,6 @@ UP032_0.py:220:5: UP032 [*] Use f-string instead of `format` call
     |
     = help: Convert to f-string
 
-ℹ Safe fix
 217 217 |                  .format(new_dict, d))
 218 218 | 
 219 219 | raise ValueError(
@@ -1152,7 +1102,6 @@ UP032_0.py:225:5: UP032 [*] Use f-string instead of `format` call
     |
     = help: Convert to f-string
 
-ℹ Safe fix
 222 222 | )
 223 223 | 
 224 224 | raise ValueError(
@@ -1176,7 +1125,6 @@ UP032_0.py:231:1: UP032 [*] Use f-string instead of `format` call
     |
     = help: Convert to f-string
 
-ℹ Safe fix
 229 229 | 
 230 230 | # The first string will be converted to an f-string and the curly braces in the second should be converted to be unescaped
 231 231 | (
@@ -1198,7 +1146,6 @@ UP032_0.py:236:1: UP032 [*] Use f-string instead of `format` call
     |
     = help: Convert to f-string
 
-ℹ Safe fix
 233 233 |     "{{}}"
 234 234 | ).format(a)
 235 235 | 
@@ -1221,7 +1168,6 @@ UP032_0.py:240:1: UP032 [*] Use f-string instead of `format` call
     |
     = help: Convert to f-string
 
-ℹ Safe fix
 238 238 | 
 239 239 | # Both strings will be converted to an f-string and the curly braces in the second should left escaped
 240 240 | (
@@ -1246,7 +1192,6 @@ UP032_0.py:245:1: UP032 [*] Use f-string instead of `format` call
     |
     = help: Convert to f-string
 
-ℹ Safe fix
 242 242 |     "{{{}}}"
 243 243 | ).format(a, b)
 244 244 | 
@@ -1266,7 +1211,6 @@ UP032_0.py:248:1: UP032 [*] Use f-string instead of `format` call
     |
     = help: Convert to f-string
 
-ℹ Safe fix
 245 245 | ("{}" "{{{}}}").format(a, b)
 246 246 | 
 247 247 | # The dictionary should be parenthesized.
@@ -1286,7 +1230,6 @@ UP032_0.py:251:1: UP032 [*] Use f-string instead of `format` call
     |
     = help: Convert to f-string
 
-ℹ Safe fix
 248 248 | "{}".format({0: 1}[0])
 249 249 | 
 250 250 | # The dictionary should be parenthesized.
@@ -1306,7 +1249,6 @@ UP032_0.py:254:1: UP032 [*] Use f-string instead of `format` call
     |
     = help: Convert to f-string
 
-ℹ Safe fix
 251 251 | "{}".format({0: 1}.bar)
 252 252 | 
 253 253 | # The dictionary should be parenthesized.
@@ -1326,7 +1268,6 @@ UP032_0.py:261:1: UP032 [*] Use f-string instead of `format` call
     |
     = help: Convert to f-string
 
-ℹ Safe fix
 258 258 | "{0} {0}".format(foo())
 259 259 | 
 260 260 | # The string _should_ be converted, since the function call is repeated in the arguments.
@@ -1346,7 +1287,6 @@ UP032_0.py:264:1: UP032 [*] Use f-string instead of `format` call
     |
     = help: Convert to f-string
 
-ℹ Safe fix
 261 261 | "{0} {1}".format(foo(), foo())
 262 262 | 
 263 263 | # The call should be removed, but the string itself should remain.
@@ -1366,7 +1306,6 @@ UP032_0.py:267:1: UP032 [*] Use f-string instead of `format` call
     |
     = help: Convert to f-string
 
-ℹ Safe fix
 264 264 | ''.format(self.project)
 265 265 | 
 266 266 | # The call should be removed, but the string itself should remain.
@@ -1385,7 +1324,6 @@ UP032_0.py:271:5: UP032 [*] Use f-string instead of `format` call
     |
     = help: Convert to f-string
 
-ℹ Safe fix
 268 268 | 
 269 269 | # Not a valid type annotation but this test shouldn't result in a panic.
 270 270 | # Refer: https://github.com/astral-sh/ruff/issues/11736

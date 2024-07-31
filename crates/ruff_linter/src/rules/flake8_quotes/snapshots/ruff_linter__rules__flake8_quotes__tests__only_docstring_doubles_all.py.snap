@@ -10,7 +10,6 @@ doubles_all.py:1:1: Q002 [*] Double quote docstring found but single quotes pref
   |
   = help: Replace double quotes docstring with single quotes
 
-ℹ Safe fix
 1   |-"""This is a docstring."""
   1 |+'''This is a docstring.'''
 2 2 | 

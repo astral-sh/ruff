@@ -17,7 +17,6 @@ two_space.py:2:1: I001 [*] Import block is un-sorted or un-formatted
    |
    = help: Organize imports
 
-ℹ Safe fix
 1 1 | # If the file doesn't contain a logical indent token, we should still detect two-space indentation on imports.
 2 2 | from math import (
 3   |-  sin,

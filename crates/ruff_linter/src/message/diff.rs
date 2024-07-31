@@ -36,6 +36,16 @@ impl<'a> Diff<'a> {
 
 impl Display for Diff<'_> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        // TODO: Instead of hard-coding this in, the `TextEmitter` should be
+        // handling it. See https://github.com/astral-sh/ruff/issues/12597 for
+        // further discussion.
+        if matches!(
+            self.fix.applicability(),
+            Applicability::Unsafe | Applicability::DisplayOnly
+        ) {
+            return Ok(());
+        }
+
         // TODO(dhruvmanila): Add support for Notebook cells once it's user-facing
         let mut output = String::with_capacity(self.source_code.source_text().len());
         let mut last_end = TextSize::default();
@@ -52,14 +62,6 @@ impl Display for Diff<'_> {
         output.push_str(&self.source_code.source_text()[usize::from(last_end)..]);
 
         let diff = TextDiff::from_lines(self.source_code.source_text(), &output);
-
-        let message = match self.fix.applicability() {
-            // TODO(zanieb): Adjust this messaging once it's user-facing
-            Applicability::Safe => "Safe fix",
-            Applicability::Unsafe => "Unsafe fix",
-            Applicability::DisplayOnly => "Display-only fix",
-        };
-        writeln!(f, "ℹ {}", message.blue())?;
 
         let (largest_old, largest_new) = diff
             .ops()

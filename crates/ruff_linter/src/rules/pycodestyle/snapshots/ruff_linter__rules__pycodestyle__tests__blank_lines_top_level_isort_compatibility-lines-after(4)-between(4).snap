@@ -15,7 +15,6 @@ E30_isort.py:1:1: I001 [*] Import block is un-sorted or un-formatted
   |
   = help: Organize imports
 
-ℹ Safe fix
 2  2  | 
 3  3  | 
 4  4  | 
@@ -36,7 +35,6 @@ E30_isort.py:8:1: E302 [*] Expected 4 blank lines, found 2
   |
   = help: Add missing blank line(s)
 
-ℹ Safe fix
 5  5  | from typing import Any, Sequence
 6  6  | 
 7  7  | 
@@ -57,7 +55,6 @@ E30_isort.py:23:1: E302 [*] Expected 2 blank lines, found 1
    |
    = help: Add missing blank line(s)
 
-ℹ Safe fix
 20 20 | 
 21 21 |     abcd.foo()
 22 22 | 
@@ -81,7 +78,6 @@ E30_isort.py:26:1: I001 [*] Import block is un-sorted or un-formatted
    |
    = help: Organize imports
 
-ℹ Safe fix
 25 25 | if TYPE_CHECKING:
 26 26 |     import os
 27 27 | 
@@ -101,7 +97,6 @@ E30_isort.py:35:1: E302 [*] Expected 2 blank lines, found 1
    |
    = help: Add missing blank line(s)
 
-ℹ Safe fix
 32 32 | 
 33 33 |     abcd.foo()
 34 34 | 
@@ -120,7 +115,6 @@ E30_isort.py:41:1: E302 [*] Expected 2 blank lines, found 1
    |
    = help: Add missing blank line(s)
 
-ℹ Safe fix
 38 38 | if TYPE_CHECKING:
 39 39 |     from typing_extensions import TypeAlias
 40 40 | 
@@ -138,7 +132,6 @@ E30_isort.py:60:1: I001 [*] Import block is un-sorted or un-formatted
    |
    = help: Organize imports
 
-ℹ Safe fix
 59 59 | 
 60 60 | from typing import Any, Sequence
 61 61 | 
@@ -156,7 +149,6 @@ E30_isort.py:62:1: E302 [*] Expected 4 blank lines, found 1
    |
    = help: Add missing blank line(s)
 
-ℹ Safe fix
 59 59 | 
 60 60 | from typing import Any, Sequence
 61 61 | 

@@ -12,7 +12,6 @@ useless_else_on_loop.py:9:5: PLW0120 [*] `else` clause on loop without a `break`
    |
    = help: Remove `else`
 
-ℹ Safe fix
 6  6  |     for i in range(10):
 7  7  |         if i % 2:
 8  8  |             return i
@@ -34,7 +33,6 @@ useless_else_on_loop.py:18:5: PLW0120 [*] `else` clause on loop without a `break
    |
    = help: Remove `else`
 
-ℹ Safe fix
 15 15 |     """else + return is not acceptable."""
 16 16 |     while True:
 17 17 |         return 1
@@ -55,7 +53,6 @@ useless_else_on_loop.py:30:1: PLW0120 [*] `else` clause on loop without a `break
    |
    = help: Remove `else`
 
-ℹ Safe fix
 27 27 |         for _ in range(10):
 28 28 |             break
 29 29 | 
@@ -76,7 +73,6 @@ useless_else_on_loop.py:37:1: PLW0120 [*] `else` clause on loop without a `break
    |
    = help: Remove `else`
 
-ℹ Safe fix
 34 34 | while True:
 35 35 |     while False:
 36 36 |         break
@@ -98,7 +94,6 @@ useless_else_on_loop.py:42:1: PLW0120 [*] `else` clause on loop without a `break
    |
    = help: Remove `else`
 
-ℹ Safe fix
 39 39 | 
 40 40 | for j in range(10):
 41 41 |     pass
@@ -124,7 +119,6 @@ useless_else_on_loop.py:88:5: PLW0120 [*] `else` clause on loop without a `break
    |
    = help: Remove `else`
 
-ℹ Safe fix
 85 85 |                     break
 86 86 |             else:
 87 87 |                 print("all right")
@@ -146,7 +140,6 @@ useless_else_on_loop.py:98:9: PLW0120 [*] `else` clause on loop without a `break
     |
     = help: Remove `else`
 
-ℹ Safe fix
 95  95  |     for _ in range(10):
 96  96  |         for _ in range(3):
 97  97  |             pass
@@ -170,7 +163,6 @@ useless_else_on_loop.py:144:5: PLW0120 [*] `else` clause on loop without a `brea
     |
     = help: Remove `else`
 
-ℹ Safe fix
 141 141 |     """Retain the comment within the `else` block"""
 142 142 |     for j in range(10):
 143 143 |         pass
@@ -183,5 +175,3 @@ useless_else_on_loop.py:144:5: PLW0120 [*] `else` clause on loop without a `brea
     145 |+    print("fat chance")
     146 |+    for j in range(10):
     147 |+        break
-
-

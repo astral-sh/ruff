@@ -11,7 +11,6 @@ UP041.py:5:8: UP041 [*] Replace aliased errors with `TimeoutError`
   |
   = help: Replace `asyncio.TimeoutError` with builtin `TimeoutError`
 
-ℹ Safe fix
 2 2 | # These should be fixed
 3 3 | try:
 4 4 |     pass
@@ -31,7 +30,6 @@ UP041.py:10:8: UP041 [*] Replace aliased errors with `TimeoutError`
    |
    = help: Replace `socket.timeout` with builtin `TimeoutError`
 
-ℹ Safe fix
 7  7  | 
 8  8  | try:
 9  9  |     pass
@@ -51,7 +49,6 @@ UP041.py:17:8: UP041 [*] Replace aliased errors with `TimeoutError`
    |
    = help: Replace with builtin `TimeoutError`
 
-ℹ Safe fix
 14 14 | 
 15 15 | try:
 16 16 |     pass
@@ -71,7 +68,6 @@ UP041.py:22:8: UP041 [*] Replace aliased errors with `TimeoutError`
    |
    = help: Replace with builtin `TimeoutError`
 
-ℹ Safe fix
 19 19 | 
 20 20 | try:
 21 21 |     pass
@@ -91,7 +87,6 @@ UP041.py:27:8: UP041 [*] Replace aliased errors with `TimeoutError`
    |
    = help: Replace with builtin `TimeoutError`
 
-ℹ Safe fix
 24 24 | 
 25 25 | try:
 26 26 |     pass
@@ -111,7 +106,6 @@ UP041.py:34:8: UP041 [*] Replace aliased errors with `TimeoutError`
    |
    = help: Replace with builtin `TimeoutError`
 
-ℹ Safe fix
 31 31 | 
 32 32 | try:
 33 33 |     pass
@@ -131,7 +125,6 @@ UP041.py:42:8: UP041 [*] Replace aliased errors with `TimeoutError`
    |
    = help: Replace with builtin `TimeoutError`
 
-ℹ Safe fix
 39 39 | from .mmap import error
 40 40 | try:
 41 41 |     pass
@@ -140,5 +133,3 @@ UP041.py:42:8: UP041 [*] Replace aliased errors with `TimeoutError`
 43 43 |     pass
 44 44 | 
 45 45 | # These should not change
-
-

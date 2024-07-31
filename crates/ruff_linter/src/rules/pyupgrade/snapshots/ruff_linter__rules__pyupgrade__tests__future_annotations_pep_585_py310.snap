@@ -10,7 +10,6 @@ future_annotations.py:34:18: UP006 [*] Use `list` instead of `List` for type ann
    |
    = help: Replace with `list`
 
-ℹ Safe fix
 31 31 |         return cls(x=0, y=0)
 32 32 | 
 33 33 | 
@@ -30,7 +29,6 @@ future_annotations.py:35:9: UP006 [*] Use `list` instead of `List` for type anno
    |
    = help: Replace with `list`
 
-ℹ Safe fix
 32 32 | 
 33 33 | 
 34 34 | def f(x: int) -> List[int]:
@@ -49,7 +47,6 @@ future_annotations.py:42:27: UP006 [*] Use `list` instead of `List` for type ann
    |
    = help: Replace with `list`
 
-ℹ Safe fix
 39 39 | 
 40 40 | x: Optional[int] = None
 41 41 | 
@@ -65,11 +62,8 @@ future_annotations.py:42:38: UP006 [*] Use `list` instead of `List` for type ann
    |
    = help: Replace with `list`
 
-ℹ Safe fix
 39 39 | 
 40 40 | x: Optional[int] = None
 41 41 | 
 42    |-MyList: TypeAlias = Union[List[int], List[str]]
    42 |+MyList: TypeAlias = Union[List[int], list[str]]
-
-

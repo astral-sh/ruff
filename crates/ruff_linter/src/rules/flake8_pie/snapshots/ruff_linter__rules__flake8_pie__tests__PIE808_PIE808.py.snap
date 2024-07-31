@@ -11,7 +11,6 @@ PIE808.py:2:7: PIE808 [*] Unnecessary `start` argument in `range`
   |
   = help: Remove `start` argument
 
-ℹ Safe fix
 1 1 | # PIE808
 2   |-range(0, 10)
   2 |+range(10)
@@ -29,7 +28,6 @@ PIE808.py:5:16: PIE808 [*] Unnecessary `start` argument in `range`
   |
   = help: Remove `start` argument
 
-ℹ Safe fix
 2 2 | range(0, 10)
 3 3 | 
 4 4 | import builtins

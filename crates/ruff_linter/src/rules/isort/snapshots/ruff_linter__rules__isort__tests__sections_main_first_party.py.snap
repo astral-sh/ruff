@@ -17,7 +17,6 @@ main_first_party.py:1:1: I001 [*] Import block is un-sorted or un-formatted
    |
    = help: Organize imports
 
-ℹ Safe fix
 1 1 | import os
 2 2 | 
 3   |-import __main__
@@ -27,5 +26,3 @@ main_first_party.py:1:1: I001 [*] Import block is un-sorted or un-formatted
 6 6 | import first_party
 7 7 | 
 8 8 | os.a
-
-

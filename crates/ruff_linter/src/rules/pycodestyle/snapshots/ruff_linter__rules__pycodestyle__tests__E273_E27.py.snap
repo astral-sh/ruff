@@ -12,7 +12,6 @@ E27.py:11:9: E273 [*] Tab after keyword
    |
    = help: Replace with single space
 
-ℹ Safe fix
 8  8  | if   1:
 9  9  |     pass
 10 10 | #: E273
@@ -33,7 +32,6 @@ E27.py:13:5: E273 [*] Tab after keyword
    |
    = help: Replace with single space
 
-ℹ Safe fix
 10 10 | #: E273
 11 11 | True and		False
 12 12 | #: E273 E274
@@ -54,7 +52,6 @@ E27.py:13:10: E273 [*] Tab after keyword
    |
    = help: Replace with single space
 
-ℹ Safe fix
 10 10 | #: E273
 11 11 | True and		False
 12 12 | #: E273 E274
@@ -75,7 +72,6 @@ E27.py:27:6: E273 [*] Tab after keyword
    |
    = help: Replace with single space
 
-ℹ Safe fix
 24 24 | #: E272
 25 25 | this  and False
 26 26 | #: E273
@@ -96,7 +92,6 @@ E27.py:31:10: E273 [*] Tab after keyword
    |
    = help: Replace with single space
 
-ℹ Safe fix
 28 28 | #: E274
 29 29 | a		and b
 30 30 | #: E273 E274
@@ -116,7 +111,6 @@ E27.py:74:5: E273 [*] Tab after keyword
    |
    = help: Replace with single space
 
-ℹ Safe fix
 71 71 | type  Number = int
 72 72 | 
 73 73 | #: E273

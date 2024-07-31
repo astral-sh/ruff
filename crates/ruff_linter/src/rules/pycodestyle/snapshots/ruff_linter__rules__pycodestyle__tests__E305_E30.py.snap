@@ -10,7 +10,6 @@ E30.py:798:1: E305 [*] Expected 2 blank lines after class or function definition
     |
     = help: Add missing blank line(s)
 
-ℹ Safe fix
 795 795 |     # comment
 796 796 | 
 797 797 |     # another comment
@@ -29,7 +28,6 @@ E30.py:809:1: E305 [*] Expected 2 blank lines after class or function definition
     |
     = help: Add missing blank line(s)
 
-ℹ Safe fix
 806 806 |     # comment
 807 807 | 
 808 808 |     # another comment
@@ -50,7 +48,6 @@ E30.py:821:1: E305 [*] Expected 2 blank lines after class or function definition
     |
     = help: Add missing blank line(s)
 
-ℹ Safe fix
 818 818 | 
 819 819 |     # another comment
 820 820 | 
@@ -69,7 +66,6 @@ E30.py:833:1: E305 [*] Expected 2 blank lines after class or function definition
     |
     = help: Add missing blank line(s)
 
-ℹ Safe fix
 830 830 |     print()
 831 831 | 
 832 832 | # Two spaces before comments, too.
@@ -90,7 +86,6 @@ E30.py:846:1: E305 [*] Expected 2 blank lines after class or function definition
     |
     = help: Add missing blank line(s)
 
-ℹ Safe fix
 843 843 | def main():
 844 844 |     blah, blah
 845 845 | 

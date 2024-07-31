@@ -11,7 +11,6 @@ unused.py:5:8: F401 [*] `sys` imported but unused
   |
   = help: Remove unused import: `sys`
 
-ℹ Safe fix
 2 2 | import os
 3 3 | 
 4 4 | # Unused, _not_ marked as required.
@@ -30,7 +29,6 @@ unused.py:8:19: F401 [*] `pathlib` imported but unused
    |
    = help: Remove unused import: `pathlib`
 
-ℹ Safe fix
 5 5 | import sys
 6 6 | 
 7 7 | # Unused, _not_ marked as required (due to the alias).

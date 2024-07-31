@@ -10,7 +10,6 @@ __init__.py:2:8: F401 [*] `submodule.a` imported but unused; consider removing, 
   |
   = help: Add `submodule` to __all__
 
-ℹ Safe fix
 1 1 | 
 2 2 | import submodule.a
 3   |-__all__ = ['FOO']

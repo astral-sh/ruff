@@ -9,17 +9,3 @@ undefined.py:3:29: TCH003 [*] Move standard library import `collections.abc.Sequ
   |                             ^^^^^^^^ TCH003
   |
   = help: Move into type-checking block
-
-ℹ Unsafe fix
-1 1 | from __future__ import annotations
-2 2 | 
-3   |-from collections.abc import Sequence
-  3 |+from typing import TYPE_CHECKING
-  4 |+
-  5 |+if TYPE_CHECKING:
-  6 |+    from collections.abc import Sequence
-4 7 | 
-5 8 | 
-6 9 | class Foo(MyBaseClass):
-
-

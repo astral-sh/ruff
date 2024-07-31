@@ -11,7 +11,6 @@ D403.py:2:5: D403 [*] First word of the first line should be capitalized: `this`
   |
   = help: Capitalize `this` to `This`
 
-ℹ Safe fix
 1 1 | def bad_function():
 2   |-    """this docstring is not capitalized"""
   2 |+    """This docstring is not capitalized"""
@@ -29,7 +28,6 @@ D403.py:30:5: D403 [*] First word of the first line should be capitalized: `sing
    |
    = help: Capitalize `singleword` to `Singleword`
 
-ℹ Safe fix
 27 27 |     """th•s is not capitalized."""
 28 28 | 
 29 29 | def single_word():
@@ -47,7 +45,6 @@ D403.py:33:5: D403 [*] First word of the first line should be capitalized: `sing
    |
    = help: Capitalize `singleword` to `Singleword`
 
-ℹ Safe fix
 30 30 |     """singleword."""
 31 31 | 
 32 32 | def single_word_no_dot():

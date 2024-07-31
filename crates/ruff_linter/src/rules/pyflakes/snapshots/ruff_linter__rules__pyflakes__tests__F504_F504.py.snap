@@ -12,7 +12,6 @@ F504.py:3:1: F504 [*] `%`-format string has unused named argument(s): b
   |
   = help: Remove extra named arguments: b
 
-ℹ Safe fix
 1 1 | # Ruff has no way of knowing if the following are F505s
 2 2 | a = "wrong"
 3   |-"%(a)s %(c)s" % {a: "?", "b": "!"}  # F504 ("b" not used)
@@ -31,7 +30,6 @@ F504.py:8:1: F504 [*] `%`-format string has unused named argument(s): b
   |
   = help: Remove extra named arguments: b
 
-ℹ Safe fix
 5 5 | hidden = {"a": "!"}
 6 6 | "%(a)s %(c)s" % {"x": 1, **hidden}  # Ok (cannot see through splat)
 7 7 | 
@@ -51,7 +49,6 @@ F504.py:9:1: F504 [*] `%`-format string has unused named argument(s): b
    |
    = help: Remove extra named arguments: b
 
-ℹ Safe fix
 6  6  | "%(a)s %(c)s" % {"x": 1, **hidden}  # Ok (cannot see through splat)
 7  7  | 
 8  8  | "%(a)s" % {"a": 1, r"b": "!"}  # F504 ("b" not used)
@@ -72,7 +69,6 @@ F504.py:11:1: F504 [*] `%`-format string has unused named argument(s): ab
    |
    = help: Remove extra named arguments: ab
 
-ℹ Safe fix
 8  8  | "%(a)s" % {"a": 1, r"b": "!"}  # F504 ("b" not used)
 9  9  | "%(a)s" % {'a': 1, u"b": "!"}  # F504 ("b" not used)
 10 10 | 
@@ -92,12 +88,9 @@ F504.py:14:1: F504 [*] `%`-format string has unused named argument(s): test1, te
    |
    = help: Remove extra named arguments: test1, test2
 
-ℹ Safe fix
 12 12 | 
 13 13 | # https://github.com/astral-sh/ruff/issues/4899
 14 14 | "" % {
 15    |-  'test1': '',16    |-  'test2': '',
    15 |+  
 17 16 | }
-
-

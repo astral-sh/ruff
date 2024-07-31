@@ -11,14 +11,6 @@ RUF100_5.py:7:5: ERA001 Found commented-out code
   |
   = help: Remove commented-out code
 
-ℹ Display-only fix
-4 4 | dictionary = {
-5 5 |     # "key1": 123,  # noqa: ERA001
-6 6 |     # "key2": 456,  # noqa
-7   |-    # "key3": 789,
-8 7 | }
-9 8 | 
-10 9 | 
 
 RUF100_5.py:11:1: ERA001 Found commented-out code
    |
@@ -27,11 +19,6 @@ RUF100_5.py:11:1: ERA001 Found commented-out code
    |
    = help: Remove commented-out code
 
-ℹ Display-only fix
-8  8  | }
-9  9  | 
-10 10 | 
-11    |-#import os  # noqa: E501
 
 RUF100_5.py:11:13: RUF100 [*] Unused `noqa` directive (unused: `E501`)
    |
@@ -40,11 +27,8 @@ RUF100_5.py:11:13: RUF100 [*] Unused `noqa` directive (unused: `E501`)
    |
    = help: Remove unused `noqa` directive
 
-ℹ Safe fix
 8  8  | }
 9  9  | 
 10 10 | 
 11    |-#import os  # noqa: E501
    11 |+#import os
-
-

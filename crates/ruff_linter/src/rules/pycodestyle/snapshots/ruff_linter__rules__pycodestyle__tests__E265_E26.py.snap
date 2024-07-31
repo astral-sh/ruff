@@ -12,7 +12,6 @@ E26.py:10:1: E265 [*] Block comment should start with `# `
    |
    = help: Format space
 
-ℹ Safe fix
 7  7  | #: E262:1:12
 8  8  | x = y + 1  #:  Increment x
 9  9  | #: E265:1:1
@@ -33,7 +32,6 @@ E26.py:14:1: E265 [*] Block comment should start with `# `
    |
    = help: Format space
 
-ℹ Safe fix
 11 11 | a = 1
 12 12 | #: E265:2:1
 13 13 | m = 42
@@ -54,7 +52,6 @@ E26.py:25:1: E265 [*] Block comment should start with `# `
    |
    = help: Format space
 
-ℹ Safe fix
 22 22 |     ### Of course it is unused
 23 23 |     return
 24 24 | #: E265:1:1 E266:2:1
@@ -74,7 +71,6 @@ E26.py:32:1: E265 [*] Block comment should start with `# `
    |
    = help: Format space
 
-ℹ Safe fix
 29 29 | #:
 30 30 | 
 31 31 | #: Okay
@@ -94,7 +90,6 @@ E26.py:73:1: E265 [*] Block comment should start with `# `
    |
    = help: Format space
 
-ℹ Safe fix
 70 70 | # E   Means test is giving error (E)
 71 71 | # F   Means test is failing (F)
 72 72 | # EF  Means test is giving error and Failing
@@ -115,7 +110,6 @@ E26.py:78:1: E265 [*] Block comment should start with `# `
    |
    = help: Format space
 
-ℹ Safe fix
 75 75 | 
 76 76 | #: Colon prefix is okay
 77 77 | 
@@ -124,5 +118,3 @@ E26.py:78:1: E265 [*] Block comment should start with `# `
 79 79 | 
 80 80 | # We should strip the space, but preserve the hashes.
 81 81 | #: E266:1:3
-
-

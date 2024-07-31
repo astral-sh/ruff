@@ -11,7 +11,6 @@ future_annotations.py:8:5: F401 [*] `models.Nut` imported but unused
   |
   = help: Remove unused import: `models.Nut`
 
-ℹ Safe fix
 5 5 | 
 6 6 | from models import (
 7 7 |     Fruit,
@@ -27,5 +26,3 @@ future_annotations.py:26:19: F821 Undefined name `Bar`
    |                   ^^^ F821
 27 |         return cls(x=0, y=0)
    |
-
-

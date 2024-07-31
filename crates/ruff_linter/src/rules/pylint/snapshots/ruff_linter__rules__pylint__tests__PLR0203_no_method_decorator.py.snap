@@ -12,7 +12,6 @@ no_method_decorator.py:15:5: PLR0203 [*] Static method defined without decorator
    |
    = help: Add @staticmethod decorator
 
-ℹ Safe fix
 12 12 | 
 13 13 |     pick_colors = classmethod(pick_colors)
 14 14 | 
@@ -36,7 +35,6 @@ no_method_decorator.py:27:5: PLR0203 [*] Static method defined without decorator
    |
    = help: Add @staticmethod decorator
 
-ℹ Safe fix
 24 24 | 
 25 25 |     class_method = classmethod(class_method);another_statement
 26 26 | 

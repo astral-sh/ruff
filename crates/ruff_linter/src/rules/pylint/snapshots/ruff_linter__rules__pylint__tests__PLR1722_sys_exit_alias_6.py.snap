@@ -9,13 +9,6 @@ sys_exit_alias_6.py:1:1: PLR1722 [*] Use `sys.exit()` instead of `exit`
   |
   = help: Replace `exit` with `sys.exit()`
 
-ℹ Unsafe fix
-1   |-exit(0)
-  1 |+import sys
-  2 |+sys.exit(0)
-2 3 | quit(0)
-3 4 | 
-4 5 | 
 
 sys_exit_alias_6.py:2:1: PLR1722 [*] Use `sys.exit()` instead of `quit`
   |
@@ -24,14 +17,3 @@ sys_exit_alias_6.py:2:1: PLR1722 [*] Use `sys.exit()` instead of `quit`
   | ^^^^ PLR1722
   |
   = help: Replace `quit` with `sys.exit()`
-
-ℹ Unsafe fix
-  1 |+import sys
-1 2 | exit(0)
-2   |-quit(0)
-  3 |+sys.exit(0)
-3 4 | 
-4 5 | 
-5 6 | def exit(e):
-
-

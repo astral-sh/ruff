@@ -10,7 +10,6 @@ RUF021.py:12:10: RUF021 [*] Parenthesize `a and b` expressions when chaining `an
    |
    = help: Parenthesize the `and` subexpression
 
-ℹ Safe fix
 9  9  | # as part of a chain.
 10 10 | 
 11 11 | a, b, c = 1, 0, 2
@@ -31,7 +30,6 @@ RUF021.py:13:10: RUF021 [*] Parenthesize `a and b` expressions when chaining `an
    |
    = help: Parenthesize the `and` subexpression
 
-ℹ Safe fix
 10 10 | 
 11 11 | a, b, c = 1, 0, 2
 12 12 | x = a or b and c  # RUF021: => `a or (b and c)`
@@ -51,7 +49,6 @@ RUF021.py:16:5: RUF021 [*] Parenthesize `a and b` expressions when chaining `and
    |
    = help: Parenthesize the `and` subexpression
 
-ℹ Safe fix
 13 13 | x = a or b and c  # looooooooooooooooooooooooooooooong comment but it won't prevent an autofix
 14 14 | 
 15 15 | a, b, c = 0, 1, 2
@@ -70,7 +67,6 @@ RUF021.py:19:14: RUF021 [*] Parenthesize `a and b` expressions when chaining `an
    |
    = help: Parenthesize the `and` subexpression
 
-ℹ Safe fix
 16 16 | y = a and b or c  # RUF021: => `(a and b) or c`
 17 17 | 
 18 18 | a, b, c, d = 1, 2, 0, 3
@@ -90,7 +86,6 @@ RUF021.py:26:11: RUF021 [*] Parenthesize `a and b` expressions when chaining `an
    |
    = help: Parenthesize the `and` subexpression
 
-ℹ Safe fix
 23 23 | 
 24 24 | if bool():
 25 25 |     pass
@@ -109,7 +104,6 @@ RUF021.py:30:7: RUF021 [*] Parenthesize `a and b` expressions when chaining `and
    |
    = help: Parenthesize the `and` subexpression
 
-ℹ Safe fix
 27 27 |     pass
 28 28 | 
 29 29 | a, b, c, d = 0, 1, 0, 2
@@ -128,7 +122,6 @@ RUF021.py:30:18: RUF021 [*] Parenthesize `a and b` expressions when chaining `an
    |
    = help: Parenthesize the `and` subexpression
 
-ℹ Safe fix
 27 27 |     pass
 28 28 | 
 29 29 | a, b, c, d = 0, 1, 0, 2
@@ -149,7 +142,6 @@ RUF021.py:35:44: RUF021 [*] Parenthesize `a and b` expressions when chaining `an
    |
    = help: Parenthesize the `and` subexpression
 
-ℹ Safe fix
 32 32 | 
 33 33 | b, c, d, e = 2, 3, 0, 4
 34 34 | # RUF021: => `a or b or c or (d and e)`:
@@ -169,7 +161,6 @@ RUF021.py:38:8: RUF021 [*] Parenthesize `a and b` expressions when chaining `and
    |
    = help: Parenthesize the `and` subexpression
 
-ℹ Safe fix
 35 35 | z = [a for a in range(5) if a or b or c or d and e]
 36 36 | 
 37 37 | a, b, c, d = 0, 1, 3, 0
@@ -190,7 +181,6 @@ RUF021.py:40:4: RUF021 [*] Parenthesize `a and b` expressions when chaining `and
    |
    = help: Parenthesize the `and` subexpression
 
-ℹ Safe fix
 37 37 | a, b, c, d = 0, 1, 3, 0
 38 38 | assert not a and b or c or d  # RUF021: => `(not a and b) or c or d`
 39 39 | 
@@ -213,7 +203,6 @@ RUF021.py:46:8: RUF021 [*] Parenthesize `a and b` expressions when chaining `and
    |
    = help: Parenthesize the `and` subexpression
 
-ℹ Safe fix
 43 43 | 
 44 44 | if (
 45 45 |     some_reasonably_long_condition
@@ -241,7 +230,6 @@ RUF021.py:48:8: RUF021 [*] Parenthesize `a and b` expressions when chaining `and
    |
    = help: Parenthesize the `and` subexpression
 
-ℹ Safe fix
 45 45 |     some_reasonably_long_condition
 46 46 |     or some_other_reasonably_long_condition
 47 47 |     and some_third_reasonably_long_condition

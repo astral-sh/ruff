@@ -9,7 +9,6 @@ D.py:161:5: D203 [*] 1 blank line required before class docstring
     |
     = help: Insert 1 blank line before class docstring
 
-ℹ Safe fix
 158 158 | 
 159 159 | 
 160 160 | class LeadingSpaceMissing:
@@ -27,7 +26,6 @@ D.py:192:5: D203 [*] 1 blank line required before class docstring
     |
     = help: Insert 1 blank line before class docstring
 
-ℹ Safe fix
 189 189 | 
 190 190 | 
 191 191 | class LeadingAndTrailingSpaceMissing:
@@ -54,7 +52,6 @@ D.py:526:5: D203 [*] 1 blank line required before class docstring
     |
     = help: Insert 1 blank line before class docstring
 
-ℹ Safe fix
 523 523 | # This is reproducing a bug where AttributeError is raised when parsing class
 524 524 | # parameters as functions for Google / Numpy conventions.
 525 525 | class Blah:  # noqa: D203,D213
@@ -73,7 +70,6 @@ D.py:649:5: D203 [*] 1 blank line required before class docstring
     |
     = help: Insert 1 blank line before class docstring
 
-ℹ Safe fix
 646 646 |     "
 647 647 | 
 648 648 | class StatementOnSameLineAsDocstring:
@@ -90,7 +86,6 @@ D.py:654:5: D203 [*] 1 blank line required before class docstring
     |
     = help: Insert 1 blank line before class docstring
 
-ℹ Safe fix
 651 651 |         pass
 652 652 | 
 653 653 | class StatementOnSameLineAsDocstring:
@@ -109,7 +104,6 @@ D.py:658:5: D203 [*] 1 blank line required before class docstring
     |
     = help: Insert 1 blank line before class docstring
 
-ℹ Safe fix
 655 655 | 
 656 656 | 
 657 657 | class CommentAfterDocstring:
@@ -117,5 +111,3 @@ D.py:658:5: D203 [*] 1 blank line required before class docstring
 658 659 |     "After this docstring there's a comment."  # priorities=1
 659 660 |     def sort_services(self):
 660 661 |         pass
-
-

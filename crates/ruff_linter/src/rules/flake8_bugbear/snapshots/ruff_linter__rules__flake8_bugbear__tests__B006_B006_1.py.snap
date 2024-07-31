@@ -11,11 +11,3 @@ B006_1.py:3:22: B006 [*] Do not use mutable data structures for argument default
 5 |     """
   |
   = help: Replace with `None`; initialize within function
-
-ℹ Unsafe fix
-1 1 | # Docstring followed by a newline
-2 2 | 
-3   |-def foobar(foor, bar={}):    
-  3 |+def foobar(foor, bar=None):    
-4 4 |     """
-5 5 |     """

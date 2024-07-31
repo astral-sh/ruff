@@ -9,12 +9,6 @@ SIM222.py:1:4: SIM222 [*] Use `True` instead of `... or True`
   |
   = help: Replace with `True`
 
-ℹ Unsafe fix
-1   |-if a or True:  # SIM222
-  1 |+if True:  # SIM222
-2 2 |     pass
-3 3 | 
-4 4 | if (a or b) or True:  # SIM222
 
 SIM222.py:4:4: SIM222 [*] Use `True` instead of `... or True`
   |
@@ -26,15 +20,6 @@ SIM222.py:4:4: SIM222 [*] Use `True` instead of `... or True`
   |
   = help: Replace with `True`
 
-ℹ Unsafe fix
-1 1 | if a or True:  # SIM222
-2 2 |     pass
-3 3 | 
-4   |-if (a or b) or True:  # SIM222
-  4 |+if True:  # SIM222
-5 5 |     pass
-6 6 | 
-7 7 | if a or (b or True):  # SIM222
 
 SIM222.py:7:10: SIM222 [*] Use `True` instead of `... or True`
   |
@@ -46,15 +31,6 @@ SIM222.py:7:10: SIM222 [*] Use `True` instead of `... or True`
   |
   = help: Replace with `True`
 
-ℹ Unsafe fix
-4 4 | if (a or b) or True:  # SIM222
-5 5 |     pass
-6 6 | 
-7   |-if a or (b or True):  # SIM222
-  7 |+if a or (True):  # SIM222
-8 8 |     pass
-9 9 | 
-10 10 | if a and True:  # OK
 
 SIM222.py:24:16: SIM222 [*] Use `True` instead of `True or ...`
    |
@@ -66,15 +42,6 @@ SIM222.py:24:16: SIM222 [*] Use `True` instead of `True or ...`
    |
    = help: Replace with `True`
 
-ℹ Unsafe fix
-21 21 | if a or f() or b or g() or True:  # OK
-22 22 |     pass
-23 23 | 
-24    |-if a or f() or True or g() or b:  # SIM222
-   24 |+if a or f() or True:  # SIM222
-25 25 |     pass
-26 26 | 
-27 27 | if True or f() or a or g() or b:  # SIM222
 
 SIM222.py:27:4: SIM222 [*] Use `True` instead of `True or ...`
    |
@@ -86,15 +53,6 @@ SIM222.py:27:4: SIM222 [*] Use `True` instead of `True or ...`
    |
    = help: Replace with `True`
 
-ℹ Unsafe fix
-24 24 | if a or f() or True or g() or b:  # SIM222
-25 25 |     pass
-26 26 | 
-27    |-if True or f() or a or g() or b:  # SIM222
-   27 |+if True:  # SIM222
-28 28 |     pass
-29 29 | 
-30 30 | if a or True or f() or b or g():  # SIM222
 
 SIM222.py:30:4: SIM222 [*] Use `True` instead of `... or True or ...`
    |
@@ -106,15 +64,6 @@ SIM222.py:30:4: SIM222 [*] Use `True` instead of `... or True or ...`
    |
    = help: Replace with `True`
 
-ℹ Unsafe fix
-27 27 | if True or f() or a or g() or b:  # SIM222
-28 28 |     pass
-29 29 | 
-30    |-if a or True or f() or b or g():  # SIM222
-   30 |+if True:  # SIM222
-31 31 |     pass
-32 32 | 
-33 33 | 
 
 SIM222.py:47:6: SIM222 [*] Use `True` instead of `... or True`
    |
@@ -125,15 +74,6 @@ SIM222.py:47:6: SIM222 [*] Use `True` instead of `... or True`
    |
    = help: Replace with `True`
 
-ℹ Unsafe fix
-44 44 |     pass
-45 45 | 
-46 46 | 
-47    |-a or "" or True  # SIM222
-   47 |+a or True  # SIM222
-48 48 | 
-49 49 | a or "foo" or True or "bar"  # SIM222
-50 50 | 
 
 SIM222.py:49:6: SIM222 [*] Use `"foo"` instead of `"foo" or ...`
    |
@@ -146,15 +86,6 @@ SIM222.py:49:6: SIM222 [*] Use `"foo"` instead of `"foo" or ...`
    |
    = help: Replace with `"foo"`
 
-ℹ Unsafe fix
-46 46 | 
-47 47 | a or "" or True  # SIM222
-48 48 | 
-49    |-a or "foo" or True or "bar"  # SIM222
-   49 |+a or "foo"  # SIM222
-50 50 | 
-51 51 | a or 0 or True  # SIM222
-52 52 | 
 
 SIM222.py:51:6: SIM222 [*] Use `True` instead of `... or True`
    |
@@ -167,15 +98,6 @@ SIM222.py:51:6: SIM222 [*] Use `True` instead of `... or True`
    |
    = help: Replace with `True`
 
-ℹ Unsafe fix
-48 48 | 
-49 49 | a or "foo" or True or "bar"  # SIM222
-50 50 | 
-51    |-a or 0 or True  # SIM222
-   51 |+a or True  # SIM222
-52 52 | 
-53 53 | a or 1 or True or 2  # SIM222
-54 54 | 
 
 SIM222.py:53:6: SIM222 [*] Use `1` instead of `1 or ...`
    |
@@ -188,15 +110,6 @@ SIM222.py:53:6: SIM222 [*] Use `1` instead of `1 or ...`
    |
    = help: Replace with `1`
 
-ℹ Unsafe fix
-50 50 | 
-51 51 | a or 0 or True  # SIM222
-52 52 | 
-53    |-a or 1 or True or 2  # SIM222
-   53 |+a or 1  # SIM222
-54 54 | 
-55 55 | a or 0.0 or True  # SIM222
-56 56 | 
 
 SIM222.py:55:6: SIM222 [*] Use `True` instead of `... or True`
    |
@@ -209,15 +122,6 @@ SIM222.py:55:6: SIM222 [*] Use `True` instead of `... or True`
    |
    = help: Replace with `True`
 
-ℹ Unsafe fix
-52 52 | 
-53 53 | a or 1 or True or 2  # SIM222
-54 54 | 
-55    |-a or 0.0 or True  # SIM222
-   55 |+a or True  # SIM222
-56 56 | 
-57 57 | a or 0.1 or True or 0.2  # SIM222
-58 58 | 
 
 SIM222.py:57:6: SIM222 [*] Use `0.1` instead of `0.1 or ...`
    |
@@ -230,15 +134,6 @@ SIM222.py:57:6: SIM222 [*] Use `0.1` instead of `0.1 or ...`
    |
    = help: Replace with `0.1`
 
-ℹ Unsafe fix
-54 54 | 
-55 55 | a or 0.0 or True  # SIM222
-56 56 | 
-57    |-a or 0.1 or True or 0.2  # SIM222
-   57 |+a or 0.1  # SIM222
-58 58 | 
-59 59 | a or [] or True  # SIM222
-60 60 | 
 
 SIM222.py:59:6: SIM222 [*] Use `True` instead of `... or True`
    |
@@ -251,15 +146,6 @@ SIM222.py:59:6: SIM222 [*] Use `True` instead of `... or True`
    |
    = help: Replace with `True`
 
-ℹ Unsafe fix
-56 56 | 
-57 57 | a or 0.1 or True or 0.2  # SIM222
-58 58 | 
-59    |-a or [] or True  # SIM222
-   59 |+a or True  # SIM222
-60 60 | 
-61 61 | a or list([]) or True  # SIM222
-62 62 | 
 
 SIM222.py:61:6: SIM222 [*] Use `True` instead of `... or True`
    |
@@ -272,15 +158,6 @@ SIM222.py:61:6: SIM222 [*] Use `True` instead of `... or True`
    |
    = help: Replace with `True`
 
-ℹ Unsafe fix
-58 58 | 
-59 59 | a or [] or True  # SIM222
-60 60 | 
-61    |-a or list([]) or True  # SIM222
-   61 |+a or True  # SIM222
-62 62 | 
-63 63 | a or [1] or True or [2]  # SIM222
-64 64 | 
 
 SIM222.py:63:6: SIM222 [*] Use `[1]` instead of `[1] or ...`
    |
@@ -293,15 +170,6 @@ SIM222.py:63:6: SIM222 [*] Use `[1]` instead of `[1] or ...`
    |
    = help: Replace with `[1]`
 
-ℹ Unsafe fix
-60 60 | 
-61 61 | a or list([]) or True  # SIM222
-62 62 | 
-63    |-a or [1] or True or [2]  # SIM222
-   63 |+a or [1]  # SIM222
-64 64 | 
-65 65 | a or list([1]) or True or list([2])  # SIM222
-66 66 | 
 
 SIM222.py:65:6: SIM222 [*] Use `list([1])` instead of `list([1]) or ...`
    |
@@ -314,15 +182,6 @@ SIM222.py:65:6: SIM222 [*] Use `list([1])` instead of `list([1]) or ...`
    |
    = help: Replace with `list([1])`
 
-ℹ Unsafe fix
-62 62 | 
-63 63 | a or [1] or True or [2]  # SIM222
-64 64 | 
-65    |-a or list([1]) or True or list([2])  # SIM222
-   65 |+a or list([1])  # SIM222
-66 66 | 
-67 67 | a or {} or True  # SIM222
-68 68 | 
 
 SIM222.py:67:6: SIM222 [*] Use `True` instead of `... or True`
    |
@@ -335,15 +194,6 @@ SIM222.py:67:6: SIM222 [*] Use `True` instead of `... or True`
    |
    = help: Replace with `True`
 
-ℹ Unsafe fix
-64 64 | 
-65 65 | a or list([1]) or True or list([2])  # SIM222
-66 66 | 
-67    |-a or {} or True  # SIM222
-   67 |+a or True  # SIM222
-68 68 | 
-69 69 | a or dict() or True  # SIM222
-70 70 | 
 
 SIM222.py:69:6: SIM222 [*] Use `True` instead of `... or True`
    |
@@ -356,15 +206,6 @@ SIM222.py:69:6: SIM222 [*] Use `True` instead of `... or True`
    |
    = help: Replace with `True`
 
-ℹ Unsafe fix
-66 66 | 
-67 67 | a or {} or True  # SIM222
-68 68 | 
-69    |-a or dict() or True  # SIM222
-   69 |+a or True  # SIM222
-70 70 | 
-71 71 | a or {1: 1} or True or {2: 2}  # SIM222
-72 72 | 
 
 SIM222.py:71:6: SIM222 [*] Use `{1: 1}` instead of `{1: 1} or ...`
    |
@@ -377,15 +218,6 @@ SIM222.py:71:6: SIM222 [*] Use `{1: 1}` instead of `{1: 1} or ...`
    |
    = help: Replace with `{1: 1}`
 
-ℹ Unsafe fix
-68 68 | 
-69 69 | a or dict() or True  # SIM222
-70 70 | 
-71    |-a or {1: 1} or True or {2: 2}  # SIM222
-   71 |+a or {1: 1}  # SIM222
-72 72 | 
-73 73 | a or dict({1: 1}) or True or dict({2: 2})  # SIM222
-74 74 | 
 
 SIM222.py:73:6: SIM222 [*] Use `dict({1: 1})` instead of `dict({1: 1}) or ...`
    |
@@ -398,15 +230,6 @@ SIM222.py:73:6: SIM222 [*] Use `dict({1: 1})` instead of `dict({1: 1}) or ...`
    |
    = help: Replace with `dict({1: 1})`
 
-ℹ Unsafe fix
-70 70 | 
-71 71 | a or {1: 1} or True or {2: 2}  # SIM222
-72 72 | 
-73    |-a or dict({1: 1}) or True or dict({2: 2})  # SIM222
-   73 |+a or dict({1: 1})  # SIM222
-74 74 | 
-75 75 | a or set() or True  # SIM222
-76 76 | 
 
 SIM222.py:75:6: SIM222 [*] Use `True` instead of `... or True`
    |
@@ -419,15 +242,6 @@ SIM222.py:75:6: SIM222 [*] Use `True` instead of `... or True`
    |
    = help: Replace with `True`
 
-ℹ Unsafe fix
-72 72 | 
-73 73 | a or dict({1: 1}) or True or dict({2: 2})  # SIM222
-74 74 | 
-75    |-a or set() or True  # SIM222
-   75 |+a or True  # SIM222
-76 76 | 
-77 77 | a or set(set()) or True  # SIM222
-78 78 | 
 
 SIM222.py:77:6: SIM222 [*] Use `True` instead of `... or True`
    |
@@ -440,15 +254,6 @@ SIM222.py:77:6: SIM222 [*] Use `True` instead of `... or True`
    |
    = help: Replace with `True`
 
-ℹ Unsafe fix
-74 74 | 
-75 75 | a or set() or True  # SIM222
-76 76 | 
-77    |-a or set(set()) or True  # SIM222
-   77 |+a or True  # SIM222
-78 78 | 
-79 79 | a or {1} or True or {2}  # SIM222
-80 80 | 
 
 SIM222.py:79:6: SIM222 [*] Use `{1}` instead of `{1} or ...`
    |
@@ -461,15 +266,6 @@ SIM222.py:79:6: SIM222 [*] Use `{1}` instead of `{1} or ...`
    |
    = help: Replace with `{1}`
 
-ℹ Unsafe fix
-76 76 | 
-77 77 | a or set(set()) or True  # SIM222
-78 78 | 
-79    |-a or {1} or True or {2}  # SIM222
-   79 |+a or {1}  # SIM222
-80 80 | 
-81 81 | a or set({1}) or True or set({2})  # SIM222
-82 82 | 
 
 SIM222.py:81:6: SIM222 [*] Use `set({1})` instead of `set({1}) or ...`
    |
@@ -482,15 +278,6 @@ SIM222.py:81:6: SIM222 [*] Use `set({1})` instead of `set({1}) or ...`
    |
    = help: Replace with `set({1})`
 
-ℹ Unsafe fix
-78 78 | 
-79 79 | a or {1} or True or {2}  # SIM222
-80 80 | 
-81    |-a or set({1}) or True or set({2})  # SIM222
-   81 |+a or set({1})  # SIM222
-82 82 | 
-83 83 | a or () or True  # SIM222
-84 84 | 
 
 SIM222.py:83:6: SIM222 [*] Use `True` instead of `... or True`
    |
@@ -503,15 +290,6 @@ SIM222.py:83:6: SIM222 [*] Use `True` instead of `... or True`
    |
    = help: Replace with `True`
 
-ℹ Unsafe fix
-80 80 | 
-81 81 | a or set({1}) or True or set({2})  # SIM222
-82 82 | 
-83    |-a or () or True  # SIM222
-   83 |+a or True  # SIM222
-84 84 | 
-85 85 | a or tuple(()) or True  # SIM222
-86 86 | 
 
 SIM222.py:85:6: SIM222 [*] Use `True` instead of `... or True`
    |
@@ -524,15 +302,6 @@ SIM222.py:85:6: SIM222 [*] Use `True` instead of `... or True`
    |
    = help: Replace with `True`
 
-ℹ Unsafe fix
-82 82 | 
-83 83 | a or () or True  # SIM222
-84 84 | 
-85    |-a or tuple(()) or True  # SIM222
-   85 |+a or True  # SIM222
-86 86 | 
-87 87 | a or (1,) or True or (2,)  # SIM222
-88 88 | 
 
 SIM222.py:87:6: SIM222 [*] Use `(1,)` instead of `(1,) or ...`
    |
@@ -545,15 +314,6 @@ SIM222.py:87:6: SIM222 [*] Use `(1,)` instead of `(1,) or ...`
    |
    = help: Replace with `(1,)`
 
-ℹ Unsafe fix
-84 84 | 
-85 85 | a or tuple(()) or True  # SIM222
-86 86 | 
-87    |-a or (1,) or True or (2,)  # SIM222
-   87 |+a or (1,)  # SIM222
-88 88 | 
-89 89 | a or tuple((1,)) or True or tuple((2,))  # SIM222
-90 90 | 
 
 SIM222.py:89:6: SIM222 [*] Use `tuple((1,))` instead of `tuple((1,)) or ...`
    |
@@ -566,15 +326,6 @@ SIM222.py:89:6: SIM222 [*] Use `tuple((1,))` instead of `tuple((1,)) or ...`
    |
    = help: Replace with `tuple((1,))`
 
-ℹ Unsafe fix
-86 86 | 
-87 87 | a or (1,) or True or (2,)  # SIM222
-88 88 | 
-89    |-a or tuple((1,)) or True or tuple((2,))  # SIM222
-   89 |+a or tuple((1,))  # SIM222
-90 90 | 
-91 91 | a or frozenset() or True  # SIM222
-92 92 | 
 
 SIM222.py:91:6: SIM222 [*] Use `True` instead of `... or True`
    |
@@ -587,15 +338,6 @@ SIM222.py:91:6: SIM222 [*] Use `True` instead of `... or True`
    |
    = help: Replace with `True`
 
-ℹ Unsafe fix
-88 88 | 
-89 89 | a or tuple((1,)) or True or tuple((2,))  # SIM222
-90 90 | 
-91    |-a or frozenset() or True  # SIM222
-   91 |+a or True  # SIM222
-92 92 | 
-93 93 | a or frozenset(frozenset()) or True  # SIM222
-94 94 | 
 
 SIM222.py:93:6: SIM222 [*] Use `True` instead of `... or True`
    |
@@ -608,15 +350,6 @@ SIM222.py:93:6: SIM222 [*] Use `True` instead of `... or True`
    |
    = help: Replace with `True`
 
-ℹ Unsafe fix
-90 90 | 
-91 91 | a or frozenset() or True  # SIM222
-92 92 | 
-93    |-a or frozenset(frozenset()) or True  # SIM222
-   93 |+a or True  # SIM222
-94 94 | 
-95 95 | a or frozenset({1}) or True or frozenset({2})  # SIM222
-96 96 | 
 
 SIM222.py:95:6: SIM222 [*] Use `frozenset({1})` instead of `frozenset({1}) or ...`
    |
@@ -629,15 +362,6 @@ SIM222.py:95:6: SIM222 [*] Use `frozenset({1})` instead of `frozenset({1}) or ..
    |
    = help: Replace with `frozenset({1})`
 
-ℹ Unsafe fix
-92 92 | 
-93 93 | a or frozenset(frozenset()) or True  # SIM222
-94 94 | 
-95    |-a or frozenset({1}) or True or frozenset({2})  # SIM222
-   95 |+a or frozenset({1})  # SIM222
-96 96 | 
-97 97 | a or frozenset(frozenset({1})) or True or frozenset(frozenset({2}))  # SIM222
-98 98 | 
 
 SIM222.py:97:6: SIM222 [*] Use `frozenset(frozenset({1}))` instead of `frozenset(frozenset({1})) or ...`
    |
@@ -648,15 +372,6 @@ SIM222.py:97:6: SIM222 [*] Use `frozenset(frozenset({1}))` instead of `frozenset
    |
    = help: Replace with `frozenset(frozenset({1}))`
 
-ℹ Unsafe fix
-94 94 | 
-95 95 | a or frozenset({1}) or True or frozenset({2})  # SIM222
-96 96 | 
-97    |-a or frozenset(frozenset({1})) or True or frozenset(frozenset({2}))  # SIM222
-   97 |+a or frozenset(frozenset({1}))  # SIM222
-98 98 | 
-99 99 | 
-100 100 | # Inside test `a` is simplified.
 
 SIM222.py:102:6: SIM222 [*] Use `True` instead of `... or True or ...`
     |
@@ -669,15 +384,6 @@ SIM222.py:102:6: SIM222 [*] Use `True` instead of `... or True or ...`
     |
     = help: Replace with `True`
 
-ℹ Unsafe fix
-99  99  | 
-100 100 | # Inside test `a` is simplified.
-101 101 | 
-102     |-bool(a or [1] or True or [2])  # SIM222
-    102 |+bool(True)  # SIM222
-103 103 | 
-104 104 | assert a or [1] or True or [2]  # SIM222
-105 105 | 
 
 SIM222.py:104:8: SIM222 [*] Use `True` instead of `... or True or ...`
     |
@@ -690,15 +396,6 @@ SIM222.py:104:8: SIM222 [*] Use `True` instead of `... or True or ...`
     |
     = help: Replace with `True`
 
-ℹ Unsafe fix
-101 101 | 
-102 102 | bool(a or [1] or True or [2])  # SIM222
-103 103 | 
-104     |-assert a or [1] or True or [2]  # SIM222
-    104 |+assert True  # SIM222
-105 105 | 
-106 106 | if (a or [1] or True or [2]) and (a or [1] or True or [2]):  # SIM222
-107 107 |     pass
 
 SIM222.py:106:5: SIM222 [*] Use `True` instead of `... or True or ...`
     |
@@ -710,15 +407,6 @@ SIM222.py:106:5: SIM222 [*] Use `True` instead of `... or True or ...`
     |
     = help: Replace with `True`
 
-ℹ Unsafe fix
-103 103 | 
-104 104 | assert a or [1] or True or [2]  # SIM222
-105 105 | 
-106     |-if (a or [1] or True or [2]) and (a or [1] or True or [2]):  # SIM222
-    106 |+if (True) and (a or [1] or True or [2]):  # SIM222
-107 107 |     pass
-108 108 | 
-109 109 | 0 if a or [1] or True or [2] else 1  # SIM222
 
 SIM222.py:106:35: SIM222 [*] Use `True` instead of `... or True or ...`
     |
@@ -730,15 +418,6 @@ SIM222.py:106:35: SIM222 [*] Use `True` instead of `... or True or ...`
     |
     = help: Replace with `True`
 
-ℹ Unsafe fix
-103 103 | 
-104 104 | assert a or [1] or True or [2]  # SIM222
-105 105 | 
-106     |-if (a or [1] or True or [2]) and (a or [1] or True or [2]):  # SIM222
-    106 |+if (a or [1] or True or [2]) and (True):  # SIM222
-107 107 |     pass
-108 108 | 
-109 109 | 0 if a or [1] or True or [2] else 1  # SIM222
 
 SIM222.py:109:6: SIM222 [*] Use `True` instead of `... or True or ...`
     |
@@ -751,15 +430,6 @@ SIM222.py:109:6: SIM222 [*] Use `True` instead of `... or True or ...`
     |
     = help: Replace with `True`
 
-ℹ Unsafe fix
-106 106 | if (a or [1] or True or [2]) and (a or [1] or True or [2]):  # SIM222
-107 107 |     pass
-108 108 | 
-109     |-0 if a or [1] or True or [2] else 1  # SIM222
-    109 |+0 if True else 1  # SIM222
-110 110 | 
-111 111 | while a or [1] or True or [2]:  # SIM222
-112 112 |     pass
 
 SIM222.py:111:7: SIM222 [*] Use `True` instead of `... or True or ...`
     |
@@ -771,15 +441,6 @@ SIM222.py:111:7: SIM222 [*] Use `True` instead of `... or True or ...`
     |
     = help: Replace with `True`
 
-ℹ Unsafe fix
-108 108 | 
-109 109 | 0 if a or [1] or True or [2] else 1  # SIM222
-110 110 | 
-111     |-while a or [1] or True or [2]:  # SIM222
-    111 |+while True:  # SIM222
-112 112 |     pass
-113 113 | 
-114 114 | [
 
 SIM222.py:118:8: SIM222 [*] Use `True` instead of `... or True or ...`
     |
@@ -792,15 +453,6 @@ SIM222.py:118:8: SIM222 [*] Use `True` instead of `... or True or ...`
     |
     = help: Replace with `True`
 
-ℹ Unsafe fix
-115 115 |     0
-116 116 |     for a in range(10)
-117 117 |     for b in range(10)
-118     |-    if a or [1] or True or [2]  # SIM222
-    118 |+    if True  # SIM222
-119 119 |     if b or [1] or True or [2]  # SIM222
-120 120 | ]
-121 121 | 
 
 SIM222.py:119:8: SIM222 [*] Use `True` instead of `... or True or ...`
     |
@@ -812,15 +464,6 @@ SIM222.py:119:8: SIM222 [*] Use `True` instead of `... or True or ...`
     |
     = help: Replace with `True`
 
-ℹ Unsafe fix
-116 116 |     for a in range(10)
-117 117 |     for b in range(10)
-118 118 |     if a or [1] or True or [2]  # SIM222
-119     |-    if b or [1] or True or [2]  # SIM222
-    119 |+    if True  # SIM222
-120 120 | ]
-121 121 | 
-122 122 | {
 
 SIM222.py:126:8: SIM222 [*] Use `True` instead of `... or True or ...`
     |
@@ -833,15 +476,6 @@ SIM222.py:126:8: SIM222 [*] Use `True` instead of `... or True or ...`
     |
     = help: Replace with `True`
 
-ℹ Unsafe fix
-123 123 |     0
-124 124 |     for a in range(10)
-125 125 |     for b in range(10)
-126     |-    if a or [1] or True or [2]  # SIM222
-    126 |+    if True  # SIM222
-127 127 |     if b or [1] or True or [2]  # SIM222
-128 128 | }
-129 129 | 
 
 SIM222.py:127:8: SIM222 [*] Use `True` instead of `... or True or ...`
     |
@@ -853,15 +487,6 @@ SIM222.py:127:8: SIM222 [*] Use `True` instead of `... or True or ...`
     |
     = help: Replace with `True`
 
-ℹ Unsafe fix
-124 124 |     for a in range(10)
-125 125 |     for b in range(10)
-126 126 |     if a or [1] or True or [2]  # SIM222
-127     |-    if b or [1] or True or [2]  # SIM222
-    127 |+    if True  # SIM222
-128 128 | }
-129 129 | 
-130 130 | {
 
 SIM222.py:134:8: SIM222 [*] Use `True` instead of `... or True or ...`
     |
@@ -874,15 +499,6 @@ SIM222.py:134:8: SIM222 [*] Use `True` instead of `... or True or ...`
     |
     = help: Replace with `True`
 
-ℹ Unsafe fix
-131 131 |     0: 0
-132 132 |     for a in range(10)
-133 133 |     for b in range(10)
-134     |-    if a or [1] or True or [2]  # SIM222
-    134 |+    if True  # SIM222
-135 135 |     if b or [1] or True or [2]  # SIM222
-136 136 | }
-137 137 | 
 
 SIM222.py:135:8: SIM222 [*] Use `True` instead of `... or True or ...`
     |
@@ -894,15 +510,6 @@ SIM222.py:135:8: SIM222 [*] Use `True` instead of `... or True or ...`
     |
     = help: Replace with `True`
 
-ℹ Unsafe fix
-132 132 |     for a in range(10)
-133 133 |     for b in range(10)
-134 134 |     if a or [1] or True or [2]  # SIM222
-135     |-    if b or [1] or True or [2]  # SIM222
-    135 |+    if True  # SIM222
-136 136 | }
-137 137 | 
-138 138 | (
 
 SIM222.py:142:8: SIM222 [*] Use `True` instead of `... or True or ...`
     |
@@ -915,15 +522,6 @@ SIM222.py:142:8: SIM222 [*] Use `True` instead of `... or True or ...`
     |
     = help: Replace with `True`
 
-ℹ Unsafe fix
-139 139 |     0
-140 140 |     for a in range(10)
-141 141 |     for b in range(10)
-142     |-    if a or [1] or True or [2]  # SIM222
-    142 |+    if True  # SIM222
-143 143 |     if b or [1] or True or [2]  # SIM222
-144 144 | )
-145 145 | 
 
 SIM222.py:143:8: SIM222 [*] Use `True` instead of `... or True or ...`
     |
@@ -935,15 +533,6 @@ SIM222.py:143:8: SIM222 [*] Use `True` instead of `... or True or ...`
     |
     = help: Replace with `True`
 
-ℹ Unsafe fix
-140 140 |     for a in range(10)
-141 141 |     for b in range(10)
-142 142 |     if a or [1] or True or [2]  # SIM222
-143     |-    if b or [1] or True or [2]  # SIM222
-    143 |+    if True  # SIM222
-144 144 | )
-145 145 | 
-146 146 | # Outside test `a` is not simplified.
 
 SIM222.py:148:6: SIM222 [*] Use `[1]` instead of `[1] or ...`
     |
@@ -956,15 +545,6 @@ SIM222.py:148:6: SIM222 [*] Use `[1]` instead of `[1] or ...`
     |
     = help: Replace with `[1]`
 
-ℹ Unsafe fix
-145 145 | 
-146 146 | # Outside test `a` is not simplified.
-147 147 | 
-148     |-a or [1] or True or [2]  # SIM222
-    148 |+a or [1]  # SIM222
-149 149 | 
-150 150 | if (a or [1] or True or [2]) == (a or [1]):  # SIM222
-151 151 |     pass
 
 SIM222.py:150:10: SIM222 [*] Use `[1]` instead of `[1] or ...`
     |
@@ -976,15 +556,6 @@ SIM222.py:150:10: SIM222 [*] Use `[1]` instead of `[1] or ...`
     |
     = help: Replace with `[1]`
 
-ℹ Unsafe fix
-147 147 | 
-148 148 | a or [1] or True or [2]  # SIM222
-149 149 | 
-150     |-if (a or [1] or True or [2]) == (a or [1]):  # SIM222
-    150 |+if (a or [1]) == (a or [1]):  # SIM222
-151 151 |     pass
-152 152 | 
-153 153 | if f(a or [1] or True or [2]):  # SIM222
 
 SIM222.py:153:11: SIM222 [*] Use `[1]` instead of `[1] or ...`
     |
@@ -996,15 +567,6 @@ SIM222.py:153:11: SIM222 [*] Use `[1]` instead of `[1] or ...`
     |
     = help: Replace with `[1]`
 
-ℹ Unsafe fix
-150 150 | if (a or [1] or True or [2]) == (a or [1]):  # SIM222
-151 151 |     pass
-152 152 | 
-153     |-if f(a or [1] or True or [2]):  # SIM222
-    153 |+if f(a or [1]):  # SIM222
-154 154 |     pass
-155 155 | 
-156 156 | # Regression test for: https://github.com/astral-sh/ruff/issues/7099
 
 SIM222.py:157:30: SIM222 [*] Use `(int, int, int)` instead of `(int, int, int) or ...`
     |
@@ -1015,15 +577,6 @@ SIM222.py:157:30: SIM222 [*] Use `(int, int, int)` instead of `(int, int, int) o
     |
     = help: Replace with `(int, int, int)`
 
-ℹ Unsafe fix
-154 154 |     pass
-155 155 | 
-156 156 | # Regression test for: https://github.com/astral-sh/ruff/issues/7099
-157     |-def secondToTime(s0: int) -> (int, int, int) or str:
-    157 |+def secondToTime(s0: int) -> (int, int, int):
-158 158 |     m, s = divmod(s0, 60)
-159 159 | 
-160 160 | 
 
 SIM222.py:161:31: SIM222 [*] Use `(int, int, int)` instead of `(int, int, int) or ...`
     |
@@ -1033,15 +586,6 @@ SIM222.py:161:31: SIM222 [*] Use `(int, int, int)` instead of `(int, int, int) o
     |
     = help: Replace with `(int, int, int)`
 
-ℹ Unsafe fix
-158 158 |     m, s = divmod(s0, 60)
-159 159 | 
-160 160 | 
-161     |-def secondToTime(s0: int) -> ((int, int, int) or str):
-    161 |+def secondToTime(s0: int) -> ((int, int, int)):
-162 162 |     m, s = divmod(s0, 60)
-163 163 | 
-164 164 | 
 
 SIM222.py:168:7: SIM222 [*] Use `"bar"` instead of `... or "bar"`
     |
@@ -1052,13 +596,3 @@ SIM222.py:168:7: SIM222 [*] Use `"bar"` instead of `... or "bar"`
 169 | print(f"{1}{''}" or "bar")
     |
     = help: Replace with `"bar"`
-
-ℹ Unsafe fix
-165 165 | # Regression test for: https://github.com/astral-sh/ruff/issues/9479
-166 166 | print(f"{a}{b}" or "bar")
-167 167 | print(f"{a}{''}" or "bar")
-168     |-print(f"{''}{''}" or "bar")
-    168 |+print("bar")
-169 169 | print(f"{1}{''}" or "bar")
-
-

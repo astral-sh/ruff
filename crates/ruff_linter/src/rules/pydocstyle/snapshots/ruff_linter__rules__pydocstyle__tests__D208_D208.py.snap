@@ -10,7 +10,6 @@ D208.py:2:1: D208 [*] Docstring is over-indented
   |
   = help: Remove over-indentation
 
-ℹ Safe fix
 1 1 | """
 2   |-   Author
   2 |+Author
@@ -29,7 +28,6 @@ D208.py:8:1: D208 [*] Docstring is over-indented
    |
    = help: Remove over-indentation
 
-ℹ Safe fix
 5 5 | 
 6 6 | class Platform:
 7 7 |     """ Remove sampler
@@ -49,7 +47,6 @@ D208.py:9:1: D208 [*] Docstring is over-indented
    |
    = help: Remove over-indentation
 
-ℹ Safe fix
 6  6  | class Platform:
 7  7  |     """ Remove sampler
 8  8  |             Args:
@@ -68,7 +65,6 @@ D208.py:10:1: D208 [*] Docstring is over-indented
    |
    = help: Remove over-indentation
 
-ℹ Safe fix
 7  7  |     """ Remove sampler
 8  8  |             Args:
 9  9  |             Returns:
@@ -77,5 +73,3 @@ D208.py:10:1: D208 [*] Docstring is over-indented
 11 11 | 
 12 12 | 
 13 13 | def memory_test():
-
-

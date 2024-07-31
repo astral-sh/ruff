@@ -11,7 +11,6 @@ invalid_characters.py:15:6: PLE2510 [*] Invalid unescaped character backspace, u
    |
    = help: Replace with escape sequence
 
-ℹ Safe fix
 12 12 | #        (Pylint, "C0414") => Rule::UselessImportAlias,
 13 13 | #        (Pylint, "C3002") => Rule::UnnecessaryDirectLambdaCall,
 14 14 | #foo = 'hi'
@@ -32,7 +31,6 @@ invalid_characters.py:16:7: PLE2510 [*] Invalid unescaped character backspace, u
    |
    = help: Replace with escape sequence
 
-ℹ Safe fix
 13 13 | #        (Pylint, "C3002") => Rule::UnnecessaryDirectLambdaCall,
 14 14 | #foo = 'hi'
 15 15 | b = '␈'
@@ -53,7 +51,6 @@ invalid_characters.py:55:21: PLE2510 [*] Invalid unescaped character backspace, 
    |
    = help: Replace with escape sequence
 
-ℹ Safe fix
 52 52 | zwsp_after_multicharacter_grapheme_cluster = "ಫ್ರಾನ್ಸಿಸ್ಕೊ ​​"
 53 53 | zwsp_after_multicharacter_grapheme_cluster = f"ಫ್ರಾನ್ಸಿಸ್ಕೊ ​​"
 54 54 | 

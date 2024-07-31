@@ -11,7 +11,6 @@ PYI055.py:31:8: PYI055 [*] Multiple `type` members in a union. Combine them into
    |
    = help: Combine multiple `type` members
 
-ℹ Safe fix
 28 28 | 
 29 29 | def func():
 30 30 |     # PYI055
@@ -30,7 +29,6 @@ PYI055.py:32:8: PYI055 [*] Multiple `type` members in a union. Combine them into
    |
    = help: Combine multiple `type` members
 
-ℹ Safe fix
 29 29 | def func():
 30 30 |     # PYI055
 31 31 |     x: type[requests_mock.Mocker] | type[httpretty] | type[str] = requests_mock.Mocker
@@ -48,7 +46,6 @@ PYI055.py:39:8: PYI055 [*] Multiple `type` members in a union. Combine them into
    |
    = help: Combine multiple `type` members
 
-ℹ Safe fix
 36 36 |     from typing import Union as U
 37 37 | 
 38 38 |     # PYI055
@@ -69,7 +66,6 @@ PYI055.py:44:9: PYI055 [*] Multiple `type` members in a union. Combine them into
    |
    = help: Combine multiple `type` members
 
-ℹ Safe fix
 41 41 | 
 42 42 | def convert_union(union: UnionType) -> _T | None:
 43 43 |     converters: tuple[
@@ -90,7 +86,6 @@ PYI055.py:50:15: PYI055 [*] Multiple `type` members in a union. Combine them int
    |
    = help: Combine multiple `type` members
 
-ℹ Safe fix
 47 47 | 
 48 48 | def convert_union(union: UnionType) -> _T | None:
 49 49 |     converters: tuple[
@@ -111,7 +106,6 @@ PYI055.py:56:15: PYI055 [*] Multiple `type` members in a union. Combine them int
    |
    = help: Combine multiple `type` members
 
-ℹ Safe fix
 53 53 | 
 54 54 | def convert_union(union: UnionType) -> _T | None:
 55 55 |     converters: tuple[
@@ -132,7 +126,6 @@ PYI055.py:62:15: PYI055 [*] Multiple `type` members in a union. Combine them int
    |
    = help: Combine multiple `type` members
 
-ℹ Safe fix
 59 59 | 
 60 60 | def convert_union(union: UnionType) -> _T | None:
 61 61 |     converters: tuple[
@@ -140,5 +133,3 @@ PYI055.py:62:15: PYI055 [*] Multiple `type` members in a union. Combine them int
    62 |+        Union[type[_T | Converter[_T]] | str] | Converter[_T] | Callable[[str], _T], ...  # PYI055
 63 63 |     ] = union.__args__
 64 64 |     ...
-
-

@@ -11,7 +11,6 @@ unnecessary_dict_index_lookup.py:4:6: PLR1733 [*] Unnecessary lookup of dictiona
   |
   = help: Use existing variable
 
-ℹ Safe fix
 1 1 | FRUITS = {"apple": 1, "orange": 10, "berry": 22}
 2 2 | 
 3 3 | def fix_these():
@@ -31,7 +30,6 @@ unnecessary_dict_index_lookup.py:5:6: PLR1733 [*] Unnecessary lookup of dictiona
   |
   = help: Use existing variable
 
-ℹ Safe fix
 2 2 | 
 3 3 | def fix_these():
 4 4 |     [FRUITS[fruit_name] for fruit_name, fruit_count in FRUITS.items()]  # PLR1733
@@ -52,7 +50,6 @@ unnecessary_dict_index_lookup.py:6:18: PLR1733 [*] Unnecessary lookup of diction
   |
   = help: Use existing variable
 
-ℹ Safe fix
 3 3 | def fix_these():
 4 4 |     [FRUITS[fruit_name] for fruit_name, fruit_count in FRUITS.items()]  # PLR1733
 5 5 |     {FRUITS[fruit_name] for fruit_name, fruit_count in FRUITS.items()}  # PLR1733
@@ -72,7 +69,6 @@ unnecessary_dict_index_lookup.py:9:15: PLR1733 [*] Unnecessary lookup of diction
    |
    = help: Use existing variable
 
-ℹ Safe fix
 6  6  |     {fruit_name: FRUITS[fruit_name] for fruit_name, fruit_count in FRUITS.items()}  # PLR1733
 7  7  | 
 8  8  |     for fruit_name, fruit_count in FRUITS.items():
@@ -92,7 +88,6 @@ unnecessary_dict_index_lookup.py:10:16: PLR1733 [*] Unnecessary lookup of dictio
    |
    = help: Use existing variable
 
-ℹ Safe fix
 7  7  | 
 8  8  |     for fruit_name, fruit_count in FRUITS.items():
 9  9  |         print(FRUITS[fruit_name])  # PLR1733
@@ -111,7 +106,6 @@ unnecessary_dict_index_lookup.py:11:16: PLR1733 [*] Unnecessary lookup of dictio
    |
    = help: Use existing variable
 
-ℹ Safe fix
 8  8  |     for fruit_name, fruit_count in FRUITS.items():
 9  9  |         print(FRUITS[fruit_name])  # PLR1733
 10 10 |         blah = FRUITS[fruit_name]  # PLR1733
@@ -120,5 +114,3 @@ unnecessary_dict_index_lookup.py:11:16: PLR1733 [*] Unnecessary lookup of dictio
 12 12 | 
 13 13 | 
 14 14 | def dont_fix_these():
-
-

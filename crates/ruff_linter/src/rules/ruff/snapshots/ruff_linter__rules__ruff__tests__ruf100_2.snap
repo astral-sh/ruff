@@ -8,8 +8,5 @@ RUF100_2.py:1:19: RUF100 [*] Unused `noqa` directive (unused: `F401`)
   |
   = help: Remove unused `noqa` directive
 
-ℹ Safe fix
 1   |-import itertools  # noqa: F401
   1 |+import itertools
-
-

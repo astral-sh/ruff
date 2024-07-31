@@ -12,7 +12,6 @@ PYI055.pyi:4:4: PYI055 [*] Multiple `type` members in a union. Combine them into
   |
   = help: Combine multiple `type` members
 
-ℹ Safe fix
 1 1 | import builtins
 2 2 | from typing import Union
 3 3 | 
@@ -32,7 +31,6 @@ PYI055.pyi:5:4: PYI055 [*] Multiple `type` members in a union. Combine them into
   |
   = help: Combine multiple `type` members
 
-ℹ Safe fix
 2 2 | from typing import Union
 3 3 | 
 4 4 | w: builtins.type[int] | builtins.type[str] | builtins.type[complex]
@@ -53,7 +51,6 @@ PYI055.pyi:6:4: PYI055 [*] Multiple `type` members in a union. Combine them into
   |
   = help: Combine multiple `type` members
 
-ℹ Safe fix
 3 3 | 
 4 4 | w: builtins.type[int] | builtins.type[str] | builtins.type[complex]
 5 5 | x: type[int] | type[str] | type[float]
@@ -73,7 +70,6 @@ PYI055.pyi:7:4: PYI055 [*] Multiple `type` members in a union. Combine them into
   |
   = help: Combine multiple `type` members
 
-ℹ Safe fix
 4 4 | w: builtins.type[int] | builtins.type[str] | builtins.type[complex]
 5 5 | x: type[int] | type[str] | type[float]
 6 6 | y: builtins.type[int] | type[str] | builtins.type[complex]
@@ -94,7 +90,6 @@ PYI055.pyi:8:4: PYI055 [*] Multiple `type` members in a union. Combine them into
    |
    = help: Combine multiple `type` members
 
-ℹ Safe fix
 5 5 | x: type[int] | type[str] | type[float]
 6 6 | y: builtins.type[int] | type[str] | builtins.type[complex]
 7 7 | z: Union[type[float], type[complex]]
@@ -115,7 +110,6 @@ PYI055.pyi:10:15: PYI055 [*] Multiple `type` members in a union. Combine them in
    |
    = help: Combine multiple `type` members
 
-ℹ Safe fix
 7  7  | z: Union[type[float], type[complex]]
 8  8  | z: Union[type[float, int], type[complex]]
 9  9  | 
@@ -135,7 +129,6 @@ PYI055.pyi:20:7: PYI055 [*] Multiple `type` members in a union. Combine them int
    |
    = help: Combine multiple `type` members
 
-ℹ Safe fix
 17 17 | def func(arg: type[int, float] | str) -> None: ...
 18 18 | 
 19 19 | # OK
@@ -155,7 +148,6 @@ PYI055.pyi:24:11: PYI055 [*] Multiple `type` members in a union. Combine them in
    |
    = help: Combine multiple `type` members
 
-ℹ Safe fix
 21 21 | 
 22 22 | def func():
 23 23 |     # PYI055
@@ -172,11 +164,8 @@ PYI055.pyi:25:12: PYI055 [*] Multiple `type` members in a union. Combine them in
    |
    = help: Combine multiple `type` members
 
-ℹ Safe fix
 22 22 | def func():
 23 23 |     # PYI055
 24 24 |     item: type[requests_mock.Mocker] | type[httpretty] | type[str] = requests_mock.Mocker
 25    |-    item2: Union[type[requests_mock.Mocker], type[httpretty], type[str]] = requests_mock.Mocker
    25 |+    item2: type[Union[requests_mock.Mocker, httpretty, str]] = requests_mock.Mocker
-
-

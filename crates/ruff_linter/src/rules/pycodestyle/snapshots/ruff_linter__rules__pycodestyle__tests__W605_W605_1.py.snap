@@ -11,7 +11,6 @@ W605_1.py:4:11: W605 [*] Invalid escape sequence: `\.`
   |
   = help: Use a raw string literal
 
-ℹ Safe fix
 1 1 | # Same as `W605_0.py` but using f-strings instead.
 2 2 | 
 3 3 | #: W605:1:10
@@ -31,7 +30,6 @@ W605_1.py:8:1: W605 [*] Invalid escape sequence: `\.`
   |
   = help: Use a raw string literal
 
-ℹ Safe fix
 4 4 | regex = f'\.png$'
 5 5 | 
 6 6 | #: W605:2:1
@@ -51,7 +49,6 @@ W605_1.py:13:7: W605 [*] Invalid escape sequence: `\_`
    |
    = help: Use a raw string literal
 
-ℹ Safe fix
 10 10 | 
 11 11 | #: W605:2:6
 12 12 | f(
@@ -72,7 +69,6 @@ W605_1.py:20:6: W605 [*] Invalid escape sequence: `\_`
    |
    = help: Use a raw string literal
 
-ℹ Safe fix
 14 14 | )
 15 15 | 
 16 16 | #: W605:4:6
@@ -90,7 +86,6 @@ W605_1.py:25:40: W605 [*] Invalid escape sequence: `\_`
    |
    = help: Add backslash to escape sequence
 
-ℹ Safe fix
 22 22 | """
 23 23 | 
 24 24 | #: W605:1:38
@@ -111,7 +106,6 @@ W605_1.py:43:13: W605 [*] Invalid escape sequence: `\_`
    |
    = help: Add backslash to escape sequence
 
-ℹ Safe fix
 40 40 | \w
 41 41 | '''  # noqa
 42 42 | 
@@ -131,7 +125,6 @@ W605_1.py:44:11: W605 [*] Invalid escape sequence: `\{`
    |
    = help: Use a raw string literal
 
-ℹ Safe fix
 41 41 | '''  # noqa
 42 42 | 
 43 43 | regex = f'\\\_'
@@ -152,7 +145,6 @@ W605_1.py:45:11: W605 [*] Invalid escape sequence: `\{`
    |
    = help: Use a raw string literal
 
-ℹ Safe fix
 42 42 | 
 43 43 | regex = f'\\\_'
 44 44 | value = f'\{{1}}'
@@ -173,7 +165,6 @@ W605_1.py:46:14: W605 [*] Invalid escape sequence: `\}`
    |
    = help: Use a raw string literal
 
-ℹ Safe fix
 43 43 | regex = f'\\\_'
 44 44 | value = f'\{{1}}'
 45 45 | value = f'\{1}'
@@ -193,7 +184,6 @@ W605_1.py:47:14: W605 [*] Invalid escape sequence: `\{`
    |
    = help: Use a raw string literal
 
-ℹ Safe fix
 44 44 | value = f'\{{1}}'
 45 45 | value = f'\{1}'
 46 46 | value = f'{1:\}'
@@ -214,7 +204,6 @@ W605_1.py:48:15: W605 [*] Invalid escape sequence: `\{`
    |
    = help: Use a raw string literal
 
-ℹ Safe fix
 45 45 | value = f'\{1}'
 46 46 | value = f'{1:\}'
 47 47 | value = f"{f"\{1}"}"
@@ -234,7 +223,6 @@ W605_1.py:57:9: W605 [*] Invalid escape sequence: `\d`
    |
    = help: Use a raw string literal
 
-ℹ Safe fix
 54 54 | value = f"{rf"\{1}"}"
 55 55 | 
 56 56 | # Regression tests for https://github.com/astral-sh/ruff/issues/10434
@@ -253,7 +241,6 @@ W605_1.py:58:11: W605 [*] Invalid escape sequence: `\d`
    |
    = help: Add backslash to escape sequence
 
-ℹ Safe fix
 55 55 | 
 56 56 | # Regression tests for https://github.com/astral-sh/ruff/issues/10434
 57 57 | f"{{}}+-\d"
@@ -270,7 +257,6 @@ W605_1.py:59:12: W605 [*] Invalid escape sequence: `\d`
    |
    = help: Add backslash to escape sequence
 
-ℹ Safe fix
 56 56 | # Regression tests for https://github.com/astral-sh/ruff/issues/10434
 57 57 | f"{{}}+-\d"
 58 58 | f"\n{{}}+-\d+"

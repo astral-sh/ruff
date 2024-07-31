@@ -10,7 +10,6 @@ PIE790.py:4:5: PIE790 [*] Unnecessary `pass` statement
   |
   = help: Remove unnecessary `pass`
 
-ℹ Safe fix
 1 1 | class Foo:
 2 2 |     """buzz"""
 3 3 | 
@@ -28,7 +27,6 @@ PIE790.py:9:5: PIE790 [*] Unnecessary `pass` statement
   |
   = help: Remove unnecessary `pass`
 
-ℹ Safe fix
 6  6  | 
 7  7  | if foo:
 8  8  |     """foo"""
@@ -46,7 +44,6 @@ PIE790.py:14:5: PIE790 [*] Unnecessary `pass` statement
    |
    = help: Remove unnecessary `pass`
 
-ℹ Safe fix
 11 11 | 
 12 12 | def multi_statement() -> None:
 13 13 |     """This is a function."""
@@ -65,7 +62,6 @@ PIE790.py:21:5: PIE790 [*] Unnecessary `pass` statement
    |
    = help: Remove unnecessary `pass`
 
-ℹ Safe fix
 18 18 |     pass
 19 19 | else:
 20 20 |     """bar"""
@@ -83,7 +79,6 @@ PIE790.py:28:5: PIE790 [*] Unnecessary `pass` statement
    |
    = help: Remove unnecessary `pass`
 
-ℹ Safe fix
 25 25 |     pass
 26 26 | else:
 27 27 |     """bar"""
@@ -101,7 +96,6 @@ PIE790.py:35:5: PIE790 [*] Unnecessary `pass` statement
    |
    = help: Remove unnecessary `pass`
 
-ℹ Safe fix
 32 32 |     pass
 33 33 | else:
 34 34 |     """bar"""
@@ -119,7 +113,6 @@ PIE790.py:42:5: PIE790 [*] Unnecessary `pass` statement
    |
    = help: Remove unnecessary `pass`
 
-ℹ Safe fix
 39 39 |     pass
 40 40 | else:
 41 41 |     """bar"""
@@ -137,7 +130,6 @@ PIE790.py:50:5: PIE790 [*] Unnecessary `pass` statement
    |
    = help: Remove unnecessary `pass`
 
-ℹ Safe fix
 47 47 |     buzz
 48 48 |     """
 49 49 | 
@@ -155,7 +147,6 @@ PIE790.py:58:5: PIE790 [*] Unnecessary `pass` statement
    |
    = help: Remove unnecessary `pass`
 
-ℹ Safe fix
 55 55 |     buzz
 56 56 |     """
 57 57 | 
@@ -175,7 +166,6 @@ PIE790.py:65:5: PIE790 [*] Unnecessary `pass` statement
    |
    = help: Remove unnecessary `pass`
 
-ℹ Safe fix
 62 62 |     """
 63 63 |     buzz
 64 64 |     """
@@ -193,7 +183,6 @@ PIE790.py:74:5: PIE790 [*] Unnecessary `pass` statement
    |
    = help: Remove unnecessary `pass`
 
-ℹ Safe fix
 71 71 |     bar()
 72 72 | except ValueError:
 73 73 |     """bar"""
@@ -213,7 +202,6 @@ PIE790.py:79:5: PIE790 [*] Unnecessary `pass` statement
    |
    = help: Remove unnecessary `pass`
 
-ℹ Safe fix
 76 76 | 
 77 77 | for _ in range(10):
 78 78 |     """buzz"""
@@ -233,7 +221,6 @@ PIE790.py:83:5: PIE790 [*] Unnecessary `pass` statement
    |
    = help: Remove unnecessary `pass`
 
-ℹ Safe fix
 80 80 | 
 81 81 | async for _ in range(10):
 82 82 |     """buzz"""
@@ -251,7 +238,6 @@ PIE790.py:87:5: PIE790 [*] Unnecessary `pass` statement
    |
    = help: Remove unnecessary `pass`
 
-ℹ Safe fix
 84 84 | 
 85 85 | while cond:
 86 86 |     """buzz"""
@@ -271,7 +257,6 @@ PIE790.py:92:5: PIE790 [*] Unnecessary `pass` statement
    |
    = help: Remove unnecessary `pass`
 
-ℹ Safe fix
 89 89 | 
 90 90 | with bar:
 91 91 |     """buzz"""
@@ -289,7 +274,6 @@ PIE790.py:96:5: PIE790 [*] Unnecessary `pass` statement
    |
    = help: Remove unnecessary `pass`
 
-ℹ Safe fix
 93 93 | 
 94 94 | async with bar:
 95 95 |     """buzz"""
@@ -307,7 +291,6 @@ PIE790.py:101:5: PIE790 [*] Unnecessary `pass` statement
     |
     = help: Remove unnecessary `pass`
 
-ℹ Safe fix
 98  98  | 
 99  99  | def foo() -> None:
 100 100 |     """buzz"""
@@ -326,7 +309,6 @@ PIE790.py:130:5: PIE790 [*] Unnecessary `pass` statement
     |
     = help: Remove unnecessary `pass`
 
-ℹ Safe fix
 127 127 | 
 128 128 | def foo():
 129 129 |     print("foo")
@@ -344,7 +326,6 @@ PIE790.py:136:5: PIE790 [*] Unnecessary `pass` statement
     |
     = help: Remove unnecessary `pass`
 
-ℹ Safe fix
 133 133 | def foo():
 134 134 |     """A docstring."""
 135 135 |     print("foo")
@@ -362,7 +343,6 @@ PIE790.py:140:5: PIE790 [*] Unnecessary `pass` statement
     |
     = help: Remove unnecessary `pass`
 
-ℹ Safe fix
 138 138 | 
 139 139 | for i in range(10):
 140 140 |     pass
@@ -382,7 +362,6 @@ PIE790.py:141:5: PIE790 [*] Unnecessary `pass` statement
     |
     = help: Remove unnecessary `pass`
 
-ℹ Safe fix
 138 138 | 
 139 139 | for i in range(10):
 140 140 |     pass
@@ -401,7 +380,6 @@ PIE790.py:144:5: PIE790 [*] Unnecessary `pass` statement
     |
     = help: Remove unnecessary `pass`
 
-ℹ Safe fix
 141 141 |     pass
 142 142 | 
 143 143 | for i in range(10):
@@ -421,7 +399,6 @@ PIE790.py:146:5: PIE790 [*] Unnecessary `pass` statement
     |
     = help: Remove unnecessary `pass`
 
-ℹ Safe fix
 143 143 | for i in range(10):
 144 144 |     pass
 145 145 | 
@@ -439,7 +416,6 @@ PIE790.py:149:5: PIE790 [*] Unnecessary `pass` statement
     |
     = help: Remove unnecessary `pass`
 
-ℹ Safe fix
 146 146 |     pass
 147 147 | 
 148 148 | for i in range(10):
@@ -458,7 +434,6 @@ PIE790.py:150:5: PIE790 [*] Unnecessary `pass` statement
     |
     = help: Remove unnecessary `pass`
 
-ℹ Safe fix
 147 147 | 
 148 148 | for i in range(10):
 149 149 |     pass  # comment
@@ -476,7 +451,6 @@ PIE790.py:155:5: PIE790 [*] Unnecessary `...` literal
     |
     = help: Remove unnecessary `...`
 
-ℹ Safe fix
 152 152 | 
 153 153 | def foo():
 154 154 |     print("foo")
@@ -494,7 +468,6 @@ PIE790.py:161:5: PIE790 [*] Unnecessary `...` literal
     |
     = help: Remove unnecessary `...`
 
-ℹ Safe fix
 158 158 | def foo():
 159 159 |     """A docstring."""
 160 160 |     print("foo")
@@ -512,7 +485,6 @@ PIE790.py:165:5: PIE790 [*] Unnecessary `...` literal
     |
     = help: Remove unnecessary `...`
 
-ℹ Safe fix
 163 163 | 
 164 164 | for i in range(10):
 165 165 |     ...
@@ -532,7 +504,6 @@ PIE790.py:166:5: PIE790 [*] Unnecessary `...` literal
     |
     = help: Remove unnecessary `...`
 
-ℹ Safe fix
 163 163 | 
 164 164 | for i in range(10):
 165 165 |     ...
@@ -551,7 +522,6 @@ PIE790.py:169:5: PIE790 [*] Unnecessary `...` literal
     |
     = help: Remove unnecessary `...`
 
-ℹ Safe fix
 166 166 |     ...
 167 167 | 
 168 168 | for i in range(10):
@@ -571,7 +541,6 @@ PIE790.py:171:5: PIE790 [*] Unnecessary `...` literal
     |
     = help: Remove unnecessary `...`
 
-ℹ Safe fix
 168 168 | for i in range(10):
 169 169 |     ...
 170 170 | 
@@ -589,7 +558,6 @@ PIE790.py:174:5: PIE790 [*] Unnecessary `...` literal
     |
     = help: Remove unnecessary `...`
 
-ℹ Safe fix
 171 171 |     ...
 172 172 | 
 173 173 | for i in range(10):
@@ -610,7 +578,6 @@ PIE790.py:175:5: PIE790 [*] Unnecessary `...` literal
     |
     = help: Remove unnecessary `...`
 
-ℹ Safe fix
 172 172 | 
 173 173 | for i in range(10):
 174 174 |     ...  # comment
@@ -628,7 +595,6 @@ PIE790.py:178:5: PIE790 [*] Unnecessary `...` literal
     |
     = help: Remove unnecessary `...`
 
-ℹ Safe fix
 175 175 |     ...
 176 176 | 
 177 177 | for i in range(10):
@@ -648,7 +614,6 @@ PIE790.py:179:5: PIE790 [*] Unnecessary `pass` statement
     |
     = help: Remove unnecessary `pass`
 
-ℹ Safe fix
 176 176 | 
 177 177 | for i in range(10):
 178 178 |     ...
@@ -666,7 +631,6 @@ PIE790.py:209:9: PIE790 [*] Unnecessary `...` literal
     |
     = help: Remove unnecessary `...`
 
-ℹ Safe fix
 206 206 | 
 207 207 |     def stub(self) -> str:
 208 208 |         """Docstring"""
@@ -674,5 +638,3 @@ PIE790.py:209:9: PIE790 [*] Unnecessary `...` literal
 210 209 | 
 211 210 | 
 212 211 | class Repro(Protocol[int]):
-
-

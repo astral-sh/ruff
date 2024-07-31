@@ -12,7 +12,6 @@ E30.py:533:1: E302 [*] Expected 2 blank lines, found 0
     |
     = help: Add missing blank line(s)
 
-ℹ Safe fix
 530 530 | 
 531 531 | # E302
 532 532 | """Main module."""
@@ -33,7 +32,6 @@ E30.py:540:1: E302 [*] Expected 2 blank lines, found 0
     |
     = help: Add missing blank line(s)
 
-ℹ Safe fix
 537 537 | 
 538 538 | # E302
 539 539 | import sys
@@ -54,7 +52,6 @@ E30.py:549:1: E302 [*] Expected 2 blank lines, found 1
     |
     = help: Add missing blank line(s)
 
-ℹ Safe fix
 546 546 | def a():
 547 547 |     pass
 548 548 | 
@@ -74,7 +71,6 @@ E30.py:560:1: E302 [*] Expected 2 blank lines, found 1
     |
     = help: Add missing blank line(s)
 
-ℹ Safe fix
 557 557 | 
 558 558 | # comment
 559 559 | 
@@ -94,7 +90,6 @@ E30.py:569:1: E302 [*] Expected 2 blank lines, found 1
     |
     = help: Add missing blank line(s)
 
-ℹ Safe fix
 566 566 | def a():
 567 567 |     pass
 568 568 | 
@@ -114,7 +109,6 @@ E30.py:578:1: E302 [*] Expected 2 blank lines, found 1
     |
     = help: Add missing blank line(s)
 
-ℹ Safe fix
 575 575 | async  def x():
 576 576 |     pass
 577 577 | 
@@ -133,7 +127,6 @@ E30.py:586:1: E302 [*] Expected 2 blank lines, found 0
     |
     = help: Add missing blank line(s)
 
-ℹ Safe fix
 583 583 | # E302
 584 584 | def bar():
 585 585 |     pass
@@ -154,7 +147,6 @@ E30.py:592:1: E302 [*] Expected 2 blank lines, found 0
     |
     = help: Add missing blank line(s)
 
-ℹ Safe fix
 589 589 | 
 590 590 | # E302
 591 591 | def bar(): pass
@@ -174,7 +166,6 @@ E30.py:602:1: E302 [*] Expected 2 blank lines, found 1
     |
     = help: Add missing blank line(s)
 
-ℹ Safe fix
 598 598 | def f():
 599 599 |     pass
 600 600 | 
@@ -194,7 +185,6 @@ E30.py:624:1: E302 [*] Expected 2 blank lines, found 0
     |
     = help: Add missing blank line(s)
 
-ℹ Safe fix
 621 621 | 
 622 622 | # E302
 623 623 | class A:...
@@ -215,7 +205,6 @@ E30.py:634:1: E302 [*] Expected 2 blank lines, found 1
     |
     = help: Add missing blank line(s)
 
-ℹ Safe fix
 631 631 | @overload
 632 632 | def fn(a: str) -> str: ...
 633 633 | 

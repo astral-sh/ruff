@@ -11,7 +11,6 @@ source: crates/ruff_linter/src/rules/pyflakes/mod.rs
   |
   = help: Remove assignment to unused variable `x`
 
-ℹ Safe fix
 5 5 |     def f():
 6 6 |         try:
 7 7 |             pass
@@ -28,5 +27,3 @@ source: crates/ruff_linter/src/rules/pyflakes/mod.rs
 13 |         print(x)
    |               ^ F821
    |
-
-

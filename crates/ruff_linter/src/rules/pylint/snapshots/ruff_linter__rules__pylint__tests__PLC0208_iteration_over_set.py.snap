@@ -11,7 +11,6 @@ iteration_over_set.py:3:13: PLC0208 [*] Use a sequence type instead of a `set` w
   |
   = help: Convert to `tuple`
 
-ℹ Safe fix
 1 1 | # Errors
 2 2 | 
 3   |-for item in {1}:
@@ -30,7 +29,6 @@ iteration_over_set.py:6:13: PLC0208 [*] Use a sequence type instead of a `set` w
   |
   = help: Convert to `tuple`
 
-ℹ Safe fix
 3 3 | for item in {1}:
 4 4 |     print(f"I can count to {item}!")
 5 5 | 
@@ -50,7 +48,6 @@ iteration_over_set.py:9:13: PLC0208 [*] Use a sequence type instead of a `set` w
    |
    = help: Convert to `tuple`
 
-ℹ Safe fix
 6  6  | for item in {"apples", "lemons", "water"}:  # flags in-line set literals
 7  7  |     print(f"I like {item}.")
 8  8  | 
@@ -73,7 +70,6 @@ iteration_over_set.py:12:13: PLC0208 [*] Use a sequence type instead of a `set` 
    |
    = help: Convert to `tuple`
 
-ℹ Safe fix
 9  9  | for item in {1,}:
 10 10 |     print(f"I can count to {item}!")
 11 11 | 
@@ -97,7 +93,6 @@ iteration_over_set.py:17:28: PLC0208 [*] Use a sequence type instead of a `set` 
    |
    = help: Convert to `tuple`
 
-ℹ Safe fix
 14 14 | }:  # flags in-line set literals
 15 15 |     print(f"I like {item}.")
 16 16 | 
@@ -118,7 +113,6 @@ iteration_over_set.py:19:27: PLC0208 [*] Use a sequence type instead of a `set` 
    |
    = help: Convert to `tuple`
 
-ℹ Safe fix
 16 16 | 
 17 17 | numbers_list = [i for i in {1, 2, 3}]  # flags sets in list comprehensions
 18 18 | 
@@ -139,7 +133,6 @@ iteration_over_set.py:21:36: PLC0208 [*] Use a sequence type instead of a `set` 
    |
    = help: Convert to `tuple`
 
-ℹ Safe fix
 18 18 | 
 19 19 | numbers_set = {i for i in {1, 2, 3}}  # flags sets in set comprehensions
 20 20 | 
@@ -160,7 +153,6 @@ iteration_over_set.py:23:27: PLC0208 [*] Use a sequence type instead of a `set` 
    |
    = help: Convert to `tuple`
 
-ℹ Safe fix
 20 20 | 
 21 21 | numbers_dict = {str(i): i for i in {1, 2, 3}}  # flags sets in dict comprehensions
 22 22 | 
@@ -168,6 +160,4 @@ iteration_over_set.py:23:27: PLC0208 [*] Use a sequence type instead of a `set` 
    23 |+numbers_gen = (i for i in (1, 2, 3))  # flags sets in generator expressions
 24 24 | 
 25 25 | # Non-errors
-26 26 | 
-
-
+26 26 |

@@ -12,7 +12,6 @@ sections.py:78:5: D410 [*] Missing blank line after section ("Returns")
    |
    = help: Add blank line after "Returns"
 
-ℹ Safe fix
 77 77 | 
 78 78 |     Returns
 79 79 |     -------
@@ -32,7 +31,6 @@ sections.py:224:5: D410 [*] Missing blank line after section ("Returns")
     |
     = help: Add blank line after "Returns"
 
-ℹ Safe fix
 224 224 |     Returns
 225 225 |     ------
 226 226 |     Many many wonderful things.

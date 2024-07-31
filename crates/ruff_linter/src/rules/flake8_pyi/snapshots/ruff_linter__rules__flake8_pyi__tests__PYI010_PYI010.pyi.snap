@@ -11,7 +11,6 @@ PYI010.pyi:6:5: PYI010 [*] Function body must contain only `...`
   |
   = help: Replace function body with `...`
 
-ℹ Safe fix
 3 3 |     """foo"""  # OK, docstrings are handled by another rule
 4 4 | 
 5 5 | def buzz():
@@ -31,7 +30,6 @@ PYI010.pyi:9:5: PYI010 [*] Function body must contain only `...`
    |
    = help: Replace function body with `...`
 
-ℹ Safe fix
 6  6  |     print("buzz")  # ERROR PYI010
 7  7  | 
 8  8  | def foo2():
@@ -51,7 +49,6 @@ PYI010.pyi:12:5: PYI010 [*] Function body must contain only `...`
    |
    = help: Replace function body with `...`
 
-ℹ Safe fix
 9  9  |     123  # ERROR PYI010
 10 10 | 
 11 11 | def bizz():
@@ -60,5 +57,3 @@ PYI010.pyi:12:5: PYI010 [*] Function body must contain only `...`
 13 13 | 
 14 14 | def foo3():
 15 15 |     pass  # OK, pass is handled by another rule
-
-

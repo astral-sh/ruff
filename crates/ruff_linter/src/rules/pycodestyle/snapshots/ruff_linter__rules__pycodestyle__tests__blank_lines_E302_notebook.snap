@@ -12,7 +12,6 @@ E30.ipynb:21:1: E302 [*] Expected 2 blank lines, found 1
    |
    = help: Add missing blank line(s)
 
-ℹ Safe fix
 18 18 | def a():
 19 19 |     pass
 20 20 | 

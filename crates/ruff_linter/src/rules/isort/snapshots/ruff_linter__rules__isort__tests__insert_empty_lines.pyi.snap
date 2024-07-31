@@ -12,7 +12,6 @@ insert_empty_lines.pyi:1:1: I001 [*] Import block is un-sorted or un-formatted
   |
   = help: Organize imports
 
-ℹ Safe fix
 1 1 | import a
 2 2 | import b
   3 |+
@@ -33,7 +32,6 @@ insert_empty_lines.pyi:4:1: I001 [*] Import block is un-sorted or un-formatted
   |
   = help: Organize imports
 
-ℹ Safe fix
 3 3 | x = 1
 4 4 | import os
 5 5 | import sys
@@ -55,7 +53,6 @@ insert_empty_lines.pyi:14:1: I001 [*] Import block is un-sorted or un-formatted
    |
    = help: Organize imports
 
-ℹ Safe fix
 13 13 | y = 1
 14 14 | import os
 15 15 | import sys
@@ -63,5 +60,3 @@ insert_empty_lines.pyi:14:1: I001 [*] Import block is un-sorted or un-formatted
 16 17 | """Docstring"""
 17 18 | 
 18 19 | if True:
-
-

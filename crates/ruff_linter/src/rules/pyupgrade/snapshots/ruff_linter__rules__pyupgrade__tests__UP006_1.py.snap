@@ -9,12 +9,9 @@ UP006_1.py:9:10: UP006 [*] Use `collections.defaultdict` instead of `typing.Defa
    |
    = help: Replace with `collections.defaultdict`
 
-ℹ Safe fix
 6  6  |     from collections import defaultdict
 7  7  | 
 8  8  | 
 9     |-def f(x: typing.DefaultDict[str, str]) -> None:
    9  |+def f(x: defaultdict[str, str]) -> None:
 10 10 |     ...
-
-

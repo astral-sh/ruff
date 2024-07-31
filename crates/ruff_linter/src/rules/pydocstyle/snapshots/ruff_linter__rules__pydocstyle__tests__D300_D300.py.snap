@@ -17,7 +17,6 @@ D300.py:10:5: D300 [*] Use triple double quotes `"""`
    |
    = help: Convert to triple double quotes
 
-ℹ Safe fix
 7  7  | 
 8  8  | 
 9  9  | def contains_quote():
@@ -26,5 +25,3 @@ D300.py:10:5: D300 [*] Use triple double quotes `"""`
 11 11 | 
 12 12 | 
 13 13 | # OK
-
-

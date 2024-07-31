@@ -12,7 +12,6 @@ E30.py:478:5: E301 [*] Expected 1 blank line, found 0
     |
     = help: Add missing blank line
 
-ℹ Safe fix
 475 475 | 
 476 476 |     def func1():
 477 477 |         pass
@@ -32,7 +31,6 @@ E30.py:489:5: E301 [*] Expected 1 blank line, found 0
     |
     = help: Add missing blank line
 
-ℹ Safe fix
 485 485 | 
 486 486 |     def fn1():
 487 487 |         pass
@@ -51,7 +49,6 @@ E30.py:499:5: E301 [*] Expected 1 blank line, found 0
     |
     = help: Add missing blank line
 
-ℹ Safe fix
 496 496 |     """Class for minimal repo."""
 497 497 | 
 498 498 |     columns = []
@@ -71,7 +68,6 @@ E30.py:511:5: E301 [*] Expected 1 blank line, found 0
     |
     = help: Add missing blank line
 
-ℹ Safe fix
 508 508 | 
 509 509 |     def method(cls) -> None:
 510 510 |         pass
@@ -91,7 +87,6 @@ E30.py:526:5: E301 [*] Expected 1 blank line, found 0
     |
     = help: Add missing blank line
 
-ℹ Safe fix
 523 523 |     @overload
 524 524 |     def bar(self, x: str) -> str:
 525 525 |         ...

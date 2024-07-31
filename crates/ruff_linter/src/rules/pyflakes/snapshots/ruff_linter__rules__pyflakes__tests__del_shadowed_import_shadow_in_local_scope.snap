@@ -10,7 +10,6 @@ source: crates/ruff_linter/src/rules/pyflakes/mod.rs
   |
   = help: Remove unused import: `os`
 
-ℹ Safe fix
 1 1 | 
 2   |-import os
 3 2 | 
@@ -25,5 +24,3 @@ source: crates/ruff_linter/src/rules/pyflakes/mod.rs
 6 |     print(os)
   |
   = help: Remove definition: `os`
-
-

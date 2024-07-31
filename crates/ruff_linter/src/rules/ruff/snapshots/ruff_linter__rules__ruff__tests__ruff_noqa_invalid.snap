@@ -8,7 +8,6 @@ ruff_noqa_invalid.py:1:8: F401 [*] `os` imported but unused
   |
   = help: Remove unused import: `os`
 
-ℹ Safe fix
 1   |-import os  # ruff: noqa: F401
 2 1 | 
 3 2 | 
@@ -21,12 +20,3 @@ ruff_noqa_invalid.py:5:5: F841 [*] Local variable `x` is assigned to but never u
   |     ^ F841
   |
   = help: Remove assignment to unused variable `x`
-
-ℹ Unsafe fix
-2 2 | 
-3 3 | 
-4 4 | def f():
-5   |-    x = 1
-  5 |+    pass
-
-

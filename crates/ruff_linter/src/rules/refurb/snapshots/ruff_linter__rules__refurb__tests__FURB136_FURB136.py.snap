@@ -12,7 +12,6 @@ FURB136.py:4:1: FURB136 [*] Replace `x if x > y else y` with `max(y, x)`
   |
   = help: Replace with `max(y, x)`
 
-ℹ Safe fix
 1 1 | x = 1
 2 2 | y = 2
 3 3 | 
@@ -33,7 +32,6 @@ FURB136.py:6:1: FURB136 [*] Replace `x if x >= y else y` with `max(x, y)`
   |
   = help: Replace with `max(x, y)`
 
-ℹ Safe fix
 3 3 | 
 4 4 | x if x > y else y  # FURB136
 5 5 | 
@@ -54,7 +52,6 @@ FURB136.py:8:1: FURB136 [*] Replace `x if x < y else y` with `min(y, x)`
    |
    = help: Replace with `min(y, x)`
 
-ℹ Safe fix
 5 5 | 
 6 6 | x if x >= y else y  # FURB136
 7 7 | 
@@ -75,7 +72,6 @@ FURB136.py:10:1: FURB136 [*] Replace `x if x <= y else y` with `min(x, y)`
    |
    = help: Replace with `min(x, y)`
 
-ℹ Safe fix
 7  7  | 
 8  8  | x if x < y else y  # FURB136
 9  9  | 
@@ -96,7 +92,6 @@ FURB136.py:12:1: FURB136 [*] Replace `y if x > y else x` with `min(x, y)`
    |
    = help: Replace with `min(x, y)`
 
-ℹ Safe fix
 9  9  | 
 10 10 | x if x <= y else y  # FURB136
 11 11 | 
@@ -117,7 +112,6 @@ FURB136.py:14:1: FURB136 [*] Replace `y if x >= y else x` with `min(y, x)`
    |
    = help: Replace with `min(y, x)`
 
-ℹ Safe fix
 11 11 | 
 12 12 | y if x > y else x  # FURB136
 13 13 | 
@@ -138,7 +132,6 @@ FURB136.py:16:1: FURB136 [*] Replace `y if x < y else x` with `max(x, y)`
    |
    = help: Replace with `max(x, y)`
 
-ℹ Safe fix
 13 13 | 
 14 14 | y if x >= y else x  # FURB136
 15 15 | 
@@ -159,7 +152,6 @@ FURB136.py:18:1: FURB136 [*] Replace `y if x <= y else x` with `max(y, x)`
    |
    = help: Replace with `max(y, x)`
 
-ℹ Safe fix
 15 15 | 
 16 16 | y if x < y else x  # FURB136
 17 17 | 
@@ -181,7 +173,6 @@ FURB136.py:22:1: FURB136 [*] Replace `if` expression with `max(y, x)`
    |
    = help: Replace with `max(y, x)`
 
-ℹ Safe fix
 19 19 | 
 20 20 | x + y if x > y else y  # OK
 21 21 | 
@@ -190,5 +181,3 @@ FURB136.py:22:1: FURB136 [*] Replace `if` expression with `max(y, x)`
 24    |-    > y
 25    |-) else y  # FURB136
    22 |+max(y, x)  # FURB136
-
-

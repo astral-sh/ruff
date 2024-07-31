@@ -10,15 +10,6 @@ annotation_presence.py:5:5: ANN201 [*] Missing return type annotation for public
   |
   = help: Add return type annotation: `None`
 
-ℹ Unsafe fix
-2 2 | from typing_extensions import override
-3 3 | 
-4 4 | # Error
-5   |-def foo(a, b):
-  5 |+def foo(a, b) -> None:
-6 6 |     pass
-7 7 | 
-8 8 | 
 
 annotation_presence.py:5:9: ANN001 Missing type annotation for function argument `a`
   |
@@ -45,15 +36,6 @@ annotation_presence.py:10:5: ANN201 [*] Missing return type annotation for publi
    |
    = help: Add return type annotation: `None`
 
-ℹ Unsafe fix
-7  7  | 
-8  8  | 
-9  9  | # Error
-10    |-def foo(a: int, b):
-   10 |+def foo(a: int, b) -> None:
-11 11 |     pass
-12 12 | 
-13 13 | 
 
 annotation_presence.py:10:17: ANN001 Missing type annotation for function argument `b`
    |
@@ -80,15 +62,6 @@ annotation_presence.py:20:5: ANN201 [*] Missing return type annotation for publi
    |
    = help: Add return type annotation: `None`
 
-ℹ Unsafe fix
-17 17 | 
-18 18 | 
-19 19 | # Error
-20    |-def foo(a: int, b: int):
-   20 |+def foo(a: int, b: int) -> None:
-21 21 |     pass
-22 22 | 
-23 23 | 
 
 annotation_presence.py:25:5: ANN201 [*] Missing return type annotation for public function `foo`
    |
@@ -99,15 +72,6 @@ annotation_presence.py:25:5: ANN201 [*] Missing return type annotation for publi
    |
    = help: Add return type annotation: `None`
 
-ℹ Unsafe fix
-22 22 | 
-23 23 | 
-24 24 | # Error
-25    |-def foo():
-   25 |+def foo() -> None:
-26 26 |     pass
-27 27 | 
-28 28 | 
 
 annotation_presence.py:45:12: ANN401 Dynamically typed expressions (typing.Any) are disallowed in `a`
    |
@@ -296,15 +260,6 @@ annotation_presence.py:159:9: ANN204 [*] Missing return type annotation for spec
     |
     = help: Add return type annotation: `None`
 
-ℹ Unsafe fix
-156 156 | 
-157 157 | class Foo:
-158 158 |     @decorator()
-159     |-    def __init__(self: "Foo", foo: int):
-    159 |+    def __init__(self: "Foo", foo: int) -> None:
-160 160 |        ...
-161 161 | 
-162 162 | 
 
 annotation_presence.py:165:9: ANN204 [*] Missing return type annotation for special method `__init__`
     |
@@ -316,13 +271,6 @@ annotation_presence.py:165:9: ANN204 [*] Missing return type annotation for spec
     |
     = help: Add return type annotation: `None`
 
-ℹ Unsafe fix
-162 162 | 
-163 163 | # Regression test for: https://github.com/astral-sh/ruff/issues/7711
-164 164 | class Class:
-165     |-    def __init__(self):
-    165 |+    def __init__(self) -> None:
-166 166 |         print(f"{self.attr=}")
 
 annotation_presence.py:165:18: ANN101 Missing type annotation for `self` in method
     |
@@ -332,5 +280,3 @@ annotation_presence.py:165:18: ANN101 Missing type annotation for `self` in meth
     |                  ^^^^ ANN101
 166 |         print(f"{self.attr=}")
     |
-
-

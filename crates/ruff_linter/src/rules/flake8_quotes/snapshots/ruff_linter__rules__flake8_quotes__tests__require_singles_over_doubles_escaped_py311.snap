@@ -10,7 +10,6 @@ doubles_escaped.py:1:26: Q003 [*] Change outer quotes to avoid escaping inner qu
   |
   = help: Change outer quotes to avoid escaping inner quotes
 
-ℹ Safe fix
 1   |-this_should_raise_Q003 = 'This is a \'string\''
   1 |+this_should_raise_Q003 = "This is a 'string'"
 2 2 | this_should_raise_Q003 = 'This is \\ a \\\'string\''
@@ -27,7 +26,6 @@ doubles_escaped.py:2:26: Q003 [*] Change outer quotes to avoid escaping inner qu
   |
   = help: Change outer quotes to avoid escaping inner quotes
 
-ℹ Safe fix
 1 1 | this_should_raise_Q003 = 'This is a \'string\''
 2   |-this_should_raise_Q003 = 'This is \\ a \\\'string\''
   2 |+this_should_raise_Q003 = "This is \\ a \\'string'"
@@ -45,7 +43,6 @@ doubles_escaped.py:10:5: Q003 [*] Change outer quotes to avoid escaping inner qu
    |
    = help: Change outer quotes to avoid escaping inner quotes
 
-ℹ Safe fix
 7  7  | this_is_fine = R'This is a \'string\''
 8  8  | this_should_raise = (
 9  9  |     'This is a'
@@ -65,7 +62,6 @@ doubles_escaped.py:14:1: Q003 [*] Change outer quotes to avoid escaping inner qu
    |
    = help: Change outer quotes to avoid escaping inner quotes
 
-ℹ Safe fix
 11 11 | )
 12 12 | 
 13 13 | # Same as above, but with f-strings
@@ -86,7 +82,6 @@ doubles_escaped.py:15:1: Q003 [*] Change outer quotes to avoid escaping inner qu
    |
    = help: Change outer quotes to avoid escaping inner quotes
 
-ℹ Safe fix
 12 12 | 
 13 13 | # Same as above, but with f-strings
 14 14 | f'This is a \'string\''  # Q003
@@ -106,7 +101,6 @@ doubles_escaped.py:23:5: Q003 [*] Change outer quotes to avoid escaping inner qu
    |
    = help: Change outer quotes to avoid escaping inner quotes
 
-ℹ Safe fix
 20 20 | fR'This is a \'string\''
 21 21 | foo = (
 22 22 |     f'This is a'
@@ -115,5 +109,3 @@ doubles_escaped.py:23:5: Q003 [*] Change outer quotes to avoid escaping inner qu
 24 24 | )
 25 25 | 
 26 26 | # Nested f-strings (Python 3.12+)
-
-

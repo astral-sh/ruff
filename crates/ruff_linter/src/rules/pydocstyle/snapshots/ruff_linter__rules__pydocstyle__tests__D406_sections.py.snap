@@ -12,7 +12,6 @@ sections.py:32:5: D406 [*] Section name should end with a newline ("Returns")
    |
    = help: Add newline after "Returns"
 
-ℹ Safe fix
 29 29 | def superfluous_suffix():  # noqa: D416
 30 30 |     """Toggle the gizmo.
 31 31 | 
@@ -32,7 +31,6 @@ sections.py:227:5: D406 [*] Section name should end with a newline ("Raises")
     |
     = help: Add newline after "Raises"
 
-ℹ Safe fix
 224 224 |     Returns
 225 225 |     ------
 226 226 |     Many many wonderful things.
@@ -53,7 +51,6 @@ sections.py:590:5: D406 [*] Section name should end with a newline ("Parameters"
     |
     = help: Add newline after "Parameters"
 
-ℹ Safe fix
 587 587 | def test_lowercase_sub_section_header_should_be_valid(parameters: list[str], value: int):  # noqa: D213
 588 588 |     """Test that lower case subsection header is valid even if it has the same name as section kind.
 589 589 | 

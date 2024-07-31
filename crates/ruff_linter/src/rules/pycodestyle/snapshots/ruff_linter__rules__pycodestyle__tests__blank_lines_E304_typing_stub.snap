@@ -10,7 +10,6 @@ E30.pyi:32:5: E304 [*] Blank lines found after function decorator (1)
    |
    = help: Remove extraneous blank line(s)
 
-ℹ Safe fix
 28 28 |     def grouped2(): ...
 29 29 |     def grouped3( ): ...
 30 30 |     @decorated

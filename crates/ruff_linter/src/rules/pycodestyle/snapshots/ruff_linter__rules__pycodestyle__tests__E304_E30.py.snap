@@ -12,7 +12,6 @@ E30.py:765:1: E304 [*] Blank lines found after function decorator (1)
     |
     = help: Remove extraneous blank line(s)
 
-ℹ Safe fix
 761 761 | 
 762 762 | # E304
 763 763 | @decorator
@@ -31,7 +30,6 @@ E30.py:774:1: E304 [*] Blank lines found after function decorator (1)
     |
     = help: Remove extraneous blank line(s)
 
-ℹ Safe fix
 769 769 | 
 770 770 | # E304
 771 771 | @decorator
@@ -50,7 +48,6 @@ E30.py:786:1: E304 [*] Blank lines found after function decorator (2)
     |
     = help: Remove extraneous blank line(s)
 
-ℹ Safe fix
 778 778 | 
 779 779 | # E304
 780 780 | @decorator

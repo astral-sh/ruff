@@ -9,7 +9,6 @@ UP006_0.py:4:10: UP006 [*] Use `list` instead of `typing.List` for type annotati
   |
   = help: Replace with `list`
 
-ℹ Safe fix
 1 1 | import typing
 2 2 | 
 3 3 | 
@@ -27,7 +26,6 @@ UP006_0.py:11:10: UP006 [*] Use `list` instead of `List` for type annotation
    |
    = help: Replace with `list`
 
-ℹ Safe fix
 8  8  | from typing import List
 9  9  | 
 10 10 | 
@@ -45,7 +43,6 @@ UP006_0.py:18:10: UP006 [*] Use `list` instead of `t.List` for type annotation
    |
    = help: Replace with `list`
 
-ℹ Safe fix
 15 15 | import typing as t
 16 16 | 
 17 17 | 
@@ -63,7 +60,6 @@ UP006_0.py:25:10: UP006 [*] Use `list` instead of `IList` for type annotation
    |
    = help: Replace with `list`
 
-ℹ Safe fix
 22 22 | from typing import List as IList
 23 23 | 
 24 24 | 
@@ -81,7 +77,6 @@ UP006_0.py:29:11: UP006 [*] Use `list` instead of `List` for type annotation
    |
    = help: Replace with `list`
 
-ℹ Safe fix
 26 26 |     ...
 27 27 | 
 28 28 | 
@@ -99,7 +94,6 @@ UP006_0.py:33:12: UP006 [*] Use `list` instead of `List` for type annotation
    |
    = help: Replace with `list`
 
-ℹ Safe fix
 30 30 |     ...
 31 31 | 
 32 32 | 
@@ -117,7 +111,6 @@ UP006_0.py:37:11: UP006 [*] Use `list` instead of `List` for type annotation
    |
    = help: Replace with `list`
 
-ℹ Safe fix
 34 34 |     ...
 35 35 | 
 36 36 | 
@@ -135,7 +128,6 @@ UP006_0.py:41:13: UP006 [*] Use `list` instead of `List` for type annotation
    |
    = help: Replace with `list`
 
-ℹ Safe fix
 38 38 |     ...
 39 39 | 
 40 40 | 
@@ -161,7 +153,6 @@ UP006_0.py:49:11: UP006 [*] Use `list` instead of `List` for type annotation
    |
    = help: Replace with `list`
 
-ℹ Safe fix
 46 46 |     ...
 47 47 | 
 48 48 | 
@@ -179,7 +170,6 @@ UP006_0.py:49:17: UP006 [*] Use `list` instead of `List` for type annotation
    |
    = help: Replace with `list`
 
-ℹ Safe fix
 46 46 |     ...
 47 47 | 
 48 48 | 
@@ -197,7 +187,6 @@ UP006_0.py:53:11: UP006 [*] Use `list` instead of `List` for type annotation
    |
    = help: Replace with `list`
 
-ℹ Safe fix
 50 50 |     ...
 51 51 | 
 52 52 | 
@@ -239,7 +228,6 @@ UP006_0.py:61:10: UP006 [*] Use `collections.deque` instead of `typing.Deque` fo
    |
    = help: Replace with `collections.deque`
 
-ℹ Safe fix
 20 20 | 
 21 21 | 
 22 22 | from typing import List as IList
@@ -265,7 +253,6 @@ UP006_0.py:65:10: UP006 [*] Use `collections.defaultdict` instead of `typing.Def
    |
    = help: Replace with `collections.defaultdict`
 
-ℹ Safe fix
 20 20 | 
 21 21 | 
 22 22 | from typing import List as IList
@@ -280,5 +267,3 @@ UP006_0.py:65:10: UP006 [*] Use `collections.defaultdict` instead of `typing.Def
 65    |-def f(x: typing.DefaultDict[str, str]) -> None:
    66 |+def f(x: defaultdict[str, str]) -> None:
 66 67 |     ...
-
-

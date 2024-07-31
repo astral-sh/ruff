@@ -8,11 +8,3 @@ B006_extended.py:17:55: B006 [*] Do not use mutable data structures for argument
 18 |     ...
    |
    = help: Replace with `None`; initialize within function
-
-ℹ Unsafe fix
-14 14 |     ...
-15 15 | 
-16 16 | 
-17    |-def error_due_to_missing_import(foo: ImmutableTypeA = []):
-   17 |+def error_due_to_missing_import(foo: ImmutableTypeA = None):
-18 18 |     ...
