@@ -191,7 +191,7 @@ async def check(
     if exclude:
         ruff_args.extend(["--exclude", exclude])
     if show_fixes:
-        ruff_args.extend(["--show-fixes", "--ecosystem-ci"])
+        ruff_args.extend(["--show-fixes"])
 
     start = time.time()
     proc = await create_subprocess_exec(
