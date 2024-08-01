@@ -41,7 +41,7 @@ pub trait HasTy {
     fn ty<'db>(&self, model: &SemanticModel<'db>) -> Type<'db>;
 }
 
-impl HasTy for ast::ExpressionRef<'_> {
+impl HasTy for ast::ExpressionRef<'_, '_> {
     fn ty<'db>(&self, model: &SemanticModel<'db>) -> Type<'db> {
         let index = semantic_index(model.db, model.file);
         let file_scope = index.expression_scope_id(*self);
@@ -64,40 +64,40 @@ macro_rules! impl_expression_has_ty {
     };
 }
 
-impl_expression_has_ty!(ast::ExprBoolOp);
-impl_expression_has_ty!(ast::ExprNamed);
-impl_expression_has_ty!(ast::ExprBinOp);
-impl_expression_has_ty!(ast::ExprUnaryOp);
-impl_expression_has_ty!(ast::ExprLambda);
-impl_expression_has_ty!(ast::ExprIf);
-impl_expression_has_ty!(ast::ExprDict);
-impl_expression_has_ty!(ast::ExprSet);
-impl_expression_has_ty!(ast::ExprListComp);
-impl_expression_has_ty!(ast::ExprSetComp);
-impl_expression_has_ty!(ast::ExprDictComp);
-impl_expression_has_ty!(ast::ExprGenerator);
-impl_expression_has_ty!(ast::ExprAwait);
-impl_expression_has_ty!(ast::ExprYield);
-impl_expression_has_ty!(ast::ExprYieldFrom);
-impl_expression_has_ty!(ast::ExprCompare);
-impl_expression_has_ty!(ast::ExprCall);
-impl_expression_has_ty!(ast::ExprFString);
-impl_expression_has_ty!(ast::ExprStringLiteral);
-impl_expression_has_ty!(ast::ExprBytesLiteral);
-impl_expression_has_ty!(ast::ExprNumberLiteral);
+impl_expression_has_ty!(ast::ExprBoolOp<'_>);
+impl_expression_has_ty!(ast::ExprNamed<'_>);
+impl_expression_has_ty!(ast::ExprBinOp<'_>);
+impl_expression_has_ty!(ast::ExprUnaryOp<'_>);
+impl_expression_has_ty!(ast::ExprLambda<'_>);
+impl_expression_has_ty!(ast::ExprIf<'_>);
+impl_expression_has_ty!(ast::ExprDict<'_>);
+impl_expression_has_ty!(ast::ExprSet<'_>);
+impl_expression_has_ty!(ast::ExprListComp<'_>);
+impl_expression_has_ty!(ast::ExprSetComp<'_>);
+impl_expression_has_ty!(ast::ExprDictComp<'_>);
+impl_expression_has_ty!(ast::ExprGenerator<'_>);
+impl_expression_has_ty!(ast::ExprAwait<'_>);
+impl_expression_has_ty!(ast::ExprYield<'_>);
+impl_expression_has_ty!(ast::ExprYieldFrom<'_>);
+impl_expression_has_ty!(ast::ExprCompare<'_>);
+impl_expression_has_ty!(ast::ExprCall<'_>);
+impl_expression_has_ty!(ast::ExprFString<'_>);
+impl_expression_has_ty!(ast::ExprStringLiteral<'_>);
+impl_expression_has_ty!(ast::ExprBytesLiteral<'_>);
+impl_expression_has_ty!(ast::ExprNumberLiteral<'_>);
 impl_expression_has_ty!(ast::ExprBooleanLiteral);
 impl_expression_has_ty!(ast::ExprNoneLiteral);
 impl_expression_has_ty!(ast::ExprEllipsisLiteral);
-impl_expression_has_ty!(ast::ExprAttribute);
-impl_expression_has_ty!(ast::ExprSubscript);
-impl_expression_has_ty!(ast::ExprStarred);
-impl_expression_has_ty!(ast::ExprName);
-impl_expression_has_ty!(ast::ExprList);
-impl_expression_has_ty!(ast::ExprTuple);
-impl_expression_has_ty!(ast::ExprSlice);
-impl_expression_has_ty!(ast::ExprIpyEscapeCommand);
+impl_expression_has_ty!(ast::ExprAttribute<'_>);
+impl_expression_has_ty!(ast::ExprSubscript<'_>);
+impl_expression_has_ty!(ast::ExprStarred<'_>);
+impl_expression_has_ty!(ast::ExprName<'_>);
+impl_expression_has_ty!(ast::ExprList<'_>);
+impl_expression_has_ty!(ast::ExprTuple<'_>);
+impl_expression_has_ty!(ast::ExprSlice<'_>);
+impl_expression_has_ty!(ast::ExprIpyEscapeCommand<'_>);
 
-impl HasTy for ast::Expr {
+impl HasTy for ast::Expr<'_> {
     fn ty<'db>(&self, model: &SemanticModel<'db>) -> Type<'db> {
         match self {
             Expr::BoolOp(inner) => inner.ty(model),
@@ -136,7 +136,7 @@ impl HasTy for ast::Expr {
     }
 }
 
-impl HasTy for ast::StmtFunctionDef {
+impl HasTy for ast::StmtFunctionDef<'_> {
     fn ty<'db>(&self, model: &SemanticModel<'db>) -> Type<'db> {
         let index = semantic_index(model.db, model.file);
         let definition = index.definition(self);
@@ -144,7 +144,7 @@ impl HasTy for ast::StmtFunctionDef {
     }
 }
 
-impl HasTy for StmtClassDef {
+impl HasTy for StmtClassDef<'_> {
     fn ty<'db>(&self, model: &SemanticModel<'db>) -> Type<'db> {
         let index = semantic_index(model.db, model.file);
         let definition = index.definition(self);
@@ -152,7 +152,7 @@ impl HasTy for StmtClassDef {
     }
 }
 
-impl HasTy for ast::Alias {
+impl HasTy for ast::Alias<'_> {
     fn ty<'db>(&self, model: &SemanticModel<'db>) -> Type<'db> {
         let index = semantic_index(model.db, model.file);
         let definition = index.definition(self);

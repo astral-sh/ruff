@@ -13,7 +13,6 @@ use ruff_db::parsed::ParsedModule;
 ///
 /// ## Equality
 /// Two `AstNodeRef` are considered equal if their wrapped nodes are equal.
-#[derive(Clone)]
 pub struct AstNodeRef<T> {
     /// Owned reference to the node's [`ParsedModule`].
     ///
@@ -47,6 +46,15 @@ impl<T> AstNodeRef<T> {
         // SAFETY: Holding on to `parsed` ensures that the AST to which `node` belongs is still
         // alive and not moved.
         unsafe { self.node.as_ref() }
+    }
+}
+
+impl<T> Clone for AstNodeRef<T> {
+    fn clone(&self) -> Self {
+        Self {
+            _parsed: self._parsed.clone(),
+            node: self.node,
+        }
     }
 }
 

@@ -258,7 +258,10 @@ pub fn any_over_expr<'ast>(expr: &Expr<'ast>, func: &dyn Fn(&Expr<'ast>) -> bool
     }
 }
 
-pub fn any_over_type_param(type_param: &TypeParam, func: &dyn Fn(&Expr) -> bool) -> bool {
+pub fn any_over_type_param<'ast>(
+    type_param: &TypeParam<'ast>,
+    func: &dyn Fn(&Expr<'ast>) -> bool,
+) -> bool {
     match type_param {
         TypeParam::TypeVar(ast::TypeParamTypeVar { bound, default, .. }) => {
             bound
@@ -277,7 +280,7 @@ pub fn any_over_type_param(type_param: &TypeParam, func: &dyn Fn(&Expr) -> bool)
     }
 }
 
-pub fn any_over_pattern(pattern: &Pattern, func: &dyn Fn(&Expr) -> bool) -> bool {
+pub fn any_over_pattern<'ast>(pattern: &Pattern<'ast>, func: &dyn Fn(&Expr<'ast>) -> bool) -> bool {
     match pattern {
         Pattern::MatchValue(ast::PatternMatchValue { value, range: _ }) => {
             any_over_expr(value, func)
@@ -334,7 +337,7 @@ pub fn any_over_f_string_element<'ast>(
     }
 }
 
-pub fn any_over_stmt(stmt: &Stmt, func: &dyn Fn(&Expr) -> bool) -> bool {
+pub fn any_over_stmt<'ast>(stmt: &Stmt<'ast>, func: &dyn Fn(&Expr<'ast>) -> bool) -> bool {
     match stmt {
         Stmt::FunctionDef(ast::StmtFunctionDef {
             parameters,
@@ -538,7 +541,7 @@ pub fn any_over_stmt(stmt: &Stmt, func: &dyn Fn(&Expr) -> bool) -> bool {
     }
 }
 
-pub fn any_over_body(body: &[Stmt], func: &dyn Fn(&Expr) -> bool) -> bool {
+pub fn any_over_body<'ast>(body: &[Stmt<'ast>], func: &dyn Fn(&Expr<'ast>) -> bool) -> bool {
     body.iter().any(|stmt| any_over_stmt(stmt, func))
 }
 
@@ -1550,18 +1553,19 @@ pub fn comment_indentation_after(
 
 #[cfg(test)]
 mod tests {
-    use std::borrow::Cow;
-    use std::cell::RefCell;
-    use std::vec;
-
-    use ruff_text_size::TextRange;
-
     use crate::helpers::{any_over_stmt, any_over_type_param, resolve_imported_module_path};
     use crate::{
         Expr, ExprContext, ExprName, ExprNumberLiteral, Identifier, Int, Number, Stmt,
         StmtTypeAlias, TypeParam, TypeParamParamSpec, TypeParamTypeVar, TypeParamTypeVarTuple,
         TypeParams,
     };
+    use itertools::all;
+    use ruff_allocator::CloneIn;
+    use ruff_text_size::TextRange;
+    use std::alloc::alloc;
+    use std::borrow::Cow;
+    use std::cell::RefCell;
+    use std::vec;
 
     #[test]
     fn resolve_import() {
@@ -1599,6 +1603,7 @@ mod tests {
 
     #[test]
     fn any_over_stmt_type_alias() {
+        let allocator = ruff_allocator::Allocator::new();
         let seen = RefCell::new(Vec::new());
         let name = Expr::Name(ExprName {
             id: "x".into(),
@@ -1619,27 +1624,33 @@ mod tests {
         });
         let type_var_one = TypeParam::TypeVar(TypeParamTypeVar {
             range: TextRange::default(),
-            bound: Some(Box::new(constant_one.clone())),
+            bound: Some(ruff_allocator::Box::new_in(
+                constant_one.clone_in(&allocator),
+                &allocator,
+            )),
             default: None,
             name: Identifier::new("x", TextRange::default()),
         });
         let type_var_two = TypeParam::TypeVar(TypeParamTypeVar {
             range: TextRange::default(),
             bound: None,
-            default: Some(Box::new(constant_two.clone())),
+            default: Some(ruff_allocator::Box::new_in(
+                constant_two.clone_in(&allocator),
+                &allocator,
+            )),
             name: Identifier::new("x", TextRange::default()),
         });
         let type_alias = Stmt::TypeAlias(StmtTypeAlias {
-            name: Box::new(name.clone()),
+            name: ruff_allocator::Box::new_in(name.clone_in(&allocator), &allocator),
             type_params: Some(TypeParams {
                 type_params: vec![type_var_one, type_var_two],
                 range: TextRange::default(),
             }),
-            value: Box::new(constant_three.clone()),
+            value: ruff_allocator::Box::new_in(constant_three.clone_in(&allocator), &allocator),
             range: TextRange::default(),
         });
         assert!(!any_over_stmt(&type_alias, &|expr| {
-            seen.borrow_mut().push(expr.clone());
+            seen.borrow_mut().push(expr.clone_in(&allocator));
             false
         }));
         assert_eq!(
@@ -1650,6 +1661,8 @@ mod tests {
 
     #[test]
     fn any_over_type_param_type_var() {
+        let allocator = ruff_allocator::Allocator::new();
+
         let type_var_no_bound = TypeParam::TypeVar(TypeParamTypeVar {
             range: TextRange::default(),
             bound: None,
@@ -1665,7 +1678,10 @@ mod tests {
 
         let type_var_with_bound = TypeParam::TypeVar(TypeParamTypeVar {
             range: TextRange::default(),
-            bound: Some(Box::new(constant.clone())),
+            bound: Some(ruff_allocator::Box::new_in(
+                constant.clone_in(&allocator),
+                &allocator,
+            )),
             default: None,
             name: Identifier::new("x", TextRange::default()),
         });
@@ -1682,7 +1698,10 @@ mod tests {
 
         let type_var_with_default = TypeParam::TypeVar(TypeParamTypeVar {
             range: TextRange::default(),
-            default: Some(Box::new(constant.clone())),
+            default: Some(ruff_allocator::Box::new_in(
+                constant.clone_in(&allocator),
+                &allocator,
+            )),
             bound: None,
             name: Identifier::new("x", TextRange::default()),
         });
@@ -1700,6 +1719,8 @@ mod tests {
 
     #[test]
     fn any_over_type_param_type_var_tuple() {
+        let allocator = ruff_allocator::Allocator::new();
+
         let type_var_tuple = TypeParam::TypeVarTuple(TypeParamTypeVarTuple {
             range: TextRange::default(),
             name: Identifier::new("x", TextRange::default()),
@@ -1717,7 +1738,10 @@ mod tests {
 
         let type_var_tuple_with_default = TypeParam::TypeVarTuple(TypeParamTypeVarTuple {
             range: TextRange::default(),
-            default: Some(Box::new(constant.clone())),
+            default: Some(ruff_allocator::Box::new_in(
+                constant.clone_in(&allocator),
+                &allocator,
+            )),
             name: Identifier::new("x", TextRange::default()),
         });
         assert!(
@@ -1734,6 +1758,7 @@ mod tests {
 
     #[test]
     fn any_over_type_param_param_spec() {
+        let allocator = ruff_allocator::Allocator::new();
         let type_param_spec = TypeParam::ParamSpec(TypeParamParamSpec {
             range: TextRange::default(),
             name: Identifier::new("x", TextRange::default()),
@@ -1751,7 +1776,10 @@ mod tests {
 
         let param_spec_with_default = TypeParam::TypeVarTuple(TypeParamTypeVarTuple {
             range: TextRange::default(),
-            default: Some(Box::new(constant.clone())),
+            default: Some(ruff_allocator::Box::new_in(
+                constant.clone_in(&allocator),
+                &allocator,
+            )),
             name: Identifier::new("x", TextRange::default()),
         });
         assert!(

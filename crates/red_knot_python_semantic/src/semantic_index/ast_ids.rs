@@ -58,7 +58,7 @@ pub trait HasScopedUseId {
 #[newtype_index]
 pub struct ScopedUseId;
 
-impl HasScopedUseId for ast::ExprName {
+impl HasScopedUseId for ast::ExprName<'_> {
     type Id = ScopedUseId;
 
     fn scoped_use_id(&self, db: &dyn Db, scope: ScopeId) -> Self::Id {
@@ -67,7 +67,7 @@ impl HasScopedUseId for ast::ExprName {
     }
 }
 
-impl HasScopedUseId for ast::ExpressionRef<'_> {
+impl HasScopedUseId for ast::ExpressionRef<'_, '_> {
     type Id = ScopedUseId;
 
     fn scoped_use_id(&self, db: &dyn Db, scope: ScopeId) -> Self::Id {
@@ -101,41 +101,41 @@ macro_rules! impl_has_scoped_expression_id {
     };
 }
 
-impl_has_scoped_expression_id!(ast::ExprBoolOp);
-impl_has_scoped_expression_id!(ast::ExprName);
-impl_has_scoped_expression_id!(ast::ExprBinOp);
-impl_has_scoped_expression_id!(ast::ExprUnaryOp);
-impl_has_scoped_expression_id!(ast::ExprLambda);
-impl_has_scoped_expression_id!(ast::ExprIf);
-impl_has_scoped_expression_id!(ast::ExprDict);
-impl_has_scoped_expression_id!(ast::ExprSet);
-impl_has_scoped_expression_id!(ast::ExprListComp);
-impl_has_scoped_expression_id!(ast::ExprSetComp);
-impl_has_scoped_expression_id!(ast::ExprDictComp);
-impl_has_scoped_expression_id!(ast::ExprGenerator);
-impl_has_scoped_expression_id!(ast::ExprAwait);
-impl_has_scoped_expression_id!(ast::ExprYield);
-impl_has_scoped_expression_id!(ast::ExprYieldFrom);
-impl_has_scoped_expression_id!(ast::ExprCompare);
-impl_has_scoped_expression_id!(ast::ExprCall);
-impl_has_scoped_expression_id!(ast::ExprFString);
-impl_has_scoped_expression_id!(ast::ExprStringLiteral);
-impl_has_scoped_expression_id!(ast::ExprBytesLiteral);
-impl_has_scoped_expression_id!(ast::ExprNumberLiteral);
+impl_has_scoped_expression_id!(ast::ExprBoolOp<'_>);
+impl_has_scoped_expression_id!(ast::ExprName<'_>);
+impl_has_scoped_expression_id!(ast::ExprBinOp<'_>);
+impl_has_scoped_expression_id!(ast::ExprUnaryOp<'_>);
+impl_has_scoped_expression_id!(ast::ExprLambda<'_>);
+impl_has_scoped_expression_id!(ast::ExprIf<'_>);
+impl_has_scoped_expression_id!(ast::ExprDict<'_>);
+impl_has_scoped_expression_id!(ast::ExprSet<'_>);
+impl_has_scoped_expression_id!(ast::ExprListComp<'_>);
+impl_has_scoped_expression_id!(ast::ExprSetComp<'_>);
+impl_has_scoped_expression_id!(ast::ExprDictComp<'_>);
+impl_has_scoped_expression_id!(ast::ExprGenerator<'_>);
+impl_has_scoped_expression_id!(ast::ExprAwait<'_>);
+impl_has_scoped_expression_id!(ast::ExprYield<'_>);
+impl_has_scoped_expression_id!(ast::ExprYieldFrom<'_>);
+impl_has_scoped_expression_id!(ast::ExprCompare<'_>);
+impl_has_scoped_expression_id!(ast::ExprCall<'_>);
+impl_has_scoped_expression_id!(ast::ExprFString<'_>);
+impl_has_scoped_expression_id!(ast::ExprStringLiteral<'_>);
+impl_has_scoped_expression_id!(ast::ExprBytesLiteral<'_>);
+impl_has_scoped_expression_id!(ast::ExprNumberLiteral<'_>);
 impl_has_scoped_expression_id!(ast::ExprBooleanLiteral);
 impl_has_scoped_expression_id!(ast::ExprNoneLiteral);
 impl_has_scoped_expression_id!(ast::ExprEllipsisLiteral);
-impl_has_scoped_expression_id!(ast::ExprAttribute);
-impl_has_scoped_expression_id!(ast::ExprSubscript);
-impl_has_scoped_expression_id!(ast::ExprStarred);
-impl_has_scoped_expression_id!(ast::ExprNamed);
-impl_has_scoped_expression_id!(ast::ExprList);
-impl_has_scoped_expression_id!(ast::ExprTuple);
-impl_has_scoped_expression_id!(ast::ExprSlice);
-impl_has_scoped_expression_id!(ast::ExprIpyEscapeCommand);
-impl_has_scoped_expression_id!(ast::Expr);
+impl_has_scoped_expression_id!(ast::ExprAttribute<'_>);
+impl_has_scoped_expression_id!(ast::ExprSubscript<'_>);
+impl_has_scoped_expression_id!(ast::ExprStarred<'_>);
+impl_has_scoped_expression_id!(ast::ExprNamed<'_>);
+impl_has_scoped_expression_id!(ast::ExprList<'_>);
+impl_has_scoped_expression_id!(ast::ExprTuple<'_>);
+impl_has_scoped_expression_id!(ast::ExprSlice<'_>);
+impl_has_scoped_expression_id!(ast::ExprIpyEscapeCommand<'_>);
+impl_has_scoped_expression_id!(ast::Expr<'_>);
 
-impl HasScopedAstId for ast::ExpressionRef<'_> {
+impl HasScopedAstId for ast::ExpressionRef<'_, '_> {
     type Id = ScopedExpressionId;
 
     fn scoped_ast_id(&self, db: &dyn Db, scope: ScopeId) -> Self::Id {
@@ -196,13 +196,13 @@ pub(crate) mod node_key {
     #[derive(Copy, Clone, Eq, PartialEq, Hash, Debug)]
     pub(crate) struct ExpressionNodeKey(NodeKey);
 
-    impl From<ast::ExpressionRef<'_>> for ExpressionNodeKey {
-        fn from(value: ast::ExpressionRef<'_>) -> Self {
+    impl From<ast::ExpressionRef<'_, '_>> for ExpressionNodeKey {
+        fn from(value: ast::ExpressionRef<'_, '_>) -> Self {
             Self(NodeKey::from_node(value))
         }
     }
 
-    impl From<&ast::Expr> for ExpressionNodeKey {
+    impl From<&ast::Expr<'_>> for ExpressionNodeKey {
         fn from(value: &ast::Expr) -> Self {
             Self(NodeKey::from_node(value))
         }

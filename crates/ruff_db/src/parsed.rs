@@ -1,5 +1,4 @@
 use std::fmt::Formatter;
-use std::ops::Deref;
 use std::sync::Arc;
 
 use ruff_python_ast::{ModModule, PySourceType};
@@ -20,7 +19,7 @@ use crate::Db;
 /// reflected in the changed AST offsets.
 /// The other reason is that Ruff's AST doesn't implement `Eq` which Sala requires
 /// for determining if a query result is unchanged.
-#[salsa::tracked(return_ref, no_eq)]
+#[salsa::tracked(no_eq, return_ref)]
 pub fn parsed_module(db: &dyn Db, file: File) -> ParsedModule {
     let _span = tracing::trace_span!("parse_module", file = ?file.path(db)).entered();
 
@@ -37,39 +36,48 @@ pub fn parsed_module(db: &dyn Db, file: File) -> ParsedModule {
             .map_or(PySourceType::Python, PySourceType::from_extension),
     };
 
-    ParsedModule::new(parse_unchecked_source(&source, ty))
+    ParsedModule::parse(&source, ty)
 }
 
 /// Cheap cloneable wrapper around the parsed module.
 #[derive(Clone)]
 pub struct ParsedModule {
-    inner: Arc<Parsed<ModModule>>,
+    inner: Arc<ParsedInner>,
+}
+
+struct ParsedInner {
+    parsed: Parsed<ModModule<'static>>,
+
+    // It's important that allocator comes **after** parsed
+    // so that it gets dropped **after** parsed.
+    allocator: Box<std::sync::Mutex<ruff_allocator::Allocator>>,
 }
 
 impl ParsedModule {
-    pub fn new(parsed: Parsed<ModModule>) -> Self {
+    pub fn parse(source: &str, ty: PySourceType) -> Self {
+        let allocator = Box::new(std::sync::Mutex::new(ruff_allocator::Allocator::new()));
+
+        let parsed: Parsed<ModModule<'static>> = {
+            let allocator = allocator.lock().unwrap();
+            let parsed = parse_unchecked_source(&source, ty, &allocator);
+            unsafe { std::mem::transmute(parsed) }
+        };
+
         Self {
-            inner: Arc::new(parsed),
+            inner: Arc::new(ParsedInner { parsed, allocator }),
         }
     }
 
-    /// Consumes `self` and returns the Arc storing the parsed module.
-    pub fn into_arc(self) -> Arc<Parsed<ModModule>> {
-        self.inner
-    }
-}
-
-impl Deref for ParsedModule {
-    type Target = Parsed<ModModule>;
-
-    fn deref(&self) -> &Self::Target {
-        &self.inner
+    pub fn parsed<'a>(&'a self) -> &'a Parsed<ModModule<'a>> {
+        unsafe { std::mem::transmute(&self.inner.parsed) }
     }
 }
 
 impl std::fmt::Debug for ParsedModule {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        f.debug_tuple("ParsedModule").field(&self.inner).finish()
+        f.debug_tuple("ParsedModule")
+            .field(&self.inner.parsed)
+            .finish()
     }
 }
 

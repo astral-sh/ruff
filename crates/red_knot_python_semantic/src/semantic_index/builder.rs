@@ -32,7 +32,7 @@ pub(super) struct SemanticIndexBuilder<'db> {
     module: &'db ParsedModule,
     scope_stack: Vec<FileScopeId>,
     /// The assignment we're currently visiting.
-    current_assignment: Option<CurrentAssignment<'db>>,
+    current_assignment: Option<CurrentAssignment<'db, 'db>>,
     /// Flow states at each `break` in the current loop.
     loop_break_states: Vec<FlowSnapshot>,
 
@@ -82,12 +82,16 @@ impl<'db> SemanticIndexBuilder<'db> {
             .expect("Always to have a root scope")
     }
 
-    fn push_scope(&mut self, node: NodeWithScopeRef) {
+    fn push_scope(&mut self, node: NodeWithScopeRef<'_, 'db>) {
         let parent = self.current_scope();
         self.push_scope_with_parent(node, Some(parent));
     }
 
-    fn push_scope_with_parent(&mut self, node: NodeWithScopeRef, parent: Option<FileScopeId>) {
+    fn push_scope_with_parent(
+        &mut self,
+        node: NodeWithScopeRef<'_, 'db>,
+        parent: Option<FileScopeId>,
+    ) {
         let children_start = self.scopes.next_index() + 1;
 
         let scope = Scope {
@@ -172,8 +176,11 @@ impl<'db> SemanticIndexBuilder<'db> {
     fn add_definition<'a>(
         &mut self,
         symbol: ScopedSymbolId,
-        definition_node: impl Into<DefinitionNodeRef<'a>>,
-    ) -> Definition<'db> {
+        definition_node: impl Into<DefinitionNodeRef<'a, 'db>>,
+    ) -> Definition<'db>
+    where
+        'db: 'a,
+    {
         let definition_node = definition_node.into();
         let definition = Definition::new(
             self.db,
@@ -197,7 +204,7 @@ impl<'db> SemanticIndexBuilder<'db> {
 
     /// Record an expression that needs to be a Salsa ingredient, because we need to infer its type
     /// standalone (type narrowing tests, RHS of an assignment.)
-    fn add_standalone_expression(&mut self, expression_node: &ast::Expr) {
+    fn add_standalone_expression(&mut self, expression_node: &ast::Expr<'db>) {
         let expression = Expression::new(
             self.db,
             self.file,
@@ -214,8 +221,8 @@ impl<'db> SemanticIndexBuilder<'db> {
 
     fn with_type_params(
         &mut self,
-        with_scope: NodeWithScopeRef,
-        type_params: Option<&'db ast::TypeParams>,
+        with_scope: NodeWithScopeRef<'_, 'db>,
+        type_params: Option<&'db ast::TypeParams<'db>>,
         nested: impl FnOnce(&mut Self) -> FileScopeId,
     ) -> FileScopeId {
         if let Some(type_params) = type_params {
@@ -239,7 +246,7 @@ impl<'db> SemanticIndexBuilder<'db> {
                     }) => (name, &None, default),
                 };
                 // TODO create Definition for typevars
-                self.add_or_update_symbol(name.id.clone(), SymbolFlags::IS_DEFINED);
+                self.add_or_update_symbol(Name::new(name.id), SymbolFlags::IS_DEFINED);
                 if let Some(bound) = bound {
                     self.visit_expr(bound);
                 }
@@ -259,7 +266,7 @@ impl<'db> SemanticIndexBuilder<'db> {
     }
 
     pub(super) fn build(mut self) -> SemanticIndex<'db> {
-        let module = self.module;
+        let module = self.module.parsed();
         self.visit_body(module.suite());
 
         // Pop the root scope
@@ -310,11 +317,8 @@ impl<'db> SemanticIndexBuilder<'db> {
     }
 }
 
-impl<'db, 'ast> Visitor<'ast> for SemanticIndexBuilder<'db>
-where
-    'ast: 'db,
-{
-    fn visit_stmt(&mut self, stmt: &'ast ast::Stmt) {
+impl<'db> Visitor<'db, 'db> for SemanticIndexBuilder<'db> {
+    fn visit_stmt(&mut self, stmt: &'db ast::Stmt<'db>) {
         match stmt {
             ast::Stmt::FunctionDef(function_def) => {
                 for decorator in &function_def.decorator_list {
@@ -322,7 +326,7 @@ where
                 }
 
                 let symbol = self
-                    .add_or_update_symbol(function_def.name.id.clone(), SymbolFlags::IS_DEFINED);
+                    .add_or_update_symbol(Name::new(function_def.name.id), SymbolFlags::IS_DEFINED);
                 self.add_definition(symbol, function_def);
 
                 self.with_type_params(
@@ -346,7 +350,7 @@ where
                 }
 
                 let symbol =
-                    self.add_or_update_symbol(class.name.id.clone(), SymbolFlags::IS_DEFINED);
+                    self.add_or_update_symbol(Name::new(class.name.id), SymbolFlags::IS_DEFINED);
                 self.add_definition(symbol, class);
 
                 self.with_type_params(
@@ -367,7 +371,7 @@ where
             ast::Stmt::Import(node) => {
                 for alias in &node.names {
                     let symbol_name = if let Some(asname) = &alias.asname {
-                        asname.id.clone()
+                        Name::new(asname.id)
                     } else {
                         Name::new(alias.name.id.split('.').next().unwrap())
                     };
@@ -385,7 +389,7 @@ where
                     };
 
                     let symbol =
-                        self.add_or_update_symbol(symbol_name.clone(), SymbolFlags::IS_DEFINED);
+                        self.add_or_update_symbol(Name::new(symbol_name), SymbolFlags::IS_DEFINED);
                     self.add_definition(symbol, ImportFromDefinitionNodeRef { node, alias_index });
                 }
             }
@@ -470,7 +474,7 @@ where
         }
     }
 
-    fn visit_expr(&mut self, expr: &'ast ast::Expr) {
+    fn visit_expr(&mut self, expr: &'db ast::Expr<'db>) {
         self.scopes_by_expression
             .insert(expr.into(), self.current_scope());
         self.current_ast_ids().record_expression(expr);
@@ -484,7 +488,7 @@ where
                     ast::ExprContext::Del => SymbolFlags::IS_DEFINED,
                     ast::ExprContext::Invalid => SymbolFlags::empty(),
                 };
-                let symbol = self.add_or_update_symbol(id.clone(), flags);
+                let symbol = self.add_or_update_symbol(Name::new(id), flags);
                 if flags.contains(SymbolFlags::IS_DEFINED) {
                     match self.current_assignment {
                         Some(CurrentAssignment::Assign(assignment)) => {
@@ -551,26 +555,26 @@ where
 }
 
 #[derive(Copy, Clone, Debug)]
-enum CurrentAssignment<'a> {
-    Assign(&'a ast::StmtAssign),
-    AnnAssign(&'a ast::StmtAnnAssign),
-    Named(&'a ast::ExprNamed),
+enum CurrentAssignment<'a, 'ast> {
+    Assign(&'a ast::StmtAssign<'ast>),
+    AnnAssign(&'a ast::StmtAnnAssign<'ast>),
+    Named(&'a ast::ExprNamed<'ast>),
 }
 
-impl<'a> From<&'a ast::StmtAssign> for CurrentAssignment<'a> {
-    fn from(value: &'a ast::StmtAssign) -> Self {
+impl<'a, 'ast> From<&'a ast::StmtAssign<'ast>> for CurrentAssignment<'a, 'ast> {
+    fn from(value: &'a ast::StmtAssign<'ast>) -> Self {
         Self::Assign(value)
     }
 }
 
-impl<'a> From<&'a ast::StmtAnnAssign> for CurrentAssignment<'a> {
-    fn from(value: &'a ast::StmtAnnAssign) -> Self {
+impl<'a, 'ast> From<&'a ast::StmtAnnAssign<'ast>> for CurrentAssignment<'a, 'ast> {
+    fn from(value: &'a ast::StmtAnnAssign<'ast>) -> Self {
         Self::AnnAssign(value)
     }
 }
 
-impl<'a> From<&'a ast::ExprNamed> for CurrentAssignment<'a> {
-    fn from(value: &'a ast::ExprNamed) -> Self {
+impl<'a, 'ast> From<&'a ast::ExprNamed<'ast>> for CurrentAssignment<'a, 'ast> {
+    fn from(value: &'a ast::ExprNamed<'ast>) -> Self {
         Self::Named(value)
     }
 }

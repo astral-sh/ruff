@@ -99,7 +99,7 @@ pub struct ScopeId<'db> {
     /// The node that introduces this scope.
     #[no_eq]
     #[return_ref]
-    pub node: NodeWithScopeKind,
+    pub node: NodeWithScopeKind<'db>,
 
     #[no_eq]
     count: countme::Count<ScopeId<'static>>,
@@ -293,22 +293,22 @@ impl SymbolTableBuilder {
 
 /// Reference to a node that introduces a new scope.
 #[derive(Copy, Clone, Debug)]
-pub(crate) enum NodeWithScopeRef<'a> {
+pub(crate) enum NodeWithScopeRef<'a, 'ast> {
     Module,
-    Class(&'a ast::StmtClassDef),
-    Function(&'a ast::StmtFunctionDef),
-    Lambda(&'a ast::ExprLambda),
-    FunctionTypeParameters(&'a ast::StmtFunctionDef),
-    ClassTypeParameters(&'a ast::StmtClassDef),
+    Class(&'a ast::StmtClassDef<'ast>),
+    Function(&'a ast::StmtFunctionDef<'ast>),
+    Lambda(&'a ast::ExprLambda<'ast>),
+    FunctionTypeParameters(&'a ast::StmtFunctionDef<'ast>),
+    ClassTypeParameters(&'a ast::StmtClassDef<'ast>),
 }
 
-impl NodeWithScopeRef<'_> {
+impl<'ast> NodeWithScopeRef<'_, 'ast> {
     /// Converts the unowned reference to an owned [`NodeWithScopeKind`].
     ///
     /// # Safety
     /// The node wrapped by `self` must be a child of `module`.
     #[allow(unsafe_code)]
-    pub(super) unsafe fn to_kind(self, module: ParsedModule) -> NodeWithScopeKind {
+    pub(super) unsafe fn to_kind(self, module: ParsedModule) -> NodeWithScopeKind<'ast> {
         match self {
             NodeWithScopeRef::Module => NodeWithScopeKind::Module,
             NodeWithScopeRef::Class(class) => {
@@ -362,13 +362,13 @@ impl NodeWithScopeRef<'_> {
 
 /// Node that introduces a new scope.
 #[derive(Clone, Debug)]
-pub enum NodeWithScopeKind {
+pub enum NodeWithScopeKind<'ast> {
     Module,
-    Class(AstNodeRef<ast::StmtClassDef>),
-    ClassTypeParameters(AstNodeRef<ast::StmtClassDef>),
-    Function(AstNodeRef<ast::StmtFunctionDef>),
-    FunctionTypeParameters(AstNodeRef<ast::StmtFunctionDef>),
-    Lambda(AstNodeRef<ast::ExprLambda>),
+    Class(AstNodeRef<ast::StmtClassDef<'ast>>),
+    ClassTypeParameters(AstNodeRef<ast::StmtClassDef<'ast>>),
+    Function(AstNodeRef<ast::StmtFunctionDef<'ast>>),
+    FunctionTypeParameters(AstNodeRef<ast::StmtFunctionDef<'ast>>),
+    Lambda(AstNodeRef<ast::ExprLambda<'ast>>),
 }
 
 #[derive(Copy, Clone, Debug, Eq, PartialEq, Hash)]

@@ -38,7 +38,7 @@ pub(crate) fn lint_syntax(db: &dyn Db, file_id: File) -> Diagnostics {
     let source = source_text(db.upcast(), file_id);
     lint_lines(&source, &mut diagnostics);
 
-    let parsed = parsed_module(db.upcast(), file_id);
+    let parsed = parsed_module(db.upcast(), file_id).parsed();
 
     if parsed.errors().is_empty() {
         let ast = parsed.syntax();
@@ -82,7 +82,7 @@ pub fn lint_semantic(db: &dyn Db, file_id: File) -> Diagnostics {
     let parsed = parsed_module(db.upcast(), file_id);
     let semantic = SemanticModel::new(db.upcast(), file_id);
 
-    if !parsed.is_valid() {
+    if !parsed.parsed().is_valid() {
         return Diagnostics::Empty;
     }
 
@@ -93,7 +93,7 @@ pub fn lint_semantic(db: &dyn Db, file_id: File) -> Diagnostics {
         diagnostics: RefCell::new(Vec::new()),
     };
 
-    SemanticVisitor { context: &context }.visit_body(parsed.suite());
+    SemanticVisitor { context: &context }.visit_body(parsed.parsed().suite());
 
     Diagnostics::from(context.diagnostics.take())
 }
@@ -201,7 +201,7 @@ impl<'db> SemanticLintContext<'db> {
 
     #[allow(unused)]
     pub(crate) fn ast(&self) -> &'db ast::ModModule {
-        self.parsed.syntax()
+        self.parsed.parsed().syntax()
     }
 
     pub(crate) fn push_diagnostic(&self, diagnostic: String) {
@@ -220,7 +220,7 @@ struct SyntaxLintVisitor<'a> {
     source: &'a str,
 }
 
-impl Visitor<'_> for SyntaxLintVisitor<'_> {
+impl Visitor<'_, '_> for SyntaxLintVisitor<'_> {
     fn visit_string_literal(&mut self, string_literal: &'_ ast::StringLiteral) {
         // A very naive implementation of use double quotes
         let text = &self.source[string_literal.range];
@@ -236,7 +236,7 @@ struct SemanticVisitor<'a> {
     context: &'a SemanticLintContext<'a>,
 }
 
-impl Visitor<'_> for SemanticVisitor<'_> {
+impl Visitor<'_, '_> for SemanticVisitor<'_> {
     fn visit_stmt(&mut self, stmt: &ast::Stmt) {
         match stmt {
             ast::Stmt::ClassDef(class) => {
@@ -299,9 +299,9 @@ impl From<Vec<String>> for Diagnostics {
 }
 
 #[derive(Copy, Clone, Debug)]
-enum AnyImportRef<'a> {
-    Import(&'a ast::StmtImport),
-    ImportFrom(&'a ast::StmtImportFrom),
+enum AnyImportRef<'a, 'ast> {
+    Import(&'a ast::StmtImport<'ast>),
+    ImportFrom(&'a ast::StmtImportFrom<'ast>),
 }
 
 #[cfg(test)]

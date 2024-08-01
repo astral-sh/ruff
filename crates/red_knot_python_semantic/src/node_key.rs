@@ -11,9 +11,10 @@ pub(super) struct NodeKey {
 }
 
 impl NodeKey {
-    pub(super) fn from_node<'a, N>(node: N) -> Self
+    pub(super) fn from_node<'a, 'ast, N>(node: N) -> Self
     where
-        N: Into<AnyNodeRef<'a>>,
+        N: Into<AnyNodeRef<'a, 'ast>>,
+        'ast: 'a,
     {
         let node = node.into();
         NodeKey {

@@ -248,7 +248,7 @@ impl<'db> TypeInferenceBuilder<'db> {
         match node {
             NodeWithScopeKind::Module => {
                 let parsed = parsed_module(self.db.upcast(), self.file);
-                self.infer_module(parsed.syntax());
+                self.infer_module(parsed.parsed().syntax());
             }
             NodeWithScopeKind::Function(function) => self.infer_function_body(function.node()),
             NodeWithScopeKind::Lambda(lambda) => self.infer_lambda_body(lambda.node()),
@@ -407,8 +407,11 @@ impl<'db> TypeInferenceBuilder<'db> {
             self.infer_optional_expression(returns.as_deref());
         }
 
-        let function_ty =
-            Type::Function(FunctionType::new(self.db, name.id.clone(), decorator_tys));
+        let function_ty = Type::Function(FunctionType::new(
+            self.db,
+            Name::new(name.id),
+            decorator_tys,
+        ));
 
         self.types.definitions.insert(definition, function_ty);
     }
@@ -483,7 +486,12 @@ impl<'db> TypeInferenceBuilder<'db> {
             .node_scope(NodeWithScopeRef::Class(class))
             .to_scope_id(self.db, self.file);
 
-        let class_ty = Type::Class(ClassType::new(self.db, name.id.clone(), bases, body_scope));
+        let class_ty = Type::Class(ClassType::new(
+            self.db,
+            Name::new(name.id),
+            bases,
+            body_scope,
+        ));
 
         self.types.definitions.insert(definition, class_ty);
     }
