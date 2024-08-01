@@ -15,10 +15,9 @@ E30.py:798:1: E305 [*] Expected 2 blank lines after class or function definition
 796 796 | 
 797 797 |     # another comment
     798 |+
-    799 |+
-798 800 | fn()
-799 801 | # end
-800 802 | 
+798 799 | fn()
+799 800 | # end
+800 801 | 
 
 E30.py:809:1: E305 [*] Expected 2 blank lines after class or function definition, found (1)
     |
@@ -34,10 +33,9 @@ E30.py:809:1: E305 [*] Expected 2 blank lines after class or function definition
 807 807 | 
 808 808 |     # another comment
     809 |+
-    810 |+
-809 811 | a = 1
-810 812 | # end
-811 813 | 
+809 810 | a = 1
+810 811 | # end
+811 812 | 
 
 E30.py:821:1: E305 [*] Expected 2 blank lines after class or function definition, found (1)
     |
@@ -70,14 +68,13 @@ E30.py:833:1: E305 [*] Expected 2 blank lines after class or function definition
     = help: Add missing blank line(s)
 
 ℹ Safe fix
+829 829 | def a():
 830 830 |     print()
 831 831 | 
-832 832 | # Two spaces before comments, too.
-    833 |+
-    834 |+
-833 835 | if a():
-834 836 |     a()
-835 837 | # end
+    832 |+
+832 833 | # Two spaces before comments, too.
+833 834 | if a():
+834 835 |     a()
 
 E30.py:846:1: E305 [*] Expected 2 blank lines after class or function definition, found (1)
     |
@@ -98,3 +95,21 @@ E30.py:846:1: E305 [*] Expected 2 blank lines after class or function definition
 846 847 | if __name__ == '__main__':
 847 848 |     main()
 848 849 | # end
+
+E30.py:973:1: E305 [*] Expected 2 blank lines after class or function definition, found (1)
+    |
+972 | # ====== Cool constants ========
+973 | BANANA = 100
+    | ^^^^^^ E305
+974 | APPLE = 200
+    |
+    = help: Add missing blank line(s)
+
+ℹ Safe fix
+969 969 | class A:
+970 970 |     pass
+971 971 | 
+    972 |+
+972 973 | # ====== Cool constants ========
+973 974 | BANANA = 100
+974 975 | APPLE = 200
