@@ -157,12 +157,15 @@ impl<'db> Type<'db> {
                 // TODO MRO? get_own_instance_member, get_instance_member
                 todo!("attribute lookup on Instance type")
             }
-            Type::Union(_) => {
-                // TODO perform the get_member on each type in the union
-                // TODO return the union of those results
-                // TODO if any of those results is `None` then include Unknown in the result union
-                todo!("attribute lookup on Union type")
-            }
+            Type::Union(union) => Type::Union(
+                union
+                    .elements(db)
+                    .iter()
+                    .fold(UnionTypeBuilder::new(db), |builder, element_ty| {
+                        builder.add(element_ty.member(db, name))
+                    })
+                    .build(),
+            ),
             Type::Intersection(_) => {
                 // TODO perform the get_member on each type in the intersection
                 // TODO return the intersection of those results
