@@ -62,3 +62,17 @@ def value_intentionally_unused():
         print(letters[index])  # OK
         blah = letters[index]  # OK
         letters[index] = "d"  # OK
+
+
+def start():
+    # OK
+    for index, list_item in enumerate(some_list, start=1):
+        print(some_list[index])
+
+    # PLR1736
+    for index, list_item in enumerate(some_list, start=0):
+        print(some_list[index])
+
+    # PLR1736
+    for index, list_item in enumerate(some_list):
+        print(some_list[index])
