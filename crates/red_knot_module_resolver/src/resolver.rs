@@ -160,11 +160,18 @@ fn try_resolve_module_resolution_settings(
         SearchPath::vendored_stdlib()
     });
 
-    if let Some(site_packages) = site_packages {
-        files.try_add_root(db.upcast(), site_packages, FileRootKind::LibrarySearchPath);
+    for site_packages_dir in site_packages {
+        files.try_add_root(
+            db.upcast(),
+            site_packages_dir,
+            FileRootKind::LibrarySearchPath,
+        );
 
-        static_search_paths.push(SearchPath::site_packages(system, site_packages.clone())?);
-    };
+        static_search_paths.push(SearchPath::site_packages(
+            system,
+            site_packages_dir.clone(),
+        )?);
+    }
 
     // TODO vendor typeshed's third-party stubs as well as the stdlib and fallback to them as a final step
 
@@ -1180,7 +1187,7 @@ mod tests {
             extra_paths: vec![],
             workspace_root: src.clone(),
             custom_typeshed: Some(custom_typeshed.clone()),
-            site_packages: Some(site_packages.clone()),
+            site_packages: vec![site_packages],
         };
 
         Program::new(&db, TargetVersion::Py38, search_paths);

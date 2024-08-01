@@ -12,6 +12,9 @@ pub(crate) struct TestCase<T> {
     pub(crate) db: TestDb,
     pub(crate) src: SystemPathBuf,
     pub(crate) stdlib: T,
+    // Most test cases only ever need a single `site-packages` directory,
+    // so this is a single directory instead of a `Vec` of directories,
+    // like it is in `ruff_db::Program`.
     pub(crate) site_packages: SystemPathBuf,
     pub(crate) target_version: TargetVersion,
 }
@@ -223,7 +226,7 @@ impl TestCaseBuilder<MockedTypeshed> {
                 extra_paths: vec![],
                 workspace_root: src.clone(),
                 custom_typeshed: Some(typeshed.clone()),
-                site_packages: Some(site_packages.clone()),
+                site_packages: vec![site_packages.clone()],
             },
         );
 
@@ -276,7 +279,7 @@ impl TestCaseBuilder<VendoredTypeshed> {
                 extra_paths: vec![],
                 workspace_root: src.clone(),
                 custom_typeshed: None,
-                site_packages: Some(site_packages.clone()),
+                site_packages: vec![site_packages.clone()],
             },
         );
 

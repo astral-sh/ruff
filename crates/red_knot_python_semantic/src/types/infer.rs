@@ -1515,7 +1515,7 @@ mod tests {
             SearchPathSettings {
                 extra_paths: Vec::new(),
                 workspace_root: SystemPathBuf::from("/src"),
-                site_packages: None,
+                site_packages: vec![],
                 custom_typeshed: None,
             },
         );
@@ -1532,7 +1532,7 @@ mod tests {
             SearchPathSettings {
                 extra_paths: Vec::new(),
                 workspace_root: SystemPathBuf::from("/src"),
-                site_packages: None,
+                site_packages: vec![],
                 custom_typeshed: Some(SystemPathBuf::from(typeshed)),
             },
         );

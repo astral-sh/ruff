@@ -81,5 +81,5 @@ pub struct SearchPathSettings {
     pub custom_typeshed: Option<SystemPathBuf>,
 
     /// The path to the user's `site-packages` directory, where third-party packages from ``PyPI`` are installed.
-    pub site_packages: Option<SystemPathBuf>,
+    pub site_packages: Vec<SystemPathBuf>,
 }

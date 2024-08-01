@@ -104,7 +104,7 @@ pub fn main() -> anyhow::Result<()> {
             extra_paths,
             workspace_root: workspace_metadata.root().to_path_buf(),
             custom_typeshed: custom_typeshed_dir,
-            site_packages: None,
+            site_packages: vec![],
         },
     };
 
