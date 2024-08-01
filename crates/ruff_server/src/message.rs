@@ -16,6 +16,8 @@ pub(crate) fn init_messenger(client_sender: ClientSender) {
 
     // When we panic, try to notify the client.
     std::panic::set_hook(Box::new(move |panic_info| {
+        use std::io::Write;
+
         if let Some(messenger) = MESSENGER.get() {
             let _ = messenger.send(lsp_server::Message::Notification(
                 lsp_server::Notification {
@@ -33,12 +35,12 @@ pub(crate) fn init_messenger(client_sender: ClientSender) {
 
         let backtrace = std::backtrace::Backtrace::force_capture();
         tracing::error!("{panic_info}\n{backtrace}");
-        #[allow(clippy::print_stderr)]
-        {
-            // we also need to print to stderr directly in case tracing hasn't
-            // been initialized.
-            eprintln!("{panic_info}\n{backtrace}");
-        }
+
+        // we also need to print to stderr directly in case tracing hasn't
+        // been initialized.
+        // But use `writeln` instead of `eprintln` to avoid panicking when the stderr pipe is broken.
+        let mut stderr = std::io::stderr().lock();
+        writeln!(stderr, "{panic_info}\n{backtrace}").ok();
     }));
 }
 
