@@ -962,3 +962,15 @@ def test_update():
 def test_clientmodel():
     pass
 # end
+
+
+# E305
+
+class A:
+    pass
+
+# ====== Cool constants ========
+BANANA = 100
+APPLE = 200
+
+# end
