@@ -352,13 +352,13 @@ struct LogicalLineInfo {
     kind: LogicalLineKind,
     first_token_range: TextRange,
 
-    // The kind of the last non-trivia token before the newline ending the logical line.
+    /// The kind of the last non-trivia token before the newline ending the logical line.
     last_token: TokenKind,
 
-    // The end of the logical line including the newline.
+    /// The end of the logical line including the newline.
     logical_line_end: TextSize,
 
-    // `true` if this is not a blank but only consists of a comment.
+    /// `true` if this is not a blank but only consists of a comment.
     is_comment_only: bool,
 
     /// If running on a notebook, whether the line is the first logical line (or a comment preceding it) of its cell.
@@ -721,6 +721,7 @@ impl<'a> BlankLinesChecker<'a> {
     /// E301, E302, E303, E304, E305, E306
     pub(crate) fn check_lines(&self, tokens: &Tokens, diagnostics: &mut Vec<Diagnostic>) {
         let mut prev_indent_length: Option<usize> = None;
+        let mut prev_logical_line: Option<LogicalLineInfo> = None;
         let mut state = BlankLinesState::default();
         let line_preprocessor =
             LinePreprocessor::new(tokens, self.locator, self.indent_width, self.cell_offsets);
@@ -736,6 +737,23 @@ impl<'a> BlankLinesChecker<'a> {
             if let Some(prev_indent_length) = prev_indent_length {
                 if prev_indent_length > logical_line.indent_length {
                     state.follows = Follows::Other;
+                }
+            }
+
+            // Reset the previous line end after an indent or dedent:
+            // ```python
+            // if True:
+            //      import test
+            //      # comment
+            // a = 10
+            // ```
+            // The `# comment` should be attached to the `import` statement, rather than the
+            // assignment.
+            if let Some(prev_logical_line) = prev_logical_line {
+                if prev_logical_line.is_comment_only {
+                    if prev_logical_line.indent_length != logical_line.indent_length {
+                        state.last_non_comment_line_end = prev_logical_line.logical_line_end;
+                    }
                 }
             }
 
@@ -793,6 +811,8 @@ impl<'a> BlankLinesChecker<'a> {
             if !logical_line.is_comment_only {
                 prev_indent_length = Some(logical_line.indent_length);
             }
+
+            prev_logical_line = Some(logical_line);
         }
     }
 
@@ -882,6 +902,8 @@ impl<'a> BlankLinesChecker<'a> {
                 line.first_token_range,
             );
 
+            // Check if the preceding comment
+
             if let Some(blank_lines_range) = line.blank_lines.range() {
                 diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
                     self.stylist
@@ -891,9 +913,10 @@ impl<'a> BlankLinesChecker<'a> {
                 )));
             } else {
                 diagnostic.set_fix(Fix::safe_edit(Edit::insertion(
-                    self.stylist
-                        .line_ending()
-                        .repeat(expected_blank_lines_before_definition as usize),
+                    self.stylist.line_ending().repeat(
+                        (expected_blank_lines_before_definition
+                            - line.preceding_blank_lines.count()) as usize,
+                    ),
                     self.locator.line_start(state.last_non_comment_line_end),
                 )));
             }
