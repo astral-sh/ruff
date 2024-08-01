@@ -2,6 +2,7 @@ import sys
 from abc import abstractmethod
 from collections.abc import Callable, Sequence
 from typing import Literal
+from typing_extensions import deprecated
 
 __all__ = ["Error", "open", "open_new", "open_new_tab", "get", "register"]
 
@@ -62,8 +63,10 @@ if sys.platform == "win32":
         def open(self, url: str, new: int = 0, autoraise: bool = True) -> bool: ...
 
 if sys.platform == "darwin":
-    class MacOSX(BaseBrowser):
-        def open(self, url: str, new: int = 0, autoraise: bool = True) -> bool: ...
+    if sys.version_info < (3, 13):
+        @deprecated("Deprecated in 3.11, to be removed in 3.13.")
+        class MacOSX(BaseBrowser):
+            def open(self, url: str, new: int = 0, autoraise: bool = True) -> bool: ...
 
     class MacOSXOSAScript(BaseBrowser):  # In runtime this class does not have `name` and `basename`
         if sys.version_info >= (3, 11):

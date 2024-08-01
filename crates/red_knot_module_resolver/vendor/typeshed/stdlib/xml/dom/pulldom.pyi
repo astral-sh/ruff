@@ -1,20 +1,20 @@
 import sys
 from _typeshed import Incomplete, SupportsRead
 from collections.abc import Sequence
-from typing import Literal
+from typing import Final, Literal
 from typing_extensions import TypeAlias
 from xml.dom.minidom import Document, DOMImplementation, Element, Text
 from xml.sax.handler import ContentHandler
 from xml.sax.xmlreader import XMLReader
 
-START_ELEMENT: Literal["START_ELEMENT"]
-END_ELEMENT: Literal["END_ELEMENT"]
-COMMENT: Literal["COMMENT"]
-START_DOCUMENT: Literal["START_DOCUMENT"]
-END_DOCUMENT: Literal["END_DOCUMENT"]
-PROCESSING_INSTRUCTION: Literal["PROCESSING_INSTRUCTION"]
-IGNORABLE_WHITESPACE: Literal["IGNORABLE_WHITESPACE"]
-CHARACTERS: Literal["CHARACTERS"]
+START_ELEMENT: Final = "START_ELEMENT"
+END_ELEMENT: Final = "END_ELEMENT"
+COMMENT: Final = "COMMENT"
+START_DOCUMENT: Final = "START_DOCUMENT"
+END_DOCUMENT: Final = "END_DOCUMENT"
+PROCESSING_INSTRUCTION: Final = "PROCESSING_INSTRUCTION"
+IGNORABLE_WHITESPACE: Final = "IGNORABLE_WHITESPACE"
+CHARACTERS: Final = "CHARACTERS"
 
 _DocumentFactory: TypeAlias = DOMImplementation | None
 _Node: TypeAlias = Document | Element | Text

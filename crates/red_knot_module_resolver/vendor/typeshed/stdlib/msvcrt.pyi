@@ -1,14 +1,14 @@
 import sys
-from typing import Final, Literal
+from typing import Final
 
 # This module is only available on Windows
 if sys.platform == "win32":
     CRT_ASSEMBLY_VERSION: Final[str]
-    LK_UNLCK: Literal[0]
-    LK_LOCK: Literal[1]
-    LK_NBLCK: Literal[2]
-    LK_RLCK: Literal[3]
-    LK_NBRLCK: Literal[4]
+    LK_UNLCK: Final = 0
+    LK_LOCK: Final = 1
+    LK_NBLCK: Final = 2
+    LK_RLCK: Final = 3
+    LK_NBRLCK: Final = 4
     SEM_FAILCRITICALERRORS: int
     SEM_NOALIGNMENTFAULTEXCEPT: int
     SEM_NOGPFAULTERRORBOX: int

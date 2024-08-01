@@ -1,29 +1,29 @@
 import sys
 from _typeshed import ReadableBuffer
-from typing import Literal
+from typing import Final
 
-DEFLATED: Literal[8]
+DEFLATED: Final = 8
 DEF_MEM_LEVEL: int  # can change
-DEF_BUF_SIZE: Literal[16384]
+DEF_BUF_SIZE: Final = 16384
 MAX_WBITS: int
 ZLIB_VERSION: str  # can change
 ZLIB_RUNTIME_VERSION: str  # can change
-Z_NO_COMPRESSION: Literal[0]
-Z_PARTIAL_FLUSH: Literal[1]
-Z_BEST_COMPRESSION: Literal[9]
-Z_BEST_SPEED: Literal[1]
-Z_BLOCK: Literal[5]
-Z_DEFAULT_COMPRESSION: Literal[-1]
-Z_DEFAULT_STRATEGY: Literal[0]
-Z_FILTERED: Literal[1]
-Z_FINISH: Literal[4]
-Z_FIXED: Literal[4]
-Z_FULL_FLUSH: Literal[3]
-Z_HUFFMAN_ONLY: Literal[2]
-Z_NO_FLUSH: Literal[0]
-Z_RLE: Literal[3]
-Z_SYNC_FLUSH: Literal[2]
-Z_TREES: Literal[6]
+Z_NO_COMPRESSION: Final = 0
+Z_PARTIAL_FLUSH: Final = 1
+Z_BEST_COMPRESSION: Final = 9
+Z_BEST_SPEED: Final = 1
+Z_BLOCK: Final = 5
+Z_DEFAULT_COMPRESSION: Final = -1
+Z_DEFAULT_STRATEGY: Final = 0
+Z_FILTERED: Final = 1
+Z_FINISH: Final = 4
+Z_FIXED: Final = 4
+Z_FULL_FLUSH: Final = 3
+Z_HUFFMAN_ONLY: Final = 2
+Z_NO_FLUSH: Final = 0
+Z_RLE: Final = 3
+Z_SYNC_FLUSH: Final = 2
+Z_TREES: Final = 6
 
 class error(Exception): ...
 

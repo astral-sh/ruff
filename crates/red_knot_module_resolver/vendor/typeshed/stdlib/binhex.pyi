@@ -1,14 +1,14 @@
 from _typeshed import SizedBuffer
-from typing import IO, Any, Literal
+from typing import IO, Any, Final
 from typing_extensions import TypeAlias
 
 __all__ = ["binhex", "hexbin", "Error"]
 
 class Error(Exception): ...
 
-REASONABLY_LARGE: Literal[32768]
-LINELEN: Literal[64]
-RUNCHAR: Literal[b"\x90"]
+REASONABLY_LARGE: Final = 32768
+LINELEN: Final = 64
+RUNCHAR: Final = b"\x90"
 
 class FInfo:
     Type: str

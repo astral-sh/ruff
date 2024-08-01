@@ -1,15 +1,15 @@
 import sys
 from collections.abc import Container, Iterable, Iterator, Sequence
 from types import CodeType
-from typing import IO, Any
+from typing import IO, Any, Final
 
 if sys.version_info < (3, 11):
-    LOAD_CONST: int  # undocumented
-    IMPORT_NAME: int  # undocumented
-    STORE_NAME: int  # undocumented
-    STORE_GLOBAL: int  # undocumented
-    STORE_OPS: tuple[int, int]  # undocumented
-    EXTENDED_ARG: int  # undocumented
+    LOAD_CONST: Final[int]  # undocumented
+    IMPORT_NAME: Final[int]  # undocumented
+    STORE_NAME: Final[int]  # undocumented
+    STORE_GLOBAL: Final[int]  # undocumented
+    STORE_OPS: Final[tuple[int, int]]  # undocumented
+    EXTENDED_ARG: Final[int]  # undocumented
 
 packagePathMap: dict[str, list[str]]  # undocumented
 

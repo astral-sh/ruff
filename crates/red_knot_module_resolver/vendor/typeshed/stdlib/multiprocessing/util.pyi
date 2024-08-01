@@ -2,7 +2,7 @@ import threading
 from _typeshed import ConvertibleToInt, Incomplete, Unused
 from collections.abc import Callable, Iterable, Mapping, MutableMapping, Sequence
 from logging import Logger, _Level as _LoggingLevel
-from typing import Any, Generic, TypeVar, overload
+from typing import Any, Final, Generic, TypeVar, overload
 
 __all__ = [
     "sub_debug",
@@ -25,14 +25,14 @@ __all__ = [
 _T = TypeVar("_T")
 _R_co = TypeVar("_R_co", default=Any, covariant=True)
 
-NOTSET: int
-SUBDEBUG: int
-DEBUG: int
-INFO: int
-SUBWARNING: int
+NOTSET: Final[int]
+SUBDEBUG: Final[int]
+DEBUG: Final[int]
+INFO: Final[int]
+SUBWARNING: Final[int]
 
-LOGGER_NAME: str
-DEFAULT_LOGGING_FORMAT: str
+LOGGER_NAME: Final[str]
+DEFAULT_LOGGING_FORMAT: Final[str]
 
 def sub_debug(msg: object, *args: object) -> None: ...
 def debug(msg: object, *args: object) -> None: ...
@@ -92,7 +92,7 @@ class ForkAwareThreadLock:
 
 class ForkAwareLocal(threading.local): ...
 
-MAXFD: int
+MAXFD: Final[int]
 
 def close_all_fds_except(fds: Iterable[int]) -> None: ...
 def spawnv_passfds(path: bytes, args: Sequence[ConvertibleToInt], passfds: Sequence[int]) -> int: ...

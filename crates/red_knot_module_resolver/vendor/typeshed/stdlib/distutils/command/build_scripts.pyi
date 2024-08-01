@@ -1,4 +1,4 @@
-from typing import Any
+from typing import Any, ClassVar
 
 from ..cmd import Command
 from ..util import Mixin2to3 as Mixin2to3
@@ -7,8 +7,8 @@ first_line_re: Any
 
 class build_scripts(Command):
     description: str
-    user_options: Any
-    boolean_options: Any
+    user_options: ClassVar[list[tuple[str, str, str]]]
+    boolean_options: ClassVar[list[str]]
     build_dir: Any
     scripts: Any
     force: Any

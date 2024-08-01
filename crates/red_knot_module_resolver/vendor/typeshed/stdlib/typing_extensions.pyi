@@ -403,6 +403,7 @@ else:
         # It's writable on types, but not on instances of TypeAliasType.
         @property
         def __module__(self) -> str | None: ...  # type: ignore[override]
+        # Returns typing._GenericAlias, which isn't stubbed.
         def __getitem__(self, parameters: Any) -> Any: ...
         if sys.version_info >= (3, 10):
             def __or__(self, right: Any) -> _SpecialForm: ...

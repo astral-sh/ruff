@@ -6,7 +6,20 @@ from collections.abc import Callable, Container, Iterable, Mapping, Sequence, Se
 from contextlib import AbstractContextManager
 from re import Pattern
 from types import TracebackType
-from typing import Any, AnyStr, ClassVar, Generic, NamedTuple, NoReturn, Protocol, SupportsAbs, SupportsRound, TypeVar, overload
+from typing import (
+    Any,
+    AnyStr,
+    ClassVar,
+    Final,
+    Generic,
+    NamedTuple,
+    NoReturn,
+    Protocol,
+    SupportsAbs,
+    SupportsRound,
+    TypeVar,
+    overload,
+)
 from typing_extensions import ParamSpec, Self, TypeAlias
 from warnings import WarningMessage
 
@@ -22,7 +35,7 @@ _E = TypeVar("_E", bound=BaseException)
 _FT = TypeVar("_FT", bound=Callable[..., Any])
 _P = ParamSpec("_P")
 
-DIFF_OMITTED: str
+DIFF_OMITTED: Final[str]
 
 class _BaseTestCaseContext:
     test_case: TestCase

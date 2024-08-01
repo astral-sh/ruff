@@ -1,3 +1,4 @@
+from _typeshed import Unused
 from collections.abc import Callable
 from typing import Any, ClassVar
 
@@ -7,9 +8,9 @@ def show_compilers() -> None: ...
 
 class build(Command):
     description: str
-    user_options: Any
-    boolean_options: Any
-    help_options: Any
+    user_options: ClassVar[list[tuple[str, str | None, str]]]
+    boolean_options: ClassVar[list[str]]
+    help_options: ClassVar[list[tuple[str, str | None, str, Callable[[], Unused]]]]
     build_base: str
     build_purelib: Any
     build_platlib: Any
