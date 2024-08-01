@@ -1,38 +1,38 @@
 import tkinter
 from _typeshed import Incomplete
-from typing import Any, Literal
+from typing import Any, Final
 
-WINDOW: Literal["window"]
-TEXT: Literal["text"]
-STATUS: Literal["status"]
-IMMEDIATE: Literal["immediate"]
-IMAGE: Literal["image"]
-IMAGETEXT: Literal["imagetext"]
-BALLOON: Literal["balloon"]
-AUTO: Literal["auto"]
-ACROSSTOP: Literal["acrosstop"]
+WINDOW: Final = "window"
+TEXT: Final = "text"
+STATUS: Final = "status"
+IMMEDIATE: Final = "immediate"
+IMAGE: Final = "image"
+IMAGETEXT: Final = "imagetext"
+BALLOON: Final = "balloon"
+AUTO: Final = "auto"
+ACROSSTOP: Final = "acrosstop"
 
-ASCII: Literal["ascii"]
-CELL: Literal["cell"]
-COLUMN: Literal["column"]
-DECREASING: Literal["decreasing"]
-INCREASING: Literal["increasing"]
-INTEGER: Literal["integer"]
-MAIN: Literal["main"]
-MAX: Literal["max"]
-REAL: Literal["real"]
-ROW: Literal["row"]
-S_REGION: Literal["s-region"]
-X_REGION: Literal["x-region"]
-Y_REGION: Literal["y-region"]
+ASCII: Final = "ascii"
+CELL: Final = "cell"
+COLUMN: Final = "column"
+DECREASING: Final = "decreasing"
+INCREASING: Final = "increasing"
+INTEGER: Final = "integer"
+MAIN: Final = "main"
+MAX: Final = "max"
+REAL: Final = "real"
+ROW: Final = "row"
+S_REGION: Final = "s-region"
+X_REGION: Final = "x-region"
+Y_REGION: Final = "y-region"
 
 # These should be kept in sync with _tkinter constants, except TCL_ALL_EVENTS which doesn't match ALL_EVENTS
-TCL_DONT_WAIT: Literal[2]
-TCL_WINDOW_EVENTS: Literal[4]
-TCL_FILE_EVENTS: Literal[8]
-TCL_TIMER_EVENTS: Literal[16]
-TCL_IDLE_EVENTS: Literal[32]
-TCL_ALL_EVENTS: Literal[0]
+TCL_DONT_WAIT: Final = 2
+TCL_WINDOW_EVENTS: Final = 4
+TCL_FILE_EVENTS: Final = 8
+TCL_TIMER_EVENTS: Final = 16
+TCL_IDLE_EVENTS: Final = 32
+TCL_ALL_EVENTS: Final = 0
 
 class tixCommand:
     def tix_addbitmapdir(self, directory: str) -> None: ...

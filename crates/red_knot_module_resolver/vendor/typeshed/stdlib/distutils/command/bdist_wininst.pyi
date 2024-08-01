@@ -1,10 +1,10 @@
 from _typeshed import StrOrBytesPath
 from distutils.cmd import Command
-from typing import Any, ClassVar
+from typing import ClassVar
 
 class bdist_wininst(Command):
     description: ClassVar[str]
-    user_options: ClassVar[list[tuple[Any, ...]]]
+    user_options: ClassVar[list[tuple[str, str | None, str]]]
     boolean_options: ClassVar[list[str]]
 
     def initialize_options(self) -> None: ...

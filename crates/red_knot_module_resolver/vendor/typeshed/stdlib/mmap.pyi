@@ -118,4 +118,16 @@ if sys.version_info >= (3, 13) and sys.platform != "win32":
     MAP_32BIT: Final = 32768
 
 if sys.version_info >= (3, 13) and sys.platform == "darwin":
+    MAP_NORESERVE: Final = 64
+    MAP_NOEXTEND: Final = 256
+    MAP_HASSEMAPHORE: Final = 512
+    MAP_NOCACHE: Final = 1024
+    MAP_JIT: Final = 2048
+    MAP_RESILIENT_CODESIGN: Final = 8192
+    MAP_RESILIENT_MEDIA: Final = 16384
+    MAP_TRANSLATED_ALLOW_EXECUTE: Final = 131072
+    MAP_UNIX03: Final = 262144
     MAP_TPRO: Final = 524288
+
+if sys.version_info >= (3, 13) and sys.platform == "linux":
+    MAP_NORESERVE: Final = 16384

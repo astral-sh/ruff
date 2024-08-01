@@ -1,24 +1,24 @@
 import sys
 from _typeshed import ReadableBuffer
-from typing import Literal, overload
+from typing import Final, Literal, overload
 
 if sys.platform == "win32":
-    SND_APPLICATION: Literal[128]
-    SND_FILENAME: Literal[131072]
-    SND_ALIAS: Literal[65536]
-    SND_LOOP: Literal[8]
-    SND_MEMORY: Literal[4]
-    SND_PURGE: Literal[64]
-    SND_ASYNC: Literal[1]
-    SND_NODEFAULT: Literal[2]
-    SND_NOSTOP: Literal[16]
-    SND_NOWAIT: Literal[8192]
+    SND_APPLICATION: Final = 128
+    SND_FILENAME: Final = 131072
+    SND_ALIAS: Final = 65536
+    SND_LOOP: Final = 8
+    SND_MEMORY: Final = 4
+    SND_PURGE: Final = 64
+    SND_ASYNC: Final = 1
+    SND_NODEFAULT: Final = 2
+    SND_NOSTOP: Final = 16
+    SND_NOWAIT: Final = 8192
 
-    MB_ICONASTERISK: Literal[64]
-    MB_ICONEXCLAMATION: Literal[48]
-    MB_ICONHAND: Literal[16]
-    MB_ICONQUESTION: Literal[32]
-    MB_OK: Literal[0]
+    MB_ICONASTERISK: Final = 64
+    MB_ICONEXCLAMATION: Final = 48
+    MB_ICONHAND: Final = 16
+    MB_ICONQUESTION: Final = 32
+    MB_OK: Final = 0
     def Beep(frequency: int, duration: int) -> None: ...
     # Can actually accept anything ORed with 4, and if not it's definitely str, but that's inexpressible
     @overload

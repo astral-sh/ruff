@@ -1,10 +1,10 @@
 from _typeshed import ReadableBuffer, SupportsRead
 from collections.abc import Callable
 from pyexpat import errors as errors, model as model
-from typing import Any, final
+from typing import Any, Final, final
 from typing_extensions import TypeAlias
 
-EXPAT_VERSION: str  # undocumented
+EXPAT_VERSION: Final[str]  # undocumented
 version_info: tuple[int, int, int]  # undocumented
 native_encoding: str  # undocumented
 features: list[tuple[str, int]]  # undocumented
@@ -15,7 +15,6 @@ class ExpatError(Exception):
     offset: int
 
 error = ExpatError
-
 XML_PARAM_ENTITY_PARSING_NEVER: int
 XML_PARAM_ENTITY_PARSING_UNLESS_STANDALONE: int
 XML_PARAM_ENTITY_PARSING_ALWAYS: int

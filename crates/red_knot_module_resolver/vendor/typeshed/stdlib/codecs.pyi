@@ -3,7 +3,7 @@ from _codecs import *
 from _typeshed import ReadableBuffer
 from abc import abstractmethod
 from collections.abc import Callable, Generator, Iterable
-from typing import Any, BinaryIO, Literal, Protocol, TextIO
+from typing import Any, BinaryIO, Final, Literal, Protocol, TextIO
 from typing_extensions import Self
 
 __all__ = [
@@ -53,10 +53,10 @@ __all__ = [
     "lookup_error",
 ]
 
-BOM32_BE: Literal[b"\xfe\xff"]
-BOM32_LE: Literal[b"\xff\xfe"]
-BOM64_BE: Literal[b"\x00\x00\xfe\xff"]
-BOM64_LE: Literal[b"\xff\xfe\x00\x00"]
+BOM32_BE: Final = b"\xfe\xff"
+BOM32_LE: Final = b"\xff\xfe"
+BOM64_BE: Final = b"\x00\x00\xfe\xff"
+BOM64_LE: Final = b"\xff\xfe\x00\x00"
 
 class _WritableStream(Protocol):
     def write(self, data: bytes, /) -> object: ...
@@ -135,23 +135,23 @@ def EncodedFile(file: _Stream, data_encoding: str, file_encoding: str | None = N
 def iterencode(iterator: Iterable[str], encoding: str, errors: str = "strict") -> Generator[bytes, None, None]: ...
 def iterdecode(iterator: Iterable[bytes], encoding: str, errors: str = "strict") -> Generator[str, None, None]: ...
 
-BOM: Literal[b"\xff\xfe", b"\xfe\xff"]  # depends on `sys.byteorder`
-BOM_BE: Literal[b"\xfe\xff"]
-BOM_LE: Literal[b"\xff\xfe"]
-BOM_UTF8: Literal[b"\xef\xbb\xbf"]
-BOM_UTF16: Literal[b"\xff\xfe", b"\xfe\xff"]  # depends on `sys.byteorder`
-BOM_UTF16_BE: Literal[b"\xfe\xff"]
-BOM_UTF16_LE: Literal[b"\xff\xfe"]
-BOM_UTF32: Literal[b"\xff\xfe\x00\x00", b"\x00\x00\xfe\xff"]  # depends on `sys.byteorder`
-BOM_UTF32_BE: Literal[b"\x00\x00\xfe\xff"]
-BOM_UTF32_LE: Literal[b"\xff\xfe\x00\x00"]
+BOM: Final[Literal[b"\xff\xfe", b"\xfe\xff"]]  # depends on `sys.byteorder`
+BOM_BE: Final = b"\xfe\xff"
+BOM_LE: Final = b"\xff\xfe"
+BOM_UTF8: Final = b"\xef\xbb\xbf"
+BOM_UTF16: Final[Literal[b"\xff\xfe", b"\xfe\xff"]]  # depends on `sys.byteorder`
+BOM_UTF16_BE: Final = b"\xfe\xff"
+BOM_UTF16_LE: Final = b"\xff\xfe"
+BOM_UTF32: Final[Literal[b"\xff\xfe\x00\x00", b"\x00\x00\xfe\xff"]]  # depends on `sys.byteorder`
+BOM_UTF32_BE: Final = b"\x00\x00\xfe\xff"
+BOM_UTF32_LE: Final = b"\xff\xfe\x00\x00"
 
-def strict_errors(exception: UnicodeError) -> tuple[str | bytes, int]: ...
-def replace_errors(exception: UnicodeError) -> tuple[str | bytes, int]: ...
-def ignore_errors(exception: UnicodeError) -> tuple[str | bytes, int]: ...
-def xmlcharrefreplace_errors(exception: UnicodeError) -> tuple[str | bytes, int]: ...
-def backslashreplace_errors(exception: UnicodeError) -> tuple[str | bytes, int]: ...
-def namereplace_errors(exception: UnicodeError) -> tuple[str | bytes, int]: ...
+def strict_errors(exception: UnicodeError, /) -> tuple[str | bytes, int]: ...
+def replace_errors(exception: UnicodeError, /) -> tuple[str | bytes, int]: ...
+def ignore_errors(exception: UnicodeError, /) -> tuple[str | bytes, int]: ...
+def xmlcharrefreplace_errors(exception: UnicodeError, /) -> tuple[str | bytes, int]: ...
+def backslashreplace_errors(exception: UnicodeError, /) -> tuple[str | bytes, int]: ...
+def namereplace_errors(exception: UnicodeError, /) -> tuple[str | bytes, int]: ...
 
 class Codec:
     # These are sort of @abstractmethod but sort of not.

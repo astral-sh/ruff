@@ -17,20 +17,20 @@ class DecimalTuple(NamedTuple):
     digits: tuple[int, ...]
     exponent: int | Literal["n", "N", "F"]
 
-ROUND_DOWN: str
-ROUND_HALF_UP: str
-ROUND_HALF_EVEN: str
-ROUND_CEILING: str
-ROUND_FLOOR: str
-ROUND_UP: str
-ROUND_HALF_DOWN: str
-ROUND_05UP: str
-HAVE_CONTEXTVAR: bool
-HAVE_THREADS: bool
-MAX_EMAX: int
-MAX_PREC: int
-MIN_EMIN: int
-MIN_ETINY: int
+ROUND_DOWN: Final[str]
+ROUND_HALF_UP: Final[str]
+ROUND_HALF_EVEN: Final[str]
+ROUND_CEILING: Final[str]
+ROUND_FLOOR: Final[str]
+ROUND_UP: Final[str]
+ROUND_HALF_DOWN: Final[str]
+ROUND_05UP: Final[str]
+HAVE_CONTEXTVAR: Final[bool]
+HAVE_THREADS: Final[bool]
+MAX_EMAX: Final[int]
+MAX_PREC: Final[int]
+MIN_EMIN: Final[int]
+MIN_ETINY: Final[int]
 
 class DecimalException(ArithmeticError): ...
 class Clamped(DecimalException): ...

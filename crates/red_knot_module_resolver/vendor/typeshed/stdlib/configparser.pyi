@@ -2,7 +2,7 @@ import sys
 from _typeshed import StrOrBytesPath, SupportsWrite
 from collections.abc import Callable, ItemsView, Iterable, Iterator, Mapping, MutableMapping, Sequence
 from re import Pattern
-from typing import Any, ClassVar, Literal, TypeVar, overload
+from typing import Any, ClassVar, Final, Literal, TypeVar, overload
 from typing_extensions import TypeAlias
 
 if sys.version_info >= (3, 13):
@@ -83,8 +83,8 @@ _ConverterCallback: TypeAlias = Callable[[str], Any]
 _ConvertersMap: TypeAlias = dict[str, _ConverterCallback]
 _T = TypeVar("_T")
 
-DEFAULTSECT: Literal["DEFAULT"]
-MAX_INTERPOLATION_DEPTH: Literal[10]
+DEFAULTSECT: Final = "DEFAULT"
+MAX_INTERPOLATION_DEPTH: Final = 10
 
 class Interpolation:
     def before_get(self, parser: _Parser, section: str, option: str, value: str, defaults: _Section) -> str: ...

@@ -1,5 +1,5 @@
 import sys
-from typing import Any, Literal
+from typing import Any, ClassVar, Literal
 
 from ..cmd import Command
 
@@ -16,8 +16,8 @@ if sys.platform == "win32":
 
     class bdist_msi(Command):
         description: str
-        user_options: Any
-        boolean_options: Any
+        user_options: ClassVar[list[tuple[str, str | None, str]]]
+        boolean_options: ClassVar[list[str]]
         all_versions: Any
         other_version: str
         if sys.version_info >= (3, 9):

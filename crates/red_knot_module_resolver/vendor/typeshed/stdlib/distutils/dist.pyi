@@ -1,8 +1,8 @@
 from _typeshed import Incomplete, StrOrBytesPath, StrPath, SupportsWrite
-from collections.abc import Iterable, Mapping
+from collections.abc import Iterable, MutableMapping
 from distutils.cmd import Command
 from re import Pattern
-from typing import IO, Any, ClassVar, Literal, TypeVar, overload
+from typing import IO, ClassVar, Literal, TypeVar, overload
 from typing_extensions import TypeAlias
 
 command_re: Pattern[str]
@@ -60,7 +60,7 @@ class DistributionMetadata:
 class Distribution:
     cmdclass: dict[str, type[Command]]
     metadata: DistributionMetadata
-    def __init__(self, attrs: Mapping[str, Any] | None = None) -> None: ...
+    def __init__(self, attrs: MutableMapping[str, Incomplete] | None = None) -> None: ...
     def get_option_dict(self, command: str) -> dict[str, tuple[str, str]]: ...
     def parse_config_files(self, filenames: Iterable[str] | None = None) -> None: ...
     @overload

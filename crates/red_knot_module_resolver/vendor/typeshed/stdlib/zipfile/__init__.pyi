@@ -5,7 +5,7 @@ from collections.abc import Callable, Iterable, Iterator
 from io import TextIOWrapper
 from os import PathLike
 from types import TracebackType
-from typing import IO, Literal, Protocol, overload
+from typing import IO, Final, Literal, Protocol, overload
 from typing_extensions import Self, TypeAlias
 
 __all__ = [
@@ -300,10 +300,10 @@ else:
 
 def is_zipfile(filename: StrOrBytesPath | _SupportsReadSeekTell) -> bool: ...
 
-ZIP_STORED: int
-ZIP_DEFLATED: int
-ZIP64_LIMIT: int
-ZIP_FILECOUNT_LIMIT: int
-ZIP_MAX_COMMENT: int
-ZIP_BZIP2: int
-ZIP_LZMA: int
+ZIP_STORED: Final[int]
+ZIP_DEFLATED: Final[int]
+ZIP64_LIMIT: Final[int]
+ZIP_FILECOUNT_LIMIT: Final[int]
+ZIP_MAX_COMMENT: Final[int]
+ZIP_BZIP2: Final[int]
+ZIP_LZMA: Final[int]

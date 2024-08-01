@@ -1,16 +1,16 @@
 from collections.abc import MutableSequence, Sequence
-from typing import Any, TypeVar
+from typing import Any, Final, TypeVar
 from typing_extensions import TypeAlias
 
 _T = TypeVar("_T")
 _Mismatch: TypeAlias = tuple[_T, _T, int]
 
-_MAX_LENGTH: int
-_PLACEHOLDER_LEN: int
-_MIN_BEGIN_LEN: int
-_MIN_END_LEN: int
-_MIN_COMMON_LEN: int
-_MIN_DIFF_LEN: int
+_MAX_LENGTH: Final[int]
+_PLACEHOLDER_LEN: Final[int]
+_MIN_BEGIN_LEN: Final[int]
+_MIN_END_LEN: Final[int]
+_MIN_COMMON_LEN: Final[int]
+_MIN_DIFF_LEN: Final[int]
 
 def _shorten(s: str, prefixlen: int, suffixlen: int) -> str: ...
 def _common_shorten_repr(*args: str) -> tuple[str, ...]: ...

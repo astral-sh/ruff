@@ -1,6 +1,6 @@
 import sys
 from _typeshed import ReadableBuffer, Unused
-from typing import IO, Any, BinaryIO, Literal, NamedTuple, NoReturn, overload
+from typing import IO, Any, BinaryIO, Final, Literal, NamedTuple, NoReturn, overload
 from typing_extensions import Self, TypeAlias, deprecated
 
 if sys.version_info >= (3, 9):
@@ -12,7 +12,7 @@ _File: TypeAlias = str | IO[bytes]
 
 class Error(Exception): ...
 
-WAVE_FORMAT_PCM: Literal[1]
+WAVE_FORMAT_PCM: Final = 1
 
 class _wave_params(NamedTuple):
     nchannels: int
