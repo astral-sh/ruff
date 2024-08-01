@@ -179,7 +179,7 @@ pub(crate) fn if_expr_with_true_false(
                 &ast::ExprCall {
                     func: Box::new(
                         ast::ExprName {
-                            id: Name::new_static("bool"),
+                            id: "bool",
                             ctx: ExprContext::Load,
                             range: TextRange::default(),
                         }

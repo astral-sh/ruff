@@ -2014,10 +2014,10 @@ fn parse_numpy_sections(
     }
 }
 
-fn parse_google_sections(
+fn parse_google_sections<'a>(
     checker: &mut Checker,
     docstring: &Docstring,
-    section_contexts: &SectionContexts,
+    section_contexts: &SectionContexts<'a>,
 ) {
     let mut iterator = section_contexts.iter().peekable();
     while let Some(context) = iterator.next() {

@@ -119,7 +119,7 @@ pub(crate) fn unnecessary_default_type_args(checker: &mut Checker, expr: &Expr) 
 /// Trim trailing `None` literals from the given elements.
 ///
 /// For example, given `[int, None, None]`, return `[int]`.
-fn trim_trailing_none(elts: &[Expr]) -> &[Expr] {
+fn trim_trailing_none<'a>(elts: &'a [Expr<'a>]) -> &'a [Expr<'a>] {
     match elts.iter().rposition(|elt| !elt.is_none_literal_expr()) {
         Some(trimmed_last_index) => elts[..=trimmed_last_index].as_ref(),
         None => &[],

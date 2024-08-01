@@ -372,7 +372,7 @@ pub struct UnqualifiedName<'a>(SegmentsVec<'a>);
 
 impl<'a> UnqualifiedName<'a> {
     /// Convert an `Expr` to its [`UnqualifiedName`] (like `["typing", "List"]`).
-    pub fn from_expr(expr: &'a Expr) -> Option<Self> {
+    pub fn from_expr(expr: &Expr<'a>) -> Option<Self> {
         // Unroll the loop up to eight times, to match the maximum number of expected attributes.
         // In practice, unrolling appears to give about a 4x speed-up on this hot path.
         let attr1 = match expr {

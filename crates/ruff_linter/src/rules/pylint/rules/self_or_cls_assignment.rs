@@ -105,7 +105,7 @@ fn check_expr(checker: &mut Checker, target: &Expr, method_type: MethodType) {
     match target {
         Expr::Name(_) => {
             if let Expr::Name(ast::ExprName { id, .. }) = target {
-                if id.as_str() == method_type.arg_name() {
+                if *id == method_type.arg_name() {
                     checker.diagnostics.push(Diagnostic::new(
                         SelfOrClsAssignment { method_type },
                         target.range(),

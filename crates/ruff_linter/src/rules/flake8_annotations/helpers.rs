@@ -210,25 +210,25 @@ impl AutoPythonType {
 }
 
 /// Given a [`PythonType`], return an [`Expr`] that resolves to that type.
-fn type_expr(python_type: PythonType) -> Option<Expr> {
-    fn name(name: &str) -> Expr {
+fn type_expr(python_type: PythonType, allocator: &ruff_allocator::Allocator) -> Option<Expr> {
+    fn name<'a>(name: &str, allocator: &'a ruff_allocator::Allocator) -> Expr<'a> {
         Expr::Name(ast::ExprName {
-            id: name.into(),
+            id: allocator.alloc_str(name),
             range: TextRange::default(),
             ctx: ExprContext::Load,
         })
     }
 
     match python_type {
-        PythonType::String => Some(name("str")),
-        PythonType::Bytes => Some(name("bytes")),
+        PythonType::String => Some(name("str", allocator)),
+        PythonType::Bytes => Some(name("bytes", allocator)),
         PythonType::Number(number) => match number {
-            NumberLike::Integer => Some(name("int")),
-            NumberLike::Float => Some(name("float")),
-            NumberLike::Complex => Some(name("complex")),
-            NumberLike::Bool => Some(name("bool")),
+            NumberLike::Integer => Some(name("int", allocator)),
+            NumberLike::Float => Some(name("float", allocator)),
+            NumberLike::Complex => Some(name("complex", allocator)),
+            NumberLike::Bool => Some(name("bool", allocator)),
         },
-        PythonType::None => Some(name("None")),
+        PythonType::None => Some(name("None", allocator)),
         PythonType::Ellipsis => None,
         PythonType::Dict => None,
         PythonType::List => None,

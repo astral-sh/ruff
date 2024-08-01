@@ -71,11 +71,11 @@ pub(crate) fn super_without_brackets(checker: &mut Checker, func: &Expr) {
         return;
     };
 
-    if id.as_str() != "super" {
+    if *id != "super" {
         return;
     }
 
-    if !checker.semantic().has_builtin_binding(id.as_str()) {
+    if !checker.semantic().has_builtin_binding(id) {
         return;
     }
 

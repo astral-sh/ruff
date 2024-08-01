@@ -43,14 +43,14 @@ impl Violation for RedeclaredAssignedName {
 
 /// PLW0128
 pub(crate) fn redeclared_assigned_name(checker: &mut Checker, targets: &Vec<Expr>) {
-    let mut names: Vec<Name> = Vec::new();
+    let mut names: Vec<&str> = Vec::new();
 
     for target in targets {
         check_expr(checker, target, &mut names);
     }
 }
 
-fn check_expr(checker: &mut Checker, expr: &Expr, names: &mut Vec<Name>) {
+fn check_expr(checker: &mut Checker, expr: &Expr, names: &mut Vec<&str>) {
     match expr {
         Expr::Tuple(ast::ExprTuple { elts, .. }) => {
             for target in elts {
@@ -70,7 +70,7 @@ fn check_expr(checker: &mut Checker, expr: &Expr, names: &mut Vec<Name>) {
                     expr.range(),
                 ));
             }
-            names.push(id.clone());
+            names.push(id);
         }
         _ => {}
     }

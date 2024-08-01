@@ -30,7 +30,7 @@ use std::path::Path;
 
 use itertools::Itertools;
 use log::debug;
-
+use ruff_allocator::Allocator;
 use ruff_diagnostics::{Diagnostic, IsolationLevel};
 use ruff_notebook::{CellOffsets, NotebookIndex};
 use ruff_python_ast::helpers::{collect_import_from_member, is_docstring_stmt, to_module_path};
@@ -175,10 +175,12 @@ impl ExpectedDocstringKind {
 }
 
 pub(crate) struct Checker<'a> {
+    allocator: &'a Allocator,
+
     /// The [`Parsed`] output for the source code.
-    parsed: &'a Parsed<ModModule>,
+    parsed: &'a Parsed<ModModule<'a>>,
     /// The [`Parsed`] output for the type annotation the checker is currently in.
-    parsed_type_annotation: Option<&'a Parsed<ModExpression>>,
+    parsed_type_annotation: Option<&'a Parsed<ModExpression<'a>>>,
     /// The [`Path`] to the file under analysis.
     path: &'a Path,
     /// The [`Path`] to the package containing the current file.
@@ -208,7 +210,7 @@ pub(crate) struct Checker<'a> {
     /// The [`Indexer`] for the current file, which contains the offsets of all comments and more.
     indexer: &'a Indexer,
     /// The [`Importer`] for the current file, which enables importing of other modules.
-    importer: Importer<'a>,
+    importer: Importer<'a, 'a>,
     /// The [`SemanticModel`], built up over the course of the AST traversal.
     semantic: SemanticModel<'a>,
     /// A set of deferred nodes to be visited after the current traversal (e.g., function bodies).
@@ -228,7 +230,8 @@ pub(crate) struct Checker<'a> {
 impl<'a> Checker<'a> {
     #[allow(clippy::too_many_arguments)]
     pub(crate) fn new(
-        parsed: &'a Parsed<ModModule>,
+        allocator: &'a Allocator,
+        parsed: &'a Parsed<ModModule<'a>>,
         settings: &'a LinterSettings,
         noqa_line_for: &'a NoqaMapping,
         noqa: flags::Noqa,
@@ -243,6 +246,7 @@ impl<'a> Checker<'a> {
         notebook_index: Option<&'a NotebookIndex>,
     ) -> Checker<'a> {
         Checker {
+            allocator,
             parsed,
             parsed_type_annotation: None,
             settings,
@@ -292,6 +296,10 @@ impl<'a> Checker<'a> {
             self.f_string_quote_style().unwrap_or(self.stylist.quote()),
             self.stylist.line_ending(),
         )
+    }
+
+    pub(crate) fn allocator(&self) -> &'a Allocator {
+        self.allocator
     }
 
     /// Returns the appropriate quoting for f-string by reversing the one used outside of
@@ -358,7 +366,7 @@ impl<'a> Checker<'a> {
     }
 
     /// The [`Importer`] for the current file, which enables importing of other modules.
-    pub(crate) const fn importer(&self) -> &Importer<'a> {
+    pub(crate) const fn importer(&self) -> &Importer<'a, 'a> {
         &self.importer
     }
 
@@ -407,8 +415,8 @@ impl<'a> Checker<'a> {
     }
 }
 
-impl<'a> Visitor<'a> for Checker<'a> {
-    fn visit_stmt(&mut self, stmt: &'a Stmt) {
+impl<'a> Visitor<'a, 'a> for Checker<'a> {
+    fn visit_stmt(&mut self, stmt: &'a Stmt<'a>) {
         // Step 0: Pre-processing
         self.semantic.push_node(stmt);
 
@@ -997,14 +1005,14 @@ impl<'a> Visitor<'a> for Checker<'a> {
         self.last_stmt_end = stmt.end();
     }
 
-    fn visit_annotation(&mut self, expr: &'a Expr) {
+    fn visit_annotation(&mut self, expr: &'a Expr<'a>) {
         let flags_snapshot = self.semantic.flags;
         self.semantic.flags |= SemanticModelFlags::TYPING_ONLY_ANNOTATION;
         self.visit_type_definition(expr);
         self.semantic.flags = flags_snapshot;
     }
 
-    fn visit_expr(&mut self, expr: &'a Expr) {
+    fn visit_expr(&mut self, expr: &'a Expr<'a>) {
         // Step 0: Pre-processing
         if self.source_type.is_stub()
             && self.semantic.in_class_base()
@@ -1064,7 +1072,7 @@ impl<'a> Visitor<'a> for Checker<'a> {
                 range: _,
             }) => {
                 if let Expr::Name(ast::ExprName { id, ctx, range: _ }) = func.as_ref() {
-                    if id == "locals" && ctx.is_load() {
+                    if *id == "locals" && ctx.is_load() {
                         let scope = self.semantic.current_scope_mut();
                         scope.set_uses_locals();
                     }
@@ -1497,7 +1505,7 @@ impl<'a> Visitor<'a> for Checker<'a> {
         self.semantic.pop_node();
     }
 
-    fn visit_except_handler(&mut self, except_handler: &'a ExceptHandler) {
+    fn visit_except_handler(&mut self, except_handler: &'a ExceptHandler<'a>) {
         let flags_snapshot = self.semantic.flags;
         self.semantic.flags |= SemanticModelFlags::EXCEPTION_HANDLER;
 
@@ -1559,7 +1567,7 @@ impl<'a> Visitor<'a> for Checker<'a> {
         analyze::parameters(parameters, self);
     }
 
-    fn visit_parameter(&mut self, parameter: &'a Parameter) {
+    fn visit_parameter(&mut self, parameter: &'a Parameter<'a>) {
         // Step 1: Binding.
         // Bind, but intentionally avoid walking the annotation, as we handle it
         // upstream.
@@ -1574,7 +1582,7 @@ impl<'a> Visitor<'a> for Checker<'a> {
         analyze::parameter(parameter, self);
     }
 
-    fn visit_pattern(&mut self, pattern: &'a Pattern) {
+    fn visit_pattern(&mut self, pattern: &'a Pattern<'a>) {
         // Step 1: Binding
         if let Pattern::MatchAs(ast::PatternMatchAs {
             name: Some(name), ..
@@ -1599,7 +1607,7 @@ impl<'a> Visitor<'a> for Checker<'a> {
         walk_pattern(self, pattern);
     }
 
-    fn visit_body(&mut self, body: &'a [Stmt]) {
+    fn visit_body(&mut self, body: &'a [Stmt<'a>]) {
         // Step 4: Analysis
         analyze::suite(body, self);
 
@@ -1609,7 +1617,7 @@ impl<'a> Visitor<'a> for Checker<'a> {
         }
     }
 
-    fn visit_match_case(&mut self, match_case: &'a MatchCase) {
+    fn visit_match_case(&mut self, match_case: &'a MatchCase<'a>) {
         self.visit_pattern(&match_case.pattern);
         if let Some(expr) = &match_case.guard {
             self.visit_boolean_test(expr);
@@ -1620,7 +1628,7 @@ impl<'a> Visitor<'a> for Checker<'a> {
         self.semantic.pop_branch();
     }
 
-    fn visit_type_param(&mut self, type_param: &'a ast::TypeParam) {
+    fn visit_type_param(&mut self, type_param: &'a ast::TypeParam<'a>) {
         // Step 1: Binding
         match type_param {
             ast::TypeParam::TypeVar(ast::TypeParamTypeVar { name, range, .. })
@@ -1678,7 +1686,7 @@ impl<'a> Visitor<'a> for Checker<'a> {
         }
     }
 
-    fn visit_f_string_element(&mut self, f_string_element: &'a FStringElement) {
+    fn visit_f_string_element(&mut self, f_string_element: &'a FStringElement<'a>) {
         let snapshot = self.semantic.flags;
         if f_string_element.is_expression() {
             self.semantic.flags |= SemanticModelFlags::F_STRING_REPLACEMENT_FIELD;
@@ -1690,13 +1698,13 @@ impl<'a> Visitor<'a> for Checker<'a> {
 
 impl<'a> Checker<'a> {
     /// Visit a [`Module`]. Returns `true` if the module contains a module-level docstring.
-    fn visit_module(&mut self, python_ast: &'a Suite) {
+    fn visit_module(&mut self, python_ast: &'a Suite<'a>) {
         analyze::module(python_ast, self);
     }
 
     /// Visit a list of [`Comprehension`] nodes, assumed to be the comprehensions that compose a
     /// generator expression, like a list or set comprehension.
-    fn visit_generators(&mut self, generators: &'a [Comprehension]) {
+    fn visit_generators(&mut self, generators: &'a [Comprehension<'a>]) {
         let mut iterator = generators.iter();
 
         let Some(generator) = iterator.next() else {
@@ -1762,7 +1770,7 @@ impl<'a> Checker<'a> {
     }
 
     /// Visit an body of [`Stmt`] nodes within a type-checking block.
-    fn visit_type_checking_block(&mut self, body: &'a [Stmt]) {
+    fn visit_type_checking_block(&mut self, body: &'a [Stmt<'a>]) {
         let snapshot = self.semantic.flags;
         self.semantic.flags |= SemanticModelFlags::TYPE_CHECKING_BLOCK;
         self.visit_body(body);
@@ -1770,7 +1778,7 @@ impl<'a> Checker<'a> {
     }
 
     /// Visit an [`Expr`], and treat it as a runtime-evaluated type annotation.
-    fn visit_runtime_evaluated_annotation(&mut self, expr: &'a Expr) {
+    fn visit_runtime_evaluated_annotation(&mut self, expr: &'a Expr<'a>) {
         let snapshot = self.semantic.flags;
         self.semantic.flags |= SemanticModelFlags::RUNTIME_EVALUATED_ANNOTATION;
         self.visit_type_definition(expr);
@@ -1778,7 +1786,7 @@ impl<'a> Checker<'a> {
     }
 
     /// Visit an [`Expr`], and treat it as a runtime-required type annotation.
-    fn visit_runtime_required_annotation(&mut self, expr: &'a Expr) {
+    fn visit_runtime_required_annotation(&mut self, expr: &'a Expr<'a>) {
         let snapshot = self.semantic.flags;
         self.semantic.flags |= SemanticModelFlags::RUNTIME_REQUIRED_ANNOTATION;
         self.visit_type_definition(expr);
@@ -1786,7 +1794,7 @@ impl<'a> Checker<'a> {
     }
 
     /// Visit an [`Expr`], and treat it as a type definition.
-    fn visit_type_definition(&mut self, expr: &'a Expr) {
+    fn visit_type_definition(&mut self, expr: &'a Expr<'a>) {
         let snapshot = self.semantic.flags;
         self.semantic.flags |= SemanticModelFlags::TYPE_DEFINITION;
         self.visit_expr(expr);
@@ -1794,7 +1802,7 @@ impl<'a> Checker<'a> {
     }
 
     /// Visit an [`Expr`], and treat it as _not_ a type definition.
-    fn visit_non_type_definition(&mut self, expr: &'a Expr) {
+    fn visit_non_type_definition(&mut self, expr: &'a Expr<'a>) {
         let snapshot = self.semantic.flags;
         self.semantic.flags -= SemanticModelFlags::TYPE_DEFINITION;
         self.visit_expr(expr);
@@ -1804,7 +1812,7 @@ impl<'a> Checker<'a> {
     /// Visit an [`Expr`], and treat it as a boolean test. This is useful for detecting whether an
     /// expressions return value is significant, or whether the calling context only relies on
     /// its truthiness.
-    fn visit_boolean_test(&mut self, expr: &'a Expr) {
+    fn visit_boolean_test(&mut self, expr: &'a Expr<'a>) {
         let snapshot = self.semantic.flags;
         self.semantic.flags |= SemanticModelFlags::BOOLEAN_TEST;
         self.visit_expr(expr);
@@ -1812,7 +1820,7 @@ impl<'a> Checker<'a> {
     }
 
     /// Visit an [`ElifElseClause`]
-    fn visit_elif_else_clause(&mut self, clause: &'a ElifElseClause) {
+    fn visit_elif_else_clause(&mut self, clause: &'a ElifElseClause<'a>) {
         if let Some(test) = &clause.test {
             self.visit_boolean_test(test);
         }
@@ -1927,7 +1935,7 @@ impl<'a> Checker<'a> {
         }
     }
 
-    fn handle_node_load(&mut self, expr: &Expr) {
+    fn handle_node_load(&mut self, expr: &Expr<'a>) {
         let Expr::Name(expr) = expr else {
             return;
         };
@@ -1948,21 +1956,21 @@ impl<'a> Checker<'a> {
             && match parent {
                 Stmt::Assign(ast::StmtAssign { targets, .. }) => {
                     if let Some(Expr::Name(ast::ExprName { id, .. })) = targets.first() {
-                        id == "__all__"
+                        *id == "__all__"
                     } else {
                         false
                     }
                 }
                 Stmt::AugAssign(ast::StmtAugAssign { target, .. }) => {
                     if let Expr::Name(ast::ExprName { id, .. }) = target.as_ref() {
-                        id == "__all__"
+                        *id == "__all__"
                     } else {
                         false
                     }
                 }
                 Stmt::AnnAssign(ast::StmtAnnAssign { target, .. }) => {
                     if let Expr::Name(ast::ExprName { id, .. }) = target.as_ref() {
-                        id == "__all__"
+                        *id == "__all__"
                     } else {
                         false
                     }
@@ -2036,7 +2044,7 @@ impl<'a> Checker<'a> {
         self.add_binding(id, expr.range(), BindingKind::Assignment, flags);
     }
 
-    fn handle_node_delete(&mut self, expr: &'a Expr) {
+    fn handle_node_delete(&mut self, expr: &'a Expr<'a>) {
         let Expr::Name(ast::ExprName { id, .. }) = expr else {
             return;
         };
@@ -2172,7 +2180,7 @@ impl<'a> Checker<'a> {
             let type_definitions = std::mem::take(&mut self.visit.string_type_definitions);
             for (string_expr, snapshot) in type_definitions {
                 if let Ok((parsed_annotation, kind)) =
-                    parse_type_annotation(string_expr, self.locator.contents())
+                    parse_type_annotation(string_expr, self.locator.contents(), self.allocator)
                 {
                     let parsed_annotation = allocator.alloc(parsed_annotation);
                     self.parsed_type_annotation = Some(parsed_annotation);
@@ -2354,8 +2362,9 @@ impl<'a> Checker<'a> {
 }
 
 #[allow(clippy::too_many_arguments)]
-pub(crate) fn check_ast(
-    parsed: &Parsed<ModModule>,
+pub(crate) fn check_ast<'a>(
+    allocator: &'a Allocator,
+    parsed: &Parsed<ModModule<'a>>,
     locator: &Locator,
     stylist: &Stylist,
     indexer: &Indexer,
@@ -2389,6 +2398,7 @@ pub(crate) fn check_ast(
     };
 
     let mut checker = Checker::new(
+        allocator,
         parsed,
         settings,
         noqa_line_for,

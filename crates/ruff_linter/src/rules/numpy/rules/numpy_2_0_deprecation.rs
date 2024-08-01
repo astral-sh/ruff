@@ -764,7 +764,7 @@ fn is_guarded_by_try_except(
             try_block_contains_undeprecated_attribute(try_node, &replacement.details, semantic)
         }
         Expr::Name(ast::ExprName { id, .. }) => {
-            let Some(binding_id) = semantic.lookup_symbol(id.as_str()) else {
+            let Some(binding_id) = semantic.lookup_symbol(id) else {
                 return false;
             };
             let binding = semantic.binding(binding_id);
@@ -840,7 +840,7 @@ impl<'a> AttributeSearcher<'a> {
     }
 }
 
-impl Visitor<'_> for AttributeSearcher<'_> {
+impl Visitor<'_, '_> for AttributeSearcher<'_> {
     fn visit_expr(&mut self, expr: &'_ Expr) {
         if self.found_attribute {
             return;
@@ -911,7 +911,7 @@ impl<'a> ImportSearcher<'a> {
     }
 }
 
-impl StatementVisitor<'_> for ImportSearcher<'_> {
+impl StatementVisitor<'_, '_> for ImportSearcher<'_> {
     fn visit_stmt(&mut self, stmt: &ast::Stmt) {
         if self.found_import {
             return;

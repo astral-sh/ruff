@@ -56,13 +56,13 @@ impl Violation for FunctionUsesLoopVariable {
 
 #[derive(Default)]
 struct LoadedNamesVisitor<'a> {
-    loaded: Vec<&'a ast::ExprName>,
-    stored: Vec<&'a ast::ExprName>,
+    loaded: Vec<&'a ast::ExprName<'a>>,
+    stored: Vec<&'a ast::ExprName<'a>>,
 }
 
 /// `Visitor` to collect all used identifiers in a statement.
-impl<'a> Visitor<'a> for LoadedNamesVisitor<'a> {
-    fn visit_expr(&mut self, expr: &'a Expr) {
+impl<'a> Visitor<'a, 'a> for LoadedNamesVisitor<'a> {
+    fn visit_expr(&mut self, expr: &'a Expr<'a>) {
         match expr {
             Expr::Name(name) => match &name.ctx {
                 ExprContext::Load => self.loaded.push(name),
@@ -76,14 +76,14 @@ impl<'a> Visitor<'a> for LoadedNamesVisitor<'a> {
 
 #[derive(Default)]
 struct SuspiciousVariablesVisitor<'a> {
-    names: Vec<&'a ast::ExprName>,
-    safe_functions: Vec<&'a Expr>,
+    names: Vec<&'a ast::ExprName<'a>>,
+    safe_functions: Vec<&'a Expr<'a>>,
 }
 
 /// `Visitor` to collect all suspicious variables (those referenced in
 /// functions, but not bound as arguments).
-impl<'a> Visitor<'a> for SuspiciousVariablesVisitor<'a> {
-    fn visit_stmt(&mut self, stmt: &'a Stmt) {
+impl<'a> Visitor<'a, 'a> for SuspiciousVariablesVisitor<'a> {
+    fn visit_stmt(&mut self, stmt: &'a Stmt<'a>) {
         match stmt {
             Stmt::FunctionDef(ast::StmtFunctionDef {
                 parameters, body, ..
@@ -122,7 +122,7 @@ impl<'a> Visitor<'a> for SuspiciousVariablesVisitor<'a> {
         visitor::walk_stmt(self, stmt);
     }
 
-    fn visit_expr(&mut self, expr: &'a Expr) {
+    fn visit_expr(&mut self, expr: &'a Expr<'a>) {
         match expr {
             Expr::Call(ast::ExprCall {
                 func,
@@ -205,11 +205,11 @@ struct NamesFromAssignmentsVisitor<'a> {
 }
 
 /// `Visitor` to collect all names used in an assignment expression.
-impl<'a> Visitor<'a> for NamesFromAssignmentsVisitor<'a> {
-    fn visit_expr(&mut self, expr: &'a Expr) {
+impl<'a> Visitor<'a, 'a> for NamesFromAssignmentsVisitor<'a> {
+    fn visit_expr(&mut self, expr: &Expr<'a>) {
         match expr {
             Expr::Name(ast::ExprName { id, .. }) => {
-                self.names.push(id.as_str());
+                self.names.push(id);
             }
             Expr::Starred(ast::ExprStarred { value, .. }) => {
                 self.visit_expr(value);
@@ -230,8 +230,8 @@ struct AssignedNamesVisitor<'a> {
 }
 
 /// `Visitor` to collect all used identifiers in a statement.
-impl<'a> Visitor<'a> for AssignedNamesVisitor<'a> {
-    fn visit_stmt(&mut self, stmt: &'a Stmt) {
+impl<'a> Visitor<'a, 'a> for AssignedNamesVisitor<'a> {
+    fn visit_stmt(&mut self, stmt: &'a Stmt<'a>) {
         if stmt.is_function_def_stmt() {
             // Don't recurse.
             return;
@@ -258,7 +258,7 @@ impl<'a> Visitor<'a> for AssignedNamesVisitor<'a> {
         visitor::walk_stmt(self, stmt);
     }
 
-    fn visit_expr(&mut self, expr: &'a Expr) {
+    fn visit_expr(&mut self, expr: &'a Expr<'a>) {
         if expr.is_lambda_expr() {
             // Don't recurse.
             return;
@@ -267,7 +267,7 @@ impl<'a> Visitor<'a> for AssignedNamesVisitor<'a> {
         visitor::walk_expr(self, expr);
     }
 
-    fn visit_comprehension(&mut self, comprehension: &'a Comprehension) {
+    fn visit_comprehension(&mut self, comprehension: &'a Comprehension<'a>) {
         let mut visitor = NamesFromAssignmentsVisitor::default();
         visitor.visit_expr(&comprehension.target);
         self.names.extend(visitor.names);
@@ -303,7 +303,7 @@ pub(crate) fn function_uses_loop_variable(checker: &mut Checker, node: &Node) {
         // If a variable was used in a function or lambda body, and assigned in the
         // loop, flag it.
         for name in suspicious_variables {
-            if reassigned_in_loop.contains(&name.id.as_str()) {
+            if reassigned_in_loop.contains(&name.id) {
                 if !checker.flake8_bugbear_seen.contains(&name.range()) {
                     checker.flake8_bugbear_seen.push(name.range());
                     checker.diagnostics.push(Diagnostic::new(

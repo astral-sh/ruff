@@ -116,14 +116,14 @@ pub(crate) fn zip_dict_keys_and_values(checker: &mut Checker, expr: &ast::ExprCa
     checker.diagnostics.push(diagnostic);
 }
 
-fn get_var_attr(expr: &Expr) -> Option<(&ExprName, &Identifier)> {
+fn get_var_attr<'ast>(expr: &Expr<'ast>) -> Option<(&'ast ExprName<'ast>, &'ast Identifier<'ast>)> {
     let Expr::Call(ast::ExprCall { func, .. }) = expr else {
         return None;
     };
-    let Expr::Attribute(ExprAttribute { value, attr, .. }) = func.as_ref() else {
+    let Expr::Attribute(ExprAttribute { value, attr, .. }) = &**func else {
         return None;
     };
-    let Expr::Name(var_name) = value.as_ref() else {
+    let Expr::Name(var_name) = &**value else {
         return None;
     };
     Some((var_name, attr))

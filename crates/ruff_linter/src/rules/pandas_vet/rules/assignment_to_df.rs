@@ -45,7 +45,7 @@ pub(crate) fn assignment_to_df(targets: &[Expr]) -> Option<Diagnostic> {
     let Expr::Name(ast::ExprName { id, .. }) = target else {
         return None;
     };
-    if id != "df" {
+    if *id != "df" {
         return None;
     }
     Some(Diagnostic::new(PandasDfVariableName, target.range()))

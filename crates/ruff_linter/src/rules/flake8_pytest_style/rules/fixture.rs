@@ -622,12 +622,12 @@ impl fmt::Display for Parentheses {
 struct SkipFunctionsVisitor<'a> {
     has_return_with_value: bool,
     has_yield_from: bool,
-    yield_statements: Vec<&'a Expr>,
-    addfinalizer_call: Option<&'a Expr>,
+    yield_statements: Vec<&'a Expr<'a>>,
+    addfinalizer_call: Option<&'a Expr<'a>>,
 }
 
-impl<'a> Visitor<'a> for SkipFunctionsVisitor<'a> {
-    fn visit_stmt(&mut self, stmt: &'a Stmt) {
+impl<'a> Visitor<'a, 'a> for SkipFunctionsVisitor<'a> {
+    fn visit_stmt(&mut self, stmt: &'a Stmt<'a>) {
         match stmt {
             Stmt::Return(ast::StmtReturn { value, range: _ }) => {
                 if value.is_some() {
@@ -639,7 +639,7 @@ impl<'a> Visitor<'a> for SkipFunctionsVisitor<'a> {
         }
     }
 
-    fn visit_expr(&mut self, expr: &'a Expr) {
+    fn visit_expr(&mut self, expr: &'a Expr<'a>) {
         match expr {
             Expr::YieldFrom(_) => {
                 self.has_yield_from = true;
@@ -663,10 +663,10 @@ impl<'a> Visitor<'a> for SkipFunctionsVisitor<'a> {
     }
 }
 
-fn fixture_decorator<'a>(
-    decorators: &'a [Decorator],
+fn fixture_decorator<'a, 'ast>(
+    decorators: &'a [Decorator<'ast>],
     semantic: &SemanticModel,
-) -> Option<&'a Decorator> {
+) -> Option<&'a Decorator<'ast>> {
     decorators.iter().find(|decorator| {
         is_pytest_fixture(decorator, semantic) || is_pytest_yield_fixture(decorator, semantic)
     })

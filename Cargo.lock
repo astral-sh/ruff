@@ -2301,6 +2301,7 @@ dependencies = [
  "pyproject-toml",
  "quick-junit",
  "regex",
+ "ruff_allocator",
  "ruff_cache",
  "ruff_diagnostics",
  "ruff_macros",
@@ -2400,6 +2401,7 @@ name = "ruff_python_codegen"
 version = "0.0.0"
 dependencies = [
  "once_cell",
+ "ruff_allocator",
  "ruff_python_ast",
  "ruff_python_literal",
  "ruff_python_parser",

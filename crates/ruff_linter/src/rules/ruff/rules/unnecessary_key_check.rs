@@ -108,8 +108,8 @@ pub(crate) fn unnecessary_key_check(checker: &mut Checker, expr: &Expr) {
             "{}.get({})",
             checker.locator().slice(
                 parenthesized_range(
-                    obj_right.into(),
-                    right.into(),
+                    (&*obj_right).into(),
+                    (&*right).into(),
                     checker.comment_ranges(),
                     checker.locator().contents(),
                 )
@@ -117,8 +117,8 @@ pub(crate) fn unnecessary_key_check(checker: &mut Checker, expr: &Expr) {
             ),
             checker.locator().slice(
                 parenthesized_range(
-                    key_right.into(),
-                    right.into(),
+                    (&*key_right).into(),
+                    (&*right).into(),
                     checker.comment_ranges(),
                     checker.locator().contents(),
                 )

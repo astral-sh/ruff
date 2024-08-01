@@ -65,13 +65,15 @@ pub(crate) fn remove_import_members(
 
 #[cfg(test)]
 mod tests {
+    use ruff_allocator::Allocator;
     use ruff_python_parser::parse_module;
     use ruff_source_file::Locator;
 
     use super::remove_import_members;
 
     fn test_helper(source: &str, members_to_remove: &[&str]) -> String {
-        let parsed = parse_module(source).unwrap();
+        let allocator = Allocator::new();
+        let parsed = parse_module(source, &allocator).unwrap();
         let import_from_stmt = parsed
             .suite()
             .first()

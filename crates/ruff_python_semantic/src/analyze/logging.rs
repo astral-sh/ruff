@@ -78,7 +78,10 @@ pub fn is_logger_candidate(
 
 /// If the keywords to a logging call contain `exc_info=True` or `exc_info=sys.exc_info()`,
 /// return the `Keyword` for `exc_info`.
-pub fn exc_info<'a>(arguments: &'a Arguments, semantic: &SemanticModel) -> Option<&'a Keyword> {
+pub fn exc_info<'a, 'ast>(
+    arguments: &'a Arguments<'ast>,
+    semantic: &SemanticModel<'a>,
+) -> Option<&'a Keyword<'ast>> {
     let exc_info = arguments.find_keyword("exc_info")?;
 
     // Ex) `logging.error("...", exc_info=True)`

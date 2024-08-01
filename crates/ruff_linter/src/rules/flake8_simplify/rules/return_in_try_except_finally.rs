@@ -50,7 +50,7 @@ impl Violation for ReturnInTryExceptFinally {
     }
 }
 
-fn find_return(stmts: &[Stmt]) -> Option<&Stmt> {
+fn find_return<'a, 'ast>(stmts: &'a [Stmt<'ast>]) -> Option<&'a Stmt<'ast>> {
     stmts.iter().find(|stmt| stmt.is_return_stmt())
 }
 

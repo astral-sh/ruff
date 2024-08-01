@@ -373,6 +373,7 @@ impl TodoDirectiveKind {
 
 #[cfg(test)]
 mod tests {
+    use ruff_allocator::Allocator;
     use ruff_python_parser::parse_module;
     use ruff_python_trivia::CommentRanges;
     use ruff_text_size::{TextLen, TextRange, TextSize};
@@ -388,7 +389,8 @@ mod tests {
     use super::IsortDirectives;
 
     fn noqa_mappings(contents: &str) -> NoqaMapping {
-        let parsed = parse_module(contents).unwrap();
+        let allocator = Allocator::new();
+        let parsed = parse_module(contents, &allocator).unwrap();
         let locator = Locator::new(contents);
         let indexer = Indexer::from_tokens(parsed.tokens(), &locator);
 
@@ -563,7 +565,8 @@ assert foo, \
     }
 
     fn isort_directives(contents: &str) -> IsortDirectives {
-        let parsed = parse_module(contents).unwrap();
+        let allocator = Allocator::new();
+        let parsed = parse_module(contents, &allocator).unwrap();
         let locator = Locator::new(contents);
         let comment_ranges = CommentRanges::from(parsed.tokens());
         extract_isort_directives(&locator, &comment_ranges)

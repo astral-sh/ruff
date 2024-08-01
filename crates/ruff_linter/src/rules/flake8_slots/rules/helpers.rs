@@ -7,7 +7,7 @@ pub(super) fn has_slots(body: &[Stmt]) -> bool {
             Stmt::Assign(ast::StmtAssign { targets, .. }) => {
                 for target in targets {
                     if let Expr::Name(ast::ExprName { id, .. }) = target {
-                        if id.as_str() == "__slots__" {
+                        if *id == "__slots__" {
                             return true;
                         }
                     }
@@ -15,7 +15,7 @@ pub(super) fn has_slots(body: &[Stmt]) -> bool {
             }
             Stmt::AnnAssign(ast::StmtAnnAssign { target, .. }) => {
                 if let Expr::Name(ast::ExprName { id, .. }) = target.as_ref() {
-                    if id.as_str() == "__slots__" {
+                    if *id == "__slots__" {
                         return true;
                     }
                 }

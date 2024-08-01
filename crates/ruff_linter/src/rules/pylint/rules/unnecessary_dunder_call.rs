@@ -95,7 +95,7 @@ pub(crate) fn unnecessary_dunder_call(checker: &mut Checker, call: &ast::ExprCal
     if let Expr::Call(ast::ExprCall { func, .. }) = value.as_ref() {
         if checker.semantic().has_builtin_binding("super") {
             if let Expr::Name(ast::ExprName { id, .. }) = func.as_ref() {
-                if id == "super" {
+                if *id == "super" {
                     return;
                 }
             }

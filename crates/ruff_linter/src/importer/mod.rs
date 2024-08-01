@@ -26,9 +26,9 @@ use crate::importer::insertion::Insertion;
 
 mod insertion;
 
-pub(crate) struct Importer<'a> {
+pub(crate) struct Importer<'a, 'ast> {
     /// The Python AST to which we are adding imports.
-    python_ast: &'a [Stmt],
+    python_ast: &'a [Stmt<'ast>],
     /// The tokens representing the Python AST.
     tokens: &'a Tokens,
     /// The [`Locator`] for the Python AST.
@@ -36,14 +36,14 @@ pub(crate) struct Importer<'a> {
     /// The [`Stylist`] for the Python AST.
     stylist: &'a Stylist<'a>,
     /// The list of visited, top-level runtime imports in the Python AST.
-    runtime_imports: Vec<&'a Stmt>,
+    runtime_imports: Vec<&'a Stmt<'ast>>,
     /// The list of visited, top-level `if TYPE_CHECKING:` blocks in the Python AST.
-    type_checking_blocks: Vec<&'a Stmt>,
+    type_checking_blocks: Vec<&'a Stmt<'ast>>,
 }
 
-impl<'a> Importer<'a> {
+impl<'a, 'ast> Importer<'a, 'ast> {
     pub(crate) fn new(
-        parsed: &'a Parsed<ModModule>,
+        parsed: &'a Parsed<ModModule<'ast>>,
         locator: &'a Locator<'a>,
         stylist: &'a Stylist<'a>,
     ) -> Self {
@@ -58,12 +58,12 @@ impl<'a> Importer<'a> {
     }
 
     /// Visit a top-level import statement.
-    pub(crate) fn visit_import(&mut self, import: &'a Stmt) {
+    pub(crate) fn visit_import(&mut self, import: &'a Stmt<'ast>) {
         self.runtime_imports.push(import);
     }
 
     /// Visit a top-level type-checking block.
-    pub(crate) fn visit_type_checking_block(&mut self, type_checking_block: &'a Stmt) {
+    pub(crate) fn visit_type_checking_block(&mut self, type_checking_block: &'a Stmt<'ast>) {
         self.type_checking_blocks.push(type_checking_block);
     }
 
@@ -468,7 +468,7 @@ impl<'a> Importer<'a> {
     }
 
     /// Return the import statement that precedes the given position, if any.
-    fn preceding_import(&self, at: TextSize) -> Option<&'a Stmt> {
+    fn preceding_import(&self, at: TextSize) -> Option<&'a Stmt<'a>> {
         self.runtime_imports
             .partition_point(|stmt| stmt.start() < at)
             .checked_sub(1)
@@ -476,7 +476,7 @@ impl<'a> Importer<'a> {
     }
 
     /// Return the `TYPE_CHECKING` block that precedes the given position, if any.
-    fn preceding_type_checking_block(&self, at: TextSize) -> Option<&'a Stmt> {
+    fn preceding_type_checking_block(&self, at: TextSize) -> Option<&'a Stmt<'a>> {
         let block = self.type_checking_blocks.first()?;
         if block.start() <= at {
             Some(block)
@@ -562,7 +562,7 @@ impl<'a> ImportRequest<'a> {
 /// An existing list of module or member imports, located within an import statement.
 pub(crate) struct ImportedMembers<'a> {
     /// The import statement.
-    pub(crate) statement: &'a Stmt,
+    pub(crate) statement: &'a Stmt<'a>,
     /// The "names" of the imported members.
     pub(crate) names: Vec<&'a str>,
 }

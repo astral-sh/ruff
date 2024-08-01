@@ -104,7 +104,7 @@ impl<'a> AvoidableEscapedQuoteChecker<'a> {
     }
 }
 
-impl Visitor<'_> for AvoidableEscapedQuoteChecker<'_> {
+impl Visitor<'_, '_> for AvoidableEscapedQuoteChecker<'_> {
     fn visit_string_literal(&mut self, string_literal: &'_ ast::StringLiteral) {
         if let Some(diagnostic) = check_string_or_bytes(
             self.locator,
@@ -323,7 +323,7 @@ struct ContainsAnyString {
     result: bool,
 }
 
-impl Visitor<'_> for ContainsAnyString {
+impl Visitor<'_, '_> for ContainsAnyString {
     fn visit_string_literal(&mut self, _: &'_ ast::StringLiteral) {
         self.result = true;
     }

@@ -663,17 +663,22 @@ This indicates a bug in Ruff. If you could open an issue at:
 }
 
 #[derive(Debug, Clone)]
-pub enum ParseSource {
+pub enum ParseSource<'a> {
     /// Parse the [`Parsed`] from the given source code.
     None,
     /// Use the precomputed [`Parsed`].
-    Precomputed(Parsed<ModModule>),
+    Precomputed(Parsed<ModModule<'a>>),
 }
 
-impl ParseSource {
+impl<'a> ParseSource<'a> {
     /// Consumes the [`ParseSource`] and returns the parsed [`Parsed`], parsing the source code if
     /// necessary.
-    fn into_parsed(self, source_kind: &SourceKind, source_type: PySourceType) -> Parsed<ModModule> {
+    fn into_parsed(
+        self,
+        source_kind: &SourceKind,
+        source_type: PySourceType,
+        allocator: &'a ruff_allocator::Allocator,
+    ) -> Parsed<ModModule<'a>> {
         match self {
             ParseSource::None => {
                 ruff_python_parser::parse_unchecked_source(source_kind.source_code(), source_type)

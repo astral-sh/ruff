@@ -68,7 +68,7 @@ impl Violation for MultipleWithStatements {
 
 /// Returns a boolean indicating whether it's an async with statement, the items
 /// and body.
-fn next_with(body: &[Stmt]) -> Option<(bool, &[WithItem], &[Stmt])> {
+fn next_with<'a>(body: &'a [Stmt<'a>]) -> Option<(bool, &'a [WithItem<'a>], &'a [Stmt<'a>])> {
     let [Stmt::With(ast::StmtWith {
         is_async,
         items,

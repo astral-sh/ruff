@@ -1,4 +1,5 @@
 use ast::{Expr, StmtAugAssign};
+use ruff_allocator::{Allocator, CloneIn};
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast as ast;
@@ -140,13 +141,14 @@ fn augmented_assignment(
     operator: Operator,
     right_operand: &Expr,
     range: TextRange,
+    allocator: &Allocator,
 ) -> Edit {
     Edit::range_replacement(
         generator.stmt(&ast::Stmt::AugAssign(StmtAugAssign {
             range: TextRange::default(),
-            target: Box::new(target.clone()),
+            target: ruff_allocator::Box::new_in(target.clone_in(allocator), allocator),
             op: operator,
-            value: Box::new(right_operand.clone()),
+            value: ruff_allocator::Box::new_in(right_operand.clone_in(allocator), allocator),
         })),
         range,
     )

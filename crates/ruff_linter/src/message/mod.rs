@@ -305,13 +305,13 @@ impl<'a> EmitterContext<'a> {
 
 #[cfg(test)]
 mod tests {
-    use rustc_hash::FxHashMap;
-
+    use ruff_allocator::Allocator;
     use ruff_diagnostics::{Diagnostic, DiagnosticKind, Edit, Fix};
     use ruff_notebook::NotebookIndex;
     use ruff_python_parser::{parse_unchecked, Mode};
     use ruff_source_file::{Locator, OneIndexed, SourceFileBuilder};
     use ruff_text_size::{Ranged, TextRange, TextSize};
+    use rustc_hash::FxHashMap;
 
     use crate::message::{Emitter, EmitterContext, Message};
 
@@ -324,7 +324,8 @@ if call(foo
 ";
         let locator = Locator::new(source);
         let source_file = SourceFileBuilder::new("syntax_errors.py", source).finish();
-        parse_unchecked(source, Mode::Module)
+        let allocator = Allocator::new();
+        parse_unchecked(source, Mode::Module, &allocator)
             .errors()
             .iter()
             .map(|parse_error| {

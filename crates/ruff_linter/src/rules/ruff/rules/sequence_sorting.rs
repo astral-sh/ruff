@@ -184,10 +184,10 @@ impl SequenceKind {
 ///
 /// 1. The two iterables that are zipped together have the same length; and,
 /// 2. The length of both iterables is >= 2
-struct SequenceElements<'a>(Vec<(&'a &'a str, &'a ast::Expr)>);
+struct SequenceElements<'a>(Vec<(&'a &'a str, &'a ast::Expr<'a>)>);
 
 impl<'a> SequenceElements<'a> {
-    fn new(elements: &'a [&str], elts: &'a [ast::Expr]) -> Self {
+    fn new(elements: &'a [&str], elts: &'a [ast::Expr<'a>]) -> Self {
         assert_eq!(elements.len(), elts.len());
         assert!(
             elements.len() >= 2,
@@ -205,7 +205,7 @@ impl<'a> SequenceElements<'a> {
     fn into_sorted_elts(
         mut self,
         sorting_style: SortingStyle,
-    ) -> impl Iterator<Item = &'a ast::Expr> {
+    ) -> impl Iterator<Item = &'a ast::Expr<'a>> {
         self.0
             .sort_by(|(elem1, _), (elem2, _)| sorting_style.compare(elem1, elem2));
         self.0.into_iter().map(|(_, elt)| elt)
@@ -261,7 +261,7 @@ pub(super) enum SortClassification<'a> {
 }
 
 impl<'a> SortClassification<'a> {
-    pub(super) fn of_elements(elements: &'a [ast::Expr], sorting_style: SortingStyle) -> Self {
+    pub(super) fn of_elements(elements: &'a [ast::Expr<'a>], sorting_style: SortingStyle) -> Self {
         // If it's of length less than 2, it has to be sorted already
         let Some((first, rest @ [_, ..])) = elements.split_first() else {
             return Self::Sorted;

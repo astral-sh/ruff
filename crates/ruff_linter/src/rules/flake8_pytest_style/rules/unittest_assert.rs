@@ -1,10 +1,13 @@
 use anyhow::{anyhow, bail, Result};
+use itertools::all;
+use rustc_hash::{FxBuildHasher, FxHashMap};
+
+use ruff_allocator::{Allocator, CloneIn};
 use ruff_python_ast::name::Name;
 use ruff_python_ast::{
     self as ast, Arguments, CmpOp, Expr, ExprContext, Identifier, Keyword, Stmt, UnaryOp,
 };
 use ruff_text_size::TextRange;
-use rustc_hash::{FxBuildHasher, FxHashMap};
 
 /// An enum to represent the different types of assertions present in the
 /// `unittest` module. Note: any variants that can't be replaced with plain
@@ -161,19 +164,24 @@ impl TryFrom<&str> for UnittestAssert {
     }
 }
 
-fn assert(expr: &Expr, msg: Option<&Expr>) -> Stmt {
+fn assert<'ast>(expr: &Expr, msg: Option<&Expr>, allocator: &'ast Allocator) -> Stmt<'ast> {
     Stmt::Assert(ast::StmtAssert {
-        test: Box::new(expr.clone()),
-        msg: msg.map(|msg| Box::new(msg.clone())),
+        test: ruff_allocator::Box::new_in(expr.clone_in(allocator), allocator),
+        msg: msg.map(|msg| ruff_allocator::Box::new_in(msg.clone_in(allocator), allocator)),
         range: TextRange::default(),
     })
 }
 
-fn compare(left: &Expr, cmp_op: CmpOp, right: &Expr) -> Expr {
+fn compare<'ast>(
+    left: &Expr,
+    cmp_op: CmpOp,
+    right: &Expr,
+    allocator: &'ast Allocator,
+) -> Expr<'ast> {
     Expr::Compare(ast::ExprCompare {
-        left: Box::new(left.clone()),
-        ops: Box::from([cmp_op]),
-        comparators: Box::from([right.clone()]),
+        left: ruff_allocator::Box::new_in(left.clone_in(allocator), allocator),
+        ops: allocator.alloc_slice_fill_iter([cmp_op.clone_in(allocator)]),
+        comparators: allocator.alloc_slice_fill_iter([right.clone_in(allocator)]),
         range: TextRange::default(),
     })
 }
@@ -276,7 +284,12 @@ impl UnittestAssert {
         Ok(args_map)
     }
 
-    pub(crate) fn generate_assert(self, args: &[Expr], keywords: &[Keyword]) -> Result<Stmt> {
+    pub(crate) fn generate_assert<'ast>(
+        self,
+        args: &[Expr],
+        keywords: &[Keyword],
+        allocator: &'ast Allocator,
+    ) -> Result<Stmt<'ast>> {
         let args = self.args_map(args, keywords)?;
         match self {
             UnittestAssert::True
@@ -292,13 +305,17 @@ impl UnittestAssert {
                         assert(
                             &Expr::UnaryOp(ast::ExprUnaryOp {
                                 op: UnaryOp::Not,
-                                operand: Box::new(expr.clone()),
+                                operand: ruff_allocator::Box::new_in(
+                                    expr.clone_in(allocator),
+                                    allocator,
+                                ),
                                 range: TextRange::default(),
                             }),
                             msg,
+                            allocator,
                         )
                     } else {
-                        assert(expr, msg)
+                        assert(expr, msg, allocator)
                     },
                 )
             }
@@ -336,8 +353,8 @@ impl UnittestAssert {
                     UnittestAssert::IsNot => CmpOp::IsNot,
                     _ => unreachable!(),
                 };
-                let expr = compare(first, cmp_op, second);
-                Ok(assert(&expr, msg))
+                let expr = compare(first, cmp_op, second, allocator);
+                Ok(assert(&expr, msg, allocator))
             }
             UnittestAssert::In | UnittestAssert::NotIn => {
                 let member = args
@@ -352,8 +369,8 @@ impl UnittestAssert {
                 } else {
                     CmpOp::NotIn
                 };
-                let expr = compare(member, cmp_op, container);
-                Ok(assert(&expr, msg))
+                let expr = compare(member, cmp_op, container, allocator);
+                Ok(assert(&expr, msg, allocator))
             }
             UnittestAssert::IsNone | UnittestAssert::IsNotNone => {
                 let expr = args
@@ -368,8 +385,8 @@ impl UnittestAssert {
                 let node = Expr::NoneLiteral(ast::ExprNoneLiteral {
                     range: TextRange::default(),
                 });
-                let expr = compare(expr, cmp_op, &node);
-                Ok(assert(&expr, msg))
+                let expr = compare(expr, cmp_op, &node, allocator);
+                Ok(assert(&expr, msg, allocator))
             }
             UnittestAssert::IsInstance | UnittestAssert::NotIsInstance => {
                 let obj = args
@@ -380,30 +397,33 @@ impl UnittestAssert {
                     .ok_or_else(|| anyhow!("Missing argument `cls`"))?;
                 let msg = args.get("msg").copied();
                 let node = ast::ExprName {
-                    id: Name::new_static("isinstance"),
+                    id: "isinstance",
                     ctx: ExprContext::Load,
                     range: TextRange::default(),
                 };
                 let node1 = ast::ExprCall {
-                    func: Box::new(node.into()),
+                    func: ruff_allocator::Box::new_in(node.into(), allocator),
                     arguments: Arguments {
-                        args: Box::from([(**obj).clone(), (**cls).clone()]),
-                        keywords: Box::from([]),
+                        args: allocator.alloc_slice_fill_iter([
+                            (**obj).clone_in(allocator),
+                            (**cls).clone_in(allocator),
+                        ]),
+                        keywords: &mut [],
                         range: TextRange::default(),
                     },
                     range: TextRange::default(),
                 };
                 let isinstance = node1.into();
                 if matches!(self, UnittestAssert::IsInstance) {
-                    Ok(assert(&isinstance, msg))
+                    Ok(assert(&isinstance, msg, allocator))
                 } else {
                     let node = ast::ExprUnaryOp {
                         op: UnaryOp::Not,
-                        operand: Box::new(isinstance),
+                        operand: ruff_allocator::Box::new_in(isinstance, allocator),
                         range: TextRange::default(),
                     };
                     let expr = node.into();
-                    Ok(assert(&expr, msg))
+                    Ok(assert(&expr, msg, allocator))
                 }
             }
             UnittestAssert::Regex
@@ -418,18 +438,18 @@ impl UnittestAssert {
                     .ok_or_else(|| anyhow!("Missing argument `regex`"))?;
                 let msg = args.get("msg").copied();
                 let node = ast::ExprName {
-                    id: Name::new_static("re"),
+                    id: "re",
                     ctx: ExprContext::Load,
                     range: TextRange::default(),
                 };
                 let node1 = ast::ExprAttribute {
-                    value: Box::new(node.into()),
-                    attr: Identifier::new("search".to_string(), TextRange::default()),
+                    value: ruff_allocator::Box::new_in(node.into(), allocator),
+                    attr: Identifier::new("search", TextRange::default()),
                     ctx: ExprContext::Load,
                     range: TextRange::default(),
                 };
                 let node2 = ast::ExprCall {
-                    func: Box::new(node1.into()),
+                    func: ruff_allocator::Box::new_in(node1.into(), allocator),
                     arguments: Arguments {
                         args: Box::from([(**regex).clone(), (**text).clone()]),
                         keywords: Box::from([]),
@@ -439,14 +459,14 @@ impl UnittestAssert {
                 };
                 let re_search = node2.into();
                 if matches!(self, UnittestAssert::Regex | UnittestAssert::RegexpMatches) {
-                    Ok(assert(&re_search, msg))
+                    Ok(assert(&re_search, msg, allocator))
                 } else {
                     let node = ast::ExprUnaryOp {
                         op: UnaryOp::Not,
                         operand: Box::new(re_search),
                         range: TextRange::default(),
                     };
-                    Ok(assert(&node.into(), msg))
+                    Ok(assert(&node.into(), msg, allocator))
                 }
             }
             _ => bail!("Cannot fix `{self}`"),

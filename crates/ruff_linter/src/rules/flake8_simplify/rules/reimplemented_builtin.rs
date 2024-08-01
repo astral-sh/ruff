@@ -1,3 +1,5 @@
+use itertools::all;
+use ruff_allocator::{Allocator, CloneIn};
 use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::helpers::any_over_expr;
@@ -58,7 +60,11 @@ impl Violation for ReimplementedBuiltin {
 }
 
 /// SIM110, SIM111
-pub(crate) fn convert_for_loop_to_any_all(checker: &mut Checker, stmt: &Stmt) {
+pub(crate) fn convert_for_loop_to_any_all(
+    checker: &mut Checker,
+    stmt: &Stmt,
+    allocator: &Allocator,
+) {
     if !checker.semantic().current_scope().kind.is_function() {
         return;
     }
@@ -90,11 +96,12 @@ pub(crate) fn convert_for_loop_to_any_all(checker: &mut Checker, stmt: &Stmt) {
         // Replace with `any`.
         (true, false) => {
             let contents = return_stmt(
-                Name::new_static("any"),
+                "any",
                 loop_.test,
                 loop_.target,
                 loop_.iter,
                 checker.generator(),
+                allocator,
             );
 
             // Don't flag if the resulting expression would exceed the maximum line length.
@@ -133,7 +140,7 @@ pub(crate) fn convert_for_loop_to_any_all(checker: &mut Checker, stmt: &Stmt) {
                     range: _,
                 }) = &loop_.test
                 {
-                    *operand.clone()
+                    (**operand).clone_in(allocator)
                 } else if let Expr::Compare(ast::ExprCompare {
                     left,
                     ops,
@@ -155,35 +162,43 @@ pub(crate) fn convert_for_loop_to_any_all(checker: &mut Checker, stmt: &Stmt) {
                             CmpOp::NotIn => CmpOp::In,
                         };
                         let node = ast::ExprCompare {
-                            left: left.clone(),
-                            ops: Box::from([op]),
-                            comparators: Box::from([comparator.clone()]),
+                            left: left.clone_in(allocator),
+                            ops: allocator.alloc_slice_fill_iter([op]),
+                            comparators: allocator
+                                .alloc_slice_fill_iter([comparator.clone_in(allocator)]),
                             range: TextRange::default(),
                         };
-                        node.into()
+                        Expr::Compare(node)
                     } else {
                         let node = ast::ExprUnaryOp {
                             op: UnaryOp::Not,
-                            operand: Box::new(loop_.test.clone()),
+                            operand: ruff_allocator::Box::new_in(
+                                loop_.test.clone_in(allocator),
+                                allocator,
+                            ),
                             range: TextRange::default(),
                         };
-                        node.into()
+                        Expr::UnaryOp(node)
                     }
                 } else {
                     let node = ast::ExprUnaryOp {
                         op: UnaryOp::Not,
-                        operand: Box::new(loop_.test.clone()),
+                        operand: ruff_allocator::Box::new_in(
+                            loop_.test.clone_in(allocator),
+                            allocator,
+                        ),
                         range: TextRange::default(),
                     };
-                    node.into()
+                    Expr::UnaryOp(node)
                 }
             };
             let contents = return_stmt(
-                Name::new_static("all"),
+                "all",
                 &test,
                 loop_.target,
                 loop_.iter,
                 checker.generator(),
+                allocator,
             );
 
             // Don't flag if the resulting expression would exceed the maximum line length.
@@ -230,11 +245,11 @@ struct Loop<'a> {
     /// The `return` value of the loop.
     return_value: bool,
     /// The test condition in the loop.
-    test: &'a Expr,
+    test: &'a Expr<'a>,
     /// The target of the loop.
-    target: &'a Expr,
+    target: &'a Expr<'a>,
     /// The iterator of the loop.
-    iter: &'a Expr,
+    iter: &'a Expr<'a>,
 }
 
 /// Represents a `return` statement following a `for` loop, like:
@@ -256,10 +271,10 @@ struct Loop<'a> {
 #[derive(Debug)]
 struct Terminal<'a> {
     return_value: bool,
-    stmt: &'a Stmt,
+    stmt: &'a Stmt<'a>,
 }
 
-fn match_loop(stmt: &Stmt) -> Option<Loop> {
+fn match_loop<'a>(stmt: &Stmt<'a>) -> Option<Loop<'a>> {
     let Stmt::For(ast::StmtFor {
         body, target, iter, ..
     }) = stmt
@@ -310,7 +325,7 @@ fn match_loop(stmt: &Stmt) -> Option<Loop> {
 ///         return True
 /// return False
 /// ```
-fn match_else_return(stmt: &Stmt) -> Option<Terminal> {
+fn match_else_return<'a>(stmt: &Stmt<'a>) -> Option<Terminal<'a>> {
     let Stmt::For(ast::StmtFor { orelse, .. }) = stmt else {
         return None;
     };
@@ -379,12 +394,19 @@ fn match_sibling_return<'a>(stmt: &'a Stmt, sibling: &'a Stmt) -> Option<Termina
 }
 
 /// Generate a return statement for an `any` or `all` builtin comprehension.
-fn return_stmt(id: Name, test: &Expr, target: &Expr, iter: &Expr, generator: Generator) -> String {
+fn return_stmt(
+    id: &str,
+    test: &Expr,
+    target: &Expr,
+    iter: &Expr,
+    generator: Generator,
+    allocator: &Allocator,
+) -> String {
     let node = ast::ExprGenerator {
-        elt: Box::new(test.clone()),
+        elt: ruff_allocator::Box::new_in(test.clone_in(allocator), allocator),
         generators: vec![Comprehension {
-            target: target.clone(),
-            iter: iter.clone(),
+            target: target.clone_in(allocator),
+            iter: iter.clone_in(allocator),
             ifs: vec![],
             is_async: false,
             range: TextRange::default(),
@@ -393,21 +415,21 @@ fn return_stmt(id: Name, test: &Expr, target: &Expr, iter: &Expr, generator: Gen
         parenthesized: false,
     };
     let node1 = ast::ExprName {
-        id,
+        id: allocator.alloc_str(id),
         ctx: ExprContext::Load,
         range: TextRange::default(),
     };
     let node2 = ast::ExprCall {
-        func: Box::new(node1.into()),
+        func: ruff_allocator::Box::new_in(node1.into(), allocator),
         arguments: Arguments {
-            args: Box::from([node.into()]),
-            keywords: Box::from([]),
+            args: allocator.alloc_slice_fill_iter([node.into()]),
+            keywords: &mut [],
             range: TextRange::default(),
         },
         range: TextRange::default(),
     };
     let node3 = ast::StmtReturn {
-        value: Some(Box::new(node2.into())),
+        value: Some(ruff_allocator::Box::new_in(node2.into(), allocator)),
         range: TextRange::default(),
     };
     generator.stmt(&node3.into())

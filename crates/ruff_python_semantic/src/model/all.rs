@@ -72,12 +72,12 @@ impl Ranged for DunderAllDefinition<'_> {
 
 impl<'a> SemanticModel<'a> {
     /// Extract the names bound to a given __all__ assignment.
-    pub fn extract_dunder_all_names<'expr>(
+    pub fn extract_dunder_all_names(
         &self,
-        stmt: &'expr Stmt,
-    ) -> (Vec<DunderAllName<'expr>>, DunderAllFlags) {
+        stmt: &'a Stmt<'a>,
+    ) -> (Vec<DunderAllName<'a>>, DunderAllFlags) {
         fn add_to_names<'expr>(
-            elts: &'expr [Expr],
+            elts: &'expr [Expr<'expr>],
             names: &mut Vec<DunderAllName<'expr>>,
             flags: &mut DunderAllFlags,
         ) {
@@ -139,10 +139,10 @@ impl<'a> SemanticModel<'a> {
         (names, flags)
     }
 
-    fn extract_dunder_all_elts<'expr>(
+    fn extract_dunder_all_elts<'expr, 'ast>(
         &self,
-        expr: &'expr Expr,
-    ) -> (Option<&'expr [Expr]>, DunderAllFlags) {
+        expr: &'expr Expr<'ast>,
+    ) -> (Option<&'expr [Expr<'ast>]>, DunderAllFlags) {
         match expr {
             Expr::List(ast::ExprList { elts, .. }) => {
                 return (Some(elts), DunderAllFlags::empty());
@@ -156,7 +156,7 @@ impl<'a> SemanticModel<'a> {
             }
             Expr::Name(ast::ExprName { id, .. }) => {
                 // Ex) `__all__ = __all__ + multiprocessing.__all__`
-                if id == "__all__" {
+                if *id == "__all__" {
                     return (None, DunderAllFlags::empty());
                 }
             }

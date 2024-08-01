@@ -73,7 +73,7 @@ pub(crate) fn runtime_string_union(checker: &mut Checker, expr: &Expr) {
 }
 
 /// Collect all string members in possibly-nested binary `|` expressions.
-fn traverse_op<'a>(expr: &'a Expr, strings: &mut Vec<&'a Expr>) {
+fn traverse_op<'a, 'ast>(expr: &'a Expr<'ast>, strings: &mut Vec<&'a Expr<'ast>>) {
     match expr {
         Expr::StringLiteral(_) => {
             strings.push(expr);

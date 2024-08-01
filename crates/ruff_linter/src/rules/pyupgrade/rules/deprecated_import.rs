@@ -399,7 +399,7 @@ const TYPING_EXTENSIONS_TO_TYPES_313: &[&str] = &["CapsuleType"];
 const TYPING_EXTENSIONS_TO_WARNINGS_313: &[&str] = &["deprecated"];
 
 struct ImportReplacer<'a> {
-    import_from_stmt: &'a StmtImportFrom,
+    import_from_stmt: &'a StmtImportFrom<'a>,
     module: &'a str,
     locator: &'a Locator<'a>,
     stylist: &'a Stylist<'a>,
@@ -409,7 +409,7 @@ struct ImportReplacer<'a> {
 
 impl<'a> ImportReplacer<'a> {
     const fn new(
-        import_from_stmt: &'a StmtImportFrom,
+        import_from_stmt: &'a StmtImportFrom<'a>,
         module: &'a str,
         locator: &'a Locator<'a>,
         stylist: &'a Stylist<'a>,

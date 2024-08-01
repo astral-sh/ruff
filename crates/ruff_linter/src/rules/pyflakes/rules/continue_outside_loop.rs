@@ -31,8 +31,8 @@ impl Violation for ContinueOutsideLoop {
 
 /// F702
 pub(crate) fn continue_outside_loop<'a>(
-    stmt: &'a Stmt,
-    parents: &mut impl Iterator<Item = &'a Stmt>,
+    stmt: &'a Stmt<'a>,
+    parents: &mut impl Iterator<Item = &'a Stmt<'a>>,
 ) -> Option<Diagnostic> {
     let mut child = stmt;
     for parent in parents {

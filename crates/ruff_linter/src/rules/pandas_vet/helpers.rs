@@ -37,7 +37,7 @@ pub(super) fn test_expression(expr: &Expr, semantic: &SemanticModel) -> Resoluti
                     match &semantic.binding(id).kind {
                         BindingKind::Argument => {
                             // Avoid, e.g., `self.values`.
-                            if matches!(name.id.as_str(), "self" | "cls") {
+                            if matches!(name.id, "self" | "cls") {
                                 Resolution::IrrelevantBinding
                             } else {
                                 Resolution::RelevantLocal

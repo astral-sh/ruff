@@ -409,7 +409,7 @@ fn fix_always_true_branch(
 }
 
 /// Return the version tuple as a sequence of [`Int`] values.
-fn extract_version(elts: &[Expr]) -> Option<Vec<Int>> {
+fn extract_version<'a>(elts: &[Expr<'a>]) -> Option<Vec<Int<'a>>> {
     let mut version: Vec<Int> = vec![];
     for elt in elts {
         let Expr::NumberLiteral(ast::ExprNumberLiteral {

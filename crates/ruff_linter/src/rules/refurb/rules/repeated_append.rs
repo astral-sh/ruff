@@ -132,15 +132,15 @@ pub(crate) fn repeated_append(checker: &mut Checker, stmt: &Stmt) {
 #[derive(Debug, Clone)]
 struct Append<'a> {
     /// Receiver of the `append` call (aka `self` argument).
-    receiver: &'a ast::ExprName,
+    receiver: &'a ast::ExprName<'a>,
     /// [`BindingId`] that the receiver references.
     binding_id: BindingId,
     /// [`Binding`] that the receiver references.
     binding: &'a Binding<'a>,
     /// [`Expr`] serving as a sole argument to `append`.
-    argument: &'a Expr,
+    argument: &'a Expr<'a>,
     /// The statement containing the `append` call.
-    stmt: &'a Stmt,
+    stmt: &'a Stmt<'a>,
 }
 
 #[derive(Debug)]

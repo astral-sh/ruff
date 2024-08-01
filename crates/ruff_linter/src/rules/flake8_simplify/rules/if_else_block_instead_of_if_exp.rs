@@ -1,3 +1,4 @@
+use ruff_allocator::{Allocator, CloneIn};
 use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::{self as ast, ElifElseClause, Expr, Stmt};
@@ -154,16 +155,22 @@ pub(crate) fn if_else_block_instead_of_if_exp(checker: &mut Checker, stmt_if: &a
     checker.diagnostics.push(diagnostic);
 }
 
-fn ternary(target_var: &Expr, body_value: &Expr, test: &Expr, orelse_value: &Expr) -> Stmt {
+fn ternary<'ast>(
+    target_var: &Expr,
+    body_value: &Expr,
+    test: &Expr,
+    orelse_value: &Expr,
+    allocator: &'ast Allocator,
+) -> Stmt<'ast> {
     let node = ast::ExprIf {
-        test: Box::new(test.clone()),
-        body: Box::new(body_value.clone()),
-        orelse: Box::new(orelse_value.clone()),
+        test: ruff_allocator::Box::new_in(test.clone_in(allocator), allocator),
+        body: ruff_allocator::Box::new_in(body_value.clone_in(allocator), allocator),
+        orelse: ruff_allocator::Box::new_in(orelse_value.clone_in(allocator), allocator),
         range: TextRange::default(),
     };
     let node1 = ast::StmtAssign {
-        targets: vec![target_var.clone()],
-        value: Box::new(node.into()),
+        targets: vec![target_var.clone_in(allocator)],
+        value: ruff_allocator::Box::new_in(node.into(), allocator),
         range: TextRange::default(),
     };
     node1.into()

@@ -234,7 +234,7 @@ impl<'a> SectionContexts<'a> {
         self.contexts.len()
     }
 
-    pub(crate) fn iter(&self) -> SectionContextsIter {
+    pub(crate) fn iter(&self) -> SectionContextsIter<'_, 'a> {
         SectionContextsIter {
             docstring_body: self.docstring.body(),
             inner: self.contexts.iter(),
@@ -242,9 +242,9 @@ impl<'a> SectionContexts<'a> {
     }
 }
 
-impl<'a> IntoIterator for &'a SectionContexts<'a> {
+impl<'sections, 'a> IntoIterator for &'sections SectionContexts<'a> {
     type Item = SectionContext<'a>;
-    type IntoIter = SectionContextsIter<'a>;
+    type IntoIter = SectionContextsIter<'sections, 'a>;
 
     fn into_iter(self) -> Self::IntoIter {
         self.iter()
@@ -257,12 +257,12 @@ impl Debug for SectionContexts<'_> {
     }
 }
 
-pub(crate) struct SectionContextsIter<'a> {
+pub(crate) struct SectionContextsIter<'sections, 'a> {
     docstring_body: DocstringBody<'a>,
-    inner: std::slice::Iter<'a, SectionContextData>,
+    inner: std::slice::Iter<'sections, SectionContextData>,
 }
 
-impl<'a> Iterator for SectionContextsIter<'a> {
+impl<'a> Iterator for SectionContextsIter<'_, 'a> {
     type Item = SectionContext<'a>;
 
     fn next(&mut self) -> Option<Self::Item> {
@@ -279,7 +279,7 @@ impl<'a> Iterator for SectionContextsIter<'a> {
     }
 }
 
-impl<'a> DoubleEndedIterator for SectionContextsIter<'a> {
+impl DoubleEndedIterator for SectionContextsIter<'_, '_> {
     fn next_back(&mut self) -> Option<Self::Item> {
         let back = self.inner.next_back()?;
         Some(SectionContext {
@@ -289,8 +289,8 @@ impl<'a> DoubleEndedIterator for SectionContextsIter<'a> {
     }
 }
 
-impl FusedIterator for SectionContextsIter<'_> {}
-impl ExactSizeIterator for SectionContextsIter<'_> {}
+impl FusedIterator for SectionContextsIter<'_, '_> {}
+impl ExactSizeIterator for SectionContextsIter<'_, '_> {}
 
 #[derive(Debug)]
 struct SectionContextData {

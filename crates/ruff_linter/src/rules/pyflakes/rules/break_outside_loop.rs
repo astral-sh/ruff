@@ -31,8 +31,8 @@ impl Violation for BreakOutsideLoop {
 
 /// F701
 pub(crate) fn break_outside_loop<'a>(
-    stmt: &'a Stmt,
-    parents: &mut impl Iterator<Item = &'a Stmt>,
+    stmt: &Stmt<'a>,
+    parents: &mut impl Iterator<Item = &'a Stmt<'a>>,
 ) -> Option<Diagnostic> {
     let mut child = stmt;
     for parent in parents {

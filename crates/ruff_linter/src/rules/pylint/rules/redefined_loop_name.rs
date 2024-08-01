@@ -129,12 +129,12 @@ impl PartialEq<InnerBindingKind> for OuterBindingKind {
 }
 
 struct ExprWithOuterBindingKind<'a> {
-    expr: &'a Expr,
+    expr: &'a Expr<'a>,
     binding_kind: OuterBindingKind,
 }
 
 struct ExprWithInnerBindingKind<'a> {
-    expr: &'a Expr,
+    expr: &'a Expr<'a>,
     binding_kind: InnerBindingKind,
 }
 
@@ -144,8 +144,8 @@ struct InnerForWithAssignTargetsVisitor<'a, 'b> {
     assignment_targets: Vec<ExprWithInnerBindingKind<'a>>,
 }
 
-impl<'a, 'b> StatementVisitor<'b> for InnerForWithAssignTargetsVisitor<'a, 'b> {
-    fn visit_stmt(&mut self, stmt: &'b Stmt) {
+impl<'a, 'b> StatementVisitor<'b, 'b> for InnerForWithAssignTargetsVisitor<'a, 'b> {
+    fn visit_stmt(&mut self, stmt: &'b Stmt<'b>) {
         // Collect target expressions.
         match stmt {
             Stmt::For(ast::StmtFor { target, .. }) => {
@@ -260,10 +260,10 @@ fn assignment_is_cast_expr(value: &Expr, target: &Expr, semantic: &SemanticModel
     semantic.match_typing_expr(func, "cast")
 }
 
-fn assignment_targets_from_expr<'a>(
-    expr: &'a Expr,
+fn assignment_targets_from_expr<'a, 'ast>(
+    expr: &'a Expr<'ast>,
     dummy_variable_rgx: &'a Regex,
-) -> Box<dyn Iterator<Item = &'a Expr> + 'a> {
+) -> Box<dyn Iterator<Item = &'a Expr<'ast>> + 'a> {
     // The Box is necessary to ensure the match arms have the same return type - we can't use
     // a cast to "impl Iterator", since at the time of writing that is only allowed for
     // return types and argument types.

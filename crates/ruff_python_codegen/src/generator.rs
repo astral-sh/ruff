@@ -1163,7 +1163,7 @@ impl<'a> Generator<'a> {
                 self.p("*");
                 self.unparse_expr(value, precedence::MAX);
             }
-            Expr::Name(ast::ExprName { id, .. }) => self.p(id.as_str()),
+            Expr::Name(ast::ExprName { id, .. }) => self.p(id),
             Expr::List(ast::ExprList { elts, .. }) => {
                 self.p("[");
                 let mut first = true;

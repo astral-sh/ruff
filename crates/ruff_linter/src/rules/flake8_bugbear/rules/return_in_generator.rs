@@ -113,7 +113,7 @@ struct ReturnInGeneratorVisitor {
     has_yield: bool,
 }
 
-impl StatementVisitor<'_> for ReturnInGeneratorVisitor {
+impl StatementVisitor<'_, '_> for ReturnInGeneratorVisitor {
     fn visit_stmt(&mut self, stmt: &Stmt) {
         match stmt {
             Stmt::Expr(ast::StmtExpr { value, .. }) => match **value {

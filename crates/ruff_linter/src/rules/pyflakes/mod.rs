@@ -13,11 +13,11 @@ mod tests {
     use regex::Regex;
     use rustc_hash::FxHashMap;
 
-    use test_case::test_case;
-
+    use ruff_allocator::Allocator;
     use ruff_python_ast::PySourceType;
     use ruff_python_codegen::Stylist;
     use ruff_python_index::Indexer;
+    use test_case::test_case;
 
     use ruff_python_trivia::textwrap::dedent;
     use ruff_source_file::Locator;
@@ -681,8 +681,12 @@ mod tests {
         let source_type = PySourceType::default();
         let source_kind = SourceKind::Python(contents.to_string());
         let settings = LinterSettings::for_rules(Linter::Pyflakes.rules());
-        let parsed =
-            ruff_python_parser::parse_unchecked_source(source_kind.source_code(), source_type);
+        let allocator = Allocator::new();
+        let parsed = ruff_python_parser::parse_unchecked_source(
+            source_kind.source_code(),
+            source_type,
+            &allocator,
+        );
         let locator = Locator::new(&contents);
         let stylist = Stylist::from_tokens(parsed.tokens(), &locator);
         let indexer = Indexer::from_tokens(parsed.tokens(), &locator);

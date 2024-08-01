@@ -143,9 +143,9 @@ fn is_mutating_function(function_name: &str) -> bool {
 /// A visitor to collect mutations to a variable in a loop.
 #[derive(Debug, Clone)]
 struct LoopMutationsVisitor<'a> {
-    iter: &'a Expr,
-    target: &'a Expr,
-    index: &'a Expr,
+    iter: &'a Expr<'a>,
+    target: &'a Expr<'a>,
+    index: &'a Expr<'a>,
     mutations: HashMap<u32, Vec<TextRange>>,
     branches: Vec<u32>,
     branch: u32,
@@ -153,7 +153,7 @@ struct LoopMutationsVisitor<'a> {
 
 impl<'a> LoopMutationsVisitor<'a> {
     /// Initialize the visitor.
-    fn new(iter: &'a Expr, target: &'a Expr, index: &'a Expr) -> Self {
+    fn new(iter: &'a Expr<'a>, target: &'a Expr<'a>, index: &'a Expr<'a>) -> Self {
         Self {
             iter,
             target,
@@ -237,8 +237,8 @@ impl<'a> LoopMutationsVisitor<'a> {
 }
 
 /// `Visitor` to collect all used identifiers in a statement.
-impl<'a> Visitor<'a> for LoopMutationsVisitor<'a> {
-    fn visit_stmt(&mut self, stmt: &'a Stmt) {
+impl<'a> Visitor<'a, 'a> for LoopMutationsVisitor<'a> {
+    fn visit_stmt(&mut self, stmt: &'a Stmt<'a>) {
         match stmt {
             // Ex) `del items[0]`
             Stmt::Delete(StmtDelete { range, targets }) => {
@@ -302,7 +302,7 @@ impl<'a> Visitor<'a> for LoopMutationsVisitor<'a> {
         }
     }
 
-    fn visit_expr(&mut self, expr: &'a Expr) {
+    fn visit_expr(&mut self, expr: &'a Expr<'a>) {
         // Ex) `items.append(1)`
         if let Expr::Call(ExprCall { func, .. }) = expr {
             self.handle_call(func);

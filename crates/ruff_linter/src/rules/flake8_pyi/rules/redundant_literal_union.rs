@@ -58,13 +58,13 @@ impl Violation for RedundantLiteralUnion {
 }
 
 /// PYI051
-pub(crate) fn redundant_literal_union<'a>(checker: &mut Checker, union: &'a Expr) {
+pub(crate) fn redundant_literal_union<'a, 'ast>(checker: &mut Checker, union: &'a Expr<'ast>) {
     let mut typing_literal_exprs = Vec::new();
     let mut builtin_types_in_union = FxHashSet::default();
 
     // Adds a member to `literal_exprs` for each value in a `Literal`, and any builtin types
     // to `builtin_types_in_union`.
-    let mut func = |expr: &'a Expr, _parent: &'a Expr| {
+    let mut func = |expr: &'a Expr<'ast>, _parent: &'a Expr<'ast>| {
         if let Expr::Subscript(ast::ExprSubscript { value, slice, .. }) = expr {
             if checker.semantic().match_typing_expr(value, "Literal") {
                 if let Expr::Tuple(ast::ExprTuple { elts, .. }) = slice.as_ref() {

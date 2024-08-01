@@ -66,7 +66,7 @@ struct GroupNameFinder<'a> {
     /// branch order.
     counter_stack: Vec<Vec<u32>>,
     /// A list of reused expressions.
-    exprs: Vec<&'a Expr>,
+    exprs: Vec<&'a Expr<'a>>,
 }
 
 impl<'a> GroupNameFinder<'a> {
@@ -112,8 +112,8 @@ impl<'a> GroupNameFinder<'a> {
     }
 }
 
-impl<'a> Visitor<'a> for GroupNameFinder<'a> {
-    fn visit_stmt(&mut self, stmt: &'a Stmt) {
+impl<'a> Visitor<'a, 'a> for GroupNameFinder<'a> {
+    fn visit_stmt(&mut self, stmt: &'a Stmt<'a>) {
         if self.overridden {
             return;
         }
@@ -220,7 +220,7 @@ impl<'a> Visitor<'a> for GroupNameFinder<'a> {
         }
     }
 
-    fn visit_comprehension(&mut self, comprehension: &'a Comprehension) {
+    fn visit_comprehension(&mut self, comprehension: &'a Comprehension<'a>) {
         if self.name_matches(&comprehension.target) {
             self.overridden = true;
         }
@@ -235,7 +235,7 @@ impl<'a> Visitor<'a> for GroupNameFinder<'a> {
         }
     }
 
-    fn visit_expr(&mut self, expr: &'a Expr) {
+    fn visit_expr(&mut self, expr: &'a Expr<'a>) {
         if let Expr::Named(ast::ExprNamed { target, .. }) = expr {
             if self.name_matches(target) {
                 self.overridden = true;

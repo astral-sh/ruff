@@ -78,7 +78,7 @@ fn is_type(expr: &Expr, semantic: &SemanticModel) -> bool {
         Expr::Name(ast::ExprName { id, .. }) => {
             // Ex) `type(obj) == int`
             matches!(
-                id.as_str(),
+                *id,
                 "bool"
                     | "bytearray"
                     | "bytes"

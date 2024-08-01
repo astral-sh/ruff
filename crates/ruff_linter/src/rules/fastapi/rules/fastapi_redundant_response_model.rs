@@ -102,11 +102,11 @@ pub(crate) fn fastapi_redundant_response_model(
     }
 }
 
-fn check_decorator<'a>(
+fn check_decorator<'a, 'ast>(
     function_def: &StmtFunctionDef,
-    decorator: &'a Decorator,
+    decorator: &'a Decorator<'ast>,
     semantic: &'a SemanticModel,
-) -> Option<(&'a ExprCall, &'a Keyword)> {
+) -> Option<(&'a ExprCall<'ast>, &'a Keyword<'ast>)> {
     let call = is_fastapi_route_decorator(decorator, semantic)?;
     let response_model_arg = call.arguments.find_keyword("response_model")?;
     let return_value = function_def.returns.as_ref()?;

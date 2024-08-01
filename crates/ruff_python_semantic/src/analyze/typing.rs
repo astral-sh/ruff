@@ -37,8 +37,8 @@ pub enum SubscriptKind {
 }
 
 pub fn match_annotated_subscript<'a>(
-    expr: &Expr,
-    semantic: &SemanticModel,
+    expr: &Expr<'a>,
+    semantic: &SemanticModel<'a>,
     typing_modules: impl Iterator<Item = &'a str>,
     extend_generics: &[String],
 ) -> Option<SubscriptKind> {
@@ -102,7 +102,10 @@ impl std::fmt::Display for ModuleMember {
 
 /// Returns the PEP 585 standard library generic variant for a `typing` module reference, if such
 /// a variant exists.
-pub fn to_pep585_generic(expr: &Expr, semantic: &SemanticModel) -> Option<ModuleMember> {
+pub fn to_pep585_generic<'a>(
+    expr: &Expr<'a>,
+    semantic: &SemanticModel<'a>,
+) -> Option<ModuleMember> {
     semantic
         .seen_module(Modules::TYPING | Modules::TYPING_EXTENSIONS)
         .then(|| semantic.resolve_qualified_name(expr))
@@ -122,7 +125,7 @@ pub fn to_pep585_generic(expr: &Expr, semantic: &SemanticModel) -> Option<Module
 }
 
 /// Return whether a given expression uses a PEP 585 standard library generic.
-pub fn is_pep585_generic(expr: &Expr, semantic: &SemanticModel) -> bool {
+pub fn is_pep585_generic<'a>(expr: &Expr<'a>, semantic: &SemanticModel<'a>) -> bool {
     semantic
         .resolve_qualified_name(expr)
         .is_some_and(|qualified_name| {
@@ -142,10 +145,10 @@ pub enum Pep604Operator {
 }
 
 /// Return the PEP 604 operator variant to which the given subscript [`Expr`] corresponds, if any.
-pub fn to_pep604_operator(
-    value: &Expr,
-    slice: &Expr,
-    semantic: &SemanticModel,
+pub fn to_pep604_operator<'a>(
+    value: &Expr<'a>,
+    slice: &Expr<'a>,
+    semantic: &SemanticModel<'a>,
 ) -> Option<Pep604Operator> {
     /// Returns `true` if any argument in the slice is a quoted annotation.
     fn quoted_annotation(slice: &Expr) -> bool {
@@ -361,17 +364,17 @@ pub fn is_sys_version_block(stmt: &ast::StmtIf, semantic: &SemanticModel) -> boo
 ///
 /// The function is called with each expression in the union (excluding declarations of nested
 /// unions) and the parent expression.
-pub fn traverse_union<'a, F>(func: &mut F, semantic: &SemanticModel, expr: &'a Expr)
+pub fn traverse_union<'a, 'ast, F>(func: &mut F, semantic: &SemanticModel, expr: &'a Expr<'ast>)
 where
-    F: FnMut(&'a Expr, &'a Expr),
+    F: FnMut(&'a Expr<'ast>, &'a Expr<'ast>),
 {
-    fn inner<'a, F>(
+    fn inner<'a, 'ast, F>(
         func: &mut F,
         semantic: &SemanticModel,
-        expr: &'a Expr,
-        parent: Option<&'a Expr>,
+        expr: &'a Expr<'ast>,
+        parent: Option<&'a Expr<'ast>>,
     ) where
-        F: FnMut(&'a Expr, &'a Expr),
+        F: FnMut(&'a Expr<'ast>, &'a Expr<'ast>),
     {
         // Ex) x | y
         if let Expr::BinOp(ast::ExprBinOp {
@@ -422,17 +425,17 @@ where
 ///
 /// The function is called with each expression in the literal (excluding declarations of nested
 /// literals) and the parent expression.
-pub fn traverse_literal<'a, F>(func: &mut F, semantic: &SemanticModel, expr: &'a Expr)
+pub fn traverse_literal<'a, 'ast, F>(func: &mut F, semantic: &SemanticModel, expr: &'a Expr<'ast>)
 where
-    F: FnMut(&'a Expr, &'a Expr),
+    F: FnMut(&'a Expr<'ast>, &'a Expr<'ast>),
 {
-    fn inner<'a, F>(
+    fn inner<'a, 'ast, F>(
         func: &mut F,
         semantic: &SemanticModel,
-        expr: &'a Expr,
-        parent: Option<&'a Expr>,
+        expr: &'a Expr<'ast>,
+        parent: Option<&'a Expr<'ast>>,
     ) where
-        F: FnMut(&'a Expr, &'a Expr),
+        F: FnMut(&'a Expr<'ast>, &'a Expr<'ast>),
     {
         // Ex) Literal[x, y]
         if let Expr::Subscript(ast::ExprSubscript { value, slice, .. }) = expr {
@@ -654,7 +657,7 @@ impl BuiltinTypeChecker for TupleChecker {
 pub struct IoBaseChecker;
 
 impl TypeChecker for IoBaseChecker {
-    fn match_annotation(annotation: &Expr, semantic: &SemanticModel) -> bool {
+    fn match_annotation<'a>(annotation: &Expr, semantic: &SemanticModel) -> bool {
         semantic
             .resolve_qualified_name(annotation)
             .is_some_and(|qualified_name| {
@@ -774,10 +777,10 @@ pub fn is_io_base_expr(expr: &Expr, semantic: &SemanticModel) -> bool {
 
 /// Find the [`ParameterWithDefault`] corresponding to the given [`Binding`].
 #[inline]
-fn find_parameter<'a>(
-    parameters: &'a Parameters,
+fn find_parameter<'a, 'ast>(
+    parameters: &'a Parameters<'ast>,
     binding: &Binding,
-) -> Option<&'a ParameterWithDefault> {
+) -> Option<&'a ParameterWithDefault<'ast>> {
     parameters
         .iter_non_variadic_params()
         .find(|arg| arg.parameter.name.range() == binding.range())
@@ -796,7 +799,7 @@ fn find_parameter<'a>(
 /// This function will return `["asyncio", "get_running_loop"]` for the `loop` binding.
 pub fn resolve_assignment<'a>(
     expr: &'a Expr,
-    semantic: &'a SemanticModel<'a>,
+    semantic: &'a SemanticModel,
 ) -> Option<QualifiedName<'a>> {
     let name = expr.as_name_expr()?;
     let binding_id = semantic.resolve_name(name)?;
@@ -826,7 +829,10 @@ pub fn resolve_assignment<'a>(
 ///
 /// This function will return a `NumberLiteral` with value `Int(42)` when called with `foo` and a
 /// `StringLiteral` with value `"str"` when called with `bla`.
-pub fn find_assigned_value<'a>(symbol: &str, semantic: &'a SemanticModel<'a>) -> Option<&'a Expr> {
+pub fn find_assigned_value<'a, 'ast>(
+    symbol: &str,
+    semantic: &'a SemanticModel<'ast>,
+) -> Option<&'a Expr<'ast>> {
     let binding_id = semantic.lookup_symbol(symbol)?;
     let binding = semantic.binding(binding_id);
     find_binding_value(binding, semantic)
@@ -843,7 +849,10 @@ pub fn find_assigned_value<'a>(symbol: &str, semantic: &'a SemanticModel<'a>) ->
 /// This function will return a `NumberLiteral` with value `Int(42)` when called with `foo` and a
 /// `StringLiteral` with value `"str"` when called with `bla`.
 #[allow(clippy::single_match)]
-pub fn find_binding_value<'a>(binding: &Binding, semantic: &'a SemanticModel) -> Option<&'a Expr> {
+pub fn find_binding_value<'a, 'ast>(
+    binding: &Binding,
+    semantic: &'a SemanticModel<'ast>,
+) -> Option<&'a Expr<'ast>> {
     match binding.kind {
         // Ex) `x := 1`
         BindingKind::NamedExprAssignment => {
@@ -888,7 +897,11 @@ pub fn find_binding_value<'a>(binding: &Binding, semantic: &'a SemanticModel) ->
 }
 
 /// Given a target and value, find the value that's assigned to the given symbol.
-fn match_value<'a>(binding: &Binding, target: &Expr, value: &'a Expr) -> Option<&'a Expr> {
+fn match_value<'a, 'ast>(
+    binding: &Binding,
+    target: &Expr,
+    value: &'a Expr<'ast>,
+) -> Option<&'a Expr<'ast>> {
     match target {
         Expr::Name(name) if name.range() == binding.range() => Some(value),
         Expr::Tuple(ast::ExprTuple { elts, .. }) | Expr::List(ast::ExprList { elts, .. }) => {
@@ -910,7 +923,11 @@ fn match_value<'a>(binding: &Binding, target: &Expr, value: &'a Expr) -> Option<
 }
 
 /// Given a target and value, find the value that's assigned to the given symbol.
-fn match_target<'a>(binding: &Binding, targets: &[Expr], values: &'a [Expr]) -> Option<&'a Expr> {
+fn match_target<'a, 'ast>(
+    binding: &Binding,
+    targets: &[Expr],
+    values: &'a [Expr<'ast>],
+) -> Option<&'a Expr<'ast>> {
     for (target, value) in targets.iter().zip(values.iter()) {
         match target {
             Expr::Tuple(ast::ExprTuple {

@@ -7,8 +7,7 @@ use std::path::Path;
 #[cfg(not(fuzzing))]
 use anyhow::Result;
 use itertools::Itertools;
-use rustc_hash::FxHashMap;
-
+use ruff_allocator::Allocator;
 use ruff_diagnostics::{Applicability, Diagnostic, FixAvailability};
 use ruff_notebook::Notebook;
 #[cfg(not(fuzzing))]
@@ -20,6 +19,7 @@ use ruff_python_parser::ParseError;
 use ruff_python_trivia::textwrap::dedent;
 use ruff_source_file::{Locator, SourceFileBuilder};
 use ruff_text_size::Ranged;
+use rustc_hash::FxHashMap;
 
 use crate::directives;
 use crate::fix::{fix_file, FixResult};
@@ -109,7 +109,12 @@ pub(crate) fn test_contents<'a>(
     settings: &LinterSettings,
 ) -> (Vec<Message>, Cow<'a, SourceKind>) {
     let source_type = PySourceType::from(path);
-    let parsed = ruff_python_parser::parse_unchecked_source(source_kind.source_code(), source_type);
+    let allocator = Allocator::new();
+    let parsed = ruff_python_parser::parse_unchecked_source(
+        source_kind.source_code(),
+        source_type,
+        &allocator,
+    );
     let locator = Locator::new(source_kind.source_code());
     let stylist = Stylist::from_tokens(parsed.tokens(), &locator);
     let indexer = Indexer::from_tokens(parsed.tokens(), &locator);
@@ -171,8 +176,11 @@ pub(crate) fn test_contents<'a>(
 
             transformed = Cow::Owned(transformed.updated(fixed_contents, &source_map));
 
-            let parsed =
-                ruff_python_parser::parse_unchecked_source(transformed.source_code(), source_type);
+            let parsed = ruff_python_parser::parse_unchecked_source(
+                transformed.source_code(),
+                source_type,
+                &allocator,
+            );
             let locator = Locator::new(transformed.source_code());
             let stylist = Stylist::from_tokens(parsed.tokens(), &locator);
             let indexer = Indexer::from_tokens(parsed.tokens(), &locator);

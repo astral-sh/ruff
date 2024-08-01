@@ -209,7 +209,7 @@ impl Violation for PytestUnittestAssertion {
 /// the exception name.
 struct ExceptionHandlerVisitor<'a> {
     exception_name: &'a str,
-    current_assert: Option<&'a Stmt>,
+    current_assert: Option<&'a Stmt<'a>>,
     errors: Vec<Diagnostic>,
 }
 
@@ -223,8 +223,8 @@ impl<'a> ExceptionHandlerVisitor<'a> {
     }
 }
 
-impl<'a> Visitor<'a> for ExceptionHandlerVisitor<'a> {
-    fn visit_stmt(&mut self, stmt: &'a Stmt) {
+impl<'a> Visitor<'a, 'a> for ExceptionHandlerVisitor<'a> {
+    fn visit_stmt(&mut self, stmt: &'a Stmt<'a>) {
         match stmt {
             Stmt::Assert(_) => {
                 self.current_assert = Some(stmt);
@@ -235,7 +235,7 @@ impl<'a> Visitor<'a> for ExceptionHandlerVisitor<'a> {
         }
     }
 
-    fn visit_expr(&mut self, expr: &'a Expr) {
+    fn visit_expr(&mut self, expr: &'a Expr<'a>) {
         match expr {
             Expr::Name(ast::ExprName { id, .. }) => {
                 if let Some(current_assert) = self.current_assert {

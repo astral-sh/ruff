@@ -287,7 +287,7 @@ fn method(
 
 fn call<'a>(
     argumentable: Argumentable,
-    parameters: impl Iterator<Item = &'a Parameter>,
+    parameters: impl Iterator<Item = &'a Parameter<'a>>,
     scope: &Scope,
     semantic: &SemanticModel,
     dummy_variable_rgx: &Regex,

@@ -65,7 +65,7 @@ impl ResolvedPythonType {
     }
 }
 
-impl From<&Expr> for ResolvedPythonType {
+impl From<&Expr<'_>> for ResolvedPythonType {
     fn from(expr: &Expr) -> Self {
         match expr {
             // Primitives.

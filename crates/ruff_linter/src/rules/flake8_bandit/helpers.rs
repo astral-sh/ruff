@@ -8,7 +8,7 @@ static PASSWORD_CANDIDATE_REGEX: Lazy<Regex> = Lazy::new(|| {
     Regex::new(r"(^|_)(?i)(pas+wo?r?d|pass(phrase)?|pwd|token|secrete?)($|_)").unwrap()
 });
 
-pub(super) fn string_literal(expr: &Expr) -> Option<&str> {
+pub(super) fn string_literal<'a>(expr: &'a Expr) -> Option<&'a str> {
     match expr {
         Expr::StringLiteral(ast::ExprStringLiteral { value, .. }) => Some(value.to_str()),
         _ => None,

@@ -98,7 +98,7 @@ pub(crate) fn write_whole_file(checker: &mut Checker, with: &ast::StmtWith) {
 struct WriteMatcher<'a> {
     candidates: Vec<FileOpen<'a>>,
     matches: Vec<FileOpen<'a>>,
-    contents: Vec<&'a Expr>,
+    contents: Vec<&'a Expr<'a>>,
     loop_counter: u32,
 }
 
@@ -112,7 +112,7 @@ impl<'a> WriteMatcher<'a> {
         }
     }
 
-    fn finish(self) -> (Vec<FileOpen<'a>>, Vec<&'a Expr>) {
+    fn finish(self) -> (Vec<FileOpen<'a>>, Vec<&'a Expr<'a>>) {
         (self.matches, self.contents)
     }
 }

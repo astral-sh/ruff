@@ -1,3 +1,4 @@
+use ruff_allocator::{Allocator, CloneIn};
 use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::{
@@ -92,6 +93,7 @@ pub(crate) fn lambda_assignment(
             annotation,
             checker.semantic(),
             checker.generator(),
+            checker.allocator(),
         )
         .universal_newlines()
         .enumerate()
@@ -146,7 +148,11 @@ pub(crate) fn lambda_assignment(
 /// The `Callable` import can be from either `collections.abc` or `typing`.
 /// If an ellipsis is used for the argument types, an empty list is returned.
 /// The returned values are cloned, so they can be used as-is.
-fn extract_types(annotation: &Expr, semantic: &SemanticModel) -> Option<(Vec<Expr>, Expr)> {
+fn extract_types<'ast>(
+    annotation: &Expr,
+    semantic: &SemanticModel,
+    allocator: &'ast Allocator,
+) -> Option<(Vec<Expr<'ast>>, Expr<'ast>)> {
     let Expr::Subscript(ast::ExprSubscript { value, slice, .. }) = &annotation else {
         return None;
     };
@@ -172,13 +178,16 @@ fn extract_types(annotation: &Expr, semantic: &SemanticModel) -> Option<(Vec<Exp
     // The first argument to `Callable` must be a list of types, parameter
     // specification, or ellipsis.
     let params = match param_types {
-        Expr::List(ast::ExprList { elts, .. }) => elts.clone(),
+        Expr::List(ast::ExprList { elts, .. }) => elts
+            .into_iter()
+            .map(|element| element.clone_in(allocator))
+            .collect(),
         Expr::EllipsisLiteral(_) => vec![],
         _ => return None,
     };
 
     // The second argument to `Callable` must be a type.
-    let return_type = return_type.clone();
+    let return_type = return_type.clone_in(allocator);
 
     Some((params, return_type))
 }
@@ -191,9 +200,13 @@ fn function(
     annotation: Option<&Expr>,
     semantic: &SemanticModel,
     generator: Generator,
+    allocator: &Allocator,
 ) -> String {
     let body = Stmt::Return(ast::StmtReturn {
-        value: Some(Box::new(body.clone())),
+        value: Some(ruff_allocator::Box::new_in(
+            body.clone_in(allocator),
+            allocator,
+        )),
         range: TextRange::default(),
     });
     let parameters = parameters.cloned().unwrap_or_default();
@@ -207,9 +220,9 @@ fn function(
                 .enumerate()
                 .map(|(idx, parameter)| ParameterWithDefault {
                     parameter: Parameter {
-                        annotation: arg_types
-                            .get(idx)
-                            .map(|arg_type| Box::new(arg_type.clone())),
+                        annotation: arg_types.get(idx).map(|arg_type| {
+                            ruff_allocator::Box::new_in(arg_type.clone_in(allocator), allocator)
+                        }),
                         ..parameter.parameter.clone()
                     },
                     ..parameter.clone()
@@ -221,9 +234,9 @@ fn function(
                 .enumerate()
                 .map(|(idx, parameter)| ParameterWithDefault {
                     parameter: Parameter {
-                        annotation: arg_types
-                            .get(idx + new_posonlyargs.len())
-                            .map(|arg_type| Box::new(arg_type.clone())),
+                        annotation: arg_types.get(idx + new_posonlyargs.len()).map(|arg_type| {
+                            ruff_allocator::Box::new_in(arg_type.clone_in(allocator), allocator)
+                        }),
                         ..parameter.parameter.clone()
                     },
                     ..parameter.clone()

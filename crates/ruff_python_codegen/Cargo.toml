@@ -14,6 +14,7 @@ license = { workspace = true }
 doctest = false
 
 [dependencies]
+ruff_allocator = { workspace = true, optional = true }
 ruff_python_ast = { workspace = true }
 ruff_python_literal = { workspace = true }
 ruff_python_parser = { workspace = true }
@@ -21,6 +22,9 @@ ruff_source_file = { workspace = true }
 ruff_text_size = { workspace = true }
 
 once_cell = { workspace = true }
+
+[features]
+round_trip = ["ruff_allocator"]
 
 [lints]
 workspace = true

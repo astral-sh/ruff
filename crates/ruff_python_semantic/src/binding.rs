@@ -224,7 +224,7 @@ impl<'a> Binding<'a> {
     }
 
     /// Returns the statement in which the binding was defined.
-    pub fn statement<'b>(&self, semantic: &SemanticModel<'b>) -> Option<&'b Stmt> {
+    pub fn statement<'b>(&self, semantic: &SemanticModel<'b>) -> Option<&'b Stmt<'b>> {
         self.source
             .map(|statement_id| semantic.statement(statement_id))
     }
@@ -609,9 +609,9 @@ bitflags! {
 }
 
 impl Exceptions {
-    pub fn from_try_stmt(
-        ast::StmtTry { handlers, .. }: &ast::StmtTry,
-        semantic: &SemanticModel,
+    pub fn from_try_stmt<'a>(
+        ast::StmtTry { handlers, .. }: &ast::StmtTry<'a>,
+        semantic: &SemanticModel<'a>,
     ) -> Self {
         let mut handled_exceptions = Self::empty();
         for type_ in extract_handled_exceptions(handlers) {

@@ -1,3 +1,4 @@
+use ruff_allocator::{Allocator, CloneIn};
 use ruff_python_ast::{self as ast, Arguments, Expr, Keyword};
 use ruff_text_size::{Ranged, TextRange};
 
@@ -87,8 +88,19 @@ impl std::fmt::Display for MinMax {
 
 /// Collect a new set of arguments to by either accepting existing args as-is or
 /// collecting child arguments, if it's a call to the same function.
-fn collect_nested_args(min_max: MinMax, args: &[Expr], semantic: &SemanticModel) -> Vec<Expr> {
-    fn inner(min_max: MinMax, args: &[Expr], semantic: &SemanticModel, new_args: &mut Vec<Expr>) {
+fn collect_nested_args<'ast>(
+    min_max: MinMax,
+    args: &[Expr],
+    semantic: &SemanticModel,
+    allocator: &'ast Allocator,
+) -> Vec<Expr<'ast>> {
+    fn inner<'ast>(
+        min_max: MinMax,
+        args: &[Expr],
+        semantic: &SemanticModel,
+        new_args: &mut Vec<Expr>,
+        allocator: &'ast Allocator,
+    ) {
         for arg in args {
             if let Expr::Call(ast::ExprCall {
                 func,
@@ -104,7 +116,7 @@ fn collect_nested_args(min_max: MinMax, args: &[Expr], semantic: &SemanticModel)
                 if let [arg] = &**args {
                     if arg.as_starred_expr().is_none() {
                         let new_arg = Expr::Starred(ast::ExprStarred {
-                            value: Box::new(arg.clone()),
+                            value: ruff_allocator::Box::new_in(arg.clone_in(allocator), allocator),
                             ctx: ast::ExprContext::Load,
                             range: TextRange::default(),
                         });
@@ -113,16 +125,16 @@ fn collect_nested_args(min_max: MinMax, args: &[Expr], semantic: &SemanticModel)
                     }
                 }
                 if MinMax::try_from_call(func, keywords, semantic) == Some(min_max) {
-                    inner(min_max, args, semantic, new_args);
+                    inner(min_max, args, semantic, new_args, allocator);
                     continue;
                 }
             }
-            new_args.push(arg.clone());
+            new_args.push(arg.clone_in(allocator));
         }
     }
 
     let mut new_args = Vec::with_capacity(args.len());
-    inner(min_max, args, semantic, &mut new_args);
+    inner(min_max, args, semantic, &mut new_args, allocator);
     new_args
 }
 
@@ -132,7 +144,7 @@ pub(crate) fn nested_min_max(
     expr: &Expr,
     func: &Expr,
     args: &[Expr],
-    keywords: &[Keyword],
+    keywords: &mut [Keyword],
 ) {
     let Some(min_max) = MinMax::try_from_call(func, keywords, checker.semantic()) else {
         return;
@@ -160,10 +172,20 @@ pub(crate) fn nested_min_max(
             .has_comments(expr, checker.locator())
         {
             let flattened_expr = Expr::Call(ast::ExprCall {
-                func: Box::new(func.clone()),
+                func: ruff_allocator::Box::new_in(
+                    func.clone_in(checker.allocator()),
+                    checker.allocator(),
+                ),
                 arguments: Arguments {
-                    args: collect_nested_args(min_max, args, checker.semantic()).into_boxed_slice(),
-                    keywords: Box::from(keywords),
+                    args: checker
+                        .allocator()
+                        .alloc_slice_fill_iter(collect_nested_args(
+                            min_max,
+                            args,
+                            checker.semantic(),
+                            checker.allocator(),
+                        )),
+                    keywords,
                     range: TextRange::default(),
                 },
                 range: TextRange::default(),

@@ -100,7 +100,7 @@ impl Ranged for AttributeAssignment<'_> {
 /// Return a list of attributes that are assigned to but not included in `__slots__`.
 ///
 /// If the `__slots__` attribute cannot be statically determined, returns an empty vector.
-fn is_attributes_not_in_slots(body: &[Stmt]) -> Vec<AttributeAssignment> {
+fn is_attributes_not_in_slots<'a>(body: &[Stmt<'a>]) -> Vec<AttributeAssignment<'a>> {
     // First, collect all the attributes that are assigned to `__slots__`.
     let mut slots = FxHashSet::default();
     for statement in body {
@@ -111,7 +111,7 @@ fn is_attributes_not_in_slots(body: &[Stmt]) -> Vec<AttributeAssignment> {
                     continue;
                 };
 
-                if id == "__slots__" {
+                if *id == "__slots__" {
                     for attribute in slots_attributes(value) {
                         if let Some(attribute) = attribute {
                             slots.insert(attribute);
@@ -132,7 +132,7 @@ fn is_attributes_not_in_slots(body: &[Stmt]) -> Vec<AttributeAssignment> {
                     continue;
                 };
 
-                if id == "__slots__" {
+                if *id == "__slots__" {
                     for attribute in slots_attributes(value) {
                         if let Some(attribute) = attribute {
                             slots.insert(attribute);
@@ -149,7 +149,7 @@ fn is_attributes_not_in_slots(body: &[Stmt]) -> Vec<AttributeAssignment> {
                     continue;
                 };
 
-                if id == "__slots__" {
+                if *id == "__slots__" {
                     for attribute in slots_attributes(value) {
                         if let Some(attribute) = attribute {
                             slots.insert(attribute);
@@ -184,7 +184,7 @@ fn is_attributes_not_in_slots(body: &[Stmt]) -> Vec<AttributeAssignment> {
                 let Some(ast::ExprName { id, .. }) = value.as_name_expr() else {
                     continue;
                 };
-                slots.insert(id.as_str());
+                slots.insert(id);
             }
         }
     }
@@ -207,7 +207,7 @@ fn is_attributes_not_in_slots(body: &[Stmt]) -> Vec<AttributeAssignment> {
                         let Expr::Name(ast::ExprName { id, .. }) = attribute.value.as_ref() else {
                             continue;
                         };
-                        if id == "self" && !slots.contains(attribute.attr.as_str()) {
+                        if *id == "self" && !slots.contains(attribute.attr.as_str()) {
                             assignments.push(AttributeAssignment {
                                 name: &attribute.attr,
                                 range: attribute.range(),
@@ -223,7 +223,7 @@ fn is_attributes_not_in_slots(body: &[Stmt]) -> Vec<AttributeAssignment> {
                         let Expr::Name(ast::ExprName { id, .. }) = attribute.value.as_ref() else {
                             continue;
                         };
-                        if id == "self" && !slots.contains(attribute.attr.as_str()) {
+                        if *id == "self" && !slots.contains(attribute.attr.as_str()) {
                             assignments.push(AttributeAssignment {
                                 name: &attribute.attr,
                                 range: attribute.range(),
@@ -239,7 +239,7 @@ fn is_attributes_not_in_slots(body: &[Stmt]) -> Vec<AttributeAssignment> {
                         let Expr::Name(ast::ExprName { id, .. }) = attribute.value.as_ref() else {
                             continue;
                         };
-                        if id == "self" && !slots.contains(attribute.attr.as_str()) {
+                        if *id == "self" && !slots.contains(attribute.attr.as_str()) {
                             assignments.push(AttributeAssignment {
                                 name: &attribute.attr,
                                 range: attribute.range(),
@@ -259,7 +259,7 @@ fn is_attributes_not_in_slots(body: &[Stmt]) -> Vec<AttributeAssignment> {
 /// Return an iterator over the attributes enumerated in the given `__slots__` value.
 ///
 /// If an attribute can't be statically determined, it will be `None`.
-fn slots_attributes(expr: &Expr) -> impl Iterator<Item = Option<&str>> {
+fn slots_attributes<'a>(expr: &'a Expr<'a>) -> impl Iterator<Item = Option<&'a str>> {
     // Ex) `__slots__ = ("name",)`
     let elts_iter = match expr {
         Expr::Tuple(ast::ExprTuple { elts, .. })

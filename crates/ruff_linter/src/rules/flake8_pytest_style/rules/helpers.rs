@@ -4,9 +4,9 @@ use ruff_python_ast::{self as ast, Decorator, Expr, Keyword};
 use ruff_python_semantic::SemanticModel;
 use ruff_python_trivia::PythonWhitespace;
 
-pub(super) fn get_mark_decorators(
-    decorators: &[Decorator],
-) -> impl Iterator<Item = (&Decorator, &str)> {
+pub(super) fn get_mark_decorators<'a, 'ast>(
+    decorators: &'a [Decorator<'ast>],
+) -> impl Iterator<Item = (&'a Decorator<'ast>, &'a str)> {
     decorators.iter().filter_map(|decorator| {
         let name = UnqualifiedName::from_expr(map_callable(&decorator.expression))?;
         let ["pytest", "mark", marker] = name.segments() else {

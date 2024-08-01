@@ -14,7 +14,7 @@ use crate::rules::isort::helpers;
 #[derive(Debug, Default)]
 pub(crate) struct Block<'a> {
     pub(crate) nested: bool,
-    pub(crate) imports: Vec<&'a Stmt>,
+    pub(crate) imports: Vec<&'a Stmt<'a>>,
     pub(crate) trailer: Option<Trailer>,
 }
 
@@ -55,7 +55,7 @@ impl<'a> BlockBuilder<'a> {
         }
     }
 
-    fn track_import(&mut self, stmt: &'a Stmt) {
+    fn track_import(&mut self, stmt: &'a Stmt<'a>) {
         let index = self.blocks.len() - 1;
         self.blocks[index].imports.push(stmt);
         self.blocks[index].nested = self.nested;
@@ -120,8 +120,8 @@ impl<'a> BlockBuilder<'a> {
     }
 }
 
-impl<'a> StatementVisitor<'a> for BlockBuilder<'a> {
-    fn visit_stmt(&mut self, stmt: &'a Stmt) {
+impl<'a> StatementVisitor<'a, 'a> for BlockBuilder<'a> {
+    fn visit_stmt(&mut self, stmt: &'a Stmt<'a>) {
         // Track manual splits (e.g., `# isort: split`).
         if self
             .splits
@@ -273,7 +273,7 @@ impl<'a> StatementVisitor<'a> for BlockBuilder<'a> {
         self.nested = prev_nested;
     }
 
-    fn visit_except_handler(&mut self, except_handler: &'a ExceptHandler) {
+    fn visit_except_handler(&mut self, except_handler: &'a ExceptHandler<'a>) {
         let prev_nested = self.nested;
         self.nested = true;
 
@@ -287,14 +287,14 @@ impl<'a> StatementVisitor<'a> for BlockBuilder<'a> {
         self.nested = prev_nested;
     }
 
-    fn visit_match_case(&mut self, match_case: &'a MatchCase) {
+    fn visit_match_case(&mut self, match_case: &'a MatchCase<'a>) {
         for stmt in &match_case.body {
             self.visit_stmt(stmt);
         }
         self.finalize(None);
     }
 
-    fn visit_elif_else_clause(&mut self, elif_else_clause: &'a ElifElseClause) {
+    fn visit_elif_else_clause(&mut self, elif_else_clause: &'a ElifElseClause<'a>) {
         for stmt in &elif_else_clause.body {
             self.visit_stmt(stmt);
         }

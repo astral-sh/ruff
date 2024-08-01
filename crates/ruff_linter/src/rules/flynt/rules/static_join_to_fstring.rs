@@ -1,7 +1,7 @@
+use crate::fix::edits::pad;
 use ast::FStringFlags;
 use itertools::Itertools;
-
-use crate::fix::edits::pad;
+use ruff_allocator::Allocator;
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::{self as ast, Arguments, Expr};
@@ -60,21 +60,26 @@ fn is_static_length(elts: &[Expr]) -> bool {
     elts.iter().all(|e| !e.is_starred_expr())
 }
 
-fn build_fstring(joiner: &str, joinees: &[Expr]) -> Option<Expr> {
+fn build_fstring<'ast>(
+    joiner: &str,
+    joinees: &[Expr],
+    allocator: &'ast Allocator,
+) -> Option<Expr<'ast>> {
     // If all elements are string constants, join them into a single string.
     if joinees.iter().all(Expr::is_string_literal_expr) {
         let node = ast::StringLiteral {
-            value: joinees
-                .iter()
-                .filter_map(|expr| {
-                    if let Expr::StringLiteral(ast::ExprStringLiteral { value, .. }) = expr {
-                        Some(value.to_str())
-                    } else {
-                        None
-                    }
-                })
-                .join(joiner)
-                .into_boxed_str(),
+            value: allocator.alloc_str(
+                &joinees
+                    .iter()
+                    .filter_map(|expr| {
+                        if let Expr::StringLiteral(ast::ExprStringLiteral { value, .. }) = expr {
+                            Some(value.to_str())
+                        } else {
+                            None
+                        }
+                    })
+                    .join(joiner),
+            ),
             ..ast::StringLiteral::default()
         };
         return Some(node.into());
@@ -90,9 +95,9 @@ fn build_fstring(joiner: &str, joinees: &[Expr]) -> Option<Expr> {
             return None;
         }
         if !std::mem::take(&mut first) {
-            f_string_elements.push(helpers::to_f_string_literal_element(joiner));
+            f_string_elements.push(helpers::to_f_string_literal_element(joiner, allocator));
         }
-        f_string_elements.push(helpers::to_f_string_element(expr)?);
+        f_string_elements.push(helpers::to_f_string_element(expr, allocator)?);
     }
 
     let node = ast::FString {
@@ -131,7 +136,7 @@ pub(crate) fn static_join_to_fstring(checker: &mut Checker, expr: &Expr, joiner:
 
     // Try to build the fstring (internally checks whether e.g. the elements are
     // convertible to f-string elements).
-    let Some(new_expr) = build_fstring(joiner, joinees) else {
+    let Some(new_expr) = build_fstring(joiner, joinees, checker.allocator()) else {
         return;
     };
 

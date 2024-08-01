@@ -139,12 +139,12 @@ pub(crate) fn nested_if_statements(
 
 #[derive(Debug, Clone, Copy)]
 pub(super) enum NestedIf<'a> {
-    If(&'a ast::StmtIf),
-    Elif(&'a ElifElseClause),
+    If(&'a ast::StmtIf<'a>),
+    Elif(&'a ElifElseClause<'a>),
 }
 
 impl<'a> NestedIf<'a> {
-    pub(super) fn body(self) -> &'a [Stmt] {
+    pub(super) fn body(self) -> &'a [Stmt<'a>] {
         match self {
             NestedIf::If(stmt_if) => &stmt_if.body,
             NestedIf::Elif(clause) => &clause.body,
@@ -165,7 +165,7 @@ impl Ranged for NestedIf<'_> {
     }
 }
 
-impl<'a> From<&NestedIf<'a>> for AnyNodeRef<'a> {
+impl<'a> From<&NestedIf<'a>> for AnyNodeRef<'a, 'a> {
     fn from(value: &NestedIf<'a>) -> Self {
         match value {
             NestedIf::If(stmt_if) => (*stmt_if).into(),
@@ -175,7 +175,7 @@ impl<'a> From<&NestedIf<'a>> for AnyNodeRef<'a> {
 }
 
 /// Returns the body, the range of the `if` or `elif` and whether the range is for an `if` or `elif`
-fn nested_if_body(stmt_if: &ast::StmtIf) -> Option<NestedIf> {
+fn nested_if_body<'a>(stmt_if: &'a ast::StmtIf<'a>) -> Option<NestedIf<'a>> {
     let ast::StmtIf {
         test,
         body,
@@ -225,7 +225,7 @@ fn nested_if_body(stmt_if: &ast::StmtIf) -> Option<NestedIf> {
 ///         z = 1
 ///         ...
 /// ```
-fn find_last_nested_if(body: &[Stmt]) -> Option<&Expr> {
+fn find_last_nested_if<'a>(body: &'a [Stmt<'a>]) -> Option<&'a Expr<'a>> {
     let [Stmt::If(ast::StmtIf {
         test,
         body: inner_body,
@@ -248,7 +248,7 @@ fn is_main_check(expr: &Expr) -> bool {
     }) = expr
     {
         if let Expr::Name(ast::ExprName { id, .. }) = left.as_ref() {
-            if id == "__name__" {
+            if *id == "__name__" {
                 if let [Expr::StringLiteral(ast::ExprStringLiteral { value, .. })] = &**comparators
                 {
                     if value == "__main__" {

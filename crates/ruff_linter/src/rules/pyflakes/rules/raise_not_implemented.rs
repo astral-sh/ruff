@@ -50,17 +50,17 @@ impl Violation for RaiseNotImplemented {
     }
 }
 
-fn match_not_implemented(expr: &Expr) -> Option<&Expr> {
+fn match_not_implemented<'a, 'ast>(expr: &'a Expr<'ast>) -> Option<&'a Expr<'ast>> {
     match expr {
         Expr::Call(ast::ExprCall { func, .. }) => {
             if let Expr::Name(ast::ExprName { id, .. }) = func.as_ref() {
-                if id == "NotImplemented" {
+                if *id == "NotImplemented" {
                     return Some(func);
                 }
             }
         }
         Expr::Name(ast::ExprName { id, .. }) => {
-            if id == "NotImplemented" {
+            if *id == "NotImplemented" {
                 return Some(expr);
             }
         }

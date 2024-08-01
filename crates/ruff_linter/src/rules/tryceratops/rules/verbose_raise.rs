@@ -71,7 +71,7 @@ pub(crate) fn verbose_raise(checker: &mut Checker, handlers: &[ExceptHandler]) {
                 if let Some(exc) = raise.exc.as_ref() {
                     // ...and the raised object is bound to the same name...
                     if let Expr::Name(ast::ExprName { id, .. }) = exc.as_ref() {
-                        if id == exception_name.as_str() {
+                        if *id == exception_name.as_str() {
                             let mut diagnostic = Diagnostic::new(VerboseRaise, exc.range());
                             diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(
                                 "raise".to_string(),
@@ -88,11 +88,11 @@ pub(crate) fn verbose_raise(checker: &mut Checker, handlers: &[ExceptHandler]) {
 
 #[derive(Default)]
 struct RaiseStatementVisitor<'a> {
-    raises: Vec<&'a ast::StmtRaise>,
+    raises: Vec<&'a ast::StmtRaise<'a>>,
 }
 
-impl<'a> StatementVisitor<'a> for RaiseStatementVisitor<'a> {
-    fn visit_stmt(&mut self, stmt: &'a Stmt) {
+impl<'a> StatementVisitor<'a, 'a> for RaiseStatementVisitor<'a> {
+    fn visit_stmt(&mut self, stmt: &'a Stmt<'a>) {
         match stmt {
             Stmt::Raise(raise @ ast::StmtRaise { .. }) => {
                 self.raises.push(raise);

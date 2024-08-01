@@ -1,9 +1,10 @@
-use ruff_python_ast::{self as ast, Arguments, Expr, ExprContext, Stmt};
-use ruff_text_size::{Ranged, TextRange};
-
+use ruff_allocator::CloneIn;
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::helpers::is_const_false;
+use ruff_python_ast::{self as ast, Arguments, Expr, ExprContext, Stmt};
+use ruff_text_size::{Ranged, TextRange};
+use std::alloc::alloc;
 
 use crate::checkers::ast::Checker;
 
@@ -48,22 +49,28 @@ impl AlwaysFixableViolation for AssertFalse {
     }
 }
 
-fn assertion_error(msg: Option<&Expr>) -> Stmt {
+fn assertion_error<'ast>(
+    msg: Option<&Expr<'ast>>,
+    allocator: &'ast ruff_allocator::Allocator,
+) -> Stmt<'ast> {
     Stmt::Raise(ast::StmtRaise {
         range: TextRange::default(),
-        exc: Some(Box::new(Expr::Call(ast::ExprCall {
-            func: Box::new(Expr::Name(ast::ExprName {
-                id: "AssertionError".into(),
-                ctx: ExprContext::Load,
-                range: TextRange::default(),
-            })),
+        exc: Some(ruff_allocator::Box::new_in(Expr::Call(ast::ExprCall {
+            func: ruff_allocator::Box::new_in(
+                Expr::Name(ast::ExprName {
+                    id: "AssertionError".into(),
+                    ctx: ExprContext::Load,
+                    range: TextRange::default(),
+                }),
+                allocator,
+            ),
             arguments: Arguments {
                 args: if let Some(msg) = msg {
-                    Box::from([msg.clone()])
+                    allocator.alloc_slice_fill_iter([msg.clone_in(allocator)])
                 } else {
-                    Box::from([])
+                    &mut []
                 },
-                keywords: Box::from([]),
+                keywords: &mut [],
                 range: TextRange::default(),
             },
             range: TextRange::default(),

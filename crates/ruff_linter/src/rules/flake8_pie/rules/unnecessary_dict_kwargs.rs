@@ -147,7 +147,7 @@ pub(crate) fn unnecessary_dict_kwargs(checker: &mut Checker, call: &ast::ExprCal
 
 /// Determine the set of keywords that appear in multiple positions (either directly, as in
 /// `func(x=1)`, or indirectly, as in `func(**{"x": 1})`).
-fn duplicates(call: &ast::ExprCall) -> FxHashSet<&str> {
+fn duplicates<'a>(call: &'a ast::ExprCall<'a>) -> FxHashSet<&'a str> {
     let mut seen =
         FxHashSet::with_capacity_and_hasher(call.arguments.keywords.len(), FxBuildHasher);
     let mut duplicates =
@@ -171,7 +171,7 @@ fn duplicates(call: &ast::ExprCall) -> FxHashSet<&str> {
 }
 
 /// Return `Some` if a key is a valid keyword argument name, or `None` otherwise.
-fn as_kwarg(key: &Expr) -> Option<&str> {
+fn as_kwarg<'a>(key: &'a Expr<'a>) -> Option<&'a str> {
     if let Expr::StringLiteral(ast::ExprStringLiteral { value, .. }) = key {
         if is_identifier(value.to_str()) {
             return Some(value.to_str());

@@ -52,11 +52,11 @@ impl Violation for ComparisonOfConstant {
 }
 
 /// PLR0133
-pub(crate) fn comparison_of_constant(
+pub(crate) fn comparison_of_constant<'a>(
     checker: &mut Checker,
-    left: &Expr,
+    left: &Expr<'a>,
     ops: &[CmpOp],
-    comparators: &[Expr],
+    comparators: &[Expr<'a>],
 ) {
     for ((left, right), op) in std::iter::once(left)
         .chain(comparators.iter())

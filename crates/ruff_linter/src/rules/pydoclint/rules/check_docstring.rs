@@ -384,7 +384,7 @@ struct BodyVisitor<'a> {
 }
 
 impl<'a> BodyVisitor<'a> {
-    fn new(semantic: &'a SemanticModel) -> Self {
+    fn new(semantic: &'a SemanticModel<'a>) -> Self {
         Self {
             returns: Vec::new(),
             raised_exceptions: Vec::new(),
@@ -400,8 +400,8 @@ impl<'a> BodyVisitor<'a> {
     }
 }
 
-impl<'a> StatementVisitor<'a> for BodyVisitor<'a> {
-    fn visit_stmt(&mut self, stmt: &'a Stmt) {
+impl<'a> StatementVisitor<'a, 'a> for BodyVisitor<'a> {
+    fn visit_stmt(&mut self, stmt: &'a Stmt<'a>) {
         match stmt {
             Stmt::Raise(ast::StmtRaise { exc: Some(exc), .. }) => {
                 if let Some(qualified_name) = extract_raised_exception(self.semantic, exc.as_ref())

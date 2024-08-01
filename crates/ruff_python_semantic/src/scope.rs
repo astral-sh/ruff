@@ -9,6 +9,7 @@ use ruff_index::{newtype_index, Idx, IndexSlice, IndexVec};
 use crate::binding::BindingId;
 use crate::globals::GlobalsId;
 use crate::star_import::StarImport;
+use crate::Captures;
 
 #[derive(Debug)]
 pub struct Scope<'a> {
@@ -101,7 +102,7 @@ impl<'a> Scope<'a> {
 
     /// Like [`Scope::get`], but returns all bindings with the given name, including
     /// those that were shadowed by later bindings.
-    pub fn get_all(&self, name: &str) -> impl Iterator<Item = BindingId> + '_ {
+    pub fn get_all(&self, name: &str) -> impl Iterator<Item = BindingId> + Captures<&'a ()> + '_ {
         std::iter::successors(self.bindings.get(name).copied(), |id| {
             self.shadowed_bindings.get(id).copied()
         })
@@ -109,7 +110,7 @@ impl<'a> Scope<'a> {
 
     /// Like [`Scope::bindings`], but returns all bindings added to the scope, including those that
     /// were shadowed by later bindings.
-    pub fn all_bindings(&self) -> impl Iterator<Item = (&str, BindingId)> + '_ {
+    pub fn all_bindings(&self) -> impl Iterator<Item = (&str, BindingId)> + Captures<&'a ()> + '_ {
         self.bindings.iter().flat_map(|(&name, &id)| {
             std::iter::successors(Some(id), |id| self.shadowed_bindings.get(id).copied())
                 .map(move |id| (name, id))
@@ -122,7 +123,10 @@ impl<'a> Scope<'a> {
     }
 
     /// Returns an iterator over all bindings that the given binding shadows, including itself.
-    pub fn shadowed_bindings(&self, id: BindingId) -> impl Iterator<Item = BindingId> + '_ {
+    pub fn shadowed_bindings(
+        &self,
+        id: BindingId,
+    ) -> impl Iterator<Item = BindingId> + Captures<&'a ()> + '_ {
         std::iter::successors(Some(id), |id| self.shadowed_bindings.get(id).copied())
     }
 
@@ -168,13 +172,13 @@ bitflags! {
 
 #[derive(Debug, is_macro::Is)]
 pub enum ScopeKind<'a> {
-    Class(&'a ast::StmtClassDef),
-    Function(&'a ast::StmtFunctionDef),
+    Class(&'a ast::StmtClassDef<'a>),
+    Function(&'a ast::StmtFunctionDef<'a>),
     Generator,
     Module,
     /// A Python 3.12+ [annotation scope](https://docs.python.org/3/reference/executionmodel.html#annotation-scopes)
     Type,
-    Lambda(&'a ast::ExprLambda),
+    Lambda(&'a ast::ExprLambda<'a>),
 }
 
 /// Id uniquely identifying a scope in a program.
@@ -221,7 +225,10 @@ impl<'a> Scopes<'a> {
     }
 
     /// Returns an iterator over all [`ScopeId`] ancestors, starting from the given [`ScopeId`].
-    pub fn ancestor_ids(&self, scope_id: ScopeId) -> impl Iterator<Item = ScopeId> + '_ {
+    pub fn ancestor_ids(
+        &self,
+        scope_id: ScopeId,
+    ) -> impl Iterator<Item = ScopeId> + Captures<&'a ()> + '_ {
         std::iter::successors(Some(scope_id), |&scope_id| self[scope_id].parent)
     }
 

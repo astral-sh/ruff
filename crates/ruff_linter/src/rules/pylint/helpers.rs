@@ -10,7 +10,7 @@ use ruff_text_size::TextRange;
 use crate::settings::LinterSettings;
 
 /// Returns the value of the `name` parameter to, e.g., a `TypeVar` constructor.
-pub(super) fn type_param_name(arguments: &Arguments) -> Option<&str> {
+pub(super) fn type_param_name<'a>(arguments: &'a Arguments) -> Option<&'a str> {
     // Handle both `TypeVar("T")` and `TypeVar(name="T")`.
     let name_param = arguments.find_argument("name", 0)?;
     if let Expr::StringLiteral(ast::ExprStringLiteral { value, .. }) = &name_param {
@@ -143,7 +143,7 @@ impl SequenceIndexVisitor<'_> {
     }
 }
 
-impl<'a> Visitor<'_> for SequenceIndexVisitor<'a> {
+impl<'a> Visitor<'_, '_> for SequenceIndexVisitor<'a> {
     fn visit_stmt(&mut self, stmt: &Stmt) {
         if self.modified {
             return;

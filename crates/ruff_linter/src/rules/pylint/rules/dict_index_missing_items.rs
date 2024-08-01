@@ -95,15 +95,15 @@ pub(crate) fn dict_index_missing_items(checker: &mut Checker, stmt_for: &ast::St
 /// A visitor to detect subscript operations on a target dictionary.
 struct SubscriptVisitor<'a> {
     /// The target of the for loop (e.g., `key` in `for key in obj:`).
-    target: &'a Expr,
+    target: &'a Expr<'a>,
     /// The name of the iterated object (e.g., `obj` in `for key in obj:`).
-    dict_name: &'a ast::ExprName,
+    dict_name: &'a ast::ExprName<'a>,
     /// Whether a violation has been detected.
     has_violation: bool,
 }
 
 impl<'a> SubscriptVisitor<'a> {
-    fn new(target: &'a Expr, dict_name: &'a ast::ExprName) -> Self {
+    fn new(target: &'a Expr<'a>, dict_name: &'a ast::ExprName<'a>) -> Self {
         Self {
             target,
             dict_name,
@@ -112,8 +112,8 @@ impl<'a> SubscriptVisitor<'a> {
     }
 }
 
-impl<'a> Visitor<'a> for SubscriptVisitor<'a> {
-    fn visit_expr(&mut self, expr: &'a Expr) {
+impl<'a> Visitor<'a, 'a> for SubscriptVisitor<'a> {
+    fn visit_expr(&mut self, expr: &'a Expr<'a>) {
         // Given `obj[key]`, `value` must be `obj` and `slice` must be `key`.
         if let Expr::Subscript(ast::ExprSubscript {
             value,
@@ -144,7 +144,7 @@ impl<'a> Visitor<'a> for SubscriptVisitor<'a> {
 }
 
 /// Extracts the name of the dictionary from the expression.
-fn extract_dict_name(expr: &Expr) -> Option<&ast::ExprName> {
+fn extract_dict_name<'a>(expr: &'a Expr<'a>) -> Option<&'a ast::ExprName<'a>> {
     // Ex) `for key in obj:`
     if let Some(name_expr) = expr.as_name_expr() {
         return Some(name_expr);

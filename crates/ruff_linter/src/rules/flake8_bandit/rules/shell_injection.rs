@@ -464,7 +464,7 @@ enum Safety {
     Unknown,
 }
 
-impl From<&Expr> for Safety {
+impl From<&Expr<'_>> for Safety {
     /// Return the [`Safety`] level for the [`Expr`]. This is based on Bandit's definition: string
     /// literals are considered okay, but dynamically-computed values are not.
     fn from(expr: &Expr) -> Self {

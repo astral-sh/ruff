@@ -141,7 +141,7 @@ fn sort_dunder_all(checker: &mut Checker, target: &ast::Expr, node: &ast::Expr) 
         return;
     };
 
-    if id != "__all__" {
+    if *id != "__all__" {
         return;
     }
 

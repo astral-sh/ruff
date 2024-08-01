@@ -58,7 +58,7 @@ impl Violation for MagicValueComparison {
 }
 
 /// If an [`Expr`] is a literal (or unary operation on a literal), return the [`LiteralExpressionRef`].
-fn as_literal(expr: &Expr) -> Option<LiteralExpressionRef<'_>> {
+fn as_literal<'a, 'ast>(expr: &'a Expr<'ast>) -> Option<LiteralExpressionRef<'a, 'ast>> {
     match expr {
         Expr::UnaryOp(ast::ExprUnaryOp {
             op: UnaryOp::UAdd | UnaryOp::USub | UnaryOp::Invert,
@@ -96,7 +96,11 @@ fn is_magic_value(literal_expr: LiteralExpressionRef, allowed_types: &[ConstantT
 }
 
 /// PLR2004
-pub(crate) fn magic_value_comparison(checker: &mut Checker, left: &Expr, comparators: &[Expr]) {
+pub(crate) fn magic_value_comparison<'a>(
+    checker: &mut Checker,
+    left: &Expr<'a>,
+    comparators: &[Expr<'a>],
+) {
     for (left, right) in std::iter::once(left)
         .chain(comparators.iter())
         .tuple_windows()

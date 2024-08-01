@@ -102,7 +102,7 @@ fn get_undecorated_methods(checker: &mut Checker, class_stmt: &Stmt, method_type
         return;
     };
 
-    let mut explicit_decorator_calls: HashMap<Name, &Stmt> = HashMap::default();
+    let mut explicit_decorator_calls: HashMap<&str, &Stmt> = HashMap::default();
 
     let (method_name, diagnostic_type): (&str, DiagnosticKind) = match method_type {
         MethodType::Classmethod => ("classmethod", NoClassmethodDecorator.into()),
@@ -117,7 +117,7 @@ fn get_undecorated_methods(checker: &mut Checker, class_stmt: &Stmt, method_type
             }) = value.as_ref()
             {
                 if let Expr::Name(ast::ExprName { id, .. }) = func.as_ref() {
-                    if id == method_name && checker.semantic().has_builtin_binding(method_name) {
+                    if *id == method_name && checker.semantic().has_builtin_binding(method_name) {
                         if arguments.args.len() != 1 {
                             continue;
                         }
@@ -133,7 +133,7 @@ fn get_undecorated_methods(checker: &mut Checker, class_stmt: &Stmt, method_type
 
                         if let Expr::Name(ast::ExprName { id, .. }) = &arguments.args[0] {
                             if target_name == *id {
-                                explicit_decorator_calls.insert(id.clone(), stmt);
+                                explicit_decorator_calls.insert(id, stmt);
                             }
                         };
                     }
@@ -160,7 +160,7 @@ fn get_undecorated_methods(checker: &mut Checker, class_stmt: &Stmt, method_type
             // if we find the decorator we're looking for, skip
             if decorator_list.iter().any(|decorator| {
                 if let Expr::Name(ast::ExprName { id, .. }) = &decorator.expression {
-                    if id == method_name && checker.semantic().has_builtin_binding(method_name) {
+                    if *id == method_name && checker.semantic().has_builtin_binding(method_name) {
                         return true;
                     }
                 }

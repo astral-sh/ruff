@@ -98,12 +98,14 @@ pub(crate) fn too_many_return_statements(
 #[cfg(test)]
 mod tests {
     use anyhow::Result;
+    use ruff_allocator::Allocator;
     use ruff_python_parser::parse_module;
 
     use super::num_returns;
 
     fn test_helper(source: &str, expected: usize) -> Result<()> {
-        let parsed = parse_module(source)?;
+        let allocator = Allocator::new();
+        let parsed = parse_module(source, &allocator)?;
         assert_eq!(num_returns(parsed.suite()), expected);
         Ok(())
     }

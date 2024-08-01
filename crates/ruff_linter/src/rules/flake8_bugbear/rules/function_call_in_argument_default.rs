@@ -98,7 +98,7 @@ impl<'a, 'b> ArgumentDefaultVisitor<'a, 'b> {
     }
 }
 
-impl Visitor<'_> for ArgumentDefaultVisitor<'_, '_> {
+impl Visitor<'_, '_> for ArgumentDefaultVisitor<'_, '_> {
     fn visit_expr(&mut self, expr: &Expr) {
         match expr {
             Expr::Call(ast::ExprCall { func, .. }) => {

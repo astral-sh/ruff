@@ -301,7 +301,7 @@ pub(crate) fn is_same_expr<'a>(a: &'a Expr, b: &'a Expr) -> Option<&'a str> {
 }
 
 /// If `call` is an `isinstance()` call, return its target.
-fn isinstance_target<'a>(call: &'a Expr, semantic: &'a SemanticModel) -> Option<&'a Expr> {
+fn isinstance_target<'a>(call: &Expr<'a>, semantic: &SemanticModel) -> Option<&'a Expr<'a>> {
     // Verify that this is an `isinstance` call.
     let ast::ExprCall {
         func,
@@ -470,7 +470,7 @@ pub(crate) fn duplicate_isinstance_call(checker: &mut Checker, expr: &Expr) {
     }
 }
 
-fn match_eq_target(expr: &Expr) -> Option<(&Name, &Expr)> {
+fn match_eq_target<'a>(expr: &Expr<'a>) -> Option<(&'a Name, &'a Expr<'a>)> {
     let Expr::Compare(ast::ExprCompare {
         left,
         ops,

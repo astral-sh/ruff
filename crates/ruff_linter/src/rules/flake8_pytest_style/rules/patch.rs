@@ -52,12 +52,12 @@ impl Violation for PytestPatchWithLambda {
 /// Visitor that checks references the argument names in the lambda body.
 #[derive(Debug)]
 struct LambdaBodyVisitor<'a> {
-    parameters: &'a Parameters,
+    parameters: &'a Parameters<'a>,
     uses_args: bool,
 }
 
-impl<'a> Visitor<'a> for LambdaBodyVisitor<'a> {
-    fn visit_expr(&mut self, expr: &'a Expr) {
+impl<'a> Visitor<'a, 'a> for LambdaBodyVisitor<'a> {
+    fn visit_expr(&mut self, expr: &'a Expr<'a>) {
         match expr {
             Expr::Name(ast::ExprName { id, .. }) => {
                 if self.parameters.includes(id) {

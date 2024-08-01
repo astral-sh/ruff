@@ -95,13 +95,13 @@ impl OpenMode {
 #[derive(Debug)]
 pub(super) struct FileOpen<'a> {
     /// With item where the open happens, we use it for the reporting range.
-    pub(super) item: &'a ast::WithItem,
+    pub(super) item: &'a ast::WithItem<'a>,
     /// Filename expression used as the first argument in `open`, we use it in the diagnostic message.
-    pub(super) filename: &'a Expr,
+    pub(super) filename: &'a Expr<'a>,
     /// The file open mode.
     pub(super) mode: OpenMode,
     /// The file open keywords.
-    pub(super) keywords: Vec<&'a ast::Keyword>,
+    pub(super) keywords: Vec<&'a ast::Keyword<'a>>,
     /// We only check `open` operations whose file handles are used exactly once.
     pub(super) reference: &'a ResolvedReference,
 }
@@ -185,7 +185,7 @@ fn find_file_open<'a>(
 
     // Now we need to find what is this variable bound to...
     let scope = semantic.current_scope();
-    let bindings: Vec<BindingId> = scope.get_all(var.id.as_str()).collect();
+    let bindings: Vec<BindingId> = scope.get_all(var.id).collect();
 
     let binding = bindings
         .iter()

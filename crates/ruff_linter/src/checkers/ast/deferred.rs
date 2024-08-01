@@ -6,13 +6,13 @@ use ruff_python_semantic::{ScopeId, Snapshot};
 /// visited.
 #[derive(Debug, Default)]
 pub(crate) struct Visit<'a> {
-    pub(crate) string_type_definitions: Vec<(&'a ExprStringLiteral, Snapshot)>,
-    pub(crate) future_type_definitions: Vec<(&'a Expr, Snapshot)>,
-    pub(crate) type_param_definitions: Vec<(&'a Expr, Snapshot)>,
+    pub(crate) string_type_definitions: Vec<(&'a ExprStringLiteral<'a>, Snapshot)>,
+    pub(crate) future_type_definitions: Vec<(&'a Expr<'a>, Snapshot)>,
+    pub(crate) type_param_definitions: Vec<(&'a Expr<'a>, Snapshot)>,
     pub(crate) functions: Vec<Snapshot>,
     pub(crate) lambdas: Vec<Snapshot>,
     /// N.B. This field should always be empty unless it's a stub file
-    pub(crate) class_bases: Vec<(&'a Expr, Snapshot)>,
+    pub(crate) class_bases: Vec<(&'a Expr<'a>, Snapshot)>,
 }
 
 impl Visit<'_> {

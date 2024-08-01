@@ -9,7 +9,7 @@ use crate::SemanticModel;
 ///
 /// sys.path.append("../")
 /// ```
-pub fn is_sys_path_modification(stmt: &Stmt, semantic: &SemanticModel) -> bool {
+pub fn is_sys_path_modification<'a>(stmt: &Stmt<'a>, semantic: &SemanticModel<'a>) -> bool {
     let Stmt::Expr(ast::StmtExpr { value, range: _ }) = stmt else {
         return false;
     };
@@ -43,7 +43,7 @@ pub fn is_sys_path_modification(stmt: &Stmt, semantic: &SemanticModel) -> bool {
 ///
 /// os.environ["CUDA_VISIBLE_DEVICES"] = "4"
 /// ```
-pub fn is_os_environ_modification(stmt: &Stmt, semantic: &SemanticModel) -> bool {
+pub fn is_os_environ_modification<'a>(stmt: &Stmt<'a>, semantic: &SemanticModel<'a>) -> bool {
     match stmt {
         Stmt::Expr(ast::StmtExpr { value, .. }) => match value.as_ref() {
             Expr::Call(ast::ExprCall { func, .. }) => semantic
@@ -91,7 +91,7 @@ pub fn is_os_environ_modification(stmt: &Stmt, semantic: &SemanticModel) -> bool
 ///
 /// matplotlib.use("Agg")
 /// ```
-pub fn is_matplotlib_activation(stmt: &Stmt, semantic: &SemanticModel) -> bool {
+pub fn is_matplotlib_activation<'a>(stmt: &Stmt<'a>, semantic: &SemanticModel<'a>) -> bool {
     let Stmt::Expr(ast::StmtExpr { value, range: _ }) = stmt else {
         return false;
     };

@@ -8,9 +8,9 @@ use ruff_python_semantic::SemanticModel;
 #[derive(Default)]
 pub(super) struct Stack<'data> {
     /// The `return` statements in the current function.
-    pub(super) returns: Vec<&'data ast::StmtReturn>,
+    pub(super) returns: Vec<&'data ast::StmtReturn<'data>>,
     /// The `elif` or `else` statements in the current function.
-    pub(super) elifs_elses: Vec<(&'data [Stmt], &'data ElifElseClause)>,
+    pub(super) elifs_elses: Vec<(&'data [Stmt<'data>], &'data ElifElseClause<'data>)>,
     /// The non-local variables in the current function.
     pub(super) non_locals: FxHashSet<&'data str>,
     /// The annotated variables in the current function.
@@ -33,8 +33,11 @@ pub(super) struct Stack<'data> {
     /// The `assignment`-to-`return` statement pairs in the current function.
     /// TODO(charlie): Remove the extra [`Stmt`] here, which is necessary to support statement
     /// removal for the `return` statement.
-    pub(super) assignment_return:
-        Vec<(&'data ast::StmtAssign, &'data ast::StmtReturn, &'data Stmt)>,
+    pub(super) assignment_return: Vec<(
+        &'data ast::StmtAssign<'data>,
+        &'data ast::StmtReturn<'data>,
+        &'data Stmt<'data>,
+    )>,
 }
 
 pub(super) struct ReturnVisitor<'semantic, 'data> {
@@ -43,9 +46,9 @@ pub(super) struct ReturnVisitor<'semantic, 'data> {
     /// The current stack of nodes.
     pub(super) stack: Stack<'data>,
     /// The preceding sibling of the current node.
-    sibling: Option<&'data Stmt>,
+    sibling: Option<&'data Stmt<'data>>,
     /// The parent nodes of the current node.
-    parents: Vec<&'data Stmt>,
+    parents: Vec<&'data Stmt<'data>>,
 }
 
 impl<'semantic, 'data> ReturnVisitor<'semantic, 'data> {
@@ -59,8 +62,8 @@ impl<'semantic, 'data> ReturnVisitor<'semantic, 'data> {
     }
 }
 
-impl<'semantic, 'a> Visitor<'a> for ReturnVisitor<'semantic, 'a> {
-    fn visit_stmt(&mut self, stmt: &'a Stmt) {
+impl<'semantic, 'a> Visitor<'a, 'a> for ReturnVisitor<'semantic, 'a> {
+    fn visit_stmt(&mut self, stmt: &'a Stmt<'a>) {
         match stmt {
             Stmt::ClassDef(ast::StmtClassDef { decorator_list, .. }) => {
                 // Visit the decorators, etc.
@@ -105,7 +108,7 @@ impl<'semantic, 'a> Visitor<'a> for ReturnVisitor<'semantic, 'a> {
                 // Ex) `x: int`
                 if value.is_none() {
                     if let Expr::Name(name) = target.as_ref() {
-                        self.stack.annotations.insert(name.id.as_str());
+                        self.stack.annotations.insert(name.id);
                     }
                 }
             }
@@ -169,7 +172,7 @@ impl<'semantic, 'a> Visitor<'a> for ReturnVisitor<'semantic, 'a> {
         self.parents.pop();
     }
 
-    fn visit_expr(&mut self, expr: &'a Expr) {
+    fn visit_expr(&mut self, expr: &'a Expr<'a>) {
         match expr {
             Expr::YieldFrom(_) | Expr::Yield(_) => {
                 self.stack.is_generator = true;
@@ -178,7 +181,7 @@ impl<'semantic, 'a> Visitor<'a> for ReturnVisitor<'semantic, 'a> {
         }
     }
 
-    fn visit_body(&mut self, body: &'a [Stmt]) {
+    fn visit_body(&mut self, body: &'a [Stmt<'a>]) {
         let sibling = self.sibling;
         self.sibling = None;
         visitor::walk_body(self, body);

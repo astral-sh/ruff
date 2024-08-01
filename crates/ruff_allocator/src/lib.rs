@@ -21,11 +21,11 @@ impl<'allocator, T> Box<'allocator, T> {
     }
 }
 
-impl<'allocator, T> CloneIn<'allocator> for Box<'allocator, T>
+impl<'ast, T> CloneIn<'ast> for Box<'ast, T>
 where
-    T: CloneIn<'allocator>,
+    T: CloneIn<'ast>,
 {
-    fn clone_in(&self, allocator: &'allocator Allocator) -> Self {
+    fn clone_in(&self, allocator: &'ast Allocator) -> Self {
         Self(bumpalo::boxed::Box::new_in(
             self.0.as_ref().clone_in(allocator),
             allocator,
@@ -122,16 +122,16 @@ impl<'a, I: ExactSizeIterator + ?Sized> ExactSizeIterator for Box<'a, I> {
 
 impl<'a, I: FusedIterator + ?Sized> FusedIterator for Box<'a, I> {}
 
-pub trait CloneIn<'allocator> {
+pub trait CloneIn<'a> {
     #[must_use]
-    fn clone_in(&self, allocator: &'allocator Allocator) -> Self;
+    fn clone_in(&self, allocator: &'a Allocator) -> Self;
 }
 
 impl<T> CloneIn<'_> for T
 where
     T: Clone,
 {
-    fn clone_in(&self, _: &Allocator) -> Self {
+    fn clone_in(&self, _: &'_ Allocator) -> Self {
         self.clone()
     }
 }

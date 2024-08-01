@@ -153,7 +153,7 @@ pub(crate) fn never_union(checker: &mut Checker, expr: &Expr) {
                             checker
                                 .generator()
                                 .expr(&Expr::Subscript(ast::ExprSubscript {
-                                    value: value.clone(),
+                                    value: value.clone_in(checker.allocator()),
                                     slice: Box::new(Expr::Tuple(ast::ExprTuple {
                                         elts: rest,
                                         ctx: ast::ExprContext::Load,

@@ -22,8 +22,8 @@ impl<'a, 'b> LoggerCandidateVisitor<'a, 'b> {
     }
 }
 
-impl<'a, 'b> Visitor<'b> for LoggerCandidateVisitor<'a, 'b> {
-    fn visit_expr(&mut self, expr: &'b Expr) {
+impl<'a, 'b> Visitor<'b, 'b> for LoggerCandidateVisitor<'a, 'b> {
+    fn visit_expr(&mut self, expr: &'b Expr<'b>) {
         if let Expr::Call(call) = expr {
             match call.func.as_ref() {
                 Expr::Attribute(ast::ExprAttribute { attr, .. }) => {
@@ -53,7 +53,7 @@ impl<'a, 'b> Visitor<'b> for LoggerCandidateVisitor<'a, 'b> {
         visitor::walk_expr(self, expr);
     }
 
-    fn visit_except_handler(&mut self, _except_handler: &'b ExceptHandler) {
+    fn visit_except_handler(&mut self, _except_handler: &'b ExceptHandler<'b>) {
         // Don't recurse into exception handlers, since we'll re-run the visitor on any such
         // handlers.
     }

@@ -54,7 +54,7 @@ pub enum ModuleKind {
 pub struct Module<'a> {
     pub kind: ModuleKind,
     pub source: ModuleSource<'a>,
-    pub python_ast: &'a [Stmt],
+    pub python_ast: &'a [Stmt<'a>],
     pub name: Option<&'a str>,
 }
 
@@ -77,15 +77,15 @@ impl<'a> Module<'a> {
 #[derive(Debug, Copy, Clone, is_macro::Is)]
 pub enum MemberKind<'a> {
     /// A class definition within a program.
-    Class(&'a ast::StmtClassDef),
+    Class(&'a ast::StmtClassDef<'a>),
     /// A nested class definition within a program.
-    NestedClass(&'a ast::StmtClassDef),
+    NestedClass(&'a ast::StmtClassDef<'a>),
     /// A function definition within a program.
-    Function(&'a ast::StmtFunctionDef),
+    Function(&'a ast::StmtFunctionDef<'a>),
     /// A nested function definition within a program.
-    NestedFunction(&'a ast::StmtFunctionDef),
+    NestedFunction(&'a ast::StmtFunctionDef<'a>),
     /// A method definition within a program.
-    Method(&'a ast::StmtFunctionDef),
+    Method(&'a ast::StmtFunctionDef<'a>),
 }
 
 /// A member of a Python module.
@@ -151,7 +151,7 @@ impl<'a> Definition<'a> {
         )
     }
 
-    pub fn is_property<P, I>(&self, extra_properties: P, semantic: &SemanticModel) -> bool
+    pub fn is_property<P, I>(&self, extra_properties: P, semantic: &SemanticModel<'a>) -> bool
     where
         P: IntoIterator<IntoIter = I>,
         I: Iterator<Item = QualifiedName<'a>> + Clone,
@@ -171,7 +171,7 @@ impl<'a> Definition<'a> {
     }
 
     /// Return the [`ast::StmtFunctionDef`] of the definition, if it's a function definition.
-    pub fn as_function_def(&self) -> Option<&'a ast::StmtFunctionDef> {
+    pub fn as_function_def(&self) -> Option<&'a ast::StmtFunctionDef<'a>> {
         match self {
             Definition::Member(Member {
                 kind:
@@ -185,7 +185,7 @@ impl<'a> Definition<'a> {
     }
 
     /// Return the [`ast::StmtClassDef`] of the definition, if it's a class definition.
-    pub fn as_class_def(&self) -> Option<&'a ast::StmtClassDef> {
+    pub fn as_class_def(&self) -> Option<&'a ast::StmtClassDef<'a>> {
         match self {
             Definition::Member(Member {
                 kind: MemberKind::Class(class) | MemberKind::NestedClass(class),

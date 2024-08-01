@@ -1,12 +1,12 @@
 use itertools::Itertools;
-use rustc_hash::{FxHashMap, FxHashSet};
-
+use ruff_allocator::{Allocator, CloneIn};
 use ruff_diagnostics::{AlwaysFixableViolation, Violation};
 use ruff_diagnostics::{Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::name::UnqualifiedName;
 use ruff_python_ast::{self as ast, ExceptHandler, Expr, ExprContext};
 use ruff_text_size::{Ranged, TextRange};
+use rustc_hash::{FxHashMap, FxHashSet};
 
 use crate::checkers::ast::Checker;
 use crate::fix::edits::pad;
@@ -103,9 +103,12 @@ impl AlwaysFixableViolation for DuplicateHandlerException {
     }
 }
 
-fn type_pattern(elts: Vec<&Expr>) -> Expr {
+fn type_pattern<'ast>(elts: Vec<&Expr>, allocator: &'ast Allocator) -> Expr<'ast> {
     ast::ExprTuple {
-        elts: elts.into_iter().cloned().collect(),
+        elts: elts
+            .into_iter()
+            .map(|elt| elt.clone_in(allocator))
+            .collect(),
         ctx: ExprContext::Load,
         range: TextRange::default(),
         parenthesized: true,
@@ -116,9 +119,9 @@ fn type_pattern(elts: Vec<&Expr>) -> Expr {
 /// B014
 fn duplicate_handler_exceptions<'a>(
     checker: &mut Checker,
-    expr: &'a Expr,
-    elts: &'a [Expr],
-) -> FxHashMap<UnqualifiedName<'a>, &'a Expr> {
+    expr: &'a Expr<'a>,
+    elts: &'a [Expr<'a>],
+) -> FxHashMap<UnqualifiedName<'a>, &'a Expr<'a>> {
     let mut seen: FxHashMap<UnqualifiedName, &Expr> = FxHashMap::default();
     let mut duplicates: FxHashSet<UnqualifiedName> = FxHashSet::default();
     let mut unique_elts: Vec<&Expr> = Vec::default();

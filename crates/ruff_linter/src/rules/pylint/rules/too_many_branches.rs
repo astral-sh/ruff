@@ -254,12 +254,14 @@ pub(crate) fn too_many_branches(
 #[cfg(test)]
 mod tests {
     use anyhow::Result;
+    use ruff_allocator::Allocator;
     use ruff_python_parser::parse_module;
 
     use super::num_branches;
 
     fn test_helper(source: &str, expected_num_branches: usize) -> Result<()> {
-        let parsed = parse_module(source)?;
+        let allocator = Allocator::new();
+        let parsed = parse_module(source, &allocator)?;
         assert_eq!(num_branches(parsed.suite()), expected_num_branches);
         Ok(())
     }

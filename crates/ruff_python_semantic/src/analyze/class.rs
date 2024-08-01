@@ -7,13 +7,13 @@ use ruff_python_ast::name::QualifiedName;
 use crate::{BindingId, SemanticModel};
 
 /// Return `true` if any base class matches a [`QualifiedName`] predicate.
-pub fn any_qualified_name(
-    class_def: &ast::StmtClassDef,
+pub fn any_qualified_name<'a>(
+    class_def: &ast::StmtClassDef<'a>,
     semantic: &SemanticModel,
     func: &dyn Fn(QualifiedName) -> bool,
 ) -> bool {
-    fn inner(
-        class_def: &ast::StmtClassDef,
+    fn inner<'a>(
+        class_def: &ast::StmtClassDef<'a>,
         semantic: &SemanticModel,
         func: &dyn Fn(QualifiedName) -> bool,
         seen: &mut FxHashSet<BindingId>,

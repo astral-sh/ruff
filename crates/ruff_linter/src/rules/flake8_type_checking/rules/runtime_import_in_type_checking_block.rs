@@ -311,7 +311,7 @@ fn move_imports(checker: &Checker, node_id: NodeId, imports: &[ImportBinding]) -
 
     // Step 1) Remove the import.
     let remove_import_edit = fix::edits::remove_unused_imports(
-        member_names.iter().map(AsRef::as_ref),
+        member_names.iter().map(|name| *name),
         statement,
         parent,
         checker.locator(),

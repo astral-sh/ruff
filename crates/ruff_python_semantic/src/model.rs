@@ -1,13 +1,13 @@
+use std::iter::FusedIterator;
 use std::path::Path;
 
 use bitflags::bitflags;
-use rustc_hash::FxHashMap;
-
 use ruff_python_ast::helpers::from_relative_import;
 use ruff_python_ast::name::{QualifiedName, UnqualifiedName};
 use ruff_python_ast::{self as ast, Expr, ExprContext, Operator, Stmt};
 use ruff_python_stdlib::path::is_python_stub_file;
 use ruff_text_size::{Ranged, TextRange, TextSize};
+use rustc_hash::FxHashMap;
 
 use crate::binding::{
     Binding, BindingFlags, BindingId, BindingKind, Bindings, Exceptions, FromImport, Import,
@@ -283,9 +283,10 @@ impl<'a> SemanticModel<'a> {
     /// This method returns `true` both for "builtin bindings"
     /// (present even without any imports, e.g. `open()`), and for explicit lookups
     /// via the `builtins` module (e.g. `import builtins; builtins.open()`).
-    pub fn resolve_builtin_symbol<'expr>(&'a self, expr: &'expr Expr) -> Option<&'a str>
+    pub fn resolve_builtin_symbol<'ast, 'name>(&self, expr: &Expr<'ast>) -> Option<&'name str>
     where
-        'expr: 'a,
+        'a: 'name,
+        'ast: 'name,
     {
         // Fast path: we only need to worry about name expressions
         if !self.seen_module(Modules::BUILTINS) {
@@ -315,7 +316,7 @@ impl<'a> SemanticModel<'a> {
             let Expr::Name(ast::ExprName { id, .. }) = expr else {
                 return false;
             };
-            return id == symbol && self.has_builtin_binding(symbol);
+            return *id == symbol && self.has_builtin_binding(symbol);
         }
 
         // slow path: we need to consider attribute accesses and aliased imports
@@ -358,7 +359,7 @@ impl<'a> SemanticModel<'a> {
         // PEP 563 indicates that if a forward reference can be resolved in the module scope, we
         // should prefer it over local resolutions.
         if self.in_forward_reference() {
-            if let Some(binding_id) = self.scopes.global().get(name.id.as_str()) {
+            if let Some(binding_id) = self.scopes.global().get(name.id) {
                 if !self.bindings[binding_id].is_unbound() {
                     // Mark the binding as used.
                     let reference_id = self.resolved_references.push(
@@ -372,7 +373,7 @@ impl<'a> SemanticModel<'a> {
 
                     // Mark any submodule aliases as used.
                     if let Some(binding_id) =
-                        self.resolve_submodule(name.id.as_str(), ScopeId::global(), binding_id)
+                        self.resolve_submodule(name.id, ScopeId::global(), binding_id)
                     {
                         let reference_id = self.resolved_references.push(
                             ScopeId::global(),
@@ -403,7 +404,7 @@ impl<'a> SemanticModel<'a> {
                 //     def __init__(self):
                 //         print(__class__)
                 // ```
-                if seen_function && matches!(name.id.as_str(), "__class__") {
+                if seen_function && matches!(name.id, "__class__") {
                     return ReadResult::ImplicitGlobal;
                 }
                 // Do not allow usages of class symbols unless it is the immediate parent
@@ -430,7 +431,7 @@ impl<'a> SemanticModel<'a> {
             // function and class definitions and their parent class scope.
             class_variables_visible = scope.kind.is_type() && index == 0;
 
-            if let Some(binding_id) = scope.get(name.id.as_str()) {
+            if let Some(binding_id) = scope.get(name.id) {
                 // Mark the binding as used.
                 let reference_id = self.resolved_references.push(
                     self.scope_id,
@@ -442,9 +443,7 @@ impl<'a> SemanticModel<'a> {
                 self.bindings[binding_id].references.push(reference_id);
 
                 // Mark any submodule aliases as used.
-                if let Some(binding_id) =
-                    self.resolve_submodule(name.id.as_str(), scope_id, binding_id)
-                {
+                if let Some(binding_id) = self.resolve_submodule(name.id, scope_id, binding_id) {
                     let reference_id = self.resolved_references.push(
                         self.scope_id,
                         self.node_id,
@@ -538,7 +537,7 @@ impl<'a> SemanticModel<'a> {
 
                         // Mark any submodule aliases as used.
                         if let Some(binding_id) =
-                            self.resolve_submodule(name.id.as_str(), scope_id, binding_id)
+                            self.resolve_submodule(name.id, scope_id, binding_id)
                         {
                             let reference_id = self.resolved_references.push(
                                 self.scope_id,
@@ -595,7 +594,7 @@ impl<'a> SemanticModel<'a> {
             //     print(__qualname__)
             // ```
             if index == 0 && scope.kind.is_class() {
-                if matches!(name.id.as_str(), "__module__" | "__qualname__") {
+                if matches!(name.id, "__module__" | "__qualname__") {
                     return ReadResult::ImplicitGlobal;
                 }
             }
@@ -766,15 +765,16 @@ impl<'a> SemanticModel<'a> {
     /// ```
     ///
     /// ...then `resolve_qualified_name(${python_version})` will resolve to `sys.version_info`.
-    pub fn resolve_qualified_name<'name, 'expr: 'name>(
+    pub fn resolve_qualified_name<'name, 'expr>(
         &self,
-        value: &'expr Expr,
+        value: &Expr<'expr>,
     ) -> Option<QualifiedName<'name>>
     where
         'a: 'name,
+        'expr: 'name,
     {
         /// Return the [`ast::ExprName`] at the head of the expression, if any.
-        const fn match_head(value: &Expr) -> Option<&ast::ExprName> {
+        fn match_head<'a, 'ast>(value: &'a Expr<'ast>) -> Option<&'a ast::ExprName<'ast>> {
             match value {
                 Expr::Attribute(ast::ExprAttribute { value, .. }) => match_head(value),
                 Expr::Name(name) => Some(name),
@@ -842,7 +842,7 @@ impl<'a> SemanticModel<'a> {
             BindingKind::Builtin => {
                 if value.is_name_expr() {
                     // Ex) `dict`
-                    Some(QualifiedName::builtin(head.id.as_str()))
+                    Some(QualifiedName::builtin(head.id))
                 } else {
                     // Ex) `dict.__dict__`
                     let value_name = UnqualifiedName::from_expr(value)?;
@@ -1047,56 +1047,64 @@ impl<'a> SemanticModel<'a> {
 
     /// Returns an [`Iterator`] over the current statement hierarchy, from the current [`Stmt`]
     /// through to any parents.
-    pub fn current_statements(&self) -> impl Iterator<Item = &'a Stmt> + '_ {
+    pub fn current_statements(&self) -> CurrentStatementsIter<'_, 'a> {
         let id = self.node_id.expect("No current node");
-        self.nodes
-            .ancestor_ids(id)
-            .filter_map(move |id| self.nodes[id].as_statement())
+        CurrentStatementsIter {
+            ancestors: self.nodes.ancestor_ids(id),
+            nodes: &self.nodes,
+        }
     }
 
     /// Return the current [`Stmt`].
-    pub fn current_statement(&self) -> &'a Stmt {
+    pub fn current_statement(&self) -> &'a Stmt<'a> {
         self.current_statements()
             .next()
             .expect("No current statement")
     }
 
     /// Return the parent [`Stmt`] of the current [`Stmt`], if any.
-    pub fn current_statement_parent(&self) -> Option<&'a Stmt> {
+    pub fn current_statement_parent(&self) -> Option<&'a Stmt<'a>> {
         self.current_statements().nth(1)
     }
 
     /// Returns an [`Iterator`] over the current expression hierarchy, from the current [`Expr`]
     /// through to any parents.
-    pub fn current_expressions(&self) -> impl Iterator<Item = &'a Expr> + '_ {
+    pub fn current_expressions(&self) -> CurrentExpressionsIter<'_, 'a> {
         let id = self.node_id.expect("No current node");
-        self.nodes
-            .ancestor_ids(id)
-            .filter_map(move |id| self.nodes[id].as_expression())
+        CurrentExpressionsIter {
+            ancestors: self.nodes.ancestor_ids(id),
+            nodes: &self.nodes,
+        }
     }
 
     /// Return the current [`Expr`].
-    pub fn current_expression(&self) -> Option<&'a Expr> {
+    pub fn current_expression(&self) -> Option<&'a Expr<'a>> {
         self.current_expressions().next()
     }
 
     /// Return the parent [`Expr`] of the current [`Expr`], if any.
-    pub fn current_expression_parent(&self) -> Option<&'a Expr> {
+    pub fn current_expression_parent(&self) -> Option<&'a Expr<'a>> {
         self.current_expressions().nth(1)
     }
 
     /// Return the grandparent [`Expr`] of the current [`Expr`], if any.
-    pub fn current_expression_grandparent(&self) -> Option<&'a Expr> {
+    pub fn current_expression_grandparent(&self) -> Option<&'a Expr<'a>> {
         self.current_expressions().nth(2)
     }
 
     /// Returns an [`Iterator`] over the current statement hierarchy represented as [`NodeId`],
     /// from the current [`NodeId`] through to any parents.
-    pub fn current_statement_ids(&self) -> impl Iterator<Item = NodeId> + '_ {
-        self.node_id
-            .iter()
-            .flat_map(|id| self.nodes.ancestor_ids(*id))
-            .filter(|id| self.nodes[*id].is_statement())
+    pub fn current_statement_ids(&self) -> CurrentStatementIdsIter<'_, 'a> {
+        let ancestors = if let Some(id) = self.node_id {
+            self.nodes.ancestor_ids(id)
+        } else {
+            crate::nodes::AncestorIter::empty()
+        };
+
+        CurrentStatementIdsIter {
+            ancestors,
+            nodes: &self.nodes,
+        }
     }
 
     /// Return the [`NodeId`] of the current [`Stmt`], if any.
@@ -1135,7 +1143,10 @@ impl<'a> SemanticModel<'a> {
     }
 
     /// Returns an iterator over all scopes IDs, starting from the current [`Scope`].
-    pub fn current_scope_ids(&self) -> impl Iterator<Item = ScopeId> + '_ {
+    pub fn current_scope_ids<'l>(&'l self) -> impl Iterator<Item = ScopeId> + 'l
+    where
+        'l: 'a,
+    {
         self.scopes.ancestor_ids(self.scope_id)
     }
 
@@ -1151,10 +1162,10 @@ impl<'a> SemanticModel<'a> {
 
     /// Returns the first parent of the given [`Scope`] that is not of [`ScopeKind::Type`], if any.
     pub fn first_non_type_parent_scope(&self, scope: &Scope) -> Option<&Scope<'a>> {
-        let mut current_scope = scope;
-        while let Some(parent) = self.parent_scope(current_scope) {
+        let mut current_scope = self.parent_scope(scope);
+        while let Some(parent) = current_scope {
             if parent.kind.is_type() {
-                current_scope = parent;
+                current_scope = self.parent_scope(parent);
             } else {
                 return Some(parent);
             }
@@ -1183,7 +1194,7 @@ impl<'a> SemanticModel<'a> {
 
     /// Given a [`NodeId`], return its parent, if any.
     #[inline]
-    pub fn parent_expression(&self, node_id: NodeId) -> Option<&'a Expr> {
+    pub fn parent_expression(&self, node_id: NodeId) -> Option<&'a Expr<'a>> {
         self.nodes
             .ancestor_ids(node_id)
             .filter_map(|id| self.nodes[id].as_expression())
@@ -1200,7 +1211,7 @@ impl<'a> SemanticModel<'a> {
 
     /// Return the [`Stmt`] corresponding to the given [`NodeId`].
     #[inline]
-    pub fn statement(&self, node_id: NodeId) -> &'a Stmt {
+    pub fn statement(&self, node_id: NodeId) -> &'a Stmt<'a> {
         self.nodes
             .ancestor_ids(node_id)
             .find_map(|id| self.nodes[id].as_statement())
@@ -1209,7 +1220,7 @@ impl<'a> SemanticModel<'a> {
 
     /// Returns an [`Iterator`] over the statements, starting from the given [`NodeId`].
     /// through to any parents.
-    pub fn statements(&self, node_id: NodeId) -> impl Iterator<Item = &'a Stmt> + '_ {
+    pub fn statements(&self, node_id: NodeId) -> impl Iterator<Item = &'a Stmt<'a>> + '_ {
         self.nodes
             .ancestor_ids(node_id)
             .filter_map(move |id| self.nodes[id].as_statement())
@@ -1217,7 +1228,7 @@ impl<'a> SemanticModel<'a> {
 
     /// Given a [`Stmt`], return its parent, if any.
     #[inline]
-    pub fn parent_statement(&self, node_id: NodeId) -> Option<&'a Stmt> {
+    pub fn parent_statement(&self, node_id: NodeId) -> Option<&'a Stmt<'a>> {
         self.nodes
             .ancestor_ids(node_id)
             .filter_map(|id| self.nodes[id].as_statement())
@@ -1234,7 +1245,7 @@ impl<'a> SemanticModel<'a> {
 
     /// Return the [`Expr`] corresponding to the given [`NodeId`].
     #[inline]
-    pub fn expression(&self, node_id: NodeId) -> Option<&'a Expr> {
+    pub fn expression(&self, node_id: NodeId) -> Option<&'a Expr<'a>> {
         self.nodes
             .ancestor_ids(node_id)
             .find_map(|id| self.nodes[id].as_expression())
@@ -1242,7 +1253,7 @@ impl<'a> SemanticModel<'a> {
 
     /// Returns an [`Iterator`] over the expressions, starting from the given [`NodeId`].
     /// through to any parents.
-    pub fn expressions(&self, node_id: NodeId) -> impl Iterator<Item = &'a Expr> + '_ {
+    pub fn expressions(&self, node_id: NodeId) -> impl Iterator<Item = &'a Expr<'a>> + '_ {
         self.nodes
             .ancestor_ids(node_id)
             .filter_map(move |id| self.nodes[id].as_expression())
@@ -1764,7 +1775,7 @@ impl<'a> SemanticModel<'a> {
         &self,
         scope_id: ScopeId,
         binding_id: BindingId,
-    ) -> impl Iterator<Item = ShadowedBinding> + '_ {
+    ) -> impl Iterator<Item = ShadowedBinding> + Captures<&'a ()> + '_ {
         let mut first = true;
         let mut binding_id = binding_id;
         std::iter::from_fn(move || {
@@ -1798,6 +1809,76 @@ impl<'a> SemanticModel<'a> {
         })
     }
 }
+
+// https://github.com/rust-lang/rust/issues/61756
+pub trait Captures<U: ?Sized> {}
+impl<U: ?Sized, T: ?Sized> Captures<U> for T {}
+
+struct CurrentStatementsIter<'nodes, 'a> {
+    ancestors: crate::nodes::AncestorIter<'nodes, 'a>,
+    nodes: &'nodes crate::nodes::Nodes<'a>,
+}
+
+impl<'a> Iterator for CurrentStatementsIter<'_, 'a> {
+    type Item = &'a Stmt<'a>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        for node_id in self.ancestors.by_ref() {
+            let node = self.nodes[node_id];
+            if let Some(stmt) = node.as_statement() {
+                return Some(stmt);
+            }
+        }
+
+        None
+    }
+}
+
+impl FusedIterator for CurrentStatementsIter<'_, '_> {}
+
+struct CurrentStatementIdsIter<'nodes, 'a> {
+    ancestors: crate::nodes::AncestorIter<'nodes, 'a>,
+    nodes: &'nodes crate::nodes::Nodes<'a>,
+}
+
+impl Iterator for crate::model::CurrentStatementIdsIter<'_, '_> {
+    type Item = NodeId;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        for node_id in self.ancestors.by_ref() {
+            let node = self.nodes[node_id];
+            if node.is_statement() {
+                return Some(node_id);
+            }
+        }
+
+        None
+    }
+}
+
+impl FusedIterator for crate::model::CurrentStatementIdsIter<'_, '_> {}
+
+struct CurrentExpressionsIter<'nodes, 'a> {
+    ancestors: crate::nodes::AncestorIter<'nodes, 'a>,
+    nodes: &'nodes crate::nodes::Nodes<'a>,
+}
+
+impl<'a> Iterator for crate::model::CurrentExpressionsIter<'_, 'a> {
+    type Item = &'a Expr<'a>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        for node_id in self.ancestors.by_ref() {
+            let node = self.nodes[node_id];
+            if let Some(expression) = node.as_expression() {
+                return Some(expression);
+            }
+        }
+
+        None
+    }
+}
+
+impl FusedIterator for crate::model::CurrentExpressionsIter<'_, '_> {}
 
 pub struct ShadowedBinding {
     /// The binding that is shadowing another binding.
@@ -2338,7 +2419,7 @@ impl ImportedName {
         self.context
     }
 
-    pub fn statement<'a>(&self, semantic: &SemanticModel<'a>) -> &'a Stmt {
+    pub fn statement<'a>(&self, semantic: &SemanticModel<'a>) -> &'a Stmt<'a> {
         semantic.statement(self.source)
     }
 }
@@ -2354,7 +2435,7 @@ impl Ranged for ImportedName {
 #[derive(Debug, Hash, PartialEq, Eq)]
 struct NameId(TextSize);
 
-impl From<&ast::ExprName> for NameId {
+impl From<&ast::ExprName<'_>> for NameId {
     fn from(name: &ast::ExprName) -> Self {
         Self(name.start())
     }

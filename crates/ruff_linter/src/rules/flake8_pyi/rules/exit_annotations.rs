@@ -290,9 +290,9 @@ fn check_positional_args_for_overloaded_method(
     parent_class_def: &StmtClassDef,
     parameters_range: TextRange,
 ) {
-    fn parameter_annotation_loosely_matches_predicate(
-        parameter: &ParameterWithDefault,
-        predicate: impl FnOnce(&Expr) -> bool,
+    fn parameter_annotation_loosely_matches_predicate<'a, 'ast>(
+        parameter: &'a ParameterWithDefault<'ast>,
+        predicate: impl FnOnce(&'a Expr<'ast>) -> bool,
         semantic: &SemanticModel,
     ) -> bool {
         parameter
@@ -424,10 +424,10 @@ fn check_positional_args_for_overloaded_method(
 }
 
 /// Return the non-`None` annotation element of a PEP 604-style union or `Optional` annotation.
-fn non_none_annotation_element<'a>(
-    annotation: &'a Expr,
+fn non_none_annotation_element<'a, 'ast>(
+    annotation: &'a Expr<'ast>,
     semantic: &SemanticModel,
-) -> Option<&'a Expr> {
+) -> Option<&'a Expr<'ast>> {
     // E.g., `typing.Union` or `typing.Optional`
     if let Expr::Subscript(ExprSubscript { value, slice, .. }) = annotation {
         let qualified_name = semantic.resolve_qualified_name(value)?;
