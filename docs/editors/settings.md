@@ -713,7 +713,7 @@ automatically decide between the two based on the Ruff version and extension set
     1. If the Ruff version is \< `0.5.3`, use [`ruff-lsp`](https://github.com/astral-sh/ruff-lsp). A
         warning will be displayed if settings specific to the native server are detected.
 - `true`: Same as `on`
-- `false: Same as`off\`
+- `false`: Same as`off`
 
 **Default value**: `"auto"`
 
