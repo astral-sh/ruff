@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "scripts"
-version = "0.5.5"
+version = "0.5.6"
 description = ""
 authors = ["Charles Marsh <charlie.r.marsh@gmail.com>"]
 
