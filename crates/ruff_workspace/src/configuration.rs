@@ -234,7 +234,7 @@ impl Configuration {
                     let mut include = INCLUDE.to_vec();
 
                     if global_preview.is_enabled() {
-                        include.push(FilePattern::Builtin("*.ipynb"))
+                        include.push(FilePattern::Builtin("*.ipynb"));
                     }
 
                     include

@@ -380,6 +380,10 @@ You can also change the default selection using the [`include`](settings.md#incl
 
 Ruff has built-in support for [Jupyter Notebooks](https://jupyter.org/).
 
+!!! info
+    Notebooks are linted and formatted by default when using [preview mode](preview).
+    You can opt-out of notebook linting and formatting by adding `*.ipynb` to [`extend-exclude`](settings.md#extend-exclude).
+
 To opt in to linting and formatting Jupyter Notebook (`.ipynb`) files, add the `*.ipynb` pattern to
 your [`extend-include`](settings.md#extend-include) setting, like so:
 
@@ -398,9 +402,6 @@ your [`extend-include`](settings.md#extend-include) setting, like so:
 
 This will prompt Ruff to discover Jupyter Notebook (`.ipynb`) files in any specified
 directories, then lint and format them accordingly.
-
-!!! info
-    Notebooks are linted and formatted by default when using [preview mode](preview).
 
 If you'd prefer to either only lint or only format Jupyter Notebook files, you can use the
 section specific `exclude` option to do so. For example, the following would only lint Jupyter
