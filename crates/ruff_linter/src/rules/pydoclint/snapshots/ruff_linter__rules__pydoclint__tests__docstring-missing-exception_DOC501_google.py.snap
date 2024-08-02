@@ -8,6 +8,7 @@ DOC501_google.py:46:15: DOC501 Raised exception `FasterThanLightError` missing f
 46 |         raise FasterThanLightError from exc
    |               ^^^^^^^^^^^^^^^^^^^^ DOC501
    |
+   = help: Add `FasterThanLightError` to the docstring
 
 DOC501_google.py:63:15: DOC501 Raised exception `FasterThanLightError` missing from docstring
    |
@@ -18,6 +19,7 @@ DOC501_google.py:63:15: DOC501 Raised exception `FasterThanLightError` missing f
 64 |     except:
 65 |         raise ValueError
    |
+   = help: Add `FasterThanLightError` to the docstring
 
 DOC501_google.py:65:15: DOC501 Raised exception `ValueError` missing from docstring
    |
@@ -26,6 +28,7 @@ DOC501_google.py:65:15: DOC501 Raised exception `ValueError` missing from docstr
 65 |         raise ValueError
    |               ^^^^^^^^^^ DOC501
    |
+   = help: Add `ValueError` to the docstring
 
 DOC501_google.py:115:11: DOC501 Raised exception `AnotherError` missing from docstring
     |
@@ -34,6 +37,7 @@ DOC501_google.py:115:11: DOC501 Raised exception `AnotherError` missing from doc
 115 |     raise AnotherError
     |           ^^^^^^^^^^^^ DOC501
     |
+    = help: Add `AnotherError` to the docstring
 
 DOC501_google.py:129:11: DOC501 Raised exception `AnotherError` missing from docstring
     |
@@ -42,6 +46,7 @@ DOC501_google.py:129:11: DOC501 Raised exception `AnotherError` missing from doc
 129 |     raise AnotherError()
     |           ^^^^^^^^^^^^^^ DOC501
     |
+    = help: Add `AnotherError` to the docstring
 
 DOC501_google.py:139:11: DOC501 Raised exception `SomeError` missing from docstring
     |
@@ -50,3 +55,4 @@ DOC501_google.py:139:11: DOC501 Raised exception `SomeError` missing from docstr
 139 |     raise something.SomeError
     |           ^^^^^^^^^^^^^^^^^^^ DOC501
     |
+    = help: Add `SomeError` to the docstring

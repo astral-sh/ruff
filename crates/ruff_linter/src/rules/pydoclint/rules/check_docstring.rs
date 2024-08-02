@@ -56,6 +56,10 @@ impl Violation for DocstringMissingReturns {
     fn message(&self) -> String {
         format!("`return` is not documented in docstring")
     }
+
+    fn fix_title(&self) -> Option<String> {
+        Some(format!("Add a \"Returns\" section to the docstring"))
+    }
 }
 
 /// ## What it does
@@ -99,6 +103,10 @@ impl Violation for DocstringExtraneousReturns {
     #[derive_message_formats]
     fn message(&self) -> String {
         format!("Docstring should not have a returns section because the function doesn't return anything")
+    }
+
+    fn fix_title(&self) -> Option<String> {
+        Some(format!("Remove the \"Returns\" section"))
     }
 }
 
@@ -256,6 +264,11 @@ impl Violation for DocstringMissingException {
         let DocstringMissingException { id } = self;
         format!("Raised exception `{id}` missing from docstring")
     }
+
+    fn fix_title(&self) -> Option<String> {
+        let DocstringMissingException { id } = self;
+        Some(format!("Add `{id}` to the docstring"))
+    }
 }
 
 /// ## What it does
@@ -316,6 +329,14 @@ impl Violation for DocstringExtraneousException {
                 ids.iter().map(|id| format!("`{id}`")).join(", ")
             )
         }
+    }
+
+    fn fix_title(&self) -> Option<String> {
+        let DocstringExtraneousException { ids } = self;
+        Some(format!(
+            "Remove {} from the docstring",
+            ids.iter().map(|id| format!("`{id}`")).join(", ")
+        ))
     }
 }
 
