@@ -29,3 +29,12 @@ DOC501_numpy.py:78:15: DOC501 Raised exception `ValueError` missing from docstri
    |               ^^^^^^^^^^ DOC501
    |
    = help: Add `ValueError` to the docstring
+
+DOC501_numpy.py:111:9: DOC501 Raised exception `TypeError` missing from docstring
+    |
+109 |     except TypeError:
+110 |         print("Not a number? Shame on you!")
+111 |         raise
+    |         ^^^^^ DOC501
+    |
+    = help: Add `TypeError` to the docstring
