@@ -17,7 +17,7 @@ pub(crate) fn deferred_scopes(checker: &mut Checker) {
         Rule::AsyncioDanglingTask,
         Rule::BadStaticmethodArgument,
         Rule::BuiltinAttributeShadowing,
-        Rule::ControlVarUsedAfterBlock,
+        Rule::ForVariableUsedAfterBlock,
         Rule::GlobalVariableNotAssigned,
         Rule::ImportPrivateName,
         Rule::ImportShadowedByLoopVar,
@@ -87,8 +87,8 @@ pub(crate) fn deferred_scopes(checker: &mut Checker) {
     for scope_id in checker.analyze.scopes.iter().rev().copied() {
         let scope = &checker.semantic.scopes[scope_id];
 
-        if checker.enabled(Rule::ControlVarUsedAfterBlock) {
-            ruff::rules::control_var_used_after_block(checker, scope, &mut diagnostics);
+        if checker.enabled(Rule::ForVariableUsedAfterBlock) {
+            ruff::rules::for_variable_used_after_block(checker, scope, &mut diagnostics);
         }
 
         if checker.enabled(Rule::UndefinedLocal) {

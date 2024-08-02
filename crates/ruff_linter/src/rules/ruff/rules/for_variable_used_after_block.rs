@@ -33,15 +33,15 @@ use crate::checkers::ast::Checker;
 /// print(x)  # prints 9
 /// ```
 #[violation]
-pub struct ControlVarUsedAfterBlock {
+pub struct ForVariableUsedAfterBlock {
     control_var_name: String,
     block_kind: BlockKind,
 }
 
-impl Violation for ControlVarUsedAfterBlock {
+impl Violation for ForVariableUsedAfterBlock {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let ControlVarUsedAfterBlock {
+        let ForVariableUsedAfterBlock {
             control_var_name,
             block_kind,
         } = self;
@@ -64,7 +64,7 @@ impl fmt::Display for BlockKind {
 }
 
 /// Based on wemake-python-styleguide (WPS441) to forbid control variables after the block body.
-pub(crate) fn control_var_used_after_block(
+pub(crate) fn for_variable_used_after_block(
     checker: &Checker,
     scope: &Scope,
     diagnostics: &mut Vec<Diagnostic>,
@@ -127,7 +127,7 @@ pub(crate) fn control_var_used_after_block(
                 };
 
                 diagnostics.push(Diagnostic::new(
-                    ControlVarUsedAfterBlock {
+                    ForVariableUsedAfterBlock {
                         control_var_name: name.to_owned(),
                         block_kind,
                     },
