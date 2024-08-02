@@ -89,4 +89,6 @@ for_variable_used_after_block.py:64:9: RUF031 `for` loop variable f is used outs
 63 |     _ = e
 64 |     _ = f
    |         ^ RUF031
+65 | 
+66 |     # Nested function and class definitions are fine
    |

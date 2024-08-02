@@ -63,4 +63,11 @@ def foo():
     _ = e
     _ = f
 
+    # Nested function and class definitions are fine
+    for potential_power in []:
+        def action():
+            print(potential_power)
+
+        class Animal:
+            power_level = potential_power
 
