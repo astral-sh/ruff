@@ -232,3 +232,17 @@ def calculate_speed(distance: float, time: float) -> float:
     except Exception as e:
         print(f"Oh no, we encountered {e}")
         raise
+
+
+def foo():
+    """Foo.
+
+    Returns:
+        42: int.
+    """
+    if True:
+        raise TypeError  # DOC501
+    else:
+        raise TypeError  # no DOC501 here because we already emitted a diagnostic for the earlier `raise TypeError`
+    raise ValueError  # DOC501
+    return 42

@@ -67,3 +67,24 @@ DOC501_google.py:213:9: DOC501 Raised exception `ZeroDivisionError` missing from
 215 |         print("Not a number? Shame on you!")
     |
     = help: Add `ZeroDivisionError` to the docstring
+
+DOC501_google.py:244:15: DOC501 Raised exception `TypeError` missing from docstring
+    |
+242 |     """
+243 |     if True:
+244 |         raise TypeError  # DOC501
+    |               ^^^^^^^^^ DOC501
+245 |     else:
+246 |         raise TypeError  # no DOC501 here because we already emitted a diagnostic for the earlier `raise TypeError`
+    |
+    = help: Add `TypeError` to the docstring
+
+DOC501_google.py:247:11: DOC501 Raised exception `ValueError` missing from docstring
+    |
+245 |     else:
+246 |         raise TypeError  # no DOC501 here because we already emitted a diagnostic for the earlier `raise TypeError`
+247 |     raise ValueError  # DOC501
+    |           ^^^^^^^^^^ DOC501
+248 |     return 42
+    |
+    = help: Add `ValueError` to the docstring

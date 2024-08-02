@@ -38,3 +38,24 @@ DOC501_numpy.py:111:9: DOC501 Raised exception `TypeError` missing from docstrin
     |         ^^^^^ DOC501
     |
     = help: Add `TypeError` to the docstring
+
+DOC501_numpy.py:147:15: DOC501 Raised exception `TypeError` missing from docstring
+    |
+145 |     """
+146 |     if True:
+147 |         raise TypeError  # DOC501
+    |               ^^^^^^^^^ DOC501
+148 |     else:
+149 |         raise TypeError  # no DOC501 here because we already emitted a diagnostic for the earlier `raise TypeError`
+    |
+    = help: Add `TypeError` to the docstring
+
+DOC501_numpy.py:150:11: DOC501 Raised exception `ValueError` missing from docstring
+    |
+148 |     else:
+149 |         raise TypeError  # no DOC501 here because we already emitted a diagnostic for the earlier `raise TypeError`
+150 |     raise ValueError  # DOC501
+    |           ^^^^^^^^^^ DOC501
+151 |     return 42
+    |
+    = help: Add `ValueError` to the docstring
