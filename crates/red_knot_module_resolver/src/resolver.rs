@@ -230,22 +230,20 @@ pub(crate) fn dynamic_resolution_paths(db: &dyn Db) -> Vec<SearchPath> {
         if !existing_paths.insert(Cow::Borrowed(site_packages_dir)) {
             continue;
         }
-        files.try_add_root(
+        let site_packages_root = files.try_add_root(
             db.upcast(),
             site_packages_dir,
             FileRootKind::LibrarySearchPath,
         );
-        dynamic_paths
-            .push(SearchPath::site_packages(system, site_packages_dir.to_owned()).unwrap());
-
         // This query needs to be re-executed each time a `.pth` file
         // is added, modified or removed from the `site-packages` directory.
         // However, we don't use Salsa queries to read the source text of `.pth` files;
         // we use the APIs on the `System` trait directly. As such, add a dependency on the
         // site-package directory's revision.
-        if let Some(site_packages_root) = db.files().root(db.upcast(), site_packages_dir) {
-            let _ = site_packages_root.revision(db.upcast());
-        }
+        site_packages_root.revision(db.upcast());
+
+        dynamic_paths
+            .push(SearchPath::site_packages(system, site_packages_dir.to_owned()).unwrap());
 
         // As well as modules installed directly into `site-packages`,
         // the directory may also contain `.pth` files.
