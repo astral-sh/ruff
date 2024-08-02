@@ -94,7 +94,7 @@ pub(crate) fn for_variable_used_after_block(
         let binding_statement_id = checker.semantic().statement_id(binding_source_node_id);
 
         // Loop over the references of those bindings to see if they're in the same block-scope
-        for reference in binding.references() {
+        'references: for reference in binding.references() {
             let reference = checker.semantic().reference(reference);
             let reference_node_id = reference.expression_id().unwrap();
 
@@ -108,17 +108,15 @@ pub(crate) fn for_variable_used_after_block(
             // Traverse the hierarchy and look for a block match
             let statement_hierarchy = checker.semantic().parent_statement_ids(reference_node_id);
 
-            let mut is_used_in_block = false;
             for ancestor_node_id in statement_hierarchy {
                 if binding_statement_id == ancestor_node_id {
-                    is_used_in_block = true;
                     known_good_reference_node_ids.push(reference_node_id);
-                    break;
+                    continue 'references;
                 }
             }
 
             // If the reference wasn't used in the same block, report a violation/diagnostic
-            if !is_used_in_block && !known_good_reference_node_ids.contains(&reference_node_id) {
+            if !known_good_reference_node_ids.contains(&reference_node_id) {
                 let block_kind = match binding_statement {
                     Stmt::For(_) => BlockKind::For,
                     _ => {
