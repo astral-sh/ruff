@@ -1,8 +1,11 @@
+use std::ops::Range;
+
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast as ast;
 use ruff_python_semantic::Modules;
 use ruff_text_size::Ranged;
+use ruff_text_size::TextSize;
 
 use crate::checkers::ast::Checker;
 use crate::rules::fastapi::rules::is_fastapi_route;
@@ -64,14 +67,23 @@ impl Violation for FastApiUnusedPathParameter {
     }
 }
 
-fn extract_path_params_from_route(input: &str) -> Vec<String> {
+/// Returns a vector of path parameters and their ranges in the route path.
+/// The string is just the name of the path parameter.
+/// The range includes the curly braces.    
+fn extract_path_params_from_route(input: &str) -> Vec<(String, Range<usize>)> {
     // We ignore text after a colon, since those are path convertors
     // See also: https://fastapi.tiangolo.com/tutorial/path-params/?h=path#path-convertor
-    let re = Regex::new(r"\{([^:}]+)").unwrap();
+    let re = Regex::new(r"\{([^:}]+).*?\}").unwrap();
 
     // Collect all matches and return them as a vector of strings
     re.captures_iter(input)
-        .filter_map(|cap| cap.get(1).map(|m| m.as_str().trim().to_string()))
+        .filter_map(|cap| {
+            if let (Some(name_match), Some(full_match)) = (cap.get(1), cap.get(0)) {
+                Some((name_match.as_str().trim().to_string(), full_match.range()))
+            } else {
+                None
+            }
+        })
         .collect()
 }
 
@@ -120,9 +132,9 @@ pub(crate) fn fastapi_unused_path_parameter(
         .collect::<Vec<_>>();
 
     // Check if any of the path parameters are not in the function signature
-    for path_param in path_params
+    for (path_param, range) in path_params
         .into_iter()
-        .filter(|path_param| is_identifier(path_param))
+        .filter(|(path_param, _)| is_identifier(path_param))
     {
         if !args.contains(&path_param) {
             let diagnostic = Diagnostic::new(
@@ -130,7 +142,9 @@ pub(crate) fn fastapi_unused_path_parameter(
                     arg_name: path_param.clone(),
                     function_name: function_def.name.to_string(),
                 },
-                diagnostic_range,
+                diagnostic_range
+                    .add_start(TextSize::from(range.start as u32 + 1))
+                    .sub_end(TextSize::from((path.len() - range.end + 1) as u32)),
             );
             checker.diagnostics.push(diagnostic);
         }
