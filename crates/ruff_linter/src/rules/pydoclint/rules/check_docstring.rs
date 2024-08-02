@@ -397,13 +397,13 @@ impl<'a> DocstringSections<'a> {
         for section in sections {
             match section.kind() {
                 SectionKind::Raises => {
-                    docstring_sections.raises = Some(RaisesSection::from_section(&section, style))
+                    docstring_sections.raises = Some(RaisesSection::from_section(&section, style));
                 }
                 SectionKind::Returns => {
-                    docstring_sections.returns = Some(GenericSection::from_section(&section))
+                    docstring_sections.returns = Some(GenericSection::from_section(&section));
                 }
                 SectionKind::Yields => {
-                    docstring_sections.yields = Some(GenericSection::from_section(&section))
+                    docstring_sections.yields = Some(GenericSection::from_section(&section));
                 }
                 _ => continue,
             }
