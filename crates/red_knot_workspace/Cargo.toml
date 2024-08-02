@@ -1,5 +1,5 @@
 [package]
-name = "red_knot"
+name = "red_knot_workspace"
 version = "0.0.0"
 edition.workspace = true
 rust-version.workspace = true
@@ -13,25 +13,19 @@ license.workspace = true
 
 [dependencies]
 red_knot_module_resolver = { workspace = true }
-red_knot_workspace = { workspace = true }
+red_knot_python_semantic = { workspace = true }
 
 ruff_db = { workspace = true, features = ["os", "cache"] }
+ruff_python_ast = { workspace = true }
 
 anyhow = { workspace = true }
-clap = { workspace = true, features = ["wrap_help"] }
-countme = { workspace = true, features = ["enable"] }
 crossbeam = { workspace = true }
-ctrlc = { version = "3.4.4" }
-rayon = { workspace = true }
+notify = { workspace = true }
+rustc-hash = { workspace = true }
 salsa = { workspace = true }
 tracing = { workspace = true }
-tracing-subscriber = { workspace = true }
-tracing-tree = { workspace = true }
 
 [dev-dependencies]
-filetime = { workspace = true }
-tempfile = { workspace = true }
-
 
 [lints]
 workspace = true
