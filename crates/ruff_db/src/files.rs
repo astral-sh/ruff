@@ -91,27 +91,19 @@ impl Files {
                     .root(db, path)
                     .map_or(Durability::default(), |root| root.durability(db));
 
-                let (permissions, revision, status) = match metadata {
-                    Ok(metadata) if metadata.file_type().is_file() => (
-                        metadata.permissions(),
-                        metadata.revision(),
-                        FileStatus::Exists,
-                    ),
+                let builder = File::builder(FilePath::System(absolute)).durability(durability);
+
+                let builder = match metadata {
+                    Ok(metadata) if metadata.file_type().is_file() => builder
+                        .permissions(metadata.permissions())
+                        .revision(metadata.revision()),
                     Ok(metadata) if metadata.file_type().is_directory() => {
-                        (None, FileRevision::zero(), FileStatus::IsADirectory)
+                        builder.status(FileStatus::IsADirectory)
                     }
-                    _ => (None, FileRevision::zero(), FileStatus::NotFound),
+                    _ => builder.status(FileStatus::NotFound),
                 };
 
-                File::builder(
-                    FilePath::System(absolute),
-                    permissions,
-                    revision,
-                    status,
-                    Count::default(),
-                )
-                .durability(durability)
-                .new(db)
+                builder.new(db)
             })
     }
 
@@ -139,15 +131,11 @@ impl Files {
                     Err(_) => return Err(FileError::NotFound),
                 };
 
-                let file = File::builder(
-                    FilePath::Vendored(path.to_path_buf()),
-                    Some(0o444),
-                    metadata.revision(),
-                    FileStatus::Exists,
-                    Count::default(),
-                )
-                .durability(Durability::HIGH)
-                .new(db);
+                let file = File::builder(FilePath::Vendored(path.to_path_buf()))
+                    .permissions(Some(0o444))
+                    .revision(metadata.revision())
+                    .durability(Durability::HIGH)
+                    .new(db);
 
                 entry.insert(file);
 
@@ -170,14 +158,10 @@ impl Files {
             Entry::Vacant(entry) => {
                 let metadata = db.system().virtual_path_metadata(path).ok()?;
 
-                let file = File::new(
-                    db,
-                    FilePath::SystemVirtual(path.to_path_buf()),
-                    metadata.permissions(),
-                    metadata.revision(),
-                    FileStatus::Exists,
-                    Count::default(),
-                );
+                let file = File::builder(FilePath::SystemVirtual(path.to_path_buf()))
+                    .revision(metadata.revision())
+                    .permissions(metadata.permissions())
+                    .new(db);
 
                 entry.insert(file);
 
@@ -290,20 +274,23 @@ pub struct File {
 
     /// The unix permissions of the file. Only supported on unix systems. Always `None` on Windows
     /// or when the file has been deleted.
+    #[default]
     pub permissions: Option<u32>,
 
     /// The file revision. A file has changed if the revisions don't compare equal.
+    #[default]
     pub revision: FileRevision,
 
     /// The status of the file.
     ///
     /// Salsa doesn't support deleting inputs. The only way to signal dependent queries that
     /// the file has been deleted is to change the status to `Deleted`.
+    #[default]
     status: FileStatus,
 
     /// Counter that counts the number of created file instances and active file instances.
     /// Only enabled in debug builds.
-    #[allow(unused)]
+    #[default]
     count: Count<File>,
 }
 
@@ -442,9 +429,10 @@ impl File {
 // The types in here need to be public because they're salsa ingredients but we
 // don't want them to be publicly accessible. That's why we put them into a private module.
 mod private {
-    #[derive(Copy, Clone, Debug, Eq, PartialEq)]
+    #[derive(Copy, Clone, Debug, Eq, PartialEq, Default)]
     pub enum FileStatus {
         /// The file exists.
+        #[default]
         Exists,
 
         /// The path isn't a file and instead points to a directory.

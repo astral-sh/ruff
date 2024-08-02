@@ -73,7 +73,8 @@ pub struct Workspace {
     /// Setting the open files to a non-`None` value changes `check` to only check the
     /// open files rather than all files in the workspace.
     #[return_ref]
-    open_file_set: Option<Arc<FxHashSet<File>>>,
+    #[default]
+    open_fileset: Option<Arc<FxHashSet<File>>>,
 
     /// The (first-party) packages in this workspace.
     #[return_ref]
@@ -92,6 +93,7 @@ pub struct Package {
 
     /// The files that are part of this package.
     #[return_ref]
+    #[default]
     file_set: PackageFiles,
     // TODO: Add the loaded settings.
 }
@@ -105,8 +107,9 @@ impl Workspace {
             packages.insert(package.root.clone(), Package::from_metadata(db, package));
         }
 
-        Workspace::builder(metadata.root, None, packages)
+        Workspace::builder(metadata.root, packages)
             .durability(Durability::MEDIUM)
+            .open_fileset_durability(Durability::LOW)
             .new(db)
     }
 
@@ -214,7 +217,7 @@ impl Workspace {
 
     /// Returns the open files in the workspace or `None` if the entire workspace should be checked.
     pub fn open_files(self, db: &dyn Db) -> Option<&FxHashSet<File>> {
-        self.open_file_set(db).as_deref()
+        self.open_fileset(db).as_deref()
     }
 
     /// Sets the open files in the workspace.
@@ -222,7 +225,7 @@ impl Workspace {
     /// This changes the behavior of `check` to only check the open files rather than all files in the workspace.
     #[tracing::instrument(level = "debug", skip(self, db))]
     pub fn set_open_files(self, db: &mut dyn Db, open_files: FxHashSet<File>) {
-        self.set_open_file_set(db).to(Some(Arc::new(open_files)));
+        self.set_open_fileset(db).to(Some(Arc::new(open_files)));
     }
 
     /// This takes the open files from the workspace and returns them.
@@ -231,7 +234,7 @@ impl Workspace {
     pub fn take_open_files(self, db: &mut dyn Db) -> FxHashSet<File> {
         // Salsa will cancel any pending queries and remove its own reference to `open_files`
         // so that the reference counter to `open_files` now drops to 1.
-        let open_files = self.set_open_file_set(db).to(None);
+        let open_files = self.set_open_fileset(db).to(None);
 
         if let Some(open_files) = open_files {
             Arc::try_unwrap(open_files).unwrap()
@@ -309,8 +312,9 @@ impl Package {
     }
 
     fn from_metadata(db: &dyn Db, metadata: PackageMetadata) -> Self {
-        Self::builder(metadata.name, metadata.root, PackageFiles::default())
+        Self::builder(metadata.name, metadata.root)
             .durability(Durability::MEDIUM)
+            .file_set_durability(Durability::LOW)
             .new(db)
     }
 
