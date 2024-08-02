@@ -326,7 +326,7 @@ mod tests {
             SearchPathSettings {
                 extra_paths: Vec::new(),
                 workspace_root,
-                site_packages: None,
+                site_packages: vec![],
                 custom_typeshed: None,
             },
         );

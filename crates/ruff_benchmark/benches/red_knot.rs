@@ -74,7 +74,7 @@ fn setup_case() -> Case {
         search_paths: SearchPathSettings {
             extra_paths: vec![],
             workspace_root: workspace_root.to_path_buf(),
-            site_packages: None,
+            site_packages: vec![],
             custom_typeshed: None,
         },
     };

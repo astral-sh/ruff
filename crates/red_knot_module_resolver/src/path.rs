@@ -477,12 +477,6 @@ impl SearchPath {
         )
     }
 
-    /// Does this search path point to the `site-packages` directory?
-    #[must_use]
-    pub(crate) fn is_site_packages(&self) -> bool {
-        matches!(&*self.0, SearchPathInner::SitePackages(_))
-    }
-
     fn is_valid_extension(&self, extension: &str) -> bool {
         if self.is_standard_library() {
             extension == "pyi"

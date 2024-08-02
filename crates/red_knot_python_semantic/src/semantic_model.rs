@@ -179,7 +179,7 @@ mod tests {
             SearchPathSettings {
                 extra_paths: vec![],
                 workspace_root: SystemPathBuf::from("/src"),
-                site_packages: None,
+                site_packages: vec![],
                 custom_typeshed: None,
             },
         );

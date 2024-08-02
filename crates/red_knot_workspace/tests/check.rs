@@ -14,7 +14,7 @@ fn setup_db(workspace_root: SystemPathBuf) -> anyhow::Result<RootDatabase> {
         extra_paths: vec![],
         workspace_root,
         custom_typeshed: None,
-        site_packages: None,
+        site_packages: vec![],
     };
     let settings = ProgramSettings {
         target_version: TargetVersion::default(),
