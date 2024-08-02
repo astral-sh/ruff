@@ -1,0 +1,31 @@
+[package]
+name = "red_knot_workspace"
+version = "0.0.0"
+edition.workspace = true
+rust-version.workspace = true
+homepage.workspace = true
+documentation.workspace = true
+repository.workspace = true
+authors.workspace = true
+license.workspace = true
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+red_knot_module_resolver = { workspace = true }
+red_knot_python_semantic = { workspace = true }
+
+ruff_db = { workspace = true, features = ["os", "cache"] }
+ruff_python_ast = { workspace = true }
+
+anyhow = { workspace = true }
+crossbeam = { workspace = true }
+notify = { workspace = true }
+rustc-hash = { workspace = true }
+salsa = { workspace = true }
+tracing = { workspace = true }
+
+[dev-dependencies]
+
+[lints]
+workspace = true

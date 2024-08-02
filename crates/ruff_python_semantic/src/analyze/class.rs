@@ -110,3 +110,13 @@ pub fn is_enumeration(class_def: &ast::StmtClassDef, semantic: &SemanticModel) -
         )
     })
 }
+
+/// Returns `true` if the given class is a metaclass.
+pub fn is_metaclass(class_def: &ast::StmtClassDef, semantic: &SemanticModel) -> bool {
+    any_qualified_name(class_def, semantic, &|qualified_name| {
+        matches!(
+            qualified_name.segments(),
+            ["" | "builtins", "type"] | ["abc", "ABCMeta"] | ["enum", "EnumMeta" | "EnumType"]
+        )
+    })
+}

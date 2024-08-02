@@ -5,7 +5,6 @@ pub mod settings;
 
 #[cfg(test)]
 mod tests {
-    use std::collections::BTreeSet;
     use std::path::Path;
 
     use anyhow::Result;
@@ -98,13 +97,11 @@ mod tests {
         let diagnostics = test_path(
             Path::new("pydocstyle").join(path).as_path(),
             &settings::LinterSettings {
-                pydocstyle: Settings {
-                    convention: None,
-                    ignore_decorators: BTreeSet::from_iter(["functools.wraps".to_string()]),
-                    property_decorators: BTreeSet::from_iter([
-                        "gi.repository.GObject.Property".to_string()
-                    ]),
-                },
+                pydocstyle: Settings::new(
+                    None,
+                    ["functools.wraps".to_string()],
+                    ["gi.repository.GObject.Property".to_string()],
+                ),
                 ..settings::LinterSettings::for_rule(rule_code)
             },
         )?;
@@ -129,11 +126,7 @@ mod tests {
             &settings::LinterSettings {
                 // When inferring the convention, we'll see a few false negatives.
                 // See: https://github.com/PyCQA/pydocstyle/issues/459.
-                pydocstyle: Settings {
-                    convention: None,
-                    ignore_decorators: BTreeSet::new(),
-                    property_decorators: BTreeSet::new(),
-                },
+                pydocstyle: Settings::default(),
                 ..settings::LinterSettings::for_rule(Rule::UndocumentedParam)
             },
         )?;
@@ -147,11 +140,7 @@ mod tests {
             Path::new("pydocstyle/D417.py"),
             &settings::LinterSettings {
                 // With explicit Google convention, we should flag every function.
-                pydocstyle: Settings {
-                    convention: Some(Convention::Google),
-                    ignore_decorators: BTreeSet::new(),
-                    property_decorators: BTreeSet::new(),
-                },
+                pydocstyle: Settings::new(Some(Convention::Google), [], []),
                 ..settings::LinterSettings::for_rule(Rule::UndocumentedParam)
             },
         )?;
@@ -164,12 +153,8 @@ mod tests {
         let diagnostics = test_path(
             Path::new("pydocstyle/D417.py"),
             &settings::LinterSettings {
-                // With explicit Google convention, we shouldn't flag anything.
-                pydocstyle: Settings {
-                    convention: Some(Convention::Numpy),
-                    ignore_decorators: BTreeSet::new(),
-                    property_decorators: BTreeSet::new(),
-                },
+                // With explicit numpy convention, we shouldn't flag anything.
+                pydocstyle: Settings::new(Some(Convention::Numpy), [], []),
                 ..settings::LinterSettings::for_rule(Rule::UndocumentedParam)
             },
         )?;

@@ -22,6 +22,7 @@
 //! holds types for every [`Definition`] and expression within the inferred region.
 use rustc_hash::FxHashMap;
 use salsa;
+use salsa::plumbing::AsId;
 
 use red_knot_module_resolver::{resolve_module, ModuleName};
 use ruff_db::files::File;
@@ -48,7 +49,9 @@ use crate::Db;
 #[salsa::tracked(return_ref)]
 pub(crate) fn infer_scope_types<'db>(db: &'db dyn Db, scope: ScopeId<'db>) -> TypeInference<'db> {
     let file = scope.file(db);
-    let _span = tracing::trace_span!("infer_scope_types", ?scope, ?file).entered();
+    let _span =
+        tracing::trace_span!("infer_scope_types", scope=?scope.as_id(), file=?file.path(db))
+            .entered();
 
     // Using the index here is fine because the code below depends on the AST anyway.
     // The isolation of the query is by the return inferred types.
@@ -77,7 +80,12 @@ pub(crate) fn infer_definition_types<'db>(
     definition: Definition<'db>,
 ) -> TypeInference<'db> {
     let file = definition.file(db);
-    let _span = tracing::trace_span!("infer_definition_types", ?definition, ?file,).entered();
+    let _span = tracing::trace_span!(
+        "infer_definition_types",
+        definition = ?definition.as_id(),
+        file = ?file.path(db)
+    )
+    .entered();
 
     let index = semantic_index(db, file);
 
@@ -95,7 +103,9 @@ pub(crate) fn infer_expression_types<'db>(
     expression: Expression<'db>,
 ) -> TypeInference<'db> {
     let file = expression.file(db);
-    let _span = tracing::trace_span!("infer_expression_types", ?expression, ?file).entered();
+    let _span =
+        tracing::trace_span!("infer_expression_types", expression=?expression.as_id(), file=?file.path(db))
+            .entered();
 
     let index = semantic_index(db, file);
 
@@ -1491,12 +1501,9 @@ mod tests {
     use crate::builtins::builtins_scope;
     use crate::db::tests::TestDb;
     use crate::semantic_index::definition::Definition;
-    use crate::semantic_index::semantic_index;
     use crate::semantic_index::symbol::FileScopeId;
-    use crate::types::{
-        global_scope, global_symbol_ty_by_name, infer_definition_types, symbol_table,
-        symbol_ty_by_name, use_def_map, Type,
-    };
+    use crate::semantic_index::{global_scope, semantic_index, symbol_table, use_def_map};
+    use crate::types::{global_symbol_ty_by_name, infer_definition_types, symbol_ty_by_name, Type};
     use crate::{HasTy, SemanticModel};
 
     fn setup_db() -> TestDb {
@@ -2232,6 +2239,36 @@ mod tests {
     }
 
     #[test]
+    fn attribute_of_union() -> anyhow::Result<()> {
+        let mut db = setup_db();
+
+        db.write_dedented(
+            "/src/a.py",
+            "
+            if flag:
+                class C:
+                    x = 1
+            else:
+                class C:
+                    x = 2
+            y = C.x
+            ",
+        )?;
+
+        assert_public_ty(&db, "/src/a.py", "y", "Literal[1, 2]");
+
+        Ok(())
+    }
+
+    fn first_public_def<'db>(db: &'db TestDb, file: File, name: &str) -> Definition<'db> {
+        let scope = global_scope(db, file);
+        *use_def_map(db, scope)
+            .public_definitions(symbol_table(db, scope).symbol_id_by_name(name).unwrap())
+            .first()
+            .unwrap()
+    }
+
+    #[test]
     fn big_int() -> anyhow::Result<()> {
         let mut db = setup_db();
 
@@ -2315,14 +2352,6 @@ mod tests {
         Ok(())
     }
 
-    fn first_public_def<'db>(db: &'db TestDb, file: File, name: &str) -> Definition<'db> {
-        let scope = global_scope(db, file);
-        *use_def_map(db, scope)
-            .public_definitions(symbol_table(db, scope).symbol_id_by_name(name).unwrap())
-            .first()
-            .unwrap()
-    }
-
     #[test]
     fn dependency_public_symbol_type_change() -> anyhow::Result<()> {
         let mut db = setup_db();
@@ -2375,10 +2404,10 @@ mod tests {
 
         let events = db.take_salsa_events();
 
-        assert_function_query_was_not_run::<infer_definition_types, _, _>(
+        assert_function_query_was_not_run(
             &db,
-            |ty| &ty.function,
-            &first_public_def(&db, a, "x"),
+            infer_definition_types,
+            first_public_def(&db, a, "x"),
             &events,
         );
 
@@ -2411,10 +2440,10 @@ mod tests {
 
         let events = db.take_salsa_events();
 
-        assert_function_query_was_not_run::<infer_definition_types, _, _>(
+        assert_function_query_was_not_run(
             &db,
-            |ty| &ty.function,
-            &first_public_def(&db, a, "x"),
+            infer_definition_types,
+            first_public_def(&db, a, "x"),
             &events,
         );
         Ok(())

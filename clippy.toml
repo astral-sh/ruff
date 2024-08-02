@@ -10,4 +10,12 @@ doc-valid-idents = [
   "SCREAMING_SNAKE_CASE",
   "SQLAlchemy",
   "StackOverflow",
+  "PyCharm",
+]
+
+ignore-interior-mutability = [
+  # Interned is read-only. The wrapped `Rc` never gets updated.
+  "ruff_formatter::format_element::Interned",
+  # The expression is read-only.
+  "ruff_python_ast::hashable::HashableExpr",
 ]

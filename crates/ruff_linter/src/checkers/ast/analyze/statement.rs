@@ -597,8 +597,11 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                 if checker.enabled(Rule::NonAsciiImportName) {
                     pylint::rules::non_ascii_module_import(checker, alias);
                 }
+                // TODO(charlie): Remove when stabilizing A004.
                 if let Some(asname) = &alias.asname {
-                    if checker.enabled(Rule::BuiltinVariableShadowing) {
+                    if checker.settings.preview.is_disabled()
+                        && checker.enabled(Rule::BuiltinVariableShadowing)
+                    {
                         flake8_builtins::rules::builtin_variable_shadowing(
                             checker,
                             asname,
@@ -738,6 +741,9 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                     ) {
                         checker.diagnostics.push(diagnostic);
                     }
+                }
+                if checker.enabled(Rule::BuiltinImportShadowing) {
+                    flake8_builtins::rules::builtin_import_shadowing(checker, alias);
                 }
             }
         }
@@ -917,8 +923,11 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                         ));
                     }
                 } else {
+                    // TODO(charlie): Remove when stabilizing A004.
                     if let Some(asname) = &alias.asname {
-                        if checker.enabled(Rule::BuiltinVariableShadowing) {
+                        if checker.settings.preview.is_disabled()
+                            && checker.enabled(Rule::BuiltinVariableShadowing)
+                        {
                             flake8_builtins::rules::builtin_variable_shadowing(
                                 checker,
                                 asname,
@@ -1029,6 +1038,9 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                             pylint::rules::useless_import_alias(checker, alias);
                         }
                     }
+                }
+                if checker.enabled(Rule::BuiltinImportShadowing) {
+                    flake8_builtins::rules::builtin_import_shadowing(checker, alias);
                 }
             }
             if checker.enabled(Rule::ImportSelf) {

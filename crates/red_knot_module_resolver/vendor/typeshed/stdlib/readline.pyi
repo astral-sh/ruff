@@ -1,6 +1,7 @@
 import sys
 from _typeshed import StrOrBytesPath
 from collections.abc import Callable, Sequence
+from typing import Literal
 from typing_extensions import TypeAlias
 
 if sys.platform != "win32":
@@ -34,3 +35,6 @@ if sys.platform != "win32":
     def set_completer_delims(string: str, /) -> None: ...
     def get_completer_delims() -> str: ...
     def set_completion_display_matches_hook(function: _CompDisp | None = None, /) -> None: ...
+
+    if sys.version_info >= (3, 13):
+        backend: Literal["readline", "editline"]

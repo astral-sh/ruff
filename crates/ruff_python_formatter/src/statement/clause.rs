@@ -17,6 +17,7 @@ use crate::{has_skip_comment, prelude::*};
 /// > A compound statement consists of one or more ‘clauses.’ A clause consists of a header and a ‘suite.’
 /// > The clause headers of a particular compound statement are all at the same indentation level.
 /// > Each clause header begins with a uniquely identifying keyword and ends with a colon.
+///
 /// [source](https://docs.python.org/3/reference/compound_stmts.html#compound-statements)
 #[derive(Copy, Clone)]
 pub(crate) enum ClauseHeader<'a> {

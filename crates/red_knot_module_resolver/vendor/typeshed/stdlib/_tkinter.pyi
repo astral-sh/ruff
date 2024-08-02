@@ -1,6 +1,6 @@
 import sys
 from collections.abc import Callable
-from typing import Any, ClassVar, Literal, final
+from typing import Any, ClassVar, Final, final
 from typing_extensions import TypeAlias
 
 # _tkinter is meant to be only used internally by tkinter, but some tkinter
@@ -95,16 +95,16 @@ class TkappType:
         def settrace(self, func: _TkinterTraceFunc | None, /) -> None: ...
 
 # These should be kept in sync with tkinter.tix constants, except ALL_EVENTS which doesn't match TCL_ALL_EVENTS
-ALL_EVENTS: Literal[-3]
-FILE_EVENTS: Literal[8]
-IDLE_EVENTS: Literal[32]
-TIMER_EVENTS: Literal[16]
-WINDOW_EVENTS: Literal[4]
+ALL_EVENTS: Final = -3
+FILE_EVENTS: Final = 8
+IDLE_EVENTS: Final = 32
+TIMER_EVENTS: Final = 16
+WINDOW_EVENTS: Final = 4
 
-DONT_WAIT: Literal[2]
-EXCEPTION: Literal[8]
-READABLE: Literal[2]
-WRITABLE: Literal[4]
+DONT_WAIT: Final = 2
+EXCEPTION: Final = 8
+READABLE: Final = 2
+WRITABLE: Final = 4
 
 TCL_VERSION: str
 TK_VERSION: str

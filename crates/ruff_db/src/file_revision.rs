@@ -15,6 +15,10 @@ impl FileRevision {
         Self(value)
     }
 
+    pub fn now() -> Self {
+        Self::from(filetime::FileTime::now())
+    }
+
     pub const fn zero() -> Self {
         Self(0)
     }

@@ -221,7 +221,7 @@ class CheckOptions(CommandOptions):
         if self.exclude:
             args.extend(["--exclude", self.exclude])
         if self.show_fixes:
-            args.extend(["--show-fixes", "--ecosystem-ci"])
+            args.extend(["--show-fixes"])
         return args
 
 

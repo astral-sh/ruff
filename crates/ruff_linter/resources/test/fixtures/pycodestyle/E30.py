@@ -935,3 +935,42 @@ def arrow_strip_whitespace(obj: Array, /, *cols: str) -> Array: ...  # type: ign
 def arrow_strip_whitespace(obj, /, *cols):
     ...
 # end
+
+
+# E302
+def test_update():
+    pass
+    # comment
+def test_clientmodel():
+    pass
+# end
+
+
+# E302
+def test_update():
+    pass
+        # comment
+def test_clientmodel():
+    pass
+# end
+
+
+# E302
+def test_update():
+    pass
+# comment
+def test_clientmodel():
+    pass
+# end
+
+
+# E305
+
+class A:
+    pass
+
+# ====== Cool constants ========
+BANANA = 100
+APPLE = 200
+
+# end

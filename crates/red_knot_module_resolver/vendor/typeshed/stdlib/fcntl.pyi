@@ -1,6 +1,6 @@
 import sys
 from _typeshed import FileDescriptorLike, ReadOnlyBuffer, WriteableBuffer
-from typing import Any, Literal, overload
+from typing import Any, Final, Literal, overload
 from typing_extensions import Buffer
 
 if sys.platform != "win32":
@@ -44,9 +44,10 @@ if sys.platform != "win32":
         F_SEAL_SHRINK: int
         F_SEAL_WRITE: int
         if sys.version_info >= (3, 9):
-            F_OFD_GETLK: int
-            F_OFD_SETLK: int
-            F_OFD_SETLKW: int
+            F_OFD_GETLK: Final[int]
+            F_OFD_SETLK: Final[int]
+            F_OFD_SETLKW: Final[int]
+
         if sys.version_info >= (3, 10):
             F_GETPIPE_SZ: int
             F_SETPIPE_SZ: int
@@ -104,6 +105,36 @@ if sys.platform != "win32":
     if sys.version_info >= (3, 12) and sys.platform == "linux":
         FICLONE: int
         FICLONERANGE: int
+
+    if sys.version_info >= (3, 13) and sys.platform == "linux":
+        F_OWNER_TID: Final = 0
+        F_OWNER_PID: Final = 1
+        F_OWNER_PGRP: Final = 2
+        F_SETOWN_EX: Final = 15
+        F_GETOWN_EX: Final = 16
+        F_SEAL_FUTURE_WRITE: Final = 16
+        F_GET_RW_HINT: Final = 1035
+        F_SET_RW_HINT: Final = 1036
+        F_GET_FILE_RW_HINT: Final = 1037
+        F_SET_FILE_RW_HINT: Final = 1038
+        RWH_WRITE_LIFE_NOT_SET: Final = 0
+        RWH_WRITE_LIFE_NONE: Final = 1
+        RWH_WRITE_LIFE_SHORT: Final = 2
+        RWH_WRITE_LIFE_MEDIUM: Final = 3
+        RWH_WRITE_LIFE_LONG: Final = 4
+        RWH_WRITE_LIFE_EXTREME: Final = 5
+
+    if sys.version_info >= (3, 11) and sys.platform == "darwin":
+        F_OFD_SETLK: Final = 90
+        F_OFD_SETLKW: Final = 91
+        F_OFD_GETLK: Final = 92
+
+    if sys.version_info >= (3, 13) and sys.platform != "linux":
+        # OSx and NetBSD
+        F_GETNOSIGPIPE: Final[int]
+        F_SETNOSIGPIPE: Final[int]
+        # OSx and FreeBSD
+        F_RDAHEAD: Final[int]
 
     @overload
     def fcntl(fd: FileDescriptorLike, cmd: int, arg: int = 0, /) -> int: ...

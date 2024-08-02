@@ -1,11 +1,11 @@
-from typing import Any
+from typing import Any, ClassVar
 
 from ..cmd import Command
 
 class install_data(Command):
     description: str
-    user_options: Any
-    boolean_options: Any
+    user_options: ClassVar[list[tuple[str, str | None, str]]]
+    boolean_options: ClassVar[list[str]]
     install_dir: Any
     outfiles: Any
     root: Any

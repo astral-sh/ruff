@@ -6,7 +6,7 @@ from collections.abc import Callable, Iterable, Mapping
 from datetime import datetime
 from io import BytesIO
 from types import TracebackType
-from typing import Any, Literal, Protocol, overload
+from typing import Any, Final, Literal, Protocol, overload
 from typing_extensions import Self, TypeAlias
 
 class _SupportsTimeTuple(Protocol):
@@ -34,22 +34,22 @@ _HostType: TypeAlias = tuple[str, dict[str, str]] | str
 
 def escape(s: str) -> str: ...  # undocumented
 
-MAXINT: int  # undocumented
-MININT: int  # undocumented
+MAXINT: Final[int]  # undocumented
+MININT: Final[int]  # undocumented
 
-PARSE_ERROR: int  # undocumented
-SERVER_ERROR: int  # undocumented
-APPLICATION_ERROR: int  # undocumented
-SYSTEM_ERROR: int  # undocumented
-TRANSPORT_ERROR: int  # undocumented
+PARSE_ERROR: Final[int]  # undocumented
+SERVER_ERROR: Final[int]  # undocumented
+APPLICATION_ERROR: Final[int]  # undocumented
+SYSTEM_ERROR: Final[int]  # undocumented
+TRANSPORT_ERROR: Final[int]  # undocumented
 
-NOT_WELLFORMED_ERROR: int  # undocumented
-UNSUPPORTED_ENCODING: int  # undocumented
-INVALID_ENCODING_CHAR: int  # undocumented
-INVALID_XMLRPC: int  # undocumented
-METHOD_NOT_FOUND: int  # undocumented
-INVALID_METHOD_PARAMS: int  # undocumented
-INTERNAL_ERROR: int  # undocumented
+NOT_WELLFORMED_ERROR: Final[int]  # undocumented
+UNSUPPORTED_ENCODING: Final[int]  # undocumented
+INVALID_ENCODING_CHAR: Final[int]  # undocumented
+INVALID_XMLRPC: Final[int]  # undocumented
+METHOD_NOT_FOUND: Final[int]  # undocumented
+INVALID_METHOD_PARAMS: Final[int]  # undocumented
+INTERNAL_ERROR: Final[int]  # undocumented
 
 class Error(Exception): ...
 
@@ -98,7 +98,7 @@ class Binary:
 
 def _binary(data: ReadableBuffer) -> Binary: ...  # undocumented
 
-WRAPPERS: tuple[type[DateTime], type[Binary]]  # undocumented
+WRAPPERS: Final[tuple[type[DateTime], type[Binary]]]  # undocumented
 
 class ExpatParser:  # undocumented
     def __init__(self, target: Unmarshaller) -> None: ...

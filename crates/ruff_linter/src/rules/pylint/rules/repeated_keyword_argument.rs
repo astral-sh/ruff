@@ -40,7 +40,7 @@ pub(crate) fn repeated_keyword_argument(checker: &mut Checker, call: &ExprCall) 
 
     let mut seen = FxHashSet::with_capacity_and_hasher(arguments.keywords.len(), FxBuildHasher);
 
-    for keyword in arguments.keywords.iter() {
+    for keyword in &*arguments.keywords {
         if let Some(id) = &keyword.arg {
             // Ex) `func(a=1, a=2)`
             if !seen.insert(id.as_str()) {

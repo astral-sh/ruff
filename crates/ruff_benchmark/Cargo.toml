@@ -50,7 +50,7 @@ ruff_python_ast = { workspace = true }
 ruff_python_formatter = { workspace = true }
 ruff_python_parser = { workspace = true }
 ruff_python_trivia = { workspace = true }
-red_knot = { workspace = true }
+red_knot_workspace = { workspace = true }
 
 [lints]
 workspace = true

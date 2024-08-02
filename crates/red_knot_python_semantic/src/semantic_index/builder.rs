@@ -330,7 +330,7 @@ where
                     function_def.type_params.as_deref(),
                     |builder| {
                         builder.visit_parameters(&function_def.parameters);
-                        for expr in &function_def.returns {
+                        if let Some(expr) = &function_def.returns {
                             builder.visit_annotation(expr);
                         }
 

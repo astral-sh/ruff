@@ -181,3 +181,40 @@ unnecessary_list_index_lookup.py:19:16: PLR1736 [*] List index lookup in `enumer
 20 20 | 
 21 21 | 
 22 22 | def dont_fix_these():
+
+unnecessary_list_index_lookup.py:74:15: PLR1736 [*] List index lookup in `enumerate()` loop
+   |
+72 |     # PLR1736
+73 |     for index, list_item in enumerate(some_list, start=0):
+74 |         print(some_list[index])
+   |               ^^^^^^^^^^^^^^^^ PLR1736
+75 | 
+76 |     # PLR1736
+   |
+   = help: Use the loop variable directly
+
+ℹ Safe fix
+71 71 | 
+72 72 |     # PLR1736
+73 73 |     for index, list_item in enumerate(some_list, start=0):
+74    |-        print(some_list[index])
+   74 |+        print(list_item)
+75 75 | 
+76 76 |     # PLR1736
+77 77 |     for index, list_item in enumerate(some_list):
+
+unnecessary_list_index_lookup.py:78:15: PLR1736 [*] List index lookup in `enumerate()` loop
+   |
+76 |     # PLR1736
+77 |     for index, list_item in enumerate(some_list):
+78 |         print(some_list[index])
+   |               ^^^^^^^^^^^^^^^^ PLR1736
+   |
+   = help: Use the loop variable directly
+
+ℹ Safe fix
+75 75 | 
+76 76 |     # PLR1736
+77 77 |     for index, list_item in enumerate(some_list):
+78    |-        print(some_list[index])
+   78 |+        print(list_item)

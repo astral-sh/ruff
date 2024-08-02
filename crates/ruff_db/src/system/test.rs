@@ -1,3 +1,7 @@
+use std::any::Any;
+use std::panic::RefUnwindSafe;
+use std::sync::Arc;
+
 use ruff_notebook::{Notebook, NotebookError};
 use ruff_python_trivia::textwrap;
 
@@ -6,9 +10,6 @@ use crate::system::{
     DirectoryEntry, MemoryFileSystem, Metadata, Result, System, SystemPath, SystemVirtualPath,
 };
 use crate::Db;
-use std::any::Any;
-use std::panic::RefUnwindSafe;
-use std::sync::Arc;
 
 use super::walk_directory::WalkDirectoryBuilder;
 
@@ -25,12 +26,6 @@ pub struct TestSystem {
 }
 
 impl TestSystem {
-    pub fn snapshot(&self) -> Self {
-        Self {
-            inner: self.inner.snapshot(),
-        }
-    }
-
     /// Returns the memory file system.
     ///
     /// ## Panics
@@ -233,15 +228,6 @@ pub trait DbWithTestSystem: Db + Sized {
 enum TestSystemInner {
     Stub(MemoryFileSystem),
     System(Arc<dyn System + RefUnwindSafe + Send + Sync>),
-}
-
-impl TestSystemInner {
-    fn snapshot(&self) -> Self {
-        match self {
-            Self::Stub(system) => Self::Stub(system.snapshot()),
-            Self::System(system) => Self::System(Arc::clone(system)),
-        }
-    }
 }
 
 impl Default for TestSystemInner {

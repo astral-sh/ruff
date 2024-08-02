@@ -2,7 +2,7 @@ use std::hash::BuildHasherDefault;
 
 use rustc_hash::FxHasher;
 
-pub use db::{Db, Jar};
+pub use db::Db;
 pub use semantic_model::{HasTy, SemanticModel};
 
 pub mod ast_node_ref;

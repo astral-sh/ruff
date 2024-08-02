@@ -1,12 +1,12 @@
-from typing import Any
+from typing import Any, ClassVar
 
 from ..cmd import Command
 
 class bdist_dumb(Command):
     description: str
-    user_options: Any
-    boolean_options: Any
-    default_format: Any
+    user_options: ClassVar[list[tuple[str, str | None, str]]]
+    boolean_options: ClassVar[list[str]]
+    default_format: ClassVar[dict[str, str]]
     bdist_dir: Any
     plat_name: Any
     format: Any

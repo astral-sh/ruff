@@ -68,13 +68,6 @@ impl MemoryFileSystem {
         &self.inner.cwd
     }
 
-    #[must_use]
-    pub fn snapshot(&self) -> Self {
-        Self {
-            inner: self.inner.clone(),
-        }
-    }
-
     pub fn metadata(&self, path: impl AsRef<SystemPath>) -> Result<Metadata> {
         fn metadata(fs: &MemoryFileSystem, path: &SystemPath) -> Result<Metadata> {
             let by_path = fs.inner.by_path.read().unwrap();
@@ -214,7 +207,9 @@ impl MemoryFileSystem {
 
         let normalized = self.normalize_path(path.as_ref());
 
-        get_or_create_file(&mut by_path, &normalized)?.content = content.to_string();
+        let file = get_or_create_file(&mut by_path, &normalized)?;
+        file.content = content.to_string();
+        file.last_modified = FileTime::now();
 
         Ok(())
     }

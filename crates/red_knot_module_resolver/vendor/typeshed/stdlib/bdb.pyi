@@ -2,7 +2,7 @@ import sys
 from _typeshed import ExcInfo, TraceFunction, Unused
 from collections.abc import Callable, Iterable, Mapping
 from types import CodeType, FrameType, TracebackType
-from typing import IO, Any, Literal, SupportsInt, TypeVar
+from typing import IO, Any, Final, SupportsInt, TypeVar
 from typing_extensions import ParamSpec
 
 __all__ = ["BdbQuit", "Bdb", "Breakpoint"]
@@ -10,7 +10,10 @@ __all__ = ["BdbQuit", "Bdb", "Breakpoint"]
 _T = TypeVar("_T")
 _P = ParamSpec("_P")
 
-GENERATOR_AND_COROUTINE_FLAGS: Literal[672]
+# A union of code-object flags at runtime.
+# The exact values of code-object flags are implementation details,
+# so we don't include the value of this constant in the stubs.
+GENERATOR_AND_COROUTINE_FLAGS: Final[int]
 
 class BdbQuit(Exception): ...
 

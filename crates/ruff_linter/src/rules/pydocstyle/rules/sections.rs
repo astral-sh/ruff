@@ -1325,7 +1325,7 @@ pub(crate) fn sections(
     checker: &mut Checker,
     docstring: &Docstring,
     section_contexts: &SectionContexts,
-    convention: Option<&Convention>,
+    convention: Option<Convention>,
 ) {
     match convention {
         Some(Convention::Google) => parse_google_sections(checker, docstring, section_contexts),
