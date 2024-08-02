@@ -15,6 +15,7 @@ license.workspace = true
 red_knot_module_resolver = { workspace = true }
 red_knot_python_semantic = { workspace = true }
 
+ruff_cache = { workspace = true }
 ruff_db = { workspace = true, features = ["os", "cache"] }
 ruff_python_ast = { workspace = true }
 
