@@ -28,6 +28,8 @@ mod tests {
 
     #[test_case(Rule::DocstringMissingReturns, Path::new("DOC201_google.py"))]
     #[test_case(Rule::DocstringExtraneousReturns, Path::new("DOC202_google.py"))]
+    #[test_case(Rule::DocstringMissingYields, Path::new("DOC402_google.py"))]
+    #[test_case(Rule::DocstringExtraneousYields, Path::new("DOC403_google.py"))]
     #[test_case(Rule::DocstringMissingException, Path::new("DOC501_google.py"))]
     #[test_case(Rule::DocstringExtraneousException, Path::new("DOC502_google.py"))]
     fn rules_google_style(rule_code: Rule, path: &Path) -> Result<()> {
@@ -45,6 +47,8 @@ mod tests {
 
     #[test_case(Rule::DocstringMissingReturns, Path::new("DOC201_numpy.py"))]
     #[test_case(Rule::DocstringExtraneousReturns, Path::new("DOC202_numpy.py"))]
+    #[test_case(Rule::DocstringMissingYields, Path::new("DOC402_numpy.py"))]
+    #[test_case(Rule::DocstringExtraneousYields, Path::new("DOC403_numpy.py"))]
     #[test_case(Rule::DocstringMissingException, Path::new("DOC501_numpy.py"))]
     #[test_case(Rule::DocstringExtraneousException, Path::new("DOC502_numpy.py"))]
     fn rules_numpy_style(rule_code: Rule, path: &Path) -> Result<()> {

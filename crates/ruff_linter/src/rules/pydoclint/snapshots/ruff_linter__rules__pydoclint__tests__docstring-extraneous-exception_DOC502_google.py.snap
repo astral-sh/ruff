@@ -11,6 +11,7 @@ DOC502_google.py:16:1: DOC502 Raised exception is not explicitly raised: `Faster
    | |____^ DOC502
 19 |       return distance / time
    |
+   = help: Remove `FasterThanLightError` from the docstring
 
 DOC502_google.py:33:1: DOC502 Raised exceptions are not explicitly raised: `FasterThanLightError`, `DivisionByZero`
    |
@@ -23,6 +24,7 @@ DOC502_google.py:33:1: DOC502 Raised exceptions are not explicitly raised: `Fast
    | |____^ DOC502
 37 |       return distance / time
    |
+   = help: Remove `FasterThanLightError`, `DivisionByZero` from the docstring
 
 DOC502_google.py:51:1: DOC502 Raised exception is not explicitly raised: `DivisionByZero`
    |
@@ -36,3 +38,4 @@ DOC502_google.py:51:1: DOC502 Raised exception is not explicitly raised: `Divisi
 55 |       try:
 56 |           return distance / time
    |
+   = help: Remove `DivisionByZero` from the docstring

@@ -3,8 +3,8 @@ use ruff_diagnostics::Diagnostic;
 use ruff_diagnostics::Violation;
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::name::QualifiedName;
-use ruff_python_ast::statement_visitor::StatementVisitor;
-use ruff_python_ast::{self as ast, statement_visitor, Expr, Stmt};
+use ruff_python_ast::visitor::Visitor;
+use ruff_python_ast::{self as ast, visitor, Expr, Stmt};
 use ruff_python_semantic::{Definition, MemberKind, SemanticModel};
 use ruff_text_size::{Ranged, TextRange};
 
@@ -15,7 +15,7 @@ use crate::registry::Rule;
 use crate::rules::pydocstyle::settings::Convention;
 
 /// ## What it does
-/// Checks for functions with explicit returns missing a returns section in
+/// Checks for functions with explicit returns missing a "returns" section in
 /// their docstring.
 ///
 /// ## Why is this bad?
@@ -56,10 +56,14 @@ impl Violation for DocstringMissingReturns {
     fn message(&self) -> String {
         format!("`return` is not documented in docstring")
     }
+
+    fn fix_title(&self) -> Option<String> {
+        Some(format!("Add a \"Returns\" section to the docstring"))
+    }
 }
 
 /// ## What it does
-/// Checks for function docstrings that have a returns section without
+/// Checks for function docstrings that have a "returns" section without
 /// needing one.
 ///
 /// ## Why is this bad?
@@ -100,11 +104,111 @@ impl Violation for DocstringExtraneousReturns {
     fn message(&self) -> String {
         format!("Docstring should not have a returns section because the function doesn't return anything")
     }
+
+    fn fix_title(&self) -> Option<String> {
+        Some(format!("Remove the \"Returns\" section"))
+    }
+}
+
+/// ## What it does
+/// Checks for functions with yield statements missing a "yields" section in
+/// their docstring.
+///
+/// ## Why is this bad?
+/// Docstrings missing yields sections are a sign of incomplete documentation
+/// or refactors.
+///
+/// ## Example
+/// ```python
+/// def count_to_n(n: int) -> int:
+///     """Generate integers up to *n*.
+///
+///     Args:
+///         n: The number at which to stop counting.
+///     """
+///     for i in range(1, n + 1):
+///         yield i
+/// ```
+///
+/// Use instead:
+/// ```python
+/// def count_to_n(n: int) -> int:
+///     """Generate integers up to *n*.
+///
+///     Args:
+///         n: The number at which to stop counting.
+///
+///     Yields:
+///         int: The number we're at in the count.
+///     """
+///     for i in range(1, n + 1):
+///         yield i
+/// ```
+#[violation]
+pub struct DocstringMissingYields;
+
+impl Violation for DocstringMissingYields {
+    #[derive_message_formats]
+    fn message(&self) -> String {
+        format!("`yield` is not documented in docstring")
+    }
+
+    fn fix_title(&self) -> Option<String> {
+        Some(format!("Add a \"Yields\" section to the docstring"))
+    }
+}
+
+/// ## What it does
+/// Checks for function docstrings that have a "yields" section without
+/// needing one.
+///
+/// ## Why is this bad?
+/// Functions which don't yield anything should not have a yields section
+/// in their docstrings.
+///
+/// ## Example
+/// ```python
+/// def say_hello(n: int) -> None:
+///     """Says hello to the user.
+///
+///     Args:
+///         n: Number of times to say hello.
+///
+///     Yields:
+///         Doesn't yield anything.
+///     """
+///     for _ in range(n):
+///         print("Hello!")
+/// ```
+///
+/// Use instead:
+/// ```python
+/// def say_hello(n: int) -> None:
+///     """Says hello to the user.
+///
+///     Args:
+///         n: Number of times to say hello.
+///     """
+///     for _ in range(n):
+///         print("Hello!")
+/// ```
+#[violation]
+pub struct DocstringExtraneousYields;
+
+impl Violation for DocstringExtraneousYields {
+    #[derive_message_formats]
+    fn message(&self) -> String {
+        format!("Docstring has a \"Yields\" section but the function doesn't yield anything")
+    }
+
+    fn fix_title(&self) -> Option<String> {
+        Some(format!("Remove the \"Yields\" section"))
+    }
 }
 
 /// ## What it does
 /// Checks for function docstrings that do not include documentation for all
-/// explicitly-raised exceptions.
+/// explicitly raised exceptions.
 ///
 /// ## Why is this bad?
 /// If a function raises an exception without documenting it in its docstring,
@@ -159,6 +263,11 @@ impl Violation for DocstringMissingException {
     fn message(&self) -> String {
         let DocstringMissingException { id } = self;
         format!("Raised exception `{id}` missing from docstring")
+    }
+
+    fn fix_title(&self) -> Option<String> {
+        let DocstringMissingException { id } = self;
+        Some(format!("Add `{id}` to the docstring"))
     }
 }
 
@@ -221,6 +330,14 @@ impl Violation for DocstringExtraneousException {
             )
         }
     }
+
+    fn fix_title(&self) -> Option<String> {
+        let DocstringExtraneousException { ids } = self;
+        Some(format!(
+            "Remove {} from the docstring",
+            ids.iter().map(|id| format!("`{id}`")).join(", ")
+        ))
+    }
 }
 
 // A generic docstring section.
@@ -267,24 +384,31 @@ impl<'a> RaisesSection<'a> {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Default)]
 struct DocstringSections<'a> {
     returns: Option<GenericSection>,
+    yields: Option<GenericSection>,
     raises: Option<RaisesSection<'a>>,
 }
 
 impl<'a> DocstringSections<'a> {
     fn from_sections(sections: &'a SectionContexts, style: SectionStyle) -> Self {
-        let mut returns: Option<GenericSection> = None;
-        let mut raises: Option<RaisesSection> = None;
-        for section in sections.iter() {
+        let mut docstring_sections = Self::default();
+        for section in sections {
             match section.kind() {
-                SectionKind::Raises => raises = Some(RaisesSection::from_section(&section, style)),
-                SectionKind::Returns => returns = Some(GenericSection::from_section(&section)),
+                SectionKind::Raises => {
+                    docstring_sections.raises = Some(RaisesSection::from_section(&section, style));
+                }
+                SectionKind::Returns => {
+                    docstring_sections.returns = Some(GenericSection::from_section(&section));
+                }
+                SectionKind::Yields => {
+                    docstring_sections.yields = Some(GenericSection::from_section(&section));
+                }
                 _ => continue,
             }
         }
-        Self { returns, raises }
+        docstring_sections
     }
 }
 
@@ -373,12 +497,14 @@ impl Ranged for ExceptionEntry<'_> {
 #[derive(Debug)]
 struct BodyEntries<'a> {
     returns: Vec<Entry>,
+    yields: Vec<Entry>,
     raised_exceptions: Vec<ExceptionEntry<'a>>,
 }
 
 /// An AST visitor to extract a summary of documentable statements from a function body.
 struct BodyVisitor<'a> {
     returns: Vec<Entry>,
+    yields: Vec<Entry>,
     raised_exceptions: Vec<ExceptionEntry<'a>>,
     semantic: &'a SemanticModel<'a>,
 }
@@ -387,6 +513,7 @@ impl<'a> BodyVisitor<'a> {
     fn new(semantic: &'a SemanticModel) -> Self {
         Self {
             returns: Vec::new(),
+            yields: Vec::new(),
             raised_exceptions: Vec::new(),
             semantic,
         }
@@ -395,12 +522,13 @@ impl<'a> BodyVisitor<'a> {
     fn finish(self) -> BodyEntries<'a> {
         BodyEntries {
             returns: self.returns,
+            yields: self.yields,
             raised_exceptions: self.raised_exceptions,
         }
     }
 }
 
-impl<'a> StatementVisitor<'a> for BodyVisitor<'a> {
+impl<'a> Visitor<'a> for BodyVisitor<'a> {
     fn visit_stmt(&mut self, stmt: &'a Stmt) {
         match stmt {
             Stmt::Raise(ast::StmtRaise { exc: Some(exc), .. }) => {
@@ -422,7 +550,24 @@ impl<'a> StatementVisitor<'a> for BodyVisitor<'a> {
             _ => {}
         }
 
-        statement_visitor::walk_stmt(self, stmt);
+        visitor::walk_stmt(self, stmt);
+    }
+
+    fn visit_expr(&mut self, expr: &'a Expr) {
+        match expr {
+            Expr::Yield(ast::ExprYield {
+                range,
+                value: Some(_),
+            }) => {
+                self.yields.push(Entry { range: *range });
+            }
+            Expr::YieldFrom(ast::ExprYieldFrom { range, .. }) => {
+                self.yields.push(Entry { range: *range });
+            }
+            Expr::Lambda(_) => return,
+            _ => {}
+        }
+        visitor::walk_expr(self, expr);
     }
 }
 
@@ -439,7 +584,7 @@ fn extract_raised_exception<'a>(
     None
 }
 
-/// DOC201, DOC202, DOC501, DOC502
+/// DOC201, DOC202, DOC402, DOC403, DOC501, DOC502
 pub(crate) fn check_docstring(
     checker: &mut Checker,
     definition: &Definition,
@@ -493,6 +638,27 @@ pub(crate) fn check_docstring(
             if body_entries.returns.is_empty() {
                 let diagnostic =
                     Diagnostic::new(DocstringExtraneousReturns, docstring_returns.range());
+                diagnostics.push(diagnostic);
+            }
+        }
+    }
+
+    // DOC402
+    if checker.enabled(Rule::DocstringMissingYields) {
+        if docstring_sections.yields.is_none() {
+            if let Some(body_yield) = body_entries.yields.first() {
+                let diagnostic = Diagnostic::new(DocstringMissingYields, body_yield.range());
+                diagnostics.push(diagnostic);
+            }
+        }
+    }
+
+    // DOC403
+    if checker.enabled(Rule::DocstringExtraneousYields) {
+        if let Some(docstring_yields) = docstring_sections.yields {
+            if body_entries.yields.is_empty() {
+                let diagnostic =
+                    Diagnostic::new(DocstringExtraneousYields, docstring_yields.range());
                 diagnostics.push(diagnostic);
             }
         }
