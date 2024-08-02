@@ -2,6 +2,7 @@ use itertools::Itertools;
 use ruff_diagnostics::Diagnostic;
 use ruff_diagnostics::Violation;
 use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::helpers::map_callable;
 use ruff_python_ast::name::QualifiedName;
 use ruff_python_ast::visitor::Visitor;
 use ruff_python_ast::{self as ast, visitor, Expr, Stmt};
@@ -505,6 +506,7 @@ struct BodyEntries<'a> {
 struct BodyVisitor<'a> {
     returns: Vec<Entry>,
     yields: Vec<Entry>,
+    currently_suspended_exceptions: Option<&'a ast::Expr>,
     raised_exceptions: Vec<ExceptionEntry<'a>>,
     semantic: &'a SemanticModel<'a>,
 }
@@ -514,6 +516,7 @@ impl<'a> BodyVisitor<'a> {
         Self {
             returns: Vec::new(),
             yields: Vec::new(),
+            currently_suspended_exceptions: None,
             raised_exceptions: Vec::new(),
             semantic,
         }
@@ -529,15 +532,47 @@ impl<'a> BodyVisitor<'a> {
 }
 
 impl<'a> Visitor<'a> for BodyVisitor<'a> {
+    fn visit_except_handler(&mut self, handler: &'a ast::ExceptHandler) {
+        let ast::ExceptHandler::ExceptHandler(handler_inner) = handler;
+        self.currently_suspended_exceptions = handler_inner.type_.as_deref();
+        visitor::walk_except_handler(self, handler);
+        self.currently_suspended_exceptions = None;
+    }
+
     fn visit_stmt(&mut self, stmt: &'a Stmt) {
         match stmt {
-            Stmt::Raise(ast::StmtRaise { exc: Some(exc), .. }) => {
-                if let Some(qualified_name) = extract_raised_exception(self.semantic, exc.as_ref())
-                {
-                    self.raised_exceptions.push(ExceptionEntry {
-                        qualified_name,
-                        range: exc.as_ref().range(),
-                    });
+            Stmt::Raise(ast::StmtRaise { exc, .. }) => {
+                if let Some(exc) = exc.as_ref() {
+                    if let Some(qualified_name) =
+                        self.semantic.resolve_qualified_name(map_callable(exc))
+                    {
+                        self.raised_exceptions.push(ExceptionEntry {
+                            qualified_name,
+                            range: exc.range(),
+                        });
+                    }
+                } else if let Some(exceptions) = self.currently_suspended_exceptions {
+                    let mut maybe_store_exception = |exception| {
+                        let Some(qualified_name) = self.semantic.resolve_qualified_name(exception)
+                        else {
+                            return;
+                        };
+                        if is_exception_or_base_exception(&qualified_name) {
+                            return;
+                        }
+                        self.raised_exceptions.push(ExceptionEntry {
+                            qualified_name,
+                            range: stmt.range(),
+                        });
+                    };
+
+                    if let ast::Expr::Tuple(tuple) = exceptions {
+                        for exception in &tuple.elts {
+                            maybe_store_exception(exception);
+                        }
+                    } else {
+                        maybe_store_exception(exceptions);
+                    }
                 }
             }
             Stmt::Return(ast::StmtReturn {
@@ -571,17 +606,14 @@ impl<'a> Visitor<'a> for BodyVisitor<'a> {
     }
 }
 
-fn extract_raised_exception<'a>(
-    semantic: &SemanticModel<'a>,
-    exc: &'a Expr,
-) -> Option<QualifiedName<'a>> {
-    if let Some(qualified_name) = semantic.resolve_qualified_name(exc) {
-        return Some(qualified_name);
-    }
-    if let Expr::Call(ast::ExprCall { func, .. }) = exc {
-        return extract_raised_exception(semantic, func.as_ref());
-    }
-    None
+fn is_exception_or_base_exception(qualified_name: &QualifiedName) -> bool {
+    matches!(
+        qualified_name.segments(),
+        [
+            "" | "builtins",
+            "BaseException" | "Exception" | "BaseExceptionGroup" | "ExceptionGroup"
+        ]
+    )
 }
 
 /// DOC201, DOC202, DOC402, DOC403, DOC501, DOC502

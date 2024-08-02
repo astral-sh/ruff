@@ -56,3 +56,14 @@ DOC501_google.py:139:11: DOC501 Raised exception `SomeError` missing from docstr
     |           ^^^^^^^^^^^^^^^^^^^ DOC501
     |
     = help: Add `SomeError` to the docstring
+
+DOC501_google.py:213:9: DOC501 Raised exception `ZeroDivisionError` missing from docstring
+    |
+211 |     except ZeroDivisionError:
+212 |         print("Oh no, why would you divide something by zero?")
+213 |         raise
+    |         ^^^^^ DOC501
+214 |     except TypeError:
+215 |         print("Not a number? Shame on you!")
+    |
+    = help: Add `ZeroDivisionError` to the docstring
