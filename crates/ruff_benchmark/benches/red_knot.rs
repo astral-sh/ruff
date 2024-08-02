@@ -28,10 +28,12 @@ fn get_test_file(name: &str) -> TestFile {
 fn setup_case() -> Case {
     let system = TestSystem::default();
     let fs = system.memory_file_system().clone();
-    let parser_path = SystemPath::new("/src/parser.py");
-    let re_path = SystemPath::new("/src/_re.py");
-    let types_path = SystemPath::new("/src/_types.py");
+    let init_path = SystemPath::new("/src/tomllib/__init__.py");
+    let parser_path = SystemPath::new("/src/tomllib/_parser.py");
+    let re_path = SystemPath::new("/src/tomllib/_re.py");
+    let types_path = SystemPath::new("/src/tomllib/_types.py");
     fs.write_files([
+        (init_path, get_test_file("__init__.py").code()),
         (parser_path, get_test_file("_parser.py").code()),
         (re_path, get_test_file("_re.py").code()),
         (types_path, get_test_file("_types.py").code()),
@@ -81,7 +83,7 @@ fn benchmark_incremental(criterion: &mut Criterion) {
                 let Case { db, parser, .. } = case;
                 let result = db.check_file(*parser).unwrap();
 
-                assert_eq!(result.len(), 321);
+                assert_eq!(result.len(), 403);
             },
             BatchSize::SmallInput,
         );
@@ -96,7 +98,7 @@ fn benchmark_cold(criterion: &mut Criterion) {
                 let Case { db, parser, .. } = case;
                 let result = db.check_file(*parser).unwrap();
 
-                assert_eq!(result.len(), 321);
+                assert_eq!(result.len(), 403);
             },
             BatchSize::SmallInput,
         );
