@@ -243,12 +243,11 @@ impl Workspace {
     /// Returns the paths that should be watched.
     ///
     /// The paths that require watching might change with every revision.
-    pub fn paths_to_watch(self, db: &dyn Db) -> FxHashSet<SystemPathBuf> {
-        ruff_db::system::deduplicate_nested_paths(
-            std::iter::once(self.root(db)).chain(system_module_search_paths(db.upcast())),
-        )
-        .map(SystemPath::to_path_buf)
-        .collect()
+    pub fn paths_to_watch(self, db: &dyn Db) -> Vec<SystemPathBuf> {
+        std::iter::once(self.root(db))
+            .chain(system_module_search_paths(db.upcast()))
+            .map(SystemPath::to_path_buf)
+            .collect()
     }
 }
 

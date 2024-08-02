@@ -34,6 +34,18 @@ impl WorkspaceWatcher {
     pub fn update(&mut self, db: &RootDatabase) {
         let new_watch_paths = db.workspace().paths_to_watch(db);
 
+        // Canonicalize the paths to support nested folders that are symlinks outside the workspace.
+        let canonicalized = new_watch_paths.into_iter().map(|path| {
+            path.as_utf8_path()
+                .canonicalize_utf8()
+                .map(SystemPathBuf::from_utf8_path_buf)
+                .unwrap_or(path)
+        });
+
+        // Deduplicate overlapping paths to avoid watching multiple paths.
+        let new_watch_paths: FxHashSet<_> =
+            ruff_db::system::deduplicate_nested_paths(canonicalized).collect();
+
         let mut added_folders = new_watch_paths.difference(&self.watched_paths).peekable();
         let mut removed_folders = self.watched_paths.difference(&new_watch_paths).peekable();
 
