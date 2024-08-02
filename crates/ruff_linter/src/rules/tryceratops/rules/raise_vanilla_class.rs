@@ -71,7 +71,9 @@ pub(crate) fn raise_vanilla_class(checker: &mut Checker, expr: &Expr) {
 
     let semantic = checker.semantic();
 
-    if semantic.match_builtin_expr(node, "Exception") || semantic.match_builtin_expr(node, "BaseException") {
+    if semantic.match_builtin_expr(node, "Exception")
+        || semantic.match_builtin_expr(node, "BaseException")
+    {
         checker
             .diagnostics
             .push(Diagnostic::new(RaiseVanillaClass, expr.range()));
