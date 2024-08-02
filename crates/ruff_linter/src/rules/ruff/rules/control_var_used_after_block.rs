@@ -79,16 +79,11 @@ pub(crate) fn control_var_used_after_block(
     let reversed_bindings = all_bindings.iter().rev();
 
     // Find for-loop variable bindings
-    for (&name, binding) in reversed_bindings
+    let loop_var_bindings = reversed_bindings
         .map(|(name, binding_id)| (name, checker.semantic().binding(*binding_id)))
-        .filter_map(|(name, binding)| {
-            if binding.kind.is_loop_var() {
-                return Some((name, binding));
-            }
+        .filter_map(|(name, binding)| binding.kind.is_loop_var().then_some((name, binding)));
 
-            None
-        })
-    {
+    for (&name, binding) in loop_var_bindings {
         let binding_statement = binding.statement(checker.semantic()).unwrap();
         let binding_source_node_id = binding.source.unwrap();
         // The node_id of the for-loop that contains the binding
