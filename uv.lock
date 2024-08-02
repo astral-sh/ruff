@@ -275,15 +275,15 @@ wheels = [
 
 [[distribution]]
 name = "mdformat-admon"
-version = "2.0.2"
+version = "2.0.3"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "mdformat" },
     { name = "mdit-py-plugins" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/31/bc/7cc59c6c5d615e99a3d9da9c5fa32e40f4123f44d404a36f3c8a5d16346c/mdformat_admon-2.0.2.tar.gz", hash = "sha256:66bf6debb4f904ff4549b5bc59380a92add16c16fb51b220f3f7288157702fea", size = 12250 }
+sdist = { url = "https://files.pythonhosted.org/packages/7d/51/01054c5cede0b7796871f80a07f1fd78e26bcd2f195527b662349666c101/mdformat_admon-2.0.3.tar.gz", hash = "sha256:2890a68ec3be06e08772d9c92d84c665b398fba1fa18f870b989f94aa6cd5aad", size = 12823 }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/5c/eb/6fd18c7435a6a9a740237d6eecd49c4e2d7b4d13e8dc937f5a49045a6e28/mdformat_admon-2.0.2-py3-none-any.whl", hash = "sha256:fb99e5c1ed63207712abd8edd7af880227d972dbbc5a5266ae0ff205dec3210f", size = 9377 },
+    { url = "https://files.pythonhosted.org/packages/58/3e/667c485571a22e5ddb0c692d6cd0de8bf607faabab07b7888f802dc798e1/mdformat_admon-2.0.3-py3-none-any.whl", hash = "sha256:d3a114fb894a4db2828e895dab9f48399d49805c63cf425d1b3c65e21e3d0053", size = 9452 },
 ]
 
 [[distribution]]
