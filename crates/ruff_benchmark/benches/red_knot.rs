@@ -15,6 +15,7 @@ struct Case {
     fs: MemoryFileSystem,
     parser: File,
     re: File,
+    re_path: &'static SystemPath,
 }
 
 const TOMLLIB_312_URL: &str = "https://raw.githubusercontent.com/python/cpython/8e8a4baf652f6e1cee7acde9d78c4b6154539748/Lib/tomllib";
@@ -59,7 +60,13 @@ fn setup_case() -> Case {
 
     let re = system_path_to_file(&db, re_path).unwrap();
 
-    Case { db, fs, parser, re }
+    Case {
+        db,
+        fs,
+        parser,
+        re,
+        re_path,
+    }
 }
 
 fn benchmark_incremental(criterion: &mut Criterion) {
@@ -71,7 +78,7 @@ fn benchmark_incremental(criterion: &mut Criterion) {
 
                 case.fs
                     .write_file(
-                        SystemPath::new("/src/_re.py"),
+                        case.re_path,
                         format!("{}\n# A comment\n", source_text(&case.db, case.re).as_str()),
                     )
                     .unwrap();
