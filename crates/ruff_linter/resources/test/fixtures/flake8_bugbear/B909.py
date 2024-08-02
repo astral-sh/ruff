@@ -173,3 +173,9 @@ for i, elem in enumerate(some_list):
 # should not error (dict)
 for i, elem in enumerate(some_list):
     some_list[elem] = 1
+
+# should not error
+def func():
+    for elem in some_list:
+        if some_list.pop() == 2:
+            return
