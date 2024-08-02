@@ -5,6 +5,11 @@
 Ruff 0.5.6 automatically enables linting and formatting of notebooks in *preview mode*.
 You can opt-out of this behavior by adding `*.ipynb` to the `extend-exclude` setting.
 
+```toml
+[tool.ruff]
+extend-exclude = ["*.ipynb"]
+```
+
 ### Preview features
 
 - Enable notebooks by default in preview mode ([#12621](https://github.com/astral-sh/ruff/pull/12621))
