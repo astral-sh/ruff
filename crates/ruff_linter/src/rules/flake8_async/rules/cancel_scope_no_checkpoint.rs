@@ -13,9 +13,9 @@ use crate::settings::types::PreviewMode;
 ///
 /// ## Why is this bad?
 /// Some asynchronous context managers, such as `asyncio.timeout` and
-/// `trio.move_on_after`, have no effect unless they contain an `await`
-/// statement. The use of such context managers without an `await` statement is
-/// likely a mistake.
+/// `trio.move_on_after`, have no effect unless they contain a checkpoint.
+/// The use of such context managers without an `await`, `async with` or
+/// `async for` statement is likely a mistake.
 ///
 /// ## Example
 /// ```python
@@ -55,17 +55,29 @@ pub(crate) fn cancel_scope_no_checkpoint(
     with_stmt: &StmtWith,
     with_items: &[WithItem],
 ) {
-    let Some(method_name) = with_items.iter().find_map(|item| {
-        let call = item.context_expr.as_call_expr()?;
-        let qualified_name = checker
-            .semantic()
-            .resolve_qualified_name(call.func.as_ref())?;
-        MethodName::try_from(&qualified_name)
-    }) else {
+    let Some((with_item_pos, method_name)) = with_items
+        .iter()
+        .enumerate()
+        .filter_map(|(pos, item)| {
+            let call = item.context_expr.as_call_expr()?;
+            let qualified_name = checker
+                .semantic()
+                .resolve_qualified_name(call.func.as_ref())?;
+            let method_name = MethodName::try_from(&qualified_name)?;
+            if method_name.is_timeout_context() {
+                Some((pos, method_name))
+            } else {
+                None
+            }
+        })
+        .last()
+    else {
         return;
     };
 
-    if !method_name.is_timeout_context() {
+    // If this is an `async with` and the timeout has items after it, then the
+    // further items are checkpoints.
+    if with_stmt.is_async && with_item_pos < with_items.len() - 1 {
         return;
     }
 
@@ -73,24 +85,6 @@ pub(crate) fn cancel_scope_no_checkpoint(
     let mut visitor = AwaitVisitor::default();
     visitor.visit_body(&with_stmt.body);
     if visitor.seen_await {
-        return;
-    }
-
-    // If there's an `asyncio.TaskGroup()` context manager alongside the timeout, it's fine, as in:
-    // ```python
-    // async with asyncio.timeout(2.0), asyncio.TaskGroup():
-    //     ...
-    // ```
-    if with_items.iter().any(|item| {
-        item.context_expr.as_call_expr().is_some_and(|call| {
-            checker
-                .semantic()
-                .resolve_qualified_name(call.func.as_ref())
-                .is_some_and(|qualified_name| {
-                    matches!(qualified_name.segments(), ["asyncio", "TaskGroup"])
-                })
-        })
-    }) {
         return;
     }
 
