@@ -37,10 +37,7 @@ impl FileRoot {
     }
 
     pub fn durability(self, db: &dyn Db) -> salsa::Durability {
-        match self.kind_at_time_of_creation(db) {
-            FileRootKind::Workspace => salsa::Durability::LOW,
-            FileRootKind::LibrarySearchPath => salsa::Durability::HIGH,
-        }
+        self.kind_at_time_of_creation(db).durability()
     }
 }
 
@@ -51,6 +48,15 @@ pub enum FileRootKind {
 
     /// A non-workspace module resolution search path.
     LibrarySearchPath,
+}
+
+impl FileRootKind {
+    const fn durability(self) -> Durability {
+        match self {
+            FileRootKind::Workspace => Durability::LOW,
+            FileRootKind::LibrarySearchPath => Durability::HIGH,
+        }
+    }
 }
 
 #[derive(Default)]
@@ -86,6 +92,7 @@ impl FileRoots {
         // Insert a new source root
         let root = FileRoot::builder(path, kind, FileRevision::now())
             .durability(Durability::HIGH)
+            .revision_durability(kind.durability())
             .new(db);
 
         // Insert a path that matches the root itself

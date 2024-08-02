@@ -73,6 +73,7 @@ pub struct Workspace {
     /// Setting the open files to a non-`None` value changes `check` to only check the
     /// open files rather than all files in the workspace.
     #[return_ref]
+    #[default]
     open_file_set: Option<Arc<FxHashSet<File>>>,
 
     /// The (first-party) packages in this workspace.
@@ -92,6 +93,7 @@ pub struct Package {
 
     /// The files that are part of this package.
     #[return_ref]
+    #[default]
     file_set: PackageFiles,
     // TODO: Add the loaded settings.
 }
@@ -105,8 +107,9 @@ impl Workspace {
             packages.insert(package.root.clone(), Package::from_metadata(db, package));
         }
 
-        Workspace::builder(metadata.root, None, packages)
+        Workspace::builder(metadata.root, packages)
             .durability(Durability::MEDIUM)
+            .open_file_set_durability(Durability::LOW)
             .new(db)
     }
 
@@ -309,8 +312,9 @@ impl Package {
     }
 
     fn from_metadata(db: &dyn Db, metadata: PackageMetadata) -> Self {
-        Self::builder(metadata.name, metadata.root, PackageFiles::default())
+        Self::builder(metadata.name, metadata.root)
             .durability(Durability::MEDIUM)
+            .file_set_durability(Durability::LOW)
             .new(db)
     }
 
