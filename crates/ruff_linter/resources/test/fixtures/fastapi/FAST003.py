@@ -26,3 +26,6 @@ async def read_thing(thing_id: int, query: str):
 async def read_thing(isbn: str):
     return {"isbn": isbn}
 
+@app.get("/things/{thing-id}")
+async def read_thing(query: str):
+    return {"query": query}

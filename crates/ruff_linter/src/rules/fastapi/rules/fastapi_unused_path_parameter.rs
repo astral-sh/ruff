@@ -8,6 +8,7 @@ use crate::checkers::ast::Checker;
 use crate::rules::fastapi::rules::is_fastapi_route;
 use crate::rules::fastapi::rules::is_fastapi_route_decorator;
 use regex::Regex;
+use ruff_python_stdlib::identifiers::is_identifier;
 
 /// ## What it does
 /// Identifies FastAPI routes that declare path parameters in the route path but not in the function signature.
@@ -15,6 +16,10 @@ use regex::Regex;
 /// ## Why is this bad?
 /// Path parameters are used to extract values from the URL path.
 /// If a path parameter is declared in the route path but not in the function signature, it will not be accessible in the function body, which is likely a mistake.
+///
+/// ## Known problems
+/// If the path parameter is not a valid Python identifier, FastAPI will normalize it to a valid identifier.
+/// This lint simply ignores path parameters that are not valid identifiers, as that normalization behavior is undocumented.
 ///
 /// ## Example
 ///
@@ -114,7 +119,10 @@ pub(crate) fn fastapi_unused_path_parameter(
         .collect::<Vec<_>>();
 
     // Check if any of the path parameters are not in the function signature
-    for path_param in path_params {
+    for path_param in path_params
+        .into_iter()
+        .filter(|path_param| is_identifier(path_param))
+    {
         if !args.contains(&path_param) {
             let diagnostic = Diagnostic::new(
                 FastApiUnusedPathParameter {
