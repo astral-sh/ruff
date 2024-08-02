@@ -27,7 +27,7 @@ You can opt-out of this behavior by adding `*.ipynb` to the `extend-exclude` set
 
 ### Bug fixes
 
-- \[`flake8-async`\] Avoid unused async when context manager includes `TaskGroup` ([#12605](https://github.com/astral-sh/ruff/pull/12605))
+- \[`flake8-async`\] Avoid flagging `asyncio.timeout`s as unused when the context manager includes `asyncio.TaskGroup` ([#12605](https://github.com/astral-sh/ruff/pull/12605))
 - \[`flake8-slots`\] Avoid recommending `__slots__` for classes that inherit from more than `namedtuple` ([#12531](https://github.com/astral-sh/ruff/pull/12531))
 - \[`isort`\] Avoid marking required imports as unused ([#12537](https://github.com/astral-sh/ruff/pull/12537))
 - \[`isort`\] Preserve trailing inline comments on import-from statements ([#12498](https://github.com/astral-sh/ruff/pull/12498))
