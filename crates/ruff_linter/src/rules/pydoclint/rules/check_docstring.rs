@@ -15,7 +15,7 @@ use crate::registry::Rule;
 use crate::rules::pydocstyle::settings::Convention;
 
 /// ## What it does
-/// Checks for functions with explicit returns missing a returns section in
+/// Checks for functions with explicit returns missing a "returns" section in
 /// their docstring.
 ///
 /// ## Why is this bad?
@@ -59,7 +59,7 @@ impl Violation for DocstringMissingReturns {
 }
 
 /// ## What it does
-/// Checks for function docstrings that have a returns section without
+/// Checks for function docstrings that have a "returns" section without
 /// needing one.
 ///
 /// ## Why is this bad?
@@ -103,7 +103,7 @@ impl Violation for DocstringExtraneousReturns {
 }
 
 /// ## What it does
-/// Checks for functions with yield statements missing a yields section in
+/// Checks for functions with yield statements missing a "yields" section in
 /// their docstring.
 ///
 /// ## Why is this bad?
@@ -113,27 +113,27 @@ impl Violation for DocstringExtraneousReturns {
 /// ## Example
 /// ```python
 /// def count_to_n(n: int) -> int:
-///     """Generate integers up to n.
+///     """Generate integers up to *n*.
 ///
 ///     Args:
-///         n: Max integer.
+///         n: The number at which to stop counting.
 ///     """
-///     for i in range(n):
+///     for i in range(1, n + 1):
 ///         yield i
 /// ```
 ///
 /// Use instead:
 /// ```python
 /// def count_to_n(n: int) -> int:
-///     """Generate integers up to n.
+///     """Generate integers up to *n*.
 ///
 ///     Args:
-///         n: Max integer.
+///         n: The number at which to stop counting.
 ///
 ///     Yields:
-///         int: The ith integer.
+///         int: The number we're at in the count.
 ///     """
-///     for i in range(n):
+///     for i in range(1, n + 1):
 ///         yield i
 /// ```
 #[violation]
@@ -144,10 +144,14 @@ impl Violation for DocstringMissingYields {
     fn message(&self) -> String {
         format!("`yield` is not documented in docstring")
     }
+
+    fn fix_title(&self) -> Option<String> {
+        Some(format!("Add a \"Yields\" section to the docstring"))
+    }
 }
 
 /// ## What it does
-/// Checks for function docstrings that have a yields section without
+/// Checks for function docstrings that have a "yields" section without
 /// needing one.
 ///
 /// ## Why is this bad?
@@ -186,13 +190,17 @@ pub struct DocstringExtraneousYields;
 impl Violation for DocstringExtraneousYields {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Docstring should not have a yields section because the function doesn't yield anything")
+        format!("Docstring has a \"Yields\" section but the function doesn't yield anything")
+    }
+
+    fn fix_title(&self) -> Option<String> {
+        Some(format!("Remove the \"Yields\" section"))
     }
 }
 
 /// ## What it does
 /// Checks for function docstrings that do not include documentation for all
-/// explicitly-raised exceptions.
+/// explicitly raised exceptions.
 ///
 /// ## Why is this bad?
 /// If a function raises an exception without documenting it in its docstring,
@@ -367,7 +375,7 @@ impl<'a> DocstringSections<'a> {
         let mut returns: Option<GenericSection> = None;
         let mut yields: Option<GenericSection> = None;
         let mut raises: Option<RaisesSection> = None;
-        for section in sections.iter() {
+        for section in sections {
             match section.kind() {
                 SectionKind::Raises => raises = Some(RaisesSection::from_section(&section, style)),
                 SectionKind::Returns => returns = Some(GenericSection::from_section(&section)),
