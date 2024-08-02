@@ -376,7 +376,7 @@ impl Ranged for RaisesSection<'_> {
 impl<'a> RaisesSection<'a> {
     /// Return the raised exceptions for the docstring, or `None` if the docstring does not contain
     /// a `Raises` section.
-    fn from_section(section: &SectionContext<'a>, style: SectionStyle) -> Self {
+    fn from_section(section: &SectionContext<'a>, style: Option<SectionStyle>) -> Self {
         Self {
             raised_exceptions: parse_entries(section.following_lines_str(), style),
             range: section.range(),
@@ -392,7 +392,7 @@ struct DocstringSections<'a> {
 }
 
 impl<'a> DocstringSections<'a> {
-    fn from_sections(sections: &'a SectionContexts, style: SectionStyle) -> Self {
+    fn from_sections(sections: &'a SectionContexts, style: Option<SectionStyle>) -> Self {
         let mut docstring_sections = Self::default();
         for section in sections {
             match section.kind() {
@@ -413,10 +413,21 @@ impl<'a> DocstringSections<'a> {
 }
 
 /// Parse the entries in a `Raises` section of a docstring.
-fn parse_entries(content: &str, style: SectionStyle) -> Vec<QualifiedName> {
+///
+/// Attempts to parse using the specified [`SectionStyle`], falling back to the other style if no
+/// entries are found.
+fn parse_entries(content: &str, style: Option<SectionStyle>) -> Vec<QualifiedName> {
     match style {
-        SectionStyle::Google => parse_entries_google(content),
-        SectionStyle::Numpy => parse_entries_numpy(content),
+        Some(SectionStyle::Google) => parse_entries_google(content),
+        Some(SectionStyle::Numpy) => parse_entries_numpy(content),
+        None => {
+            let entries = parse_entries_google(content);
+            if entries.is_empty() {
+                parse_entries_numpy(content)
+            } else {
+                entries
+            }
+        }
     }
 }
 
@@ -607,12 +618,12 @@ pub(crate) fn check_docstring(
     // Prioritize the specified convention over the determined style.
     let docstring_sections = match convention {
         Some(Convention::Google) => {
-            DocstringSections::from_sections(section_contexts, SectionStyle::Google)
+            DocstringSections::from_sections(section_contexts, Some(SectionStyle::Google))
         }
         Some(Convention::Numpy) => {
-            DocstringSections::from_sections(section_contexts, SectionStyle::Numpy)
+            DocstringSections::from_sections(section_contexts, Some(SectionStyle::Numpy))
         }
-        _ => DocstringSections::from_sections(section_contexts, section_contexts.style()),
+        Some(Convention::Pep257) | None => DocstringSections::from_sections(section_contexts, None),
     };
 
     let body_entries = {
