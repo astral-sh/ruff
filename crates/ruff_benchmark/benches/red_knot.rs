@@ -5,21 +5,16 @@ use codspeed_criterion_compat::{criterion_group, criterion_main, BatchSize, Crit
 use red_knot_workspace::db::RootDatabase;
 use red_knot_workspace::workspace::WorkspaceMetadata;
 use ruff_benchmark::TestFile;
-use ruff_db::files::{system_path_to_file, vendored_path_to_file, File};
-use ruff_db::parsed::parsed_module;
+use ruff_db::files::{system_path_to_file, File};
 use ruff_db::program::{ProgramSettings, SearchPathSettings, TargetVersion};
 use ruff_db::source::source_text;
 use ruff_db::system::{MemoryFileSystem, SystemPath, TestSystem};
-use ruff_db::vendored::VendoredPath;
-use ruff_db::Upcast;
 
 struct Case {
     db: RootDatabase,
     fs: MemoryFileSystem,
     parser: File,
     re: File,
-    types: File,
-    builtins: File,
 }
 
 const TOMLLIB_312_URL: &str = "https://raw.githubusercontent.com/python/cpython/8e8a4baf652f6e1cee7acde9d78c4b6154539748/Lib/tomllib";
@@ -36,7 +31,6 @@ fn setup_case() -> Case {
     let parser_path = SystemPath::new("/src/parser.py");
     let re_path = SystemPath::new("/src/_re.py");
     let types_path = SystemPath::new("/src/_types.py");
-    let builtins_path = VendoredPath::new("stdlib/builtins.pyi");
     fs.write_files([
         (parser_path, get_test_file("_parser.py").code()),
         (re_path, get_test_file("_re.py").code()),
@@ -62,40 +56,8 @@ fn setup_case() -> Case {
     db.workspace().open_file(&mut db, parser);
 
     let re = system_path_to_file(&db, re_path).unwrap();
-    let types = system_path_to_file(&db, types_path).unwrap();
-    let builtins = vendored_path_to_file(&db, builtins_path).unwrap();
 
-    Case {
-        db,
-        fs,
-        parser,
-        re,
-        types,
-        builtins,
-    }
-}
-
-fn benchmark_without_parse(criterion: &mut Criterion) {
-    criterion.bench_function("red_knot_check_file[without_parse]", |b| {
-        b.iter_batched_ref(
-            || {
-                let case = setup_case();
-                // Pre-parse the modules to only measure the semantic time.
-                parsed_module(case.db.upcast(), case.parser);
-                parsed_module(case.db.upcast(), case.re);
-                parsed_module(case.db.upcast(), case.types);
-                parsed_module(case.db.upcast(), case.builtins);
-                case
-            },
-            |case| {
-                let Case { db, parser, .. } = case;
-                let _ = db.check_file(*parser).unwrap();
-
-                // assert_eq!(result.as_slice(), [] as [String; 0]);
-            },
-            BatchSize::SmallInput,
-        );
-    });
+    Case { db, fs, parser, re }
 }
 
 fn benchmark_incremental(criterion: &mut Criterion) {
@@ -117,9 +79,9 @@ fn benchmark_incremental(criterion: &mut Criterion) {
             },
             |case| {
                 let Case { db, parser, .. } = case;
-                let _ = db.check_file(*parser).unwrap();
+                let result = db.check_file(*parser).unwrap();
 
-                // assert_eq!(result.as_slice(), [] as [String; 0]);
+                assert_eq!(result.len(), 321);
             },
             BatchSize::SmallInput,
         );
@@ -132,19 +94,14 @@ fn benchmark_cold(criterion: &mut Criterion) {
             setup_case,
             |case| {
                 let Case { db, parser, .. } = case;
-                let _ = db.check_file(*parser).unwrap();
+                let result = db.check_file(*parser).unwrap();
 
-                // assert_eq!(result.as_slice(), [] as [String; 0]);
+                assert_eq!(result.len(), 321);
             },
             BatchSize::SmallInput,
         );
     });
 }
 
-criterion_group!(
-    check_file,
-    benchmark_cold,
-    benchmark_without_parse,
-    benchmark_incremental
-);
+criterion_group!(check_file, benchmark_cold, benchmark_incremental);
 criterion_main!(check_file);
