@@ -106,10 +106,7 @@ pub(crate) fn control_var_used_after_block(
             }
 
             // Traverse the hierarchy and look for a block match
-            let statement_hierarchy: Vec<NodeId> = checker
-                .semantic()
-                .parent_statement_ids(reference_node_id)
-                .collect();
+            let statement_hierarchy = checker.semantic().parent_statement_ids(reference_node_id);
 
             let mut is_used_in_block = false;
             for ancestor_node_id in statement_hierarchy {
