@@ -35,31 +35,14 @@ use crate::checkers::ast::Checker;
 #[violation]
 pub struct ForVariableUsedAfterBlock {
     control_var_name: String,
-    block_kind: BlockKind,
 }
 
 impl Violation for ForVariableUsedAfterBlock {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let ForVariableUsedAfterBlock {
-            control_var_name,
-            block_kind,
-        } = self;
+        let ForVariableUsedAfterBlock { control_var_name } = self;
 
-        format!("{block_kind} variable {control_var_name} is used outside of block")
-    }
-}
-
-#[derive(Debug, PartialEq, Eq, Clone, Copy)]
-enum BlockKind {
-    For,
-}
-
-impl fmt::Display for BlockKind {
-    fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
-        match self {
-            BlockKind::For => fmt.write_str("`for` loop"),
-        }
+        format!("`for` loop variable {control_var_name} is used outside of block")
     }
 }
 
@@ -117,17 +100,9 @@ pub(crate) fn for_variable_used_after_block(
 
             // If the reference wasn't used in the same block, report a violation/diagnostic
             if !known_good_reference_node_ids.contains(&reference_node_id) {
-                let block_kind = match binding_statement {
-                    Stmt::For(_) => BlockKind::For,
-                    _ => {
-                        panic!("Unexpected block item. This is a problem with ruff itself. Fix the `filter_map` above.")
-                    }
-                };
-
                 diagnostics.push(Diagnostic::new(
                     ForVariableUsedAfterBlock {
                         control_var_name: name.to_owned(),
-                        block_kind,
                     },
                     reference.range(),
                 ));
