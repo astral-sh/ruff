@@ -1,7 +1,7 @@
 use std::ops::Range;
 
 use ruff_diagnostics::{Applicability, Fix};
-use ruff_diagnostics::{Diagnostic, Violation};
+use ruff_diagnostics::{Diagnostic, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast as ast;
 use ruff_python_semantic::Modules;
@@ -58,6 +58,8 @@ pub struct FastApiUnusedPathParameter {
 }
 
 impl Violation for FastApiUnusedPathParameter {
+    const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
+
     #[derive_message_formats]
     fn message(&self) -> String {
         let Self {
