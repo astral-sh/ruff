@@ -20,6 +20,7 @@ type LockedZipArchive<'a> = MutexGuard<'a, VendoredZipArchive>;
 ///
 /// "Files" in the `VendoredFileSystem` are read-only and immutable.
 /// Directories are supported, but symlinks and hardlinks cannot exist.
+#[derive(Clone)]
 pub struct VendoredFileSystem {
     inner: Arc<Mutex<VendoredZipArchive>>,
 }
@@ -37,12 +38,6 @@ impl VendoredFileSystem {
         Ok(Self {
             inner: Arc::new(Mutex::new(VendoredZipArchive::new(data)?)),
         })
-    }
-
-    pub fn snapshot(&self) -> Self {
-        Self {
-            inner: Arc::clone(&self.inner),
-        }
     }
 
     pub fn exists(&self, path: impl AsRef<VendoredPath>) -> bool {

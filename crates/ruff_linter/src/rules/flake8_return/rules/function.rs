@@ -12,6 +12,7 @@ use ruff_python_ast::whitespace::indentation;
 use ruff_python_ast::{self as ast, Decorator, ElifElseClause, Expr, Stmt};
 use ruff_python_codegen::Stylist;
 use ruff_python_index::Indexer;
+use ruff_python_semantic::analyze::visibility::is_property;
 use ruff_python_semantic::SemanticModel;
 use ruff_python_trivia::{is_python_whitespace, SimpleTokenKind, SimpleTokenizer};
 use ruff_source_file::Locator;
@@ -373,12 +374,12 @@ fn unnecessary_return_none(checker: &mut Checker, decorator_list: &[Decorator], 
             continue;
         }
 
-        // Skip properties.
-        if decorator_list.iter().any(|decorator| {
-            checker
-                .semantic()
-                .match_builtin_expr(&decorator.expression, "property")
-        }) {
+        // Skip property functions
+        if is_property(
+            decorator_list,
+            checker.settings.pydocstyle.property_decorators(),
+            checker.semantic(),
+        ) {
             return;
         }
 

@@ -1,8 +1,8 @@
-from typing import ClassVar, Literal
+from typing import ClassVar, Final, Literal
 
 from ..fixer_base import BaseFix
 
-NAMES: dict[str, str]
+NAMES: Final[dict[str, str]]
 
 class FixAsserts(BaseFix):
     BM_compatible: ClassVar[Literal[False]]

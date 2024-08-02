@@ -424,6 +424,7 @@ Ruff is used by a number of major open-source projects and companies, including:
 - [Dagger](https://github.com/dagger/dagger)
 - [Dagster](https://github.com/dagster-io/dagster)
 - Databricks ([MLflow](https://github.com/mlflow/mlflow))
+- [Dify](https://github.com/langgenius/dify)
 - [FastAPI](https://github.com/tiangolo/fastapi)
 - [Godot](https://github.com/godotengine/godot)
 - [Gradio](https://github.com/gradio-app/gradio)

@@ -2,12 +2,11 @@ use std::borrow::Cow;
 use std::iter::FusedIterator;
 
 use once_cell::sync::Lazy;
-use rustc_hash::{FxBuildHasher, FxHashSet};
-
-use ruff_db::files::{File, FilePath};
+use ruff_db::files::{File, FilePath, FileRootKind};
 use ruff_db::program::{Program, SearchPathSettings, TargetVersion};
 use ruff_db::system::{DirectoryEntry, System, SystemPath, SystemPathBuf};
 use ruff_db::vendored::VendoredPath;
+use rustc_hash::{FxBuildHasher, FxHashSet};
 
 use crate::db::Db;
 use crate::module::{Module, ModuleKind};
@@ -17,7 +16,7 @@ use crate::state::ResolverState;
 
 /// Resolves a module name to a module.
 pub fn resolve_module(db: &dyn Db, module_name: ModuleName) -> Option<Module> {
-    let interned_name = internal::ModuleNameIngredient::new(db, module_name);
+    let interned_name = ModuleNameIngredient::new(db, module_name);
 
     resolve_module_query(db, interned_name)
 }
@@ -29,7 +28,7 @@ pub fn resolve_module(db: &dyn Db, module_name: ModuleName) -> Option<Module> {
 #[salsa::tracked]
 pub(crate) fn resolve_module_query<'db>(
     db: &'db dyn Db,
-    module_name: internal::ModuleNameIngredient<'db>,
+    module_name: ModuleNameIngredient<'db>,
 ) -> Option<Module> {
     let name = module_name.name(db);
     let _span = tracing::trace_span!("resolve_module", %name).entered();
@@ -139,24 +138,33 @@ fn try_resolve_module_resolution_settings(
     }
 
     let system = db.system();
+    let files = db.files();
 
     let mut static_search_paths = vec![];
 
-    for path in extra_paths.iter().cloned() {
-        static_search_paths.push(SearchPath::extra(system, path)?);
+    for path in extra_paths {
+        files.try_add_root(db.upcast(), path, FileRootKind::LibrarySearchPath);
+        static_search_paths.push(SearchPath::extra(system, path.clone())?);
     }
 
     static_search_paths.push(SearchPath::first_party(system, workspace_root.clone())?);
 
     static_search_paths.push(if let Some(custom_typeshed) = custom_typeshed.as_ref() {
+        files.try_add_root(
+            db.upcast(),
+            custom_typeshed,
+            FileRootKind::LibrarySearchPath,
+        );
         SearchPath::custom_stdlib(db, custom_typeshed.clone())?
     } else {
         SearchPath::vendored_stdlib()
     });
 
     if let Some(site_packages) = site_packages {
+        files.try_add_root(db.upcast(), site_packages, FileRootKind::LibrarySearchPath);
+
         static_search_paths.push(SearchPath::site_packages(system, site_packages.clone())?);
-    }
+    };
 
     // TODO vendor typeshed's third-party stubs as well as the stdlib and fallback to them as a final step
 
@@ -197,62 +205,62 @@ pub(crate) fn module_resolution_settings(db: &dyn Db) -> ModuleResolutionSetting
 /// due to editable installations of third-party packages.
 #[salsa::tracked(return_ref)]
 pub(crate) fn editable_install_resolution_paths(db: &dyn Db) -> Vec<SearchPath> {
-    // This query needs to be re-executed each time a `.pth` file
-    // is added, modified or removed from the `site-packages` directory.
-    // However, we don't use Salsa queries to read the source text of `.pth` files;
-    // we use the APIs on the `System` trait directly. As such, for now we simply ask
-    // Salsa to recompute this query on each new revision.
-    //
-    // TODO: add some kind of watcher for the `site-packages` directory that looks
-    // for `site-packages/*.pth` files being added/modified/removed; get rid of this.
-    // When doing so, also make the test
-    // `deleting_pth_file_on_which_module_resolution_depends_invalidates_cache()`
-    // more principled!
-    db.report_untracked_read();
+    let settings = module_resolution_settings(db);
+    let static_search_paths = &settings.static_search_paths;
 
-    let static_search_paths = &module_resolution_settings(db).static_search_paths;
     let site_packages = static_search_paths
         .iter()
         .find(|path| path.is_site_packages());
 
+    let Some(site_packages) = site_packages else {
+        return Vec::new();
+    };
+
+    let site_packages = site_packages
+        .as_system_path()
+        .expect("Expected site-packages never to be a VendoredPath!");
+
     let mut dynamic_paths = Vec::default();
 
-    if let Some(site_packages) = site_packages {
-        let site_packages = site_packages
-            .as_system_path()
-            .expect("Expected site-packages never to be a VendoredPath!");
+    // This query needs to be re-executed each time a `.pth` file
+    // is added, modified or removed from the `site-packages` directory.
+    // However, we don't use Salsa queries to read the source text of `.pth` files;
+    // we use the APIs on the `System` trait directly. As such, add a dependency on the
+    // site-package directory's revision.
+    if let Some(site_packages_root) = db.files().root(db.upcast(), site_packages) {
+        let _ = site_packages_root.revision(db.upcast());
+    }
 
-        // As well as modules installed directly into `site-packages`,
-        // the directory may also contain `.pth` files.
-        // Each `.pth` file in `site-packages` may contain one or more lines
-        // containing a (relative or absolute) path.
-        // Each of these paths may point to an editable install of a package,
-        // so should be considered an additional search path.
-        let Ok(pth_file_iterator) = PthFileIterator::new(db, site_packages) else {
-            return dynamic_paths;
-        };
+    // As well as modules installed directly into `site-packages`,
+    // the directory may also contain `.pth` files.
+    // Each `.pth` file in `site-packages` may contain one or more lines
+    // containing a (relative or absolute) path.
+    // Each of these paths may point to an editable install of a package,
+    // so should be considered an additional search path.
+    let Ok(pth_file_iterator) = PthFileIterator::new(db, site_packages) else {
+        return dynamic_paths;
+    };
 
-        // The Python documentation specifies that `.pth` files in `site-packages`
-        // are processed in alphabetical order, so collecting and then sorting is necessary.
-        // https://docs.python.org/3/library/site.html#module-site
-        let mut all_pth_files: Vec<PthFile> = pth_file_iterator.collect();
-        all_pth_files.sort_by(|a, b| a.path.cmp(&b.path));
+    // The Python documentation specifies that `.pth` files in `site-packages`
+    // are processed in alphabetical order, so collecting and then sorting is necessary.
+    // https://docs.python.org/3/library/site.html#module-site
+    let mut all_pth_files: Vec<PthFile> = pth_file_iterator.collect();
+    all_pth_files.sort_by(|a, b| a.path.cmp(&b.path));
 
-        let mut existing_paths: FxHashSet<_> = static_search_paths
-            .iter()
-            .filter_map(|path| path.as_system_path())
-            .map(Cow::Borrowed)
-            .collect();
+    let mut existing_paths: FxHashSet<_> = static_search_paths
+        .iter()
+        .filter_map(|path| path.as_system_path())
+        .map(Cow::Borrowed)
+        .collect();
 
-        dynamic_paths.reserve(all_pth_files.len());
+    dynamic_paths.reserve(all_pth_files.len());
 
-        for pth_file in &all_pth_files {
-            for installation in pth_file.editable_installations() {
-                if existing_paths.insert(Cow::Owned(
-                    installation.as_system_path().unwrap().to_path_buf(),
-                )) {
-                    dynamic_paths.push(installation);
-                }
+    for pth_file in &all_pth_files {
+        for installation in pth_file.editable_installations() {
+            if existing_paths.insert(Cow::Owned(
+                installation.as_system_path().unwrap().to_path_buf(),
+            )) {
+                dynamic_paths.push(installation);
             }
         }
     }
@@ -397,9 +405,6 @@ pub(crate) struct ModuleResolutionSettings {
     target_version: TargetVersion,
     /// Search paths that have been statically determined purely from reading Ruff's configuration settings.
     /// These shouldn't ever change unless the config settings themselves change.
-    ///
-    /// Note that `site-packages` *is included* as a search path in this sequence,
-    /// but it is also stored separately so that we're able to find editable installs later.
     static_search_paths: Vec<SearchPath>,
 }
 
@@ -417,22 +422,13 @@ impl ModuleResolutionSettings {
     }
 }
 
-// The singleton methods generated by salsa are all `pub` instead of `pub(crate)` which triggers
-// `unreachable_pub`. Work around this by creating a module and allow `unreachable_pub` for it.
-// Salsa also generates uses to `_db` variables for `interned` which triggers `clippy::used_underscore_binding`. Suppress that too
-// TODO(micha): Contribute a fix for this upstream where the singleton methods have the same visibility as the struct.
-#[allow(unreachable_pub, clippy::used_underscore_binding)]
-pub(crate) mod internal {
-    use crate::module_name::ModuleName;
-
-    /// A thin wrapper around `ModuleName` to make it a Salsa ingredient.
-    ///
-    /// This is needed because Salsa requires that all query arguments are salsa ingredients.
-    #[salsa::interned]
-    pub(crate) struct ModuleNameIngredient<'db> {
-        #[return_ref]
-        pub(super) name: ModuleName,
-    }
+/// A thin wrapper around `ModuleName` to make it a Salsa ingredient.
+///
+/// This is needed because Salsa requires that all query arguments are salsa ingredients.
+#[salsa::interned]
+struct ModuleNameIngredient<'db> {
+    #[return_ref]
+    pub(super) name: ModuleName,
 }
 
 /// Modules that are builtin to the Python interpreter itself.
@@ -492,6 +488,7 @@ fn resolve_name(db: &dyn Db, name: &ModuleName) -> Option<(SearchPath, File, Mod
         if is_builtin_module && !search_path.is_standard_library() {
             continue;
         }
+
         let mut components = name.components();
         let module_name = components.next_back()?;
 
@@ -626,13 +623,13 @@ impl PackageKind {
 
 #[cfg(test)]
 mod tests {
-    use internal::ModuleNameIngredient;
     use ruff_db::files::{system_path_to_file, File, FilePath};
-    use ruff_db::system::{DbWithTestSystem, OsSystem, SystemPath};
-    use ruff_db::testing::assert_function_query_was_not_run;
+    use ruff_db::system::DbWithTestSystem;
+    use ruff_db::testing::{
+        assert_const_function_query_was_not_run, assert_function_query_was_not_run,
+    };
     use ruff_db::Db;
 
-    use crate::db::tests::TestDb;
     use crate::module::ModuleKind;
     use crate::module_name::ModuleName;
     use crate::testing::{FileSpec, MockedTypeshed, TestCase, TestCaseBuilder};
@@ -1154,7 +1151,9 @@ mod tests {
     #[test]
     #[cfg(target_family = "unix")]
     fn symlink() -> anyhow::Result<()> {
+        use crate::db::tests::TestDb;
         use ruff_db::program::Program;
+        use ruff_db::system::{OsSystem, SystemPath};
 
         let mut db = TestDb::new();
 
@@ -1284,6 +1283,7 @@ mod tests {
         db.memory_file_system()
             .remove_directory(foo_init_path.parent().unwrap())?;
         File::sync_path(&mut db, &foo_init_path);
+        File::sync_path(&mut db, foo_init_path.parent().unwrap());
 
         let foo_module = resolve_module(&db, foo_module_name).expect("Foo module to resolve");
         assert_eq!(&src.join("foo.py"), foo_module.file().path(&db));
@@ -1314,7 +1314,7 @@ mod tests {
         let functools_module = resolve_module(&db, functools_module_name.clone()).unwrap();
         assert_eq!(functools_module.search_path(), &stdlib);
         assert_eq!(
-            Some(functools_module.file()),
+            Ok(functools_module.file()),
             system_path_to_file(&db, &stdlib_functools_path)
         );
 
@@ -1326,15 +1326,15 @@ mod tests {
             .unwrap();
         let functools_module = resolve_module(&db, functools_module_name.clone()).unwrap();
         let events = db.take_salsa_events();
-        assert_function_query_was_not_run::<resolve_module_query, _, _>(
+        assert_function_query_was_not_run(
             &db,
-            |res| &res.function,
-            &ModuleNameIngredient::new(&db, functools_module_name.clone()),
+            resolve_module_query,
+            ModuleNameIngredient::new(&db, functools_module_name.clone()),
             &events,
         );
         assert_eq!(functools_module.search_path(), &stdlib);
         assert_eq!(
-            Some(functools_module.file()),
+            Ok(functools_module.file()),
             system_path_to_file(&db, &stdlib_functools_path)
         );
     }
@@ -1360,7 +1360,7 @@ mod tests {
         let functools_module = resolve_module(&db, functools_module_name.clone()).unwrap();
         assert_eq!(functools_module.search_path(), &stdlib);
         assert_eq!(
-            Some(functools_module.file()),
+            Ok(functools_module.file()),
             system_path_to_file(&db, stdlib.join("functools.pyi"))
         );
 
@@ -1371,7 +1371,7 @@ mod tests {
         let functools_module = resolve_module(&db, functools_module_name.clone()).unwrap();
         assert_eq!(functools_module.search_path(), &src);
         assert_eq!(
-            Some(functools_module.file()),
+            Ok(functools_module.file()),
             system_path_to_file(&db, &src_functools_path)
         );
     }
@@ -1402,7 +1402,7 @@ mod tests {
         let functools_module = resolve_module(&db, functools_module_name.clone()).unwrap();
         assert_eq!(functools_module.search_path(), &src);
         assert_eq!(
-            Some(functools_module.file()),
+            Ok(functools_module.file()),
             system_path_to_file(&db, &src_functools_path)
         );
 
@@ -1415,7 +1415,7 @@ mod tests {
         let functools_module = resolve_module(&db, functools_module_name.clone()).unwrap();
         assert_eq!(functools_module.search_path(), &stdlib);
         assert_eq!(
-            Some(functools_module.file()),
+            Ok(functools_module.file()),
             system_path_to_file(&db, stdlib.join("functools.pyi"))
         );
     }
@@ -1578,12 +1578,7 @@ not_a_directory
             &FilePath::system("/y/src/bar.py")
         );
         let events = db.take_salsa_events();
-        assert_function_query_was_not_run::<editable_install_resolution_paths, _, _>(
-            &db,
-            |res| &res.function,
-            &(),
-            &events,
-        );
+        assert_const_function_query_was_not_run(&db, editable_install_resolution_paths, &events);
     }
 
     #[test]
@@ -1612,18 +1607,7 @@ not_a_directory
             .remove_file(site_packages.join("_foo.pth"))
             .unwrap();
 
-        // Why are we touching a random file in the path that's been editably installed,
-        // rather than the `.pth` file, when the `.pth` file is the one that has been deleted?
-        // It's because the `.pth` file isn't directly tracked as a dependency by Salsa
-        // currently (we don't use `system_path_to_file()` to get the file, and we don't use
-        // `source_text()` to read the source of the file). Instead of using these APIs which
-        // would automatically add the existence and contents of the file as a Salsa-tracked
-        // dependency, we use `.report_untracked_read()` to force Salsa to re-parse all
-        // `.pth` files on each new "revision". Making a random modification to a tracked
-        // Salsa file forces a new revision.
-        //
-        // TODO: get rid of the `.report_untracked_read()` call...
-        File::sync_path(&mut db, SystemPath::new("/x/src/foo.py"));
+        File::sync_path(&mut db, &site_packages.join("_foo.pth"));
 
         assert_eq!(resolve_module(&db, foo_module_name.clone()), None);
     }

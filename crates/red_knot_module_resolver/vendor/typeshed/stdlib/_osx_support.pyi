@@ -1,5 +1,5 @@
 from collections.abc import Iterable, Sequence
-from typing import TypeVar
+from typing import Final, TypeVar
 
 _T = TypeVar("_T")
 _K = TypeVar("_K")
@@ -7,15 +7,15 @@ _V = TypeVar("_V")
 
 __all__ = ["compiler_fixup", "customize_config_vars", "customize_compiler", "get_platform_osx"]
 
-_UNIVERSAL_CONFIG_VARS: tuple[str, ...]  # undocumented
-_COMPILER_CONFIG_VARS: tuple[str, ...]  # undocumented
-_INITPRE: str  # undocumented
+_UNIVERSAL_CONFIG_VARS: Final[tuple[str, ...]]  # undocumented
+_COMPILER_CONFIG_VARS: Final[tuple[str, ...]]  # undocumented
+_INITPRE: Final[str]  # undocumented
 
 def _find_executable(executable: str, path: str | None = None) -> str | None: ...  # undocumented
 def _read_output(commandstring: str, capture_stderr: bool = False) -> str | None: ...  # undocumented
 def _find_build_tool(toolname: str) -> str: ...  # undocumented
 
-_SYSTEM_VERSION: str | None  # undocumented
+_SYSTEM_VERSION: Final[str | None]  # undocumented
 
 def _get_system_version() -> str: ...  # undocumented
 def _remove_original_values(_config_vars: dict[str, str]) -> None: ...  # undocumented

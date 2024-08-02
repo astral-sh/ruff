@@ -2295,7 +2295,7 @@ impl<'src> Parser<'src> {
         }
 
         if arguments.len() > 1 {
-            for arg in arguments.args.iter() {
+            for arg in &*arguments.args {
                 if let Some(ast::ExprGenerator {
                     range,
                     parenthesized: false,

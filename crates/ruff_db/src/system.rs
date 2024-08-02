@@ -39,6 +39,8 @@ pub type Result<T> = std::io::Result<T>;
 /// Abstracting the system also enables tests to use a more efficient in-memory file system.
 pub trait System: Debug {
     /// Reads the metadata of the file or directory at `path`.
+    ///
+    /// This function will traverse symbolic links to query information about the destination file.
     fn path_metadata(&self, path: &SystemPath) -> Result<Metadata>;
 
     /// Reads the content of the file at `path` into a [`String`].

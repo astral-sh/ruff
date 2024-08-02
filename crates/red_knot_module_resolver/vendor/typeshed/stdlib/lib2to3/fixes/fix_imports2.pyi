@@ -1,6 +1,8 @@
+from typing import Final
+
 from . import fix_imports
 
-MAPPING: dict[str, str]
+MAPPING: Final[dict[str, str]]
 
 class FixImports2(fix_imports.FixImports):
     mapping = MAPPING

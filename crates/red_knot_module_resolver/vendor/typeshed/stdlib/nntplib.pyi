@@ -5,7 +5,7 @@ import sys
 from _typeshed import Unused
 from builtins import list as _list  # conflicts with a method named "list"
 from collections.abc import Iterable
-from typing import IO, Any, Literal, NamedTuple
+from typing import IO, Any, Final, NamedTuple
 from typing_extensions import Self, TypeAlias
 
 __all__ = [
@@ -31,8 +31,8 @@ class NNTPPermanentError(NNTPError): ...
 class NNTPProtocolError(NNTPError): ...
 class NNTPDataError(NNTPError): ...
 
-NNTP_PORT: Literal[119]
-NNTP_SSL_PORT: Literal[563]
+NNTP_PORT: Final = 119
+NNTP_SSL_PORT: Final = 563
 
 class GroupInfo(NamedTuple):
     group: str

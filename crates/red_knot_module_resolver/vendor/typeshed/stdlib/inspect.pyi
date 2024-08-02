@@ -25,7 +25,7 @@ from types import (
     TracebackType,
     WrapperDescriptorType,
 )
-from typing import Any, ClassVar, Literal, NamedTuple, Protocol, TypeVar, overload
+from typing import Any, ClassVar, Final, Literal, NamedTuple, Protocol, TypeVar, overload
 from typing_extensions import ParamSpec, Self, TypeAlias, TypeGuard, TypeIs
 
 if sys.version_info >= (3, 11):
@@ -161,17 +161,17 @@ class BlockFinder:
     last: int
     def tokeneater(self, type: int, token: str, srowcol: tuple[int, int], erowcol: tuple[int, int], line: str) -> None: ...
 
-CO_OPTIMIZED: Literal[1]
-CO_NEWLOCALS: Literal[2]
-CO_VARARGS: Literal[4]
-CO_VARKEYWORDS: Literal[8]
-CO_NESTED: Literal[16]
-CO_GENERATOR: Literal[32]
-CO_NOFREE: Literal[64]
-CO_COROUTINE: Literal[128]
-CO_ITERABLE_COROUTINE: Literal[256]
-CO_ASYNC_GENERATOR: Literal[512]
-TPFLAGS_IS_ABSTRACT: Literal[1048576]
+CO_OPTIMIZED: Final = 1
+CO_NEWLOCALS: Final = 2
+CO_VARARGS: Final = 4
+CO_VARKEYWORDS: Final = 8
+CO_NESTED: Final = 16
+CO_GENERATOR: Final = 32
+CO_NOFREE: Final = 64
+CO_COROUTINE: Final = 128
+CO_ITERABLE_COROUTINE: Final = 256
+CO_ASYNC_GENERATOR: Final = 512
+TPFLAGS_IS_ABSTRACT: Final = 1048576
 
 modulesbyfile: dict[str, Any]
 
@@ -364,10 +364,10 @@ class _ParameterKind(enum.IntEnum):
     def description(self) -> str: ...
 
 if sys.version_info >= (3, 12):
-    AGEN_CREATED: Literal["AGEN_CREATED"]
-    AGEN_RUNNING: Literal["AGEN_RUNNING"]
-    AGEN_SUSPENDED: Literal["AGEN_SUSPENDED"]
-    AGEN_CLOSED: Literal["AGEN_CLOSED"]
+    AGEN_CREATED: Final = "AGEN_CREATED"
+    AGEN_RUNNING: Final = "AGEN_RUNNING"
+    AGEN_SUSPENDED: Final = "AGEN_SUSPENDED"
+    AGEN_CLOSED: Final = "AGEN_CLOSED"
 
     def getasyncgenstate(
         agen: AsyncGenerator[Any, Any]
@@ -584,19 +584,19 @@ def getattr_static(obj: object, attr: str, default: Any | None = ...) -> Any: ..
 # Current State of Generators and Coroutines
 #
 
-GEN_CREATED: Literal["GEN_CREATED"]
-GEN_RUNNING: Literal["GEN_RUNNING"]
-GEN_SUSPENDED: Literal["GEN_SUSPENDED"]
-GEN_CLOSED: Literal["GEN_CLOSED"]
+GEN_CREATED: Final = "GEN_CREATED"
+GEN_RUNNING: Final = "GEN_RUNNING"
+GEN_SUSPENDED: Final = "GEN_SUSPENDED"
+GEN_CLOSED: Final = "GEN_CLOSED"
 
 def getgeneratorstate(
     generator: Generator[Any, Any, Any]
 ) -> Literal["GEN_CREATED", "GEN_RUNNING", "GEN_SUSPENDED", "GEN_CLOSED"]: ...
 
-CORO_CREATED: Literal["CORO_CREATED"]
-CORO_RUNNING: Literal["CORO_RUNNING"]
-CORO_SUSPENDED: Literal["CORO_SUSPENDED"]
-CORO_CLOSED: Literal["CORO_CLOSED"]
+CORO_CREATED: Final = "CORO_CREATED"
+CORO_RUNNING: Final = "CORO_RUNNING"
+CORO_SUSPENDED: Final = "CORO_SUSPENDED"
+CORO_CLOSED: Final = "CORO_CLOSED"
 
 def getcoroutinestate(
     coroutine: Coroutine[Any, Any, Any]

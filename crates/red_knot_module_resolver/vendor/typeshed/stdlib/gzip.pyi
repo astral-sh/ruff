@@ -3,7 +3,7 @@ import sys
 import zlib
 from _typeshed import ReadableBuffer, SizedBuffer, StrOrBytesPath
 from io import FileIO
-from typing import Literal, Protocol, TextIO, overload
+from typing import Final, Literal, Protocol, TextIO, overload
 from typing_extensions import TypeAlias
 
 __all__ = ["BadGzipFile", "GzipFile", "open", "compress", "decompress"]
@@ -12,14 +12,14 @@ _ReadBinaryMode: TypeAlias = Literal["r", "rb"]
 _WriteBinaryMode: TypeAlias = Literal["a", "ab", "w", "wb", "x", "xb"]
 _OpenTextMode: TypeAlias = Literal["rt", "at", "wt", "xt"]
 
-READ: object  # undocumented
-WRITE: object  # undocumented
+READ: Final[object]  # undocumented
+WRITE: Final[object]  # undocumented
 
-FTEXT: int  # actually Literal[1] # undocumented
-FHCRC: int  # actually Literal[2] # undocumented
-FEXTRA: int  # actually Literal[4] # undocumented
-FNAME: int  # actually Literal[8] # undocumented
-FCOMMENT: int  # actually Literal[16] # undocumented
+FTEXT: Final[int]  # actually Literal[1] # undocumented
+FHCRC: Final[int]  # actually Literal[2] # undocumented
+FEXTRA: Final[int]  # actually Literal[4] # undocumented
+FNAME: Final[int]  # actually Literal[8] # undocumented
+FCOMMENT: Final[int]  # actually Literal[16] # undocumented
 
 class _ReadableFileobj(Protocol):
     def read(self, n: int, /) -> bytes: ...

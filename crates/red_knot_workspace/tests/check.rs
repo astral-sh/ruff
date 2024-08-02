@@ -1,6 +1,6 @@
-use red_knot::db::RootDatabase;
-use red_knot::lint::lint_semantic;
-use red_knot::workspace::WorkspaceMetadata;
+use red_knot_workspace::db::RootDatabase;
+use red_knot_workspace::lint::lint_semantic;
+use red_knot_workspace::workspace::WorkspaceMetadata;
 use ruff_db::files::system_path_to_file;
 use ruff_db::program::{ProgramSettings, SearchPathSettings, TargetVersion};
 use ruff_db::system::{OsSystem, SystemPathBuf};

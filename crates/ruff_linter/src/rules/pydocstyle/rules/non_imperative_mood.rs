@@ -1,11 +1,8 @@
-use std::collections::BTreeSet;
-
 use imperative::Mood;
 use once_cell::sync::Lazy;
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::name::QualifiedName;
 use ruff_python_semantic::analyze::visibility::{is_property, is_test};
 use ruff_source_file::UniversalNewlines;
 use ruff_text_size::Ranged;
@@ -13,6 +10,7 @@ use ruff_text_size::Ranged;
 use crate::checkers::ast::Checker;
 use crate::docstrings::Docstring;
 use crate::rules::pydocstyle::helpers::normalize_word;
+use crate::rules::pydocstyle::settings::Settings;
 
 static MOOD: Lazy<Mood> = Lazy::new(Mood::new);
 
@@ -66,24 +64,21 @@ impl Violation for NonImperativeMood {
 pub(crate) fn non_imperative_mood(
     checker: &mut Checker,
     docstring: &Docstring,
-    property_decorators: &BTreeSet<String>,
+    settings: &Settings,
 ) {
     let Some(function) = docstring.definition.as_function_def() else {
         return;
     };
 
-    let property_decorators = property_decorators
-        .iter()
-        .map(|decorator| QualifiedName::from_dotted_name(decorator))
-        .collect::<Vec<QualifiedName>>();
+    if is_test(&function.name) {
+        return;
+    }
 
-    if is_test(&function.name)
-        || is_property(
-            &function.decorator_list,
-            &property_decorators,
-            checker.semantic(),
-        )
-    {
+    if is_property(
+        &function.decorator_list,
+        settings.property_decorators(),
+        checker.semantic(),
+    ) {
         return;
     }
 

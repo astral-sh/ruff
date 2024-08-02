@@ -8,6 +8,7 @@ DOC402_numpy.py:11:5: DOC402 `yield` is not documented in docstring
 11 |     yield 'test'
    |     ^^^^^^^^^^^^ DOC402
    |
+   = help: Add a "Yields" section to the docstring
 
 DOC402_numpy.py:62:9: DOC402 `yield` is not documented in docstring
    |
@@ -16,3 +17,4 @@ DOC402_numpy.py:62:9: DOC402 `yield` is not documented in docstring
 62 |         yield 'test'
    |         ^^^^^^^^^^^^ DOC402
    |
+   = help: Add a "Yields" section to the docstring

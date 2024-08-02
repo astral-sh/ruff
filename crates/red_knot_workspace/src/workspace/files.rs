@@ -3,10 +3,12 @@ use std::ops::Deref;
 use std::sync::Arc;
 
 use rustc_hash::FxHashSet;
+use salsa::Setter;
+
+use ruff_db::files::File;
 
 use crate::db::Db;
 use crate::workspace::Package;
-use ruff_db::files::File;
 
 /// The indexed files of a package.
 ///
@@ -43,6 +45,10 @@ impl PackageFiles {
             State::Lazy => Index::Lazy(LazyFiles { files: state }),
             State::Indexed(files) => Index::Indexed(files.clone()),
         }
+    }
+
+    pub fn is_lazy(&self) -> bool {
+        matches!(*self.state.lock().unwrap(), State::Lazy)
     }
 
     /// Returns a mutable view on the index that allows cheap in-place mutations.

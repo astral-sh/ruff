@@ -52,7 +52,7 @@ impl<'db> LazyTypeshedVersions<'db> {
             } else {
                 return &VENDORED_VERSIONS;
             };
-            let Some(versions_file) = system_path_to_file(db.upcast(), &versions_path) else {
+            let Ok(versions_file) = system_path_to_file(db.upcast(), &versions_path) else {
                 todo!(
                     "Still need to figure out how to handle VERSIONS files being deleted \
                     from custom typeshed directories! Expected a file to exist at {versions_path}"

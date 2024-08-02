@@ -15,7 +15,7 @@ use crate::registry::Rule;
 use crate::rules::pydocstyle::settings::Convention;
 
 /// ## What it does
-/// Checks for functions with explicit returns missing a returns section in
+/// Checks for functions with explicit returns missing a "returns" section in
 /// their docstring.
 ///
 /// ## Why is this bad?
@@ -59,7 +59,7 @@ impl Violation for DocstringMissingReturns {
 }
 
 /// ## What it does
-/// Checks for function docstrings that have a returns section without
+/// Checks for function docstrings that have a "returns" section without
 /// needing one.
 ///
 /// ## Why is this bad?
@@ -103,7 +103,7 @@ impl Violation for DocstringExtraneousReturns {
 }
 
 /// ## What it does
-/// Checks for functions with yield statements missing a yields section in
+/// Checks for functions with yield statements missing a "yields" section in
 /// their docstring.
 ///
 /// ## Why is this bad?
@@ -113,27 +113,27 @@ impl Violation for DocstringExtraneousReturns {
 /// ## Example
 /// ```python
 /// def count_to_n(n: int) -> int:
-///     """Generate integers up to n.
+///     """Generate integers up to *n*.
 ///
 ///     Args:
-///         n: Max integer.
+///         n: The number at which to stop counting.
 ///     """
-///     for i in range(n):
+///     for i in range(1, n + 1):
 ///         yield i
 /// ```
 ///
 /// Use instead:
 /// ```python
 /// def count_to_n(n: int) -> int:
-///     """Generate integers up to n.
+///     """Generate integers up to *n*.
 ///
 ///     Args:
-///         n: Max integer.
+///         n: The number at which to stop counting.
 ///
 ///     Yields:
-///         int: The ith integer.
+///         int: The number we're at in the count.
 ///     """
-///     for i in range(n):
+///     for i in range(1, n + 1):
 ///         yield i
 /// ```
 #[violation]
@@ -144,10 +144,14 @@ impl Violation for DocstringMissingYields {
     fn message(&self) -> String {
         format!("`yield` is not documented in docstring")
     }
+
+    fn fix_title(&self) -> Option<String> {
+        Some(format!("Add a \"Yields\" section to the docstring"))
+    }
 }
 
 /// ## What it does
-/// Checks for function docstrings that have a yields section without
+/// Checks for function docstrings that have a "yields" section without
 /// needing one.
 ///
 /// ## Why is this bad?
@@ -186,13 +190,17 @@ pub struct DocstringExtraneousYields;
 impl Violation for DocstringExtraneousYields {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Docstring should not have a yields section because the function doesn't yield anything")
+        format!("Docstring has a \"Yields\" section but the function doesn't yield anything")
+    }
+
+    fn fix_title(&self) -> Option<String> {
+        Some(format!("Remove the \"Yields\" section"))
     }
 }
 
 /// ## What it does
 /// Checks for function docstrings that do not include documentation for all
-/// explicitly-raised exceptions.
+/// explicitly raised exceptions.
 ///
 /// ## Why is this bad?
 /// If a function raises an exception without documenting it in its docstring,
@@ -365,7 +373,7 @@ struct DocstringSections<'a> {
 impl<'a> DocstringSections<'a> {
     fn from_sections(sections: &'a SectionContexts, style: SectionStyle) -> Self {
         let mut docstring_sections = Self::default();
-        for section in sections.iter() {
+        for section in sections {
             match section.kind() {
                 SectionKind::Raises => {
                     docstring_sections.raises = Some(RaisesSection::from_section(&section, style))
@@ -555,33 +563,12 @@ fn extract_raised_exception<'a>(
     None
 }
 
-// Checks if a function has a `@property` decorator
-fn is_property(definition: &Definition, checker: &Checker) -> bool {
-    let Some(function) = definition.as_function_def() else {
-        return false;
-    };
-
-    let Some(last_decorator) = function.decorator_list.last() else {
-        return false;
-    };
-
-    checker
-        .semantic()
-        .resolve_qualified_name(&last_decorator.expression)
-        .is_some_and(|qualified_name| {
-            matches!(
-                qualified_name.segments(),
-                ["", "property"] | ["functools", "cached_property"]
-            )
-        })
-}
-
 /// DOC201, DOC202, DOC402, DOC403, DOC501, DOC502
 pub(crate) fn check_docstring(
     checker: &mut Checker,
     definition: &Definition,
     section_contexts: &SectionContexts,
-    convention: Option<&Convention>,
+    convention: Option<Convention>,
 ) {
     let mut diagnostics = Vec::new();
     let Definition::Member(member) = definition else {
@@ -614,8 +601,9 @@ pub(crate) fn check_docstring(
     };
 
     // DOC201
-    if checker.enabled(Rule::DocstringMissingReturns) {
-        if !is_property(definition, checker) && docstring_sections.returns.is_none() {
+    if checker.enabled(Rule::DocstringMissingReturns) && docstring_sections.returns.is_none() {
+        let extra_property_decorators = checker.settings.pydocstyle.property_decorators();
+        if !definition.is_property(extra_property_decorators, checker.semantic()) {
             if let Some(body_return) = body_entries.returns.first() {
                 let diagnostic = Diagnostic::new(DocstringMissingReturns, body_return.range());
                 diagnostics.push(diagnostic);

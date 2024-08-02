@@ -1,12 +1,12 @@
 from _typeshed import FileDescriptorLike, Unused
 from collections.abc import Sequence
 from struct import Struct
-from typing import Any
+from typing import Any, Final
 
 __all__ = ["ensure_running", "get_inherited_fds", "connect_to_new_process", "set_forkserver_preload"]
 
-MAXFDS_TO_SEND: int
-SIGNED_STRUCT: Struct
+MAXFDS_TO_SEND: Final = 256
+SIGNED_STRUCT: Final[Struct]
 
 class ForkServer:
     def set_forkserver_preload(self, modules_names: list[str]) -> None: ...

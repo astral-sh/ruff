@@ -4,20 +4,20 @@ from _typeshed import Unused
 from collections.abc import Callable, Collection, Iterable, Iterator
 from logging import Logger
 from types import TracebackType
-from typing import Any, Generic, Literal, NamedTuple, Protocol, TypeVar
+from typing import Any, Final, Generic, NamedTuple, Protocol, TypeVar
 from typing_extensions import ParamSpec, Self
 
 if sys.version_info >= (3, 9):
     from types import GenericAlias
 
-FIRST_COMPLETED: Literal["FIRST_COMPLETED"]
-FIRST_EXCEPTION: Literal["FIRST_EXCEPTION"]
-ALL_COMPLETED: Literal["ALL_COMPLETED"]
-PENDING: Literal["PENDING"]
-RUNNING: Literal["RUNNING"]
-CANCELLED: Literal["CANCELLED"]
-CANCELLED_AND_NOTIFIED: Literal["CANCELLED_AND_NOTIFIED"]
-FINISHED: Literal["FINISHED"]
+FIRST_COMPLETED: Final = "FIRST_COMPLETED"
+FIRST_EXCEPTION: Final = "FIRST_EXCEPTION"
+ALL_COMPLETED: Final = "ALL_COMPLETED"
+PENDING: Final = "PENDING"
+RUNNING: Final = "RUNNING"
+CANCELLED: Final = "CANCELLED"
+CANCELLED_AND_NOTIFIED: Final = "CANCELLED_AND_NOTIFIED"
+FINISHED: Final = "FINISHED"
 _FUTURE_STATES: list[str]
 _STATE_TO_DESCRIPTION_MAP: dict[str, str]
 LOGGER: Logger

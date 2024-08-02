@@ -1,6 +1,9 @@
 from _typeshed import StrPath, Unused
 from collections.abc import Callable, Container, Iterable, Mapping
 from typing import Any, Literal
+from typing_extensions import TypeVarTuple, Unpack
+
+_Ts = TypeVarTuple("_Ts")
 
 def get_host_platform() -> str: ...
 def get_platform() -> str: ...
@@ -10,8 +13,8 @@ def check_environ() -> None: ...
 def subst_vars(s: str, local_vars: Mapping[str, str]) -> None: ...
 def split_quoted(s: str) -> list[str]: ...
 def execute(
-    func: Callable[..., object],
-    args: tuple[Any, ...],
+    func: Callable[[Unpack[_Ts]], Unused],
+    args: tuple[Unpack[_Ts]],
     msg: str | None = None,
     verbose: bool | Literal[0, 1] = 0,
     dry_run: bool | Literal[0, 1] = 0,

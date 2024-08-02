@@ -69,9 +69,28 @@ pub(crate) fn cancel_scope_no_checkpoint(
         return;
     }
 
+    // If the body contains an `await` statement, the context manager is used correctly.
     let mut visitor = AwaitVisitor::default();
     visitor.visit_body(&with_stmt.body);
     if visitor.seen_await {
+        return;
+    }
+
+    // If there's an `asyncio.TaskGroup()` context manager alongside the timeout, it's fine, as in:
+    // ```python
+    // async with asyncio.timeout(2.0), asyncio.TaskGroup():
+    //     ...
+    // ```
+    if with_items.iter().any(|item| {
+        item.context_expr.as_call_expr().is_some_and(|call| {
+            checker
+                .semantic()
+                .resolve_qualified_name(call.func.as_ref())
+                .is_some_and(|qualified_name| {
+                    matches!(qualified_name.segments(), ["asyncio", "TaskGroup"])
+                })
+        })
+    }) {
         return;
     }
 

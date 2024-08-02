@@ -1,8 +1,8 @@
-from typing import ClassVar, Literal
+from typing import ClassVar, Final, Literal
 
 from .. import fixer_base
 
-MAP: dict[str, str]
+MAP: Final[dict[str, str]]
 
 class FixMethodattrs(fixer_base.BaseFix):
     BM_compatible: ClassVar[Literal[True]]

@@ -1,39 +1,28 @@
 use std::panic::{AssertUnwindSafe, RefUnwindSafe};
-use std::sync::Arc;
 
-use salsa::{Cancelled, Database, DbWithJar};
-
-use red_knot_module_resolver::{vendored_typeshed_stubs, Db as ResolverDb, Jar as ResolverJar};
-use red_knot_python_semantic::{Db as SemanticDb, Jar as SemanticJar};
+use red_knot_module_resolver::{vendored_typeshed_stubs, Db as ResolverDb};
+use red_knot_python_semantic::Db as SemanticDb;
 use ruff_db::files::{File, Files};
 use ruff_db::program::{Program, ProgramSettings};
 use ruff_db::system::System;
 use ruff_db::vendored::VendoredFileSystem;
-use ruff_db::{Db as SourceDb, Jar as SourceJar, Upcast};
+use ruff_db::{Db as SourceDb, Upcast};
+use salsa::Cancelled;
 
-use crate::lint::{lint_semantic, lint_syntax, unwind_if_cancelled, Diagnostics};
-use crate::workspace::{check_file, Package, Package_files, Workspace, WorkspaceMetadata};
+use crate::lint::Diagnostics;
+use crate::workspace::{check_file, Workspace, WorkspaceMetadata};
 
 mod changes;
 
-pub trait Db: DbWithJar<Jar> + SemanticDb + Upcast<dyn SemanticDb> {}
+#[salsa::db]
+pub trait Db: SemanticDb + Upcast<dyn SemanticDb> {}
 
-#[salsa::jar(db=Db)]
-pub struct Jar(
-    Workspace,
-    Package,
-    Package_files,
-    lint_syntax,
-    lint_semantic,
-    unwind_if_cancelled,
-);
-
-#[salsa::db(SourceJar, ResolverJar, SemanticJar, Jar)]
+#[salsa::db]
 pub struct RootDatabase {
     workspace: Option<Workspace>,
     storage: salsa::Storage<RootDatabase>,
     files: Files,
-    system: Arc<dyn System + Send + Sync + RefUnwindSafe>,
+    system: Box<dyn System + Send + Sync + RefUnwindSafe>,
 }
 
 impl RootDatabase {
@@ -45,7 +34,7 @@ impl RootDatabase {
             workspace: None,
             storage: salsa::Storage::default(),
             files: Files::default(),
-            system: Arc::new(system),
+            system: Box::new(system),
         };
 
         let workspace = Workspace::from_metadata(&db, workspace);
@@ -127,10 +116,13 @@ impl Upcast<dyn ResolverDb> for RootDatabase {
     }
 }
 
+#[salsa::db]
 impl ResolverDb for RootDatabase {}
 
+#[salsa::db]
 impl SemanticDb for RootDatabase {}
 
+#[salsa::db]
 impl SourceDb for RootDatabase {
     fn vendored(&self) -> &VendoredFileSystem {
         vendored_typeshed_stubs()
@@ -145,33 +137,23 @@ impl SourceDb for RootDatabase {
     }
 }
 
-impl Database for RootDatabase {}
+#[salsa::db]
+impl salsa::Database for RootDatabase {}
 
+#[salsa::db]
 impl Db for RootDatabase {}
-
-impl salsa::ParallelDatabase for RootDatabase {
-    fn snapshot(&self) -> salsa::Snapshot<Self> {
-        salsa::Snapshot::new(Self {
-            workspace: self.workspace,
-            storage: self.storage.snapshot(),
-            files: self.files.snapshot(),
-            system: self.system.clone(),
-        })
-    }
-}
 
 #[cfg(test)]
 pub(crate) mod tests {
-    use red_knot_module_resolver::{vendored_typeshed_stubs, Db as ResolverDb, Jar as ResolverJar};
-    use red_knot_python_semantic::{Db as SemanticDb, Jar as SemanticJar};
+    use crate::db::Db;
+    use red_knot_module_resolver::{vendored_typeshed_stubs, Db as ResolverDb};
+    use red_knot_python_semantic::Db as SemanticDb;
     use ruff_db::files::Files;
     use ruff_db::system::{DbWithTestSystem, System, TestSystem};
     use ruff_db::vendored::VendoredFileSystem;
-    use ruff_db::{Db as SourceDb, Jar as SourceJar, Upcast};
+    use ruff_db::{Db as SourceDb, Upcast};
 
-    use super::{Db, Jar};
-
-    #[salsa::db(Jar, SemanticJar, ResolverJar, SourceJar)]
+    #[salsa::db]
     pub(crate) struct TestDb {
         storage: salsa::Storage<Self>,
         files: Files,
@@ -184,7 +166,7 @@ pub(crate) mod tests {
             Self {
                 storage: salsa::Storage::default(),
                 system: TestSystem::default(),
-                vendored: vendored_typeshed_stubs().snapshot(),
+                vendored: vendored_typeshed_stubs().clone(),
                 files: Files::default(),
             }
         }
@@ -200,6 +182,7 @@ pub(crate) mod tests {
         }
     }
 
+    #[salsa::db]
     impl SourceDb for TestDb {
         fn vendored(&self) -> &VendoredFileSystem {
             &self.vendored
@@ -241,20 +224,13 @@ pub(crate) mod tests {
         }
     }
 
+    #[salsa::db]
     impl red_knot_module_resolver::Db for TestDb {}
+    #[salsa::db]
     impl red_knot_python_semantic::Db for TestDb {}
+    #[salsa::db]
     impl Db for TestDb {}
 
+    #[salsa::db]
     impl salsa::Database for TestDb {}
-
-    impl salsa::ParallelDatabase for TestDb {
-        fn snapshot(&self) -> salsa::Snapshot<Self> {
-            salsa::Snapshot::new(Self {
-                storage: self.storage.snapshot(),
-                files: self.files.snapshot(),
-                system: self.system.snapshot(),
-                vendored: self.vendored.snapshot(),
-            })
-        }
-    }
 }

@@ -4,7 +4,7 @@ from ..cmd import Command
 
 class install_egg_info(Command):
     description: ClassVar[str]
-    user_options: ClassVar[list[tuple[str, str | None, str]]]
+    user_options: ClassVar[list[tuple[str, str, str]]]
     install_dir: Any
     def initialize_options(self) -> None: ...
     target: Any

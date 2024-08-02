@@ -260,7 +260,7 @@ pub(crate) fn string_in_exception(checker: &mut Checker, stmt: &Stmt, exc: &Expr
 ///
 /// The fix includes two edits:
 /// 1. Insert the exception argument into a variable assignment before the
-///   `raise` statement. The variable name is `msg`.
+///    `raise` statement. The variable name is `msg`.
 /// 2. Replace the exception argument with the variable name.
 fn generate_fix(
     stmt: &Stmt,

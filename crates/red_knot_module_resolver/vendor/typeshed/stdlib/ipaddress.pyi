@@ -1,11 +1,11 @@
 import sys
 from collections.abc import Iterable, Iterator
-from typing import Any, Generic, Literal, SupportsInt, TypeVar, overload
+from typing import Any, Final, Generic, Literal, SupportsInt, TypeVar, overload
 from typing_extensions import Self, TypeAlias
 
 # Undocumented length constants
-IPV4LENGTH: Literal[32]
-IPV6LENGTH: Literal[128]
+IPV4LENGTH: Final = 32
+IPV6LENGTH: Final = 128
 
 _A = TypeVar("_A", IPv4Address, IPv6Address)
 _N = TypeVar("_N", IPv4Network, IPv6Network)

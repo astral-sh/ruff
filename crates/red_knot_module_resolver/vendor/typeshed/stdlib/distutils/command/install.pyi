@@ -9,9 +9,9 @@ INSTALL_SCHEMES: dict[str, dict[Any, Any]]
 
 class install(Command):
     description: str
-    user_options: Any
-    boolean_options: Any
-    negative_opt: Any
+    user_options: ClassVar[list[tuple[str, str | None, str]]]
+    boolean_options: ClassVar[list[str]]
+    negative_opt: ClassVar[dict[str, str]]
     prefix: str | None
     exec_prefix: Any
     home: str | None

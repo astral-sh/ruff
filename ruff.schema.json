@@ -933,6 +933,16 @@
     "Flake8BuiltinsOptions": {
       "type": "object",
       "properties": {
+        "builtins-allowed-modules": {
+          "description": "List of builtin module names to allow.",
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "type": "string"
+          }
+        },
         "builtins-ignorelist": {
           "description": "Ignore list of builtins.",
           "type": [
@@ -2669,6 +2679,9 @@
         "A001",
         "A002",
         "A003",
+        "A004",
+        "A005",
+        "A006",
         "AIR",
         "AIR0",
         "AIR00",

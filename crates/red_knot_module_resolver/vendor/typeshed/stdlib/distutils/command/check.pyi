@@ -1,4 +1,4 @@
-from typing import Any, Literal
+from typing import Any, ClassVar, Literal
 from typing_extensions import TypeAlias
 
 from ..cmd import Command
@@ -26,8 +26,8 @@ HAS_DOCUTILS: bool
 
 class check(Command):
     description: str
-    user_options: Any
-    boolean_options: Any
+    user_options: ClassVar[list[tuple[str, str, str]]]
+    boolean_options: ClassVar[list[str]]
     restructuredtext: int
     metadata: int
     strict: int

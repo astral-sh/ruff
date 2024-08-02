@@ -179,10 +179,9 @@ E30.py:602:1: E302 [*] Expected 2 blank lines, found 1
 599 599 |     pass
 600 600 | 
     601 |+
-    602 |+
-601 603 | # comment
-602 604 | @decorator
-603 605 | def g():
+601 602 | # comment
+602 603 | @decorator
+603 604 | def g():
 
 E30.py:624:1: E302 [*] Expected 2 blank lines, found 0
     |
@@ -223,3 +222,66 @@ E30.py:634:1: E302 [*] Expected 2 blank lines, found 1
 634 635 | def fn(a: int | str) -> int | str:
 635 636 |     ...
 636 637 | # end
+
+E30.py:944:1: E302 [*] Expected 2 blank lines, found 0
+    |
+942 |     pass
+943 |     # comment
+944 | def test_clientmodel():
+    | ^^^ E302
+945 |     pass
+946 | # end
+    |
+    = help: Add missing blank line(s)
+
+ℹ Safe fix
+941 941 | def test_update():
+942 942 |     pass
+943 943 |     # comment
+    944 |+
+    945 |+
+944 946 | def test_clientmodel():
+945 947 |     pass
+946 948 | # end
+
+E30.py:953:1: E302 [*] Expected 2 blank lines, found 0
+    |
+951 |     pass
+952 |         # comment
+953 | def test_clientmodel():
+    | ^^^ E302
+954 |     pass
+955 | # end
+    |
+    = help: Add missing blank line(s)
+
+ℹ Safe fix
+950 950 | def test_update():
+951 951 |     pass
+952 952 |         # comment
+    953 |+
+    954 |+
+953 955 | def test_clientmodel():
+954 956 |     pass
+955 957 | # end
+
+E30.py:962:1: E302 [*] Expected 2 blank lines, found 0
+    |
+960 |     pass
+961 | # comment
+962 | def test_clientmodel():
+    | ^^^ E302
+963 |     pass
+964 | # end
+    |
+    = help: Add missing blank line(s)
+
+ℹ Safe fix
+958 958 | # E302
+959 959 | def test_update():
+960 960 |     pass
+    961 |+
+    962 |+
+961 963 | # comment
+962 964 | def test_clientmodel():
+963 965 |     pass

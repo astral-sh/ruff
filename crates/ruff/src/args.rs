@@ -400,9 +400,6 @@ pub struct CheckCommand {
         conflicts_with = "watch",
     )]
     pub show_settings: bool,
-    /// Dev-only argument to show fixes
-    #[arg(long, hide = true)]
-    pub ecosystem_ci: bool,
 }
 
 #[derive(Clone, Debug, clap::Parser)]
@@ -662,7 +659,6 @@ impl CheckCommand {
         let check_arguments = CheckArguments {
             add_noqa: self.add_noqa,
             diff: self.diff,
-            ecosystem_ci: self.ecosystem_ci,
             exit_non_zero_on_fix: self.exit_non_zero_on_fix,
             exit_zero: self.exit_zero,
             files: self.files,
@@ -946,7 +942,6 @@ fn resolve_output_format(
 pub struct CheckArguments {
     pub add_noqa: bool,
     pub diff: bool,
-    pub ecosystem_ci: bool,
     pub exit_non_zero_on_fix: bool,
     pub exit_zero: bool,
     pub files: Vec<PathBuf>,

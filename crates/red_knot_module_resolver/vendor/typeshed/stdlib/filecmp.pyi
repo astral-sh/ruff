@@ -1,7 +1,7 @@
 import sys
 from _typeshed import GenericPath, StrOrBytesPath
 from collections.abc import Callable, Iterable, Sequence
-from typing import Any, AnyStr, Generic, Literal
+from typing import Any, AnyStr, Final, Generic, Literal
 
 if sys.version_info >= (3, 9):
     from types import GenericAlias
@@ -9,7 +9,7 @@ if sys.version_info >= (3, 9):
 __all__ = ["clear_cache", "cmp", "dircmp", "cmpfiles", "DEFAULT_IGNORES"]
 
 DEFAULT_IGNORES: list[str]
-BUFSIZE: Literal[8192]
+BUFSIZE: Final = 8192
 
 def cmp(f1: StrOrBytesPath, f2: StrOrBytesPath, shallow: bool | Literal[0, 1] = True) -> bool: ...
 def cmpfiles(

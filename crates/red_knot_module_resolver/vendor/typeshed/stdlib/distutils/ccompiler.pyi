@@ -1,10 +1,11 @@
-from _typeshed import BytesPath, StrPath
+from _typeshed import BytesPath, StrPath, Unused
 from collections.abc import Callable, Iterable
 from distutils.file_util import _BytesPathT, _StrPathT
-from typing import Any, Literal, overload
-from typing_extensions import TypeAlias
+from typing import Literal, overload
+from typing_extensions import TypeAlias, TypeVarTuple, Unpack
 
 _Macro: TypeAlias = tuple[str] | tuple[str, str | None]
+_Ts = TypeVarTuple("_Ts")
 
 def gen_lib_options(
     compiler: CCompiler, library_dirs: list[str], runtime_library_dirs: list[str], libraries: list[str]
@@ -161,7 +162,9 @@ class CCompiler:
     def shared_object_filename(self, basename: str, strip_dir: Literal[0, False] = 0, output_dir: StrPath = "") -> str: ...
     @overload
     def shared_object_filename(self, basename: StrPath, strip_dir: Literal[1, True], output_dir: StrPath = "") -> str: ...
-    def execute(self, func: Callable[..., object], args: tuple[Any, ...], msg: str | None = None, level: int = 1) -> None: ...
+    def execute(
+        self, func: Callable[[Unpack[_Ts]], Unused], args: tuple[Unpack[_Ts]], msg: str | None = None, level: int = 1
+    ) -> None: ...
     def spawn(self, cmd: list[str]) -> None: ...
     def mkpath(self, name: str, mode: int = 0o777) -> None: ...
     @overload
