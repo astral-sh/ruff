@@ -24,6 +24,16 @@ async def read_thing(query: str):
     return {"query": query}
 
 
+@app.get("/books/{author}/{title}")
+async def read_thing(author: str):
+    return {"author": author}
+
+
+@app.get("/books/{author}/{title}")
+async def read_thing():
+    ...
+
+
 
 # OK
 @app.get("/things/{thing_id}")
@@ -44,6 +54,11 @@ async def read_thing(thing_id: str, query: str):
 @app.get("/things/{thing_id : path}")
 async def read_thing(thing_id: str, query: str):
     return {"thing_id": thing_id, "query": query}
+
+
+@app.get("/books/{author}/{title}")
+async def read_thing(author: str, title: str):
+    return {"author": author, "title": title}
 
 
 
