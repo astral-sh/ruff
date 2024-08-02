@@ -355,7 +355,7 @@ impl<'a> RaisesSection<'a> {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Default)]
 struct DocstringSections<'a> {
     returns: Option<GenericSection>,
     yields: Option<GenericSection>,
@@ -364,22 +364,22 @@ struct DocstringSections<'a> {
 
 impl<'a> DocstringSections<'a> {
     fn from_sections(sections: &'a SectionContexts, style: SectionStyle) -> Self {
-        let mut returns: Option<GenericSection> = None;
-        let mut yields: Option<GenericSection> = None;
-        let mut raises: Option<RaisesSection> = None;
+        let mut docstring_sections = Self::default();
         for section in sections.iter() {
             match section.kind() {
-                SectionKind::Raises => raises = Some(RaisesSection::from_section(&section, style)),
-                SectionKind::Returns => returns = Some(GenericSection::from_section(&section)),
-                SectionKind::Yields => yields = Some(GenericSection::from_section(&section)),
+                SectionKind::Raises => {
+                    docstring_sections.raises = Some(RaisesSection::from_section(&section, style))
+                }
+                SectionKind::Returns => {
+                    docstring_sections.returns = Some(GenericSection::from_section(&section))
+                }
+                SectionKind::Yields => {
+                    docstring_sections.yields = Some(GenericSection::from_section(&section))
+                }
                 _ => continue,
             }
         }
-        Self {
-            returns,
-            yields,
-            raises,
-        }
+        docstring_sections
     }
 }
 
