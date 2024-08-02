@@ -80,10 +80,10 @@ impl Violation for FastApiUnusedPathParameter {
 
     fn fix_title(&self) -> Option<String> {
         let Self { arg_name, .. } = self;
-        if !self.arg_name_already_used {
-            Some(format!("Add `{arg_name}` to function signature"))
-        } else {
+        if self.arg_name_already_used {
             None
+        } else {
+            Some(format!("Add `{arg_name}` to function signature"))
         }
     }
 }
@@ -173,6 +173,7 @@ pub(crate) fn fastapi_unused_path_parameter(
                     .contains(&path_param),
             };
             let fixable = violation.fix_title().is_some();
+            #[allow(clippy::cast_possible_truncation)]
             let mut diagnostic = Diagnostic::new(
                 violation,
                 diagnostic_range
