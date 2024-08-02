@@ -33,6 +33,7 @@ use ruff_python_stdlib::identifiers::is_identifier;
 ///
 /// app = FastAPI()
 ///
+///
 /// @app.get("/things/{thing_id}")
 /// async def read_thing(query: str):
 ///     ...
@@ -44,6 +45,7 @@ use ruff_python_stdlib::identifiers::is_identifier;
 /// from fastapi import FastAPI
 ///
 /// app = FastAPI()
+///
 ///
 /// @app.get("/things/{thing_id}")
 /// async def read_thing(thing_id: int, query: str):
