@@ -21,6 +21,8 @@ struct TestCase {
     db: RootDatabase,
     watcher: Option<WorkspaceWatcher>,
     changes_receiver: crossbeam::channel::Receiver<Vec<watch::ChangeEvent>>,
+    /// The temporary directory that contains the test files.
+    /// We need to hold on to it in the test case or the temp files get deleted.
     _temp_dir: tempfile::TempDir,
     root_dir: SystemPathBuf,
 }
@@ -48,7 +50,10 @@ impl TestCase {
     }
 
     fn try_stop_watch(&mut self, timeout: Duration) -> Option<Vec<watch::ChangeEvent>> {
-        let watcher = self.watcher.take().unwrap();
+        let watcher = self
+            .watcher
+            .take()
+            .expect("Cannot call `stop_watch` more than once.");
 
         let mut all_events = self
             .changes_receiver
@@ -785,7 +790,7 @@ fn remove_search_path() -> anyhow::Result<()> {
 /// `inotify` only emits a single change event for the file that was changed.
 /// Other files that point to the same inode (hardlinks) won't get updated.
 ///
-/// For reference: VS Code and Py Charm have the same behavior where the results for one of the
+/// For reference: VS Code and PyCharm have the same behavior where the results for one of the
 /// files are stale.
 ///
 /// # Windows
@@ -951,7 +956,6 @@ mod unix {
     ///   |- baz.py
     ///
     /// - workspace
-    ///   |- foo.py
     ///   |- bar -> /bar
     /// ```
     ///
@@ -1044,8 +1048,7 @@ mod unix {
     /// Setup:
     /// ```text
     /// - workspace
-    ///   |-- .venv/lib/python3.12/site-packages
-    ///   |  |- bar -> /workspace/patched/bar
+    ///   | - bar -> /workspace/patched/bar
     ///   |
     ///   | - patched
     ///   |   |-- bar
@@ -1055,50 +1058,35 @@ mod unix {
     /// ```
     #[test]
     fn symlink_inside_workspace() -> anyhow::Result<()> {
-        let mut case = setup_with_search_paths(
-            |_root: &SystemPath, workspace: &SystemPath| {
-                let site_packages = workspace.join(".venv/lib/python3.12/site-packages");
-                std::fs::create_dir_all(site_packages.as_std_path())?;
+        let mut case = setup(|_root: &SystemPath, workspace: &SystemPath| {
+            // Set up the symlink target.
+            let link_target = workspace.join("patched/bar");
+            std::fs::create_dir_all(link_target.as_std_path())
+                .context("Failed to create link target directory")?;
+            let baz_original = link_target.join("baz.py");
+            std::fs::write(baz_original.as_std_path(), "def baz(): ...")
+                .context("Failed to write link target file")?;
 
-                // Set up the symlink target.
-                let link_target = workspace.join("patched/bar");
-                std::fs::create_dir_all(link_target.as_std_path())
-                    .context("Failed to create link target directory")?;
-                let baz_original = link_target.join("baz.py");
-                std::fs::write(baz_original.as_std_path(), "def baz(): ...")
-                    .context("Failed to write link target file")?;
-
-                // Create a symlink inside site-packages
-                let bar_in_site_packages = site_packages.join("bar");
-                std::os::unix::fs::symlink(
-                    link_target.as_std_path(),
-                    bar_in_site_packages.as_std_path(),
-                )
+            // Create a symlink inside site-packages
+            let bar_in_workspace = workspace.join("bar");
+            std::os::unix::fs::symlink(link_target.as_std_path(), bar_in_workspace.as_std_path())
                 .context("Failed to create symlink to bar package")?;
 
-                Ok(())
-            },
-            |_root, workspace| SearchPathSettings {
-                extra_paths: vec![],
-                workspace_root: workspace.to_path_buf(),
-                custom_typeshed: None,
-                site_packages: Some(workspace.join(".venv/lib/python3.12/site-packages")),
-            },
-        )?;
+            Ok(())
+        })?;
 
         let baz = resolve_module(
             case.db().upcast(),
             ModuleName::new_static("bar.baz").unwrap(),
         )
-        .expect("Expected bar.baz to exist in extra-paths.");
-        let baz_site_packages =
-            case.workspace_path(".venv/lib/python3.12/site-packages/bar/baz.py");
+        .expect("Expected bar.baz to exist in site-packages.");
+        let bar_baz = case.workspace_path("bar/baz.py");
 
-        let baz_original = case.workspace_path("patched/bar/baz.py");
-        let baz_original_file = case.system_file(&baz_original).unwrap();
+        let patched_bar_baz = case.workspace_path("patched/bar/baz.py");
+        let patched_bar_baz_file = case.system_file(&patched_bar_baz).unwrap();
 
         assert_eq!(
-            source_text(case.db(), baz_original_file).as_str(),
+            source_text(case.db(), patched_bar_baz_file).as_str(),
             "def baz(): ..."
         );
 
@@ -1106,13 +1094,10 @@ mod unix {
             source_text(case.db(), baz.file()).as_str(),
             "def baz(): ..."
         );
-        assert_eq!(
-            baz.file().path(case.db()).as_system_path(),
-            Some(&*baz_site_packages)
-        );
+        assert_eq!(baz.file().path(case.db()).as_system_path(), Some(&*bar_baz));
 
         // Write to the symlink target.
-        update_file(&baz_original, "def baz(): print('Version 2')")
+        update_file(&patched_bar_baz, "def baz(): print('Version 2')")
             .context("Failed to update bar/baz.py")?;
 
         let changes = case.stop_watch();
@@ -1121,25 +1106,30 @@ mod unix {
 
         // The file watcher is guaranteed to emit one event for the changed file, but it isn't specified
         // if the event is emitted for the "original" or linked path because both paths are watched.
-        // The best we can assert here is that one of the file should have been updated.
+        // The best we can assert here is that one of the files should have been updated.
         //
         // In a perfect world, the file watcher would emit two events, one for the original file and
         // one for the symlink. I tried parcel/watcher, node's `fs.watch` and `chokidar` and
-        // only `chockidar seems to support it (used by Pyright).
+        // only `chokidar seems to support it (used by Pyright).
         //
         // I further tested how good editor support is for symlinked files and it is not good ;)
         // * VS Code doesn't update the file content if a file gets changed through a symlink
-        // * Py Charm doesn't update diagnostics if a symlinked module is changed (same as red knot).
+        // * PyCharm doesn't update diagnostics if a symlinked module is changed (same as red knot).
         //
         // That's why I think it's fine to not support this case for now.
 
-        let original_text = source_text(case.db(), baz_original_file);
-        let original_updated = original_text.as_str() == "def baz(): print('Version 2')";
+        let patched_baz_text = source_text(case.db(), patched_bar_baz_file);
+        let did_update_patched_baz = patched_baz_text.as_str() == "def baz(): print('Version 2')";
 
-        let symlinked_text = source_text(case.db(), baz.file());
-        let symlinked_updated = symlinked_text.as_str() == "def baz(): print('Version 2')";
+        let bar_baz_text = source_text(case.db(), baz.file());
+        let did_update_bar_baz = bar_baz_text.as_str() == "def baz(): print('Version 2')";
 
-        assert!(original_updated || symlinked_updated, "Expected one of the files to be updated but neither file was updated.\nOriginal: {original_text}\nSymlinked: {symlinked_text}", original_text = original_text.as_str(), symlinked_text = symlinked_text.as_str());
+        assert!(
+            did_update_patched_baz || did_update_bar_baz,
+            "Expected one of the files to be updated but neither file was updated.\nOriginal: {patched_baz_text}\nSymlinked: {bar_baz_text}",
+            patched_baz_text = patched_baz_text.as_str(),
+            bar_baz_text = bar_baz_text.as_str()
+        );
 
         Ok(())
     }
@@ -1157,7 +1147,6 @@ mod unix {
     ///   |-- foo.py
     /// ```
     #[test]
-    // #[ignore = "Requires tracking symlink information. Only emits a single event for the target file."]
     fn symlinked_module_search_path() -> anyhow::Result<()> {
         let mut case = setup_with_search_paths(
             |root: &SystemPath, workspace: &SystemPath| {
@@ -1233,7 +1222,7 @@ mod unix {
         // * PyCharm doesn't update diagnostics if a symlinked module is changed (same as red knot).
         // We could add support for it by keeping a reverse map from `real_path` to symlinked path but
         // it doesn't seem worth doing considering that as prominent tools like PyCharm don't support it.
-        // PyRight does support it, thanks to chokidar.
+        // Pyright does support it, thanks to chokidar.
         assert_ne!(
             source_text(case.db(), baz_original_file).as_str(),
             "def baz(): print('Version 2')"
