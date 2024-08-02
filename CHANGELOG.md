@@ -39,11 +39,6 @@ You can opt-out of this behavior by adding `*.ipynb` to the `extend-exclude` set
 - \[`pyupgrade`\] Use colon rather than dot formatting for integer-only types ([#12534](https://github.com/astral-sh/ruff/pull/12534))
 - Fix NFKC normalization bug when removing unused imports ([#12571](https://github.com/astral-sh/ruff/pull/12571))
 
-### Documentation
-
--
-- Recommend client config for `trace` setting in Neovim ([#12562](https://github.com/astral-sh/ruff/pull/12562))
-
 ### Other changes
 
 - Consider more stdlib decorators to be property-like ([#12583](https://github.com/astral-sh/ruff/pull/12583))
