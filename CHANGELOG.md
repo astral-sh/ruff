@@ -1,5 +1,55 @@
 # Changelog
 
+## 0.5.6
+
+Ruff 0.5.6 automatically enables linting and formatting of notebooks in *preview mode*.
+You can opt-out of this behavior by adding `*.ipynb` to the `extend-exclude` setting.
+
+### Preview features
+
+- Enable notebooks by default in preview mode ([#12621](https://github.com/astral-sh/ruff/pull/12621))
+- \[`flake8-builtins`\] Implement import, lambda, and module shadowing ([#12546](https://github.com/astral-sh/ruff/pull/12546))
+- \[`pydoclint`\] Add `docstring-missing-returns` (`DOC201`) and `docstring-extraneous-returns` (`DOC202`) ([#12485](https://github.com/astral-sh/ruff/pull/12485))
+
+### Rule changes
+
+- \[`flake8-return`\] Exempt cached properties and other property-like decorators from explicit return rule (`RET501`) ([#12563](https://github.com/astral-sh/ruff/pull/12563))
+
+### Server
+
+- Make server panic hook more error resilient ([#12610](https://github.com/astral-sh/ruff/pull/12610))
+- Use `$/logTrace` for server trace logs in Zed and VS Code ([#12564](https://github.com/astral-sh/ruff/pull/12564))
+- Keep track of deleted cells for reorder change request ([#12575](https://github.com/astral-sh/ruff/pull/12575))
+
+### Configuration
+
+- \[`flake8-implicit-str-concat`\] Always allow explicit multi-line concatenations when implicit are banned ([#12532](https://github.com/astral-sh/ruff/pull/12532))
+
+### Bug fixes
+
+- \[`flake8-async`\] Avoid unused async when context manager includes `TaskGroup` ([#12605](https://github.com/astral-sh/ruff/pull/12605))
+- \[`flake8-slots`\] Avoid recommending `__slots__` for classes that inherit from more than `namedtuple` ([#12531](https://github.com/astral-sh/ruff/pull/12531))
+- \[`isort`\] Avoid marking required imports as unused ([#12537](https://github.com/astral-sh/ruff/pull/12537))
+- \[`isort`\] Preserve trailing inline comments on import-from statements ([#12498](https://github.com/astral-sh/ruff/pull/12498))
+- \[`pycodestyle`\] Add newlines before comments (`E305`) ([#12606](https://github.com/astral-sh/ruff/pull/12606))
+- \[`pycodestyle`\] Don't attach comments with mismatched indents ([#12604](https://github.com/astral-sh/ruff/pull/12604))
+- \[`pyflakes`\] Fix preview-mode bugs in `F401` when attempting to autofix unused first-party submodule imports in an `__init__.py` file ([#12569](https://github.com/astral-sh/ruff/pull/12569))
+- \[`pylint`\] Respect start index in `unnecessary-list-index-lookup` ([#12603](https://github.com/astral-sh/ruff/pull/12603))
+- \[`pyupgrade`\] Avoid recommending no-argument super in `slots=True` dataclasses ([#12530](https://github.com/astral-sh/ruff/pull/12530))
+- \[`pyupgrade`\] Use colon rather than dot formatting for integer-only types ([#12534](https://github.com/astral-sh/ruff/pull/12534))
+- Fix NFKC normalization bug when removing unused imports ([#12571](https://github.com/astral-sh/ruff/pull/12571))
+
+### Documentation
+
+-
+- Recommend client config for `trace` setting in Neovim ([#12562](https://github.com/astral-sh/ruff/pull/12562))
+
+### Other changes
+
+- Consider more stdlib decorators to be property-like ([#12583](https://github.com/astral-sh/ruff/pull/12583))
+- Improve handling of metaclasses in various linter rules ([#12579](https://github.com/astral-sh/ruff/pull/12579))
+- Improve consistency between linter rules in determining whether a function is property ([#12581](https://github.com/astral-sh/ruff/pull/12581))
+
 ## 0.5.5
 
 ### Preview features
