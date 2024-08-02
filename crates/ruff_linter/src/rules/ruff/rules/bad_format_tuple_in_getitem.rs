@@ -6,10 +6,13 @@ use ruff_text_size::Ranged;
 use crate::checkers::ast::Checker;
 
 /// ## What it does
-/// Checks for use of parentheses around tuples of length at least two in slices.
+/// Checks for use or omission of parentheses around tuples of length at least two in calls to `__getitem__`,
+/// depending on the setting [`lint.ruff.prefer-parentheses-getitem-tuple`]. By default, the use of parentheses
+/// is considered a violation.
 ///
 /// ## Why is this bad?
-/// Parentheses are not necessary, may add clutter, and do not affect the semantics.
+/// It is good to be consistent and, depending on the codebase, one or the other
+/// convention may be more readable.
 ///
 /// ## Example
 ///
@@ -18,7 +21,7 @@ use crate::checkers::ast::Checker;
 /// directions[(0, 1)]
 /// ```
 ///
-/// Use instead:
+/// Use instead (with default setting):
 ///
 /// ```python
 /// directions = {(0, 1): "North", (-1, 0): "East", (0, -1): "South", (1, 0): "West"}
@@ -26,16 +29,22 @@ use crate::checkers::ast::Checker;
 /// ```
 
 #[violation]
-pub struct ParenthesesInTupleSlices;
+pub struct ParenthesesInTupleSlices {
+    prefer_parentheses: bool,
+}
 
 impl AlwaysFixableViolation for ParenthesesInTupleSlices {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Avoid unnecessary parentheses when evaluating `getitem` at a tuple.")
+        if self.prefer_parentheses {
+            format!("Use preferred format when evaluating `__getitem__` at a tuple.")
+        } else {
+            format!("Use preferred format when evaluating `__getitem__` at a tuple.")
+        }
     }
 
     fn fix_title(&self) -> String {
-        "Remove parentheses from tuple argument in `getitem` call.".to_string()
+        "Remove parentheses from tuple argument in `__getitem__` call.".to_string()
     }
 }
 

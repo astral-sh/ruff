@@ -21,7 +21,7 @@ use ruff_linter::rules::{
     flake8_copyright, flake8_errmsg, flake8_gettext, flake8_implicit_str_concat,
     flake8_import_conventions, flake8_pytest_style, flake8_quotes, flake8_self,
     flake8_tidy_imports, flake8_type_checking, flake8_unused_arguments, isort, mccabe, pep8_naming,
-    pycodestyle, pydocstyle, pyflakes, pylint, pyupgrade,
+    pycodestyle, pydocstyle, pyflakes, pylint, pyupgrade, ruff,
 };
 use ruff_linter::settings::types::{
     IdentifierPattern, OutputFormat, PreviewMode, PythonVersion, RequiredVersion,
@@ -454,6 +454,9 @@ pub struct LintOptions {
         "#
     )]
     pub exclude: Option<Vec<String>>,
+
+    /// Options for the `ruff` plugin
+    pub ruff: Option<RuffOptions>,
 
     /// Whether to enable preview mode. When preview mode is enabled, Ruff will
     /// use unstable rules and fixes.
@@ -2965,6 +2968,34 @@ impl PyUpgradeOptions {
     pub fn into_settings(self) -> pyupgrade::settings::Settings {
         pyupgrade::settings::Settings {
             keep_runtime_typing: self.keep_runtime_typing.unwrap_or_default(),
+        }
+    }
+}
+#[derive(
+    Clone, Debug, PartialEq, Eq, Default, Serialize, Deserialize, OptionsMetadata, CombineOptions,
+)]
+#[serde(deny_unknown_fields, rename_all = "kebab-case")]
+#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
+pub struct RuffOptions {
+    /// Whether to prefer accessing items keyed by tuples with
+    /// parentheses around the tuple (see `RUF031`).
+    #[option(
+        default = r#"false"#,
+        value_type = "bool",
+        example = r#"
+        # Make it a violation to use `__getitem__` with a tuple argument without parentheses.
+        prefer-parentheses-getitem-tuple = true
+        "#
+    )]
+    pub prefer_parentheses_getitem_tuple: Option<bool>,
+}
+
+impl RuffOptions {
+    pub fn into_settings(self) -> ruff::settings::Settings {
+        ruff::settings::Settings {
+            prefer_parentheses_getitem_tuple: self
+                .prefer_parentheses_getitem_tuple
+                .unwrap_or_default(),
         }
     }
 }
