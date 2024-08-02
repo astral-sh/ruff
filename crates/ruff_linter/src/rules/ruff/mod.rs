@@ -1,6 +1,7 @@
 //! Ruff-specific rules.
 
 pub(crate) mod rules;
+pub mod settings;
 pub(crate) mod typing;
 
 #[cfg(test)]
