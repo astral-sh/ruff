@@ -275,15 +275,15 @@ wheels = [
 
 [[distribution]]
 name = "mdformat-admon"
-version = "2.0.3"
+version = "2.0.2"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "mdformat" },
     { name = "mdit-py-plugins" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/7d/51/01054c5cede0b7796871f80a07f1fd78e26bcd2f195527b662349666c101/mdformat_admon-2.0.3.tar.gz", hash = "sha256:2890a68ec3be06e08772d9c92d84c665b398fba1fa18f870b989f94aa6cd5aad", size = 12823 }
+sdist = { url = "https://files.pythonhosted.org/packages/31/bc/7cc59c6c5d615e99a3d9da9c5fa32e40f4123f44d404a36f3c8a5d16346c/mdformat_admon-2.0.2.tar.gz", hash = "sha256:66bf6debb4f904ff4549b5bc59380a92add16c16fb51b220f3f7288157702fea", size = 12250 }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/58/3e/667c485571a22e5ddb0c692d6cd0de8bf607faabab07b7888f802dc798e1/mdformat_admon-2.0.3-py3-none-any.whl", hash = "sha256:d3a114fb894a4db2828e895dab9f48399d49805c63cf425d1b3c65e21e3d0053", size = 9452 },
+    { url = "https://files.pythonhosted.org/packages/5c/eb/6fd18c7435a6a9a740237d6eecd49c4e2d7b4d13e8dc937f5a49045a6e28/mdformat_admon-2.0.2-py3-none-any.whl", hash = "sha256:fb99e5c1ed63207712abd8edd7af880227d972dbbc5a5266ae0ff205dec3210f", size = 9377 },
 ]
 
 [[distribution]]
@@ -303,7 +303,7 @@ wheels = [
 
 [[distribution]]
 name = "mdformat-mkdocs"
-version = "2.1.1"
+version = "2.0.8"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "mdformat" },
@@ -311,9 +311,9 @@ dependencies = [
     { name = "mdformat-gfm" },
     { name = "more-itertools" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/4e/16/b48b6b76d53565cc77c963427de436a547cfe84296ab784d2da8c00462c4/mdformat_mkdocs-2.1.1.tar.gz", hash = "sha256:4915646e755cee87427c0ed8ae6c743e15ac78ac2ba673ae7b9abcd85a018aad", size = 19474 }
+sdist = { url = "https://files.pythonhosted.org/packages/5c/37/a8cf961a5fdf8922f4a3e8082e11fbc96457d1b51721ee0ab0be7f0fc2db/mdformat_mkdocs-2.0.8.tar.gz", hash = "sha256:072848913acf6a871f2cc217c4f627b16021c891e0ef8b8793b09c40bd3af0a7", size = 17087 }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/5a/84/15b0ac9962fd9ab7f01b17c62f70e2b84342fde41d13c03d47b8c14b0e9c/mdformat_mkdocs-2.1.1-py3-none-any.whl", hash = "sha256:904c4b9dacbbc315f72626887e79f0659f743c0f410cd47daa38b35405506a37", size = 17843 },
+    { url = "https://files.pythonhosted.org/packages/09/4f/4d87f03126a3f03963e46a4a1791d8853e94eb57b9a5c9f9ce38682c0ce3/mdformat_mkdocs-2.0.8-py3-none-any.whl", hash = "sha256:d7f1ae7677a0328a7c323443fc43970ad326845ee2ca07032e4ec3ab786e0eb6", size = 14971 },
 ]
 
 [[distribution]]
