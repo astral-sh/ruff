@@ -24,7 +24,7 @@ TRY002.py:37:15: TRY002 Create your own exception
 35 |     a = 1
 36 |     if a == 1:
 37 |         raise BaseException("Custom message")
-   |               ^^^^^^^^^^^^^^^^^^^^^^^^^^^ TRY002
+   |               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ TRY002
 38 | 
 39 |     b = 1
    |
@@ -34,7 +34,7 @@ TRY002.py:41:15: TRY002 Create your own exception
 39 |     b = 1
 40 |     if b == 1:
 41 |         raise BaseException
-   |               ^^^^^^^^^ TRY002
+   |               ^^^^^^^^^^^^^ TRY002
    |
 
 
