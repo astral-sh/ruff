@@ -23,7 +23,7 @@ You can opt-out of this behavior by adding `*.ipynb` to the `extend-exclude` set
 
 ### Configuration
 
-- \[`flake8-implicit-str-concat`\] Always allow explicit multi-line concatenations when implicit are banned ([#12532](https://github.com/astral-sh/ruff/pull/12532))
+- \[`flake8-implicit-str-concat`\] Always allow explicit multi-line concatenations when implicit concatenations are banned ([#12532](https://github.com/astral-sh/ruff/pull/12532))
 
 ### Bug fixes
 
