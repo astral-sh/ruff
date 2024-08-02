@@ -523,10 +523,31 @@ impl<'a> BodyVisitor<'a> {
     }
 
     fn finish(self) -> BodyEntries<'a> {
+        let BodyVisitor {
+            returns,
+            yields,
+            mut raised_exceptions,
+            ..
+        } = self;
+
+        // Deduplicate exceptions collected:
+        // no need to complain twice about `raise TypeError` not being documented
+        // just because there are two separate `raise TypeError` statements in the function
+        raised_exceptions.sort_unstable_by(|left, right| {
+            left.qualified_name
+                .segments()
+                .cmp(right.qualified_name.segments())
+                .then_with(|| left.start().cmp(&right.start()))
+                .then_with(|| left.end().cmp(&right.end()))
+        });
+        raised_exceptions.dedup_by(|left, right| {
+            left.qualified_name.segments() == right.qualified_name.segments()
+        });
+
         BodyEntries {
-            returns: self.returns,
-            yields: self.yields,
-            raised_exceptions: self.raised_exceptions,
+            returns,
+            yields,
+            raised_exceptions,
         }
     }
 }
