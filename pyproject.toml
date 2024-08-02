@@ -43,6 +43,9 @@ Repository = "https://github.com/astral-sh/ruff"
 Documentation = "https://docs.astral.sh/ruff/"
 Changelog = "https://github.com/astral-sh/ruff/blob/main/CHANGELOG.md"
 
+[tool.uv.workspace]
+members = ["docs", "python/ruff-ecosystem"]
+
 [tool.maturin]
 bindings = "bin"
 manifest-path = "crates/ruff/Cargo.toml"
