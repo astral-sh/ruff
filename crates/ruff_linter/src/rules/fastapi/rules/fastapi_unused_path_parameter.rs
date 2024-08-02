@@ -65,12 +65,13 @@ impl Violation for FastApiUnusedPathParameter {
 }
 
 fn extract_path_params_from_route(input: &str) -> Vec<String> {
-    // Define a regular expression to match text inside curly braces
+    // We ignore text after a colon, since those are path convertors
+    // See also: https://fastapi.tiangolo.com/tutorial/path-params/?h=path#path-convertor
     let re = Regex::new(r"\{([^:}]+)").unwrap();
 
     // Collect all matches and return them as a vector of strings
     re.captures_iter(input)
-        .filter_map(|cap| cap.get(1).map(|m| m.as_str().to_string()))
+        .filter_map(|cap| cap.get(1).map(|m| m.as_str().trim().to_string()))
         .collect()
 }
 
