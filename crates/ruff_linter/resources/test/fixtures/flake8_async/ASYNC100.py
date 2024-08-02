@@ -84,3 +84,8 @@ async def func():
 async def func():
     async with asyncio.timeout(delay=0.2), asyncio.TaskGroup(), asyncio.timeout(delay=0.2), asyncio.TaskGroup():
         ...
+
+
+async def func():
+    async with asyncio.timeout(delay=0.2), asyncio.timeout(delay=0.2):
+        ...

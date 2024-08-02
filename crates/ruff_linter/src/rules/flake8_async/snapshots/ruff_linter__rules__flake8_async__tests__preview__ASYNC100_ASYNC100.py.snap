@@ -90,3 +90,12 @@ ASYNC100.py:80:5: ASYNC100 A `with asyncio.timeout(...):` context does not conta
 81 | |         ...
    | |___________^ ASYNC100
    |
+
+ASYNC100.py:90:5: ASYNC100 A `with asyncio.timeout(...):` context does not contain any `await` statements. This makes it pointless, as the timeout can only be triggered by a checkpoint.
+   |
+89 |   async def func():
+90 |       async with asyncio.timeout(delay=0.2), asyncio.timeout(delay=0.2):
+   |  _____^
+91 | |         ...
+   | |___________^ ASYNC100
+   |
