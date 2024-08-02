@@ -43,6 +43,16 @@ pub trait System: Debug {
     /// This function will traverse symbolic links to query information about the destination file.
     fn path_metadata(&self, path: &SystemPath) -> Result<Metadata>;
 
+    /// Returns the canonical, absolute form of a path with all intermediate components normalized
+    /// and symbolic links resolved.
+    ///
+    /// # Errors
+    /// This function will return an error in the following situations, but is not limited to just these cases:
+    /// * `path` does not exist.
+    /// * A non-final component in `path` is not a directory.
+    /// * the symlink target path is not valid Unicode.
+    fn canonicalize_path(&self, path: &SystemPath) -> Result<SystemPathBuf>;
+
     /// Reads the content of the file at `path` into a [`String`].
     fn read_to_string(&self, path: &SystemPath) -> Result<String>;
 

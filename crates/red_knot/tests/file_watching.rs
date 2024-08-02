@@ -1184,8 +1184,9 @@ mod unix {
             ModuleName::new_static("bar.baz").unwrap(),
         )
         .expect("Expected bar.baz to exist in site-packages.");
-        let baz_site_packages =
+        let baz_site_packages_path =
             case.workspace_path(".venv/lib/python3.12/site-packages/bar/baz.py");
+        let baz_site_packages = case.system_file(&baz_site_packages_path).unwrap();
         let baz_original = case.root_path().join("site-packages/bar/baz.py");
         let baz_original_file = case.system_file(&baz_original).unwrap();
 
@@ -1195,12 +1196,12 @@ mod unix {
         );
 
         assert_eq!(
-            source_text(case.db(), baz.file()).as_str(),
+            source_text(case.db(), baz_site_packages).as_str(),
             "def baz(): ..."
         );
         assert_eq!(
             baz.file().path(case.db()).as_system_path(),
-            Some(&*baz_site_packages)
+            Some(&*baz_original)
         );
 
         // Write to the symlink target.
@@ -1212,7 +1213,7 @@ mod unix {
         case.db_mut().apply_changes(changes);
 
         assert_eq!(
-            source_text(case.db(), baz.file()).as_str(),
+            source_text(case.db(), baz_original_file).as_str(),
             "def baz(): print('Version 2')"
         );
 
@@ -1224,7 +1225,7 @@ mod unix {
         // it doesn't seem worth doing considering that as prominent tools like PyCharm don't support it.
         // Pyright does support it, thanks to chokidar.
         assert_ne!(
-            source_text(case.db(), baz_original_file).as_str(),
+            source_text(case.db(), baz_site_packages).as_str(),
             "def baz(): print('Version 2')"
         );
 

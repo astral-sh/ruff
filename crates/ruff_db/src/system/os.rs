@@ -63,6 +63,12 @@ impl System for OsSystem {
         })
     }
 
+    fn canonicalize_path(&self, path: &SystemPath) -> Result<SystemPathBuf> {
+        path.as_utf8_path()
+            .canonicalize_utf8()
+            .map(SystemPathBuf::from_utf8_path_buf)
+    }
+
     fn read_to_string(&self, path: &SystemPath) -> Result<String> {
         std::fs::read_to_string(path.as_std_path())
     }
