@@ -24,9 +24,6 @@ where
                     DebouncerMessage::Flush => {
                         continue;
                     }
-                    DebouncerMessage::Exit => {
-                        return;
-                    }
                 };
 
                 let mut debouncer = Debouncer::default();
@@ -55,12 +52,9 @@ where
                                     break;
                                 }
 
-                                Ok(DebouncerMessage::Exit) => {
-                                    return;
-                                },
-
                                 Err(_) => {
-                                    // There are no more senders. There's no point in waiting for more messages
+                                    // There are no more senders. That means `stop` was called.
+                                    // Drop all events and exit immediately.
                                     return;
                                 }
                             }
@@ -86,9 +80,11 @@ where
         recommended_watcher(move |event| sender.send(DebouncerMessage::Event(event)).unwrap())?;
 
     Ok(Watcher {
-        watcher,
-        debouncer_sender,
-        debouncer_thread: Some(debouncer),
+        inner: Some(WatcherInner {
+            watcher,
+            debouncer_sender,
+            debouncer_thread: debouncer,
+        }),
     })
 }
 
@@ -98,27 +94,29 @@ enum DebouncerMessage {
     Event(notify::Result<notify::Event>),
 
     Flush,
-
-    /// Exit the debouncer thread.
-    Exit,
 }
 
 pub struct Watcher {
+    inner: Option<WatcherInner>,
+}
+
+struct WatcherInner {
     watcher: RecommendedWatcher,
     debouncer_sender: crossbeam::channel::Sender<DebouncerMessage>,
-    debouncer_thread: Option<std::thread::JoinHandle<()>>,
+    debouncer_thread: std::thread::JoinHandle<()>,
 }
 
 impl Watcher {
     /// Sets up file watching for `path`.
     pub fn watch(&mut self, path: &SystemPath) -> notify::Result<()> {
-        self.watcher
+        self.inner_mut()
+            .watcher
             .watch(path.as_std_path(), RecursiveMode::Recursive)
     }
 
     /// Stops file watching for `path`.
     pub fn unwatch(&mut self, path: &SystemPath) -> notify::Result<()> {
-        self.watcher.unwatch(path.as_std_path())
+        self.inner_mut().watcher.unwatch(path.as_std_path())
     }
 
     /// Stops the file watcher.
@@ -128,18 +126,37 @@ impl Watcher {
     /// The call blocks until the watcher has stopped.
     pub fn stop(mut self) {
         self.set_stop();
-        if let Some(debouncher) = self.debouncer_thread.take() {
-            debouncher.join().unwrap();
-        }
     }
 
     /// Flushes any pending events.
     pub fn flush(&self) {
-        self.debouncer_sender.send(DebouncerMessage::Flush).unwrap();
+        self.inner()
+            .debouncer_sender
+            .send(DebouncerMessage::Flush)
+            .unwrap();
     }
 
     fn set_stop(&mut self) {
-        self.debouncer_sender.send(DebouncerMessage::Exit).ok();
+        if let Some(inner) = self.inner.take() {
+            // drop the watcher to ensure there will be no more events.
+            // and to drop the sender used by the notify callback.
+            drop(inner.watcher);
+
+            // Drop "our" sender to ensure the sender count goes down to 0.
+            // The debouncer thread will end as soon as the sender count is 0.
+            drop(inner.debouncer_sender);
+
+            // Wait for the debouncer to finish, propagate any panics
+            inner.debouncer_thread.join().unwrap();
+        }
+    }
+
+    fn inner(&self) -> &WatcherInner {
+        self.inner.as_ref().expect("Watcher to be running.")
+    }
+
+    fn inner_mut(&mut self) -> &mut WatcherInner {
+        self.inner.as_mut().expect("Watcher to be running.")
     }
 }
 
