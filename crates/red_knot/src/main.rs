@@ -1,3 +1,4 @@
+use std::num::NonZeroUsize;
 use std::sync::Mutex;
 
 use clap::Parser;
@@ -29,6 +30,9 @@ mod cli;
 )]
 #[command(version)]
 struct Args {
+    #[command(subcommand)]
+    pub(crate) command: Command,
+
     #[arg(
         long,
         help = "Changes the current working directory.",
@@ -65,6 +69,11 @@ struct Args {
     watch: bool,
 }
 
+#[derive(Debug, clap::Subcommand)]
+pub enum Command {
+    Server,
+}
+
 #[allow(
     clippy::print_stdout,
     clippy::unnecessary_wraps,
@@ -73,6 +82,7 @@ struct Args {
 )]
 pub fn main() -> anyhow::Result<()> {
     let Args {
+        command,
         current_directory,
         custom_typeshed_dir,
         extra_search_path: extra_paths,
@@ -83,6 +93,18 @@ pub fn main() -> anyhow::Result<()> {
 
     let verbosity = verbosity.level();
     countme::enable(verbosity == Some(VerbosityLevel::Trace));
+
+    if matches!(command, Command::Server) {
+        let four = NonZeroUsize::new(4).unwrap();
+
+        // by default, we set the number of worker threads to `num_cpus`, with a maximum of 4.
+        let worker_threads = std::thread::available_parallelism()
+            .unwrap_or(four)
+            .max(four);
+
+        return red_knot_server::Server::new(worker_threads, None)?.run();
+    }
+
     setup_tracing(verbosity);
 
     let cwd = if let Some(cwd) = current_directory {

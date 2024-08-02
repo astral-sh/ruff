@@ -1881,7 +1881,7 @@ dependencies = [
 
 [[package]]
 name = "red_knot"
-version = "0.0.0"
+version = "0.5.5"
 dependencies = [
  "anyhow",
  "clap",
@@ -1891,6 +1891,7 @@ dependencies = [
  "filetime",
  "rayon",
  "red_knot_module_resolver",
+ "red_knot_server",
  "red_knot_workspace",
  "ruff_db",
  "salsa",
@@ -1938,6 +1939,34 @@ dependencies = [
  "rustc-hash 2.0.0",
  "salsa",
  "tracing",
+]
+
+[[package]]
+name = "red_knot_server"
+version = "0.0.0"
+dependencies = [
+ "anyhow",
+ "crossbeam",
+ "ignore",
+ "jod-thread",
+ "libc",
+ "lsp-server",
+ "lsp-types",
+ "red_knot_workspace",
+ "ruff_db",
+ "ruff_linter",
+ "ruff_notebook",
+ "ruff_python_ast",
+ "ruff_source_file",
+ "ruff_text_size",
+ "ruff_workspace",
+ "rustc-hash 2.0.0",
+ "salsa",
+ "serde",
+ "serde_json",
+ "shellexpand",
+ "tracing",
+ "tracing-subscriber",
 ]
 
 [[package]]

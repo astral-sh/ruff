@@ -130,6 +130,8 @@ pub trait System: Debug {
     fn walk_directory(&self, path: &SystemPath) -> WalkDirectoryBuilder;
 
     fn as_any(&self) -> &dyn std::any::Any;
+
+    fn as_any_mut(&mut self) -> &mut dyn std::any::Any;
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -140,6 +142,14 @@ pub struct Metadata {
 }
 
 impl Metadata {
+    pub fn new(revision: FileRevision, permissions: Option<u32>, file_type: FileType) -> Self {
+        Self {
+            revision,
+            permissions,
+            file_type,
+        }
+    }
+
     pub fn revision(&self) -> FileRevision {
         self.revision
     }
