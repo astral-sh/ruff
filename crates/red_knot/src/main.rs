@@ -9,10 +9,10 @@ use tracing_subscriber::layer::{Context, Filter, SubscriberExt};
 use tracing_subscriber::{Layer, Registry};
 use tracing_tree::time::Uptime;
 
-use red_knot::db::RootDatabase;
-use red_knot::watch;
-use red_knot::watch::WorkspaceWatcher;
-use red_knot::workspace::WorkspaceMetadata;
+use red_knot_workspace::db::RootDatabase;
+use red_knot_workspace::watch;
+use red_knot_workspace::watch::WorkspaceWatcher;
+use red_knot_workspace::workspace::WorkspaceMetadata;
 use ruff_db::program::{ProgramSettings, SearchPathSettings};
 use ruff_db::system::{OsSystem, System, SystemPathBuf};
 

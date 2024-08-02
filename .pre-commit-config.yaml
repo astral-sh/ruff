@@ -10,7 +10,7 @@ exclude: |
     crates/ruff_python_formatter/tests/snapshots/.*|
     crates/ruff_python_resolver/resources/.*|
     crates/ruff_python_resolver/tests/snapshots/.*|
-    crates/red_knot/resources/.*
+    crates/red_knot_workspace/resources/.*
   )$
 
 repos:
