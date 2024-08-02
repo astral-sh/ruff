@@ -69,13 +69,17 @@ pub(crate) fn control_var_used_after_block(
     scope: &Scope,
     diagnostics: &mut Vec<Diagnostic>,
 ) {
-    // Keep track of node_ids we know are used in the same block. This helps us when
-    // people use the same variable name in multiple blocks.
+    // Keep track of the node_ids of variable references that have already been
+    // accounted for as part of a different variable binding. This helps us avoid
+    // complaining when people use the same variable name in multiple blocks under the
+    // same scope.
     let mut known_good_reference_node_ids: Vec<NodeId> = Vec::new();
 
     let all_bindings: Vec<(&str, BindingId)> = scope.all_bindings().collect();
     // We want to reverse the bindings so that we iterate in source order and shadowed
-    // bindings come first.
+    // bindings come first. This way we can gather `known_good_reference_node_ids` and
+    // mark off things as we go which will allow us to ignore later bindings trying to
+    // reference the same variable.
     let reversed_bindings = all_bindings.iter().rev();
 
     // Find for-loop variable bindings
