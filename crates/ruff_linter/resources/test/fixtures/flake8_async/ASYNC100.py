@@ -1,51 +1,63 @@
 import anyio
 import asyncio
 import trio
+from contextlib import nullcontext
 
 
 async def func():
-    async with trio.fail_after():
+    with trio.fail_after():
         ...
 
 
 async def func():
-    async with trio.fail_at():
+    with trio.fail_at():
         await ...
 
 
 async def func():
-    async with trio.move_on_after():
+    with trio.move_on_after():
         ...
 
 
 async def func():
-    async with trio.move_at():
+    with trio.move_at():
         await ...
 
 
 async def func():
-    async with trio.move_at():
+    with trio.move_at():
         async with trio.open_nursery():
             ...
 
 
 async def func():
-    async with anyio.move_on_after(delay=0.2):
+    with trio.move_at():
+        async for x in ...:
+            ...
+
+
+async def func():
+    with anyio.move_on_after(delay=0.2):
         ...
 
 
 async def func():
-    async with anyio.fail_after():
+    with anyio.fail_after():
         ...
 
 
 async def func():
-    async with anyio.CancelScope():
+    with anyio.CancelScope():
         ...
 
 
 async def func():
-    async with anyio.CancelScope():
+    with anyio.CancelScope(), nullcontext():
+        ...
+
+
+async def func():
+    with nullcontext(), anyio.CancelScope():
         ...
 
 
@@ -61,4 +73,19 @@ async def func():
 
 async def func():
     async with asyncio.timeout(delay=0.2), asyncio.TaskGroup():
+        ...
+
+
+async def func():
+    async with asyncio.timeout(delay=0.2), asyncio.TaskGroup(), asyncio.timeout(delay=0.2):
+        ...
+
+
+async def func():
+    async with asyncio.timeout(delay=0.2), asyncio.TaskGroup(), asyncio.timeout(delay=0.2), asyncio.TaskGroup():
+        ...
+
+
+async def func():
+    async with asyncio.timeout(delay=0.2), asyncio.timeout(delay=0.2):
         ...
