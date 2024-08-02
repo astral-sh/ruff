@@ -648,6 +648,7 @@ mod tests {
     };
     use ruff_db::Db;
 
+    use crate::db::tests::TestDb;
     use crate::module::ModuleKind;
     use crate::module_name::ModuleName;
     use crate::testing::{FileSpec, MockedTypeshed, TestCase, TestCaseBuilder};
@@ -1673,5 +1674,54 @@ not_a_directory
         ));
         assert!(!search_paths
             .contains(&&SearchPath::editable(db.system(), SystemPathBuf::from("/src")).unwrap()));
+    }
+
+    #[test]
+    fn multiple_site_packages_with_editables() {
+        let mut db = TestDb::new();
+
+        let venv_site_packages = SystemPathBuf::from("/venv-site-packages");
+        let site_packages_pth = venv_site_packages.join("foo.pth");
+        let system_site_packages = SystemPathBuf::from("/system-site-packages");
+        let editable_install_location = SystemPathBuf::from("/x/y/a.py");
+        let system_site_packages_location = system_site_packages.join("a.py");
+
+        db.memory_file_system()
+            .create_directory_all("/src")
+            .unwrap();
+        db.write_files([
+            (&site_packages_pth, "/x/y"),
+            (&editable_install_location, ""),
+            (&system_site_packages_location, ""),
+        ])
+        .unwrap();
+
+        Program::new(
+            &db,
+            TargetVersion::default(),
+            SearchPathSettings {
+                extra_paths: vec![],
+                workspace_root: SystemPathBuf::from("/src"),
+                custom_typeshed: None,
+                site_packages: vec![venv_site_packages, system_site_packages],
+            },
+        );
+
+        // The editable installs discovered from the `.pth` file in the first `site-packages` directory
+        // take precedence over the second `site-packages` directory...
+        let a_module_name = ModuleName::new_static("a").unwrap();
+        let a_module = resolve_module(&db, a_module_name.clone()).unwrap();
+        assert_eq!(a_module.file().path(&db), &editable_install_location);
+
+        db.memory_file_system()
+            .remove_file(&site_packages_pth)
+            .unwrap();
+        File::sync_path(&mut db, &site_packages_pth);
+
+        // ...But now that the `.pth` file in the first `site-packages` directory has been deleted,
+        // the editable install no longer exists, so the module now resolves to the file in the
+        // second `site-packages` directory
+        let a_module = resolve_module(&db, a_module_name).unwrap();
+        assert_eq!(a_module.file().path(&db), &system_site_packages_location);
     }
 }
