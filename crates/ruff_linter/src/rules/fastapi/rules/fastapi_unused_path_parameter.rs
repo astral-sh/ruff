@@ -1,5 +1,6 @@
 use std::ops::Range;
 
+use ruff_diagnostics::{Applicability, Fix};
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast as ast;
@@ -8,6 +9,7 @@ use ruff_text_size::Ranged;
 use ruff_text_size::TextSize;
 
 use crate::checkers::ast::Checker;
+use crate::fix::edits::add_parameter;
 use crate::rules::fastapi::rules::is_fastapi_route;
 use crate::rules::fastapi::rules::is_fastapi_route_decorator;
 use regex::Regex;
@@ -52,6 +54,7 @@ use ruff_python_stdlib::identifiers::is_identifier;
 pub struct FastApiUnusedPathParameter {
     arg_name: String,
     function_name: String,
+    arg_name_already_used: bool,
 }
 
 impl Violation for FastApiUnusedPathParameter {
@@ -60,10 +63,26 @@ impl Violation for FastApiUnusedPathParameter {
         let Self {
             arg_name,
             function_name,
+            arg_name_already_used: arg_name_is_pos_only_arg,
         } = self;
-        format!(
-            "Path parameter `{arg_name}` in route path but not in function signature `{function_name}`"
-        )
+        if *arg_name_is_pos_only_arg {
+            format!(
+                "Path parameter `{arg_name}` in route path, but appears as a positional-only argument in function `{function_name}`. Consider making it a regular argument."
+            )
+        } else {
+            format!(
+                "Path parameter `{arg_name}` in route path but not in function `{function_name}`."
+            )
+        }
+    }
+
+    fn fix_title(&self) -> Option<String> {
+        let Self { arg_name, .. } = self;
+        if !self.arg_name_already_used {
+            Some(format!("Add `{arg_name}` to function signature"))
+        } else {
+            None
+        }
     }
 }
 
@@ -123,7 +142,7 @@ pub(crate) fn fastapi_unused_path_parameter(
     let path_params = extract_path_params_from_route(&path);
 
     // Now we extract the arguments from the function signature
-    let args = function_def
+    let named_args = function_def
         .parameters
         .args
         .iter()
@@ -136,16 +155,38 @@ pub(crate) fn fastapi_unused_path_parameter(
         .into_iter()
         .filter(|(path_param, _)| is_identifier(path_param))
     {
-        if !args.contains(&path_param) {
-            let diagnostic = Diagnostic::new(
-                FastApiUnusedPathParameter {
-                    arg_name: path_param.clone(),
-                    function_name: function_def.name.to_string(),
-                },
+        if !named_args.contains(&path_param) {
+            let violation = FastApiUnusedPathParameter {
+                arg_name: path_param.clone(),
+                function_name: function_def.name.to_string(),
+                // If the path parameter shows up in the positional-only arguments,
+                // the path parameter injection also won't work, but we can't fix that (yet)
+                // as that would require making that parameter non positional.
+                arg_name_already_used: function_def
+                    .parameters
+                    .posonlyargs
+                    .iter()
+                    .map(|arg| arg.parameter.name.to_string())
+                    .collect::<Vec<_>>()
+                    .contains(&path_param),
+            };
+            let fixable = violation.fix_title().is_some();
+            let mut diagnostic = Diagnostic::new(
+                violation,
                 diagnostic_range
                     .add_start(TextSize::from(range.start as u32 + 1))
                     .sub_end(TextSize::from((path.len() - range.end + 1) as u32)),
             );
+            if fixable {
+                diagnostic.set_fix(Fix::applicable_edit(
+                    add_parameter(
+                        &path_param.clone(),
+                        &function_def.parameters,
+                        checker.locator().contents(),
+                    ),
+                    Applicability::Safe,
+                ));
+            }
             checker.diagnostics.push(diagnostic);
         }
     }
