@@ -1201,13 +1201,12 @@ impl<'a> SemanticModel<'a> {
     /// Return the [`Stmt`] corresponding to the given [`NodeId`].
     #[inline]
     pub fn statement(&self, node_id: NodeId) -> &'a Stmt {
-        self.nodes
-            .ancestor_ids(node_id)
-            .find_map(|id| self.nodes[id].as_statement())
+        self.nodes[self.statement_id(node_id)]
+            .as_statement()
             .expect("No statement found")
     }
 
-    /// Return the [`Stmt`] corresponding to the given [`NodeId`].
+    /// Return the statement [`NodeId`] corresponding to the given [`NodeId`].
     #[inline]
     pub fn statement_id(&self, node_id: NodeId) -> NodeId {
         self.nodes
