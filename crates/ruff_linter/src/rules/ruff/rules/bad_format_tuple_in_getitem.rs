@@ -1,3 +1,8 @@
+// In case we want to change the boolean setting for
+// this rule to an enum, this will make the code change
+// just a little simpler.
+#![allow(clippy::match_bool)]
+
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::ExprSubscript;
@@ -36,32 +41,42 @@ pub struct ParenthesesInTupleSlices {
 impl AlwaysFixableViolation for ParenthesesInTupleSlices {
     #[derive_message_formats]
     fn message(&self) -> String {
-        if self.prefer_parentheses {
-            format!("Use preferred format when evaluating `__getitem__` at a tuple.")
-        } else {
-            format!("Use preferred format when evaluating `__getitem__` at a tuple.")
+        match self.prefer_parentheses {
+            true => format!("Use paentheses when evaluating `__getitem__` at a tuple."),
+            false => format!("Avoid parentheses when evaluating `__getitem__` at a tuple."),
         }
     }
 
     fn fix_title(&self) -> String {
-        "Remove parentheses from tuple argument in `__getitem__` call.".to_string()
+        match self.prefer_parentheses {
+            true => "Add parentheses around tuple argument in `__getitem__` call.".to_string(),
+            false => "Remove parentheses from tuple argument in `__getitem__` call.".to_string(),
+        }
     }
 }
 
 /// RUF031
 pub(crate) fn getitem_with_parenthesized_tuple(checker: &mut Checker, subscript: &ExprSubscript) {
+    let prefer_parentheses = checker.settings.ruff.prefer_parentheses_getitem_tuple;
     if let Some(tuple_index) = subscript.slice.as_tuple_expr() {
-        if tuple_index.parenthesized && tuple_index.elts.len() > 1 {
+        if (tuple_index.parenthesized != prefer_parentheses) && tuple_index.elts.len() > 1 {
             let locator = checker.locator();
             let source_range = subscript.slice.range();
-            let new_source = format!("{}", locator.slice(source_range));
-            let edit = Edit::range_replacement(
-                new_source[1..new_source.len() - 1].to_string(),
-                source_range,
-            );
+            let new_source = match prefer_parentheses {
+                true => {
+                    format!("({})", locator.slice(source_range))
+                }
+                false => {
+                    locator.slice(source_range)[1..source_range.len().to_usize() - 1].to_string()
+                }
+            };
+            let edit = Edit::range_replacement(new_source, source_range);
             checker.diagnostics.push(
-                Diagnostic::new(ParenthesesInTupleSlices, source_range)
-                    .with_fix(Fix::safe_edit(edit)),
+                Diagnostic::new(
+                    ParenthesesInTupleSlices { prefer_parentheses },
+                    source_range,
+                )
+                .with_fix(Fix::safe_edit(edit)),
             );
         }
     }
