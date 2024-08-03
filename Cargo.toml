@@ -154,6 +154,9 @@ wasm-bindgen-test = { version = "0.3.42" }
 wild = { version = "2" }
 zip = { version = "0.6.6", default-features = false, features = ["zstd"] }
 
+[patch.crates-io]
+orx-split-vec = { git = "https://github.com/CjiW/orx-split-vec.git", rev = "24b4fda5e3bc35b996a15e3ead9dbbdbe7369332" }
+
 [workspace.lints.rust]
 unsafe_code = "warn"
 unreachable_pub = "warn"
