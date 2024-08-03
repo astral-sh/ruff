@@ -52,7 +52,14 @@ impl WorkspaceWatcher {
 
         // Unregister all watch paths because ordering is important for linux because
         // it only emits an event for the last added watcher if a subtree is covered by multiple watchers.
-        // A path can be covered by multiple watchers if symlinks are involved.
+        // A path can be covered by multiple watchers if a subdirectory symlinks to a path that's covered by another watch path:
+        // ```text
+        // - bar
+        //   - baz.py
+        // - workspace
+        //   - bar -> /bar
+        //   - foo.py
+        // ```
         for path in self.watched_paths.drain(..) {
             if let Err(error) = self.watcher.unwatch(&path) {
                 info!("Failed to remove the file watcher for the path '{path}: {error}.");
