@@ -1,4 +1,6 @@
+use std::iter::Peekable;
 use std::ops::Range;
+use std::str::CharIndices;
 
 use ruff_diagnostics::{Applicability, Fix};
 use ruff_diagnostics::{Diagnostic, FixAvailability, Violation};
@@ -12,7 +14,6 @@ use crate::checkers::ast::Checker;
 use crate::fix::edits::add_parameter;
 use crate::rules::fastapi::rules::is_fastapi_route;
 use crate::rules::fastapi::rules::is_fastapi_route_decorator;
-use regex::Regex;
 use ruff_python_stdlib::identifiers::is_identifier;
 
 /// ## What it does
@@ -90,24 +91,47 @@ impl Violation for FastApiUnusedPathParameter {
     }
 }
 
-/// Returns a vector of path parameters and their ranges in the route path.
-/// The string is just the name of the path parameter.
-/// The range includes the curly braces.    
-fn extract_path_params_from_route(input: &str) -> Vec<(&str, Range<usize>)> {
-    // We ignore text after a colon, since those are path convertors
-    // See also: https://fastapi.tiangolo.com/tutorial/path-params/?h=path#path-convertor
-    let re = Regex::new(r"\{([^:}]+).*?\}").unwrap();
+struct PathParamIterator<'a> {
+    input: &'a str,
+    chars: Peekable<CharIndices<'a>>,
+}
 
-    // Collect all matches and return them as a vector of strings
-    re.captures_iter(input)
-        .filter_map(|cap| {
-            if let (Some(name_match), Some(full_match)) = (cap.get(1), cap.get(0)) {
-                Some((name_match.as_str().trim(), full_match.range()))
-            } else {
-                None
+impl<'a> PathParamIterator<'a> {
+    fn new(input: &'a str) -> Self {
+        PathParamIterator {
+            input,
+            chars: input.char_indices().peekable(),
+        }
+    }
+}
+
+impl<'a> Iterator for PathParamIterator<'a> {
+    type Item = (&'a str, Range<usize>);
+
+    fn next(&mut self) -> Option<Self::Item> {
+        while let Some((start, c)) = self.chars.next() {
+            if c == '{' {
+                if let Some((end, _)) = self.chars.by_ref().find(|&(_, ch)| ch == '}') {
+                    let param_content = &self.input[start + 1..end];
+                    // We ignore text after a colon, since those are path convertors
+                    // See also: https://fastapi.tiangolo.com/tutorial/path-params/?h=path#path-convertor
+                    let param_name_end = param_content.find(':').unwrap_or(param_content.len());
+                    let param_name = &param_content[..param_name_end].trim();
+
+                    #[allow(clippy::range_plus_one)]
+                    return Some((param_name, start..end + 1));
+                }
             }
-        })
-        .collect()
+        }
+        None
+    }
+}
+
+/// Returns an iterator of path parameters and their ranges in the route path.
+/// The string is just the name of the path parameter.
+/// The range includes the curly braces.
+fn extract_path_params_from_route(input: &str) -> PathParamIterator {
+    PathParamIterator::new(input)
 }
 
 pub(crate) fn fastapi_unused_path_parameter(
