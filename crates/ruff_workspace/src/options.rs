@@ -456,6 +456,7 @@ pub struct LintOptions {
     pub exclude: Option<Vec<String>>,
 
     /// Options for the `ruff` plugin
+    #[option_group]
     pub ruff: Option<RuffOptions>,
 
     /// Whether to enable preview mode. When preview mode is enabled, Ruff will
