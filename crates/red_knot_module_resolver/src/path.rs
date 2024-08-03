@@ -382,22 +382,27 @@ enum SearchPathInner {
 pub(crate) struct SearchPath(Arc<SearchPathInner>);
 
 impl SearchPath {
+    fn directory_path(system: &dyn System, root: SystemPathBuf) -> SearchPathResult<SystemPathBuf> {
+        let canonicalized = system.canonicalize_path(&root).unwrap_or(root);
+        if system.is_directory(&canonicalized) {
+            Ok(canonicalized)
+        } else {
+            Err(SearchPathValidationError::NotADirectory(canonicalized))
+        }
+    }
+
     /// Create a new "Extra" search path
     pub(crate) fn extra(system: &dyn System, root: SystemPathBuf) -> SearchPathResult<Self> {
-        if system.is_directory(&root) {
-            Ok(Self(Arc::new(SearchPathInner::Extra(root))))
-        } else {
-            Err(SearchPathValidationError::NotADirectory(root))
-        }
+        Ok(Self(Arc::new(SearchPathInner::Extra(
+            Self::directory_path(system, root)?,
+        ))))
     }
 
     /// Create a new first-party search path, pointing to the user code we were directly invoked on
     pub(crate) fn first_party(system: &dyn System, root: SystemPathBuf) -> SearchPathResult<Self> {
-        if system.is_directory(&root) {
-            Ok(Self(Arc::new(SearchPathInner::FirstParty(root))))
-        } else {
-            Err(SearchPathValidationError::NotADirectory(root))
-        }
+        Ok(Self(Arc::new(SearchPathInner::FirstParty(
+            Self::directory_path(system, root)?,
+        ))))
     }
 
     /// Create a new standard-library search path pointing to a custom directory on disk
@@ -408,12 +413,13 @@ impl SearchPath {
                 typeshed.to_path_buf(),
             ));
         }
-        let stdlib = typeshed.join("stdlib");
-        if !system.is_directory(&stdlib) {
-            return Err(SearchPathValidationError::NoStdlibSubdirectory(
-                typeshed.to_path_buf(),
-            ));
-        }
+        let stdlib =
+            Self::directory_path(system, typeshed.join("stdlib")).map_err(|err| match err {
+                SearchPathValidationError::NotADirectory(path) => {
+                    SearchPathValidationError::NoStdlibSubdirectory(path)
+                }
+                err => err,
+            })?;
         let typeshed_versions =
             system_path_to_file(db.upcast(), stdlib.join("VERSIONS")).map_err(|err| match err {
                 FileError::NotFound => SearchPathValidationError::NoVersionsFile(typeshed),
@@ -444,20 +450,16 @@ impl SearchPath {
         system: &dyn System,
         root: SystemPathBuf,
     ) -> SearchPathResult<Self> {
-        if system.is_directory(&root) {
-            Ok(Self(Arc::new(SearchPathInner::SitePackages(root))))
-        } else {
-            Err(SearchPathValidationError::NotADirectory(root))
-        }
+        Ok(Self(Arc::new(SearchPathInner::SitePackages(
+            Self::directory_path(system, root)?,
+        ))))
     }
 
     /// Create a new search path pointing to an editable installation
     pub(crate) fn editable(system: &dyn System, root: SystemPathBuf) -> SearchPathResult<Self> {
-        if system.is_directory(&root) {
-            Ok(Self(Arc::new(SearchPathInner::Editable(root))))
-        } else {
-            Err(SearchPathValidationError::NotADirectory(root))
-        }
+        Ok(Self(Arc::new(SearchPathInner::Editable(
+            Self::directory_path(system, root)?,
+        ))))
     }
 
     #[must_use]

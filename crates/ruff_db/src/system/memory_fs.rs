@@ -94,6 +94,10 @@ impl MemoryFileSystem {
         metadata(self, path.as_ref())
     }
 
+    pub fn canonicalize(&self, path: impl AsRef<SystemPath>) -> SystemPathBuf {
+        SystemPathBuf::from_utf8_path_buf(self.normalize_path(path))
+    }
+
     pub fn is_file(&self, path: impl AsRef<SystemPath>) -> bool {
         let by_path = self.inner.by_path.read().unwrap();
         let normalized = self.normalize_path(path.as_ref());

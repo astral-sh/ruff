@@ -7,7 +7,8 @@ use ruff_python_trivia::textwrap;
 
 use crate::files::File;
 use crate::system::{
-    DirectoryEntry, MemoryFileSystem, Metadata, Result, System, SystemPath, SystemVirtualPath,
+    DirectoryEntry, MemoryFileSystem, Metadata, Result, System, SystemPath, SystemPathBuf,
+    SystemVirtualPath,
 };
 use crate::Db;
 
@@ -138,6 +139,13 @@ impl System for TestSystem {
         match &self.inner {
             TestSystemInner::System(fs) => fs.read_directory(path),
             TestSystemInner::Stub(fs) => Ok(Box::new(fs.read_directory(path)?)),
+        }
+    }
+
+    fn canonicalize_path(&self, path: &SystemPath) -> Result<SystemPathBuf> {
+        match &self.inner {
+            TestSystemInner::System(fs) => fs.canonicalize_path(path),
+            TestSystemInner::Stub(fs) => Ok(fs.canonicalize(path)),
         }
     }
 }
