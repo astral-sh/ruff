@@ -92,6 +92,11 @@ pub struct SearchPathSettings {
     /// bundled as a zip file in the binary
     pub custom_typeshed: Option<SystemPathBuf>,
 
-    /// The path to the user's `site-packages` directory, where third-party packages from ``PyPI`` are installed.
+    /// The path to the user's `site-packages` directories,
+    /// where third-party packages from ``PyPI`` are installed.
+    ///
+    /// Usually there will either be 0 or 1 site-packages paths,
+    /// but some environments are able to access both a venv's `site-packages`
+    /// and the system installation's `site-packages`.
     pub site_packages: Vec<SystemPathBuf>,
 }
