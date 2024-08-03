@@ -1,10 +1,12 @@
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::helpers::any_over_expr;
 use ruff_python_ast::{self as ast, Expr};
 use ruff_python_trivia::{SimpleTokenKind, SimpleTokenizer};
 use ruff_text_size::{Ranged, TextRange, TextSize};
 
 use crate::checkers::ast::Checker;
+use crate::rules::flake8_comprehensions::fixes;
 
 use super::helpers;
 
@@ -68,7 +70,11 @@ impl AlwaysFixableViolation for UnnecessaryLiteralWithinTupleCall {
 }
 
 /// C409
-pub(crate) fn unnecessary_literal_within_tuple_call(checker: &mut Checker, call: &ast::ExprCall) {
+pub(crate) fn unnecessary_literal_within_tuple_call(
+    checker: &mut Checker,
+    expr: &Expr,
+    call: &ast::ExprCall,
+) {
     if !call.arguments.keywords.is_empty() {
         return;
     }
@@ -86,6 +92,8 @@ pub(crate) fn unnecessary_literal_within_tuple_call(checker: &mut Checker, call:
     let argument_kind = match argument {
         Expr::Tuple(_) => "tuple",
         Expr::List(_) => "list",
+        Expr::ListComp(_) => "list comprehension",
+        Expr::SetComp(_) => "set comprehension",
         _ => return,
     };
 
@@ -97,41 +105,57 @@ pub(crate) fn unnecessary_literal_within_tuple_call(checker: &mut Checker, call:
     );
 
     // Convert `tuple([1, 2])` to `(1, 2)`
-    diagnostic.set_fix({
-        let elts = match argument {
-            Expr::List(ast::ExprList { elts, .. }) => elts.as_slice(),
-            Expr::Tuple(ast::ExprTuple { elts, .. }) => elts.as_slice(),
-            _ => return,
-        };
+    if argument.is_tuple_expr() | argument.is_list_expr() {
+        diagnostic.set_fix({
+            let elts = match argument {
+                Expr::List(ast::ExprList { elts, .. }) => elts.as_slice(),
+                Expr::Tuple(ast::ExprTuple { elts, .. }) => elts.as_slice(),
+                _ => return,
+            };
 
-        let needs_trailing_comma = if let [item] = elts {
-            SimpleTokenizer::new(
-                checker.locator().contents(),
-                TextRange::new(item.end(), call.end()),
-            )
-            .all(|token| token.kind != SimpleTokenKind::Comma)
-        } else {
-            false
-        };
-
-        // Replace `[` with `(`.
-        let elt_start = Edit::replacement(
-            "(".into(),
-            call.start(),
-            argument.start() + TextSize::from(1),
-        );
-        // Replace `]` with `)` or `,)`.
-        let elt_end = Edit::replacement(
-            if needs_trailing_comma {
-                ",)".into()
+            let needs_trailing_comma = if let [item] = elts {
+                SimpleTokenizer::new(
+                    checker.locator().contents(),
+                    TextRange::new(item.end(), call.end()),
+                )
+                .all(|token| token.kind != SimpleTokenKind::Comma)
             } else {
-                ")".into()
-            },
-            argument.end() - TextSize::from(1),
-            call.end(),
-        );
-        Fix::unsafe_edits(elt_start, [elt_end])
-    });
+                false
+            };
+
+            // Replace `[` with `(`.
+            let elt_start = Edit::replacement(
+                "(".into(),
+                call.start(),
+                argument.start() + TextSize::from(1),
+            );
+            // Replace `]` with `)` or `,)`.
+            let elt_end = Edit::replacement(
+                if needs_trailing_comma {
+                    ",)".into()
+                } else {
+                    ")".into()
+                },
+                argument.end() - TextSize::from(1),
+                call.end(),
+            );
+            Fix::unsafe_edits(elt_start, [elt_end])
+        });
+    } else if argument.is_list_comp_expr() | argument.is_set_comp_expr() {
+        let (Expr::ListComp(ast::ExprListComp { elt, .. })
+        | Expr::SetComp(ast::ExprSetComp { elt, .. })) = argument
+        else {
+            return;
+        };
+        if any_over_expr(elt, &Expr::is_await_expr) {
+            return;
+        }
+        diagnostic.try_set_fix(|| {
+            fixes::fix_unnecessary_comprehension_in_call(expr, checker.locator(), checker.stylist())
+        });
+    } else {
+        return;
+    }
 
     checker.diagnostics.push(diagnostic);
 }
