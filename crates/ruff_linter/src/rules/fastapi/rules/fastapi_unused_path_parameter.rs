@@ -1,5 +1,3 @@
-use std::vec;
-
 use ruff_diagnostics::{Applicability, Fix};
 use ruff_diagnostics::{Diagnostic, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, violation};
