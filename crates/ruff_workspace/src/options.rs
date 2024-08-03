@@ -2971,6 +2971,7 @@ impl PyUpgradeOptions {
         }
     }
 }
+
 #[derive(
     Clone, Debug, PartialEq, Eq, Default, Serialize, Deserialize, OptionsMetadata, CombineOptions,
 )]
