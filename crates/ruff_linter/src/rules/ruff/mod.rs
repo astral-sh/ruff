@@ -20,6 +20,7 @@ mod tests {
     use crate::settings::types::{
         CompiledPerFileIgnoreList, PerFileIgnore, PreviewMode, PythonVersion,
     };
+    use crate::settings::LinterSettings;
     use crate::test::{test_path, test_resource_path};
     use crate::{assert_messages, settings};
 
@@ -65,6 +66,21 @@ mod tests {
             &settings::LinterSettings::for_rule(rule_code),
         )?;
         assert_messages!(snapshot, diagnostics);
+        Ok(())
+    }
+
+    #[test]
+    fn prefer_parentheses_getitem_tuple() -> Result<()> {
+        let diagnostics = test_path(
+            Path::new("ruff/RUF031_prefer_parens.py"),
+            &LinterSettings {
+                ruff: super::settings::Settings {
+                    prefer_parentheses_getitem_tuple: true,
+                },
+                ..LinterSettings::for_rule(Rule::ParenthesesInTupleSlices)
+            },
+        )?;
+        assert_messages!(diagnostics);
         Ok(())
     }
 
