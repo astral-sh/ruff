@@ -43,7 +43,7 @@ pub struct Workspace {
 #[wasm_bindgen]
 impl Workspace {
     #[wasm_bindgen(constructor)]
-    pub fn new(root: &str, settings: Settings) -> Result<Workspace, Error> {
+    pub fn new(root: &str, settings: &Settings) -> Result<Workspace, Error> {
         let system = WasmSystem::new(SystemPath::new(root));
         let workspace =
             WorkspaceMetadata::from_path(SystemPath::new(root), &system).map_err(into_error)?;
@@ -59,7 +59,7 @@ impl Workspace {
     }
 
     #[wasm_bindgen(js_name = "openFile")]
-    pub fn open_file(&mut self, path: &str, contents: &str) -> Result<FileId, Error> {
+    pub fn open_file(&mut self, path: &str, contents: &str) -> Result<FileHandle, Error> {
         self.system
             .fs
             .write_file(path, contents)
@@ -70,14 +70,14 @@ impl Workspace {
 
         self.db.workspace().open_file(&mut self.db, file);
 
-        Ok(FileId {
+        Ok(FileHandle {
             file,
             path: SystemPath::new(path).to_path_buf(),
         })
     }
 
     #[wasm_bindgen(js_name = "updateFile")]
-    pub fn update_file(&mut self, file_id: FileId, contents: &str) -> Result<(), Error> {
+    pub fn update_file(&mut self, file_id: &FileHandle, contents: &str) -> Result<(), Error> {
         if !self.system.fs.exists(&file_id.path) {
             return Err(Error::new("File does not exist"));
         }
@@ -93,7 +93,7 @@ impl Workspace {
     }
 
     #[wasm_bindgen(js_name = "closeFile")]
-    pub fn close_file(&mut self, file_id: FileId) -> Result<(), Error> {
+    pub fn close_file(&mut self, file_id: &FileHandle) -> Result<(), Error> {
         let file = file_id.file;
 
         self.db.workspace().close_file(&mut self.db, file);
@@ -109,7 +109,7 @@ impl Workspace {
 
     /// Checks a single file.
     #[wasm_bindgen(js_name = "checkFile")]
-    pub fn check_file(&self, file_id: FileId) -> Result<Vec<String>, Error> {
+    pub fn check_file(&self, file_id: &FileHandle) -> Result<Vec<String>, Error> {
         let result = self.db.check_file(file_id.file).map_err(into_error)?;
 
         Ok(result.to_vec())
@@ -119,18 +119,18 @@ impl Workspace {
     pub fn check(&self) -> Result<Vec<String>, Error> {
         let result = self.db.check().map_err(into_error)?;
 
-        Ok(result.to_vec())
+        Ok(result.clone())
     }
 
     /// Returns the parsed AST for `path`
-    pub fn parsed(&self, file_id: FileId) -> Result<String, Error> {
+    pub fn parsed(&self, file_id: &FileHandle) -> Result<String, Error> {
         let parsed = ruff_db::parsed::parsed_module(&self.db, file_id.file);
 
         Ok(format!("{:#?}", parsed.syntax()))
     }
 
     /// Returns the token stream for `path` serialized as a string.
-    pub fn tokens(&self, file_id: FileId) -> Result<String, Error> {
+    pub fn tokens(&self, file_id: &FileHandle) -> Result<String, Error> {
         let parsed = ruff_db::parsed::parsed_module(&self.db, file_id.file);
 
         Ok(format!("{:#?}", parsed.tokens()))
@@ -148,16 +148,17 @@ pub(crate) fn into_error<E: std::fmt::Display>(err: E) -> Error {
     Error::new(&err.to_string())
 }
 
+#[derive(Debug, Eq, PartialEq)]
 #[wasm_bindgen(inspectable)]
-pub struct FileId {
+pub struct FileHandle {
     path: SystemPathBuf,
     file: File,
 }
 
 #[wasm_bindgen]
-impl FileId {
+impl FileHandle {
     #[wasm_bindgen(js_name = toString)]
-    pub fn to_string(&self) -> String {
+    pub fn js_to_string(&self) -> String {
         format!("file(id: {:?}, path: {})", self.file, self.path)
     }
 }
