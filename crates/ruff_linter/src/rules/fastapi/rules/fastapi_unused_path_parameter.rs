@@ -93,7 +93,7 @@ impl Violation for FastApiUnusedPathParameter {
 /// Returns a vector of path parameters and their ranges in the route path.
 /// The string is just the name of the path parameter.
 /// The range includes the curly braces.    
-fn extract_path_params_from_route(input: &str) -> Vec<(String, Range<usize>)> {
+fn extract_path_params_from_route(input: &str) -> Vec<(&str, Range<usize>)> {
     // We ignore text after a colon, since those are path convertors
     // See also: https://fastapi.tiangolo.com/tutorial/path-params/?h=path#path-convertor
     let re = Regex::new(r"\{([^:}]+).*?\}").unwrap();
@@ -102,7 +102,7 @@ fn extract_path_params_from_route(input: &str) -> Vec<(String, Range<usize>)> {
     re.captures_iter(input)
         .filter_map(|cap| {
             if let (Some(name_match), Some(full_match)) = (cap.get(1), cap.get(0)) {
-                Some((name_match.as_str().trim().to_string(), full_match.range()))
+                Some((name_match.as_str().trim(), full_match.range()))
             } else {
                 None
             }
@@ -151,7 +151,7 @@ pub(crate) fn fastapi_unused_path_parameter(
         .args
         .iter()
         .chain(function_def.parameters.kwonlyargs.iter())
-        .map(|arg| arg.parameter.name.to_string())
+        .map(|arg| arg.parameter.name.as_str())
         .collect::<Vec<_>>();
 
     // Check if any of the path parameters are not in the function signature
@@ -161,7 +161,7 @@ pub(crate) fn fastapi_unused_path_parameter(
     {
         if !named_args.contains(&path_param) {
             let violation = FastApiUnusedPathParameter {
-                arg_name: path_param.clone(),
+                arg_name: path_param.to_string(),
                 function_name: function_def.name.to_string(),
                 // If the path parameter shows up in the positional-only arguments,
                 // the path parameter injection also won't work, but we can't fix that (yet)
@@ -170,7 +170,7 @@ pub(crate) fn fastapi_unused_path_parameter(
                     .parameters
                     .posonlyargs
                     .iter()
-                    .map(|arg| arg.parameter.name.to_string())
+                    .map(|arg| arg.parameter.name.as_str())
                     .collect::<Vec<_>>()
                     .contains(&path_param),
             };
@@ -185,7 +185,7 @@ pub(crate) fn fastapi_unused_path_parameter(
             if fixable {
                 diagnostic.set_fix(Fix::applicable_edit(
                     add_parameter(
-                        &path_param.clone(),
+                        path_param,
                         &function_def.parameters,
                         checker.locator().contents(),
                     ),
