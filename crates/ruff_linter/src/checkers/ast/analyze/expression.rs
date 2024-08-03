@@ -146,7 +146,7 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
                 refurb::rules::fstring_number_format(checker, subscript);
             }
 
-            if checker.enabled(Rule::ParenthesesInTupleSlices) {
+            if checker.enabled(Rule::BadFormatTupleInGetitem) {
                 ruff::rules::getitem_with_parenthesized_tuple(checker, subscript);
             }
 

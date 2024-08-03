@@ -57,7 +57,7 @@ mod tests {
     #[test_case(Rule::InvalidFormatterSuppressionComment, Path::new("RUF028.py"))]
     #[test_case(Rule::UnusedAsync, Path::new("RUF029.py"))]
     #[test_case(Rule::AssertWithPrintMessage, Path::new("RUF030.py"))]
-    #[test_case(Rule::ParenthesesInTupleSlices, Path::new("RUF031.py"))]
+    #[test_case(Rule::BadFormatTupleInGetitem, Path::new("RUF031.py"))]
     #[test_case(Rule::RedirectedNOQA, Path::new("RUF101.py"))]
     fn rules(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!("{}_{}", rule_code.noqa_code(), path.to_string_lossy());
@@ -77,7 +77,7 @@ mod tests {
                 ruff: super::settings::Settings {
                     prefer_parentheses_getitem_tuple: true,
                 },
-                ..LinterSettings::for_rule(Rule::ParenthesesInTupleSlices)
+                ..LinterSettings::for_rule(Rule::BadFormatTupleInGetitem)
             },
         )?;
         assert_messages!(diagnostics);

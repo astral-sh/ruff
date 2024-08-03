@@ -34,11 +34,11 @@ use crate::checkers::ast::Checker;
 /// ```
 
 #[violation]
-pub struct ParenthesesInTupleSlices {
+pub struct BadFormatTupleInGetitem {
     prefer_parentheses: bool,
 }
 
-impl AlwaysFixableViolation for ParenthesesInTupleSlices {
+impl AlwaysFixableViolation for BadFormatTupleInGetitem {
     #[derive_message_formats]
     fn message(&self) -> String {
         match self.prefer_parentheses {
@@ -72,11 +72,8 @@ pub(crate) fn getitem_with_parenthesized_tuple(checker: &mut Checker, subscript:
             };
             let edit = Edit::range_replacement(new_source, source_range);
             checker.diagnostics.push(
-                Diagnostic::new(
-                    ParenthesesInTupleSlices { prefer_parentheses },
-                    source_range,
-                )
-                .with_fix(Fix::safe_edit(edit)),
+                Diagnostic::new(BadFormatTupleInGetitem { prefer_parentheses }, source_range)
+                    .with_fix(Fix::safe_edit(edit)),
             );
         }
     }
