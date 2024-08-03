@@ -91,6 +91,11 @@ async def read_thing(*, author: str, title: str):
     return {"author": author, "title": title}
 
 
+@app.get("/books/{author}/{title:path}")
+async def read_thing(*, author: str, title: str):
+    return {"author": author, "title": title}
+
+
 
 # Ignored
 @app.get("/things/{thing-id}")
