@@ -2,15 +2,15 @@ use std::borrow::Cow;
 use std::iter::FusedIterator;
 
 use ruff_db::files::{File, FilePath, FileRootKind};
-use ruff_db::program::{Program, SearchPathSettings, TargetVersion};
+use ruff_db::program::{Program, SearchPathSettings};
 use ruff_db::system::{DirectoryEntry, System, SystemPath, SystemPathBuf};
 use ruff_db::vendored::VendoredPath;
-use rustc_hash::{FxBuildHasher, FxHashSet};
+use rustc_hash::FxHashSet;
 
 use crate::db::Db;
 use crate::module::{Module, ModuleKind};
 use crate::module_name::ModuleName;
-use crate::path::{ModulePath, SearchPath, SearchPathValidationError};
+use crate::path::{ModulePath, SearchPath};
 use crate::state::ResolverState;
 
 /// Resolves a module name to a module.
@@ -75,9 +75,7 @@ pub(crate) fn file_to_module(db: &dyn Db, file: File) -> Option<Module> {
         FilePath::SystemVirtual(_) => return None,
     };
 
-    let settings = module_resolution_settings(db);
-
-    let mut search_paths = settings.search_paths(db);
+    let mut search_paths = module_search_paths(db);
 
     let module_name = loop {
         let candidate = search_paths.next()?;
@@ -110,94 +108,6 @@ pub(crate) fn file_to_module(db: &dyn Db, file: File) -> Option<Module> {
     }
 }
 
-/// Validate and normalize the raw settings given by the user
-/// into settings we can use for module resolution
-///
-/// This method also implements the typing spec's [module resolution order].
-///
-/// [module resolution order]: https://typing.readthedocs.io/en/latest/spec/distributing.html#import-resolution-ordering
-fn try_resolve_module_resolution_settings(
-    db: &dyn Db,
-) -> Result<ModuleResolutionSettings, SearchPathValidationError> {
-    let program = Program::get(db.upcast());
-
-    let SearchPathSettings {
-        extra_paths,
-        src_root,
-        custom_typeshed,
-        site_packages,
-    } = program.search_paths(db.upcast());
-
-    if !extra_paths.is_empty() {
-        tracing::info!("Extra search paths: {extra_paths:?}");
-    }
-
-    if let Some(custom_typeshed) = custom_typeshed {
-        tracing::info!("Custom typeshed directory: {custom_typeshed}");
-    }
-
-    if !site_packages.is_empty() {
-        tracing::info!("Site-packages directories: {site_packages:?}");
-    }
-
-    let system = db.system();
-    let files = db.files();
-
-    let mut static_search_paths = vec![];
-
-    for path in extra_paths {
-        files.try_add_root(db.upcast(), path, FileRootKind::LibrarySearchPath);
-        static_search_paths.push(SearchPath::extra(system, path.clone())?);
-    }
-
-    static_search_paths.push(SearchPath::first_party(system, src_root.clone())?);
-
-    static_search_paths.push(if let Some(custom_typeshed) = custom_typeshed.as_ref() {
-        files.try_add_root(
-            db.upcast(),
-            custom_typeshed,
-            FileRootKind::LibrarySearchPath,
-        );
-        SearchPath::custom_stdlib(db, custom_typeshed.clone())?
-    } else {
-        SearchPath::vendored_stdlib()
-    });
-
-    // TODO vendor typeshed's third-party stubs as well as the stdlib and fallback to them as a final step
-
-    let target_version = program.target_version(db.upcast());
-    tracing::info!("Target version: {target_version}");
-
-    // Filter out module resolution paths that point to the same directory on disk (the same invariant maintained by [`sys.path` at runtime]).
-    // (Paths may, however, *overlap* -- e.g. you could have both `src/` and `src/foo`
-    // as module resolution paths simultaneously.)
-    //
-    // [`sys.path` at runtime]: https://docs.python.org/3/library/site.html#module-site
-    // This code doesn't use an `IndexSet` because the key is the system path and not the search root.
-    let mut seen_paths =
-        FxHashSet::with_capacity_and_hasher(static_search_paths.len(), FxBuildHasher);
-
-    static_search_paths.retain(|path| {
-        if let Some(path) = path.as_system_path() {
-            seen_paths.insert(path.to_path_buf())
-        } else {
-            true
-        }
-    });
-
-    Ok(ModuleResolutionSettings {
-        target_version,
-        static_search_paths,
-        site_packages_paths: site_packages.to_owned(),
-    })
-}
-
-#[salsa::tracked(return_ref)]
-pub(crate) fn module_resolution_settings(db: &dyn Db) -> ModuleResolutionSettings {
-    // TODO proper error handling if this returns an error:
-    try_resolve_module_resolution_settings(db).unwrap()
-}
-
 /// Collect all dynamic search paths. For each `site-packages` path:
 /// - Collect that `site-packages` path
 /// - Collect any search paths listed in `.pth` files in that `site-packages` directory
@@ -208,11 +118,10 @@ pub(crate) fn module_resolution_settings(db: &dyn Db) -> ModuleResolutionSetting
 /// module-resolution priority.
 #[salsa::tracked(return_ref)]
 pub(crate) fn dynamic_resolution_paths(db: &dyn Db) -> Vec<SearchPath> {
-    let ModuleResolutionSettings {
-        target_version: _,
+    let SearchPathSettings {
         static_search_paths,
         site_packages_paths,
-    } = module_resolution_settings(db);
+    } = Program::get(db).search_path_settings(db);
 
     let mut dynamic_paths = Vec::new();
 
@@ -287,12 +196,12 @@ pub(crate) fn dynamic_resolution_paths(db: &dyn Db) -> Vec<SearchPath> {
 /// [`sys.path` at runtime]: https://docs.python.org/3/library/site.html#module-site
 pub(crate) struct SearchPathIterator<'db> {
     db: &'db dyn Db,
-    static_paths: std::slice::Iter<'db, SearchPath>,
+    static_paths: std::slice::Iter<'db, ruff_db::program::SearchPath>,
     dynamic_paths: Option<std::slice::Iter<'db, SearchPath>>,
 }
 
 impl<'db> Iterator for SearchPathIterator<'db> {
-    type Item = &'db SearchPath;
+    type Item = Cow<'db, SearchPath>;
 
     fn next(&mut self) -> Option<Self::Item> {
         let SearchPathIterator {
@@ -301,11 +210,15 @@ impl<'db> Iterator for SearchPathIterator<'db> {
             dynamic_paths,
         } = self;
 
-        static_paths.next().or_else(|| {
-            dynamic_paths
-                .get_or_insert_with(|| dynamic_resolution_paths(*db).iter())
-                .next()
-        })
+        static_paths
+            .next()
+            .map(|path| Cow::Owned(SearchPath::from(path)))
+            .or_else(|| {
+                dynamic_paths
+                    .get_or_insert_with(|| dynamic_resolution_paths(*db).iter())
+                    .next()
+                    .map(Cow::Borrowed)
+            })
     }
 }
 
@@ -409,35 +322,14 @@ impl<'db> Iterator for PthFileIterator<'db> {
     }
 }
 
-/// Validated and normalized module-resolution settings.
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub(crate) struct ModuleResolutionSettings {
-    target_version: TargetVersion,
-
-    /// Search paths that have been statically determined purely from reading Ruff's configuration settings.
-    /// These shouldn't ever change unless the config settings themselves change.
-    static_search_paths: Vec<SearchPath>,
-
-    /// site-packages paths are not included in the above field:
-    /// if there are multiple site-packages paths, editable installations can appear
-    /// *between* the site-packages paths on `sys.path` at runtime.
-    /// That means we can't know where a second or third `site-packages` path should sit
-    /// in terms of module-resolution priority until we've discovered the editable installs
-    /// for the first `site-packages` path
-    site_packages_paths: Vec<SystemPathBuf>,
-}
-
-impl ModuleResolutionSettings {
-    fn target_version(&self) -> TargetVersion {
-        self.target_version
-    }
-
-    pub(crate) fn search_paths<'db>(&'db self, db: &'db dyn Db) -> SearchPathIterator<'db> {
-        SearchPathIterator {
-            db,
-            static_paths: self.static_search_paths.iter(),
-            dynamic_paths: None,
-        }
+pub(crate) fn module_search_paths(db: &dyn Db) -> SearchPathIterator {
+    SearchPathIterator {
+        db,
+        static_paths: Program::get(db)
+            .search_path_settings(db)
+            .static_search_paths
+            .iter(),
+        dynamic_paths: None,
     }
 }
 
@@ -453,14 +345,13 @@ struct ModuleNameIngredient<'db> {
 /// Given a module name and a list of search paths in which to lookup modules,
 /// attempt to resolve the module name
 fn resolve_name(db: &dyn Db, name: &ModuleName) -> Option<(SearchPath, File, ModuleKind)> {
-    let resolver_settings = module_resolution_settings(db);
-    let target_version = resolver_settings.target_version();
+    let target_version = Program::get(db).target_version(db);
     let resolver_state = ResolverState::new(db, target_version);
     let (_, minor_version) = target_version.as_tuple();
     let is_builtin_module =
         ruff_python_stdlib::sys::is_builtin_module(minor_version, name.as_str());
 
-    for search_path in resolver_settings.search_paths(db) {
+    for search_path in module_search_paths(db) {
         // When a builtin module is imported, standard module resolution is bypassed:
         // the module name always resolves to the stdlib module,
         // even if there's a module of the same name in the first-party root
@@ -472,7 +363,7 @@ fn resolve_name(db: &dyn Db, name: &ModuleName) -> Option<(SearchPath, File, Mod
         let mut components = name.components();
         let module_name = components.next_back()?;
 
-        match resolve_package(search_path, components, &resolver_state) {
+        match resolve_package(&search_path, components, &resolver_state) {
             Ok(resolved_package) => {
                 let mut package_path = resolved_package.path;
 
@@ -488,14 +379,14 @@ fn resolve_name(db: &dyn Db, name: &ModuleName) -> Option<(SearchPath, File, Mod
 
                 // TODO Implement full https://peps.python.org/pep-0561/#type-checker-module-resolution-order resolution
                 if let Some(stub) = package_path.with_pyi_extension().to_file(&resolver_state) {
-                    return Some((search_path.clone(), stub, kind));
+                    return Some((search_path.into_owned(), stub, kind));
                 }
 
                 if let Some(module) = package_path
                     .with_py_extension()
                     .and_then(|path| path.to_file(&resolver_state))
                 {
-                    return Some((search_path.clone(), module, kind));
+                    return Some((search_path.into_owned(), module, kind));
                 }
 
                 // For regular packages, don't search the next search path. All files of that
@@ -604,6 +495,7 @@ impl PackageKind {
 #[cfg(test)]
 mod tests {
     use ruff_db::files::{system_path_to_file, File, FilePath};
+    use ruff_db::program::{RawProgramSettings, RawSearchPathSettings, TargetVersion};
     use ruff_db::system::DbWithTestSystem;
     use ruff_db::testing::{
         assert_const_function_query_was_not_run, assert_function_query_was_not_run,
@@ -613,6 +505,7 @@ mod tests {
     use crate::db::tests::TestDb;
     use crate::module::ModuleKind;
     use crate::module_name::ModuleName;
+    use crate::program_from_raw_settings;
     use crate::testing::{FileSpec, MockedTypeshed, TestCase, TestCaseBuilder};
 
     use super::*;
@@ -1134,10 +1027,11 @@ mod tests {
     fn symlink() -> anyhow::Result<()> {
         use anyhow::Context;
 
-        use ruff_db::program::Program;
+        use ruff_db::program::RawProgramSettings;
         use ruff_db::system::{OsSystem, SystemPath};
 
         use crate::db::tests::TestDb;
+        use crate::settings_resolution::program_from_raw_settings;
 
         let mut db = TestDb::new();
 
@@ -1164,14 +1058,19 @@ mod tests {
         std::fs::write(foo.as_std_path(), "")?;
         std::os::unix::fs::symlink(foo.as_std_path(), bar.as_std_path())?;
 
-        let search_paths = SearchPathSettings {
-            extra_paths: vec![],
-            src_root: src.clone(),
-            custom_typeshed: Some(custom_typeshed.clone()),
-            site_packages: vec![site_packages],
-        };
-
-        Program::new(&db, TargetVersion::Py38, search_paths);
+        program_from_raw_settings(
+            &db,
+            RawProgramSettings {
+                target_version: TargetVersion::default(),
+                search_paths: RawSearchPathSettings {
+                    extra_paths: vec![],
+                    src_root: src.clone(),
+                    custom_typeshed: Some(custom_typeshed.clone()),
+                    site_packages: vec![site_packages],
+                },
+            },
+        )
+        .unwrap();
 
         let foo_module = resolve_module(&db, ModuleName::new_static("foo").unwrap()).unwrap();
         let bar_module = resolve_module(&db, ModuleName::new_static("bar").unwrap()).unwrap();
@@ -1635,14 +1534,12 @@ not_a_directory
             .with_site_packages_files(&[("_foo.pth", "/src")])
             .build();
 
-        let search_paths: Vec<&SearchPath> =
-            module_resolution_settings(&db).search_paths(&db).collect();
+        let search_paths: Vec<SearchPath> = module_search_paths(&db).map(Cow::into_owned).collect();
 
-        assert!(search_paths.contains(
-            &&SearchPath::first_party(db.system(), SystemPathBuf::from("/src")).unwrap()
-        ));
+        assert!(search_paths
+            .contains(&SearchPath::first_party(db.system(), SystemPathBuf::from("/src")).unwrap()));
         assert!(!search_paths
-            .contains(&&SearchPath::editable(db.system(), SystemPathBuf::from("/src")).unwrap()));
+            .contains(&SearchPath::editable(db.system(), SystemPathBuf::from("/src")).unwrap()));
     }
 
     #[test]
@@ -1665,16 +1562,19 @@ not_a_directory
         ])
         .unwrap();
 
-        Program::new(
+        program_from_raw_settings(
             &db,
-            TargetVersion::default(),
-            SearchPathSettings {
-                extra_paths: vec![],
-                src_root: SystemPathBuf::from("/src"),
-                custom_typeshed: None,
-                site_packages: vec![venv_site_packages, system_site_packages],
+            RawProgramSettings {
+                target_version: TargetVersion::default(),
+                search_paths: RawSearchPathSettings {
+                    extra_paths: vec![],
+                    src_root: SystemPathBuf::from("/src"),
+                    custom_typeshed: None,
+                    site_packages: vec![venv_site_packages, system_site_packages],
+                },
             },
-        );
+        )
+        .unwrap();
 
         // The editable installs discovered from the `.pth` file in the first `site-packages` directory
         // take precedence over the second `site-packages` directory...

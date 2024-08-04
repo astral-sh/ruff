@@ -1,8 +1,9 @@
-use ruff_db::program::{Program, SearchPathSettings, TargetVersion};
+use ruff_db::program::{RawProgramSettings, RawSearchPathSettings, TargetVersion};
 use ruff_db::system::{DbWithTestSystem, SystemPath, SystemPathBuf};
 use ruff_db::vendored::VendoredPathBuf;
 
 use crate::db::tests::TestDb;
+use crate::program_from_raw_settings;
 
 /// A test case for the module resolver.
 ///
@@ -219,16 +220,19 @@ impl TestCaseBuilder<MockedTypeshed> {
         let src = Self::write_mock_directory(&mut db, "/src", first_party_files);
         let typeshed = Self::build_typeshed_mock(&mut db, &typeshed_option);
 
-        Program::new(
+        program_from_raw_settings(
             &db,
-            target_version,
-            SearchPathSettings {
-                extra_paths: vec![],
-                src_root: src.clone(),
-                custom_typeshed: Some(typeshed.clone()),
-                site_packages: vec![site_packages.clone()],
+            RawProgramSettings {
+                target_version,
+                search_paths: RawSearchPathSettings {
+                    extra_paths: vec![],
+                    src_root: src.clone(),
+                    custom_typeshed: Some(typeshed.clone()),
+                    site_packages: vec![site_packages.clone()],
+                },
             },
-        );
+        )
+        .unwrap();
 
         TestCase {
             db,
@@ -272,16 +276,19 @@ impl TestCaseBuilder<VendoredTypeshed> {
             Self::write_mock_directory(&mut db, "/site-packages", site_packages_files);
         let src = Self::write_mock_directory(&mut db, "/src", first_party_files);
 
-        Program::new(
+        program_from_raw_settings(
             &db,
-            target_version,
-            SearchPathSettings {
-                extra_paths: vec![],
-                src_root: src.clone(),
-                custom_typeshed: None,
-                site_packages: vec![site_packages.clone()],
+            RawProgramSettings {
+                target_version,
+                search_paths: RawSearchPathSettings {
+                    extra_paths: vec![],
+                    src_root: src.clone(),
+                    custom_typeshed: None,
+                    site_packages: vec![site_packages.clone()],
+                },
             },
-        );
+        )
+        .unwrap();
 
         TestCase {
             db,

@@ -306,8 +306,9 @@ enum AnyImportRef<'a> {
 
 #[cfg(test)]
 mod tests {
+    use red_knot_module_resolver::program_from_raw_settings;
     use ruff_db::files::system_path_to_file;
-    use ruff_db::program::{Program, SearchPathSettings, TargetVersion};
+    use ruff_db::program::{RawProgramSettings, RawSearchPathSettings, TargetVersion};
     use ruff_db::system::{DbWithTestSystem, SystemPathBuf};
 
     use super::{lint_semantic, Diagnostics};
@@ -320,16 +321,23 @@ mod tests {
     fn setup_db_with_root(src_root: SystemPathBuf) -> TestDb {
         let db = TestDb::new();
 
-        Program::new(
+        db.memory_file_system()
+            .create_directory_all(&src_root)
+            .unwrap();
+
+        program_from_raw_settings(
             &db,
-            TargetVersion::Py38,
-            SearchPathSettings {
-                extra_paths: Vec::new(),
-                src_root,
-                site_packages: vec![],
-                custom_typeshed: None,
+            RawProgramSettings {
+                target_version: TargetVersion::default(),
+                search_paths: RawSearchPathSettings {
+                    extra_paths: vec![],
+                    src_root,
+                    site_packages: vec![],
+                    custom_typeshed: None,
+                },
             },
-        );
+        )
+        .unwrap();
 
         db
     }

@@ -1,9 +1,10 @@
 use std::fmt::{Formatter, Write};
 use std::hash::Hasher;
 
+use ruff_db::program::SearchPath;
 use tracing::info;
 
-use red_knot_module_resolver::system_module_search_paths;
+use red_knot_module_resolver::module_search_paths;
 use ruff_cache::{CacheKey, CacheKeyHasher};
 use ruff_db::system::{SystemPath, SystemPathBuf};
 use ruff_db::Upcast;
@@ -41,10 +42,14 @@ impl WorkspaceWatcher {
     }
 
     pub fn update(&mut self, db: &RootDatabase) {
-        let search_paths: Vec<_> = system_module_search_paths(db.upcast()).collect();
+        let search_paths: Vec<SearchPath> = module_search_paths(db.upcast()).collect();
+        let system_search_paths: Vec<&SystemPath> = search_paths
+            .iter()
+            .filter_map(|path| path.as_system_path())
+            .collect();
         let workspace_path = db.workspace().root(db).to_path_buf();
 
-        let new_cache_key = Self::compute_cache_key(&workspace_path, &search_paths);
+        let new_cache_key = Self::compute_cache_key(&workspace_path, &system_search_paths);
 
         if self.cache_key == Some(new_cache_key) {
             return;
@@ -77,7 +82,7 @@ impl WorkspaceWatcher {
         // Find the non-overlapping module search paths and filter out paths that are already covered by the workspace.
         // Module search paths are already canonicalized.
         let unique_module_paths = ruff_db::system::deduplicate_nested_paths(
-            search_paths
+            system_search_paths
                 .into_iter()
                 .filter(|path| !path.starts_with(&workspace_path)),
         )

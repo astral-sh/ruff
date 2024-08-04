@@ -6,7 +6,7 @@ use wasm_bindgen::prelude::*;
 use red_knot_workspace::db::RootDatabase;
 use red_knot_workspace::workspace::WorkspaceMetadata;
 use ruff_db::files::{system_path_to_file, File};
-use ruff_db::program::{ProgramSettings, SearchPathSettings};
+use ruff_db::program::{RawProgramSettings, RawSearchPathSettings};
 use ruff_db::system::walk_directory::WalkDirectoryBuilder;
 use ruff_db::system::{
     DirectoryEntry, MemoryFileSystem, Metadata, System, SystemPath, SystemPathBuf,
@@ -44,12 +44,12 @@ impl Workspace {
         let workspace =
             WorkspaceMetadata::from_path(SystemPath::new(root), &system).map_err(into_error)?;
 
-        let program_settings = ProgramSettings {
+        let program_settings = RawProgramSettings {
             target_version: settings.target_version.into(),
-            search_paths: SearchPathSettings::default(),
+            search_paths: RawSearchPathSettings::default(),
         };
 
-        let db = RootDatabase::new(workspace, program_settings, system.clone());
+        let db = RootDatabase::new(workspace, program_settings, system.clone()).unwrap();
 
         Ok(Self { db, system })
     }

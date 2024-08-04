@@ -15,7 +15,7 @@ use red_knot_workspace::db::RootDatabase;
 use red_knot_workspace::watch;
 use red_knot_workspace::watch::WorkspaceWatcher;
 use red_knot_workspace::workspace::WorkspaceMetadata;
-use ruff_db::program::{ProgramSettings, SearchPathSettings};
+use ruff_db::program::{RawProgramSettings, RawSearchPathSettings};
 use ruff_db::system::{OsSystem, System, SystemPathBuf};
 use target_version::TargetVersion;
 use verbosity::{Verbosity, VerbosityLevel};
@@ -145,9 +145,9 @@ pub fn main() -> anyhow::Result<()> {
     };
 
     // TODO: Respect the settings from the workspace metadata. when resolving the program settings.
-    let program_settings = ProgramSettings {
+    let program_settings = RawProgramSettings {
         target_version: target_version.into(),
-        search_paths: SearchPathSettings {
+        search_paths: RawSearchPathSettings {
             extra_paths,
             src_root: workspace_metadata.root().to_path_buf(),
             custom_typeshed: custom_typeshed_dir,
@@ -157,7 +157,7 @@ pub fn main() -> anyhow::Result<()> {
 
     // TODO: Use the `program_settings` to compute the key for the database's persistent
     //   cache and load the cache if it exists.
-    let mut db = RootDatabase::new(workspace_metadata, program_settings, system);
+    let mut db = RootDatabase::new(workspace_metadata, program_settings, system)?;
 
     let (main_loop, main_loop_cancellation_token) = MainLoop::new(verbosity);
 

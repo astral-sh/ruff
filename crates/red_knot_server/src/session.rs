@@ -11,7 +11,7 @@ use lsp_types::{ClientCapabilities, Url};
 use red_knot_workspace::db::RootDatabase;
 use red_knot_workspace::workspace::WorkspaceMetadata;
 use ruff_db::files::{system_path_to_file, File};
-use ruff_db::program::{ProgramSettings, SearchPathSettings, TargetVersion};
+use ruff_db::program::{RawProgramSettings, RawSearchPathSettings, TargetVersion};
 use ruff_db::system::SystemPath;
 
 use crate::edit::{DocumentKey, NotebookDocument};
@@ -69,16 +69,16 @@ impl Session {
 
             let metadata = WorkspaceMetadata::from_path(system_path, &system)?;
             // TODO(dhruvmanila): Get the values from the client settings
-            let program_settings = ProgramSettings {
+            let program_settings = RawProgramSettings {
                 target_version: TargetVersion::default(),
-                search_paths: SearchPathSettings {
+                search_paths: RawSearchPathSettings {
                     extra_paths: vec![],
                     src_root: system_path.to_path_buf(),
                     site_packages: vec![],
                     custom_typeshed: None,
                 },
             };
-            workspaces.insert(path, RootDatabase::new(metadata, program_settings, system));
+            workspaces.insert(path, RootDatabase::new(metadata, program_settings, system)?);
         }
 
         Ok(Self {

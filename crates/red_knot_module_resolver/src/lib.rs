@@ -3,48 +3,49 @@ use std::iter::FusedIterator;
 pub use db::Db;
 pub use module::{Module, ModuleKind};
 pub use module_name::ModuleName;
+pub use path::SearchPathValidationError;
 pub use resolver::resolve_module;
-use ruff_db::system::SystemPath;
+pub use settings_resolution::{program_from_raw_settings, try_resolve_module_resolution_settings};
 pub use typeshed::{
     vendored_typeshed_stubs, TypeshedVersionsParseError, TypeshedVersionsParseErrorKind,
 };
-
-use crate::resolver::{module_resolution_settings, SearchPathIterator};
 
 mod db;
 mod module;
 mod module_name;
 mod path;
 mod resolver;
+mod settings_resolution;
 mod state;
 mod typeshed;
 
 #[cfg(test)]
 mod testing;
 
-/// Returns an iterator over all search paths pointing to a system path
-pub fn system_module_search_paths(db: &dyn Db) -> SystemModuleSearchPathsIter {
-    SystemModuleSearchPathsIter {
-        inner: module_resolution_settings(db).search_paths(db),
+/// Returns an iterator over all search paths
+pub fn module_search_paths(db: &dyn Db) -> ModuleSearchPathsIter {
+    ModuleSearchPathsIter {
+        inner: resolver::module_search_paths(db),
     }
 }
 
-pub struct SystemModuleSearchPathsIter<'db> {
-    inner: SearchPathIterator<'db>,
+// Unlike the internal `SearchPathIterator` struct,
+// which yields instances of the private
+// `red_knot_module_resolver::path::SearchPath` type,
+// this public iterator yields instances of the public
+// `ruff_db::program::SearchPath` type
+pub struct ModuleSearchPathsIter<'db> {
+    inner: resolver::SearchPathIterator<'db>,
 }
 
-impl<'db> Iterator for SystemModuleSearchPathsIter<'db> {
-    type Item = &'db SystemPath;
+impl<'db> Iterator for ModuleSearchPathsIter<'db> {
+    type Item = ruff_db::program::SearchPath;
 
     fn next(&mut self) -> Option<Self::Item> {
-        loop {
-            let next = self.inner.next()?;
-
-            if let Some(system_path) = next.as_system_path() {
-                return Some(system_path);
-            }
-        }
+        self.inner
+            .next()
+            .map(|path| ruff_db::program::SearchPath::from(&*path))
     }
 }
 
-impl FusedIterator for SystemModuleSearchPathsIter<'_> {}
+impl FusedIterator for ModuleSearchPathsIter<'_> {}

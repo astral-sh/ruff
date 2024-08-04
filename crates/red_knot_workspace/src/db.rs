@@ -1,10 +1,12 @@
 use std::panic::RefUnwindSafe;
 use std::sync::Arc;
 
-use red_knot_module_resolver::{vendored_typeshed_stubs, Db as ResolverDb};
+use red_knot_module_resolver::{
+    program_from_raw_settings, vendored_typeshed_stubs, Db as ResolverDb, SearchPathValidationError,
+};
 use red_knot_python_semantic::Db as SemanticDb;
 use ruff_db::files::{File, Files};
-use ruff_db::program::{Program, ProgramSettings};
+use ruff_db::program::RawProgramSettings;
 use ruff_db::system::System;
 use ruff_db::vendored::VendoredFileSystem;
 use ruff_db::{Db as SourceDb, Upcast};
@@ -28,7 +30,11 @@ pub struct RootDatabase {
 }
 
 impl RootDatabase {
-    pub fn new<S>(workspace: WorkspaceMetadata, settings: ProgramSettings, system: S) -> Self
+    pub fn new<S>(
+        workspace: WorkspaceMetadata,
+        settings: RawProgramSettings,
+        system: S,
+    ) -> Result<Self, SearchPathValidationError>
     where
         S: System + 'static + Send + Sync + RefUnwindSafe,
     {
@@ -41,10 +47,10 @@ impl RootDatabase {
 
         let workspace = Workspace::from_metadata(&db, workspace);
         // Initialize the `Program` singleton
-        Program::from_settings(&db, settings);
+        program_from_raw_settings(&db, settings)?;
 
         db.workspace = Some(workspace);
-        db
+        Ok(db)
     }
 
     pub fn workspace(&self) -> Workspace {

@@ -6,6 +6,7 @@ use std::sync::Arc;
 use camino::{Utf8Path, Utf8PathBuf};
 
 use ruff_db::files::{system_path_to_file, vendored_path_to_file, File, FileError};
+use ruff_db::program::SearchPathInner;
 use ruff_db::system::{System, SystemPath, SystemPathBuf};
 use ruff_db::vendored::{VendoredPath, VendoredPathBuf};
 
@@ -293,7 +294,7 @@ fn query_stdlib_version(
 /// a message must be displayed to the user,
 /// as type checking cannot be done reliably in these circumstances.
 #[derive(Debug, PartialEq, Eq)]
-pub(crate) enum SearchPathValidationError {
+pub enum SearchPathValidationError {
     /// The path provided by the user was not a directory
     NotADirectory(SystemPathBuf),
 
@@ -342,16 +343,6 @@ impl std::error::Error for SearchPathValidationError {
 }
 
 type SearchPathResult<T> = Result<T, SearchPathValidationError>;
-
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
-enum SearchPathInner {
-    Extra(SystemPathBuf),
-    FirstParty(SystemPathBuf),
-    StandardLibraryCustom(SystemPathBuf),
-    StandardLibraryVendored(VendoredPathBuf),
-    SitePackages(SystemPathBuf),
-    Editable(SystemPathBuf),
-}
 
 /// Unification of the various kinds of search paths
 /// that can be used to locate Python modules.
@@ -614,6 +605,30 @@ impl PartialEq<VendoredPathBuf> for SearchPath {
 impl PartialEq<SearchPath> for VendoredPathBuf {
     fn eq(&self, other: &SearchPath) -> bool {
         other.eq(self)
+    }
+}
+
+impl From<ruff_db::program::SearchPath> for SearchPath {
+    fn from(value: ruff_db::program::SearchPath) -> Self {
+        Self(value.0)
+    }
+}
+
+impl From<&ruff_db::program::SearchPath> for SearchPath {
+    fn from(value: &ruff_db::program::SearchPath) -> Self {
+        Self(Arc::clone(&value.0))
+    }
+}
+
+impl From<SearchPath> for ruff_db::program::SearchPath {
+    fn from(value: SearchPath) -> Self {
+        ruff_db::program::SearchPath(value.0)
+    }
+}
+
+impl From<&SearchPath> for ruff_db::program::SearchPath {
+    fn from(value: &SearchPath) -> Self {
+        ruff_db::program::SearchPath(Arc::clone(&value.0))
     }
 }
 

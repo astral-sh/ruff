@@ -6,13 +6,15 @@ use std::time::Duration;
 use anyhow::{anyhow, Context};
 use salsa::Setter;
 
-use red_knot_module_resolver::{resolve_module, ModuleName};
+use red_knot_module_resolver::{
+    resolve_module, try_resolve_module_resolution_settings, ModuleName,
+};
 use red_knot_workspace::db::RootDatabase;
 use red_knot_workspace::watch;
 use red_knot_workspace::watch::{directory_watcher, WorkspaceWatcher};
 use red_knot_workspace::workspace::WorkspaceMetadata;
 use ruff_db::files::{system_path_to_file, File, FileError};
-use ruff_db::program::{Program, ProgramSettings, SearchPathSettings, TargetVersion};
+use ruff_db::program::{Program, RawProgramSettings, RawSearchPathSettings, TargetVersion};
 use ruff_db::source::source_text;
 use ruff_db::system::{OsSystem, SystemPath, SystemPathBuf};
 use ruff_db::Upcast;
@@ -24,6 +26,7 @@ struct TestCase {
     /// The temporary directory that contains the test files.
     /// We need to hold on to it in the test case or the temp files get deleted.
     _temp_dir: tempfile::TempDir,
+    initial_settings: RawProgramSettings,
     root_dir: SystemPathBuf,
 }
 
@@ -106,14 +109,17 @@ impl TestCase {
 
     fn update_search_path_settings(
         &mut self,
-        f: impl FnOnce(&SearchPathSettings) -> SearchPathSettings,
+        f: impl FnOnce(&RawSearchPathSettings) -> RawSearchPathSettings,
     ) {
         let program = Program::get(self.db());
-        let search_path_settings = program.search_paths(self.db());
+        let initial_path_settings = &self.initial_settings.search_paths;
 
-        let new_settings = f(search_path_settings);
+        let new_settings =
+            try_resolve_module_resolution_settings(self.db(), f(initial_path_settings)).unwrap();
 
-        program.set_search_paths(&mut self.db).to(new_settings);
+        program
+            .set_search_path_settings(&mut self.db)
+            .to(new_settings);
 
         if let Some(watcher) = &mut self.watcher {
             watcher.update(&self.db);
@@ -177,7 +183,7 @@ fn setup<F>(setup_files: F) -> anyhow::Result<TestCase>
 where
     F: SetupFiles,
 {
-    setup_with_search_paths(setup_files, |_root, workspace_path| SearchPathSettings {
+    setup_with_search_paths(setup_files, |_root, workspace_path| RawSearchPathSettings {
         extra_paths: vec![],
         src_root: workspace_path.to_path_buf(),
         custom_typeshed: None,
@@ -187,7 +193,7 @@ where
 
 fn setup_with_search_paths<F>(
     setup_files: F,
-    create_search_paths: impl FnOnce(&SystemPath, &SystemPath) -> SearchPathSettings,
+    create_search_paths: impl FnOnce(&SystemPath, &SystemPath) -> RawSearchPathSettings,
 ) -> anyhow::Result<TestCase>
 where
     F: SetupFiles,
@@ -232,12 +238,12 @@ where
             .with_context(|| format!("Failed to create search path '{path}'"))?;
     }
 
-    let settings = ProgramSettings {
+    let settings = RawProgramSettings {
         target_version: TargetVersion::default(),
         search_paths,
     };
 
-    let db = RootDatabase::new(workspace, settings, system);
+    let db = RootDatabase::new(workspace, settings.clone(), system)?;
 
     let (sender, receiver) = crossbeam::channel::unbounded();
     let watcher = directory_watcher(move |events| sender.send(events).unwrap())
@@ -252,6 +258,7 @@ where
         watcher: Some(watcher),
         _temp_dir: temp_dir,
         root_dir: root_path,
+        initial_settings: settings,
     };
 
     // Sometimes the file watcher reports changes for events that happened before the watcher was started.
@@ -693,7 +700,7 @@ fn directory_deleted() -> anyhow::Result<()> {
 fn search_path() -> anyhow::Result<()> {
     let mut case =
         setup_with_search_paths([("bar.py", "import sub.a")], |root_path, workspace_path| {
-            SearchPathSettings {
+            RawSearchPathSettings {
                 extra_paths: vec![],
                 src_root: workspace_path.to_path_buf(),
                 custom_typeshed: None,
@@ -733,7 +740,7 @@ fn add_search_path() -> anyhow::Result<()> {
     assert!(resolve_module(case.db().upcast(), ModuleName::new_static("a").unwrap()).is_none());
 
     // Register site-packages as a search path.
-    case.update_search_path_settings(|settings| SearchPathSettings {
+    case.update_search_path_settings(|settings| RawSearchPathSettings {
         site_packages: vec![site_packages.clone()],
         ..settings.clone()
     });
@@ -753,7 +760,7 @@ fn add_search_path() -> anyhow::Result<()> {
 fn remove_search_path() -> anyhow::Result<()> {
     let mut case =
         setup_with_search_paths([("bar.py", "import sub.a")], |root_path, workspace_path| {
-            SearchPathSettings {
+            RawSearchPathSettings {
                 extra_paths: vec![],
                 src_root: workspace_path.to_path_buf(),
                 custom_typeshed: None,
@@ -763,7 +770,7 @@ fn remove_search_path() -> anyhow::Result<()> {
 
     // Remove site packages from the search path settings.
     let site_packages = case.root_path().join("site_packages");
-    case.update_search_path_settings(|settings| SearchPathSettings {
+    case.update_search_path_settings(|settings| RawSearchPathSettings {
         site_packages: vec![],
         ..settings.clone()
     });
@@ -1171,7 +1178,7 @@ mod unix {
 
                 Ok(())
             },
-            |_root, workspace| SearchPathSettings {
+            |_root, workspace| RawSearchPathSettings {
                 extra_paths: vec![],
                 src_root: workspace.to_path_buf(),
                 custom_typeshed: None,

@@ -2,7 +2,7 @@ use red_knot_workspace::db::RootDatabase;
 use red_knot_workspace::lint::lint_semantic;
 use red_knot_workspace::workspace::WorkspaceMetadata;
 use ruff_db::files::system_path_to_file;
-use ruff_db::program::{ProgramSettings, SearchPathSettings, TargetVersion};
+use ruff_db::program::{RawProgramSettings, RawSearchPathSettings, TargetVersion};
 use ruff_db::system::{OsSystem, SystemPathBuf};
 use std::fs;
 use std::path::PathBuf;
@@ -10,17 +10,17 @@ use std::path::PathBuf;
 fn setup_db(workspace_root: SystemPathBuf) -> anyhow::Result<RootDatabase> {
     let system = OsSystem::new(&workspace_root);
     let workspace = WorkspaceMetadata::from_path(&workspace_root, &system)?;
-    let search_paths = SearchPathSettings {
+    let search_paths = RawSearchPathSettings {
         extra_paths: vec![],
         src_root: workspace_root,
         custom_typeshed: None,
         site_packages: vec![],
     };
-    let settings = ProgramSettings {
+    let settings = RawProgramSettings {
         target_version: TargetVersion::default(),
         search_paths,
     };
-    let db = RootDatabase::new(workspace, settings, system);
+    let db = RootDatabase::new(workspace, settings, system)?;
     Ok(db)
 }
 

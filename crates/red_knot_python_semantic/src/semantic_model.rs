@@ -162,9 +162,10 @@ impl HasTy for ast::Alias {
 
 #[cfg(test)]
 mod tests {
+    use red_knot_module_resolver::program_from_raw_settings;
     use ruff_db::files::system_path_to_file;
     use ruff_db::parsed::parsed_module;
-    use ruff_db::program::{Program, SearchPathSettings, TargetVersion};
+    use ruff_db::program::{RawProgramSettings, RawSearchPathSettings, TargetVersion};
     use ruff_db::system::{DbWithTestSystem, SystemPathBuf};
 
     use crate::db::tests::TestDb;
@@ -173,16 +174,25 @@ mod tests {
 
     fn setup_db() -> TestDb {
         let db = TestDb::new();
-        Program::new(
+
+        let src_root = SystemPathBuf::from("/src");
+        db.memory_file_system()
+            .create_directory_all(&src_root)
+            .unwrap();
+
+        program_from_raw_settings(
             &db,
-            TargetVersion::Py38,
-            SearchPathSettings {
-                extra_paths: vec![],
-                src_root: SystemPathBuf::from("/src"),
-                site_packages: vec![],
-                custom_typeshed: None,
+            RawProgramSettings {
+                target_version: TargetVersion::default(),
+                search_paths: RawSearchPathSettings {
+                    extra_paths: vec![],
+                    src_root,
+                    site_packages: vec![],
+                    custom_typeshed: None,
+                },
             },
-        );
+        )
+        .unwrap();
 
         db
     }

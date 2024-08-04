@@ -5,9 +5,9 @@ use red_knot_workspace::workspace::WorkspaceMetadata;
 use ruff_benchmark::criterion::{criterion_group, criterion_main, BatchSize, Criterion};
 use ruff_benchmark::TestFile;
 use ruff_db::files::{system_path_to_file, File};
-use ruff_db::program::{ProgramSettings, SearchPathSettings, TargetVersion};
+use ruff_db::program::{RawProgramSettings, RawSearchPathSettings, TargetVersion};
 use ruff_db::source::source_text;
-use ruff_db::system::{MemoryFileSystem, SystemPath, TestSystem};
+use ruff_db::system::{MemoryFileSystem, SystemPath, SystemPathBuf, TestSystem};
 
 struct Case {
     db: RootDatabase,
@@ -40,19 +40,19 @@ fn setup_case() -> Case {
     ])
     .unwrap();
 
-    let src_root = SystemPath::new("/src");
-    let metadata = WorkspaceMetadata::from_path(src_root, &system).unwrap();
-    let settings = ProgramSettings {
+    let src_root = SystemPathBuf::from("/src");
+    let metadata = WorkspaceMetadata::from_path(&src_root, &system).unwrap();
+    let settings = RawProgramSettings {
         target_version: TargetVersion::Py312,
-        search_paths: SearchPathSettings {
+        search_paths: RawSearchPathSettings {
             extra_paths: vec![],
-            src_root: src_root.to_path_buf(),
+            src_root,
             site_packages: vec![],
             custom_typeshed: None,
         },
     };
 
-    let mut db = RootDatabase::new(metadata, settings, system);
+    let mut db = RootDatabase::new(metadata, settings, system).unwrap();
     let parser = system_path_to_file(&db, parser_path).unwrap();
 
     db.workspace().open_file(&mut db, parser);

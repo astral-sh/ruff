@@ -1,26 +1,20 @@
-use crate::{system::SystemPathBuf, Db};
-use salsa::Durability;
+use std::sync::Arc;
+
+use crate::system::{SystemPath, SystemPathBuf};
+use crate::vendored::VendoredPathBuf;
 
 #[salsa::input(singleton)]
 pub struct Program {
     pub target_version: TargetVersion,
 
     #[return_ref]
-    pub search_paths: SearchPathSettings,
+    pub search_path_settings: SearchPathSettings,
 }
 
-impl Program {
-    pub fn from_settings(db: &dyn Db, settings: ProgramSettings) -> Self {
-        Program::builder(settings.target_version, settings.search_paths)
-            .durability(Durability::HIGH)
-            .new(db)
-    }
-}
-
-#[derive(Debug, Eq, PartialEq)]
-pub struct ProgramSettings {
+#[derive(Debug, Eq, PartialEq, Clone)]
+pub struct RawProgramSettings {
     pub target_version: TargetVersion,
-    pub search_paths: SearchPathSettings,
+    pub search_paths: RawSearchPathSettings,
 }
 
 /// Enumeration of all supported Python versions
@@ -76,9 +70,51 @@ impl std::fmt::Debug for TargetVersion {
     }
 }
 
-/// Configures the search paths for module resolution.
-#[derive(Eq, PartialEq, Debug, Clone, Default)]
+/// Validated and normalized module-resolution settings.
+#[derive(Eq, PartialEq, Debug, Clone)]
 pub struct SearchPathSettings {
+    /// Search paths that have been statically determined purely from reading Ruff's configuration settings.
+    /// These shouldn't ever change unless the config settings themselves change.
+    pub static_search_paths: Vec<SearchPath>,
+
+    /// site-packages paths are not included in the above field:
+    /// if there are multiple site-packages paths, editable installations can appear
+    /// *between* the site-packages paths on `sys.path` at runtime.
+    /// That means we can't know where a second or third `site-packages` path should sit
+    /// in terms of module-resolution priority until we've discovered the editable installs
+    /// for the first `site-packages` path
+    pub site_packages_paths: Vec<SystemPathBuf>,
+}
+
+#[derive(Debug, PartialEq, Eq, Hash)]
+pub enum SearchPathInner {
+    Extra(SystemPathBuf),
+    FirstParty(SystemPathBuf),
+    StandardLibraryCustom(SystemPathBuf),
+    StandardLibraryVendored(VendoredPathBuf),
+    SitePackages(SystemPathBuf),
+    Editable(SystemPathBuf),
+}
+
+#[derive(Debug, PartialEq, Eq, Clone)]
+pub struct SearchPath(pub Arc<SearchPathInner>);
+
+impl SearchPath {
+    pub fn as_system_path(&self) -> Option<&SystemPath> {
+        match &*self.0 {
+            SearchPathInner::Extra(path)
+            | SearchPathInner::FirstParty(path)
+            | SearchPathInner::StandardLibraryCustom(path)
+            | SearchPathInner::SitePackages(path)
+            | SearchPathInner::Editable(path) => Some(path),
+            SearchPathInner::StandardLibraryVendored(_) => None,
+        }
+    }
+}
+
+/// Unvalidated settings from the user that configure the search paths for module resolution.
+#[derive(Eq, PartialEq, Debug, Clone, Default)]
+pub struct RawSearchPathSettings {
     /// List of user-provided paths that should take first priority in the module resolution.
     /// Examples in other type checkers are mypy's MYPYPATH environment variable,
     /// or pyright's stubPath configuration setting.
