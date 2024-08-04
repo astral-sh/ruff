@@ -6,19 +6,21 @@ import { loader } from "@monaco-editor/react";
 import { setupMonaco } from "./Editor/setupMonaco";
 import { restore, stringify } from "./Editor/settings";
 import { DEFAULT_PYTHON_SOURCE } from "./constants";
-import init, { Workspace } from "./pkg";
+import init, { Workspace } from "./ruff";
 
-const { sourceCode, settings, ruffVersion } = await startPlayground();
-
-ReactDOM.createRoot(document.getElementById("root") as HTMLElement).render(
-  <React.StrictMode>
-    <Editor
-      initialSettings={settings}
-      initialSource={sourceCode}
-      ruffVersion={ruffVersion}
-    />
-  </React.StrictMode>,
-);
+startPlayground()
+  .then(({ sourceCode, settings, ruffVersion }) => {
+    ReactDOM.createRoot(document.getElementById("root") as HTMLElement).render(
+      <React.StrictMode>
+        <Editor
+          initialSettings={settings}
+          initialSource={sourceCode}
+          ruffVersion={ruffVersion}
+        />
+      </React.StrictMode>,
+    );
+  })
+  .catch((error) => console.error("Failed to start playground", error));
 
 // Run once during startup. Initializes monaco, loads the wasm file, and restores the previous editor state.
 async function startPlayground(): Promise<{
