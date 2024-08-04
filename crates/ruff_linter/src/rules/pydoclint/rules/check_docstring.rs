@@ -6,7 +6,8 @@ use ruff_python_ast::helpers::map_callable;
 use ruff_python_ast::name::QualifiedName;
 use ruff_python_ast::visitor::Visitor;
 use ruff_python_ast::{self as ast, visitor, Expr, Stmt};
-use ruff_python_semantic::{Definition, MemberKind, SemanticModel};
+use ruff_python_semantic::analyze::function_type;
+use ruff_python_semantic::{Definition, SemanticModel};
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
@@ -656,15 +657,14 @@ pub(crate) fn check_docstring(
     convention: Option<Convention>,
 ) {
     let mut diagnostics = Vec::new();
-    let Definition::Member(member) = definition else {
+
+    // Only check function docstrings.
+    let Some(function_def) = definition.as_function_def() else {
         return;
     };
 
-    // Only check function docstrings.
-    if matches!(
-        member.kind,
-        MemberKind::Class(_) | MemberKind::NestedClass(_)
-    ) {
+    // Ignore stubs.
+    if function_type::is_stub(function_def, checker.semantic()) {
         return;
     }
 
@@ -681,17 +681,19 @@ pub(crate) fn check_docstring(
 
     let body_entries = {
         let mut visitor = BodyVisitor::new(checker.semantic());
-        visitor.visit_body(member.body());
+        visitor.visit_body(&function_def.body);
         visitor.finish()
     };
 
     // DOC201
-    if checker.enabled(Rule::DocstringMissingReturns) && docstring_sections.returns.is_none() {
-        let extra_property_decorators = checker.settings.pydocstyle.property_decorators();
-        if !definition.is_property(extra_property_decorators, checker.semantic()) {
-            if let Some(body_return) = body_entries.returns.first() {
-                let diagnostic = Diagnostic::new(DocstringMissingReturns, body_return.range());
-                diagnostics.push(diagnostic);
+    if checker.enabled(Rule::DocstringMissingReturns) {
+        if docstring_sections.returns.is_none() {
+            let extra_property_decorators = checker.settings.pydocstyle.property_decorators();
+            if !definition.is_property(extra_property_decorators, checker.semantic()) {
+                if let Some(body_return) = body_entries.returns.first() {
+                    let diagnostic = Diagnostic::new(DocstringMissingReturns, body_return.range());
+                    diagnostics.push(diagnostic);
+                }
             }
         }
     }
