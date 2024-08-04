@@ -147,8 +147,7 @@ pub(crate) fn fastapi_unused_path_parameter(
                 .expression
                 .as_name_expr()
                 .map(|name_expr| (name_expr.id().to_string(), inner_expr.range()))
-        })
-        .collect::<Vec<_>>();
+        });
 
     // Now we extract the arguments from the function signature
     let named_args = function_def
