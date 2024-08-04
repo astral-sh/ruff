@@ -137,6 +137,11 @@ pub(crate) fn fastapi_unused_path_parameter(
         .iter()
         .filter_map(|expr| expr.as_f_string())
         .flat_map(|inner_fstring| inner_fstring.elements.expressions())
+        // We ignore any expressions that have a conversion (like !r or !s), as FastAPI will
+        // normalize them in an undocumented way.
+        .filter(|inner_expr| inner_expr.conversion.is_none())
+        // We also ignore any expressions that have debug text, for the same reason.
+        .filter(|inner_expr| inner_expr.debug_text.is_none())
         .filter_map(|inner_expr| {
             inner_expr
                 .expression

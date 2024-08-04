@@ -97,29 +97,29 @@ FAST003.py:27:27: FAST003 [*] Path parameter `title` in route path but not in fu
 30 30 | 
 31 31 | 
 
-FAST003.py:32:18: FAST003 [*] Path parameter `author` in route path but not in function `read_thing`.
+FAST003.py:32:18: FAST003 [*] Path parameter `author_name` in route path but not in function `read_thing`.
    |
-32 | @app.get("/books/{author}/{title}")
-   |                  ^^^^^^^^ FAST003
+32 | @app.get("/books/{author_name}/{title}")
+   |                  ^^^^^^^^^^^^^ FAST003
 33 | async def read_thing():
 34 |     ...
    |
-   = help: Add `author` to function signature
+   = help: Add `author_name` to function signature
 
 ℹ Safe fix
 30 30 | 
 31 31 | 
-32 32 | @app.get("/books/{author}/{title}")
+32 32 | @app.get("/books/{author_name}/{title}")
 33    |-async def read_thing():
-   33 |+async def read_thing(author):
+   33 |+async def read_thing(author_name):
 34 34 |     ...
 35 35 | 
 36 36 | 
 
-FAST003.py:32:27: FAST003 [*] Path parameter `title` in route path but not in function `read_thing`.
+FAST003.py:32:32: FAST003 [*] Path parameter `title` in route path but not in function `read_thing`.
    |
-32 | @app.get("/books/{author}/{title}")
-   |                           ^^^^^^^ FAST003
+32 | @app.get("/books/{author_name}/{title}")
+   |                                ^^^^^^^ FAST003
 33 | async def read_thing():
 34 |     ...
    |
@@ -128,7 +128,7 @@ FAST003.py:32:27: FAST003 [*] Path parameter `title` in route path but not in fu
 ℹ Safe fix
 30 30 | 
 31 31 | 
-32 32 | @app.get("/books/{author}/{title}")
+32 32 | @app.get("/books/{author_name}/{title}")
 33    |-async def read_thing():
    33 |+async def read_thing(title):
 34 34 |     ...
