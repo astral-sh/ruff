@@ -1,4 +1,4 @@
-import { useCallback, useDeferredValue, useEffect, useState } from "react";
+import { useCallback, useDeferredValue, useMemo, useState } from "react";
 import { Panel, PanelGroup } from "react-resizable-panels";
 import { Diagnostic, Workspace } from "../pkg/ruff_wasm";
 import { ErrorMessage } from "./ErrorMessage";
@@ -40,12 +40,6 @@ export default function Editor({
   initialSettings,
   ruffVersion,
 }: Props) {
-  const [checkResult, setCheckResult] = useState<CheckResult>({
-    diagnostics: [],
-    error: null,
-    secondary: null,
-  });
-
   const [source, setSource] = useState<Source>({
     revision: 0,
     pythonSource: initialSource,
@@ -65,6 +59,7 @@ export default function Editor({
       }
     },
   );
+
   const [theme, setTheme] = useTheme();
 
   // Ideally this would be retrieved right from the URL... but routing without a proper
@@ -90,7 +85,7 @@ export default function Editor({
 
   const deferredSource = useDeferredValue(source);
 
-  useEffect(() => {
+  const checkResult: CheckResult = useMemo(() => {
     const { pythonSource, settingsSource } = deferredSource;
 
     try {
@@ -144,17 +139,17 @@ export default function Editor({
         };
       }
 
-      setCheckResult({
+      return {
         diagnostics,
         error: null,
         secondary,
-      });
+      };
     } catch (e) {
-      setCheckResult({
+      return {
         diagnostics: [],
         error: (e as Error).message,
         secondary: null,
-      });
+      };
     }
   }, [deferredSource, secondaryTool]);
 
