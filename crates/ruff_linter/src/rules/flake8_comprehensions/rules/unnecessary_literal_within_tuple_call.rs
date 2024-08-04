@@ -12,7 +12,7 @@ use super::helpers;
 
 /// ## What it does
 /// Checks for `tuple` calls that take unnecessary list or tuple literals as
-/// arguments.
+/// arguments. This includes literals in the form of list or set comprehensions.
 ///
 /// ## Why is this bad?
 /// It's unnecessary to use a list or tuple literal within a `tuple()` call,
@@ -26,17 +26,22 @@ use super::helpers;
 /// ```python
 /// tuple([1, 2])
 /// tuple((1, 2))
+/// tuple([x for x in range(10)])
 /// ```
 ///
 /// Use instead:
 /// ```python
 /// (1, 2)
 /// (1, 2)
+/// tuple(x for x in range(10))
 /// ```
 ///
 /// ## Fix safety
 /// This rule's fix is marked as unsafe, as it may occasionally drop comments
 /// when rewriting the call. In most cases, though, comments will be preserved.
+/// Moreover, in the case where a comprehension is replaced by a generator,
+/// code behavior may be changed if the iteration has side-effects.
+///
 #[violation]
 pub struct UnnecessaryLiteralWithinTupleCall {
     literal: String,
