@@ -704,7 +704,9 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
                 );
             }
             if checker.enabled(Rule::UnnecessaryLiteralWithinTupleCall) {
-                flake8_comprehensions::rules::unnecessary_literal_within_tuple_call(checker, call);
+                flake8_comprehensions::rules::unnecessary_literal_within_tuple_call(
+                    checker, expr, call,
+                );
             }
             if checker.enabled(Rule::UnnecessaryLiteralWithinListCall) {
                 flake8_comprehensions::rules::unnecessary_literal_within_list_call(checker, call);
