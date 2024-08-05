@@ -651,7 +651,7 @@ fn is_exception_or_base_exception(qualified_name: &QualifiedName) -> bool {
 }
 
 fn starts_with_returns(docstring: &Docstring) -> bool {
-    if let Some(first_word) = docstring.body().as_str().split(" ").next() {
+    if let Some(first_word) = docstring.body().as_str().split(' ').next() {
         return first_word == "Returns";
     }
     false
