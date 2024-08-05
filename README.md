@@ -29,14 +29,14 @@ An extremely fast Python linter and code formatter, written in Rust.
 - 🐍 Installable via `pip`
 - 🛠️ `pyproject.toml` support
 - 🤝 Python 3.13 compatibility
-- ⚖️ Drop-in parity with [Flake8](https://docs.astral.sh/ruff/faq/#how-does-ruff-compare-to-flake8), isort, and Black
+- ⚖️ Drop-in parity with [Flake8](https://docs.astral.sh/ruff/faq/#how-does-ruffs-linter-compare-to-flake8), isort, and [Black](https://docs.astral.sh/ruff/faq/#how-does-ruffs-formatter-compare-to-black)
 - 📦 Built-in caching, to avoid re-analyzing unchanged files
 - 🔧 Fix support, for automatic error correction (e.g., automatically remove unused imports)
 - 📏 Over [800 built-in rules](https://docs.astral.sh/ruff/rules/), with native re-implementations
     of popular Flake8 plugins, like flake8-bugbear
 - ⌨️ First-party [editor integrations](https://docs.astral.sh/ruff/integrations/) for
     [VS Code](https://github.com/astral-sh/ruff-vscode) and [more](https://docs.astral.sh/ruff/editors/setup)
-- 🌎 Monorepo-friendly, with [hierarchical and cascading configuration](https://docs.astral.sh/ruff/configuration/#pyprojecttoml-discovery)
+- 🌎 Monorepo-friendly, with [hierarchical and cascading configuration](https://docs.astral.sh/ruff/configuration/#config-file-discovery)
 
 Ruff aims to be orders of magnitude faster than alternative tools while integrating more
 functionality behind a single, common interface.
