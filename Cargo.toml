@@ -58,6 +58,7 @@ console_error_panic_hook = { version = "0.1.7" }
 console_log = { version = "1.0.0" }
 countme = { version = "3.0.1" }
 compact_str = "0.8.0"
+criterion = { version = "0.5.1", default-features = false }
 crossbeam = { version = "0.8.4" }
 dashmap = { version = "6.0.1" }
 drop_bomb = { version = "0.1.5" }
@@ -156,7 +157,7 @@ zip = { version = "0.6.6", default-features = false, features = ["zstd"] }
 [workspace.lints.rust]
 unsafe_code = "warn"
 unreachable_pub = "warn"
-unexpected_cfgs = { level = "warn", check-cfg = ['cfg(fuzzing)'] }
+unexpected_cfgs = { level = "warn", check-cfg = ["cfg(fuzzing)", "cfg(codspeed)"] }
 
 [workspace.lints.clippy]
 pedantic = { level = "warn", priority = -2 }

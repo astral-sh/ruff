@@ -1,9 +1,8 @@
 #![allow(clippy::disallowed_names)]
 
-use codspeed_criterion_compat::{criterion_group, criterion_main, BatchSize, Criterion};
-
 use red_knot_workspace::db::RootDatabase;
 use red_knot_workspace::workspace::WorkspaceMetadata;
+use ruff_benchmark::criterion::{criterion_group, criterion_main, BatchSize, Criterion};
 use ruff_benchmark::TestFile;
 use ruff_db::files::{system_path_to_file, File};
 use ruff_db::program::{ProgramSettings, SearchPathSettings, TargetVersion};

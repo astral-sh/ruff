@@ -2149,6 +2149,7 @@ name = "ruff_benchmark"
 version = "0.0.0"
 dependencies = [
  "codspeed-criterion-compat",
+ "criterion",
  "mimalloc",
  "once_cell",
  "red_knot_workspace",

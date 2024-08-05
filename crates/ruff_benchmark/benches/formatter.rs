@@ -1,9 +1,8 @@
 use std::path::Path;
 
-use codspeed_criterion_compat::{
+use ruff_benchmark::criterion::{
     criterion_group, criterion_main, BenchmarkId, Criterion, Throughput,
 };
-
 use ruff_benchmark::{TestCase, TestFile, TestFileDownloadError};
 use ruff_python_formatter::{format_module_ast, PreviewMode, PyFormatOptions};
 use ruff_python_parser::{parse, Mode};
