@@ -62,6 +62,7 @@ LINK_REWRITES: dict[str, str] = {
         "configuration.md#pyprojecttoml-discovery"
     ),
     "https://docs.astral.sh/ruff/contributing/": "contributing.md",
+    "https://docs.astral.sh/ruff/editors/setup": "editors/setup.md",
     "https://docs.astral.sh/ruff/integrations/": "integrations.md",
     "https://docs.astral.sh/ruff/faq/#how-does-ruff-compare-to-flake8": (
         "faq.md#how-does-ruff-compare-to-flake8"
