@@ -66,3 +66,14 @@ def test():
     """Do something."""
     yield from range(10)
 
+
+# OK
+def f():
+    """Yields 1."""
+    yield 1
+
+
+# OK
+def f():
+    """Yield 1."""
+    yield 1

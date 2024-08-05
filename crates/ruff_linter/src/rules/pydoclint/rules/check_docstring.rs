@@ -652,7 +652,7 @@ fn is_exception_or_base_exception(qualified_name: &QualifiedName) -> bool {
 
 fn starts_with_returns(docstring: &Docstring) -> bool {
     if let Some(first_word) = docstring.body().as_str().split(' ').next() {
-        return first_word == "Returns";
+        return matches!(first_word, "Return" | "Returns");
     }
     false
 }
@@ -664,6 +664,22 @@ fn returns_documented(
 ) -> bool {
     docstring_sections.returns.is_some()
         || (matches!(convention, Some(Convention::Google)) && starts_with_returns(docstring))
+}
+
+fn starts_with_yields(docstring: &Docstring) -> bool {
+    if let Some(first_word) = docstring.body().as_str().split(' ').next() {
+        return matches!(first_word, "Yield" | "Yields");
+    }
+    false
+}
+
+fn yields_documented(
+    docstring: &Docstring,
+    docstring_sections: &DocstringSections,
+    convention: Option<Convention>,
+) -> bool {
+    docstring_sections.yields.is_some()
+        || (matches!(convention, Some(Convention::Google)) && starts_with_yields(docstring))
 }
 
 /// DOC201, DOC202, DOC402, DOC403, DOC501, DOC502
@@ -718,7 +734,7 @@ pub(crate) fn check_docstring(
 
     // DOC202
     if checker.enabled(Rule::DocstringExtraneousReturns) {
-        if let Some(docstring_returns) = docstring_sections.returns {
+        if let Some(ref docstring_returns) = docstring_sections.returns {
             if body_entries.returns.is_empty() {
                 let diagnostic =
                     Diagnostic::new(DocstringExtraneousReturns, docstring_returns.range());
@@ -729,7 +745,7 @@ pub(crate) fn check_docstring(
 
     // DOC402
     if checker.enabled(Rule::DocstringMissingYields) {
-        if docstring_sections.yields.is_none() {
+        if !yields_documented(docstring, &docstring_sections, convention) {
             if let Some(body_yield) = body_entries.yields.first() {
                 let diagnostic = Diagnostic::new(DocstringMissingYields, body_yield.range());
                 diagnostics.push(diagnostic);

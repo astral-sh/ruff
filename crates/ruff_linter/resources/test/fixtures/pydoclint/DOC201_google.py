@@ -92,3 +92,9 @@ class Baz:
 def f():
     """Returns 1."""
     return 1
+
+
+# OK
+def f():
+    """Return 1."""
+    return 1
