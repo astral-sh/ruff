@@ -19,7 +19,8 @@ enum TupleLiteralKind {
 
 /// ## What it does
 /// Checks for `tuple` calls that take unnecessary list or tuple literals as
-/// arguments. This includes literals in the form of list comprehensions.
+/// arguments. In [preview], this also includes unnecessary list comprehensions
+/// within tuple calls.
 ///
 /// ## Why is this bad?
 /// It's unnecessary to use a list or tuple literal within a `tuple()` call,
@@ -28,6 +29,10 @@ enum TupleLiteralKind {
 /// If a list literal was passed, then it should be rewritten as a `tuple`
 /// literal. Otherwise, if a tuple literal was passed, then the outer call
 /// to `tuple()` should be removed.
+///
+/// In [preview], this rule also checks for list comprehensions within `tuple()`
+/// calls. If a list comprehension is found, it should be rewritten as a
+/// generator expression.
 ///
 /// ## Examples
 /// ```python
@@ -46,9 +51,8 @@ enum TupleLiteralKind {
 /// ## Fix safety
 /// This rule's fix is marked as unsafe, as it may occasionally drop comments
 /// when rewriting the call. In most cases, though, comments will be preserved.
-/// Moreover, in the case where a comprehension is replaced by a generator,
-/// code behavior may be changed if the iteration has side-effects.
 ///
+/// [preview]: https://docs.astral.sh/ruff/preview/
 #[violation]
 pub struct UnnecessaryLiteralWithinTupleCall {
     literal_kind: TupleLiteralKind,
@@ -69,7 +73,7 @@ impl AlwaysFixableViolation for UnnecessaryLiteralWithinTupleCall {
             }
             TupleLiteralKind::ListComp => {
                 format!(
-                    "Unnecessary list comprehension passed to `tuple()` (rewrite with generator)"
+                    "Unnecessary list comprehension passed to `tuple()` (rewrite as a generator)"
                 )
             }
         }
@@ -78,9 +82,9 @@ impl AlwaysFixableViolation for UnnecessaryLiteralWithinTupleCall {
     fn fix_title(&self) -> String {
         let UnnecessaryLiteralWithinTupleCall { literal_kind } = self;
         match literal_kind {
-            TupleLiteralKind::List => "Rewrite as a `tuple` literal.".to_string(),
-            TupleLiteralKind::Tuple => "Remove the outer call to `tuple()`.".to_string(),
-            TupleLiteralKind::ListComp => "Rewrite with generator".to_string(),
+            TupleLiteralKind::List => "Rewrite as a `tuple` literal".to_string(),
+            TupleLiteralKind::Tuple => "Remove the outer call to `tuple()`".to_string(),
+            TupleLiteralKind::ListComp => "Rewrite as a generator".to_string(),
         }
     }
 }
@@ -119,8 +123,8 @@ pub(crate) fn unnecessary_literal_within_tuple_call(
         call.range(),
     );
 
-    // Convert `tuple([1, 2])` to `(1, 2)`
     if argument.is_tuple_expr() | argument.is_list_expr() {
+        // Convert `tuple([1, 2])` to `(1, 2)`
         diagnostic.set_fix({
             let elts = match argument {
                 Expr::List(ast::ExprList { elts, .. }) => elts.as_slice(),
@@ -156,7 +160,8 @@ pub(crate) fn unnecessary_literal_within_tuple_call(
             );
             Fix::unsafe_edits(elt_start, [elt_end])
         });
-    } else if argument.is_list_comp_expr() {
+    } else if checker.settings.preview.is_enabled() && argument.is_list_comp_expr() {
+        // Convert `tuple([x for x in range(10)])` to `tuple(x for x in range(10))`
         let Expr::ListComp(ast::ExprListComp { elt, .. }) = argument else {
             return;
         };

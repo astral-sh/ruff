@@ -45,6 +45,7 @@ mod tests {
         Ok(())
     }
 
+    #[test_case(Rule::UnnecessaryLiteralWithinTupleCall, Path::new("C409.py"))]
     #[test_case(Rule::UnnecessaryComprehensionInCall, Path::new("C419_1.py"))]
     fn preview_rules(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!(
