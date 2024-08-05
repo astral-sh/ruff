@@ -8,7 +8,7 @@ C409.py:1:6: C409 [*] Unnecessary `list` literal passed to `tuple()` (rewrite as
 2 | t2 = tuple([1, 2])
 3 | t3 = tuple((1, 2))
   |
-  = help: Rewrite as a `tuple` literal
+  = help: Rewrite as a `tuple` literal.
 
 ℹ Unsafe fix
 1   |-t1 = tuple([])
@@ -25,7 +25,7 @@ C409.py:2:6: C409 [*] Unnecessary `list` literal passed to `tuple()` (rewrite as
 3 | t3 = tuple((1, 2))
 4 | t4 = tuple([
   |
-  = help: Rewrite as a `tuple` literal
+  = help: Rewrite as a `tuple` literal.
 
 ℹ Unsafe fix
 1 1 | t1 = tuple([])
@@ -44,7 +44,7 @@ C409.py:3:6: C409 [*] Unnecessary `tuple` literal passed to `tuple()` (remove th
 4 | t4 = tuple([
 5 |     1,
   |
-  = help: Remove outer `tuple` call
+  = help: Remove the outer call to `tuple()`.
 
 ℹ Unsafe fix
 1 1 | t1 = tuple([])
@@ -68,7 +68,7 @@ C409.py:4:6: C409 [*] Unnecessary `list` literal passed to `tuple()` (rewrite as
 8 |   t5 = tuple(
 9 |       (1, 2)
   |
-  = help: Rewrite as a `tuple` literal
+  = help: Rewrite as a `tuple` literal.
 
 ℹ Unsafe fix
 1 1 | t1 = tuple([])
@@ -96,7 +96,7 @@ C409.py:8:6: C409 [*] Unnecessary `tuple` literal passed to `tuple()` (remove th
 11 |   
 12 |   tuple(  # comment
    |
-   = help: Remove outer `tuple` call
+   = help: Remove the outer call to `tuple()`.
 
 ℹ Unsafe fix
 5  5  |     1,
@@ -121,7 +121,7 @@ C409.py:12:1: C409 [*] Unnecessary `list` literal passed to `tuple()` (rewrite a
 15 |   
 16 |   tuple([  # comment
    |
-   = help: Rewrite as a `tuple` literal
+   = help: Rewrite as a `tuple` literal.
 
 ℹ Unsafe fix
 9  9  |     (1, 2)
@@ -146,7 +146,7 @@ C409.py:16:1: C409 [*] Unnecessary `list` literal passed to `tuple()` (rewrite a
 19 |   
 20 |   tuple((
    |
-   = help: Rewrite as a `tuple` literal
+   = help: Rewrite as a `tuple` literal.
 
 ℹ Unsafe fix
 13 13 |     [1, 2]
@@ -172,7 +172,7 @@ C409.py:20:1: C409 [*] Unnecessary `tuple` literal passed to `tuple()` (remove t
 23 |   
 24 |   t6 = tuple([1])
    |
-   = help: Remove outer `tuple` call
+   = help: Remove the outer call to `tuple()`.
 
 ℹ Unsafe fix
 17 17 |     1, 2
@@ -196,7 +196,7 @@ C409.py:24:6: C409 [*] Unnecessary `list` literal passed to `tuple()` (rewrite a
 25 | t7 = tuple((1,))
 26 | t8 = tuple([1,])
    |
-   = help: Rewrite as a `tuple` literal
+   = help: Rewrite as a `tuple` literal.
 
 ℹ Unsafe fix
 21 21 |     1,
@@ -215,7 +215,7 @@ C409.py:25:6: C409 [*] Unnecessary `tuple` literal passed to `tuple()` (remove t
    |      ^^^^^^^^^^^ C409
 26 | t8 = tuple([1,])
    |
-   = help: Remove outer `tuple` call
+   = help: Remove the outer call to `tuple()`.
 
 ℹ Unsafe fix
 22 22 | ))
@@ -236,7 +236,7 @@ C409.py:26:6: C409 [*] Unnecessary `list` literal passed to `tuple()` (rewrite a
 27 | 
 28 | tuple([x for x in range(5)])
    |
-   = help: Rewrite as a `tuple` literal
+   = help: Rewrite as a `tuple` literal.
 
 ℹ Unsafe fix
 23 23 | 
@@ -248,7 +248,7 @@ C409.py:26:6: C409 [*] Unnecessary `list` literal passed to `tuple()` (rewrite a
 28 28 | tuple([x for x in range(5)])
 29 29 | tuple({x for x in range(10)})
 
-C409.py:28:1: C409 [*] Unnecessary `list comprehension` literal passed to `tuple()` (remove the outer call to `tuple()`)
+C409.py:28:1: C409 [*] Unnecessary list comprehension passed to `tuple()` (rewrite with generator)
    |
 26 | t8 = tuple([1,])
 27 | 
@@ -257,7 +257,7 @@ C409.py:28:1: C409 [*] Unnecessary `list comprehension` literal passed to `tuple
 29 | tuple({x for x in range(10)})
 30 | tuple(x for x in range(5))
    |
-   = help: Remove outer `tuple` call
+   = help: Rewrite with generator
 
 ℹ Unsafe fix
 25 25 | t7 = tuple((1,))
@@ -269,27 +269,7 @@ C409.py:28:1: C409 [*] Unnecessary `list comprehension` literal passed to `tuple
 30 30 | tuple(x for x in range(5))
 31 31 | tuple([
 
-C409.py:29:1: C409 [*] Unnecessary `set comprehension` literal passed to `tuple()` (remove the outer call to `tuple()`)
-   |
-28 | tuple([x for x in range(5)])
-29 | tuple({x for x in range(10)})
-   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ C409
-30 | tuple(x for x in range(5))
-31 | tuple([
-   |
-   = help: Remove outer `tuple` call
-
-ℹ Unsafe fix
-26 26 | t8 = tuple([1,])
-27 27 | 
-28 28 | tuple([x for x in range(5)])
-29    |-tuple({x for x in range(10)})
-   29 |+tuple(x for x in range(10))
-30 30 | tuple(x for x in range(5))
-31 31 | tuple([
-32 32 |     x for x in [1,2,3]
-
-C409.py:31:1: C409 [*] Unnecessary `list comprehension` literal passed to `tuple()` (remove the outer call to `tuple()`)
+C409.py:31:1: C409 [*] Unnecessary list comprehension passed to `tuple()` (rewrite with generator)
    |
 29 |   tuple({x for x in range(10)})
 30 |   tuple(x for x in range(5))
@@ -300,7 +280,7 @@ C409.py:31:1: C409 [*] Unnecessary `list comprehension` literal passed to `tuple
 34 |   tuple( # comment
 35 |       [x for x in [1,2,3]]
    |
-   = help: Remove outer `tuple` call
+   = help: Rewrite with generator
 
 ℹ Unsafe fix
 28 28 | tuple([x for x in range(5)])
@@ -314,7 +294,7 @@ C409.py:31:1: C409 [*] Unnecessary `list comprehension` literal passed to `tuple
 35 33 |     [x for x in [1,2,3]]
 36 34 | )
 
-C409.py:34:1: C409 [*] Unnecessary `list comprehension` literal passed to `tuple()` (remove the outer call to `tuple()`)
+C409.py:34:1: C409 [*] Unnecessary list comprehension passed to `tuple()` (rewrite with generator)
    |
 32 |       x for x in [1,2,3]
 33 |   ])
@@ -325,7 +305,7 @@ C409.py:34:1: C409 [*] Unnecessary `list comprehension` literal passed to `tuple
 37 |   tuple([ # comment
 38 |       x for x in range(10)
    |
-   = help: Remove outer `tuple` call
+   = help: Rewrite with generator
 
 ℹ Unsafe fix
 32 32 |     x for x in [1,2,3]
@@ -337,7 +317,7 @@ C409.py:34:1: C409 [*] Unnecessary `list comprehension` literal passed to `tuple
 37 37 | tuple([ # comment
 38 38 |     x for x in range(10)
 
-C409.py:37:1: C409 [*] Unnecessary `list comprehension` literal passed to `tuple()` (remove the outer call to `tuple()`)
+C409.py:37:1: C409 [*] Unnecessary list comprehension passed to `tuple()` (rewrite with generator)
    |
 35 |       [x for x in [1,2,3]]
 36 |   )
@@ -348,7 +328,7 @@ C409.py:37:1: C409 [*] Unnecessary `list comprehension` literal passed to `tuple
 40 |   tuple(
 41 |       {
    |
-   = help: Remove outer `tuple` call
+   = help: Rewrite with generator
 
 ℹ Unsafe fix
 34 34 | tuple( # comment
@@ -364,26 +344,3 @@ C409.py:37:1: C409 [*] Unnecessary `list comprehension` literal passed to `tuple
 41 41 |     {
 42 42 |         x for x in [1,2,3]
 43 43 |     }
-
-C409.py:40:1: C409 [*] Unnecessary `set comprehension` literal passed to `tuple()` (remove the outer call to `tuple()`)
-   |
-38 |       x for x in range(10)
-39 |   ])
-40 | / tuple(
-41 | |     {
-42 | |         x for x in [1,2,3]
-43 | |     }
-44 | | )
-   | |_^ C409
-   |
-   = help: Remove outer `tuple` call
-
-ℹ Unsafe fix
-38 38 |     x for x in range(10)
-39 39 | ])
-40 40 | tuple(
-41    |-    {
-42    |-        x for x in [1,2,3]
-43    |-    }
-   41 |+    x for x in [1,2,3]
-44 42 | )
