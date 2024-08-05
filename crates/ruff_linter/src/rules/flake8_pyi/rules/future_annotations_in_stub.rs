@@ -29,7 +29,7 @@ impl Violation for FutureAnnotationsInStub {
     }
 
     fn fix_title(&self) -> Option<String> {
-        Some("Remove `annotations` import from `__future__`".to_string())
+        Some("Remove `from __future__ import annotations`".to_string())
     }
 }
 
@@ -58,7 +58,7 @@ pub(crate) fn from_future_import(checker: &mut Checker, target: &StmtImportFrom)
                         checker.indexer(),
                     )?;
 
-                    Ok(Fix::unsafe_edit(edit))
+                    Ok(Fix::safe_edit(edit))
                 });
             }
 
