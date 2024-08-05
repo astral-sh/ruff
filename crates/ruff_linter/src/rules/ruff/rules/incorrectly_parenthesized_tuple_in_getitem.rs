@@ -12,7 +12,7 @@ use crate::checkers::ast::Checker;
 
 /// ## What it does
 /// Checks for use or omission of parentheses around tuples of length at least two in calls to `__getitem__`,
-/// depending on the setting [`lint.ruff.prefer-parentheses-getitem-tuple`]. By default, the use of parentheses
+/// depending on the setting [`lint.ruff.parenthesize-tuple-in-getitem`]. By default, the use of parentheses
 /// is considered a violation.
 ///
 /// ## Why is this bad?
@@ -34,11 +34,11 @@ use crate::checkers::ast::Checker;
 /// ```
 
 #[violation]
-pub struct BadFormatTupleInGetitem {
+pub struct IncorrectlyParenthesizedTupleInGetitem {
     prefer_parentheses: bool,
 }
 
-impl AlwaysFixableViolation for BadFormatTupleInGetitem {
+impl AlwaysFixableViolation for IncorrectlyParenthesizedTupleInGetitem {
     #[derive_message_formats]
     fn message(&self) -> String {
         match self.prefer_parentheses {
@@ -57,7 +57,7 @@ impl AlwaysFixableViolation for BadFormatTupleInGetitem {
 
 /// RUF031
 pub(crate) fn getitem_with_parenthesized_tuple(checker: &mut Checker, subscript: &ExprSubscript) {
-    let prefer_parentheses = checker.settings.ruff.prefer_parentheses_getitem_tuple;
+    let prefer_parentheses = checker.settings.ruff.parenthesize_tuple_in_getitem;
     if let Some(tuple_index) = subscript.slice.as_tuple_expr() {
         if (tuple_index.parenthesized != prefer_parentheses) && tuple_index.elts.len() > 1 {
             let locator = checker.locator();
@@ -72,8 +72,11 @@ pub(crate) fn getitem_with_parenthesized_tuple(checker: &mut Checker, subscript:
             };
             let edit = Edit::range_replacement(new_source, source_range);
             checker.diagnostics.push(
-                Diagnostic::new(BadFormatTupleInGetitem { prefer_parentheses }, source_range)
-                    .with_fix(Fix::safe_edit(edit)),
+                Diagnostic::new(
+                    IncorrectlyParenthesizedTupleInGetitem { prefer_parentheses },
+                    source_range,
+                )
+                .with_fix(Fix::safe_edit(edit)),
             );
         }
     }

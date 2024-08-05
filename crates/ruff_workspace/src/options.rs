@@ -2986,18 +2986,16 @@ pub struct RuffOptions {
         value_type = "bool",
         example = r#"
         # Make it a violation to use `__getitem__` with a tuple argument without parentheses.
-        prefer-parentheses-getitem-tuple = true
+        parenthesize-tuple-in-getitem = true
         "#
     )]
-    pub prefer_parentheses_getitem_tuple: Option<bool>,
+    pub parenthesize_tuple_in_getitem: Option<bool>,
 }
 
 impl RuffOptions {
     pub fn into_settings(self) -> ruff::settings::Settings {
         ruff::settings::Settings {
-            prefer_parentheses_getitem_tuple: self
-                .prefer_parentheses_getitem_tuple
-                .unwrap_or_default(),
+            parenthesize_tuple_in_getitem: self.parenthesize_tuple_in_getitem.unwrap_or_default(),
         }
     }
 }

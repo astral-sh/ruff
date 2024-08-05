@@ -6,7 +6,7 @@ use std::fmt;
 
 #[derive(Debug, Clone, CacheKey, Default)]
 pub struct Settings {
-    pub prefer_parentheses_getitem_tuple: bool,
+    pub parenthesize_tuple_in_getitem: bool,
 }
 
 impl fmt::Display for Settings {
@@ -15,7 +15,7 @@ impl fmt::Display for Settings {
             formatter = f,
             namespace = "linter.ruff",
             fields = [
-                self.prefer_parentheses_getitem_tuple
+                self.parenthesize_tuple_in_getitem
             ]
         }
         Ok(())

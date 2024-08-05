@@ -2684,7 +2684,7 @@
     "RuffOptions": {
       "type": "object",
       "properties": {
-        "prefer-parentheses-getitem-tuple": {
+        "parenthesize-tuple-in-getitem": {
           "description": "Whether to prefer accessing items keyed by tuples with parentheses around the tuple (see `RUF031`).",
           "type": [
             "boolean",
