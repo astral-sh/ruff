@@ -17,6 +17,129 @@ use crate::registry::Rule;
 use crate::rules::pydocstyle::settings::Convention;
 
 /// ## What it does
+/// Checks for function docstrings that do not include documentation for all
+/// arguments.
+///
+/// ## Why is this bad?
+/// If a function accepts an argument without documenting it in its docstring,
+/// it can be misleading to users and/or a sign of incomplete documentation or
+/// refactors.
+///
+/// ## Example
+/// ```python
+/// def calculate_speed(distance: float, time: float) -> float:
+///     """Calculate speed as distance divided by time.
+///
+///     Args:
+///         distance: Distance traveled.
+///
+///     Returns:
+///         Speed as distance divided by time.
+///     """
+///     return distance / time
+/// ```
+///
+/// Use instead:
+/// ```python
+/// def calculate_speed(distance: float, time: float) -> float:
+///     """Calculate speed as distance divided by time.
+///
+///     Args:
+///         distance: Distance traveled.
+///         time: Time spent travelling.
+///
+///     Returns:
+///         Speed as distance divided by time.
+///     """
+///     return distance / time
+/// ``` raise FasterThanLightError from exc
+/// ```
+#[violation]
+pub struct DocstringMissingArgument {
+    id: String,
+}
+
+impl Violation for DocstringMissingArgument {
+    #[derive_message_formats]
+    fn message(&self) -> String {
+        let DocstringMissingArgument { id } = self;
+        format!("Argument `{id}` missing from docstring")
+    }
+
+    fn fix_title(&self) -> Option<String> {
+        let DocstringMissingArgument { id } = self;
+        Some(format!("Add `{id}` to the docstring"))
+    }
+}
+
+/// ## What it does
+/// Checks for function docstrings that include arguments which are not
+/// in the function signature.
+///
+/// ## Why is this bad?
+/// If a docstring documents an argument which is not in the function signature,
+/// it can be misleading to users and/or a sign of incomplete documentation or
+/// refactors.
+///
+/// ## Example
+/// ```python
+/// def calculate_speed(distance: float, time: float) -> float:
+///     """Calculate speed as distance divided by time.
+///
+///     Args:
+///         distance: Distance traveled.
+///         time: Time spent traveling.
+///         acceleration: Rate of change of speed.
+///
+///     Returns:
+///         Speed as distance divided by time.
+///     """
+///     return distance / time
+/// ```
+///
+/// Use instead:
+/// ```python
+///     """Calculate speed as distance divided by time.
+///
+///     Args:
+///         distance: Distance traveled.
+///         time: Time spent traveling.
+///
+///     Returns:
+///         Speed as distance divided by time.
+///     """
+///     return distance / time
+/// ```
+#[violation]
+pub struct DocstringExtraneousArgument {
+    ids: Vec<String>,
+}
+
+impl Violation for DocstringExtraneousArgument {
+    #[derive_message_formats]
+    fn message(&self) -> String {
+        let DocstringExtraneousArgument { ids } = self;
+
+        if let [id] = ids.as_slice() {
+            format!("`{id}` is not in the function's signature")
+        } else {
+            format!(
+                "These arguments are not in the function's signature: {}",
+                ids.iter().map(|id| format!("`{id}`")).join(", ")
+            )
+        }
+    }
+
+    fn fix_title(&self) -> Option<String> {
+        let DocstringExtraneousArgument { ids } = self;
+        Some(format!(
+            "Remove {} from the docstring",
+            ids.iter().map(|id| format!("`{id}`")).join(", ")
+        ))
+    }
+}
+
+/// ## What it does
 /// Checks for functions with explicit returns missing a "returns" section in
 /// their docstring.
 ///

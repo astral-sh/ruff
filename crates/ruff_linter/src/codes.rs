@@ -921,6 +921,8 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (FastApi, "002") => (RuleGroup::Preview, rules::fastapi::rules::FastApiNonAnnotatedDependency),
 
         // pydoclint
+        (Pydoclint, "101") => (RuleGroup::Preview, rules::pydoclint::rules::DocstringMissingArgument),
+        (Pydoclint, "102") => (RuleGroup::Preview, rules::pydoclint::rules::DocstringExtraneousArgument),
         (Pydoclint, "201") => (RuleGroup::Preview, rules::pydoclint::rules::DocstringMissingReturns),
         (Pydoclint, "202") => (RuleGroup::Preview, rules::pydoclint::rules::DocstringExtraneousReturns),
         (Pydoclint, "402") => (RuleGroup::Preview, rules::pydoclint::rules::DocstringMissingYields),
