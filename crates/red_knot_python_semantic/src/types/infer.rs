@@ -933,8 +933,10 @@ impl<'db> TypeInferenceBuilder<'db> {
                 .as_i64()
                 .map(Type::IntLiteral)
                 .unwrap_or_else(|| builtins_symbol_ty_by_name(self.db, "int").instance()),
-            // TODO float or complex
-            _ => Type::Unknown,
+            ast::Number::Float(_) => builtins_symbol_ty_by_name(self.db, "float").instance(),
+            ast::Number::Complex { .. } => {
+                builtins_symbol_ty_by_name(self.db, "complex").instance()
+            }
         }
     }
 
@@ -1641,12 +1643,23 @@ mod tests {
     }
 
     #[test]
-    fn resolve_literal() -> anyhow::Result<()> {
+    fn number_literal() -> anyhow::Result<()> {
         let mut db = setup_db();
 
-        db.write_file("src/a.py", "x = 1")?;
+        db.write_dedented(
+            "src/a.py",
+            "
+            a = 1
+            b = 9223372036854775808
+            c = 1.45
+            d = 2j
+            ",
+        )?;
 
-        assert_public_ty(&db, "src/a.py", "x", "Literal[1]");
+        assert_public_ty(&db, "src/a.py", "a", "Literal[1]");
+        assert_public_ty(&db, "src/a.py", "b", "int");
+        assert_public_ty(&db, "src/a.py", "c", "float");
+        assert_public_ty(&db, "src/a.py", "d", "complex");
 
         Ok(())
     }
