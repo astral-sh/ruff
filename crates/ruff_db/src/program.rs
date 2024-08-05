@@ -39,6 +39,18 @@ pub enum TargetVersion {
 }
 
 impl TargetVersion {
+    pub const fn as_tuple(self) -> (u8, u8) {
+        match self {
+            Self::Py37 => (3, 7),
+            Self::Py38 => (3, 8),
+            Self::Py39 => (3, 9),
+            Self::Py310 => (3, 10),
+            Self::Py311 => (3, 11),
+            Self::Py312 => (3, 12),
+            Self::Py313 => (3, 13),
+        }
+    }
+
     const fn as_str(self) -> &'static str {
         match self {
             Self::Py37 => "py37",

@@ -1,7 +1,6 @@
 use std::borrow::Cow;
 use std::iter::FusedIterator;
 
-use once_cell::sync::Lazy;
 use ruff_db::files::{File, FilePath, FileRootKind};
 use ruff_db::program::{Program, SearchPathSettings, TargetVersion};
 use ruff_db::system::{DirectoryEntry, System, SystemPath, SystemPathBuf};
@@ -447,60 +446,21 @@ struct ModuleNameIngredient<'db> {
     pub(super) name: ModuleName,
 }
 
-/// Modules that are builtin to the Python interpreter itself.
-///
-/// When these module names are imported, standard module resolution is bypassed:
-/// the module name always resolves to the stdlib module,
-/// even if there's a module of the same name in the workspace root
-/// (which would normally result in the stdlib module being overridden).
-///
-/// TODO(Alex): write a script to generate this list,
-/// similar to what we do in `crates/ruff_python_stdlib/src/sys.rs`
-static BUILTIN_MODULES: Lazy<FxHashSet<&str>> = Lazy::new(|| {
-    const BUILTIN_MODULE_NAMES: &[&str] = &[
-        "_abc",
-        "_ast",
-        "_codecs",
-        "_collections",
-        "_functools",
-        "_imp",
-        "_io",
-        "_locale",
-        "_operator",
-        "_signal",
-        "_sre",
-        "_stat",
-        "_string",
-        "_symtable",
-        "_thread",
-        "_tokenize",
-        "_tracemalloc",
-        "_typing",
-        "_warnings",
-        "_weakref",
-        "atexit",
-        "builtins",
-        "errno",
-        "faulthandler",
-        "gc",
-        "itertools",
-        "marshal",
-        "posix",
-        "pwd",
-        "sys",
-        "time",
-    ];
-    BUILTIN_MODULE_NAMES.iter().copied().collect()
-});
-
 /// Given a module name and a list of search paths in which to lookup modules,
 /// attempt to resolve the module name
 fn resolve_name(db: &dyn Db, name: &ModuleName) -> Option<(SearchPath, File, ModuleKind)> {
     let resolver_settings = module_resolution_settings(db);
-    let resolver_state = ResolverState::new(db, resolver_settings.target_version());
-    let is_builtin_module = BUILTIN_MODULES.contains(&name.as_str());
+    let target_version = resolver_settings.target_version();
+    let resolver_state = ResolverState::new(db, target_version);
+    let (_, minor_version) = target_version.as_tuple();
+    let is_builtin_module =
+        ruff_python_stdlib::sys::is_builtin_module(minor_version, name.as_str());
 
     for search_path in resolver_settings.search_paths(db) {
+        // When a builtin module is imported, standard module resolution is bypassed:
+        // the module name always resolves to the stdlib module,
+        // even if there's a module of the same name in the workspace root
+        // (which would normally result in the stdlib module being overridden).
         if is_builtin_module && !search_path.is_standard_library() {
             continue;
         }
