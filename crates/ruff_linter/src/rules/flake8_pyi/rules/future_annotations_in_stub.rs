@@ -45,20 +45,22 @@ pub(crate) fn from_future_import(checker: &mut Checker, target: &StmtImportFrom)
         if name == "__future__" && names.iter().any(|alias| &*alias.name == "annotations") {
             let mut diagnostic = Diagnostic::new(FutureAnnotationsInStub, *range);
 
-            let stmt = checker.semantic().current_statement();
+            if checker.settings.preview.is_enabled() {
+                let stmt = checker.semantic().current_statement();
 
-            diagnostic.try_set_fix(|| {
-                let edit = fix::edits::remove_unused_imports(
-                    std::iter::once("annotations"),
-                    stmt,
-                    None,
-                    checker.locator(),
-                    checker.stylist(),
-                    checker.indexer(),
-                )?;
+                diagnostic.try_set_fix(|| {
+                    let edit = fix::edits::remove_unused_imports(
+                        std::iter::once("annotations"),
+                        stmt,
+                        None,
+                        checker.locator(),
+                        checker.stylist(),
+                        checker.indexer(),
+                    )?;
 
-                Ok(Fix::unsafe_edit(edit))
-            });
+                    Ok(Fix::unsafe_edit(edit))
+                });
+            }
 
             checker.diagnostics.push(diagnostic);
         }
