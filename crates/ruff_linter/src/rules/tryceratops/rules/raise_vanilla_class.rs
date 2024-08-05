@@ -73,7 +73,10 @@ pub(crate) fn raise_vanilla_class(checker: &mut Checker, expr: &Expr) {
         .semantic()
         .resolve_qualified_name(node)
         .is_some_and(|qualified_name| {
-            matches!(qualified_name.segments(), ["" | "builtins", "Exception" | "BaseException"])
+            matches!(
+                qualified_name.segments(),
+                ["" | "builtins", "Exception" | "BaseException"]
+            )
         })
     {
         checker
