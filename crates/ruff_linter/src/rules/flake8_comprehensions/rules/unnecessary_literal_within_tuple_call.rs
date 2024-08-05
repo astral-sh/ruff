@@ -10,9 +10,16 @@ use crate::rules::flake8_comprehensions::fixes;
 
 use super::helpers;
 
+#[derive(Debug, PartialEq, Eq)]
+enum TupleLiteralKind {
+    List,
+    Tuple,
+    ListComp,
+}
+
 /// ## What it does
 /// Checks for `tuple` calls that take unnecessary list or tuple literals as
-/// arguments. This includes literals in the form of list or set comprehensions.
+/// arguments. This includes literals in the form of list comprehensions.
 ///
 /// ## Why is this bad?
 /// It's unnecessary to use a list or tuple literal within a `tuple()` call,
@@ -44,32 +51,36 @@ use super::helpers;
 ///
 #[violation]
 pub struct UnnecessaryLiteralWithinTupleCall {
-    literal: String,
+    literal_kind: TupleLiteralKind,
 }
 
 impl AlwaysFixableViolation for UnnecessaryLiteralWithinTupleCall {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let UnnecessaryLiteralWithinTupleCall { literal } = self;
-        if literal == "list" {
-            format!(
-                "Unnecessary `{literal}` literal passed to `tuple()` (rewrite as a `tuple` literal)"
-            )
-        } else {
-            format!(
-                "Unnecessary `{literal}` literal passed to `tuple()` (remove the outer call to `tuple()`)"
-            )
+        let UnnecessaryLiteralWithinTupleCall { literal_kind } = self;
+        match literal_kind {
+            TupleLiteralKind::List => {
+                format!(
+                    "Unnecessary `list` literal passed to `tuple()` (rewrite as a `tuple` literal)"
+                )
+            }
+            TupleLiteralKind::Tuple => {
+                format!("Unnecessary `tuple` literal passed to `tuple()` (remove the outer call to `tuple()`)")
+            }
+            TupleLiteralKind::ListComp => {
+                format!(
+                    "Unnecessary list comprehension passed to `tuple()` (rewrite with generator)"
+                )
+            }
         }
     }
 
     fn fix_title(&self) -> String {
-        let UnnecessaryLiteralWithinTupleCall { literal } = self;
-        {
-            if literal == "list" {
-                "Rewrite as a `tuple` literal".to_string()
-            } else {
-                "Remove outer `tuple` call".to_string()
-            }
+        let UnnecessaryLiteralWithinTupleCall { literal_kind } = self;
+        match literal_kind {
+            TupleLiteralKind::List => "Rewrite as a `tuple` literal.".to_string(),
+            TupleLiteralKind::Tuple => "Remove the outer call to `tuple()`.".to_string(),
+            TupleLiteralKind::ListComp => "Rewrite with generator".to_string(),
         }
     }
 }
@@ -95,16 +106,15 @@ pub(crate) fn unnecessary_literal_within_tuple_call(
         return;
     }
     let argument_kind = match argument {
-        Expr::Tuple(_) => "tuple",
-        Expr::List(_) => "list",
-        Expr::ListComp(_) => "list comprehension",
-        Expr::SetComp(_) => "set comprehension",
+        Expr::Tuple(_) => TupleLiteralKind::Tuple,
+        Expr::List(_) => TupleLiteralKind::List,
+        Expr::ListComp(_) => TupleLiteralKind::ListComp,
         _ => return,
     };
 
     let mut diagnostic = Diagnostic::new(
         UnnecessaryLiteralWithinTupleCall {
-            literal: argument_kind.to_string(),
+            literal_kind: argument_kind,
         },
         call.range(),
     );
@@ -146,10 +156,8 @@ pub(crate) fn unnecessary_literal_within_tuple_call(
             );
             Fix::unsafe_edits(elt_start, [elt_end])
         });
-    } else if argument.is_list_comp_expr() | argument.is_set_comp_expr() {
-        let (Expr::ListComp(ast::ExprListComp { elt, .. })
-        | Expr::SetComp(ast::ExprSetComp { elt, .. })) = argument
-        else {
+    } else if argument.is_list_comp_expr() {
+        let Expr::ListComp(ast::ExprListComp { elt, .. }) = argument else {
             return;
         };
         if any_over_expr(elt, &Expr::is_await_expr) {
