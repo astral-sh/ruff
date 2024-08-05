@@ -12,7 +12,7 @@ fn setup_db(workspace_root: SystemPathBuf) -> anyhow::Result<RootDatabase> {
     let workspace = WorkspaceMetadata::from_path(&workspace_root, &system)?;
     let search_paths = SearchPathSettings {
         extra_paths: vec![],
-        workspace_root,
+        src_root: workspace_root,
         custom_typeshed: None,
         site_packages: vec![],
     };

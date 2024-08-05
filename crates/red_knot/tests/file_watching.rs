@@ -179,7 +179,7 @@ where
 {
     setup_with_search_paths(setup_files, |_root, workspace_path| SearchPathSettings {
         extra_paths: vec![],
-        workspace_root: workspace_path.to_path_buf(),
+        src_root: workspace_path.to_path_buf(),
         custom_typeshed: None,
         site_packages: vec![],
     })
@@ -695,7 +695,7 @@ fn search_path() -> anyhow::Result<()> {
         setup_with_search_paths([("bar.py", "import sub.a")], |root_path, workspace_path| {
             SearchPathSettings {
                 extra_paths: vec![],
-                workspace_root: workspace_path.to_path_buf(),
+                src_root: workspace_path.to_path_buf(),
                 custom_typeshed: None,
                 site_packages: vec![root_path.join("site_packages")],
             }
@@ -755,7 +755,7 @@ fn remove_search_path() -> anyhow::Result<()> {
         setup_with_search_paths([("bar.py", "import sub.a")], |root_path, workspace_path| {
             SearchPathSettings {
                 extra_paths: vec![],
-                workspace_root: workspace_path.to_path_buf(),
+                src_root: workspace_path.to_path_buf(),
                 custom_typeshed: None,
                 site_packages: vec![root_path.join("site_packages")],
             }
@@ -1173,7 +1173,7 @@ mod unix {
             },
             |_root, workspace| SearchPathSettings {
                 extra_paths: vec![],
-                workspace_root: workspace.to_path_buf(),
+                src_root: workspace.to_path_buf(),
                 custom_typeshed: None,
                 site_packages: vec![workspace.join(".venv/lib/python3.12/site-packages")],
             },

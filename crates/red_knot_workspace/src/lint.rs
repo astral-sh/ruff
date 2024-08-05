@@ -317,7 +317,7 @@ mod tests {
         setup_db_with_root(SystemPathBuf::from("/src"))
     }
 
-    fn setup_db_with_root(workspace_root: SystemPathBuf) -> TestDb {
+    fn setup_db_with_root(src_root: SystemPathBuf) -> TestDb {
         let db = TestDb::new();
 
         Program::new(
@@ -325,7 +325,7 @@ mod tests {
             TargetVersion::Py38,
             SearchPathSettings {
                 extra_paths: Vec::new(),
-                workspace_root,
+                src_root,
                 site_packages: vec![],
                 custom_typeshed: None,
             },

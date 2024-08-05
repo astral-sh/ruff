@@ -40,13 +40,13 @@ fn setup_case() -> Case {
     ])
     .unwrap();
 
-    let workspace_root = SystemPath::new("/src");
-    let metadata = WorkspaceMetadata::from_path(workspace_root, &system).unwrap();
+    let src_root = SystemPath::new("/src");
+    let metadata = WorkspaceMetadata::from_path(src_root, &system).unwrap();
     let settings = ProgramSettings {
         target_version: TargetVersion::Py312,
         search_paths: SearchPathSettings {
             extra_paths: vec![],
-            workspace_root: workspace_root.to_path_buf(),
+            src_root: src_root.to_path_buf(),
             site_packages: vec![],
             custom_typeshed: None,
         },

@@ -224,7 +224,7 @@ impl TestCaseBuilder<MockedTypeshed> {
             target_version,
             SearchPathSettings {
                 extra_paths: vec![],
-                workspace_root: src.clone(),
+                src_root: src.clone(),
                 custom_typeshed: Some(typeshed.clone()),
                 site_packages: vec![site_packages.clone()],
             },
@@ -277,7 +277,7 @@ impl TestCaseBuilder<VendoredTypeshed> {
             target_version,
             SearchPathSettings {
                 extra_paths: vec![],
-                workspace_root: src.clone(),
+                src_root: src.clone(),
                 custom_typeshed: None,
                 site_packages: vec![site_packages.clone()],
             },

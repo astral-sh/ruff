@@ -123,7 +123,7 @@ fn try_resolve_module_resolution_settings(
 
     let SearchPathSettings {
         extra_paths,
-        workspace_root,
+        src_root,
         custom_typeshed,
         site_packages,
     } = program.search_paths(db.upcast());
@@ -146,7 +146,7 @@ fn try_resolve_module_resolution_settings(
         static_search_paths.push(SearchPath::extra(system, path.clone())?);
     }
 
-    static_search_paths.push(SearchPath::first_party(system, workspace_root.clone())?);
+    static_search_paths.push(SearchPath::first_party(system, src_root.clone())?);
 
     static_search_paths.push(if let Some(custom_typeshed) = custom_typeshed.as_ref() {
         files.try_add_root(
@@ -459,7 +459,7 @@ fn resolve_name(db: &dyn Db, name: &ModuleName) -> Option<(SearchPath, File, Mod
     for search_path in resolver_settings.search_paths(db) {
         // When a builtin module is imported, standard module resolution is bypassed:
         // the module name always resolves to the stdlib module,
-        // even if there's a module of the same name in the workspace root
+        // even if there's a module of the same name in the first-party root
         // (which would normally result in the stdlib module being overridden).
         if is_builtin_module && !search_path.is_standard_library() {
             continue;
@@ -1160,7 +1160,7 @@ mod tests {
 
         let search_paths = SearchPathSettings {
             extra_paths: vec![],
-            workspace_root: src.clone(),
+            src_root: src.clone(),
             custom_typeshed: Some(custom_typeshed.clone()),
             site_packages: vec![site_packages],
         };
@@ -1664,7 +1664,7 @@ not_a_directory
             TargetVersion::default(),
             SearchPathSettings {
                 extra_paths: vec![],
-                workspace_root: SystemPathBuf::from("/src"),
+                src_root: SystemPathBuf::from("/src"),
                 custom_typeshed: None,
                 site_packages: vec![venv_site_packages, system_site_packages],
             },
