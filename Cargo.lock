@@ -134,6 +134,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b3d1d046238990b9cf5bcde22a3fb3584ee5cf65fb2765f454ed428c7a0063da"
 
 [[package]]
+name = "append-only-vec"
+version = "0.1.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "74d9f7083455f1a474276ccd32374958d2cb591024aac45101c7623b10271347"
+
+[[package]]
 name = "arc-swap"
 version = "1.7.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1206,9 +1212,9 @@ checksum = "49f1f14873335454500d59611f1cf4a4b0f786f9ac11f4312a78e4cf2566695b"
 
 [[package]]
 name = "jobserver"
-version = "0.1.31"
+version = "0.1.32"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d2b099aaa34a9751c5bf0878add70444e1ed2dd73f347be99003d4577277de6e"
+checksum = "48d1dbcbbeb6a7fec7e059840aa538bd62aaccf972c7346c4d9d2059312853d0"
 dependencies = [
  "libc",
 ]
@@ -1535,80 +1541,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8c81974681ab4f0cc9fe49cad56f821d1cc67a08cd2caa9b5d58b0adaa5dd36d"
 dependencies = [
  "indexmap",
-]
-
-[[package]]
-name = "orx-concurrent-ordered-bag"
-version = "2.2.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9aa866e2be4aa03927eddb481e7c479d5109fe3121324fb7db6d97f91adf9876"
-dependencies = [
- "orx-fixed-vec",
- "orx-pinned-concurrent-col",
- "orx-pinned-vec",
- "orx-pseudo-default",
- "orx-split-vec",
-]
-
-[[package]]
-name = "orx-concurrent-vec"
-version = "2.2.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c5912426ffb660f8b61e8f0812a1d07400803cd5513969d2c7af4d69602ba8a1"
-dependencies = [
- "orx-concurrent-ordered-bag",
- "orx-fixed-vec",
- "orx-pinned-concurrent-col",
- "orx-pinned-vec",
- "orx-pseudo-default",
- "orx-split-vec",
-]
-
-[[package]]
-name = "orx-fixed-vec"
-version = "3.2.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7f69466c7c1fc2e1f00b58e39059b78c438b9fad144d1937ef177ecfc413e997"
-dependencies = [
- "orx-pinned-vec",
- "orx-pseudo-default",
-]
-
-[[package]]
-name = "orx-pinned-concurrent-col"
-version = "2.2.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "fdbcb1fa05dc1676f1c9cf19f443b3d2d2ca5835911477d22fa77cad8b79208d"
-dependencies = [
- "orx-fixed-vec",
- "orx-pinned-vec",
- "orx-pseudo-default",
- "orx-split-vec",
-]
-
-[[package]]
-name = "orx-pinned-vec"
-version = "3.2.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c1071baf586de45722668234bddf56c52c1ece6a6153d16541bbb0505f0ac055"
-dependencies = [
- "orx-pseudo-default",
-]
-
-[[package]]
-name = "orx-pseudo-default"
-version = "1.2.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a2f627c439e723fa78e410a0faba89047a8a47d0dc013da5c0e05806e8a6cddb"
-
-[[package]]
-name = "orx-split-vec"
-version = "3.2.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "52b9dbfa8c7069ae73a890870d3aa9097a897d616751d3d0278f2b42d5214730"
-dependencies = [
- "orx-pinned-vec",
- "orx-pseudo-default",
 ]
 
 [[package]]
@@ -2740,15 +2672,15 @@ checksum = "e86697c916019a8588c99b5fac3cead74ec0b4b819707a682fd4d23fa0ce1ba1"
 [[package]]
 name = "salsa"
 version = "0.18.0"
-source = "git+https://github.com/MichaReiser/salsa.git?rev=635e23943c095077c4a423488ac829b4ae0bfa77#635e23943c095077c4a423488ac829b4ae0bfa77"
+source = "git+https://github.com/MichaReiser/salsa.git?rev=b8635811b826a137ca0b8f9e1ab7d13b050d25a3#b8635811b826a137ca0b8f9e1ab7d13b050d25a3"
 dependencies = [
+ "append-only-vec",
  "arc-swap",
  "boomphf",
  "crossbeam",
  "dashmap 6.0.1",
  "hashlink",
  "indexmap",
- "orx-concurrent-vec",
  "parking_lot",
  "rustc-hash 2.0.0",
  "salsa-macro-rules",
@@ -2760,12 +2692,12 @@ dependencies = [
 [[package]]
 name = "salsa-macro-rules"
 version = "0.1.0"
-source = "git+https://github.com/MichaReiser/salsa.git?rev=635e23943c095077c4a423488ac829b4ae0bfa77#635e23943c095077c4a423488ac829b4ae0bfa77"
+source = "git+https://github.com/MichaReiser/salsa.git?rev=b8635811b826a137ca0b8f9e1ab7d13b050d25a3#b8635811b826a137ca0b8f9e1ab7d13b050d25a3"
 
 [[package]]
 name = "salsa-macros"
 version = "0.18.0"
-source = "git+https://github.com/MichaReiser/salsa.git?rev=635e23943c095077c4a423488ac829b4ae0bfa77#635e23943c095077c4a423488ac829b4ae0bfa77"
+source = "git+https://github.com/MichaReiser/salsa.git?rev=b8635811b826a137ca0b8f9e1ab7d13b050d25a3#b8635811b826a137ca0b8f9e1ab7d13b050d25a3"
 dependencies = [
  "heck",
  "proc-macro2",
