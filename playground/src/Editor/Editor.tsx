@@ -1,8 +1,7 @@
-import { useCallback, useDeferredValue, useMemo, useState } from "react";
+import { useDeferredValue, useMemo, useState } from "react";
 import { Panel, PanelGroup } from "react-resizable-panels";
 import { Diagnostic, Workspace } from "../pkg/ruff_wasm";
 import { ErrorMessage } from "./ErrorMessage";
-import Header from "./Header";
 import PrimarySideBar from "./PrimarySideBar";
 import { HorizontalResizeHandle } from "./ResizeHandle";
 import SecondaryPanel, {
@@ -10,17 +9,15 @@ import SecondaryPanel, {
   SecondaryTool,
 } from "./SecondaryPanel";
 import SecondarySideBar from "./SecondarySideBar";
-import { persist, persistLocal } from "./settings";
 import SettingsEditor from "./SettingsEditor";
 import SourceEditor from "./SourceEditor";
-import { useTheme } from "./theme";
+import { Theme } from "./theme";
 
 type Tab = "Source" | "Settings";
 
-interface Source {
+export interface Source {
   pythonSource: string;
   settingsSource: string;
-  revision: number;
 }
 
 interface CheckResult {
@@ -30,22 +27,19 @@ interface CheckResult {
 }
 
 type Props = {
-  initialSource: string;
-  initialSettings: string;
-  ruffVersion: string;
+  source: Source;
+  theme: Theme;
+
+  onSourceChanged(source: string): void;
+  onSettingsChanged(settings: string): void;
 };
 
 export default function Editor({
-  initialSource,
-  initialSettings,
-  ruffVersion,
+  source,
+  theme,
+  onSourceChanged,
+  onSettingsChanged,
 }: Props) {
-  const [source, setSource] = useState<Source>({
-    revision: 0,
-    pythonSource: initialSource,
-    settingsSource: initialSettings,
-  });
-
   const [tab, setTab] = useState<Tab>("Source");
   const [secondaryTool, setSecondaryTool] = useState<SecondaryTool | null>(
     () => {
@@ -59,8 +53,6 @@ export default function Editor({
       }
     },
   );
-
-  const [theme, setTheme] = useTheme();
 
   // Ideally this would be retrieved right from the URL... but routing without a proper
   // router is hard (there's no location changed event) and pulling in a router
@@ -153,94 +145,48 @@ export default function Editor({
     }
   }, [deferredSource, secondaryTool]);
 
-  const handleShare = useCallback(() => {
-    persist(source.settingsSource, source.pythonSource).catch((error) =>
-      console.error(`Failed to share playground: ${error}`),
-    );
-  }, [source]);
-
-  const handlePythonSourceChange = useCallback((pythonSource: string) => {
-    setSource((source) => {
-      const newSource = {
-        ...source,
-        pythonSource,
-        revision: source.revision + 1,
-      };
-
-      persistLocal(newSource);
-      return newSource;
-    });
-  }, []);
-
-  const handleSettingsSourceChange = useCallback((settingsSource: string) => {
-    setSource((source) => {
-      const newSource = {
-        ...source,
-        settingsSource,
-        revision: source.revision + 1,
-      };
-
-      persistLocal(newSource);
-      return newSource;
-    });
-  }, []);
-
   return (
-    <main className="flex flex-col h-full bg-ayu-background dark:bg-ayu-background-dark">
-      <Header
-        edit={source.revision}
-        theme={theme}
-        version={ruffVersion}
-        onChangeTheme={setTheme}
-        onShare={handleShare}
-      />
-
-      <div className="flex flex-grow">
-        {
-          <PanelGroup direction="horizontal" autoSaveId="main">
-            <PrimarySideBar
-              onSelectTool={(tool) => setTab(tool)}
-              selected={tab}
-            />
-            <Panel id="main" order={0} className="my-2" minSize={10}>
-              <SourceEditor
-                visible={tab === "Source"}
-                source={source.pythonSource}
+    <>
+      <PanelGroup direction="horizontal" autoSaveId="main">
+        <PrimarySideBar onSelectTool={(tool) => setTab(tool)} selected={tab} />
+        <Panel id="main" order={0} className="my-2" minSize={10}>
+          <SourceEditor
+            visible={tab === "Source"}
+            source={source.pythonSource}
+            theme={theme}
+            diagnostics={checkResult.diagnostics}
+            onChange={onSourceChanged}
+          />
+          <SettingsEditor
+            visible={tab === "Settings"}
+            source={source.settingsSource}
+            theme={theme}
+            onChange={onSettingsChanged}
+          />
+        </Panel>
+        {secondaryTool != null && (
+          <>
+            <HorizontalResizeHandle />
+            <Panel
+              id="secondary-panel"
+              order={1}
+              className={"my-2"}
+              minSize={10}
+            >
+              <SecondaryPanel
                 theme={theme}
-                diagnostics={checkResult.diagnostics}
-                onChange={handlePythonSourceChange}
-              />
-              <SettingsEditor
-                visible={tab === "Settings"}
-                source={source.settingsSource}
-                theme={theme}
-                onChange={handleSettingsSourceChange}
+                tool={secondaryTool}
+                result={checkResult.secondary}
               />
             </Panel>
-            {secondaryTool != null && (
-              <>
-                <HorizontalResizeHandle />
-                <Panel
-                  id="secondary-panel"
-                  order={1}
-                  className={"my-2"}
-                  minSize={10}
-                >
-                  <SecondaryPanel
-                    theme={theme}
-                    tool={secondaryTool}
-                    result={checkResult.secondary}
-                  />
-                </Panel>
-              </>
-            )}
-            <SecondarySideBar
-              selected={secondaryTool}
-              onSelected={handleSecondaryToolSelected}
-            />
-          </PanelGroup>
-        }
-      </div>
+          </>
+        )}
+        <SecondarySideBar
+          selected={secondaryTool}
+          onSelected={handleSecondaryToolSelected}
+        />
+      </PanelGroup>
+
       {checkResult.error && tab === "Source" ? (
         <div
           style={{
@@ -253,7 +199,7 @@ export default function Editor({
           <ErrorMessage>{checkResult.error}</ErrorMessage>
         </div>
       ) : null}
-    </main>
+    </>
   );
 }
 
