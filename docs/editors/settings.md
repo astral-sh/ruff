@@ -497,9 +497,9 @@ Rules to disable by default. See [the documentation](https://docs.astral.sh/ruff
     }
     ```
 
-### `extendIgnore`
+### `unfixable`
 
-Rules to disable in addition to those in [`lint.ignore`](#ignore).
+Rules for which fixes should be disabled default. See [the documentation](https://docs.astral.sh/ruff/settings/#unfixable).
 
 **Default value**: `null`
 
@@ -510,7 +510,7 @@ Rules to disable in addition to those in [`lint.ignore`](#ignore).
 === "VS Code"
     ```json
     {
-        "ruff.lint.extendIgnore": ["W1"]
+        "ruff.lint.unfixable": ["F401"]
     }
     ```
 
@@ -520,7 +520,7 @@ Rules to disable in addition to those in [`lint.ignore`](#ignore).
       init_options = {
         settings = {
           lint = {
-            extendIgnore = {"W1"}
+            ignore = {"F401"}
           }
         }
       }

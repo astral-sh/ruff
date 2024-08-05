@@ -37,6 +37,7 @@ pub(crate) struct ResolvedEditorSettings {
     pub(super) select: Option<Vec<RuleSelector>>,
     pub(super) extend_select: Option<Vec<RuleSelector>>,
     pub(super) ignore: Option<Vec<RuleSelector>>,
+    pub(super) unfixable: Option<Vec<RuleSelector>>,
     pub(super) exclude: Option<Vec<String>>,
     pub(super) line_length: Option<LineLength>,
     pub(super) configuration_preference: ConfigurationPreference,
@@ -130,6 +131,7 @@ struct LintOptions {
     select: Option<Vec<String>>,
     extend_select: Option<Vec<String>>,
     ignore: Option<Vec<String>>,
+    unfixable: Option<Vec<String>>,
 }
 
 impl LintOptions {
@@ -348,6 +350,16 @@ impl ResolvedClientSettings {
                         .map(|rule| RuleSelector::from_str(rule).ok())
                         .collect()
                 }),
+                unfixable: Self::resolve_optional(all_settings, |settings| {
+                    settings
+                        .lint
+                        .as_ref()?
+                        .unfixable
+                        .as_ref()?
+                        .iter()
+                        .map(|rule| RuleSelector::from_str(rule).ok())
+                        .collect()
+                }),
                 exclude: Self::resolve_optional(all_settings, |settings| settings.exclude.clone()),
                 line_length: Self::resolve_optional(all_settings, |settings| settings.line_length),
                 configuration_preference: Self::resolve_or(
@@ -480,6 +492,7 @@ mod tests {
                         ),
                         extend_select: None,
                         ignore: None,
+                        unfixable: None,
                     },
                 ),
                 format: Some(
@@ -535,6 +548,7 @@ mod tests {
                                 select: None,
                                 extend_select: None,
                                 ignore: None,
+                                unfixable: None,
                             },
                         ),
                         format: Some(
@@ -603,6 +617,7 @@ mod tests {
                                 select: None,
                                 extend_select: None,
                                 ignore: None,
+                                unfixable: None,
                             },
                         ),
                         format: Some(
@@ -691,6 +706,7 @@ mod tests {
                     ]),
                     extend_select: None,
                     ignore: None,
+                    unfixable: None,
                     exclude: None,
                     line_length: None,
                     configuration_preference: ConfigurationPreference::default(),
@@ -723,6 +739,7 @@ mod tests {
                     ]),
                     extend_select: None,
                     ignore: None,
+                    unfixable: None,
                     exclude: None,
                     line_length: None,
                     configuration_preference: ConfigurationPreference::EditorFirst,
@@ -754,6 +771,7 @@ mod tests {
                                 "RUF001",
                             ],
                         ),
+                        unfixable: None,
                     },
                 ),
                 format: None,
@@ -815,6 +833,7 @@ mod tests {
                     select: None,
                     extend_select: None,
                     ignore: Some(vec![RuleSelector::from_str("RUF001").unwrap()]),
+                    unfixable: None,
                     exclude: Some(vec!["third_party".into()]),
                     line_length: Some(LineLength::try_from(80).unwrap()),
                     configuration_preference: ConfigurationPreference::EditorFirst,

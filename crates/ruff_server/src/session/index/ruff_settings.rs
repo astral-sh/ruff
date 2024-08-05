@@ -246,6 +246,7 @@ impl<'a> ConfigurationTransformer for EditorConfigurationTransformer<'a> {
             select,
             extend_select,
             ignore,
+            unfixable,
             exclude,
             line_length,
             configuration_preference,
@@ -260,6 +261,7 @@ impl<'a> ConfigurationTransformer for EditorConfigurationTransformer<'a> {
                     select,
                     extend_select: extend_select.unwrap_or_default(),
                     ignore: ignore.unwrap_or_default(),
+                    unfixable: unfixable.unwrap_or_default(),
                     ..RuleSelection::default()
                 }],
                 ..LintConfiguration::default()
