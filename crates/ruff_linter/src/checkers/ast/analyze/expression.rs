@@ -852,7 +852,7 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
             }
             if checker.enabled(Rule::ZipInsteadOfPairwise) {
                 if checker.settings.target_version >= PythonVersion::Py310 {
-                    ruff::rules::zip_instead_of_pairwise(checker, func, args);
+                    ruff::rules::zip_instead_of_pairwise(checker, call);
                 }
             }
             if checker.any_enabled(&[
