@@ -13,6 +13,7 @@ use ruff_text_size::{Ranged, TextRange};
 use crate::checkers::ast::Checker;
 use crate::docstrings::sections::{SectionContext, SectionContexts, SectionKind};
 use crate::docstrings::styles::SectionStyle;
+use crate::docstrings::Docstring;
 use crate::registry::Rule;
 use crate::rules::pydocstyle::settings::Convention;
 
@@ -649,10 +650,27 @@ fn is_exception_or_base_exception(qualified_name: &QualifiedName) -> bool {
     )
 }
 
+fn starts_with_returns(docstring: &Docstring) -> bool {
+    if let Some(first_word) = docstring.body().as_str().split(" ").next() {
+        return first_word == "Returns";
+    }
+    false
+}
+
+fn returns_documented(
+    docstring: &Docstring,
+    docstring_sections: &DocstringSections,
+    convention: Option<Convention>,
+) -> bool {
+    docstring_sections.returns.is_some()
+        || (matches!(convention, Some(Convention::Google)) && starts_with_returns(docstring))
+}
+
 /// DOC201, DOC202, DOC402, DOC403, DOC501, DOC502
 pub(crate) fn check_docstring(
     checker: &mut Checker,
     definition: &Definition,
+    docstring: &Docstring,
     section_contexts: &SectionContexts,
     convention: Option<Convention>,
 ) {
@@ -687,7 +705,7 @@ pub(crate) fn check_docstring(
 
     // DOC201
     if checker.enabled(Rule::DocstringMissingReturns) {
-        if docstring_sections.returns.is_none() {
+        if !returns_documented(docstring, &docstring_sections, convention) {
             let extra_property_decorators = checker.settings.pydocstyle.property_decorators();
             if !definition.is_property(extra_property_decorators, checker.semantic()) {
                 if let Some(body_return) = body_entries.returns.first() {

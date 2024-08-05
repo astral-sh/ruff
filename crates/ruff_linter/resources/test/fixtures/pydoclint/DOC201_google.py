@@ -86,3 +86,9 @@ class Baz:
             num (int): A number
         """
         return 'test'
+
+
+# OK
+def f():
+    """Returns 1."""
+    return 1
