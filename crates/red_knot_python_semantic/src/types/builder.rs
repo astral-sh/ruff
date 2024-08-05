@@ -65,7 +65,6 @@ impl<'db> UnionBuilder<'db> {
     }
 }
 
-#[allow(unused)]
 #[derive(Clone)]
 pub(crate) struct IntersectionBuilder<'db> {
     // Really this builds a union-of-intersections, because we always keep our set-theoretic types
@@ -78,8 +77,7 @@ pub(crate) struct IntersectionBuilder<'db> {
 }
 
 impl<'db> IntersectionBuilder<'db> {
-    #[allow(dead_code)]
-    fn new(db: &'db dyn Db) -> Self {
+    pub(crate) fn new(db: &'db dyn Db) -> Self {
         Self {
             db,
             intersections: vec![InnerIntersectionBuilder::new()],
@@ -93,8 +91,7 @@ impl<'db> IntersectionBuilder<'db> {
         }
     }
 
-    #[allow(dead_code)]
-    fn add_positive(mut self, ty: Type<'db>) -> Self {
+    pub(crate) fn add_positive(mut self, ty: Type<'db>) -> Self {
         if let Type::Union(union) = ty {
             // Distribute ourself over this union: for each union element, clone ourself and
             // intersect with that union element, then create a new union-of-intersections with all
@@ -122,8 +119,7 @@ impl<'db> IntersectionBuilder<'db> {
         }
     }
 
-    #[allow(dead_code)]
-    fn add_negative(mut self, ty: Type<'db>) -> Self {
+    pub(crate) fn add_negative(mut self, ty: Type<'db>) -> Self {
         // See comments above in `add_positive`; this is just the negated version.
         if let Type::Union(union) = ty {
             union
@@ -142,8 +138,7 @@ impl<'db> IntersectionBuilder<'db> {
         }
     }
 
-    #[allow(dead_code)]
-    fn build(mut self) -> Type<'db> {
+    pub(crate) fn build(mut self) -> Type<'db> {
         // Avoid allocating the UnionBuilder unnecessarily if we have just one intersection:
         if self.intersections.len() == 1 {
             self.intersections.pop().unwrap().build(self.db)
@@ -157,7 +152,6 @@ impl<'db> IntersectionBuilder<'db> {
     }
 }
 
-#[allow(unused)]
 #[derive(Debug, Clone, Default)]
 struct InnerIntersectionBuilder<'db> {
     positive: FxOrderSet<Type<'db>>,
@@ -222,6 +216,16 @@ impl<'db> InnerIntersectionBuilder<'db> {
         if self.positive.contains(&Type::Unbound) {
             self.positive.retain(Type::is_unbound);
             self.negative.clear();
+        }
+
+        // None intersects only with object
+        for pos in &self.positive {
+            if let Type::Instance(_) = pos {
+                // could be `object` type
+            } else {
+                self.negative.remove(&Type::None);
+                break;
+            }
         }
     }
 
@@ -448,6 +452,17 @@ mod tests {
         let db = setup_db();
         let ty = IntersectionBuilder::new(&db)
             .add_negative(Type::Unbound)
+            .add_positive(Type::IntLiteral(1))
+            .build();
+
+        assert_eq!(ty, Type::IntLiteral(1));
+    }
+
+    #[test]
+    fn build_intersection_simplify_negative_none() {
+        let db = setup_db();
+        let ty = IntersectionBuilder::new(&db)
+            .add_negative(Type::None)
             .add_positive(Type::IntLiteral(1))
             .build();
 

@@ -4,15 +4,22 @@ use ruff_python_ast::name::Name;
 use crate::builtins::builtins_scope;
 use crate::semantic_index::definition::Definition;
 use crate::semantic_index::symbol::{ScopeId, ScopedSymbolId};
-use crate::semantic_index::{global_scope, symbol_table, use_def_map};
+use crate::semantic_index::{
+    global_scope, symbol_table, use_def_map, DefinitionWithConstraints,
+    DefinitionWithConstraintsIterator,
+};
+use crate::types::narrow::narrowing_constraint;
 use crate::{Db, FxOrderSet};
 
 mod builder;
 mod display;
 mod infer;
+mod narrow;
 
-pub(crate) use self::builder::UnionBuilder;
-pub(crate) use self::infer::{infer_definition_types, infer_scope_types};
+pub(crate) use self::builder::{IntersectionBuilder, UnionBuilder};
+pub(crate) use self::infer::{
+    infer_definition_types, infer_expression_types, infer_scope_types, TypeInference,
+};
 
 /// Infer the public type of a symbol (its type as seen from outside its scope).
 pub(crate) fn symbol_ty<'db>(
@@ -82,10 +89,31 @@ pub(crate) fn definition_ty<'db>(db: &'db dyn Db, definition: Definition<'db>) -
 /// provide an `unbound_ty`.
 pub(crate) fn definitions_ty<'db>(
     db: &'db dyn Db,
-    definitions: &[Definition<'db>],
+    definitions_with_constraints: DefinitionWithConstraintsIterator<'_, 'db>,
     unbound_ty: Option<Type<'db>>,
 ) -> Type<'db> {
-    let def_types = definitions.iter().map(|def| definition_ty(db, *def));
+    let def_types = definitions_with_constraints.map(
+        |DefinitionWithConstraints {
+             definition,
+             constraints,
+         }| {
+            let mut constraint_tys =
+                constraints.filter_map(|test| narrowing_constraint(db, test, definition));
+            let definition_ty = definition_ty(db, definition);
+            if let Some(first_constraint_ty) = constraint_tys.next() {
+                let mut builder = IntersectionBuilder::new(db);
+                builder = builder
+                    .add_positive(definition_ty)
+                    .add_positive(first_constraint_ty);
+                for constraint_ty in constraint_tys {
+                    builder = builder.add_positive(constraint_ty);
+                }
+                builder.build()
+            } else {
+                definition_ty
+            }
+        },
+    );
     let mut all_types = unbound_ty.into_iter().chain(def_types);
 
     let Some(first) = all_types.next() else {

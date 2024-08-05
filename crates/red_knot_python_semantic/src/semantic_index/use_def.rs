@@ -1,4 +1,5 @@
-//! Build a map from each use of a symbol to the definitions visible from that use.
+//! Build a map from each use of a symbol to the definitions visible from that use, and the
+//! type-narrowing constraints that apply to each definition.
 //!
 //! Let's take this code sample:
 //!
@@ -6,7 +7,7 @@
 //! x = 1
 //! x = 2
 //! y = x
-//! if flag:
+//! if y is not None:
 //!     x = 3
 //! else:
 //!     x = 4
@@ -34,8 +35,8 @@
 //! [`AstIds`](crate::semantic_index::ast_ids::AstIds) we number all uses (that means a `Name` node
 //! with `Load` context) so we have a `ScopedUseId` to efficiently represent each use.
 //!
-//! The other case we need to handle is when a symbol is referenced from a different scope (the
-//! most obvious example of this is an import). We call this "public" use of a symbol. So the other
+//! Another case we need to handle is when a symbol is referenced from a different scope (the most
+//! obvious example of this is an import). We call this "public" use of a symbol. So the other
 //! question we need to be able to answer is, what are the publicly-visible definitions of each
 //! symbol?
 //!
@@ -53,42 +54,55 @@
 //! start.)
 //!
 //! So this means that the publicly-visible definitions of a symbol are the definitions still
-//! visible at the end of the scope.
+//! visible at the end of the scope; effectively we have an implicit "use" of every symbol at the
+//! end of the scope.
 //!
-//! The data structure we build to answer these two questions is the `UseDefMap`. It has a
+//! We also need to know, for a given definition of a symbol, what type-narrowing constraints apply
+//! to it. For instance, in this code sample:
+//!
+//! ```python
+//! x = 1 if flag else None
+//! if x is not None:
+//!     y = x
+//! ```
+//!
+//! At the use of `x` in `y = x`, the visible definition of `x` is `1 if flag else None`, which
+//! would infer as the type `Literal[1] | None`. But the constraint `x is not None` dominates this
+//! use, which means we can rule out the possibility that `x` is `None` here, which should give us
+//! the type `Literal[1]` for this use.
+//!
+//! The data structure we build to answer these questions is the `UseDefMap`. It has a
 //! `definitions_by_use` vector indexed by [`ScopedUseId`] and a `public_definitions` vector
 //! indexed by [`ScopedSymbolId`]. The values in each of these vectors are (in principle) a list of
-//! visible definitions at that use, or at the end of the scope for that symbol.
+//! visible definitions at that use, or at the end of the scope for that symbol, with a list of the
+//! dominating constraints for each of those definitions.
 //!
-//! In order to avoid vectors-of-vectors and all the allocations that would entail, we don't
-//! actually store these "list of visible definitions" as a vector of [`Definition`] IDs. Instead,
-//! the values in `definitions_by_use` and `public_definitions` are a [`Definitions`] struct that
-//! keeps a [`Range`] into a third vector of [`Definition`] IDs, `all_definitions`. The trick with
-//! this representation is that it requires that the definitions visible at any given use of a
-//! symbol are stored sequentially in `all_definitions`.
+//! In order to avoid vectors-of-vectors-of-vectors and all the allocations that would entail, we
+//! don't actually store these "list of visible definitions" as a vector of [`Definition`].
+//! Instead, the values in `definitions_by_use` and `public_definitions` are a [`SymbolState`]
+//! struct which uses bit-sets to track definitions and constraints in terms of
+//! [`ScopedDefinitionId`] and [`ScopedConstraintId`], which are indices into the `all_definitions`
+//! and `all_constraints` indexvecs in the [`UseDefMap`].
 //!
-//! There is another special kind of possible "definition" for a symbol: it might be unbound in the
-//! scope. (This isn't equivalent to "zero visible definitions", since we may go through an `if`
-//! that has a definition for the symbol, leaving us with one visible definition, but still also
-//! the "unbound" possibility, since we might not have taken the `if` branch.)
+//! There is another special kind of possible "definition" for a symbol: there might be a path from
+//! the scope entry to a given use in which the symbol is never bound.
 //!
 //! The simplest way to model "unbound" would be as an actual [`Definition`] itself: the initial
 //! visible [`Definition`] for each symbol in a scope. But actually modeling it this way would
-//! dramatically increase the number of [`Definition`] that Salsa must track. Since "unbound" is a
+//! unnecessarily increase the number of [`Definition`] that Salsa must track. Since "unbound" is a
 //! special definition in that all symbols share it, and it doesn't have any additional per-symbol
-//! state, we can represent it more efficiently: we use the `may_be_unbound` boolean on the
-//! [`Definitions`] struct. If this flag is `true`, it means the symbol/use really has one
-//! additional visible "definition", which is the unbound state. If this flag is `false`, it means
-//! we've eliminated the possibility of unbound: every path we've followed includes a definition
-//! for this symbol.
+//! state, and constraints are irrelevant to it, we can represent it more efficiently: we use the
+//! `may_be_unbound` boolean on the [`SymbolState`] struct. If this flag is `true`, it means the
+//! symbol/use really has one additional visible "definition", which is the unbound state. If this
+//! flag is `false`, it means we've eliminated the possibility of unbound: every path we've
+//! followed includes a definition for this symbol.
 //!
-//! To build a [`UseDefMap`], the [`UseDefMapBuilder`] is notified of each new use and definition
-//! as they are encountered by the
+//! To build a [`UseDefMap`], the [`UseDefMapBuilder`] is notified of each new use, definition, and
+//! constraint as they are encountered by the
 //! [`SemanticIndexBuilder`](crate::semantic_index::builder::SemanticIndexBuilder) AST visit. For
-//! each symbol, the builder tracks the currently-visible definitions for that symbol. When we hit
-//! a use of a symbol, it records the currently-visible definitions for that symbol as the visible
-//! definitions for that use. When we reach the end of the scope, it records the currently-visible
-//! definitions for each symbol as the public definitions of that symbol.
+//! each symbol, the builder tracks the `SymbolState` for that symbol. When we hit a use of a
+//! symbol, it records the current state for that symbol for that use. When we reach the end of the
+//! scope, it records the state for each symbol as the public definitions of that symbol.
 //!
 //! Let's walk through the above example. Initially we record for `x` that it has no visible
 //! definitions, and may be unbound. When we see `x = 1`, we record that as the sole visible
@@ -98,10 +112,11 @@
 //!
 //! Then we hit the `if` branch. We visit the `test` node (`flag` in this case), since that will
 //! happen regardless. Then we take a pre-branch snapshot of the currently visible definitions for
-//! all symbols, which we'll need later. Then we go ahead and visit the `if` body. When we see `x =
-//! 3`, it replaces `x = 2` as the sole visible definition of `x`. At the end of the `if` body, we
-//! take another snapshot of the currently-visible definitions; we'll call this the post-if-body
-//! snapshot.
+//! all symbols, which we'll need later. Then we record `flag` as a possible constraint on the
+//! currently visible definition (`x = 2`), and go ahead and visit the `if` body. When we see `x =
+//! 3`, it replaces `x = 2` (constrained by `flag`) as the sole visible definition of `x`. At the
+//! end of the `if` body, we take another snapshot of the currently-visible definitions; we'll call
+//! this the post-if-body snapshot.
 //!
 //! Now we need to visit the `else` clause. The conditions when entering the `else` clause should
 //! be the pre-if conditions; if we are entering the `else` clause, we know that the `if` test
@@ -125,98 +140,142 @@
 //! (In the future we may have some other questions we want to answer as well, such as "is this
 //! definition used?", which will require tracking a bit more info in our map, e.g. a "used" bit
 //! for each [`Definition`] which is flipped to true when we record that definition for a use.)
+use self::symbol_state::{
+    ConstraintIdIterator, DefinitionIdWithConstraintsIterator, ScopedConstraintId,
+    ScopedDefinitionId, SymbolState,
+};
 use crate::semantic_index::ast_ids::ScopedUseId;
 use crate::semantic_index::definition::Definition;
+use crate::semantic_index::expression::Expression;
 use crate::semantic_index::symbol::ScopedSymbolId;
 use ruff_index::IndexVec;
-use std::ops::Range;
 
-/// All definitions that can reach a given use of a name.
+mod bitset;
+mod symbol_state;
+
+/// Applicable definitions and constraints for every use of a name.
 #[derive(Debug, PartialEq, Eq)]
 pub(crate) struct UseDefMap<'db> {
-    // TODO store constraints with definitions for type narrowing
-    /// Definition IDs array for `definitions_by_use` and `public_definitions` to slice into.
-    all_definitions: Vec<Definition<'db>>,
+    /// Array of [`Definition`] in this scope.
+    all_definitions: IndexVec<ScopedDefinitionId, Definition<'db>>,
 
-    /// Definitions that can reach a [`ScopedUseId`].
-    definitions_by_use: IndexVec<ScopedUseId, Definitions>,
+    /// Array of constraints (as [`Expression`]) in this scope.
+    all_constraints: IndexVec<ScopedConstraintId, Expression<'db>>,
 
-    /// Definitions of each symbol visible at end of scope.
-    public_definitions: IndexVec<ScopedSymbolId, Definitions>,
+    /// [`SymbolState`] visible at a [`ScopedUseId`].
+    definitions_by_use: IndexVec<ScopedUseId, SymbolState>,
+
+    /// [`SymbolState`] visible at end of scope for each symbol.
+    public_definitions: IndexVec<ScopedSymbolId, SymbolState>,
 }
 
 impl<'db> UseDefMap<'db> {
-    pub(crate) fn use_definitions(&self, use_id: ScopedUseId) -> &[Definition<'db>] {
-        &self.all_definitions[self.definitions_by_use[use_id].definitions_range.clone()]
+    pub(crate) fn use_definitions(
+        &self,
+        use_id: ScopedUseId,
+    ) -> DefinitionWithConstraintsIterator<'_, 'db> {
+        DefinitionWithConstraintsIterator {
+            all_definitions: &self.all_definitions,
+            all_constraints: &self.all_constraints,
+            inner: self.definitions_by_use[use_id].visible_definitions(),
+        }
     }
 
     pub(crate) fn use_may_be_unbound(&self, use_id: ScopedUseId) -> bool {
-        self.definitions_by_use[use_id].may_be_unbound
+        self.definitions_by_use[use_id].may_be_unbound()
     }
 
-    pub(crate) fn public_definitions(&self, symbol: ScopedSymbolId) -> &[Definition<'db>] {
-        &self.all_definitions[self.public_definitions[symbol].definitions_range.clone()]
+    pub(crate) fn public_definitions(
+        &self,
+        symbol: ScopedSymbolId,
+    ) -> DefinitionWithConstraintsIterator<'_, 'db> {
+        DefinitionWithConstraintsIterator {
+            all_definitions: &self.all_definitions,
+            all_constraints: &self.all_constraints,
+            inner: self.public_definitions[symbol].visible_definitions(),
+        }
     }
 
     pub(crate) fn public_may_be_unbound(&self, symbol: ScopedSymbolId) -> bool {
-        self.public_definitions[symbol].may_be_unbound
+        self.public_definitions[symbol].may_be_unbound()
     }
-}
-
-/// Definitions visible for a symbol at a particular use (or end-of-scope).
-#[derive(Clone, Debug, PartialEq, Eq)]
-struct Definitions {
-    /// [`Range`] in `all_definitions` of the visible definition IDs.
-    definitions_range: Range<usize>,
-    /// Is the symbol possibly unbound at this point?
-    may_be_unbound: bool,
-}
-
-impl Definitions {
-    /// The default state of a symbol is "no definitions, may be unbound", aka definitely-unbound.
-    fn unbound() -> Self {
-        Self {
-            definitions_range: Range::default(),
-            may_be_unbound: true,
-        }
-    }
-}
-
-impl Default for Definitions {
-    fn default() -> Self {
-        Definitions::unbound()
-    }
-}
-
-/// A snapshot of the visible definitions for each symbol at a particular point in control flow.
-#[derive(Clone, Debug)]
-pub(super) struct FlowSnapshot {
-    definitions_by_symbol: IndexVec<ScopedSymbolId, Definitions>,
 }
 
 #[derive(Debug)]
+pub(crate) struct DefinitionWithConstraintsIterator<'map, 'db> {
+    all_definitions: &'map IndexVec<ScopedDefinitionId, Definition<'db>>,
+    all_constraints: &'map IndexVec<ScopedConstraintId, Expression<'db>>,
+    inner: DefinitionIdWithConstraintsIterator<'map>,
+}
+
+impl<'map, 'db> Iterator for DefinitionWithConstraintsIterator<'map, 'db> {
+    type Item = DefinitionWithConstraints<'map, 'db>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        self.inner
+            .next()
+            .map(|def_id_with_constraints| DefinitionWithConstraints {
+                definition: self.all_definitions[def_id_with_constraints.definition],
+                constraints: ConstraintsIterator {
+                    all_constraints: self.all_constraints,
+                    constraint_ids: def_id_with_constraints.constraint_ids,
+                },
+            })
+    }
+}
+
+impl std::iter::FusedIterator for DefinitionWithConstraintsIterator<'_, '_> {}
+
+pub(crate) struct DefinitionWithConstraints<'map, 'db> {
+    pub(crate) definition: Definition<'db>,
+    pub(crate) constraints: ConstraintsIterator<'map, 'db>,
+}
+
+pub(crate) struct ConstraintsIterator<'map, 'db> {
+    all_constraints: &'map IndexVec<ScopedConstraintId, Expression<'db>>,
+    constraint_ids: ConstraintIdIterator<'map>,
+}
+
+impl<'map, 'db> Iterator for ConstraintsIterator<'map, 'db> {
+    type Item = Expression<'db>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        self.constraint_ids
+            .next()
+            .map(|constraint_id| self.all_constraints[constraint_id])
+    }
+}
+
+impl std::iter::FusedIterator for ConstraintsIterator<'_, '_> {}
+
+/// A snapshot of the definitions and constraints state at a particular point in control flow.
+#[derive(Clone, Debug)]
+pub(super) struct FlowSnapshot {
+    definitions_by_symbol: IndexVec<ScopedSymbolId, SymbolState>,
+}
+
+#[derive(Debug, Default)]
 pub(super) struct UseDefMapBuilder<'db> {
-    /// Definition IDs array for `definitions_by_use` and `definitions_by_symbol` to slice into.
-    all_definitions: Vec<Definition<'db>>,
+    /// Append-only array of [`Definition`]; None is unbound.
+    all_definitions: IndexVec<ScopedDefinitionId, Definition<'db>>,
+
+    /// Append-only array of constraints (as [`Expression`]).
+    all_constraints: IndexVec<ScopedConstraintId, Expression<'db>>,
 
     /// Visible definitions at each so-far-recorded use.
-    definitions_by_use: IndexVec<ScopedUseId, Definitions>,
+    definitions_by_use: IndexVec<ScopedUseId, SymbolState>,
 
     /// Currently visible definitions for each symbol.
-    definitions_by_symbol: IndexVec<ScopedSymbolId, Definitions>,
+    definitions_by_symbol: IndexVec<ScopedSymbolId, SymbolState>,
 }
 
 impl<'db> UseDefMapBuilder<'db> {
     pub(super) fn new() -> Self {
-        Self {
-            all_definitions: Vec::new(),
-            definitions_by_use: IndexVec::new(),
-            definitions_by_symbol: IndexVec::new(),
-        }
+        Self::default()
     }
 
     pub(super) fn add_symbol(&mut self, symbol: ScopedSymbolId) {
-        let new_symbol = self.definitions_by_symbol.push(Definitions::unbound());
+        let new_symbol = self.definitions_by_symbol.push(SymbolState::unbound());
         debug_assert_eq!(symbol, new_symbol);
     }
 
@@ -227,13 +286,15 @@ impl<'db> UseDefMapBuilder<'db> {
     ) {
         // We have a new definition of a symbol; this replaces any previous definitions in this
         // path.
-        let def_idx = self.all_definitions.len();
-        self.all_definitions.push(definition);
-        self.definitions_by_symbol[symbol] = Definitions {
-            #[allow(clippy::range_plus_one)]
-            definitions_range: def_idx..(def_idx + 1),
-            may_be_unbound: false,
-        };
+        let def_id = self.all_definitions.push(definition);
+        self.definitions_by_symbol[symbol] = SymbolState::with(def_id);
+    }
+
+    pub(super) fn record_constraint(&mut self, constraint: Expression<'db>) {
+        let constraint_id = self.all_constraints.push(constraint);
+        for definitions in &mut self.definitions_by_symbol {
+            definitions.add_constraint(constraint_id);
+        }
     }
 
     pub(super) fn record_use(&mut self, symbol: ScopedSymbolId, use_id: ScopedUseId) {
@@ -265,9 +326,9 @@ impl<'db> UseDefMapBuilder<'db> {
 
         // If the snapshot we are restoring is missing some symbols we've recorded since, we need
         // to fill them in so the symbol IDs continue to line up. Since they don't exist in the
-        // snapshot, the correct state to fill them in with is "unbound", the default.
+        // snapshot, the correct state to fill them in with is "unbound".
         self.definitions_by_symbol
-            .resize(num_symbols, Definitions::unbound());
+            .resize(num_symbols, SymbolState::unbound());
     }
 
     /// Merge the given snapshot into the current state, reflecting that we might have taken either
@@ -288,65 +349,24 @@ impl<'db> UseDefMapBuilder<'db> {
         debug_assert!(self.definitions_by_symbol.len() >= snapshot.definitions_by_symbol.len());
 
         for (symbol_id, current) in self.definitions_by_symbol.iter_mut_enumerated() {
-            let Some(snapshot) = snapshot.definitions_by_symbol.get(symbol_id) else {
-                // Symbol not present in snapshot, so it's unbound from that path.
-                current.may_be_unbound = true;
-                continue;
-            };
-
-            // If the symbol can be unbound in either predecessor, it can be unbound post-merge.
-            current.may_be_unbound |= snapshot.may_be_unbound;
-
-            // Merge the definition ranges.
-            let current = &mut current.definitions_range;
-            let snapshot = &snapshot.definitions_range;
-
-            // We never create reversed ranges.
-            debug_assert!(current.end >= current.start);
-            debug_assert!(snapshot.end >= snapshot.start);
-
-            if current == snapshot {
-                // Ranges already identical, nothing to do.
-            } else if snapshot.is_empty() {
-                // Merging from an empty range; nothing to do.
-            } else if (*current).is_empty() {
-                // Merging to an empty range; just use the incoming range.
-                *current = snapshot.clone();
-            } else if snapshot.end >= current.start && snapshot.start <= current.end {
-                // Ranges are adjacent or overlapping, merge them in-place.
-                *current = current.start.min(snapshot.start)..current.end.max(snapshot.end);
-            } else if current.end == self.all_definitions.len() {
-                // Ranges are not adjacent or overlapping, `current` is at the end of
-                // `all_definitions`, we need to copy `snapshot` to the end so they are adjacent
-                // and can be merged into one range.
-                self.all_definitions.extend_from_within(snapshot.clone());
-                current.end = self.all_definitions.len();
-            } else if snapshot.end == self.all_definitions.len() {
-                // Ranges are not adjacent or overlapping, `snapshot` is at the end of
-                // `all_definitions`, we need to copy `current` to the end so they are adjacent and
-                // can be merged into one range.
-                self.all_definitions.extend_from_within(current.clone());
-                current.start = snapshot.start;
-                current.end = self.all_definitions.len();
+            if let Some(snapshot) = snapshot.definitions_by_symbol.get(symbol_id) {
+                *current = SymbolState::merge(current, snapshot);
             } else {
-                // Ranges are not adjacent and neither one is at the end of `all_definitions`, we
-                // have to copy both to the end so they are adjacent and we can merge them.
-                let start = self.all_definitions.len();
-                self.all_definitions.extend_from_within(current.clone());
-                self.all_definitions.extend_from_within(snapshot.clone());
-                current.start = start;
-                current.end = self.all_definitions.len();
+                // Symbol not present in snapshot, so it's unbound from that path.
+                current.add_unbound();
             }
         }
     }
 
     pub(super) fn finish(mut self) -> UseDefMap<'db> {
         self.all_definitions.shrink_to_fit();
+        self.all_constraints.shrink_to_fit();
         self.definitions_by_symbol.shrink_to_fit();
         self.definitions_by_use.shrink_to_fit();
 
         UseDefMap {
             all_definitions: self.all_definitions,
+            all_constraints: self.all_constraints,
             definitions_by_use: self.definitions_by_use,
             public_definitions: self.definitions_by_symbol,
         }

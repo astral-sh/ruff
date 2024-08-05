@@ -319,7 +319,7 @@ impl<'db> TypeInferenceBuilder<'db> {
     }
 
     fn infer_region_expression(&mut self, expression: Expression<'db>) {
-        self.infer_expression(expression.node(self.db));
+        self.infer_expression(expression.node_ref(self.db));
     }
 
     fn infer_module(&mut self, module: &ast::ModModule) {
@@ -2588,6 +2588,26 @@ mod tests {
     }
 
     #[test]
+    fn narrow_not_none() -> anyhow::Result<()> {
+        let mut db = setup_db();
+
+        db.write_dedented(
+            "/src/a.py",
+            "
+            x = None if flag else 1
+            y = 0
+            if x is not None:
+                y = x
+            ",
+        )?;
+
+        assert_public_ty(&db, "/src/a.py", "x", "Literal[1] | None");
+        assert_public_ty(&db, "/src/a.py", "y", "Literal[0, 1]");
+
+        Ok(())
+    }
+
+    #[test]
     fn while_loop() -> anyhow::Result<()> {
         let mut db = setup_db();
 
@@ -2684,10 +2704,11 @@ mod tests {
 
     fn first_public_def<'db>(db: &'db TestDb, file: File, name: &str) -> Definition<'db> {
         let scope = global_scope(db, file);
-        *use_def_map(db, scope)
+        use_def_map(db, scope)
             .public_definitions(symbol_table(db, scope).symbol_id_by_name(name).unwrap())
-            .first()
+            .next()
             .unwrap()
+            .definition
     }
 
     #[test]
