@@ -130,6 +130,8 @@ pub enum Type<'db> {
     Union(UnionType<'db>),
     Intersection(IntersectionType<'db>),
     IntLiteral(i64),
+    /// A boolean literal, either `True` or `False`.
+    BooleanLiteral(bool),
     // TODO protocols, callable types, overloads, generics, type vars
 }
 
@@ -175,6 +177,7 @@ impl<'db> Type<'db> {
                 // TODO raise error
                 Type::Unknown
             }
+            Type::BooleanLiteral(_) => Type::Unknown,
         }
     }
 }

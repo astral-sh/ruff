@@ -939,12 +939,10 @@ impl<'db> TypeInferenceBuilder<'db> {
     }
 
     #[allow(clippy::unused_self)]
-    fn infer_boolean_literal_expression(
-        &mut self,
-        _literal: &ast::ExprBooleanLiteral,
-    ) -> Type<'db> {
-        // TODO builtins.bool and boolean Literal types
-        Type::Unknown
+    fn infer_boolean_literal_expression(&mut self, literal: &ast::ExprBooleanLiteral) -> Type<'db> {
+        let ast::ExprBooleanLiteral { range: _, value } = literal;
+
+        Type::BooleanLiteral(*value)
     }
 
     #[allow(clippy::unused_self)]
@@ -1645,6 +1643,18 @@ mod tests {
         db.write_file("src/a.py", "x = 1")?;
 
         assert_public_ty(&db, "src/a.py", "x", "Literal[1]");
+
+        Ok(())
+    }
+
+    #[test]
+    fn boolean_literal() -> anyhow::Result<()> {
+        let mut db = setup_db();
+
+        db.write_file("src/a.py", "x = True\ny = False")?;
+
+        assert_public_ty(&db, "src/a.py", "x", "Literal[True]");
+        assert_public_ty(&db, "src/a.py", "y", "Literal[False]");
 
         Ok(())
     }

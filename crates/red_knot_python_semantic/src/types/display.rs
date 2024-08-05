@@ -35,6 +35,9 @@ impl Display for DisplayType<'_> {
             Type::Union(union) => union.display(self.db).fmt(f),
             Type::Intersection(intersection) => intersection.display(self.db).fmt(f),
             Type::IntLiteral(n) => write!(f, "Literal[{n}]"),
+            Type::BooleanLiteral(boolean) => {
+                write!(f, "Literal[{}]", if *boolean { "True" } else { "False" })
+            }
         }
     }
 }
