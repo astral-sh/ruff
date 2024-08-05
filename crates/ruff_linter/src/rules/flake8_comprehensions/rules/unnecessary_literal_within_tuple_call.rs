@@ -10,13 +10,6 @@ use crate::rules::flake8_comprehensions::fixes;
 
 use super::helpers;
 
-#[derive(Debug, PartialEq, Eq)]
-enum TupleLiteralKind {
-    List,
-    Tuple,
-    ListComp,
-}
-
 /// ## What it does
 /// Checks for `tuple` calls that take unnecessary list or tuple literals as
 /// arguments. In [preview], this also includes unnecessary list comprehensions
@@ -112,7 +105,7 @@ pub(crate) fn unnecessary_literal_within_tuple_call(
     let argument_kind = match argument {
         Expr::Tuple(_) => TupleLiteralKind::Tuple,
         Expr::List(_) => TupleLiteralKind::List,
-        Expr::ListComp(_) => TupleLiteralKind::ListComp,
+        Expr::ListComp(_) if checker.settings.preview.is_enabled() => TupleLiteralKind::ListComp,
         _ => return,
     };
 
@@ -123,57 +116,63 @@ pub(crate) fn unnecessary_literal_within_tuple_call(
         call.range(),
     );
 
-    if argument.is_tuple_expr() | argument.is_list_expr() {
-        // Convert `tuple([1, 2])` to `(1, 2)`
-        diagnostic.set_fix({
-            let elts = match argument {
-                Expr::List(ast::ExprList { elts, .. }) => elts.as_slice(),
-                Expr::Tuple(ast::ExprTuple { elts, .. }) => elts.as_slice(),
-                _ => return,
-            };
-
-            let needs_trailing_comma = if let [item] = elts {
-                SimpleTokenizer::new(
-                    checker.locator().contents(),
-                    TextRange::new(item.end(), call.end()),
-                )
-                .all(|token| token.kind != SimpleTokenKind::Comma)
-            } else {
-                false
-            };
-
-            // Replace `[` with `(`.
-            let elt_start = Edit::replacement(
-                "(".into(),
-                call.start(),
-                argument.start() + TextSize::from(1),
-            );
-            // Replace `]` with `)` or `,)`.
-            let elt_end = Edit::replacement(
-                if needs_trailing_comma {
-                    ",)".into()
+    match argument {
+        Expr::List(ast::ExprList { elts, .. }) | Expr::Tuple(ast::ExprTuple { elts, .. }) => {
+            // Convert `tuple([1, 2])` to `(1, 2)`
+            diagnostic.set_fix({
+                let needs_trailing_comma = if let [item] = elts.as_slice() {
+                    SimpleTokenizer::new(
+                        checker.locator().contents(),
+                        TextRange::new(item.end(), call.end()),
+                    )
+                    .all(|token| token.kind != SimpleTokenKind::Comma)
                 } else {
-                    ")".into()
-                },
-                argument.end() - TextSize::from(1),
-                call.end(),
-            );
-            Fix::unsafe_edits(elt_start, [elt_end])
-        });
-    } else if checker.settings.preview.is_enabled() && argument.is_list_comp_expr() {
-        // Convert `tuple([x for x in range(10)])` to `tuple(x for x in range(10))`
-        let Expr::ListComp(ast::ExprListComp { elt, .. }) = argument else {
-            return;
-        };
-        if any_over_expr(elt, &Expr::is_await_expr) {
-            return;
+                    false
+                };
+
+                // Replace `[` with `(`.
+                let elt_start = Edit::replacement(
+                    "(".into(),
+                    call.start(),
+                    argument.start() + TextSize::from(1),
+                );
+                // Replace `]` with `)` or `,)`.
+                let elt_end = Edit::replacement(
+                    if needs_trailing_comma {
+                        ",)".into()
+                    } else {
+                        ")".into()
+                    },
+                    argument.end() - TextSize::from(1),
+                    call.end(),
+                );
+                Fix::unsafe_edits(elt_start, [elt_end])
+            });
         }
-        diagnostic.try_set_fix(|| {
-            fixes::fix_unnecessary_comprehension_in_call(expr, checker.locator(), checker.stylist())
-        });
-    } else {
-        return;
+
+        Expr::ListComp(ast::ExprListComp { elt, .. }) => {
+            if any_over_expr(elt, &Expr::is_await_expr) {
+                return;
+            }
+            // Convert `tuple([x for x in range(10)])` to `tuple(x for x in range(10))`
+            diagnostic.try_set_fix(|| {
+                fixes::fix_unnecessary_comprehension_in_call(
+                    expr,
+                    checker.locator(),
+                    checker.stylist(),
+                )
+            });
+        }
+
+        _ => return,
     }
 
     checker.diagnostics.push(diagnostic);
+}
+
+#[derive(Debug, PartialEq, Eq)]
+enum TupleLiteralKind {
+    List,
+    Tuple,
+    ListComp,
 }
