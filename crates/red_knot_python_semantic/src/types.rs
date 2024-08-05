@@ -180,6 +180,16 @@ impl<'db> Type<'db> {
             Type::BooleanLiteral(_) => Type::Unknown,
         }
     }
+
+    #[must_use]
+    pub fn instance(&self) -> Type<'db> {
+        match self {
+            Type::Any => Type::Any,
+            Type::Unknown => Type::Unknown,
+            Type::Class(class) => Type::Instance(*class),
+            _ => Type::Unknown, // TODO type errors
+        }
+    }
 }
 
 #[salsa::interned]
