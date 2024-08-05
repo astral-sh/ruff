@@ -932,8 +932,8 @@ impl<'db> TypeInferenceBuilder<'db> {
             ast::Number::Int(n) => n
                 .as_i64()
                 .map(Type::IntLiteral)
-                .unwrap_or_else(|| builtins_symbol_ty_by_name(self.db, "int")),
-            // TODO builtins.float or builtins.complex
+                .unwrap_or_else(|| builtins_symbol_ty_by_name(self.db, "int").instance()),
+            // TODO float or complex
             _ => Type::Unknown,
         }
     }
@@ -947,7 +947,7 @@ impl<'db> TypeInferenceBuilder<'db> {
 
     #[allow(clippy::unused_self)]
     fn infer_string_literal_expression(&mut self, _literal: &ast::ExprStringLiteral) -> Type<'db> {
-        // TODO Literal[str] or builtins.str
+        // TODO Literal["..."] or str
         Type::Unknown
     }
 
@@ -995,7 +995,7 @@ impl<'db> TypeInferenceBuilder<'db> {
         &mut self,
         _literal: &ast::ExprEllipsisLiteral,
     ) -> Type<'db> {
-        // TODO builtins.Ellipsis
+        // TODO Ellipsis
         Type::Unknown
     }
 
@@ -1012,7 +1012,7 @@ impl<'db> TypeInferenceBuilder<'db> {
         }
 
         // TODO generic
-        builtins_symbol_ty_by_name(self.db, "tuple")
+        builtins_symbol_ty_by_name(self.db, "tuple").instance()
     }
 
     fn infer_list_expression(&mut self, list: &ast::ExprList) -> Type<'db> {
@@ -1027,7 +1027,7 @@ impl<'db> TypeInferenceBuilder<'db> {
         }
 
         // TODO generic
-        builtins_symbol_ty_by_name(self.db, "list")
+        builtins_symbol_ty_by_name(self.db, "list").instance()
     }
 
     fn infer_set_expression(&mut self, set: &ast::ExprSet) -> Type<'db> {
@@ -1038,7 +1038,7 @@ impl<'db> TypeInferenceBuilder<'db> {
         }
 
         // TODO generic
-        builtins_symbol_ty_by_name(self.db, "set")
+        builtins_symbol_ty_by_name(self.db, "set").instance()
     }
 
     fn infer_dict_expression(&mut self, dict: &ast::ExprDict) -> Type<'db> {
@@ -1050,7 +1050,7 @@ impl<'db> TypeInferenceBuilder<'db> {
         }
 
         // TODO generic
-        builtins_symbol_ty_by_name(self.db, "dict")
+        builtins_symbol_ty_by_name(self.db, "dict").instance()
     }
 
     fn infer_generator_expression(&mut self, generator: &ast::ExprGenerator) -> Type<'db> {
@@ -1350,22 +1350,26 @@ impl<'db> TypeInferenceBuilder<'db> {
                 match right_ty {
                     Type::IntLiteral(m) => {
                         match op {
-                            ast::Operator::Add => n
-                                .checked_add(m)
-                                .map(Type::IntLiteral)
-                                .unwrap_or_else(|| builtins_symbol_ty_by_name(self.db, "int")),
-                            ast::Operator::Sub => n
-                                .checked_sub(m)
-                                .map(Type::IntLiteral)
-                                .unwrap_or_else(|| builtins_symbol_ty_by_name(self.db, "int")),
-                            ast::Operator::Mult => n
-                                .checked_mul(m)
-                                .map(Type::IntLiteral)
-                                .unwrap_or_else(|| builtins_symbol_ty_by_name(self.db, "int")),
-                            ast::Operator::Div => n
-                                .checked_div(m)
-                                .map(Type::IntLiteral)
-                                .unwrap_or_else(|| builtins_symbol_ty_by_name(self.db, "int")),
+                            ast::Operator::Add => {
+                                n.checked_add(m).map(Type::IntLiteral).unwrap_or_else(|| {
+                                    builtins_symbol_ty_by_name(self.db, "int").instance()
+                                })
+                            }
+                            ast::Operator::Sub => {
+                                n.checked_sub(m).map(Type::IntLiteral).unwrap_or_else(|| {
+                                    builtins_symbol_ty_by_name(self.db, "int").instance()
+                                })
+                            }
+                            ast::Operator::Mult => {
+                                n.checked_mul(m).map(Type::IntLiteral).unwrap_or_else(|| {
+                                    builtins_symbol_ty_by_name(self.db, "int").instance()
+                                })
+                            }
+                            ast::Operator::Div => {
+                                n.checked_div(m).map(Type::IntLiteral).unwrap_or_else(|| {
+                                    builtins_symbol_ty_by_name(self.db, "int").instance()
+                                })
+                            }
                             ast::Operator::Mod => n
                                 .checked_rem(m)
                                 .map(Type::IntLiteral)
@@ -1439,7 +1443,7 @@ impl<'db> TypeInferenceBuilder<'db> {
         self.infer_optional_expression(upper.as_deref());
         self.infer_optional_expression(step.as_deref());
 
-        // TODO builtins.slice
+        // TODO slice
         Type::Unknown
     }
 
@@ -2289,7 +2293,7 @@ mod tests {
             ",
         )?;
 
-        assert_public_ty(&db, "/src/a.py", "x", "Literal[int]");
+        assert_public_ty(&db, "/src/a.py", "x", "int");
 
         Ok(())
     }
@@ -2306,7 +2310,7 @@ mod tests {
         )?;
 
         // TODO should be a generic type
-        assert_public_ty(&db, "/src/a.py", "x", "Literal[tuple]");
+        assert_public_ty(&db, "/src/a.py", "x", "tuple");
 
         Ok(())
     }
@@ -2323,7 +2327,7 @@ mod tests {
         )?;
 
         // TODO should be a generic type
-        assert_public_ty(&db, "/src/a.py", "x", "Literal[list]");
+        assert_public_ty(&db, "/src/a.py", "x", "list");
 
         Ok(())
     }
@@ -2340,7 +2344,7 @@ mod tests {
         )?;
 
         // TODO should be a generic type
-        assert_public_ty(&db, "/src/a.py", "x", "Literal[set]");
+        assert_public_ty(&db, "/src/a.py", "x", "set");
 
         Ok(())
     }
@@ -2357,7 +2361,7 @@ mod tests {
         )?;
 
         // TODO should be a generic type
-        assert_public_ty(&db, "/src/a.py", "x", "Literal[dict]");
+        assert_public_ty(&db, "/src/a.py", "x", "dict");
 
         Ok(())
     }
