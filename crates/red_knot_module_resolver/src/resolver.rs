@@ -639,6 +639,7 @@ impl PackageKind {
 
 #[cfg(test)]
 mod tests {
+    use anyhow::Context;
     use ruff_db::files::{system_path_to_file, File, FilePath};
     use ruff_db::system::DbWithTestSystem;
     use ruff_db::testing::{
@@ -1175,7 +1176,11 @@ mod tests {
         let mut db = TestDb::new();
 
         let temp_dir = tempfile::tempdir()?;
-        let root = SystemPath::from_std_path(temp_dir.path()).unwrap();
+        let root = temp_dir
+            .path()
+            .canonicalize()
+            .context("Failed to canonicalize temp dir")?;
+        let root = SystemPath::from_std_path(&root).unwrap();
         db.use_system(OsSystem::new(root));
 
         let src = root.join("src");
