@@ -1,9 +1,9 @@
-use ruff_diagnostics::{Diagnostic, Violation};
+use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::{self as ast, Expr, Int};
+use ruff_python_ast::{self as ast, Arguments, Expr, Int};
 use ruff_text_size::Ranged;
 
-use crate::checkers::ast::Checker;
+use crate::{checkers::ast::Checker, importer::ImportRequest};
 
 /// ## What it does
 /// Checks for use of `zip()` to iterate over successive pairs of elements.
@@ -35,9 +35,14 @@ use crate::checkers::ast::Checker;
 pub struct ZipInsteadOfPairwise;
 
 impl Violation for ZipInsteadOfPairwise {
+    const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
     #[derive_message_formats]
     fn message(&self) -> String {
         format!("Prefer `itertools.pairwise()` over `zip()` when iterating over successive pairs")
+    }
+
+    fn fix_title(&self) -> Option<String> {
+        Some("Replace `zip()` with `itertools.pairwise()`".to_string())
     }
 }
 
@@ -95,9 +100,15 @@ fn match_slice_info(expr: &Expr) -> Option<SliceInfo> {
 }
 
 /// RUF007
-pub(crate) fn zip_instead_of_pairwise(checker: &mut Checker, func: &Expr, args: &[Expr]) {
+pub(crate) fn zip_instead_of_pairwise(checker: &mut Checker, call: &ast::ExprCall) {
+    let ast::ExprCall {
+        func,
+        arguments: Arguments { args, .. },
+        ..
+    } = call;
+
     // Require exactly two positional arguments.
-    let [first, second] = args else {
+    let [first, second] = args.as_ref() else {
         return;
     };
 
@@ -139,7 +150,20 @@ pub(crate) fn zip_instead_of_pairwise(checker: &mut Checker, func: &Expr, args: 
         return;
     }
 
-    checker
-        .diagnostics
-        .push(Diagnostic::new(ZipInsteadOfPairwise, func.range()));
+    let mut diagnostic = Diagnostic::new(ZipInsteadOfPairwise, func.range());
+
+    if checker.settings.preview.is_enabled() {
+        diagnostic.try_set_fix(|| {
+            let (import_edit, binding) = checker.importer().get_or_import_symbol(
+                &ImportRequest::import("itertools", "pairwise"),
+                func.start(),
+                checker.semantic(),
+            )?;
+            let reference_edit =
+                Edit::range_replacement(format!("{binding}({})", first_arg_info.id), call.range());
+            Ok(Fix::unsafe_edits(import_edit, [reference_edit]))
+        });
+    }
+
+    checker.diagnostics.push(diagnostic);
 }
