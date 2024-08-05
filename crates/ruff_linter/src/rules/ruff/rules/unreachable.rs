@@ -1,4 +1,4 @@
-use std::{fmt, iter, usize};
+use std::iter;
 
 use log::error;
 use ruff_python_ast::{
@@ -1180,109 +1180,17 @@ fn is_control_flow_stmt(stmt: &Stmt) -> bool {
     }
 }
 
-/// Type to create a Mermaid graph.
-///
-/// To learn amount Mermaid see <https://mermaid.js.org/intro>, for the syntax
-/// see <https://mermaid.js.org/syntax/flowchart.html>.
-struct MermaidGraph<'stmt, 'source> {
-    graph: &'stmt BasicBlocks<'stmt>,
-    source: &'source str,
-}
-
-impl<'stmt, 'source> fmt::Display for MermaidGraph<'stmt, 'source> {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        // Flowchart type of graph, top down.
-        writeln!(f, "flowchart TD")?;
-
-        // List all blocks.
-        writeln!(f, "  start((\"Start\"))")?;
-        writeln!(f, "  return((\"End\"))")?;
-        for (i, block) in self.graph.blocks.iter().enumerate() {
-            let (open, close) = if block.is_sentinel() {
-                ("[[", "]]")
-            } else {
-                ("[", "]")
-            };
-            write!(f, "  block{i}{open}\"")?;
-            if block.is_empty() {
-                write!(f, "`*(empty)*`")?;
-            } else if block.is_exception() {
-                write!(f, "Exception raised")?;
-            } else if block.is_loop_continue() {
-                write!(f, "Loop continue")?;
-            } else {
-                for stmt in block.stmts {
-                    let code_line = &self.source[stmt.range()].trim();
-                    mermaid_write_quoted_str(f, code_line)?;
-                    write!(f, "\\n")?;
-                }
-            }
-            writeln!(f, "\"{close}")?;
-        }
-        writeln!(f)?;
-
-        // Then link all the blocks.
-        writeln!(f, "  start --> block{}", self.graph.blocks.len() - 1)?;
-        for (i, block) in self.graph.blocks.iter_enumerated().rev() {
-            let i = i.as_u32();
-            match &block.next {
-                NextBlock::Always(target) => {
-                    writeln!(f, "  block{i} --> block{target}", target = target.as_u32())?;
-                }
-                NextBlock::If {
-                    condition,
-                    next,
-                    orelse,
-                    ..
-                } => {
-                    let condition_code = match condition {
-                        Condition::ExceptionRaised => "Exception raised",
-                        _ => self.source[condition.range()].trim(),
-                    };
-                    writeln!(
-                        f,
-                        "  block{i} -- \"{condition_code}\" --> block{next}",
-                        next = next.as_u32()
-                    )?;
-                    writeln!(
-                        f,
-                        "  block{i} -- \"else\" --> block{orelse}",
-                        orelse = orelse.as_u32()
-                    )?;
-                }
-                NextBlock::Terminate => writeln!(f, "  block{i} --> return")?,
-            }
-        }
-
-        Ok(())
-    }
-}
-
-/// Escape double quotes (`"`) in `value` using `#quot;`.
-fn mermaid_write_quoted_str(f: &mut fmt::Formatter<'_>, value: &str) -> fmt::Result {
-    let mut parts = value.split('"');
-    if let Some(v) = parts.next() {
-        write!(f, "{v}")?;
-    }
-    for v in parts {
-        write!(f, "#quot;{v}")?;
-    }
-    Ok(())
-}
-
 #[cfg(test)]
 mod tests {
-    use std::fs;
     use std::path::PathBuf;
+    use std::{fmt, fs};
 
-    use ruff_python_parser::{parse, Mode};
+    use ruff_python_parser::parse_module;
     use ruff_text_size::Ranged;
     use std::fmt::Write;
     use test_case::test_case;
 
-    use crate::rules::ruff::rules::unreachable::{
-        BasicBlocks, BlockIndex, MermaidGraph, NextBlock,
-    };
+    use crate::rules::ruff::rules::unreachable::{BasicBlocks, BlockIndex, Condition, NextBlock};
 
     #[test_case("simple.py")]
     #[test_case("if.py")]
@@ -1296,10 +1204,9 @@ mod tests {
     fn control_flow_graph(filename: &str) {
         let path = PathBuf::from_iter(["resources/test/fixtures/control-flow-graph", filename]);
         let source = fs::read_to_string(path).expect("failed to read file");
-        let stmts = parse(&source, Mode::Module)
+        let stmts = parse_module(&source)
             .unwrap_or_else(|err| panic!("failed to parse source: '{source}': {err}"))
-            .expect_module()
-            .body;
+            .into_suite();
 
         let mut output = String::new();
 
@@ -1353,5 +1260,95 @@ mod tests {
         }, {
             insta::assert_snapshot!(format!("{filename}.md"), output);
         });
+    }
+
+    /// Type to create a Mermaid graph.
+    ///
+    /// To learn amount Mermaid see <https://mermaid.js.org/intro>, for the syntax
+    /// see <https://mermaid.js.org/syntax/flowchart.html>.
+    struct MermaidGraph<'stmt, 'source> {
+        graph: &'stmt BasicBlocks<'stmt>,
+        source: &'source str,
+    }
+
+    impl<'stmt, 'source> fmt::Display for MermaidGraph<'stmt, 'source> {
+        fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+            // Flowchart type of graph, top down.
+            writeln!(f, "flowchart TD")?;
+
+            // List all blocks.
+            writeln!(f, "  start((\"Start\"))")?;
+            writeln!(f, "  return((\"End\"))")?;
+            for (i, block) in self.graph.blocks.iter().enumerate() {
+                let (open, close) = if block.is_sentinel() {
+                    ("[[", "]]")
+                } else {
+                    ("[", "]")
+                };
+                write!(f, "  block{i}{open}\"")?;
+                if block.is_empty() {
+                    write!(f, "`*(empty)*`")?;
+                } else if block.is_exception() {
+                    write!(f, "Exception raised")?;
+                } else if block.is_loop_continue() {
+                    write!(f, "Loop continue")?;
+                } else {
+                    for stmt in block.stmts {
+                        let code_line = &self.source[stmt.range()].trim();
+                        mermaid_write_quoted_str(f, code_line)?;
+                        write!(f, "\\n")?;
+                    }
+                }
+                writeln!(f, "\"{close}")?;
+            }
+            writeln!(f)?;
+
+            // Then link all the blocks.
+            writeln!(f, "  start --> block{}", self.graph.blocks.len() - 1)?;
+            for (i, block) in self.graph.blocks.iter_enumerated().rev() {
+                let i = i.as_u32();
+                match &block.next {
+                    NextBlock::Always(target) => {
+                        writeln!(f, "  block{i} --> block{target}", target = target.as_u32())?;
+                    }
+                    NextBlock::If {
+                        condition,
+                        next,
+                        orelse,
+                        ..
+                    } => {
+                        let condition_code = match condition {
+                            Condition::ExceptionRaised => "Exception raised",
+                            _ => self.source[condition.range()].trim(),
+                        };
+                        writeln!(
+                            f,
+                            "  block{i} -- \"{condition_code}\" --> block{next}",
+                            next = next.as_u32()
+                        )?;
+                        writeln!(
+                            f,
+                            "  block{i} -- \"else\" --> block{orelse}",
+                            orelse = orelse.as_u32()
+                        )?;
+                    }
+                    NextBlock::Terminate => writeln!(f, "  block{i} --> return")?,
+                }
+            }
+
+            Ok(())
+        }
+    }
+
+    /// Escape double quotes (`"`) in `value` using `#quot;`.
+    fn mermaid_write_quoted_str(f: &mut fmt::Formatter<'_>, value: &str) -> fmt::Result {
+        let mut parts = value.split('"');
+        if let Some(v) = parts.next() {
+            write!(f, "{v}")?;
+        }
+        for v in parts {
+            write!(f, "#quot;{v}")?;
+        }
+        Ok(())
     }
 }
