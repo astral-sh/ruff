@@ -235,9 +235,8 @@ You may use prefixes to select rules as well, e.g., `F` can be used to promote f
 
 ### Disabling fixes
 
-To limit the set of rules that Ruff should fix, use the [`lint.fixable`](settings.md#lint_fixable) and
-[`lint.unfixable`](settings.md#lint_unfixable) settings, along with their [`lint.extend-fixable`](settings.md#lint_extend-fixable)
-and [`lint.extend-unfixable`](settings.md#lint_extend-unfixable) variants.
+To limit the set of rules that Ruff should fix, use the [`lint.fixable`](settings.md#lint_fixable)
+or [`lint.extend-fixable`](settings.md#lint_extend-fixable), and [`lint.unfixable`](settings.md#lint_unfixable) settings.
 
 For example, the following configuration would enable fixes for all rules except
 [`unused-imports`](rules/unused-import.md) (`F401`):
