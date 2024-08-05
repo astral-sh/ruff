@@ -69,10 +69,12 @@ pub(crate) fn raise_vanilla_class(checker: &mut Checker, expr: &Expr) {
         expr
     };
 
-    let semantic = checker.semantic();
-
-    if semantic.match_builtin_expr(node, "Exception")
-        || semantic.match_builtin_expr(node, "BaseException")
+    if checker
+        .semantic()
+        .resolve_qualified_name(node)
+        .is_some_and(|qualified_name| {
+            matches!(qualified_name.segments(), ["" | "builtins", "Exception" | "BaseException"])
+        })
     {
         checker
             .diagnostics
