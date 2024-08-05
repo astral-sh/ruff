@@ -14,9 +14,9 @@ use crate::rules::flake8_comprehensions::fixes;
 /// Checks for unnecessary list comprehensions passed to builtin functions that take an iterable.
 ///
 /// ## Why is this bad?
-/// Many builtin functions (this rule currently covers `any`, `all`, `min`, `max`, and `sum`) take
-/// any iterable, including a generator. Constructing a temporary list via list comprehension is
-/// unnecessary and wastes memory for large iterables.
+/// Many builtin functions (this rule currently covers `any` and `all` in stable, along with `min`,
+/// `max`, and `sum` in [preview]) accept any iterable, including a generator. Constructing a
+/// temporary list via list comprehension is unnecessary and wastes memory for large iterables.
 ///
 /// `any` and `all` can also short-circuit iteration, saving a lot of time. The unnecessary
 /// comprehension forces a full iteration of the input iterable, giving up the benefits of
@@ -63,6 +63,7 @@ use crate::rules::flake8_comprehensions::fixes;
 /// has side effects (due to laziness and short-circuiting). The fix may also drop comments when
 /// rewriting some comprehensions.
 ///
+/// [preview]: https://docs.astral.sh/ruff/preview/
 #[violation]
 pub struct UnnecessaryComprehensionInCall;
 
