@@ -34,6 +34,26 @@ use itertools::izip;
 /// class Dog:
 ///     __slots__ = "breed", "name"
 /// ```
+///
+/// ## Fix safety
+/// This rule's fix is marked as unsafe whenever Ruff can detect that code
+/// elsewhere in the same file reads the `__slots__` variable in some way.
+/// This is because the order of the items in `__slots__` may have semantic
+/// significance if the `__slots__` of a class is being iterated over, or
+/// being assigned to another value.
+///
+/// In the vast majority of other cases, this rule's fix is unlikely to
+/// cause breakage; as such, Ruff will otherwise mark this rule's fix as
+/// safe. However, note that (although it's rare) the value of `__slots__`
+/// could still be read by code outside of the module in which the
+/// `__slots__` definition occurs, in which case this rule's fix could
+/// theoretically cause breakage.
+///
+/// Additionally, note that for multiline `__slots__` definitions that
+/// include comments on their own line, it can be hard to tell where the
+/// comments should be moved to when sorting the contents of `__slots__`.
+/// While this rule's fix will never delete a comment, it might *sometimes*
+/// move a comment to an unexpected location.
 #[violation]
 pub struct UnsortedDunderSlots {
     class_name: ast::name::Name,
