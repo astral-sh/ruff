@@ -178,7 +178,7 @@ mod tests {
             TargetVersion::Py38,
             SearchPathSettings {
                 extra_paths: vec![],
-                workspace_root: SystemPathBuf::from("/src"),
+                src_root: SystemPathBuf::from("/src"),
                 site_packages: vec![],
                 custom_typeshed: None,
             },

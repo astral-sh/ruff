@@ -85,7 +85,7 @@ pub struct SearchPathSettings {
     pub extra_paths: Vec<SystemPathBuf>,
 
     /// The root of the workspace, used for finding first-party modules.
-    pub workspace_root: SystemPathBuf,
+    pub src_root: SystemPathBuf,
 
     /// Optional path to a "custom typeshed" directory on disk for us to use for standard-library types.
     /// If this is not provided, we will fallback to our vendored typeshed stubs for the stdlib,

@@ -102,7 +102,7 @@ pub fn main() -> anyhow::Result<()> {
         target_version: target_version.into(),
         search_paths: SearchPathSettings {
             extra_paths,
-            workspace_root: workspace_metadata.root().to_path_buf(),
+            src_root: workspace_metadata.root().to_path_buf(),
             custom_typeshed: custom_typeshed_dir,
             site_packages: vec![],
         },
