@@ -212,7 +212,7 @@ impl TryFrom<&str> for SupportedBuiltins {
 }
 
 impl SupportedBuiltins {
-    fn duplication_variance(&self) -> DuplicationVariance {
+    fn duplication_variance(self) -> DuplicationVariance {
         match self {
             SupportedBuiltins::All
             | SupportedBuiltins::Any
