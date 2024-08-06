@@ -102,7 +102,7 @@ pub fn main() -> anyhow::Result<()> {
             .unwrap_or(four)
             .max(four);
 
-        return red_knot_server::Server::new(worker_threads, None)?.run();
+        return red_knot_server::Server::new(worker_threads)?.run();
     }
 
     setup_tracing(verbosity);

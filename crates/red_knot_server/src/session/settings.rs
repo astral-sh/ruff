@@ -1,101 +1,21 @@
-use std::{ops::Deref, path::PathBuf, str::FromStr};
+use std::path::PathBuf;
 
 use lsp_types::Url;
 use rustc_hash::FxHashMap;
 use serde::Deserialize;
 
-use ruff_linter::{line_width::LineLength, RuleSelector};
-
 /// Maps a workspace URI to its associated client settings. Used during server initialization.
 pub(crate) type WorkspaceSettingsMap = FxHashMap<Url, ClientSettings>;
-
-/// Resolved client settings for a specific document. These settings are meant to be
-/// used directly by the server, and are *not* a 1:1 representation with how the client
-/// sends them.
-#[derive(Clone, Debug)]
-#[cfg_attr(test, derive(PartialEq, Eq))]
-#[allow(clippy::struct_excessive_bools)]
-pub(crate) struct ResolvedClientSettings {
-    fix_all: bool,
-    organize_imports: bool,
-    lint_enable: bool,
-    disable_rule_comment_enable: bool,
-    fix_violation_enable: bool,
-    show_syntax_errors: bool,
-    editor_settings: ResolvedEditorSettings,
-}
-
-/// Contains the resolved values of 'editor settings' - Ruff configuration for the linter/formatter that was passed in via
-/// LSP client settings. These fields are optional because we don't want to override file-based linter/formatting settings
-/// if these were un-set.
-#[derive(Clone, Debug)]
-#[cfg_attr(test, derive(PartialEq, Eq))]
-pub(crate) struct ResolvedEditorSettings {
-    pub(super) configuration: Option<PathBuf>,
-    pub(super) lint_preview: Option<bool>,
-    pub(super) format_preview: Option<bool>,
-    pub(super) select: Option<Vec<RuleSelector>>,
-    pub(super) extend_select: Option<Vec<RuleSelector>>,
-    pub(super) ignore: Option<Vec<RuleSelector>>,
-    pub(super) exclude: Option<Vec<String>>,
-    pub(super) line_length: Option<LineLength>,
-    pub(super) configuration_preference: ConfigurationPreference,
-}
-
-/// Determines how multiple conflicting configurations should be resolved - in this
-/// case, the configuration from the client settings and configuration from local
-/// `.toml` files (aka 'workspace' configuration).
-#[derive(Clone, Copy, Debug, Deserialize, Default, PartialEq, Eq)]
-#[serde(rename_all = "camelCase")]
-pub(crate) enum ConfigurationPreference {
-    /// Configuration set in the editor takes priority over configuration set in `.toml` files.
-    #[default]
-    EditorFirst,
-    /// Configuration set in `.toml` files takes priority over configuration set in the editor.
-    FilesystemFirst,
-    /// `.toml` files are ignored completely, and only the editor configuration is used.
-    EditorOnly,
-}
 
 /// This is a direct representation of the settings schema sent by the client.
 #[derive(Debug, Deserialize, Default)]
 #[cfg_attr(test, derive(PartialEq, Eq))]
 #[serde(rename_all = "camelCase")]
 pub struct ClientSettings {
-    configuration: Option<String>,
-    fix_all: Option<bool>,
-    organize_imports: Option<bool>,
-    lint: Option<LintOptions>,
-    format: Option<FormatOptions>,
-    code_action: Option<CodeActionOptions>,
-    exclude: Option<Vec<String>>,
-    line_length: Option<LineLength>,
-    configuration_preference: Option<ConfigurationPreference>,
-
-    /// If `true` or [`None`], show syntax errors as diagnostics.
-    ///
-    /// This is useful when using Ruff with other language servers, allowing the user to refer
-    /// to syntax errors from only one source.
-    show_syntax_errors: Option<bool>,
-
     // These settings are only needed for tracing, and are only read from the global configuration.
     // These will not be in the resolved settings.
     #[serde(flatten)]
     pub(crate) tracing: TracingSettings,
-}
-
-impl ClientSettings {
-    /// Update the preview flag for the linter and the formatter with the given value.
-    pub(crate) fn set_preview(&mut self, preview: bool) {
-        match self.lint.as_mut() {
-            None => self.lint = Some(LintOptions::default().with_preview(preview)),
-            Some(lint) => lint.set_preview(preview),
-        }
-        match self.format.as_mut() {
-            None => self.format = Some(FormatOptions::default().with_preview(preview)),
-            Some(format) => format.set_preview(preview),
-        }
-    }
 }
 
 /// Settings needed to initialize tracing. These will only be
@@ -119,61 +39,6 @@ struct WorkspaceSettings {
     #[serde(flatten)]
     settings: ClientSettings,
     workspace: Url,
-}
-
-#[derive(Debug, Default, Deserialize)]
-#[cfg_attr(test, derive(PartialEq, Eq))]
-#[serde(rename_all = "camelCase")]
-struct LintOptions {
-    enable: Option<bool>,
-    preview: Option<bool>,
-    select: Option<Vec<String>>,
-    extend_select: Option<Vec<String>>,
-    ignore: Option<Vec<String>>,
-}
-
-impl LintOptions {
-    fn with_preview(mut self, preview: bool) -> LintOptions {
-        self.preview = Some(preview);
-        self
-    }
-
-    fn set_preview(&mut self, preview: bool) {
-        self.preview = Some(preview);
-    }
-}
-
-#[derive(Debug, Default, Deserialize)]
-#[cfg_attr(test, derive(PartialEq, Eq))]
-#[serde(rename_all = "camelCase")]
-struct FormatOptions {
-    preview: Option<bool>,
-}
-
-impl FormatOptions {
-    fn with_preview(mut self, preview: bool) -> FormatOptions {
-        self.preview = Some(preview);
-        self
-    }
-
-    fn set_preview(&mut self, preview: bool) {
-        self.preview = Some(preview);
-    }
-}
-
-#[derive(Debug, Default, Deserialize)]
-#[cfg_attr(test, derive(PartialEq, Eq))]
-#[serde(rename_all = "camelCase")]
-struct CodeActionOptions {
-    disable_rule_comment: Option<CodeActionParameters>,
-    fix_violation: Option<CodeActionParameters>,
-}
-
-#[derive(Debug, Deserialize)]
-#[cfg_attr(test, derive(PartialEq, Eq))]
-#[serde(rename_all = "camelCase")]
-struct CodeActionParameters {
-    enable: Option<bool>,
 }
 
 /// This is the exact schema for initialization options sent in by the client
@@ -216,16 +81,6 @@ impl AllSettings {
         )
     }
 
-    /// Update the preview flag for both the global and all workspace settings.
-    pub(crate) fn set_preview(&mut self, preview: bool) {
-        self.global_settings.set_preview(preview);
-        if let Some(workspace_settings) = self.workspace_settings.as_mut() {
-            for settings in workspace_settings.values_mut() {
-                settings.set_preview(preview);
-            }
-        }
-    }
-
     fn from_init_options(options: InitializationOptions) -> Self {
         let (global_settings, workspace_settings) = match options {
             InitializationOptions::GlobalOnly { settings } => (settings, None),
@@ -244,173 +99,6 @@ impl AllSettings {
                     .collect()
             }),
         }
-    }
-}
-
-impl ResolvedClientSettings {
-    /// Resolves a series of client settings, prioritizing workspace settings over global settings.
-    /// Any fields not specified by either are set to their defaults.
-    pub(super) fn with_workspace(
-        workspace_settings: &ClientSettings,
-        global_settings: &ClientSettings,
-    ) -> Self {
-        Self::new_impl(&[workspace_settings, global_settings])
-    }
-
-    /// Resolves global settings only.
-    pub(super) fn global(global_settings: &ClientSettings) -> Self {
-        Self::new_impl(&[global_settings])
-    }
-
-    fn new_impl(all_settings: &[&ClientSettings]) -> Self {
-        Self {
-            fix_all: Self::resolve_or(all_settings, |settings| settings.fix_all, true),
-            organize_imports: Self::resolve_or(
-                all_settings,
-                |settings| settings.organize_imports,
-                true,
-            ),
-            lint_enable: Self::resolve_or(
-                all_settings,
-                |settings| settings.lint.as_ref()?.enable,
-                true,
-            ),
-            disable_rule_comment_enable: Self::resolve_or(
-                all_settings,
-                |settings| {
-                    settings
-                        .code_action
-                        .as_ref()?
-                        .disable_rule_comment
-                        .as_ref()?
-                        .enable
-                },
-                true,
-            ),
-            fix_violation_enable: Self::resolve_or(
-                all_settings,
-                |settings| {
-                    settings
-                        .code_action
-                        .as_ref()?
-                        .fix_violation
-                        .as_ref()?
-                        .enable
-                },
-                true,
-            ),
-            show_syntax_errors: Self::resolve_or(
-                all_settings,
-                |settings| settings.show_syntax_errors,
-                true,
-            ),
-            editor_settings: ResolvedEditorSettings {
-                configuration: Self::resolve_optional(all_settings, |settings| {
-                    settings
-                        .configuration
-                        .as_ref()
-                        .and_then(|config_path| shellexpand::full(config_path).ok())
-                        .map(|config_path| PathBuf::from(config_path.as_ref()))
-                }),
-                lint_preview: Self::resolve_optional(all_settings, |settings| {
-                    settings.lint.as_ref()?.preview
-                }),
-                format_preview: Self::resolve_optional(all_settings, |settings| {
-                    settings.format.as_ref()?.preview
-                }),
-                select: Self::resolve_optional(all_settings, |settings| {
-                    settings
-                        .lint
-                        .as_ref()?
-                        .select
-                        .as_ref()?
-                        .iter()
-                        .map(|rule| RuleSelector::from_str(rule).ok())
-                        .collect()
-                }),
-                extend_select: Self::resolve_optional(all_settings, |settings| {
-                    settings
-                        .lint
-                        .as_ref()?
-                        .extend_select
-                        .as_ref()?
-                        .iter()
-                        .map(|rule| RuleSelector::from_str(rule).ok())
-                        .collect()
-                }),
-                ignore: Self::resolve_optional(all_settings, |settings| {
-                    settings
-                        .lint
-                        .as_ref()?
-                        .ignore
-                        .as_ref()?
-                        .iter()
-                        .map(|rule| RuleSelector::from_str(rule).ok())
-                        .collect()
-                }),
-                exclude: Self::resolve_optional(all_settings, |settings| settings.exclude.clone()),
-                line_length: Self::resolve_optional(all_settings, |settings| settings.line_length),
-                configuration_preference: Self::resolve_or(
-                    all_settings,
-                    |settings| settings.configuration_preference,
-                    ConfigurationPreference::EditorFirst,
-                ),
-            },
-        }
-    }
-
-    /// Attempts to resolve a setting using a list of available client settings as sources.
-    /// Client settings that come earlier in the list take priority. This function is for fields
-    /// that do not have a default value and should be left unset.
-    /// Use [`ResolvedClientSettings::resolve_or`] for settings that should have default values.
-    fn resolve_optional<T>(
-        all_settings: &[&ClientSettings],
-        get: impl Fn(&ClientSettings) -> Option<T>,
-    ) -> Option<T> {
-        all_settings.iter().map(Deref::deref).find_map(get)
-    }
-
-    /// Attempts to resolve a setting using a list of available client settings as sources.
-    /// Client settings that come earlier in the list take priority. `default` will be returned
-    /// if none of the settings specify the requested setting.
-    /// Use [`ResolvedClientSettings::resolve_optional`] if the setting should be optional instead
-    /// of having a default value.
-    fn resolve_or<T>(
-        all_settings: &[&ClientSettings],
-        get: impl Fn(&ClientSettings) -> Option<T>,
-        default: T,
-    ) -> T {
-        Self::resolve_optional(all_settings, get).unwrap_or(default)
-    }
-}
-
-impl ResolvedClientSettings {
-    pub(crate) fn fix_all(&self) -> bool {
-        self.fix_all
-    }
-
-    pub(crate) fn organize_imports(&self) -> bool {
-        self.organize_imports
-    }
-
-    pub(crate) fn lint(&self) -> bool {
-        self.lint_enable
-    }
-
-    pub(crate) fn noqa_comments(&self) -> bool {
-        self.disable_rule_comment_enable
-    }
-
-    pub(crate) fn fix_violation(&self) -> bool {
-        self.fix_violation_enable
-    }
-
-    pub(crate) fn show_syntax_errors(&self) -> bool {
-        self.show_syntax_errors
-    }
-
-    pub(crate) fn editor_settings(&self) -> &ResolvedEditorSettings {
-        &self.editor_settings
     }
 }
 

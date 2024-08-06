@@ -2,24 +2,17 @@
 
 use std::num::NonZeroUsize;
 use std::panic::PanicInfo;
-use std::str::FromStr;
 
 use lsp_server as lsp;
 use lsp_types as types;
-use types::ClientCapabilities;
-use types::DiagnosticOptions;
-use types::NotebookCellSelector;
-use types::NotebookDocumentSyncOptions;
-use types::NotebookSelector;
-use types::TextDocumentSyncCapability;
-use types::TextDocumentSyncOptions;
+use lsp_types::{
+    ClientCapabilities, DiagnosticOptions, NotebookCellSelector, NotebookDocumentSyncOptions,
+    NotebookSelector, TextDocumentSyncCapability, TextDocumentSyncOptions,
+};
 
-use self::connection::Connection;
-use self::connection::ConnectionInitializer;
+use self::connection::{Connection, ConnectionInitializer};
 use self::schedule::event_loop_thread;
-use crate::session::AllSettings;
-use crate::session::ClientSettings;
-use crate::session::Session;
+use crate::session::{AllSettings, ClientSettings, Session};
 use crate::PositionEncoding;
 
 mod api;
@@ -40,7 +33,7 @@ pub struct Server {
 }
 
 impl Server {
-    pub fn new(worker_threads: NonZeroUsize, preview: Option<bool>) -> crate::Result<Self> {
+    pub fn new(worker_threads: NonZeroUsize) -> crate::Result<Self> {
         let connection = ConnectionInitializer::stdio();
 
         let (id, init_params) = connection.initialize_start()?;
@@ -62,18 +55,14 @@ impl Server {
 
         crate::message::init_messenger(connection.make_sender());
 
-        let mut all_settings = AllSettings::from_value(
+        let AllSettings {
+            global_settings,
+            mut workspace_settings,
+        } = AllSettings::from_value(
             init_params
                 .initialization_options
                 .unwrap_or_else(|| serde_json::Value::Object(serde_json::Map::default())),
         );
-        if let Some(preview) = preview {
-            all_settings.set_preview(preview);
-        }
-        let AllSettings {
-            global_settings,
-            mut workspace_settings,
-        } = all_settings;
 
         crate::trace::init_tracing(
             connection.make_sender(),

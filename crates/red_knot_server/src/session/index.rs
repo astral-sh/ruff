@@ -1,30 +1,16 @@
 use std::borrow::Cow;
-use std::path::PathBuf;
-use std::{collections::BTreeMap, path::Path, sync::Arc};
+use std::path::{Path, PathBuf};
+use std::sync::Arc;
 
-use anyhow::anyhow;
 use lsp_types::Url;
 use rustc_hash::FxHashMap;
-
-pub(crate) use ruff_settings::RuffSettings;
 
 use crate::{
     edit::{DocumentKey, DocumentVersion, NotebookDocument},
     PositionEncoding, TextDocument,
 };
 
-use super::{settings::ResolvedClientSettings, ClientSettings};
-
-mod ruff_settings;
-
-type SettingsIndex = BTreeMap<PathBuf, WorkspaceSettings>;
-
-/// Settings associated with a workspace.
-#[derive(Debug)]
-struct WorkspaceSettings {
-    client_settings: ResolvedClientSettings,
-    ruff_settings: ruff_settings::RuffSettingsIndex,
-}
+use super::ClientSettings;
 
 /// Stores and tracks all open documents in a session, along with their associated settings.
 #[derive(Default, Debug)]
@@ -35,34 +21,17 @@ pub(crate) struct Index {
     /// Maps opaque cell URLs to a notebook URL (document)
     notebook_cells: FxHashMap<Url, Url>,
 
-    /// Maps a workspace folder root to its settings.
-    settings: SettingsIndex,
-
     /// Global settings provided by the client.
     global_settings: ClientSettings,
 }
 
 impl Index {
-    pub(super) fn new(
-        workspace_folders: &[(Url, ClientSettings)],
-        global_settings: ClientSettings,
-    ) -> crate::Result<Self> {
-        let mut settings_index = BTreeMap::new();
-        for (url, workspace_settings) in workspace_folders {
-            Self::register_workspace_settings(
-                &mut settings_index,
-                url,
-                Some(workspace_settings),
-                &global_settings,
-            )?;
-        }
-
-        Ok(Self {
+    pub(super) fn new(global_settings: ClientSettings) -> Self {
+        Self {
             documents: FxHashMap::default(),
             notebook_cells: FxHashMap::default(),
-            settings: settings_index,
             global_settings,
-        })
+        }
     }
 
     pub(super) fn text_document_urls(&self) -> impl Iterator<Item = &Url> + '_ {
@@ -147,151 +116,18 @@ impl Index {
         Ok(())
     }
 
-    pub(super) fn open_workspace_folder(&mut self, url: &Url) -> crate::Result<()> {
-        // TODO(jane): Find a way for workspace client settings to be added or changed dynamically.
-        Self::register_workspace_settings(&mut self.settings, url, None, &self.global_settings)
-    }
-
     pub(super) fn num_documents(&self) -> usize {
         self.documents.len()
     }
 
-    pub(super) fn num_workspaces(&self) -> usize {
-        self.settings.len()
-    }
-
-    pub(super) fn list_config_files(&self) -> Vec<&Path> {
-        self.settings
-            .values()
-            .flat_map(|WorkspaceSettings { ruff_settings, .. }| ruff_settings.list_files())
-            .collect()
-    }
-
-    fn register_workspace_settings(
-        settings_index: &mut SettingsIndex,
-        workspace_url: &Url,
-        workspace_settings: Option<&ClientSettings>,
-        global_settings: &ClientSettings,
-    ) -> crate::Result<()> {
-        let client_settings = if let Some(workspace_settings) = workspace_settings {
-            ResolvedClientSettings::with_workspace(workspace_settings, global_settings)
-        } else {
-            ResolvedClientSettings::global(global_settings)
-        };
-
-        let workspace_path = workspace_url
-            .to_file_path()
-            .map_err(|()| anyhow!("workspace URL was not a file path!"))?;
-
-        let workspace_settings_index = ruff_settings::RuffSettingsIndex::new(
-            &workspace_path,
-            client_settings.editor_settings(),
-        );
-
-        settings_index.insert(
-            workspace_path,
-            WorkspaceSettings {
-                client_settings,
-                ruff_settings: workspace_settings_index,
-            },
-        );
-
-        Ok(())
-    }
-
-    pub(super) fn close_workspace_folder(&mut self, workspace_url: &Url) -> crate::Result<()> {
-        let workspace_path = workspace_url
-            .to_file_path()
-            .map_err(|()| anyhow!("workspace URL was not a file path!"))?;
-
-        self.settings.remove(&workspace_path).ok_or_else(|| {
-            anyhow!(
-                "Tried to remove non-existent workspace URI {}",
-                workspace_url
-            )
-        })?;
-
-        // O(n) complexity, which isn't ideal... but this is an uncommon operation.
-        self.documents
-            .retain(|url, _| !Path::new(url.path()).starts_with(&workspace_path));
-        self.notebook_cells
-            .retain(|_, url| !Path::new(url.path()).starts_with(&workspace_path));
-
-        Ok(())
-    }
-
     pub(crate) fn make_document_ref(&self, key: DocumentKey) -> Option<DocumentQuery> {
         let url = self.url_for_key(&key)?.clone();
-
-        let document_settings = self
-            .settings_for_url(&url)
-            .map(|settings| {
-                if let Ok(file_path) = url.to_file_path() {
-                    settings.ruff_settings.get(&file_path)
-                } else {
-                    // For a new unsaved and untitled document, use the ruff settings from the top of the workspace
-                    // but only IF:
-                    // * It is the only workspace
-                    // * The ruff setting is at the top of the workspace (in the root folder)
-                    // Otherwise, use the fallback settings.
-                    if self.settings.len() == 1 {
-                        let workspace_path = self.settings.keys().next().unwrap();
-                        settings.ruff_settings.get(&workspace_path.join("untitled"))
-                    } else {
-                        tracing::debug!("Use the fallback settings for the new document '{url}'.");
-                        settings.ruff_settings.fallback()
-                    }
-                }
-            })
-            .unwrap_or_else(|| {
-                tracing::warn!(
-                    "No settings available for {} - falling back to default settings",
-                    url
-                );
-                let resolved_global = ResolvedClientSettings::global(&self.global_settings);
-                // The path here is only for completeness, it's okay to use a non-existing path
-                // in case this is an unsaved (untitled) document.
-                let path = Path::new(url.path());
-                let root = path.parent().unwrap_or(path);
-                Arc::new(RuffSettings::fallback(
-                    resolved_global.editor_settings(),
-                    root,
-                ))
-            });
-
         let controller = self.documents.get(&url)?;
         let cell_url = match key {
             DocumentKey::NotebookCell(cell_url) => Some(cell_url),
             _ => None,
         };
-        Some(controller.make_ref(cell_url, url, document_settings))
-    }
-
-    /// Reloads relevant existing settings files based on a changed settings file path.
-    pub(super) fn reload_settings(&mut self, changed_url: &Url) {
-        let Ok(changed_path) = changed_url.to_file_path() else {
-            // Files that don't map to a path can't be a workspace configuration file.
-            return;
-        };
-
-        let Some(enclosing_folder) = changed_path.parent() else {
-            return;
-        };
-
-        for (root, settings) in self
-            .settings
-            .range_mut(..=enclosing_folder.to_path_buf())
-            .rev()
-        {
-            if !enclosing_folder.starts_with(root) {
-                break;
-            }
-
-            settings.ruff_settings = ruff_settings::RuffSettingsIndex::new(
-                root,
-                settings.client_settings.editor_settings(),
-            );
-        }
+        Some(controller.make_ref(cell_url, url))
     }
 
     pub(super) fn open_text_document(&mut self, url: Url, document: TextDocument) {
@@ -330,19 +166,6 @@ impl Index {
         Ok(())
     }
 
-    pub(super) fn client_settings(&self, key: &DocumentKey) -> ResolvedClientSettings {
-        let Some(url) = self.url_for_key(key) else {
-            return ResolvedClientSettings::global(&self.global_settings);
-        };
-        let Some(WorkspaceSettings {
-            client_settings, ..
-        }) = self.settings_for_url(url)
-        else {
-            return ResolvedClientSettings::global(&self.global_settings);
-        };
-        client_settings.clone()
-    }
-
     fn document_controller_for_key(
         &mut self,
         key: &DocumentKey,
@@ -362,29 +185,6 @@ impl Index {
             DocumentKey::NotebookCell(uri) => self.notebook_cells.get(uri),
         }
     }
-
-    fn settings_for_url(&self, url: &Url) -> Option<&WorkspaceSettings> {
-        if let Ok(path) = url.to_file_path() {
-            self.settings_for_path(&path)
-        } else {
-            // If there's only a single workspace, use that configuration for an untitled document.
-            if self.settings.len() == 1 {
-                tracing::debug!(
-                    "Falling back to configuration of the only active workspace for the new document '{url}'."
-                );
-                self.settings.values().next()
-            } else {
-                None
-            }
-        }
-    }
-
-    fn settings_for_path(&self, path: &Path) -> Option<&WorkspaceSettings> {
-        self.settings
-            .range(..path.to_path_buf())
-            .next_back()
-            .map(|(_, settings)| settings)
-    }
 }
 
 /// A mutable handler to an underlying document.
@@ -403,23 +203,16 @@ impl DocumentController {
         Self::Notebook(Arc::new(document))
     }
 
-    fn make_ref(
-        &self,
-        cell_url: Option<Url>,
-        file_url: Url,
-        settings: Arc<RuffSettings>,
-    ) -> DocumentQuery {
+    fn make_ref(&self, cell_url: Option<Url>, file_url: Url) -> DocumentQuery {
         match &self {
             Self::Notebook(notebook) => DocumentQuery::Notebook {
                 cell_url,
                 file_url,
                 notebook: notebook.clone(),
-                settings,
             },
             Self::Text(document) => DocumentQuery::Text {
                 file_url,
                 document: document.clone(),
-                settings,
             },
         }
     }
@@ -462,7 +255,6 @@ pub enum DocumentQuery {
     Text {
         file_url: Url,
         document: Arc<TextDocument>,
-        settings: Arc<RuffSettings>,
     },
     Notebook {
         /// The selected notebook cell, if it exists.
@@ -470,7 +262,6 @@ pub enum DocumentQuery {
         /// The URL of the notebook.
         file_url: Url,
         notebook: Arc<NotebookDocument>,
-        settings: Arc<RuffSettings>,
     },
 }
 
@@ -484,13 +275,6 @@ impl DocumentQuery {
                 ..
             } => DocumentKey::NotebookCell(cell_uri.clone()),
             Self::Notebook { file_url, .. } => DocumentKey::Notebook(file_url.clone()),
-        }
-    }
-
-    /// Get the document settings associated with this query.
-    pub(crate) fn settings(&self) -> &RuffSettings {
-        match self {
-            Self::Text { settings, .. } | Self::Notebook { settings, .. } => settings,
         }
     }
 
