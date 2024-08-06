@@ -28,6 +28,9 @@ mod capabilities;
 pub(crate) mod index;
 mod settings;
 
+// TODO(dhruvmanila): In general, the server shouldn't use any salsa queries directly and instead
+// should use methods on `RootDatabase`.
+
 /// The global state for the LSP
 pub struct Session {
     /// Used to retrieve information about open documents and settings.
