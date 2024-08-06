@@ -30,10 +30,7 @@ impl SyncNotificationHandler for DidOpenTextDocumentHandler {
         let document = TextDocument::new(params.text_document.text, params.text_document.version);
         session.open_text_document(params.text_document.uri, document);
 
-        if let Some(db) = session.workspace_db_for_path_mut(path.as_std_path()) {
-            let file = system_path_to_file(&**db, path).unwrap();
-            db.workspace().open_file(db.get_mut(), file);
-        }
+        // TODO(dhruvmanila): Open the file in the `RootDatabase`
 
         // Publish diagnostics if the client doesn't support pull diagnostics
 

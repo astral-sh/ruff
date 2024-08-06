@@ -38,10 +38,7 @@ impl SyncNotificationHandler for DidOpenNotebookHandler {
 
         session.open_notebook_document(params.notebook_document.uri.clone(), notebook);
 
-        if let Some(db) = session.workspace_db_for_path_mut(path.as_std_path()) {
-            let file = system_path_to_file(&**db, path).unwrap();
-            db.workspace().open_file(db.get_mut(), file);
-        }
+        // TODO(dhruvmanila): Open the file in the `RootDatabase`
 
         // Publish diagnostics if the client doesn't support pull diagnostics
 

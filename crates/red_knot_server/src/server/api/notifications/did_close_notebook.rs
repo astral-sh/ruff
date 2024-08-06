@@ -31,10 +31,7 @@ impl SyncNotificationHandler for DidCloseNotebookHandler {
             .close_document(&key)
             .with_failure_code(lsp_server::ErrorCode::InternalError)?;
 
-        if let Some(db) = session.workspace_db_for_path_mut(path.as_std_path()) {
-            let file = system_path_to_file(&**db, path).unwrap();
-            db.workspace().close_file(db.get_mut(), file);
-        }
+        // TODO(dhruvmanila): Close the file in the `RootDatabase`
 
         Ok(())
     }
