@@ -10,12 +10,13 @@ use lsp_types::{ClientCapabilities, Url};
 
 use red_knot_workspace::db::RootDatabase;
 use red_knot_workspace::workspace::WorkspaceMetadata;
+use ruff_db::files::{system_path_to_file, File};
 use ruff_db::program::{ProgramSettings, SearchPathSettings, TargetVersion};
 use ruff_db::system::SystemPath;
 use ruff_db::Db as _;
 
 use crate::edit::{DocumentKey, NotebookDocument};
-use crate::system::LSPSystem;
+use crate::system::{url_to_system_path, LSPSystem};
 use crate::{PositionEncoding, TextDocument};
 
 pub(crate) use self::capabilities::ResolvedClientCapabilities;
@@ -212,5 +213,10 @@ impl DocumentSnapshot {
 
     pub(crate) fn encoding(&self) -> PositionEncoding {
         self.position_encoding
+    }
+
+    pub(crate) fn file(&self, db: &RootDatabase) -> Option<File> {
+        let path = url_to_system_path(self.document_ref.file_url()).ok()?;
+        system_path_to_file(db, path).ok()
     }
 }

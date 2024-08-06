@@ -7,12 +7,10 @@ use lsp_types::{
 };
 
 use red_knot_workspace::db::RootDatabase;
-use ruff_db::files::system_path_to_file;
 
 use crate::server::api::traits::{BackgroundDocumentRequestHandler, RequestHandler};
 use crate::server::{client::Notifier, Result};
 use crate::session::DocumentSnapshot;
-use crate::system::url_to_system_path;
 
 pub(crate) struct DocumentDiagnosticRequestHandler;
 
@@ -26,13 +24,13 @@ impl BackgroundDocumentRequestHandler for DocumentDiagnosticRequestHandler {
     }
 
     fn run_with_snapshot(
-        _snapshot: DocumentSnapshot,
+        snapshot: DocumentSnapshot,
         db: Option<salsa::Handle<RootDatabase>>,
         _notifier: Notifier,
-        params: DocumentDiagnosticParams,
+        _params: DocumentDiagnosticParams,
     ) -> Result<DocumentDiagnosticReportResult> {
         let diagnostics = db
-            .map(|db| compute_diagnostics(&params.text_document.uri, &db))
+            .map(|db| compute_diagnostics(&snapshot, &db))
             .unwrap_or_default();
 
         Ok(DocumentDiagnosticReportResult::Report(
@@ -47,11 +45,8 @@ impl BackgroundDocumentRequestHandler for DocumentDiagnosticRequestHandler {
     }
 }
 
-fn compute_diagnostics(url: &Url, db: &RootDatabase) -> Vec<Diagnostic> {
-    let Ok(path) = url_to_system_path(url) else {
-        return vec![];
-    };
-    let Ok(file) = system_path_to_file(db, path) else {
+fn compute_diagnostics(snapshot: &DocumentSnapshot, db: &RootDatabase) -> Vec<Diagnostic> {
+    let Some(file) = snapshot.file(db) else {
         return vec![];
     };
     let Ok(diagnostics) = db.check_file(file) else {
