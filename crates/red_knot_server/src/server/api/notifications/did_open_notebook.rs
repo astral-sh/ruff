@@ -40,8 +40,8 @@ impl SyncNotificationHandler for DidOpenNotebookHandler {
 
         if let Some(db) = session.workspace_db_for_path_mut(path.as_std_path()) {
             // TODO(dhruvmanila): Store the `file` in `DocumentController`
-            let file = system_path_to_file(&**db, &path).unwrap();
-            file.sync(db.get_mut());
+            let file = system_path_to_file(db, &path).unwrap();
+            file.sync(db);
         }
 
         // TODO(dhruvmanila): Publish diagnostics if the client doesn't support pull diagnostics

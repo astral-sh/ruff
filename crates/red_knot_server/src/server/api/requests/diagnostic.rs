@@ -25,7 +25,7 @@ impl BackgroundDocumentRequestHandler for DocumentDiagnosticRequestHandler {
 
     fn run_with_snapshot(
         snapshot: DocumentSnapshot,
-        db: Option<salsa::Handle<RootDatabase>>,
+        db: Option<RootDatabase>,
         _notifier: Notifier,
         _params: DocumentDiagnosticParams,
     ) -> Result<DocumentDiagnosticReportResult> {

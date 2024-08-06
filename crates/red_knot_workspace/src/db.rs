@@ -1,10 +1,6 @@
 use std::panic::RefUnwindSafe;
 use std::sync::Arc;
 
-use salsa::{Cancelled, Event};
-
-use salsa::Cancelled;
-
 use red_knot_module_resolver::{vendored_typeshed_stubs, Db as ResolverDb};
 use red_knot_python_semantic::Db as SemanticDb;
 use ruff_db::files::{File, Files};
@@ -12,6 +8,8 @@ use ruff_db::program::{Program, ProgramSettings};
 use ruff_db::system::System;
 use ruff_db::vendored::VendoredFileSystem;
 use ruff_db::{Db as SourceDb, Upcast};
+use salsa::plumbing::ZalsaDatabase;
+use salsa::{Cancelled, Event};
 
 use crate::lint::Diagnostics;
 use crate::workspace::{check_file, Workspace, WorkspaceMetadata};
@@ -61,6 +59,17 @@ impl RootDatabase {
 
     pub fn check_file(&self, file: File) -> Result<Diagnostics, Cancelled> {
         self.with_db(|db| check_file(db, file))
+    }
+
+    /// Returns a mutable reference to the system.
+    ///
+    /// WARNING: Triggers a new revision, canceling other database handles. This can lead to deadlock.
+    pub fn system_mut(&mut self) -> &mut dyn System {
+        // TODO: Use a more official method to cancel other queries.
+        // https://salsa.zulipchat.com/#narrow/stream/333573-salsa-3.2E0/topic/Expose.20an.20API.20to.20cancel.20other.20queries
+        let _ = self.zalsa_mut();
+
+        Arc::get_mut(&mut self.system).unwrap()
     }
 
     pub(crate) fn with_db<F, T>(&self, f: F) -> Result<T, Cancelled>
@@ -126,10 +135,6 @@ impl SourceDb for RootDatabase {
         &*self.system
     }
 
-    fn system_mut(&mut self) -> &mut dyn System {
-        &mut *self.system
-    }
-
     fn files(&self) -> &Files {
         &self.files
     }
@@ -193,10 +198,6 @@ pub(crate) mod tests {
 
         fn system(&self) -> &dyn System {
             &self.system
-        }
-
-        fn system_mut(&mut self) -> &mut dyn System {
-            &mut self.system
         }
 
         fn files(&self) -> &Files {

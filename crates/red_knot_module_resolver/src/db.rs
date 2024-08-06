@@ -74,10 +74,6 @@ pub(crate) mod tests {
             &self.system
         }
 
-        fn system_mut(&mut self) -> &mut dyn ruff_db::system::System {
-            &mut self.system
-        }
-
         fn files(&self) -> &Files {
             &self.files
         }
