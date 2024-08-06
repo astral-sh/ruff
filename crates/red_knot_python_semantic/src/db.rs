@@ -112,12 +112,11 @@ pub(crate) mod tests {
 
     #[salsa::db]
     impl salsa::Database for TestDb {
-        fn salsa_event(&self, event: salsa::Event) {
-            self.attach(|_| {
-                tracing::trace!("event: {event:?}");
-                let mut events = self.events.lock().unwrap();
-                events.push(event);
-            });
+        fn salsa_event(&self, event: &dyn Fn() -> salsa::Event) {
+            let event = event();
+            tracing::trace!("event: {event:?}");
+            let mut events = self.events.lock().unwrap();
+            events.push(event);
         }
     }
 }

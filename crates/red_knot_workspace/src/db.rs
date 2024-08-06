@@ -1,4 +1,7 @@
-use std::panic::{AssertUnwindSafe, RefUnwindSafe};
+use std::panic::RefUnwindSafe;
+use std::sync::Arc;
+
+use salsa::{Cancelled, Event};
 
 use salsa::Cancelled;
 
@@ -23,7 +26,7 @@ pub struct RootDatabase {
     workspace: Option<Workspace>,
     storage: salsa::Storage<RootDatabase>,
     files: Files,
-    system: Box<dyn System + Send + Sync + RefUnwindSafe>,
+    system: Arc<dyn System + Send + Sync + RefUnwindSafe>,
 }
 
 impl RootDatabase {
@@ -35,7 +38,7 @@ impl RootDatabase {
             workspace: None,
             storage: salsa::Storage::default(),
             files: Files::default(),
-            system: Box::new(system),
+            system: Arc::new(system),
         };
 
         let workspace = Workspace::from_metadata(&db, workspace);
@@ -64,27 +67,17 @@ impl RootDatabase {
     where
         F: FnOnce(&RootDatabase) -> T + std::panic::UnwindSafe,
     {
-        // The `AssertUnwindSafe` here looks scary, but is a consequence of Salsa's design.
-        // Salsa uses panics to implement cancellation and to recover from cycles. However, the Salsa
-        // storage isn't `UnwindSafe` or `RefUnwindSafe` because its dependencies `DashMap` and `parking_lot::*` aren't
-        // unwind safe.
-        //
-        // Having to use `AssertUnwindSafe` isn't as big as a deal as it might seem because
-        // the `UnwindSafe` and `RefUnwindSafe` traits are designed to catch logical bugs.
-        // They don't protect against [UB](https://internals.rust-lang.org/t/pre-rfc-deprecating-unwindsafe/15974).
-        // On top of that, `Cancelled` only catches specific Salsa-panics and propagates all other panics.
-        //
-        // That still leaves us with possible logical bugs in two sources:
-        // * In Salsa itself: This must be considered a bug in Salsa and needs fixing upstream.
-        //   Reviewing Salsa code specifically around unwind safety seems doable.
-        // * Our code: This is the main concern. Luckily, it only involves code that uses internal mutability
-        //     and calls into Salsa queries when mutating the internal state. Using `AssertUnwindSafe`
-        //     certainly makes it harder to catch these issues in our user code.
-        //
-        // For now, this is the only solution at hand unless Salsa decides to change its design.
-        // [Zulip support thread](https://salsa.zulipchat.com/#narrow/stream/145099-general/topic/How.20to.20use.20.60Cancelled.3A.3Acatch.60)
-        let db = &AssertUnwindSafe(self);
-        Cancelled::catch(|| f(db))
+        Cancelled::catch(|| f(self))
+    }
+
+    #[must_use]
+    pub fn snapshot(&self) -> Self {
+        Self {
+            workspace: self.workspace,
+            storage: self.storage.clone(),
+            files: self.files.snapshot(),
+            system: Arc::clone(&self.system),
+        }
     }
 }
 
@@ -143,20 +136,25 @@ impl SourceDb for RootDatabase {
 }
 
 #[salsa::db]
-impl salsa::Database for RootDatabase {}
+impl salsa::Database for RootDatabase {
+    fn salsa_event(&self, _event: &dyn Fn() -> Event) {}
+}
 
 #[salsa::db]
 impl Db for RootDatabase {}
 
 #[cfg(test)]
 pub(crate) mod tests {
-    use crate::db::Db;
+    use salsa::Event;
+
     use red_knot_module_resolver::{vendored_typeshed_stubs, Db as ResolverDb};
     use red_knot_python_semantic::Db as SemanticDb;
     use ruff_db::files::Files;
     use ruff_db::system::{DbWithTestSystem, System, TestSystem};
     use ruff_db::vendored::VendoredFileSystem;
     use ruff_db::{Db as SourceDb, Upcast};
+
+    use crate::db::Db;
 
     #[salsa::db]
     pub(crate) struct TestDb {
@@ -241,5 +239,7 @@ pub(crate) mod tests {
     impl Db for TestDb {}
 
     #[salsa::db]
-    impl salsa::Database for TestDb {}
+    impl salsa::Database for TestDb {
+        fn salsa_event(&self, _event: &dyn Fn() -> Event) {}
+    }
 }

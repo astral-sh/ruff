@@ -57,7 +57,7 @@ impl PackageFiles {
     pub fn indexed_mut(db: &mut dyn Db, package: Package) -> Option<IndexedFilesMut> {
         // Calling `runtime_mut` cancels all pending salsa queries. This ensures that there are no pending
         // reads to the file set.
-        let _ = db.runtime_mut();
+        let _ = db.as_dyn_database_mut().zalsa_mut();
 
         let files = package.file_set(db);
 

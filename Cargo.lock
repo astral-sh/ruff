@@ -195,18 +195,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b048fb63fd8b5923fc5aa7b340d8e156aec7ec02f0c78fa8a6ddc2613f6f71de"
 
 [[package]]
-name = "boomphf"
-version = "0.6.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "617e2d952880a00583ddb9237ac3965732e8df6a92a8e7bcc054100ec467ec3b"
-dependencies = [
- "crossbeam-utils",
- "log",
- "rayon",
- "wyhash",
-]
-
-[[package]]
 name = "bstr"
 version = "1.10.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2716,15 +2704,15 @@ checksum = "e86697c916019a8588c99b5fac3cead74ec0b4b819707a682fd4d23fa0ce1ba1"
 [[package]]
 name = "salsa"
 version = "0.18.0"
-source = "git+https://github.com/MichaReiser/salsa.git?rev=b8635811b826a137ca0b8f9e1ab7d13b050d25a3#b8635811b826a137ca0b8f9e1ab7d13b050d25a3"
+source = "git+https://github.com/MichaReiser/salsa.git?tag=red-knot-0.0.1#ece083e15b79f155f9e4368ec1318cec9a08d88b"
 dependencies = [
  "append-only-vec",
  "arc-swap",
- "boomphf",
  "crossbeam",
  "dashmap 6.0.1",
  "hashlink",
  "indexmap",
+ "lazy_static",
  "parking_lot",
  "rustc-hash 2.0.0",
  "salsa-macro-rules",
@@ -2736,12 +2724,12 @@ dependencies = [
 [[package]]
 name = "salsa-macro-rules"
 version = "0.1.0"
-source = "git+https://github.com/MichaReiser/salsa.git?rev=b8635811b826a137ca0b8f9e1ab7d13b050d25a3#b8635811b826a137ca0b8f9e1ab7d13b050d25a3"
+source = "git+https://github.com/MichaReiser/salsa.git?tag=red-knot-0.0.1#ece083e15b79f155f9e4368ec1318cec9a08d88b"
 
 [[package]]
 name = "salsa-macros"
 version = "0.18.0"
-source = "git+https://github.com/MichaReiser/salsa.git?rev=b8635811b826a137ca0b8f9e1ab7d13b050d25a3#b8635811b826a137ca0b8f9e1ab7d13b050d25a3"
+source = "git+https://github.com/MichaReiser/salsa.git?tag=red-knot-0.0.1#ece083e15b79f155f9e4368ec1318cec9a08d88b"
 dependencies = [
  "heck",
  "proc-macro2",
@@ -3851,15 +3839,6 @@ name = "winsafe"
 version = "0.0.19"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d135d17ab770252ad95e9a872d365cf3090e3be864a34ab46f48555993efc904"
-
-[[package]]
-name = "wyhash"
-version = "0.5.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "baf6e163c25e3fac820b4b453185ea2dea3b6a3e0a721d4d23d75bd33734c295"
-dependencies = [
- "rand_core",
-]
 
 [[package]]
 name = "yansi"

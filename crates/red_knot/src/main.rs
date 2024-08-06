@@ -132,7 +132,7 @@ pub fn main() -> anyhow::Result<()> {
 
     // TODO: Use the `program_settings` to compute the key for the database's persistent
     //   cache and load the cache if it exists.
-    let db = RootDatabase::new(workspace_metadata, program_settings, system);
+    let mut db = RootDatabase::new(workspace_metadata, program_settings, system);
 
     let (main_loop, main_loop_cancellation_token) = MainLoop::new(verbosity);
 
@@ -146,7 +146,6 @@ pub fn main() -> anyhow::Result<()> {
         }
     })?;
 
-    let mut db = salsa::Handle::new(db);
     if watch {
         main_loop.watch(&mut db)?;
     } else {
@@ -186,7 +185,7 @@ impl MainLoop {
         )
     }
 
-    fn watch(mut self, db: &mut salsa::Handle<RootDatabase>) -> anyhow::Result<()> {
+    fn watch(mut self, db: &mut RootDatabase) -> anyhow::Result<()> {
         let sender = self.sender.clone();
         let watcher = watch::directory_watcher(move |event| {
             sender.send(MainLoopMessage::ApplyChanges(event)).unwrap();
@@ -198,7 +197,7 @@ impl MainLoop {
     }
 
     #[allow(clippy::print_stderr)]
-    fn run(mut self, db: &mut salsa::Handle<RootDatabase>) {
+    fn run(mut self, db: &mut RootDatabase) {
         // Schedule the first check.
         self.sender.send(MainLoopMessage::CheckWorkspace).unwrap();
         let mut revision = 0usize;
@@ -208,7 +207,7 @@ impl MainLoop {
 
             match message {
                 MainLoopMessage::CheckWorkspace => {
-                    let db = db.clone();
+                    let db = db.snapshot();
                     let sender = self.sender.clone();
 
                     // Spawn a new task that checks the workspace. This needs to be done in a separate thread
@@ -243,7 +242,7 @@ impl MainLoop {
                 MainLoopMessage::ApplyChanges(changes) => {
                     revision += 1;
                     // Automatically cancels any pending queries and waits for them to complete.
-                    db.get_mut().apply_changes(changes);
+                    db.apply_changes(changes);
                     if let Some(watcher) = self.watcher.as_mut() {
                         watcher.update(db);
                     }
