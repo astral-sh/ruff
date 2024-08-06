@@ -32,6 +32,12 @@ pub(crate) fn url_to_system_path(url: &Url) -> std::result::Result<SystemPathBuf
 #[derive(Debug)]
 pub(crate) struct LSPSystem {
     /// A read-only copy of the index where the server stores all the open documents and settings.
+    ///
+    /// This will be [`None`] when a mutable reference is held to the index via [`index_mut`]
+    /// method to prevent the index from being accessed while it is being modified. It will be
+    /// restored when the mutable reference is dropped.
+    ///
+    /// [`index_mut`]: crate::Session::index_mut
     index: Option<Arc<Index>>,
 
     /// A system implementation that uses the local file system.

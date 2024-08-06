@@ -31,7 +31,14 @@ mod settings;
 /// The global state for the LSP
 pub struct Session {
     /// Used to retrieve information about open documents and settings.
+    ///
+    /// This will be [`None`] when a mutable reference is held to the index via [`index_mut`]
+    /// to prevent the index from being accessed while it is being modified. It will be restored
+    /// when the mutable reference ([`MutIndexGuard`]) is dropped.
+    ///
+    /// [`index_mut`]: Session::index_mut
     index: Option<Arc<index::Index>>,
+
     /// Maps workspace root paths to their respective databases.
     workspaces: BTreeMap<PathBuf, salsa::Handle<RootDatabase>>,
     /// The global position encoding, negotiated during LSP initialization.
@@ -138,10 +145,22 @@ impl Session {
         Ok(())
     }
 
+    /// Returns a reference to the index.
+    ///
+    /// # Panics
+    ///
+    /// Panics if there's a mutable reference to the index via [`index_mut`].
+    ///
+    /// [`index_mut`]: Session::index_mut
     fn index(&self) -> &index::Index {
         self.index.as_ref().unwrap()
     }
 
+    /// Returns a mutable reference to the index.
+    ///
+    /// This method drops all references to the index and returns a guard that will restore the
+    /// references when dropped. This guard holds the only reference to the index and allows
+    /// modifying it.
     fn index_mut(&mut self) -> MutIndexGuard {
         let index = self.index.take().unwrap();
 
@@ -167,6 +186,9 @@ impl Session {
     }
 }
 
+/// A guard that holds the only reference to the index and allows modifying it.
+///
+/// When dropped, this guard restores all references to the index.
 struct MutIndexGuard<'a> {
     session: &'a mut Session,
     index: Option<index::Index>,
