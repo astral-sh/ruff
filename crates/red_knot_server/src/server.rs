@@ -1,6 +1,8 @@
 //! Scheduling, I/O, and API endpoints.
 
 use std::num::NonZeroUsize;
+use std::panic::PanicInfo;
+use std::str::FromStr;
 
 use lsp_server as lsp;
 use lsp_types as types;
@@ -25,6 +27,7 @@ mod client;
 mod connection;
 mod schedule;
 
+use crate::message::try_show_message;
 pub(crate) use connection::ClientSender;
 
 pub(crate) type Result<T> = std::result::Result<T, api::Error>;
@@ -122,6 +125,46 @@ impl Server {
     }
 
     pub fn run(self) -> crate::Result<()> {
+        type PanicHook = Box<dyn Fn(&PanicInfo<'_>) + 'static + Sync + Send>;
+        struct RestorePanicHook {
+            hook: Option<PanicHook>,
+        }
+
+        impl Drop for RestorePanicHook {
+            fn drop(&mut self) {
+                if let Some(hook) = self.hook.take() {
+                    std::panic::set_hook(hook);
+                }
+            }
+        }
+
+        // unregister any previously registered panic hook
+        // The hook will be restored when this function exits.
+        let _ = RestorePanicHook {
+            hook: Some(std::panic::take_hook()),
+        };
+
+        // When we panic, try to notify the client.
+        std::panic::set_hook(Box::new(move |panic_info| {
+            use std::io::Write;
+
+            let backtrace = std::backtrace::Backtrace::force_capture();
+            tracing::error!("{panic_info}\n{backtrace}");
+
+            // we also need to print to stderr directly for when using `$logTrace` because
+            // the message won't be sent to the client.
+            // But don't use `eprintln` because `eprintln` itself may panic if the pipe is broken.
+            let mut stderr = std::io::stderr().lock();
+            writeln!(stderr, "{panic_info}\n{backtrace}").ok();
+
+            try_show_message(
+                "The Ruff language server exited with a panic. See the logs for more details."
+                    .to_string(),
+                lsp_types::MessageType::ERROR,
+            )
+            .ok();
+        }));
+
         event_loop_thread(move || {
             Self::event_loop(
                 &self.connection,
