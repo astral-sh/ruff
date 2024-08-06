@@ -228,8 +228,8 @@ Ruff is installable under any Python version from 3.7 onwards.
 
 Nope! Ruff is available as [`ruff`](https://pypi.org/project/ruff/) on PyPI:
 
-```shell
-pip install ruff
+```console
+$ pip install ruff
 ```
 
 Ruff ships with wheels for all major platforms, which enables `pip` to install Ruff without relying
@@ -427,8 +427,8 @@ code formatters over Jupyter Notebooks.
 
 After installing `ruff` and `nbqa`, you can run Ruff over a notebook like so:
 
-```shell
-> nbqa ruff Untitled.ipynb
+```console
+$ nbqa ruff Untitled.ipynb
 Untitled.ipynb:cell_1:2:5: F841 Local variable `x` is assigned to but never used
 Untitled.ipynb:cell_2:1:1: E402 Module level import not at top of file
 Untitled.ipynb:cell_2:1:8: F401 `os` imported but unused
