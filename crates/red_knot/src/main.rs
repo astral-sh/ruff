@@ -3,6 +3,7 @@ use std::sync::Mutex;
 
 use clap::Parser;
 use crossbeam::channel as crossbeam_channel;
+use red_knot_workspace::site_packages::site_packages_dirs_of_venv;
 use tracing::subscriber::Interest;
 use tracing::{Level, Metadata};
 use tracing_subscriber::filter::LevelFilter;
@@ -40,6 +41,17 @@ struct Args {
         value_name = "PATH"
     )]
     current_directory: Option<SystemPathBuf>,
+
+    #[arg(
+        long,
+        help = "Path to the virtual environment the project uses",
+        long_help = "\
+Path to the virtual environment the project uses. \
+If provided, red-knot will use the `site-packages` directory of this virtual environment \
+to resolve type information for the project's third-party dependencies.",
+        value_name = "PATH"
+    )]
+    venv_path: Option<SystemPathBuf>,
 
     #[arg(
         long,
@@ -87,6 +99,7 @@ pub fn main() -> anyhow::Result<()> {
         current_directory,
         custom_typeshed_dir,
         extra_search_path: extra_paths,
+        venv_path,
         target_version,
         verbosity,
         watch,
@@ -120,6 +133,17 @@ pub fn main() -> anyhow::Result<()> {
     let workspace_metadata =
         WorkspaceMetadata::from_path(system.current_directory(), &system).unwrap();
 
+    let site_packages = if let Some(venv_path) = venv_path {
+        let venv_path = system.canonicalize_path(&venv_path).unwrap_or(venv_path);
+        assert!(
+            system.is_directory(&venv_path),
+            "Provided venv-path {venv_path} is not a directory!"
+        );
+        site_packages_dirs_of_venv(&venv_path, &system).unwrap()
+    } else {
+        vec![]
+    };
+
     // TODO: Respect the settings from the workspace metadata. when resolving the program settings.
     let program_settings = ProgramSettings {
         target_version: target_version.into(),
@@ -127,7 +151,7 @@ pub fn main() -> anyhow::Result<()> {
             extra_paths,
             src_root: workspace_metadata.root().to_path_buf(),
             custom_typeshed: custom_typeshed_dir,
-            site_packages: vec![],
+            site_packages,
         },
     };
 

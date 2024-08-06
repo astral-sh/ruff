@@ -1971,6 +1971,7 @@ dependencies = [
  "ruff_python_ast",
  "rustc-hash 2.0.0",
  "salsa",
+ "thiserror",
  "tracing",
 ]
 

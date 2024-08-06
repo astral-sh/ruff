@@ -24,6 +24,7 @@ crossbeam = { workspace = true }
 notify = { workspace = true }
 rustc-hash = { workspace = true }
 salsa = { workspace = true }
+thiserror = { workspace = true }
 tracing = { workspace = true }
 
 [dev-dependencies]

@@ -128,12 +128,16 @@ fn try_resolve_module_resolution_settings(
         site_packages,
     } = program.search_paths(db.upcast());
 
+    if !extra_paths.is_empty() {
+        tracing::info!("Extra search paths: {extra_paths:?}");
+    }
+
     if let Some(custom_typeshed) = custom_typeshed {
         tracing::info!("Custom typeshed directory: {custom_typeshed}");
     }
 
-    if !extra_paths.is_empty() {
-        tracing::info!("extra search paths: {extra_paths:?}");
+    if !site_packages.is_empty() {
+        tracing::info!("Site-packages directories: {site_packages:?}");
     }
 
     let system = db.system();
