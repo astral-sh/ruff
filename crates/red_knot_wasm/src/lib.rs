@@ -14,10 +14,6 @@ use ruff_db::system::{
 };
 use ruff_notebook::Notebook;
 
-// Use `wee_alloc` as the global allocator.
-#[global_allocator]
-static ALLOC: wee_alloc::WeeAlloc = wee_alloc::WeeAlloc::INIT;
-
 #[wasm_bindgen(start)]
 pub fn run() {
     use log::Level;

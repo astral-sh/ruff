@@ -29,7 +29,6 @@ console_log = { workspace = true }
 js-sys = { workspace = true }
 log = { workspace = true }
 wasm-bindgen = { workspace = true }
-wee_alloc = "0.4.5"
 
 [dev-dependencies]
 wasm-bindgen-test = { workspace = true }
