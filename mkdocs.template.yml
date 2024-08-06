@@ -63,6 +63,8 @@ plugins:
   - typeset
 extra_css:
   - stylesheets/extra.css
+extra_javascript:
+  - js/extra.js
 not_in_nav: |
   /rules/*
   /formatter/*
