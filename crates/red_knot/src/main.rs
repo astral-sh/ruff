@@ -39,6 +39,17 @@ struct Args {
 
     #[arg(
         long,
+        help = "Path to the virtual environment the project uses",
+        long_help = "\
+Path to the virtual environment the project uses. \
+If provided, red-knot will use the `site-packages` directory of this virtual environment \
+to resolve type information for the project's third-party dependencies.",
+        value_name = "PATH"
+    )]
+    venv_path: Option<SystemPathBuf>,
+
+    #[arg(
+        long,
         value_name = "DIRECTORY",
         help = "Custom directory to use for stdlib typeshed stubs"
     )]
@@ -76,6 +87,7 @@ pub fn main() -> anyhow::Result<()> {
         current_directory,
         custom_typeshed_dir,
         extra_search_path: extra_paths,
+        venv_path,
         target_version,
         verbosity,
         watch,
