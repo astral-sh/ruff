@@ -81,8 +81,7 @@ def f():
 
 # OK
 def f(num: int):
-    """
-    Yields 1.
+    """Yields 1.
 
     Args:
         num (int): A number

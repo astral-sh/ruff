@@ -102,8 +102,7 @@ def f():
 
 # OK
 def f(num: int):
-    """
-    Returns 1.
+    """Returns 1.
 
     Args:
         num (int): A number
