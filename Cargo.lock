@@ -1947,7 +1947,6 @@ version = "0.0.0"
 dependencies = [
  "anyhow",
  "crossbeam",
- "ignore",
  "jod-thread",
  "libc",
  "lsp-server",
@@ -1959,7 +1958,6 @@ dependencies = [
  "ruff_python_ast",
  "ruff_source_file",
  "ruff_text_size",
- "ruff_workspace",
  "rustc-hash 2.0.0",
  "salsa",
  "serde",
