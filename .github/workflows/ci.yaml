@@ -111,7 +111,7 @@ jobs:
       - name: "Clippy"
         run: cargo clippy --workspace --all-targets --all-features --locked -- -D warnings
       - name: "Clippy (wasm)"
-        run: cargo clippy -p ruff_wasm --target wasm32-unknown-unknown --all-features --locked -- -D warnings
+        run: cargo clippy -p ruff_wasm -p red_knot_wasm --target wasm32-unknown-unknown --all-features --locked -- -D warnings
 
   cargo-test-linux:
     name: "cargo test (linux)"
@@ -191,9 +191,13 @@ jobs:
           cache-dependency-path: playground/package-lock.json
       - uses: jetli/wasm-pack-action@v0.4.0
       - uses: Swatinem/rust-cache@v2
-      - name: "Run wasm-pack"
+      - name: "Test ruff_wasm"
         run: |
           cd crates/ruff_wasm
+          wasm-pack test --node
+      - name: "Test red_knot_wasm"
+        run: |
+          cd crates/red_knot_wasm
           wasm-pack test --node
 
   cargo-build-release:
