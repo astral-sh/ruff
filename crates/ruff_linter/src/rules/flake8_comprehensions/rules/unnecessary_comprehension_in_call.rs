@@ -1,15 +1,11 @@
-use std::fmt::Display;
-
-use ruff_python_ast::{self as ast, Expr, Keyword};
-
 use ruff_diagnostics::{Diagnostic, FixAvailability};
 use ruff_diagnostics::{Edit, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::helpers::any_over_expr;
+use ruff_python_ast::{self as ast, Expr, Keyword};
 use ruff_text_size::{Ranged, TextSize};
 
 use crate::checkers::ast::Checker;
-
 use crate::rules::flake8_comprehensions::fixes;
 
 /// ## What it does
@@ -79,14 +75,14 @@ impl Violation for UnnecessaryComprehensionInCall {
 
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Unnecessary {} comprehension", self.comprehension_kind)
+        match self.comprehension_kind {
+            ComprehensionKind::List => format!("Unnecessary list comprehension"),
+            ComprehensionKind::Set => format!("Unnecessary set comprehension"),
+        }
     }
 
     fn fix_title(&self) -> Option<String> {
-        Some(format!(
-            "Remove unnecessary {} comprehension",
-            self.comprehension_kind
-        ))
+        Some("Remove unnecessary comprehension".to_string())
     }
 }
 
@@ -179,19 +175,19 @@ fn contains_await(expr: &Expr) -> bool {
     any_over_expr(expr, &Expr::is_await_expr)
 }
 
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
 enum DuplicationVariance {
     Invariant,
     Variant,
 }
 
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
 enum ComprehensionKind {
     List,
     Set,
 }
 
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
 enum SupportedBuiltins {
     All,
     Any,
@@ -199,6 +195,7 @@ enum SupportedBuiltins {
     Min,
     Max,
 }
+
 impl TryFrom<&str> for SupportedBuiltins {
     type Error = &'static str;
 
@@ -209,7 +206,7 @@ impl TryFrom<&str> for SupportedBuiltins {
             "sum" => Ok(Self::Sum),
             "min" => Ok(Self::Min),
             "max" => Ok(Self::Max),
-            _ => Err("Unsupported builtin for `unnecessary-comprehension-in-call`."),
+            _ => Err("Unsupported builtin for `unnecessary-comprehension-in-call`"),
         }
     }
 }
@@ -223,15 +220,5 @@ impl SupportedBuiltins {
             | SupportedBuiltins::Max => DuplicationVariance::Invariant,
             SupportedBuiltins::Sum => DuplicationVariance::Variant,
         }
-    }
-}
-
-impl Display for ComprehensionKind {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let text = match self {
-            ComprehensionKind::List => "list",
-            ComprehensionKind::Set => "set",
-        };
-        write!(f, "{text}")
     }
 }
