@@ -158,7 +158,7 @@ mod tests {
     // This test is skipped on Windows until we commit a Windows venv.
     #[cfg(not(target_os = "windows"))]
     fn can_find_site_packages_dir_in_committed_venv() {
-        let path_to_venv = SystemPath::new("resources/test/empty-test-venv");
+        let path_to_venv = SystemPath::new("resources/test/empty-unix-venv");
         let system = OsSystem::default();
 
         // if this doesn't hold true, the premise of the test is incorrect.
