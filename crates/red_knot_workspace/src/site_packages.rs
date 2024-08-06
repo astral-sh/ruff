@@ -35,7 +35,7 @@ fn site_packages_dir_from_sys_prefix(
     sys_prefix_path: &SystemPath,
     system: &dyn System,
 ) -> Result<SystemPathBuf, SitePackagesDiscoveryError> {
-    let site_packages = venv_path.join("Lib/site-packages");
+    let site_packages = sys_prefix_path.join("Lib/site-packages");
     system
         .is_directory(&site_packages)
         .then_some(site_packages)
