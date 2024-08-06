@@ -19,11 +19,11 @@ use ruff_db::system::{System, SystemPath, SystemPathBuf};
 /// at runtime in Python. For the case of a virtual environment, where a
 /// Python binary is at `/.venv/bin/python`, `sys.prefix` is the path to
 /// the virtual environment the Python binary lies inside, i.e. `/.venv`,
-/// and `site-packages` will be at `.venv/lib/site-packages`. System
+/// and `site-packages` will be at `.venv/Lib/site-packages`. System
 /// Python installations generally work the same way: if a system Python
 /// installation lies at `/opt/homebrew/bin/python`, `sys.prefix` will be
 /// `/opt/homebrew`, and `site-packages` will be at
-/// `/opt/homebrew/lib/site-packages`.
+/// `/opt/homebrew/Lib/site-packages`.
 ///
 /// This routine does not verify that `sys_prefix_path` points
 /// to an existing directory on disk; it is assumed that this has already
@@ -49,11 +49,11 @@ fn site_packages_dir_from_sys_prefix(
 /// at runtime in Python. For the case of a virtual environment, where a
 /// Python binary is at `/.venv/bin/python`, `sys.prefix` is the path to
 /// the virtual environment the Python binary lies inside, i.e. `/.venv`,
-/// and `site-packages` will be at `.venv/lib/site-packages`. System
-/// Python installations generally work the same way: if a system Python
-/// installation lies at `/opt/homebrew/bin/python`, `sys.prefix` will be
-/// `/opt/homebrew`, and `site-packages` will be at
-/// `/opt/homebrew/lib/site-packages`.
+/// and `site-packages` will be at `.venv/lib/python3.X/site-packages`.
+/// System Python installations generally work the same way: if a system
+/// Python installation lies at `/opt/homebrew/bin/python`, `sys.prefix`
+/// will be `/opt/homebrew`, and `site-packages` will be at
+/// `/opt/homebrew/lib/python3.X/site-packages`.
 ///
 /// This routine does not verify that `sys_prefix_path` points
 /// to an existing directory on disk; it is assumed that this has already
@@ -74,8 +74,8 @@ fn site_packages_dir_from_sys_prefix(
     //     libdirs.append("lib")
     // ```
     //
-    // Pyright therefore searches for both a `lib/python3.10/site-packages` directory
-    // and a `lib64/python3.10/site-packages` directory on non-MacOS Unix systems,
+    // Pyright therefore searches for both a `lib/python3.X/site-packages` directory
+    // and a `lib64/python3.X/site-packages` directory on non-MacOS Unix systems,
     // since `sys.platlibdir` can sometimes be equal to `"lib64"`.
     //
     // However, we only care about the `site-packages` directory insofar as it allows
@@ -134,7 +134,7 @@ pub enum SitePackagesDiscoveryError {
 /// Given a validated, canonicalized path to a virtual environment,
 /// return a list of `site-packages` directories that are available from that environment.
 ///
-/// See the documentation for [`site_packages_dir_from_sys_prefix`] for more details.
+/// See the documentation for `site_packages_dir_from_sys_prefix` for more details.
 ///
 /// TODO: Currently we only ever return 1 path from this function:
 /// the `site-packages` directory that is actually inside the virtual environment.
