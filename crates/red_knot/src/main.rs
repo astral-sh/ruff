@@ -16,11 +16,11 @@ use red_knot_workspace::watch::WorkspaceWatcher;
 use red_knot_workspace::workspace::WorkspaceMetadata;
 use ruff_db::program::{ProgramSettings, SearchPathSettings};
 use ruff_db::system::{OsSystem, System, SystemPathBuf};
+use target_version::TargetVersion;
+use verbosity::{Verbosity, VerbosityLevel};
 
-use cli::target_version::TargetVersion;
-use cli::verbosity::{Verbosity, VerbosityLevel};
-
-mod cli;
+mod target_version;
+mod verbosity;
 
 #[derive(Debug, Parser)]
 #[command(
