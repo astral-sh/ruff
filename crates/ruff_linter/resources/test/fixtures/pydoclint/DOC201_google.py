@@ -98,3 +98,14 @@ def f():
 def f():
     """Return 1."""
     return 1
+
+
+# OK
+def f(num: int):
+    """
+    Returns 1.
+
+    Args:
+        num (int): A number
+    """
+    return 1
