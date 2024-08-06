@@ -13,6 +13,7 @@ use ruff_text_size::{Ranged, TextRange};
 use crate::checkers::ast::Checker;
 use crate::docstrings::sections::{SectionContext, SectionContexts, SectionKind};
 use crate::docstrings::styles::SectionStyle;
+use crate::docstrings::Docstring;
 use crate::registry::Rule;
 use crate::rules::pydocstyle::settings::Convention;
 
@@ -649,10 +650,43 @@ fn is_exception_or_base_exception(qualified_name: &QualifiedName) -> bool {
     )
 }
 
+fn starts_with_returns(docstring: &Docstring) -> bool {
+    if let Some(first_word) = docstring.body().as_str().split(' ').next() {
+        return matches!(first_word, "Return" | "Returns");
+    }
+    false
+}
+
+fn returns_documented(
+    docstring: &Docstring,
+    docstring_sections: &DocstringSections,
+    convention: Option<Convention>,
+) -> bool {
+    docstring_sections.returns.is_some()
+        || (matches!(convention, Some(Convention::Google)) && starts_with_returns(docstring))
+}
+
+fn starts_with_yields(docstring: &Docstring) -> bool {
+    if let Some(first_word) = docstring.body().as_str().split(' ').next() {
+        return matches!(first_word, "Yield" | "Yields");
+    }
+    false
+}
+
+fn yields_documented(
+    docstring: &Docstring,
+    docstring_sections: &DocstringSections,
+    convention: Option<Convention>,
+) -> bool {
+    docstring_sections.yields.is_some()
+        || (matches!(convention, Some(Convention::Google)) && starts_with_yields(docstring))
+}
+
 /// DOC201, DOC202, DOC402, DOC403, DOC501, DOC502
 pub(crate) fn check_docstring(
     checker: &mut Checker,
     definition: &Definition,
+    docstring: &Docstring,
     section_contexts: &SectionContexts,
     convention: Option<Convention>,
 ) {
@@ -687,7 +721,7 @@ pub(crate) fn check_docstring(
 
     // DOC201
     if checker.enabled(Rule::DocstringMissingReturns) {
-        if docstring_sections.returns.is_none() {
+        if !returns_documented(docstring, &docstring_sections, convention) {
             let extra_property_decorators = checker.settings.pydocstyle.property_decorators();
             if !definition.is_property(extra_property_decorators, checker.semantic()) {
                 if let Some(body_return) = body_entries.returns.first() {
@@ -700,7 +734,7 @@ pub(crate) fn check_docstring(
 
     // DOC202
     if checker.enabled(Rule::DocstringExtraneousReturns) {
-        if let Some(docstring_returns) = docstring_sections.returns {
+        if let Some(ref docstring_returns) = docstring_sections.returns {
             if body_entries.returns.is_empty() {
                 let diagnostic =
                     Diagnostic::new(DocstringExtraneousReturns, docstring_returns.range());
@@ -711,7 +745,7 @@ pub(crate) fn check_docstring(
 
     // DOC402
     if checker.enabled(Rule::DocstringMissingYields) {
-        if docstring_sections.yields.is_none() {
+        if !yields_documented(docstring, &docstring_sections, convention) {
             if let Some(body_yield) = body_entries.yields.first() {
                 let diagnostic = Diagnostic::new(DocstringMissingYields, body_yield.range());
                 diagnostics.push(diagnostic);
