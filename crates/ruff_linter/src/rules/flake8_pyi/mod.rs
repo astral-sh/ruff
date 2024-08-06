@@ -9,7 +9,7 @@ mod tests {
     use test_case::test_case;
 
     use crate::registry::Rule;
-    use crate::settings::types::PythonVersion;
+    use crate::settings::types::{PreviewMode, PythonVersion};
     use crate::test::test_path;
     use crate::{assert_messages, settings};
 
@@ -143,6 +143,24 @@ mod tests {
             Path::new("flake8_pyi").join(path).as_path(),
             &settings::LinterSettings {
                 target_version: PythonVersion::Py38,
+                ..settings::LinterSettings::for_rule(rule_code)
+            },
+        )?;
+        assert_messages!(snapshot, diagnostics);
+        Ok(())
+    }
+
+    #[test_case(Rule::FutureAnnotationsInStub, Path::new("PYI044.pyi"))]
+    fn preview_rules(rule_code: Rule, path: &Path) -> Result<()> {
+        let snapshot = format!(
+            "preview__{}_{}",
+            rule_code.noqa_code(),
+            path.to_string_lossy()
+        );
+        let diagnostics = test_path(
+            Path::new("flake8_pyi").join(path).as_path(),
+            &settings::LinterSettings {
+                preview: PreviewMode::Enabled,
                 ..settings::LinterSettings::for_rule(rule_code)
             },
         )?;
