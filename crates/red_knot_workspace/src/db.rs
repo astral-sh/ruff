@@ -1,5 +1,7 @@
 use std::panic::{AssertUnwindSafe, RefUnwindSafe};
 
+use salsa::Cancelled;
+
 use red_knot_module_resolver::{vendored_typeshed_stubs, Db as ResolverDb};
 use red_knot_python_semantic::Db as SemanticDb;
 use ruff_db::files::{File, Files};
@@ -7,7 +9,6 @@ use ruff_db::program::{Program, ProgramSettings};
 use ruff_db::system::System;
 use ruff_db::vendored::VendoredFileSystem;
 use ruff_db::{Db as SourceDb, Upcast};
-use salsa::Cancelled;
 
 use crate::lint::Diagnostics;
 use crate::workspace::{check_file, Workspace, WorkspaceMetadata};
@@ -132,6 +133,10 @@ impl SourceDb for RootDatabase {
         &*self.system
     }
 
+    fn system_mut(&mut self) -> &mut dyn System {
+        &mut *self.system
+    }
+
     fn files(&self) -> &Files {
         &self.files
     }
@@ -190,6 +195,10 @@ pub(crate) mod tests {
 
         fn system(&self) -> &dyn System {
             &self.system
+        }
+
+        fn system_mut(&mut self) -> &mut dyn System {
+            &mut self.system
         }
 
         fn files(&self) -> &Files {

@@ -23,6 +23,7 @@ pub type FxDashSet<K> = dashmap::DashSet<K, BuildHasherDefault<FxHasher>>;
 pub trait Db: salsa::Database {
     fn vendored(&self) -> &VendoredFileSystem;
     fn system(&self) -> &dyn System;
+    fn system_mut(&mut self) -> &mut dyn System;
     fn files(&self) -> &Files;
 }
 
@@ -101,6 +102,10 @@ mod tests {
 
         fn system(&self) -> &dyn System {
             &self.system
+        }
+
+        fn system_mut(&mut self) -> &mut dyn System {
+            &mut self.system
         }
 
         fn files(&self) -> &Files {

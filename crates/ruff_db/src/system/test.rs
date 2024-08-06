@@ -132,6 +132,10 @@ impl System for TestSystem {
         self
     }
 
+    fn as_any_mut(&mut self) -> &mut dyn Any {
+        self
+    }
+
     fn read_directory<'a>(
         &'a self,
         path: &SystemPath,

@@ -112,6 +112,10 @@ impl System for OsSystem {
         self
     }
 
+    fn as_any_mut(&mut self) -> &mut dyn Any {
+        self
+    }
+
     fn read_directory(
         &self,
         path: &SystemPath,
