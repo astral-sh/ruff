@@ -603,7 +603,6 @@ impl PackageKind {
 
 #[cfg(test)]
 mod tests {
-    use anyhow::Context;
     use ruff_db::files::{system_path_to_file, File, FilePath};
     use ruff_db::system::DbWithTestSystem;
     use ruff_db::testing::{
@@ -1133,9 +1132,12 @@ mod tests {
     #[test]
     #[cfg(target_family = "unix")]
     fn symlink() -> anyhow::Result<()> {
-        use crate::db::tests::TestDb;
+        use anyhow::Context;
+
         use ruff_db::program::Program;
         use ruff_db::system::{OsSystem, SystemPath};
+
+        use crate::db::tests::TestDb;
 
         let mut db = TestDb::new();
 
