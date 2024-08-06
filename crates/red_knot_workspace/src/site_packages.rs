@@ -12,14 +12,27 @@ use std::io;
 
 use ruff_db::system::{System, SystemPath, SystemPathBuf};
 
-/// Attempt to retrieve the `site-packages` directory that is actually
-/// inside the virtual environment.
+/// Attempt to retrieve the `site-packages` directory
+/// associated with a given Python installation.
 ///
-/// It is assumed that it has already been checked that `venv_path` points
-/// to an existing directory on disk.
+/// `sys_prefix_path` is equivalent to the value of [`sys.prefix`]
+/// at runtime in Python. For the case of a virtual environment, where a
+/// Python binary is at `/.venv/bin/python`, `sys.prefix` is the path to
+/// the virtual environment the Python binary lies inside, i.e. `/.venv`,
+/// and `site-packages` will be at `.venv/lib/site-packages`. System
+/// Python installations generally work the same way: if a system Python
+/// installation lies at `/opt/homebrew/bin/python`, `sys.prefix` will be
+/// `/opt/homebrew`, and `site-packages` will be at
+/// `/opt/homebrew/lib/site-packages`.
+///
+/// This routine does not verify that `sys_prefix_path` points
+/// to an existing directory on disk; it is assumed that this has already
+/// been checked.
+///
+/// [`sys.prefix`]: https://docs.python.org/3/library/sys.html#sys.prefix
 #[cfg(target_os = "windows")]
-fn venv_site_packages_dir(
-    venv_path: &SystemPath,
+fn site_packages_dir_from_sys_prefix(
+    sys_prefix_path: &SystemPath,
     system: &dyn System,
 ) -> Result<SystemPathBuf, SitePackagesDiscoveryError> {
     let site_packages = venv_path.join("Lib/site-packages");
@@ -29,14 +42,27 @@ fn venv_site_packages_dir(
         .ok_or(SitePackagesDiscoveryError::NoSitePackagesDirFound)
 }
 
-/// Attempt to retrieve the `site-packages` directory that is actually
-/// inside the virtual environment.
+/// Attempt to retrieve the `site-packages` directory
+/// associated with a given Python installation.
 ///
-/// It is assumed that it has already been checked that `venv_path` points
-/// to an existing directory on disk.
+/// `sys_prefix_path` is equivalent to the value of [`sys.prefix`]
+/// at runtime in Python. For the case of a virtual environment, where a
+/// Python binary is at `/.venv/bin/python`, `sys.prefix` is the path to
+/// the virtual environment the Python binary lies inside, i.e. `/.venv`,
+/// and `site-packages` will be at `.venv/lib/site-packages`. System
+/// Python installations generally work the same way: if a system Python
+/// installation lies at `/opt/homebrew/bin/python`, `sys.prefix` will be
+/// `/opt/homebrew`, and `site-packages` will be at
+/// `/opt/homebrew/lib/site-packages`.
+///
+/// This routine does not verify that `sys_prefix_path` points
+/// to an existing directory on disk; it is assumed that this has already
+/// been checked.
+///
+/// [`sys.prefix`]: https://docs.python.org/3/library/sys.html#sys.prefix
 #[cfg(not(target_os = "windows"))]
-fn venv_site_packages_dir(
-    venv_path: &SystemPath,
+fn site_packages_dir_from_sys_prefix(
+    sys_prefix_path: &SystemPath,
     system: &dyn System,
 ) -> Result<SystemPathBuf, SitePackagesDiscoveryError> {
     // In the Python standard library's `site.py` module (used for finding `site-packages`
@@ -61,7 +87,7 @@ fn venv_site_packages_dir(
     //
     // [the non-Windows branch]: https://github.com/python/cpython/blob/a8be8fc6c4682089be45a87bd5ee1f686040116c/Lib/site.py#L401-L410
     // [the `sys`-module documentation]: https://docs.python.org/3/library/sys.html#sys.platlibdir
-    for entry_result in system.read_directory(&venv_path.join("lib"))? {
+    for entry_result in system.read_directory(&sys_prefix_path.join("lib"))? {
         let Ok(entry) = entry_result else {
             continue;
         };
@@ -105,8 +131,10 @@ pub enum SitePackagesDiscoveryError {
     NoSitePackagesDirFound,
 }
 
-/// Given a validated, canonicalized path to virtual environment,
+/// Given a validated, canonicalized path to a virtual environment,
 /// return a list of `site-packages` directories that are available from that environment.
+///
+/// See the documentation for [`site_packages_dir_from_sys_prefix`] for more details.
 ///
 /// TODO: Currently we only ever return 1 path from this function:
 /// the `site-packages` directory that is actually inside the virtual environment.
@@ -116,7 +144,7 @@ pub fn site_packages_dirs_of_venv(
     venv_path: &SystemPath,
     system: &dyn System,
 ) -> Result<Vec<SystemPathBuf>, SitePackagesDiscoveryError> {
-    Ok(vec![venv_site_packages_dir(venv_path, system)?])
+    Ok(vec![site_packages_dir_from_sys_prefix(venv_path, system)?])
 }
 
 #[cfg(test)]
