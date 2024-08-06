@@ -31,7 +31,7 @@ mod verbosity;
 #[command(version)]
 struct Args {
     #[command(subcommand)]
-    pub(crate) command: Command,
+    pub(crate) command: Option<Command>,
 
     #[arg(
         long,
@@ -71,6 +71,7 @@ struct Args {
 
 #[derive(Debug, clap::Subcommand)]
 pub enum Command {
+    /// Start the language server
     Server,
 }
 
@@ -94,7 +95,7 @@ pub fn main() -> anyhow::Result<()> {
     let verbosity = verbosity.level();
     countme::enable(verbosity == Some(VerbosityLevel::Trace));
 
-    if matches!(command, Command::Server) {
+    if matches!(command, Some(Command::Server)) {
         let four = NonZeroUsize::new(4).unwrap();
 
         // by default, we set the number of worker threads to `num_cpus`, with a maximum of 4.
