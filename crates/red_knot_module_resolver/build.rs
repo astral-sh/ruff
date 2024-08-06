@@ -22,7 +22,14 @@ const TYPESHED_ZIP_LOCATION: &str = "/zipped_typeshed.zip";
 /// <https://github.com/zip-rs/zip-old/blob/5d0f198124946b7be4e5969719a7f29f363118cd/examples/write_dir.rs>
 fn zip_dir(directory_path: &str, writer: File) -> ZipResult<File> {
     let mut zip = ZipWriter::new(writer);
-    #[cfg(not(target_arch = "wasm32"))]
+
+    // Use deflated compression for WASM builds because compiling `zstd-sys` requires clang
+    // [source](https://github.com/gyscos/zstd-rs/wiki/Compile-for-WASM) which complicates the build
+    // by a lot. Deflated compression is slower but it shouldn't matter much for the WASM use case
+    // (WASM itself is already slower than a native build for a specific platform).
+    // We can't use `#[cfg(...)]` here because the target-arch in a build script is the
+    // architecture of the system running the build script and not the architecture of the build-target.
+    // That's why we use the `TARGET` environment variable here.
     let method = if std::env::var("TARGET").unwrap().contains("wasm32") {
         CompressionMethod::Deflated
     } else {
