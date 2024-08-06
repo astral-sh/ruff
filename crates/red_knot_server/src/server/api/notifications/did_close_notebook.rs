@@ -33,7 +33,7 @@ impl SyncNotificationHandler for DidCloseNotebookHandler {
             .with_failure_code(lsp_server::ErrorCode::InternalError)?;
 
         if let Some(db) = session.workspace_db_for_path_mut(path.as_std_path()) {
-            File::sync_path(db.get_mut(), &path);
+            File::sync_path(db, &path);
         }
 
         Ok(())

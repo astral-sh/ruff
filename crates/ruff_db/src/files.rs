@@ -252,6 +252,13 @@ impl Files {
                 .to(FileRevision::now());
         }
     }
+
+    #[must_use]
+    pub fn snapshot(&self) -> Self {
+        Self {
+            inner: Arc::clone(&self.inner),
+        }
+    }
 }
 
 impl std::fmt::Debug for Files {
@@ -264,6 +271,8 @@ impl std::fmt::Debug for Files {
         map.finish()
     }
 }
+
+impl std::panic::RefUnwindSafe for Files {}
 
 /// A file that's either stored on the host system's file system or in the vendored file system.
 #[salsa::input]

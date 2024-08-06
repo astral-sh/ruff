@@ -55,9 +55,10 @@ impl PackageFiles {
     ///
     /// The changes are automatically written back to the database once the view is dropped.
     pub fn indexed_mut(db: &mut dyn Db, package: Package) -> Option<IndexedFilesMut> {
-        // Calling `runtime_mut` cancels all pending salsa queries. This ensures that there are no pending
+        // Calling `zalsa_mut` cancels all pending salsa queries. This ensures that there are no pending
         // reads to the file set.
-        let _ = db.runtime_mut();
+        // TODO: Use a non-internal API instead https://salsa.zulipchat.com/#narrow/stream/333573-salsa-3.2E0/topic/Expose.20an.20API.20to.20cancel.20other.20queries
+        let _ = db.as_dyn_database_mut().zalsa_mut();
 
         let files = package.file_set(db);
 

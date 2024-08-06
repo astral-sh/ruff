@@ -13,7 +13,6 @@ use red_knot_workspace::workspace::WorkspaceMetadata;
 use ruff_db::files::{system_path_to_file, File};
 use ruff_db::program::{ProgramSettings, SearchPathSettings, TargetVersion};
 use ruff_db::system::SystemPath;
-use ruff_db::Db as _;
 
 use crate::edit::{DocumentKey, NotebookDocument};
 use crate::system::{url_to_system_path, LSPSystem};
@@ -43,7 +42,7 @@ pub struct Session {
     index: Option<Arc<index::Index>>,
 
     /// Maps workspace root paths to their respective databases.
-    workspaces: BTreeMap<PathBuf, salsa::Handle<RootDatabase>>,
+    workspaces: BTreeMap<PathBuf, RootDatabase>,
     /// The global position encoding, negotiated during LSP initialization.
     position_encoding: PositionEncoding,
     /// Tracks what LSP features the client supports and doesn't support.
@@ -79,10 +78,7 @@ impl Session {
                     custom_typeshed: None,
                 },
             };
-            workspaces.insert(
-                path,
-                salsa::Handle::new(RootDatabase::new(metadata, program_settings, system)),
-            );
+            workspaces.insert(path, RootDatabase::new(metadata, program_settings, system));
         }
 
         Ok(Self {
@@ -95,10 +91,7 @@ impl Session {
         })
     }
 
-    pub(crate) fn workspace_db_for_path(
-        &self,
-        path: impl AsRef<Path>,
-    ) -> Option<&salsa::Handle<RootDatabase>> {
+    pub(crate) fn workspace_db_for_path(&self, path: impl AsRef<Path>) -> Option<&RootDatabase> {
         self.workspaces
             .range(..=path.as_ref().to_path_buf())
             .next_back()
@@ -108,7 +101,7 @@ impl Session {
     pub(crate) fn workspace_db_for_path_mut(
         &mut self,
         path: impl AsRef<Path>,
-    ) -> Option<&mut salsa::Handle<RootDatabase>> {
+    ) -> Option<&mut RootDatabase> {
         self.workspaces
             .range_mut(..=path.as_ref().to_path_buf())
             .next_back()
@@ -168,9 +161,6 @@ impl Session {
         let index = self.index.take().unwrap();
 
         for db in self.workspaces.values_mut() {
-            // Calling `get_mut` on `Handle<Database>` cancels all pending queries and waits for them to stop.
-            let db = db.get_mut();
-
             // Remove the `index` from each database. This drops the count of `Arc<Index>` down to 1
             db.system_mut()
                 .as_any_mut()
@@ -216,7 +206,6 @@ impl Drop for MutIndexGuard<'_> {
         if let Some(index) = self.index.take() {
             let index = Arc::new(index);
             for db in self.session.workspaces.values_mut() {
-                let db = db.get_mut();
                 db.system_mut()
                     .as_any_mut()
                     .downcast_mut::<LSPSystem>()

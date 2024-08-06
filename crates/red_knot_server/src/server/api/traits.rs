@@ -34,7 +34,7 @@ pub(super) trait BackgroundDocumentRequestHandler: RequestHandler {
 
     fn run_with_snapshot(
         snapshot: DocumentSnapshot,
-        db: Option<salsa::Handle<RootDatabase>>,
+        db: Option<RootDatabase>,
         notifier: Notifier,
         params: <<Self as RequestHandler>::RequestType as Request>::Params,
     ) -> super::Result<<<Self as RequestHandler>::RequestType as Request>::Result>;

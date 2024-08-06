@@ -23,7 +23,6 @@ pub type FxDashSet<K> = dashmap::DashSet<K, BuildHasherDefault<FxHasher>>;
 pub trait Db: salsa::Database {
     fn vendored(&self) -> &VendoredFileSystem;
     fn system(&self) -> &dyn System;
-    fn system_mut(&mut self) -> &mut dyn System;
     fn files(&self) -> &Files;
 }
 
@@ -104,10 +103,6 @@ mod tests {
             &self.system
         }
 
-        fn system_mut(&mut self) -> &mut dyn System {
-            &mut self.system
-        }
-
         fn files(&self) -> &Files {
             &self.files
         }
@@ -125,12 +120,11 @@ mod tests {
 
     #[salsa::db]
     impl salsa::Database for TestDb {
-        fn salsa_event(&self, event: salsa::Event) {
-            salsa::Database::attach(self, |_| {
-                tracing::trace!("event: {:?}", event);
-                let mut events = self.events.lock().unwrap();
-                events.push(event);
-            });
+        fn salsa_event(&self, event: &dyn Fn() -> salsa::Event) {
+            let event = event();
+            tracing::trace!("event: {:?}", event);
+            let mut events = self.events.lock().unwrap();
+            events.push(event);
         }
     }
 }
