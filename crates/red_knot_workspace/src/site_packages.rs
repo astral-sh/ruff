@@ -61,31 +61,40 @@ fn venv_site_packages_dir(
     //
     // [the non-Windows branch]: https://github.com/python/cpython/blob/a8be8fc6c4682089be45a87bd5ee1f686040116c/Lib/site.py#L401-L410
     // [the `sys`-module documentation]: https://docs.python.org/3/library/sys.html#sys.platlibdir
-    system
-        .read_directory(&venv_path.join("lib"))?
-        .flatten()
-        .find_map(|entry| {
-            if !entry.file_type().is_directory() {
-                return None;
-            }
-            let path = entry.path();
+    for entry_result in system.read_directory(&venv_path.join("lib"))? {
+        let Ok(entry) = entry_result else {
+            continue;
+        };
+        if !entry.file_type().is_directory() {
+            continue;
+        }
 
-            // The `python3.x` part of the `site-packages` path can't be computed from
-            // the `--target-version` the user has passed, as they might be running Python 3.12 locally
-            // even if they've requested that we type check their code "as if" they're running 3.8.
-            //
-            // The `python3.x` part of the `site-packages` path *could* be computed
-            // by parsing the virtual environment's `pyvenv.cfg` file.
-            // Right now that seems like overkill, but in the future we may need to parse
-            // the `pyvenv.cfg` file anyway, in which case we could switch to that method
-            // rather than iterating through the whole directory until we find
-            // an entry where the last component of the path starts with `python3.`
-            path.components()
-                .next_back()
-                .is_some_and(|last_part| last_part.as_str().starts_with("python3."))
-                .then_some(path.join("site-packages"))
-        })
-        .ok_or(SitePackagesDiscoveryError::NoSitePackagesDirFound)
+        let path = entry.path();
+
+        // The `python3.x` part of the `site-packages` path can't be computed from
+        // the `--target-version` the user has passed, as they might be running Python 3.12 locally
+        // even if they've requested that we type check their code "as if" they're running 3.8.
+        //
+        // The `python3.x` part of the `site-packages` path *could* be computed
+        // by parsing the virtual environment's `pyvenv.cfg` file.
+        // Right now that seems like overkill, but in the future we may need to parse
+        // the `pyvenv.cfg` file anyway, in which case we could switch to that method
+        // rather than iterating through the whole directory until we find
+        // an entry where the last component of the path starts with `python3.`
+        if !path
+            .components()
+            .next_back()
+            .is_some_and(|last_part| last_part.as_str().starts_with("python3."))
+        {
+            continue;
+        }
+
+        let site_packages_candidate = path.join("site-packages");
+        if system.is_directory(&site_packages_candidate) {
+            return Ok(site_packages_candidate);
+        }
+    }
+    Err(SitePackagesDiscoveryError::NoSitePackagesDirFound)
 }
 
 #[derive(Debug, thiserror::Error)]
@@ -117,6 +126,9 @@ mod tests {
     use crate::site_packages::site_packages_dirs_of_venv;
 
     #[test]
+    // Windows venvs have different layouts, and we only have a Unix venv committed for now.
+    // This test is skipped on Windows until we commit a Windows venv.
+    #[cfg(not(target_os = "windows"))]
     fn can_find_site_packages_dir_in_committed_venv() {
         let path_to_venv = SystemPath::new("resources/test/empty-test-venv");
         let system = OsSystem::default();
