@@ -2,6 +2,7 @@ use std::sync::Mutex;
 
 use clap::Parser;
 use crossbeam::channel as crossbeam_channel;
+use red_knot_workspace::site_packages::site_packages_dirs_of_venv;
 use tracing::subscriber::Interest;
 use tracing::{Level, Metadata};
 use tracing_subscriber::filter::LevelFilter;
@@ -109,6 +110,17 @@ pub fn main() -> anyhow::Result<()> {
     let workspace_metadata =
         WorkspaceMetadata::from_path(system.current_directory(), &system).unwrap();
 
+    let site_packages = if let Some(venv_path) = venv_path {
+        let venv_path = system.canonicalize_path(&venv_path).unwrap_or(venv_path);
+        assert!(
+            system.is_directory(&venv_path),
+            "Provided venv-path {venv_path} is not a directory!"
+        );
+        site_packages_dirs_of_venv(&venv_path, &system).unwrap()
+    } else {
+        vec![]
+    };
+
     // TODO: Respect the settings from the workspace metadata. when resolving the program settings.
     let program_settings = ProgramSettings {
         target_version: target_version.into(),
@@ -116,7 +128,7 @@ pub fn main() -> anyhow::Result<()> {
             extra_paths,
             src_root: workspace_metadata.root().to_path_buf(),
             custom_typeshed: custom_typeshed_dir,
-            site_packages: vec![],
+            site_packages,
         },
     };
 

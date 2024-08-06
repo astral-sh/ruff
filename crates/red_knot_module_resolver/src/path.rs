@@ -446,6 +446,12 @@ impl SearchPath {
     }
 
     /// Create a new search path pointing to the `site-packages` directory on disk
+    ///
+    /// TODO: the validation done here is somewhat redundant given that `site-packages`
+    /// are already validated at a higher level by the time we get here.
+    /// However, removing the validation here breaks some file-watching tests -- and
+    /// ultimately we'll probably want all search paths to be validated before a
+    /// `Program` is instantiated, so it doesn't seem like a huge priority right now.
     pub(crate) fn site_packages(
         system: &dyn System,
         root: SystemPathBuf,
