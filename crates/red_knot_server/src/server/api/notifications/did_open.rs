@@ -1,10 +1,12 @@
 use lsp_types::notification::DidOpenTextDocument;
 use lsp_types::DidOpenTextDocumentParams;
+use ruff_db::files::{system_path_to_file, File};
 
 use crate::server::api::traits::{NotificationHandler, SyncNotificationHandler};
 use crate::server::client::{Notifier, Requester};
 use crate::server::Result;
 use crate::session::Session;
+use crate::system::url_to_system_path;
 use crate::TextDocument;
 
 pub(crate) struct DidOpenTextDocumentHandler;
@@ -20,10 +22,18 @@ impl SyncNotificationHandler for DidOpenTextDocumentHandler {
         _requester: &mut Requester,
         params: DidOpenTextDocumentParams,
     ) -> Result<()> {
+        let Ok(path) = url_to_system_path(&params.text_document.uri) else {
+            return Ok(());
+        };
+
         let document = TextDocument::new(params.text_document.text, params.text_document.version);
         session.open_text_document(params.text_document.uri, document);
 
-        // TODO(dhruvmanila): Open the file in the `RootDatabase`
+        if let Some(db) = session.workspace_db_for_path_mut(path.as_std_path()) {
+            // TODO(dhruvmanila): Store the `file` in `TextDocument`
+            let _file = system_path_to_file(&**db, &path).unwrap();
+            File::sync_path(db.get_mut(), &path);
+        }
 
         // Publish diagnostics if the client doesn't support pull diagnostics
 

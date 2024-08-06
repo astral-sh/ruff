@@ -64,7 +64,7 @@ impl Session {
                 target_version: TargetVersion::default(),
                 search_paths: SearchPathSettings {
                     extra_paths: vec![],
-                    workspace_root: system_path.to_path_buf(),
+                    src_root: system_path.to_path_buf(),
                     site_packages: vec![],
                     custom_typeshed: None,
                 },
@@ -91,6 +91,16 @@ impl Session {
     ) -> Option<&salsa::Handle<RootDatabase>> {
         self.workspaces
             .range(..=path.as_ref().to_path_buf())
+            .next_back()
+            .map(|(_, db)| db)
+    }
+
+    pub(crate) fn workspace_db_for_path_mut(
+        &mut self,
+        path: impl AsRef<Path>,
+    ) -> Option<&mut salsa::Handle<RootDatabase>> {
+        self.workspaces
+            .range_mut(..=path.as_ref().to_path_buf())
             .next_back()
             .map(|(_, db)| db)
     }

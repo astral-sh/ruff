@@ -250,7 +250,7 @@ impl DocumentController {
 /// A read-only query to an open document.
 /// This query can 'select' a text document, full notebook, or a specific notebook cell.
 /// It also includes document settings.
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 pub enum DocumentQuery {
     Text {
         file_url: Url,
