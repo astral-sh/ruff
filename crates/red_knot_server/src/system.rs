@@ -122,8 +122,7 @@ impl System for LSPSystem {
 
         match document {
             Some(DocumentQuery::Text { document, .. }) => Ok(document.contents().to_string()),
-            Some(_) => Err(not_a_text_document(path)),
-            None => self.os_system.read_to_string(path),
+            _ => self.os_system.read_to_string(path),
         }
     }
 
@@ -207,13 +206,6 @@ fn not_a_text_document(path: impl Display) -> std::io::Error {
         std::io::ErrorKind::InvalidInput,
         format!("Input is not a text document: {path}"),
     )
-}
-
-fn not_a_notebook(path: impl Display) -> NotebookError {
-    NotebookError::from(std::io::Error::new(
-        std::io::ErrorKind::InvalidInput,
-        format!("Input is not a notebook: {path}"),
-    ))
 }
 
 fn virtual_path_not_found(path: impl Display) -> std::io::Error {
