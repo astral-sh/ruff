@@ -1881,7 +1881,7 @@ dependencies = [
 
 [[package]]
 name = "red_knot"
-version = "0.5.5"
+version = "0.0.0"
 dependencies = [
  "anyhow",
  "clap",

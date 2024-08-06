@@ -21,5 +21,5 @@ pub(crate) const DIAGNOSTIC_NAME: &str = "Red Knot";
 pub(crate) type Result<T> = anyhow::Result<T>;
 
 pub(crate) fn version() -> &'static str {
-    ruff_linter::VERSION
+    env!("CARGO_PKG_VERSION")
 }

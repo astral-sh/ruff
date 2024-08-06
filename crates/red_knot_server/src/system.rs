@@ -68,62 +68,48 @@ impl LSPSystem {
         self.index.as_ref().unwrap()
     }
 
-    fn make_document_ref(&self, url: Url) -> Result<DocumentQuery> {
+    fn make_document_ref(&self, url: Url) -> Option<DocumentQuery> {
         let index = self.index();
         let key = index.key_from_url(url);
-        index.make_document_ref(key).ok_or_else(|| {
-            std::io::Error::new(
-                std::io::ErrorKind::NotFound,
-                "Document not found in the index",
-            )
-        })
+        index.make_document_ref(key)
     }
 
-    fn system_path_to_document_ref(&self, path: &SystemPath) -> Result<DocumentQuery> {
+    fn system_path_to_document_ref(&self, path: &SystemPath) -> Result<Option<DocumentQuery>> {
         let url = Url::from_file_path(path.as_std_path()).map_err(|()| {
             std::io::Error::new(
                 std::io::ErrorKind::InvalidInput,
                 format!("Failed to convert system path to URL: {path:?}"),
             )
         })?;
-        self.make_document_ref(url)
+        Ok(self.make_document_ref(url))
     }
 
     fn system_virtual_path_to_document_ref(
         &self,
         path: &SystemVirtualPath,
-    ) -> Result<DocumentQuery> {
+    ) -> Result<Option<DocumentQuery>> {
         let url = Url::parse(path.as_str()).map_err(|_| {
             std::io::Error::new(
                 std::io::ErrorKind::InvalidInput,
                 format!("Failed to convert virtual path to URL: {path:?}"),
             )
         })?;
-        self.make_document_ref(url)
+        Ok(self.make_document_ref(url))
     }
 }
 
 impl System for LSPSystem {
     fn path_metadata(&self, path: &SystemPath) -> Result<Metadata> {
-        let document = self.system_path_to_document_ref(path);
+        let document = self.system_path_to_document_ref(path)?;
 
-        // First, we need to check if the document is opened in the editor. If it is, we need to
-        // use the document's version as the file revision. Otherwise, fall back to the OS system.
-        match document {
-            Ok(document) => {
-                // The file revision is just an opaque number which doesn't have any significant
-                // meaning other than that the file has changed if the revisions are different.
-                #[allow(clippy::cast_sign_loss)]
-                Ok(Metadata::new(
-                    FileRevision::new(document.version() as u128),
-                    None,
-                    FileType::File,
-                ))
-            }
-            Err(err) if err.kind() == std::io::ErrorKind::NotFound => {
-                self.os_system.path_metadata(path)
-            }
-            Err(err) => Err(err),
+        if let Some(document) = document {
+            Ok(Metadata::new(
+                document_revision(&document),
+                None,
+                FileType::File,
+            ))
+        } else {
+            self.os_system.path_metadata(path)
         }
     }
 
@@ -132,57 +118,44 @@ impl System for LSPSystem {
     }
 
     fn read_to_string(&self, path: &SystemPath) -> Result<String> {
-        let document = self.system_path_to_document_ref(path);
+        let document = self.system_path_to_document_ref(path)?;
 
         match document {
-            Ok(document) => {
-                if let DocumentQuery::Text { document, .. } = &document {
-                    Ok(document.contents().to_string())
-                } else {
-                    Err(not_a_text_document(path))
-                }
-            }
-            Err(err) if err.kind() == std::io::ErrorKind::NotFound => {
-                self.os_system.read_to_string(path)
-            }
-            Err(err) => Err(err),
+            Some(DocumentQuery::Text { document, .. }) => Ok(document.contents().to_string()),
+            Some(_) => Err(not_a_text_document(path)),
+            None => self.os_system.read_to_string(path),
         }
     }
 
     fn read_to_notebook(&self, path: &SystemPath) -> std::result::Result<Notebook, NotebookError> {
-        let document = self.system_path_to_document_ref(path);
+        let document = self.system_path_to_document_ref(path)?;
 
         match document {
-            Ok(document) => {
-                if let DocumentQuery::Notebook { notebook, .. } = &document {
-                    Ok(notebook.make_ruff_notebook())
-                } else {
-                    Err(not_a_notebook(path))
-                }
+            Some(DocumentQuery::Text { document, .. }) => {
+                Notebook::from_source_code(document.contents())
             }
-            Err(err) if err.kind() == std::io::ErrorKind::NotFound => {
-                self.os_system.read_to_notebook(path)
-            }
-            Err(err) => Err(NotebookError::from(err)),
+            Some(DocumentQuery::Notebook { notebook, .. }) => Ok(notebook.make_ruff_notebook()),
+            None => self.os_system.read_to_notebook(path),
         }
     }
 
     fn virtual_path_metadata(&self, path: &SystemVirtualPath) -> Result<Metadata> {
         // Virtual paths only exists in the LSP system, so we don't need to check the OS system.
-        let document = self.system_virtual_path_to_document_ref(path)?;
+        let document = self
+            .system_virtual_path_to_document_ref(path)?
+            .ok_or_else(|| virtual_path_not_found(path))?;
 
-        // The file revision is just an opaque number which doesn't have any significant
-        // meaning other than that the file has changed if the revisions are different.
-        #[allow(clippy::cast_sign_loss)]
         Ok(Metadata::new(
-            FileRevision::new(document.version() as u128),
+            document_revision(&document),
             None,
             FileType::File,
         ))
     }
 
     fn read_virtual_path_to_string(&self, path: &SystemVirtualPath) -> Result<String> {
-        let document = self.system_virtual_path_to_document_ref(path)?;
+        let document = self
+            .system_virtual_path_to_document_ref(path)?
+            .ok_or_else(|| virtual_path_not_found(path))?;
 
         if let DocumentQuery::Text { document, .. } = &document {
             Ok(document.contents().to_string())
@@ -195,12 +168,13 @@ impl System for LSPSystem {
         &self,
         path: &SystemVirtualPath,
     ) -> std::result::Result<Notebook, NotebookError> {
-        let document = self.system_virtual_path_to_document_ref(path)?;
+        let document = self
+            .system_virtual_path_to_document_ref(path)?
+            .ok_or_else(|| virtual_path_not_found(path))?;
 
-        if let DocumentQuery::Notebook { notebook, .. } = &document {
-            Ok(notebook.make_ruff_notebook())
-        } else {
-            Err(not_a_notebook(path))
+        match document {
+            DocumentQuery::Text { document, .. } => Notebook::from_source_code(document.contents()),
+            DocumentQuery::Notebook { notebook, .. } => Ok(notebook.make_ruff_notebook()),
         }
     }
 
@@ -240,4 +214,19 @@ fn not_a_notebook(path: impl Display) -> NotebookError {
         std::io::ErrorKind::InvalidInput,
         format!("Input is not a notebook: {path}"),
     ))
+}
+
+fn virtual_path_not_found(path: impl Display) -> std::io::Error {
+    std::io::Error::new(
+        std::io::ErrorKind::NotFound,
+        format!("Virtual path does not exist: {path}"),
+    )
+}
+
+/// Helper function to get the [`FileRevision`] of the given document.
+fn document_revision(document: &DocumentQuery) -> FileRevision {
+    // The file revision is just an opaque number which doesn't have any significant meaning other
+    // than that the file has changed if the revisions are different.
+    #[allow(clippy::cast_sign_loss)]
+    FileRevision::new(document.version() as u128)
 }
