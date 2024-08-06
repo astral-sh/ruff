@@ -1,5 +1,5 @@
 import Editor from "@monaco-editor/react";
-import { Theme } from "./theme";
+import { Theme } from "../shared/theme";
 
 export enum SecondaryTool {
   "Format" = "Format",

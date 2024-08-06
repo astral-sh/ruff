@@ -5,7 +5,7 @@
 import Editor, { useMonaco } from "@monaco-editor/react";
 import { useCallback, useEffect } from "react";
 import schema from "../../../ruff.schema.json";
-import { Theme } from "./theme";
+import { Theme } from "../shared/theme";
 
 export default function SettingsEditor({
   visible,

@@ -1,26 +1,19 @@
-import {
-  useCallback,
-  useDeferredValue,
-  useEffect,
-  useMemo,
-  useState,
-} from "react";
+import { useCallback, useDeferredValue, useMemo, useState } from "react";
 import { Panel, PanelGroup } from "react-resizable-panels";
-import { DEFAULT_PYTHON_SOURCE } from "../constants";
-import init, { Diagnostic, Workspace } from "../pkg/ruff_wasm";
-import { ErrorMessage } from "./ErrorMessage";
-import Header from "./Header";
+import { Diagnostic, Workspace } from "./pkg";
+import { ErrorMessage } from "../shared/ErrorMessage";
+import Header from "../shared/Header";
 import PrimarySideBar from "./PrimarySideBar";
-import { HorizontalResizeHandle } from "./ResizeHandle";
+import { HorizontalResizeHandle } from "../shared/ResizeHandle";
 import SecondaryPanel, {
   SecondaryPanelResult,
   SecondaryTool,
 } from "./SecondaryPanel";
 import SecondarySideBar from "./SecondarySideBar";
-import { persist, persistLocal, restore, stringify } from "./settings";
+import { persist, persistLocal } from "./settings";
 import SettingsEditor from "./SettingsEditor";
 import SourceEditor from "./SourceEditor";
-import { useTheme } from "./theme";
+import { useTheme } from "../shared/theme";
 
 type Tab = "Source" | "Settings";
 
@@ -36,14 +29,22 @@ interface CheckResult {
   secondary: SecondaryPanelResult;
 }
 
-export default function Editor() {
-  const [ruffVersion, setRuffVersion] = useState<string | null>(null);
-  const [checkResult, setCheckResult] = useState<CheckResult>({
-    diagnostics: [],
-    error: null,
-    secondary: null,
+type Props = {
+  initialSource: string;
+  initialSettings: string;
+  ruffVersion: string;
+};
+
+export default function Editor({
+  initialSource,
+  initialSettings,
+  ruffVersion,
+}: Props) {
+  const [source, setSource] = useState<Source>({
+    revision: 0,
+    pythonSource: initialSource,
+    settingsSource: initialSettings,
   });
-  const [source, setSource] = useState<Source | null>(null);
 
   const [tab, setTab] = useState<Tab>("Source");
   const [secondaryTool, setSecondaryTool] = useState<SecondaryTool | null>(
@@ -58,6 +59,7 @@ export default function Editor() {
       }
     },
   );
+
   const [theme, setTheme] = useTheme();
 
   // Ideally this would be retrieved right from the URL... but routing without a proper
@@ -81,33 +83,9 @@ export default function Editor() {
     setSecondaryTool(tool);
   };
 
-  useEffect(() => {
-    async function initAsync() {
-      await init();
-      const response = await restore();
-      const [settingsSource, pythonSource] = response ?? [
-        stringify(Workspace.defaultSettings()),
-        DEFAULT_PYTHON_SOURCE,
-      ];
-
-      setSource({
-        revision: 0,
-        pythonSource,
-        settingsSource,
-      });
-      setRuffVersion(Workspace.version());
-    }
-
-    initAsync().catch(console.error);
-  }, []);
-
   const deferredSource = useDeferredValue(source);
 
-  useEffect(() => {
-    if (deferredSource == null) {
-      return;
-    }
-
+  const checkResult: CheckResult = useMemo(() => {
     const { pythonSource, settingsSource } = deferredSource;
 
     try {
@@ -161,64 +139,56 @@ export default function Editor() {
         };
       }
 
-      setCheckResult({
+      return {
         diagnostics,
         error: null,
         secondary,
-      });
+      };
     } catch (e) {
-      setCheckResult({
+      return {
         diagnostics: [],
         error: (e as Error).message,
         secondary: null,
-      });
+      };
     }
   }, [deferredSource, secondaryTool]);
 
-  useEffect(() => {
-    if (source != null) {
-      persistLocal(source);
-    }
-  }, [source]);
-
-  const handleShare = useMemo(() => {
-    if (source == null) {
-      return undefined;
-    }
-
-    return () => {
-      return persist(source.settingsSource, source.pythonSource);
-    };
+  const handleShare = useCallback(() => {
+    persist(source.settingsSource, source.pythonSource).catch((error) =>
+      console.error(`Failed to share playground: ${error}`),
+    );
   }, [source]);
 
   const handlePythonSourceChange = useCallback((pythonSource: string) => {
-    setSource((state) =>
-      state
-        ? {
-            ...state,
-            pythonSource,
-            revision: state.revision + 1,
-          }
-        : null,
-    );
+    setSource((source) => {
+      const newSource = {
+        ...source,
+        pythonSource,
+        revision: source.revision + 1,
+      };
+
+      persistLocal(newSource);
+      return newSource;
+    });
   }, []);
 
   const handleSettingsSourceChange = useCallback((settingsSource: string) => {
-    setSource((state) =>
-      state
-        ? {
-            ...state,
-            settingsSource,
-            revision: state.revision + 1,
-          }
-        : null,
-    );
+    setSource((source) => {
+      const newSource = {
+        ...source,
+        settingsSource,
+        revision: source.revision + 1,
+      };
+
+      persistLocal(newSource);
+      return newSource;
+    });
   }, []);
 
   return (
     <main className="flex flex-col h-full bg-ayu-background dark:bg-ayu-background-dark">
       <Header
-        edit={source ? source.revision : null}
+        edit={source.revision}
         theme={theme}
         version={ruffVersion}
         onChangeTheme={setTheme}
@@ -226,7 +196,7 @@ export default function Editor() {
       />
 
       <div className="flex flex-grow">
-        {source ? (
+        {
           <PanelGroup direction="horizontal" autoSaveId="main">
             <PrimarySideBar
               onSelectTool={(tool) => setTab(tool)}
@@ -269,7 +239,7 @@ export default function Editor() {
               onSelected={handleSecondaryToolSelected}
             />
           </PanelGroup>
-        ) : null}
+        }
       </div>
       {checkResult.error && tab === "Source" ? (
         <div

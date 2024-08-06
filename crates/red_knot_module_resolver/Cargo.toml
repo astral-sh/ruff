@@ -25,7 +25,7 @@ zip = { workspace = true }
 [build-dependencies]
 path-slash = { workspace = true }
 walkdir = { workspace = true }
-zip = { workspace = true }
+zip = { workspace = true, features = ["zstd", "deflate"] }
 
 [dev-dependencies]
 ruff_db = { workspace = true, features = ["os"] }

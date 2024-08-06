@@ -22,9 +22,15 @@ const TYPESHED_ZIP_LOCATION: &str = "/zipped_typeshed.zip";
 /// <https://github.com/zip-rs/zip-old/blob/5d0f198124946b7be4e5969719a7f29f363118cd/examples/write_dir.rs>
 fn zip_dir(directory_path: &str, writer: File) -> ZipResult<File> {
     let mut zip = ZipWriter::new(writer);
+    #[cfg(not(target_arch = "wasm32"))]
+    let method = if std::env::var("TARGET").unwrap().contains("wasm32") {
+        CompressionMethod::Deflated
+    } else {
+        CompressionMethod::Zstd
+    };
 
     let options = FileOptions::default()
-        .compression_method(CompressionMethod::Zstd)
+        .compression_method(method)
         .unix_permissions(0o644);
 
     for entry in walkdir::WalkDir::new(directory_path) {
