@@ -1,17 +1,18 @@
-use ruff_python_ast::{self as ast, Expr, Keyword};
-
 use ruff_diagnostics::{Diagnostic, FixAvailability};
 use ruff_diagnostics::{Edit, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::helpers::any_over_expr;
+use ruff_python_ast::{self as ast, Expr, Keyword};
 use ruff_text_size::{Ranged, TextSize};
 
 use crate::checkers::ast::Checker;
-
 use crate::rules::flake8_comprehensions::fixes;
 
 /// ## What it does
-/// Checks for unnecessary list comprehensions passed to builtin functions that take an iterable.
+/// Checks for unnecessary list or set comprehensions passed to builtin functions that take an iterable.
+///
+/// Set comprehensions are only a violation in the case where the builtin function does not care about
+/// duplication of elements in the passed iterable.
 ///
 /// ## Why is this bad?
 /// Many builtin functions (this rule currently covers `any` and `all` in stable, along with `min`,
@@ -65,18 +66,23 @@ use crate::rules::flake8_comprehensions::fixes;
 ///
 /// [preview]: https://docs.astral.sh/ruff/preview/
 #[violation]
-pub struct UnnecessaryComprehensionInCall;
+pub struct UnnecessaryComprehensionInCall {
+    comprehension_kind: ComprehensionKind,
+}
 
 impl Violation for UnnecessaryComprehensionInCall {
     const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
 
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Unnecessary list comprehension")
+        match self.comprehension_kind {
+            ComprehensionKind::List => format!("Unnecessary list comprehension"),
+            ComprehensionKind::Set => format!("Unnecessary set comprehension"),
+        }
     }
 
     fn fix_title(&self) -> Option<String> {
-        Some("Remove unnecessary list comprehension".to_string())
+        Some("Remove unnecessary comprehension".to_string())
     }
 }
 
@@ -102,18 +108,42 @@ pub(crate) fn unnecessary_comprehension_in_call(
     if contains_await(elt) {
         return;
     }
-    let Some(builtin_function) = checker.semantic().resolve_builtin_symbol(func) else {
+    let Some(Ok(builtin_function)) = checker
+        .semantic()
+        .resolve_builtin_symbol(func)
+        .map(SupportedBuiltins::try_from)
+    else {
         return;
     };
-    if !(matches!(builtin_function, "any" | "all")
-        || (checker.settings.preview.is_enabled()
-            && matches!(builtin_function, "sum" | "min" | "max")))
+    if !(matches!(
+        builtin_function,
+        SupportedBuiltins::Any | SupportedBuiltins::All
+    ) || (checker.settings.preview.is_enabled()
+        && matches!(
+            builtin_function,
+            SupportedBuiltins::Sum | SupportedBuiltins::Min | SupportedBuiltins::Max
+        )))
     {
         return;
     }
 
-    let mut diagnostic = Diagnostic::new(UnnecessaryComprehensionInCall, arg.range());
-
+    let mut diagnostic = match (arg, builtin_function.duplication_variance()) {
+        (Expr::ListComp(_), _) => Diagnostic::new(
+            UnnecessaryComprehensionInCall {
+                comprehension_kind: ComprehensionKind::List,
+            },
+            arg.range(),
+        ),
+        (Expr::SetComp(_), DuplicationVariance::Invariant) => Diagnostic::new(
+            UnnecessaryComprehensionInCall {
+                comprehension_kind: ComprehensionKind::Set,
+            },
+            arg.range(),
+        ),
+        _ => {
+            return;
+        }
+    };
     if args.len() == 1 {
         // If there's only one argument, remove the list or set brackets.
         diagnostic.try_set_fix(|| {
@@ -143,4 +173,52 @@ pub(crate) fn unnecessary_comprehension_in_call(
 /// Return `true` if the [`Expr`] contains an `await` expression.
 fn contains_await(expr: &Expr) -> bool {
     any_over_expr(expr, &Expr::is_await_expr)
+}
+
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+enum DuplicationVariance {
+    Invariant,
+    Variant,
+}
+
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+enum ComprehensionKind {
+    List,
+    Set,
+}
+
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+enum SupportedBuiltins {
+    All,
+    Any,
+    Sum,
+    Min,
+    Max,
+}
+
+impl TryFrom<&str> for SupportedBuiltins {
+    type Error = &'static str;
+
+    fn try_from(value: &str) -> Result<Self, Self::Error> {
+        match value {
+            "all" => Ok(Self::All),
+            "any" => Ok(Self::Any),
+            "sum" => Ok(Self::Sum),
+            "min" => Ok(Self::Min),
+            "max" => Ok(Self::Max),
+            _ => Err("Unsupported builtin for `unnecessary-comprehension-in-call`"),
+        }
+    }
+}
+
+impl SupportedBuiltins {
+    fn duplication_variance(self) -> DuplicationVariance {
+        match self {
+            SupportedBuiltins::All
+            | SupportedBuiltins::Any
+            | SupportedBuiltins::Min
+            | SupportedBuiltins::Max => DuplicationVariance::Invariant,
+            SupportedBuiltins::Sum => DuplicationVariance::Variant,
+        }
+    }
 }
