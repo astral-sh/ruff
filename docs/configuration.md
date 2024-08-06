@@ -181,21 +181,29 @@ As an example, the following would configure Ruff to:
     ```toml
     [tool.ruff.lint]
     # 1. Enable flake8-bugbear (`B`) rules, in addition to the defaults.
-    select = ["E4", "E7", "E9", "F", "B"]
+    select = [
+        "E4",
+        "E7",
+        "E9",
+        "F",
+        "B",
+    ]
 
-    # 2. Avoid enforcing line-length violations (`E501`)
-    ignore = ["E501"]
+    ignore = [
+        "E501",  # Avoid enforcing line-length violations
+    ]
 
-    # 3. Avoid trying to fix flake8-bugbear (`B`) violations.
-    unfixable = ["B"]
+    unfixable = [
+        "B",  # Avoid trying to fix flake8-bugbear violations.
+    ]
 
-    # 4. Ignore `E402` (import violations) in all `__init__.py` files, and in selected subdirectories.
+    # 2. Ignore `E402` (import violations) in all `__init__.py` files, and in selected subdirectories.
     [tool.ruff.lint.per-file-ignores]
     "__init__.py" = ["E402"]
     "**/{tests,docs,tools}/*" = ["E402"]
 
     [tool.ruff.format]
-    # 5. Use single quotes in `ruff format`.
+    # 3. Use single quotes in `ruff format`.
     quote-style = "single"
     ```
 
@@ -204,21 +212,29 @@ As an example, the following would configure Ruff to:
     ```toml
     [lint]
     # 1. Enable flake8-bugbear (`B`) rules, in addition to the defaults.
-    select = ["E4", "E7", "E9", "F", "B"]
+    select = [
+        "E4",
+        "E7",
+        "E9",
+        "F",
+        "B",
+    ]
 
-    # 2. Avoid enforcing line-length violations (`E501`)
-    ignore = ["E501"]
+    ignore = [
+        "E501",  # Avoid enforcing line-length violations
+    ]
 
-    # 3. Avoid trying to fix flake8-bugbear (`B`) violations.
-    unfixable = ["B"]
+    unfixable = [
+        "B",  # Avoid trying to fix flake8-bugbear (`B`) violations.
+    ]
 
-    # 4. Ignore `E402` (import violations) in all `__init__.py` files, and in selected subdirectories.
+    # 2. Ignore `E402` (import violations) in all `__init__.py` files, and in selected subdirectories.
     [lint.per-file-ignores]
     "__init__.py" = ["E402"]
     "**/{tests,docs,tools}/*" = ["E402"]
 
     [format]
-    # 5. Use single quotes in `ruff format`.
+    # 3. Use single quotes in `ruff format`.
     quote-style = "single"
     ```
 
@@ -229,7 +245,13 @@ Linter plugin configurations are expressed as subsections, e.g.:
     ```toml
     [tool.ruff.lint]
     # Add "Q" to the list of enabled codes.
-    select = ["E4", "E7", "E9", "F", "Q"]
+    select = [
+        "E4",
+        "E7",
+        "E9",
+        "F",
+        "Q",
+    ]
 
     [tool.ruff.lint.flake8-quotes]
     docstring-quotes = "double"
@@ -240,7 +262,13 @@ Linter plugin configurations are expressed as subsections, e.g.:
     ```toml
     [lint]
     # Add "Q" to the list of enabled codes.
-    select = ["E4", "E7", "E9", "F", "Q"]
+    select = [
+        "E4",
+        "E7",
+        "E9",
+        "F",
+        "Q",
+    ]
 
     [lint.flake8-quotes]
     docstring-quotes = "double"
