@@ -22,7 +22,7 @@ pub(crate) fn bindings(checker: &mut Checker) {
     for binding in &*checker.semantic.bindings {
         if checker.enabled(Rule::UnusedVariable) {
             if binding.kind.is_bound_exception()
-                && !binding.is_used()
+                && binding.is_unused()
                 && !checker
                     .settings
                     .dummy_variable_rgx

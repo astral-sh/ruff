@@ -124,7 +124,7 @@ pub(crate) fn sort_dunder_slots(checker: &Checker, binding: &Binding) -> Option<
         if let Some(sorted_source_code) = display.generate_sorted_source_code(&items, checker) {
             let edit = Edit::range_replacement(sorted_source_code, display.range());
 
-            let applicability = if display.kind.is_set_literal() || !binding.is_used() {
+            let applicability = if display.kind.is_set_literal() || binding.is_unused() {
                 Applicability::Safe
             } else {
                 Applicability::Unsafe
