@@ -12,7 +12,7 @@ use crate::checkers::ast::Checker;
 
 /// ## What it does
 /// Checks for use or omission of parentheses around tuples in subscripts,
-/// depending on the setting [`lint.ruff.parenthesize-tuple-in-getitem`]. By default, the use of parentheses
+/// depending on the setting [`lint.ruff.parenthesize-tuple-in-subscript`]. By default, the use of parentheses
 /// is considered a violation.
 ///
 /// ## Why is this bad?

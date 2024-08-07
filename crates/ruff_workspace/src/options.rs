@@ -2985,8 +2985,8 @@ pub struct RuffOptions {
         default = r#"false"#,
         value_type = "bool",
         example = r#"
-        # Make it a violation to use `__getitem__` with a tuple argument without parentheses.
-        parenthesize-tuple-in-getitem = true
+        # Make it a violation to use a tuple in a subscript without parentheses.
+        parenthesize-tuple-in-subscript = true
         "#
     )]
     pub parenthesize_tuple_in_subscript: Option<bool>,
