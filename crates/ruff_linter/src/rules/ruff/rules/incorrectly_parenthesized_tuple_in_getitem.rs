@@ -11,7 +11,7 @@ use ruff_text_size::Ranged;
 use crate::checkers::ast::Checker;
 
 /// ## What it does
-/// Checks for use or omission of parentheses around tuples of length at least two in subscripts,
+/// Checks for use or omission of parentheses around tuples in subscripts,
 /// depending on the setting [`lint.ruff.parenthesize-tuple-in-getitem`]. By default, the use of parentheses
 /// is considered a violation.
 ///
@@ -61,10 +61,7 @@ pub(crate) fn subscript_with_parenthesized_tuple(checker: &mut Checker, subscrip
     let Some(tuple_index) = subscript.slice.as_tuple_expr() else {
         return;
     };
-    // We check that there is more than one element in the tuple because
-    // parentheses are necessary around length 1 tuples:
-    // while `(1,)` is a tuple, `1` is not.
-    if (tuple_index.parenthesized != prefer_parentheses) && tuple_index.elts.len() > 1 {
+    if (tuple_index.parenthesized != prefer_parentheses) {
         let locator = checker.locator();
         let source_range = subscript.slice.range();
         let new_source = match prefer_parentheses {
