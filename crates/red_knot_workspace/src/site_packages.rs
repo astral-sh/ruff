@@ -19,36 +19,6 @@ use ruff_db::system::{System, SystemPath, SystemPathBuf};
 /// at runtime in Python. For the case of a virtual environment, where a
 /// Python binary is at `/.venv/bin/python`, `sys.prefix` is the path to
 /// the virtual environment the Python binary lies inside, i.e. `/.venv`,
-/// and `site-packages` will be at `.venv/Lib/site-packages`. System
-/// Python installations generally work the same way: if a system Python
-/// installation lies at `/opt/homebrew/bin/python`, `sys.prefix` will be
-/// `/opt/homebrew`, and `site-packages` will be at
-/// `/opt/homebrew/Lib/site-packages`.
-///
-/// This routine does not verify that `sys_prefix_path` points
-/// to an existing directory on disk; it is assumed that this has already
-/// been checked.
-///
-/// [`sys.prefix`]: https://docs.python.org/3/library/sys.html#sys.prefix
-#[cfg(target_os = "windows")]
-fn site_packages_dir_from_sys_prefix(
-    sys_prefix_path: &SystemPath,
-    system: &dyn System,
-) -> Result<SystemPathBuf, SitePackagesDiscoveryError> {
-    let site_packages = sys_prefix_path.join("Lib/site-packages");
-    system
-        .is_directory(&site_packages)
-        .then_some(site_packages)
-        .ok_or(SitePackagesDiscoveryError::NoSitePackagesDirFound)
-}
-
-/// Attempt to retrieve the `site-packages` directory
-/// associated with a given Python installation.
-///
-/// `sys_prefix_path` is equivalent to the value of [`sys.prefix`]
-/// at runtime in Python. For the case of a virtual environment, where a
-/// Python binary is at `/.venv/bin/python`, `sys.prefix` is the path to
-/// the virtual environment the Python binary lies inside, i.e. `/.venv`,
 /// and `site-packages` will be at `.venv/lib/python3.X/site-packages`.
 /// System Python installations generally work the same way: if a system
 /// Python installation lies at `/opt/homebrew/bin/python`, `sys.prefix`
@@ -60,11 +30,18 @@ fn site_packages_dir_from_sys_prefix(
 /// been checked.
 ///
 /// [`sys.prefix`]: https://docs.python.org/3/library/sys.html#sys.prefix
-#[cfg(not(target_os = "windows"))]
 fn site_packages_dir_from_sys_prefix(
     sys_prefix_path: &SystemPath,
     system: &dyn System,
 ) -> Result<SystemPathBuf, SitePackagesDiscoveryError> {
+    if cfg!(target_os = "windows") {
+        let site_packages = sys_prefix_path.join("Lib/site-packages");
+        return system
+            .is_directory(&site_packages)
+            .then_some(site_packages)
+            .ok_or(SitePackagesDiscoveryError::NoSitePackagesDirFound);
+    }
+
     // In the Python standard library's `site.py` module (used for finding `site-packages`
     // at runtime), we can find this in [the non-Windows branch]:
     //
@@ -156,9 +133,9 @@ mod tests {
     #[test]
     // Windows venvs have different layouts, and we only have a Unix venv committed for now.
     // This test is skipped on Windows until we commit a Windows venv.
-    #[cfg(not(target_os = "windows"))]
+    #[cfg_attr(target_os = "windows", ignore = "Windows has a different venv layout")]
     fn can_find_site_packages_dir_in_committed_venv() {
-        let path_to_venv = SystemPath::new("resources/test/empty-unix-venv");
+        let path_to_venv = SystemPath::new("resources/test/unix-uv-venv");
         let system = OsSystem::default();
 
         // if this doesn't hold true, the premise of the test is incorrect.
