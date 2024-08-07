@@ -201,7 +201,8 @@ impl Index {
         global_settings: &ClientSettings,
     ) -> crate::Result<()> {
         if workspace_url.scheme() != "file" {
-            tracing::info!("Ignoring non-file workspace URL: {workspace_url}");
+            tracing::warn!("Ignoring non-file workspace: {workspace_url}");
+            show_warn_msg!("Ruff does not support non-file workspaces; Ignoring {workspace_url}");
             return Ok(());
         }
         let workspace_path = workspace_url.to_file_path().map_err(|()| {
