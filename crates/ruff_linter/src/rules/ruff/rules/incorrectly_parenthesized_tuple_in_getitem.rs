@@ -17,7 +17,7 @@ use crate::checkers::ast::Checker;
 ///
 /// ## Why is this bad?
 /// It is good to be consistent and, depending on the codebase, one or the other
-/// convention may be more readable.
+/// convention may be preferred.
 ///
 /// ## Example
 ///
