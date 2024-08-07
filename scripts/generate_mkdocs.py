@@ -165,7 +165,7 @@ def main() -> None:
     # Format rules docs
     add_no_escape_text_plugin()
     for rule_doc in Path("docs/rules").glob("*.md"):
-        mdformat.file(rule_doc, extensions=["mkdocs", "admonition", "no-escape-text"])
+        mdformat.file(rule_doc, extensions=["mkdocs", "admon", "no-escape-text"])
 
     with Path("mkdocs.template.yml").open(encoding="utf8") as fp:
         config = yaml.safe_load(fp)

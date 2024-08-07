@@ -26,6 +26,8 @@ function setCopyText() {
     'button[data-clipboard-target$="code"]',
   );
   const observer = new IntersectionObserver((entries) => {
+    const start = performance.now();
+
     entries.forEach((entry) => {
       // target in the viewport that have not been patched
       if (
@@ -37,6 +39,8 @@ function setCopyText() {
         );
       }
     });
+
+    console.log(performance.now() - start);
   });
 
   elements.forEach((elt) => {
