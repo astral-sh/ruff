@@ -6,9 +6,12 @@ use ruff_text_size::Ranged;
 use crate::checkers::ast::Checker;
 
 /// ## What it does
-/// Checks for use or omission of parentheses around tuples in subscripts,
-/// depending on the setting [`lint.ruff.parenthesize-tuple-in-subscript`]. By default, the use of parentheses
-/// is considered a violation.
+/// Checks for consistent style regarding whether tuples in subscripts
+/// are parenthesized.
+///
+/// The exact nature of this violation depends on the setting
+/// [`lint.ruff.parenthesize-tuple-in-subscript`]. By default, the use of
+/// parentheses is considered a violation.
 ///
 /// ## Why is this bad?
 /// It is good to be consistent and, depending on the codebase, one or the other
@@ -39,15 +42,15 @@ impl AlwaysFixableViolation for IncorrectlyParenthesizedTupleInSubscript {
         if self.prefer_parentheses {
             format!("Use parentheses for tuples in subscripts.")
         } else {
-            format!("Avoid parentheses for tuples in scubscripts.")
+            format!("Avoid parentheses for tuples in subscripts.")
         }
     }
 
     fn fix_title(&self) -> String {
         if self.prefer_parentheses {
-            "Add parentheses around tuple in subscript.".to_string()
+            "Parenthesize the tuple.".to_string()
         } else {
-            "Remove parentheses from tuple in subscript.".to_string()
+            "Remove the parentheses.".to_string()
         }
     }
 }
