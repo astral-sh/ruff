@@ -109,46 +109,149 @@ fn site_packages_dir_from_sys_prefix(
 
 #[derive(Debug, thiserror::Error)]
 pub enum SitePackagesDiscoveryError {
+    #[error("Invalid --venv-path argument: {0} does not point to a directory on disk")]
+    VenvDirIsNotADirectory(SystemPathBuf),
+    #[error("--venv-path points to a broken venv with no pyvenv.cfg file")]
+    NoPyvenvCfgFile(#[source] io::Error),
+    #[error("Failed to parse the pyvenv.cfg file at {0}")]
+    PyvenvCfgParseError(SystemPathBuf),
     #[error("Failed to search the virtual environment directory for `site-packages`")]
     CouldNotReadLibDirectory(#[from] io::Error),
     #[error("Could not find the `site-packages` directory in the virtual environment")]
     NoSitePackagesDirFound,
 }
 
-/// Given a validated, canonicalized path to a virtual environment,
-/// return a list of `site-packages` directories that are available from that environment.
-///
-/// See the documentation for `site_packages_dir_from_sys_prefix` for more details.
-///
-/// TODO: Currently we only ever return 1 path from this function:
-/// the `site-packages` directory that is actually inside the virtual environment.
-/// Some `site-packages` directories are able to also access system `site-packages` and
-/// user `site-packages`, however.
-pub fn site_packages_dirs_of_venv(
-    venv_path: &SystemPath,
-    system: &dyn System,
-) -> Result<Vec<SystemPathBuf>, SitePackagesDiscoveryError> {
-    Ok(vec![site_packages_dir_from_sys_prefix(venv_path, system)?])
+pub struct VirtualEnvironment {
+    venv_path: SystemPathBuf,
+    base_executable_path: SystemPathBuf,
+    include_system_site_packages: bool,
+    minor_version: u8,
+}
+
+impl VirtualEnvironment {
+    pub fn new(
+        path: SystemPathBuf,
+        system: &dyn System,
+    ) -> Result<Self, SitePackagesDiscoveryError> {
+        let canonicalized_venv = system
+            .canonicalize_path(&path)
+            .unwrap_or_else(|_| path.clone());
+        if !system.is_directory(&canonicalized_venv) {
+            return Err(SitePackagesDiscoveryError::VenvDirIsNotADirectory(path));
+        }
+
+        let pyvenv_cfg_path = canonicalized_venv.join("pyvenv.cfg");
+        let pyvenv_cfg = system
+            .read_to_string(&pyvenv_cfg_path)
+            .map_err(SitePackagesDiscoveryError::NoPyvenvCfgFile)?;
+
+        let mut include_system_site_packages = false;
+        let mut base_executable_path = None;
+        let mut version_info_string = None;
+
+        for line in pyvenv_cfg.lines() {
+            let mut line_split = line.split('=');
+            if let Some(key) = line_split.next() {
+                let (Some(value), None) = (line_split.next(), line_split.next()) else {
+                    return Err(SitePackagesDiscoveryError::PyvenvCfgParseError(
+                        pyvenv_cfg_path,
+                    ));
+                };
+                let key = key.trim();
+                let value = value.trim();
+                match key {
+                    "include-system-site-package" => {
+                        include_system_site_packages = value.trim().eq_ignore_ascii_case("true");
+                    }
+                    "home" => base_executable_path = Some(value),
+                    "version_info" => version_info_string = Some(value),
+                    _ => continue,
+                }
+            }
+        }
+
+        let Some(base_executable_path) = base_executable_path else {
+            return Err(SitePackagesDiscoveryError::PyvenvCfgParseError(
+                pyvenv_cfg_path,
+            ));
+        };
+        let base_executable_path = system
+            .canonicalize_path(SystemPath::new(base_executable_path))
+            .unwrap_or_else(|_| SystemPathBuf::from(base_executable_path));
+        if !system.is_directory(&base_executable_path) {
+            return Err(SitePackagesDiscoveryError::PyvenvCfgParseError(
+                pyvenv_cfg_path,
+            ));
+        }
+
+        let Some(version_info_string) = version_info_string else {
+            return Err(SitePackagesDiscoveryError::PyvenvCfgParseError(
+                pyvenv_cfg_path,
+            ));
+        };
+        let mut version_info_parts = version_info_string.split('.');
+        let (Some("3"), Some(minor)) = (version_info_parts.next(), version_info_parts.next())
+        else {
+            return Err(SitePackagesDiscoveryError::PyvenvCfgParseError(
+                pyvenv_cfg_path,
+            ));
+        };
+        let minor_version = minor
+            .parse()
+            .map_err(|_| SitePackagesDiscoveryError::PyvenvCfgParseError(pyvenv_cfg_path))?;
+
+        Ok(Self {
+            venv_path: canonicalized_venv,
+            base_executable_path,
+            include_system_site_packages,
+            minor_version,
+        })
+    }
+
+    /// Return a list of `site-packages` directories that are available from this virtual environment
+    ///
+    /// See the documentation for `site_packages_dir_from_sys_prefix` for more details.
+    pub fn site_packages_dirs(
+        &self,
+        system: &dyn System,
+    ) -> Result<Vec<SystemPathBuf>, SitePackagesDiscoveryError> {
+        let VirtualEnvironment {
+            venv_path,
+            base_executable_path,
+            include_system_site_packages,
+            minor_version,
+        } = self;
+
+        let mut site_packages_dirs = vec![site_packages_dir_from_sys_prefix(venv_path, system)?];
+        if *include_system_site_packages {
+            site_packages_dirs.push(site_packages_dir_from_sys_prefix(
+                base_executable_path,
+                system,
+            )?);
+        }
+        Ok(site_packages_dirs)
+    }
 }
 
 #[cfg(test)]
 mod tests {
-    use ruff_db::system::{OsSystem, System, SystemPath};
+    use ruff_db::system::OsSystem;
 
-    use crate::site_packages::site_packages_dirs_of_venv;
+    use super::*;
 
     #[test]
     // Windows venvs have different layouts, and we only have a Unix venv committed for now.
     // This test is skipped on Windows until we commit a Windows venv.
     #[cfg_attr(target_os = "windows", ignore = "Windows has a different venv layout")]
     fn can_find_site_packages_dir_in_committed_venv() {
-        let path_to_venv = SystemPath::new("resources/test/unix-uv-venv");
+        let path_to_venv = SystemPathBuf::from("resources/test/unix-uv-venv");
         let system = OsSystem::default();
 
         // if this doesn't hold true, the premise of the test is incorrect.
-        assert!(system.is_directory(path_to_venv));
+        assert!(system.is_directory(&path_to_venv));
 
-        let site_packages_dirs = site_packages_dirs_of_venv(path_to_venv, &system).unwrap();
+        let virtual_environment = VirtualEnvironment::new(path_to_venv, &system).unwrap();
+        let site_packages_dirs = virtual_environment.site_packages_dirs(&system).unwrap();
         assert_eq!(site_packages_dirs.len(), 1);
     }
 }
