@@ -1,7 +1,7 @@
 ---
 source: crates/ruff_linter/src/rules/ruff/mod.rs
 ---
-RUF031.py:2:3: RUF031 [*] Avoid parentheses when evaluating `__getitem__` at a tuple.
+RUF031.py:2:3: RUF031 [*] Avoid parentheses for tuples in scubscripts.
   |
 1 | d = {(1,2):"a",(3,4):"b",(5,6,7):"c",(8,):"d"}
 2 | d[(1,2)]
@@ -19,7 +19,7 @@ RUF031.py:2:3: RUF031 [*] Avoid parentheses when evaluating `__getitem__` at a t
 4 4 |     1,
 5 5 |     2
 
-RUF031.py:3:3: RUF031 [*] Avoid parentheses when evaluating `__getitem__` at a tuple.
+RUF031.py:3:3: RUF031 [*] Avoid parentheses for tuples in scubscripts.
   |
 1 |   d = {(1,2):"a",(3,4):"b",(5,6,7):"c",(8,):"d"}
 2 |   d[(1,2)]
@@ -47,7 +47,7 @@ RUF031.py:3:3: RUF031 [*] Avoid parentheses when evaluating `__getitem__` at a t
 8 8 |     1,
 9 9 |     2
 
-RUF031.py:11:3: RUF031 [*] Avoid parentheses when evaluating `__getitem__` at a tuple.
+RUF031.py:11:3: RUF031 [*] Avoid parentheses for tuples in scubscripts.
    |
  9 |     2
 10 | ]
@@ -68,7 +68,7 @@ RUF031.py:11:3: RUF031 [*] Avoid parentheses when evaluating `__getitem__` at a 
 13 13 | d[(8,)]
 14 14 | d[tuple(1,2)]
 
-RUF031.py:12:3: RUF031 [*] Avoid parentheses when evaluating `__getitem__` at a tuple.
+RUF031.py:12:3: RUF031 [*] Avoid parentheses for tuples in scubscripts.
    |
 10 | ]
 11 | d[(2,4)]
@@ -89,7 +89,7 @@ RUF031.py:12:3: RUF031 [*] Avoid parentheses when evaluating `__getitem__` at a 
 14 14 | d[tuple(1,2)]
 15 15 | d[tuple(8)]
 
-RUF031.py:20:3: RUF031 [*] Avoid parentheses when evaluating `__getitem__` at a tuple.
+RUF031.py:20:3: RUF031 [*] Avoid parentheses for tuples in scubscripts.
    |
 18 | d[5,6,7]
 19 | e = {((1,2),(3,4)):"a"}
@@ -106,3 +106,23 @@ RUF031.py:20:3: RUF031 [*] Avoid parentheses when evaluating `__getitem__` at a 
 20    |-e[((1,2),(3,4))]
 21 20 | e[(1,2),(3,4)]
    21 |+e[(1,2),(3,4)]
+22 22 | 
+23 23 | token_features[
+24 24 |     (window_position, feature_name)
+
+RUF031.py:24:5: RUF031 [*] Avoid parentheses for tuples in scubscripts.
+   |
+23 | token_features[
+24 |     (window_position, feature_name)
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF031
+25 | ] = self._extract_raw_features_from_token
+   |
+   = help: Remove parentheses from tuple argument in `__getitem__` call.
+
+ℹ Safe fix
+21 21 | e[(1,2),(3,4)]
+22 22 | 
+23 23 | token_features[
+24    |-    (window_position, feature_name)
+   24 |+    window_position, feature_name
+25 25 | ] = self._extract_raw_features_from_token
