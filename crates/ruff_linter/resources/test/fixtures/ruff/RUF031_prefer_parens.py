@@ -19,3 +19,7 @@ d[5,6,7]
 e = {((1,2),(3,4)):"a"}
 e[((1,2),(3,4))]
 e[(1,2),(3,4)]
+
+token_features[
+    (window_position, feature_name)
+] = self._extract_raw_features_from_token

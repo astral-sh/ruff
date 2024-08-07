@@ -11,7 +11,7 @@ use ruff_text_size::Ranged;
 use crate::checkers::ast::Checker;
 
 /// ## What it does
-/// Checks for use or omission of parentheses around tuples of length at least two in calls to `__getitem__`,
+/// Checks for use or omission of parentheses around tuples of length at least two in subscripts,
 /// depending on the setting [`lint.ruff.parenthesize-tuple-in-getitem`]. By default, the use of parentheses
 /// is considered a violation.
 ///
@@ -34,16 +34,16 @@ use crate::checkers::ast::Checker;
 /// ```
 
 #[violation]
-pub struct IncorrectlyParenthesizedTupleInGetitem {
+pub struct IncorrectlyParenthesizedTupleInSubscript {
     prefer_parentheses: bool,
 }
 
-impl AlwaysFixableViolation for IncorrectlyParenthesizedTupleInGetitem {
+impl AlwaysFixableViolation for IncorrectlyParenthesizedTupleInSubscript {
     #[derive_message_formats]
     fn message(&self) -> String {
         match self.prefer_parentheses {
-            true => format!("Use paentheses when evaluating `__getitem__` at a tuple."),
-            false => format!("Avoid parentheses when evaluating `__getitem__` at a tuple."),
+            true => format!("Use paentheses for tuples in subscripts."),
+            false => format!("Avoid parentheses for tuples in scubscripts."),
         }
     }
 
@@ -56,11 +56,14 @@ impl AlwaysFixableViolation for IncorrectlyParenthesizedTupleInGetitem {
 }
 
 /// RUF031
-pub(crate) fn getitem_with_parenthesized_tuple(checker: &mut Checker, subscript: &ExprSubscript) {
+pub(crate) fn subscript_with_parenthesized_tuple(checker: &mut Checker, subscript: &ExprSubscript) {
     let prefer_parentheses = checker.settings.ruff.parenthesize_tuple_in_getitem;
     let Some(tuple_index) = subscript.slice.as_tuple_expr() else {
-    	return;
-  	]
+        return;
+    };
+    // We check that there is more than one element in the tuple because
+    // parentheses are necessary around length 1 tuples:
+    // while `(1,)` is a tuple, `1` is not.
     if (tuple_index.parenthesized != prefer_parentheses) && tuple_index.elts.len() > 1 {
         let locator = checker.locator();
         let source_range = subscript.slice.range();
@@ -68,14 +71,12 @@ pub(crate) fn getitem_with_parenthesized_tuple(checker: &mut Checker, subscript:
             true => {
                 format!("({})", locator.slice(source_range))
             }
-            false => {
-                locator.slice(source_range)[1..source_range.len().to_usize() - 1].to_string()
-            }
+            false => locator.slice(source_range)[1..source_range.len().to_usize() - 1].to_string(),
         };
         let edit = Edit::range_replacement(new_source, source_range);
         checker.diagnostics.push(
             Diagnostic::new(
-                IncorrectlyParenthesizedTupleInGetitem { prefer_parentheses },
+                IncorrectlyParenthesizedTupleInSubscript { prefer_parentheses },
                 source_range,
             )
             .with_fix(Fix::safe_edit(edit)),

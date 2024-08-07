@@ -146,8 +146,8 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
                 refurb::rules::fstring_number_format(checker, subscript);
             }
 
-            if checker.enabled(Rule::IncorrectlyParenthesizedTupleInGetitem) {
-                ruff::rules::getitem_with_parenthesized_tuple(checker, subscript);
+            if checker.enabled(Rule::IncorrectlyParenthesizedTupleInSubscript) {
+                ruff::rules::subscript_with_parenthesized_tuple(checker, subscript);
             }
 
             pandas_vet::rules::subscript(checker, value, expr);
