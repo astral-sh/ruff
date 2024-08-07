@@ -1,8 +1,3 @@
-// In case we want to change the boolean setting for
-// this rule to an enum, this will make the code change
-// just a little simpler.
-#![allow(clippy::match_bool)]
-
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::ExprSubscript;
