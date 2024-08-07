@@ -1,11 +1,13 @@
-use std::num::NonZeroUsize;
+use std::process::ExitCode;
 use std::sync::Mutex;
 
 use clap::Parser;
+use colored::Colorize;
 use crossbeam::channel as crossbeam_channel;
-use red_knot_workspace::site_packages::site_packages_dirs_of_venv;
 
+use red_knot_server::run_server;
 use red_knot_workspace::db::RootDatabase;
+use red_knot_workspace::site_packages::site_packages_dirs_of_venv;
 use red_knot_workspace::watch;
 use red_knot_workspace::watch::WorkspaceWatcher;
 use red_knot_workspace::workspace::WorkspaceMetadata;
@@ -83,13 +85,34 @@ pub enum Command {
     Server,
 }
 
-#[allow(
-    clippy::print_stdout,
-    clippy::unnecessary_wraps,
-    clippy::print_stderr,
-    clippy::dbg_macro
-)]
-pub fn main() -> anyhow::Result<()> {
+#[allow(clippy::print_stdout, clippy::unnecessary_wraps, clippy::print_stderr)]
+pub fn main() -> ExitCode {
+    match run() {
+        Ok(status) => status.into(),
+        Err(error) => {
+            {
+                use std::io::Write;
+
+                // Use `writeln` instead of `eprintln` to avoid panicking when the stderr pipe is broken.
+                let mut stderr = std::io::stderr().lock();
+
+                // This communicates that this isn't a linter error but ruff itself hard-errored for
+                // some reason (e.g. failed to resolve the configuration)
+                writeln!(stderr, "{}", "ruff failed".red().bold()).ok();
+                // Currently we generally only see one error, but e.g. with io errors when resolving
+                // the configuration it is help to chain errors ("resolving configuration failed" ->
+                // "failed to read file: subdir/pyproject.toml")
+                for cause in error.chain() {
+                    writeln!(stderr, "  {} {cause}", "Cause:".bold()).ok();
+                }
+            }
+
+            ExitStatus::Error.into()
+        }
+    }
+}
+
+fn run() -> anyhow::Result<ExitStatus> {
     let Args {
         command,
         current_directory,
@@ -101,20 +124,12 @@ pub fn main() -> anyhow::Result<()> {
         watch,
     } = Args::parse_from(std::env::args().collect::<Vec<_>>());
 
-    let verbosity = verbosity.level();
-    countme::enable(verbosity.is_trace());
-
     if matches!(command, Some(Command::Server)) {
-        let four = NonZeroUsize::new(4).unwrap();
-
-        // by default, we set the number of worker threads to `num_cpus`, with a maximum of 4.
-        let worker_threads = std::thread::available_parallelism()
-            .unwrap_or(four)
-            .max(four);
-
-        return red_knot_server::Server::new(worker_threads)?.run();
+        return run_server().map(|()| ExitStatus::Success);
     }
 
+    let verbosity = verbosity.level();
+    countme::enable(verbosity.is_trace());
     let _guard = setup_tracing(verbosity)?;
 
     let cwd = if let Some(cwd) = current_directory {
@@ -167,17 +182,37 @@ pub fn main() -> anyhow::Result<()> {
         }
     })?;
 
-    if watch {
-        main_loop.watch(&mut db)?;
+    let exit_status = if watch {
+        main_loop.watch(&mut db)?
     } else {
-        main_loop.run(&mut db);
+        main_loop.run(&mut db)
     };
 
-    tracing::trace!("Counts for entire CLI run :\n{}", countme::get_all());
+    tracing::trace!("Counts for entire CLI run:\n{}", countme::get_all());
 
     std::mem::forget(db);
 
-    Ok(())
+    Ok(exit_status)
+}
+
+#[derive(Copy, Clone)]
+pub enum ExitStatus {
+    /// Linting was successful and there were no linting errors.
+    Success,
+    /// Linting was successful but there were linting errors.
+    Failure,
+    /// Linting failed.
+    Error,
+}
+
+impl From<ExitStatus> for ExitCode {
+    fn from(status: ExitStatus) -> Self {
+        match status {
+            ExitStatus::Success => ExitCode::from(0),
+            ExitStatus::Failure => ExitCode::from(1),
+            ExitStatus::Error => ExitCode::from(2),
+        }
+    }
 }
 
 struct MainLoop {
@@ -205,7 +240,7 @@ impl MainLoop {
         )
     }
 
-    fn watch(mut self, db: &mut RootDatabase) -> anyhow::Result<()> {
+    fn watch(mut self, db: &mut RootDatabase) -> anyhow::Result<ExitStatus> {
         tracing::debug!("Starting watch mode");
         let sender = self.sender.clone();
         let watcher = watch::directory_watcher(move |event| {
@@ -216,19 +251,21 @@ impl MainLoop {
 
         self.run(db);
 
-        Ok(())
+        Ok(ExitStatus::Success)
     }
 
-    fn run(mut self, db: &mut RootDatabase) {
+    fn run(mut self, db: &mut RootDatabase) -> ExitStatus {
         self.sender.send(MainLoopMessage::CheckWorkspace).unwrap();
 
-        self.main_loop(db);
+        let result = self.main_loop(db);
 
         tracing::debug!("Exiting main loop");
+
+        result
     }
 
     #[allow(clippy::print_stderr)]
-    fn main_loop(&mut self, db: &mut RootDatabase) {
+    fn main_loop(&mut self, db: &mut RootDatabase) -> ExitStatus {
         // Schedule the first check.
         tracing::debug!("Starting main loop");
 
@@ -263,7 +300,11 @@ impl MainLoop {
                     }
 
                     if self.watcher.is_none() {
-                        return;
+                        return if result.is_empty() {
+                            ExitStatus::Success
+                        } else {
+                            ExitStatus::Failure
+                        };
                     }
 
                     tracing::trace!("Counts after last check:\n{}", countme::get_all());
@@ -279,12 +320,14 @@ impl MainLoop {
                     self.sender.send(MainLoopMessage::CheckWorkspace).unwrap();
                 }
                 MainLoopMessage::Exit => {
-                    return;
+                    return ExitStatus::Success;
                 }
             }
 
             tracing::debug!("Waiting for next main loop message.");
         }
+
+        ExitStatus::Success
     }
 }
 
