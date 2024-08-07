@@ -133,7 +133,7 @@ mod tests {
     #[test]
     // Windows venvs have different layouts, and we only have a Unix venv committed for now.
     // This test is skipped on Windows until we commit a Windows venv.
-    #[cfg(not(target_os = "windows"))]
+    #[cfg_attr(target_os = "windows", ignore = "Windows has a different venv layout")]
     fn can_find_site_packages_dir_in_committed_venv() {
         let path_to_venv = SystemPath::new("resources/test/unix-uv-venv");
         let system = OsSystem::default();
