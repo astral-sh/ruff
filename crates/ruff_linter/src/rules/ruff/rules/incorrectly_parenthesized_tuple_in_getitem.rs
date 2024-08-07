@@ -42,15 +42,15 @@ impl AlwaysFixableViolation for IncorrectlyParenthesizedTupleInSubscript {
     #[derive_message_formats]
     fn message(&self) -> String {
         match self.prefer_parentheses {
-            true => format!("Use paentheses for tuples in subscripts."),
+            true => format!("Use parentheses for tuples in subscripts."),
             false => format!("Avoid parentheses for tuples in scubscripts."),
         }
     }
 
     fn fix_title(&self) -> String {
         match self.prefer_parentheses {
-            true => "Add parentheses around tuple argument in `__getitem__` call.".to_string(),
-            false => "Remove parentheses from tuple argument in `__getitem__` call.".to_string(),
+            true => "Add parentheses around tuple in subscript.".to_string(),
+            false => "Remove parentheses from tuple in subscript.".to_string(),
         }
     }
 }
