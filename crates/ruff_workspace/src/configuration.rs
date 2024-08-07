@@ -47,7 +47,7 @@ use crate::options::{
     Flake8SelfOptions, Flake8TidyImportsOptions, Flake8TypeCheckingOptions,
     Flake8UnusedArgumentsOptions, FormatOptions, IsortOptions, LintCommonOptions, LintOptions,
     McCabeOptions, Options, Pep8NamingOptions, PyUpgradeOptions, PycodestyleOptions,
-    PydocstyleOptions, PyflakesOptions, PylintOptions,
+    PydocstyleOptions, PyflakesOptions, PylintOptions, RuffOptions,
 };
 use crate::settings::{
     FileResolverSettings, FormatterSettings, LineEnding, Settings, EXCLUDE, INCLUDE,
@@ -402,6 +402,10 @@ impl Configuration {
                     .pyupgrade
                     .map(PyUpgradeOptions::into_settings)
                     .unwrap_or_default(),
+                ruff: lint
+                    .ruff
+                    .map(RuffOptions::into_settings)
+                    .unwrap_or_default(),
             },
 
             formatter,
@@ -631,6 +635,7 @@ pub struct LintConfiguration {
     pub pyflakes: Option<PyflakesOptions>,
     pub pylint: Option<PylintOptions>,
     pub pyupgrade: Option<PyUpgradeOptions>,
+    pub ruff: Option<RuffOptions>,
 }
 
 impl LintConfiguration {
@@ -741,6 +746,7 @@ impl LintConfiguration {
             pyflakes: options.common.pyflakes,
             pylint: options.common.pylint,
             pyupgrade: options.common.pyupgrade,
+            ruff: options.ruff,
         })
     }
 
@@ -1118,6 +1124,7 @@ impl LintConfiguration {
             pyflakes: self.pyflakes.combine(config.pyflakes),
             pylint: self.pylint.combine(config.pylint),
             pyupgrade: self.pyupgrade.combine(config.pyupgrade),
+            ruff: self.ruff.combine(config.ruff),
         }
     }
 }

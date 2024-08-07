@@ -2245,6 +2245,17 @@
             }
           ]
         },
+        "ruff": {
+          "description": "Options for the `ruff` plugin",
+          "anyOf": [
+            {
+              "$ref": "#/definitions/RuffOptions"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
         "select": {
           "description": "A list of rule codes or prefixes to enable. Prefixes can specify exact rules (like `F841`), entire categories (like `F`), or anything in between.\n\nWhen breaking ties between enabled and disabled rules (via `select` and `ignore`, respectively), more specific prefixes override less specific prefixes.",
           "type": [
@@ -2669,6 +2680,19 @@
     },
     "RequiredVersion": {
       "type": "string"
+    },
+    "RuffOptions": {
+      "type": "object",
+      "properties": {
+        "parenthesize-tuple-in-subscript": {
+          "description": "Whether to prefer accessing items keyed by tuples with parentheses around the tuple (see `RUF031`).",
+          "type": [
+            "boolean",
+            "null"
+          ]
+        }
+      },
+      "additionalProperties": false
     },
     "RuleSelector": {
       "type": "string",
@@ -3711,6 +3735,7 @@
         "RUF029",
         "RUF03",
         "RUF030",
+        "RUF031",
         "RUF1",
         "RUF10",
         "RUF100",
