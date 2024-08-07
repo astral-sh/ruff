@@ -4,12 +4,6 @@ use std::sync::Mutex;
 use clap::Parser;
 use crossbeam::channel as crossbeam_channel;
 use red_knot_workspace::site_packages::site_packages_dirs_of_venv;
-use tracing::subscriber::Interest;
-use tracing::{Level, Metadata};
-use tracing_subscriber::filter::LevelFilter;
-use tracing_subscriber::layer::{Context, Filter, SubscriberExt};
-use tracing_subscriber::{Layer, Registry};
-use tracing_tree::time::Uptime;
 
 use red_knot_workspace::db::RootDatabase;
 use red_knot_workspace::watch;
@@ -18,8 +12,10 @@ use red_knot_workspace::workspace::WorkspaceMetadata;
 use ruff_db::program::{ProgramSettings, SearchPathSettings};
 use ruff_db::system::{OsSystem, System, SystemPathBuf};
 use target_version::TargetVersion;
-use verbosity::{Verbosity, VerbosityLevel};
 
+use crate::logging::{setup_tracing, Verbosity, VerbosityLevel};
+
+mod logging;
 mod target_version;
 mod verbosity;
 
@@ -106,7 +102,7 @@ pub fn main() -> anyhow::Result<()> {
     } = Args::parse_from(std::env::args().collect::<Vec<_>>());
 
     let verbosity = verbosity.level();
-    countme::enable(verbosity == Some(VerbosityLevel::Trace));
+    countme::enable(verbosity.is_trace());
 
     if matches!(command, Some(Command::Server)) {
         let four = NonZeroUsize::new(4).unwrap();
@@ -119,7 +115,7 @@ pub fn main() -> anyhow::Result<()> {
         return red_knot_server::Server::new(worker_threads)?.run();
     }
 
-    setup_tracing(verbosity);
+    let _guard = setup_tracing(verbosity)?;
 
     let cwd = if let Some(cwd) = current_directory {
         let canonicalized = cwd.as_utf8_path().canonicalize_utf8().unwrap();
@@ -192,11 +188,11 @@ struct MainLoop {
     /// The file system watcher, if running in watch mode.
     watcher: Option<WorkspaceWatcher>,
 
-    verbosity: Option<VerbosityLevel>,
+    verbosity: VerbosityLevel,
 }
 
 impl MainLoop {
-    fn new(verbosity: Option<VerbosityLevel>) -> (Self, MainLoopCancellationToken) {
+    fn new(verbosity: VerbosityLevel) -> (Self, MainLoopCancellationToken) {
         let (sender, receiver) = crossbeam_channel::bounded(10);
 
         (
@@ -217,7 +213,15 @@ impl MainLoop {
         })?;
 
         self.watcher = Some(WorkspaceWatcher::new(watcher, db));
+
+        let is_trace = self.verbosity.is_trace();
         self.run(db);
+
+        if is_trace {
+            eprintln!("Exit");
+            eprintln!("{}", countme::get_all());
+        }
+
         Ok(())
     }
 
@@ -254,13 +258,13 @@ impl MainLoop {
                     if check_revision == revision {
                         eprintln!("{}", result.join("\n"));
 
-                        if self.verbosity == Some(VerbosityLevel::Trace) {
+                        if self.verbosity.is_trace() {
                             eprintln!("{}", countme::get_all());
                         }
                     }
 
                     if self.watcher.is_none() {
-                        return self.exit();
+                        return;
                     }
                 }
 
@@ -274,19 +278,9 @@ impl MainLoop {
                     self.sender.send(MainLoopMessage::CheckWorkspace).unwrap();
                 }
                 MainLoopMessage::Exit => {
-                    return self.exit();
+                    return;
                 }
             }
-        }
-
-        self.exit();
-    }
-
-    #[allow(clippy::print_stderr, clippy::unused_self)]
-    fn exit(self) {
-        if self.verbosity == Some(VerbosityLevel::Trace) {
-            eprintln!("Exit");
-            eprintln!("{}", countme::get_all());
         }
     }
 }
@@ -312,64 +306,4 @@ enum MainLoopMessage {
     },
     ApplyChanges(Vec<watch::ChangeEvent>),
     Exit,
-}
-
-fn setup_tracing(verbosity: Option<VerbosityLevel>) {
-    let trace_level = match verbosity {
-        None => Level::WARN,
-        Some(VerbosityLevel::Info) => Level::INFO,
-        Some(VerbosityLevel::Debug) => Level::DEBUG,
-        Some(VerbosityLevel::Trace) => Level::TRACE,
-    };
-
-    let subscriber = Registry::default().with(
-        tracing_tree::HierarchicalLayer::default()
-            .with_indent_lines(true)
-            .with_indent_amount(2)
-            .with_bracketed_fields(true)
-            .with_thread_ids(true)
-            .with_targets(true)
-            .with_writer(|| Box::new(std::io::stderr()))
-            .with_timer(Uptime::default())
-            .with_filter(LoggingFilter { trace_level }),
-    );
-
-    tracing::subscriber::set_global_default(subscriber).unwrap();
-}
-
-struct LoggingFilter {
-    trace_level: Level,
-}
-
-impl LoggingFilter {
-    fn is_enabled(&self, meta: &Metadata<'_>) -> bool {
-        let filter = if meta.target().starts_with("red_knot") || meta.target().starts_with("ruff") {
-            self.trace_level
-        } else if meta.target().starts_with("salsa") && self.trace_level <= Level::INFO {
-            // Salsa emits very verbose query traces with level info. Let's not show these to the user.
-            Level::WARN
-        } else {
-            Level::INFO
-        };
-
-        meta.level() <= &filter
-    }
-}
-
-impl<S> Filter<S> for LoggingFilter {
-    fn enabled(&self, meta: &Metadata<'_>, _cx: &Context<'_, S>) -> bool {
-        self.is_enabled(meta)
-    }
-
-    fn callsite_enabled(&self, meta: &'static Metadata<'static>) -> Interest {
-        if self.is_enabled(meta) {
-            Interest::always()
-        } else {
-            Interest::never()
-        }
-    }
-
-    fn max_level_hint(&self) -> Option<LevelFilter> {
-        Some(LevelFilter::from_level(self.trace_level))
-    }
 }

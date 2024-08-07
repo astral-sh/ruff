@@ -1,0 +1,89 @@
+# Tracing
+
+Traces are a useful tool to narrow down the location of a bug or, at least, to understand why the compiler is doing a particular thing.
+Note, tracing messages with severity `debug`..`error` are user-facing. They should be phrased accordingly.
+Tracing spans are only shown when using `-vvv`.
+
+## Verbosity levels
+
+The CLI supports different verbosity levels.
+
+- default: Only show errors and warnings.
+- `-v` activates `info!`: Show generally useful information such as paths of configuration files, detected platform, etc., but it's not a lot of messages, it's something you'll activate in CI by default. cargo build e.g. shows you which packages are fresh.
+- `-vv` activates `debug!` and timestamps: This should be enough information to get to the bottom of bug reports. When you're processing many packages or files, you'll get pages and pages of output, but each line is link to a specific action or state change.
+- `-vvv` activates `trace!` (only in debug builds) and shows tracing-spans: At this level, you're logging everything. Most of this is wasted, it's really slow, we dump e.g. the entire resolution graph. Only useful to developers, and you almost certainly want to use `RED_KNOT_LOG` to filter it down to the area your investigating.
+
+## `RED_KNOT_LOG`
+
+By default, the CLI shows messages from the `ruff` and `red_knot` crates. Tracing messages from other crates are not shown.
+The `RED_KNOT_LOG` environment variable allows you to customize which messages are shown by specifying one
+or more [filter directives](https://docs.rs/tracing-subscriber/latest/tracing_subscriber/filter/struct.EnvFilter.html#directives).
+
+### Examples
+
+#### Show all debug messages
+
+Shows debug messages from all crates.
+
+```bash
+RED_KNOT_LOG=debug
+```
+
+#### Show salsa query execution messages
+
+Show the salsa `execute: my_query` messages in addition to all red knot messages.
+
+```bash
+RED_KNOT_LOG=ruff=trace,red_knot=trace,salsa=info
+```
+
+#### Show typing traces
+
+Only show traces for the `red_knot_python_semantic::types` module.
+
+```bash
+RED_KNOT_LOG="red_knot_python_semantic::types"
+```
+
+Note: Ensure that you use `-vvv` to see tracing spans.
+
+## Tracing and Salsa
+
+Be mindful about using `tracing` in Salsa queries, especially when using `warn` or `error` because it isn't guaranteed
+that the query will execute after restoring from a persistent cache. In which case the user won't see the message.
+
+For example, don't use `tracing` to show the user a message when generating a lint violation failed
+because the message would only be shown when linting the file the first time, but not on subsequent analysis
+runs or when restoring from a persistent cache. This can be confusing for users because they
+don't understand why a specific lint violation isn't raised. Instead, change your
+query to return the failure as part of the query's result or use a Salsa accumulator.
+
+## Release builds
+
+`trace!` events are removed in release builds.
+
+## Profiling
+
+Red Knot generates a folded stack trace  to the current directory named `tracing.folded` when setting the environment variable `RED_KNOT_LOG_PROFILE` to `1` or `true`.
+
+```bash
+RED_KNOT_LOG_PROFILE=1 red_knot -- --current-directory=../test -vvv
+```
+
+You can convert the textual representation into a visual one using `inferno`.
+
+```shell
+cargo install inferno
+```
+
+```shell
+# flamegraph
+cat tracing.folded | inferno-flamegraph > tracing-flamegraph.svg
+
+# flamechart
+cat tracing.folded | inferno-flamegraph --flamechart > tracing-flamechart.svg
+```
+
+![Example flamegraph](./tracing-flamegraph.png)
+
+See [`tracing-flame`](https://crates.io/crates/tracing-flame) for more details.
