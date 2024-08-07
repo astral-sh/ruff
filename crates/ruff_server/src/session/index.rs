@@ -1,4 +1,5 @@
 use std::borrow::Cow;
+use std::ops::{Deref, DerefMut};
 use std::path::PathBuf;
 use std::{collections::BTreeMap, path::Path, sync::Arc};
 
@@ -17,8 +18,6 @@ use super::{settings::ResolvedClientSettings, ClientSettings};
 
 mod ruff_settings;
 
-type SettingsIndex = BTreeMap<PathBuf, WorkspaceSettings>;
-
 /// Stores and tracks all open documents in a session, along with their associated settings.
 #[derive(Default)]
 pub(crate) struct Index {
@@ -29,7 +28,7 @@ pub(crate) struct Index {
     notebook_cells: FxHashMap<Url, Url>,
 
     /// Maps a workspace folder root to its settings.
-    settings: SettingsIndex,
+    settings: WorkspaceSettingsIndex,
 }
 
 /// Settings associated with a workspace.
@@ -70,20 +69,15 @@ impl Index {
         workspace_folders: Vec<(Url, ClientSettings)>,
         global_settings: &ClientSettings,
     ) -> crate::Result<Self> {
-        let mut settings_index = BTreeMap::new();
+        let mut settings = WorkspaceSettingsIndex::default();
         for (url, workspace_settings) in workspace_folders {
-            Self::register_workspace_settings(
-                &mut settings_index,
-                &url,
-                Some(workspace_settings),
-                global_settings,
-            )?;
+            settings.register_workspace(&url, Some(workspace_settings), global_settings)?;
         }
 
         Ok(Self {
             documents: FxHashMap::default(),
             notebook_cells: FxHashMap::default(),
-            settings: settings_index,
+            settings,
         })
     }
 
@@ -176,7 +170,7 @@ impl Index {
         global_settings: &ClientSettings,
     ) -> crate::Result<()> {
         // TODO(jane): Find a way for workspace client settings to be added or changed dynamically.
-        Self::register_workspace_settings(&mut self.settings, url, None, global_settings)
+        self.settings.register_workspace(url, None, global_settings)
     }
 
     pub(super) fn num_documents(&self) -> usize {
@@ -192,43 +186,6 @@ impl Index {
             .values()
             .flat_map(|WorkspaceSettings { ruff_settings, .. }| ruff_settings.list_files())
             .collect()
-    }
-
-    fn register_workspace_settings(
-        settings_index: &mut SettingsIndex,
-        workspace_url: &Url,
-        workspace_settings: Option<ClientSettings>,
-        global_settings: &ClientSettings,
-    ) -> crate::Result<()> {
-        if workspace_url.scheme() != "file" {
-            tracing::warn!("Ignoring non-file workspace: {workspace_url}");
-            show_warn_msg!("Ruff does not support non-file workspaces; Ignoring {workspace_url}");
-            return Ok(());
-        }
-        let workspace_path = workspace_url.to_file_path().map_err(|()| {
-            anyhow!("Failed to convert workspace URL to file path: {workspace_url}")
-        })?;
-
-        let client_settings = if let Some(workspace_settings) = workspace_settings {
-            ResolvedClientSettings::with_workspace(&workspace_settings, global_settings)
-        } else {
-            ResolvedClientSettings::global(global_settings)
-        };
-
-        let workspace_settings_index = ruff_settings::RuffSettingsIndex::new(
-            &workspace_path,
-            client_settings.editor_settings(),
-        );
-
-        settings_index.insert(
-            workspace_path,
-            WorkspaceSettings {
-                client_settings,
-                ruff_settings: workspace_settings_index,
-            },
-        );
-
-        Ok(())
     }
 
     pub(super) fn close_workspace_folder(&mut self, workspace_url: &Url) -> crate::Result<()> {
@@ -424,6 +381,69 @@ impl Index {
             .range(..path.to_path_buf())
             .next_back()
             .map(|(_, settings)| settings)
+    }
+}
+
+/// Maps a workspace folder root to its settings.
+#[derive(Default)]
+struct WorkspaceSettingsIndex {
+    index: BTreeMap<PathBuf, WorkspaceSettings>,
+}
+
+impl WorkspaceSettingsIndex {
+    /// Register a workspace folder with the given settings.
+    ///
+    /// If the `workspace_settings` is [`Some`], it is preferred over the global settings for the
+    /// workspace. Otherwise, the global settings are used exclusively.
+    fn register_workspace(
+        &mut self,
+        workspace_url: &Url,
+        workspace_settings: Option<ClientSettings>,
+        global_settings: &ClientSettings,
+    ) -> crate::Result<()> {
+        if workspace_url.scheme() != "file" {
+            tracing::info!("Ignoring non-file workspace URL: {workspace_url}");
+            show_warn_msg!("Ruff does not support non-file workspaces; Ignoring {workspace_url}");
+            return Ok(());
+        }
+        let workspace_path = workspace_url.to_file_path().map_err(|()| {
+            anyhow!("Failed to convert workspace URL to file path: {workspace_url}")
+        })?;
+
+        let client_settings = if let Some(workspace_settings) = workspace_settings {
+            ResolvedClientSettings::with_workspace(&workspace_settings, global_settings)
+        } else {
+            ResolvedClientSettings::global(global_settings)
+        };
+
+        let workspace_settings_index = ruff_settings::RuffSettingsIndex::new(
+            &workspace_path,
+            client_settings.editor_settings(),
+        );
+
+        self.insert(
+            workspace_path,
+            WorkspaceSettings {
+                client_settings,
+                ruff_settings: workspace_settings_index,
+            },
+        );
+
+        Ok(())
+    }
+}
+
+impl Deref for WorkspaceSettingsIndex {
+    type Target = BTreeMap<PathBuf, WorkspaceSettings>;
+
+    fn deref(&self) -> &Self::Target {
+        &self.index
+    }
+}
+
+impl DerefMut for WorkspaceSettingsIndex {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.index
     }
 }
 
