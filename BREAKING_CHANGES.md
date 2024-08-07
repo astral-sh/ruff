@@ -337,16 +337,16 @@ upgrades.
 `--explain`, `--clean`, and `--generate-shell-completion` are now implemented as subcommands:
 
 ```console
-$ ruff .         # Still works! And will always work.
-$ ruff check .   # New! Also works.
+ruff .         # Still works! And will always work.
+ruff check .   # New! Also works.
 
-$ ruff --explain E402   # Still works.
-$ ruff rule E402        # New! Also works. (And preferred.)
+ruff --explain E402   # Still works.
+ruff rule E402        # New! Also works. (And preferred.)
 
-$ # Oops! The command has to come first.
-$ ruff --format json --explain E402   # No longer works.
-$ ruff --explain E402 --format json   # Still works!
-$ ruff rule E402   --format json      # Works! (And preferred.)
+# Oops! The command has to come first.
+ruff --format json --explain E402   # No longer works.
+ruff --explain E402 --format json   # Still works!
+ruff rule E402   --format json      # Works! (And preferred.)
 ```
 
 This change is largely backwards compatible -- most users should experience
@@ -356,7 +356,7 @@ no change in behavior. However, please note the following exceptions:
     of silently ignoring them. For example, the following will now fail:
 
     ```console
-    $ ruff --clean --respect-gitignore
+    ruff --clean --respect-gitignore
     ```
 
     (the `clean` command doesn't support `--respect-gitignore`.)
