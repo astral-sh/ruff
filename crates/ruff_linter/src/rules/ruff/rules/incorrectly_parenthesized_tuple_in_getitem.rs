@@ -58,26 +58,27 @@ impl AlwaysFixableViolation for IncorrectlyParenthesizedTupleInGetitem {
 /// RUF031
 pub(crate) fn getitem_with_parenthesized_tuple(checker: &mut Checker, subscript: &ExprSubscript) {
     let prefer_parentheses = checker.settings.ruff.parenthesize_tuple_in_getitem;
-    if let Some(tuple_index) = subscript.slice.as_tuple_expr() {
-        if (tuple_index.parenthesized != prefer_parentheses) && tuple_index.elts.len() > 1 {
-            let locator = checker.locator();
-            let source_range = subscript.slice.range();
-            let new_source = match prefer_parentheses {
-                true => {
-                    format!("({})", locator.slice(source_range))
-                }
-                false => {
-                    locator.slice(source_range)[1..source_range.len().to_usize() - 1].to_string()
-                }
-            };
-            let edit = Edit::range_replacement(new_source, source_range);
-            checker.diagnostics.push(
-                Diagnostic::new(
-                    IncorrectlyParenthesizedTupleInGetitem { prefer_parentheses },
-                    source_range,
-                )
-                .with_fix(Fix::safe_edit(edit)),
-            );
-        }
+    let Some(tuple_index) = subscript.slice.as_tuple_expr() else {
+    	return;
+  	]
+    if (tuple_index.parenthesized != prefer_parentheses) && tuple_index.elts.len() > 1 {
+        let locator = checker.locator();
+        let source_range = subscript.slice.range();
+        let new_source = match prefer_parentheses {
+            true => {
+                format!("({})", locator.slice(source_range))
+            }
+            false => {
+                locator.slice(source_range)[1..source_range.len().to_usize() - 1].to_string()
+            }
+        };
+        let edit = Edit::range_replacement(new_source, source_range);
+        checker.diagnostics.push(
+            Diagnostic::new(
+                IncorrectlyParenthesizedTupleInGetitem { prefer_parentheses },
+                source_range,
+            )
+            .with_fix(Fix::safe_edit(edit)),
+        );
     }
 }
