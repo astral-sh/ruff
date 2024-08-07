@@ -197,21 +197,19 @@ fn run() -> anyhow::Result<ExitStatus> {
 
 #[derive(Copy, Clone)]
 pub enum ExitStatus {
-    /// Linting was successful and there were no linting errors.
-    Success,
-    /// Linting was successful but there were linting errors.
-    Failure,
-    /// Linting failed.
-    Error,
+    /// Checking was successful and there were no errors.
+    Success = 0,
+
+    /// Checking was successful but there were errors.
+    Failure = 1,
+
+    /// Checking failed.
+    Error = 2,
 }
 
 impl From<ExitStatus> for ExitCode {
     fn from(status: ExitStatus) -> Self {
-        match status {
-            ExitStatus::Success => ExitCode::from(0),
-            ExitStatus::Failure => ExitCode::from(1),
-            ExitStatus::Error => ExitCode::from(2),
-        }
+        ExitCode::from(status as u8)
     }
 }
 
