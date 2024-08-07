@@ -42,16 +42,16 @@ impl Verbosity {
 
 #[derive(Debug, Copy, Clone, Eq, PartialEq, Ord, PartialOrd)]
 pub(crate) enum VerbosityLevel {
-    /// Default output level. Only shows ruff and red knot events up to the [`LogLevel::Warn`].
+    /// Default output level. Only shows Ruff and Red Knot events up to the [`WARN`](tracing::Level::WARN).
     Default,
 
-    /// Enables verbose output. Emits ruff and red knot events up to the [`LogLevel::Info`]
+    /// Enables verbose output. Emits Ruff and Red Knot events up to the [`INFO`](tracing::Level::INFO)
     Verbose,
 
-    /// Enables a more verbose tracing format and emits ruff and red_knot events up to [`LogLevel::Debug`] Corresponds to `-vv`
+    /// Enables a more verbose tracing format and emits Ruff and Red Knot events up to [`DEBUG`](tracing::Level::DEBUG) Corresponds to `-vv`
     ExtraVerbose,
 
-    /// Enables all tracing events and uses a tree like output format. Corresponds to `-vvv`.
+    /// Enables all tracing events and uses a tree-like output format. Corresponds to `-vvv`.
     Trace,
 }
 
@@ -145,6 +145,7 @@ pub(crate) fn setup_tracing(level: VerbosityLevel) -> anyhow::Result<TracingGuar
     })
 }
 
+#[allow(clippy::type_complexity)]
 fn setup_profile<S>() -> (
     Option<tracing_flame::FlameLayer<S, BufWriter<File>>>,
     Option<tracing_flame::FlushGuard<BufWriter<File>>>,
@@ -208,7 +209,7 @@ where
                 let formatted_level = level.to_string();
                 match *level {
                     tracing::Level::TRACE => {
-                        write!(writer, "{} ", formatted_level.purple().bold())?
+                        write!(writer, "{} ", formatted_level.purple().bold())?;
                     }
                     tracing::Level::DEBUG => write!(writer, "{} ", formatted_level.blue().bold())?,
                     tracing::Level::INFO => write!(writer, "{} ", formatted_level.green().bold())?,

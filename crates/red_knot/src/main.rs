@@ -13,7 +13,7 @@ use ruff_db::program::{ProgramSettings, SearchPathSettings};
 use ruff_db::system::{OsSystem, System, SystemPathBuf};
 use target_version::TargetVersion;
 
-use crate::logging::{setup_tracing, Verbosity, VerbosityLevel};
+use crate::logging::{setup_tracing, Verbosity};
 
 mod logging;
 mod target_version;
@@ -155,7 +155,7 @@ pub fn main() -> anyhow::Result<()> {
     //   cache and load the cache if it exists.
     let mut db = RootDatabase::new(workspace_metadata, program_settings, system);
 
-    let (main_loop, main_loop_cancellation_token) = MainLoop::new(verbosity);
+    let (main_loop, main_loop_cancellation_token) = MainLoop::new();
 
     // Listen to Ctrl+C and abort the watch mode.
     let main_loop_cancellation_token = Mutex::new(Some(main_loop_cancellation_token));
@@ -173,6 +173,8 @@ pub fn main() -> anyhow::Result<()> {
         main_loop.run(&mut db);
     };
 
+    tracing::trace!("Counts for entire CLI run :\n{}", countme::get_all());
+
     std::mem::forget(db);
 
     Ok(())
@@ -187,12 +189,10 @@ struct MainLoop {
 
     /// The file system watcher, if running in watch mode.
     watcher: Option<WorkspaceWatcher>,
-
-    verbosity: VerbosityLevel,
 }
 
 impl MainLoop {
-    fn new(verbosity: VerbosityLevel) -> (Self, MainLoopCancellationToken) {
+    fn new() -> (Self, MainLoopCancellationToken) {
         let (sender, receiver) = crossbeam_channel::bounded(10);
 
         (
@@ -200,13 +200,13 @@ impl MainLoop {
                 sender: sender.clone(),
                 receiver,
                 watcher: None,
-                verbosity,
             },
             MainLoopCancellationToken { sender },
         )
     }
 
     fn watch(mut self, db: &mut RootDatabase) -> anyhow::Result<()> {
+        tracing::debug!("Starting watch mode");
         let sender = self.sender.clone();
         let watcher = watch::directory_watcher(move |event| {
             sender.send(MainLoopMessage::ApplyChanges(event)).unwrap();
@@ -214,26 +214,27 @@ impl MainLoop {
 
         self.watcher = Some(WorkspaceWatcher::new(watcher, db));
 
-        let is_trace = self.verbosity.is_trace();
         self.run(db);
-
-        if is_trace {
-            eprintln!("Exit");
-            eprintln!("{}", countme::get_all());
-        }
 
         Ok(())
     }
 
-    #[allow(clippy::print_stderr)]
     fn run(mut self, db: &mut RootDatabase) {
-        // Schedule the first check.
         self.sender.send(MainLoopMessage::CheckWorkspace).unwrap();
+
+        self.main_loop(db);
+
+        tracing::debug!("Exiting main loop");
+    }
+
+    #[allow(clippy::print_stderr)]
+    fn main_loop(&mut self, db: &mut RootDatabase) {
+        // Schedule the first check.
+        tracing::debug!("Starting main loop");
+
         let mut revision = 0usize;
 
         while let Ok(message) = self.receiver.recv() {
-            tracing::trace!("Main Loop: Tick");
-
             match message {
                 MainLoopMessage::CheckWorkspace => {
                     let db = db.snapshot();
@@ -257,15 +258,15 @@ impl MainLoop {
                 } => {
                     if check_revision == revision {
                         eprintln!("{}", result.join("\n"));
-
-                        if self.verbosity.is_trace() {
-                            eprintln!("{}", countme::get_all());
-                        }
+                    } else {
+                        tracing::debug!("Discarding check result for outdated revision: current: {revision}, result revision: {check_revision}");
                     }
 
                     if self.watcher.is_none() {
                         return;
                     }
+
+                    tracing::trace!("Counts after last check:\n{}", countme::get_all());
                 }
 
                 MainLoopMessage::ApplyChanges(changes) => {
@@ -281,6 +282,8 @@ impl MainLoop {
                     return;
                 }
             }
+
+            tracing::debug!("Waiting for next main loop message.");
         }
     }
 }

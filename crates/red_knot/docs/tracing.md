@@ -47,6 +47,20 @@ RED_KNOT_LOG="red_knot_python_semantic::types"
 
 Note: Ensure that you use `-vvv` to see tracing spans.
 
+#### Show messages for a single file
+
+Shows all messages that are inside of a span for a specific file.
+
+```bash
+RED_KNOT_LOG=red_knot[{file=/home/micha/astral/test/x.py}]=trace
+```
+
+**Note**: Tracing still shows all spans because tracing can't know at the time of entering the span
+whether one if its children has the file `x.py`.
+
+**Note**: Salsa currently logs the entire memoized values. In our case, the source text and parsed AST.
+This very quickly leads to extremely long outputs.
+
 ## Tracing and Salsa
 
 Be mindful about using `tracing` in Salsa queries, especially when using `warn` or `error` because it isn't guaranteed

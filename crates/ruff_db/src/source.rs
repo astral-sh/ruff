@@ -14,7 +14,7 @@ use crate::Db;
 #[salsa::tracked]
 pub fn source_text(db: &dyn Db, file: File) -> SourceText {
     let path = file.path(db);
-    let _span = tracing::trace_span!("source_text", file=?path).entered();
+    let _span = tracing::trace_span!("source_text", file = %path).entered();
 
     let is_notebook = match path {
         FilePath::System(system) => system.extension().is_some_and(|extension| {

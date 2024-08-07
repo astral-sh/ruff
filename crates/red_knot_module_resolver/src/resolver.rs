@@ -32,9 +32,17 @@ pub(crate) fn resolve_module_query<'db>(
     let name = module_name.name(db);
     let _span = tracing::trace_span!("resolve_module", %name).entered();
 
-    let (search_path, module_file, kind) = resolve_name(db, name)?;
+    let Some((search_path, module_file, kind)) = resolve_name(db, name) else {
+        tracing::debug!("Module '{name}' not found in the search paths.");
+        return None;
+    };
 
     let module = Module::new(name.clone(), kind, search_path, module_file);
+
+    tracing::debug!(
+        "Resolved module '{name}' to '{path}'.",
+        path = module_file.path(db)
+    );
 
     Some(module)
 }

@@ -176,6 +176,8 @@ impl Workspace {
     /// Checks all open files in the workspace and its dependencies.
     #[tracing::instrument(level = "debug", skip_all)]
     pub fn check(self, db: &dyn Db) -> Vec<String> {
+        tracing::debug!("Checking workspace");
+
         let mut result = Vec::new();
 
         if let Some(open_files) = self.open_files(db) {
@@ -274,6 +276,8 @@ impl Package {
 
     #[tracing::instrument(level = "debug", skip(db))]
     pub(crate) fn check(self, db: &dyn Db) -> Vec<String> {
+        tracing::debug!("Checking package {}", self.root(db));
+
         let mut result = Vec::new();
         for file in &self.files(db).read() {
             let diagnostics = check_file(db, file);
@@ -327,6 +331,10 @@ impl Package {
 }
 
 pub(super) fn check_file(db: &dyn Db, file: File) -> Diagnostics {
+    let path = file.path(db);
+    let _span = tracing::debug_span!("check_file", file=%path).entered();
+    tracing::debug!("Checking file {path}");
+
     let mut diagnostics = Vec::new();
     diagnostics.extend_from_slice(lint_syntax(db, file));
     diagnostics.extend_from_slice(lint_semantic(db, file));
