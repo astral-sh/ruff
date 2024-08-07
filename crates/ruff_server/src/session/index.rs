@@ -200,15 +200,19 @@ impl Index {
         workspace_settings: Option<ClientSettings>,
         global_settings: &ClientSettings,
     ) -> crate::Result<()> {
+        if workspace_url.scheme() != "file" {
+            tracing::info!("Ignoring non-file workspace URL: {workspace_url}");
+            return Ok(());
+        }
+        let workspace_path = workspace_url.to_file_path().map_err(|()| {
+            anyhow!("Failed to convert workspace URL to file path: {workspace_url}")
+        })?;
+
         let client_settings = if let Some(workspace_settings) = workspace_settings {
             ResolvedClientSettings::with_workspace(&workspace_settings, global_settings)
         } else {
             ResolvedClientSettings::global(global_settings)
         };
-
-        let workspace_path = workspace_url
-            .to_file_path()
-            .map_err(|()| anyhow!("workspace URL was not a file path!"))?;
 
         let workspace_settings_index = ruff_settings::RuffSettingsIndex::new(
             &workspace_path,
@@ -227,9 +231,9 @@ impl Index {
     }
 
     pub(super) fn close_workspace_folder(&mut self, workspace_url: &Url) -> crate::Result<()> {
-        let workspace_path = workspace_url
-            .to_file_path()
-            .map_err(|()| anyhow!("workspace URL was not a file path!"))?;
+        let workspace_path = workspace_url.to_file_path().map_err(|()| {
+            anyhow!("Failed to convert workspace URL to file path: {workspace_url}")
+        })?;
 
         self.settings.remove(&workspace_path).ok_or_else(|| {
             anyhow!(
