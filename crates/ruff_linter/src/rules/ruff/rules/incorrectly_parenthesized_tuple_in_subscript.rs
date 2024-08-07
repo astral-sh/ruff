@@ -36,16 +36,18 @@ pub struct IncorrectlyParenthesizedTupleInSubscript {
 impl AlwaysFixableViolation for IncorrectlyParenthesizedTupleInSubscript {
     #[derive_message_formats]
     fn message(&self) -> String {
-        match self.prefer_parentheses {
-            true => format!("Use parentheses for tuples in subscripts."),
-            false => format!("Avoid parentheses for tuples in scubscripts."),
+        if self.prefer_parentheses {
+            format!("Use parentheses for tuples in subscripts.")
+        } else {
+            format!("Avoid parentheses for tuples in scubscripts.")
         }
     }
 
     fn fix_title(&self) -> String {
-        match self.prefer_parentheses {
-            true => "Add parentheses around tuple in subscript.".to_string(),
-            false => "Remove parentheses from tuple in subscript.".to_string(),
+        if self.prefer_parentheses {
+            "Add parentheses around tuple in subscript.".to_string()
+        } else {
+            "Remove parentheses from tuple in subscript.".to_string()
         }
     }
 }
@@ -59,11 +61,10 @@ pub(crate) fn subscript_with_parenthesized_tuple(checker: &mut Checker, subscrip
     if tuple_index.parenthesized != prefer_parentheses {
         let locator = checker.locator();
         let source_range = subscript.slice.range();
-        let new_source = match prefer_parentheses {
-            true => {
-                format!("({})", locator.slice(source_range))
-            }
-            false => locator.slice(source_range)[1..source_range.len().to_usize() - 1].to_string(),
+        let new_source = if prefer_parentheses {
+            format!("({})", locator.slice(source_range))
+        } else {
+            locator.slice(source_range)[1..source_range.len().to_usize() - 1].to_string()
         };
         let edit = Edit::range_replacement(new_source, source_range);
         checker.diagnostics.push(
