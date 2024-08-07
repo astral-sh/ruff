@@ -89,6 +89,27 @@ RUF031.py:12:3: RUF031 [*] Avoid parentheses for tuples in scubscripts.
 14 14 | d[tuple(1,2)]
 15 15 | d[tuple(8)]
 
+RUF031.py:13:3: RUF031 [*] Avoid parentheses for tuples in scubscripts.
+   |
+11 | d[(2,4)]
+12 | d[(5,6,7)]
+13 | d[(8,)]
+   |   ^^^^ RUF031
+14 | d[tuple(1,2)]
+15 | d[tuple(8)]
+   |
+   = help: Remove parentheses from tuple argument in `__getitem__` call.
+
+ℹ Safe fix
+10 10 | ]
+11 11 | d[(2,4)]
+12 12 | d[(5,6,7)]
+13    |-d[(8,)]
+   13 |+d[8,]
+14 14 | d[tuple(1,2)]
+15 15 | d[tuple(8)]
+16 16 | d[1,2]
+
 RUF031.py:20:3: RUF031 [*] Avoid parentheses for tuples in scubscripts.
    |
 18 | d[5,6,7]
@@ -126,3 +147,20 @@ RUF031.py:24:5: RUF031 [*] Avoid parentheses for tuples in scubscripts.
 24    |-    (window_position, feature_name)
    24 |+    window_position, feature_name
 25 25 | ] = self._extract_raw_features_from_token
+26 26 | 
+27 27 | d[1,]
+
+RUF031.py:28:3: RUF031 [*] Avoid parentheses for tuples in scubscripts.
+   |
+27 | d[1,]
+28 | d[(1,)]
+   |   ^^^^ RUF031
+   |
+   = help: Remove parentheses from tuple argument in `__getitem__` call.
+
+ℹ Safe fix
+25 25 | ] = self._extract_raw_features_from_token
+26 26 | 
+27 27 | d[1,]
+28    |-d[(1,)]
+   28 |+d[1,]

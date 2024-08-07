@@ -109,3 +109,21 @@ RUF031_prefer_parens.py:21:3: RUF031 [*] Use paentheses for tuples in subscripts
 22 22 | 
 23 23 | token_features[
 24 24 |     (window_position, feature_name)
+
+RUF031_prefer_parens.py:26:3: RUF031 [*] Use paentheses for tuples in subscripts.
+   |
+24 |     (window_position, feature_name)
+25 | ] = self._extract_raw_features_from_token
+26 | d[1,]
+   |   ^^ RUF031
+27 | d[(1,)]
+   |
+   = help: Add parentheses around tuple argument in `__getitem__` call.
+
+ℹ Safe fix
+23 23 | token_features[
+24 24 |     (window_position, feature_name)
+25 25 | ] = self._extract_raw_features_from_token
+26    |-d[1,]
+   26 |+d[(1,)]
+27 27 | d[(1,)]
