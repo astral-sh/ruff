@@ -61,7 +61,7 @@ pub(crate) fn subscript_with_parenthesized_tuple(checker: &mut Checker, subscrip
     let Some(tuple_index) = subscript.slice.as_tuple_expr() else {
         return;
     };
-    if (tuple_index.parenthesized != prefer_parentheses) {
+    if tuple_index.parenthesized != prefer_parentheses {
         let locator = checker.locator();
         let source_range = subscript.slice.range();
         let new_source = match prefer_parentheses {
