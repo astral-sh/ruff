@@ -75,7 +75,7 @@ mod tests {
             Path::new("ruff/RUF031_prefer_parens.py"),
             &LinterSettings {
                 ruff: super::settings::Settings {
-                    parenthesize_tuple_in_getitem: true,
+                    parenthesize_tuple_in_subscript: true,
                 },
                 ..LinterSettings::for_rule(Rule::IncorrectlyParenthesizedTupleInSubscript)
             },

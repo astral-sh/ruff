@@ -2989,13 +2989,15 @@ pub struct RuffOptions {
         parenthesize-tuple-in-getitem = true
         "#
     )]
-    pub parenthesize_tuple_in_getitem: Option<bool>,
+    pub parenthesize_tuple_in_subscript: Option<bool>,
 }
 
 impl RuffOptions {
     pub fn into_settings(self) -> ruff::settings::Settings {
         ruff::settings::Settings {
-            parenthesize_tuple_in_getitem: self.parenthesize_tuple_in_getitem.unwrap_or_default(),
+            parenthesize_tuple_in_subscript: self
+                .parenthesize_tuple_in_subscript
+                .unwrap_or_default(),
         }
     }
 }
