@@ -304,7 +304,6 @@ fn fix_always_false_branch(
                                 ),
                                 indentation,
                                 checker.locator(),
-                                checker.indexer(),
                                 checker.stylist(),
                             )
                             .ok()
@@ -379,7 +378,6 @@ fn fix_always_true_branch(
                             TextRange::new(checker.locator().line_start(start.start()), end.end()),
                             indentation,
                             checker.locator(),
-                            checker.indexer(),
                             checker.stylist(),
                         )
                         .ok()

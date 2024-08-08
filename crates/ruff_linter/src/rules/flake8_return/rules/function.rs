@@ -877,7 +877,6 @@ fn remove_else(
             TextRange::new(else_colon_end, elif_else.end()),
             desired_indentation,
             locator,
-            indexer,
             stylist,
         )?;
 
