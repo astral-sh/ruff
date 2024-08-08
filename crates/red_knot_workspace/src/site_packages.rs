@@ -34,12 +34,17 @@ fn site_packages_dir_from_sys_prefix(
     sys_prefix_path: &SystemPath,
     system: &dyn System,
 ) -> Result<SystemPathBuf, SitePackagesDiscoveryError> {
+    tracing::debug!("Searching for site-packages directory in '{sys_prefix_path}'");
+
     if cfg!(target_os = "windows") {
         let site_packages = sys_prefix_path.join("Lib/site-packages");
-        return system
-            .is_directory(&site_packages)
-            .then_some(site_packages)
-            .ok_or(SitePackagesDiscoveryError::NoSitePackagesDirFound);
+
+        return if system.is_directory(&site_packages) {
+            tracing::debug!("Resolved site-packages directory to '{site_packages}'");
+            Ok(site_packages)
+        } else {
+            Err(SitePackagesDiscoveryError::NoSitePackagesDirFound)
+        };
     }
 
     // In the Python standard library's `site.py` module (used for finding `site-packages`
@@ -72,7 +77,7 @@ fn site_packages_dir_from_sys_prefix(
             continue;
         }
 
-        let path = entry.path();
+        let mut path = entry.into_path();
 
         // The `python3.x` part of the `site-packages` path can't be computed from
         // the `--target-version` the user has passed, as they might be running Python 3.12 locally
@@ -84,21 +89,18 @@ fn site_packages_dir_from_sys_prefix(
         // the `pyvenv.cfg` file anyway, in which case we could switch to that method
         // rather than iterating through the whole directory until we find
         // an entry where the last component of the path starts with `python3.`
-        if !path
-            .components()
-            .next_back()
-            .is_some_and(|last_part| last_part.as_str().starts_with("python3."))
-        {
+        let Some(name) = path.file_name() else {
+            continue;
+        };
+
+        if !name.starts_with("python3.") {
             continue;
         }
 
-        let site_packages_candidate = path.join("site-packages");
-        if system.is_directory(&site_packages_candidate) {
-            tracing::debug!(
-                "Resoled site-packages directory: {}",
-                site_packages_candidate
-            );
-            return Ok(site_packages_candidate);
+        path.push("site-packages");
+        if system.is_directory(&path) {
+            tracing::debug!("Resolved site-packages directory to '{path}'");
+            return Ok(path);
         }
     }
     Err(SitePackagesDiscoveryError::NoSitePackagesDirFound)
@@ -106,7 +108,7 @@ fn site_packages_dir_from_sys_prefix(
 
 #[derive(Debug, thiserror::Error)]
 pub enum SitePackagesDiscoveryError {
-    #[error("Failed to search the virtual environment directory for `site-packages` due to {0}")]
+    #[error("Failed to search the virtual environment directory for `site-packages`")]
     CouldNotReadLibDirectory(#[from] io::Error),
     #[error("Could not find the `site-packages` directory in the virtual environment")]
     NoSitePackagesDirFound,
