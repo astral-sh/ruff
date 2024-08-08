@@ -10,7 +10,9 @@ use ruff_text_size::Ranged;
 use crate::checkers::ast::Checker;
 
 /// ## What it does
-/// Checks for `except` clauses that catch all exceptions.
+/// Checks for `except` clauses that catch all exceptions.  This includes
+/// bare `except`, `except BaseException` and `except Exception`.
+///
 ///
 /// ## Why is this bad?
 /// Overly broad `except` clauses can lead to unexpected behavior, such as
@@ -58,6 +60,7 @@ use crate::checkers::ast::Checker;
 /// ## References
 /// - [Python documentation: The `try` statement](https://docs.python.org/3/reference/compound_stmts.html#the-try-statement)
 /// - [Python documentation: Exception hierarchy](https://docs.python.org/3/library/exceptions.html#exception-hierarchy)
+/// - [PEP8 Programming Recommendations on bare `except`](https://peps.python.org/pep-0008/#programming-recommendations)
 #[violation]
 pub struct BlindExcept {
     name: String,
