@@ -304,6 +304,7 @@ pub(crate) fn adjust_indentation(
     // whitespace _within_ the string.
     let contents = locator.slice(range);
 
+    // If the range has mixed indentation, we will use LibCST as well.
     let mixed_indentation = contents.universal_newlines().any(|line| {
         let trimmed = line.trim_whitespace_start();
         if trimmed.is_empty() {
