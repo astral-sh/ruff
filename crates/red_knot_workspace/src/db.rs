@@ -129,7 +129,18 @@ impl SourceDb for RootDatabase {
 
 #[salsa::db]
 impl salsa::Database for RootDatabase {
-    fn salsa_event(&self, _event: &dyn Fn() -> Event) {}
+    fn salsa_event(&self, event: &dyn Fn() -> Event) {
+        if !tracing::enabled!(tracing::Level::TRACE) {
+            return;
+        }
+
+        let event = event();
+        if matches!(event.kind, salsa::EventKind::WillCheckCancellation { .. }) {
+            return;
+        }
+
+        tracing::trace!("Salsa event: {event:?}");
+    }
 }
 
 #[salsa::db]

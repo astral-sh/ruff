@@ -2154,6 +2154,8 @@ dependencies = [
  "salsa",
  "tempfile",
  "tracing",
+ "tracing-subscriber",
+ "tracing-tree",
  "web-time",
  "zip",
 ]
