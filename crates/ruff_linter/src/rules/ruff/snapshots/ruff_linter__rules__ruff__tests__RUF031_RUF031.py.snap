@@ -174,8 +174,10 @@ RUF031.py:36:3: RUF031 [*] Avoid parentheses for tuples in subscripts.
    |
 34 | # Python <=3.10 to avoid syntax error.
 35 | # https://github.com/astral-sh/ruff/issues/12776
-36 | d[(*foo,bar)] 
+36 | d[(*foo,bar)]
    |   ^^^^^^^^^^ RUF031
+37 | 
+38 | x: dict[str, int]  # tuples inside type annotations should never be altered
    |
    = help: Remove the parentheses.
 
@@ -183,5 +185,8 @@ RUF031.py:36:3: RUF031 [*] Avoid parentheses for tuples in subscripts.
 33 33 | # Should keep these parentheses in
 34 34 | # Python <=3.10 to avoid syntax error.
 35 35 | # https://github.com/astral-sh/ruff/issues/12776
-36    |-d[(*foo,bar)] 
+36    |-d[(*foo,bar)]
    36 |+d[*foo,bar]
+37 37 | 
+38 38 | x: dict[str, int]  # tuples inside type annotations should never be altered
+39 39 |
