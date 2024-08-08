@@ -12,7 +12,7 @@ Finally, install TypeScript dependencies with `npm install`, and run the develop
 
 To run the datastore, which is based on [Workers KV](https://developers.cloudflare.com/workers/runtime-apis/kv/),
 install the [Wrangler CLI](https://developers.cloudflare.com/workers/wrangler/install-and-update/),
-then run `npx wrangler dev --local` from the `./playground/db` directory. Note that the datastore is
+then run `npx wrangler dev --local` from the `./playground/api` directory. Note that the datastore is
 only required to generate shareable URLs for code snippets. The development datastore does not
 require Cloudflare authentication or login, but in turn only persists data locally.
 
