@@ -1,8 +1,7 @@
 use std::panic::RefUnwindSafe;
 use std::sync::Arc;
 
-use red_knot_module_resolver::{vendored_typeshed_stubs, Db as ResolverDb};
-use red_knot_python_semantic::Db as SemanticDb;
+use red_knot_python_semantic::{vendored_typeshed_stubs, Db as SemanticDb};
 use ruff_db::files::{File, Files};
 use ruff_db::program::{Program, ProgramSettings};
 use ruff_db::system::System;
@@ -110,18 +109,6 @@ impl Upcast<dyn SourceDb> for RootDatabase {
     }
 }
 
-impl Upcast<dyn ResolverDb> for RootDatabase {
-    fn upcast(&self) -> &(dyn ResolverDb + 'static) {
-        self
-    }
-    fn upcast_mut(&mut self) -> &mut (dyn ResolverDb + 'static) {
-        self
-    }
-}
-
-#[salsa::db]
-impl ResolverDb for RootDatabase {}
-
 #[salsa::db]
 impl SemanticDb for RootDatabase {}
 
@@ -152,8 +139,7 @@ impl Db for RootDatabase {}
 pub(crate) mod tests {
     use salsa::Event;
 
-    use red_knot_module_resolver::{vendored_typeshed_stubs, Db as ResolverDb};
-    use red_knot_python_semantic::Db as SemanticDb;
+    use red_knot_python_semantic::{vendored_typeshed_stubs, Db as SemanticDb};
     use ruff_db::files::Files;
     use ruff_db::system::{DbWithTestSystem, System, TestSystem};
     use ruff_db::vendored::VendoredFileSystem;
@@ -223,17 +209,6 @@ pub(crate) mod tests {
         }
     }
 
-    impl Upcast<dyn ResolverDb> for TestDb {
-        fn upcast(&self) -> &(dyn ResolverDb + 'static) {
-            self
-        }
-        fn upcast_mut(&mut self) -> &mut (dyn ResolverDb + 'static) {
-            self
-        }
-    }
-
-    #[salsa::db]
-    impl red_knot_module_resolver::Db for TestDb {}
     #[salsa::db]
     impl red_knot_python_semantic::Db for TestDb {}
     #[salsa::db]

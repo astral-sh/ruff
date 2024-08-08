@@ -24,13 +24,14 @@ use rustc_hash::FxHashMap;
 use salsa;
 use salsa::plumbing::AsId;
 
-use red_knot_module_resolver::{resolve_module, ModuleName};
 use ruff_db::files::File;
 use ruff_db::parsed::parsed_module;
 use ruff_python_ast as ast;
 use ruff_python_ast::{ExprContext, TypeParams};
 
 use crate::builtins::builtins_scope;
+use crate::module_name::ModuleName;
+use crate::module_resolver::resolve_module;
 use crate::semantic_index::ast_ids::{HasScopedAstId, HasScopedUseId, ScopedExpressionId};
 use crate::semantic_index::definition::{Definition, DefinitionKind, DefinitionNodeKey};
 use crate::semantic_index::expression::Expression;
@@ -840,9 +841,7 @@ impl<'db> TypeInferenceBuilder<'db> {
     }
 
     fn module_ty_from_name(&self, name: &ast::Identifier) -> Type<'db> {
-        let module_name = ModuleName::new(&name.id);
-        let module =
-            module_name.and_then(|module_name| resolve_module(self.db.upcast(), module_name));
+        let module = ModuleName::new(&name.id).and_then(|name| resolve_module(self.db, name));
         module
             .map(|module| Type::Module(module.file()))
             .unwrap_or(Type::Unbound)
