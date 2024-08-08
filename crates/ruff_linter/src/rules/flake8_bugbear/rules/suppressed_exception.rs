@@ -38,9 +38,9 @@ use crate::checkers::ast::Checker;
 /// - [Python documentation: `raise` statement](https://docs.python.org/3/reference/simple_stmts.html#the-raise-statement)
 ///
 #[violation]
-pub struct SupressedException;
+pub struct SuppressedException;
 
-impl Violation for SupressedException {
+impl Violation for SuppressedException {
     #[derive_message_formats]
     fn message(&self) -> String {
         format!("Caught exception with call to `add_note` not used. Did you forget to `raise` it?")
@@ -91,7 +91,7 @@ fn match_add_note(stmt: &Stmt) -> Option<AddNote> {
 }
 
 // B040
-pub(crate) fn supressed_exception(checker: &mut Checker, handlers: &[ExceptHandler]) {
+pub(crate) fn suppressed_exception(checker: &mut Checker, handlers: &[ExceptHandler]) {
     let mut count_str_references: usize = 0;
     for handler in handlers {
         let ExceptHandler::ExceptHandler(ast::ExceptHandlerExceptHandler { body, name, .. }) =
@@ -163,7 +163,7 @@ pub(crate) fn supressed_exception(checker: &mut Checker, handlers: &[ExceptHandl
                 {
                     checker
                         .diagnostics
-                        .push(Diagnostic::new(SupressedException, exception_name.range()));
+                        .push(Diagnostic::new(SuppressedException, exception_name.range()));
                 }
             } else {
                 return;
