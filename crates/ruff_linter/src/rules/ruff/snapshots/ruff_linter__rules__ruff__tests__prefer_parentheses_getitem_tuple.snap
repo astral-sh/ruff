@@ -117,6 +117,7 @@ RUF031_prefer_parens.py:26:3: RUF031 [*] Use parentheses for tuples in subscript
 26 | d[1,]
    |   ^^ RUF031
 27 | d[(1,)]
+28 | d[()] # empty tuples should be ignored
    |
    = help: Parenthesize the tuple.
 
@@ -127,3 +128,4 @@ RUF031_prefer_parens.py:26:3: RUF031 [*] Use parentheses for tuples in subscript
 26    |-d[1,]
 27 26 | d[(1,)]
    27 |+d[(1,)]
+28 28 | d[()] # empty tuples should be ignored
