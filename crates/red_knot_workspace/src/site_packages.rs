@@ -26,7 +26,7 @@ use ruff_db::system::{System, SystemPath, SystemPathBuf};
 /// `virtualenv` library, and `uv`), was specified by
 /// [the original PEP adding the `venv` module],
 /// and it's one of the few fields that's read by the Python
-/// standard libary's `site.py` module.
+/// standard library's `site.py` module.
 ///
 /// Other values, such as the path to the Python executable or the
 /// base-executable `sys.prefix` value, are either only provided in
@@ -42,9 +42,10 @@ struct PythonHomePath(SystemPathBuf);
 impl PythonHomePath {
     fn new(path: impl AsRef<SystemPath>, system: &dyn System) -> Option<Self> {
         let path = path.as_ref();
-        let canonicalized = system
-            .canonicalize_path(path)
-            .unwrap_or_else(|_| path.to_path_buf());
+        // It's important to resolve symlinks here rather than simply making the path absolute,
+        // since system Python installations often only put symlinks in the "expected"
+        // locations for `home` and `site-packages`
+        let canonicalized = system.canonicalize_path(path).ok()?;
         system
             .is_directory(&canonicalized)
             .then_some(Self(canonicalized))
@@ -84,9 +85,10 @@ struct SysPrefixPath(SystemPathBuf);
 impl SysPrefixPath {
     fn new(unvalidated_path: impl AsRef<SystemPath>, system: &dyn System) -> Option<Self> {
         let unvalidated_path = unvalidated_path.as_ref();
-        let canonicalized = system
-            .canonicalize_path(unvalidated_path)
-            .unwrap_or_else(|_| unvalidated_path.to_path_buf());
+        // It's important to resolve symlinks here rather than simply making the path absolute,
+        // since system Python installations often only put symlinks in the "expected"
+        // locations for `home` and `site-packages`
+        let canonicalized = system.canonicalize_path(unvalidated_path).ok()?;
         system
             .is_directory(&canonicalized)
             .then_some(Self(canonicalized))
@@ -115,6 +117,12 @@ impl fmt::Display for SysPrefixPath {
 }
 
 /// E.g. `12` for Python 3.12.4
+///
+/// Note: this may not represent a Python version that we actually support!
+/// In principle, it's perfectly fine for a user to e.g. pass us the path
+/// to a venv constructed using Python 3.14 for resolving third-party types,
+/// even if we don't yet support Python 3.14, as long as they also pass
+/// e.g. `--target-version=3.12`
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 struct PythonMinorVersion(u8);
 
@@ -155,7 +163,7 @@ fn site_packages_dir_from_sys_prefix(
     venv_minor_version: Option<PythonMinorVersion>,
     system: &dyn System,
 ) -> Result<SystemPathBuf, SitePackagesDiscoveryError> {
-    tracing::debug!("Searching for site-packages directory in {sys_prefix_path:?}");
+    tracing::debug!("Searching for site-packages directory in {sys_prefix_path}");
 
     if cfg!(target_os = "windows") {
         let site_packages = sys_prefix_path.join("Lib/site-packages");
@@ -244,13 +252,13 @@ fn site_packages_dir_from_sys_prefix(
 
 /// The various ways in which parsing a `pyvenv.cfg` file could fail
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum PyvenvCfgParseErrorReason {
+pub enum PyvenvCfgParseErrorKind {
     TooManyEquals { line_number: NonZeroUsize },
     NoHomeKey,
     HomeValueIsNotADirectory,
 }
 
-impl fmt::Display for PyvenvCfgParseErrorReason {
+impl fmt::Display for PyvenvCfgParseErrorKind {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::TooManyEquals { line_number } => {
@@ -271,7 +279,7 @@ pub enum SitePackagesDiscoveryError {
     #[error("--venv-path points to a broken venv with no pyvenv.cfg file")]
     NoPyvenvCfgFile(#[source] io::Error),
     #[error("Failed to parse the pyvenv.cfg file at {0} because {1}")]
-    PyvenvCfgParseError(SystemPathBuf, PyvenvCfgParseErrorReason),
+    PyvenvCfgParseError(SystemPathBuf, PyvenvCfgParseErrorKind),
     #[error("Failed to search the virtual environment directory for `site-packages`")]
     CouldNotReadLibDirectory(#[source] io::Error),
     #[error("Could not find the `site-packages` directory in the virtual environment")]
@@ -305,7 +313,13 @@ impl VirtualEnvironment {
         path: impl Into<SystemPathBuf>,
         system: &dyn System,
     ) -> Result<Self, SitePackagesDiscoveryError> {
-        let path = path.into();
+        Self::new_impl(path.into(), system)
+    }
+
+    fn new_impl(
+        path: SystemPathBuf,
+        system: &dyn System,
+    ) -> Result<Self, SitePackagesDiscoveryError> {
         let Some(venv_path) = SysPrefixPath::new(&path, system) else {
             return Err(SitePackagesDiscoveryError::VenvDirIsNotADirectory(path));
         };
@@ -323,7 +337,7 @@ impl VirtualEnvironment {
 
         // A `pyvenv.cfg` file *looks* like a `.ini` file, but actually isn't valid `.ini` syntax!
         // The Python standard-library's `site` module parses these files by splitting each line on
-        // '=' signs, so that's what we should do as well.
+        // '=' characters, so that's what we should do as well.
         //
         // See also: https://snarky.ca/how-virtual-environments-work/
         for (index, line) in pyvenv_cfg.lines().enumerate() {
@@ -333,7 +347,7 @@ impl VirtualEnvironment {
                     let line_number = index.checked_add(1).and_then(NonZeroUsize::new).unwrap();
                     return Err(SitePackagesDiscoveryError::PyvenvCfgParseError(
                         pyvenv_cfg_path,
-                        PyvenvCfgParseErrorReason::TooManyEquals { line_number },
+                        PyvenvCfgParseErrorKind::TooManyEquals { line_number },
                     ));
                 };
                 let key = key.trim();
@@ -358,7 +372,7 @@ impl VirtualEnvironment {
         let Some(base_executable_home_path) = base_executable_home_path else {
             return Err(SitePackagesDiscoveryError::PyvenvCfgParseError(
                 pyvenv_cfg_path,
-                PyvenvCfgParseErrorReason::NoHomeKey,
+                PyvenvCfgParseErrorKind::NoHomeKey,
             ));
         };
         let Some(base_executable_home_path) =
@@ -366,7 +380,7 @@ impl VirtualEnvironment {
         else {
             return Err(SitePackagesDiscoveryError::PyvenvCfgParseError(
                 pyvenv_cfg_path,
-                PyvenvCfgParseErrorReason::HomeValueIsNotADirectory,
+                PyvenvCfgParseErrorKind::HomeValueIsNotADirectory,
             ));
         };
 
@@ -526,7 +540,7 @@ mod tests {
             venv_result,
             Err(SitePackagesDiscoveryError::PyvenvCfgParseError(
                 path,
-                PyvenvCfgParseErrorReason::TooManyEquals { line_number }
+                PyvenvCfgParseErrorKind::TooManyEquals { line_number }
             ))
             if path == pyvenv_cfg_path && Some(line_number) == NonZeroUsize::new(1)
         ));
@@ -543,7 +557,7 @@ mod tests {
             venv_result,
             Err(SitePackagesDiscoveryError::PyvenvCfgParseError(
                 path,
-                PyvenvCfgParseErrorReason::NoHomeKey
+                PyvenvCfgParseErrorKind::NoHomeKey
             ))
             if path == pyvenv_cfg_path
         ));
@@ -562,7 +576,7 @@ mod tests {
             venv_result,
             Err(SitePackagesDiscoveryError::PyvenvCfgParseError(
                 path,
-                PyvenvCfgParseErrorReason::HomeValueIsNotADirectory
+                PyvenvCfgParseErrorKind::HomeValueIsNotADirectory
             ))
             if path == pyvenv_cfg_path
         ));
