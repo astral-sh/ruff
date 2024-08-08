@@ -27,7 +27,7 @@ mod verbosity;
 #[command(
     author,
     name = "red-knot",
-    about = "A Python type checker, written in Rust"
+    about = "An extremely fast Python type checker."
 )]
 #[command(version)]
 struct Args {
