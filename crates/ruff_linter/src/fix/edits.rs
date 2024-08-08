@@ -302,9 +302,22 @@ pub(crate) fn adjust_indentation(
 ) -> Result<String> {
     // If the range includes a multi-line string, use LibCST to ensure that we don't adjust the
     // whitespace _within_ the string.
-    if indexer.multiline_ranges().intersects(range) || indexer.fstring_ranges().intersects(range) {
-        let contents = locator.slice(range);
+    let contents = locator.slice(range);
 
+    let mixed_indentation = contents.universal_newlines().any(|line| {
+        let trimmed = line.trim_whitespace_start();
+        if trimmed.is_empty() {
+            return false;
+        }
+
+        let line_indentation: &str = &line[..line.len() - trimmed.len()];
+        line_indentation.contains('\t') && line_indentation.contains(' ')
+    });
+
+    if mixed_indentation
+        || indexer.multiline_ranges().intersects(range)
+        || indexer.fstring_ranges().intersects(range)
+    {
         let module_text = format!("def f():{}{contents}", stylist.line_ending().as_str());
 
         let mut tree = match_statement(&module_text)?;
@@ -322,7 +335,6 @@ pub(crate) fn adjust_indentation(
         Ok(module_text)
     } else {
         // Otherwise, we can do a simple adjustment ourselves.
-        let contents = locator.slice(range);
         Ok(dedent_to(contents, indentation))
     }
 }
