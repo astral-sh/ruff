@@ -85,7 +85,6 @@ pub fn main() -> ExitCode {
     match run(args) {
         Ok(code) => code.into(),
         Err(err) => {
-            #[allow(clippy::print_stderr)]
             {
                 use std::io::Write;
 
