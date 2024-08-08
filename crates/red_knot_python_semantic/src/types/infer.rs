@@ -50,7 +50,7 @@ use crate::Db;
 pub(crate) fn infer_scope_types<'db>(db: &'db dyn Db, scope: ScopeId<'db>) -> TypeInference<'db> {
     let file = scope.file(db);
     let _span =
-        tracing::trace_span!("infer_scope_types", scope=?scope.as_id(), file=?file.path(db))
+        tracing::trace_span!("infer_scope_types", scope=?scope.as_id(), file=%file.path(db))
             .entered();
 
     // Using the index here is fine because the code below depends on the AST anyway.
@@ -83,7 +83,7 @@ pub(crate) fn infer_definition_types<'db>(
     let _span = tracing::trace_span!(
         "infer_definition_types",
         definition = ?definition.as_id(),
-        file = ?file.path(db)
+        file = %file.path(db)
     )
     .entered();
 
@@ -104,7 +104,7 @@ pub(crate) fn infer_expression_types<'db>(
 ) -> TypeInference<'db> {
     let file = expression.file(db);
     let _span =
-        tracing::trace_span!("infer_expression_types", expression=?expression.as_id(), file=?file.path(db))
+        tracing::trace_span!("infer_expression_types", expression=?expression.as_id(), file=%file.path(db))
             .entered();
 
     let index = semantic_index(db, file);

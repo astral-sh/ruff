@@ -1482,11 +1482,11 @@ dependencies = [
 
 [[package]]
 name = "nu-ansi-term"
-version = "0.50.0"
+version = "0.50.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "dd2800e1520bdc966782168a627aa5d1ad92e33b984bf7c7615d31280c83ff14"
+checksum = "d4a28e057d01f97e61255210fcff094d74ed0466038633e95017f5beb68e4399"
 dependencies = [
- "windows-sys 0.48.0",
+ "windows-sys 0.52.0",
 ]
 
 [[package]]
@@ -1860,7 +1860,9 @@ name = "red_knot"
 version = "0.0.0"
 dependencies = [
  "anyhow",
+ "chrono",
  "clap",
+ "colored",
  "countme",
  "crossbeam",
  "ctrlc",
@@ -1873,6 +1875,7 @@ dependencies = [
  "salsa",
  "tempfile",
  "tracing",
+ "tracing-flame",
  "tracing-subscriber",
  "tracing-tree",
 ]
@@ -3226,6 +3229,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "tracing-flame"
+version = "0.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "0bae117ee14789185e129aaee5d93750abe67fdc5a9a62650452bfe4e122a3a9"
+dependencies = [
+ "lazy_static",
+ "tracing",
+ "tracing-subscriber",
+]
+
+[[package]]
 name = "tracing-indicatif"
 version = "0.3.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3272,7 +3286,7 @@ version = "0.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f459ca79f1b0d5f71c54ddfde6debfc59c8b6eeb46808ae492077f739dc7b49c"
 dependencies = [
- "nu-ansi-term 0.50.0",
+ "nu-ansi-term 0.50.1",
  "tracing-core",
  "tracing-log",
  "tracing-subscriber",

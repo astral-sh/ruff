@@ -94,6 +94,10 @@ fn site_packages_dir_from_sys_prefix(
 
         let site_packages_candidate = path.join("site-packages");
         if system.is_directory(&site_packages_candidate) {
+            tracing::debug!(
+                "Resoled site-packages directory: {}",
+                site_packages_candidate
+            );
             return Ok(site_packages_candidate);
         }
     }
