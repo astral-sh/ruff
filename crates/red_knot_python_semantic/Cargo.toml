@@ -40,6 +40,7 @@ tempfile = { workspace = true }
 walkdir = { workspace = true }
 zip = { workspace = true }
 ruff_python_parser = { workspace = true }
+ruff_db = { workspace = true, features = ["os"]}
 
 [lints]
 workspace = true
