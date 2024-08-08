@@ -77,7 +77,6 @@ impl Files {
     ///
     /// The operation always succeeds even if the path doesn't exist on disk, isn't accessible or if the path points to a directory.
     /// In these cases, a file with status [`FileStatus::NotFound`] is returned.
-    #[tracing::instrument(level = "trace", skip(self, db))]
     fn system(&self, db: &dyn Db, path: &SystemPath) -> File {
         let absolute = SystemPath::absolute(path, db.system().current_directory());
 
@@ -86,6 +85,8 @@ impl Files {
             .system_by_path
             .entry(absolute.clone())
             .or_insert_with(|| {
+                tracing::trace!("Adding file {path}");
+
                 let metadata = db.system().path_metadata(path);
                 let durability = self
                     .root(db, path)
@@ -118,7 +119,6 @@ impl Files {
 
     /// Looks up a vendored file by its path. Returns `Some` if a vendored file for the given path
     /// exists and `None` otherwise.
-    #[tracing::instrument(level = "trace", skip(self, db))]
     fn vendored(&self, db: &dyn Db, path: &VendoredPath) -> Result<File, FileError> {
         let file = match self.inner.vendored_by_path.entry(path.to_path_buf()) {
             Entry::Occupied(entry) => *entry.get(),
@@ -131,6 +131,7 @@ impl Files {
                     Err(_) => return Err(FileError::NotFound),
                 };
 
+                tracing::trace!("Adding vendored file {}", path);
                 let file = File::builder(FilePath::Vendored(path.to_path_buf()))
                     .permissions(Some(0o444))
                     .revision(metadata.revision())
@@ -151,12 +152,13 @@ impl Files {
     /// For a non-existing file, creates a new salsa [`File`] ingredient and stores it for future lookups.
     ///
     /// The operations fails if the system failed to provide a metadata for the path.
-    #[tracing::instrument(level = "trace", skip(self, db), ret)]
     pub fn add_virtual_file(&self, db: &dyn Db, path: &SystemVirtualPath) -> Option<File> {
         let file = match self.inner.system_virtual_by_path.entry(path.to_path_buf()) {
             Entry::Occupied(entry) => *entry.get(),
             Entry::Vacant(entry) => {
                 let metadata = db.system().virtual_path_metadata(path).ok()?;
+
+                tracing::trace!("Adding virtual file {}", path);
 
                 let file = File::builder(FilePath::SystemVirtual(path.to_path_buf()))
                     .revision(metadata.revision())
@@ -207,9 +209,9 @@ impl Files {
     /// Refreshing the state of every file under `path` is expensive. It requires iterating over all known files
     /// and making system calls to get the latest status of each file in `path`.
     /// That's why [`File::sync_path`] and [`File::sync_path`] is preferred if it is known that the path is a file.
-    #[tracing::instrument(level = "debug", skip(db))]
     pub fn sync_recursively(db: &mut dyn Db, path: &SystemPath) {
         let path = SystemPath::absolute(path, db.system().current_directory());
+        tracing::debug!("Syncing all files in {path}");
 
         let inner = Arc::clone(&db.files().inner);
         for entry in inner.system_by_path.iter_mut() {
@@ -237,8 +239,8 @@ impl Files {
     /// # Performance
     /// Refreshing the state of every file is expensive. It requires iterating over all known files and
     /// issuing a system call to get the latest status of each file.
-    #[tracing::instrument(level = "debug", skip(db))]
     pub fn sync_all(db: &mut dyn Db) {
+        tracing::debug!("Syncing all files");
         let inner = Arc::clone(&db.files().inner);
         for entry in inner.system_by_path.iter_mut() {
             File::sync_system_path(db, entry.key(), Some(*entry.value()));
@@ -350,7 +352,6 @@ impl File {
     }
 
     /// Refreshes the file metadata by querying the file system if needed.
-    #[tracing::instrument(level = "debug", skip(db))]
     pub fn sync_path(db: &mut dyn Db, path: &SystemPath) {
         let absolute = SystemPath::absolute(path, db.system().current_directory());
         Files::touch_root(db, &absolute);
@@ -358,7 +359,6 @@ impl File {
     }
 
     /// Syncs the [`File`]'s state with the state of the file on the system.
-    #[tracing::instrument(level = "debug", skip(db))]
     pub fn sync(self, db: &mut dyn Db) {
         let path = self.path(db).clone();
 
@@ -413,16 +413,19 @@ impl File {
         let durability = durability.unwrap_or_default();
 
         if file.status(db) != status {
+            tracing::debug!("Updating the status of {}", file.path(db),);
             file.set_status(db).with_durability(durability).to(status);
         }
 
         if file.revision(db) != revision {
+            tracing::debug!("Updating the revision of {}", file.path(db));
             file.set_revision(db)
                 .with_durability(durability)
                 .to(revision);
         }
 
         if file.permissions(db) != permission {
+            tracing::debug!("Updating the permissions of {}", file.path(db),);
             file.set_permissions(db)
                 .with_durability(durability)
                 .to(permission);

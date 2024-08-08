@@ -45,10 +45,12 @@ pub(crate) enum VerbosityLevel {
     /// Default output level. Only shows Ruff and Red Knot events up to the [`WARN`](tracing::Level::WARN).
     Default,
 
-    /// Enables verbose output. Emits Ruff and Red Knot events up to the [`INFO`](tracing::Level::INFO)
+    /// Enables verbose output. Emits Ruff and Red Knot events up to the [`INFO`](tracing::Level::INFO).
+    /// Corresponds to `-v`.
     Verbose,
 
-    /// Enables a more verbose tracing format and emits Ruff and Red Knot events up to [`DEBUG`](tracing::Level::DEBUG) Corresponds to `-vv`
+    /// Enables a more verbose tracing format and emits Ruff and Red Knot events up to [`DEBUG`](tracing::Level::DEBUG).
+    /// Corresponds to `-vv`
     ExtraVerbose,
 
     /// Enables all tracing events and uses a tree-like output format. Corresponds to `-vvv`.

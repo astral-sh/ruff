@@ -1,7 +1,7 @@
 # Tracing
 
 Traces are a useful tool to narrow down the location of a bug or, at least, to understand why the compiler is doing a particular thing.
-Note, tracing messages with severity `debug`..`error` are user-facing. They should be phrased accordingly.
+Note, tracing messages with severity `debug` or greater are user-facing. They should be phrased accordingly.
 Tracing spans are only shown when using `-vvv`.
 
 ## Verbosity levels

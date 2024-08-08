@@ -120,8 +120,8 @@ impl Workspace {
         self.package_tree(db).values().copied()
     }
 
-    #[tracing::instrument(skip_all)]
     pub fn reload(self, db: &mut dyn Db, metadata: WorkspaceMetadata) {
+        tracing::debug!("Reloading workspace");
         assert_eq!(self.root(db), metadata.root());
 
         let mut old_packages = self.package_tree(db).clone();
@@ -145,7 +145,6 @@ impl Workspace {
             .to(new_packages);
     }
 
-    #[tracing::instrument(level = "debug", skip_all)]
     pub fn update_package(self, db: &mut dyn Db, metadata: PackageMetadata) -> anyhow::Result<()> {
         let path = metadata.root().to_path_buf();
 
@@ -196,16 +195,18 @@ impl Workspace {
     /// Opens a file in the workspace.
     ///
     /// This changes the behavior of `check` to only check the open files rather than all files in the workspace.
-    #[tracing::instrument(level = "debug", skip(self, db))]
     pub fn open_file(self, db: &mut dyn Db, file: File) {
+        tracing::debug!("Opening file {}", file.path(db));
+
         let mut open_files = self.take_open_files(db);
         open_files.insert(file);
         self.set_open_files(db, open_files);
     }
 
     /// Closes a file in the workspace.
-    #[tracing::instrument(level = "debug", skip(self, db))]
     pub fn close_file(self, db: &mut dyn Db, file: File) -> bool {
+        tracing::debug!("Closing file {}", file.path(db));
+
         let mut open_files = self.take_open_files(db);
         let removed = open_files.remove(&file);
 
@@ -226,6 +227,8 @@ impl Workspace {
     /// This changes the behavior of `check` to only check the open files rather than all files in the workspace.
     #[tracing::instrument(level = "debug", skip(self, db))]
     pub fn set_open_files(self, db: &mut dyn Db, open_files: FxHashSet<File>) {
+        tracing::debug!("Set open workspace files (count: {})", open_files.len());
+
         self.set_open_fileset(db).to(Some(Arc::new(open_files)));
     }
 
@@ -233,6 +236,8 @@ impl Workspace {
     ///
     /// This changes the behavior of `check` to check all files in the workspace instead of just the open files.
     pub fn take_open_files(self, db: &mut dyn Db) -> FxHashSet<File> {
+        tracing::debug!("Take open workspace files");
+
         // Salsa will cancel any pending queries and remove its own reference to `open_files`
         // so that the reference counter to `open_files` now drops to 1.
         let open_files = self.set_open_fileset(db).to(None);
@@ -258,6 +263,12 @@ impl Package {
 
     #[tracing::instrument(level = "debug", skip(db))]
     pub fn remove_file(self, db: &mut dyn Db, file: File) {
+        tracing::debug!(
+            "Remove file {} from package {}",
+            file.path(db),
+            self.name(db)
+        );
+
         let Some(mut index) = PackageFiles::indexed_mut(db, self) else {
             return;
         };
@@ -265,8 +276,9 @@ impl Package {
         index.remove(file);
     }
 
-    #[tracing::instrument(level = "debug", skip(db))]
     pub fn add_file(self, db: &mut dyn Db, file: File) {
+        tracing::debug!("Add file {} to package {}", file.path(db), self.name(db));
+
         let Some(mut index) = PackageFiles::indexed_mut(db, self) else {
             return;
         };
@@ -290,10 +302,12 @@ impl Package {
     /// Returns the files belonging to this package.
     #[salsa::tracked]
     pub fn files(self, db: &dyn Db) -> IndexedFiles {
+        let _entered = tracing::debug_span!("files").entered();
         let files = self.file_set(db);
 
         let indexed = match files.get() {
             Index::Lazy(vacant) => {
+                tracing::debug!("Indexing files for package {}", self.name(db));
                 let files = discover_package_files(db, self.root(db));
                 vacant.set(files)
             }
@@ -321,8 +335,9 @@ impl Package {
         }
     }
 
-    #[tracing::instrument(level = "debug", skip(db))]
     pub fn reload_files(self, db: &mut dyn Db) {
+        tracing::debug!("Reload files for package {}", self.name(db));
+
         if !self.file_set(db).is_lazy() {
             // Force a re-index of the files in the next revision.
             self.set_file_set(db).to(PackageFiles::lazy());
