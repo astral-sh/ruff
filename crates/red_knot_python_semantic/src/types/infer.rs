@@ -28,8 +28,7 @@ use salsa::plumbing::AsId;
 
 use ruff_db::files::File;
 use ruff_db::parsed::parsed_module;
-use ruff_python_ast::{self as ast, UnaryOp};
-use ruff_python_ast::{AnyNodeRef, ExprContext};
+use ruff_python_ast::{self as ast, AnyNodeRef, ExprContext, UnaryOp};
 use ruff_text_size::Ranged;
 
 use crate::builtins::builtins_scope;
@@ -44,7 +43,7 @@ use crate::semantic_index::SemanticIndex;
 use crate::types::diagnostic::{TypeCheckDiagnostic, TypeCheckDiagnostics};
 use crate::types::{
     builtins_symbol_ty_by_name, definitions_ty, global_symbol_ty_by_name, BytesLiteralType,
-    ClassType, FunctionType, Name, StringLiteralType, Type, UnionBuilder,
+    ClassType, FunctionType, StringLiteralType, Type, UnionBuilder,
 };
 use crate::Db;
 
@@ -555,7 +554,7 @@ impl<'db> TypeInferenceBuilder<'db> {
             name,
             type_params: _,
             decorator_list,
-            arguments,
+            arguments: _,
             body: _,
         } = class;
 
@@ -563,21 +562,23 @@ impl<'db> TypeInferenceBuilder<'db> {
             self.infer_decorator(decorator);
         }
 
-        // TODO if there are type params, the bases should be inferred inside that scope (only)
-
-        let bases = arguments
-            .as_deref()
-            .map(|arguments| self.infer_arguments(arguments))
-            .unwrap_or(Vec::new());
-
         let body_scope = self
             .index
             .node_scope(NodeWithScopeRef::Class(class))
             .to_scope_id(self.db, self.file);
 
-        let class_ty = Type::Class(ClassType::new(self.db, name.id.clone(), bases, body_scope));
+        let class_ty = Type::Class(ClassType::new(
+            self.db,
+            name.id.clone(),
+            definition,
+            body_scope,
+        ));
 
         self.types.definitions.insert(definition, class_ty);
+
+        for base in class.bases() {
+            self.infer_expression(base);
+        }
     }
 
     fn infer_if_statement(&mut self, if_statement: &ast::StmtIf) {
@@ -1123,7 +1124,7 @@ impl<'db> TypeInferenceBuilder<'db> {
             asname: _,
         } = alias;
 
-        let member_ty = module_ty.member(self.db, &Name::new(&name.id));
+        let member_ty = module_ty.member(self.db, &ast::name::Name::new(&name.id));
 
         // TODO: What if it's a union where one of the elements is `Unbound`?
         if member_ty.is_unbound() {
@@ -1721,7 +1722,7 @@ impl<'db> TypeInferenceBuilder<'db> {
         } = attribute;
 
         let value_ty = self.infer_expression(value);
-        let member_ty = value_ty.member(self.db, &Name::new(&attr.id));
+        let member_ty = value_ty.member(self.db, &ast::name::Name::new(&attr.id));
 
         match ctx {
             ExprContext::Load => member_ty,
@@ -2259,7 +2260,6 @@ mod tests {
 
         let base_names: Vec<_> = class
             .bases(&db)
-            .iter()
             .map(|base_ty| format!("{}", base_ty.display(&db)))
             .collect();
 
@@ -2814,14 +2814,14 @@ mod tests {
         let Type::Class(c_class) = c_ty else {
             panic!("C is not a Class")
         };
-        let c_bases = c_class.bases(&db);
-        let b_ty = c_bases.first().unwrap();
+        let mut c_bases = c_class.bases(&db);
+        let b_ty = c_bases.next().unwrap();
         let Type::Class(b_class) = b_ty else {
             panic!("B is not a Class")
         };
         assert_eq!(b_class.name(&db), "B");
-        let b_bases = b_class.bases(&db);
-        let a_ty = b_bases.first().unwrap();
+        let mut b_bases = b_class.bases(&db);
+        let a_ty = b_bases.next().unwrap();
         let Type::Class(a_class) = a_ty else {
             panic!("A is not a Class")
         };
@@ -3053,8 +3053,8 @@ mod tests {
         Ok(())
     }
 
-    /// Test that a class's bases can be self-referential; this looks silly but
-    /// a slightly more complex version of tit actually occurs in typeshed: `class str(Sequence[str]): ...`
+    /// Test that a class's bases can be self-referential; this looks silly but a slightly more
+    /// complex version of it actually occurs in typeshed: `class str(Sequence[str]): ...`
     #[test]
     fn cyclical_class_pyi_definition() -> anyhow::Result<()> {
         let mut db = setup_db();
