@@ -20,23 +20,22 @@ use crate::checkers::ast::Checker;
 /// ## Example
 /// ```python
 /// try:
-/// ...
+///     print("hello")
 /// except Exception as e:
-///   e.add_note("...")
+///     e.add_note("test")
 /// ```
 ///
 /// Use instead:
 /// ```python
 /// try:
-/// ...
+///     print("hello")
 /// except Exception as e:
-///   e.add_note("...")
-///   raise e
+///     e.add_note("test")
+///     raise e
 /// ```
 ///
 /// ## References
-/// - [Python documentation: `raise` statement](https://docs.python.org/3/reference/simple_stmts.html#the-raise-statement)
-///
+/// - [Python documentation: `raise`](https://docs.python.org/3/reference/simple_stmts.html#the-raise-statement)
 #[violation]
 pub struct SuppressedException;
 
@@ -90,7 +89,7 @@ fn match_add_note(stmt: &Stmt) -> Option<AddNote> {
     Some(AddNote { receiver })
 }
 
-// B040
+/// B040
 pub(crate) fn suppressed_exception(checker: &mut Checker, handlers: &[ExceptHandler]) {
     let mut count_str_references: usize = 0;
     for handler in handlers {
