@@ -1,8 +1,8 @@
 use ruff_db::program::TargetVersion;
 use ruff_db::vendored::VendoredFileSystem;
 
+use super::typeshed::LazyTypeshedVersions;
 use crate::db::Db;
-use crate::typeshed::LazyTypeshedVersions;
 
 pub(crate) struct ResolverState<'db> {
     pub(crate) db: &'db dyn Db,

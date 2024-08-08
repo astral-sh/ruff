@@ -90,7 +90,7 @@ static VENDORED_VERSIONS: Lazy<TypeshedVersions> = Lazy::new(|| {
 });
 
 #[derive(Debug, PartialEq, Eq, Clone)]
-pub struct TypeshedVersionsParseError {
+pub(crate) struct TypeshedVersionsParseError {
     line_number: Option<NonZeroU16>,
     reason: TypeshedVersionsParseErrorKind,
 }
@@ -123,7 +123,7 @@ impl std::error::Error for TypeshedVersionsParseError {
 }
 
 #[derive(Debug, PartialEq, Eq, Clone)]
-pub enum TypeshedVersionsParseErrorKind {
+pub(super) enum TypeshedVersionsParseErrorKind {
     TooManyLines(NonZeroUsize),
     UnexpectedNumberOfColons,
     InvalidModuleName(String),
@@ -505,7 +505,7 @@ mod tests {
 
     #[test]
     fn typeshed_versions_consistent_with_vendored_stubs() {
-        const VERSIONS_DATA: &str = include_str!("../../vendor/typeshed/stdlib/VERSIONS");
+        const VERSIONS_DATA: &str = include_str!("../../../vendor/typeshed/stdlib/VERSIONS");
         let vendored_typeshed_dir = Path::new("vendor/typeshed").canonicalize().unwrap();
         let vendored_typeshed_versions = TypeshedVersions::from_str(VERSIONS_DATA).unwrap();
 

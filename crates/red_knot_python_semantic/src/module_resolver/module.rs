@@ -3,8 +3,8 @@ use std::sync::Arc;
 
 use ruff_db::files::File;
 
+use super::path::SearchPath;
 use crate::module_name::ModuleName;
-use crate::path::SearchPath;
 
 /// Representation of a Python module.
 #[derive(Clone, PartialEq, Eq)]

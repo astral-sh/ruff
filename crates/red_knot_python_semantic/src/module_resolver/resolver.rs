@@ -8,10 +8,11 @@ use ruff_db::vendored::VendoredPath;
 use rustc_hash::{FxBuildHasher, FxHashSet};
 
 use crate::db::Db;
-use crate::module::{Module, ModuleKind};
 use crate::module_name::ModuleName;
-use crate::path::{ModulePath, SearchPath, SearchPathValidationError};
-use crate::state::ResolverState;
+
+use super::module::{Module, ModuleKind};
+use super::path::{ModulePath, SearchPath, SearchPathValidationError};
+use super::state::ResolverState;
 
 /// Resolves a module name to a module.
 pub fn resolve_module(db: &dyn Db, module_name: ModuleName) -> Option<Module> {
@@ -619,9 +620,9 @@ mod tests {
     use ruff_db::Db;
 
     use crate::db::tests::TestDb;
-    use crate::module::ModuleKind;
     use crate::module_name::ModuleName;
-    use crate::testing::{FileSpec, MockedTypeshed, TestCase, TestCaseBuilder};
+    use crate::module_resolver::module::ModuleKind;
+    use crate::module_resolver::testing::{FileSpec, MockedTypeshed, TestCase, TestCaseBuilder};
 
     use super::*;
 

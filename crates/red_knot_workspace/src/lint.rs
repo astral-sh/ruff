@@ -4,9 +4,8 @@ use std::time::Duration;
 
 use tracing::debug_span;
 
-use red_knot_module_resolver::ModuleName;
 use red_knot_python_semantic::types::Type;
-use red_knot_python_semantic::{HasTy, SemanticModel};
+use red_knot_python_semantic::{HasTy, ModuleName, SemanticModel};
 use ruff_db::files::File;
 use ruff_db::parsed::{parsed_module, ParsedModule};
 use ruff_db::source::{source_text, SourceText};

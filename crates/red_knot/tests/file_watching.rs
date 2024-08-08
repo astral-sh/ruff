@@ -6,7 +6,7 @@ use std::time::Duration;
 use anyhow::{anyhow, Context};
 use salsa::Setter;
 
-use red_knot_module_resolver::{resolve_module, ModuleName};
+use red_knot_python_semantic::{resolve_module, ModuleName};
 use red_knot_workspace::db::RootDatabase;
 use red_knot_workspace::watch;
 use red_knot_workspace::watch::{directory_watcher, WorkspaceWatcher};

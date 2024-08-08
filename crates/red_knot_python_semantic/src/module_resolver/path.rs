@@ -11,8 +11,9 @@ use ruff_db::vendored::{VendoredPath, VendoredPathBuf};
 
 use crate::db::Db;
 use crate::module_name::ModuleName;
-use crate::state::ResolverState;
-use crate::typeshed::{TypeshedVersionsParseError, TypeshedVersionsQueryResult};
+
+use super::state::ResolverState;
+use super::typeshed::{TypeshedVersionsParseError, TypeshedVersionsQueryResult};
 
 /// A path that points to a Python module.
 ///
@@ -427,7 +428,7 @@ impl SearchPath {
                     SearchPathValidationError::VersionsIsADirectory(typeshed)
                 }
             })?;
-        crate::typeshed::parse_typeshed_versions(db, typeshed_versions)
+        super::typeshed::parse_typeshed_versions(db, typeshed_versions)
             .as_ref()
             .map_err(|validation_error| {
                 SearchPathValidationError::VersionsParseError(validation_error.clone())
@@ -623,7 +624,8 @@ mod tests {
     use ruff_db::Db;
 
     use crate::db::tests::TestDb;
-    use crate::testing::{FileSpec, MockedTypeshed, TestCase, TestCaseBuilder};
+
+    use crate::module_resolver::testing::{FileSpec, MockedTypeshed, TestCase, TestCaseBuilder};
 
     use super::*;
 

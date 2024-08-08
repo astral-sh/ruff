@@ -1,19 +1,14 @@
 use std::iter::FusedIterator;
 
-pub use db::Db;
-pub use module::{Module, ModuleKind};
-pub use module_name::ModuleName;
+pub(crate) use module::Module;
 pub use resolver::resolve_module;
 use ruff_db::system::SystemPath;
-pub use typeshed::{
-    vendored_typeshed_stubs, TypeshedVersionsParseError, TypeshedVersionsParseErrorKind,
-};
+pub use typeshed::vendored_typeshed_stubs;
 
-use crate::resolver::{module_resolution_settings, SearchPathIterator};
+use crate::Db;
+use resolver::{module_resolution_settings, SearchPathIterator};
 
-mod db;
 mod module;
-mod module_name;
 mod path;
 mod resolver;
 mod state;
