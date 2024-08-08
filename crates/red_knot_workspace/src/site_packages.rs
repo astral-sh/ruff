@@ -73,6 +73,7 @@ fn site_packages_dir_from_sys_prefix(
         let Ok(entry) = entry_result else {
             continue;
         };
+
         if !entry.file_type().is_directory() {
             continue;
         }
@@ -89,9 +90,9 @@ fn site_packages_dir_from_sys_prefix(
         // the `pyvenv.cfg` file anyway, in which case we could switch to that method
         // rather than iterating through the whole directory until we find
         // an entry where the last component of the path starts with `python3.`
-        let Some(name) = path.file_name() else {
-            continue;
-        };
+        let name = path
+            .file_name()
+            .expect("File name to be non-null because path is guaranteed to be a child of `lib`");
 
         if !name.starts_with("python3.") {
             continue;

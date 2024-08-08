@@ -1,7 +1,12 @@
+use std::process::{ExitCode, Termination};
+use std::sync::Mutex;
+
 use anyhow::{anyhow, Context};
 use clap::Parser;
 use colored::Colorize;
 use crossbeam::channel as crossbeam_channel;
+use salsa::plumbing::ZalsaDatabase;
+
 use red_knot_server::run_server;
 use red_knot_workspace::db::RootDatabase;
 use red_knot_workspace::site_packages::site_packages_dirs_of_venv;
@@ -10,9 +15,6 @@ use red_knot_workspace::watch::WorkspaceWatcher;
 use red_knot_workspace::workspace::WorkspaceMetadata;
 use ruff_db::program::{ProgramSettings, SearchPathSettings};
 use ruff_db::system::{OsSystem, System, SystemPath, SystemPathBuf};
-use salsa::plumbing::ZalsaDatabase;
-use std::process::{ExitCode, Termination};
-use std::sync::Mutex;
 use target_version::TargetVersion;
 
 use crate::logging::{setup_tracing, Verbosity};
@@ -93,7 +95,7 @@ pub fn main() -> ExitStatus {
         // Use `writeln` instead of `eprintln` to avoid panicking when the stderr pipe is broken.
         let mut stderr = std::io::stderr().lock();
 
-        // This communicates that this isn't a linter error but ruff itself hard-errored for
+        // This communicates that this isn't a linter error but Red Knot itself hard-errored for
         // some reason (e.g. failed to resolve the configuration)
         writeln!(stderr, "{}", "ruff failed".red().bold()).ok();
         // Currently we generally only see one error, but e.g. with io errors when resolving
@@ -149,7 +151,7 @@ fn run() -> anyhow::Result<ExitStatus> {
     let system = OsSystem::new(cwd.clone());
     let workspace_metadata = WorkspaceMetadata::from_path(system.current_directory(), &system)?;
 
-    // TODO: Verify the remaining search path settings.
+    // TODO: Verify the remaining search path settings eagerly.
     let site_packages = venv_path
         .map(|venv_path| {
             let venv_path = SystemPath::absolute(venv_path, &cli_base_path);
