@@ -1,7 +1,9 @@
+use std::fmt::Formatter;
 use std::ops::Deref;
 use std::sync::Arc;
 
 use countme::Count;
+use salsa::Accumulator;
 
 use ruff_notebook::Notebook;
 use ruff_python_ast::PySourceType;
@@ -16,7 +18,32 @@ pub fn source_text(db: &dyn Db, file: File) -> SourceText {
     let path = file.path(db);
     let _span = tracing::trace_span!("source_text", file = %path).entered();
 
-    let is_notebook = match path {
+    let kind = if is_notebook(file.path(db)) {
+        SourceTextKind::Notebook(file.read_to_notebook(db).unwrap_or_else(|error| {
+            tracing::debug!("Failed to read notebook {path}: {error}");
+
+            SourceDiagnostic(Arc::new(SourceTextError::FailedToReadNotebook(error))).accumulate(db);
+            Notebook::empty()
+        }))
+    } else {
+        SourceTextKind::Text(file.read_to_string(db).unwrap_or_else(|error| {
+            tracing::debug!("Failed to read file {path}: {error}");
+
+            SourceDiagnostic(Arc::new(SourceTextError::FailedToReadFile(error))).accumulate(db);
+            String::new()
+        }))
+    };
+
+    SourceText {
+        inner: Arc::new(SourceTextInner {
+            kind,
+            count: Count::new(),
+        }),
+    }
+}
+
+fn is_notebook(path: &FilePath) -> bool {
+    match path {
         FilePath::System(system) => system.extension().is_some_and(|extension| {
             PySourceType::try_from_extension(extension) == Some(PySourceType::Ipynb)
         }),
@@ -26,33 +53,6 @@ pub fn source_text(db: &dyn Db, file: File) -> SourceText {
             })
         }
         FilePath::Vendored(_) => false,
-    };
-
-    if is_notebook {
-        // TODO(micha): Proper error handling and emit a diagnostic. Tackle it together with `source_text`.
-        let notebook = file.read_to_notebook(db).unwrap_or_else(|error| {
-            tracing::error!("Failed to load notebook: {error}");
-            Notebook::empty()
-        });
-
-        return SourceText {
-            inner: Arc::new(SourceTextInner {
-                kind: SourceTextKind::Notebook(notebook),
-                count: Count::new(),
-            }),
-        };
-    }
-
-    let content = file.read_to_string(db).unwrap_or_else(|error| {
-        tracing::error!("Failed to load file: {error}");
-        String::default()
-    });
-
-    SourceText {
-        inner: Arc::new(SourceTextInner {
-            kind: SourceTextKind::Text(content),
-            count: Count::new(),
-        }),
     }
 }
 
@@ -124,6 +124,23 @@ struct SourceTextInner {
 enum SourceTextKind {
     Text(String),
     Notebook(Notebook),
+}
+
+#[salsa::accumulator]
+pub struct SourceDiagnostic(Arc<SourceTextError>);
+
+impl std::fmt::Display for SourceDiagnostic {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        std::fmt::Display::fmt(&self.0, f)
+    }
+}
+
+#[derive(Debug, thiserror::Error)]
+pub enum SourceTextError {
+    #[error("Failed to read notebook: {0}`")]
+    FailedToReadNotebook(#[from] ruff_notebook::NotebookError),
+    #[error("Failed to read file: {0}")]
+    FailedToReadFile(#[from] std::io::Error),
 }
 
 /// Computes the [`LineIndex`] for `file`.
