@@ -1,9 +1,11 @@
-use std::process::ExitCode;
+use std::process::{ExitCode, Termination};
 use std::sync::Mutex;
 
+use anyhow::{anyhow, Context};
 use clap::Parser;
 use colored::Colorize;
 use crossbeam::channel as crossbeam_channel;
+use salsa::plumbing::ZalsaDatabase;
 
 use red_knot_server::run_server;
 use red_knot_workspace::db::RootDatabase;
@@ -12,7 +14,7 @@ use red_knot_workspace::watch;
 use red_knot_workspace::watch::WorkspaceWatcher;
 use red_knot_workspace::workspace::WorkspaceMetadata;
 use ruff_db::program::{ProgramSettings, SearchPathSettings};
-use ruff_db::system::{OsSystem, System, SystemPathBuf};
+use ruff_db::system::{OsSystem, System, SystemPath, SystemPathBuf};
 use target_version::TargetVersion;
 
 use crate::logging::{setup_tracing, Verbosity};
@@ -86,30 +88,25 @@ pub enum Command {
 }
 
 #[allow(clippy::print_stdout, clippy::unnecessary_wraps, clippy::print_stderr)]
-pub fn main() -> ExitCode {
-    match run() {
-        Ok(status) => status.into(),
-        Err(error) => {
-            {
-                use std::io::Write;
+pub fn main() -> ExitStatus {
+    run().unwrap_or_else(|error| {
+        use std::io::Write;
 
-                // Use `writeln` instead of `eprintln` to avoid panicking when the stderr pipe is broken.
-                let mut stderr = std::io::stderr().lock();
+        // Use `writeln` instead of `eprintln` to avoid panicking when the stderr pipe is broken.
+        let mut stderr = std::io::stderr().lock();
 
-                // This communicates that this isn't a linter error but ruff itself hard-errored for
-                // some reason (e.g. failed to resolve the configuration)
-                writeln!(stderr, "{}", "ruff failed".red().bold()).ok();
-                // Currently we generally only see one error, but e.g. with io errors when resolving
-                // the configuration it is help to chain errors ("resolving configuration failed" ->
-                // "failed to read file: subdir/pyproject.toml")
-                for cause in error.chain() {
-                    writeln!(stderr, "  {} {cause}", "Cause:".bold()).ok();
-                }
-            }
-
-            ExitStatus::Error.into()
+        // This communicates that this isn't a linter error but Red Knot itself hard-errored for
+        // some reason (e.g. failed to resolve the configuration)
+        writeln!(stderr, "{}", "ruff failed".red().bold()).ok();
+        // Currently we generally only see one error, but e.g. with io errors when resolving
+        // the configuration it is help to chain errors ("resolving configuration failed" ->
+        // "failed to read file: subdir/pyproject.toml")
+        for cause in error.chain() {
+            writeln!(stderr, "  {} {cause}", "Cause:".bold()).ok();
         }
-    }
+
+        ExitStatus::Error
+    })
 }
 
 fn run() -> anyhow::Result<ExitStatus> {
@@ -132,28 +129,43 @@ fn run() -> anyhow::Result<ExitStatus> {
     countme::enable(verbosity.is_trace());
     let _guard = setup_tracing(verbosity)?;
 
-    let cwd = if let Some(cwd) = current_directory {
-        let canonicalized = cwd.as_utf8_path().canonicalize_utf8().unwrap();
-        SystemPathBuf::from_utf8_path_buf(canonicalized)
-    } else {
-        let cwd = std::env::current_dir().unwrap();
-        SystemPathBuf::from_path_buf(cwd).unwrap()
+    // The base path to which all CLI arguments are relative to.
+    let cli_base_path = {
+        let cwd = std::env::current_dir().context("Failed to get the current working directory")?;
+        SystemPathBuf::from_path_buf(cwd).map_err(|path| anyhow!("The current working directory '{}' contains non-unicode characters. Red Knot only supports unicode paths.", path.display()))?
     };
+
+    let cwd = current_directory
+        .map(|cwd| {
+            if cwd.as_std_path().is_dir() {
+                Ok(SystemPath::absolute(&cwd, &cli_base_path))
+            } else {
+                Err(anyhow!(
+                    "Provided current-directory path '{cwd}' is not a directory."
+                ))
+            }
+        })
+        .transpose()?
+        .unwrap_or_else(|| cli_base_path.clone());
 
     let system = OsSystem::new(cwd.clone());
-    let workspace_metadata =
-        WorkspaceMetadata::from_path(system.current_directory(), &system).unwrap();
+    let workspace_metadata = WorkspaceMetadata::from_path(system.current_directory(), &system)?;
 
-    let site_packages = if let Some(venv_path) = venv_path {
-        let venv_path = system.canonicalize_path(&venv_path).unwrap_or(venv_path);
-        assert!(
-            system.is_directory(&venv_path),
-            "Provided venv-path {venv_path} is not a directory!"
-        );
-        site_packages_dirs_of_venv(&venv_path, &system).unwrap()
-    } else {
-        vec![]
-    };
+    // TODO: Verify the remaining search path settings eagerly.
+    let site_packages = venv_path
+        .map(|venv_path| {
+            let venv_path = SystemPath::absolute(venv_path, &cli_base_path);
+
+            if system.is_directory(&venv_path) {
+                Ok(site_packages_dirs_of_venv(&venv_path, &system)?)
+            } else {
+                Err(anyhow!(
+                    "Provided venv-path {venv_path} is not a directory!"
+                ))
+            }
+        })
+        .transpose()?
+        .unwrap_or_default();
 
     // TODO: Respect the settings from the workspace metadata. when resolving the program settings.
     let program_settings = ProgramSettings {
@@ -207,9 +219,9 @@ pub enum ExitStatus {
     Error = 2,
 }
 
-impl From<ExitStatus> for ExitCode {
-    fn from(status: ExitStatus) -> Self {
-        ExitCode::from(status as u8)
+impl Termination for ExitStatus {
+    fn report(self) -> ExitCode {
+        ExitCode::from(self as u8)
     }
 }
 
@@ -262,12 +274,11 @@ impl MainLoop {
         result
     }
 
-    #[allow(clippy::print_stderr)]
     fn main_loop(&mut self, db: &mut RootDatabase) -> ExitStatus {
         // Schedule the first check.
         tracing::debug!("Starting main loop");
 
-        let mut revision = 0usize;
+        let mut revision = 0u64;
 
         while let Ok(message) = self.receiver.recv() {
             match message {
@@ -282,7 +293,7 @@ impl MainLoop {
                             // Send the result back to the main loop for printing.
                             sender
                                 .send(MainLoopMessage::CheckCompleted { result, revision })
-                                .ok();
+                                .unwrap();
                         }
                     });
                 }
@@ -291,17 +302,20 @@ impl MainLoop {
                     result,
                     revision: check_revision,
                 } => {
+                    let has_diagnostics = !result.is_empty();
                     if check_revision == revision {
-                        eprintln!("{}", result.join("\n"));
+                        for diagnostic in result {
+                            tracing::error!("{}", diagnostic);
+                        }
                     } else {
                         tracing::debug!("Discarding check result for outdated revision: current: {revision}, result revision: {check_revision}");
                     }
 
                     if self.watcher.is_none() {
-                        return if result.is_empty() {
-                            ExitStatus::Success
-                        } else {
+                        return if has_diagnostics {
                             ExitStatus::Failure
+                        } else {
+                            ExitStatus::Success
                         };
                     }
 
@@ -318,6 +332,10 @@ impl MainLoop {
                     self.sender.send(MainLoopMessage::CheckWorkspace).unwrap();
                 }
                 MainLoopMessage::Exit => {
+                    // Cancel any pending queries and wait for them to complete.
+                    // TODO: Don't use Salsa internal APIs
+                    //  [Zulip-Thread](https://salsa.zulipchat.com/#narrow/stream/333573-salsa-3.2E0/topic/Expose.20an.20API.20to.20cancel.20other.20queries)
+                    let _ = db.zalsa_mut();
                     return ExitStatus::Success;
                 }
             }
@@ -344,10 +362,7 @@ impl MainLoopCancellationToken {
 #[derive(Debug)]
 enum MainLoopMessage {
     CheckWorkspace,
-    CheckCompleted {
-        result: Vec<String>,
-        revision: usize,
-    },
+    CheckCompleted { result: Vec<String>, revision: u64 },
     ApplyChanges(Vec<watch::ChangeEvent>),
     Exit,
 }
