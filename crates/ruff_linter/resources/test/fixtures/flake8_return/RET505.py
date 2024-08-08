@@ -238,3 +238,9 @@ def indent(x, y, w, z):
   # comment
         c = 3
         return z
+
+def f():
+	if True:
+	 return True
+	else:
+	 return False
