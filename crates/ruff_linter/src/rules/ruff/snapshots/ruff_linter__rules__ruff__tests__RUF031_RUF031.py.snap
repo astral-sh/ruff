@@ -155,6 +155,7 @@ RUF031.py:28:3: RUF031 [*] Avoid parentheses for tuples in subscripts.
 27 | d[1,]
 28 | d[(1,)]
    |   ^^^^ RUF031
+29 | d[()] # empty tuples should be ignored
    |
    = help: Remove the parentheses.
 
@@ -164,3 +165,4 @@ RUF031.py:28:3: RUF031 [*] Avoid parentheses for tuples in subscripts.
 27 27 | d[1,]
 28    |-d[(1,)]
    28 |+d[1,]
+29 29 | d[()] # empty tuples should be ignored

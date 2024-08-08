@@ -25,3 +25,4 @@ token_features[
 ] = self._extract_raw_features_from_token
 d[1,]
 d[(1,)]
+d[()] # empty tuples should be ignored

@@ -6,7 +6,7 @@ use ruff_text_size::Ranged;
 use crate::checkers::ast::Checker;
 
 /// ## What it does
-/// Checks for consistent style regarding whether tuples in subscripts
+/// Checks for consistent style regarding whether nonempty tuples in subscripts
 /// are parenthesized.
 ///
 /// The exact nature of this violation depends on the setting
@@ -20,14 +20,14 @@ use crate::checkers::ast::Checker;
 /// ## Example
 ///
 /// ```python
-/// directions = {(0, 1): "North", (-1, 0): "East", (0, -1): "South", (1, 0): "West"}
+/// directions = {(0, 1): "North", (1, 0): "East", (0, -1): "South", (-1, 0): "West"}
 /// directions[(0, 1)]
 /// ```
 ///
 /// Use instead (with default setting):
 ///
 /// ```python
-/// directions = {(0, 1): "North", (-1, 0): "East", (0, -1): "South", (1, 0): "West"}
+/// directions = {(0, 1): "North", (1, 0): "East", (0, -1): "South", (-1, 0): "West"}
 /// directions[0, 1]
 /// ```
 
@@ -61,7 +61,7 @@ pub(crate) fn subscript_with_parenthesized_tuple(checker: &mut Checker, subscrip
     let Some(tuple_subscript) = subscript.slice.as_tuple_expr() else {
         return;
     };
-    if tuple_subscript.parenthesized == prefer_parentheses {
+    if tuple_subscript.parenthesized == prefer_parentheses || tuple_subscript.elts.is_empty() {
         return;
     }
     let locator = checker.locator();

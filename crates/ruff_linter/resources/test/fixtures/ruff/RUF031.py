@@ -26,3 +26,4 @@ token_features[
 
 d[1,]
 d[(1,)]
+d[()] # empty tuples should be ignored
