@@ -27,7 +27,7 @@ mod verbosity;
 #[command(
     author,
     name = "red-knot",
-    about = "An experimental multifile analysis backend for Ruff"
+    about = "A Python type checker, written in Rust"
 )]
 #[command(version)]
 struct Args {
@@ -67,7 +67,12 @@ to resolve type information for the project's third-party dependencies.",
     )]
     extra_search_path: Vec<SystemPathBuf>,
 
-    #[arg(long, help = "Python version to assume when resolving types", default_value_t = TargetVersion::default(), value_name="VERSION")]
+    #[arg(
+        long,
+        help = "Python version to assume when resolving types",
+        default_value_t = TargetVersion::default(),
+        value_name="VERSION")
+    ]
     target_version: TargetVersion,
 
     #[clap(flatten)]
@@ -97,7 +102,7 @@ pub fn main() -> ExitStatus {
 
         // This communicates that this isn't a linter error but Red Knot itself hard-errored for
         // some reason (e.g. failed to resolve the configuration)
-        writeln!(stderr, "{}", "ruff failed".red().bold()).ok();
+        writeln!(stderr, "{}", "Red Knot failed".red().bold()).ok();
         // Currently we generally only see one error, but e.g. with io errors when resolving
         // the configuration it is help to chain errors ("resolving configuration failed" ->
         // "failed to read file: subdir/pyproject.toml")
@@ -132,7 +137,13 @@ fn run() -> anyhow::Result<ExitStatus> {
     // The base path to which all CLI arguments are relative to.
     let cli_base_path = {
         let cwd = std::env::current_dir().context("Failed to get the current working directory")?;
-        SystemPathBuf::from_path_buf(cwd).map_err(|path| anyhow!("The current working directory '{}' contains non-unicode characters. Red Knot only supports unicode paths.", path.display()))?
+        SystemPathBuf::from_path_buf(cwd)
+            .map_err(|path| {
+                anyhow!(
+                    "The current working directory '{}' contains non-unicode characters. Red Knot only supports unicode paths.",
+                    path.display()
+                )
+            })?
     };
 
     let cwd = current_directory
@@ -308,7 +319,9 @@ impl MainLoop {
                             tracing::error!("{}", diagnostic);
                         }
                     } else {
-                        tracing::debug!("Discarding check result for outdated revision: current: {revision}, result revision: {check_revision}");
+                        tracing::debug!(
+                            "Discarding check result for outdated revision: current: {revision}, result revision: {check_revision}"
+                        );
                     }
 
                     if self.watcher.is_none() {
