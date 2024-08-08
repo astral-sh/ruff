@@ -1,5 +1,43 @@
 # Changelog
 
+## 0.5.7
+
+### Preview features
+
+- \[`flake8-comprehensions`\] Account for list and set comprehensions in `unnecessary-literal-within-tuple-call` (`C409`) ([#12657](https://github.com/astral-sh/ruff/pull/12657))
+- \[`flake8-pyi`\] Add autofix for `future-annotations-in-stub` (`PYI044`) ([#12676](https://github.com/astral-sh/ruff/pull/12676))
+- \[`flake8-return`\] Avoid syntax error when auto-fixing `RET505` with mixed indentation (space and tabs) ([#12740](https://github.com/astral-sh/ruff/pull/12740))
+- \[`pydoclint`\] Add `docstring-missing-yields` (`DOC402`) and `docstring-extraneous-yields` (`DOC403`) ([#12538](https://github.com/astral-sh/ruff/pull/12538))
+- \[`pydoclint`\] Avoid `DOC201` if docstring begins with "Return", "Returns", "Yield", or "Yields" ([#12675](https://github.com/astral-sh/ruff/pull/12675))
+- \[`pydoclint`\] Deduplicate collected exceptions after traversing function bodies (`DOC501`) ([#12642](https://github.com/astral-sh/ruff/pull/12642))
+- \[`pydoclint`\] Ignore `DOC` errors for stub functions ([#12651](https://github.com/astral-sh/ruff/pull/12651))
+- \[`pydoclint`\] Teach rules to understand reraised exceptions as being explicitly raised (`DOC501`, `DOC502`) ([#12639](https://github.com/astral-sh/ruff/pull/12639))
+- \[`ruff`\] Implement `incorrectly-parenthesized-tuple-in-subscript` (`RUF031`) ([#12480](https://github.com/astral-sh/ruff/pull/12480))
+- \[`ruff`\] Mark `RUF023` fix as unsafe if `__slots__` is not a set and the binding is used elsewhere ([#12692](https://github.com/astral-sh/ruff/pull/12692))
+
+### Rule changes
+
+- \[`refurb`\] Add autofix for `implicit-cwd` (`FURB177`) ([#12708](https://github.com/astral-sh/ruff/pull/12708))
+- \[`ruff`\] Add autofix for `zip-instead-of-pairwise` (`RUF007`) ([#12663](https://github.com/astral-sh/ruff/pull/12663))
+- \[`tryceratops`\] Add `BaseException` to `raise-vanilla-class` rule (`TRY002`) ([#12620](https://github.com/astral-sh/ruff/pull/12620))
+
+### Server
+
+- Ignore non-file workspace URL; Ruff will display a warning notification in this case ([#12725](https://github.com/astral-sh/ruff/pull/12725))
+
+### CLI
+
+- Fix cache invalidation for nested `pyproject.toml` files ([#12727](https://github.com/astral-sh/ruff/pull/12727))
+
+### Bug fixes
+
+- \[`flake8-async`\] Fix false positives with multiple `async with` items (`ASYNC100`) ([#12643](https://github.com/astral-sh/ruff/pull/12643))
+- \[`flake8-bandit`\] Avoid false-positives for list concatenations in SQL construction (`S608`) ([#12720](https://github.com/astral-sh/ruff/pull/12720))
+- \[`flake8-bugbear`\] Treat `return` as equivalent to `break` (`B909`) ([#12646](https://github.com/astral-sh/ruff/pull/12646))
+- \[`flake8-comprehensions`\] Set comprehensions not a violation for `sum` in `unnecessary-comprehension-in-call` (`C419`) ([#12691](https://github.com/astral-sh/ruff/pull/12691))
+- \[`flake8-simplify`\] Parenthesize conditions based on precedence when merging if arms (`SIM114`) ([#12737](https://github.com/astral-sh/ruff/pull/12737))
+- \[`pydoclint`\] Try both 'Raises' section styles when convention is unspecified (`DOC501`) ([#12649](https://github.com/astral-sh/ruff/pull/12649))
+
 ## 0.5.6
 
 Ruff 0.5.6 automatically enables linting and formatting of notebooks in *preview mode*.
