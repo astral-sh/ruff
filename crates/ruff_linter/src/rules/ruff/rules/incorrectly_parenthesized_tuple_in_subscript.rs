@@ -64,6 +64,10 @@ pub(crate) fn subscript_with_parenthesized_tuple(checker: &mut Checker, subscrip
     if tuple_subscript.parenthesized == prefer_parentheses || tuple_subscript.elts.is_empty() {
         return;
     }
+    let semantic = checker.semantic();
+    if semantic.in_annotation() || semantic.in_type_definition() {
+        return;
+    }
     let locator = checker.locator();
     let source_range = subscript.slice.range();
     let new_source = if prefer_parentheses {

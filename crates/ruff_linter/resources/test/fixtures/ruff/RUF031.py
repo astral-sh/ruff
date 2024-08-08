@@ -27,3 +27,9 @@ token_features[
 d[1,]
 d[(1,)]
 d[()] # empty tuples should be ignored
+x: dict[str, int]  # tuples inside type annotations should never be altered
+
+import typing
+
+type Y = typing.Literal[1, 2]
+Z: typing.TypeAlias = dict[int, int]
