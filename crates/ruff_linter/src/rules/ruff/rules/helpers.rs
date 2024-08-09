@@ -74,13 +74,17 @@ pub(super) fn has_default_copy_semantics(
     class_def: &ast::StmtClassDef,
     semantic: &SemanticModel,
 ) -> bool {
-    analyze::class::any_qualified_name(class_def, semantic, &|qualified_name| {
-        matches!(
-            qualified_name.segments(),
-            ["pydantic", "BaseModel" | "BaseSettings" | "BaseConfig"]
-                | ["pydantic_settings", "BaseSettings"]
-                | ["msgspec", "Struct"]
-        )
+    analyze::class::any_qualified_name(class_def, semantic, &|expr| {
+        semantic
+            .resolve_qualified_name(map_subscript(expr))
+            .is_some_and(|qualified_name| {
+                matches!(
+                    qualified_name.segments(),
+                    ["pydantic", "BaseModel" | "BaseSettings" | "BaseConfig"]
+                        | ["pydantic_settings", "BaseSettings"]
+                        | ["msgspec", "Struct"]
+                )
+            })
     })
 }
 
