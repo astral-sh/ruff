@@ -1,6 +1,6 @@
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::ExprSubscript;
+use ruff_python_ast::{Expr, ExprSubscript};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
@@ -62,6 +62,9 @@ pub(crate) fn subscript_with_parenthesized_tuple(checker: &mut Checker, subscrip
         return;
     };
     if tuple_subscript.parenthesized == prefer_parentheses || tuple_subscript.elts.is_empty() {
+        return;
+    }
+    if prefer_parentheses & tuple_subscript.elts.iter().any(Expr::is_slice_expr) {
         return;
     }
     let locator = checker.locator();
