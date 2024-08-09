@@ -265,7 +265,7 @@ fn site_packages_directory_from_sys_prefix(
     tracing::debug!("Searching for site-packages directory in {sys_prefix_path}");
 
     if cfg!(target_os = "windows") {
-        let site_packages = sys_prefix_path.join("Lib/site-packages");
+        let site_packages = sys_prefix_path.join(r"Lib\site-packages");
         return system
             .is_directory(&site_packages)
             .then_some(site_packages)
@@ -401,7 +401,11 @@ impl SysPrefixPath {
         // No need to check whether `path.parent()` is a directory:
         // the parent of a canonicalised path that is known to exist
         // is guaranteed to be a directory.
-        path.parent().map(|path| Self(path.to_path_buf()))
+        if cfg!(target_os = "windows") {
+            Some(Self(path.to_path_buf()))
+        } else {
+            path.parent().map(|path| Self(path.to_path_buf()))
+        }
     }
 }
 
