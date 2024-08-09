@@ -106,3 +106,25 @@ def func(self, obj: BytesRep) -> bytes:
             self.error(f"can't resolve buffer '{id}'")
 
     return buffer.data
+
+def func(x):
+    if x == 1:
+        return 1
+    elif False:
+        return 2
+    elif x == 3:
+        return 3
+    elif True:
+        return 4
+    elif x == 5:
+        return 5
+    elif x == 6:
+        return 6
+
+def func():
+    if x:
+        return
+    else:
+        assert x
+
+    print('pop')
