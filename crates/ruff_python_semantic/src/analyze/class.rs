@@ -2,7 +2,7 @@ use rustc_hash::FxHashSet;
 
 use ruff_python_ast as ast;
 use ruff_python_ast::helpers::map_subscript;
-use ruff_python_ast::name::QualifiedName;
+use ruff_python_ast::Expr;
 
 use crate::{BindingId, SemanticModel};
 
@@ -10,21 +10,18 @@ use crate::{BindingId, SemanticModel};
 pub fn any_qualified_name(
     class_def: &ast::StmtClassDef,
     semantic: &SemanticModel,
-    func: &dyn Fn(QualifiedName) -> bool,
+    func: &dyn Fn(&Expr) -> bool,
 ) -> bool {
     fn inner(
         class_def: &ast::StmtClassDef,
         semantic: &SemanticModel,
-        func: &dyn Fn(QualifiedName) -> bool,
+        func: &dyn Fn(&Expr) -> bool,
         seen: &mut FxHashSet<BindingId>,
     ) -> bool {
         class_def.bases().iter().any(|expr| {
             // If the base class itself matches the pattern, then this does too.
             // Ex) `class Foo(BaseModel): ...`
-            if semantic
-                .resolve_qualified_name(map_subscript(expr))
-                .is_some_and(func)
-            {
+            if func(expr) {
                 return true;
             }
 
@@ -100,23 +97,47 @@ pub fn any_super_class(
 
 /// Return `true` if `class_def` is a class that has one or more enum classes in its mro
 pub fn is_enumeration(class_def: &ast::StmtClassDef, semantic: &SemanticModel) -> bool {
-    any_qualified_name(class_def, semantic, &|qualified_name| {
-        matches!(
-            qualified_name.segments(),
-            [
-                "enum",
-                "Enum" | "Flag" | "IntEnum" | "IntFlag" | "StrEnum" | "ReprEnum" | "CheckEnum"
-            ]
-        )
+    any_qualified_name(class_def, semantic, &|expr| {
+        semantic
+            .resolve_qualified_name(map_subscript(expr))
+            .is_some_and(|qualified_name| {
+                matches!(
+                    qualified_name.segments(),
+                    [
+                        "enum",
+                        "Enum"
+                            | "Flag"
+                            | "IntEnum"
+                            | "IntFlag"
+                            | "StrEnum"
+                            | "ReprEnum"
+                            | "CheckEnum"
+                    ]
+                )
+            })
     })
 }
 
 /// Returns `true` if the given class is a metaclass.
 pub fn is_metaclass(class_def: &ast::StmtClassDef, semantic: &SemanticModel) -> bool {
-    any_qualified_name(class_def, semantic, &|qualified_name| {
-        matches!(
-            qualified_name.segments(),
-            ["" | "builtins", "type"] | ["abc", "ABCMeta"] | ["enum", "EnumMeta" | "EnumType"]
-        )
+    any_qualified_name(class_def, semantic, &|expr| match expr {
+        Expr::Call(ast::ExprCall { func, .. }) => {
+            // Ex) `class Foo(type(Protocol)): ...`
+            semantic
+                .resolve_qualified_name(func.as_ref())
+                .is_some_and(|qualified_name| {
+                    matches!(qualified_name.segments(), ["" | "builtins", "type"])
+                })
+        }
+        _ => semantic
+            .resolve_qualified_name(map_subscript(expr))
+            .is_some_and(|qualified_name| {
+                matches!(
+                    qualified_name.segments(),
+                    ["" | "builtins", "type"]
+                        | ["abc", "ABCMeta"]
+                        | ["enum", "EnumMeta" | "EnumType"]
+                )
+            }),
     })
 }
