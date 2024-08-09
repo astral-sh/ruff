@@ -13,6 +13,7 @@ use std::io;
 use std::num::NonZeroUsize;
 use std::ops::Deref;
 
+use red_knot_python_semantic::PythonVersion;
 use ruff_db::system::{System, SystemPath, SystemPathBuf};
 
 /// Abstraction for a Python virtual environment.
@@ -26,7 +27,7 @@ pub struct VirtualEnvironment {
     base_executable_home_path: PythonHomePath,
     include_system_site_packages: bool,
 
-    /// The minor version of the Python executable that was used to create this virtual environment.
+    /// The version of the Python executable that was used to create this virtual environment.
     ///
     /// The Python version is encoded under different keys and in different formats
     /// by different virtual-environment creation tools,
@@ -34,7 +35,7 @@ pub struct VirtualEnvironment {
     /// so it's possible that we might not be able to find this information
     /// in an acceptable format under any of the keys we expect.
     /// This field will be `None` if so.
-    minor_version: Option<PythonMinorVersion>,
+    version: Option<PythonVersion>,
 }
 
 impl VirtualEnvironment {
@@ -141,20 +142,17 @@ impl VirtualEnvironment {
         // created the `pyvenv.cfg` file. Lenient parsing is appropriate here:
         // the file isn't really *invalid* if it doesn't have this key,
         // or if the value doesn't parse according to our expectations.
-        let minor_version = version_info_string.and_then(|version_string| {
+        let version = version_info_string.and_then(|version_string| {
             let mut version_info_parts = version_string.split('.');
-            if version_info_parts.next()? != "3" {
-                return None;
-            }
-            let minor_version_string = version_info_parts.next()?;
-            PythonMinorVersion::from_version_string(minor_version_string)
+            let (major, minor) = (version_info_parts.next()?, version_info_parts.next()?);
+            PythonVersion::try_from((major, minor)).ok()
         });
 
         let metadata = Self {
             venv_path,
             base_executable_home_path,
             include_system_site_packages,
-            minor_version,
+            version,
         };
 
         tracing::trace!("Resolved metadata for virtual environment: {metadata:?}");
@@ -172,13 +170,11 @@ impl VirtualEnvironment {
             venv_path,
             base_executable_home_path,
             include_system_site_packages,
-            minor_version,
+            version,
         } = self;
 
         let mut site_packages_directories = vec![site_packages_directory_from_sys_prefix(
-            venv_path,
-            *minor_version,
-            system,
+            venv_path, *version, system,
         )?];
 
         if *include_system_site_packages {
@@ -189,11 +185,7 @@ impl VirtualEnvironment {
             // or if we fail to resolve the `site-packages` from the `sys.prefix` path,
             // we should probably print a warning but *not* abort type checking
             if let Some(sys_prefix_path) = system_sys_prefix {
-                match site_packages_directory_from_sys_prefix(
-                    &sys_prefix_path,
-                    *minor_version,
-                    system,
-                ) {
+                match site_packages_directory_from_sys_prefix(&sys_prefix_path, *version, system) {
                     Ok(site_packages_directory) => {
                         site_packages_directories.push(site_packages_directory);
                     }
@@ -262,11 +254,11 @@ impl fmt::Display for PyvenvCfgParseErrorKind {
 ///
 /// The location of the `site-packages` directory can vary according to the
 /// Python version that this installation represents. The Python version may
-/// or may not be known at this point, which is why the `python_minor_version`
+/// or may not be known at this point, which is why the `python_version`
 /// parameter is an `Option`.
 fn site_packages_directory_from_sys_prefix(
     sys_prefix_path: &SysPrefixPath,
-    python_minor_version: Option<PythonMinorVersion>,
+    python_version: Option<PythonVersion>,
     system: &dyn System,
 ) -> Result<SystemPathBuf, SitePackagesDiscoveryError> {
     tracing::debug!("Searching for site-packages directory in {sys_prefix_path}");
@@ -306,26 +298,25 @@ fn site_packages_directory_from_sys_prefix(
 
     // If we were able to figure out what Python version this installation is,
     // we should be able to avoid iterating through all items in the `lib/` directory:
-    if let Some(minor_version) = python_minor_version {
-        let expected_path =
-            sys_prefix_path.join(format!("lib/python3.{minor_version}/site-packages"));
+    if let Some(version) = python_version {
+        let expected_path = sys_prefix_path.join(format!("lib/python{version}/site-packages"));
         if system.is_directory(&expected_path) {
             return Ok(expected_path);
         }
-        if minor_version.free_threaded_build_available() {
-            // Nearly the same as `expected_path`, but with an additional `t` after {minor_version}:
+        if version.free_threaded_build_available() {
+            // Nearly the same as `expected_path`, but with an additional `t` after {version}:
             let alternative_path =
-                sys_prefix_path.join(format!("lib/python3.{minor_version}t/site-packages"));
+                sys_prefix_path.join(format!("lib/python{version}t/site-packages"));
             if system.is_directory(&alternative_path) {
                 return Ok(alternative_path);
             }
         }
     }
 
-    // Either we couldn't figure out the minor version before calling this function
+    // Either we couldn't figure out the version before calling this function
     // (e.g., from a `pyvenv.cfg` file if this was a venv),
     // or we couldn't find a `site-packages` folder at the expected location given
-    // the parsed minor version
+    // the parsed version
     //
     // Note: the `python3.x` part of the `site-packages` path can't be computed from
     // the `--target-version` the user has passed, as they might be running Python 3.12 locally
@@ -477,46 +468,6 @@ impl PartialEq<SystemPathBuf> for PythonHomePath {
     }
 }
 
-/// E.g. `12` for Python 3.12.4
-///
-/// Note: this may not represent a Python version that we actually support!
-/// In principle, it's perfectly fine for a user to e.g. pass us the path
-/// to a venv constructed using Python 3.14 for resolving third-party types,
-/// even if we don't yet support Python 3.14, as long as they also pass
-/// e.g. `--target-version=3.12`
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-struct PythonMinorVersion(u8);
-
-impl PythonMinorVersion {
-    fn from_version_string(version_string: &str) -> Option<Self> {
-        version_string.parse().ok().map(Self)
-    }
-
-    const fn free_threaded_build_available(self) -> bool {
-        self.0 >= 13
-    }
-}
-
-impl Deref for PythonMinorVersion {
-    type Target = u8;
-
-    fn deref(&self) -> &Self::Target {
-        &self.0
-    }
-}
-
-impl fmt::Display for PythonMinorVersion {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        self.0.fmt(f)
-    }
-}
-
-impl PartialEq<u8> for PythonMinorVersion {
-    fn eq(&self, other: &u8) -> bool {
-        &self.0 == other
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use ruff_db::system::TestSystem;
@@ -613,11 +564,14 @@ mod tests {
 
             if self.pyvenv_cfg_version_field.is_some() {
                 assert_eq!(
-                    venv.minor_version,
-                    Some(PythonMinorVersion(self.minor_version))
+                    venv.version,
+                    Some(PythonVersion {
+                        major: 3,
+                        minor: self.minor_version
+                    })
                 );
             } else {
-                assert_eq!(venv.minor_version, None);
+                assert_eq!(venv.version, None);
             }
 
             let expected_home = if cfg!(target_os = "windows") {
