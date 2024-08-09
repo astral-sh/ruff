@@ -17,6 +17,7 @@ ruff_python_ast = { workspace = true }
 ruff_python_stdlib = { workspace = true }
 ruff_text_size = { workspace = true }
 
+anyhow = { workspace = true }
 bitflags = { workspace = true }
 camino = { workspace = true }
 compact_str = { workspace = true }
@@ -34,7 +35,7 @@ walkdir = { workspace = true }
 zip = { workspace = true, features = ["zstd", "deflate"] }
 
 [dev-dependencies]
-ruff_db = { workspace = true, features = ["os", "testing"]}
+ruff_db = { workspace = true, features = ["os", "testing"] }
 ruff_python_parser = { workspace = true }
 
 anyhow = { workspace = true }

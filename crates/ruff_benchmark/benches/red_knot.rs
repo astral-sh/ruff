@@ -52,7 +52,7 @@ fn setup_case() -> Case {
         },
     };
 
-    let mut db = RootDatabase::new(metadata, settings, system);
+    let mut db = RootDatabase::new(metadata, settings, system).unwrap();
     let parser = system_path_to_file(&db, parser_path).unwrap();
 
     db.workspace().open_file(&mut db, parser);

@@ -2,11 +2,13 @@ use std::iter::FusedIterator;
 
 pub(crate) use module::Module;
 pub use resolver::resolve_module;
+pub(crate) use resolver::SearchPaths;
 use ruff_db::system::SystemPath;
 pub use typeshed::vendored_typeshed_stubs;
 
+use crate::module_resolver::resolver::search_paths;
 use crate::Db;
-use resolver::{module_resolution_settings, SearchPathIterator};
+use resolver::SearchPathIterator;
 
 mod module;
 mod path;
@@ -20,7 +22,7 @@ mod testing;
 /// Returns an iterator over all search paths pointing to a system path
 pub fn system_module_search_paths(db: &dyn Db) -> SystemModuleSearchPathsIter {
     SystemModuleSearchPathsIter {
-        inner: module_resolution_settings(db).search_paths(db),
+        inner: search_paths(db),
     }
 }
 
