@@ -49,6 +49,10 @@ impl VirtualEnvironment {
         path: SystemPathBuf,
         system: &dyn System,
     ) -> Result<Self, SitePackagesDiscoveryError> {
+        fn pyvenv_cfg_line_number(index: usize) -> NonZeroUsize {
+            index.checked_add(1).and_then(NonZeroUsize::new).unwrap()
+        }
+
         let Some(venv_path) = SysPrefixPath::new(&path, system) else {
             return Err(SitePackagesDiscoveryError::VenvDirIsNotADirectory(path));
         };
@@ -70,17 +74,36 @@ impl VirtualEnvironment {
         //
         // See also: https://snarky.ca/how-virtual-environments-work/
         for (index, line) in pyvenv_cfg.lines().enumerate() {
-            let mut line_split = line.split('=');
-            if let Some(key) = line_split.next() {
-                let (Some(value), None) = (line_split.next(), line_split.next()) else {
-                    let line_number = index.checked_add(1).and_then(NonZeroUsize::new).unwrap();
+            if let Some((key, value)) = line.split_once('=') {
+                let key = key.trim();
+                if key.is_empty() {
                     return Err(SitePackagesDiscoveryError::PyvenvCfgParseError(
                         pyvenv_cfg_path,
-                        PyvenvCfgParseErrorKind::TooManyEquals { line_number },
+                        PyvenvCfgParseErrorKind::MalformedKeyValuePair {
+                            line_number: pyvenv_cfg_line_number(index),
+                        },
                     ));
-                };
-                let key = key.trim();
+                }
+
                 let value = value.trim();
+                if value.is_empty() {
+                    return Err(SitePackagesDiscoveryError::PyvenvCfgParseError(
+                        pyvenv_cfg_path,
+                        PyvenvCfgParseErrorKind::MalformedKeyValuePair {
+                            line_number: pyvenv_cfg_line_number(index),
+                        },
+                    ));
+                }
+
+                if value.contains('=') {
+                    return Err(SitePackagesDiscoveryError::PyvenvCfgParseError(
+                        pyvenv_cfg_path,
+                        PyvenvCfgParseErrorKind::TooManyEquals {
+                            line_number: pyvenv_cfg_line_number(index),
+                        },
+                    ));
+                }
+
                 match key {
                     "include-system-site-packages" => {
                         include_system_site_packages = value.eq_ignore_ascii_case("true");
@@ -211,6 +234,7 @@ pub enum SitePackagesDiscoveryError {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum PyvenvCfgParseErrorKind {
     TooManyEquals { line_number: NonZeroUsize },
+    MalformedKeyValuePair { line_number: NonZeroUsize },
     NoHomeKey,
     HomeValueIsNotADirectory,
 }
@@ -221,6 +245,10 @@ impl fmt::Display for PyvenvCfgParseErrorKind {
             Self::TooManyEquals { line_number } => {
                 write!(f, "line {line_number} has too many '=' characters")
             }
+            Self::MalformedKeyValuePair { line_number } => write!(
+                f,
+                "line {line_number} has a malformed `<key> = <value>` pair"
+            ),
             Self::NoHomeKey => f.write_str("the file does not have a `home` key"),
             Self::HomeValueIsNotADirectory => {
                 f.write_str("the value for the `home` key does not point to a directory on disk")
@@ -554,7 +582,7 @@ mod tests {
     }
 
     #[test]
-    fn parsing_pyvenv_cfg_with_invalid_syntax_fails() {
+    fn parsing_pyvenv_cfg_with_too_many_equals() {
         let system = TestSystem::default();
         let memory_fs = system.memory_file_system();
         let pyvenv_cfg_path = SystemPathBuf::from("/.venv/pyvenv.cfg");
@@ -567,6 +595,42 @@ mod tests {
             Err(SitePackagesDiscoveryError::PyvenvCfgParseError(
                 path,
                 PyvenvCfgParseErrorKind::TooManyEquals { line_number }
+            ))
+            if path == pyvenv_cfg_path && Some(line_number) == NonZeroUsize::new(1)
+        ));
+    }
+
+    #[test]
+    fn parsing_pyvenv_cfg_with_key_but_no_value_fails() {
+        let system = TestSystem::default();
+        let memory_fs = system.memory_file_system();
+        let pyvenv_cfg_path = SystemPathBuf::from("/.venv/pyvenv.cfg");
+        memory_fs.write_file(&pyvenv_cfg_path, "home =").unwrap();
+        let venv_result = VirtualEnvironment::new("/.venv", &system);
+        assert!(matches!(
+            venv_result,
+            Err(SitePackagesDiscoveryError::PyvenvCfgParseError(
+                path,
+                PyvenvCfgParseErrorKind::MalformedKeyValuePair { line_number }
+            ))
+            if path == pyvenv_cfg_path && Some(line_number) == NonZeroUsize::new(1)
+        ));
+    }
+
+    #[test]
+    fn parsing_pyvenv_cfg_with_value_but_no_key_fails() {
+        let system = TestSystem::default();
+        let memory_fs = system.memory_file_system();
+        let pyvenv_cfg_path = SystemPathBuf::from("/.venv/pyvenv.cfg");
+        memory_fs
+            .write_file(&pyvenv_cfg_path, "= whatever")
+            .unwrap();
+        let venv_result = VirtualEnvironment::new("/.venv", &system);
+        assert!(matches!(
+            venv_result,
+            Err(SitePackagesDiscoveryError::PyvenvCfgParseError(
+                path,
+                PyvenvCfgParseErrorKind::MalformedKeyValuePair { line_number }
             ))
             if path == pyvenv_cfg_path && Some(line_number) == NonZeroUsize::new(1)
         ));
