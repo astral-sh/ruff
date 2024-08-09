@@ -28,7 +28,11 @@ pub struct RootDatabase {
 }
 
 impl RootDatabase {
-    pub fn new<S>(workspace: WorkspaceMetadata, settings: ProgramSettings, system: S) -> Self
+    pub fn new<S>(
+        workspace: WorkspaceMetadata,
+        settings: ProgramSettings,
+        system: S,
+    ) -> anyhow::Result<Self>
     where
         S: System + 'static + Send + Sync + RefUnwindSafe,
     {
@@ -41,10 +45,10 @@ impl RootDatabase {
 
         let workspace = Workspace::from_metadata(&db, workspace);
         // Initialize the `Program` singleton
-        Program::from_settings(&db, settings);
+        Program::from_settings(&db, settings)?;
 
         db.workspace = Some(workspace);
-        db
+        Ok(db)
     }
 
     pub fn workspace(&self) -> Workspace {

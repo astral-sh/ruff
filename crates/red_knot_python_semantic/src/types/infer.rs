@@ -1494,6 +1494,7 @@ impl<'db> TypeInferenceBuilder<'db> {
 
 #[cfg(test)]
 mod tests {
+    use anyhow::Context;
     use ruff_db::files::{system_path_to_file, File};
     use ruff_db::parsed::parsed_module;
     use ruff_db::system::{DbWithTestSystem, SystemPathBuf};
@@ -1508,40 +1509,58 @@ mod tests {
     use crate::semantic_index::symbol::FileScopeId;
     use crate::semantic_index::{global_scope, semantic_index, symbol_table, use_def_map};
     use crate::types::{global_symbol_ty_by_name, infer_definition_types, symbol_ty_by_name, Type};
-    use crate::{HasTy, SemanticModel};
+    use crate::{HasTy, ProgramSettings, SemanticModel};
 
     fn setup_db() -> TestDb {
         let db = TestDb::new();
 
-        Program::new(
+        let src_root = SystemPathBuf::from("/src");
+        db.memory_file_system()
+            .create_directory_all(&src_root)
+            .unwrap();
+
+        Program::from_settings(
             &db,
-            PythonVersion::default(),
-            SearchPathSettings {
-                extra_paths: Vec::new(),
-                src_root: SystemPathBuf::from("/src"),
-                site_packages: vec![],
-                custom_typeshed: None,
+            ProgramSettings {
+                target_version: PythonVersion::default(),
+                search_paths: SearchPathSettings {
+                    extra_paths: Vec::new(),
+                    src_root,
+                    site_packages: vec![],
+                    custom_typeshed: None,
+                },
             },
-        );
+        )
+        .expect("Valid search path settings");
 
         db
     }
 
-    fn setup_db_with_custom_typeshed(typeshed: &str) -> TestDb {
-        let db = TestDb::new();
+    fn setup_db_with_custom_typeshed<'a>(
+        typeshed: &str,
+        files: impl IntoIterator<Item = (&'a str, &'a str)>,
+    ) -> anyhow::Result<TestDb> {
+        let mut db = TestDb::new();
+        let src_root = SystemPathBuf::from("/src");
 
-        Program::new(
+        db.write_files(files)
+            .context("Failed to write test failes")?;
+
+        Program::from_settings(
             &db,
-            PythonVersion::default(),
-            SearchPathSettings {
-                extra_paths: Vec::new(),
-                src_root: SystemPathBuf::from("/src"),
-                site_packages: vec![],
-                custom_typeshed: Some(SystemPathBuf::from(typeshed)),
+            ProgramSettings {
+                target_version: PythonVersion::default(),
+                search_paths: SearchPathSettings {
+                    extra_paths: Vec::new(),
+                    src_root,
+                    site_packages: vec![],
+                    custom_typeshed: Some(SystemPathBuf::from(typeshed)),
+                },
             },
-        );
+        )
+        .context("Failed to create Program")?;
 
-        db
+        Ok(db)
     }
 
     fn assert_public_ty(db: &TestDb, file_name: &str, symbol_name: &str, expected: &str) {
@@ -2131,16 +2150,17 @@ mod tests {
 
     #[test]
     fn builtin_symbol_custom_stdlib() -> anyhow::Result<()> {
-        let mut db = setup_db_with_custom_typeshed("/typeshed");
-
-        db.write_files([
-            ("/src/a.py", "c = copyright"),
-            (
-                "/typeshed/stdlib/builtins.pyi",
-                "def copyright() -> None: ...",
-            ),
-            ("/typeshed/stdlib/VERSIONS", "builtins: 3.8-"),
-        ])?;
+        let db = setup_db_with_custom_typeshed(
+            "/typeshed",
+            [
+                ("/src/a.py", "c = copyright"),
+                (
+                    "/typeshed/stdlib/builtins.pyi",
+                    "def copyright() -> None: ...",
+                ),
+                ("/typeshed/stdlib/VERSIONS", "builtins: 3.8-"),
+            ],
+        )?;
 
         assert_public_ty(&db, "/src/a.py", "c", "Literal[copyright]");
 
@@ -2160,13 +2180,14 @@ mod tests {
 
     #[test]
     fn unknown_builtin_later_defined() -> anyhow::Result<()> {
-        let mut db = setup_db_with_custom_typeshed("/typeshed");
-
-        db.write_files([
-            ("/src/a.py", "x = foo"),
-            ("/typeshed/stdlib/builtins.pyi", "foo = bar; bar = 1"),
-            ("/typeshed/stdlib/VERSIONS", "builtins: 3.8-"),
-        ])?;
+        let db = setup_db_with_custom_typeshed(
+            "/typeshed",
+            [
+                ("/src/a.py", "x = foo"),
+                ("/typeshed/stdlib/builtins.pyi", "foo = bar; bar = 1"),
+                ("/typeshed/stdlib/VERSIONS", "builtins: 3.8-"),
+            ],
+        )?;
 
         assert_public_ty(&db, "/src/a.py", "x", "Unbound");
 

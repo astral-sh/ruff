@@ -4,13 +4,13 @@ use std::time::Duration;
 
 use tracing::debug_span;
 
-use red_knot_python_semantic::types::Type;
 use red_knot_python_semantic::{HasTy, ModuleName, SemanticModel};
+use red_knot_python_semantic::types::Type;
 use ruff_db::files::File;
 use ruff_db::parsed::{parsed_module, ParsedModule};
 use ruff_db::source::{source_text, SourceText};
 use ruff_python_ast as ast;
-use ruff_python_ast::visitor::{walk_expr, walk_stmt, Visitor};
+use ruff_python_ast::visitor::{Visitor, walk_expr, walk_stmt};
 
 use crate::db::Db;
 
@@ -305,13 +305,13 @@ enum AnyImportRef<'a> {
 
 #[cfg(test)]
 mod tests {
-    use red_knot_python_semantic::{Program, PythonVersion, SearchPathSettings};
+    use red_knot_python_semantic::{Program, ProgramSettings, PythonVersion, SearchPathSettings};
     use ruff_db::files::system_path_to_file;
     use ruff_db::system::{DbWithTestSystem, SystemPathBuf};
 
     use crate::db::tests::TestDb;
 
-    use super::{lint_semantic, Diagnostics};
+    use super::{Diagnostics, lint_semantic};
 
     fn setup_db() -> TestDb {
         setup_db_with_root(SystemPathBuf::from("/src"))
@@ -320,16 +320,23 @@ mod tests {
     fn setup_db_with_root(src_root: SystemPathBuf) -> TestDb {
         let db = TestDb::new();
 
-        Program::new(
+        db.memory_file_system()
+            .create_directory_all(&src_root)
+            .unwrap();
+
+        Program::from_settings(
             &db,
-            PythonVersion::default(),
-            SearchPathSettings {
-                extra_paths: Vec::new(),
-                src_root,
-                site_packages: vec![],
-                custom_typeshed: None,
+            ProgramSettings {
+                target_version: PythonVersion::default(),
+                search_paths: SearchPathSettings {
+                    extra_paths: Vec::new(),
+                    src_root,
+                    site_packages: vec![],
+                    custom_typeshed: None,
+                },
             },
-        );
+        )
+        .expect("Valid program settings");
 
         db
     }
