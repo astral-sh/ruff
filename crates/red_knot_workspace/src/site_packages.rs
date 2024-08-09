@@ -16,6 +16,8 @@ use std::ops::Deref;
 use red_knot_python_semantic::PythonVersion;
 use ruff_db::system::{System, SystemPath, SystemPathBuf};
 
+type SitePackagesDiscoveryResult<T> = Result<T, SitePackagesDiscoveryError>;
+
 /// Abstraction for a Python virtual environment.
 ///
 /// Most of this information is derived from the virtual environment's `pyvenv.cfg` file.
@@ -40,24 +42,18 @@ pub struct VirtualEnvironment {
 
 impl VirtualEnvironment {
     pub fn new(
-        path: impl Into<SystemPathBuf>,
+        path: impl AsRef<SystemPath>,
         system: &dyn System,
-    ) -> Result<Self, SitePackagesDiscoveryError> {
-        Self::new_impl(path.into(), system)
+    ) -> SitePackagesDiscoveryResult<Self> {
+        Self::new_impl(path.as_ref(), system)
     }
 
-    fn new_impl(
-        path: SystemPathBuf,
-        system: &dyn System,
-    ) -> Result<Self, SitePackagesDiscoveryError> {
+    fn new_impl(path: &SystemPath, system: &dyn System) -> SitePackagesDiscoveryResult<Self> {
         fn pyvenv_cfg_line_number(index: usize) -> NonZeroUsize {
             index.checked_add(1).and_then(NonZeroUsize::new).unwrap()
         }
 
-        let Some(venv_path) = SysPrefixPath::new(&path, system) else {
-            return Err(SitePackagesDiscoveryError::VenvDirIsNotADirectory(path));
-        };
-
+        let venv_path = SysPrefixPath::new(path, system)?;
         let pyvenv_cfg_path = venv_path.join("pyvenv.cfg");
         tracing::debug!("Attempting to parse virtual environment metadata at {pyvenv_cfg_path}");
 
@@ -128,14 +124,13 @@ impl VirtualEnvironment {
                 PyvenvCfgParseErrorKind::NoHomeKey,
             ));
         };
-        let Some(base_executable_home_path) =
-            PythonHomePath::new(base_executable_home_path, system)
-        else {
-            return Err(SitePackagesDiscoveryError::PyvenvCfgParseError(
-                pyvenv_cfg_path,
-                PyvenvCfgParseErrorKind::HomeValueIsNotADirectory,
-            ));
-        };
+        let base_executable_home_path = PythonHomePath::new(base_executable_home_path, system)
+            .map_err(|io_err| {
+                SitePackagesDiscoveryError::PyvenvCfgParseError(
+                    pyvenv_cfg_path,
+                    PyvenvCfgParseErrorKind::InvalidHomeValue(io_err),
+                )
+            })?;
 
         // but the `version`/`version_info` key is not read by the standard library,
         // and is provided under different keys depending on which virtual-environment creation tool
@@ -165,7 +160,7 @@ impl VirtualEnvironment {
     pub fn site_packages_directories(
         &self,
         system: &dyn System,
-    ) -> Result<Vec<SystemPathBuf>, SitePackagesDiscoveryError> {
+    ) -> SitePackagesDiscoveryResult<Vec<SystemPathBuf>> {
         let VirtualEnvironment {
             venv_path,
             base_executable_home_path,
@@ -210,6 +205,8 @@ System site-packages will not be used for module resolution.",
 
 #[derive(Debug, thiserror::Error)]
 pub enum SitePackagesDiscoveryError {
+    #[error("Invalid --venv-path argument: {0} could not be canonicalized")]
+    VenvDirCanonicalizationError(SystemPathBuf, #[source] io::Error),
     #[error("Invalid --venv-path argument: {0} does not point to a directory on disk")]
     VenvDirIsNotADirectory(SystemPathBuf),
     #[error("--venv-path points to a broken venv with no pyvenv.cfg file")]
@@ -223,12 +220,12 @@ pub enum SitePackagesDiscoveryError {
 }
 
 /// The various ways in which parsing a `pyvenv.cfg` file could fail
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug)]
 pub enum PyvenvCfgParseErrorKind {
     TooManyEquals { line_number: NonZeroUsize },
     MalformedKeyValuePair { line_number: NonZeroUsize },
     NoHomeKey,
-    HomeValueIsNotADirectory,
+    InvalidHomeValue(io::Error),
 }
 
 impl fmt::Display for PyvenvCfgParseErrorKind {
@@ -242,8 +239,12 @@ impl fmt::Display for PyvenvCfgParseErrorKind {
                 "line {line_number} has a malformed `<key> = <value>` pair"
             ),
             Self::NoHomeKey => f.write_str("the file does not have a `home` key"),
-            Self::HomeValueIsNotADirectory => {
-                f.write_str("the value for the `home` key does not point to a directory on disk")
+            Self::InvalidHomeValue(io_err) => {
+                write!(
+                    f,
+                    "the following error was encountered \
+when trying to resolve the `home` value to a directory on disk: {io_err}"
+                )
             }
         }
     }
@@ -260,7 +261,7 @@ fn site_packages_directory_from_sys_prefix(
     sys_prefix_path: &SysPrefixPath,
     python_version: Option<PythonVersion>,
     system: &dyn System,
-) -> Result<SystemPathBuf, SitePackagesDiscoveryError> {
+) -> SitePackagesDiscoveryResult<SystemPathBuf> {
     tracing::debug!("Searching for site-packages directory in {sys_prefix_path}");
 
     if cfg!(target_os = "windows") {
@@ -372,15 +373,28 @@ fn site_packages_directory_from_sys_prefix(
 pub struct SysPrefixPath(SystemPathBuf);
 
 impl SysPrefixPath {
-    fn new(unvalidated_path: impl AsRef<SystemPath>, system: &dyn System) -> Option<Self> {
+    fn new(
+        unvalidated_path: impl AsRef<SystemPath>,
+        system: &dyn System,
+    ) -> SitePackagesDiscoveryResult<Self> {
         let unvalidated_path = unvalidated_path.as_ref();
         // It's important to resolve symlinks here rather than simply making the path absolute,
         // since system Python installations often only put symlinks in the "expected"
         // locations for `home` and `site-packages`
-        let canonicalized = system.canonicalize_path(unvalidated_path).ok()?;
+        let canonicalized = system
+            .canonicalize_path(unvalidated_path)
+            .map_err(|io_err| {
+                SitePackagesDiscoveryError::VenvDirCanonicalizationError(
+                    unvalidated_path.to_path_buf(),
+                    io_err,
+                )
+            })?;
         system
             .is_directory(&canonicalized)
             .then_some(Self(canonicalized))
+            .ok_or_else(|| {
+                SitePackagesDiscoveryError::VenvDirIsNotADirectory(unvalidated_path.to_path_buf())
+            })
     }
 
     fn from_executable_home_path(path: &PythonHomePath) -> Option<Self> {
@@ -430,15 +444,16 @@ impl fmt::Display for SysPrefixPath {
 struct PythonHomePath(SystemPathBuf);
 
 impl PythonHomePath {
-    fn new(path: impl AsRef<SystemPath>, system: &dyn System) -> Option<Self> {
+    fn new(path: impl AsRef<SystemPath>, system: &dyn System) -> io::Result<Self> {
         let path = path.as_ref();
         // It's important to resolve symlinks here rather than simply making the path absolute,
         // since system Python installations often only put symlinks in the "expected"
         // locations for `home` and `site-packages`
-        let canonicalized = system.canonicalize_path(path).ok()?;
+        let canonicalized = system.canonicalize_path(path)?;
         system
             .is_directory(&canonicalized)
             .then_some(Self(canonicalized))
+            .ok_or_else(|| io::Error::new(io::ErrorKind::Other, "not a directory"))
     }
 }
 
@@ -803,7 +818,7 @@ mod tests {
             venv_result,
             Err(SitePackagesDiscoveryError::PyvenvCfgParseError(
                 path,
-                PyvenvCfgParseErrorKind::HomeValueIsNotADirectory
+                PyvenvCfgParseErrorKind::InvalidHomeValue(_)
             ))
             if path == pyvenv_cfg_path
         ));
