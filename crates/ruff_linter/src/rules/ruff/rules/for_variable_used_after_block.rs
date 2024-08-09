@@ -56,6 +56,8 @@ pub(crate) fn for_variable_used_after_block(
         .filter_map(|(name, binding)| binding.kind.is_loop_var().then_some((name, binding)));
 
     for (name, binding) in loop_var_bindings {
+        // This is safe to unwrap because we're only dealing with loop var bindings and
+        // this can only be `None` for built-ins.
         let binding_source_node_id = binding.source.unwrap();
         // The node_id of the for-loop that contains the binding
         let binding_statement_id = checker.semantic().statement_id(binding_source_node_id);
@@ -64,6 +66,8 @@ pub(crate) fn for_variable_used_after_block(
         // Loop over the references of those bindings to see if they're in the same block-scope
         'references: for reference in binding.references() {
             let reference = checker.semantic().reference(reference);
+            // This is safe to unwrap because a loop var binding can't be a built-in so
+            // any reference to the loop var won't be a built-in where this could be `None`.
             let reference_node_id = reference.expression_id().unwrap();
 
             // Skip any reference that come before the control var binding in the source

@@ -25,7 +25,8 @@ pub struct Binding<'a> {
     pub scope: ScopeId,
     /// The context in which the [`Binding`] was created.
     pub context: ExecutionContext,
-    /// The statement in which the [`Binding`] was defined.
+    /// The statement in which the [`Binding`] was defined. `None` if the [`Binding`]
+    /// comes from a built-in.
     pub source: Option<NodeId>,
     /// The references to the [`Binding`].
     pub references: Vec<ResolvedReferenceId>,
