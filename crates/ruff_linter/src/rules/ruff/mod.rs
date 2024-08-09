@@ -84,6 +84,22 @@ mod tests {
         Ok(())
     }
 
+    #[test]
+    fn no_remove_parentheses_starred_expr_py310() -> Result<()> {
+        let diagnostics = test_path(
+            Path::new("ruff/RUF031.py"),
+            &LinterSettings {
+                ruff: super::settings::Settings {
+                    parenthesize_tuple_in_subscript: false,
+                },
+                target_version: PythonVersion::Py310,
+                ..LinterSettings::for_rule(Rule::IncorrectlyParenthesizedTupleInSubscript)
+            },
+        )?;
+        assert_messages!(diagnostics);
+        Ok(())
+    }
+
     #[test_case(Path::new("RUF013_0.py"))]
     #[test_case(Path::new("RUF013_1.py"))]
     fn implicit_optional_py39(path: &Path) -> Result<()> {

@@ -129,3 +129,5 @@ RUF031_prefer_parens.py:26:3: RUF031 [*] Use parentheses for tuples in subscript
 27 26 | d[(1,)]
    27 |+d[(1,)]
 28 28 | d[()] # empty tuples should be ignored
+29 29 | 
+30 30 | d[:,] # slices in the subscript lead to syntax error if parens are added

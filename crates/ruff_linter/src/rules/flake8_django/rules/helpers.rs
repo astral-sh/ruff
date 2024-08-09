@@ -4,7 +4,7 @@ use ruff_python_semantic::{analyze, SemanticModel};
 
 /// Return `true` if a Python class appears to be a Django model, based on its base classes.
 pub(super) fn is_model(class_def: &ast::StmtClassDef, semantic: &SemanticModel) -> bool {
-    analyze::class::any_qualified_name(class_def, semantic, &|qualified_name| {
+    analyze::class::any_qualified_base_class(class_def, semantic, &|qualified_name| {
         matches!(
             qualified_name.segments(),
             ["django", "db", "models", "Model"]
@@ -14,7 +14,7 @@ pub(super) fn is_model(class_def: &ast::StmtClassDef, semantic: &SemanticModel) 
 
 /// Return `true` if a Python class appears to be a Django model form, based on its base classes.
 pub(super) fn is_model_form(class_def: &ast::StmtClassDef, semantic: &SemanticModel) -> bool {
-    analyze::class::any_qualified_name(class_def, semantic, &|qualified_name| {
+    analyze::class::any_qualified_base_class(class_def, semantic, &|qualified_name| {
         matches!(
             qualified_name.segments(),
             ["django", "forms", "ModelForm"] | ["django", "forms", "models", "ModelForm"]

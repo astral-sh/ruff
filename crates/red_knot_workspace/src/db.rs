@@ -1,9 +1,10 @@
 use std::panic::RefUnwindSafe;
 use std::sync::Arc;
 
-use red_knot_python_semantic::{vendored_typeshed_stubs, Db as SemanticDb};
+use red_knot_python_semantic::{
+    vendored_typeshed_stubs, Db as SemanticDb, Program, ProgramSettings,
+};
 use ruff_db::files::{File, Files};
-use ruff_db::program::{Program, ProgramSettings};
 use ruff_db::system::System;
 use ruff_db::vendored::VendoredFileSystem;
 use ruff_db::{Db as SourceDb, Upcast};
@@ -129,7 +130,18 @@ impl SourceDb for RootDatabase {
 
 #[salsa::db]
 impl salsa::Database for RootDatabase {
-    fn salsa_event(&self, _event: &dyn Fn() -> Event) {}
+    fn salsa_event(&self, event: &dyn Fn() -> Event) {
+        if !tracing::enabled!(tracing::Level::TRACE) {
+            return;
+        }
+
+        let event = event();
+        if matches!(event.kind, salsa::EventKind::WillCheckCancellation { .. }) {
+            return;
+        }
+
+        tracing::trace!("Salsa event: {event:?}");
+    }
 }
 
 #[salsa::db]

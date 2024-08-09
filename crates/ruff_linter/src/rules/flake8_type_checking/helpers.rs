@@ -78,7 +78,7 @@ fn runtime_required_base_class(
     base_classes: &[String],
     semantic: &SemanticModel,
 ) -> bool {
-    analyze::class::any_qualified_name(class_def, semantic, &|qualified_name| {
+    analyze::class::any_qualified_base_class(class_def, semantic, &|qualified_name| {
         base_classes
             .iter()
             .any(|base_class| QualifiedName::from_dotted_name(base_class) == qualified_name)

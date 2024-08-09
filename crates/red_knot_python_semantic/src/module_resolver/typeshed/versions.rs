@@ -6,16 +6,15 @@ use std::ops::{RangeFrom, RangeInclusive};
 use std::str::FromStr;
 
 use once_cell::sync::Lazy;
-use ruff_db::program::TargetVersion;
 use ruff_db::system::SystemPath;
 use rustc_hash::FxHashMap;
 
 use ruff_db::files::{system_path_to_file, File};
 
+use super::vendored::vendored_typeshed_stubs;
 use crate::db::Db;
 use crate::module_name::ModuleName;
-
-use super::vendored::vendored_typeshed_stubs;
+use crate::python_version::{PythonVersion, TargetVersion};
 
 #[derive(Debug)]
 pub(crate) struct LazyTypeshedVersions<'db>(OnceCell<&'db TypeshedVersions>);
@@ -64,7 +63,7 @@ impl<'db> LazyTypeshedVersions<'db> {
             // Unwrapping here is not correct...
             parse_typeshed_versions(db, versions_file).as_ref().unwrap()
         });
-        versions.query_module(module, PyVersion::from(target_version))
+        versions.query_module(module, PythonVersion::from(target_version))
     }
 }
 
@@ -178,7 +177,7 @@ impl TypeshedVersions {
     fn query_module(
         &self,
         module: &ModuleName,
-        target_version: PyVersion,
+        target_version: PythonVersion,
     ) -> TypeshedVersionsQueryResult {
         if let Some(range) = self.exact(module) {
             if range.contains(target_version) {
@@ -323,13 +322,13 @@ impl fmt::Display for TypeshedVersions {
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash)]
 enum PyVersionRange {
-    AvailableFrom(RangeFrom<PyVersion>),
-    AvailableWithin(RangeInclusive<PyVersion>),
+    AvailableFrom(RangeFrom<PythonVersion>),
+    AvailableWithin(RangeInclusive<PythonVersion>),
 }
 
 impl PyVersionRange {
     #[must_use]
-    fn contains(&self, version: PyVersion) -> bool {
+    fn contains(&self, version: PythonVersion) -> bool {
         match self {
             Self::AvailableFrom(inner) => inner.contains(&version),
             Self::AvailableWithin(inner) => inner.contains(&version),
@@ -343,9 +342,14 @@ impl FromStr for PyVersionRange {
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         let mut parts = s.split('-').map(str::trim);
         match (parts.next(), parts.next(), parts.next()) {
-            (Some(lower), Some(""), None) => Ok(Self::AvailableFrom((lower.parse()?)..)),
+            (Some(lower), Some(""), None) => {
+                let lower = PythonVersion::from_versions_file_string(lower)?;
+                Ok(Self::AvailableFrom(lower..))
+            }
             (Some(lower), Some(upper), None) => {
-                Ok(Self::AvailableWithin((lower.parse()?)..=(upper.parse()?)))
+                let lower = PythonVersion::from_versions_file_string(lower)?;
+                let upper = PythonVersion::from_versions_file_string(upper)?;
+                Ok(Self::AvailableWithin(lower..=upper))
             }
             _ => Err(TypeshedVersionsParseErrorKind::UnexpectedNumberOfHyphens),
         }
@@ -363,74 +367,20 @@ impl fmt::Display for PyVersionRange {
     }
 }
 
-#[derive(Debug, Clone, Copy, Eq, PartialEq, Ord, PartialOrd, Hash)]
-struct PyVersion {
-    major: u8,
-    minor: u8,
-}
-
-impl FromStr for PyVersion {
-    type Err = TypeshedVersionsParseErrorKind;
-
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
+impl PythonVersion {
+    fn from_versions_file_string(s: &str) -> Result<Self, TypeshedVersionsParseErrorKind> {
         let mut parts = s.split('.').map(str::trim);
         let (Some(major), Some(minor), None) = (parts.next(), parts.next(), parts.next()) else {
             return Err(TypeshedVersionsParseErrorKind::UnexpectedNumberOfPeriods(
                 s.to_string(),
             ));
         };
-        let major = match u8::from_str(major) {
-            Ok(major) => major,
-            Err(err) => {
-                return Err(TypeshedVersionsParseErrorKind::IntegerParsingFailure {
-                    version: s.to_string(),
-                    err,
-                })
+        PythonVersion::try_from((major, minor)).map_err(|int_parse_error| {
+            TypeshedVersionsParseErrorKind::IntegerParsingFailure {
+                version: s.to_string(),
+                err: int_parse_error,
             }
-        };
-        let minor = match u8::from_str(minor) {
-            Ok(minor) => minor,
-            Err(err) => {
-                return Err(TypeshedVersionsParseErrorKind::IntegerParsingFailure {
-                    version: s.to_string(),
-                    err,
-                })
-            }
-        };
-        Ok(Self { major, minor })
-    }
-}
-
-impl fmt::Display for PyVersion {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let PyVersion { major, minor } = self;
-        write!(f, "{major}.{minor}")
-    }
-}
-
-impl From<TargetVersion> for PyVersion {
-    fn from(value: TargetVersion) -> Self {
-        match value {
-            TargetVersion::Py37 => PyVersion { major: 3, minor: 7 },
-            TargetVersion::Py38 => PyVersion { major: 3, minor: 8 },
-            TargetVersion::Py39 => PyVersion { major: 3, minor: 9 },
-            TargetVersion::Py310 => PyVersion {
-                major: 3,
-                minor: 10,
-            },
-            TargetVersion::Py311 => PyVersion {
-                major: 3,
-                minor: 11,
-            },
-            TargetVersion::Py312 => PyVersion {
-                major: 3,
-                minor: 12,
-            },
-            TargetVersion::Py313 => PyVersion {
-                major: 3,
-                minor: 13,
-            },
-        }
+        })
     }
 }
 
@@ -440,7 +390,6 @@ mod tests {
     use std::path::Path;
 
     use insta::assert_snapshot;
-    use ruff_db::program::TargetVersion;
 
     use super::*;
 

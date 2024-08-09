@@ -34,13 +34,14 @@ walkdir = { workspace = true }
 zip = { workspace = true, features = ["zstd", "deflate"] }
 
 [dev-dependencies]
+ruff_db = { workspace = true, features = ["os", "testing"]}
+ruff_python_parser = { workspace = true }
+
 anyhow = { workspace = true }
 insta = { workspace = true }
 tempfile = { workspace = true }
 walkdir = { workspace = true }
 zip = { workspace = true }
-ruff_python_parser = { workspace = true }
-ruff_db = { workspace = true, features = ["os"]}
 
 [lints]
 workspace = true

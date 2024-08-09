@@ -620,14 +620,13 @@ impl PartialEq<SearchPath> for VendoredPathBuf {
 
 #[cfg(test)]
 mod tests {
-    use ruff_db::program::TargetVersion;
     use ruff_db::Db;
 
     use crate::db::tests::TestDb;
 
-    use crate::module_resolver::testing::{FileSpec, MockedTypeshed, TestCase, TestCaseBuilder};
-
     use super::*;
+    use crate::module_resolver::testing::{FileSpec, MockedTypeshed, TestCase, TestCaseBuilder};
+    use crate::TargetVersion;
 
     impl ModulePath {
         #[must_use]

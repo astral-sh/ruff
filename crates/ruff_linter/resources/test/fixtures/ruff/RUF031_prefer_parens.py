@@ -26,3 +26,19 @@ token_features[
 d[1,]
 d[(1,)]
 d[()] # empty tuples should be ignored
+
+d[:,] # slices in the subscript lead to syntax error if parens are added
+d[1,2,:]
+
+# Should keep these parentheses in
+# Python <=3.10 to avoid syntax error.
+# https://github.com/astral-sh/ruff/issues/12776
+d[(*foo,bar)]
+
+x: dict[str, int]  # tuples inside type annotations should never be altered
+
+import typing
+
+type Y = typing.Literal[1, 2]
+Z: typing.TypeAlias = dict[int, int]
+class Foo(dict[str, int]): pass

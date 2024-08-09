@@ -15,11 +15,11 @@ pub enum TargetVersion {
 
 impl std::fmt::Display for TargetVersion {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        ruff_db::program::TargetVersion::from(*self).fmt(f)
+        red_knot_python_semantic::TargetVersion::from(*self).fmt(f)
     }
 }
 
-impl From<TargetVersion> for ruff_db::program::TargetVersion {
+impl From<TargetVersion> for red_knot_python_semantic::TargetVersion {
     fn from(value: TargetVersion) -> Self {
         match value {
             TargetVersion::Py37 => Self::Py37,

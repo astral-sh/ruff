@@ -1,4 +1,6 @@
-use crate::{system::SystemPathBuf, Db};
+use crate::python_version::TargetVersion;
+use crate::Db;
+use ruff_db::system::SystemPathBuf;
 use salsa::Durability;
 
 #[salsa::input(singleton)]
@@ -21,59 +23,6 @@ impl Program {
 pub struct ProgramSettings {
     pub target_version: TargetVersion,
     pub search_paths: SearchPathSettings,
-}
-
-/// Enumeration of all supported Python versions
-///
-/// TODO: unify with the `PythonVersion` enum in the linter/formatter crates?
-#[derive(Copy, Clone, Hash, PartialEq, Eq, PartialOrd, Ord, Default)]
-pub enum TargetVersion {
-    Py37,
-    #[default]
-    Py38,
-    Py39,
-    Py310,
-    Py311,
-    Py312,
-    Py313,
-}
-
-impl TargetVersion {
-    pub const fn as_tuple(self) -> (u8, u8) {
-        match self {
-            Self::Py37 => (3, 7),
-            Self::Py38 => (3, 8),
-            Self::Py39 => (3, 9),
-            Self::Py310 => (3, 10),
-            Self::Py311 => (3, 11),
-            Self::Py312 => (3, 12),
-            Self::Py313 => (3, 13),
-        }
-    }
-
-    const fn as_str(self) -> &'static str {
-        match self {
-            Self::Py37 => "py37",
-            Self::Py38 => "py38",
-            Self::Py39 => "py39",
-            Self::Py310 => "py310",
-            Self::Py311 => "py311",
-            Self::Py312 => "py312",
-            Self::Py313 => "py313",
-        }
-    }
-}
-
-impl std::fmt::Display for TargetVersion {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.write_str(self.as_str())
-    }
-}
-
-impl std::fmt::Debug for TargetVersion {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        std::fmt::Display::fmt(self, f)
-    }
 }
 
 /// Configures the search paths for module resolution.
