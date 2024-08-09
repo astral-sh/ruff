@@ -39,6 +39,14 @@ def foo():
     # ❌ After the loop is not ok because the value is probably not what you expect
     _ = room_id
 
+    # ❌ Augmented assignment is not allowed because the value is probably not what you expect
+    room_id += 1
+
+    # Assigning again after the loop is ok
+    room_id = 5
+    room_id += 1
+    _ = room_id
+
     # Tuple destructuring
     for a, b, c in []:
         _ = a
