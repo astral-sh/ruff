@@ -294,28 +294,30 @@ Finally, regenerate the documentation and generated code with `cargo dev generat
 
 To preview any changes to the documentation locally:
 
-1. Install the [Rust toolchain](https://www.rust-lang.org/tools/install).
+1. Install the [Rust toolchain](https://www.rust-lang.org/tools/install).]
 
-1. Install MkDocs and Material for MkDocs with:
+1. Install [uv](https://docs.astral.sh/uv/installation/)
+
+1. Install the dependencies
 
     ```shell
-    pip install -r docs/requirements.txt
+    uv sync
     ```
 
 1. Generate the MkDocs site with:
 
     ```shell
-    python scripts/generate_mkdocs.py
+    uv run scripts/generate_mkdocs.py
     ```
 
 1. Run the development server with:
 
     ```shell
     # For contributors.
-    mkdocs serve -f mkdocs.public.yml
+    uv run -- mkdocs serve -f mkdocs.public.yml
 
     # For members of the Astral org, which has access to MkDocs Insiders via sponsorship.
-    mkdocs serve -f mkdocs.insiders.yml
+    uv run --with-requirements docs/requirements-insiders.txt -- mkdocs serve -f mkdocs.insiders.yml
     ```
 
 The documentation should then be available locally at
