@@ -313,6 +313,7 @@ fn site_packages_directory_from_sys_prefix(
             return Ok(expected_path);
         }
         if minor_version.free_threaded_build_available() {
+            // Nearly the same as `expected_path`, but with an additional `t` after {minor_version}:
             let alternative_path =
                 sys_prefix_path.join(format!("lib/python3.{minor_version}t/site-packages"));
             if system.is_directory(&alternative_path) {
