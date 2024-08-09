@@ -1179,12 +1179,10 @@ impl<'db> TypeInferenceBuilder<'db> {
         let body_ty = self.infer_expression(body);
         let orelse_ty = self.infer_expression(orelse);
 
-        let union = UnionTypeBuilder::new(self.db)
+        UnionTypeBuilder::new(self.db)
             .add(body_ty)
             .add(orelse_ty)
-            .build();
-
-        Type::Union(union)
+            .build()
     }
 
     fn infer_lambda_body(&mut self, lambda_expression: &ast::ExprLambda) {
