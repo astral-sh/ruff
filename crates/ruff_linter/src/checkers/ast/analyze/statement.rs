@@ -1486,6 +1486,9 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                     checker, stmt, body, handlers, orelse, finalbody,
                 );
             }
+            if checker.enabled(Rule::SuppressedException) {
+                flake8_bugbear::rules::suppressed_exception(checker, handlers);
+            }
             if checker.enabled(Rule::ReturnInTryExceptFinally) {
                 flake8_simplify::rules::return_in_try_except_finally(
                     checker, body, handlers, finalbody,

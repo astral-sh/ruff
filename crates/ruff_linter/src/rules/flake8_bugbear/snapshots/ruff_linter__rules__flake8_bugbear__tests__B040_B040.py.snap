@@ -1,0 +1,80 @@
+---
+source: crates/ruff_linter/src/rules/flake8_bugbear/mod.rs
+---
+B040.py:7:25: B040 Caught exception with call to `add_note` not used. Did you forget to `raise` it?
+  |
+5 |     try:
+6 |         ...
+7 |     except Exception as e:
+  |                         ^ B040
+8 |         e.add_note("...")  # error
+  |
+
+B040.py:27:25: B040 Caught exception with call to `add_note` not used. Did you forget to `raise` it?
+   |
+25 |     try:
+26 |         ...
+27 |     except Exception as e:
+   |                         ^ B040
+28 |         f = ValueError()
+29 |         e.add_note("...")  # error
+   |
+
+B040.py:94:26: B040 Caught exception with call to `add_note` not used. Did you forget to `raise` it?
+   |
+92 |     try:
+93 |         ...
+94 |     except ValueError as e:
+   |                          ^ B040
+95 |         e.add_note("")  # error
+96 |     except TypeError as e:
+   |
+
+B040.py:120:25: B040 Caught exception with call to `add_note` not used. Did you forget to `raise` it?
+    |
+118 |     try:
+119 |         ...
+120 |     except Exception as e:  # error
+    |                         ^ B040
+121 |         e.add_note(str(e))
+122 |         e.add_note(str(e))
+    |
+
+B040.py:128:25: B040 Caught exception with call to `add_note` not used. Did you forget to `raise` it?
+    |
+126 |     try:
+127 |         ...
+128 |     except Exception as e:  # error
+    |                         ^ B040
+129 |         e.add_note("")
+130 |         try:
+    |
+
+B040.py:139:25: B040 Caught exception with call to `add_note` not used. Did you forget to `raise` it?
+    |
+137 |     try:
+138 |         ...
+139 |     except Exception as e:
+    |                         ^ B040
+140 |         e.add_note("")
+141 |         e = ValueError()
+    |
+
+B040.py:167:25: B040 Caught exception with call to `add_note` not used. Did you forget to `raise` it?
+    |
+165 |     try:
+166 |         ...
+167 |     except Exception as e:  # should error
+    |                         ^ B040
+168 |         e.add_note("")
+169 |         f = lambda e: e
+    |
+
+B040.py:174:25: B040 Caught exception with call to `add_note` not used. Did you forget to `raise` it?
+    |
+172 |     try:
+173 |         ...
+174 |     except Exception as e:  # should error
+    |                         ^ B040
+175 |         e.add_note("")
+    |
