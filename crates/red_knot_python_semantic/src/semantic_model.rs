@@ -168,7 +168,8 @@ mod tests {
     use ruff_db::system::{DbWithTestSystem, SystemPathBuf};
 
     use crate::db::tests::TestDb;
-    use crate::program::{Program, SearchPathSettings, TargetVersion};
+    use crate::program::{Program, SearchPathSettings};
+    use crate::python_version::TargetVersion;
     use crate::types::Type;
     use crate::{HasTy, SemanticModel};
 

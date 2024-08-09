@@ -499,9 +499,8 @@ fn resolve_name(db: &dyn Db, name: &ModuleName) -> Option<(SearchPath, File, Mod
     let resolver_settings = module_resolution_settings(db);
     let target_version = resolver_settings.target_version();
     let resolver_state = ResolverState::new(db, target_version);
-    let (_, minor_version) = target_version.as_tuple();
     let is_builtin_module =
-        ruff_python_stdlib::sys::is_builtin_module(minor_version, name.as_str());
+        ruff_python_stdlib::sys::is_builtin_module(target_version.minor_version(), name.as_str());
 
     for search_path in resolver_settings.search_paths(db) {
         // When a builtin module is imported, standard module resolution is bypassed:
