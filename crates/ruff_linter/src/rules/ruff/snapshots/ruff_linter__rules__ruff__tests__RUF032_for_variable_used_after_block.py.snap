@@ -1,0 +1,103 @@
+---
+source: crates/ruff_linter/src/rules/ruff/mod.rs
+---
+for_variable_used_after_block.py:6:5: RUF032 `for` loop variable global_var is used outside of block
+  |
+5 | # ❌
+6 | _ = global_var
+  |     ^^^^^^^^^^ RUF032
+7 | 
+8 | def foo():
+  |
+
+for_variable_used_after_block.py:15:9: RUF032 `for` loop variable event is used outside of block
+   |
+14 |     # ❌
+15 |     _ = event
+   |         ^^^^^ RUF032
+16 | 
+17 |     for x in []:
+   |
+
+for_variable_used_after_block.py:28:12: RUF032 `for` loop variable x is used outside of block
+   |
+26 |     for y in []:
+27 |         # ❌ x is used outside of the loop it was defined in (meant to use y)
+28 |         if x == 5:
+   |            ^ RUF032
+29 |             pass
+   |
+
+for_variable_used_after_block.py:40:9: RUF032 `for` loop variable room_id is used outside of block
+   |
+39 |     # ❌ After the loop is not ok because the value is probably not what you expect
+40 |     _ = room_id
+   |         ^^^^^^^ RUF032
+41 | 
+42 |     # ❌ Augmented assignment is not allowed because the value is probably not what you expect
+   |
+
+for_variable_used_after_block.py:43:5: RUF032 `for` loop variable room_id is used outside of block
+   |
+42 |     # ❌ Augmented assignment is not allowed because the value is probably not what you expect
+43 |     room_id += 1
+   |     ^^^^^^^ RUF032
+44 | 
+45 |     # Assigning again after the loop is ok
+   |
+
+for_variable_used_after_block.py:58:9: RUF032 `for` loop variable a is used outside of block
+   |
+57 |     # ❌
+58 |     _ = a
+   |         ^ RUF032
+59 |     _ = b
+60 |     _ = c
+   |
+
+for_variable_used_after_block.py:59:9: RUF032 `for` loop variable b is used outside of block
+   |
+57 |     # ❌
+58 |     _ = a
+59 |     _ = b
+   |         ^ RUF032
+60 |     _ = c
+   |
+
+for_variable_used_after_block.py:60:9: RUF032 `for` loop variable c is used outside of block
+   |
+58 |     _ = a
+59 |     _ = b
+60 |     _ = c
+   |         ^ RUF032
+61 | 
+62 |     # Array destructuring
+   |
+
+for_variable_used_after_block.py:70:9: RUF032 `for` loop variable d is used outside of block
+   |
+69 |     # ❌
+70 |     _ = d
+   |         ^ RUF032
+71 |     _ = e
+72 |     _ = f
+   |
+
+for_variable_used_after_block.py:71:9: RUF032 `for` loop variable e is used outside of block
+   |
+69 |     # ❌
+70 |     _ = d
+71 |     _ = e
+   |         ^ RUF032
+72 |     _ = f
+   |
+
+for_variable_used_after_block.py:72:9: RUF032 `for` loop variable f is used outside of block
+   |
+70 |     _ = d
+71 |     _ = e
+72 |     _ = f
+   |         ^ RUF032
+73 | 
+74 |     # Nested function and class definitions are fine
+   |

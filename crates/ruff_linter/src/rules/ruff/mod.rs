@@ -26,6 +26,10 @@ mod tests {
 
     #[test_case(Rule::AsyncioDanglingTask, Path::new("RUF006.py"))]
     #[test_case(Rule::CollectionLiteralConcatenation, Path::new("RUF005.py"))]
+    #[test_case(
+        Rule::ForVariableUsedAfterBlock,
+        Path::new("for_variable_used_after_block.py")
+    )]
     #[test_case(Rule::ExplicitFStringTypeConversion, Path::new("RUF010.py"))]
     #[test_case(Rule::FunctionCallInDataclassDefaultArgument, Path::new("RUF009.py"))]
     #[test_case(Rule::ImplicitOptional, Path::new("RUF013_0.py"))]
