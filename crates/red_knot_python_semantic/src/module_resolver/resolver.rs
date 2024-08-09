@@ -300,9 +300,7 @@ pub(crate) fn dynamic_resolution_paths(db: &dyn Db) -> Vec<SearchPath> {
         let mut all_pth_files: Vec<PthFile> = pth_file_iterator.collect();
         all_pth_files.sort_unstable_by(|a, b| a.path.cmp(&b.path));
 
-        let installations = all_pth_files
-            .iter()
-            .flat_map(PthFile::editable_installations);
+        let installations = all_pth_files.iter().flat_map(PthFile::items);
 
         for installation in installations {
             if existing_paths.insert(Cow::Owned(installation.clone())) {
@@ -312,7 +310,7 @@ pub(crate) fn dynamic_resolution_paths(db: &dyn Db) -> Vec<SearchPath> {
                     }
 
                     Err(error) => {
-                        tracing::warn!("Skipping editable installation: {error}");
+                        tracing::debug!("Skipping editable installation: {error}");
                     }
                 }
             }
@@ -367,7 +365,7 @@ struct PthFile<'db> {
 impl<'db> PthFile<'db> {
     /// Yield paths in this `.pth` file that appear to represent editable installations,
     /// and should therefore be added as module-resolution search paths.
-    fn editable_installations(&'db self) -> impl Iterator<Item = SystemPathBuf> + 'db {
+    fn items(&'db self) -> impl Iterator<Item = SystemPathBuf> + 'db {
         let PthFile {
             path: _,
             contents,
