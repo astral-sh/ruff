@@ -1,18 +1,18 @@
 use std::borrow::Cow;
 use std::iter::FusedIterator;
 
-use ruff_db::files::{File, FilePath, FileRootKind};
-use ruff_db::program::{Program, SearchPathSettings, TargetVersion};
-use ruff_db::system::{DirectoryEntry, System, SystemPath, SystemPathBuf};
-use ruff_db::vendored::VendoredPath;
 use rustc_hash::{FxBuildHasher, FxHashSet};
 
-use crate::db::Db;
-use crate::module_name::ModuleName;
+use ruff_db::files::{File, FilePath, FileRootKind};
+use ruff_db::system::{DirectoryEntry, System, SystemPath, SystemPathBuf};
+use ruff_db::vendored::VendoredPath;
 
 use super::module::{Module, ModuleKind};
 use super::path::{ModulePath, SearchPath, SearchPathValidationError};
 use super::state::ResolverState;
+use crate::db::Db;
+use crate::module_name::ModuleName;
+use crate::{Program, SearchPathSettings, TargetVersion};
 
 /// Resolves a module name to a module.
 pub fn resolve_module(db: &dyn Db, module_name: ModuleName) -> Option<Module> {
@@ -1143,7 +1143,7 @@ mod tests {
     fn symlink() -> anyhow::Result<()> {
         use anyhow::Context;
 
-        use ruff_db::program::Program;
+        use crate::program::Program;
         use ruff_db::system::{OsSystem, SystemPath};
 
         use crate::db::tests::TestDb;

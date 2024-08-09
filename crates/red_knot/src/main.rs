@@ -7,13 +7,13 @@ use colored::Colorize;
 use crossbeam::channel as crossbeam_channel;
 use salsa::plumbing::ZalsaDatabase;
 
+use red_knot_python_semantic::{ProgramSettings, SearchPathSettings};
 use red_knot_server::run_server;
 use red_knot_workspace::db::RootDatabase;
 use red_knot_workspace::site_packages::site_packages_dirs_of_venv;
 use red_knot_workspace::watch;
 use red_knot_workspace::watch::WorkspaceWatcher;
 use red_knot_workspace::workspace::WorkspaceMetadata;
-use ruff_db::program::{ProgramSettings, SearchPathSettings};
 use ruff_db::system::{OsSystem, System, SystemPath, SystemPathBuf};
 use target_version::TargetVersion;
 

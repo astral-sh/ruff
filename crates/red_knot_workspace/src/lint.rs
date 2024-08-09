@@ -305,12 +305,13 @@ enum AnyImportRef<'a> {
 
 #[cfg(test)]
 mod tests {
+    use red_knot_python_semantic::{Program, SearchPathSettings, TargetVersion};
     use ruff_db::files::system_path_to_file;
-    use ruff_db::program::{Program, SearchPathSettings, TargetVersion};
     use ruff_db::system::{DbWithTestSystem, SystemPathBuf};
 
-    use super::{lint_semantic, Diagnostics};
     use crate::db::tests::TestDb;
+
+    use super::{lint_semantic, Diagnostics};
 
     fn setup_db() -> TestDb {
         setup_db_with_root(SystemPathBuf::from("/src"))

@@ -6,16 +6,15 @@ use std::ops::{RangeFrom, RangeInclusive};
 use std::str::FromStr;
 
 use once_cell::sync::Lazy;
-use ruff_db::program::TargetVersion;
 use ruff_db::system::SystemPath;
 use rustc_hash::FxHashMap;
 
 use ruff_db::files::{system_path_to_file, File};
 
+use super::vendored::vendored_typeshed_stubs;
 use crate::db::Db;
 use crate::module_name::ModuleName;
-
-use super::vendored::vendored_typeshed_stubs;
+use crate::TargetVersion;
 
 #[derive(Debug)]
 pub(crate) struct LazyTypeshedVersions<'db>(OnceCell<&'db TypeshedVersions>);
@@ -440,7 +439,6 @@ mod tests {
     use std::path::Path;
 
     use insta::assert_snapshot;
-    use ruff_db::program::TargetVersion;
 
     use super::*;
 

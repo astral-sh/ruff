@@ -1,4 +1,5 @@
-use crate::{system::SystemPathBuf, Db};
+use crate::Db;
+use ruff_db::system::SystemPathBuf;
 use salsa::Durability;
 
 #[salsa::input(singleton)]
