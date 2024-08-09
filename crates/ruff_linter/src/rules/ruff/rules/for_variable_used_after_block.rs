@@ -1,6 +1,6 @@
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_semantic::{BindingId, NodeId, Scope};
+use ruff_python_semantic::Scope;
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
@@ -49,25 +49,13 @@ pub(crate) fn for_variable_used_after_block(
     scope: &Scope,
     diagnostics: &mut Vec<Diagnostic>,
 ) {
-    // Keep track of the node_ids of variable references that have already been
-    // accounted for as part of a different variable binding. This helps us avoid
-    // complaining when people use the same variable name in multiple blocks under the
-    // same scope.
-    let mut known_good_reference_node_ids: Vec<NodeId> = Vec::new();
-
-    let all_bindings: Vec<(&str, BindingId)> = scope.all_bindings().collect();
-    // We want to reverse the bindings so that we iterate in source order and shadowed
-    // bindings come first. This way we can gather `known_good_reference_node_ids` and
-    // mark off things as we go which will allow us to ignore later bindings trying to
-    // reference the same variable.
-    let reversed_bindings = all_bindings.iter().rev();
-
     // Find for-loop variable bindings
-    let loop_var_bindings = reversed_bindings
-        .map(|(name, binding_id)| (name, checker.semantic().binding(*binding_id)))
+    let loop_var_bindings = scope
+        .all_bindings()
+        .map(|(name, binding_id)| (name, checker.semantic().binding(binding_id)))
         .filter_map(|(name, binding)| binding.kind.is_loop_var().then_some((name, binding)));
 
-    for (&name, binding) in loop_var_bindings {
+    for (name, binding) in loop_var_bindings {
         let binding_statement = binding.statement(checker.semantic()).unwrap();
         let binding_source_node_id = binding.source.unwrap();
         // The node_id of the for-loop that contains the binding
@@ -87,23 +75,19 @@ pub(crate) fn for_variable_used_after_block(
 
             // Traverse the hierarchy and look for a block match
             let statement_hierarchy = checker.semantic().parent_statement_ids(reference_node_id);
-
             for ancestor_node_id in statement_hierarchy {
                 if binding_statement_id == ancestor_node_id {
-                    known_good_reference_node_ids.push(reference_node_id);
                     continue 'references;
                 }
             }
 
-            // If the reference wasn't used in the same block, report a violation/diagnostic
-            if !known_good_reference_node_ids.contains(&reference_node_id) {
-                diagnostics.push(Diagnostic::new(
-                    ForVariableUsedAfterBlock {
-                        control_var_name: name.to_owned(),
-                    },
-                    reference.range(),
-                ));
-            }
+            // The reference wasn't used in the same block, report a violation/diagnostic
+            diagnostics.push(Diagnostic::new(
+                ForVariableUsedAfterBlock {
+                    control_var_name: name.to_owned(),
+                },
+                reference.range(),
+            ));
         }
     }
 }
