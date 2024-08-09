@@ -1,11 +1,11 @@
 #![allow(clippy::disallowed_names)]
 
+use red_knot_python_semantic::{ProgramSettings, SearchPathSettings, TargetVersion};
 use red_knot_workspace::db::RootDatabase;
 use red_knot_workspace::workspace::WorkspaceMetadata;
 use ruff_benchmark::criterion::{criterion_group, criterion_main, BatchSize, Criterion};
 use ruff_benchmark::TestFile;
 use ruff_db::files::{system_path_to_file, File};
-use ruff_db::program::{ProgramSettings, SearchPathSettings, TargetVersion};
 use ruff_db::source::source_text;
 use ruff_db::system::{MemoryFileSystem, SystemPath, TestSystem};
 

@@ -165,10 +165,10 @@ impl HasTy for ast::Alias {
 mod tests {
     use ruff_db::files::system_path_to_file;
     use ruff_db::parsed::parsed_module;
-    use ruff_db::program::{Program, SearchPathSettings, TargetVersion};
     use ruff_db::system::{DbWithTestSystem, SystemPathBuf};
 
     use crate::db::tests::TestDb;
+    use crate::program::{Program, SearchPathSettings, TargetVersion};
     use crate::types::Type;
     use crate::{HasTy, SemanticModel};
 

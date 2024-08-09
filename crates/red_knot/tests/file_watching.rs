@@ -6,13 +6,14 @@ use std::time::Duration;
 use anyhow::{anyhow, Context};
 use salsa::Setter;
 
-use red_knot_python_semantic::{resolve_module, ModuleName};
+use red_knot_python_semantic::{
+    resolve_module, ModuleName, Program, ProgramSettings, SearchPathSettings, TargetVersion,
+};
 use red_knot_workspace::db::RootDatabase;
 use red_knot_workspace::watch;
 use red_knot_workspace::watch::{directory_watcher, WorkspaceWatcher};
 use red_knot_workspace::workspace::WorkspaceMetadata;
 use ruff_db::files::{system_path_to_file, File, FileError};
-use ruff_db::program::{Program, ProgramSettings, SearchPathSettings, TargetVersion};
 use ruff_db::source::source_text;
 use ruff_db::system::{OsSystem, SystemPath, SystemPathBuf};
 use ruff_db::Upcast;

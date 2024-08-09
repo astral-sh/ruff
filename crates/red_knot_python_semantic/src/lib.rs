@@ -5,6 +5,7 @@ use rustc_hash::FxHasher;
 pub use db::Db;
 pub use module_name::ModuleName;
 pub use module_resolver::{resolve_module, system_module_search_paths, vendored_typeshed_stubs};
+pub use program::{Program, ProgramSettings, SearchPathSettings, TargetVersion};
 pub use semantic_model::{HasTy, SemanticModel};
 
 pub mod ast_node_ref;
@@ -13,6 +14,7 @@ mod db;
 mod module_name;
 mod module_resolver;
 mod node_key;
+mod program;
 pub mod semantic_index;
 mod semantic_model;
 pub mod types;
