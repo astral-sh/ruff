@@ -64,6 +64,7 @@ pub(crate) fn subscript_with_parenthesized_tuple(checker: &mut Checker, subscrip
     if tuple_subscript.parenthesized == prefer_parentheses || tuple_subscript.elts.is_empty() {
         return;
     }
+    // Adding parentheses in the presence of a slice leads to a syntax error.
     if prefer_parentheses & tuple_subscript.elts.iter().any(Expr::is_slice_expr) {
         return;
     }
