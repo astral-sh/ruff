@@ -432,6 +432,11 @@ impl fmt::Display for SysPrefixPath {
 /// and it's one of the few fields that's read by the Python
 /// standard library's `site.py` module.
 ///
+/// Although it doesn't appear to be specified anywhere,
+/// all existing virtual environment tools always use an absolute path
+/// for the `home` value, and the Python standard library also assumes
+/// that the `home` value will be an absolute path.
+///
 /// Other values, such as the path to the Python executable or the
 /// base-executable `sys.prefix` value, are either only provided in
 /// `pyvenv.cfg` files by some virtual-environment creators,
