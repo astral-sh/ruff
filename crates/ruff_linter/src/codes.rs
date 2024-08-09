@@ -4,11 +4,11 @@
 /// `--select`. For pylint this is e.g. C0414 and E0118 but also C and E01.
 use std::fmt::Formatter;
 
+use strum_macros::{AsRefStr, EnumIter};
+
 use crate::registry::{AsRule, Linter};
 use crate::rule_selector::is_single_rule_selector;
 use crate::rules;
-
-use strum_macros::{AsRefStr, EnumIter};
 
 #[derive(PartialEq, Eq, PartialOrd, Ord)]
 pub struct NoqaCode(&'static str, &'static str);
@@ -378,6 +378,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Flake8Comprehensions, "17") => (RuleGroup::Stable, rules::flake8_comprehensions::rules::UnnecessaryMap),
         (Flake8Comprehensions, "18") => (RuleGroup::Stable, rules::flake8_comprehensions::rules::UnnecessaryLiteralWithinDictCall),
         (Flake8Comprehensions, "19") => (RuleGroup::Stable, rules::flake8_comprehensions::rules::UnnecessaryComprehensionInCall),
+        (Flake8Comprehensions, "20") => (RuleGroup::Preview, rules::flake8_comprehensions::rules::UnnecessaryDictComprehensionForIterable),
 
         // flake8-debugger
         (Flake8Debugger, "0") => (RuleGroup::Stable, rules::flake8_debugger::rules::Debugger),
@@ -951,7 +952,6 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Ruff, "022") => (RuleGroup::Preview, rules::ruff::rules::UnsortedDunderAll),
         (Ruff, "023") => (RuleGroup::Preview, rules::ruff::rules::UnsortedDunderSlots),
         (Ruff, "024") => (RuleGroup::Stable, rules::ruff::rules::MutableFromkeysValue),
-        (Ruff, "025") => (RuleGroup::Preview, rules::ruff::rules::UnnecessaryDictComprehensionForIterable),
         (Ruff, "026") => (RuleGroup::Stable, rules::ruff::rules::DefaultFactoryKwarg),
         (Ruff, "027") => (RuleGroup::Preview, rules::ruff::rules::MissingFStringSyntax),
         (Ruff, "028") => (RuleGroup::Preview, rules::ruff::rules::InvalidFormatterSuppressionComment),
