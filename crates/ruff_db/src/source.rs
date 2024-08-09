@@ -17,26 +17,35 @@ use crate::Db;
 pub fn source_text(db: &dyn Db, file: File) -> SourceText {
     let path = file.path(db);
     let _span = tracing::trace_span!("source_text", file = %path).entered();
+    let mut has_read_error = false;
 
     let kind = if is_notebook(file.path(db)) {
-        SourceTextKind::Notebook(file.read_to_notebook(db).unwrap_or_else(|error| {
-            tracing::debug!("Failed to read notebook {path}: {error}");
+        file.read_to_notebook(db)
+            .unwrap_or_else(|error| {
+                tracing::debug!("Failed to read notebook {path}: {error}");
 
-            SourceDiagnostic(Arc::new(SourceTextError::FailedToReadNotebook(error))).accumulate(db);
-            Notebook::empty()
-        }))
+                has_read_error = true;
+                SourceDiagnostic(Arc::new(SourceTextError::FailedToReadNotebook(error)))
+                    .accumulate(db);
+                Notebook::empty()
+            })
+            .into()
     } else {
-        SourceTextKind::Text(file.read_to_string(db).unwrap_or_else(|error| {
-            tracing::debug!("Failed to read file {path}: {error}");
+        file.read_to_string(db)
+            .unwrap_or_else(|error| {
+                tracing::debug!("Failed to read file {path}: {error}");
 
-            SourceDiagnostic(Arc::new(SourceTextError::FailedToReadFile(error))).accumulate(db);
-            String::new()
-        }))
+                has_read_error = true;
+                SourceDiagnostic(Arc::new(SourceTextError::FailedToReadFile(error))).accumulate(db);
+                String::new()
+            })
+            .into()
     };
 
     SourceText {
         inner: Arc::new(SourceTextInner {
             kind,
+            has_read_error,
             count: Count::new(),
         }),
     }
@@ -87,6 +96,11 @@ impl SourceText {
     pub fn is_notebook(&self) -> bool {
         matches!(&self.inner.kind, SourceTextKind::Notebook(_))
     }
+
+    /// Returns `true` if there was an error when reading the content of the file.
+    pub fn has_read_error(&self) -> bool {
+        self.inner.has_read_error
+    }
 }
 
 impl Deref for SourceText {
@@ -118,12 +132,25 @@ impl std::fmt::Debug for SourceText {
 struct SourceTextInner {
     count: Count<SourceText>,
     kind: SourceTextKind,
+    has_read_error: bool,
 }
 
 #[derive(Eq, PartialEq)]
 enum SourceTextKind {
     Text(String),
     Notebook(Notebook),
+}
+
+impl From<String> for SourceTextKind {
+    fn from(value: String) -> Self {
+        SourceTextKind::Text(value)
+    }
+}
+
+impl From<Notebook> for SourceTextKind {
+    fn from(notebook: Notebook) -> Self {
+        SourceTextKind::Notebook(notebook)
+    }
 }
 
 #[salsa::accumulator]

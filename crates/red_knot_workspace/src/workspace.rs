@@ -354,17 +354,16 @@ pub(super) fn check_file(db: &dyn Db, file: File) -> Diagnostics {
 
     let mut diagnostics = Vec::new();
 
-    // The use of an accumulator seems unnecessarily complicated here.
     let source_diagnostics = source_text::accumulated::<SourceDiagnostic>(db.upcast(), file);
+    // TODO(micha): Consider using a single accumulator for all diagnostics
+    diagnostics.extend(
+        source_diagnostics
+            .iter()
+            .map(std::string::ToString::to_string),
+    );
 
     // Abort checking if there are IO errors.
-    if !source_diagnostics.is_empty() {
-        diagnostics.extend(
-            source_diagnostics
-                .iter()
-                .map(std::string::ToString::to_string),
-        );
-
+    if source_text(db.upcast(), file).has_read_error() {
         return Diagnostics::from(diagnostics);
     }
 
