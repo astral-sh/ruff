@@ -104,27 +104,44 @@ impl RuffSettingsIndex {
 
         // Add any settings from above the workspace root.
         for directory in root.ancestors() {
-            if let Some(pyproject) = settings_toml(directory).ok().flatten() {
-                let Ok(settings) = ruff_workspace::resolver::resolve_root_settings(
-                    &pyproject,
-                    Relativity::Parent,
-                    &EditorConfigurationTransformer(editor_settings, root),
-                ) else {
+            match settings_toml(directory) {
+                Ok(Some(pyproject)) => {
+                    match ruff_workspace::resolver::resolve_root_settings(
+                        &pyproject,
+                        Relativity::Parent,
+                        &EditorConfigurationTransformer(editor_settings, root),
+                    ) {
+                        Ok(settings) => {
+                            respect_gitignore = Some(settings.file_resolver.respect_gitignore);
+
+                            index.insert(
+                                directory.to_path_buf(),
+                                Arc::new(RuffSettings {
+                                    path: Some(pyproject),
+                                    file_resolver: settings.file_resolver,
+                                    linter: settings.linter,
+                                    formatter: settings.formatter,
+                                }),
+                            );
+                            break;
+                        }
+                        Err(err) => {
+                            tracing::error!(
+                                "Error while resolving settings from {}: {err}",
+                                pyproject.display()
+                            );
+                            continue;
+                        }
+                    }
+                }
+                Ok(None) => continue,
+                Err(err) => {
+                    tracing::error!(
+                        "Error while searching for a config file in {}: {err}",
+                        directory.display()
+                    );
                     continue;
-                };
-
-                respect_gitignore = Some(settings.file_resolver.respect_gitignore);
-
-                index.insert(
-                    directory.to_path_buf(),
-                    Arc::new(RuffSettings {
-                        path: Some(pyproject),
-                        file_resolver: settings.file_resolver,
-                        linter: settings.linter,
-                        formatter: settings.formatter,
-                    }),
-                );
-                break;
+                }
             }
         }
 
@@ -144,6 +161,8 @@ impl RuffSettingsIndex {
         let walker = builder.build_parallel();
 
         let index = std::sync::RwLock::new(index);
+        let errors: std::sync::Mutex<Vec<anyhow::Error>> = std::sync::Mutex::new(vec![]);
+
         walker.run(|| {
             Box::new(|result| {
                 let Ok(entry) = result else {
@@ -186,28 +205,51 @@ impl RuffSettingsIndex {
                     }
                 }
 
-                if let Some(pyproject) = settings_toml(&directory).ok().flatten() {
-                    let Ok(settings) = ruff_workspace::resolver::resolve_root_settings(
-                        &pyproject,
-                        Relativity::Parent,
-                        &EditorConfigurationTransformer(editor_settings, root),
-                    ) else {
-                        return WalkState::Continue;
-                    };
-                    index.write().unwrap().insert(
-                        directory,
-                        Arc::new(RuffSettings {
-                            path: Some(pyproject),
-                            file_resolver: settings.file_resolver,
-                            linter: settings.linter,
-                            formatter: settings.formatter,
-                        }),
-                    );
+                match settings_toml(&directory) {
+                    Ok(Some(pyproject)) => {
+                        match ruff_workspace::resolver::resolve_root_settings(
+                            &pyproject,
+                            Relativity::Parent,
+                            &EditorConfigurationTransformer(editor_settings, root),
+                        ) {
+                            Ok(settings) => {
+                                index.write().unwrap().insert(
+                                    directory,
+                                    Arc::new(RuffSettings {
+                                        path: Some(pyproject),
+                                        file_resolver: settings.file_resolver,
+                                        linter: settings.linter,
+                                        formatter: settings.formatter,
+                                    }),
+                                );
+                            }
+                            Err(err) => {
+                                let mut errors = errors.lock().unwrap();
+                                errors.push(err);
+                            }
+                        }
+                    }
+                    Ok(None) => {}
+                    Err(err) => {
+                        let mut errors = errors.lock().unwrap();
+                        errors.push(err);
+                    }
                 }
 
                 WalkState::Continue
             })
         });
+
+        let errors = errors.into_inner().unwrap();
+        if !errors.is_empty() {
+            tracing::error!(
+                "Errors while building the settings index in {}",
+                root.display()
+            );
+            for error in errors {
+                tracing::error!("{error}");
+            }
+        }
 
         Self {
             index: index.into_inner().unwrap(),
