@@ -1,4 +1,36 @@
 ---
 source: crates/ruff_linter/src/rules/ruff/mod.rs
 ---
+redirects.py:4:10: UP007B [*] Use `X | Y` for type annotations
+  |
+4 | def f(x: Optional[str]) -> None:  # noqa: U007B
+  |          ^^^^^^^^^^^^^ UP007B
+5 |     ...
+  |
+  = help: Convert to `X | Y`
 
+ℹ Safe fix
+1 1 | from typing import Optional
+2 2 | 
+3 3 | 
+4   |-def f(x: Optional[str]) -> None:  # noqa: U007B
+  4 |+def f(x: str | None) -> None:  # noqa: U007B
+5 5 |     ...
+6 6 | 
+7 7 | 
+
+redirects.py:8:10: UP007B [*] Use `X | Y` for type annotations
+  |
+8 | def f(x: Optional[str]) -> None:  # noqa: UP007B
+  |          ^^^^^^^^^^^^^ UP007B
+9 |     ...
+  |
+  = help: Convert to `X | Y`
+
+ℹ Safe fix
+5 5 |     ...
+6 6 | 
+7 7 | 
+8   |-def f(x: Optional[str]) -> None:  # noqa: UP007B
+  8 |+def f(x: str | None) -> None:  # noqa: UP007B
+9 9 |     ...

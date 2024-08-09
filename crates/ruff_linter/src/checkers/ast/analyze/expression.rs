@@ -27,7 +27,8 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
             // Ex) Optional[...], Union[...]
             if checker.any_enabled(&[
                 Rule::FutureRewritableTypeAnnotation,
-                Rule::NonPEP604Annotation,
+                Rule::NonPEP604AnnotationOptional,
+                Rule::NonPEP604AnnotationUnion,
             ]) {
                 if let Some(operator) = typing::to_pep604_operator(value, slice, &checker.semantic)
                 {
@@ -43,7 +44,22 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
                             );
                         }
                     }
-                    if checker.enabled(Rule::NonPEP604Annotation) {
+                    if checker.enabled(Rule::NonPEP604AnnotationOptional)
+                        && matches!(operator, typing::Pep604Operator::Optional)
+                    {
+                        if checker.source_type.is_stub()
+                            || checker.settings.target_version >= PythonVersion::Py310
+                            || (checker.settings.target_version >= PythonVersion::Py37
+                                && checker.semantic.future_annotations_or_stub()
+                                && checker.semantic.in_annotation()
+                                && !checker.settings.pyupgrade.keep_runtime_typing)
+                        {
+                            pyupgrade::rules::use_pep604_annotation(checker, expr, slice, operator);
+                        }
+                    }
+                    if checker.enabled(Rule::NonPEP604AnnotationUnion)
+                        && matches!(operator, typing::Pep604Operator::Union)
+                    {
                         if checker.source_type.is_stub()
                             || checker.settings.target_version >= PythonVersion::Py310
                             || (checker.settings.target_version >= PythonVersion::Py37
