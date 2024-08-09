@@ -128,15 +128,11 @@ pub fn is_metaclass(class_def: &ast::StmtClassDef, semantic: &SemanticModel) -> 
             func, arguments, ..
         }) => {
             // Ex) `class Foo(type(Protocol)): ...`
-            arguments.len() == 1
-                && semantic
-                    .match_builtin_expr(func.as_ref(), "type")
+            arguments.len() == 1 && semantic.match_builtin_expr(func.as_ref(), "type")
         }
         Expr::Subscript(ast::ExprSubscript { value, .. }) => {
             // Ex) `class Foo(type[int]): ...`
-            semantic
-                .match_builtin_expr(value.as_ref(), "type")
-                })
+            semantic.match_builtin_expr(value.as_ref(), "type")
         }
         _ => semantic
             .resolve_qualified_name(expr)
