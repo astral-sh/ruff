@@ -1570,6 +1570,9 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
             if checker.enabled(Rule::ParenthesizeChainedOperators) {
                 ruff::rules::parenthesize_chained_logical_operators(checker, bool_op);
             }
+            if checker.enabled(Rule::UnnecessaryChainedComparison) {
+                pylint::rules::unnecessary_chained_comparison(checker, bool_op);
+            }
         }
         Expr::Named(..) => {
             if checker.enabled(Rule::AssignmentInAssert) {
