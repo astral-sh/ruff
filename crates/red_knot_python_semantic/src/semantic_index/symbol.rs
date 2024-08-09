@@ -127,6 +127,10 @@ impl<'db> ScopeId<'db> {
             NodeWithScopeKind::Function(function)
             | NodeWithScopeKind::FunctionTypeParameters(function) => function.name.as_str(),
             NodeWithScopeKind::Lambda(_) => "<lambda>",
+            NodeWithScopeKind::ListComprehension(_) => "<listcomp>",
+            NodeWithScopeKind::SetComprehension(_) => "<setcomp>",
+            NodeWithScopeKind::DictComprehension(_) => "<dictcomp>",
+            NodeWithScopeKind::Generator(_) => "<generator>",
         }
     }
 }
@@ -170,6 +174,13 @@ pub enum ScopeKind {
     Annotation,
     Class,
     Function,
+    Generator,
+}
+
+impl ScopeKind {
+    pub const fn is_generator(self) -> bool {
+        matches!(self, ScopeKind::Generator)
+    }
 }
 
 /// Symbol table for a specific [`Scope`].
@@ -300,6 +311,10 @@ pub(crate) enum NodeWithScopeRef<'a> {
     Lambda(&'a ast::ExprLambda),
     FunctionTypeParameters(&'a ast::StmtFunctionDef),
     ClassTypeParameters(&'a ast::StmtClassDef),
+    ListComprehension(&'a ast::ExprListComp),
+    SetComprehension(&'a ast::ExprSetComp),
+    DictComprehension(&'a ast::ExprDictComp),
+    Generator(&'a ast::ExprGenerator),
 }
 
 impl NodeWithScopeRef<'_> {
@@ -326,6 +341,18 @@ impl NodeWithScopeRef<'_> {
             NodeWithScopeRef::ClassTypeParameters(class) => {
                 NodeWithScopeKind::ClassTypeParameters(AstNodeRef::new(module, class))
             }
+            NodeWithScopeRef::ListComprehension(comprehension) => {
+                NodeWithScopeKind::ListComprehension(AstNodeRef::new(module, comprehension))
+            }
+            NodeWithScopeRef::SetComprehension(comprehension) => {
+                NodeWithScopeKind::SetComprehension(AstNodeRef::new(module, comprehension))
+            }
+            NodeWithScopeRef::DictComprehension(comprehension) => {
+                NodeWithScopeKind::DictComprehension(AstNodeRef::new(module, comprehension))
+            }
+            NodeWithScopeRef::Generator(generator) => {
+                NodeWithScopeKind::Generator(AstNodeRef::new(module, generator))
+            }
         }
     }
 
@@ -337,6 +364,10 @@ impl NodeWithScopeRef<'_> {
             NodeWithScopeRef::Lambda(_) => ScopeKind::Function,
             NodeWithScopeRef::FunctionTypeParameters(_)
             | NodeWithScopeRef::ClassTypeParameters(_) => ScopeKind::Annotation,
+            NodeWithScopeRef::ListComprehension(_)
+            | NodeWithScopeRef::SetComprehension(_)
+            | NodeWithScopeRef::DictComprehension(_)
+            | NodeWithScopeRef::Generator(_) => ScopeKind::Generator,
         }
     }
 
@@ -356,6 +387,18 @@ impl NodeWithScopeRef<'_> {
             NodeWithScopeRef::ClassTypeParameters(class) => {
                 NodeWithScopeKey::ClassTypeParameters(NodeKey::from_node(class))
             }
+            NodeWithScopeRef::ListComprehension(comprehension) => {
+                NodeWithScopeKey::ListComprehension(NodeKey::from_node(comprehension))
+            }
+            NodeWithScopeRef::SetComprehension(comprehension) => {
+                NodeWithScopeKey::SetComprehension(NodeKey::from_node(comprehension))
+            }
+            NodeWithScopeRef::DictComprehension(comprehension) => {
+                NodeWithScopeKey::DictComprehension(NodeKey::from_node(comprehension))
+            }
+            NodeWithScopeRef::Generator(generator) => {
+                NodeWithScopeKey::Generator(NodeKey::from_node(generator))
+            }
         }
     }
 }
@@ -369,6 +412,10 @@ pub enum NodeWithScopeKind {
     Function(AstNodeRef<ast::StmtFunctionDef>),
     FunctionTypeParameters(AstNodeRef<ast::StmtFunctionDef>),
     Lambda(AstNodeRef<ast::ExprLambda>),
+    ListComprehension(AstNodeRef<ast::ExprListComp>),
+    SetComprehension(AstNodeRef<ast::ExprSetComp>),
+    DictComprehension(AstNodeRef<ast::ExprDictComp>),
+    Generator(AstNodeRef<ast::ExprGenerator>),
 }
 
 #[derive(Copy, Clone, Debug, Eq, PartialEq, Hash)]
@@ -379,4 +426,8 @@ pub(crate) enum NodeWithScopeKey {
     Function(NodeKey),
     FunctionTypeParameters(NodeKey),
     Lambda(NodeKey),
+    ListComprehension(NodeKey),
+    SetComprehension(NodeKey),
+    DictComprehension(NodeKey),
+    Generator(NodeKey),
 }

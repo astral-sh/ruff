@@ -44,6 +44,7 @@ pub(crate) enum DefinitionNodeRef<'a> {
     NamedExpression(&'a ast::ExprNamed),
     Assignment(AssignmentDefinitionNodeRef<'a>),
     AnnotatedAssignment(&'a ast::StmtAnnAssign),
+    Generator(GeneratorDefinitionNodeRef<'a>),
 }
 
 impl<'a> From<&'a ast::StmtFunctionDef> for DefinitionNodeRef<'a> {
@@ -88,6 +89,12 @@ impl<'a> From<AssignmentDefinitionNodeRef<'a>> for DefinitionNodeRef<'a> {
     }
 }
 
+impl<'a> From<GeneratorDefinitionNodeRef<'a>> for DefinitionNodeRef<'a> {
+    fn from(node: GeneratorDefinitionNodeRef<'a>) -> Self {
+        Self::Generator(node)
+    }
+}
+
 #[derive(Copy, Clone, Debug)]
 pub(crate) struct ImportFromDefinitionNodeRef<'a> {
     pub(crate) node: &'a ast::StmtImportFrom,
@@ -98,6 +105,12 @@ pub(crate) struct ImportFromDefinitionNodeRef<'a> {
 pub(crate) struct AssignmentDefinitionNodeRef<'a> {
     pub(crate) assignment: &'a ast::StmtAssign,
     pub(crate) target: &'a ast::ExprName,
+}
+
+#[derive(Copy, Clone, Debug)]
+pub(crate) struct GeneratorDefinitionNodeRef<'a> {
+    pub(crate) node: &'a ast::Comprehension,
+    pub(crate) first: bool,
 }
 
 impl DefinitionNodeRef<'_> {
@@ -131,6 +144,12 @@ impl DefinitionNodeRef<'_> {
             DefinitionNodeRef::AnnotatedAssignment(assign) => {
                 DefinitionKind::AnnotatedAssignment(AstNodeRef::new(parsed, assign))
             }
+            DefinitionNodeRef::Generator(GeneratorDefinitionNodeRef { node, first }) => {
+                DefinitionKind::Generator(GeneratorDefinitionKind {
+                    node: AstNodeRef::new(parsed, node),
+                    first,
+                })
+            }
         }
     }
 
@@ -148,6 +167,7 @@ impl DefinitionNodeRef<'_> {
                 target,
             }) => target.into(),
             Self::AnnotatedAssignment(node) => node.into(),
+            Self::Generator(GeneratorDefinitionNodeRef { node, first: _ }) => node.into(),
         }
     }
 }
@@ -161,6 +181,23 @@ pub enum DefinitionKind {
     NamedExpression(AstNodeRef<ast::ExprNamed>),
     Assignment(AssignmentDefinitionKind),
     AnnotatedAssignment(AstNodeRef<ast::StmtAnnAssign>),
+    Generator(GeneratorDefinitionKind),
+}
+
+#[derive(Clone, Debug)]
+pub struct GeneratorDefinitionKind {
+    node: AstNodeRef<ast::Comprehension>,
+    first: bool,
+}
+
+impl GeneratorDefinitionKind {
+    pub(crate) fn node(&self) -> &ast::Comprehension {
+        self.node.node()
+    }
+
+    pub(crate) fn is_first(&self) -> bool {
+        self.first
+    }
 }
 
 #[derive(Clone, Debug)]
@@ -227,6 +264,12 @@ impl From<&ast::ExprNamed> for DefinitionNodeKey {
 
 impl From<&ast::StmtAnnAssign> for DefinitionNodeKey {
     fn from(node: &ast::StmtAnnAssign) -> Self {
+        Self(NodeKey::from_node(node))
+    }
+}
+
+impl From<&ast::Comprehension> for DefinitionNodeKey {
+    fn from(node: &ast::Comprehension) -> Self {
         Self(NodeKey::from_node(node))
     }
 }
