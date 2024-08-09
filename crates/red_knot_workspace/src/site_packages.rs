@@ -377,7 +377,13 @@ impl SysPrefixPath {
         unvalidated_path: impl AsRef<SystemPath>,
         system: &dyn System,
     ) -> SitePackagesDiscoveryResult<Self> {
-        let unvalidated_path = unvalidated_path.as_ref();
+        Self::new_impl(unvalidated_path.as_ref(), system)
+    }
+
+    fn new_impl(
+        unvalidated_path: &SystemPath,
+        system: &dyn System,
+    ) -> SitePackagesDiscoveryResult<Self> {
         // It's important to resolve symlinks here rather than simply making the path absolute,
         // since system Python installations often only put symlinks in the "expected"
         // locations for `home` and `site-packages`

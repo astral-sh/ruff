@@ -165,7 +165,7 @@ fn run() -> anyhow::Result<ExitStatus> {
     // TODO: Verify the remaining search path settings eagerly.
     let site_packages = venv_path
         .map(|path| {
-            VirtualEnvironment::new(path, &system)
+            VirtualEnvironment::new(path, &OsSystem::new(cli_base_path))
                 .and_then(|venv| venv.site_packages_directories(&system))
         })
         .transpose()?
