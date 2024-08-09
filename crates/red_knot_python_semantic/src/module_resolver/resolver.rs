@@ -4,16 +4,16 @@ use std::iter::FusedIterator;
 use rustc_hash::{FxBuildHasher, FxHashSet};
 
 use ruff_db::files::{File, FilePath, FileRootKind};
-use ruff_db::system::{DirectoryEntry, SystemPath, SystemPathBuf};
-use ruff_db::vendored::VendoredPath;
+use ruff_db::system::{DirectoryEntry, System, SystemPath, SystemPathBuf};
+use ruff_db::vendored::{VendoredFileSystem, VendoredPath};
 
 use crate::db::Db;
 use crate::module_name::ModuleName;
-use crate::{Program, SearchPathSettings};
+use crate::module_resolver::typeshed::{vendored_typeshed_versions, TypeshedVersions};
+use crate::{Program, PythonVersion, SearchPathSettings};
 
 use super::module::{Module, ModuleKind};
 use super::path::{ModulePath, SearchPath, SearchPathValidationError};
-use super::state::ResolverState;
 
 /// Resolves a module name to a module.
 pub fn resolve_module(db: &dyn Db, module_name: ModuleName) -> Option<Module> {
@@ -122,7 +122,7 @@ pub(crate) fn search_paths(db: &dyn Db) -> SearchPathIterator {
     Program::get(db).search_paths(db).iter(db)
 }
 
-#[derive(Debug, PartialEq, Eq, Default)]
+#[derive(Debug, PartialEq, Eq)]
 pub(crate) struct SearchPaths {
     /// Search paths that have been statically determined purely from reading Ruff's configuration settings.
     /// These shouldn't ever change unless the config settings themselves change.
@@ -135,6 +135,8 @@ pub(crate) struct SearchPaths {
     /// in terms of module-resolution priority until we've discovered the editable installs
     /// for the first `site-packages` path
     site_packages: Vec<SearchPath>,
+
+    typeshed_versions: Cow<'static, TypeshedVersions>,
 }
 
 impl SearchPaths {
@@ -148,6 +150,10 @@ impl SearchPaths {
         db: &dyn Db,
         settings: SearchPathSettings,
     ) -> Result<Self, SearchPathValidationError> {
+        fn canonicalize(path: SystemPathBuf, system: &dyn System) -> SystemPathBuf {
+            system.canonicalize_path(&path).unwrap_or(path)
+        }
+
         let SearchPathSettings {
             extra_paths,
             src_root,
@@ -161,45 +167,60 @@ impl SearchPaths {
         let mut static_paths = vec![];
 
         for path in extra_paths {
-            tracing::debug!("Adding static extra search-path '{path}'");
+            let path = canonicalize(path, system);
+            files.try_add_root(db.upcast(), &path, FileRootKind::LibrarySearchPath);
+            tracing::debug!("Adding extra search-path '{path}'");
 
-            let search_path = SearchPath::extra(system, path)?;
-            files.try_add_root(
-                db.upcast(),
-                search_path.as_system_path().unwrap(),
-                FileRootKind::LibrarySearchPath,
-            );
-            static_paths.push(search_path);
+            static_paths.push(SearchPath::extra(system, path)?);
         }
 
         tracing::debug!("Adding first-party search path '{src_root}'");
         static_paths.push(SearchPath::first_party(system, src_root)?);
 
-        static_paths.push(if let Some(custom_typeshed) = custom_typeshed {
+        let (typeshed_versions, stdlib_path) = if let Some(custom_typeshed) = custom_typeshed {
+            let custom_typeshed = canonicalize(custom_typeshed, system);
             tracing::debug!("Adding custom-stdlib search path '{custom_typeshed}'");
 
-            let search_path = SearchPath::custom_stdlib(db, custom_typeshed)?;
             files.try_add_root(
                 db.upcast(),
-                search_path.as_system_path().unwrap(),
+                &custom_typeshed,
                 FileRootKind::LibrarySearchPath,
             );
-            search_path
+
+            let versions_path = custom_typeshed.join("stdlib/VERSIONS");
+
+            let versions_content = system.read_to_string(&versions_path).map_err(|error| {
+                SearchPathValidationError::FailedToReadVersionsFile {
+                    path: versions_path,
+                    error,
+                }
+            })?;
+
+            let parsed: TypeshedVersions = versions_content
+                .parse()
+                .map_err(SearchPathValidationError::VersionsParseError)?;
+
+            let search_path = SearchPath::custom_stdlib(db, &custom_typeshed)?;
+
+            (Cow::Owned(parsed), search_path)
         } else {
-            SearchPath::vendored_stdlib()
-        });
+            tracing::debug!("Using vendored stdlib");
+            (
+                Cow::Borrowed(vendored_typeshed_versions()),
+                SearchPath::vendored_stdlib(),
+            )
+        };
+
+        static_paths.push(stdlib_path);
 
         let mut site_packages: Vec<_> = Vec::with_capacity(site_packages_paths.len());
 
         for path in site_packages_paths {
+            let path = canonicalize(path, system);
+
             tracing::debug!("Adding site-packages search path '{path}'");
-            let search_path = SearchPath::site_packages(system, path)?;
-            files.try_add_root(
-                db.upcast(),
-                search_path.as_system_path().unwrap(),
-                FileRootKind::LibrarySearchPath,
-            );
-            site_packages.push(search_path);
+            files.try_add_root(db.upcast(), &path, FileRootKind::LibrarySearchPath);
+            site_packages.push(SearchPath::site_packages(system, path)?);
         }
 
         // TODO vendor typeshed's third-party stubs as well as the stdlib and fallback to them as a final step
@@ -224,15 +245,20 @@ impl SearchPaths {
         Ok(SearchPaths {
             static_paths,
             site_packages,
+            typeshed_versions,
         })
     }
 
-    pub(crate) fn iter<'a>(&'a self, db: &'a dyn Db) -> SearchPathIterator<'a> {
+    pub(super) fn iter<'a>(&'a self, db: &'a dyn Db) -> SearchPathIterator<'a> {
         SearchPathIterator {
             db,
             static_paths: self.static_paths.iter(),
             dynamic_paths: None,
         }
+    }
+
+    pub(super) fn typeshed_versions(&self) -> &TypeshedVersions {
+        &self.typeshed_versions
     }
 }
 
@@ -251,6 +277,7 @@ pub(crate) fn dynamic_resolution_paths(db: &dyn Db) -> Vec<SearchPath> {
     let SearchPaths {
         static_paths,
         site_packages,
+        typeshed_versions: _,
     } = Program::get(db).search_paths(db);
 
     let mut dynamic_paths = Vec::new();
@@ -315,12 +342,16 @@ pub(crate) fn dynamic_resolution_paths(db: &dyn Db) -> Vec<SearchPath> {
         let installations = all_pth_files.iter().flat_map(PthFile::items);
 
         for installation in installations {
+            let installation = system
+                .canonicalize_path(&installation)
+                .unwrap_or(installation);
+
             if existing_paths.insert(Cow::Owned(installation.clone())) {
-                match SearchPath::editable(system, installation) {
+                match SearchPath::editable(system, installation.clone()) {
                     Ok(search_path) => {
                         tracing::debug!(
                             "Adding editable installation to module resolution path {path}",
-                            path = search_path.as_system_path().unwrap()
+                            path = installation
                         );
                         dynamic_paths.push(search_path);
                     }
@@ -482,7 +513,7 @@ struct ModuleNameIngredient<'db> {
 fn resolve_name(db: &dyn Db, name: &ModuleName) -> Option<(SearchPath, File, ModuleKind)> {
     let program = Program::get(db);
     let target_version = program.target_version(db);
-    let resolver_state = ResolverState::new(db, target_version);
+    let resolver_state = ResolverContext::new(db, target_version);
     let is_builtin_module =
         ruff_python_stdlib::sys::is_builtin_module(target_version.minor, name.as_str());
 
@@ -545,7 +576,7 @@ fn resolve_name(db: &dyn Db, name: &ModuleName) -> Option<(SearchPath, File, Mod
 fn resolve_package<'a, 'db, I>(
     module_search_path: &SearchPath,
     components: I,
-    resolver_state: &ResolverState<'db>,
+    resolver_state: &ResolverContext<'db>,
 ) -> Result<ResolvedPackage, PackageKind>
 where
     I: Iterator<Item = &'a str>,
@@ -624,6 +655,21 @@ enum PackageKind {
 impl PackageKind {
     const fn is_regular_package(self) -> bool {
         matches!(self, PackageKind::Regular)
+    }
+}
+
+pub(super) struct ResolverContext<'db> {
+    pub(crate) db: &'db dyn Db,
+    pub(crate) target_version: PythonVersion,
+}
+
+impl<'db> ResolverContext<'db> {
+    pub(super) fn new(db: &'db dyn Db, target_version: PythonVersion) -> Self {
+        Self { db, target_version }
+    }
+
+    pub(super) fn vendored(&self) -> &VendoredFileSystem {
+        self.db.vendored()
     }
 }
 

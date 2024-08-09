@@ -12,7 +12,6 @@ use crate::Db;
 pub struct Program {
     pub target_version: PythonVersion,
 
-    #[default]
     #[return_ref]
     pub(crate) search_paths: SearchPaths,
 }
@@ -29,9 +28,8 @@ impl Program {
         let search_paths = SearchPaths::from_settings(db, search_paths)
             .with_context(|| "Invalid search path settings")?;
 
-        Ok(Program::builder(settings.target_version)
+        Ok(Program::builder(settings.target_version, search_paths)
             .durability(Durability::HIGH)
-            .search_paths(search_paths)
             .new(db))
     }
 
