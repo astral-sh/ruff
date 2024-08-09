@@ -56,10 +56,10 @@ pub(crate) fn for_variable_used_after_block(
         .filter_map(|(name, binding)| binding.kind.is_loop_var().then_some((name, binding)));
 
     for (name, binding) in loop_var_bindings {
-        let binding_statement = binding.statement(checker.semantic()).unwrap();
         let binding_source_node_id = binding.source.unwrap();
         // The node_id of the for-loop that contains the binding
         let binding_statement_id = checker.semantic().statement_id(binding_source_node_id);
+        let binding_statement = checker.semantic().statement(binding_source_node_id);
 
         // Loop over the references of those bindings to see if they're in the same block-scope
         'references: for reference in binding.references() {
