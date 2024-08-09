@@ -286,7 +286,13 @@ impl<'a> ConfigurationTransformer for EditorConfigurationTransformer<'a> {
             match open_configuration_file(&config_file_path, project_root) {
                 Ok(config_from_file) => editor_configuration.combine(config_from_file),
                 Err(err) => {
-                    tracing::error!("Unable to find editor-specified configuration file: {err}");
+                    tracing::error!(
+                        "Error while loading options from `ruff.configuration` file at {}: {err}",
+                        config_file_path.display()
+                    );
+                    show_err_msg!(
+                        "Error while loading options from the file specified in `ruff.configuration`. Check the logs for more details."
+                    );
                     editor_configuration
                 }
             }

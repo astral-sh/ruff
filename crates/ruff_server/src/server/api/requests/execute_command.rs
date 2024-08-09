@@ -62,7 +62,7 @@ impl super::SyncRequestHandler for ExecuteCommand {
         for Argument { uri, version } in arguments {
             let Some(snapshot) = session.take_snapshot(uri.clone()) else {
                 tracing::error!("Document at {uri} could not be opened");
-                show_err_msg!("Ruff does not recognize this file");
+                show_err_msg!("Ruff does not recognize the file at {uri}");
                 return Ok(None);
             };
             match command {
