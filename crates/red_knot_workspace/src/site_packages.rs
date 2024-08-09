@@ -506,7 +506,7 @@ mod tests {
                     let system_home_path = system_install_sys_prefix.clone();
                     let system_exe_path = system_home_path.join("python.exe");
                     let system_site_packages_path =
-                        system_install_sys_prefix.join("Lib/site-packages");
+                        system_install_sys_prefix.join(r"Lib\site-packages");
                     (system_home_path, system_exe_path, system_site_packages_path)
                 } else {
                     let system_home_path = system_install_sys_prefix.join("bin");
@@ -523,8 +523,8 @@ mod tests {
             let venv_sys_prefix = SystemPathBuf::from("/.venv");
             let (venv_exe, site_packages_path) = if cfg!(target_os = "windows") {
                 (
-                    venv_sys_prefix.join("Scripts/python.exe"),
-                    venv_sys_prefix.join("Lib/site-packages"),
+                    venv_sys_prefix.join(r"Scripts\python.exe"),
+                    venv_sys_prefix.join(r"Lib\site-packages"),
                 )
             } else {
                 (
@@ -575,7 +575,7 @@ mod tests {
             }
 
             let expected_home = if cfg!(target_os = "windows") {
-                SystemPathBuf::from(&*format!("/Python3.{}", self.minor_version))
+                SystemPathBuf::from(&*format!(r"\Python3.{}", self.minor_version))
             } else {
                 SystemPathBuf::from(&*format!("/Python3.{}/bin", self.minor_version))
             };
@@ -583,7 +583,7 @@ mod tests {
 
             let site_packages_directories = venv.site_packages_directories(&self.system).unwrap();
             let expected_venv_site_packages = if cfg!(target_os = "windows") {
-                SystemPathBuf::from("/.venv/Lib/site-packages")
+                SystemPathBuf::from(r"\.venv\Lib\site-packages")
             } else if self.free_threaded {
                 SystemPathBuf::from(&*format!(
                     "/.venv/lib/python3.{}t/site-packages",
@@ -598,7 +598,7 @@ mod tests {
 
             let expected_system_site_packages = if cfg!(target_os = "windows") {
                 SystemPathBuf::from(&*format!(
-                    "/Python3.{}/Lib/site-packages",
+                    r"\Python3.{}\Lib\site-packages",
                     self.minor_version
                 ))
             } else if self.free_threaded {
