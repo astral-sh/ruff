@@ -1,0 +1,56 @@
+---
+source: crates/ruff_linter/src/rules/flake8_django/mod.rs
+---
+DJ014.py:51:7: DJ014 Model defines a `__unicode__` method
+   |
+50 | # Models with __unicode__
+51 | class TestModel4(Model):
+   |       ^^^^^^^^^^ DJ014
+52 |     new_field = models.CharField(max_length=10)
+   |
+
+DJ014.py:69:7: DJ014 Model defines a `__unicode__` method
+   |
+69 | class TestModel5(models.Model):
+   |       ^^^^^^^^^^ DJ014
+70 |     new_field = models.CharField(max_length=10)
+   |
+
+DJ014.py:117:7: DJ014 Model defines a `__unicode__` method
+    |
+116 | # Abstract models with __unicode__
+117 | class AbstractTestModel3(Model):
+    |       ^^^^^^^^^^^^^^^^^^ DJ014
+118 |     new_field = models.CharField(max_length=10)
+    |
+
+DJ014.py:134:7: DJ014 Model defines a `__unicode__` method
+    |
+134 | class AbstractTestModel4(models.Model):
+    |       ^^^^^^^^^^^^^^^^^^ DJ014
+135 |     new_field = models.CharField(max_length=10)
+    |
+
+DJ014.py:151:7: DJ014 Model defines a `__unicode__` method
+    |
+151 | class AbstractTestModel5(models.Model):
+    |       ^^^^^^^^^^^^^^^^^^ DJ014
+152 |     new_field = models.CharField(max_length=10)
+    |
+
+DJ014.py:169:7: DJ014 Model defines a `__unicode__` method
+    |
+168 | # Subclass with its own __unicode__
+169 | class SubclassTestModel1(TestModel1):
+    |       ^^^^^^^^^^^^^^^^^^ DJ014
+170 |     def __unicode__(self):
+171 |         return self.new_field
+    |
+
+DJ014.py:175:7: DJ014 Model defines a `__unicode__` method
+    |
+174 | # Subclass with inherited __unicode__
+175 | class SubclassTestModel2(TestModel4):
+    |       ^^^^^^^^^^^^^^^^^^ DJ014
+176 |     pass
+    |
