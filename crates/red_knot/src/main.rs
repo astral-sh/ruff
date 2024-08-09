@@ -165,7 +165,8 @@ fn run() -> anyhow::Result<ExitStatus> {
     // TODO: Verify the remaining search path settings eagerly.
     let site_packages = venv_path
         .map(|path| {
-            VirtualEnvironment::new(path, &system).and_then(|venv| venv.site_packages_dirs(&system))
+            VirtualEnvironment::new(path, &system)
+                .and_then(|venv| venv.site_packages_directories(&system))
         })
         .transpose()?
         .unwrap_or_default();
