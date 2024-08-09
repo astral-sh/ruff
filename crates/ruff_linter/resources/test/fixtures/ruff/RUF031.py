@@ -29,3 +29,7 @@ d[(1,)]
 d[()] # empty tuples should be ignored
 d[:,] # slices in the subscript lead to syntax error if parens are added
 d[1,2,:]
+
+# Should keep these parentheses in
+# Python 3.8 to avoid syntax error.
+d[(*foo,bar)] 

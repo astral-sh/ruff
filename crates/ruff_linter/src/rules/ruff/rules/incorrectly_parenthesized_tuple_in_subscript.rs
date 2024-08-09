@@ -3,7 +3,7 @@ use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::{Expr, ExprSubscript};
 use ruff_text_size::Ranged;
 
-use crate::checkers::ast::Checker;
+use crate::{checkers::ast::Checker, settings::types::PythonVersion};
 
 /// ## What it does
 /// Checks for consistent style regarding whether nonempty tuples in subscripts
@@ -66,6 +66,14 @@ pub(crate) fn subscript_with_parenthesized_tuple(checker: &mut Checker, subscrip
     }
     // Adding parentheses in the presence of a slice leads to a syntax error.
     if prefer_parentheses && tuple_subscript.elts.iter().any(Expr::is_slice_expr) {
+        return;
+    }
+    // Removing parentheses in the presence of unpacking leads
+    // to a syntax error in Python 3.8.
+    if checker.settings.target_version <= PythonVersion::Py38
+        && !prefer_parentheses
+        && tuple_subscript.elts.iter().any(Expr::is_starred_expr)
+    {
         return;
     }
     let locator = checker.locator();
