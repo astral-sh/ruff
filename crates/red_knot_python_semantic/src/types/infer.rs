@@ -61,7 +61,7 @@ pub(crate) fn infer_scope_types<'db>(db: &'db dyn Db, scope: ScopeId<'db>) -> Ty
     TypeInferenceBuilder::new(db, InferenceRegion::Scope(scope), index).finish()
 }
 
-/// Cycle recovery for [`infer_definition_types`]: for now, just [`Type::Unknown`]
+/// Cycle recovery for [`infer_definition_types()`]: for now, just [`Type::Unknown`]
 /// TODO fixpoint iteration
 fn infer_definition_types_cycle_recovery<'db>(
     _db: &'db dyn Db,
@@ -923,7 +923,6 @@ impl<'db> TypeInferenceBuilder<'db> {
         ty
     }
 
-    #[allow(clippy::unused_self)]
     fn infer_number_literal_expression(&mut self, literal: &ast::ExprNumberLiteral) -> Type<'db> {
         let ast::ExprNumberLiteral { range: _, value } = literal;
 
@@ -1179,12 +1178,10 @@ impl<'db> TypeInferenceBuilder<'db> {
         let body_ty = self.infer_expression(body);
         let orelse_ty = self.infer_expression(orelse);
 
-        let union = UnionTypeBuilder::new(self.db)
+        UnionTypeBuilder::new(self.db)
             .add(body_ty)
             .add(orelse_ty)
-            .build();
-
-        Type::Union(union)
+            .build()
     }
 
     fn infer_lambda_body(&mut self, lambda_expression: &ast::ExprLambda) {
@@ -2193,6 +2190,26 @@ mod tests {
     }
 
     #[test]
+    fn narrow_not_none() -> anyhow::Result<()> {
+        let mut db = setup_db();
+
+        db.write_dedented(
+            "/src/a.py",
+            "
+            x = None if flag else 1
+            y = 0
+            if x is not None:
+                y = x
+            ",
+        )?;
+
+        assert_public_ty(&db, "/src/a.py", "x", "Literal[1] | None");
+        assert_public_ty(&db, "/src/a.py", "y", "Literal[0, 1]");
+
+        Ok(())
+    }
+
+    #[test]
     fn while_loop() -> anyhow::Result<()> {
         let mut db = setup_db();
 
@@ -2289,10 +2306,11 @@ mod tests {
 
     fn first_public_def<'db>(db: &'db TestDb, file: File, name: &str) -> Definition<'db> {
         let scope = global_scope(db, file);
-        *use_def_map(db, scope)
+        use_def_map(db, scope)
             .public_definitions(symbol_table(db, scope).symbol_id_by_name(name).unwrap())
-            .first()
+            .next()
             .unwrap()
+            .definition
     }
 
     #[test]

@@ -125,98 +125,142 @@
 //! (In the future we may have some other questions we want to answer as well, such as "is this
 //! definition used?", which will require tracking a bit more info in our map, e.g. a "used" bit
 //! for each [`Definition`] which is flipped to true when we record that definition for a use.)
+use self::constrained_definition::{
+    ConstrainedDefinitions, ConstraintIdIterator, DefinitionIdWithConstraintsIterator,
+    ScopedConstraintId, ScopedDefinitionId,
+};
 use crate::semantic_index::ast_ids::ScopedUseId;
 use crate::semantic_index::definition::Definition;
+use crate::semantic_index::expression::Expression;
 use crate::semantic_index::symbol::ScopedSymbolId;
 use ruff_index::IndexVec;
-use std::ops::Range;
 
-/// All definitions that can reach a given use of a name.
+mod bitset;
+mod constrained_definition;
+
+/// Applicable definitions and constraints for every use of a name.
 #[derive(Debug, PartialEq, Eq)]
 pub(crate) struct UseDefMap<'db> {
-    // TODO store constraints with definitions for type narrowing
-    /// Definition IDs array for `definitions_by_use` and `public_definitions` to slice into.
-    all_definitions: Vec<Definition<'db>>,
+    /// Array of [`Definition`] for [`ConstrainedDefinitions`] to reference. `None` is unbound.
+    all_definitions: IndexVec<ScopedDefinitionId, Definition<'db>>,
+
+    /// Array of constraints (as [`Expression`]).
+    all_constraints: IndexVec<ScopedConstraintId, Expression<'db>>,
 
     /// Definitions that can reach a [`ScopedUseId`].
-    definitions_by_use: IndexVec<ScopedUseId, Definitions>,
+    definitions_by_use: IndexVec<ScopedUseId, ConstrainedDefinitions>,
 
     /// Definitions of each symbol visible at end of scope.
-    public_definitions: IndexVec<ScopedSymbolId, Definitions>,
+    public_definitions: IndexVec<ScopedSymbolId, ConstrainedDefinitions>,
 }
 
 impl<'db> UseDefMap<'db> {
-    pub(crate) fn use_definitions(&self, use_id: ScopedUseId) -> &[Definition<'db>] {
-        &self.all_definitions[self.definitions_by_use[use_id].definitions_range.clone()]
+    pub(crate) fn use_definitions(
+        &self,
+        use_id: ScopedUseId,
+    ) -> DefinitionWithConstraintsIterator<'_, 'db> {
+        DefinitionWithConstraintsIterator {
+            all_definitions: &self.all_definitions,
+            all_constraints: &self.all_constraints,
+            wrapped: self.definitions_by_use[use_id].iter_visible_definitions(),
+        }
     }
 
     pub(crate) fn use_may_be_unbound(&self, use_id: ScopedUseId) -> bool {
-        self.definitions_by_use[use_id].may_be_unbound
+        self.definitions_by_use[use_id].may_be_unbound()
     }
 
-    pub(crate) fn public_definitions(&self, symbol: ScopedSymbolId) -> &[Definition<'db>] {
-        &self.all_definitions[self.public_definitions[symbol].definitions_range.clone()]
+    pub(crate) fn public_definitions(
+        &self,
+        symbol: ScopedSymbolId,
+    ) -> DefinitionWithConstraintsIterator<'_, 'db> {
+        DefinitionWithConstraintsIterator {
+            all_definitions: &self.all_definitions,
+            all_constraints: &self.all_constraints,
+            wrapped: self.public_definitions[symbol].iter_visible_definitions(),
+        }
     }
 
     pub(crate) fn public_may_be_unbound(&self, symbol: ScopedSymbolId) -> bool {
-        self.public_definitions[symbol].may_be_unbound
+        self.public_definitions[symbol].may_be_unbound()
     }
-}
-
-/// Definitions visible for a symbol at a particular use (or end-of-scope).
-#[derive(Clone, Debug, PartialEq, Eq)]
-struct Definitions {
-    /// [`Range`] in `all_definitions` of the visible definition IDs.
-    definitions_range: Range<usize>,
-    /// Is the symbol possibly unbound at this point?
-    may_be_unbound: bool,
-}
-
-impl Definitions {
-    /// The default state of a symbol is "no definitions, may be unbound", aka definitely-unbound.
-    fn unbound() -> Self {
-        Self {
-            definitions_range: Range::default(),
-            may_be_unbound: true,
-        }
-    }
-}
-
-impl Default for Definitions {
-    fn default() -> Self {
-        Definitions::unbound()
-    }
-}
-
-/// A snapshot of the visible definitions for each symbol at a particular point in control flow.
-#[derive(Clone, Debug)]
-pub(super) struct FlowSnapshot {
-    definitions_by_symbol: IndexVec<ScopedSymbolId, Definitions>,
 }
 
 #[derive(Debug)]
+pub(crate) struct DefinitionWithConstraintsIterator<'map, 'db> {
+    all_definitions: &'map IndexVec<ScopedDefinitionId, Definition<'db>>,
+    all_constraints: &'map IndexVec<ScopedConstraintId, Expression<'db>>,
+    wrapped: DefinitionIdWithConstraintsIterator<'map>,
+}
+
+impl<'map, 'db> Iterator for DefinitionWithConstraintsIterator<'map, 'db> {
+    type Item = DefinitionWithConstraints<'map, 'db>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        self.wrapped
+            .next()
+            .map(|def_id_with_constraints| DefinitionWithConstraints {
+                definition: self.all_definitions[def_id_with_constraints.definition],
+                constraints: ConstraintsIterator {
+                    all_constraints: self.all_constraints,
+                    constraint_ids: def_id_with_constraints.constraint_ids,
+                },
+            })
+    }
+}
+
+pub(crate) struct DefinitionWithConstraints<'map, 'db> {
+    pub(crate) definition: Definition<'db>,
+    pub(crate) constraints: ConstraintsIterator<'map, 'db>,
+}
+
+pub(crate) struct ConstraintsIterator<'map, 'db> {
+    all_constraints: &'map IndexVec<ScopedConstraintId, Expression<'db>>,
+    constraint_ids: ConstraintIdIterator<'map>,
+}
+
+impl<'map, 'db> Iterator for ConstraintsIterator<'map, 'db> {
+    type Item = Expression<'db>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        self.constraint_ids
+            .next()
+            .map(|constraint_id| self.all_constraints[constraint_id])
+    }
+}
+
+impl std::iter::FusedIterator for ConstraintsIterator<'_, '_> {}
+
+/// A snapshot of the definitions and constraints state at a particular point in control flow.
+#[derive(Clone, Debug)]
+pub(super) struct FlowSnapshot {
+    definitions_by_symbol: IndexVec<ScopedSymbolId, ConstrainedDefinitions>,
+}
+
+#[derive(Debug, Default)]
 pub(super) struct UseDefMapBuilder<'db> {
-    /// Definition IDs array for `definitions_by_use` and `definitions_by_symbol` to slice into.
-    all_definitions: Vec<Definition<'db>>,
+    /// Append-only array of [`Definition`]; None is unbound.
+    all_definitions: IndexVec<ScopedDefinitionId, Definition<'db>>,
+
+    /// Append-only array of constraints (as [`Expression`]).
+    all_constraints: IndexVec<ScopedConstraintId, Expression<'db>>,
 
     /// Visible definitions at each so-far-recorded use.
-    definitions_by_use: IndexVec<ScopedUseId, Definitions>,
+    definitions_by_use: IndexVec<ScopedUseId, ConstrainedDefinitions>,
 
     /// Currently visible definitions for each symbol.
-    definitions_by_symbol: IndexVec<ScopedSymbolId, Definitions>,
+    definitions_by_symbol: IndexVec<ScopedSymbolId, ConstrainedDefinitions>,
 }
 
 impl<'db> UseDefMapBuilder<'db> {
     pub(super) fn new() -> Self {
-        Self {
-            all_definitions: Vec::new(),
-            definitions_by_use: IndexVec::new(),
-            definitions_by_symbol: IndexVec::new(),
-        }
+        Self::default()
     }
 
     pub(super) fn add_symbol(&mut self, symbol: ScopedSymbolId) {
-        let new_symbol = self.definitions_by_symbol.push(Definitions::unbound());
+        let new_symbol = self
+            .definitions_by_symbol
+            .push(ConstrainedDefinitions::unbound());
         debug_assert_eq!(symbol, new_symbol);
     }
 
@@ -227,13 +271,15 @@ impl<'db> UseDefMapBuilder<'db> {
     ) {
         // We have a new definition of a symbol; this replaces any previous definitions in this
         // path.
-        let def_idx = self.all_definitions.len();
-        self.all_definitions.push(definition);
-        self.definitions_by_symbol[symbol] = Definitions {
-            #[allow(clippy::range_plus_one)]
-            definitions_range: def_idx..(def_idx + 1),
-            may_be_unbound: false,
-        };
+        let def_id = self.all_definitions.push(definition);
+        self.definitions_by_symbol[symbol] = ConstrainedDefinitions::with(def_id);
+    }
+
+    pub(super) fn record_constraint(&mut self, constraint: Expression<'db>) {
+        let constraint_id = self.all_constraints.push(constraint);
+        for definitions in &mut self.definitions_by_symbol {
+            definitions.add_constraint(constraint_id);
+        }
     }
 
     pub(super) fn record_use(&mut self, symbol: ScopedSymbolId, use_id: ScopedUseId) {
@@ -265,9 +311,9 @@ impl<'db> UseDefMapBuilder<'db> {
 
         // If the snapshot we are restoring is missing some symbols we've recorded since, we need
         // to fill them in so the symbol IDs continue to line up. Since they don't exist in the
-        // snapshot, the correct state to fill them in with is "unbound", the default.
+        // snapshot, the correct state to fill them in with is "unbound".
         self.definitions_by_symbol
-            .resize(num_symbols, Definitions::unbound());
+            .resize(num_symbols, ConstrainedDefinitions::unbound());
     }
 
     /// Merge the given snapshot into the current state, reflecting that we might have taken either
@@ -288,65 +334,24 @@ impl<'db> UseDefMapBuilder<'db> {
         debug_assert!(self.definitions_by_symbol.len() >= snapshot.definitions_by_symbol.len());
 
         for (symbol_id, current) in self.definitions_by_symbol.iter_mut_enumerated() {
-            let Some(snapshot) = snapshot.definitions_by_symbol.get(symbol_id) else {
-                // Symbol not present in snapshot, so it's unbound from that path.
-                current.may_be_unbound = true;
-                continue;
-            };
-
-            // If the symbol can be unbound in either predecessor, it can be unbound post-merge.
-            current.may_be_unbound |= snapshot.may_be_unbound;
-
-            // Merge the definition ranges.
-            let current = &mut current.definitions_range;
-            let snapshot = &snapshot.definitions_range;
-
-            // We never create reversed ranges.
-            debug_assert!(current.end >= current.start);
-            debug_assert!(snapshot.end >= snapshot.start);
-
-            if current == snapshot {
-                // Ranges already identical, nothing to do.
-            } else if snapshot.is_empty() {
-                // Merging from an empty range; nothing to do.
-            } else if (*current).is_empty() {
-                // Merging to an empty range; just use the incoming range.
-                *current = snapshot.clone();
-            } else if snapshot.end >= current.start && snapshot.start <= current.end {
-                // Ranges are adjacent or overlapping, merge them in-place.
-                *current = current.start.min(snapshot.start)..current.end.max(snapshot.end);
-            } else if current.end == self.all_definitions.len() {
-                // Ranges are not adjacent or overlapping, `current` is at the end of
-                // `all_definitions`, we need to copy `snapshot` to the end so they are adjacent
-                // and can be merged into one range.
-                self.all_definitions.extend_from_within(snapshot.clone());
-                current.end = self.all_definitions.len();
-            } else if snapshot.end == self.all_definitions.len() {
-                // Ranges are not adjacent or overlapping, `snapshot` is at the end of
-                // `all_definitions`, we need to copy `current` to the end so they are adjacent and
-                // can be merged into one range.
-                self.all_definitions.extend_from_within(current.clone());
-                current.start = snapshot.start;
-                current.end = self.all_definitions.len();
+            if let Some(snapshot) = snapshot.definitions_by_symbol.get(symbol_id) {
+                *current = ConstrainedDefinitions::merge(current, snapshot);
             } else {
-                // Ranges are not adjacent and neither one is at the end of `all_definitions`, we
-                // have to copy both to the end so they are adjacent and we can merge them.
-                let start = self.all_definitions.len();
-                self.all_definitions.extend_from_within(current.clone());
-                self.all_definitions.extend_from_within(snapshot.clone());
-                current.start = start;
-                current.end = self.all_definitions.len();
+                // Symbol not present in snapshot, so it's unbound from that path.
+                current.add_unbound();
             }
         }
     }
 
     pub(super) fn finish(mut self) -> UseDefMap<'db> {
         self.all_definitions.shrink_to_fit();
+        self.all_constraints.shrink_to_fit();
         self.definitions_by_symbol.shrink_to_fit();
         self.definitions_by_use.shrink_to_fit();
 
         UseDefMap {
             all_definitions: self.all_definitions,
+            all_constraints: self.all_constraints,
             definitions_by_use: self.definitions_by_use,
             public_definitions: self.definitions_by_symbol,
         }
