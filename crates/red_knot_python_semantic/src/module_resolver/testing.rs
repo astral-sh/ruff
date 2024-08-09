@@ -178,6 +178,7 @@ impl TestCaseBuilder<UnspecifiedTypeshed> {
             first_party_files,
             site_packages_files,
         } = self;
+
         TestCaseBuilder {
             typeshed_option: typeshed,
             target_version,
@@ -194,6 +195,7 @@ impl TestCaseBuilder<UnspecifiedTypeshed> {
             site_packages,
             target_version,
         } = self.with_custom_typeshed(MockedTypeshed::default()).build();
+
         TestCase {
             db,
             src,
