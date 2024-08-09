@@ -145,10 +145,6 @@ fn try_resolve_module_resolution_settings(
         tracing::info!("Custom typeshed directory: {custom_typeshed}");
     }
 
-    if !site_packages.is_empty() {
-        tracing::info!("Site-packages directories: {site_packages:?}");
-    }
-
     let system = db.system();
     let files = db.files();
 

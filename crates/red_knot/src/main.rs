@@ -10,7 +10,7 @@ use salsa::plumbing::ZalsaDatabase;
 use red_knot_python_semantic::{ProgramSettings, SearchPathSettings};
 use red_knot_server::run_server;
 use red_knot_workspace::db::RootDatabase;
-use red_knot_workspace::site_packages::site_packages_dirs_of_venv;
+use red_knot_workspace::site_packages::VirtualEnvironment;
 use red_knot_workspace::watch;
 use red_knot_workspace::watch::WorkspaceWatcher;
 use red_knot_workspace::workspace::WorkspaceMetadata;
@@ -164,16 +164,9 @@ fn run() -> anyhow::Result<ExitStatus> {
 
     // TODO: Verify the remaining search path settings eagerly.
     let site_packages = venv_path
-        .map(|venv_path| {
-            let venv_path = SystemPath::absolute(venv_path, &cli_base_path);
-
-            if system.is_directory(&venv_path) {
-                Ok(site_packages_dirs_of_venv(&venv_path, &system)?)
-            } else {
-                Err(anyhow!(
-                    "Provided venv-path {venv_path} is not a directory!"
-                ))
-            }
+        .map(|path| {
+            VirtualEnvironment::new(path, &OsSystem::new(cli_base_path))
+                .and_then(|venv| venv.site_packages_directories(&system))
         })
         .transpose()?
         .unwrap_or_default();
