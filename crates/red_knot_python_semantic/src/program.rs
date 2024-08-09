@@ -1,11 +1,11 @@
-use crate::python_version::TargetVersion;
+use crate::python_version::PythonVersion;
 use crate::Db;
 use ruff_db::system::SystemPathBuf;
 use salsa::Durability;
 
 #[salsa::input(singleton)]
 pub struct Program {
-    pub target_version: TargetVersion,
+    pub target_version: PythonVersion,
 
     #[return_ref]
     pub search_paths: SearchPathSettings,
@@ -21,7 +21,7 @@ impl Program {
 
 #[derive(Debug, Eq, PartialEq)]
 pub struct ProgramSettings {
-    pub target_version: TargetVersion,
+    pub target_version: PythonVersion,
     pub search_paths: SearchPathSettings,
 }
 

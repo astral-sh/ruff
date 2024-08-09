@@ -1,4 +1,4 @@
-use red_knot_python_semantic::{ProgramSettings, SearchPathSettings, TargetVersion};
+use red_knot_python_semantic::{ProgramSettings, PythonVersion, SearchPathSettings};
 use red_knot_workspace::db::RootDatabase;
 use red_knot_workspace::lint::lint_semantic;
 use red_knot_workspace::workspace::WorkspaceMetadata;
@@ -17,7 +17,7 @@ fn setup_db(workspace_root: SystemPathBuf) -> anyhow::Result<RootDatabase> {
         site_packages: vec![],
     };
     let settings = ProgramSettings {
-        target_version: TargetVersion::default(),
+        target_version: PythonVersion::default(),
         search_paths,
     };
     let db = RootDatabase::new(workspace, settings, system);

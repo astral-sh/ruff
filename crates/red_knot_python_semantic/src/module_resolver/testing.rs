@@ -3,7 +3,7 @@ use ruff_db::vendored::VendoredPathBuf;
 
 use crate::db::tests::TestDb;
 use crate::program::{Program, SearchPathSettings};
-use crate::python_version::TargetVersion;
+use crate::python_version::PythonVersion;
 
 /// A test case for the module resolver.
 ///
@@ -17,7 +17,7 @@ pub(crate) struct TestCase<T> {
     // so this is a single directory instead of a `Vec` of directories,
     // like it is in `ruff_db::Program`.
     pub(crate) site_packages: SystemPathBuf,
-    pub(crate) target_version: TargetVersion,
+    pub(crate) target_version: PythonVersion,
 }
 
 /// A `(file_name, file_contents)` tuple
@@ -99,7 +99,7 @@ pub(crate) struct UnspecifiedTypeshed;
 /// to `()`.
 pub(crate) struct TestCaseBuilder<T> {
     typeshed_option: T,
-    target_version: TargetVersion,
+    target_version: PythonVersion,
     first_party_files: Vec<FileSpec>,
     site_packages_files: Vec<FileSpec>,
 }
@@ -118,7 +118,7 @@ impl<T> TestCaseBuilder<T> {
     }
 
     /// Specify the target Python version the module resolver should assume
-    pub(crate) fn with_target_version(mut self, target_version: TargetVersion) -> Self {
+    pub(crate) fn with_target_version(mut self, target_version: PythonVersion) -> Self {
         self.target_version = target_version;
         self
     }
@@ -145,7 +145,7 @@ impl TestCaseBuilder<UnspecifiedTypeshed> {
     pub(crate) fn new() -> TestCaseBuilder<UnspecifiedTypeshed> {
         Self {
             typeshed_option: UnspecifiedTypeshed,
-            target_version: TargetVersion::default(),
+            target_version: PythonVersion::default(),
             first_party_files: vec![],
             site_packages_files: vec![],
         }
