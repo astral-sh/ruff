@@ -1502,7 +1502,8 @@ mod tests {
 
     use crate::builtins::builtins_scope;
     use crate::db::tests::TestDb;
-    use crate::program::{Program, SearchPathSettings, TargetVersion};
+    use crate::program::{Program, SearchPathSettings};
+    use crate::python_version::TargetVersion;
     use crate::semantic_index::definition::Definition;
     use crate::semantic_index::symbol::FileScopeId;
     use crate::semantic_index::{global_scope, semantic_index, symbol_table, use_def_map};
