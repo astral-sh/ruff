@@ -465,6 +465,18 @@ impl fmt::Display for PythonHomePath {
     }
 }
 
+impl PartialEq<SystemPath> for PythonHomePath {
+    fn eq(&self, other: &SystemPath) -> bool {
+        &*self.0 == other
+    }
+}
+
+impl PartialEq<SystemPathBuf> for PythonHomePath {
+    fn eq(&self, other: &SystemPathBuf) -> bool {
+        self == &**other
+    }
+}
+
 /// E.g. `12` for Python 3.12.4
 ///
 /// Note: this may not represent a Python version that we actually support!
@@ -507,57 +519,227 @@ impl PartialEq<u8> for PythonMinorVersion {
 
 #[cfg(test)]
 mod tests {
-    use ruff_db::system::{OsSystem, TestSystem};
+    use ruff_db::system::TestSystem;
 
     use super::*;
 
-    fn check_venv_basics_at_path(venv_name: impl AsRef<SystemPath>) {
-        let path_to_venv = SystemPath::new("resources/test").join(venv_name);
-        let system = OsSystem::default();
-
-        // if this doesn't hold true, the premise of the test is incorrect.
-        assert!(system.is_directory(&path_to_venv));
-
-        let virtual_environment = VirtualEnvironment::new(path_to_venv.clone(), &system).unwrap();
-        assert_eq!(
-            virtual_environment.venv_path,
-            SysPrefixPath(system.canonicalize_path(&path_to_venv).unwrap())
-        );
-        assert!(!virtual_environment.include_system_site_packages);
-        assert!(virtual_environment
-            .minor_version
-            .is_some_and(|minor_ver| minor_ver == 12));
-
-        assert!(!virtual_environment
-            .base_executable_home_path
-            .as_str()
-            .is_empty());
-
-        let site_packages_directories = virtual_environment
-            .site_packages_directories(&system)
-            .unwrap();
-        assert_eq!(site_packages_directories.len(), 1);
+    struct VirtualEnvironmentTester {
+        system: TestSystem,
+        minor_version: u8,
+        free_threaded: bool,
+        system_site_packages: bool,
+        pyvenv_cfg_version_field: Option<&'static str>,
     }
 
-    // Windows venvs have different layouts, and we only have Unix venvs committed for now.
-    // These tests are skipped on Windows until we commit Windows venvs.
+    impl VirtualEnvironmentTester {
+        /// Builds a mock virtual environment, and returns the path to the venv
+        fn build_mock_venv(&self) -> SystemPathBuf {
+            let VirtualEnvironmentTester {
+                system,
+                minor_version,
+                system_site_packages,
+                free_threaded,
+                pyvenv_cfg_version_field,
+            } = self;
+            let memory_fs = system.memory_file_system();
+            let unix_site_packages = if *free_threaded {
+                format!("lib/python3.{minor_version}t/site-packages")
+            } else {
+                format!("lib/python3.{minor_version}/site-packages")
+            };
 
-    #[test]
-    #[cfg_attr(target_os = "windows", ignore = "Windows has a different venv layout")]
-    fn can_find_site_packages_directory_in_uv_venv() {
-        check_venv_basics_at_path("unix-uv-venv");
+            let system_install_sys_prefix =
+                SystemPathBuf::from(&*format!("/Python3.{minor_version}"));
+            let (system_home_path, system_exe_path, system_site_packages_path) =
+                if cfg!(target_os = "windows") {
+                    let system_home_path = system_install_sys_prefix.clone();
+                    let system_exe_path = system_home_path.join("python.exe");
+                    let system_site_packages_path =
+                        system_install_sys_prefix.join("Lib/site-packages");
+                    (system_home_path, system_exe_path, system_site_packages_path)
+                } else {
+                    let system_home_path = system_install_sys_prefix.join("bin");
+                    let system_exe_path = system_home_path.join("python");
+                    let system_site_packages_path =
+                        system_install_sys_prefix.join(&unix_site_packages);
+                    (system_home_path, system_exe_path, system_site_packages_path)
+                };
+            memory_fs.write_file(system_exe_path, "").unwrap();
+            memory_fs
+                .create_directory_all(&system_site_packages_path)
+                .unwrap();
+
+            let venv_sys_prefix = SystemPathBuf::from("/.venv");
+            let (venv_exe, site_packages_path) = if cfg!(target_os = "windows") {
+                (
+                    venv_sys_prefix.join("Scripts/python.exe"),
+                    venv_sys_prefix.join("Lib/site-packages"),
+                )
+            } else {
+                (
+                    venv_sys_prefix.join("bin/python"),
+                    venv_sys_prefix.join(&unix_site_packages),
+                )
+            };
+            memory_fs.write_file(&venv_exe, "").unwrap();
+            memory_fs.create_directory_all(&site_packages_path).unwrap();
+
+            let pyvenv_cfg_path = venv_sys_prefix.join("pyvenv.cfg");
+            let mut pyvenv_cfg_contents = format!("home = {system_home_path}\n");
+            if let Some(version_field) = pyvenv_cfg_version_field {
+                pyvenv_cfg_contents.push_str(version_field);
+                pyvenv_cfg_contents.push('\n');
+            }
+            // Deliberately using weird casing here to test that our pyvenv.cfg parsing is case-insensitive:
+            if *system_site_packages {
+                pyvenv_cfg_contents.push_str("include-system-site-packages = TRuE\n");
+            }
+            memory_fs
+                .write_file(pyvenv_cfg_path, &pyvenv_cfg_contents)
+                .unwrap();
+
+            venv_sys_prefix
+        }
+
+        fn test(self) {
+            let venv_path = self.build_mock_venv();
+            let venv = VirtualEnvironment::new(venv_path.clone(), &self.system).unwrap();
+
+            assert_eq!(
+                venv.venv_path,
+                SysPrefixPath(self.system.canonicalize_path(&venv_path).unwrap())
+            );
+            assert_eq!(venv.include_system_site_packages, self.system_site_packages);
+
+            if self.pyvenv_cfg_version_field.is_some() {
+                assert_eq!(
+                    venv.minor_version,
+                    Some(PythonMinorVersion(self.minor_version))
+                );
+            } else {
+                assert_eq!(venv.minor_version, None);
+            }
+
+            let expected_home = if cfg!(target_os = "windows") {
+                SystemPathBuf::from(&*format!("/Python3.{}", self.minor_version))
+            } else {
+                SystemPathBuf::from(&*format!("/Python3.{}/bin", self.minor_version))
+            };
+            assert_eq!(venv.base_executable_home_path, expected_home);
+
+            let site_packages_directories = venv.site_packages_directories(&self.system).unwrap();
+            let expected_venv_site_packages = if cfg!(target_os = "windows") {
+                SystemPathBuf::from("/.venv/Lib/site-packages")
+            } else if self.free_threaded {
+                SystemPathBuf::from(&*format!(
+                    "/.venv/lib/python3.{}t/site-packages",
+                    self.minor_version
+                ))
+            } else {
+                SystemPathBuf::from(&*format!(
+                    "/.venv/lib/python3.{}/site-packages",
+                    self.minor_version
+                ))
+            };
+
+            let expected_system_site_packages = if cfg!(target_os = "windows") {
+                SystemPathBuf::from(&*format!(
+                    "/Python3.{}/Lib/site-packages",
+                    self.minor_version
+                ))
+            } else if self.free_threaded {
+                SystemPathBuf::from(&*format!(
+                    "/Python3.{minor_version}/lib/python3.{minor_version}t/site-packages",
+                    minor_version = self.minor_version
+                ))
+            } else {
+                SystemPathBuf::from(&*format!(
+                    "/Python3.{minor_version}/lib/python3.{minor_version}/site-packages",
+                    minor_version = self.minor_version
+                ))
+            };
+
+            if self.system_site_packages {
+                assert_eq!(
+                    &site_packages_directories,
+                    &[expected_venv_site_packages, expected_system_site_packages]
+                );
+            } else {
+                assert_eq!(&site_packages_directories, &[expected_venv_site_packages]);
+            }
+        }
     }
 
     #[test]
-    #[cfg_attr(target_os = "windows", ignore = "Windows has a different venv layout")]
-    fn can_find_site_packages_directory_in_stdlib_venv() {
-        check_venv_basics_at_path("unix-stdlib-venv");
+    fn can_find_site_packages_directory_no_version_field_in_pyvenv_cfg() {
+        let tester = VirtualEnvironmentTester {
+            system: TestSystem::default(),
+            minor_version: 12,
+            free_threaded: false,
+            system_site_packages: false,
+            pyvenv_cfg_version_field: None,
+        };
+        tester.test();
     }
 
     #[test]
-    #[cfg_attr(target_os = "windows", ignore = "Windows has a different venv layout")]
-    fn can_find_site_packages_directory_in_virtualenv_venv() {
-        check_venv_basics_at_path("unix-virtualenv-venv");
+    fn can_find_site_packages_directory_venv_style_version_field_in_pyvenv_cfg() {
+        let tester = VirtualEnvironmentTester {
+            system: TestSystem::default(),
+            minor_version: 12,
+            free_threaded: false,
+            system_site_packages: false,
+            pyvenv_cfg_version_field: Some("version = 3.12"),
+        };
+        tester.test();
+    }
+
+    #[test]
+    fn can_find_site_packages_directory_uv_style_version_field_in_pyvenv_cfg() {
+        let tester = VirtualEnvironmentTester {
+            system: TestSystem::default(),
+            minor_version: 12,
+            free_threaded: false,
+            system_site_packages: false,
+            pyvenv_cfg_version_field: Some("version_info = 3.12"),
+        };
+        tester.test();
+    }
+
+    #[test]
+    fn can_find_site_packages_directory_virtualenv_style_version_field_in_pyvenv_cfg() {
+        let tester = VirtualEnvironmentTester {
+            system: TestSystem::default(),
+            minor_version: 12,
+            free_threaded: false,
+            system_site_packages: false,
+            pyvenv_cfg_version_field: Some("version_info = 3.12.0rc2"),
+        };
+        tester.test();
+    }
+
+    #[test]
+    fn can_find_site_packages_directory_freethreaded_build() {
+        let tester = VirtualEnvironmentTester {
+            system: TestSystem::default(),
+            minor_version: 13,
+            free_threaded: true,
+            system_site_packages: false,
+            pyvenv_cfg_version_field: Some("version_info = 3.13"),
+        };
+        tester.test();
+    }
+
+    #[test]
+    fn finds_system_site_packages() {
+        let tester = VirtualEnvironmentTester {
+            system: TestSystem::default(),
+            minor_version: 13,
+            free_threaded: true,
+            system_site_packages: true,
+            pyvenv_cfg_version_field: Some("version_info = 3.13"),
+        };
+        tester.test();
     }
 
     #[test]
