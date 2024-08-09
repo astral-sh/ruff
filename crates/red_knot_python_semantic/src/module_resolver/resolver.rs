@@ -4,7 +4,7 @@ use std::iter::FusedIterator;
 use rustc_hash::{FxBuildHasher, FxHashSet};
 
 use ruff_db::files::{File, FilePath, FileRootKind};
-use ruff_db::system::{DirectoryEntry, System, SystemPath, SystemPathBuf};
+use ruff_db::system::{DirectoryEntry, SystemPath, SystemPathBuf};
 use ruff_db::vendored::VendoredPath;
 
 use super::module::{Module, ModuleKind};
@@ -155,22 +155,40 @@ fn try_resolve_module_resolution_settings(
     let mut static_search_paths = vec![];
 
     for path in extra_paths {
-        files.try_add_root(db.upcast(), path, FileRootKind::LibrarySearchPath);
-        static_search_paths.push(SearchPath::extra(system, path.clone())?);
+        let search_path = SearchPath::extra(system, path.clone())?;
+        files.try_add_root(
+            db.upcast(),
+            search_path.as_system_path().unwrap(),
+            FileRootKind::LibrarySearchPath,
+        );
+        static_search_paths.push(search_path);
     }
 
     static_search_paths.push(SearchPath::first_party(system, src_root.clone())?);
 
     static_search_paths.push(if let Some(custom_typeshed) = custom_typeshed.as_ref() {
+        let search_path = SearchPath::custom_stdlib(db, custom_typeshed.clone())?;
         files.try_add_root(
             db.upcast(),
-            custom_typeshed,
+            search_path.as_system_path().unwrap(),
             FileRootKind::LibrarySearchPath,
         );
-        SearchPath::custom_stdlib(db, custom_typeshed.clone())?
+        search_path
     } else {
         SearchPath::vendored_stdlib()
     });
+
+    let mut site_packages_paths: Vec<_> = Vec::with_capacity(site_packages.len());
+
+    for path in site_packages {
+        let search_path = SearchPath::site_packages(system, path.to_path_buf())?;
+        files.try_add_root(
+            db.upcast(),
+            search_path.as_system_path().unwrap(),
+            FileRootKind::LibrarySearchPath,
+        );
+        site_packages_paths.push(search_path);
+    }
 
     // TODO vendor typeshed's third-party stubs as well as the stdlib and fallback to them as a final step
 
@@ -197,7 +215,7 @@ fn try_resolve_module_resolution_settings(
     Ok(ModuleResolutionSettings {
         target_version,
         static_search_paths,
-        site_packages_paths: site_packages.to_owned(),
+        site_packages_paths,
     })
 }
 
@@ -238,15 +256,19 @@ pub(crate) fn dynamic_resolution_paths(db: &dyn Db) -> Vec<SearchPath> {
     let files = db.files();
     let system = db.system();
 
-    for site_packages_dir in site_packages_paths {
+    for site_packages_search_path in site_packages_paths {
+        let site_packages_dir = site_packages_search_path
+            .as_system_path()
+            .expect("Expected site package path to be a system path");
+
         if !existing_paths.insert(Cow::Borrowed(site_packages_dir)) {
             continue;
         }
-        let site_packages_root = files.try_add_root(
-            db.upcast(),
-            site_packages_dir,
-            FileRootKind::LibrarySearchPath,
-        );
+
+        let site_packages_root = files
+            .root(db.upcast(), site_packages_dir)
+            .expect("Site-package root to have been created.");
+
         // This query needs to be re-executed each time a `.pth` file
         // is added, modified or removed from the `site-packages` directory.
         // However, we don't use Salsa queries to read the source text of `.pth` files;
@@ -254,8 +276,7 @@ pub(crate) fn dynamic_resolution_paths(db: &dyn Db) -> Vec<SearchPath> {
         // site-package directory's revision.
         site_packages_root.revision(db.upcast());
 
-        dynamic_paths
-            .push(SearchPath::site_packages(system, site_packages_dir.to_owned()).unwrap());
+        dynamic_paths.push(site_packages_search_path.clone());
 
         // As well as modules installed directly into `site-packages`,
         // the directory may also contain `.pth` files.
@@ -263,22 +284,36 @@ pub(crate) fn dynamic_resolution_paths(db: &dyn Db) -> Vec<SearchPath> {
         // containing a (relative or absolute) path.
         // Each of these paths may point to an editable install of a package,
         // so should be considered an additional search path.
-        let Ok(pth_file_iterator) = PthFileIterator::new(db, site_packages_dir) else {
-            continue;
+        let pth_file_iterator = match PthFileIterator::new(db, site_packages_dir) {
+            Ok(iterator) => iterator,
+            Err(error) => {
+                tracing::warn!(
+                    "Failed to search for editable installation in {site_packages_dir}: {error}"
+                );
+                continue;
+            }
         };
 
         // The Python documentation specifies that `.pth` files in `site-packages`
         // are processed in alphabetical order, so collecting and then sorting is necessary.
         // https://docs.python.org/3/library/site.html#module-site
         let mut all_pth_files: Vec<PthFile> = pth_file_iterator.collect();
-        all_pth_files.sort_by(|a, b| a.path.cmp(&b.path));
+        all_pth_files.sort_unstable_by(|a, b| a.path.cmp(&b.path));
 
-        for pth_file in &all_pth_files {
-            for installation in pth_file.editable_installations() {
-                if existing_paths.insert(Cow::Owned(
-                    installation.as_system_path().unwrap().to_path_buf(),
-                )) {
-                    dynamic_paths.push(installation);
+        let installations = all_pth_files
+            .iter()
+            .flat_map(PthFile::editable_installations);
+
+        for installation in installations {
+            if existing_paths.insert(Cow::Owned(installation.clone())) {
+                match SearchPath::editable(system, installation) {
+                    Ok(search_path) => {
+                        dynamic_paths.push(search_path);
+                    }
+
+                    Err(error) => {
+                        tracing::warn!("Skipping editable installation: {error}");
+                    }
                 }
             }
         }
@@ -324,7 +359,6 @@ impl<'db> FusedIterator for SearchPathIterator<'db> {}
 /// One or more lines in a `.pth` file may be a (relative or absolute)
 /// path that represents an editable installation of a package.
 struct PthFile<'db> {
-    system: &'db dyn System,
     path: SystemPathBuf,
     contents: String,
     site_packages: &'db SystemPath,
@@ -333,9 +367,8 @@ struct PthFile<'db> {
 impl<'db> PthFile<'db> {
     /// Yield paths in this `.pth` file that appear to represent editable installations,
     /// and should therefore be added as module-resolution search paths.
-    fn editable_installations(&'db self) -> impl Iterator<Item = SearchPath> + 'db {
+    fn editable_installations(&'db self) -> impl Iterator<Item = SystemPathBuf> + 'db {
         let PthFile {
-            system,
             path: _,
             contents,
             site_packages,
@@ -354,8 +387,8 @@ impl<'db> PthFile<'db> {
             {
                 return None;
             }
-            let possible_editable_install = SystemPath::absolute(line, site_packages);
-            SearchPath::editable(*system, possible_editable_install).ok()
+
+            Some(SystemPath::absolute(line, site_packages))
         })
     }
 }
@@ -404,12 +437,15 @@ impl<'db> Iterator for PthFileIterator<'db> {
                 continue;
             }
 
-            let Ok(contents) = db.system().read_to_string(&path) else {
-                continue;
+            let contents = match system.read_to_string(&path) {
+                Ok(contents) => contents,
+                Err(error) => {
+                    tracing::warn!("Failed to read .pth file '{path}': {error}");
+                    continue;
+                }
             };
 
             return Some(PthFile {
-                system,
                 path,
                 contents,
                 site_packages,
@@ -433,7 +469,7 @@ pub(crate) struct ModuleResolutionSettings {
     /// That means we can't know where a second or third `site-packages` path should sit
     /// in terms of module-resolution priority until we've discovered the editable installs
     /// for the first `site-packages` path
-    site_packages_paths: Vec<SystemPathBuf>,
+    site_packages_paths: Vec<SearchPath>,
 }
 
 impl ModuleResolutionSettings {
