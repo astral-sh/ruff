@@ -1,6 +1,8 @@
-use ruff_db::files::File;
+use ruff_db::files::{File, FilePath};
+use ruff_db::source::line_index;
 use ruff_python_ast as ast;
 use ruff_python_ast::{Expr, ExpressionRef, StmtClassDef};
+use ruff_source_file::LineIndex;
 
 use crate::module_name::ModuleName;
 use crate::module_resolver::{resolve_module, Module};
@@ -23,6 +25,14 @@ impl<'db> SemanticModel<'db> {
     // solution for exposing information from types
     pub fn db(&self) -> &dyn Db {
         self.db
+    }
+
+    pub fn file_path(&self) -> &FilePath {
+        self.file.path(self.db)
+    }
+
+    pub fn line_index(&self) -> LineIndex {
+        line_index(self.db.upcast(), self.file)
     }
 
     pub fn resolve_module(&self, module_name: ModuleName) -> Option<Module> {
