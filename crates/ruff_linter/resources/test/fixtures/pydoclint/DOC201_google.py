@@ -108,3 +108,14 @@ def f(num: int):
         num (int): A number
     """
     return 1
+
+
+import abc
+
+
+class A(metaclass=abc.abcmeta):
+    # DOC201
+    @abc.abstractmethod
+    def f(self):
+        """Lorem ipsum."""
+        return True
