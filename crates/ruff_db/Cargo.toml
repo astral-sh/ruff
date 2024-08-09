@@ -27,6 +27,7 @@ ignore = { workspace = true, optional = true }
 matchit = { workspace = true }
 salsa = { workspace = true }
 path-slash = { workspace = true }
+thiserror = { workspace = true }
 tracing = { workspace = true }
 tracing-subscriber = { workspace = true, optional = true }
 tracing-tree = { workspace = true, optional = true }
