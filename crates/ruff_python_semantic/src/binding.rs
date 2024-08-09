@@ -223,7 +223,8 @@ impl<'a> Binding<'a> {
         locator.slice(self.range)
     }
 
-    /// Returns the statement in which the binding was defined.
+    /// Returns the statement in which the binding was defined. The statement can be
+    /// `None` if the binding comes from a built-in.
     pub fn statement<'b>(&self, semantic: &SemanticModel<'b>) -> Option<&'b Stmt> {
         self.source
             .map(|statement_id| semantic.statement(statement_id))
