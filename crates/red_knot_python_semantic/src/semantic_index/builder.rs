@@ -25,6 +25,8 @@ use crate::semantic_index::use_def::{FlowSnapshot, UseDefMapBuilder};
 use crate::semantic_index::SemanticIndex;
 use crate::Db;
 
+use super::definition::GeneratorDefinitionNodeRef;
+
 pub(super) struct SemanticIndexBuilder<'db> {
     // Builder state
     db: &'db dyn Db,
@@ -160,7 +162,32 @@ impl<'db> SemanticIndexBuilder<'db> {
     }
 
     fn add_or_update_symbol(&mut self, name: Name, flags: SymbolFlags) -> ScopedSymbolId {
-        let symbol_table = self.current_symbol_table();
+        // Determine the symbol table to which the symbol belongs to.
+        //
+        // Per [PEP 572](https://peps.python.org/pep-0572/#scope-of-the-target), named expressions
+        // in generators and comprehensions bind to the scope that contains the outermost
+        // comprehension.
+        let symbol_table = if self
+            .current_assignment
+            .is_some_and(CurrentAssignment::is_named)
+        {
+            let scope_id = self
+                .scope_stack
+                .iter()
+                .rev()
+                .find_map(|scope_id| {
+                    if self.scopes[*scope_id].kind().is_generator() {
+                        None
+                    } else {
+                        Some(*scope_id)
+                    }
+                })
+                .unwrap_or_else(|| self.current_scope());
+            &mut self.symbol_tables[scope_id]
+        } else {
+            self.current_symbol_table()
+        };
+
         let (symbol_id, added) = symbol_table.add_or_update_symbol(name, flags);
         if added {
             let use_def_map = self.current_use_def_map_mut();
@@ -174,7 +201,7 @@ impl<'db> SemanticIndexBuilder<'db> {
         symbol: ScopedSymbolId,
         definition_node: impl Into<DefinitionNodeRef<'a>>,
     ) -> Definition<'db> {
-        let definition_node = definition_node.into();
+        let definition_node: DefinitionNodeRef<'_> = definition_node.into();
         let definition = Definition::new(
             self.db,
             self.file,
@@ -256,6 +283,49 @@ impl<'db> SemanticIndexBuilder<'db> {
         }
 
         nested_scope
+    }
+
+    /// Visit a list of [`Comprehension`] nodes, assumed to be the comprehensions that compose a
+    /// generator expression, like a list or set comprehension.
+    ///
+    /// [`Comprehension`]: ast::Comprehension
+    fn visit_generators(&mut self, scope: NodeWithScopeRef, generators: &'db [ast::Comprehension]) {
+        let mut generators_iter = generators.iter();
+
+        let Some(generator) = generators_iter.next() else {
+            unreachable!("Expression must contain at least one generator");
+        };
+
+        // The `iter` of the first generator is evaluated in the outer scope, while all subsequent
+        // nodes are evaluated in the inner scope.
+        self.visit_expr(&generator.iter);
+        self.push_scope(scope);
+
+        self.current_assignment = Some(CurrentAssignment::Generator {
+            generator,
+            first: true,
+        });
+        self.visit_expr(&generator.target);
+        self.current_assignment = None;
+
+        for expr in &generator.ifs {
+            self.visit_expr(expr);
+        }
+
+        for generator in generators_iter {
+            self.visit_expr(&generator.iter);
+
+            self.current_assignment = Some(CurrentAssignment::Generator {
+                generator,
+                first: false,
+            });
+            self.visit_expr(&generator.target);
+            self.current_assignment = None;
+
+            for expr in &generator.ifs {
+                self.visit_expr(expr);
+            }
+        }
     }
 
     pub(super) fn build(mut self) -> SemanticIndex<'db> {
@@ -476,8 +546,7 @@ where
         self.current_ast_ids().record_expression(expr);
 
         match expr {
-            ast::Expr::Name(name_node) => {
-                let ast::ExprName { id, ctx, .. } = name_node;
+            ast::Expr::Name(name_node @ ast::ExprName { id, ctx, .. }) => {
                 let flags = match ctx {
                     ast::ExprContext::Load => SymbolFlags::IS_USED,
                     ast::ExprContext::Store => SymbolFlags::IS_DEFINED,
@@ -501,6 +570,15 @@ where
                         }
                         Some(CurrentAssignment::Named(named)) => {
                             self.add_definition(symbol, named);
+                        }
+                        Some(CurrentAssignment::Generator { generator, first }) => {
+                            self.add_definition(
+                                symbol,
+                                GeneratorDefinitionNodeRef {
+                                    node: generator,
+                                    first,
+                                },
+                            );
                         }
                         None => {}
                     }
@@ -527,7 +605,6 @@ where
                 }
                 self.push_scope(NodeWithScopeRef::Lambda(lambda));
                 self.visit_expr(lambda.body.as_ref());
-                self.pop_scope();
             }
             ast::Expr::If(ast::ExprIf {
                 body, test, orelse, ..
@@ -543,9 +620,65 @@ where
                 self.visit_expr(orelse);
                 self.flow_merge(&post_body);
             }
+            ast::Expr::ListComp(
+                list_comprehension @ ast::ExprListComp {
+                    elt, generators, ..
+                },
+            ) => {
+                self.visit_generators(
+                    NodeWithScopeRef::ListComprehension(list_comprehension),
+                    generators,
+                );
+                self.visit_expr(elt);
+            }
+            ast::Expr::SetComp(
+                set_comprehension @ ast::ExprSetComp {
+                    elt, generators, ..
+                },
+            ) => {
+                self.visit_generators(
+                    NodeWithScopeRef::SetComprehension(set_comprehension),
+                    generators,
+                );
+                self.visit_expr(elt);
+            }
+            ast::Expr::Generator(
+                generator @ ast::ExprGenerator {
+                    elt, generators, ..
+                },
+            ) => {
+                self.visit_generators(NodeWithScopeRef::Generator(generator), generators);
+                self.visit_expr(elt);
+            }
+            ast::Expr::DictComp(
+                dict_comprehension @ ast::ExprDictComp {
+                    key,
+                    value,
+                    generators,
+                    ..
+                },
+            ) => {
+                self.visit_generators(
+                    NodeWithScopeRef::DictComprehension(dict_comprehension),
+                    generators,
+                );
+                self.visit_expr(key);
+                self.visit_expr(value);
+            }
             _ => {
                 walk_expr(self, expr);
             }
+        }
+
+        if matches!(
+            expr,
+            ast::Expr::Lambda(_)
+                | ast::Expr::ListComp(_)
+                | ast::Expr::SetComp(_)
+                | ast::Expr::Generator(_)
+                | ast::Expr::DictComp(_)
+        ) {
+            self.pop_scope();
         }
     }
 }
@@ -555,6 +688,17 @@ enum CurrentAssignment<'a> {
     Assign(&'a ast::StmtAssign),
     AnnAssign(&'a ast::StmtAnnAssign),
     Named(&'a ast::ExprNamed),
+    Generator {
+        generator: &'a ast::Comprehension,
+        first: bool,
+    },
+}
+
+impl CurrentAssignment<'_> {
+    /// Returns `true` if the current assignment is a named expression e.g. `x := 1`.
+    const fn is_named(self) -> bool {
+        matches!(self, Self::Named(_))
+    }
 }
 
 impl<'a> From<&'a ast::StmtAssign> for CurrentAssignment<'a> {

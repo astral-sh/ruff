@@ -307,6 +307,7 @@ mod tests {
     use ruff_db::parsed::parsed_module;
     use ruff_db::system::DbWithTestSystem;
     use ruff_python_ast as ast;
+    use ruff_text_size::{Ranged, TextRange};
 
     use crate::db::tests::TestDb;
     use crate::semantic_index::ast_ids::HasScopedUseId;
@@ -525,6 +526,166 @@ y = 2
             definition.node(&db),
             DefinitionKind::Assignment(_)
         ));
+    }
+
+    /// Test case to validate that the generator scope is correctly identifier and that the target
+    /// variable is defined only in the generator scope and not in the global scope.
+    #[test]
+    fn generator_scope() {
+        let TestCase { db, file } = test_case(
+            "
+[x for x in iter1]
+",
+        );
+
+        let index = semantic_index(&db, file);
+        let global_table = index.symbol_table(FileScopeId::global());
+
+        assert_eq!(names(&global_table), vec!["iter1"]);
+
+        let [(generator_scope_id, generator_scope)] = index
+            .child_scopes(FileScopeId::global())
+            .collect::<Vec<_>>()[..]
+        else {
+            panic!("expected one child scope")
+        };
+
+        assert_eq!(generator_scope.kind(), ScopeKind::Generator);
+        assert_eq!(
+            generator_scope_id.to_scope_id(&db, file).name(&db),
+            "<listcomp>"
+        );
+
+        let generator_symbol_table = index.symbol_table(generator_scope_id);
+
+        assert_eq!(names(&generator_symbol_table), vec!["x"]);
+    }
+
+    /// Test case to validate that the `x` variable used in the generator is referencing the `x`
+    /// variable defined by the inner iterator (`for x in iter2`) and not the outer one.
+    #[test]
+    fn multiple_generators() {
+        let TestCase { db, file } = test_case(
+            "
+[x for x in iter1 for x in iter2]
+",
+        );
+
+        let index = semantic_index(&db, file);
+        let [(generator_scope_id, _)] = index
+            .child_scopes(FileScopeId::global())
+            .collect::<Vec<_>>()[..]
+        else {
+            panic!("expected one child scope")
+        };
+
+        let use_def = index.use_def_map(generator_scope_id);
+
+        let module = parsed_module(&db, file).syntax();
+        let element = module.body[0]
+            .as_expr_stmt()
+            .unwrap()
+            .value
+            .as_list_comp_expr()
+            .unwrap()
+            .elt
+            .as_name_expr()
+            .unwrap();
+        let element_use_id = element.scoped_use_id(&db, generator_scope_id.to_scope_id(&db, file));
+
+        let [definition] = use_def.use_definitions(element_use_id) else {
+            panic!("expected one definition")
+        };
+        let DefinitionKind::Generator(generator) = definition.node(&db) else {
+            panic!("expected generator definition")
+        };
+        let ast::Comprehension { target, .. } = generator.node();
+        let name = target.as_name_expr().unwrap().id().as_str();
+
+        assert_eq!(name, "x");
+        assert_eq!(target.range(), TextRange::new(23.into(), 24.into()));
+    }
+
+    /// Test case to validate that the nested generator creates a new scope which is a child of the
+    /// outer generator scope and the variables are correctly defined in the respective scopes.
+    #[test]
+    fn nested_generators() {
+        let TestCase { db, file } = test_case(
+            "
+[{x for x in iter2} for y in iter1]
+",
+        );
+
+        let index = semantic_index(&db, file);
+        let global_table = index.symbol_table(FileScopeId::global());
+
+        assert_eq!(names(&global_table), vec!["iter1"]);
+
+        let [(generator_scope_id, generator_scope)] = index
+            .child_scopes(FileScopeId::global())
+            .collect::<Vec<_>>()[..]
+        else {
+            panic!("expected one child scope")
+        };
+
+        assert_eq!(generator_scope.kind(), ScopeKind::Generator);
+        assert_eq!(
+            generator_scope_id.to_scope_id(&db, file).name(&db),
+            "<listcomp>"
+        );
+
+        let generator_symbol_table = index.symbol_table(generator_scope_id);
+
+        assert_eq!(names(&generator_symbol_table), vec!["y", "iter2"]);
+
+        let [(inner_generator_scope_id, inner_generator_scope)] =
+            index.child_scopes(generator_scope_id).collect::<Vec<_>>()[..]
+        else {
+            panic!("expected one inner generator scope")
+        };
+
+        assert_eq!(inner_generator_scope.kind(), ScopeKind::Generator);
+        assert_eq!(
+            inner_generator_scope_id.to_scope_id(&db, file).name(&db),
+            "<setcomp>"
+        );
+
+        let inner_generator_symbol_table = index.symbol_table(inner_generator_scope_id);
+
+        assert_eq!(names(&inner_generator_symbol_table), vec!["x"]);
+    }
+
+    /// Test that validates that the variables defined in assignment expressions within a generator
+    /// expressions are defined in the outer scope of the generator.
+    #[test]
+    fn assignment_expression_in_generator() {
+        let TestCase { db, file } = test_case(
+            "
+[a := 1 for x in iter1 if (b := 2)]
+",
+        );
+
+        let index = semantic_index(&db, file);
+        let global_table = index.symbol_table(FileScopeId::global());
+
+        assert_eq!(names(&global_table), vec!["iter1", "b", "a"]);
+
+        let [(generator_scope_id, generator_scope)] = index
+            .child_scopes(FileScopeId::global())
+            .collect::<Vec<_>>()[..]
+        else {
+            panic!("expected one child scope")
+        };
+
+        assert_eq!(generator_scope.kind(), ScopeKind::Generator);
+        assert_eq!(
+            generator_scope_id.to_scope_id(&db, file).name(&db),
+            "<listcomp>"
+        );
+
+        let generator_symbol_table = index.symbol_table(generator_scope_id);
+
+        assert_eq!(names(&generator_symbol_table), vec!["x"]);
     }
 
     #[test]
