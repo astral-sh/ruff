@@ -10,8 +10,8 @@ You can use the `ruff_python_formatter` binary to format individual files and sh
 It's fast to compile because it doesn't depend on `ruff`. The easiest way is to create a
 `scratch.py` (or `scratch.pyi`) in the project root and run:
 
-```console
-$ cargo run --bin ruff_python_formatter -- --emit stdout scratch.py
+```shell
+cargo run --bin ruff_python_formatter -- --emit stdout scratch.py
 ```
 
 ...which supports the `--print-ir` and `--print-comments` flag. (We recommend running with
@@ -22,8 +22,8 @@ $ cargo run --bin ruff_python_formatter -- --emit stdout scratch.py
 
 Command
 
-```console
-$ cargo run --bin ruff_python_formatter -- --emit stdout --print-comments --print-ir scratch.py
+```shell
+cargo run --bin ruff_python_formatter -- --emit stdout --print-comments --print-ir scratch.py
 ```
 
 Input
@@ -73,8 +73,8 @@ def f():  # a
 
 The other option is to use the playground (also check the playground README):
 
-```console
-$ cd playground && npm install && npm run dev:wasm && npm run dev
+```shell
+cd playground && npm install && npm run dev:wasm && npm run dev
 ```
 
 Run`npm run dev:wasm` and reload the page in the browser to refresh.
@@ -106,8 +106,8 @@ in debug assertions). You should ensure that your changes don't decrease the sim
 
 It's possible to format an entire project:
 
-```console
-$ cargo run --bin ruff_dev -- format-dev --write /path/to/my_project
+```shell
+cargo run --bin ruff_dev -- format-dev --write /path/to/my_project
 ```
 
 Available options:
@@ -124,13 +124,13 @@ Available options:
 **Large ecosystem checks** It is also possible to check a large number of repositories. This dataset
 is large (~60GB), so we only do this occasionally:
 
-```console
-$ # Get the list of projects
-$ curl https://raw.githubusercontent.com/akx/ruff-usage-aggregate/master/data/known-github-tomls-clean.jsonl > github_search.jsonl
-$ # Repurpose this script to download the repositories for us
-$ python scripts/check_ecosystem.py --checkouts target/checkouts --projects github_search.jsonl -v $(which true) $(which true)
-$ # Check each project for formatter stability
-$ cargo run --bin ruff_dev -- format-dev --stability-check --error-file target/formatter-ecosystem-errors.txt --multi-project target/checkouts
+```shell
+# Get the list of projects
+curl https://raw.githubusercontent.com/akx/ruff-usage-aggregate/master/data/known-github-tomls-clean.jsonl > github_search.jsonl
+# Repurpose this script to download the repositories for us
+python scripts/check_ecosystem.py --checkouts target/checkouts --projects github_search.jsonl -v $(which true) $(which true)
+# Check each project for formatter stability
+cargo run --bin ruff_dev -- format-dev --stability-check --error-file target/formatter-ecosystem-errors.txt --multi-project target/checkouts
 ```
 
 ## Helper structs
