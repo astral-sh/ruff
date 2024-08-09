@@ -85,14 +85,14 @@ mod tests {
     }
 
     #[test]
-    fn no_remove_parentheses_starred_expr_py38() -> Result<()> {
+    fn no_remove_parentheses_starred_expr_py310() -> Result<()> {
         let diagnostics = test_path(
             Path::new("ruff/RUF031.py"),
             &LinterSettings {
                 ruff: super::settings::Settings {
                     parenthesize_tuple_in_subscript: false,
                 },
-                target_version: PythonVersion::Py38,
+                target_version: PythonVersion::Py310,
                 ..LinterSettings::for_rule(Rule::IncorrectlyParenthesizedTupleInSubscript)
             },
         )?;

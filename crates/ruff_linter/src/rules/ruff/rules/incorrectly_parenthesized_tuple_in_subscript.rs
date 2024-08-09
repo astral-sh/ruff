@@ -69,8 +69,10 @@ pub(crate) fn subscript_with_parenthesized_tuple(checker: &mut Checker, subscrip
         return;
     }
     // Removing parentheses in the presence of unpacking leads
-    // to a syntax error in Python 3.8.
-    if checker.settings.target_version <= PythonVersion::Py38
+    // to a syntax error in Python 3.10.
+    // This is no longer a syntax error starting in Python 3.11
+    // see https://peps.python.org/pep-0646/#change-1-star-expressions-in-indexes
+    if checker.settings.target_version <= PythonVersion::Py310
         && !prefer_parentheses
         && tuple_subscript.elts.iter().any(Expr::is_starred_expr)
     {
