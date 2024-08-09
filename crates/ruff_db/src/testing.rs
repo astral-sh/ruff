@@ -117,10 +117,8 @@ pub fn setup_logging() -> LoggingGuard {
 ///
 /// # Examples
 /// ```
-/// use ruff_db::testing::setup_logging;
-/// let _logging = setup_logging();
-///
-/// tracing::info!("This message will be printed to stderr");
+/// use ruff_db::testing::setup_logging_with_filter;
+/// let _logging = setup_logging_with_filter("red_knot_module_resolver::resolver");
 /// ```
 ///
 /// # Filter

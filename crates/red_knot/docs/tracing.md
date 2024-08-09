@@ -72,6 +72,26 @@ runs or when restoring from a persistent cache. This can be confusing for users 
 don't understand why a specific lint violation isn't raised. Instead, change your
 query to return the failure as part of the query's result or use a Salsa accumulator.
 
+## Tracing in tests
+
+You can use `ruff_db::testing::setup_logging` or `ruff_db::testing::setup_logging_with_filter` to set up logging in tests.
+
+```rust
+use ruff_db::testing::setup_logging;
+
+#[test]
+fn test() {
+  let _logging = setup_logging();
+
+  tracing::info!("This message will be printed to stderr");
+}
+```
+
+Note: Most test runners capture stderr and only show its output when a test fails.
+
+Note also that `setup_logging` only sets up logging for the current thread because [`set_global_default`](https://docs.rs/tracing/latest/tracing/subscriber/fn.set_global_default.html) can only be
+called **once**.
+
 ## Release builds
 
 `trace!` events are removed in release builds.
