@@ -531,7 +531,7 @@ struct BodyEntries<'a> {
 struct BodyVisitor<'a> {
     returns: Vec<Entry>,
     yields: Vec<Entry>,
-    currently_suspended_exceptions: Option<&'a Expr>,
+    currently_suspended_exceptions: Option<&'a ast::Expr>,
     raised_exceptions: Vec<ExceptionEntry<'a>>,
     semantic: &'a SemanticModel<'a>,
 }

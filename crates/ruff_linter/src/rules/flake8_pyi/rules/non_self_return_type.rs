@@ -254,15 +254,11 @@ fn is_self(expr: &Expr, semantic: &SemanticModel) -> bool {
 
 /// Return `true` if the given class extends `collections.abc.Iterator`.
 fn subclasses_iterator(class_def: &ast::StmtClassDef, semantic: &SemanticModel) -> bool {
-    analyze::class::any_qualified_name(class_def, semantic, &|expr| {
-        semantic
-            .resolve_qualified_name(map_subscript(expr))
-            .is_some_and(|qualified_name| {
-                matches!(
-                    qualified_name.segments(),
-                    ["typing", "Iterator"] | ["collections", "abc", "Iterator"]
-                )
-            })
+    analyze::class::any_qualified_base_class(class_def, semantic, &|qualified_name| {
+        matches!(
+            qualified_name.segments(),
+            ["typing", "Iterator"] | ["collections", "abc", "Iterator"]
+        )
     })
 }
 
@@ -281,15 +277,11 @@ fn is_iterable_or_iterator(expr: &Expr, semantic: &SemanticModel) -> bool {
 
 /// Return `true` if the given class extends `collections.abc.AsyncIterator`.
 fn subclasses_async_iterator(class_def: &ast::StmtClassDef, semantic: &SemanticModel) -> bool {
-    analyze::class::any_qualified_name(class_def, semantic, &|expr| {
-        semantic
-            .resolve_qualified_name(map_subscript(expr))
-            .is_some_and(|qualified_name| {
-                matches!(
-                    qualified_name.segments(),
-                    ["typing", "AsyncIterator"] | ["collections", "abc", "AsyncIterator"]
-                )
-            })
+    analyze::class::any_qualified_base_class(class_def, semantic, &|qualified_name| {
+        matches!(
+            qualified_name.segments(),
+            ["typing", "AsyncIterator"] | ["collections", "abc", "AsyncIterator"]
+        )
     })
 }
 

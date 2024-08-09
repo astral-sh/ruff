@@ -1,32 +1,24 @@
-use ruff_python_ast::helpers::map_subscript;
 use ruff_python_ast::{self as ast, Expr};
+
 use ruff_python_semantic::{analyze, SemanticModel};
 
 /// Return `true` if a Python class appears to be a Django model, based on its base classes.
 pub(super) fn is_model(class_def: &ast::StmtClassDef, semantic: &SemanticModel) -> bool {
-    analyze::class::any_qualified_name(class_def, semantic, &|expr| {
-        semantic
-            .resolve_qualified_name(map_subscript(expr))
-            .is_some_and(|qualified_name| {
-                matches!(
-                    qualified_name.segments(),
-                    ["django", "db", "models", "Model"]
-                )
-            })
+    analyze::class::any_qualified_base_class(class_def, semantic, &|qualified_name| {
+        matches!(
+            qualified_name.segments(),
+            ["django", "db", "models", "Model"]
+        )
     })
 }
 
 /// Return `true` if a Python class appears to be a Django model form, based on its base classes.
 pub(super) fn is_model_form(class_def: &ast::StmtClassDef, semantic: &SemanticModel) -> bool {
-    analyze::class::any_qualified_name(class_def, semantic, &|expr| {
-        semantic
-            .resolve_qualified_name(map_subscript(expr))
-            .is_some_and(|qualified_name| {
-                matches!(
-                    qualified_name.segments(),
-                    ["django", "forms", "ModelForm"] | ["django", "forms", "models", "ModelForm"]
-                )
-            })
+    analyze::class::any_qualified_base_class(class_def, semantic, &|qualified_name| {
+        matches!(
+            qualified_name.segments(),
+            ["django", "forms", "ModelForm"] | ["django", "forms", "models", "ModelForm"]
+        )
     })
 }
 
