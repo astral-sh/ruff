@@ -135,9 +135,7 @@ pub fn is_metaclass(class_def: &ast::StmtClassDef, semantic: &SemanticModel) -> 
         Expr::Subscript(ast::ExprSubscript { value, .. }) => {
             // Ex) `class Foo(type[int]): ...`
             semantic
-                .resolve_qualified_name(value.as_ref())
-                .is_some_and(|qualified_name| {
-                    matches!(qualified_name.segments(), ["" | "builtins", "type"])
+                .match_builtin_expr(value.as_ref(), "type")
                 })
         }
         _ => semantic
