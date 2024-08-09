@@ -135,3 +135,21 @@ if TYPE_CHECKING:
     x = 3
 else:
     x = 5
+
+# SIM108 - suggested fix with `or`
+if cond:
+    z = cond 
+else:
+    z = other_cond
+
+# SIM108 - suggested fix with `and`
+if not cond:
+    z = cond
+else:
+    z = other_cond
+
+# SIM108 - suggested fix with `and`
+if cond:
+    z = not cond
+else:
+    z = other_cond
