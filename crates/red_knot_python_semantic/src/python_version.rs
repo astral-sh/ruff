@@ -59,6 +59,15 @@ pub struct PythonVersion {
     pub minor: u8,
 }
 
+impl PythonVersion {
+    pub fn free_threaded_build_available(self) -> bool {
+        self >= PythonVersion {
+            major: 3,
+            minor: 13,
+        }
+    }
+}
+
 impl TryFrom<(&str, &str)> for PythonVersion {
     type Error = std::num::ParseIntError;
 
