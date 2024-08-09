@@ -1,124 +1,71 @@
 #![allow(clippy::disallowed_names)]
 
-use codspeed_criterion_compat::{criterion_group, criterion_main, BatchSize, Criterion};
-
-use red_knot::db::RootDatabase;
-use red_knot::workspace::WorkspaceMetadata;
-use ruff_db::files::{system_path_to_file, vendored_path_to_file, File};
-use ruff_db::parsed::parsed_module;
+use red_knot_workspace::db::RootDatabase;
+use red_knot_workspace::workspace::WorkspaceMetadata;
+use ruff_benchmark::criterion::{criterion_group, criterion_main, BatchSize, Criterion};
+use ruff_benchmark::TestFile;
+use ruff_db::files::{system_path_to_file, File};
 use ruff_db::program::{ProgramSettings, SearchPathSettings, TargetVersion};
+use ruff_db::source::source_text;
 use ruff_db::system::{MemoryFileSystem, SystemPath, TestSystem};
-use ruff_db::vendored::VendoredPath;
-use ruff_db::Upcast;
-
-static FOO_CODE: &str = r#"
-import typing
-
-from bar import Bar
-
-class Foo(Bar):
-    def foo() -> object:
-        return "foo"
-
-    @typing.override
-    def bar() -> object:
-        return "foo_bar"
-"#;
-
-static BAR_CODE: &str = r#"
-class Bar:
-    def bar() -> object:
-        return "bar"
-
-    def random(arg: int) -> int:
-        if arg == 1:
-            return 48472783
-        if arg < 10:
-            return 20
-        while arg < 50:
-            arg += 1
-        return 36673
-"#;
-
-static TYPING_CODE: &str = r#"
-def override(): ...
-"#;
 
 struct Case {
     db: RootDatabase,
     fs: MemoryFileSystem,
-    foo: File,
-    bar: File,
-    typing: File,
-    builtins: File,
+    parser: File,
+    re: File,
+    re_path: &'static SystemPath,
+}
+
+const TOMLLIB_312_URL: &str = "https://raw.githubusercontent.com/python/cpython/8e8a4baf652f6e1cee7acde9d78c4b6154539748/Lib/tomllib";
+
+fn get_test_file(name: &str) -> TestFile {
+    let path = format!("tomllib/{name}");
+    let url = format!("{TOMLLIB_312_URL}/{name}");
+    TestFile::try_download(&path, &url).unwrap()
 }
 
 fn setup_case() -> Case {
     let system = TestSystem::default();
     let fs = system.memory_file_system().clone();
-    let foo_path = SystemPath::new("/src/foo.py");
-    let bar_path = SystemPath::new("/src/bar.py");
-    let typing_path = SystemPath::new("/src/typing.pyi");
-    let builtins_path = VendoredPath::new("stdlib/builtins.pyi");
+    let init_path = SystemPath::new("/src/tomllib/__init__.py");
+    let parser_path = SystemPath::new("/src/tomllib/_parser.py");
+    let re_path = SystemPath::new("/src/tomllib/_re.py");
+    let types_path = SystemPath::new("/src/tomllib/_types.py");
     fs.write_files([
-        (foo_path, FOO_CODE),
-        (bar_path, BAR_CODE),
-        (typing_path, TYPING_CODE),
+        (init_path, get_test_file("__init__.py").code()),
+        (parser_path, get_test_file("_parser.py").code()),
+        (re_path, get_test_file("_re.py").code()),
+        (types_path, get_test_file("_types.py").code()),
     ])
     .unwrap();
 
-    let workspace_root = SystemPath::new("/src");
-    let metadata = WorkspaceMetadata::from_path(workspace_root, &system).unwrap();
+    let src_root = SystemPath::new("/src");
+    let metadata = WorkspaceMetadata::from_path(src_root, &system).unwrap();
     let settings = ProgramSettings {
-        target_version: TargetVersion::default(),
+        target_version: TargetVersion::Py312,
         search_paths: SearchPathSettings {
             extra_paths: vec![],
-            workspace_root: workspace_root.to_path_buf(),
-            site_packages: None,
+            src_root: src_root.to_path_buf(),
+            site_packages: vec![],
             custom_typeshed: None,
         },
     };
 
     let mut db = RootDatabase::new(metadata, settings, system);
-    let foo = system_path_to_file(&db, foo_path).unwrap();
+    let parser = system_path_to_file(&db, parser_path).unwrap();
 
-    db.workspace().open_file(&mut db, foo);
+    db.workspace().open_file(&mut db, parser);
 
-    let bar = system_path_to_file(&db, bar_path).unwrap();
-    let typing = system_path_to_file(&db, typing_path).unwrap();
-    let builtins = vendored_path_to_file(&db, builtins_path).unwrap();
+    let re = system_path_to_file(&db, re_path).unwrap();
 
     Case {
         db,
         fs,
-        foo,
-        bar,
-        typing,
-        builtins,
+        parser,
+        re,
+        re_path,
     }
-}
-
-fn benchmark_without_parse(criterion: &mut Criterion) {
-    criterion.bench_function("red_knot_check_file[without_parse]", |b| {
-        b.iter_batched_ref(
-            || {
-                let case = setup_case();
-                // Pre-parse the module to only measure the semantic time.
-                parsed_module(case.db.upcast(), case.foo);
-                parsed_module(case.db.upcast(), case.bar);
-                parsed_module(case.db.upcast(), case.typing);
-                parsed_module(case.db.upcast(), case.builtins);
-                case
-            },
-            |case| {
-                let Case { db, foo, .. } = case;
-                let result = db.check_file(*foo).unwrap();
-
-                assert_eq!(result.as_slice(), [] as [String; 0]);
-            },
-            BatchSize::SmallInput,
-        );
-    });
 }
 
 fn benchmark_incremental(criterion: &mut Criterion) {
@@ -126,23 +73,23 @@ fn benchmark_incremental(criterion: &mut Criterion) {
         b.iter_batched_ref(
             || {
                 let mut case = setup_case();
-                case.db.check_file(case.foo).unwrap();
+                case.db.check_file(case.parser).unwrap();
 
                 case.fs
                     .write_file(
-                        SystemPath::new("/src/bar.py"),
-                        format!("{BAR_CODE}\n# A comment\n"),
+                        case.re_path,
+                        format!("{}\n# A comment\n", source_text(&case.db, case.re).as_str()),
                     )
                     .unwrap();
 
-                case.bar.sync(&mut case.db);
+                case.re.sync(&mut case.db);
                 case
             },
             |case| {
-                let Case { db, foo, .. } = case;
-                let result = db.check_file(*foo).unwrap();
+                let Case { db, parser, .. } = case;
+                let result = db.check_file(*parser).unwrap();
 
-                assert_eq!(result.as_slice(), [] as [String; 0]);
+                assert_eq!(result.len(), 403);
             },
             BatchSize::SmallInput,
         );
@@ -154,20 +101,15 @@ fn benchmark_cold(criterion: &mut Criterion) {
         b.iter_batched_ref(
             setup_case,
             |case| {
-                let Case { db, foo, .. } = case;
-                let result = db.check_file(*foo).unwrap();
+                let Case { db, parser, .. } = case;
+                let result = db.check_file(*parser).unwrap();
 
-                assert_eq!(result.as_slice(), [] as [String; 0]);
+                assert_eq!(result.len(), 403);
             },
             BatchSize::SmallInput,
         );
     });
 }
 
-criterion_group!(
-    check_file,
-    benchmark_cold,
-    benchmark_without_parse,
-    benchmark_incremental
-);
+criterion_group!(check_file, benchmark_cold, benchmark_incremental);
 criterion_main!(check_file);

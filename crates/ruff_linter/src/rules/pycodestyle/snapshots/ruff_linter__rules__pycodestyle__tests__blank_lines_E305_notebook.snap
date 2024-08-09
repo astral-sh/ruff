@@ -16,7 +16,6 @@ E30.ipynb:55:1: E305 [*] Expected 2 blank lines after class or function definiti
 53 53 | 
 54 54 |     # another comment
    55 |+
-   56 |+
-55 57 | fn()
-56 58 | # end
-57 59 | # E306:3:5
+55 56 | fn()
+56 57 | # end
+57 58 | # E306:3:5

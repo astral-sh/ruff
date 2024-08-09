@@ -1470,7 +1470,7 @@ impl<'a> SemanticModel<'a> {
                     .get_all(id)
                     .map(|binding_id| self.binding(binding_id))
                     .filter(|binding| binding.start() >= expr.start())
-                    .all(|binding| !binding.is_used())
+                    .all(Binding::is_unused)
             }
             _ => false,
         }

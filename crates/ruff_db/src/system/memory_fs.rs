@@ -94,6 +94,10 @@ impl MemoryFileSystem {
         metadata(self, path.as_ref())
     }
 
+    pub fn canonicalize(&self, path: impl AsRef<SystemPath>) -> SystemPathBuf {
+        SystemPathBuf::from_utf8_path_buf(self.normalize_path(path))
+    }
+
     pub fn is_file(&self, path: impl AsRef<SystemPath>) -> bool {
         let by_path = self.inner.by_path.read().unwrap();
         let normalized = self.normalize_path(path.as_ref());
@@ -207,7 +211,9 @@ impl MemoryFileSystem {
 
         let normalized = self.normalize_path(path.as_ref());
 
-        get_or_create_file(&mut by_path, &normalized)?.content = content.to_string();
+        let file = get_or_create_file(&mut by_path, &normalized)?;
+        file.content = content.to_string();
+        file.last_modified = now();
 
         Ok(())
     }
@@ -223,7 +229,7 @@ impl MemoryFileSystem {
             std::collections::hash_map::Entry::Vacant(entry) => {
                 entry.insert(File {
                     content: content.to_string(),
-                    last_modified: FileTime::now(),
+                    last_modified: now(),
                 });
             }
             std::collections::hash_map::Entry::Occupied(mut entry) => {
@@ -278,7 +284,7 @@ impl MemoryFileSystem {
         let mut by_path = self.inner.by_path.write().unwrap();
         let normalized = self.normalize_path(path.as_ref());
 
-        get_or_create_file(&mut by_path, &normalized)?.last_modified = FileTime::now();
+        get_or_create_file(&mut by_path, &normalized)?.last_modified = now();
 
         Ok(())
     }
@@ -443,7 +449,7 @@ fn create_dir_all(
         path.push(component);
         let entry = paths.entry(path.clone()).or_insert_with(|| {
             Entry::Directory(Directory {
-                last_modified: FileTime::now(),
+                last_modified: now(),
             })
         });
 
@@ -466,7 +472,7 @@ fn get_or_create_file<'a>(
     let entry = paths.entry(normalized.to_path_buf()).or_insert_with(|| {
         Entry::File(File {
             content: String::new(),
-            last_modified: FileTime::now(),
+            last_modified: now(),
         })
     });
 
@@ -646,6 +652,30 @@ enum WalkerState {
 
     /// Traverse into the directory with the given path at the given depth.
     Nested { path: SystemPathBuf, depth: usize },
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+fn now() -> FileTime {
+    FileTime::now()
+}
+
+#[cfg(target_arch = "wasm32")]
+fn now() -> FileTime {
+    // Copied from FileTime::from_system_time()
+    let time = web_time::SystemTime::now();
+
+    time.duration_since(web_time::UNIX_EPOCH)
+        .map(|d| FileTime::from_unix_time(d.as_secs() as i64, d.subsec_nanos()))
+        .unwrap_or_else(|e| {
+            let until_epoch = e.duration();
+            let (sec_offset, nanos) = if until_epoch.subsec_nanos() == 0 {
+                (0, 0)
+            } else {
+                (-1, 1_000_000_000 - until_epoch.subsec_nanos())
+            };
+
+            FileTime::from_unix_time(-(until_epoch.as_secs() as i64) + sec_offset, nanos)
+        })
 }
 
 #[cfg(test)]

@@ -11,6 +11,7 @@ DOC202_google.py:20:1: DOC202 Docstring should not have a returns section becaus
    | |____^ DOC202
 23 |       print('test')
    |
+   = help: Remove the "Returns" section
 
 DOC202_google.py:36:1: DOC202 Docstring should not have a returns section because the function doesn't return anything
    |
@@ -22,3 +23,4 @@ DOC202_google.py:36:1: DOC202 Docstring should not have a returns section becaus
    | |________^ DOC202
 39 |           print('test')
    |
+   = help: Remove the "Returns" section

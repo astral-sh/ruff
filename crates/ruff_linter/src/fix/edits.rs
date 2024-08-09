@@ -1,7 +1,5 @@
 //! Interface for generating fix edits from higher-level actions (e.g., "remove an argument").
 
-use std::borrow::Cow;
-
 use anyhow::{Context, Result};
 
 use ruff_diagnostics::Edit;
@@ -126,7 +124,7 @@ pub(crate) fn remove_unused_imports<'a>(
 
 /// Edits to make the specified imports explicit, e.g. change `import x` to `import x as x`.
 pub(crate) fn make_redundant_alias<'a>(
-    member_names: impl Iterator<Item = Cow<'a, str>>,
+    member_names: impl Iterator<Item = &'a str>,
     stmt: &Stmt,
 ) -> Vec<Edit> {
     let aliases = match stmt {
@@ -302,11 +300,25 @@ pub(crate) fn adjust_indentation(
     indexer: &Indexer,
     stylist: &Stylist,
 ) -> Result<String> {
+    let contents = locator.slice(range);
+
     // If the range includes a multi-line string, use LibCST to ensure that we don't adjust the
     // whitespace _within_ the string.
-    if indexer.multiline_ranges().intersects(range) || indexer.fstring_ranges().intersects(range) {
-        let contents = locator.slice(range);
+    let contains_multiline_string =
+        indexer.multiline_ranges().intersects(range) || indexer.fstring_ranges().intersects(range);
 
+    // If the range has mixed indentation, we will use LibCST as well.
+    let mixed_indentation = contents.universal_newlines().any(|line| {
+        let trimmed = line.trim_whitespace_start();
+        if trimmed.is_empty() {
+            return false;
+        }
+
+        let line_indentation: &str = &line[..line.len() - trimmed.len()];
+        line_indentation.contains('\t') && line_indentation.contains(' ')
+    });
+
+    if contains_multiline_string || mixed_indentation {
         let module_text = format!("def f():{}{contents}", stylist.line_ending().as_str());
 
         let mut tree = match_statement(&module_text)?;
@@ -324,7 +336,6 @@ pub(crate) fn adjust_indentation(
         Ok(module_text)
     } else {
         // Otherwise, we can do a simple adjustment ourselves.
-        let contents = locator.slice(range);
         Ok(dedent_to(contents, indentation))
     }
 }
@@ -527,7 +538,6 @@ fn all_lines_fit(
 #[cfg(test)]
 mod tests {
     use anyhow::{anyhow, Result};
-    use std::borrow::Cow;
     use test_case::test_case;
 
     use ruff_diagnostics::{Diagnostic, Edit, Fix};
@@ -619,7 +629,7 @@ x = 1 \
         let contents = "import x, y as y, z as bees";
         let stmt = parse_first_stmt(contents)?;
         assert_eq!(
-            make_redundant_alias(["x"].into_iter().map(Cow::from), &stmt),
+            make_redundant_alias(["x"].into_iter(), &stmt),
             vec![Edit::range_replacement(
                 String::from("x as x"),
                 TextRange::new(TextSize::new(7), TextSize::new(8)),
@@ -627,7 +637,7 @@ x = 1 \
             "make just one item redundant"
         );
         assert_eq!(
-            make_redundant_alias(vec!["x", "y"].into_iter().map(Cow::from), &stmt),
+            make_redundant_alias(vec!["x", "y"].into_iter(), &stmt),
             vec![Edit::range_replacement(
                 String::from("x as x"),
                 TextRange::new(TextSize::new(7), TextSize::new(8)),
@@ -635,7 +645,7 @@ x = 1 \
             "the second item is already a redundant alias"
         );
         assert_eq!(
-            make_redundant_alias(vec!["x", "z"].into_iter().map(Cow::from), &stmt),
+            make_redundant_alias(vec!["x", "z"].into_iter(), &stmt),
             vec![Edit::range_replacement(
                 String::from("x as x"),
                 TextRange::new(TextSize::new(7), TextSize::new(8)),

@@ -76,9 +76,7 @@ where
 
     let event = events.iter().find(|event| {
         if let salsa::EventKind::WillExecute { database_key } = event.kind {
-            db.lookup_ingredient(database_key.ingredient_index())
-                .debug_name()
-                == query_name
+            db.ingredient_debug_name(database_key.ingredient_index()) == query_name
                 && database_key.key_index() == input.as_id()
         } else {
             false

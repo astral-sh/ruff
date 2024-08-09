@@ -50,7 +50,7 @@ pub(crate) fn useless_object_inheritance(checker: &mut Checker, class_def: &ast:
         return;
     };
 
-    for base in arguments.args.iter() {
+    for base in &*arguments.args {
         if !checker.semantic().match_builtin_expr(base, "object") {
             continue;
         }

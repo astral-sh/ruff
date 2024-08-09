@@ -13,10 +13,9 @@ impl Emitter for JsonLinesEmitter {
         messages: &[Message],
         context: &EmitterContext,
     ) -> anyhow::Result<()> {
-        let mut w = writer;
         for message in messages {
-            serde_json::to_writer(&mut w, &message_to_json_value(message, context))?;
-            w.write_all(b"\n")?;
+            serde_json::to_writer(&mut *writer, &message_to_json_value(message, context))?;
+            writer.write_all(b"\n")?;
         }
         Ok(())
     }

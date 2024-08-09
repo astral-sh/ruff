@@ -64,7 +64,7 @@ class ConfigOverrides(Serializable):
     The key describes a member to override in the toml file; '.' may be used to indicate a
     nested value e.g. `format.quote-style`.
 
-    If a Ruff configuration file does not exist and overrides are provided, it will be createad.
+    If a Ruff configuration file does not exist and overrides are provided, it will be created.
     """
 
     always: dict[str, Any] = field(default_factory=dict)
@@ -221,7 +221,7 @@ class CheckOptions(CommandOptions):
         if self.exclude:
             args.extend(["--exclude", self.exclude])
         if self.show_fixes:
-            args.extend(["--show-fixes", "--ecosystem-ci"])
+            args.extend(["--show-fixes"])
         return args
 
 

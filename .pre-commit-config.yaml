@@ -2,15 +2,15 @@ fail_fast: true
 
 exclude: |
   (?x)^(
-    crates/red_knot_module_resolver/vendor/.*|
+    crates/red_knot_python_semantic/vendor/.*|
+    crates/red_knot_workspace/resources/.*|
     crates/ruff_linter/resources/.*|
     crates/ruff_linter/src/rules/.*/snapshots/.*|
     crates/ruff/resources/.*|
     crates/ruff_python_formatter/resources/.*|
     crates/ruff_python_formatter/tests/snapshots/.*|
     crates/ruff_python_resolver/resources/.*|
-    crates/ruff_python_resolver/tests/snapshots/.*|
-    crates/red_knot/resources/.*
+    crates/ruff_python_resolver/tests/snapshots/.*
   )$
 
 repos:
@@ -43,7 +43,7 @@ repos:
           )$
 
   - repo: https://github.com/crate-ci/typos
-    rev: v1.23.5
+    rev: v1.23.6
     hooks:
       - id: typos
 
@@ -57,7 +57,7 @@ repos:
         pass_filenames: false # This makes it a lot faster
 
   - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.5.5
+    rev: v0.5.6
     hooks:
       - id: ruff-format
       - id: ruff

@@ -39,7 +39,19 @@ pub type Result<T> = std::io::Result<T>;
 /// Abstracting the system also enables tests to use a more efficient in-memory file system.
 pub trait System: Debug {
     /// Reads the metadata of the file or directory at `path`.
+    ///
+    /// This function will traverse symbolic links to query information about the destination file.
     fn path_metadata(&self, path: &SystemPath) -> Result<Metadata>;
+
+    /// Returns the canonical, absolute form of a path with all intermediate components normalized
+    /// and symbolic links resolved.
+    ///
+    /// # Errors
+    /// This function will return an error in the following situations, but is not limited to just these cases:
+    /// * `path` does not exist.
+    /// * A non-final component in `path` is not a directory.
+    /// * the symlink target path is not valid Unicode.
+    fn canonicalize_path(&self, path: &SystemPath) -> Result<SystemPathBuf>;
 
     /// Reads the content of the file at `path` into a [`String`].
     fn read_to_string(&self, path: &SystemPath) -> Result<String>;
@@ -118,6 +130,8 @@ pub trait System: Debug {
     fn walk_directory(&self, path: &SystemPath) -> WalkDirectoryBuilder;
 
     fn as_any(&self) -> &dyn std::any::Any;
+
+    fn as_any_mut(&mut self) -> &mut dyn std::any::Any;
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -128,6 +142,14 @@ pub struct Metadata {
 }
 
 impl Metadata {
+    pub fn new(revision: FileRevision, permissions: Option<u32>, file_type: FileType) -> Self {
+        Self {
+            revision,
+            permissions,
+            file_type,
+        }
+    }
+
     pub fn revision(&self) -> FileRevision {
         self.revision
     }

@@ -928,9 +928,9 @@ impl<'src> CodeExampleDoctest<'src> {
 /// the same with two main differences:
 ///
 /// 1. Literal blocks are began with a line that ends with `::`. Code block
-/// directives are began with a line like `.. code-block:: python`.
+///    directives are began with a line like `.. code-block:: python`.
 /// 2. Code block directives permit a list of options as a "field list"
-/// immediately after the opening line. Literal blocks have no options.
+///    immediately after the opening line. Literal blocks have no options.
 ///
 /// Otherwise, everything else, including the indentation structure, is the
 /// same.

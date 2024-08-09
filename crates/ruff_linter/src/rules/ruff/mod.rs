@@ -1,6 +1,7 @@
 //! Ruff-specific rules.
 
 pub(crate) mod rules;
+pub mod settings;
 pub(crate) mod typing;
 
 #[cfg(test)]
@@ -19,6 +20,7 @@ mod tests {
     use crate::settings::types::{
         CompiledPerFileIgnoreList, PerFileIgnore, PreviewMode, PythonVersion,
     };
+    use crate::settings::LinterSettings;
     use crate::test::{test_path, test_resource_path};
     use crate::{assert_messages, settings};
 
@@ -59,6 +61,7 @@ mod tests {
     #[test_case(Rule::InvalidFormatterSuppressionComment, Path::new("RUF028.py"))]
     #[test_case(Rule::UnusedAsync, Path::new("RUF029.py"))]
     #[test_case(Rule::AssertWithPrintMessage, Path::new("RUF030.py"))]
+    #[test_case(Rule::IncorrectlyParenthesizedTupleInSubscript, Path::new("RUF031.py"))]
     #[test_case(Rule::RedirectedNOQA, Path::new("RUF101.py"))]
     fn rules(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!("{}_{}", rule_code.noqa_code(), path.to_string_lossy());
@@ -67,6 +70,21 @@ mod tests {
             &settings::LinterSettings::for_rule(rule_code),
         )?;
         assert_messages!(snapshot, diagnostics);
+        Ok(())
+    }
+
+    #[test]
+    fn prefer_parentheses_getitem_tuple() -> Result<()> {
+        let diagnostics = test_path(
+            Path::new("ruff/RUF031_prefer_parens.py"),
+            &LinterSettings {
+                ruff: super::settings::Settings {
+                    parenthesize_tuple_in_subscript: true,
+                },
+                ..LinterSettings::for_rule(Rule::IncorrectlyParenthesizedTupleInSubscript)
+            },
+        )?;
+        assert_messages!(diagnostics);
         Ok(())
     }
 
@@ -348,6 +366,24 @@ mod tests {
             &settings::LinterSettings::for_rule(Rule::InvalidPyprojectToml),
         );
         assert_messages!(snapshot, messages);
+        Ok(())
+    }
+
+    #[test_case(Rule::ZipInsteadOfPairwise, Path::new("RUF007.py"))]
+    fn preview_rules(rule_code: Rule, path: &Path) -> Result<()> {
+        let snapshot = format!(
+            "preview__{}_{}",
+            rule_code.noqa_code(),
+            path.to_string_lossy()
+        );
+        let diagnostics = test_path(
+            Path::new("ruff").join(path).as_path(),
+            &settings::LinterSettings {
+                preview: PreviewMode::Enabled,
+                ..settings::LinterSettings::for_rule(rule_code)
+            },
+        )?;
+        assert_messages!(snapshot, diagnostics);
         Ok(())
     }
 }

@@ -1,16 +1,19 @@
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::helpers::any_over_expr;
 use ruff_python_ast::{self as ast, Expr};
 use ruff_python_trivia::{SimpleTokenKind, SimpleTokenizer};
 use ruff_text_size::{Ranged, TextRange, TextSize};
 
 use crate::checkers::ast::Checker;
+use crate::rules::flake8_comprehensions::fixes;
 
 use super::helpers;
 
 /// ## What it does
 /// Checks for `tuple` calls that take unnecessary list or tuple literals as
-/// arguments.
+/// arguments. In [preview], this also includes unnecessary list comprehensions
+/// within tuple calls.
 ///
 /// ## Why is this bad?
 /// It's unnecessary to use a list or tuple literal within a `tuple()` call,
@@ -20,55 +23,71 @@ use super::helpers;
 /// literal. Otherwise, if a tuple literal was passed, then the outer call
 /// to `tuple()` should be removed.
 ///
+/// In [preview], this rule also checks for list comprehensions within `tuple()`
+/// calls. If a list comprehension is found, it should be rewritten as a
+/// generator expression.
+///
 /// ## Examples
 /// ```python
 /// tuple([1, 2])
 /// tuple((1, 2))
+/// tuple([x for x in range(10)])
 /// ```
 ///
 /// Use instead:
 /// ```python
 /// (1, 2)
 /// (1, 2)
+/// tuple(x for x in range(10))
 /// ```
 ///
 /// ## Fix safety
 /// This rule's fix is marked as unsafe, as it may occasionally drop comments
 /// when rewriting the call. In most cases, though, comments will be preserved.
+///
+/// [preview]: https://docs.astral.sh/ruff/preview/
 #[violation]
 pub struct UnnecessaryLiteralWithinTupleCall {
-    literal: String,
+    literal_kind: TupleLiteralKind,
 }
 
 impl AlwaysFixableViolation for UnnecessaryLiteralWithinTupleCall {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let UnnecessaryLiteralWithinTupleCall { literal } = self;
-        if literal == "list" {
-            format!(
-                "Unnecessary `{literal}` literal passed to `tuple()` (rewrite as a `tuple` literal)"
-            )
-        } else {
-            format!(
-                "Unnecessary `{literal}` literal passed to `tuple()` (remove the outer call to `tuple()`)"
-            )
+        let UnnecessaryLiteralWithinTupleCall { literal_kind } = self;
+        match literal_kind {
+            TupleLiteralKind::List => {
+                format!(
+                    "Unnecessary `list` literal passed to `tuple()` (rewrite as a `tuple` literal)"
+                )
+            }
+            TupleLiteralKind::Tuple => {
+                format!("Unnecessary `tuple` literal passed to `tuple()` (remove the outer call to `tuple()`)")
+            }
+            TupleLiteralKind::ListComp => {
+                format!(
+                    "Unnecessary list comprehension passed to `tuple()` (rewrite as a generator)"
+                )
+            }
         }
     }
 
     fn fix_title(&self) -> String {
-        let UnnecessaryLiteralWithinTupleCall { literal } = self;
-        {
-            if literal == "list" {
-                "Rewrite as a `tuple` literal".to_string()
-            } else {
-                "Remove outer `tuple` call".to_string()
-            }
+        let UnnecessaryLiteralWithinTupleCall { literal_kind } = self;
+        match literal_kind {
+            TupleLiteralKind::List => "Rewrite as a `tuple` literal".to_string(),
+            TupleLiteralKind::Tuple => "Remove the outer call to `tuple()`".to_string(),
+            TupleLiteralKind::ListComp => "Rewrite as a generator".to_string(),
         }
     }
 }
 
 /// C409
-pub(crate) fn unnecessary_literal_within_tuple_call(checker: &mut Checker, call: &ast::ExprCall) {
+pub(crate) fn unnecessary_literal_within_tuple_call(
+    checker: &mut Checker,
+    expr: &Expr,
+    call: &ast::ExprCall,
+) {
     if !call.arguments.keywords.is_empty() {
         return;
     }
@@ -84,54 +103,76 @@ pub(crate) fn unnecessary_literal_within_tuple_call(checker: &mut Checker, call:
         return;
     }
     let argument_kind = match argument {
-        Expr::Tuple(_) => "tuple",
-        Expr::List(_) => "list",
+        Expr::Tuple(_) => TupleLiteralKind::Tuple,
+        Expr::List(_) => TupleLiteralKind::List,
+        Expr::ListComp(_) if checker.settings.preview.is_enabled() => TupleLiteralKind::ListComp,
         _ => return,
     };
 
     let mut diagnostic = Diagnostic::new(
         UnnecessaryLiteralWithinTupleCall {
-            literal: argument_kind.to_string(),
+            literal_kind: argument_kind,
         },
         call.range(),
     );
 
-    // Convert `tuple([1, 2])` to `(1, 2)`
-    diagnostic.set_fix({
-        let elts = match argument {
-            Expr::List(ast::ExprList { elts, .. }) => elts.as_slice(),
-            Expr::Tuple(ast::ExprTuple { elts, .. }) => elts.as_slice(),
-            _ => return,
-        };
+    match argument {
+        Expr::List(ast::ExprList { elts, .. }) | Expr::Tuple(ast::ExprTuple { elts, .. }) => {
+            // Convert `tuple([1, 2])` to `(1, 2)`
+            diagnostic.set_fix({
+                let needs_trailing_comma = if let [item] = elts.as_slice() {
+                    SimpleTokenizer::new(
+                        checker.locator().contents(),
+                        TextRange::new(item.end(), call.end()),
+                    )
+                    .all(|token| token.kind != SimpleTokenKind::Comma)
+                } else {
+                    false
+                };
 
-        let needs_trailing_comma = if let [item] = elts {
-            SimpleTokenizer::new(
-                checker.locator().contents(),
-                TextRange::new(item.end(), call.end()),
-            )
-            .all(|token| token.kind != SimpleTokenKind::Comma)
-        } else {
-            false
-        };
+                // Replace `[` with `(`.
+                let elt_start = Edit::replacement(
+                    "(".into(),
+                    call.start(),
+                    argument.start() + TextSize::from(1),
+                );
+                // Replace `]` with `)` or `,)`.
+                let elt_end = Edit::replacement(
+                    if needs_trailing_comma {
+                        ",)".into()
+                    } else {
+                        ")".into()
+                    },
+                    argument.end() - TextSize::from(1),
+                    call.end(),
+                );
+                Fix::unsafe_edits(elt_start, [elt_end])
+            });
+        }
 
-        // Replace `[` with `(`.
-        let elt_start = Edit::replacement(
-            "(".into(),
-            call.start(),
-            argument.start() + TextSize::from(1),
-        );
-        // Replace `]` with `)` or `,)`.
-        let elt_end = Edit::replacement(
-            if needs_trailing_comma {
-                ",)".into()
-            } else {
-                ")".into()
-            },
-            argument.end() - TextSize::from(1),
-            call.end(),
-        );
-        Fix::unsafe_edits(elt_start, [elt_end])
-    });
+        Expr::ListComp(ast::ExprListComp { elt, .. }) => {
+            if any_over_expr(elt, &Expr::is_await_expr) {
+                return;
+            }
+            // Convert `tuple([x for x in range(10)])` to `tuple(x for x in range(10))`
+            diagnostic.try_set_fix(|| {
+                fixes::fix_unnecessary_comprehension_in_call(
+                    expr,
+                    checker.locator(),
+                    checker.stylist(),
+                )
+            });
+        }
+
+        _ => return,
+    }
 
     checker.diagnostics.push(diagnostic);
+}
+
+#[derive(Debug, PartialEq, Eq)]
+enum TupleLiteralKind {
+    List,
+    Tuple,
+    ListComp,
 }

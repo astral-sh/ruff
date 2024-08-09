@@ -130,6 +130,8 @@ pub enum Type<'db> {
     Union(UnionType<'db>),
     Intersection(IntersectionType<'db>),
     IntLiteral(i64),
+    /// A boolean literal, either `True` or `False`.
+    BooleanLiteral(bool),
     // TODO protocols, callable types, overloads, generics, type vars
 }
 
@@ -157,12 +159,15 @@ impl<'db> Type<'db> {
                 // TODO MRO? get_own_instance_member, get_instance_member
                 todo!("attribute lookup on Instance type")
             }
-            Type::Union(_) => {
-                // TODO perform the get_member on each type in the union
-                // TODO return the union of those results
-                // TODO if any of those results is `None` then include Unknown in the result union
-                todo!("attribute lookup on Union type")
-            }
+            Type::Union(union) => Type::Union(
+                union
+                    .elements(db)
+                    .iter()
+                    .fold(UnionTypeBuilder::new(db), |builder, element_ty| {
+                        builder.add(element_ty.member(db, name))
+                    })
+                    .build(),
+            ),
             Type::Intersection(_) => {
                 // TODO perform the get_member on each type in the intersection
                 // TODO return the intersection of those results
@@ -172,6 +177,17 @@ impl<'db> Type<'db> {
                 // TODO raise error
                 Type::Unknown
             }
+            Type::BooleanLiteral(_) => Type::Unknown,
+        }
+    }
+
+    #[must_use]
+    pub fn instance(&self) -> Type<'db> {
+        match self {
+            Type::Any => Type::Any,
+            Type::Unknown => Type::Unknown,
+            Type::Class(class) => Type::Instance(*class),
+            _ => Type::Unknown, // TODO type errors
         }
     }
 }

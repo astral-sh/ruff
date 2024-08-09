@@ -8,13 +8,16 @@
   semanticCommits: "disabled",
   separateMajorMinor: false,
   prHourlyLimit: 10,
-  enabledManagers: ["github-actions", "pre-commit", "cargo", "pep621", "npm"],
+  enabledManagers: ["github-actions", "pre-commit", "cargo", "pep621", "pip_requirements", "npm"],
   cargo: {
     // See https://docs.renovatebot.com/configuration-options/#rangestrategy
     rangeStrategy: "update-lockfile",
   },
   pep621: {
     fileMatch: ["^(python|scripts)/.*pyproject\\.toml$"],
+  },
+  pip_requirements: {
+    fileMatch: ["^docs/requirements.*\\.txt$"],
   },
   npm: {
     fileMatch: ["^playground/.*package\\.json$"],
@@ -46,6 +49,14 @@
       // See: https://github.com/astral-sh/uv/issues/3642
       matchPackagePatterns: ["zip"],
       matchManagers: ["cargo"],
+      enabled: false,
+    },
+    {
+      // `mkdocs-material` requires a manual update to keep the version in sync
+      // with `mkdocs-material-insider`.
+      // See: https://squidfunk.github.io/mkdocs-material/insiders/upgrade/
+      matchManagers: ["pip_requirements"],
+      matchPackagePatterns: ["mkdocs-material"],
       enabled: false,
     },
     {

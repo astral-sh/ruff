@@ -1,7 +1,7 @@
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::visitor::Visitor;
-use ruff_python_ast::{self as ast, Expr, StmtFor};
+use ruff_python_ast::{self as ast, Expr, Int, Number, StmtFor};
 use ruff_python_semantic::SemanticModel;
 use ruff_text_size::Ranged;
 
@@ -150,6 +150,19 @@ fn enumerate_items<'a>(
     let Some(Expr::Name(sequence)) = arguments.args.first() else {
         return None;
     };
+
+    // If the `enumerate` call has a non-zero `start`, don't omit.
+    if !arguments.find_argument("start", 1).map_or(true, |expr| {
+        matches!(
+            expr,
+            Expr::NumberLiteral(ast::ExprNumberLiteral {
+                value: Number::Int(Int::ZERO),
+                ..
+            })
+        )
+    }) {
+        return None;
+    }
 
     // Check that the function is the `enumerate` builtin.
     if !semantic.match_builtin_expr(func, "enumerate") {

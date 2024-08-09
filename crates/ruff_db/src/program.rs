@@ -1,4 +1,5 @@
 use crate::{system::SystemPathBuf, Db};
+use salsa::Durability;
 
 #[salsa::input(singleton)]
 pub struct Program {
@@ -10,7 +11,9 @@ pub struct Program {
 
 impl Program {
     pub fn from_settings(db: &dyn Db, settings: ProgramSettings) -> Self {
-        Program::new(db, settings.target_version, settings.search_paths)
+        Program::builder(settings.target_version, settings.search_paths)
+            .durability(Durability::HIGH)
+            .new(db)
     }
 }
 
@@ -36,6 +39,18 @@ pub enum TargetVersion {
 }
 
 impl TargetVersion {
+    pub const fn as_tuple(self) -> (u8, u8) {
+        match self {
+            Self::Py37 => (3, 7),
+            Self::Py38 => (3, 8),
+            Self::Py39 => (3, 9),
+            Self::Py310 => (3, 10),
+            Self::Py311 => (3, 11),
+            Self::Py312 => (3, 12),
+            Self::Py313 => (3, 13),
+        }
+    }
+
     const fn as_str(self) -> &'static str {
         match self {
             Self::Py37 => "py37",
@@ -62,7 +77,7 @@ impl std::fmt::Debug for TargetVersion {
 }
 
 /// Configures the search paths for module resolution.
-#[derive(Eq, PartialEq, Debug, Clone)]
+#[derive(Eq, PartialEq, Debug, Clone, Default)]
 pub struct SearchPathSettings {
     /// List of user-provided paths that should take first priority in the module resolution.
     /// Examples in other type checkers are mypy's MYPYPATH environment variable,
@@ -70,7 +85,7 @@ pub struct SearchPathSettings {
     pub extra_paths: Vec<SystemPathBuf>,
 
     /// The root of the workspace, used for finding first-party modules.
-    pub workspace_root: SystemPathBuf,
+    pub src_root: SystemPathBuf,
 
     /// Optional path to a "custom typeshed" directory on disk for us to use for standard-library types.
     /// If this is not provided, we will fallback to our vendored typeshed stubs for the stdlib,
@@ -78,5 +93,5 @@ pub struct SearchPathSettings {
     pub custom_typeshed: Option<SystemPathBuf>,
 
     /// The path to the user's `site-packages` directory, where third-party packages from ``PyPI`` are installed.
-    pub site_packages: Option<SystemPathBuf>,
+    pub site_packages: Vec<SystemPathBuf>,
 }

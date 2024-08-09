@@ -1,6 +1,6 @@
 [package]
 name = "ruff_linter"
-version = "0.5.5"
+version = "0.5.7"
 publish = false
 authors = { workspace = true }
 edition = { workspace = true }
@@ -69,6 +69,7 @@ toml = { workspace = true }
 typed-arena = { workspace = true }
 unicode-width = { workspace = true }
 unicode_names2 = { workspace = true }
+unicode-normalization = { workspace = true }
 url = { workspace = true }
 
 [dev-dependencies]

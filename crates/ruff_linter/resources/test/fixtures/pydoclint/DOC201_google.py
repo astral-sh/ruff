@@ -71,3 +71,40 @@ def test():
         return 5
 
     print("I never return")
+
+
+from functools import cached_property
+
+class Baz:
+    # OK
+    @cached_property
+    def baz(self) -> str:
+        """
+        Do something
+
+        Args:
+            num (int): A number
+        """
+        return 'test'
+
+
+# OK
+def f():
+    """Returns 1."""
+    return 1
+
+
+# OK
+def f():
+    """Return 1."""
+    return 1
+
+
+# OK
+def f(num: int):
+    """Returns 1.
+
+    Args:
+        num (int): A number
+    """
+    return 1

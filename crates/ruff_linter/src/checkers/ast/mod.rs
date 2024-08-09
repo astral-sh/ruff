@@ -719,7 +719,7 @@ impl<'a> Visitor<'a> for Checker<'a> {
                         self.visit_expr(expr);
                     }
                 }
-                for expr in returns {
+                if let Some(expr) = returns {
                     match annotation {
                         AnnotationContext::RuntimeRequired => {
                             self.visit_runtime_required_annotation(expr);
@@ -1240,7 +1240,7 @@ impl<'a> Visitor<'a> for Checker<'a> {
                         for arg in args {
                             self.visit_type_definition(arg);
                         }
-                        for keyword in arguments.keywords.iter() {
+                        for keyword in &*arguments.keywords {
                             let Keyword {
                                 arg,
                                 value,
@@ -1286,7 +1286,7 @@ impl<'a> Visitor<'a> for Checker<'a> {
                             }
                         }
 
-                        for keyword in arguments.keywords.iter() {
+                        for keyword in &*arguments.keywords {
                             let Keyword { arg, value, .. } = keyword;
                             match (arg.as_ref(), value) {
                                 // Ex) NamedTuple("a", **{"a": int})
@@ -1331,7 +1331,7 @@ impl<'a> Visitor<'a> for Checker<'a> {
                         }
 
                         // Ex) TypedDict("a", a=int)
-                        for keyword in arguments.keywords.iter() {
+                        for keyword in &*arguments.keywords {
                             let Keyword { value, .. } = keyword;
                             self.visit_type_definition(value);
                         }
@@ -1345,13 +1345,13 @@ impl<'a> Visitor<'a> for Checker<'a> {
                             for arg in args {
                                 self.visit_non_type_definition(arg);
                             }
-                            for keyword in arguments.keywords.iter() {
+                            for keyword in &*arguments.keywords {
                                 let Keyword { value, .. } = keyword;
                                 self.visit_non_type_definition(value);
                             }
                         } else {
                             // Ex) DefaultNamedArg(type="bool", name="some_prop_name")
-                            for keyword in arguments.keywords.iter() {
+                            for keyword in &*arguments.keywords {
                                 let Keyword {
                                     value,
                                     arg,
@@ -1369,10 +1369,10 @@ impl<'a> Visitor<'a> for Checker<'a> {
                         // If we're in a type definition, we need to treat the arguments to any
                         // other callables as non-type definitions (i.e., we don't want to treat
                         // any strings as deferred type definitions).
-                        for arg in arguments.args.iter() {
+                        for arg in &*arguments.args {
                             self.visit_non_type_definition(arg);
                         }
-                        for keyword in arguments.keywords.iter() {
+                        for keyword in &*arguments.keywords {
                             let Keyword { value, .. } = keyword;
                             self.visit_non_type_definition(value);
                         }

@@ -18,6 +18,22 @@ use crate::checkers::ast::Checker;
 ///
 /// If you want to check for an exact type match, use `is` or `is not`.
 ///
+/// ## Known problems
+/// When using libraries that override the `==` (`__eq__`) operator (such as NumPy,
+/// Pandas, and SQLAlchemy), this rule may produce false positives, as converting
+/// from `==` to `is` or `is not` will change the behavior of the code.
+///
+/// For example, the following operations are _not_ equivalent:
+/// ```python
+/// import numpy as np
+///
+/// np.array([True, False]) == False
+/// # array([False,  True])
+///
+/// np.array([True, False]) is False
+/// # False
+/// ```
+///
 /// ## Example
 /// ```python
 /// if type(obj) == type(1):
@@ -180,8 +196,8 @@ fn is_type(expr: &Expr, semantic: &SemanticModel) -> bool {
 /// Returns `true` if the [`Expr`] appears to be a reference to a NumPy dtype, since:
 /// > `dtype` are a bit of a strange beast, but definitely best thought of as instances, not
 /// > classes, and they are meant to be comparable not just to their own class, but also to the
-/// corresponding scalar types (e.g., `x.dtype == np.float32`) and strings (e.g.,
-/// `x.dtype == ['i1,i4']`; basically, __eq__ always tries to do `dtype(other)`).
+/// > corresponding scalar types (e.g., `x.dtype == np.float32`) and strings (e.g.,
+/// > `x.dtype == ['i1,i4']`; basically, __eq__ always tries to do `dtype(other)`).
 fn is_dtype(expr: &Expr, semantic: &SemanticModel) -> bool {
     match expr {
         // Ex) `np.dtype(obj)`

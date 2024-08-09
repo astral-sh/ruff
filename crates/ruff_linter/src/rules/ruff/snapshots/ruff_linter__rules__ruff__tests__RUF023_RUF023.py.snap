@@ -672,8 +672,6 @@ RUF023.py:191:17: RUF023 [*] `BezierBuilder4.__slots__` is not sorted
 192 | |                  "baz", "bingo"
 193 | |                  }
     | |__________________^ RUF023
-194 |   
-195 |   ###################################
     |
     = help: Apply a natural sort to `BezierBuilder4.__slots__`
 
@@ -691,7 +689,25 @@ RUF023.py:191:17: RUF023 [*] `BezierBuilder4.__slots__` is not sorted
     195 |+        "foo"
     196 |+    }
 194 197 | 
-195 198 | ###################################
-196 199 | # These should all not get flagged:
+195 198 | 
+196 199 | class VeryDRY:
 
+RUF023.py:199:17: RUF023 [*] `VeryDRY.__slots__` is not sorted
+    |
+197 |     # This should get flagged, *but* the fix is unsafe,
+198 |     # since the `__slots__` binding is used by the `__match_args__` definition
+199 |     __slots__ = ("foo", "bar")
+    |                 ^^^^^^^^^^^^^^ RUF023
+200 |     __match_args__ = __slots__
+    |
+    = help: Apply a natural sort to `VeryDRY.__slots__`
 
+ℹ Unsafe fix
+196 196 | class VeryDRY:
+197 197 |     # This should get flagged, *but* the fix is unsafe,
+198 198 |     # since the `__slots__` binding is used by the `__match_args__` definition
+199     |-    __slots__ = ("foo", "bar")
+    199 |+    __slots__ = ("bar", "foo")
+200 200 |     __match_args__ = __slots__
+201 201 | 
+202 202 |

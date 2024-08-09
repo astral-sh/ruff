@@ -12,28 +12,29 @@ license.workspace = true
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-red_knot_module_resolver = { workspace = true }
 red_knot_python_semantic = { workspace = true }
+red_knot_workspace = { workspace = true }
+red_knot_server = { workspace = true }
 
 ruff_db = { workspace = true, features = ["os", "cache"] }
-ruff_python_ast = { workspace = true }
 
 anyhow = { workspace = true }
+chrono = { workspace = true }
 clap = { workspace = true, features = ["wrap_help"] }
+colored = { workspace = true }
 countme = { workspace = true, features = ["enable"] }
 crossbeam = { workspace = true }
 ctrlc = { version = "3.4.4" }
-notify = { workspace = true }
 rayon = { workspace = true }
-rustc-hash = { workspace = true }
 salsa = { workspace = true }
-tracing = { workspace = true }
-tracing-subscriber = { workspace = true }
+tracing = { workspace = true, features = ["release_max_level_debug"] }
+tracing-subscriber = { workspace = true, features = ["env-filter", "fmt"] }
+tracing-flame = { workspace = true }
 tracing-tree = { workspace = true }
 
 [dev-dependencies]
+filetime = { workspace = true }
 tempfile = { workspace = true }
-
 
 [lints]
 workspace = true

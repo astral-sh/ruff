@@ -24,13 +24,14 @@ use rustc_hash::FxHashMap;
 use salsa;
 use salsa::plumbing::AsId;
 
-use red_knot_module_resolver::{resolve_module, ModuleName};
 use ruff_db::files::File;
 use ruff_db::parsed::parsed_module;
 use ruff_python_ast as ast;
 use ruff_python_ast::{ExprContext, TypeParams};
 
 use crate::builtins::builtins_scope;
+use crate::module_name::ModuleName;
+use crate::module_resolver::resolve_module;
 use crate::semantic_index::ast_ids::{HasScopedAstId, HasScopedUseId, ScopedExpressionId};
 use crate::semantic_index::definition::{Definition, DefinitionKind, DefinitionNodeKey};
 use crate::semantic_index::expression::Expression;
@@ -50,7 +51,7 @@ use crate::Db;
 pub(crate) fn infer_scope_types<'db>(db: &'db dyn Db, scope: ScopeId<'db>) -> TypeInference<'db> {
     let file = scope.file(db);
     let _span =
-        tracing::trace_span!("infer_scope_types", scope=?scope.as_id(), file=?file.path(db))
+        tracing::trace_span!("infer_scope_types", scope=?scope.as_id(), file=%file.path(db))
             .entered();
 
     // Using the index here is fine because the code below depends on the AST anyway.
@@ -83,7 +84,7 @@ pub(crate) fn infer_definition_types<'db>(
     let _span = tracing::trace_span!(
         "infer_definition_types",
         definition = ?definition.as_id(),
-        file = ?file.path(db)
+        file = %file.path(db)
     )
     .entered();
 
@@ -104,7 +105,7 @@ pub(crate) fn infer_expression_types<'db>(
 ) -> TypeInference<'db> {
     let file = expression.file(db);
     let _span =
-        tracing::trace_span!("infer_expression_types", expression=?expression.as_id(), file=?file.path(db))
+        tracing::trace_span!("infer_expression_types", expression=?expression.as_id(), file=%file.path(db))
             .entered();
 
     let index = semantic_index(db, file);
@@ -840,9 +841,7 @@ impl<'db> TypeInferenceBuilder<'db> {
     }
 
     fn module_ty_from_name(&self, name: &ast::Identifier) -> Type<'db> {
-        let module_name = ModuleName::new(&name.id);
-        let module =
-            module_name.and_then(|module_name| resolve_module(self.db.upcast(), module_name));
+        let module = ModuleName::new(&name.id).and_then(|name| resolve_module(self.db, name));
         module
             .map(|module| Type::Module(module.file()))
             .unwrap_or(Type::Unbound)
@@ -932,24 +931,24 @@ impl<'db> TypeInferenceBuilder<'db> {
             ast::Number::Int(n) => n
                 .as_i64()
                 .map(Type::IntLiteral)
-                .unwrap_or_else(|| builtins_symbol_ty_by_name(self.db, "int")),
-            // TODO builtins.float or builtins.complex
-            _ => Type::Unknown,
+                .unwrap_or_else(|| builtins_symbol_ty_by_name(self.db, "int").instance()),
+            ast::Number::Float(_) => builtins_symbol_ty_by_name(self.db, "float").instance(),
+            ast::Number::Complex { .. } => {
+                builtins_symbol_ty_by_name(self.db, "complex").instance()
+            }
         }
     }
 
     #[allow(clippy::unused_self)]
-    fn infer_boolean_literal_expression(
-        &mut self,
-        _literal: &ast::ExprBooleanLiteral,
-    ) -> Type<'db> {
-        // TODO builtins.bool and boolean Literal types
-        Type::Unknown
+    fn infer_boolean_literal_expression(&mut self, literal: &ast::ExprBooleanLiteral) -> Type<'db> {
+        let ast::ExprBooleanLiteral { range: _, value } = literal;
+
+        Type::BooleanLiteral(*value)
     }
 
     #[allow(clippy::unused_self)]
     fn infer_string_literal_expression(&mut self, _literal: &ast::ExprStringLiteral) -> Type<'db> {
-        // TODO Literal[str] or builtins.str
+        // TODO Literal["..."] or str
         Type::Unknown
     }
 
@@ -997,7 +996,7 @@ impl<'db> TypeInferenceBuilder<'db> {
         &mut self,
         _literal: &ast::ExprEllipsisLiteral,
     ) -> Type<'db> {
-        // TODO builtins.Ellipsis
+        // TODO Ellipsis
         Type::Unknown
     }
 
@@ -1014,7 +1013,7 @@ impl<'db> TypeInferenceBuilder<'db> {
         }
 
         // TODO generic
-        builtins_symbol_ty_by_name(self.db, "tuple")
+        builtins_symbol_ty_by_name(self.db, "tuple").instance()
     }
 
     fn infer_list_expression(&mut self, list: &ast::ExprList) -> Type<'db> {
@@ -1029,7 +1028,7 @@ impl<'db> TypeInferenceBuilder<'db> {
         }
 
         // TODO generic
-        builtins_symbol_ty_by_name(self.db, "list")
+        builtins_symbol_ty_by_name(self.db, "list").instance()
     }
 
     fn infer_set_expression(&mut self, set: &ast::ExprSet) -> Type<'db> {
@@ -1040,7 +1039,7 @@ impl<'db> TypeInferenceBuilder<'db> {
         }
 
         // TODO generic
-        builtins_symbol_ty_by_name(self.db, "set")
+        builtins_symbol_ty_by_name(self.db, "set").instance()
     }
 
     fn infer_dict_expression(&mut self, dict: &ast::ExprDict) -> Type<'db> {
@@ -1052,7 +1051,7 @@ impl<'db> TypeInferenceBuilder<'db> {
         }
 
         // TODO generic
-        builtins_symbol_ty_by_name(self.db, "dict")
+        builtins_symbol_ty_by_name(self.db, "dict").instance()
     }
 
     fn infer_generator_expression(&mut self, generator: &ast::ExprGenerator) -> Type<'db> {
@@ -1352,22 +1351,26 @@ impl<'db> TypeInferenceBuilder<'db> {
                 match right_ty {
                     Type::IntLiteral(m) => {
                         match op {
-                            ast::Operator::Add => n
-                                .checked_add(m)
-                                .map(Type::IntLiteral)
-                                .unwrap_or_else(|| builtins_symbol_ty_by_name(self.db, "int")),
-                            ast::Operator::Sub => n
-                                .checked_sub(m)
-                                .map(Type::IntLiteral)
-                                .unwrap_or_else(|| builtins_symbol_ty_by_name(self.db, "int")),
-                            ast::Operator::Mult => n
-                                .checked_mul(m)
-                                .map(Type::IntLiteral)
-                                .unwrap_or_else(|| builtins_symbol_ty_by_name(self.db, "int")),
-                            ast::Operator::Div => n
-                                .checked_div(m)
-                                .map(Type::IntLiteral)
-                                .unwrap_or_else(|| builtins_symbol_ty_by_name(self.db, "int")),
+                            ast::Operator::Add => {
+                                n.checked_add(m).map(Type::IntLiteral).unwrap_or_else(|| {
+                                    builtins_symbol_ty_by_name(self.db, "int").instance()
+                                })
+                            }
+                            ast::Operator::Sub => {
+                                n.checked_sub(m).map(Type::IntLiteral).unwrap_or_else(|| {
+                                    builtins_symbol_ty_by_name(self.db, "int").instance()
+                                })
+                            }
+                            ast::Operator::Mult => {
+                                n.checked_mul(m).map(Type::IntLiteral).unwrap_or_else(|| {
+                                    builtins_symbol_ty_by_name(self.db, "int").instance()
+                                })
+                            }
+                            ast::Operator::Div => {
+                                n.checked_div(m).map(Type::IntLiteral).unwrap_or_else(|| {
+                                    builtins_symbol_ty_by_name(self.db, "int").instance()
+                                })
+                            }
                             ast::Operator::Mod => n
                                 .checked_rem(m)
                                 .map(Type::IntLiteral)
@@ -1441,7 +1444,7 @@ impl<'db> TypeInferenceBuilder<'db> {
         self.infer_optional_expression(upper.as_deref());
         self.infer_optional_expression(step.as_deref());
 
-        // TODO builtins.slice
+        // TODO slice
         Type::Unknown
     }
 
@@ -1514,8 +1517,8 @@ mod tests {
             TargetVersion::Py38,
             SearchPathSettings {
                 extra_paths: Vec::new(),
-                workspace_root: SystemPathBuf::from("/src"),
-                site_packages: None,
+                src_root: SystemPathBuf::from("/src"),
+                site_packages: vec![],
                 custom_typeshed: None,
             },
         );
@@ -1531,8 +1534,8 @@ mod tests {
             TargetVersion::Py38,
             SearchPathSettings {
                 extra_paths: Vec::new(),
-                workspace_root: SystemPathBuf::from("/src"),
-                site_packages: None,
+                src_root: SystemPathBuf::from("/src"),
+                site_packages: vec![],
                 custom_typeshed: Some(SystemPathBuf::from(typeshed)),
             },
         );
@@ -1639,12 +1642,35 @@ mod tests {
     }
 
     #[test]
-    fn resolve_literal() -> anyhow::Result<()> {
+    fn number_literal() -> anyhow::Result<()> {
         let mut db = setup_db();
 
-        db.write_file("src/a.py", "x = 1")?;
+        db.write_dedented(
+            "src/a.py",
+            "
+            a = 1
+            b = 9223372036854775808
+            c = 1.45
+            d = 2j
+            ",
+        )?;
 
-        assert_public_ty(&db, "src/a.py", "x", "Literal[1]");
+        assert_public_ty(&db, "src/a.py", "a", "Literal[1]");
+        assert_public_ty(&db, "src/a.py", "b", "int");
+        assert_public_ty(&db, "src/a.py", "c", "float");
+        assert_public_ty(&db, "src/a.py", "d", "complex");
+
+        Ok(())
+    }
+
+    #[test]
+    fn boolean_literal() -> anyhow::Result<()> {
+        let mut db = setup_db();
+
+        db.write_file("src/a.py", "x = True\ny = False")?;
+
+        assert_public_ty(&db, "src/a.py", "x", "Literal[True]");
+        assert_public_ty(&db, "src/a.py", "y", "Literal[False]");
 
         Ok(())
     }
@@ -2238,6 +2264,28 @@ mod tests {
         Ok(())
     }
 
+    #[test]
+    fn attribute_of_union() -> anyhow::Result<()> {
+        let mut db = setup_db();
+
+        db.write_dedented(
+            "/src/a.py",
+            "
+            if flag:
+                class C:
+                    x = 1
+            else:
+                class C:
+                    x = 2
+            y = C.x
+            ",
+        )?;
+
+        assert_public_ty(&db, "/src/a.py", "y", "Literal[1, 2]");
+
+        Ok(())
+    }
+
     fn first_public_def<'db>(db: &'db TestDb, file: File, name: &str) -> Definition<'db> {
         let scope = global_scope(db, file);
         *use_def_map(db, scope)
@@ -2257,7 +2305,7 @@ mod tests {
             ",
         )?;
 
-        assert_public_ty(&db, "/src/a.py", "x", "Literal[int]");
+        assert_public_ty(&db, "/src/a.py", "x", "int");
 
         Ok(())
     }
@@ -2274,7 +2322,7 @@ mod tests {
         )?;
 
         // TODO should be a generic type
-        assert_public_ty(&db, "/src/a.py", "x", "Literal[tuple]");
+        assert_public_ty(&db, "/src/a.py", "x", "tuple");
 
         Ok(())
     }
@@ -2291,7 +2339,7 @@ mod tests {
         )?;
 
         // TODO should be a generic type
-        assert_public_ty(&db, "/src/a.py", "x", "Literal[list]");
+        assert_public_ty(&db, "/src/a.py", "x", "list");
 
         Ok(())
     }
@@ -2308,7 +2356,7 @@ mod tests {
         )?;
 
         // TODO should be a generic type
-        assert_public_ty(&db, "/src/a.py", "x", "Literal[set]");
+        assert_public_ty(&db, "/src/a.py", "x", "set");
 
         Ok(())
     }
@@ -2325,7 +2373,7 @@ mod tests {
         )?;
 
         // TODO should be a generic type
-        assert_public_ty(&db, "/src/a.py", "x", "Literal[dict]");
+        assert_public_ty(&db, "/src/a.py", "x", "dict");
 
         Ok(())
     }

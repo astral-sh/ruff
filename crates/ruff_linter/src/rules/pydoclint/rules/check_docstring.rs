@@ -2,20 +2,23 @@ use itertools::Itertools;
 use ruff_diagnostics::Diagnostic;
 use ruff_diagnostics::Violation;
 use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::helpers::map_callable;
 use ruff_python_ast::name::QualifiedName;
-use ruff_python_ast::statement_visitor::StatementVisitor;
-use ruff_python_ast::{self as ast, statement_visitor, Expr, Stmt};
-use ruff_python_semantic::{Definition, MemberKind, SemanticModel};
+use ruff_python_ast::visitor::Visitor;
+use ruff_python_ast::{self as ast, visitor, Expr, Stmt};
+use ruff_python_semantic::analyze::function_type;
+use ruff_python_semantic::{Definition, SemanticModel};
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
 use crate::docstrings::sections::{SectionContext, SectionContexts, SectionKind};
 use crate::docstrings::styles::SectionStyle;
+use crate::docstrings::Docstring;
 use crate::registry::Rule;
 use crate::rules::pydocstyle::settings::Convention;
 
 /// ## What it does
-/// Checks for functions with explicit returns missing a returns section in
+/// Checks for functions with explicit returns missing a "returns" section in
 /// their docstring.
 ///
 /// ## Why is this bad?
@@ -56,10 +59,14 @@ impl Violation for DocstringMissingReturns {
     fn message(&self) -> String {
         format!("`return` is not documented in docstring")
     }
+
+    fn fix_title(&self) -> Option<String> {
+        Some(format!("Add a \"Returns\" section to the docstring"))
+    }
 }
 
 /// ## What it does
-/// Checks for function docstrings that have a returns section without
+/// Checks for function docstrings that have a "returns" section without
 /// needing one.
 ///
 /// ## Why is this bad?
@@ -100,11 +107,111 @@ impl Violation for DocstringExtraneousReturns {
     fn message(&self) -> String {
         format!("Docstring should not have a returns section because the function doesn't return anything")
     }
+
+    fn fix_title(&self) -> Option<String> {
+        Some(format!("Remove the \"Returns\" section"))
+    }
+}
+
+/// ## What it does
+/// Checks for functions with yield statements missing a "yields" section in
+/// their docstring.
+///
+/// ## Why is this bad?
+/// Docstrings missing yields sections are a sign of incomplete documentation
+/// or refactors.
+///
+/// ## Example
+/// ```python
+/// def count_to_n(n: int) -> int:
+///     """Generate integers up to *n*.
+///
+///     Args:
+///         n: The number at which to stop counting.
+///     """
+///     for i in range(1, n + 1):
+///         yield i
+/// ```
+///
+/// Use instead:
+/// ```python
+/// def count_to_n(n: int) -> int:
+///     """Generate integers up to *n*.
+///
+///     Args:
+///         n: The number at which to stop counting.
+///
+///     Yields:
+///         int: The number we're at in the count.
+///     """
+///     for i in range(1, n + 1):
+///         yield i
+/// ```
+#[violation]
+pub struct DocstringMissingYields;
+
+impl Violation for DocstringMissingYields {
+    #[derive_message_formats]
+    fn message(&self) -> String {
+        format!("`yield` is not documented in docstring")
+    }
+
+    fn fix_title(&self) -> Option<String> {
+        Some(format!("Add a \"Yields\" section to the docstring"))
+    }
+}
+
+/// ## What it does
+/// Checks for function docstrings that have a "yields" section without
+/// needing one.
+///
+/// ## Why is this bad?
+/// Functions which don't yield anything should not have a yields section
+/// in their docstrings.
+///
+/// ## Example
+/// ```python
+/// def say_hello(n: int) -> None:
+///     """Says hello to the user.
+///
+///     Args:
+///         n: Number of times to say hello.
+///
+///     Yields:
+///         Doesn't yield anything.
+///     """
+///     for _ in range(n):
+///         print("Hello!")
+/// ```
+///
+/// Use instead:
+/// ```python
+/// def say_hello(n: int) -> None:
+///     """Says hello to the user.
+///
+///     Args:
+///         n: Number of times to say hello.
+///     """
+///     for _ in range(n):
+///         print("Hello!")
+/// ```
+#[violation]
+pub struct DocstringExtraneousYields;
+
+impl Violation for DocstringExtraneousYields {
+    #[derive_message_formats]
+    fn message(&self) -> String {
+        format!("Docstring has a \"Yields\" section but the function doesn't yield anything")
+    }
+
+    fn fix_title(&self) -> Option<String> {
+        Some(format!("Remove the \"Yields\" section"))
+    }
 }
 
 /// ## What it does
 /// Checks for function docstrings that do not include documentation for all
-/// explicitly-raised exceptions.
+/// explicitly raised exceptions.
 ///
 /// ## Why is this bad?
 /// If a function raises an exception without documenting it in its docstring,
@@ -159,6 +266,11 @@ impl Violation for DocstringMissingException {
     fn message(&self) -> String {
         let DocstringMissingException { id } = self;
         format!("Raised exception `{id}` missing from docstring")
+    }
+
+    fn fix_title(&self) -> Option<String> {
+        let DocstringMissingException { id } = self;
+        Some(format!("Add `{id}` to the docstring"))
     }
 }
 
@@ -221,6 +333,14 @@ impl Violation for DocstringExtraneousException {
             )
         }
     }
+
+    fn fix_title(&self) -> Option<String> {
+        let DocstringExtraneousException { ids } = self;
+        Some(format!(
+            "Remove {} from the docstring",
+            ids.iter().map(|id| format!("`{id}`")).join(", ")
+        ))
+    }
 }
 
 // A generic docstring section.
@@ -259,7 +379,7 @@ impl Ranged for RaisesSection<'_> {
 impl<'a> RaisesSection<'a> {
     /// Return the raised exceptions for the docstring, or `None` if the docstring does not contain
     /// a `Raises` section.
-    fn from_section(section: &SectionContext<'a>, style: SectionStyle) -> Self {
+    fn from_section(section: &SectionContext<'a>, style: Option<SectionStyle>) -> Self {
         Self {
             raised_exceptions: parse_entries(section.following_lines_str(), style),
             range: section.range(),
@@ -267,32 +387,50 @@ impl<'a> RaisesSection<'a> {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Default)]
 struct DocstringSections<'a> {
     returns: Option<GenericSection>,
+    yields: Option<GenericSection>,
     raises: Option<RaisesSection<'a>>,
 }
 
 impl<'a> DocstringSections<'a> {
-    fn from_sections(sections: &'a SectionContexts, style: SectionStyle) -> Self {
-        let mut returns: Option<GenericSection> = None;
-        let mut raises: Option<RaisesSection> = None;
-        for section in sections.iter() {
+    fn from_sections(sections: &'a SectionContexts, style: Option<SectionStyle>) -> Self {
+        let mut docstring_sections = Self::default();
+        for section in sections {
             match section.kind() {
-                SectionKind::Raises => raises = Some(RaisesSection::from_section(&section, style)),
-                SectionKind::Returns => returns = Some(GenericSection::from_section(&section)),
+                SectionKind::Raises => {
+                    docstring_sections.raises = Some(RaisesSection::from_section(&section, style));
+                }
+                SectionKind::Returns => {
+                    docstring_sections.returns = Some(GenericSection::from_section(&section));
+                }
+                SectionKind::Yields => {
+                    docstring_sections.yields = Some(GenericSection::from_section(&section));
+                }
                 _ => continue,
             }
         }
-        Self { returns, raises }
+        docstring_sections
     }
 }
 
 /// Parse the entries in a `Raises` section of a docstring.
-fn parse_entries(content: &str, style: SectionStyle) -> Vec<QualifiedName> {
+///
+/// Attempts to parse using the specified [`SectionStyle`], falling back to the other style if no
+/// entries are found.
+fn parse_entries(content: &str, style: Option<SectionStyle>) -> Vec<QualifiedName> {
     match style {
-        SectionStyle::Google => parse_entries_google(content),
-        SectionStyle::Numpy => parse_entries_numpy(content),
+        Some(SectionStyle::Google) => parse_entries_google(content),
+        Some(SectionStyle::Numpy) => parse_entries_numpy(content),
+        None => {
+            let entries = parse_entries_google(content);
+            if entries.is_empty() {
+                parse_entries_numpy(content)
+            } else {
+                entries
+            }
+        }
     }
 }
 
@@ -373,12 +511,15 @@ impl Ranged for ExceptionEntry<'_> {
 #[derive(Debug)]
 struct BodyEntries<'a> {
     returns: Vec<Entry>,
+    yields: Vec<Entry>,
     raised_exceptions: Vec<ExceptionEntry<'a>>,
 }
 
 /// An AST visitor to extract a summary of documentable statements from a function body.
 struct BodyVisitor<'a> {
     returns: Vec<Entry>,
+    yields: Vec<Entry>,
+    currently_suspended_exceptions: Option<&'a ast::Expr>,
     raised_exceptions: Vec<ExceptionEntry<'a>>,
     semantic: &'a SemanticModel<'a>,
 }
@@ -387,29 +528,85 @@ impl<'a> BodyVisitor<'a> {
     fn new(semantic: &'a SemanticModel) -> Self {
         Self {
             returns: Vec::new(),
+            yields: Vec::new(),
+            currently_suspended_exceptions: None,
             raised_exceptions: Vec::new(),
             semantic,
         }
     }
 
     fn finish(self) -> BodyEntries<'a> {
+        let BodyVisitor {
+            returns,
+            yields,
+            mut raised_exceptions,
+            ..
+        } = self;
+
+        // Deduplicate exceptions collected:
+        // no need to complain twice about `raise TypeError` not being documented
+        // just because there are two separate `raise TypeError` statements in the function
+        raised_exceptions.sort_unstable_by(|left, right| {
+            left.qualified_name
+                .segments()
+                .cmp(right.qualified_name.segments())
+                .then_with(|| left.start().cmp(&right.start()))
+                .then_with(|| left.end().cmp(&right.end()))
+        });
+        raised_exceptions.dedup_by(|left, right| {
+            left.qualified_name.segments() == right.qualified_name.segments()
+        });
+
         BodyEntries {
-            returns: self.returns,
-            raised_exceptions: self.raised_exceptions,
+            returns,
+            yields,
+            raised_exceptions,
         }
     }
 }
 
-impl<'a> StatementVisitor<'a> for BodyVisitor<'a> {
+impl<'a> Visitor<'a> for BodyVisitor<'a> {
+    fn visit_except_handler(&mut self, handler: &'a ast::ExceptHandler) {
+        let ast::ExceptHandler::ExceptHandler(handler_inner) = handler;
+        self.currently_suspended_exceptions = handler_inner.type_.as_deref();
+        visitor::walk_except_handler(self, handler);
+        self.currently_suspended_exceptions = None;
+    }
+
     fn visit_stmt(&mut self, stmt: &'a Stmt) {
         match stmt {
-            Stmt::Raise(ast::StmtRaise { exc: Some(exc), .. }) => {
-                if let Some(qualified_name) = extract_raised_exception(self.semantic, exc.as_ref())
-                {
-                    self.raised_exceptions.push(ExceptionEntry {
-                        qualified_name,
-                        range: exc.as_ref().range(),
-                    });
+            Stmt::Raise(ast::StmtRaise { exc, .. }) => {
+                if let Some(exc) = exc.as_ref() {
+                    if let Some(qualified_name) =
+                        self.semantic.resolve_qualified_name(map_callable(exc))
+                    {
+                        self.raised_exceptions.push(ExceptionEntry {
+                            qualified_name,
+                            range: exc.range(),
+                        });
+                    }
+                } else if let Some(exceptions) = self.currently_suspended_exceptions {
+                    let mut maybe_store_exception = |exception| {
+                        let Some(qualified_name) = self.semantic.resolve_qualified_name(exception)
+                        else {
+                            return;
+                        };
+                        if is_exception_or_base_exception(&qualified_name) {
+                            return;
+                        }
+                        self.raised_exceptions.push(ExceptionEntry {
+                            qualified_name,
+                            range: stmt.range(),
+                        });
+                    };
+
+                    if let ast::Expr::Tuple(tuple) = exceptions {
+                        for exception in &tuple.elts {
+                            maybe_store_exception(exception);
+                        }
+                    } else {
+                        maybe_store_exception(exceptions);
+                    }
                 }
             }
             Stmt::Return(ast::StmtReturn {
@@ -422,97 +619,146 @@ impl<'a> StatementVisitor<'a> for BodyVisitor<'a> {
             _ => {}
         }
 
-        statement_visitor::walk_stmt(self, stmt);
+        visitor::walk_stmt(self, stmt);
+    }
+
+    fn visit_expr(&mut self, expr: &'a Expr) {
+        match expr {
+            Expr::Yield(ast::ExprYield {
+                range,
+                value: Some(_),
+            }) => {
+                self.yields.push(Entry { range: *range });
+            }
+            Expr::YieldFrom(ast::ExprYieldFrom { range, .. }) => {
+                self.yields.push(Entry { range: *range });
+            }
+            Expr::Lambda(_) => return,
+            _ => {}
+        }
+        visitor::walk_expr(self, expr);
     }
 }
 
-fn extract_raised_exception<'a>(
-    semantic: &SemanticModel<'a>,
-    exc: &'a Expr,
-) -> Option<QualifiedName<'a>> {
-    if let Some(qualified_name) = semantic.resolve_qualified_name(exc) {
-        return Some(qualified_name);
-    }
-    if let Expr::Call(ast::ExprCall { func, .. }) = exc {
-        return extract_raised_exception(semantic, func.as_ref());
-    }
-    None
+fn is_exception_or_base_exception(qualified_name: &QualifiedName) -> bool {
+    matches!(
+        qualified_name.segments(),
+        [
+            "" | "builtins",
+            "BaseException" | "Exception" | "BaseExceptionGroup" | "ExceptionGroup"
+        ]
+    )
 }
 
-// Checks if a function has a `@property` decorator
-fn is_property(definition: &Definition, checker: &Checker) -> bool {
-    let Some(function) = definition.as_function_def() else {
-        return false;
-    };
-
-    let Some(last_decorator) = function.decorator_list.last() else {
-        return false;
-    };
-
-    checker
-        .semantic()
-        .resolve_qualified_name(&last_decorator.expression)
-        .is_some_and(|qualified_name| {
-            matches!(
-                qualified_name.segments(),
-                ["", "property"] | ["functools", "cached_property"]
-            )
-        })
+fn starts_with_returns(docstring: &Docstring) -> bool {
+    if let Some(first_word) = docstring.body().as_str().split(' ').next() {
+        return matches!(first_word, "Return" | "Returns");
+    }
+    false
 }
 
-/// DOC201, DOC202, DOC501, DOC502
+fn returns_documented(
+    docstring: &Docstring,
+    docstring_sections: &DocstringSections,
+    convention: Option<Convention>,
+) -> bool {
+    docstring_sections.returns.is_some()
+        || (matches!(convention, Some(Convention::Google)) && starts_with_returns(docstring))
+}
+
+fn starts_with_yields(docstring: &Docstring) -> bool {
+    if let Some(first_word) = docstring.body().as_str().split(' ').next() {
+        return matches!(first_word, "Yield" | "Yields");
+    }
+    false
+}
+
+fn yields_documented(
+    docstring: &Docstring,
+    docstring_sections: &DocstringSections,
+    convention: Option<Convention>,
+) -> bool {
+    docstring_sections.yields.is_some()
+        || (matches!(convention, Some(Convention::Google)) && starts_with_yields(docstring))
+}
+
+/// DOC201, DOC202, DOC402, DOC403, DOC501, DOC502
 pub(crate) fn check_docstring(
     checker: &mut Checker,
     definition: &Definition,
+    docstring: &Docstring,
     section_contexts: &SectionContexts,
-    convention: Option<&Convention>,
+    convention: Option<Convention>,
 ) {
     let mut diagnostics = Vec::new();
-    let Definition::Member(member) = definition else {
+
+    // Only check function docstrings.
+    let Some(function_def) = definition.as_function_def() else {
         return;
     };
 
-    // Only check function docstrings.
-    if matches!(
-        member.kind,
-        MemberKind::Class(_) | MemberKind::NestedClass(_)
-    ) {
+    // Ignore stubs.
+    if function_type::is_stub(function_def, checker.semantic()) {
         return;
     }
 
     // Prioritize the specified convention over the determined style.
     let docstring_sections = match convention {
         Some(Convention::Google) => {
-            DocstringSections::from_sections(section_contexts, SectionStyle::Google)
+            DocstringSections::from_sections(section_contexts, Some(SectionStyle::Google))
         }
         Some(Convention::Numpy) => {
-            DocstringSections::from_sections(section_contexts, SectionStyle::Numpy)
+            DocstringSections::from_sections(section_contexts, Some(SectionStyle::Numpy))
         }
-        _ => DocstringSections::from_sections(section_contexts, section_contexts.style()),
+        Some(Convention::Pep257) | None => DocstringSections::from_sections(section_contexts, None),
     };
 
     let body_entries = {
         let mut visitor = BodyVisitor::new(checker.semantic());
-        visitor.visit_body(member.body());
+        visitor.visit_body(&function_def.body);
         visitor.finish()
     };
 
     // DOC201
     if checker.enabled(Rule::DocstringMissingReturns) {
-        if !is_property(definition, checker) && docstring_sections.returns.is_none() {
-            if let Some(body_return) = body_entries.returns.first() {
-                let diagnostic = Diagnostic::new(DocstringMissingReturns, body_return.range());
-                diagnostics.push(diagnostic);
+        if !returns_documented(docstring, &docstring_sections, convention) {
+            let extra_property_decorators = checker.settings.pydocstyle.property_decorators();
+            if !definition.is_property(extra_property_decorators, checker.semantic()) {
+                if let Some(body_return) = body_entries.returns.first() {
+                    let diagnostic = Diagnostic::new(DocstringMissingReturns, body_return.range());
+                    diagnostics.push(diagnostic);
+                }
             }
         }
     }
 
     // DOC202
     if checker.enabled(Rule::DocstringExtraneousReturns) {
-        if let Some(docstring_returns) = docstring_sections.returns {
+        if let Some(ref docstring_returns) = docstring_sections.returns {
             if body_entries.returns.is_empty() {
                 let diagnostic =
                     Diagnostic::new(DocstringExtraneousReturns, docstring_returns.range());
+                diagnostics.push(diagnostic);
+            }
+        }
+    }
+
+    // DOC402
+    if checker.enabled(Rule::DocstringMissingYields) {
+        if !yields_documented(docstring, &docstring_sections, convention) {
+            if let Some(body_yield) = body_entries.yields.first() {
+                let diagnostic = Diagnostic::new(DocstringMissingYields, body_yield.range());
+                diagnostics.push(diagnostic);
+            }
+        }
+    }
+
+    // DOC403
+    if checker.enabled(Rule::DocstringExtraneousYields) {
+        if let Some(docstring_yields) = docstring_sections.yields {
+            if body_entries.yields.is_empty() {
+                let diagnostic =
+                    Diagnostic::new(DocstringExtraneousYields, docstring_yields.range());
                 diagnostics.push(diagnostic);
             }
         }

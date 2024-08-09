@@ -189,7 +189,7 @@ As an example, the following would configure Ruff to:
     # 3. Avoid trying to fix flake8-bugbear (`B`) violations.
     unfixable = ["B"]
 
-    # 4. Ignore `E402` (import violations) in all `__init__.py` files, and in select subdirectories.
+    # 4. Ignore `E402` (import violations) in all `__init__.py` files, and in selected subdirectories.
     [tool.ruff.lint.per-file-ignores]
     "__init__.py" = ["E402"]
     "**/{tests,docs,tools}/*" = ["E402"]
@@ -212,7 +212,7 @@ As an example, the following would configure Ruff to:
     # 3. Avoid trying to fix flake8-bugbear (`B`) violations.
     unfixable = ["B"]
 
-    # 4. Ignore `E402` (import violations) in all `__init__.py` files, and in select subdirectories.
+    # 4. Ignore `E402` (import violations) in all `__init__.py` files, and in selected subdirectories.
     [lint.per-file-ignores]
     "__init__.py" = ["E402"]
     "**/{tests,docs,tools}/*" = ["E402"]
@@ -379,6 +379,10 @@ You can also change the default selection using the [`include`](settings.md#incl
 ## Jupyter Notebook discovery
 
 Ruff has built-in support for [Jupyter Notebooks](https://jupyter.org/).
+
+!!! info
+    Notebooks are linted and formatted by default when using [preview mode](preview.md).
+    You can opt-out of notebook linting and formatting by adding `*.ipynb` to [`extend-exclude`](settings.md#extend-exclude).
 
 To opt in to linting and formatting Jupyter Notebook (`.ipynb`) files, add the `*.ipynb` pattern to
 your [`extend-include`](settings.md#extend-include) setting, like so:

@@ -1,14 +1,16 @@
+use std::any::Any;
+use std::panic::RefUnwindSafe;
+use std::sync::Arc;
+
 use ruff_notebook::{Notebook, NotebookError};
 use ruff_python_trivia::textwrap;
 
 use crate::files::File;
 use crate::system::{
-    DirectoryEntry, MemoryFileSystem, Metadata, Result, System, SystemPath, SystemVirtualPath,
+    DirectoryEntry, MemoryFileSystem, Metadata, Result, System, SystemPath, SystemPathBuf,
+    SystemVirtualPath,
 };
 use crate::Db;
-use std::any::Any;
-use std::panic::RefUnwindSafe;
-use std::sync::Arc;
 
 use super::walk_directory::WalkDirectoryBuilder;
 
@@ -130,6 +132,10 @@ impl System for TestSystem {
         self
     }
 
+    fn as_any_mut(&mut self) -> &mut dyn Any {
+        self
+    }
+
     fn read_directory<'a>(
         &'a self,
         path: &SystemPath,
@@ -137,6 +143,13 @@ impl System for TestSystem {
         match &self.inner {
             TestSystemInner::System(fs) => fs.read_directory(path),
             TestSystemInner::Stub(fs) => Ok(Box::new(fs.read_directory(path)?)),
+        }
+    }
+
+    fn canonicalize_path(&self, path: &SystemPath) -> Result<SystemPathBuf> {
+        match &self.inner {
+            TestSystemInner::System(fs) => fs.canonicalize_path(path),
+            TestSystemInner::Stub(fs) => Ok(fs.canonicalize(path)),
         }
     }
 }

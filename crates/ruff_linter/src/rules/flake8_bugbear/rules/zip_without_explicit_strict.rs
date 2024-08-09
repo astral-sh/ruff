@@ -32,7 +32,7 @@ use crate::fix::edits::add_argument;
 ///
 /// ## Fix safety
 /// This rule's fix is marked as unsafe for `zip` calls that contain
-/// `**kwargs`, as adding a `check` keyword argument to such a call may lead
+/// `**kwargs`, as adding a `strict` keyword argument to such a call may lead
 /// to a duplicate keyword argument error.
 ///
 /// ## References
@@ -116,7 +116,7 @@ fn is_infinite_iterator(arg: &Expr, semantic: &SemanticModel) -> bool {
                     }
 
                     // Ex) `iterools.repeat(1, times=None)`
-                    for keyword in keywords.iter() {
+                    for keyword in &**keywords {
                         if keyword.arg.as_ref().is_some_and(|name| name == "times") {
                             if keyword.value.is_none_literal_expr() {
                                 return true;

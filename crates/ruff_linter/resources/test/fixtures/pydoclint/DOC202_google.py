@@ -48,3 +48,14 @@ class Bar:
             num (int): A number
         """
         print('test')
+
+
+# See: https://github.com/astral-sh/ruff/issues/12650
+class C:
+    def foo(self) -> int:
+        """Calculate x.
+
+        Returns:
+            x
+        """
+        raise NotImplementedError

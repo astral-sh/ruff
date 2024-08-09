@@ -1,3 +1,6 @@
+use std::collections::HashMap;
+use std::fmt::Debug;
+
 use ruff_diagnostics::Diagnostic;
 use ruff_diagnostics::Violation;
 use ruff_macros::{derive_message_formats, violation};
@@ -6,11 +9,9 @@ use ruff_python_ast::name::UnqualifiedName;
 use ruff_python_ast::{
     visitor::{self, Visitor},
     Expr, ExprAttribute, ExprCall, ExprSubscript, ExprTuple, Stmt, StmtAssign, StmtAugAssign,
-    StmtBreak, StmtDelete, StmtFor, StmtIf,
+    StmtDelete, StmtFor, StmtIf,
 };
 use ruff_text_size::TextRange;
-use std::collections::HashMap;
-use std::fmt::Debug;
 
 use crate::checkers::ast::Checker;
 use crate::fix::snippet::SourceCodeSnippet;
@@ -285,7 +286,7 @@ impl<'a> Visitor<'a> for LoopMutationsVisitor<'a> {
             }
 
             // On break, clear the mutations for the current branch.
-            Stmt::Break(StmtBreak { range: _ }) => {
+            Stmt::Break(_) | Stmt::Return(_) => {
                 if let Some(mutations) = self.mutations.get_mut(&self.branch) {
                     mutations.clear();
                 }

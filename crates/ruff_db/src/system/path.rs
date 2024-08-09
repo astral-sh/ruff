@@ -733,26 +733,30 @@ impl ruff_cache::CacheKey for SystemVirtualPathBuf {
 /// let paths = vec![SystemPath::new("/a/b/c"), SystemPath::new("/a/b"), SystemPath::new("/a/beta"), SystemPath::new("/a/b/c")];
 /// assert_eq!(deduplicate_nested_paths(paths).collect::<Vec<_>>(), &[SystemPath::new("/a/b"), SystemPath::new("/a/beta")]);
 /// ```
-pub fn deduplicate_nested_paths<'a, I>(paths: I) -> DeduplicatedNestedPathsIter<'a>
+pub fn deduplicate_nested_paths<P, I>(paths: I) -> DeduplicatedNestedPathsIter<P>
 where
-    I: IntoIterator<Item = &'a SystemPath>,
+    I: IntoIterator<Item = P>,
+    P: AsRef<SystemPath>,
 {
     DeduplicatedNestedPathsIter::new(paths)
 }
 
-pub struct DeduplicatedNestedPathsIter<'a> {
-    inner: std::vec::IntoIter<&'a SystemPath>,
-    next: Option<&'a SystemPath>,
+pub struct DeduplicatedNestedPathsIter<P> {
+    inner: std::vec::IntoIter<P>,
+    next: Option<P>,
 }
 
-impl<'a> DeduplicatedNestedPathsIter<'a> {
+impl<P> DeduplicatedNestedPathsIter<P>
+where
+    P: AsRef<SystemPath>,
+{
     fn new<I>(paths: I) -> Self
     where
-        I: IntoIterator<Item = &'a SystemPath>,
+        I: IntoIterator<Item = P>,
     {
         let mut paths = paths.into_iter().collect::<Vec<_>>();
         // Sort the path to ensure that e.g. `/a/b/c`, comes right after `/a/b`.
-        paths.sort_unstable();
+        paths.sort_unstable_by(|left, right| left.as_ref().cmp(right.as_ref()));
 
         let mut iter = paths.into_iter();
 
@@ -763,15 +767,18 @@ impl<'a> DeduplicatedNestedPathsIter<'a> {
     }
 }
 
-impl<'a> Iterator for DeduplicatedNestedPathsIter<'a> {
-    type Item = &'a SystemPath;
+impl<P> Iterator for DeduplicatedNestedPathsIter<P>
+where
+    P: AsRef<SystemPath>,
+{
+    type Item = P;
 
     fn next(&mut self) -> Option<Self::Item> {
         let current = self.next.take()?;
 
         for next in self.inner.by_ref() {
             // Skip all paths that have the same prefix as the current path
-            if !next.starts_with(current) {
+            if !next.as_ref().starts_with(current.as_ref()) {
                 self.next = Some(next);
                 break;
             }
