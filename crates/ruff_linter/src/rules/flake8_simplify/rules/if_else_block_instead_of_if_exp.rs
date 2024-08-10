@@ -25,8 +25,7 @@ use crate::fix::edits::fits;
 ///     bar = y
 /// ```
 ///
-/// /// ```python
-/// # in preview
+/// ```python
 /// if cond:
 ///     z = cond
 /// else:
@@ -39,11 +38,13 @@ use crate::fix::edits::fits;
 /// ```
 ///
 /// ```python
+/// # in preview
 /// z = cond or other_cond
 /// ```
 ///
 /// ## References
 /// - [Python documentation: Conditional expressions](https://docs.python.org/3/reference/expressions.html#conditional-expressions)
+///
 /// [preview]: https://docs.astral.sh/ruff/preview/
 #[violation]
 pub struct IfElseBlockInsteadOfIfExp {
@@ -59,11 +60,11 @@ impl Violation for IfElseBlockInsteadOfIfExp {
     fn message(&self) -> String {
         let IfElseBlockInsteadOfIfExp { contents, kind } = self;
         match kind {
-            AssignmentKind::Binary => {
-                format!("Use binary operator `{contents}` instead of `if`-`else`-block")
-            }
             AssignmentKind::Ternary => {
                 format!("Use ternary operator `{contents}` instead of `if`-`else`-block")
+            }
+            AssignmentKind::Binary => {
+                format!("Use binary operator `{contents}` instead of `if`-`else`-block")
             }
         }
     }
