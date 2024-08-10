@@ -23,6 +23,7 @@ use crate::checkers::ast::Checker;
 /// unexpected behavior when interacting with type checkers.
 ///
 /// ## Example
+///
 /// ```python
 /// from types import TracebackType
 ///
@@ -30,11 +31,11 @@ use crate::checkers::ast::Checker;
 /// class Foo:
 ///     def __exit__(
 ///         self, typ: BaseException, exc: BaseException, tb: TracebackType
-///     ) -> None:
-///         ...
+///     ) -> None: ...
 /// ```
 ///
 /// Use instead:
+///
 /// ```python
 /// from types import TracebackType
 ///
@@ -45,8 +46,7 @@ use crate::checkers::ast::Checker;
 ///         typ: type[BaseException] | None,
 ///         exc: BaseException | None,
 ///         tb: TracebackType | None,
-///     ) -> None:
-///         ...
+///     ) -> None: ...
 /// ```
 #[violation]
 pub struct BadExitAnnotation {

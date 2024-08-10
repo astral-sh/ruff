@@ -18,25 +18,25 @@ use crate::importer::ImportRequest;
 /// standalone function.
 ///
 /// ## Example
+///
 /// ```python
 /// from functools import singledispatch
 ///
 ///
 /// class Class:
 ///     @singledispatch
-///     def method(self, arg):
-///         ...
+///     def method(self, arg): ...
 /// ```
 ///
 /// Use instead:
+///
 /// ```python
 /// from functools import singledispatchmethod
 ///
 ///
 /// class Class:
 ///     @singledispatchmethod
-///     def method(self, arg):
-///         ...
+///     def method(self, arg): ...
 /// ```
 ///
 /// ## Fix safety

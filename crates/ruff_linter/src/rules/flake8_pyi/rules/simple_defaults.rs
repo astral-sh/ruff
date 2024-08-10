@@ -30,15 +30,15 @@ use crate::settings::types::PythonVersion;
 /// or a simple container literal.
 ///
 /// ## Example
+///
 /// ```python
-/// def foo(arg: list[int] = list(range(10_000))) -> None:
-///     ...
+/// def foo(arg: list[int] = list(range(10_000))) -> None: ...
 /// ```
 ///
 /// Use instead:
+///
 /// ```python
-/// def foo(arg: list[int] = ...) -> None:
-///     ...
+/// def foo(arg: list[int] = ...) -> None: ...
 /// ```
 ///
 /// ## References
@@ -76,15 +76,15 @@ impl AlwaysFixableViolation for TypedArgumentDefaultInStub {
 /// or varies according to the current platform or Python version.
 ///
 /// ## Example
+///
 /// ```python
-/// def foo(arg=[]) -> None:
-///     ...
+/// def foo(arg=[]) -> None: ...
 /// ```
 ///
 /// Use instead:
+///
 /// ```python
-/// def foo(arg=...) -> None:
-///     ...
+/// def foo(arg=...) -> None: ...
 /// ```
 ///
 /// ## References

@@ -27,17 +27,17 @@ use crate::rules::pylint::helpers::is_known_dunder_method;
 /// [`lint.pylint.allow-dunder-method-names`] setting.
 ///
 /// ## Example
+///
 /// ```python
 /// class Foo:
-///     def __init_(self):
-///         ...
+///     def __init_(self): ...
 /// ```
 ///
 /// Use instead:
+///
 /// ```python
 /// class Foo:
-///     def __init__(self):
-///         ...
+///     def __init__(self): ...
 /// ```
 ///
 /// ## Options

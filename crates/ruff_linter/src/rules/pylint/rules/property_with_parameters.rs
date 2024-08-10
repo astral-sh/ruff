@@ -15,22 +15,21 @@ use crate::checkers::ast::Checker;
 /// desired parameters and call that method instead.
 ///
 /// ## Example
+///
 /// ```python
 /// class Cat:
 ///     @property
-///     def purr(self, volume):
-///         ...
+///     def purr(self, volume): ...
 /// ```
 ///
 /// Use instead:
+///
 /// ```python
 /// class Cat:
 ///     @property
-///     def purr(self):
-///         ...
+///     def purr(self): ...
 ///
-///     def purr_volume(self, volume):
-///         ...
+///     def purr_volume(self, volume): ...
 /// ```
 ///
 /// ## References

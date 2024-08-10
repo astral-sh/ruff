@@ -28,16 +28,16 @@ use crate::registry::Rule;
 /// that format for consistency.
 ///
 /// ## Example
+///
 /// ```python
-/// class FasterThanLightError(ZeroDivisionError):
-///     ...
+/// class FasterThanLightError(ZeroDivisionError): ...
 ///
 ///
-/// def calculate_speed(distance: float, time: float) -> float:
-///     ...
+/// def calculate_speed(distance: float, time: float) -> float: ...
 /// ```
 ///
 /// Use instead:
+///
 /// ```python
 /// """Utility functions and classes for calculating speed.
 ///
@@ -47,12 +47,10 @@ use crate::registry::Rule;
 /// """
 ///
 ///
-/// class FasterThanLightError(ZeroDivisionError):
-///     ...
+/// class FasterThanLightError(ZeroDivisionError): ...
 ///
 ///
-/// def calculate_speed(distance: float, time: float) -> float:
-///     ...
+/// def calculate_speed(distance: float, time: float) -> float: ...
 /// ```
 ///
 /// ## References
@@ -430,12 +428,12 @@ impl Violation for UndocumentedMagicMethod {
 /// that format for consistency.
 ///
 /// ## Example
+///
 /// ```python
 /// class Foo:
 ///     """Class Foo."""
 ///
-///     class Bar:
-///         ...
+///     class Bar: ...
 ///
 ///
 /// bar = Foo.Bar()
@@ -443,6 +441,7 @@ impl Violation for UndocumentedMagicMethod {
 /// ```
 ///
 /// Use instead:
+///
 /// ```python
 /// class Foo:
 ///     """Class Foo."""

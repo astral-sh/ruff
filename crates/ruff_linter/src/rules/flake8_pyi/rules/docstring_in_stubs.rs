@@ -14,6 +14,7 @@ use crate::checkers::ast::Checker;
 /// hints, rather than documentation.
 ///
 /// ## Example
+///
 /// ```python
 /// def func(param: int) -> str:
 ///     """This is a docstring."""
@@ -21,9 +22,9 @@ use crate::checkers::ast::Checker;
 /// ```
 ///
 /// Use instead:
+///
 /// ```python
-/// def func(param: int) -> str:
-///     ...
+/// def func(param: int) -> str: ...
 /// ```
 #[violation]
 pub struct DocstringInStub;

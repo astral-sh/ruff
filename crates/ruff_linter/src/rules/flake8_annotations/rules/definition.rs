@@ -24,15 +24,15 @@ use crate::rules::ruff::typing::type_hint_resolves_to_any;
 /// any provided arguments match expectation.
 ///
 /// ## Example
+///
 /// ```python
-/// def foo(x):
-///     ...
+/// def foo(x): ...
 /// ```
 ///
 /// Use instead:
+///
 /// ```python
-/// def foo(x: int):
-///     ...
+/// def foo(x: int): ...
 /// ```
 #[violation]
 pub struct MissingTypeFunctionArgument {
@@ -56,15 +56,15 @@ impl Violation for MissingTypeFunctionArgument {
 /// any provided arguments match expectation.
 ///
 /// ## Example
+///
 /// ```python
-/// def foo(*args):
-///     ...
+/// def foo(*args): ...
 /// ```
 ///
 /// Use instead:
+///
 /// ```python
-/// def foo(*args: int):
-///     ...
+/// def foo(*args: int): ...
 /// ```
 #[violation]
 pub struct MissingTypeArgs {
@@ -88,15 +88,15 @@ impl Violation for MissingTypeArgs {
 /// any provided arguments match expectation.
 ///
 /// ## Example
+///
 /// ```python
-/// def foo(**kwargs):
-///     ...
+/// def foo(**kwargs): ...
 /// ```
 ///
 /// Use instead:
+///
 /// ```python
-/// def foo(**kwargs: int):
-///     ...
+/// def foo(**kwargs: int): ...
 /// ```
 #[violation]
 pub struct MissingTypeKwargs {
@@ -127,17 +127,17 @@ impl Violation for MissingTypeKwargs {
 /// annotation is not strictly necessary.
 ///
 /// ## Example
+///
 /// ```python
 /// class Foo:
-///     def bar(self):
-///         ...
+///     def bar(self): ...
 /// ```
 ///
 /// Use instead:
+///
 /// ```python
 /// class Foo:
-///     def bar(self: "Foo"):
-///         ...
+///     def bar(self: "Foo"): ...
 /// ```
 #[violation]
 pub struct MissingTypeSelf {
@@ -168,19 +168,19 @@ impl Violation for MissingTypeSelf {
 /// annotation is not strictly necessary.
 ///
 /// ## Example
+///
 /// ```python
 /// class Foo:
 ///     @classmethod
-///     def bar(cls):
-///         ...
+///     def bar(cls): ...
 /// ```
 ///
 /// Use instead:
+///
 /// ```python
 /// class Foo:
 ///     @classmethod
-///     def bar(cls: Type["Foo"]):
-///         ...
+///     def bar(cls: Type["Foo"]): ...
 /// ```
 #[violation]
 pub struct MissingTypeCls {
@@ -449,29 +449,29 @@ impl Violation for MissingReturnTypeClassMethod {
 /// `Any` as an "escape hatch" only when it is really needed.
 ///
 /// ## Example
+///
 /// ```python
-/// def foo(x: Any):
-///     ...
+/// def foo(x: Any): ...
 /// ```
 ///
 /// Use instead:
+///
 /// ```python
-/// def foo(x: int):
-///     ...
+/// def foo(x: int): ...
 /// ```
 ///
 /// ## Known problems
 ///
 /// Type aliases are unsupported and can lead to false positives.
 /// For example, the following will trigger this rule inadvertently:
+///
 /// ```python
 /// from typing import Any
 ///
 /// MyAny = Any
 ///
 ///
-/// def foo(x: MyAny):
-///     ...
+/// def foo(x: MyAny): ...
 /// ```
 ///
 /// ## References

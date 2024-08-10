@@ -18,23 +18,23 @@ use crate::importer::ImportRequest;
 /// Instead, use the `@singledispatch` decorator.
 ///
 /// ## Example
+///
 /// ```python
 /// from functools import singledispatchmethod
 ///
 ///
 /// @singledispatchmethod
-/// def func(arg):
-///     ...
+/// def func(arg): ...
 /// ```
 ///
 /// Use instead:
+///
 /// ```python
 /// from functools import singledispatchmethod
 ///
 ///
 /// @singledispatch
-/// def func(arg):
-///     ...
+/// def func(arg): ...
 /// ```
 ///
 /// ## Fix safety

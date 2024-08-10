@@ -25,23 +25,23 @@ use super::helpers::get_mark_decorators;
 /// fixtures is fine, but it's best to be consistent.
 ///
 /// ## Example
+///
 /// ```python
 /// import pytest
 ///
 ///
 /// @pytest.mark.foo
-/// def test_something():
-///     ...
+/// def test_something(): ...
 /// ```
 ///
 /// Use instead:
+///
 /// ```python
 /// import pytest
 ///
 ///
 /// @pytest.mark.foo()
-/// def test_something():
-///     ...
+/// def test_something(): ...
 /// ```
 ///
 /// ## Options
@@ -86,19 +86,19 @@ impl AlwaysFixableViolation for PytestIncorrectMarkParenthesesStyle {
 /// useless and should be removed.
 ///
 /// ## Example
+///
 /// ```python
 /// import pytest
 ///
 ///
 /// @pytest.mark.usefixtures()
-/// def test_something():
-///     ...
+/// def test_something(): ...
 /// ```
 ///
 /// Use instead:
+///
 /// ```python
-/// def test_something():
-///     ...
+/// def test_something(): ...
 /// ```
 ///
 /// ## References

@@ -18,21 +18,21 @@ use crate::checkers::ast::Checker;
 /// - TLS v1.1
 ///
 /// ## Example
+///
 /// ```python
 /// import ssl
 ///
 ///
-/// def func(version=ssl.PROTOCOL_TLSv1):
-///     ...
+/// def func(version=ssl.PROTOCOL_TLSv1): ...
 /// ```
 ///
 /// Use instead:
+///
 /// ```python
 /// import ssl
 ///
 ///
-/// def func(version=ssl.PROTOCOL_TLSv1_2):
-///     ...
+/// def func(version=ssl.PROTOCOL_TLSv1_2): ...
 /// ```
 #[violation]
 pub struct SslWithBadDefaults {

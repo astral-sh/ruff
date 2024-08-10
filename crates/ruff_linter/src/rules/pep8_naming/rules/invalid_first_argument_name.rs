@@ -34,17 +34,17 @@ use crate::renamer::Renamer;
 /// the [`lint.pep8-naming.extend-ignore-names`] option to `["this"]`.
 ///
 /// ## Example
+///
 /// ```python
 /// class Example:
-///     def function(cls, data):
-///         ...
+///     def function(cls, data): ...
 /// ```
 ///
 /// Use instead:
+///
 /// ```python
 /// class Example:
-///     def function(self, data):
-///         ...
+///     def function(self, data): ...
 /// ```
 ///
 /// ## Fix safety
@@ -98,19 +98,19 @@ impl Violation for InvalidFirstArgumentNameForMethod {
 /// the [`lint.pep8-naming.extend-ignore-names`] option to `["klass"]`.
 ///
 /// ## Example
+///
 /// ```python
 /// class Example:
 ///     @classmethod
-///     def function(self, data):
-///         ...
+///     def function(self, data): ...
 /// ```
 ///
 /// Use instead:
+///
 /// ```python
 /// class Example:
 ///     @classmethod
-///     def function(cls, data):
-///         ...
+///     def function(cls, data): ...
 /// ```
 ///
 /// ## Fix safety
