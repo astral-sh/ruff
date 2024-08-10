@@ -24,15 +24,16 @@ use crate::registry::Rule;
 /// For an alternative, see [D211].
 ///
 /// ## Example
+///
 /// ```python
 /// class PhotoMetadata:
 ///     """Metadata about a photo."""
 /// ```
 ///
 /// Use instead:
+///
 /// ```python
 /// class PhotoMetadata:
-///
 ///     """Metadata about a photo."""
 /// ```
 ///
@@ -121,13 +122,14 @@ impl AlwaysFixableViolation for OneBlankLineAfterClass {
 /// For an alternative, see [D203].
 ///
 /// ## Example
+///
 /// ```python
 /// class PhotoMetadata:
-///
 ///     """Metadata about a photo."""
 /// ```
 ///
 /// Use instead:
+///
 /// ```python
 /// class PhotoMetadata:
 ///     """Metadata about a photo."""

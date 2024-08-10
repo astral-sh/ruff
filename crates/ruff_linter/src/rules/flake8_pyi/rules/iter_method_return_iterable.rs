@@ -50,23 +50,23 @@ use crate::checkers::ast::Checker;
 /// on the returned object, violating the expectations of the interface.
 ///
 /// ## Example
+///
 /// ```python
 /// import collections.abc
 ///
 ///
 /// class Klass:
-///     def __iter__(self) -> collections.abc.Iterable[str]:
-///         ...
+///     def __iter__(self) -> collections.abc.Iterable[str]: ...
 /// ```
 ///
 /// Use instead:
+///
 /// ```python
 /// import collections.abc
 ///
 ///
 /// class Klass:
-///     def __iter__(self) -> collections.abc.Iterator[str]:
-///         ...
+///     def __iter__(self) -> collections.abc.Iterator[str]: ...
 /// ```
 #[violation]
 pub struct IterMethodReturnIterable {

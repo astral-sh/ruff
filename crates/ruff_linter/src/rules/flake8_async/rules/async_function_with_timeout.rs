@@ -17,9 +17,9 @@ use crate::settings::types::PreviewMode;
 /// or `anyio.move_on_after`, among others.
 ///
 /// ## Example
+///
 /// ```python
-/// async def long_running_task(timeout):
-///     ...
+/// async def long_running_task(timeout): ...
 ///
 ///
 /// async def main():
@@ -27,9 +27,9 @@ use crate::settings::types::PreviewMode;
 /// ```
 ///
 /// Use instead:
+///
 /// ```python
-/// async def long_running_task():
-///     ...
+/// async def long_running_task(): ...
 ///
 ///
 /// async def main():

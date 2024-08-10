@@ -22,18 +22,18 @@ use crate::checkers::ast::Checker;
 /// [keyword-only arguments](https://docs.python.org/3/tutorial/controlflow.html#special-parameters).
 ///
 /// ## Example
+///
 /// ```python
-/// def plot(x, y, z, color, mark, add_trendline):
-///     ...
+/// def plot(x, y, z, color, mark, add_trendline): ...
 ///
 ///
 /// plot(1, 2, 3, "r", "*", True)
 /// ```
 ///
 /// Use instead:
+///
 /// ```python
-/// def plot(x, y, z, *, color, mark, add_trendline):
-///     ...
+/// def plot(x, y, z, *, color, mark, add_trendline): ...
 ///
 ///
 /// plot(1, 2, 3, color="r", mark="*", add_trendline=True)

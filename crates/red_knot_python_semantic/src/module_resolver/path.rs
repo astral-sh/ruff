@@ -626,7 +626,7 @@ mod tests {
 
     use super::*;
     use crate::module_resolver::testing::{FileSpec, MockedTypeshed, TestCase, TestCaseBuilder};
-    use crate::TargetVersion;
+    use crate::python_version::PythonVersion;
 
     impl ModulePath {
         #[must_use]
@@ -866,7 +866,7 @@ mod tests {
 
     fn typeshed_test_case(
         typeshed: MockedTypeshed,
-        target_version: TargetVersion,
+        target_version: PythonVersion,
     ) -> (TestDb, SearchPath) {
         let TestCase { db, stdlib, .. } = TestCaseBuilder::new()
             .with_custom_typeshed(typeshed)
@@ -878,11 +878,11 @@ mod tests {
     }
 
     fn py38_typeshed_test_case(typeshed: MockedTypeshed) -> (TestDb, SearchPath) {
-        typeshed_test_case(typeshed, TargetVersion::Py38)
+        typeshed_test_case(typeshed, PythonVersion::PY38)
     }
 
     fn py39_typeshed_test_case(typeshed: MockedTypeshed) -> (TestDb, SearchPath) {
-        typeshed_test_case(typeshed, TargetVersion::Py39)
+        typeshed_test_case(typeshed, PythonVersion::PY39)
     }
 
     #[test]
@@ -898,7 +898,7 @@ mod tests {
         };
 
         let (db, stdlib_path) = py38_typeshed_test_case(TYPESHED);
-        let resolver = ResolverState::new(&db, TargetVersion::Py38);
+        let resolver = ResolverState::new(&db, PythonVersion::PY38);
 
         let asyncio_regular_package = stdlib_path.join("asyncio");
         assert!(asyncio_regular_package.is_directory(&resolver));
@@ -926,7 +926,7 @@ mod tests {
         };
 
         let (db, stdlib_path) = py38_typeshed_test_case(TYPESHED);
-        let resolver = ResolverState::new(&db, TargetVersion::Py38);
+        let resolver = ResolverState::new(&db, PythonVersion::PY38);
 
         let xml_namespace_package = stdlib_path.join("xml");
         assert!(xml_namespace_package.is_directory(&resolver));
@@ -948,7 +948,7 @@ mod tests {
         };
 
         let (db, stdlib_path) = py38_typeshed_test_case(TYPESHED);
-        let resolver = ResolverState::new(&db, TargetVersion::Py38);
+        let resolver = ResolverState::new(&db, PythonVersion::PY38);
 
         let functools_module = stdlib_path.join("functools.pyi");
         assert!(functools_module.to_file(&resolver).is_some());
@@ -964,7 +964,7 @@ mod tests {
         };
 
         let (db, stdlib_path) = py38_typeshed_test_case(TYPESHED);
-        let resolver = ResolverState::new(&db, TargetVersion::Py38);
+        let resolver = ResolverState::new(&db, PythonVersion::PY38);
 
         let collections_regular_package = stdlib_path.join("collections");
         assert_eq!(collections_regular_package.to_file(&resolver), None);
@@ -980,7 +980,7 @@ mod tests {
         };
 
         let (db, stdlib_path) = py38_typeshed_test_case(TYPESHED);
-        let resolver = ResolverState::new(&db, TargetVersion::Py38);
+        let resolver = ResolverState::new(&db, PythonVersion::PY38);
 
         let importlib_namespace_package = stdlib_path.join("importlib");
         assert_eq!(importlib_namespace_package.to_file(&resolver), None);
@@ -1001,7 +1001,7 @@ mod tests {
         };
 
         let (db, stdlib_path) = py38_typeshed_test_case(TYPESHED);
-        let resolver = ResolverState::new(&db, TargetVersion::Py38);
+        let resolver = ResolverState::new(&db, PythonVersion::PY38);
 
         let non_existent = stdlib_path.join("doesnt_even_exist");
         assert_eq!(non_existent.to_file(&resolver), None);
@@ -1029,7 +1029,7 @@ mod tests {
         };
 
         let (db, stdlib_path) = py39_typeshed_test_case(TYPESHED);
-        let resolver = ResolverState::new(&db, TargetVersion::Py39);
+        let resolver = ResolverState::new(&db, PythonVersion::PY39);
 
         // Since we've set the target version to Py39,
         // `collections` should now exist as a directory, according to VERSIONS...
@@ -1058,7 +1058,7 @@ mod tests {
         };
 
         let (db, stdlib_path) = py39_typeshed_test_case(TYPESHED);
-        let resolver = ResolverState::new(&db, TargetVersion::Py39);
+        let resolver = ResolverState::new(&db, PythonVersion::PY39);
 
         // The `importlib` directory now also exists
         let importlib_namespace_package = stdlib_path.join("importlib");
@@ -1082,7 +1082,7 @@ mod tests {
         };
 
         let (db, stdlib_path) = py39_typeshed_test_case(TYPESHED);
-        let resolver = ResolverState::new(&db, TargetVersion::Py39);
+        let resolver = ResolverState::new(&db, PythonVersion::PY39);
 
         // The `xml` package no longer exists on py39:
         let xml_namespace_package = stdlib_path.join("xml");

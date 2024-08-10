@@ -38,23 +38,23 @@ use super::helpers::{
 /// the behavior of official pytest projects.
 ///
 /// ## Example
+///
 /// ```python
 /// import pytest
 ///
 ///
 /// @pytest.fixture
-/// def my_fixture():
-///     ...
+/// def my_fixture(): ...
 /// ```
 ///
 /// Use instead:
+///
 /// ```python
 /// import pytest
 ///
 ///
 /// @pytest.fixture()
-/// def my_fixture():
-///     ...
+/// def my_fixture(): ...
 /// ```
 ///
 /// ## Options
@@ -94,23 +94,23 @@ impl AlwaysFixableViolation for PytestFixtureIncorrectParenthesesStyle {
 /// fixture configuration.
 ///
 /// ## Example
+///
 /// ```python
 /// import pytest
 ///
 ///
 /// @pytest.fixture("module")
-/// def my_fixture():
-///     ...
+/// def my_fixture(): ...
 /// ```
 ///
 /// Use instead:
+///
 /// ```python
 /// import pytest
 ///
 ///
 /// @pytest.fixture(scope="module")
-/// def my_fixture():
-///     ...
+/// def my_fixture(): ...
 /// ```
 ///
 /// ## References
@@ -135,23 +135,23 @@ impl Violation for PytestFixturePositionalArgs {
 /// `scope="function"` can be omitted, as it is the default.
 ///
 /// ## Example
+///
 /// ```python
 /// import pytest
 ///
 ///
 /// @pytest.fixture(scope="function")
-/// def my_fixture():
-///     ...
+/// def my_fixture(): ...
 /// ```
 ///
 /// Use instead:
+///
 /// ```python
 /// import pytest
 ///
 ///
 /// @pytest.fixture()
-/// def my_fixture():
-///     ...
+/// def my_fixture(): ...
 /// ```
 ///
 /// ## References
@@ -303,32 +303,30 @@ impl Violation for PytestIncorrectFixtureNameUnderscore {
 /// and avoid the confusion caused by unused arguments.
 ///
 /// ## Example
+///
 /// ```python
 /// import pytest
 ///
 ///
 /// @pytest.fixture
-/// def _patch_something():
-///     ...
+/// def _patch_something(): ...
 ///
 ///
-/// def test_foo(_patch_something):
-///     ...
+/// def test_foo(_patch_something): ...
 /// ```
 ///
 /// Use instead:
+///
 /// ```python
 /// import pytest
 ///
 ///
 /// @pytest.fixture
-/// def _patch_something():
-///     ...
+/// def _patch_something(): ...
 ///
 ///
 /// @pytest.mark.usefixtures("_patch_something")
-/// def test_foo():
-///     ...
+/// def test_foo(): ...
 /// ```
 ///
 /// ## References

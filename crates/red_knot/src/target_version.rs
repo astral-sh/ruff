@@ -13,22 +13,36 @@ pub enum TargetVersion {
     Py313,
 }
 
-impl std::fmt::Display for TargetVersion {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        red_knot_python_semantic::TargetVersion::from(*self).fmt(f)
+impl TargetVersion {
+    const fn as_str(self) -> &'static str {
+        match self {
+            Self::Py37 => "py37",
+            Self::Py38 => "py38",
+            Self::Py39 => "py39",
+            Self::Py310 => "py310",
+            Self::Py311 => "py311",
+            Self::Py312 => "py312",
+            Self::Py313 => "py313",
+        }
     }
 }
 
-impl From<TargetVersion> for red_knot_python_semantic::TargetVersion {
+impl std::fmt::Display for TargetVersion {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(self.as_str())
+    }
+}
+
+impl From<TargetVersion> for red_knot_python_semantic::PythonVersion {
     fn from(value: TargetVersion) -> Self {
         match value {
-            TargetVersion::Py37 => Self::Py37,
-            TargetVersion::Py38 => Self::Py38,
-            TargetVersion::Py39 => Self::Py39,
-            TargetVersion::Py310 => Self::Py310,
-            TargetVersion::Py311 => Self::Py311,
-            TargetVersion::Py312 => Self::Py312,
-            TargetVersion::Py313 => Self::Py313,
+            TargetVersion::Py37 => Self::PY37,
+            TargetVersion::Py38 => Self::PY38,
+            TargetVersion::Py39 => Self::PY39,
+            TargetVersion::Py310 => Self::PY310,
+            TargetVersion::Py311 => Self::PY311,
+            TargetVersion::Py312 => Self::PY312,
+            TargetVersion::Py313 => Self::PY313,
         }
     }
 }

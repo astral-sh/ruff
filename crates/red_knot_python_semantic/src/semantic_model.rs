@@ -169,7 +169,7 @@ mod tests {
 
     use crate::db::tests::TestDb;
     use crate::program::{Program, SearchPathSettings};
-    use crate::python_version::TargetVersion;
+    use crate::python_version::PythonVersion;
     use crate::types::Type;
     use crate::{HasTy, SemanticModel};
 
@@ -177,7 +177,7 @@ mod tests {
         let db = TestDb::new();
         Program::new(
             &db,
-            TargetVersion::Py38,
+            PythonVersion::default(),
             SearchPathSettings {
                 extra_paths: vec![],
                 src_root: SystemPathBuf::from("/src"),

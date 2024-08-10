@@ -1503,7 +1503,7 @@ mod tests {
     use crate::builtins::builtins_scope;
     use crate::db::tests::TestDb;
     use crate::program::{Program, SearchPathSettings};
-    use crate::python_version::TargetVersion;
+    use crate::python_version::PythonVersion;
     use crate::semantic_index::definition::Definition;
     use crate::semantic_index::symbol::FileScopeId;
     use crate::semantic_index::{global_scope, semantic_index, symbol_table, use_def_map};
@@ -1515,7 +1515,7 @@ mod tests {
 
         Program::new(
             &db,
-            TargetVersion::Py38,
+            PythonVersion::default(),
             SearchPathSettings {
                 extra_paths: Vec::new(),
                 src_root: SystemPathBuf::from("/src"),
@@ -1532,7 +1532,7 @@ mod tests {
 
         Program::new(
             &db,
-            TargetVersion::Py38,
+            PythonVersion::default(),
             SearchPathSettings {
                 extra_paths: Vec::new(),
                 src_root: SystemPathBuf::from("/src"),

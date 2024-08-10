@@ -7,7 +7,7 @@ use anyhow::{anyhow, Context};
 use salsa::Setter;
 
 use red_knot_python_semantic::{
-    resolve_module, ModuleName, Program, ProgramSettings, SearchPathSettings, TargetVersion,
+    resolve_module, ModuleName, Program, ProgramSettings, PythonVersion, SearchPathSettings,
 };
 use red_knot_workspace::db::RootDatabase;
 use red_knot_workspace::watch;
@@ -234,7 +234,7 @@ where
     }
 
     let settings = ProgramSettings {
-        target_version: TargetVersion::default(),
+        target_version: PythonVersion::default(),
         search_paths,
     };
 

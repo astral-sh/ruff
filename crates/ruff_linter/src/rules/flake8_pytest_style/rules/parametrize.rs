@@ -27,41 +27,38 @@ use super::helpers::{is_pytest_parametrize, split_names};
 /// configured via the [`lint.flake8-pytest-style.parametrize-names-type`] setting.
 ///
 /// ## Example
+///
 /// ```python
 /// import pytest
 ///
 ///
 /// # single parameter, always expecting string
 /// @pytest.mark.parametrize(("param",), [1, 2, 3])
-/// def test_foo(param):
-///     ...
+/// def test_foo(param): ...
 ///
 ///
 /// # multiple parameters, expecting tuple
 /// @pytest.mark.parametrize(["param1", "param2"], [(1, 2), (3, 4)])
-/// def test_bar(param1, param2):
-///     ...
+/// def test_bar(param1, param2): ...
 ///
 ///
 /// # multiple parameters, expecting tuple
 /// @pytest.mark.parametrize("param1,param2", [(1, 2), (3, 4)])
-/// def test_baz(param1, param2):
-///     ...
+/// def test_baz(param1, param2): ...
 /// ```
 ///
 /// Use instead:
+///
 /// ```python
 /// import pytest
 ///
 ///
 /// @pytest.mark.parametrize("param", [1, 2, 3])
-/// def test_foo(param):
-///     ...
+/// def test_foo(param): ...
 ///
 ///
 /// @pytest.mark.parametrize(("param1", "param2"), [(1, 2), (3, 4)])
-/// def test_bar(param1, param2):
-///     ...
+/// def test_bar(param1, param2): ...
 /// ```
 ///
 /// ## Options
@@ -149,14 +146,14 @@ impl Violation for PytestParametrizeNamesWrongType {
 /// - `list`: `@pytest.mark.parametrize(("key", "value"), [["a", "b"], ["c", "d"]])`
 ///
 /// ## Example
+///
 /// ```python
 /// import pytest
 ///
 ///
 /// # expected list, got tuple
 /// @pytest.mark.parametrize("param", (1, 2))
-/// def test_foo(param):
-///     ...
+/// def test_foo(param): ...
 ///
 ///
 /// # expected top-level list, got tuple
@@ -167,8 +164,7 @@ impl Violation for PytestParametrizeNamesWrongType {
 ///         (3, 4),
 ///     ),
 /// )
-/// def test_bar(param1, param2):
-///     ...
+/// def test_bar(param1, param2): ...
 ///
 ///
 /// # expected individual rows to be tuples, got lists
@@ -179,23 +175,21 @@ impl Violation for PytestParametrizeNamesWrongType {
 ///         [3, 4],
 ///     ],
 /// )
-/// def test_baz(param1, param2):
-///     ...
+/// def test_baz(param1, param2): ...
 /// ```
 ///
 /// Use instead:
+///
 /// ```python
 /// import pytest
 ///
 ///
 /// @pytest.mark.parametrize("param", [1, 2, 3])
-/// def test_foo(param):
-///     ...
+/// def test_foo(param): ...
 ///
 ///
 /// @pytest.mark.parametrize(("param1", "param2"), [(1, 2), (3, 4)])
-/// def test_bar(param1, param2):
-///     ...
+/// def test_bar(param1, param2): ...
 /// ```
 ///
 /// ## Options
@@ -232,6 +226,7 @@ impl Violation for PytestParametrizeValuesWrongType {
 /// Duplicate test cases are redundant and should be removed.
 ///
 /// ## Example
+///
 /// ```python
 /// import pytest
 ///
@@ -243,11 +238,11 @@ impl Violation for PytestParametrizeValuesWrongType {
 ///         (1, 2),
 ///     ],
 /// )
-/// def test_foo(param1, param2):
-///     ...
+/// def test_foo(param1, param2): ...
 /// ```
 ///
 /// Use instead:
+///
 /// ```python
 /// import pytest
 ///
@@ -258,8 +253,7 @@ impl Violation for PytestParametrizeValuesWrongType {
 ///         (1, 2),
 ///     ],
 /// )
-/// def test_foo(param1, param2):
-///     ...
+/// def test_foo(param1, param2): ...
 /// ```
 ///
 /// ## Fix safety
