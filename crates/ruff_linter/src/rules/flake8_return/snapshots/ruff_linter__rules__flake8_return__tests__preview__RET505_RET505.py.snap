@@ -460,5 +460,24 @@ RET505.py:237:5: RET505 [*] Unnecessary `else` after `return` statement
 240     |-        return z
     238 |+    c = 3
     239 |+    return z
+241 240 | 
+242 241 | def f():
+243 242 | 	if True:
 
+RET505.py:245:2: RET505 [*] Unnecessary `else` after `return` statement
+    |
+243 |     if True:
+244 |      return True
+245 |     else:
+    |     ^^^^ RET505
+246 |      return False
+    |
+    = help: Remove unnecessary `else`
 
+ℹ Safe fix
+242 242 | def f():
+243 243 | 	if True:
+244 244 | 	 return True
+245     |-	else:
+246     |-	 return False
+    245 |+	return False

@@ -1,5 +1,5 @@
-use red_knot_module_resolver::{resolve_module, ModuleName};
-
+use crate::module_name::ModuleName;
+use crate::module_resolver::resolve_module;
 use crate::semantic_index::global_scope;
 use crate::semantic_index::symbol::ScopeId;
 use crate::Db;
@@ -11,6 +11,6 @@ use crate::Db;
 pub(crate) fn builtins_scope(db: &dyn Db) -> Option<ScopeId<'_>> {
     let builtins_name =
         ModuleName::new_static("builtins").expect("Expected 'builtins' to be a valid module name");
-    let builtins_file = resolve_module(db.upcast(), builtins_name)?.file();
+    let builtins_file = resolve_module(db, builtins_name)?.file();
     Some(global_scope(db, builtins_file))
 }

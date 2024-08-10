@@ -54,8 +54,13 @@ use crate::rules::ruff::rules::sequence_sorting::{
 ///
 /// ## Fix safety
 /// This rule's fix is marked as always being safe, in that
-/// it should never alter the semantics of any Python code.
-/// However, note that for multiline `__all__` definitions
+/// it should very rarely alter the semantics of any Python code.
+/// However, note that (although it's rare) the value of `__all__`
+/// could be read by code elsewhere that depends on the exact
+/// iteration order of the items in `__all__`, in which case this
+/// rule's fix could theoretically cause breakage.
+///
+/// Note also that for multiline `__all__` definitions
 /// that include comments on their own line, it can be hard
 /// to tell where the comments should be moved to when sorting
 /// the contents of `__all__`. While this rule's fix will

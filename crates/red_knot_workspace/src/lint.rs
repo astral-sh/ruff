@@ -2,11 +2,10 @@ use std::cell::RefCell;
 use std::ops::Deref;
 use std::time::Duration;
 
-use tracing::trace_span;
+use tracing::debug_span;
 
-use red_knot_module_resolver::ModuleName;
 use red_knot_python_semantic::types::Type;
-use red_knot_python_semantic::{HasTy, SemanticModel};
+use red_knot_python_semantic::{HasTy, ModuleName, SemanticModel};
 use ruff_db::files::File;
 use ruff_db::parsed::{parsed_module, ParsedModule};
 use ruff_db::source::{source_text, SourceText};
@@ -76,7 +75,7 @@ fn lint_lines(source: &str, diagnostics: &mut Vec<String>) {
 #[allow(unreachable_pub)]
 #[salsa::tracked(return_ref)]
 pub fn lint_semantic(db: &dyn Db, file_id: File) -> Diagnostics {
-    let _span = trace_span!("lint_semantic", file=?file_id.path(db)).entered();
+    let _span = debug_span!("lint_semantic", file=%file_id.path(db)).entered();
 
     let source = source_text(db.upcast(), file_id);
     let parsed = parsed_module(db.upcast(), file_id);
@@ -306,12 +305,13 @@ enum AnyImportRef<'a> {
 
 #[cfg(test)]
 mod tests {
+    use red_knot_python_semantic::{Program, SearchPathSettings, TargetVersion};
     use ruff_db::files::system_path_to_file;
-    use ruff_db::program::{Program, SearchPathSettings, TargetVersion};
     use ruff_db::system::{DbWithTestSystem, SystemPathBuf};
 
-    use super::{lint_semantic, Diagnostics};
     use crate::db::tests::TestDb;
+
+    use super::{lint_semantic, Diagnostics};
 
     fn setup_db() -> TestDb {
         setup_db_with_root(SystemPathBuf::from("/src"))

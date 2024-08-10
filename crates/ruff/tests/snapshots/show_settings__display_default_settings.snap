@@ -50,7 +50,7 @@ file_resolver.exclude = [
 	"venv",
 ]
 file_resolver.extend_exclude = [
-	"crates/red_knot_module_resolver/vendor/",
+	"crates/red_knot_python_semantic/vendor/",
 	"crates/ruff/resources/",
 	"crates/ruff_linter/resources/",
 	"crates/ruff_python_formatter/resources/",
@@ -370,6 +370,7 @@ linter.pylint.max_statements = 50
 linter.pylint.max_public_methods = 20
 linter.pylint.max_locals = 15
 linter.pyupgrade.keep_runtime_typing = false
+linter.ruff.parenthesize_tuple_in_subscript = false
 
 # Formatter Settings
 formatter.exclude = []

@@ -2,15 +2,15 @@ fail_fast: true
 
 exclude: |
   (?x)^(
-    crates/red_knot_module_resolver/vendor/.*|
+    crates/red_knot_python_semantic/vendor/.*|
+    crates/red_knot_workspace/resources/.*|
     crates/ruff_linter/resources/.*|
     crates/ruff_linter/src/rules/.*/snapshots/.*|
     crates/ruff/resources/.*|
     crates/ruff_python_formatter/resources/.*|
     crates/ruff_python_formatter/tests/snapshots/.*|
     crates/ruff_python_resolver/resources/.*|
-    crates/ruff_python_resolver/tests/snapshots/.*|
-    crates/red_knot_workspace/resources/.*
+    crates/ruff_python_resolver/tests/snapshots/.*
   )$
 
 repos:

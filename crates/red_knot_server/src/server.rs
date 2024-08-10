@@ -25,7 +25,7 @@ pub(crate) use connection::ClientSender;
 
 pub(crate) type Result<T> = std::result::Result<T, api::Error>;
 
-pub struct Server {
+pub(crate) struct Server {
     connection: Connection,
     client_capabilities: ClientCapabilities,
     worker_threads: NonZeroUsize,
@@ -33,7 +33,7 @@ pub struct Server {
 }
 
 impl Server {
-    pub fn new(worker_threads: NonZeroUsize) -> crate::Result<Self> {
+    pub(crate) fn new(worker_threads: NonZeroUsize) -> crate::Result<Self> {
         let connection = ConnectionInitializer::stdio();
 
         let (id, init_params) = connection.initialize_start()?;
@@ -113,7 +113,7 @@ impl Server {
         })
     }
 
-    pub fn run(self) -> crate::Result<()> {
+    pub(crate) fn run(self) -> crate::Result<()> {
         type PanicHook = Box<dyn Fn(&PanicInfo<'_>) + 'static + Sync + Send>;
         struct RestorePanicHook {
             hook: Option<PanicHook>,

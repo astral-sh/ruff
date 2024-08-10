@@ -9,9 +9,9 @@ use crate::vendored::VendoredFileSystem;
 pub mod file_revision;
 pub mod files;
 pub mod parsed;
-pub mod program;
 pub mod source;
 pub mod system;
+#[cfg(feature = "testing")]
 pub mod testing;
 pub mod vendored;
 

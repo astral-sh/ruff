@@ -1,25 +1,25 @@
-use std::num::NonZeroUsize;
+use std::process::{ExitCode, Termination};
 use std::sync::Mutex;
 
+use anyhow::{anyhow, Context};
 use clap::Parser;
+use colored::Colorize;
 use crossbeam::channel as crossbeam_channel;
-use red_knot_workspace::site_packages::site_packages_dirs_of_venv;
-use tracing::subscriber::Interest;
-use tracing::{Level, Metadata};
-use tracing_subscriber::filter::LevelFilter;
-use tracing_subscriber::layer::{Context, Filter, SubscriberExt};
-use tracing_subscriber::{Layer, Registry};
-use tracing_tree::time::Uptime;
+use salsa::plumbing::ZalsaDatabase;
 
+use red_knot_python_semantic::{ProgramSettings, SearchPathSettings};
+use red_knot_server::run_server;
 use red_knot_workspace::db::RootDatabase;
+use red_knot_workspace::site_packages::VirtualEnvironment;
 use red_knot_workspace::watch;
 use red_knot_workspace::watch::WorkspaceWatcher;
 use red_knot_workspace::workspace::WorkspaceMetadata;
-use ruff_db::program::{ProgramSettings, SearchPathSettings};
-use ruff_db::system::{OsSystem, System, SystemPathBuf};
+use ruff_db::system::{OsSystem, System, SystemPath, SystemPathBuf};
 use target_version::TargetVersion;
-use verbosity::{Verbosity, VerbosityLevel};
 
+use crate::logging::{setup_tracing, Verbosity};
+
+mod logging;
 mod target_version;
 mod verbosity;
 
@@ -27,7 +27,7 @@ mod verbosity;
 #[command(
     author,
     name = "red-knot",
-    about = "An experimental multifile analysis backend for Ruff"
+    about = "An extremely fast Python type checker."
 )]
 #[command(version)]
 struct Args {
@@ -67,7 +67,12 @@ to resolve type information for the project's third-party dependencies.",
     )]
     extra_search_path: Vec<SystemPathBuf>,
 
-    #[arg(long, help = "Python version to assume when resolving types", default_value_t = TargetVersion::default(), value_name="VERSION")]
+    #[arg(
+        long,
+        help = "Python version to assume when resolving types",
+        default_value_t = TargetVersion::default(),
+        value_name="VERSION")
+    ]
     target_version: TargetVersion,
 
     #[clap(flatten)]
@@ -87,13 +92,29 @@ pub enum Command {
     Server,
 }
 
-#[allow(
-    clippy::print_stdout,
-    clippy::unnecessary_wraps,
-    clippy::print_stderr,
-    clippy::dbg_macro
-)]
-pub fn main() -> anyhow::Result<()> {
+#[allow(clippy::print_stdout, clippy::unnecessary_wraps, clippy::print_stderr)]
+pub fn main() -> ExitStatus {
+    run().unwrap_or_else(|error| {
+        use std::io::Write;
+
+        // Use `writeln` instead of `eprintln` to avoid panicking when the stderr pipe is broken.
+        let mut stderr = std::io::stderr().lock();
+
+        // This communicates that this isn't a linter error but Red Knot itself hard-errored for
+        // some reason (e.g. failed to resolve the configuration)
+        writeln!(stderr, "{}", "Red Knot failed".red().bold()).ok();
+        // Currently we generally only see one error, but e.g. with io errors when resolving
+        // the configuration it is help to chain errors ("resolving configuration failed" ->
+        // "failed to read file: subdir/pyproject.toml")
+        for cause in error.chain() {
+            writeln!(stderr, "  {} {cause}", "Cause:".bold()).ok();
+        }
+
+        ExitStatus::Error
+    })
+}
+
+fn run() -> anyhow::Result<ExitStatus> {
     let Args {
         command,
         current_directory,
@@ -105,44 +126,50 @@ pub fn main() -> anyhow::Result<()> {
         watch,
     } = Args::parse_from(std::env::args().collect::<Vec<_>>());
 
-    let verbosity = verbosity.level();
-    countme::enable(verbosity == Some(VerbosityLevel::Trace));
-
     if matches!(command, Some(Command::Server)) {
-        let four = NonZeroUsize::new(4).unwrap();
-
-        // by default, we set the number of worker threads to `num_cpus`, with a maximum of 4.
-        let worker_threads = std::thread::available_parallelism()
-            .unwrap_or(four)
-            .max(four);
-
-        return red_knot_server::Server::new(worker_threads)?.run();
+        return run_server().map(|()| ExitStatus::Success);
     }
 
-    setup_tracing(verbosity);
+    let verbosity = verbosity.level();
+    countme::enable(verbosity.is_trace());
+    let _guard = setup_tracing(verbosity)?;
 
-    let cwd = if let Some(cwd) = current_directory {
-        let canonicalized = cwd.as_utf8_path().canonicalize_utf8().unwrap();
-        SystemPathBuf::from_utf8_path_buf(canonicalized)
-    } else {
-        let cwd = std::env::current_dir().unwrap();
-        SystemPathBuf::from_path_buf(cwd).unwrap()
+    // The base path to which all CLI arguments are relative to.
+    let cli_base_path = {
+        let cwd = std::env::current_dir().context("Failed to get the current working directory")?;
+        SystemPathBuf::from_path_buf(cwd)
+            .map_err(|path| {
+                anyhow!(
+                    "The current working directory '{}' contains non-unicode characters. Red Knot only supports unicode paths.",
+                    path.display()
+                )
+            })?
     };
+
+    let cwd = current_directory
+        .map(|cwd| {
+            if cwd.as_std_path().is_dir() {
+                Ok(SystemPath::absolute(&cwd, &cli_base_path))
+            } else {
+                Err(anyhow!(
+                    "Provided current-directory path '{cwd}' is not a directory."
+                ))
+            }
+        })
+        .transpose()?
+        .unwrap_or_else(|| cli_base_path.clone());
 
     let system = OsSystem::new(cwd.clone());
-    let workspace_metadata =
-        WorkspaceMetadata::from_path(system.current_directory(), &system).unwrap();
+    let workspace_metadata = WorkspaceMetadata::from_path(system.current_directory(), &system)?;
 
-    let site_packages = if let Some(venv_path) = venv_path {
-        let venv_path = system.canonicalize_path(&venv_path).unwrap_or(venv_path);
-        assert!(
-            system.is_directory(&venv_path),
-            "Provided venv-path {venv_path} is not a directory!"
-        );
-        site_packages_dirs_of_venv(&venv_path, &system).unwrap()
-    } else {
-        vec![]
-    };
+    // TODO: Verify the remaining search path settings eagerly.
+    let site_packages = venv_path
+        .map(|path| {
+            VirtualEnvironment::new(path, &OsSystem::new(cli_base_path))
+                .and_then(|venv| venv.site_packages_directories(&system))
+        })
+        .transpose()?
+        .unwrap_or_default();
 
     // TODO: Respect the settings from the workspace metadata. when resolving the program settings.
     let program_settings = ProgramSettings {
@@ -159,7 +186,7 @@ pub fn main() -> anyhow::Result<()> {
     //   cache and load the cache if it exists.
     let mut db = RootDatabase::new(workspace_metadata, program_settings, system);
 
-    let (main_loop, main_loop_cancellation_token) = MainLoop::new(verbosity);
+    let (main_loop, main_loop_cancellation_token) = MainLoop::new();
 
     // Listen to Ctrl+C and abort the watch mode.
     let main_loop_cancellation_token = Mutex::new(Some(main_loop_cancellation_token));
@@ -171,15 +198,35 @@ pub fn main() -> anyhow::Result<()> {
         }
     })?;
 
-    if watch {
-        main_loop.watch(&mut db)?;
+    let exit_status = if watch {
+        main_loop.watch(&mut db)?
     } else {
-        main_loop.run(&mut db);
+        main_loop.run(&mut db)
     };
+
+    tracing::trace!("Counts for entire CLI run:\n{}", countme::get_all());
 
     std::mem::forget(db);
 
-    Ok(())
+    Ok(exit_status)
+}
+
+#[derive(Copy, Clone)]
+pub enum ExitStatus {
+    /// Checking was successful and there were no errors.
+    Success = 0,
+
+    /// Checking was successful but there were errors.
+    Failure = 1,
+
+    /// Checking failed.
+    Error = 2,
+}
+
+impl Termination for ExitStatus {
+    fn report(self) -> ExitCode {
+        ExitCode::from(self as u8)
+    }
 }
 
 struct MainLoop {
@@ -191,12 +238,10 @@ struct MainLoop {
 
     /// The file system watcher, if running in watch mode.
     watcher: Option<WorkspaceWatcher>,
-
-    verbosity: Option<VerbosityLevel>,
 }
 
 impl MainLoop {
-    fn new(verbosity: Option<VerbosityLevel>) -> (Self, MainLoopCancellationToken) {
+    fn new() -> (Self, MainLoopCancellationToken) {
         let (sender, receiver) = crossbeam_channel::bounded(10);
 
         (
@@ -204,32 +249,42 @@ impl MainLoop {
                 sender: sender.clone(),
                 receiver,
                 watcher: None,
-                verbosity,
             },
             MainLoopCancellationToken { sender },
         )
     }
 
-    fn watch(mut self, db: &mut RootDatabase) -> anyhow::Result<()> {
+    fn watch(mut self, db: &mut RootDatabase) -> anyhow::Result<ExitStatus> {
+        tracing::debug!("Starting watch mode");
         let sender = self.sender.clone();
         let watcher = watch::directory_watcher(move |event| {
             sender.send(MainLoopMessage::ApplyChanges(event)).unwrap();
         })?;
 
         self.watcher = Some(WorkspaceWatcher::new(watcher, db));
+
         self.run(db);
-        Ok(())
+
+        Ok(ExitStatus::Success)
     }
 
-    #[allow(clippy::print_stderr)]
-    fn run(mut self, db: &mut RootDatabase) {
-        // Schedule the first check.
+    fn run(mut self, db: &mut RootDatabase) -> ExitStatus {
         self.sender.send(MainLoopMessage::CheckWorkspace).unwrap();
-        let mut revision = 0usize;
+
+        let result = self.main_loop(db);
+
+        tracing::debug!("Exiting main loop");
+
+        result
+    }
+
+    fn main_loop(&mut self, db: &mut RootDatabase) -> ExitStatus {
+        // Schedule the first check.
+        tracing::debug!("Starting main loop");
+
+        let mut revision = 0u64;
 
         while let Ok(message) = self.receiver.recv() {
-            tracing::trace!("Main Loop: Tick");
-
             match message {
                 MainLoopMessage::CheckWorkspace => {
                     let db = db.snapshot();
@@ -242,7 +297,7 @@ impl MainLoop {
                             // Send the result back to the main loop for printing.
                             sender
                                 .send(MainLoopMessage::CheckCompleted { result, revision })
-                                .ok();
+                                .unwrap();
                         }
                     });
                 }
@@ -251,17 +306,26 @@ impl MainLoop {
                     result,
                     revision: check_revision,
                 } => {
+                    let has_diagnostics = !result.is_empty();
                     if check_revision == revision {
-                        eprintln!("{}", result.join("\n"));
-
-                        if self.verbosity == Some(VerbosityLevel::Trace) {
-                            eprintln!("{}", countme::get_all());
+                        for diagnostic in result {
+                            tracing::error!("{}", diagnostic);
                         }
+                    } else {
+                        tracing::debug!(
+                            "Discarding check result for outdated revision: current: {revision}, result revision: {check_revision}"
+                        );
                     }
 
                     if self.watcher.is_none() {
-                        return self.exit();
+                        return if has_diagnostics {
+                            ExitStatus::Failure
+                        } else {
+                            ExitStatus::Success
+                        };
                     }
+
+                    tracing::trace!("Counts after last check:\n{}", countme::get_all());
                 }
 
                 MainLoopMessage::ApplyChanges(changes) => {
@@ -274,20 +338,18 @@ impl MainLoop {
                     self.sender.send(MainLoopMessage::CheckWorkspace).unwrap();
                 }
                 MainLoopMessage::Exit => {
-                    return self.exit();
+                    // Cancel any pending queries and wait for them to complete.
+                    // TODO: Don't use Salsa internal APIs
+                    //  [Zulip-Thread](https://salsa.zulipchat.com/#narrow/stream/333573-salsa-3.2E0/topic/Expose.20an.20API.20to.20cancel.20other.20queries)
+                    let _ = db.zalsa_mut();
+                    return ExitStatus::Success;
                 }
             }
+
+            tracing::debug!("Waiting for next main loop message.");
         }
 
-        self.exit();
-    }
-
-    #[allow(clippy::print_stderr, clippy::unused_self)]
-    fn exit(self) {
-        if self.verbosity == Some(VerbosityLevel::Trace) {
-            eprintln!("Exit");
-            eprintln!("{}", countme::get_all());
-        }
+        ExitStatus::Success
     }
 }
 
@@ -306,70 +368,7 @@ impl MainLoopCancellationToken {
 #[derive(Debug)]
 enum MainLoopMessage {
     CheckWorkspace,
-    CheckCompleted {
-        result: Vec<String>,
-        revision: usize,
-    },
+    CheckCompleted { result: Vec<String>, revision: u64 },
     ApplyChanges(Vec<watch::ChangeEvent>),
     Exit,
-}
-
-fn setup_tracing(verbosity: Option<VerbosityLevel>) {
-    let trace_level = match verbosity {
-        None => Level::WARN,
-        Some(VerbosityLevel::Info) => Level::INFO,
-        Some(VerbosityLevel::Debug) => Level::DEBUG,
-        Some(VerbosityLevel::Trace) => Level::TRACE,
-    };
-
-    let subscriber = Registry::default().with(
-        tracing_tree::HierarchicalLayer::default()
-            .with_indent_lines(true)
-            .with_indent_amount(2)
-            .with_bracketed_fields(true)
-            .with_thread_ids(true)
-            .with_targets(true)
-            .with_writer(|| Box::new(std::io::stderr()))
-            .with_timer(Uptime::default())
-            .with_filter(LoggingFilter { trace_level }),
-    );
-
-    tracing::subscriber::set_global_default(subscriber).unwrap();
-}
-
-struct LoggingFilter {
-    trace_level: Level,
-}
-
-impl LoggingFilter {
-    fn is_enabled(&self, meta: &Metadata<'_>) -> bool {
-        let filter = if meta.target().starts_with("red_knot") || meta.target().starts_with("ruff") {
-            self.trace_level
-        } else if meta.target().starts_with("salsa") && self.trace_level <= Level::INFO {
-            // Salsa emits very verbose query traces with level info. Let's not show these to the user.
-            Level::WARN
-        } else {
-            Level::INFO
-        };
-
-        meta.level() <= &filter
-    }
-}
-
-impl<S> Filter<S> for LoggingFilter {
-    fn enabled(&self, meta: &Metadata<'_>, _cx: &Context<'_, S>) -> bool {
-        self.is_enabled(meta)
-    }
-
-    fn callsite_enabled(&self, meta: &'static Metadata<'static>) -> Interest {
-        if self.is_enabled(meta) {
-            Interest::always()
-        } else {
-            Interest::never()
-        }
-    }
-
-    fn max_level_hint(&self) -> Option<LevelFilter> {
-        Some(LevelFilter::from_level(self.trace_level))
-    }
 }

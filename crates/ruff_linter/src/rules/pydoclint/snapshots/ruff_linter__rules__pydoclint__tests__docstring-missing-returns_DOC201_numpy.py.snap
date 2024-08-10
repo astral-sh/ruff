@@ -18,3 +18,12 @@ DOC201_numpy.py:62:9: DOC201 `return` is not documented in docstring
    |         ^^^^^^^^^^^^^ DOC201
    |
    = help: Add a "Returns" section to the docstring
+
+DOC201_numpy.py:87:9: DOC201 `return` is not documented in docstring
+   |
+85 |     def f(self):
+86 |         """Lorem ipsum."""
+87 |         return True
+   |         ^^^^^^^^^^^ DOC201
+   |
+   = help: Add a "Returns" section to the docstring

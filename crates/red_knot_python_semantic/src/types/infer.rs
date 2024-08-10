@@ -24,13 +24,14 @@ use rustc_hash::FxHashMap;
 use salsa;
 use salsa::plumbing::AsId;
 
-use red_knot_module_resolver::{resolve_module, ModuleName};
 use ruff_db::files::File;
 use ruff_db::parsed::parsed_module;
 use ruff_python_ast as ast;
 use ruff_python_ast::{ExprContext, TypeParams};
 
 use crate::builtins::builtins_scope;
+use crate::module_name::ModuleName;
+use crate::module_resolver::resolve_module;
 use crate::semantic_index::ast_ids::{HasScopedAstId, HasScopedUseId, ScopedExpressionId};
 use crate::semantic_index::definition::{Definition, DefinitionKind, DefinitionNodeKey};
 use crate::semantic_index::expression::Expression;
@@ -50,7 +51,7 @@ use crate::Db;
 pub(crate) fn infer_scope_types<'db>(db: &'db dyn Db, scope: ScopeId<'db>) -> TypeInference<'db> {
     let file = scope.file(db);
     let _span =
-        tracing::trace_span!("infer_scope_types", scope=?scope.as_id(), file=?file.path(db))
+        tracing::trace_span!("infer_scope_types", scope=?scope.as_id(), file=%file.path(db))
             .entered();
 
     // Using the index here is fine because the code below depends on the AST anyway.
@@ -83,7 +84,7 @@ pub(crate) fn infer_definition_types<'db>(
     let _span = tracing::trace_span!(
         "infer_definition_types",
         definition = ?definition.as_id(),
-        file = ?file.path(db)
+        file = %file.path(db)
     )
     .entered();
 
@@ -104,7 +105,7 @@ pub(crate) fn infer_expression_types<'db>(
 ) -> TypeInference<'db> {
     let file = expression.file(db);
     let _span =
-        tracing::trace_span!("infer_expression_types", expression=?expression.as_id(), file=?file.path(db))
+        tracing::trace_span!("infer_expression_types", expression=?expression.as_id(), file=%file.path(db))
             .entered();
 
     let index = semantic_index(db, file);
@@ -840,9 +841,7 @@ impl<'db> TypeInferenceBuilder<'db> {
     }
 
     fn module_ty_from_name(&self, name: &ast::Identifier) -> Type<'db> {
-        let module_name = ModuleName::new(&name.id);
-        let module =
-            module_name.and_then(|module_name| resolve_module(self.db.upcast(), module_name));
+        let module = ModuleName::new(&name.id).and_then(|name| resolve_module(self.db, name));
         module
             .map(|module| Type::Module(module.file()))
             .unwrap_or(Type::Unbound)
@@ -1497,13 +1496,14 @@ impl<'db> TypeInferenceBuilder<'db> {
 mod tests {
     use ruff_db::files::{system_path_to_file, File};
     use ruff_db::parsed::parsed_module;
-    use ruff_db::program::{Program, SearchPathSettings, TargetVersion};
     use ruff_db::system::{DbWithTestSystem, SystemPathBuf};
     use ruff_db::testing::assert_function_query_was_not_run;
     use ruff_python_ast::name::Name;
 
     use crate::builtins::builtins_scope;
     use crate::db::tests::TestDb;
+    use crate::program::{Program, SearchPathSettings};
+    use crate::python_version::TargetVersion;
     use crate::semantic_index::definition::Definition;
     use crate::semantic_index::symbol::FileScopeId;
     use crate::semantic_index::{global_scope, semantic_index, symbol_table, use_def_map};

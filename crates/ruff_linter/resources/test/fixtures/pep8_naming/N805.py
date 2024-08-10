@@ -123,3 +123,14 @@ class RenamingInMethodBodyClass:
 class RenamingWithNFKC:
     def formula(household):
         hºusehold(1)
+
+
+from typing import Protocol
+
+
+class MyMeta(type):
+    def __subclasscheck__(cls, other): ...
+
+
+class MyProtocolMeta(type(Protocol)):
+    def __subclasscheck__(cls, other): ...

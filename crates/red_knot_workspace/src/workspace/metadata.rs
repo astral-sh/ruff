@@ -22,15 +22,13 @@ pub struct PackageMetadata {
 impl WorkspaceMetadata {
     /// Discovers the closest workspace at `path` and returns its metadata.
     pub fn from_path(path: &SystemPath, system: &dyn System) -> anyhow::Result<WorkspaceMetadata> {
-        let root = if system.is_file(path) {
-            path.parent().unwrap().to_path_buf()
-        } else {
-            path.to_path_buf()
-        };
+        assert!(
+            system.is_directory(path),
+            "Workspace root path must be a directory"
+        );
+        tracing::debug!("Searching for workspace in '{path}'");
 
-        if !system.is_directory(&root) {
-            anyhow::bail!("no workspace found at {:?}", root);
-        }
+        let root = path.to_path_buf();
 
         // TODO: Discover package name from `pyproject.toml`.
         let package_name: Name = path.file_name().unwrap_or("<root>").into();

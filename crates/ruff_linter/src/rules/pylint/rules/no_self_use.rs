@@ -123,7 +123,7 @@ pub(crate) fn no_self_use(
     if scope
         .get("self")
         .map(|binding_id| semantic.binding(binding_id))
-        .is_some_and(|binding| binding.kind.is_argument() && !binding.is_used())
+        .is_some_and(|binding| binding.kind.is_argument() && binding.is_unused())
     {
         diagnostics.push(Diagnostic::new(
             NoSelfUse {

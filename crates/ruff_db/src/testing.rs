@@ -1,5 +1,8 @@
 //! Test helpers for working with Salsa databases
 
+use tracing_subscriber::layer::SubscriberExt;
+use tracing_subscriber::EnvFilter;
+
 pub fn assert_function_query_was_not_run<Db, Q, QDb, I, R>(
     db: &Db,
     query: Q,
@@ -92,6 +95,116 @@ fn query_name<Q>(_query: &Q) -> &'static str {
         .rsplit_once("::")
         .map(|(_, name)| name)
         .unwrap_or(full_qualified_query_name)
+}
+
+/// Sets up logging for the current thread. It captures all `red_knot` and `ruff` events.
+///
+/// Useful for capturing the tracing output in a failing test.
+///
+/// # Examples
+/// ```
+/// use ruff_db::testing::setup_logging;
+/// let _logging = setup_logging();
+///
+/// tracing::info!("This message will be printed to stderr");
+/// ```
+pub fn setup_logging() -> LoggingGuard {
+    LoggingBuilder::new().build()
+}
+
+/// Sets up logging for the current thread and uses the passed filter to filter the shown events.
+/// Useful for capturing the tracing output in a failing test.
+///
+/// # Examples
+/// ```
+/// use ruff_db::testing::setup_logging_with_filter;
+/// let _logging = setup_logging_with_filter("red_knot_module_resolver::resolver");
+/// ```
+///
+/// # Filter
+/// See [`tracing_subscriber::EnvFilter`] for the `filter`'s syntax.
+///
+pub fn setup_logging_with_filter(filter: &str) -> Option<LoggingGuard> {
+    LoggingBuilder::with_filter(filter).map(LoggingBuilder::build)
+}
+
+#[derive(Debug)]
+pub struct LoggingBuilder {
+    filter: EnvFilter,
+    hierarchical: bool,
+}
+
+impl LoggingBuilder {
+    pub fn new() -> Self {
+        Self {
+            filter: EnvFilter::default()
+                .add_directive(
+                    "red_knot=trace"
+                        .parse()
+                        .expect("Hardcoded directive to be valid"),
+                )
+                .add_directive(
+                    "ruff=trace"
+                        .parse()
+                        .expect("Hardcoded directive to be valid"),
+                ),
+            hierarchical: true,
+        }
+    }
+
+    pub fn with_filter(filter: &str) -> Option<Self> {
+        let filter = EnvFilter::builder().parse(filter).ok()?;
+
+        Some(Self {
+            filter,
+            hierarchical: true,
+        })
+    }
+
+    pub fn with_hierarchical(mut self, hierarchical: bool) -> Self {
+        self.hierarchical = hierarchical;
+        self
+    }
+
+    pub fn build(self) -> LoggingGuard {
+        let registry = tracing_subscriber::registry().with(self.filter);
+
+        let guard = if self.hierarchical {
+            let subscriber = registry.with(
+                tracing_tree::HierarchicalLayer::default()
+                    .with_indent_lines(true)
+                    .with_indent_amount(2)
+                    .with_bracketed_fields(true)
+                    .with_thread_ids(true)
+                    .with_targets(true)
+                    .with_writer(std::io::stderr)
+                    .with_timer(tracing_tree::time::Uptime::default()),
+            );
+
+            tracing::subscriber::set_default(subscriber)
+        } else {
+            let subscriber = registry.with(
+                tracing_subscriber::fmt::layer()
+                    .compact()
+                    .with_writer(std::io::stderr)
+                    .with_timer(tracing_subscriber::fmt::time()),
+            );
+
+            tracing::subscriber::set_default(subscriber)
+        };
+
+        LoggingGuard { _guard: guard }
+    }
+}
+
+impl Default for LoggingBuilder {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+pub struct LoggingGuard {
+    _guard: tracing::subscriber::DefaultGuard,
 }
 
 #[test]

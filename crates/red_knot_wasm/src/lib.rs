@@ -3,10 +3,10 @@ use std::any::Any;
 use js_sys::Error;
 use wasm_bindgen::prelude::*;
 
+use red_knot_python_semantic::{ProgramSettings, SearchPathSettings};
 use red_knot_workspace::db::RootDatabase;
 use red_knot_workspace::workspace::WorkspaceMetadata;
 use ruff_db::files::{system_path_to_file, File};
-use ruff_db::program::{ProgramSettings, SearchPathSettings};
 use ruff_db::system::walk_directory::WalkDirectoryBuilder;
 use ruff_db::system::{
     DirectoryEntry, MemoryFileSystem, Metadata, System, SystemPath, SystemPathBuf,
@@ -184,7 +184,7 @@ pub enum TargetVersion {
     Py313,
 }
 
-impl From<TargetVersion> for ruff_db::program::TargetVersion {
+impl From<TargetVersion> for red_knot_python_semantic::TargetVersion {
     fn from(value: TargetVersion) -> Self {
         match value {
             TargetVersion::Py37 => Self::Py37,

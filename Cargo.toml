@@ -35,7 +35,6 @@ ruff_source_file = { path = "crates/ruff_source_file" }
 ruff_text_size = { path = "crates/ruff_text_size" }
 ruff_workspace = { path = "crates/ruff_workspace" }
 
-red_knot_module_resolver = { path = "crates/red_knot_module_resolver" }
 red_knot_python_semantic = { path = "crates/red_knot_python_semantic" }
 red_knot_server = { path = "crates/red_knot_server" }
 red_knot_workspace = { path = "crates/red_knot_workspace" }
@@ -132,8 +131,9 @@ thiserror = { version = "1.0.58" }
 tikv-jemallocator = { version = "0.6.0" }
 toml = { version = "0.8.11" }
 tracing = { version = "0.1.40" }
+tracing-flame = { version = "0.2.0" }
 tracing-indicatif = { version = "0.3.6" }
-tracing-subscriber = { version = "0.3.18", features = ["env-filter"] }
+tracing-subscriber = { version = "0.3.18", default-features = false, features = ["env-filter", "fmt"] }
 tracing-tree = { version = "0.4.0" }
 typed-arena = { version = "2.0.2" }
 unic-ucd-category = { version = "0.9" }

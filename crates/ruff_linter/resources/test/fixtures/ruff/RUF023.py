@@ -192,6 +192,14 @@ class BezierBuilder4:
                  "baz", "bingo"
                  }
 
+
+class VeryDRY:
+    # This should get flagged, *but* the fix is unsafe,
+    # since the `__slots__` binding is used by the `__match_args__` definition
+    __slots__ = ("foo", "bar")
+    __match_args__ = __slots__
+
+
 ###################################
 # These should all not get flagged:
 ###################################

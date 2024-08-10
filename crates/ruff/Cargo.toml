@@ -1,6 +1,6 @@
 [package]
 name = "ruff"
-version = "0.5.6"
+version = "0.5.7"
 publish = true
 authors = { workspace = true }
 edition = { workspace = true }
