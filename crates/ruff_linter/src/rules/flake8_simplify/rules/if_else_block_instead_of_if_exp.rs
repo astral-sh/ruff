@@ -1,6 +1,7 @@
 use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::{self as ast, ElifElseClause, Expr, Stmt};
+use ruff_python_ast::comparable::ComparableExpr;
+use ruff_python_ast::{BoolOp, ElifElseClause, Expr, Stmt};
 use ruff_python_semantic::analyze::typing::{is_sys_version_block, is_type_checking_block};
 use ruff_text_size::{Ranged, TextRange};
 
@@ -8,11 +9,11 @@ use crate::checkers::ast::Checker;
 use crate::fix::edits::fits;
 
 /// ## What it does
-/// Check for `if`-`else`-blocks that can be replaced with a ternary operator.
+/// Check for `if`-`else`-blocks that can be replaced with a ternary or binary operator.
 ///
 /// ## Why is this bad?
 /// `if`-`else`-blocks that assign a value to a variable in both branches can
-/// be expressed more concisely by using a ternary operator.
+/// be expressed more concisely by using a ternary or binary operator.
 ///
 /// ## Example
 /// ```python
@@ -22,9 +23,20 @@ use crate::fix::edits::fits;
 ///     bar = y
 /// ```
 ///
+/// /// ```python
+/// if cond:
+///     z = cond
+/// else:
+///     z = other_cond
+/// ```
+///
 /// Use instead:
 /// ```python
 /// bar = x if foo else y
+/// ```
+///
+/// ```python
+/// z = cond or other_cond
 /// ```
 ///
 /// ## References
@@ -121,9 +133,57 @@ pub(crate) fn if_else_block_instead_of_if_exp(checker: &mut Checker, stmt_if: &a
         return;
     }
 
-    let target_var = &body_target;
-    let ternary = ternary(target_var, body_value, test, else_value);
-    let contents = checker.generator().stmt(&ternary);
+    // In most cases we should now suggest a ternary operator,
+    // but there are three edge cases where a binary operator
+    // is more appropriate. These are as follows:
+    //    (BinaryOr): `body_value` and `test` coincide.
+    //    (BinaryAnd): `body_value` and `not test` coincide.
+    //    (BinaryAnd): `not body_value` and `test` coincide.
+    // Here by "coincide" we mean "coincide after conversion to `ComparableExpr` objects."
+    //
+    // For the reader's convenience, here is how
+    // the notation translates to the if-else block:
+    //
+    // ```python
+    // if test:
+    //     target_var = body_value
+    // else:
+    //     target_var = else_value
+    // ```
+    //
+    // The match statement below implements the following
+    // logic:
+    //     - If `test == body_value`, replace with `target_var = test or else_value`
+    //     - If `test == not body_value`, replace with `target_var = body_value and else_value`
+    //     - If `not test == body_value`, replace with `target_var = body_value and else_value`
+    //     - Otherwise, replace with `target_var = body_value if test else else_value`
+    let contents = match (test, body_value) {
+        (test_node, body_node)
+            if ComparableExpr::from(test_node) == ComparableExpr::from(body_node) =>
+        {
+            let target_var = &body_target;
+            let binary = assignment_binary_or(target_var, body_value, else_value);
+            checker.generator().stmt(&binary)
+        }
+        (test_node, body_node)
+            if test_node.as_unary_op_expr().is_some_and(|op_expr| {
+                op_expr.op.is_not()
+                    && ComparableExpr::from(&op_expr.operand) == ComparableExpr::from(body_node)
+            }) || body_node.as_unary_op_expr().is_some_and(|op_expr| {
+                op_expr.op.is_not()
+                    && ComparableExpr::from(&op_expr.operand) == ComparableExpr::from(test_node)
+            }) =>
+        {
+            let target_var = &body_target;
+            let binary = assignment_binary_and(target_var, body_value, else_value);
+            checker.generator().stmt(&binary)
+        }
+        _ => {
+            let target_var = &body_target;
+            let ternary = assignment_ternary(target_var, body_value, test, else_value);
+            checker.generator().stmt(&ternary)
+        }
+    };
 
     // Don't flag if the resulting expression would exceed the maximum line length.
     if !fits(
@@ -154,7 +214,12 @@ pub(crate) fn if_else_block_instead_of_if_exp(checker: &mut Checker, stmt_if: &a
     checker.diagnostics.push(diagnostic);
 }
 
-fn ternary(target_var: &Expr, body_value: &Expr, test: &Expr, orelse_value: &Expr) -> Stmt {
+fn assignment_ternary(
+    target_var: &Expr,
+    body_value: &Expr,
+    test: &Expr,
+    orelse_value: &Expr,
+) -> Stmt {
     let node = ast::ExprIf {
         test: Box::new(test.clone()),
         body: Box::new(body_value.clone()),
@@ -167,4 +232,34 @@ fn ternary(target_var: &Expr, body_value: &Expr, test: &Expr, orelse_value: &Exp
         range: TextRange::default(),
     };
     node1.into()
+}
+
+fn assignment_binary_and(target_var: &Expr, left_value: &Expr, right_value: &Expr) -> Stmt {
+    let node = ast::ExprBoolOp {
+        op: BoolOp::And,
+        values: vec![left_value.clone(), right_value.clone()],
+        range: TextRange::default(),
+    };
+    let node1 = ast::StmtAssign {
+        targets: vec![target_var.clone()],
+        value: Box::new(node.into()),
+        range: TextRange::default(),
+    };
+    node1.into()
+}
+
+fn assignment_binary_or(target_var: &Expr, left_value: &Expr, right_value: &Expr) -> Stmt {
+    (ast::StmtAssign {
+        range: TextRange::default(),
+        targets: vec![target_var.clone()],
+        value: Box::new(
+            (ast::ExprBoolOp {
+                range: TextRange::default(),
+                op: BoolOp::Or,
+                values: vec![left_value.clone(), right_value.clone()],
+            })
+            .into(),
+        ),
+    })
+    .into()
 }
