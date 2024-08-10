@@ -44,6 +44,8 @@ use crate::fix::edits::fits;
 #[violation]
 pub struct IfElseBlockInsteadOfIfExp {
     contents: String,
+    // Whether to use binary or ternary assignment
+    kind: AssignmentKind,
 }
 
 impl Violation for IfElseBlockInsteadOfIfExp {
@@ -51,12 +53,19 @@ impl Violation for IfElseBlockInsteadOfIfExp {
 
     #[derive_message_formats]
     fn message(&self) -> String {
-        let IfElseBlockInsteadOfIfExp { contents } = self;
-        format!("Use ternary operator `{contents}` instead of `if`-`else`-block")
+        let IfElseBlockInsteadOfIfExp { contents, kind } = self;
+        match kind {
+            AssignmentKind::Binary => {
+                format!("Use binary operator `{contents}` instead of `if`-`else`-block")
+            }
+            AssignmentKind::Ternary => {
+                format!("Use ternary operator `{contents}` instead of `if`-`else`-block")
+            }
+        }
     }
 
     fn fix_title(&self) -> Option<String> {
-        let IfElseBlockInsteadOfIfExp { contents } = self;
+        let IfElseBlockInsteadOfIfExp { contents, .. } = self;
         Some(format!("Replace `if`-`else`-block with `{contents}`"))
     }
 }
@@ -135,11 +144,7 @@ pub(crate) fn if_else_block_instead_of_if_exp(checker: &mut Checker, stmt_if: &a
 
     // In most cases we should now suggest a ternary operator,
     // but there are three edge cases where a binary operator
-    // is more appropriate. These are as follows:
-    //    (BinaryOr): `body_value` and `test` coincide.
-    //    (BinaryAnd): `body_value` and `not test` coincide.
-    //    (BinaryAnd): `not body_value` and `test` coincide.
-    // Here by "coincide" we mean "coincide after conversion to `ComparableExpr` objects."
+    // is more appropriate.
     //
     // For the reader's convenience, here is how
     // the notation translates to the if-else block:
@@ -157,13 +162,13 @@ pub(crate) fn if_else_block_instead_of_if_exp(checker: &mut Checker, stmt_if: &a
     //     - If `test == not body_value`, replace with `target_var = body_value and else_value`
     //     - If `not test == body_value`, replace with `target_var = body_value and else_value`
     //     - Otherwise, replace with `target_var = body_value if test else else_value`
-    let contents = match (test, body_value) {
+    let (contents, assignment_kind) = match (test, body_value) {
         (test_node, body_node)
             if ComparableExpr::from(test_node) == ComparableExpr::from(body_node) =>
         {
             let target_var = &body_target;
             let binary = assignment_binary_or(target_var, body_value, else_value);
-            checker.generator().stmt(&binary)
+            (checker.generator().stmt(&binary), AssignmentKind::Binary)
         }
         (test_node, body_node)
             if test_node.as_unary_op_expr().is_some_and(|op_expr| {
@@ -176,12 +181,12 @@ pub(crate) fn if_else_block_instead_of_if_exp(checker: &mut Checker, stmt_if: &a
         {
             let target_var = &body_target;
             let binary = assignment_binary_and(target_var, body_value, else_value);
-            checker.generator().stmt(&binary)
+            (checker.generator().stmt(&binary), AssignmentKind::Binary)
         }
         _ => {
             let target_var = &body_target;
             let ternary = assignment_ternary(target_var, body_value, test, else_value);
-            checker.generator().stmt(&ternary)
+            (checker.generator().stmt(&ternary), AssignmentKind::Ternary)
         }
     };
 
@@ -199,6 +204,7 @@ pub(crate) fn if_else_block_instead_of_if_exp(checker: &mut Checker, stmt_if: &a
     let mut diagnostic = Diagnostic::new(
         IfElseBlockInsteadOfIfExp {
             contents: contents.clone(),
+            kind: assignment_kind,
         },
         stmt_if.range(),
     );
@@ -262,4 +268,10 @@ fn assignment_binary_or(target_var: &Expr, left_value: &Expr, right_value: &Expr
         ),
     })
     .into()
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+enum AssignmentKind {
+    Binary,
+    Ternary,
 }
