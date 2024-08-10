@@ -6,7 +6,7 @@ pub use db::Db;
 pub use module_name::ModuleName;
 pub use module_resolver::{resolve_module, system_module_search_paths, vendored_typeshed_stubs};
 pub use program::{Program, ProgramSettings, SearchPathSettings};
-pub use python_version::{PythonVersion, TargetVersion, UnsupportedPythonVersion};
+pub use python_version::PythonVersion;
 pub use semantic_model::{HasTy, SemanticModel};
 
 pub mod ast_node_ref;

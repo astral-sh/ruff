@@ -12,7 +12,7 @@ use super::path::{ModulePath, SearchPath, SearchPathValidationError};
 use super::state::ResolverState;
 use crate::db::Db;
 use crate::module_name::ModuleName;
-use crate::{Program, SearchPathSettings, TargetVersion};
+use crate::{Program, PythonVersion, SearchPathSettings};
 
 /// Resolves a module name to a module.
 pub fn resolve_module(db: &dyn Db, module_name: ModuleName) -> Option<Module> {
@@ -451,7 +451,7 @@ impl<'db> Iterator for PthFileIterator<'db> {
 /// Validated and normalized module-resolution settings.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub(crate) struct ModuleResolutionSettings {
-    target_version: TargetVersion,
+    target_version: PythonVersion,
 
     /// Search paths that have been statically determined purely from reading Ruff's configuration settings.
     /// These shouldn't ever change unless the config settings themselves change.
@@ -467,7 +467,7 @@ pub(crate) struct ModuleResolutionSettings {
 }
 
 impl ModuleResolutionSettings {
-    fn target_version(&self) -> TargetVersion {
+    fn target_version(&self) -> PythonVersion {
         self.target_version
     }
 
@@ -496,7 +496,7 @@ fn resolve_name(db: &dyn Db, name: &ModuleName) -> Option<(SearchPath, File, Mod
     let target_version = resolver_settings.target_version();
     let resolver_state = ResolverState::new(db, target_version);
     let is_builtin_module =
-        ruff_python_stdlib::sys::is_builtin_module(target_version.minor_version(), name.as_str());
+        ruff_python_stdlib::sys::is_builtin_module(target_version.minor, name.as_str());
 
     for search_path in resolver_settings.search_paths(db) {
         // When a builtin module is imported, standard module resolution is bypassed:
@@ -706,7 +706,7 @@ mod tests {
         let TestCase { db, stdlib, .. } = TestCaseBuilder::new()
             .with_src_files(SRC)
             .with_custom_typeshed(TYPESHED)
-            .with_target_version(TargetVersion::Py38)
+            .with_target_version(PythonVersion::PY38)
             .build();
 
         let builtins_module_name = ModuleName::new_static("builtins").unwrap();
@@ -724,7 +724,7 @@ mod tests {
 
         let TestCase { db, stdlib, .. } = TestCaseBuilder::new()
             .with_custom_typeshed(TYPESHED)
-            .with_target_version(TargetVersion::Py38)
+            .with_target_version(PythonVersion::PY38)
             .build();
 
         let functools_module_name = ModuleName::new_static("functools").unwrap();
@@ -777,7 +777,7 @@ mod tests {
 
         let TestCase { db, stdlib, .. } = TestCaseBuilder::new()
             .with_custom_typeshed(TYPESHED)
-            .with_target_version(TargetVersion::Py38)
+            .with_target_version(PythonVersion::PY38)
             .build();
 
         let existing_modules = create_module_names(&["asyncio", "functools", "xml.etree"]);
@@ -822,7 +822,7 @@ mod tests {
 
         let TestCase { db, .. } = TestCaseBuilder::new()
             .with_custom_typeshed(TYPESHED)
-            .with_target_version(TargetVersion::Py38)
+            .with_target_version(PythonVersion::PY38)
             .build();
 
         let nonexisting_modules = create_module_names(&[
@@ -866,7 +866,7 @@ mod tests {
 
         let TestCase { db, stdlib, .. } = TestCaseBuilder::new()
             .with_custom_typeshed(TYPESHED)
-            .with_target_version(TargetVersion::Py39)
+            .with_target_version(PythonVersion::PY39)
             .build();
 
         let existing_modules = create_module_names(&[
@@ -908,7 +908,7 @@ mod tests {
 
         let TestCase { db, .. } = TestCaseBuilder::new()
             .with_custom_typeshed(TYPESHED)
-            .with_target_version(TargetVersion::Py39)
+            .with_target_version(PythonVersion::PY39)
             .build();
 
         let nonexisting_modules = create_module_names(&["importlib", "xml", "xml.etree"]);
@@ -932,7 +932,7 @@ mod tests {
         let TestCase { db, src, .. } = TestCaseBuilder::new()
             .with_src_files(SRC)
             .with_custom_typeshed(TYPESHED)
-            .with_target_version(TargetVersion::Py38)
+            .with_target_version(PythonVersion::PY38)
             .build();
 
         let functools_module_name = ModuleName::new_static("functools").unwrap();
@@ -956,7 +956,7 @@ mod tests {
     fn stdlib_uses_vendored_typeshed_when_no_custom_typeshed_supplied() {
         let TestCase { db, stdlib, .. } = TestCaseBuilder::new()
             .with_vendored_typeshed()
-            .with_target_version(TargetVersion::default())
+            .with_target_version(PythonVersion::default())
             .build();
 
         let pydoc_data_topics_name = ModuleName::new_static("pydoc_data.topics").unwrap();
@@ -1209,7 +1209,7 @@ mod tests {
             site_packages: vec![site_packages],
         };
 
-        Program::new(&db, TargetVersion::Py38, search_paths);
+        Program::new(&db, PythonVersion::PY38, search_paths);
 
         let foo_module = resolve_module(&db, ModuleName::new_static("foo").unwrap()).unwrap();
         let bar_module = resolve_module(&db, ModuleName::new_static("bar").unwrap()).unwrap();
@@ -1243,7 +1243,7 @@ mod tests {
     fn deleting_an_unrelated_file_doesnt_change_module_resolution() {
         let TestCase { mut db, src, .. } = TestCaseBuilder::new()
             .with_src_files(&[("foo.py", "x = 1"), ("bar.py", "x = 2")])
-            .with_target_version(TargetVersion::Py38)
+            .with_target_version(PythonVersion::PY38)
             .build();
 
         let foo_module_name = ModuleName::new_static("foo").unwrap();
@@ -1331,7 +1331,7 @@ mod tests {
             ..
         } = TestCaseBuilder::new()
             .with_custom_typeshed(TYPESHED)
-            .with_target_version(TargetVersion::Py38)
+            .with_target_version(PythonVersion::PY38)
             .build();
 
         let functools_module_name = ModuleName::new_static("functools").unwrap();
@@ -1379,7 +1379,7 @@ mod tests {
             ..
         } = TestCaseBuilder::new()
             .with_custom_typeshed(TYPESHED)
-            .with_target_version(TargetVersion::Py38)
+            .with_target_version(PythonVersion::PY38)
             .build();
 
         let functools_module_name = ModuleName::new_static("functools").unwrap();
@@ -1419,7 +1419,7 @@ mod tests {
         } = TestCaseBuilder::new()
             .with_src_files(SRC)
             .with_custom_typeshed(TYPESHED)
-            .with_target_version(TargetVersion::Py38)
+            .with_target_version(PythonVersion::PY38)
             .build();
 
         let functools_module_name = ModuleName::new_static("functools").unwrap();
@@ -1705,7 +1705,7 @@ not_a_directory
 
         Program::new(
             &db,
-            TargetVersion::default(),
+            PythonVersion::default(),
             SearchPathSettings {
                 extra_paths: vec![],
                 src_root: SystemPathBuf::from("/src"),

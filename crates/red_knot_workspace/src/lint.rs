@@ -305,7 +305,7 @@ enum AnyImportRef<'a> {
 
 #[cfg(test)]
 mod tests {
-    use red_knot_python_semantic::{Program, SearchPathSettings, TargetVersion};
+    use red_knot_python_semantic::{Program, PythonVersion, SearchPathSettings};
     use ruff_db::files::system_path_to_file;
     use ruff_db::system::{DbWithTestSystem, SystemPathBuf};
 
@@ -322,7 +322,7 @@ mod tests {
 
         Program::new(
             &db,
-            TargetVersion::Py38,
+            PythonVersion::default(),
             SearchPathSettings {
                 extra_paths: Vec::new(),
                 src_root,
