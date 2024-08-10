@@ -9,7 +9,9 @@ use crate::checkers::ast::Checker;
 use crate::fix::edits::fits;
 
 /// ## What it does
-/// Check for `if`-`else`-blocks that can be replaced with a ternary or binary operator.
+/// Check for `if`-`else`-blocks that can be replaced with a ternary operator.
+/// Moreover, in [preview], check if these ternary expressions can be
+/// further simplified to binary expressions.
 ///
 /// ## Why is this bad?
 /// `if`-`else`-blocks that assign a value to a variable in both branches can
@@ -24,6 +26,7 @@ use crate::fix::edits::fits;
 /// ```
 ///
 /// /// ```python
+/// # in preview
 /// if cond:
 ///     z = cond
 /// else:
@@ -41,6 +44,7 @@ use crate::fix::edits::fits;
 ///
 /// ## References
 /// - [Python documentation: Conditional expressions](https://docs.python.org/3/reference/expressions.html#conditional-expressions)
+/// [preview]: https://docs.astral.sh/ruff/preview/
 #[violation]
 pub struct IfElseBlockInsteadOfIfExp {
     contents: String,
@@ -158,37 +162,38 @@ pub(crate) fn if_else_block_instead_of_if_exp(checker: &mut Checker, stmt_if: &a
     //
     // The match statement below implements the following
     // logic:
-    //     - If `test == body_value`, replace with `target_var = test or else_value`
-    //     - If `test == not body_value`, replace with `target_var = body_value and else_value`
-    //     - If `not test == body_value`, replace with `target_var = body_value and else_value`
+    //     - If `test == body_value` and preview enabled, replace with `target_var = test or else_value`
+    //     - If `test == not body_value` and preview enabled, replace with `target_var = body_value and else_value`
+    //     - If `not test == body_value` and preview enabled, replace with `target_var = body_value and else_value`
     //     - Otherwise, replace with `target_var = body_value if test else else_value`
-    let (contents, assignment_kind) = match (test, body_value) {
-        (test_node, body_node)
-            if ComparableExpr::from(test_node) == ComparableExpr::from(body_node) =>
-        {
-            let target_var = &body_target;
-            let binary = assignment_binary_or(target_var, body_value, else_value);
-            (checker.generator().stmt(&binary), AssignmentKind::Binary)
-        }
-        (test_node, body_node)
-            if test_node.as_unary_op_expr().is_some_and(|op_expr| {
-                op_expr.op.is_not()
-                    && ComparableExpr::from(&op_expr.operand) == ComparableExpr::from(body_node)
-            }) || body_node.as_unary_op_expr().is_some_and(|op_expr| {
-                op_expr.op.is_not()
-                    && ComparableExpr::from(&op_expr.operand) == ComparableExpr::from(test_node)
-            }) =>
-        {
-            let target_var = &body_target;
-            let binary = assignment_binary_and(target_var, body_value, else_value);
-            (checker.generator().stmt(&binary), AssignmentKind::Binary)
-        }
-        _ => {
-            let target_var = &body_target;
-            let ternary = assignment_ternary(target_var, body_value, test, else_value);
-            (checker.generator().stmt(&ternary), AssignmentKind::Ternary)
-        }
-    };
+    let (contents, assignment_kind) =
+        match (checker.settings.preview.is_enabled(), test, body_value) {
+            (true, test_node, body_node)
+                if ComparableExpr::from(test_node) == ComparableExpr::from(body_node) =>
+            {
+                let target_var = &body_target;
+                let binary = assignment_binary_or(target_var, body_value, else_value);
+                (checker.generator().stmt(&binary), AssignmentKind::Binary)
+            }
+            (true, test_node, body_node)
+                if test_node.as_unary_op_expr().is_some_and(|op_expr| {
+                    op_expr.op.is_not()
+                        && ComparableExpr::from(&op_expr.operand) == ComparableExpr::from(body_node)
+                }) || body_node.as_unary_op_expr().is_some_and(|op_expr| {
+                    op_expr.op.is_not()
+                        && ComparableExpr::from(&op_expr.operand) == ComparableExpr::from(test_node)
+                }) =>
+            {
+                let target_var = &body_target;
+                let binary = assignment_binary_and(target_var, body_value, else_value);
+                (checker.generator().stmt(&binary), AssignmentKind::Binary)
+            }
+            _ => {
+                let target_var = &body_target;
+                let ternary = assignment_ternary(target_var, body_value, test, else_value);
+                (checker.generator().stmt(&ternary), AssignmentKind::Ternary)
+            }
+        };
 
     // Don't flag if the resulting expression would exceed the maximum line length.
     if !fits(
