@@ -16,18 +16,18 @@ use crate::checkers::ast::Checker;
 /// as, e.g., `typing.Never | T` is equivalent to `T`.
 ///
 /// ## Example
+///
 /// ```python
 /// from typing import Never
 ///
 ///
-/// def func() -> Never | int:
-///     ...
+/// def func() -> Never | int: ...
 /// ```
 ///
 /// Use instead:
+///
 /// ```python
-/// def func() -> int:
-///     ...
+/// def func() -> int: ...
 /// ```
 ///
 /// ## References

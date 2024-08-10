@@ -26,17 +26,17 @@ use crate::checkers::ast::Checker;
 /// these comparison operators -- `__eq__` and `__ne__`.
 ///
 /// ## Example
+///
 /// ```python
 /// class Foo:
-///     def __eq__(self, obj: typing.Any) -> bool:
-///         ...
+///     def __eq__(self, obj: typing.Any) -> bool: ...
 /// ```
 ///
 /// Use instead:
+///
 /// ```python
 /// class Foo:
-///     def __eq__(self, obj: object) -> bool:
-///         ...
+///     def __eq__(self, obj: object) -> bool: ...
 /// ```
 /// ## References
 /// - [Python documentation: The `Any` type](https://docs.python.org/3/library/typing.html#the-any-type)

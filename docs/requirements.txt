@@ -1,5 +1,5 @@
 PyYAML==6.0.1
-black==23.10.0
+black==24.3.0
 mkdocs==1.5.0
 mkdocs-material==9.1.18
 mkdocs-redirects==1.2.1
