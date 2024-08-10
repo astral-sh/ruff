@@ -178,3 +178,19 @@ if 1:
     z = True
 else:
     z = other
+
+# SIM108 does not suggest a binary option in this
+# case, since we'd be reducing the number of calls
+# from Two to one.
+if foo():
+    z = foo()
+else:
+    z = other
+
+# SIM108 does not suggest a binary option in this
+# case, since we'd be reducing the number of calls
+# from Two to one.
+if foo():
+    z = not foo()
+else:
+    z = other

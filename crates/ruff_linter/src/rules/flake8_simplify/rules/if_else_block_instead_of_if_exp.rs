@@ -1,6 +1,7 @@
 use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::comparable::ComparableExpr;
+use ruff_python_ast::helpers::contains_effect;
 use ruff_python_ast::{self as ast, BoolOp, ElifElseClause, Expr, Stmt};
 use ruff_python_semantic::analyze::typing::{is_sys_version_block, is_type_checking_block};
 use ruff_text_size::{Ranged, TextRange};
@@ -18,12 +19,20 @@ use crate::fix::edits::fits;
 /// be expressed more concisely by using a ternary or binary operator.
 ///
 /// ## Example
+///
 /// ```python
 /// if foo:
 ///     bar = x
 /// else:
 ///     bar = y
 /// ```
+///
+/// Use instead:
+/// ```python
+/// bar = x if foo else y
+/// ```
+///
+/// Or, in [preview]:
 ///
 /// ```python
 /// if cond:
@@ -33,12 +42,8 @@ use crate::fix::edits::fits;
 /// ```
 ///
 /// Use instead:
-/// ```python
-/// bar = x if foo else y
-/// ```
 ///
 /// ```python
-/// # in preview
 /// z = cond or other_cond
 /// ```
 ///
@@ -48,8 +53,9 @@ use crate::fix::edits::fits;
 /// [preview]: https://docs.astral.sh/ruff/preview/
 #[violation]
 pub struct IfElseBlockInsteadOfIfExp {
+    /// The ternary or binary expression to replace the `if`-`else`-block.
     contents: String,
-    // Whether to use binary or ternary assignment
+    /// Whether to use a binary or ternary assignment.
     kind: AssignmentKind,
 }
 
@@ -170,19 +176,24 @@ pub(crate) fn if_else_block_instead_of_if_exp(checker: &mut Checker, stmt_if: &a
     let (contents, assignment_kind) =
         match (checker.settings.preview.is_enabled(), test, body_value) {
             (true, test_node, body_node)
-                if ComparableExpr::from(test_node) == ComparableExpr::from(body_node) =>
+                if ComparableExpr::from(test_node) == ComparableExpr::from(body_node)
+                    && !contains_effect(test_node, |id| {
+                        checker.semantic().has_builtin_binding(id)
+                    }) =>
             {
                 let target_var = &body_target;
                 let binary = assignment_binary_or(target_var, body_value, else_value);
                 (checker.generator().stmt(&binary), AssignmentKind::Binary)
             }
             (true, test_node, body_node)
-                if test_node.as_unary_op_expr().is_some_and(|op_expr| {
+                if (test_node.as_unary_op_expr().is_some_and(|op_expr| {
                     op_expr.op.is_not()
                         && ComparableExpr::from(&op_expr.operand) == ComparableExpr::from(body_node)
                 }) || body_node.as_unary_op_expr().is_some_and(|op_expr| {
                     op_expr.op.is_not()
                         && ComparableExpr::from(&op_expr.operand) == ComparableExpr::from(test_node)
+                })) && !contains_effect(test_node, |id| {
+                    checker.semantic().has_builtin_binding(id)
                 }) =>
             {
                 let target_var = &body_target;
@@ -224,6 +235,12 @@ pub(crate) fn if_else_block_instead_of_if_exp(checker: &mut Checker, stmt_if: &a
         )));
     }
     checker.diagnostics.push(diagnostic);
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum AssignmentKind {
+    Binary,
+    Ternary,
 }
 
 fn assignment_ternary(
@@ -274,10 +291,4 @@ fn assignment_binary_or(target_var: &Expr, left_value: &Expr, right_value: &Expr
         ),
     })
     .into()
-}
-
-#[derive(Clone, Debug, PartialEq, Eq)]
-enum AssignmentKind {
-    Binary,
-    Ternary,
 }
