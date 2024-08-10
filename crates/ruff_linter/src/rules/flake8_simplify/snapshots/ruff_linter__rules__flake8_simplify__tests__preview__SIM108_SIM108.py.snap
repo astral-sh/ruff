@@ -254,7 +254,7 @@ SIM108.py:177:1: SIM108 [*] Use ternary operator `z = True if 1 else other` inst
 182 179 | # SIM108 does not suggest a binary option in this
 183 180 | # case, since we'd be reducing the number of calls
 
-SIM108.py:185:1: SIM108 [*] Use binary operator `z = foo() or other` instead of `if`-`else`-block
+SIM108.py:185:1: SIM108 [*] Use ternary operator `z = foo() if foo() else other` instead of `if`-`else`-block
     |
 183 |   # case, since we'd be reducing the number of calls
 184 |   # from Two to one.
@@ -266,7 +266,7 @@ SIM108.py:185:1: SIM108 [*] Use binary operator `z = foo() or other` instead of 
 189 |   
 190 |   # SIM108 does not suggest a binary option in this
     |
-    = help: Replace `if`-`else`-block with `z = foo() or other`
+    = help: Replace `if`-`else`-block with `z = foo() if foo() else other`
 
 ℹ Unsafe fix
 182 182 | # SIM108 does not suggest a binary option in this
@@ -276,7 +276,7 @@ SIM108.py:185:1: SIM108 [*] Use binary operator `z = foo() or other` instead of 
 186     |-    z = foo()
 187     |-else:
 188     |-    z = other
-    185 |+z = foo() or other
+    185 |+z = foo() if foo() else other
 189 186 | 
 190 187 | # SIM108 does not suggest a binary option in this
 191 188 | # case, since we'd be reducing the number of calls
