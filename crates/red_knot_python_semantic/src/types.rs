@@ -91,7 +91,7 @@ pub(crate) fn definitions_ty<'db>(
     };
 
     if let Some(second) = all_types.next() {
-        let mut builder = UnionTypeBuilder::new(db);
+        let mut builder = UnionBuilder::new(db);
         builder = builder.add(first).add(second);
 
         for variant in all_types {
@@ -165,7 +165,7 @@ impl<'db> Type<'db> {
             Type::Union(union) => union
                 .elements(db)
                 .iter()
-                .fold(UnionTypeBuilder::new(db), |builder, element_ty| {
+                .fold(UnionBuilder::new(db), |builder, element_ty| {
                     builder.add(element_ty.member(db, name))
                 })
                 .build(),
@@ -262,12 +262,12 @@ impl<'db> UnionType<'db> {
     }
 }
 
-struct UnionTypeBuilder<'db> {
+struct UnionBuilder<'db> {
     elements: FxOrderSet<Type<'db>>,
     db: &'db dyn Db,
 }
 
-impl<'db> UnionTypeBuilder<'db> {
+impl<'db> UnionBuilder<'db> {
     fn new(db: &'db dyn Db) -> Self {
         Self {
             db,
@@ -293,7 +293,7 @@ impl<'db> UnionTypeBuilder<'db> {
     fn build(self) -> Type<'db> {
         match self.elements.len() {
             0 => Type::Never,
-            1 => *self.elements.last().unwrap(),
+            1 => self.elements[0],
             _ => Type::Union(UnionType::new(self.db, self.elements)),
         }
     }
@@ -315,17 +315,22 @@ pub struct IntersectionType<'db> {
 
 #[allow(unused)]
 #[derive(Clone)]
-struct IntersectionTypeBuilder<'db> {
-    intersections: Vec<InnerIntersectionTypeBuilder<'db>>,
+struct IntersectionBuilder<'db> {
+    // Really this builds a union-of-intersections, because we always keep our set-theoretic types
+    // in disjunctive normal form (DNF), a union of intersections. In the simplest case there's
+    // just a single intersection in this vector, and we are building a single intersection type,
+    // but if a union is added to the intersection, we'll distribute ourselves over that union and
+    // create a union of intersections.
+    intersections: Vec<InnerIntersectionBuilder<'db>>,
     db: &'db dyn Db,
 }
 
-impl<'db> IntersectionTypeBuilder<'db> {
+impl<'db> IntersectionBuilder<'db> {
     #[allow(dead_code)]
     fn new(db: &'db dyn Db) -> Self {
         Self {
             db,
-            intersections: vec![InnerIntersectionTypeBuilder::new()],
+            intersections: vec![InnerIntersectionBuilder::new()],
         }
     }
 
@@ -339,18 +344,25 @@ impl<'db> IntersectionTypeBuilder<'db> {
     #[allow(dead_code)]
     fn add_positive(mut self, ty: Type<'db>) -> Self {
         if let Type::Union(union) = ty {
+            // Distribute ourself over this union: for each union element, clone ourself and
+            // intersect with that union element, then create a new union-of-intersections with all
+            // of those sub-intersections in it. E.g. if `self` is a simple intersection `T1 & T2`
+            // and we add `T3 | T4` to the intersection, we don't get `T1 & T2 & (T3 | T4)` (that's
+            // not in DNF), we distribute the union and get `(T1 & T3) | (T2 & T3) | (T1 & T4) |
+            // (T2 & T4)`. If `self` is already a union-of-intersections `(T1 & T2) | (T3 & T4)`
+            // and we add `T5 | T6` to it, that flattens all the way out to `(T1 & T2 & T5) | (T1 &
+            // T2 & T6) | (T3 & T4 & T5) ...` -- you get the idea.
             union
                 .elements(self.db)
                 .iter()
                 .map(|elem| self.clone().add_positive(*elem))
-                .fold(
-                    IntersectionTypeBuilder::empty(self.db),
-                    |mut builder, sub| {
-                        builder.intersections.extend(sub.intersections);
-                        builder
-                    },
-                )
+                .fold(IntersectionBuilder::empty(self.db), |mut builder, sub| {
+                    builder.intersections.extend(sub.intersections);
+                    builder
+                })
         } else {
+            // If we are already a union-of-intersections, distribute the new intersected element
+            // across all of those intersections.
             for inner in &mut self.intersections {
                 inner.add_positive(self.db, ty);
             }
@@ -360,18 +372,16 @@ impl<'db> IntersectionTypeBuilder<'db> {
 
     #[allow(dead_code)]
     fn add_negative(mut self, ty: Type<'db>) -> Self {
+        // See comments above in `add_positive`; this is just the negated version.
         if let Type::Union(union) = ty {
             union
                 .elements(self.db)
                 .iter()
                 .map(|elem| self.clone().add_negative(*elem))
-                .fold(
-                    IntersectionTypeBuilder::empty(self.db),
-                    |mut builder, sub| {
-                        builder.intersections.extend(sub.intersections);
-                        builder
-                    },
-                )
+                .fold(IntersectionBuilder::empty(self.db), |mut builder, sub| {
+                    builder.intersections.extend(sub.intersections);
+                    builder
+                })
         } else {
             for inner in &mut self.intersections {
                 inner.add_negative(self.db, ty);
@@ -382,7 +392,7 @@ impl<'db> IntersectionTypeBuilder<'db> {
 
     #[allow(dead_code)]
     fn build(self) -> Type<'db> {
-        let mut builder = UnionTypeBuilder::new(self.db);
+        let mut builder = UnionBuilder::new(self.db);
         for inner in self.intersections {
             builder = builder.add(inner.build(self.db));
         }
@@ -391,18 +401,15 @@ impl<'db> IntersectionTypeBuilder<'db> {
 }
 
 #[allow(unused)]
-#[derive(Debug, Clone)]
-struct InnerIntersectionTypeBuilder<'db> {
+#[derive(Debug, Clone, Default)]
+struct InnerIntersectionBuilder<'db> {
     positive: FxOrderSet<Type<'db>>,
     negative: FxOrderSet<Type<'db>>,
 }
 
-impl<'db> InnerIntersectionTypeBuilder<'db> {
+impl<'db> InnerIntersectionBuilder<'db> {
     fn new() -> Self {
-        Self {
-            positive: FxOrderSet::default(),
-            negative: FxOrderSet::default(),
-        }
+        Self::default()
     }
 
     /// Adds a positive type to this intersection.
@@ -426,10 +433,11 @@ impl<'db> InnerIntersectionTypeBuilder<'db> {
 
     /// Adds a negative type to this intersection.
     fn add_negative(&mut self, db: &'db dyn Db, ty: Type<'db>) {
+        // TODO Any/Unknown actually should not self-cancel
         match ty {
-            Type::Intersection(inter) => {
-                let pos = inter.negative(db);
-                let neg = inter.positive(db);
+            Type::Intersection(intersection) => {
+                let pos = intersection.negative(db);
+                let neg = intersection.positive(db);
                 self.positive.extend(pos.difference(&self.negative));
                 self.negative.extend(neg.difference(&self.positive));
                 self.positive.retain(|elem| !neg.contains(elem));
@@ -447,12 +455,6 @@ impl<'db> InnerIntersectionTypeBuilder<'db> {
     fn simplify(&mut self) {
         // TODO this should be generalized based on subtyping, for now we just handle a few cases
 
-        // None intersects with no other type, so we can remove it from negative if there is any
-        // type in positive
-        if !self.positive.is_empty() {
-            self.negative.remove(&Type::None);
-        }
-
         // Never is a subtype of all types
         if self.positive.contains(&Type::Never) {
             self.positive.clear();
@@ -465,7 +467,7 @@ impl<'db> InnerIntersectionTypeBuilder<'db> {
         self.simplify();
         match (self.positive.len(), self.negative.len()) {
             (0, 0) => Type::Never,
-            (1, 0) => *self.positive.last().unwrap(),
+            (1, 0) => self.positive[0],
             _ => {
                 self.positive.shrink_to_fit();
                 self.negative.shrink_to_fit();
@@ -477,7 +479,7 @@ impl<'db> InnerIntersectionTypeBuilder<'db> {
 
 #[cfg(test)]
 mod tests {
-    use super::{IntersectionType, IntersectionTypeBuilder, Type, UnionType, UnionTypeBuilder};
+    use super::{IntersectionBuilder, IntersectionType, Type, UnionBuilder, UnionType};
     use crate::db::tests::TestDb;
 
     fn setup_db() -> TestDb {
@@ -495,7 +497,7 @@ mod tests {
         let db = setup_db();
         let t0 = Type::IntLiteral(0);
         let t1 = Type::IntLiteral(1);
-        let Type::Union(union) = UnionTypeBuilder::new(&db).add(t0).add(t1).build() else {
+        let Type::Union(union) = UnionBuilder::new(&db).add(t0).add(t1).build() else {
             panic!("expected a union");
         };
 
@@ -506,7 +508,7 @@ mod tests {
     fn build_union_single() {
         let db = setup_db();
         let t0 = Type::IntLiteral(0);
-        let ty = UnionTypeBuilder::new(&db).add(t0).build();
+        let ty = UnionBuilder::new(&db).add(t0).build();
 
         assert_eq!(ty, t0);
     }
@@ -514,7 +516,7 @@ mod tests {
     #[test]
     fn build_union_empty() {
         let db = setup_db();
-        let ty = UnionTypeBuilder::new(&db).build();
+        let ty = UnionBuilder::new(&db).build();
 
         assert_eq!(ty, Type::Never);
     }
@@ -523,7 +525,7 @@ mod tests {
     fn build_union_never() {
         let db = setup_db();
         let t0 = Type::IntLiteral(0);
-        let ty = UnionTypeBuilder::new(&db).add(t0).add(Type::Never).build();
+        let ty = UnionBuilder::new(&db).add(t0).add(Type::Never).build();
 
         assert_eq!(ty, t0);
     }
@@ -534,8 +536,8 @@ mod tests {
         let t0 = Type::IntLiteral(0);
         let t1 = Type::IntLiteral(1);
         let t2 = Type::IntLiteral(2);
-        let u1 = UnionTypeBuilder::new(&db).add(t0).add(t1).build();
-        let Type::Union(union) = UnionTypeBuilder::new(&db).add(u1).add(t2).build() else {
+        let u1 = UnionBuilder::new(&db).add(t0).add(t1).build();
+        let Type::Union(union) = UnionBuilder::new(&db).add(u1).add(t2).build() else {
             panic!("expected a union");
         };
 
@@ -556,30 +558,30 @@ mod tests {
     fn build_intersection() {
         let db = setup_db();
         let t0 = Type::IntLiteral(0);
-        let t1 = Type::IntLiteral(1);
-        let Type::Intersection(inter) = IntersectionTypeBuilder::new(&db)
-            .add_positive(t0)
-            .add_negative(t1)
+        let ta = Type::Any;
+        let Type::Intersection(inter) = IntersectionBuilder::new(&db)
+            .add_positive(ta)
+            .add_negative(t0)
             .build()
         else {
             panic!("expected to be an intersection");
         };
 
-        assert_eq!(inter.pos_vec(&db), &[t0]);
-        assert_eq!(inter.neg_vec(&db), &[t1]);
+        assert_eq!(inter.pos_vec(&db), &[ta]);
+        assert_eq!(inter.neg_vec(&db), &[t0]);
     }
 
     #[test]
     fn build_intersection_flatten_positive() {
         let db = setup_db();
-        let t0 = Type::IntLiteral(0);
+        let ta = Type::Any;
         let t1 = Type::IntLiteral(1);
         let t2 = Type::IntLiteral(2);
-        let i0 = IntersectionTypeBuilder::new(&db)
-            .add_positive(t0)
+        let i0 = IntersectionBuilder::new(&db)
+            .add_positive(ta)
             .add_negative(t1)
             .build();
-        let Type::Intersection(inter) = IntersectionTypeBuilder::new(&db)
+        let Type::Intersection(inter) = IntersectionBuilder::new(&db)
             .add_positive(t2)
             .add_positive(i0)
             .build()
@@ -587,21 +589,21 @@ mod tests {
             panic!("expected to be an intersection");
         };
 
-        assert_eq!(inter.pos_vec(&db), &[t2, t0]);
+        assert_eq!(inter.pos_vec(&db), &[t2, ta]);
         assert_eq!(inter.neg_vec(&db), &[t1]);
     }
 
     #[test]
     fn build_intersection_flatten_negative() {
         let db = setup_db();
-        let t0 = Type::IntLiteral(0);
+        let ta = Type::Any;
         let t1 = Type::IntLiteral(1);
         let t2 = Type::IntLiteral(2);
-        let i0 = IntersectionTypeBuilder::new(&db)
-            .add_positive(t0)
+        let i0 = IntersectionBuilder::new(&db)
+            .add_positive(ta)
             .add_negative(t1)
             .build();
-        let Type::Intersection(inter) = IntersectionTypeBuilder::new(&db)
+        let Type::Intersection(inter) = IntersectionBuilder::new(&db)
             .add_positive(t2)
             .add_negative(i0)
             .build()
@@ -610,7 +612,7 @@ mod tests {
         };
 
         assert_eq!(inter.pos_vec(&db), &[t2, t1]);
-        assert_eq!(inter.neg_vec(&db), &[t0]);
+        assert_eq!(inter.neg_vec(&db), &[ta]);
     }
 
     #[test]
@@ -618,11 +620,11 @@ mod tests {
         let db = setup_db();
         let t0 = Type::IntLiteral(0);
         let t1 = Type::IntLiteral(1);
-        let t2 = Type::IntLiteral(2);
-        let u0 = UnionTypeBuilder::new(&db).add(t0).add(t1).build();
+        let ta = Type::Any;
+        let u0 = UnionBuilder::new(&db).add(t0).add(t1).build();
 
-        let Type::Union(union) = IntersectionTypeBuilder::new(&db)
-            .add_positive(t2)
+        let Type::Union(union) = IntersectionBuilder::new(&db)
+            .add_positive(ta)
             .add_positive(u0)
             .build()
         else {
@@ -631,14 +633,14 @@ mod tests {
         let [Type::Intersection(i0), Type::Intersection(i1)] = union.elements_vec(&db)[..] else {
             panic!("expected a union of two intersections");
         };
-        assert_eq!(i0.pos_vec(&db), &[t2, t0]);
-        assert_eq!(i1.pos_vec(&db), &[t2, t1]);
+        assert_eq!(i0.pos_vec(&db), &[ta, t0]);
+        assert_eq!(i1.pos_vec(&db), &[ta, t1]);
     }
 
     #[test]
     fn build_intersection_self_negation() {
         let db = setup_db();
-        let ty = IntersectionTypeBuilder::new(&db)
+        let ty = IntersectionBuilder::new(&db)
             .add_positive(Type::None)
             .add_negative(Type::None)
             .build();
@@ -649,7 +651,7 @@ mod tests {
     #[test]
     fn build_intersection_simplify_negative_never() {
         let db = setup_db();
-        let ty = IntersectionTypeBuilder::new(&db)
+        let ty = IntersectionBuilder::new(&db)
             .add_positive(Type::None)
             .add_negative(Type::Never)
             .build();
@@ -660,7 +662,7 @@ mod tests {
     #[test]
     fn build_intersection_simplify_positive_never() {
         let db = setup_db();
-        let ty = IntersectionTypeBuilder::new(&db)
+        let ty = IntersectionBuilder::new(&db)
             .add_positive(Type::None)
             .add_positive(Type::Never)
             .build();
