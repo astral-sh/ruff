@@ -357,6 +357,7 @@ Then, add this to <code>Settings -> Configure Kate -> LSP Client -> User Server 
 ```
 
 Jedi is enabled by default so there is no need to enable it manually. For more details about the configuration options of pylsp and the other available servers, see the <a href="https://github.com/python-lsp/python-lsp-server?tab=readme-ov-file#configuration">pylsp page</a> and the <a href="https://github.com/python-lsp/python-lsp-server/blob/develop/CONFIGURATION.md">configuration.md file</a>.
+
 </details>
 
 
