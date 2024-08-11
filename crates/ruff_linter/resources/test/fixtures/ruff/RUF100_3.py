@@ -23,6 +23,9 @@ print(a)  # noqa: E501, F821 # comment
 print(a)  # noqa: E501, F821  # comment
 print(a)  # noqa: E501, F821 comment
 print(a)  # noqa: E501, F821  comment
+print(a)  # noqa: E501,,F821  comment
+print(a)  # noqa: E501, ,F821  comment
+print(a)  # noqa: E501 F821  comment
 
 print(a)  # comment with unicode µ    # noqa: E501
 print(a)  # comment with unicode µ    # noqa: E501, F821
