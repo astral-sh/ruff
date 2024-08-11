@@ -310,7 +310,55 @@ See [LSP Client documentation](https://docs.kde.org/stable5/en/kate/kate/kate-ap
 on how to configure the server from there.
 
 !!! important
-    Kate's LSP Client plugin does not support multiple servers for the same language.
+    Kate's LSP Client plugin does not support multiple servers for the same language! To use Ruff together with another server (e.g. [Jedi](https://jedi.readthedocs.io) to complete the linting with autocompletion and static analysis), please see the instructions below.
+
+<details>
+<summary>Instructions to use Ruff with others servers via pylsp.</summary>
+<br>
+
+To use Ruff with another server (here Jedi) in Kate, please install <a href="https://github.com/python-lsp/python-lsp-server?tab=readme-ov-file#installation">pylsp</a> and the <a href="https://github.com/python-lsp/python-lsp-ruff?tab=readme-ov-file#install">Ruff plugin</a>.
+
+Then, add this to <code>Settings -> Configure Kate -> LSP Client -> User Server Settings</code>:
+
+```json
+{
+  "servers": {
+    "python": {
+      "command": ["path/to/pylsp", "--check-parent-process"],
+      "highlightingModeRegex": "^Python$",
+      "settings": {
+        "pylsp": {
+          "plugins": {
+            "ruff": {
+                "enabled": true,
+                "executable": "path/to/ruff"
+            },
+            "autopep8": {
+                "enabled": false
+            },
+            "flake8": {
+                "enabled": false
+            },
+            "mccabe": {
+                "enabled": false
+            },
+            "pycodestyle": {
+                "enabled": false
+            },
+            "pyflakes": {
+                "enabled": false
+            }
+          }
+        }
+      }
+    }
+  }
+}
+```
+
+Jedi is enabled by default so there is no need to enable it manually. For more details about the configuration options of pylsp and the other available servers, see the <a href="https://github.com/python-lsp/python-lsp-server?tab=readme-ov-file#configuration">pylsp page</a> and the <a href="https://github.com/python-lsp/python-lsp-server/blob/develop/CONFIGURATION.md">configuration.md file</a>.
+</details>
+
 
 ## Sublime Text
 
