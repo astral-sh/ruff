@@ -134,6 +134,9 @@ jobs:
         with:
           tool: cargo-insta
       - uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: warm
+          save-if: ${{ github.ref_name == 'main' }}
       - name: "Run tests"
         shell: bash
         env:
@@ -165,6 +168,9 @@ jobs:
         with:
           tool: cargo-nextest
       - uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: warm-windows
+          save-if: ${{ github.ref_name == 'main' }}
       - name: "Run tests"
         shell: bash
         env:
@@ -191,6 +197,9 @@ jobs:
           cache-dependency-path: playground/package-lock.json
       - uses: jetli/wasm-pack-action@v0.4.0
       - uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: warm-wasm
+          save-if: ${{ github.ref_name == 'main' }}
       - name: "Test ruff_wasm"
         run: |
           cd crates/ruff_wasm
@@ -242,6 +251,9 @@ jobs:
         with:
           tool: cargo-insta
       - uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: warm-msrv
+          save-if: ${{ github.ref_name == 'main' }}
       - name: "Run tests"
         shell: bash
         env:
@@ -519,6 +531,9 @@ jobs:
       - name: "Install Rust toolchain"
         run: rustup show
       - uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: warm
+          save-if: ${{ github.ref_name == 'main' }}
       - name: "Install Insiders dependencies"
         if: ${{ env.MKDOCS_INSIDERS_SSH_KEY_EXISTS == 'true' }}
         run: pip install -r docs/requirements-insiders.txt
