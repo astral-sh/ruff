@@ -3,7 +3,7 @@ use std::fmt;
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::helpers::pep_604_union;
-use ruff_python_ast::{self as ast, Expr};
+use ruff_python_ast::Expr;
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
@@ -90,15 +90,15 @@ pub(crate) fn use_pep604_isinstance(
     let Some(types) = args.get(1) else {
         return;
     };
-    let Expr::Tuple(ast::ExprTuple { elts, .. }) = types else {
+    let Expr::Tuple(tuple) = types else {
         return;
     };
     // Ex) `()`
-    if elts.is_empty() {
+    if tuple.is_empty() {
         return;
     }
     // Ex) `(*args,)`
-    if elts.iter().any(Expr::is_starred_expr) {
+    if tuple.iter().any(Expr::is_starred_expr) {
         return;
     }
     let Some(builtin_function_name) = checker.semantic().resolve_builtin_symbol(func) else {
@@ -110,7 +110,7 @@ pub(crate) fn use_pep604_isinstance(
     checker.diagnostics.push(
         Diagnostic::new(NonPEP604Isinstance { kind }, expr.range()).with_fix(Fix::unsafe_edit(
             Edit::range_replacement(
-                checker.generator().expr(&pep_604_union(elts)),
+                checker.generator().expr(&pep_604_union(&tuple.elts)),
                 types.range(),
             ),
         )),

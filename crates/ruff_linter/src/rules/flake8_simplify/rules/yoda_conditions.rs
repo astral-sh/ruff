@@ -91,18 +91,18 @@ impl From<&Expr> for ConstantLikelihood {
                 ConstantLikelihood::from_identifier(attr)
             }
             Expr::Name(ast::ExprName { id, .. }) => ConstantLikelihood::from_identifier(id),
-            Expr::Tuple(ast::ExprTuple { elts, .. }) => elts
+            Expr::Tuple(tuple) => tuple
                 .iter()
                 .map(ConstantLikelihood::from)
                 .min()
                 .unwrap_or(ConstantLikelihood::Definitely),
-            Expr::List(ast::ExprList { elts, .. }) => elts
+            Expr::List(list) => list
                 .iter()
                 .map(ConstantLikelihood::from)
                 .min()
                 .unwrap_or(ConstantLikelihood::Definitely),
-            Expr::Dict(ast::ExprDict { items, .. }) => {
-                if items.is_empty() {
+            Expr::Dict(dict) => {
+                if dict.is_empty() {
                     ConstantLikelihood::Definitely
                 } else {
                     ConstantLikelihood::Probably

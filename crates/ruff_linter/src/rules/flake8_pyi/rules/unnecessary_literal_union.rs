@@ -70,19 +70,15 @@ pub(crate) fn unnecessary_literal_union<'a>(checker: &mut Checker, expr: &'a Exp
                     literal_subscript = Some(value.as_ref());
                 }
 
+                let slice = &**slice;
+
                 // flatten already-unioned literals to later union again
-                if let Expr::Tuple(ast::ExprTuple {
-                    elts,
-                    range: _,
-                    ctx: _,
-                    parenthesized: _,
-                }) = slice.as_ref()
-                {
-                    for expr in elts {
-                        literal_exprs.push(expr);
+                if let Expr::Tuple(tuple) = slice {
+                    for item in tuple {
+                        literal_exprs.push(item);
                     }
                 } else {
-                    literal_exprs.push(slice.as_ref());
+                    literal_exprs.push(slice);
                 }
             }
         } else {

@@ -198,8 +198,8 @@ fn percent_to_format(format_string: &CFormatString) -> String {
 
 /// If a tuple has one argument, remove the comma; otherwise, return it as-is.
 fn clean_params_tuple<'a>(right: &Expr, locator: &Locator<'a>) -> Cow<'a, str> {
-    if let Expr::Tuple(ast::ExprTuple { elts, .. }) = &right {
-        if elts.len() == 1 {
+    if let Expr::Tuple(tuple) = &right {
+        if tuple.len() == 1 {
             if !locator.contains_line_break(right.range()) {
                 let mut contents = locator.slice(right).to_string();
                 for (i, character) in contents.chars().rev().enumerate() {

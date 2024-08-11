@@ -416,9 +416,7 @@ fn check_names(checker: &mut Checker, decorator: &Decorator, expr: &Expr) {
         }
         Expr::Tuple(ast::ExprTuple { elts, .. }) => {
             if elts.len() == 1 {
-                if let Some(first) = elts.first() {
-                    handle_single_name(checker, expr, first);
-                }
+                handle_single_name(checker, expr, &elts[0]);
             } else {
                 match names_type {
                     types::ParametrizeNameType::Tuple => {}
@@ -462,9 +460,7 @@ fn check_names(checker: &mut Checker, decorator: &Decorator, expr: &Expr) {
         }
         Expr::List(ast::ExprList { elts, .. }) => {
             if elts.len() == 1 {
-                if let Some(first) = elts.first() {
-                    handle_single_name(checker, expr, first);
-                }
+                handle_single_name(checker, expr, &elts[0]);
             } else {
                 match names_type {
                     types::ParametrizeNameType::List => {}

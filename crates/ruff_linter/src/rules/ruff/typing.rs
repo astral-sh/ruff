@@ -23,7 +23,7 @@ fn is_known_type(qualified_name: &QualifiedName, minor_version: u8) -> bool {
 /// tuple, the iterator will only yield the slice.
 fn resolve_slice_value(slice: &Expr) -> impl Iterator<Item = &Expr> {
     match slice {
-        Expr::Tuple(ast::ExprTuple { elts: elements, .. }) => Left(elements.iter()),
+        Expr::Tuple(tuple) => Left(tuple.iter()),
         _ => Right(std::iter::once(slice)),
     }
 }
