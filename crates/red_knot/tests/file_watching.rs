@@ -4,7 +4,6 @@ use std::io::Write;
 use std::time::Duration;
 
 use anyhow::{anyhow, Context};
-use salsa::Setter;
 
 use red_knot_python_semantic::{
     resolve_module, ModuleName, Program, ProgramSettings, PythonVersion, SearchPathSettings,
@@ -26,6 +25,7 @@ struct TestCase {
     /// We need to hold on to it in the test case or the temp files get deleted.
     _temp_dir: tempfile::TempDir,
     root_dir: SystemPathBuf,
+    search_path_settings: SearchPathSettings,
 }
 
 impl TestCase {
@@ -108,18 +108,20 @@ impl TestCase {
     fn update_search_path_settings(
         &mut self,
         f: impl FnOnce(&SearchPathSettings) -> SearchPathSettings,
-    ) {
+    ) -> anyhow::Result<()> {
         let program = Program::get(self.db());
-        let search_path_settings = program.search_paths(self.db());
 
-        let new_settings = f(search_path_settings);
+        let new_settings = f(&self.search_path_settings);
 
-        program.set_search_paths(&mut self.db).to(new_settings);
+        program.update_search_paths(&mut self.db, new_settings.clone())?;
+        self.search_path_settings = new_settings;
 
         if let Some(watcher) = &mut self.watcher {
             watcher.update(&self.db);
             assert!(!watcher.has_errored_paths());
         }
+
+        Ok(())
     }
 
     fn collect_package_files(&self, path: &SystemPath) -> Vec<File> {
@@ -221,13 +223,13 @@ where
     let system = OsSystem::new(&workspace_path);
 
     let workspace = WorkspaceMetadata::from_path(&workspace_path, &system)?;
-    let search_paths = create_search_paths(&root_path, workspace.root());
+    let search_path_settings = create_search_paths(&root_path, workspace.root());
 
-    for path in search_paths
+    for path in search_path_settings
         .extra_paths
         .iter()
-        .chain(search_paths.site_packages.iter())
-        .chain(search_paths.custom_typeshed.iter())
+        .chain(search_path_settings.site_packages.iter())
+        .chain(search_path_settings.custom_typeshed.iter())
     {
         std::fs::create_dir_all(path.as_std_path())
             .with_context(|| format!("Failed to create search path '{path}'"))?;
@@ -235,10 +237,10 @@ where
 
     let settings = ProgramSettings {
         target_version: PythonVersion::default(),
-        search_paths,
+        search_paths: search_path_settings.clone(),
     };
 
-    let db = RootDatabase::new(workspace, settings, system);
+    let db = RootDatabase::new(workspace, settings, system)?;
 
     let (sender, receiver) = crossbeam::channel::unbounded();
     let watcher = directory_watcher(move |events| sender.send(events).unwrap())
@@ -253,6 +255,7 @@ where
         watcher: Some(watcher),
         _temp_dir: temp_dir,
         root_dir: root_path,
+        search_path_settings,
     };
 
     // Sometimes the file watcher reports changes for events that happened before the watcher was started.
@@ -737,7 +740,8 @@ fn add_search_path() -> anyhow::Result<()> {
     case.update_search_path_settings(|settings| SearchPathSettings {
         site_packages: vec![site_packages.clone()],
         ..settings.clone()
-    });
+    })
+    .expect("Search path settings to be valid");
 
     std::fs::write(site_packages.join("a.py").as_std_path(), "class A: ...")?;
 
@@ -767,7 +771,8 @@ fn remove_search_path() -> anyhow::Result<()> {
     case.update_search_path_settings(|settings| SearchPathSettings {
         site_packages: vec![],
         ..settings.clone()
-    });
+    })
+    .expect("Search path settings to be valid");
 
     std::fs::write(site_packages.join("a.py").as_std_path(), "class A: ...")?;
 

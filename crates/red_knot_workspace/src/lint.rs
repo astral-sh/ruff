@@ -305,7 +305,7 @@ enum AnyImportRef<'a> {
 
 #[cfg(test)]
 mod tests {
-    use red_knot_python_semantic::{Program, PythonVersion, SearchPathSettings};
+    use red_knot_python_semantic::{Program, ProgramSettings, PythonVersion, SearchPathSettings};
     use ruff_db::files::system_path_to_file;
     use ruff_db::system::{DbWithTestSystem, SystemPathBuf};
 
@@ -320,16 +320,23 @@ mod tests {
     fn setup_db_with_root(src_root: SystemPathBuf) -> TestDb {
         let db = TestDb::new();
 
-        Program::new(
+        db.memory_file_system()
+            .create_directory_all(&src_root)
+            .unwrap();
+
+        Program::from_settings(
             &db,
-            PythonVersion::default(),
-            SearchPathSettings {
-                extra_paths: Vec::new(),
-                src_root,
-                site_packages: vec![],
-                custom_typeshed: None,
+            ProgramSettings {
+                target_version: PythonVersion::default(),
+                search_paths: SearchPathSettings {
+                    extra_paths: Vec::new(),
+                    src_root,
+                    site_packages: vec![],
+                    custom_typeshed: None,
+                },
             },
-        );
+        )
+        .expect("Valid program settings");
 
         db
     }

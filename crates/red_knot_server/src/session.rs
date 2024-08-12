@@ -78,7 +78,8 @@ impl Session {
                     custom_typeshed: None,
                 },
             };
-            workspaces.insert(path, RootDatabase::new(metadata, program_settings, system));
+            // TODO(micha): Handle the case where the program settings are incorrect more gracefully.
+            workspaces.insert(path, RootDatabase::new(metadata, program_settings, system)?);
         }
 
         Ok(Self {
