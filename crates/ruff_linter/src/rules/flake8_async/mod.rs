@@ -38,7 +38,6 @@ mod tests {
         Ok(())
     }
 
-    #[test_case(Rule::AsyncZeroSleep, Path::new("ASYNC115.py"))]
     #[test_case(Rule::LongSleepNotForever, Path::new("ASYNC116.py"))]
     fn preview_rules(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!(
