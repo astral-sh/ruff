@@ -471,13 +471,77 @@ impl From<StmtImport> for Stmt {
     }
 }
 
-/// See also [ImportFrom](https://docs.python.org/3/library/ast.html#ast.ImportFrom)
 #[derive(Clone, Debug, PartialEq)]
-pub struct StmtImportFrom {
+pub struct StmtImportFromStar {
+    pub range: TextRange,
+    pub module: Option<Identifier>,
+    pub level: u32,
+}
+
+impl Ranged for StmtImportFromStar {
+    fn range(&self) -> TextRange {
+        self.range
+    }
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct StmtImportFromMemberList {
     pub range: TextRange,
     pub module: Option<Identifier>,
     pub names: Vec<Alias>,
     pub level: u32,
+}
+
+impl Ranged for StmtImportFromMemberList {
+    fn range(&self) -> TextRange {
+        self.range
+    }
+}
+
+/// See also [ImportFrom](https://docs.python.org/3/library/ast.html#ast.ImportFrom)
+#[derive(Clone, Debug, PartialEq)]
+pub enum StmtImportFrom {
+    Star(StmtImportFromStar),
+    MemberList(StmtImportFromMemberList),
+}
+
+impl StmtImportFrom {
+    pub fn module(&self) -> Option<&Identifier> {
+        match self {
+            Self::Star(import) => import.module.as_ref(),
+            Self::MemberList(import) => import.module.as_ref(),
+        }
+    }
+
+    pub fn level(&self) -> u32 {
+        match self {
+            Self::Star(import) => import.level,
+            Self::MemberList(import) => import.level,
+        }
+    }
+
+    pub fn names(&self) -> Option<&Vec<Alias>> {
+        match self {
+            Self::Star(_) => None,
+            Self::MemberList(import) => Some(&import.names),
+        }
+    }
+
+    pub fn names_mut(&mut self) -> Option<&mut Vec<Alias>> {
+        match self {
+            Self::Star(_) => None,
+            Self::MemberList(import) => Some(&mut import.names),
+        }
+    }
+}
+
+impl Ranged for StmtImportFrom {
+    fn range(&self) -> TextRange {
+        match self {
+            Self::Star(import) => import.range(),
+            Self::MemberList(import) => import.range(),
+        }
+    }
 }
 
 impl From<StmtImportFrom> for Stmt {
@@ -4053,11 +4117,6 @@ impl Ranged for crate::nodes::StmtAssert {
     }
 }
 impl Ranged for crate::nodes::StmtImport {
-    fn range(&self) -> TextRange {
-        self.range
-    }
-}
-impl Ranged for crate::nodes::StmtImportFrom {
     fn range(&self) -> TextRange {
         self.range
     }

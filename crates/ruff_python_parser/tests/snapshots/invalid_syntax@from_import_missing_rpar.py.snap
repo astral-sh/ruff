@@ -10,34 +10,36 @@ Module(
         range: 0..53,
         body: [
             ImportFrom(
-                StmtImportFrom {
-                    range: 0..19,
-                    module: Some(
-                        Identifier {
-                            id: Name("x"),
-                            range: 5..6,
-                        },
-                    ),
-                    names: [
-                        Alias {
-                            range: 15..16,
-                            name: Identifier {
-                                id: Name("a"),
+                MemberList(
+                    StmtImportFromMemberList {
+                        range: 0..19,
+                        module: Some(
+                            Identifier {
+                                id: Name("x"),
+                                range: 5..6,
+                            },
+                        ),
+                        names: [
+                            Alias {
                                 range: 15..16,
+                                name: Identifier {
+                                    id: Name("a"),
+                                    range: 15..16,
+                                },
+                                asname: None,
                             },
-                            asname: None,
-                        },
-                        Alias {
-                            range: 18..19,
-                            name: Identifier {
-                                id: Name("b"),
+                            Alias {
                                 range: 18..19,
+                                name: Identifier {
+                                    id: Name("b"),
+                                    range: 18..19,
+                                },
+                                asname: None,
                             },
-                            asname: None,
-                        },
-                    ],
-                    level: 0,
-                },
+                        ],
+                        level: 0,
+                    },
+                ),
             ),
             Expr(
                 StmtExpr {
@@ -67,34 +69,36 @@ Module(
                 },
             ),
             ImportFrom(
-                StmtImportFrom {
-                    range: 26..46,
-                    module: Some(
-                        Identifier {
-                            id: Name("x"),
-                            range: 31..32,
-                        },
-                    ),
-                    names: [
-                        Alias {
-                            range: 41..42,
-                            name: Identifier {
-                                id: Name("a"),
+                MemberList(
+                    StmtImportFromMemberList {
+                        range: 26..46,
+                        module: Some(
+                            Identifier {
+                                id: Name("x"),
+                                range: 31..32,
+                            },
+                        ),
+                        names: [
+                            Alias {
                                 range: 41..42,
+                                name: Identifier {
+                                    id: Name("a"),
+                                    range: 41..42,
+                                },
+                                asname: None,
                             },
-                            asname: None,
-                        },
-                        Alias {
-                            range: 44..45,
-                            name: Identifier {
-                                id: Name("b"),
+                            Alias {
                                 range: 44..45,
+                                name: Identifier {
+                                    id: Name("b"),
+                                    range: 44..45,
+                                },
+                                asname: None,
                             },
-                            asname: None,
-                        },
-                    ],
-                    level: 0,
-                },
+                        ],
+                        level: 0,
+                    },
+                ),
             ),
             Expr(
                 StmtExpr {
