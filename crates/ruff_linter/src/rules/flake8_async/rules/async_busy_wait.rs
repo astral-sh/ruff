@@ -5,7 +5,6 @@ use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
 use crate::rules::flake8_async::helpers::AsyncModule;
-use crate::settings::types::PreviewMode;
 
 /// ## What it does
 /// Checks for the use of an async sleep function in a `while` loop.
@@ -71,26 +70,15 @@ pub(crate) fn async_busy_wait(checker: &mut Checker, while_stmt: &ast::StmtWhile
         return;
     };
 
-    if matches!(checker.settings.preview, PreviewMode::Disabled) {
-        if matches!(qualified_name.segments(), ["trio", "sleep" | "sleep_until"]) {
-            checker.diagnostics.push(Diagnostic::new(
-                AsyncBusyWait {
-                    module: AsyncModule::Trio,
-                },
-                while_stmt.range(),
-            ));
-        }
-    } else {
-        if matches!(
-            qualified_name.segments(),
-            ["trio" | "anyio", "sleep" | "sleep_until"] | ["asyncio", "sleep"]
-        ) {
-            checker.diagnostics.push(Diagnostic::new(
-                AsyncBusyWait {
-                    module: AsyncModule::try_from(&qualified_name).unwrap(),
-                },
-                while_stmt.range(),
-            ));
-        }
+    if matches!(
+        qualified_name.segments(),
+        ["trio" | "anyio", "sleep" | "sleep_until"] | ["asyncio", "sleep"]
+    ) {
+        checker.diagnostics.push(Diagnostic::new(
+            AsyncBusyWait {
+                module: AsyncModule::try_from(&qualified_name).unwrap(),
+            },
+            while_stmt.range(),
+        ));
     }
 }

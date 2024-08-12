@@ -6,7 +6,6 @@ use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
 use crate::rules::flake8_async::helpers::AsyncModule;
-use crate::settings::types::PreviewMode;
 
 /// ## What it does
 /// Checks for `async` functions with a `timeout` argument.
@@ -87,17 +86,8 @@ pub(crate) fn async_function_with_timeout(
         AsyncModule::AsyncIo
     };
 
-    if matches!(checker.settings.preview, PreviewMode::Disabled) {
-        if matches!(module, AsyncModule::Trio) {
-            checker.diagnostics.push(Diagnostic::new(
-                AsyncFunctionWithTimeout { module },
-                timeout.range(),
-            ));
-        }
-    } else {
-        checker.diagnostics.push(Diagnostic::new(
-            AsyncFunctionWithTimeout { module },
-            timeout.range(),
-        ));
-    }
+    checker.diagnostics.push(Diagnostic::new(
+        AsyncFunctionWithTimeout { module },
+        timeout.range(),
+    ));
 }
