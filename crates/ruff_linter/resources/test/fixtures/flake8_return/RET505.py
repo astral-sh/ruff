@@ -244,3 +244,11 @@ def f():
 	 return True
 	else:
 	 return False
+
+
+def has_untracted_files():
+    if b'Untracked files' in result.stdout:
+        return True
+    else:
+\
+        return False
