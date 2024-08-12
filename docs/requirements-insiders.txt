@@ -5,4 +5,4 @@ mkdocs-material @ git+ssh://git@github.com/astral-sh/mkdocs-material-insiders.gi
 mkdocs-redirects==1.2.1
 mdformat==0.7.17
 mdformat-mkdocs==2.0.4
-mdformat-admon==2.0.2
+mdformat-admon==2.0.6
