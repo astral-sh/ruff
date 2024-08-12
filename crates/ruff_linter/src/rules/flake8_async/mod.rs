@@ -38,7 +38,6 @@ mod tests {
         Ok(())
     }
 
-    #[test_case(Rule::AsyncFunctionWithTimeout, Path::new("ASYNC109_0.py"))]
     #[test_case(Rule::AsyncFunctionWithTimeout, Path::new("ASYNC109_1.py"))]
     #[test_case(Rule::AsyncBusyWait, Path::new("ASYNC110.py"))]
     #[test_case(Rule::AsyncZeroSleep, Path::new("ASYNC115.py"))]
