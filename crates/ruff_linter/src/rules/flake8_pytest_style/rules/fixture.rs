@@ -232,7 +232,8 @@ impl Violation for PytestMissingFixtureNameUnderscore {
 }
 
 /// ## Deprecation
-/// Marking fixtures that do not return a value with an underscore isn't a practice recommended by the pytest community.
+/// Marking fixtures that do not return a value with an underscore
+/// isn't a practice recommended by the pytest community.
 ///
 /// ## What it does
 /// Checks for `pytest` fixtures that return a value, but are named with a
