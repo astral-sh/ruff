@@ -32,7 +32,9 @@ use super::helpers::{
 /// optional.
 ///
 /// Either removing those unnecessary parentheses _or_ requiring them for all
-/// fixtures is fine, but it's best to be consistent.
+/// fixtures is fine, but it's best to be consistent. The rule defaults to
+/// removing unnecessary parentheses, to match the documentation of the
+/// official pytest projects.
 ///
 /// ## Example
 ///
