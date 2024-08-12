@@ -22,7 +22,7 @@ rich==13.7.1
     #   rich-argparse
 rich-argparse==1.5.2
     # via -r scripts/fuzz-parser/requirements.in
-ruff==0.5.0
+ruff==0.5.7
     # via -r scripts/fuzz-parser/requirements.in
 six==1.16.0
     # via
