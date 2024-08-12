@@ -16,7 +16,7 @@ use crate::checkers::ast::Checker;
 ///
 /// ## Why is this bad?
 /// There is no reason to use a list comprehension if the result is immediately
-/// unpacked. unpacked. Instead, use a generator expression, which avoids allocating
+/// unpacked. Instead, use a generator expression, which avoids allocating
 /// an intermediary list.
 ///
 /// ## Example
