@@ -292,13 +292,14 @@ When Ruff sees an import like `import foo`, it will then iterate over the `src` 
 looking for a corresponding Python module (in reality, a directory named `foo` or a file named
 `foo.py`).
 
-If the `src` field is omitted, Ruff will default to using the "project root" as the only
-first-party source. The "project root" is typically the directory containing your `pyproject.toml`,
-`ruff.toml`, or `.ruff.toml` file, unless a configuration file is provided on the command-line via
-the `--config` option, in which case, the current working directory is used as the project root.
+If the `src` field is omitted, Ruff will default to using the "project root", along with a `"src"`
+subdirectory, as the first-party sources, to support both flat and nested project layouts.
+The "project root" is typically the directory containing your `pyproject.toml`, `ruff.toml`, or
+`.ruff.toml` file, unless a configuration file is provided on the command-line via the `--config`
+option, in which case, the current working directory is used as the project root.
 
-In this case, Ruff would only check the top-level directory. Instead, we can configure Ruff to
-consider `src` as a first-party source like so:
+In this case, Ruff would check the `"src"` directory by default, but we can configure it as an
+explicit, exclusive first-party source like so:
 
 === "pyproject.toml"
 

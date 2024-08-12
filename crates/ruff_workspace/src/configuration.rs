@@ -271,7 +271,6 @@ impl Configuration {
                         .chain(lint.extend_per_file_ignores)
                         .collect(),
                 )?,
-
                 fix_safety: FixSafetyTable::from_rule_selectors(
                     &lint.extend_safe_fixes,
                     &lint.extend_unsafe_fixes,
@@ -280,8 +279,9 @@ impl Configuration {
                         require_explicit: false,
                     },
                 ),
-
-                src: self.src.unwrap_or_else(|| vec![project_root.to_path_buf()]),
+                src: self
+                    .src
+                    .unwrap_or_else(|| vec![project_root.to_path_buf(), project_root.join("src")]),
                 explicit_preview_rules: lint.explicit_preview_rules.unwrap_or_default(),
 
                 task_tags: lint
