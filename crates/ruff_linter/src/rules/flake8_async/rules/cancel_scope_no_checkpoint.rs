@@ -5,8 +5,7 @@ use ruff_python_ast::visitor::Visitor;
 use ruff_python_ast::{StmtWith, WithItem};
 
 use crate::checkers::ast::Checker;
-use crate::rules::flake8_async::helpers::{AsyncModule, MethodName};
-use crate::settings::types::PreviewMode;
+use crate::rules::flake8_async::helpers::MethodName;
 
 /// ## What it does
 /// Checks for timeout context managers which do not contain a checkpoint.
@@ -88,17 +87,8 @@ pub(crate) fn cancel_scope_no_checkpoint(
         return;
     }
 
-    if matches!(checker.settings.preview, PreviewMode::Disabled) {
-        if matches!(method_name.module(), AsyncModule::Trio) {
-            checker.diagnostics.push(Diagnostic::new(
-                CancelScopeNoCheckpoint { method_name },
-                with_stmt.range,
-            ));
-        }
-    } else {
-        checker.diagnostics.push(Diagnostic::new(
-            CancelScopeNoCheckpoint { method_name },
-            with_stmt.range,
-        ));
-    }
+    checker.diagnostics.push(Diagnostic::new(
+        CancelScopeNoCheckpoint { method_name },
+        with_stmt.range,
+    ));
 }
