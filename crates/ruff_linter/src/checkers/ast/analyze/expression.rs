@@ -1498,7 +1498,9 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
             }
 
             if checker.enabled(Rule::UnnecessaryDictComprehensionForIterable) {
-                ruff::rules::unnecessary_dict_comprehension_for_iterable(checker, dict_comp);
+                flake8_comprehensions::rules::unnecessary_dict_comprehension_for_iterable(
+                    checker, dict_comp,
+                );
             }
 
             if checker.enabled(Rule::FunctionUsesLoopVariable) {
