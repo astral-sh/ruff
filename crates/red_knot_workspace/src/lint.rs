@@ -412,8 +412,8 @@ mod tests {
         assert_eq!(
             *messages,
             vec![
-                "Name 'flag' used when not defined.",
-                "Name 'y' used when possibly not defined."
+                "/src/a.py:3:4: Name 'flag' used when not defined.",
+                "/src/a.py:5:1: Name 'y' used when possibly not defined."
             ]
         );
     }
