@@ -15,37 +15,29 @@ pub struct FormatStmtImportFrom;
 
 impl FormatNodeRule<StmtImportFrom> for FormatStmtImportFrom {
     fn fmt_fields(&self, item: &StmtImportFrom, f: &mut PyFormatter) -> FormatResult<()> {
-        let StmtImportFrom {
-            module,
-            names,
-            level,
-            range: _,
-        } = item;
-
         write!(
             f,
             [
                 token("from"),
                 space(),
                 format_with(|f| {
-                    for _ in 0..*level {
+                    for _ in 0..item.level() {
                         token(".").fmt(f)?;
                     }
                     Ok(())
                 }),
-                module.as_ref().map(DotDelimitedIdentifier::new),
+                item.module().map(DotDelimitedIdentifier::new),
                 space(),
                 token("import"),
                 space(),
             ]
         )?;
 
-        if let [name] = names.as_slice() {
+        let names = match item {
             // star can't be surrounded by parentheses
-            if name.name.as_str() == "*" {
-                return token("*").fmt(f);
-            }
-        }
+            StmtImportFrom::Star(_) => return token("*").fmt(f),
+            StmtImportFrom::MemberList(import_from) => &import_from.names,
+        };
 
         let names = format_with(|f| {
             f.join_comma_separated(item.end())
