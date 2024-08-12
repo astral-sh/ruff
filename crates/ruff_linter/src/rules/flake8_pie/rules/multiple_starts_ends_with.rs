@@ -163,8 +163,8 @@ pub(crate) fn multiple_starts_ends_with(checker: &mut Checker, expr: &Expr) {
                 elts: words
                     .iter()
                     .flat_map(|value| {
-                        if let Expr::Tuple(ast::ExprTuple { elts, .. }) = value {
-                            Left(elts.iter())
+                        if let Expr::Tuple(tuple) = value {
+                            Left(tuple.iter())
                         } else {
                             Right(iter::once(*value))
                         }

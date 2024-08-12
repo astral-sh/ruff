@@ -613,7 +613,7 @@ impl<'a> Visitor<'a> for BodyVisitor<'a> {
                     };
 
                     if let ast::Expr::Tuple(tuple) = exceptions {
-                        for exception in &tuple.elts {
+                        for exception in tuple {
                             maybe_store_exception(exception);
                         }
                     } else {

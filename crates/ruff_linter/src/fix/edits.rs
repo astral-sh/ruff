@@ -151,16 +151,15 @@ pub(crate) fn add_to_dunder_all<'a>(
     stylist: &Stylist,
 ) -> Vec<Edit> {
     let (insertion_point, export_prefix_length) = match expr {
-        Expr::List(ExprList { elts, range, .. }) => (
-            elts.last()
-                .map_or(range.end() - "]".text_len(), Ranged::end),
+        Expr::List(ExprList { elts, .. }) => (
+            elts.last().map_or(expr.end() - "]".text_len(), Ranged::end),
             elts.len(),
         ),
         Expr::Tuple(tup) if tup.parenthesized => (
             tup.elts
                 .last()
                 .map_or(tup.end() - ")".text_len(), Ranged::end),
-            tup.elts.len(),
+            tup.len(),
         ),
         Expr::Tuple(tup) if !tup.parenthesized => (
             tup.elts
@@ -168,7 +167,7 @@ pub(crate) fn add_to_dunder_all<'a>(
                 .expect("unparenthesized empty tuple is not possible")
                 .range()
                 .end(),
-            tup.elts.len(),
+            tup.len(),
         ),
         _ => {
             // we don't know how to insert into this expression

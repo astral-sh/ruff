@@ -1432,9 +1432,7 @@ impl<'a> SemanticModel<'a> {
     /// variable to be "used" if it's shadowed by another variable with usages.
     pub fn is_unused(&self, expr: &Expr) -> bool {
         match expr {
-            Expr::Tuple(ast::ExprTuple { elts, .. }) => {
-                elts.iter().all(|expr| self.is_unused(expr))
-            }
+            Expr::Tuple(tuple) => tuple.iter().all(|expr| self.is_unused(expr)),
             Expr::Name(ast::ExprName { id, .. }) => {
                 // Treat a variable as used if it has any usages, _or_ it's shadowed by another variable
                 // with usages.
