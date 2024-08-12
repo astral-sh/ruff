@@ -208,8 +208,9 @@ impl SearchPaths {
         // (Paths may, however, *overlap* -- e.g. you could have both `src/` and `src/foo`
         // as module resolution paths simultaneously.)
         //
-        // [`sys.path` at runtime]: https://docs.python.org/3/library/site.html#module-site
         // This code doesn't use an `IndexSet` because the key is the system path and not the search root.
+        //
+        // [`sys.path` at runtime]: https://docs.python.org/3/library/site.html#module-site
         let mut seen_paths = FxHashSet::with_capacity_and_hasher(static_paths.len(), FxBuildHasher);
 
         static_paths.retain(|path| {
