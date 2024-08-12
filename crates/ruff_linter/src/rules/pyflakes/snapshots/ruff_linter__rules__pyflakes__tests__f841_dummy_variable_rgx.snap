@@ -60,6 +60,44 @@ F841_0.py:21:9: F841 Local variable `b` is assigned to but never used
    |
    = help: Remove assignment to unused variable `b`
 
+F841_0.py:24:6: F841 Local variable `c` is assigned to but never used
+   |
+23 |     bar = (1, 2)
+24 |     (c, d) = bar
+   |      ^ F841
+25 | 
+26 |     (x, y) = baz = bar
+   |
+   = help: Remove assignment to unused variable `c`
+
+F841_0.py:24:9: F841 Local variable `d` is assigned to but never used
+   |
+23 |     bar = (1, 2)
+24 |     (c, d) = bar
+   |         ^ F841
+25 | 
+26 |     (x, y) = baz = bar
+   |
+   = help: Remove assignment to unused variable `d`
+
+F841_0.py:26:6: F841 Local variable `x` is assigned to but never used
+   |
+24 |     (c, d) = bar
+25 | 
+26 |     (x, y) = baz = bar
+   |      ^ F841
+   |
+   = help: Remove assignment to unused variable `x`
+
+F841_0.py:26:9: F841 Local variable `y` is assigned to but never used
+   |
+24 |     (c, d) = bar
+25 | 
+26 |     (x, y) = baz = bar
+   |         ^ F841
+   |
+   = help: Remove assignment to unused variable `y`
+
 F841_0.py:26:14: F841 [*] Local variable `baz` is assigned to but never used
    |
 24 |     (c, d) = bar
@@ -156,6 +194,26 @@ F841_0.py:51:9: F841 [*] Local variable `b` is assigned to but never used
 53 53 |     def d():
 54 54 |         nonlocal b
 
+F841_0.py:66:24: F841 Local variable `connection` is assigned to but never used
+   |
+64 |         return None, None
+65 | 
+66 |     with connect() as (connection, cursor):
+   |                        ^^^^^^^^^^ F841
+67 |         cursor.execute("SELECT * FROM users")
+   |
+   = help: Remove assignment to unused variable `connection`
+
+F841_0.py:74:24: F841 Local variable `connection` is assigned to but never used
+   |
+72 |         return None, None
+73 | 
+74 |     with connect() as (connection, cursor):
+   |                        ^^^^^^^^^^ F841
+75 |         cursor.execute("SELECT * FROM users")
+   |
+   = help: Remove assignment to unused variable `connection`
+
 F841_0.py:79:26: F841 [*] Local variable `my_file` is assigned to but never used
    |
 78 | def f():
@@ -174,6 +232,24 @@ F841_0.py:79:26: F841 [*] Local variable `my_file` is assigned to but never used
 80 80 |         print("hello")
 81 81 | 
 82 82 | 
+
+F841_0.py:79:49: F841 Local variable `this` is assigned to but never used
+   |
+78 | def f():
+79 |     with open("file") as my_file, open("") as ((this, that)):
+   |                                                 ^^^^ F841
+80 |         print("hello")
+   |
+   = help: Remove assignment to unused variable `this`
+
+F841_0.py:79:55: F841 Local variable `that` is assigned to but never used
+   |
+78 | def f():
+79 |     with open("file") as my_file, open("") as ((this, that)):
+   |                                                       ^^^^ F841
+80 |         print("hello")
+   |
+   = help: Remove assignment to unused variable `that`
 
 F841_0.py:85:25: F841 [*] Local variable `my_file` is assigned to but never used
    |
@@ -195,6 +271,28 @@ F841_0.py:85:25: F841 [*] Local variable `my_file` is assigned to but never used
 86 86 |         open("") as ((this, that)),
 87 87 |     ):
 88 88 |         print("hello")
+
+F841_0.py:86:23: F841 Local variable `this` is assigned to but never used
+   |
+84 |     with (
+85 |         open("file") as my_file,
+86 |         open("") as ((this, that)),
+   |                       ^^^^ F841
+87 |     ):
+88 |         print("hello")
+   |
+   = help: Remove assignment to unused variable `this`
+
+F841_0.py:86:29: F841 Local variable `that` is assigned to but never used
+   |
+84 |     with (
+85 |         open("file") as my_file,
+86 |         open("") as ((this, that)),
+   |                             ^^^^ F841
+87 |     ):
+88 |         print("hello")
+   |
+   = help: Remove assignment to unused variable `that`
 
 F841_0.py:102:5: F841 [*] Local variable `msg3` is assigned to but never used
     |
@@ -273,5 +371,3 @@ F841_0.py:152:25: F841 [*] Local variable `_` is assigned to but never used
 152     |-    except Exception as _:
     152 |+    except Exception:
 153 153 |         pass
-
-

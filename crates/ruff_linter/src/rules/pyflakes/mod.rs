@@ -208,7 +208,6 @@ mod tests {
         Ok(())
     }
 
-    #[test_case(Rule::UnusedVariable, Path::new("F841_4.py"))]
     #[test_case(Rule::UnusedImport, Path::new("__init__.py"))]
     #[test_case(Rule::UnusedImport, Path::new("F401_24/__init__.py"))]
     #[test_case(Rule::UnusedImport, Path::new("F401_25__all_nonempty/__init__.py"))]
@@ -1280,33 +1279,6 @@ mod tests {
             r"
         a, *b, c = range(10)
         print(a, b, c)
-        ",
-            &[],
-        );
-    }
-
-    #[test]
-    fn used_as_star_unpack() {
-        // In stable, starred names in unpack are used if RHS is not a tuple/list literal.
-        // In preview, these should be marked as unused.
-        flakes(
-            r"
-        def f():
-            a, *b = range(10)
-        ",
-            &[],
-        );
-        flakes(
-            r"
-        def f():
-            (*a, b) = range(10)
-        ",
-            &[],
-        );
-        flakes(
-            r"
-        def f():
-            [a, *b, c] = range(10)
         ",
             &[],
         );

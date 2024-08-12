@@ -261,7 +261,6 @@ pub(crate) fn unused_variable(checker: &Checker, scope: &Scope, diagnostics: &mu
             if (binding.kind.is_assignment()
                 || binding.kind.is_named_expr_assignment()
                 || binding.kind.is_with_item_var())
-                && (!binding.is_unpacked_assignment() || checker.settings.preview.is_enabled())
                 && binding.is_unused()
                 && !binding.is_nonlocal()
                 && !binding.is_global()

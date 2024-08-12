@@ -130,11 +130,21 @@ impl PythonVersion {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, CacheKey, is_macro::Is)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, CacheKey)]
 pub enum PreviewMode {
     #[default]
     Disabled,
     Enabled,
+}
+
+impl PreviewMode {
+    pub const fn is_enabled(self) -> bool {
+        matches!(self, PreviewMode::Enabled)
+    }
+
+    pub const fn is_disabled(self) -> bool {
+        matches!(self, PreviewMode::Disabled)
+    }
 }
 
 impl From<bool> for PreviewMode {
