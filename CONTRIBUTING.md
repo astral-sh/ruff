@@ -54,28 +54,28 @@ Ruff is written in Rust. You'll need to install the
 
 You'll also need [Insta](https://insta.rs/docs/) to update snapshot tests:
 
-```console
-$ cargo install cargo-insta
+```shell
+cargo install cargo-insta
 ```
 
 And you'll need pre-commit to run some validation checks:
 
-```console
-$ pipx install pre-commit  # or `pip install pre-commit` if you have a virtualenv
+```shell
+pipx install pre-commit  # or `pip install pre-commit` if you have a virtualenv
 ```
 
 You can optionally install pre-commit hooks to automatically run the validation checks
 when making a commit:
 
-```console
-$ pre-commit install
+```shell
+pre-commit install
 ```
 
 We recommend [nextest](https://nexte.st/) to run Ruff's test suite (via `cargo nextest run`),
 though it's not strictly necessary:
 
-```console
-$ cargo install cargo-nextest --locked
+```shell
+cargo install cargo-nextest --locked
 ```
 
 Throughout this guide, any usages of `cargo test` can be replaced with `cargo nextest run`,
@@ -85,17 +85,17 @@ if you choose to install `nextest`.
 
 After cloning the repository, run Ruff locally from the repository root with:
 
-```console
-$ cargo run -p ruff -- check /path/to/file.py --no-cache
+```shell
+cargo run -p ruff -- check /path/to/file.py --no-cache
 ```
 
 Prior to opening a pull request, ensure that your code has been auto-formatted,
 and that it passes both the lint and test validation checks:
 
-```console
-$ cargo clippy --workspace --all-targets --all-features -- -D warnings  # Rust linting
-$ RUFF_UPDATE_SCHEMA=1 cargo test  # Rust testing and updating ruff.schema.json
-$ pre-commit run --all-files --show-diff-on-failure  # Rust and Python formatting, Markdown and Python linting, etc.
+```shell
+cargo clippy --workspace --all-targets --all-features -- -D warnings  # Rust linting
+RUFF_UPDATE_SCHEMA=1 cargo test  # Rust testing and updating ruff.schema.json
+pre-commit run --all-files --show-diff-on-failure  # Rust and Python formatting, Markdown and Python linting, etc.
 ```
 
 These checks will run on GitHub Actions when you open your pull request, but running them locally
@@ -106,8 +106,8 @@ If you're using VS Code, you can also install the recommended [rust-analyzer](ht
 Note that many code changes also require updating the snapshot tests, which is done interactively
 after running `cargo test` like so:
 
-```console
-$ cargo insta review
+```shell
+cargo insta review
 ```
 
 If your pull request relates to a specific lint rule, include the category and rule code in the
@@ -247,8 +247,8 @@ Once you've completed the code for the rule itself, you can define tests with th
     with the output (you see the violations you expect, and no others), proceed to the next step.
     For example, if you're adding a new rule named `E402`, you would run:
 
-    ```console
-    $ cargo run -p ruff -- check crates/ruff_linter/resources/test/fixtures/pycodestyle/E402.py --no-cache --preview --select E402
+    ```shell
+    cargo run -p ruff -- check crates/ruff_linter/resources/test/fixtures/pycodestyle/E402.py --no-cache --preview --select E402
     ```
 
     **Note:** Only a subset of rules are enabled by default. When testing a new rule, ensure that
@@ -298,24 +298,24 @@ To preview any changes to the documentation locally:
 
 1. Install MkDocs and Material for MkDocs with:
 
-    ```console
-    $ pip install -r docs/requirements.txt
+    ```shell
+    pip install -r docs/requirements.txt
     ```
 
 1. Generate the MkDocs site with:
 
-    ```console
-    $ python scripts/generate_mkdocs.py
+    ```shell
+    python scripts/generate_mkdocs.py
     ```
 
 1. Run the development server with:
 
-    ```console
-    $ # For contributors.
-    $ mkdocs serve -f mkdocs.public.yml
+    ```shell
+    # For contributors.
+    mkdocs serve -f mkdocs.public.yml
 
-    $ # For members of the Astral org, which has access to MkDocs Insiders via sponsorship.
-    $ mkdocs serve -f mkdocs.insiders.yml
+    # For members of the Astral org, which has access to MkDocs Insiders via sponsorship.
+    mkdocs serve -f mkdocs.insiders.yml
     ```
 
 The documentation should then be available locally at
@@ -373,10 +373,10 @@ even patch releases may contain [non-backwards-compatible changes](https://semve
 GitHub Actions will run your changes against a number of real-world projects from GitHub and
 report on any linter or formatter differences. You can also run those checks locally via:
 
-```console
-$ pip install -e ./python/ruff-ecosystem
-$ ruff-ecosystem check ruff "./target/debug/ruff"
-$ ruff-ecosystem format ruff "./target/debug/ruff"
+```shell
+pip install -e ./python/ruff-ecosystem
+ruff-ecosystem check ruff "./target/debug/ruff"
+ruff-ecosystem format ruff "./target/debug/ruff"
 ```
 
 See the [ruff-ecosystem package](https://github.com/astral-sh/ruff/tree/main/python/ruff-ecosystem) for more details.
@@ -399,14 +399,14 @@ We have several ways of benchmarking and profiling Ruff:
 First, clone [CPython](https://github.com/python/cpython). It's a large and diverse Python codebase,
 which makes it a good target for benchmarking.
 
-```console
-$ git clone --branch 3.10 https://github.com/python/cpython.git crates/ruff_linter/resources/test/cpython
+```shell
+git clone --branch 3.10 https://github.com/python/cpython.git crates/ruff_linter/resources/test/cpython
 ```
 
 To benchmark the release build:
 
-```console
-$ cargo build --release && hyperfine --warmup 10 \
+```shell
+cargo build --release && hyperfine --warmup 10 \
   "./target/release/ruff ./crates/ruff_linter/resources/test/cpython/ --no-cache -e" \
   "./target/release/ruff ./crates/ruff_linter/resources/test/cpython/ -e"
 
@@ -425,8 +425,8 @@ Summary
 
 To benchmark against the ecosystem's existing tools:
 
-```console
-$ hyperfine --ignore-failure --warmup 5 \
+```shell
+hyperfine --ignore-failure --warmup 5 \
   "./target/release/ruff ./crates/ruff_linter/resources/test/cpython/ --no-cache" \
   "pyflakes crates/ruff_linter/resources/test/cpython" \
   "autoflake --recursive --expand-star-imports --remove-all-unused-imports --remove-unused-variables --remove-duplicate-keys resources/test/cpython" \
@@ -471,8 +471,8 @@ Summary
 
 To benchmark a subset of rules, e.g. `LineTooLong` and `DocLineTooLong`:
 
-```console
-$ cargo build --release && hyperfine --warmup 10 \
+```shell
+cargo build --release && hyperfine --warmup 10 \
   "./target/release/ruff ./crates/ruff_linter/resources/test/cpython/ --no-cache -e --select W505,E501"
 ```
 
@@ -482,8 +482,8 @@ above. All reported benchmarks were computed using the versions specified by
 
 To benchmark Pylint, remove the following files from the CPython repository:
 
-```console
-$ rm Lib/test/bad_coding.py \
+```shell
+rm Lib/test/bad_coding.py \
   Lib/test/bad_coding2.py \
   Lib/test/bad_getattr.py \
   Lib/test/bad_getattr2.py \
@@ -511,8 +511,8 @@ will execute Pylint with maximum parallelism and only report errors.
 
 To benchmark Pyupgrade, run the following from `crates/ruff_linter/resources/test/cpython`:
 
-```console
-$ hyperfine --ignore-failure --warmup 5 --prepare "git reset --hard HEAD" \
+```shell
+hyperfine --ignore-failure --warmup 5 --prepare "git reset --hard HEAD" \
   "find . -type f -name \"*.py\" | xargs -P 0 pyupgrade --py311-plus"
 
 Benchmark 1: find . -type f -name "*.py" | xargs -P 0 pyupgrade --py311-plus
@@ -526,8 +526,8 @@ The `ruff_benchmark` crate benchmarks the linter and the formatter on individual
 
 You can run the benchmarks with
 
-```console
-$ cargo benchmark
+```shell
+cargo benchmark
 ```
 
 #### Benchmark-driven Development
@@ -537,12 +537,12 @@ Ruff uses [Criterion.rs](https://bheisler.github.io/criterion.rs/book/) for benc
 `--benchmark=<name>` to compare against that benchmark. Criterion will print a message telling you
 if the benchmark improved/regressed compared to that baseline.
 
-```console
-$ # Run once on your "baseline" code
-$ cargo bench -p ruff_benchmark -- --save-baseline=main
+```shell
+# Run once on your "baseline" code
+cargo bench -p ruff_benchmark -- --save-baseline=main
 
-$ # Then iterate with
-$ cargo bench -p ruff_benchmark -- --baseline=main
+# Then iterate with
+cargo bench -p ruff_benchmark -- --baseline=main
 ```
 
 #### PR Summary
@@ -550,14 +550,14 @@ $ cargo bench -p ruff_benchmark -- --baseline=main
 You can use `--save-baseline` and `critcmp` to get a pretty comparison between two recordings.
 This is useful to illustrate the improvements of a PR.
 
-```console
-$ # On main
-$ cargo bench -p ruff_benchmark -- --save-baseline=main
+```shell
+# On main
+cargo bench -p ruff_benchmark -- --save-baseline=main
 
-$ # After applying your changes
-$ cargo bench -p ruff_benchmark -- --save-baseline=pr
+# After applying your changes
+cargo bench -p ruff_benchmark -- --save-baseline=pr
 
-$ critcmp main pr
+critcmp main pr
 ```
 
 You must install [`critcmp`](https://github.com/BurntSushi/critcmp) for the comparison.
@@ -584,23 +584,23 @@ examples.
 
 Install `perf` and build `ruff_benchmark` with the `profiling` profile and then run it with perf
 
-```console
-$ cargo bench -p ruff_benchmark --no-run --profile=profiling && perf record --call-graph dwarf -F 9999 cargo bench -p ruff_benchmark --profile=profiling -- --profile-time=1
+```shell
+cargo bench -p ruff_benchmark --no-run --profile=profiling && perf record --call-graph dwarf -F 9999 cargo bench -p ruff_benchmark --profile=profiling -- --profile-time=1
 ```
 
 You can also use the `ruff_dev` launcher to run `ruff check` multiple times on a repository to
 gather enough samples for a good flamegraph (change the 999, the sample rate, and the 30, the number
 of checks, to your liking)
 
-```console
-$ cargo build --bin ruff_dev --profile=profiling
-$ perf record -g -F 999 target/profiling/ruff_dev repeat --repeat 30 --exit-zero --no-cache path/to/cpython > /dev/null
+```shell
+cargo build --bin ruff_dev --profile=profiling
+perf record -g -F 999 target/profiling/ruff_dev repeat --repeat 30 --exit-zero --no-cache path/to/cpython > /dev/null
 ```
 
 Then convert the recorded profile
 
-```console
-$ perf script -F +pid > /tmp/test.perf
+```shell
+perf script -F +pid > /tmp/test.perf
 ```
 
 You can now view the converted file with [firefox profiler](https://profiler.firefox.com/), with a
@@ -609,22 +609,22 @@ more in-depth guide [here](https://profiler.firefox.com/docs/#/./guide-perf-prof
 An alternative is to convert the perf data to `flamegraph.svg` using
 [flamegraph](https://github.com/flamegraph-rs/flamegraph) (`cargo install flamegraph`):
 
-```console
-$ flamegraph --perfdata perf.data --no-inline
+```shell
+flamegraph --perfdata perf.data --no-inline
 ```
 
 #### Mac
 
 Install [`cargo-instruments`](https://crates.io/crates/cargo-instruments):
 
-```console
-$ cargo install cargo-instruments
+```shell
+cargo install cargo-instruments
 ```
 
 Then run the profiler with
 
-```console
-$ cargo instruments -t time --bench linter --profile profiling -p ruff_benchmark -- --profile-time=1
+```shell
+cargo instruments -t time --bench linter --profile profiling -p ruff_benchmark -- --profile-time=1
 ```
 
 - `-t`: Specifies what to profile. Useful options are `time` to profile the wall time and `alloc`
