@@ -4,13 +4,13 @@ use std::time::Duration;
 
 use tracing::debug_span;
 
-use red_knot_python_semantic::{HasTy, ModuleName, SemanticModel};
 use red_knot_python_semantic::types::Type;
+use red_knot_python_semantic::{HasTy, ModuleName, SemanticModel};
 use ruff_db::files::File;
 use ruff_db::parsed::{parsed_module, ParsedModule};
 use ruff_db::source::{source_text, SourceText};
 use ruff_python_ast as ast;
-use ruff_python_ast::visitor::{Visitor, walk_expr, walk_stmt};
+use ruff_python_ast::visitor::{walk_expr, walk_stmt, Visitor};
 
 use crate::db::Db;
 
@@ -311,7 +311,7 @@ mod tests {
 
     use crate::db::tests::TestDb;
 
-    use super::{Diagnostics, lint_semantic};
+    use super::{lint_semantic, Diagnostics};
 
     fn setup_db() -> TestDb {
         setup_db_with_root(SystemPathBuf::from("/src"))
