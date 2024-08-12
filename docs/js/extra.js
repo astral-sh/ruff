@@ -12,7 +12,7 @@ function cleanupClipboardText(targetSelector) {
         ),
     )
     .map((node) => node.textContent)
-    .filter((s) => s != "");
+    .filter((s) => s !== "");
   return clipboardText.join("").trim();
 }
 
@@ -25,6 +25,11 @@ function setCopyText() {
   const elements = document.querySelectorAll(
     'button[data-clipboard-target$="code"]',
   );
+
+  if (elements.length === 0) {
+    return;
+  }
+
   const observer = new IntersectionObserver((entries) => {
     entries.forEach((entry) => {
       // target in the viewport that have not been patched
