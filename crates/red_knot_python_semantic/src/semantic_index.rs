@@ -528,7 +528,7 @@ y = 2
         ));
     }
 
-    /// Test case to validate that the generator scope is correctly identifier and that the target
+    /// Test case to validate that the generator scope is correctly identified and that the target
     /// variable is defined only in the generator scope and not in the global scope.
     #[test]
     fn generator_scope() {
@@ -550,7 +550,7 @@ y = 2
             panic!("expected one child scope")
         };
 
-        assert_eq!(generator_scope.kind(), ScopeKind::Generator);
+        assert_eq!(generator_scope.kind(), ScopeKind::Comprehension);
         assert_eq!(
             generator_scope_id.to_scope_id(&db, file).name(&db),
             "<listcomp>"
@@ -596,7 +596,7 @@ y = 2
         let [definition] = use_def.use_definitions(element_use_id) else {
             panic!("expected one definition")
         };
-        let DefinitionKind::Generator(generator) = definition.node(&db) else {
+        let DefinitionKind::Comprehension(generator) = definition.node(&db) else {
             panic!("expected generator definition")
         };
         let ast::Comprehension { target, .. } = generator.node();
@@ -628,7 +628,7 @@ y = 2
             panic!("expected one child scope")
         };
 
-        assert_eq!(generator_scope.kind(), ScopeKind::Generator);
+        assert_eq!(generator_scope.kind(), ScopeKind::Comprehension);
         assert_eq!(
             generator_scope_id.to_scope_id(&db, file).name(&db),
             "<listcomp>"
@@ -644,7 +644,7 @@ y = 2
             panic!("expected one inner generator scope")
         };
 
-        assert_eq!(inner_generator_scope.kind(), ScopeKind::Generator);
+        assert_eq!(inner_generator_scope.kind(), ScopeKind::Comprehension);
         assert_eq!(
             inner_generator_scope_id.to_scope_id(&db, file).name(&db),
             "<setcomp>"
@@ -653,39 +653,6 @@ y = 2
         let inner_generator_symbol_table = index.symbol_table(inner_generator_scope_id);
 
         assert_eq!(names(&inner_generator_symbol_table), vec!["x"]);
-    }
-
-    /// Test that validates that the variables defined in assignment expressions within a generator
-    /// expressions are defined in the outer scope of the generator.
-    #[test]
-    fn assignment_expression_in_generator() {
-        let TestCase { db, file } = test_case(
-            "
-[a := 1 for x in iter1 if (b := 2)]
-",
-        );
-
-        let index = semantic_index(&db, file);
-        let global_table = index.symbol_table(FileScopeId::global());
-
-        assert_eq!(names(&global_table), vec!["iter1", "b", "a"]);
-
-        let [(generator_scope_id, generator_scope)] = index
-            .child_scopes(FileScopeId::global())
-            .collect::<Vec<_>>()[..]
-        else {
-            panic!("expected one child scope")
-        };
-
-        assert_eq!(generator_scope.kind(), ScopeKind::Generator);
-        assert_eq!(
-            generator_scope_id.to_scope_id(&db, file).name(&db),
-            "<listcomp>"
-        );
-
-        let generator_symbol_table = index.symbol_table(generator_scope_id);
-
-        assert_eq!(names(&generator_symbol_table), vec!["x"]);
     }
 
     #[test]

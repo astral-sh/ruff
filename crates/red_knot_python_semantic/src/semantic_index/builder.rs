@@ -13,8 +13,8 @@ use crate::ast_node_ref::AstNodeRef;
 use crate::semantic_index::ast_ids::node_key::ExpressionNodeKey;
 use crate::semantic_index::ast_ids::AstIdsBuilder;
 use crate::semantic_index::definition::{
-    AssignmentDefinitionNodeRef, Definition, DefinitionNodeKey, DefinitionNodeRef,
-    ImportFromDefinitionNodeRef,
+    AssignmentDefinitionNodeRef, ComprehensionDefinitionNodeRef, Definition, DefinitionNodeKey,
+    DefinitionNodeRef, ImportFromDefinitionNodeRef,
 };
 use crate::semantic_index::expression::Expression;
 use crate::semantic_index::symbol::{
@@ -24,8 +24,6 @@ use crate::semantic_index::symbol::{
 use crate::semantic_index::use_def::{FlowSnapshot, UseDefMapBuilder};
 use crate::semantic_index::SemanticIndex;
 use crate::Db;
-
-use super::definition::GeneratorDefinitionNodeRef;
 
 pub(super) struct SemanticIndexBuilder<'db> {
     // Builder state
@@ -162,32 +160,7 @@ impl<'db> SemanticIndexBuilder<'db> {
     }
 
     fn add_or_update_symbol(&mut self, name: Name, flags: SymbolFlags) -> ScopedSymbolId {
-        // Determine the symbol table to which the symbol belongs to.
-        //
-        // Per [PEP 572](https://peps.python.org/pep-0572/#scope-of-the-target), named expressions
-        // in generators and comprehensions bind to the scope that contains the outermost
-        // comprehension.
-        let symbol_table = if self
-            .current_assignment
-            .is_some_and(CurrentAssignment::is_named)
-        {
-            let scope_id = self
-                .scope_stack
-                .iter()
-                .rev()
-                .find_map(|scope_id| {
-                    if self.scopes[*scope_id].kind().is_generator() {
-                        None
-                    } else {
-                        Some(*scope_id)
-                    }
-                })
-                .unwrap_or_else(|| self.current_scope());
-            &mut self.symbol_tables[scope_id]
-        } else {
-            self.current_symbol_table()
-        };
-
+        let symbol_table = self.current_symbol_table();
         let (symbol_id, added) = symbol_table.add_or_update_symbol(name, flags);
         if added {
             let use_def_map = self.current_use_def_map_mut();
@@ -301,8 +274,8 @@ impl<'db> SemanticIndexBuilder<'db> {
         self.visit_expr(&generator.iter);
         self.push_scope(scope);
 
-        self.current_assignment = Some(CurrentAssignment::Generator {
-            generator,
+        self.current_assignment = Some(CurrentAssignment::Comprehension {
+            node: generator,
             first: true,
         });
         self.visit_expr(&generator.target);
@@ -315,8 +288,8 @@ impl<'db> SemanticIndexBuilder<'db> {
         for generator in generators_iter {
             self.visit_expr(&generator.iter);
 
-            self.current_assignment = Some(CurrentAssignment::Generator {
-                generator,
+            self.current_assignment = Some(CurrentAssignment::Comprehension {
+                node: generator,
                 first: false,
             });
             self.visit_expr(&generator.target);
@@ -569,15 +542,15 @@ where
                             self.add_definition(symbol, ann_assign);
                         }
                         Some(CurrentAssignment::Named(named)) => {
+                            // TODO(dhruvmanila): If the current scope is a comprehension, then the
+                            // named expression is implicitly nonlocal. This is yet to be
+                            // implemented.
                             self.add_definition(symbol, named);
                         }
-                        Some(CurrentAssignment::Generator { generator, first }) => {
+                        Some(CurrentAssignment::Comprehension { node, first }) => {
                             self.add_definition(
                                 symbol,
-                                GeneratorDefinitionNodeRef {
-                                    node: generator,
-                                    first,
-                                },
+                                ComprehensionDefinitionNodeRef { node, first },
                             );
                         }
                         None => {}
@@ -647,7 +620,7 @@ where
                     elt, generators, ..
                 },
             ) => {
-                self.visit_generators(NodeWithScopeRef::Generator(generator), generators);
+                self.visit_generators(NodeWithScopeRef::GeneratorExpression(generator), generators);
                 self.visit_expr(elt);
             }
             ast::Expr::DictComp(
@@ -688,17 +661,10 @@ enum CurrentAssignment<'a> {
     Assign(&'a ast::StmtAssign),
     AnnAssign(&'a ast::StmtAnnAssign),
     Named(&'a ast::ExprNamed),
-    Generator {
-        generator: &'a ast::Comprehension,
+    Comprehension {
+        node: &'a ast::Comprehension,
         first: bool,
     },
-}
-
-impl CurrentAssignment<'_> {
-    /// Returns `true` if the current assignment is a named expression e.g. `x := 1`.
-    const fn is_named(self) -> bool {
-        matches!(self, Self::Named(_))
-    }
 }
 
 impl<'a> From<&'a ast::StmtAssign> for CurrentAssignment<'a> {

@@ -261,16 +261,16 @@ impl<'db> TypeInferenceBuilder<'db> {
                 self.infer_function_type_params(function.node());
             }
             NodeWithScopeKind::ListComprehension(comprehension) => {
-                self.infer_list_comprehension_expression_in_scope(comprehension.node());
+                self.infer_list_comprehension_expression_scope(comprehension.node());
             }
             NodeWithScopeKind::SetComprehension(comprehension) => {
-                self.infer_set_comprehension_expression_in_scope(comprehension.node());
+                self.infer_set_comprehension_expression_scope(comprehension.node());
             }
             NodeWithScopeKind::DictComprehension(comprehension) => {
-                self.infer_dict_comprehension_expression_in_scope(comprehension.node());
+                self.infer_dict_comprehension_expression_scope(comprehension.node());
             }
-            NodeWithScopeKind::Generator(generator) => {
-                self.infer_generator_expression_in_scope(generator.node());
+            NodeWithScopeKind::GeneratorExpression(generator) => {
+                self.infer_generator_expression_scope(generator.node());
             }
         }
     }
@@ -300,10 +300,10 @@ impl<'db> TypeInferenceBuilder<'db> {
             DefinitionKind::NamedExpression(named_expression) => {
                 self.infer_named_expression_definition(named_expression.node(), definition);
             }
-            DefinitionKind::Generator(generator) => {
+            DefinitionKind::Comprehension(comprehension) => {
                 self.infer_comprehension_definition(
-                    generator.node(),
-                    generator.is_first(),
+                    comprehension.node(),
+                    comprehension.is_first(),
                     definition,
                 );
             }
@@ -1076,7 +1076,7 @@ impl<'db> TypeInferenceBuilder<'db> {
     fn infer_first_comprehension_iter(&mut self, comprehensions: &[ast::Comprehension]) {
         let mut generators_iter = comprehensions.iter();
         let Some(first_generator) = generators_iter.next() else {
-            unreachable!("Expression must contain at least one generator");
+            unreachable!("Comprehension must contain at least one generator");
         };
         self.infer_expression(&first_generator.iter);
     }
@@ -1135,7 +1135,7 @@ impl<'db> TypeInferenceBuilder<'db> {
         Type::Unknown
     }
 
-    fn infer_generator_expression_in_scope(&mut self, generator: &ast::ExprGenerator) {
+    fn infer_generator_expression_scope(&mut self, generator: &ast::ExprGenerator) {
         let ast::ExprGenerator {
             range: _,
             elt,
@@ -1143,22 +1143,26 @@ impl<'db> TypeInferenceBuilder<'db> {
             parenthesized: _,
         } = generator;
 
-        self.infer_comprehensions(generators);
         self.infer_expression(elt);
+        for comprehension in generators {
+            self.infer_comprehension(comprehension);
+        }
     }
 
-    fn infer_list_comprehension_expression_in_scope(&mut self, listcomp: &ast::ExprListComp) {
+    fn infer_list_comprehension_expression_scope(&mut self, listcomp: &ast::ExprListComp) {
         let ast::ExprListComp {
             range: _,
             elt,
             generators,
         } = listcomp;
 
-        self.infer_comprehensions(generators);
         self.infer_expression(elt);
+        for comprehension in generators {
+            self.infer_comprehension(comprehension);
+        }
     }
 
-    fn infer_dict_comprehension_expression_in_scope(&mut self, dictcomp: &ast::ExprDictComp) {
+    fn infer_dict_comprehension_expression_scope(&mut self, dictcomp: &ast::ExprDictComp) {
         let ast::ExprDictComp {
             range: _,
             key,
@@ -1166,48 +1170,30 @@ impl<'db> TypeInferenceBuilder<'db> {
             generators,
         } = dictcomp;
 
-        self.infer_comprehensions(generators);
         self.infer_expression(key);
         self.infer_expression(value);
+        for comprehension in generators {
+            self.infer_comprehension(comprehension);
+        }
     }
 
-    fn infer_set_comprehension_expression_in_scope(&mut self, setcomp: &ast::ExprSetComp) {
+    fn infer_set_comprehension_expression_scope(&mut self, setcomp: &ast::ExprSetComp) {
         let ast::ExprSetComp {
             range: _,
             elt,
             generators,
         } = setcomp;
 
-        self.infer_comprehensions(generators);
         self.infer_expression(elt);
-    }
-
-    fn infer_comprehensions(&mut self, generators: &[ast::Comprehension]) {
-        let mut generators_iter = generators.iter();
-        let Some(first_generator) = generators_iter.next() else {
-            unreachable!("Expression must contain at least one generator");
-        };
-        self.infer_comprehension(first_generator, true);
-        for generator in generators_iter {
-            self.infer_comprehension(generator, false);
+        for comprehension in generators {
+            self.infer_comprehension(comprehension);
         }
     }
 
-    fn infer_comprehension(&mut self, comprehension: &ast::Comprehension, is_first: bool) {
-        let ast::Comprehension {
-            range: _,
-            target,
-            iter,
-            ifs,
-            is_async: _,
-        } = comprehension;
-
-        if !is_first {
-            self.infer_expression(iter);
-        }
-        self.infer_expression(target);
-        for if_clause in ifs {
-            self.infer_expression(if_clause);
+    fn infer_comprehension(&mut self, comprehension: &ast::Comprehension) {
+        self.infer_definition(comprehension);
+        for expr in &comprehension.ifs {
+            self.infer_expression(expr);
         }
     }
 
@@ -1228,6 +1214,7 @@ impl<'db> TypeInferenceBuilder<'db> {
         if !is_first {
             self.infer_expression(iter);
         }
+        // TODO(dhruvmanila): The target type should be inferred based on the iter type instead.
         let target_ty = self.infer_expression(target);
         self.types.definitions.insert(definition, target_ty);
     }

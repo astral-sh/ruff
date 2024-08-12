@@ -44,7 +44,7 @@ pub(crate) enum DefinitionNodeRef<'a> {
     NamedExpression(&'a ast::ExprNamed),
     Assignment(AssignmentDefinitionNodeRef<'a>),
     AnnotatedAssignment(&'a ast::StmtAnnAssign),
-    Generator(GeneratorDefinitionNodeRef<'a>),
+    Comprehension(ComprehensionDefinitionNodeRef<'a>),
 }
 
 impl<'a> From<&'a ast::StmtFunctionDef> for DefinitionNodeRef<'a> {
@@ -89,9 +89,9 @@ impl<'a> From<AssignmentDefinitionNodeRef<'a>> for DefinitionNodeRef<'a> {
     }
 }
 
-impl<'a> From<GeneratorDefinitionNodeRef<'a>> for DefinitionNodeRef<'a> {
-    fn from(node: GeneratorDefinitionNodeRef<'a>) -> Self {
-        Self::Generator(node)
+impl<'a> From<ComprehensionDefinitionNodeRef<'a>> for DefinitionNodeRef<'a> {
+    fn from(node: ComprehensionDefinitionNodeRef<'a>) -> Self {
+        Self::Comprehension(node)
     }
 }
 
@@ -108,7 +108,7 @@ pub(crate) struct AssignmentDefinitionNodeRef<'a> {
 }
 
 #[derive(Copy, Clone, Debug)]
-pub(crate) struct GeneratorDefinitionNodeRef<'a> {
+pub(crate) struct ComprehensionDefinitionNodeRef<'a> {
     pub(crate) node: &'a ast::Comprehension,
     pub(crate) first: bool,
 }
@@ -144,8 +144,8 @@ impl DefinitionNodeRef<'_> {
             DefinitionNodeRef::AnnotatedAssignment(assign) => {
                 DefinitionKind::AnnotatedAssignment(AstNodeRef::new(parsed, assign))
             }
-            DefinitionNodeRef::Generator(GeneratorDefinitionNodeRef { node, first }) => {
-                DefinitionKind::Generator(GeneratorDefinitionKind {
+            DefinitionNodeRef::Comprehension(ComprehensionDefinitionNodeRef { node, first }) => {
+                DefinitionKind::Comprehension(ComprehensionDefinitionKind {
                     node: AstNodeRef::new(parsed, node),
                     first,
                 })
@@ -167,7 +167,7 @@ impl DefinitionNodeRef<'_> {
                 target,
             }) => target.into(),
             Self::AnnotatedAssignment(node) => node.into(),
-            Self::Generator(GeneratorDefinitionNodeRef { node, first: _ }) => node.into(),
+            Self::Comprehension(ComprehensionDefinitionNodeRef { node, first: _ }) => node.into(),
         }
     }
 }
@@ -181,16 +181,16 @@ pub enum DefinitionKind {
     NamedExpression(AstNodeRef<ast::ExprNamed>),
     Assignment(AssignmentDefinitionKind),
     AnnotatedAssignment(AstNodeRef<ast::StmtAnnAssign>),
-    Generator(GeneratorDefinitionKind),
+    Comprehension(ComprehensionDefinitionKind),
 }
 
 #[derive(Clone, Debug)]
-pub struct GeneratorDefinitionKind {
+pub struct ComprehensionDefinitionKind {
     node: AstNodeRef<ast::Comprehension>,
     first: bool,
 }
 
-impl GeneratorDefinitionKind {
+impl ComprehensionDefinitionKind {
     pub(crate) fn node(&self) -> &ast::Comprehension {
         self.node.node()
     }

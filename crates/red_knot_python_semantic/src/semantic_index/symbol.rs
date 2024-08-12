@@ -114,6 +114,10 @@ impl<'db> ScopeId<'db> {
             NodeWithScopeKind::ClassTypeParameters(_)
                 | NodeWithScopeKind::FunctionTypeParameters(_)
                 | NodeWithScopeKind::Function(_)
+                | NodeWithScopeKind::ListComprehension(_)
+                | NodeWithScopeKind::SetComprehension(_)
+                | NodeWithScopeKind::DictComprehension(_)
+                | NodeWithScopeKind::GeneratorExpression(_)
         )
     }
 
@@ -130,7 +134,7 @@ impl<'db> ScopeId<'db> {
             NodeWithScopeKind::ListComprehension(_) => "<listcomp>",
             NodeWithScopeKind::SetComprehension(_) => "<setcomp>",
             NodeWithScopeKind::DictComprehension(_) => "<dictcomp>",
-            NodeWithScopeKind::Generator(_) => "<generator>",
+            NodeWithScopeKind::GeneratorExpression(_) => "<generator>",
         }
     }
 }
@@ -174,12 +178,12 @@ pub enum ScopeKind {
     Annotation,
     Class,
     Function,
-    Generator,
+    Comprehension,
 }
 
 impl ScopeKind {
-    pub const fn is_generator(self) -> bool {
-        matches!(self, ScopeKind::Generator)
+    pub const fn is_comprehension(self) -> bool {
+        matches!(self, ScopeKind::Comprehension)
     }
 }
 
@@ -314,7 +318,7 @@ pub(crate) enum NodeWithScopeRef<'a> {
     ListComprehension(&'a ast::ExprListComp),
     SetComprehension(&'a ast::ExprSetComp),
     DictComprehension(&'a ast::ExprDictComp),
-    Generator(&'a ast::ExprGenerator),
+    GeneratorExpression(&'a ast::ExprGenerator),
 }
 
 impl NodeWithScopeRef<'_> {
@@ -350,8 +354,8 @@ impl NodeWithScopeRef<'_> {
             NodeWithScopeRef::DictComprehension(comprehension) => {
                 NodeWithScopeKind::DictComprehension(AstNodeRef::new(module, comprehension))
             }
-            NodeWithScopeRef::Generator(generator) => {
-                NodeWithScopeKind::Generator(AstNodeRef::new(module, generator))
+            NodeWithScopeRef::GeneratorExpression(generator) => {
+                NodeWithScopeKind::GeneratorExpression(AstNodeRef::new(module, generator))
             }
         }
     }
@@ -367,7 +371,7 @@ impl NodeWithScopeRef<'_> {
             NodeWithScopeRef::ListComprehension(_)
             | NodeWithScopeRef::SetComprehension(_)
             | NodeWithScopeRef::DictComprehension(_)
-            | NodeWithScopeRef::Generator(_) => ScopeKind::Generator,
+            | NodeWithScopeRef::GeneratorExpression(_) => ScopeKind::Comprehension,
         }
     }
 
@@ -396,8 +400,8 @@ impl NodeWithScopeRef<'_> {
             NodeWithScopeRef::DictComprehension(comprehension) => {
                 NodeWithScopeKey::DictComprehension(NodeKey::from_node(comprehension))
             }
-            NodeWithScopeRef::Generator(generator) => {
-                NodeWithScopeKey::Generator(NodeKey::from_node(generator))
+            NodeWithScopeRef::GeneratorExpression(generator) => {
+                NodeWithScopeKey::GeneratorExpression(NodeKey::from_node(generator))
             }
         }
     }
@@ -415,7 +419,7 @@ pub enum NodeWithScopeKind {
     ListComprehension(AstNodeRef<ast::ExprListComp>),
     SetComprehension(AstNodeRef<ast::ExprSetComp>),
     DictComprehension(AstNodeRef<ast::ExprDictComp>),
-    Generator(AstNodeRef<ast::ExprGenerator>),
+    GeneratorExpression(AstNodeRef<ast::ExprGenerator>),
 }
 
 #[derive(Copy, Clone, Debug, Eq, PartialEq, Hash)]
@@ -429,5 +433,5 @@ pub(crate) enum NodeWithScopeKey {
     ListComprehension(NodeKey),
     SetComprehension(NodeKey),
     DictComprehension(NodeKey),
-    Generator(NodeKey),
+    GeneratorExpression(NodeKey),
 }
