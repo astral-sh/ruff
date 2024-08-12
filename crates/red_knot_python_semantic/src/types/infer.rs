@@ -771,7 +771,10 @@ impl<'db> TypeInferenceBuilder<'db> {
     }
 
     fn infer_import_from_statement(&mut self, import: &ast::StmtImportFrom) {
-        let ast::StmtImportFrom {
+        let ast::StmtImportFrom::MemberList(import) = import else {
+            todo!("Support for `*` imports")
+        };
+        let ast::StmtImportFromMemberList {
             range: _,
             module: _,
             names,
@@ -806,11 +809,11 @@ impl<'db> TypeInferenceBuilder<'db> {
 
     fn infer_import_from_definition(
         &mut self,
-        import_from: &ast::StmtImportFrom,
+        import_from: &ast::StmtImportFromMemberList,
         alias: &ast::Alias,
         definition: Definition<'db>,
     ) {
-        let ast::StmtImportFrom { module, .. } = import_from;
+        let ast::StmtImportFromMemberList { module, .. } = import_from;
         let module_ty = if let Some(module) = module {
             self.module_ty_from_name(module)
         } else {

@@ -377,6 +377,9 @@ where
                 }
             }
             ast::Stmt::ImportFrom(node) => {
+                let ast::StmtImportFrom::MemberList(node) = node else {
+                    todo!("Support `*` imports")
+                };
                 for (alias_index, alias) in node.names.iter().enumerate() {
                     let symbol_name = if let Some(asname) = &alias.asname {
                         &asname.id

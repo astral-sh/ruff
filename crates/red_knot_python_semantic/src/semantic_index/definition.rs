@@ -90,7 +90,7 @@ impl<'a> From<AssignmentDefinitionNodeRef<'a>> for DefinitionNodeRef<'a> {
 
 #[derive(Copy, Clone, Debug)]
 pub(crate) struct ImportFromDefinitionNodeRef<'a> {
-    pub(crate) node: &'a ast::StmtImportFrom,
+    pub(crate) node: &'a ast::StmtImportFromMemberList,
     pub(crate) alias_index: usize,
 }
 
@@ -165,12 +165,12 @@ pub enum DefinitionKind {
 
 #[derive(Clone, Debug)]
 pub struct ImportFromDefinitionKind {
-    node: AstNodeRef<ast::StmtImportFrom>,
+    node: AstNodeRef<ast::StmtImportFromMemberList>,
     alias_index: usize,
 }
 
 impl ImportFromDefinitionKind {
-    pub(crate) fn import(&self) -> &ast::StmtImportFrom {
+    pub(crate) fn import(&self) -> &ast::StmtImportFromMemberList {
         self.node.node()
     }
 
