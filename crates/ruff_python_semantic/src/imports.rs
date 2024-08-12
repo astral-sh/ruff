@@ -225,12 +225,14 @@ impl<'de> serde::de::Deserialize<'de> for NameImports {
                 };
 
                 let imports = match stmt {
-                    Stmt::ImportFrom(ast::StmtImportFrom {
-                        module,
-                        names,
-                        level,
-                        range: _,
-                    }) => names
+                    Stmt::ImportFrom(ast::StmtImportFrom::MemberList(
+                        ast::StmtImportFromMemberList {
+                            module,
+                            names,
+                            level,
+                            range: _,
+                        },
+                    )) => names
                         .iter()
                         .map(|name| {
                             NameImport::ImportFrom(MemberNameImport {
