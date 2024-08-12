@@ -411,10 +411,17 @@ mod tests {
 
         assert_eq!(
             *messages,
-            vec![
-                "/src/a.py:3:4: Name 'flag' used when not defined.",
-                "/src/a.py:5:1: Name 'y' used when possibly not defined."
-            ]
+            if cfg!(windows) {
+                vec![
+                    "\\src\\a.py:3:4: Name 'flag' used when not defined.",
+                    "\\src\\a.py:5:1: Name 'y' used when possibly not defined.",
+                ]
+            } else {
+                vec![
+                    "/src/a.py:3:4: Name 'flag' used when not defined.",
+                    "/src/a.py:5:1: Name 'y' used when possibly not defined.",
+                ]
+            }
         );
     }
 }
