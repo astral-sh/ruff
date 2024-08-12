@@ -89,8 +89,6 @@ pub(crate) struct SemanticIndex<'db> {
     scopes: IndexVec<FileScopeId, Scope>,
 
     /// Map expressions to their corresponding scope.
-    /// We can't use [`ExpressionId`] here, because the challenge is how to get from
-    /// an [`ast::Expr`] to an [`ExpressionId`] (which requires knowing the scope).
     scopes_by_expression: FxHashMap<ExpressionNodeKey, FileScopeId>,
 
     /// Map from a node creating a definition to its definition.
@@ -118,7 +116,7 @@ pub(crate) struct SemanticIndex<'db> {
 impl<'db> SemanticIndex<'db> {
     /// Returns the symbol table for a specific scope.
     ///
-    /// Use the Salsa cached [`symbol_table`] query if you only need the
+    /// Use the Salsa cached [`symbol_table()`] query if you only need the
     /// symbol table for a single scope.
     pub(super) fn symbol_table(&self, scope_id: FileScopeId) -> Arc<SymbolTable> {
         self.symbol_tables[scope_id].clone()
@@ -126,7 +124,7 @@ impl<'db> SemanticIndex<'db> {
 
     /// Returns the use-def map for a specific scope.
     ///
-    /// Use the Salsa cached [`use_def_map`] query if you only need the
+    /// Use the Salsa cached [`use_def_map()`] query if you only need the
     /// use-def map for a single scope.
     pub(super) fn use_def_map(&self, scope_id: FileScopeId) -> Arc<UseDefMap> {
         self.use_def_maps[scope_id].clone()
