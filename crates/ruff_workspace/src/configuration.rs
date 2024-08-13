@@ -23,7 +23,7 @@ use ruff_linter::line_width::{IndentWidth, LineLength};
 use ruff_linter::registry::RuleNamespace;
 use ruff_linter::registry::{Rule, RuleSet, INCOMPATIBLE_CODES};
 use ruff_linter::rule_selector::{PreviewOptions, Specificity};
-use ruff_linter::rules::{flake8_pytest_style, pycodestyle};
+use ruff_linter::rules::pycodestyle;
 use ruff_linter::settings::fix_safety_table::FixSafetyTable;
 use ruff_linter::settings::rule_table::RuleTable;
 use ruff_linter::settings::types::{
@@ -337,9 +337,7 @@ impl Configuration {
                         Flake8PytestStyleOptions::try_into_settings(options, lint_preview)
                     })
                     .transpose()?
-                    .unwrap_or_else(|| {
-                        flake8_pytest_style::settings::Settings::resolve_default(lint_preview)
-                    }),
+                    .unwrap_or_default(),
                 flake8_quotes: lint
                     .flake8_quotes
                     .map(Flake8QuotesOptions::into_settings)
