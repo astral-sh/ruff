@@ -260,6 +260,18 @@ impl<'db> TypeInferenceBuilder<'db> {
             NodeWithScopeKind::FunctionTypeParameters(function) => {
                 self.infer_function_type_params(function.node());
             }
+            NodeWithScopeKind::ListComprehension(comprehension) => {
+                self.infer_list_comprehension_expression_scope(comprehension.node());
+            }
+            NodeWithScopeKind::SetComprehension(comprehension) => {
+                self.infer_set_comprehension_expression_scope(comprehension.node());
+            }
+            NodeWithScopeKind::DictComprehension(comprehension) => {
+                self.infer_dict_comprehension_expression_scope(comprehension.node());
+            }
+            NodeWithScopeKind::GeneratorExpression(generator) => {
+                self.infer_generator_expression_scope(generator.node());
+            }
         }
     }
 
@@ -287,6 +299,13 @@ impl<'db> TypeInferenceBuilder<'db> {
             }
             DefinitionKind::NamedExpression(named_expression) => {
                 self.infer_named_expression_definition(named_expression.node(), definition);
+            }
+            DefinitionKind::Comprehension(comprehension) => {
+                self.infer_comprehension_definition(
+                    comprehension.node(),
+                    comprehension.is_first(),
+                    definition,
+                );
             }
         }
     }
@@ -1053,18 +1072,24 @@ impl<'db> TypeInferenceBuilder<'db> {
         builtins_symbol_ty_by_name(self.db, "dict").instance()
     }
 
+    /// Infer the type of the `iter` expression of the first comprehension.
+    fn infer_first_comprehension_iter(&mut self, comprehensions: &[ast::Comprehension]) {
+        let mut generators_iter = comprehensions.iter();
+        let Some(first_generator) = generators_iter.next() else {
+            unreachable!("Comprehension must contain at least one generator");
+        };
+        self.infer_expression(&first_generator.iter);
+    }
+
     fn infer_generator_expression(&mut self, generator: &ast::ExprGenerator) -> Type<'db> {
         let ast::ExprGenerator {
             range: _,
-            elt,
+            elt: _,
             generators,
             parenthesized: _,
         } = generator;
 
-        self.infer_expression(elt);
-        for generator in generators {
-            self.infer_comprehension(generator);
-        }
+        self.infer_first_comprehension_iter(generators);
 
         // TODO generator type
         Type::Unknown
@@ -1073,20 +1098,71 @@ impl<'db> TypeInferenceBuilder<'db> {
     fn infer_list_comprehension_expression(&mut self, listcomp: &ast::ExprListComp) -> Type<'db> {
         let ast::ExprListComp {
             range: _,
-            elt,
+            elt: _,
             generators,
         } = listcomp;
 
-        self.infer_expression(elt);
-        for generator in generators {
-            self.infer_comprehension(generator);
-        }
+        self.infer_first_comprehension_iter(generators);
 
         // TODO list type
         Type::Unknown
     }
 
     fn infer_dict_comprehension_expression(&mut self, dictcomp: &ast::ExprDictComp) -> Type<'db> {
+        let ast::ExprDictComp {
+            range: _,
+            key: _,
+            value: _,
+            generators,
+        } = dictcomp;
+
+        self.infer_first_comprehension_iter(generators);
+
+        // TODO dict type
+        Type::Unknown
+    }
+
+    fn infer_set_comprehension_expression(&mut self, setcomp: &ast::ExprSetComp) -> Type<'db> {
+        let ast::ExprSetComp {
+            range: _,
+            elt: _,
+            generators,
+        } = setcomp;
+
+        self.infer_first_comprehension_iter(generators);
+
+        // TODO set type
+        Type::Unknown
+    }
+
+    fn infer_generator_expression_scope(&mut self, generator: &ast::ExprGenerator) {
+        let ast::ExprGenerator {
+            range: _,
+            elt,
+            generators,
+            parenthesized: _,
+        } = generator;
+
+        self.infer_expression(elt);
+        for comprehension in generators {
+            self.infer_comprehension(comprehension);
+        }
+    }
+
+    fn infer_list_comprehension_expression_scope(&mut self, listcomp: &ast::ExprListComp) {
+        let ast::ExprListComp {
+            range: _,
+            elt,
+            generators,
+        } = listcomp;
+
+        self.infer_expression(elt);
+        for comprehension in generators {
+            self.infer_comprehension(comprehension);
+        }
+    }
+
+    fn infer_dict_comprehension_expression_scope(&mut self, dictcomp: &ast::ExprDictComp) {
         let ast::ExprDictComp {
             range: _,
             key,
@@ -1096,46 +1172,51 @@ impl<'db> TypeInferenceBuilder<'db> {
 
         self.infer_expression(key);
         self.infer_expression(value);
-        for generator in generators {
-            self.infer_comprehension(generator);
+        for comprehension in generators {
+            self.infer_comprehension(comprehension);
         }
-
-        // TODO dict type
-        Type::Unknown
     }
 
-    fn infer_set_comprehension_expression(&mut self, setcomp: &ast::ExprSetComp) -> Type<'db> {
+    fn infer_set_comprehension_expression_scope(&mut self, setcomp: &ast::ExprSetComp) {
         let ast::ExprSetComp {
             range: _,
             elt,
             generators,
         } = setcomp;
-        self.infer_expression(elt);
-        for generator in generators {
-            self.infer_comprehension(generator);
-        }
 
-        // TODO set type
-        Type::Unknown
+        self.infer_expression(elt);
+        for comprehension in generators {
+            self.infer_comprehension(comprehension);
+        }
     }
 
-    fn infer_comprehension(&mut self, comprehension: &ast::Comprehension) -> Type<'db> {
+    fn infer_comprehension(&mut self, comprehension: &ast::Comprehension) {
+        self.infer_definition(comprehension);
+        for expr in &comprehension.ifs {
+            self.infer_expression(expr);
+        }
+    }
+
+    fn infer_comprehension_definition(
+        &mut self,
+        comprehension: &ast::Comprehension,
+        is_first: bool,
+        definition: Definition<'db>,
+    ) {
         let ast::Comprehension {
             range: _,
             target,
             iter,
-            ifs,
+            ifs: _,
             is_async: _,
         } = comprehension;
 
-        self.infer_expression(target);
-        self.infer_expression(iter);
-        for if_clause in ifs {
-            self.infer_expression(if_clause);
+        if !is_first {
+            self.infer_expression(iter);
         }
-
-        // TODO comprehension type
-        Type::Unknown
+        // TODO(dhruvmanila): The target type should be inferred based on the iter type instead.
+        let target_ty = self.infer_expression(target);
+        self.types.definitions.insert(definition, target_ty);
     }
 
     fn infer_named_expression(&mut self, named: &ast::ExprNamed) -> Type<'db> {
