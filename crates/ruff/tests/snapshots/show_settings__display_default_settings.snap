@@ -264,7 +264,7 @@ linter.flake8_import_conventions.aliases = {
 }
 linter.flake8_import_conventions.banned_aliases = {}
 linter.flake8_import_conventions.banned_from = []
-linter.flake8_pytest_style.fixture_parentheses = true
+linter.flake8_pytest_style.fixture_parentheses = false
 linter.flake8_pytest_style.parametrize_names_type = tuple
 linter.flake8_pytest_style.parametrize_values_type = list
 linter.flake8_pytest_style.parametrize_values_row_type = tuple
@@ -278,7 +278,7 @@ linter.flake8_pytest_style.raises_require_match_for = [
 	socket.error,
 ]
 linter.flake8_pytest_style.raises_extend_require_match_for = []
-linter.flake8_pytest_style.mark_parentheses = true
+linter.flake8_pytest_style.mark_parentheses = false
 linter.flake8_quotes.inline_quotes = double
 linter.flake8_quotes.multiline_quotes = double
 linter.flake8_quotes.docstring_quotes = double
