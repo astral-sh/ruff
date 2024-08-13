@@ -1,11 +1,13 @@
-use itertools::Itertools;
+use std::iter::Peekable;
+use std::ops::Range;
+use std::str::CharIndices;
+
 use ruff_diagnostics::{Applicability, Fix};
 use ruff_diagnostics::{Diagnostic, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::{self as ast};
-use ruff_python_parser::parse_expression;
+use ruff_python_ast as ast;
 use ruff_python_semantic::Modules;
-use ruff_text_size::{Ranged, TextLen};
+use ruff_text_size::{Ranged, TextSize};
 
 use crate::checkers::ast::Checker;
 use crate::fix::edits::add_parameter;
@@ -85,6 +87,49 @@ impl Violation for FastApiUnusedPathParameter {
     }
 }
 
+struct PathParamIterator<'a> {
+    input: &'a str,
+    chars: Peekable<CharIndices<'a>>,
+}
+
+impl<'a> PathParamIterator<'a> {
+    fn new(input: &'a str) -> Self {
+        PathParamIterator {
+            input,
+            chars: input.char_indices().peekable(),
+        }
+    }
+}
+
+impl<'a> Iterator for PathParamIterator<'a> {
+    type Item = (&'a str, Range<usize>);
+
+    fn next(&mut self) -> Option<Self::Item> {
+        while let Some((start, c)) = self.chars.next() {
+            if c == '{' {
+                if let Some((end, _)) = self.chars.by_ref().find(|&(_, ch)| ch == '}') {
+                    let param_content = &self.input[start + 1..end];
+                    // We ignore text after a colon, since those are path convertors
+                    // See also: https://fastapi.tiangolo.com/tutorial/path-params/?h=path#path-convertor
+                    let param_name_end = param_content.find(':').unwrap_or(param_content.len());
+                    let param_name = &param_content[..param_name_end].trim();
+
+                    #[allow(clippy::range_plus_one)]
+                    return Some((param_name, start..end + 1));
+                }
+            }
+        }
+        None
+    }
+}
+
+/// Returns an iterator of path parameters and their ranges in the route path.
+/// The string is just the name of the path parameter.
+/// The range includes the curly braces.
+fn extract_path_params_from_route(input: &str) -> PathParamIterator {
+    PathParamIterator::new(input)
+}
+
 pub(crate) fn fastapi_unused_path_parameter(
     checker: &mut Checker,
     function_def: &ast::StmtFunctionDef,
@@ -94,11 +139,12 @@ pub(crate) fn fastapi_unused_path_parameter(
     }
 
     // Get the route path from the decorator
-    let Some(route_decorator) = function_def
+    let route_decorator = function_def
         .decorator_list
         .iter()
-        .find_map(|decorator| is_fastapi_route_decorator(decorator, checker.semantic()))
-    else {
+        .find_map(|decorator| is_fastapi_route_decorator(decorator, checker.semantic()));
+
+    let Some(route_decorator) = route_decorator else {
         return;
     };
 
@@ -114,33 +160,7 @@ pub(crate) fn fastapi_unused_path_parameter(
         None => return,
     };
 
-    let outer_fstring_expr = parse_expression(format!("f\"{path}\"").as_str())
-        .ok()
-        .and_then(|f| f.expr().as_f_string_expr().cloned());
-
-    let Some(outer_fstring_expr) = outer_fstring_expr else {
-        return;
-    };
-
-    // Iterator of path parameters and their ranges in the route path.
-    // The string is just the name of the path parameter.
-    // The range includes the curly braces.
-    let path_params = outer_fstring_expr
-        .value
-        .iter()
-        .filter_map(|expr| expr.as_f_string())
-        .flat_map(|inner_fstring| inner_fstring.elements.expressions())
-        // We ignore any expressions that have a conversion (like !r or !s), as FastAPI will
-        // normalize them in an undocumented way.
-        .filter(|inner_expr| inner_expr.conversion.is_none())
-        // We also ignore any expressions that have debug text, for the same reason.
-        .filter(|inner_expr| inner_expr.debug_text.is_none())
-        .filter_map(|inner_expr| {
-            inner_expr
-                .expression
-                .as_name_expr()
-                .map(|name_expr| (name_expr.id().to_string(), inner_expr.range()))
-        });
+    let path_params = extract_path_params_from_route(&path);
 
     // Now we extract the arguments from the function signature
     let named_args: Vec<_> = function_def
@@ -156,7 +176,7 @@ pub(crate) fn fastapi_unused_path_parameter(
         .into_iter()
         .filter(|(path_param, _)| is_identifier(path_param))
     {
-        if named_args.contains(&&*path_param) {
+        if named_args.contains(&path_param) {
             continue;
         }
 
@@ -165,10 +185,11 @@ pub(crate) fn fastapi_unused_path_parameter(
             .posonlyargs
             .iter()
             .map(|arg| arg.parameter.name.as_str())
-            .contains(&path_param.as_str());
+            .collect::<Vec<_>>()
+            .contains(&path_param);
 
         let violation = FastApiUnusedPathParameter {
-            arg_name: path_param.clone(),
+            arg_name: path_param.to_string(),
             function_name: function_def.name.to_string(),
             // If the path parameter shows up in the positional-only arguments,
             // the path parameter injection also won't work, but we can't fix that (yet)
@@ -176,22 +197,17 @@ pub(crate) fn fastapi_unused_path_parameter(
             arg_name_already_used,
         };
         let fixable = violation.fix_title().is_some();
+        #[allow(clippy::cast_possible_truncation)]
         let mut diagnostic = Diagnostic::new(
             violation,
             diagnostic_range
-                .add_start(range.start() - '{'.text_len())
-                .sub_end(
-                    // Get the total length of the path parameter
-                    diagnostic_range.len()
-                        // Subtract the length of the path parameter
-                            - range.end()
-                        + '}'.text_len(),
-                ),
+                .add_start(TextSize::from(range.start as u32 + 1))
+                .sub_end(TextSize::from((path.len() - range.end + 1) as u32)),
         );
         if fixable {
             diagnostic.set_fix(Fix::applicable_edit(
                 add_parameter(
-                    path_param.as_str(),
+                    path_param,
                     &function_def.parameters,
                     checker.locator().contents(),
                 ),
