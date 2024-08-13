@@ -45,3 +45,10 @@ def negative_cases():
 
     import django.utils.translations
     y = django.utils.translations.gettext("This {should} be understood as a translation string too!")
+
+    # Calling `gettext.install()` literall monkey-patches `builtins._ = ...`,
+    # so even the fully qualified access of `builtins._()` should be considered
+    # a possible `gettext` call.
+    import builtins
+    another = 42
+    z = builtins._("{another} translation string")
