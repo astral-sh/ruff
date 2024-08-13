@@ -53,7 +53,7 @@ impl Violation for SelfOrClsAssignment {
         let SelfOrClsAssignment { method_type } = self;
 
         format!(
-            "Confusing assignment to `{}` argument in {method_type} method",
+            "Reassigned `{}` variable in {method_type} method",
             method_type.arg_name(),
         )
     }
