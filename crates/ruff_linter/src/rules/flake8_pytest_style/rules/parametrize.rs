@@ -292,7 +292,7 @@ fn elts_to_csv(elts: &[Expr], generator: Generator) -> Option<String> {
             .fold(String::new(), |mut acc, elt| {
                 if let Expr::StringLiteral(ast::ExprStringLiteral { value, .. }) = elt {
                     if !acc.is_empty() {
-                        acc.push(',');
+                        acc.push_str(", ");
                     }
                     acc.push_str(value.to_str());
                 }
