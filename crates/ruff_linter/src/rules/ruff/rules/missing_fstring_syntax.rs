@@ -10,22 +10,18 @@ use ruff_text_size::{Ranged, TextRange};
 use rustc_hash::FxHashSet;
 
 /// ## What it does
-/// Searches for strings that look like they were meant to be f-strings, but are missing an `f` prefix.
+/// Checks for strings that contain f-string syntax but are not f-strings.
 ///
 /// ## Why is this bad?
-/// Expressions inside curly braces are only evaluated if the string has an `f` prefix.
+/// An f-string missing an `f` at the beginning won't format anything, and instead
+/// treat the interpolation syntax as literal.
 ///
-/// ## Details
+/// Since there are many possible string literals which contain syntax similar to f-strings yet are not intended to be,
+/// this lint will disqualify any literal that satisfies any of the following conditions:
 ///
-/// There are many possible string literals which are not meant to be f-strings
-/// despite containing f-string-like syntax. As such, this lint ignores all strings
-/// where one of the following conditions applies:
-///
-/// 1. The string is a standalone expression. For example, the rule ignores all docstrings.
-/// 2. The string is part of a function call with argument names that match at least one variable
-///    (for example: `format("Message: {value}", value="Hello World")`)
-/// 3. The string (or a parent expression of the string) has a direct method call on it
-///    (for example: `"{value}".format(...)`)
+/// 1. The string literal is a standalone expression. For example, a docstring.
+/// 2. The literal is part of a function call with argument names that match at least one variable (for example: `format("Message: {value}", value = "Hello World")`)
+/// 3. The literal (or a parent expression of the literal) has a direct method call on it (for example: `"{value}".format(...)`)
 /// 4. The string has no `{...}` expression sections, or uses invalid f-string syntax.
 /// 5. The string references variables that are not in scope, or it doesn't capture variables at all.
 /// 6. Any format specifiers in the potential f-string are invalid.
@@ -34,15 +30,15 @@ use rustc_hash::FxHashSet;
 ///
 /// ```python
 /// name = "Sarah"
-/// day_of_week = "Tuesday"
-/// print("Hello {name}! It is {day_of_week} today!")
+/// dayofweek = "Tuesday"
+/// msg = "Hello {name}! It is {dayofweek} today!"
 /// ```
 ///
 /// Use instead:
 /// ```python
 /// name = "Sarah"
-/// day_of_week = "Tuesday"
-/// print(f"Hello {name}! It is {day_of_week} today!")
+/// dayofweek = "Tuesday"
+/// msg = f"Hello {name}! It is {dayofweek} today!"
 /// ```
 #[violation]
 pub struct MissingFStringSyntax;
@@ -123,7 +119,7 @@ fn is_gettext(expr: &ast::Expr, semantic: &SemanticModel) -> bool {
         .is_some_and(|qualified_name| {
             matches!(
                 qualified_name.segments(),
-                ["gettext", "gettext" | "ngettext"] | ["builtins", "_"]
+                ["gettext", "gettext" | "ngettext"]
             )
         })
 }
