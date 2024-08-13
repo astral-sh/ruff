@@ -1390,11 +1390,8 @@ pub struct Flake8PytestStyleOptions {
     /// default), `@pytest.fixture()` is valid and `@pytest.fixture` is
     /// invalid. If set to `false`, `@pytest.fixture` is valid and
     /// `@pytest.fixture()` is invalid.
-    ///
-    /// If [preview](https://docs.astral.sh/ruff/preview/) is enabled, defaults to
-    /// `false`.
     #[option(
-        default = "true",
+        default = "false",
         value_type = "bool",
         example = "fixture-parentheses = true"
     )]
@@ -1476,11 +1473,8 @@ pub struct Flake8PytestStyleOptions {
     /// default), `@pytest.mark.foo()` is valid and `@pytest.mark.foo` is
     /// invalid. If set to `false`, `@pytest.mark.foo` is valid and
     /// `@pytest.mark.foo()` is invalid.
-    ///
-    /// If [preview](https://docs.astral.sh/ruff/preview/) is enabled, defaults to
-    /// `false`.
     #[option(
-        default = "true",
+        default = "false",
         value_type = "bool",
         example = "mark-parentheses = true"
     )]

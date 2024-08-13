@@ -32,10 +32,9 @@ use super::helpers::{
 /// optional.
 ///
 /// Either removing those unnecessary parentheses _or_ requiring them for all
-/// fixtures is fine, but it's best to be consistent.
-///
-/// In [preview], this rule defaults to removing unnecessary parentheses, to match
-/// the behavior of official pytest projects.
+/// fixtures is fine, but it's best to be consistent. The rule defaults to
+/// removing unnecessary parentheses, to match the documentation of the
+/// official pytest projects.
 ///
 /// ## Example
 ///
@@ -62,8 +61,6 @@ use super::helpers::{
 ///
 /// ## References
 /// - [`pytest` documentation: API Reference: Fixtures](https://docs.pytest.org/en/latest/reference/reference.html#fixtures-api)
-///
-/// [preview]: https://docs.astral.sh/ruff/preview/
 #[violation]
 pub struct PytestFixtureIncorrectParenthesesStyle {
     expected: Parentheses,
@@ -938,9 +935,7 @@ pub(crate) fn fixture(
             check_fixture_decorator(checker, name, decorator);
         }
 
-        if checker.enabled(Rule::PytestDeprecatedYieldFixture)
-            && checker.settings.flake8_pytest_style.fixture_parentheses
-        {
+        if checker.enabled(Rule::PytestDeprecatedYieldFixture) {
             check_fixture_decorator_name(checker, decorator);
         }
 
