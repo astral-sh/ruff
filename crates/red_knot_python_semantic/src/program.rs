@@ -1,21 +1,53 @@
 use crate::python_version::PythonVersion;
-use crate::Db;
-use ruff_db::system::SystemPathBuf;
+use anyhow::Context;
 use salsa::Durability;
+use salsa::Setter;
+
+use ruff_db::system::SystemPathBuf;
+
+use crate::module_resolver::SearchPaths;
+use crate::Db;
 
 #[salsa::input(singleton)]
 pub struct Program {
     pub target_version: PythonVersion,
 
+    #[default]
     #[return_ref]
-    pub search_paths: SearchPathSettings,
+    pub(crate) search_paths: SearchPaths,
 }
 
 impl Program {
-    pub fn from_settings(db: &dyn Db, settings: ProgramSettings) -> Self {
-        Program::builder(settings.target_version, settings.search_paths)
+    pub fn from_settings(db: &dyn Db, settings: ProgramSettings) -> anyhow::Result<Self> {
+        let ProgramSettings {
+            target_version,
+            search_paths,
+        } = settings;
+
+        tracing::info!("Target version: {target_version}");
+
+        let search_paths = SearchPaths::from_settings(db, search_paths)
+            .with_context(|| "Invalid search path settings")?;
+
+        Ok(Program::builder(settings.target_version)
             .durability(Durability::HIGH)
-            .new(db)
+            .search_paths(search_paths)
+            .new(db))
+    }
+
+    pub fn update_search_paths(
+        &self,
+        db: &mut dyn Db,
+        search_path_settings: SearchPathSettings,
+    ) -> anyhow::Result<()> {
+        let search_paths = SearchPaths::from_settings(db, search_path_settings)?;
+
+        if self.search_paths(db) != &search_paths {
+            tracing::debug!("Update search paths");
+            self.set_search_paths(db).to(search_paths);
+        }
+
+        Ok(())
     }
 }
 

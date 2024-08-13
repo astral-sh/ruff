@@ -1,5 +1,6 @@
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 
 use ignore::{WalkBuilder, WalkState};
@@ -99,32 +100,49 @@ impl RuffSettings {
 
 impl RuffSettingsIndex {
     pub(super) fn new(root: &Path, editor_settings: &ResolvedEditorSettings) -> Self {
+        let mut error = false;
         let mut index = BTreeMap::default();
         let mut respect_gitignore = None;
 
-        // Add any settings from above the workspace root.
-        for directory in root.ancestors() {
-            if let Some(pyproject) = settings_toml(directory).ok().flatten() {
-                let Ok(settings) = ruff_workspace::resolver::resolve_root_settings(
-                    &pyproject,
-                    Relativity::Parent,
-                    &EditorConfigurationTransformer(editor_settings, root),
-                ) else {
+        // Add any settings from above the workspace root, excluding the workspace root itself.
+        for directory in root.ancestors().skip(1) {
+            match settings_toml(directory) {
+                Ok(Some(pyproject)) => {
+                    match ruff_workspace::resolver::resolve_root_settings(
+                        &pyproject,
+                        Relativity::Parent,
+                        &EditorConfigurationTransformer(editor_settings, root),
+                    ) {
+                        Ok(settings) => {
+                            respect_gitignore = Some(settings.file_resolver.respect_gitignore);
+
+                            index.insert(
+                                directory.to_path_buf(),
+                                Arc::new(RuffSettings {
+                                    path: Some(pyproject),
+                                    file_resolver: settings.file_resolver,
+                                    linter: settings.linter,
+                                    formatter: settings.formatter,
+                                }),
+                            );
+                            break;
+                        }
+                        Err(err) => {
+                            tracing::error!(
+                                "Error while resolving settings from {}: {err}",
+                                pyproject.display()
+                            );
+                            error = true;
+                            continue;
+                        }
+                    }
+                }
+                Ok(None) => continue,
+                Err(err) => {
+                    tracing::error!("{err}");
+                    error = true;
                     continue;
-                };
-
-                respect_gitignore = Some(settings.file_resolver.respect_gitignore);
-
-                index.insert(
-                    directory.to_path_buf(),
-                    Arc::new(RuffSettings {
-                        path: Some(pyproject),
-                        file_resolver: settings.file_resolver,
-                        linter: settings.linter,
-                        formatter: settings.formatter,
-                    }),
-                );
-                break;
+                }
             }
         }
 
@@ -144,6 +162,8 @@ impl RuffSettingsIndex {
         let walker = builder.build_parallel();
 
         let index = std::sync::RwLock::new(index);
+        let error = AtomicBool::new(error);
+
         walker.run(|| {
             Box::new(|result| {
                 let Ok(entry) = result else {
@@ -186,28 +206,50 @@ impl RuffSettingsIndex {
                     }
                 }
 
-                if let Some(pyproject) = settings_toml(&directory).ok().flatten() {
-                    let Ok(settings) = ruff_workspace::resolver::resolve_root_settings(
-                        &pyproject,
-                        Relativity::Parent,
-                        &EditorConfigurationTransformer(editor_settings, root),
-                    ) else {
-                        return WalkState::Continue;
-                    };
-                    index.write().unwrap().insert(
-                        directory,
-                        Arc::new(RuffSettings {
-                            path: Some(pyproject),
-                            file_resolver: settings.file_resolver,
-                            linter: settings.linter,
-                            formatter: settings.formatter,
-                        }),
-                    );
+                match settings_toml(&directory) {
+                    Ok(Some(pyproject)) => {
+                        match ruff_workspace::resolver::resolve_root_settings(
+                            &pyproject,
+                            Relativity::Parent,
+                            &EditorConfigurationTransformer(editor_settings, root),
+                        ) {
+                            Ok(settings) => {
+                                index.write().unwrap().insert(
+                                    directory,
+                                    Arc::new(RuffSettings {
+                                        path: Some(pyproject),
+                                        file_resolver: settings.file_resolver,
+                                        linter: settings.linter,
+                                        formatter: settings.formatter,
+                                    }),
+                                );
+                            }
+                            Err(err) => {
+                                tracing::error!(
+                                    "Error while resolving settings from {}: {err}",
+                                    pyproject.display()
+                                );
+                                error.store(true, Ordering::Relaxed);
+                            }
+                        }
+                    }
+                    Ok(None) => {}
+                    Err(err) => {
+                        tracing::error!("{err}");
+                        error.store(true, Ordering::Relaxed);
+                    }
                 }
 
                 WalkState::Continue
             })
         });
+
+        if error.load(Ordering::Relaxed) {
+            let root = root.display();
+            show_err_msg!(
+                "Error while resolving settings from workspace {root}. Please refer to the logs for more details.",
+            );
+        }
 
         Self {
             index: index.into_inner().unwrap(),

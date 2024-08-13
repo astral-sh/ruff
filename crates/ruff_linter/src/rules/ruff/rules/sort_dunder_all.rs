@@ -157,11 +157,16 @@ fn sort_dunder_all(checker: &mut Checker, target: &ast::Expr, node: &ast::Expr) 
 
     let (elts, range, kind) = match node {
         ast::Expr::List(ast::ExprList { elts, range, .. }) => (elts, *range, SequenceKind::List),
-        ast::Expr::Tuple(tuple_node @ ast::ExprTuple { elts, range, .. }) => (
+        ast::Expr::Tuple(ast::ExprTuple {
+            elts,
+            range,
+            parenthesized,
+            ..
+        }) => (
             elts,
             *range,
             SequenceKind::Tuple {
-                parenthesized: tuple_node.parenthesized,
+                parenthesized: *parenthesized,
             },
         ),
         _ => return,

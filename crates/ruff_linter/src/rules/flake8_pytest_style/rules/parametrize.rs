@@ -292,7 +292,7 @@ fn elts_to_csv(elts: &[Expr], generator: Generator) -> Option<String> {
             .fold(String::new(), |mut acc, elt| {
                 if let Expr::StringLiteral(ast::ExprStringLiteral { value, .. }) = elt {
                     if !acc.is_empty() {
-                        acc.push(',');
+                        acc.push_str(", ");
                     }
                     acc.push_str(value.to_str());
                 }
@@ -416,9 +416,7 @@ fn check_names(checker: &mut Checker, decorator: &Decorator, expr: &Expr) {
         }
         Expr::Tuple(ast::ExprTuple { elts, .. }) => {
             if elts.len() == 1 {
-                if let Some(first) = elts.first() {
-                    handle_single_name(checker, expr, first);
-                }
+                handle_single_name(checker, expr, &elts[0]);
             } else {
                 match names_type {
                     types::ParametrizeNameType::Tuple => {}
@@ -462,9 +460,7 @@ fn check_names(checker: &mut Checker, decorator: &Decorator, expr: &Expr) {
         }
         Expr::List(ast::ExprList { elts, .. }) => {
             if elts.len() == 1 {
-                if let Some(first) = elts.first() {
-                    handle_single_name(checker, expr, first);
-                }
+                handle_single_name(checker, expr, &elts[0]);
             } else {
                 match names_type {
                     types::ParametrizeNameType::List => {}

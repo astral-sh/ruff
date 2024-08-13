@@ -254,13 +254,12 @@ fn itemgetter_op_tuple(
     let [arg] = params.args.as_slice() else {
         return None;
     };
-    if expr.elts.is_empty() || expr.elts.len() == 1 {
+    if expr.len() <= 1 {
         return None;
     }
     Some(Operator {
         name: "itemgetter",
         args: expr
-            .elts
             .iter()
             .map(|expr| {
                 expr.as_subscript_expr()

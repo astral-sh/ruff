@@ -98,7 +98,7 @@ fn is_none(expr: &Expr) -> bool {
             }
 
             // Ex) `(type(None),)`
-            Expr::Tuple(ast::ExprTuple { elts, .. }) => elts.iter().all(|elt| inner(elt, false)),
+            Expr::Tuple(tuple) => tuple.iter().all(|element| inner(element, false)),
 
             // Ex) `type(None) | type(None)`
             Expr::BinOp(ast::ExprBinOp {

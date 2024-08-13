@@ -52,7 +52,7 @@ fn setup_case() -> Case {
         },
     };
 
-    let mut db = RootDatabase::new(metadata, settings, system);
+    let mut db = RootDatabase::new(metadata, settings, system).unwrap();
     let parser = system_path_to_file(&db, parser_path).unwrap();
 
     db.workspace().open_file(&mut db, parser);
@@ -89,7 +89,7 @@ fn benchmark_incremental(criterion: &mut Criterion) {
                 let Case { db, parser, .. } = case;
                 let result = db.check_file(*parser).unwrap();
 
-                assert_eq!(result.len(), 403);
+                assert_eq!(result.len(), 402);
             },
             BatchSize::SmallInput,
         );
@@ -104,7 +104,7 @@ fn benchmark_cold(criterion: &mut Criterion) {
                 let Case { db, parser, .. } = case;
                 let result = db.check_file(*parser).unwrap();
 
-                assert_eq!(result.len(), 403);
+                assert_eq!(result.len(), 402);
             },
             BatchSize::SmallInput,
         );

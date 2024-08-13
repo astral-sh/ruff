@@ -40,7 +40,7 @@ use crate::semantic_index::symbol::{FileScopeId, NodeWithScopeKind, NodeWithScop
 use crate::semantic_index::SemanticIndex;
 use crate::types::{
     builtins_symbol_ty_by_name, definitions_ty, global_symbol_ty_by_name, ClassType, FunctionType,
-    Name, Type, UnionTypeBuilder,
+    Name, Type, UnionBuilder,
 };
 use crate::Db;
 
@@ -61,7 +61,7 @@ pub(crate) fn infer_scope_types<'db>(db: &'db dyn Db, scope: ScopeId<'db>) -> Ty
     TypeInferenceBuilder::new(db, InferenceRegion::Scope(scope), index).finish()
 }
 
-/// Cycle recovery for [`infer_definition_types`]: for now, just [`Type::Unknown`]
+/// Cycle recovery for [`infer_definition_types()`]: for now, just [`Type::Unknown`]
 /// TODO fixpoint iteration
 fn infer_definition_types_cycle_recovery<'db>(
     _db: &'db dyn Db,
@@ -260,6 +260,18 @@ impl<'db> TypeInferenceBuilder<'db> {
             NodeWithScopeKind::FunctionTypeParameters(function) => {
                 self.infer_function_type_params(function.node());
             }
+            NodeWithScopeKind::ListComprehension(comprehension) => {
+                self.infer_list_comprehension_expression_scope(comprehension.node());
+            }
+            NodeWithScopeKind::SetComprehension(comprehension) => {
+                self.infer_set_comprehension_expression_scope(comprehension.node());
+            }
+            NodeWithScopeKind::DictComprehension(comprehension) => {
+                self.infer_dict_comprehension_expression_scope(comprehension.node());
+            }
+            NodeWithScopeKind::GeneratorExpression(generator) => {
+                self.infer_generator_expression_scope(generator.node());
+            }
         }
     }
 
@@ -287,6 +299,13 @@ impl<'db> TypeInferenceBuilder<'db> {
             }
             DefinitionKind::NamedExpression(named_expression) => {
                 self.infer_named_expression_definition(named_expression.node(), definition);
+            }
+            DefinitionKind::Comprehension(comprehension) => {
+                self.infer_comprehension_definition(
+                    comprehension.node(),
+                    comprehension.is_first(),
+                    definition,
+                );
             }
         }
     }
@@ -923,7 +942,6 @@ impl<'db> TypeInferenceBuilder<'db> {
         ty
     }
 
-    #[allow(clippy::unused_self)]
     fn infer_number_literal_expression(&mut self, literal: &ast::ExprNumberLiteral) -> Type<'db> {
         let ast::ExprNumberLiteral { range: _, value } = literal;
 
@@ -1054,18 +1072,24 @@ impl<'db> TypeInferenceBuilder<'db> {
         builtins_symbol_ty_by_name(self.db, "dict").instance()
     }
 
+    /// Infer the type of the `iter` expression of the first comprehension.
+    fn infer_first_comprehension_iter(&mut self, comprehensions: &[ast::Comprehension]) {
+        let mut generators_iter = comprehensions.iter();
+        let Some(first_generator) = generators_iter.next() else {
+            unreachable!("Comprehension must contain at least one generator");
+        };
+        self.infer_expression(&first_generator.iter);
+    }
+
     fn infer_generator_expression(&mut self, generator: &ast::ExprGenerator) -> Type<'db> {
         let ast::ExprGenerator {
             range: _,
-            elt,
+            elt: _,
             generators,
             parenthesized: _,
         } = generator;
 
-        self.infer_expression(elt);
-        for generator in generators {
-            self.infer_comprehension(generator);
-        }
+        self.infer_first_comprehension_iter(generators);
 
         // TODO generator type
         Type::Unknown
@@ -1074,20 +1098,71 @@ impl<'db> TypeInferenceBuilder<'db> {
     fn infer_list_comprehension_expression(&mut self, listcomp: &ast::ExprListComp) -> Type<'db> {
         let ast::ExprListComp {
             range: _,
-            elt,
+            elt: _,
             generators,
         } = listcomp;
 
-        self.infer_expression(elt);
-        for generator in generators {
-            self.infer_comprehension(generator);
-        }
+        self.infer_first_comprehension_iter(generators);
 
         // TODO list type
         Type::Unknown
     }
 
     fn infer_dict_comprehension_expression(&mut self, dictcomp: &ast::ExprDictComp) -> Type<'db> {
+        let ast::ExprDictComp {
+            range: _,
+            key: _,
+            value: _,
+            generators,
+        } = dictcomp;
+
+        self.infer_first_comprehension_iter(generators);
+
+        // TODO dict type
+        Type::Unknown
+    }
+
+    fn infer_set_comprehension_expression(&mut self, setcomp: &ast::ExprSetComp) -> Type<'db> {
+        let ast::ExprSetComp {
+            range: _,
+            elt: _,
+            generators,
+        } = setcomp;
+
+        self.infer_first_comprehension_iter(generators);
+
+        // TODO set type
+        Type::Unknown
+    }
+
+    fn infer_generator_expression_scope(&mut self, generator: &ast::ExprGenerator) {
+        let ast::ExprGenerator {
+            range: _,
+            elt,
+            generators,
+            parenthesized: _,
+        } = generator;
+
+        self.infer_expression(elt);
+        for comprehension in generators {
+            self.infer_comprehension(comprehension);
+        }
+    }
+
+    fn infer_list_comprehension_expression_scope(&mut self, listcomp: &ast::ExprListComp) {
+        let ast::ExprListComp {
+            range: _,
+            elt,
+            generators,
+        } = listcomp;
+
+        self.infer_expression(elt);
+        for comprehension in generators {
+            self.infer_comprehension(comprehension);
+        }
+    }
+
+    fn infer_dict_comprehension_expression_scope(&mut self, dictcomp: &ast::ExprDictComp) {
         let ast::ExprDictComp {
             range: _,
             key,
@@ -1097,46 +1172,51 @@ impl<'db> TypeInferenceBuilder<'db> {
 
         self.infer_expression(key);
         self.infer_expression(value);
-        for generator in generators {
-            self.infer_comprehension(generator);
+        for comprehension in generators {
+            self.infer_comprehension(comprehension);
         }
-
-        // TODO dict type
-        Type::Unknown
     }
 
-    fn infer_set_comprehension_expression(&mut self, setcomp: &ast::ExprSetComp) -> Type<'db> {
+    fn infer_set_comprehension_expression_scope(&mut self, setcomp: &ast::ExprSetComp) {
         let ast::ExprSetComp {
             range: _,
             elt,
             generators,
         } = setcomp;
-        self.infer_expression(elt);
-        for generator in generators {
-            self.infer_comprehension(generator);
-        }
 
-        // TODO set type
-        Type::Unknown
+        self.infer_expression(elt);
+        for comprehension in generators {
+            self.infer_comprehension(comprehension);
+        }
     }
 
-    fn infer_comprehension(&mut self, comprehension: &ast::Comprehension) -> Type<'db> {
+    fn infer_comprehension(&mut self, comprehension: &ast::Comprehension) {
+        self.infer_definition(comprehension);
+        for expr in &comprehension.ifs {
+            self.infer_expression(expr);
+        }
+    }
+
+    fn infer_comprehension_definition(
+        &mut self,
+        comprehension: &ast::Comprehension,
+        is_first: bool,
+        definition: Definition<'db>,
+    ) {
         let ast::Comprehension {
             range: _,
             target,
             iter,
-            ifs,
+            ifs: _,
             is_async: _,
         } = comprehension;
 
-        self.infer_expression(target);
-        self.infer_expression(iter);
-        for if_clause in ifs {
-            self.infer_expression(if_clause);
+        if !is_first {
+            self.infer_expression(iter);
         }
-
-        // TODO comprehension type
-        Type::Unknown
+        // TODO(dhruvmanila): The target type should be inferred based on the iter type instead.
+        let target_ty = self.infer_expression(target);
+        self.types.definitions.insert(definition, target_ty);
     }
 
     fn infer_named_expression(&mut self, named: &ast::ExprNamed) -> Type<'db> {
@@ -1179,12 +1259,10 @@ impl<'db> TypeInferenceBuilder<'db> {
         let body_ty = self.infer_expression(body);
         let orelse_ty = self.infer_expression(orelse);
 
-        let union = UnionTypeBuilder::new(self.db)
+        UnionBuilder::new(self.db)
             .add(body_ty)
             .add(orelse_ty)
-            .build();
-
-        Type::Union(union)
+            .build()
     }
 
     fn infer_lambda_body(&mut self, lambda_expression: &ast::ExprLambda) {
@@ -1494,6 +1572,7 @@ impl<'db> TypeInferenceBuilder<'db> {
 
 #[cfg(test)]
 mod tests {
+    use anyhow::Context;
     use ruff_db::files::{system_path_to_file, File};
     use ruff_db::parsed::parsed_module;
     use ruff_db::system::{DbWithTestSystem, SystemPathBuf};
@@ -1508,40 +1587,58 @@ mod tests {
     use crate::semantic_index::symbol::FileScopeId;
     use crate::semantic_index::{global_scope, semantic_index, symbol_table, use_def_map};
     use crate::types::{global_symbol_ty_by_name, infer_definition_types, symbol_ty_by_name, Type};
-    use crate::{HasTy, SemanticModel};
+    use crate::{HasTy, ProgramSettings, SemanticModel};
 
     fn setup_db() -> TestDb {
         let db = TestDb::new();
 
-        Program::new(
+        let src_root = SystemPathBuf::from("/src");
+        db.memory_file_system()
+            .create_directory_all(&src_root)
+            .unwrap();
+
+        Program::from_settings(
             &db,
-            PythonVersion::default(),
-            SearchPathSettings {
-                extra_paths: Vec::new(),
-                src_root: SystemPathBuf::from("/src"),
-                site_packages: vec![],
-                custom_typeshed: None,
+            ProgramSettings {
+                target_version: PythonVersion::default(),
+                search_paths: SearchPathSettings {
+                    extra_paths: Vec::new(),
+                    src_root,
+                    site_packages: vec![],
+                    custom_typeshed: None,
+                },
             },
-        );
+        )
+        .expect("Valid search path settings");
 
         db
     }
 
-    fn setup_db_with_custom_typeshed(typeshed: &str) -> TestDb {
-        let db = TestDb::new();
+    fn setup_db_with_custom_typeshed<'a>(
+        typeshed: &str,
+        files: impl IntoIterator<Item = (&'a str, &'a str)>,
+    ) -> anyhow::Result<TestDb> {
+        let mut db = TestDb::new();
+        let src_root = SystemPathBuf::from("/src");
 
-        Program::new(
+        db.write_files(files)
+            .context("Failed to write test files")?;
+
+        Program::from_settings(
             &db,
-            PythonVersion::default(),
-            SearchPathSettings {
-                extra_paths: Vec::new(),
-                src_root: SystemPathBuf::from("/src"),
-                site_packages: vec![],
-                custom_typeshed: Some(SystemPathBuf::from(typeshed)),
+            ProgramSettings {
+                target_version: PythonVersion::default(),
+                search_paths: SearchPathSettings {
+                    extra_paths: Vec::new(),
+                    src_root,
+                    site_packages: vec![],
+                    custom_typeshed: Some(SystemPathBuf::from(typeshed)),
+                },
             },
-        );
+        )
+        .context("Failed to create Program")?;
 
-        db
+        Ok(db)
     }
 
     fn assert_public_ty(db: &TestDb, file_name: &str, symbol_name: &str, expected: &str) {
@@ -2131,16 +2228,17 @@ mod tests {
 
     #[test]
     fn builtin_symbol_custom_stdlib() -> anyhow::Result<()> {
-        let mut db = setup_db_with_custom_typeshed("/typeshed");
-
-        db.write_files([
-            ("/src/a.py", "c = copyright"),
-            (
-                "/typeshed/stdlib/builtins.pyi",
-                "def copyright() -> None: ...",
-            ),
-            ("/typeshed/stdlib/VERSIONS", "builtins: 3.8-"),
-        ])?;
+        let db = setup_db_with_custom_typeshed(
+            "/typeshed",
+            [
+                ("/src/a.py", "c = copyright"),
+                (
+                    "/typeshed/stdlib/builtins.pyi",
+                    "def copyright() -> None: ...",
+                ),
+                ("/typeshed/stdlib/VERSIONS", "builtins: 3.8-"),
+            ],
+        )?;
 
         assert_public_ty(&db, "/src/a.py", "c", "Literal[copyright]");
 
@@ -2160,13 +2258,14 @@ mod tests {
 
     #[test]
     fn unknown_builtin_later_defined() -> anyhow::Result<()> {
-        let mut db = setup_db_with_custom_typeshed("/typeshed");
-
-        db.write_files([
-            ("/src/a.py", "x = foo"),
-            ("/typeshed/stdlib/builtins.pyi", "foo = bar; bar = 1"),
-            ("/typeshed/stdlib/VERSIONS", "builtins: 3.8-"),
-        ])?;
+        let db = setup_db_with_custom_typeshed(
+            "/typeshed",
+            [
+                ("/src/a.py", "x = foo"),
+                ("/typeshed/stdlib/builtins.pyi", "foo = bar; bar = 1"),
+                ("/typeshed/stdlib/VERSIONS", "builtins: 3.8-"),
+            ],
+        )?;
 
         assert_public_ty(&db, "/src/a.py", "x", "Unbound");
 

@@ -20,8 +20,7 @@ fn setup_db(workspace_root: SystemPathBuf) -> anyhow::Result<RootDatabase> {
         target_version: PythonVersion::default(),
         search_paths,
     };
-    let db = RootDatabase::new(workspace, settings, system);
-    Ok(db)
+    RootDatabase::new(workspace, settings, system)
 }
 
 /// Test that all snippets in testcorpus can be checked without panic

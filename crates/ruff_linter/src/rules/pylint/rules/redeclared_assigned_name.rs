@@ -52,8 +52,8 @@ pub(crate) fn redeclared_assigned_name(checker: &mut Checker, targets: &Vec<Expr
 
 fn check_expr(checker: &mut Checker, expr: &Expr, names: &mut Vec<Name>) {
     match expr {
-        Expr::Tuple(ast::ExprTuple { elts, .. }) => {
-            for target in elts {
+        Expr::Tuple(tuple) => {
+            for target in tuple {
                 check_expr(checker, target, names);
             }
         }

@@ -457,8 +457,8 @@ Some configuration options can be provided or overridden via dedicated flags on 
 This includes those related to rule enablement and disablement,
 file discovery, logging level, and more:
 
-```shell
-ruff check path/to/code/ --select F401 --select F403 --quiet
+```console
+$ ruff check path/to/code/ --select F401 --select F403 --quiet
 ```
 
 All other configuration options can be set via the command line
@@ -469,8 +469,8 @@ using the `--config` flag, detailed below.
 The `--config` flag has two uses. It is most often used to point to the
 configuration file that you would like Ruff to use, for example:
 
-```shell
-ruff check path/to/directory --config path/to/ruff.toml
+```console
+$ ruff check path/to/directory --config path/to/ruff.toml
 ```
 
 However, the `--config` flag can also be used to provide arbitrary
@@ -484,8 +484,8 @@ since this setting has no dedicated CLI flag. The `per-file-ignores` setting
 could also have been overridden via the `--per-file-ignores` dedicated flag,
 but using `--config` to override the setting is also fine:
 
-```shell
-ruff check path/to/file --config path/to/ruff.toml --config "lint.dummy-variable-rgx = '__.*'" --config "lint.per-file-ignores = {'some_file.py' = ['F841']}"
+```console
+$ ruff check path/to/file --config path/to/ruff.toml --config "lint.dummy-variable-rgx = '__.*'" --config "lint.per-file-ignores = {'some_file.py' = ['F841']}"
 ```
 
 Configuration options passed to `--config` are parsed in the same way
@@ -500,8 +500,8 @@ a dedicated flag and by the `--config` flag, the dedicated flag
 takes priority. In this example, the maximum permitted line length
 will be set to 90, not 100:
 
-```shell
-ruff format path/to/file --line-length=90 --config "line-length=100"
+```console
+$ ruff format path/to/file --line-length=90 --config "line-length=100"
 ```
 
 Specifying `--config "line-length=90"` will override the `line-length`
