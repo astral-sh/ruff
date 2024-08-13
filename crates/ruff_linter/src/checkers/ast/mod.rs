@@ -691,6 +691,14 @@ impl<'a> Visitor<'a> for Checker<'a> {
                         self.semantic(),
                     );
 
+                // The default values of the parameters needs to be evaluated in the enclosing
+                // scope.
+                for parameter in &**parameters {
+                    if let Some(expr) = parameter.default() {
+                        self.visit_expr(expr);
+                    }
+                }
+
                 self.semantic.push_scope(ScopeKind::Type);
 
                 if let Some(type_params) = type_params {
@@ -714,9 +722,6 @@ impl<'a> Visitor<'a> for Checker<'a> {
                                 }
                             }
                         }
-                    }
-                    if let Some(expr) = parameter.default() {
-                        self.visit_expr(expr);
                     }
                 }
                 if let Some(expr) = returns {
