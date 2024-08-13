@@ -12,8 +12,8 @@ use ruff_text_size::Ranged;
 use crate::checkers::ast::Checker;
 
 /// ## What it does
-/// Checks for `__len__` implementations that return values other than a non-negative
-/// integer.
+/// Checks for `__len__` implementations that return values that are not non-negative
+/// integers.
 ///
 /// ## Why is this bad?
 /// The `__len__` method should return a non-negative integer. Returning a different
@@ -21,7 +21,7 @@ use crate::checkers::ast::Checker;
 ///
 /// Note: `bool` is a subclass of `int`, so it's technically valid for `__len__` to
 /// return `True` or `False`. However, for consistency with other rules, Ruff will
-/// still raise when `__len__` returns a `bool`.
+/// still emit a diagnostic when `__len__` returns a `bool`.
 ///
 /// ## Example
 /// ```python
@@ -36,7 +36,6 @@ use crate::checkers::ast::Checker;
 ///     def __len__(self):
 ///         return 2
 /// ```
-///
 ///
 /// ## References
 /// - [Python documentation: The `__len__` method](https://docs.python.org/3/reference/datamodel.html#object.__len__)
