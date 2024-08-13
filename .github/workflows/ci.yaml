@@ -108,6 +108,8 @@ jobs:
           rustup component add clippy
           rustup target add wasm32-unknown-unknown
       - uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: warm
       - name: "Clippy"
         run: cargo clippy --workspace --all-targets --all-features --locked -- -D warnings
       - name: "Clippy (wasm)"
@@ -135,6 +137,8 @@ jobs:
           tool: cargo-insta
       - uses: Swatinem/rust-cache@v2
         with:
+          # NOTE: only this job updates the warm linux cache. No point in having
+          # it overwritten by other jobs.
           shared-key: warm
           save-if: ${{ github.ref_name == 'main' }}
       - name: "Run tests"
@@ -168,9 +172,6 @@ jobs:
         with:
           tool: cargo-nextest
       - uses: Swatinem/rust-cache@v2
-        with:
-          shared-key: warm-windows
-          save-if: ${{ github.ref_name == 'main' }}
       - name: "Run tests"
         shell: bash
         env:
@@ -252,8 +253,7 @@ jobs:
           tool: cargo-insta
       - uses: Swatinem/rust-cache@v2
         with:
-          shared-key: warm-msrv
-          save-if: ${{ github.ref_name == 'main' }}
+          shared-key: warm
       - name: "Run tests"
         shell: bash
         env:
@@ -272,6 +272,7 @@ jobs:
         run: rustup show
       - uses: Swatinem/rust-cache@v2
         with:
+          shared-key: warm
           workspaces: "fuzz -> target"
       - name: "Install cargo-binstall"
         uses: cargo-bins/cargo-binstall@main
@@ -325,6 +326,8 @@ jobs:
       - name: "Install Rust toolchain"
         run: rustup component add rustfmt
       - uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: warm
       - run: ./scripts/add_rule.py --name DoTheThing --prefix PL --code C0999 --linter pylint
       - run: cargo check
       - run: cargo fmt --all --check
@@ -533,7 +536,6 @@ jobs:
       - uses: Swatinem/rust-cache@v2
         with:
           shared-key: warm
-          save-if: ${{ github.ref_name == 'main' }}
       - name: "Install Insiders dependencies"
         if: ${{ env.MKDOCS_INSIDERS_SSH_KEY_EXISTS == 'true' }}
         run: pip install -r docs/requirements-insiders.txt
