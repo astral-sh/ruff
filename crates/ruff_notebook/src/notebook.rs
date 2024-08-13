@@ -596,4 +596,12 @@ print("after empty cells")
         );
         Ok(())
     }
+
+    #[test]
+    fn round_trip() {
+        let path = notebook_path("vscode_language_id.ipynb");
+        let expected = std::fs::read_to_string(&path).unwrap();
+        let actual = super::round_trip(&path).unwrap();
+        assert_eq!(actual, expected);
+    }
 }

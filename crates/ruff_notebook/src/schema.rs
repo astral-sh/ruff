@@ -18,7 +18,7 @@
 //!   a code cell or not without looking at the `cell_type` property, which
 //!   would require a custom serializer.
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, HashMap};
 
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -171,7 +171,7 @@ pub struct CellMetadata {
     pub vscode: Option<CodeCellMetadataVSCode>,
     /// Catch-all for metadata that isn't required by Ruff.
     #[serde(flatten)]
-    pub extra: BTreeMap<String, Value>,
+    pub extra: HashMap<String, Value>,
 }
 
 /// VS Code specific cell metadata.
