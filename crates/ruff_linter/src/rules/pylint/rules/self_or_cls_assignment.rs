@@ -11,7 +11,7 @@ use crate::checkers::ast::Checker;
 /// Checks for assignment of `self` and `cls` in instance and class methods respectively.
 ///
 /// ## Why is this bad?
-/// The identifiers `self` and `cls` are conventional in Python for the first argument of instance
+/// The identifiers `self` and `cls` are conventional in Python for the first parameter of instance
 /// methods and class methods, respectively.
 ///
 /// ## Example
