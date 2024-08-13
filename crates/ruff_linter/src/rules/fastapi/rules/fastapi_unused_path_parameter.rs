@@ -1,15 +1,14 @@
+use itertools::Itertools;
 use ruff_diagnostics::{Applicability, Fix};
 use ruff_diagnostics::{Diagnostic, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::{self as ast};
 use ruff_python_parser::parse_expression;
 use ruff_python_semantic::Modules;
-use ruff_text_size::Ranged;
-use ruff_text_size::TextSize;
+use ruff_text_size::{Ranged, TextLen};
 
 use crate::checkers::ast::Checker;
 use crate::fix::edits::add_parameter;
-use crate::rules::fastapi::rules::is_fastapi_route;
 use crate::rules::fastapi::rules::is_fastapi_route_decorator;
 use ruff_python_stdlib::identifiers::is_identifier;
 
@@ -20,7 +19,7 @@ use ruff_python_stdlib::identifiers::is_identifier;
 /// Path parameters are used to extract values from the URL path.
 /// If a path parameter is declared in the route path but not in the function signature, it will not be accessible in the function body, which is likely a mistake.
 ///
-/// ## Known problems
+/// ## Limitations
 /// If the path parameter is not a valid Python identifier, FastAPI will normalize it to a valid identifier.
 /// This lint simply ignores path parameters that are not valid identifiers, as that normalization behavior is undocumented.
 ///
@@ -95,17 +94,13 @@ pub(crate) fn fastapi_unused_path_parameter(
     if !checker.semantic().seen_module(Modules::FASTAPI) {
         return;
     }
-    if !is_fastapi_route(function_def, checker.semantic()) {
-        return;
-    }
 
     // Get the route path from the decorator
-    let route_decorator = function_def
+    let Some(route_decorator) = function_def
         .decorator_list
         .iter()
-        .find_map(|decorator| is_fastapi_route_decorator(decorator, checker.semantic()));
-
-    let Some(route_decorator) = route_decorator else {
+        .find_map(|decorator| is_fastapi_route_decorator(decorator, checker.semantic()))
+    else {
         return;
     };
 
@@ -150,60 +145,61 @@ pub(crate) fn fastapi_unused_path_parameter(
         });
 
     // Now we extract the arguments from the function signature
-    let named_args = function_def
+    let named_args: Vec<_> = function_def
         .parameters
         .args
         .iter()
         .chain(function_def.parameters.kwonlyargs.iter())
         .map(|arg| arg.parameter.name.as_str())
-        .collect::<Vec<_>>();
+        .collect();
 
     // Check if any of the path parameters are not in the function signature
     for (path_param, range) in path_params
         .into_iter()
         .filter(|(path_param, _)| is_identifier(path_param))
     {
-        if !named_args.contains(&path_param.as_str()) {
-            let violation = FastApiUnusedPathParameter {
-                arg_name: path_param.to_string(),
-                function_name: function_def.name.to_string(),
-                // If the path parameter shows up in the positional-only arguments,
-                // the path parameter injection also won't work, but we can't fix that (yet)
-                // as that would require making that parameter non positional.
-                arg_name_already_used: function_def
-                    .parameters
-                    .posonlyargs
-                    .iter()
-                    .map(|arg| arg.parameter.name.as_str())
-                    .collect::<Vec<_>>()
-                    .contains(&path_param.as_str()),
-            };
-            let fixable = violation.fix_title().is_some();
-            let mut diagnostic = Diagnostic::new(
-                violation,
-                diagnostic_range
-                    .clone()
-                    .add_start(TextSize::from(range.start().to_u32() - 1))
-                    .sub_end(TextSize::from(
-                        // Get the total length of the path parameter
-                        diagnostic_range.end().to_u32()
-                            - diagnostic_range.start().to_u32()
-                        // Subtract the length of the path parameter
-                            - range.end().to_u32()
-                            + 1,
-                    )),
-            );
-            if fixable {
-                diagnostic.set_fix(Fix::applicable_edit(
-                    add_parameter(
-                        path_param.as_str(),
-                        &function_def.parameters,
-                        checker.locator().contents(),
-                    ),
-                    Applicability::Safe,
-                ));
-            }
-            checker.diagnostics.push(diagnostic);
+        if named_args.contains(&&*path_param) {
+            continue;
         }
+
+        let arg_name_already_used = function_def
+            .parameters
+            .posonlyargs
+            .iter()
+            .map(|arg| arg.parameter.name.as_str())
+            .contains(&path_param.as_str());
+
+        let violation = FastApiUnusedPathParameter {
+            arg_name: path_param.clone(),
+            function_name: function_def.name.to_string(),
+            // If the path parameter shows up in the positional-only arguments,
+            // the path parameter injection also won't work, but we can't fix that (yet)
+            // as that would require making that parameter non positional.
+            arg_name_already_used,
+        };
+        let fixable = violation.fix_title().is_some();
+        let mut diagnostic = Diagnostic::new(
+            violation,
+            diagnostic_range
+                .add_start(range.start() - '{'.text_len())
+                .sub_end(
+                    // Get the total length of the path parameter
+                    diagnostic_range.len()
+                        // Subtract the length of the path parameter
+                            - range.end()
+                        + '}'.text_len(),
+                ),
+        );
+        if fixable {
+            diagnostic.set_fix(Fix::applicable_edit(
+                add_parameter(
+                    path_param.as_str(),
+                    &function_def.parameters,
+                    checker.locator().contents(),
+                ),
+                Applicability::Safe,
+            ));
+        }
+        checker.diagnostics.push(diagnostic);
     }
 }
