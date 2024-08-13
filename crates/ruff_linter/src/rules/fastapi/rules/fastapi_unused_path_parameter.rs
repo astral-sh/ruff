@@ -32,8 +32,7 @@ use ruff_python_stdlib::identifiers::is_identifier;
 ///
 ///
 /// @app.get("/things/{thing_id}")
-/// async def read_thing(query: str):
-///     ...
+/// async def read_thing(query: str): ...
 /// ```
 ///
 /// Use instead:
@@ -45,8 +44,7 @@ use ruff_python_stdlib::identifiers::is_identifier;
 ///
 ///
 /// @app.get("/things/{thing_id}")
-/// async def read_thing(thing_id: int, query: str):
-///     ...
+/// async def read_thing(thing_id: int, query: str): ...
 /// ```
 
 #[violation]
