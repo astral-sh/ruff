@@ -528,10 +528,10 @@ y = 2
         ));
     }
 
-    /// Test case to validate that the generator scope is correctly identified and that the target
-    /// variable is defined only in the generator scope and not in the global scope.
+    /// Test case to validate that the comprehension scope is correctly identified and that the target
+    /// variable is defined only in the comprehension scope and not in the global scope.
     #[test]
-    fn generator_scope() {
+    fn comprehension_scope() {
         let TestCase { db, file } = test_case(
             "
 [x for x in iter1]
@@ -543,26 +543,26 @@ y = 2
 
         assert_eq!(names(&global_table), vec!["iter1"]);
 
-        let [(generator_scope_id, generator_scope)] = index
+        let [(comprehension_scope_id, comprehension_scope)] = index
             .child_scopes(FileScopeId::global())
             .collect::<Vec<_>>()[..]
         else {
             panic!("expected one child scope")
         };
 
-        assert_eq!(generator_scope.kind(), ScopeKind::Comprehension);
+        assert_eq!(comprehension_scope.kind(), ScopeKind::Comprehension);
         assert_eq!(
-            generator_scope_id.to_scope_id(&db, file).name(&db),
+            comprehension_scope_id.to_scope_id(&db, file).name(&db),
             "<listcomp>"
         );
 
-        let generator_symbol_table = index.symbol_table(generator_scope_id);
+        let comprehension_symbol_table = index.symbol_table(comprehension_scope_id);
 
-        assert_eq!(names(&generator_symbol_table), vec!["x"]);
+        assert_eq!(names(&comprehension_symbol_table), vec!["x"]);
     }
 
-    /// Test case to validate that the `x` variable used in the generator is referencing the `x`
-    /// variable defined by the inner iterator (`for x in iter2`) and not the outer one.
+    /// Test case to validate that the `x` variable used in the comprehension is referencing the
+    /// `x` variable defined by the inner generator (`for x in iter2`) and not the outer one.
     #[test]
     fn multiple_generators() {
         let TestCase { db, file } = test_case(
@@ -572,14 +572,14 @@ y = 2
         );
 
         let index = semantic_index(&db, file);
-        let [(generator_scope_id, _)] = index
+        let [(comprehension_scope_id, _)] = index
             .child_scopes(FileScopeId::global())
             .collect::<Vec<_>>()[..]
         else {
             panic!("expected one child scope")
         };
 
-        let use_def = index.use_def_map(generator_scope_id);
+        let use_def = index.use_def_map(comprehension_scope_id);
 
         let module = parsed_module(&db, file).syntax();
         let element = module.body[0]
@@ -591,23 +591,25 @@ y = 2
             .elt
             .as_name_expr()
             .unwrap();
-        let element_use_id = element.scoped_use_id(&db, generator_scope_id.to_scope_id(&db, file));
+        let element_use_id =
+            element.scoped_use_id(&db, comprehension_scope_id.to_scope_id(&db, file));
 
         let [definition] = use_def.use_definitions(element_use_id) else {
             panic!("expected one definition")
         };
-        let DefinitionKind::Comprehension(generator) = definition.node(&db) else {
+        let DefinitionKind::Comprehension(comprehension) = definition.node(&db) else {
             panic!("expected generator definition")
         };
-        let ast::Comprehension { target, .. } = generator.node();
+        let ast::Comprehension { target, .. } = comprehension.node();
         let name = target.as_name_expr().unwrap().id().as_str();
 
         assert_eq!(name, "x");
         assert_eq!(target.range(), TextRange::new(23.into(), 24.into()));
     }
 
-    /// Test case to validate that the nested generator creates a new scope which is a child of the
-    /// outer generator scope and the variables are correctly defined in the respective scopes.
+    /// Test case to validate that the nested comprehension creates a new scope which is a child of
+    /// the outer comprehension scope and the variables are correctly defined in the respective
+    /// scopes.
     #[test]
     fn nested_generators() {
         let TestCase { db, file } = test_case(
@@ -621,38 +623,41 @@ y = 2
 
         assert_eq!(names(&global_table), vec!["iter1"]);
 
-        let [(generator_scope_id, generator_scope)] = index
+        let [(comprehension_scope_id, comprehension_scope)] = index
             .child_scopes(FileScopeId::global())
             .collect::<Vec<_>>()[..]
         else {
             panic!("expected one child scope")
         };
 
-        assert_eq!(generator_scope.kind(), ScopeKind::Comprehension);
+        assert_eq!(comprehension_scope.kind(), ScopeKind::Comprehension);
         assert_eq!(
-            generator_scope_id.to_scope_id(&db, file).name(&db),
+            comprehension_scope_id.to_scope_id(&db, file).name(&db),
             "<listcomp>"
         );
 
-        let generator_symbol_table = index.symbol_table(generator_scope_id);
+        let comprehension_symbol_table = index.symbol_table(comprehension_scope_id);
 
-        assert_eq!(names(&generator_symbol_table), vec!["y", "iter2"]);
+        assert_eq!(names(&comprehension_symbol_table), vec!["y", "iter2"]);
 
-        let [(inner_generator_scope_id, inner_generator_scope)] =
-            index.child_scopes(generator_scope_id).collect::<Vec<_>>()[..]
+        let [(inner_comprehension_scope_id, inner_comprehension_scope)] = index
+            .child_scopes(comprehension_scope_id)
+            .collect::<Vec<_>>()[..]
         else {
             panic!("expected one inner generator scope")
         };
 
-        assert_eq!(inner_generator_scope.kind(), ScopeKind::Comprehension);
+        assert_eq!(inner_comprehension_scope.kind(), ScopeKind::Comprehension);
         assert_eq!(
-            inner_generator_scope_id.to_scope_id(&db, file).name(&db),
+            inner_comprehension_scope_id
+                .to_scope_id(&db, file)
+                .name(&db),
             "<setcomp>"
         );
 
-        let inner_generator_symbol_table = index.symbol_table(inner_generator_scope_id);
+        let inner_comprehension_symbol_table = index.symbol_table(inner_comprehension_scope_id);
 
-        assert_eq!(names(&inner_generator_symbol_table), vec!["x"]);
+        assert_eq!(names(&inner_comprehension_symbol_table), vec!["x"]);
     }
 
     #[test]

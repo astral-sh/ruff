@@ -258,8 +258,8 @@ impl<'db> SemanticIndexBuilder<'db> {
         nested_scope
     }
 
-    /// Visit a list of [`Comprehension`] nodes, assumed to be the comprehensions that compose a
-    /// generator expression, like a list or set comprehension.
+    /// Visit a list of [`Comprehension`] nodes, assumed to be the "generators" that compose a
+    /// comprehension (that is, the `for x in y` and `for y in z` parts of `x for x in y for y in z`.)
     ///
     /// [`Comprehension`]: ast::Comprehension
     fn visit_generators(&mut self, scope: NodeWithScopeRef, generators: &'db [ast::Comprehension]) {
