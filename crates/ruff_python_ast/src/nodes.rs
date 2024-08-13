@@ -506,10 +506,10 @@ pub enum StmtImportFrom {
 }
 
 impl StmtImportFrom {
-    pub fn module(&self) -> Option<&Identifier> {
+    pub fn module(&self) -> &Option<Identifier> {
         match self {
-            Self::Star(import) => import.module.as_ref(),
-            Self::MemberList(import) => import.module.as_ref(),
+            Self::Star(import) => &import.module,
+            Self::MemberList(import) => &import.module,
         }
     }
 
@@ -520,17 +520,31 @@ impl StmtImportFrom {
         }
     }
 
-    pub fn names(&self) -> Option<&Vec<Alias>> {
+    pub fn names(&self) -> Option<&[Alias]> {
         match self {
             Self::Star(_) => None,
             Self::MemberList(import) => Some(&import.names),
         }
     }
 
-    pub fn names_mut(&mut self) -> Option<&mut Vec<Alias>> {
+    pub fn names_mut(&mut self) -> Option<&mut [Alias]> {
         match self {
             Self::Star(_) => None,
             Self::MemberList(import) => Some(&mut import.names),
+        }
+    }
+
+    pub fn as_star_import(&self) -> Option<&StmtImportFromStar> {
+        match self {
+            Self::Star(import) => Some(import),
+            Self::MemberList(_) => None,
+        }
+    }
+
+    pub fn as_member_list_import(&self) -> Option<&StmtImportFromMemberList> {
+        match self {
+            Self::Star(_) => None,
+            Self::MemberList(import) => Some(import),
         }
     }
 }

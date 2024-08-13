@@ -1,4 +1,4 @@
-use ruff_python_ast::StmtImportFrom;
+use ruff_python_ast as ast;
 
 use ruff_diagnostics::{Diagnostic, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, violation};
@@ -34,8 +34,8 @@ impl Violation for FutureAnnotationsInStub {
 }
 
 /// PYI044
-pub(crate) fn from_future_import(checker: &mut Checker, target: &StmtImportFrom) {
-    if let StmtImportFrom {
+pub(crate) fn from_future_import(checker: &mut Checker, target: &ast::StmtImportFromMemberList) {
+    if let ast::StmtImportFromMemberList {
         range,
         module: Some(name),
         names,

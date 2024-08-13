@@ -1,5 +1,5 @@
 use itertools::Itertools;
-use ruff_python_ast::{Alias, Stmt};
+use ruff_python_ast::{StmtImportFrom, StmtImportFromMemberList};
 
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Fix};
 use ruff_macros::{derive_message_formats, violation};
@@ -53,12 +53,11 @@ impl AlwaysFixableViolation for UnnecessaryBuiltinImport {
 }
 
 /// UP029
-pub(crate) fn unnecessary_builtin_import(
-    checker: &mut Checker,
-    stmt: &Stmt,
-    module: &str,
-    names: &[Alias],
-) {
+pub(crate) fn unnecessary_builtin_import(checker: &mut Checker, import_from: &StmtImportFrom) {
+    let Some(module) = import_from.module().as_deref() else {
+        return;
+    };
+
     // Ignore irrelevant modules.
     if !matches!(
         module,
@@ -67,44 +66,53 @@ pub(crate) fn unnecessary_builtin_import(
         return;
     }
 
-    // Identify unaliased, builtin imports.
-    let unused_imports: Vec<&Alias> = names
-        .iter()
-        .filter(|alias| alias.asname.is_none())
-        .filter(|alias| {
-            matches!(
-                (module, alias.name.as_str()),
-                (
-                    "builtins" | "six.moves.builtins",
-                    "*" | "ascii"
-                        | "bytes"
-                        | "chr"
-                        | "dict"
-                        | "filter"
-                        | "hex"
-                        | "input"
-                        | "int"
-                        | "isinstance"
-                        | "list"
-                        | "map"
-                        | "max"
-                        | "min"
-                        | "next"
-                        | "object"
-                        | "oct"
-                        | "open"
-                        | "pow"
-                        | "range"
-                        | "round"
-                        | "str"
-                        | "super"
-                        | "zip"
-                ) | ("io", "open")
-                    | ("six", "callable" | "next")
-                    | ("six.moves", "filter" | "input" | "map" | "range" | "zip")
-            )
-        })
-        .collect();
+    let unused_imports = match import_from {
+        StmtImportFrom::Star(_) => {
+            if matches!(module, "builtins" | "six.moves.builtins") {
+                vec!["*"]
+            } else {
+                return;
+            }
+        }
+        StmtImportFrom::MemberList(StmtImportFromMemberList { names, .. }) => names
+            .iter()
+            .filter(|alias| alias.asname.is_none())
+            .filter(|alias| {
+                matches!(
+                    (module, alias.name.as_str()),
+                    (
+                        "builtins" | "six.moves.builtins",
+                        "ascii"
+                            | "bytes"
+                            | "chr"
+                            | "dict"
+                            | "filter"
+                            | "hex"
+                            | "input"
+                            | "int"
+                            | "isinstance"
+                            | "list"
+                            | "map"
+                            | "max"
+                            | "min"
+                            | "next"
+                            | "object"
+                            | "oct"
+                            | "open"
+                            | "pow"
+                            | "range"
+                            | "round"
+                            | "str"
+                            | "super"
+                            | "zip"
+                    ) | ("io", "open")
+                        | ("six", "callable" | "next")
+                        | ("six.moves", "filter" | "input" | "map" | "range" | "zip")
+                )
+            })
+            .map(|alias| alias.name.as_str())
+            .collect(),
+    };
 
     if unused_imports.is_empty() {
         return;
@@ -114,22 +122,18 @@ pub(crate) fn unnecessary_builtin_import(
         UnnecessaryBuiltinImport {
             names: unused_imports
                 .iter()
-                .map(|alias| alias.name.to_string())
+                .map(std::string::ToString::to_string)
                 .sorted()
                 .collect(),
         },
-        stmt.range(),
+        import_from.range(),
     );
     diagnostic.try_set_fix(|| {
-        let statement = checker.semantic().current_statement();
-        let parent = checker.semantic().current_statement_parent();
+        let semantic = checker.semantic();
         let edit = fix::edits::remove_unused_imports(
-            unused_imports
-                .iter()
-                .map(|alias| &alias.name)
-                .map(ruff_python_ast::Identifier::as_str),
-            statement,
-            parent,
+            unused_imports,
+            semantic.current_statement(),
+            semantic.current_statement_parent(),
             checker.locator(),
             checker.stylist(),
             checker.indexer(),

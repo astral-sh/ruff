@@ -345,7 +345,10 @@ pub(crate) fn unused_import(checker: &Checker, scope: &Scope, diagnostics: &mut 
         let multiple = bindings.len() > 1;
         let level = match checker.semantic().statement(import_statement) {
             Stmt::Import(_) => 0,
-            Stmt::ImportFrom(StmtImportFrom { level, .. }) => *level,
+            Stmt::ImportFrom(StmtImportFrom::MemberList(ast::StmtImportFromMemberList {
+                level,
+                ..
+            })) => *level,
             _ => {
                 continue;
             }

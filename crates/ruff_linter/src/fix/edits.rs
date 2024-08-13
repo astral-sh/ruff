@@ -109,7 +109,7 @@ pub(crate) fn delete_comment(range: TextRange, locator: &Locator) -> Edit {
 
 /// Generate a `Fix` to remove the specified imports from an `import` statement.
 pub(crate) fn remove_unused_imports<'a>(
-    member_names: impl Iterator<Item = &'a str>,
+    member_names: impl IntoIterator<Item = &'a str>,
     stmt: &Stmt,
     parent: Option<&Stmt>,
     locator: &Locator,
@@ -129,7 +129,10 @@ pub(crate) fn make_redundant_alias<'a>(
 ) -> Vec<Edit> {
     let aliases = match stmt {
         Stmt::Import(ast::StmtImport { names, .. }) => names,
-        Stmt::ImportFrom(ast::StmtImportFrom { names, .. }) => names,
+        Stmt::ImportFrom(ast::StmtImportFrom::MemberList(ast::StmtImportFromMemberList {
+            names,
+            ..
+        })) => names,
         _ => {
             return Vec::new();
         }

@@ -421,8 +421,11 @@ pub(crate) fn suspicious_imports(checker: &mut Checker, stmt: &Stmt) {
                 }
             }
         }
-        Stmt::ImportFrom(ast::StmtImportFrom { module, names, .. }) => {
-            let Some(identifier) = module else { return };
+        Stmt::ImportFrom(import_from_stmt) => {
+            let Some(identifier) = import_from_stmt.module() else {
+                return;
+            };
+            let names = import_from_stmt.names().unwrap_or_default();
             match identifier.as_str() {
                 "telnetlib" => check_and_push_diagnostic(
                     checker,

@@ -64,12 +64,12 @@ fn includes_import(stmt: &Stmt, target: &NameImport) -> bool {
             })
         }
         NameImport::ImportFrom(target) => {
-            let Stmt::ImportFrom(ast::StmtImportFrom {
+            let Stmt::ImportFrom(ast::StmtImportFrom::MemberList(ast::StmtImportFromMemberList {
                 module,
                 names,
                 level,
                 range: _,
-            }) = &stmt
+            })) = &stmt
             else {
                 return false;
             };

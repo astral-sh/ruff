@@ -1,4 +1,4 @@
-use ruff_python_ast::{self as ast, Identifier, Stmt};
+use ruff_python_ast::{self as ast, Identifier};
 use ruff_text_size::{Ranged, TextRange};
 
 use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
@@ -75,13 +75,13 @@ impl Violation for RelativeImports {
 }
 
 fn fix_banned_relative_import(
-    stmt: &Stmt,
+    stmt: &ast::StmtImportFromMemberList,
     level: u32,
     module: Option<&str>,
     module_path: Option<&[String]>,
     generator: Generator,
 ) -> Option<Fix> {
-    // Only fix is the module path is known.
+    // Only fix if the module path is known.
     let module_path = resolve_imported_module_path(level, module, module_path)?;
 
     // Require import to be a valid module:
@@ -90,10 +90,9 @@ fn fix_banned_relative_import(
         return None;
     }
 
-    let Stmt::ImportFrom(ast::StmtImportFrom { names, .. }) = stmt else {
-        panic!("Expected Stmt::ImportFrom");
-    };
-    let node = ast::StmtImportFrom {
+    let ast::StmtImportFromMemberList { names, .. } = stmt;
+
+    let node = ast::StmtImportFrom::MemberList(ast::StmtImportFromMemberList {
         module: Some(Identifier::new(
             module_path.to_string(),
             TextRange::default(),
@@ -101,7 +100,7 @@ fn fix_banned_relative_import(
         names: names.clone(),
         level: 0,
         range: TextRange::default(),
-    };
+    });
     let content = generator.stmt(&node.into());
     Some(Fix::unsafe_edit(Edit::range_replacement(
         content,
@@ -112,7 +111,7 @@ fn fix_banned_relative_import(
 /// TID252
 pub(crate) fn banned_relative_import(
     checker: &Checker,
-    stmt: &Stmt,
+    stmt: &ast::StmtImportFromMemberList,
     level: u32,
     module: Option<&str>,
     module_path: Option<&[String]>,

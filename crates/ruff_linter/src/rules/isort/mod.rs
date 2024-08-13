@@ -44,6 +44,20 @@ pub(crate) struct AnnotatedAliasData<'a> {
     pub(crate) trailing: Vec<Comment<'a>>,
 }
 
+impl<'a> AnnotatedAliasData<'a> {
+    /// It's invalid syntax for star-imports to be parenthesized,
+    /// and thus impossible for them to have any associated comments
+    pub(super) fn star_import() -> AnnotatedAliasData<'static> {
+        AnnotatedAliasData {
+            name: "*",
+            asname: None,
+            atop: vec![],
+            inline: vec![],
+            trailing: vec![],
+        }
+    }
+}
+
 #[derive(Debug)]
 pub(crate) enum AnnotatedImport<'a> {
     Import {

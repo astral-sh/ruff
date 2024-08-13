@@ -747,42 +747,14 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                 }
             }
         }
-        Stmt::ImportFrom(
-            import_from @ ast::StmtImportFrom {
-                names,
-                module,
-                level,
-                range: _,
-            },
-        ) => {
-            let level = *level;
-            let module = module.as_deref();
+        Stmt::ImportFrom(import_from) => {
+            let level = import_from.level();
+            let module = import_from.module().as_deref();
             if checker.enabled(Rule::ModuleImportNotAtTopOfFile) {
                 pycodestyle::rules::module_import_not_at_top_of_file(checker, stmt);
             }
             if checker.enabled(Rule::ImportOutsideTopLevel) {
                 pylint::rules::import_outside_top_level(checker, stmt);
-            }
-            if checker.enabled(Rule::GlobalStatement) {
-                for name in names {
-                    if let Some(asname) = name.asname.as_ref() {
-                        pylint::rules::global_statement(checker, asname);
-                    } else {
-                        pylint::rules::global_statement(checker, &name.name);
-                    }
-                }
-            }
-            if checker.enabled(Rule::NonAsciiImportName) {
-                for alias in names {
-                    pylint::rules::non_ascii_module_import(checker, alias);
-                }
-            }
-            if checker.enabled(Rule::UnnecessaryFutureImport) {
-                if checker.settings.target_version >= PythonVersion::Py37 {
-                    if let Some("__future__") = module {
-                        pyupgrade::rules::unnecessary_future_import(checker, stmt, names);
-                    }
-                }
             }
             if checker.enabled(Rule::DeprecatedMockImport) {
                 pyupgrade::rules::deprecated_mock_import(checker, stmt);
@@ -790,13 +762,8 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
             if checker.enabled(Rule::DeprecatedCElementTree) {
                 pyupgrade::rules::deprecated_c_element_tree(checker, stmt);
             }
-            if checker.enabled(Rule::DeprecatedImport) {
-                pyupgrade::rules::deprecated_import(checker, import_from);
-            }
             if checker.enabled(Rule::UnnecessaryBuiltinImport) {
-                if let Some(module) = module {
-                    pyupgrade::rules::unnecessary_builtin_import(checker, stmt, module, names);
-                }
+                pyupgrade::rules::unnecessary_builtin_import(checker, import_from);
             }
             if checker.any_enabled(&[
                 Rule::SuspiciousTelnetlibImport,
@@ -830,10 +797,7 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                         &stmt,
                     );
 
-                    for alias in names {
-                        if &alias.name == "*" {
-                            continue;
-                        }
+                    for alias in import_from.names().unwrap_or_default() {
                         flake8_tidy_imports::rules::banned_api(
                             checker,
                             &flake8_tidy_imports::matchers::NameMatchPolicy::MatchName(
@@ -861,10 +825,7 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                         &stmt,
                     );
 
-                    for alias in names {
-                        if &alias.name == "*" {
-                            continue;
-                        }
+                    for alias in import_from.names().unwrap_or_default() {
                         flake8_tidy_imports::rules::banned_module_level_imports(
                             checker,
                             &flake8_tidy_imports::matchers::NameMatchPolicy::MatchName(
@@ -885,172 +846,9 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                     checker.diagnostics.push(diagnostic);
                 }
             }
-            if checker.source_type.is_stub() {
-                if checker.enabled(Rule::FutureAnnotationsInStub) {
-                    flake8_pyi::rules::from_future_import(checker, import_from);
-                }
-            }
-            for alias in names {
-                if let Some("__future__") = module {
-                    if checker.enabled(Rule::FutureFeatureNotDefined) {
-                        pyflakes::rules::future_feature_not_defined(checker, alias);
-                    }
-                    if checker.enabled(Rule::LateFutureImport) {
-                        if checker.semantic.seen_futures_boundary() {
-                            checker.diagnostics.push(Diagnostic::new(
-                                pyflakes::rules::LateFutureImport,
-                                stmt.range(),
-                            ));
-                        }
-                    }
-                } else if &alias.name == "*" {
-                    if checker.enabled(Rule::UndefinedLocalWithNestedImportStarUsage) {
-                        if !matches!(checker.semantic.current_scope().kind, ScopeKind::Module) {
-                            checker.diagnostics.push(Diagnostic::new(
-                                pyflakes::rules::UndefinedLocalWithNestedImportStarUsage {
-                                    name: helpers::format_import_from(level, module).to_string(),
-                                },
-                                stmt.range(),
-                            ));
-                        }
-                    }
-                    if checker.enabled(Rule::UndefinedLocalWithImportStar) {
-                        checker.diagnostics.push(Diagnostic::new(
-                            pyflakes::rules::UndefinedLocalWithImportStar {
-                                name: helpers::format_import_from(level, module).to_string(),
-                            },
-                            stmt.range(),
-                        ));
-                    }
-                } else {
-                    // TODO(charlie): Remove when stabilizing A004.
-                    if let Some(asname) = &alias.asname {
-                        if checker.settings.preview.is_disabled()
-                            && checker.enabled(Rule::BuiltinVariableShadowing)
-                        {
-                            flake8_builtins::rules::builtin_variable_shadowing(
-                                checker,
-                                asname,
-                                asname.range(),
-                            );
-                        }
-                    }
-                }
-                if checker.enabled(Rule::RelativeImports) {
-                    if let Some(diagnostic) = flake8_tidy_imports::rules::banned_relative_import(
-                        checker,
-                        stmt,
-                        level,
-                        module,
-                        checker.module.qualified_name(),
-                        checker.settings.flake8_tidy_imports.ban_relative_imports,
-                    ) {
-                        checker.diagnostics.push(diagnostic);
-                    }
-                }
-                if checker.enabled(Rule::Debugger) {
-                    if let Some(diagnostic) =
-                        flake8_debugger::rules::debugger_import(stmt, module, &alias.name)
-                    {
-                        checker.diagnostics.push(diagnostic);
-                    }
-                }
-                if checker.enabled(Rule::BannedImportAlias) {
-                    if let Some(asname) = &alias.asname {
-                        let qualified_name =
-                            helpers::format_import_from_member(level, module, &alias.name);
-                        if let Some(diagnostic) =
-                            flake8_import_conventions::rules::banned_import_alias(
-                                stmt,
-                                &qualified_name,
-                                asname,
-                                &checker.settings.flake8_import_conventions.banned_aliases,
-                            )
-                        {
-                            checker.diagnostics.push(diagnostic);
-                        }
-                    }
-                }
-                if let Some(asname) = &alias.asname {
-                    if checker.enabled(Rule::ConstantImportedAsNonConstant) {
-                        if let Some(diagnostic) =
-                            pep8_naming::rules::constant_imported_as_non_constant(
-                                &alias.name,
-                                asname,
-                                alias,
-                                stmt,
-                                &checker.settings.pep8_naming.ignore_names,
-                            )
-                        {
-                            checker.diagnostics.push(diagnostic);
-                        }
-                    }
-                    if checker.enabled(Rule::LowercaseImportedAsNonLowercase) {
-                        if let Some(diagnostic) =
-                            pep8_naming::rules::lowercase_imported_as_non_lowercase(
-                                &alias.name,
-                                asname,
-                                alias,
-                                stmt,
-                                &checker.settings.pep8_naming.ignore_names,
-                            )
-                        {
-                            checker.diagnostics.push(diagnostic);
-                        }
-                    }
-                    if checker.enabled(Rule::CamelcaseImportedAsLowercase) {
-                        if let Some(diagnostic) =
-                            pep8_naming::rules::camelcase_imported_as_lowercase(
-                                &alias.name,
-                                asname,
-                                alias,
-                                stmt,
-                                &checker.settings.pep8_naming.ignore_names,
-                            )
-                        {
-                            checker.diagnostics.push(diagnostic);
-                        }
-                    }
-                    if checker.enabled(Rule::CamelcaseImportedAsConstant) {
-                        if let Some(diagnostic) = pep8_naming::rules::camelcase_imported_as_constant(
-                            &alias.name,
-                            asname,
-                            alias,
-                            stmt,
-                            &checker.settings.pep8_naming.ignore_names,
-                        ) {
-                            checker.diagnostics.push(diagnostic);
-                        }
-                    }
-                    if checker.enabled(Rule::CamelcaseImportedAsAcronym) {
-                        if let Some(diagnostic) = pep8_naming::rules::camelcase_imported_as_acronym(
-                            &alias.name,
-                            asname,
-                            alias,
-                            stmt,
-                            &checker.settings.pep8_naming.ignore_names,
-                        ) {
-                            checker.diagnostics.push(diagnostic);
-                        }
-                    }
-                    if !checker.source_type.is_stub() {
-                        if checker.enabled(Rule::UselessImportAlias) {
-                            pylint::rules::useless_import_alias(checker, alias);
-                        }
-                    }
-                }
-                if checker.enabled(Rule::BuiltinImportShadowing) {
-                    flake8_builtins::rules::builtin_import_shadowing(checker, alias);
-                }
-            }
-            if checker.enabled(Rule::ImportSelf) {
-                if let Some(diagnostic) = pylint::rules::import_from_self(
-                    level,
-                    module,
-                    names,
-                    checker.module.qualified_name(),
-                ) {
-                    checker.diagnostics.push(diagnostic);
+            if module == Some("__future__") {
+                if checker.enabled(Rule::FutureFeatureNotDefined) {
+                    pyflakes::rules::future_feature_not_defined(checker, import_from);
                 }
             }
             if checker.enabled(Rule::BannedImportFrom) {
@@ -1062,8 +860,213 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                     checker.diagnostics.push(diagnostic);
                 }
             }
-            if checker.enabled(Rule::ByteStringUsage) {
-                flake8_pyi::rules::bytestring_import(checker, import_from);
+            match import_from {
+                ast::StmtImportFrom::MemberList(
+                    member_list_import @ ast::StmtImportFromMemberList { names, .. },
+                ) => {
+                    if checker.enabled(Rule::GlobalStatement) {
+                        for name in names {
+                            if let Some(asname) = name.asname.as_ref() {
+                                pylint::rules::global_statement(checker, asname);
+                            } else {
+                                pylint::rules::global_statement(checker, &name.name);
+                            }
+                        }
+                    }
+                    if checker.enabled(Rule::NonAsciiImportName) {
+                        for alias in names {
+                            pylint::rules::non_ascii_module_import(checker, alias);
+                        }
+                    }
+                    if checker.enabled(Rule::UnnecessaryFutureImport) {
+                        if checker.settings.target_version >= PythonVersion::Py37 {
+                            if module == Some("__future__") {
+                                pyupgrade::rules::unnecessary_future_import(checker, stmt, names);
+                            }
+                        }
+                    }
+                    if checker.enabled(Rule::DeprecatedImport) {
+                        pyupgrade::rules::deprecated_import(checker, member_list_import);
+                    }
+                    if checker.source_type.is_stub() {
+                        if checker.enabled(Rule::FutureAnnotationsInStub) {
+                            flake8_pyi::rules::from_future_import(checker, member_list_import);
+                        }
+                    }
+                    for alias in names {
+                        if module == Some("__future__") {
+                            if checker.enabled(Rule::LateFutureImport) {
+                                if checker.semantic.seen_futures_boundary() {
+                                    checker.diagnostics.push(Diagnostic::new(
+                                        pyflakes::rules::LateFutureImport,
+                                        stmt.range(),
+                                    ));
+                                }
+                            }
+                        } else {
+                            // TODO(charlie): Remove when stabilizing A004.
+                            if let Some(asname) = &alias.asname {
+                                if checker.settings.preview.is_disabled()
+                                    && checker.enabled(Rule::BuiltinVariableShadowing)
+                                {
+                                    flake8_builtins::rules::builtin_variable_shadowing(
+                                        checker,
+                                        asname,
+                                        asname.range(),
+                                    );
+                                }
+                            }
+                        }
+                        if checker.enabled(Rule::RelativeImports) {
+                            if let Some(diagnostic) =
+                                flake8_tidy_imports::rules::banned_relative_import(
+                                    checker,
+                                    member_list_import,
+                                    level,
+                                    module,
+                                    checker.module.qualified_name(),
+                                    checker.settings.flake8_tidy_imports.ban_relative_imports,
+                                )
+                            {
+                                checker.diagnostics.push(diagnostic);
+                            }
+                        }
+                        if checker.enabled(Rule::Debugger) {
+                            if let Some(diagnostic) =
+                                flake8_debugger::rules::debugger_import(stmt, module, &alias.name)
+                            {
+                                checker.diagnostics.push(diagnostic);
+                            }
+                        }
+                        if checker.enabled(Rule::BannedImportAlias) {
+                            if let Some(asname) = &alias.asname {
+                                let qualified_name =
+                                    helpers::format_import_from_member(level, module, &alias.name);
+                                if let Some(diagnostic) =
+                                    flake8_import_conventions::rules::banned_import_alias(
+                                        stmt,
+                                        &qualified_name,
+                                        asname,
+                                        &checker.settings.flake8_import_conventions.banned_aliases,
+                                    )
+                                {
+                                    checker.diagnostics.push(diagnostic);
+                                }
+                            }
+                        }
+                        if let Some(asname) = &alias.asname {
+                            if checker.enabled(Rule::ConstantImportedAsNonConstant) {
+                                if let Some(diagnostic) =
+                                    pep8_naming::rules::constant_imported_as_non_constant(
+                                        &alias.name,
+                                        asname,
+                                        alias,
+                                        stmt,
+                                        &checker.settings.pep8_naming.ignore_names,
+                                    )
+                                {
+                                    checker.diagnostics.push(diagnostic);
+                                }
+                            }
+                            if checker.enabled(Rule::LowercaseImportedAsNonLowercase) {
+                                if let Some(diagnostic) =
+                                    pep8_naming::rules::lowercase_imported_as_non_lowercase(
+                                        &alias.name,
+                                        asname,
+                                        alias,
+                                        stmt,
+                                        &checker.settings.pep8_naming.ignore_names,
+                                    )
+                                {
+                                    checker.diagnostics.push(diagnostic);
+                                }
+                            }
+                            if checker.enabled(Rule::CamelcaseImportedAsLowercase) {
+                                if let Some(diagnostic) =
+                                    pep8_naming::rules::camelcase_imported_as_lowercase(
+                                        &alias.name,
+                                        asname,
+                                        alias,
+                                        stmt,
+                                        &checker.settings.pep8_naming.ignore_names,
+                                    )
+                                {
+                                    checker.diagnostics.push(diagnostic);
+                                }
+                            }
+                            if checker.enabled(Rule::CamelcaseImportedAsConstant) {
+                                if let Some(diagnostic) =
+                                    pep8_naming::rules::camelcase_imported_as_constant(
+                                        &alias.name,
+                                        asname,
+                                        alias,
+                                        stmt,
+                                        &checker.settings.pep8_naming.ignore_names,
+                                    )
+                                {
+                                    checker.diagnostics.push(diagnostic);
+                                }
+                            }
+                            if checker.enabled(Rule::CamelcaseImportedAsAcronym) {
+                                if let Some(diagnostic) =
+                                    pep8_naming::rules::camelcase_imported_as_acronym(
+                                        &alias.name,
+                                        asname,
+                                        alias,
+                                        stmt,
+                                        &checker.settings.pep8_naming.ignore_names,
+                                    )
+                                {
+                                    checker.diagnostics.push(diagnostic);
+                                }
+                            }
+                            if !checker.source_type.is_stub() {
+                                if checker.enabled(Rule::UselessImportAlias) {
+                                    pylint::rules::useless_import_alias(checker, alias);
+                                }
+                            }
+                        }
+                        if checker.enabled(Rule::BuiltinImportShadowing) {
+                            flake8_builtins::rules::builtin_import_shadowing(checker, alias);
+                        }
+                        if checker.enabled(Rule::ImportSelf) {
+                            if let Some(diagnostic) = pylint::rules::import_from_self(
+                                level,
+                                module,
+                                names,
+                                checker.module.qualified_name(),
+                            ) {
+                                checker.diagnostics.push(diagnostic);
+                            }
+                        }
+                        if checker.enabled(Rule::ByteStringUsage) {
+                            flake8_pyi::rules::bytestring_import(checker, member_list_import);
+                        }
+                    }
+                }
+                ast::StmtImportFrom::Star(_) => {
+                    if module != Some("__future__") {
+                        if checker.enabled(Rule::UndefinedLocalWithNestedImportStarUsage) {
+                            if !matches!(checker.semantic.current_scope().kind, ScopeKind::Module) {
+                                checker.diagnostics.push(Diagnostic::new(
+                                    pyflakes::rules::UndefinedLocalWithNestedImportStarUsage {
+                                        name: helpers::format_import_from(level, module)
+                                            .to_string(),
+                                    },
+                                    stmt.range(),
+                                ));
+                            }
+                        }
+                        if checker.enabled(Rule::UndefinedLocalWithImportStar) {
+                            checker.diagnostics.push(Diagnostic::new(
+                                pyflakes::rules::UndefinedLocalWithImportStar {
+                                    name: helpers::format_import_from(level, module).to_string(),
+                                },
+                                stmt.range(),
+                            ));
+                        }
+                    }
+                }
             }
         }
         Stmt::Raise(raise @ ast::StmtRaise { exc, .. }) => {
