@@ -125,12 +125,14 @@ pub(crate) fn is_dataclass_meta_annotation(annotation: &Expr, semantic: &Semanti
                     matches!(qualified_name.segments(), ["dataclasses", "dataclass"])
                 })
         }) {
-            // Determine whether the annotation is `typing.ClassVar` or `dataclasses.InitVar`.
+            // Determine whether the annotation is `typing.ClassVar`, `dataclasses.InitVar`, or `dataclasses.KW_ONLY`.
             return semantic
                 .resolve_qualified_name(map_subscript(annotation))
                 .is_some_and(|qualified_name| {
-                    matches!(qualified_name.segments(), ["dataclasses", "InitVar"])
-                        || semantic.match_typing_qualified_name(&qualified_name, "ClassVar")
+                    matches!(
+                        qualified_name.segments(),
+                        ["dataclasses", "InitVar" | "KW_ONLY"]
+                    ) || semantic.match_typing_qualified_name(&qualified_name, "ClassVar")
                 });
         }
     }
