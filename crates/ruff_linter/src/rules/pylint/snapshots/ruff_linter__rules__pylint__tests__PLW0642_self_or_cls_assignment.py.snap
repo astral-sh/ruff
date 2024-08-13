@@ -1,7 +1,7 @@
 ---
 source: crates/ruff_linter/src/rules/pylint/mod.rs
 ---
-self_or_cls_assignment.py:4:9: PLW0642 Invalid assignment to `cls` argument in class method
+self_or_cls_assignment.py:4:9: PLW0642 Confusing assignment to `cls` argument in class method
   |
 2 |     @classmethod
 3 |     def list_fruits(cls) -> None:
@@ -10,8 +10,9 @@ self_or_cls_assignment.py:4:9: PLW0642 Invalid assignment to `cls` argument in c
 5 |         cls: Fruit = "apple"  # PLW0642
 6 |         cls += "orange"  # PLW0642
   |
+  = help: Consider using a different variable name
 
-self_or_cls_assignment.py:5:9: PLW0642 Invalid assignment to `cls` argument in class method
+self_or_cls_assignment.py:5:9: PLW0642 Confusing assignment to `cls` argument in class method
   |
 3 |     def list_fruits(cls) -> None:
 4 |         cls = "apple"  # PLW0642
@@ -20,8 +21,9 @@ self_or_cls_assignment.py:5:9: PLW0642 Invalid assignment to `cls` argument in c
 6 |         cls += "orange"  # PLW0642
 7 |         *cls = "banana"  # PLW0642
   |
+  = help: Consider using a different variable name
 
-self_or_cls_assignment.py:6:9: PLW0642 Invalid assignment to `cls` argument in class method
+self_or_cls_assignment.py:6:9: PLW0642 Confusing assignment to `cls` argument in class method
   |
 4 |         cls = "apple"  # PLW0642
 5 |         cls: Fruit = "apple"  # PLW0642
@@ -30,8 +32,9 @@ self_or_cls_assignment.py:6:9: PLW0642 Invalid assignment to `cls` argument in c
 7 |         *cls = "banana"  # PLW0642
 8 |         cls, blah = "apple", "orange"  # PLW0642
   |
+  = help: Consider using a different variable name
 
-self_or_cls_assignment.py:7:10: PLW0642 Invalid assignment to `cls` argument in class method
+self_or_cls_assignment.py:7:10: PLW0642 Confusing assignment to `cls` argument in class method
   |
 5 |         cls: Fruit = "apple"  # PLW0642
 6 |         cls += "orange"  # PLW0642
@@ -40,8 +43,9 @@ self_or_cls_assignment.py:7:10: PLW0642 Invalid assignment to `cls` argument in 
 8 |         cls, blah = "apple", "orange"  # PLW0642
 9 |         blah, (cls, blah2) = "apple", ("orange", "banana")  # PLW0642
   |
+  = help: Consider using a different variable name
 
-self_or_cls_assignment.py:8:9: PLW0642 Invalid assignment to `cls` argument in class method
+self_or_cls_assignment.py:8:9: PLW0642 Confusing assignment to `cls` argument in class method
    |
  6 |         cls += "orange"  # PLW0642
  7 |         *cls = "banana"  # PLW0642
@@ -50,8 +54,9 @@ self_or_cls_assignment.py:8:9: PLW0642 Invalid assignment to `cls` argument in c
  9 |         blah, (cls, blah2) = "apple", ("orange", "banana")  # PLW0642
 10 |         blah, [cls, blah2] = "apple", ("orange", "banana")  # PLW0642
    |
+   = help: Consider using a different variable name
 
-self_or_cls_assignment.py:9:16: PLW0642 Invalid assignment to `cls` argument in class method
+self_or_cls_assignment.py:9:16: PLW0642 Confusing assignment to `cls` argument in class method
    |
  7 |         *cls = "banana"  # PLW0642
  8 |         cls, blah = "apple", "orange"  # PLW0642
@@ -59,8 +64,9 @@ self_or_cls_assignment.py:9:16: PLW0642 Invalid assignment to `cls` argument in 
    |                ^^^ PLW0642
 10 |         blah, [cls, blah2] = "apple", ("orange", "banana")  # PLW0642
    |
+   = help: Consider using a different variable name
 
-self_or_cls_assignment.py:10:16: PLW0642 Invalid assignment to `cls` argument in class method
+self_or_cls_assignment.py:10:16: PLW0642 Confusing assignment to `cls` argument in class method
    |
  8 |         cls, blah = "apple", "orange"  # PLW0642
  9 |         blah, (cls, blah2) = "apple", ("orange", "banana")  # PLW0642
@@ -69,8 +75,9 @@ self_or_cls_assignment.py:10:16: PLW0642 Invalid assignment to `cls` argument in
 11 | 
 12 |     @classmethod
    |
+   = help: Consider using a different variable name
 
-self_or_cls_assignment.py:14:9: PLW0642 Invalid assignment to `cls` argument in class method
+self_or_cls_assignment.py:14:9: PLW0642 Confusing assignment to `cls` argument in class method
    |
 12 |     @classmethod
 13 |     def add_fruits(cls, fruits, /) -> None:
@@ -79,8 +86,9 @@ self_or_cls_assignment.py:14:9: PLW0642 Invalid assignment to `cls` argument in 
 15 | 
 16 |     def print_color(self) -> None:
    |
+   = help: Consider using a different variable name
 
-self_or_cls_assignment.py:17:9: PLW0642 Invalid assignment to `self` argument in instance method
+self_or_cls_assignment.py:17:9: PLW0642 Confusing assignment to `self` argument in instance method
    |
 16 |     def print_color(self) -> None:
 17 |         self = "red"  # PLW0642
@@ -88,8 +96,9 @@ self_or_cls_assignment.py:17:9: PLW0642 Invalid assignment to `self` argument in
 18 |         self: Self = "red"  # PLW0642
 19 |         self += "blue"  # PLW0642
    |
+   = help: Consider using a different variable name
 
-self_or_cls_assignment.py:18:9: PLW0642 Invalid assignment to `self` argument in instance method
+self_or_cls_assignment.py:18:9: PLW0642 Confusing assignment to `self` argument in instance method
    |
 16 |     def print_color(self) -> None:
 17 |         self = "red"  # PLW0642
@@ -98,8 +107,9 @@ self_or_cls_assignment.py:18:9: PLW0642 Invalid assignment to `self` argument in
 19 |         self += "blue"  # PLW0642
 20 |         *self = "blue"  # PLW0642
    |
+   = help: Consider using a different variable name
 
-self_or_cls_assignment.py:19:9: PLW0642 Invalid assignment to `self` argument in instance method
+self_or_cls_assignment.py:19:9: PLW0642 Confusing assignment to `self` argument in instance method
    |
 17 |         self = "red"  # PLW0642
 18 |         self: Self = "red"  # PLW0642
@@ -108,8 +118,9 @@ self_or_cls_assignment.py:19:9: PLW0642 Invalid assignment to `self` argument in
 20 |         *self = "blue"  # PLW0642
 21 |         self, blah = "red", "blue"  # PLW0642
    |
+   = help: Consider using a different variable name
 
-self_or_cls_assignment.py:20:10: PLW0642 Invalid assignment to `self` argument in instance method
+self_or_cls_assignment.py:20:10: PLW0642 Confusing assignment to `self` argument in instance method
    |
 18 |         self: Self = "red"  # PLW0642
 19 |         self += "blue"  # PLW0642
@@ -118,8 +129,9 @@ self_or_cls_assignment.py:20:10: PLW0642 Invalid assignment to `self` argument i
 21 |         self, blah = "red", "blue"  # PLW0642
 22 |         blah, (self, blah2) = "apple", ("orange", "banana")  # PLW0642
    |
+   = help: Consider using a different variable name
 
-self_or_cls_assignment.py:21:9: PLW0642 Invalid assignment to `self` argument in instance method
+self_or_cls_assignment.py:21:9: PLW0642 Confusing assignment to `self` argument in instance method
    |
 19 |         self += "blue"  # PLW0642
 20 |         *self = "blue"  # PLW0642
@@ -128,8 +140,9 @@ self_or_cls_assignment.py:21:9: PLW0642 Invalid assignment to `self` argument in
 22 |         blah, (self, blah2) = "apple", ("orange", "banana")  # PLW0642
 23 |         blah, [self, blah2] = "apple", ("orange", "banana")  # PLW0642
    |
+   = help: Consider using a different variable name
 
-self_or_cls_assignment.py:22:16: PLW0642 Invalid assignment to `self` argument in instance method
+self_or_cls_assignment.py:22:16: PLW0642 Confusing assignment to `self` argument in instance method
    |
 20 |         *self = "blue"  # PLW0642
 21 |         self, blah = "red", "blue"  # PLW0642
@@ -137,8 +150,9 @@ self_or_cls_assignment.py:22:16: PLW0642 Invalid assignment to `self` argument i
    |                ^^^^ PLW0642
 23 |         blah, [self, blah2] = "apple", ("orange", "banana")  # PLW0642
    |
+   = help: Consider using a different variable name
 
-self_or_cls_assignment.py:23:16: PLW0642 Invalid assignment to `self` argument in instance method
+self_or_cls_assignment.py:23:16: PLW0642 Confusing assignment to `self` argument in instance method
    |
 21 |         self, blah = "red", "blue"  # PLW0642
 22 |         blah, (self, blah2) = "apple", ("orange", "banana")  # PLW0642
@@ -147,8 +161,9 @@ self_or_cls_assignment.py:23:16: PLW0642 Invalid assignment to `self` argument i
 24 | 
 25 |     def print_color(self, color, /) -> None:
    |
+   = help: Consider using a different variable name
 
-self_or_cls_assignment.py:26:9: PLW0642 Invalid assignment to `self` argument in instance method
+self_or_cls_assignment.py:26:9: PLW0642 Confusing assignment to `self` argument in instance method
    |
 25 |     def print_color(self, color, /) -> None:
 26 |         self = color
@@ -156,3 +171,4 @@ self_or_cls_assignment.py:26:9: PLW0642 Invalid assignment to `self` argument in
 27 | 
 28 |     def ok(self) -> None:
    |
+   = help: Consider using a different variable name
