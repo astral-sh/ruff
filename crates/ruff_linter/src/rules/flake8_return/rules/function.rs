@@ -764,13 +764,14 @@ fn superfluous_elif_else(checker: &mut Checker, stack: &Stack) {
 }
 
 /// Run all checks from the `flake8-return` plugin.
-pub(crate) fn function(
-    checker: &mut Checker,
-    function_def: &ast::StmtFunctionDef,
-    body: &[Stmt],
-    decorator_list: &[Decorator],
-    returns: Option<&Expr>,
-) {
+pub(crate) fn function(checker: &mut Checker, function_def: &ast::StmtFunctionDef) {
+    let ast::StmtFunctionDef {
+        decorator_list,
+        returns,
+        body,
+        ..
+    } = function_def;
+
     // Find the last statement in the function.
     let Some(last_stmt) = body.last() else {
         // Skip empty functions.
@@ -825,7 +826,7 @@ pub(crate) fn function(
     } else {
         if checker.enabled(Rule::UnnecessaryReturnNone) {
             // Skip functions that have a return annotation that is not `None`.
-            if returns.map_or(true, Expr::is_none_literal_expr) {
+            if returns.as_deref().map_or(true, Expr::is_none_literal_expr) {
                 unnecessary_return_none(checker, decorator_list, &stack);
             }
         }
