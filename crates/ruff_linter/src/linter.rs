@@ -791,6 +791,23 @@ mod tests {
         Ok(())
     }
 
+    #[test]
+    fn test_vscode_language_id() -> Result<()> {
+        let actual = notebook_path("vscode_language_id.ipynb");
+        let expected = notebook_path("vscode_language_id_expected.ipynb");
+        let TestedNotebook {
+            messages,
+            source_notebook,
+            ..
+        } = assert_notebook_path(
+            &actual,
+            expected,
+            &settings::LinterSettings::for_rule(Rule::UnusedImport),
+        )?;
+        assert_messages!(messages, actual, source_notebook);
+        Ok(())
+    }
+
     #[test_case(Path::new("before_fix.ipynb"), true; "trailing_newline")]
     #[test_case(Path::new("no_trailing_newline.ipynb"), false; "no_trailing_newline")]
     fn test_trailing_newline(path: &Path, trailing_newline: bool) -> Result<()> {
