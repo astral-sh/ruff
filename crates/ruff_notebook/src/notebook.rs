@@ -19,7 +19,7 @@ use ruff_text_size::TextSize;
 use crate::cell::CellOffsets;
 use crate::index::NotebookIndex;
 use crate::schema::{Cell, RawNotebook, SortAlphabetically, SourceValue};
-use crate::{schema, RawNotebookMetadata};
+use crate::{schema, CellMetadata, RawNotebookMetadata};
 
 /// Run round-trip source code generation on a given Jupyter notebook file path.
 pub fn round_trip(path: &Path) -> anyhow::Result<String> {
@@ -131,7 +131,7 @@ impl Notebook {
             .cells
             .iter()
             .enumerate()
-            .filter(|(_, cell)| cell.is_valid_code_cell())
+            .filter(|(_, cell)| cell.is_valid_python_code_cell())
             .map(|(cell_index, _)| u32::try_from(cell_index).unwrap())
             .collect::<Vec<_>>();
 
@@ -205,16 +205,14 @@ impl Notebook {
         })
     }
 
-    /// Creates an empty notebook.
-    ///
-    ///
+    /// Creates an empty notebook with a single code cell.
     pub fn empty() -> Self {
         Self::from_raw_notebook(
             RawNotebook {
                 cells: vec![schema::Cell::Code(schema::CodeCell {
                     execution_count: None,
                     id: None,
-                    metadata: serde_json::Value::default(),
+                    metadata: CellMetadata::default(),
                     outputs: vec![],
                     source: schema::SourceValue::String(String::default()),
                 })],
@@ -507,7 +505,9 @@ mod tests {
     #[test_case("automagic_before_code", false)]
     #[test_case("automagic_after_code", true)]
     #[test_case("unicode_magic_gh9145", true)]
-    fn test_is_valid_code_cell(cell: &str, expected: bool) -> Result<()> {
+    #[test_case("vscode_language_id_python", true)]
+    #[test_case("vscode_language_id_javascript", false)]
+    fn test_is_valid_python_code_cell(cell: &str, expected: bool) -> Result<()> {
         /// Read a Jupyter cell from the `resources/test/fixtures/jupyter/cell` directory.
         fn read_jupyter_cell(path: impl AsRef<Path>) -> Result<Cell> {
             let path = notebook_path("cell").join(path);
@@ -516,7 +516,7 @@ mod tests {
         }
 
         assert_eq!(
-            read_jupyter_cell(format!("{cell}.json"))?.is_valid_code_cell(),
+            read_jupyter_cell(format!("{cell}.json"))?.is_valid_python_code_cell(),
             expected
         );
         Ok(())
