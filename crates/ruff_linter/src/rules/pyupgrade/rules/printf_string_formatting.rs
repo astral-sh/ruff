@@ -81,7 +81,7 @@ impl Violation for PrintfStringFormatting {
 
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Use format specifiers or f-strings instead of percent format")
+        format!("Use format specifiers instead of percent format")
     }
 
     fn fix_title(&self) -> Option<String> {
@@ -389,7 +389,7 @@ pub(crate) fn printf_string_formatting(
         if !convertible(&format_string, right) {
             checker
                 .diagnostics
-                .push(Diagnostic::new(PrintfStringFormatting, expr.range()));
+                .push(Diagnostic::new(PrintfStringFormatting, string_expr.range()));
             return;
         }
 
@@ -450,7 +450,7 @@ pub(crate) fn printf_string_formatting(
             else {
                 checker
                     .diagnostics
-                    .push(Diagnostic::new(PrintfStringFormatting, expr.range()));
+                    .push(Diagnostic::new(PrintfStringFormatting, string_expr.range()));
                 return;
             };
             Cow::Owned(params_string)

@@ -126,6 +126,20 @@ path = "%s-%s-%s.pem" % (
 
 'Hello %s' % bar['bop']
 
+# Not a valid type annotation but this test shouldn't result in a panic.
+# Refer: https://github.com/astral-sh/ruff/issues/11736
+x: "'%s + %s' % (1, 2)"
+
+# See: https://github.com/astral-sh/ruff/issues/12421
+print("%.2X" % 1)
+print("%.02X" % 1)
+print("%02X" % 1)
+print("%.00002X" % 1)
+print("%.20X" % 1)
+
+print("%2X" % 1)
+print("%02X" % 1)
+
 # UP031 (no longer false negatives, but offer no fix because of more complex syntax)
 
 "%d.%d" % (a, b)
@@ -155,17 +169,3 @@ path = "%s-%s-%s.pem" % (
 "%(1)s" % {1: 2, "1": 2}
 
 "%(and)s" % {"and": 2}
-
-# Not a valid type annotation but this test shouldn't result in a panic.
-# Refer: https://github.com/astral-sh/ruff/issues/11736
-x: "'%s + %s' % (1, 2)"
-
-# See: https://github.com/astral-sh/ruff/issues/12421
-print("%.2X" % 1)
-print("%.02X" % 1)
-print("%02X" % 1)
-print("%.00002X" % 1)
-print("%.20X" % 1)
-
-print("%2X" % 1)
-print("%02X" % 1)
