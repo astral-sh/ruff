@@ -229,12 +229,7 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                 Rule::SuperfluousElseContinue,
                 Rule::SuperfluousElseBreak,
             ]) {
-                flake8_return::rules::function(
-                    checker,
-                    body,
-                    decorator_list,
-                    returns.as_ref().map(AsRef::as_ref),
-                );
+                flake8_return::rules::function(checker, function_def);
             }
             if checker.enabled(Rule::UselessReturn) {
                 pylint::rules::useless_return(
