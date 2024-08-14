@@ -10,9 +10,6 @@ use super::super::helpers::at_last_top_level_expression_in_cell;
 /// ## What it does
 /// Checks for useless comparisons.
 ///
-/// For Jupyter Notebooks, this rule ignores to check the last top-level expression for each cell.
-/// This is because it's common to have a cell that ends with an expression to display it's value.
-///
 /// ## Why is this bad?
 /// Useless comparisons have no effect on the program, and are often included
 /// by mistake. If the comparison is intended to enforce an invariant, prepend
@@ -27,6 +24,11 @@ use super::super::helpers::at_last_top_level_expression_in_cell;
 /// ```python
 /// assert foo == bar, "`foo` and `bar` should be equal."
 /// ```
+///
+/// ## Notebook behavior
+/// For Jupyter Notebooks, this rule is not applied to the last top-level expression in a cell.
+/// This is because it's common to have a notebook cell that ends with an expression,
+/// which will result in the `repr` of the evaluated expression being printed as the cell's output.
 ///
 /// ## References
 /// - [Python documentation: `assert` statement](https://docs.python.org/3/reference/simple_stmts.html#the-assert-statement)

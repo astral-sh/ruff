@@ -10,8 +10,6 @@ use ruff_text_size::TextRange;
 use crate::checkers::ast::Checker;
 use crate::registry::Rule;
 
-/// This rule is ignored for Jupyter Notebooks.
-///
 /// ## What it does
 /// Checks for undocumented public module definitions.
 ///
@@ -54,6 +52,9 @@ use crate::registry::Rule;
 ///
 /// def calculate_speed(distance: float, time: float) -> float: ...
 /// ```
+///
+/// ## Notebook behavior
+/// This rule is ignored for Jupyter Notebooks.
 ///
 /// ## References
 /// - [PEP 257 – Docstring Conventions](https://peps.python.org/pep-0257/)

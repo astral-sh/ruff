@@ -11,9 +11,6 @@ use super::super::helpers::at_last_top_level_expression_in_cell;
 /// ## What it does
 /// Checks for useless expressions.
 ///
-/// For Jupyter Notebooks, this rule ignores to check the last top-level expression for each cell.
-/// This is because it's common to have a cell that ends with an expression to display it's value.
-///
 /// ## Why is this bad?
 /// Useless expressions have no effect on the program, and are often included
 /// by mistake. Assign a useless expression to a variable, or remove it
@@ -28,6 +25,11 @@ use super::super::helpers::at_last_top_level_expression_in_cell;
 /// ```python
 /// foo = 1 + 1
 /// ```
+///
+/// ## Notebook behavior
+/// For Jupyter Notebooks, this rule is not applied to the last top-level expression in a cell.
+/// This is because it's common to have a notebook cell that ends with an expression,
+/// which will result in the `repr` of the evaluated expression being printed as the cell's output.
 ///
 /// ## Known problems
 /// This rule ignores expression types that are commonly used for their side

@@ -364,14 +364,11 @@ You can also change the default selection using the [`include`](settings.md#incl
 
 ## Jupyter Notebook discovery
 
-Ruff has built-in support for linting and formatting [Jupyter Notebooks](https://jupyter.org/).
-
-!!! info
-    Jupyter Notebook support is marked as stable from Ruff version `0.6.0` onwards and will
-    be linted and formatted by default.
+Ruff has built-in support for linting and formatting [Jupyter Notebooks](https://jupyter.org/),
+which are linted and formatted by default on version `0.6.0` and higher.
 
 If you'd prefer to either only lint or only format Jupyter Notebook files, you can use the
-section specific `exclude` option to do so. For example, the following would only lint Jupyter
+section-specific `exclude` option to do so. For example, the following would only lint Jupyter
 Notebook files and not format them:
 
 === "pyproject.toml"
@@ -405,7 +402,7 @@ And, conversely, the following would only format Jupyter Notebook files and not 
     ```
 
 You can completely disable Jupyter Notebook support by updating the
-[`extend-exclude`](settings.md#extend-exclude) settings:
+[`extend-exclude`](settings.md#extend-exclude) setting:
 
 === "pyproject.toml"
 
@@ -437,11 +434,12 @@ using the [`per-file-ignores`](settings.md#per-file-ignores) setting:
     "*.ipynb" = ["T20"]
     ```
 
-There are certain rules that has different behavior when applied to Jupyter Notebook files. For
-example, the [`module-import-not-at-top-of-file` (`E402`)](rules/module-import-not-at-top-of-file.md)
-rule works at the cell level where the rule is violated only if an import statement is not at the
-top of the **cell**. The rule documentation will specify if it has different behavior for Jupyter
-Notebook files.
+Some rules have different behavior when applied to Jupyter Notebook files. For
+example, when applied to `.py` files the
+[`module-import-not-at-top-of-file` (`E402`)](rules/module-import-not-at-top-of-file.md)
+rule detect imports at the top of a file, but for notebooks it detects imports at the top of a
+**cell**. For a given rule, the rule's documentation will always specify if it has different
+behavior when applied to Jupyter Notebook files.
 
 ## Command-line interface
 

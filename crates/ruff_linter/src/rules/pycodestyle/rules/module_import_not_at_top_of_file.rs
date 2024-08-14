@@ -8,8 +8,6 @@ use crate::checkers::ast::Checker;
 /// ## What it does
 /// Checks for imports that are not at the top of the file.
 ///
-/// For Jupyter notebooks, this checks for imports that are not at the top of the cell.
-///
 /// ## Why is this bad?
 /// According to [PEP 8], "imports are always put at the top of the file, just after any
 /// module comments and docstrings, and before module globals and constants."
@@ -36,6 +34,9 @@ use crate::checkers::ast::Checker;
 /// "Two string"
 /// a = 1
 /// ```
+///
+/// ## Notebook behavior
+/// For Jupyter notebooks, this rule checks for imports that are not at the top of a *cell*.
 ///
 /// [PEP 8]: https://peps.python.org/pep-0008/#imports
 #[violation]

@@ -241,8 +241,7 @@ pub struct Options {
     /// included here not for configuration but because we lint whether e.g. the
     /// `[project]` matches the schema.
     ///
-    /// Starting from Ruff version 0.6.0, the default also includes notebook files (`.ipynb`
-    /// extension).
+    /// Notebook files (`.ipynb` extension) are included by default on Ruff 0.6.0+.
     ///
     /// For more information on the glob syntax, refer to the [`globset` documentation](https://docs.rs/globset/latest/globset/#syntax).
     #[option(
