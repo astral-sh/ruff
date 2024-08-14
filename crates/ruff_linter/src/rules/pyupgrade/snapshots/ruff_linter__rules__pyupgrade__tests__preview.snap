@@ -1163,4 +1163,156 @@ UP031_0.py:141:7: UP031 [*] Use format specifiers instead of percent format
     141 |+print("{:02X}".format(1))
 142 142 | 
 143 143 | # UP031 (no longer false negatives, but offer no fix because of more complex syntax)
-144 144 |
+144 144 | 
+
+UP031_0.py:145:1: UP031 Use format specifiers instead of percent format
+    |
+143 | # UP031 (no longer false negatives, but offer no fix because of more complex syntax)
+144 | 
+145 | "%d.%d" % (a, b)
+    | ^^^^^^^ UP031
+146 | 
+147 | "%*s" % (5, "hi")
+    |
+    = help: Replace with format specifiers
+
+UP031_0.py:147:1: UP031 Use format specifiers instead of percent format
+    |
+145 | "%d.%d" % (a, b)
+146 | 
+147 | "%*s" % (5, "hi")
+    | ^^^^^ UP031
+148 | 
+149 | "%d" % (flt,)
+    |
+    = help: Replace with format specifiers
+
+UP031_0.py:149:1: UP031 Use format specifiers instead of percent format
+    |
+147 | "%*s" % (5, "hi")
+148 | 
+149 | "%d" % (flt,)
+    | ^^^^ UP031
+150 | 
+151 | "%c" % (some_string,)
+    |
+    = help: Replace with format specifiers
+
+UP031_0.py:151:1: UP031 Use format specifiers instead of percent format
+    |
+149 | "%d" % (flt,)
+150 | 
+151 | "%c" % (some_string,)
+    | ^^^^ UP031
+152 | 
+153 | "%.2r" % (1.25)
+    |
+    = help: Replace with format specifiers
+
+UP031_0.py:153:1: UP031 Use format specifiers instead of percent format
+    |
+151 | "%c" % (some_string,)
+152 | 
+153 | "%.2r" % (1.25)
+    | ^^^^^^ UP031
+154 | 
+155 | "%.*s" % (5, "hi")
+    |
+    = help: Replace with format specifiers
+
+UP031_0.py:155:1: UP031 Use format specifiers instead of percent format
+    |
+153 | "%.2r" % (1.25)
+154 | 
+155 | "%.*s" % (5, "hi")
+    | ^^^^^^ UP031
+156 | 
+157 | "%i" % (flt,)
+    |
+    = help: Replace with format specifiers
+
+UP031_0.py:157:1: UP031 Use format specifiers instead of percent format
+    |
+155 | "%.*s" % (5, "hi")
+156 | 
+157 | "%i" % (flt,)
+    | ^^^^ UP031
+158 | 
+159 | "%()s" % {"": "empty"}
+    |
+    = help: Replace with format specifiers
+
+UP031_0.py:159:1: UP031 Use format specifiers instead of percent format
+    |
+157 | "%i" % (flt,)
+158 | 
+159 | "%()s" % {"": "empty"}
+    | ^^^^^^ UP031
+160 | 
+161 | "%s" % {"k": "v"}
+    |
+    = help: Replace with format specifiers
+
+UP031_0.py:161:1: UP031 Use format specifiers instead of percent format
+    |
+159 | "%()s" % {"": "empty"}
+160 | 
+161 | "%s" % {"k": "v"}
+    | ^^^^ UP031
+162 | 
+163 | "%()s" % {"": "bar"}
+    |
+    = help: Replace with format specifiers
+
+UP031_0.py:163:1: UP031 Use format specifiers instead of percent format
+    |
+161 | "%s" % {"k": "v"}
+162 | 
+163 | "%()s" % {"": "bar"}
+    | ^^^^^^ UP031
+164 | 
+165 | "%(1)s" % {"1": "bar"}
+    |
+    = help: Replace with format specifiers
+
+UP031_0.py:165:1: UP031 Use format specifiers instead of percent format
+    |
+163 | "%()s" % {"": "bar"}
+164 | 
+165 | "%(1)s" % {"1": "bar"}
+    | ^^^^^^^ UP031
+166 | 
+167 | "%(a)s" % {"a": 1, "a": 2}
+    |
+    = help: Replace with format specifiers
+
+UP031_0.py:167:1: UP031 Use format specifiers instead of percent format
+    |
+165 | "%(1)s" % {"1": "bar"}
+166 | 
+167 | "%(a)s" % {"a": 1, "a": 2}
+    | ^^^^^^^ UP031
+168 | 
+169 | "%(1)s" % {1: 2, "1": 2}
+    |
+    = help: Replace with format specifiers
+
+UP031_0.py:169:1: UP031 Use format specifiers instead of percent format
+    |
+167 | "%(a)s" % {"a": 1, "a": 2}
+168 | 
+169 | "%(1)s" % {1: 2, "1": 2}
+    | ^^^^^^^ UP031
+170 | 
+171 | "%(and)s" % {"and": 2}
+    |
+    = help: Replace with format specifiers
+
+UP031_0.py:171:1: UP031 Use format specifiers instead of percent format
+    |
+169 | "%(1)s" % {1: 2, "1": 2}
+170 | 
+171 | "%(and)s" % {"and": 2}
+    | ^^^^^^^^^ UP031
+    |
+    = help: Replace with format specifiers
