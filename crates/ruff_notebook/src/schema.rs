@@ -169,7 +169,7 @@ pub struct CellMetadata {
     /// preferred language.
     /// <https://github.com/microsoft/vscode/blob/e6c009a3d4ee60f352212b978934f52c4689fbd9/extensions/ipynb/src/serializers.ts#L117-L122>
     pub vscode: Option<CodeCellMetadataVSCode>,
-    /// Catch-all for metadata that isn't required by Ruff.
+    /// For additional properties that isn't required by Ruff.
     #[serde(flatten)]
     pub extra: HashMap<String, Value>,
 }
@@ -190,8 +190,8 @@ pub struct RawNotebookMetadata {
     /// The author(s) of the notebook document
     pub authors: Option<Value>,
     /// Kernel information.
-    pub kernelspec: Option<Value>,
-    /// Kernel information.
+    pub kernelspec: Option<Kernelspec>,
+    /// Language information.
     pub language_info: Option<LanguageInfo>,
     /// Original notebook format (major number) before converting the notebook between versions.
     /// This should never be written to a file.
@@ -204,6 +204,23 @@ pub struct RawNotebookMetadata {
 }
 
 /// Kernel information.
+#[skip_serializing_none]
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
+pub struct Kernelspec {
+    /// The language name. This isn't mentioned in the spec but is populated by various tools and
+    /// can be used as a fallback if [`language_info`] is missing.
+    ///
+    /// This is also used by VS Code to determine the preferred language of the notebook:
+    /// <https://github.com/microsoft/vscode/blob/1c31e758985efe11bc0453a45ea0bb6887e670a4/extensions/ipynb/src/deserializers.ts#L20-L22>.
+    ///
+    /// [`language_info`]: RawNotebookMetadata::language_info
+    pub language: Option<String>,
+    /// For additional properties that isn't required by Ruff.
+    #[serde(flatten)]
+    pub extra: HashMap<String, Value>,
+}
+
+/// Language information.
 #[skip_serializing_none]
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 pub struct LanguageInfo {

@@ -408,13 +408,18 @@ impl Notebook {
         &self.raw.metadata
     }
 
-    /// Return `true` if the notebook is a Python notebook, `false` otherwise.
+    /// Check if it's a Python notebook.
+    ///
+    /// This is determined by checking the `language_info` or `kernelspec` in the notebook
+    /// metadata. If neither is present, it's assumed to be a Python notebook.
     pub fn is_python_notebook(&self) -> bool {
-        self.raw
-            .metadata
-            .language_info
-            .as_ref()
-            .map_or(true, |language| language.name == "python")
+        if let Some(language_info) = self.raw.metadata.language_info.as_ref() {
+            return language_info.name == "python";
+        }
+        if let Some(kernel_spec) = self.raw.metadata.kernelspec.as_ref() {
+            return kernel_spec.language.as_deref() == Some("python");
+        }
+        true
     }
 
     /// Write the notebook back to the given [`Write`] implementer.
@@ -456,18 +461,12 @@ mod tests {
         Path::new("./resources/test/fixtures/jupyter").join(path)
     }
 
-    #[test]
-    fn test_python() -> Result<(), NotebookError> {
-        let notebook = Notebook::from_path(&notebook_path("valid.ipynb"))?;
-        assert!(notebook.is_python_notebook());
-        Ok(())
-    }
-
-    #[test]
-    fn test_r() -> Result<(), NotebookError> {
-        let notebook = Notebook::from_path(&notebook_path("R.ipynb"))?;
-        assert!(!notebook.is_python_notebook());
-        Ok(())
+    #[test_case("valid.ipynb", true)]
+    #[test_case("R.ipynb", false)]
+    #[test_case("kernelspec_language.ipynb", true)]
+    fn is_python_notebook(filename: &str, expected: bool) {
+        let notebook = Notebook::from_path(&notebook_path(filename)).unwrap();
+        assert_eq!(notebook.is_python_notebook(), expected);
     }
 
     #[test]
@@ -597,9 +596,10 @@ print("after empty cells")
         Ok(())
     }
 
-    #[test]
-    fn round_trip() {
-        let path = notebook_path("vscode_language_id.ipynb");
+    #[test_case("vscode_language_id.ipynb")]
+    #[test_case("kernelspec_language.ipynb")]
+    fn round_trip(filename: &str) {
+        let path = notebook_path(filename);
         let expected = std::fs::read_to_string(&path).unwrap();
         let actual = super::round_trip(&path).unwrap();
         assert_eq!(actual, expected);
