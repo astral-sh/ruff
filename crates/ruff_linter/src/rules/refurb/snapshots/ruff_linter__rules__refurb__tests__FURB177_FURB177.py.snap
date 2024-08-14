@@ -15,7 +15,7 @@ FURB177.py:5:5: FURB177 [*] Prefer `Path.cwd()` over `Path().resolve()` for curr
 3 3 | 
 4 4 | # Errors
 5   |-_ = Path().resolve()
-  5 |+_ = pathlib.Path.cwd()
+  5 |+_ = Path.cwd()
 6 6 | _ = pathlib.Path().resolve()
 7 7 | 
 8 8 | _ = Path("").resolve()
@@ -36,7 +36,7 @@ FURB177.py:6:5: FURB177 [*] Prefer `Path.cwd()` over `Path().resolve()` for curr
 4 4 | # Errors
 5 5 | _ = Path().resolve()
 6   |-_ = pathlib.Path().resolve()
-  6 |+_ = pathlib.Path.cwd()
+  6 |+_ = Path.cwd()
 7 7 | 
 8 8 | _ = Path("").resolve()
 9 9 | _ = pathlib.Path("").resolve()
@@ -56,7 +56,7 @@ FURB177.py:8:5: FURB177 [*] Prefer `Path.cwd()` over `Path().resolve()` for curr
 6 6 | _ = pathlib.Path().resolve()
 7 7 | 
 8   |-_ = Path("").resolve()
-  8 |+_ = pathlib.Path.cwd()
+  8 |+_ = Path.cwd()
 9 9 | _ = pathlib.Path("").resolve()
 10 10 | 
 11 11 | _ = Path(".").resolve()
@@ -76,7 +76,7 @@ FURB177.py:9:5: FURB177 [*] Prefer `Path.cwd()` over `Path().resolve()` for curr
 7  7  | 
 8  8  | _ = Path("").resolve()
 9     |-_ = pathlib.Path("").resolve()
-   9  |+_ = pathlib.Path.cwd()
+   9  |+_ = Path.cwd()
 10 10 | 
 11 11 | _ = Path(".").resolve()
 12 12 | _ = pathlib.Path(".").resolve()
@@ -96,7 +96,7 @@ FURB177.py:11:5: FURB177 [*] Prefer `Path.cwd()` over `Path().resolve()` for cur
 9  9  | _ = pathlib.Path("").resolve()
 10 10 | 
 11    |-_ = Path(".").resolve()
-   11 |+_ = pathlib.Path.cwd()
+   11 |+_ = Path.cwd()
 12 12 | _ = pathlib.Path(".").resolve()
 13 13 | 
 14 14 | _ = Path("", **kwargs).resolve()
@@ -116,7 +116,7 @@ FURB177.py:12:5: FURB177 [*] Prefer `Path.cwd()` over `Path().resolve()` for cur
 10 10 | 
 11 11 | _ = Path(".").resolve()
 12    |-_ = pathlib.Path(".").resolve()
-   12 |+_ = pathlib.Path.cwd()
+   12 |+_ = Path.cwd()
 13 13 | 
 14 14 | _ = Path("", **kwargs).resolve()
 15 15 | _ = pathlib.Path("", **kwargs).resolve()
@@ -136,7 +136,7 @@ FURB177.py:14:5: FURB177 [*] Prefer `Path.cwd()` over `Path().resolve()` for cur
 12 12 | _ = pathlib.Path(".").resolve()
 13 13 | 
 14    |-_ = Path("", **kwargs).resolve()
-   14 |+_ = pathlib.Path.cwd()
+   14 |+_ = Path.cwd()
 15 15 | _ = pathlib.Path("", **kwargs).resolve()
 16 16 | 
 17 17 | _ = Path(".", **kwargs).resolve()
@@ -156,7 +156,7 @@ FURB177.py:15:5: FURB177 [*] Prefer `Path.cwd()` over `Path().resolve()` for cur
 13 13 | 
 14 14 | _ = Path("", **kwargs).resolve()
 15    |-_ = pathlib.Path("", **kwargs).resolve()
-   15 |+_ = pathlib.Path.cwd()
+   15 |+_ = Path.cwd()
 16 16 | 
 17 17 | _ = Path(".", **kwargs).resolve()
 18 18 | _ = pathlib.Path(".", **kwargs).resolve()
@@ -176,7 +176,7 @@ FURB177.py:17:5: FURB177 [*] Prefer `Path.cwd()` over `Path().resolve()` for cur
 15 15 | _ = pathlib.Path("", **kwargs).resolve()
 16 16 | 
 17    |-_ = Path(".", **kwargs).resolve()
-   17 |+_ = pathlib.Path.cwd()
+   17 |+_ = Path.cwd()
 18 18 | _ = pathlib.Path(".", **kwargs).resolve()
 19 19 | 
 20 20 | # OK
@@ -196,7 +196,7 @@ FURB177.py:18:5: FURB177 [*] Prefer `Path.cwd()` over `Path().resolve()` for cur
 16 16 | 
 17 17 | _ = Path(".", **kwargs).resolve()
 18    |-_ = pathlib.Path(".", **kwargs).resolve()
-   18 |+_ = pathlib.Path.cwd()
+   18 |+_ = Path.cwd()
 19 19 | 
 20 20 | # OK
 21 21 | _ = Path.cwd()

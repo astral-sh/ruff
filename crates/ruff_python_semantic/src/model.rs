@@ -907,7 +907,7 @@ impl<'a> SemanticModel<'a> {
         self.current_scopes()
             .enumerate()
             .find_map(|(scope_index, scope)| {
-                scope.bindings().find_map(|(name, binding_id)| {
+                let mut imported_names = scope.bindings().filter_map(|(name, binding_id)| {
                     let binding = &self.bindings[binding_id];
                     match &binding.kind {
                         // Ex) Given `module="sys"` and `object="exit"`:
@@ -987,7 +987,22 @@ impl<'a> SemanticModel<'a> {
                         _ => {}
                     }
                     None
-                })
+                });
+
+                let first = imported_names.next()?;
+                if let Some(second) = imported_names.next() {
+                    // Multiple candidates. We need to sort them because `scope.bindings()` is a HashMap
+                    // which doesn't have a stable iteration order.
+
+                    let mut imports: Vec<_> =
+                        [first, second].into_iter().chain(imported_names).collect();
+                    imports.sort_unstable_by_key(|import| import.range.start());
+
+                    // Return the binding that was imported last.
+                    imports.pop()
+                } else {
+                    Some(first)
+                }
             })
     }
 
