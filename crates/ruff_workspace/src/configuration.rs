@@ -230,15 +230,9 @@ impl Configuration {
                 extend_exclude: FilePatternSet::try_from_iter(self.extend_exclude)?,
                 extend_include: FilePatternSet::try_from_iter(self.extend_include)?,
                 force_exclude: self.force_exclude.unwrap_or(false),
-                include: FilePatternSet::try_from_iter(self.include.unwrap_or_else(|| {
-                    let mut include = INCLUDE.to_vec();
-
-                    if global_preview.is_enabled() {
-                        include.push(FilePattern::Builtin("*.ipynb"));
-                    }
-
-                    include
-                }))?,
+                include: FilePatternSet::try_from_iter(
+                    self.include.unwrap_or_else(|| INCLUDE.to_vec()),
+                )?,
                 respect_gitignore: self.respect_gitignore.unwrap_or(true),
                 project_root: project_root.to_path_buf(),
             },

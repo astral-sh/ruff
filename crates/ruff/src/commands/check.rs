@@ -268,8 +268,7 @@ mod test {
 
         // Run
         let diagnostics = check(
-            // Notebooks are not included by default
-            &[tempdir.path().to_path_buf(), notebook],
+            &[tempdir.path().to_path_buf()],
             &pyproject_config,
             &ConfigArguments::default(),
             flags::Cache::Disabled,
