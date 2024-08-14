@@ -911,9 +911,5 @@ There are three ways in which an import can be categorized as "first-party":
     the `src` setting and, for each directory, check for the existence of a subdirectory `foo` or a
     file `foo.py`.
 
-By default, `src` is set to the project root. In the above example, we'd want to set
-`src = ["./src"]` to ensure that we locate `./my_project/src/foo` and thus categorize `import foo`
-as first-party in `baz.py`. In practice, for this limited example, setting `src = ["./src"]` is
-unnecessary, as all imports within `./my_project/src/foo` would be categorized as first-party via
-the same-package heuristic; but if your project contains multiple packages, you'll want to set `src`
-explicitly.
+By default, `src` is set to the project root, along with `"src"` subdirectory in the project root.
+This ensures that Ruff supports both flat and "src" layouts out of the box.

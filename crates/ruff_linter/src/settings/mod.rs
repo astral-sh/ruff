@@ -398,7 +398,7 @@ impl LinterSettings {
             per_file_ignores: CompiledPerFileIgnoreList::default(),
             fix_safety: FixSafetyTable::default(),
 
-            src: vec![path_dedot::CWD.clone()],
+            src: vec![path_dedot::CWD.clone(), path_dedot::CWD.join("src")],
             // Needs duplicating
             tab_size: IndentWidth::default(),
             line_length: LineLength::default(),

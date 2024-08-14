@@ -323,33 +323,37 @@ pub struct Options {
     /// The directories to consider when resolving first- vs. third-party
     /// imports.
     ///
-    /// As an example: given a Python package structure like:
+    /// When omitted, the `src` directory will typically default to including both:
+    ///
+    /// 1. The directory containing the nearest `pyproject.toml`, `ruff.toml`, or `.ruff.toml` file (the "project root").
+    /// 2. The `"src"` subdirectory of the project root.
+    ///
+    /// These defaults ensure that uv supports both flat layouts and `src` layouts out-of-the-box.
+    /// (If a configuration file is explicitly provided (e.g., via the `--config` command-line
+    /// flag), the current working directory will be considered the project root.)
+    ///
+    /// As an example, consider an alternative project structure, like:
     ///
     /// ```text
     /// my_project
     /// ├── pyproject.toml
-    /// └── src
+    /// └── lib
     ///     └── my_package
     ///         ├── __init__.py
     ///         ├── foo.py
     ///         └── bar.py
     /// ```
     ///
-    /// The `./src` directory should be included in the `src` option
-    /// (e.g., `src = ["src"]`), such that when resolving imports,
-    /// `my_package.foo` is considered a first-party import.
-    ///
-    /// When omitted, the `src` directory will typically default to the
-    /// directory containing the nearest `pyproject.toml`, `ruff.toml`, or
-    /// `.ruff.toml` file (the "project root"), unless a configuration file
-    /// is explicitly provided (e.g., via the `--config` command-line flag).
+    /// In this case, the `./lib` directory should be included in the `src` option
+    /// (e.g., `src = ["lib"]`), such that when resolving imports, `my_package.foo`
+    /// is considered first-party.
     ///
     /// This field supports globs. For example, if you have a series of Python
     /// packages in a `python_modules` directory, `src = ["python_modules/*"]`
-    /// would expand to incorporate all of the packages in that directory. User
-    /// home directory and environment variables will also be expanded.
+    /// would expand to incorporate all packages in that directory. User home
+    /// directory and environment variables will also be expanded.
     #[option(
-        default = r#"["."]"#,
+        default = r#"[".", "src"]"#,
         value_type = "list[str]",
         example = r#"
             # Allow imports relative to the "src" and "test" directories.
