@@ -11,6 +11,9 @@ use super::super::helpers::at_last_top_level_expression_in_cell;
 /// ## What it does
 /// Checks for useless expressions.
 ///
+/// For Jupyter Notebooks, this rule ignores to check the last top-level expression for each cell.
+/// This is because it's common to have a cell that ends with an expression to display it's value.
+///
 /// ## Why is this bad?
 /// Useless expressions have no effect on the program, and are often included
 /// by mistake. Assign a useless expression to a variable, or remove it
@@ -81,9 +84,6 @@ pub(crate) fn useless_expression(checker: &mut Checker, value: &Expr) {
         return;
     }
 
-    // For Jupyter Notebooks, ignore the last top-level expression for each cell.
-    // This is because it's common to have a cell that ends with an expression
-    // to display it's value.
     if checker.source_type.is_ipynb()
         && at_last_top_level_expression_in_cell(
             checker.semantic(),

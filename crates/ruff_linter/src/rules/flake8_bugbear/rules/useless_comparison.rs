@@ -10,6 +10,9 @@ use super::super::helpers::at_last_top_level_expression_in_cell;
 /// ## What it does
 /// Checks for useless comparisons.
 ///
+/// For Jupyter Notebooks, this rule ignores to check the last top-level expression for each cell.
+/// This is because it's common to have a cell that ends with an expression to display it's value.
+///
 /// ## Why is this bad?
 /// Useless comparisons have no effect on the program, and are often included
 /// by mistake. If the comparison is intended to enforce an invariant, prepend
@@ -43,9 +46,6 @@ impl Violation for UselessComparison {
 /// B015
 pub(crate) fn useless_comparison(checker: &mut Checker, expr: &Expr) {
     if expr.is_compare_expr() {
-        // For Jupyter Notebooks, ignore the last top-level expression for each cell.
-        // This is because it's common to have a cell that ends with an expression
-        // to display it's value.
         if checker.source_type.is_ipynb()
             && at_last_top_level_expression_in_cell(
                 checker.semantic(),

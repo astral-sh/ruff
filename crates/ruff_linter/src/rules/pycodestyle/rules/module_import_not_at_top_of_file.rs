@@ -6,8 +6,9 @@ use ruff_text_size::Ranged;
 use crate::checkers::ast::Checker;
 
 /// ## What it does
-/// Checks for imports that are not at the top of the file. For Jupyter notebooks, this
-/// checks for imports that are not at the top of the cell.
+/// Checks for imports that are not at the top of the file.
+///
+/// For Jupyter notebooks, this checks for imports that are not at the top of the cell.
 ///
 /// ## Why is this bad?
 /// According to [PEP 8], "imports are always put at the top of the file, just after any

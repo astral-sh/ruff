@@ -10,6 +10,8 @@ use ruff_text_size::TextRange;
 use crate::checkers::ast::Checker;
 use crate::registry::Rule;
 
+/// This rule is ignored for Jupyter Notebooks.
+///
 /// ## What it does
 /// Checks for undocumented public module definitions.
 ///

@@ -367,9 +367,8 @@ You can also change the default selection using the [`include`](settings.md#incl
 Ruff has built-in support for linting and formatting [Jupyter Notebooks](https://jupyter.org/).
 
 !!! info
-    Notebooks are linted and formatted by default from Ruff version `0.6.0` onwards which marks
-    Jupyter Notebook support as stable. You can opt-out of linting and formatting notebooks by
-    adding `*.ipynb` to [`extend-exclude`](settings.md#extend-exclude).
+    Jupyter Notebook support is marked as stable from Ruff version `0.6.0` onwards and will
+    be linted and formatted by default.
 
 If you'd prefer to either only lint or only format Jupyter Notebook files, you can use the
 section specific `exclude` option to do so. For example, the following would only lint Jupyter
@@ -404,6 +403,45 @@ And, conversely, the following would only format Jupyter Notebook files and not 
     [lint]
     exclude = ["*.ipynb"]
     ```
+
+You can completely disable Jupyter Notebook support by updating the
+[`extend-exclude`](settings.md#extend-exclude) settings:
+
+=== "pyproject.toml"
+
+    ```toml
+    [tool.ruff]
+    extend-exclude = ["*.ipynb"]
+    ```
+
+=== "ruff.toml"
+
+    ```toml
+    extend-exclude = ["*.ipynb"]
+    ```
+
+If you'd like to ignore certain rules specifically for Jupyter Notebook files, you can do so by
+using the [`per-file-ignores`](settings.md#per-file-ignores) setting:
+
+=== "pyproject.toml"
+
+    ```toml
+    [tool.ruff.lint.per-file-ignores]
+    "*.ipynb" = ["T20"]
+    ```
+
+=== "ruff.toml"
+
+    ```toml
+    [lint.per-file-ignores]
+    "*.ipynb" = ["T20"]
+    ```
+
+There are certain rules that has different behavior when applied to Jupyter Notebook files. For
+example, the [`module-import-not-at-top-of-file` (`E402`)](rules/module-import-not-at-top-of-file.md)
+rule works at the cell level where the rule is violated only if an import statement is not at the
+top of the **cell**. The rule documentation will specify if it has different behavior for Jupyter
+Notebook files.
 
 ## Command-line interface
 
