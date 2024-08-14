@@ -4,43 +4,120 @@
 
 ### Breaking changes
 
-- Ruff 0.6 ([#12834](https://github.com/astral-sh/ruff/pull/12834))
+See also, the "Remapped rules" section which may result in disabled rules.
+
+- The pytest rules `PT001` and `PT023` now default to omitting the decorator parentheses when there are no arguments ([#12838](https://github.com/astral-sh/ruff/pull/12838)).
+
+- Detect imports in `src` layouts by default ([#12848](https://github.com/astral-sh/ruff/pull/12848))
+
+- Enable Jupyter Notebook formatting and linting by default ([#12878](https://github.com/astral-sh/ruff/pull/12878)).
+
+    You can disable specific rules for notebooks using [`per-file-ignores`](https://docs.astral.sh/ruff/settings/#lint_per-file-ignores):
+
+    ```toml
+    [tool.ruff.lint.per-file-ignores]
+    "*.ipynb" = ["E501"] # disable line-too-long in notebooks
+    ```
+
+    If you'd prefer to either only lint or only format Jupyter Notebook files, you can use the
+    section-specific `exclude` option to do so. For example, the following would only lint Jupyter
+    Notebook files and not format them:
+
+    ```toml
+    [tool.ruff.format]
+    exclude = ["*.ipynb"]
+    ```
+
+    And, conversely, the following would only format Jupyter Notebook files and not lint them:
+
+    ```toml
+    [tool.ruff.lint]
+    exclude = ["*.ipynb"]
+    ```
+
+    You can completely disable Jupyter Notebook support by updating the [`extend-exclude`](https://docs.astral.sh/ruff/rules/superfluous-else-continue/) setting:
+
+    ```toml
+    [tool.ruff]
+    extend-exclude = ["*.ipynb"]
+    ```
+
+### Deprecations
+
+The following rules are now deprecated:
+
+- [`pytest-missing-fixture-name-underscore`](https://docs.astral.sh/ruff/rules/pytest-missing-fixture-name-underscore/) (`PT004`)
+- [`pytest-incorrect-fixture-name-underscore`](https://docs.astral.sh/ruff/rules/pytest-incorrect-fixture-name-underscore/) (`PT005`)
+- [`unpacked-list-comprehension`](https://docs.astral.sh/ruff/rules/unpacked-list-comprehension/) (`UP027`)
+
+### Remapped rules
+
+The following rules have been remapped to new rule codes:
+
+- [`unnecessary-dict-comprehension-for-iterable`](https://docs.astral.sh/ruff/rules/unnecessary-dict-comprehension-for-iterable/): `RUF025` to `C420`
+
+### Stabilization
+
+The following rules have been stabilized and are no longer in preview:
+
+- [`singledispatch-method`](https://docs.astral.sh/ruff/rules/singledispatch-method/) (`PLE1519`)
+- [`singledispatchmethod-function`](https://docs.astral.sh/ruff/rules/singledispatchmethod-function/) (`PLE1520`)
+- [`bad-staticmethod-argument`](https://docs.astral.sh/ruff/rules/bad-staticmethod-argument/) (`PLW0211`)
+- [`if-stmt-min-max`](https://docs.astral.sh/ruff/rules/if-stmt-min-max/) (`PLR1730`)
+- [`invalid-bytes-return-type`](https://docs.astral.sh/ruff/rules/invalid-bytes-return-type/) (`PLE0308`)
+- [`invalid-hash-return-type`](https://docs.astral.sh/ruff/rules/invalid-hash-return-type/) (`PLE0309`)
+- [`invalid-index-return-type`](https://docs.astral.sh/ruff/rules/invalid-index-return-type/) (`PLE0305`)
+- [`invalid-length-return-type`](https://docs.astral.sh/ruff/rules/invalid-length-return-type/) (`E303`)
+- [`self-or-cls-assignment`](https://docs.astral.sh/ruff/rules/self-or-cls-assignment/) (`PLW0642`)
+- [`byte-string-usage`](https://docs.astral.sh/ruff/rules/byte-string-usage/) (`PYI057`)
+- [`duplicate-literal-member`](https://docs.astral.sh/ruff/rules/duplicate-literal-member/) (`PYI062`)
+- [`redirected-noqa`](https://docs.astral.sh/ruff/rules/redirected-noqa/) (`RUF101`)
+
+The following behaviors have been stabilized:
+
+- [`cancel-scope-no-checkpoint`](https://docs.astral.sh/ruff/rules/cancel-scope-no-checkpoint/) (`ASYNC100`): Support `asyncio` and `anyio` context mangers.
+- [`async-function-with-timeout`](https://docs.astral.sh/ruff/rules/async-function-with-timeout/) (`ASYNC109`): Support `asyncio` and `anyio` context mangers.
+- [`async-busy-wait`](https://docs.astral.sh/ruff/rules/async-busy-wait/) (`ASYNC110`): Support `asyncio` and `anyio` context mangers.
+- [`async-zero-sleep`](https://docs.astral.sh/ruff/rules/async-zero-sleep/) (`ASYNC115`): Support `anyio` context mangers.
+- [`long-sleep-not-forever`](https://docs.astral.sh/ruff/rules/long-sleep-not-forever/) (`ASYNC116`): : Support `anyio` context mangers.
+
+The following fixes have been stabilized:
+
+- [`superfluous-else-return`](https://docs.astral.sh/ruff/rules/superfluous-else-return/) (`RET505`)
+- [`superfluous-else-raise`](https://docs.astral.sh/ruff/rules/superfluous-else-raise/) (`RET506`)
+- [`superfluous-else-continue`](https://docs.astral.sh/ruff/rules/superfluous-else-continue/) (`RET507`)
+- [`superfluous-else-break`](https://docs.astral.sh/ruff/rules/superfluous-else-break/) (`RET508`)
 
 ### Preview features
 
-- RUF027: Ignore template strings passed to logging calls and `builtins._()` calls ([#12889](https://github.com/astral-sh/ruff/pull/12889))
-- [`pyupgrade`] Show violations without auto-fix for `UP031` ([#11229](https://github.com/astral-sh/ruff/pull/11229))
-- [flake8-return] Only add return None at end of function (RET503) ([#11074](https://github.com/astral-sh/ruff/pull/11074))
-- [flake8-simplify] Further simplify to binary in preview for `if-else-block-instead-of-if-exp (SIM108)` ([#12796](https://github.com/astral-sh/ruff/pull/12796))
-- [ruff] Do not remove parens for tuples with starred expressions in Python <=3.10 `RUF031` ([#12784](https://github.com/astral-sh/ruff/pull/12784))
-- `RUF031`: Ignore unparenthesized tuples in subscripts when the subscript is obviously a type annotation or type alias ([#12762](https://github.com/astral-sh/ruff/pull/12762))
+- \[`flake8-simplify`\] Further simplify to binary in preview for (`SIM108`) ([#12796](https://github.com/astral-sh/ruff/pull/12796))
+- \[`pyupgrade`\] Show violations without auto-fix (`UP031`) ([#11229](https://github.com/astral-sh/ruff/pull/11229))
+
+### Rule changes
+
+- \[`flake8-import-conventions`\] Add `xml.etree.ElementTree` to default conventions ([#12455](https://github.com/astral-sh/ruff/pull/12455))
+- \[`flake8-pytest-style`\] Add a space after comma in CSV output (`PT006`) ([#12853](https://github.com/astral-sh/ruff/pull/12853))
 
 ### Server
 
-- Collect errors while building up the settings index ([#12781](https://github.com/astral-sh/ruff/pull/12781))
+- Show a message for incorrect settings ([#12781](https://github.com/astral-sh/ruff/pull/12781))
 
 ### Bug fixes
 
-- Avoid treating `dataclasses.KW_ONLY` as typing-only ([#12863](https://github.com/astral-sh/ruff/pull/12863))
-- Don't enforce returns and yields in abstract methods ([#12771](https://github.com/astral-sh/ruff/pull/12771))
+- \[`flake8-return`\] Only add return `None` at end of a function (`RET503`) ([#11074](https://github.com/astral-sh/ruff/pull/11074))
+- \[`flake8-type-checking`\] Avoid treating `dataclasses.KW_ONLY` as typing-only (`TCH003`) ([#12863](https://github.com/astral-sh/ruff/pull/12863))
+- \[`pep8-naming`\] Treat `type(Protocol)` et al as metaclass base (`N805`) ([#12770](https://github.com/astral-sh/ruff/pull/12770))
+- \[`pydoclint`\] Don't enforce returns and yields in abstract methods (`DOC201`, `DOC202`) ([#12771](https://github.com/astral-sh/ruff/pull/12771))
+- \[`ruff`\] Skip tuples with slice expressions in (`RUF031`) ([#12768](https://github.com/astral-sh/ruff/pull/12768))
+- \[`ruff`\] Ignore unparenthesized tuples in subscripts when the subscript is a type annotation or type alias (`RUF031`) ([#12762](https://github.com/astral-sh/ruff/pull/12762))
+- \[`ruff`\] Ignore template strings passed to logging and `builtins._()` calls (`RUF027`) ([#12889](https://github.com/astral-sh/ruff/pull/12889))
+- \[`ruff`\] Do not remove parens for tuples with starred expressions in Python \<=3.10 (`RUF031`) ([#12784](https://github.com/astral-sh/ruff/pull/12784))
 - Evaluate default parameter value in enclosing scope ([#12852](https://github.com/astral-sh/ruff/pull/12852))
-- Treat `type(Protocol)` et al as metaclass base ([#12770](https://github.com/astral-sh/ruff/pull/12770))
-- [ruff] Skip tuples with slice expressions in `incorrectly-parenthesized-tuple-in-subscript (RUF031)` ([#12768](https://github.com/astral-sh/ruff/pull/12768))
-
-### Documentation
-
-- Add known problems warning to `type-comparison` rule ([#12769](https://github.com/astral-sh/ruff/pull/12769))
-- Document that BLE001 supports both BaseException and Exception ([#12788](https://github.com/astral-sh/ruff/pull/12788))
-- Improve docs for `missing-fstring-syntax` (`RUF027`) ([#12886](https://github.com/astral-sh/ruff/pull/12886))
-- Improve docs for `non-augmented-assignment` (`PLR6104`) ([#12887](https://github.com/astral-sh/ruff/pull/12887))
-- Improvements to documentation ([#12712](https://github.com/astral-sh/ruff/pull/12712))
-- [Minor typo] Fix article in "an fix" ([#12797](https://github.com/astral-sh/ruff/pull/12797))
 
 ### Other changes
 
-- Consider VS Code cell metadata to determine valid code cells ([#12864](https://github.com/astral-sh/ruff/pull/12864))
-- Fallback to kernelspec to check if it's a Python notebook ([#12875](https://github.com/astral-sh/ruff/pull/12875))
-- [`flake8-pytest-style`] Add a space after comma in CSV output (`PT006`) ([#12853](https://github.com/astral-sh/ruff/pull/12853))
+- Respect VS Code cell metadata when detecting the language of Jupyter Notebook cells ([#12864](https://github.com/astral-sh/ruff/pull/12864))
+- Respect `kernelspec` cell metadata when detecting the language of Jupyter Notebook cells ([#12875](https://github.com/astral-sh/ruff/pull/12875))
 
 ## 0.5.7
 
@@ -2215,9 +2292,9 @@ Read Ruff's new [versioning policy](https://docs.astral.sh/ruff/versioning/).
 - Unsafe fixes are no longer displayed or applied without opt-in ([#7769](https://github.com/astral-sh/ruff/pull/7769))
 - Drop formatting specific rules from the default set ([#7900](https://github.com/astral-sh/ruff/pull/7900))
 - The deprecated `format` setting has been removed ([#7984](https://github.com/astral-sh/ruff/pull/7984))
-  - The `format` setting cannot be used to configure the output format, use `output-format` instead
-  - The `RUFF_FORMAT` environment variable is ignored, use `RUFF_OUTPUT_FORMAT` instead
-  - The `--format` option has been removed from `ruff check`, use `--output-format` instead
+    - The `format` setting cannot be used to configure the output format, use `output-format` instead
+    - The `RUFF_FORMAT` environment variable is ignored, use `RUFF_OUTPUT_FORMAT` instead
+    - The `--format` option has been removed from `ruff check`, use `--output-format` instead
 
 ### Rule changes
 
