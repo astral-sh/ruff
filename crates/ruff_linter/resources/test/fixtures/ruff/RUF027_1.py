@@ -45,3 +45,17 @@ def negative_cases():
 
     import django.utils.translations
     y = django.utils.translations.gettext("This {should} be understood as a translation string too!")
+
+    # Calling `gettext.install()` literall monkey-patches `builtins._ = ...`,
+    # so even the fully qualified access of `builtins._()` should be considered
+    # a possible `gettext` call.
+    import builtins
+    another = 42
+    z = builtins._("{another} translation string")
+
+    # Usually logging strings use `%`-style string interpolation,
+    # but `logging` can be configured to use `{}` the same as f-strings,
+    # so these should also be ignored.
+    # See https://docs.python.org/3/howto/logging-cookbook.html#formatting-styles
+    import logging
+    logging.info("yet {another} non-f-string")

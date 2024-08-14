@@ -1,13 +1,17 @@
-use memchr::memchr2_iter;
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::{self as ast};
 use ruff_python_literal::format::FormatSpec;
 use ruff_python_parser::parse_expression;
+use ruff_python_semantic::analyze::logging;
 use ruff_python_semantic::SemanticModel;
 use ruff_source_file::Locator;
 use ruff_text_size::{Ranged, TextRange};
+
+use memchr::memchr2_iter;
 use rustc_hash::FxHashSet;
+
+use crate::checkers::ast::Checker;
 
 /// ## What it does
 /// Searches for strings that look like they were meant to be f-strings, but are missing an `f` prefix.
@@ -59,12 +63,9 @@ impl AlwaysFixableViolation for MissingFStringSyntax {
 }
 
 /// RUF027
-pub(crate) fn missing_fstring_syntax(
-    diagnostics: &mut Vec<Diagnostic>,
-    literal: &ast::StringLiteral,
-    locator: &Locator,
-    semantic: &SemanticModel,
-) {
+pub(crate) fn missing_fstring_syntax(checker: &mut Checker, literal: &ast::StringLiteral) {
+    let semantic = checker.semantic();
+
     // we want to avoid statement expressions that are just a string literal.
     // there's no reason to have standalone f-strings and this lets us avoid docstrings too
     if let ast::Stmt::Expr(ast::StmtExpr { value, .. }) = semantic.current_statement() {
@@ -75,18 +76,25 @@ pub(crate) fn missing_fstring_syntax(
     }
 
     // We also want to avoid expressions that are intended to be translated.
-    if semantic
-        .current_expressions()
-        .any(|expr| is_gettext(expr, semantic))
-    {
+    if semantic.current_expressions().any(|expr| {
+        is_gettext(expr, semantic)
+            || is_logger_call(expr, semantic, &checker.settings.logger_objects)
+    }) {
         return;
     }
 
-    if should_be_fstring(literal, locator, semantic) {
+    if should_be_fstring(literal, checker.locator(), semantic) {
         let diagnostic = Diagnostic::new(MissingFStringSyntax, literal.range())
             .with_fix(fix_fstring_syntax(literal.range()));
-        diagnostics.push(diagnostic);
+        checker.diagnostics.push(diagnostic);
     }
+}
+
+fn is_logger_call(expr: &ast::Expr, semantic: &SemanticModel, logger_objects: &[String]) -> bool {
+    let ast::Expr::Call(ast::ExprCall { func, .. }) = expr else {
+        return false;
+    };
+    logging::is_logger_candidate(func, semantic, logger_objects)
 }
 
 /// Returns `true` if an expression appears to be a `gettext` call.
@@ -123,7 +131,7 @@ fn is_gettext(expr: &ast::Expr, semantic: &SemanticModel) -> bool {
         .is_some_and(|qualified_name| {
             matches!(
                 qualified_name.segments(),
-                ["gettext", "gettext" | "ngettext"]
+                ["gettext", "gettext" | "ngettext"] | ["builtins", "_"]
             )
         })
 }
