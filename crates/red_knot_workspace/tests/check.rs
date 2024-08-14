@@ -11,9 +11,9 @@ use ruff_python_ast::{Alias, Expr, Parameter, ParameterWithDefault, Stmt};
 use ruff_python_ast::visitor::source_order;
 use ruff_python_ast::visitor::source_order::SourceOrderVisitor;
 
-fn setup_db(workspace_root: SystemPathBuf) -> anyhow::Result<RootDatabase> {
-    let system = OsSystem::new(&workspace_root);
-    let workspace = WorkspaceMetadata::from_path(&workspace_root, &system, &())?;
+fn setup_db(workspace_root: &SystemPath) -> anyhow::Result<RootDatabase> {
+    let system = OsSystem::new(workspace_root);
+    let workspace = WorkspaceMetadata::from_path(workspace_root, &system, &())?;
     RootDatabase::new(workspace, system)
 }
 
@@ -22,8 +22,9 @@ fn setup_db(workspace_root: SystemPathBuf) -> anyhow::Result<RootDatabase> {
 #[allow(clippy::print_stdout)]
 fn corpus_no_panic() -> anyhow::Result<()> {
     let corpus = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("resources/test/corpus");
-    let system_corpus = SystemPath::from_std_path(&corpus).expect("corpus path to be UTF8");
-    let db = setup_db(system_corpus.to_path_buf())?;
+    let system_corpus =
+        SystemPathBuf::from_path_buf(corpus.clone()).expect("corpus path to be UTF8");
+    let db = setup_db(&system_corpus)?;
 
     for path in fs::read_dir(&corpus).expect("corpus to be a directory") {
         let path = path.expect("path to not be an error").path();

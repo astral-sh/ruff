@@ -3,7 +3,7 @@ use anyhow::Context;
 use salsa::Durability;
 use salsa::Setter;
 
-use ruff_db::system::SystemPathBuf;
+use ruff_db::system::{SystemPath, SystemPathBuf};
 
 use crate::module_resolver::SearchPaths;
 use crate::Db;
@@ -46,6 +46,10 @@ impl Program {
         }
 
         Ok(())
+    }
+
+    pub fn custom_stdlib_search_path(self, db: &dyn Db) -> Option<&SystemPath> {
+        self.search_paths(db).custom_stdlib()
     }
 }
 

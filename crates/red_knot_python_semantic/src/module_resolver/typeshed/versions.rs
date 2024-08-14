@@ -145,7 +145,7 @@ impl TypeshedVersions {
     }
 }
 
-/// Possible answers [`LazyTypeshedVersions::query_module()`] could give to the question:
+/// Possible answers [`TypeshedVersions::query_module()`] could give to the question:
 /// "Does this module exist in the stdlib at runtime on a certain target version?"
 #[derive(Debug, Copy, PartialEq, Eq, Clone, Hash)]
 pub(crate) enum TypeshedVersionsQueryResult {

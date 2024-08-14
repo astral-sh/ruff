@@ -798,6 +798,48 @@ fn remove_search_path() -> anyhow::Result<()> {
     Ok(())
 }
 
+#[test]
+fn changed_versions_file() -> anyhow::Result<()> {
+    let mut case = setup_with_search_paths(
+        |root_path: &SystemPath, workspace_path: &SystemPath| {
+            std::fs::write(workspace_path.join("bar.py").as_std_path(), "import sub.a")?;
+            std::fs::create_dir_all(root_path.join("typeshed/stdlib").as_std_path())?;
+            std::fs::write(root_path.join("typeshed/stdlib/VERSIONS").as_std_path(), "")?;
+            std::fs::write(
+                root_path.join("typeshed/stdlib/os.pyi").as_std_path(),
+                "# not important",
+            )?;
+
+            Ok(())
+        },
+        |root_path, _workspace_path| SearchPathConfiguration {
+            custom_typeshed: Some(root_path.join("typeshed")),
+            ..SearchPathConfiguration::default()
+        },
+    )?;
+
+    // Remove site packages from the search path settings.
+    assert_eq!(
+        resolve_module(case.db(), ModuleName::new("os").unwrap()),
+        None
+    );
+
+    std::fs::write(
+        case.root_path()
+            .join("typeshed/stdlib/VERSIONS")
+            .as_std_path(),
+        "os: 3.0-",
+    )?;
+
+    let changes = case.stop_watch();
+
+    case.apply_changes(changes);
+
+    assert!(resolve_module(case.db(), ModuleName::new("os").unwrap()).is_some());
+
+    Ok(())
+}
+
 /// Watch a workspace that contains two files where one file is a hardlink to another.
 ///
 /// Setup:

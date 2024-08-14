@@ -257,6 +257,16 @@ impl SearchPaths {
         }
     }
 
+    pub(crate) fn custom_stdlib(&self) -> Option<&SystemPath> {
+        self.static_paths.iter().find_map(|search_path| {
+            if search_path.is_standard_library() {
+                search_path.as_system_path()
+            } else {
+                None
+            }
+        })
+    }
+
     pub(super) fn typeshed_versions(&self) -> &TypeshedVersions {
         &self.typeshed_versions
     }

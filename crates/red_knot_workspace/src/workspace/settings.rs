@@ -9,7 +9,7 @@ pub struct WorkspaceConfiguration {
     pub search_paths: SearchPathConfiguration,
 }
 
-#[derive(Debug, Default, Clone)]
+#[derive(Debug, Default, Clone, Eq, PartialEq)]
 pub struct SearchPathConfiguration {
     /// List of user-provided paths that should take first priority in the module resolution.
     /// Examples in other type checkers are mypy's MYPYPATH environment variable,
@@ -28,7 +28,7 @@ pub struct SearchPathConfiguration {
     pub site_packages: Option<SitePackages>,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Eq, PartialEq)]
 pub enum SitePackages {
     Derived {
         venv_path: SystemPathBuf,
@@ -75,7 +75,7 @@ impl SearchPathConfiguration {
                 .src_root
                 .clone()
                 .unwrap_or_else(|| workspace_root.to_path_buf()),
-            custom_typeshed: None,
+            custom_typeshed: self.custom_typeshed.clone(),
             site_packages,
         })
     }

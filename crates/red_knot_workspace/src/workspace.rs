@@ -14,6 +14,7 @@ use ruff_python_ast::{name::Name, PySourceType};
 use ruff_text_size::Ranged;
 
 use crate::workspace::files::{Index, Indexed, PackageFiles};
+use crate::workspace::settings::SearchPathConfiguration;
 use crate::{
     db::Db,
     lint::{lint_semantic, lint_syntax},
@@ -82,6 +83,10 @@ pub struct Workspace {
     /// The (first-party) packages in this workspace.
     #[return_ref]
     package_tree: BTreeMap<SystemPathBuf, Package>,
+
+    /// The unresolved search path configuration.
+    #[return_ref]
+    pub search_path_configuration: SearchPathConfiguration,
 }
 
 /// A first-party package in a workspace.
@@ -110,7 +115,7 @@ impl Workspace {
             packages.insert(package.root.clone(), Package::from_metadata(db, package));
         }
 
-        Workspace::builder(metadata.root, packages)
+        Workspace::builder(metadata.root, packages, metadata.configuration.search_paths)
             .durability(Durability::MEDIUM)
             .open_fileset_durability(Durability::LOW)
             .new(db)
@@ -142,6 +147,11 @@ impl Workspace {
             };
 
             new_packages.insert(path, package);
+        }
+
+        if &metadata.configuration.search_paths != self.search_path_configuration(db) {
+            self.set_search_path_configuration(db)
+                .to(metadata.configuration.search_paths);
         }
 
         self.set_package_tree(db).to(new_packages);
