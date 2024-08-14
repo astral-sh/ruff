@@ -40,7 +40,7 @@ fn setup_case() -> Case {
     ])
     .unwrap();
 
-    let src_root = SystemPath::new("/src");
+    let src_root = SystemPath::new("/src/tomllib");
     let metadata = WorkspaceMetadata::from_path(src_root, &system).unwrap();
     let settings = ProgramSettings {
         target_version: PythonVersion::PY312,
