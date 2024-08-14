@@ -10,6 +10,9 @@ use crate::rules::flake8_async::helpers::MethodName;
 /// ## What it does
 /// Checks for timeout context managers which do not contain a checkpoint.
 ///
+/// For the purposes of this check, `yield` is considered a checkpoint,
+/// since checkpoints may occur in the caller to which we yield.
+///
 /// ## Why is this bad?
 /// Some asynchronous context managers, such as `asyncio.timeout` and
 /// `trio.move_on_after`, have no effect unless they contain a checkpoint.
@@ -77,6 +80,17 @@ pub(crate) fn cancel_scope_no_checkpoint(
     // If this is an `async with` and the timeout has items after it, then the
     // further items are checkpoints.
     if with_stmt.is_async && with_item_pos < with_items.len() - 1 {
+        return;
+    }
+
+    // Treat yields as checkpoints, since checkpoints can happen
+    // in the caller yielded to.
+    // https://flake8-async.readthedocs.io/en/latest/rules.html#async100
+    // https://github.com/astral-sh/ruff/issues/12873
+    if with_stmt.body.iter().any(|stmt| {
+        stmt.as_expr_stmt()
+            .is_some_and(|expr| expr.value.is_yield_expr())
+    }) {
         return;
     }
 
