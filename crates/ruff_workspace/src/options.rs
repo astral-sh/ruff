@@ -241,13 +241,12 @@ pub struct Options {
     /// included here not for configuration but because we lint whether e.g. the
     /// `[project]` matches the schema.
     ///
-    /// If [preview](https://docs.astral.sh/ruff/preview/) is enabled, the default
-    /// includes notebook files (`.ipynb` extension). You can exclude them by adding
-    /// `*.ipynb` to [`extend-exclude`](#extend-exclude).
+    /// Starting from Ruff version 0.6.0, the default also includes notebook files (`.ipynb`
+    /// extension).
     ///
     /// For more information on the glob syntax, refer to the [`globset` documentation](https://docs.rs/globset/latest/globset/#syntax).
     #[option(
-        default = r#"["*.py", "*.pyi", "**/pyproject.toml"]"#,
+        default = r#"["*.py", "*.pyi", "*.ipynb", "**/pyproject.toml"]"#,
         value_type = "list[str]",
         example = r#"
             include = ["*.py"]

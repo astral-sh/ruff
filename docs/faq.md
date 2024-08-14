@@ -398,30 +398,8 @@ them. You can find the supported settings in the [API reference](settings.md#lin
 
 ## Does Ruff support Jupyter Notebooks?
 
-Ruff has built-in support for linting [Jupyter Notebooks](https://jupyter.org/).
-
-To opt in to linting Jupyter Notebook (`.ipynb`) files, add the `*.ipynb` pattern to your
-[`extend-include`](settings.md#extend-include) setting, like so:
-
-=== "pyproject.toml"
-
-    ```toml
-    [tool.ruff]
-    extend-include = ["*.ipynb"]
-    ```
-
-=== "ruff.toml"
-
-    ```toml
-    extend-include = ["*.ipynb"]
-    ```
-
-This will prompt Ruff to discover Jupyter Notebook (`.ipynb`) files in any specified
-directories, then lint and format them accordingly.
-
-Alternatively, pass the notebook file(s) to `ruff` on the command-line directly. For example,
-`ruff check /path/to/notebook.ipynb` will always lint `notebook.ipynb`. Similarly,
-`ruff format /path/to/notebook.ipynb` will always format `notebook.ipynb`.
+Ruff has built-in support for linting and formatting [Jupyter Notebooks](https://jupyter.org/). Refer to the
+[Jupyter Notebook section](configuration.md#jupyter-notebook-discovery) for more details.
 
 Ruff also integrates with [nbQA](https://github.com/nbQA-dev/nbQA), a tool for running linters and
 code formatters over Jupyter Notebooks.
