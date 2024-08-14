@@ -59,7 +59,7 @@ Alternatively, you can include `ruff-action` as a step in any other workflow fil
 
 - `version`: The Ruff version to install (default: latest).
 - `args`: The command-line arguments to pass to Ruff (default: `"check"`).
-- `src`: The source paths to pass to Ruff (default: `"."`).
+- `src`: The source paths to pass to Ruff (default: `[".", "src"]`).
 
 For example, to run `ruff check --select B ./src` using Ruff version `0.0.259`:
 
