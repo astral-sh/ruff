@@ -60,6 +60,7 @@ file_resolver.force_exclude = false
 file_resolver.include = [
 	"*.py",
 	"*.pyi",
+	"*.ipynb",
 	"**/pyproject.toml",
 ]
 file_resolver.extend_include = []
