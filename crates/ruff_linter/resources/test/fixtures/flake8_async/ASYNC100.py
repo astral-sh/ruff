@@ -89,3 +89,16 @@ async def func():
 async def func():
     async with asyncio.timeout(delay=0.2), asyncio.timeout(delay=0.2):
         ...
+        
+# Don't trigger for blocks with a yield statement
+async def foo():
+    with trio.fail_after(1):
+        yield
+
+# https://github.com/astral-sh/ruff/issues/12873
+@asynccontextmanager
+async def good_code():
+    with anyio.fail_after(10):
+        # There's no await keyword here, but we presume that there
+        # will be in the caller we yield to, so this is safe.
+        yield

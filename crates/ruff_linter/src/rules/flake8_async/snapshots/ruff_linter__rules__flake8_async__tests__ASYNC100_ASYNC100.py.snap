@@ -98,4 +98,6 @@ ASYNC100.py:90:5: ASYNC100 A `with asyncio.timeout(...):` context does not conta
    |  _____^
 91 | |         ...
    | |___________^ ASYNC100
+92 |           
+93 |   # Don't trigger for blocks with a yield statement
    |
