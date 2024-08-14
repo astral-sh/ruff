@@ -253,7 +253,7 @@ fn is_package_with_cache<'a>(
 /// Applies a transformation to a [`Configuration`].
 ///
 /// Used to override options with the values provided by the CLI.
-pub trait ConfigurationTransformer: Sync {
+pub trait ConfigurationTransformer {
     fn transform(&self, config: Configuration) -> Configuration;
 }
 
@@ -334,7 +334,7 @@ pub fn resolve_root_settings(
 pub fn python_files_in_path<'a>(
     paths: &[PathBuf],
     pyproject_config: &'a PyprojectConfig,
-    transformer: &dyn ConfigurationTransformer,
+    transformer: &(dyn ConfigurationTransformer + Sync),
 ) -> Result<(Vec<Result<ResolvedFile, ignore::Error>>, Resolver<'a>)> {
     // Normalize every path (e.g., convert from relative to absolute).
     let mut paths: Vec<PathBuf> = paths.iter().map(fs::normalize_path).unique().collect();
@@ -430,12 +430,12 @@ impl<'config> WalkPythonFilesState<'config> {
 
 struct PythonFilesVisitorBuilder<'s, 'config> {
     state: &'s WalkPythonFilesState<'config>,
-    transformer: &'s dyn ConfigurationTransformer,
+    transformer: &'s (dyn ConfigurationTransformer + Sync),
 }
 
 impl<'s, 'config> PythonFilesVisitorBuilder<'s, 'config> {
     fn new(
-        transformer: &'s dyn ConfigurationTransformer,
+        transformer: &'s (dyn ConfigurationTransformer + Sync),
         state: &'s WalkPythonFilesState<'config>,
     ) -> Self {
         Self { state, transformer }
@@ -446,7 +446,7 @@ struct PythonFilesVisitor<'s, 'config> {
     local_files: Vec<Result<ResolvedFile, ignore::Error>>,
     local_error: Result<()>,
     global: &'s WalkPythonFilesState<'config>,
-    transformer: &'s dyn ConfigurationTransformer,
+    transformer: &'s (dyn ConfigurationTransformer + Sync),
 }
 
 impl<'config, 's> ignore::ParallelVisitorBuilder<'s> for PythonFilesVisitorBuilder<'s, 'config>

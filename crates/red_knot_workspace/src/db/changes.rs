@@ -8,11 +8,16 @@ use ruff_db::Db;
 use crate::db::RootDatabase;
 use crate::watch;
 use crate::watch::{CreatedKind, DeletedKind};
+use crate::workspace::settings::WorkspaceConfigurationTransformer;
 use crate::workspace::WorkspaceMetadata;
 
 impl RootDatabase {
-    #[tracing::instrument(level = "debug", skip(self, changes))]
-    pub fn apply_changes(&mut self, changes: Vec<watch::ChangeEvent>) {
+    #[tracing::instrument(level = "debug", skip(self, changes, transformer))]
+    pub fn apply_changes(
+        &mut self,
+        changes: Vec<watch::ChangeEvent>,
+        transformer: &dyn WorkspaceConfigurationTransformer,
+    ) {
         let workspace = self.workspace();
         let workspace_path = workspace.root(self).to_path_buf();
 
@@ -118,7 +123,7 @@ impl RootDatabase {
         }
 
         if workspace_change {
-            match WorkspaceMetadata::from_path(&workspace_path, self.system()) {
+            match WorkspaceMetadata::from_path(&workspace_path, self.system(), transformer) {
                 Ok(metadata) => {
                     tracing::debug!("Reloading workspace after structural change.");
                     // TODO: Handle changes in the program settings.

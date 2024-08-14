@@ -8,7 +8,6 @@ use std::sync::Arc;
 use anyhow::anyhow;
 use lsp_types::{ClientCapabilities, Url};
 
-use red_knot_python_semantic::{ProgramSettings, PythonVersion, SearchPathSettings};
 use red_knot_workspace::db::RootDatabase;
 use red_knot_workspace::workspace::WorkspaceMetadata;
 use ruff_db::files::{system_path_to_file, File};
@@ -67,19 +66,10 @@ impl Session {
                 .ok_or_else(|| anyhow!("Workspace path is not a valid UTF-8 path: {:?}", path))?;
             let system = LSPSystem::new(index.clone());
 
-            let metadata = WorkspaceMetadata::from_path(system_path, &system)?;
             // TODO(dhruvmanila): Get the values from the client settings
-            let program_settings = ProgramSettings {
-                target_version: PythonVersion::default(),
-                search_paths: SearchPathSettings {
-                    extra_paths: vec![],
-                    src_root: system_path.to_path_buf(),
-                    site_packages: vec![],
-                    custom_typeshed: None,
-                },
-            };
+            let metadata = WorkspaceMetadata::from_path(system_path, &system, &())?;
             // TODO(micha): Handle the case where the program settings are incorrect more gracefully.
-            workspaces.insert(path, RootDatabase::new(metadata, program_settings, system)?);
+            workspaces.insert(path, RootDatabase::new(metadata, system)?);
         }
 
         Ok(Self {

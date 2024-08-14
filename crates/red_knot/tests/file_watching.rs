@@ -5,17 +5,18 @@ use std::time::Duration;
 
 use anyhow::{anyhow, Context};
 
-use red_knot_python_semantic::{
-    resolve_module, ModuleName, Program, ProgramSettings, PythonVersion, SearchPathSettings,
-};
+use red_knot_python_semantic::{resolve_module, ModuleName, Program, PythonVersion};
 use red_knot_workspace::db::RootDatabase;
 use red_knot_workspace::watch;
 use red_knot_workspace::watch::{directory_watcher, WorkspaceWatcher};
+use red_knot_workspace::workspace::settings::{
+    SearchPathConfiguration, SitePackages, WorkspaceConfiguration,
+};
 use red_knot_workspace::workspace::WorkspaceMetadata;
 use ruff_db::files::{system_path_to_file, File, FileError};
 use ruff_db::source::source_text;
 use ruff_db::system::{OsSystem, SystemPath, SystemPathBuf};
-use ruff_db::Upcast;
+use ruff_db::{Db, Upcast};
 
 struct TestCase {
     db: RootDatabase,
@@ -25,7 +26,7 @@ struct TestCase {
     /// We need to hold on to it in the test case or the temp files get deleted.
     _temp_dir: tempfile::TempDir,
     root_dir: SystemPathBuf,
-    search_path_settings: SearchPathSettings,
+    search_path_configuration: SearchPathConfiguration,
 }
 
 impl TestCase {
@@ -39,10 +40,6 @@ impl TestCase {
 
     fn db(&self) -> &RootDatabase {
         &self.db
-    }
-
-    fn db_mut(&mut self) -> &mut RootDatabase {
-        &mut self.db
     }
 
     fn stop_watch(&mut self) -> Vec<watch::ChangeEvent> {
@@ -105,16 +102,26 @@ impl TestCase {
         Some(all_events)
     }
 
+    fn apply_changes(&mut self, changes: Vec<watch::ChangeEvent>) {
+        self.db
+            .apply_changes(changes, &|mut configuration: WorkspaceConfiguration| {
+                configuration.target_version = Some(PythonVersion::PY312);
+                configuration.search_paths = self.search_path_configuration.clone();
+                configuration
+            });
+    }
+
     fn update_search_path_settings(
         &mut self,
-        f: impl FnOnce(&SearchPathSettings) -> SearchPathSettings,
+        configuration: SearchPathConfiguration,
     ) -> anyhow::Result<()> {
         let program = Program::get(self.db());
 
-        let new_settings = f(&self.search_path_settings);
+        let new_settings =
+            configuration.to_settings(self.db.workspace().root(&self.db), self.db.system())?;
 
-        program.update_search_paths(&mut self.db, new_settings.clone())?;
-        self.search_path_settings = new_settings;
+        program.update_search_paths(&mut self.db, new_settings)?;
+        self.search_path_configuration = configuration;
 
         if let Some(watcher) = &mut self.watcher {
             watcher.update(&self.db);
@@ -179,17 +186,14 @@ fn setup<F>(setup_files: F) -> anyhow::Result<TestCase>
 where
     F: SetupFiles,
 {
-    setup_with_search_paths(setup_files, |_root, workspace_path| SearchPathSettings {
-        extra_paths: vec![],
-        src_root: workspace_path.to_path_buf(),
-        custom_typeshed: None,
-        site_packages: vec![],
+    setup_with_search_paths(setup_files, |_root, _workspace_path| {
+        SearchPathConfiguration::default()
     })
 }
 
 fn setup_with_search_paths<F>(
     setup_files: F,
-    create_search_paths: impl FnOnce(&SystemPath, &SystemPath) -> SearchPathSettings,
+    create_search_paths: impl FnOnce(&SystemPath, &SystemPath) -> SearchPathConfiguration,
 ) -> anyhow::Result<TestCase>
 where
     F: SetupFiles,
@@ -221,25 +225,41 @@ where
 
     let system = OsSystem::new(&workspace_path);
 
-    let workspace = WorkspaceMetadata::from_path(&workspace_path, &system)?;
-    let search_path_settings = create_search_paths(&root_path, workspace.root());
+    let search_path_configuration = create_search_paths(&root_path, &workspace_path);
 
-    for path in search_path_settings
+    let workspace = WorkspaceMetadata::from_path(
+        &workspace_path,
+        &system,
+        &|mut configuration: WorkspaceConfiguration| {
+            configuration.target_version = Some(PythonVersion::PY312);
+            configuration.search_paths = search_path_configuration.clone();
+            configuration
+        },
+    )?;
+
+    for path in search_path_configuration
         .extra_paths
         .iter()
-        .chain(search_path_settings.site_packages.iter())
-        .chain(search_path_settings.custom_typeshed.iter())
+        .flatten()
+        .chain(search_path_configuration.custom_typeshed.iter())
+        .chain(
+            search_path_configuration
+                .site_packages
+                .as_ref()
+                .and_then(|site_packages| {
+                    if let SitePackages::Known(path) = site_packages {
+                        Some(path)
+                    } else {
+                        None
+                    }
+                }),
+        )
     {
         std::fs::create_dir_all(path.as_std_path())
             .with_context(|| format!("Failed to create search path '{path}'"))?;
     }
 
-    let settings = ProgramSettings {
-        target_version: PythonVersion::default(),
-        search_paths: search_path_settings.clone(),
-    };
-
-    let db = RootDatabase::new(workspace, settings, system)?;
+    let db = RootDatabase::new(workspace, system)?;
 
     let (sender, receiver) = crossbeam::channel::unbounded();
     let watcher = directory_watcher(move |events| sender.send(events).unwrap())
@@ -254,7 +274,7 @@ where
         watcher: Some(watcher),
         _temp_dir: temp_dir,
         root_dir: root_path,
-        search_path_settings,
+        search_path_configuration,
     };
 
     // Sometimes the file watcher reports changes for events that happened before the watcher was started.
@@ -307,7 +327,7 @@ fn new_file() -> anyhow::Result<()> {
 
     let changes = case.stop_watch();
 
-    case.db_mut().apply_changes(changes);
+    case.apply_changes(changes);
 
     let foo = case.system_file(&foo_path).expect("foo.py to exist.");
 
@@ -330,7 +350,7 @@ fn new_ignored_file() -> anyhow::Result<()> {
 
     let changes = case.stop_watch();
 
-    case.db_mut().apply_changes(changes);
+    case.apply_changes(changes);
 
     assert!(case.system_file(&foo_path).is_ok());
     assert_eq!(&case.collect_package_files(&bar_path), &[bar_file]);
@@ -354,7 +374,7 @@ fn changed_file() -> anyhow::Result<()> {
 
     assert!(!changes.is_empty());
 
-    case.db_mut().apply_changes(changes);
+    case.apply_changes(changes);
 
     assert_eq!(source_text(case.db(), foo).as_str(), "print('Version 2')");
     assert_eq!(&case.collect_package_files(&foo_path), &[foo]);
@@ -377,7 +397,7 @@ fn deleted_file() -> anyhow::Result<()> {
 
     let changes = case.stop_watch();
 
-    case.db_mut().apply_changes(changes);
+    case.apply_changes(changes);
 
     assert!(!foo.exists(case.db()));
     assert_eq!(&case.collect_package_files(&foo_path), &[] as &[File]);
@@ -409,7 +429,7 @@ fn move_file_to_trash() -> anyhow::Result<()> {
 
     let changes = case.stop_watch();
 
-    case.db_mut().apply_changes(changes);
+    case.apply_changes(changes);
 
     assert!(!foo.exists(case.db()));
     assert_eq!(&case.collect_package_files(&foo_path), &[] as &[File]);
@@ -441,7 +461,7 @@ fn move_file_to_workspace() -> anyhow::Result<()> {
 
     let changes = case.stop_watch();
 
-    case.db_mut().apply_changes(changes);
+    case.apply_changes(changes);
 
     let foo_in_workspace = case.system_file(&foo_in_workspace_path)?;
 
@@ -469,7 +489,7 @@ fn rename_file() -> anyhow::Result<()> {
 
     let changes = case.stop_watch();
 
-    case.db_mut().apply_changes(changes);
+    case.apply_changes(changes);
 
     assert!(!foo.exists(case.db()));
 
@@ -510,7 +530,7 @@ fn directory_moved_to_workspace() -> anyhow::Result<()> {
 
     let changes = case.stop_watch();
 
-    case.db_mut().apply_changes(changes);
+    case.apply_changes(changes);
 
     let init_file = case
         .system_file(sub_new_path.join("__init__.py"))
@@ -561,7 +581,7 @@ fn directory_moved_to_trash() -> anyhow::Result<()> {
 
     let changes = case.stop_watch();
 
-    case.db_mut().apply_changes(changes);
+    case.apply_changes(changes);
 
     // `import sub.a` should no longer resolve
     assert!(resolve_module(case.db().upcast(), ModuleName::new_static("sub.a").unwrap()).is_none());
@@ -615,7 +635,7 @@ fn directory_renamed() -> anyhow::Result<()> {
 
     let changes = case.stop_watch();
 
-    case.db_mut().apply_changes(changes);
+    case.apply_changes(changes);
 
     // `import sub.a` should no longer resolve
     assert!(resolve_module(case.db().upcast(), ModuleName::new_static("sub.a").unwrap()).is_none());
@@ -680,7 +700,7 @@ fn directory_deleted() -> anyhow::Result<()> {
 
     let changes = case.stop_watch();
 
-    case.db_mut().apply_changes(changes);
+    case.apply_changes(changes);
 
     // `import sub.a` should no longer resolve
     assert!(resolve_module(case.db().upcast(), ModuleName::new_static("sub.a").unwrap()).is_none());
@@ -694,15 +714,13 @@ fn directory_deleted() -> anyhow::Result<()> {
 
 #[test]
 fn search_path() -> anyhow::Result<()> {
-    let mut case =
-        setup_with_search_paths([("bar.py", "import sub.a")], |root_path, workspace_path| {
-            SearchPathSettings {
-                extra_paths: vec![],
-                src_root: workspace_path.to_path_buf(),
-                custom_typeshed: None,
-                site_packages: vec![root_path.join("site_packages")],
-            }
-        })?;
+    let mut case = setup_with_search_paths(
+        [("bar.py", "import sub.a")],
+        |root_path, _workspace_path| SearchPathConfiguration {
+            site_packages: Some(SitePackages::Known(root_path.join("site_packages"))),
+            ..SearchPathConfiguration::default()
+        },
+    )?;
 
     let site_packages = case.root_path().join("site_packages");
 
@@ -715,7 +733,7 @@ fn search_path() -> anyhow::Result<()> {
 
     let changes = case.stop_watch();
 
-    case.db_mut().apply_changes(changes);
+    case.apply_changes(changes);
 
     assert!(resolve_module(case.db().upcast(), ModuleName::new_static("a").unwrap()).is_some());
     assert_eq!(
@@ -736,9 +754,9 @@ fn add_search_path() -> anyhow::Result<()> {
     assert!(resolve_module(case.db().upcast(), ModuleName::new_static("a").unwrap()).is_none());
 
     // Register site-packages as a search path.
-    case.update_search_path_settings(|settings| SearchPathSettings {
-        site_packages: vec![site_packages.clone()],
-        ..settings.clone()
+    case.update_search_path_settings(SearchPathConfiguration {
+        site_packages: Some(SitePackages::Known(site_packages.clone())),
+        ..SearchPathConfiguration::default()
     })
     .expect("Search path settings to be valid");
 
@@ -746,7 +764,7 @@ fn add_search_path() -> anyhow::Result<()> {
 
     let changes = case.stop_watch();
 
-    case.db_mut().apply_changes(changes);
+    case.apply_changes(changes);
 
     assert!(resolve_module(case.db().upcast(), ModuleName::new_static("a").unwrap()).is_some());
 
@@ -755,21 +773,19 @@ fn add_search_path() -> anyhow::Result<()> {
 
 #[test]
 fn remove_search_path() -> anyhow::Result<()> {
-    let mut case =
-        setup_with_search_paths([("bar.py", "import sub.a")], |root_path, workspace_path| {
-            SearchPathSettings {
-                extra_paths: vec![],
-                src_root: workspace_path.to_path_buf(),
-                custom_typeshed: None,
-                site_packages: vec![root_path.join("site_packages")],
-            }
-        })?;
+    let mut case = setup_with_search_paths(
+        [("bar.py", "import sub.a")],
+        |root_path, _workspace_path| SearchPathConfiguration {
+            site_packages: Some(SitePackages::Known(root_path.join("site_packages"))),
+            ..SearchPathConfiguration::default()
+        },
+    )?;
 
     // Remove site packages from the search path settings.
     let site_packages = case.root_path().join("site_packages");
-    case.update_search_path_settings(|settings| SearchPathSettings {
-        site_packages: vec![],
-        ..settings.clone()
+    case.update_search_path_settings(SearchPathConfiguration {
+        site_packages: None,
+        ..SearchPathConfiguration::default()
     })
     .expect("Search path settings to be valid");
 
@@ -828,7 +844,7 @@ fn hard_links_in_workspace() -> anyhow::Result<()> {
 
     let changes = case.stop_watch();
 
-    case.db_mut().apply_changes(changes);
+    case.apply_changes(changes);
 
     assert_eq!(source_text(case.db(), foo).as_str(), "print('Version 2')");
 
@@ -899,7 +915,7 @@ fn hard_links_to_target_outside_workspace() -> anyhow::Result<()> {
 
     let changes = case.stop_watch();
 
-    case.db_mut().apply_changes(changes);
+    case.apply_changes(changes);
 
     assert_eq!(source_text(case.db(), bar).as_str(), "print('Version 2')");
 
@@ -938,7 +954,7 @@ mod unix {
 
         let changes = case.stop_watch();
 
-        case.db_mut().apply_changes(changes);
+        case.apply_changes(changes);
 
         assert_eq!(
             foo.permissions(case.db()),
@@ -1023,7 +1039,7 @@ mod unix {
 
         let changes = case.take_watch_changes();
 
-        case.db_mut().apply_changes(changes);
+        case.apply_changes(changes);
 
         assert_eq!(
             source_text(case.db(), baz.file()).as_str(),
@@ -1036,7 +1052,7 @@ mod unix {
 
         let changes = case.stop_watch();
 
-        case.db_mut().apply_changes(changes);
+        case.apply_changes(changes);
 
         assert_eq!(
             source_text(case.db(), baz.file()).as_str(),
@@ -1107,7 +1123,7 @@ mod unix {
 
         let changes = case.stop_watch();
 
-        case.db_mut().apply_changes(changes);
+        case.apply_changes(changes);
 
         // The file watcher is guaranteed to emit one event for the changed file, but it isn't specified
         // if the event is emitted for the "original" or linked path because both paths are watched.
@@ -1176,11 +1192,11 @@ mod unix {
 
                 Ok(())
             },
-            |_root, workspace| SearchPathSettings {
-                extra_paths: vec![],
-                src_root: workspace.to_path_buf(),
-                custom_typeshed: None,
-                site_packages: vec![workspace.join(".venv/lib/python3.12/site-packages")],
+            |_root, workspace| SearchPathConfiguration {
+                site_packages: Some(SitePackages::Known(
+                    workspace.join(".venv/lib/python3.12/site-packages"),
+                )),
+                ..SearchPathConfiguration::default()
             },
         )?;
 
@@ -1215,7 +1231,7 @@ mod unix {
 
         let changes = case.stop_watch();
 
-        case.db_mut().apply_changes(changes);
+        case.apply_changes(changes);
 
         assert_eq!(
             source_text(case.db(), baz_original_file).as_str(),

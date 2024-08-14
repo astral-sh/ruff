@@ -827,7 +827,7 @@ mod tests {
                 "Search path for {module_name} was unexpectedly {search_path:?}"
             );
             assert!(
-                search_path.is_stdlib_search_path(),
+                search_path.is_standard_library(),
                 "Expected a stdlib search path, but got {search_path:?}"
             );
         }
@@ -923,7 +923,7 @@ mod tests {
                 "Search path for {module_name} was unexpectedly {search_path:?}"
             );
             assert!(
-                search_path.is_stdlib_search_path(),
+                search_path.is_standard_library(),
                 "Expected a stdlib search path, but got {search_path:?}"
             );
         }

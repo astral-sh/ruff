@@ -7,12 +7,14 @@ use colored::Colorize;
 use crossbeam::channel as crossbeam_channel;
 use salsa::plumbing::ZalsaDatabase;
 
-use red_knot_python_semantic::{ProgramSettings, SearchPathSettings};
+use red_knot_python_semantic::PythonVersion;
 use red_knot_server::run_server;
 use red_knot_workspace::db::RootDatabase;
-use red_knot_workspace::site_packages::VirtualEnvironment;
 use red_knot_workspace::watch;
 use red_knot_workspace::watch::WorkspaceWatcher;
+use red_knot_workspace::workspace::settings::{
+    SitePackages, WorkspaceConfiguration, WorkspaceConfigurationTransformer,
+};
 use red_knot_workspace::workspace::WorkspaceMetadata;
 use ruff_db::system::{OsSystem, System, SystemPath, SystemPathBuf};
 use target_version::TargetVersion;
@@ -65,15 +67,14 @@ to resolve type information for the project's third-party dependencies.",
         value_name = "PATH",
         help = "Additional path to use as a module-resolution source (can be passed multiple times)"
     )]
-    extra_search_path: Vec<SystemPathBuf>,
+    extra_search_path: Option<Vec<SystemPathBuf>>,
 
     #[arg(
         long,
         help = "Python version to assume when resolving types",
-        default_value_t = TargetVersion::default(),
-        value_name="VERSION")
-    ]
-    target_version: TargetVersion,
+        value_name = "VERSION"
+    )]
+    target_version: Option<TargetVersion>,
 
     #[clap(flatten)]
     verbosity: Verbosity,
@@ -115,22 +116,13 @@ pub fn main() -> ExitStatus {
 }
 
 fn run() -> anyhow::Result<ExitStatus> {
-    let Args {
-        command,
-        current_directory,
-        custom_typeshed_dir,
-        extra_search_path: extra_paths,
-        venv_path,
-        target_version,
-        verbosity,
-        watch,
-    } = Args::parse_from(std::env::args().collect::<Vec<_>>());
+    let args = Args::parse_from(std::env::args().collect::<Vec<_>>());
 
-    if matches!(command, Some(Command::Server)) {
+    if matches!(args.command, Some(Command::Server)) {
         return run_server().map(|()| ExitStatus::Success);
     }
 
-    let verbosity = verbosity.level();
+    let verbosity = args.verbosity.level();
     countme::enable(verbosity.is_trace());
     let _guard = setup_tracing(verbosity)?;
 
@@ -146,10 +138,12 @@ fn run() -> anyhow::Result<ExitStatus> {
             })?
     };
 
-    let cwd = current_directory
+    let cwd = args
+        .current_directory
+        .as_ref()
         .map(|cwd| {
             if cwd.as_std_path().is_dir() {
-                Ok(SystemPath::absolute(&cwd, &cli_base_path))
+                Ok(SystemPath::absolute(cwd, &cli_base_path))
             } else {
                 Err(anyhow!(
                     "Provided current-directory path '{cwd}' is not a directory."
@@ -160,33 +154,15 @@ fn run() -> anyhow::Result<ExitStatus> {
         .unwrap_or_else(|| cli_base_path.clone());
 
     let system = OsSystem::new(cwd.clone());
-    let workspace_metadata = WorkspaceMetadata::from_path(system.current_directory(), &system)?;
-
-    // TODO: Verify the remaining search path settings eagerly.
-    let site_packages = venv_path
-        .map(|path| {
-            VirtualEnvironment::new(path, &OsSystem::new(cli_base_path))
-                .and_then(|venv| venv.site_packages_directories(&system))
-        })
-        .transpose()?
-        .unwrap_or_default();
-
-    // TODO: Respect the settings from the workspace metadata. when resolving the program settings.
-    let program_settings = ProgramSettings {
-        target_version: target_version.into(),
-        search_paths: SearchPathSettings {
-            extra_paths,
-            src_root: workspace_metadata.root().to_path_buf(),
-            custom_typeshed: custom_typeshed_dir,
-            site_packages,
-        },
-    };
+    let transformer = CliConfigurationTransformer::from_cli_arguments(&args, &cli_base_path);
+    let workspace_metadata =
+        WorkspaceMetadata::from_path(system.current_directory(), &system, &transformer)?;
 
     // TODO: Use the `program_settings` to compute the key for the database's persistent
     //   cache and load the cache if it exists.
-    let mut db = RootDatabase::new(workspace_metadata, program_settings, system)?;
+    let mut db = RootDatabase::new(workspace_metadata, system)?;
 
-    let (main_loop, main_loop_cancellation_token) = MainLoop::new();
+    let (main_loop, main_loop_cancellation_token) = MainLoop::new(transformer);
 
     // Listen to Ctrl+C and abort the watch mode.
     let main_loop_cancellation_token = Mutex::new(Some(main_loop_cancellation_token));
@@ -198,7 +174,7 @@ fn run() -> anyhow::Result<ExitStatus> {
         }
     })?;
 
-    let exit_status = if watch {
+    let exit_status = if args.watch {
         main_loop.watch(&mut db)?
     } else {
         main_loop.run(&mut db)
@@ -238,10 +214,14 @@ struct MainLoop {
 
     /// The file system watcher, if running in watch mode.
     watcher: Option<WorkspaceWatcher>,
+
+    configuration_transformer: CliConfigurationTransformer,
 }
 
 impl MainLoop {
-    fn new() -> (Self, MainLoopCancellationToken) {
+    fn new(
+        configuration_transformer: CliConfigurationTransformer,
+    ) -> (Self, MainLoopCancellationToken) {
         let (sender, receiver) = crossbeam_channel::bounded(10);
 
         (
@@ -249,6 +229,7 @@ impl MainLoop {
                 sender: sender.clone(),
                 receiver,
                 watcher: None,
+                configuration_transformer,
             },
             MainLoopCancellationToken { sender },
         )
@@ -331,7 +312,7 @@ impl MainLoop {
                 MainLoopMessage::ApplyChanges(changes) => {
                     revision += 1;
                     // Automatically cancels any pending queries and waits for them to complete.
-                    db.apply_changes(changes);
+                    db.apply_changes(changes, &self.configuration_transformer);
                     if let Some(watcher) = self.watcher.as_mut() {
                         watcher.update(db);
                     }
@@ -371,4 +352,70 @@ enum MainLoopMessage {
     CheckCompleted { result: Vec<String>, revision: u64 },
     ApplyChanges(Vec<watch::ChangeEvent>),
     Exit,
+}
+
+#[derive(Debug, Default)]
+struct CliConfigurationTransformer {
+    venv_path: Option<SystemPathBuf>,
+    custom_typeshed_dir: Option<SystemPathBuf>,
+    extra_search_paths: Option<Vec<SystemPathBuf>>,
+    target_version: Option<PythonVersion>,
+}
+
+impl CliConfigurationTransformer {
+    fn from_cli_arguments(arguments: &Args, cli_cwd: &SystemPath) -> Self {
+        let Args {
+            venv_path,
+            custom_typeshed_dir,
+            extra_search_path,
+            target_version,
+            ..
+        } = arguments;
+
+        let venv_path = venv_path
+            .as_deref()
+            .map(|path| SystemPath::absolute(path, cli_cwd));
+
+        let custom_typeshed_dir = custom_typeshed_dir
+            .as_deref()
+            .map(|path| SystemPath::absolute(path, cli_cwd));
+
+        let extra_search_paths = extra_search_path.as_deref().map(|paths| {
+            paths
+                .iter()
+                .map(|path| SystemPath::absolute(path, cli_cwd))
+                .collect()
+        });
+
+        Self {
+            venv_path,
+            custom_typeshed_dir,
+            extra_search_paths,
+            target_version: target_version.map(PythonVersion::from),
+        }
+    }
+}
+
+impl WorkspaceConfigurationTransformer for CliConfigurationTransformer {
+    fn transform(&self, mut configuration: WorkspaceConfiguration) -> WorkspaceConfiguration {
+        if let Some(venv_path) = &self.venv_path {
+            configuration.search_paths.site_packages = Some(SitePackages::Derived {
+                venv_path: venv_path.clone(),
+            });
+        }
+
+        if let Some(custom_typeshed_dir) = &self.custom_typeshed_dir {
+            configuration.search_paths.custom_typeshed = Some(custom_typeshed_dir.clone());
+        }
+
+        if let Some(extra_search_paths) = &self.extra_search_paths {
+            configuration.search_paths.extra_paths = Some(extra_search_paths.clone());
+        }
+
+        if let Some(target_version) = self.target_version {
+            configuration.target_version = Some(target_version);
+        }
+
+        configuration
+    }
 }

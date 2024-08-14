@@ -34,7 +34,7 @@ impl Program {
     }
 
     pub fn update_search_paths(
-        &self,
+        self,
         db: &mut dyn Db,
         search_path_settings: SearchPathSettings,
     ) -> anyhow::Result<()> {

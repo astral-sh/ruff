@@ -1,3 +1,4 @@
+use crate::workspace::settings::{WorkspaceConfiguration, WorkspaceConfigurationTransformer};
 use ruff_db::system::{System, SystemPath, SystemPathBuf};
 use ruff_python_ast::name::Name;
 
@@ -7,6 +8,8 @@ pub struct WorkspaceMetadata {
 
     /// The (first-party) packages in this workspace.
     pub(super) packages: Vec<PackageMetadata>,
+
+    pub(super) configuration: WorkspaceConfiguration,
 }
 
 /// A first-party package in a workspace.
@@ -21,7 +24,11 @@ pub struct PackageMetadata {
 
 impl WorkspaceMetadata {
     /// Discovers the closest workspace at `path` and returns its metadata.
-    pub fn from_path(path: &SystemPath, system: &dyn System) -> anyhow::Result<WorkspaceMetadata> {
+    pub fn from_path(
+        path: &SystemPath,
+        system: &dyn System,
+        transformer: &dyn WorkspaceConfigurationTransformer,
+    ) -> anyhow::Result<WorkspaceMetadata> {
         assert!(
             system.is_directory(path),
             "Workspace root path must be a directory"
@@ -41,6 +48,7 @@ impl WorkspaceMetadata {
         let workspace = WorkspaceMetadata {
             root,
             packages: vec![package],
+            configuration: transformer.transform(WorkspaceConfiguration::default()),
         };
 
         Ok(workspace)
@@ -52,6 +60,10 @@ impl WorkspaceMetadata {
 
     pub fn packages(&self) -> &[PackageMetadata] {
         &self.packages
+    }
+
+    pub fn configuration(&self) -> &WorkspaceConfiguration {
+        &self.configuration
     }
 }
 

@@ -622,15 +622,6 @@ mod tests {
     }
 
     impl SearchPath {
-        #[must_use]
-        pub(crate) fn is_stdlib_search_path(&self) -> bool {
-            matches!(
-                &*self.0,
-                SearchPathInner::StandardLibraryCustom(_)
-                    | SearchPathInner::StandardLibraryVendored(_)
-            )
-        }
-
         fn join(&self, component: &str) -> ModulePath {
             self.to_module_path().join(component)
         }

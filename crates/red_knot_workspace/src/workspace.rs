@@ -21,6 +21,7 @@ use crate::{
 
 mod files;
 mod metadata;
+pub mod settings;
 
 /// The project workspace as a Salsa ingredient.
 ///

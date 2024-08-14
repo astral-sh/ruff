@@ -1,31 +1,20 @@
-use red_knot_python_semantic::{
-    HasTy, ProgramSettings, PythonVersion, SearchPathSettings, SemanticModel,
-};
-use red_knot_workspace::db::RootDatabase;
-use red_knot_workspace::workspace::WorkspaceMetadata;
-use ruff_db::files::{system_path_to_file, File};
-use ruff_db::parsed::parsed_module;
-use ruff_db::system::{OsSystem, SystemPath, SystemPathBuf};
-use ruff_python_ast::visitor::source_order;
-use ruff_python_ast::visitor::source_order::SourceOrderVisitor;
-use ruff_python_ast::{Alias, Expr, Parameter, ParameterWithDefault, Stmt};
 use std::fs;
 use std::path::PathBuf;
 
+use red_knot_python_semantic::{HasTy, SemanticModel};
+use red_knot_workspace::db::RootDatabase;
+use red_knot_workspace::workspace::WorkspaceMetadata;
+use ruff_db::files::{File, system_path_to_file};
+use ruff_db::parsed::parsed_module;
+use ruff_db::system::{OsSystem, SystemPath, SystemPathBuf};
+use ruff_python_ast::{Alias, Expr, Parameter, ParameterWithDefault, Stmt};
+use ruff_python_ast::visitor::source_order;
+use ruff_python_ast::visitor::source_order::SourceOrderVisitor;
+
 fn setup_db(workspace_root: SystemPathBuf) -> anyhow::Result<RootDatabase> {
     let system = OsSystem::new(&workspace_root);
-    let workspace = WorkspaceMetadata::from_path(&workspace_root, &system)?;
-    let search_paths = SearchPathSettings {
-        extra_paths: vec![],
-        src_root: workspace_root,
-        custom_typeshed: None,
-        site_packages: vec![],
-    };
-    let settings = ProgramSettings {
-        target_version: PythonVersion::default(),
-        search_paths,
-    };
-    RootDatabase::new(workspace, settings, system)
+    let workspace = WorkspaceMetadata::from_path(&workspace_root, &system, &())?;
+    RootDatabase::new(workspace, system)
 }
 
 /// Test that all snippets in testcorpus can be checked without panic
