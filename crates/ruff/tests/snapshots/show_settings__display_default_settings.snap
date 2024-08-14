@@ -209,6 +209,7 @@ linter.logger_objects = []
 linter.namespace_packages = []
 linter.src = [
 	"[BASEPATH]",
+	"[BASEPATH]/src",
 ]
 linter.tab_size = 4
 linter.line_length = 88
