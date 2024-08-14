@@ -466,29 +466,26 @@ fn add_return_none(checker: &mut Checker, stmt: &Stmt, range: TextRange) {
     checker.diagnostics.push(diagnostic);
 }
 
-fn has_implicit_return(checker: &mut Checker, stmt: &Stmt) -> bool {
+fn has_implicit_return<'a>(checker: &Checker, stmt: &'a Stmt) -> Vec<&'a Stmt> {
+    let mut implicit_stmts = vec![];
+
     match stmt {
         Stmt::If(ast::StmtIf {
             body,
             elif_else_clauses,
             ..
         }) => {
-            let mut result = false;
             if let Some(last_stmt) = body.last() {
-                if has_implicit_return(checker, last_stmt) {
-                    result = true;
-                    if checker.settings.preview.is_enabled() {
-                        return result;
-                    }
+                implicit_stmts.extend(has_implicit_return(checker, last_stmt));
+                if !implicit_stmts.is_empty() && checker.settings.preview.is_enabled() {
+                    return implicit_stmts;
                 }
             }
             for clause in elif_else_clauses {
                 if let Some(last_stmt) = clause.body.last() {
-                    if has_implicit_return(checker, last_stmt) {
-                        result = true;
-                        if checker.settings.preview.is_enabled() {
-                            return result;
-                        }
+                    implicit_stmts.extend(has_implicit_return(checker, last_stmt));
+                    if !implicit_stmts.is_empty() && checker.settings.preview.is_enabled() {
+                        return implicit_stmts;
                     }
                 }
             }
@@ -498,48 +495,38 @@ fn has_implicit_return(checker: &mut Checker, stmt: &Stmt) -> bool {
                 elif_else_clauses.last(),
                 None | Some(ast::ElifElseClause { test: Some(_), .. })
             ) {
-                if checker.settings.preview.is_disabled() {
-                    add_return_none(checker, stmt, stmt.range());
-                }
-                return true;
+                implicit_stmts.push(stmt);
             }
-            result
+            implicit_stmts
         }
-        Stmt::Assert(ast::StmtAssert { test, .. }) if is_const_false(test) => false,
-        Stmt::While(ast::StmtWhile { test, .. }) if is_const_true(test) => false,
+        Stmt::Assert(ast::StmtAssert { test, .. }) if is_const_false(test) => vec![],
+        Stmt::While(ast::StmtWhile { test, .. }) if is_const_true(test) => vec![],
         Stmt::For(ast::StmtFor { orelse, .. }) | Stmt::While(ast::StmtWhile { orelse, .. }) => {
             if let Some(last_stmt) = orelse.last() {
-                has_implicit_return(checker, last_stmt)
+                implicit_stmts.extend(has_implicit_return(checker, last_stmt));
             } else {
-                if checker.settings.preview.is_disabled() {
-                    add_return_none(checker, stmt, stmt.range());
-                }
-                true
+                implicit_stmts.push(stmt);
             }
+            implicit_stmts
         }
         Stmt::Match(ast::StmtMatch { cases, .. }) => {
-            let mut result = false;
             for case in cases {
                 if let Some(last_stmt) = case.body.last() {
-                    if has_implicit_return(checker, last_stmt) {
-                        result = true;
-                        if checker.settings.preview.is_enabled() {
-                            return result;
-                        }
+                    implicit_stmts.extend(has_implicit_return(checker, last_stmt));
+                    if !implicit_stmts.is_empty() && checker.settings.preview.is_enabled() {
+                        return implicit_stmts;
                     }
                 }
             }
-            result
+            implicit_stmts
         }
         Stmt::With(ast::StmtWith { body, .. }) => {
             if let Some(last_stmt) = body.last() {
-                if has_implicit_return(checker, last_stmt) {
-                    return true;
-                }
+                implicit_stmts.extend(has_implicit_return(checker, last_stmt));
             }
-            false
+            implicit_stmts
         }
-        Stmt::Return(_) | Stmt::Raise(_) | Stmt::Try(_) => false,
+        Stmt::Return(_) | Stmt::Raise(_) | Stmt::Try(_) => vec![],
         Stmt::Expr(ast::StmtExpr { value, .. })
             if matches!(
                 value.as_ref(),
@@ -547,21 +534,29 @@ fn has_implicit_return(checker: &mut Checker, stmt: &Stmt) -> bool {
                     if is_noreturn_func(func, checker.semantic())
             ) =>
         {
-            false
+            vec![]
         }
         _ => {
-            if checker.settings.preview.is_disabled() {
-                add_return_none(checker, stmt, stmt.range());
-            }
-            true
+            implicit_stmts.push(stmt);
+            implicit_stmts
         }
     }
 }
 
 /// RET503
 fn implicit_return(checker: &mut Checker, function_def: &ast::StmtFunctionDef, stmt: &Stmt) {
-    if has_implicit_return(checker, stmt) && checker.settings.preview.is_enabled() {
+    let implicit_stmts = has_implicit_return(checker, stmt);
+
+    if implicit_stmts.is_empty() {
+        return;
+    }
+
+    if checker.settings.preview.is_enabled() {
         add_return_none(checker, stmt, function_def.range());
+    } else {
+        for implicit_stmt in implicit_stmts {
+            add_return_none(checker, implicit_stmt, implicit_stmt.range());
+        }
     }
 }
 
