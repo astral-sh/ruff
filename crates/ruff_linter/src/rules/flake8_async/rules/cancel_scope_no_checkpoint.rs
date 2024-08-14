@@ -1,8 +1,8 @@
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::helpers::AwaitVisitor;
+use ruff_python_ast::helpers::{any_over_body, AwaitVisitor};
 use ruff_python_ast::visitor::Visitor;
-use ruff_python_ast::{StmtWith, WithItem};
+use ruff_python_ast::{Expr, StmtWith, WithItem};
 
 use crate::checkers::ast::Checker;
 use crate::rules::flake8_async::helpers::MethodName;
@@ -87,10 +87,7 @@ pub(crate) fn cancel_scope_no_checkpoint(
     // in the caller yielded to.
     // https://flake8-async.readthedocs.io/en/latest/rules.html#async100
     // https://github.com/astral-sh/ruff/issues/12873
-    if with_stmt.body.iter().any(|stmt| {
-        stmt.as_expr_stmt()
-            .is_some_and(|expr| expr.value.is_yield_expr())
-    }) {
+    if any_over_body(&with_stmt.body, &Expr::is_yield_expr) {
         return;
     }
 

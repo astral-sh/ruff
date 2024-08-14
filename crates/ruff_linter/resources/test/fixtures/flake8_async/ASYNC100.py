@@ -95,6 +95,13 @@ async def foo():
     with trio.fail_after(1):
         yield
 
+async def foo(): # even if only one branch contains a yield, we skip the lint
+    with trio.fail_after(1):
+        if something:
+            ...
+        else:
+            yield
+
 # https://github.com/astral-sh/ruff/issues/12873
 @asynccontextmanager
 async def good_code():
