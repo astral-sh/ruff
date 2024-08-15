@@ -2,45 +2,15 @@
 
 ## 0.6.0
 
+Check out the [blog post](https://astral.sh/blog/ruff-v0.6.0) for a migration guide and overview of the changes!
+
 ### Breaking changes
 
 See also, the "Remapped rules" section which may result in disabled rules.
 
+- Lint and format Jupyter Notebook by default ([#12878](https://github.com/astral-sh/ruff/pull/12878)).
+- Detect imports in `src` layouts by default for `isort` rules ([#12848](https://github.com/astral-sh/ruff/pull/12848))
 - The pytest rules `PT001` and `PT023` now default to omitting the decorator parentheses when there are no arguments ([#12838](https://github.com/astral-sh/ruff/pull/12838)).
-
-- Detect imports in `src` layouts by default ([#12848](https://github.com/astral-sh/ruff/pull/12848))
-
-- Enable Jupyter Notebook formatting and linting by default ([#12878](https://github.com/astral-sh/ruff/pull/12878)).
-
-    You can disable specific rules for notebooks using [`per-file-ignores`](https://docs.astral.sh/ruff/settings/#lint_per-file-ignores):
-
-    ```toml
-    [tool.ruff.lint.per-file-ignores]
-    "*.ipynb" = ["E501"] # disable line-too-long in notebooks
-    ```
-
-    If you'd prefer to either only lint or only format Jupyter Notebook files, you can use the
-    section-specific `exclude` option to do so. For example, the following would only lint Jupyter
-    Notebook files and not format them:
-
-    ```toml
-    [tool.ruff.format]
-    exclude = ["*.ipynb"]
-    ```
-
-    And, conversely, the following would only format Jupyter Notebook files and not lint them:
-
-    ```toml
-    [tool.ruff.lint]
-    exclude = ["*.ipynb"]
-    ```
-
-    You can completely disable Jupyter Notebook support by updating the [`extend-exclude`](https://docs.astral.sh/ruff/rules/superfluous-else-continue/) setting:
-
-    ```toml
-    [tool.ruff]
-    extend-exclude = ["*.ipynb"]
-    ```
 
 ### Deprecations
 
@@ -79,7 +49,7 @@ The following behaviors have been stabilized:
 - [`async-function-with-timeout`](https://docs.astral.sh/ruff/rules/async-function-with-timeout/) (`ASYNC109`): Support `asyncio` and `anyio` context mangers.
 - [`async-busy-wait`](https://docs.astral.sh/ruff/rules/async-busy-wait/) (`ASYNC110`): Support `asyncio` and `anyio` context mangers.
 - [`async-zero-sleep`](https://docs.astral.sh/ruff/rules/async-zero-sleep/) (`ASYNC115`): Support `anyio` context mangers.
-- [`long-sleep-not-forever`](https://docs.astral.sh/ruff/rules/long-sleep-not-forever/) (`ASYNC116`): : Support `anyio` context mangers.
+- [`long-sleep-not-forever`](https://docs.astral.sh/ruff/rules/long-sleep-not-forever/) (`ASYNC116`): Support `anyio` context mangers.
 
 The following fixes have been stabilized:
 
@@ -114,12 +84,12 @@ The following fixes have been stabilized:
 - \[`ruff`\] Ignore unparenthesized tuples in subscripts when the subscript is a type annotation or type alias (`RUF031`) ([#12762](https://github.com/astral-sh/ruff/pull/12762))
 - \[`ruff`\] Ignore template strings passed to logging and `builtins._()` calls (`RUF027`) ([#12889](https://github.com/astral-sh/ruff/pull/12889))
 - \[`ruff`\] Do not remove parens for tuples with starred expressions in Python \<=3.10 (`RUF031`) ([#12784](https://github.com/astral-sh/ruff/pull/12784))
-- Evaluate default parameter value in enclosing scope ([#12852](https://github.com/astral-sh/ruff/pull/12852))
+- Evaluate default parameter values for a function in that function's enclosing scope ([#12852](https://github.com/astral-sh/ruff/pull/12852))
 
 ### Other changes
 
 - Respect VS Code cell metadata when detecting the language of Jupyter Notebook cells ([#12864](https://github.com/astral-sh/ruff/pull/12864))
-- Respect `kernelspec` cell metadata when detecting the language of Jupyter Notebook cells ([#12875](https://github.com/astral-sh/ruff/pull/12875))
+- Respect `kernelspec` notebook metadata when detecting the preferred language for a Jupyter Notebook ([#12875](https://github.com/astral-sh/ruff/pull/12875))
 
 ## 0.5.7
 
