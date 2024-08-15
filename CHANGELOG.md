@@ -104,6 +104,8 @@ The following fixes have been stabilized:
 
 ### Bug fixes
 
+- \[`flake8-async`\] Do not lint yield in context manager (`ASYNC100`) ([#12896](https://github.com/astral-sh/ruff/pull/12896))
+- \[`flake8-comprehensions`\] Do not lint `async for` comprehensions (`C419`) ([#12895](https://github.com/astral-sh/ruff/pull/12895))
 - \[`flake8-return`\] Only add return `None` at end of a function (`RET503`) ([#11074](https://github.com/astral-sh/ruff/pull/11074))
 - \[`flake8-type-checking`\] Avoid treating `dataclasses.KW_ONLY` as typing-only (`TCH003`) ([#12863](https://github.com/astral-sh/ruff/pull/12863))
 - \[`pep8-naming`\] Treat `type(Protocol)` et al as metaclass base (`N805`) ([#12770](https://github.com/astral-sh/ruff/pull/12770))
