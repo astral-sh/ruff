@@ -42,21 +42,24 @@ use crate::checkers::ast::Checker;
 /// ## Options
 /// - `lint.pylint.max-positional-args`
 #[violation]
-pub struct TooManyPositional {
+pub struct TooManyPositionalArguments {
     c_pos: usize,
     max_pos: usize,
 }
 
-impl Violation for TooManyPositional {
+impl Violation for TooManyPositionalArguments {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let TooManyPositional { c_pos, max_pos } = self;
+        let TooManyPositionalArguments { c_pos, max_pos } = self;
         format!("Too many positional arguments ({c_pos}/{max_pos})")
     }
 }
 
 /// PLR0917
-pub(crate) fn too_many_positional(checker: &mut Checker, function_def: &ast::StmtFunctionDef) {
+pub(crate) fn too_many_positional_arguments(
+    checker: &mut Checker,
+    function_def: &ast::StmtFunctionDef,
+) {
     let semantic = checker.semantic();
 
     // Count the number of positional arguments.
@@ -109,7 +112,7 @@ pub(crate) fn too_many_positional(checker: &mut Checker, function_def: &ast::Stm
     }
 
     checker.diagnostics.push(Diagnostic::new(
-        TooManyPositional {
+        TooManyPositionalArguments {
             c_pos: num_positional_args,
             max_pos: checker.settings.pylint.max_positional_args,
         },
