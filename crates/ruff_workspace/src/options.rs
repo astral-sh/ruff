@@ -1388,10 +1388,10 @@ impl Flake8ImportConventionsOptions {
 #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 pub struct Flake8PytestStyleOptions {
     /// Boolean flag specifying whether `@pytest.fixture()` without parameters
-    /// should have parentheses. If the option is set to `true` (the
-    /// default), `@pytest.fixture()` is valid and `@pytest.fixture` is
-    /// invalid. If set to `false`, `@pytest.fixture` is valid and
-    /// `@pytest.fixture()` is invalid.
+    /// should have parentheses. If the option is set to `false` (the default),
+    /// `@pytest.fixture` is valid and `@pytest.fixture()` is invalid. If set
+    /// to `true`, `@pytest.fixture()` is valid and `@pytest.fixture` is
+    /// invalid.
     #[option(
         default = "false",
         value_type = "bool",
@@ -1471,10 +1471,10 @@ pub struct Flake8PytestStyleOptions {
     pub raises_extend_require_match_for: Option<Vec<String>>,
 
     /// Boolean flag specifying whether `@pytest.mark.foo()` without parameters
-    /// should have parentheses. If the option is set to `true` (the
-    /// default), `@pytest.mark.foo()` is valid and `@pytest.mark.foo` is
-    /// invalid. If set to `false`, `@pytest.mark.foo` is valid and
-    /// `@pytest.mark.foo()` is invalid.
+    /// should have parentheses. If the option is set to `false` (the
+    /// default), `@pytest.mark.foo` is valid and `@pytest.mark.foo()` is
+    /// invalid. If set to `true`, `@pytest.mark.foo()` is valid and
+    /// `@pytest.mark.foo` is invalid.
     #[option(
         default = "false",
         value_type = "bool",
