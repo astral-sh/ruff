@@ -259,7 +259,6 @@ pub struct PreviewOptions {
 
 #[cfg(feature = "schemars")]
 mod schema {
-    use itertools::Itertools;
     use schemars::JsonSchema;
     use schemars::_serde_json::Value;
     use schemars::schema::{InstanceType, Schema, SchemaObject};
@@ -275,57 +274,91 @@ mod schema {
         }
 
         fn json_schema(_gen: &mut schemars::gen::SchemaGenerator) -> Schema {
-            Schema::Object(SchemaObject {
-                instance_type: Some(InstanceType::String.into()),
-                enum_values: Some(
-                    [
-                        // Include the non-standard "ALL" selectors.
-                        "ALL".to_string(),
-                        // Include the legacy "C" and "T" selectors.
-                        "C".to_string(),
-                        "T".to_string(),
-                        // Include some common redirect targets for those legacy selectors.
-                        "C9".to_string(),
-                        "T1".to_string(),
-                        "T2".to_string(),
-                    ]
-                    .into_iter()
-                    .chain(
-                        RuleCodePrefix::iter()
-                            .map(|p| {
-                                let prefix = p.linter().common_prefix();
-                                let code = p.short_code();
-                                format!("{prefix}{code}")
-                            })
-                            .chain(Linter::iter().filter_map(|l| {
-                                let prefix = l.common_prefix();
-                                (!prefix.is_empty()).then(|| prefix.to_string())
-                            })),
-                    )
-                    .filter(|p| {
-                        // Exclude any prefixes where all of the rules are removed
-                        if let Ok(Self::Rule { prefix, .. } | Self::Prefix { prefix, .. }) =
-                            RuleSelector::parse_no_redirect(p)
-                        {
-                            !prefix.rules().all(|rule| rule.is_removed())
-                        } else {
-                            true
-                        }
-                    })
-                    .filter(|_rule| {
-                        // Filter out all test-only rules
-                        #[cfg(any(feature = "test-rules", test))]
-                        #[allow(clippy::used_underscore_binding)]
-                        if _rule.starts_with("RUF9") {
-                            return false;
-                        }
+            let mut codes: Vec<String> = Vec::new();
+            let mut deprecated_codes: Vec<String> = Vec::new();
 
-                        true
+            for code in [
+                // Include the non-standard "ALL" selectors.
+                "ALL".to_string(),
+                // Include the legacy "C" and "T" selectors.
+                "C".to_string(),
+                "T".to_string(),
+                // Include some common redirect targets for those legacy selectors.
+                "C9".to_string(),
+                "T1".to_string(),
+                "T2".to_string(),
+            ]
+            .into_iter()
+            .chain(
+                RuleCodePrefix::iter()
+                    .map(|p| {
+                        let prefix = p.linter().common_prefix();
+                        let code = p.short_code();
+                        format!("{prefix}{code}")
                     })
-                    .sorted()
-                    .map(Value::String)
-                    .collect(),
-                ),
+                    .chain(Linter::iter().filter_map(|l| {
+                        let prefix = l.common_prefix();
+                        (!prefix.is_empty()).then(|| prefix.to_string())
+                    })),
+            ) {
+                let mut deprecated = false;
+
+                // Exclude any prefixes where all of the rules are removed
+                if let Ok(Self::Rule { prefix, .. } | Self::Prefix { prefix, .. }) =
+                    RuleSelector::parse_no_redirect(&code)
+                {
+                    if prefix.rules().all(|rule| rule.is_removed()) {
+                        continue;
+                    }
+
+                    if prefix.rules().all(|rule| rule.is_deprecated()) {
+                        deprecated = true;
+                    }
+                }
+
+                // Filter out all test-only rules
+                #[cfg(any(feature = "test-rules", test))]
+                #[allow(clippy::used_underscore_binding)]
+                if code.starts_with("RUF9") {
+                    continue;
+                }
+
+                if deprecated {
+                    deprecated_codes.push(code);
+                } else {
+                    codes.push(code);
+                }
+            }
+
+            codes.sort_unstable();
+            deprecated_codes.sort_unstable();
+
+            let rules = Schema::Object(SchemaObject {
+                instance_type: Some(InstanceType::String.into()),
+                enum_values: Some(codes.into_iter().map(Value::String).collect()),
+                ..SchemaObject::default()
+            });
+
+            if deprecated_codes.is_empty() {
+                return rules;
+            }
+
+            let deprecated = Schema::Object(SchemaObject {
+                instance_type: Some(InstanceType::String.into()),
+                enum_values: Some(deprecated_codes.into_iter().map(Value::String).collect()),
+                metadata: Some(Box::new(schemars::schema::Metadata {
+                    deprecated: true,
+                    ..schemars::schema::Metadata::default()
+                })),
+                ..SchemaObject::default()
+            });
+
+            Schema::Object(SchemaObject {
+                subschemas: Some(Box::new(schemars::schema::SubschemaValidation {
+                    one_of: Some(vec![rules, deprecated]),
+                    ..schemars::schema::SubschemaValidation::default()
+                })),
+
                 ..SchemaObject::default()
             })
         }
