@@ -89,11 +89,13 @@ async def func():
 async def func():
     async with asyncio.timeout(delay=0.2), asyncio.timeout(delay=0.2):
         ...
-        
+
+
 # Don't trigger for blocks with a yield statement
 async def foo():
     with trio.fail_after(1):
         yield
+
 
 async def foo(): # even if only one branch contains a yield, we skip the lint
     with trio.fail_after(1):
@@ -101,6 +103,7 @@ async def foo(): # even if only one branch contains a yield, we skip the lint
             ...
         else:
             yield
+
 
 # https://github.com/astral-sh/ruff/issues/12873
 @asynccontextmanager

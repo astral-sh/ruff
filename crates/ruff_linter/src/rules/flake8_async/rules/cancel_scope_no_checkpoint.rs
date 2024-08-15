@@ -85,8 +85,8 @@ pub(crate) fn cancel_scope_no_checkpoint(
 
     // Treat yields as checkpoints, since checkpoints can happen
     // in the caller yielded to.
-    // https://flake8-async.readthedocs.io/en/latest/rules.html#async100
-    // https://github.com/astral-sh/ruff/issues/12873
+    // See: https://flake8-async.readthedocs.io/en/latest/rules.html#async100
+    // See: https://github.com/astral-sh/ruff/issues/12873
     if any_over_body(&with_stmt.body, &Expr::is_yield_expr) {
         return;
     }
