@@ -1,5 +1,6 @@
 use ruff_db::files::File;
 use ruff_db::parsed::ParsedModule;
+use ruff_index::newtype_index;
 use ruff_python_ast as ast;
 
 use crate::ast_node_ref::AstNodeRef;
@@ -8,7 +9,7 @@ use crate::semantic_index::symbol::{FileScopeId, ScopeId, ScopedSymbolId};
 use crate::Db;
 
 #[salsa::tracked]
-pub struct Definition<'db> {
+pub(crate) struct Definition<'db> {
     /// The file in which the definition occurs.
     #[id]
     pub(crate) file: File,
@@ -23,7 +24,7 @@ pub struct Definition<'db> {
 
     #[no_eq]
     #[return_ref]
-    pub(crate) node: DefinitionKind,
+    pub(crate) kind: DefinitionKind,
 
     #[no_eq]
     count: countme::Count<Definition<'static>>,
@@ -34,6 +35,22 @@ impl<'db> Definition<'db> {
         self.file_scope(db).to_scope_id(db, self.file(db))
     }
 }
+
+#[derive(Clone, Debug)]
+pub(crate) enum DefinitionKind {
+    /// Inserted at control-flow merge points, if multiple definitions can reach the merge point.
+    ///
+    /// Operands are not kept inline, since it's not possible to construct cyclically-referential
+    /// Salsa tracked structs; they are kept instead in the
+    /// [`UseDefMap`](super::use_def::UseDefMap).
+    Phi(ScopedPhiId),
+
+    /// An assignment to the symbol.
+    Node(DefinitionNode),
+}
+
+#[newtype_index]
+pub(crate) struct ScopedPhiId;
 
 #[derive(Copy, Clone, Debug)]
 pub(crate) enum DefinitionNodeRef<'a> {
@@ -115,37 +132,37 @@ pub(crate) struct ComprehensionDefinitionNodeRef<'a> {
 
 impl DefinitionNodeRef<'_> {
     #[allow(unsafe_code)]
-    pub(super) unsafe fn into_owned(self, parsed: ParsedModule) -> DefinitionKind {
+    pub(super) unsafe fn into_owned(self, parsed: ParsedModule) -> DefinitionNode {
         match self {
             DefinitionNodeRef::Import(alias) => {
-                DefinitionKind::Import(AstNodeRef::new(parsed, alias))
+                DefinitionNode::Import(AstNodeRef::new(parsed, alias))
             }
             DefinitionNodeRef::ImportFrom(ImportFromDefinitionNodeRef { node, alias_index }) => {
-                DefinitionKind::ImportFrom(ImportFromDefinitionKind {
+                DefinitionNode::ImportFrom(ImportFromDefinitionNode {
                     node: AstNodeRef::new(parsed, node),
                     alias_index,
                 })
             }
             DefinitionNodeRef::Function(function) => {
-                DefinitionKind::Function(AstNodeRef::new(parsed, function))
+                DefinitionNode::Function(AstNodeRef::new(parsed, function))
             }
             DefinitionNodeRef::Class(class) => {
-                DefinitionKind::Class(AstNodeRef::new(parsed, class))
+                DefinitionNode::Class(AstNodeRef::new(parsed, class))
             }
             DefinitionNodeRef::NamedExpression(named) => {
-                DefinitionKind::NamedExpression(AstNodeRef::new(parsed, named))
+                DefinitionNode::NamedExpression(AstNodeRef::new(parsed, named))
             }
             DefinitionNodeRef::Assignment(AssignmentDefinitionNodeRef { assignment, target }) => {
-                DefinitionKind::Assignment(AssignmentDefinitionKind {
+                DefinitionNode::Assignment(AssignmentDefinitionNode {
                     assignment: AstNodeRef::new(parsed.clone(), assignment),
                     target: AstNodeRef::new(parsed, target),
                 })
             }
             DefinitionNodeRef::AnnotatedAssignment(assign) => {
-                DefinitionKind::AnnotatedAssignment(AstNodeRef::new(parsed, assign))
+                DefinitionNode::AnnotatedAssignment(AstNodeRef::new(parsed, assign))
             }
             DefinitionNodeRef::Comprehension(ComprehensionDefinitionNodeRef { node, first }) => {
-                DefinitionKind::Comprehension(ComprehensionDefinitionKind {
+                DefinitionNode::Comprehension(ComprehensionDefinitionNode {
                     node: AstNodeRef::new(parsed, node),
                     first,
                 })
@@ -173,24 +190,24 @@ impl DefinitionNodeRef<'_> {
 }
 
 #[derive(Clone, Debug)]
-pub enum DefinitionKind {
+pub enum DefinitionNode {
     Import(AstNodeRef<ast::Alias>),
-    ImportFrom(ImportFromDefinitionKind),
+    ImportFrom(ImportFromDefinitionNode),
     Function(AstNodeRef<ast::StmtFunctionDef>),
     Class(AstNodeRef<ast::StmtClassDef>),
     NamedExpression(AstNodeRef<ast::ExprNamed>),
-    Assignment(AssignmentDefinitionKind),
+    Assignment(AssignmentDefinitionNode),
     AnnotatedAssignment(AstNodeRef<ast::StmtAnnAssign>),
-    Comprehension(ComprehensionDefinitionKind),
+    Comprehension(ComprehensionDefinitionNode),
 }
 
 #[derive(Clone, Debug)]
-pub struct ComprehensionDefinitionKind {
+pub struct ComprehensionDefinitionNode {
     node: AstNodeRef<ast::Comprehension>,
     first: bool,
 }
 
-impl ComprehensionDefinitionKind {
+impl ComprehensionDefinitionNode {
     pub(crate) fn node(&self) -> &ast::Comprehension {
         self.node.node()
     }
@@ -201,12 +218,12 @@ impl ComprehensionDefinitionKind {
 }
 
 #[derive(Clone, Debug)]
-pub struct ImportFromDefinitionKind {
+pub struct ImportFromDefinitionNode {
     node: AstNodeRef<ast::StmtImportFrom>,
     alias_index: usize,
 }
 
-impl ImportFromDefinitionKind {
+impl ImportFromDefinitionNode {
     pub(crate) fn import(&self) -> &ast::StmtImportFrom {
         self.node.node()
     }
@@ -218,12 +235,12 @@ impl ImportFromDefinitionKind {
 
 #[derive(Clone, Debug)]
 #[allow(dead_code)]
-pub struct AssignmentDefinitionKind {
+pub struct AssignmentDefinitionNode {
     assignment: AstNodeRef<ast::StmtAssign>,
     target: AstNodeRef<ast::ExprName>,
 }
 
-impl AssignmentDefinitionKind {
+impl AssignmentDefinitionNode {
     pub(crate) fn assignment(&self) -> &ast::StmtAssign {
         self.assignment.node()
     }

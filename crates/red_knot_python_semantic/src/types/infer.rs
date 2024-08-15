@@ -33,13 +33,17 @@ use crate::builtins::builtins_scope;
 use crate::module_name::ModuleName;
 use crate::module_resolver::resolve_module;
 use crate::semantic_index::ast_ids::{HasScopedAstId, HasScopedUseId, ScopedExpressionId};
-use crate::semantic_index::definition::{Definition, DefinitionKind, DefinitionNodeKey};
+use crate::semantic_index::definition::{
+    Definition, DefinitionKind, DefinitionNode, DefinitionNodeKey, ScopedPhiId,
+};
 use crate::semantic_index::expression::Expression;
 use crate::semantic_index::semantic_index;
-use crate::semantic_index::symbol::{FileScopeId, NodeWithScopeKind, NodeWithScopeRef, ScopeId};
+use crate::semantic_index::symbol::{
+    FileScopeId, NodeWithScopeKind, NodeWithScopeRef, ScopeId, Symbol,
+};
 use crate::semantic_index::SemanticIndex;
 use crate::types::{
-    builtins_symbol_ty_by_name, definitions_ty, global_symbol_ty_by_name, ClassType, FunctionType,
+    builtins_symbol_ty_by_name, definition_ty, global_symbol_ty_by_name, ClassType, FunctionType,
     Name, Type, UnionBuilder,
 };
 use crate::Db;
@@ -276,37 +280,45 @@ impl<'db> TypeInferenceBuilder<'db> {
     }
 
     fn infer_region_definition(&mut self, definition: Definition<'db>) {
-        match definition.node(self.db) {
-            DefinitionKind::Function(function) => {
-                self.infer_function_definition(function.node(), definition);
-            }
-            DefinitionKind::Class(class) => self.infer_class_definition(class.node(), definition),
-            DefinitionKind::Import(import) => {
-                self.infer_import_definition(import.node(), definition);
-            }
-            DefinitionKind::ImportFrom(import_from) => {
-                self.infer_import_from_definition(
-                    import_from.import(),
-                    import_from.alias(),
-                    definition,
-                );
-            }
-            DefinitionKind::Assignment(assignment) => {
-                self.infer_assignment_definition(assignment.assignment(), definition);
-            }
-            DefinitionKind::AnnotatedAssignment(annotated_assignment) => {
-                self.infer_annotated_assignment_definition(annotated_assignment.node(), definition);
-            }
-            DefinitionKind::NamedExpression(named_expression) => {
-                self.infer_named_expression_definition(named_expression.node(), definition);
-            }
-            DefinitionKind::Comprehension(comprehension) => {
-                self.infer_comprehension_definition(
-                    comprehension.node(),
-                    comprehension.is_first(),
-                    definition,
-                );
-            }
+        match definition.kind(self.db) {
+            DefinitionKind::Phi(phi_id) => self.infer_phi_definition(*phi_id, definition),
+            DefinitionKind::Node(node) => match node {
+                DefinitionNode::Function(function) => {
+                    self.infer_function_definition(function.node(), definition);
+                }
+                DefinitionNode::Class(class) => {
+                    self.infer_class_definition(class.node(), definition);
+                }
+                DefinitionNode::Import(import) => {
+                    self.infer_import_definition(import.node(), definition);
+                }
+                DefinitionNode::ImportFrom(import_from) => {
+                    self.infer_import_from_definition(
+                        import_from.import(),
+                        import_from.alias(),
+                        definition,
+                    );
+                }
+                DefinitionNode::Assignment(assignment) => {
+                    self.infer_assignment_definition(assignment.assignment(), definition);
+                }
+                DefinitionNode::AnnotatedAssignment(annotated_assignment) => {
+                    self.infer_annotated_assignment_definition(
+                        annotated_assignment.node(),
+                        definition,
+                    );
+                }
+                DefinitionNode::NamedExpression(named_expression) => {
+                    self.infer_named_expression_definition(named_expression.node(), definition);
+                }
+                DefinitionNode::Comprehension(comprehension) => {
+                    self.infer_comprehension_definition(
+                        comprehension.node(),
+                        comprehension.is_first(),
+                        definition,
+                    );
+                }
+            },
         }
     }
 
@@ -394,6 +406,18 @@ impl<'db> TypeInferenceBuilder<'db> {
         let definition = self.index.definition(node);
         let result = infer_definition_types(self.db, definition);
         self.extend(result);
+    }
+
+    fn infer_phi_definition(&mut self, phi_id: ScopedPhiId, definition: Definition<'db>) {
+        let file_scope_id = self.scope.file_scope_id(self.db);
+        let use_def = self.index.use_def_map(file_scope_id);
+        let ty = use_def
+            .phi_operands(phi_id)
+            .iter()
+            .map(|&definition| definition_ty(self.db, definition))
+            .fold(UnionBuilder::new(self.db), UnionBuilder::add)
+            .build();
+        self.types.definitions.insert(definition, ty);
     }
 
     fn infer_function_definition_statement(&mut self, function: &ast::StmtFunctionDef) {
@@ -1338,6 +1362,22 @@ impl<'db> TypeInferenceBuilder<'db> {
         Type::Unknown
     }
 
+    fn infer_global_name_reference(&self, symbol: &Symbol) -> Type<'db> {
+        let file_scope_id = self.scope.file_scope_id(self.db);
+        // implicit global
+        let mut ty = if file_scope_id == FileScopeId::global() {
+            Type::Unbound
+        } else {
+            global_symbol_ty_by_name(self.db, self.file, symbol.name())
+        };
+        // fallback to builtins
+        if ty.may_be_unbound(self.db) && Some(self.scope) != builtins_scope(self.db) {
+            ty = ty
+                .replace_unbound_with(self.db, builtins_symbol_ty_by_name(self.db, symbol.name()));
+        }
+        ty
+    }
+
     fn infer_name_expression(&mut self, name: &ast::ExprName) -> Type<'db> {
         let ast::ExprName { range: _, id, ctx } = name;
 
@@ -1346,34 +1386,18 @@ impl<'db> TypeInferenceBuilder<'db> {
                 let file_scope_id = self.scope.file_scope_id(self.db);
                 let use_def = self.index.use_def_map(file_scope_id);
                 let use_id = name.scoped_use_id(self.db, self.scope);
-                let may_be_unbound = use_def.use_may_be_unbound(use_id);
-
-                let unbound_ty = if may_be_unbound {
+                let mut ty = definition_ty(self.db, use_def.definition_for_use(use_id));
+                if ty.may_be_unbound(self.db) {
                     let symbols = self.index.symbol_table(file_scope_id);
-                    // SAFETY: the symbol table always creates a symbol for every Name node.
                     let symbol = symbols.symbol_by_name(id).unwrap();
                     if !symbol.is_defined() || !self.scope.is_function_like(self.db) {
-                        // implicit global
-                        let mut unbound_ty = if file_scope_id == FileScopeId::global() {
-                            Type::Unbound
-                        } else {
-                            global_symbol_ty_by_name(self.db, self.file, id)
-                        };
-                        // fallback to builtins
-                        if matches!(unbound_ty, Type::Unbound)
-                            && Some(self.scope) != builtins_scope(self.db)
-                        {
-                            unbound_ty = builtins_symbol_ty_by_name(self.db, id);
-                        }
-                        Some(unbound_ty)
-                    } else {
-                        Some(Type::Unbound)
+                        ty = ty.replace_unbound_with(
+                            self.db,
+                            self.infer_global_name_reference(symbol),
+                        );
                     }
-                } else {
-                    None
-                };
-
-                definitions_ty(self.db, use_def.use_definitions(use_id), unbound_ty)
+                }
+                ty
             }
             ExprContext::Store | ExprContext::Del => Type::None,
             ExprContext::Invalid => Type::Unknown,
@@ -2163,6 +2187,38 @@ mod tests {
         Ok(())
     }
 
+    #[test]
+    fn conditionally_global_or_builtin() -> anyhow::Result<()> {
+        let mut db = setup_db();
+
+        db.write_dedented(
+            "/src/a.py",
+            "
+            if flag:
+                copyright = 1
+            def f():
+                y = copyright
+            ",
+        )?;
+
+        let file = system_path_to_file(&db, "src/a.py").expect("Expected file to exist.");
+        let index = semantic_index(&db, file);
+        let function_scope = index
+            .child_scopes(FileScopeId::global())
+            .next()
+            .unwrap()
+            .0
+            .to_scope_id(&db, file);
+        let y_ty = symbol_ty_by_name(&db, function_scope, "y");
+
+        assert_eq!(
+            y_ty.display(&db).to_string(),
+            "Literal[1] | Literal[copyright]"
+        );
+
+        Ok(())
+    }
+
     /// Class name lookups do fall back to globals, but the public type never does.
     #[test]
     fn unbound_class_local() -> anyhow::Result<()> {
@@ -2386,11 +2442,10 @@ mod tests {
         Ok(())
     }
 
-    fn first_public_def<'db>(db: &'db TestDb, file: File, name: &str) -> Definition<'db> {
+    fn public_def<'db>(db: &'db TestDb, file: File, name: &str) -> Definition<'db> {
         let scope = global_scope(db, file);
-        *use_def_map(db, scope)
-            .public_definitions(symbol_table(db, scope).symbol_id_by_name(name).unwrap())
-            .first()
+        use_def_map(db, scope)
+            .public_definition(symbol_table(db, scope).symbol_id_by_name(name).unwrap())
             .unwrap()
     }
 
@@ -2533,7 +2588,7 @@ mod tests {
         assert_function_query_was_not_run(
             &db,
             infer_definition_types,
-            first_public_def(&db, a, "x"),
+            public_def(&db, a, "x"),
             &events,
         );
 
@@ -2569,7 +2624,7 @@ mod tests {
         assert_function_query_was_not_run(
             &db,
             infer_definition_types,
-            first_public_def(&db, a, "x"),
+            public_def(&db, a, "x"),
             &events,
         );
         Ok(())

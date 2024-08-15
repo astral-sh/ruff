@@ -23,13 +23,7 @@ pub(crate) fn symbol_ty<'db>(
     let _span = tracing::trace_span!("symbol_ty", ?symbol).entered();
 
     let use_def = use_def_map(db, scope);
-    definitions_ty(
-        db,
-        use_def.public_definitions(symbol),
-        use_def
-            .public_may_be_unbound(symbol)
-            .then_some(Type::Unbound),
-    )
+    definition_ty(db, use_def.public_definition(symbol))
 }
 
 /// Shorthand for `symbol_ty` that takes a symbol name instead of an ID.
@@ -60,49 +54,16 @@ pub(crate) fn builtins_symbol_ty_by_name<'db>(db: &'db dyn Db, name: &str) -> Ty
 }
 
 /// Infer the type of a [`Definition`].
-pub(crate) fn definition_ty<'db>(db: &'db dyn Db, definition: Definition<'db>) -> Type<'db> {
-    let inference = infer_definition_types(db, definition);
-    inference.definition_ty(definition)
-}
-
-/// Infer the combined type of an array of [`Definition`]s, plus one optional "unbound type".
-///
-/// Will return a union if there is more than one definition, or at least one plus an unbound
-/// type.
-///
-/// The "unbound type" represents the type in case control flow may not have passed through any
-/// definitions in this scope. If this isn't possible, then it will be `None`. If it is possible,
-/// and the result in that case should be Unbound (e.g. an unbound function local), then it will be
-/// `Some(Type::Unbound)`. If it is possible and the result should be something else (e.g. an
-/// implicit global lookup), then `unbound_type` will be `Some(the_global_symbol_type)`.
-///
-/// # Panics
-/// Will panic if called with zero definitions and no `unbound_ty`. This is a logic error,
-/// as any symbol with zero visible definitions clearly may be unbound, and the caller should
-/// provide an `unbound_ty`.
-pub(crate) fn definitions_ty<'db>(
+pub(crate) fn definition_ty<'db>(
     db: &'db dyn Db,
-    definitions: &[Definition<'db>],
-    unbound_ty: Option<Type<'db>>,
+    definition: Option<Definition<'db>>,
 ) -> Type<'db> {
-    let def_types = definitions.iter().map(|def| definition_ty(db, *def));
-    let mut all_types = unbound_ty.into_iter().chain(def_types);
-
-    let Some(first) = all_types.next() else {
-        panic!("definitions_ty should never be called with zero definitions and no unbound_ty.")
-    };
-
-    if let Some(second) = all_types.next() {
-        let mut builder = UnionBuilder::new(db);
-        builder = builder.add(first).add(second);
-
-        for variant in all_types {
-            builder = builder.add(variant);
+    match definition {
+        Some(definition) => {
+            let inference = infer_definition_types(db, definition);
+            inference.definition_ty(definition)
         }
-
-        builder.build()
-    } else {
-        first
+        None => Type::Unbound,
     }
 }
 
@@ -145,8 +106,27 @@ impl<'db> Type<'db> {
         matches!(self, Type::Unbound)
     }
 
-    pub const fn is_unknown(&self) -> bool {
-        matches!(self, Type::Unknown)
+    pub fn may_be_unbound(&self, db: &'db dyn Db) -> bool {
+        match self {
+            Type::Unbound => true,
+            Type::Union(union) => union.contains(db, Type::Unbound),
+            _ => false,
+        }
+    }
+
+    #[must_use]
+    pub fn replace_unbound_with(&self, db: &'db dyn Db, replacement: Type<'db>) -> Type<'db> {
+        match self {
+            Type::Unbound => replacement,
+            Type::Union(union) => union
+                .elements(db)
+                .into_iter()
+                .fold(UnionBuilder::new(db), |builder, ty| {
+                    builder.add(ty.replace_unbound_with(db, replacement))
+                })
+                .build(),
+            ty => *ty,
+        }
     }
 
     #[must_use]

@@ -272,7 +272,7 @@ impl SymbolTableBuilder {
         &mut self,
         name: Name,
         flags: SymbolFlags,
-    ) -> (ScopedSymbolId, bool) {
+    ) -> ScopedSymbolId {
         let hash = SymbolTable::hash_name(&name);
         let entry = self
             .table
@@ -285,7 +285,7 @@ impl SymbolTableBuilder {
                 let symbol = &mut self.table.symbols[*entry.key()];
                 symbol.insert_flags(flags);
 
-                (*entry.key(), false)
+                *entry.key()
             }
             RawEntryMut::Vacant(entry) => {
                 let mut symbol = Symbol::new(name);
@@ -295,7 +295,7 @@ impl SymbolTableBuilder {
                 entry.insert_with_hasher(hash, id, (), |id| {
                     SymbolTable::hash_name(self.table.symbols[*id].name().as_str())
                 });
-                (id, true)
+                id
             }
         }
     }

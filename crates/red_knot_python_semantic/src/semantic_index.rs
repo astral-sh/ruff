@@ -126,7 +126,7 @@ impl<'db> SemanticIndex<'db> {
     ///
     /// Use the Salsa cached [`use_def_map()`] query if you only need the
     /// use-def map for a single scope.
-    pub(super) fn use_def_map(&self, scope_id: FileScopeId) -> Arc<UseDefMap> {
+    pub(super) fn use_def_map(&self, scope_id: FileScopeId) -> Arc<UseDefMap<'db>> {
         self.use_def_maps[scope_id].clone()
     }
 
@@ -311,7 +311,7 @@ mod tests {
 
     use crate::db::tests::TestDb;
     use crate::semantic_index::ast_ids::HasScopedUseId;
-    use crate::semantic_index::definition::DefinitionKind;
+    use crate::semantic_index::definition::{DefinitionKind, DefinitionNode};
     use crate::semantic_index::symbol::{FileScopeId, Scope, ScopeKind, SymbolTable};
     use crate::semantic_index::{global_scope, semantic_index, symbol_table, use_def_map};
     use crate::Db;
@@ -374,10 +374,11 @@ mod tests {
         let foo = global_table.symbol_id_by_name("foo").unwrap();
 
         let use_def = use_def_map(&db, scope);
-        let [definition] = use_def.public_definitions(foo) else {
-            panic!("expected one definition");
-        };
-        assert!(matches!(definition.node(&db), DefinitionKind::Import(_)));
+        let definition = use_def.public_definition(foo).unwrap();
+        assert!(matches!(
+            definition.kind(&db),
+            DefinitionKind::Node(DefinitionNode::Import(_))
+        ));
     }
 
     #[test]
@@ -411,16 +412,16 @@ mod tests {
         );
 
         let use_def = use_def_map(&db, scope);
-        let [definition] = use_def.public_definitions(
-            global_table
-                .symbol_id_by_name("foo")
-                .expect("symbol to exist"),
-        ) else {
-            panic!("expected one definition");
-        };
+        let definition = use_def
+            .public_definition(
+                global_table
+                    .symbol_id_by_name("foo")
+                    .expect("symbol to exist"),
+            )
+            .unwrap();
         assert!(matches!(
-            definition.node(&db),
-            DefinitionKind::ImportFrom(_)
+            definition.kind(&db),
+            DefinitionKind::Node(DefinitionNode::ImportFrom(_))
         ));
     }
 
@@ -438,14 +439,12 @@ mod tests {
             "a symbol used but not defined in a scope should have only the used flag"
         );
         let use_def = use_def_map(&db, scope);
-        let [definition] =
-            use_def.public_definitions(global_table.symbol_id_by_name("x").expect("symbol exists"))
-        else {
-            panic!("expected one definition");
-        };
+        let definition = use_def
+            .public_definition(global_table.symbol_id_by_name("x").expect("symbol exists"))
+            .unwrap();
         assert!(matches!(
-            definition.node(&db),
-            DefinitionKind::Assignment(_)
+            definition.kind(&db),
+            DefinitionKind::Node(DefinitionNode::Assignment(_))
         ));
     }
 
@@ -477,14 +476,12 @@ y = 2
         assert_eq!(names(&class_table), vec!["x"]);
 
         let use_def = index.use_def_map(class_scope_id);
-        let [definition] =
-            use_def.public_definitions(class_table.symbol_id_by_name("x").expect("symbol exists"))
-        else {
-            panic!("expected one definition");
-        };
+        let definition = use_def
+            .public_definition(class_table.symbol_id_by_name("x").expect("symbol exists"))
+            .unwrap();
         assert!(matches!(
-            definition.node(&db),
-            DefinitionKind::Assignment(_)
+            definition.kind(&db),
+            DefinitionKind::Node(DefinitionNode::Assignment(_))
         ));
     }
 
@@ -515,16 +512,16 @@ y = 2
         assert_eq!(names(&function_table), vec!["x"]);
 
         let use_def = index.use_def_map(function_scope_id);
-        let [definition] = use_def.public_definitions(
-            function_table
-                .symbol_id_by_name("x")
-                .expect("symbol exists"),
-        ) else {
-            panic!("expected one definition");
-        };
+        let definition = use_def
+            .public_definition(
+                function_table
+                    .symbol_id_by_name("x")
+                    .expect("symbol exists"),
+            )
+            .unwrap();
         assert!(matches!(
-            definition.node(&db),
-            DefinitionKind::Assignment(_)
+            definition.kind(&db),
+            DefinitionKind::Node(DefinitionNode::Assignment(_))
         ));
     }
 
@@ -594,10 +591,10 @@ y = 2
         let element_use_id =
             element.scoped_use_id(&db, comprehension_scope_id.to_scope_id(&db, file));
 
-        let [definition] = use_def.use_definitions(element_use_id) else {
-            panic!("expected one definition")
-        };
-        let DefinitionKind::Comprehension(comprehension) = definition.node(&db) else {
+        let definition = use_def.definition_for_use(element_use_id).unwrap();
+        let DefinitionKind::Node(DefinitionNode::Comprehension(comprehension)) =
+            definition.kind(&db)
+        else {
             panic!("expected generator definition")
         };
         let ast::Comprehension { target, .. } = comprehension.node();
@@ -611,7 +608,7 @@ y = 2
     /// the outer comprehension scope and the variables are correctly defined in the respective
     /// scopes.
     #[test]
-    fn nested_generators() {
+    fn nested_comprehensions() {
         let TestCase { db, file } = test_case(
             "
 [{x for x in iter2} for y in iter1]
@@ -644,7 +641,7 @@ y = 2
             .child_scopes(comprehension_scope_id)
             .collect::<Vec<_>>()[..]
         else {
-            panic!("expected one inner generator scope")
+            panic!("expected one inner comprehension scope")
         };
 
         assert_eq!(inner_comprehension_scope.kind(), ScopeKind::Comprehension);
@@ -693,14 +690,17 @@ def func():
         assert_eq!(names(&func2_table), vec!["y"]);
 
         let use_def = index.use_def_map(FileScopeId::global());
-        let [definition] = use_def.public_definitions(
-            global_table
-                .symbol_id_by_name("func")
-                .expect("symbol exists"),
-        ) else {
-            panic!("expected one definition");
-        };
-        assert!(matches!(definition.node(&db), DefinitionKind::Function(_)));
+        let definition = use_def
+            .public_definition(
+                global_table
+                    .symbol_id_by_name("func")
+                    .expect("symbol exists"),
+            )
+            .unwrap();
+        assert!(matches!(
+            definition.kind(&db),
+            DefinitionKind::Node(DefinitionNode::Function(_))
+        ));
     }
 
     #[test]
@@ -800,10 +800,9 @@ class C[T]:
         };
         let x_use_id = x_use_expr_name.scoped_use_id(&db, scope);
         let use_def = use_def_map(&db, scope);
-        let [definition] = use_def.use_definitions(x_use_id) else {
-            panic!("expected one definition");
-        };
-        let DefinitionKind::Assignment(assignment) = definition.node(&db) else {
+        let definition = use_def.definition_for_use(x_use_id).unwrap();
+        let DefinitionKind::Node(DefinitionNode::Assignment(assignment)) = definition.kind(&db)
+        else {
             panic!("should be an assignment definition")
         };
         let ast::Expr::NumberLiteral(ast::ExprNumberLiteral {
