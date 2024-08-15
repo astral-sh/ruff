@@ -109,3 +109,7 @@
     user-select: none;
 }
 
+/* Hide TOC in docs/contributing.md, as page is copied from CONTRIBUTING.md and TOC is only relevant here. */
+#contributing-toc {
+  display: none;
+}

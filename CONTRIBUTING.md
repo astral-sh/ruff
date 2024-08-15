@@ -2,6 +2,8 @@
 
 Welcome! We're happy to have you here. Thank you in advance for your contribution to Ruff.
 
+<div id="contributing-toc">
+
 - [The Basics](#the-basics)
     - [Prerequisites](#prerequisites)
     - [Development](#development)
@@ -30,6 +32,8 @@ Welcome! We're happy to have you here. Thank you in advance for your contributio
         - [Project root](#project-root)
         - [Package root](#package-root)
         - [Import categorization](#import-categorization-1)
+
+</div>
 
 ## The Basics
 
