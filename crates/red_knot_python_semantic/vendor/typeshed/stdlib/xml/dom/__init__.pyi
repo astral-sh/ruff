@@ -1,4 +1,4 @@
-from typing import Any
+from typing import Any, Final
 
 from .domreg import getDOMImplementation as getDOMImplementation, registerDOMImplementation as registerDOMImplementation
 
@@ -17,22 +17,22 @@ class Node:
     NOTATION_NODE: int
 
 # ExceptionCode
-INDEX_SIZE_ERR: int
-DOMSTRING_SIZE_ERR: int
-HIERARCHY_REQUEST_ERR: int
-WRONG_DOCUMENT_ERR: int
-INVALID_CHARACTER_ERR: int
-NO_DATA_ALLOWED_ERR: int
-NO_MODIFICATION_ALLOWED_ERR: int
-NOT_FOUND_ERR: int
-NOT_SUPPORTED_ERR: int
-INUSE_ATTRIBUTE_ERR: int
-INVALID_STATE_ERR: int
-SYNTAX_ERR: int
-INVALID_MODIFICATION_ERR: int
-NAMESPACE_ERR: int
-INVALID_ACCESS_ERR: int
-VALIDATION_ERR: int
+INDEX_SIZE_ERR: Final[int]
+DOMSTRING_SIZE_ERR: Final[int]
+HIERARCHY_REQUEST_ERR: Final[int]
+WRONG_DOCUMENT_ERR: Final[int]
+INVALID_CHARACTER_ERR: Final[int]
+NO_DATA_ALLOWED_ERR: Final[int]
+NO_MODIFICATION_ALLOWED_ERR: Final[int]
+NOT_FOUND_ERR: Final[int]
+NOT_SUPPORTED_ERR: Final[int]
+INUSE_ATTRIBUTE_ERR: Final[int]
+INVALID_STATE_ERR: Final[int]
+SYNTAX_ERR: Final[int]
+INVALID_MODIFICATION_ERR: Final[int]
+NAMESPACE_ERR: Final[int]
+INVALID_ACCESS_ERR: Final[int]
+VALIDATION_ERR: Final[int]
 
 class DOMException(Exception):
     code: int
@@ -62,8 +62,8 @@ class UserDataHandler:
     NODE_DELETED: int
     NODE_RENAMED: int
 
-XML_NAMESPACE: str
-XMLNS_NAMESPACE: str
-XHTML_NAMESPACE: str
-EMPTY_NAMESPACE: None
-EMPTY_PREFIX: None
+XML_NAMESPACE: Final[str]
+XMLNS_NAMESPACE: Final[str]
+XHTML_NAMESPACE: Final[str]
+EMPTY_NAMESPACE: Final[None]
+EMPTY_PREFIX: Final[None]

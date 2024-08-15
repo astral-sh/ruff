@@ -2,6 +2,7 @@ import sys
 from _collections_abc import dict_keys
 from collections.abc import Sequence
 from typing import Any
+from typing_extensions import deprecated
 
 __all__ = ["symtable", "SymbolTable", "Class", "Function", "Symbol"]
 
@@ -51,7 +52,9 @@ class Function(SymbolTable):
     def get_nonlocals(self) -> tuple[str, ...]: ...
 
 class Class(SymbolTable):
-    def get_methods(self) -> tuple[str, ...]: ...
+    if sys.version_info < (3, 16):
+        @deprecated("deprecated in Python 3.14, will be removed in Python 3.16")
+        def get_methods(self) -> tuple[str, ...]: ...
 
 class Symbol:
     def __init__(

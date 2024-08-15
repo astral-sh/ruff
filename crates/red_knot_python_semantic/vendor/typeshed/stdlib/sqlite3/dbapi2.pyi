@@ -29,7 +29,10 @@ def DateFromTicks(ticks: float) -> Date: ...
 def TimeFromTicks(ticks: float) -> Time: ...
 def TimestampFromTicks(ticks: float) -> Timestamp: ...
 
-version_info: tuple[int, int, int]
+if sys.version_info < (3, 14):
+    # Deprecated in 3.12, removed in 3.14.
+    version_info: tuple[int, int, int]
+
 sqlite_version_info: tuple[int, int, int]
 Binary = memoryview
 
@@ -90,7 +93,10 @@ SQLITE_UPDATE: Final[int]
 adapters: dict[tuple[type[Any], type[Any]], _Adapter[Any]]
 converters: dict[str, _Converter]
 sqlite_version: str
-version: str
+
+if sys.version_info < (3, 14):
+    # Deprecated in 3.12, removed in 3.14.
+    version: str
 
 if sys.version_info >= (3, 11):
     SQLITE_ABORT: Final[int]

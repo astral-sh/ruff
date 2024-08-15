@@ -5,7 +5,7 @@ from _typeshed import DataclassInstance
 from builtins import type as Type  # alias to avoid name clashes with fields named "type"
 from collections.abc import Callable, Iterable, Mapping
 from typing import Any, Generic, Literal, Protocol, TypeVar, overload
-from typing_extensions import TypeAlias, TypeIs
+from typing_extensions import Never, TypeAlias, TypeIs
 
 if sys.version_info >= (3, 9):
     from types import GenericAlias
@@ -213,6 +213,10 @@ else:
     ) -> Any: ...
 
 def fields(class_or_instance: DataclassInstance | type[DataclassInstance]) -> tuple[Field[Any], ...]: ...
+
+# HACK: `obj: Never` typing matches if object argument is using `Any` type.
+@overload
+def is_dataclass(obj: Never) -> TypeIs[DataclassInstance | type[DataclassInstance]]: ...  # type: ignore[narrowed-type-not-subtype]  # pyright: ignore[reportGeneralTypeIssues]
 @overload
 def is_dataclass(obj: type) -> TypeIs[type[DataclassInstance]]: ...
 @overload

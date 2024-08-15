@@ -6,7 +6,7 @@ from ..pytree import Node
 
 class FixUnicode(fixer_base.BaseFix):
     BM_compatible: ClassVar[Literal[True]]
-    PATTERN: ClassVar[Literal["STRING | 'unicode' | 'unichr'"]]  # type: ignore[name-defined]  # Name "STRING" is not defined
+    PATTERN: ClassVar[str]
     unicode_literals: bool
     def start_tree(self, tree: Node, filename: StrPath) -> None: ...
     def transform(self, node, results): ...
