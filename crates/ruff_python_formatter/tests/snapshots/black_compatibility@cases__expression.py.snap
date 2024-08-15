@@ -266,7 +266,17 @@ last_call()
 ```diff
 --- Black
 +++ Ruff
-@@ -115,7 +115,7 @@
+@@ -101,7 +101,8 @@
+ {a: b * -2 for a, b in dictionary.items()}
+ {
+     k: v
+-    for k, v in this_is_a_very_long_variable_which_will_cause_a_trailing_comma_which_breaks_the_comprehension
++    for k, v
++    in this_is_a_very_long_variable_which_will_cause_a_trailing_comma_which_breaks_the_comprehension
+ }
+ Python3 > Python2 > COBOL
+ Life is Life
+@@ -115,7 +116,7 @@
      arg,
      another,
      kwarg="hey",
@@ -383,7 +393,8 @@ str or None if (1 if True else 2) else str or bytes or None
 {a: b * -2 for a, b in dictionary.items()}
 {
     k: v
-    for k, v in this_is_a_very_long_variable_which_will_cause_a_trailing_comma_which_breaks_the_comprehension
+    for k, v
+    in this_is_a_very_long_variable_which_will_cause_a_trailing_comma_which_breaks_the_comprehension
 }
 Python3 > Python2 > COBOL
 Life is Life
@@ -1028,5 +1039,3 @@ bbbb >> bbbb * bbbb
 last_call()
 # standalone comment at ENDMARKER
 ```
-
-

@@ -198,7 +198,8 @@ query = {
 
 {
     a: a  # a
-    for c in e  # for  # c  # in  # e
+    for c  # for  # c
+    in e  # in  # e
 }
 
 {
@@ -232,7 +233,8 @@ query = {
     for ccccccccccccccccccccccccccccccccccccccc, ddddddddddddddddddd, [
         eeeeeeeeeeeeeeeeeeeeee,
         fffffffffffffffffffffffff,
-    ] in eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeffffffffffffffffffffffffggggggggggggggggggggghhhhhhhhhhhhhhothermoreeand_even_moreddddddddddddddddddddd
+    ]
+    in eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeffffffffffffffffffffffffggggggggggggggggggggghhhhhhhhhhhhhhothermoreeand_even_moreddddddddddddddddddddd
     if fffffffffffffffffffffffffffffffffffffffffff
     < gggggggggggggggggggggggggggggggggggggggggggggg
     < hhhhhhhhhhhhhhhhhhhhhhhhhh
@@ -263,7 +265,8 @@ query = {
         a,
         a,
         a,
-    ] in this_is_a_very_long_variable_which_will_cause_a_trailing_comma_which_breaks_the_comprehension
+    ]
+    in this_is_a_very_long_variable_which_will_cause_a_trailing_comma_which_breaks_the_comprehension
 }
 {
     k: v
@@ -288,7 +291,8 @@ query = {
         a,
         a,
         a,
-    ) in this_is_a_very_long_variable_which_will_cause_a_trailing_comma_which_breaks_the_comprehension
+    )
+    in this_is_a_very_long_variable_which_will_cause_a_trailing_comma_which_breaks_the_comprehension
 }
 
 # Leading
@@ -315,7 +319,8 @@ query = {
         a,
         a,
         a,  # Trailing
-    ) in this_is_a_very_long_variable_which_will_cause_a_trailing_comma_which_breaks_the_comprehension  # Trailing
+    )
+    in this_is_a_very_long_variable_which_will_cause_a_trailing_comma_which_breaks_the_comprehension  # Trailing
 }  # Trailing
 # Trailing
 
@@ -336,7 +341,8 @@ selected_choices = {
     for (  # foo
         x,
         aaaayaaaayaaaayaaaayaaaayaaaayaaaayaaaayaaaayaaaayaaaayaaaayaaaayaaaay,
-    ) in z
+    )
+    in z
 }
 
 a = {
@@ -403,6 +409,3 @@ query = {
     for key, queries in self._filters.items()
 }
 ```
-
-
-

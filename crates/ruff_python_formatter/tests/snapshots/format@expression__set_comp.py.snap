@@ -74,7 +74,8 @@ selected_choices = {
 
 {
     a  # a
-    for c in e  # for  # c  # in  # e
+    for c  # for  # c
+    in e  # in  # e
 }
 
 {
@@ -105,7 +106,8 @@ selected_choices = {
     for ccccccccccccccccccccccccccccccccccccccc, ddddddddddddddddddd, [
         eeeeeeeeeeeeeeeeeeeeee,
         fffffffffffffffffffffffff,
-    ] in eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeffffffffffffffffffffffffggggggggggggggggggggghhhhhhhhhhhhhhothermoreeand_even_moreddddddddddddddddddddd
+    ]
+    in eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeffffffffffffffffffffffffggggggggggggggggggggghhhhhhhhhhhhhhothermoreeand_even_moreddddddddddddddddddddd
     if fffffffffffffffffffffffffffffffffffffffffff
     < gggggggggggggggggggggggggggggggggggggggggggggg
     < hhhhhhhhhhhhhhhhhhhhhhhhhh
@@ -123,6 +125,3 @@ selected_choices = {
     if str(v) not in self.choices.field.empty_values
 }
 ```
-
-
-

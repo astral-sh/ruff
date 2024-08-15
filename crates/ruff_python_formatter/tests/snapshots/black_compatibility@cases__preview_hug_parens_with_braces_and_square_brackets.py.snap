@@ -373,7 +373,7 @@ for foo in ["a", "b"]:
  
  func(
      [
-@@ -114,13 +140,15 @@
+@@ -114,13 +140,16 @@
  func(
      [x for x in "long line long line long line long line long line long line long line"]
  )
@@ -386,7 +386,8 @@ for foo in ["a", "b"]:
 -        for x in "long line long line long line long line long line long line long line"
 +        for x in [
 +            x
-+            for x in "long line long line long line long line long line long line long line"
++            for x
++            in "long line long line long line long line long line long line long line"
 +        ]
      ]
 -])
@@ -394,7 +395,7 @@ for foo in ["a", "b"]:
  
  foooooooooooooooooooo(
      [{c: n + 1 for c in range(256)} for n in range(100)] + [{}], {size}
-@@ -131,10 +159,12 @@
+@@ -131,10 +160,12 @@
  )
  
  nested_mapping = {
@@ -411,7 +412,7 @@ for foo in ["a", "b"]:
  }
  explicit_exploding = [
      [
-@@ -144,24 +174,34 @@
+@@ -144,24 +175,34 @@
          ],
      ],
  ]
@@ -461,7 +462,7 @@ for foo in ["a", "b"]:
  
  # Edge case when deciding whether to hug the brackets without inner content.
  very_very_very_long_variable = very_very_very_long_module.VeryVeryVeryVeryLongClassName(
-@@ -169,11 +209,13 @@
+@@ -169,11 +210,14 @@
  )
  
  for foo in ["a", "b"]:
@@ -478,7 +479,8 @@ for foo in ["a", "b"]:
 +            individual
 +            for
 +            # Foobar
-+            container in xs_by_y[foo]
++            container
++            in xs_by_y[foo]
 +            # Foobar
 +            for individual in container["nested"]
 +        ]
@@ -635,7 +637,8 @@ func(
         x
         for x in [
             x
-            for x in "long line long line long line long line long line long line long line"
+            for x
+            in "long line long line long line long line long line long line long line"
         ]
     ]
 )
@@ -704,7 +707,8 @@ for foo in ["a", "b"]:
             individual
             for
             # Foobar
-            container in xs_by_y[foo]
+            container
+            in xs_by_y[foo]
             # Foobar
             for individual in container["nested"]
         ]

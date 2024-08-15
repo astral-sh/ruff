@@ -189,7 +189,8 @@ y = [
 
 [
     a  # a
-    for c in e  # for  # c  # in  # e
+    for c  # for  # c
+    in e  # in  # e
 ]
 
 [
@@ -220,7 +221,8 @@ y = [
     for ccccccccccccccccccccccccccccccccccccccc, ddddddddddddddddddd, [
         eeeeeeeeeeeeeeeeeeeeee,
         fffffffffffffffffffffffff,
-    ] in eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeffffffffffffffffffffffffggggggggggggggggggggghhhhhhhhhhhhhhothermoreeand_even_moreddddddddddddddddddddd
+    ]
+    in eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeffffffffffffffffffffffffggggggggggggggggggggghhhhhhhhhhhhhhothermoreeand_even_moreddddddddddddddddddddd
     if fffffffffffffffffffffffffffffffffffffffffff
     < gggggggggggggggggggggggggggggggggggggggggggggg
     < hhhhhhhhhhhhhhhhhhhhhhhhhh
@@ -304,7 +306,8 @@ aaaaaaaaaaaaaaaaaaaaa = [
     for (
         x,
         y,
-    ) in z
+    )
+    in z
     if head_name
 ]
 
@@ -326,7 +329,8 @@ y = [
     (
         # comment
         a
-    ) in
+    )
+    in
     (
         # comment
         x
@@ -350,7 +354,8 @@ y = [
     a
     for
     # comment
-    a, b in x
+    a, b
+    in x
     if True
 ]
 
@@ -361,7 +366,8 @@ y = [
         # comment
         a,
         b,
-    ) in x
+    )
+    in x
     if True
 ]
 
@@ -370,7 +376,8 @@ y = [
     a
     for
     # comment
-    a in
+    a
+    in
     # comment
     x
     if
@@ -388,7 +395,7 @@ y = [
 ```diff
 --- Stable
 +++ Preview
-@@ -142,24 +142,20 @@
+@@ -145,25 +145,21 @@
  # Leading expression comments:
  y = [
      a
@@ -397,9 +404,10 @@ y = [
 +    for (
          # comment
          a
--    ) in
+     )
+-    in
 -    (
-+    ) in (
++    in (
          # comment
          x
      )

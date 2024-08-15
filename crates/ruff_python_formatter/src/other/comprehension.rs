@@ -84,13 +84,13 @@ impl FormatNodeRule<Comprehension> for FormatComprehension {
         let (trailing_in_comments, dangling_if_comments) = dangling_comments
             .split_at(dangling_comments.partition_point(|comment| comment.start() < iter.start()));
 
-        let in_spacer = format_with(|f| {
-            if before_in_comments.is_empty() {
-                space().fmt(f)
-            } else {
-                soft_line_break_or_space().fmt(f)
-            }
-        });
+        // let in_spacer = format_with(|f| {
+        //     // if before_in_comments.is_empty() {
+        //     //     space().fmt(f)
+        //     // } else {
+        //     soft_line_break_or_space().fmt(f)
+        //     // }
+        // });
 
         write!(
             f,
@@ -101,10 +101,12 @@ impl FormatNodeRule<Comprehension> for FormatComprehension {
                     expression: target,
                     preserve_parentheses: !target.is_tuple_expr()
                 },
-                ExprTupleWithoutParentheses(target),
-                in_spacer,
-                leading_comments(before_in_comments),
-                token("in"),
+                group(&format_args![
+                    ExprTupleWithoutParentheses(target),
+                    soft_line_break_or_space(),
+                    leading_comments(before_in_comments),
+                    token("in"),
+                ]),
                 trailing_comments(trailing_in_comments),
                 Spacer {
                     expression: iter,
