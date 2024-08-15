@@ -13,6 +13,7 @@ use super::typeshed::{typeshed_versions, TypeshedVersionsParseError, TypeshedVer
 use crate::db::Db;
 use crate::module_name::ModuleName;
 use crate::module_resolver::resolver::ResolverContext;
+use crate::site_packages::SitePackagesDiscoveryError;
 
 /// A path that points to a Python module.
 ///
@@ -310,6 +311,9 @@ pub(crate) enum SearchPathValidationError {
     /// and a `stdlib/VERSIONS` file exists, but it fails to parse.
     /// (This is only relevant for stdlib search paths.)
     VersionsParseError(TypeshedVersionsParseError),
+
+    /// Failed to discover the site packages for the configured virtual environment.
+    SitePackagesDiscovery(SitePackagesDiscoveryError),
 }
 
 impl fmt::Display for SearchPathValidationError {
@@ -323,6 +327,9 @@ impl fmt::Display for SearchPathValidationError {
                 write!(f, "Failed to read the '{path}' file: {error}")
             }
             Self::VersionsParseError(underlying_error) => underlying_error.fmt(f),
+            SearchPathValidationError::SitePackagesDiscovery(error) => {
+                write!(f, "Failed to discover the site packages: {error}")
+            }
         }
     }
 }
@@ -334,6 +341,18 @@ impl std::error::Error for SearchPathValidationError {
         } else {
             None
         }
+    }
+}
+
+impl From<TypeshedVersionsParseError> for SearchPathValidationError {
+    fn from(value: TypeshedVersionsParseError) -> Self {
+        Self::VersionsParseError(value)
+    }
+}
+
+impl From<SitePackagesDiscoveryError> for SearchPathValidationError {
+    fn from(value: SitePackagesDiscoveryError) -> Self {
+        Self::SitePackagesDiscovery(value)
     }
 }
 

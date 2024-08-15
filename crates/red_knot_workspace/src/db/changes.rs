@@ -8,15 +8,15 @@ use rustc_hash::FxHashSet;
 use crate::db::RootDatabase;
 use crate::watch;
 use crate::watch::{CreatedKind, DeletedKind};
-use crate::workspace::settings::WorkspaceConfigurationTransformer;
+use crate::workspace::settings::Configuration;
 use crate::workspace::WorkspaceMetadata;
 
 impl RootDatabase {
-    #[tracing::instrument(level = "debug", skip(self, changes, transformer))]
+    #[tracing::instrument(level = "debug", skip(self, changes, base_configuration))]
     pub fn apply_changes(
         &mut self,
         changes: Vec<watch::ChangeEvent>,
-        transformer: &dyn WorkspaceConfigurationTransformer,
+        base_configuration: Option<&Configuration>,
     ) {
         let workspace = self.workspace();
         let workspace_path = workspace.root(self).to_path_buf();
@@ -139,7 +139,11 @@ impl RootDatabase {
         }
 
         if workspace_change {
-            match WorkspaceMetadata::from_path(&workspace_path, self.system(), transformer) {
+            match WorkspaceMetadata::from_path(
+                &workspace_path,
+                self.system(),
+                base_configuration.cloned(),
+            ) {
                 Ok(metadata) => {
                     tracing::debug!("Reloading workspace after structural change.");
                     // TODO: Handle changes in the program settings.
@@ -154,15 +158,9 @@ impl RootDatabase {
         } else if custom_stdlib_change {
             let search_path_configuration = workspace.search_path_configuration(self);
 
-            match search_path_configuration.to_settings(&workspace_path, self.system()) {
-                Ok(search_path_settings) => {
-                    if let Err(error) = program.update_search_paths(self, search_path_settings) {
-                        tracing::error!("Failed to apply to set the new search paths: {error}");
-                    }
-                }
-                Err(error) => {
-                    tracing::error!("Failed to resolve the search path settings: {error}.");
-                }
+            let search_path_settings = search_path_configuration.to_settings(&workspace_path);
+            if let Err(error) = program.update_search_paths(self, search_path_settings) {
+                tracing::error!("Failed to apply to set the new search paths: {error}");
             }
         }
 

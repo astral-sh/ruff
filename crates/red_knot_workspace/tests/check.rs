@@ -13,7 +13,7 @@ use ruff_python_ast::visitor::source_order::SourceOrderVisitor;
 
 fn setup_db(workspace_root: &SystemPath) -> anyhow::Result<RootDatabase> {
     let system = OsSystem::new(workspace_root);
-    let workspace = WorkspaceMetadata::from_path(workspace_root, &system, &())?;
+    let workspace = WorkspaceMetadata::from_path(workspace_root, &system, None)?;
     RootDatabase::new(workspace, system)
 }
 

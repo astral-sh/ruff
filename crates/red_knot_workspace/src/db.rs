@@ -30,9 +30,7 @@ impl RootDatabase {
     where
         S: System + 'static + Send + Sync + RefUnwindSafe,
     {
-        let program_settings = workspace
-            .configuration()
-            .to_program_settings(workspace.root(), &system)?;
+        let program_settings = workspace.to_program_settings(workspace.root());
 
         let mut db = Self {
             workspace: None,

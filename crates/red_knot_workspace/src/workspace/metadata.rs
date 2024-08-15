@@ -1,4 +1,5 @@
-use crate::workspace::settings::{WorkspaceConfiguration, WorkspaceConfigurationTransformer};
+use crate::workspace::settings::Configuration;
+use red_knot_python_semantic::ProgramSettings;
 use ruff_db::system::{System, SystemPath, SystemPathBuf};
 use ruff_python_ast::name::Name;
 
@@ -9,7 +10,7 @@ pub struct WorkspaceMetadata {
     /// The (first-party) packages in this workspace.
     pub(super) packages: Vec<PackageMetadata>,
 
-    pub(super) configuration: WorkspaceConfiguration,
+    pub(super) configuration: Configuration,
 }
 
 /// A first-party package in a workspace.
@@ -27,7 +28,7 @@ impl WorkspaceMetadata {
     pub fn from_path(
         path: &SystemPath,
         system: &dyn System,
-        transformer: &dyn WorkspaceConfigurationTransformer,
+        base_configuration: Option<Configuration>,
     ) -> anyhow::Result<WorkspaceMetadata> {
         assert!(
             system.is_directory(path),
@@ -45,10 +46,18 @@ impl WorkspaceMetadata {
             root: root.clone(),
         };
 
+        let mut configuration = Configuration::default();
+
+        if let Some(base_configuration) = base_configuration {
+            configuration.extend(base_configuration);
+        }
+
+        // TODO store settings instead of configuration?
+
         let workspace = WorkspaceMetadata {
             root,
             packages: vec![package],
-            configuration: transformer.transform(WorkspaceConfiguration::default()),
+            configuration,
         };
 
         Ok(workspace)
@@ -62,8 +71,18 @@ impl WorkspaceMetadata {
         &self.packages
     }
 
-    pub fn configuration(&self) -> &WorkspaceConfiguration {
+    pub fn configuration(&self) -> &Configuration {
         &self.configuration
+    }
+
+    pub fn to_program_settings(&self, workspace_root: &SystemPath) -> ProgramSettings {
+        let search_path_settings = self.configuration.search_paths.to_settings(workspace_root);
+
+        ProgramSettings {
+            // TODO: Resolve the target version across all packages.
+            target_version: self.configuration.target_version.unwrap_or_default(),
+            search_paths: search_path_settings,
+        }
     }
 }
 

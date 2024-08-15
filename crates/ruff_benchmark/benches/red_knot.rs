@@ -3,7 +3,7 @@
 use red_knot_python_semantic::PythonVersion;
 use red_knot_workspace::db::RootDatabase;
 use red_knot_workspace::watch::{ChangedKind, ChangeEvent};
-use red_knot_workspace::workspace::settings::WorkspaceConfiguration;
+use red_knot_workspace::workspace::settings::Configuration;
 use red_knot_workspace::workspace::WorkspaceMetadata;
 use ruff_benchmark::criterion::{BatchSize, Criterion, criterion_group, criterion_main};
 use ruff_benchmark::TestFile;
@@ -90,10 +90,10 @@ fn setup_case() -> Case {
     let metadata = WorkspaceMetadata::from_path(
         src_root,
         &system,
-        &|mut configuration: WorkspaceConfiguration| {
-            configuration.target_version = Some(PythonVersion::PY312);
-            configuration
-        },
+        Some(Configuration {
+            target_version: Some(PythonVersion::PY312),
+            ..Configuration::default()
+        }),
     )
     .unwrap();
 

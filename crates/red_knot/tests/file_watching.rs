@@ -5,18 +5,16 @@ use std::time::Duration;
 
 use anyhow::{anyhow, Context};
 
-use red_knot_python_semantic::{resolve_module, ModuleName, Program, PythonVersion};
+use red_knot_python_semantic::{resolve_module, ModuleName, Program, PythonVersion, SitePackages};
 use red_knot_workspace::db::RootDatabase;
 use red_knot_workspace::watch;
 use red_knot_workspace::watch::{directory_watcher, WorkspaceWatcher};
-use red_knot_workspace::workspace::settings::{
-    SearchPathConfiguration, SitePackages, WorkspaceConfiguration,
-};
+use red_knot_workspace::workspace::settings::{Configuration, SearchPathConfiguration};
 use red_knot_workspace::workspace::WorkspaceMetadata;
 use ruff_db::files::{system_path_to_file, File, FileError};
 use ruff_db::source::source_text;
 use ruff_db::system::{OsSystem, SystemPath, SystemPathBuf};
-use ruff_db::{Db, Upcast};
+use ruff_db::Upcast;
 
 struct TestCase {
     db: RootDatabase,
@@ -26,7 +24,7 @@ struct TestCase {
     /// We need to hold on to it in the test case or the temp files get deleted.
     _temp_dir: tempfile::TempDir,
     root_dir: SystemPathBuf,
-    search_path_configuration: SearchPathConfiguration,
+    configuration: Configuration,
 }
 
 impl TestCase {
@@ -103,12 +101,7 @@ impl TestCase {
     }
 
     fn apply_changes(&mut self, changes: Vec<watch::ChangeEvent>) {
-        self.db
-            .apply_changes(changes, &|mut configuration: WorkspaceConfiguration| {
-                configuration.target_version = Some(PythonVersion::PY312);
-                configuration.search_paths = self.search_path_configuration.clone();
-                configuration
-            });
+        self.db.apply_changes(changes, Some(&self.configuration));
     }
 
     fn update_search_path_settings(
@@ -117,11 +110,10 @@ impl TestCase {
     ) -> anyhow::Result<()> {
         let program = Program::get(self.db());
 
-        let new_settings =
-            configuration.to_settings(self.db.workspace().root(&self.db), self.db.system())?;
+        let new_settings = configuration.to_settings(self.db.workspace().root(&self.db));
+        self.configuration.search_paths = configuration;
 
         program.update_search_paths(&mut self.db, new_settings)?;
-        self.search_path_configuration = configuration;
 
         if let Some(watcher) = &mut self.watcher {
             watcher.update(&self.db);
@@ -225,39 +217,32 @@ where
 
     let system = OsSystem::new(&workspace_path);
 
-    let search_path_configuration = create_search_paths(&root_path, &workspace_path);
+    let search_paths = create_search_paths(&root_path, &workspace_path);
 
-    let workspace = WorkspaceMetadata::from_path(
-        &workspace_path,
-        &system,
-        &|mut configuration: WorkspaceConfiguration| {
-            configuration.target_version = Some(PythonVersion::PY312);
-            configuration.search_paths = search_path_configuration.clone();
-            configuration
-        },
-    )?;
-
-    for path in search_path_configuration
+    for path in search_paths
         .extra_paths
         .iter()
         .flatten()
-        .chain(search_path_configuration.custom_typeshed.iter())
-        .chain(
-            search_path_configuration
-                .site_packages
-                .as_ref()
-                .and_then(|site_packages| {
-                    if let SitePackages::Known(path) = site_packages {
-                        Some(path)
-                    } else {
-                        None
-                    }
-                }),
-        )
+        .chain(search_paths.custom_typeshed.iter())
+        .chain(search_paths.site_packages.iter().flat_map(|site_packages| {
+            if let SitePackages::Known(path) = site_packages {
+                path.as_slice()
+            } else {
+                &[]
+            }
+        }))
     {
         std::fs::create_dir_all(path.as_std_path())
             .with_context(|| format!("Failed to create search path '{path}'"))?;
     }
+
+    let configuration = Configuration {
+        target_version: Some(PythonVersion::PY312),
+        search_paths,
+    };
+
+    let workspace =
+        WorkspaceMetadata::from_path(&workspace_path, &system, Some(configuration.clone()))?;
 
     let db = RootDatabase::new(workspace, system)?;
 
@@ -274,7 +259,7 @@ where
         watcher: Some(watcher),
         _temp_dir: temp_dir,
         root_dir: root_path,
-        search_path_configuration,
+        configuration,
     };
 
     // Sometimes the file watcher reports changes for events that happened before the watcher was started.
@@ -717,7 +702,7 @@ fn search_path() -> anyhow::Result<()> {
     let mut case = setup_with_search_paths(
         [("bar.py", "import sub.a")],
         |root_path, _workspace_path| SearchPathConfiguration {
-            site_packages: Some(SitePackages::Known(root_path.join("site_packages"))),
+            site_packages: Some(SitePackages::Known(vec![root_path.join("site_packages")])),
             ..SearchPathConfiguration::default()
         },
     )?;
@@ -755,7 +740,7 @@ fn add_search_path() -> anyhow::Result<()> {
 
     // Register site-packages as a search path.
     case.update_search_path_settings(SearchPathConfiguration {
-        site_packages: Some(SitePackages::Known(site_packages.clone())),
+        site_packages: Some(SitePackages::Known(vec![site_packages.clone()])),
         ..SearchPathConfiguration::default()
     })
     .expect("Search path settings to be valid");
@@ -776,7 +761,7 @@ fn remove_search_path() -> anyhow::Result<()> {
     let mut case = setup_with_search_paths(
         [("bar.py", "import sub.a")],
         |root_path, _workspace_path| SearchPathConfiguration {
-            site_packages: Some(SitePackages::Known(root_path.join("site_packages"))),
+            site_packages: Some(SitePackages::Known(vec![root_path.join("site_packages")])),
             ..SearchPathConfiguration::default()
         },
     )?;
@@ -1235,9 +1220,9 @@ mod unix {
                 Ok(())
             },
             |_root, workspace| SearchPathConfiguration {
-                site_packages: Some(SitePackages::Known(
-                    workspace.join(".venv/lib/python3.12/site-packages"),
-                )),
+                site_packages: Some(SitePackages::Known(vec![
+                    workspace.join(".venv/lib/python3.12/site-packages")
+                ])),
                 ..SearchPathConfiguration::default()
             },
         )?;

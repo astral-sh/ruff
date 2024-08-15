@@ -1,12 +1,18 @@
-use red_knot_python_semantic::{ProgramSettings, PythonVersion, SearchPathSettings};
-use ruff_db::system::{System, SystemPath, SystemPathBuf};
-
-use crate::site_packages::VirtualEnvironment;
+use red_knot_python_semantic::{PythonVersion, SearchPathSettings, SitePackages};
+use ruff_db::system::{SystemPath, SystemPathBuf};
 
 #[derive(Debug, Default, Clone)]
-pub struct WorkspaceConfiguration {
+pub struct Configuration {
     pub target_version: Option<PythonVersion>,
     pub search_paths: SearchPathConfiguration,
+}
+
+impl Configuration {
+    /// Extends this configuration by using the values from `with` for all values that are absent in `self`.
+    pub fn extend(&mut self, with: Configuration) {
+        self.target_version = self.target_version.or(with.target_version);
+        self.search_paths.extend(with.search_paths);
+    }
 }
 
 #[derive(Debug, Default, Clone, Eq, PartialEq)]
@@ -28,48 +34,14 @@ pub struct SearchPathConfiguration {
     pub site_packages: Option<SitePackages>,
 }
 
-#[derive(Debug, Clone, Eq, PartialEq)]
-pub enum SitePackages {
-    Derived {
-        venv_path: SystemPathBuf,
-    },
-    /// Resolved site packages path for testing only
-    Known(SystemPathBuf),
-}
-
-impl WorkspaceConfiguration {
-    pub fn to_program_settings(
-        &self,
-        workspace_root: &SystemPath,
-        system: &dyn System,
-    ) -> anyhow::Result<ProgramSettings> {
-        let search_path_settings = self.search_paths.to_settings(workspace_root, system)?;
-
-        Ok(ProgramSettings {
-            target_version: self.target_version.unwrap_or_default(),
-            search_paths: search_path_settings,
-        })
-    }
-}
-
 impl SearchPathConfiguration {
-    pub fn to_settings(
-        &self,
-        workspace_root: &SystemPath,
-        system: &dyn System,
-    ) -> anyhow::Result<SearchPathSettings> {
+    pub fn to_settings(&self, workspace_root: &SystemPath) -> SearchPathSettings {
         let site_packages = self
             .site_packages
-            .as_ref()
-            .map(|site_packages| match site_packages {
-                SitePackages::Derived { venv_path } => VirtualEnvironment::new(venv_path, system)
-                    .and_then(|venv| venv.site_packages_directories(system)),
-                SitePackages::Known(path) => Ok(vec![path.clone()]),
-            })
-            .transpose()?
-            .unwrap_or_default();
+            .clone()
+            .unwrap_or(SitePackages::Known(vec![]));
 
-        Ok(SearchPathSettings {
+        SearchPathSettings {
             extra_paths: self.extra_paths.clone().unwrap_or_default(),
             src_root: self
                 .src_root
@@ -77,25 +49,21 @@ impl SearchPathConfiguration {
                 .unwrap_or_else(|| workspace_root.to_path_buf()),
             custom_typeshed: self.custom_typeshed.clone(),
             site_packages,
-        })
+        }
     }
-}
 
-pub trait WorkspaceConfigurationTransformer {
-    fn transform(&self, workspace_configuration: WorkspaceConfiguration) -> WorkspaceConfiguration;
-}
-
-impl WorkspaceConfigurationTransformer for () {
-    fn transform(&self, workspace_configuration: WorkspaceConfiguration) -> WorkspaceConfiguration {
-        workspace_configuration
-    }
-}
-
-impl<T> WorkspaceConfigurationTransformer for T
-where
-    T: Fn(WorkspaceConfiguration) -> WorkspaceConfiguration,
-{
-    fn transform(&self, workspace_configuration: WorkspaceConfiguration) -> WorkspaceConfiguration {
-        self(workspace_configuration)
+    pub fn extend(&mut self, with: SearchPathConfiguration) {
+        if let Some(extra_paths) = with.extra_paths {
+            self.extra_paths.get_or_insert(extra_paths);
+        }
+        if let Some(src_root) = with.src_root {
+            self.src_root.get_or_insert(src_root);
+        }
+        if let Some(custom_typeshed) = with.custom_typeshed {
+            self.custom_typeshed.get_or_insert(custom_typeshed);
+        }
+        if let Some(site_packages) = with.site_packages {
+            self.site_packages.get_or_insert(site_packages);
+        }
     }
 }

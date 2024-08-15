@@ -4,7 +4,7 @@ use ruff_db::vendored::VendoredPathBuf;
 use crate::db::tests::TestDb;
 use crate::program::{Program, SearchPathSettings};
 use crate::python_version::PythonVersion;
-use crate::ProgramSettings;
+use crate::{ProgramSettings, SitePackages};
 
 /// A test case for the module resolver.
 ///
@@ -231,7 +231,7 @@ impl TestCaseBuilder<MockedTypeshed> {
                     extra_paths: vec![],
                     src_root: src.clone(),
                     custom_typeshed: Some(typeshed.clone()),
-                    site_packages: vec![site_packages.clone()],
+                    site_packages: SitePackages::Known(vec![site_packages.clone()]),
                 },
             },
         )
@@ -284,10 +284,9 @@ impl TestCaseBuilder<VendoredTypeshed> {
             ProgramSettings {
                 target_version,
                 search_paths: SearchPathSettings {
-                    extra_paths: vec![],
                     src_root: src.clone(),
-                    custom_typeshed: None,
-                    site_packages: vec![site_packages.clone()],
+                    site_packages: SitePackages::Known(vec![site_packages.clone()]),
+                    ..SearchPathSettings::new(src.clone())
                 },
             },
         )

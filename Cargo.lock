@@ -1935,6 +1935,7 @@ dependencies = [
  "smallvec",
  "static_assertions",
  "tempfile",
+ "thiserror",
  "tracing",
  "walkdir",
  "zip",

@@ -7,14 +7,12 @@ use colored::Colorize;
 use crossbeam::channel as crossbeam_channel;
 use salsa::plumbing::ZalsaDatabase;
 
-use red_knot_python_semantic::PythonVersion;
+use red_knot_python_semantic::SitePackages;
 use red_knot_server::run_server;
 use red_knot_workspace::db::RootDatabase;
 use red_knot_workspace::watch;
 use red_knot_workspace::watch::WorkspaceWatcher;
-use red_knot_workspace::workspace::settings::{
-    SitePackages, WorkspaceConfiguration, WorkspaceConfigurationTransformer,
-};
+use red_knot_workspace::workspace::settings::Configuration;
 use red_knot_workspace::workspace::WorkspaceMetadata;
 use ruff_db::system::{OsSystem, System, SystemPath, SystemPathBuf};
 use target_version::TargetVersion;
@@ -87,6 +85,36 @@ to resolve type information for the project's third-party dependencies.",
     watch: bool,
 }
 
+impl Args {
+    fn to_configuration(&self, cli_cwd: &SystemPath) -> Configuration {
+        let mut configuration = Configuration::default();
+
+        if let Some(target_version) = self.target_version {
+            configuration.target_version = Some(target_version.into());
+        }
+
+        if let Some(venv_path) = &self.venv_path {
+            configuration.search_paths.site_packages = Some(SitePackages::Derived {
+                venv_path: SystemPath::absolute(venv_path, cli_cwd),
+            });
+        }
+
+        if let Some(custom_typeshed_dir) = &self.custom_typeshed_dir {
+            configuration.search_paths.custom_typeshed =
+                Some(SystemPath::absolute(custom_typeshed_dir, cli_cwd));
+        }
+
+        if let Some(extra_search_paths) = &self.extra_search_path {
+            configuration.search_paths.extra_paths = extra_search_paths
+                .iter()
+                .map(|path| Some(SystemPath::absolute(path, cli_cwd)))
+                .collect();
+        }
+
+        configuration
+    }
+}
+
 #[derive(Debug, clap::Subcommand)]
 pub enum Command {
     /// Start the language server
@@ -154,15 +182,18 @@ fn run() -> anyhow::Result<ExitStatus> {
         .unwrap_or_else(|| cli_base_path.clone());
 
     let system = OsSystem::new(cwd.clone());
-    let transformer = CliConfigurationTransformer::from_cli_arguments(&args, &cli_base_path);
-    let workspace_metadata =
-        WorkspaceMetadata::from_path(system.current_directory(), &system, &transformer)?;
+    let cli_configuration = args.to_configuration(&cwd);
+    let workspace_metadata = WorkspaceMetadata::from_path(
+        system.current_directory(),
+        &system,
+        Some(cli_configuration.clone()),
+    )?;
 
     // TODO: Use the `program_settings` to compute the key for the database's persistent
     //   cache and load the cache if it exists.
     let mut db = RootDatabase::new(workspace_metadata, system)?;
 
-    let (main_loop, main_loop_cancellation_token) = MainLoop::new(transformer);
+    let (main_loop, main_loop_cancellation_token) = MainLoop::new(cli_configuration);
 
     // Listen to Ctrl+C and abort the watch mode.
     let main_loop_cancellation_token = Mutex::new(Some(main_loop_cancellation_token));
@@ -215,13 +246,11 @@ struct MainLoop {
     /// The file system watcher, if running in watch mode.
     watcher: Option<WorkspaceWatcher>,
 
-    configuration_transformer: CliConfigurationTransformer,
+    cli_configuration: Configuration,
 }
 
 impl MainLoop {
-    fn new(
-        configuration_transformer: CliConfigurationTransformer,
-    ) -> (Self, MainLoopCancellationToken) {
+    fn new(cli_configuration: Configuration) -> (Self, MainLoopCancellationToken) {
         let (sender, receiver) = crossbeam_channel::bounded(10);
 
         (
@@ -229,7 +258,7 @@ impl MainLoop {
                 sender: sender.clone(),
                 receiver,
                 watcher: None,
-                configuration_transformer,
+                cli_configuration,
             },
             MainLoopCancellationToken { sender },
         )
@@ -312,7 +341,7 @@ impl MainLoop {
                 MainLoopMessage::ApplyChanges(changes) => {
                     revision += 1;
                     // Automatically cancels any pending queries and waits for them to complete.
-                    db.apply_changes(changes, &self.configuration_transformer);
+                    db.apply_changes(changes, Some(&self.cli_configuration));
                     if let Some(watcher) = self.watcher.as_mut() {
                         watcher.update(db);
                     }
@@ -352,70 +381,4 @@ enum MainLoopMessage {
     CheckCompleted { result: Vec<String>, revision: u64 },
     ApplyChanges(Vec<watch::ChangeEvent>),
     Exit,
-}
-
-#[derive(Debug, Default)]
-struct CliConfigurationTransformer {
-    venv_path: Option<SystemPathBuf>,
-    custom_typeshed_dir: Option<SystemPathBuf>,
-    extra_search_paths: Option<Vec<SystemPathBuf>>,
-    target_version: Option<PythonVersion>,
-}
-
-impl CliConfigurationTransformer {
-    fn from_cli_arguments(arguments: &Args, cli_cwd: &SystemPath) -> Self {
-        let Args {
-            venv_path,
-            custom_typeshed_dir,
-            extra_search_path,
-            target_version,
-            ..
-        } = arguments;
-
-        let venv_path = venv_path
-            .as_deref()
-            .map(|path| SystemPath::absolute(path, cli_cwd));
-
-        let custom_typeshed_dir = custom_typeshed_dir
-            .as_deref()
-            .map(|path| SystemPath::absolute(path, cli_cwd));
-
-        let extra_search_paths = extra_search_path.as_deref().map(|paths| {
-            paths
-                .iter()
-                .map(|path| SystemPath::absolute(path, cli_cwd))
-                .collect()
-        });
-
-        Self {
-            venv_path,
-            custom_typeshed_dir,
-            extra_search_paths,
-            target_version: target_version.map(PythonVersion::from),
-        }
-    }
-}
-
-impl WorkspaceConfigurationTransformer for CliConfigurationTransformer {
-    fn transform(&self, mut configuration: WorkspaceConfiguration) -> WorkspaceConfiguration {
-        if let Some(venv_path) = &self.venv_path {
-            configuration.search_paths.site_packages = Some(SitePackages::Derived {
-                venv_path: venv_path.clone(),
-            });
-        }
-
-        if let Some(custom_typeshed_dir) = &self.custom_typeshed_dir {
-            configuration.search_paths.custom_typeshed = Some(custom_typeshed_dir.clone());
-        }
-
-        if let Some(extra_search_paths) = &self.extra_search_paths {
-            configuration.search_paths.extra_paths = Some(extra_search_paths.clone());
-        }
-
-        if let Some(target_version) = self.target_version {
-            configuration.target_version = Some(target_version);
-        }
-
-        configuration
-    }
 }

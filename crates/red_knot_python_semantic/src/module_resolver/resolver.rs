@@ -7,13 +7,13 @@ use ruff_db::files::{File, FilePath, FileRootKind};
 use ruff_db::system::{DirectoryEntry, System, SystemPath, SystemPathBuf};
 use ruff_db::vendored::{VendoredFileSystem, VendoredPath};
 
+use super::module::{Module, ModuleKind};
+use super::path::{ModulePath, SearchPath, SearchPathValidationError};
 use crate::db::Db;
 use crate::module_name::ModuleName;
 use crate::module_resolver::typeshed::{vendored_typeshed_versions, TypeshedVersions};
-use crate::{Program, PythonVersion, SearchPathSettings};
-
-use super::module::{Module, ModuleKind};
-use super::path::{ModulePath, SearchPath, SearchPathValidationError};
+use crate::site_packages::VirtualEnvironment;
+use crate::{Program, PythonVersion, SearchPathSettings, SitePackages};
 
 /// Resolves a module name to a module.
 pub fn resolve_module(db: &dyn Db, module_name: ModuleName) -> Option<Module> {
@@ -196,9 +196,7 @@ impl SearchPaths {
                 }
             })?;
 
-            let parsed: TypeshedVersions = versions_content
-                .parse()
-                .map_err(SearchPathValidationError::VersionsParseError)?;
+            let parsed: TypeshedVersions = versions_content.parse()?;
 
             let search_path = SearchPath::custom_stdlib(db, &custom_typeshed)?;
 
@@ -212,6 +210,12 @@ impl SearchPaths {
         };
 
         static_paths.push(stdlib_path);
+
+        let site_packages_paths = match site_packages_paths {
+            SitePackages::Derived { venv_path } => VirtualEnvironment::new(venv_path, system)
+                .and_then(|venv| venv.site_packages_directories(system))?,
+            SitePackages::Known(paths) => paths,
+        };
 
         let mut site_packages: Vec<_> = Vec::with_capacity(site_packages_paths.len());
 
@@ -1256,7 +1260,7 @@ mod tests {
                     extra_paths: vec![],
                     src_root: src.clone(),
                     custom_typeshed: Some(custom_typeshed.clone()),
-                    site_packages: vec![site_packages],
+                    site_packages: SitePackages::Known(vec![site_packages]),
                 },
             },
         )
@@ -1761,7 +1765,10 @@ not_a_directory
                     extra_paths: vec![],
                     src_root: SystemPathBuf::from("/src"),
                     custom_typeshed: None,
-                    site_packages: vec![venv_site_packages, system_site_packages],
+                    site_packages: SitePackages::Known(vec![
+                        venv_site_packages,
+                        system_site_packages,
+                    ]),
                 },
             },
         )

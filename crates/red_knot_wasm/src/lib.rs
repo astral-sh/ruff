@@ -4,7 +4,7 @@ use js_sys::Error;
 use wasm_bindgen::prelude::*;
 
 use red_knot_workspace::db::RootDatabase;
-use red_knot_workspace::workspace::settings::WorkspaceConfiguration;
+use red_knot_workspace::workspace::settings::Configuration;
 use red_knot_workspace::workspace::WorkspaceMetadata;
 use ruff_db::files::{system_path_to_file, File};
 use ruff_db::system::walk_directory::WalkDirectoryBuilder;
@@ -44,10 +44,10 @@ impl Workspace {
         let workspace = WorkspaceMetadata::from_path(
             SystemPath::new(root),
             &system,
-            &|mut configuration: WorkspaceConfiguration| {
-                configuration.target_version = Some(settings.target_version.into());
-                configuration
-            },
+            Some(Configuration {
+                target_version: Some(settings.target_version.into()),
+                ..Configuration::default()
+            }),
         )
         .map_err(into_error)?;
 

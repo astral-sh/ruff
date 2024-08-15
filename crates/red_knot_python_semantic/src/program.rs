@@ -60,7 +60,7 @@ pub struct ProgramSettings {
 }
 
 /// Configures the search paths for module resolution.
-#[derive(Eq, PartialEq, Debug, Clone, Default)]
+#[derive(Eq, PartialEq, Debug, Clone)]
 pub struct SearchPathSettings {
     /// List of user-provided paths that should take first priority in the module resolution.
     /// Examples in other type checkers are mypy's MYPYPATH environment variable,
@@ -76,5 +76,25 @@ pub struct SearchPathSettings {
     pub custom_typeshed: Option<SystemPathBuf>,
 
     /// The path to the user's `site-packages` directory, where third-party packages from ``PyPI`` are installed.
-    pub site_packages: Vec<SystemPathBuf>,
+    pub site_packages: SitePackages,
+}
+
+impl SearchPathSettings {
+    pub fn new(src_root: SystemPathBuf) -> Self {
+        Self {
+            src_root,
+            extra_paths: vec![],
+            custom_typeshed: None,
+            site_packages: SitePackages::Known(vec![]),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Eq, PartialEq)]
+pub enum SitePackages {
+    Derived {
+        venv_path: SystemPathBuf,
+    },
+    /// Resolved site packages paths
+    Known(Vec<SystemPathBuf>),
 }
