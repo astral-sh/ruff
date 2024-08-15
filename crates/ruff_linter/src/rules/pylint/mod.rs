@@ -123,7 +123,10 @@ mod tests {
     #[test_case(Rule::RedefinedLoopName, Path::new("redefined_loop_name.py"))]
     #[test_case(Rule::ReturnInInit, Path::new("return_in_init.py"))]
     #[test_case(Rule::TooManyArguments, Path::new("too_many_arguments.py"))]
-    #[test_case(Rule::TooManyPositional, Path::new("too_many_positional.py"))]
+    #[test_case(
+        Rule::TooManyPositionalArguments,
+        Path::new("too_many_positional_arguments.py")
+    )]
     #[test_case(Rule::TooManyBranches, Path::new("too_many_branches.py"))]
     #[test_case(
         Rule::TooManyReturnStatements,
@@ -294,7 +297,7 @@ mod tests {
                     max_positional_args: 4,
                     ..pylint::settings::Settings::default()
                 },
-                ..LinterSettings::for_rule(Rule::TooManyPositional)
+                ..LinterSettings::for_rule(Rule::TooManyPositionalArguments)
             },
         )?;
         assert_messages!(diagnostics);
