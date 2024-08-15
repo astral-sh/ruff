@@ -1,5 +1,4 @@
-use crate::workspace::settings::Configuration;
-use red_knot_python_semantic::ProgramSettings;
+use crate::workspace::settings::{Configuration, WorkspaceSettings};
 use ruff_db::system::{System, SystemPath, SystemPathBuf};
 use ruff_python_ast::name::Name;
 
@@ -10,7 +9,7 @@ pub struct WorkspaceMetadata {
     /// The (first-party) packages in this workspace.
     pub(super) packages: Vec<PackageMetadata>,
 
-    pub(super) configuration: Configuration,
+    pub(super) settings: WorkspaceSettings,
 }
 
 /// A first-party package in a workspace.
@@ -46,18 +45,20 @@ impl WorkspaceMetadata {
             root: root.clone(),
         };
 
+        // TODO: Load the configuration from disk.
         let mut configuration = Configuration::default();
 
         if let Some(base_configuration) = base_configuration {
             configuration.extend(base_configuration);
         }
 
-        // TODO store settings instead of configuration?
+        // TODO: Respect the package configurations when resolving settings (e.g. for the target version).
+        let settings = configuration.into_workspace_settings(&root);
 
         let workspace = WorkspaceMetadata {
             root,
             packages: vec![package],
-            configuration,
+            settings,
         };
 
         Ok(workspace)
@@ -71,18 +72,8 @@ impl WorkspaceMetadata {
         &self.packages
     }
 
-    pub fn configuration(&self) -> &Configuration {
-        &self.configuration
-    }
-
-    pub fn to_program_settings(&self, workspace_root: &SystemPath) -> ProgramSettings {
-        let search_path_settings = self.configuration.search_paths.to_settings(workspace_root);
-
-        ProgramSettings {
-            // TODO: Resolve the target version across all packages.
-            target_version: self.configuration.target_version.unwrap_or_default(),
-            search_paths: search_path_settings,
-        }
+    pub fn settings(&self) -> &WorkspaceSettings {
+        &self.settings
     }
 }
 

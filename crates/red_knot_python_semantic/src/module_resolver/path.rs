@@ -324,7 +324,10 @@ impl fmt::Display for SearchPathValidationError {
                 write!(f, "The directory at {path} has no `stdlib/` subdirectory")
             }
             Self::FailedToReadVersionsFile { path, error } => {
-                write!(f, "Failed to read the '{path}' file: {error}")
+                write!(
+                    f,
+                    "Failed to read the custom typeshed versions file '{path}': {error}"
+                )
             }
             Self::VersionsParseError(underlying_error) => underlying_error.fmt(f),
             SearchPathValidationError::SitePackagesDiscovery(error) => {

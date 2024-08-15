@@ -1,7 +1,7 @@
+use rustc_hash::{FxBuildHasher, FxHashSet};
 use std::borrow::Cow;
 use std::iter::FusedIterator;
-
-use rustc_hash::{FxBuildHasher, FxHashSet};
+use std::ops::Deref;
 
 use ruff_db::files::{File, FilePath, FileRootKind};
 use ruff_db::system::{DirectoryEntry, System, SystemPath, SystemPathBuf};
@@ -136,7 +136,7 @@ pub(crate) struct SearchPaths {
     /// for the first `site-packages` path
     site_packages: Vec<SearchPath>,
 
-    typeshed_versions: Cow<'static, TypeshedVersions>,
+    typeshed_versions: Typeshed,
 }
 
 impl SearchPaths {
@@ -148,10 +148,12 @@ impl SearchPaths {
     /// [module resolution order]: https://typing.readthedocs.io/en/latest/spec/distributing.html#import-resolution-ordering
     pub(crate) fn from_settings(
         db: &dyn Db,
-        settings: SearchPathSettings,
+        settings: &SearchPathSettings,
     ) -> Result<Self, SearchPathValidationError> {
-        fn canonicalize(path: SystemPathBuf, system: &dyn System) -> SystemPathBuf {
-            system.canonicalize_path(&path).unwrap_or(path)
+        fn canonicalize(path: &SystemPath, system: &dyn System) -> SystemPathBuf {
+            system
+                .canonicalize_path(path)
+                .unwrap_or_else(|_| path.to_path_buf())
         }
 
         let SearchPathSettings {
@@ -175,7 +177,7 @@ impl SearchPaths {
         }
 
         tracing::debug!("Adding first-party search path '{src_root}'");
-        static_paths.push(SearchPath::first_party(system, src_root)?);
+        static_paths.push(SearchPath::first_party(system, src_root.to_path_buf())?);
 
         let (typeshed_versions, stdlib_path) = if let Some(custom_typeshed) = custom_typeshed {
             let custom_typeshed = canonicalize(custom_typeshed, system);
@@ -200,11 +202,11 @@ impl SearchPaths {
 
             let search_path = SearchPath::custom_stdlib(db, &custom_typeshed)?;
 
-            (Cow::Owned(parsed), search_path)
+            (Typeshed::Custom(parsed), search_path)
         } else {
             tracing::debug!("Using vendored stdlib");
             (
-                Cow::Borrowed(vendored_typeshed_versions()),
+                Typeshed::Vendored(vendored_typeshed_versions()),
                 SearchPath::vendored_stdlib(),
             )
         };
@@ -214,14 +216,15 @@ impl SearchPaths {
         let site_packages_paths = match site_packages_paths {
             SitePackages::Derived { venv_path } => VirtualEnvironment::new(venv_path, system)
                 .and_then(|venv| venv.site_packages_directories(system))?,
-            SitePackages::Known(paths) => paths,
+            SitePackages::Known(paths) => paths
+                .iter()
+                .map(|path| canonicalize(path, system))
+                .collect(),
         };
 
         let mut site_packages: Vec<_> = Vec::with_capacity(site_packages_paths.len());
 
         for path in site_packages_paths {
-            let path = canonicalize(path, system);
-
             tracing::debug!("Adding site-packages search path '{path}'");
             files.try_add_root(db.upcast(), &path, FileRootKind::LibrarySearchPath);
             site_packages.push(SearchPath::site_packages(system, path)?);
@@ -273,6 +276,23 @@ impl SearchPaths {
 
     pub(super) fn typeshed_versions(&self) -> &TypeshedVersions {
         &self.typeshed_versions
+    }
+}
+
+#[derive(Debug, PartialEq, Eq)]
+enum Typeshed {
+    Vendored(&'static TypeshedVersions),
+    Custom(TypeshedVersions),
+}
+
+impl Deref for Typeshed {
+    type Target = TypeshedVersions;
+
+    fn deref(&self) -> &Self::Target {
+        match self {
+            Typeshed::Vendored(versions) => versions,
+            Typeshed::Custom(versions) => versions,
+        }
     }
 }
 
@@ -1254,7 +1274,7 @@ mod tests {
 
         Program::from_settings(
             &db,
-            ProgramSettings {
+            &ProgramSettings {
                 target_version: PythonVersion::PY38,
                 search_paths: SearchPathSettings {
                     extra_paths: vec![],
@@ -1759,7 +1779,7 @@ not_a_directory
 
         Program::from_settings(
             &db,
-            ProgramSettings {
+            &ProgramSettings {
                 target_version: PythonVersion::default(),
                 search_paths: SearchPathSettings {
                     extra_paths: vec![],

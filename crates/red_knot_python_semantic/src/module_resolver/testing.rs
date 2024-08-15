@@ -225,7 +225,7 @@ impl TestCaseBuilder<MockedTypeshed> {
 
         Program::from_settings(
             &db,
-            ProgramSettings {
+            &ProgramSettings {
                 target_version,
                 search_paths: SearchPathSettings {
                     extra_paths: vec![],
@@ -281,10 +281,9 @@ impl TestCaseBuilder<VendoredTypeshed> {
 
         Program::from_settings(
             &db,
-            ProgramSettings {
+            &ProgramSettings {
                 target_version,
                 search_paths: SearchPathSettings {
-                    src_root: src.clone(),
                     site_packages: SitePackages::Known(vec![site_packages.clone()]),
                     ..SearchPathSettings::new(src.clone())
                 },

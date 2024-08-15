@@ -30,8 +30,6 @@ impl RootDatabase {
     where
         S: System + 'static + Send + Sync + RefUnwindSafe,
     {
-        let program_settings = workspace.to_program_settings(workspace.root());
-
         let mut db = Self {
             workspace: None,
             storage: salsa::Storage::default(),
@@ -39,11 +37,11 @@ impl RootDatabase {
             system: Arc::new(system),
         };
 
-        let workspace = Workspace::from_metadata(&db, workspace);
         // Initialize the `Program` singleton
-        Program::from_settings(&db, program_settings)?;
+        Program::from_settings(&db, workspace.settings().program())?;
 
-        db.workspace = Some(workspace);
+        db.workspace = Some(Workspace::from_metadata(&db, workspace));
+
         Ok(db)
     }
 

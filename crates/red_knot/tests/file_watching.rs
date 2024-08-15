@@ -110,10 +110,10 @@ impl TestCase {
     ) -> anyhow::Result<()> {
         let program = Program::get(self.db());
 
-        let new_settings = configuration.to_settings(self.db.workspace().root(&self.db));
-        self.configuration.search_paths = configuration;
+        self.configuration.search_paths = configuration.clone();
+        let new_settings = configuration.into_settings(self.db.workspace().root(&self.db));
 
-        program.update_search_paths(&mut self.db, new_settings)?;
+        program.update_search_paths(&mut self.db, &new_settings)?;
 
         if let Some(watcher) = &mut self.watcher {
             watcher.update(&self.db);

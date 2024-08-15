@@ -156,11 +156,9 @@ impl RootDatabase {
 
             return;
         } else if custom_stdlib_change {
-            let search_path_configuration = workspace.search_path_configuration(self);
-
-            let search_path_settings = search_path_configuration.to_settings(&workspace_path);
-            if let Err(error) = program.update_search_paths(self, search_path_settings) {
-                tracing::error!("Failed to apply to set the new search paths: {error}");
+            let search_paths = workspace.search_path_settings(self).clone();
+            if let Err(error) = program.update_search_paths(self, &search_paths) {
+                tracing::error!("Failed to set the new search paths: {error}");
             }
         }
 

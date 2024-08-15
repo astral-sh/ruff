@@ -1,6 +1,21 @@
-use red_knot_python_semantic::{PythonVersion, SearchPathSettings, SitePackages};
+use red_knot_python_semantic::{ProgramSettings, PythonVersion, SearchPathSettings, SitePackages};
 use ruff_db::system::{SystemPath, SystemPathBuf};
 
+/// The resolved configurations.
+///
+/// The main difference to [`Configuration`] is that default values are filled in.
+#[derive(Debug, Clone)]
+pub struct WorkspaceSettings {
+    pub(super) program: ProgramSettings,
+}
+
+impl WorkspaceSettings {
+    pub fn program(&self) -> &ProgramSettings {
+        &self.program
+    }
+}
+
+/// The configuration for the workspace or a package.
 #[derive(Debug, Default, Clone)]
 pub struct Configuration {
     pub target_version: Option<PythonVersion>,
@@ -12,6 +27,15 @@ impl Configuration {
     pub fn extend(&mut self, with: Configuration) {
         self.target_version = self.target_version.or(with.target_version);
         self.search_paths.extend(with.search_paths);
+    }
+
+    pub fn into_workspace_settings(self, workspace_root: &SystemPath) -> WorkspaceSettings {
+        WorkspaceSettings {
+            program: ProgramSettings {
+                target_version: self.target_version.unwrap_or_default(),
+                search_paths: self.search_paths.into_settings(workspace_root),
+            },
+        }
     }
 }
 
@@ -35,19 +59,15 @@ pub struct SearchPathConfiguration {
 }
 
 impl SearchPathConfiguration {
-    pub fn to_settings(&self, workspace_root: &SystemPath) -> SearchPathSettings {
-        let site_packages = self
-            .site_packages
-            .clone()
-            .unwrap_or(SitePackages::Known(vec![]));
+    pub fn into_settings(self, workspace_root: &SystemPath) -> SearchPathSettings {
+        let site_packages = self.site_packages.unwrap_or(SitePackages::Known(vec![]));
 
         SearchPathSettings {
-            extra_paths: self.extra_paths.clone().unwrap_or_default(),
+            extra_paths: self.extra_paths.unwrap_or_default(),
             src_root: self
                 .src_root
-                .clone()
                 .unwrap_or_else(|| workspace_root.to_path_buf()),
-            custom_typeshed: self.custom_typeshed.clone(),
+            custom_typeshed: self.custom_typeshed,
             site_packages,
         }
     }

@@ -4,21 +4,21 @@ use rustc_hash::{FxBuildHasher, FxHashSet};
 use salsa::{Durability, Setter as _};
 
 pub use metadata::{PackageMetadata, WorkspaceMetadata};
+use red_knot_python_semantic::SearchPathSettings;
 use red_knot_python_semantic::types::check_types;
-use ruff_db::source::{line_index, source_text, SourceDiagnostic};
 use ruff_db::{
-    files::{system_path_to_file, File},
-    system::{walk_directory::WalkState, SystemPath, SystemPathBuf},
+    files::{File, system_path_to_file},
+    system::{SystemPath, SystemPathBuf, walk_directory::WalkState},
 };
+use ruff_db::source::{line_index, source_text, SourceDiagnostic};
 use ruff_python_ast::{name::Name, PySourceType};
 use ruff_text_size::Ranged;
 
-use crate::workspace::files::{Index, Indexed, PackageFiles};
-use crate::workspace::settings::SearchPathConfiguration;
 use crate::{
     db::Db,
     lint::{lint_semantic, lint_syntax},
 };
+use crate::workspace::files::{Index, Indexed, PackageFiles};
 
 mod files;
 mod metadata;
@@ -86,7 +86,7 @@ pub struct Workspace {
 
     /// The unresolved search path configuration.
     #[return_ref]
-    pub search_path_configuration: SearchPathConfiguration,
+    pub search_path_settings: SearchPathSettings,
 }
 
 /// A first-party package in a workspace.
@@ -115,10 +115,14 @@ impl Workspace {
             packages.insert(package.root.clone(), Package::from_metadata(db, package));
         }
 
-        Workspace::builder(metadata.root, packages, metadata.configuration.search_paths)
-            .durability(Durability::MEDIUM)
-            .open_fileset_durability(Durability::LOW)
-            .new(db)
+        Workspace::builder(
+            metadata.root,
+            packages,
+            metadata.settings.program.search_paths,
+        )
+        .durability(Durability::MEDIUM)
+        .open_fileset_durability(Durability::LOW)
+        .new(db)
     }
 
     pub fn root(self, db: &dyn Db) -> &SystemPath {
@@ -149,9 +153,9 @@ impl Workspace {
             new_packages.insert(path, package);
         }
 
-        if &metadata.configuration.search_paths != self.search_path_configuration(db) {
-            self.set_search_path_configuration(db)
-                .to(metadata.configuration.search_paths);
+        if &metadata.settings.program.search_paths != self.search_path_settings(db) {
+            self.set_search_path_settings(db)
+                .to(metadata.settings.program.search_paths);
         }
 
         self.set_package_tree(db).to(new_packages);

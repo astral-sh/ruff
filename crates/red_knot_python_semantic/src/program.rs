@@ -17,7 +17,7 @@ pub struct Program {
 }
 
 impl Program {
-    pub fn from_settings(db: &dyn Db, settings: ProgramSettings) -> anyhow::Result<Self> {
+    pub fn from_settings(db: &dyn Db, settings: &ProgramSettings) -> anyhow::Result<Self> {
         let ProgramSettings {
             target_version,
             search_paths,
@@ -36,7 +36,7 @@ impl Program {
     pub fn update_search_paths(
         self,
         db: &mut dyn Db,
-        search_path_settings: SearchPathSettings,
+        search_path_settings: &SearchPathSettings,
     ) -> anyhow::Result<()> {
         let search_paths = SearchPaths::from_settings(db, search_path_settings)?;
 
@@ -53,7 +53,7 @@ impl Program {
     }
 }
 
-#[derive(Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub struct ProgramSettings {
     pub target_version: PythonVersion,
     pub search_paths: SearchPathSettings,

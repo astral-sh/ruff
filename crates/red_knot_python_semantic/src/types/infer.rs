@@ -1866,7 +1866,7 @@ mod tests {
 
         Program::from_settings(
             &db,
-            ProgramSettings {
+            &ProgramSettings {
                 target_version: PythonVersion::default(),
                 search_paths: SearchPathSettings::new(src_root),
             },
@@ -1888,7 +1888,7 @@ mod tests {
 
         Program::from_settings(
             &db,
-            ProgramSettings {
+            &ProgramSettings {
                 target_version: PythonVersion::default(),
                 search_paths: SearchPathSettings {
                     custom_typeshed: Some(SystemPathBuf::from(typeshed)),
