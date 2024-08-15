@@ -65,4 +65,4 @@ async def test() -> None:
     async def async_gen() -> AsyncGenerator[bool, None]:
         yield True
 
-    assert all([v async for v in async_gen()])  # Should not be linted
+    assert all([v async for v in async_gen()])  # OK

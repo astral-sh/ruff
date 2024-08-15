@@ -112,7 +112,7 @@ pub(crate) fn unnecessary_comprehension_in_call(
     if contains_await(elt) {
         return;
     }
-    if generators.iter().any(|x| x.is_async) {
+    if generators.iter().any(|generator| generator.is_async) {
         return;
     }
     let Some(Ok(builtin_function)) = checker
