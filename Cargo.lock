@@ -1904,6 +1904,7 @@ dependencies = [
  "ruff_text_size",
  "rustc-hash 2.0.0",
  "salsa",
+ "smallvec",
  "tempfile",
  "tracing",
  "walkdir",

@@ -56,299 +56,323 @@
 //! visible at the end of the scope.
 //!
 //! The data structure we build to answer these two questions is the `UseDefMap`. It has a
-//! `definitions_by_use` vector indexed by [`ScopedUseId`] and a `public_definitions` vector
-//! indexed by [`ScopedSymbolId`]. The values in each of these vectors are (in principle) a list of
-//! visible definitions at that use, or at the end of the scope for that symbol.
+//! `definitions_by_use` vector indexed by [`ScopedUseId`] and a `public_definitions` map
+//! indexed by [`ScopedSymbolId`]. The values in each are the visible definition of a symbol at
+//! that use, or at the end of the scope.
 //!
-//! In order to avoid vectors-of-vectors and all the allocations that would entail, we don't
-//! actually store these "list of visible definitions" as a vector of [`Definition`] IDs. Instead,
-//! the values in `definitions_by_use` and `public_definitions` are a [`Definitions`] struct that
-//! keeps a [`Range`] into a third vector of [`Definition`] IDs, `all_definitions`. The trick with
-//! this representation is that it requires that the definitions visible at any given use of a
-//! symbol are stored sequentially in `all_definitions`.
-//!
-//! There is another special kind of possible "definition" for a symbol: it might be unbound in the
-//! scope. (This isn't equivalent to "zero visible definitions", since we may go through an `if`
-//! that has a definition for the symbol, leaving us with one visible definition, but still also
-//! the "unbound" possibility, since we might not have taken the `if` branch.)
-//!
-//! The simplest way to model "unbound" would be as an actual [`Definition`] itself: the initial
-//! visible [`Definition`] for each symbol in a scope. But actually modeling it this way would
-//! dramatically increase the number of [`Definition`] that Salsa must track. Since "unbound" is a
-//! special definition in that all symbols share it, and it doesn't have any additional per-symbol
-//! state, we can represent it more efficiently: we use the `may_be_unbound` boolean on the
-//! [`Definitions`] struct. If this flag is `true`, it means the symbol/use really has one
-//! additional visible "definition", which is the unbound state. If this flag is `false`, it means
-//! we've eliminated the possibility of unbound: every path we've followed includes a definition
-//! for this symbol.
-//!
-//! To build a [`UseDefMap`], the [`UseDefMapBuilder`] is notified of each new use and definition
-//! as they are encountered by the
-//! [`SemanticIndexBuilder`](crate::semantic_index::builder::SemanticIndexBuilder) AST visit. For
-//! each symbol, the builder tracks the currently-visible definitions for that symbol. When we hit
-//! a use of a symbol, it records the currently-visible definitions for that symbol as the visible
-//! definitions for that use. When we reach the end of the scope, it records the currently-visible
-//! definitions for each symbol as the public definitions of that symbol.
-//!
-//! Let's walk through the above example. Initially we record for `x` that it has no visible
-//! definitions, and may be unbound. When we see `x = 1`, we record that as the sole visible
-//! definition of `x`, and flip `may_be_unbound` to `false`. Then we see `x = 2`, and it replaces
-//! `x = 1` as the sole visible definition of `x`. When we get to `y = x`, we record that the
-//! visible definitions for that use of `x` are just the `x = 2` definition.
-//!
-//! Then we hit the `if` branch. We visit the `test` node (`flag` in this case), since that will
-//! happen regardless. Then we take a pre-branch snapshot of the currently visible definitions for
-//! all symbols, which we'll need later. Then we go ahead and visit the `if` body. When we see `x =
-//! 3`, it replaces `x = 2` as the sole visible definition of `x`. At the end of the `if` body, we
-//! take another snapshot of the currently-visible definitions; we'll call this the post-if-body
-//! snapshot.
-//!
-//! Now we need to visit the `else` clause. The conditions when entering the `else` clause should
-//! be the pre-if conditions; if we are entering the `else` clause, we know that the `if` test
-//! failed and we didn't execute the `if` body. So we first reset the builder to the pre-if state,
-//! using the snapshot we took previously (meaning we now have `x = 2` as the sole visible
-//! definition for `x` again), then visit the `else` clause, where `x = 4` replaces `x = 2` as the
-//! sole visible definition of `x`.
-//!
-//! Now we reach the end of the if/else, and want to visit the following code. The state here needs
-//! to reflect that we might have gone through the `if` branch, or we might have gone through the
-//! `else` branch, and we don't know which. So we need to "merge" our current builder state
-//! (reflecting the end-of-else state, with `x = 4` as the only visible definition) with our
-//! post-if-body snapshot (which has `x = 3` as the only visible definition). The result of this
-//! merge is that we now have two visible definitions of `x`: `x = 3` and `x = 4`.
-//!
-//! The [`UseDefMapBuilder`] itself just exposes methods for taking a snapshot, resetting to a
-//! snapshot, and merging a snapshot into the current state. The logic using these methods lives in
-//! [`SemanticIndexBuilder`](crate::semantic_index::builder::SemanticIndexBuilder), e.g. where it
-//! visits a `StmtIf` node.
-//!
-//! (In the future we may have some other questions we want to answer as well, such as "is this
-//! definition used?", which will require tracking a bit more info in our map, e.g. a "used" bit
-//! for each [`Definition`] which is flipped to true when we record that definition for a use.)
+//! Rather than have multiple definitions, we use a Phi definition at control flow join points to
+//! merge the visible definition in each path. This means at any given point we always have exactly
+//! one definition for a symbol. (This is analogous to static-single-assignment, or SSA, form, and
+//! in fact we use the algorithm from [Simple and efficient construction of static single
+//! assignment form](https://dl.acm.org/doi/10.1007/978-3-642-37051-9_6) here.)
 use crate::semantic_index::ast_ids::ScopedUseId;
-use crate::semantic_index::definition::Definition;
-use crate::semantic_index::symbol::ScopedSymbolId;
-use ruff_index::IndexVec;
-use std::ops::Range;
+use crate::semantic_index::definition::{Definition, DefinitionKind, ScopedPhiId};
+use crate::semantic_index::symbol::{FileScopeId, ScopedSymbolId};
+use crate::Db;
+use ruff_db::files::File;
+use ruff_index::{newtype_index, IndexVec};
+use rustc_hash::{FxHashMap, FxHashSet};
+use smallvec::{smallvec, SmallVec};
 
-/// All definitions that can reach a given use of a name.
+/// Number of basic block predecessors we store inline.
+const PREDECESSORS: usize = 2;
+
+/// Input operands (definitions) for a Phi definition. None means not defined.
+// TODO would like to use SmallVec here but can't due to lifetime invariance issue.
+type PhiOperands<'db> = Vec<Option<Definition<'db>>>;
+
+/// Definition for each use of a name.
 #[derive(Debug, PartialEq, Eq)]
 pub(crate) struct UseDefMap<'db> {
     // TODO store constraints with definitions for type narrowing
-    /// Definition IDs array for `definitions_by_use` and `public_definitions` to slice into.
-    all_definitions: Vec<Definition<'db>>,
+    /// Definition that reaches each [`ScopedUseId`].
+    definitions_by_use: IndexVec<ScopedUseId, Option<Definition<'db>>>,
 
-    /// Definitions that can reach a [`ScopedUseId`].
-    definitions_by_use: IndexVec<ScopedUseId, Definitions>,
+    /// Definition of each symbol visible at end of scope.
+    ///
+    /// Sparse, because it only includes symbols defined in the scope.
+    public_definitions: FxHashMap<ScopedSymbolId, Definition<'db>>,
 
-    /// Definitions of each symbol visible at end of scope.
-    public_definitions: IndexVec<ScopedSymbolId, Definitions>,
+    /// Operands for each Phi definition in this scope.
+    phi_operands: IndexVec<ScopedPhiId, PhiOperands<'db>>,
 }
 
 impl<'db> UseDefMap<'db> {
-    pub(crate) fn use_definitions(&self, use_id: ScopedUseId) -> &[Definition<'db>] {
-        &self.all_definitions[self.definitions_by_use[use_id].definitions_range.clone()]
+    /// Return the dominating definition for a given use of a name; None means not-defined.
+    pub(crate) fn definition_for_use(&self, use_id: ScopedUseId) -> Option<Definition<'db>> {
+        self.definitions_by_use[use_id]
     }
 
-    pub(crate) fn use_may_be_unbound(&self, use_id: ScopedUseId) -> bool {
-        self.definitions_by_use[use_id].may_be_unbound
+    /// Return the definition visible at end of scope for a symbol.
+    ///
+    /// Return None if the symbol is never defined in the scope.
+    pub(crate) fn public_definition(&self, symbol_id: ScopedSymbolId) -> Option<Definition<'db>> {
+        self.public_definitions.get(&symbol_id).copied()
     }
 
-    pub(crate) fn public_definitions(&self, symbol: ScopedSymbolId) -> &[Definition<'db>] {
-        &self.all_definitions[self.public_definitions[symbol].definitions_range.clone()]
-    }
-
-    pub(crate) fn public_may_be_unbound(&self, symbol: ScopedSymbolId) -> bool {
-        self.public_definitions[symbol].may_be_unbound
-    }
-}
-
-/// Definitions visible for a symbol at a particular use (or end-of-scope).
-#[derive(Clone, Debug, PartialEq, Eq)]
-struct Definitions {
-    /// [`Range`] in `all_definitions` of the visible definition IDs.
-    definitions_range: Range<usize>,
-    /// Is the symbol possibly unbound at this point?
-    may_be_unbound: bool,
-}
-
-impl Definitions {
-    /// The default state of a symbol is "no definitions, may be unbound", aka definitely-unbound.
-    fn unbound() -> Self {
-        Self {
-            definitions_range: Range::default(),
-            may_be_unbound: true,
-        }
+    /// Return the operands for a Phi in this scope; a None means not-defined.
+    pub(crate) fn phi_operands<'s>(&'s self, phi_id: ScopedPhiId) -> &'s [Option<Definition<'db>>] {
+        self.phi_operands[phi_id].as_slice()
     }
 }
 
-impl Default for Definitions {
-    fn default() -> Self {
-        Definitions::unbound()
-    }
-}
+type PredecessorBlocks = SmallVec<[BasicBlockId; PREDECESSORS]>;
 
-/// A snapshot of the visible definitions for each symbol at a particular point in control flow.
-#[derive(Clone, Debug)]
-pub(super) struct FlowSnapshot {
-    definitions_by_symbol: IndexVec<ScopedSymbolId, Definitions>,
-}
+/// A basic block is a linear region of code (no branches.)
+#[newtype_index]
+pub(super) struct BasicBlockId;
 
-#[derive(Debug)]
 pub(super) struct UseDefMapBuilder<'db> {
-    /// Definition IDs array for `definitions_by_use` and `definitions_by_symbol` to slice into.
-    all_definitions: Vec<Definition<'db>>,
+    db: &'db dyn Db,
+    file: File,
+    file_scope: FileScopeId,
 
-    /// Visible definitions at each so-far-recorded use.
-    definitions_by_use: IndexVec<ScopedUseId, Definitions>,
+    /// Predecessor blocks for each basic block.
+    ///
+    /// Entry block has none, all other blocks have at least one, blocks that join control flow can
+    /// have two or more.
+    predecessors: IndexVec<BasicBlockId, PredecessorBlocks>,
 
-    /// Currently visible definitions for each symbol.
-    definitions_by_symbol: IndexVec<ScopedSymbolId, Definitions>,
+    /// The definition of each symbol which dominates each basic block.
+    ///
+    /// No entry means "lazily unfilled"; we haven't had to query for it yet, and we may never have
+    /// to, if the symbol isn't used in this block or any successor block.
+    ///
+    /// Each block has an [`FxHashMap`] of symbols instead of an [`IndexVec`] because it is lazy
+    /// and potentially sparse; it will only include a definition for a symbol that is actually
+    /// used in that block or a successor. An [`IndexVec`] would have to be eagerly filled with
+    /// placeholders.
+    definitions_per_block:
+        IndexVec<BasicBlockId, FxHashMap<ScopedSymbolId, Option<Definition<'db>>>>,
+
+    /// Incomplete Phi definitions in each block.
+    ///
+    /// An incomplete Phi is used when we don't know, while processing a block's body, what new
+    /// predecessors it may later gain (that is, backward jumps.)
+    ///
+    /// Sparse, because relative few blocks (just loop headers) will have any incomplete Phis.
+    incomplete_phis: FxHashMap<BasicBlockId, Vec<Definition<'db>>>,
+
+    /// Operands for each Phi definition in this scope.
+    phi_operands: IndexVec<ScopedPhiId, PhiOperands<'db>>,
+
+    /// Are this block's predecessors fully populated?
+    ///
+    /// If not, it isn't safe to recurse to predecessors yet; we might miss a predecessor block.
+    sealed_blocks: IndexVec<BasicBlockId, bool>,
+
+    /// Definition for each so-far-recorded use.
+    definitions_by_use: IndexVec<ScopedUseId, Option<Definition<'db>>>,
+
+    /// All symbols defined in this scope.
+    defined_symbols: FxHashSet<ScopedSymbolId>,
 }
 
 impl<'db> UseDefMapBuilder<'db> {
-    pub(super) fn new() -> Self {
-        Self {
-            all_definitions: Vec::new(),
+    pub(super) fn new(db: &'db dyn Db, file: File, file_scope: FileScopeId) -> Self {
+        let mut new = Self {
+            db,
+            file,
+            file_scope,
+            predecessors: IndexVec::new(),
+            definitions_per_block: IndexVec::new(),
+            incomplete_phis: FxHashMap::default(),
+            sealed_blocks: IndexVec::new(),
             definitions_by_use: IndexVec::new(),
-            definitions_by_symbol: IndexVec::new(),
-        }
+            phi_operands: IndexVec::new(),
+            defined_symbols: FxHashSet::default(),
+        };
+
+        // create the entry basic block
+        new.predecessors.push(PredecessorBlocks::default());
+        new.definitions_per_block.push(FxHashMap::default());
+        new.sealed_blocks.push(true);
+
+        new
     }
 
-    pub(super) fn add_symbol(&mut self, symbol: ScopedSymbolId) {
-        let new_symbol = self.definitions_by_symbol.push(Definitions::unbound());
-        debug_assert_eq!(symbol, new_symbol);
-    }
-
+    /// Record a definition for a symbol.
     pub(super) fn record_definition(
         &mut self,
-        symbol: ScopedSymbolId,
+        symbol_id: ScopedSymbolId,
         definition: Definition<'db>,
     ) {
-        // We have a new definition of a symbol; this replaces any previous definitions in this
-        // path.
-        let def_idx = self.all_definitions.len();
-        self.all_definitions.push(definition);
-        self.definitions_by_symbol[symbol] = Definitions {
-            #[allow(clippy::range_plus_one)]
-            definitions_range: def_idx..(def_idx + 1),
-            may_be_unbound: false,
-        };
+        self.memoize(self.current_block_id(), symbol_id, Some(definition));
+        self.defined_symbols.insert(symbol_id);
     }
 
-    pub(super) fn record_use(&mut self, symbol: ScopedSymbolId, use_id: ScopedUseId) {
-        // We have a use of a symbol; clone the currently visible definitions for that symbol, and
-        // record them as the visible definitions for this use.
-        let new_use = self
-            .definitions_by_use
-            .push(self.definitions_by_symbol[symbol].clone());
+    /// Record a use of a symbol.
+    pub(super) fn record_use(&mut self, symbol_id: ScopedSymbolId, use_id: ScopedUseId) {
+        let definition_id = self.lookup(symbol_id);
+        let new_use = self.definitions_by_use.push(definition_id);
         debug_assert_eq!(use_id, new_use);
     }
 
-    /// Take a snapshot of the current visible-symbols state.
-    pub(super) fn snapshot(&self) -> FlowSnapshot {
-        FlowSnapshot {
-            definitions_by_symbol: self.definitions_by_symbol.clone(),
+    /// Get the id of the current basic block.
+    pub(super) fn current_block_id(&self) -> BasicBlockId {
+        BasicBlockId::from(self.definitions_per_block.len() - 1)
+    }
+
+    /// Push a new basic block, with given block as predecessor.
+    pub(super) fn new_block_from(&mut self, block_id: BasicBlockId, sealed: bool) {
+        self.new_block_with_predecessors(smallvec![block_id], sealed);
+    }
+
+    /// Push a new basic block, with current block as predecessor; return the current block's ID.
+    pub(super) fn next_block(&mut self, sealed: bool) -> BasicBlockId {
+        let current_block_id = self.current_block_id();
+        self.new_block_from(current_block_id, sealed);
+        current_block_id
+    }
+
+    /// Add a predecessor to the current block.
+    pub(super) fn merge_block(&mut self, new_predecessor: BasicBlockId) {
+        let block_id = self.current_block_id();
+        debug_assert!(!self.sealed_blocks[block_id]);
+        self.predecessors[block_id].push(new_predecessor);
+    }
+
+    /// Add predecessors to the current block.
+    pub(super) fn merge_blocks(&mut self, new_predecessors: Vec<BasicBlockId>) {
+        let block_id = self.current_block_id();
+        debug_assert!(!self.sealed_blocks[block_id]);
+        self.predecessors[block_id].extend(new_predecessors);
+    }
+
+    /// Mark the current block as sealed; it cannot have any more predecessors added.
+    pub(super) fn seal_current_block(&mut self) {
+        self.seal_block(self.current_block_id());
+    }
+
+    /// Mark a block as sealed; it cannot have any more predecessors added.
+    pub(super) fn seal_block(&mut self, block_id: BasicBlockId) {
+        debug_assert!(!self.sealed_blocks[block_id]);
+        if let Some(phis) = self.incomplete_phis.get(&block_id) {
+            for phi in phis.clone() {
+                self.add_phi_operands(block_id, phi);
+            }
+            self.incomplete_phis.remove(&block_id);
+        }
+        self.sealed_blocks[block_id] = true;
+    }
+
+    pub(super) fn finish(mut self) -> UseDefMap<'db> {
+        debug_assert!(self.incomplete_phis.is_empty());
+        debug_assert!(self.sealed_blocks.iter().all(|&b| b));
+        self.definitions_by_use.shrink_to_fit();
+        self.phi_operands.shrink_to_fit();
+
+        let mut public_definitions: FxHashMap<ScopedSymbolId, Definition<'db>> =
+            FxHashMap::default();
+
+        for symbol_id in self.defined_symbols.clone() {
+            // SAFETY: We are only looking up defined symbols here, can't get None.
+            public_definitions.insert(symbol_id, self.lookup(symbol_id).unwrap());
+        }
+
+        UseDefMap {
+            definitions_by_use: self.definitions_by_use,
+            public_definitions,
+            phi_operands: self.phi_operands,
         }
     }
 
-    /// Restore the current builder visible-definitions state to the given snapshot.
-    pub(super) fn restore(&mut self, snapshot: FlowSnapshot) {
-        // We never remove symbols from `definitions_by_symbol` (it's an IndexVec, and the symbol
-        // IDs must line up), so the current number of known symbols must always be equal to or
-        // greater than the number of known symbols in a previously-taken snapshot.
-        let num_symbols = self.definitions_by_symbol.len();
-        debug_assert!(num_symbols >= snapshot.definitions_by_symbol.len());
+    /// Push a new basic block (with given predecessors) and return its ID.
+    fn new_block_with_predecessors(
+        &mut self,
+        predecessors: PredecessorBlocks,
+        sealed: bool,
+    ) -> BasicBlockId {
+        let new_block_id = self.predecessors.push(predecessors);
+        self.definitions_per_block.push(FxHashMap::default());
+        self.sealed_blocks.push(sealed);
 
-        // Restore the current visible-definitions state to the given snapshot.
-        self.definitions_by_symbol = snapshot.definitions_by_symbol;
-
-        // If the snapshot we are restoring is missing some symbols we've recorded since, we need
-        // to fill them in so the symbol IDs continue to line up. Since they don't exist in the
-        // snapshot, the correct state to fill them in with is "unbound", the default.
-        self.definitions_by_symbol
-            .resize(num_symbols, Definitions::unbound());
+        new_block_id
     }
 
-    /// Merge the given snapshot into the current state, reflecting that we might have taken either
-    /// path to get here. The new visible-definitions state for each symbol should include
-    /// definitions from both the prior state and the snapshot.
-    pub(super) fn merge(&mut self, snapshot: &FlowSnapshot) {
-        // The tricky thing about merging two Ranges pointing into `all_definitions` is that if the
-        // two Ranges aren't already adjacent in `all_definitions`, we will have to copy at least
-        // one or the other of the ranges to the end of `all_definitions` so as to make them
-        // adjacent. We can't ever move things around in `all_definitions` because previously
-        // recorded uses may still have ranges pointing to any part of it; all we can do is append.
-        // It's possible we may end up with some old entries in `all_definitions` that nobody is
-        // pointing to, but that's OK.
+    /// Look up the dominating definition for a symbol in the current block.
+    ///
+    /// If there isn't a local definition, recursively look up the symbol in predecessor blocks,
+    /// memoizing the found symbol in each block.
+    fn lookup(&mut self, symbol_id: ScopedSymbolId) -> Option<Definition<'db>> {
+        self.lookup_impl(self.current_block_id(), symbol_id)
+    }
 
-        // We never remove symbols from `definitions_by_symbol` (it's an IndexVec, and the symbol
-        // IDs must line up), so the current number of known symbols must always be equal to or
-        // greater than the number of known symbols in a previously-taken snapshot.
-        debug_assert!(self.definitions_by_symbol.len() >= snapshot.definitions_by_symbol.len());
-
-        for (symbol_id, current) in self.definitions_by_symbol.iter_mut_enumerated() {
-            let Some(snapshot) = snapshot.definitions_by_symbol.get(symbol_id) else {
-                // Symbol not present in snapshot, so it's unbound from that path.
-                current.may_be_unbound = true;
-                continue;
-            };
-
-            // If the symbol can be unbound in either predecessor, it can be unbound post-merge.
-            current.may_be_unbound |= snapshot.may_be_unbound;
-
-            // Merge the definition ranges.
-            let current = &mut current.definitions_range;
-            let snapshot = &snapshot.definitions_range;
-
-            // We never create reversed ranges.
-            debug_assert!(current.end >= current.start);
-            debug_assert!(snapshot.end >= snapshot.start);
-
-            if current == snapshot {
-                // Ranges already identical, nothing to do.
-            } else if snapshot.is_empty() {
-                // Merging from an empty range; nothing to do.
-            } else if (*current).is_empty() {
-                // Merging to an empty range; just use the incoming range.
-                *current = snapshot.clone();
-            } else if snapshot.end >= current.start && snapshot.start <= current.end {
-                // Ranges are adjacent or overlapping, merge them in-place.
-                *current = current.start.min(snapshot.start)..current.end.max(snapshot.end);
-            } else if current.end == self.all_definitions.len() {
-                // Ranges are not adjacent or overlapping, `current` is at the end of
-                // `all_definitions`, we need to copy `snapshot` to the end so they are adjacent
-                // and can be merged into one range.
-                self.all_definitions.extend_from_within(snapshot.clone());
-                current.end = self.all_definitions.len();
-            } else if snapshot.end == self.all_definitions.len() {
-                // Ranges are not adjacent or overlapping, `snapshot` is at the end of
-                // `all_definitions`, we need to copy `current` to the end so they are adjacent and
-                // can be merged into one range.
-                self.all_definitions.extend_from_within(current.clone());
-                current.start = snapshot.start;
-                current.end = self.all_definitions.len();
-            } else {
-                // Ranges are not adjacent and neither one is at the end of `all_definitions`, we
-                // have to copy both to the end so they are adjacent and we can merge them.
-                let start = self.all_definitions.len();
-                self.all_definitions.extend_from_within(current.clone());
-                self.all_definitions.extend_from_within(snapshot.clone());
-                current.start = start;
-                current.end = self.all_definitions.len();
+    fn lookup_impl(
+        &mut self,
+        block_id: BasicBlockId,
+        symbol_id: ScopedSymbolId,
+    ) -> Option<Definition<'db>> {
+        if let Some(local) = self.definitions_per_block[block_id].get(&symbol_id) {
+            return *local;
+        }
+        if !self.sealed_blocks[block_id] {
+            // we may still be missing predecessors; insert an incomplete Phi.
+            let definition = self.create_incomplete_phi(block_id, symbol_id);
+            self.incomplete_phis
+                .entry(block_id)
+                .or_default()
+                .push(definition);
+            return Some(definition);
+        }
+        match self.predecessors[block_id].as_slice() {
+            // entry block, no definition found: return None
+            [] => None,
+            // single predecessor, recurse
+            &[single_predecessor_id] => {
+                let definition = self.lookup_impl(single_predecessor_id, symbol_id);
+                self.memoize(block_id, symbol_id, definition);
+                definition
+            }
+            // multiple predecessors: create and memoize an incomplete Phi to break cycles, then
+            // recurse into predecessors and fill the Phi operands.
+            _ => {
+                let phi = self.create_incomplete_phi(block_id, symbol_id);
+                self.add_phi_operands(block_id, phi);
+                Some(phi)
             }
         }
     }
 
-    pub(super) fn finish(mut self) -> UseDefMap<'db> {
-        self.all_definitions.shrink_to_fit();
-        self.definitions_by_symbol.shrink_to_fit();
-        self.definitions_by_use.shrink_to_fit();
+    /// Recurse into predecessors to add operands for an incomplete Phi.
+    fn add_phi_operands(&mut self, block_id: BasicBlockId, phi: Definition<'db>) {
+        let predecessors: PredecessorBlocks = self.predecessors[block_id].clone();
+        let operands: PhiOperands = predecessors
+            .iter()
+            .map(|pred_id| self.lookup_impl(*pred_id, phi.symbol(self.db)))
+            .collect();
+        let DefinitionKind::Phi(phi_id) = phi.kind(self.db) else {
+            unreachable!("add_phi_operands called with non-Phi");
+        };
+        self.phi_operands[*phi_id] = operands;
+    }
 
-        UseDefMap {
-            all_definitions: self.all_definitions,
-            definitions_by_use: self.definitions_by_use,
-            public_definitions: self.definitions_by_symbol,
-        }
+    /// Remember a given definition for a given symbol in the given block.
+    fn memoize(
+        &mut self,
+        block_id: BasicBlockId,
+        symbol_id: ScopedSymbolId,
+        definition_id: Option<Definition<'db>>,
+    ) {
+        self.definitions_per_block[block_id].insert(symbol_id, definition_id);
+    }
+
+    /// Create an incomplete Phi for the given block and symbol, memoize it, and return its ID.
+    fn create_incomplete_phi(
+        &mut self,
+        block_id: BasicBlockId,
+        symbol_id: ScopedSymbolId,
+    ) -> Definition<'db> {
+        let phi_id = self.phi_operands.push(vec![]);
+        let definition = Definition::new(
+            self.db,
+            self.file,
+            self.file_scope,
+            symbol_id,
+            DefinitionKind::Phi(phi_id),
+            countme::Count::default(),
+        );
+        self.memoize(block_id, symbol_id, Some(definition));
+        definition
     }
 }

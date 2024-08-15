@@ -151,7 +151,7 @@ impl HasTy for ast::StmtFunctionDef {
     fn ty<'db>(&self, model: &SemanticModel<'db>) -> Type<'db> {
         let index = semantic_index(model.db, model.file);
         let definition = index.definition(self);
-        definition_ty(model.db, definition)
+        definition_ty(model.db, Some(definition))
     }
 }
 
@@ -159,7 +159,7 @@ impl HasTy for StmtClassDef {
     fn ty<'db>(&self, model: &SemanticModel<'db>) -> Type<'db> {
         let index = semantic_index(model.db, model.file);
         let definition = index.definition(self);
-        definition_ty(model.db, definition)
+        definition_ty(model.db, Some(definition))
     }
 }
 
@@ -167,7 +167,7 @@ impl HasTy for ast::Alias {
     fn ty<'db>(&self, model: &SemanticModel<'db>) -> Type<'db> {
         let index = semantic_index(model.db, model.file);
         let definition = index.definition(self);
-        definition_ty(model.db, definition)
+        definition_ty(model.db, Some(definition))
     }
 }
 

@@ -13,15 +13,15 @@ use crate::ast_node_ref::AstNodeRef;
 use crate::semantic_index::ast_ids::node_key::ExpressionNodeKey;
 use crate::semantic_index::ast_ids::AstIdsBuilder;
 use crate::semantic_index::definition::{
-    AssignmentDefinitionNodeRef, ComprehensionDefinitionNodeRef, Definition, DefinitionNodeKey,
-    DefinitionNodeRef, ImportFromDefinitionNodeRef,
+    AssignmentDefinitionNodeRef, ComprehensionDefinitionNodeRef, Definition, DefinitionKind,
+    DefinitionNodeKey, DefinitionNodeRef, ImportFromDefinitionNodeRef,
 };
 use crate::semantic_index::expression::Expression;
 use crate::semantic_index::symbol::{
     FileScopeId, NodeWithScopeKey, NodeWithScopeRef, Scope, ScopeId, ScopedSymbolId, SymbolFlags,
     SymbolTableBuilder,
 };
-use crate::semantic_index::use_def::{FlowSnapshot, UseDefMapBuilder};
+use crate::semantic_index::use_def::{BasicBlockId, UseDefMapBuilder};
 use crate::semantic_index::SemanticIndex;
 use crate::Db;
 
@@ -33,8 +33,8 @@ pub(super) struct SemanticIndexBuilder<'db> {
     scope_stack: Vec<FileScopeId>,
     /// The assignment we're currently visiting.
     current_assignment: Option<CurrentAssignment<'db>>,
-    /// Flow states at each `break` in the current loop.
-    loop_break_states: Vec<FlowSnapshot>,
+    /// Basic block ending at each `break` in the current loop.
+    loop_breaks: Vec<BasicBlockId>,
 
     // Semantic Index fields
     scopes: IndexVec<FileScopeId, Scope>,
@@ -56,7 +56,7 @@ impl<'db> SemanticIndexBuilder<'db> {
             module: parsed,
             scope_stack: Vec::new(),
             current_assignment: None,
-            loop_break_states: vec![],
+            loop_breaks: vec![],
 
             scopes: IndexVec::new(),
             symbol_tables: IndexVec::new(),
@@ -98,7 +98,8 @@ impl<'db> SemanticIndexBuilder<'db> {
 
         let file_scope_id = self.scopes.push(scope);
         self.symbol_tables.push(SymbolTableBuilder::new());
-        self.use_def_maps.push(UseDefMapBuilder::new());
+        self.use_def_maps
+            .push(UseDefMapBuilder::new(self.db, self.file, file_scope_id));
         let ast_id_scope = self.ast_ids.push(AstIdsBuilder::new());
 
         #[allow(unsafe_code)]
@@ -132,14 +133,9 @@ impl<'db> SemanticIndexBuilder<'db> {
         &mut self.symbol_tables[scope_id]
     }
 
-    fn current_use_def_map_mut(&mut self) -> &mut UseDefMapBuilder<'db> {
+    fn current_use_def_map(&mut self) -> &mut UseDefMapBuilder<'db> {
         let scope_id = self.current_scope();
         &mut self.use_def_maps[scope_id]
-    }
-
-    fn current_use_def_map(&self) -> &UseDefMapBuilder<'db> {
-        let scope_id = self.current_scope();
-        &self.use_def_maps[scope_id]
     }
 
     fn current_ast_ids(&mut self) -> &mut AstIdsBuilder {
@@ -147,26 +143,40 @@ impl<'db> SemanticIndexBuilder<'db> {
         &mut self.ast_ids[scope_id]
     }
 
-    fn flow_snapshot(&self) -> FlowSnapshot {
-        self.current_use_def_map().snapshot()
+    /// Start a new basic block and return the previous block's ID.
+    fn next_block(&mut self) -> BasicBlockId {
+        self.current_use_def_map().next_block(/* sealed */ true)
     }
 
-    fn flow_restore(&mut self, state: FlowSnapshot) {
-        self.current_use_def_map_mut().restore(state);
+    /// Start a new unsealed basic block and return the previous block's ID.
+    fn next_block_unsealed(&mut self) -> BasicBlockId {
+        self.current_use_def_map().next_block(/* sealed */ false)
     }
 
-    fn flow_merge(&mut self, state: &FlowSnapshot) {
-        self.current_use_def_map_mut().merge(state);
+    /// Seal an unsealed basic block.
+    fn seal_block(&mut self) {
+        self.current_use_def_map().seal_current_block();
+    }
+
+    /// Start a new basic block with the given block as predecessor.
+    fn new_block_from(&mut self, predecessor: BasicBlockId) {
+        self.current_use_def_map()
+            .new_block_from(predecessor, /* sealed */ true);
+    }
+
+    /// Add a predecessor to the current block.
+    fn merge_block(&mut self, predecessor: BasicBlockId) {
+        self.current_use_def_map().merge_block(predecessor);
+    }
+
+    /// Add predecessors to the current block.
+    fn merge_blocks(&mut self, predecessors: Vec<BasicBlockId>) {
+        self.current_use_def_map().merge_blocks(predecessors);
     }
 
     fn add_or_update_symbol(&mut self, name: Name, flags: SymbolFlags) -> ScopedSymbolId {
         let symbol_table = self.current_symbol_table();
-        let (symbol_id, added) = symbol_table.add_or_update_symbol(name, flags);
-        if added {
-            let use_def_map = self.current_use_def_map_mut();
-            use_def_map.add_symbol(symbol_id);
-        }
-        symbol_id
+        symbol_table.add_or_update_symbol(name, flags)
     }
 
     fn add_definition<'a>(
@@ -181,15 +191,13 @@ impl<'db> SemanticIndexBuilder<'db> {
             self.current_scope(),
             symbol,
             #[allow(unsafe_code)]
-            unsafe {
-                definition_node.into_owned(self.module.clone())
-            },
+            DefinitionKind::Node(unsafe { definition_node.into_owned(self.module.clone()) }),
             countme::Count::default(),
         );
 
         self.definitions_by_node
             .insert(definition_node.key(), definition);
-        self.current_use_def_map_mut()
+        self.current_use_def_map()
             .record_definition(symbol, definition);
 
         definition
@@ -455,21 +463,19 @@ where
             }
             ast::Stmt::If(node) => {
                 self.visit_expr(&node.test);
-                let pre_if = self.flow_snapshot();
+                let pre_if = self.next_block();
                 self.visit_body(&node.body);
-                let mut post_clauses: Vec<FlowSnapshot> = vec![];
+                let mut post_clauses: Vec<BasicBlockId> = vec![];
                 for clause in &node.elif_else_clauses {
                     // snapshot after every block except the last; the last one will just become
                     // the state that we merge the other snapshots into
-                    post_clauses.push(self.flow_snapshot());
+                    post_clauses.push(self.next_block());
                     // we can only take an elif/else branch if none of the previous ones were
                     // taken, so the block entry state is always `pre_if`
-                    self.flow_restore(pre_if.clone());
+                    self.new_block_from(pre_if);
                     self.visit_elif_else_clause(clause);
                 }
-                for post_clause_state in post_clauses {
-                    self.flow_merge(&post_clause_state);
-                }
+                self.next_block_unsealed();
                 let has_else = node
                     .elif_else_clauses
                     .last()
@@ -477,35 +483,39 @@ where
                 if !has_else {
                     // if there's no else clause, then it's possible we took none of the branches,
                     // and the pre_if state can reach here
-                    self.flow_merge(&pre_if);
+                    self.merge_block(pre_if);
                 }
+                self.merge_blocks(post_clauses);
+                self.seal_block();
             }
             ast::Stmt::While(node) => {
                 self.visit_expr(&node.test);
 
-                let pre_loop = self.flow_snapshot();
+                let pre_loop = self.next_block();
 
                 // Save aside any break states from an outer loop
-                let saved_break_states = std::mem::take(&mut self.loop_break_states);
+                let saved_break_states = std::mem::take(&mut self.loop_breaks);
                 self.visit_body(&node.body);
                 // Get the break states from the body of this loop, and restore the saved outer
                 // ones.
-                let break_states =
-                    std::mem::replace(&mut self.loop_break_states, saved_break_states);
+                let break_states = std::mem::replace(&mut self.loop_breaks, saved_break_states);
 
                 // We may execute the `else` clause without ever executing the body, so merge in
                 // the pre-loop state before visiting `else`.
-                self.flow_merge(&pre_loop);
+                self.next_block_unsealed();
+                self.merge_block(pre_loop);
+                self.seal_block();
                 self.visit_body(&node.orelse);
 
                 // Breaking out of a while loop bypasses the `else` clause, so merge in the break
                 // states after visiting `else`.
-                for break_state in break_states {
-                    self.flow_merge(&break_state);
-                }
+                self.next_block_unsealed();
+                self.merge_blocks(break_states);
+                self.seal_block();
             }
             ast::Stmt::Break(_) => {
-                self.loop_break_states.push(self.flow_snapshot());
+                let block_id = self.next_block();
+                self.loop_breaks.push(block_id);
             }
             _ => {
                 walk_stmt(self, stmt);
@@ -559,7 +569,7 @@ where
 
                 if flags.contains(SymbolFlags::IS_USED) {
                     let use_id = self.current_ast_ids().record_use(expr);
-                    self.current_use_def_map_mut().record_use(symbol, use_id);
+                    self.current_use_def_map().record_use(symbol, use_id);
                 }
 
                 walk_expr(self, expr);
@@ -586,12 +596,14 @@ where
                 // AST inspection, so we can't simplify here, need to record test expression for
                 // later checking)
                 self.visit_expr(test);
-                let pre_if = self.flow_snapshot();
+                let pre_if = self.next_block();
                 self.visit_expr(body);
-                let post_body = self.flow_snapshot();
-                self.flow_restore(pre_if);
+                let post_body = self.next_block();
+                self.new_block_from(pre_if);
                 self.visit_expr(orelse);
-                self.flow_merge(&post_body);
+                self.next_block_unsealed();
+                self.merge_block(post_body);
+                self.seal_block();
             }
             ast::Expr::ListComp(
                 list_comprehension @ ast::ExprListComp {
