@@ -168,6 +168,25 @@ impl ModuleName {
         };
         Some(Self(name))
     }
+
+    /// Push a new "tail" to the module name.
+    ///
+    /// The tail may be a single component, e.g. `"foo"`
+    /// or a "dotted string" consisting of multiple components,
+    /// e.g. `"foo.bar.baz"`
+    ///
+    /// ## Errors
+    /// Returns an error if any component in `tail` was not a valid identifier,
+    /// maintaining the invariant enforced by the constructor.
+    pub fn push_tail(&mut self, tail: &str) -> Result<(), &'static str> {
+        if Self::is_valid_name(tail) {
+            self.0.push('.');
+            self.0.push_str(tail);
+            Ok(())
+        } else {
+            Err("Invalid component pushed: not an identifier")
+        }
+    }
 }
 
 impl Deref for ModuleName {
