@@ -1040,7 +1040,7 @@ class Treeview(Widget, tkinter.XView, tkinter.YView):
     @overload
     def heading(self, column: str | int, option: str) -> Any: ...
     @overload
-    def heading(self, column: str | int, option: None = None) -> _TreeviewHeaderDict: ...  # type: ignore[overload-overlap]
+    def heading(self, column: str | int, option: None = None) -> _TreeviewHeaderDict: ...
     @overload
     def heading(
         self,
@@ -1052,7 +1052,8 @@ class Treeview(Widget, tkinter.XView, tkinter.YView):
         anchor: tkinter._Anchor = ...,
         command: str | Callable[[], object] = ...,
     ) -> None: ...
-    def identify(self, component, x, y): ...  # Internal Method. Leave untyped
+    # Internal Method. Leave untyped:
+    def identify(self, component, x, y): ...  # type: ignore[override]
     def identify_row(self, y: int) -> str: ...
     def identify_column(self, x: int) -> str: ...
     def identify_region(self, x: int, y: int) -> Literal["heading", "separator", "tree", "cell", "nothing"]: ...
@@ -1084,7 +1085,7 @@ class Treeview(Widget, tkinter.XView, tkinter.YView):
     @overload
     def item(self, item: str | int, option: str) -> Any: ...
     @overload
-    def item(self, item: str | int, option: None = None) -> _TreeviewItemDict: ...  # type: ignore[overload-overlap]
+    def item(self, item: str | int, option: None = None) -> _TreeviewItemDict: ...
     @overload
     def item(
         self,

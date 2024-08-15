@@ -846,7 +846,8 @@ class TextIO(IO[str]):
     @abstractmethod
     def __enter__(self) -> TextIO: ...
 
-ByteString: typing_extensions.TypeAlias = bytes | bytearray | memoryview
+if sys.version_info < (3, 14):
+    ByteString: typing_extensions.TypeAlias = bytes | bytearray | memoryview
 
 # Functions
 

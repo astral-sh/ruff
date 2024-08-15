@@ -753,9 +753,11 @@ class Constant(expr):
         __match_args__ = ("value", "kind")
     value: Any  # None, str, bytes, bool, int, float, complex, Ellipsis
     kind: str | None
-    # Aliases for value, for backwards compatibility
-    s: Any
-    n: int | float | complex
+    if sys.version_info < (3, 14):
+        # Aliases for value, for backwards compatibility
+        s: Any
+        n: int | float | complex
+
     def __init__(self, value: Any, kind: str | None = None, **kwargs: Unpack[_Attributes]) -> None: ...
 
 class NamedExpr(expr):

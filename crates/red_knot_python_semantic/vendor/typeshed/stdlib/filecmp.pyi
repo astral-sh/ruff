@@ -17,13 +17,24 @@ def cmpfiles(
 ) -> tuple[list[AnyStr], list[AnyStr], list[AnyStr]]: ...
 
 class dircmp(Generic[AnyStr]):
-    def __init__(
-        self,
-        a: GenericPath[AnyStr],
-        b: GenericPath[AnyStr],
-        ignore: Sequence[AnyStr] | None = None,
-        hide: Sequence[AnyStr] | None = None,
-    ) -> None: ...
+    if sys.version_info >= (3, 13):
+        def __init__(
+            self,
+            a: GenericPath[AnyStr],
+            b: GenericPath[AnyStr],
+            ignore: Sequence[AnyStr] | None = None,
+            hide: Sequence[AnyStr] | None = None,
+            *,
+            shallow: bool = True,
+        ) -> None: ...
+    else:
+        def __init__(
+            self,
+            a: GenericPath[AnyStr],
+            b: GenericPath[AnyStr],
+            ignore: Sequence[AnyStr] | None = None,
+            hide: Sequence[AnyStr] | None = None,
+        ) -> None: ...
     left: AnyStr
     right: AnyStr
     hide: Sequence[AnyStr]

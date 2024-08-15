@@ -73,7 +73,7 @@ def copy(obj: _CT) -> _CT: ...
 @overload
 def synchronized(obj: _SimpleCData[_T], lock: _LockLike | None = None, ctx: Any | None = None) -> Synchronized[_T]: ...
 @overload
-def synchronized(obj: ctypes.Array[c_char], lock: _LockLike | None = None, ctx: Any | None = None) -> SynchronizedString: ...  # type: ignore
+def synchronized(obj: ctypes.Array[c_char], lock: _LockLike | None = None, ctx: Any | None = None) -> SynchronizedString: ...
 @overload
 def synchronized(
     obj: ctypes.Array[_SimpleCData[_T]], lock: _LockLike | None = None, ctx: Any | None = None
@@ -115,12 +115,12 @@ class SynchronizedArray(SynchronizedBase[ctypes.Array[_SimpleCData[_T]]], Generi
 class SynchronizedString(SynchronizedArray[bytes]):
     @overload  # type: ignore[override]
     def __getitem__(self, i: slice) -> bytes: ...
-    @overload  # type: ignore[override]
+    @overload
     def __getitem__(self, i: int) -> bytes: ...
     @overload  # type: ignore[override]
     def __setitem__(self, i: slice, value: bytes) -> None: ...
-    @overload  # type: ignore[override]
-    def __setitem__(self, i: int, value: bytes) -> None: ...  # type: ignore[override]
+    @overload
+    def __setitem__(self, i: int, value: bytes) -> None: ...
     def __getslice__(self, start: int, stop: int) -> bytes: ...  # type: ignore[override]
     def __setslice__(self, start: int, stop: int, values: bytes) -> None: ...  # type: ignore[override]
 
