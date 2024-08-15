@@ -36,7 +36,7 @@ impl AlwaysFixableViolation for FloatLiteralDecimal {
     }
 }
 
-/// RUF032: Decimal() called with float literal argument
+/// RUF032: `Decimal()` called with float literal argument
 pub(crate) fn float_literal_decimal_syntax(checker: &mut Checker, call: &ast::ExprCall) {
     if !checker
         .semantic()
@@ -45,14 +45,14 @@ pub(crate) fn float_literal_decimal_syntax(checker: &mut Checker, call: &ast::Ex
     {
         return;
     }
-    if let Some(arg) = call.arguments.args.get(0) {
+    if let Some(arg) = call.arguments.args.first() {
         if let ast::Expr::NumberLiteral(ast::ExprNumberLiteral {
             value: ast::Number::Float(_),
             ..
         }) = arg
         {
             let diagnostic = Diagnostic::new(FloatLiteralDecimal, arg.range()).with_fix(
-                fix_float_literal(arg.range(), checker.generator().expr(arg)),
+                fix_float_literal(arg.range(), &checker.generator().expr(arg)),
             );
             checker.diagnostics.push(diagnostic);
         } else if let ast::Expr::UnaryOp(ast::ExprUnaryOp { operand, .. }) = arg {
@@ -62,7 +62,7 @@ pub(crate) fn float_literal_decimal_syntax(checker: &mut Checker, call: &ast::Ex
             }) = operand.as_ref()
             {
                 let diagnostic = Diagnostic::new(FloatLiteralDecimal, arg.range()).with_fix(
-                    fix_float_literal(arg.range(), checker.generator().expr(arg)),
+                    fix_float_literal(arg.range(), &checker.generator().expr(arg)),
                 );
                 checker.diagnostics.push(diagnostic);
             }
@@ -70,7 +70,7 @@ pub(crate) fn float_literal_decimal_syntax(checker: &mut Checker, call: &ast::Ex
     }
 }
 
-fn fix_float_literal(range: TextRange, float_literal: String) -> Fix {
-    let content = format!("\"{}\"", float_literal);
+fn fix_float_literal(range: TextRange, float_literal: &str) -> Fix {
+    let content = format!("\"{float_literal}\"");
     Fix::unsafe_edit(Edit::range_replacement(content, range))
 }
