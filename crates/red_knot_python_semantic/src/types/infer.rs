@@ -1354,18 +1354,22 @@ impl<'db> TypeInferenceBuilder<'db> {
                     let symbol = symbols.symbol_by_name(id).unwrap();
                     if !symbol.is_defined() || !self.scope.is_function_like(self.db) {
                         // implicit global
-                        let mut unbound_ty = if file_scope_id == FileScopeId::global() {
+                        let unbound_ty = if file_scope_id == FileScopeId::global() {
                             Type::Unbound
                         } else {
                             global_symbol_ty_by_name(self.db, self.file, id)
                         };
                         // fallback to builtins
-                        if matches!(unbound_ty, Type::Unbound)
+                        if unbound_ty.may_be_unbound(self.db)
                             && Some(self.scope) != builtins_scope(self.db)
                         {
-                            unbound_ty = builtins_symbol_ty_by_name(self.db, id);
+                            Some(unbound_ty.replace_unbound_with(
+                                self.db,
+                                builtins_symbol_ty_by_name(self.db, id),
+                            ))
+                        } else {
+                            Some(unbound_ty)
                         }
-                        Some(unbound_ty)
                     } else {
                         Some(Type::Unbound)
                     }
@@ -2159,6 +2163,38 @@ mod tests {
 
         assert_eq!(x_ty.display(&db).to_string(), "Unbound");
         assert_eq!(y_ty.display(&db).to_string(), "Literal[1]");
+
+        Ok(())
+    }
+
+    #[test]
+    fn conditionally_global_or_builtin() -> anyhow::Result<()> {
+        let mut db = setup_db();
+
+        db.write_dedented(
+            "/src/a.py",
+            "
+            if flag:
+                copyright = 1
+            def f():
+                y = copyright
+            ",
+        )?;
+
+        let file = system_path_to_file(&db, "src/a.py").expect("Expected file to exist.");
+        let index = semantic_index(&db, file);
+        let function_scope = index
+            .child_scopes(FileScopeId::global())
+            .next()
+            .unwrap()
+            .0
+            .to_scope_id(&db, file);
+        let y_ty = symbol_ty_by_name(&db, function_scope, "y");
+
+        assert_eq!(
+            y_ty.display(&db).to_string(),
+            "Literal[1] | Literal[copyright]"
+        );
 
         Ok(())
     }

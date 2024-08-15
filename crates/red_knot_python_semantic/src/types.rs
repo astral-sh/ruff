@@ -145,8 +145,33 @@ impl<'db> Type<'db> {
         matches!(self, Type::Unbound)
     }
 
-    pub const fn is_unknown(&self) -> bool {
-        matches!(self, Type::Unknown)
+    pub const fn is_never(&self) -> bool {
+        matches!(self, Type::Never)
+    }
+
+    pub fn may_be_unbound(&self, db: &'db dyn Db) -> bool {
+        match self {
+            Type::Unbound => true,
+            Type::Union(union) => union.contains(db, Type::Unbound),
+            // Unbound can't appear in an intersection, because an intersection with Unbound
+            // simplifies to just Unbound.
+            _ => false,
+        }
+    }
+
+    #[must_use]
+    pub fn replace_unbound_with(&self, db: &'db dyn Db, replacement: Type<'db>) -> Type<'db> {
+        match self {
+            Type::Unbound => replacement,
+            Type::Union(union) => union
+                .elements(db)
+                .into_iter()
+                .fold(UnionBuilder::new(db), |builder, ty| {
+                    builder.add(ty.replace_unbound_with(db, replacement))
+                })
+                .build(),
+            ty => *ty,
+        }
     }
 
     #[must_use]
