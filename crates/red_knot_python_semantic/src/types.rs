@@ -145,10 +145,16 @@ impl<'db> Type<'db> {
         matches!(self, Type::Unbound)
     }
 
+    pub const fn is_never(&self) -> bool {
+        matches!(self, Type::Never)
+    }
+
     pub fn may_be_unbound(&self, db: &'db dyn Db) -> bool {
         match self {
             Type::Unbound => true,
             Type::Union(union) => union.contains(db, Type::Unbound),
+            // Unbound can't appear in an intersection, because an intersection with Unbound
+            // simplifies to just Unbound.
             _ => false,
         }
     }

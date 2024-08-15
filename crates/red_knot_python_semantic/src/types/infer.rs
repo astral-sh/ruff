@@ -1354,7 +1354,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                     let symbol = symbols.symbol_by_name(id).unwrap();
                     if !symbol.is_defined() || !self.scope.is_function_like(self.db) {
                         // implicit global
-                        let mut unbound_ty = if file_scope_id == FileScopeId::global() {
+                        let unbound_ty = if file_scope_id == FileScopeId::global() {
                             Type::Unbound
                         } else {
                             global_symbol_ty_by_name(self.db, self.file, id)
@@ -1363,12 +1363,13 @@ impl<'db> TypeInferenceBuilder<'db> {
                         if unbound_ty.may_be_unbound(self.db)
                             && Some(self.scope) != builtins_scope(self.db)
                         {
-                            unbound_ty = unbound_ty.replace_unbound_with(
+                            Some(unbound_ty.replace_unbound_with(
                                 self.db,
                                 builtins_symbol_ty_by_name(self.db, id),
-                            );
+                            ))
+                        } else {
+                            Some(unbound_ty)
                         }
-                        Some(unbound_ty)
                     } else {
                         Some(Type::Unbound)
                     }
