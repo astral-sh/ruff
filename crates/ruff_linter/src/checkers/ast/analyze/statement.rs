@@ -707,11 +707,7 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                     }
                     if checker.enabled(Rule::CamelcaseImportedAsAcronym) {
                         if let Some(diagnostic) = pep8_naming::rules::camelcase_imported_as_acronym(
-                            name,
-                            asname,
-                            alias,
-                            stmt,
-                            &checker.settings.pep8_naming.ignore_names,
+                            name, asname, alias, stmt, checker,
                         ) {
                             checker.diagnostics.push(diagnostic);
                         }
@@ -1026,7 +1022,7 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                             asname,
                             alias,
                             stmt,
-                            &checker.settings.pep8_naming.ignore_names,
+                            checker,
                         ) {
                             checker.diagnostics.push(diagnostic);
                         }
