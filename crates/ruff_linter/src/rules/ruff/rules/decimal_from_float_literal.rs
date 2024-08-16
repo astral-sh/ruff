@@ -46,15 +46,15 @@ pub(crate) fn decimal_from_float_literal_syntax(checker: &mut Checker, call: &as
         return;
     };
 
-    if !checker
+    if !is_arg_float_literal(arg) {
+        return;
+    }
+
+    if checker
         .semantic()
         .resolve_qualified_name(call.func.as_ref())
         .is_some_and(|qualified_name| matches!(qualified_name.segments(), ["decimal", "Decimal"]))
     {
-        return;
-    }
-
-    if is_arg_float_literal(arg) {
         let diagnostic = Diagnostic::new(DecimalFromFloatLiteral, arg.range()).with_fix(
             fix_float_literal(arg.range(), &checker.generator().expr(arg)),
         );
