@@ -55,9 +55,31 @@ async def read_thing():
 async def read_thing(*, author: str):
     ...
 
+
 @app.get("/books/{author}/{title}")
 async def read_thing(hello, /, *, author: str):
     ...
+
+
+@app.get("/things/{thing_id}")
+async def read_thing(
+        query: str,
+):
+    return {"query": query}
+
+
+@app.get("/things/{thing_id}")
+async def read_thing(
+        query: str = "default",
+):
+    return {"query": query}
+
+
+@app.get("/things/{thing_id}")
+async def read_thing(
+        *, query: str = "default",
+):
+    return {"query": query}
 
 
 # OK
@@ -94,7 +116,6 @@ async def read_thing(*, author: str, title: str):
 @app.get("/books/{author}/{title:path}")
 async def read_thing(*, author: str, title: str):
     return {"author": author, "title": title}
-
 
 
 # Ignored

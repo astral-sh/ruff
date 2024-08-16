@@ -2,28 +2,37 @@ use std::iter::Peekable;
 use std::ops::Range;
 use std::str::CharIndices;
 
-use ruff_diagnostics::{Applicability, Fix};
+use ruff_diagnostics::Fix;
 use ruff_diagnostics::{Diagnostic, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast as ast;
 use ruff_python_semantic::Modules;
+use ruff_python_stdlib::identifiers::is_identifier;
 use ruff_text_size::{Ranged, TextSize};
 
 use crate::checkers::ast::Checker;
 use crate::fix::edits::add_parameter;
 use crate::rules::fastapi::rules::is_fastapi_route_decorator;
-use ruff_python_stdlib::identifiers::is_identifier;
 
 /// ## What it does
-/// Identifies FastAPI routes that declare path parameters in the route path but not in the function signature.
+/// Identifies FastAPI routes that declare path parameters in the route path
+/// that are not included in the function signature.
 ///
 /// ## Why is this bad?
 /// Path parameters are used to extract values from the URL path.
-/// If a path parameter is declared in the route path but not in the function signature, it will not be accessible in the function body, which is likely a mistake.
 ///
-/// ## Limitations
-/// If the path parameter is not a valid Python identifier, FastAPI will normalize it to a valid identifier.
-/// This lint simply ignores path parameters that are not valid identifiers, as that normalization behavior is undocumented.
+/// If a path parameter is declared in the route path but not in the function
+/// signature, it will not be accessible in the function body, which is likely
+/// a mistake.
+///
+/// If a path parameter is declared in the route path, but as a positional-only
+/// argument in the function signature, it will also not be accessible in the
+/// function body, as FastAPI will not inject the parameter.
+///
+/// ## Known problems
+/// If the path parameter is _not_ a valid Python identifier (e.g., `user-id`, as
+/// opposed to `user_id`), FastAPI will normalize it. However, this rule simply
+/// ignores such path parameters, as FastAPI's normalization behavior is undocumented.
 ///
 /// ## Example
 ///
@@ -48,12 +57,15 @@ use ruff_python_stdlib::identifiers::is_identifier;
 /// @app.get("/things/{thing_id}")
 /// async def read_thing(thing_id: int, query: str): ...
 /// ```
-
+///
+/// ## Fix safety
+/// This rule's fix is marked as unsafe, as modifying a function signature can
+/// change the behavior of the code.
 #[violation]
 pub struct FastApiUnusedPathParameter {
     arg_name: String,
     function_name: String,
-    arg_name_already_used: bool,
+    is_positional: bool,
 }
 
 impl Violation for FastApiUnusedPathParameter {
@@ -64,22 +76,25 @@ impl Violation for FastApiUnusedPathParameter {
         let Self {
             arg_name,
             function_name,
-            arg_name_already_used: arg_name_is_pos_only_arg,
+            is_positional,
         } = self;
-        if *arg_name_is_pos_only_arg {
-            format!(
-                "Path parameter `{arg_name}` in route path, but appears as a positional-only argument in function `{function_name}`. Consider making it a regular argument."
-            )
+        #[allow(clippy::if_not_else)]
+        if !is_positional {
+            format!("Parameter `{arg_name}` appears in route path, but not in `{function_name}` signature")
         } else {
             format!(
-                "Path parameter `{arg_name}` in route path but not in function `{function_name}`."
+                "Parameter `{arg_name}` appears in route path, but only as a positional-only argument in `{function_name}` signature"
             )
         }
     }
 
     fn fix_title(&self) -> Option<String> {
-        let Self { arg_name, .. } = self;
-        if self.arg_name_already_used {
+        let Self {
+            arg_name,
+            is_positional,
+            ..
+        } = self;
+        if *is_positional {
             None
         } else {
             Some(format!("Add `{arg_name}` to function signature"))
@@ -87,6 +102,99 @@ impl Violation for FastApiUnusedPathParameter {
     }
 }
 
+/// FAST003
+pub(crate) fn fastapi_unused_path_parameter(
+    checker: &mut Checker,
+    function_def: &ast::StmtFunctionDef,
+) {
+    if !checker.semantic().seen_module(Modules::FASTAPI) {
+        return;
+    }
+
+    // Get the route path from the decorator.
+    let route_decorator = function_def
+        .decorator_list
+        .iter()
+        .find_map(|decorator| is_fastapi_route_decorator(decorator, checker.semantic()));
+
+    let Some(route_decorator) = route_decorator else {
+        return;
+    };
+
+    let Some(path_arg) = route_decorator.arguments.args.first() else {
+        return;
+    };
+    let diagnostic_range = path_arg.range();
+
+    // We can't really handle anything other than string literals.
+    let path = match path_arg.as_string_literal_expr() {
+        Some(path_arg) => &path_arg.value,
+        None => return,
+    };
+
+    // Extract the path parameters from the route path.
+    let path_params = PathParamIterator::new(path.to_str());
+
+    // Extract the arguments from the function signature
+    let named_args: Vec<_> = function_def
+        .parameters
+        .args
+        .iter()
+        .chain(function_def.parameters.kwonlyargs.iter())
+        .map(|arg| arg.parameter.name.as_str())
+        .collect();
+
+    // Check if any of the path parameters are not in the function signature.
+    let mut diagnostics = vec![];
+    for (path_param, range) in path_params {
+        // Ignore invalid identifiers (e.g., `user-id`, as opposed to `user_id`)
+        if !is_identifier(path_param) {
+            continue;
+        }
+
+        // If the path parameter is already in the function signature, we don't need to do anything.
+        if named_args.contains(&path_param) {
+            continue;
+        }
+
+        // Determine whether the path parameter is used as a positional-only argument. In this case,
+        // the path parameter injection won't work, but we also can't fix it (yet), since we'd need
+        // to make the parameter non-positional-only.
+        let is_positional = function_def
+            .parameters
+            .posonlyargs
+            .iter()
+            .any(|arg| arg.parameter.name.as_str() == path_param);
+
+        let mut diagnostic = Diagnostic::new(
+            FastApiUnusedPathParameter {
+                arg_name: path_param.to_string(),
+                function_name: function_def.name.to_string(),
+                is_positional,
+            },
+            #[allow(clippy::cast_possible_truncation)]
+            diagnostic_range
+                .add_start(TextSize::from(range.start as u32 + 1))
+                .sub_end(TextSize::from((path.len() - range.end + 1) as u32)),
+        );
+        if !is_positional {
+            diagnostic.set_fix(Fix::unsafe_edit(add_parameter(
+                path_param,
+                &function_def.parameters,
+                checker.locator().contents(),
+            )));
+        }
+        diagnostics.push(diagnostic);
+    }
+
+    checker.diagnostics.extend(diagnostics);
+}
+
+/// An iterator to extract parameters from FastAPI route paths.
+///
+/// The iterator yields tuples of the parameter name and the range of the parameter in the input,
+/// inclusive of curly braces.
+#[derive(Debug)]
 struct PathParamIterator<'a> {
     input: &'a str,
     chars: Peekable<CharIndices<'a>>,
@@ -120,100 +228,5 @@ impl<'a> Iterator for PathParamIterator<'a> {
             }
         }
         None
-    }
-}
-
-/// Returns an iterator of path parameters and their ranges in the route path.
-/// The string is just the name of the path parameter.
-/// The range includes the curly braces.
-fn extract_path_params_from_route(input: &str) -> PathParamIterator {
-    PathParamIterator::new(input)
-}
-
-pub(crate) fn fastapi_unused_path_parameter(
-    checker: &mut Checker,
-    function_def: &ast::StmtFunctionDef,
-) {
-    if !checker.semantic().seen_module(Modules::FASTAPI) {
-        return;
-    }
-
-    // Get the route path from the decorator
-    let route_decorator = function_def
-        .decorator_list
-        .iter()
-        .find_map(|decorator| is_fastapi_route_decorator(decorator, checker.semantic()));
-
-    let Some(route_decorator) = route_decorator else {
-        return;
-    };
-
-    let path_arg = route_decorator.arguments.args.first();
-    let Some(path_arg) = path_arg else {
-        return;
-    };
-    // Lets path_arg go out of scope so we can reuse checker later
-    let diagnostic_range = path_arg.range();
-    // We can't really handle anything other than string literals
-    let path = match path_arg.as_string_literal_expr() {
-        Some(path_arg) => path_arg.value.to_string(),
-        None => return,
-    };
-
-    let path_params = extract_path_params_from_route(&path);
-
-    // Now we extract the arguments from the function signature
-    let named_args: Vec<_> = function_def
-        .parameters
-        .args
-        .iter()
-        .chain(function_def.parameters.kwonlyargs.iter())
-        .map(|arg| arg.parameter.name.as_str())
-        .collect();
-
-    // Check if any of the path parameters are not in the function signature
-    for (path_param, range) in path_params
-        .into_iter()
-        .filter(|(path_param, _)| is_identifier(path_param))
-    {
-        if named_args.contains(&path_param) {
-            continue;
-        }
-
-        let arg_name_already_used = function_def
-            .parameters
-            .posonlyargs
-            .iter()
-            .map(|arg| arg.parameter.name.as_str())
-            .collect::<Vec<_>>()
-            .contains(&path_param);
-
-        let violation = FastApiUnusedPathParameter {
-            arg_name: path_param.to_string(),
-            function_name: function_def.name.to_string(),
-            // If the path parameter shows up in the positional-only arguments,
-            // the path parameter injection also won't work, but we can't fix that (yet)
-            // as that would require making that parameter non positional.
-            arg_name_already_used,
-        };
-        let fixable = violation.fix_title().is_some();
-        #[allow(clippy::cast_possible_truncation)]
-        let mut diagnostic = Diagnostic::new(
-            violation,
-            diagnostic_range
-                .add_start(TextSize::from(range.start as u32 + 1))
-                .sub_end(TextSize::from((path.len() - range.end + 1) as u32)),
-        );
-        if fixable {
-            diagnostic.set_fix(Fix::applicable_edit(
-                add_parameter(
-                    path_param,
-                    &function_def.parameters,
-                    checker.locator().contents(),
-                ),
-                Applicability::Safe,
-            ));
-        }
-        checker.diagnostics.push(diagnostic);
     }
 }

@@ -285,17 +285,31 @@ pub(crate) fn add_argument(
 
 /// Generic function to add a (regular) parameter to a function definition.
 pub(crate) fn add_parameter(parameter: &str, parameters: &Parameters, source: &str) -> Edit {
-    if let Some(last) = parameters.args.last() {
+    if let Some(last) = parameters
+        .args
+        .iter()
+        .filter(|arg| arg.default.is_none())
+        .last()
+    {
         // Case 1: at least one regular parameter, so append after the last one.
-        Edit::insertion(format!(", {parameter}"), last.range().end())
+        Edit::insertion(format!(", {parameter}"), last.end())
+    } else if parameters.args.first().is_some() {
+        // Case 2: no regular parameters, but at least one keyword parameter, so add before the
+        // first.
+        let pos = parameters.start();
+        let mut tokenizer = SimpleTokenizer::starts_at(pos, source);
+        let name = tokenizer
+            .find(|token| token.kind == SimpleTokenKind::Name)
+            .expect("Unable to find name token");
+        Edit::insertion(format!("{parameter}, "), name.start())
     } else if let Some(last) = parameters.posonlyargs.last() {
-        // Case 2: no regular parameter, but a positional-only parameter exist, so add parameter after that.
+        // Case 2: no regular parameter, but a positional-only parameter exists, so add after that.
         // We take care to add it *after* the `/` separator.
-        let pos = last.range().end();
+        let pos = last.end();
         let mut tokenizer = SimpleTokenizer::starts_at(pos, source);
         let slash = tokenizer
             .find(|token| token.kind == SimpleTokenKind::Slash)
-            .expect("Unable to find ,");
+            .expect("Unable to find `/` token");
         // Try to find a comma after the slash.
         let comma = tokenizer.find(|token| token.kind == SimpleTokenKind::Comma);
         if let Some(comma) = comma {
@@ -307,11 +321,11 @@ pub(crate) fn add_parameter(parameter: &str, parameters: &Parameters, source: &s
         // Case 3: no regular parameter, but a keyword-only parameter exist, so add parameter before that.
         // We need to backtrack to before the `*` separator.
         // We know there is no non-keyword-only params, so we can safely assume that the `*` separator is the first
-        let pos = parameters.range().start();
+        let pos = parameters.start();
         let mut tokenizer = SimpleTokenizer::starts_at(pos, source);
         let star = tokenizer
             .find(|token| token.kind == SimpleTokenKind::Star)
-            .expect("Unable to find *");
+            .expect("Unable to find `*` token");
         Edit::insertion(format!("{parameter}, "), star.start())
     } else {
         // Case 4: no parameters at all, so add parameter after the opening parenthesis.
