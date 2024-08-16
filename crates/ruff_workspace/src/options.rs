@@ -2988,7 +2988,7 @@ pub struct RuffOptions {
     pub parenthesize_tuple_in_subscript: Option<bool>,
 
     /// Whether to allow fastapi routes to be defined as async function, although they don't use
-    /// any asynchronous code (see `RUF029`).
+    /// any asynchronous code (see `RUF029` and [FastAPI docs](https://fastapi.tiangolo.com/async/)).
     #[option(
         default = r#"false"#,
         value_type = "bool",

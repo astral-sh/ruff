@@ -28,6 +28,9 @@ use ruff_python_semantic::Modules;
 /// def foo():
 ///     bar()
 /// ```
+///
+/// ## Options
+/// - `lint.ruff.allow-fastapi-routes-unused-async`
 #[violation]
 pub struct UnusedAsync {
     name: String,

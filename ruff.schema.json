@@ -2685,7 +2685,7 @@
       "type": "object",
       "properties": {
         "allow-fastapi-routes-unused-async": {
-          "description": "Whether to allow fastapi routes to be defined as async function, although they don't use any asynchronous code (see `RUF029`).",
+          "description": "Whether to allow fastapi routes to be defined as async function, although they don't use any asynchronous code (see `RUF029` and [FastAPI docs](https://fastapi.tiangolo.com/async/)).",
           "type": [
             "boolean",
             "null"
