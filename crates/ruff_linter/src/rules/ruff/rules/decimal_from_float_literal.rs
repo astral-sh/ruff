@@ -9,7 +9,7 @@ use crate::checkers::ast::Checker;
 /// Checks for `Decimal` calls passing a float literal.
 ///
 /// ## Why is this bad?
-/// Float literals are non-deterministic and can lead to unexpected results. The `Decimal` class is designed to handle
+/// Float literals have limited precision that can lead to unexpected results. The `Decimal` class is designed to handle
 /// numbers with fixed-point precision, so a string literal should be used instead.
 ///
 /// ## Example
@@ -21,6 +21,10 @@ use crate::checkers::ast::Checker;
 /// Use instead:
 /// ```python
 /// num = Decimal("1.2345")
+///
+/// ## Fix Safety
+/// This rule's fix is marked as unsafe because it changes the underlying value of the `Decimal` instance that is
+/// constructed. This can lead to unexpected behavior if your program relies on the previous imprecise value.
 /// ```
 #[violation]
 pub struct DecimalFromFloatLiteral;
