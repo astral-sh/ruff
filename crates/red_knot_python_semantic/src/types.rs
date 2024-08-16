@@ -113,7 +113,7 @@ pub enum Type<'db> {
     Any,
     /// the empty set of values
     Never,
-    /// unknown type (no annotation)
+    /// unknown type (either no annotation, or some kind of type error)
     /// equivalent to Any, or possibly to object in strict mode
     Unknown,
     /// name does not exist or is not bound to any value (this represents an error, but with some
@@ -143,6 +143,10 @@ pub enum Type<'db> {
 impl<'db> Type<'db> {
     pub const fn is_unbound(&self) -> bool {
         matches!(self, Type::Unbound)
+    }
+
+    pub const fn is_unknown(&self) -> bool {
+        matches!(self, Type::Unknown)
     }
 
     pub const fn is_never(&self) -> bool {
