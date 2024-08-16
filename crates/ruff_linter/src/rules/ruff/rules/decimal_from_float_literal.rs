@@ -54,26 +54,30 @@ pub(crate) fn decimal_from_float_literal_syntax(checker: &mut Checker, call: &as
         return;
     }
 
-    if let ast::Expr::NumberLiteral(ast::ExprNumberLiteral {
-        value: ast::Number::Float(_),
-        ..
-    }) = arg
-    {
+    if is_arg_float_literal(arg) {
         let diagnostic = Diagnostic::new(DecimalFromFloatLiteral, arg.range()).with_fix(
             fix_float_literal(arg.range(), &checker.generator().expr(arg)),
         );
         checker.diagnostics.push(diagnostic);
-    } else if let ast::Expr::UnaryOp(ast::ExprUnaryOp { operand, .. }) = arg {
-        if let ast::Expr::NumberLiteral(ast::ExprNumberLiteral {
+    }
+}
+
+fn is_arg_float_literal(arg: &ast::Expr) -> bool {
+    match arg {
+        ast::Expr::NumberLiteral(ast::ExprNumberLiteral {
             value: ast::Number::Float(_),
             ..
-        }) = operand.as_ref()
-        {
-            let diagnostic = Diagnostic::new(DecimalFromFloatLiteral, arg.range()).with_fix(
-                fix_float_literal(arg.range(), &checker.generator().expr(arg)),
-            );
-            checker.diagnostics.push(diagnostic);
+        }) => true,
+        ast::Expr::UnaryOp(ast::ExprUnaryOp { operand, .. }) => {
+            matches!(
+                operand.as_ref(),
+                ast::Expr::NumberLiteral(ast::ExprNumberLiteral {
+                    value: ast::Number::Float(_),
+                    ..
+                })
+            )
         }
+        _ => false,
     }
 }
 
