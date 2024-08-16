@@ -23,9 +23,9 @@ use crate::checkers::ast::Checker;
 /// num = Decimal("1.2345")
 /// ```
 #[violation]
-pub struct FloatLiteralDecimal;
+pub struct DecimalFromFloatLiteral;
 
-impl AlwaysFixableViolation for FloatLiteralDecimal {
+impl AlwaysFixableViolation for DecimalFromFloatLiteral {
     #[derive_message_formats]
     fn message(&self) -> String {
         format!(r#"`Decimal()` called with float literal argument"#)
@@ -37,7 +37,7 @@ impl AlwaysFixableViolation for FloatLiteralDecimal {
 }
 
 /// RUF032: `Decimal()` called with float literal argument
-pub(crate) fn float_literal_decimal_syntax(checker: &mut Checker, call: &ast::ExprCall) {
+pub(crate) fn decimal_from_float_literal_syntax(checker: &mut Checker, call: &ast::ExprCall) {
     if !checker
         .semantic()
         .resolve_qualified_name(call.func.as_ref())
@@ -51,7 +51,7 @@ pub(crate) fn float_literal_decimal_syntax(checker: &mut Checker, call: &ast::Ex
             ..
         }) = arg
         {
-            let diagnostic = Diagnostic::new(FloatLiteralDecimal, arg.range()).with_fix(
+            let diagnostic = Diagnostic::new(DecimalFromFloatLiteral, arg.range()).with_fix(
                 fix_float_literal(arg.range(), &checker.generator().expr(arg)),
             );
             checker.diagnostics.push(diagnostic);
@@ -61,7 +61,7 @@ pub(crate) fn float_literal_decimal_syntax(checker: &mut Checker, call: &ast::Ex
                 ..
             }) = operand.as_ref()
             {
-                let diagnostic = Diagnostic::new(FloatLiteralDecimal, arg.range()).with_fix(
+                let diagnostic = Diagnostic::new(DecimalFromFloatLiteral, arg.range()).with_fix(
                     fix_float_literal(arg.range(), &checker.generator().expr(arg)),
                 );
                 checker.diagnostics.push(diagnostic);
