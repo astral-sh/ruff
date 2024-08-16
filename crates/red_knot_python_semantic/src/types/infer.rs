@@ -870,11 +870,11 @@ impl<'db> TypeInferenceBuilder<'db> {
     ///   - `from .foo import bar` => `level == 1`
     ///   - `from ...foo import bar` => `level == 3`
     /// - `tail` is the relative module name stripped of all leading dots:
-    ///   - `from .foo import bar` => `tail == `"foo"`
+    ///   - `from .foo import bar` => `tail == "foo"`
     ///   - `from ..foo.bar import baz` => `tail == "foo.bar"`
     fn relative_module_name(&self, tail: Option<&str>, level: NonZeroU32) -> Option<ModuleName> {
         let module = file_to_module(self.db, self.file)?;
-        let mut level = u32::from(level);
+        let mut level = level.get();
         if module.kind().is_package() {
             level -= 1;
         }
@@ -882,8 +882,8 @@ impl<'db> TypeInferenceBuilder<'db> {
         for _ in 0..level {
             module_name = module_name.parent()?;
         }
-        if let Some(tail) = tail {
-            module_name.push_tail(tail).ok()?;
+        if let Some(tail) = tail.and_then(ModuleName::new) {
+            module_name.extend(&tail);
         }
         Some(module_name)
     }
