@@ -70,13 +70,7 @@ fn is_arg_float_literal(arg: &ast::Expr) -> bool {
             ..
         }) => true,
         ast::Expr::UnaryOp(ast::ExprUnaryOp { operand, .. }) => {
-            matches!(
-                operand.as_ref(),
-                ast::Expr::NumberLiteral(ast::ExprNumberLiteral {
-                    value: ast::Number::Float(_),
-                    ..
-                })
-            )
+            is_arg_float_literal(operand.as_ref())
         }
         _ => false,
     }
