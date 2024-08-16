@@ -14,7 +14,7 @@ use ruff_python_ast::{name::Name, PySourceType};
 use crate::workspace::files::{Index, Indexed, PackageFiles};
 use crate::{
     db::Db,
-    lint::{lint_semantic, lint_syntax, Diagnostics},
+    lint::{lint_semantic, lint_syntax},
 };
 
 mod files;
@@ -348,7 +348,7 @@ impl Package {
 }
 
 #[salsa::tracked]
-pub(super) fn check_file(db: &dyn Db, file: File) -> Diagnostics {
+pub(super) fn check_file(db: &dyn Db, file: File) -> Vec<String> {
     let path = file.path(db);
     let _span = tracing::debug_span!("check_file", file=%path).entered();
     tracing::debug!("Checking file {path}");
@@ -365,12 +365,12 @@ pub(super) fn check_file(db: &dyn Db, file: File) -> Diagnostics {
 
     // Abort checking if there are IO errors.
     if source_text(db.upcast(), file).has_read_error() {
-        return Diagnostics::from(diagnostics);
+        return diagnostics;
     }
 
     diagnostics.extend_from_slice(lint_syntax(db, file));
     diagnostics.extend_from_slice(lint_semantic(db, file));
-    Diagnostics::from(diagnostics)
+    diagnostics
 }
 
 fn discover_package_files(db: &dyn Db, path: &SystemPath) -> FxHashSet<File> {
@@ -424,7 +424,7 @@ mod tests {
     use ruff_db::testing::assert_function_query_was_not_run;
 
     use crate::db::tests::TestDb;
-    use crate::lint::{lint_syntax, Diagnostics};
+    use crate::lint::lint_syntax;
     use crate::workspace::check_file;
 
     #[test]
@@ -442,9 +442,7 @@ mod tests {
         assert_eq!(source_text(&db, file).as_str(), "");
         assert_eq!(
             check_file(&db, file),
-            Diagnostics::List(vec![
-                "Failed to read file: No such file or directory".to_string()
-            ])
+            vec!["Failed to read file: No such file or directory".to_string()]
         );
 
         let events = db.take_salsa_events();
@@ -455,7 +453,7 @@ mod tests {
         db.write_file(path, "").unwrap();
 
         assert_eq!(source_text(&db, file).as_str(), "");
-        assert_eq!(check_file(&db, file), Diagnostics::Empty);
+        assert_eq!(check_file(&db, file), vec![] as Vec<String>);
 
         Ok(())
     }

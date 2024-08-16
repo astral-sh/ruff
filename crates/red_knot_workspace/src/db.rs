@@ -11,7 +11,6 @@ use ruff_db::{Db as SourceDb, Upcast};
 use salsa::plumbing::ZalsaDatabase;
 use salsa::{Cancelled, Event};
 
-use crate::lint::Diagnostics;
 use crate::workspace::{check_file, Workspace, WorkspaceMetadata};
 
 mod changes;
@@ -61,7 +60,7 @@ impl RootDatabase {
         self.with_db(|db| db.workspace().check(db))
     }
 
-    pub fn check_file(&self, file: File) -> Result<Diagnostics, Cancelled> {
+    pub fn check_file(&self, file: File) -> Result<Vec<String>, Cancelled> {
         self.with_db(|db| check_file(db, file))
     }
 
