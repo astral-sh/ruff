@@ -21,11 +21,11 @@ use crate::checkers::ast::Checker;
 /// Use instead:
 /// ```python
 /// num = Decimal("1.2345")
+/// ```
 ///
 /// ## Fix Safety
 /// This rule's fix is marked as unsafe because it changes the underlying value of the `Decimal` instance that is
 /// constructed. This can lead to unexpected behavior if your program relies on the previous imprecise value.
-/// ```
 #[violation]
 pub struct DecimalFromFloatLiteral;
 
