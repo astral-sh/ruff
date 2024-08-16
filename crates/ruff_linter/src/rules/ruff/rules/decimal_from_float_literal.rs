@@ -42,6 +42,10 @@ impl AlwaysFixableViolation for DecimalFromFloatLiteral {
 
 /// RUF032: `Decimal()` called with float literal argument
 pub(crate) fn decimal_from_float_literal_syntax(checker: &mut Checker, call: &ast::ExprCall) {
+    let Some(arg) = call.arguments.args.first() else {
+        return;
+    };
+
     if !checker
         .semantic()
         .resolve_qualified_name(call.func.as_ref())
@@ -49,27 +53,26 @@ pub(crate) fn decimal_from_float_literal_syntax(checker: &mut Checker, call: &as
     {
         return;
     }
-    if let Some(arg) = call.arguments.args.first() {
+
+    if let ast::Expr::NumberLiteral(ast::ExprNumberLiteral {
+        value: ast::Number::Float(_),
+        ..
+    }) = arg
+    {
+        let diagnostic = Diagnostic::new(DecimalFromFloatLiteral, arg.range()).with_fix(
+            fix_float_literal(arg.range(), &checker.generator().expr(arg)),
+        );
+        checker.diagnostics.push(diagnostic);
+    } else if let ast::Expr::UnaryOp(ast::ExprUnaryOp { operand, .. }) = arg {
         if let ast::Expr::NumberLiteral(ast::ExprNumberLiteral {
             value: ast::Number::Float(_),
             ..
-        }) = arg
+        }) = operand.as_ref()
         {
             let diagnostic = Diagnostic::new(DecimalFromFloatLiteral, arg.range()).with_fix(
                 fix_float_literal(arg.range(), &checker.generator().expr(arg)),
             );
             checker.diagnostics.push(diagnostic);
-        } else if let ast::Expr::UnaryOp(ast::ExprUnaryOp { operand, .. }) = arg {
-            if let ast::Expr::NumberLiteral(ast::ExprNumberLiteral {
-                value: ast::Number::Float(_),
-                ..
-            }) = operand.as_ref()
-            {
-                let diagnostic = Diagnostic::new(DecimalFromFloatLiteral, arg.range()).with_fix(
-                    fix_float_literal(arg.range(), &checker.generator().expr(arg)),
-                );
-                checker.diagnostics.push(diagnostic);
-            }
         }
     }
 }
