@@ -22,14 +22,14 @@ use crate::rules::flake8_async::helpers::MethodName;
 /// ## Example
 /// ```python
 /// async def func():
-///     with asyncio.timeout(2):
+///     async with asyncio.timeout(2):
 ///         do_something()
 /// ```
 ///
 /// Use instead:
 /// ```python
 /// async def func():
-///     with asyncio.timeout(2):
+///     async with asyncio.timeout(2):
 ///         do_something()
 ///         await awaitable()
 /// ```

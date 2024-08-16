@@ -94,6 +94,9 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
             if checker.enabled(Rule::FastApiNonAnnotatedDependency) {
                 fastapi::rules::fastapi_non_annotated_dependency(checker, function_def);
             }
+            if checker.enabled(Rule::FastApiUnusedPathParameter) {
+                fastapi::rules::fastapi_unused_path_parameter(checker, function_def);
+            }
             if checker.enabled(Rule::AmbiguousFunctionName) {
                 if let Some(diagnostic) = pycodestyle::rules::ambiguous_function_name(name) {
                     checker.diagnostics.push(diagnostic);
@@ -263,8 +266,8 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
             if checker.enabled(Rule::TooManyArguments) {
                 pylint::rules::too_many_arguments(checker, function_def);
             }
-            if checker.enabled(Rule::TooManyPositional) {
-                pylint::rules::too_many_positional(checker, function_def);
+            if checker.enabled(Rule::TooManyPositionalArguments) {
+                pylint::rules::too_many_positional_arguments(checker, function_def);
             }
             if checker.enabled(Rule::TooManyReturnStatements) {
                 if let Some(diagnostic) = pylint::rules::too_many_return_statements(
@@ -704,11 +707,7 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                     }
                     if checker.enabled(Rule::CamelcaseImportedAsAcronym) {
                         if let Some(diagnostic) = pep8_naming::rules::camelcase_imported_as_acronym(
-                            name,
-                            asname,
-                            alias,
-                            stmt,
-                            &checker.settings.pep8_naming.ignore_names,
+                            name, asname, alias, stmt, checker,
                         ) {
                             checker.diagnostics.push(diagnostic);
                         }
@@ -1023,7 +1022,7 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                             asname,
                             alias,
                             stmt,
-                            &checker.settings.pep8_naming.ignore_names,
+                            checker,
                         ) {
                             checker.diagnostics.push(diagnostic);
                         }

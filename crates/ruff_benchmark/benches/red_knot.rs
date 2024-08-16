@@ -89,7 +89,7 @@ fn benchmark_incremental(criterion: &mut Criterion) {
                 let Case { db, parser, .. } = case;
                 let result = db.check_file(*parser).unwrap();
 
-                assert_eq!(result.len(), 402);
+                assert_eq!(result.len(), 29);
             },
             BatchSize::SmallInput,
         );
@@ -104,7 +104,7 @@ fn benchmark_cold(criterion: &mut Criterion) {
                 let Case { db, parser, .. } = case;
                 let result = db.check_file(*parser).unwrap();
 
-                assert_eq!(result.len(), 402);
+                assert_eq!(result.len(), 29);
             },
             BatchSize::SmallInput,
         );

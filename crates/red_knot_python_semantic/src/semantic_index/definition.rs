@@ -45,6 +45,7 @@ pub(crate) enum DefinitionNodeRef<'a> {
     Assignment(AssignmentDefinitionNodeRef<'a>),
     AnnotatedAssignment(&'a ast::StmtAnnAssign),
     Comprehension(ComprehensionDefinitionNodeRef<'a>),
+    Parameter(ast::AnyParameterRef<'a>),
 }
 
 impl<'a> From<&'a ast::StmtFunctionDef> for DefinitionNodeRef<'a> {
@@ -92,6 +93,12 @@ impl<'a> From<AssignmentDefinitionNodeRef<'a>> for DefinitionNodeRef<'a> {
 impl<'a> From<ComprehensionDefinitionNodeRef<'a>> for DefinitionNodeRef<'a> {
     fn from(node: ComprehensionDefinitionNodeRef<'a>) -> Self {
         Self::Comprehension(node)
+    }
+}
+
+impl<'a> From<ast::AnyParameterRef<'a>> for DefinitionNodeRef<'a> {
+    fn from(node: ast::AnyParameterRef<'a>) -> Self {
+        Self::Parameter(node)
     }
 }
 
@@ -150,6 +157,14 @@ impl DefinitionNodeRef<'_> {
                     first,
                 })
             }
+            DefinitionNodeRef::Parameter(parameter) => match parameter {
+                ast::AnyParameterRef::Variadic(parameter) => {
+                    DefinitionKind::Parameter(AstNodeRef::new(parsed, parameter))
+                }
+                ast::AnyParameterRef::NonVariadic(parameter) => {
+                    DefinitionKind::ParameterWithDefault(AstNodeRef::new(parsed, parameter))
+                }
+            },
         }
     }
 
@@ -168,6 +183,10 @@ impl DefinitionNodeRef<'_> {
             }) => target.into(),
             Self::AnnotatedAssignment(node) => node.into(),
             Self::Comprehension(ComprehensionDefinitionNodeRef { node, first: _ }) => node.into(),
+            Self::Parameter(node) => match node {
+                ast::AnyParameterRef::Variadic(parameter) => parameter.into(),
+                ast::AnyParameterRef::NonVariadic(parameter) => parameter.into(),
+            },
         }
     }
 }
@@ -182,6 +201,8 @@ pub enum DefinitionKind {
     Assignment(AssignmentDefinitionKind),
     AnnotatedAssignment(AstNodeRef<ast::StmtAnnAssign>),
     Comprehension(ComprehensionDefinitionKind),
+    Parameter(AstNodeRef<ast::Parameter>),
+    ParameterWithDefault(AstNodeRef<ast::ParameterWithDefault>),
 }
 
 #[derive(Clone, Debug)]
@@ -270,6 +291,18 @@ impl From<&ast::StmtAnnAssign> for DefinitionNodeKey {
 
 impl From<&ast::Comprehension> for DefinitionNodeKey {
     fn from(node: &ast::Comprehension) -> Self {
+        Self(NodeKey::from_node(node))
+    }
+}
+
+impl From<&ast::Parameter> for DefinitionNodeKey {
+    fn from(node: &ast::Parameter) -> Self {
+        Self(NodeKey::from_node(node))
+    }
+}
+
+impl From<&ast::ParameterWithDefault> for DefinitionNodeKey {
+    fn from(node: &ast::ParameterWithDefault) -> Self {
         Self(NodeKey::from_node(node))
     }
 }

@@ -201,6 +201,7 @@ impl<'db> InnerIntersectionBuilder<'db> {
                 self.negative.retain(|elem| !pos.contains(elem));
             }
             Type::Never => {}
+            Type::Unbound => {}
             _ => {
                 if !self.positive.remove(&ty) {
                     self.negative.insert(ty);
@@ -214,9 +215,13 @@ impl<'db> InnerIntersectionBuilder<'db> {
 
         // Never is a subtype of all types
         if self.positive.contains(&Type::Never) {
-            self.positive.clear();
+            self.positive.retain(Type::is_never);
             self.negative.clear();
-            self.positive.insert(Type::Never);
+        }
+
+        if self.positive.contains(&Type::Unbound) {
+            self.positive.retain(Type::is_unbound);
+            self.negative.clear();
         }
     }
 
@@ -425,5 +430,27 @@ mod tests {
             .build();
 
         assert_eq!(ty, Type::Never);
+    }
+
+    #[test]
+    fn build_intersection_simplify_positive_unbound() {
+        let db = setup_db();
+        let ty = IntersectionBuilder::new(&db)
+            .add_positive(Type::Unbound)
+            .add_positive(Type::IntLiteral(1))
+            .build();
+
+        assert_eq!(ty, Type::Unbound);
+    }
+
+    #[test]
+    fn build_intersection_simplify_negative_unbound() {
+        let db = setup_db();
+        let ty = IntersectionBuilder::new(&db)
+            .add_negative(Type::Unbound)
+            .add_positive(Type::IntLiteral(1))
+            .build();
+
+        assert_eq!(ty, Type::IntLiteral(1));
     }
 }
