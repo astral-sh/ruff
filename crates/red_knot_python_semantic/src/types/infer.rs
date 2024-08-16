@@ -873,7 +873,10 @@ impl<'db> TypeInferenceBuilder<'db> {
     ///   - `from .foo import bar` => `tail == "foo"`
     ///   - `from ..foo.bar import baz` => `tail == "foo.bar"`
     fn relative_module_name(&self, tail: Option<&str>, level: NonZeroU32) -> Option<ModuleName> {
-        let module = file_to_module(self.db, self.file)?;
+        let Some(module) = file_to_module(self.db, self.file) else {
+            tracing::debug!("Failed to resolve file {:?} to a module", self.file);
+            return None;
+        };
         let mut level = level.get();
         if module.kind().is_package() {
             level -= 1;
@@ -882,8 +885,13 @@ impl<'db> TypeInferenceBuilder<'db> {
         for _ in 0..level {
             module_name = module_name.parent()?;
         }
-        if let Some(tail) = tail.and_then(ModuleName::new) {
-            module_name.extend(&tail);
+        if let Some(tail) = tail {
+            if let Some(valid_tail) = ModuleName::new(tail) {
+                module_name.extend(&valid_tail);
+            } else {
+                tracing::debug!("Failed to resolve relative import due to invalid syntax");
+                return None;
+            }
         }
         Some(module_name)
     }
@@ -904,6 +912,7 @@ impl<'db> TypeInferenceBuilder<'db> {
         // `follow_relative_import_bare_to_module()` and
         // `follow_nonexistent_import_bare_to_module()`.
         let ast::StmtImportFrom { module, level, .. } = import_from;
+        tracing::trace!("Resolving imported object {alias:?} from statement {import_from:?}");
         let module_name = if let Some(level) = NonZeroU32::new(*level) {
             self.relative_module_name(module.as_deref(), level)
         } else {
