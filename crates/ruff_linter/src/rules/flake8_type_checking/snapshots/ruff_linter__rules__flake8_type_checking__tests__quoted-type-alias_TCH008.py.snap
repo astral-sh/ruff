@@ -71,6 +71,7 @@ TCH008.py:22:16: TCH008 [*] Remove quotes from type alias
 22 | h: TypeAlias = 'Bar'   # TCH008
    |                ^^^^^ TCH008
 23 | i: TypeAlias = Foo['str']   # TCH008
+24 | j: TypeAlias = 'Baz'   # OK
    |
    = help: Remove quotes
 
@@ -81,8 +82,8 @@ TCH008.py:22:16: TCH008 [*] Remove quotes from type alias
 22    |-h: TypeAlias = 'Bar'   # TCH008
    22 |+h: TypeAlias = Bar   # TCH008
 23 23 | i: TypeAlias = Foo['str']   # TCH008
-24 24 | 
-25 25 | type B = 'Dict'  # TCH008
+24 24 | j: TypeAlias = 'Baz'   # OK
+25 25 | 
 
 TCH008.py:23:20: TCH008 [*] Remove quotes from type alias
    |
@@ -90,8 +91,7 @@ TCH008.py:23:20: TCH008 [*] Remove quotes from type alias
 22 | h: TypeAlias = 'Bar'   # TCH008
 23 | i: TypeAlias = Foo['str']   # TCH008
    |                    ^^^^^ TCH008
-24 | 
-25 | type B = 'Dict'  # TCH008
+24 | j: TypeAlias = 'Baz'   # OK
    |
    = help: Remove quotes
 
@@ -101,101 +101,128 @@ TCH008.py:23:20: TCH008 [*] Remove quotes from type alias
 22 22 | h: TypeAlias = 'Bar'   # TCH008
 23    |-i: TypeAlias = Foo['str']   # TCH008
    23 |+i: TypeAlias = Foo[str]   # TCH008
-24 24 | 
-25 25 | type B = 'Dict'  # TCH008
-26 26 | type D = 'Foo[str]'  # TCH008
-
-TCH008.py:25:10: TCH008 [*] Remove quotes from type alias
-   |
-23 | i: TypeAlias = Foo['str']   # TCH008
-24 | 
-25 | type B = 'Dict'  # TCH008
-   |          ^^^^^^ TCH008
-26 | type D = 'Foo[str]'  # TCH008
-27 | type E = 'Foo.bar'  # TCH008
-   |
-   = help: Remove quotes
-
-ℹ Safe fix
-22 22 | h: TypeAlias = 'Bar'   # TCH008
-23 23 | i: TypeAlias = Foo['str']   # TCH008
-24 24 | 
-25    |-type B = 'Dict'  # TCH008
-   25 |+type B = Dict  # TCH008
-26 26 | type D = 'Foo[str]'  # TCH008
-27 27 | type E = 'Foo.bar'  # TCH008
-28 28 | type G = 'OptStr'  # TCH008
+24 24 | j: TypeAlias = 'Baz'   # OK
+25 25 | 
+26 26 | type B = 'Dict'  # TCH008
 
 TCH008.py:26:10: TCH008 [*] Remove quotes from type alias
    |
-25 | type B = 'Dict'  # TCH008
-26 | type D = 'Foo[str]'  # TCH008
-   |          ^^^^^^^^^^ TCH008
-27 | type E = 'Foo.bar'  # TCH008
-28 | type G = 'OptStr'  # TCH008
+24 | j: TypeAlias = 'Baz'   # OK
+25 | 
+26 | type B = 'Dict'  # TCH008
+   |          ^^^^^^ TCH008
+27 | type D = 'Foo[str]'  # TCH008
+28 | type E = 'Foo.bar'  # TCH008
    |
    = help: Remove quotes
 
 ℹ Safe fix
 23 23 | i: TypeAlias = Foo['str']   # TCH008
-24 24 | 
-25 25 | type B = 'Dict'  # TCH008
-26    |-type D = 'Foo[str]'  # TCH008
-   26 |+type D = Foo[str]  # TCH008
-27 27 | type E = 'Foo.bar'  # TCH008
-28 28 | type G = 'OptStr'  # TCH008
-29 29 | type I = Foo['str']  # TCH008
+24 24 | j: TypeAlias = 'Baz'   # OK
+25 25 | 
+26    |-type B = 'Dict'  # TCH008
+   26 |+type B = Dict  # TCH008
+27 27 | type D = 'Foo[str]'  # TCH008
+28 28 | type E = 'Foo.bar'  # TCH008
+29 29 | type G = 'OptStr'  # TCH008
 
 TCH008.py:27:10: TCH008 [*] Remove quotes from type alias
    |
-25 | type B = 'Dict'  # TCH008
-26 | type D = 'Foo[str]'  # TCH008
-27 | type E = 'Foo.bar'  # TCH008
-   |          ^^^^^^^^^ TCH008
-28 | type G = 'OptStr'  # TCH008
-29 | type I = Foo['str']  # TCH008
+26 | type B = 'Dict'  # TCH008
+27 | type D = 'Foo[str]'  # TCH008
+   |          ^^^^^^^^^^ TCH008
+28 | type E = 'Foo.bar'  # TCH008
+29 | type G = 'OptStr'  # TCH008
    |
    = help: Remove quotes
 
 ℹ Safe fix
-24 24 | 
-25 25 | type B = 'Dict'  # TCH008
-26 26 | type D = 'Foo[str]'  # TCH008
-27    |-type E = 'Foo.bar'  # TCH008
-   27 |+type E = Foo.bar  # TCH008
-28 28 | type G = 'OptStr'  # TCH008
-29 29 | type I = Foo['str']  # TCH008
+24 24 | j: TypeAlias = 'Baz'   # OK
+25 25 | 
+26 26 | type B = 'Dict'  # TCH008
+27    |-type D = 'Foo[str]'  # TCH008
+   27 |+type D = Foo[str]  # TCH008
+28 28 | type E = 'Foo.bar'  # TCH008
+29 29 | type G = 'OptStr'  # TCH008
+30 30 | type I = Foo['str']  # TCH008
 
 TCH008.py:28:10: TCH008 [*] Remove quotes from type alias
    |
-26 | type D = 'Foo[str]'  # TCH008
-27 | type E = 'Foo.bar'  # TCH008
-28 | type G = 'OptStr'  # TCH008
+26 | type B = 'Dict'  # TCH008
+27 | type D = 'Foo[str]'  # TCH008
+28 | type E = 'Foo.bar'  # TCH008
+   |          ^^^^^^^^^ TCH008
+29 | type G = 'OptStr'  # TCH008
+30 | type I = Foo['str']  # TCH008
+   |
+   = help: Remove quotes
+
+ℹ Safe fix
+25 25 | 
+26 26 | type B = 'Dict'  # TCH008
+27 27 | type D = 'Foo[str]'  # TCH008
+28    |-type E = 'Foo.bar'  # TCH008
+   28 |+type E = Foo.bar  # TCH008
+29 29 | type G = 'OptStr'  # TCH008
+30 30 | type I = Foo['str']  # TCH008
+31 31 | type J = 'Baz'  # TCH008
+
+TCH008.py:29:10: TCH008 [*] Remove quotes from type alias
+   |
+27 | type D = 'Foo[str]'  # TCH008
+28 | type E = 'Foo.bar'  # TCH008
+29 | type G = 'OptStr'  # TCH008
    |          ^^^^^^^^ TCH008
-29 | type I = Foo['str']  # TCH008
+30 | type I = Foo['str']  # TCH008
+31 | type J = 'Baz'  # TCH008
    |
    = help: Remove quotes
 
 ℹ Safe fix
-25 25 | type B = 'Dict'  # TCH008
-26 26 | type D = 'Foo[str]'  # TCH008
-27 27 | type E = 'Foo.bar'  # TCH008
-28    |-type G = 'OptStr'  # TCH008
-   28 |+type G = OptStr  # TCH008
-29 29 | type I = Foo['str']  # TCH008
+26 26 | type B = 'Dict'  # TCH008
+27 27 | type D = 'Foo[str]'  # TCH008
+28 28 | type E = 'Foo.bar'  # TCH008
+29    |-type G = 'OptStr'  # TCH008
+   29 |+type G = OptStr  # TCH008
+30 30 | type I = Foo['str']  # TCH008
+31 31 | type J = 'Baz'  # TCH008
+32 32 | 
 
-TCH008.py:29:14: TCH008 [*] Remove quotes from type alias
+TCH008.py:30:14: TCH008 [*] Remove quotes from type alias
    |
-27 | type E = 'Foo.bar'  # TCH008
-28 | type G = 'OptStr'  # TCH008
-29 | type I = Foo['str']  # TCH008
+28 | type E = 'Foo.bar'  # TCH008
+29 | type G = 'OptStr'  # TCH008
+30 | type I = Foo['str']  # TCH008
    |              ^^^^^ TCH008
+31 | type J = 'Baz'  # TCH008
    |
    = help: Remove quotes
 
 ℹ Safe fix
-26 26 | type D = 'Foo[str]'  # TCH008
-27 27 | type E = 'Foo.bar'  # TCH008
-28 28 | type G = 'OptStr'  # TCH008
-29    |-type I = Foo['str']  # TCH008
-   29 |+type I = Foo[str]  # TCH008
+27 27 | type D = 'Foo[str]'  # TCH008
+28 28 | type E = 'Foo.bar'  # TCH008
+29 29 | type G = 'OptStr'  # TCH008
+30    |-type I = Foo['str']  # TCH008
+   30 |+type I = Foo[str]  # TCH008
+31 31 | type J = 'Baz'  # TCH008
+32 32 | 
+33 33 | 
+
+TCH008.py:31:10: TCH008 [*] Remove quotes from type alias
+   |
+29 | type G = 'OptStr'  # TCH008
+30 | type I = Foo['str']  # TCH008
+31 | type J = 'Baz'  # TCH008
+   |          ^^^^^ TCH008
+   |
+   = help: Remove quotes
+
+ℹ Safe fix
+28 28 | type E = 'Foo.bar'  # TCH008
+29 29 | type G = 'OptStr'  # TCH008
+30 30 | type I = Foo['str']  # TCH008
+31    |-type J = 'Baz'  # TCH008
+   31 |+type J = Baz  # TCH008
+32 32 | 
+33 33 | 
+34 34 | class Baz:
