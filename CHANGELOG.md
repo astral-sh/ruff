@@ -2,6 +2,12 @@
 
 ## 0.6.1
 
+This is a hotfix release to address an issue with `ruff-pre-commit`. In v0.6,
+Ruff changed its behavior to lint and format Jupyter notebooks by default;
+however, due to an oversight, these files were still excluded by default if
+Ruff was run via pre-commit, leading to inconsistent behavior.
+This has [now been fixed](https://github.com/astral-sh/ruff-pre-commit/pull/96).
+
 ### Preview features
 
 - \[`fastapi`\] Implement `fast-api-unused-path-parameter` (`FAST003`) ([#12638](https://github.com/astral-sh/ruff/pull/12638))
