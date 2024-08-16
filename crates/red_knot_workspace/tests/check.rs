@@ -90,7 +90,12 @@ impl SourceOrderVisitor<'_> for PullTypesVisitor<'_> {
                 let _ty = class.ty(&self.model);
             }
             Stmt::AnnAssign(assign) => {
-                let _ty = assign.ty(&self.model);
+                let _assignment_ty = assign.ty(&self.model);
+
+                // FIXME: I think the following constraint should be true in all cases but it isn't.
+                // let target_ty = assign.target.ty(&self.model);
+                //
+                // assert_eq!(_assignment_ty, target_ty);
             }
             Stmt::Return(_)
             | Stmt::Delete(_)
