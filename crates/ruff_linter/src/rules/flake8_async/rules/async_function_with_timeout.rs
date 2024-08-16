@@ -32,7 +32,7 @@ use crate::rules::flake8_async::helpers::AsyncModule;
 ///
 ///
 /// async def main():
-///     with asyncio.timeout(2):
+///     async with asyncio.timeout(2):
 ///         await long_running_task()
 /// ```
 ///
