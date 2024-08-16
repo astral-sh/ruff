@@ -8,11 +8,11 @@
 
 ### Rule changes
 
-- \[`pylint`\] Rename too-many-positional(-arguments) (`R0917`) ([#12905](https://github.com/astral-sh/ruff/pull/12905))
+- \[`pylint`\] Rename `too-many-positional` to `too-many-positional-arguments` (`R0917`) ([#12905](https://github.com/astral-sh/ruff/pull/12905))
 
 ### Server
 
-- Use cell source code for notebooks instead of the concatenated one ([#12929](https://github.com/astral-sh/ruff/pull/12929))
+- Fix crash when applying "fix-all" code-action to notebook cells ([#12929](https://github.com/astral-sh/ruff/pull/12929))
 
 ### Other changes
 
