@@ -1,5 +1,23 @@
 # Changelog
 
+## 0.6.1
+
+### Preview features
+
+- \[`fastapi`\] Implement `fast-api-unused-path-parameter` (`FAST003`) ([#12638](https://github.com/astral-sh/ruff/pull/12638))
+
+### Rule changes
+
+- \[`pylint`\] Rename too-many-positional(-arguments) (`R0917`) ([#12905](https://github.com/astral-sh/ruff/pull/12905))
+
+### Server
+
+- Use cell source code for notebooks instead of the concatenated one ([#12929](https://github.com/astral-sh/ruff/pull/12929))
+
+### Other changes
+
+- \[`flake8-naming`\]: Respect import conventions (`N817`) ([#12922](https://github.com/astral-sh/ruff/pull/12922))
+
 ## 0.6.0
 
 Check out the [blog post](https://astral.sh/blog/ruff-v0.6.0) for a migration guide and overview of the changes!
