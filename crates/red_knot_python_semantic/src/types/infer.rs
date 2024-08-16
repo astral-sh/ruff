@@ -307,6 +307,12 @@ impl<'db> TypeInferenceBuilder<'db> {
                     definition,
                 );
             }
+            DefinitionKind::Parameter(parameter) => {
+                self.infer_parameter_definition(parameter, definition);
+            }
+            DefinitionKind::ParameterWithDefault(parameter_with_default) => {
+                self.infer_parameter_with_default_definition(parameter_with_default, definition);
+            }
         }
     }
 
@@ -421,6 +427,13 @@ impl<'db> TypeInferenceBuilder<'db> {
             .map(|decorator| self.infer_decorator(decorator))
             .collect();
 
+        for default in parameters
+            .iter_non_variadic_params()
+            .filter_map(|param| param.default.as_deref())
+        {
+            self.infer_expression(default);
+        }
+
         // If there are type params, parameters and returns are evaluated in that scope.
         if type_params.is_none() {
             self.infer_parameters(parameters);
@@ -458,10 +471,12 @@ impl<'db> TypeInferenceBuilder<'db> {
         let ast::ParameterWithDefault {
             range: _,
             parameter,
-            default,
+            default: _,
         } = parameter_with_default;
-        self.infer_parameter(parameter);
-        self.infer_optional_expression(default.as_deref());
+
+        self.infer_optional_expression(parameter.annotation.as_deref());
+
+        self.infer_definition(parameter_with_default);
     }
 
     fn infer_parameter(&mut self, parameter: &ast::Parameter) {
@@ -470,7 +485,29 @@ impl<'db> TypeInferenceBuilder<'db> {
             name: _,
             annotation,
         } = parameter;
+
         self.infer_optional_expression(annotation.as_deref());
+
+        self.infer_definition(parameter);
+    }
+
+    fn infer_parameter_with_default_definition(
+        &mut self,
+        _parameter_with_default: &ast::ParameterWithDefault,
+        definition: Definition<'db>,
+    ) {
+        // TODO(dhruvmanila): Infer types from annotation or default expression
+        self.types.definitions.insert(definition, Type::Unknown);
+    }
+
+    fn infer_parameter_definition(
+        &mut self,
+        _parameter: &ast::Parameter,
+        definition: Definition<'db>,
+    ) {
+        // TODO(dhruvmanila): Annotation expression is resolved at the enclosing scope, infer the
+        // parameter type from there
+        self.types.definitions.insert(definition, Type::Unknown);
     }
 
     fn infer_class_definition_statement(&mut self, class: &ast::StmtClassDef) {
@@ -1277,6 +1314,13 @@ impl<'db> TypeInferenceBuilder<'db> {
         } = lambda_expression;
 
         if let Some(parameters) = parameters {
+            for default in parameters
+                .iter_non_variadic_params()
+                .filter_map(|param| param.default.as_deref())
+            {
+                self.infer_expression(default);
+            }
+
             self.infer_parameters(parameters);
         }
 

@@ -368,6 +368,16 @@ where
                     .add_or_update_symbol(function_def.name.id.clone(), SymbolFlags::IS_DEFINED);
                 self.add_definition(symbol, function_def);
 
+                // The default value of the parameters needs to be evaluated in the
+                // enclosing scope.
+                for default in function_def
+                    .parameters
+                    .iter_non_variadic_params()
+                    .filter_map(|param| param.default.as_deref())
+                {
+                    self.visit_expr(default);
+                }
+
                 self.with_type_params(
                     NodeWithScopeRef::FunctionTypeParameters(function_def),
                     function_def.type_params.as_deref(),
@@ -378,6 +388,16 @@ where
                         }
 
                         builder.push_scope(NodeWithScopeRef::Function(function_def));
+
+                        // Add symbols and definitions for the parameters to the function scope.
+                        for parameter in &*function_def.parameters {
+                            let symbol = builder.add_or_update_symbol(
+                                parameter.name().id().clone(),
+                                SymbolFlags::IS_DEFINED,
+                            );
+                            builder.add_definition(symbol, parameter);
+                        }
+
                         builder.visit_body(&function_def.body);
                         builder.pop_scope()
                     },
@@ -574,9 +594,29 @@ where
             }
             ast::Expr::Lambda(lambda) => {
                 if let Some(parameters) = &lambda.parameters {
+                    // The default value of the parameters needs to be evaluated in the
+                    // enclosing scope.
+                    for default in parameters
+                        .iter_non_variadic_params()
+                        .filter_map(|param| param.default.as_deref())
+                    {
+                        self.visit_expr(default);
+                    }
                     self.visit_parameters(parameters);
                 }
                 self.push_scope(NodeWithScopeRef::Lambda(lambda));
+
+                // Add symbols and definitions for the parameters to the lambda scope.
+                if let Some(parameters) = &lambda.parameters {
+                    for parameter in &**parameters {
+                        let symbol = self.add_or_update_symbol(
+                            parameter.name().id().clone(),
+                            SymbolFlags::IS_DEFINED,
+                        );
+                        self.add_definition(symbol, parameter);
+                    }
+                }
+
                 self.visit_expr(lambda.body.as_ref());
             }
             ast::Expr::If(ast::ExprIf {
@@ -652,6 +692,14 @@ where
                 | ast::Expr::DictComp(_)
         ) {
             self.pop_scope();
+        }
+    }
+
+    fn visit_parameters(&mut self, parameters: &'ast ruff_python_ast::Parameters) {
+        // Intentionally avoid walking default expressions, as we handle them in the enclosing
+        // scope.
+        for parameter in parameters.iter().map(ast::AnyParameterRef::as_parameter) {
+            self.visit_parameter(parameter);
         }
     }
 }
