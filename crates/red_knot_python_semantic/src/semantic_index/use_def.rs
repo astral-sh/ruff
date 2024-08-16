@@ -334,7 +334,7 @@ impl<'db> UseDefMapBuilder<'db> {
     /// Merge the given snapshot into the current state, reflecting that we might have taken either
     /// path to get here. The new visible-definitions state for each symbol should include
     /// definitions from both the prior state and the snapshot.
-    pub(super) fn merge(&mut self, snapshot: &FlowSnapshot) {
+    pub(super) fn merge(&mut self, snapshot: FlowSnapshot) {
         // The tricky thing about merging two Ranges pointing into `all_definitions` is that if the
         // two Ranges aren't already adjacent in `all_definitions`, we will have to copy at least
         // one or the other of the ranges to the end of `all_definitions` so as to make them
@@ -348,9 +348,10 @@ impl<'db> UseDefMapBuilder<'db> {
         // greater than the number of known symbols in a previously-taken snapshot.
         debug_assert!(self.definitions_by_symbol.len() >= snapshot.definitions_by_symbol.len());
 
-        for (symbol_id, current) in self.definitions_by_symbol.iter_mut_enumerated() {
-            if let Some(snapshot) = snapshot.definitions_by_symbol.get(symbol_id) {
-                *current = SymbolState::merge(current, snapshot);
+        let mut snapshot_definitions_iter = snapshot.definitions_by_symbol.into_iter();
+        for current in &mut self.definitions_by_symbol {
+            if let Some(snapshot) = snapshot_definitions_iter.next() {
+                current.merge(snapshot);
             } else {
                 // Symbol not present in snapshot, so it's unbound from that path.
                 current.add_unbound();

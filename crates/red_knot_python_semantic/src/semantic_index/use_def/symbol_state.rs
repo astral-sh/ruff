@@ -66,9 +66,11 @@ const INLINE_CONSTRAINT_BLOCKS: usize = 2;
 const INLINE_VISIBLE_DEFINITIONS_PER_SYMBOL: usize = 4;
 
 /// One [`BitSet`] of applicable [`ScopedConstraintId`] per visible definition.
-type Constraints =
-    SmallVec<[BitSet<INLINE_CONSTRAINT_BLOCKS>; INLINE_VISIBLE_DEFINITIONS_PER_SYMBOL]>;
+type InlineConstraintArray =
+    [BitSet<INLINE_CONSTRAINT_BLOCKS>; INLINE_VISIBLE_DEFINITIONS_PER_SYMBOL];
+type Constraints = SmallVec<InlineConstraintArray>;
 type ConstraintsIterator<'a> = std::slice::Iter<'a, BitSet<INLINE_CONSTRAINT_BLOCKS>>;
+type ConstraintsIntoIterator = smallvec::IntoIter<InlineConstraintArray>;
 
 /// Visible definitions and narrowing constraints for a single symbol at some point in control flow.
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -126,17 +128,18 @@ impl SymbolState {
         }
     }
 
-    /// Merge two [`SymbolState`] and return the result.
-    pub(super) fn merge(a: &SymbolState, b: &SymbolState) -> SymbolState {
-        let mut merged = Self {
+    /// Merge another [`SymbolState`] into this one.
+    pub(super) fn merge(&mut self, b: SymbolState) {
+        let mut a = Self {
             visible_definitions: Definitions::default(),
             constraints: Constraints::default(),
-            may_be_unbound: a.may_be_unbound || b.may_be_unbound,
+            may_be_unbound: self.may_be_unbound || b.may_be_unbound,
         };
+        std::mem::swap(&mut a, self);
         let mut a_defs_iter = a.visible_definitions.iter();
         let mut b_defs_iter = b.visible_definitions.iter();
-        let mut a_constraints_iter = a.constraints.iter();
-        let mut b_constraints_iter = b.constraints.iter();
+        let mut a_constraints_iter = a.constraints.into_iter();
+        let mut b_constraints_iter = b.constraints.into_iter();
 
         let mut opt_a_def: Option<u32> = a_defs_iter.next();
         let mut opt_b_def: Option<u32> = b_defs_iter.next();
@@ -147,8 +150,8 @@ impl SymbolState {
         // of the constraints from the two paths; a constraint that applies from only one possible
         // path is irrelevant.
 
-        // Helper to push `def`, with constraints in `constraints_iter`, onto  merged`.
-        let push = |def, constraints_iter: &mut ConstraintsIterator, merged: &mut Self| {
+        // Helper to push `def`, with constraints in `constraints_iter`, onto `self`.
+        let push = |def, constraints_iter: &mut ConstraintsIntoIterator, merged: &mut Self| {
             merged.visible_definitions.insert(def);
             // SAFETY: we only ever create SymbolState with either no definitions and no constraint
             // bitsets (`::unbound`) or one definition and one constraint bitset (`::with`), and
@@ -158,59 +161,57 @@ impl SymbolState {
             let constraints = constraints_iter
                 .next()
                 .expect("definitions and constraints length mismatch");
-            merged.constraints.push(constraints.clone());
+            merged.constraints.push(constraints);
         };
 
         loop {
             match (opt_a_def, opt_b_def) {
                 (Some(a_def), Some(b_def)) => match a_def.cmp(&b_def) {
                     std::cmp::Ordering::Less => {
-                        // Next definition ID is only in `a`, push it to `merged` and advance `a`.
-                        push(a_def, &mut a_constraints_iter, &mut merged);
+                        // Next definition ID is only in `a`, push it to `self` and advance `a`.
+                        push(a_def, &mut a_constraints_iter, self);
                         opt_a_def = a_defs_iter.next();
                     }
                     std::cmp::Ordering::Greater => {
-                        // Next definition ID is only in `b`, push it to `merged` and advance `b`.
-                        push(b_def, &mut b_constraints_iter, &mut merged);
+                        // Next definition ID is only in `b`, push it to `self` and advance `b`.
+                        push(b_def, &mut b_constraints_iter, self);
                         opt_b_def = b_defs_iter.next();
                     }
                     std::cmp::Ordering::Equal => {
-                        // Next definition is in both; push to `merged` and intersect constraints.
-                        push(a_def, &mut a_constraints_iter, &mut merged);
+                        // Next definition is in both; push to `self` and intersect constraints.
+                        push(a_def, &mut b_constraints_iter, self);
                         // SAFETY: we only ever create SymbolState with either no definitions and
                         // no constraint bitsets (`::unbound`) or one definition and one constraint
                         // bitset (`::with`), and `::merge` always pushes one definition and one
                         // constraint bitset together (just below), so the number of definitions
                         // and the number of constraint bitsets can never get out of sync.
-                        let b_constraints = b_constraints_iter
+                        let a_constraints = a_constraints_iter
                             .next()
                             .expect("definitions and constraints length mismatch");
                         // If the same definition is visible through both paths, any constraint
                         // that applies on only one path is irrelevant to the resulting type from
                         // unioning the two paths, so we intersect the constraints.
-                        merged
-                            .constraints
+                        self.constraints
                             .last_mut()
                             .unwrap()
-                            .intersect(b_constraints);
+                            .intersect(&a_constraints);
                         opt_a_def = a_defs_iter.next();
                         opt_b_def = b_defs_iter.next();
                     }
                 },
                 (Some(a_def), None) => {
                     // We've exhausted `b`, just push the def from `a` and move on to the next.
-                    push(a_def, &mut a_constraints_iter, &mut merged);
+                    push(a_def, &mut a_constraints_iter, self);
                     opt_a_def = a_defs_iter.next();
                 }
                 (None, Some(b_def)) => {
                     // We've exhausted `a`, just push the def from `b` and move on to the next.
-                    push(b_def, &mut b_constraints_iter, &mut merged);
+                    push(b_def, &mut b_constraints_iter, self);
                     opt_b_def = b_defs_iter.next();
                 }
                 (None, None) => break,
             }
         }
-        merged
     }
 
     /// Get iterator over visible definitions with constraints.
@@ -340,7 +341,8 @@ mod tests {
         let mut cd0b = SymbolState::with(ScopedDefinitionId::from_u32(0));
         cd0b.add_constraint(ScopedConstraintId::from_u32(0));
 
-        let cd0 = SymbolState::merge(&cd0a, &cd0b);
+        cd0a.merge(cd0b);
+        let mut cd0 = cd0a;
         cd0.assert(false, &["0<0>"]);
 
         // merging the same definition with differing constraints drops all constraints
@@ -350,7 +352,8 @@ mod tests {
         let mut cd1b = SymbolState::with(ScopedDefinitionId::from_u32(1));
         cd1b.add_constraint(ScopedConstraintId::from_u32(2));
 
-        let cd1 = SymbolState::merge(&cd1a, &cd1b);
+        cd1a.merge(cd1b);
+        let cd1 = cd1a;
         cd1.assert(false, &["1<>"]);
 
         // merging a constrained definition with unbound keeps both
@@ -359,11 +362,13 @@ mod tests {
 
         let cd2b = SymbolState::unbound();
 
-        let cd2 = SymbolState::merge(&cd2a, &cd2b);
+        cd2a.merge(cd2b);
+        let cd2 = cd2a;
         cd2.assert(true, &["2<3>"]);
 
         // merging different definitions keeps them each with their existing constraints
-        let cd = SymbolState::merge(&cd0, &cd2);
+        cd0.merge(cd2);
+        let cd = cd0;
         cd.assert(true, &["0<0>", "2<3>"]);
     }
 }
