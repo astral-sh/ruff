@@ -29,7 +29,8 @@ use salsa::plumbing::AsId;
 use ruff_db::files::File;
 use ruff_db::parsed::parsed_module;
 use ruff_python_ast as ast;
-use ruff_python_ast::{Expr, ExprContext};
+use ruff_python_ast::{AnyNodeRef, ExprContext};
+use ruff_text_size::Ranged;
 
 use crate::builtins::builtins_scope;
 use crate::module_name::ModuleName;
@@ -40,6 +41,7 @@ use crate::semantic_index::expression::Expression;
 use crate::semantic_index::semantic_index;
 use crate::semantic_index::symbol::{FileScopeId, NodeWithScopeKind, NodeWithScopeRef, ScopeId};
 use crate::semantic_index::SemanticIndex;
+use crate::types::diagnostic::{TypeCheckDiagnostic, TypeCheckDiagnostics};
 use crate::types::{
     builtins_symbol_ty_by_name, definitions_ty, global_symbol_ty_by_name, ClassType, FunctionType,
     Name, Type, UnionBuilder,
@@ -123,13 +125,16 @@ pub(crate) enum InferenceRegion<'db> {
 }
 
 /// The inferred types for a single region.
-#[derive(Debug, Eq, PartialEq, Default, Clone)]
+#[derive(Debug, Eq, PartialEq, Default)]
 pub(crate) struct TypeInference<'db> {
     /// The types of every expression in this region.
     expressions: FxHashMap<ScopedExpressionId, Type<'db>>,
 
     /// The types of every definition in this region.
     definitions: FxHashMap<Definition<'db>, Type<'db>>,
+
+    /// The diagnostics for this region.
+    diagnostics: TypeCheckDiagnostics,
 }
 
 impl<'db> TypeInference<'db> {
@@ -142,9 +147,14 @@ impl<'db> TypeInference<'db> {
         self.definitions[&definition]
     }
 
+    pub(crate) fn diagnostics(&self) -> &[std::sync::Arc<TypeCheckDiagnostic>] {
+        &self.diagnostics
+    }
+
     fn shrink_to_fit(&mut self) {
         self.expressions.shrink_to_fit();
         self.definitions.shrink_to_fit();
+        self.diagnostics.shrink_to_fit();
     }
 }
 
@@ -235,6 +245,7 @@ impl<'db> TypeInferenceBuilder<'db> {
     fn extend(&mut self, inference: &TypeInference<'db>) {
         self.types.definitions.extend(inference.definitions.iter());
         self.types.expressions.extend(inference.expressions.iter());
+        self.types.diagnostics.extend(&inference.diagnostics);
     }
 
     /// Infers types in the given [`InferenceRegion`].
@@ -1059,7 +1070,7 @@ impl<'db> TypeInferenceBuilder<'db> {
             ast::Expr::Yield(yield_expression) => self.infer_yield_expression(yield_expression),
             ast::Expr::YieldFrom(yield_from) => self.infer_yield_from_expression(yield_from),
             ast::Expr::Await(await_expression) => self.infer_await_expression(await_expression),
-            Expr::IpyEscapeCommand(_) => todo!("Implement Ipy escape command support"),
+            ast::Expr::IpyEscapeCommand(_) => todo!("Implement Ipy escape command support"),
         };
 
         let expr_id = expression.scoped_ast_id(self.db, self.scope);
@@ -1090,8 +1101,10 @@ impl<'db> TypeInferenceBuilder<'db> {
         Type::BooleanLiteral(*value)
     }
 
-    #[allow(clippy::unused_self)]
-    fn infer_string_literal_expression(&mut self, _literal: &ast::ExprStringLiteral) -> Type<'db> {
+    fn infer_string_literal_expression(&mut self, literal: &ast::ExprStringLiteral) -> Type<'db> {
+        if let Some(builder) = self.push_diagnostic(literal.into(), "unimplemented") {
+            builder.finish("Unimplemented node StringLiteralExpression")
+        }
         // TODO Literal["..."] or str
         Type::Unknown
     }
@@ -1704,6 +1717,31 @@ impl<'db> TypeInferenceBuilder<'db> {
                 }
             }
         }
+    }
+
+    // TODO return a builder?
+    #[allow(dead_code)]
+    fn push_diagnostic(
+        &mut self,
+        node: AnyNodeRef,
+        rule: &str,
+    ) -> Option<TypeCheckDiagnosticBuilder> {
+        if !self.db.is_file_open(self.file) {
+            return;
+        }
+
+        // TODO: Don't emit the diagnostic if:
+        // * The enclosing node contains any syntax errors
+        // * The rule is disabled for this file. We probably want to introduce a new query that
+        //   returns a rule selector for a given file that respects the package's settings,
+        //   any global pragma comments in the file, and any per-file-ignores.
+
+        self.types.diagnostics.push(TypeCheckDiagnostic {
+            file: self.file,
+            rule: rule.to_string(),
+            message: message.to_string(),
+            range: node.range(),
+        });
     }
 
     pub(super) fn finish(mut self) -> TypeInference<'db> {

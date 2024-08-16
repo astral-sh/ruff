@@ -114,7 +114,15 @@ impl Upcast<dyn SourceDb> for RootDatabase {
 }
 
 #[salsa::db]
-impl SemanticDb for RootDatabase {}
+impl SemanticDb for RootDatabase {
+    fn is_file_open(&self, file: File) -> bool {
+        let Some(workspace) = &self.workspace else {
+            return false;
+        };
+
+        workspace.is_file_open(self, file)
+    }
+}
 
 #[salsa::db]
 impl SourceDb for RootDatabase {
@@ -241,7 +249,12 @@ pub(crate) mod tests {
     }
 
     #[salsa::db]
-    impl red_knot_python_semantic::Db for TestDb {}
+    impl red_knot_python_semantic::Db for TestDb {
+        fn is_file_open(&self, file: ruff_db::files::File) -> bool {
+            !file.path(self).is_vendored_path()
+        }
+    }
+
     #[salsa::db]
     impl Db for TestDb {}
 

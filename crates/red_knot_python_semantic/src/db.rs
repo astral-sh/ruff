@@ -1,15 +1,18 @@
+use ruff_db::files::File;
 use ruff_db::{Db as SourceDb, Upcast};
 
 /// Database giving access to semantic information about a Python program.
 #[salsa::db]
-pub trait Db: SourceDb + Upcast<dyn SourceDb> {}
+pub trait Db: SourceDb + Upcast<dyn SourceDb> {
+    fn is_file_open(&self, file: File) -> bool;
+}
 
 #[cfg(test)]
 pub(crate) mod tests {
     use std::sync::Arc;
 
     use crate::module_resolver::vendored_typeshed_stubs;
-    use ruff_db::files::Files;
+    use ruff_db::files::{File, Files};
     use ruff_db::system::{DbWithTestSystem, System, TestSystem};
     use ruff_db::vendored::VendoredFileSystem;
     use ruff_db::{Db as SourceDb, Upcast};
@@ -91,7 +94,11 @@ pub(crate) mod tests {
     }
 
     #[salsa::db]
-    impl Db for TestDb {}
+    impl Db for TestDb {
+        fn is_file_open(&self, file: File) -> bool {
+            !file.path(self).is_vendored_path()
+        }
+    }
 
     #[salsa::db]
     impl salsa::Database for TestDb {

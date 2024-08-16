@@ -115,7 +115,7 @@ fn format_diagnostic(context: &SemanticLintContext, message: &str, start: TextSi
         .source_location(start, context.source_text());
     format!(
         "{}:{}:{}: {}",
-        context.semantic.file_path().as_str(),
+        context.semantic.file_path(),
         source_location.row,
         source_location.column,
         message,

@@ -4,14 +4,15 @@ use rustc_hash::{FxBuildHasher, FxHashSet};
 use salsa::{Durability, Setter as _};
 
 pub use metadata::{PackageMetadata, WorkspaceMetadata};
-use ruff_db::source::{source_text, SourceDiagnostic};
+use red_knot_python_semantic::types::check_types;
+use ruff_db::source::{line_index, source_text, SourceDiagnostic};
 use ruff_db::{
     files::{system_path_to_file, File},
     system::{walk_directory::WalkState, SystemPath, SystemPathBuf},
 };
 use ruff_python_ast::{name::Name, PySourceType};
+use ruff_text_size::Ranged;
 
-use crate::workspace::files::{Index, Indexed, PackageFiles};
 use crate::{
     db::Db,
     lint::{lint_semantic, lint_syntax},
@@ -92,8 +93,8 @@ pub struct Package {
     root_buf: SystemPathBuf,
 
     /// The files that are part of this package.
-    #[return_ref]
     #[default]
+    #[return_ref]
     file_set: PackageFiles,
     // TODO: Add the loaded settings.
 }
@@ -249,6 +250,32 @@ impl Workspace {
             FxHashSet::default()
         }
     }
+
+    /// Returns `true` if the file is open in the workspace.
+    ///
+    /// A file is considered open when:
+    /// * explicitly set as an open file using [`open_file`](Self::open_file)
+    /// * It has a [`SystemPath`] and belongs to a package's `src` files
+    /// * It has a [`SystemVirtualPath`](ruff_db::system::SystemVirtualPath)
+    pub fn is_file_open(self, db: &dyn Db, file: File) -> bool {
+        tracing::trace!("Testing if {} is open.", file.path(db));
+        if let Some(open_files) = self.open_files(db) {
+            open_files.contains(&file)
+        } else if let Some(system_path) = file.path(db).as_system_path() {
+            self.package(db, system_path).map_or(false, |package| {
+                tracing::trace!(
+                    "Checking if {} is in package {}",
+                    file.path(db),
+                    package.name(db)
+                );
+                package.contains_file(db, file)
+            })
+        } else if file.path(db).is_system_virtual_path() {
+            true
+        } else {
+            false
+        }
+    }
 }
 
 #[salsa::tracked]
@@ -309,8 +336,12 @@ impl Package {
                 let _entered =
                     tracing::debug_span!("index_package_files", package = %self.name(db)).entered();
 
-                tracing::debug!("Indexing files for package {}", self.name(db));
                 let files = discover_package_files(db, self.root(db));
+                tracing::info!(
+                    "Indexed {} files for package '{}'",
+                    files.len(),
+                    self.name(db)
+                );
                 vacant.set(files)
             }
             Index::Indexed(indexed) => indexed,
@@ -364,8 +395,20 @@ pub(super) fn check_file(db: &dyn Db, file: File) -> Vec<String> {
     );
 
     // Abort checking if there are IO errors.
-    if source_text(db.upcast(), file).has_read_error() {
+    let source = source_text(db.upcast(), file);
+
+    if source.has_read_error() {
         return diagnostics;
+    }
+
+    for diagnostic in check_types(db.upcast(), file) {
+        let index = line_index(db.upcast(), diagnostic.file());
+        let location = index.source_location(diagnostic.start(), source.as_str());
+        diagnostics.push(format!(
+            "{path}:{location}: {message}",
+            path = file.path(db),
+            message = diagnostic.message()
+        ));
     }
 
     diagnostics.extend_from_slice(lint_syntax(db, file));

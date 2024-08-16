@@ -1,25 +1,42 @@
 use ruff_db::files::File;
 use ruff_python_ast::name::Name;
 
-use crate::builtins::builtins_scope;
-use crate::semantic_index::definition::Definition;
-use crate::semantic_index::symbol::{ScopeId, ScopedSymbolId};
-use crate::semantic_index::{
-    global_scope, symbol_table, use_def_map, DefinitionWithConstraints,
-    DefinitionWithConstraintsIterator,
-};
-use crate::types::narrow::narrowing_constraint;
 use crate::{Db, FxOrderSet};
+use crate::builtins::builtins_scope;
+use crate::semantic_index::{
+    DefinitionWithConstraints, DefinitionWithConstraintsIterator, global_scope, semantic_index, symbol_table,
+    use_def_map,
+};
+use crate::semantic_index::definition::Definition;
+use crate::semantic_index::symbol::{ScopedSymbolId, ScopeId};
+use crate::types::narrow::narrowing_constraint;
+
+pub(crate) use self::builder::{IntersectionBuilder, UnionBuilder};
+pub(crate) use self::diagnostic::TypeCheckDiagnostics;
+pub(crate) use self::infer::{
+    infer_definition_types, infer_expression_types, infer_scope_types, TypeInference,
+};
 
 mod builder;
+mod diagnostic;
 mod display;
 mod infer;
 mod narrow;
 
-pub(crate) use self::builder::{IntersectionBuilder, UnionBuilder};
-pub(crate) use self::infer::{
-    infer_definition_types, infer_expression_types, infer_scope_types, TypeInference,
-};
+
+pub fn check_types(db: &dyn Db, file: File) -> TypeCheckDiagnostics {
+    let _span = tracing::trace_span!("check_types", file=?file.path(db)).entered();
+
+    let index = semantic_index(db, file);
+    let mut diagnostics = TypeCheckDiagnostics::new();
+
+    for scope_id in index.scope_ids() {
+        let result = infer_scope_types(db, scope_id);
+        diagnostics.extend(result.diagnostics());
+    }
+
+    diagnostics
+}
 
 /// Infer the public type of a symbol (its type as seen from outside its scope).
 pub(crate) fn symbol_ty<'db>(

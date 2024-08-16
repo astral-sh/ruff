@@ -154,6 +154,10 @@ impl<'db> SemanticIndex<'db> {
         &self.scopes[id]
     }
 
+    pub(crate) fn scope_ids(&self) -> impl Iterator<Item = ScopeId> {
+        self.scope_ids_by_scope.iter().copied()
+    }
+
     /// Returns the id of the parent scope.
     pub(crate) fn parent_scope_id(&self, scope_id: FileScopeId) -> Option<FileScopeId> {
         let scope = self.scope(scope_id);
