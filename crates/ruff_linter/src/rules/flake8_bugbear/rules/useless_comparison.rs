@@ -71,12 +71,13 @@ pub(crate) fn useless_comparison(checker: &mut Checker, expr: &Expr) {
 
         if let ScopeKind::Function(func_def) = semantic.current_scope().kind {
             if func_def.range.end() == expr.range().end() {
-                return checker.diagnostics.push(Diagnostic::new(
+                checker.diagnostics.push(Diagnostic::new(
                     UselessComparison {
                         at: ComparisonLocationAt::EndOfFunction,
                     },
                     expr.range(),
                 ));
+                return;
             }
         }
 
@@ -85,7 +86,7 @@ pub(crate) fn useless_comparison(checker: &mut Checker, expr: &Expr) {
                 at: ComparisonLocationAt::MiddleBody,
             },
             expr.range(),
-        ))
+        ));
     }
 }
 
