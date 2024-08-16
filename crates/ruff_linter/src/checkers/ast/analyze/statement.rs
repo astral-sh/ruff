@@ -94,6 +94,9 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
             if checker.enabled(Rule::FastApiNonAnnotatedDependency) {
                 fastapi::rules::fastapi_non_annotated_dependency(checker, function_def);
             }
+            if checker.enabled(Rule::FastApiUnusedPathParameter) {
+                fastapi::rules::fastapi_unused_path_parameter(checker, function_def);
+            }
             if checker.enabled(Rule::AmbiguousFunctionName) {
                 if let Some(diagnostic) = pycodestyle::rules::ambiguous_function_name(name) {
                     checker.diagnostics.push(diagnostic);
