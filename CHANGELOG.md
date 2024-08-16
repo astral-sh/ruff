@@ -1,5 +1,29 @@
 # Changelog
 
+## 0.6.1
+
+This is a hotfix release to address an issue with `ruff-pre-commit`. In v0.6,
+Ruff changed its behavior to lint and format Jupyter notebooks by default;
+however, due to an oversight, these files were still excluded by default if
+Ruff was run via pre-commit, leading to inconsistent behavior.
+This has [now been fixed](https://github.com/astral-sh/ruff-pre-commit/pull/96).
+
+### Preview features
+
+- \[`fastapi`\] Implement `fast-api-unused-path-parameter` (`FAST003`) ([#12638](https://github.com/astral-sh/ruff/pull/12638))
+
+### Rule changes
+
+- \[`pylint`\] Rename `too-many-positional` to `too-many-positional-arguments` (`R0917`) ([#12905](https://github.com/astral-sh/ruff/pull/12905))
+
+### Server
+
+- Fix crash when applying "fix-all" code-action to notebook cells ([#12929](https://github.com/astral-sh/ruff/pull/12929))
+
+### Other changes
+
+- \[`flake8-naming`\]: Respect import conventions (`N817`) ([#12922](https://github.com/astral-sh/ruff/pull/12922))
+
 ## 0.6.0
 
 Check out the [blog post](https://astral.sh/blog/ruff-v0.6.0) for a migration guide and overview of the changes!
