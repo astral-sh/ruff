@@ -19,6 +19,7 @@ use crate::checkers::ast::Checker;
 /// ## Example
 /// ```python
 /// from typing import TYPE_CHECKING, TypeAlias
+///
 /// if TYPE_CHECKING:
 ///     from foo import Foo
 /// OptFoo: TypeAlias = Foo | None
@@ -27,6 +28,7 @@ use crate::checkers::ast::Checker;
 /// Use instead:
 /// ```python
 /// from typing import TYPE_CHECKING, TypeAlias
+///
 /// if TYPE_CHECKING:
 ///     from foo import Foo
 /// OptFoo: TypeAlias = "Foo | None"
@@ -127,7 +129,7 @@ impl AlwaysFixableViolation for QuotedTypeAlias {
 //       skip expressions that don't contain either. But then we can't reuse
 //       this function for TCH007. Is it worth having two functions where one
 //       has fewer branches because we know they won't be there?
-fn contains_typing_reference<'a>(semantic: &SemanticModel, expr: &'a Expr) -> bool {
+fn contains_typing_reference(semantic: &SemanticModel, expr: &Expr) -> bool {
     match expr {
         Expr::BinOp(ast::ExprBinOp { left, right, .. }) => {
             contains_typing_reference(semantic, left) || contains_typing_reference(semantic, right)
