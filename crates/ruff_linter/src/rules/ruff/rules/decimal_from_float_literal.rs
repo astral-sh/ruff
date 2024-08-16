@@ -25,7 +25,8 @@ use crate::checkers::ast::Checker;
 ///
 /// ## Fix Safety
 /// This rule's fix is marked as unsafe because it changes the underlying value of the `Decimal` instance that is
-/// constructed. This can lead to unexpected behavior if your program relies on the previous imprecise value.
+/// constructed. This can lead to unexpected behavior if your program relies on the previous value
+/// (whether deliberately or not).
 #[violation]
 pub struct DecimalFromFloatLiteral;
 
