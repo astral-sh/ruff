@@ -949,7 +949,7 @@ impl<'db> TypeInferenceBuilder<'db> {
     fn module_ty_from_name(&self, module_name: Option<ModuleName>) -> Type<'db> {
         module_name
             .and_then(|module_name| resolve_module(self.db, module_name))
-            .map_or(Type::Unbound, |module| Type::Module(module.file()))
+            .map_or(Type::Unknown, |module| Type::Module(module.file()))
     }
 
     fn infer_decorator(&mut self, decorator: &ast::Decorator) -> Type<'db> {
@@ -1783,7 +1783,7 @@ mod tests {
             ("src/package/bar.py", "from .foo import X"),
         ])?;
 
-        assert_public_ty(&db, "src/package/bar.py", "X", "Unbound");
+        assert_public_ty(&db, "src/package/bar.py", "X", "Unknown");
 
         Ok(())
     }
@@ -1821,7 +1821,7 @@ mod tests {
     fn follow_nonexistent_relative_import_bare_to_package() -> anyhow::Result<()> {
         let mut db = setup_db();
         db.write_files([("src/package/bar.py", "from . import X")])?;
-        assert_public_ty(&db, "src/package/bar.py", "X", "Unbound");
+        assert_public_ty(&db, "src/package/bar.py", "X", "Unknown");
         Ok(())
     }
 
@@ -1851,7 +1851,7 @@ mod tests {
             ("src/package/bar.py", "from . import foo"),
         ])?;
 
-        assert_public_ty(&db, "src/package/bar.py", "foo", "Unbound");
+        assert_public_ty(&db, "src/package/bar.py", "foo", "Unknown");
 
         Ok(())
     }
@@ -1874,7 +1874,7 @@ mod tests {
     fn follow_nonexistent_relative_import_from_dunder_init() -> anyhow::Result<()> {
         let mut db = setup_db();
         db.write_files([("src/package/__init__.py", "from .foo import X")])?;
-        assert_public_ty(&db, "src/package/__init__.py", "X", "Unbound");
+        assert_public_ty(&db, "src/package/__init__.py", "X", "Unknown");
         Ok(())
     }
 

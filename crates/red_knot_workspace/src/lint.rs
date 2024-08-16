@@ -129,7 +129,7 @@ fn lint_unresolved_imports(context: &SemanticLintContext, import: AnyImportRef) 
             for alias in &import.names {
                 let ty = alias.ty(&context.semantic);
 
-                if ty.is_unbound() {
+                if ty.is_unknown() {
                     context.push_diagnostic(format_diagnostic(
                         context,
                         &format!("Unresolved import '{}'", &alias.name),
@@ -142,7 +142,7 @@ fn lint_unresolved_imports(context: &SemanticLintContext, import: AnyImportRef) 
             for alias in &import.names {
                 let ty = alias.ty(&context.semantic);
 
-                if ty.is_unbound() {
+                if ty.is_unknown() {
                     context.push_diagnostic(format_diagnostic(
                         context,
                         &format!("Unresolved import '{}'", &alias.name),
