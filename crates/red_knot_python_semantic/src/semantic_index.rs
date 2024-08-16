@@ -532,7 +532,7 @@ y = 2
     fn function_parameter_symbols() {
         let TestCase { db, file } = test_case(
             "
-def f(a, /, b, c=1, *args, d=2, **kwargs):
+def f(a: str, /, b: str, c: int = 1, *args, d: int = 2, **kwargs):
     pass
 ",
         );
@@ -540,7 +540,7 @@ def f(a, /, b, c=1, *args, d=2, **kwargs):
         let index = semantic_index(&db, file);
         let global_table = symbol_table(&db, global_scope(&db, file));
 
-        assert_eq!(names(&global_table), vec!["f"]);
+        assert_eq!(names(&global_table), vec!["f", "str", "int"]);
 
         let [(function_scope_id, _function_scope)] = index
             .child_scopes(FileScopeId::global())
