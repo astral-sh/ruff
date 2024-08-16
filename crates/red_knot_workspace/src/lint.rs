@@ -124,6 +124,10 @@ fn format_diagnostic(context: &SemanticLintContext, message: &str, start: TextSi
 }
 
 fn lint_unresolved_imports(context: &SemanticLintContext, import: AnyImportRef) {
+    // TODO: this treats any symbol with `Type::Unknown` as an unresolved import,
+    // which isn't really correct: if it exists but has `Type::Unknown` in the
+    // module we're importing it from, we shouldn't really emit a diagnostic here,
+    // but currently do.
     match import {
         AnyImportRef::Import(import) => {
             for alias in &import.names {
