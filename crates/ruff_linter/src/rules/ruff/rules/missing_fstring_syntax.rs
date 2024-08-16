@@ -1,9 +1,9 @@
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::{self as ast};
+use ruff_python_ast as ast;
 use ruff_python_literal::format::FormatSpec;
 use ruff_python_parser::parse_expression;
-use ruff_python_semantic::analyze::logging;
+use ruff_python_semantic::analyze::logging::is_logger_candidate;
 use ruff_python_semantic::SemanticModel;
 use ruff_source_file::Locator;
 use ruff_text_size::{Ranged, TextRange};
@@ -33,6 +33,8 @@ use crate::checkers::ast::Checker;
 /// 4. The string has no `{...}` expression sections, or uses invalid f-string syntax.
 /// 5. The string references variables that are not in scope, or it doesn't capture variables at all.
 /// 6. Any format specifiers in the potential f-string are invalid.
+/// 7. The string is part of a function call that is known to expect a template string rather than an
+///    evaluated f-string: for example, a `logging` call or a [`gettext`] call
 ///
 /// ## Example
 ///
@@ -48,6 +50,9 @@ use crate::checkers::ast::Checker;
 /// day_of_week = "Tuesday"
 /// print(f"Hello {name}! It is {day_of_week} today!")
 /// ```
+///
+/// [`logging`]: https://docs.python.org/3/howto/logging-cookbook.html#using-particular-formatting-styles-throughout-your-application
+/// [`gettext`]: https://docs.python.org/3/library/gettext.html
 #[violation]
 pub struct MissingFStringSyntax;
 
@@ -75,11 +80,22 @@ pub(crate) fn missing_fstring_syntax(checker: &mut Checker, literal: &ast::Strin
         }
     }
 
-    // We also want to avoid expressions that are intended to be translated.
-    if semantic.current_expressions().any(|expr| {
-        is_gettext(expr, semantic)
-            || is_logger_call(expr, semantic, &checker.settings.logger_objects)
-    }) {
+    let logger_objects = &checker.settings.logger_objects;
+
+    // We also want to avoid:
+    // - Expressions inside `gettext()` calls
+    // - Expressions passed to logging calls (since the `logging` module evaluates them lazily:
+    //   https://docs.python.org/3/howto/logging-cookbook.html#using-particular-formatting-styles-throughout-your-application)
+    // - Expressions where a method is immediately called on the string literal
+    if semantic
+        .current_expressions()
+        .filter_map(ast::Expr::as_call_expr)
+        .any(|call_expr| {
+            is_method_call_on_literal(call_expr, literal)
+                || is_gettext(call_expr, semantic)
+                || is_logger_candidate(&call_expr.func, semantic, logger_objects)
+        })
+    {
         return;
     }
 
@@ -88,13 +104,6 @@ pub(crate) fn missing_fstring_syntax(checker: &mut Checker, literal: &ast::Strin
             .with_fix(fix_fstring_syntax(literal.range()));
         checker.diagnostics.push(diagnostic);
     }
-}
-
-fn is_logger_call(expr: &ast::Expr, semantic: &SemanticModel, logger_objects: &[String]) -> bool {
-    let ast::Expr::Call(ast::ExprCall { func, .. }) = expr else {
-        return false;
-    };
-    logging::is_logger_candidate(func, semantic, logger_objects)
 }
 
 /// Returns `true` if an expression appears to be a `gettext` call.
@@ -107,12 +116,9 @@ fn is_logger_call(expr: &ast::Expr, semantic: &SemanticModel, logger_objects: &[
 /// and replace the original string with its translated counterpart. If the
 /// string contains variable placeholders or formatting, it can complicate the
 /// translation process, lead to errors or incorrect translations.
-fn is_gettext(expr: &ast::Expr, semantic: &SemanticModel) -> bool {
-    let ast::Expr::Call(ast::ExprCall { func, .. }) = expr else {
-        return false;
-    };
-
-    let short_circuit = match func.as_ref() {
+fn is_gettext(call_expr: &ast::ExprCall, semantic: &SemanticModel) -> bool {
+    let func = &*call_expr.func;
+    let short_circuit = match func {
         ast::Expr::Name(ast::ExprName { id, .. }) => {
             matches!(id.as_str(), "gettext" | "ngettext" | "_")
         }
@@ -134,6 +140,21 @@ fn is_gettext(expr: &ast::Expr, semantic: &SemanticModel) -> bool {
                 ["gettext", "gettext" | "ngettext"] | ["builtins", "_"]
             )
         })
+}
+
+/// Return `true` if `call_expr` is a method call on an [`ast::ExprStringLiteral`]
+/// in which `literal` is one of the [`ast::StringLiteral`] parts.
+///
+/// For example: `expr` is a node representing the expression `"{foo}".format(foo="bar")`,
+/// and `literal` is the node representing the string literal `"{foo}"`.
+fn is_method_call_on_literal(call_expr: &ast::ExprCall, literal: &ast::StringLiteral) -> bool {
+    let ast::Expr::Attribute(ast::ExprAttribute { value, .. }) = &*call_expr.func else {
+        return false;
+    };
+    let ast::Expr::StringLiteral(ast::ExprStringLiteral { value, .. }) = &**value else {
+        return false;
+    };
+    value.as_slice().contains(literal)
 }
 
 /// Returns `true` if `literal` is likely an f-string with a missing `f` prefix.
@@ -158,55 +179,28 @@ fn should_be_fstring(
     };
 
     let mut arg_names = FxHashSet::default();
-    let mut last_expr: Option<&ast::Expr> = None;
-    for expr in semantic.current_expressions() {
-        match expr {
-            ast::Expr::Call(ast::ExprCall {
-                arguments: ast::Arguments { keywords, args, .. },
-                func,
-                ..
-            }) => {
-                if let ast::Expr::Attribute(ast::ExprAttribute { value, .. }) = func.as_ref() {
-                    match value.as_ref() {
-                        // if the first part of the attribute is the string literal,
-                        // we want to ignore this literal from the lint.
-                        // for example: `"{x}".some_method(...)`
-                        ast::Expr::StringLiteral(expr_literal)
-                            if expr_literal.value.as_slice().contains(literal) =>
-                        {
-                            return false;
-                        }
-                        // if the first part of the attribute was the expression we
-                        // just went over in the last iteration, then we also want to pass
-                        // this over in the lint.
-                        // for example: `some_func("{x}").some_method(...)`
-                        value if last_expr == Some(value) => {
-                            return false;
-                        }
-                        _ => {}
-                    }
-                }
-                for keyword in &**keywords {
-                    if let Some(ident) = keyword.arg.as_ref() {
-                        arg_names.insert(ident.as_str());
-                    }
-                }
-                for arg in &**args {
-                    if let ast::Expr::Name(ast::ExprName { id, .. }) = arg {
-                        arg_names.insert(id.as_str());
-                    }
-                }
+    for expr in semantic
+        .current_expressions()
+        .filter_map(ast::Expr::as_call_expr)
+    {
+        let ast::Arguments { keywords, args, .. } = &expr.arguments;
+        for keyword in &**keywords {
+            if let Some(ident) = keyword.arg.as_ref() {
+                arg_names.insert(&ident.id);
             }
-            _ => continue,
         }
-        last_expr.replace(expr);
+        for arg in &**args {
+            if let ast::Expr::Name(ast::ExprName { id, .. }) = arg {
+                arg_names.insert(id);
+            }
+        }
     }
 
     for f_string in value.f_strings() {
         let mut has_name = false;
         for element in f_string.elements.expressions() {
             if let ast::Expr::Name(ast::ExprName { id, .. }) = element.expression.as_ref() {
-                if arg_names.contains(id.as_str()) {
+                if arg_names.contains(id) {
                     return false;
                 }
                 if semantic
