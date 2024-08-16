@@ -32,8 +32,8 @@ impl<const B: usize> BitSet<B> {
         bitset
     }
 
-    /// Convert from Inline to Heap representation.
-    fn overflow(&mut self, value: u32) {
+    /// Convert from Inline to Heap, if needed, and resize the Heap vector, if needed.
+    fn resize(&mut self, value: u32) {
         let num_blocks_needed = (value / 64) + 1;
         match self {
             Self::Inline(blocks) => {
@@ -47,14 +47,14 @@ impl<const B: usize> BitSet<B> {
         }
     }
 
-    fn get_blocks_mut(&mut self) -> &mut [u64] {
+    fn blocks_mut(&mut self) -> &mut [u64] {
         match self {
             Self::Inline(blocks) => blocks.as_mut_slice(),
             Self::Heap(blocks) => blocks.as_mut_slice(),
         }
     }
 
-    fn get_blocks(&self) -> &[u64] {
+    fn blocks(&self) -> &[u64] {
         match self {
             Self::Inline(blocks) => blocks.as_slice(),
             Self::Heap(blocks) => blocks.as_slice(),
@@ -67,10 +67,10 @@ impl<const B: usize> BitSet<B> {
     pub(super) fn insert(&mut self, value: u32) -> bool {
         let value_usize = value as usize;
         let (block, index) = (value_usize / 64, value_usize % 64);
-        if block >= self.get_blocks().len() {
-            self.overflow(value);
+        if block >= self.blocks().len() {
+            self.resize(value);
         }
-        let blocks = self.get_blocks_mut();
+        let blocks = self.blocks_mut();
         let missing = blocks[block] & (1 << index) == 0;
         blocks[block] |= 1 << index;
         missing
@@ -78,8 +78,8 @@ impl<const B: usize> BitSet<B> {
 
     /// Intersect in-place with another [`BitSet`].
     pub(super) fn intersect(&mut self, other: &BitSet<B>) {
-        let my_blocks = self.get_blocks_mut();
-        let other_blocks = other.get_blocks();
+        let my_blocks = self.blocks_mut();
+        let other_blocks = other.blocks();
         let min_len = my_blocks.len().min(other_blocks.len());
         for i in 0..min_len {
             my_blocks[i] &= other_blocks[i];
@@ -91,7 +91,7 @@ impl<const B: usize> BitSet<B> {
 
     /// Return an iterator over the values (in ascending order) in this [`BitSet`].
     pub(super) fn iter(&self) -> BitSetIterator<'_, B> {
-        let blocks = self.get_blocks();
+        let blocks = self.blocks();
         BitSetIterator {
             blocks,
             current_block_index: 0,
