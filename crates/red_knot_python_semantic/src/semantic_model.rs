@@ -1,7 +1,7 @@
 use ruff_db::files::{File, FilePath};
 use ruff_db::source::line_index;
 use ruff_python_ast as ast;
-use ruff_python_ast::{Expr, ExpressionRef, StmtClassDef};
+use ruff_python_ast::{Expr, ExpressionRef};
 use ruff_source_file::LineIndex;
 
 use crate::module_name::ModuleName;
@@ -161,7 +161,7 @@ macro_rules! impl_definition_has_ty {
 }
 
 impl_definition_has_ty!(ast::StmtFunctionDef);
-impl_definition_has_ty!(StmtClassDef);
+impl_definition_has_ty!(ast::StmtClassDef);
 impl_definition_has_ty!(ast::Alias);
 impl_definition_has_ty!(ast::Comprehension);
 impl_definition_has_ty!(ast::Parameter);

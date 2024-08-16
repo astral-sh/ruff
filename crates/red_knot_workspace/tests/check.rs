@@ -53,7 +53,7 @@ fn pull_types(db: &RootDatabase, file: File) {
 
     let ast = parsed_module(db, file);
 
-    visitor.visit_body(&ast.suite());
+    visitor.visit_body(ast.suite());
 }
 
 struct PullTypesVisitor<'db> {
