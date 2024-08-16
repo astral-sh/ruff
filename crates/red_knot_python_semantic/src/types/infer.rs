@@ -322,6 +322,9 @@ impl<'db> TypeInferenceBuilder<'db> {
             DefinitionKind::ParameterWithDefault(parameter_with_default) => {
                 self.infer_parameter_with_default_definition(parameter_with_default, definition);
             }
+            DefinitionKind::WithItem(with_item) => {
+                self.infer_with_item_definition(with_item, definition);
+            }
         }
     }
 
@@ -607,11 +610,34 @@ impl<'db> TypeInferenceBuilder<'db> {
         } = with_statement;
 
         for item in items {
-            self.infer_expression(&item.context_expr);
-            self.infer_optional_expression(item.optional_vars.as_deref());
+            if item.optional_vars.is_some() {
+                self.infer_definition(item);
+            } else {
+                self.infer_expression(&item.context_expr);
+            }
         }
 
         self.infer_body(body);
+    }
+
+    fn infer_with_item_definition(
+        &mut self,
+        with_item: &ast::WithItem,
+        definition: Definition<'db>,
+    ) {
+        let ast::WithItem {
+            range: _,
+            context_expr,
+            optional_vars,
+        } = with_item;
+
+        let Some(optional_vars) = optional_vars.as_deref() else {
+            unreachable!("With item definition without optional vars");
+        };
+        self.infer_expression(context_expr);
+        let with_item_ty = self.infer_expression(optional_vars);
+
+        self.types.definitions.insert(definition, with_item_ty);
     }
 
     fn infer_match_statement(&mut self, match_statement: &ast::StmtMatch) {

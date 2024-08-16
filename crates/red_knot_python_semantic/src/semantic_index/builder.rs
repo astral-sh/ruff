@@ -561,6 +561,17 @@ where
                     self.flow_merge(break_state);
                 }
             }
+            ast::Stmt::With(ast::StmtWith { items, body, .. }) => {
+                for item in items {
+                    self.visit_expr(&item.context_expr);
+                    if let Some(optional_vars) = item.optional_vars.as_deref() {
+                        self.current_assignment = Some(item.into());
+                        self.visit_expr(optional_vars);
+                        self.current_assignment = None;
+                    }
+                }
+                self.visit_body(body);
+            }
             ast::Stmt::Break(_) => {
                 self.loop_break_states.push(self.flow_snapshot());
             }
@@ -621,6 +632,9 @@ where
                                 symbol,
                                 ComprehensionDefinitionNodeRef { node, first },
                             );
+                        }
+                        Some(CurrentAssignment::WithItem(with_item)) => {
+                            self.add_definition(symbol, with_item);
                         }
                         None => {}
                     }
@@ -759,6 +773,7 @@ enum CurrentAssignment<'a> {
         node: &'a ast::Comprehension,
         first: bool,
     },
+    WithItem(&'a ast::WithItem),
 }
 
 impl<'a> From<&'a ast::StmtAssign> for CurrentAssignment<'a> {
@@ -782,5 +797,11 @@ impl<'a> From<&'a ast::StmtAugAssign> for CurrentAssignment<'a> {
 impl<'a> From<&'a ast::ExprNamed> for CurrentAssignment<'a> {
     fn from(value: &'a ast::ExprNamed) -> Self {
         Self::Named(value)
+    }
+}
+
+impl<'a> From<&'a ast::WithItem> for CurrentAssignment<'a> {
+    fn from(value: &'a ast::WithItem) -> Self {
+        Self::WithItem(value)
     }
 }

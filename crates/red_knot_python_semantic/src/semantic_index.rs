@@ -787,6 +787,31 @@ def f(a: str, /, b: str, c: int = 1, *args, d: int = 2, **kwargs):
     }
 
     #[test]
+    fn with_item_definition() {
+        let TestCase { db, file } = test_case(
+            "
+with item1 as x, item2 as y:
+    pass
+",
+        );
+
+        let index = semantic_index(&db, file);
+        let global_table = index.symbol_table(FileScopeId::global());
+
+        assert_eq!(names(&global_table), vec!["item1", "x", "item2", "y"]);
+
+        let use_def = index.use_def_map(FileScopeId::global());
+        for name in ["x", "y"] {
+            let [definition] = use_def
+                .public_definitions(global_table.symbol_id_by_name(name).expect("symbol exists"))
+            else {
+                panic!("Expected with item definition for {name}");
+            };
+            assert!(matches!(definition.node(&db), DefinitionKind::WithItem(_)));
+        }
+    }
+
+    #[test]
     fn dupes() {
         let TestCase { db, file } = test_case(
             "

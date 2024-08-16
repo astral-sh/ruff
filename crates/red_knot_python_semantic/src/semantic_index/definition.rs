@@ -47,6 +47,7 @@ pub(crate) enum DefinitionNodeRef<'a> {
     AugmentedAssignment(&'a ast::StmtAugAssign),
     Comprehension(ComprehensionDefinitionNodeRef<'a>),
     Parameter(ast::AnyParameterRef<'a>),
+    WithItem(&'a ast::WithItem),
 }
 
 impl<'a> From<&'a ast::StmtFunctionDef> for DefinitionNodeRef<'a> {
@@ -82,6 +83,12 @@ impl<'a> From<&'a ast::StmtAugAssign> for DefinitionNodeRef<'a> {
 impl<'a> From<&'a ast::Alias> for DefinitionNodeRef<'a> {
     fn from(node_ref: &'a ast::Alias) -> Self {
         Self::Import(node_ref)
+    }
+}
+
+impl<'a> From<&'a ast::WithItem> for DefinitionNodeRef<'a> {
+    fn from(node: &'a ast::WithItem) -> Self {
+        Self::WithItem(node)
     }
 }
 
@@ -175,6 +182,9 @@ impl DefinitionNodeRef<'_> {
                     DefinitionKind::ParameterWithDefault(AstNodeRef::new(parsed, parameter))
                 }
             },
+            DefinitionNodeRef::WithItem(item) => {
+                DefinitionKind::WithItem(AstNodeRef::new(parsed, item))
+            }
         }
     }
 
@@ -198,6 +208,7 @@ impl DefinitionNodeRef<'_> {
                 ast::AnyParameterRef::Variadic(parameter) => parameter.into(),
                 ast::AnyParameterRef::NonVariadic(parameter) => parameter.into(),
             },
+            Self::WithItem(node) => node.into(),
         }
     }
 }
@@ -215,6 +226,7 @@ pub enum DefinitionKind {
     Comprehension(ComprehensionDefinitionKind),
     Parameter(AstNodeRef<ast::Parameter>),
     ParameterWithDefault(AstNodeRef<ast::ParameterWithDefault>),
+    WithItem(AstNodeRef<ast::WithItem>),
 }
 
 #[derive(Clone, Debug)]
@@ -325,6 +337,12 @@ impl From<&ast::Parameter> for DefinitionNodeKey {
 
 impl From<&ast::ParameterWithDefault> for DefinitionNodeKey {
     fn from(node: &ast::ParameterWithDefault) -> Self {
+        Self(NodeKey::from_node(node))
+    }
+}
+
+impl From<&ast::WithItem> for DefinitionNodeKey {
+    fn from(node: &ast::WithItem) -> Self {
         Self(NodeKey::from_node(node))
     }
 }
