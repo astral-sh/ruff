@@ -174,7 +174,8 @@ pub(crate) fn unused_async(
         return;
     }
 
-    if checker.semantic().seen_module(Modules::FASTAPI)
+    if checker.settings.ruff.allow_fastapi_routes_unused_async
+        && checker.semantic().seen_module(Modules::FASTAPI)
         && is_fastapi_route(function_def, checker.semantic())
     {
         return;

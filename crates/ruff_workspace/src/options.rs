@@ -2986,6 +2986,18 @@ pub struct RuffOptions {
         "#
     )]
     pub parenthesize_tuple_in_subscript: Option<bool>,
+
+    /// Whether to allow fastapi routes to be defined as async function, although they don't use
+    /// any asynchronous code (see `RUF029`).
+    #[option(
+        default = r#"false"#,
+        value_type = "bool",
+        example = r#"
+        # Make it a ok to have async functions in FastAPI routes that don't use await
+        parenthesize-tuple-in-subscript = true
+        "#
+    )]
+    pub allow_fastapi_routes_unused_async: Option<bool>,
 }
 
 impl RuffOptions {
@@ -2993,6 +3005,9 @@ impl RuffOptions {
         ruff::settings::Settings {
             parenthesize_tuple_in_subscript: self
                 .parenthesize_tuple_in_subscript
+                .unwrap_or_default(),
+            allow_fastapi_routes_unused_async: self
+                .allow_fastapi_routes_unused_async
                 .unwrap_or_default(),
         }
     }

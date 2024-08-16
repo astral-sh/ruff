@@ -1,6 +1,5 @@
 import time
 import asyncio
-from fastapi import FastAPI
 
 
 async def pass_1a():  # OK: awaits a coroutine
@@ -79,11 +78,3 @@ async def test():
 async def test() -> str:
     vals = [str(val) for val in await async_func(1)]
     return ",".join(vals)
-
-
-app = FastAPI()
-
-
-@app.post("/count")
-async def fastapi_route(): # OK: fastapi route
-    return 1
