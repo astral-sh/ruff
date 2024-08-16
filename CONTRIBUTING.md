@@ -361,7 +361,7 @@ even patch releases may contain [non-backwards-compatible changes](https://semve
         downstream jobs manually if needed.
 1. Verify the GitHub release:
     1. The Changelog should match the content of `CHANGELOG.md`
-    1. Append the contributors from the `bump.sh` script
+    1. Append the contributors from the `scripts/release.sh` script
 1. If needed, [update the schemastore](https://github.com/astral-sh/ruff/blob/main/scripts/update_schemastore.py).
     1. One can determine if an update is needed when
         `git diff old-version-tag new-version-tag -- ruff.schema.json` returns a non-empty diff.
