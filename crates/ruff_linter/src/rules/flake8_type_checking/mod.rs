@@ -35,6 +35,7 @@ mod tests {
     #[test_case(Rule::RuntimeImportInTypeCheckingBlock, Path::new("TCH004_8.py"))]
     #[test_case(Rule::RuntimeImportInTypeCheckingBlock, Path::new("TCH004_9.py"))]
     #[test_case(Rule::RuntimeImportInTypeCheckingBlock, Path::new("quote.py"))]
+    #[test_case(Rule::QuotedTypeAlias, Path::new("TCH008.py"))]
     #[test_case(Rule::RuntimeStringUnion, Path::new("TCH010_1.py"))]
     #[test_case(Rule::RuntimeStringUnion, Path::new("TCH010_2.py"))]
     #[test_case(Rule::TypingOnlyFirstPartyImport, Path::new("TCH001.py"))]

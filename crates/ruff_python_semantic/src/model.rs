@@ -1646,6 +1646,23 @@ impl<'a> SemanticModel<'a> {
             || (self.in_future_type_definition() && self.in_typing_only_annotation())
     }
 
+    /// Return `true` if the model is in an explicit type alias
+    pub const fn in_explicit_type_alias(&self) -> bool {
+        self.flags
+            .intersects(SemanticModelFlags::EXPLICIT_TYPE_ALIAS)
+    }
+
+    /// Return `true` if the model is in a generic type alias
+    pub const fn in_generic_type_alias(&self) -> bool {
+        self.flags
+            .intersects(SemanticModelFlags::GENERIC_TYPE_ALIAS)
+    }
+
+    /// Return `true` if the model is in a type alias
+    pub const fn in_type_alias(&self) -> bool {
+        self.in_explicit_type_alias() || self.in_generic_type_alias()
+    }
+
     /// Return `true` if the model is in an exception handler.
     pub const fn in_exception_handler(&self) -> bool {
         self.flags.intersects(SemanticModelFlags::EXCEPTION_HANDLER)
@@ -2213,6 +2230,16 @@ bitflags! {
         ///
         /// [PEP 257]: https://peps.python.org/pep-0257/#what-is-a-docstring
         const ATTRIBUTE_DOCSTRING = 1 << 26;
+
+        /// The model is in the value expression of a [PEP 613] explicit type alias.
+        ///
+        /// [PEP 613]: https://peps.python.org/pep-0613/
+        const EXPLICIT_TYPE_ALIAS = 1 << 27;
+
+        /// The model is in the value expression of a [PEP 695] type statement
+        ///
+        /// [PEP 695]: https://peps.python.org/pep-0695/#generic-type-alias
+        const GENERIC_TYPE_ALIAS = 1 << 28;
 
         /// The context is in any type annotation.
         const ANNOTATION = Self::TYPING_ONLY_ANNOTATION.bits() | Self::RUNTIME_EVALUATED_ANNOTATION.bits() | Self::RUNTIME_REQUIRED_ANNOTATION.bits();

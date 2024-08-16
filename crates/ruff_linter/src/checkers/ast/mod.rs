@@ -831,9 +831,7 @@ impl<'a> Visitor<'a> for Checker<'a> {
                 if let Some(type_params) = type_params {
                     self.visit_type_params(type_params);
                 }
-                self.visit
-                    .type_param_definitions
-                    .push((value, self.semantic.snapshot()));
+                self.visit_generic_type_alias(value);
                 self.semantic.pop_scope();
                 self.visit_expr(name);
             }
@@ -904,7 +902,7 @@ impl<'a> Visitor<'a> for Checker<'a> {
 
                 if let Some(expr) = value {
                     if self.semantic.match_typing_expr(annotation, "TypeAlias") {
-                        self.visit_type_definition(expr);
+                        self.visit_explicit_type_alias(expr);
                     } else {
                         self.visit_expr(expr);
                     }
@@ -1790,6 +1788,28 @@ impl<'a> Checker<'a> {
         self.semantic.flags = snapshot;
     }
 
+    /// Visit an [`Expr`], and treat it as a [PEP 613] explicit type alias.
+    ///
+    /// [PEP 613]: https://peps.python.org/pep-0613/
+    fn visit_explicit_type_alias(&mut self, expr: &'a Expr) {
+        let snapshot = self.semantic.flags;
+        self.semantic.flags |= SemanticModelFlags::EXPLICIT_TYPE_ALIAS;
+        self.visit_type_definition(expr);
+        self.semantic.flags = snapshot;
+    }
+
+    /// Visit an [`Expr`], and treat it as a [PEP 695] generic type alias.
+    ///
+    /// [PEP 695]: https://peps.python.org/pep-0695/#generic-type-alias
+    fn visit_generic_type_alias(&mut self, expr: &'a Expr) {
+        let snapshot = self.semantic.flags;
+        self.semantic.flags |= SemanticModelFlags::GENERIC_TYPE_ALIAS;
+        self.visit
+            .type_param_definitions
+            .push((expr, self.semantic.snapshot()));
+        self.semantic.flags = snapshot;
+    }
+
     /// Visit an [`Expr`], and treat it as a type definition.
     fn visit_type_definition(&mut self, expr: &'a Expr) {
         let snapshot = self.semantic.flags;
@@ -2207,7 +2227,18 @@ impl<'a> Checker<'a> {
 
                     self.semantic.flags |=
                         SemanticModelFlags::TYPE_DEFINITION | type_definition_flag;
-                    self.visit_expr(parsed_annotation.expr());
+                    let parsed_expr = parsed_annotation.expr();
+                    self.visit_expr(parsed_expr);
+                    if self.semantic.in_type_alias() {
+                        if self.enabled(Rule::QuotedTypeAlias) {
+                            flake8_type_checking::rules::quoted_type_alias(
+                                self,
+                                parsed_expr,
+                                annotation,
+                                range,
+                            );
+                        }
+                    }
                     self.parsed_type_annotation = None;
                 } else {
                     if self.enabled(Rule::ForwardAnnotationSyntaxError) {
