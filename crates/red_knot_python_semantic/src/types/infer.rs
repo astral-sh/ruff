@@ -867,8 +867,8 @@ impl<'db> TypeInferenceBuilder<'db> {
     /// using the name of the module we're currently analyzing.
     ///
     /// - `level` is the number of dots at the beginning of the relative module name:
-    ///   - `from .foo import bar` => `level == 1`
-    ///   - `from ...foo import bar` => `level == 3`
+    ///   - `from .foo.bar import baz` => `level == 1`
+    ///   - `from ...foo.bar import baz` => `level == 3`
     /// - `tail` is the relative module name stripped of all leading dots:
     ///   - `from .foo import bar` => `tail == "foo"`
     ///   - `from ..foo.bar import baz` => `tail == "foo.bar"`
@@ -894,6 +894,15 @@ impl<'db> TypeInferenceBuilder<'db> {
         alias: &ast::Alias,
         definition: Definition<'db>,
     ) {
+        // TODO:
+        // - Absolute `*` imports (`from collections import *`)
+        // - Relative `*` imports (`from ...foo import *`)
+        // - Submodule imports (`from collections import abc`,
+        //   where `abc` is a submodule of the `collections` package)
+        //
+        // For the last item, see the currently skipped tests
+        // `follow_relative_import_bare_to_module()` and
+        // `follow_nonexistent_import_bare_to_module()`.
         let ast::StmtImportFrom { module, level, .. } = import_from;
         let module_ty = if let Some(level) = NonZeroU32::new(*level) {
             self.module_ty_from_name(self.relative_module_name(module.as_deref(), level))
@@ -929,8 +938,7 @@ impl<'db> TypeInferenceBuilder<'db> {
     fn module_ty_from_name(&self, module_name: Option<ModuleName>) -> Type<'db> {
         module_name
             .and_then(|module_name| resolve_module(self.db, module_name))
-            .map(|module| Type::Module(module.file()))
-            .unwrap_or(Type::Unbound)
+            .map_or(Type::Unknown, |module| Type::Module(module.file()))
     }
 
     fn infer_decorator(&mut self, decorator: &ast::Decorator) -> Type<'db> {
@@ -1756,6 +1764,20 @@ mod tests {
     }
 
     #[test]
+    fn follow_nonexistent_relative_import_simple() -> anyhow::Result<()> {
+        let mut db = setup_db();
+
+        db.write_files([
+            ("src/package/__init__.py", ""),
+            ("src/package/bar.py", "from .foo import X"),
+        ])?;
+
+        assert_public_ty(&db, "src/package/bar.py", "X", "Unknown");
+
+        Ok(())
+    }
+
+    #[test]
     fn follow_relative_import_dotted() -> anyhow::Result<()> {
         let mut db = setup_db();
 
@@ -1784,6 +1806,14 @@ mod tests {
         Ok(())
     }
 
+    #[test]
+    fn follow_nonexistent_relative_import_bare_to_package() -> anyhow::Result<()> {
+        let mut db = setup_db();
+        db.write_files([("src/package/bar.py", "from . import X")])?;
+        assert_public_ty(&db, "src/package/bar.py", "X", "Unknown");
+        Ok(())
+    }
+
     #[ignore = "TODO: Submodule imports possibly not supported right now?"]
     #[test]
     fn follow_relative_import_bare_to_module() -> anyhow::Result<()> {
@@ -1800,6 +1830,21 @@ mod tests {
         Ok(())
     }
 
+    #[ignore = "TODO: Submodule imports possibly not supported right now?"]
+    #[test]
+    fn follow_nonexistent_import_bare_to_module() -> anyhow::Result<()> {
+        let mut db = setup_db();
+
+        db.write_files([
+            ("src/package/__init__.py", ""),
+            ("src/package/bar.py", "from . import foo"),
+        ])?;
+
+        assert_public_ty(&db, "src/package/bar.py", "foo", "Unknown");
+
+        Ok(())
+    }
+
     #[test]
     fn follow_relative_import_from_dunder_init() -> anyhow::Result<()> {
         let mut db = setup_db();
@@ -1811,6 +1856,14 @@ mod tests {
 
         assert_public_ty(&db, "src/package/__init__.py", "X", "Literal[42]");
 
+        Ok(())
+    }
+
+    #[test]
+    fn follow_nonexistent_relative_import_from_dunder_init() -> anyhow::Result<()> {
+        let mut db = setup_db();
+        db.write_files([("src/package/__init__.py", "from .foo import X")])?;
+        assert_public_ty(&db, "src/package/__init__.py", "X", "Unknown");
         Ok(())
     }
 
