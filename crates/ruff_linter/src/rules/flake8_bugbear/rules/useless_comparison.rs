@@ -1,6 +1,7 @@
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::Expr;
+use ruff_python_semantic::ScopeKind;
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
@@ -33,24 +34,34 @@ use super::super::helpers::at_last_top_level_expression_in_cell;
 /// ## References
 /// - [Python documentation: `assert` statement](https://docs.python.org/3/reference/simple_stmts.html#the-assert-statement)
 #[violation]
-pub struct UselessComparison;
+pub struct UselessComparison {
+    at: ComparisonLocationAt,
+}
 
 impl Violation for UselessComparison {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!(
-            "Pointless comparison. Did you mean to assign a value? \
-             Otherwise, prepend `assert` or remove it."
-        )
+        match self.at {
+            ComparisonLocationAt::MiddleBody => format!(
+                "Pointless comparison. Did you mean to assign a value? \
+                Otherwise, prepend `assert` or remove it."
+            ),
+            ComparisonLocationAt::EndOfFunction => format!(
+                "Pointless comparison at end of function scope. Did you mean \
+                to return the expression result?"
+            ),
+        }
     }
 }
 
 /// B015
 pub(crate) fn useless_comparison(checker: &mut Checker, expr: &Expr) {
     if expr.is_compare_expr() {
+        let semantic = checker.semantic();
+
         if checker.source_type.is_ipynb()
             && at_last_top_level_expression_in_cell(
-                checker.semantic(),
+                semantic,
                 checker.locator(),
                 checker.cell_offsets(),
             )
@@ -58,8 +69,28 @@ pub(crate) fn useless_comparison(checker: &mut Checker, expr: &Expr) {
             return;
         }
 
-        checker
-            .diagnostics
-            .push(Diagnostic::new(UselessComparison, expr.range()));
+        if let ScopeKind::Function(func_def) = semantic.current_scope().kind {
+            if func_def.range.end() == expr.range().end() {
+                return checker.diagnostics.push(Diagnostic::new(
+                    UselessComparison {
+                        at: ComparisonLocationAt::EndOfFunction,
+                    },
+                    expr.range(),
+                ));
+            }
+        }
+
+        checker.diagnostics.push(Diagnostic::new(
+            UselessComparison {
+                at: ComparisonLocationAt::MiddleBody,
+            },
+            expr.range(),
+        ))
     }
+}
+
+#[derive(Debug, PartialEq, Eq, Copy, Clone)]
+enum ComparisonLocationAt {
+    MiddleBody,
+    EndOfFunction,
 }
