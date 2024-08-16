@@ -1,5 +1,5 @@
+use foldhash::HashMap;
 use ruff_python_ast::{self as ast, Expr, ParameterWithDefault};
-use rustc_hash::FxHashMap;
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
@@ -76,7 +76,7 @@ pub(crate) fn loop_variable_overrides_iterator(checker: &mut Checker, target: &E
 
 #[derive(Default)]
 struct NameFinder<'a> {
-    names: FxHashMap<&'a str, &'a Expr>,
+    names: HashMap<&'a str, &'a Expr>,
 }
 
 impl<'a> Visitor<'a> for NameFinder<'a> {

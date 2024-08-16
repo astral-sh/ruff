@@ -1,6 +1,6 @@
 use std::borrow::Cow;
 
-use rustc_hash::FxHashMap;
+use foldhash::HashMap;
 
 use ruff_python_ast::helpers::format_import_from;
 
@@ -73,7 +73,7 @@ impl<'a> Importable<'a> for ImportFromData<'a> {
 #[derive(Debug, Default)]
 pub(crate) struct ImportFromStatement<'a> {
     pub(crate) comments: ImportFromCommentSet<'a>,
-    pub(crate) aliases: FxHashMap<AliasData<'a>, ImportFromCommentSet<'a>>,
+    pub(crate) aliases: HashMap<AliasData<'a>, ImportFromCommentSet<'a>>,
     pub(crate) trailing_comma: TrailingComma,
 }
 
@@ -81,17 +81,17 @@ pub(crate) struct ImportFromStatement<'a> {
 pub(crate) struct ImportBlock<'a> {
     // Set of (name, asname), used to track regular imports.
     // Ex) `import module`
-    pub(crate) import: FxHashMap<AliasData<'a>, ImportCommentSet<'a>>,
+    pub(crate) import: HashMap<AliasData<'a>, ImportCommentSet<'a>>,
     // Map from (module, level) to `AliasData`, used to track 'from' imports.
     // Ex) `from module import member`
-    pub(crate) import_from: FxHashMap<ImportFromData<'a>, ImportFromStatement<'a>>,
+    pub(crate) import_from: HashMap<ImportFromData<'a>, ImportFromStatement<'a>>,
     // Set of (module, level, name, asname), used to track re-exported 'from' imports.
     // Ex) `from module import member as member`
     pub(crate) import_from_as:
-        FxHashMap<(ImportFromData<'a>, AliasData<'a>), ImportFromStatement<'a>>,
+        HashMap<(ImportFromData<'a>, AliasData<'a>), ImportFromStatement<'a>>,
     // Map from (module, level) to `AliasData`, used to track star imports.
     // Ex) `from module import *`
-    pub(crate) import_from_star: FxHashMap<ImportFromData<'a>, ImportFromStatement<'a>>,
+    pub(crate) import_from_star: HashMap<ImportFromData<'a>, ImportFromStatement<'a>>,
 }
 
 type Import<'a> = (AliasData<'a>, ImportCommentSet<'a>);

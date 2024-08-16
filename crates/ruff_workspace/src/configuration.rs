@@ -9,10 +9,10 @@ use std::path::{Path, PathBuf};
 use std::str::FromStr;
 
 use anyhow::{anyhow, Result};
+use foldhash::{HashMap, HashMapExt, HashSet, HashSetExt};
 use glob::{glob, GlobError, Paths, PatternError};
 use itertools::Itertools;
 use regex::Regex;
-use rustc_hash::{FxHashMap, FxHashSet};
 use shellexpand;
 use shellexpand::LookupError;
 use strum::IntoEnumIterator;
@@ -247,7 +247,7 @@ impl Configuration {
                 project_root: project_root.to_path_buf(),
                 allowed_confusables: lint
                     .allowed_confusables
-                    .map(FxHashSet::from_iter)
+                    .map(HashSet::from_iter)
                     .unwrap_or_default(),
                 builtins: self.builtins.unwrap_or_default(),
                 dummy_variable_rgx: lint
@@ -767,14 +767,14 @@ impl LintConfiguration {
         let mut carryover_unfixables: Option<&[RuleSelector]> = None;
 
         // Store selectors for displaying warnings
-        let mut redirects = FxHashMap::default();
-        let mut deprecated_selectors = FxHashSet::default();
-        let mut removed_selectors = FxHashSet::default();
-        let mut ignored_preview_selectors = FxHashSet::default();
+        let mut redirects = HashMap::default();
+        let mut deprecated_selectors = HashSet::default();
+        let mut removed_selectors = HashSet::default();
+        let mut ignored_preview_selectors = HashSet::default();
 
         // Track which docstring rules are specifically enabled
         // which lets us override the docstring convention ignore-list
-        let mut docstring_overrides: FxHashSet<Rule> = FxHashSet::default();
+        let mut docstring_overrides: HashSet<Rule> = HashSet::default();
 
         for selection in &self.rule_selections {
             // If a selection only specifies extend-select we cannot directly
@@ -784,10 +784,10 @@ impl LintConfiguration {
             // precedence over less specific selectors within a rule selection).
             // We do this via the following HashMap where the bool indicates
             // whether to enable or disable the given rule.
-            let mut select_map_updates: FxHashMap<Rule, bool> = FxHashMap::default();
-            let mut fixable_map_updates: FxHashMap<Rule, bool> = FxHashMap::default();
+            let mut select_map_updates: HashMap<Rule, bool> = HashMap::default();
+            let mut fixable_map_updates: HashMap<Rule, bool> = HashMap::default();
 
-            let mut docstring_override_updates: FxHashSet<Rule> = FxHashSet::default();
+            let mut docstring_override_updates: HashSet<Rule> = HashSet::default();
 
             let carriedover_ignores = carryover_ignores.take();
             let carriedover_unfixables = carryover_unfixables.take();

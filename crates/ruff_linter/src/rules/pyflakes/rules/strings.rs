@@ -1,6 +1,6 @@
 use std::string::ToString;
 
-use rustc_hash::FxHashSet;
+use foldhash::HashSet;
 
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, violation};
@@ -637,7 +637,7 @@ pub(crate) fn percent_format_missing_arguments(
         return; // contains **x splat
     }
 
-    let mut keywords = FxHashSet::default();
+    let mut keywords = HashSet::default();
     for key in dict.iter_keys().flatten() {
         match key {
             Expr::StringLiteral(ast::ExprStringLiteral { value, .. }) => {
@@ -859,7 +859,7 @@ pub(crate) fn string_dot_format_missing_argument(
         return;
     }
 
-    let keywords: FxHashSet<_> = keywords
+    let keywords: HashSet<_> = keywords
         .iter()
         .filter_map(|k| {
             let Keyword { arg, .. } = &k;

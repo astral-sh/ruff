@@ -5,11 +5,11 @@ use std::time::Instant;
 
 use anyhow::Result;
 use colored::Colorize;
+use foldhash::HashMap;
 use ignore::Error;
 use log::{debug, error, warn};
 #[cfg(not(target_family = "wasm"))]
 use rayon::prelude::*;
-use rustc_hash::FxHashMap;
 
 use ruff_diagnostics::Diagnostic;
 use ruff_linter::message::Message;
@@ -133,7 +133,7 @@ pub(crate) fn check(
                             dummy,
                             TextSize::default(),
                         )],
-                        FxHashMap::default(),
+                        HashMap::default(),
                     )
                 } else {
                     warn!(
@@ -221,7 +221,7 @@ mod test {
     use std::os::unix::fs::OpenOptionsExt;
 
     use anyhow::Result;
-    use rustc_hash::FxHashMap;
+    use foldhash::HashMap;
     use tempfile::TempDir;
 
     use ruff_linter::message::{Emitter, EmitterContext, TextEmitter};
@@ -284,7 +284,7 @@ mod test {
             .emit(
                 &mut output,
                 &diagnostics.messages,
-                &EmitterContext::new(&FxHashMap::default()),
+                &EmitterContext::new(&HashMap::default()),
             )
             .unwrap();
 

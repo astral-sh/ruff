@@ -1,5 +1,5 @@
+use foldhash::{HashMap, HashMapExt, HashSet, HashSetExt};
 use regex::Regex;
-use rustc_hash::{FxBuildHasher, FxHashMap, FxHashSet};
 use serde::{Deserialize, Serialize};
 use strum::IntoEnumIterator;
 
@@ -909,7 +909,7 @@ pub struct LintCommonOptions {
             "!src/**.py" = ["D"]
         "#
     )]
-    pub per_file_ignores: Option<FxHashMap<String, Vec<RuleSelector>>>,
+    pub per_file_ignores: Option<HashMap<String, Vec<RuleSelector>>>,
 
     /// A list of mappings from file pattern to rule codes or prefixes to
     /// exclude, in addition to any rules excluded by [`per-file-ignores`](#lint_per-file-ignores).
@@ -922,7 +922,7 @@ pub struct LintCommonOptions {
             "__init__.py" = ["E402"]
         "#
     )]
-    pub extend_per_file_ignores: Option<FxHashMap<String, Vec<RuleSelector>>>,
+    pub extend_per_file_ignores: Option<HashMap<String, Vec<RuleSelector>>>,
     // WARNING: Don't add new options to this type. Add them to `LintOptions` instead.
 }
 
@@ -1321,7 +1321,7 @@ pub struct Flake8ImportConventionsOptions {
             scipy = "sp"
         "#
     )]
-    pub aliases: Option<FxHashMap<String, String>>,
+    pub aliases: Option<HashMap<String, String>>,
 
     /// A mapping from module to conventional import alias. These aliases will
     /// be added to the [`aliases`](#lint_flake8-import-conventions_aliases) mapping.
@@ -1334,7 +1334,7 @@ pub struct Flake8ImportConventionsOptions {
             "dask.dataframe" = "dd"
         "#
     )]
-    pub extend_aliases: Option<FxHashMap<String, String>>,
+    pub extend_aliases: Option<HashMap<String, String>>,
 
     /// A mapping from module to its banned import aliases.
     #[option(
@@ -1346,7 +1346,7 @@ pub struct Flake8ImportConventionsOptions {
             "tensorflow.keras.backend" = ["K"]
     "#
     )]
-    pub banned_aliases: Option<FxHashMap<String, BannedAliases>>,
+    pub banned_aliases: Option<HashMap<String, BannedAliases>>,
 
     /// A list of modules that should not be imported from using the
     /// `from ... import ...` syntax.
@@ -1361,7 +1361,7 @@ pub struct Flake8ImportConventionsOptions {
             banned-from = ["typing"]
     "#
     )]
-    pub banned_from: Option<FxHashSet<String>>,
+    pub banned_from: Option<HashSet<String>>,
 }
 
 impl Flake8ImportConventionsOptions {
@@ -1662,7 +1662,7 @@ pub struct Flake8TidyImportsOptions {
             "typing.TypedDict".msg = "Use typing_extensions.TypedDict instead."
         "#
     )]
-    pub banned_api: Option<FxHashMap<String, ApiBan>>,
+    pub banned_api: Option<HashMap<String, ApiBan>>,
 
     /// List of specific modules that may not be imported at module level, and should instead be
     /// imported lazily (e.g., within a function definition, or an `if TYPE_CHECKING:`
@@ -2299,7 +2299,7 @@ pub struct IsortOptions {
             "django" = ["django"]
         "#
     )]
-    pub sections: Option<FxHashMap<ImportSection, Vec<String>>>,
+    pub sections: Option<HashMap<ImportSection, Vec<String>>>,
 }
 
 impl IsortOptions {
@@ -2382,7 +2382,7 @@ impl IsortOptions {
         let sections = self.sections.unwrap_or_default();
 
         // Verify that `sections` doesn't contain any built-in sections.
-        let sections: FxHashMap<String, Vec<glob::Pattern>> = sections
+        let sections: HashMap<String, Vec<glob::Pattern>> = sections
             .into_iter()
             .filter_map(|(section, modules)| match section {
                 ImportSection::Known(section) => {
@@ -2404,7 +2404,7 @@ impl IsortOptions {
             .collect::<Result<_, _>>()?;
 
         // Verify that `section_order` doesn't contain any duplicates.
-        let mut seen = FxHashSet::with_capacity_and_hasher(section_order.len(), FxBuildHasher);
+        let mut seen = HashSet::with_capacity(section_order.len());
         for section in &section_order {
             if !seen.insert(section) {
                 warn_user_once!(
@@ -2457,7 +2457,7 @@ impl IsortOptions {
             case_sensitive: self.case_sensitive.unwrap_or(false),
             force_wrap_aliases: self.force_wrap_aliases.unwrap_or(false),
             detect_same_package: self.detect_same_package.unwrap_or(true),
-            force_to_top: FxHashSet::from_iter(self.force_to_top.unwrap_or_default()),
+            force_to_top: HashSet::from_iter(self.force_to_top.unwrap_or_default()),
             known_modules: isort::categorize::KnownModules::new(
                 known_first_party,
                 known_third_party,
@@ -2467,14 +2467,14 @@ impl IsortOptions {
             ),
             order_by_type: self.order_by_type.unwrap_or(true),
             relative_imports_order: self.relative_imports_order.unwrap_or_default(),
-            single_line_exclusions: FxHashSet::from_iter(
+            single_line_exclusions: HashSet::from_iter(
                 self.single_line_exclusions.unwrap_or_default(),
             ),
             split_on_trailing_comma: self.split_on_trailing_comma.unwrap_or(true),
-            classes: FxHashSet::from_iter(self.classes.unwrap_or_default()),
-            constants: FxHashSet::from_iter(self.constants.unwrap_or_default()),
-            variables: FxHashSet::from_iter(self.variables.unwrap_or_default()),
-            no_lines_before: FxHashSet::from_iter(no_lines_before),
+            classes: HashSet::from_iter(self.classes.unwrap_or_default()),
+            constants: HashSet::from_iter(self.constants.unwrap_or_default()),
+            variables: HashSet::from_iter(self.variables.unwrap_or_default()),
+            no_lines_before: HashSet::from_iter(no_lines_before),
             lines_after_imports: self.lines_after_imports.unwrap_or(-1),
             lines_between_types,
             forced_separate: Vec::from_iter(self.forced_separate.unwrap_or_default()),
@@ -2830,7 +2830,7 @@ pub struct PylintOptions {
             allow-dunder-method-names = ["__tablename__", "__table_args__"]
         "#
     )]
-    pub allow_dunder_method_names: Option<FxHashSet<String>>,
+    pub allow_dunder_method_names: Option<HashSet<String>>,
 
     /// Maximum number of branches allowed for a function or method body (see `PLR0912`).
     #[option(default = r"12", value_type = "int", example = r"max-branches = 15")]

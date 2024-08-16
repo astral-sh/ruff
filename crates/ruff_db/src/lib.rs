@@ -1,6 +1,4 @@
-use std::hash::BuildHasherDefault;
-
-use rustc_hash::FxHasher;
+use foldhash::fast::RandomState;
 
 use crate::files::Files;
 use crate::system::System;
@@ -15,8 +13,8 @@ pub mod system;
 pub mod testing;
 pub mod vendored;
 
-pub type FxDashMap<K, V> = dashmap::DashMap<K, V, BuildHasherDefault<FxHasher>>;
-pub type FxDashSet<K> = dashmap::DashSet<K, BuildHasherDefault<FxHasher>>;
+pub type FxDashMap<K, V> = dashmap::DashMap<K, V, RandomState>;
+pub type FxDashSet<K> = dashmap::DashSet<K, RandomState>;
 
 /// Most basic database that gives access to files, the host system, source code, and parsed AST.
 #[salsa::db]

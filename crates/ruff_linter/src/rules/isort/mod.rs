@@ -282,9 +282,9 @@ mod tests {
     use std::path::Path;
 
     use anyhow::Result;
+    use foldhash::{HashMap, HashMapExt, HashSet, HashSetExt};
     use ruff_python_semantic::{MemberNameImport, ModuleNameImport, NameImport};
     use ruff_text_size::Ranged;
-    use rustc_hash::{FxHashMap, FxHashSet};
     use test_case::test_case;
 
     use crate::assert_messages;
@@ -378,7 +378,7 @@ mod tests {
                         vec![pattern("foo"), pattern("__future__")],
                         vec![],
                         vec![],
-                        FxHashMap::default(),
+                        HashMap::default(),
                     ),
                     ..super::settings::Settings::default()
                 },
@@ -402,7 +402,7 @@ mod tests {
                         vec![pattern("foo"), pattern("__future__")],
                         vec![],
                         vec![],
-                        FxHashMap::default(),
+                        HashMap::default(),
                     ),
                     ..super::settings::Settings::default()
                 },
@@ -426,7 +426,7 @@ mod tests {
                         vec![pattern("foo.bar")],
                         vec![],
                         vec![],
-                        FxHashMap::default(),
+                        HashMap::default(),
                     ),
                     ..super::settings::Settings::default()
                 },
@@ -465,7 +465,7 @@ mod tests {
                         vec![],
                         vec![pattern("ruff")],
                         vec![],
-                        FxHashMap::default(),
+                        HashMap::default(),
                     ),
                     ..super::settings::Settings::default()
                 },
@@ -489,7 +489,7 @@ mod tests {
                         vec![],
                         vec![pattern("ruff")],
                         vec![],
-                        FxHashMap::default(),
+                        HashMap::default(),
                     ),
                     relative_imports_order: RelativeImportsOrder::ClosestToFurthest,
                     ..super::settings::Settings::default()
@@ -527,7 +527,7 @@ mod tests {
             Path::new("isort").join(path).as_path(),
             &LinterSettings {
                 isort: super::settings::Settings {
-                    force_to_top: FxHashSet::from_iter([
+                    force_to_top: HashSet::from_iter([
                         "z".to_string(),
                         "lib1".to_string(),
                         "lib3".to_string(),
@@ -607,7 +607,7 @@ mod tests {
             &LinterSettings {
                 isort: super::settings::Settings {
                     force_single_line: true,
-                    single_line_exclusions: FxHashSet::from_iter([
+                    single_line_exclusions: HashSet::from_iter([
                         "os".to_string(),
                         "logging.handlers".to_string(),
                     ]),
@@ -669,7 +669,7 @@ mod tests {
             &LinterSettings {
                 isort: super::settings::Settings {
                     order_by_type: true,
-                    classes: FxHashSet::from_iter([
+                    classes: HashSet::from_iter([
                         "SVC".to_string(),
                         "SELU".to_string(),
                         "N_CLASS".to_string(),
@@ -697,7 +697,7 @@ mod tests {
             &LinterSettings {
                 isort: super::settings::Settings {
                     order_by_type: true,
-                    constants: FxHashSet::from_iter([
+                    constants: HashSet::from_iter([
                         "Const".to_string(),
                         "constant".to_string(),
                         "First".to_string(),
@@ -727,7 +727,7 @@ mod tests {
             &LinterSettings {
                 isort: super::settings::Settings {
                     order_by_type: true,
-                    variables: FxHashSet::from_iter([
+                    variables: HashSet::from_iter([
                         "VAR".to_string(),
                         "Variable".to_string(),
                         "MyVar".to_string(),
@@ -754,7 +754,7 @@ mod tests {
             &LinterSettings {
                 isort: super::settings::Settings {
                     force_sort_within_sections: true,
-                    force_to_top: FxHashSet::from_iter(["z".to_string()]),
+                    force_to_top: HashSet::from_iter(["z".to_string()]),
                     ..super::settings::Settings::default()
                 },
                 src: vec![test_resource_path("fixtures/isort")],
@@ -1010,7 +1010,7 @@ mod tests {
                         vec![],
                         vec![],
                         vec![],
-                        FxHashMap::from_iter([("django".to_string(), vec![pattern("django")])]),
+                        HashMap::from_iter([("django".to_string(), vec![pattern("django")])]),
                     ),
                     section_order: vec![
                         ImportSection::Known(ImportType::Future),
@@ -1061,7 +1061,7 @@ mod tests {
             Path::new("isort").join(path).as_path(),
             &LinterSettings {
                 isort: super::settings::Settings {
-                    no_lines_before: FxHashSet::from_iter([
+                    no_lines_before: HashSet::from_iter([
                         ImportSection::Known(ImportType::Future),
                         ImportSection::Known(ImportType::StandardLibrary),
                         ImportSection::Known(ImportType::ThirdParty),
@@ -1089,7 +1089,7 @@ mod tests {
             Path::new("isort").join(path).as_path(),
             &LinterSettings {
                 isort: super::settings::Settings {
-                    no_lines_before: FxHashSet::from_iter([
+                    no_lines_before: HashSet::from_iter([
                         ImportSection::Known(ImportType::StandardLibrary),
                         ImportSection::Known(ImportType::LocalFolder),
                     ]),
@@ -1202,7 +1202,7 @@ mod tests {
                         vec![],
                         vec![],
                         vec![],
-                        FxHashMap::from_iter([("django".to_string(), vec![pattern("django")])]),
+                        HashMap::from_iter([("django".to_string(), vec![pattern("django")])]),
                     ),
                     section_order: vec![
                         ImportSection::Known(ImportType::Future),
@@ -1235,7 +1235,7 @@ mod tests {
                         vec![],
                         vec![],
                         vec![],
-                        FxHashMap::from_iter([("django".to_string(), vec![pattern("django")])]),
+                        HashMap::from_iter([("django".to_string(), vec![pattern("django")])]),
                     ),
                     section_order: vec![
                         ImportSection::Known(ImportType::Future),
@@ -1267,7 +1267,7 @@ mod tests {
                         vec![],
                         vec![],
                         vec![],
-                        FxHashMap::default(),
+                        HashMap::default(),
                     ),
                     ..super::settings::Settings::default()
                 },

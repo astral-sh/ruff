@@ -10,8 +10,8 @@ mod tests {
     use std::path::Path;
 
     use anyhow::Result;
+    use foldhash::HashMap;
     use regex::Regex;
-    use rustc_hash::FxHashMap;
 
     use test_case::test_case;
 
@@ -261,7 +261,7 @@ mod tests {
                         vec![],
                         vec![],
                         vec![],
-                        FxHashMap::default(),
+                        HashMap::default(),
                     ),
                     ..isort::settings::Settings::default()
                 },

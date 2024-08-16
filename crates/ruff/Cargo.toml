@@ -44,7 +44,7 @@ notify = { workspace = true }
 path-absolutize = { workspace = true, features = ["once_cell_cache"] }
 rayon = { workspace = true }
 regex = { workspace = true }
-rustc-hash = { workspace = true }
+foldhash = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
 shellexpand = { workspace = true }

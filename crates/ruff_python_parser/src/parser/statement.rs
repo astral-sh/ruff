@@ -1,7 +1,7 @@
 use compact_str::CompactString;
 use std::fmt::Display;
 
-use rustc_hash::{FxBuildHasher, FxHashSet};
+use foldhash::{HashMapExt, HashSet, HashSetExt};
 
 use ruff_python_ast::name::Name;
 use ruff_python_ast::{
@@ -3272,8 +3272,7 @@ impl<'src> Parser<'src> {
     ///
     /// Report errors for all the duplicate names found.
     fn validate_parameters(&mut self, parameters: &ast::Parameters) {
-        let mut all_arg_names =
-            FxHashSet::with_capacity_and_hasher(parameters.len(), FxBuildHasher);
+        let mut all_arg_names = HashSet::with_capacity(parameters.len());
 
         for parameter in parameters {
             let range = parameter.name().range();

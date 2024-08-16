@@ -1,3 +1,4 @@
+use foldhash::HashSet;
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast as ast;
@@ -9,7 +10,6 @@ use ruff_source_file::Locator;
 use ruff_text_size::{Ranged, TextRange};
 
 use memchr::memchr2_iter;
-use rustc_hash::FxHashSet;
 
 use crate::checkers::ast::Checker;
 
@@ -178,7 +178,7 @@ fn should_be_fstring(
         return false;
     };
 
-    let mut arg_names = FxHashSet::default();
+    let mut arg_names = HashSet::default();
     for expr in semantic
         .current_expressions()
         .filter_map(ast::Expr::as_call_expr)

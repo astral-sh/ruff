@@ -8,8 +8,8 @@ mod tests {
     use std::path::Path;
 
     use anyhow::Result;
+    use foldhash::HashSet;
     use regex::Regex;
-    use rustc_hash::FxHashSet;
     use test_case::test_case;
 
     use crate::registry::Rule;
@@ -220,7 +220,7 @@ mod tests {
             Path::new("pylint").join(path).as_path(),
             &LinterSettings {
                 pylint: pylint::settings::Settings {
-                    allow_dunder_method_names: FxHashSet::from_iter([
+                    allow_dunder_method_names: HashSet::from_iter([
                         "__special_custom_magic__".to_string()
                     ]),
                     ..pylint::settings::Settings::default()

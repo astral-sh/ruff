@@ -1,5 +1,5 @@
+use foldhash::{HashMap, HashMapExt, HashSet};
 use itertools::Itertools;
-use rustc_hash::{FxHashMap, FxHashSet};
 
 use ruff_diagnostics::{AlwaysFixableViolation, Violation};
 use ruff_diagnostics::{Diagnostic, Edit, Fix};
@@ -118,9 +118,9 @@ fn duplicate_handler_exceptions<'a>(
     checker: &mut Checker,
     expr: &'a Expr,
     elts: &'a [Expr],
-) -> FxHashMap<UnqualifiedName<'a>, &'a Expr> {
-    let mut seen: FxHashMap<UnqualifiedName, &Expr> = FxHashMap::default();
-    let mut duplicates: FxHashSet<UnqualifiedName> = FxHashSet::default();
+) -> HashMap<UnqualifiedName<'a>, &'a Expr> {
+    let mut seen: HashMap<UnqualifiedName, &Expr> = HashMap::default();
+    let mut duplicates: HashSet<UnqualifiedName> = HashSet::default();
     let mut unique_elts: Vec<&Expr> = Vec::default();
     for type_ in elts {
         if let Some(name) = UnqualifiedName::from_expr(type_) {
@@ -171,8 +171,8 @@ fn duplicate_handler_exceptions<'a>(
 
 /// B025
 pub(crate) fn duplicate_exceptions(checker: &mut Checker, handlers: &[ExceptHandler]) {
-    let mut seen: FxHashSet<UnqualifiedName> = FxHashSet::default();
-    let mut duplicates: FxHashMap<UnqualifiedName, Vec<&Expr>> = FxHashMap::default();
+    let mut seen: HashSet<UnqualifiedName> = HashSet::default();
+    let mut duplicates: HashMap<UnqualifiedName, Vec<&Expr>> = HashMap::default();
     for handler in handlers {
         let ExceptHandler::ExceptHandler(ast::ExceptHandlerExceptHandler {
             type_: Some(type_),

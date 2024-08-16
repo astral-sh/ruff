@@ -173,7 +173,7 @@ mod tests {
     use std::str::FromStr;
 
     use anyhow::{Context, Result};
-    use rustc_hash::FxHashMap;
+    use foldhash::HashMap;
     use tempfile::TempDir;
 
     use ruff_linter::codes;
@@ -362,7 +362,7 @@ per-file-ignores = { "__init__.py" = ["F401"] }
 
                 lint: Some(LintOptions {
                     common: LintCommonOptions {
-                        per_file_ignores: Some(FxHashMap::from_iter([(
+                        per_file_ignores: Some(HashMap::from_iter([(
                             "__init__.py".to_string(),
                             vec![codes::Pyflakes::_401.into()]
                         )])),

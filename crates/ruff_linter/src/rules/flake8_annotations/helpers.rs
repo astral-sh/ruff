@@ -1,5 +1,5 @@
+use foldhash::HashSet;
 use itertools::Itertools;
-use rustc_hash::FxHashSet;
 
 use ruff_diagnostics::Edit;
 use ruff_python_ast::helpers::{
@@ -109,7 +109,7 @@ pub(crate) fn auto_return_type(function: &ast::StmtFunctionDef) -> Option<AutoPy
 pub(crate) enum AutoPythonType {
     Never,
     Atom(PythonType),
-    Union(FxHashSet<PythonType>),
+    Union(HashSet<PythonType>),
 }
 
 impl AutoPythonType {

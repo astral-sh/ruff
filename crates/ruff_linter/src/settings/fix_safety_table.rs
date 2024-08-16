@@ -1,8 +1,8 @@
 use std::fmt::{Debug, Display, Formatter};
 
+use foldhash::HashMap;
 use ruff_diagnostics::Applicability;
 use ruff_macros::CacheKey;
-use rustc_hash::FxHashMap;
 use strum::IntoEnumIterator;
 
 use crate::{
@@ -55,7 +55,7 @@ impl FixSafetyTable {
             Unsafe,
         }
 
-        let safety_override_map: FxHashMap<Rule, Override> = {
+        let safety_override_map: HashMap<Rule, Override> = {
             Specificity::iter()
                 .flat_map(|spec| {
                     let safe_overrides = extend_safe_fixes

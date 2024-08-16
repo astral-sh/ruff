@@ -1,7 +1,7 @@
 use std::path::Path;
 
 use bitflags::bitflags;
-use rustc_hash::FxHashMap;
+use foldhash::HashMap;
 
 use ruff_python_ast::helpers::from_relative_import;
 use ruff_python_ast::name::{QualifiedName, UnqualifiedName};
@@ -78,7 +78,7 @@ pub struct SemanticModel<'a> {
     ///
     /// In this case, the binding created by `x = 1` shadows the binding created by `import x`,
     /// despite the fact that they're in different scopes.
-    pub shadowed_bindings: FxHashMap<BindingId, BindingId>,
+    pub shadowed_bindings: HashMap<BindingId, BindingId>,
 
     /// Map from binding index to indexes of bindings that annotate it (in the same scope).
     ///
@@ -101,7 +101,7 @@ pub struct SemanticModel<'a> {
     /// In this case, we _do_ store the binding created by `x: int` directly on the scope, and not
     /// as a delayed annotation. Annotations are thus treated as bindings only when they are the
     /// first binding in a scope; any annotations that follow are treated as "delayed" annotations.
-    delayed_annotations: FxHashMap<BindingId, Vec<BindingId>>,
+    delayed_annotations: HashMap<BindingId, Vec<BindingId>>,
 
     /// Map from binding ID to the IDs of all scopes in which it is declared a `global` or
     /// `nonlocal`.
@@ -116,7 +116,7 @@ pub struct SemanticModel<'a> {
     ///
     /// In this case, the binding created by `x = 1` is rebound within the scope created by `f`
     /// by way of the `global x` statement.
-    rebinding_scopes: FxHashMap<BindingId, Vec<ScopeId>>,
+    rebinding_scopes: HashMap<BindingId, Vec<ScopeId>>,
 
     /// Flags for the semantic model.
     pub flags: SemanticModelFlags,
@@ -143,7 +143,7 @@ pub struct SemanticModel<'a> {
 
     /// Map from [`ast::ExprName`] node (represented as a [`NameId`]) to the [`Binding`] to which
     /// it resolved (represented as a [`BindingId`]).
-    resolved_names: FxHashMap<NameId, BindingId>,
+    resolved_names: HashMap<NameId, BindingId>,
 }
 
 impl<'a> SemanticModel<'a> {
@@ -163,13 +163,13 @@ impl<'a> SemanticModel<'a> {
             resolved_references: ResolvedReferences::default(),
             unresolved_references: UnresolvedReferences::default(),
             globals: GlobalsArena::default(),
-            shadowed_bindings: FxHashMap::default(),
-            delayed_annotations: FxHashMap::default(),
-            rebinding_scopes: FxHashMap::default(),
+            shadowed_bindings: HashMap::default(),
+            delayed_annotations: HashMap::default(),
+            rebinding_scopes: HashMap::default(),
             flags: SemanticModelFlags::new(path),
             seen: Modules::empty(),
             handled_exceptions: Vec::default(),
-            resolved_names: FxHashMap::default(),
+            resolved_names: HashMap::default(),
         }
     }
 

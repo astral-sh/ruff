@@ -1,6 +1,6 @@
 use std::fmt;
 
-use rustc_hash::FxHashSet;
+use foldhash::HashSet;
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
@@ -60,7 +60,7 @@ impl Violation for RedundantLiteralUnion {
 /// PYI051
 pub(crate) fn redundant_literal_union<'a>(checker: &mut Checker, union: &'a Expr) {
     let mut typing_literal_exprs = Vec::new();
-    let mut builtin_types_in_union = FxHashSet::default();
+    let mut builtin_types_in_union = HashSet::default();
 
     // Adds a member to `literal_exprs` for each value in a `Literal`, and any builtin types
     // to `builtin_types_in_union`.

@@ -10,7 +10,7 @@ mod tests {
     use std::path::Path;
 
     use anyhow::Result;
-    use rustc_hash::FxHashSet;
+    use foldhash::HashSet;
     use test_case::test_case;
 
     use ruff_source_file::SourceFileBuilder;
@@ -121,7 +121,7 @@ mod tests {
         let diagnostics = test_path(
             Path::new("ruff/confusables.py"),
             &settings::LinterSettings {
-                allowed_confusables: FxHashSet::from_iter(['−', 'ρ', '∗']),
+                allowed_confusables: HashSet::from_iter(['−', 'ρ', '∗']),
                 ..settings::LinterSettings::for_rules(vec![
                     Rule::AmbiguousUnicodeCharacterString,
                     Rule::AmbiguousUnicodeCharacterDocstring,
@@ -139,7 +139,7 @@ mod tests {
             Path::new("ruff/confusables.py"),
             &settings::LinterSettings {
                 preview: PreviewMode::Enabled,
-                allowed_confusables: FxHashSet::from_iter(['−', 'ρ', '∗']),
+                allowed_confusables: HashSet::from_iter(['−', 'ρ', '∗']),
                 ..settings::LinterSettings::for_rules(vec![
                     Rule::AmbiguousUnicodeCharacterString,
                     Rule::AmbiguousUnicodeCharacterDocstring,

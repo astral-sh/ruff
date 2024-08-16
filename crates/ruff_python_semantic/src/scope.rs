@@ -1,8 +1,8 @@
 use std::ops::{Deref, DerefMut};
 
 use bitflags::bitflags;
+use foldhash::HashMap;
 use ruff_python_ast as ast;
-use rustc_hash::FxHashMap;
 
 use ruff_index::{newtype_index, Idx, IndexSlice, IndexVec};
 
@@ -23,7 +23,7 @@ pub struct Scope<'a> {
     star_imports: Vec<StarImport<'a>>,
 
     /// A map from bound name to binding ID.
-    bindings: FxHashMap<&'a str, BindingId>,
+    bindings: HashMap<&'a str, BindingId>,
 
     /// A map from binding ID to binding ID that it shadows.
     ///
@@ -35,7 +35,7 @@ pub struct Scope<'a> {
     /// ```
     ///
     /// In this case, the binding created by `x = 2` shadows the binding created by `x = 1`.
-    shadowed_bindings: FxHashMap<BindingId, BindingId>,
+    shadowed_bindings: HashMap<BindingId, BindingId>,
 
     /// Index into the globals arena, if the scope contains any globally-declared symbols.
     globals_id: Option<GlobalsId>,
@@ -50,8 +50,8 @@ impl<'a> Scope<'a> {
             kind: ScopeKind::Module,
             parent: None,
             star_imports: Vec::default(),
-            bindings: FxHashMap::default(),
-            shadowed_bindings: FxHashMap::default(),
+            bindings: HashMap::default(),
+            shadowed_bindings: HashMap::default(),
             globals_id: None,
             flags: ScopeFlags::empty(),
         }
@@ -62,8 +62,8 @@ impl<'a> Scope<'a> {
             kind,
             parent: Some(parent),
             star_imports: Vec::default(),
-            bindings: FxHashMap::default(),
-            shadowed_bindings: FxHashMap::default(),
+            bindings: HashMap::default(),
+            shadowed_bindings: HashMap::default(),
             globals_id: None,
             flags: ScopeFlags::empty(),
         }

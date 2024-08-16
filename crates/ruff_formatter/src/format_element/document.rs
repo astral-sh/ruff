@@ -1,7 +1,6 @@
-use std::collections::HashMap;
 use std::ops::Deref;
 
-use rustc_hash::FxHashMap;
+use foldhash::HashMap;
 
 use crate::format_element::tag::{Condition, DedentMode};
 use crate::prelude::tag::GroupMode;
@@ -57,7 +56,7 @@ impl Document {
         fn propagate_expands<'a>(
             elements: &'a [FormatElement],
             enclosing: &mut Vec<Enclosing<'a>>,
-            checked_interned: &mut FxHashMap<&'a Interned, bool>,
+            checked_interned: &mut HashMap<&'a Interned, bool>,
         ) -> bool {
             let mut expands = false;
             for element in elements {
@@ -147,7 +146,7 @@ impl Document {
         } else {
             self.len().ilog2() as usize
         });
-        let mut interned = FxHashMap::default();
+        let mut interned = HashMap::default();
         propagate_expands(self, &mut enclosing, &mut interned);
     }
 
@@ -210,7 +209,7 @@ impl<'a> IrFormatContext<'a> {
     fn new(source_code: SourceCode<'a>) -> Self {
         Self {
             source_code,
-            printed_interned_elements: HashMap::new(),
+            printed_interned_elements: HashMap::default(),
         }
     }
 }

@@ -1,9 +1,9 @@
 use std::str::FromStr;
 
+use foldhash::HashMap;
 use ruff_python_ast::{self as ast, Expr, StringFlags, StringLiteral};
 use ruff_python_literal::cformat::{CFormatPart, CFormatSpec, CFormatStrOrBytes, CFormatString};
 use ruff_text_size::Ranged;
-use rustc_hash::FxHashMap;
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
@@ -178,7 +178,7 @@ fn is_valid_dict(formats: &[CFormatStrOrBytes<String>], items: &[ast::DictItem])
         return true;
     }
 
-    let formats_hash: FxHashMap<&str, &&CFormatSpec> = formats
+    let formats_hash: HashMap<&str, &&CFormatSpec> = formats
         .iter()
         .filter_map(|format| {
             format

@@ -1,4 +1,4 @@
-use rustc_hash::FxHashSet;
+use foldhash::HashSet;
 
 use ruff_diagnostics::Diagnostic;
 use ruff_diagnostics::{AlwaysFixableViolation, Fix};
@@ -51,7 +51,7 @@ impl AlwaysFixableViolation for DuplicateClassFieldDefinition {
 
 /// PIE794
 pub(crate) fn duplicate_class_field_definition(checker: &mut Checker, body: &[Stmt]) {
-    let mut seen_targets: FxHashSet<&str> = FxHashSet::default();
+    let mut seen_targets: HashSet<&str> = HashSet::default();
     for stmt in body {
         // Extract the property name from the assignment statement.
         let target = match stmt {

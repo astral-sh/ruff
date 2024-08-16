@@ -1,4 +1,4 @@
-use rustc_hash::FxHashSet;
+use foldhash::HashSet;
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
@@ -102,7 +102,7 @@ impl Ranged for AttributeAssignment<'_> {
 /// If the `__slots__` attribute cannot be statically determined, returns an empty vector.
 fn is_attributes_not_in_slots(body: &[Stmt]) -> Vec<AttributeAssignment> {
     // First, collect all the attributes that are assigned to `__slots__`.
-    let mut slots = FxHashSet::default();
+    let mut slots = HashSet::default();
     for statement in body {
         match statement {
             // Ex) `__slots__ = ("name",)`

@@ -9,11 +9,11 @@ use std::time::{Duration, SystemTime};
 
 use anyhow::{Context, Result};
 use filetime::FileTime;
+use foldhash::HashMap;
 use itertools::Itertools;
 use log::{debug, error};
 use rayon::iter::ParallelIterator;
 use rayon::iter::{IntoParallelIterator, ParallelBridge};
-use rustc_hash::FxHashMap;
 use serde::{Deserialize, Serialize};
 use tempfile::NamedTempFile;
 
@@ -140,7 +140,7 @@ impl Cache {
     fn empty(path: PathBuf, package_root: PathBuf) -> Self {
         let package = PackageCache {
             package_root,
-            files: FxHashMap::default(),
+            files: HashMap::default(),
         };
         Cache::new(path, package)
     }
@@ -318,7 +318,7 @@ struct PackageCache {
     /// single file "packages", e.g. scripts.
     package_root: PathBuf,
     /// Mapping of source file path to it's cached data.
-    files: FxHashMap<RelativePathBuf, FileCache>,
+    files: HashMap<RelativePathBuf, FileCache>,
 }
 
 /// On disk representation of the cache per source file.
@@ -357,9 +357,9 @@ impl FileCache {
                     .collect()
             };
             let notebook_indexes = if let Some(notebook_index) = lint.notebook_index.as_ref() {
-                FxHashMap::from_iter([(path.to_string_lossy().to_string(), notebook_index.clone())])
+                HashMap::from_iter([(path.to_string_lossy().to_string(), notebook_index.clone())])
             } else {
-                FxHashMap::default()
+                HashMap::default()
             };
             Diagnostics::new(messages, notebook_indexes)
         })
@@ -493,11 +493,11 @@ where
     }
 }
 
-pub(crate) struct PackageCacheMap<'a>(FxHashMap<&'a Path, Cache>);
+pub(crate) struct PackageCacheMap<'a>(HashMap<&'a Path, Cache>);
 
 impl<'a> PackageCacheMap<'a> {
     pub(crate) fn init(
-        package_roots: &FxHashMap<&'a Path, Option<&'a Path>>,
+        package_roots: &HashMap<&'a Path, Option<&'a Path>>,
         resolver: &Resolver,
     ) -> Self {
         fn init_cache(path: &Path) {

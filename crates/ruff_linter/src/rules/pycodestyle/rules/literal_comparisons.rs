@@ -1,4 +1,4 @@
-use rustc_hash::FxHashMap;
+use foldhash::HashMap;
 
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
@@ -175,7 +175,7 @@ pub(crate) fn literal_comparisons(checker: &mut Checker, compare: &ast::ExprComp
     // through the list of operators, we apply "dummy" fixes for each error,
     // then replace the entire expression at the end with one "real" fix, to
     // avoid conflicts.
-    let mut bad_ops: FxHashMap<usize, CmpOp> = FxHashMap::default();
+    let mut bad_ops: HashMap<usize, CmpOp> = HashMap::default();
     let mut diagnostics: Vec<Diagnostic> = vec![];
 
     // Check `left`.

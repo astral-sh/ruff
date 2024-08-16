@@ -847,6 +847,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3f9eec918d3f24069decb9af1554cad7c880e2da24a9afd88aca000531ab82c1"
 
 [[package]]
+name = "foldhash"
+version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "4deb59dd6330afa472c000b86c0c9ada26274836eb59563506c3e34e4bb9a819"
+
+[[package]]
 name = "form_urlencoded"
 version = "1.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1916,6 +1922,7 @@ version = "0.0.0"
 dependencies = [
  "anyhow",
  "crossbeam",
+ "foldhash",
  "jod-thread",
  "libc",
  "lsp-server",
@@ -1928,7 +1935,6 @@ dependencies = [
  "ruff_python_ast",
  "ruff_source_file",
  "ruff_text_size",
- "rustc-hash 2.0.0",
  "serde",
  "serde_json",
  "shellexpand",
@@ -1958,13 +1964,13 @@ version = "0.0.0"
 dependencies = [
  "anyhow",
  "crossbeam",
+ "foldhash",
  "notify",
  "red_knot_python_semantic",
  "ruff_cache",
  "ruff_db",
  "ruff_python_ast",
  "ruff_text_size",
- "rustc-hash 2.0.0",
  "salsa",
  "thiserror",
  "tracing",
@@ -2073,6 +2079,7 @@ dependencies = [
  "clearscreen",
  "colored",
  "filetime",
+ "foldhash",
  "ignore",
  "insta",
  "insta-cmd",
@@ -2095,7 +2102,6 @@ dependencies = [
  "ruff_source_file",
  "ruff_text_size",
  "ruff_workspace",
- "rustc-hash 2.0.0",
  "serde",
  "serde_json",
  "shellexpand",
@@ -2154,6 +2160,7 @@ dependencies = [
  "countme",
  "dashmap 6.0.1",
  "filetime",
+ "foldhash",
  "ignore",
  "insta",
  "matchit",
@@ -2165,7 +2172,6 @@ dependencies = [
  "ruff_python_trivia",
  "ruff_source_file",
  "ruff_text_size",
- "rustc-hash 2.0.0",
  "salsa",
  "tempfile",
  "thiserror",
@@ -2231,10 +2237,10 @@ name = "ruff_formatter"
 version = "0.0.0"
 dependencies = [
  "drop_bomb",
+ "foldhash",
  "ruff_cache",
  "ruff_macros",
  "ruff_text_size",
- "rustc-hash 2.0.0",
  "schemars",
  "serde",
  "static_assertions",
@@ -2262,6 +2268,7 @@ dependencies = [
  "clap",
  "colored",
  "fern",
+ "foldhash",
  "glob",
  "globset",
  "imperative",
@@ -2294,7 +2301,6 @@ dependencies = [
  "ruff_python_trivia",
  "ruff_source_file",
  "ruff_text_size",
- "rustc-hash 2.0.0",
  "schemars",
  "serde",
  "serde_json",
@@ -2349,6 +2355,7 @@ dependencies = [
  "aho-corasick",
  "bitflags 2.6.0",
  "compact_str",
+ "foldhash",
  "is-macro",
  "itertools 0.13.0",
  "once_cell",
@@ -2357,7 +2364,6 @@ dependencies = [
  "ruff_python_trivia",
  "ruff_source_file",
  "ruff_text_size",
- "rustc-hash 2.0.0",
  "schemars",
  "serde",
 ]
@@ -2392,6 +2398,7 @@ dependencies = [
  "anyhow",
  "clap",
  "countme",
+ "foldhash",
  "insta",
  "itertools 0.13.0",
  "memchr",
@@ -2405,7 +2412,6 @@ dependencies = [
  "ruff_python_trivia",
  "ruff_source_file",
  "ruff_text_size",
- "rustc-hash 2.0.0",
  "schemars",
  "serde",
  "serde_json",
@@ -2446,13 +2452,13 @@ dependencies = [
  "bitflags 2.6.0",
  "bstr",
  "compact_str",
+ "foldhash",
  "insta",
  "memchr",
  "ruff_python_ast",
  "ruff_python_trivia",
  "ruff_source_file",
  "ruff_text_size",
- "rustc-hash 2.0.0",
  "static_assertions",
  "unicode-ident",
  "unicode-normalization",
@@ -2475,6 +2481,7 @@ name = "ruff_python_semantic"
 version = "0.0.0"
 dependencies = [
  "bitflags 2.6.0",
+ "foldhash",
  "is-macro",
  "ruff_cache",
  "ruff_index",
@@ -2484,7 +2491,6 @@ dependencies = [
  "ruff_python_stdlib",
  "ruff_source_file",
  "ruff_text_size",
- "rustc-hash 2.0.0",
  "schemars",
  "serde",
 ]
@@ -2523,6 +2529,7 @@ version = "0.2.2"
 dependencies = [
  "anyhow",
  "crossbeam",
+ "foldhash",
  "ignore",
  "insta",
  "jod-thread",
@@ -2542,7 +2549,6 @@ dependencies = [
  "ruff_source_file",
  "ruff_text_size",
  "ruff_workspace",
- "rustc-hash 2.0.0",
  "serde",
  "serde_json",
  "shellexpand",
@@ -2602,6 +2608,7 @@ dependencies = [
  "anyhow",
  "colored",
  "etcetera",
+ "foldhash",
  "glob",
  "globset",
  "ignore",
@@ -2621,7 +2628,6 @@ dependencies = [
  "ruff_python_formatter",
  "ruff_python_semantic",
  "ruff_source_file",
- "rustc-hash 2.0.0",
  "schemars",
  "serde",
  "shellexpand",

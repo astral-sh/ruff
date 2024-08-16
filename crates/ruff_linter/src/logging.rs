@@ -5,10 +5,10 @@ use std::sync::Mutex;
 use anyhow::Result;
 use colored::Colorize;
 use fern;
+use foldhash::HashSet;
 use log::Level;
 use once_cell::sync::Lazy;
 use ruff_python_parser::{ParseError, ParseErrorType};
-use rustc_hash::FxHashSet;
 
 use ruff_source_file::{LineIndex, OneIndexed, SourceCode, SourceLocation};
 
@@ -35,7 +35,7 @@ macro_rules! warn_user_once_by_id {
     };
 }
 
-pub static MESSAGES: Lazy<Mutex<FxHashSet<String>>> = Lazy::new(Mutex::default);
+pub static MESSAGES: Lazy<Mutex<HashSet<String>>> = Lazy::new(Mutex::default);
 
 /// Warn a user once, if warnings are enabled, with uniqueness determined by the content of the
 /// message.

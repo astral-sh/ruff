@@ -4,7 +4,7 @@ use std::sync::{Arc, RwLock, RwLockWriteGuard};
 
 use camino::{Utf8Path, Utf8PathBuf};
 use filetime::FileTime;
-use rustc_hash::FxHashMap;
+use foldhash::{HashMap, HashMapExt, HashSetExt};
 
 use ruff_notebook::{Notebook, NotebookError};
 
@@ -54,7 +54,7 @@ impl MemoryFileSystem {
         let fs = Self {
             inner: Arc::new(MemoryFileSystemInner {
                 by_path: RwLock::new(BTreeMap::default()),
-                virtual_files: RwLock::new(FxHashMap::default()),
+                virtual_files: RwLock::new(HashMap::default()),
                 cwd: cwd.clone(),
             }),
         };
@@ -385,7 +385,7 @@ impl std::fmt::Debug for MemoryFileSystem {
 
 struct MemoryFileSystemInner {
     by_path: RwLock<BTreeMap<Utf8PathBuf, Entry>>,
-    virtual_files: RwLock<FxHashMap<SystemVirtualPathBuf, File>>,
+    virtual_files: RwLock<HashMap<SystemVirtualPathBuf, File>>,
     cwd: SystemPathBuf,
 }
 

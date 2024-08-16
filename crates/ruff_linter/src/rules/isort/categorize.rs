@@ -3,8 +3,8 @@ use std::fmt;
 use std::path::{Path, PathBuf};
 use std::{fs, iter};
 
+use foldhash::{HashMap, HashMapExt, HashSet, HashSetExt};
 use log::debug;
-use rustc_hash::{FxBuildHasher, FxHashMap, FxHashSet};
 use serde::{Deserialize, Serialize};
 use strum_macros::EnumIter;
 
@@ -283,7 +283,7 @@ impl KnownModules {
         third_party: Vec<glob::Pattern>,
         local_folder: Vec<glob::Pattern>,
         standard_library: Vec<glob::Pattern>,
-        user_defined: FxHashMap<String, Vec<glob::Pattern>>,
+        user_defined: HashMap<String, Vec<glob::Pattern>>,
     ) -> Self {
         let known: Vec<(glob::Pattern, ImportSection)> = user_defined
             .into_iter()
@@ -315,7 +315,7 @@ impl KnownModules {
             .collect();
 
         // Warn in the case of duplicate modules.
-        let mut seen = FxHashSet::with_capacity_and_hasher(known.len(), FxBuildHasher);
+        let mut seen = HashSet::with_capacity(known.len());
         for (module, _) in &known {
             if !seen.insert(module) {
                 warn_user_once!("One or more modules are part of multiple import sections, including: `{module}`");
@@ -382,8 +382,8 @@ impl KnownModules {
     }
 
     /// Return the list of user-defined modules, indexed by section.
-    pub fn user_defined(&self) -> FxHashMap<&str, Vec<&glob::Pattern>> {
-        let mut user_defined: FxHashMap<&str, Vec<&glob::Pattern>> = FxHashMap::default();
+    pub fn user_defined(&self) -> HashMap<&str, Vec<&glob::Pattern>> {
+        let mut user_defined: HashMap<&str, Vec<&glob::Pattern>> = HashMap::default();
         for (module, section) in &self.known {
             if let ImportSection::UserDefined(section_name) = section {
                 user_defined

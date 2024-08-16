@@ -4,8 +4,8 @@ use std::path::Path;
 
 use anyhow::{anyhow, Result};
 use colored::Colorize;
+use foldhash::HashMap;
 use itertools::Itertools;
-use rustc_hash::FxHashMap;
 
 use ruff_diagnostics::Diagnostic;
 use ruff_notebook::Notebook;
@@ -43,7 +43,7 @@ pub struct LinterResult {
     pub has_syntax_error: bool,
 }
 
-pub type FixTable = FxHashMap<Rule, usize>;
+pub type FixTable = HashMap<Rule, usize>;
 
 pub struct FixerResult<'a> {
     /// The result returned by the linter, after applying any fixes.
@@ -476,7 +476,7 @@ pub fn lint_fix<'a>(
     let mut transformed = Cow::Borrowed(source_kind);
 
     // Track the number of fixed errors across iterations.
-    let mut fixed = FxHashMap::default();
+    let mut fixed = HashMap::default();
 
     // As an escape hatch, bail after 100 iterations.
     let mut iterations = 0;

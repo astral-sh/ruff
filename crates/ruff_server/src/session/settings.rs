@@ -1,13 +1,13 @@
 use std::{ops::Deref, path::PathBuf, str::FromStr};
 
+use foldhash::HashMap;
 use lsp_types::Url;
-use rustc_hash::FxHashMap;
 use serde::Deserialize;
 
 use ruff_linter::{line_width::LineLength, RuleSelector};
 
 /// Maps a workspace URI to its associated client settings. Used during server initialization.
-pub(crate) type WorkspaceSettingsMap = FxHashMap<Url, ClientSettings>;
+pub(crate) type WorkspaceSettingsMap = HashMap<Url, ClientSettings>;
 
 /// Resolved client settings for a specific document. These settings are meant to be
 /// used directly by the server, and are *not* a 1:1 representation with how the client

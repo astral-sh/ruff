@@ -8,6 +8,7 @@ use std::sync::RwLock;
 
 use anyhow::Result;
 use anyhow::{anyhow, bail};
+use foldhash::{HashMap, HashMapExt, HashSet};
 use globset::{Candidate, GlobSet};
 use ignore::{DirEntry, Error, ParallelVisitor, WalkBuilder, WalkState};
 use itertools::Itertools;
@@ -15,7 +16,6 @@ use log::debug;
 use matchit::{InsertError, Match, Router};
 use path_absolutize::path_dedot;
 use path_slash::PathExt;
-use rustc_hash::{FxHashMap, FxHashSet};
 
 use ruff_linter::fs;
 use ruff_linter::packaging::is_package;
@@ -181,10 +181,10 @@ impl<'a> Resolver<'a> {
     }
 
     /// Return a mapping from Python package to its package root.
-    pub fn package_roots(&'a self, files: &[&'a Path]) -> FxHashMap<&'a Path, Option<&'a Path>> {
+    pub fn package_roots(&'a self, files: &[&'a Path]) -> HashMap<&'a Path, Option<&'a Path>> {
         // Pre-populate the module cache, since the list of files could (but isn't
         // required to) contain some `__init__.py` files.
-        let mut package_cache: FxHashMap<&Path, bool> = FxHashMap::default();
+        let mut package_cache: HashMap<&Path, bool> = HashMap::default();
         for file in files {
             if file.ends_with("__init__.py") {
                 if let Some(parent) = file.parent() {
@@ -200,7 +200,7 @@ impl<'a> Resolver<'a> {
             .any(|settings| !settings.linter.namespace_packages.is_empty());
 
         // Search for the package root for each file.
-        let mut package_roots: FxHashMap<&Path, Option<&Path>> = FxHashMap::default();
+        let mut package_roots: HashMap<&Path, Option<&Path>> = HashMap::default();
         for file in files {
             if let Some(package) = file.parent() {
                 package_roots.entry(package).or_insert_with(|| {
@@ -227,7 +227,7 @@ impl<'a> Resolver<'a> {
 fn detect_package_root_with_cache<'a>(
     path: &'a Path,
     namespace_packages: &[PathBuf],
-    package_cache: &mut FxHashMap<&'a Path, bool>,
+    package_cache: &mut HashMap<&'a Path, bool>,
 ) -> Option<&'a Path> {
     let mut current = None;
     for parent in path.ancestors() {
@@ -243,7 +243,7 @@ fn detect_package_root_with_cache<'a>(
 fn is_package_with_cache<'a>(
     path: &'a Path,
     namespace_packages: &[PathBuf],
-    package_cache: &mut FxHashMap<&'a Path, bool>,
+    package_cache: &mut HashMap<&'a Path, bool>,
 ) -> bool {
     *package_cache
         .entry(path)
@@ -268,7 +268,7 @@ fn resolve_configuration(
     relativity: Relativity,
     transformer: &dyn ConfigurationTransformer,
 ) -> Result<Configuration> {
-    let mut seen = FxHashSet::default();
+    let mut seen = HashSet::default();
     let mut stack = vec![];
     let mut next = Some(fs::normalize_path(pyproject));
     while let Some(path) = next {
@@ -341,7 +341,7 @@ pub fn python_files_in_path<'a>(
 
     // Search for `pyproject.toml` files in all parent directories.
     let mut resolver = Resolver::new(pyproject_config);
-    let mut seen = FxHashSet::default();
+    let mut seen = HashSet::default();
 
     // Insert the path to the root configuration to avoid parsing the configuration a second time.
     if let Some(config_path) = &pyproject_config.path {

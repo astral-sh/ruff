@@ -1,7 +1,7 @@
 use std::borrow::Cow;
 
 use anyhow::{Context, Result};
-use rustc_hash::{FxHashMap, FxHashSet};
+use foldhash::{HashMap, HashSet};
 
 use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, violation};
@@ -62,14 +62,14 @@ impl Violation for FString {
 #[derive(Debug)]
 struct FormatSummaryValues<'a> {
     args: Vec<&'a Expr>,
-    kwargs: FxHashMap<&'a str, &'a Expr>,
+    kwargs: HashMap<&'a str, &'a Expr>,
     auto_index: usize,
 }
 
 impl<'a> FormatSummaryValues<'a> {
     fn try_from_call(call: &'a ast::ExprCall, locator: &'a Locator) -> Option<Self> {
         let mut extracted_args: Vec<&Expr> = Vec::new();
-        let mut extracted_kwargs: FxHashMap<&str, &Expr> = FxHashMap::default();
+        let mut extracted_kwargs: HashMap<&str, &Expr> = HashMap::default();
 
         for arg in &*call.arguments.args {
             if matches!(arg, Expr::Starred(..))
@@ -281,7 +281,7 @@ impl FStringConversion {
         }
 
         let mut converted = String::with_capacity(contents.len());
-        let mut seen = FxHashSet::default();
+        let mut seen = HashSet::default();
         for part in format_string.format_parts {
             match part {
                 FormatPart::Field {

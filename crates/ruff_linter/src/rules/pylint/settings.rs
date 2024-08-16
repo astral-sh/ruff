@@ -1,6 +1,6 @@
 //! Settings for the `pylint` plugin.
 
-use rustc_hash::FxHashSet;
+use foldhash::HashSet;
 use serde::{Deserialize, Serialize};
 use std::fmt;
 
@@ -51,7 +51,7 @@ impl fmt::Display for ConstantType {
 #[derive(Debug, Clone, CacheKey)]
 pub struct Settings {
     pub allow_magic_value_types: Vec<ConstantType>,
-    pub allow_dunder_method_names: FxHashSet<String>,
+    pub allow_dunder_method_names: HashSet<String>,
     pub max_args: usize,
     pub max_positional_args: usize,
     pub max_returns: usize,
@@ -67,7 +67,7 @@ impl Default for Settings {
     fn default() -> Self {
         Self {
             allow_magic_value_types: vec![ConstantType::Str, ConstantType::Bytes],
-            allow_dunder_method_names: FxHashSet::default(),
+            allow_dunder_method_names: HashSet::default(),
             max_args: 5,
             max_positional_args: 5,
             max_returns: 6,

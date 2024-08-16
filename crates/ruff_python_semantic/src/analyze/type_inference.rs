@@ -1,6 +1,6 @@
 //! Analysis rules to perform basic type inference on individual expressions.
 
-use rustc_hash::FxHashSet;
+use foldhash::HashSet;
 
 use ruff_python_ast as ast;
 use ruff_python_ast::{Expr, Operator, UnaryOp};
@@ -10,7 +10,7 @@ pub enum ResolvedPythonType {
     /// The expression resolved to a single known type, like `str` or `int`.
     Atom(PythonType),
     /// The expression resolved to a union of known types, like `str | int`.
-    Union(FxHashSet<PythonType>),
+    Union(HashSet<PythonType>),
     /// The expression resolved to an unknown type, like a variable or function call.
     Unknown,
     /// The expression resolved to a `TypeError`, like `1 + "hello"`.
@@ -29,7 +29,7 @@ impl ResolvedPythonType {
                 } else if b.is_subtype_of(a) {
                     Self::Atom(a)
                 } else {
-                    Self::Union(FxHashSet::from_iter([a, b]))
+                    Self::Union(HashSet::from_iter([a, b]))
                 }
             }
             (Self::Atom(a), Self::Union(mut b)) => {

@@ -24,7 +24,7 @@ bitflags = { workspace = true }
 is-macro = { workspace = true }
 itertools = { workspace = true }
 once_cell = { workspace = true }
-rustc-hash = { workspace = true }
+foldhash = { workspace = true }
 schemars = { workspace = true, optional = true }
 serde = { workspace = true, optional = true }
 compact_str = { workspace = true }

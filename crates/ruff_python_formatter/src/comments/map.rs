@@ -1,5 +1,5 @@
 use countme::Count;
-use rustc_hash::FxHashMap;
+use foldhash::HashMap;
 use std::fmt::{Debug, Formatter};
 use std::iter::FusedIterator;
 use std::num::NonZeroU32;
@@ -45,7 +45,7 @@ use std::ops::Range;
 #[derive(Clone)]
 pub(super) struct MultiMap<K, V> {
     /// Lookup table to retrieve the entry for a key.
-    index: FxHashMap<K, Entry>,
+    index: HashMap<K, Entry>,
 
     /// Flat array storing all the parts that have been inserted in order.
     parts: Vec<V>,
@@ -62,7 +62,7 @@ pub(super) struct MultiMap<K, V> {
 impl<K: std::hash::Hash + Eq, V> MultiMap<K, V> {
     pub(super) fn new() -> Self {
         Self {
-            index: FxHashMap::default(),
+            index: HashMap::default(),
             parts: Vec::new(),
             out_of_order_parts: Vec::new(),
         }

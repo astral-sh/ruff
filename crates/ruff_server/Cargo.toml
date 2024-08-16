@@ -33,7 +33,7 @@ jod-thread = { workspace = true }
 lsp-server = { workspace = true }
 lsp-types = { workspace = true }
 regex = { workspace = true }
-rustc-hash = { workspace = true }
+foldhash = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
 shellexpand = { workspace = true }

@@ -2,8 +2,8 @@ use std::borrow::Cow;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
+use foldhash::HashMap;
 use lsp_types::Url;
-use rustc_hash::FxHashMap;
 
 use crate::{
     edit::{DocumentKey, DocumentVersion, NotebookDocument},
@@ -16,10 +16,10 @@ use super::ClientSettings;
 #[derive(Default, Debug)]
 pub(crate) struct Index {
     /// Maps all document file URLs to the associated document controller
-    documents: FxHashMap<Url, DocumentController>,
+    documents: HashMap<Url, DocumentController>,
 
     /// Maps opaque cell URLs to a notebook URL (document)
-    notebook_cells: FxHashMap<Url, Url>,
+    notebook_cells: HashMap<Url, Url>,
 
     /// Global settings provided by the client.
     global_settings: ClientSettings,
@@ -28,8 +28,8 @@ pub(crate) struct Index {
 impl Index {
     pub(super) fn new(global_settings: ClientSettings) -> Self {
         Self {
-            documents: FxHashMap::default(),
-            notebook_cells: FxHashMap::default(),
+            documents: HashMap::default(),
+            notebook_cells: HashMap::default(),
             global_settings,
         }
     }

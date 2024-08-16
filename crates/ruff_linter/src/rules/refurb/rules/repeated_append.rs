@@ -1,4 +1,4 @@
-use rustc_hash::FxHashMap;
+use foldhash::HashMap;
 
 use ast::traversal;
 use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
@@ -214,7 +214,7 @@ fn match_consecutive_appends<'a>(
 /// Group the given appends by the associated bindings.
 fn group_appends(appends: Vec<Append<'_>>) -> Vec<AppendGroup<'_>> {
     // We want to go over the given list of appends and group the by receivers.
-    let mut map: FxHashMap<BindingId, AppendGroup> = FxHashMap::default();
+    let mut map: HashMap<BindingId, AppendGroup> = HashMap::default();
     let mut iter = appends.into_iter();
     let mut last_binding = {
         let first_append = iter.next().unwrap();
@@ -254,7 +254,7 @@ fn group_appends(appends: Vec<Append<'_>>) -> Vec<AppendGroup<'_>> {
 
 #[inline]
 fn get_or_add<'a, 'b>(
-    map: &'b mut FxHashMap<BindingId, AppendGroup<'a>>,
+    map: &'b mut HashMap<BindingId, AppendGroup<'a>>,
     append: Append<'a>,
 ) -> &'b mut AppendGroup<'a> {
     let group = map.entry(append.binding_id).or_insert(AppendGroup {

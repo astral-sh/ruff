@@ -1,4 +1,4 @@
-use rustc_hash::{FxBuildHasher, FxHashSet};
+use foldhash::{HashMapExt, HashSet, HashSetExt};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
@@ -38,7 +38,7 @@ impl Violation for RepeatedKeywordArgument {
 pub(crate) fn repeated_keyword_argument(checker: &mut Checker, call: &ExprCall) {
     let ExprCall { arguments, .. } = call;
 
-    let mut seen = FxHashSet::with_capacity_and_hasher(arguments.keywords.len(), FxBuildHasher);
+    let mut seen = HashSet::with_capacity(arguments.keywords.len());
 
     for keyword in &*arguments.keywords {
         if let Some(id) = &keyword.arg {

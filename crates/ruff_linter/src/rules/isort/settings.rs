@@ -5,7 +5,7 @@ use std::error::Error;
 use std::fmt;
 use std::fmt::{Display, Formatter};
 
-use rustc_hash::FxHashSet;
+use foldhash::HashSet;
 use serde::{Deserialize, Serialize};
 use strum::IntoEnumIterator;
 
@@ -53,17 +53,17 @@ pub struct Settings {
     pub force_sort_within_sections: bool,
     pub case_sensitive: bool,
     pub force_wrap_aliases: bool,
-    pub force_to_top: FxHashSet<String>,
+    pub force_to_top: HashSet<String>,
     pub known_modules: KnownModules,
     pub detect_same_package: bool,
     pub order_by_type: bool,
     pub relative_imports_order: RelativeImportsOrder,
-    pub single_line_exclusions: FxHashSet<String>,
+    pub single_line_exclusions: HashSet<String>,
     pub split_on_trailing_comma: bool,
-    pub classes: FxHashSet<String>,
-    pub constants: FxHashSet<String>,
-    pub variables: FxHashSet<String>,
-    pub no_lines_before: FxHashSet<ImportSection>,
+    pub classes: HashSet<String>,
+    pub constants: HashSet<String>,
+    pub variables: HashSet<String>,
+    pub no_lines_before: HashSet<ImportSection>,
     pub lines_after_imports: isize,
     pub lines_between_types: usize,
     pub forced_separate: Vec<String>,
@@ -85,16 +85,16 @@ impl Default for Settings {
             detect_same_package: true,
             case_sensitive: false,
             force_wrap_aliases: false,
-            force_to_top: FxHashSet::default(),
+            force_to_top: HashSet::default(),
             known_modules: KnownModules::default(),
             order_by_type: true,
             relative_imports_order: RelativeImportsOrder::default(),
-            single_line_exclusions: FxHashSet::default(),
+            single_line_exclusions: HashSet::default(),
             split_on_trailing_comma: true,
-            classes: FxHashSet::default(),
-            constants: FxHashSet::default(),
-            variables: FxHashSet::default(),
-            no_lines_before: FxHashSet::default(),
+            classes: HashSet::default(),
+            constants: HashSet::default(),
+            variables: HashSet::default(),
+            no_lines_before: HashSet::default(),
             lines_after_imports: -1,
             lines_between_types: 0,
             forced_separate: Vec::new(),
