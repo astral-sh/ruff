@@ -147,29 +147,26 @@ impl HasTy for ast::Expr {
     }
 }
 
-impl HasTy for ast::StmtFunctionDef {
-    fn ty<'db>(&self, model: &SemanticModel<'db>) -> Type<'db> {
-        let index = semantic_index(model.db, model.file);
-        let definition = index.definition(self);
-        definition_ty(model.db, definition)
-    }
+macro_rules! impl_definition_has_ty {
+    ($ty: ty) => {
+        impl HasTy for $ty {
+            #[inline]
+            fn ty<'db>(&self, model: &SemanticModel<'db>) -> Type<'db> {
+                let index = semantic_index(model.db, model.file);
+                let definition = index.definition(self);
+                definition_ty(model.db, definition)
+            }
+        }
+    };
 }
 
-impl HasTy for StmtClassDef {
-    fn ty<'db>(&self, model: &SemanticModel<'db>) -> Type<'db> {
-        let index = semantic_index(model.db, model.file);
-        let definition = index.definition(self);
-        definition_ty(model.db, definition)
-    }
-}
-
-impl HasTy for ast::Alias {
-    fn ty<'db>(&self, model: &SemanticModel<'db>) -> Type<'db> {
-        let index = semantic_index(model.db, model.file);
-        let definition = index.definition(self);
-        definition_ty(model.db, definition)
-    }
-}
+impl_definition_has_ty!(ast::StmtFunctionDef);
+impl_definition_has_ty!(StmtClassDef);
+impl_definition_has_ty!(ast::Alias);
+impl_definition_has_ty!(ast::StmtAnnAssign);
+impl_definition_has_ty!(ast::Comprehension);
+impl_definition_has_ty!(ast::Parameter);
+impl_definition_has_ty!(ast::ParameterWithDefault);
 
 #[cfg(test)]
 mod tests {
