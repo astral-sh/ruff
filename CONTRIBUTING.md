@@ -2,39 +2,6 @@
 
 Welcome! We're happy to have you here. Thank you in advance for your contribution to Ruff.
 
-<div id="contributing-toc">
-
-- [The Basics](#the-basics)
-    - [Prerequisites](#prerequisites)
-    - [Development](#development)
-    - [Project Structure](#project-structure)
-    - [Example: Adding a new lint rule](#example-adding-a-new-lint-rule)
-        - [Rule naming convention](#rule-naming-convention)
-        - [Rule testing: fixtures and snapshots](#rule-testing-fixtures-and-snapshots)
-    - [Example: Adding a new configuration option](#example-adding-a-new-configuration-option)
-- [MkDocs](#mkdocs)
-- [Release Process](#release-process)
-    - [Creating a new release](#creating-a-new-release)
-- [Ecosystem CI](#ecosystem-ci)
-- [Benchmarking and Profiling](#benchmarking-and-profiling)
-    - [CPython Benchmark](#cpython-benchmark)
-    - [Microbenchmarks](#microbenchmarks)
-        - [Benchmark-driven Development](#benchmark-driven-development)
-        - [PR Summary](#pr-summary)
-        - [Tips](#tips)
-    - [Profiling Projects](#profiling-projects)
-        - [Linux](#linux)
-        - [Mac](#mac)
-- [`cargo dev`](#cargo-dev)
-- [Subsystems](#subsystems)
-    - [Compilation Pipeline](#compilation-pipeline)
-    - [Import Categorization](#import-categorization)
-        - [Project root](#project-root)
-        - [Package root](#package-root)
-        - [Import categorization](#import-categorization-1)
-
-</div>
-
 ## The Basics
 
 Ruff welcomes contributions in the form of pull requests.
