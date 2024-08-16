@@ -23,8 +23,7 @@ use crate::rules::pep8_naming::helpers;
 /// to accommodate selective enforcement.
 ///
 /// Also note that import aliases following an import convention according to the
-/// [`lint.flake8-boolean-trap.extend-allowed-calls`] option are allowed.
-///
+/// [`lint.flake8-import-conventions.aliases`] option are allowed.
 ///
 /// ## Example
 /// ```python
@@ -39,7 +38,7 @@ use crate::rules::pep8_naming::helpers;
 /// [PEP 8]: https://peps.python.org/pep-0008/
 ///
 /// ## Options
-/// - `lint.flake8-import-conventions.banned-aliases`
+/// - `lint.flake8-import-conventions.aliases`
 #[violation]
 pub struct CamelcaseImportedAsAcronym {
     name: String,
