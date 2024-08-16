@@ -31,26 +31,28 @@ Module(
                 },
             ),
             ImportFrom(
-                StmtImportFrom {
-                    range: 18..33,
-                    module: Some(
-                        Identifier {
-                            id: Name("x"),
-                            range: 23..24,
-                        },
-                    ),
-                    names: [
-                        Alias {
-                            range: 32..33,
-                            name: Identifier {
-                                id: Name("y"),
-                                range: 32..33,
+                MemberList(
+                    StmtImportFromMemberList {
+                        range: 18..33,
+                        module: Some(
+                            Identifier {
+                                id: Name("x"),
+                                range: 23..24,
                             },
-                            asname: None,
-                        },
-                    ],
-                    level: 0,
-                },
+                        ),
+                        names: [
+                            Alias {
+                                range: 32..33,
+                                name: Identifier {
+                                    id: Name("y"),
+                                    range: 32..33,
+                                },
+                                asname: None,
+                            },
+                        ],
+                        level: 0,
+                    },
+                ),
             ),
             Expr(
                 StmtExpr {

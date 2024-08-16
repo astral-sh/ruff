@@ -10,29 +10,33 @@ Module(
         range: 0..19,
         body: [
             ImportFrom(
-                StmtImportFrom {
-                    range: 0..4,
-                    module: None,
-                    names: [],
-                    level: 0,
-                },
+                MemberList(
+                    StmtImportFromMemberList {
+                        range: 0..4,
+                        module: None,
+                        names: [],
+                        level: 0,
+                    },
+                ),
             ),
             ImportFrom(
-                StmtImportFrom {
-                    range: 5..18,
-                    module: None,
-                    names: [
-                        Alias {
-                            range: 17..18,
-                            name: Identifier {
-                                id: Name("x"),
+                MemberList(
+                    StmtImportFromMemberList {
+                        range: 5..18,
+                        module: None,
+                        names: [
+                            Alias {
                                 range: 17..18,
+                                name: Identifier {
+                                    id: Name("x"),
+                                    range: 17..18,
+                                },
+                                asname: None,
                             },
-                            asname: None,
-                        },
-                    ],
-                    level: 0,
-                },
+                        ],
+                        level: 0,
+                    },
+                ),
             ),
         ],
     },

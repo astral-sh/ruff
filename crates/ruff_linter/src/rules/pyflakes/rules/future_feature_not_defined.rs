@@ -1,4 +1,4 @@
-use ruff_python_ast::Alias;
+use ruff_python_ast as ast;
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
@@ -30,15 +30,28 @@ impl Violation for FutureFeatureNotDefined {
     }
 }
 
-pub(crate) fn future_feature_not_defined(checker: &mut Checker, alias: &Alias) {
-    if is_feature_name(&alias.name) {
-        return;
+pub(crate) fn future_feature_not_defined(checker: &mut Checker, import_stmt: &ast::StmtImportFrom) {
+    match import_stmt {
+        ast::StmtImportFrom::Star(_) => checker.diagnostics.push(Diagnostic::new(
+            FutureFeatureNotDefined {
+                name: String::from("*"),
+            },
+            import_stmt.range(),
+        )),
+        ast::StmtImportFrom::MemberList(ast::StmtImportFromMemberList { names, .. }) => {
+            checker.diagnostics.extend(
+                names
+                    .iter()
+                    .filter(|alias| !is_feature_name(&alias.name))
+                    .map(|alias| {
+                        Diagnostic::new(
+                            FutureFeatureNotDefined {
+                                name: alias.name.to_string(),
+                            },
+                            alias.range(),
+                        )
+                    }),
+            );
+        }
     }
-
-    checker.diagnostics.push(Diagnostic::new(
-        FutureFeatureNotDefined {
-            name: alias.name.to_string(),
-        },
-        alias.range(),
-    ));
 }

@@ -10,145 +10,153 @@ Module(
         range: 0..87,
         body: [
             ImportFrom(
-                StmtImportFrom {
-                    range: 0..18,
-                    module: Some(
-                        Identifier {
-                            id: Name("x"),
-                            range: 5..6,
-                        },
-                    ),
-                    names: [
-                        Alias {
-                            range: 14..15,
-                            name: Identifier {
-                                id: Name("*"),
+                MemberList(
+                    StmtImportFromMemberList {
+                        range: 0..18,
+                        module: Some(
+                            Identifier {
+                                id: Name("x"),
+                                range: 5..6,
+                            },
+                        ),
+                        names: [
+                            Alias {
                                 range: 14..15,
-                            },
-                            asname: None,
-                        },
-                        Alias {
-                            range: 17..18,
-                            name: Identifier {
-                                id: Name("a"),
-                                range: 17..18,
-                            },
-                            asname: None,
-                        },
-                    ],
-                    level: 0,
-                },
-            ),
-            ImportFrom(
-                StmtImportFrom {
-                    range: 19..40,
-                    module: Some(
-                        Identifier {
-                            id: Name("x"),
-                            range: 24..25,
-                        },
-                    ),
-                    names: [
-                        Alias {
-                            range: 33..34,
-                            name: Identifier {
-                                id: Name("a"),
-                                range: 33..34,
-                            },
-                            asname: None,
-                        },
-                        Alias {
-                            range: 36..37,
-                            name: Identifier {
-                                id: Name("*"),
-                                range: 36..37,
-                            },
-                            asname: None,
-                        },
-                        Alias {
-                            range: 39..40,
-                            name: Identifier {
-                                id: Name("b"),
-                                range: 39..40,
-                            },
-                            asname: None,
-                        },
-                    ],
-                    level: 0,
-                },
-            ),
-            ImportFrom(
-                StmtImportFrom {
-                    range: 41..64,
-                    module: Some(
-                        Identifier {
-                            id: Name("x"),
-                            range: 46..47,
-                        },
-                    ),
-                    names: [
-                        Alias {
-                            range: 55..56,
-                            name: Identifier {
-                                id: Name("*"),
-                                range: 55..56,
-                            },
-                            asname: None,
-                        },
-                        Alias {
-                            range: 58..64,
-                            name: Identifier {
-                                id: Name("a"),
-                                range: 58..59,
-                            },
-                            asname: Some(
-                                Identifier {
-                                    id: Name("b"),
-                                    range: 63..64,
+                                name: Identifier {
+                                    id: Name("*"),
+                                    range: 14..15,
                                 },
-                            ),
-                        },
-                    ],
-                    level: 0,
-                },
+                                asname: None,
+                            },
+                            Alias {
+                                range: 17..18,
+                                name: Identifier {
+                                    id: Name("a"),
+                                    range: 17..18,
+                                },
+                                asname: None,
+                            },
+                        ],
+                        level: 0,
+                    },
+                ),
             ),
             ImportFrom(
-                StmtImportFrom {
-                    range: 65..86,
-                    module: Some(
-                        Identifier {
-                            id: Name("x"),
-                            range: 70..71,
-                        },
-                    ),
-                    names: [
-                        Alias {
-                            range: 79..80,
-                            name: Identifier {
-                                id: Name("*"),
+                MemberList(
+                    StmtImportFromMemberList {
+                        range: 19..40,
+                        module: Some(
+                            Identifier {
+                                id: Name("x"),
+                                range: 24..25,
+                            },
+                        ),
+                        names: [
+                            Alias {
+                                range: 33..34,
+                                name: Identifier {
+                                    id: Name("a"),
+                                    range: 33..34,
+                                },
+                                asname: None,
+                            },
+                            Alias {
+                                range: 36..37,
+                                name: Identifier {
+                                    id: Name("*"),
+                                    range: 36..37,
+                                },
+                                asname: None,
+                            },
+                            Alias {
+                                range: 39..40,
+                                name: Identifier {
+                                    id: Name("b"),
+                                    range: 39..40,
+                                },
+                                asname: None,
+                            },
+                        ],
+                        level: 0,
+                    },
+                ),
+            ),
+            ImportFrom(
+                MemberList(
+                    StmtImportFromMemberList {
+                        range: 41..64,
+                        module: Some(
+                            Identifier {
+                                id: Name("x"),
+                                range: 46..47,
+                            },
+                        ),
+                        names: [
+                            Alias {
+                                range: 55..56,
+                                name: Identifier {
+                                    id: Name("*"),
+                                    range: 55..56,
+                                },
+                                asname: None,
+                            },
+                            Alias {
+                                range: 58..64,
+                                name: Identifier {
+                                    id: Name("a"),
+                                    range: 58..59,
+                                },
+                                asname: Some(
+                                    Identifier {
+                                        id: Name("b"),
+                                        range: 63..64,
+                                    },
+                                ),
+                            },
+                        ],
+                        level: 0,
+                    },
+                ),
+            ),
+            ImportFrom(
+                MemberList(
+                    StmtImportFromMemberList {
+                        range: 65..86,
+                        module: Some(
+                            Identifier {
+                                id: Name("x"),
+                                range: 70..71,
+                            },
+                        ),
+                        names: [
+                            Alias {
                                 range: 79..80,
+                                name: Identifier {
+                                    id: Name("*"),
+                                    range: 79..80,
+                                },
+                                asname: None,
                             },
-                            asname: None,
-                        },
-                        Alias {
-                            range: 82..83,
-                            name: Identifier {
-                                id: Name("*"),
+                            Alias {
                                 range: 82..83,
+                                name: Identifier {
+                                    id: Name("*"),
+                                    range: 82..83,
+                                },
+                                asname: None,
                             },
-                            asname: None,
-                        },
-                        Alias {
-                            range: 85..86,
-                            name: Identifier {
-                                id: Name("a"),
+                            Alias {
                                 range: 85..86,
+                                name: Identifier {
+                                    id: Name("a"),
+                                    range: 85..86,
+                                },
+                                asname: None,
                             },
-                            asname: None,
-                        },
-                    ],
-                    level: 0,
-                },
+                        ],
+                        level: 0,
+                    },
+                ),
             ),
         ],
     },

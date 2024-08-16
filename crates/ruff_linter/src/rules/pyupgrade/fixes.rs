@@ -1,4 +1,4 @@
-use ruff_python_ast::StmtImportFrom;
+use ruff_python_ast::StmtImportFromMemberList;
 use ruff_python_parser::{TokenKind, Tokens};
 use ruff_source_file::Locator;
 use ruff_text_size::{Ranged, TextRange};
@@ -6,7 +6,7 @@ use ruff_text_size::{Ranged, TextRange};
 /// Remove any imports matching `members` from an import-from statement.
 pub(crate) fn remove_import_members(
     locator: &Locator<'_>,
-    import_from_stmt: &StmtImportFrom,
+    import_from_stmt: &StmtImportFromMemberList,
     tokens: &Tokens,
     members_to_remove: &[&str],
 ) -> String {
@@ -77,7 +77,9 @@ mod tests {
             .first()
             .expect("source should have one statement")
             .as_import_from_stmt()
-            .expect("first statement should be an import from statement");
+            .expect("first statement should be an import from statement")
+            .as_member_list_import()
+            .expect("first statement should not be a `*` import");
         remove_import_members(
             &Locator::new(source),
             import_from_stmt,

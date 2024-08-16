@@ -1,5 +1,5 @@
 use itertools::Itertools;
-use ruff_python_ast::{Alias, StmtImportFrom};
+use ruff_python_ast::{Alias, StmtImportFromMemberList};
 
 use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, violation};
@@ -399,7 +399,7 @@ const TYPING_EXTENSIONS_TO_TYPES_313: &[&str] = &["CapsuleType"];
 const TYPING_EXTENSIONS_TO_WARNINGS_313: &[&str] = &["deprecated"];
 
 struct ImportReplacer<'a> {
-    import_from_stmt: &'a StmtImportFrom,
+    import_from_stmt: &'a StmtImportFromMemberList,
     module: &'a str,
     locator: &'a Locator<'a>,
     stylist: &'a Stylist<'a>,
@@ -408,24 +408,6 @@ struct ImportReplacer<'a> {
 }
 
 impl<'a> ImportReplacer<'a> {
-    const fn new(
-        import_from_stmt: &'a StmtImportFrom,
-        module: &'a str,
-        locator: &'a Locator<'a>,
-        stylist: &'a Stylist<'a>,
-        tokens: &'a Tokens,
-        version: PythonVersion,
-    ) -> Self {
-        Self {
-            import_from_stmt,
-            module,
-            locator,
-            stylist,
-            tokens,
-            version,
-        }
-    }
-
     /// Return a list of deprecated imports whose members were renamed.
     fn with_renames(&self) -> Vec<WithRename> {
         let mut operations = vec![];
@@ -694,16 +676,12 @@ impl<'a> ImportReplacer<'a> {
 }
 
 /// UP035
-pub(crate) fn deprecated_import(checker: &mut Checker, import_from_stmt: &StmtImportFrom) {
-    // Avoid relative and star imports.
+pub(crate) fn deprecated_import(
+    checker: &mut Checker,
+    import_from_stmt: &StmtImportFromMemberList,
+) {
+    // Avoid relative imports.
     if import_from_stmt.level > 0 {
-        return;
-    }
-    if import_from_stmt
-        .names
-        .first()
-        .is_some_and(|name| &name.name == "*")
-    {
         return;
     }
     let Some(module) = import_from_stmt.module.as_deref() else {
@@ -714,14 +692,14 @@ pub(crate) fn deprecated_import(checker: &mut Checker, import_from_stmt: &StmtIm
         return;
     }
 
-    let fixer = ImportReplacer::new(
+    let fixer = ImportReplacer {
         import_from_stmt,
         module,
-        checker.locator(),
-        checker.stylist(),
-        checker.tokens(),
-        checker.settings.target_version,
-    );
+        locator: checker.locator(),
+        stylist: checker.stylist(),
+        tokens: checker.tokens(),
+        version: checker.settings.target_version,
+    };
 
     for (operation, fix) in fixer.without_renames() {
         let mut diagnostic = Diagnostic::new(

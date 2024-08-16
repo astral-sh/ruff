@@ -1673,15 +1673,22 @@ impl AstNode for ast::StmtImportFrom {
     where
         V: SourceOrderVisitor<'a> + ?Sized,
     {
-        let ast::StmtImportFrom {
-            range: _,
-            module: _,
-            names,
-            level: _,
-        } = self;
-
-        for alias in names {
-            visitor.visit_alias(alias);
+        match self {
+            Self::Star(ast::StmtImportFromStar {
+                range: _,
+                module: _,
+                level: _,
+            }) => {}
+            Self::MemberList(ast::StmtImportFromMemberList {
+                range: _,
+                module: _,
+                names,
+                level: _,
+            }) => {
+                for alias in names {
+                    visitor.visit_alias(alias);
+                }
+            }
         }
     }
 }

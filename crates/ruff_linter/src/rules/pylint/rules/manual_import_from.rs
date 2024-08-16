@@ -71,7 +71,7 @@ pub(crate) fn manual_from_import(
         alias.range(),
     );
     if names.len() == 1 {
-        let node = ast::StmtImportFrom {
+        let node = ast::StmtImportFrom::MemberList(ast::StmtImportFromMemberList {
             module: Some(Identifier::new(module.to_string(), TextRange::default())),
             names: vec![Alias {
                 name: asname.clone(),
@@ -80,7 +80,7 @@ pub(crate) fn manual_from_import(
             }],
             level: 0,
             range: TextRange::default(),
-        };
+        });
         diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
             checker.generator().stmt(&node.into()),
             stmt.range(),

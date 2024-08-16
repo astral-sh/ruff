@@ -432,12 +432,14 @@ impl<'a> Visitor<'a> for Checker<'a> {
             {
                 self.semantic.flags |= SemanticModelFlags::MODULE_DOCSTRING_BOUNDARY;
             }
-            Stmt::ImportFrom(ast::StmtImportFrom { module, names, .. }) => {
+            Stmt::ImportFrom(import_from_stmt) => {
                 self.semantic.flags |= SemanticModelFlags::MODULE_DOCSTRING_BOUNDARY;
 
                 // Allow __future__ imports until we see a non-__future__ import.
-                if let Some("__future__") = module.as_deref() {
-                    if names
+                if import_from_stmt.module().as_deref() == Some("__future__") {
+                    if import_from_stmt
+                        .names()
+                        .unwrap_or_default()
                         .iter()
                         .any(|alias| alias.name.as_str() == "annotations")
                     {
@@ -540,18 +542,13 @@ impl<'a> Visitor<'a> for Checker<'a> {
                     }
                 }
             }
-            Stmt::ImportFrom(ast::StmtImportFrom {
-                names,
-                module,
-                level,
-                range: _,
-            }) => {
+            Stmt::ImportFrom(import_from_stmt) => {
                 if self.semantic.at_top_level() {
                     self.importer.visit_import(stmt);
                 }
 
-                let module = module.as_deref();
-                let level = *level;
+                let module = import_from_stmt.module().as_deref();
+                let level = import_from_stmt.level();
 
                 // Mark the top-level module as "seen" by the semantic model.
                 if level == 0 {
@@ -560,49 +557,54 @@ impl<'a> Visitor<'a> for Checker<'a> {
                     }
                 }
 
-                for alias in names {
-                    if let Some("__future__") = module {
-                        let name = alias.asname.as_ref().unwrap_or(&alias.name);
-                        self.add_binding(
-                            name,
-                            alias.identifier(),
-                            BindingKind::FutureImport,
-                            BindingFlags::empty(),
-                        );
-                    } else if &alias.name == "*" {
+                match import_from_stmt {
+                    ast::StmtImportFrom::MemberList(ast::StmtImportFromMemberList {
+                        names,
+                        ..
+                    }) => {
+                        for alias in names {
+                            if module == Some("__future__") {
+                                let name = alias.asname.as_ref().unwrap_or(&alias.name);
+                                self.add_binding(
+                                    name,
+                                    alias.identifier(),
+                                    BindingKind::FutureImport,
+                                    BindingFlags::empty(),
+                                );
+                            } else {
+                                let mut flags = BindingFlags::EXTERNAL;
+                                if alias.asname.is_some() {
+                                    flags |= BindingFlags::ALIAS;
+                                }
+                                if alias.asname.as_deref() == Some(alias.name.as_str()) {
+                                    flags |= BindingFlags::EXPLICIT_EXPORT;
+                                }
+
+                                // Given `from foo import bar`, `name` would be "bar" and `qualified_name` would
+                                // be "foo.bar". Given `from foo import bar as baz`, `name` would be "baz"
+                                // and `qualified_name` would be "foo.bar".
+                                let name = alias.asname.as_ref().unwrap_or(&alias.name);
+
+                                // Attempt to resolve any relative imports; but if we don't know the current
+                                // module path, or the relative import extends beyond the package root,
+                                // fallback to a literal representation (e.g., `[".", "foo"]`).
+                                let qualified_name =
+                                    collect_import_from_member(level, module, &alias.name);
+                                self.add_binding(
+                                    name,
+                                    alias.identifier(),
+                                    BindingKind::FromImport(FromImport {
+                                        qualified_name: Box::new(qualified_name),
+                                    }),
+                                    flags,
+                                );
+                            }
+                        }
+                    }
+                    ast::StmtImportFrom::Star(ast::StmtImportFromStar { .. }) => {
                         self.semantic
                             .current_scope_mut()
                             .add_star_import(StarImport { level, module });
-                    } else {
-                        let mut flags = BindingFlags::EXTERNAL;
-                        if alias.asname.is_some() {
-                            flags |= BindingFlags::ALIAS;
-                        }
-                        if alias
-                            .asname
-                            .as_ref()
-                            .is_some_and(|asname| asname.as_str() == alias.name.as_str())
-                        {
-                            flags |= BindingFlags::EXPLICIT_EXPORT;
-                        }
-
-                        // Given `from foo import bar`, `name` would be "bar" and `qualified_name` would
-                        // be "foo.bar". Given `from foo import bar as baz`, `name` would be "baz"
-                        // and `qualified_name` would be "foo.bar".
-                        let name = alias.asname.as_ref().unwrap_or(&alias.name);
-
-                        // Attempt to resolve any relative imports; but if we don't know the current
-                        // module path, or the relative import extends beyond the package root,
-                        // fallback to a literal representation (e.g., `[".", "foo"]`).
-                        let qualified_name = collect_import_from_member(level, module, &alias.name);
-                        self.add_binding(
-                            name,
-                            alias.identifier(),
-                            BindingKind::FromImport(FromImport {
-                                qualified_name: Box::new(qualified_name),
-                            }),
-                            flags,
-                        );
                     }
                 }
             }

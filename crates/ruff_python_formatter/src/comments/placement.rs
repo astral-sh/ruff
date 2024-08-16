@@ -318,7 +318,9 @@ fn handle_enclosed_comment<'a>(
         AnyNodeRef::StmtClassDef(class_def) => {
             handle_leading_class_with_decorators_comment(comment, class_def)
         }
-        AnyNodeRef::StmtImportFrom(import_from) => handle_import_from_comment(comment, import_from),
+        AnyNodeRef::StmtImportFrom(ast::StmtImportFrom::MemberList(import_from)) => {
+            handle_import_from_comment(comment, import_from)
+        }
         AnyNodeRef::StmtWith(with_) => handle_with_comment(comment, with_),
         AnyNodeRef::ExprCall(_) => handle_call_comment(comment),
         AnyNodeRef::ExprStringLiteral(_) => {
@@ -1883,7 +1885,7 @@ fn handle_bracketed_end_of_line_comment<'a>(
     CommentPlacement::Default(comment)
 }
 
-/// Attach an enclosed end-of-line comment to a [`ast::StmtImportFrom`].
+/// Attach an enclosed end-of-line comment to a [`ast::StmtImportFromMemberList`].
 ///
 /// For example, given:
 /// ```python
@@ -1892,11 +1894,19 @@ fn handle_bracketed_end_of_line_comment<'a>(
 /// )
 /// ```
 ///
-/// The comment will be attached to the [`ast::StmtImportFrom`] node as a dangling comment, to
-/// ensure that it remains on the same line as the [`ast::StmtImportFrom`] itself.
+/// The comment will be attached to the [`ast::StmtImportFromMemberList`] node as a dangling comment, to
+/// ensure that it remains on the same line as the [`ast::StmtImportFromMemberList`] itself.
+///
+/// N.B. This routine does not apply to [`ast::StmtImportFromStar`] nodes,
+/// as the following is invalid syntax:
+/// ```python
+/// from foo import (  # comment
+///     *
+/// )
+/// ```
 fn handle_import_from_comment<'a>(
     comment: DecoratedComment<'a>,
-    import_from: &'a ast::StmtImportFrom,
+    import_from: &'a ast::StmtImportFromMemberList,
 ) -> CommentPlacement<'a> {
     // The comment needs to be on the same line, but before the first member. For example, we want
     // to treat this as a dangling comment:

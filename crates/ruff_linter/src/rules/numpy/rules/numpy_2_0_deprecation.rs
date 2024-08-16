@@ -916,12 +916,15 @@ impl StatementVisitor<'_> for ImportSearcher<'_> {
         if self.found_import {
             return;
         }
-        if let ast::Stmt::ImportFrom(ast::StmtImportFrom { module, names, .. }) = stmt {
-            if module.as_ref().is_some_and(|module| module == self.module)
-                && names
-                    .iter()
-                    .any(|ast::Alias { name, .. }| name == self.name)
-            {
+        if let ast::Stmt::ImportFrom(ast::StmtImportFrom::MemberList(
+            ast::StmtImportFromMemberList {
+                module: Some(module),
+                names,
+                ..
+            },
+        )) = stmt
+        {
+            if module == self.module && names.iter().any(|alias| &alias.name == self.name) {
                 self.found_import = true;
                 return;
             }

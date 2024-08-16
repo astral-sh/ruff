@@ -62,21 +62,16 @@ pub(crate) fn deprecated_c_element_tree(checker: &mut Checker, stmt: &Stmt) {
                 }
             }
         }
-        Stmt::ImportFrom(ast::StmtImportFrom {
-            module,
-            names,
-            level,
-            range: _,
-        }) => {
-            if *level > 0 {
+        Stmt::ImportFrom(import_from_stmt) => {
+            if import_from_stmt.level() > 0 {
                 // Ex) `import .xml.etree.cElementTree as ET`
-            } else if let Some(module) = module {
+            } else if let Some(module) = import_from_stmt.module() {
                 if module == "xml.etree.cElementTree" {
                     // Ex) `from xml.etree.cElementTree import XML`
                     add_check_for_node(checker, stmt);
                 } else if module == "xml.etree" {
                     // Ex) `from xml.etree import cElementTree as ET`
-                    for name in names {
+                    for name in import_from_stmt.names().unwrap_or_default() {
                         if &name.name == "cElementTree" && name.asname.is_some() {
                             add_check_for_node(checker, name);
                         }

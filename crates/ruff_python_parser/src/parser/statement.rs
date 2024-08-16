@@ -606,11 +606,28 @@ impl<'src> Parser<'src> {
             self.expect(TokenKind::Rpar);
         }
 
-        ast::StmtImportFrom {
-            module,
-            names,
-            level: leading_dots,
-            range: self.node_range(start),
+        if seen_star_import {
+            if names.len() > 1 {
+                ast::StmtImportFrom::MemberList(ast::StmtImportFromMemberList {
+                    module,
+                    names,
+                    level: leading_dots,
+                    range: self.node_range(start),
+                })
+            } else {
+                ast::StmtImportFrom::Star(ast::StmtImportFromStar {
+                    module,
+                    level: leading_dots,
+                    range: self.node_range(start),
+                })
+            }
+        } else {
+            ast::StmtImportFrom::MemberList(ast::StmtImportFromMemberList {
+                module,
+                names,
+                level: leading_dots,
+                range: self.node_range(start),
+            })
         }
     }
 

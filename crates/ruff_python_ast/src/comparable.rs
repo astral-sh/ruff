@@ -1309,10 +1309,75 @@ pub struct StmtImport<'a> {
 }
 
 #[derive(Debug, PartialEq, Eq, Hash)]
-pub struct StmtImportFrom<'a> {
-    module: Option<&'a str>,
-    names: Vec<ComparableAlias<'a>>,
-    level: u32,
+pub struct StmtImportFromStar<'a> {
+    pub module: Option<&'a str>,
+    pub level: u32,
+}
+
+impl<'a> From<&'a ast::StmtImportFromStar> for StmtImportFromStar<'a> {
+    fn from(value: &'a ast::StmtImportFromStar) -> Self {
+        let ast::StmtImportFromStar {
+            module,
+            level,
+            range: _,
+        } = value;
+        Self {
+            module: module.as_deref(),
+            level: *level,
+        }
+    }
+}
+
+#[derive(Debug, PartialEq, Eq, Hash)]
+pub struct StmtImportFromMemberList<'a> {
+    pub module: Option<&'a str>,
+    pub names: Vec<ComparableAlias<'a>>,
+    pub level: u32,
+}
+
+impl<'a> From<&'a ast::StmtImportFromMemberList> for StmtImportFromMemberList<'a> {
+    fn from(value: &'a ast::StmtImportFromMemberList) -> Self {
+        let ast::StmtImportFromMemberList {
+            module,
+            names,
+            level,
+            range: _,
+        } = value;
+        Self {
+            module: module.as_deref(),
+            names: names.iter().map(ComparableAlias::from).collect(),
+            level: *level,
+        }
+    }
+}
+
+#[derive(Debug, PartialEq, Eq, Hash)]
+pub enum StmtImportFrom<'a> {
+    Star(StmtImportFromStar<'a>),
+    MemberList(StmtImportFromMemberList<'a>),
+}
+
+impl<'a> StmtImportFrom<'a> {
+    pub fn module(&self) -> Option<&'a str> {
+        match self {
+            Self::Star(import) => import.module,
+            Self::MemberList(import) => import.module,
+        }
+    }
+
+    pub fn level(&self) -> u32 {
+        match self {
+            Self::Star(import) => import.level,
+            Self::MemberList(import) => import.level,
+        }
+    }
+
+    pub fn names(&self) -> Option<&Vec<ComparableAlias<'a>>> {
+        match self {
+            Self::Star(_) => None,
+            Self::MemberList(import) => Some(&import.names),
+        }
+    }
 }
 
 #[derive(Debug, PartialEq, Eq, Hash)]
@@ -1531,16 +1596,12 @@ impl<'a> From<&'a ast::Stmt> for ComparableStmt<'a> {
             ast::Stmt::Import(ast::StmtImport { names, range: _ }) => Self::Import(StmtImport {
                 names: names.iter().map(Into::into).collect(),
             }),
-            ast::Stmt::ImportFrom(ast::StmtImportFrom {
-                module,
-                names,
-                level,
-                range: _,
-            }) => Self::ImportFrom(StmtImportFrom {
-                module: module.as_deref(),
-                names: names.iter().map(Into::into).collect(),
-                level: *level,
-            }),
+            ast::Stmt::ImportFrom(ast::StmtImportFrom::Star(import)) => {
+                Self::ImportFrom(StmtImportFrom::Star(import.into()))
+            }
+            ast::Stmt::ImportFrom(ast::StmtImportFrom::MemberList(import)) => {
+                Self::ImportFrom(StmtImportFrom::MemberList(import.into()))
+            }
             ast::Stmt::Global(ast::StmtGlobal { names, range: _ }) => Self::Global(StmtGlobal {
                 names: names.iter().map(ast::Identifier::as_str).collect(),
             }),

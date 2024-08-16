@@ -565,12 +565,30 @@ impl<'a> Generator<'a> {
                     }
                 });
             }
-            Stmt::ImportFrom(ast::StmtImportFrom {
+            Stmt::ImportFrom(ast::StmtImportFrom::Star(ast::StmtImportFromStar {
+                module,
+                level,
+                range: _,
+            })) => {
+                statement!({
+                    self.p("from ");
+                    if *level > 0 {
+                        for _ in 0..*level {
+                            self.p(".");
+                        }
+                    }
+                    if let Some(module) = module {
+                        self.p_id(module);
+                    }
+                    self.p(" import *");
+                });
+            }
+            Stmt::ImportFrom(ast::StmtImportFrom::MemberList(ast::StmtImportFromMemberList {
                 module,
                 names,
                 level,
                 range: _,
-            }) => {
+            })) => {
                 statement!({
                     self.p("from ");
                     if *level > 0 {

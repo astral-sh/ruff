@@ -314,14 +314,13 @@ pub(crate) fn deprecated_mock_import(checker: &mut Checker, stmt: &Stmt) {
                 }
             }
         }
-        Stmt::ImportFrom(ast::StmtImportFrom {
-            module: Some(module),
-            level,
-            ..
-        }) => {
-            if *level > 0 {
+        Stmt::ImportFrom(import_from_stmt) => {
+            if import_from_stmt.level() > 0 {
                 return;
             }
+            let Some(module) = import_from_stmt.module() else {
+                return;
+            };
 
             if module == "mock" {
                 let mut diagnostic = Diagnostic::new(

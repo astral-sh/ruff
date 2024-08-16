@@ -298,9 +298,11 @@ pub fn walk_stmt<V: Transformer + ?Sized>(visitor: &V, stmt: &mut Stmt) {
                 visitor.visit_alias(alias);
             }
         }
-        Stmt::ImportFrom(ast::StmtImportFrom { names, .. }) => {
-            for alias in names {
-                visitor.visit_alias(alias);
+        Stmt::ImportFrom(import_from_stmt) => {
+            if let Some(names) = import_from_stmt.names_mut() {
+                for alias in names {
+                    visitor.visit_alias(alias);
+                }
             }
         }
         Stmt::Global(_) => {}

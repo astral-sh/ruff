@@ -139,6 +139,10 @@ fn lint_unresolved_imports(context: &SemanticLintContext, import: AnyImportRef) 
             }
         }
         AnyImportRef::ImportFrom(import) => {
+            let ast::StmtImportFrom::MemberList(import) = import else {
+                // TODO support `*` imports
+                return;
+            };
             for alias in &import.names {
                 let ty = alias.ty(&context.semantic);
 

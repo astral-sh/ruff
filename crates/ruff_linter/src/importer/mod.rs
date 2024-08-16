@@ -406,17 +406,16 @@ impl<'a> Importer<'a> {
             if stmt.start() >= at {
                 break;
             }
-            if let Stmt::ImportFrom(ast::StmtImportFrom {
-                module: name,
-                names,
-                level,
-                range: _,
-            }) = stmt
+            if let Stmt::ImportFrom(ast::StmtImportFrom::MemberList(
+                ast::StmtImportFromMemberList {
+                    module: name,
+                    names: _,
+                    level,
+                    range: _,
+                },
+            )) = stmt
             {
-                if *level == 0
-                    && name.as_ref().is_some_and(|name| name == module)
-                    && names.iter().all(|alias| alias.name.as_str() != "*")
-                {
+                if *level == 0 && name.as_deref() == Some(module) {
                     import_from = Some(*stmt);
                 }
             }

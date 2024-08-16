@@ -249,7 +249,7 @@ mod tests {
         let ast = parsed_module(&db, bar);
 
         let import = ast.suite()[0].as_import_from_stmt().unwrap();
-        let alias = &import.names[0];
+        let alias = &import.names().unwrap()[0];
         let model = SemanticModel::new(&db, bar);
         let ty = alias.ty(&model);
 

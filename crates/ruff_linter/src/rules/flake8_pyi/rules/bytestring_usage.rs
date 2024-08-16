@@ -81,8 +81,11 @@ pub(crate) fn bytestring_attribute(checker: &mut Checker, attribute: &Expr) {
 }
 
 /// PYI057
-pub(crate) fn bytestring_import(checker: &mut Checker, import_from: &ast::StmtImportFrom) {
-    let ast::StmtImportFrom { names, module, .. } = import_from;
+pub(crate) fn bytestring_import(
+    checker: &mut Checker,
+    import_from: &ast::StmtImportFromMemberList,
+) {
+    let ast::StmtImportFromMemberList { names, module, .. } = import_from;
 
     let module_id = match module {
         Some(module) => module.id.as_str(),

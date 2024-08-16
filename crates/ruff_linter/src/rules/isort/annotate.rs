@@ -53,12 +53,14 @@ pub(crate) fn annotate_imports<'a>(
                         inline,
                     }
                 }
-                Stmt::ImportFrom(ast::StmtImportFrom {
-                    module,
-                    names,
-                    level,
-                    range: _,
-                }) => {
+                Stmt::ImportFrom(ast::StmtImportFrom::MemberList(
+                    ast::StmtImportFromMemberList {
+                        module,
+                        names,
+                        level,
+                        range: _,
+                    },
+                )) => {
                     // Find comments above.
                     let mut atop = vec![];
                     while let Some(comment) =
@@ -158,6 +160,38 @@ pub(crate) fn annotate_imports<'a>(
                         atop,
                         inline,
                         trailing,
+                    }
+                }
+                Stmt::ImportFrom(ast::StmtImportFrom::Star(ast::StmtImportFromStar {
+                    module,
+                    level,
+                    range,
+                })) => {
+                    // Find comments above.
+                    let mut atop = vec![];
+                    while let Some(comment) =
+                        comments_iter.next_if(|comment| comment.start() < import.start())
+                    {
+                        atop.push(comment);
+                    }
+
+                    // Find comments inline
+                    let mut inline = vec![];
+                    let import_line_end = locator.line_end(range.end());
+                    while let Some(comment) =
+                        comments_iter.next_if(|comment| comment.end() <= import_line_end)
+                    {
+                        inline.push(comment);
+                    }
+
+                    AnnotatedImport::ImportFrom {
+                        module: module.as_ref().map(|module| locator.slice(module)),
+                        names: vec![AnnotatedAliasData::star_import()],
+                        level: *level,
+                        atop,
+                        inline,
+                        trailing: vec![],
+                        trailing_comma: TrailingComma::Absent,
                     }
                 }
                 _ => panic!("Expected Stmt::Import | Stmt::ImportFrom"),
