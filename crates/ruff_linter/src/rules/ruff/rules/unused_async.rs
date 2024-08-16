@@ -1,11 +1,12 @@
+use crate::checkers::ast::Checker;
+use crate::rules::fastapi::rules::is_fastapi_route;
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::identifier::Identifier;
 use ruff_python_ast::visitor::source_order;
 use ruff_python_ast::{self as ast, AnyNodeRef, Expr, Stmt};
 use ruff_python_semantic::analyze::function_type::is_stub;
-
-use crate::checkers::ast::Checker;
+use ruff_python_semantic::Modules;
 
 /// ## What it does
 /// Checks for functions declared `async` that do not await or otherwise use features requiring the
@@ -170,6 +171,12 @@ pub(crate) fn unused_async(
 
     // Ignore stubs (e.g., `...`).
     if is_stub(function_def, checker.semantic()) {
+        return;
+    }
+
+    if checker.semantic().seen_module(Modules::FASTAPI)
+        && is_fastapi_route(function_def, checker.semantic())
+    {
         return;
     }
 
