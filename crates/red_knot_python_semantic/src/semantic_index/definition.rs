@@ -248,6 +248,10 @@ impl AssignmentDefinitionKind {
     pub(crate) fn assignment(&self) -> &ast::StmtAssign {
         self.assignment.node()
     }
+
+    pub(crate) fn target(&self) -> &ast::ExprName {
+        self.target.node()
+    }
 }
 
 #[derive(Copy, Clone, Eq, PartialEq, Hash, Debug)]

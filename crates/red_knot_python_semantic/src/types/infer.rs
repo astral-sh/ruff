@@ -294,7 +294,11 @@ impl<'db> TypeInferenceBuilder<'db> {
                 );
             }
             DefinitionKind::Assignment(assignment) => {
-                self.infer_assignment_definition(assignment.assignment(), definition);
+                self.infer_assignment_definition(
+                    assignment.target(),
+                    assignment.assignment(),
+                    definition,
+                );
             }
             DefinitionKind::AnnotatedAssignment(annotated_assignment) => {
                 self.infer_annotated_assignment_definition(annotated_assignment.node(), definition);
@@ -706,6 +710,7 @@ impl<'db> TypeInferenceBuilder<'db> {
 
     fn infer_assignment_definition(
         &mut self,
+        target: &ast::ExprName,
         assignment: &ast::StmtAssign,
         definition: Definition<'db>,
     ) {
@@ -715,6 +720,9 @@ impl<'db> TypeInferenceBuilder<'db> {
         let value_ty = self
             .types
             .expression_ty(assignment.value.scoped_ast_id(self.db, self.scope));
+        self.types
+            .expressions
+            .insert(target.scoped_ast_id(self.db, self.scope), value_ty);
         self.types.definitions.insert(definition, value_ty);
     }
 
