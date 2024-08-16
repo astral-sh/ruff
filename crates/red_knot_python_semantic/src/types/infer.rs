@@ -930,7 +930,14 @@ impl<'db> TypeInferenceBuilder<'db> {
             asname: _,
         } = alias;
 
-        let ty = module_ty.member(self.db, &Name::new(&name.id));
+        // If a symbol is unbound in the module the symbol was originally defined in,
+        // when we're trying to import the symbol from that module into "our" module,
+        // the runtime error will occur immediately (rather than when the symbol is *used*,
+        // as would be the case for a symbol with type `Unbound`), so it's appropriate to
+        // think of the type of the imported symbol as `Unknown` rather than `Unbound`
+        let ty = module_ty
+            .member(self.db, &Name::new(&name.id))
+            .replace_unbound_with(self.db, Type::Unknown);
 
         self.types.definitions.insert(definition, ty);
     }
@@ -1897,6 +1904,24 @@ mod tests {
             "X",
             "Literal[42]",
         );
+
+        Ok(())
+    }
+
+    #[test]
+    fn imported_unbound_symbol_is_unknown() -> anyhow::Result<()> {
+        let mut db = setup_db();
+
+        db.write_files([
+            ("src/package/__init__.py", ""),
+            ("src/package/foo.py", "x"),
+            ("src/package/bar.py", "from package.foo import x"),
+        ])?;
+
+        // the type as seen from external modules (`Unknown`)
+        // is different from the type inside the module itself (`Unbound`):
+        assert_public_ty(&db, "src/package/foo.py", "x", "Unbound");
+        assert_public_ty(&db, "src/package/bar.py", "x", "Unknown");
 
         Ok(())
     }
