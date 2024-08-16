@@ -569,26 +569,26 @@ def f(a: str, /, b: str, c: int = 1, *args, d: int = 2, **kwargs):
 
         let use_def = index.use_def_map(function_scope_id);
         for name in ["a", "b", "c", "d"] {
-            let [definition] = use_def.public_definitions(
-                function_table
-                    .symbol_id_by_name(name)
-                    .expect("symbol exists"),
-            ) else {
-                panic!("Expected parameter definition for {name}");
-            };
+            let definition = use_def
+                .first_public_definition(
+                    function_table
+                        .symbol_id_by_name(name)
+                        .expect("symbol exists"),
+                )
+                .unwrap();
             assert!(matches!(
                 definition.node(&db),
                 DefinitionKind::ParameterWithDefault(_)
             ));
         }
         for name in ["args", "kwargs"] {
-            let [definition] = use_def.public_definitions(
-                function_table
-                    .symbol_id_by_name(name)
-                    .expect("symbol exists"),
-            ) else {
-                panic!("Expected parameter definition for {name}");
-            };
+            let definition = use_def
+                .first_public_definition(
+                    function_table
+                        .symbol_id_by_name(name)
+                        .expect("symbol exists"),
+                )
+                .unwrap();
             assert!(matches!(definition.node(&db), DefinitionKind::Parameter(_)));
         }
     }
@@ -617,22 +617,22 @@ def f(a: str, /, b: str, c: int = 1, *args, d: int = 2, **kwargs):
 
         let use_def = index.use_def_map(lambda_scope_id);
         for name in ["a", "b", "c", "d"] {
-            let [definition] = use_def
-                .public_definitions(lambda_table.symbol_id_by_name(name).expect("symbol exists"))
-            else {
-                panic!("Expected parameter definition for {name}");
-            };
+            let definition = use_def
+                .first_public_definition(
+                    lambda_table.symbol_id_by_name(name).expect("symbol exists"),
+                )
+                .unwrap();
             assert!(matches!(
                 definition.node(&db),
                 DefinitionKind::ParameterWithDefault(_)
             ));
         }
         for name in ["args", "kwargs"] {
-            let [definition] = use_def
-                .public_definitions(lambda_table.symbol_id_by_name(name).expect("symbol exists"))
-            else {
-                panic!("Expected parameter definition for {name}");
-            };
+            let definition = use_def
+                .first_public_definition(
+                    lambda_table.symbol_id_by_name(name).expect("symbol exists"),
+                )
+                .unwrap();
             assert!(matches!(definition.node(&db), DefinitionKind::Parameter(_)));
         }
     }
