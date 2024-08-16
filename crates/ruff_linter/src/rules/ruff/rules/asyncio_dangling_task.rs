@@ -127,6 +127,7 @@ pub(crate) fn asyncio_dangling_binding(
         if binding.is_used()
             || binding.is_global()
             || binding.is_nonlocal()
+            || binding.is_private_declaration()
             || !binding.kind.is_assignment()
         {
             continue;
@@ -145,6 +146,7 @@ pub(crate) fn asyncio_dangling_binding(
             if binding.is_used()
                 || binding.is_global()
                 || binding.is_nonlocal()
+                || binding.is_private_declaration()
                 || !binding.kind.is_assignment()
             {
                 continue;

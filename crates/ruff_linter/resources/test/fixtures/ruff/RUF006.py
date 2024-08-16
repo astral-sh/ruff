@@ -185,3 +185,8 @@ def f():
     global task
     loop = asyncio.get_event_loop()
     task = loop.create_task(main()) # Error
+
+# OK
+def f():
+    loop = asyncio.get_event_loop()
+    _task = loop.create_task(main())
