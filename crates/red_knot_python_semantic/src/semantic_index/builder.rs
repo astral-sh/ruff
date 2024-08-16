@@ -155,7 +155,7 @@ impl<'db> SemanticIndexBuilder<'db> {
         self.current_use_def_map_mut().restore(state);
     }
 
-    fn flow_merge(&mut self, state: &FlowSnapshot) {
+    fn flow_merge(&mut self, state: FlowSnapshot) {
         self.current_use_def_map_mut().merge(state);
     }
 
@@ -195,9 +195,16 @@ impl<'db> SemanticIndexBuilder<'db> {
         definition
     }
 
+    fn add_constraint(&mut self, constraint_node: &ast::Expr) -> Expression<'db> {
+        let expression = self.add_standalone_expression(constraint_node);
+        self.current_use_def_map_mut().record_constraint(expression);
+
+        expression
+    }
+
     /// Record an expression that needs to be a Salsa ingredient, because we need to infer its type
     /// standalone (type narrowing tests, RHS of an assignment.)
-    fn add_standalone_expression(&mut self, expression_node: &ast::Expr) {
+    fn add_standalone_expression(&mut self, expression_node: &ast::Expr) -> Expression<'db> {
         let expression = Expression::new(
             self.db,
             self.file,
@@ -210,6 +217,7 @@ impl<'db> SemanticIndexBuilder<'db> {
         );
         self.expressions_by_node
             .insert(expression_node.into(), expression);
+        expression
     }
 
     fn with_type_params(
@@ -476,6 +484,7 @@ where
             ast::Stmt::If(node) => {
                 self.visit_expr(&node.test);
                 let pre_if = self.flow_snapshot();
+                self.add_constraint(&node.test);
                 self.visit_body(&node.body);
                 let mut post_clauses: Vec<FlowSnapshot> = vec![];
                 for clause in &node.elif_else_clauses {
@@ -488,7 +497,7 @@ where
                     self.visit_elif_else_clause(clause);
                 }
                 for post_clause_state in post_clauses {
-                    self.flow_merge(&post_clause_state);
+                    self.flow_merge(post_clause_state);
                 }
                 let has_else = node
                     .elif_else_clauses
@@ -497,7 +506,7 @@ where
                 if !has_else {
                     // if there's no else clause, then it's possible we took none of the branches,
                     // and the pre_if state can reach here
-                    self.flow_merge(&pre_if);
+                    self.flow_merge(pre_if);
                 }
             }
             ast::Stmt::While(node) => {
@@ -515,13 +524,13 @@ where
 
                 // We may execute the `else` clause without ever executing the body, so merge in
                 // the pre-loop state before visiting `else`.
-                self.flow_merge(&pre_loop);
+                self.flow_merge(pre_loop);
                 self.visit_body(&node.orelse);
 
                 // Breaking out of a while loop bypasses the `else` clause, so merge in the break
                 // states after visiting `else`.
                 for break_state in break_states {
-                    self.flow_merge(&break_state);
+                    self.flow_merge(break_state);
                 }
             }
             ast::Stmt::Break(_) => {
@@ -631,7 +640,7 @@ where
                 let post_body = self.flow_snapshot();
                 self.flow_restore(pre_if);
                 self.visit_expr(orelse);
-                self.flow_merge(&post_body);
+                self.flow_merge(post_body);
             }
             ast::Expr::ListComp(
                 list_comprehension @ ast::ExprListComp {
