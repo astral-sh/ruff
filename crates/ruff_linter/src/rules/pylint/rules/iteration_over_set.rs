@@ -1,6 +1,6 @@
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::{self as ast, Expr};
+use ruff_python_ast::Expr;
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
@@ -42,17 +42,17 @@ impl AlwaysFixableViolation for IterationOverSet {
 
 /// PLC0208
 pub(crate) fn iteration_over_set(checker: &mut Checker, expr: &Expr) {
-    let Expr::Set(ast::ExprSet { elts, .. }) = expr else {
+    let Expr::Set(set) = expr else {
         return;
     };
 
-    if elts.iter().any(Expr::is_starred_expr) {
+    if set.iter().any(Expr::is_starred_expr) {
         return;
     }
 
     let mut diagnostic = Diagnostic::new(IterationOverSet, expr.range());
 
-    let tuple = if let [elt] = elts.as_slice() {
+    let tuple = if let [elt] = set.elts.as_slice() {
         let elt = checker.locator().slice(elt);
         format!("({elt},)")
     } else {

@@ -14,15 +14,16 @@ use crate::fix;
 /// Since Python 3, `__metaclass__ = type` is implied and can thus be omitted.
 ///
 /// ## Example
+///
 /// ```python
 /// class Foo:
 ///     __metaclass__ = type
 /// ```
 ///
 /// Use instead:
+///
 /// ```python
-/// class Foo:
-///     ...
+/// class Foo: ...
 /// ```
 ///
 /// ## References

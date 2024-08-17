@@ -87,13 +87,13 @@ pub(crate) fn unnecessary_dict_kwargs(checker: &mut Checker, call: &ast::ExprCal
             .iter_keys()
             .filter_map(|key| key.and_then(as_kwarg))
             .collect();
-        if kwargs.len() != dict.items.len() {
+        if kwargs.len() != dict.len() {
             continue;
         }
 
         let mut diagnostic = Diagnostic::new(UnnecessaryDictKwargs, keyword.range());
 
-        if dict.items.is_empty() {
+        if dict.is_empty() {
             diagnostic.try_set_fix(|| {
                 remove_argument(
                     keyword,

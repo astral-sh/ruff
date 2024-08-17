@@ -18,18 +18,18 @@ use crate::rules::flake8_boolean_trap::helpers::allow_boolean_trap;
 /// readers of the code.
 ///
 /// ## Example
+///
 /// ```python
-/// def func(flag: bool) -> None:
-///     ...
+/// def func(flag: bool) -> None: ...
 ///
 ///
 /// func(True)
 /// ```
 ///
 /// Use instead:
+///
 /// ```python
-/// def func(flag: bool) -> None:
-///     ...
+/// def func(flag: bool) -> None: ...
 ///
 ///
 /// func(flag=True)

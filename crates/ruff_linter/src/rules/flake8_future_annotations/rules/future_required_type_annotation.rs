@@ -29,18 +29,18 @@ use crate::checkers::ast::Checker;
 /// flag such usages if your project targets Python 3.9 or below.
 ///
 /// ## Example
+///
 /// ```python
-/// def func(obj: dict[str, int | None]) -> None:
-///     ...
+/// def func(obj: dict[str, int | None]) -> None: ...
 /// ```
 ///
 /// Use instead:
+///
 /// ```python
 /// from __future__ import annotations
 ///
 ///
-/// def func(obj: dict[str, int | None]) -> None:
-///     ...
+/// def func(obj: dict[str, int | None]) -> None: ...
 /// ```
 ///
 /// ## Fix safety

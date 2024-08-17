@@ -6,13 +6,14 @@ use ruff_python_ast::helpers::map_callable;
 use ruff_python_ast::name::QualifiedName;
 use ruff_python_ast::visitor::Visitor;
 use ruff_python_ast::{self as ast, visitor, Expr, Stmt};
-use ruff_python_semantic::analyze::function_type;
+use ruff_python_semantic::analyze::{function_type, visibility};
 use ruff_python_semantic::{Definition, SemanticModel};
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
 use crate::docstrings::sections::{SectionContext, SectionContexts, SectionKind};
 use crate::docstrings::styles::SectionStyle;
+use crate::docstrings::Docstring;
 use crate::registry::Rule;
 use crate::rules::pydocstyle::settings::Convention;
 
@@ -23,6 +24,8 @@ use crate::rules::pydocstyle::settings::Convention;
 /// ## Why is this bad?
 /// Docstrings missing return sections are a sign of incomplete documentation
 /// or refactors.
+///
+/// This rule is not enforced for abstract methods and stubs functions.
 ///
 /// ## Example
 /// ```python
@@ -72,6 +75,8 @@ impl Violation for DocstringMissingReturns {
 /// Functions without an explicit return should not have a returns section
 /// in their docstrings.
 ///
+/// This rule is not enforced for stub functions.
+///
 /// ## Example
 /// ```python
 /// def say_hello(n: int) -> None:
@@ -119,6 +124,8 @@ impl Violation for DocstringExtraneousReturns {
 /// ## Why is this bad?
 /// Docstrings missing yields sections are a sign of incomplete documentation
 /// or refactors.
+///
+/// This rule is not enforced for abstract methods and stubs functions.
 ///
 /// ## Example
 /// ```python
@@ -168,6 +175,8 @@ impl Violation for DocstringMissingYields {
 /// Functions which don't yield anything should not have a yields section
 /// in their docstrings.
 ///
+/// This rule is not enforced for stub functions.
+///
 /// ## Example
 /// ```python
 /// def say_hello(n: int) -> None:
@@ -216,6 +225,8 @@ impl Violation for DocstringExtraneousYields {
 /// If a function raises an exception without documenting it in its docstring,
 /// it can be misleading to users and/or a sign of incomplete documentation or
 /// refactors.
+///
+/// This rule is not enforced for abstract methods and stubs functions.
 ///
 /// ## Example
 /// ```python
@@ -281,6 +292,8 @@ impl Violation for DocstringMissingException {
 /// Some conventions prefer non-explicit exceptions be omitted from the
 /// docstring.
 ///
+/// This rule is not enforced for stub functions.
+///
 /// ## Example
 /// ```python
 /// def calculate_speed(distance: float, time: float) -> float:
@@ -342,7 +355,7 @@ impl Violation for DocstringExtraneousException {
     }
 }
 
-// A generic docstring section.
+/// A generic docstring section.
 #[derive(Debug)]
 struct GenericSection {
     range: TextRange,
@@ -362,7 +375,7 @@ impl GenericSection {
     }
 }
 
-// A Raises docstring section.
+/// A "Raises" section in a docstring.
 #[derive(Debug)]
 struct RaisesSection<'a> {
     raised_exceptions: Vec<QualifiedName<'a>>,
@@ -377,7 +390,7 @@ impl Ranged for RaisesSection<'_> {
 
 impl<'a> RaisesSection<'a> {
     /// Return the raised exceptions for the docstring, or `None` if the docstring does not contain
-    /// a `Raises` section.
+    /// a "Raises" section.
     fn from_section(section: &SectionContext<'a>, style: Option<SectionStyle>) -> Self {
         Self {
             raised_exceptions: parse_entries(section.following_lines_str(), style),
@@ -414,7 +427,7 @@ impl<'a> DocstringSections<'a> {
     }
 }
 
-/// Parse the entries in a `Raises` section of a docstring.
+/// Parse the entries in a "Raises" section of a docstring.
 ///
 /// Attempts to parse using the specified [`SectionStyle`], falling back to the other style if no
 /// entries are found.
@@ -600,7 +613,7 @@ impl<'a> Visitor<'a> for BodyVisitor<'a> {
                     };
 
                     if let ast::Expr::Tuple(tuple) = exceptions {
-                        for exception in &tuple.elts {
+                        for exception in tuple {
                             maybe_store_exception(exception);
                         }
                     } else {
@@ -649,10 +662,43 @@ fn is_exception_or_base_exception(qualified_name: &QualifiedName) -> bool {
     )
 }
 
+fn starts_with_returns(docstring: &Docstring) -> bool {
+    if let Some(first_word) = docstring.body().as_str().split(' ').next() {
+        return matches!(first_word, "Return" | "Returns");
+    }
+    false
+}
+
+fn returns_documented(
+    docstring: &Docstring,
+    docstring_sections: &DocstringSections,
+    convention: Option<Convention>,
+) -> bool {
+    docstring_sections.returns.is_some()
+        || (matches!(convention, Some(Convention::Google)) && starts_with_returns(docstring))
+}
+
+fn starts_with_yields(docstring: &Docstring) -> bool {
+    if let Some(first_word) = docstring.body().as_str().split(' ').next() {
+        return matches!(first_word, "Yield" | "Yields");
+    }
+    false
+}
+
+fn yields_documented(
+    docstring: &Docstring,
+    docstring_sections: &DocstringSections,
+    convention: Option<Convention>,
+) -> bool {
+    docstring_sections.yields.is_some()
+        || (matches!(convention, Some(Convention::Google)) && starts_with_yields(docstring))
+}
+
 /// DOC201, DOC202, DOC402, DOC403, DOC501, DOC502
 pub(crate) fn check_docstring(
     checker: &mut Checker,
     definition: &Definition,
+    docstring: &Docstring,
     section_contexts: &SectionContexts,
     convention: Option<Convention>,
 ) {
@@ -687,7 +733,7 @@ pub(crate) fn check_docstring(
 
     // DOC201
     if checker.enabled(Rule::DocstringMissingReturns) {
-        if docstring_sections.returns.is_none() {
+        if !returns_documented(docstring, &docstring_sections, convention) {
             let extra_property_decorators = checker.settings.pydocstyle.property_decorators();
             if !definition.is_property(extra_property_decorators, checker.semantic()) {
                 if let Some(body_return) = body_entries.returns.first() {
@@ -698,33 +744,11 @@ pub(crate) fn check_docstring(
         }
     }
 
-    // DOC202
-    if checker.enabled(Rule::DocstringExtraneousReturns) {
-        if let Some(docstring_returns) = docstring_sections.returns {
-            if body_entries.returns.is_empty() {
-                let diagnostic =
-                    Diagnostic::new(DocstringExtraneousReturns, docstring_returns.range());
-                diagnostics.push(diagnostic);
-            }
-        }
-    }
-
     // DOC402
     if checker.enabled(Rule::DocstringMissingYields) {
-        if docstring_sections.yields.is_none() {
+        if !yields_documented(docstring, &docstring_sections, convention) {
             if let Some(body_yield) = body_entries.yields.first() {
                 let diagnostic = Diagnostic::new(DocstringMissingYields, body_yield.range());
-                diagnostics.push(diagnostic);
-            }
-        }
-    }
-
-    // DOC403
-    if checker.enabled(Rule::DocstringExtraneousYields) {
-        if let Some(docstring_yields) = docstring_sections.yields {
-            if body_entries.yields.is_empty() {
-                let diagnostic =
-                    Diagnostic::new(DocstringExtraneousYields, docstring_yields.range());
                 diagnostics.push(diagnostic);
             }
         }
@@ -760,28 +784,54 @@ pub(crate) fn check_docstring(
         }
     }
 
-    // DOC502
-    if checker.enabled(Rule::DocstringExtraneousException) {
-        if let Some(docstring_raises) = docstring_sections.raises {
-            let mut extraneous_exceptions = Vec::new();
-            for docstring_raise in &docstring_raises.raised_exceptions {
-                if !body_entries.raised_exceptions.iter().any(|exception| {
-                    exception
-                        .qualified_name
-                        .segments()
-                        .ends_with(docstring_raise.segments())
-                }) {
-                    extraneous_exceptions.push(docstring_raise.to_string());
+    // Avoid applying "extraneous" rules to abstract methods. An abstract method's docstring _could_
+    // document that it raises an exception without including the exception in the implementation.
+    if !visibility::is_abstract(&function_def.decorator_list, checker.semantic()) {
+        // DOC202
+        if checker.enabled(Rule::DocstringExtraneousReturns) {
+            if let Some(ref docstring_returns) = docstring_sections.returns {
+                if body_entries.returns.is_empty() {
+                    let diagnostic =
+                        Diagnostic::new(DocstringExtraneousReturns, docstring_returns.range());
+                    diagnostics.push(diagnostic);
                 }
             }
-            if !extraneous_exceptions.is_empty() {
-                let diagnostic = Diagnostic::new(
-                    DocstringExtraneousException {
-                        ids: extraneous_exceptions,
-                    },
-                    docstring_raises.range(),
-                );
-                diagnostics.push(diagnostic);
+        }
+
+        // DOC403
+        if checker.enabled(Rule::DocstringExtraneousYields) {
+            if let Some(docstring_yields) = docstring_sections.yields {
+                if body_entries.yields.is_empty() {
+                    let diagnostic =
+                        Diagnostic::new(DocstringExtraneousYields, docstring_yields.range());
+                    diagnostics.push(diagnostic);
+                }
+            }
+        }
+
+        // DOC502
+        if checker.enabled(Rule::DocstringExtraneousException) {
+            if let Some(docstring_raises) = docstring_sections.raises {
+                let mut extraneous_exceptions = Vec::new();
+                for docstring_raise in &docstring_raises.raised_exceptions {
+                    if !body_entries.raised_exceptions.iter().any(|exception| {
+                        exception
+                            .qualified_name
+                            .segments()
+                            .ends_with(docstring_raise.segments())
+                    }) {
+                        extraneous_exceptions.push(docstring_raise.to_string());
+                    }
+                }
+                if !extraneous_exceptions.is_empty() {
+                    let diagnostic = Diagnostic::new(
+                        DocstringExtraneousException {
+                            ids: extraneous_exceptions,
+                        },
+                        docstring_raises.range(),
+                    );
+                    diagnostics.push(diagnostic);
+                }
             }
         }
     }

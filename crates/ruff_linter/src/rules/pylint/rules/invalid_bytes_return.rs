@@ -12,7 +12,7 @@ use ruff_text_size::Ranged;
 use crate::checkers::ast::Checker;
 
 /// ## What it does
-/// Checks for `__bytes__` implementations that return a type other than `bytes`.
+/// Checks for `__bytes__` implementations that return types other than `bytes`.
 ///
 /// ## Why is this bad?
 /// The `__bytes__` method should return a `bytes` object. Returning a different

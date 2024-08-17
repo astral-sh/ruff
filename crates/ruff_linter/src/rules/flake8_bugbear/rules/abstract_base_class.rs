@@ -67,24 +67,24 @@ impl Violation for AbstractBaseClassWithoutAbstractMethod {
 /// `@abstractmethod` decorator to the method.
 ///
 /// ## Example
+///
 /// ```python
 /// from abc import ABC
 ///
 ///
 /// class Foo(ABC):
-///     def method(self):
-///         ...
+///     def method(self): ...
 /// ```
 ///
 /// Use instead:
+///
 /// ```python
 /// from abc import ABC, abstractmethod
 ///
 ///
 /// class Foo(ABC):
 ///     @abstractmethod
-///     def method(self):
-///         ...
+///     def method(self): ...
 /// ```
 ///
 /// ## References

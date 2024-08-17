@@ -111,3 +111,7 @@ def can_access_inside_nested[T](t: T) -> T:  # OK
         return x
 
     bar(t)
+
+
+def cannot_access_in_default[T](t: T = T):  # F821
+    pass

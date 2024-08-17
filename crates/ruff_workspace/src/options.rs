@@ -21,7 +21,7 @@ use ruff_linter::rules::{
     flake8_copyright, flake8_errmsg, flake8_gettext, flake8_implicit_str_concat,
     flake8_import_conventions, flake8_pytest_style, flake8_quotes, flake8_self,
     flake8_tidy_imports, flake8_type_checking, flake8_unused_arguments, isort, mccabe, pep8_naming,
-    pycodestyle, pydocstyle, pyflakes, pylint, pyupgrade,
+    pycodestyle, pydocstyle, pyflakes, pylint, pyupgrade, ruff,
 };
 use ruff_linter::settings::types::{
     IdentifierPattern, OutputFormat, PreviewMode, PythonVersion, RequiredVersion,
@@ -241,13 +241,11 @@ pub struct Options {
     /// included here not for configuration but because we lint whether e.g. the
     /// `[project]` matches the schema.
     ///
-    /// If [preview](https://docs.astral.sh/ruff/preview/) is enabled, the default
-    /// includes notebook files (`.ipynb` extension). You can exclude them by adding
-    /// `*.ipynb` to [`extend-exclude`](#extend-exclude).
+    /// Notebook files (`.ipynb` extension) are included by default on Ruff 0.6.0+.
     ///
     /// For more information on the glob syntax, refer to the [`globset` documentation](https://docs.rs/globset/latest/globset/#syntax).
     #[option(
-        default = r#"["*.py", "*.pyi", "**/pyproject.toml"]"#,
+        default = r#"["*.py", "*.pyi", "*.ipynb", "**/pyproject.toml"]"#,
         value_type = "list[str]",
         example = r#"
             include = ["*.py"]
@@ -323,33 +321,37 @@ pub struct Options {
     /// The directories to consider when resolving first- vs. third-party
     /// imports.
     ///
-    /// As an example: given a Python package structure like:
+    /// When omitted, the `src` directory will typically default to including both:
+    ///
+    /// 1. The directory containing the nearest `pyproject.toml`, `ruff.toml`, or `.ruff.toml` file (the "project root").
+    /// 2. The `"src"` subdirectory of the project root.
+    ///
+    /// These defaults ensure that uv supports both flat layouts and `src` layouts out-of-the-box.
+    /// (If a configuration file is explicitly provided (e.g., via the `--config` command-line
+    /// flag), the current working directory will be considered the project root.)
+    ///
+    /// As an example, consider an alternative project structure, like:
     ///
     /// ```text
     /// my_project
     /// ├── pyproject.toml
-    /// └── src
+    /// └── lib
     ///     └── my_package
     ///         ├── __init__.py
     ///         ├── foo.py
     ///         └── bar.py
     /// ```
     ///
-    /// The `./src` directory should be included in the `src` option
-    /// (e.g., `src = ["src"]`), such that when resolving imports,
-    /// `my_package.foo` is considered a first-party import.
-    ///
-    /// When omitted, the `src` directory will typically default to the
-    /// directory containing the nearest `pyproject.toml`, `ruff.toml`, or
-    /// `.ruff.toml` file (the "project root"), unless a configuration file
-    /// is explicitly provided (e.g., via the `--config` command-line flag).
+    /// In this case, the `./lib` directory should be included in the `src` option
+    /// (e.g., `src = ["lib"]`), such that when resolving imports, `my_package.foo`
+    /// is considered first-party.
     ///
     /// This field supports globs. For example, if you have a series of Python
     /// packages in a `python_modules` directory, `src = ["python_modules/*"]`
-    /// would expand to incorporate all of the packages in that directory. User
-    /// home directory and environment variables will also be expanded.
+    /// would expand to incorporate all packages in that directory. User home
+    /// directory and environment variables will also be expanded.
     #[option(
-        default = r#"["."]"#,
+        default = r#"[".", "src"]"#,
         value_type = "list[str]",
         example = r#"
             # Allow imports relative to the "src" and "test" directories.
@@ -454,6 +456,10 @@ pub struct LintOptions {
         "#
     )]
     pub exclude: Option<Vec<String>>,
+
+    /// Options for the `ruff` plugin
+    #[option_group]
+    pub ruff: Option<RuffOptions>,
 
     /// Whether to enable preview mode. When preview mode is enabled, Ruff will
     /// use unstable rules and fixes.
@@ -1302,7 +1308,7 @@ pub struct Flake8ImportConventionsOptions {
     /// The conventional aliases for imports. These aliases can be extended by
     /// the [`extend-aliases`](#lint_flake8-import-conventions_extend-aliases) option.
     #[option(
-        default = r#"{"altair": "alt", "matplotlib": "mpl", "matplotlib.pyplot": "plt", "numpy": "np", "pandas": "pd", "seaborn": "sns", "tensorflow": "tf", "tkinter":  "tk", "holoviews": "hv", "panel": "pn", "plotly.express": "px", "polars": "pl", "pyarrow": "pa"}"#,
+        default = r#"{"altair": "alt", "matplotlib": "mpl", "matplotlib.pyplot": "plt", "numpy": "np", "pandas": "pd", "seaborn": "sns", "tensorflow": "tf", "tkinter":  "tk", "holoviews": "hv", "panel": "pn", "plotly.express": "px", "polars": "pl", "pyarrow": "pa", "xml.etree.ElementTree": "ET"}"#,
         value_type = "dict[str, str]",
         scope = "aliases",
         example = r#"
@@ -1382,15 +1388,12 @@ impl Flake8ImportConventionsOptions {
 #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 pub struct Flake8PytestStyleOptions {
     /// Boolean flag specifying whether `@pytest.fixture()` without parameters
-    /// should have parentheses. If the option is set to `true` (the
-    /// default), `@pytest.fixture()` is valid and `@pytest.fixture` is
-    /// invalid. If set to `false`, `@pytest.fixture` is valid and
-    /// `@pytest.fixture()` is invalid.
-    ///
-    /// If [preview](https://docs.astral.sh/ruff/preview/) is enabled, defaults to
-    /// `false`.
+    /// should have parentheses. If the option is set to `false` (the default),
+    /// `@pytest.fixture` is valid and `@pytest.fixture()` is invalid. If set
+    /// to `true`, `@pytest.fixture()` is valid and `@pytest.fixture` is
+    /// invalid.
     #[option(
-        default = "true",
+        default = "false",
         value_type = "bool",
         example = "fixture-parentheses = true"
     )]
@@ -1468,15 +1471,12 @@ pub struct Flake8PytestStyleOptions {
     pub raises_extend_require_match_for: Option<Vec<String>>,
 
     /// Boolean flag specifying whether `@pytest.mark.foo()` without parameters
-    /// should have parentheses. If the option is set to `true` (the
-    /// default), `@pytest.mark.foo()` is valid and `@pytest.mark.foo` is
-    /// invalid. If set to `false`, `@pytest.mark.foo` is valid and
-    /// `@pytest.mark.foo()` is invalid.
-    ///
-    /// If [preview](https://docs.astral.sh/ruff/preview/) is enabled, defaults to
-    /// `false`.
+    /// should have parentheses. If the option is set to `false` (the
+    /// default), `@pytest.mark.foo` is valid and `@pytest.mark.foo()` is
+    /// invalid. If set to `true`, `@pytest.mark.foo()` is valid and
+    /// `@pytest.mark.foo` is invalid.
     #[option(
-        default = "true",
+        default = "false",
         value_type = "bool",
         example = "mark-parentheses = true"
     )]
@@ -2965,6 +2965,35 @@ impl PyUpgradeOptions {
     pub fn into_settings(self) -> pyupgrade::settings::Settings {
         pyupgrade::settings::Settings {
             keep_runtime_typing: self.keep_runtime_typing.unwrap_or_default(),
+        }
+    }
+}
+
+#[derive(
+    Clone, Debug, PartialEq, Eq, Default, Serialize, Deserialize, OptionsMetadata, CombineOptions,
+)]
+#[serde(deny_unknown_fields, rename_all = "kebab-case")]
+#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
+pub struct RuffOptions {
+    /// Whether to prefer accessing items keyed by tuples with
+    /// parentheses around the tuple (see `RUF031`).
+    #[option(
+        default = r#"false"#,
+        value_type = "bool",
+        example = r#"
+        # Make it a violation to use a tuple in a subscript without parentheses.
+        parenthesize-tuple-in-subscript = true
+        "#
+    )]
+    pub parenthesize_tuple_in_subscript: Option<bool>,
+}
+
+impl RuffOptions {
+    pub fn into_settings(self) -> ruff::settings::Settings {
+        ruff::settings::Settings {
+            parenthesize_tuple_in_subscript: self
+                .parenthesize_tuple_in_subscript
+                .unwrap_or_default(),
         }
     }
 }

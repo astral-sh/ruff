@@ -2,16 +2,16 @@ use std::cell::RefCell;
 use std::ops::Deref;
 use std::time::Duration;
 
-use tracing::trace_span;
+use tracing::debug_span;
 
-use red_knot_module_resolver::ModuleName;
 use red_knot_python_semantic::types::Type;
-use red_knot_python_semantic::{HasTy, SemanticModel};
+use red_knot_python_semantic::{HasTy, ModuleName, SemanticModel};
 use ruff_db::files::File;
 use ruff_db::parsed::{parsed_module, ParsedModule};
-use ruff_db::source::{source_text, SourceText};
+use ruff_db::source::{line_index, source_text, SourceText};
 use ruff_python_ast as ast;
 use ruff_python_ast::visitor::{walk_expr, walk_stmt, Visitor};
+use ruff_text_size::{Ranged, TextSize};
 
 use crate::db::Db;
 
@@ -50,7 +50,18 @@ pub(crate) fn lint_syntax(db: &dyn Db, file_id: File) -> Diagnostics {
         visitor.visit_body(&ast.body);
         diagnostics = visitor.diagnostics;
     } else {
-        diagnostics.extend(parsed.errors().iter().map(ToString::to_string));
+        let path = file_id.path(db);
+        let line_index = line_index(db.upcast(), file_id);
+        diagnostics.extend(parsed.errors().iter().map(|err| {
+            let source_location = line_index.source_location(err.location.start(), source.as_str());
+            format!(
+                "{}:{}:{}: {}",
+                path.as_str(),
+                source_location.row,
+                source_location.column,
+                err,
+            )
+        }));
     }
 
     Diagnostics::from(diagnostics)
@@ -76,7 +87,7 @@ fn lint_lines(source: &str, diagnostics: &mut Vec<String>) {
 #[allow(unreachable_pub)]
 #[salsa::tracked(return_ref)]
 pub fn lint_semantic(db: &dyn Db, file_id: File) -> Diagnostics {
-    let _span = trace_span!("lint_semantic", file=?file_id.path(db)).entered();
+    let _span = debug_span!("lint_semantic", file=%file_id.path(db)).entered();
 
     let source = source_text(db.upcast(), file_id);
     let parsed = parsed_module(db.upcast(), file_id);
@@ -98,6 +109,20 @@ pub fn lint_semantic(db: &dyn Db, file_id: File) -> Diagnostics {
     Diagnostics::from(context.diagnostics.take())
 }
 
+fn format_diagnostic(context: &SemanticLintContext, message: &str, start: TextSize) -> String {
+    let source_location = context
+        .semantic
+        .line_index()
+        .source_location(start, context.source_text());
+    format!(
+        "{}:{}:{}: {}",
+        context.semantic.file_path().as_str(),
+        source_location.row,
+        source_location.column,
+        message,
+    )
+}
+
 fn lint_unresolved_imports(context: &SemanticLintContext, import: AnyImportRef) {
     match import {
         AnyImportRef::Import(import) => {
@@ -105,7 +130,11 @@ fn lint_unresolved_imports(context: &SemanticLintContext, import: AnyImportRef) 
                 let ty = alias.ty(&context.semantic);
 
                 if ty.is_unbound() {
-                    context.push_diagnostic(format!("Unresolved import '{}'", &alias.name));
+                    context.push_diagnostic(format_diagnostic(
+                        context,
+                        &format!("Unresolved import '{}'", &alias.name),
+                        alias.start(),
+                    ));
                 }
             }
         }
@@ -114,7 +143,11 @@ fn lint_unresolved_imports(context: &SemanticLintContext, import: AnyImportRef) 
                 let ty = alias.ty(&context.semantic);
 
                 if ty.is_unbound() {
-                    context.push_diagnostic(format!("Unresolved import '{}'", &alias.name));
+                    context.push_diagnostic(format_diagnostic(
+                        context,
+                        &format!("Unresolved import '{}'", &alias.name),
+                        alias.start(),
+                    ));
                 }
             }
         }
@@ -128,12 +161,17 @@ fn lint_maybe_undefined(context: &SemanticLintContext, name: &ast::ExprName) {
     let semantic = &context.semantic;
     match name.ty(semantic) {
         Type::Unbound => {
-            context.push_diagnostic(format!("Name '{}' used when not defined.", &name.id));
+            context.push_diagnostic(format_diagnostic(
+                context,
+                &format!("Name '{}' used when not defined.", &name.id),
+                name.start(),
+            ));
         }
         Type::Union(union) if union.contains(semantic.db(), Type::Unbound) => {
-            context.push_diagnostic(format!(
-                "Name '{}' used when possibly not defined.",
-                &name.id
+            context.push_diagnostic(format_diagnostic(
+                context,
+                &format!("Name '{}' used when possibly not defined.", &name.id),
+                name.start(),
             ));
         }
         _ => {}
@@ -304,32 +342,49 @@ enum AnyImportRef<'a> {
     ImportFrom(&'a ast::StmtImportFrom),
 }
 
+impl Ranged for AnyImportRef<'_> {
+    fn range(&self) -> ruff_text_size::TextRange {
+        match self {
+            AnyImportRef::Import(import) => import.range(),
+            AnyImportRef::ImportFrom(import) => import.range(),
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
+    use red_knot_python_semantic::{Program, ProgramSettings, PythonVersion, SearchPathSettings};
     use ruff_db::files::system_path_to_file;
-    use ruff_db::program::{Program, SearchPathSettings, TargetVersion};
     use ruff_db::system::{DbWithTestSystem, SystemPathBuf};
 
-    use super::{lint_semantic, Diagnostics};
     use crate::db::tests::TestDb;
+
+    use super::{lint_semantic, Diagnostics};
 
     fn setup_db() -> TestDb {
         setup_db_with_root(SystemPathBuf::from("/src"))
     }
 
-    fn setup_db_with_root(workspace_root: SystemPathBuf) -> TestDb {
+    fn setup_db_with_root(src_root: SystemPathBuf) -> TestDb {
         let db = TestDb::new();
 
-        Program::new(
+        db.memory_file_system()
+            .create_directory_all(&src_root)
+            .unwrap();
+
+        Program::from_settings(
             &db,
-            TargetVersion::Py38,
-            SearchPathSettings {
-                extra_paths: Vec::new(),
-                workspace_root,
-                site_packages: vec![],
-                custom_typeshed: None,
+            ProgramSettings {
+                target_version: PythonVersion::default(),
+                search_paths: SearchPathSettings {
+                    extra_paths: Vec::new(),
+                    src_root,
+                    site_packages: vec![],
+                    custom_typeshed: None,
+                },
             },
-        );
+        )
+        .expect("Valid program settings");
 
         db
     }
@@ -356,10 +411,17 @@ mod tests {
 
         assert_eq!(
             *messages,
-            vec![
-                "Name 'flag' used when not defined.",
-                "Name 'y' used when possibly not defined."
-            ]
+            if cfg!(windows) {
+                vec![
+                    "\\src\\a.py:3:4: Name 'flag' used when not defined.",
+                    "\\src\\a.py:5:1: Name 'y' used when possibly not defined.",
+                ]
+            } else {
+                vec![
+                    "/src/a.py:3:4: Name 'flag' used when not defined.",
+                    "/src/a.py:5:1: Name 'y' used when possibly not defined.",
+                ]
+            }
         );
     }
 }

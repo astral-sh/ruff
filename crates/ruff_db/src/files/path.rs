@@ -2,6 +2,7 @@ use crate::files::{system_path_to_file, vendored_path_to_file, File};
 use crate::system::{SystemPath, SystemPathBuf, SystemVirtualPath, SystemVirtualPathBuf};
 use crate::vendored::{VendoredPath, VendoredPathBuf};
 use crate::Db;
+use std::fmt::{Display, Formatter};
 
 /// Path to a file.
 ///
@@ -207,5 +208,15 @@ impl PartialEq<FilePath> for VendoredPathBuf {
     #[inline]
     fn eq(&self, other: &FilePath) -> bool {
         other == self
+    }
+}
+
+impl Display for FilePath {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        match self {
+            FilePath::System(path) => std::fmt::Display::fmt(path, f),
+            FilePath::SystemVirtual(path) => std::fmt::Display::fmt(path, f),
+            FilePath::Vendored(path) => std::fmt::Display::fmt(path, f),
+        }
     }
 }

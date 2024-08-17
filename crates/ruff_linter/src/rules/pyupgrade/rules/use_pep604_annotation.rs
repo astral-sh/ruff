@@ -189,7 +189,7 @@ fn is_allowed_value(expr: &Expr) -> bool {
         | Expr::Subscript(_)
         | Expr::Name(_)
         | Expr::List(_) => true,
-        Expr::Tuple(tuple) => tuple.elts.iter().all(is_allowed_value),
+        Expr::Tuple(tuple) => tuple.iter().all(is_allowed_value),
         // Maybe require parentheses.
         Expr::Named(_) => false,
         // Invalid in binary expressions.

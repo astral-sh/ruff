@@ -1,11 +1,11 @@
 #![allow(clippy::disallowed_names)]
 
+use red_knot_python_semantic::{ProgramSettings, PythonVersion, SearchPathSettings};
 use red_knot_workspace::db::RootDatabase;
 use red_knot_workspace::workspace::WorkspaceMetadata;
 use ruff_benchmark::criterion::{criterion_group, criterion_main, BatchSize, Criterion};
 use ruff_benchmark::TestFile;
 use ruff_db::files::{system_path_to_file, File};
-use ruff_db::program::{ProgramSettings, SearchPathSettings, TargetVersion};
 use ruff_db::source::source_text;
 use ruff_db::system::{MemoryFileSystem, SystemPath, TestSystem};
 
@@ -40,19 +40,19 @@ fn setup_case() -> Case {
     ])
     .unwrap();
 
-    let workspace_root = SystemPath::new("/src");
-    let metadata = WorkspaceMetadata::from_path(workspace_root, &system).unwrap();
+    let src_root = SystemPath::new("/src");
+    let metadata = WorkspaceMetadata::from_path(src_root, &system).unwrap();
     let settings = ProgramSettings {
-        target_version: TargetVersion::Py312,
+        target_version: PythonVersion::PY312,
         search_paths: SearchPathSettings {
             extra_paths: vec![],
-            workspace_root: workspace_root.to_path_buf(),
+            src_root: src_root.to_path_buf(),
             site_packages: vec![],
             custom_typeshed: None,
         },
     };
 
-    let mut db = RootDatabase::new(metadata, settings, system);
+    let mut db = RootDatabase::new(metadata, settings, system).unwrap();
     let parser = system_path_to_file(&db, parser_path).unwrap();
 
     db.workspace().open_file(&mut db, parser);
@@ -89,7 +89,7 @@ fn benchmark_incremental(criterion: &mut Criterion) {
                 let Case { db, parser, .. } = case;
                 let result = db.check_file(*parser).unwrap();
 
-                assert_eq!(result.len(), 403);
+                assert_eq!(result.len(), 29);
             },
             BatchSize::SmallInput,
         );
@@ -104,7 +104,7 @@ fn benchmark_cold(criterion: &mut Criterion) {
                 let Case { db, parser, .. } = case;
                 let result = db.check_file(*parser).unwrap();
 
-                assert_eq!(result.len(), 403);
+                assert_eq!(result.len(), 29);
             },
             BatchSize::SmallInput,
         );

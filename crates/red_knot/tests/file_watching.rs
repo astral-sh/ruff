@@ -4,15 +4,15 @@ use std::io::Write;
 use std::time::Duration;
 
 use anyhow::{anyhow, Context};
-use salsa::Setter;
 
-use red_knot_module_resolver::{resolve_module, ModuleName};
+use red_knot_python_semantic::{
+    resolve_module, ModuleName, Program, ProgramSettings, PythonVersion, SearchPathSettings,
+};
 use red_knot_workspace::db::RootDatabase;
 use red_knot_workspace::watch;
 use red_knot_workspace::watch::{directory_watcher, WorkspaceWatcher};
 use red_knot_workspace::workspace::WorkspaceMetadata;
 use ruff_db::files::{system_path_to_file, File, FileError};
-use ruff_db::program::{Program, ProgramSettings, SearchPathSettings, TargetVersion};
 use ruff_db::source::source_text;
 use ruff_db::system::{OsSystem, SystemPath, SystemPathBuf};
 use ruff_db::Upcast;
@@ -25,6 +25,7 @@ struct TestCase {
     /// We need to hold on to it in the test case or the temp files get deleted.
     _temp_dir: tempfile::TempDir,
     root_dir: SystemPathBuf,
+    search_path_settings: SearchPathSettings,
 }
 
 impl TestCase {
@@ -107,18 +108,20 @@ impl TestCase {
     fn update_search_path_settings(
         &mut self,
         f: impl FnOnce(&SearchPathSettings) -> SearchPathSettings,
-    ) {
+    ) -> anyhow::Result<()> {
         let program = Program::get(self.db());
-        let search_path_settings = program.search_paths(self.db());
 
-        let new_settings = f(search_path_settings);
+        let new_settings = f(&self.search_path_settings);
 
-        program.set_search_paths(&mut self.db).to(new_settings);
+        program.update_search_paths(&mut self.db, new_settings.clone())?;
+        self.search_path_settings = new_settings;
 
         if let Some(watcher) = &mut self.watcher {
             watcher.update(&self.db);
             assert!(!watcher.has_errored_paths());
         }
+
+        Ok(())
     }
 
     fn collect_package_files(&self, path: &SystemPath) -> Vec<File> {
@@ -179,7 +182,7 @@ where
 {
     setup_with_search_paths(setup_files, |_root, workspace_path| SearchPathSettings {
         extra_paths: vec![],
-        workspace_root: workspace_path.to_path_buf(),
+        src_root: workspace_path.to_path_buf(),
         custom_typeshed: None,
         site_packages: vec![],
     })
@@ -220,24 +223,24 @@ where
     let system = OsSystem::new(&workspace_path);
 
     let workspace = WorkspaceMetadata::from_path(&workspace_path, &system)?;
-    let search_paths = create_search_paths(&root_path, workspace.root());
+    let search_path_settings = create_search_paths(&root_path, workspace.root());
 
-    for path in search_paths
+    for path in search_path_settings
         .extra_paths
         .iter()
-        .chain(search_paths.site_packages.iter())
-        .chain(search_paths.custom_typeshed.iter())
+        .chain(search_path_settings.site_packages.iter())
+        .chain(search_path_settings.custom_typeshed.iter())
     {
         std::fs::create_dir_all(path.as_std_path())
             .with_context(|| format!("Failed to create search path '{path}'"))?;
     }
 
     let settings = ProgramSettings {
-        target_version: TargetVersion::default(),
-        search_paths,
+        target_version: PythonVersion::default(),
+        search_paths: search_path_settings.clone(),
     };
 
-    let db = RootDatabase::new(workspace, settings, system);
+    let db = RootDatabase::new(workspace, settings, system)?;
 
     let (sender, receiver) = crossbeam::channel::unbounded();
     let watcher = directory_watcher(move |events| sender.send(events).unwrap())
@@ -252,6 +255,7 @@ where
         watcher: Some(watcher),
         _temp_dir: temp_dir,
         root_dir: root_path,
+        search_path_settings,
     };
 
     // Sometimes the file watcher reports changes for events that happened before the watcher was started.
@@ -695,7 +699,7 @@ fn search_path() -> anyhow::Result<()> {
         setup_with_search_paths([("bar.py", "import sub.a")], |root_path, workspace_path| {
             SearchPathSettings {
                 extra_paths: vec![],
-                workspace_root: workspace_path.to_path_buf(),
+                src_root: workspace_path.to_path_buf(),
                 custom_typeshed: None,
                 site_packages: vec![root_path.join("site_packages")],
             }
@@ -736,7 +740,8 @@ fn add_search_path() -> anyhow::Result<()> {
     case.update_search_path_settings(|settings| SearchPathSettings {
         site_packages: vec![site_packages.clone()],
         ..settings.clone()
-    });
+    })
+    .expect("Search path settings to be valid");
 
     std::fs::write(site_packages.join("a.py").as_std_path(), "class A: ...")?;
 
@@ -755,7 +760,7 @@ fn remove_search_path() -> anyhow::Result<()> {
         setup_with_search_paths([("bar.py", "import sub.a")], |root_path, workspace_path| {
             SearchPathSettings {
                 extra_paths: vec![],
-                workspace_root: workspace_path.to_path_buf(),
+                src_root: workspace_path.to_path_buf(),
                 custom_typeshed: None,
                 site_packages: vec![root_path.join("site_packages")],
             }
@@ -766,7 +771,8 @@ fn remove_search_path() -> anyhow::Result<()> {
     case.update_search_path_settings(|settings| SearchPathSettings {
         site_packages: vec![],
         ..settings.clone()
-    });
+    })
+    .expect("Search path settings to be valid");
 
     std::fs::write(site_packages.join("a.py").as_std_path(), "class A: ...")?;
 
@@ -1173,7 +1179,7 @@ mod unix {
             },
             |_root, workspace| SearchPathSettings {
                 extra_paths: vec![],
-                workspace_root: workspace.to_path_buf(),
+                src_root: workspace.to_path_buf(),
                 custom_typeshed: None,
                 site_packages: vec![workspace.join(".venv/lib/python3.12/site-packages")],
             },

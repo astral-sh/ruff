@@ -115,44 +115,6 @@ impl MethodName {
                 | MethodName::TrioCancelScope
         )
     }
-
-    /// Returns associated module
-    pub(super) fn module(self) -> AsyncModule {
-        match self {
-            MethodName::AsyncIoTimeout | MethodName::AsyncIoTimeoutAt => AsyncModule::AsyncIo,
-            MethodName::AnyIoMoveOnAfter
-            | MethodName::AnyIoFailAfter
-            | MethodName::AnyIoCancelScope => AsyncModule::AnyIo,
-            MethodName::TrioAcloseForcefully
-            | MethodName::TrioCancelScope
-            | MethodName::TrioCancelShieldedCheckpoint
-            | MethodName::TrioCheckpoint
-            | MethodName::TrioCheckpointIfCancelled
-            | MethodName::TrioFailAfter
-            | MethodName::TrioFailAt
-            | MethodName::TrioMoveOnAfter
-            | MethodName::TrioMoveOnAt
-            | MethodName::TrioOpenFile
-            | MethodName::TrioOpenProcess
-            | MethodName::TrioOpenSslOverTcpListeners
-            | MethodName::TrioOpenSslOverTcpStream
-            | MethodName::TrioOpenTcpListeners
-            | MethodName::TrioOpenTcpStream
-            | MethodName::TrioOpenUnixSocket
-            | MethodName::TrioPermanentlyDetachCoroutineObject
-            | MethodName::TrioReattachDetachedCoroutineObject
-            | MethodName::TrioRunProcess
-            | MethodName::TrioServeListeners
-            | MethodName::TrioServeSslOverTcp
-            | MethodName::TrioServeTcp
-            | MethodName::TrioSleep
-            | MethodName::TrioSleepForever
-            | MethodName::TrioTemporarilyDetachCoroutineObject
-            | MethodName::TrioWaitReadable
-            | MethodName::TrioWaitTaskRescheduled
-            | MethodName::TrioWaitWritable => AsyncModule::Trio,
-        }
-    }
 }
 
 impl MethodName {

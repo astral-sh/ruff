@@ -20,6 +20,7 @@ use crate::docstrings::Docstring;
 /// the implementation.
 ///
 /// ## Example
+///
 /// ```python
 /// from typing import overload
 ///
@@ -42,18 +43,17 @@ use crate::docstrings::Docstring;
 /// ```
 ///
 /// Use instead:
+///
 /// ```python
 /// from typing import overload
 ///
 ///
 /// @overload
-/// def factorial(n: int) -> int:
-///     ...
+/// def factorial(n: int) -> int: ...
 ///
 ///
 /// @overload
-/// def factorial(n: float) -> float:
-///     ...
+/// def factorial(n: float) -> float: ...
 ///
 ///
 /// def factorial(n):

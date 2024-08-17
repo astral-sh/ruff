@@ -1,9 +1,10 @@
-use salsa::{Durability, Setter as _};
 use std::{collections::BTreeMap, sync::Arc};
 
 use rustc_hash::{FxBuildHasher, FxHashSet};
+use salsa::{Durability, Setter as _};
 
 pub use metadata::{PackageMetadata, WorkspaceMetadata};
+use ruff_db::source::{source_text, SourceDiagnostic};
 use ruff_db::{
     files::{system_path_to_file, File},
     system::{walk_directory::WalkState, SystemPath, SystemPathBuf},
@@ -120,8 +121,8 @@ impl Workspace {
         self.package_tree(db).values().copied()
     }
 
-    #[tracing::instrument(skip_all)]
     pub fn reload(self, db: &mut dyn Db, metadata: WorkspaceMetadata) {
+        tracing::debug!("Reloading workspace");
         assert_eq!(self.root(db), metadata.root());
 
         let mut old_packages = self.package_tree(db).clone();
@@ -145,7 +146,6 @@ impl Workspace {
             .to(new_packages);
     }
 
-    #[tracing::instrument(level = "debug", skip_all)]
     pub fn update_package(self, db: &mut dyn Db, metadata: PackageMetadata) -> anyhow::Result<()> {
         let path = metadata.root().to_path_buf();
 
@@ -176,6 +176,8 @@ impl Workspace {
     /// Checks all open files in the workspace and its dependencies.
     #[tracing::instrument(level = "debug", skip_all)]
     pub fn check(self, db: &dyn Db) -> Vec<String> {
+        tracing::debug!("Checking workspace");
+
         let mut result = Vec::new();
 
         if let Some(open_files) = self.open_files(db) {
@@ -194,16 +196,18 @@ impl Workspace {
     /// Opens a file in the workspace.
     ///
     /// This changes the behavior of `check` to only check the open files rather than all files in the workspace.
-    #[tracing::instrument(level = "debug", skip(self, db))]
     pub fn open_file(self, db: &mut dyn Db, file: File) {
+        tracing::debug!("Opening file {}", file.path(db));
+
         let mut open_files = self.take_open_files(db);
         open_files.insert(file);
         self.set_open_files(db, open_files);
     }
 
     /// Closes a file in the workspace.
-    #[tracing::instrument(level = "debug", skip(self, db))]
     pub fn close_file(self, db: &mut dyn Db, file: File) -> bool {
+        tracing::debug!("Closing file {}", file.path(db));
+
         let mut open_files = self.take_open_files(db);
         let removed = open_files.remove(&file);
 
@@ -224,6 +228,8 @@ impl Workspace {
     /// This changes the behavior of `check` to only check the open files rather than all files in the workspace.
     #[tracing::instrument(level = "debug", skip(self, db))]
     pub fn set_open_files(self, db: &mut dyn Db, open_files: FxHashSet<File>) {
+        tracing::debug!("Set open workspace files (count: {})", open_files.len());
+
         self.set_open_fileset(db).to(Some(Arc::new(open_files)));
     }
 
@@ -231,6 +237,8 @@ impl Workspace {
     ///
     /// This changes the behavior of `check` to check all files in the workspace instead of just the open files.
     pub fn take_open_files(self, db: &mut dyn Db) -> FxHashSet<File> {
+        tracing::debug!("Take open workspace files");
+
         // Salsa will cancel any pending queries and remove its own reference to `open_files`
         // so that the reference counter to `open_files` now drops to 1.
         let open_files = self.set_open_fileset(db).to(None);
@@ -256,6 +264,12 @@ impl Package {
 
     #[tracing::instrument(level = "debug", skip(db))]
     pub fn remove_file(self, db: &mut dyn Db, file: File) {
+        tracing::debug!(
+            "Remove file {} from package {}",
+            file.path(db),
+            self.name(db)
+        );
+
         let Some(mut index) = PackageFiles::indexed_mut(db, self) else {
             return;
         };
@@ -263,8 +277,9 @@ impl Package {
         index.remove(file);
     }
 
-    #[tracing::instrument(level = "debug", skip(db))]
     pub fn add_file(self, db: &mut dyn Db, file: File) {
+        tracing::debug!("Add file {} to package {}", file.path(db), self.name(db));
+
         let Some(mut index) = PackageFiles::indexed_mut(db, self) else {
             return;
         };
@@ -274,6 +289,8 @@ impl Package {
 
     #[tracing::instrument(level = "debug", skip(db))]
     pub(crate) fn check(self, db: &dyn Db) -> Vec<String> {
+        tracing::debug!("Checking package {}", self.root(db));
+
         let mut result = Vec::new();
         for file in &self.files(db).read() {
             let diagnostics = check_file(db, file);
@@ -286,10 +303,12 @@ impl Package {
     /// Returns the files belonging to this package.
     #[salsa::tracked]
     pub fn files(self, db: &dyn Db) -> IndexedFiles {
+        let _entered = tracing::debug_span!("files").entered();
         let files = self.file_set(db);
 
         let indexed = match files.get() {
             Index::Lazy(vacant) => {
+                tracing::debug!("Indexing files for package {}", self.name(db));
                 let files = discover_package_files(db, self.root(db));
                 vacant.set(files)
             }
@@ -317,8 +336,9 @@ impl Package {
         }
     }
 
-    #[tracing::instrument(level = "debug", skip(db))]
     pub fn reload_files(self, db: &mut dyn Db) {
+        tracing::debug!("Reload files for package {}", self.name(db));
+
         if !self.file_set(db).is_lazy() {
             // Force a re-index of the files in the next revision.
             self.set_file_set(db).to(PackageFiles::lazy());
@@ -326,8 +346,27 @@ impl Package {
     }
 }
 
+#[salsa::tracked]
 pub(super) fn check_file(db: &dyn Db, file: File) -> Diagnostics {
+    let path = file.path(db);
+    let _span = tracing::debug_span!("check_file", file=%path).entered();
+    tracing::debug!("Checking file {path}");
+
     let mut diagnostics = Vec::new();
+
+    let source_diagnostics = source_text::accumulated::<SourceDiagnostic>(db.upcast(), file);
+    // TODO(micha): Consider using a single accumulator for all diagnostics
+    diagnostics.extend(
+        source_diagnostics
+            .iter()
+            .map(std::string::ToString::to_string),
+    );
+
+    // Abort checking if there are IO errors.
+    if source_text(db.upcast(), file).has_read_error() {
+        return Diagnostics::from(diagnostics);
+    }
+
     diagnostics.extend_from_slice(lint_syntax(db, file));
     diagnostics.extend_from_slice(lint_semantic(db, file));
     Diagnostics::from(diagnostics)
@@ -374,4 +413,49 @@ fn discover_package_files(db: &dyn Db, path: &SystemPath) -> FxHashSet<File> {
     }
 
     files
+}
+
+#[cfg(test)]
+mod tests {
+    use ruff_db::files::system_path_to_file;
+    use ruff_db::source::source_text;
+    use ruff_db::system::{DbWithTestSystem, SystemPath};
+    use ruff_db::testing::assert_function_query_was_not_run;
+
+    use crate::db::tests::TestDb;
+    use crate::lint::{lint_syntax, Diagnostics};
+    use crate::workspace::check_file;
+
+    #[test]
+    fn check_file_skips_linting_when_file_cant_be_read() -> ruff_db::system::Result<()> {
+        let mut db = TestDb::new();
+        let path = SystemPath::new("test.py");
+
+        db.write_file(path, "x = 10")?;
+        let file = system_path_to_file(&db, path).unwrap();
+
+        // Now the file gets deleted before we had a chance to read its source text.
+        db.memory_file_system().remove_file(path)?;
+        file.sync(&mut db);
+
+        assert_eq!(source_text(&db, file).as_str(), "");
+        assert_eq!(
+            check_file(&db, file),
+            Diagnostics::List(vec![
+                "Failed to read file: No such file or directory".to_string()
+            ])
+        );
+
+        let events = db.take_salsa_events();
+        assert_function_query_was_not_run(&db, lint_syntax, file, &events);
+
+        // The user now creates a new file with an empty text. The source text
+        // content returned by `source_text` remains unchanged, but the diagnostics should get updated.
+        db.write_file(path, "").unwrap();
+
+        assert_eq!(source_text(&db, file).as_str(), "");
+        assert_eq!(check_file(&db, file), Diagnostics::Empty);
+
+        Ok(())
+    }
 }

@@ -21,6 +21,14 @@ flamegraph.svg
 # `CARGO_TARGET_DIR=target-llvm-lines RUSTFLAGS="-Csymbol-mangling-version=v0" cargo llvm-lines -p ruff --lib`
 /target*
 
+# samply profiles
+profile.json
+
+# tracing-flame traces
+tracing.folded
+tracing-flamechart.svg
+tracing-flamegraph.svg
+
 ###
 # Rust.gitignore
 ###

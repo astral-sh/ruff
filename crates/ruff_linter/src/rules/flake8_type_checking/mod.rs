@@ -40,6 +40,7 @@ mod tests {
     #[test_case(Rule::TypingOnlyFirstPartyImport, Path::new("TCH001.py"))]
     #[test_case(Rule::TypingOnlyStandardLibraryImport, Path::new("TCH003.py"))]
     #[test_case(Rule::TypingOnlyStandardLibraryImport, Path::new("init_var.py"))]
+    #[test_case(Rule::TypingOnlyStandardLibraryImport, Path::new("kw_only.py"))]
     #[test_case(Rule::TypingOnlyStandardLibraryImport, Path::new("snapshot.py"))]
     #[test_case(Rule::TypingOnlyThirdPartyImport, Path::new("TCH002.py"))]
     #[test_case(Rule::TypingOnlyThirdPartyImport, Path::new("quote.py"))]
@@ -77,6 +78,7 @@ mod tests {
 
     #[test_case(Rule::TypingOnlyThirdPartyImport, Path::new("strict.py"))]
     #[test_case(Rule::TypingOnlyStandardLibraryImport, Path::new("init_var.py"))]
+    #[test_case(Rule::TypingOnlyStandardLibraryImport, Path::new("kw_only.py"))]
     fn strict(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!("strict_{}_{}", rule_code.as_ref(), path.to_string_lossy());
         let diagnostics = test_path(

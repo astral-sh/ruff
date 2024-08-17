@@ -1,15 +1,14 @@
-use red_knot_module_resolver::Db as ResolverDb;
-use ruff_db::Upcast;
+use ruff_db::{Db as SourceDb, Upcast};
 
 /// Database giving access to semantic information about a Python program.
 #[salsa::db]
-pub trait Db: ResolverDb + Upcast<dyn ResolverDb> {}
+pub trait Db: SourceDb + Upcast<dyn SourceDb> {}
 
 #[cfg(test)]
 pub(crate) mod tests {
     use std::sync::Arc;
 
-    use red_knot_module_resolver::{vendored_typeshed_stubs, Db as ResolverDb};
+    use crate::module_resolver::vendored_typeshed_stubs;
     use ruff_db::files::Files;
     use ruff_db::system::{DbWithTestSystem, System, TestSystem};
     use ruff_db::vendored::VendoredFileSystem;
@@ -91,29 +90,16 @@ pub(crate) mod tests {
         }
     }
 
-    impl Upcast<dyn ResolverDb> for TestDb {
-        fn upcast(&self) -> &(dyn ResolverDb + 'static) {
-            self
-        }
-        fn upcast_mut(&mut self) -> &mut (dyn ResolverDb + 'static) {
-            self
-        }
-    }
-
-    #[salsa::db]
-    impl red_knot_module_resolver::Db for TestDb {}
-
     #[salsa::db]
     impl Db for TestDb {}
 
     #[salsa::db]
     impl salsa::Database for TestDb {
-        fn salsa_event(&self, event: salsa::Event) {
-            self.attach(|_| {
-                tracing::trace!("event: {event:?}");
-                let mut events = self.events.lock().unwrap();
-                events.push(event);
-            });
+        fn salsa_event(&self, event: &dyn Fn() -> salsa::Event) {
+            let event = event();
+            tracing::trace!("event: {event:?}");
+            let mut events = self.events.lock().unwrap();
+            events.push(event);
         }
     }
 }

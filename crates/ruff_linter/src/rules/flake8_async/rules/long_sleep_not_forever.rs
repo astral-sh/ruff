@@ -107,11 +107,7 @@ pub(crate) fn long_sleep_not_forever(checker: &mut Checker, call: &ExprCall) {
         return;
     };
 
-    let is_relevant_module = if checker.settings.preview.is_enabled() {
-        matches!(module, AsyncModule::AnyIo | AsyncModule::Trio)
-    } else {
-        matches!(module, AsyncModule::Trio)
-    };
+    let is_relevant_module = matches!(module, AsyncModule::AnyIo | AsyncModule::Trio);
 
     let is_sleep = is_relevant_module && matches!(qualified_name.segments(), [_, "sleep"]);
 

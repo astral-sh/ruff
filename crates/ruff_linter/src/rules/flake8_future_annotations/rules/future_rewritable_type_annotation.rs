@@ -33,32 +33,32 @@ use crate::checkers::ast::Checker;
 /// flag such usages if your project targets Python 3.9 or below.
 ///
 /// ## Example
+///
 /// ```python
 /// from typing import List, Dict, Optional
 ///
 ///
-/// def func(obj: Dict[str, Optional[int]]) -> None:
-///     ...
+/// def func(obj: Dict[str, Optional[int]]) -> None: ...
 /// ```
 ///
 /// Use instead:
+///
 /// ```python
 /// from __future__ import annotations
 ///
 /// from typing import List, Dict, Optional
 ///
 ///
-/// def func(obj: Dict[str, Optional[int]]) -> None:
-///     ...
+/// def func(obj: Dict[str, Optional[int]]) -> None: ...
 /// ```
 ///
 /// After running the additional pyupgrade rules:
+///
 /// ```python
 /// from __future__ import annotations
 ///
 ///
-/// def func(obj: dict[str, int | None]) -> None:
-///     ...
+/// def func(obj: dict[str, int | None]) -> None: ...
 /// ```
 ///
 /// ## Options

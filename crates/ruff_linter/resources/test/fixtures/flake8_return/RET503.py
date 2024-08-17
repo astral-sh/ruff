@@ -368,3 +368,11 @@ def foo() -> int:
     if baz() > 3:
         return 1
     bar()
+
+
+def f():
+    if a:
+        return b
+    else:
+        with c:
+            d

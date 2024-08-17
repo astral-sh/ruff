@@ -30,15 +30,15 @@ use crate::settings::types::PythonVersion;
 /// or a simple container literal.
 ///
 /// ## Example
+///
 /// ```python
-/// def foo(arg: list[int] = list(range(10_000))) -> None:
-///     ...
+/// def foo(arg: list[int] = list(range(10_000))) -> None: ...
 /// ```
 ///
 /// Use instead:
+///
 /// ```python
-/// def foo(arg: list[int] = ...) -> None:
-///     ...
+/// def foo(arg: list[int] = ...) -> None: ...
 /// ```
 ///
 /// ## References
@@ -76,15 +76,15 @@ impl AlwaysFixableViolation for TypedArgumentDefaultInStub {
 /// or varies according to the current platform or Python version.
 ///
 /// ## Example
+///
 /// ```python
-/// def foo(arg=[]) -> None:
-///     ...
+/// def foo(arg=[]) -> None: ...
 /// ```
 ///
 /// Use instead:
+///
 /// ```python
-/// def foo(arg=...) -> None:
-///     ...
+/// def foo(arg=...) -> None: ...
 /// ```
 ///
 /// ## References
@@ -298,10 +298,10 @@ fn is_valid_default_value_with_annotation(
                     .iter()
                     .all(|e| is_valid_default_value_with_annotation(e, false, locator, semantic));
         }
-        Expr::Dict(ast::ExprDict { items, range: _ }) => {
+        Expr::Dict(dict) => {
             return allow_container
-                && items.len() <= 10
-                && items.iter().all(|ast::DictItem { key, value }| {
+                && dict.len() <= 10
+                && dict.iter().all(|ast::DictItem { key, value }| {
                     key.as_ref().is_some_and(|key| {
                         is_valid_default_value_with_annotation(key, false, locator, semantic)
                     }) && is_valid_default_value_with_annotation(value, false, locator, semantic)

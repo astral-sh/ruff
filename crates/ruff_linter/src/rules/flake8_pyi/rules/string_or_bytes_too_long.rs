@@ -22,15 +22,15 @@ use crate::checkers::ast::Checker;
 /// with ellipses (`...`) to simplify the stub.
 ///
 /// ## Example
+///
 /// ```python
-/// def foo(arg: str = "51 character stringgggggggggggggggggggggggggggggggg") -> None:
-///     ...
+/// def foo(arg: str = "51 character stringgggggggggggggggggggggggggggggggg") -> None: ...
 /// ```
 ///
 /// Use instead:
+///
 /// ```python
-/// def foo(arg: str = ...) -> None:
-///     ...
+/// def foo(arg: str = ...) -> None: ...
 /// ```
 #[violation]
 pub struct StringOrBytesTooLong;

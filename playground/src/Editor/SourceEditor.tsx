@@ -5,7 +5,7 @@
 import Editor, { BeforeMount, Monaco } from "@monaco-editor/react";
 import { MarkerSeverity, MarkerTag } from "monaco-editor";
 import { useCallback, useEffect, useRef } from "react";
-import { Diagnostic } from "../pkg";
+import { Diagnostic } from "../pkg/ruff_wasm";
 import { Theme } from "./theme";
 
 export default function SourceEditor({

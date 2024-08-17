@@ -1,4 +1,4 @@
-use ruff_diagnostics::{Diagnostic, Edit, Fix, Violation};
+use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::{self as ast, Expr, ExprAttribute, ExprCall};
 use ruff_text_size::Ranged;
@@ -29,9 +29,15 @@ use crate::{checkers::ast::Checker, importer::ImportRequest};
 pub struct ImplicitCwd;
 
 impl Violation for ImplicitCwd {
+    const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
+
     #[derive_message_formats]
     fn message(&self) -> String {
         format!("Prefer `Path.cwd()` over `Path().resolve()` for current-directory lookups")
+    }
+
+    fn fix_title(&self) -> Option<String> {
+        Some("Replace `Path().resolve()` with `Path.cwd()`".to_string())
     }
 }
 
@@ -96,7 +102,5 @@ pub(crate) fn no_implicit_cwd(checker: &mut Checker, call: &ExprCall) {
         ))
     });
 
-    checker
-        .diagnostics
-        .push(Diagnostic::new(ImplicitCwd, call.range()));
+    checker.diagnostics.push(diagnostic);
 }

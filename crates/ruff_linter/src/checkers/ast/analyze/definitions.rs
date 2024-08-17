@@ -328,6 +328,7 @@ pub(crate) fn definitions(checker: &mut Checker) {
                     pydoclint::rules::check_docstring(
                         checker,
                         definition,
+                        &docstring,
                         &section_contexts,
                         checker.settings.pydocstyle.convention(),
                     );

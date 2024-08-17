@@ -20,8 +20,7 @@ use crate::importer::ImportRequest;
 /// import enum
 ///
 ///
-/// class Foo(str, enum.Enum):
-///     ...
+/// class Foo(str, enum.Enum): ...
 /// ```
 ///
 /// Use instead:
@@ -30,8 +29,7 @@ use crate::importer::ImportRequest;
 /// import enum
 ///
 ///
-/// class Foo(enum.StrEnum):
-///     ...
+/// class Foo(enum.StrEnum): ...
 /// ```
 ///
 /// ## Fix safety

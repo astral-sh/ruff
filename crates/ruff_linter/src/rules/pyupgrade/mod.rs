@@ -14,7 +14,7 @@ mod tests {
 
     use crate::registry::Rule;
     use crate::rules::pyupgrade;
-    use crate::settings::types::PythonVersion;
+    use crate::settings::types::{PreviewMode, PythonVersion};
     use crate::test::test_path;
     use crate::{assert_messages, settings};
 
@@ -97,6 +97,19 @@ mod tests {
             &settings::LinterSettings::for_rule(rule_code),
         )?;
         assert_messages!(snapshot, diagnostics);
+        Ok(())
+    }
+
+    #[test_case(Rule::PrintfStringFormatting, Path::new("UP031_0.py"))]
+    fn preview(rule_code: Rule, path: &Path) -> Result<()> {
+        let diagnostics = test_path(
+            Path::new("pyupgrade").join(path),
+            &settings::LinterSettings {
+                preview: PreviewMode::Enabled,
+                ..settings::LinterSettings::for_rule(rule_code)
+            },
+        )?;
+        assert_messages!(diagnostics);
         Ok(())
     }
 

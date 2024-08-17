@@ -452,5 +452,21 @@ RET503.py:370:5: RET503 [*] Missing explicit `return` at the end of function abl
 369 369 |         return 1
 370 370 |     bar()
     371 |+    return None
+371 372 | 
+372 373 | 
+373 374 | def f():
 
+RET503.py:378:13: RET503 [*] Missing explicit `return` at the end of function able to return non-`None` value
+    |
+376 |     else:
+377 |         with c:
+378 |             d
+    |             ^ RET503
+    |
+    = help: Add explicit `return` statement
 
+ℹ Unsafe fix
+376 376 |     else:
+377 377 |         with c:
+378 378 |             d
+    379 |+            return None

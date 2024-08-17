@@ -74,3 +74,14 @@ class Bar:
             A number
         """
         return 'test'
+
+
+import abc
+
+
+class A(metaclass=abc.abcmeta):
+    # DOC201
+    @abc.abstractmethod
+    def f(self):
+        """Lorem ipsum."""
+        return True

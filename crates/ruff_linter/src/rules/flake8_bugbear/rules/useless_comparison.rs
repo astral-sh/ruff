@@ -25,6 +25,11 @@ use super::super::helpers::at_last_top_level_expression_in_cell;
 /// assert foo == bar, "`foo` and `bar` should be equal."
 /// ```
 ///
+/// ## Notebook behavior
+/// For Jupyter Notebooks, this rule is not applied to the last top-level expression in a cell.
+/// This is because it's common to have a notebook cell that ends with an expression,
+/// which will result in the `repr` of the evaluated expression being printed as the cell's output.
+///
 /// ## References
 /// - [Python documentation: `assert` statement](https://docs.python.org/3/reference/simple_stmts.html#the-assert-statement)
 #[violation]
@@ -43,9 +48,6 @@ impl Violation for UselessComparison {
 /// B015
 pub(crate) fn useless_comparison(checker: &mut Checker, expr: &Expr) {
     if expr.is_compare_expr() {
-        // For Jupyter Notebooks, ignore the last top-level expression for each cell.
-        // This is because it's common to have a cell that ends with an expression
-        // to display it's value.
         if checker.source_type.is_ipynb()
             && at_last_top_level_expression_in_cell(
                 checker.semantic(),

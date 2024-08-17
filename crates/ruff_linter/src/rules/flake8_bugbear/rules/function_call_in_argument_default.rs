@@ -30,6 +30,7 @@ use crate::checkers::ast::Checker;
 /// [`lint.flake8-bugbear.extend-immutable-calls`] configuration option as well.
 ///
 /// ## Example
+///
 /// ```python
 /// def create_list() -> list[int]:
 ///     return [1, 2, 3]
@@ -41,6 +42,7 @@ use crate::checkers::ast::Checker;
 /// ```
 ///
 /// Use instead:
+///
 /// ```python
 /// def better(arg: list[int] | None = None) -> list[int]:
 ///     if arg is None:
@@ -52,12 +54,12 @@ use crate::checkers::ast::Checker;
 ///
 /// If the use of a singleton is intentional, assign the result call to a
 /// module-level variable, and use that variable in the default argument:
+///
 /// ```python
 /// ERROR = ValueError("Hosts weren't successfully added")
 ///
 ///
-/// def add_host(error: Exception = ERROR) -> None:
-///     ...
+/// def add_host(error: Exception = ERROR) -> None: ...
 /// ```
 ///
 /// ## Options

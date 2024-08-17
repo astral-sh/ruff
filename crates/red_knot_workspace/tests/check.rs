@@ -1,8 +1,8 @@
+use red_knot_python_semantic::{ProgramSettings, PythonVersion, SearchPathSettings};
 use red_knot_workspace::db::RootDatabase;
 use red_knot_workspace::lint::lint_semantic;
 use red_knot_workspace::workspace::WorkspaceMetadata;
 use ruff_db::files::system_path_to_file;
-use ruff_db::program::{ProgramSettings, SearchPathSettings, TargetVersion};
 use ruff_db::system::{OsSystem, SystemPathBuf};
 use std::fs;
 use std::path::PathBuf;
@@ -12,16 +12,15 @@ fn setup_db(workspace_root: SystemPathBuf) -> anyhow::Result<RootDatabase> {
     let workspace = WorkspaceMetadata::from_path(&workspace_root, &system)?;
     let search_paths = SearchPathSettings {
         extra_paths: vec![],
-        workspace_root,
+        src_root: workspace_root,
         custom_typeshed: None,
         site_packages: vec![],
     };
     let settings = ProgramSettings {
-        target_version: TargetVersion::default(),
+        target_version: PythonVersion::default(),
         search_paths,
     };
-    let db = RootDatabase::new(workspace, settings, system);
-    Ok(db)
+    RootDatabase::new(workspace, settings, system)
 }
 
 /// Test that all snippets in testcorpus can be checked without panic

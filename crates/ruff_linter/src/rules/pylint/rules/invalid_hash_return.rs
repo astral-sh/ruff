@@ -12,7 +12,7 @@ use ruff_text_size::Ranged;
 use crate::checkers::ast::Checker;
 
 /// ## What it does
-/// Checks for `__hash__` implementations that return a value other than an integer.
+/// Checks for `__hash__` implementations that return non-integer values.
 ///
 /// ## Why is this bad?
 /// The `__hash__` method should return an integer. Returning a different
@@ -20,7 +20,7 @@ use crate::checkers::ast::Checker;
 ///
 /// Note: `bool` is a subclass of `int`, so it's technically valid for `__hash__` to
 /// return `True` or `False`. However, for consistency with other rules, Ruff will
-/// still raise when `__hash__` returns a `bool`.
+/// still emit a diagnostic when `__hash__` returns a `bool`.
 ///
 /// ## Example
 /// ```python
@@ -35,7 +35,6 @@ use crate::checkers::ast::Checker;
 ///     def __hash__(self):
 ///         return 2
 /// ```
-///
 ///
 /// ## References
 /// - [Python documentation: The `__hash__` method](https://docs.python.org/3/reference/datamodel.html#object.__hash__)

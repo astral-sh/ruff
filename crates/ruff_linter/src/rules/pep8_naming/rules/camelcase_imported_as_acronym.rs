@@ -1,12 +1,11 @@
-use ruff_python_ast::{Alias, Stmt};
-
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::{Alias, Stmt};
 use ruff_python_stdlib::str::{self};
 use ruff_text_size::Ranged;
 
+use crate::checkers::ast::Checker;
 use crate::rules::pep8_naming::helpers;
-use crate::rules::pep8_naming::settings::IgnoreNames;
 
 /// ## What it does
 /// Checks for `CamelCase` imports that are aliased as acronyms.
@@ -23,6 +22,9 @@ use crate::rules::pep8_naming::settings::IgnoreNames;
 /// Note that this rule is distinct from `camelcase-imported-as-constant`
 /// to accommodate selective enforcement.
 ///
+/// Also note that import aliases following an import convention according to the
+/// [`lint.flake8-import-conventions.aliases`] option are allowed.
+///
 /// ## Example
 /// ```python
 /// from example import MyClassName as MCN
@@ -34,6 +36,9 @@ use crate::rules::pep8_naming::settings::IgnoreNames;
 /// ```
 ///
 /// [PEP 8]: https://peps.python.org/pep-0008/
+///
+/// ## Options
+/// - `lint.flake8-import-conventions.aliases`
 #[violation]
 pub struct CamelcaseImportedAsAcronym {
     name: String,
@@ -54,17 +59,32 @@ pub(crate) fn camelcase_imported_as_acronym(
     asname: &str,
     alias: &Alias,
     stmt: &Stmt,
-    ignore_names: &IgnoreNames,
+    checker: &Checker,
 ) -> Option<Diagnostic> {
     if helpers::is_camelcase(name)
         && !str::is_cased_lowercase(asname)
         && str::is_cased_uppercase(asname)
         && helpers::is_acronym(name, asname)
     {
+        let ignore_names = &checker.settings.pep8_naming.ignore_names;
+
         // Ignore any explicitly-allowed names.
         if ignore_names.matches(name) || ignore_names.matches(asname) {
             return None;
         }
+
+        // Ignore names that follow a community-agreed import convention.
+        if checker
+            .settings
+            .flake8_import_conventions
+            .aliases
+            .get(&*alias.name)
+            .map(String::as_str)
+            == Some(asname)
+        {
+            return None;
+        }
+
         let mut diagnostic = Diagnostic::new(
             CamelcaseImportedAsAcronym {
                 name: name.to_string(),

@@ -49,6 +49,7 @@ impl Violation for UnusedPrivateTypeVar {
 /// confusion.
 ///
 /// ## Example
+///
 /// ```python
 /// import typing
 ///
@@ -58,6 +59,7 @@ impl Violation for UnusedPrivateTypeVar {
 /// ```
 ///
 /// Use instead:
+///
 /// ```python
 /// import typing
 ///
@@ -66,8 +68,7 @@ impl Violation for UnusedPrivateTypeVar {
 ///     foo: int
 ///
 ///
-/// def func(arg: _PrivateProtocol) -> None:
-///     ...
+/// def func(arg: _PrivateProtocol) -> None: ...
 /// ```
 #[violation]
 pub struct UnusedPrivateProtocol {
@@ -91,6 +92,7 @@ impl Violation for UnusedPrivateProtocol {
 /// confusion.
 ///
 /// ## Example
+///
 /// ```python
 /// import typing
 ///
@@ -98,14 +100,14 @@ impl Violation for UnusedPrivateProtocol {
 /// ```
 ///
 /// Use instead:
+///
 /// ```python
 /// import typing
 ///
 /// _UsedTypeAlias: typing.TypeAlias = int
 ///
 ///
-/// def func(arg: _UsedTypeAlias) -> _UsedTypeAlias:
-///     ...
+/// def func(arg: _UsedTypeAlias) -> _UsedTypeAlias: ...
 /// ```
 #[violation]
 pub struct UnusedPrivateTypeAlias {
@@ -129,6 +131,7 @@ impl Violation for UnusedPrivateTypeAlias {
 /// confusion.
 ///
 /// ## Example
+///
 /// ```python
 /// import typing
 ///
@@ -138,6 +141,7 @@ impl Violation for UnusedPrivateTypeAlias {
 /// ```
 ///
 /// Use instead:
+///
 /// ```python
 /// import typing
 ///
@@ -146,8 +150,7 @@ impl Violation for UnusedPrivateTypeAlias {
 ///     foo: set[str]
 ///
 ///
-/// def func(arg: _UsedPrivateTypedDict) -> _UsedPrivateTypedDict:
-///     ...
+/// def func(arg: _UsedPrivateTypedDict) -> _UsedPrivateTypedDict: ...
 /// ```
 #[violation]
 pub struct UnusedPrivateTypedDict {

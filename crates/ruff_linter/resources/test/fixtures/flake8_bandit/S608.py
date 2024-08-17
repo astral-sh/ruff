@@ -102,3 +102,11 @@ query = "REPLACE INTO table VALUES (%s)" % (var,)
 query = "REPLACE table VALUES (%s)" % (var,)
 
 query = "Deselect something that is not SQL even though it has a ' from ' somewhere in %s." % "there"
+
+# # pass
+["select colA from tableA"] + ["select colB from tableB"]
+"SELECT * FROM " + (["table1"] if x > 0 else ["table2"])
+
+# # errors
+"SELECT * FROM " + ("table1" if x > 0 else "table2")
+"SELECT * FROM " + ("table1" if x > 0 else ["table2"])

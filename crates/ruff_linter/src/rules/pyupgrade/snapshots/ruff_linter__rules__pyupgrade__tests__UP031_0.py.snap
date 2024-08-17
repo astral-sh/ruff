@@ -1142,12 +1142,16 @@ UP031_0.py:140:7: UP031 [*] Use format specifiers instead of percent format
 140     |-print("%2X" % 1)
     140 |+print("{:2X}".format(1))
 141 141 | print("%02X" % 1)
+142 142 | 
+143 143 | # UP031 (no longer false negatives, but offer no fix because of more complex syntax)
 
 UP031_0.py:141:7: UP031 [*] Use format specifiers instead of percent format
     |
 140 | print("%2X" % 1)
 141 | print("%02X" % 1)
     |       ^^^^^^^^^^ UP031
+142 | 
+143 | # UP031 (no longer false negatives, but offer no fix because of more complex syntax)
     |
     = help: Replace with format specifiers
 
@@ -1157,3 +1161,6 @@ UP031_0.py:141:7: UP031 [*] Use format specifiers instead of percent format
 140 140 | print("%2X" % 1)
 141     |-print("%02X" % 1)
     141 |+print("{:02X}".format(1))
+142 142 | 
+143 143 | # UP031 (no longer false negatives, but offer no fix because of more complex syntax)
+144 144 |

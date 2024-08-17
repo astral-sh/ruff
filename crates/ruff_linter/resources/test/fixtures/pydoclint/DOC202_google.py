@@ -59,3 +59,17 @@ class C:
             x
         """
         raise NotImplementedError
+
+
+import abc
+
+
+class A(metaclass=abc.abcmeta):
+    @abc.abstractmethod
+    def f(self):
+        """Lorem ipsum
+
+        Returns:
+            dict: The values
+        """
+        return

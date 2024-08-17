@@ -14,15 +14,15 @@ use crate::fix::edits::{remove_argument, Parentheses};
 /// be omitted from the list of base classes.
 ///
 /// ## Example
+///
 /// ```python
-/// class Foo(object):
-///     ...
+/// class Foo(object): ...
 /// ```
 ///
 /// Use instead:
+///
 /// ```python
-/// class Foo:
-///     ...
+/// class Foo: ...
 /// ```
 ///
 /// ## References

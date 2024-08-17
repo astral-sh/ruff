@@ -156,9 +156,16 @@ impl<'a> Resolver<'a> {
             .insert(format!("{path}/{{*filepath}}"), self.settings.len() - 1)
         {
             Ok(()) => {}
-            Err(InsertError::Conflict { .. }) => {}
+            Err(InsertError::Conflict { .. }) => {
+                return;
+            }
             Err(_) => unreachable!("file paths are escaped before being inserted in the router"),
         }
+
+        // Insert a mapping that matches the directory itself (without a trailing slash).
+        // Inserting should always succeed because conflicts are resolved above and the above insertion guarantees
+        // that the path is correctly escaped.
+        self.router.insert(path, self.settings.len() - 1).unwrap();
     }
 
     /// Return the appropriate [`Settings`] for a given [`Path`].

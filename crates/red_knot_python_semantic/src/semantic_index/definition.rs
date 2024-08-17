@@ -44,6 +44,8 @@ pub(crate) enum DefinitionNodeRef<'a> {
     NamedExpression(&'a ast::ExprNamed),
     Assignment(AssignmentDefinitionNodeRef<'a>),
     AnnotatedAssignment(&'a ast::StmtAnnAssign),
+    Comprehension(ComprehensionDefinitionNodeRef<'a>),
+    Parameter(ast::AnyParameterRef<'a>),
 }
 
 impl<'a> From<&'a ast::StmtFunctionDef> for DefinitionNodeRef<'a> {
@@ -88,6 +90,18 @@ impl<'a> From<AssignmentDefinitionNodeRef<'a>> for DefinitionNodeRef<'a> {
     }
 }
 
+impl<'a> From<ComprehensionDefinitionNodeRef<'a>> for DefinitionNodeRef<'a> {
+    fn from(node: ComprehensionDefinitionNodeRef<'a>) -> Self {
+        Self::Comprehension(node)
+    }
+}
+
+impl<'a> From<ast::AnyParameterRef<'a>> for DefinitionNodeRef<'a> {
+    fn from(node: ast::AnyParameterRef<'a>) -> Self {
+        Self::Parameter(node)
+    }
+}
+
 #[derive(Copy, Clone, Debug)]
 pub(crate) struct ImportFromDefinitionNodeRef<'a> {
     pub(crate) node: &'a ast::StmtImportFrom,
@@ -98,6 +112,12 @@ pub(crate) struct ImportFromDefinitionNodeRef<'a> {
 pub(crate) struct AssignmentDefinitionNodeRef<'a> {
     pub(crate) assignment: &'a ast::StmtAssign,
     pub(crate) target: &'a ast::ExprName,
+}
+
+#[derive(Copy, Clone, Debug)]
+pub(crate) struct ComprehensionDefinitionNodeRef<'a> {
+    pub(crate) node: &'a ast::Comprehension,
+    pub(crate) first: bool,
 }
 
 impl DefinitionNodeRef<'_> {
@@ -131,6 +151,20 @@ impl DefinitionNodeRef<'_> {
             DefinitionNodeRef::AnnotatedAssignment(assign) => {
                 DefinitionKind::AnnotatedAssignment(AstNodeRef::new(parsed, assign))
             }
+            DefinitionNodeRef::Comprehension(ComprehensionDefinitionNodeRef { node, first }) => {
+                DefinitionKind::Comprehension(ComprehensionDefinitionKind {
+                    node: AstNodeRef::new(parsed, node),
+                    first,
+                })
+            }
+            DefinitionNodeRef::Parameter(parameter) => match parameter {
+                ast::AnyParameterRef::Variadic(parameter) => {
+                    DefinitionKind::Parameter(AstNodeRef::new(parsed, parameter))
+                }
+                ast::AnyParameterRef::NonVariadic(parameter) => {
+                    DefinitionKind::ParameterWithDefault(AstNodeRef::new(parsed, parameter))
+                }
+            },
         }
     }
 
@@ -148,6 +182,11 @@ impl DefinitionNodeRef<'_> {
                 target,
             }) => target.into(),
             Self::AnnotatedAssignment(node) => node.into(),
+            Self::Comprehension(ComprehensionDefinitionNodeRef { node, first: _ }) => node.into(),
+            Self::Parameter(node) => match node {
+                ast::AnyParameterRef::Variadic(parameter) => parameter.into(),
+                ast::AnyParameterRef::NonVariadic(parameter) => parameter.into(),
+            },
         }
     }
 }
@@ -161,6 +200,25 @@ pub enum DefinitionKind {
     NamedExpression(AstNodeRef<ast::ExprNamed>),
     Assignment(AssignmentDefinitionKind),
     AnnotatedAssignment(AstNodeRef<ast::StmtAnnAssign>),
+    Comprehension(ComprehensionDefinitionKind),
+    Parameter(AstNodeRef<ast::Parameter>),
+    ParameterWithDefault(AstNodeRef<ast::ParameterWithDefault>),
+}
+
+#[derive(Clone, Debug)]
+pub struct ComprehensionDefinitionKind {
+    node: AstNodeRef<ast::Comprehension>,
+    first: bool,
+}
+
+impl ComprehensionDefinitionKind {
+    pub(crate) fn node(&self) -> &ast::Comprehension {
+        self.node.node()
+    }
+
+    pub(crate) fn is_first(&self) -> bool {
+        self.first
+    }
 }
 
 #[derive(Clone, Debug)]
@@ -227,6 +285,24 @@ impl From<&ast::ExprNamed> for DefinitionNodeKey {
 
 impl From<&ast::StmtAnnAssign> for DefinitionNodeKey {
     fn from(node: &ast::StmtAnnAssign) -> Self {
+        Self(NodeKey::from_node(node))
+    }
+}
+
+impl From<&ast::Comprehension> for DefinitionNodeKey {
+    fn from(node: &ast::Comprehension) -> Self {
+        Self(NodeKey::from_node(node))
+    }
+}
+
+impl From<&ast::Parameter> for DefinitionNodeKey {
+    fn from(node: &ast::Parameter) -> Self {
+        Self(NodeKey::from_node(node))
+    }
+}
+
+impl From<&ast::ParameterWithDefault> for DefinitionNodeKey {
+    fn from(node: &ast::ParameterWithDefault) -> Self {
         Self(NodeKey::from_node(node))
     }
 }

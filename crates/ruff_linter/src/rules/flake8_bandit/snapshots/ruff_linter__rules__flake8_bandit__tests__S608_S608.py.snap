@@ -479,4 +479,18 @@ S608.py:102:9: S608 Possible SQL injection vector through string-based query con
 104 | query = "Deselect something that is not SQL even though it has a ' from ' somewhere in %s." % "there"
     |
 
+S608.py:111:1: S608 Possible SQL injection vector through string-based query construction
+    |
+110 | # # errors
+111 | "SELECT * FROM " + ("table1" if x > 0 else "table2")
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ S608
+112 | "SELECT * FROM " + ("table1" if x > 0 else ["table2"])
+    |
 
+S608.py:112:1: S608 Possible SQL injection vector through string-based query construction
+    |
+110 | # # errors
+111 | "SELECT * FROM " + ("table1" if x > 0 else "table2")
+112 | "SELECT * FROM " + ("table1" if x > 0 else ["table2"])
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ S608
+    |

@@ -151,7 +151,7 @@ pub fn to_pep604_operator(
     fn quoted_annotation(slice: &Expr) -> bool {
         match slice {
             Expr::StringLiteral(_) => true,
-            Expr::Tuple(ast::ExprTuple { elts, .. }) => elts.iter().any(quoted_annotation),
+            Expr::Tuple(tuple) => tuple.iter().any(quoted_annotation),
             _ => false,
         }
     }
@@ -160,7 +160,7 @@ pub fn to_pep604_operator(
     fn starred_annotation(slice: &Expr) -> bool {
         match slice {
             Expr::Starred(_) => true,
-            Expr::Tuple(ast::ExprTuple { elts, .. }) => elts.iter().any(starred_annotation),
+            Expr::Tuple(tuple) => tuple.iter().any(starred_annotation),
             _ => false,
         }
     }
@@ -237,9 +237,9 @@ pub fn is_immutable_annotation(
                 if is_immutable_generic_type(qualified_name.segments()) {
                     true
                 } else if matches!(qualified_name.segments(), ["typing", "Union"]) {
-                    if let Expr::Tuple(ast::ExprTuple { elts, .. }) = slice.as_ref() {
-                        elts.iter().all(|elt| {
-                            is_immutable_annotation(elt, semantic, extend_immutable_calls)
+                    if let Expr::Tuple(tuple) = &**slice {
+                        tuple.iter().all(|element| {
+                            is_immutable_annotation(element, semantic, extend_immutable_calls)
                         })
                     } else {
                         false
@@ -399,11 +399,12 @@ where
         // Ex) Union[x, y]
         if let Expr::Subscript(ast::ExprSubscript { value, slice, .. }) = expr {
             if semantic.match_typing_expr(value, "Union") {
-                if let Expr::Tuple(ast::ExprTuple { elts, .. }) = slice.as_ref() {
+                if let Expr::Tuple(tuple) = &**slice {
                     // Traverse each element of the tuple within the union recursively to handle cases
                     // such as `Union[..., Union[...]]
-                    elts.iter()
-                        .for_each(|elt| inner(func, semantic, elt, Some(expr)));
+                    tuple
+                        .iter()
+                        .for_each(|elem| inner(func, semantic, elem, Some(expr)));
                     return;
                 }
             }
@@ -438,11 +439,11 @@ where
         if let Expr::Subscript(ast::ExprSubscript { value, slice, .. }) = expr {
             if semantic.match_typing_expr(value, "Literal") {
                 match &**slice {
-                    Expr::Tuple(ast::ExprTuple { elts, .. }) => {
+                    Expr::Tuple(tuple) => {
                         // Traverse each element of the tuple within the literal recursively to handle cases
                         // such as `Literal[..., Literal[...]]
-                        for elt in elts {
-                            inner(func, semantic, elt, Some(expr));
+                        for element in tuple {
+                            inner(func, semantic, element, Some(expr));
                         }
                     }
                     other => {

@@ -11,30 +11,36 @@ use crate::checkers::ast::Checker;
 /// Checks for assignment of `self` and `cls` in instance and class methods respectively.
 ///
 /// ## Why is this bad?
-/// The identifiers `self` and `cls` are conventional in Python for the first argument of instance
-/// methods and class methods, respectively.
+/// The identifiers `self` and `cls` are conventional in Python for the first parameter of instance
+/// methods and class methods, respectively. Assigning new values to these variables can be
+/// confusing for others reading your code; using a different variable name can lead to clearer
+/// code.
 ///
 /// ## Example
 ///
 /// ```python
-/// class Versions:
-///     def add(self, version):
-///         self = version
+/// class Version:
+///     def add(self, other):
+///         self = self + other
+///         return self
 ///
 ///     @classmethod
-///     def from_list(cls, versions):
-///         cls = versions
+///     def superclass(cls):
+///         cls = cls.__mro__[-1]
+///         return cls
 /// ```
 ///
 /// Use instead:
 /// ```python
-/// class Versions:
-///     def add(self, version):
-///         self.versions.append(version)
+/// class Version:
+///     def add(self, other):
+///         new_version = self + other
+///         return new_version
 ///
 ///     @classmethod
-///     def from_list(cls, versions):
-///         return cls(versions)
+///     def superclass(cls):
+///         supercls = cls.__mro__[-1]
+///         return supercls
 /// ```
 #[violation]
 pub struct SelfOrClsAssignment {
@@ -47,9 +53,13 @@ impl Violation for SelfOrClsAssignment {
         let SelfOrClsAssignment { method_type } = self;
 
         format!(
-            "Invalid assignment to `{}` argument in {method_type} method",
+            "Reassigned `{}` variable in {method_type} method",
             method_type.arg_name(),
         )
+    }
+
+    fn fix_title(&self) -> Option<String> {
+        Some("Consider using a different variable name".to_string())
     }
 }
 
@@ -130,7 +140,7 @@ enum MethodType {
 }
 
 impl MethodType {
-    fn arg_name(self) -> &'static str {
+    const fn arg_name(self) -> &'static str {
         match self {
             MethodType::Instance => "self",
             MethodType::Class => "cls",

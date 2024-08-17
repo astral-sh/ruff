@@ -61,13 +61,13 @@ pub(crate) fn unnecessary_generator_dict(
     let Expr::Generator(ast::ExprGenerator { elt, .. }) = argument else {
         return;
     };
-    let Expr::Tuple(ast::ExprTuple { elts, .. }) = elt.as_ref() else {
+    let Expr::Tuple(tuple) = &**elt else {
         return;
     };
-    if elts.len() != 2 {
+    if tuple.len() != 2 {
         return;
     }
-    if elts.iter().any(Expr::is_starred_expr) {
+    if tuple.iter().any(Expr::is_starred_expr) {
         return;
     }
     let mut diagnostic = Diagnostic::new(UnnecessaryGeneratorDict, expr.range());

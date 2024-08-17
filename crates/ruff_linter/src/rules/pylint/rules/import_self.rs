@@ -12,13 +12,13 @@ use ruff_text_size::Ranged;
 /// Importing a module from itself is a circular dependency.
 ///
 /// ## Example
+///
 /// ```python
 /// # file: this_file.py
 /// from this_file import foo
 ///
 ///
-/// def foo():
-///     ...
+/// def foo(): ...
 /// ```
 #[violation]
 pub struct ImportSelf {

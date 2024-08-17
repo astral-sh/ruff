@@ -22,18 +22,18 @@ use super::super::helpers::{matches_password_name, string_literal};
 /// control.
 ///
 /// ## Example
+///
 /// ```python
-/// def connect_to_server(password="hunter2"):
-///     ...
+/// def connect_to_server(password="hunter2"): ...
 /// ```
 ///
 /// Use instead:
+///
 /// ```python
 /// import os
 ///
 ///
-/// def connect_to_server(password=os.environ["PASSWORD"]):
-///     ...
+/// def connect_to_server(password=os.environ["PASSWORD"]): ...
 /// ```
 ///
 /// ## References

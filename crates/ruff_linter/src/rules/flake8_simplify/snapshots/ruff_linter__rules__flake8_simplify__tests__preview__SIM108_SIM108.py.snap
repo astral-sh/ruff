@@ -1,0 +1,304 @@
+---
+source: crates/ruff_linter/src/rules/flake8_simplify/mod.rs
+---
+SIM108.py:2:1: SIM108 [*] Use ternary operator `b = c if a else d` instead of `if`-`else`-block
+  |
+1 |   # SIM108
+2 | / if a:
+3 | |     b = c
+4 | | else:
+5 | |     b = d
+  | |_________^ SIM108
+6 |   
+7 |   # OK
+  |
+  = help: Replace `if`-`else`-block with `b = c if a else d`
+
+ℹ Unsafe fix
+1 1 | # SIM108
+2   |-if a:
+3   |-    b = c
+4   |-else:
+5   |-    b = d
+  2 |+b = c if a else d
+6 3 | 
+7 4 | # OK
+8 5 | b = c if a else d
+
+SIM108.py:30:5: SIM108 [*] Use ternary operator `b = 1 if a else 2` instead of `if`-`else`-block
+   |
+28 |       pass
+29 |   else:
+30 |       if a:
+   |  _____^
+31 | |         b = 1
+32 | |     else:
+33 | |         b = 2
+   | |_____________^ SIM108
+   |
+   = help: Replace `if`-`else`-block with `b = 1 if a else 2`
+
+ℹ Unsafe fix
+27 27 | if True:
+28 28 |     pass
+29 29 | else:
+30    |-    if a:
+31    |-        b = 1
+32    |-    else:
+33    |-        b = 2
+   30 |+    b = 1 if a else 2
+34 31 | 
+35 32 | 
+36 33 | import sys
+
+SIM108.py:58:1: SIM108 Use ternary operator `abc = x if x > 0 else -x` instead of `if`-`else`-block
+   |
+57 |   # SIM108 (without fix due to comments)
+58 | / if x > 0:
+59 | |     # test test
+60 | |     abc = x
+61 | | else:
+62 | |     # test test test
+63 | |     abc = -x
+   | |____________^ SIM108
+   |
+   = help: Replace `if`-`else`-block with `abc = x if x > 0 else -x`
+
+SIM108.py:82:1: SIM108 [*] Use ternary operator `b = "cccccccccccccccccccccccccccccccccß" if a else "ddddddddddddddddddddddddddddddddd💣"` instead of `if`-`else`-block
+   |
+81 |   # SIM108
+82 | / if a:
+83 | |     b = "cccccccccccccccccccccccccccccccccß"
+84 | | else:
+85 | |     b = "ddddddddddddddddddddddddddddddddd💣"
+   | |_____________________________________________^ SIM108
+   |
+   = help: Replace `if`-`else`-block with `b = "cccccccccccccccccccccccccccccccccß" if a else "ddddddddddddddddddddddddddddddddd💣"`
+
+ℹ Unsafe fix
+79 79 | 
+80 80 | 
+81 81 | # SIM108
+82    |-if a:
+83    |-    b = "cccccccccccccccccccccccccccccccccß"
+84    |-else:
+85    |-    b = "ddddddddddddddddddddddddddddddddd💣"
+   82 |+b = "cccccccccccccccccccccccccccccccccß" if a else "ddddddddddddddddddddddddddddddddd💣"
+86 83 | 
+87 84 | 
+88 85 | # OK (too long)
+
+SIM108.py:105:1: SIM108 Use ternary operator `exitcode = 0 if True else 1` instead of `if`-`else`-block
+    |
+104 |   # SIM108 (without fix due to trailing comment)
+105 | / if True:
+106 | |     exitcode = 0
+107 | | else:
+108 | |     exitcode = 1  # Trailing comment
+    | |________________^ SIM108
+    |
+    = help: Replace `if`-`else`-block with `exitcode = 0 if True else 1`
+
+SIM108.py:112:1: SIM108 Use ternary operator `x = 3 if True else 5` instead of `if`-`else`-block
+    |
+111 |   # SIM108
+112 | / if True: x = 3  # Foo
+113 | | else: x = 5
+    | |___________^ SIM108
+    |
+    = help: Replace `if`-`else`-block with `x = 3 if True else 5`
+
+SIM108.py:117:1: SIM108 Use ternary operator `x = 3 if True else 5` instead of `if`-`else`-block
+    |
+116 |   # SIM108
+117 | / if True:  # Foo
+118 | |     x = 3
+119 | | else:
+120 | |     x = 5
+    | |_________^ SIM108
+    |
+    = help: Replace `if`-`else`-block with `x = 3 if True else 5`
+
+SIM108.py:141:1: SIM108 [*] Use binary operator `z = cond or other_cond` instead of `if`-`else`-block
+    |
+139 |   # SIM108 - should suggest
+140 |   # z = cond or other_cond
+141 | / if cond:
+142 | |     z = cond 
+143 | | else:
+144 | |     z = other_cond
+    | |__________________^ SIM108
+145 |   
+146 |   # SIM108 - should suggest
+    |
+    = help: Replace `if`-`else`-block with `z = cond or other_cond`
+
+ℹ Unsafe fix
+138 138 | 
+139 139 | # SIM108 - should suggest
+140 140 | # z = cond or other_cond
+141     |-if cond:
+142     |-    z = cond 
+143     |-else:
+144     |-    z = other_cond
+    141 |+z = cond or other_cond
+145 142 | 
+146 143 | # SIM108 - should suggest
+147 144 | # z = cond and other_cond
+
+SIM108.py:148:1: SIM108 [*] Use binary operator `z = cond and other_cond` instead of `if`-`else`-block
+    |
+146 |   # SIM108 - should suggest
+147 |   # z = cond and other_cond
+148 | / if not cond:
+149 | |     z = cond
+150 | | else:
+151 | |     z = other_cond
+    | |__________________^ SIM108
+152 |   
+153 |   # SIM108 - should suggest
+    |
+    = help: Replace `if`-`else`-block with `z = cond and other_cond`
+
+ℹ Unsafe fix
+145 145 | 
+146 146 | # SIM108 - should suggest
+147 147 | # z = cond and other_cond
+148     |-if not cond:
+149     |-    z = cond
+150     |-else:
+151     |-    z = other_cond
+    148 |+z = cond and other_cond
+152 149 | 
+153 150 | # SIM108 - should suggest
+154 151 | # z = not cond and other_cond
+
+SIM108.py:155:1: SIM108 [*] Use binary operator `z = not cond and other_cond` instead of `if`-`else`-block
+    |
+153 |   # SIM108 - should suggest
+154 |   # z = not cond and other_cond
+155 | / if cond:
+156 | |     z = not cond
+157 | | else:
+158 | |     z = other_cond
+    | |__________________^ SIM108
+159 |   
+160 |   # SIM108 does not suggest
+    |
+    = help: Replace `if`-`else`-block with `z = not cond and other_cond`
+
+ℹ Unsafe fix
+152 152 | 
+153 153 | # SIM108 - should suggest
+154 154 | # z = not cond and other_cond
+155     |-if cond:
+156     |-    z = not cond
+157     |-else:
+158     |-    z = other_cond
+    155 |+z = not cond and other_cond
+159 156 | 
+160 157 | # SIM108 does not suggest
+161 158 | # a binary option in these cases,
+
+SIM108.py:167:1: SIM108 [*] Use ternary operator `z = 1 if True else other` instead of `if`-`else`-block
+    |
+165 |   # (Of course, these specific expressions 
+166 |   # should be simplified for other reasons...)
+167 | / if True:
+168 | |     z = 1
+169 | | else:
+170 | |     z = other
+    | |_____________^ SIM108
+171 |   
+172 |   if False:
+    |
+    = help: Replace `if`-`else`-block with `z = 1 if True else other`
+
+ℹ Unsafe fix
+164 164 | # so, e.g. `True == 1`.
+165 165 | # (Of course, these specific expressions 
+166 166 | # should be simplified for other reasons...)
+167     |-if True:
+168     |-    z = 1
+169     |-else:
+170     |-    z = other
+    167 |+z = 1 if True else other
+171 168 | 
+172 169 | if False:
+173 170 |     z = 1
+
+SIM108.py:177:1: SIM108 [*] Use ternary operator `z = True if 1 else other` instead of `if`-`else`-block
+    |
+175 |       z = other
+176 |   
+177 | / if 1:
+178 | |     z = True
+179 | | else:
+180 | |     z = other
+    | |_____________^ SIM108
+181 |   
+182 |   # SIM108 does not suggest a binary option in this
+    |
+    = help: Replace `if`-`else`-block with `z = True if 1 else other`
+
+ℹ Unsafe fix
+174 174 | else:
+175 175 |     z = other
+176 176 | 
+177     |-if 1:
+178     |-    z = True
+179     |-else:
+180     |-    z = other
+    177 |+z = True if 1 else other
+181 178 | 
+182 179 | # SIM108 does not suggest a binary option in this
+183 180 | # case, since we'd be reducing the number of calls
+
+SIM108.py:185:1: SIM108 [*] Use ternary operator `z = foo() if foo() else other` instead of `if`-`else`-block
+    |
+183 |   # case, since we'd be reducing the number of calls
+184 |   # from Two to one.
+185 | / if foo():
+186 | |     z = foo()
+187 | | else:
+188 | |     z = other
+    | |_____________^ SIM108
+189 |   
+190 |   # SIM108 does not suggest a binary option in this
+    |
+    = help: Replace `if`-`else`-block with `z = foo() if foo() else other`
+
+ℹ Unsafe fix
+182 182 | # SIM108 does not suggest a binary option in this
+183 183 | # case, since we'd be reducing the number of calls
+184 184 | # from Two to one.
+185     |-if foo():
+186     |-    z = foo()
+187     |-else:
+188     |-    z = other
+    185 |+z = foo() if foo() else other
+189 186 | 
+190 187 | # SIM108 does not suggest a binary option in this
+191 188 | # case, since we'd be reducing the number of calls
+
+SIM108.py:193:1: SIM108 [*] Use ternary operator `z = not foo() if foo() else other` instead of `if`-`else`-block
+    |
+191 |   # case, since we'd be reducing the number of calls
+192 |   # from Two to one.
+193 | / if foo():
+194 | |     z = not foo()
+195 | | else:
+196 | |     z = other
+    | |_____________^ SIM108
+    |
+    = help: Replace `if`-`else`-block with `z = not foo() if foo() else other`
+
+ℹ Unsafe fix
+190 190 | # SIM108 does not suggest a binary option in this
+191 191 | # case, since we'd be reducing the number of calls
+192 192 | # from Two to one.
+193     |-if foo():
+194     |-    z = not foo()
+195     |-else:
+196     |-    z = other
+    193 |+z = not foo() if foo() else other

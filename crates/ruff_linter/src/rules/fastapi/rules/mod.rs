@@ -1,8 +1,10 @@
 pub(crate) use fastapi_non_annotated_dependency::*;
 pub(crate) use fastapi_redundant_response_model::*;
+pub(crate) use fastapi_unused_path_parameter::*;
 
 mod fastapi_non_annotated_dependency;
 mod fastapi_redundant_response_model;
+mod fastapi_unused_path_parameter;
 
 use ruff_python_ast::{Decorator, ExprCall, StmtFunctionDef};
 use ruff_python_semantic::analyze::typing::resolve_assignment;

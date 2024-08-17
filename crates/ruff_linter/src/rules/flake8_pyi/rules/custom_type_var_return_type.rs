@@ -24,34 +24,30 @@ use crate::checkers::ast::Checker;
 /// methods that return an instance of `cls`, and `__new__` methods.
 ///
 /// ## Example
+///
 /// ```python
 /// class Foo:
-///     def __new__(cls: type[_S], *args: str, **kwargs: int) -> _S:
-///         ...
+///     def __new__(cls: type[_S], *args: str, **kwargs: int) -> _S: ...
 ///
-///     def foo(self: _S, arg: bytes) -> _S:
-///         ...
+///     def foo(self: _S, arg: bytes) -> _S: ...
 ///
 ///     @classmethod
-///     def bar(cls: type[_S], arg: int) -> _S:
-///         ...
+///     def bar(cls: type[_S], arg: int) -> _S: ...
 /// ```
 ///
 /// Use instead:
+///
 /// ```python
 /// from typing import Self
 ///
 ///
 /// class Foo:
-///     def __new__(cls, *args: str, **kwargs: int) -> Self:
-///         ...
+///     def __new__(cls, *args: str, **kwargs: int) -> Self: ...
 ///
-///     def foo(self, arg: bytes) -> Self:
-///         ...
+///     def foo(self, arg: bytes) -> Self: ...
 ///
 ///     @classmethod
-///     def bar(cls, arg: int) -> Self:
-///         ...
+///     def bar(cls, arg: int) -> Self: ...
 /// ```
 ///
 /// [PEP 673]: https://peps.python.org/pep-0673/#motivation

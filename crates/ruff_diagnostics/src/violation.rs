@@ -18,7 +18,7 @@ impl Display for FixAvailability {
 }
 
 pub trait Violation: Debug + PartialEq + Eq {
-    /// `None` in the case an fix is never available or otherwise Some
+    /// `None` in the case a fix is never available or otherwise Some
     /// [`FixAvailability`] describing the available fix.
     const FIX_AVAILABILITY: FixAvailability = FixAvailability::None;
 

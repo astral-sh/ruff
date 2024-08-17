@@ -1,8 +1,11 @@
-use red_knot_module_resolver::{resolve_module, Module, ModuleName};
-use ruff_db::files::File;
+use ruff_db::files::{File, FilePath};
+use ruff_db::source::line_index;
 use ruff_python_ast as ast;
 use ruff_python_ast::{Expr, ExpressionRef, StmtClassDef};
+use ruff_source_file::LineIndex;
 
+use crate::module_name::ModuleName;
+use crate::module_resolver::{resolve_module, Module};
 use crate::semantic_index::ast_ids::HasScopedAstId;
 use crate::semantic_index::semantic_index;
 use crate::types::{definition_ty, global_symbol_ty_by_name, infer_scope_types, Type};
@@ -24,8 +27,16 @@ impl<'db> SemanticModel<'db> {
         self.db
     }
 
+    pub fn file_path(&self) -> &FilePath {
+        self.file.path(self.db)
+    }
+
+    pub fn line_index(&self) -> LineIndex {
+        line_index(self.db.upcast(), self.file)
+    }
+
     pub fn resolve_module(&self, module_name: ModuleName) -> Option<Module> {
-        resolve_module(self.db.upcast(), module_name)
+        resolve_module(self.db, module_name)
     }
 
     pub fn global_symbol_ty(&self, module: &Module, symbol_name: &str) -> Type<'db> {
@@ -164,34 +175,38 @@ impl HasTy for ast::Alias {
 mod tests {
     use ruff_db::files::system_path_to_file;
     use ruff_db::parsed::parsed_module;
-    use ruff_db::program::{Program, SearchPathSettings, TargetVersion};
     use ruff_db::system::{DbWithTestSystem, SystemPathBuf};
 
     use crate::db::tests::TestDb;
+    use crate::program::{Program, SearchPathSettings};
+    use crate::python_version::PythonVersion;
     use crate::types::Type;
-    use crate::{HasTy, SemanticModel};
+    use crate::{HasTy, ProgramSettings, SemanticModel};
 
-    fn setup_db() -> TestDb {
-        let db = TestDb::new();
-        Program::new(
+    fn setup_db<'a>(files: impl IntoIterator<Item = (&'a str, &'a str)>) -> anyhow::Result<TestDb> {
+        let mut db = TestDb::new();
+        db.write_files(files)?;
+
+        Program::from_settings(
             &db,
-            TargetVersion::Py38,
-            SearchPathSettings {
-                extra_paths: vec![],
-                workspace_root: SystemPathBuf::from("/src"),
-                site_packages: vec![],
-                custom_typeshed: None,
+            ProgramSettings {
+                target_version: PythonVersion::default(),
+                search_paths: SearchPathSettings {
+                    extra_paths: vec![],
+                    src_root: SystemPathBuf::from("/src"),
+                    site_packages: vec![],
+                    custom_typeshed: None,
+                },
             },
-        );
+        )?;
 
-        db
+        Ok(db)
     }
 
     #[test]
     fn function_ty() -> anyhow::Result<()> {
-        let mut db = setup_db();
+        let db = setup_db([("/src/foo.py", "def test(): pass")])?;
 
-        db.write_file("/src/foo.py", "def test(): pass")?;
         let foo = system_path_to_file(&db, "/src/foo.py").unwrap();
 
         let ast = parsed_module(&db, foo);
@@ -207,9 +222,8 @@ mod tests {
 
     #[test]
     fn class_ty() -> anyhow::Result<()> {
-        let mut db = setup_db();
+        let db = setup_db([("/src/foo.py", "class Test: pass")])?;
 
-        db.write_file("/src/foo.py", "class Test: pass")?;
         let foo = system_path_to_file(&db, "/src/foo.py").unwrap();
 
         let ast = parsed_module(&db, foo);
@@ -225,12 +239,11 @@ mod tests {
 
     #[test]
     fn alias_ty() -> anyhow::Result<()> {
-        let mut db = setup_db();
-
-        db.write_files([
+        let db = setup_db([
             ("/src/foo.py", "class Test: pass"),
             ("/src/bar.py", "from foo import Test"),
         ])?;
+
         let bar = system_path_to_file(&db, "/src/bar.py").unwrap();
 
         let ast = parsed_module(&db, bar);

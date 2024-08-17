@@ -24,6 +24,7 @@ const CONVENTIONAL_ALIASES: &[(&str, &str)] = &[
     ("plotly.express", "px"),
     ("polars", "pl"),
     ("pyarrow", "pa"),
+    ("xml.etree.ElementTree", "ET"),
 ];
 
 #[derive(Debug, Default, Clone, PartialEq, Eq, Serialize, Deserialize, CacheKey)]

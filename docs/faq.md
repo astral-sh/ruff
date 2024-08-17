@@ -228,8 +228,8 @@ Ruff is installable under any Python version from 3.7 onwards.
 
 Nope! Ruff is available as [`ruff`](https://pypi.org/project/ruff/) on PyPI:
 
-```shell
-pip install ruff
+```console
+$ pip install ruff
 ```
 
 Ruff ships with wheels for all major platforms, which enables `pip` to install Ruff without relying
@@ -292,13 +292,14 @@ When Ruff sees an import like `import foo`, it will then iterate over the `src` 
 looking for a corresponding Python module (in reality, a directory named `foo` or a file named
 `foo.py`).
 
-If the `src` field is omitted, Ruff will default to using the "project root" as the only
-first-party source. The "project root" is typically the directory containing your `pyproject.toml`,
-`ruff.toml`, or `.ruff.toml` file, unless a configuration file is provided on the command-line via
-the `--config` option, in which case, the current working directory is used as the project root.
+If the `src` field is omitted, Ruff will default to using the "project root", along with a `"src"`
+subdirectory, as the first-party sources, to support both flat and nested project layouts.
+The "project root" is typically the directory containing your `pyproject.toml`, `ruff.toml`, or
+`.ruff.toml` file, unless a configuration file is provided on the command-line via the `--config`
+option, in which case, the current working directory is used as the project root.
 
-In this case, Ruff would only check the top-level directory. Instead, we can configure Ruff to
-consider `src` as a first-party source like so:
+In this case, Ruff would check the `"src"` directory by default, but we can configure it as an
+explicit, exclusive first-party source like so:
 
 === "pyproject.toml"
 
@@ -397,38 +398,16 @@ them. You can find the supported settings in the [API reference](settings.md#lin
 
 ## Does Ruff support Jupyter Notebooks?
 
-Ruff has built-in support for linting [Jupyter Notebooks](https://jupyter.org/).
-
-To opt in to linting Jupyter Notebook (`.ipynb`) files, add the `*.ipynb` pattern to your
-[`extend-include`](settings.md#extend-include) setting, like so:
-
-=== "pyproject.toml"
-
-    ```toml
-    [tool.ruff]
-    extend-include = ["*.ipynb"]
-    ```
-
-=== "ruff.toml"
-
-    ```toml
-    extend-include = ["*.ipynb"]
-    ```
-
-This will prompt Ruff to discover Jupyter Notebook (`.ipynb`) files in any specified
-directories, then lint and format them accordingly.
-
-Alternatively, pass the notebook file(s) to `ruff` on the command-line directly. For example,
-`ruff check /path/to/notebook.ipynb` will always lint `notebook.ipynb`. Similarly,
-`ruff format /path/to/notebook.ipynb` will always format `notebook.ipynb`.
+Ruff has built-in support for linting and formatting [Jupyter Notebooks](https://jupyter.org/). Refer to the
+[Jupyter Notebook section](configuration.md#jupyter-notebook-discovery) for more details.
 
 Ruff also integrates with [nbQA](https://github.com/nbQA-dev/nbQA), a tool for running linters and
 code formatters over Jupyter Notebooks.
 
 After installing `ruff` and `nbqa`, you can run Ruff over a notebook like so:
 
-```shell
-> nbqa ruff Untitled.ipynb
+```console
+$ nbqa ruff Untitled.ipynb
 Untitled.ipynb:cell_1:2:5: F841 Local variable `x` is assigned to but never used
 Untitled.ipynb:cell_2:1:1: E402 Module level import not at top of file
 Untitled.ipynb:cell_2:1:8: F401 `os` imported but unused

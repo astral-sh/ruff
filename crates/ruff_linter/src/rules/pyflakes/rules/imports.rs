@@ -177,18 +177,19 @@ impl Violation for UndefinedLocalWithImportStarUsage {
 /// module).
 ///
 /// ## Example
+///
 /// ```python
 /// def foo():
 ///     from math import *
 /// ```
 ///
 /// Use instead:
+///
 /// ```python
 /// from math import *
 ///
 ///
-/// def foo():
-///     ...
+/// def foo(): ...
 /// ```
 ///
 /// [PEP 8]: https://peps.python.org/pep-0008/#imports

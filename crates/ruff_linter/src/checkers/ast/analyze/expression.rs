@@ -146,6 +146,10 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
                 refurb::rules::fstring_number_format(checker, subscript);
             }
 
+            if checker.enabled(Rule::IncorrectlyParenthesizedTupleInSubscript) {
+                ruff::rules::subscript_with_parenthesized_tuple(checker, subscript);
+            }
+
             pandas_vet::rules::subscript(checker, value, expr);
         }
         Expr::Tuple(ast::ExprTuple {
@@ -1073,12 +1077,7 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
             }
             if checker.enabled(Rule::MissingFStringSyntax) {
                 for string_literal in value.literals() {
-                    ruff::rules::missing_fstring_syntax(
-                        &mut checker.diagnostics,
-                        string_literal,
-                        checker.locator,
-                        &checker.semantic,
-                    );
+                    ruff::rules::missing_fstring_syntax(checker, string_literal);
                 }
             }
         }
@@ -1374,12 +1373,7 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
             }
             if checker.enabled(Rule::MissingFStringSyntax) {
                 for string_literal in value.as_slice() {
-                    ruff::rules::missing_fstring_syntax(
-                        &mut checker.diagnostics,
-                        string_literal,
-                        checker.locator,
-                        &checker.semantic,
-                    );
+                    ruff::rules::missing_fstring_syntax(checker, string_literal);
                 }
             }
         }
@@ -1494,7 +1488,9 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
             }
 
             if checker.enabled(Rule::UnnecessaryDictComprehensionForIterable) {
-                ruff::rules::unnecessary_dict_comprehension_for_iterable(checker, dict_comp);
+                flake8_comprehensions::rules::unnecessary_dict_comprehension_for_iterable(
+                    checker, dict_comp,
+                );
             }
 
             if checker.enabled(Rule::FunctionUsesLoopVariable) {

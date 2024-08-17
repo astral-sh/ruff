@@ -1,5 +1,6 @@
 use anyhow::Ok;
 use lsp_types::NotebookCellKind;
+use ruff_notebook::CellMetadata;
 use rustc_hash::{FxBuildHasher, FxHashMap};
 
 use crate::{PositionEncoding, TextDocument};
@@ -65,7 +66,7 @@ impl NotebookDocument {
                 NotebookCellKind::Code => ruff_notebook::Cell::Code(ruff_notebook::CodeCell {
                     execution_count: None,
                     id: None,
-                    metadata: serde_json::Value::Null,
+                    metadata: CellMetadata::default(),
                     outputs: vec![],
                     source: ruff_notebook::SourceValue::String(
                         cell.document.contents().to_string(),
@@ -75,7 +76,7 @@ impl NotebookDocument {
                     ruff_notebook::Cell::Markdown(ruff_notebook::MarkdownCell {
                         attachments: None,
                         id: None,
-                        metadata: serde_json::Value::Null,
+                        metadata: CellMetadata::default(),
                         source: ruff_notebook::SourceValue::String(
                             cell.document.contents().to_string(),
                         ),

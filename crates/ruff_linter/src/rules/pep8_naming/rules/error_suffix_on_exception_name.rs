@@ -17,15 +17,15 @@ use crate::rules::pep8_naming::settings::IgnoreNames;
 /// > exception names (if the exception actually is an error).
 ///
 /// ## Example
+///
 /// ```python
-/// class Validation(Exception):
-///     ...
+/// class Validation(Exception): ...
 /// ```
 ///
 /// Use instead:
+///
 /// ```python
-/// class ValidationError(Exception):
-///     ...
+/// class ValidationError(Exception): ...
 /// ```
 ///
 /// [PEP 8]: https://peps.python.org/pep-0008/#exception-names

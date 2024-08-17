@@ -36,9 +36,18 @@ pub struct Binding<'a> {
 }
 
 impl<'a> Binding<'a> {
+    /// Return `true` if this [`Binding`] is unused.
+    ///
+    /// This method is the opposite of [`Binding::is_used`].
+    pub fn is_unused(&self) -> bool {
+        self.references.is_empty()
+    }
+
     /// Return `true` if this [`Binding`] is used.
+    ///
+    /// This method is the opposite of [`Binding::is_unused`].
     pub fn is_used(&self) -> bool {
-        !self.references.is_empty()
+        !self.is_unused()
     }
 
     /// Returns an iterator over all references for the current [`Binding`].

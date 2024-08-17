@@ -690,10 +690,10 @@ pub(crate) fn percent_format_positional_count_mismatch(
         return;
     }
 
-    if let Expr::Tuple(ast::ExprTuple { elts, .. }) = right {
+    if let Expr::Tuple(tuple) = right {
         let mut found = 0;
-        for elt in elts {
-            if elt.is_starred_expr() {
+        for element in tuple {
+            if element.is_starred_expr() {
                 return;
             }
             found += 1;

@@ -34,7 +34,7 @@ type SymbolMap = hashbrown::HashMap<ScopedSymbolId, (), ()>;
 /// Prefer using [`symbol_table`] when working with symbols from a single scope.
 #[salsa::tracked(return_ref, no_eq)]
 pub(crate) fn semantic_index(db: &dyn Db, file: File) -> SemanticIndex<'_> {
-    let _span = tracing::trace_span!("semantic_index", file=?file.path(db)).entered();
+    let _span = tracing::trace_span!("semantic_index", file = %file.path(db)).entered();
 
     let parsed = parsed_module(db.upcast(), file);
 
@@ -50,7 +50,7 @@ pub(crate) fn semantic_index(db: &dyn Db, file: File) -> SemanticIndex<'_> {
 pub(crate) fn symbol_table<'db>(db: &'db dyn Db, scope: ScopeId<'db>) -> Arc<SymbolTable> {
     let file = scope.file(db);
     let _span =
-        tracing::trace_span!("symbol_table", scope=?scope.as_id(), file=?file.path(db)).entered();
+        tracing::trace_span!("symbol_table", scope=?scope.as_id(), file=%file.path(db)).entered();
     let index = semantic_index(db, file);
 
     index.symbol_table(scope.file_scope_id(db))
@@ -65,7 +65,7 @@ pub(crate) fn symbol_table<'db>(db: &'db dyn Db, scope: ScopeId<'db>) -> Arc<Sym
 pub(crate) fn use_def_map<'db>(db: &'db dyn Db, scope: ScopeId<'db>) -> Arc<UseDefMap<'db>> {
     let file = scope.file(db);
     let _span =
-        tracing::trace_span!("use_def_map", scope=?scope.as_id(), file=?file.path(db)).entered();
+        tracing::trace_span!("use_def_map", scope=?scope.as_id(), file=%file.path(db)).entered();
     let index = semantic_index(db, file);
 
     index.use_def_map(scope.file_scope_id(db))
@@ -74,7 +74,7 @@ pub(crate) fn use_def_map<'db>(db: &'db dyn Db, scope: ScopeId<'db>) -> Arc<UseD
 /// Returns the module global scope of `file`.
 #[salsa::tracked]
 pub(crate) fn global_scope(db: &dyn Db, file: File) -> ScopeId<'_> {
-    let _span = tracing::trace_span!("global_scope", file=?file.path(db)).entered();
+    let _span = tracing::trace_span!("global_scope", file = %file.path(db)).entered();
 
     FileScopeId::global().to_scope_id(db, file)
 }
@@ -89,8 +89,6 @@ pub(crate) struct SemanticIndex<'db> {
     scopes: IndexVec<FileScopeId, Scope>,
 
     /// Map expressions to their corresponding scope.
-    /// We can't use [`ExpressionId`] here, because the challenge is how to get from
-    /// an [`ast::Expr`] to an [`ExpressionId`] (which requires knowing the scope).
     scopes_by_expression: FxHashMap<ExpressionNodeKey, FileScopeId>,
 
     /// Map from a node creating a definition to its definition.
@@ -118,7 +116,7 @@ pub(crate) struct SemanticIndex<'db> {
 impl<'db> SemanticIndex<'db> {
     /// Returns the symbol table for a specific scope.
     ///
-    /// Use the Salsa cached [`symbol_table`] query if you only need the
+    /// Use the Salsa cached [`symbol_table()`] query if you only need the
     /// symbol table for a single scope.
     pub(super) fn symbol_table(&self, scope_id: FileScopeId) -> Arc<SymbolTable> {
         self.symbol_tables[scope_id].clone()
@@ -126,7 +124,7 @@ impl<'db> SemanticIndex<'db> {
 
     /// Returns the use-def map for a specific scope.
     ///
-    /// Use the Salsa cached [`use_def_map`] query if you only need the
+    /// Use the Salsa cached [`use_def_map()`] query if you only need the
     /// use-def map for a single scope.
     pub(super) fn use_def_map(&self, scope_id: FileScopeId) -> Arc<UseDefMap> {
         self.use_def_maps[scope_id].clone()
@@ -309,6 +307,7 @@ mod tests {
     use ruff_db::parsed::parsed_module;
     use ruff_db::system::DbWithTestSystem;
     use ruff_python_ast as ast;
+    use ruff_text_size::{Ranged, TextRange};
 
     use crate::db::tests::TestDb;
     use crate::semantic_index::ast_ids::HasScopedUseId;
@@ -527,6 +526,235 @@ y = 2
             definition.node(&db),
             DefinitionKind::Assignment(_)
         ));
+    }
+
+    #[test]
+    fn function_parameter_symbols() {
+        let TestCase { db, file } = test_case(
+            "
+def f(a: str, /, b: str, c: int = 1, *args, d: int = 2, **kwargs):
+    pass
+",
+        );
+
+        let index = semantic_index(&db, file);
+        let global_table = symbol_table(&db, global_scope(&db, file));
+
+        assert_eq!(names(&global_table), vec!["f", "str", "int"]);
+
+        let [(function_scope_id, _function_scope)] = index
+            .child_scopes(FileScopeId::global())
+            .collect::<Vec<_>>()[..]
+        else {
+            panic!("Expected a function scope")
+        };
+
+        let function_table = index.symbol_table(function_scope_id);
+        assert_eq!(
+            names(&function_table),
+            vec!["a", "b", "c", "args", "d", "kwargs"],
+        );
+
+        let use_def = index.use_def_map(function_scope_id);
+        for name in ["a", "b", "c", "d"] {
+            let [definition] = use_def.public_definitions(
+                function_table
+                    .symbol_id_by_name(name)
+                    .expect("symbol exists"),
+            ) else {
+                panic!("Expected parameter definition for {name}");
+            };
+            assert!(matches!(
+                definition.node(&db),
+                DefinitionKind::ParameterWithDefault(_)
+            ));
+        }
+        for name in ["args", "kwargs"] {
+            let [definition] = use_def.public_definitions(
+                function_table
+                    .symbol_id_by_name(name)
+                    .expect("symbol exists"),
+            ) else {
+                panic!("Expected parameter definition for {name}");
+            };
+            assert!(matches!(definition.node(&db), DefinitionKind::Parameter(_)));
+        }
+    }
+
+    #[test]
+    fn lambda_parameter_symbols() {
+        let TestCase { db, file } = test_case("lambda a, b, c=1, *args, d=2, **kwargs: None");
+
+        let index = semantic_index(&db, file);
+        let global_table = symbol_table(&db, global_scope(&db, file));
+
+        assert!(names(&global_table).is_empty());
+
+        let [(lambda_scope_id, _lambda_scope)] = index
+            .child_scopes(FileScopeId::global())
+            .collect::<Vec<_>>()[..]
+        else {
+            panic!("Expected a lambda scope")
+        };
+
+        let lambda_table = index.symbol_table(lambda_scope_id);
+        assert_eq!(
+            names(&lambda_table),
+            vec!["a", "b", "c", "args", "d", "kwargs"],
+        );
+
+        let use_def = index.use_def_map(lambda_scope_id);
+        for name in ["a", "b", "c", "d"] {
+            let [definition] = use_def
+                .public_definitions(lambda_table.symbol_id_by_name(name).expect("symbol exists"))
+            else {
+                panic!("Expected parameter definition for {name}");
+            };
+            assert!(matches!(
+                definition.node(&db),
+                DefinitionKind::ParameterWithDefault(_)
+            ));
+        }
+        for name in ["args", "kwargs"] {
+            let [definition] = use_def
+                .public_definitions(lambda_table.symbol_id_by_name(name).expect("symbol exists"))
+            else {
+                panic!("Expected parameter definition for {name}");
+            };
+            assert!(matches!(definition.node(&db), DefinitionKind::Parameter(_)));
+        }
+    }
+
+    /// Test case to validate that the comprehension scope is correctly identified and that the target
+    /// variable is defined only in the comprehension scope and not in the global scope.
+    #[test]
+    fn comprehension_scope() {
+        let TestCase { db, file } = test_case(
+            "
+[x for x in iter1]
+",
+        );
+
+        let index = semantic_index(&db, file);
+        let global_table = index.symbol_table(FileScopeId::global());
+
+        assert_eq!(names(&global_table), vec!["iter1"]);
+
+        let [(comprehension_scope_id, comprehension_scope)] = index
+            .child_scopes(FileScopeId::global())
+            .collect::<Vec<_>>()[..]
+        else {
+            panic!("expected one child scope")
+        };
+
+        assert_eq!(comprehension_scope.kind(), ScopeKind::Comprehension);
+        assert_eq!(
+            comprehension_scope_id.to_scope_id(&db, file).name(&db),
+            "<listcomp>"
+        );
+
+        let comprehension_symbol_table = index.symbol_table(comprehension_scope_id);
+
+        assert_eq!(names(&comprehension_symbol_table), vec!["x"]);
+    }
+
+    /// Test case to validate that the `x` variable used in the comprehension is referencing the
+    /// `x` variable defined by the inner generator (`for x in iter2`) and not the outer one.
+    #[test]
+    fn multiple_generators() {
+        let TestCase { db, file } = test_case(
+            "
+[x for x in iter1 for x in iter2]
+",
+        );
+
+        let index = semantic_index(&db, file);
+        let [(comprehension_scope_id, _)] = index
+            .child_scopes(FileScopeId::global())
+            .collect::<Vec<_>>()[..]
+        else {
+            panic!("expected one child scope")
+        };
+
+        let use_def = index.use_def_map(comprehension_scope_id);
+
+        let module = parsed_module(&db, file).syntax();
+        let element = module.body[0]
+            .as_expr_stmt()
+            .unwrap()
+            .value
+            .as_list_comp_expr()
+            .unwrap()
+            .elt
+            .as_name_expr()
+            .unwrap();
+        let element_use_id =
+            element.scoped_use_id(&db, comprehension_scope_id.to_scope_id(&db, file));
+
+        let [definition] = use_def.use_definitions(element_use_id) else {
+            panic!("expected one definition")
+        };
+        let DefinitionKind::Comprehension(comprehension) = definition.node(&db) else {
+            panic!("expected generator definition")
+        };
+        let ast::Comprehension { target, .. } = comprehension.node();
+        let name = target.as_name_expr().unwrap().id().as_str();
+
+        assert_eq!(name, "x");
+        assert_eq!(target.range(), TextRange::new(23.into(), 24.into()));
+    }
+
+    /// Test case to validate that the nested comprehension creates a new scope which is a child of
+    /// the outer comprehension scope and the variables are correctly defined in the respective
+    /// scopes.
+    #[test]
+    fn nested_generators() {
+        let TestCase { db, file } = test_case(
+            "
+[{x for x in iter2} for y in iter1]
+",
+        );
+
+        let index = semantic_index(&db, file);
+        let global_table = index.symbol_table(FileScopeId::global());
+
+        assert_eq!(names(&global_table), vec!["iter1"]);
+
+        let [(comprehension_scope_id, comprehension_scope)] = index
+            .child_scopes(FileScopeId::global())
+            .collect::<Vec<_>>()[..]
+        else {
+            panic!("expected one child scope")
+        };
+
+        assert_eq!(comprehension_scope.kind(), ScopeKind::Comprehension);
+        assert_eq!(
+            comprehension_scope_id.to_scope_id(&db, file).name(&db),
+            "<listcomp>"
+        );
+
+        let comprehension_symbol_table = index.symbol_table(comprehension_scope_id);
+
+        assert_eq!(names(&comprehension_symbol_table), vec!["y", "iter2"]);
+
+        let [(inner_comprehension_scope_id, inner_comprehension_scope)] = index
+            .child_scopes(comprehension_scope_id)
+            .collect::<Vec<_>>()[..]
+        else {
+            panic!("expected one inner generator scope")
+        };
+
+        assert_eq!(inner_comprehension_scope.kind(), ScopeKind::Comprehension);
+        assert_eq!(
+            inner_comprehension_scope_id
+                .to_scope_id(&db, file)
+                .name(&db),
+            "<setcomp>"
+        );
+
+        let inner_comprehension_symbol_table = index.symbol_table(inner_comprehension_scope_id);
+
+        assert_eq!(names(&inner_comprehension_symbol_table), vec!["x"]);
     }
 
     #[test]

@@ -9,8 +9,8 @@ use crate::rule_redirects::get_redirect_target;
 /// Checks for `noqa` directives that use redirected rule codes.
 ///
 /// ## Why is this bad?
-/// When a rule code has been redirected, the implication is that the rule has
-/// been deprecated in favor of another rule or code. To keep the codebase
+/// When one of Ruff's rule codes has been redirected, the implication is that the rule has
+/// been deprecated in favor of another rule or code. To keep your codebase
 /// consistent and up-to-date, prefer the canonical rule code over the deprecated
 /// code.
 ///

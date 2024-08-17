@@ -6,7 +6,6 @@ use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
 use crate::rules::flake8_async::helpers::AsyncModule;
-use crate::settings::types::PreviewMode;
 
 /// ## What it does
 /// Checks for `async` functions with a `timeout` argument.
@@ -17,9 +16,9 @@ use crate::settings::types::PreviewMode;
 /// or `anyio.move_on_after`, among others.
 ///
 /// ## Example
+///
 /// ```python
-/// async def long_running_task(timeout):
-///     ...
+/// async def long_running_task(timeout): ...
 ///
 ///
 /// async def main():
@@ -27,13 +26,13 @@ use crate::settings::types::PreviewMode;
 /// ```
 ///
 /// Use instead:
+///
 /// ```python
-/// async def long_running_task():
-///     ...
+/// async def long_running_task(): ...
 ///
 ///
 /// async def main():
-///     with asyncio.timeout(2):
+///     async with asyncio.timeout(2):
 ///         await long_running_task()
 /// ```
 ///
@@ -87,17 +86,8 @@ pub(crate) fn async_function_with_timeout(
         AsyncModule::AsyncIo
     };
 
-    if matches!(checker.settings.preview, PreviewMode::Disabled) {
-        if matches!(module, AsyncModule::Trio) {
-            checker.diagnostics.push(Diagnostic::new(
-                AsyncFunctionWithTimeout { module },
-                timeout.range(),
-            ));
-        }
-    } else {
-        checker.diagnostics.push(Diagnostic::new(
-            AsyncFunctionWithTimeout { module },
-            timeout.range(),
-        ));
-    }
+    checker.diagnostics.push(Diagnostic::new(
+        AsyncFunctionWithTimeout { module },
+        timeout.range(),
+    ));
 }

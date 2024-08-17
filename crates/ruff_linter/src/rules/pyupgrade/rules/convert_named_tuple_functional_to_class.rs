@@ -169,14 +169,15 @@ fn create_field_assignment_stmt(field: Name, annotation: &Expr) -> Stmt {
 
 /// Create a list of field assignments from the `NamedTuple` fields argument.
 fn create_fields_from_fields_arg(fields: &Expr) -> Option<Vec<Stmt>> {
-    let ast::ExprList { elts, .. } = fields.as_list_expr()?;
-    if elts.is_empty() {
+    let fields = fields.as_list_expr()?;
+    if fields.is_empty() {
         let node = Stmt::Pass(ast::StmtPass {
             range: TextRange::default(),
         });
         Some(vec![node])
     } else {
-        elts.iter()
+        fields
+            .iter()
             .map(|field| {
                 let ast::ExprTuple { elts, .. } = field.as_tuple_expr()?;
                 let [field, annotation] = elts.as_slice() else {

@@ -91,7 +91,7 @@ pub(super) fn is_typed_dict_class(class_def: &ast::StmtClassDef, semantic: &Sema
         return false;
     }
 
-    analyze::class::any_qualified_name(class_def, semantic, &|qualified_name| {
+    analyze::class::any_qualified_base_class(class_def, semantic, &|qualified_name| {
         semantic.match_typing_qualified_name(&qualified_name, "TypedDict")
     })
 }

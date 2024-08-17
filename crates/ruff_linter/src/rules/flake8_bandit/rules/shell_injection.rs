@@ -530,11 +530,11 @@ fn is_partial_path(expr: &Expr) -> bool {
 /// subprocess.Popen(["/usr/local/bin/rsync", "*", "some_where:"], shell=True)
 /// ```
 fn is_wildcard_command(expr: &Expr) -> bool {
-    if let Expr::List(ast::ExprList { elts, .. }) = expr {
+    if let Expr::List(list) = expr {
         let mut has_star = false;
         let mut has_command = false;
-        for elt in elts {
-            if let Some(text) = string_literal(elt) {
+        for item in list {
+            if let Some(text) = string_literal(item) {
                 has_star |= text.contains('*');
                 has_command |= text.contains("chown")
                     || text.contains("chmod")

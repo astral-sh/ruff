@@ -13,8 +13,8 @@ use crate::ast_node_ref::AstNodeRef;
 use crate::semantic_index::ast_ids::node_key::ExpressionNodeKey;
 use crate::semantic_index::ast_ids::AstIdsBuilder;
 use crate::semantic_index::definition::{
-    AssignmentDefinitionNodeRef, Definition, DefinitionNodeKey, DefinitionNodeRef,
-    ImportFromDefinitionNodeRef,
+    AssignmentDefinitionNodeRef, ComprehensionDefinitionNodeRef, Definition, DefinitionNodeKey,
+    DefinitionNodeRef, ImportFromDefinitionNodeRef,
 };
 use crate::semantic_index::expression::Expression;
 use crate::semantic_index::symbol::{
@@ -174,7 +174,7 @@ impl<'db> SemanticIndexBuilder<'db> {
         symbol: ScopedSymbolId,
         definition_node: impl Into<DefinitionNodeRef<'a>>,
     ) -> Definition<'db> {
-        let definition_node = definition_node.into();
+        let definition_node: DefinitionNodeRef<'_> = definition_node.into();
         let definition = Definition::new(
             self.db,
             self.file,
@@ -258,6 +258,49 @@ impl<'db> SemanticIndexBuilder<'db> {
         nested_scope
     }
 
+    /// Visit a list of [`Comprehension`] nodes, assumed to be the "generators" that compose a
+    /// comprehension (that is, the `for x in y` and `for y in z` parts of `x for x in y for y in z`.)
+    ///
+    /// [`Comprehension`]: ast::Comprehension
+    fn visit_generators(&mut self, scope: NodeWithScopeRef, generators: &'db [ast::Comprehension]) {
+        let mut generators_iter = generators.iter();
+
+        let Some(generator) = generators_iter.next() else {
+            unreachable!("Expression must contain at least one generator");
+        };
+
+        // The `iter` of the first generator is evaluated in the outer scope, while all subsequent
+        // nodes are evaluated in the inner scope.
+        self.visit_expr(&generator.iter);
+        self.push_scope(scope);
+
+        self.current_assignment = Some(CurrentAssignment::Comprehension {
+            node: generator,
+            first: true,
+        });
+        self.visit_expr(&generator.target);
+        self.current_assignment = None;
+
+        for expr in &generator.ifs {
+            self.visit_expr(expr);
+        }
+
+        for generator in generators_iter {
+            self.visit_expr(&generator.iter);
+
+            self.current_assignment = Some(CurrentAssignment::Comprehension {
+                node: generator,
+                first: false,
+            });
+            self.visit_expr(&generator.target);
+            self.current_assignment = None;
+
+            for expr in &generator.ifs {
+                self.visit_expr(expr);
+            }
+        }
+    }
+
     pub(super) fn build(mut self) -> SemanticIndex<'db> {
         let module = self.module;
         self.visit_body(module.suite());
@@ -325,6 +368,16 @@ where
                     .add_or_update_symbol(function_def.name.id.clone(), SymbolFlags::IS_DEFINED);
                 self.add_definition(symbol, function_def);
 
+                // The default value of the parameters needs to be evaluated in the
+                // enclosing scope.
+                for default in function_def
+                    .parameters
+                    .iter_non_variadic_params()
+                    .filter_map(|param| param.default.as_deref())
+                {
+                    self.visit_expr(default);
+                }
+
                 self.with_type_params(
                     NodeWithScopeRef::FunctionTypeParameters(function_def),
                     function_def.type_params.as_deref(),
@@ -335,6 +388,16 @@ where
                         }
 
                         builder.push_scope(NodeWithScopeRef::Function(function_def));
+
+                        // Add symbols and definitions for the parameters to the function scope.
+                        for parameter in &*function_def.parameters {
+                            let symbol = builder.add_or_update_symbol(
+                                parameter.name().id().clone(),
+                                SymbolFlags::IS_DEFINED,
+                            );
+                            builder.add_definition(symbol, parameter);
+                        }
+
                         builder.visit_body(&function_def.body);
                         builder.pop_scope()
                     },
@@ -476,8 +539,7 @@ where
         self.current_ast_ids().record_expression(expr);
 
         match expr {
-            ast::Expr::Name(name_node) => {
-                let ast::ExprName { id, ctx, .. } = name_node;
+            ast::Expr::Name(name_node @ ast::ExprName { id, ctx, .. }) => {
                 let flags = match ctx {
                     ast::ExprContext::Load => SymbolFlags::IS_USED,
                     ast::ExprContext::Store => SymbolFlags::IS_DEFINED,
@@ -500,7 +562,16 @@ where
                             self.add_definition(symbol, ann_assign);
                         }
                         Some(CurrentAssignment::Named(named)) => {
+                            // TODO(dhruvmanila): If the current scope is a comprehension, then the
+                            // named expression is implicitly nonlocal. This is yet to be
+                            // implemented.
                             self.add_definition(symbol, named);
+                        }
+                        Some(CurrentAssignment::Comprehension { node, first }) => {
+                            self.add_definition(
+                                symbol,
+                                ComprehensionDefinitionNodeRef { node, first },
+                            );
                         }
                         None => {}
                     }
@@ -523,11 +594,30 @@ where
             }
             ast::Expr::Lambda(lambda) => {
                 if let Some(parameters) = &lambda.parameters {
+                    // The default value of the parameters needs to be evaluated in the
+                    // enclosing scope.
+                    for default in parameters
+                        .iter_non_variadic_params()
+                        .filter_map(|param| param.default.as_deref())
+                    {
+                        self.visit_expr(default);
+                    }
                     self.visit_parameters(parameters);
                 }
                 self.push_scope(NodeWithScopeRef::Lambda(lambda));
+
+                // Add symbols and definitions for the parameters to the lambda scope.
+                if let Some(parameters) = &lambda.parameters {
+                    for parameter in &**parameters {
+                        let symbol = self.add_or_update_symbol(
+                            parameter.name().id().clone(),
+                            SymbolFlags::IS_DEFINED,
+                        );
+                        self.add_definition(symbol, parameter);
+                    }
+                }
+
                 self.visit_expr(lambda.body.as_ref());
-                self.pop_scope();
             }
             ast::Expr::If(ast::ExprIf {
                 body, test, orelse, ..
@@ -543,9 +633,73 @@ where
                 self.visit_expr(orelse);
                 self.flow_merge(&post_body);
             }
+            ast::Expr::ListComp(
+                list_comprehension @ ast::ExprListComp {
+                    elt, generators, ..
+                },
+            ) => {
+                self.visit_generators(
+                    NodeWithScopeRef::ListComprehension(list_comprehension),
+                    generators,
+                );
+                self.visit_expr(elt);
+            }
+            ast::Expr::SetComp(
+                set_comprehension @ ast::ExprSetComp {
+                    elt, generators, ..
+                },
+            ) => {
+                self.visit_generators(
+                    NodeWithScopeRef::SetComprehension(set_comprehension),
+                    generators,
+                );
+                self.visit_expr(elt);
+            }
+            ast::Expr::Generator(
+                generator @ ast::ExprGenerator {
+                    elt, generators, ..
+                },
+            ) => {
+                self.visit_generators(NodeWithScopeRef::GeneratorExpression(generator), generators);
+                self.visit_expr(elt);
+            }
+            ast::Expr::DictComp(
+                dict_comprehension @ ast::ExprDictComp {
+                    key,
+                    value,
+                    generators,
+                    ..
+                },
+            ) => {
+                self.visit_generators(
+                    NodeWithScopeRef::DictComprehension(dict_comprehension),
+                    generators,
+                );
+                self.visit_expr(key);
+                self.visit_expr(value);
+            }
             _ => {
                 walk_expr(self, expr);
             }
+        }
+
+        if matches!(
+            expr,
+            ast::Expr::Lambda(_)
+                | ast::Expr::ListComp(_)
+                | ast::Expr::SetComp(_)
+                | ast::Expr::Generator(_)
+                | ast::Expr::DictComp(_)
+        ) {
+            self.pop_scope();
+        }
+    }
+
+    fn visit_parameters(&mut self, parameters: &'ast ruff_python_ast::Parameters) {
+        // Intentionally avoid walking default expressions, as we handle them in the enclosing
+        // scope.
+        for parameter in parameters.iter().map(ast::AnyParameterRef::as_parameter) {
+            self.visit_parameter(parameter);
         }
     }
 }
@@ -555,6 +709,10 @@ enum CurrentAssignment<'a> {
     Assign(&'a ast::StmtAssign),
     AnnAssign(&'a ast::StmtAnnAssign),
     Named(&'a ast::ExprNamed),
+    Comprehension {
+        node: &'a ast::Comprehension,
+        first: bool,
+    },
 }
 
 impl<'a> From<&'a ast::StmtAssign> for CurrentAssignment<'a> {

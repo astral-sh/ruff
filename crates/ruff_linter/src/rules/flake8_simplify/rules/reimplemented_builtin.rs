@@ -18,8 +18,7 @@ use crate::line_width::LineWidthBuilder;
 /// `any` or `all`.
 ///
 /// ## Why is this bad?
-/// Using a builtin function is more concise and readable. Builtins are also
-/// more efficient than `for` loops.
+/// Using a builtin function is more concise and readable.
 ///
 /// ## Example
 /// ```python

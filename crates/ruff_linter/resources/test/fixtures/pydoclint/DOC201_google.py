@@ -86,3 +86,36 @@ class Baz:
             num (int): A number
         """
         return 'test'
+
+
+# OK
+def f():
+    """Returns 1."""
+    return 1
+
+
+# OK
+def f():
+    """Return 1."""
+    return 1
+
+
+# OK
+def f(num: int):
+    """Returns 1.
+
+    Args:
+        num (int): A number
+    """
+    return 1
+
+
+import abc
+
+
+class A(metaclass=abc.abcmeta):
+    # DOC201
+    @abc.abstractmethod
+    def f(self):
+        """Lorem ipsum."""
+        return True

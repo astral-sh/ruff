@@ -1052,7 +1052,7 @@ pub(crate) fn has_own_parentheses(
                 ..
             },
         ) => {
-            if !tuple.elts.is_empty() || context.comments().has_dangling(AnyNodeRef::from(expr)) {
+            if !tuple.is_empty() || context.comments().has_dangling(AnyNodeRef::from(expr)) {
                 Some(OwnParentheses::NonEmpty)
             } else {
                 Some(OwnParentheses::Empty)
@@ -1216,10 +1216,10 @@ pub(crate) fn is_splittable_expression(expr: &Expr, context: &PyFormatContext) -
         | Expr::YieldFrom(_) => true,
 
         // Sequence types can split if they contain at least one element.
-        Expr::Tuple(tuple) => !tuple.elts.is_empty(),
-        Expr::Dict(dict) => !dict.items.is_empty(),
-        Expr::Set(set) => !set.elts.is_empty(),
-        Expr::List(list) => !list.elts.is_empty(),
+        Expr::Tuple(tuple) => !tuple.is_empty(),
+        Expr::Dict(dict) => !dict.is_empty(),
+        Expr::Set(set) => !set.is_empty(),
+        Expr::List(list) => !list.is_empty(),
 
         Expr::UnaryOp(unary) => is_splittable_expression(unary.operand.as_ref(), context),
         Expr::Yield(ast::ExprYield { value, .. }) => value.is_some(),

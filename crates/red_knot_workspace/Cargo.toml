@@ -12,18 +12,19 @@ license.workspace = true
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-red_knot_module_resolver = { workspace = true }
 red_knot_python_semantic = { workspace = true }
 
 ruff_cache = { workspace = true }
 ruff_db = { workspace = true, features = ["os", "cache"] }
 ruff_python_ast = { workspace = true }
+ruff_text_size = { workspace = true }
 
 anyhow = { workspace = true }
 crossbeam = { workspace = true }
 notify = { workspace = true }
 rustc-hash = { workspace = true }
 salsa = { workspace = true }
+thiserror = { workspace = true }
 tracing = { workspace = true }
 
 [dev-dependencies]

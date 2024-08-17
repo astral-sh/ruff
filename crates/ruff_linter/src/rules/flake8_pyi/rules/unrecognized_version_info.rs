@@ -181,7 +181,7 @@ fn version_check(
     }
 
     // Tuple comparison, e.g., `sys.version_info == (3, 4)`.
-    let Expr::Tuple(ast::ExprTuple { elts, .. }) = comparator else {
+    let Expr::Tuple(tuple) = comparator else {
         if checker.enabled(Rule::UnrecognizedVersionInfoCheck) {
             checker
                 .diagnostics
@@ -190,7 +190,7 @@ fn version_check(
         return;
     };
 
-    if !elts.iter().all(is_int_constant) {
+    if !tuple.iter().all(is_int_constant) {
         // All tuple elements must be integers, e.g., `sys.version_info == (3, 4)` instead of
         // `sys.version_info == (3.0, 4)`.
         if checker.enabled(Rule::UnrecognizedVersionInfoCheck) {
@@ -198,7 +198,7 @@ fn version_check(
                 .diagnostics
                 .push(Diagnostic::new(UnrecognizedVersionInfoCheck, test.range()));
         }
-    } else if elts.len() > 2 {
+    } else if tuple.len() > 2 {
         // Must compare against major and minor version only, e.g., `sys.version_info == (3, 4)`
         // instead of `sys.version_info == (3, 4, 0)`.
         if checker.enabled(Rule::PatchVersionComparison) {
@@ -216,7 +216,7 @@ fn version_check(
                 _ => return,
             };
 
-            if elts.len() != expected_length {
+            if tuple.len() != expected_length {
                 checker.diagnostics.push(Diagnostic::new(
                     WrongTupleLengthVersionComparison { expected_length },
                     test.range(),

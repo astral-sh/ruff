@@ -7,13 +7,17 @@ use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
 
+/// ## Deprecation
+/// There's no [evidence](https://github.com/astral-sh/ruff/issues/12754) that generators are
+/// meaningfully faster than list comprehensions when combined with unpacking.
+///
 /// ## What it does
 /// Checks for list comprehensions that are immediately unpacked.
 ///
 /// ## Why is this bad?
 /// There is no reason to use a list comprehension if the result is immediately
-/// unpacked. Instead, use a generator expression, which is more efficient as
-/// it avoids allocating an intermediary list.
+/// unpacked. Instead, use a generator expression, which avoids allocating
+/// an intermediary list.
 ///
 /// ## Example
 /// ```python

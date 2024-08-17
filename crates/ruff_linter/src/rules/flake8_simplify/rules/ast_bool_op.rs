@@ -411,8 +411,8 @@ pub(crate) fn duplicate_isinstance_call(checker: &mut Checker, expr: &Expr) {
                     elts: types
                         .iter()
                         .flat_map(|value| {
-                            if let Expr::Tuple(ast::ExprTuple { elts, .. }) = value {
-                                Left(elts.iter())
+                            if let Expr::Tuple(tuple) = value {
+                                Left(tuple.iter())
                             } else {
                                 Right(iter::once(*value))
                             }
@@ -722,8 +722,7 @@ fn get_short_circuit_edit(
         generator.expr(expr)
     };
     Edit::range_replacement(
-        if matches!(expr, Expr::Tuple(ast::ExprTuple { elts, ctx: _, range: _, parenthesized: _}) if !elts.is_empty())
-        {
+        if matches!(expr, Expr::Tuple(tuple) if !tuple.is_empty()) {
             format!("({content})")
         } else {
             content

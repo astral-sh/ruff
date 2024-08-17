@@ -17,20 +17,20 @@ use crate::fix;
 /// When it comes to consistency and readability, it's preferred to use the decorator.
 ///
 /// ## Example
+///
 /// ```python
 /// class Foo:
-///     def bar(cls):
-///         ...
+///     def bar(cls): ...
 ///
 ///     bar = classmethod(bar)
 /// ```
 ///
 /// Use instead:
+///
 /// ```python
 /// class Foo:
 ///     @classmethod
-///     def bar(cls):
-///         ...
+///     def bar(cls): ...
 /// ```
 #[violation]
 pub struct NoClassmethodDecorator;
@@ -53,20 +53,20 @@ impl AlwaysFixableViolation for NoClassmethodDecorator {
 /// When it comes to consistency and readability, it's preferred to use the decorator.
 ///
 /// ## Example
+///
 /// ```python
 /// class Foo:
-///     def bar(arg1, arg2):
-///         ...
+///     def bar(arg1, arg2): ...
 ///
 ///     bar = staticmethod(bar)
 /// ```
 ///
 /// Use instead:
+///
 /// ```python
 /// class Foo:
 ///     @staticmethod
-///     def bar(arg1, arg2):
-///         ...
+///     def bar(arg1, arg2): ...
 /// ```
 #[violation]
 pub struct NoStaticmethodDecorator;

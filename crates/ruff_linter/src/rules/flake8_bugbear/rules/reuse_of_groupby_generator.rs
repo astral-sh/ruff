@@ -315,15 +315,15 @@ pub(crate) fn reuse_of_groupby_generator(
     let Expr::Call(ast::ExprCall { func, .. }) = &iter else {
         return;
     };
-    let Expr::Tuple(ast::ExprTuple { elts, .. }) = target else {
+    let Expr::Tuple(tuple) = target else {
         // Ignore any `groupby()` invocation that isn't unpacked
         return;
     };
-    if elts.len() != 2 {
+    if tuple.len() != 2 {
         return;
     }
     // We have an invocation of groupby which is a simple unpacking
-    let Expr::Name(ast::ExprName { id: group_name, .. }) = &elts[1] else {
+    let Expr::Name(ast::ExprName { id: group_name, .. }) = &tuple.elts[1] else {
         return;
     };
     // Check if the function call is `itertools.groupby`

@@ -135,11 +135,10 @@ fn is_same_expr(left: &Expr, right: &Expr) -> bool {
     match (&left, &right) {
         (Expr::Name(left), Expr::Name(right)) => left.id == right.id,
         (Expr::Tuple(left), Expr::Tuple(right)) => {
-            left.elts.len() == right.elts.len()
+            left.len() == right.len()
                 && left
-                    .elts
                     .iter()
-                    .zip(right.elts.iter())
+                    .zip(right)
                     .all(|(left, right)| is_same_expr(left, right))
         }
         _ => false,
@@ -153,7 +152,7 @@ fn collect_names<'a>(expr: &'a Expr) -> Box<dyn Iterator<Item = &ast::ExprName> 
         expr.as_name_expr().into_iter().chain(
             expr.as_tuple_expr()
                 .into_iter()
-                .flat_map(|tuple| tuple.elts.iter().flat_map(collect_names)),
+                .flat_map(|tuple| tuple.iter().flat_map(collect_names)),
         ),
     )
 }

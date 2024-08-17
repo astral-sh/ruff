@@ -21,31 +21,34 @@ use crate::checkers::ast::Checker;
 /// annotations on assignments in function bodies.
 ///
 /// ## Example
+///
 /// Given:
+///
 /// ```python
 /// from __future__ import annotations
 ///
 ///
-/// def foo(bar: "Bar") -> "Bar":
-///     ...
+/// def foo(bar: "Bar") -> "Bar": ...
 /// ```
 ///
 /// Use instead:
+///
 /// ```python
 /// from __future__ import annotations
 ///
 ///
-/// def foo(bar: Bar) -> Bar:
-///     ...
+/// def foo(bar: Bar) -> Bar: ...
 /// ```
 ///
 /// Given:
+///
 /// ```python
 /// def foo() -> None:
 ///     bar: "Bar"
 /// ```
 ///
 /// Use instead:
+///
 /// ```python
 /// def foo() -> None:
 ///     bar: Bar

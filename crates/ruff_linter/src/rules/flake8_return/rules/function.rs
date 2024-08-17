@@ -451,21 +451,45 @@ fn is_noreturn_func(func: &Expr, semantic: &SemanticModel) -> bool {
     semantic.match_typing_qualified_name(&qualified_name, "NoReturn")
 }
 
-/// RET503
-fn implicit_return(checker: &mut Checker, stmt: &Stmt) {
+fn add_return_none(checker: &mut Checker, stmt: &Stmt, range: TextRange) {
+    let mut diagnostic = Diagnostic::new(ImplicitReturn, range);
+    if let Some(indent) = indentation(checker.locator(), stmt) {
+        let mut content = String::new();
+        content.push_str(checker.stylist().line_ending().as_str());
+        content.push_str(indent);
+        content.push_str("return None");
+        diagnostic.set_fix(Fix::unsafe_edit(Edit::insertion(
+            content,
+            end_of_last_statement(stmt, checker.locator()),
+        )));
+    }
+    checker.diagnostics.push(diagnostic);
+}
+
+/// Returns a list of all implicit returns in the given statement.
+///
+/// Note: The function should be refactored to `has_implicit_return` with an early return (when seeing the first implicit return)
+/// when removing the preview gating.
+fn implicit_returns<'a>(checker: &Checker, stmt: &'a Stmt) -> Vec<&'a Stmt> {
     match stmt {
         Stmt::If(ast::StmtIf {
             body,
             elif_else_clauses,
             ..
         }) => {
-            if let Some(last_stmt) = body.last() {
-                implicit_return(checker, last_stmt);
-            }
+            let mut implicit_stmts = body
+                .last()
+                .map(|last| implicit_returns(checker, last))
+                .unwrap_or_default();
+
             for clause in elif_else_clauses {
-                if let Some(last_stmt) = clause.body.last() {
-                    implicit_return(checker, last_stmt);
-                }
+                implicit_stmts.extend(
+                    clause
+                        .body
+                        .last()
+                        .iter()
+                        .flat_map(|last| implicit_returns(checker, last)),
+                );
             }
 
             // Check if we don't have an else clause
@@ -473,72 +497,64 @@ fn implicit_return(checker: &mut Checker, stmt: &Stmt) {
                 elif_else_clauses.last(),
                 None | Some(ast::ElifElseClause { test: Some(_), .. })
             ) {
-                let mut diagnostic = Diagnostic::new(ImplicitReturn, stmt.range());
-                if let Some(indent) = indentation(checker.locator(), stmt) {
-                    let mut content = String::new();
-                    content.push_str(checker.stylist().line_ending().as_str());
-                    content.push_str(indent);
-                    content.push_str("return None");
-                    diagnostic.set_fix(Fix::unsafe_edit(Edit::insertion(
-                        content,
-                        end_of_last_statement(stmt, checker.locator()),
-                    )));
-                }
-                checker.diagnostics.push(diagnostic);
+                implicit_stmts.push(stmt);
             }
+            implicit_stmts
         }
-        Stmt::Assert(ast::StmtAssert { test, .. }) if is_const_false(test) => {}
-        Stmt::While(ast::StmtWhile { test, .. }) if is_const_true(test) => {}
+        Stmt::Assert(ast::StmtAssert { test, .. }) if is_const_false(test) => vec![],
+        Stmt::While(ast::StmtWhile { test, .. }) if is_const_true(test) => vec![],
         Stmt::For(ast::StmtFor { orelse, .. }) | Stmt::While(ast::StmtWhile { orelse, .. }) => {
             if let Some(last_stmt) = orelse.last() {
-                implicit_return(checker, last_stmt);
+                implicit_returns(checker, last_stmt)
             } else {
-                let mut diagnostic = Diagnostic::new(ImplicitReturn, stmt.range());
-                if let Some(indent) = indentation(checker.locator(), stmt) {
-                    let mut content = String::new();
-                    content.push_str(checker.stylist().line_ending().as_str());
-                    content.push_str(indent);
-                    content.push_str("return None");
-                    diagnostic.set_fix(Fix::unsafe_edit(Edit::insertion(
-                        content,
-                        end_of_last_statement(stmt, checker.locator()),
-                    )));
-                }
-                checker.diagnostics.push(diagnostic);
+                vec![stmt]
             }
         }
         Stmt::Match(ast::StmtMatch { cases, .. }) => {
+            let mut implicit_stmts = vec![];
             for case in cases {
-                if let Some(last_stmt) = case.body.last() {
-                    implicit_return(checker, last_stmt);
-                }
+                implicit_stmts.extend(
+                    case.body
+                        .last()
+                        .into_iter()
+                        .flat_map(|last_stmt| implicit_returns(checker, last_stmt)),
+                );
             }
+            implicit_stmts
         }
-        Stmt::With(ast::StmtWith { body, .. }) => {
-            if let Some(last_stmt) = body.last() {
-                implicit_return(checker, last_stmt);
-            }
-        }
-        Stmt::Return(_) | Stmt::Raise(_) | Stmt::Try(_) => {}
+        Stmt::With(ast::StmtWith { body, .. }) => body
+            .last()
+            .map(|last_stmt| implicit_returns(checker, last_stmt))
+            .unwrap_or_default(),
+        Stmt::Return(_) | Stmt::Raise(_) | Stmt::Try(_) => vec![],
         Stmt::Expr(ast::StmtExpr { value, .. })
             if matches!(
                 value.as_ref(),
                 Expr::Call(ast::ExprCall { func, ..  })
                     if is_noreturn_func(func, checker.semantic())
-            ) => {}
+            ) =>
+        {
+            vec![]
+        }
         _ => {
-            let mut diagnostic = Diagnostic::new(ImplicitReturn, stmt.range());
-            if let Some(indent) = indentation(checker.locator(), stmt) {
-                let mut content = String::new();
-                content.push_str(checker.stylist().line_ending().as_str());
-                content.push_str(indent);
-                content.push_str("return None");
-                diagnostic.set_fix(Fix::unsafe_edit(Edit::insertion(
-                    content,
-                    end_of_last_statement(stmt, checker.locator()),
-                )));
-            }
-            checker.diagnostics.push(diagnostic);
+            vec![stmt]
+        }
+    }
+}
+
+/// RET503
+fn implicit_return(checker: &mut Checker, function_def: &ast::StmtFunctionDef, stmt: &Stmt) {
+    let implicit_stmts = implicit_returns(checker, stmt);
+
+    if implicit_stmts.is_empty() {
+        return;
+    }
+
+    if checker.settings.preview.is_enabled() {
+        add_return_none(checker, stmt, function_def.range());
+    } else {
+        for implicit_stmt in implicit_stmts {
+            add_return_none(checker, implicit_stmt, implicit_stmt.range());
         }
     }
 }
@@ -656,16 +672,14 @@ fn superfluous_else_node(
                     .unwrap_or_else(|| elif_else.range()),
             );
             if checker.enabled(diagnostic.kind.rule()) {
-                if checker.settings.preview.is_enabled() {
-                    diagnostic.try_set_fix(|| {
-                        remove_else(
-                            elif_else,
-                            checker.locator(),
-                            checker.indexer(),
-                            checker.stylist(),
-                        )
-                    });
-                }
+                diagnostic.try_set_fix(|| {
+                    remove_else(
+                        elif_else,
+                        checker.locator(),
+                        checker.indexer(),
+                        checker.stylist(),
+                    )
+                });
                 checker.diagnostics.push(diagnostic);
             }
             return true;
@@ -676,16 +690,15 @@ fn superfluous_else_node(
                     .unwrap_or_else(|| elif_else.range()),
             );
             if checker.enabled(diagnostic.kind.rule()) {
-                if checker.settings.preview.is_enabled() {
-                    diagnostic.try_set_fix(|| {
-                        remove_else(
-                            elif_else,
-                            checker.locator(),
-                            checker.indexer(),
-                            checker.stylist(),
-                        )
-                    });
-                }
+                diagnostic.try_set_fix(|| {
+                    remove_else(
+                        elif_else,
+                        checker.locator(),
+                        checker.indexer(),
+                        checker.stylist(),
+                    )
+                });
+
                 checker.diagnostics.push(diagnostic);
             }
             return true;
@@ -696,16 +709,15 @@ fn superfluous_else_node(
                     .unwrap_or_else(|| elif_else.range()),
             );
             if checker.enabled(diagnostic.kind.rule()) {
-                if checker.settings.preview.is_enabled() {
-                    diagnostic.try_set_fix(|| {
-                        remove_else(
-                            elif_else,
-                            checker.locator(),
-                            checker.indexer(),
-                            checker.stylist(),
-                        )
-                    });
-                }
+                diagnostic.try_set_fix(|| {
+                    remove_else(
+                        elif_else,
+                        checker.locator(),
+                        checker.indexer(),
+                        checker.stylist(),
+                    )
+                });
+
                 checker.diagnostics.push(diagnostic);
             }
             return true;
@@ -716,16 +728,15 @@ fn superfluous_else_node(
                     .unwrap_or_else(|| elif_else.range()),
             );
             if checker.enabled(diagnostic.kind.rule()) {
-                if checker.settings.preview.is_enabled() {
-                    diagnostic.try_set_fix(|| {
-                        remove_else(
-                            elif_else,
-                            checker.locator(),
-                            checker.indexer(),
-                            checker.stylist(),
-                        )
-                    });
-                }
+                diagnostic.try_set_fix(|| {
+                    remove_else(
+                        elif_else,
+                        checker.locator(),
+                        checker.indexer(),
+                        checker.stylist(),
+                    )
+                });
+
                 checker.diagnostics.push(diagnostic);
             }
             return true;
@@ -742,12 +753,14 @@ fn superfluous_elif_else(checker: &mut Checker, stack: &Stack) {
 }
 
 /// Run all checks from the `flake8-return` plugin.
-pub(crate) fn function(
-    checker: &mut Checker,
-    body: &[Stmt],
-    decorator_list: &[Decorator],
-    returns: Option<&Expr>,
-) {
+pub(crate) fn function(checker: &mut Checker, function_def: &ast::StmtFunctionDef) {
+    let ast::StmtFunctionDef {
+        decorator_list,
+        returns,
+        body,
+        ..
+    } = function_def;
+
     // Find the last statement in the function.
     let Some(last_stmt) = body.last() else {
         // Skip empty functions.
@@ -793,7 +806,7 @@ pub(crate) fn function(
             implicit_return_value(checker, &stack);
         }
         if checker.enabled(Rule::ImplicitReturn) {
-            implicit_return(checker, last_stmt);
+            implicit_return(checker, function_def, last_stmt);
         }
 
         if checker.enabled(Rule::UnnecessaryAssign) {
@@ -802,7 +815,7 @@ pub(crate) fn function(
     } else {
         if checker.enabled(Rule::UnnecessaryReturnNone) {
             // Skip functions that have a return annotation that is not `None`.
-            if returns.map_or(true, Expr::is_none_literal_expr) {
+            if returns.as_deref().map_or(true, Expr::is_none_literal_expr) {
                 unnecessary_return_none(checker, decorator_list, &stack);
             }
         }

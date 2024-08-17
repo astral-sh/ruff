@@ -1,4 +1,4 @@
-use ruff_python_ast::{self as ast, Expr, StmtIf};
+use ruff_python_ast::{Expr, StmtIf};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
@@ -41,10 +41,10 @@ impl Violation for IfTuple {
 /// F634
 pub(crate) fn if_tuple(checker: &mut Checker, stmt_if: &StmtIf) {
     for branch in if_elif_branches(stmt_if) {
-        let Expr::Tuple(ast::ExprTuple { elts, .. }) = &branch.test else {
+        let Expr::Tuple(tuple) = &branch.test else {
             continue;
         };
-        if elts.is_empty() {
+        if tuple.is_empty() {
             continue;
         }
         checker
