@@ -820,16 +820,12 @@ impl<'a> Visitor<'a> for Checker<'a> {
                     BindingKind::ClassDefinition(scope_id),
                     BindingFlags::empty(),
                 );
-                // FIXME: We should probably pass in a vector when initializing the scope
-                self.semantic.scopes[scope_id]
-                    .class_names
-                    .push(name.id.as_str());
-                for name in self.semantic.scopes[self.semantic.scope_id]
-                    .class_names
-                    .clone()
-                {
-                    self.semantic.scopes[scope_id].class_names.push(name);
-                }
+
+                // Record class names that should be unavailable within this scope
+                let mut class_names =
+                    self.semantic.scopes[self.semantic.scope_id].copy_class_names();
+                class_names.push(name.id.as_str());
+                self.semantic.scopes[scope_id].set_class_names(class_names);
             }
             Stmt::TypeAlias(ast::StmtTypeAlias {
                 range: _,

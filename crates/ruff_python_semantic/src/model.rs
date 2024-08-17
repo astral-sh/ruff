@@ -694,7 +694,7 @@ impl<'a> SemanticModel<'a> {
             // to remember the specific binding ids that we need to ignore from this point
             // on in the loop, but in most cases we probably want to treat this as unresolved
             // since without a forward reference, this would probably refer to the wrong binding
-            if !seen_function && scope.kind.is_class() && scope.class_names.contains(&symbol) {
+            if !seen_function && scope.kind.is_class() && scope.is_class_name(&symbol) {
                 return None;
             }
 
