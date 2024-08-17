@@ -424,6 +424,26 @@ impl<'a> Checker<'a> {
         self.parsed_annotations_cache
             .lookup_or_parse(annotation, self.locator.contents())
     }
+
+    /// Apply a test to an annotation expression,
+    /// abstracting over the fact that the annotation expression might be "stringized".
+    ///
+    /// A stringized annotation is one enclosed in string quotes:
+    /// `foo: "typing.Any"` means the same thing to a type checker as `foo: typing.Any`.
+    pub(crate) fn match_maybe_stringized_annotation(
+        &self,
+        expr: &ast::Expr,
+        match_fn: impl FnOnce(&ast::Expr) -> bool,
+    ) -> bool {
+        if let ast::Expr::StringLiteral(string_annotation) = expr {
+            let Some(parsed_annotation) = self.parse_type_annotation(string_annotation) else {
+                return false;
+            };
+            match_fn(parsed_annotation.expression())
+        } else {
+            match_fn(expr)
+        }
+    }
 }
 
 impl<'a> Visitor<'a> for Checker<'a> {
