@@ -15,7 +15,7 @@ license.workspace = true
 red_knot_python_semantic = { workspace = true }
 
 ruff_cache = { workspace = true }
-ruff_db = { workspace = true, features = ["os", "cache"] }
+ruff_db = { workspace = true, features = ["os", "cache", "testing"] }
 ruff_python_ast = { workspace = true }
 ruff_text_size = { workspace = true }
 

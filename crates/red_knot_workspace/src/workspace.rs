@@ -259,7 +259,7 @@ impl Package {
 
     /// Returns `true` if `file` is a first-party file part of this package.
     pub fn contains_file(self, db: &dyn Db, file: File) -> bool {
-        self.files(db).read().contains(&file)
+        self.files(db).contains(&file)
     }
 
     #[tracing::instrument(level = "debug", skip(db))]
@@ -292,7 +292,7 @@ impl Package {
         tracing::debug!("Checking package {}", self.root(db));
 
         let mut result = Vec::new();
-        for file in &self.files(db).read() {
+        for file in &self.files(db) {
             let diagnostics = check_file(db, file);
             result.extend_from_slice(&diagnostics);
         }
@@ -301,13 +301,14 @@ impl Package {
     }
 
     /// Returns the files belonging to this package.
-    #[salsa::tracked]
-    pub fn files(self, db: &dyn Db) -> IndexedFiles {
-        let _entered = tracing::debug_span!("files").entered();
+    pub fn files(self, db: &dyn Db) -> IndexedFiles<'_> {
         let files = self.file_set(db);
 
         let indexed = match files.get() {
             Index::Lazy(vacant) => {
+                let _entered =
+                    tracing::debug_span!("index_package_files", package = %self.name(db)).entered();
+
                 tracing::debug!("Indexing files for package {}", self.name(db));
                 let files = discover_package_files(db, self.root(db));
                 vacant.set(files)
