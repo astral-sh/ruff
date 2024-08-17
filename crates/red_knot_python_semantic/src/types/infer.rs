@@ -29,7 +29,7 @@ use salsa::plumbing::AsId;
 use ruff_db::files::File;
 use ruff_db::parsed::parsed_module;
 use ruff_python_ast as ast;
-use ruff_python_ast::{ExprContext, TypeParams};
+use ruff_python_ast::{Expr, ExprContext};
 
 use crate::builtins::builtins_scope;
 use crate::module_name::ModuleName;
@@ -294,7 +294,11 @@ impl<'db> TypeInferenceBuilder<'db> {
                 );
             }
             DefinitionKind::Assignment(assignment) => {
-                self.infer_assignment_definition(assignment.assignment(), definition);
+                self.infer_assignment_definition(
+                    assignment.target(),
+                    assignment.assignment(),
+                    definition,
+                );
             }
             DefinitionKind::AnnotatedAssignment(annotated_assignment) => {
                 self.infer_annotated_assignment_definition(annotated_assignment.node(), definition);
@@ -706,6 +710,7 @@ impl<'db> TypeInferenceBuilder<'db> {
 
     fn infer_assignment_definition(
         &mut self,
+        target: &ast::ExprName,
         assignment: &ast::StmtAssign,
         definition: Definition<'db>,
     ) {
@@ -715,6 +720,9 @@ impl<'db> TypeInferenceBuilder<'db> {
         let value_ty = self
             .types
             .expression_ty(assignment.value.scoped_ast_id(self.db, self.scope));
+        self.types
+            .expressions
+            .insert(target.scoped_ast_id(self.db, self.scope), value_ty);
         self.types.definitions.insert(definition, value_ty);
     }
 
@@ -999,6 +1007,9 @@ impl<'db> TypeInferenceBuilder<'db> {
             ast::Expr::NumberLiteral(literal) => self.infer_number_literal_expression(literal),
             ast::Expr::BooleanLiteral(literal) => self.infer_boolean_literal_expression(literal),
             ast::Expr::StringLiteral(literal) => self.infer_string_literal_expression(literal),
+            ast::Expr::BytesLiteral(bytes_literal) => {
+                self.infer_bytes_literal_expression(bytes_literal)
+            }
             ast::Expr::FString(fstring) => self.infer_fstring_expression(fstring),
             ast::Expr::EllipsisLiteral(literal) => self.infer_ellipsis_literal_expression(literal),
             ast::Expr::Tuple(tuple) => self.infer_tuple_expression(tuple),
@@ -1025,8 +1036,7 @@ impl<'db> TypeInferenceBuilder<'db> {
             ast::Expr::Yield(yield_expression) => self.infer_yield_expression(yield_expression),
             ast::Expr::YieldFrom(yield_from) => self.infer_yield_from_expression(yield_from),
             ast::Expr::Await(await_expression) => self.infer_await_expression(await_expression),
-
-            _ => todo!("expression type resolution for {:?}", expression),
+            Expr::IpyEscapeCommand(_) => todo!("Implement Ipy escape command support"),
         };
 
         let expr_id = expression.scoped_ast_id(self.db, self.scope);
@@ -1060,6 +1070,12 @@ impl<'db> TypeInferenceBuilder<'db> {
     #[allow(clippy::unused_self)]
     fn infer_string_literal_expression(&mut self, _literal: &ast::ExprStringLiteral) -> Type<'db> {
         // TODO Literal["..."] or str
+        Type::Unknown
+    }
+
+    #[allow(clippy::unused_self)]
+    fn infer_bytes_literal_expression(&mut self, _literal: &ast::ExprBytesLiteral) -> Type<'db> {
+        // TODO
         Type::Unknown
     }
 
@@ -1630,7 +1646,7 @@ impl<'db> TypeInferenceBuilder<'db> {
         Type::Unknown
     }
 
-    fn infer_type_parameters(&mut self, type_parameters: &TypeParams) {
+    fn infer_type_parameters(&mut self, type_parameters: &ast::TypeParams) {
         let ast::TypeParams {
             range: _,
             type_params,
@@ -1677,6 +1693,7 @@ impl<'db> TypeInferenceBuilder<'db> {
 #[cfg(test)]
 mod tests {
     use anyhow::Context;
+
     use ruff_db::files::{system_path_to_file, File};
     use ruff_db::parsed::parsed_module;
     use ruff_db::system::{DbWithTestSystem, SystemPathBuf};
