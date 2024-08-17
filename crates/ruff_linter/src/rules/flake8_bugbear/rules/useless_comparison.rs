@@ -1,6 +1,6 @@
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::Expr;
+use ruff_python_ast::{Expr, Stmt};
 use ruff_python_semantic::ScopeKind;
 use ruff_text_size::Ranged;
 
@@ -70,7 +70,12 @@ pub(crate) fn useless_comparison(checker: &mut Checker, expr: &Expr) {
         }
 
         if let ScopeKind::Function(func_def) = semantic.current_scope().kind {
-            if func_def.range.end() == expr.range().end() {
+            if func_def
+                .body
+                .last()
+                .and_then(Stmt::as_expr_stmt)
+                .is_some_and(|last_stmt| &*last_stmt.value == expr)
+            {
                 checker.diagnostics.push(Diagnostic::new(
                     UselessComparison {
                         at: ComparisonLocationAt::EndOfFunction,
