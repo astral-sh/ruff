@@ -61,7 +61,7 @@ The following rules have been stabilized and are no longer in preview:
 - [`invalid-bytes-return-type`](https://docs.astral.sh/ruff/rules/invalid-bytes-return-type/) (`PLE0308`)
 - [`invalid-hash-return-type`](https://docs.astral.sh/ruff/rules/invalid-hash-return-type/) (`PLE0309`)
 - [`invalid-index-return-type`](https://docs.astral.sh/ruff/rules/invalid-index-return-type/) (`PLE0305`)
-- [`invalid-length-return-type`](https://docs.astral.sh/ruff/rules/invalid-length-return-type/) (`E303`)
+- [`invalid-length-return-type`](https://docs.astral.sh/ruff/rules/invalid-length-return-type/) (`PLEE303`)
 - [`self-or-cls-assignment`](https://docs.astral.sh/ruff/rules/self-or-cls-assignment/) (`PLW0642`)
 - [`byte-string-usage`](https://docs.astral.sh/ruff/rules/byte-string-usage/) (`PYI057`)
 - [`duplicate-literal-member`](https://docs.astral.sh/ruff/rules/duplicate-literal-member/) (`PYI062`)
