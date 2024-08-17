@@ -6,5 +6,5 @@ from mod import CamelCase as CC
 import xml.etree.ElementTree as ET
 from xml.etree import ElementTree as ET
 
-# Always an error
+# Always an error (relative import)
 from ..xml.eltree import ElementTree as ET
