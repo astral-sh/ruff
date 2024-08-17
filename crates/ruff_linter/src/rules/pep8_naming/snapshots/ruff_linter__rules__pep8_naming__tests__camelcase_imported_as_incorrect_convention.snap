@@ -30,12 +30,12 @@ N817.py:7:23: N817 CamelCase `ElementTree` imported as acronym `ET`
 7 | from xml.etree import ElementTree as ET
   |                       ^^^^^^^^^^^^^^^^^ N817
 8 | 
-9 | # Always an error
+9 | # Always an error (relative import)
   |
 
 N817.py:10:26: N817 CamelCase `ElementTree` imported as acronym `ET`
    |
- 9 | # Always an error
+ 9 | # Always an error (relative import)
 10 | from ..xml.eltree import ElementTree as ET
    |                          ^^^^^^^^^^^^^^^^^ N817
    |
