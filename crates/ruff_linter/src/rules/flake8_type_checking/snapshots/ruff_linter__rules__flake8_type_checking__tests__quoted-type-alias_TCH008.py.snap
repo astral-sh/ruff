@@ -226,3 +226,19 @@ TCH008.py:31:10: TCH008 [*] Remove quotes from type alias
 32 32 | 
 33 33 | 
 34 34 | class Baz:
+
+TCH008.py:36:14: TCH008 [*] Remove quotes from type alias
+   |
+34 | class Baz:
+35 |     a: TypeAlias = 'Baz'  # OK
+36 |     type A = 'Baz'  # TCH008
+   |              ^^^^^ TCH008
+   |
+   = help: Remove quotes
+
+ℹ Safe fix
+33 33 | 
+34 34 | class Baz:
+35 35 |     a: TypeAlias = 'Baz'  # OK
+36    |-    type A = 'Baz'  # TCH008
+   36 |+    type A = Baz  # TCH008

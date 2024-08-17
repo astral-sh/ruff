@@ -663,6 +663,80 @@ impl<'a> SemanticModel<'a> {
                 }
             }
 
+            // FIXME: Shouldn't this happen above where `class_variables_visible` is set?
+            seen_function |= scope.kind.is_function();
+        }
+
+        None
+    }
+
+    /// Simulates a runtime load of a given [`ast::ExprName`].
+    ///
+    /// This should not be run until after all the bindings have been visited.
+    pub fn simulate_runtime_load(&self, name: &ast::ExprName) -> Option<BindingId> {
+        let symbol = name.id.as_str();
+        let range = name.range;
+        let mut seen_function = false;
+        let mut class_variables_visible = true;
+        let mut lexicographical_lookup = true;
+        for (index, scope_id) in self.scopes.ancestor_ids(self.scope_id).enumerate() {
+            let scope = &self.scopes[scope_id];
+            if scope.kind.is_class() {
+                if seen_function && matches!(symbol, "__class__") {
+                    return None;
+                }
+                if !class_variables_visible {
+                    continue;
+                }
+            }
+
+            // Technically returning here is not quite correct, it would be more accurate
+            // to remember the specific binding ids that we need to ignore from this point
+            // on in the loop, but in most cases we probably want to treat this as unresolved
+            // since without a forward reference, this would probably refer to the wrong binding
+            if !seen_function && scope.kind.is_class() && scope.class_names.contains(&symbol) {
+                return None;
+            }
+
+            class_variables_visible = scope.kind.is_type() && index == 0;
+
+            // once we hit a type scope we should stop doing lexicographical lookups
+            if scope.kind.is_type() {
+                lexicographical_lookup = false;
+            }
+
+            if let Some(binding_id) = scope.get(symbol) {
+                let candidate_id = match self.bindings[binding_id].kind {
+                    BindingKind::Annotation => continue,
+                    BindingKind::Deletion | BindingKind::UnboundException(None) => return None,
+                    BindingKind::ConditionalDeletion(binding_id) => binding_id,
+                    BindingKind::UnboundException(Some(binding_id)) => binding_id,
+                    _ => binding_id,
+                };
+
+                if self.bindings[candidate_id].context.is_typing() {
+                    continue;
+                }
+
+                if lexicographical_lookup
+                    && self.bindings[candidate_id]
+                        .defn_range(self)
+                        .ordering(range)
+                        .is_gt()
+                {
+                    continue;
+                }
+
+                return Some(candidate_id);
+            }
+
+            if index == 0 && scope.kind.is_class() {
+                if matches!(symbol, "__module__" | "__qualname__") {
+                    return None;
+                }
+            }
+
+            // FIXME: Shouldn't this happen above where `class_variables_visible` is set?
             seen_function |= scope.kind.is_function();
         }
 

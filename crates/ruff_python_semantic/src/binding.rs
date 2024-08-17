@@ -249,6 +249,16 @@ impl<'a> Binding<'a> {
         })
     }
 
+    /// Returns the statement range for AnnAssign and the Name otherwise.
+    pub fn defn_range(&self, semantic: &SemanticModel) -> TextRange {
+        if let Some(parent) = self.statement(semantic) {
+            if parent.is_ann_assign_stmt() {
+                return parent.range();
+            }
+        }
+        self.range
+    }
+
     pub fn as_any_import(&self) -> Option<AnyImport<'_, 'a>> {
         match &self.kind {
             BindingKind::Import(import) => Some(AnyImport::Import(import)),

@@ -3,7 +3,7 @@ use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast as ast;
 use ruff_python_ast::Expr;
-use ruff_python_semantic::{Binding, SemanticModel};
+use ruff_python_semantic::SemanticModel;
 use ruff_text_size::TextRange;
 use std::borrow::Borrow;
 
@@ -128,10 +128,10 @@ impl AlwaysFixableViolation for QuotedTypeAlias {
 //       skip expressions that don't contain either. But then we can't reuse
 //       this function for TCH007. Is it worth having two functions where one
 //       has fewer branches because we know they won't be there?
-fn check_bindings(semantic: &SemanticModel, expr: &Expr, pred: &impl Fn(&Binding) -> bool) -> bool {
+fn contains_typing_reference(semantic: &SemanticModel, expr: &Expr) -> bool {
     match expr {
         Expr::BinOp(ast::ExprBinOp { left, right, .. }) => {
-            check_bindings(semantic, left, pred) || check_bindings(semantic, right, pred)
+            contains_typing_reference(semantic, left) || contains_typing_reference(semantic, right)
         }
         Expr::Starred(ast::ExprStarred {
             value,
@@ -139,30 +139,31 @@ fn check_bindings(semantic: &SemanticModel, expr: &Expr, pred: &impl Fn(&Binding
             ..
         })
         | Expr::Attribute(ast::ExprAttribute { value, .. }) => {
-            check_bindings(semantic, value, pred)
+            contains_typing_reference(semantic, value)
         }
         Expr::Subscript(ast::ExprSubscript { value, slice, .. }) => {
-            if check_bindings(semantic, value, pred) {
+            if contains_typing_reference(semantic, value) {
                 return true;
             }
             if let Expr::Name(ast::ExprName { id, .. }) = value.borrow() {
                 if id.as_str() != "Literal" {
-                    return check_bindings(semantic, slice, pred);
+                    return contains_typing_reference(semantic, slice);
                 }
             }
             false
         }
         Expr::List(ast::ExprList { elts, .. }) | Expr::Tuple(ast::ExprTuple { elts, .. }) => {
             for elt in elts {
-                if check_bindings(semantic, elt, pred) {
+                if contains_typing_reference(semantic, elt) {
                     return true;
                 }
             }
             false
         }
-        Expr::Name(name) => semantic
-            .resolve_name(name)
-            .is_some_and(|binding_id| pred(semantic.binding(binding_id))),
+        Expr::Name(name) => {
+            semantic.lookup_symbol(name.id.as_str()).is_some()
+                && semantic.simulate_runtime_load(name).is_none()
+        }
         _ => false,
     }
 }
@@ -183,9 +184,7 @@ pub(crate) fn quoted_type_alias(
 
         // if the expression contains references to typing-only bindings
         // then the quotes are not redundant
-        if check_bindings(checker.semantic(), expr, &|binding| {
-            binding.context.is_typing() || binding.range.ordering(range).is_gt()
-        }) {
+        if contains_typing_reference(checker.semantic(), expr) {
             return;
         }
     }

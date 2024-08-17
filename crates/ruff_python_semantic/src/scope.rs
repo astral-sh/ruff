@@ -42,6 +42,9 @@ pub struct Scope<'a> {
 
     /// Flags for the [`Scope`].
     flags: ScopeFlags,
+
+    /// A vector of class names that should not be available in this scope
+    pub class_names: Vec<&'a str>,
 }
 
 impl<'a> Scope<'a> {
@@ -54,6 +57,7 @@ impl<'a> Scope<'a> {
             shadowed_bindings: FxHashMap::default(),
             globals_id: None,
             flags: ScopeFlags::empty(),
+            class_names: Vec::default(),
         }
     }
 
@@ -66,6 +70,7 @@ impl<'a> Scope<'a> {
             shadowed_bindings: FxHashMap::default(),
             globals_id: None,
             flags: ScopeFlags::empty(),
+            class_names: Vec::default(),
         }
     }
 

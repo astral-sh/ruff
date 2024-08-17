@@ -32,4 +32,5 @@ type J = 'Baz'  # TCH008
 
 
 class Baz:
-    pass
+    a: TypeAlias = 'Baz'  # OK
+    type A = 'Baz'  # TCH008

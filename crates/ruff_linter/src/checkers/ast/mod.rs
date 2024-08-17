@@ -820,6 +820,16 @@ impl<'a> Visitor<'a> for Checker<'a> {
                     BindingKind::ClassDefinition(scope_id),
                     BindingFlags::empty(),
                 );
+                // FIXME: We should probably pass in a vector when initializing the scope
+                self.semantic.scopes[scope_id]
+                    .class_names
+                    .push(name.id.as_str());
+                for name in self.semantic.scopes[self.semantic.scope_id]
+                    .class_names
+                    .clone()
+                {
+                    self.semantic.scopes[scope_id].class_names.push(name);
+                }
             }
             Stmt::TypeAlias(ast::StmtTypeAlias {
                 range: _,
