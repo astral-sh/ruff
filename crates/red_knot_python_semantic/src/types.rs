@@ -239,7 +239,7 @@ pub enum Type<'db> {
     Never,
     /// unknown type (either no annotation, or some kind of type error)
     /// equivalent to Any, or possibly to object in strict mode
-    Unknown,
+    Unknown(UnknownTypeKind),
     /// name does not exist or is not bound to any value (this represents an error, but with some
     /// leniency options it could be silently resolved to Unknown in some cases)
     Unbound,
@@ -369,14 +369,24 @@ impl<'db> Type<'db> {
         }
     }
 
+    /// Apply a function to the type (if it is a non-union); or,
+    /// if it is a union, apply the function to each element of the union
+    /// and build a new union from the result
     #[must_use]
-    pub fn replace_unbound_with(&self, db: &'db dyn Db, replacement: Type<'db>) -> Type<'db> {
+    pub fn recursive_transform(
+        self,
+        db: &'db dyn Db,
+        mut transform_fn: impl FnMut(Type<'db>) -> Type<'db>,
+    ) -> Self {
         match self {
-            Type::Unbound => replacement,
-            Type::Union(union) => {
-                union.map(db, |element| element.replace_unbound_with(db, replacement))
-            }
-            ty => *ty,
+            Type::Union(union) => union
+                .elements(db)
+                .into_iter()
+                .fold(UnionBuilder::new(db), |builder, ty| {
+                    builder.add(transform_fn(ty))
+                })
+                .build(),
+            ty => transform_fn(ty),
         }
     }
 
@@ -471,52 +481,52 @@ impl<'db> Type<'db> {
             Type::Any => Type::Any,
             Type::Never => {
                 // TODO: attribute lookup on Never type
-                Type::Unknown
+                Type::Unknown(UnknownTypeKind::RedKnotLimitation)
             }
-            Type::Unknown => Type::Unknown,
+            Type::Unknown(kind) => Type::Unknown(*kind),
             Type::Unbound => Type::Unbound,
             Type::None => {
                 // TODO: attribute lookup on None type
-                Type::Unknown
+                Type::Unknown(UnknownTypeKind::RedKnotLimitation)
             }
             Type::Function(_) | Type::RevealTypeFunction(_) => {
                 // TODO: attribute lookup on function type
-                Type::Unknown
+                Type::Unknown(UnknownTypeKind::RedKnotLimitation)
             }
             Type::Module(file) => global_symbol_ty(db, *file, name),
             Type::Class(class) => class.class_member(db, name),
             Type::Instance(_) => {
                 // TODO MRO? get_own_instance_member, get_instance_member
-                Type::Unknown
+                Type::Unknown(UnknownTypeKind::RedKnotLimitation)
             }
             Type::Union(union) => union.map(db, |element| element.member(db, name)),
             Type::Intersection(_) => {
                 // TODO perform the get_member on each type in the intersection
                 // TODO return the intersection of those results
-                Type::Unknown
+                Type::Unknown(UnknownTypeKind::RedKnotLimitation)
             }
             Type::IntLiteral(_) => {
                 // TODO raise error
-                Type::Unknown
+                Type::Unknown(UnknownTypeKind::RedKnotLimitation)
             }
-            Type::BooleanLiteral(_) => Type::Unknown,
+            Type::BooleanLiteral(_) => Type::Unknown(UnknownTypeKind::RedKnotLimitation),
             Type::StringLiteral(_) => {
                 // TODO defer to `typing.LiteralString`/`builtins.str` methods
                 // from typeshed's stubs
-                Type::Unknown
+                Type::Unknown(UnknownTypeKind::RedKnotLimitation)
             }
             Type::LiteralString => {
                 // TODO defer to `typing.LiteralString`/`builtins.str` methods
                 // from typeshed's stubs
-                Type::Unknown
+                Type::Unknown(UnknownTypeKind::RedKnotLimitation)
             }
             Type::BytesLiteral(_) => {
                 // TODO defer to Type::Instance(<bytes from typeshed>).member
-                Type::Unknown
+                Type::Unknown(UnknownTypeKind::RedKnotLimitation)
             }
             Type::Tuple(_) => {
                 // TODO: implement tuple methods
-                Type::Unknown
+                Type::Unknown(UnknownTypeKind::RedKnotLimitation)
             }
         }
     }
@@ -622,13 +632,14 @@ impl<'db> Type<'db> {
     pub fn to_instance(&self, db: &'db dyn Db) -> Type<'db> {
         match self {
             Type::Any => Type::Any,
-            Type::Unknown => Type::Unknown,
-            Type::Unbound => Type::Unknown,
+            Type::Unknown(kind) => Type::Unknown(*kind),
+            // REVIEW: I am not sure about the correct subtype here --Slyces
+            Type::Unbound => Type::Unknown(UnknownTypeKind::TypeError),
             Type::Never => Type::Never,
             Type::Class(class) => Type::Instance(*class),
             Type::Union(union) => union.map(db, |element| element.to_instance(db)),
             // TODO: we can probably do better here: --Alex
-            Type::Intersection(_) => Type::Unknown,
+            Type::Intersection(_) => Type::Unknown(UnknownTypeKind::RedKnotLimitation),
             // TODO: calling `.to_instance()` on any of these should result in a diagnostic,
             // since they already indicate that the object is an instance of some kind:
             Type::BooleanLiteral(_)
@@ -641,7 +652,7 @@ impl<'db> Type<'db> {
             | Type::StringLiteral(_)
             | Type::Tuple(_)
             | Type::LiteralString
-            | Type::None => Type::Unknown,
+            | Type::None => Type::Unknown(UnknownTypeKind::TypeError),
         }
     }
 
@@ -667,9 +678,9 @@ impl<'db> Type<'db> {
             // TODO: `type[Any]`?
             Type::Any => Type::Any,
             // TODO: `type[Unknown]`?
-            Type::Unknown => Type::Unknown,
+            Type::Unknown(kind) => Type::Unknown(*kind),
             // TODO intersections
-            Type::Intersection(_) => Type::Unknown,
+            Type::Intersection(_) => Type::Unknown(UnknownTypeKind::RedKnotLimitation),
             Type::Tuple(_) => builtins_symbol_ty(db, "tuple"),
         }
     }
@@ -750,7 +761,9 @@ impl<'db> CallOutcome<'db> {
                     match (acc, ty) {
                         (None, None) => None,
                         (None, Some(ty)) => Some(UnionBuilder::new(db).add(ty)),
-                        (Some(builder), ty) => Some(builder.add(ty.unwrap_or(Type::Unknown))),
+                        (Some(builder), ty) => Some(
+                            builder.add(ty.unwrap_or(Type::Unknown(UnknownTypeKind::TypeError))),
+                        ),
                     }
                 })
                 .map(UnionBuilder::build),
@@ -786,7 +799,7 @@ impl<'db> CallOutcome<'db> {
                         not_callable_ty.display(db)
                     ),
                 );
-                Type::Unknown
+                Type::Unknown(UnknownTypeKind::TypeError)
             }
             Self::Union {
                 outcomes,
@@ -799,7 +812,7 @@ impl<'db> CallOutcome<'db> {
                     let return_ty = match outcome {
                         Self::NotCallable { not_callable_ty } => {
                             not_callable.push(*not_callable_ty);
-                            Type::Unknown
+                            Type::Unknown(UnknownTypeKind::TypeError)
                         }
                         Self::RevealType {
                             return_ty,
@@ -867,10 +880,43 @@ impl<'db> IterationOutcome<'db> {
             Self::Iterable { element_ty } => element_ty,
             Self::NotIterable { not_iterable_ty } => {
                 inference_builder.not_iterable_diagnostic(iterable_node, not_iterable_ty);
-                Type::Unknown
+                Type::Unknown(UnknownTypeKind::TypeError)
             }
         }
     }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub enum UnknownTypeKind {
+    /// Temporary variant that indicates that we *should*
+    /// be able to infer a type here in due course, but currently can't
+    RedKnotLimitation,
+
+    /// Invalid syntax in the node means we can't infer a type here
+    InvalidSyntax,
+
+    /// An `Unknown` type stemming from some kind of type error.
+    ///
+    /// Examples:
+    /// - A function was called with argument(s) of incorrect type(s), leading
+    ///   to a diagnostic being emitted and the expression being evaluated as `Unknown`.
+    /// - An expression was deemed to take place between two invalid types, e.g. `1 + "foo"`.
+    ///   (This is really the same as the first example, since expressions ultimately desguar
+    ///   to function calls, e.g. `1 + "foo"` desugars approximately to `type(1).__add__("foo")`.)
+    /// - An attribute or method was looked up on an instance of a type that doesn't have that
+    ///   attribute or method.
+    TypeError,
+
+    /// The symbol was unannotated and the true type can't be reasonably inferred
+    UnannotatedSymbol,
+
+    /// The type of symbols imported by imports that could not be resolved
+    UnresolvedImport,
+
+    /// A "second-order" Unknown type, that results from an interaction with
+    /// a "first-order" Unknown type. For example, if the type of `x` is `Unknown`,
+    /// the type of `x + 1` will also be `Unknown`
+    SecondOrder,
 }
 
 #[salsa::interned]
@@ -914,13 +960,12 @@ impl<'db> FunctionType<'db> {
             panic!("Function type definition must have `DefinitionKind::Function`")
         };
 
-        // TODO if a function `bar` is decorated by `foo`,
-        // where `foo` is annotated as returning a type `X` that is a subtype of `Callable`,
-        // we need to infer the return type from `X`'s return annotation
-        // rather than from `bar`'s return annotation
-        // in order to determine the type that `bar` returns
+        // TODO if a function `bar` is decorated by `foo`, where `foo` is annotated as returning a
+        // type `X` that is a subtype of `Callable`, we need to infer the return type from `X`'s
+        // return annotation rather than from `bar`'s return annotation in order to determine the
+        // type that `bar` returns
         if !function_stmt_node.decorator_list.is_empty() {
-            return Type::Unknown;
+            return Type::Unknown(UnknownTypeKind::RedKnotLimitation);
         }
 
         function_stmt_node
@@ -929,12 +974,13 @@ impl<'db> FunctionType<'db> {
             .map(|returns| {
                 if function_stmt_node.is_async {
                     // TODO: generic `types.CoroutineType`!
-                    Type::Unknown
+                    Type::Unknown(UnknownTypeKind::RedKnotLimitation)
                 } else {
                     definition_expression_ty(db, definition, returns.as_ref())
                 }
             })
-            .unwrap_or(Type::Unknown)
+            // TODO: can't we figure out the return type from the function body?
+            .unwrap_or(Type::Unknown(UnknownTypeKind::RedKnotLimitation))
     }
 }
 
@@ -1122,7 +1168,7 @@ mod tests {
         fn into_type(self, db: &TestDb) -> Type<'_> {
             match self {
                 Ty::Never => Type::Never,
-                Ty::Unknown => Type::Unknown,
+                Ty::Unknown => Type::Unknown(super::UnknownTypeKind::TypeError),
                 Ty::Any => Type::Any,
                 Ty::IntLiteral(n) => Type::IntLiteral(n),
                 Ty::StringLiteral(s) => {

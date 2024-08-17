@@ -64,7 +64,7 @@ impl Display for DisplayRepresentation<'_> {
         match self.ty {
             Type::Any => f.write_str("Any"),
             Type::Never => f.write_str("Never"),
-            Type::Unknown => f.write_str("Unknown"),
+            Type::Unknown(_) => f.write_str("Unknown"),
             Type::Unbound => f.write_str("Unbound"),
             Type::None => f.write_str("None"),
             Type::Module(file) => {
