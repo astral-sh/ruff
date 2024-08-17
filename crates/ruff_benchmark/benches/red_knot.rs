@@ -19,18 +19,9 @@ struct Case {
 
 const TOMLLIB_312_URL: &str = "https://raw.githubusercontent.com/python/cpython/8e8a4baf652f6e1cee7acde9d78c4b6154539748/Lib/tomllib";
 
-// This first "unresolved import" is because we don't understand `*` imports yet.
-// The following "unresolved import" violations are because we can't distinguish currently from
-// "Symbol exists in the module but its type is unknown" and
-// "Symbol does not exist in the module"
+// The "unresolved import" is because we don't understand `*` imports yet.
 static EXPECTED_DIAGNOSTICS: &[&str] = &[
     "/src/tomllib/_parser.py:7:29: Could not resolve import of 'Iterable' from 'collections.abc'",
-    "/src/tomllib/_parser.py:10:20: Could not resolve import of 'Any' from 'typing'",
-    "/src/tomllib/_parser.py:13:5: Could not resolve import of 'RE_DATETIME' from '._re'",
-    "/src/tomllib/_parser.py:14:5: Could not resolve import of 'RE_LOCALTIME' from '._re'",
-    "/src/tomllib/_parser.py:15:5: Could not resolve import of 'RE_NUMBER' from '._re'",
-    "/src/tomllib/_parser.py:20:21: Could not resolve import of 'Key' from '._types'",
-    "/src/tomllib/_parser.py:20:26: Could not resolve import of 'ParseFloat' from '._types'",
     "Line 69 is too long (89 characters)",
     "Use double quotes for strings",
     "Use double quotes for strings",

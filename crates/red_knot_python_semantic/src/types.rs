@@ -159,7 +159,7 @@ pub enum Type<'db> {
     Never,
     /// unknown type (either no annotation, or some kind of type error)
     /// equivalent to Any, or possibly to object in strict mode
-    Unknown,
+    Unknown(UnknownTypeKind),
     /// name does not exist or is not bound to any value (this represents an error, but with some
     /// leniency options it could be silently resolved to Unknown in some cases)
     Unbound,
@@ -189,10 +189,6 @@ impl<'db> Type<'db> {
         matches!(self, Type::Unbound)
     }
 
-    pub const fn is_unknown(&self) -> bool {
-        matches!(self, Type::Unknown)
-    }
-
     pub const fn is_never(&self) -> bool {
         matches!(self, Type::Never)
     }
@@ -207,18 +203,24 @@ impl<'db> Type<'db> {
         }
     }
 
+    /// Apply a function to the type (if it is a non-union); or,
+    /// if it is a union, apply the function to each element of the union
+    /// and build a new union from the result
     #[must_use]
-    pub fn replace_unbound_with(&self, db: &'db dyn Db, replacement: Type<'db>) -> Type<'db> {
+    pub fn recursive_transform(
+        self,
+        db: &'db dyn Db,
+        mut transform_fn: impl FnMut(Type<'db>) -> Type<'db>,
+    ) -> Self {
         match self {
-            Type::Unbound => replacement,
             Type::Union(union) => union
                 .elements(db)
                 .into_iter()
                 .fold(UnionBuilder::new(db), |builder, ty| {
-                    builder.add(ty.replace_unbound_with(db, replacement))
+                    builder.add(transform_fn(ty))
                 })
                 .build(),
-            ty => *ty,
+            ty => transform_fn(ty),
         }
     }
 
@@ -241,23 +243,23 @@ impl<'db> Type<'db> {
             Type::Any => Type::Any,
             Type::Never => {
                 // TODO: attribute lookup on Never type
-                Type::Unknown
+                Type::Unknown(UnknownTypeKind::RedKnotLimitation)
             }
-            Type::Unknown => Type::Unknown,
+            Type::Unknown(kind) => Type::Unknown(*kind),
             Type::Unbound => Type::Unbound,
             Type::None => {
                 // TODO: attribute lookup on None type
-                Type::Unknown
+                Type::Unknown(UnknownTypeKind::RedKnotLimitation)
             }
             Type::Function(_) => {
                 // TODO: attribute lookup on function type
-                Type::Unknown
+                Type::Unknown(UnknownTypeKind::RedKnotLimitation)
             }
             Type::Module(file) => global_symbol_ty_by_name(db, *file, name),
             Type::Class(class) => class.class_member(db, name),
             Type::Instance(_) => {
                 // TODO MRO? get_own_instance_member, get_instance_member
-                Type::Unknown
+                Type::Unknown(UnknownTypeKind::RedKnotLimitation)
             }
             Type::Union(union) => union
                 .elements(db)
@@ -269,13 +271,13 @@ impl<'db> Type<'db> {
             Type::Intersection(_) => {
                 // TODO perform the get_member on each type in the intersection
                 // TODO return the intersection of those results
-                Type::Unknown
+                Type::Unknown(UnknownTypeKind::RedKnotLimitation)
             }
             Type::IntLiteral(_) => {
                 // TODO raise error
-                Type::Unknown
+                Type::Unknown(UnknownTypeKind::RedKnotLimitation)
             }
-            Type::BooleanLiteral(_) => Type::Unknown,
+            Type::BooleanLiteral(_) => Type::Unknown(UnknownTypeKind::RedKnotLimitation),
         }
     }
 
@@ -283,11 +285,44 @@ impl<'db> Type<'db> {
     pub fn instance(&self) -> Type<'db> {
         match self {
             Type::Any => Type::Any,
-            Type::Unknown => Type::Unknown,
+            Type::Unknown(kind) => Type::Unknown(*kind),
             Type::Class(class) => Type::Instance(*class),
-            _ => Type::Unknown, // TODO type errors
+            _ => Type::Unknown(UnknownTypeKind::RedKnotLimitation), // TODO type errors
         }
     }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub enum UnknownTypeKind {
+    /// Temporary variant that indicates that we *should*
+    /// be able to infer a type here in due course, but currently can't
+    RedKnotLimitation,
+
+    /// Invalid syntax in the node means we can't infer a type here
+    InvalidSyntax,
+
+    /// An `Unknown` type stemming from some kind of type error.
+    ///
+    /// Examples:
+    /// - A function was called with argument(s) of incorrect type(s), leading
+    ///   to a diagnostic being emitted and the expression being evaluated as `Unknown`.
+    /// - An expression was deemed to take place between two invalid types, e.g. `1 + "foo"`.
+    ///   (This is really the same as the first example, since expressions ultimately desguar
+    ///   to function calls, e.g. `1 + "foo"` desugars approximately to `type(1).__add__("foo")`.)
+    /// - An attribute or method was looked up on an instance of a type that doesn't have that
+    ///   attribute or method.
+    TypeError,
+
+    /// The symbol was unannotated and the true type can't be reasonably inferred
+    UnannotatedSymbol,
+
+    /// The type of symbols imported by imports that could not be resolved
+    UnresolvedImport,
+
+    /// A "second-order" Unknown type, that results from an interaction with
+    /// a "first-order" Unknown type. For example, if the type of `x` is `Unknown`,
+    /// the type of `x + 1` will also be `Unknown`
+    SecondOrder,
 }
 
 #[salsa::interned]
@@ -456,9 +491,6 @@ mod tests {
         );
     }
 
-    #[ignore = "\
-A spurious second 'Unresolved import' diagnostic message is emitted on `b.py`, \
-despite the symbol existing in the symbol table for `a.py`"]
     #[test]
     fn resolved_import_of_symbol_from_unresolved_import() {
         let mut db = setup_db();

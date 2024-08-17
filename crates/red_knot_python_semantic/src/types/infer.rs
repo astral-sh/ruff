@@ -44,7 +44,7 @@ use crate::semantic_index::SemanticIndex;
 use crate::types::diagnostic::{TypeCheckDiagnostic, TypeCheckDiagnostics};
 use crate::types::{
     builtins_symbol_ty_by_name, definitions_ty, global_symbol_ty_by_name, ClassType, FunctionType,
-    Name, Type, UnionBuilder,
+    Name, Type, UnionBuilder, UnknownTypeKind,
 };
 use crate::Db;
 
@@ -73,7 +73,9 @@ fn infer_definition_types_cycle_recovery<'db>(
     input: Definition<'db>,
 ) -> TypeInference<'db> {
     let mut inference = TypeInference::default();
-    inference.definitions.insert(input, Type::Unknown);
+    inference
+        .definitions
+        .insert(input, Type::Unknown(UnknownTypeKind::RedKnotLimitation));
     inference
 }
 
@@ -517,7 +519,10 @@ impl<'db> TypeInferenceBuilder<'db> {
         definition: Definition<'db>,
     ) {
         // TODO(dhruvmanila): Infer types from annotation or default expression
-        self.types.definitions.insert(definition, Type::Unknown);
+        self.types.definitions.insert(
+            definition,
+            Type::Unknown(UnknownTypeKind::RedKnotLimitation),
+        );
     }
 
     fn infer_parameter_definition(
@@ -527,7 +532,10 @@ impl<'db> TypeInferenceBuilder<'db> {
     ) {
         // TODO(dhruvmanila): Annotation expression is resolved at the enclosing scope, infer the
         // parameter type from there
-        self.types.definitions.insert(definition, Type::Unknown);
+        self.types.definitions.insert(
+            definition,
+            Type::Unknown(UnknownTypeKind::RedKnotLimitation),
+        );
     }
 
     fn infer_class_definition_statement(&mut self, class: &ast::StmtClassDef) {
@@ -805,7 +813,7 @@ impl<'db> TypeInferenceBuilder<'db> {
         self.infer_expression(target);
 
         // TODO(dhruvmanila): Resolve the target type using the value type and the operator
-        Type::Unknown
+        Type::Unknown(UnknownTypeKind::RedKnotLimitation)
     }
 
     fn infer_type_alias_statement(&mut self, type_alias_statement: &ast::StmtTypeAlias) {
@@ -866,25 +874,20 @@ impl<'db> TypeInferenceBuilder<'db> {
             asname: _,
         } = alias;
 
-        let module_ty = ModuleName::new(name)
-            .ok_or(ModuleResolutionError::InvalidSyntax)
-            .and_then(|module_name| self.module_ty_from_name(module_name));
-
-        let module_ty = match module_ty {
-            Ok(ty) => ty,
-            Err(ModuleResolutionError::InvalidSyntax) => {
-                tracing::debug!("Failed to resolve import due to invalid syntax");
-                Type::Unknown
-            }
-            Err(ModuleResolutionError::UnresolvedModule) => {
-                self.add_diagnostic(
-                    AnyNodeRef::Alias(alias),
-                    "unresolved-import",
-                    format_args!("Import '{name}' could not be resolved."),
-                );
-                Type::Unknown
-            }
+        let module_ty = if let Some(module_name) = ModuleName::new(name) {
+            self.module_ty_from_name(module_name)
+        } else {
+            tracing::debug!("Failed to resolve import due to invalid syntax");
+            Type::Unknown(UnknownTypeKind::InvalidSyntax)
         };
+
+        if matches!(module_ty, Type::Unknown(UnknownTypeKind::UnresolvedImport)) {
+            self.add_diagnostic(
+                AnyNodeRef::Alias(alias),
+                "unresolved-import",
+                format_args!("Import '{name}' could not be resolved."),
+            );
+        }
 
         self.types.definitions.insert(definition, module_ty);
     }
@@ -937,14 +940,14 @@ impl<'db> TypeInferenceBuilder<'db> {
         &self,
         tail: Option<&str>,
         level: NonZeroU32,
-    ) -> Result<ModuleName, ModuleResolutionError> {
+    ) -> Result<ModuleName, UnknownTypeKind> {
         let Some(module) = file_to_module(self.db, self.file) else {
             tracing::debug!(
                 "Relative module resolution '{}' failed; could not resolve file '{}' to a module",
                 format_import_from_module(level.get(), tail),
                 self.file.path(self.db)
             );
-            return Err(ModuleResolutionError::UnresolvedModule);
+            return Err(UnknownTypeKind::UnresolvedImport);
         };
         let mut level = level.get();
         if module.kind().is_package() {
@@ -954,14 +957,14 @@ impl<'db> TypeInferenceBuilder<'db> {
         for _ in 0..level {
             module_name = module_name
                 .parent()
-                .ok_or(ModuleResolutionError::UnresolvedModule)?;
+                .ok_or(UnknownTypeKind::UnresolvedImport)?;
         }
         if let Some(tail) = tail {
             if let Some(valid_tail) = ModuleName::new(tail) {
                 module_name.extend(&valid_tail);
             } else {
                 tracing::debug!("Relative module resolution failed: invalid syntax");
-                return Err(ModuleResolutionError::InvalidSyntax);
+                return Err(UnknownTypeKind::InvalidSyntax);
             }
         }
         Ok(module_name)
@@ -999,12 +1002,17 @@ impl<'db> TypeInferenceBuilder<'db> {
                 alias.name,
                 format_import_from_module(*level, module),
             );
-            module
-                .and_then(ModuleName::new)
-                .ok_or(ModuleResolutionError::InvalidSyntax)
+            if let Some(module_name) = module.and_then(ModuleName::new) {
+                Ok(module_name)
+            } else {
+                tracing::debug!("Module resolution failed: invalid syntax");
+                Err(UnknownTypeKind::InvalidSyntax)
+            }
         };
 
-        let module_ty = module_name.and_then(|module_name| self.module_ty_from_name(module_name));
+        let module_ty = module_name
+            .map(|module_name| self.module_ty_from_name(module_name))
+            .unwrap_or_else(Type::Unknown);
 
         let ast::Alias {
             range: _,
@@ -1018,11 +1026,14 @@ impl<'db> TypeInferenceBuilder<'db> {
         // as would be the case for a symbol with type `Unbound`), so it's appropriate to
         // think of the type of the imported symbol as `Unknown` rather than `Unbound`
         let member_ty = module_ty
-            .unwrap_or(Type::Unbound)
             .member(self.db, &Name::new(&name.id))
-            .replace_unbound_with(self.db, Type::Unknown);
+            .recursive_transform(self.db, |ty| match ty {
+                Type::Unbound => Type::Unknown(UnknownTypeKind::UnresolvedImport),
+                Type::Unknown(_) => Type::Unknown(UnknownTypeKind::SecondOrder),
+                ty => ty,
+            });
 
-        if matches!(module_ty, Err(ModuleResolutionError::UnresolvedModule)) {
+        if matches!(module_ty, Type::Unknown(UnknownTypeKind::UnresolvedImport)) {
             self.add_diagnostic(
                 AnyNodeRef::StmtImportFrom(import_from),
                 "unresolved-import",
@@ -1032,7 +1043,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                     module.unwrap_or_default()
                 ),
             );
-        } else if module_ty.is_ok() && member_ty.is_unknown() {
+        } else if matches!(member_ty, Type::Unknown(UnknownTypeKind::UnresolvedImport)) {
             self.add_diagnostic(
                 AnyNodeRef::Alias(alias),
                 "unresolved-import",
@@ -1058,13 +1069,10 @@ impl<'db> TypeInferenceBuilder<'db> {
         }
     }
 
-    fn module_ty_from_name(
-        &self,
-        module_name: ModuleName,
-    ) -> Result<Type<'db>, ModuleResolutionError> {
+    fn module_ty_from_name(&self, module_name: ModuleName) -> Type<'db> {
         resolve_module(self.db, module_name)
             .map(|module| Type::Module(module.file()))
-            .ok_or(ModuleResolutionError::UnresolvedModule)
+            .unwrap_or(Type::Unknown(UnknownTypeKind::UnresolvedImport))
     }
 
     fn infer_decorator(&mut self, decorator: &ast::Decorator) -> Type<'db> {
@@ -1170,13 +1178,13 @@ impl<'db> TypeInferenceBuilder<'db> {
     #[allow(clippy::unused_self)]
     fn infer_string_literal_expression(&mut self, _literal: &ast::ExprStringLiteral) -> Type<'db> {
         // TODO Literal["..."] or str
-        Type::Unknown
+        Type::Unknown(UnknownTypeKind::RedKnotLimitation)
     }
 
     #[allow(clippy::unused_self)]
     fn infer_bytes_literal_expression(&mut self, _literal: &ast::ExprBytesLiteral) -> Type<'db> {
         // TODO
-        Type::Unknown
+        Type::Unknown(UnknownTypeKind::RedKnotLimitation)
     }
 
     fn infer_fstring_expression(&mut self, fstring: &ast::ExprFString) -> Type<'db> {
@@ -1201,7 +1209,7 @@ impl<'db> TypeInferenceBuilder<'db> {
         }
 
         // TODO str type
-        Type::Unknown
+        Type::Unknown(UnknownTypeKind::RedKnotLimitation)
     }
 
     fn infer_fstring_element(&mut self, element: &ast::FStringElement) {
@@ -1234,7 +1242,7 @@ impl<'db> TypeInferenceBuilder<'db> {
         _literal: &ast::ExprEllipsisLiteral,
     ) -> Type<'db> {
         // TODO Ellipsis
-        Type::Unknown
+        Type::Unknown(UnknownTypeKind::RedKnotLimitation)
     }
 
     fn infer_tuple_expression(&mut self, tuple: &ast::ExprTuple) -> Type<'db> {
@@ -1311,7 +1319,7 @@ impl<'db> TypeInferenceBuilder<'db> {
         self.infer_first_comprehension_iter(generators);
 
         // TODO generator type
-        Type::Unknown
+        Type::Unknown(UnknownTypeKind::RedKnotLimitation)
     }
 
     fn infer_list_comprehension_expression(&mut self, listcomp: &ast::ExprListComp) -> Type<'db> {
@@ -1324,7 +1332,7 @@ impl<'db> TypeInferenceBuilder<'db> {
         self.infer_first_comprehension_iter(generators);
 
         // TODO list type
-        Type::Unknown
+        Type::Unknown(UnknownTypeKind::RedKnotLimitation)
     }
 
     fn infer_dict_comprehension_expression(&mut self, dictcomp: &ast::ExprDictComp) -> Type<'db> {
@@ -1338,7 +1346,7 @@ impl<'db> TypeInferenceBuilder<'db> {
         self.infer_first_comprehension_iter(generators);
 
         // TODO dict type
-        Type::Unknown
+        Type::Unknown(UnknownTypeKind::RedKnotLimitation)
     }
 
     fn infer_set_comprehension_expression(&mut self, setcomp: &ast::ExprSetComp) -> Type<'db> {
@@ -1351,7 +1359,7 @@ impl<'db> TypeInferenceBuilder<'db> {
         self.infer_first_comprehension_iter(generators);
 
         // TODO set type
-        Type::Unknown
+        Type::Unknown(UnknownTypeKind::RedKnotLimitation)
     }
 
     fn infer_generator_expression_scope(&mut self, generator: &ast::ExprGenerator) {
@@ -1507,7 +1515,7 @@ impl<'db> TypeInferenceBuilder<'db> {
         }
 
         // TODO function type
-        Type::Unknown
+        Type::Unknown(UnknownTypeKind::RedKnotLimitation)
     }
 
     fn infer_call_expression(&mut self, call_expression: &ast::ExprCall) -> Type<'db> {
@@ -1521,7 +1529,7 @@ impl<'db> TypeInferenceBuilder<'db> {
         self.infer_expression(func);
 
         // TODO resolve to return type of `func`, if its a callable type
-        Type::Unknown
+        Type::Unknown(UnknownTypeKind::RedKnotLimitation)
     }
 
     fn infer_starred_expression(&mut self, starred: &ast::ExprStarred) -> Type<'db> {
@@ -1534,7 +1542,7 @@ impl<'db> TypeInferenceBuilder<'db> {
         self.infer_expression(value);
 
         // TODO
-        Type::Unknown
+        Type::Unknown(UnknownTypeKind::RedKnotLimitation)
     }
 
     fn infer_yield_expression(&mut self, yield_expression: &ast::ExprYield) -> Type<'db> {
@@ -1543,7 +1551,7 @@ impl<'db> TypeInferenceBuilder<'db> {
         self.infer_optional_expression(value.as_deref());
 
         // TODO awaitable type
-        Type::Unknown
+        Type::Unknown(UnknownTypeKind::RedKnotLimitation)
     }
 
     fn infer_yield_from_expression(&mut self, yield_from: &ast::ExprYieldFrom) -> Type<'db> {
@@ -1552,7 +1560,7 @@ impl<'db> TypeInferenceBuilder<'db> {
         self.infer_expression(value);
 
         // TODO get type from awaitable
-        Type::Unknown
+        Type::Unknown(UnknownTypeKind::RedKnotLimitation)
     }
 
     fn infer_await_expression(&mut self, await_expression: &ast::ExprAwait) -> Type<'db> {
@@ -1561,7 +1569,7 @@ impl<'db> TypeInferenceBuilder<'db> {
         self.infer_expression(value);
 
         // TODO awaitable type
-        Type::Unknown
+        Type::Unknown(UnknownTypeKind::RedKnotLimitation)
     }
 
     fn infer_name_expression(&mut self, name: &ast::ExprName) -> Type<'db> {
@@ -1589,10 +1597,10 @@ impl<'db> TypeInferenceBuilder<'db> {
                         if unbound_ty.may_be_unbound(self.db)
                             && Some(self.scope) != builtins_scope(self.db)
                         {
-                            Some(unbound_ty.replace_unbound_with(
-                                self.db,
-                                builtins_symbol_ty_by_name(self.db, id),
-                            ))
+                            Some(unbound_ty.recursive_transform(self.db, |ty| match ty {
+                                Type::Unbound => builtins_symbol_ty_by_name(self.db, id),
+                                ty => ty,
+                            }))
                         } else {
                             Some(unbound_ty)
                         }
@@ -1606,7 +1614,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                 definitions_ty(self.db, use_def.use_definitions(use_id), unbound_ty)
             }
             ExprContext::Store | ExprContext::Del => Type::None,
-            ExprContext::Invalid => Type::Unknown,
+            ExprContext::Invalid => Type::Unknown(UnknownTypeKind::InvalidSyntax),
         }
     }
 
@@ -1624,7 +1632,7 @@ impl<'db> TypeInferenceBuilder<'db> {
         match ctx {
             ExprContext::Load => member_ty,
             ExprContext::Store | ExprContext::Del => Type::None,
-            ExprContext::Invalid => Type::Unknown,
+            ExprContext::Invalid => Type::Unknown(UnknownTypeKind::InvalidSyntax),
         }
     }
 
@@ -1638,7 +1646,7 @@ impl<'db> TypeInferenceBuilder<'db> {
         self.infer_expression(operand);
 
         // TODO unary op types
-        Type::Unknown
+        Type::Unknown(UnknownTypeKind::RedKnotLimitation)
     }
 
     fn infer_binary_expression(&mut self, binary: &ast::ExprBinOp) -> Type<'db> {
@@ -1654,7 +1662,7 @@ impl<'db> TypeInferenceBuilder<'db> {
 
         match left_ty {
             Type::Any => Type::Any,
-            Type::Unknown => Type::Unknown,
+            Type::Unknown(_) => Type::Unknown(UnknownTypeKind::SecondOrder),
             Type::IntLiteral(n) => {
                 match right_ty {
                     Type::IntLiteral(m) => {
@@ -1683,14 +1691,14 @@ impl<'db> TypeInferenceBuilder<'db> {
                                 .checked_rem(m)
                                 .map(Type::IntLiteral)
                                 // TODO division by zero error
-                                .unwrap_or(Type::Unknown),
-                            _ => Type::Unknown, // TODO
+                                .unwrap_or(Type::Unknown(UnknownTypeKind::RedKnotLimitation)),
+                            _ => Type::Unknown(UnknownTypeKind::RedKnotLimitation), // TODO
                         }
                     }
-                    _ => Type::Unknown, // TODO
+                    _ => Type::Unknown(UnknownTypeKind::RedKnotLimitation), // TODO
                 }
             }
-            _ => Type::Unknown, // TODO
+            _ => Type::Unknown(UnknownTypeKind::RedKnotLimitation), // TODO
         }
     }
 
@@ -1706,7 +1714,7 @@ impl<'db> TypeInferenceBuilder<'db> {
         }
 
         // TODO resolve bool op
-        Type::Unknown
+        Type::Unknown(UnknownTypeKind::RedKnotLimitation)
     }
 
     fn infer_compare_expression(&mut self, compare: &ast::ExprCompare) -> Type<'db> {
@@ -1722,7 +1730,7 @@ impl<'db> TypeInferenceBuilder<'db> {
         for right in comparators.as_ref() {
             self.infer_expression(right);
         }
-        Type::Unknown
+        Type::Unknown(UnknownTypeKind::RedKnotLimitation)
     }
 
     fn infer_subscript_expression(&mut self, subscript: &ast::ExprSubscript) -> Type<'db> {
@@ -1737,7 +1745,7 @@ impl<'db> TypeInferenceBuilder<'db> {
         self.infer_expression(value);
 
         // TODO actual subscript support
-        Type::Unknown
+        Type::Unknown(UnknownTypeKind::RedKnotLimitation)
     }
 
     fn infer_slice_expression(&mut self, slice: &ast::ExprSlice) -> Type<'db> {
@@ -1753,7 +1761,7 @@ impl<'db> TypeInferenceBuilder<'db> {
         self.infer_optional_expression(step.as_deref());
 
         // TODO slice
-        Type::Unknown
+        Type::Unknown(UnknownTypeKind::RedKnotLimitation)
     }
 
     fn infer_type_parameters(&mut self, type_parameters: &ast::TypeParams) {
@@ -1828,12 +1836,6 @@ fn format_import_from_module(level: u32, module: Option<&str>) -> String {
         ".".repeat(level as usize),
         module.unwrap_or_default()
     )
-}
-
-#[derive(Debug, Copy, Clone, PartialEq, Eq)]
-enum ModuleResolutionError {
-    InvalidSyntax,
-    UnresolvedModule,
 }
 
 #[cfg(test)]
