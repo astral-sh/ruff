@@ -249,7 +249,8 @@ impl<'a> Binding<'a> {
         })
     }
 
-    /// Returns the statement range for AnnAssign and the Name otherwise.
+    /// Returns the statement range for bindings created by `[ast::StmtAnnAssign]`
+    /// and `[Binding.range]` otherwise.
     pub fn defn_range(&self, semantic: &SemanticModel) -> TextRange {
         if let Some(parent) = self.statement(semantic) {
             if parent.is_ann_assign_stmt() {
