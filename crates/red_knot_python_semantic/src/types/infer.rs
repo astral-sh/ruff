@@ -757,8 +757,6 @@ impl<'db> TypeInferenceBuilder<'db> {
 
         let annotation_ty = self.infer_expression(annotation);
 
-        // FIXME: This seems incorrect? Shouldn't the target get the same type as the annotation?
-        //   E.g. calling `name.ty(model)` should return the same as `annotated.ty(model)`.?
         self.infer_expression(target);
 
         annotation_ty

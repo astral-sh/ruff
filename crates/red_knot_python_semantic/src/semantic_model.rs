@@ -163,24 +163,8 @@ macro_rules! impl_definition_has_ty {
 impl_definition_has_ty!(ast::StmtFunctionDef);
 impl_definition_has_ty!(ast::StmtClassDef);
 impl_definition_has_ty!(ast::Alias);
-impl_definition_has_ty!(ast::Comprehension);
 impl_definition_has_ty!(ast::Parameter);
 impl_definition_has_ty!(ast::ParameterWithDefault);
-
-impl HasTy for ast::StmtAnnAssign {
-    fn ty<'db>(&self, model: &SemanticModel<'db>) -> Type<'db> {
-        // FIXME: We don't consider assignments with non-name targets as definitions.
-        //   https://github.com/astral-sh/ruff/blob/e49d47a6fce4d42d4d9dc1da6ed9357a42bbc987/crates/red_knot_python_semantic/src/types/infer.rs#L728-L733
-        //   For now, call into the expression's type in this case.
-        if self.target.is_name_expr() {
-            let index = semantic_index(model.db, model.file);
-            let definition = index.definition(self);
-            definition_ty(model.db, definition)
-        } else {
-            self.target.ty(model)
-        }
-    }
-}
 
 #[cfg(test)]
 mod tests {

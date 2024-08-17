@@ -8,6 +8,7 @@ use ruff_index::IndexVec;
 use ruff_python_ast as ast;
 use ruff_python_ast::name::Name;
 use ruff_python_ast::visitor::{walk_expr, walk_stmt, Visitor};
+use ruff_python_ast::AnyParameterRef;
 
 use crate::ast_node_ref::AstNodeRef;
 use crate::semantic_index::ast_ids::node_key::ExpressionNodeKey;
@@ -309,6 +310,23 @@ impl<'db> SemanticIndexBuilder<'db> {
         }
     }
 
+    fn declare_parameter(&mut self, parameter: AnyParameterRef) {
+        let symbol =
+            self.add_or_update_symbol(parameter.name().id().clone(), SymbolFlags::IS_DEFINED);
+
+        let definition = self.add_definition(symbol, parameter);
+
+        if let AnyParameterRef::NonVariadic(with_default) = parameter {
+            // Insert a mapping from the parameter to the same definition.
+            // This ensures that calling `HasTy::ty` on the inner parameter returns
+            // a valid type (and doesn't panic)
+            self.definitions_by_node.insert(
+                DefinitionNodeRef::from(AnyParameterRef::Variadic(&with_default.parameter)).key(),
+                definition,
+            );
+        }
+    }
+
     pub(super) fn build(mut self) -> SemanticIndex<'db> {
         let module = self.module;
         self.visit_body(module.suite());
@@ -399,11 +417,7 @@ where
 
                         // Add symbols and definitions for the parameters to the function scope.
                         for parameter in &*function_def.parameters {
-                            let symbol = builder.add_or_update_symbol(
-                                parameter.name().id().clone(),
-                                SymbolFlags::IS_DEFINED,
-                            );
-                            builder.add_definition(symbol, parameter);
+                            builder.declare_parameter(parameter);
                         }
 
                         builder.visit_body(&function_def.body);
@@ -618,11 +632,7 @@ where
                 // Add symbols and definitions for the parameters to the lambda scope.
                 if let Some(parameters) = &lambda.parameters {
                     for parameter in &**parameters {
-                        let symbol = self.add_or_update_symbol(
-                            parameter.name().id().clone(),
-                            SymbolFlags::IS_DEFINED,
-                        );
-                        self.add_definition(symbol, parameter);
+                        self.declare_parameter(parameter);
                     }
                 }
 

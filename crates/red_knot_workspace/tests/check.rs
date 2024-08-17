@@ -8,7 +8,7 @@ use ruff_db::parsed::parsed_module;
 use ruff_db::system::{OsSystem, SystemPath, SystemPathBuf};
 use ruff_python_ast::visitor::source_order;
 use ruff_python_ast::visitor::source_order::SourceOrderVisitor;
-use ruff_python_ast::{Alias, Comprehension, Expr, Parameter, ParameterWithDefault, Stmt};
+use ruff_python_ast::{Alias, Expr, Parameter, ParameterWithDefault, Stmt};
 use std::fs;
 use std::path::PathBuf;
 
@@ -40,7 +40,8 @@ fn corpus_no_panic() -> anyhow::Result<()> {
         let path = path.expect("path to not be an error").path();
         println!("checking {path:?}");
         let path = SystemPathBuf::from_path_buf(path.clone()).expect("path to be UTF-8");
-        // this test is only asserting that we can pull every expression and definition type without a panic
+        // this test is only asserting that we can pull every expression type without a panic
+        // (and some non-expressions that clearly define a single type)
         let file = system_path_to_file(&db, path).expect("file to exist");
 
         pull_types(&db, file);
@@ -69,18 +70,6 @@ impl<'db> PullTypesVisitor<'db> {
 }
 
 impl SourceOrderVisitor<'_> for PullTypesVisitor<'_> {
-    fn visit_expr(&mut self, expr: &Expr) {
-        let _ty = expr.ty(&self.model);
-
-        source_order::walk_expr(self, expr);
-    }
-
-    fn visit_alias(&mut self, alias: &Alias) {
-        let _ty = alias.ty(&self.model);
-
-        source_order::walk_alias(self, alias);
-    }
-
     fn visit_stmt(&mut self, stmt: &Stmt) {
         match stmt {
             Stmt::FunctionDef(function) => {
@@ -89,15 +78,8 @@ impl SourceOrderVisitor<'_> for PullTypesVisitor<'_> {
             Stmt::ClassDef(class) => {
                 let _ty = class.ty(&self.model);
             }
-            Stmt::AnnAssign(assign) => {
-                let _assignment_ty = assign.ty(&self.model);
-
-                // FIXME: I think the following constraint should be true in all cases but it isn't.
-                // let target_ty = assign.target.ty(&self.model);
-                //
-                // assert_eq!(_assignment_ty, target_ty);
-            }
-            Stmt::Return(_)
+            Stmt::AnnAssign(_)
+            | Stmt::Return(_)
             | Stmt::Delete(_)
             | Stmt::Assign(_)
             | Stmt::AugAssign(_)
@@ -124,9 +106,10 @@ impl SourceOrderVisitor<'_> for PullTypesVisitor<'_> {
         source_order::walk_stmt(self, stmt);
     }
 
-    fn visit_comprehension(&mut self, comprehension: &Comprehension) {
-        let _ty = comprehension.ty(&self.model);
-        source_order::walk_comprehension(self, comprehension);
+    fn visit_expr(&mut self, expr: &Expr) {
+        let _ty = expr.ty(&self.model);
+
+        source_order::walk_expr(self, expr);
     }
 
     fn visit_parameter(&mut self, parameter: &Parameter) {
@@ -138,11 +121,12 @@ impl SourceOrderVisitor<'_> for PullTypesVisitor<'_> {
     fn visit_parameter_with_default(&mut self, parameter_with_default: &ParameterWithDefault) {
         let _ty = parameter_with_default.ty(&self.model);
 
-        // FIXME: We currently don't create a definition for the nested parameter in the semantic builder.
-        //   This seems correct to me because we otherwise end up with two definitions for the same symbol.
-        //   However, it breaks the contract that `parameter.ty` always returns a type (doesn't panic).
-        //   Not sure what the right fix is, but it's out of scope for changing the tests.
-        //   Example: `def foo(bar): ...` panics
-        // source_order::walk_parameter_with_default(self, parameter_with_default);
+        source_order::walk_parameter_with_default(self, parameter_with_default);
+    }
+
+    fn visit_alias(&mut self, alias: &Alias) {
+        let _ty = alias.ty(&self.model);
+
+        source_order::walk_alias(self, alias);
     }
 }
