@@ -69,45 +69,12 @@ mod tests {
     }
 
     #[test]
-    fn dont_allow_fastapi_routes_unused_async() -> Result<()> {
-        let diagnostics = test_path(
-            Path::new("ruff/RUF029_fastapi.py"),
-            &LinterSettings {
-                ruff: super::settings::Settings {
-                    parenthesize_tuple_in_subscript: false,
-                    allow_fastapi_routes_unused_async: false,
-                },
-                ..LinterSettings::for_rule(Rule::UnusedAsync)
-            },
-        )?;
-        assert_messages!(diagnostics);
-        Ok(())
-    }
-
-    #[test]
-    fn allow_fastapi_routes_unused_async() -> Result<()> {
-        let diagnostics = test_path(
-            Path::new("ruff/RUF029_fastapi.py"),
-            &LinterSettings {
-                ruff: super::settings::Settings {
-                    parenthesize_tuple_in_subscript: false,
-                    allow_fastapi_routes_unused_async: true,
-                },
-                ..LinterSettings::for_rule(Rule::UnusedAsync)
-            },
-        )?;
-        assert_messages!(diagnostics);
-        Ok(())
-    }
-
-    #[test]
     fn prefer_parentheses_getitem_tuple() -> Result<()> {
         let diagnostics = test_path(
             Path::new("ruff/RUF031_prefer_parens.py"),
             &LinterSettings {
                 ruff: super::settings::Settings {
                     parenthesize_tuple_in_subscript: true,
-                    allow_fastapi_routes_unused_async: false,
                 },
                 ..LinterSettings::for_rule(Rule::IncorrectlyParenthesizedTupleInSubscript)
             },
@@ -123,7 +90,6 @@ mod tests {
             &LinterSettings {
                 ruff: super::settings::Settings {
                     parenthesize_tuple_in_subscript: false,
-                    allow_fastapi_routes_unused_async: false,
                 },
                 target_version: PythonVersion::Py310,
                 ..LinterSettings::for_rule(Rule::IncorrectlyParenthesizedTupleInSubscript)

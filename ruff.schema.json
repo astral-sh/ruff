@@ -2684,13 +2684,6 @@
     "RuffOptions": {
       "type": "object",
       "properties": {
-        "allow-fastapi-routes-unused-async": {
-          "description": "Whether to allow fastapi routes to be defined as async function, although they don't use any asynchronous code (see `RUF029` and [FastAPI docs](https://fastapi.tiangolo.com/async/)).",
-          "type": [
-            "boolean",
-            "null"
-          ]
-        },
         "parenthesize-tuple-in-subscript": {
           "description": "Whether to prefer accessing items keyed by tuples with parentheses around the tuple (see `RUF031`).",
           "type": [
