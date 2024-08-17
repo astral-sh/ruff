@@ -706,28 +706,42 @@ impl<'a> SemanticModel<'a> {
             }
 
             if let Some(binding_id) = scope.get(symbol) {
-                let candidate_id = match self.bindings[binding_id].kind {
-                    BindingKind::Annotation => continue,
-                    BindingKind::Deletion | BindingKind::UnboundException(None) => return None,
-                    BindingKind::ConditionalDeletion(binding_id) => binding_id,
-                    BindingKind::UnboundException(Some(binding_id)) => binding_id,
-                    _ => binding_id,
-                };
+                if lexicographical_lookup {
+                    // we need to look through all the shadowed bindings
+                    // since we may be shadowing a valid runtime binding
+                    // with an invalid one
+                    for shadowed_id in scope.shadowed_bindings(binding_id) {
+                        let binding = &self.bindings[shadowed_id];
+                        if binding.context.is_typing() {
+                            continue;
+                        }
+                        if let BindingKind::Annotation
+                        | BindingKind::Deletion
+                        | BindingKind::UnboundException(..)
+                        | BindingKind::ConditionalDeletion(..) = binding.kind
+                        {
+                            continue;
+                        }
 
-                if self.bindings[candidate_id].context.is_typing() {
-                    continue;
+                        if binding.defn_range(self).ordering(range).is_lt() {
+                            return Some(shadowed_id);
+                        }
+                    }
+                } else {
+                    let candidate_id = match self.bindings[binding_id].kind {
+                        BindingKind::Annotation => continue,
+                        BindingKind::Deletion | BindingKind::UnboundException(None) => return None,
+                        BindingKind::ConditionalDeletion(binding_id) => binding_id,
+                        BindingKind::UnboundException(Some(binding_id)) => binding_id,
+                        _ => binding_id,
+                    };
+
+                    if self.bindings[candidate_id].context.is_typing() {
+                        continue;
+                    }
+
+                    return Some(candidate_id);
                 }
-
-                if lexicographical_lookup
-                    && self.bindings[candidate_id]
-                        .defn_range(self)
-                        .ordering(range)
-                        .is_gt()
-                {
-                    continue;
-                }
-
-                return Some(candidate_id);
             }
 
             if index == 0 && scope.kind.is_class() {

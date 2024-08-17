@@ -22,6 +22,7 @@ g: TypeAlias = 'OptStr'   # OK
 h: TypeAlias = 'Bar'   # TCH008
 i: TypeAlias = Foo['str']   # TCH008
 j: TypeAlias = 'Baz'   # OK
+k: TypeAlias = 'k | None'  # OK
 
 type B = 'Dict'  # TCH008
 type D = 'Foo[str]'  # TCH008
@@ -29,6 +30,7 @@ type E = 'Foo.bar'  # TCH008
 type G = 'OptStr'  # TCH008
 type I = Foo['str']  # TCH008
 type J = 'Baz'  # TCH008
+type K = 'K | None'  # TCH008
 
 
 class Baz:
