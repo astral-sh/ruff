@@ -333,22 +333,34 @@ even patch releases may contain [non-backwards-compatible changes](https://semve
 ### Creating a new release
 
 1. Install `uv`: `curl -LsSf https://astral.sh/uv/install.sh | sh`
+
 1. Run `./scripts/release.sh`; this command will:
+
     - Generate a temporary virtual environment with `rooster`
     - Generate a changelog entry in `CHANGELOG.md`
     - Update versions in `pyproject.toml` and `Cargo.toml`
     - Update references to versions in the `README.md` and documentation
     - Display contributors for the release
+
 1. The changelog should then be editorialized for consistency
+
     - Often labels will be missing from pull requests they will need to be manually organized into the proper section
     - Changes should be edited to be user-facing descriptions, avoiding internal details
+
 1. Highlight any breaking changes in `BREAKING_CHANGES.md`
+
 1. Run `cargo check`. This should update the lock file with new versions.
+
 1. Create a pull request with the changelog and version updates
+
 1. Merge the PR
+
 1. Run the [release workflow](https://github.com/astral-sh/ruff/actions/workflows/release.yml) with:
+
     - The new version number (without starting `v`)
+
 1. The release workflow will do the following:
+
     1. Build all the assets. If this fails (even though we tested in step 4), we haven't tagged or
         uploaded anything, you can restart after pushing a fix. If you just need to rerun the build,
         make sure you're [re-running all the failed
@@ -359,14 +371,25 @@ even patch releases may contain [non-backwards-compatible changes](https://semve
     1. Attach artifacts to draft GitHub release
     1. Trigger downstream repositories. This can fail non-catastrophically, as we can run any
         downstream jobs manually if needed.
+
 1. Verify the GitHub release:
+
     1. The Changelog should match the content of `CHANGELOG.md`
     1. Append the contributors from the `scripts/release.sh` script
+
 1. If needed, [update the schemastore](https://github.com/astral-sh/ruff/blob/main/scripts/update_schemastore.py).
+
     1. One can determine if an update is needed when
         `git diff old-version-tag new-version-tag -- ruff.schema.json` returns a non-empty diff.
     1. Once run successfully, you should follow the link in the output to create a PR.
-1. If needed, update the `ruff-lsp` and `ruff-vscode` repositories.
+
+1. If needed, update the [`ruff-lsp`](https://github.com/astral-sh/ruff-lsp) and
+    [`ruff-vscode`](https://github.com/astral-sh/ruff-vscode) repositories and follow
+    the release instructions in those repositories. `ruff-lsp` should always be updated
+    before `ruff-vscode`.
+
+    This step is generally not required for a patch release, but should always be done
+    for a minor release.
 
 ## Ecosystem CI
 
