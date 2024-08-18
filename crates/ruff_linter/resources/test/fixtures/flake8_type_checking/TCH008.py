@@ -36,3 +36,7 @@ type K = 'K | None'  # TCH008
 class Baz:
     a: TypeAlias = 'Baz'  # OK
     type A = 'Baz'  # TCH008
+
+    class Nested:
+        a: TypeAlias = 'Baz'  # OK
+        type A = 'Baz'  # TCH008

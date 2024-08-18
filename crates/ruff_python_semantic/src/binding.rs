@@ -250,14 +250,13 @@ impl<'a> Binding<'a> {
     }
 
     /// Returns the statement range for bindings created by `[ast::StmtAnnAssign]`
-    /// and `[Binding.range]` otherwise.
+    /// or `[ast::StmtClassDef]` and `[Binding.range]` otherwise.
     pub fn defn_range(&self, semantic: &SemanticModel) -> TextRange {
-        if let Some(parent) = self.statement(semantic) {
-            if parent.is_ann_assign_stmt() {
-                return parent.range();
-            }
+        match self.statement(semantic) {
+            Some(Stmt::AnnAssign(stmt)) => stmt.range(),
+            Some(Stmt::ClassDef(stmt)) => stmt.range(),
+            _ => self.range,
         }
-        self.range
     }
 
     pub fn as_any_import(&self) -> Option<AnyImport<'_, 'a>> {

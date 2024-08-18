@@ -820,12 +820,6 @@ impl<'a> Visitor<'a> for Checker<'a> {
                     BindingKind::ClassDefinition(scope_id),
                     BindingFlags::empty(),
                 );
-
-                // Record class names that should be unavailable within this scope
-                let mut class_names =
-                    self.semantic.scopes[self.semantic.scope_id].copy_class_names();
-                class_names.push(name.id.as_str());
-                self.semantic.scopes[scope_id].set_class_names(class_names);
             }
             Stmt::TypeAlias(ast::StmtTypeAlias {
                 range: _,

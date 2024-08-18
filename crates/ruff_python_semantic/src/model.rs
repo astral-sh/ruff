@@ -681,6 +681,16 @@ impl<'a> SemanticModel<'a> {
         let mut lexicographical_lookup = true;
         for (index, scope_id) in self.scopes.ancestor_ids(self.scope_id).enumerate() {
             let scope = &self.scopes[scope_id];
+
+            // Only once we leave a function scope and its enclosing type scope should
+            // we stop doing lexicographical lookups. We could e.g. have nested classes
+            // where we lookup symbols from the innermost class scope, which can only see
+            // things from the outer class(es) that have been defined before the inner
+            // class.
+            if seen_function && !scope.kind.is_type() {
+                lexicographical_lookup = false;
+            }
+
             if scope.kind.is_class() {
                 if seen_function && matches!(symbol, "__class__") {
                     return None;
@@ -690,20 +700,7 @@ impl<'a> SemanticModel<'a> {
                 }
             }
 
-            // Technically returning here is not quite correct, it would be more accurate
-            // to remember the specific binding ids that we need to ignore from this point
-            // on in the loop, but in most cases we probably want to treat this as unresolved
-            // since without a forward reference, this would probably refer to the wrong binding
-            if !seen_function && scope.kind.is_class() && scope.is_class_name(symbol) {
-                return None;
-            }
-
             class_variables_visible = scope.kind.is_type() && index == 0;
-
-            // once we hit a type scope we should stop doing lexicographical lookups
-            if scope.kind.is_type() {
-                lexicographical_lookup = false;
-            }
 
             if let Some(binding_id) = scope.get(symbol) {
                 if lexicographical_lookup {

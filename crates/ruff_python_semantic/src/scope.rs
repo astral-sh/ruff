@@ -42,9 +42,6 @@ pub struct Scope<'a> {
 
     /// Flags for the [`Scope`].
     flags: ScopeFlags,
-
-    /// A vector of class names that should not be available in this scope
-    class_names: Option<Vec<&'a str>>,
 }
 
 impl<'a> Scope<'a> {
@@ -57,7 +54,6 @@ impl<'a> Scope<'a> {
             shadowed_bindings: FxHashMap::default(),
             globals_id: None,
             flags: ScopeFlags::empty(),
-            class_names: None,
         }
     }
 
@@ -70,7 +66,6 @@ impl<'a> Scope<'a> {
             shadowed_bindings: FxHashMap::default(),
             globals_id: None,
             flags: ScopeFlags::empty(),
-            class_names: None,
         }
     }
 
@@ -159,31 +154,6 @@ impl<'a> Scope<'a> {
     /// Returns `true` if this scope uses locals (e.g., `locals()`).
     pub const fn uses_locals(&self) -> bool {
         self.flags.intersects(ScopeFlags::USES_LOCALS)
-    }
-
-    /// Either returns a copy of the class names contained within this scope
-    /// or an empty vector.
-    pub fn copy_class_names(&self) -> Vec<&'a str> {
-        if let Some(names) = &self.class_names {
-            names.clone()
-        } else {
-            Vec::default()
-        }
-    }
-
-    /// Sets the class names for this scope.
-    pub fn set_class_names(&mut self, class_names: Vec<&'a str>) {
-        self.class_names = Some(class_names);
-    }
-
-    /// Returns `true` if this name is one of the class names that should not
-    /// be accessible within this scope.
-    pub fn is_class_name(&self, name: &str) -> bool {
-        if let Some(names) = &self.class_names {
-            names.contains(&name)
-        } else {
-            false
-        }
     }
 }
 
