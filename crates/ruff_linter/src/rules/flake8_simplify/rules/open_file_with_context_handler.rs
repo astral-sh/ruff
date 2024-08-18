@@ -112,32 +112,21 @@ fn match_exit_stack(semantic: &SemanticModel) -> bool {
     false
 }
 
-/// Return `true` if `func` is the builtin `open` or `pathlib.Path(...).open`.
+/// Return `true` if the expression is an `open` call or temporary file constructor.
 fn is_open(semantic: &SemanticModel, func: &Expr) -> bool {
-    // Ex) `open(...)`
-    if semantic.match_builtin_expr(func, "open") {
-        return true;
-    }
-
-    // Ex) `pathlib.Path(...).open()`
-    let Expr::Attribute(ast::ExprAttribute { attr, value, .. }) = func else {
+    let Some(qualified_name) = semantic.resolve_qualified_name(func) else {
         return false;
     };
 
-    if attr != "open" {
-        return false;
-    }
-
-    let Expr::Call(ast::ExprCall {
-        func: value_func, ..
-    }) = &**value
-    else {
-        return false;
-    };
-
-    semantic
-        .resolve_qualified_name(value_func)
-        .is_some_and(|qualified_name| matches!(qualified_name.segments(), ["pathlib", "Path"]))
+    matches!(
+        qualified_name.segments(),
+        ["" | "builtins", "open"]
+            | ["pathlib", "Path", "open"]
+            | [
+                "tempfile",
+                "TemporaryFile" | "NamedTemporaryFile" | "SpooledTemporaryFile"
+            ]
+    )
 }
 
 /// Return `true` if the current expression is followed by a `close` call.

@@ -3,6 +3,7 @@ import pathlib
 import pathlib as pl
 from pathlib import Path
 from pathlib import Path as P
+import tempfile
 
 # SIM115
 f = open("foo.txt")
@@ -10,6 +11,9 @@ f = Path("foo.txt").open()
 f = pathlib.Path("foo.txt").open()
 f = pl.Path("foo.txt").open()
 f = P("foo.txt").open()
+f = tempfile.NamedTemporaryFile()
+f = tempfile.TemporaryFile()
+f = tempfile.SpooledTemporaryFile()
 data = f.read()
 f.close()
 
@@ -43,10 +47,14 @@ with contextlib.ExitStack() as exit_stack:
     exit_stack_ = exit_stack
     f = exit_stack_.enter_context(open("filename"))
 
+# OK
+with tempfile.TemporaryFile() as f:
+    data = f.read()
+
 # OK (quick one-liner to clear file contents)
 open("filename", "w").close()
 pathlib.Path("filename").open("w").close()
-
+tempfile.NamedTemporaryFile().close()
 
 # OK (custom context manager)
 class MyFile:
