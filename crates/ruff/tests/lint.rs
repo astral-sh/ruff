@@ -1434,7 +1434,7 @@ def unused(x):
 
     insta::assert_snapshot!(test_code, @r###"
 
-    def unused(x):  # noqa: ANN001, ANN201, ARG001, D103
+    def unused(x):  # noqa: ANN001, ANN201, D103
         pass
     "###);
 
