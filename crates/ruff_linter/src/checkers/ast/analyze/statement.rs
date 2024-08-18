@@ -1112,9 +1112,6 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
             }
         }
         Stmt::AugAssign(aug_assign @ ast::StmtAugAssign { target, .. }) => {
-            if checker.enabled(Rule::SelfOrClsAssignment) {
-                pylint::rules::self_or_cls_assignment(checker, target);
-            }
             if checker.enabled(Rule::GlobalStatement) {
                 if let Expr::Name(ast::ExprName { id, .. }) = target.as_ref() {
                     pylint::rules::global_statement(checker, id);
