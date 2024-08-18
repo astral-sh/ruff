@@ -20,8 +20,8 @@ fn lint_select() {
     `ignore`, respectively), more specific prefixes override less
     specific prefixes.
 
-    Default value: ["E4", "E7", "E9", "F"]  
-    Type: list[RuleSelector]  
+    Default value: `["E4", "E7", "E9", "F"]`  
+    Type: `list[RuleSelector]`  
     Example usage:
     ```toml
     # On top of the defaults (`E4`, E7`, `E9`, and `F`), enable flake8-bugbear (`B`) and flake8-quotes (`Q`).
@@ -43,8 +43,8 @@ fn lint_extendignore() {
     A list of rule codes or prefixes to ignore, in addition to those
     specified by `ignore`.
 
-    Default value: []  
-    Type: list[RuleSelector]  
+    Default value: `[]`  
+    Type: `list[RuleSelector]`  
     Deprecated: The `extend-ignore` option is now interchangeable with [`ignore`](#lint_ignore). Please update your configuration to use the [`ignore`](#lint_ignore) option instead.  
     Example usage:
     ```toml

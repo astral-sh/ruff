@@ -396,8 +396,8 @@ impl Display for OptionField {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         writeln!(f, "{}", self.doc)?;
         writeln!(f)?;
-        writeln!(f, "Default value: {}  ", self.default)?;
-        writeln!(f, "Type: {}  ", self.value_type)?;
+        writeln!(f, "Default value: `{}`  ", self.default)?;
+        writeln!(f, "Type: `{}`  ", self.value_type)?;
 
         if let Some(deprecated) = &self.deprecated {
             write!(f, "Deprecated")?;
