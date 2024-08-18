@@ -20,12 +20,36 @@ fn lint_select() {
     `ignore`, respectively), more specific prefixes override less
     specific prefixes.
 
-    Default value: ["E4", "E7", "E9", "F"]
-    Type: list[RuleSelector]
+    Default value: ["E4", "E7", "E9", "F"]  
+    Type: list[RuleSelector]  
     Example usage:
     ```toml
     # On top of the defaults (`E4`, E7`, `E9`, and `F`), enable flake8-bugbear (`B`) and flake8-quotes (`Q`).
     select = ["E4", "E7", "E9", "F", "B", "Q"]
+    ```
+
+    ----- stderr -----
+    "###
+    );
+}
+
+#[test]
+fn lint_extendignore() {
+    assert_cmd_snapshot!(
+        Command::new(get_cargo_bin(BIN_NAME)).arg("config").arg("lint.extend-ignore"), @r###"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+    A list of rule codes or prefixes to ignore, in addition to those
+    specified by `ignore`.
+
+    Default value: []  
+    Type: list[RuleSelector]  
+    Deprecated: The `extend-ignore` option is now interchangeable with [`ignore`](#lint_ignore). Please update your configuration to use the [`ignore`](#lint_ignore) option instead.  
+    Example usage:
+    ```toml
+    # Skip unused variable rules (`F841`).
+    extend-ignore = ["F841"]
     ```
 
     ----- stderr -----
