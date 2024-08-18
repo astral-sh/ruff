@@ -423,6 +423,17 @@ mod tests {
     ",
         "multiple_modules_different_types"
     )]
+    #[test_case(
+        r"
+        from __future__ import annotations
+
+        from typing import TYPE_CHECKING, TypeAlias
+
+        a: TypeAlias = 'int | None'  # TCH008
+        b: TypeAlias = 'int' | None  # TCH010
+    ",
+        "tc010_precedence_over_tch008"
+    )]
     fn contents(contents: &str, snapshot: &str) {
         let diagnostics = test_snippet(
             contents,

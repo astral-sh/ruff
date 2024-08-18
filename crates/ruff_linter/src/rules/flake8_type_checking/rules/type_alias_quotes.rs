@@ -1,4 +1,5 @@
-use ast::ExprContext;
+use crate::registry::Rule;
+use ast::{ExprContext, Operator};
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast as ast;
@@ -175,6 +176,17 @@ pub(crate) fn quoted_type_alias(
     annotation: &str,
     range: TextRange,
 ) {
+    if checker.enabled(Rule::RuntimeStringUnion) {
+        // this should return a TCH010 error instead
+        if let Some(Expr::BinOp(ast::ExprBinOp {
+            op: Operator::BitOr,
+            ..
+        })) = checker.semantic().current_expression_parent()
+        {
+            return;
+        }
+    }
+
     // explicit type aliases require some additional checks to avoid false positives
     if checker.semantic().in_explicit_type_alias() {
         // if the expression contains a subscript or attribute access
