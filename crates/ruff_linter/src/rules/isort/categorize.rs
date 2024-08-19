@@ -1,7 +1,7 @@
 use std::collections::BTreeMap;
 use std::fmt;
+use std::iter;
 use std::path::{Path, PathBuf};
-use std::{fs, iter};
 
 use log::debug;
 use rustc_hash::{FxBuildHasher, FxHashMap, FxHashSet};
@@ -127,7 +127,7 @@ pub(crate) fn categorize<'a>(
                 &ImportSection::Known(ImportType::FirstParty),
                 Reason::SamePackage,
             )
-        } else if let Some(src) = match_sources(src, module_base) {
+        } else if let Some(src) = inferred_first_party_root(src, module_name) {
             (
                 &ImportSection::Known(ImportType::FirstParty),
                 Reason::SourceMatch(src),
@@ -157,17 +157,24 @@ fn same_package(package: Option<&Path>, module_base: &str) -> bool {
     package.is_some_and(|package| package.ends_with(module_base))
 }
 
-fn match_sources<'a>(paths: &'a [PathBuf], base: &str) -> Option<&'a Path> {
-    for path in paths {
-        if let Ok(metadata) = fs::metadata(path.join(base)) {
-            if metadata.is_dir() {
-                return Some(path);
-            }
+/// Determine whether `module_name` can be inferred as a first-party package
+/// under any of the user-configured root directories for first-party code
+fn inferred_first_party_root<'a>(
+    first_party_roots: &'a [PathBuf],
+    module_name: &str,
+) -> Option<&'a Path> {
+    let relative_path: PathBuf = module_name.split('.').collect();
+    relative_path.components().next()?;
+    for root in first_party_roots {
+        let candidate = root.join(&relative_path);
+        if candidate.is_dir() {
+            return Some(root);
         }
-        if let Ok(metadata) = fs::metadata(path.join(format!("{base}.py"))) {
-            if metadata.is_file() {
-                return Some(path);
-            }
+        if ["py", "pyi"]
+            .into_iter()
+            .any(|extension| candidate.with_extension(extension).is_file())
+        {
+            return Some(root);
         }
     }
     None
