@@ -133,6 +133,7 @@ def main() -> None:
         with Path(f"docs/{filename}").open("w+", encoding="utf8") as f:
             if filename == "contributing.md":
                 # Copy the CONTRIBUTING.md.
+
                 shutil.copy("CONTRIBUTING.md", "docs/contributing.md")
                 continue
 
