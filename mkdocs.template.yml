@@ -61,6 +61,9 @@ markdown_extensions:
 plugins:
   - search
   - typeset
+  - mike:
+      deploy_prefix: site/ruff
+      canonical_version: latest
 extra_css:
   - stylesheets/extra.css
 extra_javascript:
@@ -71,3 +74,6 @@ not_in_nav: |
 extra:
   analytics:
     provider: fathom
+  version:
+    provider: mike
+    alias: true
