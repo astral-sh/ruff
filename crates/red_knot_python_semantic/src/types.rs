@@ -151,7 +151,7 @@ pub(crate) fn definitions_ty<'db>(
 }
 
 /// Unique ID for a type.
-#[derive(Copy, Clone, Debug, PartialOrd, Ord, PartialEq, Eq, Hash)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
 pub enum Type<'db> {
     /// the dynamic type: a statically-unknown set of values
     Any,
@@ -292,7 +292,7 @@ impl<'db> Type<'db> {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum UnknownTypeKind {
     /// Temporary variant that indicates that we *should*
     /// be able to infer a type here in due course, but currently can't
