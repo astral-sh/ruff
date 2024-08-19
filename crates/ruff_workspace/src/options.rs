@@ -47,7 +47,7 @@ pub struct Options {
     /// This setting will override even the `RUFF_CACHE_DIR` environment
     /// variable, if set.
     #[option(
-        default = ".ruff_cache",
+        default = r#"".ruff_cache""#,
         value_type = "str",
         example = r#"cache-dir = "~/.cache/ruff""#
     )]
@@ -553,7 +553,7 @@ pub struct LintCommonOptions {
     /// default expression matches `_`, `__`, and `_var`, but not `_var_`.
     #[option(
         default = r#""^(_+|(_+[a-zA-Z0-9_]*[a-zA-Z0-9]+?))$""#,
-        value_type = "re.Pattern",
+        value_type = "str",
         example = r#"
             # Only ignore variables named "_".
             dummy-variable-rgx = "^_$"
@@ -1171,7 +1171,7 @@ pub struct Flake8CopyrightOptions {
     /// - `Copyright (C) 2021-2023`
     /// - `Copyright (C) 2021, 2023`
     #[option(
-        default = r#"(?i)Copyright\s+((?:\(C\)|©)\s+)?\d{4}((-|,\s)\d{4})*"#,
+        default = r#""(?i)Copyright\s+((?:\(C\)|©)\s+)?\d{4}((-|,\s)\d{4})*""#,
         value_type = "str",
         example = r#"notice-rgx = "(?i)Copyright \\(C\\) \\d{4}""#
     )]
@@ -2029,7 +2029,7 @@ pub struct IsortOptions {
     /// this to "closest-to-furthest" is equivalent to isort's
     /// `reverse-relative = true`.
     #[option(
-        default = r#"furthest-to-closest"#,
+        default = r#""furthest-to-closest""#,
         value_type = r#""furthest-to-closest" | "closest-to-furthest""#,
         example = r#"
             relative-imports-order = "closest-to-furthest"
@@ -2146,7 +2146,7 @@ pub struct IsortOptions {
 
     /// Define a default section for any imports that don't fit into the specified [`section-order`](#lint_isort_section-order).
     #[option(
-        default = r#"third-party"#,
+        default = r#""third-party""#,
         value_type = "str",
         example = r#"
             default-section = "first-party"
@@ -2660,8 +2660,8 @@ pub struct PycodestyleOptions {
     pub max_doc_length: Option<LineLength>,
 
     /// Whether line-length violations (`E501`) should be triggered for
-    /// comments starting with [`task-tags`](#lint_task-tags) (by default: \["TODO", "FIXME",
-    /// and "XXX"\]).
+    /// comments starting with [`task-tags`](#lint_task-tags) (by default: "TODO", "FIXME",
+    /// and "XXX").
     #[option(
         default = "false",
         value_type = "bool",
@@ -3059,7 +3059,7 @@ pub struct FormatOptions {
     ///
     /// See [`indent-width`](#indent-width) to configure the number of spaces per indentation and the tab width.
     #[option(
-        default = "space",
+        default = r#""space""#,
         value_type = r#""space" | "tab""#,
         example = r#"
             # Use tabs instead of 4 space indentation.
@@ -3092,7 +3092,7 @@ pub struct FormatOptions {
     /// a mixture of single and double quotes and can't migrate to the `double` or `single` style.
     /// The quote style `preserve` leaves the quotes of all strings unchanged.
     #[option(
-        default = r#"double"#,
+        default = r#""double""#,
         value_type = r#""double" | "single" | "preserve""#,
         example = r#"
             # Prefer single quotes over double quotes.
@@ -3136,7 +3136,7 @@ pub struct FormatOptions {
     /// * `cr-lf`: Line endings will be converted to `\r\n`. The default line ending on Windows.
     /// * `native`: Line endings will be converted to `\n` on Unix and `\r\n` on Windows.
     #[option(
-        default = r#"auto"#,
+        default = r#""auto""#,
         value_type = r#""auto" | "lf" | "cr-lf" | "native""#,
         example = r#"
             # Use `\n` line endings for all files
