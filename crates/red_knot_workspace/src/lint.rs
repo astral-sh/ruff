@@ -122,41 +122,6 @@ fn format_diagnostic(context: &SemanticLintContext, message: &str, start: TextSi
     )
 }
 
-fn lint_unresolved_imports(context: &SemanticLintContext, import: AnyImportRef) {
-    // TODO: this treats any symbol with `Type::Unknown` as an unresolved import,
-    // which isn't really correct: if it exists but has `Type::Unknown` in the
-    // module we're importing it from, we shouldn't really emit a diagnostic here,
-    // but currently do.
-    match import {
-        AnyImportRef::Import(import) => {
-            for alias in &import.names {
-                let ty = alias.ty(&context.semantic);
-
-                if ty.is_unknown() {
-                    context.push_diagnostic(format_diagnostic(
-                        context,
-                        &format!("Unresolved import '{}'", &alias.name),
-                        alias.start(),
-                    ));
-                }
-            }
-        }
-        AnyImportRef::ImportFrom(import) => {
-            for alias in &import.names {
-                let ty = alias.ty(&context.semantic);
-
-                if ty.is_unknown() {
-                    context.push_diagnostic(format_diagnostic(
-                        context,
-                        &format!("Unresolved import '{}'", &alias.name),
-                        alias.start(),
-                    ));
-                }
-            }
-        }
-    }
-}
-
 fn lint_maybe_undefined(context: &SemanticLintContext, name: &ast::ExprName) {
     if !matches!(name.ctx, ast::ExprContext::Load) {
         return;
@@ -282,12 +247,6 @@ impl Visitor<'_> for SemanticVisitor<'_> {
         match stmt {
             ast::Stmt::ClassDef(class) => {
                 lint_bad_override(self.context, class);
-            }
-            ast::Stmt::Import(import) => {
-                lint_unresolved_imports(self.context, AnyImportRef::Import(import));
-            }
-            ast::Stmt::ImportFrom(import) => {
-                lint_unresolved_imports(self.context, AnyImportRef::ImportFrom(import));
             }
             _ => {}
         }
