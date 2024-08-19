@@ -1009,7 +1009,7 @@ impl<'db> TypeInferenceBuilder<'db> {
         } else {
             self.add_diagnostic(
                 node,
-                "report-missing-import",
+                "unresolved-import",
                 format_args!("Import '{module_name}' could not be resolved."),
             );
 
