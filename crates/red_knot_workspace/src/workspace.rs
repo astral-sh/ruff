@@ -13,6 +13,7 @@ use ruff_db::{
 use ruff_python_ast::{name::Name, PySourceType};
 use ruff_text_size::Ranged;
 
+use crate::workspace::files::{Index, Indexed, PackageFiles};
 use crate::{
     db::Db,
     lint::{lint_semantic, lint_syntax},
