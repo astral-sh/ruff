@@ -325,6 +325,16 @@ pub enum UnknownTypeKind {
     SecondOrder,
 }
 
+impl UnknownTypeKind {
+    pub(crate) fn union(self, other: Self) -> Self {
+        if self == other {
+            self
+        } else {
+            UnknownTypeKind::SecondOrder
+        }
+    }
+}
+
 #[salsa::interned]
 pub struct FunctionType<'db> {
     /// name of the function at definition

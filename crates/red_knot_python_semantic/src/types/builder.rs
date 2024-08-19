@@ -25,11 +25,12 @@
 //!   * No type in an intersection can be a supertype of any other type in the intersection (just
 //!     eliminate the supertype from the intersection).
 //!   * An intersection containing two non-overlapping types should simplify to [`Type::Never`].
-use crate::types::{IntersectionType, Type, UnionType};
+use crate::types::{IntersectionType, Type, UnionType, UnknownTypeKind};
 use crate::{Db, FxOrderSet};
 
 pub(crate) struct UnionBuilder<'db> {
     elements: FxOrderSet<Type<'db>>,
+    unknown_elements: Option<UnknownTypeKind>,
     db: &'db dyn Db,
 }
 
@@ -38,6 +39,7 @@ impl<'db> UnionBuilder<'db> {
         Self {
             db,
             elements: FxOrderSet::default(),
+            unknown_elements: None,
         }
     }
 
@@ -48,6 +50,12 @@ impl<'db> UnionBuilder<'db> {
                 self.elements.extend(&union.elements(self.db));
             }
             Type::Never => {}
+            Type::Unknown(kind) => {
+                self.unknown_elements = Some(
+                    self.unknown_elements
+                        .map_or(kind, |existing| existing.union(kind)),
+                );
+            }
             _ => {
                 self.elements.insert(ty);
             }
@@ -56,7 +64,9 @@ impl<'db> UnionBuilder<'db> {
         self
     }
 
-    pub(crate) fn build(self) -> Type<'db> {
+    pub(crate) fn build(mut self) -> Type<'db> {
+        self.elements
+            .extend(self.unknown_elements.map(Type::Unknown));
         match self.elements.len() {
             0 => Type::Never,
             1 => self.elements[0],
