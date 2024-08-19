@@ -886,7 +886,7 @@ impl<'db> IterationOutcome<'db> {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum UnknownTypeKind {
     /// Temporary variant that indicates that we *should*
     /// be able to infer a type here in due course, but currently can't
