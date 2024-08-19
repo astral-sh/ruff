@@ -25,7 +25,7 @@
 //!   * No type in an intersection can be a supertype of any other type in the intersection (just
 //!     eliminate the supertype from the intersection).
 //!   * An intersection containing two non-overlapping types should simplify to [`Type::Never`].
-use crate::types::{builtins_symbol_ty, IntersectionType, Type, UnionType};
+use crate::types::{builtins_symbol_ty, IntersectionType, Type, UnionType, UnknownTypeKind};
 use crate::{Db, FxOrderSet};
 use smallvec::SmallVec;
 
@@ -53,6 +53,12 @@ impl<'db> UnionBuilder<'db> {
                 }
             }
             Type::Never => {}
+            Type::Unknown(kind) => {
+                self.unknown_elements = Some(
+                    self.unknown_elements
+                        .map_or(kind, |existing| existing.union(kind)),
+                );
+            }
             _ => {
                 let bool_pair = if let Type::BooleanLiteral(b) = ty {
                     Some(Type::BooleanLiteral(!b))
@@ -105,7 +111,21 @@ impl<'db> UnionBuilder<'db> {
         self
     }
 
-    pub(crate) fn build(self) -> Type<'db> {
+    /// Performs the following normalizations:
+    ///     - Replaces `Literal[True,False]` with `bool`.
+    ///     - TODO For enums `E` with members `X1`,...,`Xn`, replaces
+    ///     `Literal[E.X1,...,E.Xn]` with `E`.
+    fn simplify(&mut self) {
+        if let Some(true_index) = self.elements.get_index_of(&Type::BooleanLiteral(true)) {
+            if self.elements.contains(&Type::BooleanLiteral(false)) {
+                *self.elements.get_index_mut2(true_index).unwrap() =
+                    builtins_symbol_ty(self.db, "bool");
+                self.elements.remove(&Type::BooleanLiteral(false));
+            }
+        }
+    }
+
+    pub(crate) fn build(mut self) -> Type<'db> {
         match self.elements.len() {
             0 => Type::Never,
             1 => self.elements[0],
