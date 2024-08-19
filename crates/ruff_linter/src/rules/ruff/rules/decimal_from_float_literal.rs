@@ -10,8 +10,9 @@ use crate::checkers::ast::Checker;
 /// Checks for `Decimal` calls passing a float literal.
 ///
 /// ## Why is this bad?
-/// Float literals have limited precision that can lead to unexpected results. The `Decimal` class is designed to handle
-/// numbers with fixed-point precision, so a string literal should be used instead.
+/// Float literals have limited precision that can lead to unexpected results.
+/// The `Decimal` class is designed to handle numbers with fixed-point precision,
+/// so a string literal should be used instead.
 ///
 /// ## Example
 ///
@@ -25,20 +26,20 @@ use crate::checkers::ast::Checker;
 /// ```
 ///
 /// ## Fix Safety
-/// This rule's fix is marked as unsafe because it changes the underlying value of the `Decimal` instance that is
-/// constructed. This can lead to unexpected behavior if your program relies on the previous value
-/// (whether deliberately or not).
+/// This rule's fix is marked as unsafe because it changes the underlying value
+/// of the `Decimal` instance that is constructed. This can lead to unexpected
+/// behavior if your program relies on the previous value (whether deliberately or not).
 #[violation]
 pub struct DecimalFromFloatLiteral;
 
 impl AlwaysFixableViolation for DecimalFromFloatLiteral {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!(r#"`Decimal()` called with float literal argument"#)
+        format!("`Decimal()` called with float literal argument")
     }
 
     fn fix_title(&self) -> String {
-        "Use a string literal instead".into()
+        "Use a string literal instead".to_string()
     }
 }
 
@@ -73,9 +74,7 @@ fn is_arg_float_literal(arg: &ast::Expr) -> bool {
             value: ast::Number::Float(_),
             ..
         }) => true,
-        ast::Expr::UnaryOp(ast::ExprUnaryOp { operand, .. }) => {
-            is_arg_float_literal(operand.as_ref())
-        }
+        ast::Expr::UnaryOp(ast::ExprUnaryOp { operand, .. }) => is_arg_float_literal(operand),
         _ => false,
     }
 }
