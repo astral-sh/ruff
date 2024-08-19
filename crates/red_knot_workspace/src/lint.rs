@@ -244,11 +244,8 @@ struct SemanticVisitor<'a> {
 
 impl Visitor<'_> for SemanticVisitor<'_> {
     fn visit_stmt(&mut self, stmt: &ast::Stmt) {
-        match stmt {
-            ast::Stmt::ClassDef(class) => {
-                lint_bad_override(self.context, class);
-            }
-            _ => {}
+        if let ast::Stmt::ClassDef(class) = stmt {
+            lint_bad_override(self.context, class);
         }
 
         walk_stmt(self, stmt);

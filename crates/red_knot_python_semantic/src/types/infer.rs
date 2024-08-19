@@ -1005,13 +1005,13 @@ impl<'db> TypeInferenceBuilder<'db> {
         };
 
         if let Some(module) = resolve_module(self.db, module_name.clone()) {
+            Type::Module(module.file())
+        } else {
             self.add_diagnostic(
                 node,
-                "reportMissingImport",
+                "report-missing-import",
                 format_args!("Import '{module_name}' could not be resolved."),
             );
-                builder.finish(format!("Import '{module_name}' could not be resolved."));
-            }
 
             Type::Unknown
         }
@@ -1731,12 +1731,12 @@ impl<'db> TypeInferenceBuilder<'db> {
                 }
             }
         }
-    /// Adds a new diagnostic.
+    }
 
+    /// Adds a new diagnostic.
+    ///
     /// The diagnostic does not get added if the rule isn't enabled for this file.
     fn add_diagnostic(&mut self, node: AnyNodeRef, rule: &str, message: std::fmt::Arguments) {
-        rule: &str,
-    ) -> Option<TypeCheckDiagnosticBuilder> {
         if !self.db.is_file_open(self.file) {
             return;
         }

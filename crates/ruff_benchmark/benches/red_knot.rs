@@ -104,7 +104,7 @@ fn benchmark_cold(criterion: &mut Criterion) {
                 let Case { db, parser, .. } = case;
                 let result = db.check_file(*parser).unwrap();
 
-                assert_eq!(result.len(), 34);
+                assert_eq!(result.len(), EXPECTED_DIAGNOSTICS);
             },
             BatchSize::SmallInput,
         );
