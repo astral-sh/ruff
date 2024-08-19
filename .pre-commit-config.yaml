@@ -6,6 +6,8 @@ exclude: |
     crates/red_knot_workspace/resources/.*|
     crates/ruff_linter/resources/.*|
     crates/ruff_linter/src/rules/.*/snapshots/.*|
+    crates/ruff_notebook/resources/.*|
+    crates/ruff_server/resources/.*|
     crates/ruff/resources/.*|
     crates/ruff_python_formatter/resources/.*|
     crates/ruff_python_formatter/tests/snapshots/.*|
