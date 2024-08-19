@@ -1216,9 +1216,17 @@ impl<'a> SemanticModel<'a> {
     /// Return the [`Stmt`] corresponding to the given [`NodeId`].
     #[inline]
     pub fn statement(&self, node_id: NodeId) -> &'a Stmt {
+        self.nodes[self.statement_id(node_id)]
+            .as_statement()
+            .expect("No statement found")
+    }
+
+    /// Return the statement [`NodeId`] corresponding to the given [`NodeId`].
+    #[inline]
+    pub fn statement_id(&self, node_id: NodeId) -> NodeId {
         self.nodes
             .ancestor_ids(node_id)
-            .find_map(|id| self.nodes[id].as_statement())
+            .find(|id| self.nodes[*id].is_statement())
             .expect("No statement found")
     }
 
@@ -1245,6 +1253,13 @@ impl<'a> SemanticModel<'a> {
             .ancestor_ids(node_id)
             .filter(|id| self.nodes[*id].is_statement())
             .nth(1)
+    }
+
+    /// Given a [`NodeId`], return the [`NodeId`] of the parent statement, if any.
+    pub fn parent_statement_ids(&self, node_id: NodeId) -> impl Iterator<Item = NodeId> + '_ {
+        self.nodes
+            .ancestor_ids(node_id)
+            .filter(|id| self.nodes[*id].is_statement())
     }
 
     /// Return the [`Expr`] corresponding to the given [`NodeId`].

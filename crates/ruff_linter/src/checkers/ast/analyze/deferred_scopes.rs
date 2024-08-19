@@ -17,6 +17,7 @@ pub(crate) fn deferred_scopes(checker: &mut Checker) {
         Rule::AsyncioDanglingTask,
         Rule::BadStaticmethodArgument,
         Rule::BuiltinAttributeShadowing,
+        Rule::ForVariableUsedAfterBlock,
         Rule::GlobalVariableNotAssigned,
         Rule::ImportPrivateName,
         Rule::ImportShadowedByLoopVar,
@@ -85,6 +86,10 @@ pub(crate) fn deferred_scopes(checker: &mut Checker) {
     let mut diagnostics: Vec<Diagnostic> = vec![];
     for scope_id in checker.analyze.scopes.iter().rev().copied() {
         let scope = &checker.semantic.scopes[scope_id];
+
+        if checker.enabled(Rule::ForVariableUsedAfterBlock) {
+            ruff::rules::for_variable_used_after_block(checker, scope, &mut diagnostics);
+        }
 
         if checker.enabled(Rule::UndefinedLocal) {
             pyflakes::rules::undefined_local(checker, scope_id, scope, &mut diagnostics);
