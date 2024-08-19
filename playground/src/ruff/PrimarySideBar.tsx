@@ -1,5 +1,5 @@
-import { FileIcon, SettingsIcon } from "./Icons";
-import SideBar, { SideBarEntry } from "./SideBar";
+import { FileIcon, SettingsIcon } from "../shared/Icons";
+import SideBar, { SideBarEntry } from "../shared/SideBar";
 
 type Tool = "Settings" | "Source";
 

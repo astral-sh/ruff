@@ -1,11 +1,11 @@
-import SideBar, { SideBarEntry } from "./SideBar";
+import SideBar, { SideBarEntry } from "../shared/SideBar";
 import {
   FormatIcon,
   FormatterIRIcon,
   StructureIcon,
   TokensIcon,
   CommentsIcon,
-} from "./Icons";
+} from "../shared/Icons";
 import { SecondaryTool } from "./SecondaryPanel";
 
 interface RightSideBarProps {

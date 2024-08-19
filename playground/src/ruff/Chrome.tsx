@@ -1,11 +1,11 @@
 import { useCallback, useMemo, useRef, useState } from "react";
-import Header from "./Header";
+import Header from "../shared/Header";
 import { persist, persistLocal, restore, stringify } from "./settings";
-import { useTheme } from "./theme";
+import { useTheme } from "../shared/theme";
 import { default as Editor, Source } from "./Editor";
-import initRuff, { Workspace } from "../pkg/ruff_wasm";
+import initRuff, { Workspace } from "./ruff_wasm";
 import { loader } from "@monaco-editor/react";
-import { setupMonaco } from "./setupMonaco";
+import { setupMonaco } from "../shared/setupMonaco";
 import { DEFAULT_PYTHON_SOURCE } from "../constants";
 
 export default function Chrome() {
@@ -104,8 +104,6 @@ async function startPlayground(): Promise<{
 }> {
   await initRuff();
   const monaco = await loader.init();
-
-  console.log(monaco);
 
   setupMonaco(monaco);
 

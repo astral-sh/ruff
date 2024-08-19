@@ -539,7 +539,7 @@ impl<'db> TypeInferenceBuilder<'db> {
         let bases = arguments
             .as_deref()
             .map(|arguments| self.infer_arguments(arguments))
-            .unwrap_or(Vec::new());
+            .unwrap_or_default();
 
         let body_scope = self
             .index

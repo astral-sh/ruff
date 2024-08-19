@@ -1,9 +1,9 @@
 import { useDeferredValue, useMemo, useState } from "react";
 import { Panel, PanelGroup } from "react-resizable-panels";
-import { Diagnostic, Workspace } from "../pkg/ruff_wasm";
-import { ErrorMessage } from "./ErrorMessage";
+import { Diagnostic, Workspace } from "./ruff_wasm";
+import { ErrorMessage } from "../shared/ErrorMessage";
 import PrimarySideBar from "./PrimarySideBar";
-import { HorizontalResizeHandle } from "./ResizeHandle";
+import { HorizontalResizeHandle } from "../shared/ResizeHandle";
 import SecondaryPanel, {
   SecondaryPanelResult,
   SecondaryTool,
@@ -11,7 +11,7 @@ import SecondaryPanel, {
 import SecondarySideBar from "./SecondarySideBar";
 import SettingsEditor from "./SettingsEditor";
 import SourceEditor from "./SourceEditor";
-import { Theme } from "./theme";
+import { Theme } from "../shared/theme";
 
 type Tab = "Source" | "Settings";
 

@@ -1,12 +1,9 @@
 import Editor from "@monaco-editor/react";
-import { Theme } from "./theme";
+import { Theme } from "../shared/theme";
 
 export enum SecondaryTool {
-  "Format" = "Format",
   "AST" = "AST",
   "Tokens" = "Tokens",
-  "FIR" = "FIR",
-  "Comments" = "Comments",
 }
 
 export type SecondaryPanelResult =
@@ -14,11 +11,11 @@ export type SecondaryPanelResult =
   | { status: "ok"; content: string }
   | { status: "error"; error: string };
 
-export type SecondaryPanelProps = {
+export interface SecondaryPanelProps {
   tool: SecondaryTool;
   result: SecondaryPanelResult;
   theme: Theme;
-};
+}
 
 export default function SecondaryPanel({
   tool,
@@ -50,24 +47,12 @@ function Content({
     switch (result.status) {
       case "ok":
         switch (tool) {
-          case "Format":
-            language = "python";
-            break;
-
           case "AST":
             language = "RustPythonAst";
             break;
 
           case "Tokens":
             language = "RustPythonTokens";
-            break;
-
-          case "FIR":
-            language = "fir";
-            break;
-
-          case "Comments":
-            language = "Comments";
             break;
         }
 

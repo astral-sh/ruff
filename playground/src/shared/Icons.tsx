@@ -140,3 +140,63 @@ export function CommentsIcon() {
     </svg>
   );
 }
+
+export function AddIcon() {
+  return (
+    <svg
+      viewBox="0 0 16 16"
+      xmlns="http://www.w3.org/2000/svg"
+      className="fill-current"
+      width={16}
+      height={16}
+    >
+      <path d="M14.0004 7V8H8.00037V14H7.00037V8H1.00037V7H7.00037V1H8.00037V7H14.0004Z" />
+    </svg>
+  );
+}
+
+export function CloseIcon() {
+  return (
+    <svg
+      viewBox="0 0 16 16"
+      xmlns="http://www.w3.org/2000/svg"
+      className="fill-current"
+      width={16}
+      height={16}
+    >
+      <path
+        fillRule="evenodd"
+        clipRule="evenodd"
+        d="M8.00028 8.70711L11.6467 12.3536L12.3538 11.6465L8.70739 8.00001L12.3538 4.35356L11.6467 3.64645L8.00028 7.2929L4.35384 3.64645L3.64673 4.35356L7.29317 8.00001L3.64673 11.6465L4.35384 12.3536L8.00028 8.70711Z"
+      />
+    </svg>
+  );
+}
+
+// https://github.com/material-extensions/vscode-material-icon-theme/blob/main/icons/python.svg
+// or use https://github.com/vscode-icons/vscode-icons/blob/master/icons/file_type_python.svg?short_path=677f216
+export function PythonIcon({
+  height = 24,
+  width = 24,
+}: {
+  height?: number;
+  width?: number;
+}) {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      xmlns="http://www.w3.org/2000/svg"
+      width={width}
+      height={height}
+    >
+      <path
+        fill="#0288D1"
+        d="M9.86 2A2.86 2.86 0 0 0 7 4.86v1.68h4.29c.39 0 .71.57.71.96H4.86A2.86 2.86 0 0 0 2 10.36v3.781a2.86 2.86 0 0 0 2.86 2.86h1.18v-2.68a2.85 2.85 0 0 1 2.85-2.86h5.25c1.58 0 2.86-1.271 2.86-2.851V4.86A2.86 2.86 0 0 0 14.14 2zm-.72 1.61c.4 0 .72.12.72.71s-.32.891-.72.891c-.39 0-.71-.3-.71-.89s.32-.711.71-.711z"
+      />
+      <path
+        fill="#fdd835"
+        d="M17.959 7v2.68a2.85 2.85 0 0 1-2.85 2.859H9.86A2.85 2.85 0 0 0 7 15.389v3.75a2.86 2.86 0 0 0 2.86 2.86h4.28A2.86 2.86 0 0 0 17 19.14v-1.68h-4.291c-.39 0-.709-.57-.709-.96h7.14A2.86 2.86 0 0 0 22 13.64V9.86A2.86 2.86 0 0 0 19.14 7zM8.32 11.513l-.004.004c.012-.002.025-.001.038-.004zm6.54 7.276c.39 0 .71.3.71.89a.71.71 0 0 1-.71.71c-.4 0-.72-.12-.72-.71s.32-.89.72-.89z"
+      />
+    </svg>
+  );
+}

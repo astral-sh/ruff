@@ -1,10 +1,13 @@
 use std::any::Any;
 
 use js_sys::Error;
+
+use tracing_subscriber_wasm::MakeConsoleWriter;
 use wasm_bindgen::prelude::*;
 
 use red_knot_python_semantic::{ProgramSettings, SearchPathSettings};
 use red_knot_workspace::db::RootDatabase;
+use red_knot_workspace::watch::{ChangeEvent, ChangedKind, CreatedKind, DeletedKind};
 use red_knot_workspace::workspace::WorkspaceMetadata;
 use ruff_db::files::{system_path_to_file, File};
 use ruff_db::system::walk_directory::WalkDirectoryBuilder;
@@ -16,8 +19,6 @@ use ruff_notebook::Notebook;
 
 #[wasm_bindgen(start)]
 pub fn run() {
-    use log::Level;
-
     // When the `console_error_panic_hook` feature is enabled, we can call the
     // `set_panic_hook` function at least once during initialization, and then
     // we will get better error messages if our code ever panics.
@@ -27,7 +28,17 @@ pub fn run() {
     #[cfg(feature = "console_error_panic_hook")]
     console_error_panic_hook::set_once();
 
-    console_log::init_with_level(Level::Debug).expect("Initializing logger went wrong.");
+    tracing_subscriber::fmt()
+        .with_writer(
+            // To avoide trace events in the browser from showing their
+            // JS backtrace, which is very annoying, in my opinion
+            MakeConsoleWriter::default().map_trace_level_to(tracing::Level::TRACE),
+        )
+        // For some reason, if we don't do this in the browser, we get
+        // a runtime error.
+        .with_ansi(false)
+        .without_time()
+        .init();
 }
 
 #[wasm_bindgen]
@@ -57,19 +68,24 @@ impl Workspace {
 
     #[wasm_bindgen(js_name = "openFile")]
     pub fn open_file(&mut self, path: &str, contents: &str) -> Result<FileHandle, Error> {
+        let path = SystemPath::new(path);
         self.system
             .fs
             .write_file(path, contents)
             .map_err(into_error)?;
 
+        self.db.apply_changes(vec![ChangeEvent::Created {
+            path: path.to_path_buf(),
+            kind: CreatedKind::File,
+        }]);
+
         let file = system_path_to_file(&self.db, path).expect("File to exist");
-        file.sync(&mut self.db);
 
         self.db.workspace().open_file(&mut self.db, file);
 
         Ok(FileHandle {
             file,
-            path: SystemPath::new(path).to_path_buf(),
+            path: path.to_path_buf(),
         })
     }
 
@@ -84,7 +100,16 @@ impl Workspace {
             .write_file(&file_id.path, contents)
             .map_err(into_error)?;
 
-        file_id.file.sync(&mut self.db);
+        self.db.apply_changes(vec![
+            ChangeEvent::Changed {
+                path: file_id.path.to_path_buf(),
+                kind: ChangedKind::FileContent,
+            },
+            ChangeEvent::Changed {
+                path: file_id.path.to_path_buf(),
+                kind: ChangedKind::FileMetadata,
+            },
+        ]);
 
         Ok(())
     }
@@ -99,7 +124,10 @@ impl Workspace {
             .remove_file(&file_id.path)
             .map_err(into_error)?;
 
-        file.sync(&mut self.db);
+        self.db.apply_changes(vec![ChangeEvent::Deleted {
+            path: file_id.path.to_path_buf(),
+            kind: DeletedKind::File,
+        }]);
 
         Ok(())
     }

@@ -4,11 +4,11 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "build:wasm": "wasm-pack build ../crates/ruff_wasm --target web --out-dir ../../playground/src/pkg",
+    "build:wasm": "wasm-pack build ../crates/ruff_wasm --target web --out-dir ../../playground/src/ruff/ruff_wasm && wasm-pack build ../crates/red_knot_wasm --target web --out-dir ../../playground/src/red_knot/red_knot_wasm",
     "build": "tsc && vite build",
     "check": "npm run lint && npm run tsc",
     "dev": "vite",
-    "dev:wasm": "wasm-pack build ../crates/ruff_wasm --dev --target web --out-dir ../../playground/src/pkg",
+    "dev:wasm": "wasm-pack build ../crates/ruff_wasm --dev --target web --out-dir ../../playground/src/ruff/ruff_wasm && wasm-pack build ../crates/red_knot_wasm --dev --target web --out-dir ../../playground/src/red_knot/red_knot_wasm",
     "fmt": "prettier --cache -w .",
     "lint": "eslint --cache --ext .ts,.tsx src",
     "preview": "vite preview",

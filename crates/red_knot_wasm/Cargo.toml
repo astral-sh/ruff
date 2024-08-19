@@ -26,9 +26,10 @@ ruff_db = { workspace = true }
 ruff_notebook = { workspace = true }
 
 console_error_panic_hook = { workspace = true, optional = true }
-console_log = { workspace = true }
 js-sys = { workspace = true }
-log = { workspace = true }
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true }
+tracing-subscriber-wasm = "0.1.0"
 wasm-bindgen = { workspace = true }
 
 [dev-dependencies]

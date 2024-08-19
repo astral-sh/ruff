@@ -1,0 +1,8 @@
+# This enables building the WASM module with catch-unwind support but wasm-bindgen doesn't support it yet.
+
+#[build]
+#rustflags = ["-C", "llvm-args=-wasm-enable-eh", "-C", "target-feature=+exception-handling", "-C", "panic=unwind"]
+#
+#
+#[unstable]
+#build-std = ["std", "alloc"]
