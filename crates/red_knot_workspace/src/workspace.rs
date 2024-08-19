@@ -258,22 +258,13 @@ impl Workspace {
     /// * It has a [`SystemPath`] and belongs to a package's `src` files
     /// * It has a [`SystemVirtualPath`](ruff_db::system::SystemVirtualPath)
     pub fn is_file_open(self, db: &dyn Db, file: File) -> bool {
-        tracing::trace!("Testing if {} is open.", file.path(db));
         if let Some(open_files) = self.open_files(db) {
             open_files.contains(&file)
         } else if let Some(system_path) = file.path(db).as_system_path() {
-            self.package(db, system_path).map_or(false, |package| {
-                tracing::trace!(
-                    "Checking if {} is in package {}",
-                    file.path(db),
-                    package.name(db)
-                );
-                package.contains_file(db, file)
-            })
-        } else if file.path(db).is_system_virtual_path() {
-            true
+            self.package(db, system_path)
+                .map_or(false, |package| package.contains_file(db, file))
         } else {
-            false
+            file.path(db).is_system_virtual_path()
         }
     }
 }

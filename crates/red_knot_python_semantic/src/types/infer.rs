@@ -866,7 +866,7 @@ impl<'db> TypeInferenceBuilder<'db> {
             asname: _,
         } = alias;
 
-        let module_ty = self.module_ty_from_name(ModuleName::new(name));
+        let module_ty = self.module_ty_from_name(ModuleName::new(name), alias.into());
         self.types.definitions.insert(definition, module_ty);
     }
 
@@ -964,7 +964,7 @@ impl<'db> TypeInferenceBuilder<'db> {
             ModuleName::new(module_name)
         };
 
-        let module_ty = self.module_ty_from_name(module_name);
+        let module_ty = self.module_ty_from_name(module_name, import_from.into());
 
         let ast::Alias {
             range: _,
@@ -995,10 +995,26 @@ impl<'db> TypeInferenceBuilder<'db> {
         }
     }
 
-    fn module_ty_from_name(&self, module_name: Option<ModuleName>) -> Type<'db> {
-        module_name
-            .and_then(|module_name| resolve_module(self.db, module_name))
-            .map_or(Type::Unknown, |module| Type::Module(module.file()))
+    fn module_ty_from_name(
+        &mut self,
+        module_name: Option<ModuleName>,
+        node: AnyNodeRef,
+    ) -> Type<'db> {
+        let Some(module_name) = module_name else {
+            return Type::Unknown;
+        };
+
+        if let Some(module) = resolve_module(self.db, module_name.clone()) {
+            self.add_diagnostic(
+                node,
+                "reportMissingImport",
+                format_args!("Import '{module_name}' could not be resolved."),
+            );
+                builder.finish(format!("Import '{module_name}' could not be resolved."));
+            }
+
+            Type::Unknown
+        }
     }
 
     fn infer_decorator(&mut self, decorator: &ast::Decorator) -> Type<'db> {
@@ -1101,10 +1117,8 @@ impl<'db> TypeInferenceBuilder<'db> {
         Type::BooleanLiteral(*value)
     }
 
-    fn infer_string_literal_expression(&mut self, literal: &ast::ExprStringLiteral) -> Type<'db> {
-        if let Some(builder) = self.push_diagnostic(literal.into(), "unimplemented") {
-            builder.finish("Unimplemented node StringLiteralExpression")
-        }
+    #[allow(clippy::unused_self)]
+    fn infer_string_literal_expression(&mut self, _literal: &ast::ExprStringLiteral) -> Type<'db> {
         // TODO Literal["..."] or str
         Type::Unknown
     }
@@ -1717,13 +1731,10 @@ impl<'db> TypeInferenceBuilder<'db> {
                 }
             }
         }
-    }
+    /// Adds a new diagnostic.
 
-    // TODO return a builder?
-    #[allow(dead_code)]
-    fn push_diagnostic(
-        &mut self,
-        node: AnyNodeRef,
+    /// The diagnostic does not get added if the rule isn't enabled for this file.
+    fn add_diagnostic(&mut self, node: AnyNodeRef, rule: &str, message: std::fmt::Arguments) {
         rule: &str,
     ) -> Option<TypeCheckDiagnosticBuilder> {
         if !self.db.is_file_open(self.file) {

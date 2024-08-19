@@ -1,15 +1,15 @@
 use ruff_db::files::File;
 use ruff_python_ast::name::Name;
 
-use crate::{Db, FxOrderSet};
 use crate::builtins::builtins_scope;
-use crate::semantic_index::{
-    DefinitionWithConstraints, DefinitionWithConstraintsIterator, global_scope, semantic_index, symbol_table,
-    use_def_map,
-};
 use crate::semantic_index::definition::Definition;
-use crate::semantic_index::symbol::{ScopedSymbolId, ScopeId};
+use crate::semantic_index::symbol::{ScopeId, ScopedSymbolId};
+use crate::semantic_index::{
+    global_scope, semantic_index, symbol_table, use_def_map, DefinitionWithConstraints,
+    DefinitionWithConstraintsIterator,
+};
 use crate::types::narrow::narrowing_constraint;
+use crate::{Db, FxOrderSet};
 
 pub(crate) use self::builder::{IntersectionBuilder, UnionBuilder};
 pub(crate) use self::diagnostic::TypeCheckDiagnostics;
@@ -22,7 +22,6 @@ mod diagnostic;
 mod display;
 mod infer;
 mod narrow;
-
 
 pub fn check_types(db: &dyn Db, file: File) -> TypeCheckDiagnostics {
     let _span = tracing::trace_span!("check_types", file=?file.path(db)).entered();
@@ -349,4 +348,49 @@ pub struct IntersectionType<'db> {
     /// narrowing along with intersections (e.g. `if not isinstance(...)`), so we represent them
     /// directly in intersections rather than as a separate type.
     negative: FxOrderSet<Type<'db>>,
+}
+
+#[cfg(test)]
+mod tests {
+    use anyhow::Context;
+
+    use ruff_db::files::system_path_to_file;
+    use ruff_db::system::{DbWithTestSystem, SystemPathBuf};
+
+    use crate::db::tests::TestDb;
+    use crate::{Program, ProgramSettings, PythonVersion, SearchPathSettings};
+
+    #[test]
+    fn check_types() -> anyhow::Result<()> {
+        let mut db = TestDb::new();
+
+        db.write_file("src/foo.py", "import bar\n")
+            .context("Failed to write foo.py")?;
+
+        Program::from_settings(
+            &db,
+            ProgramSettings {
+                target_version: PythonVersion::default(),
+                search_paths: SearchPathSettings {
+                    extra_paths: Vec::new(),
+                    src_root: SystemPathBuf::from("/src"),
+                    site_packages: vec![],
+                    custom_typeshed: None,
+                },
+            },
+        )
+        .expect("Valid search path settings");
+
+        let foo = system_path_to_file(&db, "src/foo.py").context("Failed to resolve foo.py")?;
+
+        let diagnostics = super::check_types(&db, foo);
+
+        assert_eq!(diagnostics.len(), 1);
+        assert_eq!(
+            diagnostics[0].message(),
+            "Import 'bar' could not be resolved."
+        );
+
+        Ok(())
+    }
 }
