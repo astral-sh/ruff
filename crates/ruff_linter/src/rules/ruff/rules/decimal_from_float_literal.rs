@@ -1,6 +1,7 @@
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::{self as ast};
+use ruff_python_codegen::Stylist;
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
@@ -56,9 +57,12 @@ pub(crate) fn decimal_from_float_literal_syntax(checker: &mut Checker, call: &as
         .resolve_qualified_name(call.func.as_ref())
         .is_some_and(|qualified_name| matches!(qualified_name.segments(), ["decimal", "Decimal"]))
     {
-        let diagnostic = Diagnostic::new(DecimalFromFloatLiteral, arg.range()).with_fix(
-            fix_float_literal(arg.range(), &checker.generator().expr(arg)),
-        );
+        let diagnostic =
+            Diagnostic::new(DecimalFromFloatLiteral, arg.range()).with_fix(fix_float_literal(
+                arg.range(),
+                &checker.generator().expr(arg),
+                checker.stylist(),
+            ));
         checker.diagnostics.push(diagnostic);
     }
 }
@@ -76,7 +80,7 @@ fn is_arg_float_literal(arg: &ast::Expr) -> bool {
     }
 }
 
-fn fix_float_literal(range: TextRange, float_literal: &str) -> Fix {
-    let content = format!("\"{float_literal}\"");
+fn fix_float_literal(range: TextRange, float_literal: &str, stylist: &Stylist) -> Fix {
+    let content = format!("{quote}{float_literal}{quote}", quote = stylist.quote());
     Fix::unsafe_edit(Edit::range_replacement(content, range))
 }
