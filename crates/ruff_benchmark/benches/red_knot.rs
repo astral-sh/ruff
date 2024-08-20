@@ -18,6 +18,7 @@ struct Case {
 }
 
 const TOMLLIB_312_URL: &str = "https://raw.githubusercontent.com/python/cpython/8e8a4baf652f6e1cee7acde9d78c4b6154539748/Lib/tomllib";
+const EXPECTED_DIAGNOSTICS: usize = 27;
 
 fn get_test_file(name: &str) -> TestFile {
     let path = format!("tomllib/{name}");
@@ -89,7 +90,7 @@ fn benchmark_incremental(criterion: &mut Criterion) {
                 let Case { db, parser, .. } = case;
                 let result = db.check_file(*parser).unwrap();
 
-                assert_eq!(result.len(), 34);
+                assert_eq!(result.len(), EXPECTED_DIAGNOSTICS);
             },
             BatchSize::SmallInput,
         );
@@ -104,7 +105,7 @@ fn benchmark_cold(criterion: &mut Criterion) {
                 let Case { db, parser, .. } = case;
                 let result = db.check_file(*parser).unwrap();
 
-                assert_eq!(result.len(), 34);
+                assert_eq!(result.len(), EXPECTED_DIAGNOSTICS);
             },
             BatchSize::SmallInput,
         );

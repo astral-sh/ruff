@@ -109,7 +109,7 @@ impl Workspace {
     pub fn check_file(&self, file_id: &FileHandle) -> Result<Vec<String>, Error> {
         let result = self.db.check_file(file_id.file).map_err(into_error)?;
 
-        Ok(result.to_vec())
+        Ok(result.clone())
     }
 
     /// Checks all open files

@@ -11,7 +11,6 @@ use ruff_db::{Db as SourceDb, Upcast};
 use salsa::plumbing::ZalsaDatabase;
 use salsa::{Cancelled, Event};
 
-use crate::lint::Diagnostics;
 use crate::workspace::{check_file, Workspace, WorkspaceMetadata};
 
 mod changes;
@@ -61,7 +60,7 @@ impl RootDatabase {
         self.with_db(|db| db.workspace().check(db))
     }
 
-    pub fn check_file(&self, file: File) -> Result<Diagnostics, Cancelled> {
+    pub fn check_file(&self, file: File) -> Result<Vec<String>, Cancelled> {
         self.with_db(|db| check_file(db, file))
     }
 
@@ -115,7 +114,15 @@ impl Upcast<dyn SourceDb> for RootDatabase {
 }
 
 #[salsa::db]
-impl SemanticDb for RootDatabase {}
+impl SemanticDb for RootDatabase {
+    fn is_file_open(&self, file: File) -> bool {
+        let Some(workspace) = &self.workspace else {
+            return false;
+        };
+
+        workspace.is_file_open(self, file)
+    }
+}
 
 #[salsa::db]
 impl SourceDb for RootDatabase {
@@ -242,7 +249,12 @@ pub(crate) mod tests {
     }
 
     #[salsa::db]
-    impl red_knot_python_semantic::Db for TestDb {}
+    impl red_knot_python_semantic::Db for TestDb {
+        fn is_file_open(&self, file: ruff_db::files::File) -> bool {
+            !file.path(self).is_vendored_path()
+        }
+    }
+
     #[salsa::db]
     impl Db for TestDb {}
 

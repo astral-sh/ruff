@@ -1,5 +1,4 @@
 use std::cell::RefCell;
-use std::ops::Deref;
 use std::time::Duration;
 
 use tracing::debug_span;
@@ -22,7 +21,7 @@ use crate::db::Db;
 pub(crate) fn unwind_if_cancelled(db: &dyn Db) {}
 
 #[salsa::tracked(return_ref)]
-pub(crate) fn lint_syntax(db: &dyn Db, file_id: File) -> Diagnostics {
+pub(crate) fn lint_syntax(db: &dyn Db, file_id: File) -> Vec<String> {
     #[allow(clippy::print_stdout)]
     if std::env::var("RED_KNOT_SLOW_LINT").is_ok() {
         for i in 0..10 {
@@ -64,7 +63,7 @@ pub(crate) fn lint_syntax(db: &dyn Db, file_id: File) -> Diagnostics {
         }));
     }
 
-    Diagnostics::from(diagnostics)
+    diagnostics
 }
 
 fn lint_lines(source: &str, diagnostics: &mut Vec<String>) {
@@ -86,7 +85,7 @@ fn lint_lines(source: &str, diagnostics: &mut Vec<String>) {
 
 #[allow(unreachable_pub)]
 #[salsa::tracked(return_ref)]
-pub fn lint_semantic(db: &dyn Db, file_id: File) -> Diagnostics {
+pub fn lint_semantic(db: &dyn Db, file_id: File) -> Vec<String> {
     let _span = debug_span!("lint_semantic", file=%file_id.path(db)).entered();
 
     let source = source_text(db.upcast(), file_id);
@@ -94,7 +93,7 @@ pub fn lint_semantic(db: &dyn Db, file_id: File) -> Diagnostics {
     let semantic = SemanticModel::new(db.upcast(), file_id);
 
     if !parsed.is_valid() {
-        return Diagnostics::Empty;
+        return vec![];
     }
 
     let context = SemanticLintContext {
@@ -106,7 +105,7 @@ pub fn lint_semantic(db: &dyn Db, file_id: File) -> Diagnostics {
 
     SemanticVisitor { context: &context }.visit_body(parsed.suite());
 
-    Diagnostics::from(context.diagnostics.take())
+    context.diagnostics.take()
 }
 
 fn format_diagnostic(context: &SemanticLintContext, message: &str, start: TextSize) -> String {
@@ -116,46 +115,11 @@ fn format_diagnostic(context: &SemanticLintContext, message: &str, start: TextSi
         .source_location(start, context.source_text());
     format!(
         "{}:{}:{}: {}",
-        context.semantic.file_path().as_str(),
+        context.semantic.file_path(),
         source_location.row,
         source_location.column,
         message,
     )
-}
-
-fn lint_unresolved_imports(context: &SemanticLintContext, import: AnyImportRef) {
-    // TODO: this treats any symbol with `Type::Unknown` as an unresolved import,
-    // which isn't really correct: if it exists but has `Type::Unknown` in the
-    // module we're importing it from, we shouldn't really emit a diagnostic here,
-    // but currently do.
-    match import {
-        AnyImportRef::Import(import) => {
-            for alias in &import.names {
-                let ty = alias.ty(&context.semantic);
-
-                if ty.is_unknown() {
-                    context.push_diagnostic(format_diagnostic(
-                        context,
-                        &format!("Unresolved import '{}'", &alias.name),
-                        alias.start(),
-                    ));
-                }
-            }
-        }
-        AnyImportRef::ImportFrom(import) => {
-            for alias in &import.names {
-                let ty = alias.ty(&context.semantic);
-
-                if ty.is_unknown() {
-                    context.push_diagnostic(format_diagnostic(
-                        context,
-                        &format!("Unresolved import '{}'", &alias.name),
-                        alias.start(),
-                    ));
-                }
-            }
-        }
-    }
 }
 
 fn lint_maybe_undefined(context: &SemanticLintContext, name: &ast::ExprName) {
@@ -280,17 +244,8 @@ struct SemanticVisitor<'a> {
 
 impl Visitor<'_> for SemanticVisitor<'_> {
     fn visit_stmt(&mut self, stmt: &ast::Stmt) {
-        match stmt {
-            ast::Stmt::ClassDef(class) => {
-                lint_bad_override(self.context, class);
-            }
-            ast::Stmt::Import(import) => {
-                lint_unresolved_imports(self.context, AnyImportRef::Import(import));
-            }
-            ast::Stmt::ImportFrom(import) => {
-                lint_unresolved_imports(self.context, AnyImportRef::ImportFrom(import));
-            }
-            _ => {}
+        if let ast::Stmt::ClassDef(class) = stmt {
+            lint_bad_override(self.context, class);
         }
 
         walk_stmt(self, stmt);
@@ -308,53 +263,6 @@ impl Visitor<'_> for SemanticVisitor<'_> {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub enum Diagnostics {
-    Empty,
-    List(Vec<String>),
-}
-
-impl Diagnostics {
-    pub fn as_slice(&self) -> &[String] {
-        match self {
-            Diagnostics::Empty => &[],
-            Diagnostics::List(list) => list.as_slice(),
-        }
-    }
-}
-
-impl Deref for Diagnostics {
-    type Target = [String];
-    fn deref(&self) -> &Self::Target {
-        self.as_slice()
-    }
-}
-
-impl From<Vec<String>> for Diagnostics {
-    fn from(value: Vec<String>) -> Self {
-        if value.is_empty() {
-            Diagnostics::Empty
-        } else {
-            Diagnostics::List(value)
-        }
-    }
-}
-
-#[derive(Copy, Clone, Debug)]
-enum AnyImportRef<'a> {
-    Import(&'a ast::StmtImport),
-    ImportFrom(&'a ast::StmtImportFrom),
-}
-
-impl Ranged for AnyImportRef<'_> {
-    fn range(&self) -> ruff_text_size::TextRange {
-        match self {
-            AnyImportRef::Import(import) => import.range(),
-            AnyImportRef::ImportFrom(import) => import.range(),
-        }
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use red_knot_python_semantic::{Program, ProgramSettings, PythonVersion, SearchPathSettings};
@@ -363,7 +271,7 @@ mod tests {
 
     use crate::db::tests::TestDb;
 
-    use super::{lint_semantic, Diagnostics};
+    use super::lint_semantic;
 
     fn setup_db() -> TestDb {
         setup_db_with_root(SystemPathBuf::from("/src"))
@@ -409,9 +317,9 @@ mod tests {
         .unwrap();
 
         let file = system_path_to_file(&db, "/src/a.py").expect("file to exist");
-        let Diagnostics::List(messages) = lint_semantic(&db, file) else {
-            panic!("expected some diagnostics");
-        };
+        let messages = lint_semantic(&db, file);
+
+        assert_ne!(messages, &[] as &[String], "expected some diagnostics");
 
         assert_eq!(
             *messages,
