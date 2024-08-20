@@ -24,7 +24,7 @@ impl Program {
             search_paths,
         } = settings;
 
-        tracing::info!("Target version: {target_version}");
+        tracing::info!("Target version: Python {target_version}");
 
         let search_paths = SearchPaths::from_settings(db, search_paths)
             .with_context(|| "Invalid search path settings")?;

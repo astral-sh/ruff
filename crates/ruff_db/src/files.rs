@@ -85,7 +85,7 @@ impl Files {
             .system_by_path
             .entry(absolute.clone())
             .or_insert_with(|| {
-                tracing::trace!("Adding file {path}");
+                tracing::trace!("Adding file '{path}'");
 
                 let metadata = db.system().path_metadata(path);
                 let durability = self
@@ -131,7 +131,7 @@ impl Files {
                     Err(_) => return Err(FileError::NotFound),
                 };
 
-                tracing::trace!("Adding vendored file {}", path);
+                tracing::trace!("Adding vendored file '{}'", path);
                 let file = File::builder(FilePath::Vendored(path.to_path_buf()))
                     .permissions(Some(0o444))
                     .revision(metadata.revision())
@@ -158,7 +158,7 @@ impl Files {
             Entry::Vacant(entry) => {
                 let metadata = db.system().virtual_path_metadata(path).ok()?;
 
-                tracing::trace!("Adding virtual file {}", path);
+                tracing::trace!("Adding virtual file '{}'", path);
 
                 let file = File::builder(FilePath::SystemVirtual(path.to_path_buf()))
                     .revision(metadata.revision())
@@ -211,7 +211,7 @@ impl Files {
     /// That's why [`File::sync_path`] and [`File::sync_path`] is preferred if it is known that the path is a file.
     pub fn sync_recursively(db: &mut dyn Db, path: &SystemPath) {
         let path = SystemPath::absolute(path, db.system().current_directory());
-        tracing::debug!("Syncing all files in {path}");
+        tracing::debug!("Syncing all files in '{path}'");
 
         let inner = Arc::clone(&db.files().inner);
         for entry in inner.system_by_path.iter_mut() {
@@ -413,19 +413,19 @@ impl File {
         let durability = durability.unwrap_or_default();
 
         if file.status(db) != status {
-            tracing::debug!("Updating the status of {}", file.path(db),);
+            tracing::debug!("Updating the status of '{}'", file.path(db),);
             file.set_status(db).with_durability(durability).to(status);
         }
 
         if file.revision(db) != revision {
-            tracing::debug!("Updating the revision of {}", file.path(db));
+            tracing::debug!("Updating the revision of '{}'", file.path(db));
             file.set_revision(db)
                 .with_durability(durability)
                 .to(revision);
         }
 
         if file.permissions(db) != permission {
-            tracing::debug!("Updating the permissions of {}", file.path(db),);
+            tracing::debug!("Updating the permissions of '{}'", file.path(db),);
             file.set_permissions(db)
                 .with_durability(durability)
                 .to(permission);
