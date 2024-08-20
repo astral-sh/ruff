@@ -1017,4 +1017,28 @@ def x():
             vec!["bar", "foo", "Test", "<module>"]
         );
     }
+
+    #[test]
+    fn match_stmt_symbols() {
+        let TestCase { db, file } = test_case(
+            "
+match subject:
+    case a: ...
+    case [b, c, *d]: ...
+    case e as f: ...
+    case {'x': g, **h}: ...
+    case Foo(i, z=j): ...
+    case k | l: ...
+    case _: ...
+",
+        );
+
+        let global_table = symbol_table(&db, global_scope(&db, file));
+
+        assert!(global_table.symbol_by_name("Foo").unwrap().is_used());
+        assert_eq!(
+            names(&global_table),
+            vec!["subject", "a", "b", "c", "d", "f", "e", "h", "g", "Foo", "i", "j", "k", "l"]
+        );
+    }
 }

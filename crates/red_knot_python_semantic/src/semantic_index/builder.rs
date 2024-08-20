@@ -7,7 +7,7 @@ use ruff_db::parsed::ParsedModule;
 use ruff_index::IndexVec;
 use ruff_python_ast as ast;
 use ruff_python_ast::name::Name;
-use ruff_python_ast::visitor::{walk_expr, walk_stmt, Visitor};
+use ruff_python_ast::visitor::{walk_expr, walk_pattern, walk_stmt, Visitor};
 use ruff_python_ast::AnyParameterRef;
 
 use crate::ast_node_ref::AstNodeRef;
@@ -746,6 +746,25 @@ where
         for parameter in parameters.iter().map(ast::AnyParameterRef::as_parameter) {
             self.visit_parameter(parameter);
         }
+    }
+
+    fn visit_pattern(&mut self, pattern: &'ast ast::Pattern) {
+        if let ast::Pattern::MatchAs(ast::PatternMatchAs {
+            name: Some(name), ..
+        })
+        | ast::Pattern::MatchStar(ast::PatternMatchStar {
+            name: Some(name),
+            range: _,
+        })
+        | ast::Pattern::MatchMapping(ast::PatternMatchMapping {
+            rest: Some(name), ..
+        }) = pattern
+        {
+            // TODO(dhruvmanila): Add definition
+            self.add_or_update_symbol(name.id.clone(), SymbolFlags::IS_DEFINED);
+        }
+
+        walk_pattern(self, pattern);
     }
 }
 
