@@ -2430,7 +2430,7 @@
       "type": "object",
       "properties": {
         "ignore-overlong-task-comments": {
-          "description": "Whether line-length violations (`E501`) should be triggered for comments starting with [`task-tags`](#lint_task-tags) (by default: \\[\"TODO\", \"FIXME\", and \"XXX\"\\]).",
+          "description": "Whether line-length violations (`E501`) should be triggered for comments starting with [`task-tags`](#lint_task-tags) (by default: \"TODO\", \"FIXME\", and \"XXX\").",
           "type": [
             "boolean",
             "null"
@@ -3738,6 +3738,7 @@
         "RUF03",
         "RUF030",
         "RUF031",
+        "RUF032",
         "RUF1",
         "RUF10",
         "RUF100",
