@@ -369,12 +369,13 @@ mod tests {
     use crate::db::tests::TestDb;
     use crate::{Program, ProgramSettings, PythonVersion, SearchPathSettings};
 
-    #[test]
-    fn check_types() -> anyhow::Result<()> {
-        let mut db = TestDb::new();
+    use super::TypeCheckDiagnostics;
 
-        db.write_file("src/foo.py", "import bar\n")
-            .context("Failed to write foo.py")?;
+    fn setup_db() -> TestDb {
+        let db = TestDb::new();
+        db.memory_file_system()
+            .create_directory_all("/src")
+            .unwrap();
 
         Program::from_settings(
             &db,
@@ -390,16 +391,68 @@ mod tests {
         )
         .expect("Valid search path settings");
 
+        db
+    }
+
+    fn assert_diagnostic_messages(diagnostics: &TypeCheckDiagnostics, expected: &[&str]) {
+        let messages: Vec<&str> = diagnostics
+            .iter()
+            .map(|diagnostic| diagnostic.message())
+            .collect();
+        assert_eq!(&messages, expected);
+    }
+
+    #[test]
+    fn check_types() -> anyhow::Result<()> {
+        let mut db = setup_db();
+
+        db.write_file("src/foo.py", "import bar\n")
+            .context("Failed to write foo.py")?;
+
         let foo = system_path_to_file(&db, "src/foo.py").context("Failed to resolve foo.py")?;
 
         let diagnostics = super::check_types(&db, foo);
-
-        assert_eq!(diagnostics.len(), 1);
-        assert_eq!(
-            diagnostics[0].message(),
-            "Import 'bar' could not be resolved."
-        );
+        assert_diagnostic_messages(&diagnostics, &["Import 'bar' could not be resolved."]);
 
         Ok(())
+    }
+
+    #[test]
+    fn unresolved_import() {
+        let mut db = setup_db();
+
+        db.write_files([
+            ("/src/a.py", "import foo as foo"),
+            ("/src/b.py", "from a import foo"),
+        ])
+        .unwrap();
+
+        let a_file = system_path_to_file(&db, "/src/a.py").expect("Expected `a.py` to exist!");
+        let a_file_diagnostics = super::check_types(&db, a_file);
+        assert_diagnostic_messages(
+            &a_file_diagnostics,
+            &["Import 'foo' could not be resolved."],
+        );
+
+        // Importing the unresolved import into a second first-party file does not trigger
+        // an additional "unresolved import" violation
+        let b_file = system_path_to_file(&db, "/src/b.py").expect("Expected `by.py` to exist!");
+        let b_file_diagnostics = super::check_types(&db, b_file);
+        assert_eq!(&*b_file_diagnostics, &[]);
+    }
+
+    #[test]
+    fn unresolved_import_from_resolved_module() {
+        let mut db = setup_db();
+
+        db.write_files([("/src/a.py", ""), ("/src/b.py", "from a import thing")])
+            .unwrap();
+
+        let b_file = system_path_to_file(&db, "/src/b.py").expect("Expected `b.py` to exist");
+        let b_file_diagnostics = super::check_types(&db, b_file);
+        assert_diagnostic_messages(
+            &b_file_diagnostics,
+            &["Could not resolve import of 'thing' from 'a'"],
+        );
     }
 }

@@ -19,6 +19,7 @@ struct Case {
 
 const TOMLLIB_312_URL: &str = "https://raw.githubusercontent.com/python/cpython/8e8a4baf652f6e1cee7acde9d78c4b6154539748/Lib/tomllib";
 static EXPECTED_DIAGNOSTICS: &[&str] = &[
+    "/src/tomllib/_parser.py:7:29: Could not resolve import of 'Iterable' from 'collections.abc'",
     "Line 69 is too long (89 characters)",
     "Use double quotes for strings",
     "Use double quotes for strings",
