@@ -99,6 +99,12 @@ impl ResolvedReference {
         self.flags
             .intersects(SemanticModelFlags::DUNDER_ALL_DEFINITION)
     }
+
+    /// Return `true` if the context is in an explicit type alias.
+    pub const fn in_explicit_type_alias(&self) -> bool {
+        self.flags
+            .intersects(SemanticModelFlags::EXPLICIT_TYPE_ALIAS)
+    }
 }
 
 impl Ranged for ResolvedReference {

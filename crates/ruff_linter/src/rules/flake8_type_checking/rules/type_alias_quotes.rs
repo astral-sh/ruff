@@ -132,7 +132,7 @@ pub(crate) fn unquoted_type_alias(checker: &Checker, binding: &Binding) -> Optio
     };
 
     let mut names = Vec::new();
-    collect_typing_references(checker.semantic(), expr, &mut names);
+    collect_typing_references(checker, expr, &mut names);
     if !names.is_empty() {
         // We generate a diagnostic for every name that needs to be quoted
         // but we currently emit a single shared fix that quotes the entire
@@ -163,16 +163,17 @@ pub(crate) fn unquoted_type_alias(checker: &Checker, binding: &Binding) -> Optio
 }
 
 /// Traverses the type expression and collects `[Expr::Name]` nodes that are
-/// not available at runtime and thus need to be quoted.
+/// not available at runtime and thus need to be quoted, unless they would
+/// become available through `[Rule::RuntimeImportInTypeCheckingBlock]`.
 fn collect_typing_references<'a>(
-    semantic: &SemanticModel,
+    checker: &Checker,
     expr: &'a Expr,
     names: &mut Vec<&'a ast::ExprName>,
 ) {
     match expr {
         Expr::BinOp(ast::ExprBinOp { left, right, .. }) => {
-            collect_typing_references(semantic, left, names);
-            collect_typing_references(semantic, right, names);
+            collect_typing_references(checker, left, names);
+            collect_typing_references(checker, right, names);
         }
         Expr::Starred(ast::ExprStarred {
             value,
@@ -180,27 +181,42 @@ fn collect_typing_references<'a>(
             ..
         })
         | Expr::Attribute(ast::ExprAttribute { value, .. }) => {
-            collect_typing_references(semantic, value, names);
+            collect_typing_references(checker, value, names);
         }
         Expr::Subscript(ast::ExprSubscript { value, slice, .. }) => {
-            collect_typing_references(semantic, value, names);
+            collect_typing_references(checker, value, names);
             if let Expr::Name(ast::ExprName { id, .. }) = value.borrow() {
                 if id.as_str() != "Literal" {
-                    collect_typing_references(semantic, slice, names);
+                    collect_typing_references(checker, slice, names);
                 }
             }
         }
         Expr::List(ast::ExprList { elts, .. }) | Expr::Tuple(ast::ExprTuple { elts, .. }) => {
             for elt in elts {
-                collect_typing_references(semantic, elt, names);
+                collect_typing_references(checker, elt, names);
             }
         }
         Expr::Name(name) => {
-            if semantic.resolve_name(name).is_some()
-                && semantic.simulate_runtime_load(name).is_none()
-            {
-                names.push(name);
+            let Some(binding_id) = checker.semantic().resolve_name(name) else {
+                return;
+            };
+            if checker.semantic().simulate_runtime_load(name).is_some() {
+                return;
             }
+
+            // if TCH004 is enabled we shouldn't emit a TCH007 for a reference to
+            // a binding that would emit a TCH004, otherwise the fixes will never
+            // stabilize and keep going in circles
+            if checker.enabled(Rule::RuntimeImportInTypeCheckingBlock)
+                && checker
+                    .semantic()
+                    .binding(binding_id)
+                    .references()
+                    .any(|id| checker.semantic().reference(id).in_runtime_context())
+            {
+                return;
+            }
+            names.push(name);
         }
         _ => {}
     }

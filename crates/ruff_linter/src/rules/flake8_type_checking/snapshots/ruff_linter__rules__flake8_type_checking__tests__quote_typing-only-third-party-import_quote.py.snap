@@ -369,6 +369,8 @@ quote.py:96:24: TCH002 [*] Move third-party import `pandas.DataFrame` into a typ
 98      |-    def func(self) -> DataFrame | list[Series]:
     101 |+    def func(self) -> "DataFrame | list[Series]":
 99  102 |         pass
+100 103 | 
+101 104 | 
 
 quote.py:96:35: TCH002 [*] Move third-party import `pandas.Series` into a type-checking block
    |
@@ -397,3 +399,5 @@ quote.py:96:35: TCH002 [*] Move third-party import `pandas.Series` into a type-c
 98      |-    def func(self) -> DataFrame | list[Series]:
     101 |+    def func(self) -> "DataFrame | list[Series]":
 99  102 |         pass
+100 103 | 
+101 104 |

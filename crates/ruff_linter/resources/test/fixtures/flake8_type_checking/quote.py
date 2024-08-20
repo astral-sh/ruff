@@ -97,3 +97,12 @@ def f():
 
     def func(self) -> DataFrame | list[Series]:
         pass
+
+
+def f():
+    from typing import TypeAlias, TYPE_CHECKING
+
+    if TYPE_CHECKING:
+        from pandas import DataFrame
+
+    x: TypeAlias = DataFrame | None

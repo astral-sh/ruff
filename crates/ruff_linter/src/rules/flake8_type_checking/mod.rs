@@ -429,6 +429,18 @@ mod tests {
         from __future__ import annotations
 
         from typing import TYPE_CHECKING, TypeAlias
+        if TYPE_CHECKING:
+            from foo import Foo  # TCH004
+
+        a: TypeAlias = Foo | None  # OK
+    ",
+        "tch004_precedence_over_tch007"
+    )]
+    #[test_case(
+        r"
+        from __future__ import annotations
+
+        from typing import TypeAlias
 
         a: TypeAlias = 'int | None'  # TCH008
         b: TypeAlias = 'int' | None  # TCH010
