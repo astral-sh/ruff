@@ -108,7 +108,8 @@ rand = { version = "0.8.5" }
 rayon = { version = "1.10.0" }
 regex = { version = "1.10.2" }
 rustc-hash = { version = "2.0.0" }
-salsa = { git = "https://github.com/MichaReiser/salsa.git", tag = "red-knot-0.0.1" }
+# FIXME use tag
+salsa = { git = "https://github.com/MichaReiser/salsa.git", rev = "3f934153134fd1a4e712f307a3b38daf1f173bd6" }
 schemars = { version = "0.8.16" }
 seahash = { version = "4.1.0" }
 serde = { version = "1.0.197", features = ["derive"] }

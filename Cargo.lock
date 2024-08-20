@@ -2742,7 +2742,7 @@ checksum = "e86697c916019a8588c99b5fac3cead74ec0b4b819707a682fd4d23fa0ce1ba1"
 [[package]]
 name = "salsa"
 version = "0.18.0"
-source = "git+https://github.com/MichaReiser/salsa.git?tag=red-knot-0.0.1#ece083e15b79f155f9e4368ec1318cec9a08d88b"
+source = "git+https://github.com/MichaReiser/salsa.git?rev=3f934153134fd1a4e712f307a3b38daf1f173bd6#3f934153134fd1a4e712f307a3b38daf1f173bd6"
 dependencies = [
  "append-only-vec",
  "arc-swap",
@@ -2762,12 +2762,12 @@ dependencies = [
 [[package]]
 name = "salsa-macro-rules"
 version = "0.1.0"
-source = "git+https://github.com/MichaReiser/salsa.git?tag=red-knot-0.0.1#ece083e15b79f155f9e4368ec1318cec9a08d88b"
+source = "git+https://github.com/MichaReiser/salsa.git?rev=3f934153134fd1a4e712f307a3b38daf1f173bd6#3f934153134fd1a4e712f307a3b38daf1f173bd6"
 
 [[package]]
 name = "salsa-macros"
 version = "0.18.0"
-source = "git+https://github.com/MichaReiser/salsa.git?tag=red-knot-0.0.1#ece083e15b79f155f9e4368ec1318cec9a08d88b"
+source = "git+https://github.com/MichaReiser/salsa.git?rev=3f934153134fd1a4e712f307a3b38daf1f173bd6#3f934153134fd1a4e712f307a3b38daf1f173bd6"
 dependencies = [
  "heck",
  "proc-macro2",
