@@ -11,7 +11,7 @@ use ruff_db::{
 };
 use ruff_python_ast::{name::Name, PySourceType};
 
-use crate::workspace::files::{Index, IndexedFiles, PackageFiles};
+use crate::workspace::files::{Index, Indexed, PackageFiles};
 use crate::{
     db::Db,
     lint::{lint_semantic, lint_syntax, Diagnostics},
@@ -301,7 +301,7 @@ impl Package {
     }
 
     /// Returns the files belonging to this package.
-    pub fn files(self, db: &dyn Db) -> IndexedFiles<'_> {
+    pub fn files(self, db: &dyn Db) -> Indexed<'_> {
         let files = self.file_set(db);
 
         let indexed = match files.get() {
