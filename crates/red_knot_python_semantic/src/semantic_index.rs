@@ -812,6 +812,31 @@ with item1 as x, item2 as y:
     }
 
     #[test]
+    fn with_item_unpacked_definition() {
+        let TestCase { db, file } = test_case(
+            "
+with context() as (x, y):
+    pass
+",
+        );
+
+        let index = semantic_index(&db, file);
+        let global_table = index.symbol_table(FileScopeId::global());
+
+        assert_eq!(names(&global_table), vec!["context", "x", "y"]);
+
+        let use_def = index.use_def_map(FileScopeId::global());
+        for name in ["x", "y"] {
+            let Some(definition) = use_def.first_public_definition(
+                global_table.symbol_id_by_name(name).expect("symbol exists"),
+            ) else {
+                panic!("Expected with item definition for {name}");
+            };
+            assert!(matches!(definition.node(&db), DefinitionKind::WithItem(_)));
+        }
+    }
+
+    #[test]
     fn dupes() {
         let TestCase { db, file } = test_case(
             "
