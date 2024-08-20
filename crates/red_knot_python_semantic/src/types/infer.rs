@@ -904,14 +904,6 @@ impl<'db> TypeInferenceBuilder<'db> {
         self.infer_optional_expression(cause.as_deref());
     }
 
-    fn format_import_from_module(level: u32, module: Option<&str>) -> String {
-        format!(
-            "{}{}",
-            ".".repeat(level as usize),
-            module.unwrap_or_default()
-        )
-    }
-
     /// Given a `from .foo import bar` relative import, resolve the relative module
     /// we're importing `bar` from into an absolute [`ModuleName`]
     /// using the name of the module we're currently analyzing.
@@ -923,14 +915,10 @@ impl<'db> TypeInferenceBuilder<'db> {
     ///   - `from .foo import bar` => `tail == "foo"`
     ///   - `from ..foo.bar import baz` => `tail == "foo.bar"`
     fn relative_module_name(&self, tail: Option<&str>, level: NonZeroU32) -> Option<ModuleName> {
-        tracing::trace!(
-            "Attempting to resolve module '{}' relative to file '{}'",
-            Self::format_import_from_module(level.get(), tail),
-            self.file.path(self.db)
-        );
         let Some(module) = file_to_module(self.db, self.file) else {
             tracing::debug!(
-                "Relative module resolution failed; could not resolve file '{}' to a module",
+                "Relative module resolution '{}' failed; could not resolve file '{}' to a module",
+                format_import_from_module(level.get(), tail),
                 self.file.path(self.db)
             );
             return None;
@@ -973,18 +961,18 @@ impl<'db> TypeInferenceBuilder<'db> {
         tracing::trace!("Resolving imported object {alias:?} from statement {import_from:?}");
         let module = module.as_deref();
         let module_name = if let Some(level) = NonZeroU32::new(*level) {
-            tracing::debug!(
+            tracing::trace!(
                 "Resolving imported object '{}' from module '{}' relative to file '{}'",
                 alias.name,
-                Self::format_import_from_module(level.get(), module),
+                format_import_from_module(level.get(), module),
                 self.file.path(self.db),
             );
             self.relative_module_name(module, level)
         } else {
-            tracing::debug!(
+            tracing::trace!(
                 "Resolving imported object '{}' from module '{}'",
                 alias.name,
-                Self::format_import_from_module(*level, module),
+                format_import_from_module(*level, module),
             );
             let module_name =
                 module.expect("Non-relative import should always have a non-None `module`!");
@@ -1787,6 +1775,14 @@ impl<'db> TypeInferenceBuilder<'db> {
         self.types.shrink_to_fit();
         self.types
     }
+}
+
+fn format_import_from_module(level: u32, module: Option<&str>) -> String {
+    format!(
+        "{}{}",
+        ".".repeat(level as usize),
+        module.unwrap_or_default()
+    )
 }
 
 #[cfg(test)]

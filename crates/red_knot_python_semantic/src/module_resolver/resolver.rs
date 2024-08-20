@@ -41,7 +41,7 @@ pub(crate) fn resolve_module_query<'db>(
 
     let module = Module::new(name.clone(), kind, search_path, module_file);
 
-    tracing::debug!(
+    tracing::trace!(
         "Resolved module '{name}' to '{path}'.",
         path = module_file.path(db)
     );
