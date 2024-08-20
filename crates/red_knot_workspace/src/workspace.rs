@@ -143,9 +143,7 @@ impl Workspace {
             new_packages.insert(path, package);
         }
 
-        self.set_package_tree(db)
-            .with_durability(Durability::MEDIUM)
-            .to(new_packages);
+        self.set_package_tree(db).to(new_packages);
     }
 
     pub fn update_package(self, db: &mut dyn Db, metadata: PackageMetadata) -> anyhow::Result<()> {
@@ -358,9 +356,7 @@ impl Package {
         assert_eq!(root, metadata.root());
 
         if self.name(db) != metadata.name() {
-            self.set_name(db)
-                .with_durability(Durability::MEDIUM)
-                .to(metadata.name);
+            self.set_name(db).to(metadata.name);
         }
     }
 

@@ -224,9 +224,7 @@ impl Files {
 
         for root in roots.all() {
             if root.path(db).starts_with(&path) {
-                root.set_revision(db)
-                    .with_durability(Durability::HIGH)
-                    .to(FileRevision::now());
+                root.set_revision(db).to(FileRevision::now());
             }
         }
     }
@@ -249,9 +247,7 @@ impl Files {
         let roots = inner.roots.read().unwrap();
 
         for root in roots.all() {
-            root.set_revision(db)
-                .with_durability(Durability::HIGH)
-                .to(FileRevision::now());
+            root.set_revision(db).to(FileRevision::now());
         }
     }
 
@@ -381,23 +377,17 @@ impl File {
             return;
         };
         let metadata = db.system().path_metadata(path);
-        let durability = db.files().root(db, path).map(|root| root.durability(db));
-        Self::sync_impl(db, metadata, file, durability);
+        Self::sync_impl(db, metadata, file);
     }
 
     fn sync_system_virtual_path(db: &mut dyn Db, path: &SystemVirtualPath, file: File) {
         let metadata = db.system().virtual_path_metadata(path);
-        Self::sync_impl(db, metadata, file, None);
+        Self::sync_impl(db, metadata, file);
     }
 
     /// Private method providing the implementation for [`Self::sync_system_path`] and
     /// [`Self::sync_system_virtual_path`].
-    fn sync_impl(
-        db: &mut dyn Db,
-        metadata: crate::system::Result<Metadata>,
-        file: File,
-        durability: Option<Durability>,
-    ) {
+    fn sync_impl(db: &mut dyn Db, metadata: crate::system::Result<Metadata>, file: File) {
         let (status, revision, permission) = match metadata {
             Ok(metadata) if metadata.file_type().is_file() => (
                 FileStatus::Exists,
@@ -410,25 +400,19 @@ impl File {
             _ => (FileStatus::NotFound, FileRevision::zero(), None),
         };
 
-        let durability = durability.unwrap_or_default();
-
         if file.status(db) != status {
             tracing::debug!("Updating the status of '{}'", file.path(db),);
-            file.set_status(db).with_durability(durability).to(status);
+            file.set_status(db).to(status);
         }
 
         if file.revision(db) != revision {
             tracing::debug!("Updating the revision of '{}'", file.path(db));
-            file.set_revision(db)
-                .with_durability(durability)
-                .to(revision);
+            file.set_revision(db).to(revision);
         }
 
         if file.permissions(db) != permission {
             tracing::debug!("Updating the permissions of '{}'", file.path(db),);
-            file.set_permissions(db)
-                .with_durability(durability)
-                .to(permission);
+            file.set_permissions(db).to(permission);
         }
     }
 

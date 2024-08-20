@@ -31,16 +31,25 @@ pub fn assert_const_function_query_was_not_run<Db, Q, QDb, R>(
     Db: salsa::Database,
     Q: Fn(QDb) -> R,
 {
-    // FIXME
-    // let (query_name, will_execute_event) = find_will_execute_event(db, query, (), events);
-    //
-    // db.attach(|_| {
-    //     if let Some(will_execute_event) = will_execute_event {
-    //         panic!(
-    //             "Expected query {query_name}() not to have run but it did: {will_execute_event:?}"
-    //         );
-    //     }
-    // });
+    // Salsa now interns singleton ingredients. But we know that it is a singleton, so we can just search for
+    // any event of that ingredient.
+    let query_name = query_name(&query);
+
+    let event = events.iter().find(|event| {
+        if let salsa::EventKind::WillExecute { database_key } = event.kind {
+            db.ingredient_debug_name(database_key.ingredient_index()) == query_name
+        } else {
+            false
+        }
+    });
+
+    db.attach(|_| {
+        if let Some(will_execute_event) = event {
+            panic!(
+                "Expected query {query_name}() not to have run but it did: {will_execute_event:?}"
+            );
+        }
+    });
 }
 
 /// Assert that the Salsa query described by the generic parameter `C`
