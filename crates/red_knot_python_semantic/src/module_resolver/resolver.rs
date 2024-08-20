@@ -172,11 +172,11 @@ impl SearchPaths {
             static_paths.push(search_path);
         }
 
-        tracing::debug!("Adding static search path '{src_root}'");
+        tracing::debug!("Adding first-party search path '{src_root}'");
         static_paths.push(SearchPath::first_party(system, src_root)?);
 
         static_paths.push(if let Some(custom_typeshed) = custom_typeshed {
-            tracing::debug!("Adding static custom-sdtlib search-path '{custom_typeshed}'");
+            tracing::debug!("Adding custom-stdlib search path '{custom_typeshed}'");
 
             let search_path = SearchPath::custom_stdlib(db, custom_typeshed)?;
             files.try_add_root(
@@ -192,7 +192,7 @@ impl SearchPaths {
         let mut site_packages: Vec<_> = Vec::with_capacity(site_packages_paths.len());
 
         for path in site_packages_paths {
-            tracing::debug!("Adding site-package path '{path}'");
+            tracing::debug!("Adding site-packages search path '{path}'");
             let search_path = SearchPath::site_packages(system, path)?;
             files.try_add_root(
                 db.upcast(),
