@@ -7,7 +7,7 @@ use ruff_db::parsed::ParsedModule;
 use ruff_index::IndexVec;
 use ruff_python_ast as ast;
 use ruff_python_ast::name::Name;
-use ruff_python_ast::visitor::{walk_expr, walk_parameter, walk_stmt, Visitor};
+use ruff_python_ast::visitor::{walk_expr, walk_pattern, walk_stmt, Visitor};
 use ruff_python_ast::AnyParameterRef;
 
 use crate::ast_node_ref::AstNodeRef;
