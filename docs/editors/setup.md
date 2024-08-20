@@ -310,7 +310,12 @@ See [LSP Client documentation](https://docs.kde.org/stable5/en/kate/kate/kate-ap
 on how to configure the server from there.
 
 !!! important
-    Kate's LSP Client plugin does not support multiple servers for the same language.
+    Kate's LSP Client plugin does not support multiple servers for the same language. As a
+    workaround, you can use the [`python-lsp-server`](https://github.com/python-lsp/python-lsp-server)
+    along with the [`python-lsp-ruff`](https://github.com/python-lsp/python-lsp-ruff) plugin to
+    use Ruff alongside another language server. Note that this setup won't use the [server settings](settings.md)
+    because the [`python-lsp-ruff`](https://github.com/python-lsp/python-lsp-ruff) plugin uses the
+    `ruff` executable and not the language server.
 
 ## Sublime Text
 
