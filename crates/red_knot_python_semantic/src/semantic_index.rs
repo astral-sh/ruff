@@ -464,6 +464,25 @@ mod tests {
     }
 
     #[test]
+    fn augmented_assignment() {
+        let TestCase { db, file } = test_case("x += 1");
+        let scope = global_scope(&db, file);
+        let global_table = symbol_table(&db, scope);
+
+        assert_eq!(names(&global_table), vec!["x"]);
+
+        let use_def = use_def_map(&db, scope);
+        let definition = use_def
+            .first_public_definition(global_table.symbol_id_by_name("x").unwrap())
+            .unwrap();
+
+        assert!(matches!(
+            definition.node(&db),
+            DefinitionKind::AugmentedAssignment(_)
+        ));
+    }
+
+    #[test]
     fn class_scope() {
         let TestCase { db, file } = test_case(
             "

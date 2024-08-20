@@ -495,6 +495,20 @@ where
                 self.visit_expr(&node.target);
                 self.current_assignment = None;
             }
+            ast::Stmt::AugAssign(
+                aug_assign @ ast::StmtAugAssign {
+                    range: _,
+                    target,
+                    op: _,
+                    value,
+                },
+            ) => {
+                debug_assert!(self.current_assignment.is_none());
+                self.visit_expr(value);
+                self.current_assignment = Some(aug_assign.into());
+                self.visit_expr(target);
+                self.current_assignment = None;
+            }
             ast::Stmt::If(node) => {
                 self.visit_expr(&node.test);
                 let pre_if = self.flow_snapshot();
@@ -563,12 +577,21 @@ where
 
         match expr {
             ast::Expr::Name(name_node @ ast::ExprName { id, ctx, .. }) => {
-                let flags = match ctx {
+                let mut flags = match ctx {
                     ast::ExprContext::Load => SymbolFlags::IS_USED,
                     ast::ExprContext::Store => SymbolFlags::IS_DEFINED,
                     ast::ExprContext::Del => SymbolFlags::IS_DEFINED,
                     ast::ExprContext::Invalid => SymbolFlags::empty(),
                 };
+                if matches!(
+                    self.current_assignment,
+                    Some(CurrentAssignment::AugAssign(_))
+                ) && !ctx.is_invalid()
+                {
+                    // For augmented assignment, the target expression is also used, so we should
+                    // record that as a use.
+                    flags |= SymbolFlags::IS_USED;
+                }
                 let symbol = self.add_or_update_symbol(id.clone(), flags);
                 if flags.contains(SymbolFlags::IS_DEFINED) {
                     match self.current_assignment {
@@ -583,6 +606,9 @@ where
                         }
                         Some(CurrentAssignment::AnnAssign(ann_assign)) => {
                             self.add_definition(symbol, ann_assign);
+                        }
+                        Some(CurrentAssignment::AugAssign(aug_assign)) => {
+                            self.add_definition(symbol, aug_assign);
                         }
                         Some(CurrentAssignment::Named(named)) => {
                             // TODO(dhruvmanila): If the current scope is a comprehension, then the
@@ -727,6 +753,7 @@ where
 enum CurrentAssignment<'a> {
     Assign(&'a ast::StmtAssign),
     AnnAssign(&'a ast::StmtAnnAssign),
+    AugAssign(&'a ast::StmtAugAssign),
     Named(&'a ast::ExprNamed),
     Comprehension {
         node: &'a ast::Comprehension,
@@ -743,6 +770,12 @@ impl<'a> From<&'a ast::StmtAssign> for CurrentAssignment<'a> {
 impl<'a> From<&'a ast::StmtAnnAssign> for CurrentAssignment<'a> {
     fn from(value: &'a ast::StmtAnnAssign) -> Self {
         Self::AnnAssign(value)
+    }
+}
+
+impl<'a> From<&'a ast::StmtAugAssign> for CurrentAssignment<'a> {
+    fn from(value: &'a ast::StmtAugAssign) -> Self {
+        Self::AugAssign(value)
     }
 }
 

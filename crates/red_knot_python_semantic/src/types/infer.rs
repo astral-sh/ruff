@@ -303,6 +303,9 @@ impl<'db> TypeInferenceBuilder<'db> {
             DefinitionKind::AnnotatedAssignment(annotated_assignment) => {
                 self.infer_annotated_assignment_definition(annotated_assignment.node(), definition);
             }
+            DefinitionKind::AugmentedAssignment(augmented_assignment) => {
+                self.infer_augment_assignment_definition(augmented_assignment.node(), definition);
+            }
             DefinitionKind::NamedExpression(named_expression) => {
                 self.infer_named_expression_definition(named_expression.node(), definition);
             }
@@ -763,15 +766,35 @@ impl<'db> TypeInferenceBuilder<'db> {
     }
 
     fn infer_augmented_assignment_statement(&mut self, assignment: &ast::StmtAugAssign) {
-        // TODO this should be a Definition
+        if assignment.target.is_name_expr() {
+            self.infer_definition(assignment);
+        } else {
+            // TODO currently we don't consider assignments to non-Names to be Definitions
+            self.infer_augment_assignment(assignment);
+        }
+    }
+
+    fn infer_augment_assignment_definition(
+        &mut self,
+        assignment: &ast::StmtAugAssign,
+        definition: Definition<'db>,
+    ) {
+        let target_ty = self.infer_augment_assignment(assignment);
+        self.types.definitions.insert(definition, target_ty);
+    }
+
+    fn infer_augment_assignment(&mut self, assignment: &ast::StmtAugAssign) -> Type<'db> {
         let ast::StmtAugAssign {
             range: _,
             target,
             op: _,
             value,
         } = assignment;
-        self.infer_expression(target);
         self.infer_expression(value);
+        self.infer_expression(target);
+
+        // TODO(dhruvmanila): Resolve the target type using the value type and the operator
+        Type::Unknown
     }
 
     fn infer_type_alias_statement(&mut self, type_alias_statement: &ast::StmtTypeAlias) {
