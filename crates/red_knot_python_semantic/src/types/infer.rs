@@ -323,7 +323,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                 self.infer_parameter_with_default_definition(parameter_with_default, definition);
             }
             DefinitionKind::WithItem(with_item) => {
-                self.infer_with_item_definition(with_item, definition);
+                self.infer_with_item_definition(with_item.target(), with_item.node(), definition);
             }
         }
     }
@@ -610,10 +610,14 @@ impl<'db> TypeInferenceBuilder<'db> {
         } = with_statement;
 
         for item in items {
-            if item.optional_vars.is_some() {
-                self.infer_definition(item);
-            } else {
-                self.infer_expression(&item.context_expr);
+            match item.optional_vars.as_deref() {
+                Some(ast::Expr::Name(name)) => {
+                    self.infer_definition(name);
+                }
+                _ => {
+                    // TODO infer definitions in unpacking assignment
+                    self.infer_expression(&item.context_expr);
+                }
             }
         }
 
@@ -622,22 +626,24 @@ impl<'db> TypeInferenceBuilder<'db> {
 
     fn infer_with_item_definition(
         &mut self,
+        target: &ast::ExprName,
         with_item: &ast::WithItem,
         definition: Definition<'db>,
     ) {
-        let ast::WithItem {
-            range: _,
-            context_expr,
-            optional_vars,
-        } = with_item;
+        let expression = self.index.expression(&with_item.context_expr);
+        let result = infer_expression_types(self.db, expression);
+        self.extend(result);
 
-        let Some(optional_vars) = optional_vars.as_deref() else {
-            unreachable!("With item definition without optional vars");
-        };
-        self.infer_expression(context_expr);
-        let with_item_ty = self.infer_expression(optional_vars);
+        // TODO(dhruvmanila): The correct type inference here is the return type of the __enter__
+        // method of the context manager.
+        let context_expr_ty = self
+            .types
+            .expression_ty(with_item.context_expr.scoped_ast_id(self.db, self.scope));
 
-        self.types.definitions.insert(definition, with_item_ty);
+        self.types
+            .expressions
+            .insert(target.scoped_ast_id(self.db, self.scope), context_expr_ty);
+        self.types.definitions.insert(definition, context_expr_ty);
     }
 
     fn infer_match_statement(&mut self, match_statement: &ast::StmtMatch) {

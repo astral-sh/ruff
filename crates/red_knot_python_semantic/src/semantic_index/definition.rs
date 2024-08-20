@@ -47,7 +47,7 @@ pub(crate) enum DefinitionNodeRef<'a> {
     AugmentedAssignment(&'a ast::StmtAugAssign),
     Comprehension(ComprehensionDefinitionNodeRef<'a>),
     Parameter(ast::AnyParameterRef<'a>),
-    WithItem(&'a ast::WithItem),
+    WithItem(WithItemDefinitionNodeRef<'a>),
 }
 
 impl<'a> From<&'a ast::StmtFunctionDef> for DefinitionNodeRef<'a> {
@@ -86,12 +86,6 @@ impl<'a> From<&'a ast::Alias> for DefinitionNodeRef<'a> {
     }
 }
 
-impl<'a> From<&'a ast::WithItem> for DefinitionNodeRef<'a> {
-    fn from(node: &'a ast::WithItem) -> Self {
-        Self::WithItem(node)
-    }
-}
-
 impl<'a> From<ImportFromDefinitionNodeRef<'a>> for DefinitionNodeRef<'a> {
     fn from(node_ref: ImportFromDefinitionNodeRef<'a>) -> Self {
         Self::ImportFrom(node_ref)
@@ -101,6 +95,12 @@ impl<'a> From<ImportFromDefinitionNodeRef<'a>> for DefinitionNodeRef<'a> {
 impl<'a> From<AssignmentDefinitionNodeRef<'a>> for DefinitionNodeRef<'a> {
     fn from(node_ref: AssignmentDefinitionNodeRef<'a>) -> Self {
         Self::Assignment(node_ref)
+    }
+}
+
+impl<'a> From<WithItemDefinitionNodeRef<'a>> for DefinitionNodeRef<'a> {
+    fn from(node_ref: WithItemDefinitionNodeRef<'a>) -> Self {
+        Self::WithItem(node_ref)
     }
 }
 
@@ -125,6 +125,12 @@ pub(crate) struct ImportFromDefinitionNodeRef<'a> {
 #[derive(Copy, Clone, Debug)]
 pub(crate) struct AssignmentDefinitionNodeRef<'a> {
     pub(crate) assignment: &'a ast::StmtAssign,
+    pub(crate) target: &'a ast::ExprName,
+}
+
+#[derive(Copy, Clone, Debug)]
+pub(crate) struct WithItemDefinitionNodeRef<'a> {
+    pub(crate) node: &'a ast::WithItem,
     pub(crate) target: &'a ast::ExprName,
 }
 
@@ -182,8 +188,11 @@ impl DefinitionNodeRef<'_> {
                     DefinitionKind::ParameterWithDefault(AstNodeRef::new(parsed, parameter))
                 }
             },
-            DefinitionNodeRef::WithItem(item) => {
-                DefinitionKind::WithItem(AstNodeRef::new(parsed, item))
+            DefinitionNodeRef::WithItem(WithItemDefinitionNodeRef { node, target }) => {
+                DefinitionKind::WithItem(WithItemDefinitionKind {
+                    node: AstNodeRef::new(parsed.clone(), node),
+                    target: AstNodeRef::new(parsed, target),
+                })
             }
         }
     }
@@ -208,7 +217,7 @@ impl DefinitionNodeRef<'_> {
                 ast::AnyParameterRef::Variadic(parameter) => parameter.into(),
                 ast::AnyParameterRef::NonVariadic(parameter) => parameter.into(),
             },
-            Self::WithItem(node) => node.into(),
+            Self::WithItem(WithItemDefinitionNodeRef { node: _, target }) => target.into(),
         }
     }
 }
@@ -226,7 +235,7 @@ pub enum DefinitionKind {
     Comprehension(ComprehensionDefinitionKind),
     Parameter(AstNodeRef<ast::Parameter>),
     ParameterWithDefault(AstNodeRef<ast::ParameterWithDefault>),
-    WithItem(AstNodeRef<ast::WithItem>),
+    WithItem(WithItemDefinitionKind),
 }
 
 #[derive(Clone, Debug)]
@@ -262,7 +271,6 @@ impl ImportFromDefinitionKind {
 }
 
 #[derive(Clone, Debug)]
-#[allow(dead_code)]
 pub struct AssignmentDefinitionKind {
     assignment: AstNodeRef<ast::StmtAssign>,
     target: AstNodeRef<ast::ExprName>,
@@ -271,6 +279,22 @@ pub struct AssignmentDefinitionKind {
 impl AssignmentDefinitionKind {
     pub(crate) fn assignment(&self) -> &ast::StmtAssign {
         self.assignment.node()
+    }
+
+    pub(crate) fn target(&self) -> &ast::ExprName {
+        self.target.node()
+    }
+}
+
+#[derive(Clone, Debug)]
+pub struct WithItemDefinitionKind {
+    node: AstNodeRef<ast::WithItem>,
+    target: AstNodeRef<ast::ExprName>,
+}
+
+impl WithItemDefinitionKind {
+    pub(crate) fn node(&self) -> &ast::WithItem {
+        self.node.node()
     }
 
     pub(crate) fn target(&self) -> &ast::ExprName {
@@ -337,12 +361,6 @@ impl From<&ast::Parameter> for DefinitionNodeKey {
 
 impl From<&ast::ParameterWithDefault> for DefinitionNodeKey {
     fn from(node: &ast::ParameterWithDefault) -> Self {
-        Self(NodeKey::from_node(node))
-    }
-}
-
-impl From<&ast::WithItem> for DefinitionNodeKey {
-    fn from(node: &ast::WithItem) -> Self {
         Self(NodeKey::from_node(node))
     }
 }

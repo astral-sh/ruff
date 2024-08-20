@@ -802,9 +802,9 @@ with item1 as x, item2 as y:
 
         let use_def = index.use_def_map(FileScopeId::global());
         for name in ["x", "y"] {
-            let [definition] = use_def
-                .public_definitions(global_table.symbol_id_by_name(name).expect("symbol exists"))
-            else {
+            let Some(definition) = use_def.first_public_definition(
+                global_table.symbol_id_by_name(name).expect("symbol exists"),
+            ) else {
                 panic!("Expected with item definition for {name}");
             };
             assert!(matches!(definition.node(&db), DefinitionKind::WithItem(_)));

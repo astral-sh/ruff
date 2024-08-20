@@ -26,6 +26,8 @@ use crate::semantic_index::use_def::{FlowSnapshot, UseDefMapBuilder};
 use crate::semantic_index::SemanticIndex;
 use crate::Db;
 
+use super::definition::WithItemDefinitionNodeRef;
+
 pub(super) struct SemanticIndexBuilder<'db> {
     // Builder state
     db: &'db dyn Db,
@@ -565,6 +567,7 @@ where
                 for item in items {
                     self.visit_expr(&item.context_expr);
                     if let Some(optional_vars) = item.optional_vars.as_deref() {
+                        self.add_standalone_expression(&item.context_expr);
                         self.current_assignment = Some(item.into());
                         self.visit_expr(optional_vars);
                         self.current_assignment = None;
@@ -634,7 +637,13 @@ where
                             );
                         }
                         Some(CurrentAssignment::WithItem(with_item)) => {
-                            self.add_definition(symbol, with_item);
+                            self.add_definition(
+                                symbol,
+                                WithItemDefinitionNodeRef {
+                                    node: with_item,
+                                    target: name_node,
+                                },
+                            );
                         }
                         None => {}
                     }
