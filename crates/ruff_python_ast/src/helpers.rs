@@ -1,7 +1,7 @@
 use std::borrow::Cow;
 use std::path::Path;
 
-use rustc_hash::FxHashMap;
+use foldhash::HashMap;
 
 use ruff_python_trivia::{indentation_at_offset, CommentRanges, SimpleTokenKind, SimpleTokenizer};
 use ruff_source_file::Locator;
@@ -877,7 +877,7 @@ pub fn resolve_imported_module_path<'a>(
 #[derive(Debug, Default)]
 pub struct NameFinder<'a> {
     /// A map from identifier to defining expression.
-    pub names: FxHashMap<&'a str, &'a ast::ExprName>,
+    pub names: HashMap<&'a str, &'a ast::ExprName>,
 }
 
 impl<'a> Visitor<'a> for NameFinder<'a> {
@@ -893,7 +893,7 @@ impl<'a> Visitor<'a> for NameFinder<'a> {
 #[derive(Debug, Default)]
 pub struct StoredNameFinder<'a> {
     /// A map from identifier to defining expression.
-    pub names: FxHashMap<&'a str, &'a ast::ExprName>,
+    pub names: HashMap<&'a str, &'a ast::ExprName>,
 }
 
 impl<'a> Visitor<'a> for StoredNameFinder<'a> {

@@ -35,7 +35,7 @@ path-absolutize = { workspace = true }
 path-slash = { workspace = true }
 pep440_rs = { workspace = true, features = ["serde"] }
 regex = { workspace = true }
-rustc-hash = { workspace = true }
+foldhash = { workspace = true }
 schemars = { workspace = true, optional = true }
 serde = { workspace = true }
 shellexpand = { workspace = true }

@@ -1,7 +1,7 @@
 use std::fmt;
 
+use foldhash::HashSet;
 use ruff_python_ast::{self as ast, Expr};
-use rustc_hash::FxHashSet;
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
@@ -124,7 +124,7 @@ impl fmt::Display for RemovalKind {
 /// escapes.
 fn has_duplicates(s: &ast::StringLiteralValue) -> bool {
     let mut escaped = false;
-    let mut seen = FxHashSet::default();
+    let mut seen = HashSet::default();
     for ch in s.chars() {
         if escaped {
             escaped = false;

@@ -6,8 +6,8 @@ use std::path::Path;
 
 #[cfg(not(fuzzing))]
 use anyhow::Result;
+use foldhash::HashMap;
 use itertools::Itertools;
-use rustc_hash::FxHashMap;
 
 use ruff_diagnostics::{Applicability, Diagnostic, FixAvailability};
 use ruff_notebook::Notebook;
@@ -335,7 +335,7 @@ pub(crate) fn print_jupyter_messages(
         .emit(
             &mut output,
             messages,
-            &EmitterContext::new(&FxHashMap::from_iter([(
+            &EmitterContext::new(&HashMap::from_iter([(
                 path.file_name().unwrap().to_string_lossy().to_string(),
                 notebook.index().clone(),
             )])),
@@ -356,7 +356,7 @@ pub(crate) fn print_messages(messages: &[Message]) -> String {
         .emit(
             &mut output,
             messages,
-            &EmitterContext::new(&FxHashMap::default()),
+            &EmitterContext::new(&HashMap::default()),
         )
         .unwrap();
 

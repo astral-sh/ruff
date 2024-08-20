@@ -1,4 +1,4 @@
-use rustc_hash::FxHashMap;
+use foldhash::HashMap;
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
@@ -51,7 +51,7 @@ pub(crate) fn banned_import_alias(
     stmt: &Stmt,
     name: &str,
     asname: &str,
-    banned_conventions: &FxHashMap<String, BannedAliases>,
+    banned_conventions: &HashMap<String, BannedAliases>,
 ) -> Option<Diagnostic> {
     if let Some(banned_aliases) = banned_conventions.get(name) {
         if banned_aliases

@@ -16,7 +16,7 @@ ruff_macros = { workspace = true }
 ruff_text_size = { workspace = true }
 
 drop_bomb = { workspace = true }
-rustc-hash = { workspace = true }
+foldhash = { workspace = true }
 schemars = { workspace = true, optional = true }
 serde = { workspace = true, optional = true }
 static_assertions = { workspace = true }

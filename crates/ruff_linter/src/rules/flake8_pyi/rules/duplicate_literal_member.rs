@@ -1,6 +1,4 @@
-use std::collections::HashSet;
-
-use rustc_hash::FxHashSet;
+use foldhash::HashSet;
 
 use ruff_diagnostics::{Diagnostic, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, violation};
@@ -45,7 +43,7 @@ impl Violation for DuplicateLiteralMember {
 
 /// PYI062
 pub(crate) fn duplicate_literal_member<'a>(checker: &mut Checker, expr: &'a Expr) {
-    let mut seen_nodes: HashSet<ComparableExpr<'_>, _> = FxHashSet::default();
+    let mut seen_nodes = HashSet::<ComparableExpr<'_>>::default();
     let mut diagnostics: Vec<Diagnostic> = Vec::new();
 
     // Adds a member to `literal_exprs` if it is a `Literal` annotation

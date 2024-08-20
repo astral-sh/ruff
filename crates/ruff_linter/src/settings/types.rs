@@ -8,10 +8,10 @@ use std::str::FromStr;
 use std::string::ToString;
 
 use anyhow::{bail, Result};
+use foldhash::HashMap;
 use globset::{Glob, GlobMatcher, GlobSet, GlobSetBuilder};
 use log::debug;
 use pep440_rs::{Operator, Version as Pep440Version, Version, VersionSpecifier, VersionSpecifiers};
-use rustc_hash::FxHashMap;
 use serde::{de, Deserialize, Deserializer, Serialize};
 use strum::IntoEnumIterator;
 use strum_macros::EnumIter;
@@ -480,7 +480,7 @@ impl From<ExtensionPair> for (String, Language) {
 }
 #[derive(Debug, Clone, Default, CacheKey)]
 pub struct ExtensionMapping {
-    mapping: FxHashMap<String, Language>,
+    mapping: HashMap<String, Language>,
 }
 
 impl ExtensionMapping {
@@ -504,8 +504,8 @@ impl Display for ExtensionMapping {
     }
 }
 
-impl From<FxHashMap<String, Language>> for ExtensionMapping {
-    fn from(value: FxHashMap<String, Language>) -> Self {
+impl From<HashMap<String, Language>> for ExtensionMapping {
+    fn from(value: HashMap<String, Language>) -> Self {
         Self { mapping: value }
     }
 }

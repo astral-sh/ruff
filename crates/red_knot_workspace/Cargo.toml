@@ -22,7 +22,7 @@ ruff_text_size = { workspace = true }
 anyhow = { workspace = true }
 crossbeam = { workspace = true }
 notify = { workspace = true }
-rustc-hash = { workspace = true }
+foldhash = { workspace = true }
 salsa = { workspace = true }
 thiserror = { workspace = true }
 tracing = { workspace = true }

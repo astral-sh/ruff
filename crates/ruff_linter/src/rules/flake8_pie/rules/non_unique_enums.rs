@@ -1,4 +1,4 @@
-use rustc_hash::FxHashSet;
+use foldhash::HashSet;
 
 use ruff_diagnostics::Diagnostic;
 use ruff_diagnostics::Violation;
@@ -68,7 +68,7 @@ pub(crate) fn non_unique_enums(checker: &mut Checker, parent: &Stmt, body: &[Stm
         return;
     }
 
-    let mut seen_targets: FxHashSet<ComparableExpr> = FxHashSet::default();
+    let mut seen_targets: HashSet<ComparableExpr> = HashSet::default();
     for stmt in body {
         let Stmt::Assign(ast::StmtAssign { value, .. }) = stmt else {
             continue;

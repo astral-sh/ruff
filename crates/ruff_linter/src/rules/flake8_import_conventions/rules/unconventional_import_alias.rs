@@ -1,4 +1,4 @@
-use rustc_hash::FxHashMap;
+use foldhash::HashMap;
 
 use ruff_diagnostics::{Diagnostic, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, violation};
@@ -59,7 +59,7 @@ impl Violation for UnconventionalImportAlias {
 pub(crate) fn unconventional_import_alias(
     checker: &Checker,
     binding: &Binding,
-    conventions: &FxHashMap<String, String>,
+    conventions: &HashMap<String, String>,
 ) -> Option<Diagnostic> {
     let import = binding.as_any_import()?;
     let qualified_name = import.qualified_name().to_string();

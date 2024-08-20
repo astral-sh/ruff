@@ -1,4 +1,4 @@
-use rustc_hash::{FxBuildHasher, FxHashMap, FxHashSet};
+use foldhash::{HashMap, HashMapExt, HashSet, HashSetExt};
 
 use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, violation};
@@ -129,8 +129,8 @@ impl Violation for MultiValueRepeatedKeyVariable {
 /// F601, F602
 pub(crate) fn repeated_keys(checker: &mut Checker, dict: &ast::ExprDict) {
     // Generate a map from key to (index, value).
-    let mut seen: FxHashMap<ComparableExpr, FxHashSet<ComparableExpr>> =
-        FxHashMap::with_capacity_and_hasher(dict.len(), FxBuildHasher);
+    let mut seen: HashMap<ComparableExpr, HashSet<ComparableExpr>> =
+        HashMap::with_capacity(dict.len());
 
     // Detect duplicate keys.
     for (i, ast::DictItem { key, value }) in dict.iter().enumerate() {
@@ -142,7 +142,7 @@ pub(crate) fn repeated_keys(checker: &mut Checker, dict: &ast::ExprDict) {
         let comparable_value = ComparableExpr::from(value);
 
         let Some(seen_values) = seen.get_mut(&comparable_key) else {
-            seen.insert(comparable_key, FxHashSet::from_iter([comparable_value]));
+            seen.insert(comparable_key, HashSet::from_iter([comparable_value]));
             continue;
         };
 

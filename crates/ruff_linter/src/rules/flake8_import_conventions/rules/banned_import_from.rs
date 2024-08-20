@@ -1,5 +1,5 @@
+use foldhash::HashSet;
 use ruff_python_ast::Stmt;
-use rustc_hash::FxHashSet;
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
@@ -48,7 +48,7 @@ impl Violation for BannedImportFrom {
 pub(crate) fn banned_import_from(
     stmt: &Stmt,
     name: &str,
-    banned_conventions: &FxHashSet<String>,
+    banned_conventions: &HashSet<String>,
 ) -> Option<Diagnostic> {
     if banned_conventions.contains(name) {
         return Some(Diagnostic::new(

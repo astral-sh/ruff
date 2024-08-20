@@ -9,8 +9,8 @@ use std::path::Path;
 
 use anyhow::{Context, Result};
 use colored::Colorize;
+use foldhash::HashMap;
 use log::{debug, warn};
-use rustc_hash::FxHashMap;
 
 use ruff_diagnostics::Diagnostic;
 use ruff_linter::codes::Rule;
@@ -33,13 +33,13 @@ use crate::cache::{Cache, FileCacheKey, LintCacheData};
 pub(crate) struct Diagnostics {
     pub(crate) messages: Vec<Message>,
     pub(crate) fixed: FixMap,
-    pub(crate) notebook_indexes: FxHashMap<String, NotebookIndex>,
+    pub(crate) notebook_indexes: HashMap<String, NotebookIndex>,
 }
 
 impl Diagnostics {
     pub(crate) fn new(
         messages: Vec<Message>,
-        notebook_indexes: FxHashMap<String, NotebookIndex>,
+        notebook_indexes: HashMap<String, NotebookIndex>,
     ) -> Self {
         Self {
             messages,
@@ -72,7 +72,7 @@ impl Diagnostics {
                             source_file,
                             TextSize::default(),
                         )],
-                        FxHashMap::default(),
+                        HashMap::default(),
                     )
                 } else {
                     match path {
@@ -106,7 +106,7 @@ impl Diagnostics {
                         range: TextRange::default(),
                         file: dummy,
                     })],
-                    FxHashMap::default(),
+                    HashMap::default(),
                 )
             }
         }
@@ -132,7 +132,7 @@ impl AddAssign for Diagnostics {
 
 /// A collection of fixes indexed by file path.
 #[derive(Debug, Default, PartialEq)]
-pub(crate) struct FixMap(FxHashMap<String, FixTable>);
+pub(crate) struct FixMap(HashMap<String, FixTable>);
 
 impl FixMap {
     /// Returns `true` if there are no fixes in the map.
@@ -314,7 +314,7 @@ pub(crate) fn lint_path(
                 ParseSource::None,
             );
             let transformed = source_kind;
-            let fixed = FxHashMap::default();
+            let fixed = HashMap::default();
             (result, transformed, fixed)
         }
     } else {
@@ -328,7 +328,7 @@ pub(crate) fn lint_path(
             ParseSource::None,
         );
         let transformed = source_kind;
-        let fixed = FxHashMap::default();
+        let fixed = HashMap::default();
         (result, transformed, fixed)
     };
 
@@ -357,9 +357,9 @@ pub(crate) fn lint_path(
     }
 
     let notebook_indexes = if let SourceKind::IpyNotebook(notebook) = transformed {
-        FxHashMap::from_iter([(path.to_string_lossy().to_string(), notebook.into_index())])
+        HashMap::from_iter([(path.to_string_lossy().to_string(), notebook.into_index())])
     } else {
-        FxHashMap::default()
+        HashMap::default()
     };
 
     Ok(Diagnostics {
@@ -456,7 +456,7 @@ pub(crate) fn lint_stdin(
                 }
 
                 let transformed = source_kind;
-                let fixed = FxHashMap::default();
+                let fixed = HashMap::default();
                 (result, transformed, fixed)
             }
         } else {
@@ -470,17 +470,17 @@ pub(crate) fn lint_stdin(
                 ParseSource::None,
             );
             let transformed = source_kind;
-            let fixed = FxHashMap::default();
+            let fixed = HashMap::default();
             (result, transformed, fixed)
         };
 
     let notebook_indexes = if let SourceKind::IpyNotebook(notebook) = transformed {
-        FxHashMap::from_iter([(
+        HashMap::from_iter([(
             path.map_or_else(|| "-".into(), |path| path.to_string_lossy().to_string()),
             notebook.into_index(),
         )])
     } else {
-        FxHashMap::default()
+        HashMap::default()
     };
 
     Ok(Diagnostics {

@@ -2,7 +2,7 @@ use super::{write, Arguments, FormatElement};
 use crate::format_element::Interned;
 use crate::prelude::LineMode;
 use crate::{FormatResult, FormatState};
-use rustc_hash::FxHashMap;
+use foldhash::HashMap;
 use std::any::{Any, TypeId};
 use std::fmt::Debug;
 use std::ops::{Deref, DerefMut};
@@ -349,7 +349,7 @@ pub struct RemoveSoftLinesBuffer<'a, Context> {
     ///
     /// It's fine to not snapshot the cache. The worst that can happen is that it holds on interned elements
     /// that are now unused. But there's little harm in that and the cache is cleaned when dropping the buffer.
-    interned_cache: FxHashMap<Interned, Interned>,
+    interned_cache: HashMap<Interned, Interned>,
 }
 
 impl<'a, Context> RemoveSoftLinesBuffer<'a, Context> {
@@ -357,7 +357,7 @@ impl<'a, Context> RemoveSoftLinesBuffer<'a, Context> {
     pub fn new(inner: &'a mut dyn Buffer<Context = Context>) -> Self {
         Self {
             inner,
-            interned_cache: FxHashMap::default(),
+            interned_cache: HashMap::default(),
         }
     }
 
@@ -370,7 +370,7 @@ impl<'a, Context> RemoveSoftLinesBuffer<'a, Context> {
 // Extracted to function to avoid monomorphization
 fn clean_interned(
     interned: &Interned,
-    interned_cache: &mut FxHashMap<Interned, Interned>,
+    interned_cache: &mut HashMap<Interned, Interned>,
 ) -> Interned {
     if let Some(cleaned) = interned_cache.get(interned) {
         cleaned.clone()

@@ -1,6 +1,6 @@
 use std::borrow::Cow;
 
-use rustc_hash::FxHashMap;
+use foldhash::HashMap;
 
 use ruff_linter::{
     linter::{FixerResult, LinterResult},
@@ -19,7 +19,7 @@ use crate::{
 
 /// A simultaneous fix made across a single text document or among an arbitrary
 /// number of notebook cells.
-pub(crate) type Fixes = FxHashMap<lsp_types::Url, Vec<lsp_types::TextEdit>>;
+pub(crate) type Fixes = HashMap<lsp_types::Url, Vec<lsp_types::TextEdit>>;
 
 pub(crate) fn fix_all(
     query: &DocumentQuery,

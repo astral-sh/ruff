@@ -1,4 +1,4 @@
-use rustc_hash::FxHashSet;
+use foldhash::HashSet;
 
 use crate::{BindingId, SemanticModel};
 use ruff_python_ast as ast;
@@ -29,7 +29,7 @@ pub fn any_base_class(
         class_def: &ast::StmtClassDef,
         semantic: &SemanticModel,
         func: &dyn Fn(&Expr) -> bool,
-        seen: &mut FxHashSet<BindingId>,
+        seen: &mut HashSet<BindingId>,
     ) -> bool {
         class_def.bases().iter().any(|expr| {
             // If the base class itself matches the pattern, then this does too.
@@ -63,7 +63,7 @@ pub fn any_base_class(
         return false;
     }
 
-    inner(class_def, semantic, func, &mut FxHashSet::default())
+    inner(class_def, semantic, func, &mut HashSet::default())
 }
 
 /// Return `true` if any base class matches an [`ast::StmtClassDef`] predicate.
@@ -76,7 +76,7 @@ pub fn any_super_class(
         class_def: &ast::StmtClassDef,
         semantic: &SemanticModel,
         func: &dyn Fn(&ast::StmtClassDef) -> bool,
-        seen: &mut FxHashSet<BindingId>,
+        seen: &mut HashSet<BindingId>,
     ) -> bool {
         // If the function itself matches the pattern, then this does too.
         if func(class_def) {
@@ -105,7 +105,7 @@ pub fn any_super_class(
         })
     }
 
-    inner(class_def, semantic, func, &mut FxHashSet::default())
+    inner(class_def, semantic, func, &mut HashSet::default())
 }
 
 /// Return `true` if `class_def` is a class that has one or more enum classes in its mro

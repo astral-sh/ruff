@@ -2,7 +2,7 @@ use std::iter::FusedIterator;
 use std::ops::Deref;
 use std::sync::Arc;
 
-use rustc_hash::FxHashSet;
+use foldhash::HashSet;
 use salsa::Setter;
 
 use ruff_db::files::File;
@@ -105,7 +105,7 @@ pub struct LazyFiles<'a> {
 
 impl<'a> LazyFiles<'a> {
     /// Sets the indexed files of a package to `files`.
-    pub fn set(mut self, files: FxHashSet<File>) -> IndexedFiles {
+    pub fn set(mut self, files: HashSet<File>) -> IndexedFiles {
         let files = IndexedFiles::new(files);
         *self.files = State::Indexed(files.clone());
         files
@@ -127,11 +127,11 @@ impl<'a> LazyFiles<'a> {
 #[derive(Debug, Clone)]
 pub struct IndexedFiles {
     revision: u64,
-    files: Arc<std::sync::Mutex<FxHashSet<File>>>,
+    files: Arc<std::sync::Mutex<HashSet<File>>>,
 }
 
 impl IndexedFiles {
-    fn new(files: FxHashSet<File>) -> Self {
+    fn new(files: HashSet<File>) -> Self {
         Self {
             files: Arc::new(std::sync::Mutex::new(files)),
             revision: 0,
@@ -155,11 +155,11 @@ impl PartialEq for IndexedFiles {
 impl Eq for IndexedFiles {}
 
 pub struct IndexedFilesGuard<'a> {
-    guard: std::sync::MutexGuard<'a, FxHashSet<File>>,
+    guard: std::sync::MutexGuard<'a, HashSet<File>>,
 }
 
 impl Deref for IndexedFilesGuard<'_> {
-    type Target = FxHashSet<File>;
+    type Target = HashSet<File>;
 
     fn deref(&self) -> &Self::Target {
         &self.guard

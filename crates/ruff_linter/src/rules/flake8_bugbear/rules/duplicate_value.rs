@@ -1,5 +1,5 @@
 use anyhow::{Context, Result};
-use rustc_hash::FxHashSet;
+use foldhash::HashSet;
 
 use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, violation};
@@ -48,7 +48,7 @@ impl Violation for DuplicateValue {
 
 /// B033
 pub(crate) fn duplicate_value(checker: &mut Checker, set: &ast::ExprSet) {
-    let mut seen_values: FxHashSet<ComparableExpr> = FxHashSet::default();
+    let mut seen_values: HashSet<ComparableExpr> = HashSet::default();
     for (index, value) in set.iter().enumerate() {
         if value.is_literal_expr() {
             let comparable_value = ComparableExpr::from(value);

@@ -1,7 +1,7 @@
 use anyhow::Ok;
+use foldhash::{HashMap, HashMapExt, HashSetExt};
 use lsp_types::NotebookCellKind;
 use ruff_notebook::CellMetadata;
-use rustc_hash::{FxBuildHasher, FxHashMap};
 
 use crate::{PositionEncoding, TextDocument};
 
@@ -17,7 +17,7 @@ pub struct NotebookDocument {
     metadata: ruff_notebook::RawNotebookMetadata,
     version: DocumentVersion,
     // Used to quickly find the index of a cell for a given URL.
-    cell_index: FxHashMap<lsp_types::Url, CellId>,
+    cell_index: HashMap<lsp_types::Url, CellId>,
 }
 
 /// A single cell within a notebook, which has text contents represented as a `TextDocument`.
@@ -35,7 +35,7 @@ impl NotebookDocument {
         metadata: serde_json::Map<String, serde_json::Value>,
         cell_documents: Vec<lsp_types::TextDocumentItem>,
     ) -> crate::Result<Self> {
-        let mut cell_contents: FxHashMap<_, _> = cell_documents
+        let mut cell_contents: HashMap<_, _> = cell_documents
             .into_iter()
             .map(|document| (document.uri, document.text))
             .collect();
@@ -122,7 +122,7 @@ impl NotebookDocument {
                 // Instead, it only provides that (a) these cell URIs were removed, and (b) these
                 // cell URIs were added.
                 // https://github.com/astral-sh/ruff/issues/12573
-                let mut deleted_cells = FxHashMap::default();
+                let mut deleted_cells = HashMap::default();
 
                 // First, delete the cells and remove them from the index.
                 if delete > 0 {
@@ -221,8 +221,8 @@ impl NotebookDocument {
         self.cells.get_mut(*self.cell_index.get(uri)?)
     }
 
-    fn make_cell_index(cells: &[NotebookCell]) -> FxHashMap<lsp_types::Url, CellId> {
-        let mut index = FxHashMap::with_capacity_and_hasher(cells.len(), FxBuildHasher);
+    fn make_cell_index(cells: &[NotebookCell]) -> HashMap<lsp_types::Url, CellId> {
+        let mut index = HashMap::with_capacity(cells.len());
         for (i, cell) in cells.iter().enumerate() {
             index.insert(cell.url.clone(), i);
         }

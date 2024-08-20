@@ -2,22 +2,22 @@
 use std::convert::TryFrom;
 use std::str::FromStr;
 
+use foldhash::HashSet;
 use ruff_python_literal::cformat::{
     CFormatError, CFormatPart, CFormatPrecision, CFormatQuantity, CFormatSpec, CFormatString,
 };
-use rustc_hash::FxHashSet;
 
 pub(crate) struct CFormatSummary {
     pub(crate) starred: bool,
     pub(crate) num_positional: usize,
-    pub(crate) keywords: FxHashSet<String>,
+    pub(crate) keywords: HashSet<String>,
 }
 
 impl From<&CFormatString> for CFormatSummary {
     fn from(format_string: &CFormatString) -> Self {
         let mut starred = false;
         let mut num_positional = 0;
-        let mut keywords = FxHashSet::default();
+        let mut keywords = HashSet::default();
 
         for format_part in format_string.iter() {
             let CFormatPart::Spec(CFormatSpec {

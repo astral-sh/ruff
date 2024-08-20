@@ -1,6 +1,6 @@
 use std::{collections::BTreeMap, sync::Arc};
 
-use rustc_hash::{FxBuildHasher, FxHashSet};
+use foldhash::{HashMapExt, HashSet, HashSetExt};
 use salsa::{Durability, Setter as _};
 
 pub use metadata::{PackageMetadata, WorkspaceMetadata};
@@ -74,7 +74,7 @@ pub struct Workspace {
     /// open files rather than all files in the workspace.
     #[return_ref]
     #[default]
-    open_fileset: Option<Arc<FxHashSet<File>>>,
+    open_fileset: Option<Arc<HashSet<File>>>,
 
     /// The (first-party) packages in this workspace.
     #[return_ref]
@@ -219,7 +219,7 @@ impl Workspace {
     }
 
     /// Returns the open files in the workspace or `None` if the entire workspace should be checked.
-    pub fn open_files(self, db: &dyn Db) -> Option<&FxHashSet<File>> {
+    pub fn open_files(self, db: &dyn Db) -> Option<&HashSet<File>> {
         self.open_fileset(db).as_deref()
     }
 
@@ -227,7 +227,7 @@ impl Workspace {
     ///
     /// This changes the behavior of `check` to only check the open files rather than all files in the workspace.
     #[tracing::instrument(level = "debug", skip(self, db))]
-    pub fn set_open_files(self, db: &mut dyn Db, open_files: FxHashSet<File>) {
+    pub fn set_open_files(self, db: &mut dyn Db, open_files: HashSet<File>) {
         tracing::debug!("Set open workspace files (count: {})", open_files.len());
 
         self.set_open_fileset(db).to(Some(Arc::new(open_files)));
@@ -236,7 +236,7 @@ impl Workspace {
     /// This takes the open files from the workspace and returns them.
     ///
     /// This changes the behavior of `check` to check all files in the workspace instead of just the open files.
-    pub fn take_open_files(self, db: &mut dyn Db) -> FxHashSet<File> {
+    pub fn take_open_files(self, db: &mut dyn Db) -> HashSet<File> {
         tracing::debug!("Take open workspace files");
 
         // Salsa will cancel any pending queries and remove its own reference to `open_files`
@@ -246,7 +246,7 @@ impl Workspace {
         if let Some(open_files) = open_files {
             Arc::try_unwrap(open_files).unwrap()
         } else {
-            FxHashSet::default()
+            HashSet::default()
         }
     }
 }
@@ -372,7 +372,7 @@ pub(super) fn check_file(db: &dyn Db, file: File) -> Diagnostics {
     Diagnostics::from(diagnostics)
 }
 
-fn discover_package_files(db: &dyn Db, path: &SystemPath) -> FxHashSet<File> {
+fn discover_package_files(db: &dyn Db, path: &SystemPath) -> HashSet<File> {
     let paths = std::sync::Mutex::new(Vec::new());
 
     db.system().walk_directory(path).run(|| {
@@ -402,7 +402,7 @@ fn discover_package_files(db: &dyn Db, path: &SystemPath) -> FxHashSet<File> {
     });
 
     let paths = paths.into_inner().unwrap();
-    let mut files = FxHashSet::with_capacity_and_hasher(paths.len(), FxBuildHasher);
+    let mut files = HashSet::with_capacity(paths.len());
 
     for path in paths {
         // If this returns `None`, then the file was deleted between the `walk_directory` call and now.

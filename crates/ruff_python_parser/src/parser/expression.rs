@@ -2,7 +2,7 @@ use std::cmp::Ordering;
 use std::ops::Deref;
 
 use bitflags::bitflags;
-use rustc_hash::{FxBuildHasher, FxHashSet};
+use foldhash::{HashMapExt, HashSet, HashSetExt};
 
 use ruff_python_ast::name::Name;
 use ruff_python_ast::{
@@ -2277,8 +2277,7 @@ impl<'src> Parser<'src> {
     /// 2. If there are more than one argument (positional or keyword), all generator expressions
     ///    present should be parenthesized.
     fn validate_arguments(&mut self, arguments: &ast::Arguments) {
-        let mut all_arg_names =
-            FxHashSet::with_capacity_and_hasher(arguments.keywords.len(), FxBuildHasher);
+        let mut all_arg_names = HashSet::with_capacity(arguments.keywords.len());
 
         for (name, range) in arguments
             .keywords

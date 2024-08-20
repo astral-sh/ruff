@@ -1,6 +1,6 @@
+use foldhash::HashSet;
 use lsp_server::ErrorCode;
 use lsp_types::{self as types, request as req};
-use rustc_hash::FxHashSet;
 use types::{CodeActionKind, CodeActionOrCommand};
 
 use crate::edit::WorkspaceEditTracker;
@@ -282,7 +282,7 @@ fn notebook_organize_imports(snapshot: &DocumentSnapshot) -> crate::Result<CodeA
 /// the list is filtered.
 fn supported_code_actions(
     action_filter: Option<Vec<CodeActionKind>>,
-) -> FxHashSet<SupportedCodeAction> {
+) -> HashSet<SupportedCodeAction> {
     let Some(action_filter) = action_filter else {
         return SupportedCodeAction::all().collect();
     };

@@ -2,8 +2,8 @@
 
 use std::path::Path;
 
+use foldhash::HashSet;
 use itertools::Itertools;
-use rustc_hash::FxHashSet;
 
 use ruff_diagnostics::{Diagnostic, Edit, Fix};
 use ruff_python_trivia::CommentRanges;
@@ -132,7 +132,7 @@ pub(crate) fn check_noqa(
                     let mut unknown_codes = vec![];
                     let mut unmatched_codes = vec![];
                     let mut valid_codes = vec![];
-                    let mut seen_codes = FxHashSet::default();
+                    let mut seen_codes = HashSet::default();
                     let mut self_ignore = false;
                     for original_code in directive.iter().map(Code::as_str) {
                         let code = get_redirect_target(original_code).unwrap_or(original_code);

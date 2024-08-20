@@ -1,4 +1,4 @@
-use rustc_hash::FxHashMap;
+use foldhash::HashMap;
 use serde::{Deserialize, Serialize};
 use std::fmt::{Display, Formatter};
 
@@ -42,7 +42,7 @@ impl Display for Strictness {
 #[derive(Debug, Clone, CacheKey, Default)]
 pub struct Settings {
     pub ban_relative_imports: Strictness,
-    pub banned_api: FxHashMap<String, ApiBan>,
+    pub banned_api: HashMap<String, ApiBan>,
     pub banned_module_level_imports: Vec<String>,
 }
 

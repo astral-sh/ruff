@@ -1,7 +1,7 @@
 use std::borrow::Cow;
 
 use anyhow::Result;
-use rustc_hash::FxHashMap;
+use foldhash::HashMap;
 
 use ruff_diagnostics::{Diagnostic, DiagnosticKind, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, violation};
@@ -248,10 +248,10 @@ pub(crate) fn typing_only_runtime_import(
     diagnostics: &mut Vec<Diagnostic>,
 ) {
     // Collect all typing-only imports by statement and import type.
-    let mut errors_by_statement: FxHashMap<(NodeId, ImportType), Vec<ImportBinding>> =
-        FxHashMap::default();
-    let mut ignores_by_statement: FxHashMap<(NodeId, ImportType), Vec<ImportBinding>> =
-        FxHashMap::default();
+    let mut errors_by_statement: HashMap<(NodeId, ImportType), Vec<ImportBinding>> =
+        HashMap::default();
+    let mut ignores_by_statement: HashMap<(NodeId, ImportType), Vec<ImportBinding>> =
+        HashMap::default();
 
     for binding_id in scope.binding_ids() {
         let binding = checker.semantic().binding(binding_id);

@@ -1,7 +1,7 @@
 use std::any::TypeId;
 
+use foldhash::HashMap;
 use lsp_server::{Notification, RequestId};
-use rustc_hash::FxHashMap;
 use serde_json::Value;
 
 use super::{schedule::Task, ClientSender};
@@ -23,7 +23,7 @@ pub(crate) struct Responder(ClientSender);
 pub(crate) struct Requester<'s> {
     sender: ClientSender,
     next_request_id: i32,
-    response_handlers: FxHashMap<lsp_server::RequestId, ResponseBuilder<'s>>,
+    response_handlers: HashMap<lsp_server::RequestId, ResponseBuilder<'s>>,
 }
 
 impl<'s> Client<'s> {
@@ -34,7 +34,7 @@ impl<'s> Client<'s> {
             requester: Requester {
                 sender,
                 next_request_id: 1,
-                response_handlers: FxHashMap::default(),
+                response_handlers: HashMap::default(),
             },
         }
     }

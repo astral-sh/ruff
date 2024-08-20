@@ -1,4 +1,4 @@
-use rustc_hash::FxHashSet;
+use foldhash::HashSet;
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
@@ -94,7 +94,7 @@ pub(crate) fn if_else_block_instead_of_dict_lookup(checker: &mut Checker, stmt_i
     }
 
     // The `expr` was checked to be a literal above, so this is safe.
-    let mut literals: FxHashSet<ComparableLiteral> = FxHashSet::default();
+    let mut literals: HashSet<ComparableLiteral> = HashSet::default();
     literals.insert(literal_expr.into());
 
     for clause in elif_else_clauses {

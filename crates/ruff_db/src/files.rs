@@ -6,6 +6,7 @@ use dashmap::mapref::entry::Entry;
 use salsa::{Durability, Setter};
 
 pub use file_root::{FileRoot, FileRootKind};
+use foldhash::{HashMapExt, HashSetExt};
 pub use path::FilePath;
 use ruff_notebook::{Notebook, NotebookError};
 

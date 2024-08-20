@@ -1,8 +1,8 @@
 use itertools::Itertools;
 use std::collections::BTreeSet;
 
+use foldhash::{HashMap, HashMapExt, HashSet};
 use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
-use rustc_hash::{FxHashMap, FxHashSet};
 
 use ruff_diagnostics::{Diagnostic, Edit, Fix, IsolationLevel, SourceMap};
 use ruff_source_file::Locator;
@@ -57,8 +57,8 @@ fn apply_fixes<'a>(
     let mut output = String::with_capacity(locator.len());
     let mut last_pos: Option<TextSize> = None;
     let mut applied: BTreeSet<&Edit> = BTreeSet::default();
-    let mut isolated: FxHashSet<u32> = FxHashSet::default();
-    let mut fixed = FxHashMap::default();
+    let mut isolated: HashSet<u32> = HashSet::default();
+    let mut fixed = HashMap::default();
     let mut source_map = SourceMap::default();
 
     for (rule, fix) in diagnostics

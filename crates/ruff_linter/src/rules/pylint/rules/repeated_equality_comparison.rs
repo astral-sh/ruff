@@ -1,5 +1,5 @@
+use foldhash::{HashMap, HashMapExt, HashSetExt};
 use itertools::Itertools;
-use rustc_hash::{FxBuildHasher, FxHashMap};
 
 use ast::ExprContext;
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
@@ -71,8 +71,8 @@ impl AlwaysFixableViolation for RepeatedEqualityComparison {
 /// PLR1714
 pub(crate) fn repeated_equality_comparison(checker: &mut Checker, bool_op: &ast::ExprBoolOp) {
     // Map from expression hash to (starting offset, number of comparisons, list
-    let mut value_to_comparators: FxHashMap<HashableExpr, (TextSize, Vec<&Expr>, Vec<usize>)> =
-        FxHashMap::with_capacity_and_hasher(bool_op.values.len() * 2, FxBuildHasher);
+    let mut value_to_comparators: HashMap<HashableExpr, (TextSize, Vec<&Expr>, Vec<usize>)> =
+        HashMap::with_capacity(bool_op.values.len() * 2);
 
     for (i, value) in bool_op.values.iter().enumerate() {
         let Some((left, right)) = to_allowed_value(bool_op.op, value, checker.semantic()) else {

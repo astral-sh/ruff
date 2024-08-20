@@ -1,4 +1,4 @@
-use rustc_hash::FxHashSet;
+use foldhash::HashSet;
 
 use ruff_db::files::{system_path_to_file, File, Files};
 use ruff_db::system::walk_directory::WalkState;
@@ -18,13 +18,13 @@ impl RootDatabase {
 
         let mut workspace_change = false;
         // Packages that need reloading
-        let mut changed_packages = FxHashSet::default();
+        let mut changed_packages = HashSet::default();
         // Paths that were added
-        let mut added_paths = FxHashSet::default();
+        let mut added_paths = HashSet::default();
 
         // Deduplicate the `sync` calls. Many file watchers emit multiple events for the same path.
-        let mut synced_files = FxHashSet::default();
-        let mut synced_recursively = FxHashSet::default();
+        let mut synced_files = HashSet::default();
+        let mut synced_recursively = HashSet::default();
 
         let mut sync_path = |db: &mut RootDatabase, path: &SystemPath| {
             if synced_files.insert(path.to_path_buf()) {

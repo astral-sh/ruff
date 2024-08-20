@@ -5,10 +5,10 @@
 use std::fmt::{Display, Formatter};
 use std::path::{Path, PathBuf};
 
+use foldhash::HashSet;
 use once_cell::sync::Lazy;
 use path_absolutize::path_dedot;
 use regex::Regex;
-use rustc_hash::FxHashSet;
 
 use crate::codes::RuleCodePrefix;
 use ruff_macros::CacheKey;
@@ -226,7 +226,7 @@ pub struct LinterSettings {
     pub explicit_preview_rules: bool,
 
     // Rule-specific settings
-    pub allowed_confusables: FxHashSet<char>,
+    pub allowed_confusables: HashSet<char>,
     pub builtins: Vec<String>,
     pub dummy_variable_rgx: Regex,
     pub external: Vec<String>,
@@ -384,7 +384,7 @@ impl LinterSettings {
                 .iter()
                 .flat_map(|selector| selector.rules(&PreviewOptions::default()))
                 .collect(),
-            allowed_confusables: FxHashSet::from_iter([]),
+            allowed_confusables: HashSet::from_iter([]),
 
             // Needs duplicating
             builtins: vec![],

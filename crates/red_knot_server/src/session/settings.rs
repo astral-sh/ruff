@@ -1,11 +1,11 @@
 use std::path::PathBuf;
 
+use foldhash::HashMap;
 use lsp_types::Url;
-use rustc_hash::FxHashMap;
 use serde::Deserialize;
 
 /// Maps a workspace URI to its associated client settings. Used during server initialization.
-pub(crate) type WorkspaceSettingsMap = FxHashMap<Url, ClientSettings>;
+pub(crate) type WorkspaceSettingsMap = HashMap<Url, ClientSettings>;
 
 /// This is a direct representation of the settings schema sent by the client.
 #[derive(Debug, Deserialize, Default)]

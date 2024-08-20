@@ -8,7 +8,7 @@ mod tests {
     use std::path::Path;
 
     use anyhow::Result;
-    use rustc_hash::FxHashMap;
+    use foldhash::HashMap;
 
     use crate::assert_messages;
     use crate::registry::Rule;
@@ -23,7 +23,7 @@ mod tests {
             Path::new("flake8_tidy_imports/TID251.py"),
             &LinterSettings {
                 flake8_tidy_imports: flake8_tidy_imports::settings::Settings {
-                    banned_api: FxHashMap::from_iter([
+                    banned_api: HashMap::from_iter([
                         (
                             "cgi".to_string(),
                             ApiBan {
@@ -52,7 +52,7 @@ mod tests {
             Path::new("flake8_tidy_imports/TID/my_package/sublib/api/application.py"),
             &LinterSettings {
                 flake8_tidy_imports: flake8_tidy_imports::settings::Settings {
-                    banned_api: FxHashMap::from_iter([
+                    banned_api: HashMap::from_iter([
                         (
                             "attrs".to_string(),
                             ApiBan {

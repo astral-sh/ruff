@@ -1,5 +1,5 @@
+use foldhash::HashSet;
 use ruff_python_ast::{self as ast, ElifElseClause, Expr, Identifier, Stmt};
-use rustc_hash::FxHashSet;
 
 use ruff_python_ast::visitor;
 use ruff_python_ast::visitor::Visitor;
@@ -12,7 +12,7 @@ pub(super) struct Stack<'data> {
     /// The `elif` or `else` statements in the current function.
     pub(super) elifs_elses: Vec<(&'data [Stmt], &'data ElifElseClause)>,
     /// The non-local variables in the current function.
-    pub(super) non_locals: FxHashSet<&'data str>,
+    pub(super) non_locals: HashSet<&'data str>,
     /// The annotated variables in the current function.
     ///
     /// For example, consider:
@@ -27,7 +27,7 @@ pub(super) struct Stack<'data> {
     /// In this case, the annotation on `x` is used to cast the return value
     /// of `foo()` to an `int`. Removing the `x = foo()` statement would
     /// change the return type of the function.
-    pub(super) annotations: FxHashSet<&'data str>,
+    pub(super) annotations: HashSet<&'data str>,
     /// Whether the current function is a generator.
     pub(super) is_generator: bool,
     /// The `assignment`-to-`return` statement pairs in the current function.

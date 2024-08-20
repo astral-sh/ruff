@@ -1,7 +1,7 @@
 //! Access to the Ruff linting API for the LSP
 
+use foldhash::HashMap;
 use ruff_python_parser::ParseError;
-use rustc_hash::FxHashMap;
 use serde::{Deserialize, Serialize};
 
 use ruff_diagnostics::{Applicability, Diagnostic, DiagnosticKind, Edit, Fix};
@@ -58,7 +58,7 @@ pub(crate) struct DiagnosticFix {
 }
 
 /// A series of diagnostics across a single text document or an arbitrary number of notebook cells.
-pub(crate) type DiagnosticsMap = FxHashMap<lsp_types::Url, Vec<lsp_types::Diagnostic>>;
+pub(crate) type DiagnosticsMap = HashMap<lsp_types::Url, Vec<lsp_types::Diagnostic>>;
 
 pub(crate) fn check(
     query: &DocumentQuery,

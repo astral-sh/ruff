@@ -4,8 +4,8 @@ use std::path::PathBuf;
 use std::{collections::BTreeMap, path::Path, sync::Arc};
 
 use anyhow::anyhow;
+use foldhash::HashMap;
 use lsp_types::Url;
-use rustc_hash::FxHashMap;
 
 pub(crate) use ruff_settings::RuffSettings;
 
@@ -22,10 +22,10 @@ mod ruff_settings;
 #[derive(Default)]
 pub(crate) struct Index {
     /// Maps all document file URLs to the associated document controller
-    documents: FxHashMap<Url, DocumentController>,
+    documents: HashMap<Url, DocumentController>,
 
     /// Maps opaque cell URLs to a notebook URL (document)
-    notebook_cells: FxHashMap<Url, Url>,
+    notebook_cells: HashMap<Url, Url>,
 
     /// Maps a workspace folder root to its settings.
     settings: WorkspaceSettingsIndex,
@@ -75,8 +75,8 @@ impl Index {
         }
 
         Ok(Self {
-            documents: FxHashMap::default(),
-            notebook_cells: FxHashMap::default(),
+            documents: HashMap::default(),
+            notebook_cells: HashMap::default(),
             settings,
         })
     }

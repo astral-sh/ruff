@@ -1,10 +1,10 @@
 use anyhow::{anyhow, bail, Result};
+use foldhash::{HashMap, HashMapExt, HashSetExt};
 use ruff_python_ast::name::Name;
 use ruff_python_ast::{
     self as ast, Arguments, CmpOp, Expr, ExprContext, Identifier, Keyword, Stmt, UnaryOp,
 };
 use ruff_text_size::TextRange;
-use rustc_hash::{FxBuildHasher, FxHashMap};
 
 /// An enum to represent the different types of assertions present in the
 /// `unittest` module. Note: any variants that can't be replaced with plain
@@ -230,7 +230,7 @@ impl UnittestAssert {
         &'a self,
         args: &'a [Expr],
         keywords: &'a [Keyword],
-    ) -> Result<FxHashMap<&'a str, &'a Expr>> {
+    ) -> Result<HashMap<&'a str, &'a Expr>> {
         // If we have variable-length arguments, abort.
         if args.iter().any(Expr::is_starred_expr) || keywords.iter().any(|kw| kw.arg.is_none()) {
             bail!("Variable-length arguments are not supported");
@@ -248,8 +248,8 @@ impl UnittestAssert {
         }
 
         // Generate a map from argument name to value.
-        let mut args_map: FxHashMap<&str, &Expr> =
-            FxHashMap::with_capacity_and_hasher(args.len() + keywords.len(), FxBuildHasher);
+        let mut args_map: HashMap<&str, &Expr> =
+            HashMap::with_capacity(args.len() + keywords.len());
 
         // Process positional arguments.
         for (arg_name, value) in arg_spec.iter().zip(args.iter()) {

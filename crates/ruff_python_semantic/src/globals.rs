@@ -4,9 +4,9 @@
 
 use std::ops::Index;
 
+use foldhash::HashMap;
 use ruff_python_ast::{self as ast, Stmt};
 use ruff_text_size::{Ranged, TextRange};
-use rustc_hash::FxHashMap;
 
 use ruff_index::{newtype_index, IndexVec};
 use ruff_python_ast::statement_visitor::{walk_stmt, StatementVisitor};
@@ -37,7 +37,7 @@ impl<'a> Index<GlobalsId> for GlobalsArena<'a> {
 /// The set of global names for a given scope, represented as a map from the name of the global to
 /// the range of the declaration in the source code.
 #[derive(Debug)]
-pub struct Globals<'a>(FxHashMap<&'a str, TextRange>);
+pub struct Globals<'a>(HashMap<&'a str, TextRange>);
 
 impl<'a> Globals<'a> {
     /// Extracts the set of global names from a given scope, or return `None` if the scope does not
@@ -59,11 +59,11 @@ impl<'a> Globals<'a> {
 
 /// Extracts the set of global names from a given scope.
 #[derive(Debug)]
-struct GlobalsVisitor<'a>(FxHashMap<&'a str, TextRange>);
+struct GlobalsVisitor<'a>(HashMap<&'a str, TextRange>);
 
 impl<'a> GlobalsVisitor<'a> {
     fn new() -> Self {
-        Self(FxHashMap::default())
+        Self(HashMap::default())
     }
 
     fn finish(self) -> Option<Globals<'a>> {

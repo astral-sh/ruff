@@ -9,9 +9,9 @@ use anyhow::{anyhow, bail};
 use clap::builder::{TypedValueParser, ValueParserFactory};
 use clap::{command, Parser};
 use colored::Colorize;
+use foldhash::HashMap;
 use path_absolutize::path_dedot;
 use regex::Regex;
-use rustc_hash::FxHashMap;
 use toml;
 
 use ruff_linter::line_width::LineLength;
@@ -1278,7 +1278,7 @@ impl ConfigurationTransformer for ExplicitConfigOverrides {
 
 /// Convert a list of `PatternPrefixPair` structs to `PerFileIgnore`.
 pub fn collect_per_file_ignores(pairs: Vec<PatternPrefixPair>) -> Vec<PerFileIgnore> {
-    let mut per_file_ignores: FxHashMap<String, Vec<RuleSelector>> = FxHashMap::default();
+    let mut per_file_ignores: HashMap<String, Vec<RuleSelector>> = HashMap::default();
     for pair in pairs {
         per_file_ignores
             .entry(pair.pattern)

@@ -2,7 +2,7 @@
 
 use std::fmt::{Display, Formatter};
 
-use rustc_hash::{FxHashMap, FxHashSet};
+use foldhash::{HashMap, HashSet};
 use serde::{Deserialize, Serialize};
 
 use ruff_macros::CacheKey;
@@ -60,24 +60,24 @@ impl FromIterator<String> for BannedAliases {
 
 #[derive(Debug, Clone, CacheKey)]
 pub struct Settings {
-    pub aliases: FxHashMap<String, String>,
-    pub banned_aliases: FxHashMap<String, BannedAliases>,
-    pub banned_from: FxHashSet<String>,
+    pub aliases: HashMap<String, String>,
+    pub banned_aliases: HashMap<String, BannedAliases>,
+    pub banned_from: HashSet<String>,
 }
 
-pub fn default_aliases() -> FxHashMap<String, String> {
+pub fn default_aliases() -> HashMap<String, String> {
     CONVENTIONAL_ALIASES
         .iter()
         .map(|(k, v)| ((*k).to_string(), (*v).to_string()))
-        .collect::<FxHashMap<_, _>>()
+        .collect::<HashMap<_, _>>()
 }
 
 impl Default for Settings {
     fn default() -> Self {
         Self {
             aliases: default_aliases(),
-            banned_aliases: FxHashMap::default(),
-            banned_from: FxHashSet::default(),
+            banned_aliases: HashMap::default(),
+            banned_from: HashSet::default(),
         }
     }
 }

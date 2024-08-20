@@ -1,5 +1,5 @@
+use foldhash::{HashMapExt, HashSet, HashSetExt};
 use itertools::Itertools;
-use rustc_hash::{FxBuildHasher, FxHashSet};
 
 use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, violation};
@@ -147,11 +147,9 @@ pub(crate) fn unnecessary_dict_kwargs(checker: &mut Checker, call: &ast::ExprCal
 
 /// Determine the set of keywords that appear in multiple positions (either directly, as in
 /// `func(x=1)`, or indirectly, as in `func(**{"x": 1})`).
-fn duplicates(call: &ast::ExprCall) -> FxHashSet<&str> {
-    let mut seen =
-        FxHashSet::with_capacity_and_hasher(call.arguments.keywords.len(), FxBuildHasher);
-    let mut duplicates =
-        FxHashSet::with_capacity_and_hasher(call.arguments.keywords.len(), FxBuildHasher);
+fn duplicates(call: &ast::ExprCall) -> HashSet<&str> {
+    let mut seen = HashSet::with_capacity(call.arguments.keywords.len());
+    let mut duplicates = HashSet::with_capacity(call.arguments.keywords.len());
     for keyword in &*call.arguments.keywords {
         if let Some(name) = &keyword.arg {
             if !seen.insert(name.as_str()) {

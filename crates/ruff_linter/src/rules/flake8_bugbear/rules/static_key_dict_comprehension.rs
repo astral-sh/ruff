@@ -1,4 +1,4 @@
-use rustc_hash::FxHashMap;
+use foldhash::HashMap;
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
@@ -70,7 +70,7 @@ pub(crate) fn static_key_dict_comprehension(checker: &mut Checker, dict_comp: &a
 
 /// Returns `true` if the given expression is a constant in the context of the dictionary
 /// comprehension.
-fn is_constant(key: &Expr, names: &FxHashMap<&str, &ast::ExprName>) -> bool {
+fn is_constant(key: &Expr, names: &HashMap<&str, &ast::ExprName>) -> bool {
     match key {
         Expr::Tuple(tuple) => tuple.iter().all(|elem| is_constant(elem, names)),
         Expr::Name(ast::ExprName { id, .. }) => !names.contains_key(id.as_str()),

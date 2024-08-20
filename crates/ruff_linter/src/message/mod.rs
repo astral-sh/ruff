@@ -3,7 +3,7 @@ use std::collections::BTreeMap;
 use std::io::Write;
 use std::ops::Deref;
 
-use rustc_hash::FxHashMap;
+use foldhash::HashMap;
 
 pub use azure::AzureEmitter;
 pub use github::GithubEmitter;
@@ -285,11 +285,11 @@ pub trait Emitter {
 
 /// Context passed to [`Emitter`].
 pub struct EmitterContext<'a> {
-    notebook_indexes: &'a FxHashMap<String, NotebookIndex>,
+    notebook_indexes: &'a HashMap<String, NotebookIndex>,
 }
 
 impl<'a> EmitterContext<'a> {
-    pub fn new(notebook_indexes: &'a FxHashMap<String, NotebookIndex>) -> Self {
+    pub fn new(notebook_indexes: &'a HashMap<String, NotebookIndex>) -> Self {
         Self { notebook_indexes }
     }
 
@@ -305,7 +305,7 @@ impl<'a> EmitterContext<'a> {
 
 #[cfg(test)]
 mod tests {
-    use rustc_hash::FxHashMap;
+    use foldhash::HashMap;
 
     use ruff_diagnostics::{Diagnostic, DiagnosticKind, Edit, Fix};
     use ruff_notebook::NotebookIndex;
@@ -399,7 +399,7 @@ def fibonacci(n):
         ]
     }
 
-    pub(super) fn create_notebook_messages() -> (Vec<Message>, FxHashMap<String, NotebookIndex>) {
+    pub(super) fn create_notebook_messages() -> (Vec<Message>, HashMap<String, NotebookIndex>) {
         let notebook = r"# cell 1
 import os
 # cell 2
@@ -453,7 +453,7 @@ def foo():
 
         let notebook_source = SourceFileBuilder::new("notebook.ipynb", notebook).finish();
 
-        let mut notebook_indexes = FxHashMap::default();
+        let mut notebook_indexes = HashMap::default();
         notebook_indexes.insert(
             "notebook.ipynb".to_string(),
             NotebookIndex::new(
@@ -510,7 +510,7 @@ def foo():
         emitter: &mut dyn Emitter,
         messages: &[Message],
     ) -> String {
-        let notebook_indexes = FxHashMap::default();
+        let notebook_indexes = HashMap::default();
         let context = EmitterContext::new(&notebook_indexes);
         let mut output: Vec<u8> = Vec::new();
         emitter.emit(&mut output, messages, &context).unwrap();
@@ -521,7 +521,7 @@ def foo():
     pub(super) fn capture_emitter_notebook_output(
         emitter: &mut dyn Emitter,
         messages: &[Message],
-        notebook_indexes: &FxHashMap<String, NotebookIndex>,
+        notebook_indexes: &HashMap<String, NotebookIndex>,
     ) -> String {
         let context = EmitterContext::new(notebook_indexes);
         let mut output: Vec<u8> = Vec::new();

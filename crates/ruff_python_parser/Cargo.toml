@@ -21,7 +21,7 @@ bitflags = { workspace = true }
 bstr = { workspace = true }
 compact_str = { workspace = true }
 memchr = { workspace = true }
-rustc-hash = { workspace = true }
+foldhash = { workspace = true }
 static_assertions = { workspace = true }
 unicode-ident = { workspace = true }
 unicode_names2 = { workspace = true }

@@ -1,7 +1,7 @@
+use foldhash::HashSet;
 use itertools::Itertools;
 use once_cell::sync::Lazy;
 use regex::Regex;
-use rustc_hash::FxHashSet;
 use std::ops::Add;
 
 use ruff_diagnostics::{AlwaysFixableViolation, Violation};
@@ -1779,13 +1779,13 @@ fn common_section(
     blanks_and_section_underline(checker, docstring, context);
 }
 
-fn missing_args(checker: &mut Checker, docstring: &Docstring, docstrings_args: &FxHashSet<String>) {
+fn missing_args(checker: &mut Checker, docstring: &Docstring, docstrings_args: &HashSet<String>) {
     let Some(function) = docstring.definition.as_function_def() else {
         return;
     };
 
     // Look for arguments that weren't included in the docstring.
-    let mut missing_arg_names: FxHashSet<String> = FxHashSet::default();
+    let mut missing_arg_names: HashSet<String> = HashSet::default();
 
     // If this is a non-static method, skip `cls` or `self`.
     for ParameterWithDefault {
@@ -1847,10 +1847,10 @@ fn missing_args(checker: &mut Checker, docstring: &Docstring, docstrings_args: &
 static GOOGLE_ARGS_REGEX: Lazy<Regex> =
     Lazy::new(|| Regex::new(r"^\s*(\*?\*?\w+)\s*(\(.*?\))?\s*:(\r\n|\n)?\s*.+").unwrap());
 
-fn args_section(context: &SectionContext) -> FxHashSet<String> {
+fn args_section(context: &SectionContext) -> HashSet<String> {
     let mut following_lines = context.following_lines().peekable();
     let Some(first_line) = following_lines.next() else {
-        return FxHashSet::default();
+        return HashSet::default();
     };
 
     // Normalize leading whitespace, by removing any lines with less indentation
@@ -1896,12 +1896,12 @@ fn args_section(context: &SectionContext) -> FxHashSet<String> {
     matches
         .iter()
         .filter_map(|captures| captures.get(1).map(|arg_name| arg_name.as_str().to_owned()))
-        .collect::<FxHashSet<String>>()
+        .collect::<HashSet<String>>()
 }
 
 fn parameters_section(checker: &mut Checker, docstring: &Docstring, context: &SectionContext) {
     // Collect the list of arguments documented in the docstring.
-    let mut docstring_args: FxHashSet<String> = FxHashSet::default();
+    let mut docstring_args: HashSet<String> = HashSet::default();
     let section_level_indent = leading_space(context.summary_line());
 
     // Join line continuations, then resplit by line.
@@ -2026,7 +2026,7 @@ fn parse_google_sections(
 
     if checker.enabled(Rule::UndocumentedParam) {
         let mut has_args = false;
-        let mut documented_args: FxHashSet<String> = FxHashSet::default();
+        let mut documented_args: HashSet<String> = HashSet::default();
         for section_context in section_contexts {
             // Checks occur at the section level. Since two sections (args/keyword args and their
             // variants) can list arguments, we need to unify the sets of arguments mentioned in both

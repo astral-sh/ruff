@@ -7,11 +7,11 @@ use std::time::Instant;
 
 use anyhow::Result;
 use colored::Colorize;
+use foldhash::HashSet;
 use itertools::Itertools;
 use log::{error, warn};
 use rayon::iter::Either::{Left, Right};
 use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
-use rustc_hash::FxHashSet;
 use thiserror::Error;
 use tracing::debug;
 
@@ -782,7 +782,7 @@ impl Display for FormatCommandError {
 
 pub(super) fn warn_incompatible_formatter_settings(resolver: &Resolver) {
     // First, collect all rules that are incompatible regardless of the linter-specific settings.
-    let mut incompatible_rules = FxHashSet::default();
+    let mut incompatible_rules = HashSet::default();
     for setting in resolver.settings() {
         for rule in [
             // The formatter might collapse implicit string concatenation on a single line.
