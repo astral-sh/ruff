@@ -1745,7 +1745,7 @@ impl<'a> SemanticModel<'a> {
 
     /// Return `true` if the model is in a type alias
     pub const fn in_type_alias(&self) -> bool {
-        self.in_explicit_type_alias() || self.in_generic_type_alias()
+        self.flags.intersects(SemanticModelFlags::TYPE_ALIAS)
     }
 
     /// Return `true` if the model is in an exception handler.
@@ -2342,6 +2342,9 @@ bitflags! {
         /// The context is in a typing-only context.
         const TYPING_CONTEXT = Self::TYPE_CHECKING_BLOCK.bits() | Self::TYPING_ONLY_ANNOTATION.bits() |
             Self::STRING_TYPE_DEFINITION.bits() | Self::TYPE_PARAM_DEFINITION.bits();
+
+        /// The context is in any type alias.
+        const TYPE_ALIAS = Self::EXPLICIT_TYPE_ALIAS.bits() | Self::GENERIC_TYPE_ALIAS.bits();
     }
 }
 

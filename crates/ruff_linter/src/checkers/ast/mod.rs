@@ -1967,6 +1967,21 @@ impl<'a> Checker<'a> {
             flags.insert(BindingFlags::UNPACKED_ASSIGNMENT);
         }
 
+        match parent {
+            Stmt::TypeAlias(_) => flags.insert(BindingFlags::GENERIC_TYPE_ALIAS),
+            Stmt::AnnAssign(ast::StmtAnnAssign { annotation, .. }) => {
+                // TODO: It is a bit unfortunate that we do this check twice
+                //       maybe we should change how we visit this statement
+                //       so the semantic flag for the type alias sticks around
+                //       until after we've handled this store, so we can check
+                //       the flag instead of duplicating this check
+                if self.semantic.match_typing_expr(annotation, "TypeAlias") {
+                    flags.insert(BindingFlags::EXPLICIT_TYPE_ALIAS);
+                }
+            }
+            _ => {}
+        }
+
         let scope = self.semantic.current_scope();
 
         if scope.kind.is_module()

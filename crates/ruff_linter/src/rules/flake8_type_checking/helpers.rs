@@ -266,6 +266,19 @@ pub(crate) fn quote_annotation(
         }
     }
 
+    quote_type_expression(expr, locator, stylist, generator)
+}
+/// Wrap a type expression in quotes.
+///
+/// This function assumes that the callee already expanded expression components
+/// to the minimum acceptable range for quoting, i.e. the parent node may not be
+/// a [`Expr::Subscript`], [`Expr::Attribute`], `[Expr::Call]` or `[Expr::BinOp]`.
+pub(crate) fn quote_type_expression(
+    expr: &Expr,
+    locator: &Locator,
+    stylist: &Stylist,
+    generator: Generator,
+) -> Result<Edit> {
     // If the annotation already contains a quote, avoid attempting to re-quote it. For example:
     // ```python
     // from typing import Literal

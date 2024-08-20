@@ -1,14 +1,15 @@
 use crate::registry::Rule;
 use ast::{ExprContext, Operator};
-use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
+use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast as ast;
-use ruff_python_ast::Expr;
-use ruff_python_semantic::SemanticModel;
-use ruff_text_size::TextRange;
+use ruff_python_ast::{Expr, Stmt};
+use ruff_python_semantic::{Binding, SemanticModel};
+use ruff_text_size::{Ranged, TextRange};
 use std::borrow::Borrow;
 
 use crate::checkers::ast::Checker;
+use crate::rules::flake8_type_checking::helpers::quote_type_expression;
 
 /// ## What it does
 /// Checks if [PEP 613] explicit type aliases contain references to
@@ -42,14 +43,16 @@ use crate::checkers::ast::Checker;
 #[violation]
 pub struct UnquotedTypeAlias;
 
-impl AlwaysFixableViolation for UnquotedTypeAlias {
+impl Violation for UnquotedTypeAlias {
+    const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
+
     #[derive_message_formats]
     fn message(&self) -> String {
         format!("Add quotes to type alias")
     }
 
-    fn fix_title(&self) -> String {
-        "Add quotes".to_string()
+    fn fix_title(&self) -> Option<String> {
+        Some("Add quotes".to_string())
     }
 }
 
@@ -112,27 +115,64 @@ impl AlwaysFixableViolation for QuotedTypeAlias {
 }
 
 /// TCH007
-/*pub(crate) fn unquoted_type_alias(checker: &mut Checker, expr: &Expr) {
-    if !checker.semantic().in_explicit_type_alias() {
-        return;
+pub(crate) fn unquoted_type_alias(checker: &Checker, binding: &Binding) -> Option<Vec<Diagnostic>> {
+    if binding.context.is_typing() {
+        return None;
     }
 
-    if checker.semantic().in_forward_reference() {
-        return;
+    if !binding.is_explicit_type_alias() {
+        return None;
     }
 
-    // TODO implement this
-}*/
+    let Some(Stmt::AnnAssign(ast::StmtAnnAssign {
+        value: Some(expr), ..
+    })) = binding.statement(checker.semantic())
+    else {
+        return None;
+    };
 
-/// Traverses the type expression and checks the given predicate for each [`Binding`]
-// TODO: Do we want to remove Attribute and Subscript traversal? We already
-//       skip expressions that don't contain either. But then we can't reuse
-//       this function for TCH007. Is it worth having two functions where one
-//       has fewer branches because we know they won't be there?
-fn contains_typing_reference(semantic: &SemanticModel, expr: &Expr) -> bool {
+    let mut names = Vec::new();
+    collect_typing_references(checker.semantic(), expr, &mut names);
+    if !names.is_empty() {
+        // We generate a diagnostic for every name that needs to be quoted
+        // but we currently emit a single shared fix that quotes the entire
+        // expression.
+        //
+        // Eventually we may try to be more clever and come up with the
+        // minimal set of subexpressions that need to be quoted.
+        let parent = expr.range().start();
+        let edit = quote_type_expression(
+            expr,
+            checker.locator(),
+            checker.stylist(),
+            checker.generator(),
+        )
+        .ok();
+        let mut diagnostics = Vec::with_capacity(names.len());
+        for name in names {
+            let mut diagnostic = Diagnostic::new(UnquotedTypeAlias, name.range());
+            diagnostic.set_parent(parent);
+            if let Some(edit) = edit.as_ref() {
+                diagnostic.set_fix(Fix::unsafe_edit(edit.clone()));
+            }
+            diagnostics.push(diagnostic);
+        }
+        return Some(diagnostics);
+    }
+    None
+}
+
+/// Traverses the type expression and collects `[Expr::Name]` nodes that are
+/// not available at runtime and thus need to be quoted.
+fn collect_typing_references<'a>(
+    semantic: &SemanticModel,
+    expr: &'a Expr,
+    names: &mut Vec<&'a ast::ExprName>,
+) {
     match expr {
         Expr::BinOp(ast::ExprBinOp { left, right, .. }) => {
-            contains_typing_reference(semantic, left) || contains_typing_reference(semantic, right)
+            collect_typing_references(semantic, left, names);
+            collect_typing_references(semantic, right, names);
         }
         Expr::Starred(ast::ExprStarred {
             value,
@@ -140,32 +180,29 @@ fn contains_typing_reference(semantic: &SemanticModel, expr: &Expr) -> bool {
             ..
         })
         | Expr::Attribute(ast::ExprAttribute { value, .. }) => {
-            contains_typing_reference(semantic, value)
+            collect_typing_references(semantic, value, names);
         }
         Expr::Subscript(ast::ExprSubscript { value, slice, .. }) => {
-            if contains_typing_reference(semantic, value) {
-                return true;
-            }
+            collect_typing_references(semantic, value, names);
             if let Expr::Name(ast::ExprName { id, .. }) = value.borrow() {
                 if id.as_str() != "Literal" {
-                    return contains_typing_reference(semantic, slice);
+                    collect_typing_references(semantic, slice, names);
                 }
             }
-            false
         }
         Expr::List(ast::ExprList { elts, .. }) | Expr::Tuple(ast::ExprTuple { elts, .. }) => {
             for elt in elts {
-                if contains_typing_reference(semantic, elt) {
-                    return true;
-                }
+                collect_typing_references(semantic, elt, names);
             }
-            false
         }
         Expr::Name(name) => {
-            semantic.lookup_symbol(name.id.as_str()).is_some()
+            if semantic.resolve_name(name).is_some()
                 && semantic.simulate_runtime_load(name).is_none()
+            {
+                names.push(name);
+            }
         }
-        _ => false,
+        _ => {}
     }
 }
 
@@ -188,17 +225,10 @@ pub(crate) fn quoted_type_alias(
     }
 
     // explicit type aliases require some additional checks to avoid false positives
-    if checker.semantic().in_explicit_type_alias() {
-        // if the expression contains a subscript or attribute access
-        if annotation.find(|c: char| c == '[' || c == '.').is_some() {
-            return;
-        }
-
-        // if the expression contains references to typing-only bindings
-        // then the quotes are not redundant
-        if contains_typing_reference(checker.semantic(), expr) {
-            return;
-        }
+    if checker.semantic().in_explicit_type_alias()
+        && quotes_are_unremovable(checker.semantic(), expr)
+    {
+        return;
     }
 
     let mut diagnostic = Diagnostic::new(QuotedTypeAlias, range);
@@ -207,4 +237,36 @@ pub(crate) fn quoted_type_alias(
         range,
     )));
     checker.diagnostics.push(diagnostic);
+}
+
+/// Traverses the type expression and checks if the expression can safely
+/// be unquoted
+fn quotes_are_unremovable(semantic: &SemanticModel, expr: &Expr) -> bool {
+    match expr {
+        Expr::BinOp(ast::ExprBinOp { left, right, .. }) => {
+            quotes_are_unremovable(semantic, left) || quotes_are_unremovable(semantic, right)
+        }
+        Expr::Starred(ast::ExprStarred {
+            value,
+            ctx: ExprContext::Load,
+            ..
+        }) => quotes_are_unremovable(semantic, value),
+        // for subscripts and attributes we don't know whether it's safe
+        // to do at runtime, since the operation may only be available at
+        // type checking time. E.g. stubs only generics. Or stubs only
+        // type aliases.
+        Expr::Subscript(_) | Expr::Attribute(_) => true,
+        Expr::List(ast::ExprList { elts, .. }) | Expr::Tuple(ast::ExprTuple { elts, .. }) => {
+            for elt in elts {
+                if quotes_are_unremovable(semantic, elt) {
+                    return true;
+                }
+            }
+            false
+        }
+        Expr::Name(name) => {
+            semantic.resolve_name(name).is_some() && semantic.simulate_runtime_load(name).is_none()
+        }
+        _ => false,
+    }
 }

@@ -136,6 +136,21 @@ impl<'a> Binding<'a> {
         self.flags.contains(BindingFlags::IN_EXCEPT_HANDLER)
     }
 
+    /// Return `true` if this [`Binding`] represents an explicit type alias
+    pub const fn is_explicit_type_alias(&self) -> bool {
+        self.flags.intersects(BindingFlags::EXPLICIT_TYPE_ALIAS)
+    }
+
+    /// Return `true` if this [`Binding`] represents a generic type alias
+    pub const fn is_generic_type_alias(&self) -> bool {
+        self.flags.intersects(BindingFlags::GENERIC_TYPE_ALIAS)
+    }
+
+    /// Return `true` if this [`Binding`] represents a type alias
+    pub const fn is_type_alias(&self) -> bool {
+        self.flags.intersects(BindingFlags::TYPE_ALIAS)
+    }
+
     /// Return `true` if this binding "redefines" the given binding, as per Pyflake's definition of
     /// redefinition.
     pub fn redefines(&self, existing: &Binding) -> bool {
@@ -377,6 +392,19 @@ bitflags! {
         ///     y = 42
         /// ```
         const IN_EXCEPT_HANDLER = 1 << 10;
+
+        /// The binding represents a [PEP 613] explicit type alias.
+        ///
+        /// [PEP 613]: https://peps.python.org/pep-0613/
+        const EXPLICIT_TYPE_ALIAS = 1 << 11;
+
+        /// The binding represents a [PEP 695] type statement
+        ///
+        /// [PEP 695]: https://peps.python.org/pep-0695/#generic-type-alias
+        const GENERIC_TYPE_ALIAS = 1 << 12;
+
+        /// The binding represents any type alias.
+        const TYPE_ALIAS = Self::EXPLICIT_TYPE_ALIAS.bits() | Self::GENERIC_TYPE_ALIAS.bits();
     }
 }
 
