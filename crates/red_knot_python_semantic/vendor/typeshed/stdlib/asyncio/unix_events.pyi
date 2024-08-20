@@ -159,7 +159,7 @@ if sys.platform != "win32":
 
     class _UnixSelectorEventLoop(BaseSelectorEventLoop):
         if sys.version_info >= (3, 13):
-            async def create_unix_server(  # type: ignore[override]
+            async def create_unix_server(
                 self,
                 protocol_factory: _ProtocolFactory,
                 path: StrPath | None = None,

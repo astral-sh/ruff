@@ -1,4 +1,4 @@
-use ruff_python_ast::{self as ast, Expr, ExprLambda};
+use ruff_python_ast::{Expr, ExprLambda};
 
 use ruff_diagnostics::{Diagnostic, Edit, Fix};
 use ruff_diagnostics::{FixAvailability, Violation};
@@ -70,8 +70,8 @@ pub(crate) fn reimplemented_container_builtin(checker: &mut Checker, expr: &Expr
     }
 
     let container = match &**body {
-        Expr::List(ast::ExprList { elts, .. }) if elts.is_empty() => Container::List,
-        Expr::Dict(ast::ExprDict { items, .. }) if items.is_empty() => Container::Dict,
+        Expr::List(list) if list.is_empty() => Container::List,
+        Expr::Dict(dict) if dict.is_empty() => Container::Dict,
         _ => return,
     };
     let mut diagnostic = Diagnostic::new(ReimplementedContainerBuiltin { container }, expr.range());

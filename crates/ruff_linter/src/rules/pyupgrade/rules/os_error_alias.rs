@@ -98,22 +98,20 @@ fn tuple_diagnostic(checker: &mut Checker, tuple: &ast::ExprTuple, aliases: &[&E
     if semantic.has_builtin_binding("OSError") {
         // Filter out any `OSErrors` aliases.
         let mut remaining: Vec<Expr> = tuple
-            .elts
             .iter()
-            .filter_map(|elt| {
-                if aliases.contains(&elt) {
+            .filter_map(|element| {
+                if aliases.contains(&element) {
                     None
                 } else {
-                    Some(elt.clone())
+                    Some(element.clone())
                 }
             })
             .collect();
 
         // If `OSError` itself isn't already in the tuple, add it.
         if tuple
-            .elts
             .iter()
-            .all(|elt| !semantic.match_builtin_expr(elt, "OSError"))
+            .all(|elem| !semantic.match_builtin_expr(elem, "OSError"))
         {
             let node = ast::ExprName {
                 id: Name::new_static("OSError"),
@@ -159,9 +157,9 @@ pub(crate) fn os_error_alias_handlers(checker: &mut Checker, handlers: &[ExceptH
             Expr::Tuple(tuple) => {
                 // List of aliases to replace with `OSError`.
                 let mut aliases: Vec<&Expr> = vec![];
-                for elt in &tuple.elts {
-                    if is_alias(elt, checker.semantic()) {
-                        aliases.push(elt);
+                for element in tuple {
+                    if is_alias(element, checker.semantic()) {
+                        aliases.push(element);
                     }
                 }
                 if !aliases.is_empty() {

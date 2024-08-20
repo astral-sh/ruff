@@ -1,14 +1,15 @@
 import sys
 from _typeshed import FileDescriptorOrPath
 from collections.abc import Callable
+from typing import Final
 from xml.etree.ElementTree import Element
 
-XINCLUDE: str
-XINCLUDE_INCLUDE: str
-XINCLUDE_FALLBACK: str
+XINCLUDE: Final[str]
+XINCLUDE_INCLUDE: Final[str]
+XINCLUDE_FALLBACK: Final[str]
 
 if sys.version_info >= (3, 9):
-    DEFAULT_MAX_INCLUSION_DEPTH: int
+    DEFAULT_MAX_INCLUSION_DEPTH: Final = 6
 
 class FatalIncludeError(SyntaxError): ...
 

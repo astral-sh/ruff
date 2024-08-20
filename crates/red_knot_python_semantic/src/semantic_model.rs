@@ -1,6 +1,8 @@
-use ruff_db::files::File;
+use ruff_db::files::{File, FilePath};
+use ruff_db::source::line_index;
 use ruff_python_ast as ast;
-use ruff_python_ast::{Expr, ExpressionRef, StmtClassDef};
+use ruff_python_ast::{Expr, ExpressionRef};
+use ruff_source_file::LineIndex;
 
 use crate::module_name::ModuleName;
 use crate::module_resolver::{resolve_module, Module};
@@ -23,6 +25,14 @@ impl<'db> SemanticModel<'db> {
     // solution for exposing information from types
     pub fn db(&self) -> &dyn Db {
         self.db
+    }
+
+    pub fn file_path(&self) -> &FilePath {
+        self.file.path(self.db)
+    }
+
+    pub fn line_index(&self) -> LineIndex {
+        line_index(self.db.upcast(), self.file)
     }
 
     pub fn resolve_module(&self, module_name: ModuleName) -> Option<Module> {
@@ -137,29 +147,24 @@ impl HasTy for ast::Expr {
     }
 }
 
-impl HasTy for ast::StmtFunctionDef {
-    fn ty<'db>(&self, model: &SemanticModel<'db>) -> Type<'db> {
-        let index = semantic_index(model.db, model.file);
-        let definition = index.definition(self);
-        definition_ty(model.db, definition)
-    }
+macro_rules! impl_definition_has_ty {
+    ($ty: ty) => {
+        impl HasTy for $ty {
+            #[inline]
+            fn ty<'db>(&self, model: &SemanticModel<'db>) -> Type<'db> {
+                let index = semantic_index(model.db, model.file);
+                let definition = index.definition(self);
+                definition_ty(model.db, definition)
+            }
+        }
+    };
 }
 
-impl HasTy for StmtClassDef {
-    fn ty<'db>(&self, model: &SemanticModel<'db>) -> Type<'db> {
-        let index = semantic_index(model.db, model.file);
-        let definition = index.definition(self);
-        definition_ty(model.db, definition)
-    }
-}
-
-impl HasTy for ast::Alias {
-    fn ty<'db>(&self, model: &SemanticModel<'db>) -> Type<'db> {
-        let index = semantic_index(model.db, model.file);
-        let definition = index.definition(self);
-        definition_ty(model.db, definition)
-    }
-}
+impl_definition_has_ty!(ast::StmtFunctionDef);
+impl_definition_has_ty!(ast::StmtClassDef);
+impl_definition_has_ty!(ast::Alias);
+impl_definition_has_ty!(ast::Parameter);
+impl_definition_has_ty!(ast::ParameterWithDefault);
 
 #[cfg(test)]
 mod tests {
@@ -171,29 +176,32 @@ mod tests {
     use crate::program::{Program, SearchPathSettings};
     use crate::python_version::PythonVersion;
     use crate::types::Type;
-    use crate::{HasTy, SemanticModel};
+    use crate::{HasTy, ProgramSettings, SemanticModel};
 
-    fn setup_db() -> TestDb {
-        let db = TestDb::new();
-        Program::new(
+    fn setup_db<'a>(files: impl IntoIterator<Item = (&'a str, &'a str)>) -> anyhow::Result<TestDb> {
+        let mut db = TestDb::new();
+        db.write_files(files)?;
+
+        Program::from_settings(
             &db,
-            PythonVersion::default(),
-            SearchPathSettings {
-                extra_paths: vec![],
-                src_root: SystemPathBuf::from("/src"),
-                site_packages: vec![],
-                custom_typeshed: None,
+            ProgramSettings {
+                target_version: PythonVersion::default(),
+                search_paths: SearchPathSettings {
+                    extra_paths: vec![],
+                    src_root: SystemPathBuf::from("/src"),
+                    site_packages: vec![],
+                    custom_typeshed: None,
+                },
             },
-        );
+        )?;
 
-        db
+        Ok(db)
     }
 
     #[test]
     fn function_ty() -> anyhow::Result<()> {
-        let mut db = setup_db();
+        let db = setup_db([("/src/foo.py", "def test(): pass")])?;
 
-        db.write_file("/src/foo.py", "def test(): pass")?;
         let foo = system_path_to_file(&db, "/src/foo.py").unwrap();
 
         let ast = parsed_module(&db, foo);
@@ -209,9 +217,8 @@ mod tests {
 
     #[test]
     fn class_ty() -> anyhow::Result<()> {
-        let mut db = setup_db();
+        let db = setup_db([("/src/foo.py", "class Test: pass")])?;
 
-        db.write_file("/src/foo.py", "class Test: pass")?;
         let foo = system_path_to_file(&db, "/src/foo.py").unwrap();
 
         let ast = parsed_module(&db, foo);
@@ -227,12 +234,11 @@ mod tests {
 
     #[test]
     fn alias_ty() -> anyhow::Result<()> {
-        let mut db = setup_db();
-
-        db.write_files([
+        let db = setup_db([
             ("/src/foo.py", "class Test: pass"),
             ("/src/bar.py", "from foo import Test"),
         ])?;
+
         let bar = system_path_to_file(&db, "/src/bar.py").unwrap();
 
         let ast = parsed_module(&db, bar);

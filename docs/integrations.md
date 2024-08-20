@@ -59,7 +59,7 @@ Alternatively, you can include `ruff-action` as a step in any other workflow fil
 
 - `version`: The Ruff version to install (default: latest).
 - `args`: The command-line arguments to pass to Ruff (default: `"check"`).
-- `src`: The source paths to pass to Ruff (default: `"."`).
+- `src`: The source paths to pass to Ruff (default: `[".", "src"]`).
 
 For example, to run `ruff check --select B ./src` using Ruff version `0.0.259`:
 
@@ -78,7 +78,7 @@ Ruff can be used as a [pre-commit](https://pre-commit.com) hook via [`ruff-pre-c
 ```yaml
 - repo: https://github.com/astral-sh/ruff-pre-commit
   # Ruff version.
-  rev: v0.5.7
+  rev: v0.6.1
   hooks:
     # Run the linter.
     - id: ruff
@@ -91,7 +91,7 @@ To enable lint fixes, add the `--fix` argument to the lint hook:
 ```yaml
 - repo: https://github.com/astral-sh/ruff-pre-commit
   # Ruff version.
-  rev: v0.5.7
+  rev: v0.6.1
   hooks:
     # Run the linter.
     - id: ruff
@@ -105,7 +105,7 @@ To run the hooks over Jupyter Notebooks too, add `jupyter` to the list of allowe
 ```yaml
 - repo: https://github.com/astral-sh/ruff-pre-commit
   # Ruff version.
-  rev: v0.5.7
+  rev: v0.6.1
   hooks:
     # Run the linter.
     - id: ruff

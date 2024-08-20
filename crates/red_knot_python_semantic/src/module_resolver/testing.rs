@@ -4,6 +4,7 @@ use ruff_db::vendored::VendoredPathBuf;
 use crate::db::tests::TestDb;
 use crate::program::{Program, SearchPathSettings};
 use crate::python_version::PythonVersion;
+use crate::ProgramSettings;
 
 /// A test case for the module resolver.
 ///
@@ -220,16 +221,19 @@ impl TestCaseBuilder<MockedTypeshed> {
         let src = Self::write_mock_directory(&mut db, "/src", first_party_files);
         let typeshed = Self::build_typeshed_mock(&mut db, &typeshed_option);
 
-        Program::new(
+        Program::from_settings(
             &db,
-            target_version,
-            SearchPathSettings {
-                extra_paths: vec![],
-                src_root: src.clone(),
-                custom_typeshed: Some(typeshed.clone()),
-                site_packages: vec![site_packages.clone()],
+            ProgramSettings {
+                target_version,
+                search_paths: SearchPathSettings {
+                    extra_paths: vec![],
+                    src_root: src.clone(),
+                    custom_typeshed: Some(typeshed.clone()),
+                    site_packages: vec![site_packages.clone()],
+                },
             },
-        );
+        )
+        .expect("Valid program settings");
 
         TestCase {
             db,
@@ -273,16 +277,19 @@ impl TestCaseBuilder<VendoredTypeshed> {
             Self::write_mock_directory(&mut db, "/site-packages", site_packages_files);
         let src = Self::write_mock_directory(&mut db, "/src", first_party_files);
 
-        Program::new(
+        Program::from_settings(
             &db,
-            target_version,
-            SearchPathSettings {
-                extra_paths: vec![],
-                src_root: src.clone(),
-                custom_typeshed: None,
-                site_packages: vec![site_packages.clone()],
+            ProgramSettings {
+                target_version,
+                search_paths: SearchPathSettings {
+                    extra_paths: vec![],
+                    src_root: src.clone(),
+                    custom_typeshed: None,
+                    site_packages: vec![site_packages.clone()],
+                },
             },
-        );
+        )
+        .expect("Valid search path settings");
 
         TestCase {
             db,

@@ -17,5 +17,5 @@ fn check() {
 
     let result = workspace.check_file(&test).expect("Check to succeed");
 
-    assert_eq!(result, vec!["Unresolved import 'random22'"]);
+    assert_eq!(result, vec!["/test.py:1:8: Unresolved import 'random22'"]);
 }

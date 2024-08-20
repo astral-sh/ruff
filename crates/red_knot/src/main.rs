@@ -184,7 +184,7 @@ fn run() -> anyhow::Result<ExitStatus> {
 
     // TODO: Use the `program_settings` to compute the key for the database's persistent
     //   cache and load the cache if it exists.
-    let mut db = RootDatabase::new(workspace_metadata, program_settings, system);
+    let mut db = RootDatabase::new(workspace_metadata, program_settings, system)?;
 
     let (main_loop, main_loop_cancellation_token) = MainLoop::new();
 

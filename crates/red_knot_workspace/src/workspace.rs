@@ -1,9 +1,10 @@
-use salsa::{Durability, Setter as _};
 use std::{collections::BTreeMap, sync::Arc};
 
 use rustc_hash::{FxBuildHasher, FxHashSet};
+use salsa::{Durability, Setter as _};
 
 pub use metadata::{PackageMetadata, WorkspaceMetadata};
+use ruff_db::source::{source_text, SourceDiagnostic};
 use ruff_db::{
     files::{system_path_to_file, File},
     system::{walk_directory::WalkState, SystemPath, SystemPathBuf},
@@ -345,12 +346,27 @@ impl Package {
     }
 }
 
+#[salsa::tracked]
 pub(super) fn check_file(db: &dyn Db, file: File) -> Diagnostics {
     let path = file.path(db);
     let _span = tracing::debug_span!("check_file", file=%path).entered();
     tracing::debug!("Checking file {path}");
 
     let mut diagnostics = Vec::new();
+
+    let source_diagnostics = source_text::accumulated::<SourceDiagnostic>(db.upcast(), file);
+    // TODO(micha): Consider using a single accumulator for all diagnostics
+    diagnostics.extend(
+        source_diagnostics
+            .iter()
+            .map(std::string::ToString::to_string),
+    );
+
+    // Abort checking if there are IO errors.
+    if source_text(db.upcast(), file).has_read_error() {
+        return Diagnostics::from(diagnostics);
+    }
+
     diagnostics.extend_from_slice(lint_syntax(db, file));
     diagnostics.extend_from_slice(lint_semantic(db, file));
     Diagnostics::from(diagnostics)
@@ -397,4 +413,49 @@ fn discover_package_files(db: &dyn Db, path: &SystemPath) -> FxHashSet<File> {
     }
 
     files
+}
+
+#[cfg(test)]
+mod tests {
+    use ruff_db::files::system_path_to_file;
+    use ruff_db::source::source_text;
+    use ruff_db::system::{DbWithTestSystem, SystemPath};
+    use ruff_db::testing::assert_function_query_was_not_run;
+
+    use crate::db::tests::TestDb;
+    use crate::lint::{lint_syntax, Diagnostics};
+    use crate::workspace::check_file;
+
+    #[test]
+    fn check_file_skips_linting_when_file_cant_be_read() -> ruff_db::system::Result<()> {
+        let mut db = TestDb::new();
+        let path = SystemPath::new("test.py");
+
+        db.write_file(path, "x = 10")?;
+        let file = system_path_to_file(&db, path).unwrap();
+
+        // Now the file gets deleted before we had a chance to read its source text.
+        db.memory_file_system().remove_file(path)?;
+        file.sync(&mut db);
+
+        assert_eq!(source_text(&db, file).as_str(), "");
+        assert_eq!(
+            check_file(&db, file),
+            Diagnostics::List(vec![
+                "Failed to read file: No such file or directory".to_string()
+            ])
+        );
+
+        let events = db.take_salsa_events();
+        assert_function_query_was_not_run(&db, lint_syntax, file, &events);
+
+        // The user now creates a new file with an empty text. The source text
+        // content returned by `source_text` remains unchanged, but the diagnostics should get updated.
+        db.write_file(path, "").unwrap();
+
+        assert_eq!(source_text(&db, file).as_str(), "");
+        assert_eq!(check_file(&db, file), Diagnostics::Empty);
+
+        Ok(())
+    }
 }

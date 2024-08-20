@@ -49,7 +49,8 @@ impl Workspace {
             search_paths: SearchPathSettings::default(),
         };
 
-        let db = RootDatabase::new(workspace, program_settings, system.clone());
+        let db =
+            RootDatabase::new(workspace, program_settings, system.clone()).map_err(into_error)?;
 
         Ok(Self { db, system })
     }

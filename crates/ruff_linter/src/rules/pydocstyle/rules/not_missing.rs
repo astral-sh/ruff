@@ -53,6 +53,9 @@ use crate::registry::Rule;
 /// def calculate_speed(distance: float, time: float) -> float: ...
 /// ```
 ///
+/// ## Notebook behavior
+/// This rule is ignored for Jupyter Notebooks.
+///
 /// ## References
 /// - [PEP 257 – Docstring Conventions](https://peps.python.org/pep-0257/)
 /// - [PEP 287 – reStructuredText Docstring Format](https://peps.python.org/pep-0287/)

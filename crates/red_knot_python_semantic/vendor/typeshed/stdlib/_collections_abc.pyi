@@ -1,13 +1,12 @@
 import sys
 from abc import abstractmethod
 from types import MappingProxyType
-from typing import (  # noqa: Y022,Y038,Y057
+from typing import (  # noqa: Y022,Y038
     AbstractSet as Set,
     AsyncGenerator as AsyncGenerator,
     AsyncIterable as AsyncIterable,
     AsyncIterator as AsyncIterator,
     Awaitable as Awaitable,
-    ByteString as ByteString,
     Callable as Callable,
     Collection as Collection,
     Container as Container,
@@ -59,8 +58,12 @@ __all__ = [
     "ValuesView",
     "Sequence",
     "MutableSequence",
-    "ByteString",
 ]
+if sys.version_info < (3, 14):
+    from typing import ByteString as ByteString  # noqa: Y057
+
+    __all__ += ["ByteString"]
+
 if sys.version_info >= (3, 12):
     __all__ += ["Buffer"]
 

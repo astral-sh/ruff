@@ -691,6 +691,14 @@ impl<'a> Visitor<'a> for Checker<'a> {
                         self.semantic(),
                     );
 
+                // The default values of the parameters needs to be evaluated in the enclosing
+                // scope.
+                for parameter in &**parameters {
+                    if let Some(expr) = parameter.default() {
+                        self.visit_expr(expr);
+                    }
+                }
+
                 self.semantic.push_scope(ScopeKind::Type);
 
                 if let Some(type_params) = type_params {
@@ -714,9 +722,6 @@ impl<'a> Visitor<'a> for Checker<'a> {
                                 }
                             }
                         }
-                    }
-                    if let Some(expr) = parameter.default() {
-                        self.visit_expr(expr);
                     }
                 }
                 if let Some(expr) = returns {
@@ -1290,8 +1295,8 @@ impl<'a> Visitor<'a> for Checker<'a> {
                             let Keyword { arg, value, .. } = keyword;
                             match (arg.as_ref(), value) {
                                 // Ex) NamedTuple("a", **{"a": int})
-                                (None, Expr::Dict(ast::ExprDict { items, .. })) => {
-                                    for ast::DictItem { key, value } in items {
+                                (None, Expr::Dict(dict)) => {
+                                    for ast::DictItem { key, value } in dict {
                                         if let Some(key) = key.as_ref() {
                                             self.visit_non_type_definition(key);
                                             self.visit_type_definition(value);

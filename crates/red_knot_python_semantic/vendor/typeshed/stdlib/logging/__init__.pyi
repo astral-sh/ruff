@@ -55,10 +55,9 @@ __all__ = [
     "setLogRecordFactory",
     "lastResort",
     "raiseExceptions",
+    "warn",
 ]
 
-if sys.version_info < (3, 13):
-    __all__ += ["warn"]
 if sys.version_info >= (3, 11):
     __all__ += ["getLevelNamesMapping"]
 if sys.version_info >= (3, 12):
@@ -157,17 +156,16 @@ class Logger(Filterer):
         stacklevel: int = 1,
         extra: Mapping[str, object] | None = None,
     ) -> None: ...
-    if sys.version_info < (3, 13):
-        def warn(
-            self,
-            msg: object,
-            *args: object,
-            exc_info: _ExcInfoType = None,
-            stack_info: bool = False,
-            stacklevel: int = 1,
-            extra: Mapping[str, object] | None = None,
-        ) -> None: ...
-
+    @deprecated("Deprecated; use warning() instead.")
+    def warn(
+        self,
+        msg: object,
+        *args: object,
+        exc_info: _ExcInfoType = None,
+        stack_info: bool = False,
+        stacklevel: int = 1,
+        extra: Mapping[str, object] | None = None,
+    ) -> None: ...
     def error(
         self,
         msg: object,
@@ -412,18 +410,17 @@ class LoggerAdapter(Generic[_L]):
         extra: Mapping[str, object] | None = None,
         **kwargs: object,
     ) -> None: ...
-    if sys.version_info < (3, 13):
-        def warn(
-            self,
-            msg: object,
-            *args: object,
-            exc_info: _ExcInfoType = None,
-            stack_info: bool = False,
-            stacklevel: int = 1,
-            extra: Mapping[str, object] | None = None,
-            **kwargs: object,
-        ) -> None: ...
-
+    @deprecated("Deprecated; use warning() instead.")
+    def warn(
+        self,
+        msg: object,
+        *args: object,
+        exc_info: _ExcInfoType = None,
+        stack_info: bool = False,
+        stacklevel: int = 1,
+        extra: Mapping[str, object] | None = None,
+        **kwargs: object,
+    ) -> None: ...
     def error(
         self,
         msg: object,
@@ -523,17 +520,15 @@ def warning(
     stacklevel: int = 1,
     extra: Mapping[str, object] | None = None,
 ) -> None: ...
-
-if sys.version_info < (3, 13):
-    def warn(
-        msg: object,
-        *args: object,
-        exc_info: _ExcInfoType = None,
-        stack_info: bool = False,
-        stacklevel: int = 1,
-        extra: Mapping[str, object] | None = None,
-    ) -> None: ...
-
+@deprecated("Deprecated; use warning() instead.")
+def warn(
+    msg: object,
+    *args: object,
+    exc_info: _ExcInfoType = None,
+    stack_info: bool = False,
+    stacklevel: int = 1,
+    extra: Mapping[str, object] | None = None,
+) -> None: ...
 def error(
     msg: object,
     *args: object,

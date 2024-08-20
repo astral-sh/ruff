@@ -136,7 +136,7 @@ fn start_is_empty_list(arguments: &Arguments, semantic: &SemanticModel) -> bool 
         Expr::Call(ast::ExprCall {
             func, arguments, ..
         }) => arguments.is_empty() && semantic.match_builtin_expr(func, "list"),
-        Expr::List(ast::ExprList { elts, ctx, .. }) => elts.is_empty() && ctx.is_load(),
+        Expr::List(list) => list.is_empty() && list.ctx.is_load(),
         _ => false,
     }
 }

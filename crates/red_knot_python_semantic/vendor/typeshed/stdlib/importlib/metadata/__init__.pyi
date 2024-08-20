@@ -155,7 +155,7 @@ if sys.version_info >= (3, 10) and sys.version_info < (3, 12):
         @property
         def names(self) -> set[str]: ...
         @overload
-        def select(self) -> Self: ...  # type: ignore[misc]
+        def select(self) -> Self: ...
         @overload
         def select(
             self,
@@ -277,7 +277,7 @@ if sys.version_info >= (3, 12):
 
 elif sys.version_info >= (3, 10):
     @overload
-    def entry_points() -> SelectableGroups: ...  # type: ignore[overload-overlap]
+    def entry_points() -> SelectableGroups: ...
     @overload
     def entry_points(
         *, name: str = ..., value: str = ..., group: str = ..., module: str = ..., attr: str = ..., extras: list[str] = ...

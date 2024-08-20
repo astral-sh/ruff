@@ -7,14 +7,15 @@ use ruff_db::parsed::ParsedModule;
 use ruff_index::IndexVec;
 use ruff_python_ast as ast;
 use ruff_python_ast::name::Name;
-use ruff_python_ast::visitor::{walk_expr, walk_stmt, Visitor};
+use ruff_python_ast::visitor::{walk_expr, walk_pattern, walk_stmt, Visitor};
+use ruff_python_ast::AnyParameterRef;
 
 use crate::ast_node_ref::AstNodeRef;
 use crate::semantic_index::ast_ids::node_key::ExpressionNodeKey;
 use crate::semantic_index::ast_ids::AstIdsBuilder;
 use crate::semantic_index::definition::{
-    AssignmentDefinitionNodeRef, Definition, DefinitionNodeKey, DefinitionNodeRef,
-    ImportFromDefinitionNodeRef,
+    AssignmentDefinitionNodeRef, ComprehensionDefinitionNodeRef, Definition, DefinitionNodeKey,
+    DefinitionNodeRef, ImportFromDefinitionNodeRef,
 };
 use crate::semantic_index::expression::Expression;
 use crate::semantic_index::symbol::{
@@ -155,7 +156,7 @@ impl<'db> SemanticIndexBuilder<'db> {
         self.current_use_def_map_mut().restore(state);
     }
 
-    fn flow_merge(&mut self, state: &FlowSnapshot) {
+    fn flow_merge(&mut self, state: FlowSnapshot) {
         self.current_use_def_map_mut().merge(state);
     }
 
@@ -174,7 +175,7 @@ impl<'db> SemanticIndexBuilder<'db> {
         symbol: ScopedSymbolId,
         definition_node: impl Into<DefinitionNodeRef<'a>>,
     ) -> Definition<'db> {
-        let definition_node = definition_node.into();
+        let definition_node: DefinitionNodeRef<'_> = definition_node.into();
         let definition = Definition::new(
             self.db,
             self.file,
@@ -195,9 +196,16 @@ impl<'db> SemanticIndexBuilder<'db> {
         definition
     }
 
+    fn add_constraint(&mut self, constraint_node: &ast::Expr) -> Expression<'db> {
+        let expression = self.add_standalone_expression(constraint_node);
+        self.current_use_def_map_mut().record_constraint(expression);
+
+        expression
+    }
+
     /// Record an expression that needs to be a Salsa ingredient, because we need to infer its type
     /// standalone (type narrowing tests, RHS of an assignment.)
-    fn add_standalone_expression(&mut self, expression_node: &ast::Expr) {
+    fn add_standalone_expression(&mut self, expression_node: &ast::Expr) -> Expression<'db> {
         let expression = Expression::new(
             self.db,
             self.file,
@@ -210,6 +218,7 @@ impl<'db> SemanticIndexBuilder<'db> {
         );
         self.expressions_by_node
             .insert(expression_node.into(), expression);
+        expression
     }
 
     fn with_type_params(
@@ -256,6 +265,66 @@ impl<'db> SemanticIndexBuilder<'db> {
         }
 
         nested_scope
+    }
+
+    /// Visit a list of [`Comprehension`] nodes, assumed to be the "generators" that compose a
+    /// comprehension (that is, the `for x in y` and `for y in z` parts of `x for x in y for y in z`.)
+    ///
+    /// [`Comprehension`]: ast::Comprehension
+    fn visit_generators(&mut self, scope: NodeWithScopeRef, generators: &'db [ast::Comprehension]) {
+        let mut generators_iter = generators.iter();
+
+        let Some(generator) = generators_iter.next() else {
+            unreachable!("Expression must contain at least one generator");
+        };
+
+        // The `iter` of the first generator is evaluated in the outer scope, while all subsequent
+        // nodes are evaluated in the inner scope.
+        self.visit_expr(&generator.iter);
+        self.push_scope(scope);
+
+        self.current_assignment = Some(CurrentAssignment::Comprehension {
+            node: generator,
+            first: true,
+        });
+        self.visit_expr(&generator.target);
+        self.current_assignment = None;
+
+        for expr in &generator.ifs {
+            self.visit_expr(expr);
+        }
+
+        for generator in generators_iter {
+            self.visit_expr(&generator.iter);
+
+            self.current_assignment = Some(CurrentAssignment::Comprehension {
+                node: generator,
+                first: false,
+            });
+            self.visit_expr(&generator.target);
+            self.current_assignment = None;
+
+            for expr in &generator.ifs {
+                self.visit_expr(expr);
+            }
+        }
+    }
+
+    fn declare_parameter(&mut self, parameter: AnyParameterRef) {
+        let symbol =
+            self.add_or_update_symbol(parameter.name().id().clone(), SymbolFlags::IS_DEFINED);
+
+        let definition = self.add_definition(symbol, parameter);
+
+        if let AnyParameterRef::NonVariadic(with_default) = parameter {
+            // Insert a mapping from the parameter to the same definition.
+            // This ensures that calling `HasTy::ty` on the inner parameter returns
+            // a valid type (and doesn't panic)
+            self.definitions_by_node.insert(
+                DefinitionNodeRef::from(AnyParameterRef::Variadic(&with_default.parameter)).key(),
+                definition,
+            );
+        }
     }
 
     pub(super) fn build(mut self) -> SemanticIndex<'db> {
@@ -325,6 +394,16 @@ where
                     .add_or_update_symbol(function_def.name.id.clone(), SymbolFlags::IS_DEFINED);
                 self.add_definition(symbol, function_def);
 
+                // The default value of the parameters needs to be evaluated in the
+                // enclosing scope.
+                for default in function_def
+                    .parameters
+                    .iter_non_variadic_params()
+                    .filter_map(|param| param.default.as_deref())
+                {
+                    self.visit_expr(default);
+                }
+
                 self.with_type_params(
                     NodeWithScopeRef::FunctionTypeParameters(function_def),
                     function_def.type_params.as_deref(),
@@ -335,6 +414,12 @@ where
                         }
 
                         builder.push_scope(NodeWithScopeRef::Function(function_def));
+
+                        // Add symbols and definitions for the parameters to the function scope.
+                        for parameter in &*function_def.parameters {
+                            builder.declare_parameter(parameter);
+                        }
+
                         builder.visit_body(&function_def.body);
                         builder.pop_scope()
                     },
@@ -410,9 +495,24 @@ where
                 self.visit_expr(&node.target);
                 self.current_assignment = None;
             }
+            ast::Stmt::AugAssign(
+                aug_assign @ ast::StmtAugAssign {
+                    range: _,
+                    target,
+                    op: _,
+                    value,
+                },
+            ) => {
+                debug_assert!(self.current_assignment.is_none());
+                self.visit_expr(value);
+                self.current_assignment = Some(aug_assign.into());
+                self.visit_expr(target);
+                self.current_assignment = None;
+            }
             ast::Stmt::If(node) => {
                 self.visit_expr(&node.test);
                 let pre_if = self.flow_snapshot();
+                self.add_constraint(&node.test);
                 self.visit_body(&node.body);
                 let mut post_clauses: Vec<FlowSnapshot> = vec![];
                 for clause in &node.elif_else_clauses {
@@ -425,7 +525,7 @@ where
                     self.visit_elif_else_clause(clause);
                 }
                 for post_clause_state in post_clauses {
-                    self.flow_merge(&post_clause_state);
+                    self.flow_merge(post_clause_state);
                 }
                 let has_else = node
                     .elif_else_clauses
@@ -434,7 +534,7 @@ where
                 if !has_else {
                     // if there's no else clause, then it's possible we took none of the branches,
                     // and the pre_if state can reach here
-                    self.flow_merge(&pre_if);
+                    self.flow_merge(pre_if);
                 }
             }
             ast::Stmt::While(node) => {
@@ -452,13 +552,13 @@ where
 
                 // We may execute the `else` clause without ever executing the body, so merge in
                 // the pre-loop state before visiting `else`.
-                self.flow_merge(&pre_loop);
+                self.flow_merge(pre_loop);
                 self.visit_body(&node.orelse);
 
                 // Breaking out of a while loop bypasses the `else` clause, so merge in the break
                 // states after visiting `else`.
                 for break_state in break_states {
-                    self.flow_merge(&break_state);
+                    self.flow_merge(break_state);
                 }
             }
             ast::Stmt::Break(_) => {
@@ -476,14 +576,22 @@ where
         self.current_ast_ids().record_expression(expr);
 
         match expr {
-            ast::Expr::Name(name_node) => {
-                let ast::ExprName { id, ctx, .. } = name_node;
-                let flags = match ctx {
+            ast::Expr::Name(name_node @ ast::ExprName { id, ctx, .. }) => {
+                let mut flags = match ctx {
                     ast::ExprContext::Load => SymbolFlags::IS_USED,
                     ast::ExprContext::Store => SymbolFlags::IS_DEFINED,
                     ast::ExprContext::Del => SymbolFlags::IS_DEFINED,
                     ast::ExprContext::Invalid => SymbolFlags::empty(),
                 };
+                if matches!(
+                    self.current_assignment,
+                    Some(CurrentAssignment::AugAssign(_))
+                ) && !ctx.is_invalid()
+                {
+                    // For augmented assignment, the target expression is also used, so we should
+                    // record that as a use.
+                    flags |= SymbolFlags::IS_USED;
+                }
                 let symbol = self.add_or_update_symbol(id.clone(), flags);
                 if flags.contains(SymbolFlags::IS_DEFINED) {
                     match self.current_assignment {
@@ -499,8 +607,20 @@ where
                         Some(CurrentAssignment::AnnAssign(ann_assign)) => {
                             self.add_definition(symbol, ann_assign);
                         }
+                        Some(CurrentAssignment::AugAssign(aug_assign)) => {
+                            self.add_definition(symbol, aug_assign);
+                        }
                         Some(CurrentAssignment::Named(named)) => {
+                            // TODO(dhruvmanila): If the current scope is a comprehension, then the
+                            // named expression is implicitly nonlocal. This is yet to be
+                            // implemented.
                             self.add_definition(symbol, named);
+                        }
+                        Some(CurrentAssignment::Comprehension { node, first }) => {
+                            self.add_definition(
+                                symbol,
+                                ComprehensionDefinitionNodeRef { node, first },
+                            );
                         }
                         None => {}
                     }
@@ -523,11 +643,26 @@ where
             }
             ast::Expr::Lambda(lambda) => {
                 if let Some(parameters) = &lambda.parameters {
+                    // The default value of the parameters needs to be evaluated in the
+                    // enclosing scope.
+                    for default in parameters
+                        .iter_non_variadic_params()
+                        .filter_map(|param| param.default.as_deref())
+                    {
+                        self.visit_expr(default);
+                    }
                     self.visit_parameters(parameters);
                 }
                 self.push_scope(NodeWithScopeRef::Lambda(lambda));
+
+                // Add symbols and definitions for the parameters to the lambda scope.
+                if let Some(parameters) = &lambda.parameters {
+                    for parameter in &**parameters {
+                        self.declare_parameter(parameter);
+                    }
+                }
+
                 self.visit_expr(lambda.body.as_ref());
-                self.pop_scope();
             }
             ast::Expr::If(ast::ExprIf {
                 body, test, orelse, ..
@@ -541,12 +676,95 @@ where
                 let post_body = self.flow_snapshot();
                 self.flow_restore(pre_if);
                 self.visit_expr(orelse);
-                self.flow_merge(&post_body);
+                self.flow_merge(post_body);
+            }
+            ast::Expr::ListComp(
+                list_comprehension @ ast::ExprListComp {
+                    elt, generators, ..
+                },
+            ) => {
+                self.visit_generators(
+                    NodeWithScopeRef::ListComprehension(list_comprehension),
+                    generators,
+                );
+                self.visit_expr(elt);
+            }
+            ast::Expr::SetComp(
+                set_comprehension @ ast::ExprSetComp {
+                    elt, generators, ..
+                },
+            ) => {
+                self.visit_generators(
+                    NodeWithScopeRef::SetComprehension(set_comprehension),
+                    generators,
+                );
+                self.visit_expr(elt);
+            }
+            ast::Expr::Generator(
+                generator @ ast::ExprGenerator {
+                    elt, generators, ..
+                },
+            ) => {
+                self.visit_generators(NodeWithScopeRef::GeneratorExpression(generator), generators);
+                self.visit_expr(elt);
+            }
+            ast::Expr::DictComp(
+                dict_comprehension @ ast::ExprDictComp {
+                    key,
+                    value,
+                    generators,
+                    ..
+                },
+            ) => {
+                self.visit_generators(
+                    NodeWithScopeRef::DictComprehension(dict_comprehension),
+                    generators,
+                );
+                self.visit_expr(key);
+                self.visit_expr(value);
             }
             _ => {
                 walk_expr(self, expr);
             }
         }
+
+        if matches!(
+            expr,
+            ast::Expr::Lambda(_)
+                | ast::Expr::ListComp(_)
+                | ast::Expr::SetComp(_)
+                | ast::Expr::Generator(_)
+                | ast::Expr::DictComp(_)
+        ) {
+            self.pop_scope();
+        }
+    }
+
+    fn visit_parameters(&mut self, parameters: &'ast ruff_python_ast::Parameters) {
+        // Intentionally avoid walking default expressions, as we handle them in the enclosing
+        // scope.
+        for parameter in parameters.iter().map(ast::AnyParameterRef::as_parameter) {
+            self.visit_parameter(parameter);
+        }
+    }
+
+    fn visit_pattern(&mut self, pattern: &'ast ast::Pattern) {
+        if let ast::Pattern::MatchAs(ast::PatternMatchAs {
+            name: Some(name), ..
+        })
+        | ast::Pattern::MatchStar(ast::PatternMatchStar {
+            name: Some(name),
+            range: _,
+        })
+        | ast::Pattern::MatchMapping(ast::PatternMatchMapping {
+            rest: Some(name), ..
+        }) = pattern
+        {
+            // TODO(dhruvmanila): Add definition
+            self.add_or_update_symbol(name.id.clone(), SymbolFlags::IS_DEFINED);
+        }
+
+        walk_pattern(self, pattern);
     }
 }
 
@@ -554,7 +772,12 @@ where
 enum CurrentAssignment<'a> {
     Assign(&'a ast::StmtAssign),
     AnnAssign(&'a ast::StmtAnnAssign),
+    AugAssign(&'a ast::StmtAugAssign),
     Named(&'a ast::ExprNamed),
+    Comprehension {
+        node: &'a ast::Comprehension,
+        first: bool,
+    },
 }
 
 impl<'a> From<&'a ast::StmtAssign> for CurrentAssignment<'a> {
@@ -566,6 +789,12 @@ impl<'a> From<&'a ast::StmtAssign> for CurrentAssignment<'a> {
 impl<'a> From<&'a ast::StmtAnnAssign> for CurrentAssignment<'a> {
     fn from(value: &'a ast::StmtAnnAssign) -> Self {
         Self::AnnAssign(value)
+    }
+}
+
+impl<'a> From<&'a ast::StmtAugAssign> for CurrentAssignment<'a> {
+    fn from(value: &'a ast::StmtAugAssign) -> Self {
+        Self::AugAssign(value)
     }
 }
 

@@ -4,13 +4,22 @@ use ruff_python_ast::name::Name;
 use crate::builtins::builtins_scope;
 use crate::semantic_index::definition::Definition;
 use crate::semantic_index::symbol::{ScopeId, ScopedSymbolId};
-use crate::semantic_index::{global_scope, symbol_table, use_def_map};
+use crate::semantic_index::{
+    global_scope, symbol_table, use_def_map, DefinitionWithConstraints,
+    DefinitionWithConstraintsIterator,
+};
+use crate::types::narrow::narrowing_constraint;
 use crate::{Db, FxOrderSet};
 
+mod builder;
 mod display;
 mod infer;
+mod narrow;
 
-pub(crate) use self::infer::{infer_definition_types, infer_scope_types};
+pub(crate) use self::builder::{IntersectionBuilder, UnionBuilder};
+pub(crate) use self::infer::{
+    infer_definition_types, infer_expression_types, infer_scope_types, TypeInference,
+};
 
 /// Infer the public type of a symbol (its type as seen from outside its scope).
 pub(crate) fn symbol_ty<'db>(
@@ -80,10 +89,31 @@ pub(crate) fn definition_ty<'db>(db: &'db dyn Db, definition: Definition<'db>) -
 /// provide an `unbound_ty`.
 pub(crate) fn definitions_ty<'db>(
     db: &'db dyn Db,
-    definitions: &[Definition<'db>],
+    definitions_with_constraints: DefinitionWithConstraintsIterator<'_, 'db>,
     unbound_ty: Option<Type<'db>>,
 ) -> Type<'db> {
-    let def_types = definitions.iter().map(|def| definition_ty(db, *def));
+    let def_types = definitions_with_constraints.map(
+        |DefinitionWithConstraints {
+             definition,
+             constraints,
+         }| {
+            let mut constraint_tys =
+                constraints.filter_map(|test| narrowing_constraint(db, test, definition));
+            let definition_ty = definition_ty(db, definition);
+            if let Some(first_constraint_ty) = constraint_tys.next() {
+                let mut builder = IntersectionBuilder::new(db);
+                builder = builder
+                    .add_positive(definition_ty)
+                    .add_positive(first_constraint_ty);
+                for constraint_ty in constraint_tys {
+                    builder = builder.add_positive(constraint_ty);
+                }
+                builder.build()
+            } else {
+                definition_ty
+            }
+        },
+    );
     let mut all_types = unbound_ty.into_iter().chain(def_types);
 
     let Some(first) = all_types.next() else {
@@ -91,14 +121,14 @@ pub(crate) fn definitions_ty<'db>(
     };
 
     if let Some(second) = all_types.next() {
-        let mut builder = UnionTypeBuilder::new(db);
+        let mut builder = UnionBuilder::new(db);
         builder = builder.add(first).add(second);
 
         for variant in all_types {
             builder = builder.add(variant);
         }
 
-        Type::Union(builder.build())
+        builder.build()
     } else {
         first
     }
@@ -111,13 +141,13 @@ pub enum Type<'db> {
     Any,
     /// the empty set of values
     Never,
-    /// unknown type (no annotation)
+    /// unknown type (either no annotation, or some kind of type error)
     /// equivalent to Any, or possibly to object in strict mode
     Unknown,
     /// name does not exist or is not bound to any value (this represents an error, but with some
     /// leniency options it could be silently resolved to Unknown in some cases)
     Unbound,
-    /// the None object (TODO remove this in favor of Instance(types.NoneType)
+    /// the None object -- TODO remove this in favor of Instance(types.NoneType)
     None,
     /// a specific function object
     Function(FunctionType<'db>),
@@ -127,8 +157,11 @@ pub enum Type<'db> {
     Class(ClassType<'db>),
     /// the set of Python objects with the given class in their __class__'s method resolution order
     Instance(ClassType<'db>),
+    /// the set of objects in any of the types in the union
     Union(UnionType<'db>),
+    /// the set of objects in all of the types in the intersection
     Intersection(IntersectionType<'db>),
+    /// An integer literal
     IntLiteral(i64),
     /// A boolean literal, either `True` or `False`.
     BooleanLiteral(bool),
@@ -142,6 +175,35 @@ impl<'db> Type<'db> {
 
     pub const fn is_unknown(&self) -> bool {
         matches!(self, Type::Unknown)
+    }
+
+    pub const fn is_never(&self) -> bool {
+        matches!(self, Type::Never)
+    }
+
+    pub fn may_be_unbound(&self, db: &'db dyn Db) -> bool {
+        match self {
+            Type::Unbound => true,
+            Type::Union(union) => union.contains(db, Type::Unbound),
+            // Unbound can't appear in an intersection, because an intersection with Unbound
+            // simplifies to just Unbound.
+            _ => false,
+        }
+    }
+
+    #[must_use]
+    pub fn replace_unbound_with(&self, db: &'db dyn Db, replacement: Type<'db>) -> Type<'db> {
+        match self {
+            Type::Unbound => replacement,
+            Type::Union(union) => union
+                .elements(db)
+                .into_iter()
+                .fold(UnionBuilder::new(db), |builder, ty| {
+                    builder.add(ty.replace_unbound_with(db, replacement))
+                })
+                .build(),
+            ty => *ty,
+        }
     }
 
     #[must_use]
@@ -159,15 +221,13 @@ impl<'db> Type<'db> {
                 // TODO MRO? get_own_instance_member, get_instance_member
                 todo!("attribute lookup on Instance type")
             }
-            Type::Union(union) => Type::Union(
-                union
-                    .elements(db)
-                    .iter()
-                    .fold(UnionTypeBuilder::new(db), |builder, element_ty| {
-                        builder.add(element_ty.member(db, name))
-                    })
-                    .build(),
-            ),
+            Type::Union(union) => union
+                .elements(db)
+                .iter()
+                .fold(UnionBuilder::new(db), |builder, element_ty| {
+                    builder.add(element_ty.member(db, name))
+                })
+                .build(),
             Type::Intersection(_) => {
                 // TODO perform the get_member on each type in the intersection
                 // TODO return the intersection of those results
@@ -251,7 +311,7 @@ impl<'db> ClassType<'db> {
 
 #[salsa::interned]
 pub struct UnionType<'db> {
-    /// the union type includes values in any of these types
+    /// The union type includes values in any of these types.
     elements: FxOrderSet<Type<'db>>,
 }
 
@@ -261,48 +321,15 @@ impl<'db> UnionType<'db> {
     }
 }
 
-struct UnionTypeBuilder<'db> {
-    elements: FxOrderSet<Type<'db>>,
-    db: &'db dyn Db,
-}
-
-impl<'db> UnionTypeBuilder<'db> {
-    fn new(db: &'db dyn Db) -> Self {
-        Self {
-            db,
-            elements: FxOrderSet::default(),
-        }
-    }
-
-    /// Adds a type to this union.
-    fn add(mut self, ty: Type<'db>) -> Self {
-        match ty {
-            Type::Union(union) => {
-                self.elements.extend(&union.elements(self.db));
-            }
-            _ => {
-                self.elements.insert(ty);
-            }
-        }
-
-        self
-    }
-
-    fn build(self) -> UnionType<'db> {
-        UnionType::new(self.db, self.elements)
-    }
-}
-
-// Negation types aren't expressible in annotations, and are most likely to arise from type
-// narrowing along with intersections (e.g. `if not isinstance(...)`), so we represent them
-// directly in intersections rather than as a separate type. This sacrifices some efficiency in the
-// case where a Not appears outside an intersection (unclear when that could even happen, but we'd
-// have to represent it as a single-element intersection if it did) in exchange for better
-// efficiency in the within-intersection case.
 #[salsa::interned]
 pub struct IntersectionType<'db> {
-    // the intersection type includes only values in all of these types
+    /// The intersection type includes only values in all of these types.
     positive: FxOrderSet<Type<'db>>,
-    // the intersection type does not include any value in any of these types
+
+    /// The intersection type does not include any value in any of these types.
+    ///
+    /// Negation types aren't expressible in annotations, and are most likely to arise from type
+    /// narrowing along with intersections (e.g. `if not isinstance(...)`), so we represent them
+    /// directly in intersections rather than as a separate type.
     negative: FxOrderSet<Type<'db>>,
 }

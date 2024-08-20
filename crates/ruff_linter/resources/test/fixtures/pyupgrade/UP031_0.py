@@ -139,3 +139,33 @@ print("%.20X" % 1)
 
 print("%2X" % 1)
 print("%02X" % 1)
+
+# UP031 (no longer false negatives, but offer no fix because of more complex syntax)
+
+"%d.%d" % (a, b)
+
+"%*s" % (5, "hi")
+
+"%d" % (flt,)
+
+"%c" % (some_string,)
+
+"%.2r" % (1.25)
+
+"%.*s" % (5, "hi")
+
+"%i" % (flt,)
+
+"%()s" % {"": "empty"}
+
+"%s" % {"k": "v"}
+
+"%()s" % {"": "bar"}
+
+"%(1)s" % {"1": "bar"}
+
+"%(a)s" % {"a": 1, "a": 2}
+
+"%(1)s" % {1: 2, "1": 2}
+
+"%(and)s" % {"and": 2}
