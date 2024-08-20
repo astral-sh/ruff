@@ -127,7 +127,6 @@ impl TestCase {
     fn collect_package_files(&self, path: &SystemPath) -> Vec<File> {
         let package = self.db().workspace().package(self.db(), path).unwrap();
         let files = package.files(self.db());
-        let files = files.read();
         let mut collected: Vec<_> = files.into_iter().collect();
         collected.sort_unstable_by_key(|file| file.path(self.db()).as_system_path().unwrap());
         collected
