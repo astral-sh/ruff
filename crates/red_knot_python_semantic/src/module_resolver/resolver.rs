@@ -136,7 +136,7 @@ pub(crate) struct SearchPaths {
     /// for the first `site-packages` path
     site_packages: Vec<SearchPath>,
 
-    typeshed_versions: Typeshed,
+    typeshed_versions: ResolvedTypeshedVersions,
 }
 
 impl SearchPaths {
@@ -202,11 +202,11 @@ impl SearchPaths {
 
             let search_path = SearchPath::custom_stdlib(db, &custom_typeshed)?;
 
-            (Typeshed::Custom(parsed), search_path)
+            (ResolvedTypeshedVersions::Custom(parsed), search_path)
         } else {
             tracing::debug!("Using vendored stdlib");
             (
-                Typeshed::Vendored(vendored_typeshed_versions()),
+                ResolvedTypeshedVersions::Vendored(vendored_typeshed_versions()),
                 SearchPath::vendored_stdlib(),
             )
         };
@@ -280,18 +280,18 @@ impl SearchPaths {
 }
 
 #[derive(Debug, PartialEq, Eq)]
-enum Typeshed {
+enum ResolvedTypeshedVersions {
     Vendored(&'static TypeshedVersions),
     Custom(TypeshedVersions),
 }
 
-impl Deref for Typeshed {
+impl Deref for ResolvedTypeshedVersions {
     type Target = TypeshedVersions;
 
     fn deref(&self) -> &Self::Target {
         match self {
-            Typeshed::Vendored(versions) => versions,
-            Typeshed::Custom(versions) => versions,
+            ResolvedTypeshedVersions::Vendored(versions) => versions,
+            ResolvedTypeshedVersions::Custom(versions) => versions,
         }
     }
 }
@@ -693,8 +693,8 @@ impl PackageKind {
 }
 
 pub(super) struct ResolverContext<'db> {
-    pub(crate) db: &'db dyn Db,
-    pub(crate) target_version: PythonVersion,
+    pub(super) db: &'db dyn Db,
+    pub(super) target_version: PythonVersion,
 }
 
 impl<'db> ResolverContext<'db> {

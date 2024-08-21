@@ -300,7 +300,7 @@ pub(crate) enum SearchPathValidationError {
     NoStdlibSubdirectory(SystemPathBuf),
 
     /// The typeshed path provided by the user is a directory,
-    /// but `stdlib/VERSIONS` could not be read
+    /// but `stdlib/VERSIONS` could not be read.
     /// (This is only relevant for stdlib search paths.)
     FailedToReadVersionsFile {
         path: SystemPathBuf,
@@ -312,7 +312,7 @@ pub(crate) enum SearchPathValidationError {
     /// (This is only relevant for stdlib search paths.)
     VersionsParseError(TypeshedVersionsParseError),
 
-    /// Failed to discover the site packages for the configured virtual environment.
+    /// Failed to discover the site-packages for the configured virtual environment.
     SitePackagesDiscovery(SitePackagesDiscoveryError),
 }
 
@@ -331,7 +331,7 @@ impl fmt::Display for SearchPathValidationError {
             }
             Self::VersionsParseError(underlying_error) => underlying_error.fmt(f),
             SearchPathValidationError::SitePackagesDiscovery(error) => {
-                write!(f, "Failed to discover the site packages: {error}")
+                write!(f, "Failed to discover the site-packages directory: {error}")
             }
         }
     }

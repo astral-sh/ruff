@@ -4,12 +4,12 @@ use std::path::PathBuf;
 use red_knot_python_semantic::{HasTy, SemanticModel};
 use red_knot_workspace::db::RootDatabase;
 use red_knot_workspace::workspace::WorkspaceMetadata;
-use ruff_db::files::{File, system_path_to_file};
+use ruff_db::files::{system_path_to_file, File};
 use ruff_db::parsed::parsed_module;
 use ruff_db::system::{OsSystem, SystemPath, SystemPathBuf};
-use ruff_python_ast::{Alias, Expr, Parameter, ParameterWithDefault, Stmt};
 use ruff_python_ast::visitor::source_order;
 use ruff_python_ast::visitor::source_order::SourceOrderVisitor;
+use ruff_python_ast::{Alias, Expr, Parameter, ParameterWithDefault, Stmt};
 
 fn setup_db(workspace_root: &SystemPath) -> anyhow::Result<RootDatabase> {
     let system = OsSystem::new(workspace_root);

@@ -115,7 +115,7 @@ impl TypeshedVersions {
     }
 
     #[must_use]
-    pub(crate) fn query_module(
+    pub(in crate::module_resolver) fn query_module(
         &self,
         module: &ModuleName,
         target_version: PythonVersion,

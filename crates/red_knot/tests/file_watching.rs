@@ -803,7 +803,7 @@ fn changed_versions_file() -> anyhow::Result<()> {
         },
     )?;
 
-    // Remove site packages from the search path settings.
+    // Unset the custom typeshed directory.
     assert_eq!(
         resolve_module(case.db(), ModuleName::new("os").unwrap()),
         None

@@ -4,21 +4,21 @@ use rustc_hash::{FxBuildHasher, FxHashSet};
 use salsa::{Durability, Setter as _};
 
 pub use metadata::{PackageMetadata, WorkspaceMetadata};
-use red_knot_python_semantic::SearchPathSettings;
 use red_knot_python_semantic::types::check_types;
-use ruff_db::{
-    files::{File, system_path_to_file},
-    system::{SystemPath, SystemPathBuf, walk_directory::WalkState},
-};
+use red_knot_python_semantic::SearchPathSettings;
 use ruff_db::source::{line_index, source_text, SourceDiagnostic};
+use ruff_db::{
+    files::{system_path_to_file, File},
+    system::{walk_directory::WalkState, SystemPath, SystemPathBuf},
+};
 use ruff_python_ast::{name::Name, PySourceType};
 use ruff_text_size::Ranged;
 
+use crate::workspace::files::{Index, Indexed, PackageFiles};
 use crate::{
     db::Db,
     lint::{lint_semantic, lint_syntax},
 };
-use crate::workspace::files::{Index, Indexed, PackageFiles};
 
 mod files;
 mod metadata;
@@ -346,11 +346,7 @@ impl Package {
                     tracing::debug_span!("index_package_files", package = %self.name(db)).entered();
 
                 let files = discover_package_files(db, self.root(db));
-                tracing::info!(
-                    "Indexed {} files for package '{}'",
-                    files.len(),
-                    self.name(db)
-                );
+                tracing::info!("Found {} files in package '{}'", files.len(), self.name(db));
                 vacant.set(files)
             }
             Index::Indexed(indexed) => indexed,

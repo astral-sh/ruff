@@ -2,12 +2,12 @@
 
 use red_knot_python_semantic::PythonVersion;
 use red_knot_workspace::db::RootDatabase;
-use red_knot_workspace::watch::{ChangedKind, ChangeEvent};
+use red_knot_workspace::watch::{ChangeEvent, ChangedKind};
 use red_knot_workspace::workspace::settings::Configuration;
 use red_knot_workspace::workspace::WorkspaceMetadata;
-use ruff_benchmark::criterion::{BatchSize, Criterion, criterion_group, criterion_main};
+use ruff_benchmark::criterion::{criterion_group, criterion_main, BatchSize, Criterion};
 use ruff_benchmark::TestFile;
-use ruff_db::files::{File, system_path_to_file};
+use ruff_db::files::{system_path_to_file, File};
 use ruff_db::source::source_text;
 use ruff_db::system::{MemoryFileSystem, SystemPath, TestSystem};
 
@@ -131,10 +131,13 @@ fn benchmark_incremental(criterion: &mut Criterion) {
             |case| {
                 let Case { db, .. } = case;
 
-                db.apply_changes(vec![ChangeEvent::Changed {
-                    path: case.re_path.to_path_buf(),
-                    kind: ChangedKind::FileContent,
-                }]);
+                db.apply_changes(
+                    vec![ChangeEvent::Changed {
+                        path: case.re_path.to_path_buf(),
+                        kind: ChangedKind::FileContent,
+                    }],
+                    None,
+                );
 
                 let result = db.check().unwrap();
 

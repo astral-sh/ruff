@@ -26,7 +26,7 @@ impl RootDatabase {
             .map(|path| path.join("VERSIONS"));
 
         let mut workspace_change = false;
-        // Changes to a custom stdlib path's VERSION
+        // Changes to a custom stdlib path's VERSIONS
         let mut custom_stdlib_change = false;
         // Packages that need reloading
         let mut changed_packages = FxHashSet::default();
