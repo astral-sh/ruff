@@ -5,6 +5,7 @@ use salsa::{Durability, Setter as _};
 
 pub use metadata::{PackageMetadata, WorkspaceMetadata};
 use red_knot_python_semantic::types::check_types;
+use red_knot_python_semantic::SearchPathSettings;
 use ruff_db::source::{line_index, source_text, SourceDiagnostic};
 use ruff_db::{
     files::{system_path_to_file, File},
@@ -21,6 +22,7 @@ use crate::{
 
 mod files;
 mod metadata;
+pub mod settings;
 
 /// The project workspace as a Salsa ingredient.
 ///
@@ -81,6 +83,10 @@ pub struct Workspace {
     /// The (first-party) packages in this workspace.
     #[return_ref]
     package_tree: BTreeMap<SystemPathBuf, Package>,
+
+    /// The unresolved search path configuration.
+    #[return_ref]
+    pub search_path_settings: SearchPathSettings,
 }
 
 /// A first-party package in a workspace.
@@ -109,10 +115,14 @@ impl Workspace {
             packages.insert(package.root.clone(), Package::from_metadata(db, package));
         }
 
-        Workspace::builder(metadata.root, packages)
-            .durability(Durability::MEDIUM)
-            .open_fileset_durability(Durability::LOW)
-            .new(db)
+        Workspace::builder(
+            metadata.root,
+            packages,
+            metadata.settings.program.search_paths,
+        )
+        .durability(Durability::MEDIUM)
+        .open_fileset_durability(Durability::LOW)
+        .new(db)
     }
 
     pub fn root(self, db: &dyn Db) -> &SystemPath {
@@ -141,6 +151,11 @@ impl Workspace {
             };
 
             new_packages.insert(path, package);
+        }
+
+        if &metadata.settings.program.search_paths != self.search_path_settings(db) {
+            self.set_search_path_settings(db)
+                .to(metadata.settings.program.search_paths);
         }
 
         self.set_package_tree(db).to(new_packages);
@@ -331,11 +346,7 @@ impl Package {
                     tracing::debug_span!("index_package_files", package = %self.name(db)).entered();
 
                 let files = discover_package_files(db, self.root(db));
-                tracing::info!(
-                    "Indexed {} files for package '{}'",
-                    files.len(),
-                    self.name(db)
-                );
+                tracing::info!("Found {} files in package '{}'", files.len(), self.name(db));
                 vacant.set(files)
             }
             Index::Indexed(indexed) => indexed,

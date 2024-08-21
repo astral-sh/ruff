@@ -1,15 +1,14 @@
 use std::panic::RefUnwindSafe;
 use std::sync::Arc;
 
-use red_knot_python_semantic::{
-    vendored_typeshed_stubs, Db as SemanticDb, Program, ProgramSettings,
-};
+use salsa::plumbing::ZalsaDatabase;
+use salsa::{Cancelled, Event};
+
+use red_knot_python_semantic::{vendored_typeshed_stubs, Db as SemanticDb, Program};
 use ruff_db::files::{File, Files};
 use ruff_db::system::System;
 use ruff_db::vendored::VendoredFileSystem;
 use ruff_db::{Db as SourceDb, Upcast};
-use salsa::plumbing::ZalsaDatabase;
-use salsa::{Cancelled, Event};
 
 use crate::workspace::{check_file, Workspace, WorkspaceMetadata};
 
@@ -27,11 +26,7 @@ pub struct RootDatabase {
 }
 
 impl RootDatabase {
-    pub fn new<S>(
-        workspace: WorkspaceMetadata,
-        settings: ProgramSettings,
-        system: S,
-    ) -> anyhow::Result<Self>
+    pub fn new<S>(workspace: WorkspaceMetadata, system: S) -> anyhow::Result<Self>
     where
         S: System + 'static + Send + Sync + RefUnwindSafe,
     {
@@ -42,11 +37,11 @@ impl RootDatabase {
             system: Arc::new(system),
         };
 
-        let workspace = Workspace::from_metadata(&db, workspace);
         // Initialize the `Program` singleton
-        Program::from_settings(&db, settings)?;
+        Program::from_settings(&db, workspace.settings().program())?;
 
-        db.workspace = Some(workspace);
+        db.workspace = Some(Workspace::from_metadata(&db, workspace));
+
         Ok(db)
     }
 
@@ -160,8 +155,9 @@ impl Db for RootDatabase {}
 
 #[cfg(test)]
 pub(crate) mod tests {
-    use salsa::Event;
     use std::sync::Arc;
+
+    use salsa::Event;
 
     use red_knot_python_semantic::{vendored_typeshed_stubs, Db as SemanticDb};
     use ruff_db::files::Files;

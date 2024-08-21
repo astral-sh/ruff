@@ -1,6 +1,7 @@
-use red_knot_python_semantic::{
-    HasTy, ProgramSettings, PythonVersion, SearchPathSettings, SemanticModel,
-};
+use std::fs;
+use std::path::PathBuf;
+
+use red_knot_python_semantic::{HasTy, SemanticModel};
 use red_knot_workspace::db::RootDatabase;
 use red_knot_workspace::workspace::WorkspaceMetadata;
 use ruff_db::files::{system_path_to_file, File};
@@ -9,23 +10,11 @@ use ruff_db::system::{OsSystem, SystemPath, SystemPathBuf};
 use ruff_python_ast::visitor::source_order;
 use ruff_python_ast::visitor::source_order::SourceOrderVisitor;
 use ruff_python_ast::{Alias, Expr, Parameter, ParameterWithDefault, Stmt};
-use std::fs;
-use std::path::PathBuf;
 
-fn setup_db(workspace_root: SystemPathBuf) -> anyhow::Result<RootDatabase> {
-    let system = OsSystem::new(&workspace_root);
-    let workspace = WorkspaceMetadata::from_path(&workspace_root, &system)?;
-    let search_paths = SearchPathSettings {
-        extra_paths: vec![],
-        src_root: workspace_root,
-        custom_typeshed: None,
-        site_packages: vec![],
-    };
-    let settings = ProgramSettings {
-        target_version: PythonVersion::default(),
-        search_paths,
-    };
-    RootDatabase::new(workspace, settings, system)
+fn setup_db(workspace_root: &SystemPath) -> anyhow::Result<RootDatabase> {
+    let system = OsSystem::new(workspace_root);
+    let workspace = WorkspaceMetadata::from_path(workspace_root, &system, None)?;
+    RootDatabase::new(workspace, system)
 }
 
 /// Test that all snippets in testcorpus can be checked without panic
@@ -33,8 +22,9 @@ fn setup_db(workspace_root: SystemPathBuf) -> anyhow::Result<RootDatabase> {
 #[allow(clippy::print_stdout)]
 fn corpus_no_panic() -> anyhow::Result<()> {
     let corpus = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("resources/test/corpus");
-    let system_corpus = SystemPath::from_std_path(&corpus).expect("corpus path to be UTF8");
-    let db = setup_db(system_corpus.to_path_buf())?;
+    let system_corpus =
+        SystemPathBuf::from_path_buf(corpus.clone()).expect("corpus path to be UTF8");
+    let db = setup_db(&system_corpus)?;
 
     for path in fs::read_dir(&corpus).expect("corpus to be a directory") {
         let path = path.expect("path to not be an error").path();

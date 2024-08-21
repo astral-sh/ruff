@@ -13,8 +13,9 @@ use std::io;
 use std::num::NonZeroUsize;
 use std::ops::Deref;
 
-use red_knot_python_semantic::PythonVersion;
 use ruff_db::system::{System, SystemPath, SystemPathBuf};
+
+use crate::PythonVersion;
 
 type SitePackagesDiscoveryResult<T> = Result<T, SitePackagesDiscoveryError>;
 
@@ -24,7 +25,7 @@ type SitePackagesDiscoveryResult<T> = Result<T, SitePackagesDiscoveryError>;
 /// The format of this file is not defined anywhere, and exactly which keys are present
 /// depends on the tool that was used to create the virtual environment.
 #[derive(Debug)]
-pub struct VirtualEnvironment {
+pub(crate) struct VirtualEnvironment {
     venv_path: SysPrefixPath,
     base_executable_home_path: PythonHomePath,
     include_system_site_packages: bool,
@@ -41,7 +42,7 @@ pub struct VirtualEnvironment {
 }
 
 impl VirtualEnvironment {
-    pub fn new(
+    pub(crate) fn new(
         path: impl AsRef<SystemPath>,
         system: &dyn System,
     ) -> SitePackagesDiscoveryResult<Self> {
@@ -157,7 +158,7 @@ impl VirtualEnvironment {
     /// Return a list of `site-packages` directories that are available from this virtual environment
     ///
     /// See the documentation for `site_packages_dir_from_sys_prefix` for more details.
-    pub fn site_packages_directories(
+    pub(crate) fn site_packages_directories(
         &self,
         system: &dyn System,
     ) -> SitePackagesDiscoveryResult<Vec<SystemPathBuf>> {
@@ -204,7 +205,7 @@ System site-packages will not be used for module resolution.",
 }
 
 #[derive(Debug, thiserror::Error)]
-pub enum SitePackagesDiscoveryError {
+pub(crate) enum SitePackagesDiscoveryError {
     #[error("Invalid --venv-path argument: {0} could not be canonicalized")]
     VenvDirCanonicalizationError(SystemPathBuf, #[source] io::Error),
     #[error("Invalid --venv-path argument: {0} does not point to a directory on disk")]
@@ -221,7 +222,7 @@ pub enum SitePackagesDiscoveryError {
 
 /// The various ways in which parsing a `pyvenv.cfg` file could fail
 #[derive(Debug)]
-pub enum PyvenvCfgParseErrorKind {
+pub(crate) enum PyvenvCfgParseErrorKind {
     TooManyEquals { line_number: NonZeroUsize },
     MalformedKeyValuePair { line_number: NonZeroUsize },
     NoHomeKey,
@@ -370,7 +371,7 @@ fn site_packages_directory_from_sys_prefix(
 ///
 /// [`sys.prefix`]: https://docs.python.org/3/library/sys.html#sys.prefix
 #[derive(Debug, PartialEq, Eq, Clone)]
-pub struct SysPrefixPath(SystemPathBuf);
+pub(crate) struct SysPrefixPath(SystemPathBuf);
 
 impl SysPrefixPath {
     fn new(

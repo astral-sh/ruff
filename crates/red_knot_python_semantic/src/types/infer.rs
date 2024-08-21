@@ -1866,14 +1866,9 @@ mod tests {
 
         Program::from_settings(
             &db,
-            ProgramSettings {
+            &ProgramSettings {
                 target_version: PythonVersion::default(),
-                search_paths: SearchPathSettings {
-                    extra_paths: Vec::new(),
-                    src_root,
-                    site_packages: vec![],
-                    custom_typeshed: None,
-                },
+                search_paths: SearchPathSettings::new(src_root),
             },
         )
         .expect("Valid search path settings");
@@ -1893,13 +1888,11 @@ mod tests {
 
         Program::from_settings(
             &db,
-            ProgramSettings {
+            &ProgramSettings {
                 target_version: PythonVersion::default(),
                 search_paths: SearchPathSettings {
-                    extra_paths: Vec::new(),
-                    src_root,
-                    site_packages: vec![],
                     custom_typeshed: Some(SystemPathBuf::from(typeshed)),
+                    ..SearchPathSettings::new(src_root)
                 },
             },
         )

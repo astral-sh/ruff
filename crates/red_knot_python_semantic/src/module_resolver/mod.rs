@@ -13,7 +13,6 @@ use resolver::SearchPathIterator;
 mod module;
 mod path;
 mod resolver;
-mod state;
 mod typeshed;
 
 #[cfg(test)]

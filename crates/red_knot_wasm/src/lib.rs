@@ -3,8 +3,8 @@ use std::any::Any;
 use js_sys::Error;
 use wasm_bindgen::prelude::*;
 
-use red_knot_python_semantic::{ProgramSettings, SearchPathSettings};
 use red_knot_workspace::db::RootDatabase;
+use red_knot_workspace::workspace::settings::Configuration;
 use red_knot_workspace::workspace::WorkspaceMetadata;
 use ruff_db::files::{system_path_to_file, File};
 use ruff_db::system::walk_directory::WalkDirectoryBuilder;
@@ -41,16 +41,17 @@ impl Workspace {
     #[wasm_bindgen(constructor)]
     pub fn new(root: &str, settings: &Settings) -> Result<Workspace, Error> {
         let system = WasmSystem::new(SystemPath::new(root));
-        let workspace =
-            WorkspaceMetadata::from_path(SystemPath::new(root), &system).map_err(into_error)?;
+        let workspace = WorkspaceMetadata::from_path(
+            SystemPath::new(root),
+            &system,
+            Some(Configuration {
+                target_version: Some(settings.target_version.into()),
+                ..Configuration::default()
+            }),
+        )
+        .map_err(into_error)?;
 
-        let program_settings = ProgramSettings {
-            target_version: settings.target_version.into(),
-            search_paths: SearchPathSettings::default(),
-        };
-
-        let db =
-            RootDatabase::new(workspace, program_settings, system.clone()).map_err(into_error)?;
+        let db = RootDatabase::new(workspace, system.clone()).map_err(into_error)?;
 
         Ok(Self { db, system })
     }

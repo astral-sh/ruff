@@ -184,14 +184,9 @@ mod tests {
 
         Program::from_settings(
             &db,
-            ProgramSettings {
+            &ProgramSettings {
                 target_version: PythonVersion::default(),
-                search_paths: SearchPathSettings {
-                    extra_paths: vec![],
-                    src_root: SystemPathBuf::from("/src"),
-                    site_packages: vec![],
-                    custom_typeshed: None,
-                },
+                search_paths: SearchPathSettings::new(SystemPathBuf::from("/src")),
             },
         )?;
 
