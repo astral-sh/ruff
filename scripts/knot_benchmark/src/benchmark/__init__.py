@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import logging
-import os
 import shlex
 import subprocess
 import typing
@@ -71,4 +70,7 @@ class Hyperfine(typing.NamedTuple):
 
         logging.info(f"Running {args}")
 
-        subprocess.run(args, cwd=cwd, check=True)
+        subprocess.run(
+            args,
+            cwd=cwd,
+        )

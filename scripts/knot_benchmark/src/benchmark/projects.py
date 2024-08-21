@@ -121,7 +121,15 @@ ALL = [
             "pytest",
         ],
     ),
+    Project(
+        name="isort",
+        repository="https://github.com/pycqa/isort",
+        revision="7de182933fd50e04a7c47cc8be75a6547754b19c",
+        mypy_arguments=["--ignore-missing-imports", "isort"],
+        include=["isort"],
+        dependencies=["types-setuptools"],
+    ),
 ]
 
 
-DEFAULT: list[str] = ["black", "jinja"]
+DEFAULT: list[str] = ["black", "jinja", "isort"]

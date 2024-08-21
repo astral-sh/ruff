@@ -118,7 +118,12 @@ class MyPy(Tool):
         )
 
     def warm_command(self, project: Project, venv: Venv) -> Command | None:
-        command = self._base_command(project, venv)
+        command = [
+            str(self.path),
+            *(project.mypy_arguments or project.include),
+            "--python-executable",
+            str(venv.python),
+        ]
 
         return Command(
             name="mypy",
@@ -193,7 +198,7 @@ class Venv:
         ]
 
         try:
-            subprocess.run(command, cwd=parent, check=True, stderr=subprocess.PIPE)
+            subprocess.run(command, cwd=parent, check=True)
         except subprocess.CalledProcessError as e:
             raise RuntimeError(f"Failed to create venv: {e.stderr.decode()}")
 
@@ -213,6 +218,6 @@ class Venv:
         ]
 
         try:
-            subprocess.run(command, cwd=self.path, check=True, stderr=subprocess.PIPE)
+            subprocess.run(command, cwd=self.path, check=True)
         except subprocess.CalledProcessError as e:
             raise RuntimeError(f"Failed to install dependencies: {e.stderr.decode()}")
