@@ -1159,21 +1159,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                         flags: _,
                     } = fstring;
                     for element in elements {
-                        match element {
-                            ast::FStringElement::Literal(_) => {
-                                // TODO string literal type
-                            }
-                            ast::FStringElement::Expression(expr_element) => {
-                                let ast::FStringExpressionElement {
-                                    range: _,
-                                    expression,
-                                    debug_text: _,
-                                    conversion: _,
-                                    format_spec: _,
-                                } = expr_element;
-                                self.infer_expression(expression);
-                            }
-                        }
+                        self.infer_fstring_element(element);
                     }
                 }
             }
@@ -1181,6 +1167,30 @@ impl<'db> TypeInferenceBuilder<'db> {
 
         // TODO str type
         Type::Unknown
+    }
+
+    fn infer_fstring_element(&mut self, element: &ast::FStringElement) {
+        match element {
+            ast::FStringElement::Literal(_) => {
+                // TODO string literal type
+            }
+            ast::FStringElement::Expression(expr_element) => {
+                let ast::FStringExpressionElement {
+                    range: _,
+                    expression,
+                    debug_text: _,
+                    conversion: _,
+                    format_spec,
+                } = expr_element;
+                self.infer_expression(expression);
+
+                if let Some(format_spec) = format_spec {
+                    for spec_element in &format_spec.elements {
+                        self.infer_fstring_element(spec_element);
+                    }
+                }
+            }
+        }
     }
 
     #[allow(clippy::unused_self)]
