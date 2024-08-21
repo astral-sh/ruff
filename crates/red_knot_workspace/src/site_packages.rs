@@ -55,7 +55,7 @@ impl VirtualEnvironment {
 
         let venv_path = SysPrefixPath::new(path, system)?;
         let pyvenv_cfg_path = venv_path.join("pyvenv.cfg");
-        tracing::debug!("Attempting to parse virtual environment metadata at {pyvenv_cfg_path}");
+        tracing::debug!("Attempting to parse virtual environment metadata at '{pyvenv_cfg_path}'");
 
         let pyvenv_cfg = system
             .read_to_string(&pyvenv_cfg_path)
@@ -191,7 +191,7 @@ impl VirtualEnvironment {
             } else {
                 tracing::warn!(
                     "Failed to resolve `sys.prefix` of the system Python installation \
-from the `home` value in the `pyvenv.cfg` file at {}. \
+from the `home` value in the `pyvenv.cfg` file at '{}'. \
 System site-packages will not be used for module resolution.",
                     venv_path.join("pyvenv.cfg")
                 );
@@ -425,7 +425,7 @@ impl Deref for SysPrefixPath {
 
 impl fmt::Display for SysPrefixPath {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "`sys.prefix` path {}", self.0)
+        write!(f, "`sys.prefix` path '{}'", self.0)
     }
 }
 
@@ -482,7 +482,7 @@ impl Deref for PythonHomePath {
 
 impl fmt::Display for PythonHomePath {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "`home` location {}", self.0)
+        write!(f, "`home` location '{}'", self.0)
     }
 }
 

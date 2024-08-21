@@ -199,7 +199,7 @@ impl Workspace {
     ///
     /// This changes the behavior of `check` to only check the open files rather than all files in the workspace.
     pub fn open_file(self, db: &mut dyn Db, file: File) {
-        tracing::debug!("Opening file {}", file.path(db));
+        tracing::debug!("Opening file '{}'", file.path(db));
 
         let mut open_files = self.take_open_files(db);
         open_files.insert(file);
@@ -208,7 +208,7 @@ impl Workspace {
 
     /// Closes a file in the workspace.
     pub fn close_file(self, db: &mut dyn Db, file: File) -> bool {
-        tracing::debug!("Closing file {}", file.path(db));
+        tracing::debug!("Closing file '{}'", file.path(db));
 
         let mut open_files = self.take_open_files(db);
         let removed = open_files.remove(&file);
@@ -284,7 +284,7 @@ impl Package {
     #[tracing::instrument(level = "debug", skip(db))]
     pub fn remove_file(self, db: &mut dyn Db, file: File) {
         tracing::debug!(
-            "Remove file {} from package {}",
+            "Removing file '{}' from package '{}'",
             file.path(db),
             self.name(db)
         );
@@ -297,7 +297,11 @@ impl Package {
     }
 
     pub fn add_file(self, db: &mut dyn Db, file: File) {
-        tracing::debug!("Add file {} to package {}", file.path(db), self.name(db));
+        tracing::debug!(
+            "Adding file '{}' to package '{}'",
+            file.path(db),
+            self.name(db)
+        );
 
         let Some(mut index) = PackageFiles::indexed_mut(db, self) else {
             return;
@@ -308,7 +312,7 @@ impl Package {
 
     #[tracing::instrument(level = "debug", skip(db))]
     pub(crate) fn check(self, db: &dyn Db) -> Vec<String> {
-        tracing::debug!("Checking package {}", self.root(db));
+        tracing::debug!("Checking package '{}'", self.root(db));
 
         let mut result = Vec::new();
         for file in &self.files(db) {
@@ -361,7 +365,7 @@ impl Package {
     }
 
     pub fn reload_files(self, db: &mut dyn Db) {
-        tracing::debug!("Reload files for package {}", self.name(db));
+        tracing::debug!("Reloading files for package '{}'", self.name(db));
 
         if !self.file_set(db).is_lazy() {
             // Force a re-index of the files in the next revision.
@@ -374,7 +378,7 @@ impl Package {
 pub(super) fn check_file(db: &dyn Db, file: File) -> Vec<String> {
     let path = file.path(db);
     let _span = tracing::debug_span!("check_file", file=%path).entered();
-    tracing::debug!("Checking file {path}");
+    tracing::debug!("Checking file '{path}'");
 
     let mut diagnostics = Vec::new();
 
