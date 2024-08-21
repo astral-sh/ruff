@@ -1953,7 +1953,6 @@ dependencies = [
  "red_knot_python_semantic",
  "red_knot_workspace",
  "ruff_db",
- "ruff_linter",
  "ruff_notebook",
  "ruff_python_ast",
  "ruff_source_file",
