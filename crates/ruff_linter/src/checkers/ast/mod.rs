@@ -1422,6 +1422,7 @@ impl<'a> Visitor<'a> for Checker<'a> {
                         }
                         // Ex) Annotated[int, "Hello, world!"]
                         Some(typing::SubscriptKind::PEP593Annotation) => {
+                            self.semantic.flags |= SemanticModelFlags::TYPING_ANNOTATED_PEP593;
                             // First argument is a type (including forward references); the
                             // rest are arbitrary Python objects.
                             if let Expr::Tuple(ast::ExprTuple {
