@@ -19,6 +19,7 @@ static GLOBAL: mimalloc::MiMalloc = mimalloc::MiMalloc;
 #[cfg(all(
     not(target_os = "windows"),
     not(target_os = "openbsd"),
+    not(codspeed),
     any(
         target_arch = "x86_64",
         target_arch = "aarch64",
