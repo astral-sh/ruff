@@ -1,19 +1,21 @@
 use crate::visitor::source_order::SourceOrderVisitor;
 use crate::{
     self as ast, Alias, AnyParameterRef, ArgOrKeyword, Arguments, Comprehension, Decorator,
-    ExceptHandler, Expr, FStringElement, Keyword, MatchCase, Mod, Parameter, ParameterWithDefault,
-    Parameters, Pattern, PatternArguments, PatternKeyword, Stmt, StmtAnnAssign, StmtAssert,
-    StmtAssign, StmtAugAssign, StmtBreak, StmtClassDef, StmtContinue, StmtDelete, StmtExpr,
-    StmtFor, StmtFunctionDef, StmtGlobal, StmtIf, StmtImport, StmtImportFrom, StmtIpyEscapeCommand,
-    StmtMatch, StmtNonlocal, StmtPass, StmtRaise, StmtReturn, StmtTry, StmtTypeAlias, StmtWhile,
-    StmtWith, TypeParam, TypeParamParamSpec, TypeParamTypeVar, TypeParamTypeVarTuple, TypeParams,
-    WithItem,
+    ExceptHandler, Expr, ExpressionRef, FStringElement, Keyword, MatchCase, Mod, Parameter,
+    ParameterWithDefault, Parameters, Pattern, PatternArguments, PatternKeyword, Stmt,
+    StmtAnnAssign, StmtAssert, StmtAssign, StmtAugAssign, StmtBreak, StmtClassDef, StmtContinue,
+    StmtDelete, StmtExpr, StmtFor, StmtFunctionDef, StmtGlobal, StmtIf, StmtImport, StmtImportFrom,
+    StmtIpyEscapeCommand, StmtMatch, StmtNonlocal, StmtPass, StmtRaise, StmtReturn, StmtTry,
+    StmtTypeAlias, StmtWhile, StmtWith, TypeParam, TypeParamParamSpec, TypeParamTypeVar,
+    TypeParamTypeVarTuple, TypeParams, WithItem,
 };
 use ruff_text_size::{Ranged, TextRange};
 use std::ptr::NonNull;
 
 pub trait AstNode: Ranged {
     type Ref<'a>;
+
+    fn kind(&self) -> NodeKind;
 
     fn cast(kind: AnyNode) -> Option<Self>
     where
@@ -646,6 +648,11 @@ impl AnyNode {
 impl AstNode for ast::ModModule {
     type Ref<'a> = &'a Self;
 
+    #[inline]
+    fn kind(&self) -> NodeKind {
+        NodeKind::ModModule
+    }
+
     fn cast(kind: AnyNode) -> Option<Self>
     where
         Self: Sized,
@@ -689,6 +696,11 @@ impl AstNode for ast::ModModule {
 impl AstNode for ast::ModExpression {
     type Ref<'a> = &'a Self;
 
+    #[inline]
+    fn kind(&self) -> NodeKind {
+        NodeKind::ModExpression
+    }
+
     fn cast(kind: AnyNode) -> Option<Self>
     where
         Self: Sized,
@@ -730,6 +742,11 @@ impl AstNode for ast::ModExpression {
 }
 impl AstNode for ast::StmtFunctionDef {
     type Ref<'a> = &'a Self;
+
+    #[inline]
+    fn kind(&self) -> NodeKind {
+        NodeKind::StmtFunctionDef
+    }
 
     fn cast(kind: AnyNode) -> Option<Self>
     where
@@ -795,6 +812,11 @@ impl AstNode for ast::StmtFunctionDef {
 impl AstNode for ast::StmtClassDef {
     type Ref<'a> = &'a Self;
 
+    #[inline]
+    fn kind(&self) -> NodeKind {
+        NodeKind::StmtClassDef
+    }
+
     fn cast(kind: AnyNode) -> Option<Self>
     where
         Self: Sized,
@@ -855,6 +877,12 @@ impl AstNode for ast::StmtClassDef {
 }
 impl AstNode for ast::StmtReturn {
     type Ref<'a> = &'a Self;
+
+    #[inline]
+    fn kind(&self) -> NodeKind {
+        NodeKind::StmtReturn
+    }
+
     fn cast(kind: AnyNode) -> Option<Self>
     where
         Self: Sized,
@@ -898,6 +926,12 @@ impl AstNode for ast::StmtReturn {
 }
 impl AstNode for ast::StmtDelete {
     type Ref<'a> = &'a Self;
+
+    #[inline]
+    fn kind(&self) -> NodeKind {
+        NodeKind::StmtDelete
+    }
+
     fn cast(kind: AnyNode) -> Option<Self>
     where
         Self: Sized,
@@ -941,6 +975,12 @@ impl AstNode for ast::StmtDelete {
 }
 impl AstNode for ast::StmtTypeAlias {
     type Ref<'a> = &'a Self;
+
+    #[inline]
+    fn kind(&self) -> NodeKind {
+        NodeKind::StmtTypeAlias
+    }
+
     fn cast(kind: AnyNode) -> Option<Self>
     where
         Self: Sized,
@@ -992,6 +1032,12 @@ impl AstNode for ast::StmtTypeAlias {
 }
 impl AstNode for ast::StmtAssign {
     type Ref<'a> = &'a Self;
+
+    #[inline]
+    fn kind(&self) -> NodeKind {
+        NodeKind::StmtAssign
+    }
+
     fn cast(kind: AnyNode) -> Option<Self>
     where
         Self: Sized,
@@ -1042,6 +1088,12 @@ impl AstNode for ast::StmtAssign {
 }
 impl AstNode for ast::StmtAugAssign {
     type Ref<'a> = &'a Self;
+
+    #[inline]
+    fn kind(&self) -> NodeKind {
+        NodeKind::StmtAugAssign
+    }
+
     fn cast(kind: AnyNode) -> Option<Self>
     where
         Self: Sized,
@@ -1091,6 +1143,12 @@ impl AstNode for ast::StmtAugAssign {
 }
 impl AstNode for ast::StmtAnnAssign {
     type Ref<'a> = &'a Self;
+
+    #[inline]
+    fn kind(&self) -> NodeKind {
+        NodeKind::StmtAnnAssign
+    }
+
     fn cast(kind: AnyNode) -> Option<Self>
     where
         Self: Sized,
@@ -1143,6 +1201,12 @@ impl AstNode for ast::StmtAnnAssign {
 }
 impl AstNode for ast::StmtFor {
     type Ref<'a> = &'a Self;
+
+    #[inline]
+    fn kind(&self) -> NodeKind {
+        NodeKind::StmtFor
+    }
+
     fn cast(kind: AnyNode) -> Option<Self>
     where
         Self: Sized,
@@ -1194,6 +1258,12 @@ impl AstNode for ast::StmtFor {
 }
 impl AstNode for ast::StmtWhile {
     type Ref<'a> = &'a Self;
+
+    #[inline]
+    fn kind(&self) -> NodeKind {
+        NodeKind::StmtWhile
+    }
+
     fn cast(kind: AnyNode) -> Option<Self>
     where
         Self: Sized,
@@ -1243,6 +1313,12 @@ impl AstNode for ast::StmtWhile {
 }
 impl AstNode for ast::StmtIf {
     type Ref<'a> = &'a Self;
+
+    #[inline]
+    fn kind(&self) -> NodeKind {
+        NodeKind::StmtIf
+    }
+
     fn cast(kind: AnyNode) -> Option<Self>
     where
         Self: Sized,
@@ -1294,6 +1370,12 @@ impl AstNode for ast::StmtIf {
 }
 impl AstNode for ast::ElifElseClause {
     type Ref<'a> = &'a Self;
+
+    #[inline]
+    fn kind(&self) -> NodeKind {
+        NodeKind::ElifElseClause
+    }
+
     fn cast(kind: AnyNode) -> Option<Self>
     where
         Self: Sized,
@@ -1342,6 +1424,12 @@ impl AstNode for ast::ElifElseClause {
 }
 impl AstNode for ast::StmtWith {
     type Ref<'a> = &'a Self;
+
+    #[inline]
+    fn kind(&self) -> NodeKind {
+        NodeKind::StmtWith
+    }
+
     fn cast(kind: AnyNode) -> Option<Self>
     where
         Self: Sized,
@@ -1392,6 +1480,12 @@ impl AstNode for ast::StmtWith {
 }
 impl AstNode for ast::StmtMatch {
     type Ref<'a> = &'a Self;
+
+    #[inline]
+    fn kind(&self) -> NodeKind {
+        NodeKind::StmtMatch
+    }
+
     fn cast(kind: AnyNode) -> Option<Self>
     where
         Self: Sized,
@@ -1441,6 +1535,12 @@ impl AstNode for ast::StmtMatch {
 }
 impl AstNode for ast::StmtRaise {
     type Ref<'a> = &'a Self;
+
+    #[inline]
+    fn kind(&self) -> NodeKind {
+        NodeKind::StmtRaise
+    }
+
     fn cast(kind: AnyNode) -> Option<Self>
     where
         Self: Sized,
@@ -1492,6 +1592,12 @@ impl AstNode for ast::StmtRaise {
 }
 impl AstNode for ast::StmtTry {
     type Ref<'a> = &'a Self;
+
+    #[inline]
+    fn kind(&self) -> NodeKind {
+        NodeKind::StmtTry
+    }
+
     fn cast(kind: AnyNode) -> Option<Self>
     where
         Self: Sized,
@@ -1546,6 +1652,12 @@ impl AstNode for ast::StmtTry {
 }
 impl AstNode for ast::StmtAssert {
     type Ref<'a> = &'a Self;
+
+    #[inline]
+    fn kind(&self) -> NodeKind {
+        NodeKind::StmtAssert
+    }
+
     fn cast(kind: AnyNode) -> Option<Self>
     where
         Self: Sized,
@@ -1594,6 +1706,12 @@ impl AstNode for ast::StmtAssert {
 }
 impl AstNode for ast::StmtImport {
     type Ref<'a> = &'a Self;
+
+    #[inline]
+    fn kind(&self) -> NodeKind {
+        NodeKind::StmtImport
+    }
+
     fn cast(kind: AnyNode) -> Option<Self>
     where
         Self: Sized,
@@ -1638,6 +1756,12 @@ impl AstNode for ast::StmtImport {
 }
 impl AstNode for ast::StmtImportFrom {
     type Ref<'a> = &'a Self;
+
+    #[inline]
+    fn kind(&self) -> NodeKind {
+        NodeKind::StmtImportFrom
+    }
+
     fn cast(kind: AnyNode) -> Option<Self>
     where
         Self: Sized,
@@ -1687,6 +1811,12 @@ impl AstNode for ast::StmtImportFrom {
 }
 impl AstNode for ast::StmtGlobal {
     type Ref<'a> = &'a Self;
+
+    #[inline]
+    fn kind(&self) -> NodeKind {
+        NodeKind::StmtGlobal
+    }
+
     fn cast(kind: AnyNode) -> Option<Self>
     where
         Self: Sized,
@@ -1727,6 +1857,12 @@ impl AstNode for ast::StmtGlobal {
 }
 impl AstNode for ast::StmtNonlocal {
     type Ref<'a> = &'a Self;
+
+    #[inline]
+    fn kind(&self) -> NodeKind {
+        NodeKind::StmtNonlocal
+    }
+
     fn cast(kind: AnyNode) -> Option<Self>
     where
         Self: Sized,
@@ -1767,6 +1903,12 @@ impl AstNode for ast::StmtNonlocal {
 }
 impl AstNode for ast::StmtExpr {
     type Ref<'a> = &'a Self;
+
+    #[inline]
+    fn kind(&self) -> NodeKind {
+        NodeKind::StmtExpr
+    }
+
     fn cast(kind: AnyNode) -> Option<Self>
     where
         Self: Sized,
@@ -1809,6 +1951,12 @@ impl AstNode for ast::StmtExpr {
 }
 impl AstNode for ast::StmtPass {
     type Ref<'a> = &'a Self;
+
+    #[inline]
+    fn kind(&self) -> NodeKind {
+        NodeKind::StmtPass
+    }
+
     fn cast(kind: AnyNode) -> Option<Self>
     where
         Self: Sized,
@@ -1849,6 +1997,12 @@ impl AstNode for ast::StmtPass {
 }
 impl AstNode for ast::StmtBreak {
     type Ref<'a> = &'a Self;
+
+    #[inline]
+    fn kind(&self) -> NodeKind {
+        NodeKind::StmtBreak
+    }
+
     fn cast(kind: AnyNode) -> Option<Self>
     where
         Self: Sized,
@@ -1889,6 +2043,12 @@ impl AstNode for ast::StmtBreak {
 }
 impl AstNode for ast::StmtContinue {
     type Ref<'a> = &'a Self;
+
+    #[inline]
+    fn kind(&self) -> NodeKind {
+        NodeKind::StmtContinue
+    }
+
     fn cast(kind: AnyNode) -> Option<Self>
     where
         Self: Sized,
@@ -1929,6 +2089,12 @@ impl AstNode for ast::StmtContinue {
 }
 impl AstNode for ast::StmtIpyEscapeCommand {
     type Ref<'a> = &'a Self;
+
+    #[inline]
+    fn kind(&self) -> NodeKind {
+        NodeKind::StmtIpyEscapeCommand
+    }
+
     fn cast(kind: AnyNode) -> Option<Self>
     where
         Self: Sized,
@@ -1969,6 +2135,12 @@ impl AstNode for ast::StmtIpyEscapeCommand {
 }
 impl AstNode for ast::ExprBoolOp {
     type Ref<'a> = &'a Self;
+
+    #[inline]
+    fn kind(&self) -> NodeKind {
+        NodeKind::ExprBoolOp
+    }
+
     fn cast(kind: AnyNode) -> Option<Self>
     where
         Self: Sized,
@@ -2025,6 +2197,12 @@ impl AstNode for ast::ExprBoolOp {
 }
 impl AstNode for ast::ExprNamed {
     type Ref<'a> = &'a Self;
+
+    #[inline]
+    fn kind(&self) -> NodeKind {
+        NodeKind::ExprNamed
+    }
+
     fn cast(kind: AnyNode) -> Option<Self>
     where
         Self: Sized,
@@ -2071,6 +2249,12 @@ impl AstNode for ast::ExprNamed {
 }
 impl AstNode for ast::ExprBinOp {
     type Ref<'a> = &'a Self;
+
+    #[inline]
+    fn kind(&self) -> NodeKind {
+        NodeKind::ExprBinOp
+    }
+
     fn cast(kind: AnyNode) -> Option<Self>
     where
         Self: Sized,
@@ -2119,6 +2303,12 @@ impl AstNode for ast::ExprBinOp {
 }
 impl AstNode for ast::ExprUnaryOp {
     type Ref<'a> = &'a Self;
+
+    #[inline]
+    fn kind(&self) -> NodeKind {
+        NodeKind::ExprUnaryOp
+    }
+
     fn cast(kind: AnyNode) -> Option<Self>
     where
         Self: Sized,
@@ -2166,6 +2356,11 @@ impl AstNode for ast::ExprUnaryOp {
 }
 impl AstNode for ast::ExprLambda {
     type Ref<'a> = &'a Self;
+
+    #[inline]
+    fn kind(&self) -> NodeKind {
+        NodeKind::ExprLambda
+    }
 
     fn cast(kind: AnyNode) -> Option<Self>
     where
@@ -2216,6 +2411,12 @@ impl AstNode for ast::ExprLambda {
 }
 impl AstNode for ast::ExprIf {
     type Ref<'a> = &'a Self;
+
+    #[inline]
+    fn kind(&self) -> NodeKind {
+        NodeKind::ExprIf
+    }
+
     fn cast(kind: AnyNode) -> Option<Self>
     where
         Self: Sized,
@@ -2266,6 +2467,12 @@ impl AstNode for ast::ExprIf {
 }
 impl AstNode for ast::ExprDict {
     type Ref<'a> = &'a Self;
+
+    #[inline]
+    fn kind(&self) -> NodeKind {
+        NodeKind::ExprDict
+    }
+
     fn cast(kind: AnyNode) -> Option<Self>
     where
         Self: Sized,
@@ -2313,6 +2520,12 @@ impl AstNode for ast::ExprDict {
 }
 impl AstNode for ast::ExprSet {
     type Ref<'a> = &'a Self;
+
+    #[inline]
+    fn kind(&self) -> NodeKind {
+        NodeKind::ExprSet
+    }
+
     fn cast(kind: AnyNode) -> Option<Self>
     where
         Self: Sized,
@@ -2357,6 +2570,12 @@ impl AstNode for ast::ExprSet {
 }
 impl AstNode for ast::ExprListComp {
     type Ref<'a> = &'a Self;
+
+    #[inline]
+    fn kind(&self) -> NodeKind {
+        NodeKind::ExprListComp
+    }
+
     fn cast(kind: AnyNode) -> Option<Self>
     where
         Self: Sized,
@@ -2406,6 +2625,12 @@ impl AstNode for ast::ExprListComp {
 }
 impl AstNode for ast::ExprSetComp {
     type Ref<'a> = &'a Self;
+
+    #[inline]
+    fn kind(&self) -> NodeKind {
+        NodeKind::ExprSetComp
+    }
+
     fn cast(kind: AnyNode) -> Option<Self>
     where
         Self: Sized,
@@ -2455,6 +2680,12 @@ impl AstNode for ast::ExprSetComp {
 }
 impl AstNode for ast::ExprDictComp {
     type Ref<'a> = &'a Self;
+
+    #[inline]
+    fn kind(&self) -> NodeKind {
+        NodeKind::ExprDictComp
+    }
+
     fn cast(kind: AnyNode) -> Option<Self>
     where
         Self: Sized,
@@ -2507,6 +2738,12 @@ impl AstNode for ast::ExprDictComp {
 }
 impl AstNode for ast::ExprGenerator {
     type Ref<'a> = &'a Self;
+
+    #[inline]
+    fn kind(&self) -> NodeKind {
+        NodeKind::ExprGenerator
+    }
+
     fn cast(kind: AnyNode) -> Option<Self>
     where
         Self: Sized,
@@ -2556,6 +2793,12 @@ impl AstNode for ast::ExprGenerator {
 }
 impl AstNode for ast::ExprAwait {
     type Ref<'a> = &'a Self;
+
+    #[inline]
+    fn kind(&self) -> NodeKind {
+        NodeKind::ExprAwait
+    }
+
     fn cast(kind: AnyNode) -> Option<Self>
     where
         Self: Sized,
@@ -2597,6 +2840,12 @@ impl AstNode for ast::ExprAwait {
 }
 impl AstNode for ast::ExprYield {
     type Ref<'a> = &'a Self;
+
+    #[inline]
+    fn kind(&self) -> NodeKind {
+        NodeKind::ExprYield
+    }
+
     fn cast(kind: AnyNode) -> Option<Self>
     where
         Self: Sized,
@@ -2640,6 +2889,12 @@ impl AstNode for ast::ExprYield {
 }
 impl AstNode for ast::ExprYieldFrom {
     type Ref<'a> = &'a Self;
+
+    #[inline]
+    fn kind(&self) -> NodeKind {
+        NodeKind::ExprYieldFrom
+    }
+
     fn cast(kind: AnyNode) -> Option<Self>
     where
         Self: Sized,
@@ -2681,6 +2936,12 @@ impl AstNode for ast::ExprYieldFrom {
 }
 impl AstNode for ast::ExprCompare {
     type Ref<'a> = &'a Self;
+
+    #[inline]
+    fn kind(&self) -> NodeKind {
+        NodeKind::ExprCompare
+    }
+
     fn cast(kind: AnyNode) -> Option<Self>
     where
         Self: Sized,
@@ -2733,6 +2994,12 @@ impl AstNode for ast::ExprCompare {
 }
 impl AstNode for ast::ExprCall {
     type Ref<'a> = &'a Self;
+
+    #[inline]
+    fn kind(&self) -> NodeKind {
+        NodeKind::ExprCall
+    }
+
     fn cast(kind: AnyNode) -> Option<Self>
     where
         Self: Sized,
@@ -2779,6 +3046,12 @@ impl AstNode for ast::ExprCall {
 }
 impl AstNode for ast::FStringFormatSpec {
     type Ref<'a> = &'a Self;
+
+    #[inline]
+    fn kind(&self) -> NodeKind {
+        NodeKind::FStringFormatSpec
+    }
+
     fn cast(kind: AnyNode) -> Option<Self>
     where
         Self: Sized,
@@ -2821,6 +3094,12 @@ impl AstNode for ast::FStringFormatSpec {
 }
 impl AstNode for ast::FStringExpressionElement {
     type Ref<'a> = &'a Self;
+
+    #[inline]
+    fn kind(&self) -> NodeKind {
+        NodeKind::FStringExpressionElement
+    }
+
     fn cast(kind: AnyNode) -> Option<Self>
     where
         Self: Sized,
@@ -2872,6 +3151,12 @@ impl AstNode for ast::FStringExpressionElement {
 }
 impl AstNode for ast::FStringLiteralElement {
     type Ref<'a> = &'a Self;
+
+    #[inline]
+    fn kind(&self) -> NodeKind {
+        NodeKind::FStringLiteralElement
+    }
+
     fn cast(kind: AnyNode) -> Option<Self>
     where
         Self: Sized,
@@ -2911,6 +3196,12 @@ impl AstNode for ast::FStringLiteralElement {
 }
 impl AstNode for ast::ExprFString {
     type Ref<'a> = &'a Self;
+
+    #[inline]
+    fn kind(&self) -> NodeKind {
+        NodeKind::ExprFString
+    }
+
     fn cast(kind: AnyNode) -> Option<Self>
     where
         Self: Sized,
@@ -2962,6 +3253,12 @@ impl AstNode for ast::ExprFString {
 }
 impl AstNode for ast::ExprStringLiteral {
     type Ref<'a> = &'a Self;
+
+    #[inline]
+    fn kind(&self) -> NodeKind {
+        NodeKind::ExprStringLiteral
+    }
+
     fn cast(kind: AnyNode) -> Option<Self>
     where
         Self: Sized,
@@ -3006,6 +3303,12 @@ impl AstNode for ast::ExprStringLiteral {
 }
 impl AstNode for ast::ExprBytesLiteral {
     type Ref<'a> = &'a Self;
+
+    #[inline]
+    fn kind(&self) -> NodeKind {
+        NodeKind::ExprBytesLiteral
+    }
+
     fn cast(kind: AnyNode) -> Option<Self>
     where
         Self: Sized,
@@ -3050,6 +3353,12 @@ impl AstNode for ast::ExprBytesLiteral {
 }
 impl AstNode for ast::ExprNumberLiteral {
     type Ref<'a> = &'a Self;
+
+    #[inline]
+    fn kind(&self) -> NodeKind {
+        NodeKind::ExprNumberLiteral
+    }
+
     fn cast(kind: AnyNode) -> Option<Self>
     where
         Self: Sized,
@@ -3089,6 +3398,12 @@ impl AstNode for ast::ExprNumberLiteral {
 }
 impl AstNode for ast::ExprBooleanLiteral {
     type Ref<'a> = &'a Self;
+
+    #[inline]
+    fn kind(&self) -> NodeKind {
+        NodeKind::ExprBooleanLiteral
+    }
+
     fn cast(kind: AnyNode) -> Option<Self>
     where
         Self: Sized,
@@ -3128,6 +3443,12 @@ impl AstNode for ast::ExprBooleanLiteral {
 }
 impl AstNode for ast::ExprNoneLiteral {
     type Ref<'a> = &'a Self;
+
+    #[inline]
+    fn kind(&self) -> NodeKind {
+        NodeKind::ExprNoneLiteral
+    }
+
     fn cast(kind: AnyNode) -> Option<Self>
     where
         Self: Sized,
@@ -3167,6 +3488,12 @@ impl AstNode for ast::ExprNoneLiteral {
 }
 impl AstNode for ast::ExprEllipsisLiteral {
     type Ref<'a> = &'a Self;
+
+    #[inline]
+    fn kind(&self) -> NodeKind {
+        NodeKind::ExprEllipsisLiteral
+    }
+
     fn cast(kind: AnyNode) -> Option<Self>
     where
         Self: Sized,
@@ -3206,6 +3533,12 @@ impl AstNode for ast::ExprEllipsisLiteral {
 }
 impl AstNode for ast::ExprAttribute {
     type Ref<'a> = &'a Self;
+
+    #[inline]
+    fn kind(&self) -> NodeKind {
+        NodeKind::ExprAttribute
+    }
+
     fn cast(kind: AnyNode) -> Option<Self>
     where
         Self: Sized,
@@ -3253,6 +3586,12 @@ impl AstNode for ast::ExprAttribute {
 }
 impl AstNode for ast::ExprSubscript {
     type Ref<'a> = &'a Self;
+
+    #[inline]
+    fn kind(&self) -> NodeKind {
+        NodeKind::ExprSubscript
+    }
+
     fn cast(kind: AnyNode) -> Option<Self>
     where
         Self: Sized,
@@ -3300,6 +3639,12 @@ impl AstNode for ast::ExprSubscript {
 }
 impl AstNode for ast::ExprStarred {
     type Ref<'a> = &'a Self;
+
+    #[inline]
+    fn kind(&self) -> NodeKind {
+        NodeKind::ExprStarred
+    }
+
     fn cast(kind: AnyNode) -> Option<Self>
     where
         Self: Sized,
@@ -3346,6 +3691,12 @@ impl AstNode for ast::ExprStarred {
 }
 impl AstNode for ast::ExprName {
     type Ref<'a> = &'a Self;
+
+    #[inline]
+    fn kind(&self) -> NodeKind {
+        NodeKind::ExprName
+    }
+
     fn cast(kind: AnyNode) -> Option<Self>
     where
         Self: Sized,
@@ -3391,6 +3742,12 @@ impl AstNode for ast::ExprName {
 }
 impl AstNode for ast::ExprList {
     type Ref<'a> = &'a Self;
+
+    #[inline]
+    fn kind(&self) -> NodeKind {
+        NodeKind::ExprList
+    }
+
     fn cast(kind: AnyNode) -> Option<Self>
     where
         Self: Sized,
@@ -3439,6 +3796,12 @@ impl AstNode for ast::ExprList {
 }
 impl AstNode for ast::ExprTuple {
     type Ref<'a> = &'a Self;
+
+    #[inline]
+    fn kind(&self) -> NodeKind {
+        NodeKind::ExprTuple
+    }
+
     fn cast(kind: AnyNode) -> Option<Self>
     where
         Self: Sized,
@@ -3488,6 +3851,12 @@ impl AstNode for ast::ExprTuple {
 }
 impl AstNode for ast::ExprSlice {
     type Ref<'a> = &'a Self;
+
+    #[inline]
+    fn kind(&self) -> NodeKind {
+        NodeKind::ExprSlice
+    }
+
     fn cast(kind: AnyNode) -> Option<Self>
     where
         Self: Sized,
@@ -3542,6 +3911,12 @@ impl AstNode for ast::ExprSlice {
 }
 impl AstNode for ast::ExprIpyEscapeCommand {
     type Ref<'a> = &'a Self;
+
+    #[inline]
+    fn kind(&self) -> NodeKind {
+        NodeKind::ExprIpyEscapeCommand
+    }
+
     fn cast(kind: AnyNode) -> Option<Self>
     where
         Self: Sized,
@@ -3585,8 +3960,462 @@ impl AstNode for ast::ExprIpyEscapeCommand {
         } = self;
     }
 }
+
+impl AstNode for ast::Expr {
+    type Ref<'a> = ExpressionRef<'a>;
+
+    #[inline]
+    fn kind(&self) -> NodeKind {
+        match self {
+            Expr::BoolOp(node) => node.kind(),
+            Expr::Named(node) => node.kind(),
+            Expr::BinOp(node) => node.kind(),
+            Expr::UnaryOp(node) => node.kind(),
+            Expr::Lambda(node) => node.kind(),
+            Expr::If(node) => node.kind(),
+            Expr::Dict(node) => node.kind(),
+            Expr::Set(node) => node.kind(),
+            Expr::ListComp(node) => node.kind(),
+            Expr::SetComp(node) => node.kind(),
+            Expr::DictComp(node) => node.kind(),
+            Expr::Generator(node) => node.kind(),
+            Expr::Await(node) => node.kind(),
+            Expr::Yield(node) => node.kind(),
+            Expr::YieldFrom(node) => node.kind(),
+            Expr::Compare(node) => node.kind(),
+            Expr::Call(node) => node.kind(),
+            Expr::FString(node) => node.kind(),
+            Expr::StringLiteral(node) => node.kind(),
+            Expr::BytesLiteral(node) => node.kind(),
+            Expr::NumberLiteral(node) => node.kind(),
+            Expr::BooleanLiteral(node) => node.kind(),
+            Expr::NoneLiteral(node) => node.kind(),
+            Expr::EllipsisLiteral(node) => node.kind(),
+            Expr::Attribute(node) => node.kind(),
+            Expr::Subscript(node) => node.kind(),
+            Expr::Starred(node) => node.kind(),
+            Expr::Name(node) => node.kind(),
+            Expr::List(node) => node.kind(),
+            Expr::Tuple(node) => node.kind(),
+            Expr::Slice(node) => node.kind(),
+            Expr::IpyEscapeCommand(node) => node.kind(),
+        }
+    }
+
+    fn cast(kind: AnyNode) -> Option<Self>
+    where
+        Self: Sized,
+    {
+        match kind {
+            AnyNode::ExprBoolOp(node) => Some(Expr::BoolOp(node)),
+            AnyNode::ExprNamed(node) => Some(Expr::Named(node)),
+            AnyNode::ExprBinOp(node) => Some(Expr::BinOp(node)),
+            AnyNode::ExprUnaryOp(node) => Some(Expr::UnaryOp(node)),
+            AnyNode::ExprLambda(node) => Some(Expr::Lambda(node)),
+            AnyNode::ExprIf(node) => Some(Expr::If(node)),
+            AnyNode::ExprDict(node) => Some(Expr::Dict(node)),
+            AnyNode::ExprSet(node) => Some(Expr::Set(node)),
+            AnyNode::ExprListComp(node) => Some(Expr::ListComp(node)),
+            AnyNode::ExprSetComp(node) => Some(Expr::SetComp(node)),
+            AnyNode::ExprDictComp(node) => Some(Expr::DictComp(node)),
+            AnyNode::ExprGenerator(node) => Some(Expr::Generator(node)),
+            AnyNode::ExprAwait(node) => Some(Expr::Await(node)),
+            AnyNode::ExprYield(node) => Some(Expr::Yield(node)),
+            AnyNode::ExprYieldFrom(node) => Some(Expr::YieldFrom(node)),
+            AnyNode::ExprCompare(node) => Some(Expr::Compare(node)),
+            AnyNode::ExprCall(node) => Some(Expr::Call(node)),
+            AnyNode::ExprFString(node) => Some(Expr::FString(node)),
+            AnyNode::ExprStringLiteral(node) => Some(Expr::StringLiteral(node)),
+            AnyNode::ExprBytesLiteral(node) => Some(Expr::BytesLiteral(node)),
+            AnyNode::ExprNumberLiteral(node) => Some(Expr::NumberLiteral(node)),
+            AnyNode::ExprBooleanLiteral(node) => Some(Expr::BooleanLiteral(node)),
+            AnyNode::ExprNoneLiteral(node) => Some(Expr::NoneLiteral(node)),
+            AnyNode::ExprEllipsisLiteral(node) => Some(Expr::EllipsisLiteral(node)),
+            AnyNode::ExprAttribute(node) => Some(Expr::Attribute(node)),
+            AnyNode::ExprSubscript(node) => Some(Expr::Subscript(node)),
+            AnyNode::ExprStarred(node) => Some(Expr::Starred(node)),
+            AnyNode::ExprName(node) => Some(Expr::Name(node)),
+            AnyNode::ExprList(node) => Some(Expr::List(node)),
+            AnyNode::ExprTuple(node) => Some(Expr::Tuple(node)),
+            AnyNode::ExprSlice(node) => Some(Expr::Slice(node)),
+            AnyNode::ExprIpyEscapeCommand(node) => Some(Expr::IpyEscapeCommand(node)),
+            AnyNode::ModModule(_)
+            | AnyNode::ModExpression(_)
+            | AnyNode::StmtFunctionDef(_)
+            | AnyNode::StmtClassDef(_)
+            | AnyNode::StmtReturn(_)
+            | AnyNode::StmtDelete(_)
+            | AnyNode::StmtTypeAlias(_)
+            | AnyNode::StmtAssign(_)
+            | AnyNode::StmtAugAssign(_)
+            | AnyNode::StmtAnnAssign(_)
+            | AnyNode::StmtFor(_)
+            | AnyNode::StmtWhile(_)
+            | AnyNode::StmtIf(_)
+            | AnyNode::StmtWith(_)
+            | AnyNode::StmtMatch(_)
+            | AnyNode::StmtRaise(_)
+            | AnyNode::StmtTry(_)
+            | AnyNode::StmtAssert(_)
+            | AnyNode::StmtImport(_)
+            | AnyNode::StmtImportFrom(_)
+            | AnyNode::StmtGlobal(_)
+            | AnyNode::StmtNonlocal(_)
+            | AnyNode::StmtExpr(_)
+            | AnyNode::StmtPass(_)
+            | AnyNode::StmtBreak(_)
+            | AnyNode::StmtContinue(_)
+            | AnyNode::StmtIpyEscapeCommand(_)
+            | AnyNode::ExceptHandlerExceptHandler(_)
+            | AnyNode::FStringExpressionElement(_)
+            | AnyNode::FStringLiteralElement(_)
+            | AnyNode::FStringFormatSpec(_)
+            | AnyNode::PatternMatchValue(_)
+            | AnyNode::PatternMatchSingleton(_)
+            | AnyNode::PatternMatchSequence(_)
+            | AnyNode::PatternMatchMapping(_)
+            | AnyNode::PatternMatchClass(_)
+            | AnyNode::PatternMatchStar(_)
+            | AnyNode::PatternMatchAs(_)
+            | AnyNode::PatternMatchOr(_)
+            | AnyNode::PatternArguments(_)
+            | AnyNode::PatternKeyword(_)
+            | AnyNode::Comprehension(_)
+            | AnyNode::Arguments(_)
+            | AnyNode::Parameters(_)
+            | AnyNode::Parameter(_)
+            | AnyNode::ParameterWithDefault(_)
+            | AnyNode::Keyword(_)
+            | AnyNode::Alias(_)
+            | AnyNode::WithItem(_)
+            | AnyNode::MatchCase(_)
+            | AnyNode::Decorator(_)
+            | AnyNode::ElifElseClause(_)
+            | AnyNode::TypeParams(_)
+            | AnyNode::TypeParamTypeVar(_)
+            | AnyNode::TypeParamTypeVarTuple(_)
+            | AnyNode::TypeParamParamSpec(_)
+            | AnyNode::FString(_)
+            | AnyNode::StringLiteral(_)
+            | AnyNode::BytesLiteral(_) => None,
+        }
+    }
+
+    fn cast_ref(kind: AnyNodeRef<'_>) -> Option<Self::Ref<'_>> {
+        match kind {
+            AnyNodeRef::ExprBoolOp(node) => Some(ExpressionRef::BoolOp(node)),
+            AnyNodeRef::ExprNamed(node) => Some(ExpressionRef::Named(node)),
+            AnyNodeRef::ExprBinOp(node) => Some(ExpressionRef::BinOp(node)),
+            AnyNodeRef::ExprUnaryOp(node) => Some(ExpressionRef::UnaryOp(node)),
+            AnyNodeRef::ExprLambda(node) => Some(ExpressionRef::Lambda(node)),
+            AnyNodeRef::ExprIf(node) => Some(ExpressionRef::If(node)),
+            AnyNodeRef::ExprDict(node) => Some(ExpressionRef::Dict(node)),
+            AnyNodeRef::ExprSet(node) => Some(ExpressionRef::Set(node)),
+            AnyNodeRef::ExprListComp(node) => Some(ExpressionRef::ListComp(node)),
+            AnyNodeRef::ExprSetComp(node) => Some(ExpressionRef::SetComp(node)),
+            AnyNodeRef::ExprDictComp(node) => Some(ExpressionRef::DictComp(node)),
+            AnyNodeRef::ExprGenerator(node) => Some(ExpressionRef::Generator(node)),
+            AnyNodeRef::ExprAwait(node) => Some(ExpressionRef::Await(node)),
+            AnyNodeRef::ExprYield(node) => Some(ExpressionRef::Yield(node)),
+            AnyNodeRef::ExprYieldFrom(node) => Some(ExpressionRef::YieldFrom(node)),
+            AnyNodeRef::ExprCompare(node) => Some(ExpressionRef::Compare(node)),
+            AnyNodeRef::ExprCall(node) => Some(ExpressionRef::Call(node)),
+            AnyNodeRef::ExprFString(node) => Some(ExpressionRef::FString(node)),
+            AnyNodeRef::ExprStringLiteral(node) => Some(ExpressionRef::StringLiteral(node)),
+            AnyNodeRef::ExprBytesLiteral(node) => Some(ExpressionRef::BytesLiteral(node)),
+            AnyNodeRef::ExprNumberLiteral(node) => Some(ExpressionRef::NumberLiteral(node)),
+            AnyNodeRef::ExprBooleanLiteral(node) => Some(ExpressionRef::BooleanLiteral(node)),
+            AnyNodeRef::ExprNoneLiteral(node) => Some(ExpressionRef::NoneLiteral(node)),
+            AnyNodeRef::ExprEllipsisLiteral(node) => Some(ExpressionRef::EllipsisLiteral(node)),
+            AnyNodeRef::ExprAttribute(node) => Some(ExpressionRef::Attribute(node)),
+            AnyNodeRef::ExprSubscript(node) => Some(ExpressionRef::Subscript(node)),
+            AnyNodeRef::ExprStarred(node) => Some(ExpressionRef::Starred(node)),
+            AnyNodeRef::ExprName(node) => Some(ExpressionRef::Name(node)),
+            AnyNodeRef::ExprList(node) => Some(ExpressionRef::List(node)),
+            AnyNodeRef::ExprTuple(node) => Some(ExpressionRef::Tuple(node)),
+            AnyNodeRef::ExprSlice(node) => Some(ExpressionRef::Slice(node)),
+            AnyNodeRef::ExprIpyEscapeCommand(node) => Some(ExpressionRef::IpyEscapeCommand(node)),
+            AnyNodeRef::ModModule(_)
+            | AnyNodeRef::ModExpression(_)
+            | AnyNodeRef::StmtFunctionDef(_)
+            | AnyNodeRef::StmtClassDef(_)
+            | AnyNodeRef::StmtReturn(_)
+            | AnyNodeRef::StmtDelete(_)
+            | AnyNodeRef::StmtTypeAlias(_)
+            | AnyNodeRef::StmtAssign(_)
+            | AnyNodeRef::StmtAugAssign(_)
+            | AnyNodeRef::StmtAnnAssign(_)
+            | AnyNodeRef::StmtFor(_)
+            | AnyNodeRef::StmtWhile(_)
+            | AnyNodeRef::StmtIf(_)
+            | AnyNodeRef::StmtWith(_)
+            | AnyNodeRef::StmtMatch(_)
+            | AnyNodeRef::StmtRaise(_)
+            | AnyNodeRef::StmtTry(_)
+            | AnyNodeRef::StmtAssert(_)
+            | AnyNodeRef::StmtImport(_)
+            | AnyNodeRef::StmtImportFrom(_)
+            | AnyNodeRef::StmtGlobal(_)
+            | AnyNodeRef::StmtNonlocal(_)
+            | AnyNodeRef::StmtExpr(_)
+            | AnyNodeRef::StmtPass(_)
+            | AnyNodeRef::StmtBreak(_)
+            | AnyNodeRef::StmtContinue(_)
+            | AnyNodeRef::StmtIpyEscapeCommand(_)
+            | AnyNodeRef::ExceptHandlerExceptHandler(_)
+            | AnyNodeRef::FStringExpressionElement(_)
+            | AnyNodeRef::FStringLiteralElement(_)
+            | AnyNodeRef::FStringFormatSpec(_)
+            | AnyNodeRef::PatternMatchValue(_)
+            | AnyNodeRef::PatternMatchSingleton(_)
+            | AnyNodeRef::PatternMatchSequence(_)
+            | AnyNodeRef::PatternMatchMapping(_)
+            | AnyNodeRef::PatternMatchClass(_)
+            | AnyNodeRef::PatternMatchStar(_)
+            | AnyNodeRef::PatternMatchAs(_)
+            | AnyNodeRef::PatternMatchOr(_)
+            | AnyNodeRef::PatternArguments(_)
+            | AnyNodeRef::PatternKeyword(_)
+            | AnyNodeRef::Comprehension(_)
+            | AnyNodeRef::Arguments(_)
+            | AnyNodeRef::Parameters(_)
+            | AnyNodeRef::Parameter(_)
+            | AnyNodeRef::ParameterWithDefault(_)
+            | AnyNodeRef::Keyword(_)
+            | AnyNodeRef::Alias(_)
+            | AnyNodeRef::WithItem(_)
+            | AnyNodeRef::MatchCase(_)
+            | AnyNodeRef::Decorator(_)
+            | AnyNodeRef::ElifElseClause(_)
+            | AnyNodeRef::TypeParams(_)
+            | AnyNodeRef::TypeParamTypeVar(_)
+            | AnyNodeRef::TypeParamTypeVarTuple(_)
+            | AnyNodeRef::TypeParamParamSpec(_)
+            | AnyNodeRef::FString(_)
+            | AnyNodeRef::StringLiteral(_)
+            | AnyNodeRef::BytesLiteral(_) => None,
+        }
+    }
+
+    fn can_cast(kind: NodeKind) -> bool {
+        match kind {
+            NodeKind::ExprBoolOp
+            | NodeKind::ExprNamed
+            | NodeKind::ExprBinOp
+            | NodeKind::ExprUnaryOp
+            | NodeKind::ExprLambda
+            | NodeKind::ExprIf
+            | NodeKind::ExprDict
+            | NodeKind::ExprSet
+            | NodeKind::ExprListComp
+            | NodeKind::ExprSetComp
+            | NodeKind::ExprDictComp
+            | NodeKind::ExprGenerator
+            | NodeKind::ExprAwait
+            | NodeKind::ExprYield
+            | NodeKind::ExprYieldFrom
+            | NodeKind::ExprCompare
+            | NodeKind::ExprCall
+            | NodeKind::ExprFString
+            | NodeKind::ExprStringLiteral
+            | NodeKind::ExprBytesLiteral
+            | NodeKind::ExprNumberLiteral
+            | NodeKind::ExprBooleanLiteral
+            | NodeKind::ExprNoneLiteral
+            | NodeKind::ExprEllipsisLiteral
+            | NodeKind::ExprAttribute
+            | NodeKind::ExprSubscript
+            | NodeKind::ExprStarred
+            | NodeKind::ExprName
+            | NodeKind::ExprList
+            | NodeKind::ExprTuple
+            | NodeKind::ExprSlice
+            | NodeKind::ExprIpyEscapeCommand => true,
+            NodeKind::ModModule
+            | NodeKind::ModExpression
+            | NodeKind::StmtFunctionDef
+            | NodeKind::StmtClassDef
+            | NodeKind::StmtReturn
+            | NodeKind::StmtDelete
+            | NodeKind::StmtTypeAlias
+            | NodeKind::StmtAssign
+            | NodeKind::StmtAugAssign
+            | NodeKind::StmtAnnAssign
+            | NodeKind::StmtFor
+            | NodeKind::StmtWhile
+            | NodeKind::StmtIf
+            | NodeKind::StmtWith
+            | NodeKind::StmtMatch
+            | NodeKind::StmtRaise
+            | NodeKind::StmtTry
+            | NodeKind::StmtAssert
+            | NodeKind::StmtImport
+            | NodeKind::StmtImportFrom
+            | NodeKind::StmtGlobal
+            | NodeKind::StmtNonlocal
+            | NodeKind::StmtExpr
+            | NodeKind::StmtPass
+            | NodeKind::StmtBreak
+            | NodeKind::StmtContinue
+            | NodeKind::StmtIpyEscapeCommand
+            | NodeKind::ExceptHandlerExceptHandler
+            | NodeKind::FStringExpressionElement
+            | NodeKind::FStringLiteralElement
+            | NodeKind::FStringFormatSpec
+            | NodeKind::PatternMatchValue
+            | NodeKind::PatternMatchSingleton
+            | NodeKind::PatternMatchSequence
+            | NodeKind::PatternMatchMapping
+            | NodeKind::PatternMatchClass
+            | NodeKind::PatternMatchStar
+            | NodeKind::PatternMatchAs
+            | NodeKind::PatternMatchOr
+            | NodeKind::PatternArguments
+            | NodeKind::PatternKeyword
+            | NodeKind::Comprehension
+            | NodeKind::Arguments
+            | NodeKind::Parameters
+            | NodeKind::Parameter
+            | NodeKind::ParameterWithDefault
+            | NodeKind::Keyword
+            | NodeKind::Alias
+            | NodeKind::WithItem
+            | NodeKind::MatchCase
+            | NodeKind::Decorator
+            | NodeKind::ElifElseClause
+            | NodeKind::TypeParams
+            | NodeKind::TypeParamTypeVar
+            | NodeKind::TypeParamTypeVarTuple
+            | NodeKind::TypeParamParamSpec
+            | NodeKind::FString
+            | NodeKind::StringLiteral
+            | NodeKind::BytesLiteral => false,
+        }
+    }
+
+    fn as_any_node_ref(&self) -> AnyNodeRef {
+        match self {
+            Expr::BoolOp(node) => node.as_any_node_ref(),
+            Expr::Named(node) => node.as_any_node_ref(),
+            Expr::BinOp(node) => node.as_any_node_ref(),
+            Expr::UnaryOp(node) => node.as_any_node_ref(),
+            Expr::Lambda(node) => node.as_any_node_ref(),
+            Expr::If(node) => node.as_any_node_ref(),
+            Expr::Dict(node) => node.as_any_node_ref(),
+            Expr::Set(node) => node.as_any_node_ref(),
+            Expr::ListComp(node) => node.as_any_node_ref(),
+            Expr::SetComp(node) => node.as_any_node_ref(),
+            Expr::DictComp(node) => node.as_any_node_ref(),
+            Expr::Generator(node) => node.as_any_node_ref(),
+            Expr::Await(node) => node.as_any_node_ref(),
+            Expr::Yield(node) => node.as_any_node_ref(),
+            Expr::YieldFrom(node) => node.as_any_node_ref(),
+            Expr::Compare(node) => node.as_any_node_ref(),
+            Expr::Call(node) => node.as_any_node_ref(),
+            Expr::FString(node) => node.as_any_node_ref(),
+            Expr::StringLiteral(node) => node.as_any_node_ref(),
+            Expr::BytesLiteral(node) => node.as_any_node_ref(),
+            Expr::NumberLiteral(node) => node.as_any_node_ref(),
+            Expr::BooleanLiteral(node) => node.as_any_node_ref(),
+            Expr::NoneLiteral(node) => node.as_any_node_ref(),
+            Expr::EllipsisLiteral(node) => node.as_any_node_ref(),
+            Expr::Attribute(node) => node.as_any_node_ref(),
+            Expr::Subscript(node) => node.as_any_node_ref(),
+            Expr::Starred(node) => node.as_any_node_ref(),
+            Expr::Name(node) => node.as_any_node_ref(),
+            Expr::List(node) => node.as_any_node_ref(),
+            Expr::Tuple(node) => node.as_any_node_ref(),
+            Expr::Slice(node) => node.as_any_node_ref(),
+            Expr::IpyEscapeCommand(node) => node.as_any_node_ref(),
+        }
+    }
+
+    fn into_any_node(self) -> AnyNode {
+        match self {
+            Expr::BoolOp(node) => node.into_any_node(),
+            Expr::Named(node) => node.into_any_node(),
+            Expr::BinOp(node) => node.into_any_node(),
+            Expr::UnaryOp(node) => node.into_any_node(),
+            Expr::Lambda(node) => node.into_any_node(),
+            Expr::If(node) => node.into_any_node(),
+            Expr::Dict(node) => node.into_any_node(),
+            Expr::Set(node) => node.into_any_node(),
+            Expr::ListComp(node) => node.into_any_node(),
+            Expr::SetComp(node) => node.into_any_node(),
+            Expr::DictComp(node) => node.into_any_node(),
+            Expr::Generator(node) => node.into_any_node(),
+            Expr::Await(node) => node.into_any_node(),
+            Expr::Yield(node) => node.into_any_node(),
+            Expr::YieldFrom(node) => node.into_any_node(),
+            Expr::Compare(node) => node.into_any_node(),
+            Expr::Call(node) => node.into_any_node(),
+            Expr::FString(node) => node.into_any_node(),
+            Expr::StringLiteral(node) => node.into_any_node(),
+            Expr::BytesLiteral(node) => node.into_any_node(),
+            Expr::NumberLiteral(node) => node.into_any_node(),
+            Expr::BooleanLiteral(node) => node.into_any_node(),
+            Expr::NoneLiteral(node) => node.into_any_node(),
+            Expr::EllipsisLiteral(node) => node.into_any_node(),
+            Expr::Attribute(node) => node.into_any_node(),
+            Expr::Subscript(node) => node.into_any_node(),
+            Expr::Starred(node) => node.into_any_node(),
+            Expr::Name(node) => node.into_any_node(),
+            Expr::List(node) => node.into_any_node(),
+            Expr::Tuple(node) => node.into_any_node(),
+            Expr::Slice(node) => node.into_any_node(),
+            Expr::IpyEscapeCommand(node) => node.into_any_node(),
+        }
+    }
+
+    fn visit_source_order<'a, V>(&'a self, visitor: &mut V)
+    where
+        V: SourceOrderVisitor<'a> + ?Sized,
+    {
+        match self {
+            Expr::BoolOp(node) => node.visit_source_order(visitor),
+            Expr::Named(node) => node.visit_source_order(visitor),
+            Expr::BinOp(node) => node.visit_source_order(visitor),
+            Expr::UnaryOp(node) => node.visit_source_order(visitor),
+            Expr::Lambda(node) => node.visit_source_order(visitor),
+            Expr::If(node) => node.visit_source_order(visitor),
+            Expr::Dict(node) => node.visit_source_order(visitor),
+            Expr::Set(node) => node.visit_source_order(visitor),
+            Expr::ListComp(node) => node.visit_source_order(visitor),
+            Expr::SetComp(node) => node.visit_source_order(visitor),
+            Expr::DictComp(node) => node.visit_source_order(visitor),
+            Expr::Generator(node) => node.visit_source_order(visitor),
+            Expr::Await(node) => node.visit_source_order(visitor),
+            Expr::Yield(node) => node.visit_source_order(visitor),
+            Expr::YieldFrom(node) => node.visit_source_order(visitor),
+            Expr::Compare(node) => node.visit_source_order(visitor),
+            Expr::Call(node) => node.visit_source_order(visitor),
+            Expr::FString(node) => node.visit_source_order(visitor),
+            Expr::StringLiteral(node) => node.visit_source_order(visitor),
+            Expr::BytesLiteral(node) => node.visit_source_order(visitor),
+            Expr::NumberLiteral(node) => node.visit_source_order(visitor),
+            Expr::BooleanLiteral(node) => node.visit_source_order(visitor),
+            Expr::NoneLiteral(node) => node.visit_source_order(visitor),
+            Expr::EllipsisLiteral(node) => node.visit_source_order(visitor),
+            Expr::Attribute(node) => node.visit_source_order(visitor),
+            Expr::Subscript(node) => node.visit_source_order(visitor),
+            Expr::Starred(node) => node.visit_source_order(visitor),
+            Expr::Name(node) => node.visit_source_order(visitor),
+            Expr::List(node) => node.visit_source_order(visitor),
+            Expr::Tuple(node) => node.visit_source_order(visitor),
+            Expr::Slice(node) => node.visit_source_order(visitor),
+            Expr::IpyEscapeCommand(node) => node.visit_source_order(visitor),
+        }
+    }
+}
+
 impl AstNode for ast::ExceptHandlerExceptHandler {
     type Ref<'a> = &'a Self;
+
+    #[inline]
+    fn kind(&self) -> NodeKind {
+        NodeKind::ExceptHandlerExceptHandler
+    }
+
     fn cast(kind: AnyNode) -> Option<Self>
     where
         Self: Sized,
@@ -3636,6 +4465,12 @@ impl AstNode for ast::ExceptHandlerExceptHandler {
 }
 impl AstNode for ast::PatternMatchValue {
     type Ref<'a> = &'a Self;
+
+    #[inline]
+    fn kind(&self) -> NodeKind {
+        NodeKind::PatternMatchValue
+    }
+
     fn cast(kind: AnyNode) -> Option<Self>
     where
         Self: Sized,
@@ -3677,6 +4512,12 @@ impl AstNode for ast::PatternMatchValue {
 }
 impl AstNode for ast::PatternMatchSingleton {
     type Ref<'a> = &'a Self;
+
+    #[inline]
+    fn kind(&self) -> NodeKind {
+        NodeKind::PatternMatchSingleton
+    }
+
     fn cast(kind: AnyNode) -> Option<Self>
     where
         Self: Sized,
@@ -3718,6 +4559,12 @@ impl AstNode for ast::PatternMatchSingleton {
 }
 impl AstNode for ast::PatternMatchSequence {
     type Ref<'a> = &'a Self;
+
+    #[inline]
+    fn kind(&self) -> NodeKind {
+        NodeKind::PatternMatchSequence
+    }
+
     fn cast(kind: AnyNode) -> Option<Self>
     where
         Self: Sized,
@@ -3761,6 +4608,12 @@ impl AstNode for ast::PatternMatchSequence {
 }
 impl AstNode for ast::PatternMatchMapping {
     type Ref<'a> = &'a Self;
+
+    #[inline]
+    fn kind(&self) -> NodeKind {
+        NodeKind::PatternMatchMapping
+    }
+
     fn cast(kind: AnyNode) -> Option<Self>
     where
         Self: Sized,
@@ -3810,6 +4663,12 @@ impl AstNode for ast::PatternMatchMapping {
 }
 impl AstNode for ast::PatternMatchClass {
     type Ref<'a> = &'a Self;
+
+    #[inline]
+    fn kind(&self) -> NodeKind {
+        NodeKind::PatternMatchClass
+    }
+
     fn cast(kind: AnyNode) -> Option<Self>
     where
         Self: Sized,
@@ -3856,6 +4715,12 @@ impl AstNode for ast::PatternMatchClass {
 }
 impl AstNode for ast::PatternMatchStar {
     type Ref<'a> = &'a Self;
+
+    #[inline]
+    fn kind(&self) -> NodeKind {
+        NodeKind::PatternMatchStar
+    }
+
     fn cast(kind: AnyNode) -> Option<Self>
     where
         Self: Sized,
@@ -3897,6 +4762,12 @@ impl AstNode for ast::PatternMatchStar {
 }
 impl AstNode for ast::PatternMatchAs {
     type Ref<'a> = &'a Self;
+
+    #[inline]
+    fn kind(&self) -> NodeKind {
+        NodeKind::PatternMatchAs
+    }
+
     fn cast(kind: AnyNode) -> Option<Self>
     where
         Self: Sized,
@@ -3944,6 +4815,12 @@ impl AstNode for ast::PatternMatchAs {
 }
 impl AstNode for ast::PatternMatchOr {
     type Ref<'a> = &'a Self;
+
+    #[inline]
+    fn kind(&self) -> NodeKind {
+        NodeKind::PatternMatchOr
+    }
+
     fn cast(kind: AnyNode) -> Option<Self>
     where
         Self: Sized,
@@ -3987,6 +4864,12 @@ impl AstNode for ast::PatternMatchOr {
 }
 impl AstNode for PatternArguments {
     type Ref<'a> = &'a Self;
+
+    #[inline]
+    fn kind(&self) -> NodeKind {
+        NodeKind::PatternArguments
+    }
+
     fn cast(kind: AnyNode) -> Option<Self>
     where
         Self: Sized,
@@ -4039,6 +4922,12 @@ impl AstNode for PatternArguments {
 }
 impl AstNode for PatternKeyword {
     type Ref<'a> = &'a Self;
+
+    #[inline]
+    fn kind(&self) -> NodeKind {
+        NodeKind::PatternKeyword
+    }
+
     fn cast(kind: AnyNode) -> Option<Self>
     where
         Self: Sized,
@@ -4086,6 +4975,12 @@ impl AstNode for PatternKeyword {
 
 impl AstNode for Comprehension {
     type Ref<'a> = &'a Self;
+
+    #[inline]
+    fn kind(&self) -> NodeKind {
+        NodeKind::Comprehension
+    }
+
     fn cast(kind: AnyNode) -> Option<Self>
     where
         Self: Sized,
@@ -4138,6 +5033,12 @@ impl AstNode for Comprehension {
 }
 impl AstNode for Arguments {
     type Ref<'a> = &'a Self;
+
+    #[inline]
+    fn kind(&self) -> NodeKind {
+        NodeKind::Arguments
+    }
+
     fn cast(kind: AnyNode) -> Option<Self>
     where
         Self: Sized,
@@ -4183,6 +5084,12 @@ impl AstNode for Arguments {
 }
 impl AstNode for Parameters {
     type Ref<'a> = &'a Self;
+
+    #[inline]
+    fn kind(&self) -> NodeKind {
+        NodeKind::Parameters
+    }
+
     fn cast(kind: AnyNode) -> Option<Self>
     where
         Self: Sized,
@@ -4230,6 +5137,12 @@ impl AstNode for Parameters {
 }
 impl AstNode for Parameter {
     type Ref<'a> = &'a Self;
+
+    #[inline]
+    fn kind(&self) -> NodeKind {
+        NodeKind::Parameter
+    }
+
     fn cast(kind: AnyNode) -> Option<Self>
     where
         Self: Sized,
@@ -4278,6 +5191,12 @@ impl AstNode for Parameter {
 }
 impl AstNode for ParameterWithDefault {
     type Ref<'a> = &'a Self;
+
+    #[inline]
+    fn kind(&self) -> NodeKind {
+        NodeKind::ParameterWithDefault
+    }
+
     fn cast(kind: AnyNode) -> Option<Self>
     where
         Self: Sized,
@@ -4326,6 +5245,12 @@ impl AstNode for ParameterWithDefault {
 }
 impl AstNode for Keyword {
     type Ref<'a> = &'a Self;
+
+    #[inline]
+    fn kind(&self) -> NodeKind {
+        NodeKind::Keyword
+    }
+
     fn cast(kind: AnyNode) -> Option<Self>
     where
         Self: Sized,
@@ -4372,6 +5297,12 @@ impl AstNode for Keyword {
 }
 impl AstNode for Alias {
     type Ref<'a> = &'a Self;
+
+    #[inline]
+    fn kind(&self) -> NodeKind {
+        NodeKind::Alias
+    }
+
     fn cast(kind: AnyNode) -> Option<Self>
     where
         Self: Sized,
@@ -4417,6 +5348,12 @@ impl AstNode for Alias {
 }
 impl AstNode for WithItem {
     type Ref<'a> = &'a Self;
+
+    #[inline]
+    fn kind(&self) -> NodeKind {
+        NodeKind::WithItem
+    }
+
     fn cast(kind: AnyNode) -> Option<Self>
     where
         Self: Sized,
@@ -4467,6 +5404,12 @@ impl AstNode for WithItem {
 }
 impl AstNode for MatchCase {
     type Ref<'a> = &'a Self;
+
+    #[inline]
+    fn kind(&self) -> NodeKind {
+        NodeKind::MatchCase
+    }
+
     fn cast(kind: AnyNode) -> Option<Self>
     where
         Self: Sized,
@@ -4519,6 +5462,12 @@ impl AstNode for MatchCase {
 
 impl AstNode for Decorator {
     type Ref<'a> = &'a Self;
+
+    #[inline]
+    fn kind(&self) -> NodeKind {
+        NodeKind::Decorator
+    }
+
     fn cast(kind: AnyNode) -> Option<Self>
     where
         Self: Sized,
@@ -4564,6 +5513,12 @@ impl AstNode for Decorator {
 }
 impl AstNode for ast::TypeParams {
     type Ref<'a> = &'a Self;
+
+    #[inline]
+    fn kind(&self) -> NodeKind {
+        NodeKind::TypeParams
+    }
+
     fn cast(kind: AnyNode) -> Option<Self>
     where
         Self: Sized,
@@ -4611,6 +5566,12 @@ impl AstNode for ast::TypeParams {
 }
 impl AstNode for ast::TypeParamTypeVar {
     type Ref<'a> = &'a Self;
+
+    #[inline]
+    fn kind(&self) -> NodeKind {
+        NodeKind::TypeParamTypeVar
+    }
+
     fn cast(kind: AnyNode) -> Option<Self>
     where
         Self: Sized,
@@ -4663,6 +5624,12 @@ impl AstNode for ast::TypeParamTypeVar {
 }
 impl AstNode for ast::TypeParamTypeVarTuple {
     type Ref<'a> = &'a Self;
+
+    #[inline]
+    fn kind(&self) -> NodeKind {
+        NodeKind::TypeParamTypeVarTuple
+    }
+
     fn cast(kind: AnyNode) -> Option<Self>
     where
         Self: Sized,
@@ -4711,6 +5678,12 @@ impl AstNode for ast::TypeParamTypeVarTuple {
 }
 impl AstNode for ast::TypeParamParamSpec {
     type Ref<'a> = &'a Self;
+
+    #[inline]
+    fn kind(&self) -> NodeKind {
+        NodeKind::TypeParamParamSpec
+    }
+
     fn cast(kind: AnyNode) -> Option<Self>
     where
         Self: Sized,
@@ -4759,6 +5732,12 @@ impl AstNode for ast::TypeParamParamSpec {
 }
 impl AstNode for ast::FString {
     type Ref<'a> = &'a Self;
+
+    #[inline]
+    fn kind(&self) -> NodeKind {
+        NodeKind::FString
+    }
+
     fn cast(kind: AnyNode) -> Option<Self>
     where
         Self: Sized,
@@ -4807,6 +5786,12 @@ impl AstNode for ast::FString {
 }
 impl AstNode for ast::StringLiteral {
     type Ref<'a> = &'a Self;
+
+    #[inline]
+    fn kind(&self) -> NodeKind {
+        NodeKind::StringLiteral
+    }
+
     fn cast(kind: AnyNode) -> Option<Self>
     where
         Self: Sized,
@@ -4846,6 +5831,12 @@ impl AstNode for ast::StringLiteral {
 }
 impl AstNode for ast::BytesLiteral {
     type Ref<'a> = &'a Self;
+
+    #[inline]
+    fn kind(&self) -> NodeKind {
+        NodeKind::BytesLiteral
+    }
+
     fn cast(kind: AnyNode) -> Option<Self>
     where
         Self: Sized,
@@ -4886,6 +5877,37 @@ impl AstNode for ast::BytesLiteral {
 
 impl AstNode for Stmt {
     type Ref<'a> = StatementRef<'a>;
+
+    #[inline]
+    fn kind(&self) -> NodeKind {
+        match self {
+            Stmt::FunctionDef(node) => node.kind(),
+            Stmt::ClassDef(node) => node.kind(),
+            Stmt::Return(node) => node.kind(),
+            Stmt::Delete(node) => node.kind(),
+            Stmt::Assign(node) => node.kind(),
+            Stmt::AugAssign(node) => node.kind(),
+            Stmt::AnnAssign(node) => node.kind(),
+            Stmt::TypeAlias(node) => node.kind(),
+            Stmt::For(node) => node.kind(),
+            Stmt::While(node) => node.kind(),
+            Stmt::If(node) => node.kind(),
+            Stmt::With(node) => node.kind(),
+            Stmt::Match(node) => node.kind(),
+            Stmt::Raise(node) => node.kind(),
+            Stmt::Try(node) => node.kind(),
+            Stmt::Assert(node) => node.kind(),
+            Stmt::Import(node) => node.kind(),
+            Stmt::ImportFrom(node) => node.kind(),
+            Stmt::Global(node) => node.kind(),
+            Stmt::Nonlocal(node) => node.kind(),
+            Stmt::Expr(node) => node.kind(),
+            Stmt::Pass(node) => node.kind(),
+            Stmt::Break(node) => node.kind(),
+            Stmt::Continue(node) => node.kind(),
+            Stmt::IpyEscapeCommand(node) => node.kind(),
+        }
+    }
 
     fn cast(kind: AnyNode) -> Option<Self> {
         match kind {
@@ -5110,9 +6132,7 @@ impl AstNode for Stmt {
             | NodeKind::StmtContinue => true,
             NodeKind::ExprBoolOp
             | NodeKind::ModModule
-            | NodeKind::ModInteractive
             | NodeKind::ModExpression
-            | NodeKind::ModFunctionType
             | NodeKind::StmtFunctionDef
             | NodeKind::ExprNamed
             | NodeKind::ExprBinOp
@@ -5159,7 +6179,6 @@ impl AstNode for Stmt {
             | NodeKind::PatternMatchOr
             | NodeKind::PatternArguments
             | NodeKind::PatternKeyword
-            | NodeKind::TypeIgnoreTypeIgnore
             | NodeKind::Comprehension
             | NodeKind::Arguments
             | NodeKind::Parameters
@@ -5277,6 +6296,15 @@ impl AstNode for Stmt {
 
 impl AstNode for TypeParam {
     type Ref<'a> = TypeParamRef<'a>;
+
+    #[inline]
+    fn kind(&self) -> NodeKind {
+        match self {
+            TypeParam::TypeVar(node) => node.kind(),
+            TypeParam::ParamSpec(node) => node.kind(),
+            TypeParam::TypeVarTuple(node) => node.kind(),
+        }
+    }
 
     fn cast(kind: AnyNode) -> Option<Self>
     where
@@ -7906,9 +8934,7 @@ impl Ranged for AnyNodeRef<'_> {
 #[derive(Copy, Clone, Debug, Eq, PartialEq, Hash)]
 pub enum NodeKind {
     ModModule,
-    ModInteractive,
     ModExpression,
-    ModFunctionType,
     StmtFunctionDef,
     StmtClassDef,
     StmtReturn,
@@ -7980,7 +9006,6 @@ pub enum NodeKind {
     PatternMatchOr,
     PatternArguments,
     PatternKeyword,
-    TypeIgnoreTypeIgnore,
     Comprehension,
     Arguments,
     Parameters,

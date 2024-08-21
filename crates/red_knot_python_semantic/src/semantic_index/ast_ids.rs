@@ -197,12 +197,14 @@ pub(crate) mod node_key {
     pub(crate) struct ExpressionNodeKey(NodeKey);
 
     impl From<ast::ExpressionRef<'_>> for ExpressionNodeKey {
+        #[inline]
         fn from(value: ast::ExpressionRef<'_>) -> Self {
-            Self(NodeKey::from_node(value))
+            Self(NodeKey::from_ref(value))
         }
     }
 
     impl From<&ast::Expr> for ExpressionNodeKey {
+        #[inline]
         fn from(value: &ast::Expr) -> Self {
             Self(NodeKey::from_node(value))
         }
