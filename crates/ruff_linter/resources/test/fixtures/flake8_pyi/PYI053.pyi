@@ -1,6 +1,7 @@
 import warnings
 import typing_extensions
 from typing_extensions import deprecated
+from typing import Literal,Annotated,TypeAlias
 
 def f1(x: str = "50 character stringggggggggggggggggggggggggggggggg") -> None: ...  # OK
 def f2(
@@ -67,5 +68,13 @@ def not_a_deprecated_function() -> None: ...
 
 fbaz: str = f"51 character {foo} stringgggggggggggggggggggggggggg"  # Error: PYI053
 
-# see https://github.com/astral-sh/ruff/issues/12995
-def foo(bar: typing.Literal["a", "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"]):...
+# See https://github.com/astral-sh/ruff/issues/12995
+def foo(bar: Literal["a", "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"]):... #OK
+
+def foo(bar: Annotated[int,"aaaaaaaloooooooooooooongannnnnoooottttatiooooooooooooooon"]):... #OK
+
+x: TypeAlias = Literal["fooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooO"] #OK
+y: TypeAlias = Annotated[int, "metadataaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"] #OK
+
+def f(x:int) -> "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb":... #OK
+
