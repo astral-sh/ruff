@@ -222,6 +222,19 @@ impl<'db> Type<'db> {
         }
     }
 
+    /// Resolve a member access of a type.
+    ///
+    /// For example, if `foo` is `Type::Instance(<Bar>)`,
+    /// `foo.member(&db, "baz")` returns the type of `baz` attributes
+    /// as accessed from instances of the `Bar` class.
+    ///
+    /// TODO: use of this method currently requires manually checking
+    /// whether the returned type is `Unknown`/`Unbound`
+    /// (or a union with `Unknown`/`Unbound`) in many places.
+    /// Ideally we'd use a more type-safe pattern, such as returning
+    /// an `Option` or a `Result` from this method, which would force
+    /// us to explicitly consider whether to handle an error or propagate
+    /// it up the call stack.
     #[must_use]
     pub fn member(&self, db: &'db dyn Db, name: &Name) -> Type<'db> {
         match self {
@@ -369,12 +382,13 @@ mod tests {
     use crate::db::tests::TestDb;
     use crate::{Program, ProgramSettings, PythonVersion, SearchPathSettings};
 
-    #[test]
-    fn check_types() -> anyhow::Result<()> {
-        let mut db = TestDb::new();
+    use super::TypeCheckDiagnostics;
 
-        db.write_file("src/foo.py", "import bar\n")
-            .context("Failed to write foo.py")?;
+    fn setup_db() -> TestDb {
+        let db = TestDb::new();
+        db.memory_file_system()
+            .create_directory_all("/src")
+            .unwrap();
 
         Program::from_settings(
             &db,
@@ -390,16 +404,82 @@ mod tests {
         )
         .expect("Valid search path settings");
 
+        db
+    }
+
+    fn assert_diagnostic_messages(diagnostics: &TypeCheckDiagnostics, expected: &[&str]) {
+        let messages: Vec<&str> = diagnostics
+            .iter()
+            .map(|diagnostic| diagnostic.message())
+            .collect();
+        assert_eq!(&messages, expected);
+    }
+
+    #[test]
+    fn unresolved_import_statement() -> anyhow::Result<()> {
+        let mut db = setup_db();
+
+        db.write_file("src/foo.py", "import bar\n")
+            .context("Failed to write foo.py")?;
+
         let foo = system_path_to_file(&db, "src/foo.py").context("Failed to resolve foo.py")?;
 
         let diagnostics = super::check_types(&db, foo);
-
-        assert_eq!(diagnostics.len(), 1);
-        assert_eq!(
-            diagnostics[0].message(),
-            "Import 'bar' could not be resolved."
-        );
+        assert_diagnostic_messages(&diagnostics, &["Import 'bar' could not be resolved."]);
 
         Ok(())
+    }
+
+    #[test]
+    fn unresolved_import_from_statement() {
+        let mut db = setup_db();
+
+        db.write_file("src/foo.py", "from bar import baz\n")
+            .unwrap();
+        let foo = system_path_to_file(&db, "src/foo.py").unwrap();
+        let diagnostics = super::check_types(&db, foo);
+        assert_diagnostic_messages(&diagnostics, &["Import 'bar' could not be resolved."]);
+    }
+
+    #[test]
+    fn unresolved_import_from_resolved_module() {
+        let mut db = setup_db();
+
+        db.write_files([("/src/a.py", ""), ("/src/b.py", "from a import thing")])
+            .unwrap();
+
+        let b_file = system_path_to_file(&db, "/src/b.py").unwrap();
+        let b_file_diagnostics = super::check_types(&db, b_file);
+        assert_diagnostic_messages(
+            &b_file_diagnostics,
+            &["Could not resolve import of 'thing' from 'a'"],
+        );
+    }
+
+    #[ignore = "\
+A spurious second 'Unresolved import' diagnostic message is emitted on `b.py`, \
+despite the symbol existing in the symbol table for `a.py`"]
+    #[test]
+    fn resolved_import_of_symbol_from_unresolved_import() {
+        let mut db = setup_db();
+
+        db.write_files([
+            ("/src/a.py", "import foo as foo"),
+            ("/src/b.py", "from a import foo"),
+        ])
+        .unwrap();
+
+        let a_file = system_path_to_file(&db, "/src/a.py").unwrap();
+        let a_file_diagnostics = super::check_types(&db, a_file);
+        assert_diagnostic_messages(
+            &a_file_diagnostics,
+            &["Import 'foo' could not be resolved."],
+        );
+
+        // Importing the unresolved import into a second first-party file should not trigger
+        // an additional "unresolved import" violation
+        let b_file = system_path_to_file(&db, "/src/b.py").unwrap();
+        let b_file_diagnostics = super::check_types(&db, b_file);
+        assert_eq!(&*b_file_diagnostics, &[]);
     }
 }

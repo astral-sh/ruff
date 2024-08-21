@@ -866,7 +866,26 @@ impl<'db> TypeInferenceBuilder<'db> {
             asname: _,
         } = alias;
 
-        let module_ty = self.module_ty_from_name(ModuleName::new(name), alias.into());
+        let module_ty = ModuleName::new(name)
+            .ok_or(ModuleResolutionError::InvalidSyntax)
+            .and_then(|module_name| self.module_ty_from_name(module_name));
+
+        let module_ty = match module_ty {
+            Ok(ty) => ty,
+            Err(ModuleResolutionError::InvalidSyntax) => {
+                tracing::debug!("Failed to resolve import due to invalid syntax");
+                Type::Unknown
+            }
+            Err(ModuleResolutionError::UnresolvedModule) => {
+                self.add_diagnostic(
+                    AnyNodeRef::Alias(alias),
+                    "unresolved-import",
+                    format_args!("Import '{name}' could not be resolved."),
+                );
+                Type::Unknown
+            }
+        };
+
         self.types.definitions.insert(definition, module_ty);
     }
 
@@ -914,14 +933,18 @@ impl<'db> TypeInferenceBuilder<'db> {
     /// - `tail` is the relative module name stripped of all leading dots:
     ///   - `from .foo import bar` => `tail == "foo"`
     ///   - `from ..foo.bar import baz` => `tail == "foo.bar"`
-    fn relative_module_name(&self, tail: Option<&str>, level: NonZeroU32) -> Option<ModuleName> {
+    fn relative_module_name(
+        &self,
+        tail: Option<&str>,
+        level: NonZeroU32,
+    ) -> Result<ModuleName, ModuleResolutionError> {
         let Some(module) = file_to_module(self.db, self.file) else {
             tracing::debug!(
                 "Relative module resolution '{}' failed; could not resolve file '{}' to a module",
                 format_import_from_module(level.get(), tail),
                 self.file.path(self.db)
             );
-            return None;
+            return Err(ModuleResolutionError::UnresolvedModule);
         };
         let mut level = level.get();
         if module.kind().is_package() {
@@ -929,17 +952,19 @@ impl<'db> TypeInferenceBuilder<'db> {
         }
         let mut module_name = module.name().to_owned();
         for _ in 0..level {
-            module_name = module_name.parent()?;
+            module_name = module_name
+                .parent()
+                .ok_or(ModuleResolutionError::UnresolvedModule)?;
         }
         if let Some(tail) = tail {
             if let Some(valid_tail) = ModuleName::new(tail) {
                 module_name.extend(&valid_tail);
             } else {
                 tracing::debug!("Relative module resolution failed: invalid syntax");
-                return None;
+                return Err(ModuleResolutionError::InvalidSyntax);
             }
         }
-        Some(module_name)
+        Ok(module_name)
     }
 
     fn infer_import_from_definition(
@@ -974,12 +999,12 @@ impl<'db> TypeInferenceBuilder<'db> {
                 alias.name,
                 format_import_from_module(*level, module),
             );
-            let module_name =
-                module.expect("Non-relative import should always have a non-None `module`!");
-            ModuleName::new(module_name)
+            module
+                .and_then(ModuleName::new)
+                .ok_or(ModuleResolutionError::InvalidSyntax)
         };
 
-        let module_ty = self.module_ty_from_name(module_name, import_from.into());
+        let module_ty = module_name.and_then(|module_name| self.module_ty_from_name(module_name));
 
         let ast::Alias {
             range: _,
@@ -992,11 +1017,34 @@ impl<'db> TypeInferenceBuilder<'db> {
         // the runtime error will occur immediately (rather than when the symbol is *used*,
         // as would be the case for a symbol with type `Unbound`), so it's appropriate to
         // think of the type of the imported symbol as `Unknown` rather than `Unbound`
-        let ty = module_ty
+        let member_ty = module_ty
+            .unwrap_or(Type::Unbound)
             .member(self.db, &Name::new(&name.id))
             .replace_unbound_with(self.db, Type::Unknown);
 
-        self.types.definitions.insert(definition, ty);
+        if matches!(module_ty, Err(ModuleResolutionError::UnresolvedModule)) {
+            self.add_diagnostic(
+                AnyNodeRef::StmtImportFrom(import_from),
+                "unresolved-import",
+                format_args!(
+                    "Import '{}{}' could not be resolved.",
+                    ".".repeat(*level as usize),
+                    module.unwrap_or_default()
+                ),
+            );
+        } else if module_ty.is_ok() && member_ty.is_unknown() {
+            self.add_diagnostic(
+                AnyNodeRef::Alias(alias),
+                "unresolved-import",
+                format_args!(
+                    "Could not resolve import of '{name}' from '{}{}'",
+                    ".".repeat(*level as usize),
+                    module.unwrap_or_default()
+                ),
+            );
+        }
+
+        self.types.definitions.insert(definition, member_ty);
     }
 
     fn infer_return_statement(&mut self, ret: &ast::StmtReturn) {
@@ -1011,25 +1059,12 @@ impl<'db> TypeInferenceBuilder<'db> {
     }
 
     fn module_ty_from_name(
-        &mut self,
-        module_name: Option<ModuleName>,
-        node: AnyNodeRef,
-    ) -> Type<'db> {
-        let Some(module_name) = module_name else {
-            return Type::Unknown;
-        };
-
-        if let Some(module) = resolve_module(self.db, module_name.clone()) {
-            Type::Module(module.file())
-        } else {
-            self.add_diagnostic(
-                node,
-                "unresolved-import",
-                format_args!("Import '{module_name}' could not be resolved."),
-            );
-
-            Type::Unknown
-        }
+        &self,
+        module_name: ModuleName,
+    ) -> Result<Type<'db>, ModuleResolutionError> {
+        resolve_module(self.db, module_name)
+            .map(|module| Type::Module(module.file()))
+            .ok_or(ModuleResolutionError::UnresolvedModule)
     }
 
     fn infer_decorator(&mut self, decorator: &ast::Decorator) -> Type<'db> {
@@ -1795,6 +1830,12 @@ fn format_import_from_module(level: u32, module: Option<&str>) -> String {
     )
 }
 
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+enum ModuleResolutionError {
+    InvalidSyntax,
+    UnresolvedModule,
+}
+
 #[cfg(test)]
 mod tests {
     use anyhow::Context;
@@ -2045,6 +2086,16 @@ mod tests {
         assert_public_ty(&db, "src/package/foo.py", "x", "Unbound");
         assert_public_ty(&db, "src/package/bar.py", "x", "Unknown");
 
+        Ok(())
+    }
+
+    #[test]
+    fn from_import_with_no_module_name() -> anyhow::Result<()> {
+        // This test checks that invalid syntax in a `StmtImportFrom` node
+        // leads to the type being inferred as `Unknown`
+        let mut db = setup_db();
+        db.write_file("src/foo.py", "from import bar")?;
+        assert_public_ty(&db, "src/foo.py", "bar", "Unknown");
         Ok(())
     }
 
