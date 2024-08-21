@@ -407,8 +407,8 @@ To benchmark the release build:
 
 ```shell
 cargo build --release && hyperfine --warmup 10 \
-  "./target/release/ruff ./crates/ruff_linter/resources/test/cpython/ --no-cache -e" \
-  "./target/release/ruff ./crates/ruff_linter/resources/test/cpython/ -e"
+  "./target/release/ruff check ./crates/ruff_linter/resources/test/cpython/ --no-cache -e" \
+  "./target/release/ruff check ./crates/ruff_linter/resources/test/cpython/ -e"
 
 Benchmark 1: ./target/release/ruff ./crates/ruff_linter/resources/test/cpython/ --no-cache
   Time (mean ± σ):     293.8 ms ±   3.2 ms    [User: 2384.6 ms, System: 90.3 ms]
@@ -427,7 +427,7 @@ To benchmark against the ecosystem's existing tools:
 
 ```shell
 hyperfine --ignore-failure --warmup 5 \
-  "./target/release/ruff ./crates/ruff_linter/resources/test/cpython/ --no-cache" \
+  "./target/release/ruff check ./crates/ruff_linter/resources/test/cpython/ --no-cache" \
   "pyflakes crates/ruff_linter/resources/test/cpython" \
   "autoflake --recursive --expand-star-imports --remove-all-unused-imports --remove-unused-variables --remove-duplicate-keys resources/test/cpython" \
   "pycodestyle crates/ruff_linter/resources/test/cpython" \
@@ -473,7 +473,7 @@ To benchmark a subset of rules, e.g. `LineTooLong` and `DocLineTooLong`:
 
 ```shell
 cargo build --release && hyperfine --warmup 10 \
-  "./target/release/ruff ./crates/ruff_linter/resources/test/cpython/ --no-cache -e --select W505,E501"
+  "./target/release/ruff check ./crates/ruff_linter/resources/test/cpython/ --no-cache -e --select W505,E501"
 ```
 
 You can run `poetry install` from `./scripts/benchmarks` to create a working environment for the
