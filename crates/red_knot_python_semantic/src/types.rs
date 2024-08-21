@@ -222,6 +222,19 @@ impl<'db> Type<'db> {
         }
     }
 
+    /// Resolve a member access of a type.
+    ///
+    /// For example, if `foo` is `Type::Instance(<Bar>)`,
+    /// `foo.member(&db, "baz")` returns the type of `baz` attributes
+    /// as accessed from instances of the `Bar` class.
+    ///
+    /// TODO: use of this method currently requires manually checking
+    /// whether the returned type is `Unknown`/`Unbound`
+    /// (or a union with `Unknown`/`Unbound`) in many places.
+    /// Ideally we'd use a more type-safe pattern, such as returning
+    /// an `Option` or a `Result` from this method, which would force
+    /// us to explicitly consider whether to handle an error or propagate
+    /// it up the call stack.
     #[must_use]
     pub fn member(&self, db: &'db dyn Db, name: &Name) -> Type<'db> {
         match self {
@@ -403,7 +416,7 @@ mod tests {
     }
 
     #[test]
-    fn check_types() -> anyhow::Result<()> {
+    fn unresolved_import_statement() -> anyhow::Result<()> {
         let mut db = setup_db();
 
         db.write_file("src/foo.py", "import bar\n")
@@ -418,27 +431,14 @@ mod tests {
     }
 
     #[test]
-    fn unresolved_import() {
+    fn unresolved_import_from_statement() {
         let mut db = setup_db();
 
-        db.write_files([
-            ("/src/a.py", "import foo as foo"),
-            ("/src/b.py", "from a import foo"),
-        ])
-        .unwrap();
-
-        let a_file = system_path_to_file(&db, "/src/a.py").expect("Expected `a.py` to exist!");
-        let a_file_diagnostics = super::check_types(&db, a_file);
-        assert_diagnostic_messages(
-            &a_file_diagnostics,
-            &["Import 'foo' could not be resolved."],
-        );
-
-        // TODO: Importing the unresolved import into a second first-party file should not trigger
-        // an additional "unresolved import" violation
-        // let b_file = system_path_to_file(&db, "/src/b.py").expect("Expected `by.py` to exist!");
-        // let b_file_diagnostics = super::check_types(&db, b_file);
-        // assert_eq!(&*b_file_diagnostics, &[]);
+        db.write_file("src/foo.py", "from bar import baz\n")
+            .unwrap();
+        let foo = system_path_to_file(&db, "src/foo.py").unwrap();
+        let diagnostics = super::check_types(&db, foo);
+        assert_diagnostic_messages(&diagnostics, &["Import 'bar' could not be resolved."]);
     }
 
     #[test]
@@ -448,11 +448,38 @@ mod tests {
         db.write_files([("/src/a.py", ""), ("/src/b.py", "from a import thing")])
             .unwrap();
 
-        let b_file = system_path_to_file(&db, "/src/b.py").expect("Expected `b.py` to exist");
+        let b_file = system_path_to_file(&db, "/src/b.py").unwrap();
         let b_file_diagnostics = super::check_types(&db, b_file);
         assert_diagnostic_messages(
             &b_file_diagnostics,
             &["Could not resolve import of 'thing' from 'a'"],
         );
+    }
+
+    #[ignore = "\
+A spurious second 'Unresolved import' diagnostic message is emitted on `b.py`, \
+despite the symbol existing in the symbol table for `a.py`"]
+    #[test]
+    fn resolved_import_of_symbol_from_unresolved_import() {
+        let mut db = setup_db();
+
+        db.write_files([
+            ("/src/a.py", "import foo as foo"),
+            ("/src/b.py", "from a import foo"),
+        ])
+        .unwrap();
+
+        let a_file = system_path_to_file(&db, "/src/a.py").unwrap();
+        let a_file_diagnostics = super::check_types(&db, a_file);
+        assert_diagnostic_messages(
+            &a_file_diagnostics,
+            &["Import 'foo' could not be resolved."],
+        );
+
+        // Importing the unresolved import into a second first-party file should not trigger
+        // an additional "unresolved import" violation
+        let b_file = system_path_to_file(&db, "/src/b.py").unwrap();
+        let b_file_diagnostics = super::check_types(&db, b_file);
+        assert_eq!(&*b_file_diagnostics, &[]);
     }
 }

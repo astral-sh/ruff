@@ -866,20 +866,26 @@ impl<'db> TypeInferenceBuilder<'db> {
             asname: _,
         } = alias;
 
-        let module_ty = if let Some(module_name) = ModuleName::new(name) {
-            let ty = self.module_ty_from_name(module_name.clone());
-            if ty.is_unknown() {
+        let module_ty = ModuleName::new(name)
+            .ok_or(ModuleResolutionError::InvalidSyntax)
+            .and_then(|module_name| self.module_ty_from_name(module_name));
+
+        let module_ty = match module_ty {
+            Ok(ty) => ty,
+            Err(ModuleResolutionError::InvalidSyntax) => {
+                tracing::debug!("Failed to resolve import due to invalid syntax");
+                Type::Unknown
+            }
+            Err(ModuleResolutionError::UnresolvedModule) => {
                 self.add_diagnostic(
                     AnyNodeRef::Alias(alias),
                     "unresolved-import",
-                    format_args!("Import '{module_name}' could not be resolved."),
+                    format_args!("Import '{name}' could not be resolved."),
                 );
+                Type::Unknown
             }
-            ty
-        } else {
-            tracing::debug!("Failed to resolve import due to invalid syntax");
-            Type::Unknown
         };
+
         self.types.definitions.insert(definition, module_ty);
     }
 
@@ -998,7 +1004,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                 .ok_or(ModuleResolutionError::InvalidSyntax)
         };
 
-        let module_ty = module_name.map(|module_name| self.module_ty_from_name(module_name));
+        let module_ty = module_name.and_then(|module_name| self.module_ty_from_name(module_name));
 
         let ast::Alias {
             range: _,
@@ -1021,7 +1027,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                 AnyNodeRef::StmtImportFrom(import_from),
                 "unresolved-import",
                 format_args!(
-                    "Unresolved import {}{}",
+                    "Import '{}{}' could not be resolved.",
                     ".".repeat(*level as usize),
                     module.unwrap_or_default()
                 ),
@@ -1052,10 +1058,13 @@ impl<'db> TypeInferenceBuilder<'db> {
         }
     }
 
-    fn module_ty_from_name(&self, module_name: ModuleName) -> Type<'db> {
+    fn module_ty_from_name(
+        &self,
+        module_name: ModuleName,
+    ) -> Result<Type<'db>, ModuleResolutionError> {
         resolve_module(self.db, module_name)
             .map(|module| Type::Module(module.file()))
-            .unwrap_or(Type::Unknown)
+            .ok_or(ModuleResolutionError::UnresolvedModule)
     }
 
     fn infer_decorator(&mut self, decorator: &ast::Decorator) -> Type<'db> {
