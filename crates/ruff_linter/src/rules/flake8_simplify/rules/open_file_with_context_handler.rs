@@ -114,19 +114,73 @@ fn match_exit_stack(semantic: &SemanticModel) -> bool {
 
 /// Return `true` if the expression is an `open` call or temporary file constructor.
 fn is_open(semantic: &SemanticModel, func: &Expr) -> bool {
-    let Some(qualified_name) = semantic.resolve_qualified_name(func) else {
+    // Ex) `open(...)`
+    if semantic.match_builtin_expr(func, "open") {
+        return true;
+    }
+
+    // Ex) `pathlib.Path(...).open()`
+    let Expr::Attribute(ast::ExprAttribute { attr, value, .. }) = func else {
         return false;
     };
 
-    matches!(
-        qualified_name.segments(),
-        ["" | "builtins", "open"]
-            | ["pathlib", "Path", "open"]
-            | [
-                "tempfile",
-                "TemporaryFile" | "NamedTemporaryFile" | "SpooledTemporaryFile"
-            ]
-    )
+    let segments: Option<Vec<&str>> = match value.as_ref() {
+        Expr::Call(ast::ExprCall {
+            func: value_func, ..
+        }) => {
+            // Ex) `pathlib.Path(...).open()` -> ["pathlib", "Path", "open"]
+            semantic
+                .resolve_qualified_name(value_func)
+                .map(|qualified_name| qualified_name.append_member(attr).segments().to_vec())
+        }
+        Expr::Name(ast::ExprName { id, .. }) => {
+            // Ex) `tarfile.open(...)` -> ["tarfile", "open"]
+            Some(vec![&**id, attr])
+        }
+        Expr::Attribute(ast::ExprAttribute {
+            attr: value_attr,
+            value,
+            ..
+        }) => {
+            // Ex) `dbm.gnu.open(...)` -> ["dbm", "gnu", "open"]
+
+            semantic
+                .resolve_qualified_name(value)
+                .map(|qualified_name| {
+                    qualified_name
+                        .append_member(value_attr)
+                        .append_member(attr)
+                        .segments()
+                        .to_vec()
+                })
+        }
+        _ => None,
+    };
+
+    let Some(segments) = segments else {
+        return false;
+    };
+
+    match segments[..] {
+        // Ex) `pathlib.Path(...).open()`
+        ["pathlib", "Path", "open"] => true,
+        ["tarfile", "TarFile", "open" | "taropen" | "gzopen" | "bz2open" | "xzopen"] => true,
+        ["zipfile", "ZipFile", "open"] => true,
+        ["lzma", "LZMAFile", "open"] => true,
+        ["dbm", "gnu" | "ndbm", "open"] => true,
+
+        // Ex) `foo.open(...)`
+        ["codecs" | "dbm" | "tarfile" | "bz2" | "gzip" | "io" | "lzma" | "shelve" | "tokenize"
+        | "wave", "open"] => true,
+        ["fileinput", "FileInput" | "input"] => true,
+
+        // fringe cases
+        ["tempfile", "TemporaryFile" | "NamedTemporaryFile" | "SpooledTemporaryFile"] => true,
+        ["io", "open_code" | "BytesIO" | "StringIO"] => true,
+        ["lzma", "LZMAFile"] => true,
+
+        _ => false,
+    }
 }
 
 /// Return `true` if the current expression is followed by a `close` call.
