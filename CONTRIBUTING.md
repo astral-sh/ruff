@@ -397,6 +397,12 @@ which makes it a good target for benchmarking.
 git clone --branch 3.10 https://github.com/python/cpython.git crates/ruff_linter/resources/test/cpython
 ```
 
+Install `hyperfine`:
+
+```shell
+cargo install hyperfine
+```
+
 To benchmark the release build:
 
 ```shell

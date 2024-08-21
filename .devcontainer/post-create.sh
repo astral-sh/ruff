@@ -3,6 +3,7 @@
 rustup default < rust-toolchain
 rustup component add clippy rustfmt
 cargo install cargo-insta
+cargo install hyperfine
 cargo fetch
 
 pip install maturin pre-commit
