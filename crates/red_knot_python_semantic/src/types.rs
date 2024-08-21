@@ -226,16 +226,25 @@ impl<'db> Type<'db> {
     pub fn member(&self, db: &'db dyn Db, name: &Name) -> Type<'db> {
         match self {
             Type::Any => Type::Any,
-            Type::Never => todo!("attribute lookup on Never type"),
+            Type::Never => {
+                // TODO: attribute lookup on Never type
+                Type::Unknown
+            }
             Type::Unknown => Type::Unknown,
             Type::Unbound => Type::Unbound,
-            Type::None => todo!("attribute lookup on None type"),
-            Type::Function(_) => todo!("attribute lookup on Function type"),
+            Type::None => {
+                // TODO: attribute lookup on None type
+                Type::Unknown
+            }
+            Type::Function(_) => {
+                // TODO: attribute lookup on function type
+                Type::Unknown
+            }
             Type::Module(file) => global_symbol_ty_by_name(db, *file, name),
             Type::Class(class) => class.class_member(db, name),
             Type::Instance(_) => {
                 // TODO MRO? get_own_instance_member, get_instance_member
-                todo!("attribute lookup on Instance type")
+                Type::Unknown
             }
             Type::Union(union) => union
                 .elements(db)
@@ -247,7 +256,7 @@ impl<'db> Type<'db> {
             Type::Intersection(_) => {
                 // TODO perform the get_member on each type in the intersection
                 // TODO return the intersection of those results
-                todo!("attribute lookup on Intersection type")
+                Type::Unknown
             }
             Type::IntLiteral(_) => {
                 // TODO raise error
