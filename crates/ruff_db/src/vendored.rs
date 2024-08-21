@@ -97,7 +97,12 @@ impl VendoredFileSystem {
         fn read_to_string(fs: &VendoredFileSystem, path: &VendoredPath) -> Result<String> {
             let mut archive = fs.lock_archive();
             let mut zip_file = archive.lookup_path(&NormalizedVendoredPath::from(path))?;
-            let mut buffer = String::new();
+
+            let mut buffer = String::with_capacity(
+                usize::try_from(zip_file.size())
+                    .unwrap_or(usize::MAX)
+                    .min(10_000_000),
+            );
             zip_file.read_to_string(&mut buffer)?;
             Ok(buffer)
         }
