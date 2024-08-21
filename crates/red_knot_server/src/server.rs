@@ -6,7 +6,8 @@ use std::panic::PanicInfo;
 use lsp_server::Message;
 use lsp_types::{
     ClientCapabilities, DiagnosticOptions, DiagnosticServerCapabilities, MessageType,
-    ServerCapabilities, TextDocumentSyncCapability, TextDocumentSyncOptions, Url,
+    ServerCapabilities, TextDocumentSyncCapability, TextDocumentSyncKind, TextDocumentSyncOptions,
+    Url,
 };
 
 use self::connection::{Connection, ConnectionInitializer};
@@ -220,6 +221,7 @@ impl Server {
             text_document_sync: Some(TextDocumentSyncCapability::Options(
                 TextDocumentSyncOptions {
                     open_close: Some(true),
+                    change: Some(TextDocumentSyncKind::INCREMENTAL),
                     ..Default::default()
                 },
             )),
