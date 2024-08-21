@@ -1682,9 +1682,15 @@ impl<'a> SemanticModel<'a> {
         self.flags.intersects(SemanticModelFlags::BOOLEAN_TEST)
     }
 
-    /// Return `true` if the model is in a `typing::Literal` annotation.
+    /// Return `true` if the model is in a `typing.Literal` annotation.
     pub const fn in_typing_literal(&self) -> bool {
         self.flags.intersects(SemanticModelFlags::TYPING_LITERAL)
+    }
+
+    /// Return `true` if the model is in a `typing.Annotated` annotation.
+    pub const fn in_typing_annotated_pep593(&self) -> bool {
+        self.flags
+            .intersects(SemanticModelFlags::TYPING_ANNOTATED_PEP593)
     }
 
     /// Return `true` if the model is in a subscript expression.
@@ -2019,7 +2025,7 @@ bitflags! {
         /// not used, only its truthiness.
         const BOOLEAN_TEST = 1 << 9;
 
-        /// The model is in a `typing::Literal` annotation.
+        /// The model is in a `typing.Literal` annotation.
         ///
         /// For example, the model could be visiting any of `"A"`, `"B"`, or `"C"` in:
         /// ```python
@@ -2228,6 +2234,14 @@ bitflags! {
         ///
         /// [PEP 257]: https://peps.python.org/pep-0257/#what-is-a-docstring
         const ATTRIBUTE_DOCSTRING = 1 << 26;
+
+        /// The model is in a `typing.Annotated` annotation.
+        ///
+        /// For example, the model could be visiting `int` or "A" in
+        /// ```python
+        /// def f(x: Annotated[int, "A"]): ...
+        /// ```
+        const TYPING_ANNOTATED_PEP593 = 1<<27;
 
         /// The context is in any type annotation.
         const ANNOTATION = Self::TYPING_ONLY_ANNOTATION.bits() | Self::RUNTIME_EVALUATED_ANNOTATION.bits() | Self::RUNTIME_REQUIRED_ANNOTATION.bits();
