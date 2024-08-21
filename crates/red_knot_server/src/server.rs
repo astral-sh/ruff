@@ -99,6 +99,11 @@ impl Server {
                 anyhow::anyhow!("Failed to get the current working directory while creating a default workspace.")
             })?;
 
+        if workspaces.len() > 1 {
+            // TODO(dhruvmanila): Support multi-root workspaces
+            anyhow::bail!("Multi-root workspaces are not supported yet");
+        }
+
         Ok(Self {
             connection,
             worker_threads,

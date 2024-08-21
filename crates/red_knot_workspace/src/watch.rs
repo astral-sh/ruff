@@ -46,6 +46,16 @@ pub enum ChangeEvent {
 }
 
 impl ChangeEvent {
+    /// Creates a new [`Created`] event for a file at the given path.
+    ///
+    /// [`Created`]: ChangeEvent::Created
+    pub fn file_created(path: SystemPathBuf) -> ChangeEvent {
+        ChangeEvent::Created {
+            path,
+            kind: CreatedKind::File,
+        }
+    }
+
     pub fn file_name(&self) -> Option<&str> {
         self.path().and_then(|path| path.file_name())
     }

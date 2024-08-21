@@ -7,7 +7,6 @@ mod requests;
 mod traits;
 
 use notifications as notification;
-use red_knot_workspace::db::RootDatabase;
 use requests as request;
 
 use self::traits::{NotificationHandler, RequestHandler};
@@ -85,9 +84,10 @@ fn background_request_task<'a, R: traits::BackgroundDocumentRequestHandler>(
         let Ok(path) = url_to_system_path(&url) else {
             return Box::new(|_, _| {});
         };
-        let db = session
-            .workspace_db_for_path(path.as_std_path())
-            .map(RootDatabase::snapshot);
+        let db = match session.workspace_db_for_path(path.as_std_path()) {
+            Some(db) => db.snapshot(),
+            None => session.default_workspace_db().snapshot(),
+        };
 
         let Some(snapshot) = session.take_snapshot(url) else {
             return Box::new(|_, _| {});

@@ -2,8 +2,6 @@ use lsp_server::ErrorCode;
 use lsp_types::notification::DidCloseTextDocument;
 use lsp_types::DidCloseTextDocumentParams;
 
-use ruff_db::files::File;
-
 use crate::server::api::diagnostics::clear_diagnostics;
 use crate::server::api::traits::{NotificationHandler, SyncNotificationHandler};
 use crate::server::api::LSPResult;
@@ -25,7 +23,7 @@ impl SyncNotificationHandler for DidCloseTextDocumentHandler {
         _requester: &mut Requester,
         params: DidCloseTextDocumentParams,
     ) -> Result<()> {
-        let Ok(path) = url_to_system_path(&params.text_document.uri) else {
+        let Ok(_path) = url_to_system_path(&params.text_document.uri) else {
             return Ok(());
         };
 
@@ -33,10 +31,6 @@ impl SyncNotificationHandler for DidCloseTextDocumentHandler {
         session
             .close_document(&key)
             .with_failure_code(ErrorCode::InternalError)?;
-
-        if let Some(db) = session.workspace_db_for_path_mut(path.as_std_path()) {
-            File::sync_path(db, &path);
-        }
 
         clear_diagnostics(key.url(), &notifier)?;
 
