@@ -112,8 +112,36 @@ fn match_exit_stack(semantic: &SemanticModel) -> bool {
     false
 }
 
-/// Return `true` if the expression is an `open` call or temporary file constructor.
+/// Return `true` if `func` is the builtin `open` or `pathlib.Path(...).open`.
 fn is_open(semantic: &SemanticModel, func: &Expr) -> bool {
+    // Ex) `open(...)`
+    if semantic.match_builtin_expr(func, "open") {
+        return true;
+    }
+
+    // Ex) `pathlib.Path(...).open()`
+    let Expr::Attribute(ast::ExprAttribute { attr, value, .. }) = func else {
+        return false;
+    };
+
+    if attr != "open" {
+        return false;
+    }
+
+    let Expr::Call(ast::ExprCall {
+        func: value_func, ..
+    }) = &**value
+    else {
+        return false;
+    };
+
+    semantic
+        .resolve_qualified_name(value_func)
+        .is_some_and(|qualified_name| matches!(qualified_name.segments(), ["pathlib", "Path"]))
+}
+
+/// Return `true` if the expression is an `open` call or temporary file constructor.
+fn is_open_preview(semantic: &SemanticModel, func: &Expr) -> bool {
     // Ex) `open(...)`
     if semantic.match_builtin_expr(func, "open") {
         return true;
@@ -211,8 +239,14 @@ fn is_closed(semantic: &SemanticModel) -> bool {
 pub(crate) fn open_file_with_context_handler(checker: &mut Checker, func: &Expr) {
     let semantic = checker.semantic();
 
-    if !is_open(semantic, func) {
-        return;
+    if checker.settings.preview.is_disabled() {
+        if !is_open(semantic, func) {
+            return;
+        }
+    } else {
+        if !is_open_preview(semantic, func) {
+            return;
+        }
     }
 
     // Ex) `open("foo.txt").close()`
