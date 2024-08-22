@@ -43,8 +43,8 @@ use crate::semantic_index::symbol::{FileScopeId, NodeWithScopeKind, NodeWithScop
 use crate::semantic_index::SemanticIndex;
 use crate::types::diagnostic::{TypeCheckDiagnostic, TypeCheckDiagnostics};
 use crate::types::{
-    builtins_symbol_ty_by_name, definitions_ty, global_symbol_ty_by_name, ClassType, FunctionType,
-    Name, Type, UnionBuilder,
+    builtins_symbol_ty_by_name, definitions_ty, global_symbol_ty_by_name, BytesLiteralType,
+    ClassType, FunctionType, Name, Type, UnionBuilder,
 };
 use crate::Db;
 
@@ -1206,9 +1206,12 @@ impl<'db> TypeInferenceBuilder<'db> {
     }
 
     #[allow(clippy::unused_self)]
-    fn infer_bytes_literal_expression(&mut self, _literal: &ast::ExprBytesLiteral) -> Type<'db> {
-        // TODO
-        Type::Unknown
+    fn infer_bytes_literal_expression(&mut self, literal: &ast::ExprBytesLiteral) -> Type<'db> {
+        // TODO: ignoring r/R prefixes for now, should normalize bytes values
+        Type::BytesLiteral(BytesLiteralType::new(
+            self.db,
+            literal.value.bytes().collect(),
+        ))
     }
 
     fn infer_fstring_expression(&mut self, fstring: &ast::ExprFString) -> Type<'db> {
@@ -1684,6 +1687,7 @@ impl<'db> TypeInferenceBuilder<'db> {
         let left_ty = self.infer_expression(left);
         let right_ty = self.infer_expression(right);
 
+        // TODO flatten the matches by matching on (left_ty, right_ty, op)
         match left_ty {
             Type::Any => Type::Any,
             Type::Unknown => Type::Unknown,
@@ -1716,6 +1720,22 @@ impl<'db> TypeInferenceBuilder<'db> {
                                 .map(Type::IntLiteral)
                                 // TODO division by zero error
                                 .unwrap_or(Type::Unknown),
+                            _ => Type::Unknown, // TODO
+                        }
+                    }
+                    _ => Type::Unknown, // TODO
+                }
+            }
+            Type::BytesLiteral(lhs) => {
+                match right_ty {
+                    Type::BytesLiteral(rhs) => {
+                        match op {
+                            ast::Operator::Add => Type::BytesLiteral(BytesLiteralType::new(
+                                self.db,
+                                [lhs.value(self.db).as_ref(), rhs.value(self.db).as_ref()]
+                                    .concat()
+                                    .into_boxed_slice(),
+                            )),
                             _ => Type::Unknown, // TODO
                         }
                     }
@@ -2231,6 +2251,28 @@ mod tests {
 
         assert_public_ty(&db, "src/a.py", "x", "Literal[True]");
         assert_public_ty(&db, "src/a.py", "y", "Literal[False]");
+
+        Ok(())
+    }
+
+    #[test]
+    fn bytes_type() -> anyhow::Result<()> {
+        let mut db = setup_db();
+
+        db.write_dedented(
+            "src/a.py",
+            "
+            w = b'red' b'knot'
+            x = b'hello'
+            y = b'world' + b'!'
+            z = b'\\xff\\x00'
+            ",
+        )?;
+
+        assert_public_ty(&db, "src/a.py", "w", "Literal[b\"redknot\"]");
+        assert_public_ty(&db, "src/a.py", "x", "Literal[b\"hello\"]");
+        assert_public_ty(&db, "src/a.py", "y", "Literal[b\"world!\"]");
+        assert_public_ty(&db, "src/a.py", "z", "Literal[b\"\\xff\\x00\"]");
 
         Ok(())
     }
