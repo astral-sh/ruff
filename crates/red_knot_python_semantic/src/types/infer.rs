@@ -43,8 +43,8 @@ use crate::semantic_index::symbol::{FileScopeId, NodeWithScopeKind, NodeWithScop
 use crate::semantic_index::SemanticIndex;
 use crate::types::diagnostic::{TypeCheckDiagnostic, TypeCheckDiagnostics};
 use crate::types::{
-    builtins_symbol_ty_by_name, definitions_ty, global_symbol_ty_by_name, ClassType, FunctionType,
-    Name, Type, UnionBuilder,
+    builtins_symbol_ty_by_name, definitions_ty, global_symbol_ty_by_name, BytesLiteralType,
+    ClassType, FunctionType, Name, Type, UnionBuilder,
 };
 use crate::Db;
 
@@ -1206,8 +1206,12 @@ impl<'db> TypeInferenceBuilder<'db> {
     }
 
     #[allow(clippy::unused_self)]
-    fn infer_bytes_literal_expression(&mut self, _literal: &ast::ExprBytesLiteral) -> Type<'db> {
-        builtins_symbol_ty_by_name(self.db, "bytes").instance()
+    fn infer_bytes_literal_expression(&mut self, literal: &ast::ExprBytesLiteral) -> Type<'db> {
+        // TODO: ignoring r/R prefixes for now, should normalize bytes values
+        Type::BytesLiteral(BytesLiteralType::new(
+            self.db,
+            literal.value.bytes().collect(),
+        ))
     }
 
     fn infer_fstring_expression(&mut self, fstring: &ast::ExprFString) -> Type<'db> {
@@ -1715,6 +1719,23 @@ impl<'db> TypeInferenceBuilder<'db> {
                                 .map(Type::IntLiteral)
                                 // TODO division by zero error
                                 .unwrap_or(Type::Unknown),
+                            _ => Type::Unknown, // TODO
+                        }
+                    }
+                    _ => Type::Unknown, // TODO
+                }
+            }
+            Type::BytesLiteral(lhs) => {
+                match right_ty {
+                    Type::BytesLiteral(rhs) => {
+                        match op {
+                            ast::Operator::Add => {
+                                Type::BytesLiteral(BytesLiteralType::new(
+                                    self.db,
+                                    // TODO the value accessors are cloning?
+                                    [lhs.value(self.db), rhs.value(self.db)].concat(),
+                                ))
+                            }
                             _ => Type::Unknown, // TODO
                         }
                     }
@@ -2238,9 +2259,18 @@ mod tests {
     fn bytes_type() -> anyhow::Result<()> {
         let mut db = setup_db();
 
-        db.write_file("src/a.py", "x = b'hello'")?;
+        db.write_dedented(
+            "src/a.py",
+            "
+            x = b'hello'
+            y = b'world' + b'!'
+            z = b'\\xff\\x00'
+            ",
+        )?;
 
-        assert_public_ty(&db, "src/a.py", "x", "bytes");
+        assert_public_ty(&db, "src/a.py", "x", "Literal[b\"hello\"]");
+        assert_public_ty(&db, "src/a.py", "y", "Literal[b\"world!\"]");
+        assert_public_ty(&db, "src/a.py", "z", "Literal[b\"\\xff\\x00\"]");
 
         Ok(())
     }

@@ -181,6 +181,8 @@ pub enum Type<'db> {
     IntLiteral(i64),
     /// A boolean literal, either `True` or `False`.
     BooleanLiteral(bool),
+    /// A bytes literal
+    BytesLiteral(BytesLiteralType<'db>),
     // TODO protocols, callable types, overloads, generics, type vars
 }
 
@@ -276,6 +278,10 @@ impl<'db> Type<'db> {
                 Type::Unknown
             }
             Type::BooleanLiteral(_) => Type::Unknown,
+            Type::BytesLiteral(_) => {
+                // TODO check if bytes have members
+                Type::Unknown
+            }
         }
     }
 
@@ -370,6 +376,11 @@ pub struct IntersectionType<'db> {
     /// narrowing along with intersections (e.g. `if not isinstance(...)`), so we represent them
     /// directly in intersections rather than as a separate type.
     negative: FxOrderSet<Type<'db>>,
+}
+
+#[salsa::interned]
+pub struct BytesLiteralType<'db> {
+    value: Vec<u8>,
 }
 
 #[cfg(test)]
