@@ -1729,15 +1729,12 @@ impl<'db> TypeInferenceBuilder<'db> {
                 match right_ty {
                     Type::BytesLiteral(rhs) => {
                         match op {
-                            ast::Operator::Add => {
-                                Type::BytesLiteral(BytesLiteralType::new(
-                                    self.db,
-                                    // TODO the value accessors are cloning?
-                                    [lhs.value(self.db).as_ref(), rhs.value(self.db).as_ref()]
-                                        .concat()
-                                        .into_boxed_slice(),
-                                ))
-                            }
+                            ast::Operator::Add => Type::BytesLiteral(BytesLiteralType::new(
+                                self.db,
+                                [lhs.value(self.db).as_ref(), rhs.value(self.db).as_ref()]
+                                    .concat()
+                                    .into_boxed_slice(),
+                            )),
                             _ => Type::Unknown, // TODO
                         }
                     }
