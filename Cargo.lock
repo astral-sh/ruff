@@ -1989,6 +1989,7 @@ dependencies = [
  "anyhow",
  "crossbeam",
  "notify",
+ "rayon",
  "red_knot_python_semantic",
  "ruff_cache",
  "ruff_db",
