@@ -181,6 +181,8 @@ pub enum Type<'db> {
     IntLiteral(i64),
     /// A boolean literal, either `True` or `False`.
     BooleanLiteral(bool),
+    /// A bytes type, TODO bytes literals
+    Bytes,
     // TODO protocols, callable types, overloads, generics, type vars
 }
 
@@ -276,6 +278,10 @@ impl<'db> Type<'db> {
                 Type::Unknown
             }
             Type::BooleanLiteral(_) => Type::Unknown,
+            Type::Bytes => {
+                // TODO check if bytes have members
+                Type::Unknown
+            }
         }
     }
 
