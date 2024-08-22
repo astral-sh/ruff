@@ -658,9 +658,9 @@ where
             }
             ast::Expr::Named(node) => {
                 debug_assert!(self.current_assignment.is_none());
-                self.current_assignment = Some(node.into());
                 // TODO walrus in comprehensions is implicitly nonlocal
                 self.visit_expr(&node.value);
+                self.current_assignment = Some(node.into());
                 self.visit_expr(&node.target);
                 self.current_assignment = None;
             }
