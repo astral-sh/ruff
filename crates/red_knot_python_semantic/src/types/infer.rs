@@ -2291,6 +2291,23 @@ mod tests {
     }
 
     #[test]
+    fn walrus_self_plus_one() -> anyhow::Result<()> {
+        let mut db = setup_db();
+
+        db.write_dedented(
+            "src/a.py",
+            "
+            x = 0
+            (x := x + 1)
+            ",
+        )?;
+
+        assert_public_ty(&db, "src/a.py", "x", "Literal[1]");
+
+        Ok(())
+    }
+
+    #[test]
     fn ifexpr() -> anyhow::Result<()> {
         let mut db = setup_db();
 
