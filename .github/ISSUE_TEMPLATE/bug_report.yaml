@@ -47,8 +47,7 @@ body:
       label: Invoked command
       description: The command you invoked (e.g., ), ideally including the `--isolated` flag.
       placeholder: ruff /path/to/file.py --fix
-      render: shell
-  - type: settings
+  - type: textarea
     id: settings
     attributes:
       label: Settings
