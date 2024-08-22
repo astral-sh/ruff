@@ -333,6 +333,9 @@ impl<'db> TypeInferenceBuilder<'db> {
             DefinitionKind::ParameterWithDefault(parameter_with_default) => {
                 self.infer_parameter_with_default_definition(parameter_with_default, definition);
             }
+            DefinitionKind::WithItem(with_item) => {
+                self.infer_with_item_definition(with_item.target(), with_item.node(), definition);
+            }
         }
     }
 
@@ -618,11 +621,40 @@ impl<'db> TypeInferenceBuilder<'db> {
         } = with_statement;
 
         for item in items {
-            self.infer_expression(&item.context_expr);
-            self.infer_optional_expression(item.optional_vars.as_deref());
+            match item.optional_vars.as_deref() {
+                Some(ast::Expr::Name(name)) => {
+                    self.infer_definition(name);
+                }
+                _ => {
+                    // TODO infer definitions in unpacking assignment
+                    self.infer_expression(&item.context_expr);
+                }
+            }
         }
 
         self.infer_body(body);
+    }
+
+    fn infer_with_item_definition(
+        &mut self,
+        target: &ast::ExprName,
+        with_item: &ast::WithItem,
+        definition: Definition<'db>,
+    ) {
+        let expression = self.index.expression(&with_item.context_expr);
+        let result = infer_expression_types(self.db, expression);
+        self.extend(result);
+
+        // TODO(dhruvmanila): The correct type inference here is the return type of the __enter__
+        // method of the context manager.
+        let context_expr_ty = self
+            .types
+            .expression_ty(with_item.context_expr.scoped_ast_id(self.db, self.scope));
+
+        self.types
+            .expressions
+            .insert(target.scoped_ast_id(self.db, self.scope), context_expr_ty);
+        self.types.definitions.insert(definition, context_expr_ty);
     }
 
     fn infer_match_statement(&mut self, match_statement: &ast::StmtMatch) {
