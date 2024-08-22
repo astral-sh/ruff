@@ -1,5 +1,8 @@
-use crate::{server::schedule::Task, session::Session, system::url_to_system_path};
 use lsp_server as server;
+
+use crate::server::schedule::Task;
+use crate::session::Session;
+use crate::system::{url_to_any_system_path, AnySystemPath};
 
 mod diagnostics;
 mod notifications;
@@ -82,12 +85,17 @@ fn background_request_task<'a, R: traits::BackgroundDocumentRequestHandler>(
     Ok(Task::background(schedule, move |session: &Session| {
         let url = R::document_url(&params).into_owned();
 
-        let Ok(path) = url_to_system_path(&url) else {
+        let Ok(path) = url_to_any_system_path(&url) else {
             return Box::new(|_, _| {});
         };
-        let db = match session.workspace_db_for_path(path.as_std_path()) {
-            Some(db) => db.snapshot(),
-            None => session.default_workspace_db().snapshot(),
+        let db = match path {
+            AnySystemPath::System(path) => {
+                match session.workspace_db_for_path(path.as_std_path()) {
+                    Some(db) => db.snapshot(),
+                    None => session.default_workspace_db().snapshot(),
+                }
+            }
+            AnySystemPath::SystemVirtual(_) => session.default_workspace_db().snapshot(),
         };
 
         let Some(snapshot) = session.take_snapshot(url) else {

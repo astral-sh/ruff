@@ -1,4 +1,4 @@
-use ruff_db::system::{SystemPath, SystemPathBuf};
+use ruff_db::system::{SystemPath, SystemPathBuf, SystemVirtualPathBuf};
 pub use watcher::{directory_watcher, EventHandler, Watcher};
 pub use workspace_watcher::WorkspaceWatcher;
 
@@ -41,6 +41,15 @@ pub enum ChangeEvent {
         kind: DeletedKind,
     },
 
+    /// A new virtual path was created.
+    CreatedVirtual(SystemVirtualPathBuf),
+
+    /// The content of a virtual path was changed.
+    ChangedVirtual(SystemVirtualPathBuf),
+
+    /// A virtual path was deleted.
+    DeletedVirtual(SystemVirtualPathBuf),
+
     /// The file watcher failed to observe some changes and now is out of sync with the file system.
     ///
     /// This can happen if many files are changed at once. The consumer should rescan all files to catch up
@@ -69,7 +78,7 @@ impl ChangeEvent {
             | ChangeEvent::Created { path, .. }
             | ChangeEvent::Changed { path, .. }
             | ChangeEvent::Deleted { path, .. } => Some(path),
-            ChangeEvent::Rescan => None,
+            _ => None,
         }
     }
 }

@@ -131,6 +131,17 @@ impl RootDatabase {
                     }
                 }
 
+                watch::ChangeEvent::CreatedVirtual(path)
+                | watch::ChangeEvent::ChangedVirtual(path) => {
+                    File::sync_virtual_path(self, &path);
+                }
+
+                watch::ChangeEvent::DeletedVirtual(path) => {
+                    if let Some(virtual_file) = self.files().try_virtual_file(&path) {
+                        virtual_file.close(self);
+                    }
+                }
+
                 watch::ChangeEvent::Rescan => {
                     workspace_change = true;
                     Files::sync_all(self);

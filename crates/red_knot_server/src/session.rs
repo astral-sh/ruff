@@ -12,9 +12,10 @@ use red_knot_workspace::db::RootDatabase;
 use red_knot_workspace::workspace::WorkspaceMetadata;
 use ruff_db::files::{system_path_to_file, File};
 use ruff_db::system::SystemPath;
+use ruff_db::Db;
 
 use crate::edit::{DocumentKey, DocumentVersion, NotebookDocument};
-use crate::system::{url_to_system_path, LSPSystem};
+use crate::system::{url_to_any_system_path, AnySystemPath, LSPSystem};
 use crate::{PositionEncoding, TextDocument};
 
 pub(crate) use self::capabilities::ResolvedClientCapabilities;
@@ -246,6 +247,7 @@ impl Drop for MutIndexGuard<'_> {
 
 /// An immutable snapshot of `Session` that references
 /// a specific document.
+#[derive(Debug)]
 pub struct DocumentSnapshot {
     resolved_client_capabilities: Arc<ResolvedClientCapabilities>,
     document_ref: index::DocumentQuery,
@@ -266,7 +268,12 @@ impl DocumentSnapshot {
     }
 
     pub(crate) fn file(&self, db: &RootDatabase) -> Option<File> {
-        let path = url_to_system_path(self.document_ref.file_url()).ok()?;
-        system_path_to_file(db, path).ok()
+        match url_to_any_system_path(self.document_ref.file_url()).ok()? {
+            AnySystemPath::System(path) => system_path_to_file(db, path).ok(),
+            AnySystemPath::SystemVirtual(virtual_path) => db
+                .files()
+                .try_virtual_file(&virtual_path)
+                .map(|virtual_file| virtual_file.file()),
+        }
     }
 }
