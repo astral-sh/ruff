@@ -26,6 +26,8 @@ use crate::semantic_index::use_def::{FlowSnapshot, UseDefMapBuilder};
 use crate::semantic_index::SemanticIndex;
 use crate::Db;
 
+use super::definition::WithItemDefinitionNodeRef;
+
 pub(super) struct SemanticIndexBuilder<'db> {
     // Builder state
     db: &'db dyn Db,
@@ -561,6 +563,18 @@ where
                     self.flow_merge(break_state);
                 }
             }
+            ast::Stmt::With(ast::StmtWith { items, body, .. }) => {
+                for item in items {
+                    self.visit_expr(&item.context_expr);
+                    if let Some(optional_vars) = item.optional_vars.as_deref() {
+                        self.add_standalone_expression(&item.context_expr);
+                        self.current_assignment = Some(item.into());
+                        self.visit_expr(optional_vars);
+                        self.current_assignment = None;
+                    }
+                }
+                self.visit_body(body);
+            }
             ast::Stmt::Break(_) => {
                 self.loop_break_states.push(self.flow_snapshot());
             }
@@ -620,6 +634,15 @@ where
                             self.add_definition(
                                 symbol,
                                 ComprehensionDefinitionNodeRef { node, first },
+                            );
+                        }
+                        Some(CurrentAssignment::WithItem(with_item)) => {
+                            self.add_definition(
+                                symbol,
+                                WithItemDefinitionNodeRef {
+                                    node: with_item,
+                                    target: name_node,
+                                },
                             );
                         }
                         None => {}
@@ -778,6 +801,7 @@ enum CurrentAssignment<'a> {
         node: &'a ast::Comprehension,
         first: bool,
     },
+    WithItem(&'a ast::WithItem),
 }
 
 impl<'a> From<&'a ast::StmtAssign> for CurrentAssignment<'a> {
@@ -801,5 +825,11 @@ impl<'a> From<&'a ast::StmtAugAssign> for CurrentAssignment<'a> {
 impl<'a> From<&'a ast::ExprNamed> for CurrentAssignment<'a> {
     fn from(value: &'a ast::ExprNamed) -> Self {
         Self::Named(value)
+    }
+}
+
+impl<'a> From<&'a ast::WithItem> for CurrentAssignment<'a> {
+    fn from(value: &'a ast::WithItem) -> Self {
+        Self::WithItem(value)
     }
 }
