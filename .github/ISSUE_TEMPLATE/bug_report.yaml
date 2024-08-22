@@ -29,7 +29,7 @@ body:
     attributes:
       label: Keywords
       description: List of keywords you searched for before creating this issue. Write them down here so that others can find this issue more easily and help provide feedback.
-      placeholder: "RUF987", "unused variable", "Jupyter notebook"
+      placeholder: "RUF987, unused variable, Jupyter notebook"
   - type: textarea
     id: logs
     attributes:
