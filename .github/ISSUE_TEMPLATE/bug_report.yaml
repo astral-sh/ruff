@@ -22,7 +22,7 @@ body:
     attributes:
       label: Version
       description: What version of our software are you running? (`ruff --version`)
-      placeholder: '0.1.2'
+      placeholder: "0.1.2"
     validations:
       required: true
   - type: input
@@ -65,5 +65,3 @@ body:
             "F",
             "B",
         ]
-
-
