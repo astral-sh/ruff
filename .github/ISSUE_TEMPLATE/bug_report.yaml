@@ -22,6 +22,7 @@ body:
     attributes:
       label: Version
       description: What version of our software are you running? (`ruff --version`)
+      placeholder: '0.1.2'
     validations:
       required: true
   - type: input
@@ -41,6 +42,7 @@ body:
     attributes:
       label: Reproduction code
       description: A minimal code snippet that reproduces the bug.
+      render: plaintext
   - type: input
     id: command
     attributes:
@@ -52,4 +54,16 @@ body:
     attributes:
       label: Settings
       description: The current Ruff settings (any relevant sections from your `pyproject.toml`).
-      render: yaml
+      render: toml
+      placeholder: |
+        [tool.ruff]
+        line-length = 150
+        [tool.ruff.lint]
+        select = [
+            "E",
+            "W"
+            "F",
+            "B",
+        ]
+
+
