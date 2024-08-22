@@ -2,12 +2,12 @@ from __future__ import annotations
 
 import abc
 import enum
+import logging
 import os
 import shutil
-from pathlib import Path
 import subprocess
 import sys
-import logging
+from pathlib import Path
 
 from benchmark import Command
 from benchmark.projects import Project
@@ -21,9 +21,6 @@ class Benchmark(enum.Enum):
 
     WARM = "warm"
     """Re-checking the entire project without any changes"."""
-
-    INCREMENTAL = "incremental"
-    """Incremental check between two commits."""
 
 
 def which_tool(name: str) -> Path:
@@ -46,8 +43,6 @@ class Tool(abc.ABC):
                 return self.cold_command(project, venv)
             case Benchmark.WARM:
                 return self.warm_command(project, venv)
-            case Benchmark.INCREMENTAL:
-                return self.incremental_command(project, venv)
             case _:
                 raise ValueError(f"Invalid benchmark: {benchmark}")
 
@@ -55,9 +50,6 @@ class Tool(abc.ABC):
     def cold_command(self, project: Project, venv: Venv) -> Command: ...
 
     def warm_command(self, project: Project, venv: Venv) -> Command | None:
-        return None
-
-    def incremental_command(self, project: Project, venv: Venv) -> Command | None:
         return None
 
 
@@ -68,14 +60,7 @@ class Knot(Tool):
     def __init__(self, *, path: Path | None = None):
         self.name = str(path) or "knot"
         self.path = path or (
-            Path(__file__)
-            .joinpath(
-                "../../../../../",
-                "target",
-                "release",
-                "red_knot",
-            )
-            .resolve()
+            (Path(__file__) / "../../../../../target/release/red_knot").resolve()
         )
 
         assert self.path.is_file(), f"Red Knot not found at '{self.path}'. Run `cargo build --release --bin red_knot`."
@@ -85,8 +70,8 @@ class Knot(Tool):
 
         assert len(project.include) < 2, "Knot doesn't support multiple source folders"
 
-        if directory := project.include[0]:
-            command.extend(["--current-directory", directory])
+        if project.include:
+            command.extend(["--current-directory", project.include[0]])
 
         command.extend(["--venv-path", str(venv.path)])
 
@@ -96,7 +81,7 @@ class Knot(Tool):
         )
 
 
-class MyPy(Tool):
+class Mypy(Tool):
     path: Path
 
     def __init__(self, *, path: Path | None = None):
@@ -180,11 +165,11 @@ class Venv:
     @property
     def bin(self) -> Path:
         bin_dir = "scripts" if sys.platform == "win32" else "bin"
-        return self.path.joinpath(bin_dir)
+        return self.path / bin_dir
 
     def script(self, name: str) -> Path:
         extension = ".exe" if sys.platform == "win32" else ""
-        return self.bin.joinpath(f"{name}{extension}")
+        return self.bin / f"{name}{extension}"
 
     @staticmethod
     def create(parent: Path) -> Venv:
@@ -198,11 +183,13 @@ class Venv:
         ]
 
         try:
-            subprocess.run(command, cwd=parent, check=True)
+            subprocess.run(
+                command, cwd=parent, check=True, capture_output=True, text=True
+            )
         except subprocess.CalledProcessError as e:
-            raise RuntimeError(f"Failed to create venv: {e.stderr.decode()}")
+            raise RuntimeError(f"Failed to create venv: {e.stderr}")
 
-        root = parent.joinpath("venv")
+        root = parent / "venv"
         return Venv(root)
 
     def install(self, dependencies: list[str]):
@@ -218,6 +205,8 @@ class Venv:
         ]
 
         try:
-            subprocess.run(command, cwd=self.path, check=True)
+            subprocess.run(
+                command, cwd=self.path, check=True, capture_output=True, text=True
+            )
         except subprocess.CalledProcessError as e:
-            raise RuntimeError(f"Failed to install dependencies: {e.stderr.decode()}")
+            raise RuntimeError(f"Failed to install dependencies: {e.stderr}")

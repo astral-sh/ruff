@@ -8,7 +8,7 @@ import typing
 from pathlib import Path
 
 from benchmark import Hyperfine
-from benchmark.cases import Benchmark, Knot, MyPy, Pyright, Tool, Venv
+from benchmark.cases import Benchmark, Knot, Mypy, Pyright, Tool, Venv
 from benchmark.projects import ALL as all_projects
 from benchmark.projects import DEFAULT as default_projects
 
@@ -97,10 +97,10 @@ def main():
         suites.append(Knot(path=path))
 
     if args.mypy:
-        suites.append(MyPy())
+        suites.append(Mypy())
 
     # If no tools were specified, default to benchmarking all tools.
-    suites = suites or [Knot(), Pyright(), MyPy()]
+    suites = suites or [Knot(), Pyright(), Mypy()]
 
     # Determine the benchmarks to run, based on user input.
     benchmarks = (
@@ -125,7 +125,7 @@ def main():
 
             # Set the `venv` config for pyright. Pyright only respects the `--venvpath`
             # CLI option when `venv` is set in the configuration... 🤷‍♂️
-            with open(cwd.joinpath("pyrightconfig.json"), "w") as f:
+            with open(cwd / "pyrightconfig.json", "w") as f:
                 f.write(json.dumps(dict(venv=venv.name)))
 
             for benchmark in benchmarks:

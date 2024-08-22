@@ -27,30 +27,35 @@ class Project(typing.NamedTuple):
     """The arguments passed to mypy. Overrides `include` if set."""
 
     def clone(self, checkout_dir: Path):
+        # Skip cloning if the project has already been cloned (the script doesn't yet support updating)')
         if os.path.exists(os.path.join(checkout_dir, ".git")):
             return
 
         logging.debug(f"Cloning {self.repository} to {checkout_dir}")
 
         try:
+            # git doesn't support cloning a specific revision.
+            # This is the closest that I found to a "shallow clone with a specific revision"
             subprocess.run(
                 [
                     "git",
                     "init",
                     "--quiet",
                 ],
-                stderr=subprocess.PIPE,
                 env={"GIT_TERMINAL_PROMPT": "0"},
-                check=True,
                 cwd=checkout_dir,
+                check=True,
+                capture_output=True,
+                text=True,
             )
 
             subprocess.run(
                 ["git", "remote", "add", "origin", str(self.repository), "--no-fetch"],
                 env={"GIT_TERMINAL_PROMPT": "0"},
-                check=True,
-                stderr=subprocess.PIPE,
                 cwd=checkout_dir,
+                check=True,
+                capture_output=True,
+                text=True,
             )
 
             subprocess.run(
@@ -65,19 +70,21 @@ class Project(typing.NamedTuple):
                     "--no-tags",
                 ],
                 check=True,
-                stderr=subprocess.PIPE,
                 cwd=checkout_dir,
+                capture_output=True,
+                text=True,
             )
 
             subprocess.run(
                 ["git", "reset", "--hard", "FETCH_HEAD", "--quiet"],
                 check=True,
-                stderr=subprocess.PIPE,
                 cwd=checkout_dir,
+                capture_output=True,
+                text=True,
             )
 
         except subprocess.CalledProcessError as e:
-            raise RuntimeError(f"Failed to clone {self.name}: {e.stderr.decode()}")
+            raise RuntimeError(f"Failed to clone {self.name}: {e.stderr}")
 
         logging.info(f"Cloned {self.name} to {checkout_dir}.")
 
