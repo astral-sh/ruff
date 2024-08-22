@@ -42,9 +42,8 @@ impl Display for DisplayType<'_> {
                 write!(f, "Literal[{}]", if *boolean { "True" } else { "False" })
             }
             Type::BytesLiteral(bytes) => {
-                // TODO: cant I just borrow this value?
-                let value = bytes.value(self.db);
-                let escape = AsciiEscape::with_preferred_quote(value.as_ref(), Quote::Double);
+                let escape =
+                    AsciiEscape::with_preferred_quote(bytes.value(self.db).as_ref(), Quote::Double);
 
                 f.write_str("Literal[")?;
                 escape.bytes_repr().write(f)?;

@@ -1733,7 +1733,9 @@ impl<'db> TypeInferenceBuilder<'db> {
                                 Type::BytesLiteral(BytesLiteralType::new(
                                     self.db,
                                     // TODO the value accessors are cloning?
-                                    [lhs.value(self.db), rhs.value(self.db)].concat(),
+                                    [lhs.value(self.db).as_ref(), rhs.value(self.db).as_ref()]
+                                        .concat()
+                                        .into_boxed_slice(),
                                 ))
                             }
                             _ => Type::Unknown, // TODO
@@ -2262,12 +2264,14 @@ mod tests {
         db.write_dedented(
             "src/a.py",
             "
+            w = b'red' b'knot'
             x = b'hello'
             y = b'world' + b'!'
             z = b'\\xff\\x00'
             ",
         )?;
 
+        assert_public_ty(&db, "src/a.py", "w", "Literal[b\"redknot\"]");
         assert_public_ty(&db, "src/a.py", "x", "Literal[b\"hello\"]");
         assert_public_ty(&db, "src/a.py", "y", "Literal[b\"world!\"]");
         assert_public_ty(&db, "src/a.py", "z", "Literal[b\"\\xff\\x00\"]");

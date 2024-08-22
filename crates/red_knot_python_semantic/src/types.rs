@@ -380,7 +380,8 @@ pub struct IntersectionType<'db> {
 
 #[salsa::interned]
 pub struct BytesLiteralType<'db> {
-    value: Vec<u8>,
+    #[return_ref]
+    value: Box<[u8]>,
 }
 
 #[cfg(test)]
