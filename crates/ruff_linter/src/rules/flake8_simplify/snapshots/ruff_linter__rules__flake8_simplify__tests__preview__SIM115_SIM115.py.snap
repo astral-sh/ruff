@@ -146,7 +146,7 @@ SIM115.py:88:5: SIM115 Use a context manager for opening files
 88 | f = io.open("foo.txt")
    |     ^^^^^^^ SIM115
 89 | f = io.open_code("foo.txt")
-90 | f = io.BytesIO(b"data")
+90 | f = codecs.open("foo.txt")
    |
 
 SIM115.py:89:5: SIM115 Use a context manager for opening files
@@ -155,192 +155,172 @@ SIM115.py:89:5: SIM115 Use a context manager for opening files
 88 | f = io.open("foo.txt")
 89 | f = io.open_code("foo.txt")
    |     ^^^^^^^^^^^^ SIM115
-90 | f = io.BytesIO(b"data")
-91 | f = io.StringIO("data")
+90 | f = codecs.open("foo.txt")
+91 | f = bz2.open("foo.txt")
    |
 
 SIM115.py:90:5: SIM115 Use a context manager for opening files
    |
 88 | f = io.open("foo.txt")
 89 | f = io.open_code("foo.txt")
-90 | f = io.BytesIO(b"data")
-   |     ^^^^^^^^^^ SIM115
-91 | f = io.StringIO("data")
-92 | f = codecs.open("foo.txt")
+90 | f = codecs.open("foo.txt")
+   |     ^^^^^^^^^^^ SIM115
+91 | f = bz2.open("foo.txt")
+92 | f = gzip.open("foo.txt")
    |
 
 SIM115.py:91:5: SIM115 Use a context manager for opening files
    |
 89 | f = io.open_code("foo.txt")
-90 | f = io.BytesIO(b"data")
-91 | f = io.StringIO("data")
-   |     ^^^^^^^^^^^ SIM115
-92 | f = codecs.open("foo.txt")
-93 | f = bz2.open("foo.txt")
+90 | f = codecs.open("foo.txt")
+91 | f = bz2.open("foo.txt")
+   |     ^^^^^^^^ SIM115
+92 | f = gzip.open("foo.txt")
+93 | f = dbm.open("foo.db")
    |
 
 SIM115.py:92:5: SIM115 Use a context manager for opening files
    |
-90 | f = io.BytesIO(b"data")
-91 | f = io.StringIO("data")
-92 | f = codecs.open("foo.txt")
-   |     ^^^^^^^^^^^ SIM115
-93 | f = bz2.open("foo.txt")
-94 | f = gzip.open("foo.txt")
+90 | f = codecs.open("foo.txt")
+91 | f = bz2.open("foo.txt")
+92 | f = gzip.open("foo.txt")
+   |     ^^^^^^^^^ SIM115
+93 | f = dbm.open("foo.db")
+94 | f = dbm.gnu.open("foo.db")
    |
 
 SIM115.py:93:5: SIM115 Use a context manager for opening files
    |
-91 | f = io.StringIO("data")
-92 | f = codecs.open("foo.txt")
-93 | f = bz2.open("foo.txt")
+91 | f = bz2.open("foo.txt")
+92 | f = gzip.open("foo.txt")
+93 | f = dbm.open("foo.db")
    |     ^^^^^^^^ SIM115
-94 | f = gzip.open("foo.txt")
-95 | f = dbm.open("foo.db")
+94 | f = dbm.gnu.open("foo.db")
+95 | f = dbm.ndbm.open("foo.db")
    |
 
 SIM115.py:94:5: SIM115 Use a context manager for opening files
    |
-92 | f = codecs.open("foo.txt")
-93 | f = bz2.open("foo.txt")
-94 | f = gzip.open("foo.txt")
-   |     ^^^^^^^^^ SIM115
-95 | f = dbm.open("foo.db")
-96 | f = dbm.gnu.open("foo.db")
+92 | f = gzip.open("foo.txt")
+93 | f = dbm.open("foo.db")
+94 | f = dbm.gnu.open("foo.db")
+   |     ^^^^^^^^^^^^ SIM115
+95 | f = dbm.ndbm.open("foo.db")
+96 | f = dbm.dumb.open("foo.db")
    |
 
 SIM115.py:95:5: SIM115 Use a context manager for opening files
    |
-93 | f = bz2.open("foo.txt")
-94 | f = gzip.open("foo.txt")
-95 | f = dbm.open("foo.db")
-   |     ^^^^^^^^ SIM115
-96 | f = dbm.gnu.open("foo.db")
-97 | f = dbm.ndbm.open("foo.db")
+93 | f = dbm.open("foo.db")
+94 | f = dbm.gnu.open("foo.db")
+95 | f = dbm.ndbm.open("foo.db")
+   |     ^^^^^^^^^^^^^ SIM115
+96 | f = dbm.dumb.open("foo.db")
+97 | f = lzma.open("foo.xz")
    |
 
 SIM115.py:96:5: SIM115 Use a context manager for opening files
    |
-94 | f = gzip.open("foo.txt")
-95 | f = dbm.open("foo.db")
-96 | f = dbm.gnu.open("foo.db")
-   |     ^^^^^^^^^^^^ SIM115
-97 | f = dbm.ndbm.open("foo.db")
-98 | f = dbm.dumb.open("foo.db")
+94 | f = dbm.gnu.open("foo.db")
+95 | f = dbm.ndbm.open("foo.db")
+96 | f = dbm.dumb.open("foo.db")
+   |     ^^^^^^^^^^^^^ SIM115
+97 | f = lzma.open("foo.xz")
+98 | f = lzma.LZMAFile("foo.xz")
    |
 
 SIM115.py:97:5: SIM115 Use a context manager for opening files
    |
-95 | f = dbm.open("foo.db")
-96 | f = dbm.gnu.open("foo.db")
-97 | f = dbm.ndbm.open("foo.db")
-   |     ^^^^^^^^^^^^^ SIM115
-98 | f = dbm.dumb.open("foo.db")
-99 | f = lzma.open("foo.xz")
+95 | f = dbm.ndbm.open("foo.db")
+96 | f = dbm.dumb.open("foo.db")
+97 | f = lzma.open("foo.xz")
+   |     ^^^^^^^^^ SIM115
+98 | f = lzma.LZMAFile("foo.xz")
+99 | f = shelve.open("foo.db")
    |
 
 SIM115.py:98:5: SIM115 Use a context manager for opening files
     |
- 96 | f = dbm.gnu.open("foo.db")
- 97 | f = dbm.ndbm.open("foo.db")
- 98 | f = dbm.dumb.open("foo.db")
+ 96 | f = dbm.dumb.open("foo.db")
+ 97 | f = lzma.open("foo.xz")
+ 98 | f = lzma.LZMAFile("foo.xz")
     |     ^^^^^^^^^^^^^ SIM115
- 99 | f = lzma.open("foo.xz")
-100 | f = lzma.LZMAFile("foo.xz")
+ 99 | f = shelve.open("foo.db")
+100 | f = tokenize.open("foo.py")
     |
 
 SIM115.py:99:5: SIM115 Use a context manager for opening files
     |
- 97 | f = dbm.ndbm.open("foo.db")
- 98 | f = dbm.dumb.open("foo.db")
- 99 | f = lzma.open("foo.xz")
-    |     ^^^^^^^^^ SIM115
-100 | f = lzma.LZMAFile("foo.xz")
-101 | f = shelve.open("foo.db")
+ 97 | f = lzma.open("foo.xz")
+ 98 | f = lzma.LZMAFile("foo.xz")
+ 99 | f = shelve.open("foo.db")
+    |     ^^^^^^^^^^^ SIM115
+100 | f = tokenize.open("foo.py")
+101 | f = wave.open("foo.wav")
     |
 
 SIM115.py:100:5: SIM115 Use a context manager for opening files
     |
- 98 | f = dbm.dumb.open("foo.db")
- 99 | f = lzma.open("foo.xz")
-100 | f = lzma.LZMAFile("foo.xz")
+ 98 | f = lzma.LZMAFile("foo.xz")
+ 99 | f = shelve.open("foo.db")
+100 | f = tokenize.open("foo.py")
     |     ^^^^^^^^^^^^^ SIM115
-101 | f = shelve.open("foo.db")
-102 | f = tokenize.open("foo.py")
+101 | f = wave.open("foo.wav")
+102 | f = tarfile.TarFile.taropen("foo.tar")
     |
 
 SIM115.py:101:5: SIM115 Use a context manager for opening files
     |
- 99 | f = lzma.open("foo.xz")
-100 | f = lzma.LZMAFile("foo.xz")
-101 | f = shelve.open("foo.db")
-    |     ^^^^^^^^^^^ SIM115
-102 | f = tokenize.open("foo.py")
-103 | f = wave.open("foo.wav")
+ 99 | f = shelve.open("foo.db")
+100 | f = tokenize.open("foo.py")
+101 | f = wave.open("foo.wav")
+    |     ^^^^^^^^^ SIM115
+102 | f = tarfile.TarFile.taropen("foo.tar")
+103 | f = fileinput.input("foo.txt")
     |
 
 SIM115.py:102:5: SIM115 Use a context manager for opening files
     |
-100 | f = lzma.LZMAFile("foo.xz")
-101 | f = shelve.open("foo.db")
-102 | f = tokenize.open("foo.py")
-    |     ^^^^^^^^^^^^^ SIM115
-103 | f = wave.open("foo.wav")
-104 | f = tarfile.TarFile.taropen("foo.tar")
+100 | f = tokenize.open("foo.py")
+101 | f = wave.open("foo.wav")
+102 | f = tarfile.TarFile.taropen("foo.tar")
+    |     ^^^^^^^^^^^^^^^^^^^^^^^ SIM115
+103 | f = fileinput.input("foo.txt")
+104 | f = fileinput.FileInput("foo.txt")
     |
 
 SIM115.py:103:5: SIM115 Use a context manager for opening files
     |
-101 | f = shelve.open("foo.db")
-102 | f = tokenize.open("foo.py")
-103 | f = wave.open("foo.wav")
-    |     ^^^^^^^^^ SIM115
-104 | f = tarfile.TarFile.taropen("foo.tar")
-105 | f = fileinput.input("foo.txt")
+101 | f = wave.open("foo.wav")
+102 | f = tarfile.TarFile.taropen("foo.tar")
+103 | f = fileinput.input("foo.txt")
+    |     ^^^^^^^^^^^^^^^ SIM115
+104 | f = fileinput.FileInput("foo.txt")
     |
 
 SIM115.py:104:5: SIM115 Use a context manager for opening files
     |
-102 | f = tokenize.open("foo.py")
-103 | f = wave.open("foo.wav")
-104 | f = tarfile.TarFile.taropen("foo.tar")
-    |     ^^^^^^^^^^^^^^^^^^^^^^^ SIM115
-105 | f = fileinput.input("foo.txt")
-106 | f = fileinput.FileInput("foo.txt")
-    |
-
-SIM115.py:105:5: SIM115 Use a context manager for opening files
-    |
-103 | f = wave.open("foo.wav")
-104 | f = tarfile.TarFile.taropen("foo.tar")
-105 | f = fileinput.input("foo.txt")
-    |     ^^^^^^^^^^^^^^^ SIM115
-106 | f = fileinput.FileInput("foo.txt")
-    |
-
-SIM115.py:106:5: SIM115 Use a context manager for opening files
-    |
-104 | f = tarfile.TarFile.taropen("foo.tar")
-105 | f = fileinput.input("foo.txt")
-106 | f = fileinput.FileInput("foo.txt")
+102 | f = tarfile.TarFile.taropen("foo.tar")
+103 | f = fileinput.input("foo.txt")
+104 | f = fileinput.FileInput("foo.txt")
     |     ^^^^^^^^^^^^^^^^^^^ SIM115
-107 | 
-108 | with contextlib.suppress(Exception):
+105 | 
+106 | with contextlib.suppress(Exception):
     |
 
-SIM115.py:252:9: SIM115 Use a context manager for opening files
+SIM115.py:240:9: SIM115 Use a context manager for opening files
     |
-250 | def aliased():
-251 |     from shelve import open as open_shelf
-252 |     x = open_shelf()
+238 | def aliased():
+239 |     from shelve import open as open_shelf
+240 |     x = open_shelf("foo.dbm")
     |         ^^^^^^^^^^ SIM115
-253 |     x.close()
+241 |     x.close()
     |
 
-SIM115.py:256:9: SIM115 Use a context manager for opening files
+SIM115.py:244:9: SIM115 Use a context manager for opening files
     |
-255 |     from tarfile import TarFile as TF
-256 |     f = TF("foo").open()
+243 |     from tarfile import TarFile as TF
+244 |     f = TF("foo").open()
     |         ^^^^^^^^^^^^^^ SIM115
-257 |     f.close()
+245 |     f.close()
     |

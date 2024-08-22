@@ -167,7 +167,7 @@ fn is_open_preview(semantic: &SemanticModel, call: &ast::ExprCall) -> bool {
                 "open"
             ] | ["dbm", "gnu" | "ndbm" | "dumb", "open"]
                 | ["fileinput", "FileInput" | "input"]
-                | ["io", "open" | "open_code" | "BytesIO" | "StringIO"]
+                | ["io", "open" | "open_code"]
                 | ["lzma", "LZMAFile" | "open"]
                 | ["tarfile", "TarFile", "taropen"]
                 | [

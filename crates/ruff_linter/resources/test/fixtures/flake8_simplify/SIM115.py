@@ -87,8 +87,6 @@ f = tarfile.TarFile().open()
 f = zipfile.ZipFile("foo.zip").open("foo.txt")
 f = io.open("foo.txt")
 f = io.open_code("foo.txt")
-f = io.BytesIO(b"data")
-f = io.StringIO("data")
 f = codecs.open("foo.txt")
 f = bz2.open("foo.txt")
 f = gzip.open("foo.txt")
@@ -147,14 +145,6 @@ with io.open("foo.txt") as f:
 
 # OK
 with io.open_code("foo.txt") as f:
-    data = f.read()
-
-# OK
-with io.BytesIO(b"data") as f:
-    data = f.read()
-
-# OK
-with io.StringIO("data") as f:
     data = f.read()
 
 # OK
@@ -244,12 +234,10 @@ wave.open("foo.wav").close()
 tarfile.TarFile.taropen("foo.tar").close()
 fileinput.input("foo.txt").close()
 fileinput.FileInput("foo.txt").close()
-io.BytesIO(b"data").close()
-io.StringIO("data").close()
 
 def aliased():
     from shelve import open as open_shelf
-    x = open_shelf()
+    x = open_shelf("foo.dbm")
     x.close()
 
     from tarfile import TarFile as TF
