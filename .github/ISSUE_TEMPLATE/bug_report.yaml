@@ -7,7 +7,7 @@ body:
   - type: markdown
     attributes:
       value: |
-        Thanks for taking the time to fill out this bug report!
+        Thank you for taking the time to report an issue! We're glad to have you involved with Ruff.
   - type: textarea
     id: what-happened
     attributes:
