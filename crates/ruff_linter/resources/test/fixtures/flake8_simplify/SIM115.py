@@ -246,3 +246,12 @@ fileinput.input("foo.txt").close()
 fileinput.FileInput("foo.txt").close()
 io.BytesIO(b"data").close()
 io.StringIO("data").close()
+
+def aliased():
+    from shelve import open as open_shelf
+    x = open_shelf()
+    x.close()
+
+    from tarfile import TarFile as TF
+    f = TF("foo").open()
+    f.close()

@@ -37,7 +37,7 @@ pub struct OpenFileWithContextHandler;
 impl Violation for OpenFileWithContextHandler {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Use context handler for opening files")
+        format!("Use a context manager for opening files")
     }
 }
 
@@ -113,14 +113,14 @@ fn match_exit_stack(semantic: &SemanticModel) -> bool {
 }
 
 /// Return `true` if `func` is the builtin `open` or `pathlib.Path(...).open`.
-fn is_open(semantic: &SemanticModel, func: &Expr) -> bool {
+fn is_open(semantic: &SemanticModel, call: &ast::ExprCall) -> bool {
     // Ex) `open(...)`
-    if semantic.match_builtin_expr(func, "open") {
+    if semantic.match_builtin_expr(&call.func, "open") {
         return true;
     }
 
     // Ex) `pathlib.Path(...).open()`
-    let Expr::Attribute(ast::ExprAttribute { attr, value, .. }) = func else {
+    let Expr::Attribute(ast::ExprAttribute { attr, value, .. }) = &*call.func else {
         return false;
     };
 
@@ -141,10 +141,34 @@ fn is_open(semantic: &SemanticModel, func: &Expr) -> bool {
 }
 
 /// Return `true` if the expression is an `open` call or temporary file constructor.
-fn is_open_preview(semantic: &SemanticModel, func: &Expr) -> bool {
+fn is_open_preview(semantic: &SemanticModel, call: &ast::ExprCall) -> bool {
+    let func = &*call.func;
+
     // Ex) `open(...)`
-    if semantic.match_builtin_expr(func, "open") {
-        return true;
+    if let Some(qualified_name) = semantic.resolve_qualified_name(func) {
+        return matches!(
+            qualified_name.segments(),
+            [
+                "" | "builtins"
+                    | "bz2"
+                    | "codecs"
+                    | "dbm"
+                    | "gzip"
+                    | "tarfile"
+                    | "shelve"
+                    | "tokenize"
+                    | "wave",
+                "open"
+            ] | ["dbm", "gnu" | "ndbm" | "dumb", "open"]
+                | ["fileinput", "FileInput" | "input"]
+                | ["io", "open" | "open_code" | "BytesIO" | "StringIO"]
+                | ["lzma", "LZMAFile" | "open"]
+                | ["tarfile", "TarFile", "taropen"]
+                | [
+                    "tempfile",
+                    "TemporaryFile" | "NamedTemporaryFile" | "SpooledTemporaryFile"
+                ]
+        );
     }
 
     // Ex) `pathlib.Path(...).open()`
@@ -152,63 +176,25 @@ fn is_open_preview(semantic: &SemanticModel, func: &Expr) -> bool {
         return false;
     };
 
-    let segments: Option<Vec<&str>> = match value.as_ref() {
-        Expr::Call(ast::ExprCall {
-            func: value_func, ..
-        }) => {
-            // Ex) `pathlib.Path(...).open()` -> ["pathlib", "Path", "open"]
-            semantic
-                .resolve_qualified_name(value_func)
-                .map(|qualified_name| qualified_name.append_member(attr).segments().to_vec())
-        }
-        Expr::Name(ast::ExprName { id, .. }) => {
-            // Ex) `tarfile.open(...)` -> ["tarfile", "open"]
-            Some(vec![&**id, attr])
-        }
-        Expr::Attribute(ast::ExprAttribute {
-            attr: value_attr,
-            value,
-            ..
-        }) => {
-            // Ex) `dbm.gnu.open(...)` -> ["dbm", "gnu", "open"]
-
-            semantic
-                .resolve_qualified_name(value)
-                .map(|qualified_name| {
-                    qualified_name
-                        .append_member(value_attr)
-                        .append_member(attr)
-                        .segments()
-                        .to_vec()
-                })
-        }
-        _ => None,
-    };
-
-    let Some(segments) = segments else {
+    let Expr::Call(ast::ExprCall { func, .. }) = &**value else {
         return false;
     };
 
-    match segments[..] {
-        // Ex) `pathlib.Path(...).open()`
-        ["pathlib", "Path", "open"] => true,
-        ["tarfile", "TarFile", "open" | "taropen" | "gzopen" | "bz2open" | "xzopen"] => true,
-        ["zipfile", "ZipFile", "open"] => true,
-        ["lzma", "LZMAFile", "open"] => true,
-        ["dbm", "gnu" | "ndbm" | "dumb", "open"] => true,
+    // E.g. for `pathlib.Path(...).open()`, `qualified_name_of_instance.segments() == ["pathlib", "Path"]`
+    let Some(qualified_name_of_instance) = semantic.resolve_qualified_name(func) else {
+        return false;
+    };
 
-        // Ex) `foo.open(...)`
-        ["codecs" | "dbm" | "tarfile" | "bz2" | "gzip" | "io" | "lzma" | "shelve" | "tokenize"
-        | "wave", "open"] => true,
-        ["fileinput", "FileInput" | "input"] => true,
-
-        // fringe cases
-        ["tempfile", "TemporaryFile" | "NamedTemporaryFile" | "SpooledTemporaryFile"] => true,
-        ["io", "open_code" | "BytesIO" | "StringIO"] => true,
-        ["lzma", "LZMAFile"] => true,
-
-        _ => false,
-    }
+    matches!(
+        (qualified_name_of_instance.segments(), &**attr),
+        (
+            ["pathlib", "Path"] | ["zipfile", "ZipFile"] | ["lzma", "LZMAFile"],
+            "open"
+        ) | (
+            ["tarfile", "TarFile"],
+            "open" | "taropen" | "gzopen" | "bz2open" | "xzopen"
+        )
+    )
 }
 
 /// Return `true` if the current expression is followed by a `close` call.
@@ -236,15 +222,15 @@ fn is_closed(semantic: &SemanticModel) -> bool {
 }
 
 /// SIM115
-pub(crate) fn open_file_with_context_handler(checker: &mut Checker, func: &Expr) {
+pub(crate) fn open_file_with_context_handler(checker: &mut Checker, call: &ast::ExprCall) {
     let semantic = checker.semantic();
 
     if checker.settings.preview.is_disabled() {
-        if !is_open(semantic, func) {
+        if !is_open(semantic, call) {
             return;
         }
     } else {
-        if !is_open_preview(semantic, func) {
+        if !is_open_preview(semantic, call) {
             return;
         }
     }
@@ -278,7 +264,8 @@ pub(crate) fn open_file_with_context_handler(checker: &mut Checker, func: &Expr)
         }
     }
 
-    checker
-        .diagnostics
-        .push(Diagnostic::new(OpenFileWithContextHandler, func.range()));
+    checker.diagnostics.push(Diagnostic::new(
+        OpenFileWithContextHandler,
+        call.func.range(),
+    ));
 }

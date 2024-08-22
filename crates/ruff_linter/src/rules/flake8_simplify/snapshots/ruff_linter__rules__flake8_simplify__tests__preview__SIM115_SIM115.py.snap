@@ -1,7 +1,7 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_simplify/mod.rs
 ---
-SIM115.py:8:5: SIM115 Use context handler for opening files
+SIM115.py:8:5: SIM115 Use a context manager for opening files
    |
  7 | # SIM115
  8 | f = open("foo.txt")
@@ -10,7 +10,7 @@ SIM115.py:8:5: SIM115 Use context handler for opening files
 10 | f = pathlib.Path("foo.txt").open()
    |
 
-SIM115.py:9:5: SIM115 Use context handler for opening files
+SIM115.py:9:5: SIM115 Use a context manager for opening files
    |
  7 | # SIM115
  8 | f = open("foo.txt")
@@ -20,7 +20,7 @@ SIM115.py:9:5: SIM115 Use context handler for opening files
 11 | f = pl.Path("foo.txt").open()
    |
 
-SIM115.py:10:5: SIM115 Use context handler for opening files
+SIM115.py:10:5: SIM115 Use a context manager for opening files
    |
  8 | f = open("foo.txt")
  9 | f = Path("foo.txt").open()
@@ -30,7 +30,7 @@ SIM115.py:10:5: SIM115 Use context handler for opening files
 12 | f = P("foo.txt").open()
    |
 
-SIM115.py:11:5: SIM115 Use context handler for opening files
+SIM115.py:11:5: SIM115 Use a context manager for opening files
    |
  9 | f = Path("foo.txt").open()
 10 | f = pathlib.Path("foo.txt").open()
@@ -40,7 +40,7 @@ SIM115.py:11:5: SIM115 Use context handler for opening files
 13 | data = f.read()
    |
 
-SIM115.py:12:5: SIM115 Use context handler for opening files
+SIM115.py:12:5: SIM115 Use a context manager for opening files
    |
 10 | f = pathlib.Path("foo.txt").open()
 11 | f = pl.Path("foo.txt").open()
@@ -50,7 +50,7 @@ SIM115.py:12:5: SIM115 Use context handler for opening files
 14 | f.close()
    |
 
-SIM115.py:39:9: SIM115 Use context handler for opening files
+SIM115.py:39:9: SIM115 Use a context manager for opening files
    |
 37 | # SIM115
 38 | with contextlib.ExitStack():
@@ -60,7 +60,7 @@ SIM115.py:39:9: SIM115 Use context handler for opening files
 41 | # OK
    |
 
-SIM115.py:80:5: SIM115 Use context handler for opening files
+SIM115.py:80:5: SIM115 Use a context manager for opening files
    |
 78 | import fileinput
 79 | 
@@ -70,7 +70,7 @@ SIM115.py:80:5: SIM115 Use context handler for opening files
 82 | f = tempfile.SpooledTemporaryFile()
    |
 
-SIM115.py:81:5: SIM115 Use context handler for opening files
+SIM115.py:81:5: SIM115 Use a context manager for opening files
    |
 80 | f = tempfile.NamedTemporaryFile()
 81 | f = tempfile.TemporaryFile()
@@ -79,7 +79,7 @@ SIM115.py:81:5: SIM115 Use context handler for opening files
 83 | f = tarfile.open("foo.tar")
    |
 
-SIM115.py:82:5: SIM115 Use context handler for opening files
+SIM115.py:82:5: SIM115 Use a context manager for opening files
    |
 80 | f = tempfile.NamedTemporaryFile()
 81 | f = tempfile.TemporaryFile()
@@ -89,7 +89,7 @@ SIM115.py:82:5: SIM115 Use context handler for opening files
 84 | f = TarFile("foo.tar").open()
    |
 
-SIM115.py:83:5: SIM115 Use context handler for opening files
+SIM115.py:83:5: SIM115 Use a context manager for opening files
    |
 81 | f = tempfile.TemporaryFile()
 82 | f = tempfile.SpooledTemporaryFile()
@@ -99,7 +99,7 @@ SIM115.py:83:5: SIM115 Use context handler for opening files
 85 | f = tarfile.TarFile("foo.tar").open()
    |
 
-SIM115.py:84:5: SIM115 Use context handler for opening files
+SIM115.py:84:5: SIM115 Use a context manager for opening files
    |
 82 | f = tempfile.SpooledTemporaryFile()
 83 | f = tarfile.open("foo.tar")
@@ -109,7 +109,7 @@ SIM115.py:84:5: SIM115 Use context handler for opening files
 86 | f = tarfile.TarFile().open()
    |
 
-SIM115.py:85:5: SIM115 Use context handler for opening files
+SIM115.py:85:5: SIM115 Use a context manager for opening files
    |
 83 | f = tarfile.open("foo.tar")
 84 | f = TarFile("foo.tar").open()
@@ -119,7 +119,7 @@ SIM115.py:85:5: SIM115 Use context handler for opening files
 87 | f = zipfile.ZipFile("foo.zip").open("foo.txt")
    |
 
-SIM115.py:86:5: SIM115 Use context handler for opening files
+SIM115.py:86:5: SIM115 Use a context manager for opening files
    |
 84 | f = TarFile("foo.tar").open()
 85 | f = tarfile.TarFile("foo.tar").open()
@@ -129,7 +129,7 @@ SIM115.py:86:5: SIM115 Use context handler for opening files
 88 | f = io.open("foo.txt")
    |
 
-SIM115.py:87:5: SIM115 Use context handler for opening files
+SIM115.py:87:5: SIM115 Use a context manager for opening files
    |
 85 | f = tarfile.TarFile("foo.tar").open()
 86 | f = tarfile.TarFile().open()
@@ -139,7 +139,7 @@ SIM115.py:87:5: SIM115 Use context handler for opening files
 89 | f = io.open_code("foo.txt")
    |
 
-SIM115.py:88:5: SIM115 Use context handler for opening files
+SIM115.py:88:5: SIM115 Use a context manager for opening files
    |
 86 | f = tarfile.TarFile().open()
 87 | f = zipfile.ZipFile("foo.zip").open("foo.txt")
@@ -149,7 +149,7 @@ SIM115.py:88:5: SIM115 Use context handler for opening files
 90 | f = io.BytesIO(b"data")
    |
 
-SIM115.py:89:5: SIM115 Use context handler for opening files
+SIM115.py:89:5: SIM115 Use a context manager for opening files
    |
 87 | f = zipfile.ZipFile("foo.zip").open("foo.txt")
 88 | f = io.open("foo.txt")
@@ -159,7 +159,7 @@ SIM115.py:89:5: SIM115 Use context handler for opening files
 91 | f = io.StringIO("data")
    |
 
-SIM115.py:90:5: SIM115 Use context handler for opening files
+SIM115.py:90:5: SIM115 Use a context manager for opening files
    |
 88 | f = io.open("foo.txt")
 89 | f = io.open_code("foo.txt")
@@ -169,7 +169,7 @@ SIM115.py:90:5: SIM115 Use context handler for opening files
 92 | f = codecs.open("foo.txt")
    |
 
-SIM115.py:91:5: SIM115 Use context handler for opening files
+SIM115.py:91:5: SIM115 Use a context manager for opening files
    |
 89 | f = io.open_code("foo.txt")
 90 | f = io.BytesIO(b"data")
@@ -179,7 +179,7 @@ SIM115.py:91:5: SIM115 Use context handler for opening files
 93 | f = bz2.open("foo.txt")
    |
 
-SIM115.py:92:5: SIM115 Use context handler for opening files
+SIM115.py:92:5: SIM115 Use a context manager for opening files
    |
 90 | f = io.BytesIO(b"data")
 91 | f = io.StringIO("data")
@@ -189,7 +189,7 @@ SIM115.py:92:5: SIM115 Use context handler for opening files
 94 | f = gzip.open("foo.txt")
    |
 
-SIM115.py:93:5: SIM115 Use context handler for opening files
+SIM115.py:93:5: SIM115 Use a context manager for opening files
    |
 91 | f = io.StringIO("data")
 92 | f = codecs.open("foo.txt")
@@ -199,7 +199,7 @@ SIM115.py:93:5: SIM115 Use context handler for opening files
 95 | f = dbm.open("foo.db")
    |
 
-SIM115.py:94:5: SIM115 Use context handler for opening files
+SIM115.py:94:5: SIM115 Use a context manager for opening files
    |
 92 | f = codecs.open("foo.txt")
 93 | f = bz2.open("foo.txt")
@@ -209,7 +209,7 @@ SIM115.py:94:5: SIM115 Use context handler for opening files
 96 | f = dbm.gnu.open("foo.db")
    |
 
-SIM115.py:95:5: SIM115 Use context handler for opening files
+SIM115.py:95:5: SIM115 Use a context manager for opening files
    |
 93 | f = bz2.open("foo.txt")
 94 | f = gzip.open("foo.txt")
@@ -219,7 +219,7 @@ SIM115.py:95:5: SIM115 Use context handler for opening files
 97 | f = dbm.ndbm.open("foo.db")
    |
 
-SIM115.py:96:5: SIM115 Use context handler for opening files
+SIM115.py:96:5: SIM115 Use a context manager for opening files
    |
 94 | f = gzip.open("foo.txt")
 95 | f = dbm.open("foo.db")
@@ -229,7 +229,7 @@ SIM115.py:96:5: SIM115 Use context handler for opening files
 98 | f = dbm.dumb.open("foo.db")
    |
 
-SIM115.py:97:5: SIM115 Use context handler for opening files
+SIM115.py:97:5: SIM115 Use a context manager for opening files
    |
 95 | f = dbm.open("foo.db")
 96 | f = dbm.gnu.open("foo.db")
@@ -239,7 +239,7 @@ SIM115.py:97:5: SIM115 Use context handler for opening files
 99 | f = lzma.open("foo.xz")
    |
 
-SIM115.py:98:5: SIM115 Use context handler for opening files
+SIM115.py:98:5: SIM115 Use a context manager for opening files
     |
  96 | f = dbm.gnu.open("foo.db")
  97 | f = dbm.ndbm.open("foo.db")
@@ -249,7 +249,7 @@ SIM115.py:98:5: SIM115 Use context handler for opening files
 100 | f = lzma.LZMAFile("foo.xz")
     |
 
-SIM115.py:99:5: SIM115 Use context handler for opening files
+SIM115.py:99:5: SIM115 Use a context manager for opening files
     |
  97 | f = dbm.ndbm.open("foo.db")
  98 | f = dbm.dumb.open("foo.db")
@@ -259,7 +259,7 @@ SIM115.py:99:5: SIM115 Use context handler for opening files
 101 | f = shelve.open("foo.db")
     |
 
-SIM115.py:100:5: SIM115 Use context handler for opening files
+SIM115.py:100:5: SIM115 Use a context manager for opening files
     |
  98 | f = dbm.dumb.open("foo.db")
  99 | f = lzma.open("foo.xz")
@@ -269,7 +269,7 @@ SIM115.py:100:5: SIM115 Use context handler for opening files
 102 | f = tokenize.open("foo.py")
     |
 
-SIM115.py:101:5: SIM115 Use context handler for opening files
+SIM115.py:101:5: SIM115 Use a context manager for opening files
     |
  99 | f = lzma.open("foo.xz")
 100 | f = lzma.LZMAFile("foo.xz")
@@ -279,7 +279,7 @@ SIM115.py:101:5: SIM115 Use context handler for opening files
 103 | f = wave.open("foo.wav")
     |
 
-SIM115.py:102:5: SIM115 Use context handler for opening files
+SIM115.py:102:5: SIM115 Use a context manager for opening files
     |
 100 | f = lzma.LZMAFile("foo.xz")
 101 | f = shelve.open("foo.db")
@@ -289,7 +289,7 @@ SIM115.py:102:5: SIM115 Use context handler for opening files
 104 | f = tarfile.TarFile.taropen("foo.tar")
     |
 
-SIM115.py:103:5: SIM115 Use context handler for opening files
+SIM115.py:103:5: SIM115 Use a context manager for opening files
     |
 101 | f = shelve.open("foo.db")
 102 | f = tokenize.open("foo.py")
@@ -299,7 +299,7 @@ SIM115.py:103:5: SIM115 Use context handler for opening files
 105 | f = fileinput.input("foo.txt")
     |
 
-SIM115.py:104:5: SIM115 Use context handler for opening files
+SIM115.py:104:5: SIM115 Use a context manager for opening files
     |
 102 | f = tokenize.open("foo.py")
 103 | f = wave.open("foo.wav")
@@ -309,7 +309,7 @@ SIM115.py:104:5: SIM115 Use context handler for opening files
 106 | f = fileinput.FileInput("foo.txt")
     |
 
-SIM115.py:105:5: SIM115 Use context handler for opening files
+SIM115.py:105:5: SIM115 Use a context manager for opening files
     |
 103 | f = wave.open("foo.wav")
 104 | f = tarfile.TarFile.taropen("foo.tar")
@@ -318,7 +318,7 @@ SIM115.py:105:5: SIM115 Use context handler for opening files
 106 | f = fileinput.FileInput("foo.txt")
     |
 
-SIM115.py:106:5: SIM115 Use context handler for opening files
+SIM115.py:106:5: SIM115 Use a context manager for opening files
     |
 104 | f = tarfile.TarFile.taropen("foo.tar")
 105 | f = fileinput.input("foo.txt")
@@ -326,4 +326,21 @@ SIM115.py:106:5: SIM115 Use context handler for opening files
     |     ^^^^^^^^^^^^^^^^^^^ SIM115
 107 | 
 108 | with contextlib.suppress(Exception):
+    |
+
+SIM115.py:252:9: SIM115 Use a context manager for opening files
+    |
+250 | def aliased():
+251 |     from shelve import open as open_shelf
+252 |     x = open_shelf()
+    |         ^^^^^^^^^^ SIM115
+253 |     x.close()
+    |
+
+SIM115.py:256:9: SIM115 Use a context manager for opening files
+    |
+255 |     from tarfile import TarFile as TF
+256 |     f = TF("foo").open()
+    |         ^^^^^^^^^^^^^^ SIM115
+257 |     f.close()
     |
