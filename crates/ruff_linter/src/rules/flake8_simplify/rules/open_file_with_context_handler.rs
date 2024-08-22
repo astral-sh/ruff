@@ -8,13 +8,19 @@ use ruff_text_size::Ranged;
 use crate::checkers::ast::Checker;
 
 /// ## What it does
-/// Checks for uses of the builtin `open()` function without an associated context
-/// manager.
+/// Checks for cases where files are opened (e.g., using the builtin `open()` function)
+/// without using a context manager.
 ///
 /// ## Why is this bad?
 /// If a file is opened without a context manager, it is not guaranteed that
 /// the file will be closed (e.g., if an exception is raised), which can cause
 /// resource leaks.
+///
+/// ## Preview-mode behavior
+/// If [preview] mode is enabled, this rule will detect a wide array of IO calls where
+/// context managers could be used, such as `tempfile.TemporaryFile()` or
+/// `tarfile.TarFile(...).gzopen()`. If preview mode is not enabled, only `open()`,
+/// `builtins.open()` and `pathlib.Path(...).open()` are detected.
 ///
 /// ## Example
 /// ```python
