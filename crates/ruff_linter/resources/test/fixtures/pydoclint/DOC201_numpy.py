@@ -175,3 +175,15 @@ def foo(x):
         return None
     else:
         return x
+
+
+# DOC201 - only returns None, but return annotation is not None
+def foo(s: str) -> str | None:
+    """A very helpful docstring.
+
+    Parameters
+    ----------
+    x : str
+        A string.
+    """
+    return None

@@ -747,7 +747,12 @@ pub(crate) fn check_docstring(
             if !definition.is_property(extra_property_decorators, checker.semantic()) {
                 if let Some(body_return) = body_entries.returns.first() {
                     // If a function only returns None, we skip the diagnostic.
-                    if body_entries.returns.len() != body_entries.none_returns {
+                    if !function_def
+                        .returns
+                        .as_deref()
+                        .map_or(true, Expr::is_none_literal_expr)
+                        || (body_entries.returns.len() != body_entries.none_returns)
+                    {
                         let diagnostic =
                             Diagnostic::new(DocstringMissingReturns, body_return.range());
                         diagnostics.push(diagnostic);
