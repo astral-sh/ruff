@@ -25,7 +25,8 @@ use crate::rules::pydocstyle::settings::Convention;
 /// Docstrings missing return sections are a sign of incomplete documentation
 /// or refactors.
 ///
-/// This rule is not enforced for abstract methods and stubs functions.
+/// This rule is not enforced for abstract methods, stubs functions, or
+/// functions that only return `None`.
 ///
 /// ## Example
 /// ```python
