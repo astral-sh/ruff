@@ -24,9 +24,33 @@ body:
       description: What version of our software are you running? (`ruff --version`)
     validations:
       required: true
+  - type: input
+    id: keywords
+    attributes:
+      label: Keywords
+      description: List of keywords you searched for before creating this issue. Write them down here so that others can find this issue more easily and help provide feedback.
+      placeholder: "RUF987", "unused variable", "Jupyter notebook"
   - type: textarea
     id: logs
     attributes:
       label: Relevant log output
       description: Please copy and paste any relevant log output. This will be automatically formatted into code, so no need for backticks.
       render: shell
+  - type: textarea
+    id: code-snippet
+    attributes:
+      label: Reproduction code
+      description: A minimal code snippet that reproduces the bug.
+  - type: input
+    id: command
+    attributes:
+      label: Invoked command
+      description: The command you invoked (e.g., ), ideally including the `--isolated` flag.
+      placeholder: ruff /path/to/file.py --fix
+      render: shell
+  - type: settings
+    id: settings
+    attributes:
+      label: Settings
+      description: The current Ruff settings (any relevant sections from your `pyproject.toml`).
+      render: yaml
