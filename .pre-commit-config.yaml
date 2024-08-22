@@ -32,6 +32,7 @@ repos:
           (?x)^(
             docs/formatter/black\.md
             | docs/\w+\.md
+            | \.github/ISSUE_TEMPLATE\.*.md
           )$
 
   - repo: https://github.com/igorshubovych/markdownlint-cli
@@ -42,6 +43,7 @@ repos:
           (?x)^(
             docs/formatter/black\.md
             | docs/\w+\.md
+            | \.github/ISSUE_TEMPLATE\.*.md
           )$
 
   - repo: https://github.com/crate-ci/typos
