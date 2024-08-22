@@ -195,7 +195,7 @@ fn is_open_preview(semantic: &SemanticModel, func: &Expr) -> bool {
         ["tarfile", "TarFile", "open" | "taropen" | "gzopen" | "bz2open" | "xzopen"] => true,
         ["zipfile", "ZipFile", "open"] => true,
         ["lzma", "LZMAFile", "open"] => true,
-        ["dbm", "gnu" | "ndbm", "open"] => true,
+        ["dbm", "gnu" | "ndbm" | "dumb", "open"] => true,
 
         // Ex) `foo.open(...)`
         ["codecs" | "dbm" | "tarfile" | "bz2" | "gzip" | "io" | "lzma" | "shelve" | "tokenize"

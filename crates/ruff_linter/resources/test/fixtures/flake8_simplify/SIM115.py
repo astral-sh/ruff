@@ -70,6 +70,7 @@ import gzip
 import dbm
 import dbm.gnu
 import dbm.ndbm
+import dbm.dumb
 import lzma
 import shelve
 import tokenize
@@ -94,6 +95,7 @@ f = gzip.open("foo.txt")
 f = dbm.open("foo.db")
 f = dbm.gnu.open("foo.db")
 f = dbm.ndbm.open("foo.db")
+f = dbm.dumb.open("foo.db")
 f = lzma.open("foo.xz")
 f = lzma.LZMAFile("foo.xz")
 f = shelve.open("foo.db")
@@ -180,6 +182,10 @@ with dbm.ndbm.open("foo.db") as f:
     data = f.get("foo")
 
 # OK
+with dbm.dumb.open("foo.db") as f:
+    data = f.get("foo")
+
+# OK
 with lzma.open("foo.xz") as f:
     data = f.read()
 
@@ -229,6 +235,7 @@ gzip.open("foo.txt").close()
 dbm.open("foo.db").close()
 dbm.gnu.open("foo.db").close()
 dbm.ndbm.open("foo.db").close()
+dbm.dumb.open("foo.db").close()
 lzma.open("foo.xz").close()
 lzma.LZMAFile("foo.xz").close()
 shelve.open("foo.db").close()
