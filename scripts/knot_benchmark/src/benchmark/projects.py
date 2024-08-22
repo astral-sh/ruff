@@ -27,7 +27,7 @@ class Project(typing.NamedTuple):
     """The arguments passed to mypy. Overrides `include` if set."""
 
     def clone(self, checkout_dir: Path):
-        # Skip cloning if the project has already been cloned (the script doesn't yet support updating)')
+        # Skip cloning if the project has already been cloned (the script doesn't yet support updating)
         if os.path.exists(os.path.join(checkout_dir, ".git")):
             return
 
