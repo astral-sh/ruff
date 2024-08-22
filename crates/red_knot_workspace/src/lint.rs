@@ -7,7 +7,7 @@ use red_knot_python_semantic::types::Type;
 use red_knot_python_semantic::{HasTy, ModuleName, SemanticModel};
 use ruff_db::files::File;
 use ruff_db::parsed::{parsed_module, ParsedModule};
-use ruff_db::source::{line_index, source_text, SourceText};
+use ruff_db::source::{source_text, SourceText};
 use ruff_python_ast as ast;
 use ruff_python_ast::visitor::{walk_expr, walk_stmt, Visitor};
 use ruff_text_size::{Ranged, TextSize};
@@ -48,19 +48,6 @@ pub(crate) fn lint_syntax(db: &dyn Db, file_id: File) -> Vec<String> {
         };
         visitor.visit_body(&ast.body);
         diagnostics = visitor.diagnostics;
-    } else {
-        let path = file_id.path(db);
-        let line_index = line_index(db.upcast(), file_id);
-        diagnostics.extend(parsed.errors().iter().map(|err| {
-            let source_location = line_index.source_location(err.location.start(), source.as_str());
-            format!(
-                "{}:{}:{}: {}",
-                path.as_str(),
-                source_location.row,
-                source_location.column,
-                err,
-            )
-        }));
     }
 
     diagnostics

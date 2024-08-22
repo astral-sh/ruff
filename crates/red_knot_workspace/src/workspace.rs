@@ -6,6 +6,7 @@ use salsa::{Durability, Setter as _};
 pub use metadata::{PackageMetadata, WorkspaceMetadata};
 use red_knot_python_semantic::types::check_types;
 use red_knot_python_semantic::SearchPathSettings;
+use ruff_db::parsed::parsed_module;
 use ruff_db::source::{line_index, source_text, SourceDiagnostic};
 use ruff_db::{
     files::{system_path_to_file, File},
@@ -402,6 +403,17 @@ pub(super) fn check_file(db: &dyn Db, file: File) -> Vec<String> {
 
     if source.has_read_error() {
         return diagnostics;
+    }
+
+    let parsed = parsed_module(db.upcast(), file);
+
+    if !parsed.errors().is_empty() {
+        let path = file.path(db);
+        let line_index = line_index(db.upcast(), file);
+        diagnostics.extend(parsed.errors().iter().map(|err| {
+            let source_location = line_index.source_location(err.location.start(), source.as_str());
+            format!("{path}:{source_location}: {message}", message = err.error)
+        }));
     }
 
     for diagnostic in check_types(db.upcast(), file) {
