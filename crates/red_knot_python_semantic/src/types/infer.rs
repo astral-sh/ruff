@@ -1207,7 +1207,7 @@ impl<'db> TypeInferenceBuilder<'db> {
 
     #[allow(clippy::unused_self)]
     fn infer_bytes_literal_expression(&mut self, _literal: &ast::ExprBytesLiteral) -> Type<'db> {
-        Type::Bytes
+        builtins_symbol_ty_by_name(self.db, "bytes").instance()
     }
 
     fn infer_fstring_expression(&mut self, fstring: &ast::ExprFString) -> Type<'db> {
@@ -1719,20 +1719,6 @@ impl<'db> TypeInferenceBuilder<'db> {
                         }
                     }
                     _ => Type::Unknown, // TODO
-                }
-            }
-            Type::Bytes => {
-                match right_ty {
-                    Type::Bytes => {
-                        match op {
-                            ast::Operator::Add => {
-                                Type::Bytes
-                            }
-                            _ => Type::Unknown, // TODO
-                        }
-                    }
-                    _ => Type::Unknown, // TODO
-
                 }
             }
             _ => Type::Unknown, // TODO
@@ -2252,10 +2238,9 @@ mod tests {
     fn bytes_type() -> anyhow::Result<()> {
         let mut db = setup_db();
 
-        db.write_file("src/a.py", "x = b'hello'\ny = b'world' + b'!'")?;
+        db.write_file("src/a.py", "x = b'hello'")?;
 
         assert_public_ty(&db, "src/a.py", "x", "bytes");
-        assert_public_ty(&db, "src/a.py", "y", "bytes");
 
         Ok(())
     }
