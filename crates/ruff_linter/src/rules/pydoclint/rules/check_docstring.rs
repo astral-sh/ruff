@@ -523,6 +523,7 @@ impl Ranged for ExceptionEntry<'_> {
 #[derive(Debug)]
 struct BodyEntries<'a> {
     returns: Vec<Entry>,
+    none_returns: usize,
     yields: Vec<Entry>,
     raised_exceptions: Vec<ExceptionEntry<'a>>,
 }
@@ -530,6 +531,7 @@ struct BodyEntries<'a> {
 /// An AST visitor to extract a summary of documentable statements from a function body.
 struct BodyVisitor<'a> {
     returns: Vec<Entry>,
+    none_returns: usize,
     yields: Vec<Entry>,
     currently_suspended_exceptions: Option<&'a ast::Expr>,
     raised_exceptions: Vec<ExceptionEntry<'a>>,
@@ -540,6 +542,7 @@ impl<'a> BodyVisitor<'a> {
     fn new(semantic: &'a SemanticModel) -> Self {
         Self {
             returns: Vec::new(),
+            none_returns: 0,
             yields: Vec::new(),
             currently_suspended_exceptions: None,
             raised_exceptions: Vec::new(),
@@ -550,6 +553,7 @@ impl<'a> BodyVisitor<'a> {
     fn finish(self) -> BodyEntries<'a> {
         let BodyVisitor {
             returns,
+            none_returns,
             yields,
             mut raised_exceptions,
             ..
@@ -571,6 +575,7 @@ impl<'a> BodyVisitor<'a> {
 
         BodyEntries {
             returns,
+            none_returns,
             yields,
             raised_exceptions,
         }
@@ -623,9 +628,12 @@ impl<'a> Visitor<'a> for BodyVisitor<'a> {
             }
             Stmt::Return(ast::StmtReturn {
                 range,
-                value: Some(_),
+                value: Some(value),
             }) => {
                 self.returns.push(Entry { range: *range });
+                if value.is_none_literal_expr() {
+                    self.none_returns += 1;
+                }
             }
             Stmt::FunctionDef(_) | Stmt::ClassDef(_) => return,
             _ => {}
@@ -737,8 +745,12 @@ pub(crate) fn check_docstring(
             let extra_property_decorators = checker.settings.pydocstyle.property_decorators();
             if !definition.is_property(extra_property_decorators, checker.semantic()) {
                 if let Some(body_return) = body_entries.returns.first() {
-                    let diagnostic = Diagnostic::new(DocstringMissingReturns, body_return.range());
-                    diagnostics.push(diagnostic);
+                    // If a function only returns None, we skip the diagnostic.
+                    if body_entries.returns.len() != body_entries.none_returns {
+                        let diagnostic =
+                            Diagnostic::new(DocstringMissingReturns, body_return.range());
+                        diagnostics.push(diagnostic);
+                    }
                 }
             }
         }
