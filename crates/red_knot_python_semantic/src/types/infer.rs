@@ -1687,6 +1687,7 @@ impl<'db> TypeInferenceBuilder<'db> {
         let left_ty = self.infer_expression(left);
         let right_ty = self.infer_expression(right);
 
+        // TODO flatten the matches by matching on (left_ty, right_ty, op)
         match left_ty {
             Type::Any => Type::Any,
             Type::Unknown => Type::Unknown,

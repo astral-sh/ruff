@@ -279,7 +279,7 @@ impl<'db> Type<'db> {
             }
             Type::BooleanLiteral(_) => Type::Unknown,
             Type::BytesLiteral(_) => {
-                // TODO check if bytes have members
+                // TODO defer to Type::Instance(<bytes from typeshed>).member
                 Type::Unknown
             }
         }
