@@ -6,14 +6,14 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
 use anyhow::anyhow;
-use lsp_types::{ClientCapabilities, Url};
+use lsp_types::{ClientCapabilities, TextDocumentContentChangeEvent, Url};
 
 use red_knot_workspace::db::RootDatabase;
 use red_knot_workspace::workspace::WorkspaceMetadata;
 use ruff_db::files::{system_path_to_file, File};
 use ruff_db::system::SystemPath;
 
-use crate::edit::{DocumentKey, NotebookDocument};
+use crate::edit::{DocumentKey, DocumentVersion, NotebookDocument};
 use crate::system::{url_to_system_path, LSPSystem};
 use crate::{PositionEncoding, TextDocument};
 
@@ -144,6 +144,20 @@ impl Session {
     /// If a document is already open here, it will be overwritten.
     pub(crate) fn open_text_document(&mut self, url: Url, document: TextDocument) {
         self.index_mut().open_text_document(url, document);
+    }
+
+    /// Updates a text document at the associated `key`.
+    ///
+    /// The document key must point to a text document, or this will throw an error.
+    pub(crate) fn update_text_document(
+        &mut self,
+        key: &DocumentKey,
+        content_changes: Vec<TextDocumentContentChangeEvent>,
+        new_version: DocumentVersion,
+    ) -> crate::Result<()> {
+        let position_encoding = self.position_encoding;
+        self.index_mut()
+            .update_text_document(key, content_changes, new_version, position_encoding)
     }
 
     /// De-registers a document, specified by its key.

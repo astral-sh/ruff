@@ -42,6 +42,7 @@ pub(super) fn notification<'a>(notif: server::Notification) -> Task<'a> {
     match notif.method.as_str() {
         notification::DidCloseTextDocumentHandler::METHOD => local_notification_task::<notification::DidCloseTextDocumentHandler>(notif),
         notification::DidOpenTextDocumentHandler::METHOD => local_notification_task::<notification::DidOpenTextDocumentHandler>(notif),
+        notification::DidChangeTextDocumentHandler::METHOD => local_notification_task::<notification::DidChangeTextDocumentHandler>(notif),
         notification::DidOpenNotebookHandler::METHOD => {
             local_notification_task::<notification::DidOpenNotebookHandler>(notif)
         }

@@ -49,6 +49,16 @@ pub enum ChangeEvent {
 }
 
 impl ChangeEvent {
+    /// Creates a new [`Changed`] event for the file content at the given path.
+    ///
+    /// [`Changed`]: ChangeEvent::Changed
+    pub fn file_content_changed(path: SystemPathBuf) -> ChangeEvent {
+        ChangeEvent::Changed {
+            path,
+            kind: ChangedKind::FileContent,
+        }
+    }
+
     pub fn file_name(&self) -> Option<&str> {
         self.path().and_then(|path| path.file_name())
     }
