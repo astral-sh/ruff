@@ -1121,11 +1121,15 @@ match subject:
         assert_eq!(&names(&global_table), &["a", "x", "y"]);
 
         let use_def = use_def_map(&db, scope);
-        let definition = use_def
+        let x_definition = use_def
             .first_public_definition(global_table.symbol_id_by_name("x").unwrap())
             .unwrap();
+        let y_definition = use_def
+            .first_public_definition(global_table.symbol_id_by_name("y").unwrap())
+            .unwrap();
 
-        assert!(matches!(definition.node(&db), DefinitionKind::For(_)));
+        assert!(matches!(x_definition.node(&db), DefinitionKind::For(_)));
+        assert!(matches!(y_definition.node(&db), DefinitionKind::For(_)));
     }
 
     #[test]
