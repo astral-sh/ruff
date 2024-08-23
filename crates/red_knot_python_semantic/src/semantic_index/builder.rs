@@ -15,7 +15,7 @@ use crate::semantic_index::ast_ids::node_key::ExpressionNodeKey;
 use crate::semantic_index::ast_ids::AstIdsBuilder;
 use crate::semantic_index::definition::{
     AssignmentDefinitionNodeRef, ComprehensionDefinitionNodeRef, Definition, DefinitionNodeKey,
-    DefinitionNodeRef, ImportFromDefinitionNodeRef,
+    DefinitionNodeRef, ForStmtDefinitionNodeRef, ImportFromDefinitionNodeRef,
 };
 use crate::semantic_index::expression::Expression;
 use crate::semantic_index::symbol::{
@@ -589,6 +589,7 @@ where
                     orelse,
                 },
             ) => {
+                // TODO add control flow similar to `ast::Stmt::While` above
                 self.add_standalone_expression(iter);
                 self.visit_expr(iter);
                 debug_assert!(self.current_assignment.is_none());
@@ -644,8 +645,14 @@ where
                         Some(CurrentAssignment::AugAssign(aug_assign)) => {
                             self.add_definition(symbol, aug_assign);
                         }
-                        Some(CurrentAssignment::For(for_stmt)) => {
-                            self.add_definition(symbol, for_stmt);
+                        Some(CurrentAssignment::For(node)) => {
+                            self.add_definition(
+                                symbol,
+                                ForStmtDefinitionNodeRef {
+                                    iterable: &node.iter,
+                                    target: name_node,
+                                },
+                            );
                         }
                         Some(CurrentAssignment::Named(named)) => {
                             // TODO(dhruvmanila): If the current scope is a comprehension, then the

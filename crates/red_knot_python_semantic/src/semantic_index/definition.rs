@@ -39,7 +39,7 @@ impl<'db> Definition<'db> {
 pub(crate) enum DefinitionNodeRef<'a> {
     Import(&'a ast::Alias),
     ImportFrom(ImportFromDefinitionNodeRef<'a>),
-    For(&'a ast::StmtFor),
+    For(ForStmtDefinitionNodeRef<'a>),
     Function(&'a ast::StmtFunctionDef),
     Class(&'a ast::StmtClassDef),
     NamedExpression(&'a ast::ExprNamed),
@@ -49,12 +49,6 @@ pub(crate) enum DefinitionNodeRef<'a> {
     Comprehension(ComprehensionDefinitionNodeRef<'a>),
     Parameter(ast::AnyParameterRef<'a>),
     WithItem(WithItemDefinitionNodeRef<'a>),
-}
-
-impl<'a> From<&'a ast::StmtFor> for DefinitionNodeRef<'a> {
-    fn from(value: &'a ast::StmtFor) -> Self {
-        Self::For(value)
-    }
 }
 
 impl<'a> From<&'a ast::StmtFunctionDef> for DefinitionNodeRef<'a> {
@@ -96,6 +90,12 @@ impl<'a> From<&'a ast::Alias> for DefinitionNodeRef<'a> {
 impl<'a> From<ImportFromDefinitionNodeRef<'a>> for DefinitionNodeRef<'a> {
     fn from(node_ref: ImportFromDefinitionNodeRef<'a>) -> Self {
         Self::ImportFrom(node_ref)
+    }
+}
+
+impl<'a> From<ForStmtDefinitionNodeRef<'a>> for DefinitionNodeRef<'a> {
+    fn from(value: ForStmtDefinitionNodeRef<'a>) -> Self {
+        Self::For(value)
     }
 }
 
@@ -142,6 +142,12 @@ pub(crate) struct WithItemDefinitionNodeRef<'a> {
 }
 
 #[derive(Copy, Clone, Debug)]
+pub(crate) struct ForStmtDefinitionNodeRef<'a> {
+    pub(crate) iterable: &'a ast::Expr,
+    pub(crate) target: &'a ast::ExprName,
+}
+
+#[derive(Copy, Clone, Debug)]
 pub(crate) struct ComprehensionDefinitionNodeRef<'a> {
     pub(crate) node: &'a ast::Comprehension,
     pub(crate) first: bool,
@@ -181,8 +187,11 @@ impl DefinitionNodeRef<'_> {
             DefinitionNodeRef::AugmentedAssignment(augmented_assignment) => {
                 DefinitionKind::AugmentedAssignment(AstNodeRef::new(parsed, augmented_assignment))
             }
-            DefinitionNodeRef::For(for_stmt) => {
-                DefinitionKind::For(AstNodeRef::new(parsed, for_stmt))
+            DefinitionNodeRef::For(ForStmtDefinitionNodeRef { iterable, target }) => {
+                DefinitionKind::For(ForStmtDefinitionKind {
+                    iterable: AstNodeRef::new(parsed.clone(), iterable),
+                    target: AstNodeRef::new(parsed, target),
+                })
             }
             DefinitionNodeRef::Comprehension(ComprehensionDefinitionNodeRef { node, first }) => {
                 DefinitionKind::Comprehension(ComprehensionDefinitionKind {
@@ -222,7 +231,10 @@ impl DefinitionNodeRef<'_> {
             }) => target.into(),
             Self::AnnotatedAssignment(node) => node.into(),
             Self::AugmentedAssignment(node) => node.into(),
-            Self::For(node) => node.into(),
+            Self::For(ForStmtDefinitionNodeRef {
+                iterable: _,
+                target,
+            }) => target.into(),
             Self::Comprehension(ComprehensionDefinitionNodeRef { node, first: _ }) => node.into(),
             Self::Parameter(node) => match node {
                 ast::AnyParameterRef::Variadic(parameter) => parameter.into(),
@@ -243,7 +255,7 @@ pub enum DefinitionKind {
     Assignment(AssignmentDefinitionKind),
     AnnotatedAssignment(AstNodeRef<ast::StmtAnnAssign>),
     AugmentedAssignment(AstNodeRef<ast::StmtAugAssign>),
-    For(AstNodeRef<ast::StmtFor>),
+    For(ForStmtDefinitionKind),
     Comprehension(ComprehensionDefinitionKind),
     Parameter(AstNodeRef<ast::Parameter>),
     ParameterWithDefault(AstNodeRef<ast::ParameterWithDefault>),
@@ -307,6 +319,22 @@ pub struct WithItemDefinitionKind {
 impl WithItemDefinitionKind {
     pub(crate) fn node(&self) -> &ast::WithItem {
         self.node.node()
+    }
+
+    pub(crate) fn target(&self) -> &ast::ExprName {
+        self.target.node()
+    }
+}
+
+#[derive(Clone, Debug)]
+pub struct ForStmtDefinitionKind {
+    iterable: AstNodeRef<ast::Expr>,
+    target: AstNodeRef<ast::ExprName>,
+}
+
+impl ForStmtDefinitionKind {
+    pub(crate) fn iterable(&self) -> &ast::Expr {
+        self.iterable.node()
     }
 
     pub(crate) fn target(&self) -> &ast::ExprName {
