@@ -264,6 +264,7 @@ def main(argv: Sequence[str] | None = None) -> int:
 
     violations = 0
     errors = 0
+    print("Checking docs formatting...")
     for file in [*static_docs, *generated_docs]:
         rule_name = file.name.split(".")[0]
         if rule_name in KNOWN_FORMATTING_VIOLATIONS:
@@ -285,6 +286,8 @@ def main(argv: Sequence[str] | None = None) -> int:
 
     if violations > 0 or errors > 0:
         return 1
+
+    print("All docs are formatted correctly.")
 
     return 0
 
