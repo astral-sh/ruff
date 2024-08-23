@@ -136,22 +136,6 @@ impl MemoryFileSystem {
         ruff_notebook::Notebook::from_source_code(&content)
     }
 
-    pub(crate) fn virtual_path_metadata(
-        &self,
-        path: impl AsRef<SystemVirtualPath>,
-    ) -> Result<Metadata> {
-        let virtual_files = self.inner.virtual_files.read().unwrap();
-        let file = virtual_files
-            .get(&path.as_ref().to_path_buf())
-            .ok_or_else(not_found)?;
-
-        Ok(Metadata {
-            revision: file.last_modified.into(),
-            permissions: Some(MemoryFileSystem::PERMISSION),
-            file_type: FileType::File,
-        })
-    }
-
     pub(crate) fn read_virtual_path_to_string(
         &self,
         path: impl AsRef<SystemVirtualPath>,

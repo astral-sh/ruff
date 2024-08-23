@@ -144,19 +144,6 @@ impl System for LSPSystem {
         }
     }
 
-    fn virtual_path_metadata(&self, path: &SystemVirtualPath) -> Result<Metadata> {
-        // Virtual paths only exists in the LSP system, so we don't need to check the OS system.
-        let document = self
-            .system_virtual_path_to_document_ref(path)?
-            .ok_or_else(|| virtual_path_not_found(path))?;
-
-        Ok(Metadata::new(
-            document_revision(&document),
-            None,
-            FileType::File,
-        ))
-    }
-
     fn read_virtual_path_to_string(&self, path: &SystemVirtualPath) -> Result<String> {
         let document = self
             .system_virtual_path_to_document_ref(path)?

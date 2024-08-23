@@ -12,7 +12,7 @@ use ruff_notebook::{Notebook, NotebookError};
 use crate::file_revision::FileRevision;
 use crate::files::file_root::FileRoots;
 use crate::files::private::FileStatus;
-use crate::system::{Metadata, SystemPath, SystemPathBuf, SystemVirtualPath, SystemVirtualPathBuf};
+use crate::system::{SystemPath, SystemPathBuf, SystemVirtualPath, SystemVirtualPathBuf};
 use crate::vendored::{VendoredPath, VendoredPathBuf};
 use crate::{vendored, Db, FxDashMap};
 
@@ -60,8 +60,8 @@ struct FilesInner {
     /// so that queries that depend on the existence of a file are re-executed when the file is created.
     system_by_path: FxDashMap<SystemPathBuf, File>,
 
-    /// Lookup table that maps [`SystemVirtualPathBuf`]s to salsa interned [`File`] instances.
-    system_virtual_by_path: FxDashMap<SystemVirtualPathBuf, File>,
+    /// Lookup table that maps [`SystemVirtualPathBuf`]s to [`VirtualFile`] instances.
+    system_virtual_by_path: FxDashMap<SystemVirtualPathBuf, VirtualFile>,
 
     /// Lookup table that maps vendored files to the salsa [`File`] ingredients.
     vendored_by_path: FxDashMap<VendoredPathBuf, File>,
@@ -147,31 +147,31 @@ impl Files {
         Ok(file)
     }
 
-    /// Looks up a virtual file by its `path`.
+    /// Create a new virtual file at the given path and store it for future lookups.
     ///
-    /// For a non-existing file, creates a new salsa [`File`] ingredient and stores it for future lookups.
-    ///
-    /// The operations fails if the system failed to provide a metadata for the path.
-    pub fn add_virtual_file(&self, db: &dyn Db, path: &SystemVirtualPath) -> Option<File> {
-        let file = match self.inner.system_virtual_by_path.entry(path.to_path_buf()) {
-            Entry::Occupied(entry) => *entry.get(),
-            Entry::Vacant(entry) => {
-                let metadata = db.system().virtual_path_metadata(path).ok()?;
+    /// This will always create a new file, overwriting any existing file at `path` in the internal
+    /// storage.
+    pub fn virtual_file(&self, db: &dyn Db, path: &SystemVirtualPath) -> VirtualFile {
+        tracing::trace!("Adding virtual file {}", path);
+        let virtual_file = VirtualFile(
+            File::builder(FilePath::SystemVirtual(path.to_path_buf()))
+                .status(FileStatus::Exists)
+                .revision(FileRevision::zero())
+                .permissions(None)
+                .new(db),
+        );
+        self.inner
+            .system_virtual_by_path
+            .insert(path.to_path_buf(), virtual_file);
+        virtual_file
+    }
 
-                tracing::trace!("Adding virtual file '{}'", path);
-
-                let file = File::builder(FilePath::SystemVirtual(path.to_path_buf()))
-                    .revision(metadata.revision())
-                    .permissions(metadata.permissions())
-                    .new(db);
-
-                entry.insert(file);
-
-                file
-            }
-        };
-
-        Some(file)
+    /// Tries to look up a virtual file by its path. Returns `None` if no such file exists yet.
+    pub fn try_virtual_file(&self, path: &SystemVirtualPath) -> Option<VirtualFile> {
+        self.inner
+            .system_virtual_by_path
+            .get(&path.to_path_buf())
+            .map(|entry| *entry.value())
     }
 
     /// Looks up the closest  root for `path`. Returns `None` if `path` isn't enclosed by any source root.
@@ -354,6 +354,13 @@ impl File {
         Self::sync_system_path(db, &absolute, None);
     }
 
+    /// Increments the revision for the virtual file at `path`.
+    pub fn sync_virtual_path(db: &mut dyn Db, path: &SystemVirtualPath) {
+        if let Some(virtual_file) = db.files().try_virtual_file(path) {
+            virtual_file.sync(db);
+        }
+    }
+
     /// Syncs the [`File`]'s state with the state of the file on the system.
     pub fn sync(self, db: &mut dyn Db) {
         let path = self.path(db).clone();
@@ -366,29 +373,20 @@ impl File {
             FilePath::Vendored(_) => {
                 // Readonly, can never be out of date.
             }
-            FilePath::SystemVirtual(system_virtual) => {
-                Self::sync_system_virtual_path(db, &system_virtual, self);
+            FilePath::SystemVirtual(_) => {
+                VirtualFile(self).sync(db);
             }
         }
     }
 
+    /// Private method providing the implementation for [`Self::sync_path`] and [`Self::sync`] for
+    /// system paths.
     fn sync_system_path(db: &mut dyn Db, path: &SystemPath, file: Option<File>) {
         let Some(file) = file.or_else(|| db.files().try_system(db, path)) else {
             return;
         };
-        let metadata = db.system().path_metadata(path);
-        Self::sync_impl(db, metadata, file);
-    }
 
-    fn sync_system_virtual_path(db: &mut dyn Db, path: &SystemVirtualPath, file: File) {
-        let metadata = db.system().virtual_path_metadata(path);
-        Self::sync_impl(db, metadata, file);
-    }
-
-    /// Private method providing the implementation for [`Self::sync_system_path`] and
-    /// [`Self::sync_system_virtual_path`].
-    fn sync_impl(db: &mut dyn Db, metadata: crate::system::Result<Metadata>, file: File) {
-        let (status, revision, permission) = match metadata {
+        let (status, revision, permission) = match db.system().path_metadata(path) {
             Ok(metadata) if metadata.file_type().is_file() => (
                 FileStatus::Exists,
                 metadata.revision(),
@@ -419,6 +417,35 @@ impl File {
     /// Returns `true` if the file exists.
     pub fn exists(self, db: &dyn Db) -> bool {
         self.status(db) == FileStatus::Exists
+    }
+}
+
+/// A virtual file that doesn't exist on the file system.
+///
+/// This is a wrapper around a [`File`] that provides additional methods to interact with a virtual
+/// file.
+#[derive(Copy, Clone)]
+pub struct VirtualFile(File);
+
+impl VirtualFile {
+    /// Returns the underlying [`File`].
+    pub fn file(&self) -> File {
+        self.0
+    }
+
+    /// Increments the revision of the underlying [`File`].
+    fn sync(&self, db: &mut dyn Db) {
+        let file = self.0;
+        tracing::debug!("Updating the revision of '{}'", file.path(db));
+        let current_revision = file.revision(db);
+        file.set_revision(db)
+            .to(FileRevision::new(current_revision.as_u128() + 1));
+    }
+
+    /// Closes the virtual file.
+    pub fn close(&self, db: &mut dyn Db) {
+        tracing::debug!("Closing virtual file '{}'", self.0.path(db));
+        self.0.set_status(db).to(FileStatus::NotFound);
     }
 }
 

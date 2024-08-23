@@ -234,13 +234,6 @@ impl System for WasmSystem {
         Notebook::from_source_code(&content)
     }
 
-    fn virtual_path_metadata(
-        &self,
-        _path: &SystemVirtualPath,
-    ) -> ruff_db::system::Result<Metadata> {
-        Err(not_found())
-    }
-
     fn read_virtual_path_to_string(
         &self,
         _path: &SystemVirtualPath,
