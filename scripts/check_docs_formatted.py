@@ -132,6 +132,8 @@ def format_contents(
             code = format_str(code, mode=black_mode)
         except InvalidInput as e:
             errors.append(CodeBlockError(e))
+        except NotImplementedError as e:
+            raise e
 
         code = textwrap.indent(code, match["indent"])
         return f'{match["before"]}{code}{match["after"]}'
