@@ -336,10 +336,14 @@ fn should_be_fstring(
                 if relevant_argument_names.contains(id) {
                     return false;
                 }
-                if semantic
-                    .lookup_symbol_in_scope(id, scope, false)
-                    .map_or(true, |id| semantic.binding(id).kind.is_builtin())
-                {
+                let Some(binding_id) = semantic.lookup_symbol_in_scope(id, scope, false) else {
+                    return false;
+                };
+                let binding = semantic.binding(binding_id);
+                if binding.kind.is_builtin() {
+                    return false;
+                }
+                if binding.start() > literal.end() {
                     return false;
                 }
                 has_name = true;

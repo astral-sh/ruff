@@ -163,7 +163,7 @@ RUF027_0.py:39:19: RUF027 [*] Possible f-string without an `f` prefix
 39 |     single_line = """ {a} """  # RUF027
    |                   ^^^^^^^^^^^ RUF027
 40 |     # RUF027
-41 |     multi_line = a = """b { # comment
+41 |     multi_line = """b { # comment
    |
    = help: Add `f` prefix
 
@@ -174,15 +174,15 @@ RUF027_0.py:39:19: RUF027 [*] Possible f-string without an `f` prefix
 39    |-    single_line = """ {a} """  # RUF027
    39 |+    single_line = f""" {a} """  # RUF027
 40 40 |     # RUF027
-41 41 |     multi_line = a = """b { # comment
+41 41 |     multi_line = """b { # comment
 42 42 |     c}  d
 
-RUF027_0.py:41:22: RUF027 [*] Possible f-string without an `f` prefix
+RUF027_0.py:41:18: RUF027 [*] Possible f-string without an `f` prefix
    |
 39 |       single_line = """ {a} """  # RUF027
 40 |       # RUF027
-41 |       multi_line = a = """b { # comment
-   |  ______________________^
+41 |       multi_line = """b { # comment
+   |  __________________^
 42 | |     c}  d
 43 | |     """
    | |_______^ RUF027
@@ -193,8 +193,8 @@ RUF027_0.py:41:22: RUF027 [*] Possible f-string without an `f` prefix
 38 38 |     c = a
 39 39 |     single_line = """ {a} """  # RUF027
 40 40 |     # RUF027
-41    |-    multi_line = a = """b { # comment
-   41 |+    multi_line = a = f"""b { # comment
+41    |-    multi_line = """b { # comment
+   41 |+    multi_line = f"""b { # comment
 42 42 |     c}  d
 43 43 |     """
 44 44 | 
@@ -315,5 +315,3 @@ RUF027_0.py:74:9: RUF027 [*] Possible f-string without an `f` prefix
 73 73 |     a = 4
 74    |-    b = "{a:b} {a:^5}"
    74 |+    b = f"{a:b} {a:^5}"
-
-

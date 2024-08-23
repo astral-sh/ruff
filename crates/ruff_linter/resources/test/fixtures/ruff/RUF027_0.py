@@ -38,7 +38,7 @@ def tripled_quoted():
     c = a
     single_line = """ {a} """  # RUF027
     # RUF027
-    multi_line = a = """b { # comment
+    multi_line = """b { # comment
     c}  d
     """
 

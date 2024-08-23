@@ -80,3 +80,12 @@ def uses_global_strings():
 
     import logging
     logging.error(LOGGING_TEMPLATE, 42)
+
+
+def binding_defined_after_string():
+    if bool():
+        x = "{foo}"
+    else:
+        x = "{foo}"
+    foo = 42
+    print(x.format(foo=foo))
