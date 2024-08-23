@@ -138,7 +138,6 @@ pub(crate) struct TypeInference<'db> {
 }
 
 impl<'db> TypeInference<'db> {
-    #[allow(unused)]
     pub(crate) fn expression_ty(&self, expression: ScopedExpressionId) -> Type<'db> {
         self.expressions[&expression]
     }
@@ -316,6 +315,9 @@ impl<'db> TypeInferenceBuilder<'db> {
             }
             DefinitionKind::AugmentedAssignment(augmented_assignment) => {
                 self.infer_augment_assignment_definition(augmented_assignment.node(), definition);
+            }
+            DefinitionKind::For(for_statement) => {
+                self.infer_for_statement_definition(for_statement, definition);
             }
             DefinitionKind::NamedExpression(named_expression) => {
                 self.infer_named_expression_definition(named_expression.node(), definition);
@@ -857,7 +859,7 @@ impl<'db> TypeInferenceBuilder<'db> {
     fn infer_for_statement(&mut self, for_statement: &ast::StmtFor) {
         let ast::StmtFor {
             range: _,
-            target,
+            target: _,
             iter,
             body,
             orelse,
@@ -865,9 +867,54 @@ impl<'db> TypeInferenceBuilder<'db> {
         } = for_statement;
 
         self.infer_expression(iter);
-        self.infer_expression(target);
+        self.infer_definition(for_statement);
         self.infer_body(body);
         self.infer_body(orelse);
+    }
+
+    fn add_maybe_multiple_for_definitions(
+        &mut self,
+        for_target: &ast::Expr,
+        loop_var_ty: Type<'db>,
+        definition: Definition<'db>,
+    ) {
+        if let ast::Expr::Tuple(ast::ExprTuple { elts, .. })
+        | ast::Expr::List(ast::ExprList { elts, .. }) = for_target
+        {
+            for elt in elts {
+                // TODO(Alex): unpack `loop_var_ty` as well, in tandem with unpacking `for_target`
+                self.add_maybe_multiple_for_definitions(elt, loop_var_ty, definition);
+            }
+            return;
+        }
+
+        self.types
+            .expressions
+            .insert(for_target.scoped_ast_id(self.db, self.scope), loop_var_ty);
+        self.types.definitions.insert(definition, loop_var_ty);
+    }
+
+    fn infer_for_statement_definition(
+        &mut self,
+        for_statement: &ast::StmtFor,
+        definition: Definition<'db>,
+    ) {
+        let ast::StmtFor {
+            range: _,
+            is_async: _,
+            target,
+            iter,
+            body: _,
+            orelse: _,
+        } = for_statement;
+        let expression = self.index.expression(&**iter);
+        let result = infer_expression_types(self.db, expression);
+        self.extend(result);
+        // TODO(Alex): the type of the loop var is the result of calling
+        // `type(x).__next__(x)` where `x` is the value returned by calling
+        // `type(iter).__iter__(iter)`
+        let loop_var_ty = Type::Unknown;
+        self.add_maybe_multiple_for_definitions(target, loop_var_ty, definition);
     }
 
     fn infer_while_statement(&mut self, while_statement: &ast::StmtWhile) {

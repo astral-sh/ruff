@@ -578,6 +578,26 @@ where
             ast::Stmt::Break(_) => {
                 self.loop_break_states.push(self.flow_snapshot());
             }
+
+            ast::Stmt::For(
+                for_stmt @ ast::StmtFor {
+                    range: _,
+                    is_async: _,
+                    target,
+                    iter,
+                    body,
+                    orelse,
+                },
+            ) => {
+                debug_assert!(self.current_assignment.is_none());
+                self.add_standalone_expression(iter);
+                self.visit_expr(iter);
+                self.current_assignment = Some(for_stmt.into());
+                self.visit_expr(target);
+                self.current_assignment = None;
+                self.visit_body(body);
+                self.visit_body(orelse);
+            }
             _ => {
                 walk_stmt(self, stmt);
             }
@@ -623,6 +643,9 @@ where
                         }
                         Some(CurrentAssignment::AugAssign(aug_assign)) => {
                             self.add_definition(symbol, aug_assign);
+                        }
+                        Some(CurrentAssignment::For(for_stmt)) => {
+                            self.add_definition(symbol, for_stmt);
                         }
                         Some(CurrentAssignment::Named(named)) => {
                             // TODO(dhruvmanila): If the current scope is a comprehension, then the
@@ -796,6 +819,7 @@ enum CurrentAssignment<'a> {
     Assign(&'a ast::StmtAssign),
     AnnAssign(&'a ast::StmtAnnAssign),
     AugAssign(&'a ast::StmtAugAssign),
+    For(&'a ast::StmtFor),
     Named(&'a ast::ExprNamed),
     Comprehension {
         node: &'a ast::Comprehension,
@@ -819,6 +843,12 @@ impl<'a> From<&'a ast::StmtAnnAssign> for CurrentAssignment<'a> {
 impl<'a> From<&'a ast::StmtAugAssign> for CurrentAssignment<'a> {
     fn from(value: &'a ast::StmtAugAssign) -> Self {
         Self::AugAssign(value)
+    }
+}
+
+impl<'a> From<&'a ast::StmtFor> for CurrentAssignment<'a> {
+    fn from(value: &'a ast::StmtFor) -> Self {
+        Self::For(value)
     }
 }
 
