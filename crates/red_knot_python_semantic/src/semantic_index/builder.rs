@@ -589,9 +589,9 @@ where
                     orelse,
                 },
             ) => {
-                debug_assert!(self.current_assignment.is_none());
                 self.add_standalone_expression(iter);
                 self.visit_expr(iter);
+                debug_assert!(self.current_assignment.is_none());
                 self.current_assignment = Some(for_stmt.into());
                 self.visit_expr(target);
                 self.current_assignment = None;
