@@ -6,14 +6,11 @@ from __future__ import annotations
 import argparse
 import os
 import re
+import subprocess
 import textwrap
 from pathlib import Path
 from re import Match
 from typing import TYPE_CHECKING
-
-from black import FileMode, format_str
-from black.mode import Mode, TargetVersion
-from black.parsing import InvalidInput
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
@@ -52,6 +49,7 @@ KNOWN_FORMATTING_VIOLATIONS = [
     "missing-whitespace-around-modulo-operator",
     "missing-whitespace-around-operator",
     "missing-whitespace-around-parameter-equals",
+    "module-import-not-at-top-of-file",
     "multi-line-implicit-string-concatenation",
     "multiple-leading-hashes-for-block-comment",
     "multiple-spaces-after-comma",
@@ -114,22 +112,62 @@ KNOWN_PARSE_ERRORS = [
     "unexpected-indentation",
 ]
 
+SCRIPT_DIR = Path(__file__).resolve().parent
+ROOT_DIR = SCRIPT_DIR.parent
+
 
 class CodeBlockError(Exception):
     """A code block parse error."""
 
 
-def format_contents(
-    src: str,
-    black_mode: FileMode,
-) -> tuple[str, Sequence[CodeBlockError]]:
+class InvalidInput(ValueError):
+    """Raised when ruff fails to parse file."""
+
+
+def format_str(code: str) -> str:
+    """Format a code block with ruff by writing to a temporary file."""
+    tmp_file = SCRIPT_DIR / "tmp.py"
+
+    # Create a temporary file to write the code block to
+    with tmp_file.open("w+") as f:
+        f.write(code)
+
+    # Run ruff to format the tmp file
+    try:
+        subprocess.run(
+            ["./target/debug/ruff", "format", tmp_file.as_posix()],
+            cwd=ROOT_DIR,
+            check=True,
+            capture_output=True,
+        )
+    except subprocess.CalledProcessError as e:
+        err = e.stderr.decode()
+        if "error: Failed to parse" in err:
+            raise InvalidInput(err) from e
+
+        raise NotImplementedError(
+            "This error has not been handled correctly, please update "
+            f"`check_docs_formatted.py\n\nError:\n\n{err}",
+        ) from e
+
+    # Read the formatted code from the tmp file
+    with tmp_file.open("r") as f:
+        formatted_code = f.read()
+
+    # Remove the temporary file
+    tmp_file.unlink()
+
+    return formatted_code
+
+
+def format_contents(src: str) -> tuple[str, Sequence[CodeBlockError]]:
     """Format a single docs content."""
     errors: list[CodeBlockError] = []
 
     def _snipped_match(match: Match[str]) -> str:
         code = textwrap.dedent(match["code"])
         try:
-            code = format_str(code, mode=black_mode)
+            code = format_str(code)
         except InvalidInput as e:
             errors.append(CodeBlockError(e))
         except NotImplementedError as e:
@@ -142,12 +180,7 @@ def format_contents(
     return src, errors
 
 
-def format_file(
-    file: Path,
-    black_mode: FileMode,
-    error_known: bool,
-    args: argparse.Namespace,
-) -> int:
+def format_file(file: Path, error_known: bool, args: argparse.Namespace) -> int:
     """Check the formatting of a single docs file.
 
     Returns the exit code for the script.
@@ -172,7 +205,7 @@ def format_file(
     # Remove everything after the last example
     contents = contents[: contents.rfind("```")] + "```"
 
-    new_contents, errors = format_contents(contents, black_mode)
+    new_contents, errors = format_contents(contents)
 
     if errors and not args.skip_errors and not error_known:
         for error in errors:
@@ -239,10 +272,6 @@ def main(argv: Sequence[str] | None = None) -> int:
         print("Please generate rules first.")
         return 1
 
-    black_mode = Mode(
-        target_versions={TargetVersion[val.upper()] for val in TARGET_VERSIONS},
-    )
-
     # Check known formatting violations and parse errors are sorted alphabetically and
     # have no duplicates. This will reduce the diff when adding new violations
 
@@ -264,6 +293,11 @@ def main(argv: Sequence[str] | None = None) -> int:
             print("Please remove them and re-run.")
             return 1
 
+    # Build ruff
+    print("Building ruff, this may take a some time...")
+    subprocess.run(["cargo", "build"], cwd=ROOT_DIR, check=True)
+    print("Ruff build complete.")
+
     violations = 0
     errors = 0
     print("Checking docs formatting...")
@@ -274,7 +308,7 @@ def main(argv: Sequence[str] | None = None) -> int:
 
         error_known = rule_name in KNOWN_PARSE_ERRORS
 
-        result = format_file(file, black_mode, error_known, args)
+        result = format_file(file, error_known, args)
         if result == 1:
             violations += 1
         elif result == 2 and not error_known:
