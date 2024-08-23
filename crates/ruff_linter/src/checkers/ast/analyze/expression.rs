@@ -1080,7 +1080,7 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
             }
             if checker.enabled(Rule::MissingFStringSyntax) {
                 for string_literal in value.literals() {
-                    ruff::rules::missing_fstring_syntax(checker, string_literal);
+                    ruff::rules::missing_fstring_syntax_expr(checker, string_literal);
                 }
             }
         }
@@ -1376,7 +1376,7 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
             }
             if checker.enabled(Rule::MissingFStringSyntax) {
                 for string_literal in value.as_slice() {
-                    ruff::rules::missing_fstring_syntax(checker, string_literal);
+                    ruff::rules::missing_fstring_syntax_expr(checker, string_literal);
                 }
             }
         }

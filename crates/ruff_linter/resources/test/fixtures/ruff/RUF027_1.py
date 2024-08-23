@@ -68,3 +68,15 @@ def negative_cases():
     @app.get("/items/{item_id}")
     async def read_item(item_id):
         return {"item_id": item_id}
+
+
+# we shouldn't flag either of these, because the bindings are used elsewhere
+# in contexts that make it clear that they're not meant to be f-strings
+GLOBAL_STRING = "foo {bar}"
+LOGGING_TEMPLATE = "{foo} bar"
+
+def uses_global_strings():
+    print(GLOBAL_STRING.format(bar="whatever"))
+
+    import logging
+    logging.error(LOGGING_TEMPLATE, 42)
