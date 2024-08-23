@@ -746,16 +746,17 @@ pub(crate) fn check_docstring(
             let extra_property_decorators = checker.settings.pydocstyle.property_decorators();
             if !definition.is_property(extra_property_decorators, checker.semantic()) {
                 if let Some(body_return) = body_entries.returns.first() {
-                    // If a function only returns None, we skip the diagnostic.
-                    if !function_def
-                        .returns
-                        .as_deref()
-                        .map_or(true, Expr::is_none_literal_expr)
-                        || (body_entries.returns.len() != body_entries.none_returns)
-                    {
-                        let diagnostic =
-                            Diagnostic::new(DocstringMissingReturns, body_return.range());
-                        diagnostics.push(diagnostic);
+                    match function_def.returns.as_deref() {
+                        Some(returns) if !Expr::is_none_literal_expr(returns) => diagnostics.push(
+                            Diagnostic::new(DocstringMissingReturns, body_return.range()),
+                        ),
+                        None if body_entries.returns.len() != body_entries.none_returns => {
+                            diagnostics.push(Diagnostic::new(
+                                DocstringMissingReturns,
+                                body_return.range(),
+                            ));
+                        }
+                        _ => {}
                     }
                 }
             }
