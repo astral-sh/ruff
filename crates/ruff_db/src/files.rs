@@ -318,6 +318,9 @@ impl File {
             }
             FilePath::Vendored(vendored) => db.vendored().read_to_string(vendored),
             FilePath::SystemVirtual(system_virtual) => {
+                // Add a dependency on the revision to ensure the operation gets re-executed when the file changes.
+                let _ = self.revision(db);
+
                 db.system().read_virtual_path_to_string(system_virtual)
             }
         }
@@ -342,6 +345,9 @@ impl File {
                 "Reading a notebook from the vendored file system is not supported.",
             ))),
             FilePath::SystemVirtual(system_virtual) => {
+                // Add a dependency on the revision to ensure the operation gets re-executed when the file changes.
+                let _ = self.revision(db);
+
                 db.system().read_virtual_path_to_notebook(system_virtual)
             }
         }

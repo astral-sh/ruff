@@ -72,7 +72,7 @@ fn to_lsp_diagnostic(message: &str) -> Diagnostic {
     let words = message.split(':').collect::<Vec<_>>();
 
     let (range, message) = match words.as_slice() {
-        [_filename, line, column, message] => {
+        [_, _, line, column, message] | [_, line, column, message] => {
             let line = line.parse::<u32>().unwrap_or_default().saturating_sub(1);
             let column = column.parse::<u32>().unwrap_or_default();
             (

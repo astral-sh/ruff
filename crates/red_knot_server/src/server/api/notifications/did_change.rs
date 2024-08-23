@@ -9,7 +9,7 @@ use crate::server::api::LSPResult;
 use crate::server::client::{Notifier, Requester};
 use crate::server::Result;
 use crate::session::Session;
-use crate::system::url_to_system_path;
+use crate::system::{url_to_any_system_path, AnySystemPath};
 
 pub(crate) struct DidChangeTextDocumentHandler;
 
@@ -24,7 +24,7 @@ impl SyncNotificationHandler for DidChangeTextDocumentHandler {
         _requester: &mut Requester,
         params: DidChangeTextDocumentParams,
     ) -> Result<()> {
-        let Ok(path) = url_to_system_path(&params.text_document.uri) else {
+        let Ok(path) = url_to_any_system_path(&params.text_document.uri) else {
             return Ok(());
         };
 
@@ -34,11 +34,19 @@ impl SyncNotificationHandler for DidChangeTextDocumentHandler {
             .update_text_document(&key, params.content_changes, params.text_document.version)
             .with_failure_code(ErrorCode::InternalError)?;
 
-        let db = match session.workspace_db_for_path_mut(path.as_std_path()) {
-            Some(db) => db,
-            None => session.default_workspace_db_mut(),
-        };
-        db.apply_changes(vec![ChangeEvent::file_content_changed(path)], None);
+        match path {
+            AnySystemPath::System(path) => {
+                let db = match session.workspace_db_for_path_mut(path.as_std_path()) {
+                    Some(db) => db,
+                    None => session.default_workspace_db_mut(),
+                };
+                db.apply_changes(vec![ChangeEvent::file_content_changed(path)], None);
+            }
+            AnySystemPath::SystemVirtual(virtual_path) => {
+                let db = session.default_workspace_db_mut();
+                db.apply_changes(vec![ChangeEvent::ChangedVirtual(virtual_path)], None);
+            }
+        }
 
         // TODO(dhruvmanila): Publish diagnostics if the client doesnt support pull diagnostics
 
