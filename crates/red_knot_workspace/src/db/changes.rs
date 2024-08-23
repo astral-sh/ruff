@@ -72,7 +72,8 @@ impl RootDatabase {
             }
 
             match change {
-                watch::ChangeEvent::Changed { path, kind: _ } => sync_path(self, &path),
+                watch::ChangeEvent::Changed { path, kind: _ }
+                | watch::ChangeEvent::Opened(path) => sync_path(self, &path),
 
                 watch::ChangeEvent::Created { kind, path } => {
                     match kind {

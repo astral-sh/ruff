@@ -20,6 +20,9 @@ mod workspace_watcher;
 /// event instead of emitting an event for each file or subdirectory in that path.
 #[derive(Debug, PartialEq, Eq)]
 pub enum ChangeEvent {
+    /// The file corresponding to the given path was opened in an editor.
+    Opened(SystemPathBuf),
+
     /// A new path was created
     Created {
         path: SystemPathBuf,
@@ -52,7 +55,8 @@ impl ChangeEvent {
 
     pub fn path(&self) -> Option<&SystemPath> {
         match self {
-            ChangeEvent::Created { path, .. }
+            ChangeEvent::Opened(path)
+            | ChangeEvent::Created { path, .. }
             | ChangeEvent::Changed { path, .. }
             | ChangeEvent::Deleted { path, .. } => Some(path),
             ChangeEvent::Rescan => None,

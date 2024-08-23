@@ -82,6 +82,12 @@ impl Session {
         })
     }
 
+    // TODO(dhruvmanila): Ideally, we should have a single method for `workspace_db_for_path_mut`
+    // and `default_workspace_db_mut` but the borrow checker doesn't allow that.
+    // https://github.com/astral-sh/ruff/pull/13041#discussion_r1726725437
+
+    /// Returns a reference to the workspace [`RootDatabase`] corresponding to the given path, if
+    /// any.
     pub(crate) fn workspace_db_for_path(&self, path: impl AsRef<Path>) -> Option<&RootDatabase> {
         self.workspaces
             .range(..=path.as_ref().to_path_buf())
@@ -89,6 +95,8 @@ impl Session {
             .map(|(_, db)| db)
     }
 
+    /// Returns a mutable reference to the workspace [`RootDatabase`] corresponding to the given
+    /// path, if any.
     pub(crate) fn workspace_db_for_path_mut(
         &mut self,
         path: impl AsRef<Path>,
@@ -97,6 +105,19 @@ impl Session {
             .range_mut(..=path.as_ref().to_path_buf())
             .next_back()
             .map(|(_, db)| db)
+    }
+
+    /// Returns a reference to the default workspace [`RootDatabase`]. The default workspace is the
+    /// minimum root path in the workspace map.
+    pub(crate) fn default_workspace_db(&self) -> &RootDatabase {
+        // SAFETY: Currently, red knot only support a single workspace.
+        self.workspaces.values().next().unwrap()
+    }
+
+    /// Returns a mutable reference to the default workspace [`RootDatabase`].
+    pub(crate) fn default_workspace_db_mut(&mut self) -> &mut RootDatabase {
+        // SAFETY: Currently, red knot only support a single workspace.
+        self.workspaces.values_mut().next().unwrap()
     }
 
     pub fn key_from_url(&self, url: Url) -> DocumentKey {
