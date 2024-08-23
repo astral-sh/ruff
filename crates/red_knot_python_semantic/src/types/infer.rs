@@ -368,9 +368,9 @@ impl<'db> TypeInferenceBuilder<'db> {
         let Some(type_params) = function.type_params.as_deref() else {
             panic!("function type params scope without type params");
         };
+        self.infer_optional_expression(function.returns.as_deref());
         self.infer_type_parameters(type_params);
         self.infer_parameters(&function.parameters);
-        self.infer_optional_expression(function.returns.as_deref());
     }
 
     fn infer_function_body(&mut self, function: &ast::StmtFunctionDef) {
