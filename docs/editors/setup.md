@@ -439,6 +439,7 @@ and enabling the [`format_on_save`](https://zed.dev/docs/configuring-zed#format-
     {
       "languages": {
         "Python": {
+          "language_servers": ["ruff"],
           "format_on_save": "on",
           "formatter": [
             {
@@ -460,6 +461,7 @@ You can configure Ruff to fix lint violations and/or organize imports on-save by
     {
       "languages": {
         "Python": {
+          "language_servers": ["ruff"],
           "format_on_save": "on",
           "formatter": [
             {
@@ -490,6 +492,7 @@ following `settings.json`:
     {
       "languages": {
         "Python": {
+          "language_servers": ["ruff"],
           "format_on_save": "on",
           "formatter": [
             {
