@@ -2148,6 +2148,7 @@ dependencies = [
  "criterion",
  "mimalloc",
  "once_cell",
+ "rayon",
  "red_knot_python_semantic",
  "red_knot_workspace",
  "ruff_db",
