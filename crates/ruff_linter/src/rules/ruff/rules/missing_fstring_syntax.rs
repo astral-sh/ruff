@@ -190,6 +190,7 @@ pub(crate) fn missing_fstring_syntax_binding(
     }
 
     let logger_objects = &checker.settings.logger_objects;
+    let fastapi_seen = semantic.seen_module(Modules::FASTAPI);
     let mut arg_names = FxHashSet::default();
 
     for reference in binding.references().map(|id| semantic.reference(id)) {
@@ -207,6 +208,9 @@ pub(crate) fn missing_fstring_syntax_binding(
                 return None;
             }
             if is_logger_candidate(&call_expr.func, semantic, logger_objects) {
+                return None;
+            }
+            if fastapi_seen && is_fastapi_route_call(call_expr, semantic) {
                 return None;
             }
             let ast::Arguments { keywords, args, .. } = &call_expr.arguments;
