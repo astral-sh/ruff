@@ -11,7 +11,8 @@ from pathlib import Path
 from re import Match
 from typing import TYPE_CHECKING
 
-import black
+from black import FileMode
+from black import format_str as black_format_str
 from black.mode import Mode, TargetVersion
 from black.parsing import InvalidInput
 
@@ -121,7 +122,7 @@ class CodeBlockError(Exception):
 
 def format_str(
     src: str,
-    black_mode: black.FileMode,
+    black_mode: FileMode,
 ) -> tuple[str, Sequence[CodeBlockError]]:
     """Format a single docs file string."""
     errors: list[CodeBlockError] = []
@@ -129,7 +130,7 @@ def format_str(
     def _snipped_match(match: Match[str]) -> str:
         code = textwrap.dedent(match["code"])
         try:
-            code = black.format_str(code, mode=black_mode)
+            code = black_format_str(code, mode=black_mode)
         except InvalidInput as e:
             errors.append(CodeBlockError(e))
 
@@ -142,7 +143,7 @@ def format_str(
 
 def format_file(
     file: Path,
-    black_mode: black.FileMode,
+    black_mode: FileMode,
     error_known: bool,
     args: argparse.Namespace,
 ) -> int:
