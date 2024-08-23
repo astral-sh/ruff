@@ -105,8 +105,6 @@ async function startPlayground(): Promise<{
   await initRuff();
   const monaco = await loader.init();
 
-  console.log(monaco);
-
   setupMonaco(monaco);
 
   const response = await restore();
