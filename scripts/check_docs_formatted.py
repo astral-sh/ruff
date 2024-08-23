@@ -15,7 +15,6 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from collections.abc import Sequence
 
-TARGET_VERSIONS = ["py37", "py38", "py39", "py310", "py311"]
 SNIPPED_RE = re.compile(
     r"(?P<before>^(?P<indent> *)```\s*python\n)"
     r"(?P<code>.*?)"
