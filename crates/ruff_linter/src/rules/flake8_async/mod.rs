@@ -11,6 +11,7 @@ mod tests {
 
     use crate::assert_messages;
     use crate::registry::Rule;
+    use crate::settings::types::PythonVersion;
     use crate::settings::LinterSettings;
     use crate::test::test_path;
 
@@ -34,6 +35,20 @@ mod tests {
             &LinterSettings::for_rule(rule_code),
         )?;
         assert_messages!(snapshot, diagnostics);
+        Ok(())
+    }
+
+    #[test_case(Path::new("ASYNC109_0.py"); "asyncio")]
+    #[test_case(Path::new("ASYNC109_1.py"); "trio")]
+    fn async109_python_310_or_older(path: &Path) -> Result<()> {
+        let diagnostics = test_path(
+            Path::new("flake8_async").join(path),
+            &LinterSettings {
+                target_version: PythonVersion::Py310,
+                ..LinterSettings::for_rule(Rule::AsyncFunctionWithTimeout)
+            },
+        )?;
+        assert_messages!(path.file_name().unwrap().to_str().unwrap(), diagnostics);
         Ok(())
     }
 }

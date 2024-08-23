@@ -6,6 +6,7 @@ use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
 use crate::rules::flake8_async::helpers::AsyncModule;
+use crate::settings::types::PythonVersion;
 
 /// ## What it does
 /// Checks for `async` functions with a `timeout` argument.
@@ -85,6 +86,11 @@ pub(crate) fn async_function_with_timeout(
     } else {
         AsyncModule::AsyncIo
     };
+
+    // asyncio.timeout feature was first introduced in Python 3.11
+    if module == AsyncModule::AsyncIo && checker.settings.target_version < PythonVersion::Py311 {
+        return;
+    }
 
     checker.diagnostics.push(Diagnostic::new(
         AsyncFunctionWithTimeout { module },
