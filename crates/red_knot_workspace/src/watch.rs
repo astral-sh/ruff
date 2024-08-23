@@ -20,6 +20,9 @@ mod workspace_watcher;
 /// event instead of emitting an event for each file or subdirectory in that path.
 #[derive(Debug, PartialEq, Eq)]
 pub enum ChangeEvent {
+    /// The file corresponding to the given path was opened in an editor.
+    Opened(SystemPathBuf),
+
     /// A new path was created
     Created {
         path: SystemPathBuf,
@@ -46,23 +49,14 @@ pub enum ChangeEvent {
 }
 
 impl ChangeEvent {
-    /// Creates a new [`Created`] event for a file at the given path.
-    ///
-    /// [`Created`]: ChangeEvent::Created
-    pub fn file_created(path: SystemPathBuf) -> ChangeEvent {
-        ChangeEvent::Created {
-            path,
-            kind: CreatedKind::File,
-        }
-    }
-
     pub fn file_name(&self) -> Option<&str> {
         self.path().and_then(|path| path.file_name())
     }
 
     pub fn path(&self) -> Option<&SystemPath> {
         match self {
-            ChangeEvent::Created { path, .. }
+            ChangeEvent::Opened(path)
+            | ChangeEvent::Created { path, .. }
             | ChangeEvent::Changed { path, .. }
             | ChangeEvent::Deleted { path, .. } => Some(path),
             ChangeEvent::Rescan => None,

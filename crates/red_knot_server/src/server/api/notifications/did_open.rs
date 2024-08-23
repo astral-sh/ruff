@@ -34,7 +34,7 @@ impl SyncNotificationHandler for DidOpenTextDocumentHandler {
             Some(db) => db,
             None => session.default_workspace_db_mut(),
         };
-        db.apply_changes(vec![ChangeEvent::file_created(path)], None);
+        db.apply_changes(vec![ChangeEvent::Opened(path)], None);
 
         // TODO(dhruvmanila): Publish diagnostics if the client doesn't support pull diagnostics
 
