@@ -1,8 +1,9 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_comprehensions/mod.rs
 ---
-error[C415]: C415.py:2:5: Unnecessary subscript reversal of iterable within `set()`
+error[C415]: 2:5: Unnecessary subscript reversal of iterable within `set()`
 
+ --> C415.py:2:5
   |
 1 | lst = [2, 1, 3]
 2 | a = set(lst[::-1])
@@ -10,8 +11,9 @@ error[C415]: C415.py:2:5: Unnecessary subscript reversal of iterable within `set
 3 | b = reversed(lst[::-1])
 4 | c = sorted(lst[::-1])
   |
-error[C415]: C415.py:3:5: Unnecessary subscript reversal of iterable within `reversed()`
+error[C415]: 3:5: Unnecessary subscript reversal of iterable within `reversed()`
 
+ --> C415.py:3:5
   |
 1 | lst = [2, 1, 3]
 2 | a = set(lst[::-1])
@@ -20,8 +22,9 @@ error[C415]: C415.py:3:5: Unnecessary subscript reversal of iterable within `rev
 4 | c = sorted(lst[::-1])
 5 | d = sorted(lst[::-1], reverse=True)
   |
-error[C415]: C415.py:4:5: Unnecessary subscript reversal of iterable within `sorted()`
+error[C415]: 4:5: Unnecessary subscript reversal of iterable within `sorted()`
 
+ --> C415.py:4:5
   |
 2 | a = set(lst[::-1])
 3 | b = reversed(lst[::-1])
@@ -30,8 +33,9 @@ error[C415]: C415.py:4:5: Unnecessary subscript reversal of iterable within `sor
 5 | d = sorted(lst[::-1], reverse=True)
 6 | e = set(lst[2:-1])
   |
-error[C415]: C415.py:5:5: Unnecessary subscript reversal of iterable within `sorted()`
+error[C415]: 5:5: Unnecessary subscript reversal of iterable within `sorted()`
 
+ --> C415.py:5:5
   |
 3 | b = reversed(lst[::-1])
 4 | c = sorted(lst[::-1])

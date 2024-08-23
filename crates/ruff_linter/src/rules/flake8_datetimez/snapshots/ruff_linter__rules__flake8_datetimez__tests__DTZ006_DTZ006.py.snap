@@ -1,8 +1,9 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_datetimez/mod.rs
 ---
-error[DTZ006]: DTZ006.py:4:1: `datetime.datetime.fromtimestamp()` called without a `tz` argument
+error[DTZ006]: 4:1: `datetime.datetime.fromtimestamp()` called without a `tz` argument
 
+ --> DTZ006.py:3:10
   |
 3 | # no args
 4 | datetime.datetime.fromtimestamp(1234)
@@ -11,8 +12,9 @@ error[DTZ006]: DTZ006.py:4:1: `datetime.datetime.fromtimestamp()` called without
 6 | # wrong keywords
   |
   = help: Pass a `datetime.timezone` object to the `tz` parameter
-error[DTZ006]: DTZ006.py:7:1: `datetime.datetime.fromtimestamp()` called without a `tz` argument
+error[DTZ006]: 7:1: `datetime.datetime.fromtimestamp()` called without a `tz` argument
 
+ --> DTZ006.py:6:17
   |
 6 | # wrong keywords
 7 | datetime.datetime.fromtimestamp(1234, bad=datetime.timezone.utc)
@@ -21,8 +23,9 @@ error[DTZ006]: DTZ006.py:7:1: `datetime.datetime.fromtimestamp()` called without
 9 | # none args
   |
   = help: Pass a `datetime.timezone` object to the `tz` parameter
-error[DTZ006]: DTZ006.py:10:1: `tz=None` passed to `datetime.datetime.fromtimestamp()`
+error[DTZ006]: 10:1: `tz=None` passed to `datetime.datetime.fromtimestamp()`
 
+  --> DTZ006.py:9:12
    |
  9 | # none args
 10 | datetime.datetime.fromtimestamp(1234, None)
@@ -31,8 +34,9 @@ error[DTZ006]: DTZ006.py:10:1: `tz=None` passed to `datetime.datetime.fromtimest
 12 | # none keywords
    |
    = help: Pass a `datetime.timezone` object to the `tz` parameter
-error[DTZ006]: DTZ006.py:13:1: `tz=None` passed to `datetime.datetime.fromtimestamp()`
+error[DTZ006]: 13:1: `tz=None` passed to `datetime.datetime.fromtimestamp()`
 
+  --> DTZ006.py:12:16
    |
 12 | # none keywords
 13 | datetime.datetime.fromtimestamp(1234, tz=None)
@@ -41,8 +45,9 @@ error[DTZ006]: DTZ006.py:13:1: `tz=None` passed to `datetime.datetime.fromtimest
 15 | from datetime import datetime
    |
    = help: Pass a `datetime.timezone` object to the `tz` parameter
-error[DTZ006]: DTZ006.py:18:1: `datetime.datetime.fromtimestamp()` called without a `tz` argument
+error[DTZ006]: 18:1: `datetime.datetime.fromtimestamp()` called without a `tz` argument
 
+  --> DTZ006.py:17:22
    |
 17 | # no args unqualified
 18 | datetime.fromtimestamp(1234)

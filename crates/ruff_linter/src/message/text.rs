@@ -71,17 +71,12 @@ impl Emitter for TextEmitter {
     ) -> anyhow::Result<()> {
         for message in messages {
             let mut title = String::new();
-            write!(
-                title,
-                "{path}{sep}",
-                path = relativize_path(message.filename()).bold(),
-                sep = ":".cyan(),
-            )?;
 
             let start_location = message.compute_start_location();
             let notebook_index = context.notebook_index(message.filename());
 
             // Check if we're working on a jupyter notebook and translate positions with cell accordingly
+            // TODO: Only append location to title if there are no snippets
             let diagnostic_location = if let Some(notebook_index) = notebook_index {
                 write!(
                     title,
@@ -118,7 +113,7 @@ impl Emitter for TextEmitter {
             let code = message
                 .rule()
                 .map(|rule| rule.noqa_code().to_string())
-                .unwrap_or_default();
+                .unwrap_or_else(|| "syntax-error".to_string());
             let mut snippet_message = Level::Error.title(&title).id(&code);
 
             // The `0..0` range is used to highlight file-level diagnostics.
@@ -172,9 +167,6 @@ impl Display for RuleCodeAndBody<'_> {
             if let Some(fix) = self.message.fix() {
                 // Do not display an indicator for unapplicable fixes
                 if fix.applies(self.unsafe_fixes.required_applicability()) {
-                    if let Some(rule) = self.message.rule() {
-                        write!(f, "{} ", rule.noqa_code().to_string().red().bold())?;
-                    }
                     return write!(
                         f,
                         "{fix}{body}",
@@ -185,21 +177,13 @@ impl Display for RuleCodeAndBody<'_> {
             }
         };
 
-        if let Some(rule) = self.message.rule() {
-            write!(
-                f,
-                "{code} {body}",
-                code = rule.noqa_code().to_string().red().bold(),
-                body = self.message.body(),
-            )
-        } else {
-            f.write_str(self.message.body())
-        }
+        f.write_str(self.message.body())
     }
 }
 
 struct CodeFrameSnippet<'a> {
     pub(crate) source: SourceCode<'a>,
+    file_name: String,
     line_start: OneIndexed,
 }
 
@@ -281,11 +265,16 @@ impl<'a> CodeFrameSnippet<'a> {
             },
         );
 
-        Self { line_start, source }
+        Self {
+            line_start,
+            source,
+            file_name: relativize_path(message.filename()),
+        }
     }
 
     pub(super) fn as_snippet(&self) -> Snippet {
         Snippet::source(&self.source.text)
+            .origin(&self.file_name)
             .line_start(self.line_start.get())
             .annotation(Level::Error.span(self.source.annotation_range.into()))
     }

@@ -1,8 +1,9 @@
 ---
 source: crates/ruff_linter/src/rules/pydocstyle/mod.rs
 ---
-error[D411]: sections.py:80:5: [*] Missing blank line before section ("Yields")
+error[D411]: 80:5: [*] Missing blank line before section ("Yields")
 
+  --> sections.py:80:5
    |
 78 |     Returns
 79 |     -------
@@ -20,8 +21,9 @@ error[D411]: sections.py:80:5: [*] Missing blank line before section ("Yields")
 81 82 |     ------
 82 83 | 
 
-error[D411]: sections.py:134:5: [*] Missing blank line before section ("Returns")
+error[D411]: 134:5: [*] Missing blank line before section ("Returns")
 
+   --> sections.py:134:5
     |
 133 |     The function's description.
 134 |     Returns
@@ -39,8 +41,9 @@ error[D411]: sections.py:134:5: [*] Missing blank line before section ("Returns"
 135 136 |     -------
 136 137 |     A value of some sort.
 
-error[D411]: sections.py:227:5: [*] Missing blank line before section ("Raises")
+error[D411]: 227:5: [*] Missing blank line before section ("Raises")
 
+   --> sections.py:227:5
     |
 225 |     ------
 226 |     Many many wonderful things.

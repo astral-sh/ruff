@@ -1,8 +1,9 @@
 ---
 source: crates/ruff_linter/src/rules/ruff/mod.rs
 ---
-error[RUF200]: pyproject.toml:9:17: Failed to parse pyproject.toml: wanted string or table
+error[RUF200]: 9:17: Failed to parse pyproject.toml: wanted string or table
 
+  --> pyproject.toml:9:17
    |
  7 | [project]
  8 | name = "..."

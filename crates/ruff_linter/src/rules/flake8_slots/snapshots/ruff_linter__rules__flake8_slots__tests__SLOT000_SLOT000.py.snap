@@ -1,8 +1,9 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_slots/mod.rs
 ---
-error[SLOT000]: SLOT000.py:1:7: Subclasses of `str` should define `__slots__`
+error[SLOT000]: 1:7: Subclasses of `str` should define `__slots__`
 
+ --> SLOT000.py:1:7
   |
 1 | class Bad(str):  # SLOT000
   |       ^^^

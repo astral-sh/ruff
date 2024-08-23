@@ -1,8 +1,9 @@
 ---
 source: crates/ruff_linter/src/rules/pyflakes/mod.rs
 ---
-error[F507]: F50x.py:5:1: `%`-format string has 2 placeholder(s) but 1 substitution(s)
+error[F507]: 5:1: `%`-format string has 2 placeholder(s) but 1 substitution(s)
 
+ --> F50x.py:4:20
   |
 3 | '%(foo)s %s' % {'foo': 'bar'}  # F506
 4 | '%j' % (1,)  # F509
@@ -11,8 +12,9 @@ error[F507]: F50x.py:5:1: `%`-format string has 2 placeholder(s) but 1 substitut
 6 | '%s %s' % (1, 2, 3)  # F507
 7 | '%(bar)s' % {}  # F505
   |
-error[F507]: F50x.py:6:1: `%`-format string has 2 placeholder(s) but 3 substitution(s)
+error[F507]: 6:1: `%`-format string has 2 placeholder(s) but 3 substitution(s)
 
+ --> F50x.py:5:23
   |
 4 | '%j' % (1,)  # F509
 5 | '%s %s' % (1,)  # F507

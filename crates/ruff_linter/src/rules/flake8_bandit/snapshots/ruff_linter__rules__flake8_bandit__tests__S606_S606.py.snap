@@ -1,8 +1,9 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_bandit/mod.rs
 ---
-error[S606]: S606.py:4:1: Starting a process without a shell
+error[S606]: 4:1: Starting a process without a shell
 
+ --> S606.py:3:29
   |
 3 | # Check all shell functions.
 4 | os.execl("true")
@@ -10,8 +11,9 @@ error[S606]: S606.py:4:1: Starting a process without a shell
 5 | os.execle("true")
 6 | os.execlp("true")
   |
-error[S606]: S606.py:5:1: Starting a process without a shell
+error[S606]: 5:1: Starting a process without a shell
 
+ --> S606.py:4:17
   |
 3 | # Check all shell functions.
 4 | os.execl("true")
@@ -20,8 +22,9 @@ error[S606]: S606.py:5:1: Starting a process without a shell
 6 | os.execlp("true")
 7 | os.execlpe("true")
   |
-error[S606]: S606.py:6:1: Starting a process without a shell
+error[S606]: 6:1: Starting a process without a shell
 
+ --> S606.py:5:18
   |
 4 | os.execl("true")
 5 | os.execle("true")
@@ -30,8 +33,9 @@ error[S606]: S606.py:6:1: Starting a process without a shell
 7 | os.execlpe("true")
 8 | os.execv("true")
   |
-error[S606]: S606.py:7:1: Starting a process without a shell
+error[S606]: 7:1: Starting a process without a shell
 
+ --> S606.py:6:18
   |
 5 | os.execle("true")
 6 | os.execlp("true")
@@ -40,8 +44,9 @@ error[S606]: S606.py:7:1: Starting a process without a shell
 8 | os.execv("true")
 9 | os.execve("true")
   |
-error[S606]: S606.py:8:1: Starting a process without a shell
+error[S606]: 8:1: Starting a process without a shell
 
+  --> S606.py:7:19
    |
  6 | os.execlp("true")
  7 | os.execlpe("true")
@@ -50,8 +55,9 @@ error[S606]: S606.py:8:1: Starting a process without a shell
  9 | os.execve("true")
 10 | os.execvp("true")
    |
-error[S606]: S606.py:9:1: Starting a process without a shell
+error[S606]: 9:1: Starting a process without a shell
 
+  --> S606.py:8:17
    |
  7 | os.execlpe("true")
  8 | os.execv("true")
@@ -60,8 +66,9 @@ error[S606]: S606.py:9:1: Starting a process without a shell
 10 | os.execvp("true")
 11 | os.execvpe("true")
    |
-error[S606]: S606.py:10:1: Starting a process without a shell
+error[S606]: 10:1: Starting a process without a shell
 
+  --> S606.py:9:18
    |
  8 | os.execv("true")
  9 | os.execve("true")
@@ -70,8 +77,9 @@ error[S606]: S606.py:10:1: Starting a process without a shell
 11 | os.execvpe("true")
 12 | os.spawnl("true")
    |
-error[S606]: S606.py:11:1: Starting a process without a shell
+error[S606]: 11:1: Starting a process without a shell
 
+  --> S606.py:10:18
    |
  9 | os.execve("true")
 10 | os.execvp("true")
@@ -80,8 +88,9 @@ error[S606]: S606.py:11:1: Starting a process without a shell
 12 | os.spawnl("true")
 13 | os.spawnle("true")
    |
-error[S606]: S606.py:12:1: Starting a process without a shell
+error[S606]: 12:1: Starting a process without a shell
 
+  --> S606.py:11:19
    |
 10 | os.execvp("true")
 11 | os.execvpe("true")
@@ -90,8 +99,9 @@ error[S606]: S606.py:12:1: Starting a process without a shell
 13 | os.spawnle("true")
 14 | os.spawnlp("true")
    |
-error[S606]: S606.py:13:1: Starting a process without a shell
+error[S606]: 13:1: Starting a process without a shell
 
+  --> S606.py:12:18
    |
 11 | os.execvpe("true")
 12 | os.spawnl("true")
@@ -100,8 +110,9 @@ error[S606]: S606.py:13:1: Starting a process without a shell
 14 | os.spawnlp("true")
 15 | os.spawnlpe("true")
    |
-error[S606]: S606.py:14:1: Starting a process without a shell
+error[S606]: 14:1: Starting a process without a shell
 
+  --> S606.py:13:19
    |
 12 | os.spawnl("true")
 13 | os.spawnle("true")
@@ -110,8 +121,9 @@ error[S606]: S606.py:14:1: Starting a process without a shell
 15 | os.spawnlpe("true")
 16 | os.spawnv("true")
    |
-error[S606]: S606.py:15:1: Starting a process without a shell
+error[S606]: 15:1: Starting a process without a shell
 
+  --> S606.py:14:19
    |
 13 | os.spawnle("true")
 14 | os.spawnlp("true")
@@ -120,8 +132,9 @@ error[S606]: S606.py:15:1: Starting a process without a shell
 16 | os.spawnv("true")
 17 | os.spawnve("true")
    |
-error[S606]: S606.py:16:1: Starting a process without a shell
+error[S606]: 16:1: Starting a process without a shell
 
+  --> S606.py:15:20
    |
 14 | os.spawnlp("true")
 15 | os.spawnlpe("true")
@@ -130,8 +143,9 @@ error[S606]: S606.py:16:1: Starting a process without a shell
 17 | os.spawnve("true")
 18 | os.spawnvp("true")
    |
-error[S606]: S606.py:17:1: Starting a process without a shell
+error[S606]: 17:1: Starting a process without a shell
 
+  --> S606.py:16:18
    |
 15 | os.spawnlpe("true")
 16 | os.spawnv("true")
@@ -140,8 +154,9 @@ error[S606]: S606.py:17:1: Starting a process without a shell
 18 | os.spawnvp("true")
 19 | os.spawnvpe("true")
    |
-error[S606]: S606.py:18:1: Starting a process without a shell
+error[S606]: 18:1: Starting a process without a shell
 
+  --> S606.py:17:19
    |
 16 | os.spawnv("true")
 17 | os.spawnve("true")
@@ -150,8 +165,9 @@ error[S606]: S606.py:18:1: Starting a process without a shell
 19 | os.spawnvpe("true")
 20 | os.startfile("true")
    |
-error[S606]: S606.py:19:1: Starting a process without a shell
+error[S606]: 19:1: Starting a process without a shell
 
+  --> S606.py:18:19
    |
 17 | os.spawnve("true")
 18 | os.spawnvp("true")
@@ -159,8 +175,9 @@ error[S606]: S606.py:19:1: Starting a process without a shell
    | ^^^^^^^^^^^
 20 | os.startfile("true")
    |
-error[S606]: S606.py:20:1: Starting a process without a shell
+error[S606]: 20:1: Starting a process without a shell
 
+  --> S606.py:19:20
    |
 18 | os.spawnvp("true")
 19 | os.spawnvpe("true")

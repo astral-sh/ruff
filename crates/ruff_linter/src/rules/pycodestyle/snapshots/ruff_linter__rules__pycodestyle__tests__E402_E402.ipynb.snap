@@ -1,8 +1,9 @@
 ---
 source: crates/ruff_linter/src/rules/pycodestyle/mod.rs
 ---
-error[E402]: E402.ipynb:9:1: Module level import not at top of cell
+error[E402]: 9:1: Module level import not at top of cell
 
+  --> E402.ipynb:8:1
    |
  7 | os.path
  8 | 
@@ -11,8 +12,9 @@ error[E402]: E402.ipynb:9:1: Module level import not at top of cell
 10 | 
 11 | import a
    |
-error[E402]: E402.ipynb:22:1: Module level import not at top of cell
+error[E402]: 22:1: Module level import not at top of cell
 
+  --> E402.ipynb:21:1
    |
 20 | __some__magic = 1
 21 | 
@@ -20,8 +22,9 @@ error[E402]: E402.ipynb:22:1: Module level import not at top of cell
    | ^^^^^^^^
 23 | import ok
    |
-error[E402]: E402.ipynb:30:1: Module level import not at top of cell
+error[E402]: 30:1: Module level import not at top of cell
 
+  --> E402.ipynb:30:1
    |
 30 | import no_ok
    | ^^^^^^^^^^^^

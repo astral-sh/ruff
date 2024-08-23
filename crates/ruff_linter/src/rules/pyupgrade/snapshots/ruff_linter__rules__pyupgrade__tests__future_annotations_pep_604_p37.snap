@@ -1,8 +1,9 @@
 ---
 source: crates/ruff_linter/src/rules/pyupgrade/mod.rs
 ---
-error[UP007]: future_annotations.py:40:4: [*] Use `X | Y` for type annotations
+error[UP007]: 40:4: [*] Use `X | Y` for type annotations
 
+  --> future_annotations.py:40:4
    |
 40 | x: Optional[int] = None
    |    ^^^^^^^^^^^^^

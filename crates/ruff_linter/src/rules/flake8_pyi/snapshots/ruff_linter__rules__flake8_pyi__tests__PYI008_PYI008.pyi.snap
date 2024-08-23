@@ -1,8 +1,9 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_pyi/mod.rs
 ---
-error[PYI008]: PYI008.pyi:3:20: Unrecognized platform `linus`
+error[PYI008]: 3:20: Unrecognized platform `linus`
 
+ --> PYI008.pyi:3:20
   |
 1 | import sys
 2 | 

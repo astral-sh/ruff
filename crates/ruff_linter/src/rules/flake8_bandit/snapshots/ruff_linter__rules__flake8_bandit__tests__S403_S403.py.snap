@@ -1,16 +1,18 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_bandit/mod.rs
 ---
-error[S403]: S403.py:1:8: `pickle`, `cPickle`, `dill`, and `shelve` modules are possibly insecure
+error[S403]: 1:8: `pickle`, `cPickle`, `dill`, and `shelve` modules are possibly insecure
 
+ --> S403.py:1:8
   |
 1 | import dill  # S403
   |        ^^^^
 2 | from dill import objects  # S403
 3 | import shelve
   |
-error[S403]: S403.py:2:6: `pickle`, `cPickle`, `dill`, and `shelve` modules are possibly insecure
+error[S403]: 2:6: `pickle`, `cPickle`, `dill`, and `shelve` modules are possibly insecure
 
+ --> S403.py:2:6
   |
 1 | import dill  # S403
 2 | from dill import objects  # S403
@@ -18,8 +20,9 @@ error[S403]: S403.py:2:6: `pickle`, `cPickle`, `dill`, and `shelve` modules are 
 3 | import shelve
 4 | from shelve import open
   |
-error[S403]: S403.py:3:8: `pickle`, `cPickle`, `dill`, and `shelve` modules are possibly insecure
+error[S403]: 3:8: `pickle`, `cPickle`, `dill`, and `shelve` modules are possibly insecure
 
+ --> S403.py:3:8
   |
 1 | import dill  # S403
 2 | from dill import objects  # S403
@@ -28,8 +31,9 @@ error[S403]: S403.py:3:8: `pickle`, `cPickle`, `dill`, and `shelve` modules are 
 4 | from shelve import open
 5 | import cPickle
   |
-error[S403]: S403.py:4:6: `pickle`, `cPickle`, `dill`, and `shelve` modules are possibly insecure
+error[S403]: 4:6: `pickle`, `cPickle`, `dill`, and `shelve` modules are possibly insecure
 
+ --> S403.py:4:6
   |
 2 | from dill import objects  # S403
 3 | import shelve
@@ -38,8 +42,9 @@ error[S403]: S403.py:4:6: `pickle`, `cPickle`, `dill`, and `shelve` modules are 
 5 | import cPickle
 6 | from cPickle import load
   |
-error[S403]: S403.py:5:8: `pickle`, `cPickle`, `dill`, and `shelve` modules are possibly insecure
+error[S403]: 5:8: `pickle`, `cPickle`, `dill`, and `shelve` modules are possibly insecure
 
+ --> S403.py:5:8
   |
 3 | import shelve
 4 | from shelve import open
@@ -48,8 +53,9 @@ error[S403]: S403.py:5:8: `pickle`, `cPickle`, `dill`, and `shelve` modules are 
 6 | from cPickle import load
 7 | import pickle
   |
-error[S403]: S403.py:6:6: `pickle`, `cPickle`, `dill`, and `shelve` modules are possibly insecure
+error[S403]: 6:6: `pickle`, `cPickle`, `dill`, and `shelve` modules are possibly insecure
 
+ --> S403.py:6:6
   |
 4 | from shelve import open
 5 | import cPickle
@@ -58,8 +64,9 @@ error[S403]: S403.py:6:6: `pickle`, `cPickle`, `dill`, and `shelve` modules are 
 7 | import pickle
 8 | from pickle import load
   |
-error[S403]: S403.py:7:8: `pickle`, `cPickle`, `dill`, and `shelve` modules are possibly insecure
+error[S403]: 7:8: `pickle`, `cPickle`, `dill`, and `shelve` modules are possibly insecure
 
+ --> S403.py:7:8
   |
 5 | import cPickle
 6 | from cPickle import load
@@ -67,8 +74,9 @@ error[S403]: S403.py:7:8: `pickle`, `cPickle`, `dill`, and `shelve` modules are 
   |        ^^^^^^
 8 | from pickle import load
   |
-error[S403]: S403.py:8:6: `pickle`, `cPickle`, `dill`, and `shelve` modules are possibly insecure
+error[S403]: 8:6: `pickle`, `cPickle`, `dill`, and `shelve` modules are possibly insecure
 
+ --> S403.py:8:6
   |
 6 | from cPickle import load
 7 | import pickle

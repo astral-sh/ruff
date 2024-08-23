@@ -1,8 +1,9 @@
 ---
 source: crates/ruff_linter/src/rules/pylint/mod.rs
 ---
-error[PLR1722]: sys_exit_alias_8.py:5:5: [*] Use `sys.exit()` instead of `exit`
+error[PLR1722]: 5:5: [*] Use `sys.exit()` instead of `exit`
 
+ --> sys_exit_alias_8.py:5:5
   |
 4 | def main():
 5 |     exit(0)

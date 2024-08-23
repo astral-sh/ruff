@@ -1,8 +1,9 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_simplify/mod.rs
 ---
-error[SIM910]: SIM910.py:2:1: [*] Use `{}.get(key)` instead of `{}.get(key, None)`
+error[SIM910]: 2:1: [*] Use `{}.get(key)` instead of `{}.get(key, None)`
 
+ --> SIM910.py:1:9
   |
 1 | # SIM910
 2 | {}.get(key, None)
@@ -19,8 +20,9 @@ error[SIM910]: SIM910.py:2:1: [*] Use `{}.get(key)` instead of `{}.get(key, None
 4 4 | # SIM910
 5 5 | {}.get("key", None)
 
-error[SIM910]: SIM910.py:5:1: [*] Use `{}.get("key")` instead of `{}.get("key", None)`
+error[SIM910]: 5:1: [*] Use `{}.get("key")` instead of `{}.get("key", None)`
 
+ --> SIM910.py:4:9
   |
 4 | # SIM910
 5 | {}.get("key", None)
@@ -39,8 +41,9 @@ error[SIM910]: SIM910.py:5:1: [*] Use `{}.get("key")` instead of `{}.get("key", 
 7 7 | # OK
 8 8 | {}.get(key)
 
-error[SIM910]: SIM910.py:20:9: [*] Use `{}.get(key)` instead of `{}.get(key, None)`
+error[SIM910]: 20:9: [*] Use `{}.get(key)` instead of `{}.get(key, None)`
 
+  --> SIM910.py:20:9
    |
 19 | # SIM910
 20 | if a := {}.get(key, None):
@@ -58,8 +61,9 @@ error[SIM910]: SIM910.py:20:9: [*] Use `{}.get(key)` instead of `{}.get(key, Non
 22 22 | 
 23 23 | # SIM910
 
-error[SIM910]: SIM910.py:24:5: [*] Use `{}.get(key)` instead of `{}.get(key, None)`
+error[SIM910]: 24:5: [*] Use `{}.get(key)` instead of `{}.get(key, None)`
 
+  --> SIM910.py:24:5
    |
 23 | # SIM910
 24 | a = {}.get(key, None)
@@ -78,8 +82,9 @@ error[SIM910]: SIM910.py:24:5: [*] Use `{}.get(key)` instead of `{}.get(key, Non
 26 26 | # SIM910
 27 27 | ({}).get(key, None)
 
-error[SIM910]: SIM910.py:27:1: [*] Use `({}).get(key)` instead of `({}).get(key, None)`
+error[SIM910]: 27:1: [*] Use `({}).get(key)` instead of `({}).get(key, None)`
 
+  --> SIM910.py:26:9
    |
 26 | # SIM910
 27 | ({}).get(key, None)
@@ -98,8 +103,9 @@ error[SIM910]: SIM910.py:27:1: [*] Use `({}).get(key)` instead of `({}).get(key,
 29 29 | # SIM910
 30 30 | ages = {"Tom": 23, "Maria": 23, "Dog": 11}
 
-error[SIM910]: SIM910.py:31:7: [*] Use `ages.get("Cat")` instead of `ages.get("Cat", None)`
+error[SIM910]: 31:7: [*] Use `ages.get("Cat")` instead of `ages.get("Cat", None)`
 
+  --> SIM910.py:31:7
    |
 29 | # SIM910
 30 | ages = {"Tom": 23, "Maria": 23, "Dog": 11}

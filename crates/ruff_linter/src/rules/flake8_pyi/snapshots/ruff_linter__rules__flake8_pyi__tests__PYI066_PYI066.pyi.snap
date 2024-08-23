@@ -1,8 +1,9 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_pyi/mod.rs
 ---
-error[PYI066]: PYI066.pyi:3:4: Use `>=` when using `if`-`else` with `sys.version_info` comparisons
+error[PYI066]: 3:4: Use `>=` when using `if`-`else` with `sys.version_info` comparisons
 
+ --> PYI066.pyi:3:4
   |
 1 | import sys
 2 | 
@@ -11,8 +12,9 @@ error[PYI066]: PYI066.pyi:3:4: Use `>=` when using `if`-`else` with `sys.version
 4 |     def foo(x): ...
 5 | else:
   |
-error[PYI066]: PYI066.pyi:8:4: Use `>=` when using `if`-`else` with `sys.version_info` comparisons
+error[PYI066]: 8:4: Use `>=` when using `if`-`else` with `sys.version_info` comparisons
 
+  --> PYI066.pyi:8:4
    |
  6 |     def foo(x, *, bar=True): ...
  7 | 
@@ -21,8 +23,9 @@ error[PYI066]: PYI066.pyi:8:4: Use `>=` when using `if`-`else` with `sys.version
  9 |     def bar(x): ...
 10 | elif sys.version_info < (3, 9):  # Y066 When using if/else with sys.version_info, put the code for new Python versions first, e.g. "...
    |
-error[PYI066]: PYI066.pyi:10:6: Use `>=` when using `if`-`else` with `sys.version_info` comparisons
+error[PYI066]: 10:6: Use `>=` when using `if`-`else` with `sys.version_info` comparisons
 
+  --> PYI066.pyi:10:6
    |
  8 | if sys.version_info < (3, 8):  # Y066 When using if/else with sys.version_info, put the code for new Python versions first, e.g. "if...
  9 |     def bar(x): ...
@@ -31,8 +34,9 @@ error[PYI066]: PYI066.pyi:10:6: Use `>=` when using `if`-`else` with `sys.versio
 11 |     def bar(x, *, bar=True): ...
 12 | elif sys.version_info < (3, 11):  # Y066 When using if/else with sys.version_info, put the code for new Python versions first, e.g. ...
    |
-error[PYI066]: PYI066.pyi:12:6: Use `>=` when using `if`-`else` with `sys.version_info` comparisons
+error[PYI066]: 12:6: Use `>=` when using `if`-`else` with `sys.version_info` comparisons
 
+  --> PYI066.pyi:12:6
    |
 10 | elif sys.version_info < (3, 9):  # Y066 When using if/else with sys.version_info, put the code for new Python versions first, e.g. "...
 11 |     def bar(x, *, bar=True): ...
@@ -41,8 +45,9 @@ error[PYI066]: PYI066.pyi:12:6: Use `>=` when using `if`-`else` with `sys.versio
 13 |     def bar(x, *, bar=True, baz=False): ...
 14 | else:
    |
-error[PYI066]: PYI066.pyi:20:6: Use `>=` when using `if`-`else` with `sys.version_info` comparisons
+error[PYI066]: 20:6: Use `>=` when using `if`-`else` with `sys.version_info` comparisons
 
+  --> PYI066.pyi:20:6
    |
 18 | if sys.version_info >= (3, 5):
 19 |     ...

@@ -1,13 +1,14 @@
 ---
 source: crates/ruff_linter/src/rules/pydocstyle/mod.rs
 ---
-error[D208]: D.py:252:1: [*] Docstring is over-indented
+error[D208]: 252:1: [*] Docstring is over-indented
 
+   --> D.py:251:1
     |
 250 |     """Summary.
 251 | 
-252 |        Description.
     | ^
+252 |        Description.
 253 | 
 254 |     """
     |
@@ -22,13 +23,14 @@ error[D208]: D.py:252:1: [*] Docstring is over-indented
 254 254 |     """
 255 255 | 
 
-error[D208]: D.py:264:1: [*] Docstring is over-indented
+error[D208]: 264:1: [*] Docstring is over-indented
 
+   --> D.py:263:1
     |
 262 |     Description.
 263 | 
-264 |         """
     | ^
+264 |         """
     |
     = help: Remove over-indentation
 ℹ Safe fix
@@ -41,13 +43,14 @@ error[D208]: D.py:264:1: [*] Docstring is over-indented
 266 266 | 
 267 267 | @expect('D208: Docstring is over-indented')
 
-error[D208]: D.py:272:1: [*] Docstring is over-indented
+error[D208]: 272:1: [*] Docstring is over-indented
 
+   --> D.py:271:1
     |
 270 |     """Summary.
 271 | 
-272 |         Description.
     | ^
+272 |         Description.
 273 | 
 274 |     """
     |
@@ -62,13 +65,14 @@ error[D208]: D.py:272:1: [*] Docstring is over-indented
 274 274 |     """
 275 275 | 
 
-error[D208]: D.py:673:1: [*] Docstring is over-indented
+error[D208]: 673:1: [*] Docstring is over-indented
 
+   --> D.py:672:1
     |
 671 |     """Summary.
 672 | 
-673 |         This is overindented
     | ^
+673 |         This is overindented
 674 |             And so is this, but it we should preserve the extra space on this line relative
 675 |             to the one before
     |
@@ -83,12 +87,13 @@ error[D208]: D.py:673:1: [*] Docstring is over-indented
 675 675 |             to the one before
 676 676 |     """
 
-error[D208]: D.py:674:1: [*] Docstring is over-indented
+error[D208]: 674:1: [*] Docstring is over-indented
 
+   --> D.py:673:29
     |
 673 |         This is overindented
+    |                             ^
 674 |             And so is this, but it we should preserve the extra space on this line relative
-    | ^
 675 |             to the one before
 676 |     """
     |
@@ -103,13 +108,14 @@ error[D208]: D.py:674:1: [*] Docstring is over-indented
 676 676 |     """
 677 677 | 
 
-error[D208]: D.py:675:1: [*] Docstring is over-indented
+error[D208]: 675:1: [*] Docstring is over-indented
 
+   --> D.py:674:92
     |
 673 |         This is overindented
 674 |             And so is this, but it we should preserve the extra space on this line relative
+    |                                                                                            ^
 675 |             to the one before
-    | ^
 676 |     """
     |
     = help: Remove over-indentation
@@ -123,13 +129,14 @@ error[D208]: D.py:675:1: [*] Docstring is over-indented
 677 677 | 
 678 678 | 
 
-error[D208]: D.py:682:1: [*] Docstring is over-indented
+error[D208]: 682:1: [*] Docstring is over-indented
 
+   --> D.py:681:1
     |
 680 |     """Summary.
 681 | 
-682 |         This is overindented
     | ^
+682 |         This is overindented
 683 |             And so is this, but it we should preserve the extra space on this line relative
 684 |             to the one before
     |
@@ -144,12 +151,13 @@ error[D208]: D.py:682:1: [*] Docstring is over-indented
 684 684 |             to the one before
 685 685 |         This is also overindented
 
-error[D208]: D.py:683:1: [*] Docstring is over-indented
+error[D208]: 683:1: [*] Docstring is over-indented
 
+   --> D.py:682:29
     |
 682 |         This is overindented
+    |                             ^
 683 |             And so is this, but it we should preserve the extra space on this line relative
-    | ^
 684 |             to the one before
 685 |         This is also overindented
     |
@@ -164,13 +172,14 @@ error[D208]: D.py:683:1: [*] Docstring is over-indented
 685 685 |         This is also overindented
 686 686 |             And so is this, but it we should preserve the extra space on this line relative
 
-error[D208]: D.py:684:1: [*] Docstring is over-indented
+error[D208]: 684:1: [*] Docstring is over-indented
 
+   --> D.py:683:92
     |
 682 |         This is overindented
 683 |             And so is this, but it we should preserve the extra space on this line relative
+    |                                                                                            ^
 684 |             to the one before
-    | ^
 685 |         This is also overindented
 686 |             And so is this, but it we should preserve the extra space on this line relative
     |
@@ -185,13 +194,14 @@ error[D208]: D.py:684:1: [*] Docstring is over-indented
 686 686 |             And so is this, but it we should preserve the extra space on this line relative
 687 687 |             to the one before
 
-error[D208]: D.py:685:1: [*] Docstring is over-indented
+error[D208]: 685:1: [*] Docstring is over-indented
 
+   --> D.py:684:30
     |
 683 |             And so is this, but it we should preserve the extra space on this line relative
 684 |             to the one before
+    |                              ^
 685 |         This is also overindented
-    | ^
 686 |             And so is this, but it we should preserve the extra space on this line relative
 687 |             to the one before
     |
@@ -206,13 +216,14 @@ error[D208]: D.py:685:1: [*] Docstring is over-indented
 687 687 |             to the one before
 688 688 |     """
 
-error[D208]: D.py:686:1: [*] Docstring is over-indented
+error[D208]: 686:1: [*] Docstring is over-indented
 
+   --> D.py:685:34
     |
 684 |             to the one before
 685 |         This is also overindented
+    |                                  ^
 686 |             And so is this, but it we should preserve the extra space on this line relative
-    | ^
 687 |             to the one before
 688 |     """
     |
@@ -227,13 +238,14 @@ error[D208]: D.py:686:1: [*] Docstring is over-indented
 688 688 |     """
 689 689 | 
 
-error[D208]: D.py:687:1: [*] Docstring is over-indented
+error[D208]: 687:1: [*] Docstring is over-indented
 
+   --> D.py:686:92
     |
 685 |         This is also overindented
 686 |             And so is this, but it we should preserve the extra space on this line relative
+    |                                                                                            ^
 687 |             to the one before
-    | ^
 688 |     """
     |
     = help: Remove over-indentation
@@ -247,13 +259,14 @@ error[D208]: D.py:687:1: [*] Docstring is over-indented
 689 689 | 
 690 690 | 
 
-error[D208]: D.py:695:1: [*] Docstring is over-indented
+error[D208]: 695:1: [*] Docstring is over-indented
 
+   --> D.py:694:1
     |
 693 |     """Summary.
 694 | 
-695 |         This is overindented
     | ^
+695 |         This is overindented
 696 |             And so is this, but it we should preserve the extra space on this line relative
 697 |             to the one before
     |
@@ -268,12 +281,13 @@ error[D208]: D.py:695:1: [*] Docstring is over-indented
 697 697 |             to the one before
 698 698 |                 And the relative indent here should be preserved too
 
-error[D208]: D.py:696:1: [*] Docstring is over-indented
+error[D208]: 696:1: [*] Docstring is over-indented
 
+   --> D.py:695:29
     |
 695 |         This is overindented
+    |                             ^
 696 |             And so is this, but it we should preserve the extra space on this line relative
-    | ^
 697 |             to the one before
 698 |                 And the relative indent here should be preserved too
     |
@@ -288,13 +302,14 @@ error[D208]: D.py:696:1: [*] Docstring is over-indented
 698 698 |                 And the relative indent here should be preserved too
 699 699 |     """
 
-error[D208]: D.py:697:1: [*] Docstring is over-indented
+error[D208]: 697:1: [*] Docstring is over-indented
 
+   --> D.py:696:92
     |
 695 |         This is overindented
 696 |             And so is this, but it we should preserve the extra space on this line relative
+    |                                                                                            ^
 697 |             to the one before
-    | ^
 698 |                 And the relative indent here should be preserved too
 699 |     """
     |
@@ -309,13 +324,14 @@ error[D208]: D.py:697:1: [*] Docstring is over-indented
 699 699 |     """
 700 700 | 
 
-error[D208]: D.py:698:1: [*] Docstring is over-indented
+error[D208]: 698:1: [*] Docstring is over-indented
 
+   --> D.py:697:30
     |
 696 |             And so is this, but it we should preserve the extra space on this line relative
 697 |             to the one before
+    |                              ^
 698 |                 And the relative indent here should be preserved too
-    | ^
 699 |     """
     |
     = help: Remove over-indentation
@@ -329,13 +345,14 @@ error[D208]: D.py:698:1: [*] Docstring is over-indented
 700 700 | 
 701 701 | def retain_extra_whitespace_followed_by_same_offset():
 
-error[D208]: D.py:704:1: [*] Docstring is over-indented
+error[D208]: 704:1: [*] Docstring is over-indented
 
+   --> D.py:703:1
     |
 702 |     """Summary.
 703 | 
-704 |         This is overindented
     | ^
+704 |         This is overindented
 705 |             And so is this, but it we should preserve the extra space on this line relative
 706 |         This is overindented
     |
@@ -350,12 +367,13 @@ error[D208]: D.py:704:1: [*] Docstring is over-indented
 706 706 |         This is overindented
 707 707 |         This is overindented
 
-error[D208]: D.py:705:1: [*] Docstring is over-indented
+error[D208]: 705:1: [*] Docstring is over-indented
 
+   --> D.py:704:29
     |
 704 |         This is overindented
+    |                             ^
 705 |             And so is this, but it we should preserve the extra space on this line relative
-    | ^
 706 |         This is overindented
 707 |         This is overindented
     |
@@ -370,13 +388,14 @@ error[D208]: D.py:705:1: [*] Docstring is over-indented
 707 707 |         This is overindented
 708 708 |     """
 
-error[D208]: D.py:706:1: [*] Docstring is over-indented
+error[D208]: 706:1: [*] Docstring is over-indented
 
+   --> D.py:705:92
     |
 704 |         This is overindented
 705 |             And so is this, but it we should preserve the extra space on this line relative
+    |                                                                                            ^
 706 |         This is overindented
-    | ^
 707 |         This is overindented
 708 |     """
     |
@@ -391,13 +410,14 @@ error[D208]: D.py:706:1: [*] Docstring is over-indented
 708 708 |     """
 709 709 | 
 
-error[D208]: D.py:707:1: [*] Docstring is over-indented
+error[D208]: 707:1: [*] Docstring is over-indented
 
+   --> D.py:706:29
     |
 705 |             And so is this, but it we should preserve the extra space on this line relative
 706 |         This is overindented
+    |                             ^
 707 |         This is overindented
-    | ^
 708 |     """
     |
     = help: Remove over-indentation
@@ -411,13 +431,14 @@ error[D208]: D.py:707:1: [*] Docstring is over-indented
 709 709 | 
 710 710 | 
 
-error[D208]: D.py:723:1: [*] Docstring is over-indented
+error[D208]: 723:1: [*] Docstring is over-indented
 
+   --> D.py:722:1
     |
 721 |     """There's a non-breaking space (2-bytes) after 3 spaces (https://github.com/astral-sh/ruff/issues/9080).
 722 | 
-723 |        Returns:
     | ^
+723 |        Returns:
 724 |     """
     |
     = help: Remove over-indentation

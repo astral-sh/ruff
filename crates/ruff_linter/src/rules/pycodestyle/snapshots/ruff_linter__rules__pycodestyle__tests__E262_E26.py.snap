@@ -1,8 +1,9 @@
 ---
 source: crates/ruff_linter/src/rules/pycodestyle/mod.rs
 ---
-error[E262]: E26.py:4:12: [*] Inline comment should start with `# `
+error[E262]: 4:12: [*] Inline comment should start with `# `
 
+ --> E26.py:4:12
   |
 2 | pass # an inline comment
 3 | #: E262:1:12
@@ -22,8 +23,9 @@ error[E262]: E26.py:4:12: [*] Inline comment should start with `# `
 6 6 | x = x + 1  #  Increment x
 7 7 | #: E262:1:12
 
-error[E262]: E26.py:6:12: [*] Inline comment should start with `# `
+error[E262]: 6:12: [*] Inline comment should start with `# `
 
+ --> E26.py:6:12
   |
 4 | x = x + 1  #Increment x
 5 | #: E262:1:12
@@ -43,8 +45,9 @@ error[E262]: E26.py:6:12: [*] Inline comment should start with `# `
 8 8 | x = y + 1  #:  Increment x
 9 9 | #: E265:1:1
 
-error[E262]: E26.py:8:12: [*] Inline comment should start with `# `
+error[E262]: 8:12: [*] Inline comment should start with `# `
 
+  --> E26.py:8:12
    |
  6 | x = x + 1  #  Increment x
  7 | #: E262:1:12
@@ -64,8 +67,9 @@ error[E262]: E26.py:8:12: [*] Inline comment should start with `# `
 10 10 | #Block comment
 11 11 | a = 1
 
-error[E262]: E26.py:63:9: [*] Inline comment should start with `# `
+error[E262]: 63:9: [*] Inline comment should start with `# `
 
+  --> E26.py:63:9
    |
 61 | # -*- coding: utf8 -*-
 62 | #  (One space one NBSP) Ok for block comment
@@ -85,8 +89,9 @@ error[E262]: E26.py:63:9: [*] Inline comment should start with `# `
 65 65 | #  (Two spaces) Ok for block comment
 66 66 | a = 42  #  (Two spaces)
 
-error[E262]: E26.py:66:9: [*] Inline comment should start with `# `
+error[E262]: 66:9: [*] Inline comment should start with `# `
 
+  --> E26.py:66:9
    |
 64 | #: E262:2:9
 65 | #  (Two spaces) Ok for block comment
@@ -106,8 +111,9 @@ error[E262]: E26.py:66:9: [*] Inline comment should start with `# `
 68 68 | #: E265:5:1
 69 69 | ### Means test is not done yet
 
-error[E262]: E26.py:84:8: [*] Inline comment should start with `# `
+error[E262]: 84:8: [*] Inline comment should start with `# `
 
+  --> E26.py:84:8
    |
 82 | ##  Foo
 83 | 
@@ -126,8 +132,9 @@ error[E262]: E26.py:84:8: [*] Inline comment should start with `# `
 85 85 | 
 86 86 | a = 1  #:Foo
 
-error[E262]: E26.py:86:8: [*] Inline comment should start with `# `
+error[E262]: 86:8: [*] Inline comment should start with `# `
 
+  --> E26.py:86:8
    |
 84 | a = 1  ## Foo
 85 | 

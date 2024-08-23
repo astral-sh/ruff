@@ -1,8 +1,9 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_pyi/mod.rs
 ---
-error[PYI033]: PYI033.pyi:6:22: Don't use type comments in stub file
+error[PYI033]: 6:22: Don't use type comments in stub file
 
+ --> PYI033.pyi:6:22
   |
 4 | from typing import TypeAlias
 5 | 
@@ -11,8 +12,9 @@ error[PYI033]: PYI033.pyi:6:22: Don't use type comments in stub file
 7 | B: TypeAlias = None  # type: str  # And here's an extra comment about why it's that type  # Y033 Do not use type comments in stubs (e...
 8 | C: TypeAlias = None  #type: int  # Y033 Do not use type comments in stubs (e.g. use "x: int" instead of "x = ... # type: int")
   |
-error[PYI033]: PYI033.pyi:7:22: Don't use type comments in stub file
+error[PYI033]: 7:22: Don't use type comments in stub file
 
+ --> PYI033.pyi:7:22
   |
 6 | ...e  # type: int  # Y033 Do not use type comments in stubs (e.g. use "x: int" instead of "x = ... # type: int")
 7 | ...e  # type: str  # And here's an extra comment about why it's that type  # Y033 Do not use type comments in stubs (e.g. use "x: int" instead of "x = ... # type: int")
@@ -20,8 +22,9 @@ error[PYI033]: PYI033.pyi:7:22: Don't use type comments in stub file
 8 | ...e  #type: int  # Y033 Do not use type comments in stubs (e.g. use "x: int" instead of "x = ... # type: int")
 9 | ...e  #      type: int  # Y033 Do not use type comments in stubs (e.g. use "x: int" instead of "x = ... # type: int")
   |
-error[PYI033]: PYI033.pyi:8:22: Don't use type comments in stub file
+error[PYI033]: 8:22: Don't use type comments in stub file
 
+  --> PYI033.pyi:8:22
    |
  6 | A: TypeAlias = None  # type: int  # Y033 Do not use type comments in stubs (e.g. use "x: int" instead of "x = ... # type: int")
  7 | B: TypeAlias = None  # type: str  # And here's an extra comment about why it's that type  # Y033 Do not use type comments in stubs (...
@@ -30,8 +33,9 @@ error[PYI033]: PYI033.pyi:8:22: Don't use type comments in stub file
  9 | D: TypeAlias = None  #      type: int  # Y033 Do not use type comments in stubs (e.g. use "x: int" instead of "x = ... # type: int")
 10 | E: TypeAlias = None#    type: int  # Y033 Do not use type comments in stubs (e.g. use "x: int" instead of "x = ... # type: int")
    |
-error[PYI033]: PYI033.pyi:9:22: Don't use type comments in stub file
+error[PYI033]: 9:22: Don't use type comments in stub file
 
+  --> PYI033.pyi:9:22
    |
  7 | ... = None  # type: str  # And here's an extra comment about why it's that type  # Y033 Do not use type comments in stubs (e.g. use ...
  8 | ... = None  #type: int  # Y033 Do not use type comments in stubs (e.g. use "x: int" instead of "x = ... # type: int")
@@ -40,8 +44,9 @@ error[PYI033]: PYI033.pyi:9:22: Don't use type comments in stub file
 10 | ... = None#    type: int  # Y033 Do not use type comments in stubs (e.g. use "x: int" instead of "x = ... # type: int")
 11 | ... = None#type:int  # Y033 Do not use type comments in stubs (e.g. use "x: int" instead of "x = ... # type: int")
    |
-error[PYI033]: PYI033.pyi:10:20: Don't use type comments in stub file
+error[PYI033]: 10:20: Don't use type comments in stub file
 
+  --> PYI033.pyi:10:20
    |
  8 | C: TypeAlias = None  #type: int  # Y033 Do not use type comments in stubs (e.g. use "x: int" instead of "x = ... # type: int")
  9 | D: TypeAlias = None  #      type: int  # Y033 Do not use type comments in stubs (e.g. use "x: int" instead of "x = ... # type: int")
@@ -49,8 +54,9 @@ error[PYI033]: PYI033.pyi:10:20: Don't use type comments in stub file
    |                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 11 | F: TypeAlias = None#type:int  # Y033 Do not use type comments in stubs (e.g. use "x: int" instead of "x = ... # type: int")
    |
-error[PYI033]: PYI033.pyi:11:20: Don't use type comments in stub file
+error[PYI033]: 11:20: Don't use type comments in stub file
 
+  --> PYI033.pyi:11:20
    |
  9 | D: TypeAlias = None  #      type: int  # Y033 Do not use type comments in stubs (e.g. use "x: int" instead of "x = ... # type: int")
 10 | E: TypeAlias = None#    type: int  # Y033 Do not use type comments in stubs (e.g. use "x: int" instead of "x = ... # type: int")
@@ -59,8 +65,9 @@ error[PYI033]: PYI033.pyi:11:20: Don't use type comments in stub file
 12 | 
 13 | def func(
    |
-error[PYI033]: PYI033.pyi:14:12: Don't use type comments in stub file
+error[PYI033]: 14:12: Don't use type comments in stub file
 
+  --> PYI033.pyi:14:12
    |
 13 | def func(
 14 |     arg1,  # type: dict[str, int]  # Y033 Do not use type comments in stubs (e.g. use "x: int" instead of "x = ... # type: int")
@@ -68,8 +75,9 @@ error[PYI033]: PYI033.pyi:14:12: Don't use type comments in stub file
 15 |     arg2  # type: Sequence[bytes]  # And here's some more info about this arg  # Y033 Do not use type comments in stubs (e.g. use "x...
 16 | ): ...
    |
-error[PYI033]: PYI033.pyi:15:11: Don't use type comments in stub file
+error[PYI033]: 15:11: Don't use type comments in stub file
 
+  --> PYI033.pyi:15:11
    |
 13 | ...c(
 14 | ...1,  # type: dict[str, int]  # Y033 Do not use type comments in stubs (e.g. use "x: int" instead of "x = ... # type: int")
@@ -77,8 +85,9 @@ error[PYI033]: PYI033.pyi:15:11: Don't use type comments in stub file
    |       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 16 | ...
    |
-error[PYI033]: PYI033.pyi:19:29: Don't use type comments in stub file
+error[PYI033]: 19:29: Don't use type comments in stub file
 
+  --> PYI033.pyi:19:29
    |
 18 | ...
 19 | ... = None  # type: set[str]  # Y033 Do not use type comments in stubs (e.g. use "x: int" instead of "x = ... # type: int")
@@ -86,8 +95,9 @@ error[PYI033]: PYI033.pyi:19:29: Don't use type comments in stub file
 20 | ...
 21 | ...  # type: ignore
    |
-error[PYI033]: PYI033.pyi:29:22: Don't use type comments in stub file
+error[PYI033]: 29:22: Don't use type comments in stub file
 
+  --> PYI033.pyi:29:22
    |
 28 | # Whole line commented out  # type: int
 29 | M: TypeAlias = None  # type: can't parse me!
@@ -95,8 +105,9 @@ error[PYI033]: PYI033.pyi:29:22: Don't use type comments in stub file
 30 | 
 31 | class Bar:
    |
-error[PYI033]: PYI033.pyi:32:26: Don't use type comments in stub file
+error[PYI033]: 32:26: Don't use type comments in stub file
 
+  --> PYI033.pyi:32:26
    |
 31 | class Bar:
 32 |     N: TypeAlias = None  # type: can't parse me either!

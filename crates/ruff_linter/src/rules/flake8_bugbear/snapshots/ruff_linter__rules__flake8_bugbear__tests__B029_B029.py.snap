@@ -1,8 +1,9 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_bugbear/mod.rs
 ---
-error[B029]: B029.py:8:1: Using `except ():` with an empty tuple does not catch anything; add exceptions to handle
+error[B029]: 8:1: Using `except ():` with an empty tuple does not catch anything; add exceptions to handle
 
+  --> B029.py:7:9
    |
  6 |   try:
  7 |       pass
@@ -12,8 +13,9 @@ error[B029]: B029.py:8:1: Using `except ():` with an empty tuple does not catch 
 10 |   
 11 |   try:
    |
-error[B029]: B029.py:13:1: Using `except ():` with an empty tuple does not catch anything; add exceptions to handle
+error[B029]: 13:1: Using `except ():` with an empty tuple does not catch anything; add exceptions to handle
 
+  --> B029.py:12:9
    |
 11 |   try:
 12 |       pass

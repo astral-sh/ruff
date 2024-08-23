@@ -1,8 +1,9 @@
 ---
 source: crates/ruff_linter/src/rules/refurb/mod.rs
 ---
-error[FURB167]: FURB167.py:13:42: [*] Use of regular expression alias `re.I`
+error[FURB167]: 13:42: [*] Use of regular expression alias `re.I`
 
+  --> FURB167.py:13:42
    |
 12 |     # FURB167
 13 |     if re.match("^hello", "hello world", re.I):
@@ -20,8 +21,9 @@ error[FURB167]: FURB167.py:13:42: [*] Use of regular expression alias `re.I`
 15 15 | 
 16 16 | 
 
-error[FURB167]: FURB167.py:21:39: [*] Use of regular expression alias `re.I`
+error[FURB167]: 21:39: [*] Use of regular expression alias `re.I`
 
+  --> FURB167.py:21:39
    |
 20 |     # FURB167
 21 |     if match("^hello", "hello world", I):

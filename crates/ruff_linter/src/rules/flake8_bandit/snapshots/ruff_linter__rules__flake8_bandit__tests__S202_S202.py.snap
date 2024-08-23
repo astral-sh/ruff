@@ -1,8 +1,9 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_bandit/mod.rs
 ---
-error[S202]: S202.py:8:5: Uses of `tarfile.extractall()`
+error[S202]: 8:5: Uses of `tarfile.extractall()`
 
+ --> S202.py:8:5
   |
 6 | def unsafe_archive_handler(filename):
 7 |     tar = tarfile.open(filename)
@@ -10,8 +11,9 @@ error[S202]: S202.py:8:5: Uses of `tarfile.extractall()`
   |     ^^^^^^^^^^^^^^
 9 |     tar.close()
   |
-error[S202]: S202.py:14:5: Uses of `tarfile.extractall()`
+error[S202]: 14:5: Uses of `tarfile.extractall()`
 
+  --> S202.py:14:5
    |
 12 | def managed_members_archive_handler(filename):
 13 |     tar = tarfile.open(filename)
@@ -19,8 +21,9 @@ error[S202]: S202.py:14:5: Uses of `tarfile.extractall()`
    |     ^^^^^^^^^^^^^^
 15 |     tar.close()
    |
-error[S202]: S202.py:20:5: Uses of `tarfile.extractall()`
+error[S202]: 20:5: Uses of `tarfile.extractall()`
 
+  --> S202.py:20:5
    |
 18 | def list_members_archive_handler(filename):
 19 |     tar = tarfile.open(filename)
@@ -28,8 +31,9 @@ error[S202]: S202.py:20:5: Uses of `tarfile.extractall()`
    |     ^^^^^^^^^^^^^^
 21 |     tar.close()
    |
-error[S202]: S202.py:26:5: Uses of `tarfile.extractall()`
+error[S202]: 26:5: Uses of `tarfile.extractall()`
 
+  --> S202.py:26:5
    |
 24 | def provided_members_archive_handler(filename):
 25 |     tar = tarfile.open(filename)
@@ -37,8 +41,9 @@ error[S202]: S202.py:26:5: Uses of `tarfile.extractall()`
    |     ^^^^^^^^^^^^^^^^^^
 27 |     tar.close()
    |
-error[S202]: S202.py:38:5: Uses of `tarfile.extractall()`
+error[S202]: 38:5: Uses of `tarfile.extractall()`
 
+  --> S202.py:38:5
    |
 36 | def filter_fully_trusted(filename):
 37 |     tar = tarfile.open(filename)

@@ -112,10 +112,7 @@ impl Message {
             .map_or(TextSize::new(0), TextLen::text_len);
 
         Message::SyntaxError(SyntaxErrorMessage {
-            message: format!(
-                "SyntaxError: {}",
-                DisplayParseErrorType::new(&parse_error.error)
-            ),
+            message: DisplayParseErrorType::new(&parse_error.error).to_string(),
             range: TextRange::at(parse_error.location.start(), len),
             file,
         })

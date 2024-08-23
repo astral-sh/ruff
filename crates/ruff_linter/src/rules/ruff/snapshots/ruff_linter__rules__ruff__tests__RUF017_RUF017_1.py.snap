@@ -1,8 +1,9 @@
 ---
 source: crates/ruff_linter/src/rules/ruff/mod.rs
 ---
-error[RUF017]: RUF017_1.py:1:1: [*] Avoid quadratic list summation
+error[RUF017]: 1:1: [*] Avoid quadratic list summation
 
+ --> RUF017_1.py:1:1
   |
 1 | sum((factor.dims for factor in bases), [])
   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^

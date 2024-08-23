@@ -1,16 +1,18 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_quotes/mod.rs
 ---
-error[Q000]: singles_would_be_triple_quotes.py:1:5: Single quotes found but double quotes preferred
+error[Q000]: 1:5: Single quotes found but double quotes preferred
 
+ --> singles_would_be_triple_quotes.py:1:5
   |
 1 | s = ''"Start with empty string" ' and lint docstring safely'
   |     ^^
 2 | s = 'Do not'" start with empty string" ' and lint docstring safely'
   |
   = help: Replace single quotes with double quotes
-error[Q000]: singles_would_be_triple_quotes.py:1:33: [*] Single quotes found but double quotes preferred
+error[Q000]: 1:33: [*] Single quotes found but double quotes preferred
 
+ --> singles_would_be_triple_quotes.py:1:33
   |
 1 | s = ''"Start with empty string" ' and lint docstring safely'
   |                                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -22,8 +24,9 @@ error[Q000]: singles_would_be_triple_quotes.py:1:33: [*] Single quotes found but
   1 |+s = ''"Start with empty string" " and lint docstring safely"
 2 2 | s = 'Do not'" start with empty string" ' and lint docstring safely'
 
-error[Q000]: singles_would_be_triple_quotes.py:2:5: [*] Single quotes found but double quotes preferred
+error[Q000]: 2:5: [*] Single quotes found but double quotes preferred
 
+ --> singles_would_be_triple_quotes.py:2:5
   |
 1 | s = ''"Start with empty string" ' and lint docstring safely'
 2 | s = 'Do not'" start with empty string" ' and lint docstring safely'
@@ -35,8 +38,9 @@ error[Q000]: singles_would_be_triple_quotes.py:2:5: [*] Single quotes found but 
 2   |-s = 'Do not'" start with empty string" ' and lint docstring safely'
   2 |+s = "Do not"" start with empty string" ' and lint docstring safely'
 
-error[Q000]: singles_would_be_triple_quotes.py:2:40: [*] Single quotes found but double quotes preferred
+error[Q000]: 2:40: [*] Single quotes found but double quotes preferred
 
+ --> singles_would_be_triple_quotes.py:2:40
   |
 1 | s = ''"Start with empty string" ' and lint docstring safely'
 2 | s = 'Do not'" start with empty string" ' and lint docstring safely'

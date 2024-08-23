@@ -1,8 +1,9 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_use_pathlib/mod.rs
 ---
-error[PTH206]: PTH206.py:8:12: Replace `.split(os.sep)` with `Path.parts`
+error[PTH206]: 8:12: Replace `.split(os.sep)` with `Path.parts`
 
+  --> PTH206.py:8:12
    |
  7 | # PTH206
  8 | "foo/bar/".split(os.sep)
@@ -10,8 +11,9 @@ error[PTH206]: PTH206.py:8:12: Replace `.split(os.sep)` with `Path.parts`
  9 | "foo/bar/".split(sep=os.sep)
 10 | "foo/bar/".split(os.sep)[-1]
    |
-error[PTH206]: PTH206.py:9:12: Replace `.split(os.sep)` with `Path.parts`
+error[PTH206]: 9:12: Replace `.split(os.sep)` with `Path.parts`
 
+  --> PTH206.py:9:12
    |
  7 | # PTH206
  8 | "foo/bar/".split(os.sep)
@@ -20,8 +22,9 @@ error[PTH206]: PTH206.py:9:12: Replace `.split(os.sep)` with `Path.parts`
 10 | "foo/bar/".split(os.sep)[-1]
 11 | "foo/bar/".split(os.sep)[-2]
    |
-error[PTH206]: PTH206.py:10:12: Replace `.split(os.sep)` with `Path.parts`
+error[PTH206]: 10:12: Replace `.split(os.sep)` with `Path.parts`
 
+  --> PTH206.py:10:12
    |
  8 | "foo/bar/".split(os.sep)
  9 | "foo/bar/".split(sep=os.sep)
@@ -30,8 +33,9 @@ error[PTH206]: PTH206.py:10:12: Replace `.split(os.sep)` with `Path.parts`
 11 | "foo/bar/".split(os.sep)[-2]
 12 | "foo/bar/".split(os.sep)[-2:]
    |
-error[PTH206]: PTH206.py:11:12: Replace `.split(os.sep)` with `Path.parts`
+error[PTH206]: 11:12: Replace `.split(os.sep)` with `Path.parts`
 
+  --> PTH206.py:11:12
    |
  9 | "foo/bar/".split(sep=os.sep)
 10 | "foo/bar/".split(os.sep)[-1]
@@ -40,8 +44,9 @@ error[PTH206]: PTH206.py:11:12: Replace `.split(os.sep)` with `Path.parts`
 12 | "foo/bar/".split(os.sep)[-2:]
 13 | "fizz/buzz".split(sep)
    |
-error[PTH206]: PTH206.py:12:12: Replace `.split(os.sep)` with `Path.parts`
+error[PTH206]: 12:12: Replace `.split(os.sep)` with `Path.parts`
 
+  --> PTH206.py:12:12
    |
 10 | "foo/bar/".split(os.sep)[-1]
 11 | "foo/bar/".split(os.sep)[-2]
@@ -50,8 +55,9 @@ error[PTH206]: PTH206.py:12:12: Replace `.split(os.sep)` with `Path.parts`
 13 | "fizz/buzz".split(sep)
 14 | "fizz/buzz".split(sep)[-1]
    |
-error[PTH206]: PTH206.py:13:13: Replace `.split(os.sep)` with `Path.parts`
+error[PTH206]: 13:13: Replace `.split(os.sep)` with `Path.parts`
 
+  --> PTH206.py:13:13
    |
 11 | "foo/bar/".split(os.sep)[-2]
 12 | "foo/bar/".split(os.sep)[-2:]
@@ -60,8 +66,9 @@ error[PTH206]: PTH206.py:13:13: Replace `.split(os.sep)` with `Path.parts`
 14 | "fizz/buzz".split(sep)[-1]
 15 | os.path.splitext("path/to/hello_world.py")[0].split(os.sep)[-1]
    |
-error[PTH206]: PTH206.py:14:13: Replace `.split(os.sep)` with `Path.parts`
+error[PTH206]: 14:13: Replace `.split(os.sep)` with `Path.parts`
 
+  --> PTH206.py:14:13
    |
 12 | "foo/bar/".split(os.sep)[-2:]
 13 | "fizz/buzz".split(sep)
@@ -70,8 +77,9 @@ error[PTH206]: PTH206.py:14:13: Replace `.split(os.sep)` with `Path.parts`
 15 | os.path.splitext("path/to/hello_world.py")[0].split(os.sep)[-1]
 16 | file_name.split(os.sep)
    |
-error[PTH206]: PTH206.py:15:47: Replace `.split(os.sep)` with `Path.parts`
+error[PTH206]: 15:47: Replace `.split(os.sep)` with `Path.parts`
 
+  --> PTH206.py:15:47
    |
 13 | "fizz/buzz".split(sep)
 14 | "fizz/buzz".split(sep)[-1]
@@ -80,8 +88,9 @@ error[PTH206]: PTH206.py:15:47: Replace `.split(os.sep)` with `Path.parts`
 16 | file_name.split(os.sep)
 17 | (os.path.abspath(file_name)).split(os.sep)
    |
-error[PTH206]: PTH206.py:16:11: Replace `.split(os.sep)` with `Path.parts`
+error[PTH206]: 16:11: Replace `.split(os.sep)` with `Path.parts`
 
+  --> PTH206.py:16:11
    |
 14 | "fizz/buzz".split(sep)[-1]
 15 | os.path.splitext("path/to/hello_world.py")[0].split(os.sep)[-1]
@@ -89,8 +98,9 @@ error[PTH206]: PTH206.py:16:11: Replace `.split(os.sep)` with `Path.parts`
    |           ^^^^^
 17 | (os.path.abspath(file_name)).split(os.sep)
    |
-error[PTH206]: PTH206.py:17:30: Replace `.split(os.sep)` with `Path.parts`
+error[PTH206]: 17:30: Replace `.split(os.sep)` with `Path.parts`
 
+  --> PTH206.py:17:30
    |
 15 | os.path.splitext("path/to/hello_world.py")[0].split(os.sep)[-1]
 16 | file_name.split(os.sep)

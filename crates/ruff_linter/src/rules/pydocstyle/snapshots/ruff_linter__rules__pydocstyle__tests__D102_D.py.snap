@@ -1,32 +1,36 @@
 ---
 source: crates/ruff_linter/src/rules/pydocstyle/mod.rs
 ---
-error[D102]: D.py:23:9: Missing docstring in public method
+error[D102]: 23:9: Missing docstring in public method
 
+  --> D.py:23:9
    |
 22 |     @expect('D102: Missing docstring in public method')
 23 |     def method(self=None):
    |         ^^^^^^
 24 |         pass
    |
-error[D102]: D.py:56:9: Missing docstring in public method
+error[D102]: 56:9: Missing docstring in public method
 
+  --> D.py:56:9
    |
 55 |     @expect('D102: Missing docstring in public method')
 56 |     def __new__(self=None):
    |         ^^^^^^^
 57 |         pass
    |
-error[D102]: D.py:68:9: Missing docstring in public method
+error[D102]: 68:9: Missing docstring in public method
 
+  --> D.py:68:9
    |
 67 |     @expect('D102: Missing docstring in public method')
 68 |     def __call__(self=None, x=None, y=None, z=None):
    |         ^^^^^^^^
 69 |         pass
    |
-error[D102]: D.py:650:9: Missing docstring in public method
+error[D102]: 650:9: Missing docstring in public method
 
+   --> D.py:650:9
     |
 648 | class StatementOnSameLineAsDocstring:
 649 |     "After this docstring there's another statement on the same line separated by a semicolon." ; priorities=1
@@ -34,8 +38,9 @@ error[D102]: D.py:650:9: Missing docstring in public method
     |         ^^^^^^^^^^^^^
 651 |         pass
     |
-error[D102]: D.py:659:9: Missing docstring in public method
+error[D102]: 659:9: Missing docstring in public method
 
+   --> D.py:659:9
     |
 657 | class CommentAfterDocstring:
 658 |     "After this docstring there's a comment."  # priorities=1

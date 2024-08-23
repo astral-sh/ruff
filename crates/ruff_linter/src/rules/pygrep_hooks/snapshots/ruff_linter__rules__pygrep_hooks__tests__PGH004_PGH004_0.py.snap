@@ -1,16 +1,18 @@
 ---
 source: crates/ruff_linter/src/rules/pygrep_hooks/mod.rs
 ---
-error[PGH004]: PGH004_0.py:1:8: Use specific rule codes when using `noqa`
+error[PGH004]: 1:8: Use specific rule codes when using `noqa`
 
+ --> PGH004_0.py:1:8
   |
 1 | x = 1  # noqa
   |        ^^^^^^
 2 | x = 1  # NOQA:F401,W203
 3 | # noqa
   |
-error[PGH004]: PGH004_0.py:3:1: Use specific rule codes when using `noqa`
+error[PGH004]: 3:1: Use specific rule codes when using `noqa`
 
+ --> PGH004_0.py:2:24
   |
 1 | x = 1  # noqa
 2 | x = 1  # NOQA:F401,W203
@@ -19,8 +21,9 @@ error[PGH004]: PGH004_0.py:3:1: Use specific rule codes when using `noqa`
 4 | # NOQA
 5 | # noqa:F401
   |
-error[PGH004]: PGH004_0.py:4:1: Use specific rule codes when using `noqa`
+error[PGH004]: 4:1: Use specific rule codes when using `noqa`
 
+ --> PGH004_0.py:3:7
   |
 2 | x = 1  # NOQA:F401,W203
 3 | # noqa
@@ -29,8 +32,9 @@ error[PGH004]: PGH004_0.py:4:1: Use specific rule codes when using `noqa`
 5 | # noqa:F401
 6 | # noqa:F401,W203
   |
-error[PGH004]: PGH004_0.py:18:8: [*] Use a colon when specifying `noqa` rule codes
+error[PGH004]: 18:8: [*] Use a colon when specifying `noqa` rule codes
 
+  --> PGH004_0.py:18:8
    |
 17 | # PGH004
 18 | x = 2  # noqa X100
@@ -49,8 +53,9 @@ error[PGH004]: PGH004_0.py:18:8: [*] Use a colon when specifying `noqa` rule cod
 20 20 | # PGH004
 21 21 | x = 2  # noqa X100, X200
 
-error[PGH004]: PGH004_0.py:21:8: [*] Use a colon when specifying `noqa` rule codes
+error[PGH004]: 21:8: [*] Use a colon when specifying `noqa` rule codes
 
+  --> PGH004_0.py:21:8
    |
 20 | # PGH004
 21 | x = 2  # noqa X100, X200
@@ -69,8 +74,9 @@ error[PGH004]: PGH004_0.py:21:8: [*] Use a colon when specifying `noqa` rule cod
 23 23 | # PGH004
 24 24 | x = 2  # noqa : X300
 
-error[PGH004]: PGH004_0.py:24:8: [*] Do not add spaces between `noqa` and its colon
+error[PGH004]: 24:8: [*] Do not add spaces between `noqa` and its colon
 
+  --> PGH004_0.py:24:8
    |
 23 | # PGH004
 24 | x = 2  # noqa : X300
@@ -89,8 +95,9 @@ error[PGH004]: PGH004_0.py:24:8: [*] Do not add spaces between `noqa` and its co
 26 26 | # PGH004
 27 27 | x = 2  # noqa  : X400
 
-error[PGH004]: PGH004_0.py:27:8: [*] Do not add spaces between `noqa` and its colon
+error[PGH004]: 27:8: [*] Do not add spaces between `noqa` and its colon
 
+  --> PGH004_0.py:27:8
    |
 26 | # PGH004
 27 | x = 2  # noqa  : X400
@@ -109,8 +116,9 @@ error[PGH004]: PGH004_0.py:27:8: [*] Do not add spaces between `noqa` and its co
 29 29 | # PGH004
 30 30 | x = 2  # noqa :X500
 
-error[PGH004]: PGH004_0.py:30:8: [*] Do not add spaces between `noqa` and its colon
+error[PGH004]: 30:8: [*] Do not add spaces between `noqa` and its colon
 
+  --> PGH004_0.py:30:8
    |
 29 | # PGH004
 30 | x = 2  # noqa :X500

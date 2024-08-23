@@ -1,16 +1,18 @@
 ---
 source: crates/ruff_linter/src/rules/ruff/mod.rs
 ---
-error[RUF016]: RUF016.py:20:13: Indexed access to type `str` uses type `str` instead of an integer or slice
+error[RUF016]: 20:13: Indexed access to type `str` uses type `str` instead of an integer or slice
 
+  --> RUF016.py:20:13
    |
 19 | # Should emit for invalid access on strings
 20 | var = "abc"["x"]
    |             ^^^
 21 | var = f"abc"["x"]
    |
-error[RUF016]: RUF016.py:21:14: Indexed access to type `str` uses type `str` instead of an integer or slice
+error[RUF016]: 21:14: Indexed access to type `str` uses type `str` instead of an integer or slice
 
+  --> RUF016.py:21:14
    |
 19 | # Should emit for invalid access on strings
 20 | var = "abc"["x"]
@@ -19,8 +21,9 @@ error[RUF016]: RUF016.py:21:14: Indexed access to type `str` uses type `str` ins
 22 | 
 23 | # Should emit for invalid access on bytes
    |
-error[RUF016]: RUF016.py:24:14: Indexed access to type `bytes` uses type `str` instead of an integer or slice
+error[RUF016]: 24:14: Indexed access to type `bytes` uses type `str` instead of an integer or slice
 
+  --> RUF016.py:24:14
    |
 23 | # Should emit for invalid access on bytes
 24 | var = b"abc"["x"]
@@ -28,16 +31,18 @@ error[RUF016]: RUF016.py:24:14: Indexed access to type `bytes` uses type `str` i
 25 | 
 26 | # Should emit for invalid access on lists and tuples
    |
-error[RUF016]: RUF016.py:27:17: Indexed access to type `list` uses type `str` instead of an integer or slice
+error[RUF016]: 27:17: Indexed access to type `list` uses type `str` instead of an integer or slice
 
+  --> RUF016.py:27:17
    |
 26 | # Should emit for invalid access on lists and tuples
 27 | var = [1, 2, 3]["x"]
    |                 ^^^
 28 | var = (1, 2, 3)["x"]
    |
-error[RUF016]: RUF016.py:28:17: Indexed access to type `tuple` uses type `str` instead of an integer or slice
+error[RUF016]: 28:17: Indexed access to type `tuple` uses type `str` instead of an integer or slice
 
+  --> RUF016.py:28:17
    |
 26 | # Should emit for invalid access on lists and tuples
 27 | var = [1, 2, 3]["x"]
@@ -46,8 +51,9 @@ error[RUF016]: RUF016.py:28:17: Indexed access to type `tuple` uses type `str` i
 29 | 
 30 | # Should emit for invalid access on list comprehensions
    |
-error[RUF016]: RUF016.py:31:30: Indexed access to type `list comprehension` uses type `str` instead of an integer or slice
+error[RUF016]: 31:30: Indexed access to type `list comprehension` uses type `str` instead of an integer or slice
 
+  --> RUF016.py:31:30
    |
 30 | # Should emit for invalid access on list comprehensions
 31 | var = [x for x in range(10)]["x"]
@@ -55,8 +61,9 @@ error[RUF016]: RUF016.py:31:30: Indexed access to type `list comprehension` uses
 32 | 
 33 | # Should emit for invalid access using tuple
    |
-error[RUF016]: RUF016.py:34:13: Indexed access to type `str` uses type `tuple` instead of an integer or slice
+error[RUF016]: 34:13: Indexed access to type `str` uses type `tuple` instead of an integer or slice
 
+  --> RUF016.py:34:13
    |
 33 | # Should emit for invalid access using tuple
 34 | var = "abc"[1, 2]
@@ -64,8 +71,9 @@ error[RUF016]: RUF016.py:34:13: Indexed access to type `str` uses type `tuple` i
 35 | 
 36 | # Should emit for invalid access using string
    |
-error[RUF016]: RUF016.py:37:14: Indexed access to type `list` uses type `str` instead of an integer or slice
+error[RUF016]: 37:14: Indexed access to type `list` uses type `str` instead of an integer or slice
 
+  --> RUF016.py:37:14
    |
 36 | # Should emit for invalid access using string
 37 | var = [1, 2]["x"]
@@ -73,8 +81,9 @@ error[RUF016]: RUF016.py:37:14: Indexed access to type `list` uses type `str` in
 38 | 
 39 | # Should emit for invalid access using float
    |
-error[RUF016]: RUF016.py:40:14: Indexed access to type `list` uses type `float` instead of an integer or slice
+error[RUF016]: 40:14: Indexed access to type `list` uses type `float` instead of an integer or slice
 
+  --> RUF016.py:40:14
    |
 39 | # Should emit for invalid access using float
 40 | var = [1, 2][0.25]
@@ -82,8 +91,9 @@ error[RUF016]: RUF016.py:40:14: Indexed access to type `list` uses type `float` 
 41 | 
 42 | # Should emit for invalid access using dict
    |
-error[RUF016]: RUF016.py:43:14: Indexed access to type `list` uses type `dict` instead of an integer or slice
+error[RUF016]: 43:14: Indexed access to type `list` uses type `dict` instead of an integer or slice
 
+  --> RUF016.py:43:14
    |
 42 | # Should emit for invalid access using dict
 43 | var = [1, 2][{"x": "y"}]
@@ -91,8 +101,9 @@ error[RUF016]: RUF016.py:43:14: Indexed access to type `list` uses type `dict` i
 44 | 
 45 | # Should emit for invalid access using dict comp
    |
-error[RUF016]: RUF016.py:46:14: Indexed access to type `list` uses type `dict comprehension` instead of an integer or slice
+error[RUF016]: 46:14: Indexed access to type `list` uses type `dict comprehension` instead of an integer or slice
 
+  --> RUF016.py:46:14
    |
 45 | # Should emit for invalid access using dict comp
 46 | var = [1, 2][{x: "y" for x in range(2)}]
@@ -100,8 +111,9 @@ error[RUF016]: RUF016.py:46:14: Indexed access to type `list` uses type `dict co
 47 | 
 48 | # Should emit for invalid access using list 
    |
-error[RUF016]: RUF016.py:49:14: Indexed access to type `list` uses type `tuple` instead of an integer or slice
+error[RUF016]: 49:14: Indexed access to type `list` uses type `tuple` instead of an integer or slice
 
+  --> RUF016.py:49:14
    |
 48 | # Should emit for invalid access using list 
 49 | var = [1, 2][2, 3]
@@ -109,8 +121,9 @@ error[RUF016]: RUF016.py:49:14: Indexed access to type `list` uses type `tuple` 
 50 | 
 51 | # Should emit for invalid access using list comp
    |
-error[RUF016]: RUF016.py:52:14: Indexed access to type `list` uses type `list comprehension` instead of an integer or slice
+error[RUF016]: 52:14: Indexed access to type `list` uses type `list comprehension` instead of an integer or slice
 
+  --> RUF016.py:52:14
    |
 51 | # Should emit for invalid access using list comp
 52 | var = [1, 2][[x for x in range(2)]]
@@ -118,8 +131,9 @@ error[RUF016]: RUF016.py:52:14: Indexed access to type `list` uses type `list co
 53 | 
 54 | # Should emit on invalid access using set
    |
-error[RUF016]: RUF016.py:55:14: Indexed access to type `list` uses type `set` instead of an integer or slice
+error[RUF016]: 55:14: Indexed access to type `list` uses type `set` instead of an integer or slice
 
+  --> RUF016.py:55:14
    |
 54 | # Should emit on invalid access using set
 55 | var = [1, 2][{"x", "y"}]
@@ -127,8 +141,9 @@ error[RUF016]: RUF016.py:55:14: Indexed access to type `list` uses type `set` in
 56 | 
 57 | # Should emit on invalid access using set comp
    |
-error[RUF016]: RUF016.py:58:14: Indexed access to type `list` uses type `set comprehension` instead of an integer or slice
+error[RUF016]: 58:14: Indexed access to type `list` uses type `set comprehension` instead of an integer or slice
 
+  --> RUF016.py:58:14
    |
 57 | # Should emit on invalid access using set comp
 58 | var = [1, 2][{x for x in range(2)}]
@@ -136,8 +151,9 @@ error[RUF016]: RUF016.py:58:14: Indexed access to type `list` uses type `set com
 59 | 
 60 | # Should emit on invalid access using bytes
    |
-error[RUF016]: RUF016.py:61:14: Indexed access to type `list` uses type `bytes` instead of an integer or slice
+error[RUF016]: 61:14: Indexed access to type `list` uses type `bytes` instead of an integer or slice
 
+  --> RUF016.py:61:14
    |
 60 | # Should emit on invalid access using bytes
 61 | var = [1, 2][b"x"]
@@ -145,8 +161,9 @@ error[RUF016]: RUF016.py:61:14: Indexed access to type `list` uses type `bytes` 
 62 | 
 63 | # Should emit for non-integer slice start
    |
-error[RUF016]: RUF016.py:64:17: Slice in indexed access to type `list` uses type `str` instead of an integer
+error[RUF016]: 64:17: Slice in indexed access to type `list` uses type `str` instead of an integer
 
+  --> RUF016.py:64:17
    |
 63 | # Should emit for non-integer slice start
 64 | var = [1, 2, 3]["x":2]
@@ -154,8 +171,9 @@ error[RUF016]: RUF016.py:64:17: Slice in indexed access to type `list` uses type
 65 | var = [1, 2, 3][f"x":2]
 66 | var = [1, 2, 3][1.2:2]
    |
-error[RUF016]: RUF016.py:65:17: Slice in indexed access to type `list` uses type `str` instead of an integer
+error[RUF016]: 65:17: Slice in indexed access to type `list` uses type `str` instead of an integer
 
+  --> RUF016.py:65:17
    |
 63 | # Should emit for non-integer slice start
 64 | var = [1, 2, 3]["x":2]
@@ -164,8 +182,9 @@ error[RUF016]: RUF016.py:65:17: Slice in indexed access to type `list` uses type
 66 | var = [1, 2, 3][1.2:2]
 67 | var = [1, 2, 3][{"x"}:2]
    |
-error[RUF016]: RUF016.py:66:17: Slice in indexed access to type `list` uses type `float` instead of an integer
+error[RUF016]: 66:17: Slice in indexed access to type `list` uses type `float` instead of an integer
 
+  --> RUF016.py:66:17
    |
 64 | var = [1, 2, 3]["x":2]
 65 | var = [1, 2, 3][f"x":2]
@@ -174,8 +193,9 @@ error[RUF016]: RUF016.py:66:17: Slice in indexed access to type `list` uses type
 67 | var = [1, 2, 3][{"x"}:2]
 68 | var = [1, 2, 3][{x for x in range(2)}:2]
    |
-error[RUF016]: RUF016.py:67:17: Slice in indexed access to type `list` uses type `set` instead of an integer
+error[RUF016]: 67:17: Slice in indexed access to type `list` uses type `set` instead of an integer
 
+  --> RUF016.py:67:17
    |
 65 | var = [1, 2, 3][f"x":2]
 66 | var = [1, 2, 3][1.2:2]
@@ -184,8 +204,9 @@ error[RUF016]: RUF016.py:67:17: Slice in indexed access to type `list` uses type
 68 | var = [1, 2, 3][{x for x in range(2)}:2]
 69 | var = [1, 2, 3][{"x": x for x in range(2)}:2]
    |
-error[RUF016]: RUF016.py:68:17: Slice in indexed access to type `list` uses type `set comprehension` instead of an integer
+error[RUF016]: 68:17: Slice in indexed access to type `list` uses type `set comprehension` instead of an integer
 
+  --> RUF016.py:68:17
    |
 66 | var = [1, 2, 3][1.2:2]
 67 | var = [1, 2, 3][{"x"}:2]
@@ -194,8 +215,9 @@ error[RUF016]: RUF016.py:68:17: Slice in indexed access to type `list` uses type
 69 | var = [1, 2, 3][{"x": x for x in range(2)}:2]
 70 | var = [1, 2, 3][[x for x in range(2)]:2]
    |
-error[RUF016]: RUF016.py:69:17: Slice in indexed access to type `list` uses type `dict comprehension` instead of an integer
+error[RUF016]: 69:17: Slice in indexed access to type `list` uses type `dict comprehension` instead of an integer
 
+  --> RUF016.py:69:17
    |
 67 | var = [1, 2, 3][{"x"}:2]
 68 | var = [1, 2, 3][{x for x in range(2)}:2]
@@ -203,8 +225,9 @@ error[RUF016]: RUF016.py:69:17: Slice in indexed access to type `list` uses type
    |                 ^^^^^^^^^^^^^^^^^^^^^^^^^^
 70 | var = [1, 2, 3][[x for x in range(2)]:2]
    |
-error[RUF016]: RUF016.py:70:17: Slice in indexed access to type `list` uses type `list comprehension` instead of an integer
+error[RUF016]: 70:17: Slice in indexed access to type `list` uses type `list comprehension` instead of an integer
 
+  --> RUF016.py:70:17
    |
 68 | var = [1, 2, 3][{x for x in range(2)}:2]
 69 | var = [1, 2, 3][{"x": x for x in range(2)}:2]
@@ -213,8 +236,9 @@ error[RUF016]: RUF016.py:70:17: Slice in indexed access to type `list` uses type
 71 | 
 72 | # Should emit for non-integer slice end
    |
-error[RUF016]: RUF016.py:73:19: Slice in indexed access to type `list` uses type `str` instead of an integer
+error[RUF016]: 73:19: Slice in indexed access to type `list` uses type `str` instead of an integer
 
+  --> RUF016.py:73:19
    |
 72 | # Should emit for non-integer slice end
 73 | var = [1, 2, 3][0:"x"]
@@ -222,8 +246,9 @@ error[RUF016]: RUF016.py:73:19: Slice in indexed access to type `list` uses type
 74 | var = [1, 2, 3][0:f"x"]
 75 | var = [1, 2, 3][0:1.2]
    |
-error[RUF016]: RUF016.py:74:19: Slice in indexed access to type `list` uses type `str` instead of an integer
+error[RUF016]: 74:19: Slice in indexed access to type `list` uses type `str` instead of an integer
 
+  --> RUF016.py:74:19
    |
 72 | # Should emit for non-integer slice end
 73 | var = [1, 2, 3][0:"x"]
@@ -232,8 +257,9 @@ error[RUF016]: RUF016.py:74:19: Slice in indexed access to type `list` uses type
 75 | var = [1, 2, 3][0:1.2]
 76 | var = [1, 2, 3][0:{"x"}]
    |
-error[RUF016]: RUF016.py:75:19: Slice in indexed access to type `list` uses type `float` instead of an integer
+error[RUF016]: 75:19: Slice in indexed access to type `list` uses type `float` instead of an integer
 
+  --> RUF016.py:75:19
    |
 73 | var = [1, 2, 3][0:"x"]
 74 | var = [1, 2, 3][0:f"x"]
@@ -242,8 +268,9 @@ error[RUF016]: RUF016.py:75:19: Slice in indexed access to type `list` uses type
 76 | var = [1, 2, 3][0:{"x"}]
 77 | var = [1, 2, 3][0:{x for x in range(2)}]
    |
-error[RUF016]: RUF016.py:76:19: Slice in indexed access to type `list` uses type `set` instead of an integer
+error[RUF016]: 76:19: Slice in indexed access to type `list` uses type `set` instead of an integer
 
+  --> RUF016.py:76:19
    |
 74 | var = [1, 2, 3][0:f"x"]
 75 | var = [1, 2, 3][0:1.2]
@@ -252,8 +279,9 @@ error[RUF016]: RUF016.py:76:19: Slice in indexed access to type `list` uses type
 77 | var = [1, 2, 3][0:{x for x in range(2)}]
 78 | var = [1, 2, 3][0:{"x": x for x in range(2)}]
    |
-error[RUF016]: RUF016.py:77:19: Slice in indexed access to type `list` uses type `set comprehension` instead of an integer
+error[RUF016]: 77:19: Slice in indexed access to type `list` uses type `set comprehension` instead of an integer
 
+  --> RUF016.py:77:19
    |
 75 | var = [1, 2, 3][0:1.2]
 76 | var = [1, 2, 3][0:{"x"}]
@@ -262,8 +290,9 @@ error[RUF016]: RUF016.py:77:19: Slice in indexed access to type `list` uses type
 78 | var = [1, 2, 3][0:{"x": x for x in range(2)}]
 79 | var = [1, 2, 3][0:[x for x in range(2)]]
    |
-error[RUF016]: RUF016.py:78:19: Slice in indexed access to type `list` uses type `dict comprehension` instead of an integer
+error[RUF016]: 78:19: Slice in indexed access to type `list` uses type `dict comprehension` instead of an integer
 
+  --> RUF016.py:78:19
    |
 76 | var = [1, 2, 3][0:{"x"}]
 77 | var = [1, 2, 3][0:{x for x in range(2)}]
@@ -271,8 +300,9 @@ error[RUF016]: RUF016.py:78:19: Slice in indexed access to type `list` uses type
    |                   ^^^^^^^^^^^^^^^^^^^^^^^^^^
 79 | var = [1, 2, 3][0:[x for x in range(2)]]
    |
-error[RUF016]: RUF016.py:79:19: Slice in indexed access to type `list` uses type `list comprehension` instead of an integer
+error[RUF016]: 79:19: Slice in indexed access to type `list` uses type `list comprehension` instead of an integer
 
+  --> RUF016.py:79:19
    |
 77 | var = [1, 2, 3][0:{x for x in range(2)}]
 78 | var = [1, 2, 3][0:{"x": x for x in range(2)}]
@@ -281,8 +311,9 @@ error[RUF016]: RUF016.py:79:19: Slice in indexed access to type `list` uses type
 80 | 
 81 | # Should emit for non-integer slice step
    |
-error[RUF016]: RUF016.py:82:21: Slice in indexed access to type `list` uses type `str` instead of an integer
+error[RUF016]: 82:21: Slice in indexed access to type `list` uses type `str` instead of an integer
 
+  --> RUF016.py:82:21
    |
 81 | # Should emit for non-integer slice step
 82 | var = [1, 2, 3][0:1:"x"]
@@ -290,8 +321,9 @@ error[RUF016]: RUF016.py:82:21: Slice in indexed access to type `list` uses type
 83 | var = [1, 2, 3][0:1:f"x"]
 84 | var = [1, 2, 3][0:1:1.2]
    |
-error[RUF016]: RUF016.py:83:21: Slice in indexed access to type `list` uses type `str` instead of an integer
+error[RUF016]: 83:21: Slice in indexed access to type `list` uses type `str` instead of an integer
 
+  --> RUF016.py:83:21
    |
 81 | # Should emit for non-integer slice step
 82 | var = [1, 2, 3][0:1:"x"]
@@ -300,8 +332,9 @@ error[RUF016]: RUF016.py:83:21: Slice in indexed access to type `list` uses type
 84 | var = [1, 2, 3][0:1:1.2]
 85 | var = [1, 2, 3][0:1:{"x"}]
    |
-error[RUF016]: RUF016.py:84:21: Slice in indexed access to type `list` uses type `float` instead of an integer
+error[RUF016]: 84:21: Slice in indexed access to type `list` uses type `float` instead of an integer
 
+  --> RUF016.py:84:21
    |
 82 | var = [1, 2, 3][0:1:"x"]
 83 | var = [1, 2, 3][0:1:f"x"]
@@ -310,8 +343,9 @@ error[RUF016]: RUF016.py:84:21: Slice in indexed access to type `list` uses type
 85 | var = [1, 2, 3][0:1:{"x"}]
 86 | var = [1, 2, 3][0:1:{x for x in range(2)}]
    |
-error[RUF016]: RUF016.py:85:21: Slice in indexed access to type `list` uses type `set` instead of an integer
+error[RUF016]: 85:21: Slice in indexed access to type `list` uses type `set` instead of an integer
 
+  --> RUF016.py:85:21
    |
 83 | var = [1, 2, 3][0:1:f"x"]
 84 | var = [1, 2, 3][0:1:1.2]
@@ -320,8 +354,9 @@ error[RUF016]: RUF016.py:85:21: Slice in indexed access to type `list` uses type
 86 | var = [1, 2, 3][0:1:{x for x in range(2)}]
 87 | var = [1, 2, 3][0:1:{"x": x for x in range(2)}]
    |
-error[RUF016]: RUF016.py:86:21: Slice in indexed access to type `list` uses type `set comprehension` instead of an integer
+error[RUF016]: 86:21: Slice in indexed access to type `list` uses type `set comprehension` instead of an integer
 
+  --> RUF016.py:86:21
    |
 84 | var = [1, 2, 3][0:1:1.2]
 85 | var = [1, 2, 3][0:1:{"x"}]
@@ -330,8 +365,9 @@ error[RUF016]: RUF016.py:86:21: Slice in indexed access to type `list` uses type
 87 | var = [1, 2, 3][0:1:{"x": x for x in range(2)}]
 88 | var = [1, 2, 3][0:1:[x for x in range(2)]]
    |
-error[RUF016]: RUF016.py:87:21: Slice in indexed access to type `list` uses type `dict comprehension` instead of an integer
+error[RUF016]: 87:21: Slice in indexed access to type `list` uses type `dict comprehension` instead of an integer
 
+  --> RUF016.py:87:21
    |
 85 | var = [1, 2, 3][0:1:{"x"}]
 86 | var = [1, 2, 3][0:1:{x for x in range(2)}]
@@ -339,8 +375,9 @@ error[RUF016]: RUF016.py:87:21: Slice in indexed access to type `list` uses type
    |                     ^^^^^^^^^^^^^^^^^^^^^^^^^^
 88 | var = [1, 2, 3][0:1:[x for x in range(2)]]
    |
-error[RUF016]: RUF016.py:88:21: Slice in indexed access to type `list` uses type `list comprehension` instead of an integer
+error[RUF016]: 88:21: Slice in indexed access to type `list` uses type `list comprehension` instead of an integer
 
+  --> RUF016.py:88:21
    |
 86 | var = [1, 2, 3][0:1:{x for x in range(2)}]
 87 | var = [1, 2, 3][0:1:{"x": x for x in range(2)}]
@@ -349,8 +386,9 @@ error[RUF016]: RUF016.py:88:21: Slice in indexed access to type `list` uses type
 89 | 
 90 | # Should emit for non-integer slice start and end; should emit twice with specific ranges
    |
-error[RUF016]: RUF016.py:91:17: Slice in indexed access to type `list` uses type `str` instead of an integer
+error[RUF016]: 91:17: Slice in indexed access to type `list` uses type `str` instead of an integer
 
+  --> RUF016.py:91:17
    |
 90 | # Should emit for non-integer slice start and end; should emit twice with specific ranges
 91 | var = [1, 2, 3]["x":"y"]
@@ -358,8 +396,9 @@ error[RUF016]: RUF016.py:91:17: Slice in indexed access to type `list` uses type
 92 | 
 93 | # Should emit once for repeated invalid access
    |
-error[RUF016]: RUF016.py:91:21: Slice in indexed access to type `list` uses type `str` instead of an integer
+error[RUF016]: 91:21: Slice in indexed access to type `list` uses type `str` instead of an integer
 
+  --> RUF016.py:91:21
    |
 90 | # Should emit for non-integer slice start and end; should emit twice with specific ranges
 91 | var = [1, 2, 3]["x":"y"]
@@ -367,8 +406,9 @@ error[RUF016]: RUF016.py:91:21: Slice in indexed access to type `list` uses type
 92 | 
 93 | # Should emit once for repeated invalid access
    |
-error[RUF016]: RUF016.py:94:17: Indexed access to type `list` uses type `str` instead of an integer or slice
+error[RUF016]: 94:17: Indexed access to type `list` uses type `str` instead of an integer or slice
 
+  --> RUF016.py:94:17
    |
 93 | # Should emit once for repeated invalid access
 94 | var = [1, 2, 3]["x"]["y"]["z"]

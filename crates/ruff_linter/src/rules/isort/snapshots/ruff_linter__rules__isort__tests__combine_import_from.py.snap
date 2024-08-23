@@ -1,14 +1,16 @@
 ---
 source: crates/ruff_linter/src/rules/isort/mod.rs
 ---
-error[I001]: combine_import_from.py:1:1: [*] Import block is un-sorted or un-formatted
+error[I001]: 1:1: [*] Import block is un-sorted or un-formatted
 
+ --> combine_import_from.py:1:1
   |
 1 | / from collections import Awaitable
 2 | | from collections import AsyncIterable
 3 | | from collections import Collection
 4 | | from collections import ChainMap
 5 | | from collections import MutableSequence, MutableMapping
+  | |________________________________________________________^
   |
   = help: Organize imports
 ℹ Safe fix

@@ -1,8 +1,9 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_pytest_style/mod.rs
 ---
-error[PT018]: PT018.py:14:5: [*] Assertion should be broken down into multiple parts
+error[PT018]: 14:5: [*] Assertion should be broken down into multiple parts
 
+  --> PT018.py:14:5
    |
 13 | def test_error():
 14 |     assert something and something_else
@@ -22,8 +23,9 @@ error[PT018]: PT018.py:14:5: [*] Assertion should be broken down into multiple p
 16 17 |     assert something and not something_else
 17 18 |     assert something and (something_else or something_third)
 
-error[PT018]: PT018.py:15:5: [*] Assertion should be broken down into multiple parts
+error[PT018]: 15:5: [*] Assertion should be broken down into multiple parts
 
+  --> PT018.py:15:5
    |
 13 | def test_error():
 14 |     assert something and something_else
@@ -44,8 +46,9 @@ error[PT018]: PT018.py:15:5: [*] Assertion should be broken down into multiple p
 17 18 |     assert something and (something_else or something_third)
 18 19 |     assert not something and something_else
 
-error[PT018]: PT018.py:16:5: [*] Assertion should be broken down into multiple parts
+error[PT018]: 16:5: [*] Assertion should be broken down into multiple parts
 
+  --> PT018.py:16:5
    |
 14 |     assert something and something_else
 15 |     assert something and something_else and something_third
@@ -66,8 +69,9 @@ error[PT018]: PT018.py:16:5: [*] Assertion should be broken down into multiple p
 18 19 |     assert not something and something_else
 19 20 |     assert not (something or something_else)
 
-error[PT018]: PT018.py:17:5: [*] Assertion should be broken down into multiple parts
+error[PT018]: 17:5: [*] Assertion should be broken down into multiple parts
 
+  --> PT018.py:17:5
    |
 15 |     assert something and something_else and something_third
 16 |     assert something and not something_else
@@ -88,8 +92,9 @@ error[PT018]: PT018.py:17:5: [*] Assertion should be broken down into multiple p
 19 20 |     assert not (something or something_else)
 20 21 |     assert not (something or something_else or something_third)
 
-error[PT018]: PT018.py:18:5: [*] Assertion should be broken down into multiple parts
+error[PT018]: 18:5: [*] Assertion should be broken down into multiple parts
 
+  --> PT018.py:18:5
    |
 16 |     assert something and not something_else
 17 |     assert something and (something_else or something_third)
@@ -110,8 +115,9 @@ error[PT018]: PT018.py:18:5: [*] Assertion should be broken down into multiple p
 20 21 |     assert not (something or something_else or something_third)
 21 22 |     assert something and something_else == """error
 
-error[PT018]: PT018.py:19:5: [*] Assertion should be broken down into multiple parts
+error[PT018]: 19:5: [*] Assertion should be broken down into multiple parts
 
+  --> PT018.py:19:5
    |
 17 |     assert something and (something_else or something_third)
 18 |     assert not something and something_else
@@ -132,8 +138,9 @@ error[PT018]: PT018.py:19:5: [*] Assertion should be broken down into multiple p
 21 22 |     assert something and something_else == """error
 22 23 |     message
 
-error[PT018]: PT018.py:20:5: [*] Assertion should be broken down into multiple parts
+error[PT018]: 20:5: [*] Assertion should be broken down into multiple parts
 
+  --> PT018.py:20:5
    |
 18 |     assert not something and something_else
 19 |     assert not (something or something_else)
@@ -154,8 +161,9 @@ error[PT018]: PT018.py:20:5: [*] Assertion should be broken down into multiple p
 22 23 |     message
 23 24 |     """
 
-error[PT018]: PT018.py:21:5: [*] Assertion should be broken down into multiple parts
+error[PT018]: 21:5: [*] Assertion should be broken down into multiple parts
 
+  --> PT018.py:21:5
    |
 19 |       assert not (something or something_else)
 20 |       assert not (something or something_else or something_third)
@@ -179,8 +187,9 @@ error[PT018]: PT018.py:21:5: [*] Assertion should be broken down into multiple p
 23 24 |     """
 24 25 |     assert (
 
-error[PT018]: PT018.py:24:5: [*] Assertion should be broken down into multiple parts
+error[PT018]: 24:5: [*] Assertion should be broken down into multiple parts
 
+  --> PT018.py:24:5
    |
 22 |       message
 23 |       """
@@ -210,8 +219,9 @@ error[PT018]: PT018.py:24:5: [*] Assertion should be broken down into multiple p
 28 28 | message
 29 29 | """
 
-error[PT018]: PT018.py:33:5: [*] Assertion should be broken down into multiple parts
+error[PT018]: 33:5: [*] Assertion should be broken down into multiple parts
 
+  --> PT018.py:33:5
    |
 32 |     # recursive case
 33 |     assert not (a or not (b or c))
@@ -230,8 +240,9 @@ error[PT018]: PT018.py:33:5: [*] Assertion should be broken down into multiple p
 35 36 | 
 36 37 |     # detected, but no fix for messages
 
-error[PT018]: PT018.py:34:5: [*] Assertion should be broken down into multiple parts
+error[PT018]: 34:5: [*] Assertion should be broken down into multiple parts
 
+  --> PT018.py:34:5
    |
 32 |     # recursive case
 33 |     assert not (a or not (b or c))
@@ -252,8 +263,9 @@ error[PT018]: PT018.py:34:5: [*] Assertion should be broken down into multiple p
 36 37 |     # detected, but no fix for messages
 37 38 |     assert something and something_else, "error message"
 
-error[PT018]: PT018.py:37:5: Assertion should be broken down into multiple parts
+error[PT018]: 37:5: Assertion should be broken down into multiple parts
 
+  --> PT018.py:37:5
    |
 36 |     # detected, but no fix for messages
 37 |     assert something and something_else, "error message"
@@ -262,8 +274,9 @@ error[PT018]: PT018.py:37:5: Assertion should be broken down into multiple parts
 39 |     # detected, but no fix for mixed conditions (e.g. `a or b and c`)
    |
    = help: Break down assertion into multiple parts
-error[PT018]: PT018.py:38:5: Assertion should be broken down into multiple parts
+error[PT018]: 38:5: Assertion should be broken down into multiple parts
 
+  --> PT018.py:38:5
    |
 36 |     # detected, but no fix for messages
 37 |     assert something and something_else, "error message"
@@ -273,8 +286,9 @@ error[PT018]: PT018.py:38:5: Assertion should be broken down into multiple parts
 40 |     assert not (something or something_else and something_third)
    |
    = help: Break down assertion into multiple parts
-error[PT018]: PT018.py:40:5: Assertion should be broken down into multiple parts
+error[PT018]: 40:5: Assertion should be broken down into multiple parts
 
+  --> PT018.py:40:5
    |
 38 |     assert not (something or something_else and something_third), "with message"
 39 |     # detected, but no fix for mixed conditions (e.g. `a or b and c`)
@@ -282,8 +296,9 @@ error[PT018]: PT018.py:40:5: Assertion should be broken down into multiple parts
    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
    |
    = help: Break down assertion into multiple parts
-error[PT018]: PT018.py:44:1: [*] Assertion should be broken down into multiple parts
+error[PT018]: 44:1: [*] Assertion should be broken down into multiple parts
 
+  --> PT018.py:43:23
    |
 43 | assert something  # OK
 44 | assert something and something_else  # Error
@@ -302,8 +317,9 @@ error[PT018]: PT018.py:44:1: [*] Assertion should be broken down into multiple p
 46 47 | 
 47 48 | 
 
-error[PT018]: PT018.py:45:1: [*] Assertion should be broken down into multiple parts
+error[PT018]: 45:1: [*] Assertion should be broken down into multiple parts
 
+  --> PT018.py:44:45
    |
 43 | assert something  # OK
 44 | assert something and something_else  # Error
@@ -322,8 +338,9 @@ error[PT018]: PT018.py:45:1: [*] Assertion should be broken down into multiple p
 47 48 | 
 48 49 | def test_multiline():
 
-error[PT018]: PT018.py:49:5: Assertion should be broken down into multiple parts
+error[PT018]: 49:5: Assertion should be broken down into multiple parts
 
+  --> PT018.py:49:5
    |
 48 | def test_multiline():
 49 |     assert something and something_else; x = 1
@@ -332,8 +349,9 @@ error[PT018]: PT018.py:49:5: Assertion should be broken down into multiple parts
 51 |     x = 1; assert something and something_else
    |
    = help: Break down assertion into multiple parts
-error[PT018]: PT018.py:51:12: Assertion should be broken down into multiple parts
+error[PT018]: 51:12: Assertion should be broken down into multiple parts
 
+  --> PT018.py:51:12
    |
 49 |     assert something and something_else; x = 1
 50 | 
@@ -343,16 +361,18 @@ error[PT018]: PT018.py:51:12: Assertion should be broken down into multiple part
 53 |     x = 1; \
    |
    = help: Break down assertion into multiple parts
-error[PT018]: PT018.py:54:9: Assertion should be broken down into multiple parts
+error[PT018]: 54:9: Assertion should be broken down into multiple parts
 
+  --> PT018.py:54:9
    |
 53 |     x = 1; \
 54 |         assert something and something_else
    |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
    |
    = help: Break down assertion into multiple parts
-error[PT018]: PT018.py:59:5: [*] Assertion should be broken down into multiple parts
+error[PT018]: 59:5: [*] Assertion should be broken down into multiple parts
 
+  --> PT018.py:59:5
    |
 57 |   # Regression test for: https://github.com/astral-sh/ruff/issues/7143
 58 |   def test_parenthesized_not():
@@ -380,8 +400,9 @@ error[PT018]: PT018.py:59:5: [*] Assertion should be broken down into multiple p
 65 67 |     assert (not (
 66 68 |         self.find_graph_output(node.output[0])
 
-error[PT018]: PT018.py:65:5: [*] Assertion should be broken down into multiple parts
+error[PT018]: 65:5: [*] Assertion should be broken down into multiple parts
 
+  --> PT018.py:65:5
    |
 63 |       )
 64 |   

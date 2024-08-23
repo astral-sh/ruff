@@ -1,8 +1,9 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_simplify/mod.rs
 ---
-error[SIM118]: SIM118.py:3:1: [*] Use `key in dict` instead of `key in dict.keys()`
+error[SIM118]: 3:1: [*] Use `key in dict` instead of `key in dict.keys()`
 
+ --> SIM118.py:2:1
   |
 1 | obj = {}
 2 | 
@@ -21,8 +22,9 @@ error[SIM118]: SIM118.py:3:1: [*] Use `key in dict` instead of `key in dict.keys
 5 5 | key not in obj.keys()  # SIM118
 6 6 | 
 
-error[SIM118]: SIM118.py:5:1: [*] Use `key not in dict` instead of `key not in dict.keys()`
+error[SIM118]: 5:1: [*] Use `key not in dict` instead of `key not in dict.keys()`
 
+ --> SIM118.py:4:1
   |
 3 | key in obj.keys()  # SIM118
 4 | 
@@ -42,8 +44,9 @@ error[SIM118]: SIM118.py:5:1: [*] Use `key not in dict` instead of `key not in d
 7 7 | foo["bar"] in obj.keys()  # SIM118
 8 8 | 
 
-error[SIM118]: SIM118.py:7:1: [*] Use `key in dict` instead of `key in dict.keys()`
+error[SIM118]: 7:1: [*] Use `key in dict` instead of `key in dict.keys()`
 
+ --> SIM118.py:6:1
   |
 5 | key not in obj.keys()  # SIM118
 6 | 
@@ -63,8 +66,9 @@ error[SIM118]: SIM118.py:7:1: [*] Use `key in dict` instead of `key in dict.keys
 9 9 | foo["bar"] not in obj.keys()  # SIM118
 10 10 | 
 
-error[SIM118]: SIM118.py:9:1: [*] Use `key not in dict` instead of `key not in dict.keys()`
+error[SIM118]: 9:1: [*] Use `key not in dict` instead of `key not in dict.keys()`
 
+  --> SIM118.py:8:1
    |
  7 | foo["bar"] in obj.keys()  # SIM118
  8 | 
@@ -84,8 +88,9 @@ error[SIM118]: SIM118.py:9:1: [*] Use `key not in dict` instead of `key not in d
 11 11 | foo['bar'] in obj.keys()  # SIM118
 12 12 | 
 
-error[SIM118]: SIM118.py:11:1: [*] Use `key in dict` instead of `key in dict.keys()`
+error[SIM118]: 11:1: [*] Use `key in dict` instead of `key in dict.keys()`
 
+  --> SIM118.py:10:1
    |
  9 | foo["bar"] not in obj.keys()  # SIM118
 10 | 
@@ -105,8 +110,9 @@ error[SIM118]: SIM118.py:11:1: [*] Use `key in dict` instead of `key in dict.key
 13 13 | foo['bar'] not in obj.keys()  # SIM118
 14 14 | 
 
-error[SIM118]: SIM118.py:13:1: [*] Use `key not in dict` instead of `key not in dict.keys()`
+error[SIM118]: 13:1: [*] Use `key not in dict` instead of `key not in dict.keys()`
 
+  --> SIM118.py:12:1
    |
 11 | foo['bar'] in obj.keys()  # SIM118
 12 | 
@@ -126,8 +132,9 @@ error[SIM118]: SIM118.py:13:1: [*] Use `key not in dict` instead of `key not in 
 15 15 | foo() in obj.keys()  # SIM118
 16 16 | 
 
-error[SIM118]: SIM118.py:15:1: [*] Use `key in dict` instead of `key in dict.keys()`
+error[SIM118]: 15:1: [*] Use `key in dict` instead of `key in dict.keys()`
 
+  --> SIM118.py:14:1
    |
 13 | foo['bar'] not in obj.keys()  # SIM118
 14 | 
@@ -147,8 +154,9 @@ error[SIM118]: SIM118.py:15:1: [*] Use `key in dict` instead of `key in dict.key
 17 17 | foo() not in obj.keys()  # SIM118
 18 18 | 
 
-error[SIM118]: SIM118.py:17:1: [*] Use `key not in dict` instead of `key not in dict.keys()`
+error[SIM118]: 17:1: [*] Use `key not in dict` instead of `key not in dict.keys()`
 
+  --> SIM118.py:16:1
    |
 15 | foo() in obj.keys()  # SIM118
 16 | 
@@ -168,8 +176,9 @@ error[SIM118]: SIM118.py:17:1: [*] Use `key not in dict` instead of `key not in 
 19 19 | for key in obj.keys():  # SIM118
 20 20 |     pass
 
-error[SIM118]: SIM118.py:19:5: [*] Use `key in dict` instead of `key in dict.keys()`
+error[SIM118]: 19:5: [*] Use `key in dict` instead of `key in dict.keys()`
 
+  --> SIM118.py:19:5
    |
 17 | foo() not in obj.keys()  # SIM118
 18 | 
@@ -188,8 +197,9 @@ error[SIM118]: SIM118.py:19:5: [*] Use `key in dict` instead of `key in dict.key
 21 21 | 
 22 22 | for key in list(obj.keys()):
 
-error[SIM118]: SIM118.py:26:8: [*] Use `key in dict` instead of `key in dict.keys()`
+error[SIM118]: 26:8: [*] Use `key in dict` instead of `key in dict.keys()`
 
+  --> SIM118.py:26:8
    |
 24 |         del obj[key]
 25 | 
@@ -209,8 +219,9 @@ error[SIM118]: SIM118.py:26:8: [*] Use `key in dict` instead of `key in dict.key
 28 28 | {k for k in obj.keys()}  # SIM118
 29 29 | 
 
-error[SIM118]: SIM118.py:28:8: [*] Use `key in dict` instead of `key in dict.keys()`
+error[SIM118]: 28:8: [*] Use `key in dict` instead of `key in dict.keys()`
 
+  --> SIM118.py:28:8
    |
 26 | [k for k in obj.keys()]  # SIM118
 27 | 
@@ -230,8 +241,9 @@ error[SIM118]: SIM118.py:28:8: [*] Use `key in dict` instead of `key in dict.key
 30 30 | {k: k for k in obj.keys()}  # SIM118
 31 31 | 
 
-error[SIM118]: SIM118.py:30:11: [*] Use `key in dict` instead of `key in dict.keys()`
+error[SIM118]: 30:11: [*] Use `key in dict` instead of `key in dict.keys()`
 
+  --> SIM118.py:30:11
    |
 28 | {k for k in obj.keys()}  # SIM118
 29 | 
@@ -251,8 +263,9 @@ error[SIM118]: SIM118.py:30:11: [*] Use `key in dict` instead of `key in dict.ke
 32 32 | (k for k in obj.keys())  # SIM118
 33 33 | 
 
-error[SIM118]: SIM118.py:32:8: [*] Use `key in dict` instead of `key in dict.keys()`
+error[SIM118]: 32:8: [*] Use `key in dict` instead of `key in dict.keys()`
 
+  --> SIM118.py:32:8
    |
 30 | {k: k for k in obj.keys()}  # SIM118
 31 | 
@@ -272,8 +285,9 @@ error[SIM118]: SIM118.py:32:8: [*] Use `key in dict` instead of `key in dict.key
 34 34 | key in (obj or {}).keys()  # SIM118
 35 35 | 
 
-error[SIM118]: SIM118.py:34:1: [*] Use `key in dict` instead of `key in dict.keys()`
+error[SIM118]: 34:1: [*] Use `key in dict` instead of `key in dict.keys()`
 
+  --> SIM118.py:33:1
    |
 32 | (k for k in obj.keys())  # SIM118
 33 | 
@@ -293,8 +307,9 @@ error[SIM118]: SIM118.py:34:1: [*] Use `key in dict` instead of `key in dict.key
 36 36 | (key) in (obj or {}).keys()  # SIM118
 37 37 | 
 
-error[SIM118]: SIM118.py:36:1: [*] Use `key in dict` instead of `key in dict.keys()`
+error[SIM118]: 36:1: [*] Use `key in dict` instead of `key in dict.keys()`
 
+  --> SIM118.py:35:1
    |
 34 | key in (obj or {}).keys()  # SIM118
 35 | 
@@ -314,8 +329,9 @@ error[SIM118]: SIM118.py:36:1: [*] Use `key in dict` instead of `key in dict.key
 38 38 | from typing import KeysView
 39 39 | 
 
-error[SIM118]: SIM118.py:50:1: [*] Use `key in dict` instead of `key in dict.keys()`
+error[SIM118]: 50:1: [*] Use `key in dict` instead of `key in dict.keys()`
 
+  --> SIM118.py:49:69
    |
 49 | # Regression test for: https://github.com/astral-sh/ruff/issues/7124
 50 | key in obj.keys()and foo
@@ -334,8 +350,9 @@ error[SIM118]: SIM118.py:50:1: [*] Use `key in dict` instead of `key in dict.key
 52 52 | key in (obj.keys())and foo
 53 53 | 
 
-error[SIM118]: SIM118.py:51:2: [*] Use `key in dict` instead of `key in dict.keys()`
+error[SIM118]: 51:2: [*] Use `key in dict` instead of `key in dict.keys()`
 
+  --> SIM118.py:51:2
    |
 49 | # Regression test for: https://github.com/astral-sh/ruff/issues/7124
 50 | key in obj.keys()and foo
@@ -354,8 +371,9 @@ error[SIM118]: SIM118.py:51:2: [*] Use `key in dict` instead of `key in dict.key
 53 53 | 
 54 54 | # Regression test for: https://github.com/astral-sh/ruff/issues/7200
 
-error[SIM118]: SIM118.py:52:1: [*] Use `key in dict` instead of `key in dict.keys()`
+error[SIM118]: 52:1: [*] Use `key in dict` instead of `key in dict.keys()`
 
+  --> SIM118.py:51:27
    |
 50 | key in obj.keys()and foo
 51 | (key in obj.keys())and foo
@@ -375,8 +393,9 @@ error[SIM118]: SIM118.py:52:1: [*] Use `key in dict` instead of `key in dict.key
 54 54 | # Regression test for: https://github.com/astral-sh/ruff/issues/7200
 55 55 | for key in (
 
-error[SIM118]: SIM118.py:55:5: [*] Use `key in dict` instead of `key in dict.keys()`
+error[SIM118]: 55:5: [*] Use `key in dict` instead of `key in dict.keys()`
 
+  --> SIM118.py:55:5
    |
 54 |   # Regression test for: https://github.com/astral-sh/ruff/issues/7200
 55 |   for key in (
@@ -399,8 +418,9 @@ error[SIM118]: SIM118.py:55:5: [*] Use `key in dict` instead of `key in dict.key
 60 60 |     continue
 61 61 | 
 
-error[SIM118]: SIM118.py:65:1: [*] Use `key in dict` instead of `key in dict.keys()`
+error[SIM118]: 65:1: [*] Use `key in dict` instead of `key in dict.keys()`
 
+  --> SIM118.py:64:17
    |
 64 | d = SneakyDict()
 65 | key in d.keys()  # SIM118

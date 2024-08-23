@@ -1,29 +1,33 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_slots/mod.rs
 ---
-error[SLOT001]: SLOT001.py:1:7: Subclasses of `tuple` should define `__slots__`
+error[SLOT001]: 1:7: Subclasses of `tuple` should define `__slots__`
 
+ --> SLOT001.py:1:7
   |
 1 | class Bad(tuple):  # SLOT001
   |       ^^^
 2 |     pass
   |
-error[SLOT001]: SLOT001.py:12:7: Subclasses of `tuple` should define `__slots__`
+error[SLOT001]: 12:7: Subclasses of `tuple` should define `__slots__`
 
+  --> SLOT001.py:12:7
    |
 12 | class Bad(Tuple):  # SLOT001
    |       ^^^
 13 |     pass
    |
-error[SLOT001]: SLOT001.py:16:7: Subclasses of `tuple` should define `__slots__`
+error[SLOT001]: 16:7: Subclasses of `tuple` should define `__slots__`
 
+  --> SLOT001.py:16:7
    |
 16 | class Bad(Tuple[str, int, float]):  # SLOT001
    |       ^^^
 17 |     pass
    |
-error[SLOT001]: SLOT001.py:26:7: Subclasses of `tuple` should define `__slots__`
+error[SLOT001]: 26:7: Subclasses of `tuple` should define `__slots__`
 
+  --> SLOT001.py:26:7
    |
 24 | import builtins
 25 | 

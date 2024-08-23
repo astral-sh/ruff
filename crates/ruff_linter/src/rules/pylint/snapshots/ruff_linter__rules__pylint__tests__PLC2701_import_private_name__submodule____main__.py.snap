@@ -1,8 +1,9 @@
 ---
 source: crates/ruff_linter/src/rules/pylint/mod.rs
 ---
-error[PLC2701]: __main__.py:2:16: Private name import `_a`
+error[PLC2701]: 2:16: Private name import `_a`
 
+ --> __main__.py:2:16
   |
 1 | # Errors.
 2 | from _a import b
@@ -10,8 +11,9 @@ error[PLC2701]: __main__.py:2:16: Private name import `_a`
 3 | from c._d import e
 4 | from _f.g import h
   |
-error[PLC2701]: __main__.py:3:18: Private name import `_d` from external module `c`
+error[PLC2701]: 3:18: Private name import `_d` from external module `c`
 
+ --> __main__.py:3:18
   |
 1 | # Errors.
 2 | from _a import b
@@ -20,8 +22,9 @@ error[PLC2701]: __main__.py:3:18: Private name import `_d` from external module 
 4 | from _f.g import h
 5 | from i import _j
   |
-error[PLC2701]: __main__.py:4:18: Private name import `_f`
+error[PLC2701]: 4:18: Private name import `_f`
 
+ --> __main__.py:4:18
   |
 2 | from _a import b
 3 | from c._d import e
@@ -30,8 +33,9 @@ error[PLC2701]: __main__.py:4:18: Private name import `_f`
 5 | from i import _j
 6 | from k import _l as m
   |
-error[PLC2701]: __main__.py:5:15: Private name import `_j` from external module `i`
+error[PLC2701]: 5:15: Private name import `_j` from external module `i`
 
+ --> __main__.py:5:15
   |
 3 | from c._d import e
 4 | from _f.g import h
@@ -40,8 +44,9 @@ error[PLC2701]: __main__.py:5:15: Private name import `_j` from external module 
 6 | from k import _l as m
 7 | import _aaa
   |
-error[PLC2701]: __main__.py:6:21: Private name import `_l` from external module `k`
+error[PLC2701]: 6:21: Private name import `_l` from external module `k`
 
+ --> __main__.py:6:21
   |
 4 | from _f.g import h
 5 | from i import _j
@@ -50,8 +55,9 @@ error[PLC2701]: __main__.py:6:21: Private name import `_l` from external module 
 7 | import _aaa
 8 | import bbb.ccc._ddd as eee  # Panicked in https://github.com/astral-sh/ruff/pull/5920
   |
-error[PLC2701]: __main__.py:7:8: Private name import `_aaa`
+error[PLC2701]: 7:8: Private name import `_aaa`
 
+ --> __main__.py:7:8
   |
 5 | from i import _j
 6 | from k import _l as m
@@ -59,8 +65,9 @@ error[PLC2701]: __main__.py:7:8: Private name import `_aaa`
   |        ^^^^
 8 | import bbb.ccc._ddd as eee  # Panicked in https://github.com/astral-sh/ruff/pull/5920
   |
-error[PLC2701]: __main__.py:8:24: Private name import `_ddd` from external module `bbb.ccc`
+error[PLC2701]: 8:24: Private name import `_ddd` from external module `bbb.ccc`
 
+  --> __main__.py:8:24
    |
  6 | from k import _l as m
  7 | import _aaa

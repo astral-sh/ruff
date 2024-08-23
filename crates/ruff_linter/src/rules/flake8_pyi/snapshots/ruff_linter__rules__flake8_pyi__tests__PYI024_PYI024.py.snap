@@ -1,8 +1,9 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_pyi/mod.rs
 ---
-error[PYI024]: PYI024.py:3:9: Use `typing.NamedTuple` instead of `collections.namedtuple`
+error[PYI024]: 3:9: Use `typing.NamedTuple` instead of `collections.namedtuple`
 
+ --> PYI024.py:3:9
   |
 1 | import collections
 2 | 
@@ -12,8 +13,9 @@ error[PYI024]: PYI024.py:3:9: Use `typing.NamedTuple` instead of `collections.na
 5 | from collections import namedtuple
   |
   = help: Replace with `typing.NamedTuple`
-error[PYI024]: PYI024.py:7:9: Use `typing.NamedTuple` instead of `collections.namedtuple`
+error[PYI024]: 7:9: Use `typing.NamedTuple` instead of `collections.namedtuple`
 
+ --> PYI024.py:7:9
   |
 5 | from collections import namedtuple
 6 | 
@@ -23,8 +25,9 @@ error[PYI024]: PYI024.py:7:9: Use `typing.NamedTuple` instead of `collections.na
 9 | person = namedtuple(
   |
   = help: Replace with `typing.NamedTuple`
-error[PYI024]: PYI024.py:9:10: Use `typing.NamedTuple` instead of `collections.namedtuple`
+error[PYI024]: 9:10: Use `typing.NamedTuple` instead of `collections.namedtuple`
 
+  --> PYI024.py:9:10
    |
  7 | person: namedtuple  # Y024 Use "typing.NamedTuple" instead of "collections.namedtuple"
  8 | 

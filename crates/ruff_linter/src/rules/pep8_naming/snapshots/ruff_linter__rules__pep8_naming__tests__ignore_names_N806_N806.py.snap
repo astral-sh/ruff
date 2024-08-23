@@ -1,8 +1,9 @@
 ---
 source: crates/ruff_linter/src/rules/pep8_naming/mod.rs
 ---
-error[N806]: N806.py:3:5: Variable `stillBad` in function should be lowercase
+error[N806]: 3:5: Variable `stillBad` in function should be lowercase
 
+ --> N806.py:3:5
   |
 1 | def assign():
 2 |     badAllowed = 0
@@ -11,8 +12,9 @@ error[N806]: N806.py:3:5: Variable `stillBad` in function should be lowercase
 4 | 
 5 |     BAD_ALLOWED = 0
   |
-error[N806]: N806.py:6:5: Variable `STILL_BAD` in function should be lowercase
+error[N806]: 6:5: Variable `STILL_BAD` in function should be lowercase
 
+ --> N806.py:6:5
   |
 5 |     BAD_ALLOWED = 0
 6 |     STILL_BAD = 0

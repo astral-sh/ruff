@@ -1,8 +1,9 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_comprehensions/mod.rs
 ---
-error[C402]: C402.py:1:1: [*] Unnecessary generator (rewrite as a `dict` comprehension)
+error[C402]: 1:1: [*] Unnecessary generator (rewrite as a `dict` comprehension)
 
+ --> C402.py:1:1
   |
 1 | dict((x, x) for x in range(3))
   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -17,8 +18,9 @@ error[C402]: C402.py:1:1: [*] Unnecessary generator (rewrite as a `dict` compreh
 3 3 |     (x, x) for x in range(3)
 4 4 | )
 
-error[C402]: C402.py:2:1: [*] Unnecessary generator (rewrite as a `dict` comprehension)
+error[C402]: 2:1: [*] Unnecessary generator (rewrite as a `dict` comprehension)
 
+ --> C402.py:1:31
   |
 1 |   dict((x, x) for x in range(3))
 2 | / dict(
@@ -41,8 +43,9 @@ error[C402]: C402.py:2:1: [*] Unnecessary generator (rewrite as a `dict` compreh
 6 6 | y = f'{dict((x, x) for x in range(3))}'
 7 7 | print(f'Hello {dict((x, x) for x in range(3))} World')
 
-error[C402]: C402.py:6:8: [*] Unnecessary generator (rewrite as a `dict` comprehension)
+error[C402]: 6:8: [*] Unnecessary generator (rewrite as a `dict` comprehension)
 
+ --> C402.py:6:8
   |
 4 | )
 5 | dict(((x, x) for x in range(3)), z=3)
@@ -62,8 +65,9 @@ error[C402]: C402.py:6:8: [*] Unnecessary generator (rewrite as a `dict` compreh
 8 8 | print(f"Hello {dict((x, x) for x in 'abc')} World")
 9 9 | print(f'Hello {dict((x, x) for x in "abc")} World')
 
-error[C402]: C402.py:7:16: [*] Unnecessary generator (rewrite as a `dict` comprehension)
+error[C402]: 7:16: [*] Unnecessary generator (rewrite as a `dict` comprehension)
 
+ --> C402.py:7:16
   |
 5 | dict(((x, x) for x in range(3)), z=3)
 6 | y = f'{dict((x, x) for x in range(3))}'
@@ -83,8 +87,9 @@ error[C402]: C402.py:7:16: [*] Unnecessary generator (rewrite as a `dict` compre
 9 9 | print(f'Hello {dict((x, x) for x in "abc")} World')
 10 10 | print(f'Hello {dict((x,x) for x in "abc")} World')
 
-error[C402]: C402.py:8:16: [*] Unnecessary generator (rewrite as a `dict` comprehension)
+error[C402]: 8:16: [*] Unnecessary generator (rewrite as a `dict` comprehension)
 
+  --> C402.py:8:16
    |
  6 | y = f'{dict((x, x) for x in range(3))}'
  7 | print(f'Hello {dict((x, x) for x in range(3))} World')
@@ -104,8 +109,9 @@ error[C402]: C402.py:8:16: [*] Unnecessary generator (rewrite as a `dict` compre
 10 10 | print(f'Hello {dict((x,x) for x in "abc")} World')
 11 11 | 
 
-error[C402]: C402.py:9:16: [*] Unnecessary generator (rewrite as a `dict` comprehension)
+error[C402]: 9:16: [*] Unnecessary generator (rewrite as a `dict` comprehension)
 
+  --> C402.py:9:16
    |
  7 | print(f'Hello {dict((x, x) for x in range(3))} World')
  8 | print(f"Hello {dict((x, x) for x in 'abc')} World")
@@ -124,8 +130,9 @@ error[C402]: C402.py:9:16: [*] Unnecessary generator (rewrite as a `dict` compre
 11 11 | 
 12 12 | f'{dict((x, x) for x in range(3)) | dict((x, x) for x in range(3))}'
 
-error[C402]: C402.py:10:16: [*] Unnecessary generator (rewrite as a `dict` comprehension)
+error[C402]: 10:16: [*] Unnecessary generator (rewrite as a `dict` comprehension)
 
+  --> C402.py:10:16
    |
  8 | print(f"Hello {dict((x, x) for x in 'abc')} World")
  9 | print(f'Hello {dict((x, x) for x in "abc")} World')
@@ -145,8 +152,9 @@ error[C402]: C402.py:10:16: [*] Unnecessary generator (rewrite as a `dict` compr
 12 12 | f'{dict((x, x) for x in range(3)) | dict((x, x) for x in range(3))}'
 13 13 | f'{ dict((x, x) for x in range(3)) | dict((x, x) for x in range(3)) }'
 
-error[C402]: C402.py:12:4: [*] Unnecessary generator (rewrite as a `dict` comprehension)
+error[C402]: 12:4: [*] Unnecessary generator (rewrite as a `dict` comprehension)
 
+  --> C402.py:12:4
    |
 10 | print(f'Hello {dict((x,x) for x in "abc")} World')
 11 | 
@@ -165,8 +173,9 @@ error[C402]: C402.py:12:4: [*] Unnecessary generator (rewrite as a `dict` compre
 14 14 | 
 15 15 | def f(x):
 
-error[C402]: C402.py:12:37: [*] Unnecessary generator (rewrite as a `dict` comprehension)
+error[C402]: 12:37: [*] Unnecessary generator (rewrite as a `dict` comprehension)
 
+  --> C402.py:12:37
    |
 10 | print(f'Hello {dict((x,x) for x in "abc")} World')
 11 | 
@@ -185,8 +194,9 @@ error[C402]: C402.py:12:37: [*] Unnecessary generator (rewrite as a `dict` compr
 14 14 | 
 15 15 | def f(x):
 
-error[C402]: C402.py:13:5: [*] Unnecessary generator (rewrite as a `dict` comprehension)
+error[C402]: 13:5: [*] Unnecessary generator (rewrite as a `dict` comprehension)
 
+  --> C402.py:13:5
    |
 12 | f'{dict((x, x) for x in range(3)) | dict((x, x) for x in range(3))}'
 13 | f'{ dict((x, x) for x in range(3)) | dict((x, x) for x in range(3)) }'
@@ -205,8 +215,9 @@ error[C402]: C402.py:13:5: [*] Unnecessary generator (rewrite as a `dict` compre
 15 15 | def f(x):
 16 16 |     return x
 
-error[C402]: C402.py:13:38: [*] Unnecessary generator (rewrite as a `dict` comprehension)
+error[C402]: 13:38: [*] Unnecessary generator (rewrite as a `dict` comprehension)
 
+  --> C402.py:13:38
    |
 12 | f'{dict((x, x) for x in range(3)) | dict((x, x) for x in range(3))}'
 13 | f'{ dict((x, x) for x in range(3)) | dict((x, x) for x in range(3)) }'
@@ -225,8 +236,9 @@ error[C402]: C402.py:13:38: [*] Unnecessary generator (rewrite as a `dict` compr
 15 15 | def f(x):
 16 16 |     return x
 
-error[C402]: C402.py:18:16: [*] Unnecessary generator (rewrite as a `dict` comprehension)
+error[C402]: 18:16: [*] Unnecessary generator (rewrite as a `dict` comprehension)
 
+  --> C402.py:18:16
    |
 16 |     return x
 17 | 
@@ -246,8 +258,9 @@ error[C402]: C402.py:18:16: [*] Unnecessary generator (rewrite as a `dict` compr
 20 20 | # Regression test for: https://github.com/astral-sh/ruff/issues/7086
 21 21 | dict((k,v)for k,v in d.iteritems() if k in only_args)
 
-error[C402]: C402.py:21:1: [*] Unnecessary generator (rewrite as a `dict` comprehension)
+error[C402]: 21:1: [*] Unnecessary generator (rewrite as a `dict` comprehension)
 
+  --> C402.py:20:69
    |
 20 | # Regression test for: https://github.com/astral-sh/ruff/issues/7086
 21 | dict((k,v)for k,v in d.iteritems() if k in only_args)

@@ -1,8 +1,9 @@
 ---
 source: crates/ruff_linter/src/rules/pyflakes/mod.rs
 ---
-error[F401]: F401_11.py:4:27: [*] `pathlib.PurePath` imported but unused
+error[F401]: 4:27: [*] `pathlib.PurePath` imported but unused
 
+ --> F401_11.py:4:27
   |
 3 | from typing import List
 4 | from pathlib import Path, PurePath

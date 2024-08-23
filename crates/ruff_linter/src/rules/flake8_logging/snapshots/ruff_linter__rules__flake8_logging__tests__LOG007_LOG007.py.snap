@@ -1,8 +1,9 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_logging/mod.rs
 ---
-error[LOG007]: LOG007.py:6:1: Use of `logging.exception` with falsy `exc_info`
+error[LOG007]: 6:1: Use of `logging.exception` with falsy `exc_info`
 
+ --> LOG007.py:5:31
   |
 5 | logging.exception("foo")  # OK
 6 | logging.exception("foo", exc_info=False)  # LOG007
@@ -10,8 +11,9 @@ error[LOG007]: LOG007.py:6:1: Use of `logging.exception` with falsy `exc_info`
 7 | logging.exception("foo", exc_info=[])  # LOG007
 8 | logger.exception("foo")  # OK
   |
-error[LOG007]: LOG007.py:7:1: Use of `logging.exception` with falsy `exc_info`
+error[LOG007]: 7:1: Use of `logging.exception` with falsy `exc_info`
 
+ --> LOG007.py:6:51
   |
 5 | logging.exception("foo")  # OK
 6 | logging.exception("foo", exc_info=False)  # LOG007
@@ -20,8 +22,9 @@ error[LOG007]: LOG007.py:7:1: Use of `logging.exception` with falsy `exc_info`
 8 | logger.exception("foo")  # OK
 9 | logger.exception("foo", exc_info=False)  # LOG007
   |
-error[LOG007]: LOG007.py:9:1: Use of `logging.exception` with falsy `exc_info`
+error[LOG007]: 9:1: Use of `logging.exception` with falsy `exc_info`
 
+  --> LOG007.py:8:30
    |
  7 | logging.exception("foo", exc_info=[])  # LOG007
  8 | logger.exception("foo")  # OK
@@ -30,8 +33,9 @@ error[LOG007]: LOG007.py:9:1: Use of `logging.exception` with falsy `exc_info`
 10 | logger.exception("foo", exc_info=[])  # LOG007
 11 | logger.error("foo", exc_info=False)  # OK
    |
-error[LOG007]: LOG007.py:10:1: Use of `logging.exception` with falsy `exc_info`
+error[LOG007]: 10:1: Use of `logging.exception` with falsy `exc_info`
 
+  --> LOG007.py:9:50
    |
  8 | logger.exception("foo")  # OK
  9 | logger.exception("foo", exc_info=False)  # LOG007
@@ -40,8 +44,9 @@ error[LOG007]: LOG007.py:10:1: Use of `logging.exception` with falsy `exc_info`
 11 | logger.error("foo", exc_info=False)  # OK
 12 | logger.info("foo", exc_info=False)  # OK
    |
-error[LOG007]: LOG007.py:17:1: Use of `logging.exception` with falsy `exc_info`
+error[LOG007]: 17:1: Use of `logging.exception` with falsy `exc_info`
 
+  --> LOG007.py:16:1
    |
 15 | from logging import exception
 16 | 

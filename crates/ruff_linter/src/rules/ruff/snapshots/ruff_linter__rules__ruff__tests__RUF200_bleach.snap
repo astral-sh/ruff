@@ -1,10 +1,11 @@
 ---
 source: crates/ruff_linter/src/rules/ruff/mod.rs
 ---
-error[RUF200]: pyproject.toml:5:16: Failed to parse pyproject.toml: Version specifier `>=1.1.0<1.2` doesn't match PEP 440 rules
+error[RUF200]: 5:16: Failed to parse pyproject.toml: Version specifier `>=1.1.0<1.2` doesn't match PEP 440 rules
 tinycss2>=1.1.0<1.2
         ^^^^^^^^^^^
 
+ --> pyproject.toml:5:16
   |
 3 |   version = "0.1.0"
 4 |   # There's a comma missing here

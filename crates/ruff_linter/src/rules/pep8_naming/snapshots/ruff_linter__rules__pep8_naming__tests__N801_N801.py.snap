@@ -1,36 +1,41 @@
 ---
 source: crates/ruff_linter/src/rules/pep8_naming/mod.rs
 ---
-error[N801]: N801.py:1:7: Class name `bad` should use CapWords convention
+error[N801]: 1:7: Class name `bad` should use CapWords convention
 
+ --> N801.py:1:7
   |
 1 | class bad:
   |       ^^^
 2 |     pass
   |
-error[N801]: N801.py:5:7: Class name `_bad` should use CapWords convention
+error[N801]: 5:7: Class name `_bad` should use CapWords convention
 
+ --> N801.py:5:7
   |
 5 | class _bad:
   |       ^^^^
 6 |     pass
   |
-error[N801]: N801.py:9:7: Class name `bad_class` should use CapWords convention
+error[N801]: 9:7: Class name `bad_class` should use CapWords convention
 
+  --> N801.py:9:7
    |
  9 | class bad_class:
    |       ^^^^^^^^^
 10 |     pass
    |
-error[N801]: N801.py:13:7: Class name `Bad_Class` should use CapWords convention
+error[N801]: 13:7: Class name `Bad_Class` should use CapWords convention
 
+  --> N801.py:13:7
    |
 13 | class Bad_Class:
    |       ^^^^^^^^^
 14 |     pass
    |
-error[N801]: N801.py:17:7: Class name `BAD_CLASS` should use CapWords convention
+error[N801]: 17:7: Class name `BAD_CLASS` should use CapWords convention
 
+  --> N801.py:17:7
    |
 17 | class BAD_CLASS:
    |       ^^^^^^^^^

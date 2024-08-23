@@ -1,8 +1,9 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_pyi/mod.rs
 ---
-error[PYI013]: PYI013.pyi:5:5: [*] Non-empty class body must not contain `...`
+error[PYI013]: 5:5: [*] Non-empty class body must not contain `...`
 
+ --> PYI013.pyi:5:5
   |
 3 | class OneAttributeClass:
 4 |     value: int
@@ -21,8 +22,9 @@ error[PYI013]: PYI013.pyi:5:5: [*] Non-empty class body must not contain `...`
 7 6 | class OneAttributeClass2:
 8 7 |     ...  # Error
 
-error[PYI013]: PYI013.pyi:8:5: [*] Non-empty class body must not contain `...`
+error[PYI013]: 8:5: [*] Non-empty class body must not contain `...`
 
+ --> PYI013.pyi:8:5
   |
 7 | class OneAttributeClass2:
 8 |     ...  # Error
@@ -39,8 +41,9 @@ error[PYI013]: PYI013.pyi:8:5: [*] Non-empty class body must not contain `...`
 10 9 | 
 11 10 | class MyClass:
 
-error[PYI013]: PYI013.pyi:12:5: [*] Non-empty class body must not contain `...`
+error[PYI013]: 12:5: [*] Non-empty class body must not contain `...`
 
+  --> PYI013.pyi:12:5
    |
 11 | class MyClass:
 12 |     ...
@@ -57,8 +60,9 @@ error[PYI013]: PYI013.pyi:12:5: [*] Non-empty class body must not contain `...`
 14 13 | 
 15 14 | class TwoEllipsesClass:
 
-error[PYI013]: PYI013.pyi:16:5: [*] Non-empty class body must not contain `...`
+error[PYI013]: 16:5: [*] Non-empty class body must not contain `...`
 
+  --> PYI013.pyi:16:5
    |
 15 | class TwoEllipsesClass:
 16 |     ...
@@ -75,8 +79,9 @@ error[PYI013]: PYI013.pyi:16:5: [*] Non-empty class body must not contain `...`
 18 17 | 
 19 18 | class DocstringClass:
 
-error[PYI013]: PYI013.pyi:17:5: [*] Non-empty class body must not contain `...`
+error[PYI013]: 17:5: [*] Non-empty class body must not contain `...`
 
+  --> PYI013.pyi:17:5
    |
 15 | class TwoEllipsesClass:
 16 |     ...
@@ -95,8 +100,9 @@ error[PYI013]: PYI013.pyi:17:5: [*] Non-empty class body must not contain `...`
 19 18 | class DocstringClass:
 20 19 |     """
 
-error[PYI013]: PYI013.pyi:24:5: [*] Non-empty class body must not contain `...`
+error[PYI013]: 24:5: [*] Non-empty class body must not contain `...`
 
+  --> PYI013.pyi:24:5
    |
 22 |     """
 23 | 
@@ -115,8 +121,9 @@ error[PYI013]: PYI013.pyi:24:5: [*] Non-empty class body must not contain `...`
 26 25 | class NonEmptyChild(Exception):
 27 26 |     value: int
 
-error[PYI013]: PYI013.pyi:28:5: [*] Non-empty class body must not contain `...`
+error[PYI013]: 28:5: [*] Non-empty class body must not contain `...`
 
+  --> PYI013.pyi:28:5
    |
 26 | class NonEmptyChild(Exception):
 27 |     value: int
@@ -135,8 +142,9 @@ error[PYI013]: PYI013.pyi:28:5: [*] Non-empty class body must not contain `...`
 30 29 | class NonEmptyChild2(Exception):
 31 30 |     ...  # Error
 
-error[PYI013]: PYI013.pyi:31:5: [*] Non-empty class body must not contain `...`
+error[PYI013]: 31:5: [*] Non-empty class body must not contain `...`
 
+  --> PYI013.pyi:31:5
    |
 30 | class NonEmptyChild2(Exception):
 31 |     ...  # Error
@@ -153,8 +161,9 @@ error[PYI013]: PYI013.pyi:31:5: [*] Non-empty class body must not contain `...`
 33 32 | 
 34 33 | class NonEmptyWithInit:
 
-error[PYI013]: PYI013.pyi:36:5: [*] Non-empty class body must not contain `...`
+error[PYI013]: 36:5: [*] Non-empty class body must not contain `...`
 
+  --> PYI013.pyi:36:5
    |
 34 | class NonEmptyWithInit:
 35 |     value: int

@@ -1,8 +1,9 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_comprehensions/mod.rs
 ---
-error[C410]: C410.py:1:6: [*] Unnecessary `list` literal passed to `list()` (remove the outer call to `list()`)
+error[C410]: 1:6: [*] Unnecessary `list` literal passed to `list()` (remove the outer call to `list()`)
 
+ --> C410.py:1:6
   |
 1 | l1 = list([1, 2])
   |      ^^^^^^^^^^^^
@@ -17,8 +18,9 @@ error[C410]: C410.py:1:6: [*] Unnecessary `list` literal passed to `list()` (rem
 3 3 | l3 = list([])
 4 4 | l4 = list(())
 
-error[C410]: C410.py:2:6: [*] Unnecessary `tuple` literal passed to `list()` (rewrite as a `list` literal)
+error[C410]: 2:6: [*] Unnecessary `tuple` literal passed to `list()` (rewrite as a `list` literal)
 
+ --> C410.py:2:6
   |
 1 | l1 = list([1, 2])
 2 | l2 = list((1, 2))
@@ -35,8 +37,9 @@ error[C410]: C410.py:2:6: [*] Unnecessary `tuple` literal passed to `list()` (re
 4 4 | l4 = list(())
 5 5 | 
 
-error[C410]: C410.py:3:6: [*] Unnecessary `list` literal passed to `list()` (remove the outer call to `list()`)
+error[C410]: 3:6: [*] Unnecessary `list` literal passed to `list()` (remove the outer call to `list()`)
 
+ --> C410.py:3:6
   |
 1 | l1 = list([1, 2])
 2 | l2 = list((1, 2))
@@ -54,8 +57,9 @@ error[C410]: C410.py:3:6: [*] Unnecessary `list` literal passed to `list()` (rem
 5 5 | 
 6 6 | 
 
-error[C410]: C410.py:4:6: [*] Unnecessary `tuple` literal passed to `list()` (rewrite as a `list` literal)
+error[C410]: 4:6: [*] Unnecessary `tuple` literal passed to `list()` (rewrite as a `list` literal)
 
+ --> C410.py:4:6
   |
 2 | l2 = list((1, 2))
 3 | l3 = list([])
@@ -73,8 +77,9 @@ error[C410]: C410.py:4:6: [*] Unnecessary `tuple` literal passed to `list()` (re
 6 6 | 
 7 7 | list(  # comment
 
-error[C410]: C410.py:7:1: [*] Unnecessary `list` literal passed to `list()` (remove the outer call to `list()`)
+error[C410]: 7:1: [*] Unnecessary `list` literal passed to `list()` (remove the outer call to `list()`)
 
+  --> C410.py:7:1
    |
  7 | / list(  # comment
  8 | |     [1, 2]
@@ -96,8 +101,9 @@ error[C410]: C410.py:7:1: [*] Unnecessary `list` literal passed to `list()` (rem
 11 9  | list([  # comment
 12 10 |     1, 2
 
-error[C410]: C410.py:11:1: [*] Unnecessary `list` literal passed to `list()` (remove the outer call to `list()`)
+error[C410]: 11:1: [*] Unnecessary `list` literal passed to `list()` (remove the outer call to `list()`)
 
+  --> C410.py:10:1
    |
  9 |   )
 10 |   

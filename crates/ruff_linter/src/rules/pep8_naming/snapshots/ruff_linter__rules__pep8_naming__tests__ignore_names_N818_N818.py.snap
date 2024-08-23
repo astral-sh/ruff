@@ -1,8 +1,9 @@
 ---
 source: crates/ruff_linter/src/rules/pep8_naming/mod.rs
 ---
-error[N818]: N818.py:4:7: Exception name `StillBad` should be named with an Error suffix
+error[N818]: 4:7: Exception name `StillBad` should be named with an Error suffix
 
+ --> N818.py:4:7
   |
 2 |     pass
 3 | 
@@ -10,8 +11,9 @@ error[N818]: N818.py:4:7: Exception name `StillBad` should be named with an Erro
   |       ^^^^^^^^
 5 |     pass
   |
-error[N818]: N818.py:10:7: Exception name `StillBad` should be named with an Error suffix
+error[N818]: 10:7: Exception name `StillBad` should be named with an Error suffix
 
+  --> N818.py:10:7
    |
  8 |     pass
  9 | 

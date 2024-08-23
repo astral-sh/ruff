@@ -1,8 +1,9 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_comprehensions/mod.rs
 ---
-error[C403]: C403.py:1:5: [*] Unnecessary `list` comprehension (rewrite as a `set` comprehension)
+error[C403]: 1:5: [*] Unnecessary `list` comprehension (rewrite as a `set` comprehension)
 
+ --> C403.py:1:5
   |
 1 | s = set([x for x in range(3)])
   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -17,8 +18,9 @@ error[C403]: C403.py:1:5: [*] Unnecessary `list` comprehension (rewrite as a `se
 3 3 |     [x for x in range(3)]
 4 4 | )
 
-error[C403]: C403.py:2:5: [*] Unnecessary `list` comprehension (rewrite as a `set` comprehension)
+error[C403]: 2:5: [*] Unnecessary `list` comprehension (rewrite as a `set` comprehension)
 
+ --> C403.py:2:5
   |
 1 |   s = set([x for x in range(3)])
 2 |   s = set(
@@ -42,8 +44,9 @@ error[C403]: C403.py:2:5: [*] Unnecessary `list` comprehension (rewrite as a `se
 6 6 | s = f"{set([x for x in 'ab'])}"
 7 7 | s = f'{set([x for x in "ab"])}'
 
-error[C403]: C403.py:6:8: [*] Unnecessary `list` comprehension (rewrite as a `set` comprehension)
+error[C403]: 6:8: [*] Unnecessary `list` comprehension (rewrite as a `set` comprehension)
 
+ --> C403.py:6:8
   |
 4 | )
 5 | 
@@ -62,8 +65,9 @@ error[C403]: C403.py:6:8: [*] Unnecessary `list` comprehension (rewrite as a `se
 8 8 | 
 9 9 | def f(x):
 
-error[C403]: C403.py:7:8: [*] Unnecessary `list` comprehension (rewrite as a `set` comprehension)
+error[C403]: 7:8: [*] Unnecessary `list` comprehension (rewrite as a `set` comprehension)
 
+ --> C403.py:7:8
   |
 6 | s = f"{set([x for x in 'ab'])}"
 7 | s = f'{set([x for x in "ab"])}'
@@ -82,8 +86,9 @@ error[C403]: C403.py:7:8: [*] Unnecessary `list` comprehension (rewrite as a `se
 9 9 | def f(x):
 10 10 |     return x
 
-error[C403]: C403.py:12:8: [*] Unnecessary `list` comprehension (rewrite as a `set` comprehension)
+error[C403]: 12:8: [*] Unnecessary `list` comprehension (rewrite as a `set` comprehension)
 
+  --> C403.py:12:8
    |
 10 |     return x
 11 | 
@@ -103,8 +108,9 @@ error[C403]: C403.py:12:8: [*] Unnecessary `list` comprehension (rewrite as a `s
 14 14 | s = f"{ set([x for x in 'ab']) | set([x for x in 'ab']) }"
 15 15 | s = f"{set([x for x in 'ab']) | set([x for x in 'ab'])}"
 
-error[C403]: C403.py:14:9: [*] Unnecessary `list` comprehension (rewrite as a `set` comprehension)
+error[C403]: 14:9: [*] Unnecessary `list` comprehension (rewrite as a `set` comprehension)
 
+  --> C403.py:14:9
    |
 12 | s = f"{set([f(x) for x in 'ab'])}"
 13 | 
@@ -123,8 +129,9 @@ error[C403]: C403.py:14:9: [*] Unnecessary `list` comprehension (rewrite as a `s
 16 16 | 
 17 17 | s = set(  # comment
 
-error[C403]: C403.py:14:34: [*] Unnecessary `list` comprehension (rewrite as a `set` comprehension)
+error[C403]: 14:34: [*] Unnecessary `list` comprehension (rewrite as a `set` comprehension)
 
+  --> C403.py:14:34
    |
 12 | s = f"{set([f(x) for x in 'ab'])}"
 13 | 
@@ -143,8 +150,9 @@ error[C403]: C403.py:14:34: [*] Unnecessary `list` comprehension (rewrite as a `
 16 16 | 
 17 17 | s = set(  # comment
 
-error[C403]: C403.py:15:8: [*] Unnecessary `list` comprehension (rewrite as a `set` comprehension)
+error[C403]: 15:8: [*] Unnecessary `list` comprehension (rewrite as a `set` comprehension)
 
+  --> C403.py:15:8
    |
 14 | s = f"{ set([x for x in 'ab']) | set([x for x in 'ab']) }"
 15 | s = f"{set([x for x in 'ab']) | set([x for x in 'ab'])}"
@@ -163,8 +171,9 @@ error[C403]: C403.py:15:8: [*] Unnecessary `list` comprehension (rewrite as a `s
 17 17 | s = set(  # comment
 18 18 |     [x for x in range(3)]
 
-error[C403]: C403.py:15:33: [*] Unnecessary `list` comprehension (rewrite as a `set` comprehension)
+error[C403]: 15:33: [*] Unnecessary `list` comprehension (rewrite as a `set` comprehension)
 
+  --> C403.py:15:33
    |
 14 | s = f"{ set([x for x in 'ab']) | set([x for x in 'ab']) }"
 15 | s = f"{set([x for x in 'ab']) | set([x for x in 'ab'])}"
@@ -183,8 +192,9 @@ error[C403]: C403.py:15:33: [*] Unnecessary `list` comprehension (rewrite as a `
 17 17 | s = set(  # comment
 18 18 |     [x for x in range(3)]
 
-error[C403]: C403.py:17:5: [*] Unnecessary `list` comprehension (rewrite as a `set` comprehension)
+error[C403]: 17:5: [*] Unnecessary `list` comprehension (rewrite as a `set` comprehension)
 
+  --> C403.py:17:5
    |
 15 |   s = f"{set([x for x in 'ab']) | set([x for x in 'ab'])}"
 16 |   
@@ -211,8 +221,9 @@ error[C403]: C403.py:17:5: [*] Unnecessary `list` comprehension (rewrite as a `s
 21 21 | s = set([  # comment
 22 22 |     x for x in range(3)
 
-error[C403]: C403.py:21:5: [*] Unnecessary `list` comprehension (rewrite as a `set` comprehension)
+error[C403]: 21:5: [*] Unnecessary `list` comprehension (rewrite as a `set` comprehension)
 
+  --> C403.py:21:5
    |
 19 |   )
 20 |   

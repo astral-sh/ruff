@@ -1,16 +1,18 @@
 ---
 source: crates/ruff_linter/src/rules/tryceratops/mod.rs
 ---
-error[TRY401]: TRY401.py:8:45: Redundant exception object included in `logging.exception` call
+error[TRY401]: 8:45: Redundant exception object included in `logging.exception` call
 
+ --> TRY401.py:8:45
   |
 6 |         finish()
 7 |     except Exception as ex:
 8 |         logger.exception(f"Found an error: {ex}")  # TRY401
   |                                             ^^
   |
-error[TRY401]: TRY401.py:19:53: Redundant exception object included in `logging.exception` call
+error[TRY401]: 19:53: Redundant exception object included in `logging.exception` call
 
+  --> TRY401.py:19:53
    |
 17 |         if True is False:
 18 |             for i in range(10):
@@ -19,8 +21,9 @@ error[TRY401]: TRY401.py:19:53: Redundant exception object included in `logging.
 20 |     except IndexError as bad:
 21 |         logger.exception(f"Found an error: {bad} {bad}")  # TRY401
    |
-error[TRY401]: TRY401.py:21:45: Redundant exception object included in `logging.exception` call
+error[TRY401]: 21:45: Redundant exception object included in `logging.exception` call
 
+  --> TRY401.py:21:45
    |
 19 |                 logger.exception(f"Found an error: {bad} {good}")  # TRY401
 20 |     except IndexError as bad:
@@ -29,8 +32,9 @@ error[TRY401]: TRY401.py:21:45: Redundant exception object included in `logging.
 22 |     except Exception as bad:
 23 |         logger.exception(f"Found an error: {bad}")  # TRY401
    |
-error[TRY401]: TRY401.py:21:51: Redundant exception object included in `logging.exception` call
+error[TRY401]: 21:51: Redundant exception object included in `logging.exception` call
 
+  --> TRY401.py:21:51
    |
 19 |                 logger.exception(f"Found an error: {bad} {good}")  # TRY401
 20 |     except IndexError as bad:
@@ -39,8 +43,9 @@ error[TRY401]: TRY401.py:21:51: Redundant exception object included in `logging.
 22 |     except Exception as bad:
 23 |         logger.exception(f"Found an error: {bad}")  # TRY401
    |
-error[TRY401]: TRY401.py:23:45: Redundant exception object included in `logging.exception` call
+error[TRY401]: 23:45: Redundant exception object included in `logging.exception` call
 
+  --> TRY401.py:23:45
    |
 21 |         logger.exception(f"Found an error: {bad} {bad}")  # TRY401
 22 |     except Exception as bad:
@@ -48,8 +53,9 @@ error[TRY401]: TRY401.py:23:45: Redundant exception object included in `logging.
    |                                             ^^^
 24 |         logger.exception(f"Found an error: {bad}")  # TRY401
    |
-error[TRY401]: TRY401.py:24:45: Redundant exception object included in `logging.exception` call
+error[TRY401]: 24:45: Redundant exception object included in `logging.exception` call
 
+  --> TRY401.py:24:45
    |
 22 |     except Exception as bad:
 23 |         logger.exception(f"Found an error: {bad}")  # TRY401
@@ -58,47 +64,53 @@ error[TRY401]: TRY401.py:24:45: Redundant exception object included in `logging.
 25 | 
 26 |         if True:
    |
-error[TRY401]: TRY401.py:27:49: Redundant exception object included in `logging.exception` call
+error[TRY401]: 27:49: Redundant exception object included in `logging.exception` call
 
+  --> TRY401.py:27:49
    |
 26 |         if True:
 27 |             logger.exception(f"Found an error: {bad}")  # TRY401
    |                                                 ^^^
    |
-error[TRY401]: TRY401.py:39:47: Redundant exception object included in `logging.exception` call
+error[TRY401]: 39:47: Redundant exception object included in `logging.exception` call
 
+  --> TRY401.py:39:47
    |
 37 |         ...
 38 |     except Exception as ex:
 39 |         logger.exception(f"Logging an error: {ex}")  # TRY401
    |                                               ^^
    |
-error[TRY401]: TRY401.py:46:53: Redundant exception object included in `logging.exception` call
+error[TRY401]: 46:53: Redundant exception object included in `logging.exception` call
 
+  --> TRY401.py:46:53
    |
 44 |         ...
 45 |     except Exception as ex:
 46 |         logger.exception("Logging an error: " + str(ex))  # TRY401
    |                                                     ^^
    |
-error[TRY401]: TRY401.py:53:47: Redundant exception object included in `logging.exception` call
+error[TRY401]: 53:47: Redundant exception object included in `logging.exception` call
 
+  --> TRY401.py:53:47
    |
 51 |         ...
 52 |     except Exception as ex:
 53 |         logger.exception("Logging an error:", ex)  # TRY401
    |                                               ^^
    |
-error[TRY401]: TRY401.py:77:38: Redundant exception object included in `logging.exception` call
+error[TRY401]: 77:38: Redundant exception object included in `logging.exception` call
 
+  --> TRY401.py:77:38
    |
 75 |         finish()
 76 |     except Exception as ex:
 77 |         exception(f"Found an error: {ex}")  # TRY401
    |                                      ^^
    |
-error[TRY401]: TRY401.py:88:46: Redundant exception object included in `logging.exception` call
+error[TRY401]: 88:46: Redundant exception object included in `logging.exception` call
 
+  --> TRY401.py:88:46
    |
 86 |         if True is False:
 87 |             for i in range(10):
@@ -107,8 +119,9 @@ error[TRY401]: TRY401.py:88:46: Redundant exception object included in `logging.
 89 |     except IndexError as bad:
 90 |         exception(f"Found an error: {bad} {bad}")  # TRY401
    |
-error[TRY401]: TRY401.py:90:38: Redundant exception object included in `logging.exception` call
+error[TRY401]: 90:38: Redundant exception object included in `logging.exception` call
 
+  --> TRY401.py:90:38
    |
 88 |                 exception(f"Found an error: {bad} {good}")  # TRY401
 89 |     except IndexError as bad:
@@ -117,8 +130,9 @@ error[TRY401]: TRY401.py:90:38: Redundant exception object included in `logging.
 91 |     except Exception as bad:
 92 |         exception(f"Found an error: {bad}")  # TRY401
    |
-error[TRY401]: TRY401.py:90:44: Redundant exception object included in `logging.exception` call
+error[TRY401]: 90:44: Redundant exception object included in `logging.exception` call
 
+  --> TRY401.py:90:44
    |
 88 |                 exception(f"Found an error: {bad} {good}")  # TRY401
 89 |     except IndexError as bad:
@@ -127,8 +141,9 @@ error[TRY401]: TRY401.py:90:44: Redundant exception object included in `logging.
 91 |     except Exception as bad:
 92 |         exception(f"Found an error: {bad}")  # TRY401
    |
-error[TRY401]: TRY401.py:92:38: Redundant exception object included in `logging.exception` call
+error[TRY401]: 92:38: Redundant exception object included in `logging.exception` call
 
+  --> TRY401.py:92:38
    |
 90 |         exception(f"Found an error: {bad} {bad}")  # TRY401
 91 |     except Exception as bad:
@@ -136,8 +151,9 @@ error[TRY401]: TRY401.py:92:38: Redundant exception object included in `logging.
    |                                      ^^^
 93 |         exception(f"Found an error: {bad}")  # TRY401
    |
-error[TRY401]: TRY401.py:93:38: Redundant exception object included in `logging.exception` call
+error[TRY401]: 93:38: Redundant exception object included in `logging.exception` call
 
+  --> TRY401.py:93:38
    |
 91 |     except Exception as bad:
 92 |         exception(f"Found an error: {bad}")  # TRY401
@@ -146,47 +162,53 @@ error[TRY401]: TRY401.py:93:38: Redundant exception object included in `logging.
 94 | 
 95 |         if True:
    |
-error[TRY401]: TRY401.py:96:42: Redundant exception object included in `logging.exception` call
+error[TRY401]: 96:42: Redundant exception object included in `logging.exception` call
 
+  --> TRY401.py:96:42
    |
 95 |         if True:
 96 |             exception(f"Found an error: {bad}")  # TRY401
    |                                          ^^^
    |
-error[TRY401]: TRY401.py:103:40: Redundant exception object included in `logging.exception` call
+error[TRY401]: 103:40: Redundant exception object included in `logging.exception` call
 
+   --> TRY401.py:103:40
     |
 101 |         ...
 102 |     except Exception as ex:
 103 |         exception(f"Logging an error: {ex}")  # TRY401
     |                                        ^^
     |
-error[TRY401]: TRY401.py:110:46: Redundant exception object included in `logging.exception` call
+error[TRY401]: 110:46: Redundant exception object included in `logging.exception` call
 
+   --> TRY401.py:110:46
     |
 108 |         ...
 109 |     except Exception as ex:
 110 |         exception("Logging an error: " + str(ex))  # TRY401
     |                                              ^^
     |
-error[TRY401]: TRY401.py:117:40: Redundant exception object included in `logging.exception` call
+error[TRY401]: 117:40: Redundant exception object included in `logging.exception` call
 
+   --> TRY401.py:117:40
     |
 115 |         ...
 116 |     except Exception as ex:
 117 |         exception("Logging an error:", ex)  # TRY401
     |                                        ^^
     |
-error[TRY401]: TRY401.py:139:49: Redundant exception object included in `logging.exception` call
+error[TRY401]: 139:49: Redundant exception object included in `logging.exception` call
 
+   --> TRY401.py:139:49
     |
 137 |             finish()
 138 |         except Exception as ex:
 139 |             logger.exception(f"Found an error: {ex}")  # TRY401
     |                                                 ^^
     |
-error[TRY401]: TRY401.py:150:49: Redundant exception object included in `logging.exception` call
+error[TRY401]: 150:49: Redundant exception object included in `logging.exception` call
 
+   --> TRY401.py:150:49
     |
 148 |             finish()
 149 |         except Exception:

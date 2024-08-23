@@ -1,15 +1,17 @@
 ---
 source: crates/ruff_linter/src/rules/pyflakes/mod.rs
 ---
-error[F706]: F706.py:6:5: `return` statement outside of a function/method
+error[F706]: 6:5: `return` statement outside of a function/method
 
+ --> F706.py:6:5
   |
 5 | class Foo:
 6 |     return 2
   |     ^^^^^^^^
   |
-error[F706]: F706.py:9:1: `return` statement outside of a function/method
+error[F706]: 9:1: `return` statement outside of a function/method
 
+ --> F706.py:9:1
   |
 9 | return 3
   | ^^^^^^^^

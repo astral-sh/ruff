@@ -1,8 +1,9 @@
 ---
 source: crates/ruff_linter/src/rules/pydocstyle/mod.rs
 ---
-error[D301]: D.py:333:5: [*] Use `r"""` if any backslashes in a docstring
+error[D301]: 333:5: [*] Use `r"""` if any backslashes in a docstring
 
+   --> D.py:333:5
     |
 331 | @expect('D301: Use r""" if any backslashes in a docstring')
 332 | def double_quotes_backslash():

@@ -1,8 +1,9 @@
 ---
 source: crates/ruff_linter/src/rules/pyflakes/mod.rs
 ---
-error[F811]: F811_8.py:5:12: [*] Redefinition of unused `os` from line 4
+error[F811]: 5:12: [*] Redefinition of unused `os` from line 4
 
+ --> F811_8.py:5:12
   |
 3 | try:
 4 |     import os

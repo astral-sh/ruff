@@ -1,8 +1,9 @@
 ---
 source: crates/ruff_linter/src/rules/refurb/mod.rs
 ---
-error[FURB129]: FURB129.py:7:18: [*] Instead of calling `readlines()`, iterate over file object directly
+error[FURB129]: 7:18: [*] Instead of calling `readlines()`, iterate over file object directly
 
+ --> FURB129.py:7:18
   |
 5 | # Errors
 6 | with open("FURB129.py") as f:
@@ -22,8 +23,9 @@ error[FURB129]: FURB129.py:7:18: [*] Instead of calling `readlines()`, iterate o
 9 9 |     a = [line.lower() for line in f.readlines()]
 10 10 |     b = {line.upper() for line in f.readlines()}
 
-error[FURB129]: FURB129.py:9:35: [*] Instead of calling `readlines()`, iterate over file object directly
+error[FURB129]: 9:35: [*] Instead of calling `readlines()`, iterate over file object directly
 
+  --> FURB129.py:9:35
    |
  7 |     for _line in f.readlines():
  8 |         pass
@@ -43,8 +45,9 @@ error[FURB129]: FURB129.py:9:35: [*] Instead of calling `readlines()`, iterate o
 11 11 |     c = {line.lower(): line.upper() for line in f.readlines()}
 12 12 | 
 
-error[FURB129]: FURB129.py:10:35: [*] Instead of calling `readlines()`, iterate over file object directly
+error[FURB129]: 10:35: [*] Instead of calling `readlines()`, iterate over file object directly
 
+  --> FURB129.py:10:35
    |
  8 |         pass
  9 |     a = [line.lower() for line in f.readlines()]
@@ -63,8 +66,9 @@ error[FURB129]: FURB129.py:10:35: [*] Instead of calling `readlines()`, iterate 
 12 12 | 
 13 13 | with Path("FURB129.py").open() as f:
 
-error[FURB129]: FURB129.py:11:49: [*] Instead of calling `readlines()`, iterate over file object directly
+error[FURB129]: 11:49: [*] Instead of calling `readlines()`, iterate over file object directly
 
+  --> FURB129.py:11:49
    |
  9 |     a = [line.lower() for line in f.readlines()]
 10 |     b = {line.upper() for line in f.readlines()}
@@ -84,8 +88,9 @@ error[FURB129]: FURB129.py:11:49: [*] Instead of calling `readlines()`, iterate 
 13 13 | with Path("FURB129.py").open() as f:
 14 14 |     for _line in f.readlines():
 
-error[FURB129]: FURB129.py:14:18: [*] Instead of calling `readlines()`, iterate over file object directly
+error[FURB129]: 14:18: [*] Instead of calling `readlines()`, iterate over file object directly
 
+  --> FURB129.py:14:18
    |
 13 | with Path("FURB129.py").open() as f:
 14 |     for _line in f.readlines():
@@ -103,8 +108,9 @@ error[FURB129]: FURB129.py:14:18: [*] Instead of calling `readlines()`, iterate 
 16 16 | 
 17 17 | for _line in open("FURB129.py").readlines():
 
-error[FURB129]: FURB129.py:17:14: [*] Instead of calling `readlines()`, iterate over file object directly
+error[FURB129]: 17:14: [*] Instead of calling `readlines()`, iterate over file object directly
 
+  --> FURB129.py:17:14
    |
 15 |         pass
 16 | 
@@ -123,8 +129,9 @@ error[FURB129]: FURB129.py:17:14: [*] Instead of calling `readlines()`, iterate 
 19 19 | 
 20 20 | for _line in Path("FURB129.py").open().readlines():
 
-error[FURB129]: FURB129.py:20:14: [*] Instead of calling `readlines()`, iterate over file object directly
+error[FURB129]: 20:14: [*] Instead of calling `readlines()`, iterate over file object directly
 
+  --> FURB129.py:20:14
    |
 18 |     pass
 19 | 
@@ -143,8 +150,9 @@ error[FURB129]: FURB129.py:20:14: [*] Instead of calling `readlines()`, iterate 
 22 22 | 
 23 23 | 
 
-error[FURB129]: FURB129.py:26:18: [*] Instead of calling `readlines()`, iterate over file object directly
+error[FURB129]: 26:18: [*] Instead of calling `readlines()`, iterate over file object directly
 
+  --> FURB129.py:26:18
    |
 24 | def func():
 25 |     f = Path("FURB129.py").open()
@@ -164,8 +172,9 @@ error[FURB129]: FURB129.py:26:18: [*] Instead of calling `readlines()`, iterate 
 28 28 |     f.close()
 29 29 | 
 
-error[FURB129]: FURB129.py:32:18: [*] Instead of calling `readlines()`, iterate over file object directly
+error[FURB129]: 32:18: [*] Instead of calling `readlines()`, iterate over file object directly
 
+  --> FURB129.py:32:18
    |
 31 | def func(f: io.BytesIO):
 32 |     for _line in f.readlines():
@@ -183,8 +192,9 @@ error[FURB129]: FURB129.py:32:18: [*] Instead of calling `readlines()`, iterate 
 34 34 | 
 35 35 | 
 
-error[FURB129]: FURB129.py:38:22: [*] Instead of calling `readlines()`, iterate over file object directly
+error[FURB129]: 38:22: [*] Instead of calling `readlines()`, iterate over file object directly
 
+  --> FURB129.py:38:22
    |
 36 | def func():
 37 |     with (open("FURB129.py") as f, foo as bar):
@@ -204,8 +214,9 @@ error[FURB129]: FURB129.py:38:22: [*] Instead of calling `readlines()`, iterate 
 40 40 |         for _line in bar.readlines():
 41 41 |             pass
 
-error[FURB129]: FURB129.py:48:17: [*] Instead of calling `readlines()`, iterate over file object directly
+error[FURB129]: 48:17: [*] Instead of calling `readlines()`, iterate over file object directly
 
+  --> FURB129.py:48:17
    |
 47 | with builtins.open("FURB129.py") as f:
 48 |     for line in f.readlines():
@@ -223,8 +234,9 @@ error[FURB129]: FURB129.py:48:17: [*] Instead of calling `readlines()`, iterate 
 50 50 | 
 51 51 | 
 
-error[FURB129]: FURB129.py:56:17: [*] Instead of calling `readlines()`, iterate over file object directly
+error[FURB129]: 56:17: [*] Instead of calling `readlines()`, iterate over file object directly
 
+  --> FURB129.py:56:17
    |
 55 | with o("FURB129.py") as f:
 56 |     for line in f.readlines():

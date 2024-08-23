@@ -2,16 +2,18 @@
 source: crates/ruff_linter/src/message/text.rs
 expression: content
 ---
-error[F401]: notebook.ipynb:cell 1:2:8: [*] `os` imported but unused
+error[F401]: cell 1:2:8: [*] `os` imported but unused
 
+ --> notebook.ipynb:2:8
   |
 1 | # cell 1
 2 | import os
   |        ^^
   |
   = help: Remove unused import: `os`
-error[F401]: notebook.ipynb:cell 2:2:8: [*] `math` imported but unused
+error[F401]: cell 2:2:8: [*] `math` imported but unused
 
+ --> notebook.ipynb:2:8
   |
 1 | # cell 2
 2 | import math
@@ -20,8 +22,9 @@ error[F401]: notebook.ipynb:cell 2:2:8: [*] `math` imported but unused
 4 | print('hello world')
   |
   = help: Remove unused import: `math`
-error[F841]: notebook.ipynb:cell 3:4:5: [*] Local variable `x` is assigned to but never used
+error[F841]: cell 3:4:5: [*] Local variable `x` is assigned to but never used
 
+ --> notebook.ipynb:4:5
   |
 2 | def foo():
 3 |     print()

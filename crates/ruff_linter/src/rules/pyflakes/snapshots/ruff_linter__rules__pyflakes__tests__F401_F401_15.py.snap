@@ -1,8 +1,9 @@
 ---
 source: crates/ruff_linter/src/rules/pyflakes/mod.rs
 ---
-error[F401]: F401_15.py:5:25: [*] `pathlib.Path` imported but unused
+error[F401]: 5:25: [*] `pathlib.Path` imported but unused
 
+ --> F401_15.py:5:25
   |
 4 | if TYPE_CHECKING:
 5 |     from pathlib import Path

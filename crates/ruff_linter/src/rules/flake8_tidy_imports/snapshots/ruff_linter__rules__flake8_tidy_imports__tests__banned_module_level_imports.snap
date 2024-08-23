@@ -1,8 +1,9 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_tidy_imports/mod.rs
 ---
-error[TID253]: TID253.py:2:8: `torch` is banned at the module level
+error[TID253]: 2:8: `torch` is banned at the module level
 
+ --> TID253.py:2:8
   |
 1 | ## Banned modules ##
 2 | import torch
@@ -10,8 +11,9 @@ error[TID253]: TID253.py:2:8: `torch` is banned at the module level
 3 | 
 4 | from torch import *
   |
-error[TID253]: TID253.py:4:1: `torch` is banned at the module level
+error[TID253]: 4:1: `torch` is banned at the module level
 
+ --> TID253.py:3:1
   |
 2 | import torch
 3 | 
@@ -20,8 +22,9 @@ error[TID253]: TID253.py:4:1: `torch` is banned at the module level
 5 | 
 6 | from tensorflow import a, b, c
   |
-error[TID253]: TID253.py:6:1: `tensorflow` is banned at the module level
+error[TID253]: 6:1: `tensorflow` is banned at the module level
 
+ --> TID253.py:5:1
   |
 4 | from torch import *
 5 | 
@@ -30,8 +33,9 @@ error[TID253]: TID253.py:6:1: `tensorflow` is banned at the module level
 7 | 
 8 | import torch as torch_wearing_a_trenchcoat
   |
-error[TID253]: TID253.py:8:8: `torch` is banned at the module level
+error[TID253]: 8:8: `torch` is banned at the module level
 
+  --> TID253.py:8:8
    |
  6 | from tensorflow import a, b, c
  7 | 
@@ -40,8 +44,9 @@ error[TID253]: TID253.py:8:8: `torch` is banned at the module level
  9 | 
 10 | # this should count as module level
    |
-error[TID253]: TID253.py:11:15: `tensorflow` is banned at the module level
+error[TID253]: 11:15: `tensorflow` is banned at the module level
 
+  --> TID253.py:11:15
    |
 10 | # this should count as module level
 11 | x = 1; import tensorflow
@@ -49,8 +54,9 @@ error[TID253]: TID253.py:11:15: `tensorflow` is banned at the module level
 12 | 
 13 | # banning a module also bans any submodules
    |
-error[TID253]: TID253.py:14:8: `torch` is banned at the module level
+error[TID253]: 14:8: `torch` is banned at the module level
 
+  --> TID253.py:14:8
    |
 13 | # banning a module also bans any submodules
 14 | import torch.foo.bar
@@ -58,8 +64,9 @@ error[TID253]: TID253.py:14:8: `torch` is banned at the module level
 15 | 
 16 | from tensorflow.foo import bar
    |
-error[TID253]: TID253.py:16:1: `tensorflow` is banned at the module level
+error[TID253]: 16:1: `tensorflow` is banned at the module level
 
+  --> TID253.py:15:1
    |
 14 | import torch.foo.bar
 15 | 
@@ -68,8 +75,9 @@ error[TID253]: TID253.py:16:1: `tensorflow` is banned at the module level
 17 | 
 18 | from torch.foo.bar import *
    |
-error[TID253]: TID253.py:18:1: `torch` is banned at the module level
+error[TID253]: 18:1: `torch` is banned at the module level
 
+  --> TID253.py:17:1
    |
 16 | from tensorflow.foo import bar
 17 | 

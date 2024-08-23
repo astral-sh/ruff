@@ -1,8 +1,9 @@
 ---
 source: crates/ruff_linter/src/rules/pylint/mod.rs
 ---
-error[PLC0205]: single_string_slots.py:3:5: Class `__slots__` should be a non-string iterable
+error[PLC0205]: 3:5: Class `__slots__` should be a non-string iterable
 
+ --> single_string_slots.py:3:5
   |
 1 | # Errors.
 2 | class Foo:
@@ -11,8 +12,9 @@ error[PLC0205]: single_string_slots.py:3:5: Class `__slots__` should be a non-st
 4 | 
 5 |     def __init__(self, bar):
   |
-error[PLC0205]: single_string_slots.py:10:5: Class `__slots__` should be a non-string iterable
+error[PLC0205]: 10:5: Class `__slots__` should be a non-string iterable
 
+  --> single_string_slots.py:10:5
    |
  9 | class Foo:
 10 |     __slots__: str = "bar"
@@ -20,8 +22,9 @@ error[PLC0205]: single_string_slots.py:10:5: Class `__slots__` should be a non-s
 11 | 
 12 |     def __init__(self, bar):
    |
-error[PLC0205]: single_string_slots.py:17:5: Class `__slots__` should be a non-string iterable
+error[PLC0205]: 17:5: Class `__slots__` should be a non-string iterable
 
+  --> single_string_slots.py:17:5
    |
 16 | class Foo:
 17 |     __slots__: str = f"bar"

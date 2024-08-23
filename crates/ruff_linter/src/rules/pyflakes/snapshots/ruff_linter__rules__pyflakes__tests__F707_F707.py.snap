@@ -1,8 +1,9 @@
 ---
 source: crates/ruff_linter/src/rules/pyflakes/mod.rs
 ---
-error[F707]: F707.py:3:1: An `except` block as not the last exception handler
+error[F707]: 3:1: An `except` block as not the last exception handler
 
+ --> F707.py:2:9
   |
 1 | try:
 2 |     pass
@@ -11,8 +12,9 @@ error[F707]: F707.py:3:1: An `except` block as not the last exception handler
 4 |     pass
 5 | except ValueError:
   |
-error[F707]: F707.py:10:1: An `except` block as not the last exception handler
+error[F707]: 10:1: An `except` block as not the last exception handler
 
+  --> F707.py:9:9
    |
  8 | try:
  9 |     pass
@@ -21,8 +23,9 @@ error[F707]: F707.py:10:1: An `except` block as not the last exception handler
 11 |     pass
 12 | except ValueError:
    |
-error[F707]: F707.py:19:1: An `except` block as not the last exception handler
+error[F707]: 19:1: An `except` block as not the last exception handler
 
+  --> F707.py:18:9
    |
 17 | try:
 18 |     pass

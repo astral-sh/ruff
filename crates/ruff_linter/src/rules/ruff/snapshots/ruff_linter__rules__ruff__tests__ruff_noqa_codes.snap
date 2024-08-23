@@ -1,8 +1,9 @@
 ---
 source: crates/ruff_linter/src/rules/ruff/mod.rs
 ---
-error[F841]: ruff_noqa_codes.py:8:5: [*] Local variable `x` is assigned to but never used
+error[F841]: 8:5: [*] Local variable `x` is assigned to but never used
 
+ --> ruff_noqa_codes.py:8:5
   |
 7 | def f():
 8 |     x = 1

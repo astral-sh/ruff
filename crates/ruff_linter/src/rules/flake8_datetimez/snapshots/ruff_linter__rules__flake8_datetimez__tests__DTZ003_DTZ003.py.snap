@@ -1,8 +1,9 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_datetimez/mod.rs
 ---
-error[DTZ003]: DTZ003.py:4:1: `datetime.datetime.utcnow()` used
+error[DTZ003]: 4:1: `datetime.datetime.utcnow()` used
 
+ --> DTZ003.py:3:12
   |
 3 | # qualified
 4 | datetime.datetime.utcnow()
@@ -11,8 +12,9 @@ error[DTZ003]: DTZ003.py:4:1: `datetime.datetime.utcnow()` used
 6 | from datetime import datetime
   |
   = help: Use `datetime.datetime.now(tz=...)` instead
-error[DTZ003]: DTZ003.py:9:1: `datetime.datetime.utcnow()` used
+error[DTZ003]: 9:1: `datetime.datetime.utcnow()` used
 
+  --> DTZ003.py:8:14
    |
  8 | # unqualified
  9 | datetime.utcnow()

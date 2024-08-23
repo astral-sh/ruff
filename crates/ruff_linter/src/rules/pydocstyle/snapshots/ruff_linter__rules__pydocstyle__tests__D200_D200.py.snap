@@ -1,8 +1,9 @@
 ---
 source: crates/ruff_linter/src/rules/pydocstyle/mod.rs
 ---
-error[D200]: D200.py:2:5: One-line docstring should fit on one line
+error[D200]: 2:5: One-line docstring should fit on one line
 
+ --> D200.py:2:5
   |
 1 |   def func():
 2 |       """\
@@ -11,8 +12,9 @@ error[D200]: D200.py:2:5: One-line docstring should fit on one line
   | |_______^
   |
   = help: Reformat to one line
-error[D200]: D200.py:7:5: [*] One-line docstring should fit on one line
+error[D200]: 7:5: [*] One-line docstring should fit on one line
 
+ --> D200.py:7:5
   |
 6 |   def func():
 7 |       """\\
@@ -32,8 +34,9 @@ error[D200]: D200.py:7:5: [*] One-line docstring should fit on one line
 10 9 | 
 11 10 | def func():
 
-error[D200]: D200.py:12:5: One-line docstring should fit on one line
+error[D200]: 12:5: One-line docstring should fit on one line
 
+  --> D200.py:12:5
    |
 11 |   def func():
 12 |       """\ \

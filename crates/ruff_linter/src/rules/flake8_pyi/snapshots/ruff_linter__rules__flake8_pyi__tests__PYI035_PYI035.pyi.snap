@@ -1,16 +1,18 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_pyi/mod.rs
 ---
-error[PYI035]: PYI035.pyi:1:1: `__all__` in a stub file must have a value, as it has the same semantics as `__all__` at runtime
+error[PYI035]: 1:1: `__all__` in a stub file must have a value, as it has the same semantics as `__all__` at runtime
 
+ --> PYI035.pyi:1:1
   |
 1 | __all__: list[str]  # Error: PYI035
   | ^^^^^^^^^^^^^^^^^^
 2 | 
 3 | __all__: list[str] = ["foo"]
   |
-error[PYI035]: PYI035.pyi:7:5: `__match_args__` in a stub file must have a value, as it has the same semantics as `__match_args__` at runtime
+error[PYI035]: 7:5: `__match_args__` in a stub file must have a value, as it has the same semantics as `__match_args__` at runtime
 
+ --> PYI035.pyi:7:5
   |
 5 | class Foo:
 6 |     __all__: list[str]
@@ -18,8 +20,9 @@ error[PYI035]: PYI035.pyi:7:5: `__match_args__` in a stub file must have a value
   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 8 |     __slots__: tuple[str, ...]  # Error: PYI035
   |
-error[PYI035]: PYI035.pyi:8:5: `__slots__` in a stub file must have a value, as it has the same semantics as `__slots__` at runtime
+error[PYI035]: 8:5: `__slots__` in a stub file must have a value, as it has the same semantics as `__slots__` at runtime
 
+  --> PYI035.pyi:8:5
    |
  6 |     __all__: list[str]
  7 |     __match_args__: tuple[str, ...]  # Error: PYI035

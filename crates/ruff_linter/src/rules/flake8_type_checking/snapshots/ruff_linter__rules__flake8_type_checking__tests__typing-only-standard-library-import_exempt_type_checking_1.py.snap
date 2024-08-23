@@ -1,8 +1,9 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_type_checking/mod.rs
 ---
-error[TCH003]: exempt_type_checking_1.py:5:20: [*] Move standard library import `typing.Final` into a type-checking block
+error[TCH003]: 5:20: [*] Move standard library import `typing.Final` into a type-checking block
 
+ --> exempt_type_checking_1.py:5:20
   |
 3 | from __future__ import annotations
 4 | 

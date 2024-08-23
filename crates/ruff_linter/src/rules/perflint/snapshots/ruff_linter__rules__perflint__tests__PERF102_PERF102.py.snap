@@ -1,8 +1,9 @@
 ---
 source: crates/ruff_linter/src/rules/perflint/mod.rs
 ---
-error[PERF102]: PERF102.py:5:21: [*] When using only the values of a dict use the `values()` method
+error[PERF102]: 5:21: [*] When using only the values of a dict use the `values()` method
 
+ --> PERF102.py:5:21
   |
 4 | def f():
 5 |     for _, value in some_dict.items():  # PERF102
@@ -20,8 +21,9 @@ error[PERF102]: PERF102.py:5:21: [*] When using only the values of a dict use th
 7 7 | 
 8 8 | 
 
-error[PERF102]: PERF102.py:10:19: [*] When using only the keys of a dict use the `keys()` method
+error[PERF102]: 10:19: [*] When using only the keys of a dict use the `keys()` method
 
+  --> PERF102.py:10:19
    |
  9 | def f():
 10 |     for key, _ in some_dict.items():  # PERF102
@@ -39,8 +41,9 @@ error[PERF102]: PERF102.py:10:19: [*] When using only the keys of a dict use the
 12 12 | 
 13 13 | 
 
-error[PERF102]: PERF102.py:15:30: [*] When using only the keys of a dict use the `keys()` method
+error[PERF102]: 15:30: [*] When using only the keys of a dict use the `keys()` method
 
+  --> PERF102.py:15:30
    |
 14 | def f():
 15 |     for weird_arg_name, _ in some_dict.items():  # PERF102
@@ -58,8 +61,9 @@ error[PERF102]: PERF102.py:15:30: [*] When using only the keys of a dict use the
 17 17 | 
 18 18 | 
 
-error[PERF102]: PERF102.py:20:25: [*] When using only the keys of a dict use the `keys()` method
+error[PERF102]: 20:25: [*] When using only the keys of a dict use the `keys()` method
 
+  --> PERF102.py:20:25
    |
 19 | def f():
 20 |     for name, (_, _) in some_dict.items():  # PERF102
@@ -77,8 +81,9 @@ error[PERF102]: PERF102.py:20:25: [*] When using only the keys of a dict use the
 22 22 | 
 23 23 | 
 
-error[PERF102]: PERF102.py:30:30: [*] When using only the keys of a dict use the `keys()` method
+error[PERF102]: 30:30: [*] When using only the keys of a dict use the `keys()` method
 
+  --> PERF102.py:30:30
    |
 29 | def f():
 30 |     for (key1, _), (_, _) in some_dict.items():  # PERF102
@@ -96,8 +101,9 @@ error[PERF102]: PERF102.py:30:30: [*] When using only the keys of a dict use the
 32 32 | 
 33 33 | 
 
-error[PERF102]: PERF102.py:35:36: [*] When using only the values of a dict use the `values()` method
+error[PERF102]: 35:36: [*] When using only the values of a dict use the `values()` method
 
+  --> PERF102.py:35:36
    |
 34 | def f():
 35 |     for (_, (_, _)), (value, _) in some_dict.items():  # PERF102
@@ -115,8 +121,9 @@ error[PERF102]: PERF102.py:35:36: [*] When using only the values of a dict use t
 37 37 | 
 38 38 | 
 
-error[PERF102]: PERF102.py:50:32: [*] When using only the keys of a dict use the `keys()` method
+error[PERF102]: 50:32: [*] When using only the keys of a dict use the `keys()` method
 
+  --> PERF102.py:50:32
    |
 49 | def f():
 50 |     for ((_, key2), (_, _)) in some_dict.items():  # PERF102
@@ -134,8 +141,9 @@ error[PERF102]: PERF102.py:50:32: [*] When using only the keys of a dict use the
 52 52 | 
 53 53 | 
 
-error[PERF102]: PERF102.py:85:25: [*] When using only the keys of a dict use the `keys()` method
+error[PERF102]: 85:25: [*] When using only the keys of a dict use the `keys()` method
 
+  --> PERF102.py:85:25
    |
 84 | def f():
 85 |     for name, (_, _) in (some_function()).items():  # PERF102
@@ -153,8 +161,9 @@ error[PERF102]: PERF102.py:85:25: [*] When using only the keys of a dict use the
 87 87 | 
 88 88 | 
 
-error[PERF102]: PERF102.py:90:25: [*] When using only the keys of a dict use the `keys()` method
+error[PERF102]: 90:25: [*] When using only the keys of a dict use the `keys()` method
 
+  --> PERF102.py:90:25
    |
 89 | def f():
 90 |     for name, (_, _) in (some_function().some_attribute).items():  # PERF102
@@ -172,8 +181,9 @@ error[PERF102]: PERF102.py:90:25: [*] When using only the keys of a dict use the
 92 92 | 
 93 93 | 
 
-error[PERF102]: PERF102.py:95:31: [*] When using only the keys of a dict use the `keys()` method
+error[PERF102]: 95:31: [*] When using only the keys of a dict use the `keys()` method
 
+  --> PERF102.py:95:31
    |
 94 | def f():
 95 |     for name, unused_value in some_dict.items():  # PERF102
@@ -191,8 +201,9 @@ error[PERF102]: PERF102.py:95:31: [*] When using only the keys of a dict use the
 97 97 | 
 98 98 | 
 
-error[PERF102]: PERF102.py:100:31: [*] When using only the values of a dict use the `values()` method
+error[PERF102]: 100:31: [*] When using only the values of a dict use the `values()` method
 
+   --> PERF102.py:100:31
     |
  99 | def f():
 100 |     for unused_name, value in some_dict.items():  # PERF102
@@ -210,8 +221,9 @@ error[PERF102]: PERF102.py:100:31: [*] When using only the values of a dict use 
 102 102 | 
 103 103 | 
 
-error[PERF102]: PERF102.py:106:16: [*] When using only the keys of a dict use the `keys()` method
+error[PERF102]: 106:16: [*] When using only the keys of a dict use the `keys()` method
 
+   --> PERF102.py:106:16
     |
 104 | # Regression test for: https://github.com/astral-sh/ruff/issues/7097
 105 | def _create_context(name_to_value):

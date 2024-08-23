@@ -1,8 +1,9 @@
 ---
 source: crates/ruff_linter/src/rules/pyupgrade/mod.rs
 ---
-error[UP036]: UP036_3.py:3:15: [*] Version block is outdated for minimum Python version
+error[UP036]: 3:15: [*] Version block is outdated for minimum Python version
 
+ --> UP036_3.py:3:15
   |
 1 | import sys
 2 | 
@@ -30,8 +31,9 @@ error[UP036]: UP036_3.py:3:15: [*] Version block is outdated for minimum Python 
 12 7  | if False:
 13 8  |     if            sys.version_info < (3,0):
 
-error[UP036]: UP036_3.py:13:19: [*] Version block is outdated for minimum Python version
+error[UP036]: 13:19: [*] Version block is outdated for minimum Python version
 
+  --> UP036_3.py:13:19
    |
 12 | if False:
 13 |     if            sys.version_info < (3,0):
@@ -59,8 +61,9 @@ error[UP036]: UP036_3.py:13:19: [*] Version block is outdated for minimum Python
 22 17 | 
 23 18 | if            sys.version_info < (3,0): print("PY2!")
 
-error[UP036]: UP036_3.py:23:15: [*] Version block is outdated for minimum Python version
+error[UP036]: 23:15: [*] Version block is outdated for minimum Python version
 
+  --> UP036_3.py:23:15
    |
 23 | if            sys.version_info < (3,0): print("PY2!")
    |               ^^^^^^^^^^^^^^^^^^^^^^^^

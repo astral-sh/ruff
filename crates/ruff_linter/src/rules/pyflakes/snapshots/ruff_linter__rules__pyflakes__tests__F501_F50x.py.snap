@@ -1,8 +1,9 @@
 ---
 source: crates/ruff_linter/src/rules/pyflakes/mod.rs
 ---
-error[F501]: F50x.py:1:1: `%`-format string has invalid format string: incomplete format
+error[F501]: 1:1: `%`-format string has invalid format string: incomplete format
 
+ --> F50x.py:1:1
   |
 1 | '%(foo)' % {'foo': 'bar'}  # F501
   | ^^^^^^^^^^^^^^^^^^^^^^^^^

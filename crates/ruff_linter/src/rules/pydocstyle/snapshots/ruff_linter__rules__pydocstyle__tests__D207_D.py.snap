@@ -1,13 +1,14 @@
 ---
 source: crates/ruff_linter/src/rules/pydocstyle/mod.rs
 ---
-error[D207]: D.py:232:1: [*] Docstring is under-indented
+error[D207]: 232:1: [*] Docstring is under-indented
 
+   --> D.py:231:1
     |
 230 |     """Summary.
 231 | 
-232 | Description.
     | ^
+232 | Description.
 233 | 
 234 |     """
     |
@@ -22,13 +23,14 @@ error[D207]: D.py:232:1: [*] Docstring is under-indented
 234 234 |     """
 235 235 | 
 
-error[D207]: D.py:244:1: [*] Docstring is under-indented
+error[D207]: 244:1: [*] Docstring is under-indented
 
+   --> D.py:243:1
     |
 242 |     Description.
 243 | 
-244 | """
     | ^
+244 | """
     |
     = help: Increase indentation
 ℹ Safe fix
@@ -41,13 +43,14 @@ error[D207]: D.py:244:1: [*] Docstring is under-indented
 246 246 | 
 247 247 | @expect('D208: Docstring is over-indented')
 
-error[D207]: D.py:440:1: [*] Docstring is under-indented
+error[D207]: 440:1: [*] Docstring is under-indented
 
+   --> D.py:439:1
     |
 438 | def docstring_start_in_same_line(): """First Line.
 439 | 
-440 |     Second Line
     | ^
+440 |     Second Line
 441 |     """
     |
     = help: Increase indentation
@@ -61,12 +64,13 @@ error[D207]: D.py:440:1: [*] Docstring is under-indented
 442 442 | 
 443 443 | 
 
-error[D207]: D.py:441:1: [*] Docstring is under-indented
+error[D207]: 441:1: [*] Docstring is under-indented
 
+   --> D.py:440:16
     |
 440 |     Second Line
+    |                ^
 441 |     """
-    | ^
     |
     = help: Increase indentation
 ℹ Safe fix

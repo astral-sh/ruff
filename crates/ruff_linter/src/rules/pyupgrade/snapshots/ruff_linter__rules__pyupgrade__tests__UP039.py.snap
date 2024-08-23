@@ -1,8 +1,9 @@
 ---
 source: crates/ruff_linter/src/rules/pyupgrade/mod.rs
 ---
-error[UP039]: UP039.py:2:8: [*] Unnecessary parentheses after class definition
+error[UP039]: 2:8: [*] Unnecessary parentheses after class definition
 
+ --> UP039.py:2:8
   |
 1 | # Errors
 2 | class A():
@@ -18,8 +19,9 @@ error[UP039]: UP039.py:2:8: [*] Unnecessary parentheses after class definition
 4 4 | 
 5 5 | 
 
-error[UP039]: UP039.py:6:8: [*] Unnecessary parentheses after class definition
+error[UP039]: 6:8: [*] Unnecessary parentheses after class definition
 
+ --> UP039.py:6:8
   |
 6 | class A() \
   |        ^^
@@ -37,8 +39,9 @@ error[UP039]: UP039.py:6:8: [*] Unnecessary parentheses after class definition
 8 8 |     pass
 9 9 | 
 
-error[UP039]: UP039.py:12:9: [*] Unnecessary parentheses after class definition
+error[UP039]: 12:9: [*] Unnecessary parentheses after class definition
 
+  --> UP039.py:12:9
    |
 11 | class A \
 12 |         ():
@@ -56,8 +59,9 @@ error[UP039]: UP039.py:12:9: [*] Unnecessary parentheses after class definition
 14 14 | 
 15 15 | 
 
-error[UP039]: UP039.py:17:8: [*] Unnecessary parentheses after class definition
+error[UP039]: 17:8: [*] Unnecessary parentheses after class definition
 
+  --> UP039.py:17:8
    |
 16 | @decorator()
 17 | class A():
@@ -75,8 +79,9 @@ error[UP039]: UP039.py:17:8: [*] Unnecessary parentheses after class definition
 19 19 | 
 20 20 | @decorator
 
-error[UP039]: UP039.py:21:8: [*] Unnecessary parentheses after class definition
+error[UP039]: 21:8: [*] Unnecessary parentheses after class definition
 
+  --> UP039.py:21:8
    |
 20 | @decorator
 21 | class A():

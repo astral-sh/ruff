@@ -1,8 +1,9 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_bugbear/mod.rs
 ---
-error[B006]: B006_8.py:1:19: [*] Do not use mutable data structures for argument defaults
+error[B006]: 1:19: [*] Do not use mutable data structures for argument defaults
 
+ --> B006_8.py:1:19
   |
 1 | def foo(a: list = []):
   |                   ^^
@@ -16,8 +17,9 @@ error[B006]: B006_8.py:1:19: [*] Do not use mutable data structures for argument
 3 3 | 
 4 4 | 
 
-error[B006]: B006_8.py:5:19: [*] Do not use mutable data structures for argument defaults
+error[B006]: 5:19: [*] Do not use mutable data structures for argument defaults
 
+ --> B006_8.py:5:19
   |
 5 | def bar(a: dict = {}):
   |                   ^^
@@ -35,8 +37,9 @@ error[B006]: B006_8.py:5:19: [*] Do not use mutable data structures for argument
 7 7 |     raise NotImplementedError("and has some text in here")
 8 8 | 
 
-error[B006]: B006_8.py:10:19: [*] Do not use mutable data structures for argument defaults
+error[B006]: 10:19: [*] Do not use mutable data structures for argument defaults
 
+  --> B006_8.py:10:19
    |
 10 | def baz(a: list = []):
    |                   ^^
@@ -57,8 +60,9 @@ error[B006]: B006_8.py:10:19: [*] Do not use mutable data structures for argumen
 13 15 | 
 14 16 | 
 
-error[B006]: B006_8.py:15:19: [*] Do not use mutable data structures for argument defaults
+error[B006]: 15:19: [*] Do not use mutable data structures for argument defaults
 
+  --> B006_8.py:15:19
    |
 15 | def qux(a: list = []):
    |                   ^^
@@ -75,8 +79,9 @@ error[B006]: B006_8.py:15:19: [*] Do not use mutable data structures for argumen
 17 17 | 
 18 18 | 
 
-error[B006]: B006_8.py:19:20: [*] Do not use mutable data structures for argument defaults
+error[B006]: 19:20: [*] Do not use mutable data structures for argument defaults
 
+  --> B006_8.py:19:20
    |
 19 | def quux(a: list = []):
    |                    ^^

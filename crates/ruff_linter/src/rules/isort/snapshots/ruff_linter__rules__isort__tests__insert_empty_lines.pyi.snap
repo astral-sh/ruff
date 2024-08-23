@@ -1,13 +1,14 @@
 ---
 source: crates/ruff_linter/src/rules/isort/mod.rs
 ---
-error[I001]: insert_empty_lines.pyi:1:1: [*] Import block is un-sorted or un-formatted
+error[I001]: 1:1: [*] Import block is un-sorted or un-formatted
 
+ --> insert_empty_lines.pyi:1:1
   |
 1 | / import a
 2 | | import b
-3 | | x = 1
-  | |_^
+  | |_________^
+3 |   x = 1
 4 |   import os
 5 |   import sys
   |
@@ -20,15 +21,16 @@ error[I001]: insert_empty_lines.pyi:1:1: [*] Import block is un-sorted or un-for
 4 5 | import os
 5 6 | import sys
 
-error[I001]: insert_empty_lines.pyi:4:1: [*] Import block is un-sorted or un-formatted
+error[I001]: 4:1: [*] Import block is un-sorted or un-formatted
 
+ --> insert_empty_lines.pyi:3:6
   |
 2 |   import b
 3 |   x = 1
 4 | / import os
 5 | | import sys
-6 | | def f():
-  | |_^
+  | |___________^
+6 |   def f():
 7 |       pass
 8 |   if True:
   |
@@ -42,15 +44,16 @@ error[I001]: insert_empty_lines.pyi:4:1: [*] Import block is un-sorted or un-for
 7 8 |     pass
 8 9 | if True:
 
-error[I001]: insert_empty_lines.pyi:14:1: [*] Import block is un-sorted or un-formatted
+error[I001]: 14:1: [*] Import block is un-sorted or un-formatted
 
+  --> insert_empty_lines.pyi:13:6
    |
 12 |   class X: pass
 13 |   y = 1
 14 | / import os
 15 | | import sys
-16 | | """Docstring"""
-   | |_^
+   | |___________^
+16 |   """Docstring"""
 17 |   
 18 |   if True:
    |

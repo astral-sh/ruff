@@ -1,8 +1,9 @@
 ---
 source: crates/ruff_linter/src/rules/ruff/mod.rs
 ---
-error[RUF008]: RUF008.py:10:34: Do not use mutable default values for dataclass attributes
+error[RUF008]: 10:34: Do not use mutable default values for dataclass attributes
 
+  --> RUF008.py:10:34
    |
  8 | @dataclass
  9 | class A:
@@ -11,8 +12,9 @@ error[RUF008]: RUF008.py:10:34: Do not use mutable default values for dataclass 
 11 |     immutable_annotation: typing.Sequence[int] = []
 12 |     without_annotation = []
    |
-error[RUF008]: RUF008.py:20:34: Do not use mutable default values for dataclass attributes
+error[RUF008]: 20:34: Do not use mutable default values for dataclass attributes
 
+  --> RUF008.py:20:34
    |
 18 | @dataclass
 19 | class B:

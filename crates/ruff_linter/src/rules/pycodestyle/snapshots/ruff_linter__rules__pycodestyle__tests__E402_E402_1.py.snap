@@ -1,8 +1,9 @@
 ---
 source: crates/ruff_linter/src/rules/pycodestyle/mod.rs
 ---
-error[E402]: E402_1.py:5:1: Module level import not at top of file
+error[E402]: 5:1: Module level import not at top of file
 
+ --> E402_1.py:4:1
   |
 3 | """Some other docstring."""
 4 | 
@@ -11,8 +12,9 @@ error[E402]: E402_1.py:5:1: Module level import not at top of file
 6 | 
 7 | """Some other docstring."""
   |
-error[E402]: E402_1.py:9:1: Module level import not at top of file
+error[E402]: 9:1: Module level import not at top of file
 
+ --> E402_1.py:8:1
   |
 7 | """Some other docstring."""
 8 | 

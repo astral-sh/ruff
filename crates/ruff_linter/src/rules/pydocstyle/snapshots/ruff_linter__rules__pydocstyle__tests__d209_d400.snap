@@ -1,8 +1,9 @@
 ---
 source: crates/ruff_linter/src/rules/pydocstyle/mod.rs
 ---
-error[D209]: D209_D400.py:2:5: [*] Multi-line docstring closing quotes should be on a separate line
+error[D209]: 2:5: [*] Multi-line docstring closing quotes should be on a separate line
 
+ --> D209_D400.py:2:5
   |
 1 |   def lorem():
 2 |       """lorem ipsum dolor sit amet consectetur adipiscing elit
@@ -18,8 +19,9 @@ error[D209]: D209_D400.py:2:5: [*] Multi-line docstring closing quotes should be
   3 |+    sed do eiusmod tempor incididunt ut labore et dolore magna aliqua
   4 |+    """
 
-error[D400]: D209_D400.py:2:5: [*] First line should end with a period
+error[D400]: 2:5: [*] First line should end with a period
 
+ --> D209_D400.py:2:5
   |
 1 |   def lorem():
 2 |       """lorem ipsum dolor sit amet consectetur adipiscing elit

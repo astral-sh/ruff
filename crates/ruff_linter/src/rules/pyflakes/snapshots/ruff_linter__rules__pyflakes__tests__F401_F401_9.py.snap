@@ -1,8 +1,9 @@
 ---
 source: crates/ruff_linter/src/rules/pyflakes/mod.rs
 ---
-error[F401]: F401_9.py:4:22: [*] `foo.baz` imported but unused
+error[F401]: 4:22: [*] `foo.baz` imported but unused
 
+ --> F401_9.py:4:22
   |
 3 | __all__ = ("bar",)
 4 | from foo import bar, baz

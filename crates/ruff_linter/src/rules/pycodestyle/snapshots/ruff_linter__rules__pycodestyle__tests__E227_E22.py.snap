@@ -1,8 +1,9 @@
 ---
 source: crates/ruff_linter/src/rules/pycodestyle/mod.rs
 ---
-error[E227]: E22.py:72:13: [*] Missing whitespace around bitwise or shift operator
+error[E227]: 72:13: [*] Missing whitespace around bitwise or shift operator
 
+  --> E22.py:72:13
    |
 70 | z = (x + 1)** y
 71 | #: E225
@@ -22,8 +23,9 @@ error[E227]: E22.py:72:13: [*] Missing whitespace around bitwise or shift operat
 74 74 | _1kB = _1MB>> 10
 75 75 | #: E225 E225
 
-error[E227]: E22.py:74:12: [*] Missing whitespace around bitwise or shift operator
+error[E227]: 74:12: [*] Missing whitespace around bitwise or shift operator
 
+  --> E22.py:74:12
    |
 72 | _1kB = _1MB >>10
 73 | #: E225
@@ -43,8 +45,9 @@ error[E227]: E22.py:74:12: [*] Missing whitespace around bitwise or shift operat
 76 76 | i=i+ 1
 77 77 | #: E225 E225
 
-error[E227]: E22.py:121:12: [*] Missing whitespace around bitwise or shift operator
+error[E227]: 121:12: [*] Missing whitespace around bitwise or shift operator
 
+   --> E22.py:121:12
     |
 119 |     return (i//2 for i in range(n))
 120 | #: E227
@@ -64,8 +67,9 @@ error[E227]: E22.py:121:12: [*] Missing whitespace around bitwise or shift opera
 123 123 | _1MB = _1kB<<10
 124 124 | #: E227
 
-error[E227]: E22.py:123:12: [*] Missing whitespace around bitwise or shift operator
+error[E227]: 123:12: [*] Missing whitespace around bitwise or shift operator
 
+   --> E22.py:123:12
     |
 121 | _1kB = _1MB>>10
 122 | #: E227
@@ -85,8 +89,9 @@ error[E227]: E22.py:123:12: [*] Missing whitespace around bitwise or shift opera
 125 125 | a = b|c
 126 126 | #: E227
 
-error[E227]: E22.py:125:6: [*] Missing whitespace around bitwise or shift operator
+error[E227]: 125:6: [*] Missing whitespace around bitwise or shift operator
 
+   --> E22.py:125:6
     |
 123 | _1MB = _1kB<<10
 124 | #: E227
@@ -106,8 +111,9 @@ error[E227]: E22.py:125:6: [*] Missing whitespace around bitwise or shift operat
 127 127 | b = c&a
 128 128 | #: E227
 
-error[E227]: E22.py:127:6: [*] Missing whitespace around bitwise or shift operator
+error[E227]: 127:6: [*] Missing whitespace around bitwise or shift operator
 
+   --> E22.py:127:6
     |
 125 | a = b|c
 126 | #: E227
@@ -127,8 +133,9 @@ error[E227]: E22.py:127:6: [*] Missing whitespace around bitwise or shift operat
 129 129 | c = b^a
 130 130 | #: E228
 
-error[E227]: E22.py:129:6: [*] Missing whitespace around bitwise or shift operator
+error[E227]: 129:6: [*] Missing whitespace around bitwise or shift operator
 
+   --> E22.py:129:6
     |
 127 | b = c&a
 128 | #: E227
@@ -148,8 +155,9 @@ error[E227]: E22.py:129:6: [*] Missing whitespace around bitwise or shift operat
 131 131 | a = b%c
 132 132 | #: E228
 
-error[E227]: E22.py:154:11: [*] Missing whitespace around bitwise or shift operator
+error[E227]: 154:11: [*] Missing whitespace around bitwise or shift operator
 
+   --> E22.py:154:11
     |
 152 | func2(lambda a, b=h[:], c=0: (a, b, c))
 153 | if not -5 < x < +5:

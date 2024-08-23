@@ -1,8 +1,9 @@
 ---
 source: crates/ruff_linter/src/rules/pycodestyle/mod.rs
 ---
-error[E228]: E22.py:131:6: [*] Missing whitespace around modulo operator
+error[E228]: 131:6: [*] Missing whitespace around modulo operator
 
+   --> E22.py:131:6
     |
 129 | c = b^a
 130 | #: E228
@@ -22,8 +23,9 @@ error[E228]: E22.py:131:6: [*] Missing whitespace around modulo operator
 133 133 | msg = fmt%(errno, errmsg)
 134 134 | #: E228
 
-error[E228]: E22.py:133:10: [*] Missing whitespace around modulo operator
+error[E228]: 133:10: [*] Missing whitespace around modulo operator
 
+   --> E22.py:133:10
     |
 131 | a = b%c
 132 | #: E228
@@ -43,8 +45,9 @@ error[E228]: E22.py:133:10: [*] Missing whitespace around modulo operator
 135 135 | msg = "Error %d occurred"%errno
 136 136 | #:
 
-error[E228]: E22.py:135:26: [*] Missing whitespace around modulo operator
+error[E228]: 135:26: [*] Missing whitespace around modulo operator
 
+   --> E22.py:135:26
     |
 133 | msg = fmt%(errno, errmsg)
 134 | #: E228

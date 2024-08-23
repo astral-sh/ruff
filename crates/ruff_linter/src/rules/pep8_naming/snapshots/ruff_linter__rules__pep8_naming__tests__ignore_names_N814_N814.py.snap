@@ -1,8 +1,9 @@
 ---
 source: crates/ruff_linter/src/rules/pep8_naming/mod.rs
 ---
-error[N814]: N814.py:2:8: Camelcase `StillBad` imported as constant `STILLBAD`
+error[N814]: 2:8: Camelcase `StillBad` imported as constant `STILLBAD`
 
+ --> N814.py:2:8
   |
 1 | import mod.BadAllowed as BADALLOWED
 2 | import mod.StillBad as STILLBAD
@@ -10,8 +11,9 @@ error[N814]: N814.py:2:8: Camelcase `StillBad` imported as constant `STILLBAD`
 3 | 
 4 | from mod import BadAllowed as BADALLOWED
   |
-error[N814]: N814.py:5:17: Camelcase `StillBad` imported as constant `STILLBAD`
+error[N814]: 5:17: Camelcase `StillBad` imported as constant `STILLBAD`
 
+ --> N814.py:5:17
   |
 4 | from mod import BadAllowed as BADALLOWED
 5 | from mod import StillBad as STILLBAD
@@ -19,8 +21,9 @@ error[N814]: N814.py:5:17: Camelcase `StillBad` imported as constant `STILLBAD`
 6 | 
 7 | from mod import BadAllowed as BAD_ALLOWED
   |
-error[N814]: N814.py:8:17: Camelcase `StillBad` imported as constant `STILL_BAD`
+error[N814]: 8:17: Camelcase `StillBad` imported as constant `STILL_BAD`
 
+ --> N814.py:8:17
   |
 7 | from mod import BadAllowed as BAD_ALLOWED
 8 | from mod import StillBad as STILL_BAD

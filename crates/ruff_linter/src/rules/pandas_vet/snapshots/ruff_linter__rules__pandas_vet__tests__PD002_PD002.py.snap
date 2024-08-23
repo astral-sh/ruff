@@ -1,8 +1,9 @@
 ---
 source: crates/ruff_linter/src/rules/pandas_vet/mod.rs
 ---
-error[PD002]: PD002.py:5:23: [*] `inplace=True` should be avoided; it has inconsistent behavior
+error[PD002]: 5:23: [*] `inplace=True` should be avoided; it has inconsistent behavior
 
+ --> PD002.py:5:23
   |
 3 | x = pd.DataFrame()
 4 | 
@@ -22,8 +23,9 @@ error[PD002]: PD002.py:5:23: [*] `inplace=True` should be avoided; it has incons
 7 7 | x.y.drop(["a"], axis=1, inplace=True)
 8 8 | 
 
-error[PD002]: PD002.py:7:25: [*] `inplace=True` should be avoided; it has inconsistent behavior
+error[PD002]: 7:25: [*] `inplace=True` should be avoided; it has inconsistent behavior
 
+ --> PD002.py:7:25
   |
 5 | x.drop(["a"], axis=1, inplace=True)
 6 | 
@@ -43,8 +45,9 @@ error[PD002]: PD002.py:7:25: [*] `inplace=True` should be avoided; it has incons
 9 9 | x["y"].drop(["a"], axis=1, inplace=True)
 10 10 | 
 
-error[PD002]: PD002.py:9:28: [*] `inplace=True` should be avoided; it has inconsistent behavior
+error[PD002]: 9:28: [*] `inplace=True` should be avoided; it has inconsistent behavior
 
+  --> PD002.py:9:28
    |
  7 | x.y.drop(["a"], axis=1, inplace=True)
  8 | 
@@ -64,8 +67,9 @@ error[PD002]: PD002.py:9:28: [*] `inplace=True` should be avoided; it has incons
 11 11 | x.drop(
 12 12 |     inplace=True,
 
-error[PD002]: PD002.py:12:5: [*] `inplace=True` should be avoided; it has inconsistent behavior
+error[PD002]: 12:5: [*] `inplace=True` should be avoided; it has inconsistent behavior
 
+  --> PD002.py:12:5
    |
 11 | x.drop(
 12 |     inplace=True,
@@ -85,8 +89,9 @@ error[PD002]: PD002.py:12:5: [*] `inplace=True` should be avoided; it has incons
 14 13 |     axis=1,
 15 14 | )
 
-error[PD002]: PD002.py:19:9: [*] `inplace=True` should be avoided; it has inconsistent behavior
+error[PD002]: 19:9: [*] `inplace=True` should be avoided; it has inconsistent behavior
 
+  --> PD002.py:19:9
    |
 17 | if True:
 18 |     x.drop(
@@ -107,8 +112,9 @@ error[PD002]: PD002.py:19:9: [*] `inplace=True` should be avoided; it has incons
 21 20 |         axis=1,
 22 21 |     )
 
-error[PD002]: PD002.py:24:33: [*] `inplace=True` should be avoided; it has inconsistent behavior
+error[PD002]: 24:33: [*] `inplace=True` should be avoided; it has inconsistent behavior
 
+  --> PD002.py:24:33
    |
 22 |     )
 23 | 
@@ -128,8 +134,9 @@ error[PD002]: PD002.py:24:33: [*] `inplace=True` should be avoided; it has incon
 26 26 | f(x.drop(["a"], axis=1, inplace=True))
 27 27 | 
 
-error[PD002]: PD002.py:25:23: `inplace=True` should be avoided; it has inconsistent behavior
+error[PD002]: 25:23: `inplace=True` should be avoided; it has inconsistent behavior
 
+  --> PD002.py:25:23
    |
 24 | x.drop(["a"], axis=1, **kwargs, inplace=True)
 25 | x.drop(["a"], axis=1, inplace=True, **kwargs)
@@ -137,8 +144,9 @@ error[PD002]: PD002.py:25:23: `inplace=True` should be avoided; it has inconsist
 26 | f(x.drop(["a"], axis=1, inplace=True))
    |
    = help: Assign to variable; remove `inplace` arg
-error[PD002]: PD002.py:26:25: `inplace=True` should be avoided; it has inconsistent behavior
+error[PD002]: 26:25: `inplace=True` should be avoided; it has inconsistent behavior
 
+  --> PD002.py:26:25
    |
 24 | x.drop(["a"], axis=1, **kwargs, inplace=True)
 25 | x.drop(["a"], axis=1, inplace=True, **kwargs)
@@ -148,8 +156,9 @@ error[PD002]: PD002.py:26:25: `inplace=True` should be avoided; it has inconsist
 28 | x.apply(lambda x: x.sort_values("a", inplace=True))
    |
    = help: Assign to variable; remove `inplace` arg
-error[PD002]: PD002.py:28:38: `inplace=True` should be avoided; it has inconsistent behavior
+error[PD002]: 28:38: `inplace=True` should be avoided; it has inconsistent behavior
 
+  --> PD002.py:28:38
    |
 26 | f(x.drop(["a"], axis=1, inplace=True))
 27 | 
@@ -158,8 +167,9 @@ error[PD002]: PD002.py:28:38: `inplace=True` should be avoided; it has inconsist
 29 | import torch
    |
    = help: Assign to variable; remove `inplace` arg
-error[PD002]: PD002.py:33:24: [*] `inplace=True` should be avoided; it has inconsistent behavior
+error[PD002]: 33:24: [*] `inplace=True` should be avoided; it has inconsistent behavior
 
+  --> PD002.py:33:24
    |
 31 | torch.m.ReLU(inplace=True)  # safe because this isn't a pandas call
 32 | 

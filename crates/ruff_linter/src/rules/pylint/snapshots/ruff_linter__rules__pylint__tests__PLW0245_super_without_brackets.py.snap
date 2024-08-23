@@ -1,8 +1,9 @@
 ---
 source: crates/ruff_linter/src/rules/pylint/mod.rs
 ---
-error[PLW0245]: super_without_brackets.py:10:26: [*] `super` call is missing parentheses
+error[PLW0245]: 10:26: [*] `super` call is missing parentheses
 
+  --> super_without_brackets.py:10:26
    |
  8 |     @staticmethod
  9 |     def speak():

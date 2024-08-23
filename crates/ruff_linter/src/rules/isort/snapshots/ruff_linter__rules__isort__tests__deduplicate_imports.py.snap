@@ -1,13 +1,15 @@
 ---
 source: crates/ruff_linter/src/rules/isort/mod.rs
 ---
-error[I001]: deduplicate_imports.py:1:1: [*] Import block is un-sorted or un-formatted
+error[I001]: 1:1: [*] Import block is un-sorted or un-formatted
 
+ --> deduplicate_imports.py:1:1
   |
 1 | / import os
 2 | | import os
 3 | | import os as os1
 4 | | import os as os2
+  | |_________________^
   |
   = help: Organize imports
 ℹ Safe fix

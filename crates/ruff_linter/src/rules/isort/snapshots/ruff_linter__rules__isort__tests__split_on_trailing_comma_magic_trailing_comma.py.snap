@@ -1,8 +1,9 @@
 ---
 source: crates/ruff_linter/src/rules/isort/mod.rs
 ---
-error[I001]: magic_trailing_comma.py:2:1: [*] Import block is un-sorted or un-formatted
+error[I001]: 2:1: [*] Import block is un-sorted or un-formatted
 
+  --> magic_trailing_comma.py:1:80
    |
  1 |   # This has a magic trailing comma, will be sorted, but not rolled into one line
  2 | / from sys import (
@@ -42,6 +43,7 @@ error[I001]: magic_trailing_comma.py:2:1: [*] Import block is un-sorted or un-fo
 36 | | from module2 import (
 37 | |     member3,
 38 | | )
+   | |__^
    |
    = help: Organize imports
 ℹ Safe fix

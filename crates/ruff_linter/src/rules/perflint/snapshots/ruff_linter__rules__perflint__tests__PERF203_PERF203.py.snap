@@ -1,8 +1,9 @@
 ---
 source: crates/ruff_linter/src/rules/perflint/mod.rs
 ---
-error[PERF203]: PERF203.py:5:5: `try`-`except` within a loop incurs performance overhead
+error[PERF203]: 5:5: `try`-`except` within a loop incurs performance overhead
 
+ --> PERF203.py:5:5
   |
 3 |       try:
 4 |           print(f"{i}")

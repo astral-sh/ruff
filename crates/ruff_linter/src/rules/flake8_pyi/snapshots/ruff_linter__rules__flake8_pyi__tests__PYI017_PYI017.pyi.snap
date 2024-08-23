@@ -1,8 +1,9 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_pyi/mod.rs
 ---
-error[PYI017]: PYI017.pyi:4:1: Stubs should not contain assignments to attributes or multiple targets
+error[PYI017]: 4:1: Stubs should not contain assignments to attributes or multiple targets
 
+ --> PYI017.pyi:3:1
   |
 2 | a = var  # OK
 3 | 
@@ -11,8 +12,9 @@ error[PYI017]: PYI017.pyi:4:1: Stubs should not contain assignments to attribute
 5 | 
 6 | a.b = int  # PYI017
   |
-error[PYI017]: PYI017.pyi:6:1: Stubs should not contain assignments to attributes or multiple targets
+error[PYI017]: 6:1: Stubs should not contain assignments to attributes or multiple targets
 
+ --> PYI017.pyi:5:1
   |
 4 | b = c = int  # PYI017
 5 | 
@@ -21,8 +23,9 @@ error[PYI017]: PYI017.pyi:6:1: Stubs should not contain assignments to attribute
 7 | 
 8 | d, e = int, str  # PYI017
   |
-error[PYI017]: PYI017.pyi:8:1: Stubs should not contain assignments to attributes or multiple targets
+error[PYI017]: 8:1: Stubs should not contain assignments to attributes or multiple targets
 
+  --> PYI017.pyi:7:1
    |
  6 | a.b = int  # PYI017
  7 | 
@@ -31,8 +34,9 @@ error[PYI017]: PYI017.pyi:8:1: Stubs should not contain assignments to attribute
  9 | 
 10 | f, g, h = int, str, TypeVar("T")  # PYI017
    |
-error[PYI017]: PYI017.pyi:10:1: Stubs should not contain assignments to attributes or multiple targets
+error[PYI017]: 10:1: Stubs should not contain assignments to attributes or multiple targets
 
+  --> PYI017.pyi:9:1
    |
  8 | d, e = int, str  # PYI017
  9 | 

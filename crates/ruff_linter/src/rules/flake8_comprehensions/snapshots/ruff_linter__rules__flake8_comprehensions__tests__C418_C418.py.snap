@@ -1,8 +1,9 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_comprehensions/mod.rs
 ---
-error[C418]: C418.py:1:1: [*] Unnecessary `dict` literal passed to `dict()` (remove the outer call to `dict()`)
+error[C418]: 1:1: [*] Unnecessary `dict` literal passed to `dict()` (remove the outer call to `dict()`)
 
+ --> C418.py:1:1
   |
 1 | dict({})
   | ^^^^^^^^
@@ -17,8 +18,9 @@ error[C418]: C418.py:1:1: [*] Unnecessary `dict` literal passed to `dict()` (rem
 3 3 | dict({'x': 1 for x in range(10)})
 4 4 | dict(
 
-error[C418]: C418.py:2:1: [*] Unnecessary `dict` literal passed to `dict()` (remove the outer call to `dict()`)
+error[C418]: 2:1: [*] Unnecessary `dict` literal passed to `dict()` (remove the outer call to `dict()`)
 
+ --> C418.py:1:9
   |
 1 | dict({})
 2 | dict({'a': 1})
@@ -35,8 +37,9 @@ error[C418]: C418.py:2:1: [*] Unnecessary `dict` literal passed to `dict()` (rem
 4 4 | dict(
 5 5 |     {'x': 1 for x in range(10)}
 
-error[C418]: C418.py:3:1: [*] Unnecessary `dict` comprehension passed to `dict()` (remove the outer call to `dict()`)
+error[C418]: 3:1: [*] Unnecessary `dict` comprehension passed to `dict()` (remove the outer call to `dict()`)
 
+ --> C418.py:2:15
   |
 1 | dict({})
 2 | dict({'a': 1})
@@ -55,8 +58,9 @@ error[C418]: C418.py:3:1: [*] Unnecessary `dict` comprehension passed to `dict()
 5 5 |     {'x': 1 for x in range(10)}
 6 6 | )
 
-error[C418]: C418.py:4:1: [*] Unnecessary `dict` comprehension passed to `dict()` (remove the outer call to `dict()`)
+error[C418]: 4:1: [*] Unnecessary `dict` comprehension passed to `dict()` (remove the outer call to `dict()`)
 
+ --> C418.py:3:34
   |
 2 |   dict({'a': 1})
 3 |   dict({'x': 1 for x in range(10)})

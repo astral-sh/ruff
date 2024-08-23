@@ -1,8 +1,9 @@
 ---
 source: crates/ruff_linter/src/rules/pylint/mod.rs
 ---
-error[PLW1509]: subprocess_popen_preexec_fn.py:9:18: `preexec_fn` argument is unsafe when using threads
+error[PLW1509]: 9:18: `preexec_fn` argument is unsafe when using threads
 
+  --> subprocess_popen_preexec_fn.py:9:18
    |
  8 | # Errors.
  9 | subprocess.Popen(preexec_fn=foo)
@@ -10,8 +11,9 @@ error[PLW1509]: subprocess_popen_preexec_fn.py:9:18: `preexec_fn` argument is un
 10 | subprocess.Popen(["ls"], preexec_fn=foo)
 11 | subprocess.Popen(preexec_fn=lambda: print("Hello, world!"))
    |
-error[PLW1509]: subprocess_popen_preexec_fn.py:10:26: `preexec_fn` argument is unsafe when using threads
+error[PLW1509]: 10:26: `preexec_fn` argument is unsafe when using threads
 
+  --> subprocess_popen_preexec_fn.py:10:26
    |
  8 | # Errors.
  9 | subprocess.Popen(preexec_fn=foo)
@@ -20,8 +22,9 @@ error[PLW1509]: subprocess_popen_preexec_fn.py:10:26: `preexec_fn` argument is u
 11 | subprocess.Popen(preexec_fn=lambda: print("Hello, world!"))
 12 | subprocess.Popen(["ls"], preexec_fn=lambda: print("Hello, world!"))
    |
-error[PLW1509]: subprocess_popen_preexec_fn.py:11:18: `preexec_fn` argument is unsafe when using threads
+error[PLW1509]: 11:18: `preexec_fn` argument is unsafe when using threads
 
+  --> subprocess_popen_preexec_fn.py:11:18
    |
  9 | subprocess.Popen(preexec_fn=foo)
 10 | subprocess.Popen(["ls"], preexec_fn=foo)
@@ -29,8 +32,9 @@ error[PLW1509]: subprocess_popen_preexec_fn.py:11:18: `preexec_fn` argument is u
    |                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 12 | subprocess.Popen(["ls"], preexec_fn=lambda: print("Hello, world!"))
    |
-error[PLW1509]: subprocess_popen_preexec_fn.py:12:26: `preexec_fn` argument is unsafe when using threads
+error[PLW1509]: 12:26: `preexec_fn` argument is unsafe when using threads
 
+  --> subprocess_popen_preexec_fn.py:12:26
    |
 10 | subprocess.Popen(["ls"], preexec_fn=foo)
 11 | subprocess.Popen(preexec_fn=lambda: print("Hello, world!"))

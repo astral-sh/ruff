@@ -1,8 +1,9 @@
 ---
 source: crates/ruff_linter/src/rules/pycodestyle/mod.rs
 ---
-error[E304]: E30.pyi:32:5: [*] Blank lines found after function decorator (1)
+error[E304]: 32:5: [*] Blank lines found after function decorator (1)
 
+  --> E30.pyi:32:5
    |
 30 |     @decorated
 31 |     

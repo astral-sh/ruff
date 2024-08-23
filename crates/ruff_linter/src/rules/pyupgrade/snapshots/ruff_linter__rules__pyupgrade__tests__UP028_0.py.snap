@@ -1,8 +1,9 @@
 ---
 source: crates/ruff_linter/src/rules/pyupgrade/mod.rs
 ---
-error[UP028]: UP028_0.py:2:5: [*] Replace `yield` over `for` loop with `yield from`
+error[UP028]: 2:5: [*] Replace `yield` over `for` loop with `yield from`
 
+ --> UP028_0.py:2:5
   |
 1 |   def f():
 2 |       for x in y:
@@ -20,8 +21,9 @@ error[UP028]: UP028_0.py:2:5: [*] Replace `yield` over `for` loop with `yield fr
 5 4 | 
 6 5 | def g():
 
-error[UP028]: UP028_0.py:7:5: [*] Replace `yield` over `for` loop with `yield from`
+error[UP028]: 7:5: [*] Replace `yield` over `for` loop with `yield from`
 
+ --> UP028_0.py:7:5
   |
 6 |   def g():
 7 |       for x, y in z:
@@ -41,8 +43,9 @@ error[UP028]: UP028_0.py:7:5: [*] Replace `yield` over `for` loop with `yield fr
 10 9 | 
 11 10 | def h():
 
-error[UP028]: UP028_0.py:12:5: [*] Replace `yield` over `for` loop with `yield from`
+error[UP028]: 12:5: [*] Replace `yield` over `for` loop with `yield from`
 
+  --> UP028_0.py:12:5
    |
 11 |   def h():
 12 |       for x in [1, 2, 3]:
@@ -62,8 +65,9 @@ error[UP028]: UP028_0.py:12:5: [*] Replace `yield` over `for` loop with `yield f
 15 14 | 
 16 15 | def i():
 
-error[UP028]: UP028_0.py:17:5: [*] Replace `yield` over `for` loop with `yield from`
+error[UP028]: 17:5: [*] Replace `yield` over `for` loop with `yield from`
 
+  --> UP028_0.py:17:5
    |
 16 |   def i():
 17 |       for x in {x for x in y}:
@@ -83,8 +87,9 @@ error[UP028]: UP028_0.py:17:5: [*] Replace `yield` over `for` loop with `yield f
 20 19 | 
 21 20 | def j():
 
-error[UP028]: UP028_0.py:22:5: [*] Replace `yield` over `for` loop with `yield from`
+error[UP028]: 22:5: [*] Replace `yield` over `for` loop with `yield from`
 
+  --> UP028_0.py:22:5
    |
 21 |   def j():
 22 |       for x in (1, 2, 3):
@@ -104,8 +109,9 @@ error[UP028]: UP028_0.py:22:5: [*] Replace `yield` over `for` loop with `yield f
 25 24 | 
 26 25 | def k():
 
-error[UP028]: UP028_0.py:27:5: [*] Replace `yield` over `for` loop with `yield from`
+error[UP028]: 27:5: [*] Replace `yield` over `for` loop with `yield from`
 
+  --> UP028_0.py:27:5
    |
 26 |   def k():
 27 |       for x, y in {3: "x", 6: "y"}:
@@ -125,8 +131,9 @@ error[UP028]: UP028_0.py:27:5: [*] Replace `yield` over `for` loop with `yield f
 30 29 | 
 31 30 | def f():  # Comment one\n'
 
-error[UP028]: UP028_0.py:33:5: [*] Replace `yield` over `for` loop with `yield from`
+error[UP028]: 33:5: [*] Replace `yield` over `for` loop with `yield from`
 
+  --> UP028_0.py:33:5
    |
 31 |   def f():  # Comment one\n'
 32 |       # Comment two\n'
@@ -159,8 +166,9 @@ error[UP028]: UP028_0.py:33:5: [*] Replace `yield` over `for` loop with `yield f
 41 39 | 
 42 40 | 
 
-error[UP028]: UP028_0.py:44:5: [*] Replace `yield` over `for` loop with `yield from`
+error[UP028]: 44:5: [*] Replace `yield` over `for` loop with `yield from`
 
+  --> UP028_0.py:44:5
    |
 43 |   def f():
 44 |       for x, y in [{3: (3, [44, "long ss"]), 6: "y"}]:
@@ -180,8 +188,9 @@ error[UP028]: UP028_0.py:44:5: [*] Replace `yield` over `for` loop with `yield f
 47 46 | 
 48 47 | def f():
 
-error[UP028]: UP028_0.py:49:5: [*] Replace `yield` over `for` loop with `yield from`
+error[UP028]: 49:5: [*] Replace `yield` over `for` loop with `yield from`
 
+  --> UP028_0.py:49:5
    |
 48 |   def f():
 49 |       for x, y in z():
@@ -203,8 +212,9 @@ error[UP028]: UP028_0.py:49:5: [*] Replace `yield` over `for` loop with `yield f
 52 51 | def f():
 53 52 |     def func():
 
-error[UP028]: UP028_0.py:55:9: [*] Replace `yield` over `for` loop with `yield from`
+error[UP028]: 55:9: [*] Replace `yield` over `for` loop with `yield from`
 
+  --> UP028_0.py:55:9
    |
 53 |       def func():
 54 |           # This comment is preserved\n'
@@ -229,8 +239,9 @@ error[UP028]: UP028_0.py:55:9: [*] Replace `yield` over `for` loop with `yield f
 59 57 | # Comment\n'
 60 58 | def g():
 
-error[UP028]: UP028_0.py:67:5: [*] Replace `yield` over `for` loop with `yield from`
+error[UP028]: 67:5: [*] Replace `yield` over `for` loop with `yield from`
 
+  --> UP028_0.py:67:5
    |
 65 |       for x in y:
 66 |           yield x
@@ -251,8 +262,9 @@ error[UP028]: UP028_0.py:67:5: [*] Replace `yield` over `for` loop with `yield f
 70 69 | 
 71 70 | def f():
 
-error[UP028]: UP028_0.py:72:5: [*] Replace `yield` over `for` loop with `yield from`
+error[UP028]: 72:5: [*] Replace `yield` over `for` loop with `yield from`
 
+  --> UP028_0.py:72:5
    |
 71 |   def f():
 72 |       for x, y in z():
@@ -273,8 +285,9 @@ error[UP028]: UP028_0.py:72:5: [*] Replace `yield` over `for` loop with `yield f
 75 74 | 
 76 75 | 
 
-error[UP028]: UP028_0.py:79:5: [*] Replace `yield` over `for` loop with `yield from`
+error[UP028]: 79:5: [*] Replace `yield` over `for` loop with `yield from`
 
+  --> UP028_0.py:79:5
    |
 77 |   # Regression test for: https://github.com/astral-sh/ruff/issues/7103
 78 |   def _serve_method(fn):

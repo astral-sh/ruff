@@ -1,8 +1,9 @@
 ---
 source: crates/ruff_linter/src/rules/pycodestyle/mod.rs
 ---
-error[E221]: E22.py:3:6: [*] Multiple spaces before operator
+error[E221]: 3:6: [*] Multiple spaces before operator
 
+ --> E22.py:3:6
   |
 1 | #: E221
 2 | a = 12 + 3
@@ -21,8 +22,9 @@ error[E221]: E22.py:3:6: [*] Multiple spaces before operator
 5 5 | x             = 1
 6 6 | y             = 2
 
-error[E221]: E22.py:5:2: [*] Multiple spaces before operator
+error[E221]: 5:2: [*] Multiple spaces before operator
 
+ --> E22.py:5:2
   |
 3 | b = 4  + 5
 4 | #: E221 E221
@@ -42,8 +44,9 @@ error[E221]: E22.py:5:2: [*] Multiple spaces before operator
 7 7 | long_variable = 3
 8 8 | #: E221 E221
 
-error[E221]: E22.py:6:2: [*] Multiple spaces before operator
+error[E221]: 6:2: [*] Multiple spaces before operator
 
+ --> E22.py:6:2
   |
 4 | #: E221 E221
 5 | x             = 1
@@ -63,8 +66,9 @@ error[E221]: E22.py:6:2: [*] Multiple spaces before operator
 8 8 | #: E221 E221
 9 9 | x[0]          = 1
 
-error[E221]: E22.py:9:5: [*] Multiple spaces before operator
+error[E221]: 9:5: [*] Multiple spaces before operator
 
+  --> E22.py:9:5
    |
  7 | long_variable = 3
  8 | #: E221 E221
@@ -84,8 +88,9 @@ error[E221]: E22.py:9:5: [*] Multiple spaces before operator
 11 11 | long_variable = 3
 12 12 | #: E221 E221
 
-error[E221]: E22.py:10:5: [*] Multiple spaces before operator
+error[E221]: 10:5: [*] Multiple spaces before operator
 
+  --> E22.py:10:5
    |
  8 | #: E221 E221
  9 | x[0]          = 1
@@ -105,8 +110,9 @@ error[E221]: E22.py:10:5: [*] Multiple spaces before operator
 12 12 | #: E221 E221
 13 13 | x = f(x)          + 1
 
-error[E221]: E22.py:13:9: [*] Multiple spaces before operator
+error[E221]: 13:9: [*] Multiple spaces before operator
 
+  --> E22.py:13:9
    |
 11 | long_variable = 3
 12 | #: E221 E221
@@ -126,8 +132,9 @@ error[E221]: E22.py:13:9: [*] Multiple spaces before operator
 15 15 | z = x[0]          + 3
 16 16 | #: E221:3:14
 
-error[E221]: E22.py:15:9: [*] Multiple spaces before operator
+error[E221]: 15:9: [*] Multiple spaces before operator
 
+  --> E22.py:15:9
    |
 13 | x = f(x)          + 1
 14 | y = long_variable + 2
@@ -147,8 +154,9 @@ error[E221]: E22.py:15:9: [*] Multiple spaces before operator
 17 17 | text = """
 18 18 |     bar
 
-error[E221]: E22.py:19:14: [*] Multiple spaces before operator
+error[E221]: 19:14: [*] Multiple spaces before operator
 
+  --> E22.py:19:14
    |
 17 | text = """
 18 |     bar

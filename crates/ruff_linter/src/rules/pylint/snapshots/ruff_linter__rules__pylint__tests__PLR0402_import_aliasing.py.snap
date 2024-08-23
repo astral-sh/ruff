@@ -1,8 +1,9 @@
 ---
 source: crates/ruff_linter/src/rules/pylint/mod.rs
 ---
-error[PLR0402]: import_aliasing.py:9:8: [*] Use `from os import path` in lieu of alias
+error[PLR0402]: 9:8: [*] Use `from os import path` in lieu of alias
 
+  --> import_aliasing.py:9:8
    |
  7 | from collections import OrderedDict as OrderedDict  # [useless-import-alias]
  8 | from collections import OrderedDict as o_dict
@@ -22,8 +23,9 @@ error[PLR0402]: import_aliasing.py:9:8: [*] Use `from os import path` in lieu of
 11 11 | import foo.bar.foobar as foobar  # [consider-using-from-import]
 12 12 | import foo.bar.foobar as foobar, sys  # [consider-using-from-import]
 
-error[PLR0402]: import_aliasing.py:11:8: [*] Use `from foo.bar import foobar` in lieu of alias
+error[PLR0402]: 11:8: [*] Use `from foo.bar import foobar` in lieu of alias
 
+  --> import_aliasing.py:11:8
    |
  9 | import os.path as path  # [consider-using-from-import]
 10 | import os.path as p
@@ -43,8 +45,9 @@ error[PLR0402]: import_aliasing.py:11:8: [*] Use `from foo.bar import foobar` in
 13 13 | import os
 14 14 | import os as OS
 
-error[PLR0402]: import_aliasing.py:12:8: Use `from foo.bar import foobar` in lieu of alias
+error[PLR0402]: 12:8: Use `from foo.bar import foobar` in lieu of alias
 
+  --> import_aliasing.py:12:8
    |
 10 | import os.path as p
 11 | import foo.bar.foobar as foobar  # [consider-using-from-import]

@@ -1,8 +1,9 @@
 ---
 source: crates/ruff_linter/src/rules/pydocstyle/mod.rs
 ---
-error[D215]: sections.py:159:9: [*] Section underline is over-indented ("Returns")
+error[D215]: 159:9: [*] Section underline is over-indented ("Returns")
 
+   --> sections.py:159:9
     |
 158 |     Returns
 159 |         -------
@@ -20,8 +21,9 @@ error[D215]: sections.py:159:9: [*] Section underline is over-indented ("Returns
 161 161 | 
 162 162 |     """
 
-error[D215]: sections.py:173:9: [*] Section underline is over-indented ("Returns")
+error[D215]: 173:9: [*] Section underline is over-indented ("Returns")
 
+   --> sections.py:173:9
     |
 172 |     Returns
 173 |         -------

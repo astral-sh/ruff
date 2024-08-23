@@ -1,8 +1,9 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_pyi/mod.rs
 ---
-error[PYI059]: PYI059.py:8:17: [*] `Generic[]` should always be the last base class
+error[PYI059]: 8:17: [*] `Generic[]` should always be the last base class
 
+  --> PYI059.py:8:17
    |
  6 | V = TypeVar('V')
  7 | 
@@ -22,8 +23,9 @@ error[PYI059]: PYI059.py:8:17: [*] `Generic[]` should always be the last base cl
 10 10 |         self._items: List[T] = []
 11 11 | 
 
-error[PYI059]: PYI059.py:15:16: [*] `Generic[]` should always be the last base class
+error[PYI059]: 15:16: [*] `Generic[]` should always be the last base class
 
+  --> PYI059.py:15:16
    |
 13 |           self._items.append(item)
 14 |   
@@ -49,8 +51,9 @@ error[PYI059]: PYI059.py:15:16: [*] `Generic[]` should always be the last base c
 20 19 |     ...
 21 20 | 
 
-error[PYI059]: PYI059.py:26:10: [*] `Generic[]` should always be the last base class
+error[PYI059]: 26:10: [*] `Generic[]` should always be the last base class
 
+  --> PYI059.py:26:10
    |
 24 | # to flag this issue in this case as well, since after fixing the error
 25 | # the Generic's position issue persists.
@@ -69,8 +72,9 @@ error[PYI059]: PYI059.py:26:10: [*] `Generic[]` should always be the last base c
 28 28 | 
 29 29 | 
 
-error[PYI059]: PYI059.py:30:10: [*] `Generic[]` should always be the last base class
+error[PYI059]: 30:10: [*] `Generic[]` should always be the last base class
 
+  --> PYI059.py:30:10
    |
 30 |   class Foo(  # comment about the bracket
    |  __________^
@@ -104,8 +108,9 @@ error[PYI059]: PYI059.py:30:10: [*] `Generic[]` should always be the last base c
 40 38 | ):  # and another one for good measure
 41 39 |     ...
 
-error[PYI059]: PYI059.py:45:8: `Generic[]` should always be the last base class
+error[PYI059]: 45:8: `Generic[]` should always be the last base class
 
+  --> PYI059.py:45:8
    |
 44 | # in case of multiple Generic[] inheritance, don't fix it.
 45 | class C(Generic[T], Generic[K, V]): ...  # PYI059

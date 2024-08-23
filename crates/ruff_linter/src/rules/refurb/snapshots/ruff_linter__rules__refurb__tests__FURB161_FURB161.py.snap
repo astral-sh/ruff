@@ -1,8 +1,9 @@
 ---
 source: crates/ruff_linter/src/rules/refurb/mod.rs
 ---
-error[FURB161]: FURB161.py:6:9: [*] Use of `bin(x).count('1')`
+error[FURB161]: 6:9: [*] Use of `bin(x).count('1')`
 
+ --> FURB161.py:6:9
   |
 4 |     return 10
 5 | 
@@ -22,8 +23,9 @@ error[FURB161]: FURB161.py:6:9: [*] Use of `bin(x).count('1')`
 8 8 | count = bin(0b1010).count("1")  # FURB161
 9 9 | count = bin(0xA).count("1")  # FURB161
 
-error[FURB161]: FURB161.py:7:9: [*] Use of `bin(10).count('1')`
+error[FURB161]: 7:9: [*] Use of `bin(10).count('1')`
 
+ --> FURB161.py:7:9
   |
 6 | count = bin(x).count("1")  # FURB161
 7 | count = bin(10).count("1")  # FURB161
@@ -42,8 +44,9 @@ error[FURB161]: FURB161.py:7:9: [*] Use of `bin(10).count('1')`
 9 9 | count = bin(0xA).count("1")  # FURB161
 10 10 | count = bin(0o12).count("1")  # FURB161
 
-error[FURB161]: FURB161.py:8:9: [*] Use of `bin(0b1010).count('1')`
+error[FURB161]: 8:9: [*] Use of `bin(0b1010).count('1')`
 
+  --> FURB161.py:8:9
    |
  6 | count = bin(x).count("1")  # FURB161
  7 | count = bin(10).count("1")  # FURB161
@@ -63,8 +66,9 @@ error[FURB161]: FURB161.py:8:9: [*] Use of `bin(0b1010).count('1')`
 10 10 | count = bin(0o12).count("1")  # FURB161
 11 11 | count = bin(0x10 + 0x1000).count("1")  # FURB161
 
-error[FURB161]: FURB161.py:9:9: [*] Use of `bin(0xA).count('1')`
+error[FURB161]: 9:9: [*] Use of `bin(0xA).count('1')`
 
+  --> FURB161.py:9:9
    |
  7 | count = bin(10).count("1")  # FURB161
  8 | count = bin(0b1010).count("1")  # FURB161
@@ -84,8 +88,9 @@ error[FURB161]: FURB161.py:9:9: [*] Use of `bin(0xA).count('1')`
 11 11 | count = bin(0x10 + 0x1000).count("1")  # FURB161
 12 12 | count = bin(ten()).count("1")  # FURB161
 
-error[FURB161]: FURB161.py:10:9: [*] Use of `bin(0o12).count('1')`
+error[FURB161]: 10:9: [*] Use of `bin(0o12).count('1')`
 
+  --> FURB161.py:10:9
    |
  8 | count = bin(0b1010).count("1")  # FURB161
  9 | count = bin(0xA).count("1")  # FURB161
@@ -105,8 +110,9 @@ error[FURB161]: FURB161.py:10:9: [*] Use of `bin(0o12).count('1')`
 12 12 | count = bin(ten()).count("1")  # FURB161
 13 13 | count = bin((10)).count("1")  # FURB161
 
-error[FURB161]: FURB161.py:11:9: [*] Use of `bin(0x10 + 0x1000).count('1')`
+error[FURB161]: 11:9: [*] Use of `bin(0x10 + 0x1000).count('1')`
 
+  --> FURB161.py:11:9
    |
  9 | count = bin(0xA).count("1")  # FURB161
 10 | count = bin(0o12).count("1")  # FURB161
@@ -126,8 +132,9 @@ error[FURB161]: FURB161.py:11:9: [*] Use of `bin(0x10 + 0x1000).count('1')`
 13 13 | count = bin((10)).count("1")  # FURB161
 14 14 | count = bin("10" "15").count("1")  # FURB161
 
-error[FURB161]: FURB161.py:12:9: [*] Use of `bin(ten()).count('1')`
+error[FURB161]: 12:9: [*] Use of `bin(ten()).count('1')`
 
+  --> FURB161.py:12:9
    |
 10 | count = bin(0o12).count("1")  # FURB161
 11 | count = bin(0x10 + 0x1000).count("1")  # FURB161
@@ -147,8 +154,9 @@ error[FURB161]: FURB161.py:12:9: [*] Use of `bin(ten()).count('1')`
 14 14 | count = bin("10" "15").count("1")  # FURB161
 15 15 | 
 
-error[FURB161]: FURB161.py:13:9: [*] Use of `bin(10).count('1')`
+error[FURB161]: 13:9: [*] Use of `bin(10).count('1')`
 
+  --> FURB161.py:13:9
    |
 11 | count = bin(0x10 + 0x1000).count("1")  # FURB161
 12 | count = bin(ten()).count("1")  # FURB161
@@ -167,8 +175,9 @@ error[FURB161]: FURB161.py:13:9: [*] Use of `bin(10).count('1')`
 15 15 | 
 16 16 | count = x.bit_count()  # OK
 
-error[FURB161]: FURB161.py:14:9: [*] Use of `bin("10" "15").count('1')`
+error[FURB161]: 14:9: [*] Use of `bin("10" "15").count('1')`
 
+  --> FURB161.py:14:9
    |
 12 | count = bin(ten()).count("1")  # FURB161
 13 | count = bin((10)).count("1")  # FURB161

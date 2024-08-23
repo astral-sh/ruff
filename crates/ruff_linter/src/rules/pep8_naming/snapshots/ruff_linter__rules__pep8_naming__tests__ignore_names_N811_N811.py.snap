@@ -1,8 +1,9 @@
 ---
 source: crates/ruff_linter/src/rules/pep8_naming/mod.rs
 ---
-error[N811]: N811.py:2:8: Constant `STILL_BAD` imported as non-constant `stillBad`
+error[N811]: 2:8: Constant `STILL_BAD` imported as non-constant `stillBad`
 
+ --> N811.py:2:8
   |
 1 | import mod.BAD_ALLOWED as badAllowed
 2 | import mod.STILL_BAD as stillBad
@@ -10,8 +11,9 @@ error[N811]: N811.py:2:8: Constant `STILL_BAD` imported as non-constant `stillBa
 3 | 
 4 | from mod import BAD_ALLOWED as badAllowed
   |
-error[N811]: N811.py:5:17: Constant `STILL_BAD` imported as non-constant `stillBad`
+error[N811]: 5:17: Constant `STILL_BAD` imported as non-constant `stillBad`
 
+ --> N811.py:5:17
   |
 4 | from mod import BAD_ALLOWED as badAllowed
 5 | from mod import STILL_BAD as stillBad

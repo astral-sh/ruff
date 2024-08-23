@@ -1,8 +1,9 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_pyi/mod.rs
 ---
-error[PYI029]: PYI029.pyi:10:9: [*] Defining `__str__` in a stub is almost always redundant
+error[PYI029]: 10:9: [*] Defining `__str__` in a stub is almost always redundant
 
+  --> PYI029.pyi:10:9
    |
  9 | class ShouldRemoveSingle:
 10 |     def __str__(self) -> builtins.str: ...  # Error: PYI029
@@ -21,8 +22,9 @@ error[PYI029]: PYI029.pyi:10:9: [*] Defining `__str__` in a stub is almost alway
 12 12 | class ShouldRemove:
 13 13 |     def __repr__(self) -> str: ...  # Error: PYI029
 
-error[PYI029]: PYI029.pyi:13:9: [*] Defining `__repr__` in a stub is almost always redundant
+error[PYI029]: 13:9: [*] Defining `__repr__` in a stub is almost always redundant
 
+  --> PYI029.pyi:13:9
    |
 12 | class ShouldRemove:
 13 |     def __repr__(self) -> str: ...  # Error: PYI029
@@ -39,8 +41,9 @@ error[PYI029]: PYI029.pyi:13:9: [*] Defining `__repr__` in a stub is almost alwa
 15 14 | 
 16 15 | class NoReturnSpecified:
 
-error[PYI029]: PYI029.pyi:14:9: [*] Defining `__str__` in a stub is almost always redundant
+error[PYI029]: 14:9: [*] Defining `__str__` in a stub is almost always redundant
 
+  --> PYI029.pyi:14:9
    |
 12 | class ShouldRemove:
 13 |     def __repr__(self) -> str: ...  # Error: PYI029

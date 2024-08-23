@@ -1,8 +1,9 @@
 ---
 source: crates/ruff_linter/src/rules/refurb/mod.rs
 ---
-error[FURB110]: FURB110.py:1:5: [*] Replace ternary `if` expression with `or` operator
+error[FURB110]: 1:5: [*] Replace ternary `if` expression with `or` operator
 
+ --> FURB110.py:1:5
   |
 1 | z = x if x else y  # FURB110
   |     ^^^^^^^^^^^^^
@@ -17,8 +18,9 @@ error[FURB110]: FURB110.py:1:5: [*] Replace ternary `if` expression with `or` op
 3 3 | z = x \
 4 4 |     if x else y  # FURB110
 
-error[FURB110]: FURB110.py:3:5: [*] Replace ternary `if` expression with `or` operator
+error[FURB110]: 3:5: [*] Replace ternary `if` expression with `or` operator
 
+ --> FURB110.py:3:5
   |
 1 |   z = x if x else y  # FURB110
 2 |   
@@ -40,8 +42,9 @@ error[FURB110]: FURB110.py:3:5: [*] Replace ternary `if` expression with `or` op
 6 5 | z = x if x \
 7 6 |     else  \
 
-error[FURB110]: FURB110.py:6:5: [*] Replace ternary `if` expression with `or` operator
+error[FURB110]: 6:5: [*] Replace ternary `if` expression with `or` operator
 
+  --> FURB110.py:6:5
    |
  4 |       if x else y  # FURB110
  5 |   
@@ -66,8 +69,9 @@ error[FURB110]: FURB110.py:6:5: [*] Replace ternary `if` expression with `or` op
 10 8 | z = x() if x() else y()  # FURB110
 11 9 | 
 
-error[FURB110]: FURB110.py:10:5: [*] Replace ternary `if` expression with `or` operator
+error[FURB110]: 10:5: [*] Replace ternary `if` expression with `or` operator
 
+  --> FURB110.py:10:5
    |
  8 |         y  # FURB110
  9 | 
@@ -87,8 +91,9 @@ error[FURB110]: FURB110.py:10:5: [*] Replace ternary `if` expression with `or` o
 12 12 | # FURB110
 13 13 | z = x if (
 
-error[FURB110]: FURB110.py:13:5: [*] Replace ternary `if` expression with `or` operator
+error[FURB110]: 13:5: [*] Replace ternary `if` expression with `or` operator
 
+  --> FURB110.py:13:5
    |
 12 |   # FURB110
 13 |   z = x if (
@@ -118,8 +123,9 @@ error[FURB110]: FURB110.py:13:5: [*] Replace ternary `if` expression with `or` o
 18 18 |     y
 19 19 | )
 
-error[FURB110]: FURB110.py:23:5: [*] Replace ternary `if` expression with `or` operator
+error[FURB110]: 23:5: [*] Replace ternary `if` expression with `or` operator
 
+  --> FURB110.py:23:5
    |
 21 |   # FURB110
 22 |   z = (
@@ -149,8 +155,9 @@ error[FURB110]: FURB110.py:23:5: [*] Replace ternary `if` expression with `or` o
 28 28 |         y
 29 29 |     )
 
-error[FURB110]: FURB110.py:34:5: [*] Replace ternary `if` expression with `or` operator
+error[FURB110]: 34:5: [*] Replace ternary `if` expression with `or` operator
 
+  --> FURB110.py:34:5
    |
 32 |   # FURB110
 33 |   z = (
@@ -180,8 +187,9 @@ error[FURB110]: FURB110.py:34:5: [*] Replace ternary `if` expression with `or` o
 41 36 | 
 42 37 | # FURB110
 
-error[FURB110]: FURB110.py:44:5: [*] Replace ternary `if` expression with `or` operator
+error[FURB110]: 44:5: [*] Replace ternary `if` expression with `or` operator
 
+  --> FURB110.py:44:5
    |
 42 |   # FURB110
 43 |   z = (

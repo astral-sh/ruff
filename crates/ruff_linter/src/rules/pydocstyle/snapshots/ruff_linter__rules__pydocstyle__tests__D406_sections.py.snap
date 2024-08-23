@@ -1,8 +1,9 @@
 ---
 source: crates/ruff_linter/src/rules/pydocstyle/mod.rs
 ---
-error[D406]: sections.py:32:5: [*] Section name should end with a newline ("Returns")
+error[D406]: 32:5: [*] Section name should end with a newline ("Returns")
 
+  --> sections.py:32:5
    |
 30 |     """Toggle the gizmo.
 31 | 
@@ -22,8 +23,9 @@ error[D406]: sections.py:32:5: [*] Section name should end with a newline ("Retu
 34 34 |     A value of some sort.
 35 35 | 
 
-error[D406]: sections.py:227:5: [*] Section name should end with a newline ("Raises")
+error[D406]: 227:5: [*] Section name should end with a newline ("Raises")
 
+   --> sections.py:227:5
     |
 225 |     ------
 226 |     Many many wonderful things.
@@ -42,8 +44,9 @@ error[D406]: sections.py:227:5: [*] Section name should end with a newline ("Rai
 229 229 | 
 230 230 |     """
 
-error[D406]: sections.py:590:5: [*] Section name should end with a newline ("Parameters")
+error[D406]: 590:5: [*] Section name should end with a newline ("Parameters")
 
+   --> sections.py:590:5
     |
 588 |     """Test that lower case subsection header is valid even if it has the same name as section kind.
 589 | 

@@ -1,8 +1,9 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_bandit/mod.rs
 ---
-error[S312]: S312.py:3:1: Telnet-related functions are being called. Telnet is considered insecure. Use SSH or some other encrypted protocol.
+error[S312]: 3:1: Telnet-related functions are being called. Telnet is considered insecure. Use SSH or some other encrypted protocol.
 
+ --> S312.py:2:1
   |
 1 | from telnetlib import Telnet
 2 | 

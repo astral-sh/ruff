@@ -1,8 +1,9 @@
 ---
 source: crates/ruff_linter/src/rules/pyupgrade/mod.rs
 ---
-error[UP010]: UP010.py:1:1: [*] Unnecessary `__future__` imports `generators`, `nested_scopes` for target Python version
+error[UP010]: 1:1: [*] Unnecessary `__future__` imports `generators`, `nested_scopes` for target Python version
 
+ --> UP010.py:1:1
   |
 1 | from __future__ import nested_scopes, generators
   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -16,8 +17,9 @@ error[UP010]: UP010.py:1:1: [*] Unnecessary `__future__` imports `generators`, `
 3 2 | from __future__ import absolute_import, division
 4 3 | from __future__ import generator_stop
 
-error[UP010]: UP010.py:2:1: [*] Unnecessary `__future__` imports `unicode_literals`, `with_statement` for target Python version
+error[UP010]: 2:1: [*] Unnecessary `__future__` imports `unicode_literals`, `with_statement` for target Python version
 
+ --> UP010.py:1:49
   |
 1 | from __future__ import nested_scopes, generators
 2 | from __future__ import with_statement, unicode_literals
@@ -33,8 +35,9 @@ error[UP010]: UP010.py:2:1: [*] Unnecessary `__future__` imports `unicode_litera
 4 3 | from __future__ import generator_stop
 5 4 | from __future__ import print_function, generator_stop
 
-error[UP010]: UP010.py:3:1: [*] Unnecessary `__future__` imports `absolute_import`, `division` for target Python version
+error[UP010]: 3:1: [*] Unnecessary `__future__` imports `absolute_import`, `division` for target Python version
 
+ --> UP010.py:2:56
   |
 1 | from __future__ import nested_scopes, generators
 2 | from __future__ import with_statement, unicode_literals
@@ -52,8 +55,9 @@ error[UP010]: UP010.py:3:1: [*] Unnecessary `__future__` imports `absolute_impor
 5 4 | from __future__ import print_function, generator_stop
 6 5 | from __future__ import invalid_module, generators
 
-error[UP010]: UP010.py:4:1: [*] Unnecessary `__future__` import `generator_stop` for target Python version
+error[UP010]: 4:1: [*] Unnecessary `__future__` import `generator_stop` for target Python version
 
+ --> UP010.py:3:49
   |
 2 | from __future__ import with_statement, unicode_literals
 3 | from __future__ import absolute_import, division
@@ -72,8 +76,9 @@ error[UP010]: UP010.py:4:1: [*] Unnecessary `__future__` import `generator_stop`
 6 5 | from __future__ import invalid_module, generators
 7 6 | 
 
-error[UP010]: UP010.py:5:1: [*] Unnecessary `__future__` imports `generator_stop`, `print_function` for target Python version
+error[UP010]: 5:1: [*] Unnecessary `__future__` imports `generator_stop`, `print_function` for target Python version
 
+ --> UP010.py:4:38
   |
 3 | from __future__ import absolute_import, division
 4 | from __future__ import generator_stop
@@ -91,8 +96,9 @@ error[UP010]: UP010.py:5:1: [*] Unnecessary `__future__` imports `generator_stop
 7 6 | 
 8 7 | if True:
 
-error[UP010]: UP010.py:6:1: [*] Unnecessary `__future__` import `generators` for target Python version
+error[UP010]: 6:1: [*] Unnecessary `__future__` import `generators` for target Python version
 
+ --> UP010.py:5:54
   |
 4 | from __future__ import generator_stop
 5 | from __future__ import print_function, generator_stop
@@ -112,8 +118,9 @@ error[UP010]: UP010.py:6:1: [*] Unnecessary `__future__` import `generators` for
 8 8 | if True:
 9 9 |     from __future__ import generator_stop
 
-error[UP010]: UP010.py:9:5: [*] Unnecessary `__future__` import `generator_stop` for target Python version
+error[UP010]: 9:5: [*] Unnecessary `__future__` import `generator_stop` for target Python version
 
+  --> UP010.py:9:5
    |
  8 | if True:
  9 |     from __future__ import generator_stop
@@ -130,8 +137,9 @@ error[UP010]: UP010.py:9:5: [*] Unnecessary `__future__` import `generator_stop`
 11 10 | 
 12 11 | if True:
 
-error[UP010]: UP010.py:10:5: [*] Unnecessary `__future__` import `generators` for target Python version
+error[UP010]: 10:5: [*] Unnecessary `__future__` import `generators` for target Python version
 
+  --> UP010.py:10:5
    |
  8 | if True:
  9 |     from __future__ import generator_stop
@@ -150,8 +158,9 @@ error[UP010]: UP010.py:10:5: [*] Unnecessary `__future__` import `generators` fo
 12 11 | if True:
 13 12 |     from __future__ import generator_stop
 
-error[UP010]: UP010.py:13:5: [*] Unnecessary `__future__` import `generator_stop` for target Python version
+error[UP010]: 13:5: [*] Unnecessary `__future__` import `generator_stop` for target Python version
 
+  --> UP010.py:13:5
    |
 12 | if True:
 13 |     from __future__ import generator_stop
@@ -166,8 +175,9 @@ error[UP010]: UP010.py:13:5: [*] Unnecessary `__future__` import `generator_stop
 13    |-    from __future__ import generator_stop
 14 13 |     from __future__ import invalid_module, generators
 
-error[UP010]: UP010.py:14:5: [*] Unnecessary `__future__` import `generators` for target Python version
+error[UP010]: 14:5: [*] Unnecessary `__future__` import `generators` for target Python version
 
+  --> UP010.py:14:5
    |
 12 | if True:
 13 |     from __future__ import generator_stop

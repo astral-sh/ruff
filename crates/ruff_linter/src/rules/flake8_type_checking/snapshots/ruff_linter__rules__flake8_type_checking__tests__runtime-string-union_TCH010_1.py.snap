@@ -1,8 +1,9 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_type_checking/mod.rs
 ---
-error[TCH010]: TCH010_1.py:18:30: Invalid string member in `X | Y`-style union type
+error[TCH010]: 18:30: Invalid string member in `X | Y`-style union type
 
+  --> TCH010_1.py:18:30
    |
 16 | type A = Value["int" | str]  # OK
 17 | 

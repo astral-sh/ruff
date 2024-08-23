@@ -1,8 +1,9 @@
 ---
 source: crates/ruff_linter/src/rules/ruff/mod.rs
 ---
-error[RUF020]: RUF020.py:3:7: [*] `Union[Never, T]` is equivalent to `T`
+error[RUF020]: 3:7: [*] `Union[Never, T]` is equivalent to `T`
 
+ --> RUF020.py:3:7
   |
 1 | from typing import Never, NoReturn, Union
 2 | 
@@ -21,8 +22,9 @@ error[RUF020]: RUF020.py:3:7: [*] `Union[Never, T]` is equivalent to `T`
 5 5 | Never | int
 6 6 | NoReturn | int
 
-error[RUF020]: RUF020.py:4:7: [*] `Union[NoReturn, T]` is equivalent to `T`
+error[RUF020]: 4:7: [*] `Union[NoReturn, T]` is equivalent to `T`
 
+ --> RUF020.py:4:7
   |
 3 | Union[Never, int]
 4 | Union[NoReturn, int]
@@ -41,8 +43,9 @@ error[RUF020]: RUF020.py:4:7: [*] `Union[NoReturn, T]` is equivalent to `T`
 6 6 | NoReturn | int
 7 7 | Union[Union[Never, int], Union[NoReturn, int]]
 
-error[RUF020]: RUF020.py:5:1: [*] `Never | T` is equivalent to `T`
+error[RUF020]: 5:1: [*] `Never | T` is equivalent to `T`
 
+ --> RUF020.py:4:21
   |
 3 | Union[Never, int]
 4 | Union[NoReturn, int]
@@ -62,8 +65,9 @@ error[RUF020]: RUF020.py:5:1: [*] `Never | T` is equivalent to `T`
 7 7 | Union[Union[Never, int], Union[NoReturn, int]]
 8 8 | Union[NoReturn, int, float]
 
-error[RUF020]: RUF020.py:6:1: [*] `NoReturn | T` is equivalent to `T`
+error[RUF020]: 6:1: [*] `NoReturn | T` is equivalent to `T`
 
+ --> RUF020.py:5:12
   |
 4 | Union[NoReturn, int]
 5 | Never | int
@@ -82,8 +86,9 @@ error[RUF020]: RUF020.py:6:1: [*] `NoReturn | T` is equivalent to `T`
 7 7 | Union[Union[Never, int], Union[NoReturn, int]]
 8 8 | Union[NoReturn, int, float]
 
-error[RUF020]: RUF020.py:7:13: [*] `Union[Never, T]` is equivalent to `T`
+error[RUF020]: 7:13: [*] `Union[Never, T]` is equivalent to `T`
 
+ --> RUF020.py:7:13
   |
 5 | Never | int
 6 | NoReturn | int
@@ -100,8 +105,9 @@ error[RUF020]: RUF020.py:7:13: [*] `Union[Never, T]` is equivalent to `T`
   7 |+Union[int, Union[NoReturn, int]]
 8 8 | Union[NoReturn, int, float]
 
-error[RUF020]: RUF020.py:7:32: [*] `Union[NoReturn, T]` is equivalent to `T`
+error[RUF020]: 7:32: [*] `Union[NoReturn, T]` is equivalent to `T`
 
+ --> RUF020.py:7:32
   |
 5 | Never | int
 6 | NoReturn | int
@@ -118,8 +124,9 @@ error[RUF020]: RUF020.py:7:32: [*] `Union[NoReturn, T]` is equivalent to `T`
   7 |+Union[Union[Never, int], int]
 8 8 | Union[NoReturn, int, float]
 
-error[RUF020]: RUF020.py:8:7: [*] `Union[NoReturn, T]` is equivalent to `T`
+error[RUF020]: 8:7: [*] `Union[NoReturn, T]` is equivalent to `T`
 
+ --> RUF020.py:8:7
   |
 6 | NoReturn | int
 7 | Union[Union[Never, int], Union[NoReturn, int]]

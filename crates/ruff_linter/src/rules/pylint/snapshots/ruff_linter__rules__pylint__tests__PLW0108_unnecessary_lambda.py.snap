@@ -1,8 +1,9 @@
 ---
 source: crates/ruff_linter/src/rules/pylint/mod.rs
 ---
-error[PLW0108]: unnecessary_lambda.py:1:5: [*] Lambda may be unnecessary; consider inlining inner function
+error[PLW0108]: 1:5: [*] Lambda may be unnecessary; consider inlining inner function
 
+ --> unnecessary_lambda.py:1:5
   |
 1 | _ = lambda: print()  # [unnecessary-lambda]
   |     ^^^^^^^^^^^^^^^
@@ -16,8 +17,9 @@ error[PLW0108]: unnecessary_lambda.py:1:5: [*] Lambda may be unnecessary; consid
 3 3 | 
 4 4 | _ = lambda *args: f(*args) # [unnecessary-lambda]
 
-error[PLW0108]: unnecessary_lambda.py:2:5: [*] Lambda may be unnecessary; consider inlining inner function
+error[PLW0108]: 2:5: [*] Lambda may be unnecessary; consider inlining inner function
 
+ --> unnecessary_lambda.py:2:5
   |
 1 | _ = lambda: print()  # [unnecessary-lambda]
 2 | _ = lambda x, y: min(x, y) # [unnecessary-lambda]
@@ -34,8 +36,9 @@ error[PLW0108]: unnecessary_lambda.py:2:5: [*] Lambda may be unnecessary; consid
 4 4 | _ = lambda *args: f(*args) # [unnecessary-lambda]
 5 5 | _ = lambda **kwargs: f(**kwargs) # [unnecessary-lambda]
 
-error[PLW0108]: unnecessary_lambda.py:4:5: [*] Lambda may be unnecessary; consider inlining inner function
+error[PLW0108]: 4:5: [*] Lambda may be unnecessary; consider inlining inner function
 
+ --> unnecessary_lambda.py:4:5
   |
 2 | _ = lambda x, y: min(x, y) # [unnecessary-lambda]
 3 | 
@@ -55,8 +58,9 @@ error[PLW0108]: unnecessary_lambda.py:4:5: [*] Lambda may be unnecessary; consid
 6 6 | _ = lambda *args, **kwargs: f(*args, **kwargs) # [unnecessary-lambda]
 7 7 | _ = lambda x, y, z, *args, **kwargs: f(x, y, z, *args, **kwargs) # [unnecessary-lambda]
 
-error[PLW0108]: unnecessary_lambda.py:5:5: [*] Lambda may be unnecessary; consider inlining inner function
+error[PLW0108]: 5:5: [*] Lambda may be unnecessary; consider inlining inner function
 
+ --> unnecessary_lambda.py:5:5
   |
 4 | _ = lambda *args: f(*args) # [unnecessary-lambda]
 5 | _ = lambda **kwargs: f(**kwargs) # [unnecessary-lambda]
@@ -75,8 +79,9 @@ error[PLW0108]: unnecessary_lambda.py:5:5: [*] Lambda may be unnecessary; consid
 7 7 | _ = lambda x, y, z, *args, **kwargs: f(x, y, z, *args, **kwargs) # [unnecessary-lambda]
 8 8 | 
 
-error[PLW0108]: unnecessary_lambda.py:6:5: [*] Lambda may be unnecessary; consider inlining inner function
+error[PLW0108]: 6:5: [*] Lambda may be unnecessary; consider inlining inner function
 
+ --> unnecessary_lambda.py:6:5
   |
 4 | _ = lambda *args: f(*args) # [unnecessary-lambda]
 5 | _ = lambda **kwargs: f(**kwargs) # [unnecessary-lambda]
@@ -95,8 +100,9 @@ error[PLW0108]: unnecessary_lambda.py:6:5: [*] Lambda may be unnecessary; consid
 8 8 | 
 9 9 | _ = lambda x: f(lambda x: x)(x) # [unnecessary-lambda]
 
-error[PLW0108]: unnecessary_lambda.py:7:5: [*] Lambda may be unnecessary; consider inlining inner function
+error[PLW0108]: 7:5: [*] Lambda may be unnecessary; consider inlining inner function
 
+ --> unnecessary_lambda.py:7:5
   |
 5 | _ = lambda **kwargs: f(**kwargs) # [unnecessary-lambda]
 6 | _ = lambda *args, **kwargs: f(*args, **kwargs) # [unnecessary-lambda]
@@ -116,8 +122,9 @@ error[PLW0108]: unnecessary_lambda.py:7:5: [*] Lambda may be unnecessary; consid
 9 9 | _ = lambda x: f(lambda x: x)(x) # [unnecessary-lambda]
 10 10 | _ = lambda x, y: f(lambda x, y: x + y)(x, y) # [unnecessary-lambda]
 
-error[PLW0108]: unnecessary_lambda.py:9:5: [*] Lambda may be unnecessary; consider inlining inner function
+error[PLW0108]: 9:5: [*] Lambda may be unnecessary; consider inlining inner function
 
+  --> unnecessary_lambda.py:9:5
    |
  7 | _ = lambda x, y, z, *args, **kwargs: f(x, y, z, *args, **kwargs) # [unnecessary-lambda]
  8 | 
@@ -136,8 +143,9 @@ error[PLW0108]: unnecessary_lambda.py:9:5: [*] Lambda may be unnecessary; consid
 11 11 | 
 12 12 | # default value in lambda parameters
 
-error[PLW0108]: unnecessary_lambda.py:10:5: [*] Lambda may be unnecessary; consider inlining inner function
+error[PLW0108]: 10:5: [*] Lambda may be unnecessary; consider inlining inner function
 
+  --> unnecessary_lambda.py:10:5
    |
  9 | _ = lambda x: f(lambda x: x)(x) # [unnecessary-lambda]
 10 | _ = lambda x, y: f(lambda x, y: x + y)(x, y) # [unnecessary-lambda]

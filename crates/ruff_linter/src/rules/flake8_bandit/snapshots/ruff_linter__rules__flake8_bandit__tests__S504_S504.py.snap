@@ -1,8 +1,9 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_bandit/mod.rs
 ---
-error[S504]: S504.py:4:1: `ssl.wrap_socket` called without an `ssl_version``
+error[S504]: 4:1: `ssl.wrap_socket` called without an `ssl_version``
 
+ --> S504.py:3:1
   |
 2 | from ssl import wrap_socket
 3 | 
@@ -11,8 +12,9 @@ error[S504]: S504.py:4:1: `ssl.wrap_socket` called without an `ssl_version``
 5 | wrap_socket()  # S504
 6 | ssl.wrap_socket(ssl_version=ssl.PROTOCOL_TLSv1_2)  # OK
   |
-error[S504]: S504.py:5:1: `ssl.wrap_socket` called without an `ssl_version``
+error[S504]: 5:1: `ssl.wrap_socket` called without an `ssl_version``
 
+ --> S504.py:4:26
   |
 4 | ssl.wrap_socket()  # S504
 5 | wrap_socket()  # S504

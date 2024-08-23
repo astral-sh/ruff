@@ -1,8 +1,9 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_pyi/mod.rs
 ---
-error[PYI056]: PYI056.pyi:4:1: Calling `.append()` on `__all__` may not be supported by all type checkers (use `+=` instead)
+error[PYI056]: 4:1: Calling `.append()` on `__all__` may not be supported by all type checkers (use `+=` instead)
 
+ --> PYI056.pyi:3:9
   |
 3 | # Errors
 4 | __all__.append("D")
@@ -10,8 +11,9 @@ error[PYI056]: PYI056.pyi:4:1: Calling `.append()` on `__all__` may not be suppo
 5 | __all__.extend(["E", "Foo"])
 6 | __all__.remove("A")
   |
-error[PYI056]: PYI056.pyi:5:1: Calling `.extend()` on `__all__` may not be supported by all type checkers (use `+=` instead)
+error[PYI056]: 5:1: Calling `.extend()` on `__all__` may not be supported by all type checkers (use `+=` instead)
 
+ --> PYI056.pyi:4:20
   |
 3 | # Errors
 4 | __all__.append("D")
@@ -19,8 +21,9 @@ error[PYI056]: PYI056.pyi:5:1: Calling `.extend()` on `__all__` may not be suppo
   | ^^^^^^^^^^^^^^
 6 | __all__.remove("A")
   |
-error[PYI056]: PYI056.pyi:6:1: Calling `.remove()` on `__all__` may not be supported by all type checkers (use `+=` instead)
+error[PYI056]: 6:1: Calling `.remove()` on `__all__` may not be supported by all type checkers (use `+=` instead)
 
+ --> PYI056.pyi:5:29
   |
 4 | __all__.append("D")
 5 | __all__.extend(["E", "Foo"])

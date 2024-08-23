@@ -1,8 +1,9 @@
 ---
 source: crates/ruff_linter/src/rules/pydocstyle/mod.rs
 ---
-error[D405]: sections.py:19:5: [*] Section name should be properly capitalized ("returns")
+error[D405]: 19:5: [*] Section name should be properly capitalized ("returns")
 
+  --> sections.py:19:5
    |
 17 |     """Toggle the gizmo.
 18 | 
@@ -22,8 +23,9 @@ error[D405]: sections.py:19:5: [*] Section name should be properly capitalized (
 21 21 |     A value of some sort.
 22 22 | 
 
-error[D405]: sections.py:218:5: [*] Section name should be properly capitalized ("Short summary")
+error[D405]: 218:5: [*] Section name should be properly capitalized ("Short summary")
 
+   --> sections.py:218:5
     |
 216 |     """Toggle the gizmo.
 217 | 

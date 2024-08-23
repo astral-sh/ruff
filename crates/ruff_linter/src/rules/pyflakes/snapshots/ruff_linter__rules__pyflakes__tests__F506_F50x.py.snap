@@ -1,8 +1,9 @@
 ---
 source: crates/ruff_linter/src/rules/pyflakes/mod.rs
 ---
-error[F506]: F50x.py:2:1: `%`-format string has mixed positional and named placeholders
+error[F506]: 2:1: `%`-format string has mixed positional and named placeholders
 
+ --> F50x.py:1:34
   |
 1 | '%(foo)' % {'foo': 'bar'}  # F501
 2 | '%s %(foo)s' % {'foo': 'bar'}  # F506
@@ -10,8 +11,9 @@ error[F506]: F50x.py:2:1: `%`-format string has mixed positional and named place
 3 | '%(foo)s %s' % {'foo': 'bar'}  # F506
 4 | '%j' % (1,)  # F509
   |
-error[F506]: F50x.py:3:1: `%`-format string has mixed positional and named placeholders
+error[F506]: 3:1: `%`-format string has mixed positional and named placeholders
 
+ --> F50x.py:2:38
   |
 1 | '%(foo)' % {'foo': 'bar'}  # F501
 2 | '%s %(foo)s' % {'foo': 'bar'}  # F506
@@ -20,8 +22,9 @@ error[F506]: F50x.py:3:1: `%`-format string has mixed positional and named place
 4 | '%j' % (1,)  # F509
 5 | '%s %s' % (1,)  # F507
   |
-error[F506]: F50x.py:11:1: `%`-format string has mixed positional and named placeholders
+error[F506]: 11:1: `%`-format string has mixed positional and named placeholders
 
+  --> F50x.py:10:29
    |
  9 | '%(bar)s' % (1, 2, 3)  # F502
 10 | '%s %s' % {'k': 'v'}  # F503

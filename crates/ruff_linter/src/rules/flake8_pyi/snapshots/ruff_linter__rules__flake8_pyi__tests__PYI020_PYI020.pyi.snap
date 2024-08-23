@@ -1,8 +1,9 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_pyi/mod.rs
 ---
-error[PYI020]: PYI020.pyi:7:10: [*] Quoted annotations should not be included in stubs
+error[PYI020]: 7:10: [*] Quoted annotations should not be included in stubs
 
+ --> PYI020.pyi:7:10
   |
 5 | import typing_extensions
 6 | 
@@ -22,8 +23,9 @@ error[PYI020]: PYI020.pyi:7:10: [*] Quoted annotations should not be included in
 9 9 | _T = TypeVar("_T", bound="int")  # Y020 Quoted annotations should never be used in stubs
 10 10 | 
 
-error[PYI020]: PYI020.pyi:8:15: [*] Quoted annotations should not be included in stubs
+error[PYI020]: 8:15: [*] Quoted annotations should not be included in stubs
 
+ --> PYI020.pyi:8:15
   |
 7 | def f(x: "int"): ...  # Y020 Quoted annotations should never be used in stubs
 8 | def g(x: list["int"]): ...  # Y020 Quoted annotations should never be used in stubs
@@ -41,8 +43,9 @@ error[PYI020]: PYI020.pyi:8:15: [*] Quoted annotations should not be included in
 10 10 | 
 11 11 | def h(w: Literal["a", "b"], x: typing.Literal["c"], y: typing_extensions.Literal["d"], z: _T) -> _T: ...
 
-error[PYI020]: PYI020.pyi:9:26: [*] Quoted annotations should not be included in stubs
+error[PYI020]: 9:26: [*] Quoted annotations should not be included in stubs
 
+  --> PYI020.pyi:9:26
    |
  7 | def f(x: "int"): ...  # Y020 Quoted annotations should never be used in stubs
  8 | def g(x: list["int"]): ...  # Y020 Quoted annotations should never be used in stubs
@@ -62,8 +65,9 @@ error[PYI020]: PYI020.pyi:9:26: [*] Quoted annotations should not be included in
 11 11 | def h(w: Literal["a", "b"], x: typing.Literal["c"], y: typing_extensions.Literal["d"], z: _T) -> _T: ...
 12 12 | 
 
-error[PYI020]: PYI020.pyi:13:12: [*] Quoted annotations should not be included in stubs
+error[PYI020]: 13:12: [*] Quoted annotations should not be included in stubs
 
+  --> PYI020.pyi:13:12
    |
 11 | def h(w: Literal["a", "b"], x: typing.Literal["c"], y: typing_extensions.Literal["d"], z: _T) -> _T: ...
 12 | 
@@ -82,8 +86,9 @@ error[PYI020]: PYI020.pyi:13:12: [*] Quoted annotations should not be included i
 15 15 | 
 16 16 | class Child(list["int"]):  # Y020 Quoted annotations should never be used in stubs
 
-error[PYI020]: PYI020.pyi:14:25: [*] Quoted annotations should not be included in stubs
+error[PYI020]: 14:25: [*] Quoted annotations should not be included in stubs
 
+  --> PYI020.pyi:14:25
    |
 13 | def j() -> "int": ...  # Y020 Quoted annotations should never be used in stubs
 14 | Alias: TypeAlias = list["int"]  # Y020 Quoted annotations should never be used in stubs
@@ -102,8 +107,9 @@ error[PYI020]: PYI020.pyi:14:25: [*] Quoted annotations should not be included i
 16 16 | class Child(list["int"]):  # Y020 Quoted annotations should never be used in stubs
 17 17 |     """Documented and guaranteed useful."""  # Y021 Docstrings should not be included in stubs
 
-error[PYI020]: PYI020.pyi:16:18: [*] Quoted annotations should not be included in stubs
+error[PYI020]: 16:18: [*] Quoted annotations should not be included in stubs
 
+  --> PYI020.pyi:16:18
    |
 14 | Alias: TypeAlias = list["int"]  # Y020 Quoted annotations should never be used in stubs
 15 | 
@@ -122,8 +128,9 @@ error[PYI020]: PYI020.pyi:16:18: [*] Quoted annotations should not be included i
 18 18 | 
 19 19 | if sys.platform == "linux":
 
-error[PYI020]: PYI020.pyi:20:8: [*] Quoted annotations should not be included in stubs
+error[PYI020]: 20:8: [*] Quoted annotations should not be included in stubs
 
+  --> PYI020.pyi:20:8
    |
 19 | if sys.platform == "linux":
 20 |     f: "int"  # Y020 Quoted annotations should never be used in stubs
@@ -142,8 +149,9 @@ error[PYI020]: PYI020.pyi:20:8: [*] Quoted annotations should not be included in
 22 22 |     f: "str"  # Y020 Quoted annotations should never be used in stubs
 23 23 | else:
 
-error[PYI020]: PYI020.pyi:22:8: [*] Quoted annotations should not be included in stubs
+error[PYI020]: 22:8: [*] Quoted annotations should not be included in stubs
 
+  --> PYI020.pyi:22:8
    |
 20 |     f: "int"  # Y020 Quoted annotations should never be used in stubs
 21 | elif sys.platform == "win32":
@@ -163,8 +171,9 @@ error[PYI020]: PYI020.pyi:22:8: [*] Quoted annotations should not be included in
 24 24 |     f: "bytes"  # Y020 Quoted annotations should never be used in stubs
 25 25 | 
 
-error[PYI020]: PYI020.pyi:24:8: [*] Quoted annotations should not be included in stubs
+error[PYI020]: 24:8: [*] Quoted annotations should not be included in stubs
 
+  --> PYI020.pyi:24:8
    |
 22 |     f: "str"  # Y020 Quoted annotations should never be used in stubs
 23 | else:

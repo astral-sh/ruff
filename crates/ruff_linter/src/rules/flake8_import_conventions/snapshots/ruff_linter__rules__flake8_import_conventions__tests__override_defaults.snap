@@ -1,8 +1,9 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_import_conventions/mod.rs
 ---
-error[ICN001]: override_default.py:3:8: `altair` should be imported as `alt`
+error[ICN001]: 3:8: `altair` should be imported as `alt`
 
+ --> override_default.py:3:8
   |
 1 | import math  # not checked
 2 | 
@@ -12,8 +13,9 @@ error[ICN001]: override_default.py:3:8: `altair` should be imported as `alt`
 5 | import numpy  # unconventional
   |
   = help: Alias `altair` to `alt`
-error[ICN001]: override_default.py:4:8: `matplotlib.pyplot` should be imported as `plt`
+error[ICN001]: 4:8: `matplotlib.pyplot` should be imported as `plt`
 
+ --> override_default.py:4:8
   |
 3 | import altair  # unconventional
 4 | import matplotlib.pyplot  # unconventional
@@ -22,8 +24,9 @@ error[ICN001]: override_default.py:4:8: `matplotlib.pyplot` should be imported a
 6 | import pandas  # unconventional
   |
   = help: Alias `matplotlib.pyplot` to `plt`
-error[ICN001]: override_default.py:5:8: `numpy` should be imported as `nmp`
+error[ICN001]: 5:8: `numpy` should be imported as `nmp`
 
+ --> override_default.py:5:8
   |
 3 | import altair  # unconventional
 4 | import matplotlib.pyplot  # unconventional
@@ -33,8 +36,9 @@ error[ICN001]: override_default.py:5:8: `numpy` should be imported as `nmp`
 7 | import seaborn  # unconventional
   |
   = help: Alias `numpy` to `nmp`
-error[ICN001]: override_default.py:6:8: `pandas` should be imported as `pd`
+error[ICN001]: 6:8: `pandas` should be imported as `pd`
 
+ --> override_default.py:6:8
   |
 4 | import matplotlib.pyplot  # unconventional
 5 | import numpy  # unconventional
@@ -43,8 +47,9 @@ error[ICN001]: override_default.py:6:8: `pandas` should be imported as `pd`
 7 | import seaborn  # unconventional
   |
   = help: Alias `pandas` to `pd`
-error[ICN001]: override_default.py:7:8: `seaborn` should be imported as `sns`
+error[ICN001]: 7:8: `seaborn` should be imported as `sns`
 
+ --> override_default.py:7:8
   |
 5 | import numpy  # unconventional
 6 | import pandas  # unconventional
@@ -54,8 +59,9 @@ error[ICN001]: override_default.py:7:8: `seaborn` should be imported as `sns`
 9 | import altair as altr  # unconventional
   |
   = help: Alias `seaborn` to `sns`
-error[ICN001]: override_default.py:9:18: `altair` should be imported as `alt`
+error[ICN001]: 9:18: `altair` should be imported as `alt`
 
+  --> override_default.py:9:18
    |
  7 | import seaborn  # unconventional
  8 | 
@@ -65,8 +71,9 @@ error[ICN001]: override_default.py:9:18: `altair` should be imported as `alt`
 11 | import numpy as np  # unconventional
    |
    = help: Alias `altair` to `alt`
-error[ICN001]: override_default.py:10:29: `matplotlib.pyplot` should be imported as `plt`
+error[ICN001]: 10:29: `matplotlib.pyplot` should be imported as `plt`
 
+  --> override_default.py:10:29
    |
  9 | import altair as altr  # unconventional
 10 | import matplotlib.pyplot as plot  # unconventional
@@ -75,8 +82,9 @@ error[ICN001]: override_default.py:10:29: `matplotlib.pyplot` should be imported
 12 | import pandas as pdas  # unconventional
    |
    = help: Alias `matplotlib.pyplot` to `plt`
-error[ICN001]: override_default.py:11:17: `numpy` should be imported as `nmp`
+error[ICN001]: 11:17: `numpy` should be imported as `nmp`
 
+  --> override_default.py:11:17
    |
  9 | import altair as altr  # unconventional
 10 | import matplotlib.pyplot as plot  # unconventional
@@ -86,8 +94,9 @@ error[ICN001]: override_default.py:11:17: `numpy` should be imported as `nmp`
 13 | import seaborn as sbrn  # unconventional
    |
    = help: Alias `numpy` to `nmp`
-error[ICN001]: override_default.py:12:18: `pandas` should be imported as `pd`
+error[ICN001]: 12:18: `pandas` should be imported as `pd`
 
+  --> override_default.py:12:18
    |
 10 | import matplotlib.pyplot as plot  # unconventional
 11 | import numpy as np  # unconventional
@@ -96,8 +105,9 @@ error[ICN001]: override_default.py:12:18: `pandas` should be imported as `pd`
 13 | import seaborn as sbrn  # unconventional
    |
    = help: Alias `pandas` to `pd`
-error[ICN001]: override_default.py:13:19: `seaborn` should be imported as `sns`
+error[ICN001]: 13:19: `seaborn` should be imported as `sns`
 
+  --> override_default.py:13:19
    |
 11 | import numpy as np  # unconventional
 12 | import pandas as pdas  # unconventional

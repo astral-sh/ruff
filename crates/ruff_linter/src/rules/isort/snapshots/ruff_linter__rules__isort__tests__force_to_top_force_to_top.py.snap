@@ -1,8 +1,9 @@
 ---
 source: crates/ruff_linter/src/rules/isort/mod.rs
 ---
-error[I001]: force_to_top.py:1:1: [*] Import block is un-sorted or un-formatted
+error[I001]: 1:1: [*] Import block is un-sorted or un-formatted
 
+  --> force_to_top.py:1:1
    |
  1 | / import lib6
  2 | | import lib2
@@ -27,6 +28,7 @@ error[I001]: force_to_top.py:1:1: [*] Import block is un-sorted or un-formatted
 21 | | import lib3.lib4.lib5
 22 | | from lib3.lib4 import foo
 23 | | from lib3.lib4.lib5 import foo
+   | |_______________________________^
    |
    = help: Organize imports
 ℹ Safe fix

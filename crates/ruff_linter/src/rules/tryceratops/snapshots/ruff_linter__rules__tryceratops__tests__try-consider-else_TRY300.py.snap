@@ -1,8 +1,9 @@
 ---
 source: crates/ruff_linter/src/rules/tryceratops/mod.rs
 ---
-error[TRY300]: TRY300.py:20:9: Consider moving this statement to an `else` block
+error[TRY300]: 20:9: Consider moving this statement to an `else` block
 
+  --> TRY300.py:20:9
    |
 18 |         a = 1
 19 |         b = process()

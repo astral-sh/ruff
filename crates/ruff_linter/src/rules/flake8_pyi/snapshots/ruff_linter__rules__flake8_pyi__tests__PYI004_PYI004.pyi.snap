@@ -1,8 +1,9 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_pyi/mod.rs
 ---
-error[PYI004]: PYI004.pyi:4:4: Version comparison must use only major and minor version
+error[PYI004]: 4:4: Version comparison must use only major and minor version
 
+ --> PYI004.pyi:4:4
   |
 2 | from sys import version_info
 3 | 
@@ -11,8 +12,9 @@ error[PYI004]: PYI004.pyi:4:4: Version comparison must use only major and minor 
 5 | if sys.version_info < (3, 4, 3): ...  # PYI004 
 6 | if sys.version_info == (3, 4, 3): ...  # PYI004 
   |
-error[PYI004]: PYI004.pyi:5:4: Version comparison must use only major and minor version
+error[PYI004]: 5:4: Version comparison must use only major and minor version
 
+ --> PYI004.pyi:5:4
   |
 4 | if sys.version_info >= (3, 4, 3): ...  # PYI004 
 5 | if sys.version_info < (3, 4, 3): ...  # PYI004 
@@ -20,8 +22,9 @@ error[PYI004]: PYI004.pyi:5:4: Version comparison must use only major and minor 
 6 | if sys.version_info == (3, 4, 3): ...  # PYI004 
 7 | if sys.version_info != (3, 4, 3): ...  # PYI004 
   |
-error[PYI004]: PYI004.pyi:6:4: Version comparison must use only major and minor version
+error[PYI004]: 6:4: Version comparison must use only major and minor version
 
+ --> PYI004.pyi:6:4
   |
 4 | if sys.version_info >= (3, 4, 3): ...  # PYI004 
 5 | if sys.version_info < (3, 4, 3): ...  # PYI004 
@@ -29,8 +32,9 @@ error[PYI004]: PYI004.pyi:6:4: Version comparison must use only major and minor 
   |    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 7 | if sys.version_info != (3, 4, 3): ...  # PYI004 
   |
-error[PYI004]: PYI004.pyi:7:4: Version comparison must use only major and minor version
+error[PYI004]: 7:4: Version comparison must use only major and minor version
 
+ --> PYI004.pyi:7:4
   |
 5 | if sys.version_info < (3, 4, 3): ...  # PYI004 
 6 | if sys.version_info == (3, 4, 3): ...  # PYI004 

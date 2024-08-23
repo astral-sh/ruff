@@ -1,8 +1,9 @@
 ---
 source: crates/ruff_linter/src/rules/pydocstyle/mod.rs
 ---
-error[D214]: D214_module.py:3:5: [*] Section is over-indented ("Returns")
+error[D214]: 3:5: [*] Section is over-indented ("Returns")
 
+ --> D214_module.py:3:5
   |
 1 | """A module docstring with D214 violations
 2 | 
@@ -21,8 +22,9 @@ error[D214]: D214_module.py:3:5: [*] Section is over-indented ("Returns")
 5 5 |     valid returns
 6 6 | 
 
-error[D214]: D214_module.py:7:5: [*] Section is over-indented ("Args")
+error[D214]: 7:5: [*] Section is over-indented ("Args")
 
+ --> D214_module.py:7:5
   |
 5 |     valid returns
 6 | 

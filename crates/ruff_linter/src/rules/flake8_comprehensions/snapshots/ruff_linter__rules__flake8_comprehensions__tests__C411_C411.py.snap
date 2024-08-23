@@ -1,8 +1,9 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_comprehensions/mod.rs
 ---
-error[C411]: C411.py:2:1: [*] Unnecessary `list` call (remove the outer call to `list()`)
+error[C411]: 2:1: [*] Unnecessary `list` call (remove the outer call to `list()`)
 
+ --> C411.py:1:14
   |
 1 | x = [1, 2, 3]
 2 | list([i for i in x])

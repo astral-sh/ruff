@@ -1,8 +1,9 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_bugbear/mod.rs
 ---
-error[B025]: B025.py:19:8: try-except block with duplicate exception `ValueError`
+error[B025]: 19:8: try-except block with duplicate exception `ValueError`
 
+  --> B025.py:19:8
    |
 17 | except ValueError:
 18 |     a = 2
@@ -10,8 +11,9 @@ error[B025]: B025.py:19:8: try-except block with duplicate exception `ValueError
    |        ^^^^^^^^^^
 20 |     a = 2
    |
-error[B025]: B025.py:28:8: try-except block with duplicate exception `pickle.PickleError`
+error[B025]: 28:8: try-except block with duplicate exception `pickle.PickleError`
 
+  --> B025.py:28:8
    |
 26 | except ValueError:
 27 |     a = 2
@@ -19,8 +21,9 @@ error[B025]: B025.py:28:8: try-except block with duplicate exception `pickle.Pic
    |        ^^^^^^^^^^^^^^^^^^
 29 |     a = 2
    |
-error[B025]: B025.py:35:8: try-except block with duplicate exception `ValueError`
+error[B025]: 35:8: try-except block with duplicate exception `ValueError`
 
+  --> B025.py:35:8
    |
 33 | except (ValueError, TypeError):
 34 |     a = 2
@@ -29,8 +32,9 @@ error[B025]: B025.py:35:8: try-except block with duplicate exception `ValueError
 36 |     a = 2
 37 | except (OSError, TypeError):
    |
-error[B025]: B025.py:37:18: try-except block with duplicate exception `TypeError`
+error[B025]: 37:18: try-except block with duplicate exception `TypeError`
 
+  --> B025.py:37:18
    |
 35 | except ValueError:
 36 |     a = 2

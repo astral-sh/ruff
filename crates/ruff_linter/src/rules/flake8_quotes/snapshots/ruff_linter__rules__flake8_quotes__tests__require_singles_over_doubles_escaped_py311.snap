@@ -1,8 +1,9 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_quotes/mod.rs
 ---
-error[Q003]: doubles_escaped.py:1:26: [*] Change outer quotes to avoid escaping inner quotes
+error[Q003]: 1:26: [*] Change outer quotes to avoid escaping inner quotes
 
+ --> doubles_escaped.py:1:26
   |
 1 | this_should_raise_Q003 = 'This is a \'string\''
   |                          ^^^^^^^^^^^^^^^^^^^^^^
@@ -17,8 +18,9 @@ error[Q003]: doubles_escaped.py:1:26: [*] Change outer quotes to avoid escaping 
 3 3 | this_is_fine = '"This" is a \'string\''
 4 4 | this_is_fine = "This is a 'string'"
 
-error[Q003]: doubles_escaped.py:2:26: [*] Change outer quotes to avoid escaping inner quotes
+error[Q003]: 2:26: [*] Change outer quotes to avoid escaping inner quotes
 
+ --> doubles_escaped.py:2:26
   |
 1 | this_should_raise_Q003 = 'This is a \'string\''
 2 | this_should_raise_Q003 = 'This is \\ a \\\'string\''
@@ -35,8 +37,9 @@ error[Q003]: doubles_escaped.py:2:26: [*] Change outer quotes to avoid escaping 
 4 4 | this_is_fine = "This is a 'string'"
 5 5 | this_is_fine = "\"This\" is a 'string'"
 
-error[Q003]: doubles_escaped.py:10:5: [*] Change outer quotes to avoid escaping inner quotes
+error[Q003]: 10:5: [*] Change outer quotes to avoid escaping inner quotes
 
+  --> doubles_escaped.py:10:5
    |
  8 | this_should_raise = (
  9 |     'This is a'
@@ -55,8 +58,9 @@ error[Q003]: doubles_escaped.py:10:5: [*] Change outer quotes to avoid escaping 
 12 12 | 
 13 13 | # Same as above, but with f-strings
 
-error[Q003]: doubles_escaped.py:14:1: [*] Change outer quotes to avoid escaping inner quotes
+error[Q003]: 14:1: [*] Change outer quotes to avoid escaping inner quotes
 
+  --> doubles_escaped.py:13:36
    |
 13 | # Same as above, but with f-strings
 14 | f'This is a \'string\''  # Q003
@@ -75,8 +79,9 @@ error[Q003]: doubles_escaped.py:14:1: [*] Change outer quotes to avoid escaping 
 16 16 | f'"This" is a \'string\''
 17 17 | f"This is a 'string'"
 
-error[Q003]: doubles_escaped.py:15:1: [*] Change outer quotes to avoid escaping inner quotes
+error[Q003]: 15:1: [*] Change outer quotes to avoid escaping inner quotes
 
+  --> doubles_escaped.py:14:32
    |
 13 | # Same as above, but with f-strings
 14 | f'This is a \'string\''  # Q003
@@ -96,8 +101,9 @@ error[Q003]: doubles_escaped.py:15:1: [*] Change outer quotes to avoid escaping 
 17 17 | f"This is a 'string'"
 18 18 | f"\"This\" is a 'string'"
 
-error[Q003]: doubles_escaped.py:23:5: [*] Change outer quotes to avoid escaping inner quotes
+error[Q003]: 23:5: [*] Change outer quotes to avoid escaping inner quotes
 
+  --> doubles_escaped.py:23:5
    |
 21 | foo = (
 22 |     f'This is a'

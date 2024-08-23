@@ -1,30 +1,34 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_bugbear/mod.rs
 ---
-error[B008]: B006_B008.py:102:61: Do not perform function call `range` in argument defaults; instead, perform the call within the function, or read the default from a module-level singleton variable
+error[B008]: 102:61: Do not perform function call `range` in argument defaults; instead, perform the call within the function, or read the default from a module-level singleton variable
 
+   --> B006_B008.py:102:61
     |
 101 | # N.B. we're also flagging the function call in the comprehension
 102 | def list_comprehension_also_not_okay(default=[i**2 for i in range(3)]):
     |                                                             ^^^^^^^^
 103 |     pass
     |
-error[B008]: B006_B008.py:106:64: Do not perform function call `range` in argument defaults; instead, perform the call within the function, or read the default from a module-level singleton variable
+error[B008]: 106:64: Do not perform function call `range` in argument defaults; instead, perform the call within the function, or read the default from a module-level singleton variable
 
+   --> B006_B008.py:106:64
     |
 106 | def dict_comprehension_also_not_okay(default={i: i**2 for i in range(3)}):
     |                                                                ^^^^^^^^
 107 |     pass
     |
-error[B008]: B006_B008.py:110:60: Do not perform function call `range` in argument defaults; instead, perform the call within the function, or read the default from a module-level singleton variable
+error[B008]: 110:60: Do not perform function call `range` in argument defaults; instead, perform the call within the function, or read the default from a module-level singleton variable
 
+   --> B006_B008.py:110:60
     |
 110 | def set_comprehension_also_not_okay(default={i**2 for i in range(3)}):
     |                                                            ^^^^^^^^
 111 |     pass
     |
-error[B008]: B006_B008.py:126:39: Do not perform function call `time.time` in argument defaults; instead, perform the call within the function, or read the default from a module-level singleton variable
+error[B008]: 126:39: Do not perform function call `time.time` in argument defaults; instead, perform the call within the function, or read the default from a module-level singleton variable
 
+   --> B006_B008.py:126:39
     |
 124 | # B008
 125 | # Flag function calls as default args (including if they are part of a sub-expression)
@@ -32,22 +36,25 @@ error[B008]: B006_B008.py:126:39: Do not perform function call `time.time` in ar
     |                                       ^^^^^^^^^^^
 127 |     ...
     |
-error[B008]: B006_B008.py:130:12: Do not perform function call `dt.datetime.now` in argument defaults; instead, perform the call within the function, or read the default from a module-level singleton variable
+error[B008]: 130:12: Do not perform function call `dt.datetime.now` in argument defaults; instead, perform the call within the function, or read the default from a module-level singleton variable
 
+   --> B006_B008.py:130:12
     |
 130 | def f(when=dt.datetime.now() + dt.timedelta(days=7)):
     |            ^^^^^^^^^^^^^^^^^
 131 |     pass
     |
-error[B008]: B006_B008.py:134:30: Do not perform function call in argument defaults; instead, perform the call within the function, or read the default from a module-level singleton variable
+error[B008]: 134:30: Do not perform function call in argument defaults; instead, perform the call within the function, or read the default from a module-level singleton variable
 
+   --> B006_B008.py:134:30
     |
 134 | def can_even_catch_lambdas(a=(lambda x: x)()):
     |                              ^^^^^^^^^^^^^^^
 135 |     ...
     |
-error[B008]: B006_B008.py:239:31: Do not perform function call `dt.datetime.now` in argument defaults; instead, perform the call within the function, or read the default from a module-level singleton variable
+error[B008]: 239:31: Do not perform function call `dt.datetime.now` in argument defaults; instead, perform the call within the function, or read the default from a module-level singleton variable
 
+   --> B006_B008.py:239:31
     |
 237 | # B006 and B008
 238 | # We should handle arbitrary nesting of these B008.
@@ -55,8 +62,9 @@ error[B008]: B006_B008.py:239:31: Do not perform function call `dt.datetime.now`
     |                               ^^^^^^^^^^^^^^^^^
 240 |     pass
     |
-error[B008]: B006_B008.py:245:22: Do not perform function call `map` in argument defaults; instead, perform the call within the function, or read the default from a module-level singleton variable
+error[B008]: 245:22: Do not perform function call `map` in argument defaults; instead, perform the call within the function, or read the default from a module-level singleton variable
 
+   --> B006_B008.py:245:22
     |
 243 | # Don't flag nested B006 since we can't guarantee that
 244 | # it isn't made mutable by the outer operation.
@@ -64,16 +72,18 @@ error[B008]: B006_B008.py:245:22: Do not perform function call `map` in argument
     |                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 246 |     pass
     |
-error[B008]: B006_B008.py:250:19: Do not perform function call `random.randint` in argument defaults; instead, perform the call within the function, or read the default from a module-level singleton variable
+error[B008]: 250:19: Do not perform function call `random.randint` in argument defaults; instead, perform the call within the function, or read the default from a module-level singleton variable
 
+   --> B006_B008.py:250:19
     |
 249 | # B008-ception.
 250 | def nested_b008(a=random.randint(0, dt.datetime.now().year)):
     |                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 251 |     pass
     |
-error[B008]: B006_B008.py:250:37: Do not perform function call `dt.datetime.now` in argument defaults; instead, perform the call within the function, or read the default from a module-level singleton variable
+error[B008]: 250:37: Do not perform function call `dt.datetime.now` in argument defaults; instead, perform the call within the function, or read the default from a module-level singleton variable
 
+   --> B006_B008.py:250:37
     |
 249 | # B008-ception.
 250 | def nested_b008(a=random.randint(0, dt.datetime.now().year)):

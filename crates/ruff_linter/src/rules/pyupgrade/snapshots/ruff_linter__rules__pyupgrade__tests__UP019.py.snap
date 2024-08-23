@@ -1,8 +1,9 @@
 ---
 source: crates/ruff_linter/src/rules/pyupgrade/mod.rs
 ---
-error[UP019]: UP019.py:7:22: [*] `typing.Text` is deprecated, use `str`
+error[UP019]: 7:22: [*] `typing.Text` is deprecated, use `str`
 
+ --> UP019.py:7:22
   |
 7 | def print_word(word: Text) -> None:
   |                      ^^^^
@@ -19,8 +20,9 @@ error[UP019]: UP019.py:7:22: [*] `typing.Text` is deprecated, use `str`
 9 9 | 
 10 10 | 
 
-error[UP019]: UP019.py:11:29: [*] `typing.Text` is deprecated, use `str`
+error[UP019]: 11:29: [*] `typing.Text` is deprecated, use `str`
 
+  --> UP019.py:11:29
    |
 11 | def print_second_word(word: typing.Text) -> None:
    |                             ^^^^^^^^^^^
@@ -37,8 +39,9 @@ error[UP019]: UP019.py:11:29: [*] `typing.Text` is deprecated, use `str`
 13 13 | 
 14 14 | 
 
-error[UP019]: UP019.py:15:28: [*] `typing.Text` is deprecated, use `str`
+error[UP019]: 15:28: [*] `typing.Text` is deprecated, use `str`
 
+  --> UP019.py:15:28
    |
 15 | def print_third_word(word: Hello.Text) -> None:
    |                            ^^^^^^^^^^
@@ -55,8 +58,9 @@ error[UP019]: UP019.py:15:28: [*] `typing.Text` is deprecated, use `str`
 17 17 | 
 18 18 | 
 
-error[UP019]: UP019.py:19:29: [*] `typing.Text` is deprecated, use `str`
+error[UP019]: 19:29: [*] `typing.Text` is deprecated, use `str`
 
+  --> UP019.py:19:29
    |
 19 | def print_fourth_word(word: Goodbye) -> None:
    |                             ^^^^^^^

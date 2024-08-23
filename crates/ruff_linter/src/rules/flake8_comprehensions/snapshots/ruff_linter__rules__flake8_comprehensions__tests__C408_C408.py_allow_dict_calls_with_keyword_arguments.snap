@@ -1,8 +1,9 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_comprehensions/mod.rs
 ---
-error[C408]: C408.py:1:5: [*] Unnecessary `tuple` call (rewrite as a literal)
+error[C408]: 1:5: [*] Unnecessary `tuple` call (rewrite as a literal)
 
+ --> C408.py:1:5
   |
 1 | t = tuple()
   |     ^^^^^^^
@@ -17,8 +18,9 @@ error[C408]: C408.py:1:5: [*] Unnecessary `tuple` call (rewrite as a literal)
 3 3 | d1 = dict()
 4 4 | d2 = dict(a=1)
 
-error[C408]: C408.py:2:5: [*] Unnecessary `list` call (rewrite as a literal)
+error[C408]: 2:5: [*] Unnecessary `list` call (rewrite as a literal)
 
+ --> C408.py:2:5
   |
 1 | t = tuple()
 2 | l = list()
@@ -35,8 +37,9 @@ error[C408]: C408.py:2:5: [*] Unnecessary `list` call (rewrite as a literal)
 4 4 | d2 = dict(a=1)
 5 5 | d3 = dict(**d2)
 
-error[C408]: C408.py:3:6: [*] Unnecessary `dict` call (rewrite as a literal)
+error[C408]: 3:6: [*] Unnecessary `dict` call (rewrite as a literal)
 
+ --> C408.py:3:6
   |
 1 | t = tuple()
 2 | l = list()
@@ -55,8 +58,9 @@ error[C408]: C408.py:3:6: [*] Unnecessary `dict` call (rewrite as a literal)
 5 5 | d3 = dict(**d2)
 6 6 | 
 
-error[C408]: C408.py:16:4: [*] Unnecessary `dict` call (rewrite as a literal)
+error[C408]: 16:4: [*] Unnecessary `dict` call (rewrite as a literal)
 
+  --> C408.py:16:4
    |
 14 | f"{dict(x='y')}"
 15 | f'{dict(x="y")}'
@@ -75,8 +79,9 @@ error[C408]: C408.py:16:4: [*] Unnecessary `dict` call (rewrite as a literal)
 18 18 | 
 19 19 | f"{dict(x='y') | dict(y='z')}"
 
-error[C408]: C408.py:17:6: [*] Unnecessary `dict` call (rewrite as a literal)
+error[C408]: 17:6: [*] Unnecessary `dict` call (rewrite as a literal)
 
+  --> C408.py:17:6
    |
 15 | f'{dict(x="y")}'
 16 | f"{dict()}"
@@ -96,8 +101,9 @@ error[C408]: C408.py:17:6: [*] Unnecessary `dict` call (rewrite as a literal)
 19 19 | f"{dict(x='y') | dict(y='z')}"
 20 20 | f"{ dict(x='y') | dict(y='z') }"
 
-error[C408]: C408.py:24:1: [*] Unnecessary `dict` call (rewrite as a literal)
+error[C408]: 24:1: [*] Unnecessary `dict` call (rewrite as a literal)
 
+  --> C408.py:23:1
    |
 22 |   f"a { dict(x='y') | dict(y='z') } b"
 23 |   
@@ -122,8 +128,9 @@ error[C408]: C408.py:24:1: [*] Unnecessary `dict` call (rewrite as a literal)
 28 28 | tuple(  # comment
 29 29 | )
 
-error[C408]: C408.py:28:1: [*] Unnecessary `tuple` call (rewrite as a literal)
+error[C408]: 28:1: [*] Unnecessary `tuple` call (rewrite as a literal)
 
+  --> C408.py:27:1
    |
 26 |   )
 27 |   

@@ -1,8 +1,9 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_bugbear/mod.rs
 ---
-error[B007]: B007.py:6:5: Loop control variable `i` not used within loop body
+error[B007]: 6:5: Loop control variable `i` not used within loop body
 
+ --> B007.py:6:5
   |
 4 | print(i)  # name no longer defined on Python 3; no warning yet
 5 | 
@@ -11,8 +12,9 @@ error[B007]: B007.py:6:5: Loop control variable `i` not used within loop body
 7 |     print(10)
   |
   = help: Rename unused `i` to `_i`
-error[B007]: B007.py:18:13: [*] Loop control variable `k` not used within loop body
+error[B007]: 18:13: [*] Loop control variable `k` not used within loop body
 
+  --> B007.py:18:13
    |
 16 | for i in range(10):
 17 |     for j in range(10):
@@ -31,16 +33,18 @@ error[B007]: B007.py:18:13: [*] Loop control variable `k` not used within loop b
 20 20 | 
 21 21 | 
 
-error[B007]: B007.py:30:5: Loop control variable `i` not used within loop body
+error[B007]: 30:5: Loop control variable `i` not used within loop body
 
+  --> B007.py:30:5
    |
 30 | for i, (j, (k, l)) in strange_generator():  # i, k not used
    |     ^
 31 |     print(j, l)
    |
    = help: Rename unused `i` to `_i`
-error[B007]: B007.py:30:13: [*] Loop control variable `k` not used within loop body
+error[B007]: 30:13: [*] Loop control variable `k` not used within loop body
 
+  --> B007.py:30:13
    |
 30 | for i, (j, (k, l)) in strange_generator():  # i, k not used
    |             ^
@@ -57,8 +61,9 @@ error[B007]: B007.py:30:13: [*] Loop control variable `k` not used within loop b
 32 32 | 
 33 33 | FMT = "{foo} {bar}"
 
-error[B007]: B007.py:34:10: Loop control variable `bar` may not be used within loop body
+error[B007]: 34:10: Loop control variable `bar` may not be used within loop body
 
+  --> B007.py:34:10
    |
 33 | FMT = "{foo} {bar}"
 34 | for foo, bar in [(1, 2)]:
@@ -67,8 +72,9 @@ error[B007]: B007.py:34:10: Loop control variable `bar` may not be used within l
 36 |         print(FMT.format(**locals()))
    |
    = help: Rename unused `bar` to `_bar`
-error[B007]: B007.py:38:10: Loop control variable `bar` may not be used within loop body
+error[B007]: 38:10: Loop control variable `bar` may not be used within loop body
 
+  --> B007.py:38:10
    |
 36 |         print(FMT.format(**locals()))
 37 | 
@@ -78,8 +84,9 @@ error[B007]: B007.py:38:10: Loop control variable `bar` may not be used within l
 40 |         print(FMT.format(**globals()))
    |
    = help: Rename unused `bar` to `_bar`
-error[B007]: B007.py:42:10: Loop control variable `bar` may not be used within loop body
+error[B007]: 42:10: Loop control variable `bar` may not be used within loop body
 
+  --> B007.py:42:10
    |
 40 |         print(FMT.format(**globals()))
 41 | 
@@ -89,8 +96,9 @@ error[B007]: B007.py:42:10: Loop control variable `bar` may not be used within l
 44 |         print(FMT.format(**vars()))
    |
    = help: Rename unused `bar` to `_bar`
-error[B007]: B007.py:46:10: Loop control variable `bar` may not be used within loop body
+error[B007]: 46:10: Loop control variable `bar` may not be used within loop body
 
+  --> B007.py:46:10
    |
 44 |         print(FMT.format(**vars()))
 45 | 
@@ -99,8 +107,9 @@ error[B007]: B007.py:46:10: Loop control variable `bar` may not be used within l
 47 |     print(FMT.format(foo=foo, bar=eval("bar")))
    |
    = help: Rename unused `bar` to `_bar`
-error[B007]: B007.py:52:14: [*] Loop control variable `bar` not used within loop body
+error[B007]: 52:14: [*] Loop control variable `bar` not used within loop body
 
+  --> B007.py:52:14
    |
 50 | def f():
 51 |     # Fixable.
@@ -120,8 +129,9 @@ error[B007]: B007.py:52:14: [*] Loop control variable `bar` not used within loop
 54 54 |             break
 55 55 | 
 
-error[B007]: B007.py:59:14: Loop control variable `bar` not used within loop body
+error[B007]: 59:14: Loop control variable `bar` not used within loop body
 
+  --> B007.py:59:14
    |
 57 | def f():
 58 |     # Unfixable due to usage of `bar` outside of loop.
@@ -131,8 +141,9 @@ error[B007]: B007.py:59:14: Loop control variable `bar` not used within loop bod
 61 |             break
    |
    = help: Rename unused `bar` to `_bar`
-error[B007]: B007.py:68:14: [*] Loop control variable `bar` not used within loop body
+error[B007]: 68:14: [*] Loop control variable `bar` not used within loop body
 
+  --> B007.py:68:14
    |
 66 | def f():
 67 |     # Fixable.
@@ -152,8 +163,9 @@ error[B007]: B007.py:68:14: [*] Loop control variable `bar` not used within loop
 70 70 |             break
 71 71 | 
 
-error[B007]: B007.py:77:14: Loop control variable `bar` not used within loop body
+error[B007]: 77:14: Loop control variable `bar` not used within loop body
 
+  --> B007.py:77:14
    |
 75 | def f():
 76 |     # Unfixable.
@@ -163,8 +175,9 @@ error[B007]: B007.py:77:14: Loop control variable `bar` not used within loop bod
 79 |             break
    |
    = help: Rename unused `bar` to `_bar`
-error[B007]: B007.py:88:14: Loop control variable `bar` not used within loop body
+error[B007]: 88:14: Loop control variable `bar` not used within loop body
 
+  --> B007.py:88:14
    |
 86 | def f():
 87 |     # Unfixable (false negative) due to usage of `bar` outside of loop.
@@ -174,8 +187,9 @@ error[B007]: B007.py:88:14: Loop control variable `bar` not used within loop bod
 90 |             break
    |
    = help: Rename unused `bar` to `_bar`
-error[B007]: B007.py:98:5: Loop control variable `line_` not used within loop body
+error[B007]: 98:5: Loop control variable `line_` not used within loop body
 
+  --> B007.py:98:5
    |
 96 | # Unfixable due to trailing underscore (`_line_` wouldn't be considered an ignorable
 97 | # variable name).

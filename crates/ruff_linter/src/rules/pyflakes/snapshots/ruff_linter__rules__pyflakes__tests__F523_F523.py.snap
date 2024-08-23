@@ -1,8 +1,9 @@
 ---
 source: crates/ruff_linter/src/rules/pyflakes/mod.rs
 ---
-error[F523]: F523.py:2:1: [*] `.format` call has unused arguments at position(s): 1
+error[F523]: 2:1: [*] `.format` call has unused arguments at position(s): 1
 
+ --> F523.py:1:15
   |
 1 | # With indexes
 2 | "{0}".format(1, 2)  # F523
@@ -19,8 +20,9 @@ error[F523]: F523.py:2:1: [*] `.format` call has unused arguments at position(s)
 4 4 | "{1:{0}}".format(1, 2)  # No issues
 5 5 | "{1:{0}}".format(1, 2, 3)  # F523
 
-error[F523]: F523.py:3:1: `.format` call has unused arguments at position(s): 0, 2
+error[F523]: 3:1: `.format` call has unused arguments at position(s): 0, 2
 
+ --> F523.py:2:27
   |
 1 | # With indexes
 2 | "{0}".format(1, 2)  # F523
@@ -30,8 +32,9 @@ error[F523]: F523.py:3:1: `.format` call has unused arguments at position(s): 0,
 5 | "{1:{0}}".format(1, 2, 3)  # F523
   |
   = help: Remove extra positional arguments at position(s): 0, 2
-error[F523]: F523.py:5:1: [*] `.format` call has unused arguments at position(s): 2
+error[F523]: 5:1: [*] `.format` call has unused arguments at position(s): 2
 
+ --> F523.py:4:36
   |
 3 | "{1}".format(1, 2, 3)  # F523
 4 | "{1:{0}}".format(1, 2)  # No issues
@@ -51,8 +54,9 @@ error[F523]: F523.py:5:1: [*] `.format` call has unused arguments at position(s)
 7 7 | "{1.arg[1]!r:0{2['arg']}{1}}".format(1, 2, 3, 4) # F523
 8 8 | 
 
-error[F523]: F523.py:6:1: [*] `.format` call has unused arguments at position(s): 1
+error[F523]: 6:1: [*] `.format` call has unused arguments at position(s): 1
 
+ --> F523.py:5:34
   |
 4 | "{1:{0}}".format(1, 2)  # No issues
 5 | "{1:{0}}".format(1, 2, 3)  # F523
@@ -71,8 +75,9 @@ error[F523]: F523.py:6:1: [*] `.format` call has unused arguments at position(s)
 8 8 | 
 9 9 | # With no indexes
 
-error[F523]: F523.py:7:1: `.format` call has unused arguments at position(s): 0, 3
+error[F523]: 7:1: `.format` call has unused arguments at position(s): 0, 3
 
+ --> F523.py:6:38
   |
 5 | "{1:{0}}".format(1, 2, 3)  # F523
 6 | "{0}{2}".format(1, 2)  # F523, # F524
@@ -82,8 +87,9 @@ error[F523]: F523.py:7:1: `.format` call has unused arguments at position(s): 0,
 9 | # With no indexes
   |
   = help: Remove extra positional arguments at position(s): 0, 3
-error[F523]: F523.py:10:1: [*] `.format` call has unused arguments at position(s): 1
+error[F523]: 10:1: [*] `.format` call has unused arguments at position(s): 1
 
+  --> F523.py:9:18
    |
  9 | # With no indexes
 10 | "{}".format(1, 2)  # F523
@@ -102,8 +108,9 @@ error[F523]: F523.py:10:1: [*] `.format` call has unused arguments at position(s
 12 12 | "{:{}}".format(1, 2)  # No issues
 13 13 | "{:{}}".format(1, 2, 3)  # F523
 
-error[F523]: F523.py:11:1: [*] `.format` call has unused arguments at position(s): 1, 2
+error[F523]: 11:1: [*] `.format` call has unused arguments at position(s): 1, 2
 
+  --> F523.py:10:26
    |
  9 | # With no indexes
 10 | "{}".format(1, 2)  # F523
@@ -123,8 +130,9 @@ error[F523]: F523.py:11:1: [*] `.format` call has unused arguments at position(s
 13 13 | "{:{}}".format(1, 2, 3)  # F523
 14 14 | 
 
-error[F523]: F523.py:13:1: [*] `.format` call has unused arguments at position(s): 2
+error[F523]: 13:1: [*] `.format` call has unused arguments at position(s): 2
 
+  --> F523.py:12:34
    |
 11 | "{}".format(1, 2, 3)  # F523
 12 | "{:{}}".format(1, 2)  # No issues
@@ -144,8 +152,9 @@ error[F523]: F523.py:13:1: [*] `.format` call has unused arguments at position(s
 15 15 | # With *args
 16 16 | "{0}{1}".format(*args)  # No issues
 
-error[F523]: F523.py:19:1: `.format` call has unused arguments at position(s): 2
+error[F523]: 19:1: `.format` call has unused arguments at position(s): 2
 
+  --> F523.py:18:42
    |
 17 | "{0}{1}".format(1, *args)  # No issues
 18 | "{0}{1}".format(1, 2, *args)  # No issues
@@ -155,8 +164,9 @@ error[F523]: F523.py:19:1: `.format` call has unused arguments at position(s): 2
 21 | # With nested quotes
    |
    = help: Remove extra positional arguments at position(s): 2
-error[F523]: F523.py:22:1: [*] `.format` call has unused arguments at position(s): 1, 2
+error[F523]: 22:1: [*] `.format` call has unused arguments at position(s): 1, 2
 
+  --> F523.py:21:21
    |
 21 | # With nested quotes
 22 | "''1{0}".format(1, 2, 3)  # F523
@@ -175,8 +185,9 @@ error[F523]: F523.py:22:1: [*] `.format` call has unused arguments at position(s
 24 24 | '""{1}{0}'.format(1, 2, 3)  # F523
 25 25 | 
 
-error[F523]: F523.py:23:1: [*] `.format` call has unused arguments at position(s): 2
+error[F523]: 23:1: [*] `.format` call has unused arguments at position(s): 2
 
+  --> F523.py:22:33
    |
 21 | # With nested quotes
 22 | "''1{0}".format(1, 2, 3)  # F523
@@ -195,8 +206,9 @@ error[F523]: F523.py:23:1: [*] `.format` call has unused arguments at position(s
 25 25 | 
 26 26 | # With modified indexes
 
-error[F523]: F523.py:24:1: [*] `.format` call has unused arguments at position(s): 2
+error[F523]: 24:1: [*] `.format` call has unused arguments at position(s): 2
 
+  --> F523.py:23:37
    |
 22 | "''1{0}".format(1, 2, 3)  # F523
 23 | "\"\"{1}{0}".format(1, 2, 3)  # F523
@@ -216,8 +228,9 @@ error[F523]: F523.py:24:1: [*] `.format` call has unused arguments at position(s
 26 26 | # With modified indexes
 27 27 | "{1}{2}".format(1, 2, 3)  # F523, # F524
 
-error[F523]: F523.py:27:1: `.format` call has unused arguments at position(s): 0
+error[F523]: 27:1: `.format` call has unused arguments at position(s): 0
 
+  --> F523.py:26:24
    |
 26 | # With modified indexes
 27 | "{1}{2}".format(1, 2, 3)  # F523, # F524
@@ -226,8 +239,9 @@ error[F523]: F523.py:27:1: `.format` call has unused arguments at position(s): 0
 29 | "{1} {8}".format(0, 1)  # F523, # F524
    |
    = help: Remove extra positional arguments at position(s): 0
-error[F523]: F523.py:28:1: `.format` call has unused arguments at position(s): 0, 2
+error[F523]: 28:1: `.format` call has unused arguments at position(s): 0, 2
 
+  --> F523.py:27:41
    |
 26 | # With modified indexes
 27 | "{1}{2}".format(1, 2, 3)  # F523, # F524
@@ -236,8 +250,9 @@ error[F523]: F523.py:28:1: `.format` call has unused arguments at position(s): 0
 29 | "{1} {8}".format(0, 1)  # F523, # F524
    |
    = help: Remove extra positional arguments at position(s): 0, 2
-error[F523]: F523.py:29:1: `.format` call has unused arguments at position(s): 0
+error[F523]: 29:1: `.format` call has unused arguments at position(s): 0
 
+  --> F523.py:28:44
    |
 27 | "{1}{2}".format(1, 2, 3)  # F523, # F524
 28 | "{1}{3}".format(1, 2, 3, 4)  # F523, # F524
@@ -247,8 +262,9 @@ error[F523]: F523.py:29:1: `.format` call has unused arguments at position(s): 0
 31 | # Multiline
    |
    = help: Remove extra positional arguments at position(s): 0
-error[F523]: F523.py:32:2: [*] `.format` call has unused arguments at position(s): 0
+error[F523]: 32:2: [*] `.format` call has unused arguments at position(s): 0
 
+  --> F523.py:32:2
    |
 31 |   # Multiline
 32 |   (''

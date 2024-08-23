@@ -1,8 +1,9 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_pyi/mod.rs
 ---
-error[PYI018]: PYI018.py:6:1: Private TypeVar `_T` is never used
+error[PYI018]: 6:1: Private TypeVar `_T` is never used
 
+ --> PYI018.py:5:1
   |
 4 | from typing_extensions import ParamSpec, TypeVarTuple
 5 | 
@@ -11,8 +12,9 @@ error[PYI018]: PYI018.py:6:1: Private TypeVar `_T` is never used
 7 | _Ts = typing_extensions.TypeVarTuple("_Ts")
 8 | _P = ParamSpec("_P")
   |
-error[PYI018]: PYI018.py:7:1: Private TypeVarTuple `_Ts` is never used
+error[PYI018]: 7:1: Private TypeVarTuple `_Ts` is never used
 
+ --> PYI018.py:6:26
   |
 6 | _T = typing.TypeVar("_T")
 7 | _Ts = typing_extensions.TypeVarTuple("_Ts")
@@ -20,8 +22,9 @@ error[PYI018]: PYI018.py:7:1: Private TypeVarTuple `_Ts` is never used
 8 | _P = ParamSpec("_P")
 9 | _P2 = typing.ParamSpec("_P2")
   |
-error[PYI018]: PYI018.py:8:1: Private ParamSpec `_P` is never used
+error[PYI018]: 8:1: Private ParamSpec `_P` is never used
 
+  --> PYI018.py:7:44
    |
  6 | _T = typing.TypeVar("_T")
  7 | _Ts = typing_extensions.TypeVarTuple("_Ts")
@@ -30,8 +33,9 @@ error[PYI018]: PYI018.py:8:1: Private ParamSpec `_P` is never used
  9 | _P2 = typing.ParamSpec("_P2")
 10 | _Ts2 = TypeVarTuple("_Ts2")
    |
-error[PYI018]: PYI018.py:9:1: Private ParamSpec `_P2` is never used
+error[PYI018]: 9:1: Private ParamSpec `_P2` is never used
 
+  --> PYI018.py:8:21
    |
  7 | _Ts = typing_extensions.TypeVarTuple("_Ts")
  8 | _P = ParamSpec("_P")
@@ -39,8 +43,9 @@ error[PYI018]: PYI018.py:9:1: Private ParamSpec `_P2` is never used
    | ^^^
 10 | _Ts2 = TypeVarTuple("_Ts2")
    |
-error[PYI018]: PYI018.py:10:1: Private TypeVarTuple `_Ts2` is never used
+error[PYI018]: 10:1: Private TypeVarTuple `_Ts2` is never used
 
+  --> PYI018.py:9:30
    |
  8 | _P = ParamSpec("_P")
  9 | _P2 = typing.ParamSpec("_P2")

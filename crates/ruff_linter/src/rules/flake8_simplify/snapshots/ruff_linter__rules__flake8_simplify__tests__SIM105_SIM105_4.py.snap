@@ -1,8 +1,9 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_simplify/mod.rs
 ---
-error[SIM105]: SIM105_4.py:2:1: [*] Use `contextlib.suppress(ImportError)` instead of `try`-`except`-`pass`
+error[SIM105]: 2:1: [*] Use `contextlib.suppress(ImportError)` instead of `try`-`except`-`pass`
 
+ --> SIM105_4.py:1:23
   |
 1 |   ﻿#!/usr/bin/env python
 2 | / try:

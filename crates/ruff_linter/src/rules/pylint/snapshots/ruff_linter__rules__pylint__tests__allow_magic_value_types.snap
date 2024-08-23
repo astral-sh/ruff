@@ -1,8 +1,9 @@
 ---
 source: crates/ruff_linter/src/rules/pylint/mod.rs
 ---
-error[PLR2004]: magic_value_comparison.py:56:12: Magic value used in comparison, consider replacing `-2.0` with a constant variable
+error[PLR2004]: 56:12: Magic value used in comparison, consider replacing `-2.0` with a constant variable
 
+  --> magic_value_comparison.py:56:12
    |
 54 |     pass
 55 | 
@@ -10,8 +11,9 @@ error[PLR2004]: magic_value_comparison.py:56:12: Magic value used in comparison,
    |            ^^^^
 57 |     pass
    |
-error[PLR2004]: magic_value_comparison.py:59:12: Magic value used in comparison, consider replacing `+2.0` with a constant variable
+error[PLR2004]: 59:12: Magic value used in comparison, consider replacing `+2.0` with a constant variable
 
+  --> magic_value_comparison.py:59:12
    |
 57 |     pass
 58 | 
@@ -19,8 +21,9 @@ error[PLR2004]: magic_value_comparison.py:59:12: Magic value used in comparison,
    |            ^^^^
 60 |     pass
    |
-error[PLR2004]: magic_value_comparison.py:74:22: Magic value used in comparison, consider replacing `"Hunter2"` with a constant variable
+error[PLR2004]: 74:22: Magic value used in comparison, consider replacing `"Hunter2"` with a constant variable
 
+  --> magic_value_comparison.py:74:22
    |
 72 |     pass
 73 | 
@@ -28,8 +31,9 @@ error[PLR2004]: magic_value_comparison.py:74:22: Magic value used in comparison,
    |                      ^^^^^^^^^
 75 |     pass
    |
-error[PLR2004]: magic_value_comparison.py:80:21: Magic value used in comparison, consider replacing `3.141592653589793238` with a constant variable
+error[PLR2004]: 80:21: Magic value used in comparison, consider replacing `3.141592653589793238` with a constant variable
 
+  --> magic_value_comparison.py:80:21
    |
 78 | pi_estimation = 3.14
 79 | 
@@ -37,8 +41,9 @@ error[PLR2004]: magic_value_comparison.py:80:21: Magic value used in comparison,
    |                     ^^^^^^^^^^^^^^^^^^^^
 81 |     pass
    |
-error[PLR2004]: magic_value_comparison.py:92:18: Magic value used in comparison, consider replacing `b"something"` with a constant variable
+error[PLR2004]: 92:18: Magic value used in comparison, consider replacing `b"something"` with a constant variable
 
+  --> magic_value_comparison.py:92:18
    |
 90 | user_input = b"Hello, There!"
 91 | 

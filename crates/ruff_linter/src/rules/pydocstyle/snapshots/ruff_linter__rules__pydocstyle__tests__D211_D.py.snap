@@ -1,8 +1,9 @@
 ---
 source: crates/ruff_linter/src/rules/pydocstyle/mod.rs
 ---
-error[D211]: D.py:170:5: [*] No blank lines allowed before class docstring
+error[D211]: 170:5: [*] No blank lines allowed before class docstring
 
+   --> D.py:170:5
     |
 168 | class WithLeadingSpace:
 169 | 
@@ -19,8 +20,9 @@ error[D211]: D.py:170:5: [*] No blank lines allowed before class docstring
 171 170 | 
 172 171 | 
 
-error[D211]: D.py:181:5: [*] No blank lines allowed before class docstring
+error[D211]: 181:5: [*] No blank lines allowed before class docstring
 
+   --> D.py:181:5
     |
 179 | class TrailingSpace:
 180 | 

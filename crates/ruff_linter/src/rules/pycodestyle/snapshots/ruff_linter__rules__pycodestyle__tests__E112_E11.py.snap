@@ -1,17 +1,20 @@
 ---
 source: crates/ruff_linter/src/rules/pycodestyle/mod.rs
 ---
-E11.py:9:1: E112 Expected an indented block
+error[E112]: 9:1: Expected an indented block
+
+  --> E11.py:8:10
    |
  7 | #: E112
  8 | if False:
+   |          ^
  9 | print()
-   |  E112
 10 | #: E113
 11 | print()
    |
+error[syntax-error]: 9:1: Expected an indented block after `if` statement
 
-E11.py:9:1: SyntaxError: Expected an indented block after `if` statement
+  --> E11.py:8:10
    |
  7 | #: E112
  8 | if False:
@@ -20,8 +23,9 @@ E11.py:9:1: SyntaxError: Expected an indented block after `if` statement
 10 | #: E113
 11 | print()
    |
+error[syntax-error]: 12:1: Unexpected indentation
 
-E11.py:12:1: SyntaxError: Unexpected indentation
+  --> E11.py:11:8
    |
 10 | #: E113
 11 | print()
@@ -30,8 +34,9 @@ E11.py:12:1: SyntaxError: Unexpected indentation
 13 | #: E114 E116
 14 | mimetype = 'application/x-directory'
    |
+error[syntax-error]: 14:1: Expected a statement
 
-E11.py:14:1: SyntaxError: Expected a statement
+  --> E11.py:13:13
    |
 12 |     print()
 13 | #: E114 E116
@@ -40,18 +45,20 @@ E11.py:14:1: SyntaxError: Expected a statement
 15 |      # 'httpd/unix-directory'
 16 | create_date = False
    |
+error[E112]: 45:1: Expected an indented block
 
-E11.py:45:1: E112 Expected an indented block
+  --> E11.py:44:13
    |
 43 | #: E112
 44 | if False:  #
+   |             ^
 45 | print()
-   |  E112
 46 | #:
 47 | if False:
    |
+error[syntax-error]: 45:1: Expected an indented block after `if` statement
 
-E11.py:45:1: SyntaxError: Expected an indented block after `if` statement
+  --> E11.py:44:13
    |
 43 | #: E112
 44 | if False:  #

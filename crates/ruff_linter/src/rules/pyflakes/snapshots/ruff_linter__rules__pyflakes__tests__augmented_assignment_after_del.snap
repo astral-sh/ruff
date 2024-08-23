@@ -1,16 +1,18 @@
 ---
 source: crates/ruff_linter/src/rules/pyflakes/mod.rs
 ---
-error[F821]: <filename>:10:5: Undefined name `x`
+error[F821]: 10:5: Undefined name `x`
 
+  --> <filename>:10:5
    |
  8 |     # entirely after the `del` statement. However, it should be an F821
  9 |     # error, because the name is defined in the scope, but unbound.
 10 |     x += 1
    |     ^
    |
-error[F841]: <filename>:10:5: Local variable `x` is assigned to but never used
+error[F841]: 10:5: Local variable `x` is assigned to but never used
 
+  --> <filename>:10:5
    |
  8 |     # entirely after the `del` statement. However, it should be an F821
  9 |     # error, because the name is defined in the scope, but unbound.

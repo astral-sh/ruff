@@ -1,8 +1,9 @@
 ---
 source: crates/ruff_linter/src/rules/numpy/mod.rs
 ---
-error[NPY002]: NPY002.py:12:8: Replace legacy `np.random.standard_normal` call with `np.random.Generator`
+error[NPY002]: 12:8: Replace legacy `np.random.standard_normal` call with `np.random.Generator`
 
+  --> NPY002.py:12:8
    |
 10 | from numpy import random
 11 | 
@@ -11,16 +12,18 @@ error[NPY002]: NPY002.py:12:8: Replace legacy `np.random.standard_normal` call w
 13 | more_vals = random.standard_normal(10)
 14 | numbers = random.integers(high, size=5)
    |
-error[NPY002]: NPY002.py:13:13: Replace legacy `np.random.standard_normal` call with `np.random.Generator`
+error[NPY002]: 13:13: Replace legacy `np.random.standard_normal` call with `np.random.Generator`
 
+  --> NPY002.py:13:13
    |
 12 | vals = random.standard_normal(10)
 13 | more_vals = random.standard_normal(10)
    |             ^^^^^^^^^^^^^^^^^^^^^^
 14 | numbers = random.integers(high, size=5)
    |
-error[NPY002]: NPY002.py:18:1: Replace legacy `np.random.seed` call with `np.random.Generator`
+error[NPY002]: 18:1: Replace legacy `np.random.seed` call with `np.random.Generator`
 
+  --> NPY002.py:17:1
    |
 16 | import numpy
 17 | 
@@ -29,8 +32,9 @@ error[NPY002]: NPY002.py:18:1: Replace legacy `np.random.seed` call with `np.ran
 19 | numpy.random.get_state()
 20 | numpy.random.set_state()
    |
-error[NPY002]: NPY002.py:19:1: Replace legacy `np.random.get_state` call with `np.random.Generator`
+error[NPY002]: 19:1: Replace legacy `np.random.get_state` call with `np.random.Generator`
 
+  --> NPY002.py:18:20
    |
 18 | numpy.random.seed()
 19 | numpy.random.get_state()
@@ -38,8 +42,9 @@ error[NPY002]: NPY002.py:19:1: Replace legacy `np.random.get_state` call with `n
 20 | numpy.random.set_state()
 21 | numpy.random.rand()
    |
-error[NPY002]: NPY002.py:20:1: Replace legacy `np.random.set_state` call with `np.random.Generator`
+error[NPY002]: 20:1: Replace legacy `np.random.set_state` call with `np.random.Generator`
 
+  --> NPY002.py:19:25
    |
 18 | numpy.random.seed()
 19 | numpy.random.get_state()
@@ -48,8 +53,9 @@ error[NPY002]: NPY002.py:20:1: Replace legacy `np.random.set_state` call with `n
 21 | numpy.random.rand()
 22 | numpy.random.ranf()
    |
-error[NPY002]: NPY002.py:21:1: Replace legacy `np.random.rand` call with `np.random.Generator`
+error[NPY002]: 21:1: Replace legacy `np.random.rand` call with `np.random.Generator`
 
+  --> NPY002.py:20:25
    |
 19 | numpy.random.get_state()
 20 | numpy.random.set_state()
@@ -58,8 +64,9 @@ error[NPY002]: NPY002.py:21:1: Replace legacy `np.random.rand` call with `np.ran
 22 | numpy.random.ranf()
 23 | numpy.random.sample()
    |
-error[NPY002]: NPY002.py:22:1: Replace legacy `np.random.ranf` call with `np.random.Generator`
+error[NPY002]: 22:1: Replace legacy `np.random.ranf` call with `np.random.Generator`
 
+  --> NPY002.py:21:20
    |
 20 | numpy.random.set_state()
 21 | numpy.random.rand()
@@ -68,8 +75,9 @@ error[NPY002]: NPY002.py:22:1: Replace legacy `np.random.ranf` call with `np.ran
 23 | numpy.random.sample()
 24 | numpy.random.randn()
    |
-error[NPY002]: NPY002.py:23:1: Replace legacy `np.random.sample` call with `np.random.Generator`
+error[NPY002]: 23:1: Replace legacy `np.random.sample` call with `np.random.Generator`
 
+  --> NPY002.py:22:20
    |
 21 | numpy.random.rand()
 22 | numpy.random.ranf()
@@ -78,8 +86,9 @@ error[NPY002]: NPY002.py:23:1: Replace legacy `np.random.sample` call with `np.r
 24 | numpy.random.randn()
 25 | numpy.random.randint()
    |
-error[NPY002]: NPY002.py:24:1: Replace legacy `np.random.randn` call with `np.random.Generator`
+error[NPY002]: 24:1: Replace legacy `np.random.randn` call with `np.random.Generator`
 
+  --> NPY002.py:23:22
    |
 22 | numpy.random.ranf()
 23 | numpy.random.sample()
@@ -88,8 +97,9 @@ error[NPY002]: NPY002.py:24:1: Replace legacy `np.random.randn` call with `np.ra
 25 | numpy.random.randint()
 26 | numpy.random.random()
    |
-error[NPY002]: NPY002.py:25:1: Replace legacy `np.random.randint` call with `np.random.Generator`
+error[NPY002]: 25:1: Replace legacy `np.random.randint` call with `np.random.Generator`
 
+  --> NPY002.py:24:21
    |
 23 | numpy.random.sample()
 24 | numpy.random.randn()
@@ -98,8 +108,9 @@ error[NPY002]: NPY002.py:25:1: Replace legacy `np.random.randint` call with `np.
 26 | numpy.random.random()
 27 | numpy.random.random_integers()
    |
-error[NPY002]: NPY002.py:26:1: Replace legacy `np.random.random` call with `np.random.Generator`
+error[NPY002]: 26:1: Replace legacy `np.random.random` call with `np.random.Generator`
 
+  --> NPY002.py:25:23
    |
 24 | numpy.random.randn()
 25 | numpy.random.randint()
@@ -108,8 +119,9 @@ error[NPY002]: NPY002.py:26:1: Replace legacy `np.random.random` call with `np.r
 27 | numpy.random.random_integers()
 28 | numpy.random.random_sample()
    |
-error[NPY002]: NPY002.py:27:1: Replace legacy `np.random.random_integers` call with `np.random.Generator`
+error[NPY002]: 27:1: Replace legacy `np.random.random_integers` call with `np.random.Generator`
 
+  --> NPY002.py:26:22
    |
 25 | numpy.random.randint()
 26 | numpy.random.random()
@@ -118,8 +130,9 @@ error[NPY002]: NPY002.py:27:1: Replace legacy `np.random.random_integers` call w
 28 | numpy.random.random_sample()
 29 | numpy.random.choice()
    |
-error[NPY002]: NPY002.py:28:1: Replace legacy `np.random.random_sample` call with `np.random.Generator`
+error[NPY002]: 28:1: Replace legacy `np.random.random_sample` call with `np.random.Generator`
 
+  --> NPY002.py:27:31
    |
 26 | numpy.random.random()
 27 | numpy.random.random_integers()
@@ -128,8 +141,9 @@ error[NPY002]: NPY002.py:28:1: Replace legacy `np.random.random_sample` call wit
 29 | numpy.random.choice()
 30 | numpy.random.bytes()
    |
-error[NPY002]: NPY002.py:29:1: Replace legacy `np.random.choice` call with `np.random.Generator`
+error[NPY002]: 29:1: Replace legacy `np.random.choice` call with `np.random.Generator`
 
+  --> NPY002.py:28:29
    |
 27 | numpy.random.random_integers()
 28 | numpy.random.random_sample()
@@ -138,8 +152,9 @@ error[NPY002]: NPY002.py:29:1: Replace legacy `np.random.choice` call with `np.r
 30 | numpy.random.bytes()
 31 | numpy.random.shuffle()
    |
-error[NPY002]: NPY002.py:30:1: Replace legacy `np.random.bytes` call with `np.random.Generator`
+error[NPY002]: 30:1: Replace legacy `np.random.bytes` call with `np.random.Generator`
 
+  --> NPY002.py:29:22
    |
 28 | numpy.random.random_sample()
 29 | numpy.random.choice()
@@ -148,8 +163,9 @@ error[NPY002]: NPY002.py:30:1: Replace legacy `np.random.bytes` call with `np.ra
 31 | numpy.random.shuffle()
 32 | numpy.random.permutation()
    |
-error[NPY002]: NPY002.py:31:1: Replace legacy `np.random.shuffle` call with `np.random.Generator`
+error[NPY002]: 31:1: Replace legacy `np.random.shuffle` call with `np.random.Generator`
 
+  --> NPY002.py:30:21
    |
 29 | numpy.random.choice()
 30 | numpy.random.bytes()
@@ -158,8 +174,9 @@ error[NPY002]: NPY002.py:31:1: Replace legacy `np.random.shuffle` call with `np.
 32 | numpy.random.permutation()
 33 | numpy.random.beta()
    |
-error[NPY002]: NPY002.py:32:1: Replace legacy `np.random.permutation` call with `np.random.Generator`
+error[NPY002]: 32:1: Replace legacy `np.random.permutation` call with `np.random.Generator`
 
+  --> NPY002.py:31:23
    |
 30 | numpy.random.bytes()
 31 | numpy.random.shuffle()
@@ -168,8 +185,9 @@ error[NPY002]: NPY002.py:32:1: Replace legacy `np.random.permutation` call with 
 33 | numpy.random.beta()
 34 | numpy.random.binomial()
    |
-error[NPY002]: NPY002.py:33:1: Replace legacy `np.random.beta` call with `np.random.Generator`
+error[NPY002]: 33:1: Replace legacy `np.random.beta` call with `np.random.Generator`
 
+  --> NPY002.py:32:27
    |
 31 | numpy.random.shuffle()
 32 | numpy.random.permutation()
@@ -178,8 +196,9 @@ error[NPY002]: NPY002.py:33:1: Replace legacy `np.random.beta` call with `np.ran
 34 | numpy.random.binomial()
 35 | numpy.random.chisquare()
    |
-error[NPY002]: NPY002.py:34:1: Replace legacy `np.random.binomial` call with `np.random.Generator`
+error[NPY002]: 34:1: Replace legacy `np.random.binomial` call with `np.random.Generator`
 
+  --> NPY002.py:33:20
    |
 32 | numpy.random.permutation()
 33 | numpy.random.beta()
@@ -188,8 +207,9 @@ error[NPY002]: NPY002.py:34:1: Replace legacy `np.random.binomial` call with `np
 35 | numpy.random.chisquare()
 36 | numpy.random.dirichlet()
    |
-error[NPY002]: NPY002.py:35:1: Replace legacy `np.random.chisquare` call with `np.random.Generator`
+error[NPY002]: 35:1: Replace legacy `np.random.chisquare` call with `np.random.Generator`
 
+  --> NPY002.py:34:24
    |
 33 | numpy.random.beta()
 34 | numpy.random.binomial()
@@ -198,8 +218,9 @@ error[NPY002]: NPY002.py:35:1: Replace legacy `np.random.chisquare` call with `n
 36 | numpy.random.dirichlet()
 37 | numpy.random.exponential()
    |
-error[NPY002]: NPY002.py:36:1: Replace legacy `np.random.dirichlet` call with `np.random.Generator`
+error[NPY002]: 36:1: Replace legacy `np.random.dirichlet` call with `np.random.Generator`
 
+  --> NPY002.py:35:25
    |
 34 | numpy.random.binomial()
 35 | numpy.random.chisquare()
@@ -208,8 +229,9 @@ error[NPY002]: NPY002.py:36:1: Replace legacy `np.random.dirichlet` call with `n
 37 | numpy.random.exponential()
 38 | numpy.random.f()
    |
-error[NPY002]: NPY002.py:37:1: Replace legacy `np.random.exponential` call with `np.random.Generator`
+error[NPY002]: 37:1: Replace legacy `np.random.exponential` call with `np.random.Generator`
 
+  --> NPY002.py:36:25
    |
 35 | numpy.random.chisquare()
 36 | numpy.random.dirichlet()
@@ -218,8 +240,9 @@ error[NPY002]: NPY002.py:37:1: Replace legacy `np.random.exponential` call with 
 38 | numpy.random.f()
 39 | numpy.random.gamma()
    |
-error[NPY002]: NPY002.py:38:1: Replace legacy `np.random.f` call with `np.random.Generator`
+error[NPY002]: 38:1: Replace legacy `np.random.f` call with `np.random.Generator`
 
+  --> NPY002.py:37:27
    |
 36 | numpy.random.dirichlet()
 37 | numpy.random.exponential()
@@ -228,8 +251,9 @@ error[NPY002]: NPY002.py:38:1: Replace legacy `np.random.f` call with `np.random
 39 | numpy.random.gamma()
 40 | numpy.random.geometric()
    |
-error[NPY002]: NPY002.py:39:1: Replace legacy `np.random.gamma` call with `np.random.Generator`
+error[NPY002]: 39:1: Replace legacy `np.random.gamma` call with `np.random.Generator`
 
+  --> NPY002.py:38:17
    |
 37 | numpy.random.exponential()
 38 | numpy.random.f()
@@ -238,8 +262,9 @@ error[NPY002]: NPY002.py:39:1: Replace legacy `np.random.gamma` call with `np.ra
 40 | numpy.random.geometric()
 41 | numpy.random.gumbel()
    |
-error[NPY002]: NPY002.py:40:1: Replace legacy `np.random.geometric` call with `np.random.Generator`
+error[NPY002]: 40:1: Replace legacy `np.random.geometric` call with `np.random.Generator`
 
+  --> NPY002.py:39:21
    |
 38 | numpy.random.f()
 39 | numpy.random.gamma()
@@ -248,8 +273,9 @@ error[NPY002]: NPY002.py:40:1: Replace legacy `np.random.geometric` call with `n
 41 | numpy.random.gumbel()
 42 | numpy.random.hypergeometric()
    |
-error[NPY002]: NPY002.py:41:1: Replace legacy `np.random.gumbel` call with `np.random.Generator`
+error[NPY002]: 41:1: Replace legacy `np.random.gumbel` call with `np.random.Generator`
 
+  --> NPY002.py:40:25
    |
 39 | numpy.random.gamma()
 40 | numpy.random.geometric()
@@ -258,8 +284,9 @@ error[NPY002]: NPY002.py:41:1: Replace legacy `np.random.gumbel` call with `np.r
 42 | numpy.random.hypergeometric()
 43 | numpy.random.laplace()
    |
-error[NPY002]: NPY002.py:42:1: Replace legacy `np.random.hypergeometric` call with `np.random.Generator`
+error[NPY002]: 42:1: Replace legacy `np.random.hypergeometric` call with `np.random.Generator`
 
+  --> NPY002.py:41:22
    |
 40 | numpy.random.geometric()
 41 | numpy.random.gumbel()
@@ -268,8 +295,9 @@ error[NPY002]: NPY002.py:42:1: Replace legacy `np.random.hypergeometric` call wi
 43 | numpy.random.laplace()
 44 | numpy.random.logistic()
    |
-error[NPY002]: NPY002.py:43:1: Replace legacy `np.random.laplace` call with `np.random.Generator`
+error[NPY002]: 43:1: Replace legacy `np.random.laplace` call with `np.random.Generator`
 
+  --> NPY002.py:42:30
    |
 41 | numpy.random.gumbel()
 42 | numpy.random.hypergeometric()
@@ -278,8 +306,9 @@ error[NPY002]: NPY002.py:43:1: Replace legacy `np.random.laplace` call with `np.
 44 | numpy.random.logistic()
 45 | numpy.random.lognormal()
    |
-error[NPY002]: NPY002.py:44:1: Replace legacy `np.random.logistic` call with `np.random.Generator`
+error[NPY002]: 44:1: Replace legacy `np.random.logistic` call with `np.random.Generator`
 
+  --> NPY002.py:43:23
    |
 42 | numpy.random.hypergeometric()
 43 | numpy.random.laplace()
@@ -288,8 +317,9 @@ error[NPY002]: NPY002.py:44:1: Replace legacy `np.random.logistic` call with `np
 45 | numpy.random.lognormal()
 46 | numpy.random.logseries()
    |
-error[NPY002]: NPY002.py:45:1: Replace legacy `np.random.lognormal` call with `np.random.Generator`
+error[NPY002]: 45:1: Replace legacy `np.random.lognormal` call with `np.random.Generator`
 
+  --> NPY002.py:44:24
    |
 43 | numpy.random.laplace()
 44 | numpy.random.logistic()
@@ -298,8 +328,9 @@ error[NPY002]: NPY002.py:45:1: Replace legacy `np.random.lognormal` call with `n
 46 | numpy.random.logseries()
 47 | numpy.random.multinomial()
    |
-error[NPY002]: NPY002.py:46:1: Replace legacy `np.random.logseries` call with `np.random.Generator`
+error[NPY002]: 46:1: Replace legacy `np.random.logseries` call with `np.random.Generator`
 
+  --> NPY002.py:45:25
    |
 44 | numpy.random.logistic()
 45 | numpy.random.lognormal()
@@ -308,8 +339,9 @@ error[NPY002]: NPY002.py:46:1: Replace legacy `np.random.logseries` call with `n
 47 | numpy.random.multinomial()
 48 | numpy.random.multivariate_normal()
    |
-error[NPY002]: NPY002.py:47:1: Replace legacy `np.random.multinomial` call with `np.random.Generator`
+error[NPY002]: 47:1: Replace legacy `np.random.multinomial` call with `np.random.Generator`
 
+  --> NPY002.py:46:25
    |
 45 | numpy.random.lognormal()
 46 | numpy.random.logseries()
@@ -318,8 +350,9 @@ error[NPY002]: NPY002.py:47:1: Replace legacy `np.random.multinomial` call with 
 48 | numpy.random.multivariate_normal()
 49 | numpy.random.negative_binomial()
    |
-error[NPY002]: NPY002.py:48:1: Replace legacy `np.random.multivariate_normal` call with `np.random.Generator`
+error[NPY002]: 48:1: Replace legacy `np.random.multivariate_normal` call with `np.random.Generator`
 
+  --> NPY002.py:47:27
    |
 46 | numpy.random.logseries()
 47 | numpy.random.multinomial()
@@ -328,8 +361,9 @@ error[NPY002]: NPY002.py:48:1: Replace legacy `np.random.multivariate_normal` ca
 49 | numpy.random.negative_binomial()
 50 | numpy.random.noncentral_chisquare()
    |
-error[NPY002]: NPY002.py:49:1: Replace legacy `np.random.negative_binomial` call with `np.random.Generator`
+error[NPY002]: 49:1: Replace legacy `np.random.negative_binomial` call with `np.random.Generator`
 
+  --> NPY002.py:48:35
    |
 47 | numpy.random.multinomial()
 48 | numpy.random.multivariate_normal()
@@ -338,8 +372,9 @@ error[NPY002]: NPY002.py:49:1: Replace legacy `np.random.negative_binomial` call
 50 | numpy.random.noncentral_chisquare()
 51 | numpy.random.noncentral_f()
    |
-error[NPY002]: NPY002.py:50:1: Replace legacy `np.random.noncentral_chisquare` call with `np.random.Generator`
+error[NPY002]: 50:1: Replace legacy `np.random.noncentral_chisquare` call with `np.random.Generator`
 
+  --> NPY002.py:49:33
    |
 48 | numpy.random.multivariate_normal()
 49 | numpy.random.negative_binomial()
@@ -348,8 +383,9 @@ error[NPY002]: NPY002.py:50:1: Replace legacy `np.random.noncentral_chisquare` c
 51 | numpy.random.noncentral_f()
 52 | numpy.random.normal()
    |
-error[NPY002]: NPY002.py:51:1: Replace legacy `np.random.noncentral_f` call with `np.random.Generator`
+error[NPY002]: 51:1: Replace legacy `np.random.noncentral_f` call with `np.random.Generator`
 
+  --> NPY002.py:50:36
    |
 49 | numpy.random.negative_binomial()
 50 | numpy.random.noncentral_chisquare()
@@ -358,8 +394,9 @@ error[NPY002]: NPY002.py:51:1: Replace legacy `np.random.noncentral_f` call with
 52 | numpy.random.normal()
 53 | numpy.random.pareto()
    |
-error[NPY002]: NPY002.py:52:1: Replace legacy `np.random.normal` call with `np.random.Generator`
+error[NPY002]: 52:1: Replace legacy `np.random.normal` call with `np.random.Generator`
 
+  --> NPY002.py:51:28
    |
 50 | numpy.random.noncentral_chisquare()
 51 | numpy.random.noncentral_f()
@@ -368,8 +405,9 @@ error[NPY002]: NPY002.py:52:1: Replace legacy `np.random.normal` call with `np.r
 53 | numpy.random.pareto()
 54 | numpy.random.poisson()
    |
-error[NPY002]: NPY002.py:53:1: Replace legacy `np.random.pareto` call with `np.random.Generator`
+error[NPY002]: 53:1: Replace legacy `np.random.pareto` call with `np.random.Generator`
 
+  --> NPY002.py:52:22
    |
 51 | numpy.random.noncentral_f()
 52 | numpy.random.normal()
@@ -378,8 +416,9 @@ error[NPY002]: NPY002.py:53:1: Replace legacy `np.random.pareto` call with `np.r
 54 | numpy.random.poisson()
 55 | numpy.random.power()
    |
-error[NPY002]: NPY002.py:54:1: Replace legacy `np.random.poisson` call with `np.random.Generator`
+error[NPY002]: 54:1: Replace legacy `np.random.poisson` call with `np.random.Generator`
 
+  --> NPY002.py:53:22
    |
 52 | numpy.random.normal()
 53 | numpy.random.pareto()
@@ -388,8 +427,9 @@ error[NPY002]: NPY002.py:54:1: Replace legacy `np.random.poisson` call with `np.
 55 | numpy.random.power()
 56 | numpy.random.rayleigh()
    |
-error[NPY002]: NPY002.py:55:1: Replace legacy `np.random.power` call with `np.random.Generator`
+error[NPY002]: 55:1: Replace legacy `np.random.power` call with `np.random.Generator`
 
+  --> NPY002.py:54:23
    |
 53 | numpy.random.pareto()
 54 | numpy.random.poisson()
@@ -398,8 +438,9 @@ error[NPY002]: NPY002.py:55:1: Replace legacy `np.random.power` call with `np.ra
 56 | numpy.random.rayleigh()
 57 | numpy.random.standard_cauchy()
    |
-error[NPY002]: NPY002.py:56:1: Replace legacy `np.random.rayleigh` call with `np.random.Generator`
+error[NPY002]: 56:1: Replace legacy `np.random.rayleigh` call with `np.random.Generator`
 
+  --> NPY002.py:55:21
    |
 54 | numpy.random.poisson()
 55 | numpy.random.power()
@@ -408,8 +449,9 @@ error[NPY002]: NPY002.py:56:1: Replace legacy `np.random.rayleigh` call with `np
 57 | numpy.random.standard_cauchy()
 58 | numpy.random.standard_exponential()
    |
-error[NPY002]: NPY002.py:57:1: Replace legacy `np.random.standard_cauchy` call with `np.random.Generator`
+error[NPY002]: 57:1: Replace legacy `np.random.standard_cauchy` call with `np.random.Generator`
 
+  --> NPY002.py:56:24
    |
 55 | numpy.random.power()
 56 | numpy.random.rayleigh()
@@ -418,8 +460,9 @@ error[NPY002]: NPY002.py:57:1: Replace legacy `np.random.standard_cauchy` call w
 58 | numpy.random.standard_exponential()
 59 | numpy.random.standard_gamma()
    |
-error[NPY002]: NPY002.py:58:1: Replace legacy `np.random.standard_exponential` call with `np.random.Generator`
+error[NPY002]: 58:1: Replace legacy `np.random.standard_exponential` call with `np.random.Generator`
 
+  --> NPY002.py:57:31
    |
 56 | numpy.random.rayleigh()
 57 | numpy.random.standard_cauchy()
@@ -428,8 +471,9 @@ error[NPY002]: NPY002.py:58:1: Replace legacy `np.random.standard_exponential` c
 59 | numpy.random.standard_gamma()
 60 | numpy.random.standard_normal()
    |
-error[NPY002]: NPY002.py:59:1: Replace legacy `np.random.standard_gamma` call with `np.random.Generator`
+error[NPY002]: 59:1: Replace legacy `np.random.standard_gamma` call with `np.random.Generator`
 
+  --> NPY002.py:58:36
    |
 57 | numpy.random.standard_cauchy()
 58 | numpy.random.standard_exponential()
@@ -438,8 +482,9 @@ error[NPY002]: NPY002.py:59:1: Replace legacy `np.random.standard_gamma` call wi
 60 | numpy.random.standard_normal()
 61 | numpy.random.standard_t()
    |
-error[NPY002]: NPY002.py:60:1: Replace legacy `np.random.standard_normal` call with `np.random.Generator`
+error[NPY002]: 60:1: Replace legacy `np.random.standard_normal` call with `np.random.Generator`
 
+  --> NPY002.py:59:30
    |
 58 | numpy.random.standard_exponential()
 59 | numpy.random.standard_gamma()
@@ -448,8 +493,9 @@ error[NPY002]: NPY002.py:60:1: Replace legacy `np.random.standard_normal` call w
 61 | numpy.random.standard_t()
 62 | numpy.random.triangular()
    |
-error[NPY002]: NPY002.py:61:1: Replace legacy `np.random.standard_t` call with `np.random.Generator`
+error[NPY002]: 61:1: Replace legacy `np.random.standard_t` call with `np.random.Generator`
 
+  --> NPY002.py:60:31
    |
 59 | numpy.random.standard_gamma()
 60 | numpy.random.standard_normal()
@@ -458,8 +504,9 @@ error[NPY002]: NPY002.py:61:1: Replace legacy `np.random.standard_t` call with `
 62 | numpy.random.triangular()
 63 | numpy.random.uniform()
    |
-error[NPY002]: NPY002.py:62:1: Replace legacy `np.random.triangular` call with `np.random.Generator`
+error[NPY002]: 62:1: Replace legacy `np.random.triangular` call with `np.random.Generator`
 
+  --> NPY002.py:61:26
    |
 60 | numpy.random.standard_normal()
 61 | numpy.random.standard_t()
@@ -468,8 +515,9 @@ error[NPY002]: NPY002.py:62:1: Replace legacy `np.random.triangular` call with `
 63 | numpy.random.uniform()
 64 | numpy.random.vonmises()
    |
-error[NPY002]: NPY002.py:63:1: Replace legacy `np.random.uniform` call with `np.random.Generator`
+error[NPY002]: 63:1: Replace legacy `np.random.uniform` call with `np.random.Generator`
 
+  --> NPY002.py:62:26
    |
 61 | numpy.random.standard_t()
 62 | numpy.random.triangular()
@@ -478,8 +526,9 @@ error[NPY002]: NPY002.py:63:1: Replace legacy `np.random.uniform` call with `np.
 64 | numpy.random.vonmises()
 65 | numpy.random.wald()
    |
-error[NPY002]: NPY002.py:64:1: Replace legacy `np.random.vonmises` call with `np.random.Generator`
+error[NPY002]: 64:1: Replace legacy `np.random.vonmises` call with `np.random.Generator`
 
+  --> NPY002.py:63:23
    |
 62 | numpy.random.triangular()
 63 | numpy.random.uniform()
@@ -488,8 +537,9 @@ error[NPY002]: NPY002.py:64:1: Replace legacy `np.random.vonmises` call with `np
 65 | numpy.random.wald()
 66 | numpy.random.weibull()
    |
-error[NPY002]: NPY002.py:65:1: Replace legacy `np.random.wald` call with `np.random.Generator`
+error[NPY002]: 65:1: Replace legacy `np.random.wald` call with `np.random.Generator`
 
+  --> NPY002.py:64:24
    |
 63 | numpy.random.uniform()
 64 | numpy.random.vonmises()
@@ -498,8 +548,9 @@ error[NPY002]: NPY002.py:65:1: Replace legacy `np.random.wald` call with `np.ran
 66 | numpy.random.weibull()
 67 | numpy.random.zipf()
    |
-error[NPY002]: NPY002.py:66:1: Replace legacy `np.random.weibull` call with `np.random.Generator`
+error[NPY002]: 66:1: Replace legacy `np.random.weibull` call with `np.random.Generator`
 
+  --> NPY002.py:65:20
    |
 64 | numpy.random.vonmises()
 65 | numpy.random.wald()
@@ -507,8 +558,9 @@ error[NPY002]: NPY002.py:66:1: Replace legacy `np.random.weibull` call with `np.
    | ^^^^^^^^^^^^^^^^^^^^
 67 | numpy.random.zipf()
    |
-error[NPY002]: NPY002.py:67:1: Replace legacy `np.random.zipf` call with `np.random.Generator`
+error[NPY002]: 67:1: Replace legacy `np.random.zipf` call with `np.random.Generator`
 
+  --> NPY002.py:66:23
    |
 65 | numpy.random.wald()
 66 | numpy.random.weibull()

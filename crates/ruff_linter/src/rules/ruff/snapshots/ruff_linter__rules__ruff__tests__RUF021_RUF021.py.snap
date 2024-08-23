@@ -1,8 +1,9 @@
 ---
 source: crates/ruff_linter/src/rules/ruff/mod.rs
 ---
-error[RUF021]: RUF021.py:12:10: [*] Parenthesize `a and b` expressions when chaining `and` and `or` together, to make the precedence clear
+error[RUF021]: 12:10: [*] Parenthesize `a and b` expressions when chaining `and` and `or` together, to make the precedence clear
 
+  --> RUF021.py:12:10
    |
 11 | a, b, c = 1, 0, 2
 12 | x = a or b and c  # RUF021: => `a or (b and c)`
@@ -20,8 +21,9 @@ error[RUF021]: RUF021.py:12:10: [*] Parenthesize `a and b` expressions when chai
 14 14 | 
 15 15 | a, b, c = 0, 1, 2
 
-error[RUF021]: RUF021.py:13:10: [*] Parenthesize `a and b` expressions when chaining `and` and `or` together, to make the precedence clear
+error[RUF021]: 13:10: [*] Parenthesize `a and b` expressions when chaining `and` and `or` together, to make the precedence clear
 
+  --> RUF021.py:13:10
    |
 11 | a, b, c = 1, 0, 2
 12 | x = a or b and c  # RUF021: => `a or (b and c)`
@@ -41,8 +43,9 @@ error[RUF021]: RUF021.py:13:10: [*] Parenthesize `a and b` expressions when chai
 15 15 | a, b, c = 0, 1, 2
 16 16 | y = a and b or c  # RUF021: => `(a and b) or c`
 
-error[RUF021]: RUF021.py:16:5: [*] Parenthesize `a and b` expressions when chaining `and` and `or` together, to make the precedence clear
+error[RUF021]: 16:5: [*] Parenthesize `a and b` expressions when chaining `and` and `or` together, to make the precedence clear
 
+  --> RUF021.py:16:5
    |
 15 | a, b, c = 0, 1, 2
 16 | y = a and b or c  # RUF021: => `(a and b) or c`
@@ -61,8 +64,9 @@ error[RUF021]: RUF021.py:16:5: [*] Parenthesize `a and b` expressions when chain
 18 18 | a, b, c, d = 1, 2, 0, 3
 19 19 | if a or b or c and d:  # RUF021: => `a or b or (c and d)`
 
-error[RUF021]: RUF021.py:19:14: [*] Parenthesize `a and b` expressions when chaining `and` and `or` together, to make the precedence clear
+error[RUF021]: 19:14: [*] Parenthesize `a and b` expressions when chaining `and` and `or` together, to make the precedence clear
 
+  --> RUF021.py:19:14
    |
 18 | a, b, c, d = 1, 2, 0, 3
 19 | if a or b or c and d:  # RUF021: => `a or b or (c and d)`
@@ -80,8 +84,9 @@ error[RUF021]: RUF021.py:19:14: [*] Parenthesize `a and b` expressions when chai
 21 21 | 
 22 22 | a, b, c, d = 0, 0, 2, 3
 
-error[RUF021]: RUF021.py:26:11: [*] Parenthesize `a and b` expressions when chaining `and` and `or` together, to make the precedence clear
+error[RUF021]: 26:11: [*] Parenthesize `a and b` expressions when chaining `and` and `or` together, to make the precedence clear
 
+  --> RUF021.py:26:11
    |
 24 | if bool():
 25 |     pass
@@ -100,8 +105,9 @@ error[RUF021]: RUF021.py:26:11: [*] Parenthesize `a and b` expressions when chai
 28 28 | 
 29 29 | a, b, c, d = 0, 1, 0, 2
 
-error[RUF021]: RUF021.py:30:7: [*] Parenthesize `a and b` expressions when chaining `and` and `or` together, to make the precedence clear
+error[RUF021]: 30:7: [*] Parenthesize `a and b` expressions when chaining `and` and `or` together, to make the precedence clear
 
+  --> RUF021.py:30:7
    |
 29 | a, b, c, d = 0, 1, 0, 2
 30 | while a and b or c and d:  # RUF021: => `(and b) or (c and d)`
@@ -119,8 +125,9 @@ error[RUF021]: RUF021.py:30:7: [*] Parenthesize `a and b` expressions when chain
 32 32 | 
 33 33 | b, c, d, e = 2, 3, 0, 4
 
-error[RUF021]: RUF021.py:30:18: [*] Parenthesize `a and b` expressions when chaining `and` and `or` together, to make the precedence clear
+error[RUF021]: 30:18: [*] Parenthesize `a and b` expressions when chaining `and` and `or` together, to make the precedence clear
 
+  --> RUF021.py:30:18
    |
 29 | a, b, c, d = 0, 1, 0, 2
 30 | while a and b or c and d:  # RUF021: => `(and b) or (c and d)`
@@ -138,8 +145,9 @@ error[RUF021]: RUF021.py:30:18: [*] Parenthesize `a and b` expressions when chai
 32 32 | 
 33 33 | b, c, d, e = 2, 3, 0, 4
 
-error[RUF021]: RUF021.py:35:44: [*] Parenthesize `a and b` expressions when chaining `and` and `or` together, to make the precedence clear
+error[RUF021]: 35:44: [*] Parenthesize `a and b` expressions when chaining `and` and `or` together, to make the precedence clear
 
+  --> RUF021.py:35:44
    |
 33 | b, c, d, e = 2, 3, 0, 4
 34 | # RUF021: => `a or b or c or (d and e)`:
@@ -159,8 +167,9 @@ error[RUF021]: RUF021.py:35:44: [*] Parenthesize `a and b` expressions when chai
 37 37 | a, b, c, d = 0, 1, 3, 0
 38 38 | assert not a and b or c or d  # RUF021: => `(not a and b) or c or d`
 
-error[RUF021]: RUF021.py:38:8: [*] Parenthesize `a and b` expressions when chaining `and` and `or` together, to make the precedence clear
+error[RUF021]: 38:8: [*] Parenthesize `a and b` expressions when chaining `and` and `or` together, to make the precedence clear
 
+  --> RUF021.py:38:8
    |
 37 | a, b, c, d = 0, 1, 3, 0
 38 | assert not a and b or c or d  # RUF021: => `(not a and b) or c or d`
@@ -179,8 +188,9 @@ error[RUF021]: RUF021.py:38:8: [*] Parenthesize `a and b` expressions when chain
 40 40 | if (not a) and b or c or d:  # RUF021: => `((not a) and b) or c or d`
 41 41 |     if (not a and b) or c or d:  # OK
 
-error[RUF021]: RUF021.py:40:4: [*] Parenthesize `a and b` expressions when chaining `and` and `or` together, to make the precedence clear
+error[RUF021]: 40:4: [*] Parenthesize `a and b` expressions when chaining `and` and `or` together, to make the precedence clear
 
+  --> RUF021.py:40:4
    |
 38 | assert not a and b or c or d  # RUF021: => `(not a and b) or c or d`
 39 | 
@@ -200,8 +210,9 @@ error[RUF021]: RUF021.py:40:4: [*] Parenthesize `a and b` expressions when chain
 42 42 |         pass
 43 43 | 
 
-error[RUF021]: RUF021.py:46:8: [*] Parenthesize `a and b` expressions when chaining `and` and `or` together, to make the precedence clear
+error[RUF021]: 46:8: [*] Parenthesize `a and b` expressions when chaining `and` and `or` together, to make the precedence clear
 
+  --> RUF021.py:46:8
    |
 44 |   if (
 45 |       some_reasonably_long_condition
@@ -225,8 +236,9 @@ error[RUF021]: RUF021.py:46:8: [*] Parenthesize `a and b` expressions when chain
 49 49 |     and some_fifth_reasonably_long_condition
 50 50 |     # a comment
 
-error[RUF021]: RUF021.py:48:8: [*] Parenthesize `a and b` expressions when chaining `and` and `or` together, to make the precedence clear
+error[RUF021]: 48:8: [*] Parenthesize `a and b` expressions when chaining `and` and `or` together, to make the precedence clear
 
+  --> RUF021.py:48:8
    |
 46 |       or some_other_reasonably_long_condition
 47 |       and some_third_reasonably_long_condition

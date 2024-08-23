@@ -1,8 +1,9 @@
 ---
 source: crates/ruff_linter/src/rules/ruff/mod.rs
 ---
-error[F401]: RUF100_1.py:37:9: [*] `typing.Union` imported but unused
+error[F401]: 37:9: [*] `typing.Union` imported but unused
 
+  --> RUF100_1.py:37:9
    |
 35 |     from typing import (
 36 |         Mapping,  # noqa: F401
@@ -22,8 +23,9 @@ error[F401]: RUF100_1.py:37:9: [*] `typing.Union` imported but unused
 40 39 | 
 41 40 | def f():
 
-error[RUF100]: RUF100_1.py:52:20: [*] Unused `noqa` directive (unused: `F401`)
+error[RUF100]: 52:20: [*] Unused `noqa` directive (unused: `F401`)
 
+  --> RUF100_1.py:52:20
    |
 50 |     # This should ignore the error, but the inner noqa should be marked as unused.
 51 |     from typing import (  # noqa: F401
@@ -42,8 +44,9 @@ error[RUF100]: RUF100_1.py:52:20: [*] Unused `noqa` directive (unused: `F401`)
 54 54 | 
 55 55 | 
 
-error[RUF100]: RUF100_1.py:59:20: [*] Unused `noqa` directive (unused: `F401`)
+error[RUF100]: 59:20: [*] Unused `noqa` directive (unused: `F401`)
 
+  --> RUF100_1.py:59:20
    |
 57 |     # This should ignore the error, but the inner noqa should be marked as unused.
 58 |     from typing import (  # noqa
@@ -62,8 +65,9 @@ error[RUF100]: RUF100_1.py:59:20: [*] Unused `noqa` directive (unused: `F401`)
 61 61 | 
 62 62 | 
 
-error[RUF100]: RUF100_1.py:66:16: [*] Unused `noqa` directive (non-enabled: `F501`)
+error[RUF100]: 66:16: [*] Unused `noqa` directive (non-enabled: `F501`)
 
+  --> RUF100_1.py:66:16
    |
 64 |     # This should ignore the error, but mark F501 as unused.
 65 |     from typing import (  # noqa: F401
@@ -82,8 +86,9 @@ error[RUF100]: RUF100_1.py:66:16: [*] Unused `noqa` directive (non-enabled: `F50
 68 68 | 
 69 69 | 
 
-error[RUF100]: RUF100_1.py:72:27: [*] Unused `noqa` directive (non-enabled: `F501`)
+error[RUF100]: 72:27: [*] Unused `noqa` directive (non-enabled: `F501`)
 
+  --> RUF100_1.py:72:27
    |
 70 | def f():
 71 |     # This should ignore the error, but mark F501 as unused.
@@ -103,8 +108,9 @@ error[RUF100]: RUF100_1.py:72:27: [*] Unused `noqa` directive (non-enabled: `F50
 74 74 |     )
 75 75 | 
 
-error[F401]: RUF100_1.py:89:24: [*] `typing.Awaitable` imported but unused
+error[F401]: 89:24: [*] `typing.Awaitable` imported but unused
 
+  --> RUF100_1.py:89:24
    |
 87 | def f():
 88 |     # This should mark F501 as unused.
@@ -119,8 +125,9 @@ error[F401]: RUF100_1.py:89:24: [*] `typing.Awaitable` imported but unused
 89    |-    from typing import Awaitable, AwaitableGenerator  # noqa: F501
    89 |+    pass  # noqa: F501
 
-error[F401]: RUF100_1.py:89:35: [*] `typing.AwaitableGenerator` imported but unused
+error[F401]: 89:35: [*] `typing.AwaitableGenerator` imported but unused
 
+  --> RUF100_1.py:89:35
    |
 87 | def f():
 88 |     # This should mark F501 as unused.
@@ -135,8 +142,9 @@ error[F401]: RUF100_1.py:89:35: [*] `typing.AwaitableGenerator` imported but unu
 89    |-    from typing import Awaitable, AwaitableGenerator  # noqa: F501
    89 |+    pass  # noqa: F501
 
-error[RUF100]: RUF100_1.py:89:55: [*] Unused `noqa` directive (non-enabled: `F501`)
+error[RUF100]: 89:55: [*] Unused `noqa` directive (non-enabled: `F501`)
 
+  --> RUF100_1.py:89:55
    |
 87 | def f():
 88 |     # This should mark F501 as unused.

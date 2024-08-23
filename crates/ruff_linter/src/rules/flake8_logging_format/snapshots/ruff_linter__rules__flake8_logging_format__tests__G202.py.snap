@@ -1,8 +1,9 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_logging_format/mod.rs
 ---
-error[G202]: G202.py:8:38: Logging statement has redundant `exc_info`
+error[G202]: 8:38: Logging statement has redundant `exc_info`
 
+  --> G202.py:8:38
    |
  6 |     pass
  7 | except:
@@ -11,8 +12,9 @@ error[G202]: G202.py:8:38: Logging statement has redundant `exc_info`
  9 | 
 10 | try:
    |
-error[G202]: G202.py:13:38: Logging statement has redundant `exc_info`
+error[G202]: 13:38: Logging statement has redundant `exc_info`
 
+  --> G202.py:13:38
    |
 11 |     pass
 12 | except:
@@ -21,8 +23,9 @@ error[G202]: G202.py:13:38: Logging statement has redundant `exc_info`
 14 | 
 15 | # OK
    |
-error[G202]: G202.py:28:30: Logging statement has redundant `exc_info`
+error[G202]: 28:30: Logging statement has redundant `exc_info`
 
+  --> G202.py:28:30
    |
 26 |     pass
 27 | except:
@@ -31,8 +34,9 @@ error[G202]: G202.py:28:30: Logging statement has redundant `exc_info`
 29 | 
 30 | try:
    |
-error[G202]: G202.py:33:30: Logging statement has redundant `exc_info`
+error[G202]: 33:30: Logging statement has redundant `exc_info`
 
+  --> G202.py:33:30
    |
 31 |     pass
 32 | except:

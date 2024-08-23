@@ -1,8 +1,9 @@
 ---
 source: crates/ruff_linter/src/rules/pycodestyle/mod.rs
 ---
-error[E265]: E26.py:10:1: [*] Block comment should start with `# `
+error[E265]: 10:1: [*] Block comment should start with `# `
 
+  --> E26.py:9:12
    |
  8 | x = y + 1  #:  Increment x
  9 | #: E265:1:1
@@ -22,8 +23,9 @@ error[E265]: E26.py:10:1: [*] Block comment should start with `# `
 12 12 | #: E265:2:1
 13 13 | m = 42
 
-error[E265]: E26.py:14:1: [*] Block comment should start with `# `
+error[E265]: 14:1: [*] Block comment should start with `# `
 
+  --> E26.py:13:7
    |
 12 | #: E265:2:1
 13 | m = 42
@@ -43,8 +45,9 @@ error[E265]: E26.py:14:1: [*] Block comment should start with `# `
 16 16 | #: E266:3:5 E266:6:5
 17 17 | def how_it_feel(r):
 
-error[E265]: E26.py:25:1: [*] Block comment should start with `# `
+error[E265]: 25:1: [*] Block comment should start with `# `
 
+  --> E26.py:24:21
    |
 23 |     return
 24 | #: E265:1:1 E266:2:1
@@ -64,8 +67,9 @@ error[E265]: E26.py:25:1: [*] Block comment should start with `# `
 27 27 | #: W291:1:42
 28 28 | #########################################
 
-error[E265]: E26.py:32:1: [*] Block comment should start with `# `
+error[E265]: 32:1: [*] Block comment should start with `# `
 
+  --> E26.py:31:8
    |
 31 | #: Okay
 32 | #!/usr/bin/env python
@@ -84,8 +88,9 @@ error[E265]: E26.py:32:1: [*] Block comment should start with `# `
 34 34 | pass  # an inline comment
 35 35 | x = x + 1   # Increment x
 
-error[E265]: E26.py:73:1: [*] Block comment should start with `# `
+error[E265]: 73:1: [*] Block comment should start with `# `
 
+  --> E26.py:72:45
    |
 71 | # F   Means test is failing (F)
 72 | # EF  Means test is giving error and Failing
@@ -104,8 +109,9 @@ error[E265]: E26.py:73:1: [*] Block comment should start with `# `
 75 75 | 
 76 76 | #: Colon prefix is okay
 
-error[E265]: E26.py:78:1: [*] Block comment should start with `# `
+error[E265]: 78:1: [*] Block comment should start with `# `
 
+  --> E26.py:77:1
    |
 76 | #: Colon prefix is okay
 77 | 

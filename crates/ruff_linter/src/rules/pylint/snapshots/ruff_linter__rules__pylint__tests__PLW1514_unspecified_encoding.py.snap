@@ -1,8 +1,9 @@
 ---
 source: crates/ruff_linter/src/rules/pylint/mod.rs
 ---
-error[PLW1514]: unspecified_encoding.py:8:1: [*] `open` in text mode without explicit `encoding` argument
+error[PLW1514]: 8:1: [*] `open` in text mode without explicit `encoding` argument
 
+  --> unspecified_encoding.py:7:10
    |
  7 | # Errors.
  8 | open("test.txt")
@@ -21,8 +22,9 @@ error[PLW1514]: unspecified_encoding.py:8:1: [*] `open` in text mode without exp
 10 10 | hugo.TextIOWrapper(hugo.FileIO("test.txt"))
 11 11 | tempfile.NamedTemporaryFile("w")
 
-error[PLW1514]: unspecified_encoding.py:9:1: [*] `io.TextIOWrapper` without explicit `encoding` argument
+error[PLW1514]: 9:1: [*] `io.TextIOWrapper` without explicit `encoding` argument
 
+  --> unspecified_encoding.py:8:17
    |
  7 | # Errors.
  8 | open("test.txt")
@@ -42,8 +44,9 @@ error[PLW1514]: unspecified_encoding.py:9:1: [*] `io.TextIOWrapper` without expl
 11 11 | tempfile.NamedTemporaryFile("w")
 12 12 | tempfile.TemporaryFile("w")
 
-error[PLW1514]: unspecified_encoding.py:10:1: [*] `io.TextIOWrapper` without explicit `encoding` argument
+error[PLW1514]: 10:1: [*] `io.TextIOWrapper` without explicit `encoding` argument
 
+  --> unspecified_encoding.py:9:40
    |
  8 | open("test.txt")
  9 | io.TextIOWrapper(io.FileIO("test.txt"))
@@ -63,8 +66,9 @@ error[PLW1514]: unspecified_encoding.py:10:1: [*] `io.TextIOWrapper` without exp
 12 12 | tempfile.TemporaryFile("w")
 13 13 | codecs.open("test.txt")
 
-error[PLW1514]: unspecified_encoding.py:11:1: [*] `tempfile.NamedTemporaryFile` in text mode without explicit `encoding` argument
+error[PLW1514]: 11:1: [*] `tempfile.NamedTemporaryFile` in text mode without explicit `encoding` argument
 
+  --> unspecified_encoding.py:10:44
    |
  9 | io.TextIOWrapper(io.FileIO("test.txt"))
 10 | hugo.TextIOWrapper(hugo.FileIO("test.txt"))
@@ -84,8 +88,9 @@ error[PLW1514]: unspecified_encoding.py:11:1: [*] `tempfile.NamedTemporaryFile` 
 13 13 | codecs.open("test.txt")
 14 14 | tempfile.SpooledTemporaryFile(0, "w")
 
-error[PLW1514]: unspecified_encoding.py:12:1: [*] `tempfile.TemporaryFile` in text mode without explicit `encoding` argument
+error[PLW1514]: 12:1: [*] `tempfile.TemporaryFile` in text mode without explicit `encoding` argument
 
+  --> unspecified_encoding.py:11:33
    |
 10 | hugo.TextIOWrapper(hugo.FileIO("test.txt"))
 11 | tempfile.NamedTemporaryFile("w")
@@ -105,8 +110,9 @@ error[PLW1514]: unspecified_encoding.py:12:1: [*] `tempfile.TemporaryFile` in te
 14 14 | tempfile.SpooledTemporaryFile(0, "w")
 15 15 | 
 
-error[PLW1514]: unspecified_encoding.py:13:1: [*] `codecs.open` in text mode without explicit `encoding` argument
+error[PLW1514]: 13:1: [*] `codecs.open` in text mode without explicit `encoding` argument
 
+  --> unspecified_encoding.py:12:28
    |
 11 | tempfile.NamedTemporaryFile("w")
 12 | tempfile.TemporaryFile("w")
@@ -125,8 +131,9 @@ error[PLW1514]: unspecified_encoding.py:13:1: [*] `codecs.open` in text mode wit
 15 15 | 
 16 16 | # Non-errors.
 
-error[PLW1514]: unspecified_encoding.py:14:1: [*] `tempfile.SpooledTemporaryFile` in text mode without explicit `encoding` argument
+error[PLW1514]: 14:1: [*] `tempfile.SpooledTemporaryFile` in text mode without explicit `encoding` argument
 
+  --> unspecified_encoding.py:13:24
    |
 12 | tempfile.TemporaryFile("w")
 13 | codecs.open("test.txt")
@@ -146,8 +153,9 @@ error[PLW1514]: unspecified_encoding.py:14:1: [*] `tempfile.SpooledTemporaryFile
 16 16 | # Non-errors.
 17 17 | open("test.txt", encoding="utf-8")
 
-error[PLW1514]: unspecified_encoding.py:46:1: [*] `open` in text mode without explicit `encoding` argument
+error[PLW1514]: 46:1: [*] `open` in text mode without explicit `encoding` argument
 
+  --> unspecified_encoding.py:45:1
    |
 44 | tempfile.SpooledTemporaryFile(0, )
 45 | 
@@ -167,8 +175,9 @@ error[PLW1514]: unspecified_encoding.py:46:1: [*] `open` in text mode without ex
 48 48 | open(
 49 49 |     "test.txt",  # comment
 
-error[PLW1514]: unspecified_encoding.py:47:1: [*] `open` in text mode without explicit `encoding` argument
+error[PLW1514]: 47:1: [*] `open` in text mode without explicit `encoding` argument
 
+  --> unspecified_encoding.py:46:18
    |
 46 | open("test.txt",)
 47 | open()
@@ -187,8 +196,9 @@ error[PLW1514]: unspecified_encoding.py:47:1: [*] `open` in text mode without ex
 49 49 |     "test.txt",  # comment
 50 50 | )
 
-error[PLW1514]: unspecified_encoding.py:48:1: [*] `open` in text mode without explicit `encoding` argument
+error[PLW1514]: 48:1: [*] `open` in text mode without explicit `encoding` argument
 
+  --> unspecified_encoding.py:47:7
    |
 46 | open("test.txt",)
 47 | open()
@@ -208,8 +218,9 @@ error[PLW1514]: unspecified_encoding.py:48:1: [*] `open` in text mode without ex
 51 51 | open(
 52 52 |     "test.txt",
 
-error[PLW1514]: unspecified_encoding.py:51:1: [*] `open` in text mode without explicit `encoding` argument
+error[PLW1514]: 51:1: [*] `open` in text mode without explicit `encoding` argument
 
+  --> unspecified_encoding.py:50:2
    |
 49 |     "test.txt",  # comment
 50 | )
@@ -229,8 +240,9 @@ error[PLW1514]: unspecified_encoding.py:51:1: [*] `open` in text mode without ex
 54 54 | )
 55 55 | open(("test.txt"),)
 
-error[PLW1514]: unspecified_encoding.py:55:1: [*] `open` in text mode without explicit `encoding` argument
+error[PLW1514]: 55:1: [*] `open` in text mode without explicit `encoding` argument
 
+  --> unspecified_encoding.py:54:2
    |
 53 |     # comment
 54 | )
@@ -250,8 +262,9 @@ error[PLW1514]: unspecified_encoding.py:55:1: [*] `open` in text mode without ex
 57 57 |     ("test.txt"),  # comment
 58 58 | )
 
-error[PLW1514]: unspecified_encoding.py:56:1: [*] `open` in text mode without explicit `encoding` argument
+error[PLW1514]: 56:1: [*] `open` in text mode without explicit `encoding` argument
 
+  --> unspecified_encoding.py:55:20
    |
 54 | )
 55 | open(("test.txt"),)
@@ -271,8 +284,9 @@ error[PLW1514]: unspecified_encoding.py:56:1: [*] `open` in text mode without ex
 59 59 | open(
 60 60 |     ("test.txt"),
 
-error[PLW1514]: unspecified_encoding.py:59:1: [*] `open` in text mode without explicit `encoding` argument
+error[PLW1514]: 59:1: [*] `open` in text mode without explicit `encoding` argument
 
+  --> unspecified_encoding.py:58:2
    |
 57 |     ("test.txt"),  # comment
 58 | )
@@ -292,8 +306,9 @@ error[PLW1514]: unspecified_encoding.py:59:1: [*] `open` in text mode without ex
 62 62 | )
 63 63 | 
 
-error[PLW1514]: unspecified_encoding.py:64:1: [*] `open` in text mode without explicit `encoding` argument
+error[PLW1514]: 64:1: [*] `open` in text mode without explicit `encoding` argument
 
+  --> unspecified_encoding.py:63:1
    |
 62 | )
 63 | 
@@ -313,8 +328,9 @@ error[PLW1514]: unspecified_encoding.py:64:1: [*] `open` in text mode without ex
 66 66 |     (("test.txt")),  # comment
 67 67 | )
 
-error[PLW1514]: unspecified_encoding.py:65:1: [*] `open` in text mode without explicit `encoding` argument
+error[PLW1514]: 65:1: [*] `open` in text mode without explicit `encoding` argument
 
+  --> unspecified_encoding.py:64:22
    |
 64 | open((("test.txt")),)
 65 | open(
@@ -333,8 +349,9 @@ error[PLW1514]: unspecified_encoding.py:65:1: [*] `open` in text mode without ex
 68 68 | open(
 69 69 |     (("test.txt")),
 
-error[PLW1514]: unspecified_encoding.py:68:1: [*] `open` in text mode without explicit `encoding` argument
+error[PLW1514]: 68:1: [*] `open` in text mode without explicit `encoding` argument
 
+  --> unspecified_encoding.py:67:2
    |
 66 |     (("test.txt")),  # comment
 67 | )
@@ -354,8 +371,9 @@ error[PLW1514]: unspecified_encoding.py:68:1: [*] `open` in text mode without ex
 71 71 | )
 72 72 | 
 
-error[PLW1514]: unspecified_encoding.py:77:1: [*] `pathlib.Path(...).open` in text mode without explicit `encoding` argument
+error[PLW1514]: 77:1: [*] `pathlib.Path(...).open` in text mode without explicit `encoding` argument
 
+  --> unspecified_encoding.py:76:10
    |
 76 | # Errors.
 77 | Path("foo.txt").open()
@@ -374,8 +392,9 @@ error[PLW1514]: unspecified_encoding.py:77:1: [*] `pathlib.Path(...).open` in te
 79 79 | text = Path("foo.txt").read_text()
 80 80 | Path("foo.txt").write_text(text)
 
-error[PLW1514]: unspecified_encoding.py:78:1: [*] `pathlib.Path(...).open` in text mode without explicit `encoding` argument
+error[PLW1514]: 78:1: [*] `pathlib.Path(...).open` in text mode without explicit `encoding` argument
 
+  --> unspecified_encoding.py:77:23
    |
 76 | # Errors.
 77 | Path("foo.txt").open()
@@ -395,8 +414,9 @@ error[PLW1514]: unspecified_encoding.py:78:1: [*] `pathlib.Path(...).open` in te
 80 80 | Path("foo.txt").write_text(text)
 81 81 | 
 
-error[PLW1514]: unspecified_encoding.py:79:8: [*] `pathlib.Path(...).read_text` without explicit `encoding` argument
+error[PLW1514]: 79:8: [*] `pathlib.Path(...).read_text` without explicit `encoding` argument
 
+  --> unspecified_encoding.py:79:8
    |
 77 | Path("foo.txt").open()
 78 | Path("foo.txt").open("w")
@@ -415,8 +435,9 @@ error[PLW1514]: unspecified_encoding.py:79:8: [*] `pathlib.Path(...).read_text` 
 81 81 | 
 82 82 | # Non-errors.
 
-error[PLW1514]: unspecified_encoding.py:80:1: [*] `pathlib.Path(...).write_text` without explicit `encoding` argument
+error[PLW1514]: 80:1: [*] `pathlib.Path(...).write_text` without explicit `encoding` argument
 
+  --> unspecified_encoding.py:79:35
    |
 78 | Path("foo.txt").open("w")
 79 | text = Path("foo.txt").read_text()

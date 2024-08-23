@@ -1,8 +1,9 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_2020/mod.rs
 ---
-error[YTT103]: YTT103.py:4:1: `sys.version` compared to string (python3.10), use `sys.version_info`
+error[YTT103]: 4:1: `sys.version` compared to string (python3.10), use `sys.version_info`
 
+ --> YTT103.py:3:1
   |
 2 | from sys import version
 3 | 
@@ -11,8 +12,9 @@ error[YTT103]: YTT103.py:4:1: `sys.version` compared to string (python3.10), use
 5 | sys.version < "3.5"
 6 | sys.version <= "3.5"
   |
-error[YTT103]: YTT103.py:5:1: `sys.version` compared to string (python3.10), use `sys.version_info`
+error[YTT103]: 5:1: `sys.version` compared to string (python3.10), use `sys.version_info`
 
+ --> YTT103.py:4:16
   |
 4 | version < "3.5"
 5 | sys.version < "3.5"
@@ -20,8 +22,9 @@ error[YTT103]: YTT103.py:5:1: `sys.version` compared to string (python3.10), use
 6 | sys.version <= "3.5"
 7 | sys.version > "3.5"
   |
-error[YTT103]: YTT103.py:6:1: `sys.version` compared to string (python3.10), use `sys.version_info`
+error[YTT103]: 6:1: `sys.version` compared to string (python3.10), use `sys.version_info`
 
+ --> YTT103.py:5:20
   |
 4 | version < "3.5"
 5 | sys.version < "3.5"
@@ -30,8 +33,9 @@ error[YTT103]: YTT103.py:6:1: `sys.version` compared to string (python3.10), use
 7 | sys.version > "3.5"
 8 | sys.version >= "3.5"
   |
-error[YTT103]: YTT103.py:7:1: `sys.version` compared to string (python3.10), use `sys.version_info`
+error[YTT103]: 7:1: `sys.version` compared to string (python3.10), use `sys.version_info`
 
+ --> YTT103.py:6:21
   |
 5 | sys.version < "3.5"
 6 | sys.version <= "3.5"
@@ -39,8 +43,9 @@ error[YTT103]: YTT103.py:7:1: `sys.version` compared to string (python3.10), use
   | ^^^^^^^^^^^
 8 | sys.version >= "3.5"
   |
-error[YTT103]: YTT103.py:8:1: `sys.version` compared to string (python3.10), use `sys.version_info`
+error[YTT103]: 8:1: `sys.version` compared to string (python3.10), use `sys.version_info`
 
+ --> YTT103.py:7:20
   |
 6 | sys.version <= "3.5"
 7 | sys.version > "3.5"

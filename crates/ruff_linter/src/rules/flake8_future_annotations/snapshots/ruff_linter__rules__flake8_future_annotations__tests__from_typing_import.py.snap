@@ -1,8 +1,9 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_future_annotations/mod.rs
 ---
-error[FA100]: from_typing_import.py:5:13: Add `from __future__ import annotations` to simplify `typing.List`
+error[FA100]: 5:13: Add `from __future__ import annotations` to simplify `typing.List`
 
+ --> from_typing_import.py:5:13
   |
 4 | def main() -> None:
 5 |     a_list: List[str] = []

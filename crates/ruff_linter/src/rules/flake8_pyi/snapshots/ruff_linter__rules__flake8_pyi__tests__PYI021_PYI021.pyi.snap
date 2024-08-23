@@ -1,16 +1,18 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_pyi/mod.rs
 ---
-error[PYI021]: PYI021.pyi:1:1: Docstrings should not be included in stubs
+error[PYI021]: 1:1: Docstrings should not be included in stubs
 
+ --> PYI021.pyi:1:1
   |
 1 | """foo"""  # ERROR PYI021
   | ^^^^^^^^^
 2 | 
 3 | def foo():
   |
-error[PYI021]: PYI021.pyi:4:5: Docstrings should not be included in stubs
+error[PYI021]: 4:5: Docstrings should not be included in stubs
 
+ --> PYI021.pyi:4:5
   |
 3 | def foo():
 4 |     """foo"""  # ERROR PYI021
@@ -18,8 +20,9 @@ error[PYI021]: PYI021.pyi:4:5: Docstrings should not be included in stubs
 5 | 
 6 | class Bar:
   |
-error[PYI021]: PYI021.pyi:7:5: Docstrings should not be included in stubs
+error[PYI021]: 7:5: Docstrings should not be included in stubs
 
+ --> PYI021.pyi:7:5
   |
 6 | class Bar:
 7 |     """bar"""  # ERROR PYI021

@@ -1,8 +1,9 @@
 ---
 source: crates/ruff_linter/src/rules/pydocstyle/mod.rs
 ---
-error[D209]: D.py:281:5: [*] Multi-line docstring closing quotes should be on a separate line
+error[D209]: 281:5: [*] Multi-line docstring closing quotes should be on a separate line
 
+   --> D.py:281:5
     |
 279 |   @expect('D213: Multi-line docstring summary should start at the second line')
 280 |   def asdfljdf24():
@@ -24,8 +25,9 @@ error[D209]: D.py:281:5: [*] Multi-line docstring closing quotes should be on a 
 285 286 | 
 286 287 | @expect('D210: No whitespaces allowed surrounding docstring text')
 
-error[D209]: D.py:588:5: [*] Multi-line docstring closing quotes should be on a separate line
+error[D209]: 588:5: [*] Multi-line docstring closing quotes should be on a separate line
 
+   --> D.py:588:5
     |
 586 |   @expect('D213: Multi-line docstring summary should start at the second line')
 587 |   def asdfljdjgf24():

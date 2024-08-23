@@ -1,8 +1,9 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_bugbear/mod.rs
 ---
-error[B030]: B030.py:12:8: `except` handlers should only be exception classes or tuples of exception classes
+error[B030]: 12:8: `except` handlers should only be exception classes or tuples of exception classes
 
+  --> B030.py:12:8
    |
 10 | try:
 11 |     pass
@@ -10,8 +11,9 @@ error[B030]: B030.py:12:8: `except` handlers should only be exception classes or
    |        ^
 13 |     pass
    |
-error[B030]: B030.py:17:9: `except` handlers should only be exception classes or tuples of exception classes
+error[B030]: 17:9: `except` handlers should only be exception classes or tuples of exception classes
 
+  --> B030.py:17:9
    |
 15 | try:
 16 |     pass
@@ -19,8 +21,9 @@ error[B030]: B030.py:17:9: `except` handlers should only be exception classes or
    |         ^
 18 |     pass
    |
-error[B030]: B030.py:22:21: `except` handlers should only be exception classes or tuples of exception classes
+error[B030]: 22:21: `except` handlers should only be exception classes or tuples of exception classes
 
+  --> B030.py:22:21
    |
 20 | try:
 21 |     pass
@@ -28,8 +31,9 @@ error[B030]: B030.py:22:21: `except` handlers should only be exception classes o
    |                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 23 |     pass
    |
-error[B030]: B030.py:27:37: `except` handlers should only be exception classes or tuples of exception classes
+error[B030]: 27:37: `except` handlers should only be exception classes or tuples of exception classes
 
+  --> B030.py:27:37
    |
 25 | try:
 26 |     pass
@@ -37,8 +41,9 @@ error[B030]: B030.py:27:37: `except` handlers should only be exception classes o
    |                                     ^^^^^^^^^^^^^^^^^^^^^
 28 |     pass
    |
-error[B030]: B030.py:33:29: `except` handlers should only be exception classes or tuples of exception classes
+error[B030]: 33:29: `except` handlers should only be exception classes or tuples of exception classes
 
+  --> B030.py:33:29
    |
 31 | try:
 32 |     pass
@@ -46,8 +51,9 @@ error[B030]: B030.py:33:29: `except` handlers should only be exception classes o
    |                             ^^^^^^^^^^^^^^^^^^^^^
 34 |     pass
    |
-error[B030]: B030.py:39:28: `except` handlers should only be exception classes or tuples of exception classes
+error[B030]: 39:28: `except` handlers should only be exception classes or tuples of exception classes
 
+  --> B030.py:39:28
    |
 37 | try:
 38 |     pass
@@ -55,8 +61,9 @@ error[B030]: B030.py:39:28: `except` handlers should only be exception classes o
    |                            ^^^^^^^^^^^^^^^^^^^^^
 40 |     pass
    |
-error[B030]: B030.py:131:8: `except` handlers should only be exception classes or tuples of exception classes
+error[B030]: 131:8: `except` handlers should only be exception classes or tuples of exception classes
 
+   --> B030.py:131:8
     |
 129 | try:
 130 |     pass

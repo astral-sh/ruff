@@ -1,8 +1,9 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_quotes/mod.rs
 ---
-error[Q002]: docstring_singles_mixed_quotes_class_var_1.py:2:5: Single quote docstring found but double quotes preferred
+error[Q002]: 2:5: Single quote docstring found but double quotes preferred
 
+ --> docstring_singles_mixed_quotes_class_var_1.py:2:5
   |
 1 | class SingleLineDocstrings():
 2 |     ''"Start with empty string" ' and lint docstring safely'
@@ -10,8 +11,9 @@ error[Q002]: docstring_singles_mixed_quotes_class_var_1.py:2:5: Single quote doc
 3 |     ''' Not a docstring '''
   |
   = help: Replace single quotes docstring with double quotes
-error[Q002]: docstring_singles_mixed_quotes_class_var_1.py:2:33: [*] Single quote docstring found but double quotes preferred
+error[Q002]: 2:33: [*] Single quote docstring found but double quotes preferred
 
+ --> docstring_singles_mixed_quotes_class_var_1.py:2:33
   |
 1 | class SingleLineDocstrings():
 2 |     ''"Start with empty string" ' and lint docstring safely'
@@ -27,8 +29,9 @@ error[Q002]: docstring_singles_mixed_quotes_class_var_1.py:2:33: [*] Single quot
 4 4 | 
 5 5 |     def foo(self, bar='''not a docstring'''):
 
-error[Q002]: docstring_singles_mixed_quotes_class_var_1.py:6:9: Single quote docstring found but double quotes preferred
+error[Q002]: 6:9: Single quote docstring found but double quotes preferred
 
+ --> docstring_singles_mixed_quotes_class_var_1.py:6:9
   |
 5 |     def foo(self, bar='''not a docstring'''):
 6 |         ''"Start with empty string" ' and lint docstring safely'
@@ -36,8 +39,9 @@ error[Q002]: docstring_singles_mixed_quotes_class_var_1.py:6:9: Single quote doc
 7 |         pass
   |
   = help: Replace single quotes docstring with double quotes
-error[Q002]: docstring_singles_mixed_quotes_class_var_1.py:6:37: [*] Single quote docstring found but double quotes preferred
+error[Q002]: 6:37: [*] Single quote docstring found but double quotes preferred
 
+ --> docstring_singles_mixed_quotes_class_var_1.py:6:37
   |
 5 |     def foo(self, bar='''not a docstring'''):
 6 |         ''"Start with empty string" ' and lint docstring safely'
@@ -55,8 +59,9 @@ error[Q002]: docstring_singles_mixed_quotes_class_var_1.py:6:37: [*] Single quot
 8 8 | 
 9 9 |     class Nested(foo()[:]): ''"Start with empty string" ' and lint docstring safely'; pass
 
-error[Q002]: docstring_singles_mixed_quotes_class_var_1.py:9:29: Single quote docstring found but double quotes preferred
+error[Q002]: 9:29: Single quote docstring found but double quotes preferred
 
+ --> docstring_singles_mixed_quotes_class_var_1.py:9:29
   |
 7 |         pass
 8 | 
@@ -64,8 +69,9 @@ error[Q002]: docstring_singles_mixed_quotes_class_var_1.py:9:29: Single quote do
   |                             ^^
   |
   = help: Replace single quotes docstring with double quotes
-error[Q002]: docstring_singles_mixed_quotes_class_var_1.py:9:57: [*] Single quote docstring found but double quotes preferred
+error[Q002]: 9:57: [*] Single quote docstring found but double quotes preferred
 
+ --> docstring_singles_mixed_quotes_class_var_1.py:9:57
   |
 7 |         pass
 8 | 

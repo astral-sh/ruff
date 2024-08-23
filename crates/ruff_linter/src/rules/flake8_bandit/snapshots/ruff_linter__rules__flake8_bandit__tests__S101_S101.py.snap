@@ -1,14 +1,16 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_bandit/mod.rs
 ---
-error[S101]: S101.py:1:1: Use of `assert` detected
+error[S101]: 1:1: Use of `assert` detected
 
+ --> S101.py:1:1
   |
 1 | assert True  # S101
   | ^^^^^^
   |
-error[S101]: S101.py:6:5: Use of `assert` detected
+error[S101]: 6:5: Use of `assert` detected
 
+ --> S101.py:6:5
   |
 4 | def fn():
 5 |     x = 1
@@ -16,8 +18,9 @@ error[S101]: S101.py:6:5: Use of `assert` detected
   |     ^^^^^^
 7 |     assert x == 2  # S101
   |
-error[S101]: S101.py:7:5: Use of `assert` detected
+error[S101]: 7:5: Use of `assert` detected
 
+ --> S101.py:7:5
   |
 5 |     x = 1
 6 |     assert x == 1  # S101

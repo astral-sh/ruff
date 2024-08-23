@@ -1,8 +1,9 @@
 ---
 source: crates/ruff_linter/src/rules/pycodestyle/mod.rs
 ---
-error[E702]: E70.py:6:10: Multiple statements on one line (semicolon)
+error[E702]: 6:10: Multiple statements on one line (semicolon)
 
+ --> E70.py:6:10
   |
 4 | if not header or header[:6] != 'bytes=': return
 5 | #: E702:1:10
@@ -11,8 +12,9 @@ error[E702]: E70.py:6:10: Multiple statements on one line (semicolon)
 7 | #: E702:1:17
 8 | import bdist_egg; bdist_egg.write_safety_flag(cmd.egg_info, safe)
   |
-error[E702]: E70.py:8:17: Multiple statements on one line (semicolon)
+error[E702]: 8:17: Multiple statements on one line (semicolon)
 
+  --> E70.py:8:17
    |
  6 | a = False; b = True
  7 | #: E702:1:17
@@ -21,8 +23,9 @@ error[E702]: E70.py:8:17: Multiple statements on one line (semicolon)
  9 | #: E703:1:13
 10 | import shlex;
    |
-error[E702]: E70.py:12:9: Multiple statements on one line (semicolon)
+error[E702]: 12:9: Multiple statements on one line (semicolon)
 
+  --> E70.py:12:9
    |
 10 | import shlex;
 11 | #: E702:1:9 E703:1:23
@@ -31,8 +34,9 @@ error[E702]: E70.py:12:9: Multiple statements on one line (semicolon)
 13 | #: E704:1:1
 14 | def f(x): return 2
    |
-error[E702]: E70.py:25:11: Multiple statements on one line (semicolon)
+error[E702]: 25:11: Multiple statements on one line (semicolon)
 
+  --> E70.py:25:11
    |
 23 |     def f(x): return 2*x
 24 | #: E704:1:8 E702:1:11 E703:1:14
@@ -41,8 +45,9 @@ error[E702]: E70.py:25:11: Multiple statements on one line (semicolon)
 26 | #: E701:1:8
 27 | if True: lambda a: b
    |
-error[E702]: E70.py:54:13: Multiple statements on one line (semicolon)
+error[E702]: 54:13: Multiple statements on one line (semicolon)
 
+  --> E70.py:54:13
    |
 52 | def f(): ...
 53 | #: E701:1:8 E702:1:13
@@ -51,8 +56,9 @@ error[E702]: E70.py:54:13: Multiple statements on one line (semicolon)
 55 | #: E701:1:8 E702:1:13
 56 | class C: ...; ...
    |
-error[E702]: E70.py:56:13: Multiple statements on one line (semicolon)
+error[E702]: 56:13: Multiple statements on one line (semicolon)
 
+  --> E70.py:56:13
    |
 54 | class C: ...; x = 1
 55 | #: E701:1:8 E702:1:13
@@ -61,8 +67,9 @@ error[E702]: E70.py:56:13: Multiple statements on one line (semicolon)
 57 | #: E701:2:12
 58 | match *0, 1, *2:
    |
-error[E702]: E70.py:65:4: Multiple statements on one line (semicolon)
+error[E702]: 65:4: Multiple statements on one line (semicolon)
 
+  --> E70.py:65:4
    |
 63 | #: E702:2:4
 64 | while 1:

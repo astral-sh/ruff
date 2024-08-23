@@ -1,22 +1,25 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_pyi/mod.rs
 ---
-error[PYI046]: PYI046.pyi:5:7: Private protocol `_Foo` is never used
+error[PYI046]: 5:7: Private protocol `_Foo` is never used
 
+ --> PYI046.pyi:5:7
   |
 5 | class _Foo(object, Protocol):
   |       ^^^^
 6 |     bar: int
   |
-error[PYI046]: PYI046.pyi:9:7: Private protocol `_Bar` is never used
+error[PYI046]: 9:7: Private protocol `_Bar` is never used
 
+  --> PYI046.pyi:9:7
    |
  9 | class _Bar(typing.Protocol):
    |       ^^^^
 10 |     bar: int
    |
-error[PYI046]: PYI046.pyi:16:7: Private protocol `_Baz` is never used
+error[PYI046]: 16:7: Private protocol `_Baz` is never used
 
+  --> PYI046.pyi:16:7
    |
 16 | class _Baz(Protocol[_T]):
    |       ^^^^

@@ -1,8 +1,9 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_quotes/mod.rs
 ---
-error[Q001]: docstring_singles.py:5:1: [*] Single quote multiline found but double quotes preferred
+error[Q001]: 5:1: [*] Single quote multiline found but double quotes preferred
 
+ --> docstring_singles.py:4:1
   |
 3 |   '''
 4 |   
@@ -27,8 +28,9 @@ error[Q001]: docstring_singles.py:5:1: [*] Single quote multiline found but doub
 9 9 | l = []
 10 10 | 
 
-error[Q001]: docstring_singles.py:11:21: [*] Single quote multiline found but double quotes preferred
+error[Q001]: 11:21: [*] Single quote multiline found but double quotes preferred
 
+  --> docstring_singles.py:11:21
    |
  9 |   l = []
 10 |   
@@ -54,8 +56,9 @@ error[Q001]: docstring_singles.py:11:21: [*] Single quote multiline found but do
 15 15 |     Single quotes multiline class docstring
 16 16 |     '''
 
-error[Q001]: docstring_singles.py:18:5: [*] Single quote multiline found but double quotes preferred
+error[Q001]: 18:5: [*] Single quote multiline found but double quotes preferred
 
+  --> docstring_singles.py:18:5
    |
 16 |       '''
 17 |   
@@ -81,8 +84,9 @@ error[Q001]: docstring_singles.py:18:5: [*] Single quote multiline found but dou
 22 22 |     # The colon in the list indexing below is an edge case for the docstring scanner
 23 23 |     def f(self, bar='''
 
-error[Q001]: docstring_singles.py:23:21: [*] Single quote multiline found but double quotes preferred
+error[Q001]: 23:21: [*] Single quote multiline found but double quotes preferred
 
+  --> docstring_singles.py:23:21
    |
 22 |       # The colon in the list indexing below is an edge case for the docstring scanner
 23 |       def f(self, bar='''
@@ -105,8 +109,9 @@ error[Q001]: docstring_singles.py:23:21: [*] Single quote multiline found but do
 26 26 |         '''
 27 27 |         Single quotes multiline function docstring
 
-error[Q001]: docstring_singles.py:32:9: [*] Single quote multiline found but double quotes preferred
+error[Q001]: 32:9: [*] Single quote multiline found but double quotes preferred
 
+  --> docstring_singles.py:32:9
    |
 30 |           some_expression = 'hello world'
 31 |   
@@ -132,8 +137,9 @@ error[Q001]: docstring_singles.py:32:9: [*] Single quote multiline found but dou
 36 36 |         if l:
 37 37 |             '''
 
-error[Q001]: docstring_singles.py:37:13: [*] Single quote multiline found but double quotes preferred
+error[Q001]: 37:13: [*] Single quote multiline found but double quotes preferred
 
+  --> docstring_singles.py:37:13
    |
 36 |           if l:
 37 |               '''

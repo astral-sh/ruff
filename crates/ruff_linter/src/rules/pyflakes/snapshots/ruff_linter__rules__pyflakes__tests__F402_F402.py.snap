@@ -1,15 +1,17 @@
 ---
 source: crates/ruff_linter/src/rules/pyflakes/mod.rs
 ---
-error[F402]: F402.py:5:5: Import `os` from line 1 shadowed by loop variable
+error[F402]: 5:5: Import `os` from line 1 shadowed by loop variable
 
+ --> F402.py:5:5
   |
 5 | for os in range(3):
   |     ^^
 6 |     pass
   |
-error[F402]: F402.py:8:5: Import `path` from line 2 shadowed by loop variable
+error[F402]: 8:5: Import `path` from line 2 shadowed by loop variable
 
+ --> F402.py:8:5
   |
 6 |     pass
 7 | 

@@ -1,8 +1,9 @@
 ---
 source: crates/ruff_linter/src/rules/pycodestyle/mod.rs
 ---
-error[E703]: E703.ipynb:5:2: [*] Statement ends with an unnecessary semicolon
+error[E703]: 5:2: [*] Statement ends with an unnecessary semicolon
 
+ --> E703.ipynb:5:2
   |
 3 | x;
 4 | # Only skip the last expression
@@ -22,8 +23,9 @@ error[E703]: E703.ipynb:5:2: [*] Statement ends with an unnecessary semicolon
 7 7 | # Nested expressions isn't relevant
 8 8 | if True:
 
-error[E703]: E703.ipynb:9:6: [*] Statement ends with an unnecessary semicolon
+error[E703]: 9:6: [*] Statement ends with an unnecessary semicolon
 
+  --> E703.ipynb:9:6
    |
  7 | # Nested expressions isn't relevant
  8 | if True:

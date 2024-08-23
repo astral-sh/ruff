@@ -1,8 +1,9 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_use_pathlib/mod.rs
 ---
-error[PTH201]: PTH201.py:5:10: [*] Do not pass the current directory explicitly to `Path`
+error[PTH201]: 5:10: [*] Do not pass the current directory explicitly to `Path`
 
+ --> PTH201.py:5:10
   |
 4 | # match
 5 | _ = Path(".")
@@ -21,8 +22,9 @@ error[PTH201]: PTH201.py:5:10: [*] Do not pass the current directory explicitly 
 7 7 | _ = PurePath(".")
 8 8 | _ = Path("")
 
-error[PTH201]: PTH201.py:6:9: [*] Do not pass the current directory explicitly to `Path`
+error[PTH201]: 6:9: [*] Do not pass the current directory explicitly to `Path`
 
+ --> PTH201.py:6:9
   |
 4 | # match
 5 | _ = Path(".")
@@ -42,8 +44,9 @@ error[PTH201]: PTH201.py:6:9: [*] Do not pass the current directory explicitly t
 8 8 | _ = Path("")
 9 9 | 
 
-error[PTH201]: PTH201.py:7:14: [*] Do not pass the current directory explicitly to `Path`
+error[PTH201]: 7:14: [*] Do not pass the current directory explicitly to `Path`
 
+ --> PTH201.py:7:14
   |
 5 | _ = Path(".")
 6 | _ = pth(".")
@@ -62,8 +65,9 @@ error[PTH201]: PTH201.py:7:14: [*] Do not pass the current directory explicitly 
 9 9 | 
 10 10 | # no match
 
-error[PTH201]: PTH201.py:8:10: [*] Do not pass the current directory explicitly to `Path`
+error[PTH201]: 8:10: [*] Do not pass the current directory explicitly to `Path`
 
+  --> PTH201.py:8:10
    |
  6 | _ = pth(".")
  7 | _ = PurePath(".")

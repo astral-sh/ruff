@@ -1,8 +1,9 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_comprehensions/mod.rs
 ---
-error[C404]: C404.py:1:1: [*] Unnecessary `list` comprehension (rewrite as a `dict` comprehension)
+error[C404]: 1:1: [*] Unnecessary `list` comprehension (rewrite as a `dict` comprehension)
 
+ --> C404.py:1:1
   |
 1 | dict([(i, i) for i in range(3)])
   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -16,8 +17,9 @@ error[C404]: C404.py:1:1: [*] Unnecessary `list` comprehension (rewrite as a `di
 3 3 | 
 4 4 | def f(x):
 
-error[C404]: C404.py:7:4: [*] Unnecessary `list` comprehension (rewrite as a `dict` comprehension)
+error[C404]: 7:4: [*] Unnecessary `list` comprehension (rewrite as a `dict` comprehension)
 
+ --> C404.py:7:4
   |
 5 |     return x
 6 | 
@@ -37,8 +39,9 @@ error[C404]: C404.py:7:4: [*] Unnecessary `list` comprehension (rewrite as a `di
 9 9 | f"{dict([(s, s) for s in 'ab'])}"
 10 10 | f"{dict([(s,f(s)) for s in 'ab'])}"
 
-error[C404]: C404.py:8:4: [*] Unnecessary `list` comprehension (rewrite as a `dict` comprehension)
+error[C404]: 8:4: [*] Unnecessary `list` comprehension (rewrite as a `dict` comprehension)
 
+  --> C404.py:8:4
    |
  7 | f'{dict([(s,s) for s in "ab"])}'
  8 | f"{dict([(s,s) for s in 'ab'])}"
@@ -57,8 +60,9 @@ error[C404]: C404.py:8:4: [*] Unnecessary `list` comprehension (rewrite as a `di
 10 10 | f"{dict([(s,f(s)) for s in 'ab'])}"
 11 11 | 
 
-error[C404]: C404.py:9:4: [*] Unnecessary `list` comprehension (rewrite as a `dict` comprehension)
+error[C404]: 9:4: [*] Unnecessary `list` comprehension (rewrite as a `dict` comprehension)
 
+  --> C404.py:9:4
    |
  7 | f'{dict([(s,s) for s in "ab"])}'
  8 | f"{dict([(s,s) for s in 'ab'])}"
@@ -77,8 +81,9 @@ error[C404]: C404.py:9:4: [*] Unnecessary `list` comprehension (rewrite as a `di
 11 11 | 
 12 12 | f'{dict([(s,s) for s in "ab"]) | dict([(s,s) for s in "ab"])}'
 
-error[C404]: C404.py:10:4: [*] Unnecessary `list` comprehension (rewrite as a `dict` comprehension)
+error[C404]: 10:4: [*] Unnecessary `list` comprehension (rewrite as a `dict` comprehension)
 
+  --> C404.py:10:4
    |
  8 | f"{dict([(s,s) for s in 'ab'])}"
  9 | f"{dict([(s, s) for s in 'ab'])}"
@@ -98,8 +103,9 @@ error[C404]: C404.py:10:4: [*] Unnecessary `list` comprehension (rewrite as a `d
 12 12 | f'{dict([(s,s) for s in "ab"]) | dict([(s,s) for s in "ab"])}'
 13 13 | f'{ dict([(s,s) for s in "ab"]) | dict([(s,s) for s in "ab"]) }'
 
-error[C404]: C404.py:12:4: [*] Unnecessary `list` comprehension (rewrite as a `dict` comprehension)
+error[C404]: 12:4: [*] Unnecessary `list` comprehension (rewrite as a `dict` comprehension)
 
+  --> C404.py:12:4
    |
 10 | f"{dict([(s,f(s)) for s in 'ab'])}"
 11 | 
@@ -118,8 +124,9 @@ error[C404]: C404.py:12:4: [*] Unnecessary `list` comprehension (rewrite as a `d
 14 14 | 
 15 15 | # Regression test for: https://github.com/astral-sh/ruff/issues/7087
 
-error[C404]: C404.py:12:34: [*] Unnecessary `list` comprehension (rewrite as a `dict` comprehension)
+error[C404]: 12:34: [*] Unnecessary `list` comprehension (rewrite as a `dict` comprehension)
 
+  --> C404.py:12:34
    |
 10 | f"{dict([(s,f(s)) for s in 'ab'])}"
 11 | 
@@ -138,8 +145,9 @@ error[C404]: C404.py:12:34: [*] Unnecessary `list` comprehension (rewrite as a `
 14 14 | 
 15 15 | # Regression test for: https://github.com/astral-sh/ruff/issues/7087
 
-error[C404]: C404.py:13:5: [*] Unnecessary `list` comprehension (rewrite as a `dict` comprehension)
+error[C404]: 13:5: [*] Unnecessary `list` comprehension (rewrite as a `dict` comprehension)
 
+  --> C404.py:13:5
    |
 12 | f'{dict([(s,s) for s in "ab"]) | dict([(s,s) for s in "ab"])}'
 13 | f'{ dict([(s,s) for s in "ab"]) | dict([(s,s) for s in "ab"]) }'
@@ -158,8 +166,9 @@ error[C404]: C404.py:13:5: [*] Unnecessary `list` comprehension (rewrite as a `d
 15 15 | # Regression test for: https://github.com/astral-sh/ruff/issues/7087
 16 16 | saved.append(dict([(k, v)for k,v in list(unique_instance.__dict__.items()) if k in [f.name for f in unique_instance._meta.fields]]))
 
-error[C404]: C404.py:13:35: [*] Unnecessary `list` comprehension (rewrite as a `dict` comprehension)
+error[C404]: 13:35: [*] Unnecessary `list` comprehension (rewrite as a `dict` comprehension)
 
+  --> C404.py:13:35
    |
 12 | f'{dict([(s,s) for s in "ab"]) | dict([(s,s) for s in "ab"])}'
 13 | f'{ dict([(s,s) for s in "ab"]) | dict([(s,s) for s in "ab"]) }'
@@ -178,8 +187,9 @@ error[C404]: C404.py:13:35: [*] Unnecessary `list` comprehension (rewrite as a `
 15 15 | # Regression test for: https://github.com/astral-sh/ruff/issues/7087
 16 16 | saved.append(dict([(k, v)for k,v in list(unique_instance.__dict__.items()) if k in [f.name for f in unique_instance._meta.fields]]))
 
-error[C404]: C404.py:16:14: [*] Unnecessary `list` comprehension (rewrite as a `dict` comprehension)
+error[C404]: 16:14: [*] Unnecessary `list` comprehension (rewrite as a `dict` comprehension)
 
+  --> C404.py:16:14
    |
 15 | # Regression test for: https://github.com/astral-sh/ruff/issues/7087
 16 | saved.append(dict([(k, v)for k,v in list(unique_instance.__dict__.items()) if k in [f.name for f in unique_instance._meta.fields]]))

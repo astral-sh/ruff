@@ -1,8 +1,9 @@
 ---
 source: crates/ruff_linter/src/rules/pylint/mod.rs
 ---
-error[PLE0118]: load_before_global_declaration.py:5:11: Name `x` is used prior to global declaration on line 7
+error[PLE0118]: 5:11: Name `x` is used prior to global declaration on line 7
 
+ --> load_before_global_declaration.py:5:11
   |
 3 | ###
 4 | def f():
@@ -11,8 +12,9 @@ error[PLE0118]: load_before_global_declaration.py:5:11: Name `x` is used prior t
 6 | 
 7 |     global x
   |
-error[PLE0118]: load_before_global_declaration.py:15:11: Name `x` is used prior to global declaration on line 17
+error[PLE0118]: 15:11: Name `x` is used prior to global declaration on line 17
 
+  --> load_before_global_declaration.py:15:11
    |
 13 |     global x
 14 | 
@@ -21,8 +23,9 @@ error[PLE0118]: load_before_global_declaration.py:15:11: Name `x` is used prior 
 16 | 
 17 |     global x
    |
-error[PLE0118]: load_before_global_declaration.py:23:11: Name `x` is used prior to global declaration on line 25
+error[PLE0118]: 23:11: Name `x` is used prior to global declaration on line 25
 
+  --> load_before_global_declaration.py:23:11
    |
 22 | def f():
 23 |     print(x)
@@ -30,8 +33,9 @@ error[PLE0118]: load_before_global_declaration.py:23:11: Name `x` is used prior 
 24 | 
 25 |     global x, y
    |
-error[PLE0118]: load_before_global_declaration.py:33:11: Name `x` is used prior to global declaration on line 35
+error[PLE0118]: 33:11: Name `x` is used prior to global declaration on line 35
 
+  --> load_before_global_declaration.py:33:11
    |
 31 |     global x, y
 32 | 
@@ -40,8 +44,9 @@ error[PLE0118]: load_before_global_declaration.py:33:11: Name `x` is used prior 
 34 | 
 35 |     global x, y
    |
-error[PLE0118]: load_before_global_declaration.py:41:5: Name `x` is used prior to global declaration on line 43
+error[PLE0118]: 41:5: Name `x` is used prior to global declaration on line 43
 
+  --> load_before_global_declaration.py:41:5
    |
 40 | def f():
 41 |     x = 1
@@ -49,8 +54,9 @@ error[PLE0118]: load_before_global_declaration.py:41:5: Name `x` is used prior t
 42 | 
 43 |     global x
    |
-error[PLE0118]: load_before_global_declaration.py:51:5: Name `x` is used prior to global declaration on line 53
+error[PLE0118]: 51:5: Name `x` is used prior to global declaration on line 53
 
+  --> load_before_global_declaration.py:51:5
    |
 49 |     global x
 50 | 
@@ -59,8 +65,9 @@ error[PLE0118]: load_before_global_declaration.py:51:5: Name `x` is used prior t
 52 | 
 53 |     global x
    |
-error[PLE0118]: load_before_global_declaration.py:59:9: Name `x` is used prior to global declaration on line 61
+error[PLE0118]: 59:9: Name `x` is used prior to global declaration on line 61
 
+  --> load_before_global_declaration.py:59:9
    |
 58 | def f():
 59 |     del x
@@ -68,8 +75,9 @@ error[PLE0118]: load_before_global_declaration.py:59:9: Name `x` is used prior t
 60 | 
 61 |     global x, y
    |
-error[PLE0118]: load_before_global_declaration.py:69:9: Name `x` is used prior to global declaration on line 71
+error[PLE0118]: 69:9: Name `x` is used prior to global declaration on line 71
 
+  --> load_before_global_declaration.py:69:9
    |
 67 |     global x, y
 68 | 
@@ -78,8 +86,9 @@ error[PLE0118]: load_before_global_declaration.py:69:9: Name `x` is used prior t
 70 | 
 71 |     global x, y
    |
-error[PLE0118]: load_before_global_declaration.py:77:9: Name `x` is used prior to global declaration on line 79
+error[PLE0118]: 77:9: Name `x` is used prior to global declaration on line 79
 
+  --> load_before_global_declaration.py:77:9
    |
 76 | def f():
 77 |     del x
@@ -87,8 +96,9 @@ error[PLE0118]: load_before_global_declaration.py:77:9: Name `x` is used prior t
 78 | 
 79 |     global x
    |
-error[PLE0118]: load_before_global_declaration.py:87:9: Name `x` is used prior to global declaration on line 89
+error[PLE0118]: 87:9: Name `x` is used prior to global declaration on line 89
 
+  --> load_before_global_declaration.py:87:9
    |
 85 |     global x
 86 | 
@@ -97,8 +107,9 @@ error[PLE0118]: load_before_global_declaration.py:87:9: Name `x` is used prior t
 88 | 
 89 |     global x
    |
-error[PLE0118]: load_before_global_declaration.py:95:9: Name `x` is used prior to global declaration on line 97
+error[PLE0118]: 95:9: Name `x` is used prior to global declaration on line 97
 
+  --> load_before_global_declaration.py:95:9
    |
 94 | def f():
 95 |     del x
@@ -106,8 +117,9 @@ error[PLE0118]: load_before_global_declaration.py:95:9: Name `x` is used prior t
 96 | 
 97 |     global x, y
    |
-error[PLE0118]: load_before_global_declaration.py:105:9: Name `x` is used prior to global declaration on line 107
+error[PLE0118]: 105:9: Name `x` is used prior to global declaration on line 107
 
+   --> load_before_global_declaration.py:105:9
     |
 103 |     global x, y
 104 | 
@@ -116,8 +128,9 @@ error[PLE0118]: load_before_global_declaration.py:105:9: Name `x` is used prior 
 106 | 
 107 |     global x, y
     |
-error[PLE0118]: load_before_global_declaration.py:113:14: Name `x` is used prior to global declaration on line 114
+error[PLE0118]: 113:14: Name `x` is used prior to global declaration on line 114
 
+   --> load_before_global_declaration.py:113:14
     |
 112 | def f():
 113 |     print(f"{x=}")

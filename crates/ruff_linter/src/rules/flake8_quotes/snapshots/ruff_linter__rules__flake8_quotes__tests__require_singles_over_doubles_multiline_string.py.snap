@@ -1,8 +1,9 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_quotes/mod.rs
 ---
-error[Q001]: doubles_multiline_string.py:1:5: [*] Double quote multiline found but single quotes preferred
+error[Q001]: 1:5: [*] Double quote multiline found but single quotes preferred
 
+ --> doubles_multiline_string.py:1:5
   |
 1 |   s = """ This "should"
   |  _____^

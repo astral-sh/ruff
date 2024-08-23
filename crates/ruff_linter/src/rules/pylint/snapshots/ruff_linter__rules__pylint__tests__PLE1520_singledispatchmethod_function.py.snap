@@ -1,8 +1,9 @@
 ---
 source: crates/ruff_linter/src/rules/pylint/mod.rs
 ---
-error[PLE1520]: singledispatchmethod_function.py:4:1: [*] `@singledispatchmethod` decorator should not be used on non-method functions
+error[PLE1520]: 4:1: [*] `@singledispatchmethod` decorator should not be used on non-method functions
 
+ --> singledispatchmethod_function.py:4:1
   |
 4 | @singledispatchmethod  # [singledispatchmethod-function]
   | ^^^^^^^^^^^^^^^^^^^^^

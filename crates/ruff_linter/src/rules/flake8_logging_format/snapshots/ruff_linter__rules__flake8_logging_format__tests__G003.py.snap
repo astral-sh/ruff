@@ -1,8 +1,9 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_logging_format/mod.rs
 ---
-error[G003]: G003.py:3:14: Logging statement uses `+`
+error[G003]: 3:14: Logging statement uses `+`
 
+ --> G003.py:3:14
   |
 1 | import logging
 2 | 
@@ -10,8 +11,9 @@ error[G003]: G003.py:3:14: Logging statement uses `+`
   |              ^^^^^^^^^^^^^^^^^^^^^^^^
 4 | logging.log(logging.INFO, "Hello" + " " + "World!")
   |
-error[G003]: G003.py:4:27: Logging statement uses `+`
+error[G003]: 4:27: Logging statement uses `+`
 
+ --> G003.py:4:27
   |
 3 | logging.info("Hello" + " " + "World!")
 4 | logging.log(logging.INFO, "Hello" + " " + "World!")
@@ -19,8 +21,9 @@ error[G003]: G003.py:4:27: Logging statement uses `+`
 5 | 
 6 | from logging import info, log
   |
-error[G003]: G003.py:8:6: Logging statement uses `+`
+error[G003]: 8:6: Logging statement uses `+`
 
+ --> G003.py:8:6
   |
 6 | from logging import info, log
 7 | 
@@ -28,8 +31,9 @@ error[G003]: G003.py:8:6: Logging statement uses `+`
   |      ^^^^^^^^^^^^^^^^^^^^^^^^
 9 | log(logging.INFO, "Hello" + " " + "World!")
   |
-error[G003]: G003.py:9:19: Logging statement uses `+`
+error[G003]: 9:19: Logging statement uses `+`
 
+ --> G003.py:9:19
   |
 8 | info("Hello" + " " + "World!")
 9 | log(logging.INFO, "Hello" + " " + "World!")

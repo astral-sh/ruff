@@ -1,13 +1,15 @@
 ---
 source: crates/ruff_linter/src/rules/isort/mod.rs
 ---
-error[I001]: combine_as_imports.py:1:1: [*] Import block is un-sorted or un-formatted
+error[I001]: 1:1: [*] Import block is un-sorted or un-formatted
 
+ --> combine_as_imports.py:1:1
   |
 1 | / from module import Class as C
 2 | | from module import CONSTANT
 3 | | from module import function
 4 | | from module import function as f
+  | |_________________________________^
   |
   = help: Organize imports
 ℹ Safe fix

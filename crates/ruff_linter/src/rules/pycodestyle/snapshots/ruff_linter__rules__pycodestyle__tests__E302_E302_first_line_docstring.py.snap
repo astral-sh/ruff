@@ -1,8 +1,9 @@
 ---
 source: crates/ruff_linter/src/rules/pycodestyle/mod.rs
 ---
-error[E302]: E302_first_line_docstring.py:3:1: [*] Expected 2 blank lines, found 1
+error[E302]: 3:1: [*] Expected 2 blank lines, found 1
 
+ --> E302_first_line_docstring.py:2:1
   |
 1 | """Test where the error is after the module's docstring."""
 2 | 

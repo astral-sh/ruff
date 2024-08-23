@@ -1,8 +1,9 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_use_pathlib/mod.rs
 ---
-error[PTH207]: PTH207.py:9:1: Replace `glob` with `Path.glob` or `Path.rglob`
+error[PTH207]: 9:1: Replace `glob` with `Path.glob` or `Path.rglob`
 
+  --> PTH207.py:8:9
    |
  8 | # PTH207
  9 | glob.glob(os.path.join(extensions_dir, "ops", "autograd", "*.cpp"))
@@ -10,8 +11,9 @@ error[PTH207]: PTH207.py:9:1: Replace `glob` with `Path.glob` or `Path.rglob`
 10 | list(glob.iglob(os.path.join(extensions_dir, "ops", "autograd", "*.cpp")))
 11 | search("*.png")
    |
-error[PTH207]: PTH207.py:10:6: Replace `iglob` with `Path.glob` or `Path.rglob`
+error[PTH207]: 10:6: Replace `iglob` with `Path.glob` or `Path.rglob`
 
+  --> PTH207.py:10:6
    |
  8 | # PTH207
  9 | glob.glob(os.path.join(extensions_dir, "ops", "autograd", "*.cpp"))
@@ -19,8 +21,9 @@ error[PTH207]: PTH207.py:10:6: Replace `iglob` with `Path.glob` or `Path.rglob`
    |      ^^^^^^^^^^
 11 | search("*.png")
    |
-error[PTH207]: PTH207.py:11:1: Replace `glob` with `Path.glob` or `Path.rglob`
+error[PTH207]: 11:1: Replace `glob` with `Path.glob` or `Path.rglob`
 
+  --> PTH207.py:10:75
    |
  9 | glob.glob(os.path.join(extensions_dir, "ops", "autograd", "*.cpp"))
 10 | list(glob.iglob(os.path.join(extensions_dir, "ops", "autograd", "*.cpp")))

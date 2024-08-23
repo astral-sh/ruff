@@ -1,24 +1,27 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_bugbear/mod.rs
 ---
-error[B012]: B012.py:5:9: `return` inside `finally` blocks cause exceptions to be silenced
+error[B012]: 5:9: `return` inside `finally` blocks cause exceptions to be silenced
 
+ --> B012.py:5:9
   |
 3 |         pass
 4 |     finally:
 5 |         return  # warning
   |         ^^^^^^
   |
-error[B012]: B012.py:13:13: `return` inside `finally` blocks cause exceptions to be silenced
+error[B012]: 13:13: `return` inside `finally` blocks cause exceptions to be silenced
 
+  --> B012.py:13:13
    |
 11 |     finally:
 12 |         if 1 + 0 == 2 - 1:
 13 |             return  # warning
    |             ^^^^^^
    |
-error[B012]: B012.py:21:13: `return` inside `finally` blocks cause exceptions to be silenced
+error[B012]: 21:13: `return` inside `finally` blocks cause exceptions to be silenced
 
+  --> B012.py:21:13
    |
 19 |     finally:
 20 |         try:
@@ -27,8 +30,9 @@ error[B012]: B012.py:21:13: `return` inside `finally` blocks cause exceptions to
 22 |         except Exception:
 23 |             pass
    |
-error[B012]: B012.py:31:13: `return` inside `finally` blocks cause exceptions to be silenced
+error[B012]: 31:13: `return` inside `finally` blocks cause exceptions to be silenced
 
+  --> B012.py:31:13
    |
 29 |             pass
 30 |         finally:
@@ -37,8 +41,9 @@ error[B012]: B012.py:31:13: `return` inside `finally` blocks cause exceptions to
 32 |     finally:
 33 |         pass
    |
-error[B012]: B012.py:44:21: `return` inside `finally` blocks cause exceptions to be silenced
+error[B012]: 44:21: `return` inside `finally` blocks cause exceptions to be silenced
 
+  --> B012.py:44:21
    |
 42 |                     pass
 43 |                 finally:
@@ -47,8 +52,9 @@ error[B012]: B012.py:44:21: `return` inside `finally` blocks cause exceptions to
 45 | 
 46 |         finally:
    |
-error[B012]: B012.py:66:13: `break` inside `finally` blocks cause exceptions to be silenced
+error[B012]: 66:13: `break` inside `finally` blocks cause exceptions to be silenced
 
+  --> B012.py:66:13
    |
 64 |             pass
 65 |         finally:
@@ -57,8 +63,9 @@ error[B012]: B012.py:66:13: `break` inside `finally` blocks cause exceptions to 
 67 | 
 68 |             def j():
    |
-error[B012]: B012.py:78:13: `continue` inside `finally` blocks cause exceptions to be silenced
+error[B012]: 78:13: `continue` inside `finally` blocks cause exceptions to be silenced
 
+  --> B012.py:78:13
    |
 76 |             pass
 77 |         finally:
@@ -67,16 +74,18 @@ error[B012]: B012.py:78:13: `continue` inside `finally` blocks cause exceptions 
 79 | 
 80 |             def j():
    |
-error[B012]: B012.py:94:13: `return` inside `finally` blocks cause exceptions to be silenced
+error[B012]: 94:13: `return` inside `finally` blocks cause exceptions to be silenced
 
+  --> B012.py:94:13
    |
 92 |             continue  # no warning
 93 |         while True:
 94 |             return  # warning
    |             ^^^^^^
    |
-error[B012]: B012.py:101:9: `continue` inside `finally` blocks cause exceptions to be silenced
+error[B012]: 101:9: `continue` inside `finally` blocks cause exceptions to be silenced
 
+   --> B012.py:101:9
     |
  99 |         pass
 100 |     finally:
@@ -85,16 +94,18 @@ error[B012]: B012.py:101:9: `continue` inside `finally` blocks cause exceptions 
 102 | 
 103 | while True:
     |
-error[B012]: B012.py:107:9: `break` inside `finally` blocks cause exceptions to be silenced
+error[B012]: 107:9: `break` inside `finally` blocks cause exceptions to be silenced
 
+   --> B012.py:107:9
     |
 105 |         pass
 106 |     finally:
 107 |         break  # warning
     |         ^^^^^
     |
-error[B012]: B012.py:118:17: `break` inside `finally` blocks cause exceptions to be silenced
+error[B012]: 118:17: `break` inside `finally` blocks cause exceptions to be silenced
 
+   --> B012.py:118:17
     |
 116 |                 y = 0
 117 |             case 0, *x:

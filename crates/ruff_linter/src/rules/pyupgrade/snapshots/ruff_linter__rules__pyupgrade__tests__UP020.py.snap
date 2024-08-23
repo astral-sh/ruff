@@ -1,8 +1,9 @@
 ---
 source: crates/ruff_linter/src/rules/pyupgrade/mod.rs
 ---
-error[UP020]: UP020.py:3:6: [*] Use builtin `open`
+error[UP020]: 3:6: [*] Use builtin `open`
 
+ --> UP020.py:3:6
   |
 1 | import io
 2 | 
@@ -20,8 +21,9 @@ error[UP020]: UP020.py:3:6: [*] Use builtin `open`
 5 5 | 
 6 6 | from io import open
 
-error[UP020]: UP020.py:8:6: [*] Use builtin `open`
+error[UP020]: 8:6: [*] Use builtin `open`
 
+ --> UP020.py:8:6
   |
 6 | from io import open
 7 | 

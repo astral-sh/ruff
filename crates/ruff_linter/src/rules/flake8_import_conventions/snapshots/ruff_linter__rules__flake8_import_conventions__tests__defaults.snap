@@ -1,8 +1,9 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_import_conventions/mod.rs
 ---
-error[ICN001]: defaults.py:6:12: [*] `altair` should be imported as `alt`
+error[ICN001]: 6:12: [*] `altair` should be imported as `alt`
 
+ --> defaults.py:6:12
   |
 5 | def unconventional():
 6 |     import altair
@@ -21,8 +22,9 @@ error[ICN001]: defaults.py:6:12: [*] `altair` should be imported as `alt`
 8 8 |     import numpy
 9 9 |     import pandas
 
-error[ICN001]: defaults.py:7:12: `matplotlib.pyplot` should be imported as `plt`
+error[ICN001]: 7:12: `matplotlib.pyplot` should be imported as `plt`
 
+ --> defaults.py:7:12
   |
 5 | def unconventional():
 6 |     import altair
@@ -32,8 +34,9 @@ error[ICN001]: defaults.py:7:12: `matplotlib.pyplot` should be imported as `plt`
 9 |     import pandas
   |
   = help: Alias `matplotlib.pyplot` to `plt`
-error[ICN001]: defaults.py:8:12: [*] `numpy` should be imported as `np`
+error[ICN001]: 8:12: [*] `numpy` should be imported as `np`
 
+  --> defaults.py:8:12
    |
  6 |     import altair
  7 |     import matplotlib.pyplot
@@ -53,8 +56,9 @@ error[ICN001]: defaults.py:8:12: [*] `numpy` should be imported as `np`
 10 10 |     import seaborn
 11 11 |     import tkinter
 
-error[ICN001]: defaults.py:9:12: [*] `pandas` should be imported as `pd`
+error[ICN001]: 9:12: [*] `pandas` should be imported as `pd`
 
+  --> defaults.py:9:12
    |
  7 |     import matplotlib.pyplot
  8 |     import numpy
@@ -74,8 +78,9 @@ error[ICN001]: defaults.py:9:12: [*] `pandas` should be imported as `pd`
 11 11 |     import tkinter
 12 12 |     import networkx
 
-error[ICN001]: defaults.py:10:12: [*] `seaborn` should be imported as `sns`
+error[ICN001]: 10:12: [*] `seaborn` should be imported as `sns`
 
+  --> defaults.py:10:12
    |
  8 |     import numpy
  9 |     import pandas
@@ -95,8 +100,9 @@ error[ICN001]: defaults.py:10:12: [*] `seaborn` should be imported as `sns`
 12 12 |     import networkx
 13 13 | 
 
-error[ICN001]: defaults.py:11:12: [*] `tkinter` should be imported as `tk`
+error[ICN001]: 11:12: [*] `tkinter` should be imported as `tk`
 
+  --> defaults.py:11:12
    |
  9 |     import pandas
 10 |     import seaborn
@@ -115,8 +121,9 @@ error[ICN001]: defaults.py:11:12: [*] `tkinter` should be imported as `tk`
 13 13 | 
 14 14 | 
 
-error[ICN001]: defaults.py:12:12: [*] `networkx` should be imported as `nx`
+error[ICN001]: 12:12: [*] `networkx` should be imported as `nx`
 
+  --> defaults.py:12:12
    |
 10 |     import seaborn
 11 |     import tkinter
@@ -134,8 +141,9 @@ error[ICN001]: defaults.py:12:12: [*] `networkx` should be imported as `nx`
 14 14 | 
 15 15 | def unconventional_aliases():
 
-error[ICN001]: defaults.py:16:22: [*] `altair` should be imported as `alt`
+error[ICN001]: 16:22: [*] `altair` should be imported as `alt`
 
+  --> defaults.py:16:22
    |
 15 | def unconventional_aliases():
 16 |     import altair as altr
@@ -154,8 +162,9 @@ error[ICN001]: defaults.py:16:22: [*] `altair` should be imported as `alt`
 18 18 |     import numpy as nmp
 19 19 |     import pandas as pdas
 
-error[ICN001]: defaults.py:17:33: [*] `matplotlib.pyplot` should be imported as `plt`
+error[ICN001]: 17:33: [*] `matplotlib.pyplot` should be imported as `plt`
 
+  --> defaults.py:17:33
    |
 15 | def unconventional_aliases():
 16 |     import altair as altr
@@ -175,8 +184,9 @@ error[ICN001]: defaults.py:17:33: [*] `matplotlib.pyplot` should be imported as 
 19 19 |     import pandas as pdas
 20 20 |     import seaborn as sbrn
 
-error[ICN001]: defaults.py:18:21: [*] `numpy` should be imported as `np`
+error[ICN001]: 18:21: [*] `numpy` should be imported as `np`
 
+  --> defaults.py:18:21
    |
 16 |     import altair as altr
 17 |     import matplotlib.pyplot as plot
@@ -196,8 +206,9 @@ error[ICN001]: defaults.py:18:21: [*] `numpy` should be imported as `np`
 20 20 |     import seaborn as sbrn
 21 21 |     import tkinter as tkr
 
-error[ICN001]: defaults.py:19:22: [*] `pandas` should be imported as `pd`
+error[ICN001]: 19:22: [*] `pandas` should be imported as `pd`
 
+  --> defaults.py:19:22
    |
 17 |     import matplotlib.pyplot as plot
 18 |     import numpy as nmp
@@ -217,8 +228,9 @@ error[ICN001]: defaults.py:19:22: [*] `pandas` should be imported as `pd`
 21 21 |     import tkinter as tkr
 22 22 |     import networkx as nxy
 
-error[ICN001]: defaults.py:20:23: [*] `seaborn` should be imported as `sns`
+error[ICN001]: 20:23: [*] `seaborn` should be imported as `sns`
 
+  --> defaults.py:20:23
    |
 18 |     import numpy as nmp
 19 |     import pandas as pdas
@@ -238,8 +250,9 @@ error[ICN001]: defaults.py:20:23: [*] `seaborn` should be imported as `sns`
 22 22 |     import networkx as nxy
 23 23 | 
 
-error[ICN001]: defaults.py:21:23: [*] `tkinter` should be imported as `tk`
+error[ICN001]: 21:23: [*] `tkinter` should be imported as `tk`
 
+  --> defaults.py:21:23
    |
 19 |     import pandas as pdas
 20 |     import seaborn as sbrn
@@ -258,8 +271,9 @@ error[ICN001]: defaults.py:21:23: [*] `tkinter` should be imported as `tk`
 23 23 | 
 24 24 | 
 
-error[ICN001]: defaults.py:22:24: [*] `networkx` should be imported as `nx`
+error[ICN001]: 22:24: [*] `networkx` should be imported as `nx`
 
+  --> defaults.py:22:24
    |
 20 |     import seaborn as sbrn
 21 |     import tkinter as tkr

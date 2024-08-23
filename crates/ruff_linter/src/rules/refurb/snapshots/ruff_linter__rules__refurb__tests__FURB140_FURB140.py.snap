@@ -1,8 +1,9 @@
 ---
 source: crates/ruff_linter/src/rules/refurb/mod.rs
 ---
-error[FURB140]: FURB140.py:7:1: [*] Use `itertools.starmap` instead of the generator
+error[FURB140]: 7:1: [*] Use `itertools.starmap` instead of the generator
 
+ --> FURB140.py:6:10
   |
 6 | # FURB140
 7 | [print(x, y) for x, y in zipped()]
@@ -25,8 +26,9 @@ error[FURB140]: FURB140.py:7:1: [*] Use `itertools.starmap` instead of the gener
 9 10 | # FURB140
 10 11 | (print(x, y) for x, y in zipped())
 
-error[FURB140]: FURB140.py:10:1: [*] Use `itertools.starmap` instead of the generator
+error[FURB140]: 10:1: [*] Use `itertools.starmap` instead of the generator
 
+  --> FURB140.py:9:10
    |
  9 | # FURB140
 10 | (print(x, y) for x, y in zipped())
@@ -50,8 +52,9 @@ error[FURB140]: FURB140.py:10:1: [*] Use `itertools.starmap` instead of the gene
 12 13 | # FURB140
 13 14 | {print(x, y) for x, y in zipped()}
 
-error[FURB140]: FURB140.py:13:1: [*] Use `itertools.starmap` instead of the generator
+error[FURB140]: 13:1: [*] Use `itertools.starmap` instead of the generator
 
+  --> FURB140.py:12:10
    |
 12 | # FURB140
 13 | {print(x, y) for x, y in zipped()}
@@ -73,8 +76,9 @@ error[FURB140]: FURB140.py:13:1: [*] Use `itertools.starmap` instead of the gene
 15 16 | 
 16 17 | from itertools import starmap as sm
 
-error[FURB140]: FURB140.py:19:1: [*] Use `itertools.starmap` instead of the generator
+error[FURB140]: 19:1: [*] Use `itertools.starmap` instead of the generator
 
+  --> FURB140.py:18:10
    |
 18 | # FURB140
 19 | [print(x, y) for x, y in zipped()]
@@ -93,8 +97,9 @@ error[FURB140]: FURB140.py:19:1: [*] Use `itertools.starmap` instead of the gene
 21 21 | # FURB140
 22 22 | (print(x, y) for x, y in zipped())
 
-error[FURB140]: FURB140.py:22:1: [*] Use `itertools.starmap` instead of the generator
+error[FURB140]: 22:1: [*] Use `itertools.starmap` instead of the generator
 
+  --> FURB140.py:21:10
    |
 21 | # FURB140
 22 | (print(x, y) for x, y in zipped())
@@ -113,8 +118,9 @@ error[FURB140]: FURB140.py:22:1: [*] Use `itertools.starmap` instead of the gene
 24 24 | # FURB140
 25 25 | {print(x, y) for x, y in zipped()}
 
-error[FURB140]: FURB140.py:25:1: [*] Use `itertools.starmap` instead of the generator
+error[FURB140]: 25:1: [*] Use `itertools.starmap` instead of the generator
 
+  --> FURB140.py:24:10
    |
 24 | # FURB140
 25 | {print(x, y) for x, y in zipped()}
@@ -133,8 +139,9 @@ error[FURB140]: FURB140.py:25:1: [*] Use `itertools.starmap` instead of the gene
 27 27 | # FURB140 (check it still flags starred arguments).
 28 28 | # See https://github.com/astral-sh/ruff/issues/7636
 
-error[FURB140]: FURB140.py:29:1: [*] Use `itertools.starmap` instead of the generator
+error[FURB140]: 29:1: [*] Use `itertools.starmap` instead of the generator
 
+  --> FURB140.py:28:52
    |
 27 | # FURB140 (check it still flags starred arguments).
 28 | # See https://github.com/astral-sh/ruff/issues/7636
@@ -154,8 +161,9 @@ error[FURB140]: FURB140.py:29:1: [*] Use `itertools.starmap` instead of the gene
 31 31 | {foo(*t) for t in [(85, 60), (100, 80)]}
 32 32 | 
 
-error[FURB140]: FURB140.py:30:1: [*] Use `itertools.starmap` instead of the generator
+error[FURB140]: 30:1: [*] Use `itertools.starmap` instead of the generator
 
+  --> FURB140.py:29:41
    |
 28 | # See https://github.com/astral-sh/ruff/issues/7636
 29 | [foo(*t) for t in [(85, 60), (100, 80)]]
@@ -174,8 +182,9 @@ error[FURB140]: FURB140.py:30:1: [*] Use `itertools.starmap` instead of the gene
 32 32 | 
 33 33 | # Non-errors.
 
-error[FURB140]: FURB140.py:31:1: [*] Use `itertools.starmap` instead of the generator
+error[FURB140]: 31:1: [*] Use `itertools.starmap` instead of the generator
 
+  --> FURB140.py:30:41
    |
 29 | [foo(*t) for t in [(85, 60), (100, 80)]]
 30 | (foo(*t) for t in [(85, 60), (100, 80)])

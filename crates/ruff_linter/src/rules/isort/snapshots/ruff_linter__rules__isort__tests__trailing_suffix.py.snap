@@ -1,8 +1,9 @@
 ---
 source: crates/ruff_linter/src/rules/isort/mod.rs
 ---
-error[I001]: trailing_suffix.py:1:1: Import block is un-sorted or un-formatted
+error[I001]: 1:1: Import block is un-sorted or un-formatted
 
+ --> trailing_suffix.py:1:1
   |
 1 | / import sys
 2 | | import os; x = 1
@@ -11,8 +12,9 @@ error[I001]: trailing_suffix.py:1:1: Import block is un-sorted or un-formatted
 4 |   if True:
   |
   = help: Organize imports
-error[I001]: trailing_suffix.py:5:5: Import block is un-sorted or un-formatted
+error[I001]: 5:5: Import block is un-sorted or un-formatted
 
+ --> trailing_suffix.py:5:5
   |
 4 |   if True:
 5 |       import sys

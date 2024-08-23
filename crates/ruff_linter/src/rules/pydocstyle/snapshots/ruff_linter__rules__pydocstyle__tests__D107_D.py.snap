@@ -1,16 +1,18 @@
 ---
 source: crates/ruff_linter/src/rules/pydocstyle/mod.rs
 ---
-error[D107]: D.py:60:9: Missing docstring in `__init__`
+error[D107]: 60:9: Missing docstring in `__init__`
 
+  --> D.py:60:9
    |
 59 |     @expect('D107: Missing docstring in __init__')
 60 |     def __init__(self=None):
    |         ^^^^^^^^
 61 |         pass
    |
-error[D107]: D.py:534:9: Missing docstring in `__init__`
+error[D107]: 534:9: Missing docstring in `__init__`
 
+   --> D.py:534:9
     |
 532 |     """
 533 | 

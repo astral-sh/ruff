@@ -1,8 +1,9 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_boolean_trap/mod.rs
 ---
-error[FBT002]: FBT.py:12:5: Boolean default positional argument in function definition
+error[FBT002]: 12:5: Boolean default positional argument in function definition
 
+  --> FBT.py:12:5
    |
 10 |     posorkw_nonvalued_boolhint: bool,
 11 |     posorkw_nonvalued_boolstrhint: "bool",
@@ -11,8 +12,9 @@ error[FBT002]: FBT.py:12:5: Boolean default positional argument in function defi
 13 |     posorkw_boolvalued_nonboolhint: int = True,
 14 |     posorkw_boolvalued_boolhint: bool = True,
    |
-error[FBT002]: FBT.py:13:5: Boolean default positional argument in function definition
+error[FBT002]: 13:5: Boolean default positional argument in function definition
 
+  --> FBT.py:13:5
    |
 11 |     posorkw_nonvalued_boolstrhint: "bool",
 12 |     posorkw_boolvalued_nohint=True,
@@ -21,8 +23,9 @@ error[FBT002]: FBT.py:13:5: Boolean default positional argument in function defi
 14 |     posorkw_boolvalued_boolhint: bool = True,
 15 |     posorkw_boolvalued_boolstrhint: "bool" = True,
    |
-error[FBT002]: FBT.py:14:5: Boolean default positional argument in function definition
+error[FBT002]: 14:5: Boolean default positional argument in function definition
 
+  --> FBT.py:14:5
    |
 12 |     posorkw_boolvalued_nohint=True,
 13 |     posorkw_boolvalued_nonboolhint: int = True,
@@ -31,8 +34,9 @@ error[FBT002]: FBT.py:14:5: Boolean default positional argument in function defi
 15 |     posorkw_boolvalued_boolstrhint: "bool" = True,
 16 |     posorkw_nonboolvalued_nohint=1,
    |
-error[FBT002]: FBT.py:15:5: Boolean default positional argument in function definition
+error[FBT002]: 15:5: Boolean default positional argument in function definition
 
+  --> FBT.py:15:5
    |
 13 |     posorkw_boolvalued_nonboolhint: int = True,
 14 |     posorkw_boolvalued_boolhint: bool = True,

@@ -1,8 +1,9 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_pie/mod.rs
 ---
-error[PIE810]: PIE810.py:2:1: [*] Call `startswith` once with a `tuple`
+error[PIE810]: 2:1: [*] Call `startswith` once with a `tuple`
 
+ --> PIE810.py:1:8
   |
 1 | # error
 2 | obj.startswith("foo") or obj.startswith("bar")
@@ -19,8 +20,9 @@ error[PIE810]: PIE810.py:2:1: [*] Call `startswith` once with a `tuple`
 4 4 | obj.endswith("foo") or obj.endswith("bar")
 5 5 | # error
 
-error[PIE810]: PIE810.py:4:1: [*] Call `endswith` once with a `tuple`
+error[PIE810]: 4:1: [*] Call `endswith` once with a `tuple`
 
+ --> PIE810.py:3:8
   |
 2 | obj.startswith("foo") or obj.startswith("bar")
 3 | # error
@@ -40,8 +42,9 @@ error[PIE810]: PIE810.py:4:1: [*] Call `endswith` once with a `tuple`
 6 6 | obj.startswith(foo) or obj.startswith(bar)
 7 7 | # error
 
-error[PIE810]: PIE810.py:6:1: [*] Call `startswith` once with a `tuple`
+error[PIE810]: 6:1: [*] Call `startswith` once with a `tuple`
 
+ --> PIE810.py:5:8
   |
 4 | obj.endswith("foo") or obj.endswith("bar")
 5 | # error
@@ -61,8 +64,9 @@ error[PIE810]: PIE810.py:6:1: [*] Call `startswith` once with a `tuple`
 8 8 | obj.startswith(foo) or obj.startswith("foo")
 9 9 | # error
 
-error[PIE810]: PIE810.py:8:1: [*] Call `startswith` once with a `tuple`
+error[PIE810]: 8:1: [*] Call `startswith` once with a `tuple`
 
+  --> PIE810.py:7:8
    |
  6 | obj.startswith(foo) or obj.startswith(bar)
  7 | # error
@@ -82,8 +86,9 @@ error[PIE810]: PIE810.py:8:1: [*] Call `startswith` once with a `tuple`
 10 10 | obj.endswith(foo) or obj.startswith(foo) or obj.startswith("foo")
 11 11 | 
 
-error[PIE810]: PIE810.py:10:1: [*] Call `startswith` once with a `tuple`
+error[PIE810]: 10:1: [*] Call `startswith` once with a `tuple`
 
+  --> PIE810.py:9:8
    |
  8 | obj.startswith(foo) or obj.startswith("foo")
  9 | # error
@@ -103,8 +108,9 @@ error[PIE810]: PIE810.py:10:1: [*] Call `startswith` once with a `tuple`
 12 12 | def func():
 13 13 |     msg = "hello world"
 
-error[PIE810]: PIE810.py:19:8: [*] Call `startswith` once with a `tuple`
+error[PIE810]: 19:8: [*] Call `startswith` once with a `tuple`
 
+  --> PIE810.py:19:8
    |
 17 |     z = "w"
 18 | 
@@ -123,8 +129,9 @@ error[PIE810]: PIE810.py:19:8: [*] Call `startswith` once with a `tuple`
 21 21 | 
 22 22 | def func():
 
-error[PIE810]: PIE810.py:25:8: [*] Call `startswith` once with a `tuple`
+error[PIE810]: 25:8: [*] Call `startswith` once with a `tuple`
 
+  --> PIE810.py:25:8
    |
 23 |     msg = "hello world"
 24 | 

@@ -1,8 +1,9 @@
 ---
 source: crates/ruff_linter/src/rules/pep8_naming/mod.rs
 ---
-error[N805]: N805.py:7:20: [*] First argument of a method should be named `self`
+error[N805]: 7:20: [*] First argument of a method should be named `self`
 
+ --> N805.py:7:20
   |
 6 | class Class:
 7 |     def bad_method(this):
@@ -20,8 +21,9 @@ error[N805]: N805.py:7:20: [*] First argument of a method should be named `self`
 9 9 | 
 10 10 |     if False:
 
-error[N805]: N805.py:11:30: [*] First argument of a method should be named `self`
+error[N805]: 11:30: [*] First argument of a method should be named `self`
 
+  --> N805.py:11:30
    |
 10 |     if False:
 11 |         def extra_bad_method(this):
@@ -39,8 +41,9 @@ error[N805]: N805.py:11:30: [*] First argument of a method should be named `self
 13 13 | 
 14 14 |     def good_method(self):
 
-error[N805]: N805.py:30:15: [*] First argument of a method should be named `self`
+error[N805]: 30:15: [*] First argument of a method should be named `self`
 
+  --> N805.py:30:15
    |
 29 |     @pydantic.validator
 30 |     def lower(cls, my_field: str) -> str:
@@ -58,8 +61,9 @@ error[N805]: N805.py:30:15: [*] First argument of a method should be named `self
 32 32 | 
 33 33 |     @pydantic.validator("my_field")
 
-error[N805]: N805.py:34:15: [*] First argument of a method should be named `self`
+error[N805]: 34:15: [*] First argument of a method should be named `self`
 
+  --> N805.py:34:15
    |
 33 |     @pydantic.validator("my_field")
 34 |     def lower(cls, my_field: str) -> str:
@@ -77,8 +81,9 @@ error[N805]: N805.py:34:15: [*] First argument of a method should be named `self
 36 36 | 
 37 37 |     def __init__(self):
 
-error[N805]: N805.py:63:29: [*] First argument of a method should be named `self`
+error[N805]: 63:29: [*] First argument of a method should be named `self`
 
+  --> N805.py:63:29
    |
 61 |         pass
 62 | 
@@ -97,8 +102,9 @@ error[N805]: N805.py:63:29: [*] First argument of a method should be named `self
 65 65 | 
 66 66 | 
 
-error[N805]: N805.py:69:13: [*] First argument of a method should be named `self`
+error[N805]: 69:13: [*] First argument of a method should be named `self`
 
+  --> N805.py:69:13
    |
 67 | class ModelClass:
 68 |     @hybrid_property
@@ -117,8 +123,9 @@ error[N805]: N805.py:69:13: [*] First argument of a method should be named `self
 71 71 | 
 72 72 |     @bad.expression
 
-error[N805]: N805.py:77:13: [*] First argument of a method should be named `self`
+error[N805]: 77:13: [*] First argument of a method should be named `self`
 
+  --> N805.py:77:13
    |
 76 |     @bad.wtf
 77 |     def bad(cls):
@@ -136,8 +143,9 @@ error[N805]: N805.py:77:13: [*] First argument of a method should be named `self
 79 79 | 
 80 80 |     @hybrid_property
 
-error[N805]: N805.py:85:14: [*] First argument of a method should be named `self`
+error[N805]: 85:14: [*] First argument of a method should be named `self`
 
+  --> N805.py:85:14
    |
 84 |     @good.expression
 85 |     def good(cls):
@@ -155,8 +163,9 @@ error[N805]: N805.py:85:14: [*] First argument of a method should be named `self
 87 87 | 
 88 88 |     @good.wtf
 
-error[N805]: N805.py:93:19: [*] First argument of a method should be named `self`
+error[N805]: 93:19: [*] First argument of a method should be named `self`
 
+  --> N805.py:93:19
    |
 92 |     @foobar.thisisstatic
 93 |     def badstatic(foo):
@@ -174,8 +183,9 @@ error[N805]: N805.py:93:19: [*] First argument of a method should be named `self
 95 95 | 
 96 96 | 
 
-error[N805]: N805.py:98:26: First argument of a method should be named `self`
+error[N805]: 98:26: First argument of a method should be named `self`
 
+  --> N805.py:98:26
    |
 97 | class SelfInArgsClass:
 98 |     def self_as_argument(this, self):
@@ -183,8 +193,9 @@ error[N805]: N805.py:98:26: First argument of a method should be named `self`
 99 |         pass
    |
    = help: Rename `this` to `self`
-error[N805]: N805.py:101:35: First argument of a method should be named `self`
+error[N805]: 101:35: First argument of a method should be named `self`
 
+   --> N805.py:101:35
     |
  99 |         pass
 100 | 
@@ -193,8 +204,9 @@ error[N805]: N805.py:101:35: First argument of a method should be named `self`
 102 |         pass
     |
     = help: Rename `this` to `self`
-error[N805]: N805.py:104:34: First argument of a method should be named `self`
+error[N805]: 104:34: First argument of a method should be named `self`
 
+   --> N805.py:104:34
     |
 102 |         pass
 103 | 
@@ -203,8 +215,9 @@ error[N805]: N805.py:104:34: First argument of a method should be named `self`
 105 |         pass
     |
     = help: Rename `this` to `self`
-error[N805]: N805.py:107:24: First argument of a method should be named `self`
+error[N805]: 107:24: First argument of a method should be named `self`
 
+   --> N805.py:107:24
     |
 105 |         pass
 106 | 
@@ -213,8 +226,9 @@ error[N805]: N805.py:107:24: First argument of a method should be named `self`
 108 |         pass
     |
     = help: Rename `this` to `self`
-error[N805]: N805.py:110:24: First argument of a method should be named `self`
+error[N805]: 110:24: First argument of a method should be named `self`
 
+   --> N805.py:110:24
     |
 108 |         pass
 109 | 
@@ -223,8 +237,9 @@ error[N805]: N805.py:110:24: First argument of a method should be named `self`
 111 |         pass
     |
     = help: Rename `this` to `self`
-error[N805]: N805.py:115:20: [*] First argument of a method should be named `self`
+error[N805]: 115:20: [*] First argument of a method should be named `self`
 
+   --> N805.py:115:20
     |
 114 | class RenamingInMethodBodyClass:
 115 |     def bad_method(this):
@@ -247,8 +262,9 @@ error[N805]: N805.py:115:20: [*] First argument of a method should be named `sel
 119 119 |     def bad_method(this):
 120 120 |         self = this
 
-error[N805]: N805.py:119:20: [*] First argument of a method should be named `self`
+error[N805]: 119:20: [*] First argument of a method should be named `self`
 
+   --> N805.py:119:20
     |
 117 |         this
 118 | 
@@ -269,8 +285,9 @@ error[N805]: N805.py:119:20: [*] First argument of a method should be named `sel
 122 122 | 
 123 123 | class RenamingWithNFKC:
 
-error[N805]: N805.py:124:17: [*] First argument of a method should be named `self`
+error[N805]: 124:17: [*] First argument of a method should be named `self`
 
+   --> N805.py:124:17
     |
 123 | class RenamingWithNFKC:
 124 |     def formula(household):

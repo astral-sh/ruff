@@ -1,8 +1,9 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_use_pathlib/mod.rs
 ---
-error[PTH203]: PTH203.py:5:1: `os.path.getatime` should be replaced by `Path.stat().st_atime`
+error[PTH203]: 5:1: `os.path.getatime` should be replaced by `Path.stat().st_atime`
 
+ --> PTH203.py:4:1
   |
 3 | from os.path import getatime
 4 | 
@@ -11,40 +12,45 @@ error[PTH203]: PTH203.py:5:1: `os.path.getatime` should be replaced by `Path.sta
 6 | os.path.getatime(b"filename")
 7 | os.path.getatime(Path("filename"))
   |
-error[PTH203]: PTH203.py:6:1: `os.path.getatime` should be replaced by `Path.stat().st_atime`
+error[PTH203]: 6:1: `os.path.getatime` should be replaced by `Path.stat().st_atime`
 
+ --> PTH203.py:5:29
   |
 5 | os.path.getatime("filename")
 6 | os.path.getatime(b"filename")
   | ^^^^^^^^^^^^^^^^
 7 | os.path.getatime(Path("filename"))
   |
-error[PTH203]: PTH203.py:7:1: `os.path.getatime` should be replaced by `Path.stat().st_atime`
+error[PTH203]: 7:1: `os.path.getatime` should be replaced by `Path.stat().st_atime`
 
+ --> PTH203.py:6:30
   |
 5 | os.path.getatime("filename")
 6 | os.path.getatime(b"filename")
 7 | os.path.getatime(Path("filename"))
   | ^^^^^^^^^^^^^^^^
   |
-error[PTH203]: PTH203.py:10:1: `os.path.getatime` should be replaced by `Path.stat().st_atime`
+error[PTH203]: 10:1: `os.path.getatime` should be replaced by `Path.stat().st_atime`
 
+  --> PTH203.py:10:1
    |
 10 | getatime("filename")
    | ^^^^^^^^
 11 | getatime(b"filename")
 12 | getatime(Path("filename"))
    |
-error[PTH203]: PTH203.py:11:1: `os.path.getatime` should be replaced by `Path.stat().st_atime`
+error[PTH203]: 11:1: `os.path.getatime` should be replaced by `Path.stat().st_atime`
 
+  --> PTH203.py:10:21
    |
 10 | getatime("filename")
 11 | getatime(b"filename")
    | ^^^^^^^^
 12 | getatime(Path("filename"))
    |
-error[PTH203]: PTH203.py:12:1: `os.path.getatime` should be replaced by `Path.stat().st_atime`
+error[PTH203]: 12:1: `os.path.getatime` should be replaced by `Path.stat().st_atime`
 
+  --> PTH203.py:11:22
    |
 10 | getatime("filename")
 11 | getatime(b"filename")

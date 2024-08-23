@@ -1,8 +1,9 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_future_annotations/mod.rs
 ---
-error[FA102]: no_future_import_uses_lowercase.py:6:14: [*] Missing `from __future__ import annotations`, but uses PEP 585 collection
+error[FA102]: 6:14: [*] Missing `from __future__ import annotations`, but uses PEP 585 collection
 
+ --> no_future_import_uses_lowercase.py:6:14
   |
 6 | def hello(y: dict[str, int]) -> None:
   |              ^^^^^^^^^^^^^^

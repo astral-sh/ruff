@@ -1,8 +1,9 @@
 ---
 source: crates/ruff_linter/src/rules/pycodestyle/mod.rs
 ---
-error[E713]: E713.py:2:8: [*] Test for membership should be `not in`
+error[E713]: 2:8: [*] Test for membership should be `not in`
 
+ --> E713.py:2:8
   |
 1 | #: E713
 2 | if not X in Y:
@@ -19,8 +20,9 @@ error[E713]: E713.py:2:8: [*] Test for membership should be `not in`
 4 4 | #: E713
 5 5 | if not X.B in Y:
 
-error[E713]: E713.py:5:8: [*] Test for membership should be `not in`
+error[E713]: 5:8: [*] Test for membership should be `not in`
 
+ --> E713.py:5:8
   |
 3 |     pass
 4 | #: E713
@@ -40,8 +42,9 @@ error[E713]: E713.py:5:8: [*] Test for membership should be `not in`
 7 7 | #: E713
 8 8 | if not X in Y and Z == "zero":
 
-error[E713]: E713.py:8:8: [*] Test for membership should be `not in`
+error[E713]: 8:8: [*] Test for membership should be `not in`
 
+  --> E713.py:8:8
    |
  6 |     pass
  7 | #: E713
@@ -61,8 +64,9 @@ error[E713]: E713.py:8:8: [*] Test for membership should be `not in`
 10 10 | #: E713
 11 11 | if X == "zero" or not Y in Z:
 
-error[E713]: E713.py:11:23: [*] Test for membership should be `not in`
+error[E713]: 11:23: [*] Test for membership should be `not in`
 
+  --> E713.py:11:23
    |
  9 |     pass
 10 | #: E713
@@ -82,8 +86,9 @@ error[E713]: E713.py:11:23: [*] Test for membership should be `not in`
 13 13 | #: E713
 14 14 | if not (X in Y):
 
-error[E713]: E713.py:14:9: [*] Test for membership should be `not in`
+error[E713]: 14:9: [*] Test for membership should be `not in`
 
+  --> E713.py:14:9
    |
 12 |     pass
 13 | #: E713
@@ -102,8 +107,9 @@ error[E713]: E713.py:14:9: [*] Test for membership should be `not in`
 16 16 | 
 17 17 | #: Okay
 
-error[E713]: E713.py:40:12: [*] Test for membership should be `not in`
+error[E713]: 40:12: [*] Test for membership should be `not in`
 
+  --> E713.py:40:12
    |
 38 | assert [42, not foo] in bar
 39 | assert not (re.search(r"^.:\\Users\\[^\\]*\\Downloads\\.*") is None)

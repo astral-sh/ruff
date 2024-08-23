@@ -1,8 +1,9 @@
 ---
 source: crates/ruff_linter/src/rules/ruff/mod.rs
 ---
-error[RUF009]: RUF009.py:20:41: Do not perform function call `default_function` in dataclass defaults
+error[RUF009]: 20:41: Do not perform function call `default_function` in dataclass defaults
 
+  --> RUF009.py:20:41
    |
 18 | @dataclass()
 19 | class A:
@@ -11,8 +12,9 @@ error[RUF009]: RUF009.py:20:41: Do not perform function call `default_function` 
 21 |     class_variable: typing.ClassVar[list[int]] = default_function()
 22 |     another_class_var: ClassVar[list[int]] = default_function()
    |
-error[RUF009]: RUF009.py:43:41: Do not perform function call `default_function` in dataclass defaults
+error[RUF009]: 43:41: Do not perform function call `default_function` in dataclass defaults
 
+  --> RUF009.py:43:41
    |
 41 | @dataclass
 42 | class B:
@@ -21,8 +23,9 @@ error[RUF009]: RUF009.py:43:41: Do not perform function call `default_function` 
 44 |     another_dataclass: A = A()
 45 |     not_optimal: ImmutableType = ImmutableType(20)
    |
-error[RUF009]: RUF009.py:44:28: Do not perform function call `A` in dataclass defaults
+error[RUF009]: 44:28: Do not perform function call `A` in dataclass defaults
 
+  --> RUF009.py:44:28
    |
 42 | class B:
 43 |     hidden_mutable_default: list[int] = default_function()
@@ -31,8 +34,9 @@ error[RUF009]: RUF009.py:44:28: Do not perform function call `A` in dataclass de
 45 |     not_optimal: ImmutableType = ImmutableType(20)
 46 |     good_variant: ImmutableType = DEFAULT_IMMUTABLETYPE_FOR_ALL_DATACLASSES
    |
-error[RUF009]: RUF009.py:45:34: Do not perform function call `ImmutableType` in dataclass defaults
+error[RUF009]: 45:34: Do not perform function call `ImmutableType` in dataclass defaults
 
+  --> RUF009.py:45:34
    |
 43 |     hidden_mutable_default: list[int] = default_function()
 44 |     another_dataclass: A = A()

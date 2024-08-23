@@ -1,8 +1,9 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_quotes/mod.rs
 ---
-error[Q001]: docstring_singles_function.py:3:5: [*] Single quote multiline found but double quotes preferred
+error[Q001]: 3:5: [*] Single quote multiline found but double quotes preferred
 
+ --> docstring_singles_function.py:3:5
   |
 1 | def foo():
 2 |     '''function without params, single line docstring'''
@@ -20,8 +21,9 @@ error[Q001]: docstring_singles_function.py:3:5: [*] Single quote multiline found
 5 5 | 
 6 6 | 
 
-error[Q001]: docstring_singles_function.py:11:5: [*] Single quote multiline found but double quotes preferred
+error[Q001]: 11:5: [*] Single quote multiline found but double quotes preferred
 
+  --> docstring_singles_function.py:11:5
    |
  9 |         function without params, multiline docstring
 10 |     '''
@@ -40,8 +42,9 @@ error[Q001]: docstring_singles_function.py:11:5: [*] Single quote multiline foun
 13 13 | 
 14 14 | 
 
-error[Q001]: docstring_singles_function.py:15:39: [*] Single quote multiline found but double quotes preferred
+error[Q001]: 15:39: [*] Single quote multiline found but double quotes preferred
 
+  --> docstring_singles_function.py:15:39
    |
 15 |   def fun_with_params_no_docstring(a, b='''
    |  _______________________________________^
@@ -64,8 +67,9 @@ error[Q001]: docstring_singles_function.py:15:39: [*] Single quote multiline fou
 19 19 | 
 20 20 | 
 
-error[Q001]: docstring_singles_function.py:17:5: [*] Single quote multiline found but double quotes preferred
+error[Q001]: 17:5: [*] Single quote multiline found but double quotes preferred
 
+  --> docstring_singles_function.py:17:5
    |
 15 | def fun_with_params_no_docstring(a, b='''
 16 |     not a
@@ -84,8 +88,9 @@ error[Q001]: docstring_singles_function.py:17:5: [*] Single quote multiline foun
 19 19 | 
 20 20 | 
 
-error[Q001]: docstring_singles_function.py:22:5: [*] Single quote multiline found but double quotes preferred
+error[Q001]: 22:5: [*] Single quote multiline found but double quotes preferred
 
+  --> docstring_singles_function.py:22:5
    |
 21 | def fun_with_params_no_docstring2(a, b=c[foo():], c=\
 22 |     ''' not a docstring '''):

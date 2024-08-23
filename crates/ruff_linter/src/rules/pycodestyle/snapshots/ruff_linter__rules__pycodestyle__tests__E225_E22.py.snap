@@ -1,8 +1,9 @@
 ---
 source: crates/ruff_linter/src/rules/pycodestyle/mod.rs
 ---
-error[E225]: E22.py:54:11: [*] Missing whitespace around operator
+error[E225]: 54:11: [*] Missing whitespace around operator
 
+  --> E22.py:54:11
    |
 53 | #: E225
 54 | submitted +=1
@@ -21,8 +22,9 @@ error[E225]: E22.py:54:11: [*] Missing whitespace around operator
 56 56 | submitted+= 1
 57 57 | #: E225
 
-error[E225]: E22.py:56:10: [*] Missing whitespace around operator
+error[E225]: 56:10: [*] Missing whitespace around operator
 
+  --> E22.py:56:10
    |
 54 | submitted +=1
 55 | #: E225
@@ -42,8 +44,9 @@ error[E225]: E22.py:56:10: [*] Missing whitespace around operator
 58 58 | c =-1
 59 59 | #: E225
 
-error[E225]: E22.py:58:3: [*] Missing whitespace around operator
+error[E225]: 58:3: [*] Missing whitespace around operator
 
+  --> E22.py:58:3
    |
 56 | submitted+= 1
 57 | #: E225
@@ -63,8 +66,9 @@ error[E225]: E22.py:58:3: [*] Missing whitespace around operator
 60 60 | x = x /2 - 1
 61 61 | #: E225
 
-error[E225]: E22.py:76:2: [*] Missing whitespace around operator
+error[E225]: 76:2: [*] Missing whitespace around operator
 
+  --> E22.py:76:2
    |
 74 | _1kB = _1MB>> 10
 75 | #: E225 E225
@@ -84,8 +88,9 @@ error[E225]: E22.py:76:2: [*] Missing whitespace around operator
 78 78 | i=i +1
 79 79 | #: E225
 
-error[E225]: E22.py:78:2: [*] Missing whitespace around operator
+error[E225]: 78:2: [*] Missing whitespace around operator
 
+  --> E22.py:78:2
    |
 76 | i=i+ 1
 77 | #: E225 E225
@@ -105,8 +110,9 @@ error[E225]: E22.py:78:2: [*] Missing whitespace around operator
 80 80 | i = 1and 1
 81 81 | #: E225
 
-error[E225]: E22.py:80:6: [*] Missing whitespace around operator
+error[E225]: 80:6: [*] Missing whitespace around operator
 
+  --> E22.py:80:6
    |
 78 | i=i +1
 79 | #: E225
@@ -126,8 +132,9 @@ error[E225]: E22.py:80:6: [*] Missing whitespace around operator
 82 82 | i = 1or 0
 83 83 | #: E225
 
-error[E225]: E22.py:82:6: [*] Missing whitespace around operator
+error[E225]: 82:6: [*] Missing whitespace around operator
 
+  --> E22.py:82:6
    |
 80 | i = 1and 1
 81 | #: E225
@@ -147,8 +154,9 @@ error[E225]: E22.py:82:6: [*] Missing whitespace around operator
 84 84 | 1is 1
 85 85 | #: E225
 
-error[E225]: E22.py:84:2: [*] Missing whitespace around operator
+error[E225]: 84:2: [*] Missing whitespace around operator
 
+  --> E22.py:84:2
    |
 82 | i = 1or 0
 83 | #: E225
@@ -168,8 +176,9 @@ error[E225]: E22.py:84:2: [*] Missing whitespace around operator
 86 86 | 1in []
 87 87 | #: E225
 
-error[E225]: E22.py:86:2: [*] Missing whitespace around operator
+error[E225]: 86:2: [*] Missing whitespace around operator
 
+  --> E22.py:86:2
    |
 84 | 1is 1
 85 | #: E225
@@ -189,8 +198,9 @@ error[E225]: E22.py:86:2: [*] Missing whitespace around operator
 88 88 | i = 1 @2
 89 89 | #: E225
 
-error[E225]: E22.py:92:2: [*] Missing whitespace around operator
+error[E225]: 92:2: [*] Missing whitespace around operator
 
+  --> E22.py:92:2
    |
 90 | i = 1@ 2
 91 | #: E225 E226
@@ -210,8 +220,9 @@ error[E225]: E22.py:92:2: [*] Missing whitespace around operator
 94 94 | i =i+1
 95 95 | #: E225 E226
 
-error[E225]: E22.py:94:3: [*] Missing whitespace around operator
+error[E225]: 94:3: [*] Missing whitespace around operator
 
+  --> E22.py:94:3
    |
 92 | i=i+1
 93 | #: E225 E226
@@ -231,8 +242,9 @@ error[E225]: E22.py:94:3: [*] Missing whitespace around operator
 96 96 | i= i+1
 97 97 | #: E225 E226
 
-error[E225]: E22.py:96:2: [*] Missing whitespace around operator
+error[E225]: 96:2: [*] Missing whitespace around operator
 
+  --> E22.py:96:2
    |
 94 | i =i+1
 95 | #: E225 E226

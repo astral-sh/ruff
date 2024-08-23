@@ -1,71 +1,81 @@
 ---
 source: crates/ruff_linter/src/rules/pydocstyle/mod.rs
 ---
-error[D417]: D417.py:1:5: Missing argument descriptions in the docstring for `f`: `y`, `z`
+error[D417]: 1:5: Missing argument descriptions in the docstring for `f`: `y`, `z`
 
+ --> D417.py:1:5
   |
 1 | def f(x, y, z):
   |     ^
 2 |     """Do something.
   |
-error[D417]: D417.py:14:5: Missing argument descriptions in the docstring for `f`: `y`, `z`
+error[D417]: 14:5: Missing argument descriptions in the docstring for `f`: `y`, `z`
 
+  --> D417.py:14:5
    |
 14 | def f(x, y, z):
    |     ^
 15 |     """Do something.
    |
-error[D417]: D417.py:27:5: Missing argument descriptions in the docstring for `f`: `y`, `z`
+error[D417]: 27:5: Missing argument descriptions in the docstring for `f`: `y`, `z`
 
+  --> D417.py:27:5
    |
 27 | def f(x, y, z):
    |     ^
 28 |     """Do something.
    |
-error[D417]: D417.py:39:5: Missing argument descriptions in the docstring for `f`: `y`, `z`
+error[D417]: 39:5: Missing argument descriptions in the docstring for `f`: `y`, `z`
 
+  --> D417.py:39:5
    |
 39 | def f(x, y, z):
    |     ^
 40 |     """Do something.
    |
-error[D417]: D417.py:52:5: Missing argument description in the docstring for `f`: `y`
+error[D417]: 52:5: Missing argument description in the docstring for `f`: `y`
 
+  --> D417.py:52:5
    |
 52 | def f(x, y, z):
    |     ^
 53 |     """Do something.
    |
-error[D417]: D417.py:65:5: Missing argument description in the docstring for `f`: `y`
+error[D417]: 65:5: Missing argument description in the docstring for `f`: `y`
 
+  --> D417.py:65:5
    |
 65 | def f(x, y, z):
    |     ^
 66 |     """Do something.
    |
-error[D417]: D417.py:77:5: Missing argument description in the docstring for `f`: `y`
+error[D417]: 77:5: Missing argument description in the docstring for `f`: `y`
 
+  --> D417.py:77:5
    |
 77 | def f(x, y, z):
    |     ^
 78 |     """Do something.
    |
-error[D417]: D417.py:98:5: Missing argument description in the docstring for `f`: `x`
+error[D417]: 98:5: Missing argument description in the docstring for `f`: `x`
 
+  --> D417.py:98:5
    |
 98 | def f(x, *args, **kwargs):
    |     ^
 99 |     """Do something.
    |
-error[D417]: D417.py:108:5: Missing argument description in the docstring for `f`: `*args`
+error[D417]: 108:5: Missing argument description in the docstring for `f`: `*args`
 
+   --> D417.py:108:5
     |
 108 | def f(x, *args, **kwargs):
     |     ^
 109 |     """Do something.
     |
-error[D417]: D417.py:155:5: Missing argument description in the docstring for `select_data`: `auto_save`
+error[D417]: 155:5: Missing argument description in the docstring for `select_data`: `auto_save`
 
+   --> D417.py:155:5
     |
 155 | def select_data(
     |     ^^^^^^^^^^^

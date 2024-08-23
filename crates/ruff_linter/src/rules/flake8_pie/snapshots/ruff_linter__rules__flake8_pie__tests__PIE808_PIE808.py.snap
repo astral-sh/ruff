@@ -1,8 +1,9 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_pie/mod.rs
 ---
-error[PIE808]: PIE808.py:2:7: [*] Unnecessary `start` argument in `range`
+error[PIE808]: 2:7: [*] Unnecessary `start` argument in `range`
 
+ --> PIE808.py:2:7
   |
 1 | # PIE808
 2 | range(0, 10)
@@ -19,8 +20,9 @@ error[PIE808]: PIE808.py:2:7: [*] Unnecessary `start` argument in `range`
 4 4 | import builtins
 5 5 | builtins.range(0, 10)
 
-error[PIE808]: PIE808.py:5:16: [*] Unnecessary `start` argument in `range`
+error[PIE808]: 5:16: [*] Unnecessary `start` argument in `range`
 
+ --> PIE808.py:5:16
   |
 4 | import builtins
 5 | builtins.range(0, 10)

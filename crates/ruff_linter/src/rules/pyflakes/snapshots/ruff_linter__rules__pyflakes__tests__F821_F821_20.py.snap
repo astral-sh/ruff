@@ -1,8 +1,9 @@
 ---
 source: crates/ruff_linter/src/rules/pyflakes/mod.rs
 ---
-error[F821]: F821_20.py:3:24: Undefined name `Record`
+error[F821]: 3:24: Undefined name `Record`
 
+ --> F821_20.py:3:24
   |
 1 | """Test lazy evaluation of type alias values."""
 2 | 

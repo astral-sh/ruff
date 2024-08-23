@@ -1,8 +1,9 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_type_checking/mod.rs
 ---
-error[TCH002]: exempt_modules.py:14:12: [*] Move third-party import `flask` into a type-checking block
+error[TCH002]: 14:12: [*] Move third-party import `flask` into a type-checking block
 
+  --> exempt_modules.py:14:12
    |
 13 | def f():
 14 |     import flask

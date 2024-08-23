@@ -1,15 +1,17 @@
 ---
 source: crates/ruff_linter/src/rules/pylint/mod.rs
 ---
-error[PLW2101]: useless_with_lock.py:5:6: Threading lock directly created in `with` statement has no effect
+error[PLW2101]: 5:6: Threading lock directly created in `with` statement has no effect
 
+ --> useless_with_lock.py:5:6
   |
 5 | with threading.Lock():  # [useless-with-lock]
   |      ^^^^^^^^^^^^^^^^
 6 |     ...
   |
-error[PLW2101]: useless_with_lock.py:8:6: Threading lock directly created in `with` statement has no effect
+error[PLW2101]: 8:6: Threading lock directly created in `with` statement has no effect
 
+ --> useless_with_lock.py:8:6
   |
 6 |     ...
 7 | 
@@ -17,8 +19,9 @@ error[PLW2101]: useless_with_lock.py:8:6: Threading lock directly created in `wi
   |      ^^^^^^
 9 |     ...
   |
-error[PLW2101]: useless_with_lock.py:11:6: Threading lock directly created in `with` statement has no effect
+error[PLW2101]: 11:6: Threading lock directly created in `with` statement has no effect
 
+  --> useless_with_lock.py:11:6
    |
  9 |     ...
 10 | 
@@ -26,8 +29,9 @@ error[PLW2101]: useless_with_lock.py:11:6: Threading lock directly created in `w
    |      ^^^^^^^^^^^^^^^^
 12 |     ...
    |
-error[PLW2101]: useless_with_lock.py:14:6: Threading lock directly created in `with` statement has no effect
+error[PLW2101]: 14:6: Threading lock directly created in `with` statement has no effect
 
+  --> useless_with_lock.py:14:6
    |
 12 |     ...
 13 | 
@@ -35,8 +39,9 @@ error[PLW2101]: useless_with_lock.py:14:6: Threading lock directly created in `w
    |      ^^^^^^^^^^^^^^^^^
 15 |     ...
    |
-error[PLW2101]: useless_with_lock.py:17:6: Threading lock directly created in `with` statement has no effect
+error[PLW2101]: 17:6: Threading lock directly created in `with` statement has no effect
 
+  --> useless_with_lock.py:17:6
    |
 15 |     ...
 16 | 
@@ -44,8 +49,9 @@ error[PLW2101]: useless_with_lock.py:17:6: Threading lock directly created in `w
    |      ^^^^^^^
 18 |     ...
    |
-error[PLW2101]: useless_with_lock.py:20:6: Threading lock directly created in `with` statement has no effect
+error[PLW2101]: 20:6: Threading lock directly created in `with` statement has no effect
 
+  --> useless_with_lock.py:20:6
    |
 18 |     ...
 19 | 
@@ -53,8 +59,9 @@ error[PLW2101]: useless_with_lock.py:20:6: Threading lock directly created in `w
    |      ^^^^^^^^^^^^^^^^^^^^^
 21 |     ...
    |
-error[PLW2101]: useless_with_lock.py:23:6: Threading lock directly created in `with` statement has no effect
+error[PLW2101]: 23:6: Threading lock directly created in `with` statement has no effect
 
+  --> useless_with_lock.py:23:6
    |
 21 |     ...
 22 | 
@@ -62,8 +69,9 @@ error[PLW2101]: useless_with_lock.py:23:6: Threading lock directly created in `w
    |      ^^^^^^^^^^^
 24 |     ...
    |
-error[PLW2101]: useless_with_lock.py:26:6: Threading lock directly created in `with` statement has no effect
+error[PLW2101]: 26:6: Threading lock directly created in `with` statement has no effect
 
+  --> useless_with_lock.py:26:6
    |
 24 |     ...
 25 | 
@@ -71,8 +79,9 @@ error[PLW2101]: useless_with_lock.py:26:6: Threading lock directly created in `w
    |      ^^^^^^^^^^^^^^^^^^^^^
 27 |     ...
    |
-error[PLW2101]: useless_with_lock.py:29:6: Threading lock directly created in `with` statement has no effect
+error[PLW2101]: 29:6: Threading lock directly created in `with` statement has no effect
 
+  --> useless_with_lock.py:29:6
    |
 27 |     ...
 28 | 
@@ -80,8 +89,9 @@ error[PLW2101]: useless_with_lock.py:29:6: Threading lock directly created in `w
    |      ^^^^^^^^^^^
 30 |     ...
    |
-error[PLW2101]: useless_with_lock.py:32:6: Threading lock directly created in `with` statement has no effect
+error[PLW2101]: 32:6: Threading lock directly created in `with` statement has no effect
 
+  --> useless_with_lock.py:32:6
    |
 30 |     ...
 31 | 
@@ -89,8 +99,9 @@ error[PLW2101]: useless_with_lock.py:32:6: Threading lock directly created in `w
    |      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 33 |     ...
    |
-error[PLW2101]: useless_with_lock.py:35:6: Threading lock directly created in `with` statement has no effect
+error[PLW2101]: 35:6: Threading lock directly created in `with` statement has no effect
 
+  --> useless_with_lock.py:35:6
    |
 33 |     ...
 34 | 

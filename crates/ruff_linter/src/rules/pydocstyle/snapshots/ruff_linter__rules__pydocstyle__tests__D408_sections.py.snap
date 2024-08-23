@@ -1,8 +1,9 @@
 ---
 source: crates/ruff_linter/src/rules/pydocstyle/mod.rs
 ---
-error[D408]: sections.py:98:5: [*] Section underline should be in the line following the section's name ("Returns")
+error[D408]: 98:5: [*] Section underline should be in the line following the section's name ("Returns")
 
+  --> sections.py:98:5
    |
 96 |     Returns
 97 | 

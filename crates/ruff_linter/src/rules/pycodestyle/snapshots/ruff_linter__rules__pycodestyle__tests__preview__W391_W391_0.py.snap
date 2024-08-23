@@ -1,8 +1,9 @@
 ---
 source: crates/ruff_linter/src/rules/pycodestyle/mod.rs
 ---
-error[W391]: W391_0.py:14:1: [*] Extra newline at end of file
+error[W391]: 14:1: [*] Extra newline at end of file
 
+  --> W391_0.py:13:10
    |
 12 |     foo()
 13 |     bar()

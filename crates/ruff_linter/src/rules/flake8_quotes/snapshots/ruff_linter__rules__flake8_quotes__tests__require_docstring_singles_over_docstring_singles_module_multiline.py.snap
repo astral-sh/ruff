@@ -1,8 +1,9 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_quotes/mod.rs
 ---
-error[Q001]: docstring_singles_module_multiline.py:4:1: [*] Single quote multiline found but double quotes preferred
+error[Q001]: 4:1: [*] Single quote multiline found but double quotes preferred
 
+ --> docstring_singles_module_multiline.py:3:4
   |
 2 |   Double quotes multiline module docstring
 3 |   '''
@@ -27,8 +28,9 @@ error[Q001]: docstring_singles_module_multiline.py:4:1: [*] Single quote multili
 8 8 |     pass
 9 9 | '''
 
-error[Q001]: docstring_singles_module_multiline.py:9:1: [*] Single quote multiline found but double quotes preferred
+error[Q001]: 9:1: [*] Single quote multiline found but double quotes preferred
 
+  --> docstring_singles_module_multiline.py:8:9
    |
  7 |   def foo():
  8 |       pass

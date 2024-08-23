@@ -1,8 +1,9 @@
 ---
 source: crates/ruff_linter/src/rules/pycodestyle/mod.rs
 ---
-error[E303]: E30.ipynb:29:5: [*] Too many blank lines (2)
+error[E303]: 29:5: [*] Too many blank lines (2)
 
+  --> E30.ipynb:29:5
    |
 29 |     # arbitrary comment
    |     ^^^^^^^^^^^^^^^^^^^
@@ -19,8 +20,9 @@ error[E303]: E30.ipynb:29:5: [*] Too many blank lines (2)
 30 29 | 
 31 30 |     def inner():  # E306 not expected (pycodestyle detects E306)
 
-error[E303]: E30.ipynb:39:1: [*] Too many blank lines (4)
+error[E303]: 39:1: [*] Too many blank lines (4)
 
+  --> E30.ipynb:39:1
    |
 39 | def fn():
    | ^^^

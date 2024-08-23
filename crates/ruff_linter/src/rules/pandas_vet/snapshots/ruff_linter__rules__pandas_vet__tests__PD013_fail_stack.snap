@@ -1,8 +1,9 @@
 ---
 source: crates/ruff_linter/src/rules/pandas_vet/mod.rs
 ---
-error[PD013]: <filename>:4:5: `.melt` is preferred to `.stack`; provides same functionality
+error[PD013]: 4:5: `.melt` is preferred to `.stack`; provides same functionality
 
+ --> <filename>:4:5
   |
 2 | import pandas as pd
 3 | x = pd.DataFrame()

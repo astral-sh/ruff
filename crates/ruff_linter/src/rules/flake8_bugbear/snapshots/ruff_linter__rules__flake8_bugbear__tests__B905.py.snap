@@ -1,8 +1,9 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_bugbear/mod.rs
 ---
-error[B905]: B905.py:4:1: [*] `zip()` without an explicit `strict=` parameter
+error[B905]: 4:1: [*] `zip()` without an explicit `strict=` parameter
 
+ --> B905.py:3:9
   |
 3 | # Errors
 4 | zip()
@@ -21,8 +22,9 @@ error[B905]: B905.py:4:1: [*] `zip()` without an explicit `strict=` parameter
 6 6 | zip("a", "b")
 7 7 | zip("a", "b", *zip("c"))
 
-error[B905]: B905.py:5:1: [*] `zip()` without an explicit `strict=` parameter
+error[B905]: 5:1: [*] `zip()` without an explicit `strict=` parameter
 
+ --> B905.py:4:6
   |
 3 | # Errors
 4 | zip()
@@ -42,8 +44,9 @@ error[B905]: B905.py:5:1: [*] `zip()` without an explicit `strict=` parameter
 7 7 | zip("a", "b", *zip("c"))
 8 8 | zip(zip("a"), strict=False)
 
-error[B905]: B905.py:6:1: [*] `zip()` without an explicit `strict=` parameter
+error[B905]: 6:1: [*] `zip()` without an explicit `strict=` parameter
 
+ --> B905.py:5:14
   |
 4 | zip()
 5 | zip(range(3))
@@ -63,8 +66,9 @@ error[B905]: B905.py:6:1: [*] `zip()` without an explicit `strict=` parameter
 8 8 | zip(zip("a"), strict=False)
 9 9 | zip(zip("a", strict=True))
 
-error[B905]: B905.py:7:1: [*] `zip()` without an explicit `strict=` parameter
+error[B905]: 7:1: [*] `zip()` without an explicit `strict=` parameter
 
+ --> B905.py:6:14
   |
 5 | zip(range(3))
 6 | zip("a", "b")
@@ -84,8 +88,9 @@ error[B905]: B905.py:7:1: [*] `zip()` without an explicit `strict=` parameter
 9 9 | zip(zip("a", strict=True))
 10 10 | 
 
-error[B905]: B905.py:7:16: [*] `zip()` without an explicit `strict=` parameter
+error[B905]: 7:16: [*] `zip()` without an explicit `strict=` parameter
 
+ --> B905.py:7:16
   |
 5 | zip(range(3))
 6 | zip("a", "b")
@@ -105,8 +110,9 @@ error[B905]: B905.py:7:16: [*] `zip()` without an explicit `strict=` parameter
 9 9 | zip(zip("a", strict=True))
 10 10 | 
 
-error[B905]: B905.py:8:5: [*] `zip()` without an explicit `strict=` parameter
+error[B905]: 8:5: [*] `zip()` without an explicit `strict=` parameter
 
+ --> B905.py:8:5
   |
 6 | zip("a", "b")
 7 | zip("a", "b", *zip("c"))
@@ -125,8 +131,9 @@ error[B905]: B905.py:8:5: [*] `zip()` without an explicit `strict=` parameter
 10 10 | 
 11 11 | # OK
 
-error[B905]: B905.py:9:1: [*] `zip()` without an explicit `strict=` parameter
+error[B905]: 9:1: [*] `zip()` without an explicit `strict=` parameter
 
+  --> B905.py:8:28
    |
  7 | zip("a", "b", *zip("c"))
  8 | zip(zip("a"), strict=False)
@@ -146,8 +153,9 @@ error[B905]: B905.py:9:1: [*] `zip()` without an explicit `strict=` parameter
 11 11 | # OK
 12 12 | zip(range(3), strict=True)
 
-error[B905]: B905.py:24:1: [*] `zip()` without an explicit `strict=` parameter
+error[B905]: 24:1: [*] `zip()` without an explicit `strict=` parameter
 
+  --> B905.py:23:30
    |
 23 | # Errors (limited iterators).
 24 | zip([1, 2, 3], repeat(1, 1))
@@ -165,8 +173,9 @@ error[B905]: B905.py:24:1: [*] `zip()` without an explicit `strict=` parameter
 26 26 | 
 27 27 | import builtins
 
-error[B905]: B905.py:25:1: [*] `zip()` without an explicit `strict=` parameter
+error[B905]: 25:1: [*] `zip()` without an explicit `strict=` parameter
 
+  --> B905.py:24:29
    |
 23 | # Errors (limited iterators).
 24 | zip([1, 2, 3], repeat(1, 1))
@@ -186,8 +195,9 @@ error[B905]: B905.py:25:1: [*] `zip()` without an explicit `strict=` parameter
 27 27 | import builtins
 28 28 | # Still an error even though it uses the qualified name
 
-error[B905]: B905.py:29:1: [*] `zip()` without an explicit `strict=` parameter
+error[B905]: 29:1: [*] `zip()` without an explicit `strict=` parameter
 
+  --> B905.py:28:56
    |
 27 | import builtins
 28 | # Still an error even though it uses the qualified name

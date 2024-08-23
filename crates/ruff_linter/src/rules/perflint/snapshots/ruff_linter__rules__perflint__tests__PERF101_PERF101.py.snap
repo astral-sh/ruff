@@ -1,8 +1,9 @@
 ---
 source: crates/ruff_linter/src/rules/perflint/mod.rs
 ---
-error[PERF101]: PERF101.py:7:10: [*] Do not cast an iterable to `list` before iterating over it
+error[PERF101]: 7:10: [*] Do not cast an iterable to `list` before iterating over it
 
+ --> PERF101.py:7:10
   |
 5 | foo_int = 123
 6 | 
@@ -21,8 +22,9 @@ error[PERF101]: PERF101.py:7:10: [*] Do not cast an iterable to `list` before it
 9 9 | 
 10 10 | for i in list(foo_list):  # PERF101
 
-error[PERF101]: PERF101.py:10:10: [*] Do not cast an iterable to `list` before iterating over it
+error[PERF101]: 10:10: [*] Do not cast an iterable to `list` before iterating over it
 
+  --> PERF101.py:10:10
    |
  8 |     pass
  9 | 
@@ -41,8 +43,9 @@ error[PERF101]: PERF101.py:10:10: [*] Do not cast an iterable to `list` before i
 12 12 | 
 13 13 | for i in list(foo_set):  # PERF101
 
-error[PERF101]: PERF101.py:13:10: [*] Do not cast an iterable to `list` before iterating over it
+error[PERF101]: 13:10: [*] Do not cast an iterable to `list` before iterating over it
 
+  --> PERF101.py:13:10
    |
 11 |     pass
 12 | 
@@ -61,8 +64,9 @@ error[PERF101]: PERF101.py:13:10: [*] Do not cast an iterable to `list` before i
 15 15 | 
 16 16 | for i in list((1, 2, 3)):  # PERF101
 
-error[PERF101]: PERF101.py:16:10: [*] Do not cast an iterable to `list` before iterating over it
+error[PERF101]: 16:10: [*] Do not cast an iterable to `list` before iterating over it
 
+  --> PERF101.py:16:10
    |
 14 |     pass
 15 | 
@@ -81,8 +85,9 @@ error[PERF101]: PERF101.py:16:10: [*] Do not cast an iterable to `list` before i
 18 18 | 
 19 19 | for i in list([1, 2, 3]):  # PERF101
 
-error[PERF101]: PERF101.py:19:10: [*] Do not cast an iterable to `list` before iterating over it
+error[PERF101]: 19:10: [*] Do not cast an iterable to `list` before iterating over it
 
+  --> PERF101.py:19:10
    |
 17 |     pass
 18 | 
@@ -101,8 +106,9 @@ error[PERF101]: PERF101.py:19:10: [*] Do not cast an iterable to `list` before i
 21 21 | 
 22 22 | for i in list({1, 2, 3}):  # PERF101
 
-error[PERF101]: PERF101.py:22:10: [*] Do not cast an iterable to `list` before iterating over it
+error[PERF101]: 22:10: [*] Do not cast an iterable to `list` before iterating over it
 
+  --> PERF101.py:22:10
    |
 20 |     pass
 21 | 
@@ -121,8 +127,9 @@ error[PERF101]: PERF101.py:22:10: [*] Do not cast an iterable to `list` before i
 24 24 | 
 25 25 | for i in list(
 
-error[PERF101]: PERF101.py:25:10: [*] Do not cast an iterable to `list` before iterating over it
+error[PERF101]: 25:10: [*] Do not cast an iterable to `list` before iterating over it
 
+  --> PERF101.py:25:10
    |
 23 |       pass
 24 |   
@@ -155,8 +162,9 @@ error[PERF101]: PERF101.py:25:10: [*] Do not cast an iterable to `list` before i
 33 31 | 
 34 32 | for i in list( # Comment
 
-error[PERF101]: PERF101.py:34:10: [*] Do not cast an iterable to `list` before iterating over it
+error[PERF101]: 34:10: [*] Do not cast an iterable to `list` before iterating over it
 
+  --> PERF101.py:34:10
    |
 32 |       pass
 33 |   
@@ -180,8 +188,9 @@ error[PERF101]: PERF101.py:34:10: [*] Do not cast an iterable to `list` before i
 38 36 | 
 39 37 | for i in list(foo_dict):  # OK
 
-error[PERF101]: PERF101.py:57:10: [*] Do not cast an iterable to `list` before iterating over it
+error[PERF101]: 57:10: [*] Do not cast an iterable to `list` before iterating over it
 
+  --> PERF101.py:57:10
    |
 55 |     foo_list.append(i + 1)
 56 | 
@@ -201,8 +210,9 @@ error[PERF101]: PERF101.py:57:10: [*] Do not cast an iterable to `list` before i
 59 59 |     other_list.append(i + 1)
 60 60 | 
 
-error[PERF101]: PERF101.py:69:10: [*] Do not cast an iterable to `list` before iterating over it
+error[PERF101]: 69:10: [*] Do not cast an iterable to `list` before iterating over it
 
+  --> PERF101.py:69:10
    |
 67 | x, y, nested_tuple = (1, 2, (3, 4, 5))
 68 | 
@@ -221,8 +231,9 @@ error[PERF101]: PERF101.py:69:10: [*] Do not cast an iterable to `list` before i
 71 71 | 
 72 72 | for i in list(foo_list):  # OK
 
-error[PERF101]: PERF101.py:86:10: [*] Do not cast an iterable to `list` before iterating over it
+error[PERF101]: 86:10: [*] Do not cast an iterable to `list` before iterating over it
 
+  --> PERF101.py:86:10
    |
 84 | import builtins
 85 | 

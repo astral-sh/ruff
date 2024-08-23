@@ -1,8 +1,9 @@
 ---
 source: crates/ruff_linter/src/rules/pycodestyle/mod.rs
 ---
-error[E703]: E70.py:10:13: [*] Statement ends with an unnecessary semicolon
+error[E703]: 10:13: [*] Statement ends with an unnecessary semicolon
 
+  --> E70.py:10:13
    |
  8 | import bdist_egg; bdist_egg.write_safety_flag(cmd.egg_info, safe)
  9 | #: E703:1:13
@@ -22,8 +23,9 @@ error[E703]: E70.py:10:13: [*] Statement ends with an unnecessary semicolon
 12 12 | del a[:]; a.append(42);
 13 13 | #: E704:1:1
 
-error[E703]: E70.py:12:23: [*] Statement ends with an unnecessary semicolon
+error[E703]: 12:23: [*] Statement ends with an unnecessary semicolon
 
+  --> E70.py:12:23
    |
 10 | import shlex;
 11 | #: E702:1:9 E703:1:23
@@ -43,8 +45,9 @@ error[E703]: E70.py:12:23: [*] Statement ends with an unnecessary semicolon
 14 14 | def f(x): return 2
 15 15 | #: E704:1:1
 
-error[E703]: E70.py:25:14: [*] Statement ends with an unnecessary semicolon
+error[E703]: 25:14: [*] Statement ends with an unnecessary semicolon
 
+  --> E70.py:25:14
    |
 23 |     def f(x): return 2*x
 24 | #: E704:1:8 E702:1:11 E703:1:14
@@ -64,8 +67,9 @@ error[E703]: E70.py:25:14: [*] Statement ends with an unnecessary semicolon
 27 27 | if True: lambda a: b
 28 28 | #: E701:1:10
 
-error[E703]: E70.py:68:1: [*] Statement ends with an unnecessary semicolon
+error[E703]: 68:1: [*] Statement ends with an unnecessary semicolon
 
+  --> E70.py:67:3
    |
 66 | #: E703:2:1
 67 | 0\
@@ -86,8 +90,9 @@ error[E703]: E70.py:68:1: [*] Statement ends with an unnecessary semicolon
 70 69 | a = \
 71 70 |   5;
 
-error[E703]: E70.py:71:4: [*] Statement ends with an unnecessary semicolon
+error[E703]: 71:4: [*] Statement ends with an unnecessary semicolon
 
+  --> E70.py:71:4
    |
 69 | #: E701:2:3
 70 | a = \

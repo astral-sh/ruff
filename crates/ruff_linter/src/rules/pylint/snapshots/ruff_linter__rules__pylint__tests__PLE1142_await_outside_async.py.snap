@@ -1,15 +1,17 @@
 ---
 source: crates/ruff_linter/src/rules/pylint/mod.rs
 ---
-error[PLE1142]: await_outside_async.py:12:11: `await` should be used within an async function
+error[PLE1142]: 12:11: `await` should be used within an async function
 
+  --> await_outside_async.py:12:11
    |
 11 | def not_async():
 12 |     print(await nested())  # [await-outside-async]
    |           ^^^^^^^^^^^^^^
    |
-error[PLE1142]: await_outside_async.py:25:9: `await` should be used within an async function
+error[PLE1142]: 25:9: `await` should be used within an async function
 
+  --> await_outside_async.py:25:9
    |
 23 | async def func2():
 24 |     def inner_func():

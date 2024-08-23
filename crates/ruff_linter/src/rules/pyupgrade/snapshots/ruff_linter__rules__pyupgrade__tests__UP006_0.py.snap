@@ -1,8 +1,9 @@
 ---
 source: crates/ruff_linter/src/rules/pyupgrade/mod.rs
 ---
-error[UP006]: UP006_0.py:4:10: [*] Use `list` instead of `typing.List` for type annotation
+error[UP006]: 4:10: [*] Use `list` instead of `typing.List` for type annotation
 
+ --> UP006_0.py:4:10
   |
 4 | def f(x: typing.List[str]) -> None:
   |          ^^^^^^^^^^^
@@ -19,8 +20,9 @@ error[UP006]: UP006_0.py:4:10: [*] Use `list` instead of `typing.List` for type 
 6 6 | 
 7 7 | 
 
-error[UP006]: UP006_0.py:11:10: [*] Use `list` instead of `List` for type annotation
+error[UP006]: 11:10: [*] Use `list` instead of `List` for type annotation
 
+  --> UP006_0.py:11:10
    |
 11 | def f(x: List[str]) -> None:
    |          ^^^^
@@ -37,8 +39,9 @@ error[UP006]: UP006_0.py:11:10: [*] Use `list` instead of `List` for type annota
 13 13 | 
 14 14 | 
 
-error[UP006]: UP006_0.py:18:10: [*] Use `list` instead of `t.List` for type annotation
+error[UP006]: 18:10: [*] Use `list` instead of `t.List` for type annotation
 
+  --> UP006_0.py:18:10
    |
 18 | def f(x: t.List[str]) -> None:
    |          ^^^^^^
@@ -55,8 +58,9 @@ error[UP006]: UP006_0.py:18:10: [*] Use `list` instead of `t.List` for type anno
 20 20 | 
 21 21 | 
 
-error[UP006]: UP006_0.py:25:10: [*] Use `list` instead of `IList` for type annotation
+error[UP006]: 25:10: [*] Use `list` instead of `IList` for type annotation
 
+  --> UP006_0.py:25:10
    |
 25 | def f(x: IList[str]) -> None:
    |          ^^^^^
@@ -73,8 +77,9 @@ error[UP006]: UP006_0.py:25:10: [*] Use `list` instead of `IList` for type annot
 27 27 | 
 28 28 | 
 
-error[UP006]: UP006_0.py:29:11: [*] Use `list` instead of `List` for type annotation
+error[UP006]: 29:11: [*] Use `list` instead of `List` for type annotation
 
+  --> UP006_0.py:29:11
    |
 29 | def f(x: "List[str]") -> None:
    |           ^^^^
@@ -91,8 +96,9 @@ error[UP006]: UP006_0.py:29:11: [*] Use `list` instead of `List` for type annota
 31 31 | 
 32 32 | 
 
-error[UP006]: UP006_0.py:33:12: [*] Use `list` instead of `List` for type annotation
+error[UP006]: 33:12: [*] Use `list` instead of `List` for type annotation
 
+  --> UP006_0.py:33:12
    |
 33 | def f(x: r"List[str]") -> None:
    |            ^^^^
@@ -109,8 +115,9 @@ error[UP006]: UP006_0.py:33:12: [*] Use `list` instead of `List` for type annota
 35 35 | 
 36 36 | 
 
-error[UP006]: UP006_0.py:37:11: [*] Use `list` instead of `List` for type annotation
+error[UP006]: 37:11: [*] Use `list` instead of `List` for type annotation
 
+  --> UP006_0.py:37:11
    |
 37 | def f(x: "List[str]") -> None:
    |           ^^^^
@@ -127,8 +134,9 @@ error[UP006]: UP006_0.py:37:11: [*] Use `list` instead of `List` for type annota
 39 39 | 
 40 40 | 
 
-error[UP006]: UP006_0.py:41:13: [*] Use `list` instead of `List` for type annotation
+error[UP006]: 41:13: [*] Use `list` instead of `List` for type annotation
 
+  --> UP006_0.py:41:13
    |
 41 | def f(x: """List[str]""") -> None:
    |             ^^^^
@@ -145,16 +153,18 @@ error[UP006]: UP006_0.py:41:13: [*] Use `list` instead of `List` for type annota
 43 43 | 
 44 44 | 
 
-error[UP006]: UP006_0.py:45:10: Use `list` instead of `List` for type annotation
+error[UP006]: 45:10: Use `list` instead of `List` for type annotation
 
+  --> UP006_0.py:45:10
    |
 45 | def f(x: "Li" "st[str]") -> None:
    |          ^^^^^^^^^^^^^^
 46 |     ...
    |
    = help: Replace with `list`
-error[UP006]: UP006_0.py:49:11: [*] Use `list` instead of `List` for type annotation
+error[UP006]: 49:11: [*] Use `list` instead of `List` for type annotation
 
+  --> UP006_0.py:49:11
    |
 49 | def f(x: "List['List[str]']") -> None:
    |           ^^^^
@@ -171,8 +181,9 @@ error[UP006]: UP006_0.py:49:11: [*] Use `list` instead of `List` for type annota
 51 51 | 
 52 52 | 
 
-error[UP006]: UP006_0.py:49:17: [*] Use `list` instead of `List` for type annotation
+error[UP006]: 49:17: [*] Use `list` instead of `List` for type annotation
 
+  --> UP006_0.py:49:17
    |
 49 | def f(x: "List['List[str]']") -> None:
    |                 ^^^^
@@ -189,8 +200,9 @@ error[UP006]: UP006_0.py:49:17: [*] Use `list` instead of `List` for type annota
 51 51 | 
 52 52 | 
 
-error[UP006]: UP006_0.py:53:11: [*] Use `list` instead of `List` for type annotation
+error[UP006]: 53:11: [*] Use `list` instead of `List` for type annotation
 
+  --> UP006_0.py:53:11
    |
 53 | def f(x: "List['Li' 'st[str]']") -> None:
    |           ^^^^
@@ -207,32 +219,36 @@ error[UP006]: UP006_0.py:53:11: [*] Use `list` instead of `List` for type annota
 55 55 | 
 56 56 | 
 
-error[UP006]: UP006_0.py:53:16: Use `list` instead of `List` for type annotation
+error[UP006]: 53:16: Use `list` instead of `List` for type annotation
 
+  --> UP006_0.py:53:16
    |
 53 | def f(x: "List['Li' 'st[str]']") -> None:
    |                ^^^^^^^^^^^^^^
 54 |     ...
    |
    = help: Replace with `list`
-error[UP006]: UP006_0.py:57:10: Use `list` instead of `List` for type annotation
+error[UP006]: 57:10: Use `list` instead of `List` for type annotation
 
+  --> UP006_0.py:57:10
    |
 57 | def f(x: "Li" "st['List[str]']") -> None:
    |          ^^^^^^^^^^^^^^^^^^^^^^
 58 |     ...
    |
    = help: Replace with `list`
-error[UP006]: UP006_0.py:57:10: Use `list` instead of `List` for type annotation
+error[UP006]: 57:10: Use `list` instead of `List` for type annotation
 
+  --> UP006_0.py:57:10
    |
 57 | def f(x: "Li" "st['List[str]']") -> None:
    |          ^^^^^^^^^^^^^^^^^^^^^^
 58 |     ...
    |
    = help: Replace with `list`
-error[UP006]: UP006_0.py:61:10: [*] Use `collections.deque` instead of `typing.Deque` for type annotation
+error[UP006]: 61:10: [*] Use `collections.deque` instead of `typing.Deque` for type annotation
 
+  --> UP006_0.py:61:10
    |
 61 | def f(x: typing.Deque[str]) -> None:
    |          ^^^^^^^^^^^^
@@ -257,8 +273,9 @@ error[UP006]: UP006_0.py:61:10: [*] Use `collections.deque` instead of `typing.D
 63 64 | 
 64 65 | 
 
-error[UP006]: UP006_0.py:65:10: [*] Use `collections.defaultdict` instead of `typing.DefaultDict` for type annotation
+error[UP006]: 65:10: [*] Use `collections.defaultdict` instead of `typing.DefaultDict` for type annotation
 
+  --> UP006_0.py:65:10
    |
 65 | def f(x: typing.DefaultDict[str, str]) -> None:
    |          ^^^^^^^^^^^^^^^^^^

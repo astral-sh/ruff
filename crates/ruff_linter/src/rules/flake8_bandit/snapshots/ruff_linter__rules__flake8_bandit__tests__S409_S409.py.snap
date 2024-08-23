@@ -1,15 +1,17 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_bandit/mod.rs
 ---
-error[S409]: S409.py:1:6: `xml.dom.pulldom` is vulnerable to XML attacks
+error[S409]: 1:6: `xml.dom.pulldom` is vulnerable to XML attacks
 
+ --> S409.py:1:6
   |
 1 | from xml.dom.pulldom import parseString  # S409
   |      ^^^^^^^^^^^^^^^
 2 | import xml.dom.pulldom  # S409
   |
-error[S409]: S409.py:2:8: `xml.dom.pulldom` is vulnerable to XML attacks
+error[S409]: 2:8: `xml.dom.pulldom` is vulnerable to XML attacks
 
+ --> S409.py:2:8
   |
 1 | from xml.dom.pulldom import parseString  # S409
 2 | import xml.dom.pulldom  # S409

@@ -1,31 +1,35 @@
 ---
 source: crates/ruff_linter/src/rules/pyflakes/mod.rs
 ---
-error[F704]: F704.py:6:5: `yield` statement outside of a function
+error[F704]: 6:5: `yield` statement outside of a function
 
+ --> F704.py:6:5
   |
 5 | class Foo:
 6 |     yield 2
   |     ^^^^^^^
   |
-error[F704]: F704.py:9:1: `yield` statement outside of a function
+error[F704]: 9:1: `yield` statement outside of a function
 
+  --> F704.py:9:1
    |
  9 | yield 3
    | ^^^^^^^
 10 | yield from 3
 11 | await f()
    |
-error[F704]: F704.py:10:1: `yield from` statement outside of a function
+error[F704]: 10:1: `yield from` statement outside of a function
 
+  --> F704.py:9:8
    |
  9 | yield 3
 10 | yield from 3
    | ^^^^^^^^^^^^
 11 | await f()
    |
-error[F704]: F704.py:11:1: `await` statement outside of a function
+error[F704]: 11:1: `await` statement outside of a function
 
+  --> F704.py:10:13
    |
  9 | yield 3
 10 | yield from 3

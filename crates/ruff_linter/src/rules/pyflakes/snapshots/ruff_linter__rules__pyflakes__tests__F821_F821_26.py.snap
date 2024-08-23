@@ -1,8 +1,9 @@
 ---
 source: crates/ruff_linter/src/rules/pyflakes/mod.rs
 ---
-error[F821]: F821_26.py:9:33: Undefined name `CStr`
+error[F821]: 9:33: Undefined name `CStr`
 
+  --> F821_26.py:9:33
    |
  8 | # Forward references:
  9 | MaybeCStr: TypeAlias = Optional[CStr]  # valid in a `.pyi` stub file, not in a `.py` runtime file
@@ -10,8 +11,9 @@ error[F821]: F821_26.py:9:33: Undefined name `CStr`
 10 | MaybeCStr2: TypeAlias = Optional["CStr"]  # always okay
 11 | CStr: TypeAlias = Union[C, str]  # valid in a `.pyi` stub file, not in a `.py` runtime file
    |
-error[F821]: F821_26.py:11:25: Undefined name `C`
+error[F821]: 11:25: Undefined name `C`
 
+  --> F821_26.py:11:25
    |
  9 | MaybeCStr: TypeAlias = Optional[CStr]  # valid in a `.pyi` stub file, not in a `.py` runtime file
 10 | MaybeCStr2: TypeAlias = Optional["CStr"]  # always okay
@@ -19,8 +21,9 @@ error[F821]: F821_26.py:11:25: Undefined name `C`
    |                         ^
 12 | CStr2: TypeAlias = Union["C", str]  # always okay
    |
-error[F821]: F821_26.py:16:12: Undefined name `C`
+error[F821]: 16:12: Undefined name `C`
 
+  --> F821_26.py:16:12
    |
 14 | # References to a class from inside the class:
 15 | class C:
@@ -29,8 +32,9 @@ error[F821]: F821_26.py:16:12: Undefined name `C`
 17 |     other2: "C" = ...  # always okay
 18 |     def from_str(self, s: str) -> C: ...  # valid in a `.pyi` stub file, not in a `.py` runtime file
    |
-error[F821]: F821_26.py:18:35: Undefined name `C`
+error[F821]: 18:35: Undefined name `C`
 
+  --> F821_26.py:18:35
    |
 16 |     other: C = ...  # valid in a `.pyi` stub file, not in a `.py` runtime file
 17 |     other2: "C" = ...  # always okay
@@ -38,8 +42,9 @@ error[F821]: F821_26.py:18:35: Undefined name `C`
    |                                   ^
 19 |     def from_str2(self, s: str) -> "C": ...  # always okay
    |
-error[F821]: F821_26.py:23:10: Undefined name `B`
+error[F821]: 23:10: Undefined name `B`
 
+  --> F821_26.py:23:10
    |
 21 | # Circular references:
 22 | class A:
@@ -48,8 +53,9 @@ error[F821]: F821_26.py:23:10: Undefined name `B`
 24 |     foo2: "B"  # always okay
 25 |     bar: dict[str, B]  # valid in a `.pyi` stub file, not in a `.py` runtime file
    |
-error[F821]: F821_26.py:25:20: Undefined name `B`
+error[F821]: 25:20: Undefined name `B`
 
+  --> F821_26.py:25:20
    |
 23 |     foo: B  # valid in a `.pyi` stub file, not in a `.py` runtime file
 24 |     foo2: "B"  # always okay
@@ -57,16 +63,18 @@ error[F821]: F821_26.py:25:20: Undefined name `B`
    |                    ^
 26 |     bar2: dict[str, "A"]  # always okay
    |
-error[F821]: F821_26.py:33:17: Undefined name `Tree`
+error[F821]: 33:17: Undefined name `Tree`
 
+  --> F821_26.py:33:17
    |
 32 | class Leaf: ...
 33 | class Tree(list[Tree | Leaf]): ...  # valid in a `.pyi` stub file, not in a `.py` runtime file
    |                 ^^^^
 34 | class Tree2(list["Tree | Leaf"]): ...  # always okay
    |
-error[F821]: F821_26.py:39:11: Undefined name `foo`
+error[F821]: 39:11: Undefined name `foo`
 
+  --> F821_26.py:39:11
    |
 37 | class MyClass:
 38 |     foo: int
@@ -74,8 +82,9 @@ error[F821]: F821_26.py:39:11: Undefined name `foo`
    |           ^^^
 40 |     bar = "foo"  # always okay
    |
-error[F821]: F821_26.py:43:8: Undefined name `baz`
+error[F821]: 43:8: Undefined name `baz`
 
+  --> F821_26.py:43:8
    |
 42 | baz: MyClass
 43 | eggs = baz  # valid in a `.pyi` stub file, not in a `.py` runtime file

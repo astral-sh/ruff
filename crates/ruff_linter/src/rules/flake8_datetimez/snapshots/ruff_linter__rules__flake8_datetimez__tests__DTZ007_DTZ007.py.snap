@@ -1,8 +1,9 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_datetimez/mod.rs
 ---
-error[DTZ007]: DTZ007.py:4:1: Naive datetime constructed using `datetime.datetime.strptime()` without %z
+error[DTZ007]: 4:1: Naive datetime constructed using `datetime.datetime.strptime()` without %z
 
+ --> DTZ007.py:3:13
   |
 3 | # bad format
 4 | datetime.datetime.strptime("something", "%H:%M:%S%Z")
@@ -11,8 +12,9 @@ error[DTZ007]: DTZ007.py:4:1: Naive datetime constructed using `datetime.datetim
 6 | # no replace or astimezone
   |
   = help: Call `.replace(tzinfo=<timezone>)` or `.astimezone()` to convert to an aware datetime
-error[DTZ007]: DTZ007.py:7:1: Naive datetime constructed using `datetime.datetime.strptime()` without %z
+error[DTZ007]: 7:1: Naive datetime constructed using `datetime.datetime.strptime()` without %z
 
+ --> DTZ007.py:6:27
   |
 6 | # no replace or astimezone
 7 | datetime.datetime.strptime("something", "something")
@@ -21,8 +23,9 @@ error[DTZ007]: DTZ007.py:7:1: Naive datetime constructed using `datetime.datetim
 9 | # wrong replace
   |
   = help: Call `.replace(tzinfo=<timezone>)` or `.astimezone()` to convert to an aware datetime
-error[DTZ007]: DTZ007.py:10:1: Naive datetime constructed using `datetime.datetime.strptime()` without %z
+error[DTZ007]: 10:1: Naive datetime constructed using `datetime.datetime.strptime()` without %z
 
+  --> DTZ007.py:9:16
    |
  9 | # wrong replace
 10 | datetime.datetime.strptime("something", "something").replace(hour=1)
@@ -31,8 +34,9 @@ error[DTZ007]: DTZ007.py:10:1: Naive datetime constructed using `datetime.dateti
 12 | # none replace
    |
    = help: Call `.replace(tzinfo=<timezone>)` or `.astimezone()` to convert to an aware datetime
-error[DTZ007]: DTZ007.py:13:1: `datetime.datetime.strptime(...).replace(tz=None)` used
+error[DTZ007]: 13:1: `datetime.datetime.strptime(...).replace(tz=None)` used
 
+  --> DTZ007.py:12:15
    |
 12 | # none replace
 13 | datetime.datetime.strptime("something", "something").replace(tzinfo=None)
@@ -41,8 +45,9 @@ error[DTZ007]: DTZ007.py:13:1: `datetime.datetime.strptime(...).replace(tz=None)
 15 | # OK
    |
    = help: Pass a `datetime.timezone` object to the `tzinfo` parameter
-error[DTZ007]: DTZ007.py:35:1: Naive datetime constructed using `datetime.datetime.strptime()` without %z
+error[DTZ007]: 35:1: Naive datetime constructed using `datetime.datetime.strptime()` without %z
 
+  --> DTZ007.py:34:38
    |
 34 | # no replace orastimezone unqualified
 35 | datetime.strptime("something", "something")

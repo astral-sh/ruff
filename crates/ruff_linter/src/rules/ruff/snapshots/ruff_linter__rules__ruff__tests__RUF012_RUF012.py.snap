@@ -1,8 +1,9 @@
 ---
 source: crates/ruff_linter/src/rules/ruff/mod.rs
 ---
-error[RUF012]: RUF012.py:9:34: Mutable class attributes should be annotated with `typing.ClassVar`
+error[RUF012]: 9:34: Mutable class attributes should be annotated with `typing.ClassVar`
 
+  --> RUF012.py:9:34
    |
  7 |     }
  8 | 
@@ -11,8 +12,9 @@ error[RUF012]: RUF012.py:9:34: Mutable class attributes should be annotated with
 10 |     immutable_annotation: Sequence[int] = []
 11 |     without_annotation = []
    |
-error[RUF012]: RUF012.py:11:26: Mutable class attributes should be annotated with `typing.ClassVar`
+error[RUF012]: 11:26: Mutable class attributes should be annotated with `typing.ClassVar`
 
+  --> RUF012.py:11:26
    |
  9 |     mutable_default: list[int] = []
 10 |     immutable_annotation: Sequence[int] = []
@@ -21,8 +23,9 @@ error[RUF012]: RUF012.py:11:26: Mutable class attributes should be annotated wit
 12 |     class_variable: ClassVar[list[int]] = []
 13 |     final_variable: Final[list[int]] = []
    |
-error[RUF012]: RUF012.py:25:26: Mutable class attributes should be annotated with `typing.ClassVar`
+error[RUF012]: 25:26: Mutable class attributes should be annotated with `typing.ClassVar`
 
+  --> RUF012.py:25:26
    |
 23 |     mutable_default: list[int] = []
 24 |     immutable_annotation: Sequence[int] = []

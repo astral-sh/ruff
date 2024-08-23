@@ -1,14 +1,15 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_simplify/mod.rs
 ---
-SIM101.py:1:4: SIM101 [*] Multiple `isinstance` calls for `a`, merge into a single call
+error[SIM101]: 1:4: [*] Multiple `isinstance` calls for `a`, merge into a single call
+
+ --> SIM101.py:1:4
   |
 1 | if isinstance(a, int) or isinstance(a, float):  # SIM101
-  |    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ SIM101
+  |    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 2 |     pass
   |
   = help: Merge `isinstance` calls for `a`
-
 ℹ Unsafe fix
 1   |-if isinstance(a, int) or isinstance(a, float):  # SIM101
   1 |+if isinstance(a, (int, float)):  # SIM101
@@ -16,16 +17,17 @@ SIM101.py:1:4: SIM101 [*] Multiple `isinstance` calls for `a`, merge into a sing
 3 3 | 
 4 4 | if isinstance(a, (int, float)) or isinstance(a, bool):  # SIM101
 
-SIM101.py:4:4: SIM101 [*] Multiple `isinstance` calls for `a`, merge into a single call
+error[SIM101]: 4:4: [*] Multiple `isinstance` calls for `a`, merge into a single call
+
+ --> SIM101.py:4:4
   |
 2 |     pass
 3 | 
 4 | if isinstance(a, (int, float)) or isinstance(a, bool):  # SIM101
-  |    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ SIM101
+  |    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 5 |     pass
   |
   = help: Merge `isinstance` calls for `a`
-
 ℹ Unsafe fix
 1 1 | if isinstance(a, int) or isinstance(a, float):  # SIM101
 2 2 |     pass
@@ -36,16 +38,17 @@ SIM101.py:4:4: SIM101 [*] Multiple `isinstance` calls for `a`, merge into a sing
 6 6 | 
 7 7 | if isinstance(a, int) or isinstance(a, float) or isinstance(b, bool):  # SIM101
 
-SIM101.py:7:4: SIM101 [*] Multiple `isinstance` calls for `a`, merge into a single call
+error[SIM101]: 7:4: [*] Multiple `isinstance` calls for `a`, merge into a single call
+
+ --> SIM101.py:7:4
   |
 5 |     pass
 6 | 
 7 | if isinstance(a, int) or isinstance(a, float) or isinstance(b, bool):  # SIM101
-  |    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ SIM101
+  |    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 8 |     pass
   |
   = help: Merge `isinstance` calls for `a`
-
 ℹ Unsafe fix
 4 4 | if isinstance(a, (int, float)) or isinstance(a, bool):  # SIM101
 5 5 |     pass
@@ -56,16 +59,17 @@ SIM101.py:7:4: SIM101 [*] Multiple `isinstance` calls for `a`, merge into a sing
 9 9 | 
 10 10 | if isinstance(b, bool) or isinstance(a, int) or isinstance(a, float):  # SIM101
 
-SIM101.py:10:4: SIM101 [*] Multiple `isinstance` calls for `a`, merge into a single call
+error[SIM101]: 10:4: [*] Multiple `isinstance` calls for `a`, merge into a single call
+
+  --> SIM101.py:10:4
    |
  8 |     pass
  9 | 
 10 | if isinstance(b, bool) or isinstance(a, int) or isinstance(a, float):  # SIM101
-   |    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ SIM101
+   |    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 11 |     pass
    |
    = help: Merge `isinstance` calls for `a`
-
 ℹ Unsafe fix
 7  7  | if isinstance(a, int) or isinstance(a, float) or isinstance(b, bool):  # SIM101
 8  8  |     pass
@@ -76,16 +80,17 @@ SIM101.py:10:4: SIM101 [*] Multiple `isinstance` calls for `a`, merge into a sin
 12 12 | 
 13 13 | if isinstance(a, int) or isinstance(b, bool) or isinstance(a, float):  # SIM101
 
-SIM101.py:16:5: SIM101 [*] Multiple `isinstance` calls for `a`, merge into a single call
+error[SIM101]: 16:5: [*] Multiple `isinstance` calls for `a`, merge into a single call
+
+  --> SIM101.py:16:5
    |
 14 |     pass
 15 | 
 16 | if (isinstance(a, int) or isinstance(a, float)) and isinstance(b, bool):  # SIM101
-   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ SIM101
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 17 |     pass
    |
    = help: Merge `isinstance` calls for `a`
-
 ℹ Unsafe fix
 13 13 | if isinstance(a, int) or isinstance(b, bool) or isinstance(a, float):  # SIM101
 14 14 |     pass
@@ -96,16 +101,17 @@ SIM101.py:16:5: SIM101 [*] Multiple `isinstance` calls for `a`, merge into a sin
 18 18 | 
 19 19 | if isinstance(a.b, int) or isinstance(a.b, float):  # SIM101
 
-SIM101.py:19:4: SIM101 [*] Multiple `isinstance` calls for expression, merge into a single call
+error[SIM101]: 19:4: [*] Multiple `isinstance` calls for expression, merge into a single call
+
+  --> SIM101.py:19:4
    |
 17 |     pass
 18 | 
 19 | if isinstance(a.b, int) or isinstance(a.b, float):  # SIM101
-   |    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ SIM101
+   |    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 20 |     pass
    |
    = help: Merge `isinstance` calls
-
 ℹ Unsafe fix
 16 16 | if (isinstance(a, int) or isinstance(a, float)) and isinstance(b, bool):  # SIM101
 17 17 |     pass
@@ -116,26 +122,28 @@ SIM101.py:19:4: SIM101 [*] Multiple `isinstance` calls for expression, merge int
 21 21 | 
 22 22 | if isinstance(a(), int) or isinstance(a(), float):  # SIM101
 
-SIM101.py:22:4: SIM101 Multiple `isinstance` calls for expression, merge into a single call
+error[SIM101]: 22:4: Multiple `isinstance` calls for expression, merge into a single call
+
+  --> SIM101.py:22:4
    |
 20 |     pass
 21 | 
 22 | if isinstance(a(), int) or isinstance(a(), float):  # SIM101
-   |    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ SIM101
+   |    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 23 |     pass
    |
    = help: Merge `isinstance` calls
+error[SIM101]: 38:4: [*] Multiple `isinstance` calls for `a`, merge into a single call
 
-SIM101.py:38:4: SIM101 [*] Multiple `isinstance` calls for `a`, merge into a single call
+  --> SIM101.py:38:4
    |
 36 |     pass
 37 | 
 38 | if x or isinstance(a, int) or isinstance(a, float):
-   |    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ SIM101
+   |    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 39 |     pass
    |
    = help: Merge `isinstance` calls for `a`
-
 ℹ Unsafe fix
 35 35 | if isinstance(a, int) or unrelated_condition or isinstance(a, float):
 36 36 |     pass
@@ -146,16 +154,17 @@ SIM101.py:38:4: SIM101 [*] Multiple `isinstance` calls for `a`, merge into a sin
 40 40 | 
 41 41 | if x or y or isinstance(a, int) or isinstance(a, float) or z:
 
-SIM101.py:41:4: SIM101 [*] Multiple `isinstance` calls for `a`, merge into a single call
+error[SIM101]: 41:4: [*] Multiple `isinstance` calls for `a`, merge into a single call
+
+  --> SIM101.py:41:4
    |
 39 |     pass
 40 | 
 41 | if x or y or isinstance(a, int) or isinstance(a, float) or z:
-   |    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ SIM101
+   |    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 42 |     pass
    |
    = help: Merge `isinstance` calls for `a`
-
 ℹ Unsafe fix
 38 38 | if x or isinstance(a, int) or isinstance(a, float):
 39 39 |     pass
@@ -166,15 +175,16 @@ SIM101.py:41:4: SIM101 [*] Multiple `isinstance` calls for `a`, merge into a sin
 43 43 | 
 44 44 | def f():
 
-SIM101.py:53:3: SIM101 [*] Multiple `isinstance` calls for `a`, merge into a single call
+error[SIM101]: 53:3: [*] Multiple `isinstance` calls for `a`, merge into a single call
+
+  --> SIM101.py:53:3
    |
 52 | # Regression test for: https://github.com/astral-sh/ruff/issues/7455#issuecomment-1722460483
 53 | if(isinstance(a, int)) or (isinstance(a, float)):
-   |   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ SIM101
+   |   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 54 |     pass
    |
    = help: Merge `isinstance` calls for `a`
-
 ℹ Unsafe fix
 50 50 |         pass
 51 51 | 

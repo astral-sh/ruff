@@ -1,24 +1,27 @@
 ---
 source: crates/ruff_linter/src/rules/pep8_naming/mod.rs
 ---
-error[N813]: N813.py:1:8: Camelcase `Camel` imported as lowercase `camel`
+error[N813]: 1:8: Camelcase `Camel` imported as lowercase `camel`
 
+ --> N813.py:1:8
   |
 1 | import mod.Camel as camel
   |        ^^^^^^^^^^^^^^^^^^
 2 | from mod import CamelCase as camelcase
 3 | from mod import AnotherCamelCase as another_camelcase
   |
-error[N813]: N813.py:2:17: Camelcase `CamelCase` imported as lowercase `camelcase`
+error[N813]: 2:17: Camelcase `CamelCase` imported as lowercase `camelcase`
 
+ --> N813.py:2:17
   |
 1 | import mod.Camel as camel
 2 | from mod import CamelCase as camelcase
   |                 ^^^^^^^^^^^^^^^^^^^^^^
 3 | from mod import AnotherCamelCase as another_camelcase
   |
-error[N813]: N813.py:3:17: Camelcase `AnotherCamelCase` imported as lowercase `another_camelcase`
+error[N813]: 3:17: Camelcase `AnotherCamelCase` imported as lowercase `another_camelcase`
 
+ --> N813.py:3:17
   |
 1 | import mod.Camel as camel
 2 | from mod import CamelCase as camelcase

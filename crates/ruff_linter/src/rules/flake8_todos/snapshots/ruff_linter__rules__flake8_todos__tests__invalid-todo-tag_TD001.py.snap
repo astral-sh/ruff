@@ -1,8 +1,9 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_todos/mod.rs
 ---
-error[TD001]: TD001.py:7:3: Invalid TODO tag: `XXX`
+error[TD001]: 7:3: Invalid TODO tag: `XXX`
 
+ --> TD001.py:7:3
   |
 6 | # T001 - errors
 7 | # XXX (evanrittenhouse): this is not fine
@@ -10,8 +11,9 @@ error[TD001]: TD001.py:7:3: Invalid TODO tag: `XXX`
 8 | # FIXME (evanrittenhouse): this is not fine
 9 | # foo # XXX: this isn't fine either
   |
-error[TD001]: TD001.py:8:3: Invalid TODO tag: `FIXME`
+error[TD001]: 8:3: Invalid TODO tag: `FIXME`
 
+ --> TD001.py:8:3
   |
 6 | # T001 - errors
 7 | # XXX (evanrittenhouse): this is not fine
@@ -19,8 +21,9 @@ error[TD001]: TD001.py:8:3: Invalid TODO tag: `FIXME`
   |   ^^^^^
 9 | # foo # XXX: this isn't fine either
   |
-error[TD001]: TD001.py:9:9: Invalid TODO tag: `XXX`
+error[TD001]: 9:9: Invalid TODO tag: `XXX`
 
+ --> TD001.py:9:9
   |
 7 | # XXX (evanrittenhouse): this is not fine
 8 | # FIXME (evanrittenhouse): this is not fine

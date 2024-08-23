@@ -1,16 +1,18 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_quotes/mod.rs
 ---
-error[Q000]: doubles_would_be_triple_quotes.py:1:5: Double quotes found but single quotes preferred
+error[Q000]: 1:5: Double quotes found but single quotes preferred
 
+ --> doubles_would_be_triple_quotes.py:1:5
   |
 1 | s = ""'Start with empty string' ' and lint docstring safely'
   |     ^^
 2 | s = "Do not"' start with empty string' ' and lint docstring safely'
   |
   = help: Replace double quotes with single quotes
-error[Q000]: doubles_would_be_triple_quotes.py:2:5: [*] Double quotes found but single quotes preferred
+error[Q000]: 2:5: [*] Double quotes found but single quotes preferred
 
+ --> doubles_would_be_triple_quotes.py:2:5
   |
 1 | s = ""'Start with empty string' ' and lint docstring safely'
 2 | s = "Do not"' start with empty string' ' and lint docstring safely'

@@ -1,8 +1,9 @@
 ---
 source: crates/ruff_linter/src/rules/pydocstyle/mod.rs
 ---
-error[D417]: sections.py:292:9: Missing argument description in the docstring for `bar`: `y`
+error[D417]: 292:9: Missing argument description in the docstring for `bar`: `y`
 
+   --> sections.py:292:9
     |
 290 |     x = 1
 291 | 
@@ -10,8 +11,9 @@ error[D417]: sections.py:292:9: Missing argument description in the docstring fo
     |         ^^^
 293 |         """Nested function test for docstrings.
     |
-error[D417]: sections.py:309:5: Missing argument description in the docstring for `test_missing_google_args`: `y`
+error[D417]: 309:5: Missing argument description in the docstring for `test_missing_google_args`: `y`
 
+   --> sections.py:309:5
     |
 307 |         "(argument(s) y are missing descriptions in "
 308 |         "'test_missing_google_args' docstring)")
@@ -19,8 +21,9 @@ error[D417]: sections.py:309:5: Missing argument description in the docstring fo
     |     ^^^^^^^^^^^^^^^^^^^^^^^^
 310 |     """Toggle the gizmo.
     |
-error[D417]: sections.py:333:9: Missing argument descriptions in the docstring for `test_missing_args`: `test`, `y`, `z`
+error[D417]: 333:9: Missing argument descriptions in the docstring for `test_missing_args`: `test`, `y`, `z`
 
+   --> sections.py:333:9
     |
 331 |             "(argument(s) test, y, z are missing descriptions in "
 332 |             "'test_missing_args' docstring)", arg_count=5)
@@ -28,8 +31,9 @@ error[D417]: sections.py:333:9: Missing argument descriptions in the docstring f
     |         ^^^^^^^^^^^^^^^^^
 334 |         """Test a valid args section.
     |
-error[D417]: sections.py:345:9: Missing argument descriptions in the docstring for `test_missing_args_class_method`: `test`, `y`, `z`
+error[D417]: 345:9: Missing argument descriptions in the docstring for `test_missing_args_class_method`: `test`, `y`, `z`
 
+   --> sections.py:345:9
     |
 343 |             "(argument(s) test, y, z are missing descriptions in "
 344 |             "'test_missing_args_class_method' docstring)", arg_count=5)
@@ -37,8 +41,9 @@ error[D417]: sections.py:345:9: Missing argument descriptions in the docstring f
     |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 346 |         """Test a valid args section.
     |
-error[D417]: sections.py:358:9: Missing argument descriptions in the docstring for `test_missing_args_static_method`: `a`, `y`, `z`
+error[D417]: 358:9: Missing argument descriptions in the docstring for `test_missing_args_static_method`: `a`, `y`, `z`
 
+   --> sections.py:358:9
     |
 356 |             "(argument(s) a, y, z are missing descriptions in "
 357 |             "'test_missing_args_static_method' docstring)", arg_count=4)
@@ -46,8 +51,9 @@ error[D417]: sections.py:358:9: Missing argument descriptions in the docstring f
     |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 359 |         """Test a valid args section.
     |
-error[D417]: sections.py:370:9: Missing argument descriptions in the docstring for `test_missing_docstring`: `a`, `b`
+error[D417]: 370:9: Missing argument descriptions in the docstring for `test_missing_docstring`: `a`, `b`
 
+   --> sections.py:370:9
     |
 368 |             "(argument(s) a, b are missing descriptions in "
 369 |             "'test_missing_docstring' docstring)", arg_count=2)
@@ -55,8 +61,9 @@ error[D417]: sections.py:370:9: Missing argument descriptions in the docstring f
     |         ^^^^^^^^^^^^^^^^^^^^^^
 371 |         """Test a valid args section.
     |
-error[D417]: sections.py:398:5: Missing argument description in the docstring for `test_missing_numpy_args`: `y`
+error[D417]: 398:5: Missing argument description in the docstring for `test_missing_numpy_args`: `y`
 
+   --> sections.py:398:5
     |
 396 |         "(argument(s) y are missing descriptions in "
 397 |         "'test_missing_numpy_args' docstring)")
@@ -64,8 +71,9 @@ error[D417]: sections.py:398:5: Missing argument description in the docstring fo
     |     ^^^^^^^^^^^^^^^^^^^^^^^
 399 |     """Toggle the gizmo.
     |
-error[D417]: sections.py:434:9: Missing argument descriptions in the docstring for `test_missing_args`: `test`, `y`, `z`
+error[D417]: 434:9: Missing argument descriptions in the docstring for `test_missing_args`: `test`, `y`, `z`
 
+   --> sections.py:434:9
     |
 432 |             "(argument(s) test, y, z are missing descriptions in "
 433 |             "'test_missing_args' docstring)", arg_count=5)
@@ -73,8 +81,9 @@ error[D417]: sections.py:434:9: Missing argument descriptions in the docstring f
     |         ^^^^^^^^^^^^^^^^^
 435 |         """Test a valid args section.
     |
-error[D417]: sections.py:449:9: Missing argument descriptions in the docstring for `test_missing_args_class_method`: `test`, `y`, `z`
+error[D417]: 449:9: Missing argument descriptions in the docstring for `test_missing_args_class_method`: `test`, `y`, `z`
 
+   --> sections.py:449:9
     |
 447 |             "(argument(s) test, y, z are missing descriptions in "
 448 |             "'test_missing_args_class_method' docstring)", arg_count=4)
@@ -82,8 +91,9 @@ error[D417]: sections.py:449:9: Missing argument descriptions in the docstring f
     |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 450 |         """Test a valid args section.
     |
-error[D417]: sections.py:468:9: Missing argument descriptions in the docstring for `test_missing_args_static_method`: `a`, `z`
+error[D417]: 468:9: Missing argument descriptions in the docstring for `test_missing_args_static_method`: `a`, `z`
 
+   --> sections.py:468:9
     |
 466 |             "(argument(s) a, z are missing descriptions in "
 467 |             "'test_missing_args_static_method' docstring)", arg_count=3)
@@ -91,8 +101,9 @@ error[D417]: sections.py:468:9: Missing argument descriptions in the docstring f
     |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 469 |         """Test a valid args section.
     |
-error[D417]: sections.py:498:9: Missing argument description in the docstring for `test_incorrect_indent`: `y`
+error[D417]: 498:9: Missing argument description in the docstring for `test_incorrect_indent`: `y`
 
+   --> sections.py:498:9
     |
 496 |             "(argument(s) y are missing descriptions in "
 497 |             "'test_incorrect_indent' docstring)", arg_count=3)

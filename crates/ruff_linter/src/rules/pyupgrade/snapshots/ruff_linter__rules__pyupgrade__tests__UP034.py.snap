@@ -1,8 +1,9 @@
 ---
 source: crates/ruff_linter/src/rules/pyupgrade/mod.rs
 ---
-error[UP034]: UP034.py:2:7: [*] Avoid extraneous parentheses
+error[UP034]: 2:7: [*] Avoid extraneous parentheses
 
+ --> UP034.py:2:7
   |
 1 | # UP034
 2 | print(("foo"))
@@ -19,8 +20,9 @@ error[UP034]: UP034.py:2:7: [*] Avoid extraneous parentheses
 4 4 | # UP034
 5 5 | print(("hell((goodybe))o"))
 
-error[UP034]: UP034.py:5:7: [*] Avoid extraneous parentheses
+error[UP034]: 5:7: [*] Avoid extraneous parentheses
 
+ --> UP034.py:5:7
   |
 4 | # UP034
 5 | print(("hell((goodybe))o"))
@@ -39,8 +41,9 @@ error[UP034]: UP034.py:5:7: [*] Avoid extraneous parentheses
 7 7 | # UP034
 8 8 | print((("foo")))
 
-error[UP034]: UP034.py:8:7: [*] Avoid extraneous parentheses
+error[UP034]: 8:7: [*] Avoid extraneous parentheses
 
+  --> UP034.py:8:7
    |
  7 | # UP034
  8 | print((("foo")))
@@ -59,8 +62,9 @@ error[UP034]: UP034.py:8:7: [*] Avoid extraneous parentheses
 10 10 | # UP034
 11 11 | print((((1))))
 
-error[UP034]: UP034.py:11:7: [*] Avoid extraneous parentheses
+error[UP034]: 11:7: [*] Avoid extraneous parentheses
 
+  --> UP034.py:11:7
    |
 10 | # UP034
 11 | print((((1))))
@@ -79,8 +83,9 @@ error[UP034]: UP034.py:11:7: [*] Avoid extraneous parentheses
 13 13 | # UP034
 14 14 | print(("foo{}".format(1)))
 
-error[UP034]: UP034.py:14:7: [*] Avoid extraneous parentheses
+error[UP034]: 14:7: [*] Avoid extraneous parentheses
 
+  --> UP034.py:14:7
    |
 13 | # UP034
 14 | print(("foo{}".format(1)))
@@ -99,8 +104,9 @@ error[UP034]: UP034.py:14:7: [*] Avoid extraneous parentheses
 16 16 | # UP034
 17 17 | print(
 
-error[UP034]: UP034.py:18:5: [*] Avoid extraneous parentheses
+error[UP034]: 18:5: [*] Avoid extraneous parentheses
 
+  --> UP034.py:18:5
    |
 16 | # UP034
 17 | print(
@@ -119,8 +125,9 @@ error[UP034]: UP034.py:18:5: [*] Avoid extraneous parentheses
 20 20 | 
 21 21 | # UP034
 
-error[UP034]: UP034.py:23:5: [*] Avoid extraneous parentheses
+error[UP034]: 23:5: [*] Avoid extraneous parentheses
 
+  --> UP034.py:23:5
    |
 21 |   # UP034
 22 |   print(
@@ -145,8 +152,9 @@ error[UP034]: UP034.py:23:5: [*] Avoid extraneous parentheses
 27 27 | 
 28 28 | # UP034
 
-error[UP034]: UP034.py:30:13: [*] Avoid extraneous parentheses
+error[UP034]: 30:13: [*] Avoid extraneous parentheses
 
+  --> UP034.py:30:13
    |
 28 | # UP034
 29 | def f():
@@ -166,8 +174,9 @@ error[UP034]: UP034.py:30:13: [*] Avoid extraneous parentheses
 32 32 | # UP034
 33 33 | if True:
 
-error[UP034]: UP034.py:35:9: [*] Avoid extraneous parentheses
+error[UP034]: 35:9: [*] Avoid extraneous parentheses
 
+  --> UP034.py:35:9
    |
 33 | if True:
 34 |     print(
@@ -186,8 +195,9 @@ error[UP034]: UP034.py:35:9: [*] Avoid extraneous parentheses
 37 37 | 
 38 38 | # UP034
 
-error[UP034]: UP034.py:39:7: [*] Avoid extraneous parentheses
+error[UP034]: 39:7: [*] Avoid extraneous parentheses
 
+  --> UP034.py:39:7
    |
 38 | # UP034
 39 | print((x for x in range(3)))

@@ -1,24 +1,27 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_use_pathlib/mod.rs
 ---
-error[PTH205]: PTH205.py:6:1: `os.path.getctime` should be replaced by `Path.stat().st_ctime`
+error[PTH205]: 6:1: `os.path.getctime` should be replaced by `Path.stat().st_ctime`
 
+ --> PTH205.py:6:1
   |
 6 | os.path.getctime("filename")
   | ^^^^^^^^^^^^^^^^
 7 | os.path.getctime(b"filename")
 8 | os.path.getctime(Path("filename"))
   |
-error[PTH205]: PTH205.py:7:1: `os.path.getctime` should be replaced by `Path.stat().st_ctime`
+error[PTH205]: 7:1: `os.path.getctime` should be replaced by `Path.stat().st_ctime`
 
+ --> PTH205.py:6:29
   |
 6 | os.path.getctime("filename")
 7 | os.path.getctime(b"filename")
   | ^^^^^^^^^^^^^^^^
 8 | os.path.getctime(Path("filename"))
   |
-error[PTH205]: PTH205.py:8:1: `os.path.getctime` should be replaced by `Path.stat().st_ctime`
+error[PTH205]: 8:1: `os.path.getctime` should be replaced by `Path.stat().st_ctime`
 
+  --> PTH205.py:7:30
    |
  6 | os.path.getctime("filename")
  7 | os.path.getctime(b"filename")
@@ -27,8 +30,9 @@ error[PTH205]: PTH205.py:8:1: `os.path.getctime` should be replaced by `Path.sta
  9 | 
 10 | getctime("filename")
    |
-error[PTH205]: PTH205.py:10:1: `os.path.getctime` should be replaced by `Path.stat().st_ctime`
+error[PTH205]: 10:1: `os.path.getctime` should be replaced by `Path.stat().st_ctime`
 
+  --> PTH205.py:9:1
    |
  8 | os.path.getctime(Path("filename"))
  9 | 
@@ -37,16 +41,18 @@ error[PTH205]: PTH205.py:10:1: `os.path.getctime` should be replaced by `Path.st
 11 | getctime(b"filename")
 12 | getctime(Path("filename"))
    |
-error[PTH205]: PTH205.py:11:1: `os.path.getctime` should be replaced by `Path.stat().st_ctime`
+error[PTH205]: 11:1: `os.path.getctime` should be replaced by `Path.stat().st_ctime`
 
+  --> PTH205.py:10:21
    |
 10 | getctime("filename")
 11 | getctime(b"filename")
    | ^^^^^^^^
 12 | getctime(Path("filename"))
    |
-error[PTH205]: PTH205.py:12:1: `os.path.getctime` should be replaced by `Path.stat().st_ctime`
+error[PTH205]: 12:1: `os.path.getctime` should be replaced by `Path.stat().st_ctime`
 
+  --> PTH205.py:11:22
    |
 10 | getctime("filename")
 11 | getctime(b"filename")

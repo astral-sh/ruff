@@ -1,8 +1,9 @@
 ---
 source: crates/ruff_linter/src/rules/pyupgrade/mod.rs
 ---
-error[UP024]: UP024_1.py:5:8: [*] Replace aliased errors with `OSError`
+error[UP024]: 5:8: [*] Replace aliased errors with `OSError`
 
+ --> UP024_1.py:5:8
   |
 3 | try:
 4 |     pass
@@ -22,8 +23,9 @@ error[UP024]: UP024_1.py:5:8: [*] Replace aliased errors with `OSError`
 7 7 | except (OSError, socket.error, KeyError):
 8 8 |     pass
 
-error[UP024]: UP024_1.py:7:8: [*] Replace aliased errors with `OSError`
+error[UP024]: 7:8: [*] Replace aliased errors with `OSError`
 
+ --> UP024_1.py:7:8
   |
 5 | except (OSError, mmap.error, IOError):
 6 |     pass
@@ -42,8 +44,9 @@ error[UP024]: UP024_1.py:7:8: [*] Replace aliased errors with `OSError`
 9 9 | 
 10 10 | try:
 
-error[UP024]: UP024_1.py:12:8: [*] Replace aliased errors with `OSError`
+error[UP024]: 12:8: [*] Replace aliased errors with `OSError`
 
+  --> UP024_1.py:12:8
    |
 10 |   try:
 11 |       pass

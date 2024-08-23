@@ -1,8 +1,9 @@
 ---
 source: crates/ruff_linter/src/rules/refurb/mod.rs
 ---
-error[FURB169]: FURB169.py:5:1: [*] Compare the identities of `foo` and `None` instead of their respective types
+error[FURB169]: 5:1: [*] Compare the identities of `foo` and `None` instead of their respective types
 
+ --> FURB169.py:4:1
   |
 3 | # Error.
 4 | 
@@ -22,8 +23,9 @@ error[FURB169]: FURB169.py:5:1: [*] Compare the identities of `foo` and `None` i
 7 7 | type(None) is type(foo)
 8 8 | 
 
-error[FURB169]: FURB169.py:7:1: [*] Compare the identities of `foo` and `None` instead of their respective types
+error[FURB169]: 7:1: [*] Compare the identities of `foo` and `None` instead of their respective types
 
+ --> FURB169.py:6:1
   |
 5 | type(foo) is type(None)
 6 | 
@@ -43,8 +45,9 @@ error[FURB169]: FURB169.py:7:1: [*] Compare the identities of `foo` and `None` i
 9 9 | type(None) is type(None)
 10 10 | 
 
-error[FURB169]: FURB169.py:9:1: [*] Compare the identities of `None` and `None` instead of their respective types
+error[FURB169]: 9:1: [*] Compare the identities of `None` and `None` instead of their respective types
 
+  --> FURB169.py:8:1
    |
  7 | type(None) is type(foo)
  8 | 
@@ -64,8 +67,9 @@ error[FURB169]: FURB169.py:9:1: [*] Compare the identities of `None` and `None` 
 11 11 | type(foo) is not type(None)
 12 12 | 
 
-error[FURB169]: FURB169.py:11:1: [*] Compare the identities of `foo` and `None` instead of their respective types
+error[FURB169]: 11:1: [*] Compare the identities of `foo` and `None` instead of their respective types
 
+  --> FURB169.py:10:1
    |
  9 | type(None) is type(None)
 10 | 
@@ -85,8 +89,9 @@ error[FURB169]: FURB169.py:11:1: [*] Compare the identities of `foo` and `None` 
 13 13 | type(None) is not type(foo)
 14 14 | 
 
-error[FURB169]: FURB169.py:13:1: [*] Compare the identities of `foo` and `None` instead of their respective types
+error[FURB169]: 13:1: [*] Compare the identities of `foo` and `None` instead of their respective types
 
+  --> FURB169.py:12:1
    |
 11 | type(foo) is not type(None)
 12 | 
@@ -106,8 +111,9 @@ error[FURB169]: FURB169.py:13:1: [*] Compare the identities of `foo` and `None` 
 15 15 | type(None) is not type(None)
 16 16 | 
 
-error[FURB169]: FURB169.py:15:1: [*] Compare the identities of `None` and `None` instead of their respective types
+error[FURB169]: 15:1: [*] Compare the identities of `None` and `None` instead of their respective types
 
+  --> FURB169.py:14:1
    |
 13 | type(None) is not type(foo)
 14 | 
@@ -127,8 +133,9 @@ error[FURB169]: FURB169.py:15:1: [*] Compare the identities of `None` and `None`
 17 17 | type(foo) == type(None)
 18 18 | 
 
-error[FURB169]: FURB169.py:17:1: [*] Compare the identities of `foo` and `None` instead of their respective types
+error[FURB169]: 17:1: [*] Compare the identities of `foo` and `None` instead of their respective types
 
+  --> FURB169.py:16:1
    |
 15 | type(None) is not type(None)
 16 | 
@@ -148,8 +155,9 @@ error[FURB169]: FURB169.py:17:1: [*] Compare the identities of `foo` and `None` 
 19 19 | type(None) == type(foo)
 20 20 | 
 
-error[FURB169]: FURB169.py:19:1: [*] Compare the identities of `foo` and `None` instead of their respective types
+error[FURB169]: 19:1: [*] Compare the identities of `foo` and `None` instead of their respective types
 
+  --> FURB169.py:18:1
    |
 17 | type(foo) == type(None)
 18 | 
@@ -169,8 +177,9 @@ error[FURB169]: FURB169.py:19:1: [*] Compare the identities of `foo` and `None` 
 21 21 | type(None) == type(None)
 22 22 | 
 
-error[FURB169]: FURB169.py:21:1: [*] Compare the identities of `None` and `None` instead of their respective types
+error[FURB169]: 21:1: [*] Compare the identities of `None` and `None` instead of their respective types
 
+  --> FURB169.py:20:1
    |
 19 | type(None) == type(foo)
 20 | 
@@ -190,8 +199,9 @@ error[FURB169]: FURB169.py:21:1: [*] Compare the identities of `None` and `None`
 23 23 | type(foo) != type(None)
 24 24 | 
 
-error[FURB169]: FURB169.py:23:1: [*] Compare the identities of `foo` and `None` instead of their respective types
+error[FURB169]: 23:1: [*] Compare the identities of `foo` and `None` instead of their respective types
 
+  --> FURB169.py:22:1
    |
 21 | type(None) == type(None)
 22 | 
@@ -211,8 +221,9 @@ error[FURB169]: FURB169.py:23:1: [*] Compare the identities of `foo` and `None` 
 25 25 | type(None) != type(foo)
 26 26 | 
 
-error[FURB169]: FURB169.py:25:1: [*] Compare the identities of `foo` and `None` instead of their respective types
+error[FURB169]: 25:1: [*] Compare the identities of `foo` and `None` instead of their respective types
 
+  --> FURB169.py:24:1
    |
 23 | type(foo) != type(None)
 24 | 
@@ -232,8 +243,9 @@ error[FURB169]: FURB169.py:25:1: [*] Compare the identities of `foo` and `None` 
 27 27 | type(None) != type(None)
 28 28 | 
 
-error[FURB169]: FURB169.py:27:1: [*] Compare the identities of `None` and `None` instead of their respective types
+error[FURB169]: 27:1: [*] Compare the identities of `None` and `None` instead of their respective types
 
+  --> FURB169.py:26:1
    |
 25 | type(None) != type(foo)
 26 | 

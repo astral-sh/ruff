@@ -1,8 +1,9 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_pyi/mod.rs
 ---
-error[PYI009]: PYI009.pyi:3:5: [*] Empty body should contain `...`, not `pass`
+error[PYI009]: 3:5: [*] Empty body should contain `...`, not `pass`
 
+ --> PYI009.pyi:3:5
   |
 1 | def bar(): ...  # OK
 2 | def foo():
@@ -21,8 +22,9 @@ error[PYI009]: PYI009.pyi:3:5: [*] Empty body should contain `...`, not `pass`
 5 5 | class Bar: ...  # OK
 6 6 | 
 
-error[PYI009]: PYI009.pyi:8:5: [*] Empty body should contain `...`, not `pass`
+error[PYI009]: 8:5: [*] Empty body should contain `...`, not `pass`
 
+ --> PYI009.pyi:8:5
   |
 7 | class Foo:
 8 |     pass  # ERROR PYI009, since we're in a stub file

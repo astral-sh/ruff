@@ -1,8 +1,9 @@
 ---
 source: crates/ruff_linter/src/rules/pandas_vet/mod.rs
 ---
-error[PD011]: <filename>:4:10: Use `.to_numpy()` instead of `.values`
+error[PD011]: 4:10: Use `.to_numpy()` instead of `.values`
 
+ --> <filename>:4:10
   |
 2 | import pandas as pd
 3 | x = pd.DataFrame()

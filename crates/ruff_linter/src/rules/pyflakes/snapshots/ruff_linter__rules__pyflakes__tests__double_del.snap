@@ -1,8 +1,9 @@
 ---
 source: crates/ruff_linter/src/rules/pyflakes/mod.rs
 ---
-error[F821]: <filename>:5:9: Undefined name `x`
+error[F821]: 5:9: Undefined name `x`
 
+ --> <filename>:5:9
   |
 3 |     x = 1
 4 |     del x

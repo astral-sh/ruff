@@ -1,8 +1,9 @@
 ---
 source: crates/ruff_linter/src/rules/pydocstyle/mod.rs
 ---
-error[D202]: D.py:142:5: [*] No blank lines allowed after function docstring (found 1)
+error[D202]: 142:5: [*] No blank lines allowed after function docstring (found 1)
 
+   --> D.py:142:5
     |
 140 | @expect('D202: No blank lines allowed after function docstring (found 1)')
 141 | def trailing_space():
@@ -21,8 +22,9 @@ error[D202]: D.py:142:5: [*] No blank lines allowed after function docstring (fo
 145 144 | 
 146 145 | 
 
-error[D202]: D.py:151:5: [*] No blank lines allowed after function docstring (found 1)
+error[D202]: 151:5: [*] No blank lines allowed after function docstring (found 1)
 
+   --> D.py:151:5
     |
 149 | def trailing_and_leading_space():
 150 | 
@@ -41,8 +43,9 @@ error[D202]: D.py:151:5: [*] No blank lines allowed after function docstring (fo
 154 153 | 
 155 154 | 
 
-error[D202]: D.py:555:5: [*] No blank lines allowed after function docstring (found 1)
+error[D202]: 555:5: [*] No blank lines allowed after function docstring (found 1)
 
+   --> D.py:555:5
     |
 553 |   @expect('D213: Multi-line docstring summary should start at the second line')
 554 |   def multiline_trailing_space():
@@ -65,8 +68,9 @@ error[D202]: D.py:555:5: [*] No blank lines allowed after function docstring (fo
 561 560 | 
 562 561 | 
 
-error[D202]: D.py:568:5: [*] No blank lines allowed after function docstring (found 1)
+error[D202]: 568:5: [*] No blank lines allowed after function docstring (found 1)
 
+   --> D.py:568:5
     |
 566 |   def multiline_trailing_and_leading_space():
 567 |   

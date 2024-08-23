@@ -1,8 +1,9 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_bugbear/mod.rs
 ---
-error[B033]: B033.py:4:35: [*] Sets should not contain duplicate item `"value1"`
+error[B033]: 4:35: [*] Sets should not contain duplicate item `"value1"`
 
+ --> B033.py:4:35
   |
 2 | # Errors.
 3 | ###
@@ -22,8 +23,9 @@ error[B033]: B033.py:4:35: [*] Sets should not contain duplicate item `"value1"`
 6 6 | incorrect_set_multiline = {
 7 7 |     "value1",
 
-error[B033]: B033.py:5:21: [*] Sets should not contain duplicate item `1`
+error[B033]: 5:21: [*] Sets should not contain duplicate item `1`
 
+ --> B033.py:5:21
   |
 3 | ###
 4 | incorrect_set = {"value1", 23, 5, "value1"}
@@ -43,8 +45,9 @@ error[B033]: B033.py:5:21: [*] Sets should not contain duplicate item `1`
 7 7 |     "value1",
 8 8 |     23,
 
-error[B033]: B033.py:10:5: [*] Sets should not contain duplicate item `"value1"`
+error[B033]: 10:5: [*] Sets should not contain duplicate item `"value1"`
 
+  --> B033.py:10:5
    |
  8 |     23,
  9 |     5,
@@ -63,8 +66,9 @@ error[B033]: B033.py:10:5: [*] Sets should not contain duplicate item `"value1"`
 12 11 | }
 13 12 | incorrect_set = {1, 1}
 
-error[B033]: B033.py:13:21: [*] Sets should not contain duplicate item `1`
+error[B033]: 13:21: [*] Sets should not contain duplicate item `1`
 
+  --> B033.py:13:21
    |
 11 |     # B033
 12 | }
@@ -84,8 +88,9 @@ error[B033]: B033.py:13:21: [*] Sets should not contain duplicate item `1`
 15 15 | incorrect_set = {0, 1, 1,}
 16 16 | incorrect_set = {0, 1, 1}
 
-error[B033]: B033.py:14:21: [*] Sets should not contain duplicate item `1`
+error[B033]: 14:21: [*] Sets should not contain duplicate item `1`
 
+  --> B033.py:14:21
    |
 12 | }
 13 | incorrect_set = {1, 1}
@@ -105,8 +110,9 @@ error[B033]: B033.py:14:21: [*] Sets should not contain duplicate item `1`
 16 16 | incorrect_set = {0, 1, 1}
 17 17 | incorrect_set = {
 
-error[B033]: B033.py:15:24: [*] Sets should not contain duplicate item `1`
+error[B033]: 15:24: [*] Sets should not contain duplicate item `1`
 
+  --> B033.py:15:24
    |
 13 | incorrect_set = {1, 1}
 14 | incorrect_set = {1, 1,}
@@ -126,8 +132,9 @@ error[B033]: B033.py:15:24: [*] Sets should not contain duplicate item `1`
 17 17 | incorrect_set = {
 18 18 |     0,
 
-error[B033]: B033.py:16:24: [*] Sets should not contain duplicate item `1`
+error[B033]: 16:24: [*] Sets should not contain duplicate item `1`
 
+  --> B033.py:16:24
    |
 14 | incorrect_set = {1, 1,}
 15 | incorrect_set = {0, 1, 1,}
@@ -147,8 +154,9 @@ error[B033]: B033.py:16:24: [*] Sets should not contain duplicate item `1`
 18 18 |     0,
 19 19 |     1,
 
-error[B033]: B033.py:20:5: [*] Sets should not contain duplicate item `1`
+error[B033]: 20:5: [*] Sets should not contain duplicate item `1`
 
+  --> B033.py:20:5
    |
 18 |     0,
 19 |     1,

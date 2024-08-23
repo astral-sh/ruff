@@ -1,8 +1,9 @@
 ---
 source: crates/ruff_linter/src/rules/pylint/mod.rs
 ---
-error[PLR0915]: too_many_statements.py:5:11: Too many statements (51 > 50)
+error[PLR0915]: 5:11: Too many statements (51 > 50)
 
+ --> too_many_statements.py:5:11
   |
 5 | async def f():  # Too many statements (52/50)
   |           ^

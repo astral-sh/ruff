@@ -1,8 +1,9 @@
 ---
 source: crates/ruff_linter/src/rules/pyflakes/mod.rs
 ---
-error[F822]: F822_1.py:3:22: Undefined name `b` in `__all__`
+error[F822]: 3:22: Undefined name `b` in `__all__`
 
+ --> F822_1.py:3:22
   |
 1 | a = 1
 2 | 

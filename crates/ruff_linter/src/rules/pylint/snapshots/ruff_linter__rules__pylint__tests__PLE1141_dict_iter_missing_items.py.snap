@@ -1,8 +1,9 @@
 ---
 source: crates/ruff_linter/src/rules/pylint/mod.rs
 ---
-error[PLE1141]: dict_iter_missing_items.py:13:13: [*] Unpacking a dictionary in iteration without calling `.items()`
+error[PLE1141]: 13:13: [*] Unpacking a dictionary in iteration without calling `.items()`
 
+  --> dict_iter_missing_items.py:13:13
    |
 12 | # Errors
 13 | for k, v in d:
@@ -20,8 +21,9 @@ error[PLE1141]: dict_iter_missing_items.py:13:13: [*] Unpacking a dictionary in 
 15 15 | 
 16 16 | for k, v in d_tuple_incorrect_tuple:
 
-error[PLE1141]: dict_iter_missing_items.py:16:13: [*] Unpacking a dictionary in iteration without calling `.items()`
+error[PLE1141]: 16:13: [*] Unpacking a dictionary in iteration without calling `.items()`
 
+  --> dict_iter_missing_items.py:16:13
    |
 14 |     pass
 15 | 

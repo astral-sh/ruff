@@ -1,8 +1,9 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_type_checking/mod.rs
 ---
-error[TCH003]: runtime_evaluated_base_classes_3.py:5:18: [*] Move standard library import `uuid.UUID` into a type-checking block
+error[TCH003]: 5:18: [*] Move standard library import `uuid.UUID` into a type-checking block
 
+ --> runtime_evaluated_base_classes_3.py:5:18
   |
 3 | import datetime
 4 | import pathlib

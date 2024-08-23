@@ -1,8 +1,9 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_pie/mod.rs
 ---
-error[PIE794]: PIE794.py:4:5: [*] Class field `name` is defined multiple times
+error[PIE794]: 4:5: [*] Class field `name` is defined multiple times
 
+ --> PIE794.py:4:5
   |
 2 |     name = StringField()
 3 |     # ....
@@ -21,8 +22,9 @@ error[PIE794]: PIE794.py:4:5: [*] Class field `name` is defined multiple times
 6 5 |     def remove(self) -> None:
 7 6 |         ...
 
-error[PIE794]: PIE794.py:13:5: [*] Class field `name` is defined multiple times
+error[PIE794]: 13:5: [*] Class field `name` is defined multiple times
 
+  --> PIE794.py:13:5
    |
 11 |     name: str = StringField()
 12 |     # ....
@@ -41,8 +43,9 @@ error[PIE794]: PIE794.py:13:5: [*] Class field `name` is defined multiple times
 15 14 |     def foo(self) -> None:
 16 15 |         ...
 
-error[PIE794]: PIE794.py:23:5: [*] Class field `bar` is defined multiple times
+error[PIE794]: 23:5: [*] Class field `bar` is defined multiple times
 
+  --> PIE794.py:23:5
    |
 21 |     foo: bool = BooleanField()
 22 |     # ...
@@ -59,8 +62,9 @@ error[PIE794]: PIE794.py:23:5: [*] Class field `bar` is defined multiple times
 25 24 | 
 26 25 | class User(BaseModel):
 
-error[PIE794]: PIE794.py:40:5: [*] Class field `bar` is defined multiple times
+error[PIE794]: 40:5: [*] Class field `bar` is defined multiple times
 
+  --> PIE794.py:40:5
    |
 38 |     foo: bool = BooleanField()
 39 |     # ...
@@ -77,8 +81,9 @@ error[PIE794]: PIE794.py:40:5: [*] Class field `bar` is defined multiple times
 42 41 | 
 43 42 | class Person:
 
-error[PIE794]: PIE794.py:46:5: [*] Class field `name` is defined multiple times
+error[PIE794]: 46:5: [*] Class field `name` is defined multiple times
 
+  --> PIE794.py:46:5
    |
 44 |     name = "Foo"
 45 |     name = name + " Bar"
@@ -95,8 +100,9 @@ error[PIE794]: PIE794.py:46:5: [*] Class field `name` is defined multiple times
 48 47 | 
 49 48 | class Person:
 
-error[PIE794]: PIE794.py:52:5: [*] Class field `name` is defined multiple times
+error[PIE794]: 52:5: [*] Class field `name` is defined multiple times
 
+  --> PIE794.py:52:5
    |
 50 |     name: str = "Foo"
 51 |     name: str = name + " Bar"

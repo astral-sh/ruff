@@ -1,8 +1,9 @@
 ---
 source: crates/ruff_linter/src/rules/refurb/mod.rs
 ---
-error[FURB180]: FURB180.py:7:10: [*] Use of `metaclass=abc.ABCMeta` to define abstract base class
+error[FURB180]: 7:10: [*] Use of `metaclass=abc.ABCMeta` to define abstract base class
 
+ --> FURB180.py:7:10
   |
 5 | # Errors
 6 | 
@@ -22,8 +23,9 @@ error[FURB180]: FURB180.py:7:10: [*] Use of `metaclass=abc.ABCMeta` to define ab
 9 9 |     def foo(self): pass
 10 10 | 
 
-error[FURB180]: FURB180.py:12:10: [*] Use of `metaclass=abc.ABCMeta` to define abstract base class
+error[FURB180]: 12:10: [*] Use of `metaclass=abc.ABCMeta` to define abstract base class
 
+  --> FURB180.py:12:10
    |
 12 | class A1(metaclass=ABCMeta):
    |          ^^^^^^^^^^^^^^^^^
@@ -41,8 +43,9 @@ error[FURB180]: FURB180.py:12:10: [*] Use of `metaclass=abc.ABCMeta` to define a
 14 14 |     def foo(self): pass
 15 15 | 
 
-error[FURB180]: FURB180.py:26:18: [*] Use of `metaclass=abc.ABCMeta` to define abstract base class
+error[FURB180]: 26:18: [*] Use of `metaclass=abc.ABCMeta` to define abstract base class
 
+  --> FURB180.py:26:18
    |
 26 | class A2(B0, B1, metaclass=ABCMeta):
    |                  ^^^^^^^^^^^^^^^^^
@@ -60,8 +63,9 @@ error[FURB180]: FURB180.py:26:18: [*] Use of `metaclass=abc.ABCMeta` to define a
 28 28 |     def foo(self): pass
 29 29 | 
 
-error[FURB180]: FURB180.py:31:34: [*] Use of `metaclass=abc.ABCMeta` to define abstract base class
+error[FURB180]: 31:34: [*] Use of `metaclass=abc.ABCMeta` to define abstract base class
 
+  --> FURB180.py:31:34
    |
 31 | class A3(B0, before_metaclass=1, metaclass=abc.ABCMeta):
    |                                  ^^^^^^^^^^^^^^^^^^^^^

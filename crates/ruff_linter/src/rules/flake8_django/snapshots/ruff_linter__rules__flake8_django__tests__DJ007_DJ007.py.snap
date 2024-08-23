@@ -1,16 +1,18 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_django/mod.rs
 ---
-error[DJ007]: DJ007.py:6:9: Do not use `__all__` with `ModelForm`, use `fields` instead
+error[DJ007]: 6:9: Do not use `__all__` with `ModelForm`, use `fields` instead
 
+ --> DJ007.py:6:9
   |
 4 | class TestModelForm1(forms.ModelForm):
 5 |     class Meta:
 6 |         fields = "__all__"
   |         ^^^^^^^^^^^^^^^^^^
   |
-error[DJ007]: DJ007.py:11:9: Do not use `__all__` with `ModelForm`, use `fields` instead
+error[DJ007]: 11:9: Do not use `__all__` with `ModelForm`, use `fields` instead
 
+  --> DJ007.py:11:9
    |
  9 | class TestModelForm2(forms.ModelForm):
 10 |     class Meta:

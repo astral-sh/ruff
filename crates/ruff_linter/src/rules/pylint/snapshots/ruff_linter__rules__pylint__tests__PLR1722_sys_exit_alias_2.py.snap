@@ -1,8 +1,9 @@
 ---
 source: crates/ruff_linter/src/rules/pylint/mod.rs
 ---
-error[PLR1722]: sys_exit_alias_2.py:3:1: [*] Use `sys.exit()` instead of `exit`
+error[PLR1722]: 3:1: [*] Use `sys.exit()` instead of `exit`
 
+ --> sys_exit_alias_2.py:2:1
   |
 1 | import sys as sys2
 2 | 
@@ -20,8 +21,9 @@ error[PLR1722]: sys_exit_alias_2.py:3:1: [*] Use `sys.exit()` instead of `exit`
 5 5 | 
 6 6 | 
 
-error[PLR1722]: sys_exit_alias_2.py:4:1: [*] Use `sys.exit()` instead of `quit`
+error[PLR1722]: 4:1: [*] Use `sys.exit()` instead of `quit`
 
+ --> sys_exit_alias_2.py:3:8
   |
 3 | exit(0)
 4 | quit(0)
@@ -38,8 +40,9 @@ error[PLR1722]: sys_exit_alias_2.py:4:1: [*] Use `sys.exit()` instead of `quit`
 6 6 | 
 7 7 | def main():
 
-error[PLR1722]: sys_exit_alias_2.py:8:5: [*] Use `sys.exit()` instead of `exit`
+error[PLR1722]: 8:5: [*] Use `sys.exit()` instead of `exit`
 
+ --> sys_exit_alias_2.py:8:5
   |
 7 | def main():
 8 |     exit(1)
@@ -55,8 +58,9 @@ error[PLR1722]: sys_exit_alias_2.py:8:5: [*] Use `sys.exit()` instead of `exit`
   8 |+    sys2.exit(1)
 9 9 |     quit(1)
 
-error[PLR1722]: sys_exit_alias_2.py:9:5: [*] Use `sys.exit()` instead of `quit`
+error[PLR1722]: 9:5: [*] Use `sys.exit()` instead of `quit`
 
+ --> sys_exit_alias_2.py:9:5
   |
 7 | def main():
 8 |     exit(1)

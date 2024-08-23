@@ -1,8 +1,9 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_bandit/mod.rs
 ---
-error[S506]: S506.py:10:9: Probable use of unsafe `yaml.load`. Allows instantiation of arbitrary objects. Consider `yaml.safe_load`.
+error[S506]: 10:9: Probable use of unsafe `yaml.load`. Allows instantiation of arbitrary objects. Consider `yaml.safe_load`.
 
+  --> S506.py:10:9
    |
  8 | def test_yaml_load():
  9 |     ystr = yaml.dump({"a": 1, "b": 2, "c": 3})
@@ -11,8 +12,9 @@ error[S506]: S506.py:10:9: Probable use of unsafe `yaml.load`. Allows instantiat
 11 |     yaml.dump(y)
 12 |     try:
    |
-error[S506]: S506.py:24:24: Probable use of unsafe loader `Loader` with `yaml.load`. Allows instantiation of arbitrary objects. Consider `yaml.safe_load`.
+error[S506]: 24:24: Probable use of unsafe loader `Loader` with `yaml.load`. Allows instantiation of arbitrary objects. Consider `yaml.safe_load`.
 
+  --> S506.py:24:24
    |
 24 | yaml.load("{}", Loader=yaml.Loader)
    |                        ^^^^^^^^^^^

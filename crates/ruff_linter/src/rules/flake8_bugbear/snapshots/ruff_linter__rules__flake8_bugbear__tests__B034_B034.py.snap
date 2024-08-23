@@ -1,8 +1,9 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_bugbear/mod.rs
 ---
-error[B034]: B034.py:5:1: `re.sub` should pass `count` and `flags` as keyword arguments to avoid confusion due to unintuitive argument positions
+error[B034]: 5:1: `re.sub` should pass `count` and `flags` as keyword arguments to avoid confusion due to unintuitive argument positions
 
+ --> B034.py:4:7
   |
 4 | # B034
 5 | re.sub("a", "b", "aaa", re.IGNORECASE)
@@ -10,8 +11,9 @@ error[B034]: B034.py:5:1: `re.sub` should pass `count` and `flags` as keyword ar
 6 | re.sub("a", "b", "aaa", 5)
 7 | re.sub("a", "b", "aaa", 5, re.IGNORECASE)
   |
-error[B034]: B034.py:6:1: `re.sub` should pass `count` and `flags` as keyword arguments to avoid confusion due to unintuitive argument positions
+error[B034]: 6:1: `re.sub` should pass `count` and `flags` as keyword arguments to avoid confusion due to unintuitive argument positions
 
+ --> B034.py:5:39
   |
 4 | # B034
 5 | re.sub("a", "b", "aaa", re.IGNORECASE)
@@ -20,8 +22,9 @@ error[B034]: B034.py:6:1: `re.sub` should pass `count` and `flags` as keyword ar
 7 | re.sub("a", "b", "aaa", 5, re.IGNORECASE)
 8 | re.subn("a", "b", "aaa", re.IGNORECASE)
   |
-error[B034]: B034.py:7:1: `re.sub` should pass `count` and `flags` as keyword arguments to avoid confusion due to unintuitive argument positions
+error[B034]: 7:1: `re.sub` should pass `count` and `flags` as keyword arguments to avoid confusion due to unintuitive argument positions
 
+ --> B034.py:6:27
   |
 5 | re.sub("a", "b", "aaa", re.IGNORECASE)
 6 | re.sub("a", "b", "aaa", 5)
@@ -30,8 +33,9 @@ error[B034]: B034.py:7:1: `re.sub` should pass `count` and `flags` as keyword ar
 8 | re.subn("a", "b", "aaa", re.IGNORECASE)
 9 | re.subn("a", "b", "aaa", 5)
   |
-error[B034]: B034.py:8:1: `re.subn` should pass `count` and `flags` as keyword arguments to avoid confusion due to unintuitive argument positions
+error[B034]: 8:1: `re.subn` should pass `count` and `flags` as keyword arguments to avoid confusion due to unintuitive argument positions
 
+  --> B034.py:7:42
    |
  6 | re.sub("a", "b", "aaa", 5)
  7 | re.sub("a", "b", "aaa", 5, re.IGNORECASE)
@@ -40,8 +44,9 @@ error[B034]: B034.py:8:1: `re.subn` should pass `count` and `flags` as keyword a
  9 | re.subn("a", "b", "aaa", 5)
 10 | re.subn("a", "b", "aaa", 5, re.IGNORECASE)
    |
-error[B034]: B034.py:9:1: `re.subn` should pass `count` and `flags` as keyword arguments to avoid confusion due to unintuitive argument positions
+error[B034]: 9:1: `re.subn` should pass `count` and `flags` as keyword arguments to avoid confusion due to unintuitive argument positions
 
+  --> B034.py:8:40
    |
  7 | re.sub("a", "b", "aaa", 5, re.IGNORECASE)
  8 | re.subn("a", "b", "aaa", re.IGNORECASE)
@@ -50,8 +55,9 @@ error[B034]: B034.py:9:1: `re.subn` should pass `count` and `flags` as keyword a
 10 | re.subn("a", "b", "aaa", 5, re.IGNORECASE)
 11 | re.split(" ", "a a a a", re.I)
    |
-error[B034]: B034.py:10:1: `re.subn` should pass `count` and `flags` as keyword arguments to avoid confusion due to unintuitive argument positions
+error[B034]: 10:1: `re.subn` should pass `count` and `flags` as keyword arguments to avoid confusion due to unintuitive argument positions
 
+  --> B034.py:9:28
    |
  8 | re.subn("a", "b", "aaa", re.IGNORECASE)
  9 | re.subn("a", "b", "aaa", 5)
@@ -60,8 +66,9 @@ error[B034]: B034.py:10:1: `re.subn` should pass `count` and `flags` as keyword 
 11 | re.split(" ", "a a a a", re.I)
 12 | re.split(" ", "a a a a", 2)
    |
-error[B034]: B034.py:11:1: `re.split` should pass `maxsplit` and `flags` as keyword arguments to avoid confusion due to unintuitive argument positions
+error[B034]: 11:1: `re.split` should pass `maxsplit` and `flags` as keyword arguments to avoid confusion due to unintuitive argument positions
 
+  --> B034.py:10:43
    |
  9 | re.subn("a", "b", "aaa", 5)
 10 | re.subn("a", "b", "aaa", 5, re.IGNORECASE)
@@ -70,8 +77,9 @@ error[B034]: B034.py:11:1: `re.split` should pass `maxsplit` and `flags` as keyw
 12 | re.split(" ", "a a a a", 2)
 13 | re.split(" ", "a a a a", 2, re.I)
    |
-error[B034]: B034.py:12:1: `re.split` should pass `maxsplit` and `flags` as keyword arguments to avoid confusion due to unintuitive argument positions
+error[B034]: 12:1: `re.split` should pass `maxsplit` and `flags` as keyword arguments to avoid confusion due to unintuitive argument positions
 
+  --> B034.py:11:31
    |
 10 | re.subn("a", "b", "aaa", 5, re.IGNORECASE)
 11 | re.split(" ", "a a a a", re.I)
@@ -80,8 +88,9 @@ error[B034]: B034.py:12:1: `re.split` should pass `maxsplit` and `flags` as keyw
 13 | re.split(" ", "a a a a", 2, re.I)
 14 | sub("a", "b", "aaa", re.IGNORECASE)
    |
-error[B034]: B034.py:13:1: `re.split` should pass `maxsplit` and `flags` as keyword arguments to avoid confusion due to unintuitive argument positions
+error[B034]: 13:1: `re.split` should pass `maxsplit` and `flags` as keyword arguments to avoid confusion due to unintuitive argument positions
 
+  --> B034.py:12:28
    |
 11 | re.split(" ", "a a a a", re.I)
 12 | re.split(" ", "a a a a", 2)
@@ -89,8 +98,9 @@ error[B034]: B034.py:13:1: `re.split` should pass `maxsplit` and `flags` as keyw
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 14 | sub("a", "b", "aaa", re.IGNORECASE)
    |
-error[B034]: B034.py:14:1: `re.sub` should pass `count` and `flags` as keyword arguments to avoid confusion due to unintuitive argument positions
+error[B034]: 14:1: `re.sub` should pass `count` and `flags` as keyword arguments to avoid confusion due to unintuitive argument positions
 
+  --> B034.py:13:34
    |
 12 | re.split(" ", "a a a a", 2)
 13 | re.split(" ", "a a a a", 2, re.I)

@@ -1,8 +1,9 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_comprehensions/mod.rs
 ---
-error[C406]: C406.py:1:6: [*] Unnecessary `list` literal (rewrite as a `dict` literal)
+error[C406]: 1:6: [*] Unnecessary `list` literal (rewrite as a `dict` literal)
 
+ --> C406.py:1:6
   |
 1 | d1 = dict([(1, 2)])
   |      ^^^^^^^^^^^^^^
@@ -17,8 +18,9 @@ error[C406]: C406.py:1:6: [*] Unnecessary `list` literal (rewrite as a `dict` li
 3 3 | d3 = dict([])
 4 4 | d4 = dict(())
 
-error[C406]: C406.py:2:6: [*] Unnecessary `tuple` literal (rewrite as a `dict` literal)
+error[C406]: 2:6: [*] Unnecessary `tuple` literal (rewrite as a `dict` literal)
 
+ --> C406.py:2:6
   |
 1 | d1 = dict([(1, 2)])
 2 | d2 = dict(((1, 2),))
@@ -35,8 +37,9 @@ error[C406]: C406.py:2:6: [*] Unnecessary `tuple` literal (rewrite as a `dict` l
 4 4 | d4 = dict(())
 5 5 | d5 = dict()
 
-error[C406]: C406.py:3:6: [*] Unnecessary `list` literal (rewrite as a `dict` literal)
+error[C406]: 3:6: [*] Unnecessary `list` literal (rewrite as a `dict` literal)
 
+ --> C406.py:3:6
   |
 1 | d1 = dict([(1, 2)])
 2 | d2 = dict(((1, 2),))
@@ -54,8 +57,9 @@ error[C406]: C406.py:3:6: [*] Unnecessary `list` literal (rewrite as a `dict` li
 4 4 | d4 = dict(())
 5 5 | d5 = dict()
 
-error[C406]: C406.py:4:6: [*] Unnecessary `tuple` literal (rewrite as a `dict` literal)
+error[C406]: 4:6: [*] Unnecessary `tuple` literal (rewrite as a `dict` literal)
 
+ --> C406.py:4:6
   |
 2 | d2 = dict(((1, 2),))
 3 | d3 = dict([])

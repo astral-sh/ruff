@@ -1,8 +1,9 @@
 ---
 source: crates/ruff_linter/src/rules/airflow/mod.rs
 ---
-error[AIR001]: AIR001.py:11:1: Task variable name should match the `task_id`: "my_task"
+error[AIR001]: 11:1: Task variable name should match the `task_id`: "my_task"
 
+  --> AIR001.py:10:1
    |
  9 | my_task_2 = PythonOperator(callable=my_callable, task_id="my_task_2")
 10 | 
@@ -10,8 +11,9 @@ error[AIR001]: AIR001.py:11:1: Task variable name should match the `task_id`: "m
    | ^^^^^^^^^^^^^^
 12 | incorrect_name_2 = PythonOperator(callable=my_callable, task_id="my_task_2")
    |
-error[AIR001]: AIR001.py:12:1: Task variable name should match the `task_id`: "my_task_2"
+error[AIR001]: 12:1: Task variable name should match the `task_id`: "my_task_2"
 
+  --> AIR001.py:11:51
    |
 11 | incorrect_name = PythonOperator(task_id="my_task")
 12 | incorrect_name_2 = PythonOperator(callable=my_callable, task_id="my_task_2")

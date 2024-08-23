@@ -1,8 +1,9 @@
 ---
 source: crates/ruff_linter/src/rules/pydocstyle/mod.rs
 ---
-error[D413]: sections.py:67:5: [*] Missing blank line after last section ("Returns")
+error[D413]: 67:5: [*] Missing blank line after last section ("Returns")
 
+  --> sections.py:67:5
    |
 65 |     """Toggle the gizmo.
 66 | 
@@ -22,8 +23,9 @@ error[D413]: sections.py:67:5: [*] Missing blank line after last section ("Retur
 69 71 | 
 70 72 | @expect(_D213)
 
-error[D413]: sections.py:122:5: [*] Missing blank line after last section ("Returns")
+error[D413]: 122:5: [*] Missing blank line after last section ("Returns")
 
+   --> sections.py:122:5
     |
 120 |     """Toggle the gizmo.
 121 | 
@@ -42,8 +44,9 @@ error[D413]: sections.py:122:5: [*] Missing blank line after last section ("Retu
 126 127 | 
 127 128 | 
 
-error[D413]: sections.py:172:5: [*] Missing blank line after last section ("Returns")
+error[D413]: 172:5: [*] Missing blank line after last section ("Returns")
 
+   --> sections.py:172:5
     |
 170 |     """Toggle the gizmo.
 171 | 
@@ -62,8 +65,9 @@ error[D413]: sections.py:172:5: [*] Missing blank line after last section ("Retu
 175 176 | 
 176 177 | 
 
-error[D413]: sections.py:521:5: [*] Missing blank line after last section ("Parameters")
+error[D413]: 521:5: [*] Missing blank line after last section ("Parameters")
 
+   --> sections.py:521:5
     |
 519 |     """Equal length equals should be replaced with dashes.
 520 | 
@@ -82,8 +86,9 @@ error[D413]: sections.py:521:5: [*] Missing blank line after last section ("Para
 524 525 | 
 525 526 | 
 
-error[D413]: sections.py:529:5: [*] Missing blank line after last section ("Parameters")
+error[D413]: 529:5: [*] Missing blank line after last section ("Parameters")
 
+   --> sections.py:529:5
     |
 527 |     """Here, the length of equals is not the same.
 528 | 
@@ -102,8 +107,9 @@ error[D413]: sections.py:529:5: [*] Missing blank line after last section ("Para
 532 533 | 
 533 534 | 
 
-error[D413]: sections.py:550:5: [*] Missing blank line after last section ("Args")
+error[D413]: 550:5: [*] Missing blank line after last section ("Args")
 
+   --> sections.py:550:5
     |
 548 |     """Below, `returns:` should _not_ be considered a section header.
 549 | 
@@ -121,8 +127,9 @@ error[D413]: sections.py:550:5: [*] Missing blank line after last section ("Args
 555 556 | 
 556 557 | 
 
-error[D413]: sections.py:563:9: [*] Missing blank line after last section ("Returns")
+error[D413]: 563:9: [*] Missing blank line after last section ("Returns")
 
+   --> sections.py:563:9
     |
 561 |         Here's a note.
 562 | 
@@ -140,8 +147,9 @@ error[D413]: sections.py:563:9: [*] Missing blank line after last section ("Retu
 565 566 | 
 566 567 | 
 
-error[D413]: sections.py:590:5: [*] Missing blank line after last section ("Parameters")
+error[D413]: 590:5: [*] Missing blank line after last section ("Parameters")
 
+   --> sections.py:590:5
     |
 588 |     """Test that lower case subsection header is valid even if it has the same name as section kind.
 589 | 

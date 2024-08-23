@@ -1,8 +1,9 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_todos/mod.rs
 ---
-error[TD004]: TD004.py:4:3: Missing colon in TODO
+error[TD004]: 4:3: Missing colon in TODO
 
+ --> TD004.py:4:3
   |
 2 | # TODO(evanrittenhouse): this has a colon
 3 | # T004 - errors
@@ -11,8 +12,9 @@ error[TD004]: TD004.py:4:3: Missing colon in TODO
 5 | # TODO(evanrittenhouse 😀) this has no colon
 6 | # FIXME add a colon
   |
-error[TD004]: TD004.py:5:3: Missing colon in TODO
+error[TD004]: 5:3: Missing colon in TODO
 
+ --> TD004.py:5:3
   |
 3 | # T004 - errors
 4 | # TODO this has no colon
@@ -21,8 +23,9 @@ error[TD004]: TD004.py:5:3: Missing colon in TODO
 6 | # FIXME add a colon
 7 | # foo # TODO add a colon
   |
-error[TD004]: TD004.py:6:3: Missing colon in TODO
+error[TD004]: 6:3: Missing colon in TODO
 
+ --> TD004.py:6:3
   |
 4 | # TODO this has no colon
 5 | # TODO(evanrittenhouse 😀) this has no colon
@@ -31,8 +34,9 @@ error[TD004]: TD004.py:6:3: Missing colon in TODO
 7 | # foo # TODO add a colon
 8 | # TODO this has a colon but it doesn't terminate the tag, so this should throw. https://www.google.com
   |
-error[TD004]: TD004.py:7:9: Missing colon in TODO
+error[TD004]: 7:9: Missing colon in TODO
 
+ --> TD004.py:7:9
   |
 5 | # TODO(evanrittenhouse 😀) this has no colon
 6 | # FIXME add a colon
@@ -40,8 +44,9 @@ error[TD004]: TD004.py:7:9: Missing colon in TODO
   |         ^^^^
 8 | # TODO this has a colon but it doesn't terminate the tag, so this should throw. https://www.google.com
   |
-error[TD004]: TD004.py:8:3: Missing colon in TODO
+error[TD004]: 8:3: Missing colon in TODO
 
+ --> TD004.py:8:3
   |
 6 | # FIXME add a colon
 7 | # foo # TODO add a colon

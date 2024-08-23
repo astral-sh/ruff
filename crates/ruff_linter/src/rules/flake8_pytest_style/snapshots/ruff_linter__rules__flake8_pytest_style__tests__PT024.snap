@@ -1,8 +1,9 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_pytest_style/mod.rs
 ---
-error[PT024]: PT024.py:14:1: [*] `pytest.mark.asyncio` is unnecessary for fixtures
+error[PT024]: 14:1: [*] `pytest.mark.asyncio` is unnecessary for fixtures
 
+  --> PT024.py:14:1
    |
 14 | @pytest.mark.asyncio()
    | ^^^^^^^^^^^^^^^^^^^^^^
@@ -19,8 +20,9 @@ error[PT024]: PT024.py:14:1: [*] `pytest.mark.asyncio` is unnecessary for fixtur
 16 15 | async def my_fixture():  # Error before
 17 16 |     return 0
 
-error[PT024]: PT024.py:20:1: [*] `pytest.mark.asyncio` is unnecessary for fixtures
+error[PT024]: 20:1: [*] `pytest.mark.asyncio` is unnecessary for fixtures
 
+  --> PT024.py:20:1
    |
 20 | @pytest.mark.asyncio
    | ^^^^^^^^^^^^^^^^^^^^
@@ -37,8 +39,9 @@ error[PT024]: PT024.py:20:1: [*] `pytest.mark.asyncio` is unnecessary for fixtur
 22 21 | async def my_fixture():  # Error before no parens
 23 22 |     return 0
 
-error[PT024]: PT024.py:27:1: [*] `pytest.mark.asyncio` is unnecessary for fixtures
+error[PT024]: 27:1: [*] `pytest.mark.asyncio` is unnecessary for fixtures
 
+  --> PT024.py:26:18
    |
 26 | @pytest.fixture()
 27 | @pytest.mark.asyncio()
@@ -56,8 +59,9 @@ error[PT024]: PT024.py:27:1: [*] `pytest.mark.asyncio` is unnecessary for fixtur
 29 28 |     return 0
 30 29 | 
 
-error[PT024]: PT024.py:33:1: [*] `pytest.mark.asyncio` is unnecessary for fixtures
+error[PT024]: 33:1: [*] `pytest.mark.asyncio` is unnecessary for fixtures
 
+  --> PT024.py:32:18
    |
 32 | @pytest.fixture()
 33 | @pytest.mark.asyncio

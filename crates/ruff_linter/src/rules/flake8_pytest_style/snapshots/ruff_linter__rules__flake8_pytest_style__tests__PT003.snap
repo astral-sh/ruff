@@ -1,8 +1,9 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_pytest_style/mod.rs
 ---
-error[PT003]: PT003.py:14:17: [*] `scope='function'` is implied in `@pytest.fixture()`
+error[PT003]: 14:17: [*] `scope='function'` is implied in `@pytest.fixture()`
 
+  --> PT003.py:14:17
    |
 14 | @pytest.fixture(scope="function")
    |                 ^^^^^^^^^^^^^^^^
@@ -20,8 +21,9 @@ error[PT003]: PT003.py:14:17: [*] `scope='function'` is implied in `@pytest.fixt
 16 16 |     ...
 17 17 | 
 
-error[PT003]: PT003.py:19:17: [*] `scope='function'` is implied in `@pytest.fixture()`
+error[PT003]: 19:17: [*] `scope='function'` is implied in `@pytest.fixture()`
 
+  --> PT003.py:19:17
    |
 19 | @pytest.fixture(scope="function", name="my_fixture")
    |                 ^^^^^^^^^^^^^^^^
@@ -39,8 +41,9 @@ error[PT003]: PT003.py:19:17: [*] `scope='function'` is implied in `@pytest.fixt
 21 21 |     ...
 22 22 | 
 
-error[PT003]: PT003.py:24:36: [*] `scope='function'` is implied in `@pytest.fixture()`
+error[PT003]: 24:36: [*] `scope='function'` is implied in `@pytest.fixture()`
 
+  --> PT003.py:24:36
    |
 24 | @pytest.fixture(name="my_fixture", scope="function")
    |                                    ^^^^^^^^^^^^^^^^
@@ -58,8 +61,9 @@ error[PT003]: PT003.py:24:36: [*] `scope='function'` is implied in `@pytest.fixt
 26 26 |     ...
 27 27 | 
 
-error[PT003]: PT003.py:29:36: [*] `scope='function'` is implied in `@pytest.fixture()`
+error[PT003]: 29:36: [*] `scope='function'` is implied in `@pytest.fixture()`
 
+  --> PT003.py:29:36
    |
 29 | @pytest.fixture(name="my_fixture", scope="function", **kwargs)
    |                                    ^^^^^^^^^^^^^^^^
@@ -77,8 +81,9 @@ error[PT003]: PT003.py:29:36: [*] `scope='function'` is implied in `@pytest.fixt
 31 31 |     ...
 32 32 | 
 
-error[PT003]: PT003.py:37:31: [*] `scope='function'` is implied in `@pytest.fixture()`
+error[PT003]: 37:31: [*] `scope='function'` is implied in `@pytest.fixture()`
 
+  --> PT003.py:37:31
    |
 35 | # tests the general case as we use a helper function that should
 36 | # work for all cases.
@@ -98,8 +103,9 @@ error[PT003]: PT003.py:37:31: [*] `scope='function'` is implied in `@pytest.fixt
 39 39 |     ...
 40 40 | 
 
-error[PT003]: PT003.py:43:5: [*] `scope='function'` is implied in `@pytest.fixture()`
+error[PT003]: 43:5: [*] `scope='function'` is implied in `@pytest.fixture()`
 
+  --> PT003.py:43:5
    |
 42 | @pytest.fixture(
 43 |     scope="function",
@@ -117,8 +123,9 @@ error[PT003]: PT003.py:43:5: [*] `scope='function'` is implied in `@pytest.fixtu
 45 44 | )
 46 45 | def error_multiple_args():
 
-error[PT003]: PT003.py:52:5: [*] `scope='function'` is implied in `@pytest.fixture()`
+error[PT003]: 52:5: [*] `scope='function'` is implied in `@pytest.fixture()`
 
+  --> PT003.py:52:5
    |
 50 | @pytest.fixture(
 51 |     name="my_fixture",
@@ -137,8 +144,9 @@ error[PT003]: PT003.py:52:5: [*] `scope='function'` is implied in `@pytest.fixtu
 54 53 | def error_multiple_args():
 55 54 |     ...
 
-error[PT003]: PT003.py:66:5: [*] `scope='function'` is implied in `@pytest.fixture()`
+error[PT003]: 66:5: [*] `scope='function'` is implied in `@pytest.fixture()`
 
+  --> PT003.py:66:5
    |
 64 |       # another comment ,)
 65 |       

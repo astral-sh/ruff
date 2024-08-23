@@ -1,8 +1,9 @@
 ---
 source: crates/ruff_linter/src/rules/pydocstyle/mod.rs
 ---
-error[D103]: D.py:400:5: Missing docstring in public function
+error[D103]: 400:5: Missing docstring in public function
 
+   --> D.py:400:5
     |
 399 | @expect("D103: Missing docstring in public function")
 400 | def oneliner_d102(): return

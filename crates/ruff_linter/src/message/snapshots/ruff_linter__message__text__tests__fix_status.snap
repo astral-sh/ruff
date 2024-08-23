@@ -2,15 +2,17 @@
 source: crates/ruff_linter/src/message/text.rs
 expression: content
 ---
-error[F401]: fib.py:1:8: `os` imported but unused
+error[F401]: 1:8: `os` imported but unused
 
+ --> fib.py:1:8
   |
 1 | import os
   |        ^^
   |
   = help: Remove unused import: `os`
-error[F841]: fib.py:6:5: Local variable `x` is assigned to but never used
+error[F841]: 6:5: Local variable `x` is assigned to but never used
 
+ --> fib.py:6:5
   |
 4 | def fibonacci(n):
 5 |     """Compute the nth number in the Fibonacci sequence."""
@@ -20,8 +22,9 @@ error[F841]: fib.py:6:5: Local variable `x` is assigned to but never used
 8 |         return 0
   |
   = help: Remove assignment to unused variable `x`
-error[F821]: undef.py:1:4: Undefined name `a`
+error[F821]: 1:4: Undefined name `a`
 
+ --> undef.py:1:4
   |
 1 | if a == 1: pass
   |    ^

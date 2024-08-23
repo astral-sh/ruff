@@ -1,8 +1,9 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_pytest_style/mod.rs
 ---
-error[PT026]: PT026.py:19:1: [*] Useless `pytest.mark.usefixtures` without parameters
+error[PT026]: 19:1: [*] Useless `pytest.mark.usefixtures` without parameters
 
+  --> PT026.py:19:1
    |
 19 | @pytest.mark.usefixtures()
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -20,8 +21,9 @@ error[PT026]: PT026.py:19:1: [*] Useless `pytest.mark.usefixtures` without param
 21 21 |     pass
 22 22 | 
 
-error[PT026]: PT026.py:24:1: [*] Useless `pytest.mark.usefixtures` without parameters
+error[PT026]: 24:1: [*] Useless `pytest.mark.usefixtures` without parameters
 
+  --> PT026.py:24:1
    |
 24 | @pytest.mark.usefixtures
    | ^^^^^^^^^^^^^^^^^^^^^^^^

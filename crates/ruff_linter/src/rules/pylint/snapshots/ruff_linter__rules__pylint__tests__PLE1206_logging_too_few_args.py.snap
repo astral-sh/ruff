@@ -1,8 +1,9 @@
 ---
 source: crates/ruff_linter/src/rules/pylint/mod.rs
 ---
-error[PLE1206]: logging_too_few_args.py:3:1: Not enough arguments for `logging` format string
+error[PLE1206]: 3:1: Not enough arguments for `logging` format string
 
+ --> logging_too_few_args.py:2:1
   |
 1 | import logging
 2 | 
@@ -11,8 +12,9 @@ error[PLE1206]: logging_too_few_args.py:3:1: Not enough arguments for `logging` 
 4 | 
 5 | # do not handle calls with kwargs (like pylint)
   |
-error[PLE1206]: logging_too_few_args.py:33:1: Not enough arguments for `logging` format string
+error[PLE1206]: 33:1: Not enough arguments for `logging` format string
 
+  --> logging_too_few_args.py:32:1
    |
 31 | from logging import error, info, warning
 32 | 

@@ -1,8 +1,9 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_pyi/mod.rs
 ---
-error[PYI057]: PYI057.pyi:4:20: Do not use `typing.ByteString`, which has unclear semantics and is deprecated
+error[PYI057]: 4:20: Do not use `typing.ByteString`, which has unclear semantics and is deprecated
 
+ --> PYI057.pyi:4:20
   |
 2 | import collections.abc
 3 | import foo
@@ -11,8 +12,9 @@ error[PYI057]: PYI057.pyi:4:20: Do not use `typing.ByteString`, which has unclea
 5 | from collections.abc import ByteString
 6 | from foo import ByteString
   |
-error[PYI057]: PYI057.pyi:5:29: Do not use `collections.abc.ByteString`, which has unclear semantics and is deprecated
+error[PYI057]: 5:29: Do not use `collections.abc.ByteString`, which has unclear semantics and is deprecated
 
+ --> PYI057.pyi:5:29
   |
 3 | import foo
 4 | from typing import ByteString
@@ -20,8 +22,9 @@ error[PYI057]: PYI057.pyi:5:29: Do not use `collections.abc.ByteString`, which h
   |                             ^^^^^^^^^^
 6 | from foo import ByteString
   |
-error[PYI057]: PYI057.pyi:8:4: Do not use `typing.ByteString`, which has unclear semantics and is deprecated
+error[PYI057]: 8:4: Do not use `typing.ByteString`, which has unclear semantics and is deprecated
 
+  --> PYI057.pyi:8:4
    |
  6 | from foo import ByteString
  7 | 
@@ -30,8 +33,9 @@ error[PYI057]: PYI057.pyi:8:4: Do not use `typing.ByteString`, which has unclear
  9 | b: collections.abc.ByteString
 10 | c: foo.ByteString
    |
-error[PYI057]: PYI057.pyi:9:4: Do not use `collections.abc.ByteString`, which has unclear semantics and is deprecated
+error[PYI057]: 9:4: Do not use `collections.abc.ByteString`, which has unclear semantics and is deprecated
 
+  --> PYI057.pyi:9:4
    |
  8 | a: typing.ByteString
  9 | b: collections.abc.ByteString

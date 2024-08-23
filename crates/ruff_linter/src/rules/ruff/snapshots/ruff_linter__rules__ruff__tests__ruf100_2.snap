@@ -1,8 +1,9 @@
 ---
 source: crates/ruff_linter/src/rules/ruff/mod.rs
 ---
-error[RUF100]: RUF100_2.py:1:19: [*] Unused `noqa` directive (unused: `F401`)
+error[RUF100]: 1:19: [*] Unused `noqa` directive (unused: `F401`)
 
+ --> RUF100_2.py:1:19
   |
 1 | import itertools  # noqa: F401
   |                   ^^^^^^^^^^^^

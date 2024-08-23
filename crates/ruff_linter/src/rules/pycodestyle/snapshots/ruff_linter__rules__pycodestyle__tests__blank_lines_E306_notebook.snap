@@ -1,8 +1,9 @@
 ---
 source: crates/ruff_linter/src/rules/pycodestyle/mod.rs
 ---
-error[E306]: E30.ipynb:60:5: [*] Expected 1 blank line before a nested definition, found 0
+error[E306]: 60:5: [*] Expected 1 blank line before a nested definition, found 0
 
+  --> E30.ipynb:60:5
    |
 58 | def a():
 59 |     x = 1

@@ -1,8 +1,9 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_pyi/mod.rs
 ---
-error[PYI011]: PYI011.pyi:10:14: [*] Only simple default values allowed for typed arguments
+error[PYI011]: 10:14: [*] Only simple default values allowed for typed arguments
 
+  --> PYI011.pyi:10:14
    |
  8 | def f12(
  9 |     x,
@@ -22,8 +23,9 @@ error[PYI011]: PYI011.pyi:10:14: [*] Only simple default values allowed for type
 12 12 | def f11(*, x: str = "x") -> None: ...  # OK
 13 13 | def f13(
 
-error[PYI011]: PYI011.pyi:38:9: [*] Only simple default values allowed for typed arguments
+error[PYI011]: 38:9: [*] Only simple default values allowed for typed arguments
 
+  --> PYI011.pyi:38:9
    |
 36 |       x: dict[
 37 |           int, int
@@ -50,8 +52,9 @@ error[PYI011]: PYI011.pyi:38:9: [*] Only simple default values allowed for typed
 43 40 | def f153(
 44 41 |     x: list[
 
-error[PYI011]: PYI011.pyi:46:9: [*] Only simple default values allowed for typed arguments
+error[PYI011]: 46:9: [*] Only simple default values allowed for typed arguments
 
+  --> PYI011.pyi:46:9
    |
 44 |       x: list[
 45 |           int
@@ -96,8 +99,9 @@ error[PYI011]: PYI011.pyi:46:9: [*] Only simple default values allowed for typed
 60 48 | def f154(
 61 49 |     x: tuple[
 
-error[PYI011]: PYI011.pyi:63:9: [*] Only simple default values allowed for typed arguments
+error[PYI011]: 63:9: [*] Only simple default values allowed for typed arguments
 
+  --> PYI011.pyi:63:9
    |
 61 |       x: tuple[
 62 |           str, tuple[str, ...]
@@ -124,8 +128,9 @@ error[PYI011]: PYI011.pyi:63:9: [*] Only simple default values allowed for typed
 68 65 | def f141(
 69 66 |     x: list[
 
-error[PYI011]: PYI011.pyi:71:9: [*] Only simple default values allowed for typed arguments
+error[PYI011]: 71:9: [*] Only simple default values allowed for typed arguments
 
+  --> PYI011.pyi:71:9
    |
 69 |       x: list[
 70 |           int
@@ -150,8 +155,9 @@ error[PYI011]: PYI011.pyi:71:9: [*] Only simple default values allowed for typed
 75 73 | def f142(
 76 74 |     x: list[
 
-error[PYI011]: PYI011.pyi:78:9: [*] Only simple default values allowed for typed arguments
+error[PYI011]: 78:9: [*] Only simple default values allowed for typed arguments
 
+  --> PYI011.pyi:78:9
    |
 76 |       x: list[
 77 |           int
@@ -176,8 +182,9 @@ error[PYI011]: PYI011.pyi:78:9: [*] Only simple default values allowed for typed
 82 80 | def f16(
 83 81 |     x: frozenset[
 
-error[PYI011]: PYI011.pyi:85:9: [*] Only simple default values allowed for typed arguments
+error[PYI011]: 85:9: [*] Only simple default values allowed for typed arguments
 
+  --> PYI011.pyi:85:9
    |
 83 |       x: frozenset[
 84 |           bytes
@@ -202,8 +209,9 @@ error[PYI011]: PYI011.pyi:85:9: [*] Only simple default values allowed for typed
 89 87 | def f17(
 90 88 |     x: str = "foo"  # Error PYI011 Only simple default values allowed for typed arguments
 
-error[PYI011]: PYI011.pyi:90:14: [*] Only simple default values allowed for typed arguments
+error[PYI011]: 90:14: [*] Only simple default values allowed for typed arguments
 
+  --> PYI011.pyi:90:14
    |
 88 |   ) -> None: ...
 89 |   def f17(
@@ -226,8 +234,9 @@ error[PYI011]: PYI011.pyi:90:14: [*] Only simple default values allowed for type
 93 92 | def f18(
 94 93 |     x: str = b"foo"  # Error PYI011 Only simple default values allowed for typed arguments
 
-error[PYI011]: PYI011.pyi:94:14: [*] Only simple default values allowed for typed arguments
+error[PYI011]: 94:14: [*] Only simple default values allowed for typed arguments
 
+  --> PYI011.pyi:94:14
    |
 92 |   ) -> None: ...
 93 |   def f18(
@@ -250,8 +259,9 @@ error[PYI011]: PYI011.pyi:94:14: [*] Only simple default values allowed for type
 97 96 | def f19(
 98 97 |     x: object = "foo"  # Error PYI011 Only simple default values allowed for typed arguments
 
-error[PYI011]: PYI011.pyi:98:17: [*] Only simple default values allowed for typed arguments
+error[PYI011]: 98:17: [*] Only simple default values allowed for typed arguments
 
+   --> PYI011.pyi:98:17
     |
  96 |   ) -> None: ...
  97 |   def f19(
@@ -274,8 +284,9 @@ error[PYI011]: PYI011.pyi:98:17: [*] Only simple default values allowed for type
 101 100 | def f20(
 102 101 |     x: int = 5
 
-error[PYI011]: PYI011.pyi:102:14: [*] Only simple default values allowed for typed arguments
+error[PYI011]: 102:14: [*] Only simple default values allowed for typed arguments
 
+   --> PYI011.pyi:102:14
     |
 100 |   ) -> None: ...
 101 |   def f20(
@@ -298,8 +309,9 @@ error[PYI011]: PYI011.pyi:102:14: [*] Only simple default values allowed for typ
 105 104 | def f21(
 106 105 |     x: complex = 3j
 
-error[PYI011]: PYI011.pyi:106:18: [*] Only simple default values allowed for typed arguments
+error[PYI011]: 106:18: [*] Only simple default values allowed for typed arguments
 
+   --> PYI011.pyi:106:18
     |
 104 |   ) -> None: ...
 105 |   def f21(
@@ -322,8 +334,9 @@ error[PYI011]: PYI011.pyi:106:18: [*] Only simple default values allowed for typ
 109 108 | def f22(
 110 109 |     x: complex = -42.5j  # Error PYI011 Only simple default values allowed for typed arguments
 
-error[PYI011]: PYI011.pyi:110:18: [*] Only simple default values allowed for typed arguments
+error[PYI011]: 110:18: [*] Only simple default values allowed for typed arguments
 
+   --> PYI011.pyi:110:18
     |
 108 |   ) -> None: ...
 109 |   def f22(
@@ -346,8 +359,9 @@ error[PYI011]: PYI011.pyi:110:18: [*] Only simple default values allowed for typ
 113 112 | def f23(
 114 113 |     x: bool = True,  # OK
 
-error[PYI011]: PYI011.pyi:138:16: [*] Only simple default values allowed for typed arguments
+error[PYI011]: 138:16: [*] Only simple default values allowed for typed arguments
 
+   --> PYI011.pyi:138:16
     |
 136 | ) -> None: ...
 137 | def f31(
@@ -367,8 +381,9 @@ error[PYI011]: PYI011.pyi:138:16: [*] Only simple default values allowed for typ
 140 140 | def f32(
 141 141 |     x: float = np.inf,  # Error PYI011 Only simple default values allowed for typed arguments
 
-error[PYI011]: PYI011.pyi:141:16: [*] Only simple default values allowed for typed arguments
+error[PYI011]: 141:16: [*] Only simple default values allowed for typed arguments
 
+   --> PYI011.pyi:141:16
     |
 139 | ) -> None: ...
 140 | def f32(
@@ -388,8 +403,9 @@ error[PYI011]: PYI011.pyi:141:16: [*] Only simple default values allowed for typ
 143 143 | def f33(
 144 144 |     x: float = math.nan,  # OK
 
-error[PYI011]: PYI011.pyi:147:16: [*] Only simple default values allowed for typed arguments
+error[PYI011]: 147:16: [*] Only simple default values allowed for typed arguments
 
+   --> PYI011.pyi:147:16
     |
 145 | ) -> None: ...
 146 | def f34(
@@ -409,8 +425,9 @@ error[PYI011]: PYI011.pyi:147:16: [*] Only simple default values allowed for typ
 149 149 | def f35(
 150 150 |     x: complex = math.inf  # Error PYI011 Only simple default values allowed for typed arguments
 
-error[PYI011]: PYI011.pyi:150:18: [*] Only simple default values allowed for typed arguments
+error[PYI011]: 150:18: [*] Only simple default values allowed for typed arguments
 
+   --> PYI011.pyi:150:18
     |
 148 |   ) -> None: ...
 149 |   def f35(
@@ -433,8 +450,9 @@ error[PYI011]: PYI011.pyi:150:18: [*] Only simple default values allowed for typ
 153 152 | def f36(
 154 153 |     *,
 
-error[PYI011]: PYI011.pyi:159:14: [*] Only simple default values allowed for typed arguments
+error[PYI011]: 159:14: [*] Only simple default values allowed for typed arguments
 
+   --> PYI011.pyi:159:14
     |
 157 |   def f37(
 158 |       *,

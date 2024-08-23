@@ -1,8 +1,9 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_unused_arguments/mod.rs
 ---
-error[ARG003]: ARG.py:47:16: Unused class method argument: `x`
+error[ARG003]: 47:16: Unused class method argument: `x`
 
+  --> ARG.py:47:16
    |
 46 |     @classmethod
 47 |     def f(cls, x):

@@ -1,8 +1,9 @@
 ---
 source: crates/ruff_linter/src/rules/mccabe/mod.rs
 ---
-error[C901]: C901.py:73:5: `try_else` is too complex (4 > 3)
+error[C901]: 73:5: `try_else` is too complex (4 > 3)
 
+  --> C901.py:73:5
    |
 72 | # Complexity = 4
 73 | def try_else():
@@ -10,8 +11,9 @@ error[C901]: C901.py:73:5: `try_else` is too complex (4 > 3)
 74 |     try:
 75 |         print(1)
    |
-error[C901]: C901.py:113:9: `handle` is too complex (9 > 3)
+error[C901]: 113:9: `handle` is too complex (9 > 3)
 
+   --> C901.py:113:9
     |
 111 | # Complexity = 9
 112 | class Class:

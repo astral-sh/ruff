@@ -1,8 +1,9 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_tidy_imports/mod.rs
 ---
-error[TID251]: TID251.py:2:8: `cgi` is banned: The cgi module is deprecated.
+error[TID251]: 2:8: `cgi` is banned: The cgi module is deprecated.
 
+ --> TID251.py:2:8
   |
 1 | ## Banned modules ##
 2 | import cgi
@@ -10,8 +11,9 @@ error[TID251]: TID251.py:2:8: `cgi` is banned: The cgi module is deprecated.
 3 | 
 4 | from cgi import *
   |
-error[TID251]: TID251.py:4:1: `cgi` is banned: The cgi module is deprecated.
+error[TID251]: 4:1: `cgi` is banned: The cgi module is deprecated.
 
+ --> TID251.py:3:1
   |
 2 | import cgi
 3 | 
@@ -20,8 +22,9 @@ error[TID251]: TID251.py:4:1: `cgi` is banned: The cgi module is deprecated.
 5 | 
 6 | from cgi import a, b, c
   |
-error[TID251]: TID251.py:6:1: `cgi` is banned: The cgi module is deprecated.
+error[TID251]: 6:1: `cgi` is banned: The cgi module is deprecated.
 
+ --> TID251.py:5:1
   |
 4 | from cgi import *
 5 | 
@@ -30,8 +33,9 @@ error[TID251]: TID251.py:6:1: `cgi` is banned: The cgi module is deprecated.
 7 | 
 8 | # banning a module also bans any submodules
   |
-error[TID251]: TID251.py:9:8: `cgi` is banned: The cgi module is deprecated.
+error[TID251]: 9:8: `cgi` is banned: The cgi module is deprecated.
 
+  --> TID251.py:9:8
    |
  8 | # banning a module also bans any submodules
  9 | import cgi.foo.bar
@@ -39,8 +43,9 @@ error[TID251]: TID251.py:9:8: `cgi` is banned: The cgi module is deprecated.
 10 | 
 11 | from cgi.foo import bar
    |
-error[TID251]: TID251.py:11:1: `cgi` is banned: The cgi module is deprecated.
+error[TID251]: 11:1: `cgi` is banned: The cgi module is deprecated.
 
+  --> TID251.py:10:1
    |
  9 | import cgi.foo.bar
 10 | 
@@ -49,8 +54,9 @@ error[TID251]: TID251.py:11:1: `cgi` is banned: The cgi module is deprecated.
 12 | 
 13 | from cgi.foo.bar import *
    |
-error[TID251]: TID251.py:13:1: `cgi` is banned: The cgi module is deprecated.
+error[TID251]: 13:1: `cgi` is banned: The cgi module is deprecated.
 
+  --> TID251.py:12:1
    |
 11 | from cgi.foo import bar
 12 | 
@@ -59,8 +65,9 @@ error[TID251]: TID251.py:13:1: `cgi` is banned: The cgi module is deprecated.
 14 | 
 15 | ## Banned module members ##
    |
-error[TID251]: TID251.py:17:20: `typing.TypedDict` is banned: Use typing_extensions.TypedDict instead.
+error[TID251]: 17:20: `typing.TypedDict` is banned: Use typing_extensions.TypedDict instead.
 
+  --> TID251.py:17:20
    |
 15 | ## Banned module members ##
 16 | 
@@ -69,8 +76,9 @@ error[TID251]: TID251.py:17:20: `typing.TypedDict` is banned: Use typing_extensi
 18 | 
 19 | import typing
    |
-error[TID251]: TID251.py:22:1: `typing.TypedDict` is banned: Use typing_extensions.TypedDict instead.
+error[TID251]: 22:1: `typing.TypedDict` is banned: Use typing_extensions.TypedDict instead.
 
+  --> TID251.py:21:30
    |
 21 | # attribute access is checked
 22 | typing.TypedDict
@@ -78,8 +86,9 @@ error[TID251]: TID251.py:22:1: `typing.TypedDict` is banned: Use typing_extensio
 23 | 
 24 | typing.TypedDict.anything
    |
-error[TID251]: TID251.py:24:1: `typing.TypedDict` is banned: Use typing_extensions.TypedDict instead.
+error[TID251]: 24:1: `typing.TypedDict` is banned: Use typing_extensions.TypedDict instead.
 
+  --> TID251.py:23:1
    |
 22 | typing.TypedDict
 23 | 
@@ -88,8 +97,9 @@ error[TID251]: TID251.py:24:1: `typing.TypedDict` is banned: Use typing_extensio
 25 | 
 26 | # function calls are checked
    |
-error[TID251]: TID251.py:27:1: `typing.TypedDict` is banned: Use typing_extensions.TypedDict instead.
+error[TID251]: 27:1: `typing.TypedDict` is banned: Use typing_extensions.TypedDict instead.
 
+  --> TID251.py:26:29
    |
 26 | # function calls are checked
 27 | typing.TypedDict()
@@ -97,8 +107,9 @@ error[TID251]: TID251.py:27:1: `typing.TypedDict` is banned: Use typing_extensio
 28 | 
 29 | typing.TypedDict.anything()
    |
-error[TID251]: TID251.py:29:1: `typing.TypedDict` is banned: Use typing_extensions.TypedDict instead.
+error[TID251]: 29:1: `typing.TypedDict` is banned: Use typing_extensions.TypedDict instead.
 
+  --> TID251.py:28:1
    |
 27 | typing.TypedDict()
 28 | 
@@ -107,8 +118,9 @@ error[TID251]: TID251.py:29:1: `typing.TypedDict` is banned: Use typing_extensio
 30 | 
 31 | # import aliases are resolved
    |
-error[TID251]: TID251.py:33:1: `typing.TypedDict` is banned: Use typing_extensions.TypedDict instead.
+error[TID251]: 33:1: `typing.TypedDict` is banned: Use typing_extensions.TypedDict instead.
 
+  --> TID251.py:32:36
    |
 31 | # import aliases are resolved
 32 | import typing as totally_not_typing

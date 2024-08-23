@@ -1,8 +1,9 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_simplify/mod.rs
 ---
-error[SIM212]: SIM212.py:1:5: [*] Use `a if a else b` instead of `b if not a else a`
+error[SIM212]: 1:5: [*] Use `a if a else b` instead of `b if not a else a`
 
+ --> SIM212.py:1:5
   |
 1 | c = b if not a else a  # SIM212
   |     ^^^^^^^^^^^^^^^^^
@@ -17,8 +18,9 @@ error[SIM212]: SIM212.py:1:5: [*] Use `a if a else b` instead of `b if not a els
 3 3 | c = b + c if not a else a  # SIM212
 4 4 | 
 
-error[SIM212]: SIM212.py:3:5: [*] Use `a if a else b + c` instead of `b + c if not a else a`
+error[SIM212]: 3:5: [*] Use `a if a else b + c` instead of `b + c if not a else a`
 
+ --> SIM212.py:3:5
   |
 1 | c = b if not a else a  # SIM212
 2 | 

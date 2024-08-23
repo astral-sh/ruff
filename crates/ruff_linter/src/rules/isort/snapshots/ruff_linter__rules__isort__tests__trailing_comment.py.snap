@@ -1,7 +1,9 @@
 ---
 source: crates/ruff_linter/src/rules/isort/mod.rs
 ---
-trailing_comment.py:8:1: I001 [*] Import block is un-sorted or un-formatted
+error[I001]: 8:1: [*] Import block is un-sorted or un-formatted
+
+  --> trailing_comment.py:7:1
    |
  6 |   pass
  7 |   
@@ -12,13 +14,12 @@ trailing_comment.py:8:1: I001 [*] Import block is un-sorted or un-formatted
 12 | |     bar
 13 | | )# some comment
 14 | | 
-15 | | pass
-   | |_^ I001
+   | |__^
+15 |   pass
 16 |   
 17 |   from foo import (
    |
    = help: Organize imports
-
 ℹ Safe fix
 5  5  | 
 6  6  | pass
@@ -35,7 +36,9 @@ trailing_comment.py:8:1: I001 [*] Import block is un-sorted or un-formatted
 15 14 | pass
 16 15 | 
 
-trailing_comment.py:17:1: I001 [*] Import block is un-sorted or un-formatted
+error[I001]: 17:1: [*] Import block is un-sorted or un-formatted
+
+  --> trailing_comment.py:16:1
    |
 15 |   pass
 16 |   
@@ -48,13 +51,12 @@ trailing_comment.py:17:1: I001 [*] Import block is un-sorted or un-formatted
 23 | |     # some comment
 24 | | )
 25 | | 
-26 | | pass
-   | |_^ I001
+   | |__^
+26 |   pass
 27 |   
 28 |   from mylib import (
    |
    = help: Organize imports
-
 ℹ Safe fix
 14 14 | 
 15 15 | pass
@@ -67,7 +69,9 @@ trailing_comment.py:17:1: I001 [*] Import block is un-sorted or un-formatted
 21 19 |     MyClient,
 22 20 |     MyMgmtClient,
 
-trailing_comment.py:35:1: I001 [*] Import block is un-sorted or un-formatted
+error[I001]: 35:1: [*] Import block is un-sorted or un-formatted
+
+  --> trailing_comment.py:34:1
    |
 33 |   pass
 34 |   
@@ -76,13 +80,12 @@ trailing_comment.py:35:1: I001 [*] Import block is un-sorted or un-formatted
 37 | |     # some comment
 38 | | )
 39 | | 
-40 | | pass
-   | |_^ I001
+   | |__^
+40 |   pass
 41 |   
 42 |   from mylib import (
    |
    = help: Organize imports
-
 ℹ Safe fix
 32 32 | 
 33 33 | pass
@@ -96,7 +99,9 @@ trailing_comment.py:35:1: I001 [*] Import block is un-sorted or un-formatted
 40 37 | pass
 41 38 | 
 
-trailing_comment.py:42:1: I001 [*] Import block is un-sorted or un-formatted
+error[I001]: 42:1: [*] Import block is un-sorted or un-formatted
+
+  --> trailing_comment.py:41:1
    |
 40 |   pass
 41 |   
@@ -105,13 +110,12 @@ trailing_comment.py:42:1: I001 [*] Import block is un-sorted or un-formatted
 44 | |     MyClient
 45 | | )
 46 | | 
-47 | | pass
-   | |_^ I001
+   | |__^
+47 |   pass
 48 |   
 49 |   # a
    |
    = help: Organize imports
-
 ℹ Safe fix
 39 39 | 
 40 40 | pass
@@ -125,7 +129,9 @@ trailing_comment.py:42:1: I001 [*] Import block is un-sorted or un-formatted
 47 44 | pass
 48 45 | 
 
-trailing_comment.py:50:1: I001 [*] Import block is un-sorted or un-formatted
+error[I001]: 50:1: [*] Import block is un-sorted or un-formatted
+
+  --> trailing_comment.py:49:4
    |
 49 |   # a
 50 | / from mylib import ( # b
@@ -133,9 +139,9 @@ trailing_comment.py:50:1: I001 [*] Import block is un-sorted or un-formatted
 52 | |     MyClient # d
 53 | |     # e
 54 | | ) # f
+   | |______^
    |
    = help: Organize imports
-
 ℹ Safe fix
 47 47 | pass
 48 48 | 

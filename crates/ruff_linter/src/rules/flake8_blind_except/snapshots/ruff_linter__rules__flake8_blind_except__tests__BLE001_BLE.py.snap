@@ -1,8 +1,9 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_blind_except/mod.rs
 ---
-error[BLE001]: BLE.py:25:8: Do not catch blind exception: `BaseException`
+error[BLE001]: 25:8: Do not catch blind exception: `BaseException`
 
+  --> BLE.py:25:8
    |
 23 | except Exception as e:
 24 |     raise e
@@ -10,8 +11,9 @@ error[BLE001]: BLE.py:25:8: Do not catch blind exception: `BaseException`
    |        ^^^^^^^^^^^^^
 26 |     pass
    |
-error[BLE001]: BLE.py:31:8: Do not catch blind exception: `Exception`
+error[BLE001]: 31:8: Do not catch blind exception: `Exception`
 
+  --> BLE.py:31:8
    |
 29 | try:
 30 |     pass
@@ -20,8 +22,9 @@ error[BLE001]: BLE.py:31:8: Do not catch blind exception: `Exception`
 32 |     pass
 33 | finally:
    |
-error[BLE001]: BLE.py:42:8: Do not catch blind exception: `Exception`
+error[BLE001]: 42:8: Do not catch blind exception: `Exception`
 
+  --> BLE.py:42:8
    |
 40 | try:
 41 |     pass
@@ -30,8 +33,9 @@ error[BLE001]: BLE.py:42:8: Do not catch blind exception: `Exception`
 43 |     try:
 44 |         raise e
    |
-error[BLE001]: BLE.py:45:12: Do not catch blind exception: `BaseException`
+error[BLE001]: 45:12: Do not catch blind exception: `BaseException`
 
+  --> BLE.py:45:12
    |
 43 |     try:
 44 |         raise e
@@ -39,8 +43,9 @@ error[BLE001]: BLE.py:45:12: Do not catch blind exception: `BaseException`
    |            ^^^^^^^^^^^^^
 46 |         pass
    |
-error[BLE001]: BLE.py:54:8: Do not catch blind exception: `Exception`
+error[BLE001]: 54:8: Do not catch blind exception: `Exception`
 
+  --> BLE.py:54:8
    |
 52 |     except BaseException as e:
 53 |         raise e
@@ -48,8 +53,9 @@ error[BLE001]: BLE.py:54:8: Do not catch blind exception: `Exception`
    |        ^^^^^^^^^
 55 |     pass
    |
-error[BLE001]: BLE.py:60:8: Do not catch blind exception: `Exception`
+error[BLE001]: 60:8: Do not catch blind exception: `Exception`
 
+  --> BLE.py:60:8
    |
 58 | try:
 59 |     pass
@@ -58,8 +64,9 @@ error[BLE001]: BLE.py:60:8: Do not catch blind exception: `Exception`
 61 |     raise bad
 62 | except BaseException:
    |
-error[BLE001]: BLE.py:62:8: Do not catch blind exception: `BaseException`
+error[BLE001]: 62:8: Do not catch blind exception: `BaseException`
 
+  --> BLE.py:62:8
    |
 60 | except Exception as e:
 61 |     raise bad
@@ -67,8 +74,9 @@ error[BLE001]: BLE.py:62:8: Do not catch blind exception: `BaseException`
    |        ^^^^^^^^^^^^^
 63 |     pass
    |
-error[BLE001]: BLE.py:69:8: Do not catch blind exception: `Exception`
+error[BLE001]: 69:8: Do not catch blind exception: `Exception`
 
+  --> BLE.py:69:8
    |
 67 | try:
 68 |     pass
@@ -76,8 +84,9 @@ error[BLE001]: BLE.py:69:8: Do not catch blind exception: `Exception`
    |        ^^^^^^^^^
 70 |     logging.error("...")
    |
-error[BLE001]: BLE.py:75:8: Do not catch blind exception: `Exception`
+error[BLE001]: 75:8: Do not catch blind exception: `Exception`
 
+  --> BLE.py:75:8
    |
 73 | try:
 74 |     pass
@@ -85,8 +94,9 @@ error[BLE001]: BLE.py:75:8: Do not catch blind exception: `Exception`
    |        ^^^^^^^^^
 76 |     logging.error("...", exc_info=False)
    |
-error[BLE001]: BLE.py:81:8: Do not catch blind exception: `Exception`
+error[BLE001]: 81:8: Do not catch blind exception: `Exception`
 
+  --> BLE.py:81:8
    |
 79 | try:
 80 |     pass
@@ -94,8 +104,9 @@ error[BLE001]: BLE.py:81:8: Do not catch blind exception: `Exception`
    |        ^^^^^^^^^
 82 |     logging.error("...", exc_info=None)
    |
-error[BLE001]: BLE.py:101:8: Do not catch blind exception: `Exception`
+error[BLE001]: 101:8: Do not catch blind exception: `Exception`
 
+   --> BLE.py:101:8
     |
  99 | try:
 100 |     pass
@@ -103,8 +114,9 @@ error[BLE001]: BLE.py:101:8: Do not catch blind exception: `Exception`
     |        ^^^^^^^^^
 102 |     error("...")
     |
-error[BLE001]: BLE.py:107:8: Do not catch blind exception: `Exception`
+error[BLE001]: 107:8: Do not catch blind exception: `Exception`
 
+   --> BLE.py:107:8
     |
 105 | try:
 106 |     pass
@@ -112,8 +124,9 @@ error[BLE001]: BLE.py:107:8: Do not catch blind exception: `Exception`
     |        ^^^^^^^^^
 108 |     error("...", exc_info=False)
     |
-error[BLE001]: BLE.py:113:8: Do not catch blind exception: `Exception`
+error[BLE001]: 113:8: Do not catch blind exception: `Exception`
 
+   --> BLE.py:113:8
     |
 111 | try:
 112 |     pass

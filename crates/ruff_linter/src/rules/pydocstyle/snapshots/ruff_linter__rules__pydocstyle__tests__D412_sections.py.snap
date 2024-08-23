@@ -1,8 +1,9 @@
 ---
 source: crates/ruff_linter/src/rules/pydocstyle/mod.rs
 ---
-error[D412]: sections.py:218:5: [*] No blank lines allowed between a section header and its content ("Short summary")
+error[D412]: 218:5: [*] No blank lines allowed between a section header and its content ("Short summary")
 
+   --> sections.py:218:5
     |
 216 |     """Toggle the gizmo.
 217 | 

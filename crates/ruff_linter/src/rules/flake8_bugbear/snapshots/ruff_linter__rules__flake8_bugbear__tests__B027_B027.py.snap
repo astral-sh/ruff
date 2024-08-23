@@ -1,8 +1,9 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_bugbear/mod.rs
 ---
-error[B027]: B027.py:18:5: `AbstractClass.empty_1` is an empty method in an abstract base class, but has no abstract decorator
+error[B027]: 18:5: `AbstractClass.empty_1` is an empty method in an abstract base class, but has no abstract decorator
 
+  --> B027.py:18:5
    |
 17 |   class AbstractClass(ABC):
 18 |       def empty_1(self):  # error
@@ -12,8 +13,9 @@ error[B027]: B027.py:18:5: `AbstractClass.empty_1` is an empty method in an abst
 20 |   
 21 |       def empty_2(self):  # error
    |
-error[B027]: B027.py:21:5: `AbstractClass.empty_2` is an empty method in an abstract base class, but has no abstract decorator
+error[B027]: 21:5: `AbstractClass.empty_2` is an empty method in an abstract base class, but has no abstract decorator
 
+  --> B027.py:21:5
    |
 19 |           ...
 20 |   
@@ -24,8 +26,9 @@ error[B027]: B027.py:21:5: `AbstractClass.empty_2` is an empty method in an abst
 23 |   
 24 |       def empty_3(self):  # error
    |
-error[B027]: B027.py:24:5: `AbstractClass.empty_3` is an empty method in an abstract base class, but has no abstract decorator
+error[B027]: 24:5: `AbstractClass.empty_3` is an empty method in an abstract base class, but has no abstract decorator
 
+  --> B027.py:24:5
    |
 22 |           pass
 23 |   
@@ -37,8 +40,9 @@ error[B027]: B027.py:24:5: `AbstractClass.empty_3` is an empty method in an abst
 27 |   
 28 |       def empty_4(self):  # error
    |
-error[B027]: B027.py:28:5: `AbstractClass.empty_4` is an empty method in an abstract base class, but has no abstract decorator
+error[B027]: 28:5: `AbstractClass.empty_4` is an empty method in an abstract base class, but has no abstract decorator
 
+  --> B027.py:28:5
    |
 26 |           ...
 27 |   

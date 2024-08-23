@@ -1,8 +1,9 @@
 ---
 source: crates/ruff_linter/src/rules/pydocstyle/mod.rs
 ---
-error[D403]: D403.py:2:5: [*] First word of the first line should be capitalized: `this` -> `This`
+error[D403]: 2:5: [*] First word of the first line should be capitalized: `this` -> `This`
 
+ --> D403.py:2:5
   |
 1 | def bad_function():
 2 |     """this docstring is not capitalized"""
@@ -19,8 +20,9 @@ error[D403]: D403.py:2:5: [*] First word of the first line should be capitalized
 4 4 | def good_function():
 5 5 |     """This docstring is capitalized."""
 
-error[D403]: D403.py:30:5: [*] First word of the first line should be capitalized: `singleword` -> `Singleword`
+error[D403]: 30:5: [*] First word of the first line should be capitalized: `singleword` -> `Singleword`
 
+  --> D403.py:30:5
    |
 29 | def single_word():
 30 |     """singleword."""
@@ -39,8 +41,9 @@ error[D403]: D403.py:30:5: [*] First word of the first line should be capitalize
 32 32 | def single_word_no_dot():
 33 33 |     """singleword"""
 
-error[D403]: D403.py:33:5: [*] First word of the first line should be capitalized: `singleword` -> `Singleword`
+error[D403]: 33:5: [*] First word of the first line should be capitalized: `singleword` -> `Singleword`
 
+  --> D403.py:33:5
    |
 32 | def single_word_no_dot():
 33 |     """singleword"""

@@ -1,8 +1,9 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_quotes/mod.rs
 ---
-error[Q002]: docstring_singles.py:1:1: [*] Single quote docstring found but double quotes preferred
+error[Q002]: 1:1: [*] Single quote docstring found but double quotes preferred
 
+ --> docstring_singles.py:1:1
   |
 1 | / '''
 2 | | Single quotes multiline module docstring
@@ -22,8 +23,9 @@ error[Q002]: docstring_singles.py:1:1: [*] Single quote docstring found but doub
 5 5 | '''
 6 6 | this is not a docstring
 
-error[Q002]: docstring_singles.py:14:5: [*] Single quote docstring found but double quotes preferred
+error[Q002]: 14:5: [*] Single quote docstring found but double quotes preferred
 
+  --> docstring_singles.py:14:5
    |
 12 |       class params \t not a docstring
 13 |   ''')):
@@ -49,8 +51,9 @@ error[Q002]: docstring_singles.py:14:5: [*] Single quote docstring found but dou
 18 18 |     '''
 19 19 |     this is not a docstring
 
-error[Q002]: docstring_singles.py:26:9: [*] Single quote docstring found but double quotes preferred
+error[Q002]: 26:9: [*] Single quote docstring found but double quotes preferred
 
+  --> docstring_singles.py:26:9
    |
 24 |           definitely not a docstring''',
 25 |           val=l[Cls():3]):

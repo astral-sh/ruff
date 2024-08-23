@@ -1,8 +1,9 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_logging_format/mod.rs
 ---
-error[G001]: G001.py:4:14: Logging statement uses `str.format`
+error[G001]: 4:14: Logging statement uses `str.format`
 
+ --> G001.py:4:14
   |
 2 | import logging as foo
 3 | 
@@ -11,8 +12,9 @@ error[G001]: G001.py:4:14: Logging statement uses `str.format`
 5 | logging.log(logging.INFO, "Hello {}".format("World!"))
 6 | foo.info("Hello {}".format("World!"))
   |
-error[G001]: G001.py:5:27: Logging statement uses `str.format`
+error[G001]: 5:27: Logging statement uses `str.format`
 
+ --> G001.py:5:27
   |
 4 | logging.info("Hello {}".format("World!"))
 5 | logging.log(logging.INFO, "Hello {}".format("World!"))
@@ -20,8 +22,9 @@ error[G001]: G001.py:5:27: Logging statement uses `str.format`
 6 | foo.info("Hello {}".format("World!"))
 7 | logging.log(logging.INFO, msg="Hello {}".format("World!"))
   |
-error[G001]: G001.py:6:10: Logging statement uses `str.format`
+error[G001]: 6:10: Logging statement uses `str.format`
 
+ --> G001.py:6:10
   |
 4 | logging.info("Hello {}".format("World!"))
 5 | logging.log(logging.INFO, "Hello {}".format("World!"))
@@ -30,8 +33,9 @@ error[G001]: G001.py:6:10: Logging statement uses `str.format`
 7 | logging.log(logging.INFO, msg="Hello {}".format("World!"))
 8 | logging.log(level=logging.INFO, msg="Hello {}".format("World!"))
   |
-error[G001]: G001.py:7:31: Logging statement uses `str.format`
+error[G001]: 7:31: Logging statement uses `str.format`
 
+ --> G001.py:7:31
   |
 5 | logging.log(logging.INFO, "Hello {}".format("World!"))
 6 | foo.info("Hello {}".format("World!"))
@@ -40,8 +44,9 @@ error[G001]: G001.py:7:31: Logging statement uses `str.format`
 8 | logging.log(level=logging.INFO, msg="Hello {}".format("World!"))
 9 | logging.log(msg="Hello {}".format("World!"), level=logging.INFO)
   |
-error[G001]: G001.py:8:37: Logging statement uses `str.format`
+error[G001]: 8:37: Logging statement uses `str.format`
 
+ --> G001.py:8:37
   |
 6 | foo.info("Hello {}".format("World!"))
 7 | logging.log(logging.INFO, msg="Hello {}".format("World!"))
@@ -49,8 +54,9 @@ error[G001]: G001.py:8:37: Logging statement uses `str.format`
   |                                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^
 9 | logging.log(msg="Hello {}".format("World!"), level=logging.INFO)
   |
-error[G001]: G001.py:9:17: Logging statement uses `str.format`
+error[G001]: 9:17: Logging statement uses `str.format`
 
+  --> G001.py:9:17
    |
  7 | logging.log(logging.INFO, msg="Hello {}".format("World!"))
  8 | logging.log(level=logging.INFO, msg="Hello {}".format("World!"))
@@ -59,8 +65,9 @@ error[G001]: G001.py:9:17: Logging statement uses `str.format`
 10 | 
 11 | # Flask support
    |
-error[G001]: G001.py:16:31: Logging statement uses `str.format`
+error[G001]: 16:31: Logging statement uses `str.format`
 
+  --> G001.py:16:31
    |
 14 | from flask import current_app as app
 15 | 
@@ -69,16 +76,18 @@ error[G001]: G001.py:16:31: Logging statement uses `str.format`
 17 | current_app.logger.info("Hello {}".format("World!"))
 18 | app.logger.log(logging.INFO, "Hello {}".format("World!"))
    |
-error[G001]: G001.py:17:25: Logging statement uses `str.format`
+error[G001]: 17:25: Logging statement uses `str.format`
 
+  --> G001.py:17:25
    |
 16 | flask.current_app.logger.info("Hello {}".format("World!"))
 17 | current_app.logger.info("Hello {}".format("World!"))
    |                         ^^^^^^^^^^^^^^^^^^^^^^^^^^^
 18 | app.logger.log(logging.INFO, "Hello {}".format("World!"))
    |
-error[G001]: G001.py:18:30: Logging statement uses `str.format`
+error[G001]: 18:30: Logging statement uses `str.format`
 
+  --> G001.py:18:30
    |
 16 | flask.current_app.logger.info("Hello {}".format("World!"))
 17 | current_app.logger.info("Hello {}".format("World!"))
@@ -87,8 +96,9 @@ error[G001]: G001.py:18:30: Logging statement uses `str.format`
 19 | 
 20 | from logging import info, log
    |
-error[G001]: G001.py:22:6: Logging statement uses `str.format`
+error[G001]: 22:6: Logging statement uses `str.format`
 
+  --> G001.py:22:6
    |
 20 | from logging import info, log
 21 | 
@@ -97,8 +107,9 @@ error[G001]: G001.py:22:6: Logging statement uses `str.format`
 23 | log(logging.INFO, "Hello {}".format("World!"))
 24 | info("Hello {}".format("World!"))
    |
-error[G001]: G001.py:23:19: Logging statement uses `str.format`
+error[G001]: 23:19: Logging statement uses `str.format`
 
+  --> G001.py:23:19
    |
 22 | info("Hello {}".format("World!"))
 23 | log(logging.INFO, "Hello {}".format("World!"))
@@ -106,8 +117,9 @@ error[G001]: G001.py:23:19: Logging statement uses `str.format`
 24 | info("Hello {}".format("World!"))
 25 | log(logging.INFO, msg="Hello {}".format("World!"))
    |
-error[G001]: G001.py:24:6: Logging statement uses `str.format`
+error[G001]: 24:6: Logging statement uses `str.format`
 
+  --> G001.py:24:6
    |
 22 | info("Hello {}".format("World!"))
 23 | log(logging.INFO, "Hello {}".format("World!"))
@@ -116,8 +128,9 @@ error[G001]: G001.py:24:6: Logging statement uses `str.format`
 25 | log(logging.INFO, msg="Hello {}".format("World!"))
 26 | log(level=logging.INFO, msg="Hello {}".format("World!"))
    |
-error[G001]: G001.py:25:23: Logging statement uses `str.format`
+error[G001]: 25:23: Logging statement uses `str.format`
 
+  --> G001.py:25:23
    |
 23 | log(logging.INFO, "Hello {}".format("World!"))
 24 | info("Hello {}".format("World!"))
@@ -126,8 +139,9 @@ error[G001]: G001.py:25:23: Logging statement uses `str.format`
 26 | log(level=logging.INFO, msg="Hello {}".format("World!"))
 27 | log(msg="Hello {}".format("World!"), level=logging.INFO)
    |
-error[G001]: G001.py:26:29: Logging statement uses `str.format`
+error[G001]: 26:29: Logging statement uses `str.format`
 
+  --> G001.py:26:29
    |
 24 | info("Hello {}".format("World!"))
 25 | log(logging.INFO, msg="Hello {}".format("World!"))
@@ -135,8 +149,9 @@ error[G001]: G001.py:26:29: Logging statement uses `str.format`
    |                             ^^^^^^^^^^^^^^^^^^^^^^^^^^^
 27 | log(msg="Hello {}".format("World!"), level=logging.INFO)
    |
-error[G001]: G001.py:27:9: Logging statement uses `str.format`
+error[G001]: 27:9: Logging statement uses `str.format`
 
+  --> G001.py:27:9
    |
 25 | log(logging.INFO, msg="Hello {}".format("World!"))
 26 | log(level=logging.INFO, msg="Hello {}".format("World!"))

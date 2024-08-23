@@ -1,8 +1,9 @@
 ---
 source: crates/ruff_linter/src/rules/pycodestyle/mod.rs
 ---
-error[I001]: E30_isort.py:1:1: [*] Import block is un-sorted or un-formatted
+error[I001]: 1:1: [*] Import block is un-sorted or un-formatted
 
+ --> E30_isort.py:1:1
   |
 1 | / import json
 2 | | 
@@ -11,8 +12,8 @@ error[I001]: E30_isort.py:1:1: [*] Import block is un-sorted or un-formatted
 5 | | from typing import Any, Sequence
 6 | | 
 7 | | 
-8 | | class MissingCommand(TypeError): ...  # noqa: N818
-  | |_^
+  | |__^
+8 |   class MissingCommand(TypeError): ...  # noqa: N818
   |
   = help: Organize imports
 ℹ Safe fix
@@ -29,8 +30,9 @@ error[I001]: E30_isort.py:1:1: [*] Import block is un-sorted or un-formatted
 9  12 | 
 10 13 | 
 
-error[E302]: E30_isort.py:8:1: [*] Expected 4 blank lines, found 2
+error[E302]: 8:1: [*] Expected 4 blank lines, found 2
 
+ --> E30_isort.py:8:1
   |
 8 | class MissingCommand(TypeError): ...  # noqa: N818
   | ^^^^^
@@ -46,8 +48,9 @@ error[E302]: E30_isort.py:8:1: [*] Expected 4 blank lines, found 2
 9  11 | 
 10 12 | 
 
-error[E302]: E30_isort.py:23:1: [*] Expected 2 blank lines, found 1
+error[E302]: 23:1: [*] Expected 2 blank lines, found 1
 
+  --> E30_isort.py:22:1
    |
 21 |     abcd.foo()
 22 | 
@@ -66,8 +69,9 @@ error[E302]: E30_isort.py:23:1: [*] Expected 2 blank lines, found 1
 24 25 | 
 25 26 | if TYPE_CHECKING:
 
-error[I001]: E30_isort.py:26:1: [*] Import block is un-sorted or un-formatted
+error[I001]: 26:1: [*] Import block is un-sorted or un-formatted
 
+  --> E30_isort.py:25:18
    |
 25 |   if TYPE_CHECKING:
 26 | /     import os
@@ -75,8 +79,8 @@ error[I001]: E30_isort.py:26:1: [*] Import block is un-sorted or un-formatted
 28 | | 
 29 | | 
 30 | |     from typing_extensions import TypeAlias
-31 | | 
-   | |_^
+   | |____________________________________________^
+31 |   
 32 |   
 33 |       abcd.foo()
    |
@@ -91,8 +95,9 @@ error[I001]: E30_isort.py:26:1: [*] Import block is un-sorted or un-formatted
 31 29 | 
 32 30 | 
 
-error[E302]: E30_isort.py:35:1: [*] Expected 2 blank lines, found 1
+error[E302]: 35:1: [*] Expected 2 blank lines, found 1
 
+  --> E30_isort.py:34:1
    |
 33 |     abcd.foo()
 34 | 
@@ -110,8 +115,9 @@ error[E302]: E30_isort.py:35:1: [*] Expected 2 blank lines, found 1
 36 37 |     ...
 37 38 | 
 
-error[E302]: E30_isort.py:41:1: [*] Expected 2 blank lines, found 1
+error[E302]: 41:1: [*] Expected 2 blank lines, found 1
 
+  --> E30_isort.py:40:1
    |
 39 |     from typing_extensions import TypeAlias
 40 | 
@@ -129,13 +135,14 @@ error[E302]: E30_isort.py:41:1: [*] Expected 2 blank lines, found 1
 42 43 |     ...
 43 44 | 
 
-error[I001]: E30_isort.py:60:1: [*] Import block is un-sorted or un-formatted
+error[I001]: 60:1: [*] Import block is un-sorted or un-formatted
 
+  --> E30_isort.py:60:1
    |
 60 | / from typing import Any, Sequence
 61 | | 
-62 | | class MissingCommand(TypeError): ...  # noqa: N818
-   | |_^
+   | |__^
+62 |   class MissingCommand(TypeError): ...  # noqa: N818
    |
    = help: Organize imports
 ℹ Safe fix
@@ -147,8 +154,9 @@ error[I001]: E30_isort.py:60:1: [*] Import block is un-sorted or un-formatted
    64 |+
 62 65 | class MissingCommand(TypeError): ...  # noqa: N818
 
-error[E302]: E30_isort.py:62:1: [*] Expected 4 blank lines, found 1
+error[E302]: 62:1: [*] Expected 4 blank lines, found 1
 
+  --> E30_isort.py:61:1
    |
 60 | from typing import Any, Sequence
 61 | 

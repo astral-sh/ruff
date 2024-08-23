@@ -1,8 +1,9 @@
 ---
 source: crates/ruff_linter/src/rules/isort/mod.rs
 ---
-error[I001]: length_sort_non_ascii_modules.py:1:1: [*] Import block is un-sorted or un-formatted
+error[I001]: 1:1: [*] Import block is un-sorted or un-formatted
 
+ --> length_sort_non_ascii_modules.py:1:1
   |
 1 | / import loooooooooooooong
 2 | | import mediuuuuuum
@@ -13,6 +14,7 @@ error[I001]: length_sort_non_ascii_modules.py:1:1: [*] Import block is un-sorted
 7 | | import λοοοοοοοοοοοοοονγ
 8 | | import μεδιυυυυυμ
 9 | | import looooooooooooooong
+  | |__________________________^
   |
   = help: Organize imports
 ℹ Safe fix

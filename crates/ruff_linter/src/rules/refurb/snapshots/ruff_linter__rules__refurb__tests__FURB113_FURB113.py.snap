@@ -1,8 +1,9 @@
 ---
 source: crates/ruff_linter/src/rules/refurb/mod.rs
 ---
-error[FURB113]: FURB113.py:23:1: [*] Use `nums.extend((1, 2))` instead of repeatedly calling `nums.append()`
+error[FURB113]: 23:1: [*] Use `nums.extend((1, 2))` instead of repeatedly calling `nums.append()`
 
+  --> FURB113.py:22:10
    |
 22 |   # FURB113
 23 | / nums.append(1)
@@ -22,8 +23,9 @@ error[FURB113]: FURB113.py:23:1: [*] Use `nums.extend((1, 2))` instead of repeat
 26 25 | 
 27 26 | 
 
-error[FURB113]: FURB113.py:29:1: [*] Use `nums3.extend((1, 2))` instead of repeatedly calling `nums3.append()`
+error[FURB113]: 29:1: [*] Use `nums3.extend((1, 2))` instead of repeatedly calling `nums3.append()`
 
+  --> FURB113.py:28:10
    |
 28 |   # FURB113
 29 | / nums3.append(1)
@@ -43,8 +45,9 @@ error[FURB113]: FURB113.py:29:1: [*] Use `nums3.extend((1, 2))` instead of repea
 32 31 | 
 33 32 | 
 
-error[FURB113]: FURB113.py:35:1: [*] Use `nums4.extend((1, 2))` instead of repeatedly calling `nums4.append()`
+error[FURB113]: 35:1: [*] Use `nums4.extend((1, 2))` instead of repeatedly calling `nums4.append()`
 
+  --> FURB113.py:34:10
    |
 34 |   # FURB113
 35 | / nums4.append(1)
@@ -64,8 +67,9 @@ error[FURB113]: FURB113.py:35:1: [*] Use `nums4.extend((1, 2))` instead of repea
 38 37 | 
 39 38 | 
 
-error[FURB113]: FURB113.py:41:1: Use `nums.extend((1, 2, 3))` instead of repeatedly calling `nums.append()`
+error[FURB113]: 41:1: Use `nums.extend((1, 2, 3))` instead of repeatedly calling `nums.append()`
 
+  --> FURB113.py:40:10
    |
 40 |   # FURB113
 41 | / nums.append(1)
@@ -76,8 +80,9 @@ error[FURB113]: FURB113.py:41:1: Use `nums.extend((1, 2, 3))` instead of repeate
 45 |   pass
    |
    = help: Replace with `nums.extend((1, 2, 3))`
-error[FURB113]: FURB113.py:49:1: Use `nums.extend((1, 2, 3))` instead of repeatedly calling `nums.append()`
+error[FURB113]: 49:1: Use `nums.extend((1, 2, 3))` instead of repeatedly calling `nums.append()`
 
+  --> FURB113.py:48:10
    |
 48 |   # FURB113
 49 | / nums.append(1)
@@ -91,8 +96,9 @@ error[FURB113]: FURB113.py:49:1: Use `nums.extend((1, 2, 3))` instead of repeate
 56 |   nums4.append(1)
    |
    = help: Replace with `nums.extend((1, 2, 3))`
-error[FURB113]: FURB113.py:53:1: Use `nums3.extend((1, 2))` instead of repeatedly calling `nums3.append()`
+error[FURB113]: 53:1: Use `nums3.extend((1, 2))` instead of repeatedly calling `nums3.append()`
 
+  --> FURB113.py:52:10
    |
 51 |   nums.append(2)
 52 |   # FURB113
@@ -106,8 +112,9 @@ error[FURB113]: FURB113.py:53:1: Use `nums3.extend((1, 2))` instead of repeatedl
 59 |   pass
    |
    = help: Replace with `nums3.extend((1, 2))`
-error[FURB113]: FURB113.py:56:1: [*] Use `nums4.extend((1, 2))` instead of repeatedly calling `nums4.append()`
+error[FURB113]: 56:1: [*] Use `nums4.extend((1, 2))` instead of repeatedly calling `nums4.append()`
 
+  --> FURB113.py:55:10
    |
 54 |   nums.append(3)
 55 |   # FURB113
@@ -129,8 +136,9 @@ error[FURB113]: FURB113.py:56:1: [*] Use `nums4.extend((1, 2))` instead of repea
 59 58 | pass
 60 59 | 
 
-error[FURB113]: FURB113.py:62:1: [*] Use `nums.extend((1, 2, 3))` instead of repeatedly calling `nums.append()`
+error[FURB113]: 62:1: [*] Use `nums.extend((1, 2, 3))` instead of repeatedly calling `nums.append()`
 
+  --> FURB113.py:61:10
    |
 61 |   # FURB113
 62 | / nums.append(1)
@@ -151,8 +159,9 @@ error[FURB113]: FURB113.py:62:1: [*] Use `nums.extend((1, 2, 3))` instead of rep
 66 64 | 
 67 65 | if True:
 
-error[FURB113]: FURB113.py:69:5: [*] Use `nums.extend((1, 2))` instead of repeatedly calling `nums.append()`
+error[FURB113]: 69:5: [*] Use `nums.extend((1, 2))` instead of repeatedly calling `nums.append()`
 
+  --> FURB113.py:69:5
    |
 67 |   if True:
 68 |       # FURB113
@@ -173,8 +182,9 @@ error[FURB113]: FURB113.py:69:5: [*] Use `nums.extend((1, 2))` instead of repeat
 72 71 | 
 73 72 | if True:
 
-error[FURB113]: FURB113.py:75:5: [*] Use `nums.extend((1, 2))` instead of repeatedly calling `nums.append()`
+error[FURB113]: 75:5: [*] Use `nums.extend((1, 2))` instead of repeatedly calling `nums.append()`
 
+  --> FURB113.py:75:5
    |
 73 |   if True:
 74 |       # FURB113
@@ -196,8 +206,9 @@ error[FURB113]: FURB113.py:75:5: [*] Use `nums.extend((1, 2))` instead of repeat
 78 77 | 
 79 78 | 
 
-error[FURB113]: FURB113.py:82:5: Use `nums.extend((1, 2, 3))` instead of repeatedly calling `nums.append()`
+error[FURB113]: 82:5: Use `nums.extend((1, 2, 3))` instead of repeatedly calling `nums.append()`
 
+  --> FURB113.py:82:5
    |
 80 |   if True:
 81 |       # FURB113
@@ -209,8 +220,9 @@ error[FURB113]: FURB113.py:82:5: Use `nums.extend((1, 2, 3))` instead of repeate
    | |__________________^
    |
    = help: Replace with `nums.extend((1, 2, 3))`
-error[FURB113]: FURB113.py:90:5: [*] Use `x.extend((1, 2))` instead of repeatedly calling `x.append()`
+error[FURB113]: 90:5: [*] Use `x.extend((1, 2))` instead of repeatedly calling `x.append()`
 
+  --> FURB113.py:90:5
    |
 88 |   def yes_one(x: list[int]):
 89 |       # FURB113
@@ -231,8 +243,9 @@ error[FURB113]: FURB113.py:90:5: [*] Use `x.extend((1, 2))` instead of repeatedl
 93 92 | 
 94 93 | def yes_two(x: List[int]):
 
-error[FURB113]: FURB113.py:96:5: [*] Use `x.extend((1, 2))` instead of repeatedly calling `x.append()`
+error[FURB113]: 96:5: [*] Use `x.extend((1, 2))` instead of repeatedly calling `x.append()`
 
+  --> FURB113.py:96:5
    |
 94 |   def yes_two(x: List[int]):
 95 |       # FURB113
@@ -253,8 +266,9 @@ error[FURB113]: FURB113.py:96:5: [*] Use `x.extend((1, 2))` instead of repeatedl
 99 98 | 
 100 99 | def yes_three(*, x: list[int]):
 
-error[FURB113]: FURB113.py:102:5: [*] Use `x.extend((1, 2))` instead of repeatedly calling `x.append()`
+error[FURB113]: 102:5: [*] Use `x.extend((1, 2))` instead of repeatedly calling `x.append()`
 
+   --> FURB113.py:102:5
     |
 100 |   def yes_three(*, x: list[int]):
 101 |       # FURB113
@@ -275,8 +289,9 @@ error[FURB113]: FURB113.py:102:5: [*] Use `x.extend((1, 2))` instead of repeated
 105 104 | 
 106 105 | def yes_four(x: list[int], /):
 
-error[FURB113]: FURB113.py:108:5: [*] Use `x.extend((1, 2))` instead of repeatedly calling `x.append()`
+error[FURB113]: 108:5: [*] Use `x.extend((1, 2))` instead of repeatedly calling `x.append()`
 
+   --> FURB113.py:108:5
     |
 106 |   def yes_four(x: list[int], /):
 107 |       # FURB113
@@ -297,8 +312,9 @@ error[FURB113]: FURB113.py:108:5: [*] Use `x.extend((1, 2))` instead of repeated
 111 110 | 
 112 111 | def yes_five(x: list[int], y: list[int]):
 
-error[FURB113]: FURB113.py:114:5: Use `x.extend((1, 2, 3))` instead of repeatedly calling `x.append()`
+error[FURB113]: 114:5: Use `x.extend((1, 2, 3))` instead of repeatedly calling `x.append()`
 
+   --> FURB113.py:114:5
     |
 112 |   def yes_five(x: list[int], y: list[int]):
 113 |       # FURB113
@@ -310,8 +326,9 @@ error[FURB113]: FURB113.py:114:5: Use `x.extend((1, 2, 3))` instead of repeatedl
     | |_______________^
     |
     = help: Replace with `x.extend((1, 2, 3))`
-error[FURB113]: FURB113.py:122:5: [*] Use `x.extend((1, 2))` instead of repeatedly calling `x.append()`
+error[FURB113]: 122:5: [*] Use `x.extend((1, 2))` instead of repeatedly calling `x.append()`
 
+   --> FURB113.py:122:5
     |
 120 |   def yes_six(x: list):
 121 |       # FURB113
@@ -332,8 +349,9 @@ error[FURB113]: FURB113.py:122:5: [*] Use `x.extend((1, 2))` instead of repeated
 125 124 | 
 126 125 | if True:
 
-error[FURB113]: FURB113.py:128:5: Use `nums.extend((1, 2, 3))` instead of repeatedly calling `nums.append()`
+error[FURB113]: 128:5: Use `nums.extend((1, 2, 3))` instead of repeatedly calling `nums.append()`
 
+   --> FURB113.py:128:5
     |
 126 |   if True:
 127 |       # FURB113

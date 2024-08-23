@@ -1,8 +1,9 @@
 ---
 source: crates/ruff_linter/src/rules/pyflakes/mod.rs
 ---
-error[F401]: F401_6.py:7:25: [*] `.background.BackgroundTasks` imported but unused
+error[F401]: 7:25: [*] `.background.BackgroundTasks` imported but unused
 
+ --> F401_6.py:7:25
   |
 6 | # F401 `background.BackgroundTasks` imported but unused
 7 | from .background import BackgroundTasks
@@ -20,8 +21,9 @@ error[F401]: F401_6.py:7:25: [*] `.background.BackgroundTasks` imported but unus
 9 8 | # F401 `datastructures.UploadFile` imported but unused
 10 9 | from .datastructures import UploadFile as FileUpload
 
-error[F401]: F401_6.py:10:43: [*] `.datastructures.UploadFile` imported but unused
+error[F401]: 10:43: [*] `.datastructures.UploadFile` imported but unused
 
+  --> F401_6.py:10:43
    |
  9 | # F401 `datastructures.UploadFile` imported but unused
 10 | from .datastructures import UploadFile as FileUpload
@@ -39,8 +41,9 @@ error[F401]: F401_6.py:10:43: [*] `.datastructures.UploadFile` imported but unus
 12 11 | # OK
 13 12 | import applications as applications
 
-error[F401]: F401_6.py:16:8: [*] `background` imported but unused
+error[F401]: 16:8: [*] `background` imported but unused
 
+  --> F401_6.py:16:8
    |
 15 | # F401 `background` imported but unused
 16 | import background
@@ -58,8 +61,9 @@ error[F401]: F401_6.py:16:8: [*] `background` imported but unused
 18 17 | # F401 `datastructures` imported but unused
 19 18 | import datastructures as structures
 
-error[F401]: F401_6.py:19:26: [*] `datastructures` imported but unused
+error[F401]: 19:26: [*] `datastructures` imported but unused
 
+  --> F401_6.py:19:26
    |
 18 | # F401 `datastructures` imported but unused
 19 | import datastructures as structures

@@ -1,15 +1,17 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_import_conventions/mod.rs
 ---
-error[ICN002]: custom_banned.py:1:1: `typing` should not be imported as `t`
+error[ICN002]: 1:1: `typing` should not be imported as `t`
 
+ --> custom_banned.py:1:1
   |
 1 | import typing as t  # banned
   | ^^^^^^^^^^^^^^^^^^
 2 | import typing as ty  # banned
   |
-error[ICN002]: custom_banned.py:2:1: `typing` should not be imported as `ty`
+error[ICN002]: 2:1: `typing` should not be imported as `ty`
 
+ --> custom_banned.py:1:29
   |
 1 | import typing as t  # banned
 2 | import typing as ty  # banned
@@ -17,8 +19,9 @@ error[ICN002]: custom_banned.py:2:1: `typing` should not be imported as `ty`
 3 | 
 4 | import numpy as nmp  # banned
   |
-error[ICN002]: custom_banned.py:4:1: `numpy` should not be imported as `nmp`
+error[ICN002]: 4:1: `numpy` should not be imported as `nmp`
 
+ --> custom_banned.py:3:1
   |
 2 | import typing as ty  # banned
 3 | 
@@ -27,8 +30,9 @@ error[ICN002]: custom_banned.py:4:1: `numpy` should not be imported as `nmp`
 5 | import numpy as npy  # banned
 6 | import tensorflow.keras.backend as K  # banned
   |
-error[ICN002]: custom_banned.py:5:1: `numpy` should not be imported as `npy`
+error[ICN002]: 5:1: `numpy` should not be imported as `npy`
 
+ --> custom_banned.py:4:30
   |
 4 | import numpy as nmp  # banned
 5 | import numpy as npy  # banned
@@ -36,8 +40,9 @@ error[ICN002]: custom_banned.py:5:1: `numpy` should not be imported as `npy`
 6 | import tensorflow.keras.backend as K  # banned
 7 | import torch.nn.functional as F  # banned
   |
-error[ICN002]: custom_banned.py:6:1: `tensorflow.keras.backend` should not be imported as `K`
+error[ICN002]: 6:1: `tensorflow.keras.backend` should not be imported as `K`
 
+ --> custom_banned.py:5:30
   |
 4 | import numpy as nmp  # banned
 5 | import numpy as npy  # banned
@@ -46,8 +51,9 @@ error[ICN002]: custom_banned.py:6:1: `tensorflow.keras.backend` should not be im
 7 | import torch.nn.functional as F  # banned
 8 | from tensorflow.keras import backend as K  # banned
   |
-error[ICN002]: custom_banned.py:7:1: `torch.nn.functional` should not be imported as `F`
+error[ICN002]: 7:1: `torch.nn.functional` should not be imported as `F`
 
+ --> custom_banned.py:6:47
   |
 5 | import numpy as npy  # banned
 6 | import tensorflow.keras.backend as K  # banned
@@ -56,8 +62,9 @@ error[ICN002]: custom_banned.py:7:1: `torch.nn.functional` should not be importe
 8 | from tensorflow.keras import backend as K  # banned
 9 | from torch.nn import functional as F  # banned
   |
-error[ICN002]: custom_banned.py:8:1: `tensorflow.keras.backend` should not be imported as `K`
+error[ICN002]: 8:1: `tensorflow.keras.backend` should not be imported as `K`
 
+ --> custom_banned.py:7:42
   |
 6 | import tensorflow.keras.backend as K  # banned
 7 | import torch.nn.functional as F  # banned
@@ -65,8 +72,9 @@ error[ICN002]: custom_banned.py:8:1: `tensorflow.keras.backend` should not be im
   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 9 | from torch.nn import functional as F  # banned
   |
-error[ICN002]: custom_banned.py:9:1: `torch.nn.functional` should not be imported as `F`
+error[ICN002]: 9:1: `torch.nn.functional` should not be imported as `F`
 
+  --> custom_banned.py:8:52
    |
  7 | import torch.nn.functional as F  # banned
  8 | from tensorflow.keras import backend as K  # banned

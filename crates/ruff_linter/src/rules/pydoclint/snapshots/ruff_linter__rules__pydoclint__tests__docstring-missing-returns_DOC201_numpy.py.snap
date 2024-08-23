@@ -1,29 +1,33 @@
 ---
 source: crates/ruff_linter/src/rules/pydoclint/mod.rs
 ---
-DOC201_numpy.py:11:5: DOC201 `return` is not documented in docstring
+error[DOC201]: 11:5: `return` is not documented in docstring
+
+  --> DOC201_numpy.py:11:5
    |
  9 |         A number
 10 |     """
 11 |     return 'test'
-   |     ^^^^^^^^^^^^^ DOC201
+   |     ^^^^^^^^^^^^^
    |
    = help: Add a "Returns" section to the docstring
+error[DOC201]: 62:9: `return` is not documented in docstring
 
-DOC201_numpy.py:62:9: DOC201 `return` is not documented in docstring
+  --> DOC201_numpy.py:62:9
    |
 60 |             A number
 61 |         """
 62 |         return 'test'
-   |         ^^^^^^^^^^^^^ DOC201
+   |         ^^^^^^^^^^^^^
    |
    = help: Add a "Returns" section to the docstring
+error[DOC201]: 87:9: `return` is not documented in docstring
 
-DOC201_numpy.py:87:9: DOC201 `return` is not documented in docstring
+  --> DOC201_numpy.py:87:9
    |
 85 |     def f(self):
 86 |         """Lorem ipsum."""
 87 |         return True
-   |         ^^^^^^^^^^^ DOC201
+   |         ^^^^^^^^^^^
    |
    = help: Add a "Returns" section to the docstring

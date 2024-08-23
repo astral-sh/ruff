@@ -1,8 +1,9 @@
 ---
 source: crates/ruff_linter/src/rules/pydocstyle/mod.rs
 ---
-error[D414]: sections.py:56:5: Section has no content ("Returns")
+error[D414]: 56:5: Section has no content ("Returns")
 
+  --> sections.py:56:5
    |
 54 |     """Toggle the gizmo.
 55 | 
@@ -11,16 +12,18 @@ error[D414]: sections.py:56:5: Section has no content ("Returns")
 57 | 
 58 |     """
    |
-error[D414]: sections.py:67:5: Section has no content ("Returns")
+error[D414]: 67:5: Section has no content ("Returns")
 
+  --> sections.py:67:5
    |
 65 |     """Toggle the gizmo.
 66 | 
 67 |     Returns"""
    |     ^^^^^^^
    |
-error[D414]: sections.py:78:5: Section has no content ("Returns")
+error[D414]: 78:5: Section has no content ("Returns")
 
+  --> sections.py:78:5
    |
 76 |     """Toggle the gizmo.
 77 | 
@@ -29,8 +32,9 @@ error[D414]: sections.py:78:5: Section has no content ("Returns")
 79 |     -------
 80 |     Yields
    |
-error[D414]: sections.py:80:5: Section has no content ("Yields")
+error[D414]: 80:5: Section has no content ("Yields")
 
+  --> sections.py:80:5
    |
 78 |     Returns
 79 |     -------
@@ -38,8 +42,9 @@ error[D414]: sections.py:80:5: Section has no content ("Yields")
    |     ^^^^^^
 81 |     ------
    |
-error[D414]: sections.py:172:5: Section has no content ("Returns")
+error[D414]: 172:5: Section has no content ("Returns")
 
+   --> sections.py:172:5
     |
 170 |     """Toggle the gizmo.
 171 | 
@@ -48,8 +53,9 @@ error[D414]: sections.py:172:5: Section has no content ("Returns")
 173 |         -------
 174 |     """
     |
-error[D414]: sections.py:266:5: Section has no content ("Returns")
+error[D414]: 266:5: Section has no content ("Returns")
 
+   --> sections.py:266:5
     |
 264 |         note: A random string.
 265 | 
@@ -58,8 +64,9 @@ error[D414]: sections.py:266:5: Section has no content ("Returns")
 267 | 
 268 |     Raises:
     |
-error[D414]: sections.py:563:9: Section has no content ("Returns")
+error[D414]: 563:9: Section has no content ("Returns")
 
+   --> sections.py:563:9
     |
 561 |         Here's a note.
 562 | 

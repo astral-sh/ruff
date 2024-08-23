@@ -1,8 +1,9 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_annotations/mod.rs
 ---
-error[ANN201]: suppress_none_returning.py:45:5: [*] Missing return type annotation for public function `foo`
+error[ANN201]: 45:5: [*] Missing return type annotation for public function `foo`
 
+  --> suppress_none_returning.py:45:5
    |
 44 | # Error
 45 | def foo():
@@ -20,8 +21,9 @@ error[ANN201]: suppress_none_returning.py:45:5: [*] Missing return type annotati
 47 47 | 
 48 48 | 
 
-error[ANN201]: suppress_none_returning.py:50:5: [*] Missing return type annotation for public function `foo`
+error[ANN201]: 50:5: [*] Missing return type annotation for public function `foo`
 
+  --> suppress_none_returning.py:50:5
    |
 49 | # Error
 50 | def foo():
@@ -40,8 +42,9 @@ error[ANN201]: suppress_none_returning.py:50:5: [*] Missing return type annotati
 52 52 |     if a == 4:
 53 53 |         return True
 
-error[ANN001]: suppress_none_returning.py:59:9: Missing type annotation for function argument `a`
+error[ANN001]: 59:9: Missing type annotation for function argument `a`
 
+  --> suppress_none_returning.py:59:9
    |
 58 | # Error (on the argument, but not the return type)
 59 | def foo(a):

@@ -1,15 +1,17 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_pyi/mod.rs
 ---
-error[PYI047]: PYI047.py:6:1: Private TypeAlias `_UnusedPrivateTypeAlias` is never used
+error[PYI047]: 6:1: Private TypeAlias `_UnusedPrivateTypeAlias` is never used
 
+ --> PYI047.py:6:1
   |
 6 | _UnusedPrivateTypeAlias: TypeAlias = int | None
   | ^^^^^^^^^^^^^^^^^^^^^^^
 7 | _T: typing.TypeAlias = str
   |
-error[PYI047]: PYI047.py:7:1: Private TypeAlias `_T` is never used
+error[PYI047]: 7:1: Private TypeAlias `_T` is never used
 
+ --> PYI047.py:6:48
   |
 6 | _UnusedPrivateTypeAlias: TypeAlias = int | None
 7 | _T: typing.TypeAlias = str
@@ -17,8 +19,9 @@ error[PYI047]: PYI047.py:7:1: Private TypeAlias `_T` is never used
 8 | 
 9 | # OK
   |
-error[PYI047]: PYI047.py:24:6: Private TypeAlias `_UnusedPEP695` is never used
+error[PYI047]: 24:6: Private TypeAlias `_UnusedPEP695` is never used
 
+  --> PYI047.py:24:6
    |
 22 | def func2(arg: _PrivateTypeAlias) -> None: ...
 23 | 
@@ -26,8 +29,9 @@ error[PYI047]: PYI047.py:24:6: Private TypeAlias `_UnusedPEP695` is never used
    |      ^^^^^^^^^^^^^
 25 | type _UnusedGeneric695[T] = list[T]
    |
-error[PYI047]: PYI047.py:25:6: Private TypeAlias `_UnusedGeneric695` is never used
+error[PYI047]: 25:6: Private TypeAlias `_UnusedGeneric695` is never used
 
+  --> PYI047.py:25:6
    |
 24 | type _UnusedPEP695 = int
 25 | type _UnusedGeneric695[T] = list[T]

@@ -1,8 +1,9 @@
 ---
 source: crates/ruff_linter/src/rules/pylint/mod.rs
 ---
-error[PLE1307]: bad_string_format_type.py:2:7: Format type does not match argument type
+error[PLE1307]: 2:7: Format type does not match argument type
 
+ --> bad_string_format_type.py:2:7
   |
 1 | # Errors
 2 | print("foo %(foo)d bar %(bar)d" % {"foo": "1", "bar": "2"})
@@ -10,8 +11,9 @@ error[PLE1307]: bad_string_format_type.py:2:7: Format type does not match argume
 3 | 
 4 | "foo %e bar %s" % ("1", 2)
   |
-error[PLE1307]: bad_string_format_type.py:4:1: Format type does not match argument type
+error[PLE1307]: 4:1: Format type does not match argument type
 
+ --> bad_string_format_type.py:3:1
   |
 2 | print("foo %(foo)d bar %(bar)d" % {"foo": "1", "bar": "2"})
 3 | 
@@ -20,8 +22,9 @@ error[PLE1307]: bad_string_format_type.py:4:1: Format type does not match argume
 5 | 
 6 | "%d" % "1"
   |
-error[PLE1307]: bad_string_format_type.py:6:1: Format type does not match argument type
+error[PLE1307]: 6:1: Format type does not match argument type
 
+ --> bad_string_format_type.py:5:1
   |
 4 | "foo %e bar %s" % ("1", 2)
 5 | 
@@ -30,8 +33,9 @@ error[PLE1307]: bad_string_format_type.py:6:1: Format type does not match argume
 7 | "%o" % "1"
 8 | "%(key)d" % {"key": "1"}
   |
-error[PLE1307]: bad_string_format_type.py:7:1: Format type does not match argument type
+error[PLE1307]: 7:1: Format type does not match argument type
 
+ --> bad_string_format_type.py:6:11
   |
 6 | "%d" % "1"
 7 | "%o" % "1"
@@ -39,8 +43,9 @@ error[PLE1307]: bad_string_format_type.py:7:1: Format type does not match argume
 8 | "%(key)d" % {"key": "1"}
 9 | "%x" % 1.1
   |
-error[PLE1307]: bad_string_format_type.py:8:1: Format type does not match argument type
+error[PLE1307]: 8:1: Format type does not match argument type
 
+  --> bad_string_format_type.py:7:11
    |
  6 | "%d" % "1"
  7 | "%o" % "1"
@@ -49,8 +54,9 @@ error[PLE1307]: bad_string_format_type.py:8:1: Format type does not match argume
  9 | "%x" % 1.1
 10 | "%(key)x" % {"key": 1.1}
    |
-error[PLE1307]: bad_string_format_type.py:9:1: Format type does not match argument type
+error[PLE1307]: 9:1: Format type does not match argument type
 
+  --> bad_string_format_type.py:8:25
    |
  7 | "%o" % "1"
  8 | "%(key)d" % {"key": "1"}
@@ -59,8 +65,9 @@ error[PLE1307]: bad_string_format_type.py:9:1: Format type does not match argume
 10 | "%(key)x" % {"key": 1.1}
 11 | "%d" % []
    |
-error[PLE1307]: bad_string_format_type.py:10:1: Format type does not match argument type
+error[PLE1307]: 10:1: Format type does not match argument type
 
+  --> bad_string_format_type.py:9:11
    |
  8 | "%(key)d" % {"key": "1"}
  9 | "%x" % 1.1
@@ -69,8 +76,9 @@ error[PLE1307]: bad_string_format_type.py:10:1: Format type does not match argum
 11 | "%d" % []
 12 | "%d" % ([],)
    |
-error[PLE1307]: bad_string_format_type.py:11:1: Format type does not match argument type
+error[PLE1307]: 11:1: Format type does not match argument type
 
+  --> bad_string_format_type.py:10:25
    |
  9 | "%x" % 1.1
 10 | "%(key)x" % {"key": 1.1}
@@ -79,8 +87,9 @@ error[PLE1307]: bad_string_format_type.py:11:1: Format type does not match argum
 12 | "%d" % ([],)
 13 | "%(key)d" % {"key": []}
    |
-error[PLE1307]: bad_string_format_type.py:12:1: Format type does not match argument type
+error[PLE1307]: 12:1: Format type does not match argument type
 
+  --> bad_string_format_type.py:11:10
    |
 10 | "%(key)x" % {"key": 1.1}
 11 | "%d" % []
@@ -89,8 +98,9 @@ error[PLE1307]: bad_string_format_type.py:12:1: Format type does not match argum
 13 | "%(key)d" % {"key": []}
 14 | print("%d" % ("%s" % ("nested",),))
    |
-error[PLE1307]: bad_string_format_type.py:13:1: Format type does not match argument type
+error[PLE1307]: 13:1: Format type does not match argument type
 
+  --> bad_string_format_type.py:12:13
    |
 11 | "%d" % []
 12 | "%d" % ([],)
@@ -99,8 +109,9 @@ error[PLE1307]: bad_string_format_type.py:13:1: Format type does not match argum
 14 | print("%d" % ("%s" % ("nested",),))
 15 | "%d" % ((1, 2, 3),)
    |
-error[PLE1307]: bad_string_format_type.py:14:7: Format type does not match argument type
+error[PLE1307]: 14:7: Format type does not match argument type
 
+  --> bad_string_format_type.py:14:7
    |
 12 | "%d" % ([],)
 13 | "%(key)d" % {"key": []}
@@ -109,8 +120,9 @@ error[PLE1307]: bad_string_format_type.py:14:7: Format type does not match argum
 15 | "%d" % ((1, 2, 3),)
 16 | "%d" % (1 if x > 0 else [])
    |
-error[PLE1307]: bad_string_format_type.py:15:1: Format type does not match argument type
+error[PLE1307]: 15:1: Format type does not match argument type
 
+  --> bad_string_format_type.py:14:36
    |
 13 | "%(key)d" % {"key": []}
 14 | print("%d" % ("%s" % ("nested",),))
@@ -118,8 +130,9 @@ error[PLE1307]: bad_string_format_type.py:15:1: Format type does not match argum
    | ^^^^^^^^^^^^^^^^^^^
 16 | "%d" % (1 if x > 0 else [])
    |
-error[PLE1307]: bad_string_format_type.py:16:1: Format type does not match argument type
+error[PLE1307]: 16:1: Format type does not match argument type
 
+  --> bad_string_format_type.py:15:20
    |
 14 | print("%d" % ("%s" % ("nested",),))
 15 | "%d" % ((1, 2, 3),)

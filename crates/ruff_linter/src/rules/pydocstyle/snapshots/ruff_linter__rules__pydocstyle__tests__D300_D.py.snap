@@ -1,8 +1,9 @@
 ---
 source: crates/ruff_linter/src/rules/pydocstyle/mod.rs
 ---
-error[D300]: D.py:307:5: [*] Use triple double quotes `"""`
+error[D300]: 307:5: [*] Use triple double quotes `"""`
 
+   --> D.py:307:5
     |
 305 | @expect('D300: Use """triple double quotes""" (found \'\'\'-quotes)')
 306 | def triple_single_quotes_raw():
@@ -20,8 +21,9 @@ error[D300]: D.py:307:5: [*] Use triple double quotes `"""`
 309 309 | 
 310 310 | @expect('D300: Use """triple double quotes""" (found \'\'\'-quotes)')
 
-error[D300]: D.py:312:5: [*] Use triple double quotes `"""`
+error[D300]: 312:5: [*] Use triple double quotes `"""`
 
+   --> D.py:312:5
     |
 310 | @expect('D300: Use """triple double quotes""" (found \'\'\'-quotes)')
 311 | def triple_single_quotes_raw_uppercase():
@@ -39,8 +41,9 @@ error[D300]: D.py:312:5: [*] Use triple double quotes `"""`
 314 314 | 
 315 315 | @expect('D300: Use """triple double quotes""" (found \'-quotes)')
 
-error[D300]: D.py:317:5: [*] Use triple double quotes `"""`
+error[D300]: 317:5: [*] Use triple double quotes `"""`
 
+   --> D.py:317:5
     |
 315 | @expect('D300: Use """triple double quotes""" (found \'-quotes)')
 316 | def single_quotes_raw():
@@ -58,8 +61,9 @@ error[D300]: D.py:317:5: [*] Use triple double quotes `"""`
 319 319 | 
 320 320 | @expect('D300: Use """triple double quotes""" (found \'-quotes)')
 
-error[D300]: D.py:322:5: [*] Use triple double quotes `"""`
+error[D300]: 322:5: [*] Use triple double quotes `"""`
 
+   --> D.py:322:5
     |
 320 | @expect('D300: Use """triple double quotes""" (found \'-quotes)')
 321 | def single_quotes_raw_uppercase():
@@ -77,8 +81,9 @@ error[D300]: D.py:322:5: [*] Use triple double quotes `"""`
 324 324 | 
 325 325 | @expect('D300: Use """triple double quotes""" (found \'-quotes)')
 
-error[D300]: D.py:328:5: [*] Use triple double quotes `"""`
+error[D300]: 328:5: [*] Use triple double quotes `"""`
 
+   --> D.py:328:5
     |
 326 | @expect('D301: Use r""" if any backslashes in a docstring')
 327 | def single_quotes_raw_uppercase_backslash():
@@ -96,8 +101,9 @@ error[D300]: D.py:328:5: [*] Use triple double quotes `"""`
 330 330 | 
 331 331 | @expect('D301: Use r""" if any backslashes in a docstring')
 
-error[D300]: D.py:645:5: [*] Use triple double quotes `"""`
+error[D300]: 645:5: [*] Use triple double quotes `"""`
 
+   --> D.py:645:5
     |
 644 |   def single_line_docstring_with_an_escaped_backslash():
 645 |       "\
@@ -120,8 +126,9 @@ error[D300]: D.py:645:5: [*] Use triple double quotes `"""`
 648 648 | class StatementOnSameLineAsDocstring:
 649 649 |     "After this docstring there's another statement on the same line separated by a semicolon." ; priorities=1
 
-error[D300]: D.py:649:5: [*] Use triple double quotes `"""`
+error[D300]: 649:5: [*] Use triple double quotes `"""`
 
+   --> D.py:649:5
     |
 648 | class StatementOnSameLineAsDocstring:
 649 |     "After this docstring there's another statement on the same line separated by a semicolon." ; priorities=1
@@ -140,8 +147,9 @@ error[D300]: D.py:649:5: [*] Use triple double quotes `"""`
 651 651 |         pass
 652 652 | 
 
-error[D300]: D.py:654:5: [*] Use triple double quotes `"""`
+error[D300]: 654:5: [*] Use triple double quotes `"""`
 
+   --> D.py:654:5
     |
 653 | class StatementOnSameLineAsDocstring:
 654 |     "After this docstring there's another statement on the same line separated by a semicolon."; priorities=1
@@ -158,8 +166,9 @@ error[D300]: D.py:654:5: [*] Use triple double quotes `"""`
 656 656 | 
 657 657 | class CommentAfterDocstring:
 
-error[D300]: D.py:658:5: [*] Use triple double quotes `"""`
+error[D300]: 658:5: [*] Use triple double quotes `"""`
 
+   --> D.py:658:5
     |
 657 | class CommentAfterDocstring:
 658 |     "After this docstring there's a comment."  # priorities=1
@@ -178,8 +187,9 @@ error[D300]: D.py:658:5: [*] Use triple double quotes `"""`
 660 660 |         pass
 661 661 | 
 
-error[D300]: D.py:664:5: [*] Use triple double quotes `"""`
+error[D300]: 664:5: [*] Use triple double quotes `"""`
 
+   --> D.py:664:5
     |
 663 |   def newline_after_closing_quote(self):
 664 |       "We enforce a newline after the closing quote for a multi-line docstring \

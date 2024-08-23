@@ -1,8 +1,9 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_bugbear/mod.rs
 ---
-error[B016]: B016.py:6:7: Cannot raise a literal. Did you intend to return it or raise an Exception?
+error[B016]: 6:7: Cannot raise a literal. Did you intend to return it or raise an Exception?
 
+ --> B016.py:6:7
   |
 4 | """
 5 | 
@@ -11,8 +12,9 @@ error[B016]: B016.py:6:7: Cannot raise a literal. Did you intend to return it or
 7 | raise 1
 8 | raise "string"
   |
-error[B016]: B016.py:7:7: Cannot raise a literal. Did you intend to return it or raise an Exception?
+error[B016]: 7:7: Cannot raise a literal. Did you intend to return it or raise an Exception?
 
+ --> B016.py:7:7
   |
 6 | raise False
 7 | raise 1
@@ -20,8 +22,9 @@ error[B016]: B016.py:7:7: Cannot raise a literal. Did you intend to return it or
 8 | raise "string"
 9 | raise Exception(False)
   |
-error[B016]: B016.py:8:7: Cannot raise a literal. Did you intend to return it or raise an Exception?
+error[B016]: 8:7: Cannot raise a literal. Did you intend to return it or raise an Exception?
 
+  --> B016.py:8:7
    |
  6 | raise False
  7 | raise 1

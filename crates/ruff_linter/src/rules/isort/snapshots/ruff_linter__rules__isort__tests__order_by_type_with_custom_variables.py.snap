@@ -1,11 +1,13 @@
 ---
 source: crates/ruff_linter/src/rules/isort/mod.rs
 ---
-error[I001]: order_by_type_with_custom_variables.py:1:1: [*] Import block is un-sorted or un-formatted
+error[I001]: 1:1: [*] Import block is un-sorted or un-formatted
 
+ --> order_by_type_with_custom_variables.py:1:1
   |
 1 | / from sklearn.svm import VAR, Class, MyVar, CONST, abc
 2 | | from subprocess import utils, var_ABC, Variable, Klass, CONSTANT, exe
+  | |______________________________________________________________________^
   |
   = help: Organize imports
 ℹ Safe fix

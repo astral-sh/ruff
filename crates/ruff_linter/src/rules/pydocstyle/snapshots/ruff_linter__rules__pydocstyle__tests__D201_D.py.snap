@@ -1,8 +1,9 @@
 ---
 source: crates/ruff_linter/src/rules/pydocstyle/mod.rs
 ---
-error[D201]: D.py:137:5: [*] No blank lines allowed before function docstring (found 1)
+error[D201]: 137:5: [*] No blank lines allowed before function docstring (found 1)
 
+   --> D.py:137:5
     |
 135 | def leading_space():
 136 | 
@@ -19,8 +20,9 @@ error[D201]: D.py:137:5: [*] No blank lines allowed before function docstring (f
 138 137 | 
 139 138 | 
 
-error[D201]: D.py:151:5: [*] No blank lines allowed before function docstring (found 1)
+error[D201]: 151:5: [*] No blank lines allowed before function docstring (found 1)
 
+   --> D.py:151:5
     |
 149 | def trailing_and_leading_space():
 150 | 
@@ -39,8 +41,9 @@ error[D201]: D.py:151:5: [*] No blank lines allowed before function docstring (f
 152 151 | 
 153 152 |     pass
 
-error[D201]: D.py:546:5: [*] No blank lines allowed before function docstring (found 1)
+error[D201]: 546:5: [*] No blank lines allowed before function docstring (found 1)
 
+   --> D.py:546:5
     |
 544 |   def multiline_leading_space():
 545 |   
@@ -61,8 +64,9 @@ error[D201]: D.py:546:5: [*] No blank lines allowed before function docstring (f
 547 546 | 
 548 547 |     More content.
 
-error[D201]: D.py:568:5: [*] No blank lines allowed before function docstring (found 1)
+error[D201]: 568:5: [*] No blank lines allowed before function docstring (found 1)
 
+   --> D.py:568:5
     |
 566 |   def multiline_trailing_and_leading_space():
 567 |   

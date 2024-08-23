@@ -1,8 +1,9 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_simplify/mod.rs
 ---
-error[SIM220]: SIM220.py:1:4: [*] Use `False` instead of `a and not a`
+error[SIM220]: 1:4: [*] Use `False` instead of `a and not a`
 
+ --> SIM220.py:1:4
   |
 1 | if a and not a:
   |    ^^^^^^^^^^^
@@ -16,8 +17,9 @@ error[SIM220]: SIM220.py:1:4: [*] Use `False` instead of `a and not a`
 3 3 | 
 4 4 | if (a and not a) and b:
 
-error[SIM220]: SIM220.py:4:5: [*] Use `False` instead of `a and not a`
+error[SIM220]: 4:5: [*] Use `False` instead of `a and not a`
 
+ --> SIM220.py:4:5
   |
 2 |     pass
 3 | 
@@ -36,8 +38,9 @@ error[SIM220]: SIM220.py:4:5: [*] Use `False` instead of `a and not a`
 6 6 | 
 7 7 | if (a and not a) or b:
 
-error[SIM220]: SIM220.py:7:5: [*] Use `False` instead of `a and not a`
+error[SIM220]: 7:5: [*] Use `False` instead of `a and not a`
 
+ --> SIM220.py:7:5
   |
 5 |     pass
 6 | 

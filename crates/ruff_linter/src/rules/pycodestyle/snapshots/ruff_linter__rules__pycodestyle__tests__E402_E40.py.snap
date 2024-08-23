@@ -1,8 +1,9 @@
 ---
 source: crates/ruff_linter/src/rules/pycodestyle/mod.rs
 ---
-error[E402]: E40.py:56:1: Module level import not at top of file
+error[E402]: 56:1: Module level import not at top of file
 
+  --> E40.py:55:1
    |
 54 | VERSION = '1.2.3'
 55 | 
@@ -11,8 +12,9 @@ error[E402]: E40.py:56:1: Module level import not at top of file
 57 | #: E402
 58 | import foo
    |
-error[E402]: E40.py:58:1: Module level import not at top of file
+error[E402]: 58:1: Module level import not at top of file
 
+  --> E40.py:57:8
    |
 56 | import foo
 57 | #: E402
@@ -21,8 +23,9 @@ error[E402]: E40.py:58:1: Module level import not at top of file
 59 | 
 60 | a = 1
    |
-error[E402]: E40.py:62:1: Module level import not at top of file
+error[E402]: 62:1: Module level import not at top of file
 
+  --> E40.py:61:1
    |
 60 | a = 1
 61 | 
@@ -31,16 +34,18 @@ error[E402]: E40.py:62:1: Module level import not at top of file
 63 | 
 64 | #: E401
    |
-error[E402]: E40.py:65:1: Module level import not at top of file
+error[E402]: 65:1: Module level import not at top of file
 
+  --> E40.py:64:8
    |
 64 | #: E401
 65 | import re as regex, string  # also with a comment!
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^
 66 | import re as regex, string; x = 1
    |
-error[E402]: E40.py:66:1: Module level import not at top of file
+error[E402]: 66:1: Module level import not at top of file
 
+  --> E40.py:65:51
    |
 64 | #: E401
 65 | import re as regex, string  # also with a comment!
@@ -49,8 +54,9 @@ error[E402]: E40.py:66:1: Module level import not at top of file
 67 | 
 68 | x = 1; import re as regex, string
    |
-error[E402]: E40.py:68:8: Module level import not at top of file
+error[E402]: 68:8: Module level import not at top of file
 
+  --> E40.py:68:8
    |
 66 | import re as regex, string; x = 1
 67 | 

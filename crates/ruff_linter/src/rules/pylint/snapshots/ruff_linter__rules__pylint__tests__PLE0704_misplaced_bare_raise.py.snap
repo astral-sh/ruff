@@ -1,8 +1,9 @@
 ---
 source: crates/ruff_linter/src/rules/pylint/mod.rs
 ---
-error[PLE0704]: misplaced_bare_raise.py:30:5: Bare `raise` statement is not inside an exception handler
+error[PLE0704]: 30:5: Bare `raise` statement is not inside an exception handler
 
+  --> misplaced_bare_raise.py:30:5
    |
 29 | try:
 30 |     raise # [misplaced-bare-raise]
@@ -10,8 +11,9 @@ error[PLE0704]: misplaced_bare_raise.py:30:5: Bare `raise` statement is not insi
 31 | except Exception:
 32 |     pass
    |
-error[PLE0704]: misplaced_bare_raise.py:36:9: Bare `raise` statement is not inside an exception handler
+error[PLE0704]: 36:9: Bare `raise` statement is not inside an exception handler
 
+  --> misplaced_bare_raise.py:36:9
    |
 34 | def f():
 35 |     try:
@@ -20,8 +22,9 @@ error[PLE0704]: misplaced_bare_raise.py:36:9: Bare `raise` statement is not insi
 37 |     except Exception:
 38 |         pass
    |
-error[PLE0704]: misplaced_bare_raise.py:41:5: Bare `raise` statement is not inside an exception handler
+error[PLE0704]: 41:5: Bare `raise` statement is not inside an exception handler
 
+  --> misplaced_bare_raise.py:41:5
    |
 40 | def g():
 41 |     raise # [misplaced-bare-raise]
@@ -29,8 +32,9 @@ error[PLE0704]: misplaced_bare_raise.py:41:5: Bare `raise` statement is not insi
 42 | 
 43 | def h():
    |
-error[PLE0704]: misplaced_bare_raise.py:47:17: Bare `raise` statement is not inside an exception handler
+error[PLE0704]: 47:17: Bare `raise` statement is not inside an exception handler
 
+  --> misplaced_bare_raise.py:47:17
    |
 45 |         if True:
 46 |             def i():
@@ -39,8 +43,9 @@ error[PLE0704]: misplaced_bare_raise.py:47:17: Bare `raise` statement is not ins
 48 |     except Exception:
 49 |         pass
    |
-error[PLE0704]: misplaced_bare_raise.py:50:5: Bare `raise` statement is not inside an exception handler
+error[PLE0704]: 50:5: Bare `raise` statement is not inside an exception handler
 
+  --> misplaced_bare_raise.py:50:5
    |
 48 |     except Exception:
 49 |         pass
@@ -49,8 +54,9 @@ error[PLE0704]: misplaced_bare_raise.py:50:5: Bare `raise` statement is not insi
 51 | 
 52 | raise # [misplaced-bare-raise]
    |
-error[PLE0704]: misplaced_bare_raise.py:52:1: Bare `raise` statement is not inside an exception handler
+error[PLE0704]: 52:1: Bare `raise` statement is not inside an exception handler
 
+  --> misplaced_bare_raise.py:51:1
    |
 50 |     raise # [misplaced-bare-raise]
 51 | 
@@ -59,8 +65,9 @@ error[PLE0704]: misplaced_bare_raise.py:52:1: Bare `raise` statement is not insi
 53 | 
 54 | try:
    |
-error[PLE0704]: misplaced_bare_raise.py:58:9: Bare `raise` statement is not inside an exception handler
+error[PLE0704]: 58:9: Bare `raise` statement is not inside an exception handler
 
+  --> misplaced_bare_raise.py:58:9
    |
 56 | except:
 57 |     def i():
@@ -69,8 +76,9 @@ error[PLE0704]: misplaced_bare_raise.py:58:9: Bare `raise` statement is not insi
 59 | 
 60 | try:
    |
-error[PLE0704]: misplaced_bare_raise.py:64:9: Bare `raise` statement is not inside an exception handler
+error[PLE0704]: 64:9: Bare `raise` statement is not inside an exception handler
 
+  --> misplaced_bare_raise.py:64:9
    |
 62 | except:
 63 |     class C:
@@ -79,8 +87,9 @@ error[PLE0704]: misplaced_bare_raise.py:64:9: Bare `raise` statement is not insi
 65 | 
 66 | try:
    |
-error[PLE0704]: misplaced_bare_raise.py:71:5: Bare `raise` statement is not inside an exception handler
+error[PLE0704]: 71:5: Bare `raise` statement is not inside an exception handler
 
+  --> misplaced_bare_raise.py:71:5
    |
 69 |     pass
 70 | finally:

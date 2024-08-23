@@ -1,8 +1,9 @@
 ---
 source: crates/ruff_linter/src/rules/pydocstyle/mod.rs
 ---
-error[D300]: bom.py:1:1: [*] Use triple double quotes `"""`
+error[D300]: 1:1: [*] Use triple double quotes `"""`
 
+ --> bom.py:1:2
   |
 1 | ﻿''' SAM macro definitions '''
   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^

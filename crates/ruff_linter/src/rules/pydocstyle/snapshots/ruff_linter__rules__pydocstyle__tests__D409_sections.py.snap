@@ -1,8 +1,9 @@
 ---
 source: crates/ruff_linter/src/rules/pydocstyle/mod.rs
 ---
-error[D409]: sections.py:111:5: [*] Section underline should match the length of its name ("Returns")
+error[D409]: 111:5: [*] Section underline should match the length of its name ("Returns")
 
+   --> sections.py:111:5
     |
 110 |     Returns
 111 |     --
@@ -20,8 +21,9 @@ error[D409]: sections.py:111:5: [*] Section underline should match the length of
 113 113 | 
 114 114 |     """
 
-error[D409]: sections.py:225:5: [*] Section underline should match the length of its name ("Returns")
+error[D409]: 225:5: [*] Section underline should match the length of its name ("Returns")
 
+   --> sections.py:225:5
     |
 224 |     Returns
 225 |     ------
@@ -40,8 +42,9 @@ error[D409]: sections.py:225:5: [*] Section underline should match the length of
 227 227 |     Raises:
 228 228 |     My attention.
 
-error[D409]: sections.py:578:5: [*] Section underline should match the length of its name ("Other Parameters")
+error[D409]: 578:5: [*] Section underline should match the length of its name ("Other Parameters")
 
+   --> sections.py:578:5
     |
 577 |     Other Parameters
 578 |     ----------

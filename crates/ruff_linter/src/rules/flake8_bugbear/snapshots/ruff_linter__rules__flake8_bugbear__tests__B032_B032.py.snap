@@ -1,8 +1,9 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_bugbear/mod.rs
 ---
-error[B032]: B032.py:9:1: Possible unintentional type annotation (using `:`). Did you mean to assign (using `=`)?
+error[B032]: 9:1: Possible unintentional type annotation (using `:`). Did you mean to assign (using `=`)?
 
+  --> B032.py:8:1
    |
  7 | dct = {"a": 1}
  8 | 
@@ -10,8 +11,9 @@ error[B032]: B032.py:9:1: Possible unintentional type annotation (using `:`). Di
    | ^^^^^^^^^^^
 10 | dct.b: 2
    |
-error[B032]: B032.py:10:1: Possible unintentional type annotation (using `:`). Did you mean to assign (using `=`)?
+error[B032]: 10:1: Possible unintentional type annotation (using `:`). Did you mean to assign (using `=`)?
 
+  --> B032.py:9:12
    |
  9 | dct["b"]: 2
 10 | dct.b: 2
@@ -19,8 +21,9 @@ error[B032]: B032.py:10:1: Possible unintentional type annotation (using `:`). D
 11 | 
 12 | dct["b"]: "test"
    |
-error[B032]: B032.py:12:1: Possible unintentional type annotation (using `:`). Did you mean to assign (using `=`)?
+error[B032]: 12:1: Possible unintentional type annotation (using `:`). Did you mean to assign (using `=`)?
 
+  --> B032.py:11:1
    |
 10 | dct.b: 2
 11 | 
@@ -28,8 +31,9 @@ error[B032]: B032.py:12:1: Possible unintentional type annotation (using `:`). D
    | ^^^^^^^^^^^^^^^^
 13 | dct.b: "test"
    |
-error[B032]: B032.py:13:1: Possible unintentional type annotation (using `:`). Did you mean to assign (using `=`)?
+error[B032]: 13:1: Possible unintentional type annotation (using `:`). Did you mean to assign (using `=`)?
 
+  --> B032.py:12:17
    |
 12 | dct["b"]: "test"
 13 | dct.b: "test"
@@ -37,8 +41,9 @@ error[B032]: B032.py:13:1: Possible unintentional type annotation (using `:`). D
 14 | 
 15 | test = "test"
    |
-error[B032]: B032.py:16:1: Possible unintentional type annotation (using `:`). Did you mean to assign (using `=`)?
+error[B032]: 16:1: Possible unintentional type annotation (using `:`). Did you mean to assign (using `=`)?
 
+  --> B032.py:15:14
    |
 15 | test = "test"
 16 | dct["b"]: test
@@ -46,8 +51,9 @@ error[B032]: B032.py:16:1: Possible unintentional type annotation (using `:`). D
 17 | dct["b"]: test.lower()
 18 | dct.b: test
    |
-error[B032]: B032.py:17:1: Possible unintentional type annotation (using `:`). Did you mean to assign (using `=`)?
+error[B032]: 17:1: Possible unintentional type annotation (using `:`). Did you mean to assign (using `=`)?
 
+  --> B032.py:16:15
    |
 15 | test = "test"
 16 | dct["b"]: test
@@ -56,8 +62,9 @@ error[B032]: B032.py:17:1: Possible unintentional type annotation (using `:`). D
 18 | dct.b: test
 19 | dct.b: test.lower()
    |
-error[B032]: B032.py:18:1: Possible unintentional type annotation (using `:`). Did you mean to assign (using `=`)?
+error[B032]: 18:1: Possible unintentional type annotation (using `:`). Did you mean to assign (using `=`)?
 
+  --> B032.py:17:23
    |
 16 | dct["b"]: test
 17 | dct["b"]: test.lower()
@@ -65,8 +72,9 @@ error[B032]: B032.py:18:1: Possible unintentional type annotation (using `:`). D
    | ^^^^^^^^^^^
 19 | dct.b: test.lower()
    |
-error[B032]: B032.py:19:1: Possible unintentional type annotation (using `:`). Did you mean to assign (using `=`)?
+error[B032]: 19:1: Possible unintentional type annotation (using `:`). Did you mean to assign (using `=`)?
 
+  --> B032.py:18:12
    |
 17 | dct["b"]: test.lower()
 18 | dct.b: test

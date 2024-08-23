@@ -1,8 +1,9 @@
 ---
 source: crates/ruff_linter/src/rules/pycodestyle/mod.rs
 ---
-error[E266]: E26.py:19:5: [*] Too many leading `#` before block comment
+error[E266]: 19:5: [*] Too many leading `#` before block comment
 
+  --> E26.py:19:5
    |
 17 | def how_it_feel(r):
 18 | 
@@ -21,8 +22,9 @@ error[E266]: E26.py:19:5: [*] Too many leading `#` before block comment
 21 21 | 
 22 22 |     ### Of course it is unused
 
-error[E266]: E26.py:22:5: [*] Too many leading `#` before block comment
+error[E266]: 22:5: [*] Too many leading `#` before block comment
 
+  --> E26.py:22:5
    |
 20 |     a = 42
 21 | 
@@ -42,8 +44,9 @@ error[E266]: E26.py:22:5: [*] Too many leading `#` before block comment
 24 24 | #: E265:1:1 E266:2:1
 25 25 | ##if DEBUG:
 
-error[E266]: E26.py:26:1: [*] Too many leading `#` before block comment
+error[E266]: 26:1: [*] Too many leading `#` before block comment
 
+  --> E26.py:25:12
    |
 24 | #: E265:1:1 E266:2:1
 25 | ##if DEBUG:
@@ -63,8 +66,9 @@ error[E266]: E26.py:26:1: [*] Too many leading `#` before block comment
 28 28 | #########################################
 29 29 | #:
 
-error[E266]: E26.py:69:1: [*] Too many leading `#` before block comment
+error[E266]: 69:1: [*] Too many leading `#` before block comment
 
+  --> E26.py:68:12
    |
 68 | #: E265:5:1
 69 | ### Means test is not done yet
@@ -83,8 +87,9 @@ error[E266]: E26.py:69:1: [*] Too many leading `#` before block comment
 71 71 | # F   Means test is failing (F)
 72 72 | # EF  Means test is giving error and Failing
 
-error[E266]: E26.py:82:1: [*] Too many leading `#` before block comment
+error[E266]: 82:1: [*] Too many leading `#` before block comment
 
+  --> E26.py:81:12
    |
 80 | # We should strip the space, but preserve the hashes.
 81 | #: E266:1:3

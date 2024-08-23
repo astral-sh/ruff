@@ -16,7 +16,7 @@ expression: content
       "column": 15,
       "row": 1
     },
-    "message": "SyntaxError: Expected one or more symbol names after import",
+    "message": "Expected one or more symbol names after import",
     "noqa_row": null,
     "url": null
   },
@@ -33,7 +33,7 @@ expression: content
       "column": 12,
       "row": 3
     },
-    "message": "SyntaxError: Expected ')', found newline",
+    "message": "Expected ')', found newline",
     "noqa_row": null,
     "url": null
   }

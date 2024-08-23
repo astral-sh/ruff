@@ -1,8 +1,9 @@
 ---
 source: crates/ruff_linter/src/rules/pycodestyle/mod.rs
 ---
-error[W293]: W29.py:7:1: [*] Blank line contains whitespace
+error[W293]: 7:1: [*] Blank line contains whitespace
 
+ --> W29.py:6:19
   |
 5 | #: W293:2:1
 6 | class Foo(object):

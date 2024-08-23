@@ -1,8 +1,9 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_pyi/mod.rs
 ---
-error[PYI002]: PYI002.pyi:3:4: `if` test must be a simple comparison against `sys.platform` or `sys.version_info`
+error[PYI002]: 3:4: `if` test must be a simple comparison against `sys.platform` or `sys.version_info`
 
+ --> PYI002.pyi:3:4
   |
 1 | import sys
 2 | 
@@ -11,8 +12,9 @@ error[PYI002]: PYI002.pyi:3:4: `if` test must be a simple comparison against `sy
 4 | if 'linux' == sys.platform: ...  # Y002 If test must be a simple comparison against sys.platform or sys.version_info
 5 | if hasattr(sys, 'maxint'): ...  # Y002 If test must be a simple comparison against sys.platform or sys.version_info
   |
-error[PYI002]: PYI002.pyi:4:4: `if` test must be a simple comparison against `sys.platform` or `sys.version_info`
+error[PYI002]: 4:4: `if` test must be a simple comparison against `sys.platform` or `sys.version_info`
 
+ --> PYI002.pyi:4:4
   |
 3 | if sys.version == 'Python 2.7.10': ...  # Y002 If test must be a simple comparison against sys.platform or sys.version_info
 4 | if 'linux' == sys.platform: ...  # Y002 If test must be a simple comparison against sys.platform or sys.version_info
@@ -20,8 +22,9 @@ error[PYI002]: PYI002.pyi:4:4: `if` test must be a simple comparison against `sy
 5 | if hasattr(sys, 'maxint'): ...  # Y002 If test must be a simple comparison against sys.platform or sys.version_info
 6 | if sys.maxsize == 42: ...  # Y002 If test must be a simple comparison against sys.platform or sys.version_info
   |
-error[PYI002]: PYI002.pyi:5:4: `if` test must be a simple comparison against `sys.platform` or `sys.version_info`
+error[PYI002]: 5:4: `if` test must be a simple comparison against `sys.platform` or `sys.version_info`
 
+ --> PYI002.pyi:5:4
   |
 3 | if sys.version == 'Python 2.7.10': ...  # Y002 If test must be a simple comparison against sys.platform or sys.version_info
 4 | if 'linux' == sys.platform: ...  # Y002 If test must be a simple comparison against sys.platform or sys.version_info
@@ -29,8 +32,9 @@ error[PYI002]: PYI002.pyi:5:4: `if` test must be a simple comparison against `sy
   |    ^^^^^^^^^^^^^^^^^^^^^^
 6 | if sys.maxsize == 42: ...  # Y002 If test must be a simple comparison against sys.platform or sys.version_info
   |
-error[PYI002]: PYI002.pyi:6:4: `if` test must be a simple comparison against `sys.platform` or `sys.version_info`
+error[PYI002]: 6:4: `if` test must be a simple comparison against `sys.platform` or `sys.version_info`
 
+ --> PYI002.pyi:6:4
   |
 4 | if 'linux' == sys.platform: ...  # Y002 If test must be a simple comparison against sys.platform or sys.version_info
 5 | if hasattr(sys, 'maxint'): ...  # Y002 If test must be a simple comparison against sys.platform or sys.version_info

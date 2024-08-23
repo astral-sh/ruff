@@ -1,8 +1,9 @@
 ---
 source: crates/ruff_linter/src/rules/pycodestyle/mod.rs
 ---
-error[E501]: E501_3.py:11:89: Line too long (89 > 88)
+error[E501]: 11:89: Line too long (89 > 88)
 
+  --> E501_3.py:11:89
    |
 10 | # Error (89 characters)
 11 | "shape:" + "shape:" + "shape:" + "shape:" + "shape:" + "shape:" + "shape:" + "shape:aaaa"  # type: ignore

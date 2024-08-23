@@ -1,8 +1,9 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_2020/mod.rs
 ---
-error[YTT201]: YTT201.py:7:7: `sys.version_info[0] == 3` referenced (python4), use `>=`
+error[YTT201]: 7:7: `sys.version_info[0] == 3` referenced (python4), use `>=`
 
+ --> YTT201.py:7:7
   |
 5 | PY3 = sys.version_info[0] >= 3
 6 | 
@@ -11,8 +12,9 @@ error[YTT201]: YTT201.py:7:7: `sys.version_info[0] == 3` referenced (python4), u
 8 | PY3 = version_info[0] == 3
 9 | PY2 = sys.version_info[0] != 3
   |
-error[YTT201]: YTT201.py:8:7: `sys.version_info[0] == 3` referenced (python4), use `>=`
+error[YTT201]: 8:7: `sys.version_info[0] == 3` referenced (python4), use `>=`
 
+  --> YTT201.py:8:7
    |
  7 | PY3 = sys.version_info[0] == 3
  8 | PY3 = version_info[0] == 3
@@ -20,8 +22,9 @@ error[YTT201]: YTT201.py:8:7: `sys.version_info[0] == 3` referenced (python4), u
  9 | PY2 = sys.version_info[0] != 3
 10 | PY2 = version_info[0] != 3
    |
-error[YTT201]: YTT201.py:9:7: `sys.version_info[0] == 3` referenced (python4), use `>=`
+error[YTT201]: 9:7: `sys.version_info[0] == 3` referenced (python4), use `>=`
 
+  --> YTT201.py:9:7
    |
  7 | PY3 = sys.version_info[0] == 3
  8 | PY3 = version_info[0] == 3
@@ -29,8 +32,9 @@ error[YTT201]: YTT201.py:9:7: `sys.version_info[0] == 3` referenced (python4), u
    |       ^^^^^^^^^^^^^^^^^^^
 10 | PY2 = version_info[0] != 3
    |
-error[YTT201]: YTT201.py:10:7: `sys.version_info[0] == 3` referenced (python4), use `>=`
+error[YTT201]: 10:7: `sys.version_info[0] == 3` referenced (python4), use `>=`
 
+  --> YTT201.py:10:7
    |
  8 | PY3 = version_info[0] == 3
  9 | PY2 = sys.version_info[0] != 3

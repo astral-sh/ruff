@@ -1,8 +1,9 @@
 ---
 source: crates/ruff_linter/src/rules/pylint/mod.rs
 ---
-error[PLW0127]: self_assigning_variable.py:6:1: Self-assignment of variable `foo`
+error[PLW0127]: 6:1: Self-assignment of variable `foo`
 
+ --> self_assigning_variable.py:5:10
   |
 5 | # Errors.
 6 | foo = foo
@@ -10,8 +11,9 @@ error[PLW0127]: self_assigning_variable.py:6:1: Self-assignment of variable `foo
 7 | bar = bar
 8 | foo, bar = foo, bar
   |
-error[PLW0127]: self_assigning_variable.py:7:1: Self-assignment of variable `bar`
+error[PLW0127]: 7:1: Self-assignment of variable `bar`
 
+ --> self_assigning_variable.py:6:10
   |
 5 | # Errors.
 6 | foo = foo
@@ -20,8 +22,9 @@ error[PLW0127]: self_assigning_variable.py:7:1: Self-assignment of variable `bar
 8 | foo, bar = foo, bar
 9 | bar, foo = bar, foo
   |
-error[PLW0127]: self_assigning_variable.py:8:1: Self-assignment of variable `foo`
+error[PLW0127]: 8:1: Self-assignment of variable `foo`
 
+  --> self_assigning_variable.py:7:10
    |
  6 | foo = foo
  7 | bar = bar
@@ -30,8 +33,9 @@ error[PLW0127]: self_assigning_variable.py:8:1: Self-assignment of variable `foo
  9 | bar, foo = bar, foo
 10 | (foo, bar) = (foo, bar)
    |
-error[PLW0127]: self_assigning_variable.py:8:6: Self-assignment of variable `bar`
+error[PLW0127]: 8:6: Self-assignment of variable `bar`
 
+  --> self_assigning_variable.py:8:6
    |
  6 | foo = foo
  7 | bar = bar
@@ -40,8 +44,9 @@ error[PLW0127]: self_assigning_variable.py:8:6: Self-assignment of variable `bar
  9 | bar, foo = bar, foo
 10 | (foo, bar) = (foo, bar)
    |
-error[PLW0127]: self_assigning_variable.py:9:1: Self-assignment of variable `bar`
+error[PLW0127]: 9:1: Self-assignment of variable `bar`
 
+  --> self_assigning_variable.py:8:20
    |
  7 | bar = bar
  8 | foo, bar = foo, bar
@@ -50,8 +55,9 @@ error[PLW0127]: self_assigning_variable.py:9:1: Self-assignment of variable `bar
 10 | (foo, bar) = (foo, bar)
 11 | (bar, foo) = (bar, foo)
    |
-error[PLW0127]: self_assigning_variable.py:9:6: Self-assignment of variable `foo`
+error[PLW0127]: 9:6: Self-assignment of variable `foo`
 
+  --> self_assigning_variable.py:9:6
    |
  7 | bar = bar
  8 | foo, bar = foo, bar
@@ -60,8 +66,9 @@ error[PLW0127]: self_assigning_variable.py:9:6: Self-assignment of variable `foo
 10 | (foo, bar) = (foo, bar)
 11 | (bar, foo) = (bar, foo)
    |
-error[PLW0127]: self_assigning_variable.py:10:2: Self-assignment of variable `foo`
+error[PLW0127]: 10:2: Self-assignment of variable `foo`
 
+  --> self_assigning_variable.py:10:2
    |
  8 | foo, bar = foo, bar
  9 | bar, foo = bar, foo
@@ -70,8 +77,9 @@ error[PLW0127]: self_assigning_variable.py:10:2: Self-assignment of variable `fo
 11 | (bar, foo) = (bar, foo)
 12 | foo, (bar, baz) = foo, (bar, baz)
    |
-error[PLW0127]: self_assigning_variable.py:10:7: Self-assignment of variable `bar`
+error[PLW0127]: 10:7: Self-assignment of variable `bar`
 
+  --> self_assigning_variable.py:10:7
    |
  8 | foo, bar = foo, bar
  9 | bar, foo = bar, foo
@@ -80,8 +88,9 @@ error[PLW0127]: self_assigning_variable.py:10:7: Self-assignment of variable `ba
 11 | (bar, foo) = (bar, foo)
 12 | foo, (bar, baz) = foo, (bar, baz)
    |
-error[PLW0127]: self_assigning_variable.py:11:2: Self-assignment of variable `bar`
+error[PLW0127]: 11:2: Self-assignment of variable `bar`
 
+  --> self_assigning_variable.py:11:2
    |
  9 | bar, foo = bar, foo
 10 | (foo, bar) = (foo, bar)
@@ -90,8 +99,9 @@ error[PLW0127]: self_assigning_variable.py:11:2: Self-assignment of variable `ba
 12 | foo, (bar, baz) = foo, (bar, baz)
 13 | bar, (foo, baz) = bar, (foo, baz)
    |
-error[PLW0127]: self_assigning_variable.py:11:7: Self-assignment of variable `foo`
+error[PLW0127]: 11:7: Self-assignment of variable `foo`
 
+  --> self_assigning_variable.py:11:7
    |
  9 | bar, foo = bar, foo
 10 | (foo, bar) = (foo, bar)
@@ -100,8 +110,9 @@ error[PLW0127]: self_assigning_variable.py:11:7: Self-assignment of variable `fo
 12 | foo, (bar, baz) = foo, (bar, baz)
 13 | bar, (foo, baz) = bar, (foo, baz)
    |
-error[PLW0127]: self_assigning_variable.py:12:1: Self-assignment of variable `foo`
+error[PLW0127]: 12:1: Self-assignment of variable `foo`
 
+  --> self_assigning_variable.py:11:24
    |
 10 | (foo, bar) = (foo, bar)
 11 | (bar, foo) = (bar, foo)
@@ -110,8 +121,9 @@ error[PLW0127]: self_assigning_variable.py:12:1: Self-assignment of variable `fo
 13 | bar, (foo, baz) = bar, (foo, baz)
 14 | (foo, bar), baz = (foo, bar), baz
    |
-error[PLW0127]: self_assigning_variable.py:12:7: Self-assignment of variable `bar`
+error[PLW0127]: 12:7: Self-assignment of variable `bar`
 
+  --> self_assigning_variable.py:12:7
    |
 10 | (foo, bar) = (foo, bar)
 11 | (bar, foo) = (bar, foo)
@@ -120,8 +132,9 @@ error[PLW0127]: self_assigning_variable.py:12:7: Self-assignment of variable `ba
 13 | bar, (foo, baz) = bar, (foo, baz)
 14 | (foo, bar), baz = (foo, bar), baz
    |
-error[PLW0127]: self_assigning_variable.py:12:12: Self-assignment of variable `baz`
+error[PLW0127]: 12:12: Self-assignment of variable `baz`
 
+  --> self_assigning_variable.py:12:12
    |
 10 | (foo, bar) = (foo, bar)
 11 | (bar, foo) = (bar, foo)
@@ -130,8 +143,9 @@ error[PLW0127]: self_assigning_variable.py:12:12: Self-assignment of variable `b
 13 | bar, (foo, baz) = bar, (foo, baz)
 14 | (foo, bar), baz = (foo, bar), baz
    |
-error[PLW0127]: self_assigning_variable.py:13:1: Self-assignment of variable `bar`
+error[PLW0127]: 13:1: Self-assignment of variable `bar`
 
+  --> self_assigning_variable.py:12:34
    |
 11 | (bar, foo) = (bar, foo)
 12 | foo, (bar, baz) = foo, (bar, baz)
@@ -140,8 +154,9 @@ error[PLW0127]: self_assigning_variable.py:13:1: Self-assignment of variable `ba
 14 | (foo, bar), baz = (foo, bar), baz
 15 | (foo, (bar, baz)) = (foo, (bar, baz))
    |
-error[PLW0127]: self_assigning_variable.py:13:7: Self-assignment of variable `foo`
+error[PLW0127]: 13:7: Self-assignment of variable `foo`
 
+  --> self_assigning_variable.py:13:7
    |
 11 | (bar, foo) = (bar, foo)
 12 | foo, (bar, baz) = foo, (bar, baz)
@@ -150,8 +165,9 @@ error[PLW0127]: self_assigning_variable.py:13:7: Self-assignment of variable `fo
 14 | (foo, bar), baz = (foo, bar), baz
 15 | (foo, (bar, baz)) = (foo, (bar, baz))
    |
-error[PLW0127]: self_assigning_variable.py:13:12: Self-assignment of variable `baz`
+error[PLW0127]: 13:12: Self-assignment of variable `baz`
 
+  --> self_assigning_variable.py:13:12
    |
 11 | (bar, foo) = (bar, foo)
 12 | foo, (bar, baz) = foo, (bar, baz)
@@ -160,8 +176,9 @@ error[PLW0127]: self_assigning_variable.py:13:12: Self-assignment of variable `b
 14 | (foo, bar), baz = (foo, bar), baz
 15 | (foo, (bar, baz)) = (foo, (bar, baz))
    |
-error[PLW0127]: self_assigning_variable.py:14:2: Self-assignment of variable `foo`
+error[PLW0127]: 14:2: Self-assignment of variable `foo`
 
+  --> self_assigning_variable.py:14:2
    |
 12 | foo, (bar, baz) = foo, (bar, baz)
 13 | bar, (foo, baz) = bar, (foo, baz)
@@ -170,8 +187,9 @@ error[PLW0127]: self_assigning_variable.py:14:2: Self-assignment of variable `fo
 15 | (foo, (bar, baz)) = (foo, (bar, baz))
 16 | foo, bar = foo, 1
    |
-error[PLW0127]: self_assigning_variable.py:14:7: Self-assignment of variable `bar`
+error[PLW0127]: 14:7: Self-assignment of variable `bar`
 
+  --> self_assigning_variable.py:14:7
    |
 12 | foo, (bar, baz) = foo, (bar, baz)
 13 | bar, (foo, baz) = bar, (foo, baz)
@@ -180,8 +198,9 @@ error[PLW0127]: self_assigning_variable.py:14:7: Self-assignment of variable `ba
 15 | (foo, (bar, baz)) = (foo, (bar, baz))
 16 | foo, bar = foo, 1
    |
-error[PLW0127]: self_assigning_variable.py:14:13: Self-assignment of variable `baz`
+error[PLW0127]: 14:13: Self-assignment of variable `baz`
 
+  --> self_assigning_variable.py:14:13
    |
 12 | foo, (bar, baz) = foo, (bar, baz)
 13 | bar, (foo, baz) = bar, (foo, baz)
@@ -190,8 +209,9 @@ error[PLW0127]: self_assigning_variable.py:14:13: Self-assignment of variable `b
 15 | (foo, (bar, baz)) = (foo, (bar, baz))
 16 | foo, bar = foo, 1
    |
-error[PLW0127]: self_assigning_variable.py:15:2: Self-assignment of variable `foo`
+error[PLW0127]: 15:2: Self-assignment of variable `foo`
 
+  --> self_assigning_variable.py:15:2
    |
 13 | bar, (foo, baz) = bar, (foo, baz)
 14 | (foo, bar), baz = (foo, bar), baz
@@ -200,8 +220,9 @@ error[PLW0127]: self_assigning_variable.py:15:2: Self-assignment of variable `fo
 16 | foo, bar = foo, 1
 17 | bar, foo = bar, 1
    |
-error[PLW0127]: self_assigning_variable.py:15:8: Self-assignment of variable `bar`
+error[PLW0127]: 15:8: Self-assignment of variable `bar`
 
+  --> self_assigning_variable.py:15:8
    |
 13 | bar, (foo, baz) = bar, (foo, baz)
 14 | (foo, bar), baz = (foo, bar), baz
@@ -210,8 +231,9 @@ error[PLW0127]: self_assigning_variable.py:15:8: Self-assignment of variable `ba
 16 | foo, bar = foo, 1
 17 | bar, foo = bar, 1
    |
-error[PLW0127]: self_assigning_variable.py:15:13: Self-assignment of variable `baz`
+error[PLW0127]: 15:13: Self-assignment of variable `baz`
 
+  --> self_assigning_variable.py:15:13
    |
 13 | bar, (foo, baz) = bar, (foo, baz)
 14 | (foo, bar), baz = (foo, bar), baz
@@ -220,8 +242,9 @@ error[PLW0127]: self_assigning_variable.py:15:13: Self-assignment of variable `b
 16 | foo, bar = foo, 1
 17 | bar, foo = bar, 1
    |
-error[PLW0127]: self_assigning_variable.py:16:1: Self-assignment of variable `foo`
+error[PLW0127]: 16:1: Self-assignment of variable `foo`
 
+  --> self_assigning_variable.py:15:38
    |
 14 | (foo, bar), baz = (foo, bar), baz
 15 | (foo, (bar, baz)) = (foo, (bar, baz))
@@ -230,8 +253,9 @@ error[PLW0127]: self_assigning_variable.py:16:1: Self-assignment of variable `fo
 17 | bar, foo = bar, 1
 18 | (foo, bar) = (foo, 1)
    |
-error[PLW0127]: self_assigning_variable.py:17:1: Self-assignment of variable `bar`
+error[PLW0127]: 17:1: Self-assignment of variable `bar`
 
+  --> self_assigning_variable.py:16:18
    |
 15 | (foo, (bar, baz)) = (foo, (bar, baz))
 16 | foo, bar = foo, 1
@@ -240,8 +264,9 @@ error[PLW0127]: self_assigning_variable.py:17:1: Self-assignment of variable `ba
 18 | (foo, bar) = (foo, 1)
 19 | (bar, foo) = (bar, 1)
    |
-error[PLW0127]: self_assigning_variable.py:18:2: Self-assignment of variable `foo`
+error[PLW0127]: 18:2: Self-assignment of variable `foo`
 
+  --> self_assigning_variable.py:18:2
    |
 16 | foo, bar = foo, 1
 17 | bar, foo = bar, 1
@@ -250,8 +275,9 @@ error[PLW0127]: self_assigning_variable.py:18:2: Self-assignment of variable `fo
 19 | (bar, foo) = (bar, 1)
 20 | foo, (bar, baz) = foo, (bar, 1)
    |
-error[PLW0127]: self_assigning_variable.py:19:2: Self-assignment of variable `bar`
+error[PLW0127]: 19:2: Self-assignment of variable `bar`
 
+  --> self_assigning_variable.py:19:2
    |
 17 | bar, foo = bar, 1
 18 | (foo, bar) = (foo, 1)
@@ -260,8 +286,9 @@ error[PLW0127]: self_assigning_variable.py:19:2: Self-assignment of variable `ba
 20 | foo, (bar, baz) = foo, (bar, 1)
 21 | bar, (foo, baz) = bar, (foo, 1)
    |
-error[PLW0127]: self_assigning_variable.py:20:1: Self-assignment of variable `foo`
+error[PLW0127]: 20:1: Self-assignment of variable `foo`
 
+  --> self_assigning_variable.py:19:22
    |
 18 | (foo, bar) = (foo, 1)
 19 | (bar, foo) = (bar, 1)
@@ -270,8 +297,9 @@ error[PLW0127]: self_assigning_variable.py:20:1: Self-assignment of variable `fo
 21 | bar, (foo, baz) = bar, (foo, 1)
 22 | (foo, bar), baz = (foo, bar), 1
    |
-error[PLW0127]: self_assigning_variable.py:20:7: Self-assignment of variable `bar`
+error[PLW0127]: 20:7: Self-assignment of variable `bar`
 
+  --> self_assigning_variable.py:20:7
    |
 18 | (foo, bar) = (foo, 1)
 19 | (bar, foo) = (bar, 1)
@@ -280,8 +308,9 @@ error[PLW0127]: self_assigning_variable.py:20:7: Self-assignment of variable `ba
 21 | bar, (foo, baz) = bar, (foo, 1)
 22 | (foo, bar), baz = (foo, bar), 1
    |
-error[PLW0127]: self_assigning_variable.py:21:1: Self-assignment of variable `bar`
+error[PLW0127]: 21:1: Self-assignment of variable `bar`
 
+  --> self_assigning_variable.py:20:32
    |
 19 | (bar, foo) = (bar, 1)
 20 | foo, (bar, baz) = foo, (bar, 1)
@@ -290,8 +319,9 @@ error[PLW0127]: self_assigning_variable.py:21:1: Self-assignment of variable `ba
 22 | (foo, bar), baz = (foo, bar), 1
 23 | (foo, (bar, baz)) = (foo, (bar, 1))
    |
-error[PLW0127]: self_assigning_variable.py:21:7: Self-assignment of variable `foo`
+error[PLW0127]: 21:7: Self-assignment of variable `foo`
 
+  --> self_assigning_variable.py:21:7
    |
 19 | (bar, foo) = (bar, 1)
 20 | foo, (bar, baz) = foo, (bar, 1)
@@ -300,8 +330,9 @@ error[PLW0127]: self_assigning_variable.py:21:7: Self-assignment of variable `fo
 22 | (foo, bar), baz = (foo, bar), 1
 23 | (foo, (bar, baz)) = (foo, (bar, 1))
    |
-error[PLW0127]: self_assigning_variable.py:22:2: Self-assignment of variable `foo`
+error[PLW0127]: 22:2: Self-assignment of variable `foo`
 
+  --> self_assigning_variable.py:22:2
    |
 20 | foo, (bar, baz) = foo, (bar, 1)
 21 | bar, (foo, baz) = bar, (foo, 1)
@@ -310,8 +341,9 @@ error[PLW0127]: self_assigning_variable.py:22:2: Self-assignment of variable `fo
 23 | (foo, (bar, baz)) = (foo, (bar, 1))
 24 | foo: int = foo
    |
-error[PLW0127]: self_assigning_variable.py:22:7: Self-assignment of variable `bar`
+error[PLW0127]: 22:7: Self-assignment of variable `bar`
 
+  --> self_assigning_variable.py:22:7
    |
 20 | foo, (bar, baz) = foo, (bar, 1)
 21 | bar, (foo, baz) = bar, (foo, 1)
@@ -320,8 +352,9 @@ error[PLW0127]: self_assigning_variable.py:22:7: Self-assignment of variable `ba
 23 | (foo, (bar, baz)) = (foo, (bar, 1))
 24 | foo: int = foo
    |
-error[PLW0127]: self_assigning_variable.py:23:2: Self-assignment of variable `foo`
+error[PLW0127]: 23:2: Self-assignment of variable `foo`
 
+  --> self_assigning_variable.py:23:2
    |
 21 | bar, (foo, baz) = bar, (foo, 1)
 22 | (foo, bar), baz = (foo, bar), 1
@@ -330,8 +363,9 @@ error[PLW0127]: self_assigning_variable.py:23:2: Self-assignment of variable `fo
 24 | foo: int = foo
 25 | bar: int = bar
    |
-error[PLW0127]: self_assigning_variable.py:23:8: Self-assignment of variable `bar`
+error[PLW0127]: 23:8: Self-assignment of variable `bar`
 
+  --> self_assigning_variable.py:23:8
    |
 21 | bar, (foo, baz) = bar, (foo, 1)
 22 | (foo, bar), baz = (foo, bar), 1
@@ -340,8 +374,9 @@ error[PLW0127]: self_assigning_variable.py:23:8: Self-assignment of variable `ba
 24 | foo: int = foo
 25 | bar: int = bar
    |
-error[PLW0127]: self_assigning_variable.py:24:1: Self-assignment of variable `foo`
+error[PLW0127]: 24:1: Self-assignment of variable `foo`
 
+  --> self_assigning_variable.py:23:36
    |
 22 | (foo, bar), baz = (foo, bar), 1
 23 | (foo, (bar, baz)) = (foo, (bar, 1))
@@ -350,8 +385,9 @@ error[PLW0127]: self_assigning_variable.py:24:1: Self-assignment of variable `fo
 25 | bar: int = bar
 26 | foo = foo = bar
    |
-error[PLW0127]: self_assigning_variable.py:25:1: Self-assignment of variable `bar`
+error[PLW0127]: 25:1: Self-assignment of variable `bar`
 
+  --> self_assigning_variable.py:24:15
    |
 23 | (foo, (bar, baz)) = (foo, (bar, 1))
 24 | foo: int = foo
@@ -360,8 +396,9 @@ error[PLW0127]: self_assigning_variable.py:25:1: Self-assignment of variable `ba
 26 | foo = foo = bar
 27 | (foo, bar) = (foo, bar) = baz
    |
-error[PLW0127]: self_assigning_variable.py:26:1: Self-assignment of variable `foo`
+error[PLW0127]: 26:1: Self-assignment of variable `foo`
 
+  --> self_assigning_variable.py:25:15
    |
 24 | foo: int = foo
 25 | bar: int = bar
@@ -370,8 +407,9 @@ error[PLW0127]: self_assigning_variable.py:26:1: Self-assignment of variable `fo
 27 | (foo, bar) = (foo, bar) = baz
 28 | (foo, bar) = baz = (foo, bar) = 1
    |
-error[PLW0127]: self_assigning_variable.py:27:2: Self-assignment of variable `foo`
+error[PLW0127]: 27:2: Self-assignment of variable `foo`
 
+  --> self_assigning_variable.py:27:2
    |
 25 | bar: int = bar
 26 | foo = foo = bar
@@ -379,8 +417,9 @@ error[PLW0127]: self_assigning_variable.py:27:2: Self-assignment of variable `fo
    |  ^^^
 28 | (foo, bar) = baz = (foo, bar) = 1
    |
-error[PLW0127]: self_assigning_variable.py:27:7: Self-assignment of variable `bar`
+error[PLW0127]: 27:7: Self-assignment of variable `bar`
 
+  --> self_assigning_variable.py:27:7
    |
 25 | bar: int = bar
 26 | foo = foo = bar
@@ -388,8 +427,9 @@ error[PLW0127]: self_assigning_variable.py:27:7: Self-assignment of variable `ba
    |       ^^^
 28 | (foo, bar) = baz = (foo, bar) = 1
    |
-error[PLW0127]: self_assigning_variable.py:28:2: Self-assignment of variable `foo`
+error[PLW0127]: 28:2: Self-assignment of variable `foo`
 
+  --> self_assigning_variable.py:28:2
    |
 26 | foo = foo = bar
 27 | (foo, bar) = (foo, bar) = baz
@@ -398,8 +438,9 @@ error[PLW0127]: self_assigning_variable.py:28:2: Self-assignment of variable `fo
 29 | 
 30 | # Non-errors.
    |
-error[PLW0127]: self_assigning_variable.py:28:7: Self-assignment of variable `bar`
+error[PLW0127]: 28:7: Self-assignment of variable `bar`
 
+  --> self_assigning_variable.py:28:7
    |
 26 | foo = foo = bar
 27 | (foo, bar) = (foo, bar) = baz

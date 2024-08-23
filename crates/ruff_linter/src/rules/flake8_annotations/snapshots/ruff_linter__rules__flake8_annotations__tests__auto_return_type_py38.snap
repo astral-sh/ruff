@@ -1,8 +1,9 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_annotations/mod.rs
 ---
-error[ANN201]: auto_return_type.py:1:5: [*] Missing return type annotation for public function `func`
+error[ANN201]: 1:5: [*] Missing return type annotation for public function `func`
 
+ --> auto_return_type.py:1:5
   |
 1 | def func():
   |     ^^^^
@@ -16,8 +17,9 @@ error[ANN201]: auto_return_type.py:1:5: [*] Missing return type annotation for p
 3 3 | 
 4 4 | 
 
-error[ANN201]: auto_return_type.py:5:5: [*] Missing return type annotation for public function `func`
+error[ANN201]: 5:5: [*] Missing return type annotation for public function `func`
 
+ --> auto_return_type.py:5:5
   |
 5 | def func():
   |     ^^^^
@@ -34,8 +36,9 @@ error[ANN201]: auto_return_type.py:5:5: [*] Missing return type annotation for p
 7 7 | 
 8 8 | 
 
-error[ANN201]: auto_return_type.py:9:5: [*] Missing return type annotation for public function `func`
+error[ANN201]: 9:5: [*] Missing return type annotation for public function `func`
 
+  --> auto_return_type.py:9:5
    |
  9 | def func(x: int):
    |     ^^^^
@@ -53,8 +56,9 @@ error[ANN201]: auto_return_type.py:9:5: [*] Missing return type annotation for p
 11 11 |         return 1
 12 12 |     else:
 
-error[ANN201]: auto_return_type.py:16:5: [*] Missing return type annotation for public function `func`
+error[ANN201]: 16:5: [*] Missing return type annotation for public function `func`
 
+  --> auto_return_type.py:16:5
    |
 16 | def func():
    |     ^^^^
@@ -71,8 +75,9 @@ error[ANN201]: auto_return_type.py:16:5: [*] Missing return type annotation for 
 18 18 | 
 19 19 | 
 
-error[ANN201]: auto_return_type.py:20:5: [*] Missing return type annotation for public function `func`
+error[ANN201]: 20:5: [*] Missing return type annotation for public function `func`
 
+  --> auto_return_type.py:20:5
    |
 20 | def func(x: int):
    |     ^^^^
@@ -90,8 +95,9 @@ error[ANN201]: auto_return_type.py:20:5: [*] Missing return type annotation for 
 22 22 |         return None
 23 23 |     else:
 
-error[ANN201]: auto_return_type.py:27:5: [*] Missing return type annotation for public function `func`
+error[ANN201]: 27:5: [*] Missing return type annotation for public function `func`
 
+  --> auto_return_type.py:27:5
    |
 27 | def func(x: int):
    |     ^^^^
@@ -113,8 +119,9 @@ error[ANN201]: auto_return_type.py:27:5: [*] Missing return type annotation for 
 29 30 | 
 30 31 | 
 
-error[ANN201]: auto_return_type.py:31:5: [*] Missing return type annotation for public function `func`
+error[ANN201]: 31:5: [*] Missing return type annotation for public function `func`
 
+  --> auto_return_type.py:31:5
    |
 31 | def func(x: int):
    |     ^^^^
@@ -136,8 +143,9 @@ error[ANN201]: auto_return_type.py:31:5: [*] Missing return type annotation for 
 33 34 | 
 34 35 | 
 
-error[ANN201]: auto_return_type.py:35:5: Missing return type annotation for public function `func`
+error[ANN201]: 35:5: Missing return type annotation for public function `func`
 
+  --> auto_return_type.py:35:5
    |
 35 | def func(x: int):
    |     ^^^^
@@ -145,16 +153,18 @@ error[ANN201]: auto_return_type.py:35:5: Missing return type annotation for publ
 37 |         return None
    |
    = help: Add return type annotation
-error[ANN201]: auto_return_type.py:41:5: Missing return type annotation for public function `func`
+error[ANN201]: 41:5: Missing return type annotation for public function `func`
 
+  --> auto_return_type.py:41:5
    |
 41 | def func(x: int):
    |     ^^^^
 42 |     return {"foo": 1}
    |
    = help: Add return type annotation
-error[ANN201]: auto_return_type.py:45:5: [*] Missing return type annotation for public function `func`
+error[ANN201]: 45:5: [*] Missing return type annotation for public function `func`
 
+  --> auto_return_type.py:45:5
    |
 45 | def func(x: int):
    |     ^^^^
@@ -172,8 +182,9 @@ error[ANN201]: auto_return_type.py:45:5: [*] Missing return type annotation for 
 47 47 |         return 1
 48 48 |     else:
 
-error[ANN201]: auto_return_type.py:52:5: [*] Missing return type annotation for public function `func`
+error[ANN201]: 52:5: [*] Missing return type annotation for public function `func`
 
+  --> auto_return_type.py:52:5
    |
 52 | def func(x: int):
    |     ^^^^
@@ -196,8 +207,9 @@ error[ANN201]: auto_return_type.py:52:5: [*] Missing return type annotation for 
 54 55 |         return 1
 55 56 |     else:
 
-error[ANN201]: auto_return_type.py:59:5: [*] Missing return type annotation for public function `func`
+error[ANN201]: 59:5: [*] Missing return type annotation for public function `func`
 
+  --> auto_return_type.py:59:5
    |
 59 | def func(x: int):
    |     ^^^^
@@ -220,8 +232,9 @@ error[ANN201]: auto_return_type.py:59:5: [*] Missing return type annotation for 
 61 62 |         return 1
 62 63 |     elif x > 5:
 
-error[ANN201]: auto_return_type.py:68:5: [*] Missing return type annotation for public function `func`
+error[ANN201]: 68:5: [*] Missing return type annotation for public function `func`
 
+  --> auto_return_type.py:68:5
    |
 68 | def func(x: int):
    |     ^^^^
@@ -244,8 +257,9 @@ error[ANN201]: auto_return_type.py:68:5: [*] Missing return type annotation for 
 70 71 |         return 1
 71 72 | 
 
-error[ANN201]: auto_return_type.py:73:5: [*] Missing return type annotation for public function `func`
+error[ANN201]: 73:5: [*] Missing return type annotation for public function `func`
 
+  --> auto_return_type.py:73:5
    |
 73 | def func():
    |     ^^^^
@@ -262,8 +276,9 @@ error[ANN201]: auto_return_type.py:73:5: [*] Missing return type annotation for 
 75 75 | 
 76 76 | 
 
-error[ANN201]: auto_return_type.py:77:5: [*] Missing return type annotation for public function `func`
+error[ANN201]: 77:5: [*] Missing return type annotation for public function `func`
 
+  --> auto_return_type.py:77:5
    |
 77 | def func(x: int):
    |     ^^^^
@@ -286,8 +301,9 @@ error[ANN201]: auto_return_type.py:77:5: [*] Missing return type annotation for 
 79 80 |         return 1
 80 81 | 
 
-error[ANN201]: auto_return_type.py:82:5: [*] Missing return type annotation for public function `func`
+error[ANN201]: 82:5: [*] Missing return type annotation for public function `func`
 
+  --> auto_return_type.py:82:5
    |
 82 | def func(x: int):
    |     ^^^^
@@ -310,8 +326,9 @@ error[ANN201]: auto_return_type.py:82:5: [*] Missing return type annotation for 
 84 85 |         case [1, 2, 3]:
 85 86 |             return 1
 
-error[ANN201]: auto_return_type.py:90:5: [*] Missing return type annotation for public function `func`
+error[ANN201]: 90:5: [*] Missing return type annotation for public function `func`
 
+  --> auto_return_type.py:90:5
    |
 90 | def func(x: int):
    |     ^^^^
@@ -334,8 +351,9 @@ error[ANN201]: auto_return_type.py:90:5: [*] Missing return type annotation for 
 92 93 |         if i > 0:
 93 94 |             return 1
 
-error[ANN201]: auto_return_type.py:96:5: [*] Missing return type annotation for public function `func`
+error[ANN201]: 96:5: [*] Missing return type annotation for public function `func`
 
+  --> auto_return_type.py:96:5
    |
 96 | def func(x: int):
    |     ^^^^
@@ -353,8 +371,9 @@ error[ANN201]: auto_return_type.py:96:5: [*] Missing return type annotation for 
 98 98 |         if i > 0:
 99 99 |             return 1
 
-error[ANN201]: auto_return_type.py:104:5: [*] Missing return type annotation for public function `func`
+error[ANN201]: 104:5: [*] Missing return type annotation for public function `func`
 
+   --> auto_return_type.py:104:5
     |
 104 | def func(x: int):
     |     ^^^^
@@ -377,8 +396,9 @@ error[ANN201]: auto_return_type.py:104:5: [*] Missing return type annotation for
 106 107 |         if i > 0:
 107 108 |             break
 
-error[ANN201]: auto_return_type.py:112:5: [*] Missing return type annotation for public function `func`
+error[ANN201]: 112:5: [*] Missing return type annotation for public function `func`
 
+   --> auto_return_type.py:112:5
     |
 112 | def func(x: int):
     |     ^^^^
@@ -401,8 +421,9 @@ error[ANN201]: auto_return_type.py:112:5: [*] Missing return type annotation for
 114 115 |         pass
 115 116 |     except:
 
-error[ANN201]: auto_return_type.py:119:5: [*] Missing return type annotation for public function `func`
+error[ANN201]: 119:5: [*] Missing return type annotation for public function `func`
 
+   --> auto_return_type.py:119:5
     |
 119 | def func(x: int):
     |     ^^^^
@@ -420,8 +441,9 @@ error[ANN201]: auto_return_type.py:119:5: [*] Missing return type annotation for
 121 121 |         pass
 122 122 |     except:
 
-error[ANN201]: auto_return_type.py:128:5: [*] Missing return type annotation for public function `func`
+error[ANN201]: 128:5: [*] Missing return type annotation for public function `func`
 
+   --> auto_return_type.py:128:5
     |
 128 | def func(x: int):
     |     ^^^^
@@ -439,8 +461,9 @@ error[ANN201]: auto_return_type.py:128:5: [*] Missing return type annotation for
 130 130 |         pass
 131 131 |     except:
 
-error[ANN201]: auto_return_type.py:137:5: [*] Missing return type annotation for public function `func`
+error[ANN201]: 137:5: [*] Missing return type annotation for public function `func`
 
+   --> auto_return_type.py:137:5
     |
 137 | def func(x: int):
     |     ^^^^
@@ -463,8 +486,9 @@ error[ANN201]: auto_return_type.py:137:5: [*] Missing return type annotation for
 139 140 |         return 1
 140 141 |     except:
 
-error[ANN201]: auto_return_type.py:146:5: [*] Missing return type annotation for public function `func`
+error[ANN201]: 146:5: [*] Missing return type annotation for public function `func`
 
+   --> auto_return_type.py:146:5
     |
 146 | def func(x: int):
     |     ^^^^
@@ -487,8 +511,9 @@ error[ANN201]: auto_return_type.py:146:5: [*] Missing return type annotation for
 148 149 |         break
 149 150 |         return 1
 
-error[ANN201]: auto_return_type.py:158:9: Missing return type annotation for public function `method`
+error[ANN201]: 158:9: Missing return type annotation for public function `method`
 
+   --> auto_return_type.py:158:9
     |
 156 | class Foo(abc.ABC):
 157 |     @abstractmethod
@@ -497,8 +522,9 @@ error[ANN201]: auto_return_type.py:158:9: Missing return type annotation for pub
 159 |         pass
     |
     = help: Add return type annotation
-error[ANN201]: auto_return_type.py:162:9: Missing return type annotation for public function `method`
+error[ANN201]: 162:9: Missing return type annotation for public function `method`
 
+   --> auto_return_type.py:162:9
     |
 161 |     @abc.abstractmethod
 162 |     def method(self):
@@ -506,8 +532,9 @@ error[ANN201]: auto_return_type.py:162:9: Missing return type annotation for pub
 163 |         """Docstring."""
     |
     = help: Add return type annotation
-error[ANN201]: auto_return_type.py:166:9: Missing return type annotation for public function `method`
+error[ANN201]: 166:9: Missing return type annotation for public function `method`
 
+   --> auto_return_type.py:166:9
     |
 165 |     @abc.abstractmethod
 166 |     def method(self):
@@ -515,8 +542,9 @@ error[ANN201]: auto_return_type.py:166:9: Missing return type annotation for pub
 167 |         ...
     |
     = help: Add return type annotation
-error[ANN205]: auto_return_type.py:171:9: Missing return type annotation for staticmethod `method`
+error[ANN205]: 171:9: Missing return type annotation for staticmethod `method`
 
+   --> auto_return_type.py:171:9
     |
 169 |     @staticmethod
 170 |     @abstractmethod
@@ -525,8 +553,9 @@ error[ANN205]: auto_return_type.py:171:9: Missing return type annotation for sta
 172 |         pass
     |
     = help: Add return type annotation
-error[ANN206]: auto_return_type.py:176:9: Missing return type annotation for classmethod `method`
+error[ANN206]: 176:9: Missing return type annotation for classmethod `method`
 
+   --> auto_return_type.py:176:9
     |
 174 |     @classmethod
 175 |     @abstractmethod
@@ -535,8 +564,9 @@ error[ANN206]: auto_return_type.py:176:9: Missing return type annotation for cla
 177 |         pass
     |
     = help: Add return type annotation
-error[ANN201]: auto_return_type.py:180:9: [*] Missing return type annotation for public function `method`
+error[ANN201]: 180:9: [*] Missing return type annotation for public function `method`
 
+   --> auto_return_type.py:180:9
     |
 179 |     @abstractmethod
 180 |     def method(self):
@@ -555,8 +585,9 @@ error[ANN201]: auto_return_type.py:180:9: [*] Missing return type annotation for
 182 182 |             return 1
 183 183 |         else:
 
-error[ANN201]: auto_return_type.py:187:5: [*] Missing return type annotation for public function `func`
+error[ANN201]: 187:5: [*] Missing return type annotation for public function `func`
 
+   --> auto_return_type.py:187:5
     |
 187 | def func(x: int):
     |     ^^^^
@@ -582,8 +613,9 @@ error[ANN201]: auto_return_type.py:187:5: [*] Missing return type annotation for
 189 190 |         pass
 190 191 |     except:
 
-error[ANN201]: auto_return_type.py:194:5: [*] Missing return type annotation for public function `func`
+error[ANN201]: 194:5: [*] Missing return type annotation for public function `func`
 
+   --> auto_return_type.py:194:5
     |
 194 | def func(x: int):
     |     ^^^^
@@ -601,8 +633,9 @@ error[ANN201]: auto_return_type.py:194:5: [*] Missing return type annotation for
 196 196 |         pass
 197 197 |     except:
 
-error[ANN201]: auto_return_type.py:203:5: [*] Missing return type annotation for public function `func`
+error[ANN201]: 203:5: [*] Missing return type annotation for public function `func`
 
+   --> auto_return_type.py:203:5
     |
 203 | def func(x: int):
     |     ^^^^
@@ -628,8 +661,9 @@ error[ANN201]: auto_return_type.py:203:5: [*] Missing return type annotation for
 205 206 |         raise ValueError
 206 207 |     else:
 
-error[ANN201]: auto_return_type.py:210:5: [*] Missing return type annotation for public function `func`
+error[ANN201]: 210:5: [*] Missing return type annotation for public function `func`
 
+   --> auto_return_type.py:210:5
     |
 210 | def func(x: int):
     |     ^^^^
@@ -647,8 +681,9 @@ error[ANN201]: auto_return_type.py:210:5: [*] Missing return type annotation for
 212 212 |         raise ValueError
 213 213 |     else:
 
-error[ANN201]: auto_return_type.py:234:5: [*] Missing return type annotation for public function `func`
+error[ANN201]: 234:5: [*] Missing return type annotation for public function `func`
 
+   --> auto_return_type.py:234:5
     |
 234 | def func(x: int):
     |     ^^^^
@@ -666,8 +701,9 @@ error[ANN201]: auto_return_type.py:234:5: [*] Missing return type annotation for
 236 236 |         return 1
 237 237 |     raise ValueError
 
-error[ANN201]: auto_return_type.py:240:5: [*] Missing return type annotation for public function `func`
+error[ANN201]: 240:5: [*] Missing return type annotation for public function `func`
 
+   --> auto_return_type.py:240:5
     |
 240 | def func(x: int):
     |     ^^^^
@@ -685,8 +721,9 @@ error[ANN201]: auto_return_type.py:240:5: [*] Missing return type annotation for
 242 242 |         return 1
 243 243 |     else:
 
-error[ANN201]: auto_return_type.py:248:5: [*] Missing return type annotation for public function `func`
+error[ANN201]: 248:5: [*] Missing return type annotation for public function `func`
 
+   --> auto_return_type.py:248:5
     |
 248 | def func():
     |     ^^^^
@@ -713,8 +750,9 @@ error[ANN201]: auto_return_type.py:248:5: [*] Missing return type annotation for
 250 250 |         raise ValueError
 251 251 |     except:
 
-error[ANN201]: auto_return_type.py:255:5: [*] Missing return type annotation for public function `func`
+error[ANN201]: 255:5: [*] Missing return type annotation for public function `func`
 
+   --> auto_return_type.py:255:5
     |
 255 | def func():
     |     ^^^^
@@ -741,8 +779,9 @@ error[ANN201]: auto_return_type.py:255:5: [*] Missing return type annotation for
 257 257 |         return 1
 258 258 |     except:
 
-error[ANN201]: auto_return_type.py:262:5: [*] Missing return type annotation for public function `func`
+error[ANN201]: 262:5: [*] Missing return type annotation for public function `func`
 
+   --> auto_return_type.py:262:5
     |
 262 | def func(x: int):
     |     ^^^^
@@ -760,8 +799,9 @@ error[ANN201]: auto_return_type.py:262:5: [*] Missing return type annotation for
 264 264 |         if x > 0:
 265 265 |             return 1
 
-error[ANN201]: auto_return_type.py:269:5: [*] Missing return type annotation for public function `func`
+error[ANN201]: 269:5: [*] Missing return type annotation for public function `func`
 
+   --> auto_return_type.py:269:5
     |
 269 | def func(x: int):
     |     ^^^^
@@ -779,8 +819,9 @@ error[ANN201]: auto_return_type.py:269:5: [*] Missing return type annotation for
 271 271 |         raise ValueError
 272 272 |     else:
 
-error[ANN201]: auto_return_type.py:276:5: [*] Missing return type annotation for public function `func`
+error[ANN201]: 276:5: [*] Missing return type annotation for public function `func`
 
+   --> auto_return_type.py:276:5
     |
 276 | def func(x: int):
     |     ^^^^
@@ -798,8 +839,9 @@ error[ANN201]: auto_return_type.py:276:5: [*] Missing return type annotation for
 278 278 |         raise ValueError
 279 279 |     elif x > 10:
 
-error[ANN201]: auto_return_type.py:283:5: [*] Missing return type annotation for public function `func`
+error[ANN201]: 283:5: [*] Missing return type annotation for public function `func`
 
+   --> auto_return_type.py:283:5
     |
 283 | def func(x: int):
     |     ^^^^
@@ -826,8 +868,9 @@ error[ANN201]: auto_return_type.py:283:5: [*] Missing return type annotation for
 285 285 |         raise ValueError
 286 286 |     elif x > 10:
 
-error[ANN201]: auto_return_type.py:290:5: [*] Missing return type annotation for public function `func`
+error[ANN201]: 290:5: [*] Missing return type annotation for public function `func`
 
+   --> auto_return_type.py:290:5
     |
 290 | def func():
     |     ^^^^
@@ -845,8 +888,9 @@ error[ANN201]: auto_return_type.py:290:5: [*] Missing return type annotation for
 292 292 |         return 5
 293 293 |     except:
 
-error[ANN201]: auto_return_type.py:299:5: [*] Missing return type annotation for public function `func`
+error[ANN201]: 299:5: [*] Missing return type annotation for public function `func`
 
+   --> auto_return_type.py:299:5
     |
 299 | def func(x: int):
     |     ^^^^

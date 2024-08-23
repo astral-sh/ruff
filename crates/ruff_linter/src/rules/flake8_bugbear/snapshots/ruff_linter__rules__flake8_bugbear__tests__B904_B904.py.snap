@@ -1,8 +1,9 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_bugbear/mod.rs
 ---
-error[B904]: B904.py:10:9: Within an `except` clause, raise exceptions with `raise ... from err` or `raise ... from None` to distinguish them from errors in exception handling
+error[B904]: 10:9: Within an `except` clause, raise exceptions with `raise ... from err` or `raise ... from None` to distinguish them from errors in exception handling
 
+  --> B904.py:10:9
    |
  8 | except ValueError:
  9 |     if "abc":
@@ -11,8 +12,9 @@ error[B904]: B904.py:10:9: Within an `except` clause, raise exceptions with `rai
 11 |     raise UserWarning
 12 | except AssertionError:
    |
-error[B904]: B904.py:11:5: Within an `except` clause, raise exceptions with `raise ... from err` or `raise ... from None` to distinguish them from errors in exception handling
+error[B904]: 11:5: Within an `except` clause, raise exceptions with `raise ... from err` or `raise ... from None` to distinguish them from errors in exception handling
 
+  --> B904.py:11:5
    |
  9 |     if "abc":
 10 |         raise TypeError
@@ -21,8 +23,9 @@ error[B904]: B904.py:11:5: Within an `except` clause, raise exceptions with `rai
 12 | except AssertionError:
 13 |     raise  # Bare `raise` should not be an error
    |
-error[B904]: B904.py:16:5: Within an `except` clause, raise exceptions with `raise ... from err` or `raise ... from None` to distinguish them from errors in exception handling
+error[B904]: 16:5: Within an `except` clause, raise exceptions with `raise ... from err` or `raise ... from None` to distinguish them from errors in exception handling
 
+  --> B904.py:16:5
    |
 14 | except Exception as err:
 15 |     assert err
@@ -31,8 +34,9 @@ error[B904]: B904.py:16:5: Within an `except` clause, raise exceptions with `rai
 17 | except BaseException as err:
 18 |     raise err
    |
-error[B904]: B904.py:20:5: Within an `except` clause, raise exceptions with `raise ... from err` or `raise ... from None` to distinguish them from errors in exception handling
+error[B904]: 20:5: Within an `except` clause, raise exceptions with `raise ... from err` or `raise ... from None` to distinguish them from errors in exception handling
 
+  --> B904.py:20:5
    |
 18 |     raise err
 19 | except BaseException as err:
@@ -41,8 +45,9 @@ error[B904]: B904.py:20:5: Within an `except` clause, raise exceptions with `rai
 21 | finally:
 22 |     raise Exception("Nothing to chain from, so no warning here")
    |
-error[B904]: B904.py:63:9: Within an `except` clause, raise exceptions with `raise ... from err` or `raise ... from None` to distinguish them from errors in exception handling
+error[B904]: 63:9: Within an `except` clause, raise exceptions with `raise ... from err` or `raise ... from None` to distinguish them from errors in exception handling
 
+  --> B904.py:63:9
    |
 61 | except Exception as e:
 62 |     if ...:
@@ -51,16 +56,18 @@ error[B904]: B904.py:63:9: Within an `except` clause, raise exceptions with `rai
 64 |     else:
 65 |         raise RuntimeError("bang!")
    |
-error[B904]: B904.py:65:9: Within an `except` clause, raise exceptions with `raise ... from err` or `raise ... from None` to distinguish them from errors in exception handling
+error[B904]: 65:9: Within an `except` clause, raise exceptions with `raise ... from err` or `raise ... from None` to distinguish them from errors in exception handling
 
+  --> B904.py:65:9
    |
 63 |         raise RuntimeError("boom!")
 64 |     else:
 65 |         raise RuntimeError("bang!")
    |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^
    |
-error[B904]: B904.py:73:13: Within an `except` clause, raise exceptions with `raise ... from err` or `raise ... from None` to distinguish them from errors in exception handling
+error[B904]: 73:13: Within an `except` clause, raise exceptions with `raise ... from err` or `raise ... from None` to distinguish them from errors in exception handling
 
+  --> B904.py:73:13
    |
 71 |     match 0:
 72 |         case 0:

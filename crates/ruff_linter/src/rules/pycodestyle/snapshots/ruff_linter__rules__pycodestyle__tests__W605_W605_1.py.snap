@@ -1,8 +1,9 @@
 ---
 source: crates/ruff_linter/src/rules/pycodestyle/mod.rs
 ---
-error[W605]: W605_1.py:4:11: [*] Invalid escape sequence: `\.`
+error[W605]: 4:11: [*] Invalid escape sequence: `\.`
 
+ --> W605_1.py:4:11
   |
 3 | #: W605:1:10
 4 | regex = f'\.png$'
@@ -21,8 +22,9 @@ error[W605]: W605_1.py:4:11: [*] Invalid escape sequence: `\.`
 6 6 | #: W605:2:1
 7 7 | regex = f'''
 
-error[W605]: W605_1.py:8:1: [*] Invalid escape sequence: `\.`
+error[W605]: 8:1: [*] Invalid escape sequence: `\.`
 
+ --> W605_1.py:7:13
   |
 6 | #: W605:2:1
 7 | regex = f'''
@@ -41,8 +43,9 @@ error[W605]: W605_1.py:8:1: [*] Invalid escape sequence: `\.`
 9 9 | '''
 10 10 | 
 
-error[W605]: W605_1.py:13:7: [*] Invalid escape sequence: `\_`
+error[W605]: 13:7: [*] Invalid escape sequence: `\_`
 
+  --> W605_1.py:13:7
    |
 11 | #: W605:2:6
 12 | f(
@@ -61,8 +64,9 @@ error[W605]: W605_1.py:13:7: [*] Invalid escape sequence: `\_`
 15 15 | 
 16 16 | #: W605:4:6
 
-error[W605]: W605_1.py:20:6: [*] Invalid escape sequence: `\_`
+error[W605]: 20:6: [*] Invalid escape sequence: `\_`
 
+  --> W605_1.py:20:6
    |
 18 | multi-line
 19 | literal
@@ -82,8 +86,9 @@ error[W605]: W605_1.py:20:6: [*] Invalid escape sequence: `\_`
 19 19 | literal
 20 20 | with \_ somewhere
 
-error[W605]: W605_1.py:25:40: [*] Invalid escape sequence: `\_`
+error[W605]: 25:40: [*] Invalid escape sequence: `\_`
 
+  --> W605_1.py:25:40
    |
 24 | #: W605:1:38
 25 | value = f'new line\nand invalid escape \_ here'
@@ -100,8 +105,9 @@ error[W605]: W605_1.py:25:40: [*] Invalid escape sequence: `\_`
 27 27 | 
 28 28 | #: Okay
 
-error[W605]: W605_1.py:43:13: [*] Invalid escape sequence: `\_`
+error[W605]: 43:13: [*] Invalid escape sequence: `\_`
 
+  --> W605_1.py:43:13
    |
 41 | '''  # noqa
 42 | 
@@ -121,8 +127,9 @@ error[W605]: W605_1.py:43:13: [*] Invalid escape sequence: `\_`
 45 45 | value = f'\{1}'
 46 46 | value = f'{1:\}'
 
-error[W605]: W605_1.py:44:11: [*] Invalid escape sequence: `\{`
+error[W605]: 44:11: [*] Invalid escape sequence: `\{`
 
+  --> W605_1.py:44:11
    |
 43 | regex = f'\\\_'
 44 | value = f'\{{1}}'
@@ -141,8 +148,9 @@ error[W605]: W605_1.py:44:11: [*] Invalid escape sequence: `\{`
 46 46 | value = f'{1:\}'
 47 47 | value = f"{f"\{1}"}"
 
-error[W605]: W605_1.py:45:11: [*] Invalid escape sequence: `\{`
+error[W605]: 45:11: [*] Invalid escape sequence: `\{`
 
+  --> W605_1.py:45:11
    |
 43 | regex = f'\\\_'
 44 | value = f'\{{1}}'
@@ -162,8 +170,9 @@ error[W605]: W605_1.py:45:11: [*] Invalid escape sequence: `\{`
 47 47 | value = f"{f"\{1}"}"
 48 48 | value = rf"{f"\{1}"}"
 
-error[W605]: W605_1.py:46:14: [*] Invalid escape sequence: `\}`
+error[W605]: 46:14: [*] Invalid escape sequence: `\}`
 
+  --> W605_1.py:46:14
    |
 44 | value = f'\{{1}}'
 45 | value = f'\{1}'
@@ -183,8 +192,9 @@ error[W605]: W605_1.py:46:14: [*] Invalid escape sequence: `\}`
 48 48 | value = rf"{f"\{1}"}"
 49 49 | 
 
-error[W605]: W605_1.py:47:14: [*] Invalid escape sequence: `\{`
+error[W605]: 47:14: [*] Invalid escape sequence: `\{`
 
+  --> W605_1.py:47:14
    |
 45 | value = f'\{1}'
 46 | value = f'{1:\}'
@@ -203,8 +213,9 @@ error[W605]: W605_1.py:47:14: [*] Invalid escape sequence: `\{`
 49 49 | 
 50 50 | # Okay
 
-error[W605]: W605_1.py:48:15: [*] Invalid escape sequence: `\{`
+error[W605]: 48:15: [*] Invalid escape sequence: `\{`
 
+  --> W605_1.py:48:15
    |
 46 | value = f'{1:\}'
 47 | value = f"{f"\{1}"}"
@@ -224,8 +235,9 @@ error[W605]: W605_1.py:48:15: [*] Invalid escape sequence: `\{`
 50 50 | # Okay
 51 51 | value = rf'\{{1}}'
 
-error[W605]: W605_1.py:57:9: [*] Invalid escape sequence: `\d`
+error[W605]: 57:9: [*] Invalid escape sequence: `\d`
 
+  --> W605_1.py:57:9
    |
 56 | # Regression tests for https://github.com/astral-sh/ruff/issues/10434
 57 | f"{{}}+-\d"
@@ -243,8 +255,9 @@ error[W605]: W605_1.py:57:9: [*] Invalid escape sequence: `\d`
 58 58 | f"\n{{}}+-\d+"
 59 59 | f"\n{{}}�+-\d+"
 
-error[W605]: W605_1.py:58:11: [*] Invalid escape sequence: `\d`
+error[W605]: 58:11: [*] Invalid escape sequence: `\d`
 
+  --> W605_1.py:58:11
    |
 56 | # Regression tests for https://github.com/astral-sh/ruff/issues/10434
 57 | f"{{}}+-\d"
@@ -261,8 +274,9 @@ error[W605]: W605_1.py:58:11: [*] Invalid escape sequence: `\d`
    58 |+f"\n{{}}+-\\d+"
 59 59 | f"\n{{}}�+-\d+"
 
-error[W605]: W605_1.py:59:12: [*] Invalid escape sequence: `\d`
+error[W605]: 59:12: [*] Invalid escape sequence: `\d`
 
+  --> W605_1.py:59:12
    |
 57 | f"{{}}+-\d"
 58 | f"\n{{}}+-\d+"

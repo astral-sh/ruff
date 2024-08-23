@@ -1,8 +1,9 @@
 ---
 source: crates/ruff_linter/src/rules/pycodestyle/mod.rs
 ---
-error[E226]: E22.py:60:7: [*] Missing whitespace around arithmetic operator
+error[E226]: 60:7: [*] Missing whitespace around arithmetic operator
 
+  --> E22.py:60:7
    |
 58 | c =-1
 59 | #: E225
@@ -22,8 +23,9 @@ error[E226]: E22.py:60:7: [*] Missing whitespace around arithmetic operator
 62 62 | c = alpha -4
 63 63 | #: E225
 
-error[E226]: E22.py:62:11: [*] Missing whitespace around arithmetic operator
+error[E226]: 62:11: [*] Missing whitespace around arithmetic operator
 
+  --> E22.py:62:11
    |
 60 | x = x /2 - 1
 61 | #: E225
@@ -43,8 +45,9 @@ error[E226]: E22.py:62:11: [*] Missing whitespace around arithmetic operator
 64 64 | c = alpha- 4
 65 65 | #: E225
 
-error[E226]: E22.py:64:10: [*] Missing whitespace around arithmetic operator
+error[E226]: 64:10: [*] Missing whitespace around arithmetic operator
 
+  --> E22.py:64:10
    |
 62 | c = alpha -4
 63 | #: E225
@@ -64,8 +67,9 @@ error[E226]: E22.py:64:10: [*] Missing whitespace around arithmetic operator
 66 66 | z = x **y
 67 67 | #: E225
 
-error[E226]: E22.py:66:7: [*] Missing whitespace around arithmetic operator
+error[E226]: 66:7: [*] Missing whitespace around arithmetic operator
 
+  --> E22.py:66:7
    |
 64 | c = alpha- 4
 65 | #: E225
@@ -85,8 +89,9 @@ error[E226]: E22.py:66:7: [*] Missing whitespace around arithmetic operator
 68 68 | z = (x + 1) **y
 69 69 | #: E225
 
-error[E226]: E22.py:68:13: [*] Missing whitespace around arithmetic operator
+error[E226]: 68:13: [*] Missing whitespace around arithmetic operator
 
+  --> E22.py:68:13
    |
 66 | z = x **y
 67 | #: E225
@@ -106,8 +111,9 @@ error[E226]: E22.py:68:13: [*] Missing whitespace around arithmetic operator
 70 70 | z = (x + 1)** y
 71 71 | #: E225
 
-error[E226]: E22.py:70:12: [*] Missing whitespace around arithmetic operator
+error[E226]: 70:12: [*] Missing whitespace around arithmetic operator
 
+  --> E22.py:70:12
    |
 68 | z = (x + 1) **y
 69 | #: E225
@@ -127,8 +133,9 @@ error[E226]: E22.py:70:12: [*] Missing whitespace around arithmetic operator
 72 72 | _1kB = _1MB >>10
 73 73 | #: E225
 
-error[E226]: E22.py:76:4: [*] Missing whitespace around arithmetic operator
+error[E226]: 76:4: [*] Missing whitespace around arithmetic operator
 
+  --> E22.py:76:4
    |
 74 | _1kB = _1MB>> 10
 75 | #: E225 E225
@@ -148,8 +155,9 @@ error[E226]: E22.py:76:4: [*] Missing whitespace around arithmetic operator
 78 78 | i=i +1
 79 79 | #: E225
 
-error[E226]: E22.py:78:5: [*] Missing whitespace around arithmetic operator
+error[E226]: 78:5: [*] Missing whitespace around arithmetic operator
 
+  --> E22.py:78:5
    |
 76 | i=i+ 1
 77 | #: E225 E225
@@ -169,8 +177,9 @@ error[E226]: E22.py:78:5: [*] Missing whitespace around arithmetic operator
 80 80 | i = 1and 1
 81 81 | #: E225
 
-error[E226]: E22.py:88:7: [*] Missing whitespace around arithmetic operator
+error[E226]: 88:7: [*] Missing whitespace around arithmetic operator
 
+  --> E22.py:88:7
    |
 86 | 1in []
 87 | #: E225
@@ -190,8 +199,9 @@ error[E226]: E22.py:88:7: [*] Missing whitespace around arithmetic operator
 90 90 | i = 1@ 2
 91 91 | #: E225 E226
 
-error[E226]: E22.py:90:6: [*] Missing whitespace around arithmetic operator
+error[E226]: 90:6: [*] Missing whitespace around arithmetic operator
 
+  --> E22.py:90:6
    |
 88 | i = 1 @2
 89 | #: E225
@@ -211,8 +221,9 @@ error[E226]: E22.py:90:6: [*] Missing whitespace around arithmetic operator
 92 92 | i=i+1
 93 93 | #: E225 E226
 
-error[E226]: E22.py:92:4: [*] Missing whitespace around arithmetic operator
+error[E226]: 92:4: [*] Missing whitespace around arithmetic operator
 
+  --> E22.py:92:4
    |
 90 | i = 1@ 2
 91 | #: E225 E226
@@ -232,8 +243,9 @@ error[E226]: E22.py:92:4: [*] Missing whitespace around arithmetic operator
 94 94 | i =i+1
 95 95 | #: E225 E226
 
-error[E226]: E22.py:94:5: [*] Missing whitespace around arithmetic operator
+error[E226]: 94:5: [*] Missing whitespace around arithmetic operator
 
+  --> E22.py:94:5
    |
 92 | i=i+1
 93 | #: E225 E226
@@ -253,8 +265,9 @@ error[E226]: E22.py:94:5: [*] Missing whitespace around arithmetic operator
 96 96 | i= i+1
 97 97 | #: E225 E226
 
-error[E226]: E22.py:96:5: [*] Missing whitespace around arithmetic operator
+error[E226]: 96:5: [*] Missing whitespace around arithmetic operator
 
+  --> E22.py:96:5
    |
 94 | i =i+1
 95 | #: E225 E226
@@ -274,8 +287,9 @@ error[E226]: E22.py:96:5: [*] Missing whitespace around arithmetic operator
 98 98 | c = (a +b)*(a - b)
 99 99 | #: E225 E226
 
-error[E226]: E22.py:98:8: [*] Missing whitespace around arithmetic operator
+error[E226]: 98:8: [*] Missing whitespace around arithmetic operator
 
+   --> E22.py:98:8
     |
  96 | i= i+1
  97 | #: E225 E226
@@ -295,8 +309,9 @@ error[E226]: E22.py:98:8: [*] Missing whitespace around arithmetic operator
 100 100 | c = (a+ b)*(a - b)
 101 101 | #:
 
-error[E226]: E22.py:98:11: [*] Missing whitespace around arithmetic operator
+error[E226]: 98:11: [*] Missing whitespace around arithmetic operator
 
+   --> E22.py:98:11
     |
  96 | i= i+1
  97 | #: E225 E226
@@ -316,8 +331,9 @@ error[E226]: E22.py:98:11: [*] Missing whitespace around arithmetic operator
 100 100 | c = (a+ b)*(a - b)
 101 101 | #:
 
-error[E226]: E22.py:100:7: [*] Missing whitespace around arithmetic operator
+error[E226]: 100:7: [*] Missing whitespace around arithmetic operator
 
+   --> E22.py:100:7
     |
  98 | c = (a +b)*(a - b)
  99 | #: E225 E226
@@ -336,8 +352,9 @@ error[E226]: E22.py:100:7: [*] Missing whitespace around arithmetic operator
 102 102 | 
 103 103 | #: E226
 
-error[E226]: E22.py:100:11: [*] Missing whitespace around arithmetic operator
+error[E226]: 100:11: [*] Missing whitespace around arithmetic operator
 
+   --> E22.py:100:11
     |
  98 | c = (a +b)*(a - b)
  99 | #: E225 E226
@@ -356,8 +373,9 @@ error[E226]: E22.py:100:11: [*] Missing whitespace around arithmetic operator
 102 102 | 
 103 103 | #: E226
 
-error[E226]: E22.py:104:6: [*] Missing whitespace around arithmetic operator
+error[E226]: 104:6: [*] Missing whitespace around arithmetic operator
 
+   --> E22.py:104:6
     |
 103 | #: E226
 104 | z = 2//30
@@ -376,8 +394,9 @@ error[E226]: E22.py:104:6: [*] Missing whitespace around arithmetic operator
 106 106 | c = (a+b) * (a-b)
 107 107 | #: E226
 
-error[E226]: E22.py:106:7: [*] Missing whitespace around arithmetic operator
+error[E226]: 106:7: [*] Missing whitespace around arithmetic operator
 
+   --> E22.py:106:7
     |
 104 | z = 2//30
 105 | #: E226 E226
@@ -397,8 +416,9 @@ error[E226]: E22.py:106:7: [*] Missing whitespace around arithmetic operator
 108 108 | norman = True+False
 109 109 | #: E226
 
-error[E226]: E22.py:106:15: [*] Missing whitespace around arithmetic operator
+error[E226]: 106:15: [*] Missing whitespace around arithmetic operator
 
+   --> E22.py:106:15
     |
 104 | z = 2//30
 105 | #: E226 E226
@@ -418,8 +438,9 @@ error[E226]: E22.py:106:15: [*] Missing whitespace around arithmetic operator
 108 108 | norman = True+False
 109 109 | #: E226
 
-error[E226]: E22.py:110:6: [*] Missing whitespace around arithmetic operator
+error[E226]: 110:6: [*] Missing whitespace around arithmetic operator
 
+   --> E22.py:110:6
     |
 108 | norman = True+False
 109 | #: E226
@@ -439,8 +460,9 @@ error[E226]: E22.py:110:6: [*] Missing whitespace around arithmetic operator
 112 112 | x = x/2 - 1
 113 113 | #: E226 E226
 
-error[E226]: E22.py:112:6: [*] Missing whitespace around arithmetic operator
+error[E226]: 112:6: [*] Missing whitespace around arithmetic operator
 
+   --> E22.py:112:6
     |
 110 | x = x*2 - 1
 111 | #: E226
@@ -460,8 +482,9 @@ error[E226]: E22.py:112:6: [*] Missing whitespace around arithmetic operator
 114 114 | hypot2 = x*x + y*y
 115 115 | #: E226
 
-error[E226]: E22.py:114:11: [*] Missing whitespace around arithmetic operator
+error[E226]: 114:11: [*] Missing whitespace around arithmetic operator
 
+   --> E22.py:114:11
     |
 112 | x = x/2 - 1
 113 | #: E226 E226
@@ -481,8 +504,9 @@ error[E226]: E22.py:114:11: [*] Missing whitespace around arithmetic operator
 116 116 | c = (a + b)*(a - b)
 117 117 | #: E226
 
-error[E226]: E22.py:114:17: [*] Missing whitespace around arithmetic operator
+error[E226]: 114:17: [*] Missing whitespace around arithmetic operator
 
+   --> E22.py:114:17
     |
 112 | x = x/2 - 1
 113 | #: E226 E226
@@ -502,8 +526,9 @@ error[E226]: E22.py:114:17: [*] Missing whitespace around arithmetic operator
 116 116 | c = (a + b)*(a - b)
 117 117 | #: E226
 
-error[E226]: E22.py:116:12: [*] Missing whitespace around arithmetic operator
+error[E226]: 116:12: [*] Missing whitespace around arithmetic operator
 
+   --> E22.py:116:12
     |
 114 | hypot2 = x*x + y*y
 115 | #: E226
@@ -523,8 +548,9 @@ error[E226]: E22.py:116:12: [*] Missing whitespace around arithmetic operator
 118 118 | def halves(n):
 119 119 |     return (i//2 for i in range(n))
 
-error[E226]: E22.py:119:14: [*] Missing whitespace around arithmetic operator
+error[E226]: 119:14: [*] Missing whitespace around arithmetic operator
 
+   --> E22.py:119:14
     |
 117 | #: E226
 118 | def halves(n):

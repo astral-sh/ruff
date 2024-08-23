@@ -1,8 +1,9 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_comprehensions/mod.rs
 ---
-error[C416]: C416.py:6:1: [*] Unnecessary `list` comprehension (rewrite using `list()`)
+error[C416]: 6:1: [*] Unnecessary `list` comprehension (rewrite using `list()`)
 
+ --> C416.py:5:1
   |
 4 | d = {"a": 1, "b": 2, "c": 3}
 5 | 
@@ -22,8 +23,9 @@ error[C416]: C416.py:6:1: [*] Unnecessary `list` comprehension (rewrite using `l
 8 8 | {k: v for k, v in y}
 9 9 | {k: v for k, v in d.items()}
 
-error[C416]: C416.py:7:1: [*] Unnecessary `set` comprehension (rewrite using `set()`)
+error[C416]: 7:1: [*] Unnecessary `set` comprehension (rewrite using `set()`)
 
+ --> C416.py:6:15
   |
 6 | [i for i in x]
 7 | {i for i in x}
@@ -42,8 +44,9 @@ error[C416]: C416.py:7:1: [*] Unnecessary `set` comprehension (rewrite using `se
 9 9 | {k: v for k, v in d.items()}
 10 10 | [(k, v) for k, v in d.items()]
 
-error[C416]: C416.py:8:1: [*] Unnecessary `dict` comprehension (rewrite using `dict()`)
+error[C416]: 8:1: [*] Unnecessary `dict` comprehension (rewrite using `dict()`)
 
+  --> C416.py:7:15
    |
  6 | [i for i in x]
  7 | {i for i in x}
@@ -63,8 +66,9 @@ error[C416]: C416.py:8:1: [*] Unnecessary `dict` comprehension (rewrite using `d
 10 10 | [(k, v) for k, v in d.items()]
 11 11 | {k: (a, b) for k, (a, b) in d.items()}
 
-error[C416]: C416.py:9:1: [*] Unnecessary `dict` comprehension (rewrite using `dict()`)
+error[C416]: 9:1: [*] Unnecessary `dict` comprehension (rewrite using `dict()`)
 
+  --> C416.py:8:21
    |
  7 | {i for i in x}
  8 | {k: v for k, v in y}
@@ -84,8 +88,9 @@ error[C416]: C416.py:9:1: [*] Unnecessary `dict` comprehension (rewrite using `d
 11 11 | {k: (a, b) for k, (a, b) in d.items()}
 12 12 | 
 
-error[C416]: C416.py:10:1: [*] Unnecessary `list` comprehension (rewrite using `list()`)
+error[C416]: 10:1: [*] Unnecessary `list` comprehension (rewrite using `list()`)
 
+  --> C416.py:9:29
    |
  8 | {k: v for k, v in y}
  9 | {k: v for k, v in d.items()}
@@ -104,8 +109,9 @@ error[C416]: C416.py:10:1: [*] Unnecessary `list` comprehension (rewrite using `
 12 12 | 
 13 13 | [i for i, in z]
 
-error[C416]: C416.py:11:1: [*] Unnecessary `dict` comprehension (rewrite using `dict()`)
+error[C416]: 11:1: [*] Unnecessary `dict` comprehension (rewrite using `dict()`)
 
+  --> C416.py:10:31
    |
  9 | {k: v for k, v in d.items()}
 10 | [(k, v) for k, v in d.items()]
@@ -125,8 +131,9 @@ error[C416]: C416.py:11:1: [*] Unnecessary `dict` comprehension (rewrite using `
 13 13 | [i for i, in z]
 14 14 | [i for i, j in y]
 
-error[C416]: C416.py:24:70: [*] Unnecessary `list` comprehension (rewrite using `list()`)
+error[C416]: 24:70: [*] Unnecessary `list` comprehension (rewrite using `list()`)
 
+  --> C416.py:24:70
    |
 23 | # Regression test for: https://github.com/astral-sh/ruff/issues/7196
 24 | any(len(symbol_table.get_by_type(symbol_type)) > 0 for symbol_type in[t for t in SymbolType])

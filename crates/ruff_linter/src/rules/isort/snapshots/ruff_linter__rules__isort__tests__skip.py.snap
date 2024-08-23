@@ -1,15 +1,16 @@
 ---
 source: crates/ruff_linter/src/rules/isort/mod.rs
 ---
-error[I001]: skip.py:20:1: [*] Import block is un-sorted or un-formatted
+error[I001]: 20:1: [*] Import block is un-sorted or un-formatted
 
+  --> skip.py:19:29
    |
 18 |       import sys
 19 |       import os  # isort: skip
 20 | /     import collections
 21 | |     import abc
-22 | | 
-   | |_^
+   | |_______________^
+22 |   
 23 |   
 24 |   def f():
    |
@@ -25,15 +26,16 @@ error[I001]: skip.py:20:1: [*] Import block is un-sorted or un-formatted
 23 23 | 
 24 24 | def f():
 
-error[I001]: skip.py:27:1: [*] Import block is un-sorted or un-formatted
+error[I001]: 27:1: [*] Import block is un-sorted or un-formatted
 
+  --> skip.py:26:28
    |
 25 |       import sys
 26 |       import os  # isort:skip
 27 | /     import collections
 28 | |     import abc
-29 | | 
-   | |_^
+   | |_______________^
+29 |   
 30 |   
 31 |   def f():
    |
@@ -49,12 +51,14 @@ error[I001]: skip.py:27:1: [*] Import block is un-sorted or un-formatted
 30 30 | 
 31 31 | def f():
 
-error[I001]: skip.py:34:1: [*] Import block is un-sorted or un-formatted
+error[I001]: 34:1: [*] Import block is un-sorted or un-formatted
 
+  --> skip.py:33:54
    |
-32 |       import sys; import os  # isort:skip
-33 |       import sys; import os  # isort:skip  # isort:skip
-34 | /     import sys; import os
+32 |     import sys; import os  # isort:skip
+33 |     import sys; import os  # isort:skip  # isort:skip
+34 |     import sys; import os
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^
    |
    = help: Organize imports
 ℹ Safe fix

@@ -1,8 +1,9 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_pyi/mod.rs
 ---
-error[PYI058]: PYI058.pyi:5:13: [*] Use `Iterator` as the return value for simple `__iter__` methods
+error[PYI058]: 5:13: [*] Use `Iterator` as the return value for simple `__iter__` methods
 
+ --> PYI058.pyi:5:13
   |
 4 |     class IteratorReturningSimpleGenerator1:
 5 |         def __iter__(self) -> Generator: ...  # PYI058 (use `Iterator`)
@@ -23,8 +24,9 @@ error[PYI058]: PYI058.pyi:5:13: [*] Use `Iterator` as the return value for simpl
 7 8 | def scope():
 8 9 |     import typing
 
-error[PYI058]: PYI058.pyi:11:13: [*] Use `Iterator` as the return value for simple `__iter__` methods
+error[PYI058]: 11:13: [*] Use `Iterator` as the return value for simple `__iter__` methods
 
+  --> PYI058.pyi:11:13
    |
 10 |     class IteratorReturningSimpleGenerator2:
 11 |         def __iter__(self) -> typing.Generator: ...  # PYI058 (use `Iterator`)
@@ -43,8 +45,9 @@ error[PYI058]: PYI058.pyi:11:13: [*] Use `Iterator` as the return value for simp
 13 13 | def scope():
 14 14 |     import collections.abc
 
-error[PYI058]: PYI058.pyi:17:13: [*] Use `Iterator` as the return value for simple `__iter__` methods
+error[PYI058]: 17:13: [*] Use `Iterator` as the return value for simple `__iter__` methods
 
+  --> PYI058.pyi:17:13
    |
 16 |     class IteratorReturningSimpleGenerator3:
 17 |         def __iter__(self) -> collections.abc.Generator: ...  # PYI058 (use `Iterator`)
@@ -63,8 +66,9 @@ error[PYI058]: PYI058.pyi:17:13: [*] Use `Iterator` as the return value for simp
 19 19 | def scope():
 20 20 |     import collections.abc
 
-error[PYI058]: PYI058.pyi:24:13: [*] Use `Iterator` as the return value for simple `__iter__` methods
+error[PYI058]: 24:13: [*] Use `Iterator` as the return value for simple `__iter__` methods
 
+  --> PYI058.pyi:24:13
    |
 23 |     class IteratorReturningSimpleGenerator4:
 24 |         def __iter__(self, /) -> collections.abc.Generator[str, Any, None]: ...  # PYI058 (use `Iterator`)
@@ -83,8 +87,9 @@ error[PYI058]: PYI058.pyi:24:13: [*] Use `Iterator` as the return value for simp
 26 26 | def scope():
 27 27 |     import collections.abc
 
-error[PYI058]: PYI058.pyi:31:13: [*] Use `Iterator` as the return value for simple `__iter__` methods
+error[PYI058]: 31:13: [*] Use `Iterator` as the return value for simple `__iter__` methods
 
+  --> PYI058.pyi:31:13
    |
 30 |     class IteratorReturningSimpleGenerator5:
 31 |         def __iter__(self, /) -> collections.abc.Generator[str, None, typing.Any]: ...  # PYI058 (use `Iterator`)
@@ -103,8 +108,9 @@ error[PYI058]: PYI058.pyi:31:13: [*] Use `Iterator` as the return value for simp
 33 33 | def scope():
 34 34 |     from collections.abc import Generator
 
-error[PYI058]: PYI058.pyi:37:13: [*] Use `Iterator` as the return value for simple `__iter__` methods
+error[PYI058]: 37:13: [*] Use `Iterator` as the return value for simple `__iter__` methods
 
+  --> PYI058.pyi:37:13
    |
 36 |     class IteratorReturningSimpleGenerator6:
 37 |         def __iter__(self, /) -> Generator[str, None, None]: ...  # PYI058 (use `Iterator`)
@@ -128,8 +134,9 @@ error[PYI058]: PYI058.pyi:37:13: [*] Use `Iterator` as the return value for simp
 39 40 | def scope():
 40 41 |     import typing_extensions
 
-error[PYI058]: PYI058.pyi:43:13: [*] Use `AsyncIterator` as the return value for simple `__aiter__` methods
+error[PYI058]: 43:13: [*] Use `AsyncIterator` as the return value for simple `__aiter__` methods
 
+  --> PYI058.pyi:43:13
    |
 42 |     class AsyncIteratorReturningSimpleAsyncGenerator1:
 43 |         def __aiter__(self,) -> typing_extensions.AsyncGenerator: ...  # PYI058 (Use `AsyncIterator`)
@@ -148,8 +155,9 @@ error[PYI058]: PYI058.pyi:43:13: [*] Use `AsyncIterator` as the return value for
 45 45 | def scope():
 46 46 |     import collections.abc
 
-error[PYI058]: PYI058.pyi:49:13: [*] Use `AsyncIterator` as the return value for simple `__aiter__` methods
+error[PYI058]: 49:13: [*] Use `AsyncIterator` as the return value for simple `__aiter__` methods
 
+  --> PYI058.pyi:49:13
    |
 48 |     class AsyncIteratorReturningSimpleAsyncGenerator3:
 49 |         def __aiter__(self, /) -> collections.abc.AsyncGenerator[str, None]:
@@ -167,8 +175,9 @@ error[PYI058]: PYI058.pyi:49:13: [*] Use `AsyncIterator` as the return value for
 51 51 | 
 52 52 | def scope():
 
-error[PYI058]: PYI058.pyi:56:13: [*] Use `AsyncIterator` as the return value for simple `__aiter__` methods
+error[PYI058]: 56:13: [*] Use `AsyncIterator` as the return value for simple `__aiter__` methods
 
+  --> PYI058.pyi:56:13
    |
 55 |     class AsyncIteratorReturningSimpleAsyncGenerator3:
 56 |         def __aiter__(self, /) -> collections.abc.AsyncGenerator[str, None]: ...  # PYI058 (Use `AsyncIterator`)

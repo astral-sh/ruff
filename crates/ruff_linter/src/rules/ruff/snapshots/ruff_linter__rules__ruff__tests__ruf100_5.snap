@@ -1,8 +1,9 @@
 ---
 source: crates/ruff_linter/src/rules/ruff/mod.rs
 ---
-error[ERA001]: RUF100_5.py:7:5: Found commented-out code
+error[ERA001]: 7:5: Found commented-out code
 
+ --> RUF100_5.py:7:5
   |
 5 |     # "key1": 123,  # noqa: ERA001
 6 |     # "key2": 456,  # noqa
@@ -20,8 +21,9 @@ error[ERA001]: RUF100_5.py:7:5: Found commented-out code
 9 8 | 
 10 9 | 
 
-error[ERA001]: RUF100_5.py:11:1: Found commented-out code
+error[ERA001]: 11:1: Found commented-out code
 
+  --> RUF100_5.py:11:1
    |
 11 | #import os  # noqa: E501
    | ^^^^^^^^^^^^^^^^^^^^^^^^
@@ -33,8 +35,9 @@ error[ERA001]: RUF100_5.py:11:1: Found commented-out code
 10 10 | 
 11    |-#import os  # noqa: E501
 
-error[RUF100]: RUF100_5.py:11:13: [*] Unused `noqa` directive (unused: `E501`)
+error[RUF100]: 11:13: [*] Unused `noqa` directive (unused: `E501`)
 
+  --> RUF100_5.py:11:13
    |
 11 | #import os  # noqa: E501
    |             ^^^^^^^^^^^^

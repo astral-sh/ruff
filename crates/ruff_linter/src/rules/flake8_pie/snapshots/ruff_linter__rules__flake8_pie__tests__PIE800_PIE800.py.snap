@@ -1,8 +1,9 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_pie/mod.rs
 ---
-error[PIE800]: PIE800.py:1:14: [*] Unnecessary spread `**`
+error[PIE800]: 1:14: [*] Unnecessary spread `**`
 
+ --> PIE800.py:1:14
   |
 1 | {"foo": 1, **{"bar": 1}}  # PIE800
   |              ^^^^^^^^^^
@@ -17,8 +18,9 @@ error[PIE800]: PIE800.py:1:14: [*] Unnecessary spread `**`
 3 3 | {**{"bar": 10}, "a": "b"}  # PIE800
 4 4 | 
 
-error[PIE800]: PIE800.py:3:4: [*] Unnecessary spread `**`
+error[PIE800]: 3:4: [*] Unnecessary spread `**`
 
+ --> PIE800.py:3:4
   |
 1 | {"foo": 1, **{"bar": 1}}  # PIE800
 2 | 
@@ -37,8 +39,9 @@ error[PIE800]: PIE800.py:3:4: [*] Unnecessary spread `**`
 5 5 | foo({**foo, **{"bar": True}})  # PIE800
 6 6 | 
 
-error[PIE800]: PIE800.py:5:15: [*] Unnecessary spread `**`
+error[PIE800]: 5:15: [*] Unnecessary spread `**`
 
+ --> PIE800.py:5:15
   |
 3 | {**{"bar": 10}, "a": "b"}  # PIE800
 4 | 
@@ -58,8 +61,9 @@ error[PIE800]: PIE800.py:5:15: [*] Unnecessary spread `**`
 7 7 | {**foo, **{"bar": 10}}  # PIE800
 8 8 | 
 
-error[PIE800]: PIE800.py:7:11: [*] Unnecessary spread `**`
+error[PIE800]: 7:11: [*] Unnecessary spread `**`
 
+ --> PIE800.py:7:11
   |
 5 | foo({**foo, **{"bar": True}})  # PIE800
 6 | 
@@ -79,8 +83,9 @@ error[PIE800]: PIE800.py:7:11: [*] Unnecessary spread `**`
 9 9 | { # PIE800
 10 10 |     "a": "b",
 
-error[PIE800]: PIE800.py:12:7: [*] Unnecessary spread `**`
+error[PIE800]: 12:7: [*] Unnecessary spread `**`
 
+  --> PIE800.py:12:7
    |
 10 |       "a": "b",
 11 |       # Preserve
@@ -110,8 +115,9 @@ error[PIE800]: PIE800.py:12:7: [*] Unnecessary spread `**`
 18 18 | 
 19 19 | {**foo, **buzz, **{bar: 10}}  # PIE800
 
-error[PIE800]: PIE800.py:19:19: [*] Unnecessary spread `**`
+error[PIE800]: 19:19: [*] Unnecessary spread `**`
 
+  --> PIE800.py:19:19
    |
 17 | }
 18 | 

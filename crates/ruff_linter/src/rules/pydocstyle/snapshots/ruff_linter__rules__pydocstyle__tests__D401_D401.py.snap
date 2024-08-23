@@ -1,22 +1,25 @@
 ---
 source: crates/ruff_linter/src/rules/pydocstyle/mod.rs
 ---
-error[D401]: D401.py:10:5: First line of docstring should be in imperative mood: "Returns foo."
+error[D401]: 10:5: First line of docstring should be in imperative mood: "Returns foo."
 
+  --> D401.py:10:5
    |
  9 | def bad_liouiwnlkjl():
 10 |     """Returns foo."""
    |     ^^^^^^^^^^^^^^^^^^
    |
-error[D401]: D401.py:14:5: First line of docstring should be in imperative mood: "Constructor for a foo."
+error[D401]: 14:5: First line of docstring should be in imperative mood: "Constructor for a foo."
 
+  --> D401.py:14:5
    |
 13 | def bad_sdgfsdg23245():
 14 |     """Constructor for a foo."""
    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
    |
-error[D401]: D401.py:18:5: First line of docstring should be in imperative mood: "Constructor for a boa."
+error[D401]: 18:5: First line of docstring should be in imperative mood: "Constructor for a boa."
 
+  --> D401.py:18:5
    |
 17 |   def bad_sdgfsdg23245777():
 18 |       """
@@ -27,8 +30,9 @@ error[D401]: D401.py:18:5: First line of docstring should be in imperative mood:
 22 | |     """
    | |_______^
    |
-error[D401]: D401.py:26:5: First line of docstring should be in imperative mood: "Runs something"
+error[D401]: 26:5: First line of docstring should be in imperative mood: "Runs something"
 
+  --> D401.py:26:5
    |
 25 | def bad_run_something():
 26 |     """Runs something"""
@@ -36,8 +40,9 @@ error[D401]: D401.py:26:5: First line of docstring should be in imperative mood:
 27 | 
 28 |     def bad_nested():
    |
-error[D401]: D401.py:29:9: First line of docstring should be in imperative mood: "Runs other things, nested"
+error[D401]: 29:9: First line of docstring should be in imperative mood: "Runs other things, nested"
 
+  --> D401.py:29:9
    |
 28 |     def bad_nested():
 29 |         """Runs other things, nested"""
@@ -45,8 +50,9 @@ error[D401]: D401.py:29:9: First line of docstring should be in imperative mood:
 30 | 
 31 |     bad_nested()
    |
-error[D401]: D401.py:35:5: First line of docstring should be in imperative mood: "Writes a logical line that"
+error[D401]: 35:5: First line of docstring should be in imperative mood: "Writes a logical line that"
 
+  --> D401.py:35:5
    |
 34 |   def multi_line():
 35 |       """Writes a logical line that
@@ -55,8 +61,9 @@ error[D401]: D401.py:35:5: First line of docstring should be in imperative mood:
 37 | |     """
    | |_______^
    |
-error[D401]: D401.py:74:9: First line of docstring should be in imperative mood: "This method docstring should be written in imperative mood."
+error[D401]: 74:9: First line of docstring should be in imperative mood: "This method docstring should be written in imperative mood."
 
+  --> D401.py:74:9
    |
 73 |     def bad_method(self):
 74 |         """This method docstring should be written in imperative mood."""

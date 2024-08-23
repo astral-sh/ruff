@@ -1,8 +1,9 @@
 ---
 source: crates/ruff_linter/src/rules/pyupgrade/mod.rs
 ---
-error[UP027]: UP027.py:2:17: [*] Replace unpacked list comprehension with a generator expression
+error[UP027]: 2:17: [*] Replace unpacked list comprehension with a generator expression
 
+ --> UP027.py:2:17
   |
 1 | # Should change
 2 | foo, bar, baz = [fn(x) for x in items]
@@ -19,8 +20,9 @@ error[UP027]: UP027.py:2:17: [*] Replace unpacked list comprehension with a gene
 4 4 | foo, bar, baz =[fn(x) for x in items]
 5 5 | 
 
-error[UP027]: UP027.py:4:16: [*] Replace unpacked list comprehension with a generator expression
+error[UP027]: 4:16: [*] Replace unpacked list comprehension with a generator expression
 
+ --> UP027.py:4:16
   |
 2 | foo, bar, baz = [fn(x) for x in items]
 3 | 
@@ -40,8 +42,9 @@ error[UP027]: UP027.py:4:16: [*] Replace unpacked list comprehension with a gene
 6 6 | foo, bar, baz =          [fn(x) for x in items]
 7 7 | 
 
-error[UP027]: UP027.py:6:26: [*] Replace unpacked list comprehension with a generator expression
+error[UP027]: 6:26: [*] Replace unpacked list comprehension with a generator expression
 
+ --> UP027.py:6:26
   |
 4 | foo, bar, baz =[fn(x) for x in items]
 5 | 
@@ -61,8 +64,9 @@ error[UP027]: UP027.py:6:26: [*] Replace unpacked list comprehension with a gene
 8 8 | foo, bar, baz = [[i for i in fn(x)] for x in items]
 9 9 | 
 
-error[UP027]: UP027.py:8:17: [*] Replace unpacked list comprehension with a generator expression
+error[UP027]: 8:17: [*] Replace unpacked list comprehension with a generator expression
 
+  --> UP027.py:8:17
    |
  6 | foo, bar, baz =          [fn(x) for x in items]
  7 | 
@@ -82,8 +86,9 @@ error[UP027]: UP027.py:8:17: [*] Replace unpacked list comprehension with a gene
 10 10 | foo, bar, baz = [
 11 11 |     fn(x)
 
-error[UP027]: UP027.py:10:17: [*] Replace unpacked list comprehension with a generator expression
+error[UP027]: 10:17: [*] Replace unpacked list comprehension with a generator expression
 
+  --> UP027.py:10:17
    |
  8 |   foo, bar, baz = [[i for i in fn(x)] for x in items]
  9 |   

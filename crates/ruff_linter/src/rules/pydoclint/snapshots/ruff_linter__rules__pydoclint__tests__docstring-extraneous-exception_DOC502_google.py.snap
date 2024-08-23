@@ -1,19 +1,22 @@
 ---
 source: crates/ruff_linter/src/rules/pydoclint/mod.rs
 ---
-DOC502_google.py:16:1: DOC502 Raised exception is not explicitly raised: `FasterThanLightError`
+error[DOC502]: 16:1: Raised exception is not explicitly raised: `FasterThanLightError`
+
+  --> DOC502_google.py:15:1
    |
 14 |           Speed as distance divided by time.
 15 |   
 16 | /     Raises:
 17 | |         FasterThanLightError: If speed is greater than the speed of light.
 18 | |     """
-   | |____^ DOC502
+   | |____^
 19 |       return distance / time
    |
    = help: Remove `FasterThanLightError` from the docstring
+error[DOC502]: 33:1: Raised exceptions are not explicitly raised: `FasterThanLightError`, `DivisionByZero`
 
-DOC502_google.py:33:1: DOC502 Raised exceptions are not explicitly raised: `FasterThanLightError`, `DivisionByZero`
+  --> DOC502_google.py:32:1
    |
 31 |           Speed as distance divided by time.
 32 |   
@@ -21,12 +24,13 @@ DOC502_google.py:33:1: DOC502 Raised exceptions are not explicitly raised: `Fast
 34 | |         FasterThanLightError: If speed is greater than the speed of light.
 35 | |         DivisionByZero: Divide by zero.
 36 | |     """
-   | |____^ DOC502
+   | |____^
 37 |       return distance / time
    |
    = help: Remove `FasterThanLightError`, `DivisionByZero` from the docstring
+error[DOC502]: 51:1: Raised exception is not explicitly raised: `DivisionByZero`
 
-DOC502_google.py:51:1: DOC502 Raised exception is not explicitly raised: `DivisionByZero`
+  --> DOC502_google.py:50:1
    |
 49 |           Speed as distance divided by time.
 50 |   
@@ -34,7 +38,7 @@ DOC502_google.py:51:1: DOC502 Raised exception is not explicitly raised: `Divisi
 52 | |         FasterThanLightError: If speed is greater than the speed of light.
 53 | |         DivisionByZero: Divide by zero.
 54 | |     """
-   | |____^ DOC502
+   | |____^
 55 |       try:
 56 |           return distance / time
    |

@@ -1,8 +1,9 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_bugbear/mod.rs
 ---
-error[B035]: B035.py:17:2: Dictionary comprehension uses static key: `"key"`
+error[B035]: 17:2: Dictionary comprehension uses static key: `"key"`
 
+  --> B035.py:17:2
    |
 16 | # Errors
 17 | {"key": value.upper() for value in data}
@@ -10,8 +11,9 @@ error[B035]: B035.py:17:2: Dictionary comprehension uses static key: `"key"`
 18 | {True: value.upper() for value in data}
 19 | {0: value.upper() for value in data}
    |
-error[B035]: B035.py:18:2: Dictionary comprehension uses static key: `True`
+error[B035]: 18:2: Dictionary comprehension uses static key: `True`
 
+  --> B035.py:18:2
    |
 16 | # Errors
 17 | {"key": value.upper() for value in data}
@@ -20,8 +22,9 @@ error[B035]: B035.py:18:2: Dictionary comprehension uses static key: `True`
 19 | {0: value.upper() for value in data}
 20 | {(1, "a"): value.upper() for value in data}  # Constant tuple
    |
-error[B035]: B035.py:19:2: Dictionary comprehension uses static key: `0`
+error[B035]: 19:2: Dictionary comprehension uses static key: `0`
 
+  --> B035.py:19:2
    |
 17 | {"key": value.upper() for value in data}
 18 | {True: value.upper() for value in data}
@@ -30,8 +33,9 @@ error[B035]: B035.py:19:2: Dictionary comprehension uses static key: `0`
 20 | {(1, "a"): value.upper() for value in data}  # Constant tuple
 21 | {constant: value.upper() for value in data}
    |
-error[B035]: B035.py:20:2: Dictionary comprehension uses static key: `(1, "a")`
+error[B035]: 20:2: Dictionary comprehension uses static key: `(1, "a")`
 
+  --> B035.py:20:2
    |
 18 | {True: value.upper() for value in data}
 19 | {0: value.upper() for value in data}
@@ -40,8 +44,9 @@ error[B035]: B035.py:20:2: Dictionary comprehension uses static key: `(1, "a")`
 21 | {constant: value.upper() for value in data}
 22 | {constant + constant: value.upper() for value in data}
    |
-error[B035]: B035.py:21:2: Dictionary comprehension uses static key: `constant`
+error[B035]: 21:2: Dictionary comprehension uses static key: `constant`
 
+  --> B035.py:21:2
    |
 19 | {0: value.upper() for value in data}
 20 | {(1, "a"): value.upper() for value in data}  # Constant tuple
@@ -50,8 +55,9 @@ error[B035]: B035.py:21:2: Dictionary comprehension uses static key: `constant`
 22 | {constant + constant: value.upper() for value in data}
 23 | {constant.attribute: value.upper() for value in data}
    |
-error[B035]: B035.py:22:2: Dictionary comprehension uses static key: `constant + constant`
+error[B035]: 22:2: Dictionary comprehension uses static key: `constant + constant`
 
+  --> B035.py:22:2
    |
 20 | {(1, "a"): value.upper() for value in data}  # Constant tuple
 21 | {constant: value.upper() for value in data}
@@ -60,8 +66,9 @@ error[B035]: B035.py:22:2: Dictionary comprehension uses static key: `constant +
 23 | {constant.attribute: value.upper() for value in data}
 24 | {constant[0]: value.upper() for value in data}
    |
-error[B035]: B035.py:23:2: Dictionary comprehension uses static key: `constant.attribute`
+error[B035]: 23:2: Dictionary comprehension uses static key: `constant.attribute`
 
+  --> B035.py:23:2
    |
 21 | {constant: value.upper() for value in data}
 22 | {constant + constant: value.upper() for value in data}
@@ -70,8 +77,9 @@ error[B035]: B035.py:23:2: Dictionary comprehension uses static key: `constant.a
 24 | {constant[0]: value.upper() for value in data}
 25 | {tokens: token for token in tokens}
    |
-error[B035]: B035.py:24:2: Dictionary comprehension uses static key: `constant[0]`
+error[B035]: 24:2: Dictionary comprehension uses static key: `constant[0]`
 
+  --> B035.py:24:2
    |
 22 | {constant + constant: value.upper() for value in data}
 23 | {constant.attribute: value.upper() for value in data}
@@ -79,8 +87,9 @@ error[B035]: B035.py:24:2: Dictionary comprehension uses static key: `constant[0
    |  ^^^^^^^^^^^
 25 | {tokens: token for token in tokens}
    |
-error[B035]: B035.py:25:2: Dictionary comprehension uses static key: `tokens`
+error[B035]: 25:2: Dictionary comprehension uses static key: `tokens`
 
+  --> B035.py:25:2
    |
 23 | {constant.attribute: value.upper() for value in data}
 24 | {constant[0]: value.upper() for value in data}

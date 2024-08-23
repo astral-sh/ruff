@@ -1,8 +1,9 @@
 ---
 source: crates/ruff_linter/src/rules/pycodestyle/mod.rs
 ---
-error[E303]: E30.pyi:17:1: [*] Too many blank lines (2)
+error[E303]: 17:1: [*] Too many blank lines (2)
 
+  --> E30.pyi:17:1
    |
 17 | def grouped1(): ...
    | ^^^
@@ -19,8 +20,9 @@ error[E303]: E30.pyi:17:1: [*] Too many blank lines (2)
 18 17 | def grouped2(): ...
 19 18 | def grouped3( ): ...
 
-error[E303]: E30.pyi:22:1: [*] Too many blank lines (2)
+error[E303]: 22:1: [*] Too many blank lines (2)
 
+  --> E30.pyi:22:1
    |
 22 | class BackendProxy:
    | ^^^^^
@@ -37,8 +39,9 @@ error[E303]: E30.pyi:22:1: [*] Too many blank lines (2)
 23 22 |     backend_module: str
 24 23 |     backend_object: str | None
 
-error[E303]: E30.pyi:35:5: [*] Too many blank lines (2)
+error[E303]: 35:5: [*] Too many blank lines (2)
 
+  --> E30.pyi:35:5
    |
 35 |     def ungrouped(): ...
    |     ^^^
@@ -54,8 +57,9 @@ error[E303]: E30.pyi:35:5: [*] Too many blank lines (2)
 36 35 | a = "test"
 37 36 | 
 
-error[E303]: E30.pyi:43:1: [*] Too many blank lines (2)
+error[E303]: 43:1: [*] Too many blank lines (2)
 
+  --> E30.pyi:43:1
    |
 43 | def outer():
    | ^^^

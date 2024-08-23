@@ -1,8 +1,9 @@
 ---
 source: crates/ruff_linter/src/rules/pyflakes/mod.rs
 ---
-error[F502]: F50x.py:9:1: `%`-format string expected mapping but got sequence
+error[F502]: 9:1: `%`-format string expected mapping but got sequence
 
+  --> F50x.py:8:41
    |
  7 | '%(bar)s' % {}  # F505
  8 | '%(bar)s' % {'bar': 1, 'baz': 2}  # F504

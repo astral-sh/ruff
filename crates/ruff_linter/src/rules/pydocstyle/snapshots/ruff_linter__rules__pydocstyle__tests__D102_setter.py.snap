@@ -1,8 +1,9 @@
 ---
 source: crates/ruff_linter/src/rules/pydocstyle/mod.rs
 ---
-error[D102]: setter.py:16:9: Missing docstring in public method
+error[D102]: 16:9: Missing docstring in public method
 
+  --> setter.py:16:9
    |
 15 |     @foo
 16 |     def foo(self, value: str) -> None:

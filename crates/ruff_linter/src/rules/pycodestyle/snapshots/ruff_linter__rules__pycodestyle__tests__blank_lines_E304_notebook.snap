@@ -1,8 +1,9 @@
 ---
 source: crates/ruff_linter/src/rules/pycodestyle/mod.rs
 ---
-error[E304]: E30.ipynb:45:1: [*] Blank lines found after function decorator (1)
+error[E304]: 45:1: [*] Blank lines found after function decorator (1)
 
+  --> E30.ipynb:44:1
    |
 43 | @decorator
 44 | 

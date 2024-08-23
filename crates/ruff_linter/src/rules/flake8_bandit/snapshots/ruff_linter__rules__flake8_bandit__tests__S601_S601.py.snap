@@ -1,8 +1,9 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_bandit/mod.rs
 ---
-error[S601]: S601.py:3:1: Possible shell injection via Paramiko call; check inputs are properly sanitized
+error[S601]: 3:1: Possible shell injection via Paramiko call; check inputs are properly sanitized
 
+ --> S601.py:2:1
   |
 1 | import paramiko
 2 | 

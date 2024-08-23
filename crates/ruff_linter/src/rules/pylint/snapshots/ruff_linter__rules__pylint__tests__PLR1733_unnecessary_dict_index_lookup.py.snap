@@ -1,8 +1,9 @@
 ---
 source: crates/ruff_linter/src/rules/pylint/mod.rs
 ---
-error[PLR1733]: unnecessary_dict_index_lookup.py:4:6: [*] Unnecessary lookup of dictionary value by key
+error[PLR1733]: 4:6: [*] Unnecessary lookup of dictionary value by key
 
+ --> unnecessary_dict_index_lookup.py:4:6
   |
 3 | def fix_these():
 4 |     [FRUITS[fruit_name] for fruit_name, fruit_count in FRUITS.items()]  # PLR1733
@@ -21,8 +22,9 @@ error[PLR1733]: unnecessary_dict_index_lookup.py:4:6: [*] Unnecessary lookup of 
 6 6 |     {fruit_name: FRUITS[fruit_name] for fruit_name, fruit_count in FRUITS.items()}  # PLR1733
 7 7 | 
 
-error[PLR1733]: unnecessary_dict_index_lookup.py:5:6: [*] Unnecessary lookup of dictionary value by key
+error[PLR1733]: 5:6: [*] Unnecessary lookup of dictionary value by key
 
+ --> unnecessary_dict_index_lookup.py:5:6
   |
 3 | def fix_these():
 4 |     [FRUITS[fruit_name] for fruit_name, fruit_count in FRUITS.items()]  # PLR1733
@@ -41,8 +43,9 @@ error[PLR1733]: unnecessary_dict_index_lookup.py:5:6: [*] Unnecessary lookup of 
 7 7 | 
 8 8 |     for fruit_name, fruit_count in FRUITS.items():
 
-error[PLR1733]: unnecessary_dict_index_lookup.py:6:18: [*] Unnecessary lookup of dictionary value by key
+error[PLR1733]: 6:18: [*] Unnecessary lookup of dictionary value by key
 
+ --> unnecessary_dict_index_lookup.py:6:18
   |
 4 |     [FRUITS[fruit_name] for fruit_name, fruit_count in FRUITS.items()]  # PLR1733
 5 |     {FRUITS[fruit_name] for fruit_name, fruit_count in FRUITS.items()}  # PLR1733
@@ -62,8 +65,9 @@ error[PLR1733]: unnecessary_dict_index_lookup.py:6:18: [*] Unnecessary lookup of
 8 8 |     for fruit_name, fruit_count in FRUITS.items():
 9 9 |         print(FRUITS[fruit_name])  # PLR1733
 
-error[PLR1733]: unnecessary_dict_index_lookup.py:9:15: [*] Unnecessary lookup of dictionary value by key
+error[PLR1733]: 9:15: [*] Unnecessary lookup of dictionary value by key
 
+  --> unnecessary_dict_index_lookup.py:9:15
    |
  8 |     for fruit_name, fruit_count in FRUITS.items():
  9 |         print(FRUITS[fruit_name])  # PLR1733
@@ -82,8 +86,9 @@ error[PLR1733]: unnecessary_dict_index_lookup.py:9:15: [*] Unnecessary lookup of
 11 11 |         assert FRUITS[fruit_name] == "pear"  # PLR1733
 12 12 | 
 
-error[PLR1733]: unnecessary_dict_index_lookup.py:10:16: [*] Unnecessary lookup of dictionary value by key
+error[PLR1733]: 10:16: [*] Unnecessary lookup of dictionary value by key
 
+  --> unnecessary_dict_index_lookup.py:10:16
    |
  8 |     for fruit_name, fruit_count in FRUITS.items():
  9 |         print(FRUITS[fruit_name])  # PLR1733
@@ -102,8 +107,9 @@ error[PLR1733]: unnecessary_dict_index_lookup.py:10:16: [*] Unnecessary lookup o
 12 12 | 
 13 13 | 
 
-error[PLR1733]: unnecessary_dict_index_lookup.py:11:16: [*] Unnecessary lookup of dictionary value by key
+error[PLR1733]: 11:16: [*] Unnecessary lookup of dictionary value by key
 
+  --> unnecessary_dict_index_lookup.py:11:16
    |
  9 |         print(FRUITS[fruit_name])  # PLR1733
 10 |         blah = FRUITS[fruit_name]  # PLR1733

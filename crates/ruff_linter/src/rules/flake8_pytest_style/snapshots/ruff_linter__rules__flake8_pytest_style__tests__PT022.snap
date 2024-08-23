@@ -1,8 +1,9 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_pytest_style/mod.rs
 ---
-error[PT022]: PT022.py:17:5: [*] No teardown in fixture `error`, use `return` instead of `yield`
+error[PT022]: 17:5: [*] No teardown in fixture `error`, use `return` instead of `yield`
 
+  --> PT022.py:17:5
    |
 15 | def error():
 16 |     resource = acquire_resource()
@@ -20,8 +21,9 @@ error[PT022]: PT022.py:17:5: [*] No teardown in fixture `error`, use `return` in
 19 19 | 
 20 20 | import typing
 
-error[PT022]: PT022.py:37:5: [*] No teardown in fixture `error`, use `return` instead of `yield`
+error[PT022]: 37:5: [*] No teardown in fixture `error`, use `return` instead of `yield`
 
+  --> PT022.py:37:5
    |
 35 | def error() -> typing.Generator[typing.Any, None, None]:
 36 |     resource = acquire_resource()
@@ -42,8 +44,9 @@ error[PT022]: PT022.py:37:5: [*] No teardown in fixture `error`, use `return` in
 39 39 | 
 40 40 | @pytest.fixture()
 
-error[PT022]: PT022.py:43:5: [*] No teardown in fixture `error`, use `return` instead of `yield`
+error[PT022]: 43:5: [*] No teardown in fixture `error`, use `return` instead of `yield`
 
+  --> PT022.py:43:5
    |
 41 | def error() -> Generator[Resource, None, None]:
 42 |     resource = acquire_resource()

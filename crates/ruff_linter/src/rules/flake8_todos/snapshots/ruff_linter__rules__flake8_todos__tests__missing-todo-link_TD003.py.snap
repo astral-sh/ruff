@@ -1,16 +1,18 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_todos/mod.rs
 ---
-error[TD003]: TD003.py:9:3: Missing issue link on the line following this TODO
+error[TD003]: 9:3: Missing issue link on the line following this TODO
 
+  --> TD003.py:9:3
    |
  8 | # TDO003 - errors
  9 | # TODO: this comment has no
    |   ^^^^
 10 | # link after it
    |
-error[TD003]: TD003.py:12:3: Missing issue link on the line following this TODO
+error[TD003]: 12:3: Missing issue link on the line following this TODO
 
+  --> TD003.py:12:3
    |
 10 | # link after it
 11 | 
@@ -19,8 +21,9 @@ error[TD003]: TD003.py:12:3: Missing issue link on the line following this TODO
 13 | def foo(x):
 14 |     return x
    |
-error[TD003]: TD003.py:25:3: Missing issue link on the line following this TODO
+error[TD003]: 25:3: Missing issue link on the line following this TODO
 
+  --> TD003.py:25:3
    |
 23 | # TDO-3870
 24 | 
@@ -29,8 +32,9 @@ error[TD003]: TD003.py:25:3: Missing issue link on the line following this TODO
 26 | # TODO: followed by a new TODO with an issue link
 27 | # TDO-3870
    |
-error[TD003]: TD003.py:29:9: Missing issue link on the line following this TODO
+error[TD003]: 29:9: Missing issue link on the line following this TODO
 
+  --> TD003.py:29:9
    |
 27 | # TDO-3870
 28 | 
@@ -39,8 +43,9 @@ error[TD003]: TD003.py:29:9: Missing issue link on the line following this TODO
 30 | 
 31 | # TODO: here's a TODO on the last line with no link
    |
-error[TD003]: TD003.py:31:3: Missing issue link on the line following this TODO
+error[TD003]: 31:3: Missing issue link on the line following this TODO
 
+  --> TD003.py:31:3
    |
 29 | # foo # TODO: no link!
 30 | 

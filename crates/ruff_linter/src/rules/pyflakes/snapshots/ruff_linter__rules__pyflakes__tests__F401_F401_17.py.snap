@@ -1,8 +1,9 @@
 ---
 source: crates/ruff_linter/src/rules/pyflakes/mod.rs
 ---
-error[F401]: F401_17.py:12:27: [*] `threading.Thread` imported but unused
+error[F401]: 12:27: [*] `threading.Thread` imported but unused
 
+  --> F401_17.py:12:27
    |
 11 | def fn(thread: Thread):
 12 |     from threading import Thread
@@ -20,8 +21,9 @@ error[F401]: F401_17.py:12:27: [*] `threading.Thread` imported but unused
 14 13 |     # The `Thread` on the left-hand side should resolve to the `Thread` imported at the
 15 14 |     # top level.
 
-error[F401]: F401_17.py:20:27: [*] `threading.Thread` imported but unused
+error[F401]: 20:27: [*] `threading.Thread` imported but unused
 
+  --> F401_17.py:20:27
    |
 19 | def fn(thread: Thread):
 20 |     from threading import Thread

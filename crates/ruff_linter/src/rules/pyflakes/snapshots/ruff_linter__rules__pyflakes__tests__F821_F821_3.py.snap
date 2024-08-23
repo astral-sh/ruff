@@ -1,8 +1,9 @@
 ---
 source: crates/ruff_linter/src/rules/pyflakes/mod.rs
 ---
-error[F821]: F821_3.py:11:10: Undefined name `key`
+error[F821]: 11:10: Undefined name `key`
 
+  --> F821_3.py:11:10
    |
  9 | # F821 Undefined name `key`
 10 | # F821 Undefined name `value`
@@ -11,8 +12,9 @@ error[F821]: F821_3.py:11:10: Undefined name `key`
 12 | 
 13 | # OK
    |
-error[F821]: F821_3.py:11:17: Undefined name `value`
+error[F821]: 11:17: Undefined name `value`
 
+  --> F821_3.py:11:17
    |
  9 | # F821 Undefined name `key`
 10 | # F821 Undefined name `value`

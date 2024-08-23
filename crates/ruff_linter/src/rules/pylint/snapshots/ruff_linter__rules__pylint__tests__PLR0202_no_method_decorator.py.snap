@@ -1,8 +1,9 @@
 ---
 source: crates/ruff_linter/src/rules/pylint/mod.rs
 ---
-error[PLR0202]: no_method_decorator.py:9:5: [*] Class method defined without decorator
+error[PLR0202]: 9:5: [*] Class method defined without decorator
 
+  --> no_method_decorator.py:9:5
    |
  7 |         self.color = color
  8 | 
@@ -26,8 +27,9 @@ error[PLR0202]: no_method_decorator.py:9:5: [*] Class method defined without dec
 15 15 |     def pick_one_color():  # [no-staticmethod-decorator]
 16 16 |         """staticmethod to pick one fruit color"""
 
-error[PLR0202]: no_method_decorator.py:22:5: [*] Class method defined without decorator
+error[PLR0202]: 22:5: [*] Class method defined without decorator
 
+  --> no_method_decorator.py:22:5
    |
 21 | class Class:
 22 |     def class_method(cls):

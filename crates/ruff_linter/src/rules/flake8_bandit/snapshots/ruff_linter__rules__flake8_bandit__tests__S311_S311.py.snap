@@ -1,8 +1,9 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_bandit/mod.rs
 ---
-error[S311]: S311.py:10:1: Standard pseudo-random generators are not suitable for cryptographic purposes
+error[S311]: 10:1: Standard pseudo-random generators are not suitable for cryptographic purposes
 
+  --> S311.py:9:9
    |
  9 | # Errors
 10 | random.Random()
@@ -10,8 +11,9 @@ error[S311]: S311.py:10:1: Standard pseudo-random generators are not suitable fo
 11 | random.random()
 12 | random.randrange()
    |
-error[S311]: S311.py:11:1: Standard pseudo-random generators are not suitable for cryptographic purposes
+error[S311]: 11:1: Standard pseudo-random generators are not suitable for cryptographic purposes
 
+  --> S311.py:10:16
    |
  9 | # Errors
 10 | random.Random()
@@ -20,8 +22,9 @@ error[S311]: S311.py:11:1: Standard pseudo-random generators are not suitable fo
 12 | random.randrange()
 13 | random.randint()
    |
-error[S311]: S311.py:12:1: Standard pseudo-random generators are not suitable for cryptographic purposes
+error[S311]: 12:1: Standard pseudo-random generators are not suitable for cryptographic purposes
 
+  --> S311.py:11:16
    |
 10 | random.Random()
 11 | random.random()
@@ -30,8 +33,9 @@ error[S311]: S311.py:12:1: Standard pseudo-random generators are not suitable fo
 13 | random.randint()
 14 | random.choice()
    |
-error[S311]: S311.py:13:1: Standard pseudo-random generators are not suitable for cryptographic purposes
+error[S311]: 13:1: Standard pseudo-random generators are not suitable for cryptographic purposes
 
+  --> S311.py:12:19
    |
 11 | random.random()
 12 | random.randrange()
@@ -40,8 +44,9 @@ error[S311]: S311.py:13:1: Standard pseudo-random generators are not suitable fo
 14 | random.choice()
 15 | random.choices()
    |
-error[S311]: S311.py:14:1: Standard pseudo-random generators are not suitable for cryptographic purposes
+error[S311]: 14:1: Standard pseudo-random generators are not suitable for cryptographic purposes
 
+  --> S311.py:13:17
    |
 12 | random.randrange()
 13 | random.randint()
@@ -50,8 +55,9 @@ error[S311]: S311.py:14:1: Standard pseudo-random generators are not suitable fo
 15 | random.choices()
 16 | random.uniform()
    |
-error[S311]: S311.py:15:1: Standard pseudo-random generators are not suitable for cryptographic purposes
+error[S311]: 15:1: Standard pseudo-random generators are not suitable for cryptographic purposes
 
+  --> S311.py:14:16
    |
 13 | random.randint()
 14 | random.choice()
@@ -60,8 +66,9 @@ error[S311]: S311.py:15:1: Standard pseudo-random generators are not suitable fo
 16 | random.uniform()
 17 | random.triangular()
    |
-error[S311]: S311.py:16:1: Standard pseudo-random generators are not suitable for cryptographic purposes
+error[S311]: 16:1: Standard pseudo-random generators are not suitable for cryptographic purposes
 
+  --> S311.py:15:17
    |
 14 | random.choice()
 15 | random.choices()
@@ -70,8 +77,9 @@ error[S311]: S311.py:16:1: Standard pseudo-random generators are not suitable fo
 17 | random.triangular()
 18 | random.randbytes()
    |
-error[S311]: S311.py:17:1: Standard pseudo-random generators are not suitable for cryptographic purposes
+error[S311]: 17:1: Standard pseudo-random generators are not suitable for cryptographic purposes
 
+  --> S311.py:16:17
    |
 15 | random.choices()
 16 | random.uniform()
@@ -79,8 +87,9 @@ error[S311]: S311.py:17:1: Standard pseudo-random generators are not suitable fo
    | ^^^^^^^^^^^^^^^^^^^
 18 | random.randbytes()
    |
-error[S311]: S311.py:18:1: Standard pseudo-random generators are not suitable for cryptographic purposes
+error[S311]: 18:1: Standard pseudo-random generators are not suitable for cryptographic purposes
 
+  --> S311.py:17:20
    |
 16 | random.uniform()
 17 | random.triangular()

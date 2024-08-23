@@ -1,8 +1,9 @@
 ---
 source: crates/ruff_linter/src/rules/pyflakes/mod.rs
 ---
-error[F402]: F402.ipynb:3:5: Import `os` from cell 1, line 1 shadowed by loop variable
+error[F402]: 3:5: Import `os` from cell 1, line 1 shadowed by loop variable
 
+ --> F402.ipynb:3:5
   |
 1 | import os
 2 | import os.path as path
@@ -11,8 +12,9 @@ error[F402]: F402.ipynb:3:5: Import `os` from cell 1, line 1 shadowed by loop va
 4 |     pass
 5 | for path in range(3):
   |
-error[F402]: F402.ipynb:5:5: Import `path` from cell 1, line 2 shadowed by loop variable
+error[F402]: 5:5: Import `path` from cell 1, line 2 shadowed by loop variable
 
+ --> F402.ipynb:5:5
   |
 3 | for os in range(3):
 4 |     pass

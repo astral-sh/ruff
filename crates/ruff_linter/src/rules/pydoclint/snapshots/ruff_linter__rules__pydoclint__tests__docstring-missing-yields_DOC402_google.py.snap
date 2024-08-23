@@ -1,40 +1,45 @@
 ---
 source: crates/ruff_linter/src/rules/pydoclint/mod.rs
 ---
-DOC402_google.py:9:5: DOC402 `yield` is not documented in docstring
+error[DOC402]: 9:5: `yield` is not documented in docstring
+
+ --> DOC402_google.py:9:5
   |
 7 |         num (int): A number
 8 |     """
 9 |     yield 'test'
-  |     ^^^^^^^^^^^^ DOC402
+  |     ^^^^^^^^^^^^
   |
   = help: Add a "Yields" section to the docstring
+error[DOC402]: 50:9: `yield` is not documented in docstring
 
-DOC402_google.py:50:9: DOC402 `yield` is not documented in docstring
+  --> DOC402_google.py:50:9
    |
 48 |             num (int): A number
 49 |         """
 50 |         yield 'test'
-   |         ^^^^^^^^^^^^ DOC402
+   |         ^^^^^^^^^^^^
    |
    = help: Add a "Yields" section to the docstring
+error[DOC402]: 59:9: `yield` is not documented in docstring
 
-DOC402_google.py:59:9: DOC402 `yield` is not documented in docstring
+  --> DOC402_google.py:59:9
    |
 57 |     def nested():
 58 |         """Do something nested."""
 59 |         yield 5
-   |         ^^^^^^^ DOC402
+   |         ^^^^^^^
 60 | 
 61 |     print("I never yield")
    |
    = help: Add a "Yields" section to the docstring
+error[DOC402]: 67:5: `yield` is not documented in docstring
 
-DOC402_google.py:67:5: DOC402 `yield` is not documented in docstring
+  --> DOC402_google.py:67:5
    |
 65 | def test():
 66 |     """Do something."""
 67 |     yield from range(10)
-   |     ^^^^^^^^^^^^^^^^^^^^ DOC402
+   |     ^^^^^^^^^^^^^^^^^^^^
    |
    = help: Add a "Yields" section to the docstring

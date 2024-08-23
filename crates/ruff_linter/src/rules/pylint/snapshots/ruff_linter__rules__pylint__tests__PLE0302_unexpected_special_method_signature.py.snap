@@ -1,8 +1,9 @@
 ---
 source: crates/ruff_linter/src/rules/pylint/mod.rs
 ---
-error[PLE0302]: unexpected_special_method_signature.py:5:9: The special method `__bool__` expects 1 parameter, 2 were given
+error[PLE0302]: 5:9: The special method `__bool__` expects 1 parameter, 2 were given
 
+ --> unexpected_special_method_signature.py:5:9
   |
 3 |         ...
 4 | 
@@ -10,16 +11,18 @@ error[PLE0302]: unexpected_special_method_signature.py:5:9: The special method `
   |         ^^^^^^^^
 6 |         ...
   |
-error[PLE0302]: unexpected_special_method_signature.py:19:9: The special method `__bool__` expects 0 parameters, 1 was given
+error[PLE0302]: 19:9: The special method `__bool__` expects 0 parameters, 1 was given
 
+  --> unexpected_special_method_signature.py:19:9
    |
 18 |     @staticmethod
 19 |     def __bool__(x):  # too many mandatory args
    |         ^^^^^^^^
 20 |         ...
    |
-error[PLE0302]: unexpected_special_method_signature.py:32:9: The special method `__eq__` expects 2 parameters, 1 was given
+error[PLE0302]: 32:9: The special method `__eq__` expects 2 parameters, 1 was given
 
+  --> unexpected_special_method_signature.py:32:9
    |
 30 |         ...
 31 | 
@@ -27,8 +30,9 @@ error[PLE0302]: unexpected_special_method_signature.py:32:9: The special method 
    |         ^^^^^^
 33 |         ...
    |
-error[PLE0302]: unexpected_special_method_signature.py:35:9: The special method `__eq__` expects 2 parameters, 3 were given
+error[PLE0302]: 35:9: The special method `__eq__` expects 2 parameters, 3 were given
 
+  --> unexpected_special_method_signature.py:35:9
    |
 33 |         ...
 34 | 
@@ -36,8 +40,9 @@ error[PLE0302]: unexpected_special_method_signature.py:35:9: The special method 
    |         ^^^^^^
 36 |         ...
    |
-error[PLE0302]: unexpected_special_method_signature.py:44:9: The special method `__round__` expects between 1 and 2 parameters, 3 were given
+error[PLE0302]: 44:9: The special method `__round__` expects between 1 and 2 parameters, 3 were given
 
+  --> unexpected_special_method_signature.py:44:9
    |
 42 |         ...
 43 | 
@@ -45,8 +50,9 @@ error[PLE0302]: unexpected_special_method_signature.py:44:9: The special method 
    |         ^^^^^^^^^
 45 |         ...
    |
-error[PLE0302]: unexpected_special_method_signature.py:47:9: The special method `__round__` expects between 1 and 2 parameters, 4 were given
+error[PLE0302]: 47:9: The special method `__round__` expects between 1 and 2 parameters, 4 were given
 
+  --> unexpected_special_method_signature.py:47:9
    |
 45 |         ...
 46 | 
@@ -54,8 +60,9 @@ error[PLE0302]: unexpected_special_method_signature.py:47:9: The special method 
    |         ^^^^^^^^^
 48 |         ...
    |
-error[PLE0302]: unexpected_special_method_signature.py:56:9: The special method `__eq__` expects 2 parameters, 3 were given
+error[PLE0302]: 56:9: The special method `__eq__` expects 2 parameters, 3 were given
 
+  --> unexpected_special_method_signature.py:56:9
    |
 54 |         ...
 55 | 
@@ -63,8 +70,9 @@ error[PLE0302]: unexpected_special_method_signature.py:56:9: The special method 
    |         ^^^^^^
 57 |         ...
    |
-error[PLE0302]: unexpected_special_method_signature.py:65:9: The special method `__round__` expects between 1 and 2 parameters, 3 were given
+error[PLE0302]: 65:9: The special method `__round__` expects between 1 and 2 parameters, 3 were given
 
+  --> unexpected_special_method_signature.py:65:9
    |
 63 |         ...
 64 | 

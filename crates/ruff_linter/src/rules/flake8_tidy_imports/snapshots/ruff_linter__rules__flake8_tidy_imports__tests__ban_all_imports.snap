@@ -1,8 +1,9 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_tidy_imports/mod.rs
 ---
-error[TID252]: TID252.py:7:1: Prefer absolute imports over relative imports
+error[TID252]: 7:1: Prefer absolute imports over relative imports
 
+ --> TID252.py:6:9
   |
 6 | # TID252
 7 | from . import sibling
@@ -11,8 +12,9 @@ error[TID252]: TID252.py:7:1: Prefer absolute imports over relative imports
 9 | from .. import parent
   |
   = help: Replace relative imports with absolute imports
-error[TID252]: TID252.py:8:1: Prefer absolute imports over relative imports
+error[TID252]: 8:1: Prefer absolute imports over relative imports
 
+  --> TID252.py:7:22
    |
  6 | # TID252
  7 | from . import sibling
@@ -22,8 +24,9 @@ error[TID252]: TID252.py:8:1: Prefer absolute imports over relative imports
 10 | from ..parent import example
    |
    = help: Replace relative imports with absolute imports
-error[TID252]: TID252.py:9:1: Prefer absolute imports over relative imports
+error[TID252]: 9:1: Prefer absolute imports over relative imports
 
+  --> TID252.py:8:29
    |
  7 | from . import sibling
  8 | from .sibling import example
@@ -33,8 +36,9 @@ error[TID252]: TID252.py:9:1: Prefer absolute imports over relative imports
 11 | from ... import grandparent
    |
    = help: Replace relative imports with absolute imports
-error[TID252]: TID252.py:10:1: Prefer absolute imports over relative imports
+error[TID252]: 10:1: Prefer absolute imports over relative imports
 
+  --> TID252.py:9:22
    |
  8 | from .sibling import example
  9 | from .. import parent
@@ -44,8 +48,9 @@ error[TID252]: TID252.py:10:1: Prefer absolute imports over relative imports
 12 | from ...grandparent import example
    |
    = help: Replace relative imports with absolute imports
-error[TID252]: TID252.py:11:1: Prefer absolute imports over relative imports
+error[TID252]: 11:1: Prefer absolute imports over relative imports
 
+  --> TID252.py:10:29
    |
  9 | from .. import parent
 10 | from ..parent import example
@@ -55,8 +60,9 @@ error[TID252]: TID252.py:11:1: Prefer absolute imports over relative imports
 13 | from  .parent import hello
    |
    = help: Replace relative imports with absolute imports
-error[TID252]: TID252.py:12:1: Prefer absolute imports over relative imports
+error[TID252]: 12:1: Prefer absolute imports over relative imports
 
+  --> TID252.py:11:28
    |
 10 | from ..parent import example
 11 | from ... import grandparent
@@ -66,8 +72,9 @@ error[TID252]: TID252.py:12:1: Prefer absolute imports over relative imports
 14 | from .\
    |
    = help: Replace relative imports with absolute imports
-error[TID252]: TID252.py:13:1: Prefer absolute imports over relative imports
+error[TID252]: 13:1: Prefer absolute imports over relative imports
 
+  --> TID252.py:12:35
    |
 11 | from ... import grandparent
 12 | from ...grandparent import example
@@ -77,8 +84,9 @@ error[TID252]: TID252.py:13:1: Prefer absolute imports over relative imports
 15 |     parent import \
    |
    = help: Replace relative imports with absolute imports
-error[TID252]: TID252.py:14:1: Prefer absolute imports over relative imports
+error[TID252]: 14:1: Prefer absolute imports over relative imports
 
+  --> TID252.py:13:27
    |
 12 |   from ...grandparent import example
 13 |   from  .parent import hello
@@ -90,8 +98,9 @@ error[TID252]: TID252.py:14:1: Prefer absolute imports over relative imports
 18 |       ..parent\
    |
    = help: Replace relative imports with absolute imports
-error[TID252]: TID252.py:17:1: Prefer absolute imports over relative imports
+error[TID252]: 17:1: Prefer absolute imports over relative imports
 
+  --> TID252.py:16:20
    |
 15 |       parent import \
 16 |           hello_world
@@ -104,8 +113,9 @@ error[TID252]: TID252.py:17:1: Prefer absolute imports over relative imports
 22 |   from ...... import ultragrantparent
    |
    = help: Replace relative imports with absolute imports
-error[TID252]: TID252.py:21:1: Prefer absolute imports over relative imports
+error[TID252]: 21:1: Prefer absolute imports over relative imports
 
+  --> TID252.py:20:16
    |
 19 |     import \
 20 |     world_hello
@@ -115,8 +125,9 @@ error[TID252]: TID252.py:21:1: Prefer absolute imports over relative imports
 23 | from ....... import ultragrantparent
    |
    = help: Replace relative imports with absolute imports
-error[TID252]: TID252.py:22:1: Prefer absolute imports over relative imports
+error[TID252]: 22:1: Prefer absolute imports over relative imports
 
+  --> TID252.py:21:35
    |
 20 |     world_hello
 21 | from ..... import ultragrantparent
@@ -126,8 +137,9 @@ error[TID252]: TID252.py:22:1: Prefer absolute imports over relative imports
 24 | from ......... import ultragrantparent
    |
    = help: Replace relative imports with absolute imports
-error[TID252]: TID252.py:23:1: Prefer absolute imports over relative imports
+error[TID252]: 23:1: Prefer absolute imports over relative imports
 
+  --> TID252.py:22:36
    |
 21 | from ..... import ultragrantparent
 22 | from ...... import ultragrantparent
@@ -137,8 +149,9 @@ error[TID252]: TID252.py:23:1: Prefer absolute imports over relative imports
 25 | from ........................... import ultragrantparent
    |
    = help: Replace relative imports with absolute imports
-error[TID252]: TID252.py:24:1: Prefer absolute imports over relative imports
+error[TID252]: 24:1: Prefer absolute imports over relative imports
 
+  --> TID252.py:23:37
    |
 22 | from ...... import ultragrantparent
 23 | from ....... import ultragrantparent
@@ -148,8 +161,9 @@ error[TID252]: TID252.py:24:1: Prefer absolute imports over relative imports
 26 | from .....parent import ultragrantparent
    |
    = help: Replace relative imports with absolute imports
-error[TID252]: TID252.py:25:1: Prefer absolute imports over relative imports
+error[TID252]: 25:1: Prefer absolute imports over relative imports
 
+  --> TID252.py:24:39
    |
 23 | from ....... import ultragrantparent
 24 | from ......... import ultragrantparent
@@ -159,8 +173,9 @@ error[TID252]: TID252.py:25:1: Prefer absolute imports over relative imports
 27 | from .........parent import ultragrantparent
    |
    = help: Replace relative imports with absolute imports
-error[TID252]: TID252.py:26:1: Prefer absolute imports over relative imports
+error[TID252]: 26:1: Prefer absolute imports over relative imports
 
+  --> TID252.py:25:57
    |
 24 | from ......... import ultragrantparent
 25 | from ........................... import ultragrantparent
@@ -170,8 +185,9 @@ error[TID252]: TID252.py:26:1: Prefer absolute imports over relative imports
 28 | from ...........................parent import ultragrantparent
    |
    = help: Replace relative imports with absolute imports
-error[TID252]: TID252.py:27:1: Prefer absolute imports over relative imports
+error[TID252]: 27:1: Prefer absolute imports over relative imports
 
+  --> TID252.py:26:41
    |
 25 | from ........................... import ultragrantparent
 26 | from .....parent import ultragrantparent
@@ -180,8 +196,9 @@ error[TID252]: TID252.py:27:1: Prefer absolute imports over relative imports
 28 | from ...........................parent import ultragrantparent
    |
    = help: Replace relative imports with absolute imports
-error[TID252]: TID252.py:28:1: Prefer absolute imports over relative imports
+error[TID252]: 28:1: Prefer absolute imports over relative imports
 
+  --> TID252.py:27:45
    |
 26 | from .....parent import ultragrantparent
 27 | from .........parent import ultragrantparent

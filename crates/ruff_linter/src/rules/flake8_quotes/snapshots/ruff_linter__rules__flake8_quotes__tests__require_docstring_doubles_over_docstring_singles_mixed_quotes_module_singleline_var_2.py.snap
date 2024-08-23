@@ -1,8 +1,9 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_quotes/mod.rs
 ---
-error[Q002]: docstring_singles_mixed_quotes_module_singleline_var_2.py:1:1: [*] Single quote docstring found but double quotes preferred
+error[Q002]: 1:1: [*] Single quote docstring found but double quotes preferred
 
+ --> docstring_singles_mixed_quotes_module_singleline_var_2.py:1:1
   |
 1 | 'Do not'" start with empty string" ' and lint docstring safely'
   | ^^^^^^^^
@@ -17,8 +18,9 @@ error[Q002]: docstring_singles_mixed_quotes_module_singleline_var_2.py:1:1: [*] 
 3 3 | def foo():
 4 4 |     pass
 
-error[Q002]: docstring_singles_mixed_quotes_module_singleline_var_2.py:1:36: [*] Single quote docstring found but double quotes preferred
+error[Q002]: 1:36: [*] Single quote docstring found but double quotes preferred
 
+ --> docstring_singles_mixed_quotes_module_singleline_var_2.py:1:36
   |
 1 | 'Do not'" start with empty string" ' and lint docstring safely'
   |                                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -33,8 +35,9 @@ error[Q002]: docstring_singles_mixed_quotes_module_singleline_var_2.py:1:36: [*]
 3 3 | def foo():
 4 4 |     pass
 
-error[Q001]: docstring_singles_mixed_quotes_module_singleline_var_2.py:5:1: [*] Double quote multiline found but single quotes preferred
+error[Q001]: 5:1: [*] Double quote multiline found but single quotes preferred
 
+ --> docstring_singles_mixed_quotes_module_singleline_var_2.py:4:9
   |
 3 | def foo():
 4 |     pass

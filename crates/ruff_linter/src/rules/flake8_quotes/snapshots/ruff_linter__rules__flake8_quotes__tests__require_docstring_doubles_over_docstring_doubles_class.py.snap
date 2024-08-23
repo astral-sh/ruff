@@ -1,8 +1,9 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_quotes/mod.rs
 ---
-error[Q001]: docstring_doubles_class.py:3:5: [*] Double quote multiline found but single quotes preferred
+error[Q001]: 3:5: [*] Double quote multiline found but single quotes preferred
 
+ --> docstring_doubles_class.py:3:5
   |
 1 | class SingleLineDocstrings():
 2 |     """ Double quotes single line class docstring """
@@ -21,8 +22,9 @@ error[Q001]: docstring_doubles_class.py:3:5: [*] Double quote multiline found bu
 5 5 |     def foo(self, bar="""not a docstring"""):
 6 6 |         """ Double quotes single line method docstring"""
 
-error[Q001]: docstring_doubles_class.py:5:23: [*] Double quote multiline found but single quotes preferred
+error[Q001]: 5:23: [*] Double quote multiline found but single quotes preferred
 
+ --> docstring_doubles_class.py:5:23
   |
 3 |     """ Not a docstring """
 4 | 

@@ -1,15 +1,17 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_bandit/mod.rs
 ---
-error[S401]: S401.py:1:8: `telnetlib` and related modules are considered insecure. Use SSH or another encrypted protocol.
+error[S401]: 1:8: `telnetlib` and related modules are considered insecure. Use SSH or another encrypted protocol.
 
+ --> S401.py:1:8
   |
 1 | import telnetlib  # S401
   |        ^^^^^^^^^
 2 | from telnetlib import Telnet  # S401
   |
-error[S401]: S401.py:2:6: `telnetlib` and related modules are considered insecure. Use SSH or another encrypted protocol.
+error[S401]: 2:6: `telnetlib` and related modules are considered insecure. Use SSH or another encrypted protocol.
 
+ --> S401.py:2:6
   |
 1 | import telnetlib  # S401
 2 | from telnetlib import Telnet  # S401

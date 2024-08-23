@@ -1,24 +1,27 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_django/mod.rs
 ---
-error[DJ012]: DJ012.py:28:5: Order of model's inner classes, methods, and fields does not follow the Django Style Guide: field declaration should come before `Meta` class
+error[DJ012]: 28:5: Order of model's inner classes, methods, and fields does not follow the Django Style Guide: field declaration should come before `Meta` class
 
+  --> DJ012.py:28:5
    |
 26 |         return "foobar"
 27 | 
 28 |     first_name = models.CharField(max_length=32)
    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
    |
-error[DJ012]: DJ012.py:43:5: Order of model's inner classes, methods, and fields does not follow the Django Style Guide: field declaration should come before manager declaration
+error[DJ012]: 43:5: Order of model's inner classes, methods, and fields does not follow the Django Style Guide: field declaration should come before manager declaration
 
+  --> DJ012.py:43:5
    |
 41 |         return "foobar"
 42 | 
 43 |     first_name = models.CharField(max_length=32)
    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
    |
-error[DJ012]: DJ012.py:56:5: Order of model's inner classes, methods, and fields does not follow the Django Style Guide: `__str__` method should come before custom method
+error[DJ012]: 56:5: Order of model's inner classes, methods, and fields does not follow the Django Style Guide: `__str__` method should come before custom method
 
+  --> DJ012.py:56:5
    |
 54 |           pass
 55 |   
@@ -27,8 +30,9 @@ error[DJ012]: DJ012.py:56:5: Order of model's inner classes, methods, and fields
 57 | |         return "foobar"
    | |_______________________^
    |
-error[DJ012]: DJ012.py:69:5: Order of model's inner classes, methods, and fields does not follow the Django Style Guide: `save` method should come before `get_absolute_url` method
+error[DJ012]: 69:5: Order of model's inner classes, methods, and fields does not follow the Django Style Guide: `save` method should come before `get_absolute_url` method
 
+  --> DJ012.py:69:5
    |
 67 |           pass
 68 |   
@@ -37,8 +41,9 @@ error[DJ012]: DJ012.py:69:5: Order of model's inner classes, methods, and fields
 70 | |         pass
    | |____________^
    |
-error[DJ012]: DJ012.py:123:5: Order of model's inner classes, methods, and fields does not follow the Django Style Guide: field declaration should come before `Meta` class
+error[DJ012]: 123:5: Order of model's inner classes, methods, and fields does not follow the Django Style Guide: field declaration should come before `Meta` class
 
+   --> DJ012.py:123:5
     |
 121 |         verbose_name = "test"
 122 | 
@@ -46,16 +51,18 @@ error[DJ012]: DJ012.py:123:5: Order of model's inner classes, methods, and field
     |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 124 |     last_name = models.CharField(max_length=32)
     |
-error[DJ012]: DJ012.py:129:5: Order of model's inner classes, methods, and fields does not follow the Django Style Guide: field declaration should come before `Meta` class
+error[DJ012]: 129:5: Order of model's inner classes, methods, and fields does not follow the Django Style Guide: field declaration should come before `Meta` class
 
+   --> DJ012.py:129:5
     |
 127 |         pass
 128 | 
 129 |     middle_name = models.CharField(max_length=32)
     |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
     |
-error[DJ012]: DJ012.py:146:5: Order of model's inner classes, methods, and fields does not follow the Django Style Guide: field declaration should come before `Meta` class
+error[DJ012]: 146:5: Order of model's inner classes, methods, and fields does not follow the Django Style Guide: field declaration should come before `Meta` class
 
+   --> DJ012.py:146:5
     |
 144 |         return "foobar"
 145 | 

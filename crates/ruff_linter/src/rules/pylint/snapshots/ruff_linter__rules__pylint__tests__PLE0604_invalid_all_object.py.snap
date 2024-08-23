@@ -1,16 +1,18 @@
 ---
 source: crates/ruff_linter/src/rules/pylint/mod.rs
 ---
-error[PLE0604]: invalid_all_object.py:1:1: Invalid object in `__all__`, must contain only strings
+error[PLE0604]: 1:1: Invalid object in `__all__`, must contain only strings
 
+ --> invalid_all_object.py:1:1
   |
 1 | __all__ = (
   | ^^^^^^^
 2 |     None,  # [invalid-all-object]
 3 |     Fruit,
   |
-error[PLE0604]: invalid_all_object.py:7:1: Invalid object in `__all__`, must contain only strings
+error[PLE0604]: 7:1: Invalid object in `__all__`, must contain only strings
 
+ --> invalid_all_object.py:6:1
   |
 5 | )
 6 | 

@@ -1,8 +1,9 @@
 ---
 source: crates/ruff_linter/src/rules/isort/mod.rs
 ---
-error[I001]: add_newline_before_comments.py:1:1: [*] Import block is un-sorted or un-formatted
+error[I001]: 1:1: [*] Import block is un-sorted or un-formatted
 
+ --> add_newline_before_comments.py:1:1
   |
 1 | / import os
 2 | | # This is a comment in the same section, so we need to add one newline.
@@ -11,6 +12,7 @@ error[I001]: add_newline_before_comments.py:1:1: [*] Import block is un-sorted o
 5 | | # This is a comment, but it starts a new section, so we don't need to add a newline
 6 | | # before it.
 7 | | import leading_prefix
+  | |______________________^
   |
   = help: Organize imports
 ℹ Safe fix

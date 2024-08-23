@@ -1,16 +1,18 @@
 ---
 source: crates/ruff_linter/src/rules/pylint/mod.rs
 ---
-error[PLR6301]: no_self_use.py:7:9: Method `developer_greeting` could be a function, class method, or static method
+error[PLR6301]: 7:9: Method `developer_greeting` could be a function, class method, or static method
 
+ --> no_self_use.py:7:9
   |
 6 | class Person:
 7 |     def developer_greeting(self, name):  # [no-self-use]
   |         ^^^^^^^^^^^^^^^^^^
 8 |         print(f"Greetings {name}!")
   |
-error[PLR6301]: no_self_use.py:10:9: Method `greeting_1` could be a function, class method, or static method
+error[PLR6301]: 10:9: Method `greeting_1` could be a function, class method, or static method
 
+  --> no_self_use.py:10:9
    |
  8 |         print(f"Greetings {name}!")
  9 | 
@@ -18,8 +20,9 @@ error[PLR6301]: no_self_use.py:10:9: Method `greeting_1` could be a function, cl
    |         ^^^^^^^^^^
 11 |         print("Hello!")
    |
-error[PLR6301]: no_self_use.py:13:9: Method `greeting_2` could be a function, class method, or static method
+error[PLR6301]: 13:9: Method `greeting_2` could be a function, class method, or static method
 
+  --> no_self_use.py:13:9
    |
 11 |         print("Hello!")
 12 | 

@@ -1,8 +1,9 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_type_checking/mod.rs
 ---
-error[TCH005]: TCH005.py:4:5: [*] Found empty type-checking block
+error[TCH005]: 4:5: [*] Found empty type-checking block
 
+ --> TCH005.py:4:5
   |
 3 | if TYPE_CHECKING:
 4 |     pass  # TCH005
@@ -18,8 +19,9 @@ error[TCH005]: TCH005.py:4:5: [*] Found empty type-checking block
 6 4 | 
 7 5 | if False:
 
-error[TCH005]: TCH005.py:8:5: [*] Found empty type-checking block
+error[TCH005]: 8:5: [*] Found empty type-checking block
 
+  --> TCH005.py:8:5
    |
  7 | if False:
  8 |     pass  # TCH005
@@ -38,8 +40,9 @@ error[TCH005]: TCH005.py:8:5: [*] Found empty type-checking block
 10 8 | if 0:
 11 9 |     pass  # TCH005
 
-error[TCH005]: TCH005.py:11:5: [*] Found empty type-checking block
+error[TCH005]: 11:5: [*] Found empty type-checking block
 
+  --> TCH005.py:11:5
    |
 10 | if 0:
 11 |     pass  # TCH005
@@ -56,8 +59,9 @@ error[TCH005]: TCH005.py:11:5: [*] Found empty type-checking block
 13 11 | 
 14 12 | def example():
 
-error[TCH005]: TCH005.py:16:9: [*] Found empty type-checking block
+error[TCH005]: 16:9: [*] Found empty type-checking block
 
+  --> TCH005.py:16:9
    |
 14 | def example():
 15 |     if TYPE_CHECKING:
@@ -76,8 +80,9 @@ error[TCH005]: TCH005.py:16:9: [*] Found empty type-checking block
 18 16 | 
 19 17 | 
 
-error[TCH005]: TCH005.py:22:9: [*] Found empty type-checking block
+error[TCH005]: 22:9: [*] Found empty type-checking block
 
+  --> TCH005.py:22:9
    |
 20 | class Test:
 21 |     if TYPE_CHECKING:
@@ -96,8 +101,9 @@ error[TCH005]: TCH005.py:22:9: [*] Found empty type-checking block
 24 22 | 
 25 23 | 
 
-error[TCH005]: TCH005.py:45:5: [*] Found empty type-checking block
+error[TCH005]: 45:5: [*] Found empty type-checking block
 
+  --> TCH005.py:45:5
    |
 44 | if TYPE_CHECKING:
 45 |     pass  # TCH005

@@ -1,8 +1,9 @@
 ---
 source: crates/ruff_linter/src/rules/isort/mod.rs
 ---
-error[I001]: leading_prefix.py:1:8: Import block is un-sorted or un-formatted
+error[I001]: 1:8: Import block is un-sorted or un-formatted
 
+ --> leading_prefix.py:1:8
   |
 1 |   x = 1; import sys
   |  ________^
@@ -12,8 +13,9 @@ error[I001]: leading_prefix.py:1:8: Import block is un-sorted or un-formatted
 4 |   if True:
   |
   = help: Organize imports
-error[I001]: leading_prefix.py:5:12: Import block is un-sorted or un-formatted
+error[I001]: 5:12: Import block is un-sorted or un-formatted
 
+ --> leading_prefix.py:5:12
   |
 4 |   if True:
 5 |       x = 1; import sys
@@ -24,8 +26,9 @@ error[I001]: leading_prefix.py:5:12: Import block is un-sorted or un-formatted
 8 |   if True:
   |
   = help: Organize imports
-error[I001]: leading_prefix.py:10:9: Import block is un-sorted or un-formatted
+error[I001]: 10:9: Import block is un-sorted or un-formatted
 
+  --> leading_prefix.py:10:9
    |
  8 | if True:
  9 |     x = 1; \
@@ -35,8 +38,9 @@ error[I001]: leading_prefix.py:10:9: Import block is un-sorted or un-formatted
 12 | x = 1; \
    |
    = help: Organize imports
-error[I001]: leading_prefix.py:13:1: Import block is un-sorted or un-formatted
+error[I001]: 13:1: Import block is un-sorted or un-formatted
 
+  --> leading_prefix.py:12:9
    |
 12 | x = 1; \
 13 | import os

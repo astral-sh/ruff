@@ -1,56 +1,63 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_pyi/mod.rs
 ---
-error[PYI045]: PYI045.py:12:27: `__iter__` methods should return an `Iterator`, not an `Iterable`
+error[PYI045]: 12:27: `__iter__` methods should return an `Iterator`, not an `Iterable`
 
+  --> PYI045.py:12:27
    |
 11 | class TypingIterableTReturn:
 12 |     def __iter__(self) -> typing.Iterable[int]:
    |                           ^^^^^^^^^^^^^^^^^^^^
 13 |         ...
    |
-error[PYI045]: PYI045.py:20:27: `__iter__` methods should return an `Iterator`, not an `Iterable`
+error[PYI045]: 20:27: `__iter__` methods should return an `Iterator`, not an `Iterable`
 
+  --> PYI045.py:20:27
    |
 19 | class TypingIterableReturn:
 20 |     def __iter__(self) -> typing.Iterable:
    |                           ^^^^^^^^^^^^^^^
 21 |         ...
    |
-error[PYI045]: PYI045.py:28:27: `__iter__` methods should return an `Iterator`, not an `Iterable`
+error[PYI045]: 28:27: `__iter__` methods should return an `Iterator`, not an `Iterable`
 
+  --> PYI045.py:28:27
    |
 27 | class CollectionsIterableTReturn:
 28 |     def __iter__(self) -> collections.abc.Iterable[int]:
    |                           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 29 |         ...
    |
-error[PYI045]: PYI045.py:36:27: `__iter__` methods should return an `Iterator`, not an `Iterable`
+error[PYI045]: 36:27: `__iter__` methods should return an `Iterator`, not an `Iterable`
 
+  --> PYI045.py:36:27
    |
 35 | class CollectionsIterableReturn:
 36 |     def __iter__(self) -> collections.abc.Iterable:
    |                           ^^^^^^^^^^^^^^^^^^^^^^^^
 37 |         ...
    |
-error[PYI045]: PYI045.py:44:27: `__iter__` methods should return an `Iterator`, not an `Iterable`
+error[PYI045]: 44:27: `__iter__` methods should return an `Iterator`, not an `Iterable`
 
+  --> PYI045.py:44:27
    |
 43 | class IterableReturn:
 44 |     def __iter__(self) -> Iterable:
    |                           ^^^^^^^^
 45 |         ...
    |
-error[PYI045]: PYI045.py:79:28: `__aiter__` methods should return an `AsyncIterator`, not an `AsyncIterable`
+error[PYI045]: 79:28: `__aiter__` methods should return an `AsyncIterator`, not an `AsyncIterable`
 
+  --> PYI045.py:79:28
    |
 78 | class TypingAsyncIterableTReturn:
 79 |     def __aiter__(self) -> typing.AsyncIterable[int]:
    |                            ^^^^^^^^^^^^^^^^^^^^^^^^^
 80 |         ...
    |
-error[PYI045]: PYI045.py:84:28: `__aiter__` methods should return an `AsyncIterator`, not an `AsyncIterable`
+error[PYI045]: 84:28: `__aiter__` methods should return an `AsyncIterator`, not an `AsyncIterable`
 
+  --> PYI045.py:84:28
    |
 83 | class TypingAsyncIterableReturn:
 84 |     def __aiter__(self) -> typing.AsyncIterable:

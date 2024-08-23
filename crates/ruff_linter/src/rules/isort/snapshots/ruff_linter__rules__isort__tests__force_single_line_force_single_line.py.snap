@@ -1,8 +1,9 @@
 ---
 source: crates/ruff_linter/src/rules/isort/mod.rs
 ---
-error[I001]: force_single_line.py:1:1: [*] Import block is un-sorted or un-formatted
+error[I001]: 1:1: [*] Import block is un-sorted or un-formatted
 
+  --> force_single_line.py:1:1
    |
  1 | / import sys, math
  2 | | from os import path, uname
@@ -31,6 +32,7 @@ error[I001]: force_single_line.py:1:1: [*] Import block is un-sorted or un-forma
 25 | | 
 26 | | # comment 9
 27 | | from baz import *  # comment 10
+   | |________________________________^
    |
    = help: Organize imports
 ℹ Safe fix

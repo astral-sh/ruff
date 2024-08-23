@@ -1,8 +1,9 @@
 ---
 source: crates/ruff_linter/src/rules/pydocstyle/mod.rs
 ---
-error[D415]: D.py:355:5: [*] First line should end with a period, question mark, or exclamation point
+error[D415]: 355:5: [*] First line should end with a period, question mark, or exclamation point
 
+   --> D.py:355:5
     |
 353 |         "or exclamation point (not 'y')")
 354 | def lwnlkjl():
@@ -20,8 +21,9 @@ error[D415]: D.py:355:5: [*] First line should end with a period, question mark,
 357 357 | 
 358 358 | @expect("D401: First line should be in imperative mood "
 
-error[D415]: D.py:406:25: [*] First line should end with a period, question mark, or exclamation point
+error[D415]: 406:25: [*] First line should end with a period, question mark, or exclamation point
 
+   --> D.py:406:25
     |
 404 | @expect("D415: First line should end with a period, question mark,"
 405 |         " or exclamation point (not 'r')")
@@ -39,8 +41,9 @@ error[D415]: D.py:406:25: [*] First line should end with a period, question mark
 408 408 | 
 409 409 | def ignored_decorator(func):   # noqa: D400,D401,D415
 
-error[D415]: D.py:410:5: [*] First line should end with a period, question mark, or exclamation point
+error[D415]: 410:5: [*] First line should end with a period, question mark, or exclamation point
 
+   --> D.py:410:5
     |
 409 | def ignored_decorator(func):   # noqa: D400,D401,D415
 410 |     """Runs something"""
@@ -59,8 +62,9 @@ error[D415]: D.py:410:5: [*] First line should end with a period, question mark,
 412 412 |     pass
 413 413 | 
 
-error[D415]: D.py:416:5: [*] First line should end with a period, question mark, or exclamation point
+error[D415]: 416:5: [*] First line should end with a period, question mark, or exclamation point
 
+   --> D.py:416:5
     |
 415 | def decorator_for_test(func):   # noqa: D400,D401,D415
 416 |     """Runs something"""
@@ -79,8 +83,9 @@ error[D415]: D.py:416:5: [*] First line should end with a period, question mark,
 418 418 |     pass
 419 419 | 
 
-error[D415]: D.py:422:35: [*] First line should end with a period, question mark, or exclamation point
+error[D415]: 422:35: [*] First line should end with a period, question mark, or exclamation point
 
+   --> D.py:422:35
     |
 421 | @ignored_decorator
 422 | def oneliner_ignored_decorator(): """One liner"""
@@ -97,8 +102,9 @@ error[D415]: D.py:422:35: [*] First line should end with a period, question mark
 424 424 | 
 425 425 | @decorator_for_test
 
-error[D415]: D.py:429:49: [*] First line should end with a period, question mark, or exclamation point
+error[D415]: 429:49: [*] First line should end with a period, question mark, or exclamation point
 
+   --> D.py:429:49
     |
 427 | @expect("D415: First line should end with a period, question mark,"
 428 |         " or exclamation point (not 'r')")
@@ -116,8 +122,9 @@ error[D415]: D.py:429:49: [*] First line should end with a period, question mark
 431 431 | 
 432 432 | @decorator_for_test
 
-error[D415]: D.py:470:5: [*] First line should end with a period, question mark, or exclamation point
+error[D415]: 470:5: [*] First line should end with a period, question mark, or exclamation point
 
+   --> D.py:470:5
     |
 468 |         "or exclamation point (not 'g')")
 469 | def docstring_bad():
@@ -136,8 +143,9 @@ error[D415]: D.py:470:5: [*] First line should end with a period, question mark,
 472 472 | 
 473 473 | 
 
-error[D415]: D.py:475:5: [*] First line should end with a period, question mark, or exclamation point
+error[D415]: 475:5: [*] First line should end with a period, question mark, or exclamation point
 
+   --> D.py:475:5
     |
 474 | def docstring_bad_ignore_all():  # noqa
 475 |     """Runs something"""
@@ -155,8 +163,9 @@ error[D415]: D.py:475:5: [*] First line should end with a period, question mark,
 477 477 | 
 478 478 | 
 
-error[D415]: D.py:480:5: [*] First line should end with a period, question mark, or exclamation point
+error[D415]: 480:5: [*] First line should end with a period, question mark, or exclamation point
 
+   --> D.py:480:5
     |
 479 | def docstring_bad_ignore_one():  # noqa: D400,D401,D415
 480 |     """Runs something"""
@@ -174,8 +183,9 @@ error[D415]: D.py:480:5: [*] First line should end with a period, question mark,
 482 482 | 
 483 483 | 
 
-error[D415]: D.py:487:5: [*] First line should end with a period, question mark, or exclamation point
+error[D415]: 487:5: [*] First line should end with a period, question mark, or exclamation point
 
+   --> D.py:487:5
     |
 485 |         "(perhaps 'Run', not 'Runs')")
 486 | def docstring_ignore_some_violations_but_catch_D401():  # noqa: E501,D400,D415
@@ -194,8 +204,9 @@ error[D415]: D.py:487:5: [*] First line should end with a period, question mark,
 489 489 | 
 490 490 | 
 
-error[D415]: D.py:520:5: [*] First line should end with a period, question mark, or exclamation point
+error[D415]: 520:5: [*] First line should end with a period, question mark, or exclamation point
 
+   --> D.py:520:5
     |
 518 |         "or exclamation point (not 'g')")
 519 | def bad_google_string():  # noqa: D400
@@ -213,8 +224,9 @@ error[D415]: D.py:520:5: [*] First line should end with a period, question mark,
 522 522 | 
 523 523 | # This is reproducing a bug where AttributeError is raised when parsing class
 
-error[D415]: D.py:581:5: [*] First line should end with a period, question mark, or exclamation point
+error[D415]: 581:5: [*] First line should end with a period, question mark, or exclamation point
 
+   --> D.py:581:5
     |
 579 |         "or exclamation point (not '\"')")
 580 | def endswith_quote():
@@ -232,8 +244,9 @@ error[D415]: D.py:581:5: [*] First line should end with a period, question mark,
 583 583 | 
 584 584 | @expect('D209: Multi-line docstring closing quotes should be on a separate '
 
-error[D415]: D.py:615:5: [*] First line should end with a period, question mark, or exclamation point
+error[D415]: 615:5: [*] First line should end with a period, question mark, or exclamation point
 
+   --> D.py:615:5
     |
 613 |   @expect('D212: Multi-line docstring summary should start at the first line')
 614 |   def one_liner():
@@ -254,8 +267,9 @@ error[D415]: D.py:615:5: [*] First line should end with a period, question mark,
 617 617 |     """
 618 618 | 
 
-error[D415]: D.py:639:17: [*] First line should end with a period, question mark, or exclamation point
+error[D415]: 639:17: [*] First line should end with a period, question mark, or exclamation point
 
+   --> D.py:639:17
     |
 639 | class SameLine: """This is a docstring on the same line"""
     |                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -273,8 +287,9 @@ error[D415]: D.py:639:17: [*] First line should end with a period, question mark
 641 641 | def same_line(): """This is a docstring on the same line"""
 642 642 | 
 
-error[D415]: D.py:641:18: [*] First line should end with a period, question mark, or exclamation point
+error[D415]: 641:18: [*] First line should end with a period, question mark, or exclamation point
 
+   --> D.py:641:18
     |
 639 | class SameLine: """This is a docstring on the same line"""
 640 | 
@@ -292,8 +307,9 @@ error[D415]: D.py:641:18: [*] First line should end with a period, question mark
 643 643 | 
 644 644 | def single_line_docstring_with_an_escaped_backslash():
 
-error[D415]: D.py:664:5: [*] First line should end with a period, question mark, or exclamation point
+error[D415]: 664:5: [*] First line should end with a period, question mark, or exclamation point
 
+   --> D.py:664:5
     |
 663 |   def newline_after_closing_quote(self):
 664 |       "We enforce a newline after the closing quote for a multi-line docstring \

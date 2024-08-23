@@ -1,8 +1,9 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_bandit/mod.rs
 ---
-error[S110]: S110.py:3:1: `try`-`except`-`pass` detected, consider logging the exception
+error[S110]: 3:1: `try`-`except`-`pass` detected, consider logging the exception
 
+ --> S110.py:2:9
   |
 1 |   try:
 2 |       pass
@@ -12,8 +13,9 @@ error[S110]: S110.py:3:1: `try`-`except`-`pass` detected, consider logging the e
 5 |   
 6 |   try:
   |
-error[S110]: S110.py:8:1: `try`-`except`-`pass` detected, consider logging the exception
+error[S110]: 8:1: `try`-`except`-`pass` detected, consider logging the exception
 
+  --> S110.py:7:9
    |
  6 |   try:
  7 |       pass
@@ -23,8 +25,9 @@ error[S110]: S110.py:8:1: `try`-`except`-`pass` detected, consider logging the e
 10 |   
 11 |   try:
    |
-error[S110]: S110.py:13:1: `try`-`except`-`pass` detected, consider logging the exception
+error[S110]: 13:1: `try`-`except`-`pass` detected, consider logging the exception
 
+  --> S110.py:12:9
    |
 11 |   try:
 12 |       pass

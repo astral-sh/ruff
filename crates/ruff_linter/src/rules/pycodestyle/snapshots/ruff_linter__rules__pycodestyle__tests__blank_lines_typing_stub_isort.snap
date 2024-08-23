@@ -1,8 +1,9 @@
 ---
 source: crates/ruff_linter/src/rules/pycodestyle/mod.rs
 ---
-error[I001]: E30_isort.pyi:1:1: [*] Import block is un-sorted or un-formatted
+error[I001]: 1:1: [*] Import block is un-sorted or un-formatted
 
+ --> E30_isort.pyi:1:1
   |
 1 | / import json
 2 | | 
@@ -11,8 +12,8 @@ error[I001]: E30_isort.pyi:1:1: [*] Import block is un-sorted or un-formatted
 5 | | from typing import Any, Sequence
 6 | | 
 7 | | 
-8 | | class MissingCommand(TypeError): ...  # noqa: N818
-  | |_^
+  | |__^
+8 |   class MissingCommand(TypeError): ...  # noqa: N818
   |
   = help: Organize imports
 ℹ Safe fix
@@ -26,8 +27,9 @@ error[I001]: E30_isort.pyi:1:1: [*] Import block is un-sorted or un-formatted
 8 4 | class MissingCommand(TypeError): ...  # noqa: N818
 9 5 | 
 
-error[E303]: E30_isort.pyi:5:1: [*] Too many blank lines (3)
+error[E303]: 5:1: [*] Too many blank lines (3)
 
+ --> E30_isort.pyi:5:1
   |
 5 | from typing import Any, Sequence
   | ^^^^
@@ -42,8 +44,9 @@ error[E303]: E30_isort.pyi:5:1: [*] Too many blank lines (3)
 6 4 | 
 7 5 | 
 
-error[E303]: E30_isort.pyi:8:1: [*] Too many blank lines (2)
+error[E303]: 8:1: [*] Too many blank lines (2)
 
+ --> E30_isort.pyi:8:1
   |
 8 | class MissingCommand(TypeError): ...  # noqa: N818
   | ^^^^^
@@ -58,8 +61,9 @@ error[E303]: E30_isort.pyi:8:1: [*] Too many blank lines (2)
 9 8 | 
 10 9 | 
 
-error[E303]: E30_isort.pyi:11:1: [*] Too many blank lines (2)
+error[E303]: 11:1: [*] Too many blank lines (2)
 
+  --> E30_isort.pyi:11:1
    |
 11 | class BackendProxy:
    | ^^^^^
@@ -76,8 +80,9 @@ error[E303]: E30_isort.pyi:11:1: [*] Too many blank lines (2)
 12 11 |     backend_module: str
 13 12 |     backend_object: str | None
 
-error[E303]: E30_isort.pyi:17:1: [*] Too many blank lines (2)
+error[E303]: 17:1: [*] Too many blank lines (2)
 
+  --> E30_isort.pyi:17:1
    |
 17 | if __name__ == "__main__":
    | ^^
@@ -93,8 +98,9 @@ error[E303]: E30_isort.pyi:17:1: [*] Too many blank lines (2)
 18 17 |     import abcd
 19 18 | 
 
-error[E303]: E30_isort.pyi:21:5: [*] Too many blank lines (2)
+error[E303]: 21:5: [*] Too many blank lines (2)
 
+  --> E30_isort.pyi:21:5
    |
 21 |     abcd.foo()
    |     ^^^^
@@ -111,8 +117,9 @@ error[E303]: E30_isort.pyi:21:5: [*] Too many blank lines (2)
 22 21 | 
 23 22 | def __init__(self, backend_module: str, backend_obj: str | None) -> None: ...
 
-error[I001]: E30_isort.pyi:26:1: [*] Import block is un-sorted or un-formatted
+error[I001]: 26:1: [*] Import block is un-sorted or un-formatted
 
+  --> E30_isort.pyi:25:18
    |
 25 |   if TYPE_CHECKING:
 26 | /     import os
@@ -120,8 +127,8 @@ error[I001]: E30_isort.pyi:26:1: [*] Import block is un-sorted or un-formatted
 28 | | 
 29 | | 
 30 | |     from typing_extensions import TypeAlias
-31 | | 
-   | |_^
+   | |____________________________________________^
+31 |   
 32 |   
 33 |       abcd.foo()
    |
@@ -136,8 +143,9 @@ error[I001]: E30_isort.pyi:26:1: [*] Import block is un-sorted or un-formatted
 31 29 | 
 32 30 | 
 
-error[E303]: E30_isort.pyi:30:5: [*] Too many blank lines (3)
+error[E303]: 30:5: [*] Too many blank lines (3)
 
+  --> E30_isort.pyi:30:5
    |
 30 |     from typing_extensions import TypeAlias
    |     ^^^^
@@ -153,8 +161,9 @@ error[E303]: E30_isort.pyi:30:5: [*] Too many blank lines (3)
 31 29 | 
 32 30 | 
 
-error[E303]: E30_isort.pyi:33:5: [*] Too many blank lines (2)
+error[E303]: 33:5: [*] Too many blank lines (2)
 
+  --> E30_isort.pyi:33:5
    |
 33 |     abcd.foo()
    |     ^^^^
@@ -171,8 +180,9 @@ error[E303]: E30_isort.pyi:33:5: [*] Too many blank lines (2)
 34 33 | 
 35 34 | def __call__(self, name: str, *args: Any, **kwargs: Any) -> Any:
 
-error[E303]: E30_isort.pyi:45:1: [*] Too many blank lines (2)
+error[E303]: 45:1: [*] Too many blank lines (2)
 
+  --> E30_isort.pyi:45:1
    |
 45 | def _exit(self) -> None: ...
    | ^^^
@@ -187,8 +197,9 @@ error[E303]: E30_isort.pyi:45:1: [*] Too many blank lines (2)
 46 45 | 
 47 46 | 
 
-error[E303]: E30_isort.pyi:48:1: [*] Too many blank lines (2)
+error[E303]: 48:1: [*] Too many blank lines (2)
 
+  --> E30_isort.pyi:48:1
    |
 48 | def _optional_commands(self) -> dict[str, bool]: ...
    | ^^^
@@ -203,8 +214,9 @@ error[E303]: E30_isort.pyi:48:1: [*] Too many blank lines (2)
 49 48 | 
 50 49 | 
 
-error[E303]: E30_isort.pyi:51:1: [*] Too many blank lines (2)
+error[E303]: 51:1: [*] Too many blank lines (2)
 
+  --> E30_isort.pyi:51:1
    |
 51 | def run(argv: Sequence[str]) -> int: ...
    | ^^^
@@ -219,8 +231,9 @@ error[E303]: E30_isort.pyi:51:1: [*] Too many blank lines (2)
 52 51 | 
 53 52 | 
 
-error[E303]: E30_isort.pyi:54:1: [*] Too many blank lines (2)
+error[E303]: 54:1: [*] Too many blank lines (2)
 
+  --> E30_isort.pyi:54:1
    |
 54 | def read_line(fd: int = 0) -> bytearray: ...
    | ^^^
@@ -235,8 +248,9 @@ error[E303]: E30_isort.pyi:54:1: [*] Too many blank lines (2)
 55 54 | 
 56 55 | 
 
-error[E303]: E30_isort.pyi:57:1: [*] Too many blank lines (2)
+error[E303]: 57:1: [*] Too many blank lines (2)
 
+  --> E30_isort.pyi:57:1
    |
 57 | def flush() -> None: ...
    | ^^^
@@ -251,8 +265,9 @@ error[E303]: E30_isort.pyi:57:1: [*] Too many blank lines (2)
 58 57 | 
 59 58 | 
 
-error[E303]: E30_isort.pyi:60:1: [*] Too many blank lines (2)
+error[E303]: 60:1: [*] Too many blank lines (2)
 
+  --> E30_isort.pyi:60:1
    |
 60 | from typing import Any, Sequence
    | ^^^^

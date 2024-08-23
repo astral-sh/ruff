@@ -1,8 +1,9 @@
 ---
 source: crates/ruff_linter/src/rules/pyupgrade/mod.rs
 ---
-error[UP024]: UP024_0.py:6:8: [*] Replace aliased errors with `OSError`
+error[UP024]: 6:8: [*] Replace aliased errors with `OSError`
 
+ --> UP024_0.py:6:8
   |
 4 | try:
 5 |     pass
@@ -21,8 +22,9 @@ error[UP024]: UP024_0.py:6:8: [*] Replace aliased errors with `OSError`
 8 8 | 
 9 9 | try:
 
-error[UP024]: UP024_0.py:11:8: [*] Replace aliased errors with `OSError`
+error[UP024]: 11:8: [*] Replace aliased errors with `OSError`
 
+  --> UP024_0.py:11:8
    |
  9 | try:
 10 |     pass
@@ -41,8 +43,9 @@ error[UP024]: UP024_0.py:11:8: [*] Replace aliased errors with `OSError`
 13 13 | 
 14 14 | try:
 
-error[UP024]: UP024_0.py:16:8: [*] Replace aliased errors with `OSError`
+error[UP024]: 16:8: [*] Replace aliased errors with `OSError`
 
+  --> UP024_0.py:16:8
    |
 14 | try:
 15 |     pass
@@ -61,8 +64,9 @@ error[UP024]: UP024_0.py:16:8: [*] Replace aliased errors with `OSError`
 18 18 | 
 19 19 | try:
 
-error[UP024]: UP024_0.py:21:8: [*] Replace aliased errors with `OSError`
+error[UP024]: 21:8: [*] Replace aliased errors with `OSError`
 
+  --> UP024_0.py:21:8
    |
 19 | try:
 20 |     pass
@@ -81,8 +85,9 @@ error[UP024]: UP024_0.py:21:8: [*] Replace aliased errors with `OSError`
 23 23 | 
 24 24 | try:
 
-error[UP024]: UP024_0.py:26:8: [*] Replace aliased errors with `OSError`
+error[UP024]: 26:8: [*] Replace aliased errors with `OSError`
 
+  --> UP024_0.py:26:8
    |
 24 | try:
 25 |     pass
@@ -101,8 +106,9 @@ error[UP024]: UP024_0.py:26:8: [*] Replace aliased errors with `OSError`
 28 28 | 
 29 29 | try:
 
-error[UP024]: UP024_0.py:31:8: [*] Replace aliased errors with `OSError`
+error[UP024]: 31:8: [*] Replace aliased errors with `OSError`
 
+  --> UP024_0.py:31:8
    |
 29 | try:
 30 |     pass
@@ -121,8 +127,9 @@ error[UP024]: UP024_0.py:31:8: [*] Replace aliased errors with `OSError`
 33 33 | 
 34 34 | try:
 
-error[UP024]: UP024_0.py:36:8: [*] Replace aliased errors with `OSError`
+error[UP024]: 36:8: [*] Replace aliased errors with `OSError`
 
+  --> UP024_0.py:36:8
    |
 34 | try:
 35 |     pass
@@ -141,8 +148,9 @@ error[UP024]: UP024_0.py:36:8: [*] Replace aliased errors with `OSError`
 38 38 | 
 39 39 | # Should NOT be in parentheses when replaced
 
-error[UP024]: UP024_0.py:43:8: [*] Replace aliased errors with `OSError`
+error[UP024]: 43:8: [*] Replace aliased errors with `OSError`
 
+  --> UP024_0.py:43:8
    |
 41 | try:
 42 |     pass
@@ -162,8 +170,9 @@ error[UP024]: UP024_0.py:43:8: [*] Replace aliased errors with `OSError`
 45 45 | try:
 46 46 |     pass
 
-error[UP024]: UP024_0.py:47:8: [*] Replace aliased errors with `OSError`
+error[UP024]: 47:8: [*] Replace aliased errors with `OSError`
 
+  --> UP024_0.py:47:8
    |
 45 | try:
 46 |     pass
@@ -183,8 +192,9 @@ error[UP024]: UP024_0.py:47:8: [*] Replace aliased errors with `OSError`
 49 49 | try:
 50 50 |     pass
 
-error[UP024]: UP024_0.py:51:8: [*] Replace aliased errors with `OSError`
+error[UP024]: 51:8: [*] Replace aliased errors with `OSError`
 
+  --> UP024_0.py:51:8
    |
 49 | try:
 50 |     pass
@@ -203,8 +213,9 @@ error[UP024]: UP024_0.py:51:8: [*] Replace aliased errors with `OSError`
 53 53 | 
 54 54 | # Should be kept in parentheses (because multiple)
 
-error[UP024]: UP024_0.py:58:8: [*] Replace aliased errors with `OSError`
+error[UP024]: 58:8: [*] Replace aliased errors with `OSError`
 
+  --> UP024_0.py:58:8
    |
 56 | try:
 57 |     pass
@@ -223,8 +234,9 @@ error[UP024]: UP024_0.py:58:8: [*] Replace aliased errors with `OSError`
 60 60 | 
 61 61 | # First should change, second should not
 
-error[UP024]: UP024_0.py:65:8: [*] Replace aliased errors with `OSError`
+error[UP024]: 65:8: [*] Replace aliased errors with `OSError`
 
+  --> UP024_0.py:65:8
    |
 63 | try:
 64 |     pass
@@ -244,8 +256,9 @@ error[UP024]: UP024_0.py:65:8: [*] Replace aliased errors with `OSError`
 67 67 | # These should not change
 68 68 | 
 
-error[UP024]: UP024_0.py:87:8: [*] Replace aliased errors with `OSError`
+error[UP024]: 87:8: [*] Replace aliased errors with `OSError`
 
+  --> UP024_0.py:87:8
    |
 85 | try:
 86 |     pass
@@ -264,8 +277,9 @@ error[UP024]: UP024_0.py:87:8: [*] Replace aliased errors with `OSError`
 89 89 | 
 90 90 | try:
 
-error[UP024]: UP024_0.py:105:11: [*] Replace aliased errors with `OSError`
+error[UP024]: 105:11: [*] Replace aliased errors with `OSError`
 
+   --> UP024_0.py:105:11
     |
 103 |     try:
 104 |         mac_address = get_primary_mac_address()
@@ -284,8 +298,9 @@ error[UP024]: UP024_0.py:105:11: [*] Replace aliased errors with `OSError`
 107 107 | 
 108 108 | 
 
-error[UP024]: UP024_0.py:114:8: [*] Replace aliased errors with `OSError`
+error[UP024]: 114:8: [*] Replace aliased errors with `OSError`
 
+   --> UP024_0.py:114:8
     |
 112 | try:
 113 |     pass

@@ -1,8 +1,9 @@
 ---
 source: crates/ruff_linter/src/rules/pyflakes/mod.rs
 ---
-error[F841]: F841_4.py:12:5: [*] Local variable `a` is assigned to but never used
+error[F841]: 12:5: [*] Local variable `a` is assigned to but never used
 
+  --> F841_4.py:12:5
    |
 11 | def bar():
 12 |     a = foo()
@@ -20,8 +21,9 @@ error[F841]: F841_4.py:12:5: [*] Local variable `a` is assigned to but never use
 14 14 | 
 15 15 | 
 
-error[F841]: F841_4.py:13:5: [*] Local variable `b` is assigned to but never used
+error[F841]: 13:5: [*] Local variable `b` is assigned to but never used
 
+  --> F841_4.py:13:5
    |
 11 | def bar():
 12 |     a = foo()
@@ -39,8 +41,9 @@ error[F841]: F841_4.py:13:5: [*] Local variable `b` is assigned to but never use
 15 15 | 
 16 16 | def baz():
 
-error[F841]: F841_4.py:13:8: [*] Local variable `c` is assigned to but never used
+error[F841]: 13:8: [*] Local variable `c` is assigned to but never used
 
+  --> F841_4.py:13:8
    |
 11 | def bar():
 12 |     a = foo()

@@ -1,8 +1,9 @@
 ---
 source: crates/ruff_linter/src/rules/pyupgrade/mod.rs
 ---
-error[UP024]: UP024_4.py:9:8: [*] Replace aliased errors with `OSError`
+error[UP024]: 9:8: [*] Replace aliased errors with `OSError`
 
+  --> UP024_4.py:9:8
    |
  7 |     conn.ensure_connection(max_retries=2)
  8 |     conn._close()

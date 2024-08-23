@@ -1,8 +1,9 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_datetimez/mod.rs
 ---
-error[DTZ001]: DTZ001.py:4:1: `datetime.datetime()` called without a `tzinfo` argument
+error[DTZ001]: 4:1: `datetime.datetime()` called without a `tzinfo` argument
 
+ --> DTZ001.py:3:10
   |
 3 | # no args
 4 | datetime.datetime(2000, 1, 1, 0, 0, 0)
@@ -11,8 +12,9 @@ error[DTZ001]: DTZ001.py:4:1: `datetime.datetime()` called without a `tzinfo` ar
 6 | # none args
   |
   = help: Pass a `datetime.timezone` object to the `tzinfo` parameter
-error[DTZ001]: DTZ001.py:7:1: `tzinfo=None` passed to `datetime.datetime()`
+error[DTZ001]: 7:1: `tzinfo=None` passed to `datetime.datetime()`
 
+ --> DTZ001.py:6:12
   |
 6 | # none args
 7 | datetime.datetime(2000, 1, 1, 0, 0, 0, 0, None)
@@ -21,8 +23,9 @@ error[DTZ001]: DTZ001.py:7:1: `tzinfo=None` passed to `datetime.datetime()`
 9 | # not none arg
   |
   = help: Pass a `datetime.timezone` object to the `tzinfo` parameter
-error[DTZ001]: DTZ001.py:13:1: `datetime.datetime()` called without a `tzinfo` argument
+error[DTZ001]: 13:1: `datetime.datetime()` called without a `tzinfo` argument
 
+  --> DTZ001.py:12:12
    |
 12 | # no kwargs
 13 | datetime.datetime(2000, 1, 1, fold=1)
@@ -31,8 +34,9 @@ error[DTZ001]: DTZ001.py:13:1: `datetime.datetime()` called without a `tzinfo` a
 15 | # none kwargs
    |
    = help: Pass a `datetime.timezone` object to the `tzinfo` parameter
-error[DTZ001]: DTZ001.py:16:1: `tzinfo=None` passed to `datetime.datetime()`
+error[DTZ001]: 16:1: `tzinfo=None` passed to `datetime.datetime()`
 
+  --> DTZ001.py:15:14
    |
 15 | # none kwargs
 16 | datetime.datetime(2000, 1, 1, tzinfo=None)
@@ -41,8 +45,9 @@ error[DTZ001]: DTZ001.py:16:1: `tzinfo=None` passed to `datetime.datetime()`
 18 | from datetime import datetime
    |
    = help: Pass a `datetime.timezone` object to the `tzinfo` parameter
-error[DTZ001]: DTZ001.py:21:1: `datetime.datetime()` called without a `tzinfo` argument
+error[DTZ001]: 21:1: `datetime.datetime()` called without a `tzinfo` argument
 
+  --> DTZ001.py:20:22
    |
 20 | # no args unqualified
 21 | datetime(2000, 1, 1, 0, 0, 0)

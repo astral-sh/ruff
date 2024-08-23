@@ -1,8 +1,9 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_simplify/mod.rs
 ---
-error[SIM201]: SIM201.py:2:4: [*] Use `a != b` instead of `not a == b`
+error[SIM201]: 2:4: [*] Use `a != b` instead of `not a == b`
 
+ --> SIM201.py:2:4
   |
 1 | # SIM201
 2 | if not a == b:
@@ -18,8 +19,9 @@ error[SIM201]: SIM201.py:2:4: [*] Use `a != b` instead of `not a == b`
 4 4 | 
 5 5 | # SIM201
 
-error[SIM201]: SIM201.py:6:4: [*] Use `a != b + c` instead of `not a == b + c`
+error[SIM201]: 6:4: [*] Use `a != b + c` instead of `not a == b + c`
 
+ --> SIM201.py:6:4
   |
 5 | # SIM201
 6 | if not a == (b + c):
@@ -37,8 +39,9 @@ error[SIM201]: SIM201.py:6:4: [*] Use `a != b + c` instead of `not a == b + c`
 8 8 | 
 9 9 | # SIM201
 
-error[SIM201]: SIM201.py:10:4: [*] Use `a + b != c` instead of `not a + b == c`
+error[SIM201]: 10:4: [*] Use `a + b != c` instead of `not a + b == c`
 
+  --> SIM201.py:10:4
    |
  9 | # SIM201
 10 | if not (a + b) == c:

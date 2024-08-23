@@ -1,8 +1,9 @@
 ---
 source: crates/ruff_linter/src/rules/pylint/mod.rs
 ---
-error[PLC0414]: import_aliasing.py:6:8: [*] Import alias does not rename original package
+error[PLC0414]: 6:8: [*] Import alias does not rename original package
 
+ --> import_aliasing.py:6:8
   |
 4 | # 2. consider-using-from-import
 5 | 
@@ -22,8 +23,9 @@ error[PLC0414]: import_aliasing.py:6:8: [*] Import alias does not rename origina
 8 8 | from collections import OrderedDict as o_dict
 9 9 | import os.path as path  # [consider-using-from-import]
 
-error[PLC0414]: import_aliasing.py:7:25: [*] Import alias does not rename original package
+error[PLC0414]: 7:25: [*] Import alias does not rename original package
 
+ --> import_aliasing.py:7:25
   |
 6 | import collections as collections  # [useless-import-alias]
 7 | from collections import OrderedDict as OrderedDict  # [useless-import-alias]
@@ -42,8 +44,9 @@ error[PLC0414]: import_aliasing.py:7:25: [*] Import alias does not rename origin
 9 9 | import os.path as path  # [consider-using-from-import]
 10 10 | import os.path as p
 
-error[PLC0414]: import_aliasing.py:16:15: [*] Import alias does not rename original package
+error[PLC0414]: 16:15: [*] Import alias does not rename original package
 
+  --> import_aliasing.py:16:15
    |
 14 | import os as OS
 15 | from sys import version
@@ -63,8 +66,9 @@ error[PLC0414]: import_aliasing.py:16:15: [*] Import alias does not rename origi
 18 18 | from . import bar
 19 19 | from ..foo import bar as bar  # [useless-import-alias]
 
-error[PLC0414]: import_aliasing.py:19:19: [*] Import alias does not rename original package
+error[PLC0414]: 19:19: [*] Import alias does not rename original package
 
+  --> import_aliasing.py:19:19
    |
 17 | from . import bar as Bar
 18 | from . import bar
@@ -84,8 +88,9 @@ error[PLC0414]: import_aliasing.py:19:19: [*] Import alias does not rename origi
 21 21 | from ..foo.bar import foobar as anotherfoobar
 22 22 | from . import foo as foo, foo2 as bar2  # [useless-import-alias]
 
-error[PLC0414]: import_aliasing.py:20:23: [*] Import alias does not rename original package
+error[PLC0414]: 20:23: [*] Import alias does not rename original package
 
+  --> import_aliasing.py:20:23
    |
 18 | from . import bar
 19 | from ..foo import bar as bar  # [useless-import-alias]
@@ -105,8 +110,9 @@ error[PLC0414]: import_aliasing.py:20:23: [*] Import alias does not rename origi
 22 22 | from . import foo as foo, foo2 as bar2  # [useless-import-alias]
 23 23 | from . import foo as bar, foo2 as foo2  # [useless-import-alias]
 
-error[PLC0414]: import_aliasing.py:22:15: [*] Import alias does not rename original package
+error[PLC0414]: 22:15: [*] Import alias does not rename original package
 
+  --> import_aliasing.py:22:15
    |
 20 | from ..foo.bar import foobar as foobar  # [useless-import-alias]
 21 | from ..foo.bar import foobar as anotherfoobar
@@ -126,8 +132,9 @@ error[PLC0414]: import_aliasing.py:22:15: [*] Import alias does not rename origi
 24 24 | from . import foo as bar, foo2 as bar2
 25 25 | from foo.bar import foobar as foobar  # [useless-import-alias]
 
-error[PLC0414]: import_aliasing.py:23:27: [*] Import alias does not rename original package
+error[PLC0414]: 23:27: [*] Import alias does not rename original package
 
+  --> import_aliasing.py:23:27
    |
 21 | from ..foo.bar import foobar as anotherfoobar
 22 | from . import foo as foo, foo2 as bar2  # [useless-import-alias]
@@ -147,8 +154,9 @@ error[PLC0414]: import_aliasing.py:23:27: [*] Import alias does not rename origi
 25 25 | from foo.bar import foobar as foobar  # [useless-import-alias]
 26 26 | from foo.bar import foobar as foo
 
-error[PLC0414]: import_aliasing.py:25:21: [*] Import alias does not rename original package
+error[PLC0414]: 25:21: [*] Import alias does not rename original package
 
+  --> import_aliasing.py:25:21
    |
 23 | from . import foo as bar, foo2 as foo2  # [useless-import-alias]
 24 | from . import foo as bar, foo2 as bar2

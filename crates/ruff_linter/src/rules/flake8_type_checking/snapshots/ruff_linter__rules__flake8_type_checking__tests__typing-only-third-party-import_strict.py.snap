@@ -1,8 +1,9 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_type_checking/mod.rs
 ---
-error[TCH002]: strict.py:54:25: [*] Move third-party import `pkg.bar.A` into a type-checking block
+error[TCH002]: 54:25: [*] Move third-party import `pkg.bar.A` into a type-checking block
 
+  --> strict.py:54:25
    |
 52 |     # In un-strict mode, this _should_ raise an error, since `pkg.bar` isn't used at runtime
 53 |     import pkg
@@ -30,8 +31,9 @@ error[TCH002]: strict.py:54:25: [*] Move third-party import `pkg.bar.A` into a t
 56 59 |     def test(value: A):
 57 60 |         return pkg.B()
 
-error[TCH002]: strict.py:91:12: [*] Move third-party import `pkg` into a type-checking block
+error[TCH002]: 91:12: [*] Move third-party import `pkg` into a type-checking block
 
+  --> strict.py:91:12
    |
 89 |     # Note that `pkg` is a prefix of `pkgfoo` which are both different modules. This is
 90 |     # testing the implementation.

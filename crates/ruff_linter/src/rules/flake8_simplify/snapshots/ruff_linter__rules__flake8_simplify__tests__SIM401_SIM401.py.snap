@@ -1,8 +1,9 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_simplify/mod.rs
 ---
-error[SIM401]: SIM401.py:6:1: [*] Use `var = a_dict.get(key, "default1")` instead of an `if` block
+error[SIM401]: 6:1: [*] Use `var = a_dict.get(key, "default1")` instead of an `if` block
 
+  --> SIM401.py:5:21
    |
  5 |   # SIM401 (pattern-1)
  6 | / if key in a_dict:
@@ -27,8 +28,9 @@ error[SIM401]: SIM401.py:6:1: [*] Use `var = a_dict.get(key, "default1")` instea
 11 8  | # SIM401 (pattern-2)
 12 9  | if key not in a_dict:
 
-error[SIM401]: SIM401.py:12:1: [*] Use `var = a_dict.get(key, "default2")` instead of an `if` block
+error[SIM401]: 12:1: [*] Use `var = a_dict.get(key, "default2")` instead of an `if` block
 
+  --> SIM401.py:11:21
    |
 11 |   # SIM401 (pattern-2)
 12 | / if key not in a_dict:
@@ -53,8 +55,9 @@ error[SIM401]: SIM401.py:12:1: [*] Use `var = a_dict.get(key, "default2")` inste
 17 14 | # OK (default contains effect)
 18 15 | if key in a_dict:
 
-error[SIM401]: SIM401.py:24:1: [*] Use `var = a_dict.get(keys[idx], "default")` instead of an `if` block
+error[SIM401]: 24:1: [*] Use `var = a_dict.get(keys[idx], "default")` instead of an `if` block
 
+  --> SIM401.py:23:37
    |
 23 |   # SIM401 (complex expression in key)
 24 | / if keys[idx] in a_dict:
@@ -79,8 +82,9 @@ error[SIM401]: SIM401.py:24:1: [*] Use `var = a_dict.get(keys[idx], "default")` 
 29 26 | # SIM401 (complex expression in dict)
 30 27 | if key in dicts[idx]:
 
-error[SIM401]: SIM401.py:30:1: [*] Use `var = dicts[idx].get(key, "default")` instead of an `if` block
+error[SIM401]: 30:1: [*] Use `var = dicts[idx].get(key, "default")` instead of an `if` block
 
+  --> SIM401.py:29:38
    |
 29 |   # SIM401 (complex expression in dict)
 30 | / if key in dicts[idx]:
@@ -105,8 +109,9 @@ error[SIM401]: SIM401.py:30:1: [*] Use `var = dicts[idx].get(key, "default")` in
 35 32 | # SIM401 (complex expression in var)
 36 33 | if key in a_dict:
 
-error[SIM401]: SIM401.py:36:1: [*] Use `vars[idx] = a_dict.get(key, "defaultß9💣2ℝ6789ß9💣2ℝ6789ß9💣2ℝ6789ß9💣2ℝ6789ß9💣2ℝ6789")` instead of an `if` block
+error[SIM401]: 36:1: [*] Use `vars[idx] = a_dict.get(key, "defaultß9💣2ℝ6789ß9💣2ℝ6789ß9💣2ℝ6789ß9💣2ℝ6789ß9💣2ℝ6789")` instead of an `if` block
 
+  --> SIM401.py:35:37
    |
 35 |   # SIM401 (complex expression in var)
 36 | / if key in a_dict:
@@ -131,8 +136,9 @@ error[SIM401]: SIM401.py:36:1: [*] Use `vars[idx] = a_dict.get(key, "defaultß9�
 41 38 | # SIM401
 42 39 | if foo():
 
-error[SIM401]: SIM401.py:45:5: [*] Use `vars[idx] = a_dict.get(key, "default")` instead of an `if` block
+error[SIM401]: 45:5: [*] Use `vars[idx] = a_dict.get(key, "default")` instead of an `if` block
 
+  --> SIM401.py:45:5
    |
 43 |       pass
 44 |   else:
@@ -159,8 +165,9 @@ error[SIM401]: SIM401.py:45:5: [*] Use `vars[idx] = a_dict.get(key, "default")` 
 50 47 | ###
 51 48 | # Negative cases
 
-error[SIM401]: SIM401.py:123:7: [*] Use `a_dict.get(key, "default3")` instead of an `if` block
+error[SIM401]: 123:7: [*] Use `a_dict.get(key, "default3")` instead of an `if` block
 
+   --> SIM401.py:123:7
     |
 122 | # SIM401
 123 | var = a_dict[key] if key in a_dict else "default3"
@@ -179,8 +186,9 @@ error[SIM401]: SIM401.py:123:7: [*] Use `a_dict.get(key, "default3")` instead of
 125 125 | # SIM401
 126 126 | var = "default-1" if key not in a_dict else a_dict[key]
 
-error[SIM401]: SIM401.py:126:7: [*] Use `a_dict.get(key, "default-1")` instead of an `if` block
+error[SIM401]: 126:7: [*] Use `a_dict.get(key, "default-1")` instead of an `if` block
 
+   --> SIM401.py:126:7
     |
 125 | # SIM401
 126 | var = "default-1" if key not in a_dict else a_dict[key]

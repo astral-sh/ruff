@@ -1,8 +1,9 @@
 ---
 source: crates/ruff_linter/src/rules/pylint/mod.rs
 ---
-error[PLW1510]: subprocess_run_without_check.py:4:1: [*] `subprocess.run` without explicit `check` argument
+error[PLW1510]: 4:1: [*] `subprocess.run` without explicit `check` argument
 
+ --> subprocess_run_without_check.py:3:10
   |
 3 | # Errors.
 4 | subprocess.run("ls")
@@ -21,8 +22,9 @@ error[PLW1510]: subprocess_run_without_check.py:4:1: [*] `subprocess.run` withou
 6 6 | subprocess.run(
 7 7 |     ["ls"],
 
-error[PLW1510]: subprocess_run_without_check.py:5:1: [*] `subprocess.run` without explicit `check` argument
+error[PLW1510]: 5:1: [*] `subprocess.run` without explicit `check` argument
 
+ --> subprocess_run_without_check.py:4:21
   |
 3 | # Errors.
 4 | subprocess.run("ls")
@@ -42,8 +44,9 @@ error[PLW1510]: subprocess_run_without_check.py:5:1: [*] `subprocess.run` withou
 7 7 |     ["ls"],
 8 8 |     shell=False,
 
-error[PLW1510]: subprocess_run_without_check.py:6:1: [*] `subprocess.run` without explicit `check` argument
+error[PLW1510]: 6:1: [*] `subprocess.run` without explicit `check` argument
 
+ --> subprocess_run_without_check.py:5:33
   |
 4 | subprocess.run("ls")
 5 | subprocess.run("ls", shell=True)
@@ -63,8 +66,9 @@ error[PLW1510]: subprocess_run_without_check.py:6:1: [*] `subprocess.run` withou
 10 10 | subprocess.run(["ls"], **kwargs)
 11 11 | 
 
-error[PLW1510]: subprocess_run_without_check.py:10:1: [*] `subprocess.run` without explicit `check` argument
+error[PLW1510]: 10:1: [*] `subprocess.run` without explicit `check` argument
 
+  --> subprocess_run_without_check.py:9:2
    |
  8 |     shell=False,
  9 | )

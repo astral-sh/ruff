@@ -1,8 +1,9 @@
 ---
 source: crates/ruff_linter/src/rules/pyflakes/mod.rs
 ---
-error[F401]: F401_23.py:4:16: [*] `re.RegexFlag` imported but unused
+error[F401]: 4:16: [*] `re.RegexFlag` imported but unused
 
+ --> F401_23.py:4:16
   |
 3 | from pathlib import Path
 4 | from re import RegexFlag

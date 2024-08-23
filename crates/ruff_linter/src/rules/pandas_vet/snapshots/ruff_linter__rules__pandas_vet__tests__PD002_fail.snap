@@ -1,8 +1,9 @@
 ---
 source: crates/ruff_linter/src/rules/pandas_vet/mod.rs
 ---
-error[PD002]: <filename>:4:23: [*] `inplace=True` should be avoided; it has inconsistent behavior
+error[PD002]: 4:23: [*] `inplace=True` should be avoided; it has inconsistent behavior
 
+ --> <filename>:4:23
   |
 2 | import pandas as pd
 3 | x = pd.DataFrame()

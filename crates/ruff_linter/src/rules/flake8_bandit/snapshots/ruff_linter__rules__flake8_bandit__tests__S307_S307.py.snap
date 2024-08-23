@@ -1,8 +1,9 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_bandit/mod.rs
 ---
-error[S307]: S307.py:3:7: Use of possibly insecure function; consider using `ast.literal_eval`
+error[S307]: 3:7: Use of possibly insecure function; consider using `ast.literal_eval`
 
+ --> S307.py:3:7
   |
 1 | import os
 2 | 
@@ -10,8 +11,9 @@ error[S307]: S307.py:3:7: Use of possibly insecure function; consider using `ast
   |       ^^^^^^^^^^^
 4 | print(eval("os.getcwd()"))  # S307
   |
-error[S307]: S307.py:4:7: Use of possibly insecure function; consider using `ast.literal_eval`
+error[S307]: 4:7: Use of possibly insecure function; consider using `ast.literal_eval`
 
+ --> S307.py:4:7
   |
 3 | print(eval("1+1"))  # S307
 4 | print(eval("os.getcwd()"))  # S307

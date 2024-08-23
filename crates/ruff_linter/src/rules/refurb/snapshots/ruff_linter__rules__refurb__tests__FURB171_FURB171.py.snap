@@ -1,8 +1,9 @@
 ---
 source: crates/ruff_linter/src/rules/refurb/mod.rs
 ---
-error[FURB171]: FURB171.py:3:4: [*] Membership test against single-item container
+error[FURB171]: 3:4: [*] Membership test against single-item container
 
+ --> FURB171.py:3:4
   |
 1 | # Errors.
 2 | 
@@ -20,8 +21,9 @@ error[FURB171]: FURB171.py:3:4: [*] Membership test against single-item containe
 5 5 | 
 6 6 | if 1 in [1]:
 
-error[FURB171]: FURB171.py:6:4: [*] Membership test against single-item container
+error[FURB171]: 6:4: [*] Membership test against single-item container
 
+ --> FURB171.py:6:4
   |
 4 |     print("Single-element tuple")
 5 | 
@@ -40,8 +42,9 @@ error[FURB171]: FURB171.py:6:4: [*] Membership test against single-item containe
 8 8 | 
 9 9 | if 1 in {1}:
 
-error[FURB171]: FURB171.py:9:4: [*] Membership test against single-item container
+error[FURB171]: 9:4: [*] Membership test against single-item container
 
+  --> FURB171.py:9:4
    |
  7 |     print("Single-element list")
  8 | 
@@ -60,8 +63,9 @@ error[FURB171]: FURB171.py:9:4: [*] Membership test against single-item containe
 11 11 | 
 12 12 | if "a" in "a":
 
-error[FURB171]: FURB171.py:12:4: [*] Membership test against single-item container
+error[FURB171]: 12:4: [*] Membership test against single-item container
 
+  --> FURB171.py:12:4
    |
 10 |     print("Single-element set")
 11 | 
@@ -80,8 +84,9 @@ error[FURB171]: FURB171.py:12:4: [*] Membership test against single-item contain
 14 14 | 
 15 15 | if 1 not in (1,):
 
-error[FURB171]: FURB171.py:15:4: [*] Membership test against single-item container
+error[FURB171]: 15:4: [*] Membership test against single-item container
 
+  --> FURB171.py:15:4
    |
 13 |     print("Single-element string")
 14 | 
@@ -100,8 +105,9 @@ error[FURB171]: FURB171.py:15:4: [*] Membership test against single-item contain
 17 17 | 
 18 18 | if not 1 in (1,):
 
-error[FURB171]: FURB171.py:18:8: [*] Membership test against single-item container
+error[FURB171]: 18:8: [*] Membership test against single-item container
 
+  --> FURB171.py:18:8
    |
 16 |     print("Check `not in` membership test")
 17 | 

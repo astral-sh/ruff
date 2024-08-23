@@ -1,8 +1,9 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_2020/mod.rs
 ---
-error[YTT102]: YTT102.py:4:12: `sys.version[2]` referenced (python3.10), use `sys.version_info`
+error[YTT102]: 4:12: `sys.version[2]` referenced (python3.10), use `sys.version_info`
 
+ --> YTT102.py:4:12
   |
 2 | from sys import version
 3 | 
@@ -10,8 +11,9 @@ error[YTT102]: YTT102.py:4:12: `sys.version[2]` referenced (python3.10), use `sy
   |            ^^^^^^^^^^^
 5 | py_minor = version[2]
   |
-error[YTT102]: YTT102.py:5:12: `sys.version[2]` referenced (python3.10), use `sys.version_info`
+error[YTT102]: 5:12: `sys.version[2]` referenced (python3.10), use `sys.version_info`
 
+ --> YTT102.py:5:12
   |
 4 | py_minor = sys.version[2]
 5 | py_minor = version[2]

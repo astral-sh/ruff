@@ -1,8 +1,9 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_bugbear/mod.rs
 ---
-error[B028]: B028.py:8:1: No explicit `stacklevel` keyword argument found
+error[B028]: 8:1: No explicit `stacklevel` keyword argument found
 
+  --> B028.py:7:1
    |
  6 | """
  7 | 
@@ -11,8 +12,9 @@ error[B028]: B028.py:8:1: No explicit `stacklevel` keyword argument found
  9 | warnings.warn(DeprecationWarning("test"), source=None)
 10 | warnings.warn(DeprecationWarning("test"), source=None, stacklevel=2)
    |
-error[B028]: B028.py:9:1: No explicit `stacklevel` keyword argument found
+error[B028]: 9:1: No explicit `stacklevel` keyword argument found
 
+  --> B028.py:8:42
    |
  8 | warnings.warn(DeprecationWarning("test"))
  9 | warnings.warn(DeprecationWarning("test"), source=None)

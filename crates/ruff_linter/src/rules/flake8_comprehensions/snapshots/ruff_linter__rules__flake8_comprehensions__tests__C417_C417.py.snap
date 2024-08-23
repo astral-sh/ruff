@@ -1,8 +1,9 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_comprehensions/mod.rs
 ---
-error[C417]: C417.py:3:1: [*] Unnecessary `map` usage (rewrite using a generator expression)
+error[C417]: 3:1: [*] Unnecessary `map` usage (rewrite using a generator expression)
 
+ --> C417.py:2:17
   |
 1 | # Errors.
 2 | nums = [1, 2, 3]
@@ -21,8 +22,9 @@ error[C417]: C417.py:3:1: [*] Unnecessary `map` usage (rewrite using a generator
 5 5 | list(map(lambda x: x * 2, nums))
 6 6 | set(map(lambda x: x % 2 == 0, nums))
 
-error[C417]: C417.py:4:1: [*] Unnecessary `map` usage (rewrite using a generator expression)
+error[C417]: 4:1: [*] Unnecessary `map` usage (rewrite using a generator expression)
 
+ --> C417.py:3:27
   |
 2 | nums = [1, 2, 3]
 3 | map(lambda x: x + 1, nums)
@@ -42,8 +44,9 @@ error[C417]: C417.py:4:1: [*] Unnecessary `map` usage (rewrite using a generator
 6 6 | set(map(lambda x: x % 2 == 0, nums))
 7 7 | dict(map(lambda v: (v, v**2), nums))
 
-error[C417]: C417.py:5:1: [*] Unnecessary `map` usage (rewrite using a `list` comprehension)
+error[C417]: 5:1: [*] Unnecessary `map` usage (rewrite using a `list` comprehension)
 
+ --> C417.py:4:28
   |
 3 | map(lambda x: x + 1, nums)
 4 | map(lambda x: str(x), nums)
@@ -63,8 +66,9 @@ error[C417]: C417.py:5:1: [*] Unnecessary `map` usage (rewrite using a `list` co
 7 7 | dict(map(lambda v: (v, v**2), nums))
 8 8 | dict(map(lambda v: [v, v**2], nums))
 
-error[C417]: C417.py:6:1: [*] Unnecessary `map` usage (rewrite using a `set` comprehension)
+error[C417]: 6:1: [*] Unnecessary `map` usage (rewrite using a `set` comprehension)
 
+ --> C417.py:5:33
   |
 4 | map(lambda x: str(x), nums)
 5 | list(map(lambda x: x * 2, nums))
@@ -84,8 +88,9 @@ error[C417]: C417.py:6:1: [*] Unnecessary `map` usage (rewrite using a `set` com
 8 8 | dict(map(lambda v: [v, v**2], nums))
 9 9 | map(lambda: "const", nums)
 
-error[C417]: C417.py:7:1: [*] Unnecessary `map` usage (rewrite using a `dict` comprehension)
+error[C417]: 7:1: [*] Unnecessary `map` usage (rewrite using a `dict` comprehension)
 
+ --> C417.py:6:37
   |
 5 | list(map(lambda x: x * 2, nums))
 6 | set(map(lambda x: x % 2 == 0, nums))
@@ -105,8 +110,9 @@ error[C417]: C417.py:7:1: [*] Unnecessary `map` usage (rewrite using a `dict` co
 9 9 | map(lambda: "const", nums)
 10 10 | map(lambda _: 3.0, nums)
 
-error[C417]: C417.py:8:1: [*] Unnecessary `map` usage (rewrite using a `dict` comprehension)
+error[C417]: 8:1: [*] Unnecessary `map` usage (rewrite using a `dict` comprehension)
 
+  --> C417.py:7:37
    |
  6 | set(map(lambda x: x % 2 == 0, nums))
  7 | dict(map(lambda v: (v, v**2), nums))
@@ -126,8 +132,9 @@ error[C417]: C417.py:8:1: [*] Unnecessary `map` usage (rewrite using a `dict` co
 10 10 | map(lambda _: 3.0, nums)
 11 11 | _ = "".join(map(lambda x: x in nums and "1" or "0", range(123)))
 
-error[C417]: C417.py:9:1: [*] Unnecessary `map` usage (rewrite using a generator expression)
+error[C417]: 9:1: [*] Unnecessary `map` usage (rewrite using a generator expression)
 
+  --> C417.py:8:37
    |
  7 | dict(map(lambda v: (v, v**2), nums))
  8 | dict(map(lambda v: [v, v**2], nums))
@@ -147,8 +154,9 @@ error[C417]: C417.py:9:1: [*] Unnecessary `map` usage (rewrite using a generator
 11 11 | _ = "".join(map(lambda x: x in nums and "1" or "0", range(123)))
 12 12 | all(map(lambda v: isinstance(v, dict), nums))
 
-error[C417]: C417.py:10:1: [*] Unnecessary `map` usage (rewrite using a generator expression)
+error[C417]: 10:1: [*] Unnecessary `map` usage (rewrite using a generator expression)
 
+  --> C417.py:9:27
    |
  8 | dict(map(lambda v: [v, v**2], nums))
  9 | map(lambda: "const", nums)
@@ -168,8 +176,9 @@ error[C417]: C417.py:10:1: [*] Unnecessary `map` usage (rewrite using a generato
 12 12 | all(map(lambda v: isinstance(v, dict), nums))
 13 13 | filter(func, map(lambda v: v, nums))
 
-error[C417]: C417.py:11:13: [*] Unnecessary `map` usage (rewrite using a generator expression)
+error[C417]: 11:13: [*] Unnecessary `map` usage (rewrite using a generator expression)
 
+  --> C417.py:11:13
    |
  9 | map(lambda: "const", nums)
 10 | map(lambda _: 3.0, nums)
@@ -189,8 +198,9 @@ error[C417]: C417.py:11:13: [*] Unnecessary `map` usage (rewrite using a generat
 13 13 | filter(func, map(lambda v: v, nums))
 14 14 | list(map(lambda x, y: x * y, nums))
 
-error[C417]: C417.py:12:5: [*] Unnecessary `map` usage (rewrite using a generator expression)
+error[C417]: 12:5: [*] Unnecessary `map` usage (rewrite using a generator expression)
 
+  --> C417.py:12:5
    |
 10 | map(lambda _: 3.0, nums)
 11 | _ = "".join(map(lambda x: x in nums and "1" or "0", range(123)))
@@ -210,8 +220,9 @@ error[C417]: C417.py:12:5: [*] Unnecessary `map` usage (rewrite using a generato
 14 14 | list(map(lambda x, y: x * y, nums))
 15 15 | 
 
-error[C417]: C417.py:13:14: [*] Unnecessary `map` usage (rewrite using a generator expression)
+error[C417]: 13:14: [*] Unnecessary `map` usage (rewrite using a generator expression)
 
+  --> C417.py:13:14
    |
 11 | _ = "".join(map(lambda x: x in nums and "1" or "0", range(123)))
 12 | all(map(lambda v: isinstance(v, dict), nums))
@@ -230,8 +241,9 @@ error[C417]: C417.py:13:14: [*] Unnecessary `map` usage (rewrite using a generat
 15 15 | 
 16 16 | # When inside f-string, then the fix should be surrounded by whitespace
 
-error[C417]: C417.py:14:1: [*] Unnecessary `map` usage (rewrite using a `list` comprehension)
+error[C417]: 14:1: [*] Unnecessary `map` usage (rewrite using a `list` comprehension)
 
+  --> C417.py:13:37
    |
 12 | all(map(lambda v: isinstance(v, dict), nums))
 13 | filter(func, map(lambda v: v, nums))
@@ -251,8 +263,9 @@ error[C417]: C417.py:14:1: [*] Unnecessary `map` usage (rewrite using a `list` c
 16 16 | # When inside f-string, then the fix should be surrounded by whitespace
 17 17 | _ = f"{set(map(lambda x: x % 2 == 0, nums))}"
 
-error[C417]: C417.py:17:8: [*] Unnecessary `map` usage (rewrite using a `set` comprehension)
+error[C417]: 17:8: [*] Unnecessary `map` usage (rewrite using a `set` comprehension)
 
+  --> C417.py:17:8
    |
 16 | # When inside f-string, then the fix should be surrounded by whitespace
 17 | _ = f"{set(map(lambda x: x % 2 == 0, nums))}"
@@ -270,8 +283,9 @@ error[C417]: C417.py:17:8: [*] Unnecessary `map` usage (rewrite using a `set` co
 19 19 | 
 20 20 | # False negatives.
 
-error[C417]: C417.py:18:8: [*] Unnecessary `map` usage (rewrite using a `dict` comprehension)
+error[C417]: 18:8: [*] Unnecessary `map` usage (rewrite using a `dict` comprehension)
 
+  --> C417.py:18:8
    |
 16 | # When inside f-string, then the fix should be surrounded by whitespace
 17 | _ = f"{set(map(lambda x: x % 2 == 0, nums))}"
@@ -291,8 +305,9 @@ error[C417]: C417.py:18:8: [*] Unnecessary `map` usage (rewrite using a `dict` c
 20 20 | # False negatives.
 21 21 | map(lambda x=2, y=1: x + y, nums, nums)
 
-error[C417]: C417.py:36:1: [*] Unnecessary `map` usage (rewrite using a generator expression)
+error[C417]: 36:1: [*] Unnecessary `map` usage (rewrite using a generator expression)
 
+  --> C417.py:35:52
    |
 35 | # Error: the `x` is overridden by the inner lambda.
 36 | map(lambda x: lambda x: x, range(4))
@@ -311,8 +326,9 @@ error[C417]: C417.py:36:1: [*] Unnecessary `map` usage (rewrite using a generato
 38 38 | # Ok because of the default parameters, and variadic arguments.
 39 39 | map(lambda x=1: x, nums)
 
-error[C417]: C417.py:47:1: [*] Unnecessary `map` usage (rewrite using a generator expression)
+error[C417]: 47:1: [*] Unnecessary `map` usage (rewrite using a generator expression)
 
+  --> C417.py:46:69
    |
 46 | # Regression test for: https://github.com/astral-sh/ruff/issues/7121
 47 | map(lambda x: x, y if y else z)
@@ -330,8 +346,9 @@ error[C417]: C417.py:47:1: [*] Unnecessary `map` usage (rewrite using a generato
 48 48 | map(lambda x: x, (y if y else z))
 49 49 | map(lambda x: x, (x, y, z))
 
-error[C417]: C417.py:48:1: [*] Unnecessary `map` usage (rewrite using a generator expression)
+error[C417]: 48:1: [*] Unnecessary `map` usage (rewrite using a generator expression)
 
+  --> C417.py:47:32
    |
 46 | # Regression test for: https://github.com/astral-sh/ruff/issues/7121
 47 | map(lambda x: x, y if y else z)
@@ -348,8 +365,9 @@ error[C417]: C417.py:48:1: [*] Unnecessary `map` usage (rewrite using a generato
    48 |+(x for x in (y if y else z))
 49 49 | map(lambda x: x, (x, y, z))
 
-error[C417]: C417.py:49:1: [*] Unnecessary `map` usage (rewrite using a generator expression)
+error[C417]: 49:1: [*] Unnecessary `map` usage (rewrite using a generator expression)
 
+  --> C417.py:48:34
    |
 47 | map(lambda x: x, y if y else z)
 48 | map(lambda x: x, (y if y else z))

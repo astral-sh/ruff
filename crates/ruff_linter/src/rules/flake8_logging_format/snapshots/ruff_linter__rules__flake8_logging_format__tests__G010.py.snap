@@ -1,8 +1,9 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_logging_format/mod.rs
 ---
-error[G010]: G010.py:6:9: [*] Logging statement uses `warn` instead of `warning`
+error[G010]: 6:9: [*] Logging statement uses `warn` instead of `warning`
 
+ --> G010.py:6:9
   |
 4 | from logging_setup import logger
 5 | 
@@ -22,8 +23,9 @@ error[G010]: G010.py:6:9: [*] Logging statement uses `warn` instead of `warning`
 8 8 | logger.warn("Hello world!")
 9 9 | 
 
-error[G010]: G010.py:8:8: [*] Logging statement uses `warn` instead of `warning`
+error[G010]: 8:8: [*] Logging statement uses `warn` instead of `warning`
 
+  --> G010.py:8:8
    |
  6 | logging.warn("Hello World!")
  7 | log.warn("Hello world!")  # This shouldn't be considered as a logger candidate
@@ -43,8 +45,9 @@ error[G010]: G010.py:8:8: [*] Logging statement uses `warn` instead of `warning`
 10 10 | logging . warn("Hello World!")
 11 11 | 
 
-error[G010]: G010.py:10:11: [*] Logging statement uses `warn` instead of `warning`
+error[G010]: 10:11: [*] Logging statement uses `warn` instead of `warning`
 
+  --> G010.py:10:11
    |
  8 | logger.warn("Hello world!")
  9 | 
@@ -64,8 +67,9 @@ error[G010]: G010.py:10:11: [*] Logging statement uses `warn` instead of `warnin
 12 12 | from logging import warn, warning, exception
 13 13 | warn("foo")
 
-error[G010]: G010.py:13:1: [*] Logging statement uses `warn` instead of `warning`
+error[G010]: 13:1: [*] Logging statement uses `warn` instead of `warning`
 
+  --> G010.py:12:45
    |
 12 | from logging import warn, warning, exception
 13 | warn("foo")

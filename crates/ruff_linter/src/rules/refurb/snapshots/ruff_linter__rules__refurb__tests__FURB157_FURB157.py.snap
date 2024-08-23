@@ -1,8 +1,9 @@
 ---
 source: crates/ruff_linter/src/rules/refurb/mod.rs
 ---
-error[FURB157]: FURB157.py:5:9: [*] Verbose expression in `Decimal` constructor
+error[FURB157]: 5:9: [*] Verbose expression in `Decimal` constructor
 
+ --> FURB157.py:5:9
   |
 4 | # Errors
 5 | Decimal("0")
@@ -21,8 +22,9 @@ error[FURB157]: FURB157.py:5:9: [*] Verbose expression in `Decimal` constructor
 7 7 | Decimal(float("Infinity"))
 8 8 | Decimal(float("-Infinity"))
 
-error[FURB157]: FURB157.py:6:9: [*] Verbose expression in `Decimal` constructor
+error[FURB157]: 6:9: [*] Verbose expression in `Decimal` constructor
 
+ --> FURB157.py:6:9
   |
 4 | # Errors
 5 | Decimal("0")
@@ -42,8 +44,9 @@ error[FURB157]: FURB157.py:6:9: [*] Verbose expression in `Decimal` constructor
 8 8 | Decimal(float("-Infinity"))
 9 9 | Decimal(float("inf"))
 
-error[FURB157]: FURB157.py:7:9: [*] Verbose expression in `Decimal` constructor
+error[FURB157]: 7:9: [*] Verbose expression in `Decimal` constructor
 
+ --> FURB157.py:7:9
   |
 5 | Decimal("0")
 6 | Decimal("-42")
@@ -63,8 +66,9 @@ error[FURB157]: FURB157.py:7:9: [*] Verbose expression in `Decimal` constructor
 9 9 | Decimal(float("inf"))
 10 10 | Decimal(float("-inf"))
 
-error[FURB157]: FURB157.py:8:9: [*] Verbose expression in `Decimal` constructor
+error[FURB157]: 8:9: [*] Verbose expression in `Decimal` constructor
 
+  --> FURB157.py:8:9
    |
  6 | Decimal("-42")
  7 | Decimal(float("Infinity"))
@@ -84,8 +88,9 @@ error[FURB157]: FURB157.py:8:9: [*] Verbose expression in `Decimal` constructor
 10 10 | Decimal(float("-inf"))
 11 11 | Decimal(float("nan"))
 
-error[FURB157]: FURB157.py:9:9: [*] Verbose expression in `Decimal` constructor
+error[FURB157]: 9:9: [*] Verbose expression in `Decimal` constructor
 
+  --> FURB157.py:9:9
    |
  7 | Decimal(float("Infinity"))
  8 | Decimal(float("-Infinity"))
@@ -105,8 +110,9 @@ error[FURB157]: FURB157.py:9:9: [*] Verbose expression in `Decimal` constructor
 11 11 | Decimal(float("nan"))
 12 12 | decimal.Decimal("0")
 
-error[FURB157]: FURB157.py:10:9: [*] Verbose expression in `Decimal` constructor
+error[FURB157]: 10:9: [*] Verbose expression in `Decimal` constructor
 
+  --> FURB157.py:10:9
    |
  8 | Decimal(float("-Infinity"))
  9 | Decimal(float("inf"))
@@ -126,8 +132,9 @@ error[FURB157]: FURB157.py:10:9: [*] Verbose expression in `Decimal` constructor
 12 12 | decimal.Decimal("0")
 13 13 | 
 
-error[FURB157]: FURB157.py:11:9: [*] Verbose expression in `Decimal` constructor
+error[FURB157]: 11:9: [*] Verbose expression in `Decimal` constructor
 
+  --> FURB157.py:11:9
    |
  9 | Decimal(float("inf"))
 10 | Decimal(float("-inf"))
@@ -146,8 +153,9 @@ error[FURB157]: FURB157.py:11:9: [*] Verbose expression in `Decimal` constructor
 13 13 | 
 14 14 | # OK
 
-error[FURB157]: FURB157.py:12:17: [*] Verbose expression in `Decimal` constructor
+error[FURB157]: 12:17: [*] Verbose expression in `Decimal` constructor
 
+  --> FURB157.py:12:17
    |
 10 | Decimal(float("-inf"))
 11 | Decimal(float("nan"))

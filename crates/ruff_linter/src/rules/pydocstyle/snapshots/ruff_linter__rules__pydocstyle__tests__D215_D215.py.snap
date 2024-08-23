@@ -1,8 +1,9 @@
 ---
 source: crates/ruff_linter/src/rules/pydocstyle/mod.rs
 ---
-error[D215]: D215.py:3:5: [*] Section underline is over-indented ("TODO")
+error[D215]: 3:5: [*] Section underline is over-indented ("TODO")
 
+ --> D215.py:3:5
   |
 1 | """
 2 | TODO:

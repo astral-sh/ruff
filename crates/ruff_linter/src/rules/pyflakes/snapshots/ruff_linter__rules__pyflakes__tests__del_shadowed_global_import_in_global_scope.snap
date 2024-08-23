@@ -1,8 +1,9 @@
 ---
 source: crates/ruff_linter/src/rules/pyflakes/mod.rs
 ---
-error[F401]: <filename>:5:12: [*] `os` imported but unused
+error[F401]: 5:12: [*] `os` imported but unused
 
+ --> <filename>:5:12
   |
 4 | def f():
 5 |     import os

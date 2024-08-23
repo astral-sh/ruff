@@ -1,8 +1,9 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_bugbear/mod.rs
 ---
-error[B015]: B015.ipynb:5:1: Pointless comparison. Did you mean to assign a value? Otherwise, prepend `assert` or remove it.
+error[B015]: 5:1: Pointless comparison. Did you mean to assign a value? Otherwise, prepend `assert` or remove it.
 
+ --> B015.ipynb:4:32
   |
 3 | x == 1
 4 | # Only skip the last expression
@@ -11,8 +12,9 @@ error[B015]: B015.ipynb:5:1: Pointless comparison. Did you mean to assign a valu
 6 | x == 1
 7 | # Nested expressions isn't relevant
   |
-error[B015]: B015.ipynb:9:5: Pointless comparison. Did you mean to assign a value? Otherwise, prepend `assert` or remove it.
+error[B015]: 9:5: Pointless comparison. Did you mean to assign a value? Otherwise, prepend `assert` or remove it.
 
+  --> B015.ipynb:9:5
    |
  7 | # Nested expressions isn't relevant
  8 | if True:
@@ -21,8 +23,9 @@ error[B015]: B015.ipynb:9:5: Pointless comparison. Did you mean to assign a valu
 10 | # Semicolons shouldn't affect the output
 11 | x == 1;
    |
-error[B015]: B015.ipynb:13:1: Pointless comparison. Did you mean to assign a value? Otherwise, prepend `assert` or remove it.
+error[B015]: 13:1: Pointless comparison. Did you mean to assign a value? Otherwise, prepend `assert` or remove it.
 
+  --> B015.ipynb:12:39
    |
 11 | x == 1;
 12 | # Semicolons with multiple expressions

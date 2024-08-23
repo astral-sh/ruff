@@ -1,8 +1,9 @@
 ---
 source: crates/ruff_linter/src/rules/pyflakes/mod.rs
 ---
-error[F811]: F811_29.pyi:8:1: Redefinition of unused `Bar` from line 3
+error[F811]: 8:1: Redefinition of unused `Bar` from line 3
 
+ --> F811_29.pyi:7:1
   |
 6 |     Bar: int  # OK
 7 | 

@@ -1,8 +1,9 @@
 ---
 source: crates/ruff_linter/src/rules/pyupgrade/mod.rs
 ---
-error[UP022]: UP022.py:4:10: [*] Prefer `capture_output` over sending `stdout` and `stderr` to `PIPE`
+error[UP022]: 4:10: [*] Prefer `capture_output` over sending `stdout` and `stderr` to `PIPE`
 
+ --> UP022.py:4:10
   |
 2 | import subprocess
 3 | 
@@ -22,8 +23,9 @@ error[UP022]: UP022.py:4:10: [*] Prefer `capture_output` over sending `stdout` a
 6 6 | output = subprocess.run(["foo"], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
 7 7 | 
 
-error[UP022]: UP022.py:6:10: [*] Prefer `capture_output` over sending `stdout` and `stderr` to `PIPE`
+error[UP022]: 6:10: [*] Prefer `capture_output` over sending `stdout` and `stderr` to `PIPE`
 
+ --> UP022.py:6:10
   |
 4 | output = run(["foo"], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
 5 | 
@@ -43,8 +45,9 @@ error[UP022]: UP022.py:6:10: [*] Prefer `capture_output` over sending `stdout` a
 8 8 | output = subprocess.run(stdout=subprocess.PIPE, args=["foo"],  stderr=subprocess.PIPE)
 9 9 | 
 
-error[UP022]: UP022.py:8:10: [*] Prefer `capture_output` over sending `stdout` and `stderr` to `PIPE`
+error[UP022]: 8:10: [*] Prefer `capture_output` over sending `stdout` and `stderr` to `PIPE`
 
+  --> UP022.py:8:10
    |
  6 | output = subprocess.run(["foo"], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
  7 | 
@@ -64,8 +67,9 @@ error[UP022]: UP022.py:8:10: [*] Prefer `capture_output` over sending `stdout` a
 10 10 | output = subprocess.run(
 11 11 |     ["foo"], stdout=subprocess.PIPE, check=True, stderr=subprocess.PIPE
 
-error[UP022]: UP022.py:10:10: [*] Prefer `capture_output` over sending `stdout` and `stderr` to `PIPE`
+error[UP022]: 10:10: [*] Prefer `capture_output` over sending `stdout` and `stderr` to `PIPE`
 
+  --> UP022.py:10:10
    |
  8 |   output = subprocess.run(stdout=subprocess.PIPE, args=["foo"],  stderr=subprocess.PIPE)
  9 |   
@@ -88,8 +92,9 @@ error[UP022]: UP022.py:10:10: [*] Prefer `capture_output` over sending `stdout` 
 13 13 | 
 14 14 | output = subprocess.run(
 
-error[UP022]: UP022.py:14:10: [*] Prefer `capture_output` over sending `stdout` and `stderr` to `PIPE`
+error[UP022]: 14:10: [*] Prefer `capture_output` over sending `stdout` and `stderr` to `PIPE`
 
+  --> UP022.py:14:10
    |
 12 |   )
 13 |   
@@ -112,8 +117,9 @@ error[UP022]: UP022.py:14:10: [*] Prefer `capture_output` over sending `stdout` 
 17 17 | 
 18 18 | output = subprocess.run(
 
-error[UP022]: UP022.py:18:10: [*] Prefer `capture_output` over sending `stdout` and `stderr` to `PIPE`
+error[UP022]: 18:10: [*] Prefer `capture_output` over sending `stdout` and `stderr` to `PIPE`
 
+  --> UP022.py:18:10
    |
 16 |   )
 17 |   
@@ -144,8 +150,9 @@ error[UP022]: UP022.py:18:10: [*] Prefer `capture_output` over sending `stdout` 
 24 23 |     encoding="utf-8",
 25 24 |     close_fds=True,
 
-error[UP022]: UP022.py:29:14: [*] Prefer `capture_output` over sending `stdout` and `stderr` to `PIPE`
+error[UP022]: 29:14: [*] Prefer `capture_output` over sending `stdout` and `stderr` to `PIPE`
 
+  --> UP022.py:29:14
    |
 28 |   if output:
 29 |       output = subprocess.run(
@@ -174,8 +181,9 @@ error[UP022]: UP022.py:29:14: [*] Prefer `capture_output` over sending `stdout` 
 35 34 |         encoding="utf-8",
 36 35 |     )
 
-error[UP022]: UP022.py:38:10: Prefer `capture_output` over sending `stdout` and `stderr` to `PIPE`
+error[UP022]: 38:10: Prefer `capture_output` over sending `stdout` and `stderr` to `PIPE`
 
+  --> UP022.py:38:10
    |
 36 |       )
 37 |   
@@ -188,8 +196,9 @@ error[UP022]: UP022.py:38:10: Prefer `capture_output` over sending `stdout` and 
 42 |   output = subprocess.run(
    |
    = help: Replace with `capture_output` keyword argument
-error[UP022]: UP022.py:42:10: Prefer `capture_output` over sending `stdout` and `stderr` to `PIPE`
+error[UP022]: 42:10: Prefer `capture_output` over sending `stdout` and `stderr` to `PIPE`
 
+  --> UP022.py:42:10
    |
 40 |   )
 41 |   
@@ -202,8 +211,9 @@ error[UP022]: UP022.py:42:10: Prefer `capture_output` over sending `stdout` and 
 46 |   output = subprocess.run(
    |
    = help: Replace with `capture_output` keyword argument
-error[UP022]: UP022.py:46:10: Prefer `capture_output` over sending `stdout` and `stderr` to `PIPE`
+error[UP022]: 46:10: Prefer `capture_output` over sending `stdout` and `stderr` to `PIPE`
 
+  --> UP022.py:46:10
    |
 44 |   )
 45 |   

@@ -1,11 +1,13 @@
 ---
 source: crates/ruff_linter/src/rules/isort/mod.rs
 ---
-error[I001]: reorder_within_section.py:1:1: [*] Import block is un-sorted or un-formatted
+error[I001]: 1:1: [*] Import block is un-sorted or un-formatted
 
+ --> reorder_within_section.py:1:1
   |
 1 | / import sys
 2 | | import os
+  | |__________^
   |
   = help: Organize imports
 ℹ Safe fix

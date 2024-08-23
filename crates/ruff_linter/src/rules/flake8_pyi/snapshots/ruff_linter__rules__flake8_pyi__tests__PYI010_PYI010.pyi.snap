@@ -1,8 +1,9 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_pyi/mod.rs
 ---
-error[PYI010]: PYI010.pyi:6:5: [*] Function body must contain only `...`
+error[PYI010]: 6:5: [*] Function body must contain only `...`
 
+ --> PYI010.pyi:6:5
   |
 5 | def buzz():
 6 |     print("buzz")  # ERROR PYI010
@@ -21,8 +22,9 @@ error[PYI010]: PYI010.pyi:6:5: [*] Function body must contain only `...`
 8 8 | def foo2():
 9 9 |     123  # ERROR PYI010
 
-error[PYI010]: PYI010.pyi:9:5: [*] Function body must contain only `...`
+error[PYI010]: 9:5: [*] Function body must contain only `...`
 
+  --> PYI010.pyi:9:5
    |
  8 | def foo2():
  9 |     123  # ERROR PYI010
@@ -41,8 +43,9 @@ error[PYI010]: PYI010.pyi:9:5: [*] Function body must contain only `...`
 11 11 | def bizz():
 12 12 |     x = 123  # ERROR PYI010
 
-error[PYI010]: PYI010.pyi:12:5: [*] Function body must contain only `...`
+error[PYI010]: 12:5: [*] Function body must contain only `...`
 
+  --> PYI010.pyi:12:5
    |
 11 | def bizz():
 12 |     x = 123  # ERROR PYI010

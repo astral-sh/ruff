@@ -1,8 +1,9 @@
 ---
 source: crates/ruff_linter/src/rules/pydocstyle/mod.rs
 ---
-error[D101]: D.py:15:7: Missing docstring in public class
+error[D101]: 15:7: Missing docstring in public class
 
+  --> D.py:15:7
    |
 15 | class class_:
    |       ^^^^^^

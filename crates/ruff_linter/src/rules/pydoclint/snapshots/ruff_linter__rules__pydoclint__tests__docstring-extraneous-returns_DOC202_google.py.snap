@@ -1,26 +1,29 @@
 ---
 source: crates/ruff_linter/src/rules/pydoclint/mod.rs
 ---
-DOC202_google.py:20:1: DOC202 Docstring should not have a returns section because the function doesn't return anything
+error[DOC202]: 20:1: Docstring should not have a returns section because the function doesn't return anything
+
+  --> DOC202_google.py:19:1
    |
 18 |           num (int): A number
 19 |   
 20 | /     Returns:
 21 | |         str: A string
 22 | |     """
-   | |____^ DOC202
+   | |____^
 23 |       print('test')
    |
    = help: Remove the "Returns" section
+error[DOC202]: 36:1: Docstring should not have a returns section because the function doesn't return anything
 
-DOC202_google.py:36:1: DOC202 Docstring should not have a returns section because the function doesn't return anything
+  --> DOC202_google.py:35:1
    |
 34 |               num (int): A number
 35 |   
 36 | /         Returns:
 37 | |             str: A string
 38 | |         """
-   | |________^ DOC202
+   | |________^
 39 |           print('test')
    |
    = help: Remove the "Returns" section

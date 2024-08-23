@@ -1,15 +1,17 @@
 ---
 source: crates/ruff_linter/src/rules/pyflakes/mod.rs
 ---
-error[F823]: F823.py:6:5: Local variable `my_var` referenced before assignment
+error[F823]: 6:5: Local variable `my_var` referenced before assignment
 
+ --> F823.py:6:5
   |
 5 | def foo():
 6 |     my_var += 1
   |     ^^^^^^
   |
-error[F823]: F823.py:32:15: Local variable `my_var` referenced before assignment
+error[F823]: 32:15: Local variable `my_var` referenced before assignment
 
+  --> F823.py:32:15
    |
 30 | class Class:
 31 |     def f(self):
@@ -17,16 +19,18 @@ error[F823]: F823.py:32:15: Local variable `my_var` referenced before assignment
    |               ^^^^^^
 33 |         my_var = 1
    |
-error[F823]: F823.py:40:15: Local variable `my_var` referenced before assignment
+error[F823]: 40:15: Local variable `my_var` referenced before assignment
 
+  --> F823.py:40:15
    |
 39 |     def f(self):
 40 |         print(my_var)
    |               ^^^^^^
 41 |         my_var = 1
    |
-error[F823]: F823.py:48:11: Local variable `sys` referenced before assignment
+error[F823]: 48:11: Local variable `sys` referenced before assignment
 
+  --> F823.py:48:11
    |
 47 | def main():
 48 |     print(sys.argv)
@@ -34,8 +38,9 @@ error[F823]: F823.py:48:11: Local variable `sys` referenced before assignment
 49 | 
 50 |     try:
    |
-error[F823]: F823.py:62:11: Local variable `sys` referenced before assignment
+error[F823]: 62:11: Local variable `sys` referenced before assignment
 
+  --> F823.py:62:11
    |
 61 | def main():
 62 |     print(sys.argv)

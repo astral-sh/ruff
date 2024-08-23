@@ -22,7 +22,7 @@ expression: content
           }
         }
       },
-      "message": "SyntaxError: Expected one or more symbol names after import"
+      "message": "Expected one or more symbol names after import"
     },
     {
       "code": {
@@ -42,7 +42,7 @@ expression: content
           }
         }
       },
-      "message": "SyntaxError: Expected ')', found newline"
+      "message": "Expected ')', found newline"
     }
   ],
   "severity": "warning",

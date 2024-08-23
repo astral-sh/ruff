@@ -1,40 +1,46 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_pyi/mod.rs
 ---
-error[PYI041]: PYI041.pyi:21:14: Use `float` instead of `int | float`
+error[PYI041]: 21:14: Use `float` instead of `int | float`
 
+  --> PYI041.pyi:21:14
    |
 21 | def f0(arg1: float | int) -> None: ...  # PYI041
    |              ^^^^^^^^^^^
    |
-error[PYI041]: PYI041.pyi:24:30: Use `complex` instead of `float | complex`
+error[PYI041]: 24:30: Use `complex` instead of `float | complex`
 
+  --> PYI041.pyi:24:30
    |
 24 | def f1(arg1: float, *, arg2: float | list[str] | type[bool] | complex) -> None: ...  # PYI041
    |                              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
    |
-error[PYI041]: PYI041.pyi:27:28: Use `float` instead of `int | float`
+error[PYI041]: 27:28: Use `float` instead of `int | float`
 
+  --> PYI041.pyi:27:28
    |
 27 | def f2(arg1: int, /, arg2: int | int | float) -> None: ...  # PYI041
    |                            ^^^^^^^^^^^^^^^^^
    |
-error[PYI041]: PYI041.pyi:33:24: Use `float` instead of `int | float`
+error[PYI041]: 33:24: Use `float` instead of `int | float`
 
+  --> PYI041.pyi:33:24
    |
 33 | async def f4(**kwargs: int | int | float) -> None: ...  # PYI041
    |                        ^^^^^^^^^^^^^^^^^
    |
-error[PYI041]: PYI041.pyi:39:24: Use `complex` instead of `float | complex`
+error[PYI041]: 39:24: Use `complex` instead of `float | complex`
 
+  --> PYI041.pyi:39:24
    |
 37 |     def good(self, arg: int) -> None: ...
 38 | 
 39 |     def bad(self, arg: int | float | complex) -> None: ...  # PYI041
    |                        ^^^^^^^^^^^^^^^^^^^^^
    |
-error[PYI041]: PYI041.pyi:39:24: Use `complex` instead of `int | complex`
+error[PYI041]: 39:24: Use `complex` instead of `int | complex`
 
+  --> PYI041.pyi:39:24
    |
 37 |     def good(self, arg: int) -> None: ...
 38 | 

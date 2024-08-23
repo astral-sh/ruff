@@ -1,8 +1,9 @@
 ---
 source: crates/ruff_linter/src/rules/pydocstyle/mod.rs
 ---
-error[D419]: D.py:20:9: Docstring is empty
+error[D419]: 20:9: Docstring is empty
 
+  --> D.py:20:9
    |
 19 |     class meta:
 20 |         """"""
@@ -10,8 +11,9 @@ error[D419]: D.py:20:9: Docstring is empty
 21 | 
 22 |     @expect('D102: Missing docstring in public method')
    |
-error[D419]: D.py:74:5: Docstring is empty
+error[D419]: 74:5: Docstring is empty
 
+  --> D.py:74:5
    |
 72 | @expect('D419: Docstring is empty')
 73 | def function():
@@ -20,8 +22,9 @@ error[D419]: D.py:74:5: Docstring is empty
 75 |     def ok_since_nested():
 76 |         pass
    |
-error[D419]: D.py:80:9: Docstring is empty
+error[D419]: 80:9: Docstring is empty
 
+  --> D.py:80:9
    |
 78 |     @expect('D419: Docstring is empty')
 79 |     def nested():

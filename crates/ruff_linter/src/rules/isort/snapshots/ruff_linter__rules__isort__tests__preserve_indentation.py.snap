@@ -1,14 +1,15 @@
 ---
 source: crates/ruff_linter/src/rules/isort/mod.rs
 ---
-error[I001]: preserve_indentation.py:2:1: [*] Import block is un-sorted or un-formatted
+error[I001]: 2:1: [*] Import block is un-sorted or un-formatted
 
+ --> preserve_indentation.py:1:9
   |
 1 |   if True:
 2 | /     import sys
 3 | |     import os
-4 | | else:
-  | |_^
+  | |______________^
+4 |   else:
 5 |       import sys
 6 |       import os
   |
@@ -22,13 +23,15 @@ error[I001]: preserve_indentation.py:2:1: [*] Import block is un-sorted or un-fo
 5 5 |     import sys
 6 6 |     import os
 
-error[I001]: preserve_indentation.py:5:1: [*] Import block is un-sorted or un-formatted
+error[I001]: 5:1: [*] Import block is un-sorted or un-formatted
 
+ --> preserve_indentation.py:4:6
   |
 3 |       import os
 4 |   else:
 5 | /     import sys
 6 | |     import os
+  | |______________^
   |
   = help: Organize imports
 ℹ Safe fix

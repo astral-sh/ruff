@@ -1,8 +1,9 @@
 ---
 source: crates/ruff_linter/src/rules/pydocstyle/mod.rs
 ---
-error[D212]: D.py:129:5: [*] Multi-line docstring summary should start at the first line
+error[D212]: 129:5: [*] Multi-line docstring summary should start at the first line
 
+   --> D.py:129:5
     |
 127 |   @expect('D212: Multi-line docstring summary should start at the first line')
 128 |   def asdlkfasd():
@@ -24,8 +25,9 @@ error[D212]: D.py:129:5: [*] Multi-line docstring summary should start at the fi
 132 131 | 
 133 132 | 
 
-error[D212]: D.py:597:5: [*] Multi-line docstring summary should start at the first line
+error[D212]: 597:5: [*] Multi-line docstring summary should start at the first line
 
+   --> D.py:597:5
     |
 595 |   @expect('D212: Multi-line docstring summary should start at the first line')
 596 |   def one_liner():
@@ -48,8 +50,9 @@ error[D212]: D.py:597:5: [*] Multi-line docstring summary should start at the fi
 601 599 | 
 602 600 | @expect('D200: One-line docstring should fit on one line with quotes '
 
-error[D212]: D.py:624:5: [*] Multi-line docstring summary should start at the first line
+error[D212]: 624:5: [*] Multi-line docstring summary should start at the first line
 
+   --> D.py:624:5
     |
 622 |   @expect('D212: Multi-line docstring summary should start at the first line')
 623 |   def one_liner():

@@ -1,8 +1,9 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_fixme/mod.rs
 ---
-error[FIX003]: T00.py:3:3: Line contains XXX, consider resolving the issue
+error[FIX003]: 3:3: Line contains XXX, consider resolving the issue
 
+ --> T00.py:3:3
   |
 1 | # TODO: todo
 2 | # todo: todo
@@ -11,8 +12,9 @@ error[FIX003]: T00.py:3:3: Line contains XXX, consider resolving the issue
 4 | # xxx: xxx
 5 | # HACK: hack
   |
-error[FIX003]: T00.py:4:3: Line contains XXX, consider resolving the issue
+error[FIX003]: 4:3: Line contains XXX, consider resolving the issue
 
+ --> T00.py:4:3
   |
 2 | # todo: todo
 3 | # XXX: xxx

@@ -1,8 +1,9 @@
 ---
 source: crates/ruff_linter/src/rules/pyupgrade/mod.rs
 ---
-error[UP018]: UP018.py:37:1: [*] Unnecessary `str` call (rewrite as a literal)
+error[UP018]: 37:1: [*] Unnecessary `str` call (rewrite as a literal)
 
+  --> UP018.py:36:24
    |
 36 | # These become literals
 37 | str()
@@ -21,8 +22,9 @@ error[UP018]: UP018.py:37:1: [*] Unnecessary `str` call (rewrite as a literal)
 39 39 | str("""
 40 40 | foo""")
 
-error[UP018]: UP018.py:38:1: [*] Unnecessary `str` call (rewrite as a literal)
+error[UP018]: 38:1: [*] Unnecessary `str` call (rewrite as a literal)
 
+  --> UP018.py:37:6
    |
 36 | # These become literals
 37 | str()
@@ -42,8 +44,9 @@ error[UP018]: UP018.py:38:1: [*] Unnecessary `str` call (rewrite as a literal)
 40 40 | foo""")
 41 41 | bytes()
 
-error[UP018]: UP018.py:39:1: [*] Unnecessary `str` call (rewrite as a literal)
+error[UP018]: 39:1: [*] Unnecessary `str` call (rewrite as a literal)
 
+  --> UP018.py:38:11
    |
 37 |   str()
 38 |   str("foo")
@@ -66,8 +69,9 @@ error[UP018]: UP018.py:39:1: [*] Unnecessary `str` call (rewrite as a literal)
 42 42 | bytes(b"foo")
 43 43 | bytes(b"""
 
-error[UP018]: UP018.py:41:1: [*] Unnecessary `bytes` call (rewrite as a literal)
+error[UP018]: 41:1: [*] Unnecessary `bytes` call (rewrite as a literal)
 
+  --> UP018.py:40:8
    |
 39 | str("""
 40 | foo""")
@@ -87,8 +91,9 @@ error[UP018]: UP018.py:41:1: [*] Unnecessary `bytes` call (rewrite as a literal)
 43 43 | bytes(b"""
 44 44 | foo""")
 
-error[UP018]: UP018.py:42:1: [*] Unnecessary `bytes` call (rewrite as a literal)
+error[UP018]: 42:1: [*] Unnecessary `bytes` call (rewrite as a literal)
 
+  --> UP018.py:41:8
    |
 40 | foo""")
 41 | bytes()
@@ -108,8 +113,9 @@ error[UP018]: UP018.py:42:1: [*] Unnecessary `bytes` call (rewrite as a literal)
 44 44 | foo""")
 45 45 | f"{str()}"
 
-error[UP018]: UP018.py:43:1: [*] Unnecessary `bytes` call (rewrite as a literal)
+error[UP018]: 43:1: [*] Unnecessary `bytes` call (rewrite as a literal)
 
+  --> UP018.py:42:14
    |
 41 |   bytes()
 42 |   bytes(b"foo")
@@ -132,8 +138,9 @@ error[UP018]: UP018.py:43:1: [*] Unnecessary `bytes` call (rewrite as a literal)
 46 46 | int()
 47 47 | int(1)
 
-error[UP018]: UP018.py:45:4: [*] Unnecessary `str` call (rewrite as a literal)
+error[UP018]: 45:4: [*] Unnecessary `str` call (rewrite as a literal)
 
+  --> UP018.py:45:4
    |
 43 | bytes(b"""
 44 | foo""")
@@ -153,8 +160,9 @@ error[UP018]: UP018.py:45:4: [*] Unnecessary `str` call (rewrite as a literal)
 47 47 | int(1)
 48 48 | float()
 
-error[UP018]: UP018.py:46:1: [*] Unnecessary `int` call (rewrite as a literal)
+error[UP018]: 46:1: [*] Unnecessary `int` call (rewrite as a literal)
 
+  --> UP018.py:45:11
    |
 44 | foo""")
 45 | f"{str()}"
@@ -174,8 +182,9 @@ error[UP018]: UP018.py:46:1: [*] Unnecessary `int` call (rewrite as a literal)
 48 48 | float()
 49 49 | float(1.0)
 
-error[UP018]: UP018.py:47:1: [*] Unnecessary `int` call (rewrite as a literal)
+error[UP018]: 47:1: [*] Unnecessary `int` call (rewrite as a literal)
 
+  --> UP018.py:46:6
    |
 45 | f"{str()}"
 46 | int()
@@ -195,8 +204,9 @@ error[UP018]: UP018.py:47:1: [*] Unnecessary `int` call (rewrite as a literal)
 49 49 | float(1.0)
 50 50 | bool()
 
-error[UP018]: UP018.py:48:1: [*] Unnecessary `float` call (rewrite as a literal)
+error[UP018]: 48:1: [*] Unnecessary `float` call (rewrite as a literal)
 
+  --> UP018.py:47:7
    |
 46 | int()
 47 | int(1)
@@ -216,8 +226,9 @@ error[UP018]: UP018.py:48:1: [*] Unnecessary `float` call (rewrite as a literal)
 50 50 | bool()
 51 51 | bool(True)
 
-error[UP018]: UP018.py:49:1: [*] Unnecessary `float` call (rewrite as a literal)
+error[UP018]: 49:1: [*] Unnecessary `float` call (rewrite as a literal)
 
+  --> UP018.py:48:8
    |
 47 | int(1)
 48 | float()
@@ -237,8 +248,9 @@ error[UP018]: UP018.py:49:1: [*] Unnecessary `float` call (rewrite as a literal)
 51 51 | bool(True)
 52 52 | bool(False)
 
-error[UP018]: UP018.py:50:1: [*] Unnecessary `bool` call (rewrite as a literal)
+error[UP018]: 50:1: [*] Unnecessary `bool` call (rewrite as a literal)
 
+  --> UP018.py:49:11
    |
 48 | float()
 49 | float(1.0)
@@ -258,8 +270,9 @@ error[UP018]: UP018.py:50:1: [*] Unnecessary `bool` call (rewrite as a literal)
 52 52 | bool(False)
 53 53 | 
 
-error[UP018]: UP018.py:51:1: [*] Unnecessary `bool` call (rewrite as a literal)
+error[UP018]: 51:1: [*] Unnecessary `bool` call (rewrite as a literal)
 
+  --> UP018.py:50:7
    |
 49 | float(1.0)
 50 | bool()
@@ -278,8 +291,9 @@ error[UP018]: UP018.py:51:1: [*] Unnecessary `bool` call (rewrite as a literal)
 53 53 | 
 54 54 | # These become a literal but retain parentheses
 
-error[UP018]: UP018.py:52:1: [*] Unnecessary `bool` call (rewrite as a literal)
+error[UP018]: 52:1: [*] Unnecessary `bool` call (rewrite as a literal)
 
+  --> UP018.py:51:11
    |
 50 | bool()
 51 | bool(True)
@@ -299,8 +313,9 @@ error[UP018]: UP018.py:52:1: [*] Unnecessary `bool` call (rewrite as a literal)
 54 54 | # These become a literal but retain parentheses
 55 55 | int(1).denominator
 
-error[UP018]: UP018.py:55:1: [*] Unnecessary `int` call (rewrite as a literal)
+error[UP018]: 55:1: [*] Unnecessary `int` call (rewrite as a literal)
 
+  --> UP018.py:54:48
    |
 54 | # These become a literal but retain parentheses
 55 | int(1).denominator
@@ -319,8 +334,9 @@ error[UP018]: UP018.py:55:1: [*] Unnecessary `int` call (rewrite as a literal)
 57 57 | # These too are literals in spirit
 58 58 | int(+1)
 
-error[UP018]: UP018.py:58:1: [*] Unnecessary `int` call (rewrite as a literal)
+error[UP018]: 58:1: [*] Unnecessary `int` call (rewrite as a literal)
 
+  --> UP018.py:57:35
    |
 57 | # These too are literals in spirit
 58 | int(+1)
@@ -339,8 +355,9 @@ error[UP018]: UP018.py:58:1: [*] Unnecessary `int` call (rewrite as a literal)
 60 60 | float(+1.0)
 61 61 | float(-1.0)
 
-error[UP018]: UP018.py:59:1: [*] Unnecessary `int` call (rewrite as a literal)
+error[UP018]: 59:1: [*] Unnecessary `int` call (rewrite as a literal)
 
+  --> UP018.py:58:8
    |
 57 | # These too are literals in spirit
 58 | int(+1)
@@ -359,8 +376,9 @@ error[UP018]: UP018.py:59:1: [*] Unnecessary `int` call (rewrite as a literal)
 60 60 | float(+1.0)
 61 61 | float(-1.0)
 
-error[UP018]: UP018.py:60:1: [*] Unnecessary `float` call (rewrite as a literal)
+error[UP018]: 60:1: [*] Unnecessary `float` call (rewrite as a literal)
 
+  --> UP018.py:59:8
    |
 58 | int(+1)
 59 | int(-1)
@@ -377,8 +395,9 @@ error[UP018]: UP018.py:60:1: [*] Unnecessary `float` call (rewrite as a literal)
    60 |++1.0
 61 61 | float(-1.0)
 
-error[UP018]: UP018.py:61:1: [*] Unnecessary `float` call (rewrite as a literal)
+error[UP018]: 61:1: [*] Unnecessary `float` call (rewrite as a literal)
 
+  --> UP018.py:60:12
    |
 59 | int(-1)
 60 | float(+1.0)

@@ -1,16 +1,18 @@
 ---
 source: crates/ruff_linter/src/rules/pylint/mod.rs
 ---
-error[PLW0128]: redeclared_assigned_name.py:1:8: Redeclared variable `FIRST` in assignment
+error[PLW0128]: 1:8: Redeclared variable `FIRST` in assignment
 
+ --> redeclared_assigned_name.py:1:8
   |
 1 | FIRST, FIRST = (1, 2)  # PLW0128
   |        ^^^^^
 2 | FIRST, (FIRST, SECOND) = (1, (1, 2))  # PLW0128
 3 | FIRST, (FIRST, SECOND, (THIRD, FIRST)) = (1, (1, 2))  # PLW0128
   |
-error[PLW0128]: redeclared_assigned_name.py:2:9: Redeclared variable `FIRST` in assignment
+error[PLW0128]: 2:9: Redeclared variable `FIRST` in assignment
 
+ --> redeclared_assigned_name.py:2:9
   |
 1 | FIRST, FIRST = (1, 2)  # PLW0128
 2 | FIRST, (FIRST, SECOND) = (1, (1, 2))  # PLW0128
@@ -18,8 +20,9 @@ error[PLW0128]: redeclared_assigned_name.py:2:9: Redeclared variable `FIRST` in 
 3 | FIRST, (FIRST, SECOND, (THIRD, FIRST)) = (1, (1, 2))  # PLW0128
 4 | FIRST, SECOND, THIRD, FIRST, SECOND = (1, 2, 3, 4)  # PLW0128
   |
-error[PLW0128]: redeclared_assigned_name.py:3:9: Redeclared variable `FIRST` in assignment
+error[PLW0128]: 3:9: Redeclared variable `FIRST` in assignment
 
+ --> redeclared_assigned_name.py:3:9
   |
 1 | FIRST, FIRST = (1, 2)  # PLW0128
 2 | FIRST, (FIRST, SECOND) = (1, (1, 2))  # PLW0128
@@ -27,8 +30,9 @@ error[PLW0128]: redeclared_assigned_name.py:3:9: Redeclared variable `FIRST` in 
   |         ^^^^^
 4 | FIRST, SECOND, THIRD, FIRST, SECOND = (1, 2, 3, 4)  # PLW0128
   |
-error[PLW0128]: redeclared_assigned_name.py:3:32: Redeclared variable `FIRST` in assignment
+error[PLW0128]: 3:32: Redeclared variable `FIRST` in assignment
 
+ --> redeclared_assigned_name.py:3:32
   |
 1 | FIRST, FIRST = (1, 2)  # PLW0128
 2 | FIRST, (FIRST, SECOND) = (1, (1, 2))  # PLW0128
@@ -36,8 +40,9 @@ error[PLW0128]: redeclared_assigned_name.py:3:32: Redeclared variable `FIRST` in
   |                                ^^^^^
 4 | FIRST, SECOND, THIRD, FIRST, SECOND = (1, 2, 3, 4)  # PLW0128
   |
-error[PLW0128]: redeclared_assigned_name.py:4:23: Redeclared variable `FIRST` in assignment
+error[PLW0128]: 4:23: Redeclared variable `FIRST` in assignment
 
+ --> redeclared_assigned_name.py:4:23
   |
 2 | FIRST, (FIRST, SECOND) = (1, (1, 2))  # PLW0128
 3 | FIRST, (FIRST, SECOND, (THIRD, FIRST)) = (1, (1, 2))  # PLW0128
@@ -46,8 +51,9 @@ error[PLW0128]: redeclared_assigned_name.py:4:23: Redeclared variable `FIRST` in
 5 | 
 6 | FIRST, SECOND, _, _, _ignored = (1, 2, 3, 4, 5)  # OK
   |
-error[PLW0128]: redeclared_assigned_name.py:4:30: Redeclared variable `SECOND` in assignment
+error[PLW0128]: 4:30: Redeclared variable `SECOND` in assignment
 
+ --> redeclared_assigned_name.py:4:30
   |
 2 | FIRST, (FIRST, SECOND) = (1, (1, 2))  # PLW0128
 3 | FIRST, (FIRST, SECOND, (THIRD, FIRST)) = (1, (1, 2))  # PLW0128

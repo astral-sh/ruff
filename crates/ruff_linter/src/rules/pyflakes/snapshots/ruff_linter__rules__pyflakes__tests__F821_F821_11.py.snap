@@ -1,15 +1,17 @@
 ---
 source: crates/ruff_linter/src/rules/pyflakes/mod.rs
 ---
-error[F821]: F821_11.py:18:28: Undefined name `os`
+error[F821]: 18:28: Undefined name `os`
 
+  --> F821_11.py:18:28
    |
 18 | def f(x: Callable[[VarArg("os")], None]):  # F821
    |                            ^^
 19 |     pass
    |
-error[F821]: F821_11.py:23:14: Undefined name `Baz`
+error[F821]: 23:14: Undefined name `Baz`
 
+  --> F821_11.py:23:14
    |
 22 | f(Callable[["Bar"], None])
 23 | f(Callable[["Baz"], None])

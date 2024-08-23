@@ -1,8 +1,9 @@
 ---
 source: crates/ruff_linter/src/linter.rs
 ---
-error[F401]: ipy_escape_command.ipynb:cell 1:5:8: [*] `os` imported but unused
+error[F401]: cell 1:5:8: [*] `os` imported but unused
 
+ --> ipy_escape_command.ipynb:5:8
   |
 3 | %matplotlib inline
 4 | 
@@ -21,8 +22,9 @@ error[F401]: ipy_escape_command.ipynb:cell 1:5:8: [*] `os` imported but unused
 7 6 | _ = math.pi
 8 7 | %%timeit
 
-error[F401]: ipy_escape_command.ipynb:cell 2:2:8: [*] `sys` imported but unused
+error[F401]: cell 2:2:8: [*] `sys` imported but unused
 
+ --> ipy_escape_command.ipynb:2:8
   |
 1 | %%timeit
 2 | import sys

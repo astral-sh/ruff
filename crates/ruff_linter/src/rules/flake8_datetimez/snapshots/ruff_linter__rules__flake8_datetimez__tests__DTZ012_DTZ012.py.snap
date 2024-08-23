@@ -1,8 +1,9 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_datetimez/mod.rs
 ---
-error[DTZ012]: DTZ012.py:4:1: `datetime.date.fromtimestamp()` used
+error[DTZ012]: 4:1: `datetime.date.fromtimestamp()` used
 
+ --> DTZ012.py:3:12
   |
 3 | # qualified
 4 | datetime.date.fromtimestamp(1234)
@@ -11,8 +12,9 @@ error[DTZ012]: DTZ012.py:4:1: `datetime.date.fromtimestamp()` used
 6 | from datetime import date
   |
   = help: Use `datetime.datetime.fromtimestamp(ts, tz=...).date()` instead
-error[DTZ012]: DTZ012.py:9:1: `datetime.date.fromtimestamp()` used
+error[DTZ012]: 9:1: `datetime.date.fromtimestamp()` used
 
+ --> DTZ012.py:8:14
   |
 8 | # unqualified
 9 | date.fromtimestamp(1234)

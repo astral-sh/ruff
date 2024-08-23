@@ -1,8 +1,9 @@
 ---
 source: crates/ruff_linter/src/rules/pycodestyle/mod.rs
 ---
-error[E261]: E26.py:2:5: [*] Insert at least two spaces before an inline comment
+error[E261]: 2:5: [*] Insert at least two spaces before an inline comment
 
+ --> E26.py:2:5
   |
 1 | #: E261:1:5
 2 | pass # an inline comment

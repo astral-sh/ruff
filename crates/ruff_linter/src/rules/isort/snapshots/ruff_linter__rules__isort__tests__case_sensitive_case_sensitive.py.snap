@@ -1,8 +1,9 @@
 ---
 source: crates/ruff_linter/src/rules/isort/mod.rs
 ---
-error[I001]: case_sensitive.py:1:1: [*] Import block is un-sorted or un-formatted
+error[I001]: 1:1: [*] Import block is un-sorted or un-formatted
 
+ --> case_sensitive.py:1:1
   |
 1 | / import A
 2 | | import B
@@ -13,6 +14,7 @@ error[I001]: case_sensitive.py:1:1: [*] Import block is un-sorted or un-formatte
 7 | | import f
 8 | | from g import a, B, c
 9 | | from h import A, b, C
+  | |______________________^
   |
   = help: Organize imports
 ℹ Safe fix

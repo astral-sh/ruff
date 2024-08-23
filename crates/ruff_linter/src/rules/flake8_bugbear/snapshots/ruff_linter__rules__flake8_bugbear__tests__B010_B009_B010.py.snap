@@ -1,8 +1,9 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_bugbear/mod.rs
 ---
-error[B010]: B009_B010.py:50:1: [*] Do not call `setattr` with a constant attribute value. It is not any safer than normal property access.
+error[B010]: 50:1: [*] Do not call `setattr` with a constant attribute value. It is not any safer than normal property access.
 
+  --> B009_B010.py:49:16
    |
 49 | # Invalid usage
 50 | setattr(foo, "bar", None)
@@ -21,8 +22,9 @@ error[B010]: B009_B010.py:50:1: [*] Do not call `setattr` with a constant attrib
 52 52 | setattr(foo, "__123abc__", None)
 53 53 | setattr(foo, "abc123", None)
 
-error[B010]: B009_B010.py:51:1: [*] Do not call `setattr` with a constant attribute value. It is not any safer than normal property access.
+error[B010]: 51:1: [*] Do not call `setattr` with a constant attribute value. It is not any safer than normal property access.
 
+  --> B009_B010.py:50:26
    |
 49 | # Invalid usage
 50 | setattr(foo, "bar", None)
@@ -42,8 +44,9 @@ error[B010]: B009_B010.py:51:1: [*] Do not call `setattr` with a constant attrib
 53 53 | setattr(foo, "abc123", None)
 54 54 | setattr(foo, r"abc123", None)
 
-error[B010]: B009_B010.py:52:1: [*] Do not call `setattr` with a constant attribute value. It is not any safer than normal property access.
+error[B010]: 52:1: [*] Do not call `setattr` with a constant attribute value. It is not any safer than normal property access.
 
+  --> B009_B010.py:51:30
    |
 50 | setattr(foo, "bar", None)
 51 | setattr(foo, "_123abc", None)
@@ -63,8 +66,9 @@ error[B010]: B009_B010.py:52:1: [*] Do not call `setattr` with a constant attrib
 54 54 | setattr(foo, r"abc123", None)
 55 55 | setattr(foo.bar, r"baz", None)
 
-error[B010]: B009_B010.py:53:1: [*] Do not call `setattr` with a constant attribute value. It is not any safer than normal property access.
+error[B010]: 53:1: [*] Do not call `setattr` with a constant attribute value. It is not any safer than normal property access.
 
+  --> B009_B010.py:52:33
    |
 51 | setattr(foo, "_123abc", None)
 52 | setattr(foo, "__123abc__", None)
@@ -84,8 +88,9 @@ error[B010]: B009_B010.py:53:1: [*] Do not call `setattr` with a constant attrib
 55 55 | setattr(foo.bar, r"baz", None)
 56 56 | 
 
-error[B010]: B009_B010.py:54:1: [*] Do not call `setattr` with a constant attribute value. It is not any safer than normal property access.
+error[B010]: 54:1: [*] Do not call `setattr` with a constant attribute value. It is not any safer than normal property access.
 
+  --> B009_B010.py:53:29
    |
 52 | setattr(foo, "__123abc__", None)
 53 | setattr(foo, "abc123", None)
@@ -104,8 +109,9 @@ error[B010]: B009_B010.py:54:1: [*] Do not call `setattr` with a constant attrib
 56 56 | 
 57 57 | # Regression test for: https://github.com/astral-sh/ruff/issues/7455#issuecomment-1722458885
 
-error[B010]: B009_B010.py:55:1: [*] Do not call `setattr` with a constant attribute value. It is not any safer than normal property access.
+error[B010]: 55:1: [*] Do not call `setattr` with a constant attribute value. It is not any safer than normal property access.
 
+  --> B009_B010.py:54:30
    |
 53 | setattr(foo, "abc123", None)
 54 | setattr(foo, r"abc123", None)

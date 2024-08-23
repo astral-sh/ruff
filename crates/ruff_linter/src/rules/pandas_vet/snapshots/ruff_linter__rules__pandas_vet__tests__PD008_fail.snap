@@ -1,8 +1,9 @@
 ---
 source: crates/ruff_linter/src/rules/pandas_vet/mod.rs
 ---
-error[PD008]: <filename>:4:9: Use `.loc` instead of `.at`. If speed is important, use NumPy.
+error[PD008]: 4:9: Use `.loc` instead of `.at`. If speed is important, use NumPy.
 
+ --> <filename>:4:9
   |
 2 | import pandas as pd
 3 | x = pd.DataFrame()

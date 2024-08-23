@@ -1,8 +1,9 @@
 ---
 source: crates/ruff_linter/src/rules/isort/mod.rs
 ---
-error[I001]: order_by_type.py:1:1: [*] Import block is un-sorted or un-formatted
+error[I001]: 1:1: [*] Import block is un-sorted or un-formatted
 
+  --> order_by_type.py:1:1
    |
  1 | / import StringIO
  2 | | import glob
@@ -16,6 +17,7 @@ error[I001]: order_by_type.py:1:1: [*] Import block is un-sorted or un-formatted
 10 | | import FOO
 11 | | import BAR
 12 | | import bar
+   | |___________^
    |
    = help: Organize imports
 ℹ Safe fix

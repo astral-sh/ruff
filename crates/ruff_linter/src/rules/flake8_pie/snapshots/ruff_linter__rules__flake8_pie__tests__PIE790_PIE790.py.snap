@@ -1,8 +1,9 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_pie/mod.rs
 ---
-error[PIE790]: PIE790.py:4:5: [*] Unnecessary `pass` statement
+error[PIE790]: 4:5: [*] Unnecessary `pass` statement
 
+ --> PIE790.py:4:5
   |
 2 |     """buzz"""
 3 | 
@@ -19,8 +20,9 @@ error[PIE790]: PIE790.py:4:5: [*] Unnecessary `pass` statement
 6 5 | 
 7 6 | if foo:
 
-error[PIE790]: PIE790.py:9:5: [*] Unnecessary `pass` statement
+error[PIE790]: 9:5: [*] Unnecessary `pass` statement
 
+ --> PIE790.py:9:5
   |
 7 | if foo:
 8 |     """foo"""
@@ -37,8 +39,9 @@ error[PIE790]: PIE790.py:9:5: [*] Unnecessary `pass` statement
 11 10 | 
 12 11 | def multi_statement() -> None:
 
-error[PIE790]: PIE790.py:14:5: [*] Unnecessary `pass` statement
+error[PIE790]: 14:5: [*] Unnecessary `pass` statement
 
+  --> PIE790.py:14:5
    |
 12 | def multi_statement() -> None:
 13 |     """This is a function."""
@@ -56,8 +59,9 @@ error[PIE790]: PIE790.py:14:5: [*] Unnecessary `pass` statement
 16 16 | 
 17 17 | if foo:
 
-error[PIE790]: PIE790.py:21:5: [*] Unnecessary `pass` statement
+error[PIE790]: 21:5: [*] Unnecessary `pass` statement
 
+  --> PIE790.py:21:5
    |
 19 | else:
 20 |     """bar"""
@@ -74,8 +78,9 @@ error[PIE790]: PIE790.py:21:5: [*] Unnecessary `pass` statement
 23 22 | 
 24 23 | while True:
 
-error[PIE790]: PIE790.py:28:5: [*] Unnecessary `pass` statement
+error[PIE790]: 28:5: [*] Unnecessary `pass` statement
 
+  --> PIE790.py:28:5
    |
 26 | else:
 27 |     """bar"""
@@ -92,8 +97,9 @@ error[PIE790]: PIE790.py:28:5: [*] Unnecessary `pass` statement
 30 29 | 
 31 30 | for _ in range(10):
 
-error[PIE790]: PIE790.py:35:5: [*] Unnecessary `pass` statement
+error[PIE790]: 35:5: [*] Unnecessary `pass` statement
 
+  --> PIE790.py:35:5
    |
 33 | else:
 34 |     """bar"""
@@ -110,8 +116,9 @@ error[PIE790]: PIE790.py:35:5: [*] Unnecessary `pass` statement
 37 36 | 
 38 37 | async for _ in range(10):
 
-error[PIE790]: PIE790.py:42:5: [*] Unnecessary `pass` statement
+error[PIE790]: 42:5: [*] Unnecessary `pass` statement
 
+  --> PIE790.py:42:5
    |
 40 | else:
 41 |     """bar"""
@@ -128,8 +135,9 @@ error[PIE790]: PIE790.py:42:5: [*] Unnecessary `pass` statement
 44 43 | 
 45 44 | def foo() -> None:
 
-error[PIE790]: PIE790.py:50:5: [*] Unnecessary `pass` statement
+error[PIE790]: 50:5: [*] Unnecessary `pass` statement
 
+  --> PIE790.py:50:5
    |
 48 |     """
 49 | 
@@ -146,8 +154,9 @@ error[PIE790]: PIE790.py:50:5: [*] Unnecessary `pass` statement
 52 51 | 
 53 52 | async def foo():
 
-error[PIE790]: PIE790.py:58:5: [*] Unnecessary `pass` statement
+error[PIE790]: 58:5: [*] Unnecessary `pass` statement
 
+  --> PIE790.py:58:5
    |
 56 |     """
 57 | 
@@ -164,8 +173,9 @@ error[PIE790]: PIE790.py:58:5: [*] Unnecessary `pass` statement
 60 59 | 
 61 60 | try:
 
-error[PIE790]: PIE790.py:65:5: [*] Unnecessary `pass` statement
+error[PIE790]: 65:5: [*] Unnecessary `pass` statement
 
+  --> PIE790.py:65:5
    |
 63 |     buzz
 64 |     """
@@ -184,8 +194,9 @@ error[PIE790]: PIE790.py:65:5: [*] Unnecessary `pass` statement
 67 66 |     pass
 68 67 | 
 
-error[PIE790]: PIE790.py:74:5: [*] Unnecessary `pass` statement
+error[PIE790]: 74:5: [*] Unnecessary `pass` statement
 
+  --> PIE790.py:74:5
    |
 72 | except ValueError:
 73 |     """bar"""
@@ -202,8 +213,9 @@ error[PIE790]: PIE790.py:74:5: [*] Unnecessary `pass` statement
 76 75 | 
 77 76 | for _ in range(10):
 
-error[PIE790]: PIE790.py:79:5: [*] Unnecessary `pass` statement
+error[PIE790]: 79:5: [*] Unnecessary `pass` statement
 
+  --> PIE790.py:79:5
    |
 77 | for _ in range(10):
 78 |     """buzz"""
@@ -222,8 +234,9 @@ error[PIE790]: PIE790.py:79:5: [*] Unnecessary `pass` statement
 81 80 | async for _ in range(10):
 82 81 |     """buzz"""
 
-error[PIE790]: PIE790.py:83:5: [*] Unnecessary `pass` statement
+error[PIE790]: 83:5: [*] Unnecessary `pass` statement
 
+  --> PIE790.py:83:5
    |
 81 | async for _ in range(10):
 82 |     """buzz"""
@@ -242,8 +255,9 @@ error[PIE790]: PIE790.py:83:5: [*] Unnecessary `pass` statement
 85 84 | while cond:
 86 85 |     """buzz"""
 
-error[PIE790]: PIE790.py:87:5: [*] Unnecessary `pass` statement
+error[PIE790]: 87:5: [*] Unnecessary `pass` statement
 
+  --> PIE790.py:87:5
    |
 85 | while cond:
 86 |     """buzz"""
@@ -260,8 +274,9 @@ error[PIE790]: PIE790.py:87:5: [*] Unnecessary `pass` statement
 89 88 | 
 90 89 | with bar:
 
-error[PIE790]: PIE790.py:92:5: [*] Unnecessary `pass` statement
+error[PIE790]: 92:5: [*] Unnecessary `pass` statement
 
+  --> PIE790.py:92:5
    |
 90 | with bar:
 91 |     """buzz"""
@@ -280,8 +295,9 @@ error[PIE790]: PIE790.py:92:5: [*] Unnecessary `pass` statement
 94 93 | async with bar:
 95 94 |     """buzz"""
 
-error[PIE790]: PIE790.py:96:5: [*] Unnecessary `pass` statement
+error[PIE790]: 96:5: [*] Unnecessary `pass` statement
 
+  --> PIE790.py:96:5
    |
 94 | async with bar:
 95 |     """buzz"""
@@ -298,8 +314,9 @@ error[PIE790]: PIE790.py:96:5: [*] Unnecessary `pass` statement
 98 97 | 
 99 98 | def foo() -> None:
 
-error[PIE790]: PIE790.py:101:5: [*] Unnecessary `pass` statement
+error[PIE790]: 101:5: [*] Unnecessary `pass` statement
 
+   --> PIE790.py:101:5
     |
  99 | def foo() -> None:
 100 |     """buzz"""
@@ -317,8 +334,9 @@ error[PIE790]: PIE790.py:101:5: [*] Unnecessary `pass` statement
 103 103 | 
 104 104 | class Foo:
 
-error[PIE790]: PIE790.py:130:5: [*] Unnecessary `pass` statement
+error[PIE790]: 130:5: [*] Unnecessary `pass` statement
 
+   --> PIE790.py:130:5
     |
 128 | def foo():
 129 |     print("foo")
@@ -335,8 +353,9 @@ error[PIE790]: PIE790.py:130:5: [*] Unnecessary `pass` statement
 132 131 | 
 133 132 | def foo():
 
-error[PIE790]: PIE790.py:136:5: [*] Unnecessary `pass` statement
+error[PIE790]: 136:5: [*] Unnecessary `pass` statement
 
+   --> PIE790.py:136:5
     |
 134 |     """A docstring."""
 135 |     print("foo")
@@ -353,8 +372,9 @@ error[PIE790]: PIE790.py:136:5: [*] Unnecessary `pass` statement
 138 137 | 
 139 138 | for i in range(10):
 
-error[PIE790]: PIE790.py:140:5: [*] Unnecessary `pass` statement
+error[PIE790]: 140:5: [*] Unnecessary `pass` statement
 
+   --> PIE790.py:140:5
     |
 139 | for i in range(10):
 140 |     pass
@@ -371,8 +391,9 @@ error[PIE790]: PIE790.py:140:5: [*] Unnecessary `pass` statement
 143 142 | for i in range(10):
 144 143 |     pass
 
-error[PIE790]: PIE790.py:141:5: [*] Unnecessary `pass` statement
+error[PIE790]: 141:5: [*] Unnecessary `pass` statement
 
+   --> PIE790.py:141:5
     |
 139 | for i in range(10):
 140 |     pass
@@ -391,8 +412,9 @@ error[PIE790]: PIE790.py:141:5: [*] Unnecessary `pass` statement
 143 142 | for i in range(10):
 144 143 |     pass
 
-error[PIE790]: PIE790.py:144:5: [*] Unnecessary `pass` statement
+error[PIE790]: 144:5: [*] Unnecessary `pass` statement
 
+   --> PIE790.py:144:5
     |
 143 | for i in range(10):
 144 |     pass
@@ -410,8 +432,9 @@ error[PIE790]: PIE790.py:144:5: [*] Unnecessary `pass` statement
 146 145 |     pass
 147 146 | 
 
-error[PIE790]: PIE790.py:146:5: [*] Unnecessary `pass` statement
+error[PIE790]: 146:5: [*] Unnecessary `pass` statement
 
+   --> PIE790.py:146:5
     |
 144 |     pass
 145 | 
@@ -430,8 +453,9 @@ error[PIE790]: PIE790.py:146:5: [*] Unnecessary `pass` statement
 148 147 | for i in range(10):
 149 148 |     pass  # comment
 
-error[PIE790]: PIE790.py:149:5: [*] Unnecessary `pass` statement
+error[PIE790]: 149:5: [*] Unnecessary `pass` statement
 
+   --> PIE790.py:149:5
     |
 148 | for i in range(10):
 149 |     pass  # comment
@@ -449,8 +473,9 @@ error[PIE790]: PIE790.py:149:5: [*] Unnecessary `pass` statement
 151 151 | 
 152 152 | 
 
-error[PIE790]: PIE790.py:150:5: [*] Unnecessary `pass` statement
+error[PIE790]: 150:5: [*] Unnecessary `pass` statement
 
+   --> PIE790.py:150:5
     |
 148 | for i in range(10):
 149 |     pass  # comment
@@ -467,8 +492,9 @@ error[PIE790]: PIE790.py:150:5: [*] Unnecessary `pass` statement
 152 151 | 
 153 152 | def foo():
 
-error[PIE790]: PIE790.py:155:5: [*] Unnecessary `...` literal
+error[PIE790]: 155:5: [*] Unnecessary `...` literal
 
+   --> PIE790.py:155:5
     |
 153 | def foo():
 154 |     print("foo")
@@ -485,8 +511,9 @@ error[PIE790]: PIE790.py:155:5: [*] Unnecessary `...` literal
 157 156 | 
 158 157 | def foo():
 
-error[PIE790]: PIE790.py:161:5: [*] Unnecessary `...` literal
+error[PIE790]: 161:5: [*] Unnecessary `...` literal
 
+   --> PIE790.py:161:5
     |
 159 |     """A docstring."""
 160 |     print("foo")
@@ -503,8 +530,9 @@ error[PIE790]: PIE790.py:161:5: [*] Unnecessary `...` literal
 163 162 | 
 164 163 | for i in range(10):
 
-error[PIE790]: PIE790.py:165:5: [*] Unnecessary `...` literal
+error[PIE790]: 165:5: [*] Unnecessary `...` literal
 
+   --> PIE790.py:165:5
     |
 164 | for i in range(10):
 165 |     ...
@@ -521,8 +549,9 @@ error[PIE790]: PIE790.py:165:5: [*] Unnecessary `...` literal
 168 167 | for i in range(10):
 169 168 |     ...
 
-error[PIE790]: PIE790.py:166:5: [*] Unnecessary `...` literal
+error[PIE790]: 166:5: [*] Unnecessary `...` literal
 
+   --> PIE790.py:166:5
     |
 164 | for i in range(10):
 165 |     ...
@@ -541,8 +570,9 @@ error[PIE790]: PIE790.py:166:5: [*] Unnecessary `...` literal
 168 167 | for i in range(10):
 169 168 |     ...
 
-error[PIE790]: PIE790.py:169:5: [*] Unnecessary `...` literal
+error[PIE790]: 169:5: [*] Unnecessary `...` literal
 
+   --> PIE790.py:169:5
     |
 168 | for i in range(10):
 169 |     ...
@@ -560,8 +590,9 @@ error[PIE790]: PIE790.py:169:5: [*] Unnecessary `...` literal
 171 170 |     ...
 172 171 | 
 
-error[PIE790]: PIE790.py:171:5: [*] Unnecessary `...` literal
+error[PIE790]: 171:5: [*] Unnecessary `...` literal
 
+   --> PIE790.py:171:5
     |
 169 |     ...
 170 | 
@@ -580,8 +611,9 @@ error[PIE790]: PIE790.py:171:5: [*] Unnecessary `...` literal
 173 172 | for i in range(10):
 174 173 |     ...  # comment
 
-error[PIE790]: PIE790.py:174:5: [*] Unnecessary `...` literal
+error[PIE790]: 174:5: [*] Unnecessary `...` literal
 
+   --> PIE790.py:174:5
     |
 173 | for i in range(10):
 174 |     ...  # comment
@@ -599,8 +631,9 @@ error[PIE790]: PIE790.py:174:5: [*] Unnecessary `...` literal
 176 176 | 
 177 177 | for i in range(10):
 
-error[PIE790]: PIE790.py:175:5: [*] Unnecessary `...` literal
+error[PIE790]: 175:5: [*] Unnecessary `...` literal
 
+   --> PIE790.py:175:5
     |
 173 | for i in range(10):
 174 |     ...  # comment
@@ -619,8 +652,9 @@ error[PIE790]: PIE790.py:175:5: [*] Unnecessary `...` literal
 177 176 | for i in range(10):
 178 177 |     ...
 
-error[PIE790]: PIE790.py:178:5: [*] Unnecessary `...` literal
+error[PIE790]: 178:5: [*] Unnecessary `...` literal
 
+   --> PIE790.py:178:5
     |
 177 | for i in range(10):
 178 |     ...
@@ -637,8 +671,9 @@ error[PIE790]: PIE790.py:178:5: [*] Unnecessary `...` literal
 180 179 | 
 181 180 | from typing import Protocol
 
-error[PIE790]: PIE790.py:179:5: [*] Unnecessary `pass` statement
+error[PIE790]: 179:5: [*] Unnecessary `pass` statement
 
+   --> PIE790.py:179:5
     |
 177 | for i in range(10):
 178 |     ...
@@ -657,8 +692,9 @@ error[PIE790]: PIE790.py:179:5: [*] Unnecessary `pass` statement
 181 180 | from typing import Protocol
 182 181 | 
 
-error[PIE790]: PIE790.py:209:9: [*] Unnecessary `...` literal
+error[PIE790]: 209:9: [*] Unnecessary `...` literal
 
+   --> PIE790.py:209:9
     |
 207 |     def stub(self) -> str:
 208 |         """Docstring"""

@@ -1,8 +1,9 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_type_checking/mod.rs
 ---
-error[TCH002]: <filename>:7:5: [*] Move third-party import `pandas.DataFrame` into a type-checking block
+error[TCH002]: 7:5: [*] Move third-party import `pandas.DataFrame` into a type-checking block
 
+ --> <filename>:7:5
   |
 6 | from pandas import (
 7 |     DataFrame,  # DataFrame
@@ -29,8 +30,9 @@ error[TCH002]: <filename>:7:5: [*] Move third-party import `pandas.DataFrame` in
 11 13 | def f(x: DataFrame, y: Series):
 12 14 |     pass
 
-error[TCH002]: <filename>:8:5: [*] Move third-party import `pandas.Series` into a type-checking block
+error[TCH002]: 8:5: [*] Move third-party import `pandas.Series` into a type-checking block
 
+ --> <filename>:8:5
   |
 6 | from pandas import (
 7 |     DataFrame,  # DataFrame

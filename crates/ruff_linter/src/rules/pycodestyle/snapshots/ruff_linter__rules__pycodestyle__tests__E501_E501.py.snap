@@ -1,8 +1,9 @@
 ---
 source: crates/ruff_linter/src/rules/pycodestyle/mod.rs
 ---
-error[E501]: E501.py:5:89: Line too long (123 > 88)
+error[E501]: 5:89: Line too long (123 > 88)
 
+ --> E501.py:5:89
   |
 3 |     https://github.com/PyCQA/pycodestyle/pull/258/files#diff-841c622497a8033d10152bfdfb15b20b92437ecdea21a260944ea86b77b51533
 4 | 
@@ -10,15 +11,17 @@ error[E501]: E501.py:5:89: Line too long (123 > 88)
   |                                                                                         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 6 | """
   |
-error[E501]: E501.py:16:85: Line too long (95 > 88)
+error[E501]: 16:85: Line too long (95 > 88)
 
+  --> E501.py:16:85
    |
 15 | _ = "---------------------------------------------------------------------------AAAAAAA"
 16 | _ = "---------------------------------------------------------------------------亜亜亜亜亜亜亜"
    |                                                                                         ^^^^^^^
    |
-error[E501]: E501.py:25:89: Line too long (127 > 88)
+error[E501]: 25:89: Line too long (127 > 88)
 
+  --> E501.py:25:89
    |
 23 | caller(
 24 |     """
@@ -27,8 +30,9 @@ error[E501]: E501.py:25:89: Line too long (127 > 88)
 26 |     """,
 27 | )
    |
-error[E501]: E501.py:40:89: Line too long (132 > 88)
+error[E501]: 40:89: Line too long (132 > 88)
 
+  --> E501.py:40:89
    |
 38 |     "Lorem ipsum dolor": "sit amet",
 39 |     # E501 Line too long
@@ -37,8 +41,9 @@ error[E501]: E501.py:40:89: Line too long (132 > 88)
 41 |     # E501 Line too long
 42 |     "Lorem ipsum dolor": """
    |
-error[E501]: E501.py:43:89: Line too long (105 > 88)
+error[E501]: 43:89: Line too long (105 > 88)
 
+  --> E501.py:43:89
    |
 41 |     # E501 Line too long
 42 |     "Lorem ipsum dolor": """
@@ -47,8 +52,9 @@ error[E501]: E501.py:43:89: Line too long (105 > 88)
 44 | """,
 45 |     # OK
    |
-error[E501]: E501.py:83:89: Line too long (147 > 88)
+error[E501]: 83:89: Line too long (147 > 88)
 
+  --> E501.py:83:89
    |
 81 | ...
 82 | ...

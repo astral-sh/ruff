@@ -1,8 +1,9 @@
 ---
 source: crates/ruff_linter/src/rules/pylint/mod.rs
 ---
-error[PLR0915]: too_many_statements_params.py:6:5: Too many statements (2 > 1)
+error[PLR0915]: 6:5: Too many statements (2 > 1)
 
+ --> too_many_statements_params.py:6:5
   |
 6 | def f(x):
   |     ^

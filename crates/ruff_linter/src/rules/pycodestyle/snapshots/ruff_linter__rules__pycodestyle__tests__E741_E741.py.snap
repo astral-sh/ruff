@@ -1,8 +1,9 @@
 ---
 source: crates/ruff_linter/src/rules/pycodestyle/mod.rs
 ---
-error[E741]: E741.py:3:1: Ambiguous variable name: `l`
+error[E741]: 3:1: Ambiguous variable name: `l`
 
+ --> E741.py:2:1
   |
 1 | from contextlib import contextmanager
 2 | 
@@ -11,8 +12,9 @@ error[E741]: E741.py:3:1: Ambiguous variable name: `l`
 4 | I = 0
 5 | O = 0
   |
-error[E741]: E741.py:4:1: Ambiguous variable name: `I`
+error[E741]: 4:1: Ambiguous variable name: `I`
 
+ --> E741.py:3:6
   |
 3 | l = 0
 4 | I = 0
@@ -20,8 +22,9 @@ error[E741]: E741.py:4:1: Ambiguous variable name: `I`
 5 | O = 0
 6 | l: int = 0
   |
-error[E741]: E741.py:5:1: Ambiguous variable name: `O`
+error[E741]: 5:1: Ambiguous variable name: `O`
 
+ --> E741.py:4:6
   |
 3 | l = 0
 4 | I = 0
@@ -29,8 +32,9 @@ error[E741]: E741.py:5:1: Ambiguous variable name: `O`
   | ^
 6 | l: int = 0
   |
-error[E741]: E741.py:6:1: Ambiguous variable name: `l`
+error[E741]: 6:1: Ambiguous variable name: `l`
 
+ --> E741.py:5:6
   |
 4 | I = 0
 5 | O = 0
@@ -39,8 +43,9 @@ error[E741]: E741.py:6:1: Ambiguous variable name: `l`
 7 | 
 8 | a, l = 0, 1
   |
-error[E741]: E741.py:8:4: Ambiguous variable name: `l`
+error[E741]: 8:4: Ambiguous variable name: `l`
 
+  --> E741.py:8:4
    |
  6 | l: int = 0
  7 | 
@@ -49,8 +54,9 @@ error[E741]: E741.py:8:4: Ambiguous variable name: `l`
  9 | [a, l] = 0, 1
 10 | a, *l = 0, 1, 2
    |
-error[E741]: E741.py:9:5: Ambiguous variable name: `l`
+error[E741]: 9:5: Ambiguous variable name: `l`
 
+  --> E741.py:9:5
    |
  8 | a, l = 0, 1
  9 | [a, l] = 0, 1
@@ -58,8 +64,9 @@ error[E741]: E741.py:9:5: Ambiguous variable name: `l`
 10 | a, *l = 0, 1, 2
 11 | a = l = 0
    |
-error[E741]: E741.py:10:5: Ambiguous variable name: `l`
+error[E741]: 10:5: Ambiguous variable name: `l`
 
+  --> E741.py:10:5
    |
  8 | a, l = 0, 1
  9 | [a, l] = 0, 1
@@ -67,8 +74,9 @@ error[E741]: E741.py:10:5: Ambiguous variable name: `l`
    |     ^
 11 | a = l = 0
    |
-error[E741]: E741.py:11:5: Ambiguous variable name: `l`
+error[E741]: 11:5: Ambiguous variable name: `l`
 
+  --> E741.py:11:5
    |
  9 | [a, l] = 0, 1
 10 | a, *l = 0, 1, 2
@@ -77,8 +85,9 @@ error[E741]: E741.py:11:5: Ambiguous variable name: `l`
 12 | 
 13 | o = 0
    |
-error[E741]: E741.py:16:5: Ambiguous variable name: `l`
+error[E741]: 16:5: Ambiguous variable name: `l`
 
+  --> E741.py:16:5
    |
 14 | i = 0
 15 | 
@@ -86,31 +95,35 @@ error[E741]: E741.py:16:5: Ambiguous variable name: `l`
    |     ^
 17 |     pass
    |
-error[E741]: E741.py:20:8: Ambiguous variable name: `l`
+error[E741]: 20:8: Ambiguous variable name: `l`
 
+  --> E741.py:20:8
    |
 20 | for a, l in zip(range(3), range(3)):
    |        ^
 21 |     pass
    |
-error[E741]: E741.py:25:12: Ambiguous variable name: `l`
+error[E741]: 25:12: Ambiguous variable name: `l`
 
+  --> E741.py:25:12
    |
 24 | def f1():
 25 |     global l
    |            ^
 26 |     l = 0
    |
-error[E741]: E741.py:26:5: Ambiguous variable name: `l`
+error[E741]: 26:5: Ambiguous variable name: `l`
 
+  --> E741.py:26:5
    |
 24 | def f1():
 25 |     global l
 26 |     l = 0
    |     ^
    |
-error[E741]: E741.py:30:5: Ambiguous variable name: `l`
+error[E741]: 30:5: Ambiguous variable name: `l`
 
+  --> E741.py:30:5
    |
 29 | def f2():
 30 |     l = 0
@@ -118,16 +131,18 @@ error[E741]: E741.py:30:5: Ambiguous variable name: `l`
 31 | 
 32 |     def f3():
    |
-error[E741]: E741.py:33:18: Ambiguous variable name: `l`
+error[E741]: 33:18: Ambiguous variable name: `l`
 
+  --> E741.py:33:18
    |
 32 |     def f3():
 33 |         nonlocal l
    |                  ^
 34 |         l = 1
    |
-error[E741]: E741.py:34:9: Ambiguous variable name: `l`
+error[E741]: 34:9: Ambiguous variable name: `l`
 
+  --> E741.py:34:9
    |
 32 |     def f3():
 33 |         nonlocal l
@@ -136,64 +151,73 @@ error[E741]: E741.py:34:9: Ambiguous variable name: `l`
 35 | 
 36 |     f3()
    |
-error[E741]: E741.py:40:8: Ambiguous variable name: `l`
+error[E741]: 40:8: Ambiguous variable name: `l`
 
+  --> E741.py:40:8
    |
 40 | def f4(l, /, I):
    |        ^
 41 |     return l, I, O
    |
-error[E741]: E741.py:40:14: Ambiguous variable name: `I`
+error[E741]: 40:14: Ambiguous variable name: `I`
 
+  --> E741.py:40:14
    |
 40 | def f4(l, /, I):
    |              ^
 41 |     return l, I, O
    |
-error[E741]: E741.py:44:8: Ambiguous variable name: `l`
+error[E741]: 44:8: Ambiguous variable name: `l`
 
+  --> E741.py:44:8
    |
 44 | def f5(l=0, *, I=1):
    |        ^
 45 |     return l, I
    |
-error[E741]: E741.py:44:16: Ambiguous variable name: `I`
+error[E741]: 44:16: Ambiguous variable name: `I`
 
+  --> E741.py:44:16
    |
 44 | def f5(l=0, *, I=1):
    |                ^
 45 |     return l, I
    |
-error[E741]: E741.py:48:9: Ambiguous variable name: `l`
+error[E741]: 48:9: Ambiguous variable name: `l`
 
+  --> E741.py:48:9
    |
 48 | def f6(*l, **I):
    |         ^
 49 |     return l, I
    |
-error[E741]: E741.py:48:14: Ambiguous variable name: `I`
+error[E741]: 48:14: Ambiguous variable name: `I`
 
+  --> E741.py:48:14
    |
 48 | def f6(*l, **I):
    |              ^
 49 |     return l, I
    |
-error[E741]: E741.py:57:16: Ambiguous variable name: `l`
+error[E741]: 57:16: Ambiguous variable name: `l`
 
+  --> E741.py:57:16
    |
 57 | with ctx1() as l:
    |                ^
 58 |     pass
    |
-error[E741]: E741.py:66:20: Ambiguous variable name: `l`
+error[E741]: 66:20: Ambiguous variable name: `l`
 
+  --> E741.py:66:20
    |
 66 | with ctx2() as (a, l):
    |                    ^
 67 |     pass
    |
-error[E741]: E741.py:71:22: Ambiguous variable name: `l`
+error[E741]: 71:22: Ambiguous variable name: `l`
 
+  --> E741.py:71:22
    |
 69 | try:
 70 |     pass
@@ -201,8 +225,9 @@ error[E741]: E741.py:71:22: Ambiguous variable name: `l`
    |                      ^
 72 |     pass
    |
-error[E741]: E741.py:74:5: Ambiguous variable name: `l`
+error[E741]: 74:5: Ambiguous variable name: `l`
 
+  --> E741.py:74:5
    |
 72 |     pass
 73 | 

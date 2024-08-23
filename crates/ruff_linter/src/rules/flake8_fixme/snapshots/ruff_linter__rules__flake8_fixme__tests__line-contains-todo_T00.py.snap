@@ -1,16 +1,18 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_fixme/mod.rs
 ---
-error[FIX002]: T00.py:1:3: Line contains TODO, consider resolving the issue
+error[FIX002]: 1:3: Line contains TODO, consider resolving the issue
 
+ --> T00.py:1:3
   |
 1 | # TODO: todo
   |   ^^^^
 2 | # todo: todo
 3 | # XXX: xxx
   |
-error[FIX002]: T00.py:2:3: Line contains TODO, consider resolving the issue
+error[FIX002]: 2:3: Line contains TODO, consider resolving the issue
 
+ --> T00.py:2:3
   |
 1 | # TODO: todo
 2 | # todo: todo

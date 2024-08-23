@@ -1,8 +1,9 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_type_checking/mod.rs
 ---
-error[TCH003]: <filename>:6:8: [*] Move standard library import `os` into a type-checking block
+error[TCH003]: 6:8: [*] Move standard library import `os` into a type-checking block
 
+ --> <filename>:6:8
   |
 4 | from typing import TYPE_CHECKING
 5 | 
@@ -25,8 +26,9 @@ error[TCH003]: <filename>:6:8: [*] Move standard library import `os` into a type
 8  11 | def f(x: os, y: pandas):
 9  12 |     pass
 
-error[TCH002]: <filename>:6:12: [*] Move third-party import `pandas` into a type-checking block
+error[TCH002]: 6:12: [*] Move third-party import `pandas` into a type-checking block
 
+ --> <filename>:6:12
   |
 4 | from typing import TYPE_CHECKING
 5 | 

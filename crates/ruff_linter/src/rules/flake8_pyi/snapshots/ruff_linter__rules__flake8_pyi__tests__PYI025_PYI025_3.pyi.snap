@@ -1,8 +1,9 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_pyi/mod.rs
 ---
-error[PYI025]: PYI025_3.pyi:6:36: [*] Use `from collections.abc import Set as AbstractSet` to avoid confusion with the `set` builtin
+error[PYI025]: 6:36: [*] Use `from collections.abc import Set as AbstractSet` to avoid confusion with the `set` builtin
 
+ --> PYI025_3.pyi:6:36
   |
 4 | """
 5 | 

@@ -1,8 +1,9 @@
 ---
 source: crates/ruff_linter/src/rules/tryceratops/mod.rs
 ---
-error[TRY201]: TRY201.py:20:15: [*] Use `raise` without specifying exception name
+error[TRY201]: 20:15: [*] Use `raise` without specifying exception name
 
+  --> TRY201.py:20:15
    |
 18 |     except MyException as e:
 19 |         logger.exception("process failed")
@@ -20,8 +21,9 @@ error[TRY201]: TRY201.py:20:15: [*] Use `raise` without specifying exception nam
 22 22 | 
 23 23 | def good():
 
-error[TRY201]: TRY201.py:63:19: [*] Use `raise` without specifying exception name
+error[TRY201]: 63:19: [*] Use `raise` without specifying exception name
 
+  --> TRY201.py:63:19
    |
 61 |         logger.exception("process failed")
 62 |         if True:
@@ -39,8 +41,9 @@ error[TRY201]: TRY201.py:63:19: [*] Use `raise` without specifying exception nam
 65 65 | 
 66 66 | def bad_that_needs_recursion_2():
 
-error[TRY201]: TRY201.py:74:23: [*] Use `raise` without specifying exception name
+error[TRY201]: 74:23: [*] Use `raise` without specifying exception name
 
+  --> TRY201.py:74:23
    |
 73 |             def foo():
 74 |                 raise e

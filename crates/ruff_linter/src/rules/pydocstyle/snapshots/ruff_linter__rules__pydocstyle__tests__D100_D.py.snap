@@ -1,4 +1,4 @@
 ---
 source: crates/ruff_linter/src/rules/pydocstyle/mod.rs
 ---
-D.py:1:1: D100 Missing docstring in public module
+error[D100]: 1:1: Missing docstring in public module

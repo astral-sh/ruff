@@ -1,8 +1,9 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_print/mod.rs
 ---
-error[T203]: T203.py:3:1: [*] `pprint` found
+error[T203]: 3:1: [*] `pprint` found
 
+ --> T203.py:2:1
   |
 1 | from pprint import pprint
 2 | 
@@ -20,8 +21,9 @@ error[T203]: T203.py:3:1: [*] `pprint` found
 5 4 | import pprint
 6 5 | 
 
-error[T203]: T203.py:7:1: [*] `pprint` found
+error[T203]: 7:1: [*] `pprint` found
 
+ --> T203.py:6:1
   |
 5 | import pprint
 6 | 

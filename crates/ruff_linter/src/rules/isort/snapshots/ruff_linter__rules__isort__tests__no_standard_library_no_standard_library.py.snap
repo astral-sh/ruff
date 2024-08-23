@@ -1,8 +1,9 @@
 ---
 source: crates/ruff_linter/src/rules/isort/mod.rs
 ---
-error[I001]: no_standard_library.py:1:1: [*] Import block is un-sorted or un-formatted
+error[I001]: 1:1: [*] Import block is un-sorted or un-formatted
 
+ --> no_standard_library.py:1:1
   |
 1 | / from __future__ import annotations
 2 | | 
@@ -13,6 +14,7 @@ error[I001]: no_standard_library.py:1:1: [*] Import block is un-sorted or un-for
 7 | | 
 8 | | from . import local
 9 | | import sys
+  | |___________^
   |
   = help: Organize imports
 ℹ Safe fix

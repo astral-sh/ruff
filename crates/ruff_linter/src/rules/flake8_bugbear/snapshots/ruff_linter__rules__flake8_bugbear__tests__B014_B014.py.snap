@@ -1,8 +1,9 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_bugbear/mod.rs
 ---
-error[B014]: B014.py:17:8: [*] Exception handler with duplicate exception: `OSError`
+error[B014]: 17:8: [*] Exception handler with duplicate exception: `OSError`
 
+  --> B014.py:17:8
    |
 15 | try:
 16 |     pass
@@ -22,8 +23,9 @@ error[B014]: B014.py:17:8: [*] Exception handler with duplicate exception: `OSEr
 19 19 |     pass
 20 20 | 
 
-error[B014]: B014.py:28:8: [*] Exception handler with duplicate exception: `MyError`
+error[B014]: 28:8: [*] Exception handler with duplicate exception: `MyError`
 
+  --> B014.py:28:8
    |
 26 | try:
 27 |     pass
@@ -43,8 +45,9 @@ error[B014]: B014.py:28:8: [*] Exception handler with duplicate exception: `MyEr
 30 30 |     pass
 31 31 | 
 
-error[B014]: B014.py:49:8: [*] Exception handler with duplicate exception: `re.error`
+error[B014]: 49:8: [*] Exception handler with duplicate exception: `re.error`
 
+  --> B014.py:49:8
    |
 47 | try:
 48 |     pass
@@ -64,8 +67,9 @@ error[B014]: B014.py:49:8: [*] Exception handler with duplicate exception: `re.e
 51 51 |     pass
 52 52 | 
 
-error[B014]: B014.py:82:8: [*] Exception handler with duplicate exception: `ValueError`
+error[B014]: 82:8: [*] Exception handler with duplicate exception: `ValueError`
 
+  --> B014.py:82:8
    |
 80 | try:
 81 |     pass
@@ -84,8 +88,9 @@ error[B014]: B014.py:82:8: [*] Exception handler with duplicate exception: `Valu
 84 84 | 
 85 85 | 
 
-error[B014]: B014.py:89:7: [*] Exception handler with duplicate exception: `re.error`
+error[B014]: 89:7: [*] Exception handler with duplicate exception: `re.error`
 
+  --> B014.py:89:7
    |
 87 | try:
 88 |     pas

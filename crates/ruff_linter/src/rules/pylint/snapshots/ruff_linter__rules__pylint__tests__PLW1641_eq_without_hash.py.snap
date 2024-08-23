@@ -1,8 +1,9 @@
 ---
 source: crates/ruff_linter/src/rules/pylint/mod.rs
 ---
-error[PLW1641]: eq_without_hash.py:1:7: Object does not implement `__hash__` method
+error[PLW1641]: 1:7: Object does not implement `__hash__` method
 
+ --> eq_without_hash.py:1:7
   |
 1 | class Person:  # [eq-without-hash]
   |       ^^^^^^

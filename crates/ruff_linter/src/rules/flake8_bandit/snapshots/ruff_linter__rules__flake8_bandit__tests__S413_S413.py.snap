@@ -1,16 +1,18 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_bandit/mod.rs
 ---
-error[S413]: S413.py:1:8: `pycrypto` library is known to have publicly disclosed buffer overflow vulnerability
+error[S413]: 1:8: `pycrypto` library is known to have publicly disclosed buffer overflow vulnerability
 
+ --> S413.py:1:8
   |
 1 | import Crypto.Hash  # S413
   |        ^^^^^^^^^^^
 2 | from Crypto.Hash import MD2  # S413
 3 | import Crypto.PublicKey  # S413
   |
-error[S413]: S413.py:2:6: `pycrypto` library is known to have publicly disclosed buffer overflow vulnerability
+error[S413]: 2:6: `pycrypto` library is known to have publicly disclosed buffer overflow vulnerability
 
+ --> S413.py:2:6
   |
 1 | import Crypto.Hash  # S413
 2 | from Crypto.Hash import MD2  # S413
@@ -18,8 +20,9 @@ error[S413]: S413.py:2:6: `pycrypto` library is known to have publicly disclosed
 3 | import Crypto.PublicKey  # S413
 4 | from Crypto.PublicKey import RSA  # S413
   |
-error[S413]: S413.py:3:8: `pycrypto` library is known to have publicly disclosed buffer overflow vulnerability
+error[S413]: 3:8: `pycrypto` library is known to have publicly disclosed buffer overflow vulnerability
 
+ --> S413.py:3:8
   |
 1 | import Crypto.Hash  # S413
 2 | from Crypto.Hash import MD2  # S413
@@ -27,8 +30,9 @@ error[S413]: S413.py:3:8: `pycrypto` library is known to have publicly disclosed
   |        ^^^^^^^^^^^^^^^^
 4 | from Crypto.PublicKey import RSA  # S413
   |
-error[S413]: S413.py:4:6: `pycrypto` library is known to have publicly disclosed buffer overflow vulnerability
+error[S413]: 4:6: `pycrypto` library is known to have publicly disclosed buffer overflow vulnerability
 
+ --> S413.py:4:6
   |
 2 | from Crypto.Hash import MD2  # S413
 3 | import Crypto.PublicKey  # S413

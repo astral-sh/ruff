@@ -1,8 +1,9 @@
 ---
 source: crates/ruff_linter/src/rules/pyflakes/mod.rs
 ---
-error[F633]: F633.py:4:1: Use of `>>` is invalid with `print` function
+error[F633]: 4:1: Use of `>>` is invalid with `print` function
 
+ --> F633.py:3:1
   |
 2 | import sys
 3 | 

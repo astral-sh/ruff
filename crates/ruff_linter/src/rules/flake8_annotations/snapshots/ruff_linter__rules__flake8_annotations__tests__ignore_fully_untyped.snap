@@ -1,8 +1,9 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_annotations/mod.rs
 ---
-error[ANN201]: ignore_fully_untyped.py:24:5: [*] Missing return type annotation for public function `error_partially_typed_1`
+error[ANN201]: 24:5: [*] Missing return type annotation for public function `error_partially_typed_1`
 
+  --> ignore_fully_untyped.py:24:5
    |
 24 | def error_partially_typed_1(a: int, b):
    |     ^^^^^^^^^^^^^^^^^^^^^^^
@@ -19,22 +20,25 @@ error[ANN201]: ignore_fully_untyped.py:24:5: [*] Missing return type annotation 
 26 26 | 
 27 27 | 
 
-error[ANN001]: ignore_fully_untyped.py:24:37: Missing type annotation for function argument `b`
+error[ANN001]: 24:37: Missing type annotation for function argument `b`
 
+  --> ignore_fully_untyped.py:24:37
    |
 24 | def error_partially_typed_1(a: int, b):
    |                                     ^
 25 |     pass
    |
-error[ANN001]: ignore_fully_untyped.py:28:37: Missing type annotation for function argument `b`
+error[ANN001]: 28:37: Missing type annotation for function argument `b`
 
+  --> ignore_fully_untyped.py:28:37
    |
 28 | def error_partially_typed_2(a: int, b) -> int:
    |                                     ^
 29 |     pass
    |
-error[ANN201]: ignore_fully_untyped.py:32:5: [*] Missing return type annotation for public function `error_partially_typed_3`
+error[ANN201]: 32:5: [*] Missing return type annotation for public function `error_partially_typed_3`
 
+  --> ignore_fully_untyped.py:32:5
    |
 32 | def error_partially_typed_3(a: int, b: int):
    |     ^^^^^^^^^^^^^^^^^^^^^^^
@@ -51,8 +55,9 @@ error[ANN201]: ignore_fully_untyped.py:32:5: [*] Missing return type annotation 
 34 34 | 
 35 35 | 
 
-error[ANN201]: ignore_fully_untyped.py:43:9: [*] Missing return type annotation for public function `error_typed_self`
+error[ANN201]: 43:9: [*] Missing return type annotation for public function `error_typed_self`
 
+  --> ignore_fully_untyped.py:43:9
    |
 41 |         pass
 42 | 

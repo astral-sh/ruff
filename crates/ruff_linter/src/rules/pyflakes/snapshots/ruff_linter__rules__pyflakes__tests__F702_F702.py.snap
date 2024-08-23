@@ -1,8 +1,9 @@
 ---
 source: crates/ruff_linter/src/rules/pyflakes/mod.rs
 ---
-error[F702]: F702.py:4:5: `continue` not properly in loop
+error[F702]: 4:5: `continue` not properly in loop
 
+ --> F702.py:4:5
   |
 2 |     continue
 3 | else:
@@ -11,23 +12,26 @@ error[F702]: F702.py:4:5: `continue` not properly in loop
 5 | 
 6 | i = 0
   |
-error[F702]: F702.py:16:5: `continue` not properly in loop
+error[F702]: 16:5: `continue` not properly in loop
 
+  --> F702.py:16:5
    |
 14 |         continue
 15 | 
 16 |     continue
    |     ^^^^^^^^
    |
-error[F702]: F702.py:20:5: `continue` not properly in loop
+error[F702]: 20:5: `continue` not properly in loop
 
+  --> F702.py:20:5
    |
 19 | class Foo:
 20 |     continue
    |     ^^^^^^^^
    |
-error[F702]: F702.py:23:1: `continue` not properly in loop
+error[F702]: 23:1: `continue` not properly in loop
 
+  --> F702.py:23:1
    |
 23 | continue
    | ^^^^^^^^

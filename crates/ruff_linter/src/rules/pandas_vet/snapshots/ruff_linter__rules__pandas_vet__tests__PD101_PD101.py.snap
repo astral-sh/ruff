@@ -1,8 +1,9 @@
 ---
 source: crates/ruff_linter/src/rules/pandas_vet/mod.rs
 ---
-error[PD101]: PD101.py:7:1: Using `series.nunique()` for checking that a series is constant is inefficient
+error[PD101]: 7:1: Using `series.nunique()` for checking that a series is constant is inefficient
 
+ --> PD101.py:6:8
   |
 6 | # PD101
 7 | data.nunique() <= 1
@@ -10,8 +11,9 @@ error[PD101]: PD101.py:7:1: Using `series.nunique()` for checking that a series 
 8 | data.nunique(dropna=True) <= 1
 9 | data.nunique(dropna=False) <= 1
   |
-error[PD101]: PD101.py:8:1: Using `series.nunique()` for checking that a series is constant is inefficient
+error[PD101]: 8:1: Using `series.nunique()` for checking that a series is constant is inefficient
 
+  --> PD101.py:7:20
    |
  6 | # PD101
  7 | data.nunique() <= 1
@@ -20,8 +22,9 @@ error[PD101]: PD101.py:8:1: Using `series.nunique()` for checking that a series 
  9 | data.nunique(dropna=False) <= 1
 10 | data.nunique() == 1
    |
-error[PD101]: PD101.py:9:1: Using `series.nunique()` for checking that a series is constant is inefficient
+error[PD101]: 9:1: Using `series.nunique()` for checking that a series is constant is inefficient
 
+  --> PD101.py:8:31
    |
  7 | data.nunique() <= 1
  8 | data.nunique(dropna=True) <= 1
@@ -30,8 +33,9 @@ error[PD101]: PD101.py:9:1: Using `series.nunique()` for checking that a series 
 10 | data.nunique() == 1
 11 | data.nunique(dropna=True) == 1
    |
-error[PD101]: PD101.py:10:1: Using `series.nunique()` for checking that a series is constant is inefficient
+error[PD101]: 10:1: Using `series.nunique()` for checking that a series is constant is inefficient
 
+  --> PD101.py:9:32
    |
  8 | data.nunique(dropna=True) <= 1
  9 | data.nunique(dropna=False) <= 1
@@ -40,8 +44,9 @@ error[PD101]: PD101.py:10:1: Using `series.nunique()` for checking that a series
 11 | data.nunique(dropna=True) == 1
 12 | data.nunique(dropna=False) == 1
    |
-error[PD101]: PD101.py:11:1: Using `series.nunique()` for checking that a series is constant is inefficient
+error[PD101]: 11:1: Using `series.nunique()` for checking that a series is constant is inefficient
 
+  --> PD101.py:10:20
    |
  9 | data.nunique(dropna=False) <= 1
 10 | data.nunique() == 1
@@ -50,8 +55,9 @@ error[PD101]: PD101.py:11:1: Using `series.nunique()` for checking that a series
 12 | data.nunique(dropna=False) == 1
 13 | data.nunique() != 1
    |
-error[PD101]: PD101.py:12:1: Using `series.nunique()` for checking that a series is constant is inefficient
+error[PD101]: 12:1: Using `series.nunique()` for checking that a series is constant is inefficient
 
+  --> PD101.py:11:31
    |
 10 | data.nunique() == 1
 11 | data.nunique(dropna=True) == 1
@@ -60,8 +66,9 @@ error[PD101]: PD101.py:12:1: Using `series.nunique()` for checking that a series
 13 | data.nunique() != 1
 14 | data.nunique(dropna=True) != 1
    |
-error[PD101]: PD101.py:13:1: Using `series.nunique()` for checking that a series is constant is inefficient
+error[PD101]: 13:1: Using `series.nunique()` for checking that a series is constant is inefficient
 
+  --> PD101.py:12:32
    |
 11 | data.nunique(dropna=True) == 1
 12 | data.nunique(dropna=False) == 1
@@ -70,8 +77,9 @@ error[PD101]: PD101.py:13:1: Using `series.nunique()` for checking that a series
 14 | data.nunique(dropna=True) != 1
 15 | data.nunique(dropna=False) != 1
    |
-error[PD101]: PD101.py:14:1: Using `series.nunique()` for checking that a series is constant is inefficient
+error[PD101]: 14:1: Using `series.nunique()` for checking that a series is constant is inefficient
 
+  --> PD101.py:13:20
    |
 12 | data.nunique(dropna=False) == 1
 13 | data.nunique() != 1
@@ -80,8 +88,9 @@ error[PD101]: PD101.py:14:1: Using `series.nunique()` for checking that a series
 15 | data.nunique(dropna=False) != 1
 16 | data.nunique() > 1
    |
-error[PD101]: PD101.py:15:1: Using `series.nunique()` for checking that a series is constant is inefficient
+error[PD101]: 15:1: Using `series.nunique()` for checking that a series is constant is inefficient
 
+  --> PD101.py:14:31
    |
 13 | data.nunique() != 1
 14 | data.nunique(dropna=True) != 1
@@ -90,8 +99,9 @@ error[PD101]: PD101.py:15:1: Using `series.nunique()` for checking that a series
 16 | data.nunique() > 1
 17 | data.dropna().nunique() == 1
    |
-error[PD101]: PD101.py:16:1: Using `series.nunique()` for checking that a series is constant is inefficient
+error[PD101]: 16:1: Using `series.nunique()` for checking that a series is constant is inefficient
 
+  --> PD101.py:15:32
    |
 14 | data.nunique(dropna=True) != 1
 15 | data.nunique(dropna=False) != 1
@@ -100,8 +110,9 @@ error[PD101]: PD101.py:16:1: Using `series.nunique()` for checking that a series
 17 | data.dropna().nunique() == 1
 18 | data[data.notnull()].nunique() == 1
    |
-error[PD101]: PD101.py:17:1: Using `series.nunique()` for checking that a series is constant is inefficient
+error[PD101]: 17:1: Using `series.nunique()` for checking that a series is constant is inefficient
 
+  --> PD101.py:16:19
    |
 15 | data.nunique(dropna=False) != 1
 16 | data.nunique() > 1
@@ -109,8 +120,9 @@ error[PD101]: PD101.py:17:1: Using `series.nunique()` for checking that a series
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 18 | data[data.notnull()].nunique() == 1
    |
-error[PD101]: PD101.py:18:1: Using `series.nunique()` for checking that a series is constant is inefficient
+error[PD101]: 18:1: Using `series.nunique()` for checking that a series is constant is inefficient
 
+  --> PD101.py:17:29
    |
 16 | data.nunique() > 1
 17 | data.dropna().nunique() == 1

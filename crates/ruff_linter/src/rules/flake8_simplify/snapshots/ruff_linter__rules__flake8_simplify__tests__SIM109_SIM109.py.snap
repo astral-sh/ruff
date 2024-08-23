@@ -1,8 +1,9 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_simplify/mod.rs
 ---
-error[SIM109]: SIM109.py:2:4: [*] Use `a in (b, c)` instead of multiple equality comparisons
+error[SIM109]: 2:4: [*] Use `a in (b, c)` instead of multiple equality comparisons
 
+ --> SIM109.py:2:4
   |
 1 | # SIM109
 2 | if a == b or a == c:
@@ -18,8 +19,9 @@ error[SIM109]: SIM109.py:2:4: [*] Use `a in (b, c)` instead of multiple equality
 4 4 | 
 5 5 | # SIM109
 
-error[SIM109]: SIM109.py:6:5: [*] Use `a in (b, c)` instead of multiple equality comparisons
+error[SIM109]: 6:5: [*] Use `a in (b, c)` instead of multiple equality comparisons
 
+ --> SIM109.py:6:5
   |
 5 | # SIM109
 6 | if (a == b or a == c) and None:
@@ -37,8 +39,9 @@ error[SIM109]: SIM109.py:6:5: [*] Use `a in (b, c)` instead of multiple equality
 8 8 | 
 9 9 | # SIM109
 
-error[SIM109]: SIM109.py:10:4: [*] Use `a in (b, c)` instead of multiple equality comparisons
+error[SIM109]: 10:4: [*] Use `a in (b, c)` instead of multiple equality comparisons
 
+  --> SIM109.py:10:4
    |
  9 | # SIM109
 10 | if a == b or a == c or None:
@@ -56,8 +59,9 @@ error[SIM109]: SIM109.py:10:4: [*] Use `a in (b, c)` instead of multiple equalit
 12 12 | 
 13 13 | # SIM109
 
-error[SIM109]: SIM109.py:14:4: [*] Use `a in (b, c)` instead of multiple equality comparisons
+error[SIM109]: 14:4: [*] Use `a in (b, c)` instead of multiple equality comparisons
 
+  --> SIM109.py:14:4
    |
 13 | # SIM109
 14 | if a == b or None or a == c:

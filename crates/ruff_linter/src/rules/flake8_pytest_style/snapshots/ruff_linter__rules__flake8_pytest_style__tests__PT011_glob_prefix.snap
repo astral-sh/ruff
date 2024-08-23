@@ -1,8 +1,9 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_pytest_style/mod.rs
 ---
-error[PT011]: PT011.py:24:24: `pytest.raises(pickle.PicklingError)` is too broad, set the `match` parameter or use a more specific exception
+error[PT011]: 24:24: `pytest.raises(pickle.PicklingError)` is too broad, set the `match` parameter or use a more specific exception
 
+  --> PT011.py:24:24
    |
 22 |         raise ValueError("Can't divide 1 by 0")
 23 | 
@@ -10,8 +11,9 @@ error[PT011]: PT011.py:24:24: `pytest.raises(pickle.PicklingError)` is too broad
    |                        ^^^^^^^^^^^^^
 25 |         raise PicklingError("Can't pickle")
    |
-error[PT011]: PT011.py:27:24: `pytest.raises(pickle.UnpicklingError)` is too broad, set the `match` parameter or use a more specific exception
+error[PT011]: 27:24: `pytest.raises(pickle.UnpicklingError)` is too broad, set the `match` parameter or use a more specific exception
 
+  --> PT011.py:27:24
    |
 25 |         raise PicklingError("Can't pickle")
 26 | 

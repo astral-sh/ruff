@@ -1,8 +1,9 @@
 ---
 source: crates/ruff_linter/src/rules/pyflakes/mod.rs
 ---
-error[F504]: F504.py:3:1: [*] `%`-format string has unused named argument(s): b
+error[F504]: 3:1: [*] `%`-format string has unused named argument(s): b
 
+ --> F504.py:2:12
   |
 1 | # Ruff has no way of knowing if the following are F505s
 2 | a = "wrong"
@@ -21,8 +22,9 @@ error[F504]: F504.py:3:1: [*] `%`-format string has unused named argument(s): b
 5 5 | hidden = {"a": "!"}
 6 6 | "%(a)s %(c)s" % {"x": 1, **hidden}  # Ok (cannot see through splat)
 
-error[F504]: F504.py:8:1: [*] `%`-format string has unused named argument(s): b
+error[F504]: 8:1: [*] `%`-format string has unused named argument(s): b
 
+ --> F504.py:7:1
   |
 6 | "%(a)s %(c)s" % {"x": 1, **hidden}  # Ok (cannot see through splat)
 7 | 
@@ -41,8 +43,9 @@ error[F504]: F504.py:8:1: [*] `%`-format string has unused named argument(s): b
 10 10 | 
 11 11 | '' % {'a''b' : ''}  # F504 ("ab" not used)
 
-error[F504]: F504.py:9:1: [*] `%`-format string has unused named argument(s): b
+error[F504]: 9:1: [*] `%`-format string has unused named argument(s): b
 
+  --> F504.py:8:53
    |
  8 | "%(a)s" % {"a": 1, r"b": "!"}  # F504 ("b" not used)
  9 | "%(a)s" % {'a': 1, u"b": "!"}  # F504 ("b" not used)
@@ -61,8 +64,9 @@ error[F504]: F504.py:9:1: [*] `%`-format string has unused named argument(s): b
 11 11 | '' % {'a''b' : ''}  # F504 ("ab" not used)
 12 12 | 
 
-error[F504]: F504.py:11:1: [*] `%`-format string has unused named argument(s): ab
+error[F504]: 11:1: [*] `%`-format string has unused named argument(s): ab
 
+  --> F504.py:10:1
    |
  9 | "%(a)s" % {'a': 1, u"b": "!"}  # F504 ("b" not used)
 10 | 
@@ -82,8 +86,9 @@ error[F504]: F504.py:11:1: [*] `%`-format string has unused named argument(s): a
 13 13 | # https://github.com/astral-sh/ruff/issues/4899
 14 14 | "" % {
 
-error[F504]: F504.py:14:1: [*] `%`-format string has unused named argument(s): test1, test2
+error[F504]: 14:1: [*] `%`-format string has unused named argument(s): test1, test2
 
+  --> F504.py:13:48
    |
 13 |   # https://github.com/astral-sh/ruff/issues/4899
 14 | / "" % {

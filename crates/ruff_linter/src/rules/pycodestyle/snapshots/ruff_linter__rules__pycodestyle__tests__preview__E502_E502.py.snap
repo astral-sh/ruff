@@ -1,8 +1,9 @@
 ---
 source: crates/ruff_linter/src/rules/pycodestyle/mod.rs
 ---
-error[E502]: E502.py:9:9: [*] Redundant backslash
+error[E502]: 9:9: [*] Redundant backslash
 
+  --> E502.py:9:9
    |
  7 |     + 4
  8 | 
@@ -22,8 +23,9 @@ error[E502]: E502.py:9:9: [*] Redundant backslash
 11 11 |     7)
 12 12 | 
 
-error[E502]: E502.py:10:11: [*] Redundant backslash
+error[E502]: 10:11: [*] Redundant backslash
 
+  --> E502.py:10:11
    |
  9 | a = (3 -\
 10 |     2 +   \
@@ -41,8 +43,9 @@ error[E502]: E502.py:10:11: [*] Redundant backslash
 12 12 | 
 13 13 | z = 5 + \
 
-error[E502]: E502.py:14:9: [*] Redundant backslash
+error[E502]: 14:9: [*] Redundant backslash
 
+  --> E502.py:14:9
    |
 13 | z = 5 + \
 14 |     (3 -\
@@ -61,8 +64,9 @@ error[E502]: E502.py:14:9: [*] Redundant backslash
 16 16 |     7) + \
 17 17 |     4
 
-error[E502]: E502.py:15:11: [*] Redundant backslash
+error[E502]: 15:11: [*] Redundant backslash
 
+  --> E502.py:15:11
    |
 13 | z = 5 + \
 14 |     (3 -\
@@ -82,8 +86,9 @@ error[E502]: E502.py:15:11: [*] Redundant backslash
 17 17 |     4
 18 18 | 
 
-error[E502]: E502.py:23:17: [*] Redundant backslash
+error[E502]: 23:17: [*] Redundant backslash
 
+  --> E502.py:23:17
    |
 22 | b = [
 23 |     2 + 4 + 5 + \
@@ -102,8 +107,9 @@ error[E502]: E502.py:23:17: [*] Redundant backslash
 25 25 |     - 5
 26 26 | ]
 
-error[E502]: E502.py:24:8: [*] Redundant backslash
+error[E502]: 24:8: [*] Redundant backslash
 
+  --> E502.py:24:8
    |
 22 | b = [
 23 |     2 + 4 + 5 + \
@@ -123,8 +129,9 @@ error[E502]: E502.py:24:8: [*] Redundant backslash
 26 26 | ]
 27 27 | 
 
-error[E502]: E502.py:29:11: [*] Redundant backslash
+error[E502]: 29:11: [*] Redundant backslash
 
+  --> E502.py:29:11
    |
 28 | c = (True and
 29 |     False \
@@ -143,8 +150,9 @@ error[E502]: E502.py:29:11: [*] Redundant backslash
 31 31 |     and True \
 32 32 | )
 
-error[E502]: E502.py:30:14: [*] Redundant backslash
+error[E502]: 30:14: [*] Redundant backslash
 
+  --> E502.py:30:14
    |
 28 | c = (True and
 29 |     False \
@@ -164,8 +172,9 @@ error[E502]: E502.py:30:14: [*] Redundant backslash
 32 32 | )
 33 33 | 
 
-error[E502]: E502.py:31:14: [*] Redundant backslash
+error[E502]: 31:14: [*] Redundant backslash
 
+  --> E502.py:31:14
    |
 29 |     False \
 30 |     or False \
@@ -184,8 +193,9 @@ error[E502]: E502.py:31:14: [*] Redundant backslash
 33 33 | 
 34 34 | c = (True and
 
-error[E502]: E502.py:44:14: [*] Redundant backslash
+error[E502]: 44:14: [*] Redundant backslash
 
+  --> E502.py:44:14
    |
 43 | s = {
 44 |     'x': 2 + \
@@ -204,8 +214,9 @@ error[E502]: E502.py:44:14: [*] Redundant backslash
 46 46 | }
 47 47 | 
 
-error[E502]: E502.py:55:12: [*] Redundant backslash
+error[E502]: 55:12: [*] Redundant backslash
 
+  --> E502.py:55:12
    |
 55 | x = {2 + 4 \
    |            ^
@@ -222,8 +233,9 @@ error[E502]: E502.py:55:12: [*] Redundant backslash
 57 57 | 
 58 58 | y = (
 
-error[E502]: E502.py:61:9: [*] Redundant backslash
+error[E502]: 61:9: [*] Redundant backslash
 
+  --> E502.py:61:9
    |
 59 |     2 + 2  # \
 60 |     + 3  # \
@@ -243,8 +255,9 @@ error[E502]: E502.py:61:9: [*] Redundant backslash
 63 63 | )
 64 64 | 
 
-error[E502]: E502.py:82:12: [*] Redundant backslash
+error[E502]: 82:12: [*] Redundant backslash
 
+  --> E502.py:82:12
    |
 80 |     "xyz"
 81 | 
@@ -263,8 +276,9 @@ error[E502]: E502.py:82:12: [*] Redundant backslash
 84 84 | 
 85 85 | 
 
-error[E502]: E502.py:87:14: [*] Redundant backslash
+error[E502]: 87:14: [*] Redundant backslash
 
+  --> E502.py:87:14
    |
 86 | def foo():
 87 |     x = (a + \

@@ -1,8 +1,9 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_bugbear/mod.rs
 ---
-error[B006]: B006_2.py:4:22: [*] Do not use mutable data structures for argument defaults
+error[B006]: 4:22: [*] Do not use mutable data structures for argument defaults
 
+ --> B006_2.py:4:22
   |
 2 | # Regression test for https://github.com/astral-sh/ruff/issues/7155
 3 | 

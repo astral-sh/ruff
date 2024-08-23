@@ -1,8 +1,9 @@
 ---
 source: crates/ruff_linter/src/rules/pyupgrade/mod.rs
 ---
-error[UP017]: UP017.py:10:11: [*] Use `datetime.UTC` alias
+error[UP017]: 10:11: [*] Use `datetime.UTC` alias
 
+  --> UP017.py:10:11
    |
  8 |     from datetime import timezone
  9 | 
@@ -25,8 +26,9 @@ error[UP017]: UP017.py:10:11: [*] Use `datetime.UTC` alias
 12 13 | 
 13 14 | def func():
 
-error[UP017]: UP017.py:16:11: [*] Use `datetime.UTC` alias
+error[UP017]: 16:11: [*] Use `datetime.UTC` alias
 
+  --> UP017.py:16:11
    |
 14 |     from datetime import timezone as tz
 15 | 
@@ -49,8 +51,9 @@ error[UP017]: UP017.py:16:11: [*] Use `datetime.UTC` alias
 18 19 | 
 19 20 | def func():
 
-error[UP017]: UP017.py:22:11: [*] Use `datetime.UTC` alias
+error[UP017]: 22:11: [*] Use `datetime.UTC` alias
 
+  --> UP017.py:22:11
    |
 20 |     import datetime
 21 | 
@@ -68,8 +71,9 @@ error[UP017]: UP017.py:22:11: [*] Use `datetime.UTC` alias
 24 24 | 
 25 25 | def func():
 
-error[UP017]: UP017.py:28:11: [*] Use `datetime.UTC` alias
+error[UP017]: 28:11: [*] Use `datetime.UTC` alias
 
+  --> UP017.py:28:11
    |
 26 |     import datetime as dt
 27 | 

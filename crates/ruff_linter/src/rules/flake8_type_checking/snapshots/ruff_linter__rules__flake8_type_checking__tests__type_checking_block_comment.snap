@@ -1,8 +1,9 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_type_checking/mod.rs
 ---
-error[TCH002]: <filename>:6:18: [*] Move third-party import `pandas` into a type-checking block
+error[TCH002]: 6:18: [*] Move third-party import `pandas` into a type-checking block
 
+ --> <filename>:6:18
   |
 4 | from typing import TYPE_CHECKING
 5 | 

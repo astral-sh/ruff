@@ -1,8 +1,9 @@
 ---
 source: crates/ruff_linter/src/rules/refurb/mod.rs
 ---
-error[FURB192]: FURB192.py:3:1: [*] Prefer `min` over `sorted()` to compute the minimum value in a sequence
+error[FURB192]: 3:1: [*] Prefer `min` over `sorted()` to compute the minimum value in a sequence
 
+ --> FURB192.py:2:1
   |
 1 | # Errors
 2 | 
@@ -21,8 +22,9 @@ error[FURB192]: FURB192.py:3:1: [*] Prefer `min` over `sorted()` to compute the 
 5 5 | sorted(l)[-1]
 6 6 | 
 
-error[FURB192]: FURB192.py:5:1: [*] Prefer `max` over `sorted()` to compute the maximum value in a sequence
+error[FURB192]: 5:1: [*] Prefer `max` over `sorted()` to compute the maximum value in a sequence
 
+ --> FURB192.py:4:1
   |
 3 | sorted(l)[0]
 4 | 
@@ -42,8 +44,9 @@ error[FURB192]: FURB192.py:5:1: [*] Prefer `max` over `sorted()` to compute the 
 7 7 | sorted(l, reverse=False)[-1]
 8 8 | 
 
-error[FURB192]: FURB192.py:7:1: [*] Prefer `max` over `sorted()` to compute the maximum value in a sequence
+error[FURB192]: 7:1: [*] Prefer `max` over `sorted()` to compute the maximum value in a sequence
 
+ --> FURB192.py:6:1
   |
 5 | sorted(l)[-1]
 6 | 
@@ -63,8 +66,9 @@ error[FURB192]: FURB192.py:7:1: [*] Prefer `max` over `sorted()` to compute the 
 9 9 | sorted(l, key=lambda x: x)[0]
 10 10 | 
 
-error[FURB192]: FURB192.py:9:1: [*] Prefer `min` over `sorted()` to compute the minimum value in a sequence
+error[FURB192]: 9:1: [*] Prefer `min` over `sorted()` to compute the minimum value in a sequence
 
+  --> FURB192.py:8:1
    |
  7 | sorted(l, reverse=False)[-1]
  8 | 
@@ -84,8 +88,9 @@ error[FURB192]: FURB192.py:9:1: [*] Prefer `min` over `sorted()` to compute the 
 11 11 | sorted(l, key=key_fn)[0]
 12 12 | 
 
-error[FURB192]: FURB192.py:11:1: [*] Prefer `min` over `sorted()` to compute the minimum value in a sequence
+error[FURB192]: 11:1: [*] Prefer `min` over `sorted()` to compute the minimum value in a sequence
 
+  --> FURB192.py:10:1
    |
  9 | sorted(l, key=lambda x: x)[0]
 10 | 
@@ -105,8 +110,9 @@ error[FURB192]: FURB192.py:11:1: [*] Prefer `min` over `sorted()` to compute the
 13 13 | sorted([1, 2, 3])[0]
 14 14 | 
 
-error[FURB192]: FURB192.py:13:1: [*] Prefer `min` over `sorted()` to compute the minimum value in a sequence
+error[FURB192]: 13:1: [*] Prefer `min` over `sorted()` to compute the minimum value in a sequence
 
+  --> FURB192.py:12:1
    |
 11 | sorted(l, key=key_fn)[0]
 12 | 
@@ -126,8 +132,9 @@ error[FURB192]: FURB192.py:13:1: [*] Prefer `min` over `sorted()` to compute the
 15 15 | # Unsafe
 16 16 | 
 
-error[FURB192]: FURB192.py:17:1: [*] Prefer `min` over `sorted()` to compute the minimum value in a sequence
+error[FURB192]: 17:1: [*] Prefer `min` over `sorted()` to compute the minimum value in a sequence
 
+  --> FURB192.py:16:1
    |
 15 | # Unsafe
 16 | 
@@ -147,8 +154,9 @@ error[FURB192]: FURB192.py:17:1: [*] Prefer `min` over `sorted()` to compute the
 19 19 | sorted(l, reverse=True)[0]
 20 20 | 
 
-error[FURB192]: FURB192.py:19:1: [*] Prefer `max` over `sorted()` to compute the maximum value in a sequence
+error[FURB192]: 19:1: [*] Prefer `max` over `sorted()` to compute the maximum value in a sequence
 
+  --> FURB192.py:18:1
    |
 17 | sorted(l, key=key_fn, reverse=True)[-1]
 18 | 
@@ -168,8 +176,9 @@ error[FURB192]: FURB192.py:19:1: [*] Prefer `max` over `sorted()` to compute the
 21 21 | sorted(l, reverse=True)[-1]
 22 22 | 
 
-error[FURB192]: FURB192.py:21:1: [*] Prefer `min` over `sorted()` to compute the minimum value in a sequence
+error[FURB192]: 21:1: [*] Prefer `min` over `sorted()` to compute the minimum value in a sequence
 
+  --> FURB192.py:20:1
    |
 19 | sorted(l, reverse=True)[0]
 20 | 

@@ -1,8 +1,9 @@
 ---
 source: crates/ruff_linter/src/rules/isort/mod.rs
 ---
-error[I001]: sort_similar_imports.py:1:1: [*] Import block is un-sorted or un-formatted
+error[I001]: 1:1: [*] Import block is un-sorted or un-formatted
 
+  --> sort_similar_imports.py:1:1
    |
  1 | / from a import b
  2 | | from a import BAD as DEF
@@ -30,6 +31,7 @@ error[I001]: sort_similar_imports.py:1:1: [*] Import block is un-sorted or un-fo
 24 | | import x as Y
 25 | | import x
 26 | | import x as a
+   | |______________^
    |
    = help: Organize imports
 ℹ Safe fix

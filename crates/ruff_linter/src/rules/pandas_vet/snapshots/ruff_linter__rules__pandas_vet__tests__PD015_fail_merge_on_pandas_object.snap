@@ -1,8 +1,9 @@
 ---
 source: crates/ruff_linter/src/rules/pandas_vet/mod.rs
 ---
-error[PD015]: <filename>:5:1: Use `.merge` method instead of `pd.merge` function. They have equivalent functionality.
+error[PD015]: 5:1: Use `.merge` method instead of `pd.merge` function. They have equivalent functionality.
 
+ --> <filename>:4:19
   |
 3 | x = pd.DataFrame()
 4 | y = pd.DataFrame()

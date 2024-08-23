@@ -1,8 +1,9 @@
 ---
 source: crates/ruff_linter/src/rules/pyflakes/mod.rs
 ---
-error[F701]: F701.py:4:5: `break` outside loop
+error[F701]: 4:5: `break` outside loop
 
+ --> F701.py:4:5
   |
 2 |     break
 3 | else:
@@ -11,23 +12,26 @@ error[F701]: F701.py:4:5: `break` outside loop
 5 | 
 6 | i = 0
   |
-error[F701]: F701.py:16:5: `break` outside loop
+error[F701]: 16:5: `break` outside loop
 
+  --> F701.py:16:5
    |
 14 |         break
 15 | 
 16 |     break
    |     ^^^^^
    |
-error[F701]: F701.py:20:5: `break` outside loop
+error[F701]: 20:5: `break` outside loop
 
+  --> F701.py:20:5
    |
 19 | class Foo:
 20 |     break
    |     ^^^^^
    |
-error[F701]: F701.py:23:1: `break` outside loop
+error[F701]: 23:1: `break` outside loop
 
+  --> F701.py:23:1
    |
 23 | break
    | ^^^^^

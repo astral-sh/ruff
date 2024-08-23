@@ -1,8 +1,9 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_tidy_imports/mod.rs
 ---
-error[TID252]: application.py:5:1: Prefer absolute imports over relative imports from parent modules
+error[TID252]: 5:1: Prefer absolute imports over relative imports from parent modules
 
+ --> application.py:4:1
   |
 3 | import attrs
 4 | 
@@ -12,8 +13,9 @@ error[TID252]: application.py:5:1: Prefer absolute imports over relative imports
 7 | from ..server import example
   |
   = help: Replace relative imports from parent modules with absolute imports
-error[TID252]: application.py:6:1: [*] Prefer absolute imports over relative imports from parent modules
+error[TID252]: 6:1: [*] Prefer absolute imports over relative imports from parent modules
 
+ --> application.py:5:24
   |
 5 | from ....import unknown
 6 | from ..protocol import commands, definitions, responses
@@ -32,8 +34,9 @@ error[TID252]: application.py:6:1: [*] Prefer absolute imports over relative imp
 8 8 | from .. import server
 9 9 | from . import logger, models
 
-error[TID252]: application.py:6:1: [*] Prefer absolute imports over relative imports from parent modules
+error[TID252]: 6:1: [*] Prefer absolute imports over relative imports from parent modules
 
+ --> application.py:5:24
   |
 5 | from ....import unknown
 6 | from ..protocol import commands, definitions, responses
@@ -52,8 +55,9 @@ error[TID252]: application.py:6:1: [*] Prefer absolute imports over relative imp
 8 8 | from .. import server
 9 9 | from . import logger, models
 
-error[TID252]: application.py:6:1: [*] Prefer absolute imports over relative imports from parent modules
+error[TID252]: 6:1: [*] Prefer absolute imports over relative imports from parent modules
 
+ --> application.py:5:24
   |
 5 | from ....import unknown
 6 | from ..protocol import commands, definitions, responses
@@ -72,8 +76,9 @@ error[TID252]: application.py:6:1: [*] Prefer absolute imports over relative imp
 8 8 | from .. import server
 9 9 | from . import logger, models
 
-error[TID252]: application.py:7:1: [*] Prefer absolute imports over relative imports from parent modules
+error[TID252]: 7:1: [*] Prefer absolute imports over relative imports from parent modules
 
+ --> application.py:6:56
   |
 5 | from ....import unknown
 6 | from ..protocol import commands, definitions, responses
@@ -93,8 +98,9 @@ error[TID252]: application.py:7:1: [*] Prefer absolute imports over relative imp
 9 9 | from . import logger, models
 10 10 | from ..protocol.UpperCaseModule import some_function
 
-error[TID252]: application.py:8:1: [*] Prefer absolute imports over relative imports from parent modules
+error[TID252]: 8:1: [*] Prefer absolute imports over relative imports from parent modules
 
+  --> application.py:7:29
    |
  6 | from ..protocol import commands, definitions, responses
  7 | from ..server import example
@@ -113,8 +119,9 @@ error[TID252]: application.py:8:1: [*] Prefer absolute imports over relative imp
 9 9 | from . import logger, models
 10 10 | from ..protocol.UpperCaseModule import some_function
 
-error[TID252]: application.py:10:1: [*] Prefer absolute imports over relative imports from parent modules
+error[TID252]: 10:1: [*] Prefer absolute imports over relative imports from parent modules
 
+  --> application.py:9:29
    |
  8 | from .. import server
  9 | from . import logger, models

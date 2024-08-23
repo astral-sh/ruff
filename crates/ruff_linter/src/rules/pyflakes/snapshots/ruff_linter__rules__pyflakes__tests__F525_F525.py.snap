@@ -1,15 +1,17 @@
 ---
 source: crates/ruff_linter/src/rules/pyflakes/mod.rs
 ---
-error[F525]: F525.py:1:1: `.format` string mixes automatic and manual numbering
+error[F525]: 1:1: `.format` string mixes automatic and manual numbering
 
+ --> F525.py:1:1
   |
 1 | "{} {1}".format(1, 2)  # F525
   | ^^^^^^^^^^^^^^^^^^^^^
 2 | "{0} {}".format(1, 2)  # F523, F525
   |
-error[F525]: F525.py:2:1: `.format` string mixes automatic and manual numbering
+error[F525]: 2:1: `.format` string mixes automatic and manual numbering
 
+ --> F525.py:1:30
   |
 1 | "{} {1}".format(1, 2)  # F525
 2 | "{0} {}".format(1, 2)  # F523, F525

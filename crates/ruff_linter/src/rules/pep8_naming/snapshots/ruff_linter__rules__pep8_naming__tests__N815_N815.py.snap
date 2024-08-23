@@ -1,8 +1,9 @@
 ---
 source: crates/ruff_linter/src/rules/pep8_naming/mod.rs
 ---
-error[N815]: N815.py:9:5: Variable `mixedCase` in class scope should not be mixedCase
+error[N815]: 9:5: Variable `mixedCase` in class scope should not be mixedCase
 
+  --> N815.py:9:5
    |
  7 |     lower = 0
  8 |     CONSTANT = 0
@@ -11,8 +12,9 @@ error[N815]: N815.py:9:5: Variable `mixedCase` in class scope should not be mixe
 10 |     _mixedCase = 0
 11 |     mixed_Case = 0
    |
-error[N815]: N815.py:10:5: Variable `_mixedCase` in class scope should not be mixedCase
+error[N815]: 10:5: Variable `_mixedCase` in class scope should not be mixedCase
 
+  --> N815.py:10:5
    |
  8 |     CONSTANT = 0
  9 |     mixedCase = 0
@@ -21,8 +23,9 @@ error[N815]: N815.py:10:5: Variable `_mixedCase` in class scope should not be mi
 11 |     mixed_Case = 0
 12 |     myObj1 = collections.namedtuple("MyObj1", ["a", "b"])
    |
-error[N815]: N815.py:11:5: Variable `mixed_Case` in class scope should not be mixedCase
+error[N815]: 11:5: Variable `mixed_Case` in class scope should not be mixedCase
 
+  --> N815.py:11:5
    |
  9 |     mixedCase = 0
 10 |     _mixedCase = 0

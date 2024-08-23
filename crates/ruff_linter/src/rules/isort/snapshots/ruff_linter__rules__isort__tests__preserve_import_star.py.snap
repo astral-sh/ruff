@@ -1,8 +1,9 @@
 ---
 source: crates/ruff_linter/src/rules/isort/mod.rs
 ---
-error[I001]: preserve_import_star.py:1:1: [*] Import block is un-sorted or un-formatted
+error[I001]: 1:1: [*] Import block is un-sorted or un-formatted
 
+ --> preserve_import_star.py:1:1
   |
 1 | / from some_other_module import some_class
 2 | | from some_other_module import *
@@ -10,6 +11,7 @@ error[I001]: preserve_import_star.py:1:1: [*] Import block is un-sorted or un-fo
 4 | | from some_module import some_class  # Aside
 5 | | # Above
 6 | | from some_module import *  # Aside
+  | |___________________________________^
   |
   = help: Organize imports
 ℹ Safe fix

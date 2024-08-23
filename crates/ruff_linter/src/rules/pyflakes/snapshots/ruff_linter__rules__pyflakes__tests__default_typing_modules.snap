@@ -1,8 +1,9 @@
 ---
 source: crates/ruff_linter/src/rules/pyflakes/mod.rs
 ---
-error[F821]: typing_modules.py:6:36: Undefined name `db`
+error[F821]: 6:36: Undefined name `db`
 
+ --> typing_modules.py:6:36
   |
 6 | X = Union[Literal[False], Literal["db"]]
   |                                    ^^

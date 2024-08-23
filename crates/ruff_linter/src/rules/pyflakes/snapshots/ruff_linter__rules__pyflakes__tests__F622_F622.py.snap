@@ -1,8 +1,9 @@
 ---
 source: crates/ruff_linter/src/rules/pyflakes/mod.rs
 ---
-error[F622]: F622.py:1:1: Two starred expressions in assignment
+error[F622]: 1:1: Two starred expressions in assignment
 
+ --> F622.py:1:1
   |
 1 | *a, *b, c = (1, 2, 3)
   | ^^^^^^^^^

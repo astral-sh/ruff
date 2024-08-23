@@ -1,13 +1,15 @@
 ---
 source: crates/ruff_linter/src/rules/isort/mod.rs
 ---
-error[I001]: propagate_inline_comments.py:1:1: [*] Import block is un-sorted or un-formatted
+error[I001]: 1:1: [*] Import block is un-sorted or un-formatted
 
+ --> propagate_inline_comments.py:1:1
   |
 1 | / from mypackage.subpackage import (  # long comment that seems to be a problem
 2 | |     a_long_variable_name_that_causes_problems,
 3 | |     items,
 4 | | )
+  | |__^
   |
   = help: Organize imports
 ℹ Safe fix

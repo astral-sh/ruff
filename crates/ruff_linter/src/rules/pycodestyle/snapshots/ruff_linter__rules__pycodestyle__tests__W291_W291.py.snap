@@ -1,8 +1,9 @@
 ---
 source: crates/ruff_linter/src/rules/pycodestyle/mod.rs
 ---
-error[W291]: W291.py:1:23: [*] Trailing whitespace
+error[W291]: 1:23: [*] Trailing whitespace
 
+ --> W291.py:1:23
   |
 1 | '''trailing whitespace 
   |                       ^
@@ -16,8 +17,9 @@ error[W291]: W291.py:1:23: [*] Trailing whitespace
 3 3 | 
 4 4 | f'''trailing whitespace 
 
-error[W291]: W291.py:4:24: [*] Trailing whitespace
+error[W291]: 4:24: [*] Trailing whitespace
 
+ --> W291.py:4:24
   |
 2 | inside a multiline string'''
 3 | 
@@ -36,8 +38,9 @@ error[W291]: W291.py:4:24: [*] Trailing whitespace
 6 6 | 
 7 7 | # Trailing whitespace after `{`
 
-error[W291]: W291.py:8:8: [*] Trailing whitespace
+error[W291]: 8:8: [*] Trailing whitespace
 
+  --> W291.py:8:8
    |
  7 | # Trailing whitespace after `{`
  8 | f'abc { 
@@ -56,8 +59,9 @@ error[W291]: W291.py:8:8: [*] Trailing whitespace
 10 10 | }'
 11 11 | 
 
-error[W291]: W291.py:14:10: [*] Trailing whitespace
+error[W291]: 14:10: [*] Trailing whitespace
 
+  --> W291.py:14:10
    |
 12 | # Trailing whitespace after `2`
 13 | f'abc {

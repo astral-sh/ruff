@@ -1,8 +1,9 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_quotes/mod.rs
 ---
-error[Q002]: doubles_all.py:1:1: [*] Double quote docstring found but single quotes preferred
+error[Q002]: 1:1: [*] Double quote docstring found but single quotes preferred
 
+ --> doubles_all.py:1:1
   |
 1 | """This is a docstring."""
   | ^^^^^^^^^^^^^^^^^^^^^^^^^^

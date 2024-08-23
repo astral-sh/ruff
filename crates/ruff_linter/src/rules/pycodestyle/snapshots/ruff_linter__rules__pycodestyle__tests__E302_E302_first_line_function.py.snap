@@ -1,8 +1,9 @@
 ---
 source: crates/ruff_linter/src/rules/pycodestyle/mod.rs
 ---
-error[E302]: E302_first_line_function.py:4:1: [*] Expected 2 blank lines, found 1
+error[E302]: 4:1: [*] Expected 2 blank lines, found 1
 
+ --> E302_first_line_function.py:3:1
   |
 2 |     pass
 3 | 

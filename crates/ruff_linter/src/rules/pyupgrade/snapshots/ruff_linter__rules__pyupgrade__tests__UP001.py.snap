@@ -1,8 +1,9 @@
 ---
 source: crates/ruff_linter/src/rules/pyupgrade/mod.rs
 ---
-error[UP001]: UP001.py:2:5: [*] `__metaclass__ = type` is implied
+error[UP001]: 2:5: [*] `__metaclass__ = type` is implied
 
+ --> UP001.py:2:5
   |
 1 | class A:
 2 |     __metaclass__ = type
@@ -17,8 +18,9 @@ error[UP001]: UP001.py:2:5: [*] `__metaclass__ = type` is implied
 4 4 | 
 5 5 | class B:
 
-error[UP001]: UP001.py:6:5: [*] `__metaclass__ = type` is implied
+error[UP001]: 6:5: [*] `__metaclass__ = type` is implied
 
+ --> UP001.py:6:5
   |
 5 | class B:
 6 |     __metaclass__ = type

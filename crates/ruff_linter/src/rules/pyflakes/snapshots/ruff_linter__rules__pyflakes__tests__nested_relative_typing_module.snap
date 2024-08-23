@@ -1,15 +1,17 @@
 ---
 source: crates/ruff_linter/src/rules/pyflakes/mod.rs
 ---
-error[F821]: baz.py:26:17: Undefined name `foo`
+error[F821]: 26:17: Undefined name `foo`
 
+  --> baz.py:26:17
    |
 25 |     # F821
 26 |     x: Literal["foo"]
    |                 ^^^
    |
-error[F821]: baz.py:33:17: Undefined name `foo`
+error[F821]: 33:17: Undefined name `foo`
 
+  --> baz.py:33:17
    |
 32 |     # F821
 33 |     x: Literal["foo"]

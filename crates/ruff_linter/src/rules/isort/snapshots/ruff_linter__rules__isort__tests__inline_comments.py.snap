@@ -1,8 +1,9 @@
 ---
 source: crates/ruff_linter/src/rules/isort/mod.rs
 ---
-error[I001]: inline_comments.py:1:1: [*] Import block is un-sorted or un-formatted
+error[I001]: 1:1: [*] Import block is un-sorted or un-formatted
 
+  --> inline_comments.py:1:1
    |
  1 | / from a.prometheus.metrics import (  # type:ignore[attr-defined]
  2 | |     TERMINAL_CURRENTLY_RUNNING_TOTAL,
@@ -15,6 +16,7 @@ error[I001]: inline_comments.py:1:1: [*] Import block is un-sorted or un-formatt
  9 | | from c.prometheus.metrics import TERMINAL_CURRENTLY_RUNNING_TOTAL  # type:ignore[attr-defined]
 10 | | 
 11 | | from d.prometheus.metrics import TERMINAL_CURRENTLY_RUNNING_TOTAL, OTHER_RUNNING_TOTAL  # type:ignore[attr-defined]
+   | |____________________________________________________________________________________________________________________^
    |
    = help: Organize imports
 ℹ Safe fix

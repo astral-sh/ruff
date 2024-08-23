@@ -1,8 +1,9 @@
 ---
 source: crates/ruff_linter/src/rules/pycodestyle/mod.rs
 ---
-error[E223]: E22.py:43:2: [*] Tab before operator
+error[E223]: 43:2: [*] Tab before operator
 
+  --> E22.py:43:2
    |
 41 | #: E223
 42 | foobart = 4

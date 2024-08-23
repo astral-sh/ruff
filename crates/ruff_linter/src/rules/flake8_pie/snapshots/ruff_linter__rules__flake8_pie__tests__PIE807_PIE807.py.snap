@@ -1,8 +1,9 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_pie/mod.rs
 ---
-error[PIE807]: PIE807.py:3:44: [*] Prefer `list` over useless lambda
+error[PIE807]: 3:44: [*] Prefer `list` over useless lambda
 
+ --> PIE807.py:3:44
   |
 1 | @dataclass
 2 | class Foo:
@@ -20,8 +21,9 @@ error[PIE807]: PIE807.py:3:44: [*] Prefer `list` over useless lambda
 5 5 | 
 6 6 | 
 
-error[PIE807]: PIE807.py:4:49: [*] Prefer `dict` over useless lambda
+error[PIE807]: 4:49: [*] Prefer `dict` over useless lambda
 
+ --> PIE807.py:4:49
   |
 2 | class Foo:
 3 |     foo: List[str] = field(default_factory=lambda: [])  # PIE807
@@ -39,8 +41,9 @@ error[PIE807]: PIE807.py:4:49: [*] Prefer `dict` over useless lambda
 6 6 | 
 7 7 | class FooTable(BaseTable):
 
-error[PIE807]: PIE807.py:8:36: [*] Prefer `list` over useless lambda
+error[PIE807]: 8:36: [*] Prefer `list` over useless lambda
 
+ --> PIE807.py:8:36
   |
 7 | class FooTable(BaseTable):
 8 |     foo = fields.ListField(default=lambda: [])  # PIE807
@@ -58,8 +61,9 @@ error[PIE807]: PIE807.py:8:36: [*] Prefer `list` over useless lambda
 10 10 | 
 11 11 | 
 
-error[PIE807]: PIE807.py:9:36: [*] Prefer `dict` over useless lambda
+error[PIE807]: 9:36: [*] Prefer `dict` over useless lambda
 
+ --> PIE807.py:9:36
   |
 7 | class FooTable(BaseTable):
 8 |     foo = fields.ListField(default=lambda: [])  # PIE807
@@ -77,8 +81,9 @@ error[PIE807]: PIE807.py:9:36: [*] Prefer `dict` over useless lambda
 11 11 | 
 12 12 | class FooTable(BaseTable):
 
-error[PIE807]: PIE807.py:13:28: [*] Prefer `list` over useless lambda
+error[PIE807]: 13:28: [*] Prefer `list` over useless lambda
 
+  --> PIE807.py:13:28
    |
 12 | class FooTable(BaseTable):
 13 |     foo = fields.ListField(lambda: [])  # PIE807
@@ -96,8 +101,9 @@ error[PIE807]: PIE807.py:13:28: [*] Prefer `list` over useless lambda
 15 15 | 
 16 16 | 
 
-error[PIE807]: PIE807.py:14:36: [*] Prefer `dict` over useless lambda
+error[PIE807]: 14:36: [*] Prefer `dict` over useless lambda
 
+  --> PIE807.py:14:36
    |
 12 | class FooTable(BaseTable):
 13 |     foo = fields.ListField(lambda: [])  # PIE807

@@ -1,8 +1,9 @@
 ---
 source: crates/ruff_linter/src/rules/pylint/mod.rs
 ---
-error[PLW0711]: binary_op_exception.py:3:8: Exception to catch is the result of a binary `or` operation
+error[PLW0711]: 3:8: Exception to catch is the result of a binary `or` operation
 
+ --> binary_op_exception.py:3:8
   |
 1 | try:
 2 |     1 / 0
@@ -10,8 +11,9 @@ error[PLW0711]: binary_op_exception.py:3:8: Exception to catch is the result of 
   |        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 4 |     pass
   |
-error[PLW0711]: binary_op_exception.py:8:8: Exception to catch is the result of a binary `and` operation
+error[PLW0711]: 8:8: Exception to catch is the result of a binary `and` operation
 
+ --> binary_op_exception.py:8:8
   |
 6 | try:
 7 |     raise ValueError

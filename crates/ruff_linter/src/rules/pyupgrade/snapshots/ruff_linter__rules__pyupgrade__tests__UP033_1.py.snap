@@ -1,8 +1,9 @@
 ---
 source: crates/ruff_linter/src/rules/pyupgrade/mod.rs
 ---
-error[UP033]: UP033_1.py:4:11: [*] Use `@functools.cache` instead of `@functools.lru_cache(maxsize=None)`
+error[UP033]: 4:11: [*] Use `@functools.cache` instead of `@functools.lru_cache(maxsize=None)`
 
+ --> UP033_1.py:4:11
   |
 4 | @lru_cache(maxsize=None)
   |           ^^^^^^^^^^^^^^
@@ -21,8 +22,9 @@ error[UP033]: UP033_1.py:4:11: [*] Use `@functools.cache` instead of `@functools
 6 6 |     pass
 7 7 | 
 
-error[UP033]: UP033_1.py:10:11: [*] Use `@functools.cache` instead of `@functools.lru_cache(maxsize=None)`
+error[UP033]: 10:11: [*] Use `@functools.cache` instead of `@functools.lru_cache(maxsize=None)`
 
+  --> UP033_1.py:10:11
    |
  9 | @other_decorator
 10 | @lru_cache(maxsize=None)
@@ -47,8 +49,9 @@ error[UP033]: UP033_1.py:10:11: [*] Use `@functools.cache` instead of `@functool
 12 12 |     pass
 13 13 | 
 
-error[UP033]: UP033_1.py:15:11: [*] Use `@functools.cache` instead of `@functools.lru_cache(maxsize=None)`
+error[UP033]: 15:11: [*] Use `@functools.cache` instead of `@functools.lru_cache(maxsize=None)`
 
+  --> UP033_1.py:15:11
    |
 15 | @lru_cache(maxsize=None)
    |           ^^^^^^^^^^^^^^

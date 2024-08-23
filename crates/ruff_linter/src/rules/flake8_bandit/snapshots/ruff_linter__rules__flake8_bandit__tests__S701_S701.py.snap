@@ -1,8 +1,9 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_bandit/mod.rs
 ---
-error[S701]: S701.py:9:57: Using jinja2 templates with `autoescape=False` is dangerous and can lead to XSS. Ensure `autoescape=True` or use the `select_autoescape` function.
+error[S701]: 9:57: Using jinja2 templates with `autoescape=False` is dangerous and can lead to XSS. Ensure `autoescape=True` or use the `select_autoescape` function.
 
+  --> S701.py:9:57
    |
  7 | templateEnv = jinja2.Environment(autoescape=True,
  8 |         loader=templateLoader )
@@ -11,8 +12,9 @@ error[S701]: S701.py:9:57: Using jinja2 templates with `autoescape=False` is dan
 10 | templateEnv = jinja2.Environment(autoescape=False, loader=templateLoader )  # S701
 11 | Environment(loader=templateLoader,
    |
-error[S701]: S701.py:10:34: Using jinja2 templates with `autoescape=False` is dangerous and can lead to XSS. Ensure `autoescape=True` or use the `select_autoescape` function.
+error[S701]: 10:34: Using jinja2 templates with `autoescape=False` is dangerous and can lead to XSS. Ensure `autoescape=True` or use the `select_autoescape` function.
 
+  --> S701.py:10:34
    |
  8 |         loader=templateLoader )
  9 | Environment(loader=templateLoader, load=templateLoader, autoescape=something)  # S701
@@ -21,8 +23,9 @@ error[S701]: S701.py:10:34: Using jinja2 templates with `autoescape=False` is da
 11 | Environment(loader=templateLoader,
 12 |             load=templateLoader,
    |
-error[S701]: S701.py:13:13: Using jinja2 templates with `autoescape=False` is dangerous and can lead to XSS. Ensure `autoescape=True` or use the `select_autoescape` function.
+error[S701]: 13:13: Using jinja2 templates with `autoescape=False` is dangerous and can lead to XSS. Ensure `autoescape=True` or use the `select_autoescape` function.
 
+  --> S701.py:13:13
    |
 11 | Environment(loader=templateLoader,
 12 |             load=templateLoader,
@@ -31,8 +34,9 @@ error[S701]: S701.py:13:13: Using jinja2 templates with `autoescape=False` is da
 14 | 
 15 | Environment(loader=templateLoader,  # S701
    |
-error[S701]: S701.py:15:1: By default, jinja2 sets `autoescape` to `False`. Consider using `autoescape=True` or the `select_autoescape` function to mitigate XSS vulnerabilities.
+error[S701]: 15:1: By default, jinja2 sets `autoescape` to `False`. Consider using `autoescape=True` or the `select_autoescape` function to mitigate XSS vulnerabilities.
 
+  --> S701.py:14:1
    |
 13 |             autoescape=False)  # S701
 14 | 
@@ -40,8 +44,9 @@ error[S701]: S701.py:15:1: By default, jinja2 sets `autoescape` to `False`. Cons
    | ^^^^^^^^^^^
 16 |             load=templateLoader)
    |
-error[S701]: S701.py:29:36: Using jinja2 templates with `autoescape=False` is dangerous and can lead to XSS. Ensure `autoescape=True` or use the `select_autoescape` function.
+error[S701]: 29:36: Using jinja2 templates with `autoescape=False` is dangerous and can lead to XSS. Ensure `autoescape=True` or use the `select_autoescape` function.
 
+  --> S701.py:29:36
    |
 27 | def fake_func():
 28 |     return 'foobar'

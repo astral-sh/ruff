@@ -1,8 +1,9 @@
 ---
 source: crates/ruff_linter/src/rules/isort/mod.rs
 ---
-error[I001]: comments.py:3:1: [*] Import block is un-sorted or un-formatted
+error[I001]: 3:1: [*] Import block is un-sorted or un-formatted
 
+  --> comments.py:2:12
    |
  1 |   # Comment 1
  2 |   # Comment 2
@@ -37,6 +38,7 @@ error[I001]: comments.py:3:1: [*] Import block is un-sorted or un-formatted
 31 | | 
 32 | | from F import a  # Comment 1
 33 | | from F import b
+   | |________________^
    |
    = help: Organize imports
 ℹ Safe fix

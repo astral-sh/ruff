@@ -1,8 +1,9 @@
 ---
 source: crates/ruff_linter/src/rules/pycodestyle/mod.rs
 ---
-error[E731]: E731.py:3:5: [*] Do not assign a `lambda` expression, use a `def`
+error[E731]: 3:5: [*] Do not assign a `lambda` expression, use a `def`
 
+ --> E731.py:3:5
   |
 1 | def scope():
 2 |     # E731
@@ -20,8 +21,9 @@ error[E731]: E731.py:3:5: [*] Do not assign a `lambda` expression, use a `def`
 5 6 | 
 6 7 | def scope():
 
-error[E731]: E731.py:8:5: [*] Do not assign a `lambda` expression, use a `def`
+error[E731]: 8:5: [*] Do not assign a `lambda` expression, use a `def`
 
+ --> E731.py:8:5
   |
 6 | def scope():
 7 |     # E731
@@ -40,8 +42,9 @@ error[E731]: E731.py:8:5: [*] Do not assign a `lambda` expression, use a `def`
 10 11 | 
 11 12 | def scope():
 
-error[E731]: E731.py:14:9: [*] Do not assign a `lambda` expression, use a `def`
+error[E731]: 14:9: [*] Do not assign a `lambda` expression, use a `def`
 
+  --> E731.py:14:9
    |
 12 |     # E731
 13 |     while False:
@@ -60,8 +63,9 @@ error[E731]: E731.py:14:9: [*] Do not assign a `lambda` expression, use a `def`
 16 17 | 
 17 18 | def scope():
 
-error[E731]: E731.py:19:5: [*] Do not assign a `lambda` expression, use a `def`
+error[E731]: 19:5: [*] Do not assign a `lambda` expression, use a `def`
 
+  --> E731.py:19:5
    |
 17 | def scope():
 18 |     # E731
@@ -80,8 +84,9 @@ error[E731]: E731.py:19:5: [*] Do not assign a `lambda` expression, use a `def`
 21 22 | 
 22 23 | def scope():
 
-error[E731]: E731.py:24:5: [*] Do not assign a `lambda` expression, use a `def`
+error[E731]: 24:5: [*] Do not assign a `lambda` expression, use a `def`
 
+  --> E731.py:24:5
    |
 22 | def scope():
 23 |     # E731
@@ -100,8 +105,9 @@ error[E731]: E731.py:24:5: [*] Do not assign a `lambda` expression, use a `def`
 26 27 | 
 27 28 | def scope():
 
-error[E731]: E731.py:57:5: Do not assign a `lambda` expression, use a `def`
+error[E731]: 57:5: Do not assign a `lambda` expression, use a `def`
 
+  --> E731.py:57:5
    |
 55 | class Scope:
 56 |     # E731
@@ -120,8 +126,9 @@ error[E731]: E731.py:57:5: Do not assign a `lambda` expression, use a `def`
 59 60 | 
 60 61 | class Scope:
 
-error[E731]: E731.py:73:9: Do not assign a `lambda` expression, use a `def`
+error[E731]: 73:9: Do not assign a `lambda` expression, use a `def`
 
+  --> E731.py:73:9
    |
 71 |     x: Callable[[int], int]
 72 |     if True:
@@ -142,8 +149,9 @@ error[E731]: E731.py:73:9: Do not assign a `lambda` expression, use a `def`
 75 76 |         x = lambda: 2
 76 77 |     return x
 
-error[E731]: E731.py:75:9: Do not assign a `lambda` expression, use a `def`
+error[E731]: 75:9: Do not assign a `lambda` expression, use a `def`
 
+  --> E731.py:75:9
    |
 73 |         x = lambda: 1
 74 |     else:
@@ -163,8 +171,9 @@ error[E731]: E731.py:75:9: Do not assign a `lambda` expression, use a `def`
 77 78 | 
 78 79 | 
 
-error[E731]: E731.py:86:5: [*] Do not assign a `lambda` expression, use a `def`
+error[E731]: 86:5: [*] Do not assign a `lambda` expression, use a `def`
 
+  --> E731.py:86:5
    |
 84 |     # ParamSpec cannot be used in this context, so do not preserve the annotation.
 85 |     P = ParamSpec("P")
@@ -183,8 +192,9 @@ error[E731]: E731.py:86:5: [*] Do not assign a `lambda` expression, use a `def`
 88 89 | 
 89 90 | def scope():
 
-error[E731]: E731.py:94:5: [*] Do not assign a `lambda` expression, use a `def`
+error[E731]: 94:5: [*] Do not assign a `lambda` expression, use a `def`
 
+  --> E731.py:94:5
    |
 92 |     from typing import Callable
 93 | 
@@ -203,8 +213,9 @@ error[E731]: E731.py:94:5: [*] Do not assign a `lambda` expression, use a `def`
 96 97 | 
 97 98 | def scope():
 
-error[E731]: E731.py:102:5: [*] Do not assign a `lambda` expression, use a `def`
+error[E731]: 102:5: [*] Do not assign a `lambda` expression, use a `def`
 
+   --> E731.py:102:5
     |
 100 |     from typing import Callable
 101 | 
@@ -223,8 +234,9 @@ error[E731]: E731.py:102:5: [*] Do not assign a `lambda` expression, use a `def`
 104 105 | 
 105 106 | def scope():
 
-error[E731]: E731.py:110:5: [*] Do not assign a `lambda` expression, use a `def`
+error[E731]: 110:5: [*] Do not assign a `lambda` expression, use a `def`
 
+   --> E731.py:110:5
     |
 108 |     from typing import Callable
 109 | 
@@ -243,8 +255,9 @@ error[E731]: E731.py:110:5: [*] Do not assign a `lambda` expression, use a `def`
 112 113 | 
 113 114 | # Let's use the `Callable` type from `collections.abc` instead.
 
-error[E731]: E731.py:119:5: [*] Do not assign a `lambda` expression, use a `def`
+error[E731]: 119:5: [*] Do not assign a `lambda` expression, use a `def`
 
+   --> E731.py:119:5
     |
 117 |     from collections.abc import Callable
 118 | 
@@ -263,8 +276,9 @@ error[E731]: E731.py:119:5: [*] Do not assign a `lambda` expression, use a `def`
 121 122 | 
 122 123 | def scope():
 
-error[E731]: E731.py:127:5: [*] Do not assign a `lambda` expression, use a `def`
+error[E731]: 127:5: [*] Do not assign a `lambda` expression, use a `def`
 
+   --> E731.py:127:5
     |
 125 |     from collections.abc import Callable
 126 | 
@@ -283,8 +297,9 @@ error[E731]: E731.py:127:5: [*] Do not assign a `lambda` expression, use a `def`
 129 130 | 
 130 131 | def scope():
 
-error[E731]: E731.py:135:5: [*] Do not assign a `lambda` expression, use a `def`
+error[E731]: 135:5: [*] Do not assign a `lambda` expression, use a `def`
 
+   --> E731.py:135:5
     |
 133 |     from collections.abc import Callable
 134 | 
@@ -303,8 +318,9 @@ error[E731]: E731.py:135:5: [*] Do not assign a `lambda` expression, use a `def`
 137 138 | 
 138 139 | class TemperatureScales(Enum):
 
-error[E731]: E731.py:139:5: Do not assign a `lambda` expression, use a `def`
+error[E731]: 139:5: Do not assign a `lambda` expression, use a `def`
 
+   --> E731.py:139:5
     |
 138 | class TemperatureScales(Enum):
 139 |     CELSIUS = (lambda deg_c: deg_c)
@@ -323,8 +339,9 @@ error[E731]: E731.py:139:5: Do not assign a `lambda` expression, use a `def`
 141 142 | 
 142 143 | 
 
-error[E731]: E731.py:140:5: Do not assign a `lambda` expression, use a `def`
+error[E731]: 140:5: Do not assign a `lambda` expression, use a `def`
 
+   --> E731.py:140:5
     |
 138 | class TemperatureScales(Enum):
 139 |     CELSIUS = (lambda deg_c: deg_c)
@@ -343,8 +360,9 @@ error[E731]: E731.py:140:5: Do not assign a `lambda` expression, use a `def`
 142 143 | 
 143 144 | # Regression test for: https://github.com/astral-sh/ruff/issues/7141
 
-error[E731]: E731.py:147:5: [*] Do not assign a `lambda` expression, use a `def`
+error[E731]: 147:5: [*] Do not assign a `lambda` expression, use a `def`
 
+   --> E731.py:147:5
     |
 145 |       # E731
 146 |   

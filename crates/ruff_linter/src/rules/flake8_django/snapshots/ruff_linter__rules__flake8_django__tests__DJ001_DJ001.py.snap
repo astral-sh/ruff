@@ -1,8 +1,9 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_django/mod.rs
 ---
-error[DJ001]: DJ001.py:7:17: Avoid using `null=True` on string-based fields such as `CharField`
+error[DJ001]: 7:17: Avoid using `null=True` on string-based fields such as `CharField`
 
+ --> DJ001.py:7:17
   |
 6 | class IncorrectModel(models.Model):
 7 |     charfield = models.CharField(max_length=255, null=True)
@@ -10,8 +11,9 @@ error[DJ001]: DJ001.py:7:17: Avoid using `null=True` on string-based fields such
 8 |     textfield = models.TextField(max_length=255, null=True)
 9 |     slugfield = models.SlugField(max_length=255, null=True)
   |
-error[DJ001]: DJ001.py:8:17: Avoid using `null=True` on string-based fields such as `TextField`
+error[DJ001]: 8:17: Avoid using `null=True` on string-based fields such as `TextField`
 
+  --> DJ001.py:8:17
    |
  6 | class IncorrectModel(models.Model):
  7 |     charfield = models.CharField(max_length=255, null=True)
@@ -20,8 +22,9 @@ error[DJ001]: DJ001.py:8:17: Avoid using `null=True` on string-based fields such
  9 |     slugfield = models.SlugField(max_length=255, null=True)
 10 |     emailfield = models.EmailField(max_length=255, null=True)
    |
-error[DJ001]: DJ001.py:9:17: Avoid using `null=True` on string-based fields such as `SlugField`
+error[DJ001]: 9:17: Avoid using `null=True` on string-based fields such as `SlugField`
 
+  --> DJ001.py:9:17
    |
  7 |     charfield = models.CharField(max_length=255, null=True)
  8 |     textfield = models.TextField(max_length=255, null=True)
@@ -30,8 +33,9 @@ error[DJ001]: DJ001.py:9:17: Avoid using `null=True` on string-based fields such
 10 |     emailfield = models.EmailField(max_length=255, null=True)
 11 |     filepathfield = models.FilePathField(max_length=255, null=True)
    |
-error[DJ001]: DJ001.py:10:18: Avoid using `null=True` on string-based fields such as `EmailField`
+error[DJ001]: 10:18: Avoid using `null=True` on string-based fields such as `EmailField`
 
+  --> DJ001.py:10:18
    |
  8 |     textfield = models.TextField(max_length=255, null=True)
  9 |     slugfield = models.SlugField(max_length=255, null=True)
@@ -40,8 +44,9 @@ error[DJ001]: DJ001.py:10:18: Avoid using `null=True` on string-based fields suc
 11 |     filepathfield = models.FilePathField(max_length=255, null=True)
 12 |     urlfield = models.URLField(max_length=255, null=True)
    |
-error[DJ001]: DJ001.py:11:21: Avoid using `null=True` on string-based fields such as `FilePathField`
+error[DJ001]: 11:21: Avoid using `null=True` on string-based fields such as `FilePathField`
 
+  --> DJ001.py:11:21
    |
  9 |     slugfield = models.SlugField(max_length=255, null=True)
 10 |     emailfield = models.EmailField(max_length=255, null=True)
@@ -49,16 +54,18 @@ error[DJ001]: DJ001.py:11:21: Avoid using `null=True` on string-based fields suc
    |                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 12 |     urlfield = models.URLField(max_length=255, null=True)
    |
-error[DJ001]: DJ001.py:12:16: Avoid using `null=True` on string-based fields such as `URLField`
+error[DJ001]: 12:16: Avoid using `null=True` on string-based fields such as `URLField`
 
+  --> DJ001.py:12:16
    |
 10 |     emailfield = models.EmailField(max_length=255, null=True)
 11 |     filepathfield = models.FilePathField(max_length=255, null=True)
 12 |     urlfield = models.URLField(max_length=255, null=True)
    |                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
    |
-error[DJ001]: DJ001.py:16:17: Avoid using `null=True` on string-based fields such as `CharField`
+error[DJ001]: 16:17: Avoid using `null=True` on string-based fields such as `CharField`
 
+  --> DJ001.py:16:17
    |
 15 | class IncorrectModelWithAlias(DjangoModel):
 16 |     charfield = DjangoModel.CharField(max_length=255, null=True)
@@ -66,8 +73,9 @@ error[DJ001]: DJ001.py:16:17: Avoid using `null=True` on string-based fields suc
 17 |     textfield = SmthCharField(max_length=255, null=True)
 18 |     slugfield = models.SlugField(max_length=255, null=True)
    |
-error[DJ001]: DJ001.py:17:17: Avoid using `null=True` on string-based fields such as `CharField`
+error[DJ001]: 17:17: Avoid using `null=True` on string-based fields such as `CharField`
 
+  --> DJ001.py:17:17
    |
 15 | class IncorrectModelWithAlias(DjangoModel):
 16 |     charfield = DjangoModel.CharField(max_length=255, null=True)
@@ -76,8 +84,9 @@ error[DJ001]: DJ001.py:17:17: Avoid using `null=True` on string-based fields suc
 18 |     slugfield = models.SlugField(max_length=255, null=True)
 19 |     emailfield = models.EmailField(max_length=255, null=True)
    |
-error[DJ001]: DJ001.py:18:17: Avoid using `null=True` on string-based fields such as `SlugField`
+error[DJ001]: 18:17: Avoid using `null=True` on string-based fields such as `SlugField`
 
+  --> DJ001.py:18:17
    |
 16 |     charfield = DjangoModel.CharField(max_length=255, null=True)
 17 |     textfield = SmthCharField(max_length=255, null=True)
@@ -86,8 +95,9 @@ error[DJ001]: DJ001.py:18:17: Avoid using `null=True` on string-based fields suc
 19 |     emailfield = models.EmailField(max_length=255, null=True)
 20 |     filepathfield = models.FilePathField(max_length=255, null=True)
    |
-error[DJ001]: DJ001.py:19:18: Avoid using `null=True` on string-based fields such as `EmailField`
+error[DJ001]: 19:18: Avoid using `null=True` on string-based fields such as `EmailField`
 
+  --> DJ001.py:19:18
    |
 17 |     textfield = SmthCharField(max_length=255, null=True)
 18 |     slugfield = models.SlugField(max_length=255, null=True)
@@ -96,8 +106,9 @@ error[DJ001]: DJ001.py:19:18: Avoid using `null=True` on string-based fields suc
 20 |     filepathfield = models.FilePathField(max_length=255, null=True)
 21 |     urlfield = models.URLField(max_length=255, null=True)
    |
-error[DJ001]: DJ001.py:20:21: Avoid using `null=True` on string-based fields such as `FilePathField`
+error[DJ001]: 20:21: Avoid using `null=True` on string-based fields such as `FilePathField`
 
+  --> DJ001.py:20:21
    |
 18 |     slugfield = models.SlugField(max_length=255, null=True)
 19 |     emailfield = models.EmailField(max_length=255, null=True)
@@ -105,16 +116,18 @@ error[DJ001]: DJ001.py:20:21: Avoid using `null=True` on string-based fields suc
    |                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 21 |     urlfield = models.URLField(max_length=255, null=True)
    |
-error[DJ001]: DJ001.py:21:16: Avoid using `null=True` on string-based fields such as `URLField`
+error[DJ001]: 21:16: Avoid using `null=True` on string-based fields such as `URLField`
 
+  --> DJ001.py:21:16
    |
 19 |     emailfield = models.EmailField(max_length=255, null=True)
 20 |     filepathfield = models.FilePathField(max_length=255, null=True)
 21 |     urlfield = models.URLField(max_length=255, null=True)
    |                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
    |
-error[DJ001]: DJ001.py:25:17: Avoid using `null=True` on string-based fields such as `CharField`
+error[DJ001]: 25:17: Avoid using `null=True` on string-based fields such as `CharField`
 
+  --> DJ001.py:25:17
    |
 24 | class IncorrectModelWithoutSuperclass:
 25 |     charfield = DjangoModel.CharField(max_length=255, null=True)
@@ -122,8 +135,9 @@ error[DJ001]: DJ001.py:25:17: Avoid using `null=True` on string-based fields suc
 26 |     textfield = SmthCharField(max_length=255, null=True)
 27 |     slugfield = models.SlugField(max_length=255, null=True)
    |
-error[DJ001]: DJ001.py:26:17: Avoid using `null=True` on string-based fields such as `CharField`
+error[DJ001]: 26:17: Avoid using `null=True` on string-based fields such as `CharField`
 
+  --> DJ001.py:26:17
    |
 24 | class IncorrectModelWithoutSuperclass:
 25 |     charfield = DjangoModel.CharField(max_length=255, null=True)
@@ -132,8 +146,9 @@ error[DJ001]: DJ001.py:26:17: Avoid using `null=True` on string-based fields suc
 27 |     slugfield = models.SlugField(max_length=255, null=True)
 28 |     emailfield = models.EmailField(max_length=255, null=True)
    |
-error[DJ001]: DJ001.py:27:17: Avoid using `null=True` on string-based fields such as `SlugField`
+error[DJ001]: 27:17: Avoid using `null=True` on string-based fields such as `SlugField`
 
+  --> DJ001.py:27:17
    |
 25 |     charfield = DjangoModel.CharField(max_length=255, null=True)
 26 |     textfield = SmthCharField(max_length=255, null=True)
@@ -142,8 +157,9 @@ error[DJ001]: DJ001.py:27:17: Avoid using `null=True` on string-based fields suc
 28 |     emailfield = models.EmailField(max_length=255, null=True)
 29 |     filepathfield = models.FilePathField(max_length=255, null=True)
    |
-error[DJ001]: DJ001.py:28:18: Avoid using `null=True` on string-based fields such as `EmailField`
+error[DJ001]: 28:18: Avoid using `null=True` on string-based fields such as `EmailField`
 
+  --> DJ001.py:28:18
    |
 26 |     textfield = SmthCharField(max_length=255, null=True)
 27 |     slugfield = models.SlugField(max_length=255, null=True)
@@ -152,8 +168,9 @@ error[DJ001]: DJ001.py:28:18: Avoid using `null=True` on string-based fields suc
 29 |     filepathfield = models.FilePathField(max_length=255, null=True)
 30 |     urlfield = models.URLField(max_length=255, null=True)
    |
-error[DJ001]: DJ001.py:29:21: Avoid using `null=True` on string-based fields such as `FilePathField`
+error[DJ001]: 29:21: Avoid using `null=True` on string-based fields such as `FilePathField`
 
+  --> DJ001.py:29:21
    |
 27 |     slugfield = models.SlugField(max_length=255, null=True)
 28 |     emailfield = models.EmailField(max_length=255, null=True)
@@ -161,8 +178,9 @@ error[DJ001]: DJ001.py:29:21: Avoid using `null=True` on string-based fields suc
    |                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 30 |     urlfield = models.URLField(max_length=255, null=True)
    |
-error[DJ001]: DJ001.py:30:16: Avoid using `null=True` on string-based fields such as `URLField`
+error[DJ001]: 30:16: Avoid using `null=True` on string-based fields such as `URLField`
 
+  --> DJ001.py:30:16
    |
 28 |     emailfield = models.EmailField(max_length=255, null=True)
 29 |     filepathfield = models.FilePathField(max_length=255, null=True)

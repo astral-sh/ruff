@@ -1,8 +1,9 @@
 ---
 source: crates/ruff_linter/src/rules/ruff/mod.rs
 ---
-error[RUF010]: RUF010.py:9:4: [*] Use explicit conversion flag
+error[RUF010]: 9:4: [*] Use explicit conversion flag
 
+  --> RUF010.py:9:4
    |
  9 | f"{str(bla)}, {repr(bla)}, {ascii(bla)}"  # RUF010
    |    ^^^^^^^^
@@ -20,8 +21,9 @@ error[RUF010]: RUF010.py:9:4: [*] Use explicit conversion flag
 11 11 | f"{str(d['a'])}, {repr(d['b'])}, {ascii(d['c'])}"  # RUF010
 12 12 | 
 
-error[RUF010]: RUF010.py:9:16: [*] Use explicit conversion flag
+error[RUF010]: 9:16: [*] Use explicit conversion flag
 
+  --> RUF010.py:9:16
    |
  9 | f"{str(bla)}, {repr(bla)}, {ascii(bla)}"  # RUF010
    |                ^^^^^^^^^
@@ -39,8 +41,9 @@ error[RUF010]: RUF010.py:9:16: [*] Use explicit conversion flag
 11 11 | f"{str(d['a'])}, {repr(d['b'])}, {ascii(d['c'])}"  # RUF010
 12 12 | 
 
-error[RUF010]: RUF010.py:9:29: [*] Use explicit conversion flag
+error[RUF010]: 9:29: [*] Use explicit conversion flag
 
+  --> RUF010.py:9:29
    |
  9 | f"{str(bla)}, {repr(bla)}, {ascii(bla)}"  # RUF010
    |                             ^^^^^^^^^^
@@ -58,8 +61,9 @@ error[RUF010]: RUF010.py:9:29: [*] Use explicit conversion flag
 11 11 | f"{str(d['a'])}, {repr(d['b'])}, {ascii(d['c'])}"  # RUF010
 12 12 | 
 
-error[RUF010]: RUF010.py:11:4: [*] Use explicit conversion flag
+error[RUF010]: 11:4: [*] Use explicit conversion flag
 
+  --> RUF010.py:11:4
    |
  9 | f"{str(bla)}, {repr(bla)}, {ascii(bla)}"  # RUF010
 10 | 
@@ -79,8 +83,9 @@ error[RUF010]: RUF010.py:11:4: [*] Use explicit conversion flag
 13 13 | f"{(str(bla))}, {(repr(bla))}, {(ascii(bla))}"  # RUF010
 14 14 | 
 
-error[RUF010]: RUF010.py:11:19: [*] Use explicit conversion flag
+error[RUF010]: 11:19: [*] Use explicit conversion flag
 
+  --> RUF010.py:11:19
    |
  9 | f"{str(bla)}, {repr(bla)}, {ascii(bla)}"  # RUF010
 10 | 
@@ -100,8 +105,9 @@ error[RUF010]: RUF010.py:11:19: [*] Use explicit conversion flag
 13 13 | f"{(str(bla))}, {(repr(bla))}, {(ascii(bla))}"  # RUF010
 14 14 | 
 
-error[RUF010]: RUF010.py:11:35: [*] Use explicit conversion flag
+error[RUF010]: 11:35: [*] Use explicit conversion flag
 
+  --> RUF010.py:11:35
    |
  9 | f"{str(bla)}, {repr(bla)}, {ascii(bla)}"  # RUF010
 10 | 
@@ -121,8 +127,9 @@ error[RUF010]: RUF010.py:11:35: [*] Use explicit conversion flag
 13 13 | f"{(str(bla))}, {(repr(bla))}, {(ascii(bla))}"  # RUF010
 14 14 | 
 
-error[RUF010]: RUF010.py:13:5: [*] Use explicit conversion flag
+error[RUF010]: 13:5: [*] Use explicit conversion flag
 
+  --> RUF010.py:13:5
    |
 11 | f"{str(d['a'])}, {repr(d['b'])}, {ascii(d['c'])}"  # RUF010
 12 | 
@@ -142,8 +149,9 @@ error[RUF010]: RUF010.py:13:5: [*] Use explicit conversion flag
 15 15 | f"{bla!s}, {(repr(bla))}, {(ascii(bla))}"  # RUF010
 16 16 | 
 
-error[RUF010]: RUF010.py:13:19: [*] Use explicit conversion flag
+error[RUF010]: 13:19: [*] Use explicit conversion flag
 
+  --> RUF010.py:13:19
    |
 11 | f"{str(d['a'])}, {repr(d['b'])}, {ascii(d['c'])}"  # RUF010
 12 | 
@@ -163,8 +171,9 @@ error[RUF010]: RUF010.py:13:19: [*] Use explicit conversion flag
 15 15 | f"{bla!s}, {(repr(bla))}, {(ascii(bla))}"  # RUF010
 16 16 | 
 
-error[RUF010]: RUF010.py:13:34: [*] Use explicit conversion flag
+error[RUF010]: 13:34: [*] Use explicit conversion flag
 
+  --> RUF010.py:13:34
    |
 11 | f"{str(d['a'])}, {repr(d['b'])}, {ascii(d['c'])}"  # RUF010
 12 | 
@@ -184,8 +193,9 @@ error[RUF010]: RUF010.py:13:34: [*] Use explicit conversion flag
 15 15 | f"{bla!s}, {(repr(bla))}, {(ascii(bla))}"  # RUF010
 16 16 | 
 
-error[RUF010]: RUF010.py:15:14: [*] Use explicit conversion flag
+error[RUF010]: 15:14: [*] Use explicit conversion flag
 
+  --> RUF010.py:15:14
    |
 13 | f"{(str(bla))}, {(repr(bla))}, {(ascii(bla))}"  # RUF010
 14 | 
@@ -205,8 +215,9 @@ error[RUF010]: RUF010.py:15:14: [*] Use explicit conversion flag
 17 17 | f"{foo(bla)}"  # OK
 18 18 | 
 
-error[RUF010]: RUF010.py:15:29: [*] Use explicit conversion flag
+error[RUF010]: 15:29: [*] Use explicit conversion flag
 
+  --> RUF010.py:15:29
    |
 13 | f"{(str(bla))}, {(repr(bla))}, {(ascii(bla))}"  # RUF010
 14 | 
@@ -226,8 +237,9 @@ error[RUF010]: RUF010.py:15:29: [*] Use explicit conversion flag
 17 17 | f"{foo(bla)}"  # OK
 18 18 | 
 
-error[RUF010]: RUF010.py:35:20: [*] Use explicit conversion flag
+error[RUF010]: 35:20: [*] Use explicit conversion flag
 
+  --> RUF010.py:35:20
    |
 33 |     f"Member of tuple mismatches type at index {i}. Expected {of_shape_i}. Got "
 34 |     " intermediary content "

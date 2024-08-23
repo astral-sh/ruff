@@ -1,8 +1,9 @@
 ---
 source: crates/ruff_linter/src/rules/pylint/mod.rs
 ---
-error[PLR0904]: too_many_public_methods.py:1:1: Too many public methods (10 > 7)
+error[PLR0904]: 1:1: Too many public methods (10 > 7)
 
+  --> too_many_public_methods.py:1:1
    |
  1 | / class Everything:
  2 | |     foo = 1

@@ -1,8 +1,9 @@
 ---
 source: crates/ruff_linter/src/rules/pylint/mod.rs
 ---
-error[PLE1205]: logging_too_many_args.py:3:1: Too many arguments for `logging` format string
+error[PLE1205]: 3:1: Too many arguments for `logging` format string
 
+ --> logging_too_many_args.py:2:1
   |
 1 | import logging
 2 | 
@@ -11,8 +12,9 @@ error[PLE1205]: logging_too_many_args.py:3:1: Too many arguments for `logging` f
 4 | 
 5 | logging.warning("Hello %s", "World!", "again", something="else")
   |
-error[PLE1205]: logging_too_many_args.py:5:1: Too many arguments for `logging` format string
+error[PLE1205]: 5:1: Too many arguments for `logging` format string
 
+ --> logging_too_many_args.py:4:1
   |
 3 | logging.warning("Hello %s", "World!", "again")  # [logging-too-many-args]
 4 | 
@@ -21,8 +23,9 @@ error[PLE1205]: logging_too_many_args.py:5:1: Too many arguments for `logging` f
 6 | 
 7 | logging.warning("Hello %s", "World!")
   |
-error[PLE1205]: logging_too_many_args.py:29:1: Too many arguments for `logging` format string
+error[PLE1205]: 29:1: Too many arguments for `logging` format string
 
+  --> logging_too_many_args.py:28:1
    |
 27 | from logging import info, error, warning
 28 | 
@@ -31,8 +34,9 @@ error[PLE1205]: logging_too_many_args.py:29:1: Too many arguments for `logging` 
 30 | 
 31 | warning("Hello %s", "World!", "again", something="else")
    |
-error[PLE1205]: logging_too_many_args.py:31:1: Too many arguments for `logging` format string
+error[PLE1205]: 31:1: Too many arguments for `logging` format string
 
+  --> logging_too_many_args.py:30:1
    |
 29 | warning("Hello %s", "World!", "again")  # [logging-too-many-args]
 30 | 

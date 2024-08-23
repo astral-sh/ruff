@@ -1,8 +1,9 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_implicit_str_concat/mod.rs
 ---
-error[ISC002]: ISC.py:5:5: Implicitly concatenated string literals over multiple lines
+error[ISC002]: 5:5: Implicitly concatenated string literals over multiple lines
 
+ --> ISC.py:5:5
   |
 3 |   _ = "abc" + "def"
 4 |   
@@ -13,8 +14,9 @@ error[ISC002]: ISC.py:5:5: Implicitly concatenated string literals over multiple
 7 |   
 8 |   _ = (
   |
-error[ISC002]: ISC.py:24:3: Implicitly concatenated string literals over multiple lines
+error[ISC002]: 24:3: Implicitly concatenated string literals over multiple lines
 
+  --> ISC.py:24:3
    |
 23 |   _ = (
 24 |     "abc"
@@ -23,8 +25,9 @@ error[ISC002]: ISC.py:24:3: Implicitly concatenated string literals over multipl
    | |_______^
 26 |   )
    |
-error[ISC002]: ISC.py:29:3: Implicitly concatenated string literals over multiple lines
+error[ISC002]: 29:3: Implicitly concatenated string literals over multiple lines
 
+  --> ISC.py:29:3
    |
 28 |   _ = (
 29 |     f"abc"
@@ -33,8 +36,9 @@ error[ISC002]: ISC.py:29:3: Implicitly concatenated string literals over multipl
    | |_______^
 31 |   )
    |
-error[ISC002]: ISC.py:34:3: Implicitly concatenated string literals over multiple lines
+error[ISC002]: 34:3: Implicitly concatenated string literals over multiple lines
 
+  --> ISC.py:34:3
    |
 33 |   _ = (
 34 |     b"abc"
@@ -43,8 +47,9 @@ error[ISC002]: ISC.py:34:3: Implicitly concatenated string literals over multipl
    | |________^
 36 |   )
    |
-error[ISC002]: ISC.py:67:5: Implicitly concatenated string literals over multiple lines
+error[ISC002]: 67:5: Implicitly concatenated string literals over multiple lines
 
+  --> ISC.py:67:5
    |
 65 |   _ = f"""abc {"def" "ghi"} jkl"""
 66 |   _ = f"""abc {
@@ -54,8 +59,9 @@ error[ISC002]: ISC.py:67:5: Implicitly concatenated string literals over multipl
    | |_________^
 69 |   } jkl"""
    |
-error[ISC002]: ISC.py:74:10: Implicitly concatenated string literals over multiple lines
+error[ISC002]: 74:10: Implicitly concatenated string literals over multiple lines
 
+  --> ISC.py:74:10
    |
 72 |   _ = "a" f"b {f"c" f"d"} e" "f"
 73 |   _ = f"b {f"c" f"d {f"e" f"f"} g"} h"

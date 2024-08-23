@@ -1,29 +1,33 @@
 ---
 source: crates/ruff_linter/src/rules/pyflakes/mod.rs
 ---
-error[F821]: F821_1.py:11:11: Undefined name `Model`
+error[F821]: 11:11: Undefined name `Model`
 
+  --> F821_1.py:11:11
    |
 10 | # F821 Undefined name `Model`
 11 | x = cast("Model", x)
    |           ^^^^^
    |
-error[F821]: F821_1.py:18:18: Undefined name `Model`
+error[F821]: 18:18: Undefined name `Model`
 
+  --> F821_1.py:18:18
    |
 17 | # F821 Undefined name `Model`
 18 | x = typing.cast("Model", x)
    |                  ^^^^^
    |
-error[F821]: F821_1.py:24:14: Undefined name `Model`
+error[F821]: 24:14: Undefined name `Model`
 
+  --> F821_1.py:24:14
    |
 23 | # F821 Undefined name `Model`
 24 | x = Pattern["Model"]
    |              ^^^^^
    |
-error[F821]: F821_1.py:30:12: Undefined name `Model`
+error[F821]: 30:12: Undefined name `Model`
 
+  --> F821_1.py:30:12
    |
 29 | # F821 Undefined name `Model`
 30 | x = Match["Model"]

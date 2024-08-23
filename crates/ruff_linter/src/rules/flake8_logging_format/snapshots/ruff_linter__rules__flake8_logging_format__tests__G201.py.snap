@@ -1,8 +1,9 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_logging_format/mod.rs
 ---
-error[G201]: G201.py:8:13: Logging `.exception(...)` should be used instead of `.error(..., exc_info=True)`
+error[G201]: 8:13: Logging `.exception(...)` should be used instead of `.error(..., exc_info=True)`
 
+  --> G201.py:8:13
    |
  6 |     pass
  7 | except:
@@ -11,8 +12,9 @@ error[G201]: G201.py:8:13: Logging `.exception(...)` should be used instead of `
  9 | 
 10 | try:
    |
-error[G201]: G201.py:13:13: Logging `.exception(...)` should be used instead of `.error(..., exc_info=True)`
+error[G201]: 13:13: Logging `.exception(...)` should be used instead of `.error(..., exc_info=True)`
 
+  --> G201.py:13:13
    |
 11 |     pass
 12 | except:
@@ -21,8 +23,9 @@ error[G201]: G201.py:13:13: Logging `.exception(...)` should be used instead of 
 14 | 
 15 | # OK
    |
-error[G201]: G201.py:28:5: Logging `.exception(...)` should be used instead of `.error(..., exc_info=True)`
+error[G201]: 28:5: Logging `.exception(...)` should be used instead of `.error(..., exc_info=True)`
 
+  --> G201.py:28:5
    |
 26 |     pass
 27 | except:
@@ -31,8 +34,9 @@ error[G201]: G201.py:28:5: Logging `.exception(...)` should be used instead of `
 29 | 
 30 | try:
    |
-error[G201]: G201.py:33:5: Logging `.exception(...)` should be used instead of `.error(..., exc_info=True)`
+error[G201]: 33:5: Logging `.exception(...)` should be used instead of `.error(..., exc_info=True)`
 
+  --> G201.py:33:5
    |
 31 |     pass
 32 | except:

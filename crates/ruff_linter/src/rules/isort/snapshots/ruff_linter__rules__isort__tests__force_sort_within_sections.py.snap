@@ -1,8 +1,9 @@
 ---
 source: crates/ruff_linter/src/rules/isort/mod.rs
 ---
-error[I001]: force_sort_within_sections.py:1:1: [*] Import block is un-sorted or un-formatted
+error[I001]: 1:1: [*] Import block is un-sorted or un-formatted
 
+  --> force_sort_within_sections.py:1:1
    |
  1 | / from a import a1  # import_from
  2 | | from c import * # import_from_star
@@ -17,6 +18,7 @@ error[I001]: force_sort_within_sections.py:1:1: [*] Import block is un-sorted or
 11 | | from . import my
 12 | | from .my.nested import fn2
 13 | | from ...grandparent import fn3
+   | |_______________________________^
    |
    = help: Organize imports
 ℹ Safe fix

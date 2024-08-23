@@ -1,8 +1,9 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_executable/mod.rs
 ---
-error[EXE004]: EXE004_1.py:1:1: [*] Avoid whitespace before shebang
+error[EXE004]: 1:1: [*] Avoid whitespace before shebang
 
+ --> EXE004_1.py:1:1
   |
 1 |     #!/usr/bin/python
   | ^^^^

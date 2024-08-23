@@ -1,40 +1,45 @@
 ---
 source: crates/ruff_linter/src/rules/pyflakes/mod.rs
 ---
-error[F821]: F821_4.py:4:11: Undefined name `Model`
+error[F821]: 4:11: Undefined name `Model`
 
+ --> F821_4.py:4:11
   |
 2 | from typing import List
 3 | 
 4 | _ = List["Model"]
   |           ^^^^^
   |
-error[F821]: F821_4.py:9:12: Undefined name `Model`
+error[F821]: 9:12: Undefined name `Model`
 
+ --> F821_4.py:9:12
   |
 7 | from typing import List as IList
 8 | 
 9 | _ = IList["Model"]
   |            ^^^^^
   |
-error[F821]: F821_4.py:14:16: Undefined name `Model`
+error[F821]: 14:16: Undefined name `Model`
 
+  --> F821_4.py:14:16
    |
 12 | from collections.abc import ItemsView
 13 | 
 14 | _ = ItemsView["Model"]
    |                ^^^^^
    |
-error[F821]: F821_4.py:19:32: Undefined name `Model`
+error[F821]: 19:32: Undefined name `Model`
 
+  --> F821_4.py:19:32
    |
 17 | import collections.abc
 18 | 
 19 | _ = collections.abc.ItemsView["Model"]
    |                                ^^^^^
    |
-error[F821]: F821_4.py:24:20: Undefined name `Model`
+error[F821]: 24:20: Undefined name `Model`
 
+  --> F821_4.py:24:20
    |
 22 | from collections import abc
 23 | 

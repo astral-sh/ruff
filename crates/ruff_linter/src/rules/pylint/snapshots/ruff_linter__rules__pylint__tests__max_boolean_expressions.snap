@@ -1,8 +1,9 @@
 ---
 source: crates/ruff_linter/src/rules/pylint/mod.rs
 ---
-error[PLR0916]: too_many_boolean_expressions.py:11:6: Too many Boolean expressions (6 > 5)
+error[PLR0916]: 11:6: Too many Boolean expressions (6 > 5)
 
+  --> too_many_boolean_expressions.py:11:6
    |
  9 | elif (a and b) and c and d and e:
 10 |     ...
@@ -11,8 +12,9 @@ error[PLR0916]: too_many_boolean_expressions.py:11:6: Too many Boolean expressio
 12 |     ...
 13 | elif (a and b) and c and d and e and f and g:
    |
-error[PLR0916]: too_many_boolean_expressions.py:13:6: Too many Boolean expressions (7 > 5)
+error[PLR0916]: 13:6: Too many Boolean expressions (7 > 5)
 
+  --> too_many_boolean_expressions.py:13:6
    |
 11 | elif (a and b) and c and d and e and f:
 12 |     ...
@@ -21,8 +23,9 @@ error[PLR0916]: too_many_boolean_expressions.py:13:6: Too many Boolean expressio
 14 |     ...
 15 | elif (a and b) and c and d and e and f and g and h:
    |
-error[PLR0916]: too_many_boolean_expressions.py:15:6: Too many Boolean expressions (8 > 5)
+error[PLR0916]: 15:6: Too many Boolean expressions (8 > 5)
 
+  --> too_many_boolean_expressions.py:15:6
    |
 13 | elif (a and b) and c and d and e and f and g:
 14 |     ...
@@ -31,8 +34,9 @@ error[PLR0916]: too_many_boolean_expressions.py:15:6: Too many Boolean expressio
 16 |     ...
 17 | elif (a and b) and c and d and e and f and g and h and i:
    |
-error[PLR0916]: too_many_boolean_expressions.py:17:6: Too many Boolean expressions (9 > 5)
+error[PLR0916]: 17:6: Too many Boolean expressions (9 > 5)
 
+  --> too_many_boolean_expressions.py:17:6
    |
 15 | elif (a and b) and c and d and e and f and g and h:
 16 |     ...
@@ -41,8 +45,9 @@ error[PLR0916]: too_many_boolean_expressions.py:17:6: Too many Boolean expressio
 18 |     ...
 19 | elif (a and b) and c and d and e and f and g and h and i and j:
    |
-error[PLR0916]: too_many_boolean_expressions.py:19:6: Too many Boolean expressions (10 > 5)
+error[PLR0916]: 19:6: Too many Boolean expressions (10 > 5)
 
+  --> too_many_boolean_expressions.py:19:6
    |
 17 | elif (a and b) and c and d and e and f and g and h and i:
 18 |     ...
@@ -51,8 +56,9 @@ error[PLR0916]: too_many_boolean_expressions.py:19:6: Too many Boolean expressio
 20 |     ...
 21 | elif (a and b) and c and d and e and f and g and h and i and j and k:
    |
-error[PLR0916]: too_many_boolean_expressions.py:21:6: Too many Boolean expressions (11 > 5)
+error[PLR0916]: 21:6: Too many Boolean expressions (11 > 5)
 
+  --> too_many_boolean_expressions.py:21:6
    |
 19 | elif (a and b) and c and d and e and f and g and h and i and j:
 20 |     ...
@@ -61,8 +67,9 @@ error[PLR0916]: too_many_boolean_expressions.py:21:6: Too many Boolean expressio
 22 |     ...
 23 | elif (a and b) and c and d and e and f and g and h and i and j and k and l:
    |
-error[PLR0916]: too_many_boolean_expressions.py:23:6: Too many Boolean expressions (12 > 5)
+error[PLR0916]: 23:6: Too many Boolean expressions (12 > 5)
 
+  --> too_many_boolean_expressions.py:23:6
    |
 21 | elif (a and b) and c and d and e and f and g and h and i and j and k:
 22 |     ...
@@ -71,8 +78,9 @@ error[PLR0916]: too_many_boolean_expressions.py:23:6: Too many Boolean expressio
 24 |     ...
 25 | elif (a and b) and c and d and e and f and g and h and i and j and k and l and m:
    |
-error[PLR0916]: too_many_boolean_expressions.py:25:6: Too many Boolean expressions (13 > 5)
+error[PLR0916]: 25:6: Too many Boolean expressions (13 > 5)
 
+  --> too_many_boolean_expressions.py:25:6
    |
 23 | elif (a and b) and c and d and e and f and g and h and i and j and k and l:
 24 |     ...
@@ -81,8 +89,9 @@ error[PLR0916]: too_many_boolean_expressions.py:25:6: Too many Boolean expressio
 26 |     ...
 27 | elif (a and b) and c and d and e and f and g and h and i and j and k and l and m and n:
    |
-error[PLR0916]: too_many_boolean_expressions.py:27:6: Too many Boolean expressions (14 > 5)
+error[PLR0916]: 27:6: Too many Boolean expressions (14 > 5)
 
+  --> too_many_boolean_expressions.py:27:6
    |
 25 | elif (a and b) and c and d and e and f and g and h and i and j and k and l and m:
 26 |     ...
@@ -91,8 +100,9 @@ error[PLR0916]: too_many_boolean_expressions.py:27:6: Too many Boolean expressio
 28 |     ...
 29 | elif (a and b) and c and d and e and f and g and h and i and j and k and l and m and n and o:
    |
-error[PLR0916]: too_many_boolean_expressions.py:29:6: Too many Boolean expressions (15 > 5)
+error[PLR0916]: 29:6: Too many Boolean expressions (15 > 5)
 
+  --> too_many_boolean_expressions.py:29:6
    |
 27 | elif (a and b) and c and d and e and f and g and h and i and j and k and l and m and n:
 28 |     ...
@@ -101,8 +111,9 @@ error[PLR0916]: too_many_boolean_expressions.py:29:6: Too many Boolean expressio
 30 |     ...
 31 | elif (a and b) and c and d and e and f and g and h and i and j and k and l and m and n and o and p:
    |
-error[PLR0916]: too_many_boolean_expressions.py:31:6: Too many Boolean expressions (16 > 5)
+error[PLR0916]: 31:6: Too many Boolean expressions (16 > 5)
 
+  --> too_many_boolean_expressions.py:31:6
    |
 29 | elif (a and b) and c and d and e and f and g and h and i and j and k and l and m and n and o:
 30 |     ...
@@ -111,8 +122,9 @@ error[PLR0916]: too_many_boolean_expressions.py:31:6: Too many Boolean expressio
 32 |     ...
 33 | elif (a and b) and c and d and e and f and g and h and i and j and k and l and m and n and o and p and q:
    |
-error[PLR0916]: too_many_boolean_expressions.py:33:6: Too many Boolean expressions (17 > 5)
+error[PLR0916]: 33:6: Too many Boolean expressions (17 > 5)
 
+  --> too_many_boolean_expressions.py:33:6
    |
 31 | elif (a and b) and c and d and e and f and g and h and i and j and k and l and m and n and o and p:
 32 |     ...
@@ -121,8 +133,9 @@ error[PLR0916]: too_many_boolean_expressions.py:33:6: Too many Boolean expressio
 34 |     ...
 35 | elif (a and b) and c and d and e and f and g and h and i and j and k and l and m and n and o and p and q and r:
    |
-error[PLR0916]: too_many_boolean_expressions.py:35:6: Too many Boolean expressions (18 > 5)
+error[PLR0916]: 35:6: Too many Boolean expressions (18 > 5)
 
+  --> too_many_boolean_expressions.py:35:6
    |
 33 | elif (a and b) and c and d and e and f and g and h and i and j and k and l and m and n and o and p and q:
 34 |     ...
@@ -131,8 +144,9 @@ error[PLR0916]: too_many_boolean_expressions.py:35:6: Too many Boolean expressio
 36 |     ...
 37 | elif (a and b) and c and d and e and f and g and h and i and j and k and l and m and n and o and p and q and r and s:
    |
-error[PLR0916]: too_many_boolean_expressions.py:37:6: Too many Boolean expressions (19 > 5)
+error[PLR0916]: 37:6: Too many Boolean expressions (19 > 5)
 
+  --> too_many_boolean_expressions.py:37:6
    |
 35 | elif (a and b) and c and d and e and f and g and h and i and j and k and l and m and n and o and p and q and r:
 36 |     ...
@@ -141,8 +155,9 @@ error[PLR0916]: too_many_boolean_expressions.py:37:6: Too many Boolean expressio
 38 |     ...
 39 | elif (a and b) and c and d and e and f and g and h and i and j and k and l and m and n and o and p and q and r and s and t:
    |
-error[PLR0916]: too_many_boolean_expressions.py:39:6: Too many Boolean expressions (20 > 5)
+error[PLR0916]: 39:6: Too many Boolean expressions (20 > 5)
 
+  --> too_many_boolean_expressions.py:39:6
    |
 37 | elif (a and b) and c and d and e and f and g and h and i and j and k and l and m and n and o and p and q and r and s:
 38 |     ...
@@ -151,8 +166,9 @@ error[PLR0916]: too_many_boolean_expressions.py:39:6: Too many Boolean expressio
 40 |     ...
 41 | elif (a and b) and c and d and e and f and g and h and i and j and k and l and m and n and o and p and q and r and s and t and u:
    |
-error[PLR0916]: too_many_boolean_expressions.py:41:6: Too many Boolean expressions (21 > 5)
+error[PLR0916]: 41:6: Too many Boolean expressions (21 > 5)
 
+  --> too_many_boolean_expressions.py:41:6
    |
 39 | elif (a and b) and c and d and e and f and g and h and i and j and k and l and m and n and o and p and q and r and s and t:
 40 |     ...
@@ -161,8 +177,9 @@ error[PLR0916]: too_many_boolean_expressions.py:41:6: Too many Boolean expressio
 42 |     ...
 43 | elif (a and b) and c and d and e and f and g and h and i and j and k and l and m and n and o and p and q and r and s and t and u and v:
    |
-error[PLR0916]: too_many_boolean_expressions.py:43:6: Too many Boolean expressions (22 > 5)
+error[PLR0916]: 43:6: Too many Boolean expressions (22 > 5)
 
+  --> too_many_boolean_expressions.py:43:6
    |
 41 | elif (a and b) and c and d and e and f and g and h and i and j and k and l and m and n and o and p and q and r and s and t and u:
 42 |     ...
@@ -171,8 +188,9 @@ error[PLR0916]: too_many_boolean_expressions.py:43:6: Too many Boolean expressio
 44 |     ...
 45 | elif (a and b) and c and d and e and f and g and h and i and j and k and l and m and n and o and p and q and r and s and t and u and v an...
    |
-error[PLR0916]: too_many_boolean_expressions.py:45:6: Too many Boolean expressions (23 > 5)
+error[PLR0916]: 45:6: Too many Boolean expressions (23 > 5)
 
+  --> too_many_boolean_expressions.py:45:6
    |
 43 | elif (a and b) and c and d and e and f and g and h and i and j and k and l and m and n and o and p and q and r and s and t and u and v:
 44 |     ...
@@ -181,8 +199,9 @@ error[PLR0916]: too_many_boolean_expressions.py:45:6: Too many Boolean expressio
 46 |     ...
 47 | elif (a and b) and c and d and e and f and g and h and i and j and k and l and m and n and o and p and q and r and s and t and u and v and w an...
    |
-error[PLR0916]: too_many_boolean_expressions.py:47:6: Too many Boolean expressions (24 > 5)
+error[PLR0916]: 47:6: Too many Boolean expressions (24 > 5)
 
+  --> too_many_boolean_expressions.py:47:6
    |
 45 | elif (a and b) and c and d and e and f and g and h and i and j and k and l and m and n and o and p and q and r and s and t and u and v and w:
 46 |     ...
@@ -191,8 +210,9 @@ error[PLR0916]: too_many_boolean_expressions.py:47:6: Too many Boolean expressio
 48 |     ...
 49 | elif (a and b) and c and d and e and f and g and h and i and j and k and l and m and n and o and p and q and r and s and t and u and v and w and x an...
    |
-error[PLR0916]: too_many_boolean_expressions.py:49:6: Too many Boolean expressions (25 > 5)
+error[PLR0916]: 49:6: Too many Boolean expressions (25 > 5)
 
+  --> too_many_boolean_expressions.py:49:6
    |
 47 | elif (a and b) and c and d and e and f and g and h and i and j and k and l and m and n and o and p and q and r and s and t and u and v and w and x:
 48 |     ...
@@ -201,8 +221,9 @@ error[PLR0916]: too_many_boolean_expressions.py:49:6: Too many Boolean expressio
 50 |     ...
 51 | elif (a and b) and c and d and e and f and g and h and i and j and k and l and m and n and o and p and q and r and s and t and u and v and w and x and y an...
    |
-error[PLR0916]: too_many_boolean_expressions.py:51:6: Too many Boolean expressions (26 > 5)
+error[PLR0916]: 51:6: Too many Boolean expressions (26 > 5)
 
+  --> too_many_boolean_expressions.py:51:6
    |
 49 | elif (a and b) and c and d and e and f and g and h and i and j and k and l and m and n and o and p and q and r and s and t and u and v and w and x and y:
 50 |     ...

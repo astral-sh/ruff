@@ -1,8 +1,9 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_bugbear/mod.rs
 ---
-error[B002]: B002.py:18:9: Python does not support the unary prefix increment operator (`++`)
+error[B002]: 18:9: Python does not support the unary prefix increment operator (`++`)
 
+  --> B002.py:18:9
    |
 17 | def this_is_buggy(n):
 18 |     x = ++n
@@ -10,8 +11,9 @@ error[B002]: B002.py:18:9: Python does not support the unary prefix increment op
 19 |     y = --n
 20 |     return x, y
    |
-error[B002]: B002.py:19:9: Python does not support the unary prefix decrement operator (`--`)
+error[B002]: 19:9: Python does not support the unary prefix decrement operator (`--`)
 
+  --> B002.py:19:9
    |
 17 | def this_is_buggy(n):
 18 |     x = ++n
@@ -19,15 +21,17 @@ error[B002]: B002.py:19:9: Python does not support the unary prefix decrement op
    |         ^^^
 20 |     return x, y
    |
-error[B002]: B002.py:24:12: Python does not support the unary prefix increment operator (`++`)
+error[B002]: 24:12: Python does not support the unary prefix increment operator (`++`)
 
+  --> B002.py:24:12
    |
 23 | def this_is_buggy_too(n):
 24 |     return ++n, --n
    |            ^^^
    |
-error[B002]: B002.py:24:17: Python does not support the unary prefix decrement operator (`--`)
+error[B002]: 24:17: Python does not support the unary prefix decrement operator (`--`)
 
+  --> B002.py:24:17
    |
 23 | def this_is_buggy_too(n):
 24 |     return ++n, --n

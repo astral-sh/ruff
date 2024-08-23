@@ -1,8 +1,9 @@
 ---
 source: crates/ruff_linter/src/rules/pyflakes/mod.rs
 ---
-error[F811]: F811_0.py:10:5: Redefinition of unused `bar` from line 6
+error[F811]: 10:5: Redefinition of unused `bar` from line 6
 
+  --> F811_0.py:10:5
    |
 10 | def bar():
    |     ^^^

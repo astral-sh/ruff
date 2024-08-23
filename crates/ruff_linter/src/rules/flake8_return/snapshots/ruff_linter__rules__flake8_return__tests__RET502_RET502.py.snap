@@ -1,8 +1,9 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_return/mod.rs
 ---
-error[RET502]: RET502.py:3:9: [*] Do not implicitly `return None` in function able to return non-`None` value
+error[RET502]: 3:9: [*] Do not implicitly `return None` in function able to return non-`None` value
 
+ --> RET502.py:3:9
   |
 1 | def x(y):
 2 |     if not y:

@@ -1,8 +1,9 @@
 ---
 source: crates/ruff_linter/src/rules/pycodestyle/mod.rs
 ---
-error[E722]: E722.py:4:1: Do not use bare `except`
+error[E722]: 4:1: Do not use bare `except`
 
+ --> E722.py:3:9
   |
 2 | try:
 3 |     pass
@@ -11,8 +12,9 @@ error[E722]: E722.py:4:1: Do not use bare `except`
 5 |     pass
 6 | #: E722
   |
-error[E722]: E722.py:11:1: Do not use bare `except`
+error[E722]: 11:1: Do not use bare `except`
 
+  --> E722.py:10:9
    |
  9 | except Exception:
 10 |     pass
@@ -21,8 +23,9 @@ error[E722]: E722.py:11:1: Do not use bare `except`
 12 |     pass
 13 | #: E722
    |
-error[E722]: E722.py:16:1: Do not use bare `except`
+error[E722]: 16:1: Do not use bare `except`
 
+  --> E722.py:15:9
    |
 14 | try:
 15 |     pass

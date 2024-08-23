@@ -1,8 +1,9 @@
 ---
 source: crates/ruff_linter/src/rules/pyflakes/mod.rs
 ---
-error[F811]: F811_23.py:4:15: Redefinition of unused `foo` from line 3
+error[F811]: 4:15: Redefinition of unused `foo` from line 3
 
+ --> F811_23.py:4:15
   |
 3 | import foo as foo
 4 | import bar as foo

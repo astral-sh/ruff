@@ -1,8 +1,9 @@
 ---
 source: crates/ruff_linter/src/rules/isort/mod.rs
 ---
-error[I001]: fit_line_length_comment.py:1:1: [*] Import block is un-sorted or un-formatted
+error[I001]: 1:1: [*] Import block is un-sorted or un-formatted
 
+ --> fit_line_length_comment.py:1:1
   |
 1 | / import a
 2 | | # Don't take this comment into account when determining whether the next import can fit on one line.
@@ -12,6 +13,7 @@ error[I001]: fit_line_length_comment.py:1:1: [*] Import block is un-sorted or un
 6 | | from f import g  # 012ß9💣2ℝ9012ß9💣2ℝ9012ß9💣2ℝ9012ß9💣2ℝ9012ß9💣2ℝ9012ß9💣2ℝ9012ß9💣2ℝ
 7 | | # The next import doesn't fit on one line.
 8 | | from h import i  # 012ß9💣2ℝ9012ß9💣2ℝ9012ß9💣2ℝ9012ß9💣2ℝ9012ß9💣2ℝ9012ß9💣2ℝ9012ß9💣2ℝ9
+  | |__________________________________________________________________________________________^
   |
   = help: Organize imports
 ℹ Safe fix

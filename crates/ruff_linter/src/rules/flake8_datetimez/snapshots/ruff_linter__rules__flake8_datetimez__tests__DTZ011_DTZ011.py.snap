@@ -1,8 +1,9 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_datetimez/mod.rs
 ---
-error[DTZ011]: DTZ011.py:4:1: `datetime.date.today()` used
+error[DTZ011]: 4:1: `datetime.date.today()` used
 
+ --> DTZ011.py:3:12
   |
 3 | # qualified
 4 | datetime.date.today()
@@ -11,8 +12,9 @@ error[DTZ011]: DTZ011.py:4:1: `datetime.date.today()` used
 6 | from datetime import date
   |
   = help: Use `datetime.datetime.now(tz=...).date()` instead
-error[DTZ011]: DTZ011.py:9:1: `datetime.date.today()` used
+error[DTZ011]: 9:1: `datetime.date.today()` used
 
+ --> DTZ011.py:8:14
   |
 8 | # unqualified
 9 | date.today()

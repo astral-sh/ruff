@@ -1,8 +1,9 @@
 ---
 source: crates/ruff_linter/src/rules/pandas_vet/mod.rs
 ---
-error[PD009]: <filename>:4:9: Use `.iloc` instead of `.iat`. If speed is important, use NumPy.
+error[PD009]: 4:9: Use `.iloc` instead of `.iat`. If speed is important, use NumPy.
 
+ --> <filename>:4:9
   |
 2 | import pandas as pd
 3 | x = pd.DataFrame()

@@ -1,8 +1,9 @@
 ---
 source: crates/ruff_linter/src/rules/pycodestyle/mod.rs
 ---
-error[E711]: E711.py:2:11: [*] Comparison to `None` should be `cond is None`
+error[E711]: 2:11: [*] Comparison to `None` should be `cond is None`
 
+ --> E711.py:2:11
   |
 1 | #: E711
 2 | if res == None:
@@ -19,8 +20,9 @@ error[E711]: E711.py:2:11: [*] Comparison to `None` should be `cond is None`
 4 4 | #: E711
 5 5 | if res != None:
 
-error[E711]: E711.py:5:11: [*] Comparison to `None` should be `cond is not None`
+error[E711]: 5:11: [*] Comparison to `None` should be `cond is not None`
 
+ --> E711.py:5:11
   |
 3 |     pass
 4 | #: E711
@@ -40,8 +42,9 @@ error[E711]: E711.py:5:11: [*] Comparison to `None` should be `cond is not None`
 7 7 | #: E711
 8 8 | if None == res:
 
-error[E711]: E711.py:8:4: [*] Comparison to `None` should be `cond is None`
+error[E711]: 8:4: [*] Comparison to `None` should be `cond is None`
 
+  --> E711.py:8:4
    |
  6 |     pass
  7 | #: E711
@@ -61,8 +64,9 @@ error[E711]: E711.py:8:4: [*] Comparison to `None` should be `cond is None`
 10 10 | #: E711
 11 11 | if None != res:
 
-error[E711]: E711.py:11:4: [*] Comparison to `None` should be `cond is not None`
+error[E711]: 11:4: [*] Comparison to `None` should be `cond is not None`
 
+  --> E711.py:11:4
    |
  9 |     pass
 10 | #: E711
@@ -82,8 +86,9 @@ error[E711]: E711.py:11:4: [*] Comparison to `None` should be `cond is not None`
 13 13 | #: E711
 14 14 | if res[1] == None:
 
-error[E711]: E711.py:14:14: [*] Comparison to `None` should be `cond is None`
+error[E711]: 14:14: [*] Comparison to `None` should be `cond is None`
 
+  --> E711.py:14:14
    |
 12 |     pass
 13 | #: E711
@@ -103,8 +108,9 @@ error[E711]: E711.py:14:14: [*] Comparison to `None` should be `cond is None`
 16 16 | #: E711
 17 17 | if res[1] != None:
 
-error[E711]: E711.py:17:14: [*] Comparison to `None` should be `cond is not None`
+error[E711]: 17:14: [*] Comparison to `None` should be `cond is not None`
 
+  --> E711.py:17:14
    |
 15 |     pass
 16 | #: E711
@@ -124,8 +130,9 @@ error[E711]: E711.py:17:14: [*] Comparison to `None` should be `cond is not None
 19 19 | #: E711
 20 20 | if None != res[1]:
 
-error[E711]: E711.py:20:4: [*] Comparison to `None` should be `cond is not None`
+error[E711]: 20:4: [*] Comparison to `None` should be `cond is not None`
 
+  --> E711.py:20:4
    |
 18 |     pass
 19 | #: E711
@@ -145,8 +152,9 @@ error[E711]: E711.py:20:4: [*] Comparison to `None` should be `cond is not None`
 22 22 | #: E711
 23 23 | if None == res[1]:
 
-error[E711]: E711.py:23:4: [*] Comparison to `None` should be `cond is None`
+error[E711]: 23:4: [*] Comparison to `None` should be `cond is None`
 
+  --> E711.py:23:4
    |
 21 |     pass
 22 | #: E711
@@ -165,8 +173,9 @@ error[E711]: E711.py:23:4: [*] Comparison to `None` should be `cond is None`
 25 25 | 
 26 26 | if x == None != None:
 
-error[E711]: E711.py:26:9: [*] Comparison to `None` should be `cond is None`
+error[E711]: 26:9: [*] Comparison to `None` should be `cond is None`
 
+  --> E711.py:26:9
    |
 24 |     pass
 25 | 
@@ -185,8 +194,9 @@ error[E711]: E711.py:26:9: [*] Comparison to `None` should be `cond is None`
 28 28 | 
 29 29 | #: Okay
 
-error[E711]: E711.py:26:17: [*] Comparison to `None` should be `cond is not None`
+error[E711]: 26:17: [*] Comparison to `None` should be `cond is not None`
 
+  --> E711.py:26:17
    |
 24 |     pass
 25 | 

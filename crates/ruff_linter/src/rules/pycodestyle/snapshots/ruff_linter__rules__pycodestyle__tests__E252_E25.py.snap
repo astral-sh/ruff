@@ -1,8 +1,9 @@
 ---
 source: crates/ruff_linter/src/rules/pycodestyle/mod.rs
 ---
-error[E252]: E25.py:46:15: [*] Missing whitespace around parameter equals
+error[E252]: 46:15: [*] Missing whitespace around parameter equals
 
+  --> E25.py:46:15
    |
 44 |     return a + b
 45 | #: E252:1:15 E252:1:16 E252:1:27 E252:1:36
@@ -22,8 +23,9 @@ error[E252]: E25.py:46:15: [*] Missing whitespace around parameter equals
 48 48 | #: Okay
 49 49 | def add(a: int = _default(name='f')):
 
-error[E252]: E25.py:46:15: [*] Missing whitespace around parameter equals
+error[E252]: 46:15: [*] Missing whitespace around parameter equals
 
+  --> E25.py:46:15
    |
 44 |     return a + b
 45 | #: E252:1:15 E252:1:16 E252:1:27 E252:1:36
@@ -43,8 +45,9 @@ error[E252]: E25.py:46:15: [*] Missing whitespace around parameter equals
 48 48 | #: Okay
 49 49 | def add(a: int = _default(name='f')):
 
-error[E252]: E25.py:46:26: [*] Missing whitespace around parameter equals
+error[E252]: 46:26: [*] Missing whitespace around parameter equals
 
+  --> E25.py:46:26
    |
 44 |     return a + b
 45 | #: E252:1:15 E252:1:16 E252:1:27 E252:1:36
@@ -64,8 +67,9 @@ error[E252]: E25.py:46:26: [*] Missing whitespace around parameter equals
 48 48 | #: Okay
 49 49 | def add(a: int = _default(name='f')):
 
-error[E252]: E25.py:46:36: [*] Missing whitespace around parameter equals
+error[E252]: 46:36: [*] Missing whitespace around parameter equals
 
+  --> E25.py:46:36
    |
 44 |     return a + b
 45 | #: E252:1:15 E252:1:16 E252:1:27 E252:1:36

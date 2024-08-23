@@ -1,8 +1,9 @@
 ---
 source: crates/ruff_linter/src/rules/ruff/mod.rs
 ---
-error[RUF015]: RUF015.py:4:1: [*] Prefer `next(iter(x))` over single element slice
+error[RUF015]: 4:1: [*] Prefer `next(iter(x))` over single element slice
 
+ --> RUF015.py:3:9
   |
 3 | # RUF015
 4 | list(x)[0]
@@ -21,8 +22,9 @@ error[RUF015]: RUF015.py:4:1: [*] Prefer `next(iter(x))` over single element sli
 6 6 | list(i for i in x)[0]
 7 7 | [i for i in x][0]
 
-error[RUF015]: RUF015.py:5:1: [*] Prefer `next(iter(x))` over single element slice
+error[RUF015]: 5:1: [*] Prefer `next(iter(x))` over single element slice
 
+ --> RUF015.py:4:11
   |
 3 | # RUF015
 4 | list(x)[0]
@@ -42,8 +44,9 @@ error[RUF015]: RUF015.py:5:1: [*] Prefer `next(iter(x))` over single element sli
 7 7 | [i for i in x][0]
 8 8 | 
 
-error[RUF015]: RUF015.py:6:1: [*] Prefer `next(iter(x))` over single element slice
+error[RUF015]: 6:1: [*] Prefer `next(iter(x))` over single element slice
 
+ --> RUF015.py:5:12
   |
 4 | list(x)[0]
 5 | tuple(x)[0]
@@ -62,8 +65,9 @@ error[RUF015]: RUF015.py:6:1: [*] Prefer `next(iter(x))` over single element sli
 8 8 | 
 9 9 | # OK (not indexing (solely) the first element)
 
-error[RUF015]: RUF015.py:7:1: [*] Prefer `next(iter(x))` over single element slice
+error[RUF015]: 7:1: [*] Prefer `next(iter(x))` over single element slice
 
+ --> RUF015.py:6:22
   |
 5 | tuple(x)[0]
 6 | list(i for i in x)[0]
@@ -83,8 +87,9 @@ error[RUF015]: RUF015.py:7:1: [*] Prefer `next(iter(x))` over single element sli
 9 9 | # OK (not indexing (solely) the first element)
 10 10 | list(x)
 
-error[RUF015]: RUF015.py:29:1: [*] Prefer `next(i + 1 for i in x)` over single element slice
+error[RUF015]: 29:1: [*] Prefer `next(i + 1 for i in x)` over single element slice
 
+  --> RUF015.py:28:46
    |
 28 | # RUF015 (doesn't mirror the underlying list)
 29 | [i + 1 for i in x][0]
@@ -103,8 +108,9 @@ error[RUF015]: RUF015.py:29:1: [*] Prefer `next(i + 1 for i in x)` over single e
 31 31 | [(i, i + 1) for i in x][0]
 32 32 | 
 
-error[RUF015]: RUF015.py:30:1: [*] Prefer `next(i for i in x if i > 5)` over single element slice
+error[RUF015]: 30:1: [*] Prefer `next(i for i in x if i > 5)` over single element slice
 
+  --> RUF015.py:29:22
    |
 28 | # RUF015 (doesn't mirror the underlying list)
 29 | [i + 1 for i in x][0]
@@ -123,8 +129,9 @@ error[RUF015]: RUF015.py:30:1: [*] Prefer `next(i for i in x if i > 5)` over sin
 32 32 | 
 33 33 | # RUF015 (multiple generators)
 
-error[RUF015]: RUF015.py:31:1: [*] Prefer `next((i, i + 1) for i in x)` over single element slice
+error[RUF015]: 31:1: [*] Prefer `next((i, i + 1) for i in x)` over single element slice
 
+  --> RUF015.py:30:27
    |
 29 | [i + 1 for i in x][0]
 30 | [i for i in x if i > 5][0]
@@ -144,8 +151,9 @@ error[RUF015]: RUF015.py:31:1: [*] Prefer `next((i, i + 1) for i in x)` over sin
 33 33 | # RUF015 (multiple generators)
 34 34 | y = range(10)
 
-error[RUF015]: RUF015.py:35:1: [*] Prefer `next(i + j for i in x for j in y)` over single element slice
+error[RUF015]: 35:1: [*] Prefer `next(i + j for i in x for j in y)` over single element slice
 
+  --> RUF015.py:34:14
    |
 33 | # RUF015 (multiple generators)
 34 | y = range(10)
@@ -165,8 +173,9 @@ error[RUF015]: RUF015.py:35:1: [*] Prefer `next(i + j for i in x for j in y)` ov
 37 37 | # RUF015
 38 38 | list(range(10))[0]
 
-error[RUF015]: RUF015.py:38:1: [*] Prefer `next(iter(range(10)))` over single element slice
+error[RUF015]: 38:1: [*] Prefer `next(iter(range(10)))` over single element slice
 
+  --> RUF015.py:37:9
    |
 37 | # RUF015
 38 | list(range(10))[0]
@@ -185,8 +194,9 @@ error[RUF015]: RUF015.py:38:1: [*] Prefer `next(iter(range(10)))` over single el
 40 40 | list(x["y"])[0]
 41 41 | [*range(10)][0]
 
-error[RUF015]: RUF015.py:39:1: [*] Prefer `next(iter(x.y))` over single element slice
+error[RUF015]: 39:1: [*] Prefer `next(iter(x.y))` over single element slice
 
+  --> RUF015.py:38:19
    |
 37 | # RUF015
 38 | list(range(10))[0]
@@ -206,8 +216,9 @@ error[RUF015]: RUF015.py:39:1: [*] Prefer `next(iter(x.y))` over single element 
 41 41 | [*range(10)][0]
 42 42 | [*x["y"]][0]
 
-error[RUF015]: RUF015.py:40:1: [*] Prefer `next(iter(x["y"]))` over single element slice
+error[RUF015]: 40:1: [*] Prefer `next(iter(x["y"]))` over single element slice
 
+  --> RUF015.py:39:13
    |
 38 | list(range(10))[0]
 39 | list(x.y)[0]
@@ -227,8 +238,9 @@ error[RUF015]: RUF015.py:40:1: [*] Prefer `next(iter(x["y"]))` over single eleme
 42 42 | [*x["y"]][0]
 43 43 | [*x.y][0]
 
-error[RUF015]: RUF015.py:41:1: [*] Prefer `next(iter(range(10)))` over single element slice
+error[RUF015]: 41:1: [*] Prefer `next(iter(range(10)))` over single element slice
 
+  --> RUF015.py:40:16
    |
 39 | list(x.y)[0]
 40 | list(x["y"])[0]
@@ -248,8 +260,9 @@ error[RUF015]: RUF015.py:41:1: [*] Prefer `next(iter(range(10)))` over single el
 43 43 | [*x.y][0]
 44 44 | [* x.y][0]
 
-error[RUF015]: RUF015.py:42:1: [*] Prefer `next(iter(x["y"]))` over single element slice
+error[RUF015]: 42:1: [*] Prefer `next(iter(x["y"]))` over single element slice
 
+  --> RUF015.py:41:16
    |
 40 | list(x["y"])[0]
 41 | [*range(10)][0]
@@ -269,8 +282,9 @@ error[RUF015]: RUF015.py:42:1: [*] Prefer `next(iter(x["y"]))` over single eleme
 44 44 | [* x.y][0]
 45 45 | [
 
-error[RUF015]: RUF015.py:43:1: [*] Prefer `next(iter(x.y))` over single element slice
+error[RUF015]: 43:1: [*] Prefer `next(iter(x.y))` over single element slice
 
+  --> RUF015.py:42:13
    |
 41 | [*range(10)][0]
 42 | [*x["y"]][0]
@@ -290,8 +304,9 @@ error[RUF015]: RUF015.py:43:1: [*] Prefer `next(iter(x.y))` over single element 
 45 45 | [
 46 46 |     *x.y
 
-error[RUF015]: RUF015.py:44:1: [*] Prefer `next(iter(x.y))` over single element slice
+error[RUF015]: 44:1: [*] Prefer `next(iter(x.y))` over single element slice
 
+  --> RUF015.py:43:10
    |
 42 | [*x["y"]][0]
 43 | [*x.y][0]
@@ -311,8 +326,9 @@ error[RUF015]: RUF015.py:44:1: [*] Prefer `next(iter(x.y))` over single element 
 46 46 |     *x.y
 47 47 | ][0]
 
-error[RUF015]: RUF015.py:45:1: [*] Prefer `next(iter(x.y))` over single element slice
+error[RUF015]: 45:1: [*] Prefer `next(iter(x.y))` over single element slice
 
+  --> RUF015.py:44:11
    |
 43 |   [*x.y][0]
 44 |   [* x.y][0]
@@ -336,8 +352,9 @@ error[RUF015]: RUF015.py:45:1: [*] Prefer `next(iter(x.y))` over single element 
 49 47 | # RUF015 (multi-line)
 50 48 | revision_heads_map_ast = [
 
-error[RUF015]: RUF015.py:50:26: [*] Prefer `next(...)` over single element slice
+error[RUF015]: 50:26: [*] Prefer `next(...)` over single element slice
 
+  --> RUF015.py:50:26
    |
 49 |   # RUF015 (multi-line)
 50 |   revision_heads_map_ast = [
@@ -366,8 +383,9 @@ error[RUF015]: RUF015.py:50:26: [*] Prefer `next(...)` over single element slice
 56 56 | # RUF015 (zip)
 57 57 | list(zip(x, y))[0]
 
-error[RUF015]: RUF015.py:57:1: [*] Prefer `next(zip(x, y))` over single element slice
+error[RUF015]: 57:1: [*] Prefer `next(zip(x, y))` over single element slice
 
+  --> RUF015.py:56:15
    |
 56 | # RUF015 (zip)
 57 | list(zip(x, y))[0]
@@ -385,8 +403,9 @@ error[RUF015]: RUF015.py:57:1: [*] Prefer `next(zip(x, y))` over single element 
 59 59 | 
 60 60 | # RUF015 (pop)
 
-error[RUF015]: RUF015.py:58:1: [*] Prefer `next(zip(x, y))` over single element slice
+error[RUF015]: 58:1: [*] Prefer `next(zip(x, y))` over single element slice
 
+  --> RUF015.py:57:19
    |
 56 | # RUF015 (zip)
 57 | list(zip(x, y))[0]
@@ -406,8 +425,9 @@ error[RUF015]: RUF015.py:58:1: [*] Prefer `next(zip(x, y))` over single element 
 60 60 | # RUF015 (pop)
 61 61 | list(x).pop(0)
 
-error[RUF015]: RUF015.py:61:1: [*] Prefer `next(iter(x))` over single element slice
+error[RUF015]: 61:1: [*] Prefer `next(iter(x))` over single element slice
 
+  --> RUF015.py:60:15
    |
 60 | # RUF015 (pop)
 61 | list(x).pop(0)
@@ -426,8 +446,9 @@ error[RUF015]: RUF015.py:61:1: [*] Prefer `next(iter(x))` over single element sl
 63 63 | list(i for i in x).pop(0)
 64 64 | 
 
-error[RUF015]: RUF015.py:62:1: [*] Prefer `next(iter(x))` over single element slice
+error[RUF015]: 62:1: [*] Prefer `next(iter(x))` over single element slice
 
+  --> RUF015.py:61:15
    |
 60 | # RUF015 (pop)
 61 | list(x).pop(0)
@@ -446,8 +467,9 @@ error[RUF015]: RUF015.py:62:1: [*] Prefer `next(iter(x))` over single element sl
 64 64 | 
 65 65 | # OK
 
-error[RUF015]: RUF015.py:63:1: [*] Prefer `next(iter(x))` over single element slice
+error[RUF015]: 63:1: [*] Prefer `next(iter(x))` over single element slice
 
+  --> RUF015.py:62:22
    |
 61 | list(x).pop(0)
 62 | [i for i in x].pop(0)
@@ -467,8 +489,9 @@ error[RUF015]: RUF015.py:63:1: [*] Prefer `next(iter(x))` over single element sl
 65 65 | # OK
 66 66 | list(x).pop(1)
 
-error[RUF015]: RUF015.py:73:5: [*] Prefer `next(iter(zip(x, y)))` over single element slice
+error[RUF015]: 73:5: [*] Prefer `next(iter(zip(x, y)))` over single element slice
 
+  --> RUF015.py:73:5
    |
 71 | def test():
 72 |     zip = list  # Overwrite the builtin zip

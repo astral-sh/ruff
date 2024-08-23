@@ -1,8 +1,9 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_executable/mod.rs
 ---
-error[EXE005]: EXE005_3.py:6:1: Shebang should be at the beginning of the file
+error[EXE005]: 6:1: Shebang should be at the beginning of the file
 
+ --> EXE005_3.py:5:19
   |
 4 | """
 5 | # A python comment

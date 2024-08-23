@@ -1,8 +1,9 @@
 ---
 source: crates/ruff_linter/src/rules/pyflakes/mod.rs
 ---
-error[F401]: F401_7.py:30:5: [*] `typing.Union` imported but unused
+error[F401]: 30:5: [*] `typing.Union` imported but unused
 
+  --> F401_7.py:30:5
    |
 28 | from typing import (
 29 |     Mapping,  # noqa: F401
@@ -22,8 +23,9 @@ error[F401]: F401_7.py:30:5: [*] `typing.Union` imported but unused
 33 32 | # This should ignore both errors.
 34 33 | from typing import (  # noqa
 
-error[F401]: F401_7.py:66:20: [*] `typing.Awaitable` imported but unused
+error[F401]: 66:20: [*] `typing.Awaitable` imported but unused
 
+  --> F401_7.py:66:20
    |
 65 | # This should mark F501 as unused.
 66 | from typing import Awaitable, AwaitableGenerator  # noqa: F501
@@ -36,8 +38,9 @@ error[F401]: F401_7.py:66:20: [*] `typing.Awaitable` imported but unused
 65 65 | # This should mark F501 as unused.
 66    |-from typing import Awaitable, AwaitableGenerator  # noqa: F501
 
-error[F401]: F401_7.py:66:31: [*] `typing.AwaitableGenerator` imported but unused
+error[F401]: 66:31: [*] `typing.AwaitableGenerator` imported but unused
 
+  --> F401_7.py:66:31
    |
 65 | # This should mark F501 as unused.
 66 | from typing import Awaitable, AwaitableGenerator  # noqa: F501

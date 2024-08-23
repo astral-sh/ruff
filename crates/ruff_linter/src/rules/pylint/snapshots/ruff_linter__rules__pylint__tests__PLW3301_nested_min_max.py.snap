@@ -1,8 +1,9 @@
 ---
 source: crates/ruff_linter/src/rules/pylint/mod.rs
 ---
-error[PLW3301]: nested_min_max.py:2:1: [*] Nested `min` calls can be flattened
+error[PLW3301]: 2:1: [*] Nested `min` calls can be flattened
 
+ --> nested_min_max.py:1:13
   |
 1 | min(1, 2, 3)
 2 | min(1, min(2, 3))
@@ -19,8 +20,9 @@ error[PLW3301]: nested_min_max.py:2:1: [*] Nested `min` calls can be flattened
 4 4 | min(1, foo("a", "b"), min(3, 4))
 5 5 | min(1, max(2, 3))
 
-error[PLW3301]: nested_min_max.py:3:1: [*] Nested `min` calls can be flattened
+error[PLW3301]: 3:1: [*] Nested `min` calls can be flattened
 
+ --> nested_min_max.py:2:18
   |
 1 | min(1, 2, 3)
 2 | min(1, min(2, 3))
@@ -39,8 +41,9 @@ error[PLW3301]: nested_min_max.py:3:1: [*] Nested `min` calls can be flattened
 5 5 | min(1, max(2, 3))
 6 6 | max(1, 2, 3)
 
-error[PLW3301]: nested_min_max.py:3:8: [*] Nested `min` calls can be flattened
+error[PLW3301]: 3:8: [*] Nested `min` calls can be flattened
 
+ --> nested_min_max.py:3:8
   |
 1 | min(1, 2, 3)
 2 | min(1, min(2, 3))
@@ -59,8 +62,9 @@ error[PLW3301]: nested_min_max.py:3:8: [*] Nested `min` calls can be flattened
 5 5 | min(1, max(2, 3))
 6 6 | max(1, 2, 3)
 
-error[PLW3301]: nested_min_max.py:4:1: [*] Nested `min` calls can be flattened
+error[PLW3301]: 4:1: [*] Nested `min` calls can be flattened
 
+ --> nested_min_max.py:3:26
   |
 2 | min(1, min(2, 3))
 3 | min(1, min(2, min(3, 4)))
@@ -80,8 +84,9 @@ error[PLW3301]: nested_min_max.py:4:1: [*] Nested `min` calls can be flattened
 6 6 | max(1, 2, 3)
 7 7 | max(1, max(2, 3))
 
-error[PLW3301]: nested_min_max.py:7:1: [*] Nested `max` calls can be flattened
+error[PLW3301]: 7:1: [*] Nested `max` calls can be flattened
 
+ --> nested_min_max.py:6:13
   |
 5 | min(1, max(2, 3))
 6 | max(1, 2, 3)
@@ -101,8 +106,9 @@ error[PLW3301]: nested_min_max.py:7:1: [*] Nested `max` calls can be flattened
 9 9 | max(1, foo("a", "b"), max(3, 4))
 10 10 | 
 
-error[PLW3301]: nested_min_max.py:8:1: [*] Nested `max` calls can be flattened
+error[PLW3301]: 8:1: [*] Nested `max` calls can be flattened
 
+ --> nested_min_max.py:7:18
   |
 6 | max(1, 2, 3)
 7 | max(1, max(2, 3))
@@ -121,8 +127,9 @@ error[PLW3301]: nested_min_max.py:8:1: [*] Nested `max` calls can be flattened
 10 10 | 
 11 11 | # These should not trigger; we do not flag cases with keyword args.
 
-error[PLW3301]: nested_min_max.py:8:8: [*] Nested `max` calls can be flattened
+error[PLW3301]: 8:8: [*] Nested `max` calls can be flattened
 
+ --> nested_min_max.py:8:8
   |
 6 | max(1, 2, 3)
 7 | max(1, max(2, 3))
@@ -141,8 +148,9 @@ error[PLW3301]: nested_min_max.py:8:8: [*] Nested `max` calls can be flattened
 10 10 | 
 11 11 | # These should not trigger; we do not flag cases with keyword args.
 
-error[PLW3301]: nested_min_max.py:9:1: [*] Nested `max` calls can be flattened
+error[PLW3301]: 9:1: [*] Nested `max` calls can be flattened
 
+  --> nested_min_max.py:8:26
    |
  7 | max(1, max(2, 3))
  8 | max(1, max(2, max(3, 4)))
@@ -162,8 +170,9 @@ error[PLW3301]: nested_min_max.py:9:1: [*] Nested `max` calls can be flattened
 11 11 | # These should not trigger; we do not flag cases with keyword args.
 12 12 | min(1, min(2, 3), key=test)
 
-error[PLW3301]: nested_min_max.py:15:1: [*] Nested `min` calls can be flattened
+error[PLW3301]: 15:1: [*] Nested `min` calls can be flattened
 
+  --> nested_min_max.py:14:68
    |
 13 | min(1, min(2, 3, key=test))
 14 | # This will still trigger, to merge the calls without keyword args.
@@ -183,8 +192,9 @@ error[PLW3301]: nested_min_max.py:15:1: [*] Nested `min` calls can be flattened
 17 17 | # Don't provide a fix if there are comments within the call.
 18 18 | min(
 
-error[PLW3301]: nested_min_max.py:18:1: Nested `min` calls can be flattened
+error[PLW3301]: 18:1: Nested `min` calls can be flattened
 
+  --> nested_min_max.py:17:61
    |
 17 |   # Don't provide a fix if there are comments within the call.
 18 | / min(
@@ -196,8 +206,9 @@ error[PLW3301]: nested_min_max.py:18:1: Nested `min` calls can be flattened
 23 |   # Handle iterable expressions.
    |
    = help: Flatten nested `min` calls
-error[PLW3301]: nested_min_max.py:24:1: [*] Nested `min` calls can be flattened
+error[PLW3301]: 24:1: [*] Nested `min` calls can be flattened
 
+  --> nested_min_max.py:23:31
    |
 23 | # Handle iterable expressions.
 24 | min(1, min(a))
@@ -216,8 +227,9 @@ error[PLW3301]: nested_min_max.py:24:1: [*] Nested `min` calls can be flattened
 26 26 | max(1, max(a))
 27 27 | max(1, max(i for i in range(10)))
 
-error[PLW3301]: nested_min_max.py:25:1: [*] Nested `min` calls can be flattened
+error[PLW3301]: 25:1: [*] Nested `min` calls can be flattened
 
+  --> nested_min_max.py:24:15
    |
 23 | # Handle iterable expressions.
 24 | min(1, min(a))
@@ -237,8 +249,9 @@ error[PLW3301]: nested_min_max.py:25:1: [*] Nested `min` calls can be flattened
 27 27 | max(1, max(i for i in range(10)))
 28 28 | 
 
-error[PLW3301]: nested_min_max.py:26:1: [*] Nested `max` calls can be flattened
+error[PLW3301]: 26:1: [*] Nested `max` calls can be flattened
 
+  --> nested_min_max.py:25:34
    |
 24 | min(1, min(a))
 25 | min(1, min(i for i in range(10)))
@@ -257,8 +270,9 @@ error[PLW3301]: nested_min_max.py:26:1: [*] Nested `max` calls can be flattened
 28 28 | 
 29 29 | tuples_list = [
 
-error[PLW3301]: nested_min_max.py:27:1: [*] Nested `max` calls can be flattened
+error[PLW3301]: 27:1: [*] Nested `max` calls can be flattened
 
+  --> nested_min_max.py:26:15
    |
 25 | min(1, min(i for i in range(10)))
 26 | max(1, max(a))
@@ -278,8 +292,9 @@ error[PLW3301]: nested_min_max.py:27:1: [*] Nested `max` calls can be flattened
 29 29 | tuples_list = [
 30 30 |     (1, 2),
 
-error[PLW3301]: nested_min_max.py:41:1: [*] Nested `max` calls can be flattened
+error[PLW3301]: 41:1: [*] Nested `max` calls can be flattened
 
+  --> nested_min_max.py:40:46
    |
 40 | # Starred argument should be copied as it is.
 41 | max(1, max(*a))
@@ -298,8 +313,9 @@ error[PLW3301]: nested_min_max.py:41:1: [*] Nested `max` calls can be flattened
 43 43 | import builtins
 44 44 | builtins.min(1, min(2, 3))
 
-error[PLW3301]: nested_min_max.py:44:1: [*] Nested `min` calls can be flattened
+error[PLW3301]: 44:1: [*] Nested `min` calls can be flattened
 
+  --> nested_min_max.py:43:16
    |
 43 | import builtins
 44 | builtins.min(1, min(2, 3))

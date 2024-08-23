@@ -1,8 +1,9 @@
 ---
 source: crates/ruff_linter/src/rules/pyflakes/mod.rs
 ---
-error[F503]: F503.py:17:1: `%`-format string expected sequence but got mapping
+error[F503]: 17:1: `%`-format string expected sequence but got mapping
 
+  --> F503.py:16:14
    |
 15 | # Multiple placeholders
 16 | "%s %s" % dog
@@ -11,8 +12,9 @@ error[F503]: F503.py:17:1: `%`-format string expected sequence but got mapping
 18 | "%s %s" % {**{"bob": "bob"}}  # F503
 19 | "%s %s" % ["bob"]
    |
-error[F503]: F503.py:18:1: `%`-format string expected sequence but got mapping
+error[F503]: 18:1: `%`-format string expected sequence but got mapping
 
+  --> F503.py:17:33
    |
 16 | "%s %s" % dog
 17 | "%s %s" % {"bob": "bob"}  # F503
@@ -21,8 +23,9 @@ error[F503]: F503.py:18:1: `%`-format string expected sequence but got mapping
 19 | "%s %s" % ["bob"]
 20 | "%s %s" % ("bob",)
    |
-error[F503]: F503.py:23:1: `%`-format string expected sequence but got mapping
+error[F503]: 23:1: `%`-format string expected sequence but got mapping
 
+  --> F503.py:22:21
    |
 21 | "%s %s" % {"bob"}
 22 | "%s %s" % [*["bob"]]

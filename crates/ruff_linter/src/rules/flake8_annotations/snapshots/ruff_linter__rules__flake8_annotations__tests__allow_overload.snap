@@ -1,8 +1,9 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_annotations/mod.rs
 ---
-error[ANN201]: allow_overload.py:29:9: Missing return type annotation for public function `bar`
+error[ANN201]: 29:9: Missing return type annotation for public function `bar`
 
+  --> allow_overload.py:29:9
    |
 28 | class X:
 29 |     def bar(i):

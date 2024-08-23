@@ -1,8 +1,9 @@
 ---
 source: crates/ruff_linter/src/rules/pylint/mod.rs
 ---
-error[PLR1702]: too_many_nested_blocks.py:2:5: Too many nested blocks (6 > 5)
+error[PLR1702]: 2:5: Too many nested blocks (6 > 5)
 
+  --> too_many_nested_blocks.py:2:5
    |
  1 |   def correct_fruits(fruits) -> bool:
  2 |       if len(fruits) > 1:  # PLR1702

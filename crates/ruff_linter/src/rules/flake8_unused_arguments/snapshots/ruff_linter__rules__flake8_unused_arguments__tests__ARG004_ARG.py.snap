@@ -1,24 +1,27 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_unused_arguments/mod.rs
 ---
-error[ARG004]: ARG.py:51:11: Unused static method argument: `cls`
+error[ARG004]: 51:11: Unused static method argument: `cls`
 
+  --> ARG.py:51:11
    |
 50 |     @staticmethod
 51 |     def f(cls, x):
    |           ^^^
 52 |         print("Hello, world!")
    |
-error[ARG004]: ARG.py:51:16: Unused static method argument: `x`
+error[ARG004]: 51:16: Unused static method argument: `x`
 
+  --> ARG.py:51:16
    |
 50 |     @staticmethod
 51 |     def f(cls, x):
    |                ^
 52 |         print("Hello, world!")
    |
-error[ARG004]: ARG.py:55:11: Unused static method argument: `x`
+error[ARG004]: 55:11: Unused static method argument: `x`
 
+  --> ARG.py:55:11
    |
 54 |     @staticmethod
 55 |     def f(x):

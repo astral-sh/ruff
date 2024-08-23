@@ -1,8 +1,9 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_unused_arguments/mod.rs
 ---
-error[ARG002]: ARG.py:37:17: Unused method argument: `x`
+error[ARG002]: 37:17: Unused method argument: `x`
 
+  --> ARG.py:37:17
    |
 35 |     # Unused arguments.
 36 |     ###
@@ -10,8 +11,9 @@ error[ARG002]: ARG.py:37:17: Unused method argument: `x`
    |                 ^
 38 |         print("Hello, world!")
    |
-error[ARG002]: ARG.py:40:20: Unused method argument: `x`
+error[ARG002]: 40:20: Unused method argument: `x`
 
+  --> ARG.py:40:20
    |
 38 |         print("Hello, world!")
 39 | 
@@ -19,8 +21,9 @@ error[ARG002]: ARG.py:40:20: Unused method argument: `x`
    |                    ^
 41 |         print("Hello, world!")
    |
-error[ARG002]: ARG.py:43:16: Unused method argument: `x`
+error[ARG002]: 43:16: Unused method argument: `x`
 
+  --> ARG.py:43:16
    |
 41 |         print("Hello, world!")
 42 | 
@@ -28,8 +31,9 @@ error[ARG002]: ARG.py:43:16: Unused method argument: `x`
    |                ^
 44 |         print("Hello, world!")
    |
-error[ARG002]: ARG.py:192:24: Unused method argument: `x`
+error[ARG002]: 192:24: Unused method argument: `x`
 
+   --> ARG.py:192:24
     |
 190 | ###
 191 | class C:

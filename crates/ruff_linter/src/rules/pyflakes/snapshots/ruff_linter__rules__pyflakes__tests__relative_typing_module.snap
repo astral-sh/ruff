@@ -1,8 +1,9 @@
 ---
 source: crates/ruff_linter/src/rules/pyflakes/mod.rs
 ---
-error[F821]: bar.py:26:17: Undefined name `foo`
+error[F821]: 26:17: Undefined name `foo`
 
+  --> bar.py:26:17
    |
 25 |     # F821
 26 |     x: Literal["foo"]

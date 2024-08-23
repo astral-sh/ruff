@@ -1,8 +1,9 @@
 ---
 source: crates/ruff_linter/src/rules/ruff/mod.rs
 ---
-error[RUF013]: RUF013_1.py:4:12: [*] PEP 484 prohibits implicit `Optional`
+error[RUF013]: 4:12: [*] PEP 484 prohibits implicit `Optional`
 
+ --> RUF013_1.py:4:12
   |
 4 | def f(arg: int = None):  # RUF013
   |            ^^^

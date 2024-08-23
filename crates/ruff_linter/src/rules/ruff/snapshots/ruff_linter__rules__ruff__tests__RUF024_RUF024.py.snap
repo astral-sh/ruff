@@ -1,8 +1,9 @@
 ---
 source: crates/ruff_linter/src/rules/ruff/mod.rs
 ---
-error[RUF024]: RUF024.py:9:1: [*] Do not pass mutable objects as values to `dict.fromkeys`
+error[RUF024]: 9:1: [*] Do not pass mutable objects as values to `dict.fromkeys`
 
+  --> RUF024.py:8:10
    |
  8 | # Errors.
  9 | dict.fromkeys(pierogi_fillings, [])
@@ -21,8 +22,9 @@ error[RUF024]: RUF024.py:9:1: [*] Do not pass mutable objects as values to `dict
 11 11 | dict.fromkeys(pierogi_fillings, {})
 12 12 | dict.fromkeys(pierogi_fillings, set())
 
-error[RUF024]: RUF024.py:10:1: [*] Do not pass mutable objects as values to `dict.fromkeys`
+error[RUF024]: 10:1: [*] Do not pass mutable objects as values to `dict.fromkeys`
 
+  --> RUF024.py:9:36
    |
  8 | # Errors.
  9 | dict.fromkeys(pierogi_fillings, [])
@@ -42,8 +44,9 @@ error[RUF024]: RUF024.py:10:1: [*] Do not pass mutable objects as values to `dic
 12 12 | dict.fromkeys(pierogi_fillings, set())
 13 13 | dict.fromkeys(pierogi_fillings, {"pre": "populated!"})
 
-error[RUF024]: RUF024.py:11:1: [*] Do not pass mutable objects as values to `dict.fromkeys`
+error[RUF024]: 11:1: [*] Do not pass mutable objects as values to `dict.fromkeys`
 
+  --> RUF024.py:10:40
    |
  9 | dict.fromkeys(pierogi_fillings, [])
 10 | dict.fromkeys(pierogi_fillings, list())
@@ -63,8 +66,9 @@ error[RUF024]: RUF024.py:11:1: [*] Do not pass mutable objects as values to `dic
 13 13 | dict.fromkeys(pierogi_fillings, {"pre": "populated!"})
 14 14 | dict.fromkeys(pierogi_fillings, dict())
 
-error[RUF024]: RUF024.py:12:1: [*] Do not pass mutable objects as values to `dict.fromkeys`
+error[RUF024]: 12:1: [*] Do not pass mutable objects as values to `dict.fromkeys`
 
+  --> RUF024.py:11:36
    |
 10 | dict.fromkeys(pierogi_fillings, list())
 11 | dict.fromkeys(pierogi_fillings, {})
@@ -84,8 +88,9 @@ error[RUF024]: RUF024.py:12:1: [*] Do not pass mutable objects as values to `dic
 14 14 | dict.fromkeys(pierogi_fillings, dict())
 15 15 | import builtins
 
-error[RUF024]: RUF024.py:13:1: [*] Do not pass mutable objects as values to `dict.fromkeys`
+error[RUF024]: 13:1: [*] Do not pass mutable objects as values to `dict.fromkeys`
 
+  --> RUF024.py:12:39
    |
 11 | dict.fromkeys(pierogi_fillings, {})
 12 | dict.fromkeys(pierogi_fillings, set())
@@ -105,8 +110,9 @@ error[RUF024]: RUF024.py:13:1: [*] Do not pass mutable objects as values to `dic
 15 15 | import builtins
 16 16 | builtins.dict.fromkeys(pierogi_fillings, dict())
 
-error[RUF024]: RUF024.py:14:1: [*] Do not pass mutable objects as values to `dict.fromkeys`
+error[RUF024]: 14:1: [*] Do not pass mutable objects as values to `dict.fromkeys`
 
+  --> RUF024.py:13:55
    |
 12 | dict.fromkeys(pierogi_fillings, set())
 13 | dict.fromkeys(pierogi_fillings, {"pre": "populated!"})
@@ -126,8 +132,9 @@ error[RUF024]: RUF024.py:14:1: [*] Do not pass mutable objects as values to `dic
 16 16 | builtins.dict.fromkeys(pierogi_fillings, dict())
 17 17 | 
 
-error[RUF024]: RUF024.py:16:1: [*] Do not pass mutable objects as values to `dict.fromkeys`
+error[RUF024]: 16:1: [*] Do not pass mutable objects as values to `dict.fromkeys`
 
+  --> RUF024.py:15:16
    |
 14 | dict.fromkeys(pierogi_fillings, dict())
 15 | import builtins

@@ -1,8 +1,9 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_quotes/mod.rs
 ---
-error[Q002]: docstring_doubles_function.py:2:5: [*] Double quote docstring found but single quotes preferred
+error[Q002]: 2:5: [*] Double quote docstring found but single quotes preferred
 
+ --> docstring_doubles_function.py:2:5
   |
 1 | def foo():
 2 |     """function without params, single line docstring"""
@@ -19,8 +20,9 @@ error[Q002]: docstring_doubles_function.py:2:5: [*] Double quote docstring found
 4 4 |     return
 5 5 | 
 
-error[Q002]: docstring_doubles_function.py:8:5: [*] Double quote docstring found but single quotes preferred
+error[Q002]: 8:5: [*] Double quote docstring found but single quotes preferred
 
+  --> docstring_doubles_function.py:8:5
    |
  7 |   def foo2():
  8 |       """
@@ -45,8 +47,9 @@ error[Q002]: docstring_doubles_function.py:8:5: [*] Double quote docstring found
 12 12 |     return
 13 13 | 
 
-error[Q002]: docstring_doubles_function.py:27:5: [*] Double quote docstring found but single quotes preferred
+error[Q002]: 27:5: [*] Double quote docstring found but single quotes preferred
 
+  --> docstring_doubles_function.py:27:5
    |
 26 | def function_with_single_docstring(a):
 27 |     "Single line docstring"

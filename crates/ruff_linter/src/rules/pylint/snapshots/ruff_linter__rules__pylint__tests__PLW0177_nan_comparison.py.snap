@@ -1,88 +1,99 @@
 ---
 source: crates/ruff_linter/src/rules/pylint/mod.rs
 ---
-error[PLW0177]: nan_comparison.py:11:9: Comparing against a NaN value; use `math.isnan` instead
+error[PLW0177]: 11:9: Comparing against a NaN value; use `math.isnan` instead
 
+  --> nan_comparison.py:11:9
    |
 10 | # PLW0117
 11 | if x == float("nan"):
    |         ^^^^^^^^^^^^
 12 |     pass
    |
-error[PLW0177]: nan_comparison.py:15:9: Comparing against a NaN value; use `math.isnan` instead
+error[PLW0177]: 15:9: Comparing against a NaN value; use `math.isnan` instead
 
+  --> nan_comparison.py:15:9
    |
 14 | # PLW0117
 15 | if x == float("NaN"):
    |         ^^^^^^^^^^^^
 16 |     pass
    |
-error[PLW0177]: nan_comparison.py:19:9: Comparing against a NaN value; use `math.isnan` instead
+error[PLW0177]: 19:9: Comparing against a NaN value; use `math.isnan` instead
 
+  --> nan_comparison.py:19:9
    |
 18 | # PLW0117
 19 | if x == float("NAN"):
    |         ^^^^^^^^^^^^
 20 |     pass
    |
-error[PLW0177]: nan_comparison.py:23:9: Comparing against a NaN value; use `math.isnan` instead
+error[PLW0177]: 23:9: Comparing against a NaN value; use `math.isnan` instead
 
+  --> nan_comparison.py:23:9
    |
 22 | # PLW0117
 23 | if x == float("Nan"):
    |         ^^^^^^^^^^^^
 24 |     pass
    |
-error[PLW0177]: nan_comparison.py:27:9: Comparing against a NaN value; use `math.isnan` instead
+error[PLW0177]: 27:9: Comparing against a NaN value; use `math.isnan` instead
 
+  --> nan_comparison.py:27:9
    |
 26 | # PLW0117
 27 | if x == math.nan:
    |         ^^^^^^^^
 28 |     pass
    |
-error[PLW0177]: nan_comparison.py:31:9: Comparing against a NaN value; use `math.isnan` instead
+error[PLW0177]: 31:9: Comparing against a NaN value; use `math.isnan` instead
 
+  --> nan_comparison.py:31:9
    |
 30 | # PLW0117
 31 | if x == bad_val:
    |         ^^^^^^^
 32 |     pass
    |
-error[PLW0177]: nan_comparison.py:35:9: Comparing against a NaN value; use `np.isnan` instead
+error[PLW0177]: 35:9: Comparing against a NaN value; use `np.isnan` instead
 
+  --> nan_comparison.py:35:9
    |
 34 | # PLW0117
 35 | if y == np.NaN:
    |         ^^^^^^
 36 |     pass
    |
-error[PLW0177]: nan_comparison.py:39:9: Comparing against a NaN value; use `np.isnan` instead
+error[PLW0177]: 39:9: Comparing against a NaN value; use `np.isnan` instead
 
+  --> nan_comparison.py:39:9
    |
 38 | # PLW0117
 39 | if y == np.NAN:
    |         ^^^^^^
 40 |     pass
    |
-error[PLW0177]: nan_comparison.py:43:9: Comparing against a NaN value; use `np.isnan` instead
+error[PLW0177]: 43:9: Comparing against a NaN value; use `np.isnan` instead
 
+  --> nan_comparison.py:43:9
    |
 42 | # PLW0117
 43 | if y == np.nan:
    |         ^^^^^^
 44 |     pass
    |
-error[PLW0177]: nan_comparison.py:47:9: Comparing against a NaN value; use `np.isnan` instead
+error[PLW0177]: 47:9: Comparing against a NaN value; use `np.isnan` instead
 
+  --> nan_comparison.py:47:9
    |
 46 | # PLW0117
 47 | if y == npy_nan:
    |         ^^^^^^^
 48 |     pass
    |
-error[PLW0177]: nan_comparison.py:53:9: Comparing against a NaN value; use `math.isnan` instead
+error[PLW0177]: 53:9: Comparing against a NaN value; use `math.isnan` instead
 
+  --> nan_comparison.py:53:9
    |
 52 | # PLW0117
 53 | if x == builtins.float("nan"):

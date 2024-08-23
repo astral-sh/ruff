@@ -1,8 +1,9 @@
 ---
 source: crates/ruff_linter/src/rules/pylint/mod.rs
 ---
-error[PLR2004]: magic_value_comparison.py:5:4: Magic value used in comparison, consider replacing `10` with a constant variable
+error[PLR2004]: 5:4: Magic value used in comparison, consider replacing `10` with a constant variable
 
+ --> magic_value_comparison.py:5:4
   |
 3 | user_input = 10
 4 | 
@@ -10,8 +11,9 @@ error[PLR2004]: magic_value_comparison.py:5:4: Magic value used in comparison, c
   |    ^^
 6 |     pass
   |
-error[PLR2004]: magic_value_comparison.py:47:12: Magic value used in comparison, consider replacing `2` with a constant variable
+error[PLR2004]: 47:12: Magic value used in comparison, consider replacing `2` with a constant variable
 
+  --> magic_value_comparison.py:47:12
    |
 45 |     pass
 46 | 
@@ -19,8 +21,9 @@ error[PLR2004]: magic_value_comparison.py:47:12: Magic value used in comparison,
    |            ^
 48 |     pass
    |
-error[PLR2004]: magic_value_comparison.py:50:12: Magic value used in comparison, consider replacing `-2` with a constant variable
+error[PLR2004]: 50:12: Magic value used in comparison, consider replacing `-2` with a constant variable
 
+  --> magic_value_comparison.py:50:12
    |
 48 |     pass
 49 | 
@@ -28,8 +31,9 @@ error[PLR2004]: magic_value_comparison.py:50:12: Magic value used in comparison,
    |            ^^
 51 |     pass
    |
-error[PLR2004]: magic_value_comparison.py:53:12: Magic value used in comparison, consider replacing `+2` with a constant variable
+error[PLR2004]: 53:12: Magic value used in comparison, consider replacing `+2` with a constant variable
 
+  --> magic_value_comparison.py:53:12
    |
 51 |     pass
 52 | 
@@ -37,8 +41,9 @@ error[PLR2004]: magic_value_comparison.py:53:12: Magic value used in comparison,
    |            ^^
 54 |     pass
    |
-error[PLR2004]: magic_value_comparison.py:56:12: Magic value used in comparison, consider replacing `-2.0` with a constant variable
+error[PLR2004]: 56:12: Magic value used in comparison, consider replacing `-2.0` with a constant variable
 
+  --> magic_value_comparison.py:56:12
    |
 54 |     pass
 55 | 
@@ -46,8 +51,9 @@ error[PLR2004]: magic_value_comparison.py:56:12: Magic value used in comparison,
    |            ^^^^
 57 |     pass
    |
-error[PLR2004]: magic_value_comparison.py:59:12: Magic value used in comparison, consider replacing `+2.0` with a constant variable
+error[PLR2004]: 59:12: Magic value used in comparison, consider replacing `+2.0` with a constant variable
 
+  --> magic_value_comparison.py:59:12
    |
 57 |     pass
 58 | 
@@ -55,8 +61,9 @@ error[PLR2004]: magic_value_comparison.py:59:12: Magic value used in comparison,
    |            ^^^^
 60 |     pass
    |
-error[PLR2004]: magic_value_comparison.py:80:21: Magic value used in comparison, consider replacing `3.141592653589793238` with a constant variable
+error[PLR2004]: 80:21: Magic value used in comparison, consider replacing `3.141592653589793238` with a constant variable
 
+  --> magic_value_comparison.py:80:21
    |
 78 | pi_estimation = 3.14
 79 | 
@@ -64,8 +71,9 @@ error[PLR2004]: magic_value_comparison.py:80:21: Magic value used in comparison,
    |                     ^^^^^^^^^^^^^^^^^^^^
 81 |     pass
    |
-error[PLR2004]: magic_value_comparison.py:86:21: Magic value used in comparison, consider replacing `0x3` with a constant variable
+error[PLR2004]: 86:21: Magic value used in comparison, consider replacing `0x3` with a constant variable
 
+  --> magic_value_comparison.py:86:21
    |
 84 |     pass
 85 | 

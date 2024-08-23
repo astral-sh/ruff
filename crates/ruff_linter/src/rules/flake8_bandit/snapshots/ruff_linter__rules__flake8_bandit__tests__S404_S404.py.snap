@@ -1,24 +1,27 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_bandit/mod.rs
 ---
-error[S404]: S404.py:1:8: `subprocess` module is possibly insecure
+error[S404]: 1:8: `subprocess` module is possibly insecure
 
+ --> S404.py:1:8
   |
 1 | import subprocess  # S404
   |        ^^^^^^^^^^
 2 | from subprocess import Popen  # S404
 3 | from subprocess import Popen as pop  # S404
   |
-error[S404]: S404.py:2:6: `subprocess` module is possibly insecure
+error[S404]: 2:6: `subprocess` module is possibly insecure
 
+ --> S404.py:2:6
   |
 1 | import subprocess  # S404
 2 | from subprocess import Popen  # S404
   |      ^^^^^^^^^^
 3 | from subprocess import Popen as pop  # S404
   |
-error[S404]: S404.py:3:6: `subprocess` module is possibly insecure
+error[S404]: 3:6: `subprocess` module is possibly insecure
 
+ --> S404.py:3:6
   |
 1 | import subprocess  # S404
 2 | from subprocess import Popen  # S404

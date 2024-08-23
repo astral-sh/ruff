@@ -1,8 +1,9 @@
 ---
 source: crates/ruff_linter/src/rules/pycodestyle/mod.rs
 ---
-error[E401]: E40.py:2:1: [*] Multiple imports on one line
+error[E401]: 2:1: [*] Multiple imports on one line
 
+ --> E40.py:1:8
   |
 1 | #: E401
 2 | import os, sys
@@ -20,8 +21,9 @@ error[E401]: E40.py:2:1: [*] Multiple imports on one line
 4 5 | #: Okay
 5 6 | import os
 
-error[E401]: E40.py:65:1: [*] Multiple imports on one line
+error[E401]: 65:1: [*] Multiple imports on one line
 
+  --> E40.py:64:8
    |
 64 | #: E401
 65 | import re as regex, string  # also with a comment!
@@ -40,8 +42,9 @@ error[E401]: E40.py:65:1: [*] Multiple imports on one line
 67 68 | 
 68 69 | x = 1; import re as regex, string
 
-error[E401]: E40.py:66:1: [*] Multiple imports on one line
+error[E401]: 66:1: [*] Multiple imports on one line
 
+  --> E40.py:65:51
    |
 64 | #: E401
 65 | import re as regex, string  # also with a comment!
@@ -61,8 +64,9 @@ error[E401]: E40.py:66:1: [*] Multiple imports on one line
 68 68 | x = 1; import re as regex, string
 69 69 | 
 
-error[E401]: E40.py:68:8: [*] Multiple imports on one line
+error[E401]: 68:8: [*] Multiple imports on one line
 
+  --> E40.py:68:8
    |
 66 | import re as regex, string; x = 1
 67 | 
@@ -80,8 +84,9 @@ error[E401]: E40.py:68:8: [*] Multiple imports on one line
 70 70 | 
 71 71 | def blah():
 
-error[E401]: E40.py:72:5: [*] Multiple imports on one line
+error[E401]: 72:5: [*] Multiple imports on one line
 
+  --> E40.py:72:5
    |
 71 | def blah():
 72 |     import datetime as dt, copy
@@ -101,8 +106,9 @@ error[E401]: E40.py:72:5: [*] Multiple imports on one line
 74 75 |     def nested_and_tested():
 75 76 |         import builtins, textwrap as tw
 
-error[E401]: E40.py:75:9: [*] Multiple imports on one line
+error[E401]: 75:9: [*] Multiple imports on one line
 
+  --> E40.py:75:9
    |
 74 |     def nested_and_tested():
 75 |         import builtins, textwrap as tw
@@ -122,8 +128,9 @@ error[E401]: E40.py:75:9: [*] Multiple imports on one line
 77 78 |         x = 1; import re as regex, string
 78 79 |         import re as regex, string; x = 1
 
-error[E401]: E40.py:77:16: [*] Multiple imports on one line
+error[E401]: 77:16: [*] Multiple imports on one line
 
+  --> E40.py:77:16
    |
 75 |         import builtins, textwrap as tw
 76 | 
@@ -142,8 +149,9 @@ error[E401]: E40.py:77:16: [*] Multiple imports on one line
 79 79 | 
 80 80 |     if True: import re as regex, string
 
-error[E401]: E40.py:78:9: [*] Multiple imports on one line
+error[E401]: 78:9: [*] Multiple imports on one line
 
+  --> E40.py:78:9
    |
 77 |         x = 1; import re as regex, string
 78 |         import re as regex, string; x = 1
@@ -161,8 +169,9 @@ error[E401]: E40.py:78:9: [*] Multiple imports on one line
 79 79 | 
 80 80 |     if True: import re as regex, string
 
-error[E401]: E40.py:80:14: [*] Multiple imports on one line
+error[E401]: 80:14: [*] Multiple imports on one line
 
+  --> E40.py:80:14
    |
 78 |         import re as regex, string; x = 1
 79 | 

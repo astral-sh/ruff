@@ -1,8 +1,9 @@
 ---
 source: crates/ruff_linter/src/rules/pyflakes/mod.rs
 ---
-error[F841]: <filename>:7:26: [*] Local variable `x` is assigned to but never used
+error[F841]: 7:26: [*] Local variable `x` is assigned to but never used
 
+ --> <filename>:7:26
   |
 5 |     try:
 6 |         1 / 0
@@ -22,8 +23,9 @@ error[F841]: <filename>:7:26: [*] Local variable `x` is assigned to but never us
 9 9 |     except ImportError as x:
 10 10 |         pass
 
-error[F841]: <filename>:9:27: [*] Local variable `x` is assigned to but never used
+error[F841]: 9:27: [*] Local variable `x` is assigned to but never used
 
+  --> <filename>:9:27
    |
  7 |     except ValueError as x:
  8 |         pass

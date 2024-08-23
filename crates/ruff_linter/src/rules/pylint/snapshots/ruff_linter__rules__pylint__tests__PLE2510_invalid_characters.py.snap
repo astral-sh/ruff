@@ -1,16 +1,17 @@
 ---
 source: crates/ruff_linter/src/rules/pylint/mod.rs
 ---
-invalid_characters.py:15:6: PLE2510 [*] Invalid unescaped character backspace, use "\b" instead
+error[PLE2510]: 15:6: [*] Invalid unescaped character backspace, use "\b" instead
+
+  --> invalid_characters.py:15:6
    |
 13 | #        (Pylint, "C3002") => Rule::UnnecessaryDirectLambdaCall,
 14 | #foo = 'hi'
-15 | b = '␈'
-   |      ^ PLE2510
-16 | b = f'␈'
+15 | b = ''
+   |      ^
+16 | b = f''
    |
    = help: Replace with escape sequence
-
 ℹ Safe fix
 12 12 | #        (Pylint, "C0414") => Rule::UselessImportAlias,
 13 13 | #        (Pylint, "C3002") => Rule::UnnecessaryDirectLambdaCall,
@@ -21,17 +22,18 @@ invalid_characters.py:15:6: PLE2510 [*] Invalid unescaped character backspace, u
 17 17 | 
 18 18 | b_ok = '\\b'
 
-invalid_characters.py:16:7: PLE2510 [*] Invalid unescaped character backspace, use "\b" instead
+error[PLE2510]: 16:7: [*] Invalid unescaped character backspace, use "\b" instead
+
+  --> invalid_characters.py:16:7
    |
 14 | #foo = 'hi'
-15 | b = '␈'
-16 | b = f'␈'
-   |       ^ PLE2510
+15 | b = ''
+16 | b = f''
+   |       ^
 17 | 
 18 | b_ok = '\\b'
    |
    = help: Replace with escape sequence
-
 ℹ Safe fix
 13 13 | #        (Pylint, "C3002") => Rule::UnnecessaryDirectLambdaCall,
 14 14 | #foo = 'hi'
@@ -42,17 +44,18 @@ invalid_characters.py:16:7: PLE2510 [*] Invalid unescaped character backspace, u
 18 18 | b_ok = '\\b'
 19 19 | b_ok = f'\\b'
 
-invalid_characters.py:55:21: PLE2510 [*] Invalid unescaped character backspace, use "\b" instead
+error[PLE2510]: 55:21: [*] Invalid unescaped character backspace, use "\b" instead
+
+  --> invalid_characters.py:55:21
    |
 53 | zwsp_after_multicharacter_grapheme_cluster = f"ಫ್ರಾನ್ಸಿಸ್ಕೊ ​​"
 54 | 
-55 | nested_fstrings = f'␈{f'{f'␛'}'}'
-   |                     ^ PLE2510
+55 | nested_fstrings = f'{f'{f''}'}'
+   |                     ^
 56 | 
 57 | # https://github.com/astral-sh/ruff/issues/7455#issuecomment-1741998106
    |
    = help: Replace with escape sequence
-
 ℹ Safe fix
 52 52 | zwsp_after_multicharacter_grapheme_cluster = "ಫ್ರಾನ್ಸಿಸ್ಕೊ ​​"
 53 53 | zwsp_after_multicharacter_grapheme_cluster = f"ಫ್ರಾನ್ಸಿಸ್ಕೊ ​​"

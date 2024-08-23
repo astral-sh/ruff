@@ -1,8 +1,9 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_type_checking/mod.rs
 ---
-error[TCH003]: init_var.py:5:25: [*] Move standard library import `dataclasses.FrozenInstanceError` into a type-checking block
+error[TCH003]: 5:25: [*] Move standard library import `dataclasses.FrozenInstanceError` into a type-checking block
 
+ --> init_var.py:5:25
   |
 3 | from __future__ import annotations
 4 | 
@@ -26,8 +27,9 @@ error[TCH003]: init_var.py:5:25: [*] Move standard library import `dataclasses.F
 8  12 | 
 9  13 | @dataclass
 
-error[TCH003]: init_var.py:6:21: [*] Move standard library import `pathlib.Path` into a type-checking block
+error[TCH003]: 6:21: [*] Move standard library import `pathlib.Path` into a type-checking block
 
+ --> init_var.py:6:21
   |
 5 | from dataclasses import FrozenInstanceError, InitVar, dataclass
 6 | from pathlib import Path

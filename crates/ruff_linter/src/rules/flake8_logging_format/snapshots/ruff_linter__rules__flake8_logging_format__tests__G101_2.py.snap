@@ -1,8 +1,9 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_logging_format/mod.rs
 ---
-error[G101]: G101_2.py:6:9: Logging statement uses an `extra` field that clashes with a `LogRecord` field: `name`
+error[G101]: 6:9: Logging statement uses an `extra` field that clashes with a `LogRecord` field: `name`
 
+ --> G101_2.py:6:9
   |
 4 |     "Hello world!",
 5 |     extra=dict(
@@ -11,8 +12,9 @@ error[G101]: G101_2.py:6:9: Logging statement uses an `extra` field that clashes
 7 |     ),
 8 | )
   |
-error[G101]: G101_2.py:15:9: Logging statement uses an `extra` field that clashes with a `LogRecord` field: `name`
+error[G101]: 15:9: Logging statement uses an `extra` field that clashes with a `LogRecord` field: `name`
 
+  --> G101_2.py:15:9
    |
 13 |     "Hello world!",
 14 |     extra=dict(

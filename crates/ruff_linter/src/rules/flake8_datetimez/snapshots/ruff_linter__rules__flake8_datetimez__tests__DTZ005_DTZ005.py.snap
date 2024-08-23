@@ -1,8 +1,9 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_datetimez/mod.rs
 ---
-error[DTZ005]: DTZ005.py:4:1: `datetime.datetime.now()` called without a `tz` argument
+error[DTZ005]: 4:1: `datetime.datetime.now()` called without a `tz` argument
 
+ --> DTZ005.py:3:10
   |
 3 | # no args
 4 | datetime.datetime.now()
@@ -11,8 +12,9 @@ error[DTZ005]: DTZ005.py:4:1: `datetime.datetime.now()` called without a `tz` ar
 6 | # wrong keywords
   |
   = help: Pass a `datetime.timezone` object to the `tz` parameter
-error[DTZ005]: DTZ005.py:7:1: `datetime.datetime.now()` called without a `tz` argument
+error[DTZ005]: 7:1: `datetime.datetime.now()` called without a `tz` argument
 
+ --> DTZ005.py:6:17
   |
 6 | # wrong keywords
 7 | datetime.datetime.now(bad=datetime.timezone.utc)
@@ -21,8 +23,9 @@ error[DTZ005]: DTZ005.py:7:1: `datetime.datetime.now()` called without a `tz` ar
 9 | # none args
   |
   = help: Pass a `datetime.timezone` object to the `tz` parameter
-error[DTZ005]: DTZ005.py:10:1: `tz=None` passed to `datetime.datetime.now()`
+error[DTZ005]: 10:1: `tz=None` passed to `datetime.datetime.now()`
 
+  --> DTZ005.py:9:12
    |
  9 | # none args
 10 | datetime.datetime.now(None)
@@ -31,8 +34,9 @@ error[DTZ005]: DTZ005.py:10:1: `tz=None` passed to `datetime.datetime.now()`
 12 | # none keywords
    |
    = help: Pass a `datetime.timezone` object to the `tz` parameter
-error[DTZ005]: DTZ005.py:13:1: `tz=None` passed to `datetime.datetime.now()`
+error[DTZ005]: 13:1: `tz=None` passed to `datetime.datetime.now()`
 
+  --> DTZ005.py:12:16
    |
 12 | # none keywords
 13 | datetime.datetime.now(tz=None)
@@ -41,8 +45,9 @@ error[DTZ005]: DTZ005.py:13:1: `tz=None` passed to `datetime.datetime.now()`
 15 | from datetime import datetime
    |
    = help: Pass a `datetime.timezone` object to the `tz` parameter
-error[DTZ005]: DTZ005.py:18:1: `datetime.datetime.now()` called without a `tz` argument
+error[DTZ005]: 18:1: `datetime.datetime.now()` called without a `tz` argument
 
+  --> DTZ005.py:17:22
    |
 17 | # no args unqualified
 18 | datetime.now()

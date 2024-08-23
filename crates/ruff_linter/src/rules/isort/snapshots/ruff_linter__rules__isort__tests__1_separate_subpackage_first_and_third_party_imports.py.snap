@@ -1,8 +1,9 @@
 ---
 source: crates/ruff_linter/src/rules/isort/mod.rs
 ---
-error[I001]: separate_subpackage_first_and_third_party_imports.py:1:1: [*] Import block is un-sorted or un-formatted
+error[I001]: 1:1: [*] Import block is un-sorted or un-formatted
 
+ --> separate_subpackage_first_and_third_party_imports.py:1:1
   |
 1 | / import sys
 2 | | import baz
@@ -12,6 +13,7 @@ error[I001]: separate_subpackage_first_and_third_party_imports.py:1:1: [*] Impor
 6 | | import foo
 7 | | import foo.bar
 8 | | import foo.bar.baz
+  | |___________________^
   |
   = help: Organize imports
 ℹ Safe fix

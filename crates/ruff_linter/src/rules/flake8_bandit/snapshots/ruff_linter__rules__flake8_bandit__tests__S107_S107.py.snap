@@ -1,36 +1,41 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_bandit/mod.rs
 ---
-error[S107]: S107.py:5:29: Possible hardcoded password assigned to function default: "password"
+error[S107]: 5:29: Possible hardcoded password assigned to function default: "password"
 
+ --> S107.py:5:29
   |
 5 | def default(first, password="default"):
   |                             ^^^^^^^^^
 6 |     pass
   |
-error[S107]: S107.py:13:45: Possible hardcoded password assigned to function default: "password"
+error[S107]: 13:45: Possible hardcoded password assigned to function default: "password"
 
+  --> S107.py:13:45
    |
 13 | def default_posonly(first, /, pos, password="posonly"):
    |                                             ^^^^^^^^^
 14 |     pass
    |
-error[S107]: S107.py:21:39: Possible hardcoded password assigned to function default: "password"
+error[S107]: 21:39: Possible hardcoded password assigned to function default: "password"
 
+  --> S107.py:21:39
    |
 21 | def default_kwonly(first, *, password="kwonly"):
    |                                       ^^^^^^^^
 22 |     pass
    |
-error[S107]: S107.py:29:39: Possible hardcoded password assigned to function default: "secret"
+error[S107]: 29:39: Possible hardcoded password assigned to function default: "secret"
 
+  --> S107.py:29:39
    |
 29 | def default_all(first, /, pos, secret="posonly", *, password="kwonly"):
    |                                       ^^^^^^^^^
 30 |     pass
    |
-error[S107]: S107.py:29:62: Possible hardcoded password assigned to function default: "password"
+error[S107]: 29:62: Possible hardcoded password assigned to function default: "password"
 
+  --> S107.py:29:62
    |
 29 | def default_all(first, /, pos, secret="posonly", *, password="kwonly"):
    |                                                              ^^^^^^^^

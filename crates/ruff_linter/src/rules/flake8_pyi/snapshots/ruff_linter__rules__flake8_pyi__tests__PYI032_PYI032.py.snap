@@ -1,8 +1,9 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_pyi/mod.rs
 ---
-error[PYI032]: PYI032.py:6:29: [*] Prefer `object` to `Any` for the second parameter to `__eq__`
+error[PYI032]: 6:29: [*] Prefer `object` to `Any` for the second parameter to `__eq__`
 
+ --> PYI032.py:6:29
   |
 5 | class Bad:
 6 |     def __eq__(self, other: Any) -> bool: ...  # Y032
@@ -20,8 +21,9 @@ error[PYI032]: PYI032.py:6:29: [*] Prefer `object` to `Any` for the second param
 8 8 | 
 9 9 | 
 
-error[PYI032]: PYI032.py:7:29: [*] Prefer `object` to `Any` for the second parameter to `__ne__`
+error[PYI032]: 7:29: [*] Prefer `object` to `Any` for the second parameter to `__ne__`
 
+ --> PYI032.py:7:29
   |
 5 | class Bad:
 6 |     def __eq__(self, other: Any) -> bool: ...  # Y032

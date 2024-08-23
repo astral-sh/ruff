@@ -1,8 +1,9 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_pyi/mod.rs
 ---
-error[PYI064]: PYI064.pyi:3:1: [*] `Final[Literal[True]]` can be replaced with a bare `Final`
+error[PYI064]: 3:1: [*] `Final[Literal[True]]` can be replaced with a bare `Final`
 
+ --> PYI064.pyi:2:1
   |
 1 | from typing import Final, Literal
 2 | 
@@ -21,8 +22,9 @@ error[PYI064]: PYI064.pyi:3:1: [*] `Final[Literal[True]]` can be replaced with a
 5 5 | z: Final[Literal["this is a really long literal, that won't be rendered in the issue text"]]  # PYI064
 6 6 | 
 
-error[PYI064]: PYI064.pyi:4:1: [*] `Final[Literal[None]]` can be replaced with a bare `Final`
+error[PYI064]: 4:1: [*] `Final[Literal[None]]` can be replaced with a bare `Final`
 
+ --> PYI064.pyi:3:34
   |
 3 | x: Final[Literal[True]]  # PYI064
 4 | y: Final[Literal[None]] = None  # PYI064
@@ -40,8 +42,9 @@ error[PYI064]: PYI064.pyi:4:1: [*] `Final[Literal[None]]` can be replaced with a
 6 6 | 
 7 7 | # This should be fixable, and marked as safe
 
-error[PYI064]: PYI064.pyi:5:1: [*] `Final[Literal[...]]` can be replaced with a bare `Final`
+error[PYI064]: 5:1: [*] `Final[Literal[...]]` can be replaced with a bare `Final`
 
+ --> PYI064.pyi:4:41
   |
 3 | x: Final[Literal[True]]  # PYI064
 4 | y: Final[Literal[None]] = None  # PYI064
@@ -61,8 +64,9 @@ error[PYI064]: PYI064.pyi:5:1: [*] `Final[Literal[...]]` can be replaced with a 
 7 7 | # This should be fixable, and marked as safe
 8 8 | w1: Final[Literal[123]]  # PYI064
 
-error[PYI064]: PYI064.pyi:8:1: [*] `Final[Literal[123]]` can be replaced with a bare `Final`
+error[PYI064]: 8:1: [*] `Final[Literal[123]]` can be replaced with a bare `Final`
 
+  --> PYI064.pyi:7:45
    |
  7 | # This should be fixable, and marked as safe
  8 | w1: Final[Literal[123]]  # PYI064
@@ -81,8 +85,9 @@ error[PYI064]: PYI064.pyi:8:1: [*] `Final[Literal[123]]` can be replaced with a 
 10 10 | # This should not be fixable
 11 11 | w2: Final[Literal[123]] = "random value"  # PYI064
 
-error[PYI064]: PYI064.pyi:11:1: `Final[Literal[123]]` can be replaced with a bare `Final`
+error[PYI064]: 11:1: `Final[Literal[123]]` can be replaced with a bare `Final`
 
+  --> PYI064.pyi:10:29
    |
 10 | # This should not be fixable
 11 | w2: Final[Literal[123]] = "random value"  # PYI064

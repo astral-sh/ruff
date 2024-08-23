@@ -1,8 +1,9 @@
 ---
 source: crates/ruff_linter/src/rules/isort/mod.rs
 ---
-error[I001]: lines_after_imports.pyi:1:1: [*] Import block is un-sorted or un-formatted
+error[I001]: 1:1: [*] Import block is un-sorted or un-formatted
 
+  --> lines_after_imports.pyi:1:1
    |
  1 | / from __future__ import annotations
  2 | | 
@@ -16,8 +17,8 @@ error[I001]: lines_after_imports.pyi:1:1: [*] Import block is un-sorted or un-fo
 10 | | 
 11 | | 
 12 | | 
-13 | | class Thing(object):
-   | |_^
+   | |__^
+13 |   class Thing(object):
 14 |     name: str
 15 |     def __init__(self, name: str):
    |

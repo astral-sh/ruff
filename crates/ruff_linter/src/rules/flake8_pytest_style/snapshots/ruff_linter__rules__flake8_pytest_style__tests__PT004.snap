@@ -1,16 +1,18 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_pytest_style/mod.rs
 ---
-error[PT004]: PT004.py:51:5: Fixture `patch_something` does not return anything, add leading underscore
+error[PT004]: 51:5: Fixture `patch_something` does not return anything, add leading underscore
 
+  --> PT004.py:51:5
    |
 50 | @pytest.fixture()
 51 | def patch_something(mocker):  # Error simple
    |     ^^^^^^^^^^^^^^^
 52 |     mocker.patch("some.thing")
    |
-error[PT004]: PT004.py:56:5: Fixture `activate_context` does not return anything, add leading underscore
+error[PT004]: 56:5: Fixture `activate_context` does not return anything, add leading underscore
 
+  --> PT004.py:56:5
    |
 55 | @pytest.fixture()
 56 | def activate_context():  # Error with yield

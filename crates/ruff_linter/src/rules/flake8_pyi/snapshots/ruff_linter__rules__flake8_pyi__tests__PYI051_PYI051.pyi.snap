@@ -1,8 +1,9 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_pyi/mod.rs
 ---
-error[PYI051]: PYI051.pyi:4:18: `Literal["foo"]` is redundant in a union with `str`
+error[PYI051]: 4:18: `Literal["foo"]` is redundant in a union with `str`
 
+ --> PYI051.pyi:4:18
   |
 2 | from typing import Literal, TypeAlias, Union
 3 | 
@@ -11,8 +12,9 @@ error[PYI051]: PYI051.pyi:4:18: `Literal["foo"]` is redundant in a union with `s
 5 | B: TypeAlias = typing.Union[Literal[b"bar", b"foo"], bytes, str]
 6 | C: TypeAlias = typing.Union[Literal[5], int, typing.Union[Literal["foo"], str]]
   |
-error[PYI051]: PYI051.pyi:5:37: `Literal[b"bar"]` is redundant in a union with `bytes`
+error[PYI051]: 5:37: `Literal[b"bar"]` is redundant in a union with `bytes`
 
+ --> PYI051.pyi:5:37
   |
 4 | A: str | Literal["foo"]
 5 | B: TypeAlias = typing.Union[Literal[b"bar", b"foo"], bytes, str]
@@ -20,8 +22,9 @@ error[PYI051]: PYI051.pyi:5:37: `Literal[b"bar"]` is redundant in a union with `
 6 | C: TypeAlias = typing.Union[Literal[5], int, typing.Union[Literal["foo"], str]]
 7 | D: TypeAlias = typing.Union[Literal[b"str_bytes", 42], bytes, int]
   |
-error[PYI051]: PYI051.pyi:5:45: `Literal[b"foo"]` is redundant in a union with `bytes`
+error[PYI051]: 5:45: `Literal[b"foo"]` is redundant in a union with `bytes`
 
+ --> PYI051.pyi:5:45
   |
 4 | A: str | Literal["foo"]
 5 | B: TypeAlias = typing.Union[Literal[b"bar", b"foo"], bytes, str]
@@ -29,8 +32,9 @@ error[PYI051]: PYI051.pyi:5:45: `Literal[b"foo"]` is redundant in a union with `
 6 | C: TypeAlias = typing.Union[Literal[5], int, typing.Union[Literal["foo"], str]]
 7 | D: TypeAlias = typing.Union[Literal[b"str_bytes", 42], bytes, int]
   |
-error[PYI051]: PYI051.pyi:6:37: `Literal[5]` is redundant in a union with `int`
+error[PYI051]: 6:37: `Literal[5]` is redundant in a union with `int`
 
+ --> PYI051.pyi:6:37
   |
 4 | A: str | Literal["foo"]
 5 | B: TypeAlias = typing.Union[Literal[b"bar", b"foo"], bytes, str]
@@ -38,8 +42,9 @@ error[PYI051]: PYI051.pyi:6:37: `Literal[5]` is redundant in a union with `int`
   |                                     ^
 7 | D: TypeAlias = typing.Union[Literal[b"str_bytes", 42], bytes, int]
   |
-error[PYI051]: PYI051.pyi:6:67: `Literal["foo"]` is redundant in a union with `str`
+error[PYI051]: 6:67: `Literal["foo"]` is redundant in a union with `str`
 
+ --> PYI051.pyi:6:67
   |
 4 | A: str | Literal["foo"]
 5 | B: TypeAlias = typing.Union[Literal[b"bar", b"foo"], bytes, str]
@@ -47,8 +52,9 @@ error[PYI051]: PYI051.pyi:6:67: `Literal["foo"]` is redundant in a union with `s
   |                                                                   ^^^^^
 7 | D: TypeAlias = typing.Union[Literal[b"str_bytes", 42], bytes, int]
   |
-error[PYI051]: PYI051.pyi:7:37: `Literal[b"str_bytes"]` is redundant in a union with `bytes`
+error[PYI051]: 7:37: `Literal[b"str_bytes"]` is redundant in a union with `bytes`
 
+ --> PYI051.pyi:7:37
   |
 5 | B: TypeAlias = typing.Union[Literal[b"bar", b"foo"], bytes, str]
 6 | C: TypeAlias = typing.Union[Literal[5], int, typing.Union[Literal["foo"], str]]
@@ -57,8 +63,9 @@ error[PYI051]: PYI051.pyi:7:37: `Literal[b"str_bytes"]` is redundant in a union 
 8 | 
 9 | def func(x: complex | Literal[1J], y: Union[Literal[3.14], float]): ...
   |
-error[PYI051]: PYI051.pyi:7:51: `Literal[42]` is redundant in a union with `int`
+error[PYI051]: 7:51: `Literal[42]` is redundant in a union with `int`
 
+ --> PYI051.pyi:7:51
   |
 5 | B: TypeAlias = typing.Union[Literal[b"bar", b"foo"], bytes, str]
 6 | C: TypeAlias = typing.Union[Literal[5], int, typing.Union[Literal["foo"], str]]
@@ -67,8 +74,9 @@ error[PYI051]: PYI051.pyi:7:51: `Literal[42]` is redundant in a union with `int`
 8 | 
 9 | def func(x: complex | Literal[1J], y: Union[Literal[3.14], float]): ...
   |
-error[PYI051]: PYI051.pyi:9:31: `Literal[1J]` is redundant in a union with `complex`
+error[PYI051]: 9:31: `Literal[1J]` is redundant in a union with `complex`
 
+  --> PYI051.pyi:9:31
    |
  7 | D: TypeAlias = typing.Union[Literal[b"str_bytes", 42], bytes, int]
  8 | 
@@ -77,8 +85,9 @@ error[PYI051]: PYI051.pyi:9:31: `Literal[1J]` is redundant in a union with `comp
 10 | 
 11 | # OK
    |
-error[PYI051]: PYI051.pyi:9:53: `Literal[3.14]` is redundant in a union with `float`
+error[PYI051]: 9:53: `Literal[3.14]` is redundant in a union with `float`
 
+  --> PYI051.pyi:9:53
    |
  7 | D: TypeAlias = typing.Union[Literal[b"str_bytes", 42], bytes, int]
  8 | 

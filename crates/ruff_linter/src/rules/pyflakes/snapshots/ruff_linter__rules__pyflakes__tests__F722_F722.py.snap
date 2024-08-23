@@ -1,15 +1,17 @@
 ---
 source: crates/ruff_linter/src/rules/pyflakes/mod.rs
 ---
-error[F722]: F722.py:9:12: Syntax error in forward annotation: `///`
+error[F722]: 9:12: Syntax error in forward annotation: `///`
 
+  --> F722.py:9:12
    |
  9 | def g() -> "///":
    |            ^^^^^
 10 |     pass
    |
-error[F722]: F722.py:13:4: Syntax error in forward annotation: `List[int]☃`
+error[F722]: 13:4: Syntax error in forward annotation: `List[int]☃`
 
+  --> F722.py:13:4
    |
 13 | X: """List[int]"""'☃' = []
    |    ^^^^^^^^^^^^^^^^^^

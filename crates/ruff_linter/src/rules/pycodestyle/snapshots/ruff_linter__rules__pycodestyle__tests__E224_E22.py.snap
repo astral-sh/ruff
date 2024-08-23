@@ -1,8 +1,9 @@
 ---
 source: crates/ruff_linter/src/rules/pycodestyle/mod.rs
 ---
-error[E224]: E22.py:48:5: [*] Tab after operator
+error[E224]: 48:5: [*] Tab after operator
 
+  --> E22.py:48:5
    |
 47 | #: E224
 48 | a +=    1

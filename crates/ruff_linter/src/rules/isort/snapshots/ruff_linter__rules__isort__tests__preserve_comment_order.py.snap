@@ -1,8 +1,9 @@
 ---
 source: crates/ruff_linter/src/rules/isort/mod.rs
 ---
-error[I001]: preserve_comment_order.py:1:1: [*] Import block is un-sorted or un-formatted
+error[I001]: 1:1: [*] Import block is un-sorted or un-formatted
 
+  --> preserve_comment_order.py:1:1
    |
  1 | / import io
  2 | | # Old MacDonald had a farm,
@@ -15,6 +16,7 @@ error[I001]: preserve_comment_order.py:1:1: [*] Import block is un-sorted or un-
  9 | | # EIEIO
 10 | | from errno import EIO
 11 | | import abc
+   | |___________^
    |
    = help: Organize imports
 ℹ Safe fix

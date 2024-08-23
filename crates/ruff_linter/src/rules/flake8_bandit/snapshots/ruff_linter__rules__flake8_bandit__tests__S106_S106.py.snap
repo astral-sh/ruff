@@ -1,8 +1,9 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_bandit/mod.rs
 ---
-error[S106]: S106.py:14:9: Possible hardcoded password assigned to argument: "password"
+error[S106]: 14:9: Possible hardcoded password assigned to argument: "password"
 
+  --> S106.py:14:9
    |
 13 | # Error
 14 | func(1, password="s3cr3t")

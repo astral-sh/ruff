@@ -1,8 +1,9 @@
 ---
 source: crates/ruff_linter/src/rules/pycodestyle/mod.rs
 ---
-error[E101]: E101.py:11:1: Indentation contains mixed spaces and tabs
+error[E101]: 11:1: Indentation contains mixed spaces and tabs
 
+  --> E101.py:10:11
    |
  9 | def func_mixed_start_with_tab():
 10 |     # E101
@@ -11,8 +12,9 @@ error[E101]: E101.py:11:1: Indentation contains mixed spaces and tabs
 12 | 
 13 | def func_mixed_start_with_space():
    |
-error[E101]: E101.py:15:1: Indentation contains mixed spaces and tabs
+error[E101]: 15:1: Indentation contains mixed spaces and tabs
 
+  --> E101.py:14:11
    |
 13 | def func_mixed_start_with_space():
 14 |     # E101
@@ -21,8 +23,9 @@ error[E101]: E101.py:15:1: Indentation contains mixed spaces and tabs
 16 | 
 17 | def xyz():
    |
-error[E101]: E101.py:19:1: Indentation contains mixed spaces and tabs
+error[E101]: 19:1: Indentation contains mixed spaces and tabs
 
+  --> E101.py:18:11
    |
 17 | def xyz():
 18 |     # E101

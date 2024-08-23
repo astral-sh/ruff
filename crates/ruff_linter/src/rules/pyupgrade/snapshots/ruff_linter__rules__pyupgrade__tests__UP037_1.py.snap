@@ -1,8 +1,9 @@
 ---
 source: crates/ruff_linter/src/rules/pyupgrade/mod.rs
 ---
-error[UP037]: UP037_1.py:9:8: [*] Remove quotes from type annotation
+error[UP037]: 9:8: [*] Remove quotes from type annotation
 
+  --> UP037_1.py:9:8
    |
  7 | def foo():
  8 |     # UP037

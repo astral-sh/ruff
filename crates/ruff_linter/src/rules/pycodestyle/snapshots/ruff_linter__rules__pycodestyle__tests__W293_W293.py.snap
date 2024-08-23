@@ -1,8 +1,9 @@
 ---
 source: crates/ruff_linter/src/rules/pycodestyle/mod.rs
 ---
-error[W293]: W293.py:4:1: [*] Blank line contains whitespace
+error[W293]: 4:1: [*] Blank line contains whitespace
 
+ --> W293.py:3:16
   |
 2 | class Chassis(RobotModuleTemplate):
 3 |     """底盘信息推送控制
@@ -21,8 +22,9 @@ error[W293]: W293.py:4:1: [*] Blank line contains whitespace
 6 6 | 
 7 7 | 
 
-error[W293]: W293.py:10:1: [*] Blank line contains whitespace
+error[W293]: 10:1: [*] Blank line contains whitespace
 
+  --> W293.py:9:6
    |
  8 | """""" \
  9 |     \
@@ -42,8 +44,9 @@ error[W293]: W293.py:10:1: [*] Blank line contains whitespace
 12 10 | 
 13 11 | "abc\
 
-error[W293]: W293.py:16:1: [*] Blank line contains whitespace
+error[W293]: 16:1: [*] Blank line contains whitespace
 
+  --> W293.py:15:6
    |
 14 |  " \
 15 |     \
@@ -64,8 +67,9 @@ error[W293]: W293.py:16:1: [*] Blank line contains whitespace
 18 16 |  
 19 17 | inside a multiline string'''
 
-error[W293]: W293.py:18:1: [*] Blank line contains whitespace
+error[W293]: 18:1: [*] Blank line contains whitespace
 
+  --> W293.py:17:30
    |
 17 | '''blank line with whitespace
 18 |  

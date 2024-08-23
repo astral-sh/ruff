@@ -1,8 +1,9 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_simplify/mod.rs
 ---
-error[SIM210]: SIM210.py:1:5: [*] Use `bool(...)` instead of `True if ... else False`
+error[SIM210]: 1:5: [*] Use `bool(...)` instead of `True if ... else False`
 
+ --> SIM210.py:1:5
   |
 1 | a = True if b else False  # SIM210
   |     ^^^^^^^^^^^^^^^^^^^^
@@ -17,8 +18,9 @@ error[SIM210]: SIM210.py:1:5: [*] Use `bool(...)` instead of `True if ... else F
 3 3 | a = True if b != c else False  # SIM210
 4 4 | 
 
-error[SIM210]: SIM210.py:3:5: [*] Remove unnecessary `True if ... else False`
+error[SIM210]: 3:5: [*] Remove unnecessary `True if ... else False`
 
+ --> SIM210.py:3:5
   |
 1 | a = True if b else False  # SIM210
 2 | 
@@ -37,8 +39,9 @@ error[SIM210]: SIM210.py:3:5: [*] Remove unnecessary `True if ... else False`
 5 5 | a = True if b + c else False  # SIM210
 6 6 | 
 
-error[SIM210]: SIM210.py:5:5: [*] Use `bool(...)` instead of `True if ... else False`
+error[SIM210]: 5:5: [*] Use `bool(...)` instead of `True if ... else False`
 
+ --> SIM210.py:5:5
   |
 3 | a = True if b != c else False  # SIM210
 4 | 
@@ -58,8 +61,9 @@ error[SIM210]: SIM210.py:5:5: [*] Use `bool(...)` instead of `True if ... else F
 7 7 | a = False if b else True  # OK
 8 8 | 
 
-error[SIM210]: SIM210.py:15:9: Use `bool(...)` instead of `True if ... else False`
+error[SIM210]: 15:9: Use `bool(...)` instead of `True if ... else False`
 
+  --> SIM210.py:15:9
    |
 13 |         return False
 14 | 
@@ -67,8 +71,9 @@ error[SIM210]: SIM210.py:15:9: Use `bool(...)` instead of `True if ... else Fals
    |         ^^^^^^^^^^^^^^^^^^^^
    |
    = help: Replace with `bool(...)
-error[SIM210]: SIM210.py:19:11: [*] Remove unnecessary `True if ... else False`
+error[SIM210]: 19:11: [*] Remove unnecessary `True if ... else False`
 
+  --> SIM210.py:19:11
    |
 18 |   # Regression test for: https://github.com/astral-sh/ruff/issues/7076
 19 |   samesld = True if (psl.privatesuffix(urlparse(response.url).netloc) ==

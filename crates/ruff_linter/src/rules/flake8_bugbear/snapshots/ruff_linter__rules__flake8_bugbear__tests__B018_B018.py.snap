@@ -1,8 +1,9 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_bugbear/mod.rs
 ---
-error[B018]: B018.py:11:5: Found useless expression. Either assign it to a variable or remove it.
+error[B018]: 11:5: Found useless expression. Either assign it to a variable or remove it.
 
+  --> B018.py:11:5
    |
  9 |     "str"  # Str (no raise)
 10 |     f"{int}"  # JoinedStr (no raise)
@@ -11,8 +12,9 @@ error[B018]: B018.py:11:5: Found useless expression. Either assign it to a varia
 12 |     1  # Number (int)
 13 |     1.0  # Number (float)
    |
-error[B018]: B018.py:12:5: Found useless expression. Either assign it to a variable or remove it.
+error[B018]: 12:5: Found useless expression. Either assign it to a variable or remove it.
 
+  --> B018.py:12:5
    |
 10 |     f"{int}"  # JoinedStr (no raise)
 11 |     1j  # Number (complex)
@@ -21,8 +23,9 @@ error[B018]: B018.py:12:5: Found useless expression. Either assign it to a varia
 13 |     1.0  # Number (float)
 14 |     b"foo"  # Binary
    |
-error[B018]: B018.py:13:5: Found useless expression. Either assign it to a variable or remove it.
+error[B018]: 13:5: Found useless expression. Either assign it to a variable or remove it.
 
+  --> B018.py:13:5
    |
 11 |     1j  # Number (complex)
 12 |     1  # Number (int)
@@ -31,8 +34,9 @@ error[B018]: B018.py:13:5: Found useless expression. Either assign it to a varia
 14 |     b"foo"  # Binary
 15 |     True  # NameConstant (True)
    |
-error[B018]: B018.py:14:5: Found useless expression. Either assign it to a variable or remove it.
+error[B018]: 14:5: Found useless expression. Either assign it to a variable or remove it.
 
+  --> B018.py:14:5
    |
 12 |     1  # Number (int)
 13 |     1.0  # Number (float)
@@ -41,8 +45,9 @@ error[B018]: B018.py:14:5: Found useless expression. Either assign it to a varia
 15 |     True  # NameConstant (True)
 16 |     False  # NameConstant (False)
    |
-error[B018]: B018.py:15:5: Found useless expression. Either assign it to a variable or remove it.
+error[B018]: 15:5: Found useless expression. Either assign it to a variable or remove it.
 
+  --> B018.py:15:5
    |
 13 |     1.0  # Number (float)
 14 |     b"foo"  # Binary
@@ -51,8 +56,9 @@ error[B018]: B018.py:15:5: Found useless expression. Either assign it to a varia
 16 |     False  # NameConstant (False)
 17 |     None  # NameConstant (None)
    |
-error[B018]: B018.py:16:5: Found useless expression. Either assign it to a variable or remove it.
+error[B018]: 16:5: Found useless expression. Either assign it to a variable or remove it.
 
+  --> B018.py:16:5
    |
 14 |     b"foo"  # Binary
 15 |     True  # NameConstant (True)
@@ -61,8 +67,9 @@ error[B018]: B018.py:16:5: Found useless expression. Either assign it to a varia
 17 |     None  # NameConstant (None)
 18 |     [1, 2]  # list
    |
-error[B018]: B018.py:17:5: Found useless expression. Either assign it to a variable or remove it.
+error[B018]: 17:5: Found useless expression. Either assign it to a variable or remove it.
 
+  --> B018.py:17:5
    |
 15 |     True  # NameConstant (True)
 16 |     False  # NameConstant (False)
@@ -71,8 +78,9 @@ error[B018]: B018.py:17:5: Found useless expression. Either assign it to a varia
 18 |     [1, 2]  # list
 19 |     {1, 2}  # set
    |
-error[B018]: B018.py:18:5: Found useless expression. Either assign it to a variable or remove it.
+error[B018]: 18:5: Found useless expression. Either assign it to a variable or remove it.
 
+  --> B018.py:18:5
    |
 16 |     False  # NameConstant (False)
 17 |     None  # NameConstant (None)
@@ -81,8 +89,9 @@ error[B018]: B018.py:18:5: Found useless expression. Either assign it to a varia
 19 |     {1, 2}  # set
 20 |     {"foo": "bar"}  # dict
    |
-error[B018]: B018.py:19:5: Found useless expression. Either assign it to a variable or remove it.
+error[B018]: 19:5: Found useless expression. Either assign it to a variable or remove it.
 
+  --> B018.py:19:5
    |
 17 |     None  # NameConstant (None)
 18 |     [1, 2]  # list
@@ -90,16 +99,18 @@ error[B018]: B018.py:19:5: Found useless expression. Either assign it to a varia
    |     ^^^^^^
 20 |     {"foo": "bar"}  # dict
    |
-error[B018]: B018.py:20:5: Found useless expression. Either assign it to a variable or remove it.
+error[B018]: 20:5: Found useless expression. Either assign it to a variable or remove it.
 
+  --> B018.py:20:5
    |
 18 |     [1, 2]  # list
 19 |     {1, 2}  # set
 20 |     {"foo": "bar"}  # dict
    |     ^^^^^^^^^^^^^^
    |
-error[B018]: B018.py:24:5: Found useless expression. Either assign it to a variable or remove it.
+error[B018]: 24:5: Found useless expression. Either assign it to a variable or remove it.
 
+  --> B018.py:24:5
    |
 23 | class Foo3:
 24 |     123
@@ -107,16 +118,18 @@ error[B018]: B018.py:24:5: Found useless expression. Either assign it to a varia
 25 |     a = 2
 26 |     "str"
    |
-error[B018]: B018.py:27:5: Found useless expression. Either assign it to a variable or remove it.
+error[B018]: 27:5: Found useless expression. Either assign it to a variable or remove it.
 
+  --> B018.py:27:5
    |
 25 |     a = 2
 26 |     "str"
 27 |     1
    |     ^
    |
-error[B018]: B018.py:39:5: Found useless expression. Either assign it to a variable or remove it.
+error[B018]: 39:5: Found useless expression. Either assign it to a variable or remove it.
 
+  --> B018.py:39:5
    |
 37 |     "str"  # Str (no raise)
 38 |     f"{int}"  # JoinedStr (no raise)
@@ -125,8 +138,9 @@ error[B018]: B018.py:39:5: Found useless expression. Either assign it to a varia
 40 |     1  # Number (int)
 41 |     1.0  # Number (float)
    |
-error[B018]: B018.py:40:5: Found useless expression. Either assign it to a variable or remove it.
+error[B018]: 40:5: Found useless expression. Either assign it to a variable or remove it.
 
+  --> B018.py:40:5
    |
 38 |     f"{int}"  # JoinedStr (no raise)
 39 |     1j  # Number (complex)
@@ -135,8 +149,9 @@ error[B018]: B018.py:40:5: Found useless expression. Either assign it to a varia
 41 |     1.0  # Number (float)
 42 |     b"foo"  # Binary
    |
-error[B018]: B018.py:41:5: Found useless expression. Either assign it to a variable or remove it.
+error[B018]: 41:5: Found useless expression. Either assign it to a variable or remove it.
 
+  --> B018.py:41:5
    |
 39 |     1j  # Number (complex)
 40 |     1  # Number (int)
@@ -145,8 +160,9 @@ error[B018]: B018.py:41:5: Found useless expression. Either assign it to a varia
 42 |     b"foo"  # Binary
 43 |     True  # NameConstant (True)
    |
-error[B018]: B018.py:42:5: Found useless expression. Either assign it to a variable or remove it.
+error[B018]: 42:5: Found useless expression. Either assign it to a variable or remove it.
 
+  --> B018.py:42:5
    |
 40 |     1  # Number (int)
 41 |     1.0  # Number (float)
@@ -155,8 +171,9 @@ error[B018]: B018.py:42:5: Found useless expression. Either assign it to a varia
 43 |     True  # NameConstant (True)
 44 |     False  # NameConstant (False)
    |
-error[B018]: B018.py:43:5: Found useless expression. Either assign it to a variable or remove it.
+error[B018]: 43:5: Found useless expression. Either assign it to a variable or remove it.
 
+  --> B018.py:43:5
    |
 41 |     1.0  # Number (float)
 42 |     b"foo"  # Binary
@@ -165,8 +182,9 @@ error[B018]: B018.py:43:5: Found useless expression. Either assign it to a varia
 44 |     False  # NameConstant (False)
 45 |     None  # NameConstant (None)
    |
-error[B018]: B018.py:44:5: Found useless expression. Either assign it to a variable or remove it.
+error[B018]: 44:5: Found useless expression. Either assign it to a variable or remove it.
 
+  --> B018.py:44:5
    |
 42 |     b"foo"  # Binary
 43 |     True  # NameConstant (True)
@@ -175,8 +193,9 @@ error[B018]: B018.py:44:5: Found useless expression. Either assign it to a varia
 45 |     None  # NameConstant (None)
 46 |     [1, 2]  # list
    |
-error[B018]: B018.py:45:5: Found useless expression. Either assign it to a variable or remove it.
+error[B018]: 45:5: Found useless expression. Either assign it to a variable or remove it.
 
+  --> B018.py:45:5
    |
 43 |     True  # NameConstant (True)
 44 |     False  # NameConstant (False)
@@ -185,8 +204,9 @@ error[B018]: B018.py:45:5: Found useless expression. Either assign it to a varia
 46 |     [1, 2]  # list
 47 |     {1, 2}  # set
    |
-error[B018]: B018.py:46:5: Found useless expression. Either assign it to a variable or remove it.
+error[B018]: 46:5: Found useless expression. Either assign it to a variable or remove it.
 
+  --> B018.py:46:5
    |
 44 |     False  # NameConstant (False)
 45 |     None  # NameConstant (None)
@@ -195,8 +215,9 @@ error[B018]: B018.py:46:5: Found useless expression. Either assign it to a varia
 47 |     {1, 2}  # set
 48 |     {"foo": "bar"}  # dict
    |
-error[B018]: B018.py:47:5: Found useless expression. Either assign it to a variable or remove it.
+error[B018]: 47:5: Found useless expression. Either assign it to a variable or remove it.
 
+  --> B018.py:47:5
    |
 45 |     None  # NameConstant (None)
 46 |     [1, 2]  # list
@@ -204,16 +225,18 @@ error[B018]: B018.py:47:5: Found useless expression. Either assign it to a varia
    |     ^^^^^^
 48 |     {"foo": "bar"}  # dict
    |
-error[B018]: B018.py:48:5: Found useless expression. Either assign it to a variable or remove it.
+error[B018]: 48:5: Found useless expression. Either assign it to a variable or remove it.
 
+  --> B018.py:48:5
    |
 46 |     [1, 2]  # list
 47 |     {1, 2}  # set
 48 |     {"foo": "bar"}  # dict
    |     ^^^^^^^^^^^^^^
    |
-error[B018]: B018.py:52:5: Found useless expression. Either assign it to a variable or remove it.
+error[B018]: 52:5: Found useless expression. Either assign it to a variable or remove it.
 
+  --> B018.py:52:5
    |
 51 | def foo3():
 52 |     123
@@ -221,16 +244,18 @@ error[B018]: B018.py:52:5: Found useless expression. Either assign it to a varia
 53 |     a = 2
 54 |     "str"
    |
-error[B018]: B018.py:55:5: Found useless expression. Either assign it to a variable or remove it.
+error[B018]: 55:5: Found useless expression. Either assign it to a variable or remove it.
 
+  --> B018.py:55:5
    |
 53 |     a = 2
 54 |     "str"
 55 |     3
    |     ^
    |
-error[B018]: B018.py:63:5: Found useless expression. Either assign it to a variable or remove it.
+error[B018]: 63:5: Found useless expression. Either assign it to a variable or remove it.
 
+  --> B018.py:63:5
    |
 62 | def foo5():
 63 |     foo.bar  # Attribute (raise)
@@ -238,8 +263,9 @@ error[B018]: B018.py:63:5: Found useless expression. Either assign it to a varia
 64 |     object().__class__  # Attribute (raise)
 65 |     "foo" + "bar"  # BinOp (raise)
    |
-error[B018]: B018.py:64:5: Found useless attribute access. Either assign it to a variable or remove it.
+error[B018]: 64:5: Found useless attribute access. Either assign it to a variable or remove it.
 
+  --> B018.py:64:5
    |
 62 | def foo5():
 63 |     foo.bar  # Attribute (raise)
@@ -247,8 +273,9 @@ error[B018]: B018.py:64:5: Found useless attribute access. Either assign it to a
    |     ^^^^^^^^^^^^^^^^^^
 65 |     "foo" + "bar"  # BinOp (raise)
    |
-error[B018]: B018.py:65:5: Found useless expression. Either assign it to a variable or remove it.
+error[B018]: 65:5: Found useless expression. Either assign it to a variable or remove it.
 
+  --> B018.py:65:5
    |
 63 |     foo.bar  # Attribute (raise)
 64 |     object().__class__  # Attribute (raise)

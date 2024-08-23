@@ -1,8 +1,9 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_quotes/mod.rs
 ---
-error[Q000]: singles.py:1:25: [*] Single quotes found but double quotes preferred
+error[Q000]: 1:25: [*] Single quotes found but double quotes preferred
 
+ --> singles.py:1:25
   |
 1 | this_should_be_linted = 'single quote string'
   |                         ^^^^^^^^^^^^^^^^^^^^^
@@ -17,8 +18,9 @@ error[Q000]: singles.py:1:25: [*] Single quotes found but double quotes preferre
 3 3 | this_should_be_linted = f'double quote string'
 4 4 | this_should_be_linted = f'double {"quote"} string'
 
-error[Q000]: singles.py:2:25: [*] Single quotes found but double quotes preferred
+error[Q000]: 2:25: [*] Single quotes found but double quotes preferred
 
+ --> singles.py:2:25
   |
 1 | this_should_be_linted = 'single quote string'
 2 | this_should_be_linted = u'double quote string'
@@ -35,8 +37,9 @@ error[Q000]: singles.py:2:25: [*] Single quotes found but double quotes preferre
 4 4 | this_should_be_linted = f'double {"quote"} string'
 5 5 | 
 
-error[Q000]: singles.py:3:25: [*] Single quotes found but double quotes preferred
+error[Q000]: 3:25: [*] Single quotes found but double quotes preferred
 
+ --> singles.py:3:25
   |
 1 | this_should_be_linted = 'single quote string'
 2 | this_should_be_linted = u'double quote string'

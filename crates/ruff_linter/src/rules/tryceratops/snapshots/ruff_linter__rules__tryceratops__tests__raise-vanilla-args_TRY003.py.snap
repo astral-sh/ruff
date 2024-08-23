@@ -1,8 +1,9 @@
 ---
 source: crates/ruff_linter/src/rules/tryceratops/mod.rs
 ---
-error[TRY003]: TRY003.py:8:15: Avoid specifying long messages outside the exception class
+error[TRY003]: 8:15: Avoid specifying long messages outside the exception class
 
+  --> TRY003.py:8:15
    |
  6 |     a = 1
  7 |     if a == 1:
@@ -11,24 +12,27 @@ error[TRY003]: TRY003.py:8:15: Avoid specifying long messages outside the except
  9 |     elif a == 2:
 10 |         raise CustomException("Short")  # This is acceptable
    |
-error[TRY003]: TRY003.py:34:15: Avoid specifying long messages outside the exception class
+error[TRY003]: 34:15: Avoid specifying long messages outside the exception class
 
+  --> TRY003.py:34:15
    |
 32 | def bad(a):
 33 |     if a % 2 == 0:
 34 |         raise BadArgCantBeEven(f"The argument '{a}' should be even")
    |               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
    |
-error[TRY003]: TRY003.py:39:15: Avoid specifying long messages outside the exception class
+error[TRY003]: 39:15: Avoid specifying long messages outside the exception class
 
+  --> TRY003.py:39:15
    |
 37 | def another_bad(a):
 38 |     if a % 2 == 0:
 39 |         raise BadArgCantBeEven(f"The argument {a} should not be odd.")
    |               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
    |
-error[TRY003]: TRY003.py:44:15: Avoid specifying long messages outside the exception class
+error[TRY003]: 44:15: Avoid specifying long messages outside the exception class
 
+  --> TRY003.py:44:15
    |
 42 | def and_another_bad(a):
 43 |     if a % 2 == 0:

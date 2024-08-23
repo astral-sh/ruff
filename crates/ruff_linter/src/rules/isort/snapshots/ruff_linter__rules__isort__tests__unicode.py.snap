@@ -1,16 +1,17 @@
 ---
 source: crates/ruff_linter/src/rules/isort/mod.rs
 ---
-error[I001]: unicode.py:1:1: [*] Import block is un-sorted or un-formatted
+error[I001]: 1:1: [*] Import block is un-sorted or un-formatted
 
+ --> unicode.py:1:1
   |
 1 | / from astropy.constants import hbar as ℏ
 2 | | from numpy import pi as π
 3 | | import numpy as ℂℇℊℋℌℍℎℐℑℒℓℕℤΩℨKÅℬℭℯℰℱℹℴ
 4 | | import numpy as CƐgHHHhIILlNZΩZKÅBCeEFio
 5 | | 
-6 | | h = 2 * π * ℏ
-  | |_^
+  | |__^
+6 |   h = 2 * π * ℏ
   |
   = help: Organize imports
 ℹ Safe fix

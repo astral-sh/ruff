@@ -1,8 +1,9 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_type_checking/mod.rs
 ---
-error[TCH002]: quote.py:2:24: [*] Move third-party import `pandas.DataFrame` into a type-checking block
+error[TCH002]: 2:24: [*] Move third-party import `pandas.DataFrame` into a type-checking block
 
+ --> quote.py:2:24
   |
 1 | def f():
 2 |     from pandas import DataFrame
@@ -25,8 +26,9 @@ error[TCH002]: quote.py:2:24: [*] Move third-party import `pandas.DataFrame` int
 6 9 | 
 7 10 | 
 
-error[TCH002]: quote.py:9:24: [*] Move third-party import `pandas.DataFrame` into a type-checking block
+error[TCH002]: 9:24: [*] Move third-party import `pandas.DataFrame` into a type-checking block
 
+  --> quote.py:9:24
    |
  8 | def f():
  9 |     from pandas import DataFrame
@@ -55,8 +57,9 @@ error[TCH002]: quote.py:9:24: [*] Move third-party import `pandas.DataFrame` int
 13 16 | 
 14 17 | 
 
-error[TCH002]: quote.py:16:24: Move third-party import `pandas.DataFrame` into a type-checking block
+error[TCH002]: 16:24: Move third-party import `pandas.DataFrame` into a type-checking block
 
+  --> quote.py:16:24
    |
 15 | def f():
 16 |     from pandas import DataFrame
@@ -65,8 +68,9 @@ error[TCH002]: quote.py:16:24: Move third-party import `pandas.DataFrame` into a
 18 |     def baz() -> DataFrame["int"]:
    |
    = help: Move into type-checking block
-error[TCH002]: quote.py:23:22: [*] Move third-party import `pandas` into a type-checking block
+error[TCH002]: 23:22: [*] Move third-party import `pandas` into a type-checking block
 
+  --> quote.py:23:22
    |
 22 | def f():
 23 |     import pandas as pd
@@ -95,8 +99,9 @@ error[TCH002]: quote.py:23:22: [*] Move third-party import `pandas` into a type-
 27 30 | 
 28 31 | 
 
-error[TCH002]: quote.py:30:22: [*] Move third-party import `pandas` into a type-checking block
+error[TCH002]: 30:22: [*] Move third-party import `pandas` into a type-checking block
 
+  --> quote.py:30:22
    |
 29 | def f():
 30 |     import pandas as pd
@@ -125,8 +130,9 @@ error[TCH002]: quote.py:30:22: [*] Move third-party import `pandas` into a type-
 34 37 | 
 35 38 | 
 
-error[TCH002]: quote.py:37:22: [*] Move third-party import `pandas` into a type-checking block
+error[TCH002]: 37:22: [*] Move third-party import `pandas` into a type-checking block
 
+  --> quote.py:37:22
    |
 36 | def f():
 37 |     import pandas as pd
@@ -155,8 +161,9 @@ error[TCH002]: quote.py:37:22: [*] Move third-party import `pandas` into a type-
 41 44 | 
 42 45 | 
 
-error[TCH002]: quote.py:45:24: [*] Move third-party import `pandas.DataFrame` into a type-checking block
+error[TCH002]: 45:24: [*] Move third-party import `pandas.DataFrame` into a type-checking block
 
+  --> quote.py:45:24
    |
 44 | def f():
 45 |     from pandas import DataFrame
@@ -185,8 +192,9 @@ error[TCH002]: quote.py:45:24: [*] Move third-party import `pandas.DataFrame` in
 49 52 | 
 50 53 | 
 
-error[TCH002]: quote.py:54:24: Move third-party import `pandas.DataFrame` into a type-checking block
+error[TCH002]: 54:24: Move third-party import `pandas.DataFrame` into a type-checking block
 
+  --> quote.py:54:24
    |
 52 |     from typing import Literal
 53 | 
@@ -196,8 +204,9 @@ error[TCH002]: quote.py:54:24: Move third-party import `pandas.DataFrame` into a
 56 |     def baz() -> DataFrame[Literal["int"]]:
    |
    = help: Move into type-checking block
-error[TCH002]: quote.py:71:24: [*] Move third-party import `pandas.DataFrame` into a type-checking block
+error[TCH002]: 71:24: [*] Move third-party import `pandas.DataFrame` into a type-checking block
 
+  --> quote.py:71:24
    |
 70 | def f():
 71 |     from pandas import DataFrame, Series
@@ -226,8 +235,9 @@ error[TCH002]: quote.py:71:24: [*] Move third-party import `pandas.DataFrame` in
 75 78 | 
 76 79 | 
 
-error[TCH002]: quote.py:71:35: [*] Move third-party import `pandas.Series` into a type-checking block
+error[TCH002]: 71:35: [*] Move third-party import `pandas.Series` into a type-checking block
 
+  --> quote.py:71:35
    |
 70 | def f():
 71 |     from pandas import DataFrame, Series
@@ -256,8 +266,9 @@ error[TCH002]: quote.py:71:35: [*] Move third-party import `pandas.Series` into 
 75 78 | 
 76 79 | 
 
-error[TCH002]: quote.py:78:24: [*] Move third-party import `pandas.DataFrame` into a type-checking block
+error[TCH002]: 78:24: [*] Move third-party import `pandas.DataFrame` into a type-checking block
 
+  --> quote.py:78:24
    |
 77 | def f():
 78 |     from pandas import DataFrame, Series
@@ -299,8 +310,9 @@ error[TCH002]: quote.py:78:24: [*] Move third-party import `pandas.DataFrame` in
 93 93 | 
 94 94 | 
 
-error[TCH002]: quote.py:78:35: [*] Move third-party import `pandas.Series` into a type-checking block
+error[TCH002]: 78:35: [*] Move third-party import `pandas.Series` into a type-checking block
 
+  --> quote.py:78:35
    |
 77 | def f():
 78 |     from pandas import DataFrame, Series
@@ -342,8 +354,9 @@ error[TCH002]: quote.py:78:35: [*] Move third-party import `pandas.Series` into 
 93 93 | 
 94 94 | 
 
-error[TCH002]: quote.py:96:24: [*] Move third-party import `pandas.DataFrame` into a type-checking block
+error[TCH002]: 96:24: [*] Move third-party import `pandas.DataFrame` into a type-checking block
 
+  --> quote.py:96:24
    |
 95 | def f():
 96 |     from pandas import DataFrame, Series
@@ -370,8 +383,9 @@ error[TCH002]: quote.py:96:24: [*] Move third-party import `pandas.DataFrame` in
     101 |+    def func(self) -> "DataFrame | list[Series]":
 99  102 |         pass
 
-error[TCH002]: quote.py:96:35: [*] Move third-party import `pandas.Series` into a type-checking block
+error[TCH002]: 96:35: [*] Move third-party import `pandas.Series` into a type-checking block
 
+  --> quote.py:96:35
    |
 95 | def f():
 96 |     from pandas import DataFrame, Series

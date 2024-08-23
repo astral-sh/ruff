@@ -1,8 +1,9 @@
 ---
 source: crates/ruff_linter/src/rules/pep8_naming/mod.rs
 ---
-error[N804]: N804.py:30:27: [*] First argument of a class method should be named `cls`
+error[N804]: 30:27: [*] First argument of a class method should be named `cls`
 
+  --> N804.py:30:27
    |
 28 |         ...
 29 | 
@@ -21,8 +22,9 @@ error[N804]: N804.py:30:27: [*] First argument of a class method should be named
 32 32 | 
 33 33 |     @classmethod
 
-error[N804]: N804.py:38:56: [*] First argument of a class method should be named `cls`
+error[N804]: 38:56: [*] First argument of a class method should be named `cls`
 
+  --> N804.py:38:56
    |
 37 |     @classmethod
 38 |     def bad_class_method_with_positional_only_argument(self, x, /, other):
@@ -40,8 +42,9 @@ error[N804]: N804.py:38:56: [*] First argument of a class method should be named
 40 40 | 
 41 41 | 
 
-error[N804]: N804.py:43:20: [*] First argument of a class method should be named `cls`
+error[N804]: 43:20: [*] First argument of a class method should be named `cls`
 
+  --> N804.py:43:20
    |
 42 | class MetaClass(ABCMeta):
 43 |     def bad_method(self):
@@ -59,8 +62,9 @@ error[N804]: N804.py:43:20: [*] First argument of a class method should be named
 45 45 | 
 46 46 |     def good_method(cls):
 
-error[N804]: N804.py:54:25: First argument of a class method should be named `cls`
+error[N804]: 54:25: First argument of a class method should be named `cls`
 
+  --> N804.py:54:25
    |
 53 | class ClsInArgsClass(ABCMeta):
 54 |     def cls_as_argument(this, cls):
@@ -68,8 +72,9 @@ error[N804]: N804.py:54:25: First argument of a class method should be named `cl
 55 |         pass
    |
    = help: Rename `this` to `cls`
-error[N804]: N804.py:57:34: First argument of a class method should be named `cls`
+error[N804]: 57:34: First argument of a class method should be named `cls`
 
+  --> N804.py:57:34
    |
 55 |         pass
 56 | 
@@ -78,8 +83,9 @@ error[N804]: N804.py:57:34: First argument of a class method should be named `cl
 58 |         pass
    |
    = help: Rename `this` to `cls`
-error[N804]: N804.py:60:33: First argument of a class method should be named `cls`
+error[N804]: 60:33: First argument of a class method should be named `cls`
 
+  --> N804.py:60:33
    |
 58 |         pass
 59 | 
@@ -88,8 +94,9 @@ error[N804]: N804.py:60:33: First argument of a class method should be named `cl
 61 |         pass
    |
    = help: Rename `this` to `cls`
-error[N804]: N804.py:63:23: First argument of a class method should be named `cls`
+error[N804]: 63:23: First argument of a class method should be named `cls`
 
+  --> N804.py:63:23
    |
 61 |         pass
 62 | 
@@ -98,8 +105,9 @@ error[N804]: N804.py:63:23: First argument of a class method should be named `cl
 64 |         pass
    |
    = help: Rename `this` to `cls`
-error[N804]: N804.py:66:23: First argument of a class method should be named `cls`
+error[N804]: 66:23: First argument of a class method should be named `cls`
 
+  --> N804.py:66:23
    |
 64 |         pass
 65 | 
@@ -108,8 +116,9 @@ error[N804]: N804.py:66:23: First argument of a class method should be named `cl
 67 |         pass
    |
    = help: Rename `this` to `cls`
-error[N804]: N804.py:70:20: [*] First argument of a class method should be named `cls`
+error[N804]: 70:20: [*] First argument of a class method should be named `cls`
 
+  --> N804.py:70:20
    |
 69 | class RenamingInMethodBodyClass(ABCMeta):
 70 |     def bad_method(this):
@@ -132,8 +141,9 @@ error[N804]: N804.py:70:20: [*] First argument of a class method should be named
 74 74 |     def bad_method(this):
 75 75 |         self = this
 
-error[N804]: N804.py:74:20: [*] First argument of a class method should be named `cls`
+error[N804]: 74:20: [*] First argument of a class method should be named `cls`
 
+  --> N804.py:74:20
    |
 72 |         this
 73 | 

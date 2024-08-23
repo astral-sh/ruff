@@ -1,8 +1,9 @@
 ---
 source: crates/ruff_linter/src/rules/pycodestyle/mod.rs
 ---
-error[E303]: E303_first_line_expression.py:5:1: [*] Too many blank lines (3)
+error[E303]: 5:1: [*] Too many blank lines (3)
 
+ --> E303_first_line_expression.py:5:1
   |
 5 | def fn():
   | ^^^

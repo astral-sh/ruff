@@ -1,8 +1,9 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_bugbear/mod.rs
 ---
-error[B026]: B026.py:16:16: Star-arg unpacking after a keyword argument is strongly discouraged
+error[B026]: 16:16: Star-arg unpacking after a keyword argument is strongly discouraged
 
+  --> B026.py:16:16
    |
 14 | foo("bar", baz="baz", bam="bam")
 15 | foo(bar="bar", baz="baz", bam="bam")
@@ -11,8 +12,9 @@ error[B026]: B026.py:16:16: Star-arg unpacking after a keyword argument is stron
 17 | foo(bam="bam", *bar_baz)
 18 | foo(baz="baz", bam="bam", *["bar"])
    |
-error[B026]: B026.py:17:16: Star-arg unpacking after a keyword argument is strongly discouraged
+error[B026]: 17:16: Star-arg unpacking after a keyword argument is strongly discouraged
 
+  --> B026.py:17:16
    |
 15 | foo(bar="bar", baz="baz", bam="bam")
 16 | foo(bam="bam", *["bar", "baz"])
@@ -21,8 +23,9 @@ error[B026]: B026.py:17:16: Star-arg unpacking after a keyword argument is stron
 18 | foo(baz="baz", bam="bam", *["bar"])
 19 | foo(bar="bar", baz="baz", bam="bam", *[])
    |
-error[B026]: B026.py:18:27: Star-arg unpacking after a keyword argument is strongly discouraged
+error[B026]: 18:27: Star-arg unpacking after a keyword argument is strongly discouraged
 
+  --> B026.py:18:27
    |
 16 | foo(bam="bam", *["bar", "baz"])
 17 | foo(bam="bam", *bar_baz)
@@ -31,8 +34,9 @@ error[B026]: B026.py:18:27: Star-arg unpacking after a keyword argument is stron
 19 | foo(bar="bar", baz="baz", bam="bam", *[])
 20 | foo(bam="bam", *["bar"], *["baz"])
    |
-error[B026]: B026.py:19:38: Star-arg unpacking after a keyword argument is strongly discouraged
+error[B026]: 19:38: Star-arg unpacking after a keyword argument is strongly discouraged
 
+  --> B026.py:19:38
    |
 17 | foo(bam="bam", *bar_baz)
 18 | foo(baz="baz", bam="bam", *["bar"])
@@ -41,8 +45,9 @@ error[B026]: B026.py:19:38: Star-arg unpacking after a keyword argument is stron
 20 | foo(bam="bam", *["bar"], *["baz"])
 21 | foo(*["bar"], bam="bam", *["baz"])
    |
-error[B026]: B026.py:20:16: Star-arg unpacking after a keyword argument is strongly discouraged
+error[B026]: 20:16: Star-arg unpacking after a keyword argument is strongly discouraged
 
+  --> B026.py:20:16
    |
 18 | foo(baz="baz", bam="bam", *["bar"])
 19 | foo(bar="bar", baz="baz", bam="bam", *[])
@@ -50,8 +55,9 @@ error[B026]: B026.py:20:16: Star-arg unpacking after a keyword argument is stron
    |                ^^^^^^^^
 21 | foo(*["bar"], bam="bam", *["baz"])
    |
-error[B026]: B026.py:20:26: Star-arg unpacking after a keyword argument is strongly discouraged
+error[B026]: 20:26: Star-arg unpacking after a keyword argument is strongly discouraged
 
+  --> B026.py:20:26
    |
 18 | foo(baz="baz", bam="bam", *["bar"])
 19 | foo(bar="bar", baz="baz", bam="bam", *[])
@@ -59,8 +65,9 @@ error[B026]: B026.py:20:26: Star-arg unpacking after a keyword argument is stron
    |                          ^^^^^^^^
 21 | foo(*["bar"], bam="bam", *["baz"])
    |
-error[B026]: B026.py:21:26: Star-arg unpacking after a keyword argument is strongly discouraged
+error[B026]: 21:26: Star-arg unpacking after a keyword argument is strongly discouraged
 
+  --> B026.py:21:26
    |
 19 | foo(bar="bar", baz="baz", bam="bam", *[])
 20 | foo(bam="bam", *["bar"], *["baz"])

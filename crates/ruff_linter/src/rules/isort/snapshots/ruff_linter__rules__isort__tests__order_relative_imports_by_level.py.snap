@@ -1,13 +1,15 @@
 ---
 source: crates/ruff_linter/src/rules/isort/mod.rs
 ---
-error[I001]: order_relative_imports_by_level.py:1:1: [*] Import block is un-sorted or un-formatted
+error[I001]: 1:1: [*] Import block is un-sorted or un-formatted
 
+ --> order_relative_imports_by_level.py:1:1
   |
 1 | / from .a import a
 2 | | from ..a import a
 3 | | from ..b import a
 4 | | from .b import a
+  | |_________________^
   |
   = help: Organize imports
 ℹ Safe fix

@@ -1,8 +1,9 @@
 ---
 source: crates/ruff_linter/src/rules/pandas_vet/mod.rs
 ---
-error[PD012]: pandas_use_of_dot_read_table.py:4:6: Use `.read_csv` instead of `.read_table` to read CSV files
+error[PD012]: 4:6: Use `.read_csv` instead of `.read_table` to read CSV files
 
+ --> pandas_use_of_dot_read_table.py:4:6
   |
 3 | # Errors.
 4 | df = pd.read_table("data.csv", sep=",")
@@ -10,8 +11,9 @@ error[PD012]: pandas_use_of_dot_read_table.py:4:6: Use `.read_csv` instead of `.
 5 | df = pd.read_table("data.csv", sep=",", header=0)
 6 | filename = "data.csv"
   |
-error[PD012]: pandas_use_of_dot_read_table.py:5:6: Use `.read_csv` instead of `.read_table` to read CSV files
+error[PD012]: 5:6: Use `.read_csv` instead of `.read_table` to read CSV files
 
+ --> pandas_use_of_dot_read_table.py:5:6
   |
 3 | # Errors.
 4 | df = pd.read_table("data.csv", sep=",")
@@ -20,8 +22,9 @@ error[PD012]: pandas_use_of_dot_read_table.py:5:6: Use `.read_csv` instead of `.
 6 | filename = "data.csv"
 7 | df = pd.read_table(filename, sep=",")
   |
-error[PD012]: pandas_use_of_dot_read_table.py:7:6: Use `.read_csv` instead of `.read_table` to read CSV files
+error[PD012]: 7:6: Use `.read_csv` instead of `.read_table` to read CSV files
 
+ --> pandas_use_of_dot_read_table.py:7:6
   |
 5 | df = pd.read_table("data.csv", sep=",", header=0)
 6 | filename = "data.csv"
@@ -29,8 +32,9 @@ error[PD012]: pandas_use_of_dot_read_table.py:7:6: Use `.read_csv` instead of `.
   |      ^^^^^^^^^^^^^
 8 | df = pd.read_table(filename, sep=",", header=0)
   |
-error[PD012]: pandas_use_of_dot_read_table.py:8:6: Use `.read_csv` instead of `.read_table` to read CSV files
+error[PD012]: 8:6: Use `.read_csv` instead of `.read_table` to read CSV files
 
+  --> pandas_use_of_dot_read_table.py:8:6
    |
  6 | filename = "data.csv"
  7 | df = pd.read_table(filename, sep=",")

@@ -1,8 +1,9 @@
 ---
 source: crates/ruff_linter/src/rules/tryceratops/mod.rs
 ---
-error[TRY301]: TRY301.py:14:13: Abstract `raise` to an inner function
+error[TRY301]: 14:13: Abstract `raise` to an inner function
 
+  --> TRY301.py:14:13
    |
 12 |         a = process()
 13 |         if not a:
@@ -11,8 +12,9 @@ error[TRY301]: TRY301.py:14:13: Abstract `raise` to an inner function
 15 | 
 16 |         raise MyException(a)
    |
-error[TRY301]: TRY301.py:16:9: Abstract `raise` to an inner function
+error[TRY301]: 16:9: Abstract `raise` to an inner function
 
+  --> TRY301.py:16:9
    |
 14 |             raise MyException(a)
 15 | 
@@ -21,8 +23,9 @@ error[TRY301]: TRY301.py:16:9: Abstract `raise` to an inner function
 17 | 
 18 |         try:
    |
-error[TRY301]: TRY301.py:21:17: Abstract `raise` to an inner function
+error[TRY301]: 21:17: Abstract `raise` to an inner function
 
+  --> TRY301.py:21:17
    |
 19 |             b = process()
 20 |             if not b:
@@ -31,8 +34,9 @@ error[TRY301]: TRY301.py:21:17: Abstract `raise` to an inner function
 22 |         except Exception:
 23 |             logger.exception("something failed")
    |
-error[TRY301]: TRY301.py:32:13: Abstract `raise` to an inner function
+error[TRY301]: 32:13: Abstract `raise` to an inner function
 
+  --> TRY301.py:32:13
    |
 30 |         a = process()
 31 |         if not a:
@@ -41,8 +45,9 @@ error[TRY301]: TRY301.py:32:13: Abstract `raise` to an inner function
 33 | 
 34 |         raise MyException(a)
    |
-error[TRY301]: TRY301.py:34:9: Abstract `raise` to an inner function
+error[TRY301]: 34:9: Abstract `raise` to an inner function
 
+  --> TRY301.py:34:9
    |
 32 |             raise MyException(a)
 33 | 
@@ -51,8 +56,9 @@ error[TRY301]: TRY301.py:34:9: Abstract `raise` to an inner function
 35 | 
 36 |         try:
    |
-error[TRY301]: TRY301.py:39:17: Abstract `raise` to an inner function
+error[TRY301]: 39:17: Abstract `raise` to an inner function
 
+  --> TRY301.py:39:17
    |
 37 |             b = process()
 38 |             if not b:

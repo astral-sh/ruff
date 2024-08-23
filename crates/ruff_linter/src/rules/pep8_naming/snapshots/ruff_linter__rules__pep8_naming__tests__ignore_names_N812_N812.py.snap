@@ -1,8 +1,9 @@
 ---
 source: crates/ruff_linter/src/rules/pep8_naming/mod.rs
 ---
-error[N812]: N812.py:2:8: Lowercase `stillbad` imported as non-lowercase `stillBad`
+error[N812]: 2:8: Lowercase `stillbad` imported as non-lowercase `stillBad`
 
+ --> N812.py:2:8
   |
 1 | import mod.badallowed as badAllowed
 2 | import mod.stillbad as stillBad
@@ -10,8 +11,9 @@ error[N812]: N812.py:2:8: Lowercase `stillbad` imported as non-lowercase `stillB
 3 | 
 4 | from mod import badallowed as BadAllowed
   |
-error[N812]: N812.py:5:17: Lowercase `stillbad` imported as non-lowercase `StillBad`
+error[N812]: 5:17: Lowercase `stillbad` imported as non-lowercase `StillBad`
 
+ --> N812.py:5:17
   |
 4 | from mod import badallowed as BadAllowed
 5 | from mod import stillbad as StillBad

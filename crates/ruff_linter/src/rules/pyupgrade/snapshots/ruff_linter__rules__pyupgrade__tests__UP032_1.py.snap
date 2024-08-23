@@ -1,8 +1,9 @@
 ---
 source: crates/ruff_linter/src/rules/pyupgrade/mod.rs
 ---
-error[UP032]: UP032_1.py:1:1: [*] Use f-string instead of `format` call
+error[UP032]: 1:1: [*] Use f-string instead of `format` call
 
+ --> UP032_1.py:1:1
   |
 1 | "{} {}".format(a, b)  # Intentionally at start-of-file, to ensure graceful handling.
   | ^^^^^^^^^^^^^^^^^^^^

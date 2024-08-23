@@ -1,8 +1,9 @@
 ---
 source: crates/ruff_linter/src/rules/ruff/mod.rs
 ---
-error[RUF005]: RUF005.py:4:1: Consider `[*foo]` instead of concatenation
+error[RUF005]: 4:1: Consider `[*foo]` instead of concatenation
 
+ --> RUF005.py:3:4
   |
 2 |   # Non-fixable Errors.
 3 |   ###
@@ -13,8 +14,9 @@ error[RUF005]: RUF005.py:4:1: Consider `[*foo]` instead of concatenation
 7 |   ]
   |
   = help: Replace with `[*foo]`
-error[RUF005]: RUF005.py:6:1: Consider `[*foo]` instead of concatenation
+error[RUF005]: 6:1: Consider `[*foo]` instead of concatenation
 
+ --> RUF005.py:5:2
   |
 4 |   foo + [  # This will be preserved.
 5 |   ]
@@ -25,8 +27,9 @@ error[RUF005]: RUF005.py:6:1: Consider `[*foo]` instead of concatenation
 9 |       # The order
   |
   = help: Replace with `[*foo]`
-error[RUF005]: RUF005.py:16:10: Consider `[*first, 4, 5, 6]` instead of concatenation
+error[RUF005]: 16:10: Consider `[*first, 4, 5, 6]` instead of concatenation
 
+  --> RUF005.py:16:10
    |
 14 |       # to preserve
 15 |   ]
@@ -42,8 +45,9 @@ error[RUF005]: RUF005.py:16:10: Consider `[*first, 4, 5, 6]` instead of concaten
    | |_^
    |
    = help: Replace with `[*first, 4, 5, 6]`
-error[RUF005]: RUF005.py:39:7: [*] Consider `[1, 2, 3, *foo]` instead of concatenation
+error[RUF005]: 39:7: [*] Consider `[1, 2, 3, *foo]` instead of concatenation
 
+  --> RUF005.py:39:7
    |
 38 | foo = [4, 5, 6]
 39 | bar = [1, 2, 3] + foo
@@ -62,8 +66,9 @@ error[RUF005]: RUF005.py:39:7: [*] Consider `[1, 2, 3, *foo]` instead of concate
 41 41 | quux = (7, 8, 9) + zoob
 42 42 | spam = quux + (10, 11, 12)
 
-error[RUF005]: RUF005.py:41:8: [*] Consider `(7, 8, 9, *zoob)` instead of concatenation
+error[RUF005]: 41:8: [*] Consider `(7, 8, 9, *zoob)` instead of concatenation
 
+  --> RUF005.py:41:8
    |
 39 | bar = [1, 2, 3] + foo
 40 | zoob = tuple(bar)
@@ -83,8 +88,9 @@ error[RUF005]: RUF005.py:41:8: [*] Consider `(7, 8, 9, *zoob)` instead of concat
 43 43 | spom = list(spam)
 44 44 | eggs = spom + [13, 14, 15]
 
-error[RUF005]: RUF005.py:42:8: [*] Consider `(*quux, 10, 11, 12)` instead of concatenation
+error[RUF005]: 42:8: [*] Consider `(*quux, 10, 11, 12)` instead of concatenation
 
+  --> RUF005.py:42:8
    |
 40 | zoob = tuple(bar)
 41 | quux = (7, 8, 9) + zoob
@@ -104,8 +110,9 @@ error[RUF005]: RUF005.py:42:8: [*] Consider `(*quux, 10, 11, 12)` instead of con
 44 44 | eggs = spom + [13, 14, 15]
 45 45 | elatement = ("we all say",) + yay()
 
-error[RUF005]: RUF005.py:44:8: [*] Consider `[*spom, 13, 14, 15]` instead of concatenation
+error[RUF005]: 44:8: [*] Consider `[*spom, 13, 14, 15]` instead of concatenation
 
+  --> RUF005.py:44:8
    |
 42 | spam = quux + (10, 11, 12)
 43 | spom = list(spam)
@@ -125,8 +132,9 @@ error[RUF005]: RUF005.py:44:8: [*] Consider `[*spom, 13, 14, 15]` instead of con
 46 46 | excitement = ("we all think",) + Fun().yay()
 47 47 | astonishment = ("we all feel",) + Fun.words
 
-error[RUF005]: RUF005.py:45:13: [*] Consider `("we all say", *yay())` instead of concatenation
+error[RUF005]: 45:13: [*] Consider `("we all say", *yay())` instead of concatenation
 
+  --> RUF005.py:45:13
    |
 43 | spom = list(spam)
 44 | eggs = spom + [13, 14, 15]
@@ -146,8 +154,9 @@ error[RUF005]: RUF005.py:45:13: [*] Consider `("we all say", *yay())` instead of
 47 47 | astonishment = ("we all feel",) + Fun.words
 48 48 | 
 
-error[RUF005]: RUF005.py:46:14: [*] Consider `("we all think", *Fun().yay())` instead of concatenation
+error[RUF005]: 46:14: [*] Consider `("we all think", *Fun().yay())` instead of concatenation
 
+  --> RUF005.py:46:14
    |
 44 | eggs = spom + [13, 14, 15]
 45 | elatement = ("we all say",) + yay()
@@ -166,8 +175,9 @@ error[RUF005]: RUF005.py:46:14: [*] Consider `("we all think", *Fun().yay())` in
 48 48 | 
 49 49 | chain = ["a", "b", "c"] + eggs + list(("yes", "no", "pants") + zoob)
 
-error[RUF005]: RUF005.py:47:16: [*] Consider `("we all feel", *Fun.words)` instead of concatenation
+error[RUF005]: 47:16: [*] Consider `("we all feel", *Fun.words)` instead of concatenation
 
+  --> RUF005.py:47:16
    |
 45 | elatement = ("we all say",) + yay()
 46 | excitement = ("we all think",) + Fun().yay()
@@ -187,8 +197,9 @@ error[RUF005]: RUF005.py:47:16: [*] Consider `("we all feel", *Fun.words)` inste
 49 49 | chain = ["a", "b", "c"] + eggs + list(("yes", "no", "pants") + zoob)
 50 50 | 
 
-error[RUF005]: RUF005.py:49:9: [*] Consider iterable unpacking instead of concatenation
+error[RUF005]: 49:9: [*] Consider iterable unpacking instead of concatenation
 
+  --> RUF005.py:49:9
    |
 47 | astonishment = ("we all feel",) + Fun.words
 48 | 
@@ -208,8 +219,9 @@ error[RUF005]: RUF005.py:49:9: [*] Consider iterable unpacking instead of concat
 51 51 | baz = () + zoob
 52 52 | 
 
-error[RUF005]: RUF005.py:49:39: [*] Consider `("yes", "no", "pants", *zoob)` instead of concatenation
+error[RUF005]: 49:39: [*] Consider `("yes", "no", "pants", *zoob)` instead of concatenation
 
+  --> RUF005.py:49:39
    |
 47 | astonishment = ("we all feel",) + Fun.words
 48 | 
@@ -229,8 +241,9 @@ error[RUF005]: RUF005.py:49:39: [*] Consider `("yes", "no", "pants", *zoob)` ins
 51 51 | baz = () + zoob
 52 52 | 
 
-error[RUF005]: RUF005.py:51:7: [*] Consider `(*zoob,)` instead of concatenation
+error[RUF005]: 51:7: [*] Consider `(*zoob,)` instead of concatenation
 
+  --> RUF005.py:51:7
    |
 49 | chain = ["a", "b", "c"] + eggs + list(("yes", "no", "pants") + zoob)
 50 | 
@@ -250,8 +263,9 @@ error[RUF005]: RUF005.py:51:7: [*] Consider `(*zoob,)` instead of concatenation
 53 53 | [] + foo + [
 54 54 | ]
 
-error[RUF005]: RUF005.py:53:1: [*] Consider `[*foo]` instead of concatenation
+error[RUF005]: 53:1: [*] Consider `[*foo]` instead of concatenation
 
+  --> RUF005.py:52:1
    |
 51 |   baz = () + zoob
 52 |   
@@ -273,8 +287,9 @@ error[RUF005]: RUF005.py:53:1: [*] Consider `[*foo]` instead of concatenation
 56 55 | pylint_call = [sys.executable, "-m", "pylint"] + args + [path]
 57 56 | pylint_call_tuple = (sys.executable, "-m", "pylint") + args + (path, path2)
 
-error[RUF005]: RUF005.py:56:15: [*] Consider `[sys.executable, "-m", "pylint", *args, path]` instead of concatenation
+error[RUF005]: 56:15: [*] Consider `[sys.executable, "-m", "pylint", *args, path]` instead of concatenation
 
+  --> RUF005.py:56:15
    |
 54 | ]
 55 | 
@@ -294,8 +309,9 @@ error[RUF005]: RUF005.py:56:15: [*] Consider `[sys.executable, "-m", "pylint", *
 58 58 | b = a + [2, 3] + [4]
 59 59 | 
 
-error[RUF005]: RUF005.py:57:21: [*] Consider iterable unpacking instead of concatenation
+error[RUF005]: 57:21: [*] Consider iterable unpacking instead of concatenation
 
+  --> RUF005.py:57:21
    |
 56 | pylint_call = [sys.executable, "-m", "pylint"] + args + [path]
 57 | pylint_call_tuple = (sys.executable, "-m", "pylint") + args + (path, path2)
@@ -313,8 +329,9 @@ error[RUF005]: RUF005.py:57:21: [*] Consider iterable unpacking instead of conca
 59 59 | 
 60 60 | # Uses the non-preferred quote style, which should be retained.
 
-error[RUF005]: RUF005.py:58:5: [*] Consider `[*a, 2, 3, 4]` instead of concatenation
+error[RUF005]: 58:5: [*] Consider `[*a, 2, 3, 4]` instead of concatenation
 
+  --> RUF005.py:58:5
    |
 56 | pylint_call = [sys.executable, "-m", "pylint"] + args + [path]
 57 | pylint_call_tuple = (sys.executable, "-m", "pylint") + args + (path, path2)
@@ -334,8 +351,9 @@ error[RUF005]: RUF005.py:58:5: [*] Consider `[*a, 2, 3, 4]` instead of concatena
 60 60 | # Uses the non-preferred quote style, which should be retained.
 61 61 | f"{a() + ['b']}"
 
-error[RUF005]: RUF005.py:61:4: [*] Consider `[*a(), 'b']` instead of concatenation
+error[RUF005]: 61:4: [*] Consider `[*a(), 'b']` instead of concatenation
 
+  --> RUF005.py:61:4
    |
 60 | # Uses the non-preferred quote style, which should be retained.
 61 | f"{a() + ['b']}"

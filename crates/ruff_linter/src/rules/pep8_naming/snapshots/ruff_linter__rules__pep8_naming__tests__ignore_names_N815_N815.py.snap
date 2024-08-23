@@ -1,8 +1,9 @@
 ---
 source: crates/ruff_linter/src/rules/pep8_naming/mod.rs
 ---
-error[N815]: N815.py:3:5: Variable `stillBad` in class scope should not be mixedCase
+error[N815]: 3:5: Variable `stillBad` in class scope should not be mixedCase
 
+ --> N815.py:3:5
   |
 1 | class C:
 2 |     badAllowed = 0
@@ -11,8 +12,9 @@ error[N815]: N815.py:3:5: Variable `stillBad` in class scope should not be mixed
 4 | 
 5 |     _badAllowed = 0
   |
-error[N815]: N815.py:6:5: Variable `_stillBad` in class scope should not be mixedCase
+error[N815]: 6:5: Variable `_stillBad` in class scope should not be mixedCase
 
+ --> N815.py:6:5
   |
 5 |     _badAllowed = 0
 6 |     _stillBad = 0
@@ -20,8 +22,9 @@ error[N815]: N815.py:6:5: Variable `_stillBad` in class scope should not be mixe
 7 | 
 8 |     bad_Allowed = 0
   |
-error[N815]: N815.py:9:5: Variable `still_Bad` in class scope should not be mixedCase
+error[N815]: 9:5: Variable `still_Bad` in class scope should not be mixedCase
 
+  --> N815.py:9:5
    |
  8 |     bad_Allowed = 0
  9 |     still_Bad = 0
@@ -29,8 +32,9 @@ error[N815]: N815.py:9:5: Variable `still_Bad` in class scope should not be mixe
 10 | 
 11 | class D(TypedDict):
    |
-error[N815]: N815.py:13:5: Variable `stillBad` in class scope should not be mixedCase
+error[N815]: 13:5: Variable `stillBad` in class scope should not be mixedCase
 
+  --> N815.py:13:5
    |
 11 | class D(TypedDict):
 12 |     badAllowed: bool
@@ -39,8 +43,9 @@ error[N815]: N815.py:13:5: Variable `stillBad` in class scope should not be mixe
 14 | 
 15 |     _badAllowed: list
    |
-error[N815]: N815.py:16:5: Variable `_stillBad` in class scope should not be mixedCase
+error[N815]: 16:5: Variable `_stillBad` in class scope should not be mixedCase
 
+  --> N815.py:16:5
    |
 15 |     _badAllowed: list
 16 |     _stillBad: list
@@ -48,8 +53,9 @@ error[N815]: N815.py:16:5: Variable `_stillBad` in class scope should not be mix
 17 | 
 18 |     bad_Allowed: set
    |
-error[N815]: N815.py:19:5: Variable `still_Bad` in class scope should not be mixedCase
+error[N815]: 19:5: Variable `still_Bad` in class scope should not be mixedCase
 
+  --> N815.py:19:5
    |
 18 |     bad_Allowed: set
 19 |     still_Bad: set

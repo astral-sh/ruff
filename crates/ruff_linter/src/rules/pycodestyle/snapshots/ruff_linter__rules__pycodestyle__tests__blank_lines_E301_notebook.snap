@@ -1,8 +1,9 @@
 ---
 source: crates/ruff_linter/src/rules/pycodestyle/mod.rs
 ---
-error[E301]: E30.ipynb:13:5: [*] Expected 1 blank line, found 0
+error[E301]: 13:5: [*] Expected 1 blank line, found 0
 
+  --> E30.ipynb:13:5
    |
 11 |     def method(cls) -> None:
 12 |         pass

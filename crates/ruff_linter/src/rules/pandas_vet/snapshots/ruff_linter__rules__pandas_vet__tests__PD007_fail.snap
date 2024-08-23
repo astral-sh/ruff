@@ -1,8 +1,9 @@
 ---
 source: crates/ruff_linter/src/rules/pandas_vet/mod.rs
 ---
-error[PD007]: <filename>:4:5: `.ix` is deprecated; use more explicit `.loc` or `.iloc`
+error[PD007]: 4:5: `.ix` is deprecated; use more explicit `.loc` or `.iloc`
 
+ --> <filename>:4:5
   |
 2 | import pandas as pd
 3 | x = pd.DataFrame()

@@ -1,8 +1,9 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_bandit/mod.rs
 ---
-error[S108]: S108.py:5:11: Probable insecure usage of temporary file or directory: "/tmp/abc"
+error[S108]: 5:11: Probable insecure usage of temporary file or directory: "/tmp/abc"
 
+ --> S108.py:5:11
   |
 3 |     f.write("def")
 4 | 
@@ -10,8 +11,9 @@ error[S108]: S108.py:5:11: Probable insecure usage of temporary file or director
   |           ^^^^^^^^^^
 6 |     f.write("def")
   |
-error[S108]: S108.py:8:13: Probable insecure usage of temporary file or directory: "/tmp/abc"
+error[S108]: 8:13: Probable insecure usage of temporary file or directory: "/tmp/abc"
 
+ --> S108.py:8:13
   |
 6 |     f.write("def")
 7 | 
@@ -19,8 +21,9 @@ error[S108]: S108.py:8:13: Probable insecure usage of temporary file or director
   |             ^^^^^^^^
 9 |     f.write("def")
   |
-error[S108]: S108.py:11:11: Probable insecure usage of temporary file or directory: "/var/tmp/123"
+error[S108]: 11:11: Probable insecure usage of temporary file or directory: "/var/tmp/123"
 
+  --> S108.py:11:11
    |
  9 |     f.write("def")
 10 | 
@@ -28,8 +31,9 @@ error[S108]: S108.py:11:11: Probable insecure usage of temporary file or directo
    |           ^^^^^^^^^^^^^^
 12 |     f.write("def")
    |
-error[S108]: S108.py:14:11: Probable insecure usage of temporary file or directory: "/dev/shm/unit/test"
+error[S108]: 14:11: Probable insecure usage of temporary file or directory: "/dev/shm/unit/test"
 
+  --> S108.py:14:11
    |
 12 |     f.write("def")
 13 | 
@@ -37,24 +41,27 @@ error[S108]: S108.py:14:11: Probable insecure usage of temporary file or directo
    |           ^^^^^^^^^^^^^^^^^^^^
 15 |     f.write("def")
    |
-error[S108]: S108.py:18:11: Probable insecure usage of temporary file or directory: "/foo/bar"
+error[S108]: 18:11: Probable insecure usage of temporary file or directory: "/foo/bar"
 
+  --> S108.py:18:11
    |
 17 | # not ok by config
 18 | with open("/foo/bar", "w") as f:
    |           ^^^^^^^^^^
 19 |     f.write("def")
    |
-error[S108]: S108.py:22:11: Probable insecure usage of temporary file or directory: "/tmp/abc"
+error[S108]: 22:11: Probable insecure usage of temporary file or directory: "/tmp/abc"
 
+  --> S108.py:22:11
    |
 21 | # Implicit string concatenation
 22 | with open("/tmp/" "abc", "w") as f:
    |           ^^^^^^^^^^^^^
 23 |     f.write("def")
    |
-error[S108]: S108.py:25:11: Probable insecure usage of temporary file or directory: "/tmp/abc"
+error[S108]: 25:11: Probable insecure usage of temporary file or directory: "/tmp/abc"
 
+  --> S108.py:25:11
    |
 23 |     f.write("def")
 24 | 
@@ -62,8 +69,9 @@ error[S108]: S108.py:25:11: Probable insecure usage of temporary file or directo
    |           ^^^^^^^^^^
 26 |     f.write("def")
    |
-error[S108]: S108.py:25:24: Probable insecure usage of temporary file or directory: "/tmp/abc"
+error[S108]: 25:24: Probable insecure usage of temporary file or directory: "/tmp/abc"
 
+  --> S108.py:25:24
    |
 23 |     f.write("def")
 24 | 

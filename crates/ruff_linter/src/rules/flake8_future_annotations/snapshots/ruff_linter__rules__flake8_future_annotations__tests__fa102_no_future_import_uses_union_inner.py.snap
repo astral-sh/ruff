@@ -1,8 +1,9 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_future_annotations/mod.rs
 ---
-error[FA102]: no_future_import_uses_union_inner.py:6:14: [*] Missing `from __future__ import annotations`, but uses PEP 585 collection
+error[FA102]: 6:14: [*] Missing `from __future__ import annotations`, but uses PEP 585 collection
 
+ --> no_future_import_uses_union_inner.py:6:14
   |
 6 | def hello(y: dict[str | None, int]) -> None:
   |              ^^^^^^^^^^^^^^^^^^^^^
@@ -16,8 +17,9 @@ error[FA102]: no_future_import_uses_union_inner.py:6:14: [*] Missing `from __fut
 2 3 |     a_list: list[str | None] = []
 3 4 |     a_list.append("hello")
 
-error[FA102]: no_future_import_uses_union_inner.py:6:19: [*] Missing `from __future__ import annotations`, but uses PEP 604 union
+error[FA102]: 6:19: [*] Missing `from __future__ import annotations`, but uses PEP 604 union
 
+ --> no_future_import_uses_union_inner.py:6:19
   |
 6 | def hello(y: dict[str | None, int]) -> None:
   |                   ^^^^^^^^^^

@@ -1,8 +1,9 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_import_conventions/mod.rs
 ---
-error[ICN001]: custom.py:3:8: `altair` should be imported as `alt`
+error[ICN001]: 3:8: `altair` should be imported as `alt`
 
+ --> custom.py:3:8
   |
 1 | import math  # not checked
 2 | 
@@ -12,8 +13,9 @@ error[ICN001]: custom.py:3:8: `altair` should be imported as `alt`
 5 | import dask.dataframe  # unconventional
   |
   = help: Alias `altair` to `alt`
-error[ICN001]: custom.py:4:8: `dask.array` should be imported as `da`
+error[ICN001]: 4:8: `dask.array` should be imported as `da`
 
+ --> custom.py:4:8
   |
 3 | import altair  # unconventional
 4 | import dask.array  # unconventional
@@ -22,8 +24,9 @@ error[ICN001]: custom.py:4:8: `dask.array` should be imported as `da`
 6 | import matplotlib.pyplot  # unconventional
   |
   = help: Alias `dask.array` to `da`
-error[ICN001]: custom.py:5:8: `dask.dataframe` should be imported as `dd`
+error[ICN001]: 5:8: `dask.dataframe` should be imported as `dd`
 
+ --> custom.py:5:8
   |
 3 | import altair  # unconventional
 4 | import dask.array  # unconventional
@@ -33,8 +36,9 @@ error[ICN001]: custom.py:5:8: `dask.dataframe` should be imported as `dd`
 7 | import numpy  # unconventional
   |
   = help: Alias `dask.dataframe` to `dd`
-error[ICN001]: custom.py:6:8: `matplotlib.pyplot` should be imported as `plt`
+error[ICN001]: 6:8: `matplotlib.pyplot` should be imported as `plt`
 
+ --> custom.py:6:8
   |
 4 | import dask.array  # unconventional
 5 | import dask.dataframe  # unconventional
@@ -44,8 +48,9 @@ error[ICN001]: custom.py:6:8: `matplotlib.pyplot` should be imported as `plt`
 8 | import pandas  # unconventional
   |
   = help: Alias `matplotlib.pyplot` to `plt`
-error[ICN001]: custom.py:7:8: `numpy` should be imported as `np`
+error[ICN001]: 7:8: `numpy` should be imported as `np`
 
+ --> custom.py:7:8
   |
 5 | import dask.dataframe  # unconventional
 6 | import matplotlib.pyplot  # unconventional
@@ -55,8 +60,9 @@ error[ICN001]: custom.py:7:8: `numpy` should be imported as `np`
 9 | import seaborn  # unconventional
   |
   = help: Alias `numpy` to `np`
-error[ICN001]: custom.py:8:8: `pandas` should be imported as `pd`
+error[ICN001]: 8:8: `pandas` should be imported as `pd`
 
+  --> custom.py:8:8
    |
  6 | import matplotlib.pyplot  # unconventional
  7 | import numpy  # unconventional
@@ -66,8 +72,9 @@ error[ICN001]: custom.py:8:8: `pandas` should be imported as `pd`
 10 | import tensorflow  # unconventional
    |
    = help: Alias `pandas` to `pd`
-error[ICN001]: custom.py:9:8: `seaborn` should be imported as `sns`
+error[ICN001]: 9:8: `seaborn` should be imported as `sns`
 
+  --> custom.py:9:8
    |
  7 | import numpy  # unconventional
  8 | import pandas  # unconventional
@@ -77,8 +84,9 @@ error[ICN001]: custom.py:9:8: `seaborn` should be imported as `sns`
 11 | import holoviews  # unconventional
    |
    = help: Alias `seaborn` to `sns`
-error[ICN001]: custom.py:10:8: `tensorflow` should be imported as `tf`
+error[ICN001]: 10:8: `tensorflow` should be imported as `tf`
 
+  --> custom.py:10:8
    |
  8 | import pandas  # unconventional
  9 | import seaborn  # unconventional
@@ -88,8 +96,9 @@ error[ICN001]: custom.py:10:8: `tensorflow` should be imported as `tf`
 12 | import panel  # unconventional
    |
    = help: Alias `tensorflow` to `tf`
-error[ICN001]: custom.py:11:8: `holoviews` should be imported as `hv`
+error[ICN001]: 11:8: `holoviews` should be imported as `hv`
 
+  --> custom.py:11:8
    |
  9 | import seaborn  # unconventional
 10 | import tensorflow  # unconventional
@@ -99,8 +108,9 @@ error[ICN001]: custom.py:11:8: `holoviews` should be imported as `hv`
 13 | import plotly.express  # unconventional
    |
    = help: Alias `holoviews` to `hv`
-error[ICN001]: custom.py:12:8: `panel` should be imported as `pn`
+error[ICN001]: 12:8: `panel` should be imported as `pn`
 
+  --> custom.py:12:8
    |
 10 | import tensorflow  # unconventional
 11 | import holoviews  # unconventional
@@ -110,8 +120,9 @@ error[ICN001]: custom.py:12:8: `panel` should be imported as `pn`
 14 | import matplotlib  # unconventional
    |
    = help: Alias `panel` to `pn`
-error[ICN001]: custom.py:13:8: `plotly.express` should be imported as `px`
+error[ICN001]: 13:8: `plotly.express` should be imported as `px`
 
+  --> custom.py:13:8
    |
 11 | import holoviews  # unconventional
 12 | import panel  # unconventional
@@ -121,8 +132,9 @@ error[ICN001]: custom.py:13:8: `plotly.express` should be imported as `px`
 15 | import polars  # unconventional
    |
    = help: Alias `plotly.express` to `px`
-error[ICN001]: custom.py:14:8: `matplotlib` should be imported as `mpl`
+error[ICN001]: 14:8: `matplotlib` should be imported as `mpl`
 
+  --> custom.py:14:8
    |
 12 | import panel  # unconventional
 13 | import plotly.express  # unconventional
@@ -132,8 +144,9 @@ error[ICN001]: custom.py:14:8: `matplotlib` should be imported as `mpl`
 16 | import pyarrow  # unconventional
    |
    = help: Alias `matplotlib` to `mpl`
-error[ICN001]: custom.py:15:8: `polars` should be imported as `pl`
+error[ICN001]: 15:8: `polars` should be imported as `pl`
 
+  --> custom.py:15:8
    |
 13 | import plotly.express  # unconventional
 14 | import matplotlib  # unconventional
@@ -142,8 +155,9 @@ error[ICN001]: custom.py:15:8: `polars` should be imported as `pl`
 16 | import pyarrow  # unconventional
    |
    = help: Alias `polars` to `pl`
-error[ICN001]: custom.py:16:8: `pyarrow` should be imported as `pa`
+error[ICN001]: 16:8: `pyarrow` should be imported as `pa`
 
+  --> custom.py:16:8
    |
 14 | import matplotlib  # unconventional
 15 | import polars  # unconventional
@@ -153,8 +167,9 @@ error[ICN001]: custom.py:16:8: `pyarrow` should be imported as `pa`
 18 | import altair as altr  # unconventional
    |
    = help: Alias `pyarrow` to `pa`
-error[ICN001]: custom.py:18:18: `altair` should be imported as `alt`
+error[ICN001]: 18:18: `altair` should be imported as `alt`
 
+  --> custom.py:18:18
    |
 16 | import pyarrow  # unconventional
 17 | 
@@ -164,8 +179,9 @@ error[ICN001]: custom.py:18:18: `altair` should be imported as `alt`
 20 | import dask.array as darray  # unconventional
    |
    = help: Alias `altair` to `alt`
-error[ICN001]: custom.py:19:29: `matplotlib.pyplot` should be imported as `plt`
+error[ICN001]: 19:29: `matplotlib.pyplot` should be imported as `plt`
 
+  --> custom.py:19:29
    |
 18 | import altair as altr  # unconventional
 19 | import matplotlib.pyplot as plot  # unconventional
@@ -174,8 +190,9 @@ error[ICN001]: custom.py:19:29: `matplotlib.pyplot` should be imported as `plt`
 21 | import dask.dataframe as ddf  # unconventional
    |
    = help: Alias `matplotlib.pyplot` to `plt`
-error[ICN001]: custom.py:20:22: `dask.array` should be imported as `da`
+error[ICN001]: 20:22: `dask.array` should be imported as `da`
 
+  --> custom.py:20:22
    |
 18 | import altair as altr  # unconventional
 19 | import matplotlib.pyplot as plot  # unconventional
@@ -185,8 +202,9 @@ error[ICN001]: custom.py:20:22: `dask.array` should be imported as `da`
 22 | import numpy as nmp  # unconventional
    |
    = help: Alias `dask.array` to `da`
-error[ICN001]: custom.py:21:26: `dask.dataframe` should be imported as `dd`
+error[ICN001]: 21:26: `dask.dataframe` should be imported as `dd`
 
+  --> custom.py:21:26
    |
 19 | import matplotlib.pyplot as plot  # unconventional
 20 | import dask.array as darray  # unconventional
@@ -196,8 +214,9 @@ error[ICN001]: custom.py:21:26: `dask.dataframe` should be imported as `dd`
 23 | import pandas as pdas  # unconventional
    |
    = help: Alias `dask.dataframe` to `dd`
-error[ICN001]: custom.py:22:17: `numpy` should be imported as `np`
+error[ICN001]: 22:17: `numpy` should be imported as `np`
 
+  --> custom.py:22:17
    |
 20 | import dask.array as darray  # unconventional
 21 | import dask.dataframe as ddf  # unconventional
@@ -207,8 +226,9 @@ error[ICN001]: custom.py:22:17: `numpy` should be imported as `np`
 24 | import seaborn as sbrn  # unconventional
    |
    = help: Alias `numpy` to `np`
-error[ICN001]: custom.py:23:18: `pandas` should be imported as `pd`
+error[ICN001]: 23:18: `pandas` should be imported as `pd`
 
+  --> custom.py:23:18
    |
 21 | import dask.dataframe as ddf  # unconventional
 22 | import numpy as nmp  # unconventional
@@ -218,8 +238,9 @@ error[ICN001]: custom.py:23:18: `pandas` should be imported as `pd`
 25 | import tensorflow as tfz  # unconventional
    |
    = help: Alias `pandas` to `pd`
-error[ICN001]: custom.py:24:19: `seaborn` should be imported as `sns`
+error[ICN001]: 24:19: `seaborn` should be imported as `sns`
 
+  --> custom.py:24:19
    |
 22 | import numpy as nmp  # unconventional
 23 | import pandas as pdas  # unconventional
@@ -229,8 +250,9 @@ error[ICN001]: custom.py:24:19: `seaborn` should be imported as `sns`
 26 | import holoviews as hsv  # unconventional
    |
    = help: Alias `seaborn` to `sns`
-error[ICN001]: custom.py:25:22: `tensorflow` should be imported as `tf`
+error[ICN001]: 25:22: `tensorflow` should be imported as `tf`
 
+  --> custom.py:25:22
    |
 23 | import pandas as pdas  # unconventional
 24 | import seaborn as sbrn  # unconventional
@@ -240,8 +262,9 @@ error[ICN001]: custom.py:25:22: `tensorflow` should be imported as `tf`
 27 | import panel as pns  # unconventional
    |
    = help: Alias `tensorflow` to `tf`
-error[ICN001]: custom.py:26:21: `holoviews` should be imported as `hv`
+error[ICN001]: 26:21: `holoviews` should be imported as `hv`
 
+  --> custom.py:26:21
    |
 24 | import seaborn as sbrn  # unconventional
 25 | import tensorflow as tfz  # unconventional
@@ -251,8 +274,9 @@ error[ICN001]: custom.py:26:21: `holoviews` should be imported as `hv`
 28 | import plotly.express as pltx  # unconventional
    |
    = help: Alias `holoviews` to `hv`
-error[ICN001]: custom.py:27:17: `panel` should be imported as `pn`
+error[ICN001]: 27:17: `panel` should be imported as `pn`
 
+  --> custom.py:27:17
    |
 25 | import tensorflow as tfz  # unconventional
 26 | import holoviews as hsv  # unconventional
@@ -262,8 +286,9 @@ error[ICN001]: custom.py:27:17: `panel` should be imported as `pn`
 29 | import matplotlib as ml  # unconventional
    |
    = help: Alias `panel` to `pn`
-error[ICN001]: custom.py:28:26: `plotly.express` should be imported as `px`
+error[ICN001]: 28:26: `plotly.express` should be imported as `px`
 
+  --> custom.py:28:26
    |
 26 | import holoviews as hsv  # unconventional
 27 | import panel as pns  # unconventional
@@ -273,8 +298,9 @@ error[ICN001]: custom.py:28:26: `plotly.express` should be imported as `px`
 30 | import polars as ps # unconventional
    |
    = help: Alias `plotly.express` to `px`
-error[ICN001]: custom.py:29:22: `matplotlib` should be imported as `mpl`
+error[ICN001]: 29:22: `matplotlib` should be imported as `mpl`
 
+  --> custom.py:29:22
    |
 27 | import panel as pns  # unconventional
 28 | import plotly.express as pltx  # unconventional
@@ -284,8 +310,9 @@ error[ICN001]: custom.py:29:22: `matplotlib` should be imported as `mpl`
 31 | import pyarrow as arr  # unconventional
    |
    = help: Alias `matplotlib` to `mpl`
-error[ICN001]: custom.py:30:18: `polars` should be imported as `pl`
+error[ICN001]: 30:18: `polars` should be imported as `pl`
 
+  --> custom.py:30:18
    |
 28 | import plotly.express as pltx  # unconventional
 29 | import matplotlib as ml  # unconventional
@@ -294,8 +321,9 @@ error[ICN001]: custom.py:30:18: `polars` should be imported as `pl`
 31 | import pyarrow as arr  # unconventional
    |
    = help: Alias `polars` to `pl`
-error[ICN001]: custom.py:31:19: `pyarrow` should be imported as `pa`
+error[ICN001]: 31:19: `pyarrow` should be imported as `pa`
 
+  --> custom.py:31:19
    |
 29 | import matplotlib as ml  # unconventional
 30 | import polars as ps # unconventional

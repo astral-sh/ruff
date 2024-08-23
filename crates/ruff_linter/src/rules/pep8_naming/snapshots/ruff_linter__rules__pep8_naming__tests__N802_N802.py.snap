@@ -1,36 +1,41 @@
 ---
 source: crates/ruff_linter/src/rules/pep8_naming/mod.rs
 ---
-error[N802]: N802.py:4:5: Function name `Bad` should be lowercase
+error[N802]: 4:5: Function name `Bad` should be lowercase
 
+ --> N802.py:4:5
   |
 4 | def Bad():
   |     ^^^
 5 |     pass
   |
-error[N802]: N802.py:8:5: Function name `_Bad` should be lowercase
+error[N802]: 8:5: Function name `_Bad` should be lowercase
 
+ --> N802.py:8:5
   |
 8 | def _Bad():
   |     ^^^^
 9 |     pass
   |
-error[N802]: N802.py:12:5: Function name `BAD` should be lowercase
+error[N802]: 12:5: Function name `BAD` should be lowercase
 
+  --> N802.py:12:5
    |
 12 | def BAD():
    |     ^^^
 13 |     pass
    |
-error[N802]: N802.py:16:5: Function name `BAD_FUNC` should be lowercase
+error[N802]: 16:5: Function name `BAD_FUNC` should be lowercase
 
+  --> N802.py:16:5
    |
 16 | def BAD_FUNC():
    |     ^^^^^^^^
 17 |     pass
    |
-error[N802]: N802.py:40:9: Function name `testTest` should be lowercase
+error[N802]: 40:9: Function name `testTest` should be lowercase
 
+  --> N802.py:40:9
    |
 38 |         return super().tearDown()
 39 | 

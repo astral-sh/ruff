@@ -1,8 +1,9 @@
 ---
 source: crates/ruff_linter/src/rules/pycodestyle/mod.rs
 ---
-error[I001]: E30_isort.py:1:1: [*] Import block is un-sorted or un-formatted
+error[I001]: 1:1: [*] Import block is un-sorted or un-formatted
 
+ --> E30_isort.py:1:1
   |
 1 | / import json
 2 | | 
@@ -11,8 +12,8 @@ error[I001]: E30_isort.py:1:1: [*] Import block is un-sorted or un-formatted
 5 | | from typing import Any, Sequence
 6 | | 
 7 | | 
-8 | | class MissingCommand(TypeError): ...  # noqa: N818
-  | |_^
+  | |__^
+8 |   class MissingCommand(TypeError): ...  # noqa: N818
   |
   = help: Organize imports
 ℹ Safe fix
@@ -29,8 +30,9 @@ error[I001]: E30_isort.py:1:1: [*] Import block is un-sorted or un-formatted
 9  12 | 
 10 13 | 
 
-error[E303]: E30_isort.py:21:5: [*] Too many blank lines (2)
+error[E303]: 21:5: [*] Too many blank lines (2)
 
+  --> E30_isort.py:21:5
    |
 21 |     abcd.foo()
    |     ^^^^
@@ -47,8 +49,9 @@ error[E303]: E30_isort.py:21:5: [*] Too many blank lines (2)
 22 21 | 
 23 22 | def __init__(self, backend_module: str, backend_obj: str | None) -> None: ...
 
-error[I001]: E30_isort.py:26:1: [*] Import block is un-sorted or un-formatted
+error[I001]: 26:1: [*] Import block is un-sorted or un-formatted
 
+  --> E30_isort.py:25:18
    |
 25 |   if TYPE_CHECKING:
 26 | /     import os
@@ -56,8 +59,8 @@ error[I001]: E30_isort.py:26:1: [*] Import block is un-sorted or un-formatted
 28 | | 
 29 | | 
 30 | |     from typing_extensions import TypeAlias
-31 | | 
-   | |_^
+   | |____________________________________________^
+31 |   
 32 |   
 33 |       abcd.foo()
    |
@@ -72,8 +75,9 @@ error[I001]: E30_isort.py:26:1: [*] Import block is un-sorted or un-formatted
 31 29 | 
 32 30 | 
 
-error[E303]: E30_isort.py:33:5: [*] Too many blank lines (2)
+error[E303]: 33:5: [*] Too many blank lines (2)
 
+  --> E30_isort.py:33:5
    |
 33 |     abcd.foo()
    |     ^^^^
@@ -90,13 +94,14 @@ error[E303]: E30_isort.py:33:5: [*] Too many blank lines (2)
 34 33 | 
 35 34 | def __call__(self, name: str, *args: Any, **kwargs: Any) -> Any:
 
-error[I001]: E30_isort.py:60:1: [*] Import block is un-sorted or un-formatted
+error[I001]: 60:1: [*] Import block is un-sorted or un-formatted
 
+  --> E30_isort.py:60:1
    |
 60 | / from typing import Any, Sequence
 61 | | 
-62 | | class MissingCommand(TypeError): ...  # noqa: N818
-   | |_^
+   | |__^
+62 |   class MissingCommand(TypeError): ...  # noqa: N818
    |
    = help: Organize imports
 ℹ Safe fix

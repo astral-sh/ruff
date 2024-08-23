@@ -1,8 +1,9 @@
 ---
 source: crates/ruff_linter/src/rules/pydocstyle/mod.rs
 ---
-error[D204]: D.py:181:5: [*] 1 blank line required after class docstring
+error[D204]: 181:5: [*] 1 blank line required after class docstring
 
+   --> D.py:181:5
     |
 179 | class TrailingSpace:
 180 | 
@@ -20,8 +21,9 @@ error[D204]: D.py:181:5: [*] 1 blank line required after class docstring
 183 184 | 
 184 185 | 
 
-error[D204]: D.py:192:5: [*] 1 blank line required after class docstring
+error[D204]: 192:5: [*] 1 blank line required after class docstring
 
+   --> D.py:192:5
     |
 191 | class LeadingAndTrailingSpaceMissing:
 192 |     """Leading and trailing space missing."""
@@ -38,8 +40,9 @@ error[D204]: D.py:192:5: [*] 1 blank line required after class docstring
 194 195 | 
 195 196 | 
 
-error[D204]: D.py:649:5: [*] 1 blank line required after class docstring
+error[D204]: 649:5: [*] 1 blank line required after class docstring
 
+   --> D.py:649:5
     |
 648 | class StatementOnSameLineAsDocstring:
 649 |     "After this docstring there's another statement on the same line separated by a semicolon." ; priorities=1
@@ -60,8 +63,9 @@ error[D204]: D.py:649:5: [*] 1 blank line required after class docstring
 651 653 |         pass
 652 654 | 
 
-error[D204]: D.py:654:5: [*] 1 blank line required after class docstring
+error[D204]: 654:5: [*] 1 blank line required after class docstring
 
+   --> D.py:654:5
     |
 653 | class StatementOnSameLineAsDocstring:
 654 |     "After this docstring there's another statement on the same line separated by a semicolon."; priorities=1
@@ -80,8 +84,9 @@ error[D204]: D.py:654:5: [*] 1 blank line required after class docstring
 656 658 | 
 657 659 | class CommentAfterDocstring:
 
-error[D204]: D.py:658:5: [*] 1 blank line required after class docstring
+error[D204]: 658:5: [*] 1 blank line required after class docstring
 
+   --> D.py:658:5
     |
 657 | class CommentAfterDocstring:
 658 |     "After this docstring there's a comment."  # priorities=1

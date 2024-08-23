@@ -1,8 +1,9 @@
 ---
 source: crates/ruff_linter/src/rules/ruff/mod.rs
 ---
-error[F841]: noqa.py:23:5: [*] Local variable `I` is assigned to but never used
+error[F841]: 23:5: [*] Local variable `I` is assigned to but never used
 
+  --> noqa.py:23:5
    |
 21 | def f():
 22 |     # Only `E741` should be ignored by the `noqa`.

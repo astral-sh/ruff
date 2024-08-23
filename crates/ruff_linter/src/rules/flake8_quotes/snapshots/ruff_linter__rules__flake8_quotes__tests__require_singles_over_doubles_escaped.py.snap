@@ -1,8 +1,9 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_quotes/mod.rs
 ---
-error[Q003]: doubles_escaped.py:1:26: [*] Change outer quotes to avoid escaping inner quotes
+error[Q003]: 1:26: [*] Change outer quotes to avoid escaping inner quotes
 
+ --> doubles_escaped.py:1:26
   |
 1 | this_should_raise_Q003 = 'This is a \'string\''
   |                          ^^^^^^^^^^^^^^^^^^^^^^
@@ -17,8 +18,9 @@ error[Q003]: doubles_escaped.py:1:26: [*] Change outer quotes to avoid escaping 
 3 3 | this_is_fine = '"This" is a \'string\''
 4 4 | this_is_fine = "This is a 'string'"
 
-error[Q003]: doubles_escaped.py:2:26: [*] Change outer quotes to avoid escaping inner quotes
+error[Q003]: 2:26: [*] Change outer quotes to avoid escaping inner quotes
 
+ --> doubles_escaped.py:2:26
   |
 1 | this_should_raise_Q003 = 'This is a \'string\''
 2 | this_should_raise_Q003 = 'This is \\ a \\\'string\''
@@ -35,8 +37,9 @@ error[Q003]: doubles_escaped.py:2:26: [*] Change outer quotes to avoid escaping 
 4 4 | this_is_fine = "This is a 'string'"
 5 5 | this_is_fine = "\"This\" is a 'string'"
 
-error[Q003]: doubles_escaped.py:10:5: [*] Change outer quotes to avoid escaping inner quotes
+error[Q003]: 10:5: [*] Change outer quotes to avoid escaping inner quotes
 
+  --> doubles_escaped.py:10:5
    |
  8 | this_should_raise = (
  9 |     'This is a'
@@ -55,8 +58,9 @@ error[Q003]: doubles_escaped.py:10:5: [*] Change outer quotes to avoid escaping 
 12 12 | 
 13 13 | # Same as above, but with f-strings
 
-error[Q003]: doubles_escaped.py:14:1: [*] Change outer quotes to avoid escaping inner quotes
+error[Q003]: 14:1: [*] Change outer quotes to avoid escaping inner quotes
 
+  --> doubles_escaped.py:13:36
    |
 13 | # Same as above, but with f-strings
 14 | f'This is a \'string\''  # Q003
@@ -75,8 +79,9 @@ error[Q003]: doubles_escaped.py:14:1: [*] Change outer quotes to avoid escaping 
 16 16 | f'"This" is a \'string\''
 17 17 | f"This is a 'string'"
 
-error[Q003]: doubles_escaped.py:15:1: [*] Change outer quotes to avoid escaping inner quotes
+error[Q003]: 15:1: [*] Change outer quotes to avoid escaping inner quotes
 
+  --> doubles_escaped.py:14:32
    |
 13 | # Same as above, but with f-strings
 14 | f'This is a \'string\''  # Q003
@@ -96,8 +101,9 @@ error[Q003]: doubles_escaped.py:15:1: [*] Change outer quotes to avoid escaping 
 17 17 | f"This is a 'string'"
 18 18 | f"\"This\" is a 'string'"
 
-error[Q003]: doubles_escaped.py:23:5: [*] Change outer quotes to avoid escaping inner quotes
+error[Q003]: 23:5: [*] Change outer quotes to avoid escaping inner quotes
 
+  --> doubles_escaped.py:23:5
    |
 21 | foo = (
 22 |     f'This is a'
@@ -116,8 +122,9 @@ error[Q003]: doubles_escaped.py:23:5: [*] Change outer quotes to avoid escaping 
 25 25 | 
 26 26 | # Nested f-strings (Python 3.12+)
 
-error[Q003]: doubles_escaped.py:33:1: [*] Change outer quotes to avoid escaping inner quotes
+error[Q003]: 33:1: [*] Change outer quotes to avoid escaping inner quotes
 
+  --> doubles_escaped.py:32:74
    |
 31 | #
 32 | # but as the actual string itself is invalid pre 3.12, we don't catch it.
@@ -137,8 +144,9 @@ error[Q003]: doubles_escaped.py:33:1: [*] Change outer quotes to avoid escaping 
 35 35 | f'\'foo\' {f'\'nested\''} \'\''  # Q003
 36 36 | 
 
-error[Q003]: doubles_escaped.py:34:1: [*] Change outer quotes to avoid escaping inner quotes
+error[Q003]: 34:1: [*] Change outer quotes to avoid escaping inner quotes
 
+  --> doubles_escaped.py:33:30
    |
 32 | # but as the actual string itself is invalid pre 3.12, we don't catch it.
 33 | f'\'foo\' {'nested'}'  # Q003
@@ -157,8 +165,9 @@ error[Q003]: doubles_escaped.py:34:1: [*] Change outer quotes to avoid escaping 
 36 36 | 
 37 37 | f'normal {f'nested'} normal'
 
-error[Q003]: doubles_escaped.py:35:1: [*] Change outer quotes to avoid escaping inner quotes
+error[Q003]: 35:1: [*] Change outer quotes to avoid escaping inner quotes
 
+  --> doubles_escaped.py:34:31
    |
 33 | f'\'foo\' {'nested'}'  # Q003
 34 | f'\'foo\' {f'nested'}'  # Q003
@@ -178,8 +187,9 @@ error[Q003]: doubles_escaped.py:35:1: [*] Change outer quotes to avoid escaping 
 37 37 | f'normal {f'nested'} normal'
 38 38 | f'\'normal\' {f'nested'} normal'  # Q003
 
-error[Q003]: doubles_escaped.py:35:12: [*] Change outer quotes to avoid escaping inner quotes
+error[Q003]: 35:12: [*] Change outer quotes to avoid escaping inner quotes
 
+  --> doubles_escaped.py:35:12
    |
 33 | f'\'foo\' {'nested'}'  # Q003
 34 | f'\'foo\' {f'nested'}'  # Q003
@@ -199,8 +209,9 @@ error[Q003]: doubles_escaped.py:35:12: [*] Change outer quotes to avoid escaping
 37 37 | f'normal {f'nested'} normal'
 38 38 | f'\'normal\' {f'nested'} normal'  # Q003
 
-error[Q003]: doubles_escaped.py:38:1: [*] Change outer quotes to avoid escaping inner quotes
+error[Q003]: 38:1: [*] Change outer quotes to avoid escaping inner quotes
 
+  --> doubles_escaped.py:37:29
    |
 37 | f'normal {f'nested'} normal'
 38 | f'\'normal\' {f'nested'} normal'  # Q003
@@ -219,8 +230,9 @@ error[Q003]: doubles_escaped.py:38:1: [*] Change outer quotes to avoid escaping 
 40 40 | f'\'normal\' {f'\'nested\' {'other'} normal'} "double quotes"'  # Q003
 41 41 | f'\'normal\' {f'\'nested\' {'other'} "double quotes"'} normal'  # Q00l
 
-error[Q003]: doubles_escaped.py:40:15: [*] Change outer quotes to avoid escaping inner quotes
+error[Q003]: 40:15: [*] Change outer quotes to avoid escaping inner quotes
 
+  --> doubles_escaped.py:40:15
    |
 38 | f'\'normal\' {f'nested'} normal'  # Q003
 39 | f'\'normal\' {f'nested'} "double quotes"'
@@ -237,8 +249,9 @@ error[Q003]: doubles_escaped.py:40:15: [*] Change outer quotes to avoid escaping
    40 |+f'\'normal\' {f"'nested' {'other'} normal"} "double quotes"'  # Q003
 41 41 | f'\'normal\' {f'\'nested\' {'other'} "double quotes"'} normal'  # Q00l
 
-error[Q003]: doubles_escaped.py:41:1: [*] Change outer quotes to avoid escaping inner quotes
+error[Q003]: 41:1: [*] Change outer quotes to avoid escaping inner quotes
 
+  --> doubles_escaped.py:40:71
    |
 39 | f'\'normal\' {f'nested'} "double quotes"'
 40 | f'\'normal\' {f'\'nested\' {'other'} normal'} "double quotes"'  # Q003

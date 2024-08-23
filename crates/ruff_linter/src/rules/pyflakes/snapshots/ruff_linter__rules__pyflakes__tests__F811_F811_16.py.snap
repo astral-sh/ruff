@@ -1,8 +1,9 @@
 ---
 source: crates/ruff_linter/src/rules/pyflakes/mod.rs
 ---
-error[F811]: F811_16.py:8:13: Redefinition of unused `fu` from line 3
+error[F811]: 8:13: Redefinition of unused `fu` from line 3
 
+ --> F811_16.py:8:13
   |
 6 | def bar():
 7 |     def baz():

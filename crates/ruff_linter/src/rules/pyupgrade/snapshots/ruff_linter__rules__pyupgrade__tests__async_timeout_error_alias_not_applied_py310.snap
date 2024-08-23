@@ -1,8 +1,9 @@
 ---
 source: crates/ruff_linter/src/rules/pyupgrade/mod.rs
 ---
-error[UP041]: UP041.py:10:8: [*] Replace aliased errors with `TimeoutError`
+error[UP041]: 10:8: [*] Replace aliased errors with `TimeoutError`
 
+  --> UP041.py:10:8
    |
  8 | try:
  9 |     pass
@@ -21,8 +22,9 @@ error[UP041]: UP041.py:10:8: [*] Replace aliased errors with `TimeoutError`
 12 12 | 
 13 13 | # Should NOT be in parentheses when replaced
 
-error[UP041]: UP041.py:22:8: [*] Replace aliased errors with `TimeoutError`
+error[UP041]: 22:8: [*] Replace aliased errors with `TimeoutError`
 
+  --> UP041.py:22:8
    |
 20 | try:
 21 |     pass
@@ -41,8 +43,9 @@ error[UP041]: UP041.py:22:8: [*] Replace aliased errors with `TimeoutError`
 24 24 | 
 25 25 | try:
 
-error[UP041]: UP041.py:27:8: [*] Replace aliased errors with `TimeoutError`
+error[UP041]: 27:8: [*] Replace aliased errors with `TimeoutError`
 
+  --> UP041.py:27:8
    |
 25 | try:
 26 |     pass
@@ -61,8 +64,9 @@ error[UP041]: UP041.py:27:8: [*] Replace aliased errors with `TimeoutError`
 29 29 | 
 30 30 | # Should be kept in parentheses (because multiple)
 
-error[UP041]: UP041.py:34:8: [*] Replace aliased errors with `TimeoutError`
+error[UP041]: 34:8: [*] Replace aliased errors with `TimeoutError`
 
+  --> UP041.py:34:8
    |
 32 | try:
 33 |     pass

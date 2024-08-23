@@ -1,8 +1,9 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_todos/mod.rs
 ---
-error[TD006]: TD006.py:4:3: [*] Invalid TODO capitalization: `ToDo` should be `TODO`
+error[TD006]: 4:3: [*] Invalid TODO capitalization: `ToDo` should be `TODO`
 
+ --> TD006.py:4:3
   |
 2 | # TODO (evanrittenhouse): this is a valid TODO
 3 | # TDO006 - error
@@ -21,8 +22,9 @@ error[TD006]: TD006.py:4:3: [*] Invalid TODO capitalization: `ToDo` should be `T
 5 5 | # todo (evanrittenhouse): another invalid capitalization
 6 6 | # foo # todo: invalid capitalization
 
-error[TD006]: TD006.py:5:3: [*] Invalid TODO capitalization: `todo` should be `TODO`
+error[TD006]: 5:3: [*] Invalid TODO capitalization: `todo` should be `TODO`
 
+ --> TD006.py:5:3
   |
 3 | # TDO006 - error
 4 | # ToDo (evanrittenhouse): invalid capitalization
@@ -39,8 +41,9 @@ error[TD006]: TD006.py:5:3: [*] Invalid TODO capitalization: `todo` should be `T
   5 |+# TODO (evanrittenhouse): another invalid capitalization
 6 6 | # foo # todo: invalid capitalization
 
-error[TD006]: TD006.py:6:9: [*] Invalid TODO capitalization: `todo` should be `TODO`
+error[TD006]: 6:9: [*] Invalid TODO capitalization: `todo` should be `TODO`
 
+ --> TD006.py:6:9
   |
 4 | # ToDo (evanrittenhouse): invalid capitalization
 5 | # todo (evanrittenhouse): another invalid capitalization

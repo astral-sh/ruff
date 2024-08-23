@@ -1,8 +1,9 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_bandit/mod.rs
 ---
-error[S201]: S201.py:10:9: Use of `debug=True` in Flask app detected
+error[S201]: 10:9: Use of `debug=True` in Flask app detected
 
+  --> S201.py:10:9
    |
  9 | # OK
 10 | app.run(debug=True)

@@ -1,8 +1,9 @@
 ---
 source: crates/ruff_linter/src/rules/ruff/mod.rs
 ---
-error[RUF026]: RUF026.py:11:5: [*] `default_factory` is a positional-only argument to `defaultdict`
+error[RUF026]: 11:5: [*] `default_factory` is a positional-only argument to `defaultdict`
 
+  --> RUF026.py:11:5
    |
 10 | def func():
 11 |     defaultdict(default_factory=int)  # RUF026
@@ -19,8 +20,9 @@ error[RUF026]: RUF026.py:11:5: [*] `default_factory` is a positional-only argume
 13 13 | 
 14 14 | def func():
 
-error[RUF026]: RUF026.py:15:5: [*] `default_factory` is a positional-only argument to `defaultdict`
+error[RUF026]: 15:5: [*] `default_factory` is a positional-only argument to `defaultdict`
 
+  --> RUF026.py:15:5
    |
 14 | def func():
 15 |     defaultdict(default_factory=float)  # RUF026
@@ -37,8 +39,9 @@ error[RUF026]: RUF026.py:15:5: [*] `default_factory` is a positional-only argume
 17 17 | 
 18 18 | def func():
 
-error[RUF026]: RUF026.py:19:5: [*] `default_factory` is a positional-only argument to `defaultdict`
+error[RUF026]: 19:5: [*] `default_factory` is a positional-only argument to `defaultdict`
 
+  --> RUF026.py:19:5
    |
 18 | def func():
 19 |     defaultdict(default_factory=dict)  # RUF026
@@ -55,8 +58,9 @@ error[RUF026]: RUF026.py:19:5: [*] `default_factory` is a positional-only argume
 21 21 | 
 22 22 | def func():
 
-error[RUF026]: RUF026.py:23:5: [*] `default_factory` is a positional-only argument to `defaultdict`
+error[RUF026]: 23:5: [*] `default_factory` is a positional-only argument to `defaultdict`
 
+  --> RUF026.py:23:5
    |
 22 | def func():
 23 |     defaultdict(default_factory=list)  # RUF026
@@ -73,8 +77,9 @@ error[RUF026]: RUF026.py:23:5: [*] `default_factory` is a positional-only argume
 25 25 | 
 26 26 | def func():
 
-error[RUF026]: RUF026.py:27:5: [*] `default_factory` is a positional-only argument to `defaultdict`
+error[RUF026]: 27:5: [*] `default_factory` is a positional-only argument to `defaultdict`
 
+  --> RUF026.py:27:5
    |
 26 | def func():
 27 |     defaultdict(default_factory=tuple)  # RUF026
@@ -91,8 +96,9 @@ error[RUF026]: RUF026.py:27:5: [*] `default_factory` is a positional-only argume
 29 29 | 
 30 30 | def func():
 
-error[RUF026]: RUF026.py:34:5: [*] `default_factory` is a positional-only argument to `defaultdict`
+error[RUF026]: 34:5: [*] `default_factory` is a positional-only argument to `defaultdict`
 
+  --> RUF026.py:34:5
    |
 32 |         pass
 33 | 
@@ -110,8 +116,9 @@ error[RUF026]: RUF026.py:34:5: [*] `default_factory` is a positional-only argume
 36 36 | 
 37 37 | def func():
 
-error[RUF026]: RUF026.py:38:5: [*] `default_factory` is a positional-only argument to `defaultdict`
+error[RUF026]: 38:5: [*] `default_factory` is a positional-only argument to `defaultdict`
 
+  --> RUF026.py:38:5
    |
 37 | def func():
 38 |     defaultdict(default_factory=lambda: 1)  # RUF026
@@ -128,8 +135,9 @@ error[RUF026]: RUF026.py:38:5: [*] `default_factory` is a positional-only argume
 40 40 | 
 41 41 | def func():
 
-error[RUF026]: RUF026.py:44:5: [*] `default_factory` is a positional-only argument to `defaultdict`
+error[RUF026]: 44:5: [*] `default_factory` is a positional-only argument to `defaultdict`
 
+  --> RUF026.py:44:5
    |
 42 |     from collections import deque
 43 | 
@@ -147,8 +155,9 @@ error[RUF026]: RUF026.py:44:5: [*] `default_factory` is a positional-only argume
 46 46 | 
 47 47 | def func():
 
-error[RUF026]: RUF026.py:52:5: [*] `default_factory` is a positional-only argument to `defaultdict`
+error[RUF026]: 52:5: [*] `default_factory` is a positional-only argument to `defaultdict`
 
+  --> RUF026.py:52:5
    |
 50 |             pass
 51 | 
@@ -166,8 +175,9 @@ error[RUF026]: RUF026.py:52:5: [*] `default_factory` is a positional-only argume
 54 54 | 
 55 55 | def func():
 
-error[RUF026]: RUF026.py:56:5: [*] `default_factory` is a positional-only argument to `defaultdict`
+error[RUF026]: 56:5: [*] `default_factory` is a positional-only argument to `defaultdict`
 
+  --> RUF026.py:56:5
    |
 55 | def func():
 56 |     defaultdict(default_factory=tuple, member=1)  # RUF026
@@ -184,8 +194,9 @@ error[RUF026]: RUF026.py:56:5: [*] `default_factory` is a positional-only argume
 58 58 | 
 59 59 | def func():
 
-error[RUF026]: RUF026.py:60:5: [*] `default_factory` is a positional-only argument to `defaultdict`
+error[RUF026]: 60:5: [*] `default_factory` is a positional-only argument to `defaultdict`
 
+  --> RUF026.py:60:5
    |
 59 | def func():
 60 |     defaultdict(member=1, default_factory=tuple)  # RUF026
@@ -202,8 +213,9 @@ error[RUF026]: RUF026.py:60:5: [*] `default_factory` is a positional-only argume
 62 62 | 
 63 63 | def func():
 
-error[RUF026]: RUF026.py:64:5: [*] `default_factory` is a positional-only argument to `defaultdict`
+error[RUF026]: 64:5: [*] `default_factory` is a positional-only argument to `defaultdict`
 
+  --> RUF026.py:64:5
    |
 63 | def func():
 64 |     defaultdict(member=1, default_factory=tuple,)  # RUF026
@@ -220,8 +232,9 @@ error[RUF026]: RUF026.py:64:5: [*] `default_factory` is a positional-only argume
 66 66 | 
 67 67 | def func():
 
-error[RUF026]: RUF026.py:68:5: [*] `default_factory` is a positional-only argument to `defaultdict`
+error[RUF026]: 68:5: [*] `default_factory` is a positional-only argument to `defaultdict`
 
+  --> RUF026.py:68:5
    |
 67 |   def func():
 68 |       defaultdict(
@@ -243,8 +256,9 @@ error[RUF026]: RUF026.py:68:5: [*] `default_factory` is a positional-only argume
 72 71 | 
 73 72 | 
 
-error[RUF026]: RUF026.py:75:5: [*] `default_factory` is a positional-only argument to `defaultdict`
+error[RUF026]: 75:5: [*] `default_factory` is a positional-only argument to `defaultdict`
 
+  --> RUF026.py:75:5
    |
 74 |   def func():
 75 |       defaultdict(

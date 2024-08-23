@@ -1,8 +1,9 @@
 ---
 source: crates/ruff_linter/src/rules/pyflakes/mod.rs
 ---
-error[F401]: F401_10.py:6:16: `orjson` imported but unused; consider using `importlib.util.find_spec` to test for availability
+error[F401]: 6:16: `orjson` imported but unused; consider using `importlib.util.find_spec` to test for availability
 
+ --> F401_10.py:6:16
   |
 4 | def module_not_found_error():
 5 |     try:
@@ -12,8 +13,9 @@ error[F401]: F401_10.py:6:16: `orjson` imported but unused; consider using `impo
 8 |         return True
   |
   = help: Remove unused import: `orjson`
-error[F401]: F401_10.py:15:16: `orjson` imported but unused; consider using `importlib.util.find_spec` to test for availability
+error[F401]: 15:16: `orjson` imported but unused; consider using `importlib.util.find_spec` to test for availability
 
+  --> F401_10.py:15:16
    |
 13 | def import_error():
 14 |     try:

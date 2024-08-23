@@ -1,8 +1,9 @@
 ---
 source: crates/ruff_linter/src/rules/pyupgrade/mod.rs
 ---
-error[UP011]: UP011.py:5:21: [*] Unnecessary parentheses to `functools.lru_cache`
+error[UP011]: 5:21: [*] Unnecessary parentheses to `functools.lru_cache`
 
+ --> UP011.py:5:21
   |
 5 | @functools.lru_cache()
   |                     ^^
@@ -20,8 +21,9 @@ error[UP011]: UP011.py:5:21: [*] Unnecessary parentheses to `functools.lru_cache
 7 7 |     pass
 8 8 | 
 
-error[UP011]: UP011.py:10:11: [*] Unnecessary parentheses to `functools.lru_cache`
+error[UP011]: 10:11: [*] Unnecessary parentheses to `functools.lru_cache`
 
+  --> UP011.py:10:11
    |
 10 | @lru_cache()
    |           ^^
@@ -39,8 +41,9 @@ error[UP011]: UP011.py:10:11: [*] Unnecessary parentheses to `functools.lru_cach
 12 12 |     pass
 13 13 | 
 
-error[UP011]: UP011.py:16:21: [*] Unnecessary parentheses to `functools.lru_cache`
+error[UP011]: 16:21: [*] Unnecessary parentheses to `functools.lru_cache`
 
+  --> UP011.py:16:21
    |
 15 | @other_decorator
 16 | @functools.lru_cache()
@@ -59,8 +62,9 @@ error[UP011]: UP011.py:16:21: [*] Unnecessary parentheses to `functools.lru_cach
 18 18 |     pass
 19 19 | 
 
-error[UP011]: UP011.py:21:21: [*] Unnecessary parentheses to `functools.lru_cache`
+error[UP011]: 21:21: [*] Unnecessary parentheses to `functools.lru_cache`
 
+  --> UP011.py:21:21
    |
 21 | @functools.lru_cache()
    |                     ^^

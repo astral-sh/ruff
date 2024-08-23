@@ -1,8 +1,9 @@
 ---
 source: crates/ruff_linter/src/rules/pyflakes/mod.rs
 ---
-error[F401]: __init__.py:5:15: [*] `.unused` imported but unused; consider removing, adding to `__all__`, or using a redundant alias
+error[F401]: 5:15: [*] `.unused` imported but unused; consider removing, adding to `__all__`, or using a redundant alias
 
+ --> __init__.py:5:15
   |
 5 | from . import unused  # F401: recommend add to all w/o fix
   |               ^^^^^^
@@ -17,8 +18,9 @@ error[F401]: __init__.py:5:15: [*] `.unused` imported but unused; consider remov
 7 6 | 
 8 7 | from . import renamed as bees  # F401: recommend add to all w/o fix
 
-error[F401]: __init__.py:8:26: [*] `.renamed` imported but unused; consider removing, adding to `__all__`, or using a redundant alias
+error[F401]: 8:26: [*] `.renamed` imported but unused; consider removing, adding to `__all__`, or using a redundant alias
 
+ --> __init__.py:8:26
   |
 8 | from . import renamed as bees  # F401: recommend add to all w/o fix
   |                          ^^^^

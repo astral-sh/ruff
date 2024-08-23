@@ -1,8 +1,9 @@
 ---
 source: crates/ruff_linter/src/rules/pylint/mod.rs
 ---
-error[PLR0913]: too_many_arguments_params.py:3:5: Too many arguments in function definition (6 > 4)
+error[PLR0913]: 3:5: Too many arguments in function definition (6 > 4)
 
+ --> too_many_arguments_params.py:3:5
   |
 1 | # Too many args (6/4) for max_args=4
 2 | # OK for dummy_variable_rgx ~ "skip_.*"
@@ -10,8 +11,9 @@ error[PLR0913]: too_many_arguments_params.py:3:5: Too many arguments in function
   |     ^
 4 |     pass
   |
-error[PLR0913]: too_many_arguments_params.py:9:5: Too many arguments in function definition (6 > 4)
+error[PLR0913]: 9:5: Too many arguments in function definition (6 > 4)
 
+  --> too_many_arguments_params.py:9:5
    |
  7 | # Too many args (6/4) for max_args=4
  8 | # Too many args (6/5) for dummy_variable_rgx ~ "skip_.*"

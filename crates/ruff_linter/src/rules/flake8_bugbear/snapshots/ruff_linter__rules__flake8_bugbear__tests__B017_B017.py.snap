@@ -1,8 +1,9 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_bugbear/mod.rs
 ---
-error[B017]: B017.py:23:14: `assertRaises(Exception)` should be considered evil
+error[B017]: 23:14: `assertRaises(Exception)` should be considered evil
 
+  --> B017.py:23:14
    |
 21 | class Foobar(unittest.TestCase):
 22 |     def evil_raises(self) -> None:
@@ -10,24 +11,27 @@ error[B017]: B017.py:23:14: `assertRaises(Exception)` should be considered evil
    |              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 24 |             raise Exception("Evil I say!")
    |
-error[B017]: B017.py:27:14: `assertRaises(BaseException)` should be considered evil
+error[B017]: 27:14: `assertRaises(BaseException)` should be considered evil
 
+  --> B017.py:27:14
    |
 26 |     def also_evil_raises(self) -> None:
 27 |         with self.assertRaises(BaseException):
    |              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 28 |             raise Exception("Evil I say!")
    |
-error[B017]: B017.py:45:10: `pytest.raises(Exception)` should be considered evil
+error[B017]: 45:10: `pytest.raises(Exception)` should be considered evil
 
+  --> B017.py:45:10
    |
 44 | def test_pytest_raises():
 45 |     with pytest.raises(Exception):
    |          ^^^^^^^^^^^^^^^^^^^^^^^^
 46 |         raise ValueError("Hello")
    |
-error[B017]: B017.py:48:10: `pytest.raises(Exception)` should be considered evil
+error[B017]: 48:10: `pytest.raises(Exception)` should be considered evil
 
+  --> B017.py:48:10
    |
 46 |         raise ValueError("Hello")
 47 | 

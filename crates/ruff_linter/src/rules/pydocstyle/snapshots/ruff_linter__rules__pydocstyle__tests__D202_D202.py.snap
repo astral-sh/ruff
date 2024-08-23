@@ -1,8 +1,9 @@
 ---
 source: crates/ruff_linter/src/rules/pydocstyle/mod.rs
 ---
-error[D202]: D202.py:57:5: [*] No blank lines allowed after function docstring (found 2)
+error[D202]: 57:5: [*] No blank lines allowed after function docstring (found 2)
 
+  --> D202.py:57:5
    |
 55 | # D202
 56 | def outer():
@@ -20,8 +21,9 @@ error[D202]: D202.py:57:5: [*] No blank lines allowed after function docstring (
 61 59 |         return
 62 60 | 
 
-error[D202]: D202.py:68:5: [*] No blank lines allowed after function docstring (found 2)
+error[D202]: 68:5: [*] No blank lines allowed after function docstring (found 2)
 
+  --> D202.py:68:5
    |
 66 | # D202
 67 | def outer():
@@ -39,8 +41,9 @@ error[D202]: D202.py:68:5: [*] No blank lines allowed after function docstring (
 72 70 |     def inner():
 73 71 |         return
 
-error[D202]: D202.py:80:5: [*] No blank lines allowed after function docstring (found 1)
+error[D202]: 80:5: [*] No blank lines allowed after function docstring (found 1)
 
+  --> D202.py:80:5
    |
 78 | # D202
 79 | def outer():
