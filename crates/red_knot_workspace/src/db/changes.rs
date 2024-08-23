@@ -50,7 +50,7 @@ impl RootDatabase {
         };
 
         for change in changes {
-            if let Some(path) = change.path() {
+            if let Some(path) = change.system_path() {
                 if matches!(
                     path.file_name(),
                     Some(".gitignore" | ".ignore" | "ruff.toml" | ".ruff.toml" | "pyproject.toml")

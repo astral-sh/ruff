@@ -69,10 +69,10 @@ impl ChangeEvent {
     }
 
     pub fn file_name(&self) -> Option<&str> {
-        self.path().and_then(|path| path.file_name())
+        self.system_path().and_then(|path| path.file_name())
     }
 
-    pub fn path(&self) -> Option<&SystemPath> {
+    pub fn system_path(&self) -> Option<&SystemPath> {
         match self {
             ChangeEvent::Opened(path)
             | ChangeEvent::Created { path, .. }
