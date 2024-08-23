@@ -111,3 +111,26 @@ version_files = [
   "crates/ruff_wasm/Cargo.toml",
   "scripts/benchmarks/pyproject.toml",
 ]
+
+[tool.uv]
+# Dependencies for our various Python scripts in `scripts/`.
+# These could possibly use inline script metadata, but then the exact
+# version of the dependency installed wouldn't be recorded in `uv.lock`.
+dev-dependencies = [
+    # Required by `generate_known_standard_library.py`
+    "stdlibs>=2022.10.9",
+    # Required by `fuzz-parser.py
+    "pysource-codegen",
+    "pysource-minimize",
+    "rich-argparse",
+    "ruff",
+    "termcolor",
+    # Docs dependencies are deliberately omitted,
+    # as they're unfortunately quite complicated.
+    # See `docs/requirements.txt` and `docs/requirements-insiders.txt`
+    # for the requirements of `generate_mkdocs.py`, `_mdformat_utils.py`
+    # and `check_docs_formatted.py`
+]
+
+[tool.uv.workspace]
+members = []

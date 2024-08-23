@@ -58,19 +58,18 @@ cargo test --package ruff_python_parser
 The Ruff project includes a Python-based fuzzer that can be used to run the parser on
 randomly generated (but syntactically valid) Python source code files.
 
-To run the fuzzer, first install the required dependencies:
+To run the fuzzer, first [install `uv`](https://docs.astral.sh/uv/getting-started/installation/):
 
-```sh
-uv pip install -r scripts/fuzz-parser/requirements.txt
-```
+- Unix: `curl -LsSf https://astral.sh/uv/install.sh | sh`
+- Windows: `powershell -c "irm https://astral.sh/uv/install.ps1 | iex"`
 
 Then, run the fuzzer with the following command:
 
 ```sh
-python scripts/fuzz-parser/fuzz.py
+uv run scripts/fuzz-parser.py
 ```
 
-Refer to the [fuzz.py](https://github.com/astral-sh/ruff/blob/main/scripts/fuzz-parser/fuzz.py)
+Refer to the [fuzz-parser.py](https://github.com/astral-sh/ruff/blob/main/scripts/fuzz-parser.py)
 script for more information or use the `--help` flag to see the available options.
 
 #### CI
