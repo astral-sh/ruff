@@ -16,9 +16,8 @@ use crate::semantic_index::expression::Expression;
 use crate::semantic_index::symbol::{
     FileScopeId, NodeWithScopeKey, NodeWithScopeRef, Scope, ScopeId, ScopedSymbolId, SymbolTable,
 };
+use crate::semantic_index::use_def::UseDefMap;
 use crate::Db;
-
-pub(crate) use self::use_def::UseDefMap;
 
 pub mod ast_ids;
 mod builder;
@@ -26,6 +25,8 @@ pub mod definition;
 pub mod expression;
 pub mod symbol;
 mod use_def;
+
+pub(crate) use self::use_def::{DefinitionWithConstraints, DefinitionWithConstraintsIterator};
 
 type SymbolMap = hashbrown::HashMap<ScopedSymbolId, (), ()>;
 
@@ -151,6 +152,10 @@ impl<'db> SemanticIndex<'db> {
     /// Returns the [`Scope`] with the given id.
     pub(crate) fn scope(&self, id: FileScopeId) -> &Scope {
         &self.scopes[id]
+    }
+
+    pub(crate) fn scope_ids(&self) -> impl Iterator<Item = ScopeId> {
+        self.scope_ids_by_scope.iter().copied()
     }
 
     /// Returns the id of the parent scope.
@@ -310,11 +315,28 @@ mod tests {
     use ruff_text_size::{Ranged, TextRange};
 
     use crate::db::tests::TestDb;
-    use crate::semantic_index::ast_ids::HasScopedUseId;
-    use crate::semantic_index::definition::DefinitionKind;
-    use crate::semantic_index::symbol::{FileScopeId, Scope, ScopeKind, SymbolTable};
+    use crate::semantic_index::ast_ids::{HasScopedUseId, ScopedUseId};
+    use crate::semantic_index::definition::{Definition, DefinitionKind};
+    use crate::semantic_index::symbol::{
+        FileScopeId, Scope, ScopeKind, ScopedSymbolId, SymbolTable,
+    };
+    use crate::semantic_index::use_def::UseDefMap;
     use crate::semantic_index::{global_scope, semantic_index, symbol_table, use_def_map};
     use crate::Db;
+
+    impl UseDefMap<'_> {
+        fn first_public_definition(&self, symbol: ScopedSymbolId) -> Option<Definition<'_>> {
+            self.public_definitions(symbol)
+                .next()
+                .map(|constrained_definition| constrained_definition.definition)
+        }
+
+        fn first_use_definition(&self, use_id: ScopedUseId) -> Option<Definition<'_>> {
+            self.use_definitions(use_id)
+                .next()
+                .map(|constrained_definition| constrained_definition.definition)
+        }
+    }
 
     struct TestCase {
         db: TestDb,
@@ -374,9 +396,7 @@ mod tests {
         let foo = global_table.symbol_id_by_name("foo").unwrap();
 
         let use_def = use_def_map(&db, scope);
-        let [definition] = use_def.public_definitions(foo) else {
-            panic!("expected one definition");
-        };
+        let definition = use_def.first_public_definition(foo).unwrap();
         assert!(matches!(definition.node(&db), DefinitionKind::Import(_)));
     }
 
@@ -411,13 +431,13 @@ mod tests {
         );
 
         let use_def = use_def_map(&db, scope);
-        let [definition] = use_def.public_definitions(
-            global_table
-                .symbol_id_by_name("foo")
-                .expect("symbol to exist"),
-        ) else {
-            panic!("expected one definition");
-        };
+        let definition = use_def
+            .first_public_definition(
+                global_table
+                    .symbol_id_by_name("foo")
+                    .expect("symbol to exist"),
+            )
+            .unwrap();
         assert!(matches!(
             definition.node(&db),
             DefinitionKind::ImportFrom(_)
@@ -438,14 +458,31 @@ mod tests {
             "a symbol used but not defined in a scope should have only the used flag"
         );
         let use_def = use_def_map(&db, scope);
-        let [definition] =
-            use_def.public_definitions(global_table.symbol_id_by_name("x").expect("symbol exists"))
-        else {
-            panic!("expected one definition");
-        };
+        let definition = use_def
+            .first_public_definition(global_table.symbol_id_by_name("x").expect("symbol exists"))
+            .unwrap();
         assert!(matches!(
             definition.node(&db),
             DefinitionKind::Assignment(_)
+        ));
+    }
+
+    #[test]
+    fn augmented_assignment() {
+        let TestCase { db, file } = test_case("x += 1");
+        let scope = global_scope(&db, file);
+        let global_table = symbol_table(&db, scope);
+
+        assert_eq!(names(&global_table), vec!["x"]);
+
+        let use_def = use_def_map(&db, scope);
+        let definition = use_def
+            .first_public_definition(global_table.symbol_id_by_name("x").unwrap())
+            .unwrap();
+
+        assert!(matches!(
+            definition.node(&db),
+            DefinitionKind::AugmentedAssignment(_)
         ));
     }
 
@@ -477,11 +514,9 @@ y = 2
         assert_eq!(names(&class_table), vec!["x"]);
 
         let use_def = index.use_def_map(class_scope_id);
-        let [definition] =
-            use_def.public_definitions(class_table.symbol_id_by_name("x").expect("symbol exists"))
-        else {
-            panic!("expected one definition");
-        };
+        let definition = use_def
+            .first_public_definition(class_table.symbol_id_by_name("x").expect("symbol exists"))
+            .unwrap();
         assert!(matches!(
             definition.node(&db),
             DefinitionKind::Assignment(_)
@@ -515,13 +550,13 @@ y = 2
         assert_eq!(names(&function_table), vec!["x"]);
 
         let use_def = index.use_def_map(function_scope_id);
-        let [definition] = use_def.public_definitions(
-            function_table
-                .symbol_id_by_name("x")
-                .expect("symbol exists"),
-        ) else {
-            panic!("expected one definition");
-        };
+        let definition = use_def
+            .first_public_definition(
+                function_table
+                    .symbol_id_by_name("x")
+                    .expect("symbol exists"),
+            )
+            .unwrap();
         assert!(matches!(
             definition.node(&db),
             DefinitionKind::Assignment(_)
@@ -557,26 +592,26 @@ def f(a: str, /, b: str, c: int = 1, *args, d: int = 2, **kwargs):
 
         let use_def = index.use_def_map(function_scope_id);
         for name in ["a", "b", "c", "d"] {
-            let [definition] = use_def.public_definitions(
-                function_table
-                    .symbol_id_by_name(name)
-                    .expect("symbol exists"),
-            ) else {
-                panic!("Expected parameter definition for {name}");
-            };
+            let definition = use_def
+                .first_public_definition(
+                    function_table
+                        .symbol_id_by_name(name)
+                        .expect("symbol exists"),
+                )
+                .unwrap();
             assert!(matches!(
                 definition.node(&db),
                 DefinitionKind::ParameterWithDefault(_)
             ));
         }
         for name in ["args", "kwargs"] {
-            let [definition] = use_def.public_definitions(
-                function_table
-                    .symbol_id_by_name(name)
-                    .expect("symbol exists"),
-            ) else {
-                panic!("Expected parameter definition for {name}");
-            };
+            let definition = use_def
+                .first_public_definition(
+                    function_table
+                        .symbol_id_by_name(name)
+                        .expect("symbol exists"),
+                )
+                .unwrap();
             assert!(matches!(definition.node(&db), DefinitionKind::Parameter(_)));
         }
     }
@@ -605,22 +640,22 @@ def f(a: str, /, b: str, c: int = 1, *args, d: int = 2, **kwargs):
 
         let use_def = index.use_def_map(lambda_scope_id);
         for name in ["a", "b", "c", "d"] {
-            let [definition] = use_def
-                .public_definitions(lambda_table.symbol_id_by_name(name).expect("symbol exists"))
-            else {
-                panic!("Expected parameter definition for {name}");
-            };
+            let definition = use_def
+                .first_public_definition(
+                    lambda_table.symbol_id_by_name(name).expect("symbol exists"),
+                )
+                .unwrap();
             assert!(matches!(
                 definition.node(&db),
                 DefinitionKind::ParameterWithDefault(_)
             ));
         }
         for name in ["args", "kwargs"] {
-            let [definition] = use_def
-                .public_definitions(lambda_table.symbol_id_by_name(name).expect("symbol exists"))
-            else {
-                panic!("Expected parameter definition for {name}");
-            };
+            let definition = use_def
+                .first_public_definition(
+                    lambda_table.symbol_id_by_name(name).expect("symbol exists"),
+                )
+                .unwrap();
             assert!(matches!(definition.node(&db), DefinitionKind::Parameter(_)));
         }
     }
@@ -691,9 +726,7 @@ def f(a: str, /, b: str, c: int = 1, *args, d: int = 2, **kwargs):
         let element_use_id =
             element.scoped_use_id(&db, comprehension_scope_id.to_scope_id(&db, file));
 
-        let [definition] = use_def.use_definitions(element_use_id) else {
-            panic!("expected one definition")
-        };
+        let definition = use_def.first_use_definition(element_use_id).unwrap();
         let DefinitionKind::Comprehension(comprehension) = definition.node(&db) else {
             panic!("expected generator definition")
         };
@@ -758,6 +791,56 @@ def f(a: str, /, b: str, c: int = 1, *args, d: int = 2, **kwargs):
     }
 
     #[test]
+    fn with_item_definition() {
+        let TestCase { db, file } = test_case(
+            "
+with item1 as x, item2 as y:
+    pass
+",
+        );
+
+        let index = semantic_index(&db, file);
+        let global_table = index.symbol_table(FileScopeId::global());
+
+        assert_eq!(names(&global_table), vec!["item1", "x", "item2", "y"]);
+
+        let use_def = index.use_def_map(FileScopeId::global());
+        for name in ["x", "y"] {
+            let Some(definition) = use_def.first_public_definition(
+                global_table.symbol_id_by_name(name).expect("symbol exists"),
+            ) else {
+                panic!("Expected with item definition for {name}");
+            };
+            assert!(matches!(definition.node(&db), DefinitionKind::WithItem(_)));
+        }
+    }
+
+    #[test]
+    fn with_item_unpacked_definition() {
+        let TestCase { db, file } = test_case(
+            "
+with context() as (x, y):
+    pass
+",
+        );
+
+        let index = semantic_index(&db, file);
+        let global_table = index.symbol_table(FileScopeId::global());
+
+        assert_eq!(names(&global_table), vec!["context", "x", "y"]);
+
+        let use_def = index.use_def_map(FileScopeId::global());
+        for name in ["x", "y"] {
+            let Some(definition) = use_def.first_public_definition(
+                global_table.symbol_id_by_name(name).expect("symbol exists"),
+            ) else {
+                panic!("Expected with item definition for {name}");
+            };
+            assert!(matches!(definition.node(&db), DefinitionKind::WithItem(_)));
+        }
+    }
+
+    #[test]
     fn dupes() {
         let TestCase { db, file } = test_case(
             "
@@ -790,13 +873,13 @@ def func():
         assert_eq!(names(&func2_table), vec!["y"]);
 
         let use_def = index.use_def_map(FileScopeId::global());
-        let [definition] = use_def.public_definitions(
-            global_table
-                .symbol_id_by_name("func")
-                .expect("symbol exists"),
-        ) else {
-            panic!("expected one definition");
-        };
+        let definition = use_def
+            .first_public_definition(
+                global_table
+                    .symbol_id_by_name("func")
+                    .expect("symbol exists"),
+            )
+            .unwrap();
         assert!(matches!(definition.node(&db), DefinitionKind::Function(_)));
     }
 
@@ -897,9 +980,7 @@ class C[T]:
         };
         let x_use_id = x_use_expr_name.scoped_use_id(&db, scope);
         let use_def = use_def_map(&db, scope);
-        let [definition] = use_def.use_definitions(x_use_id) else {
-            panic!("expected one definition");
-        };
+        let definition = use_def.first_use_definition(x_use_id).unwrap();
         let DefinitionKind::Assignment(assignment) = definition.node(&db) else {
             panic!("should be an assignment definition")
         };
@@ -988,6 +1069,30 @@ def x():
         assert_eq!(
             scope_names(ancestors, &db, file),
             vec!["bar", "foo", "Test", "<module>"]
+        );
+    }
+
+    #[test]
+    fn match_stmt_symbols() {
+        let TestCase { db, file } = test_case(
+            "
+match subject:
+    case a: ...
+    case [b, c, *d]: ...
+    case e as f: ...
+    case {'x': g, **h}: ...
+    case Foo(i, z=j): ...
+    case k | l: ...
+    case _: ...
+",
+        );
+
+        let global_table = symbol_table(&db, global_scope(&db, file));
+
+        assert!(global_table.symbol_by_name("Foo").unwrap().is_used());
+        assert_eq!(
+            names(&global_table),
+            vec!["subject", "a", "b", "c", "d", "f", "e", "h", "g", "Foo", "i", "j", "k", "l"]
         );
     }
 }

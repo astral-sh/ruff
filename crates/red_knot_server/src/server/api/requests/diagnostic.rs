@@ -26,13 +26,11 @@ impl BackgroundDocumentRequestHandler for DocumentDiagnosticRequestHandler {
 
     fn run_with_snapshot(
         snapshot: DocumentSnapshot,
-        db: Option<RootDatabase>,
+        db: RootDatabase,
         _notifier: Notifier,
         _params: DocumentDiagnosticParams,
     ) -> Result<DocumentDiagnosticReportResult> {
-        let diagnostics = db
-            .map(|db| compute_diagnostics(&snapshot, &db))
-            .unwrap_or_default();
+        let diagnostics = compute_diagnostics(&snapshot, &db);
 
         Ok(DocumentDiagnosticReportResult::Report(
             DocumentDiagnosticReport::Full(RelatedFullDocumentDiagnosticReport {
@@ -48,10 +46,19 @@ impl BackgroundDocumentRequestHandler for DocumentDiagnosticRequestHandler {
 
 fn compute_diagnostics(snapshot: &DocumentSnapshot, db: &RootDatabase) -> Vec<Diagnostic> {
     let Some(file) = snapshot.file(db) else {
+        tracing::info!(
+            "No file found for snapshot for '{}'",
+            snapshot.query().file_url()
+        );
         return vec![];
     };
-    let Ok(diagnostics) = db.check_file(file) else {
-        return vec![];
+
+    let diagnostics = match db.check_file(file) {
+        Ok(diagnostics) => diagnostics,
+        Err(cancelled) => {
+            tracing::info!("Diagnostics computation {cancelled}");
+            return vec![];
+        }
     };
 
     diagnostics
@@ -65,12 +72,12 @@ fn to_lsp_diagnostic(message: &str) -> Diagnostic {
     let words = message.split(':').collect::<Vec<_>>();
 
     let (range, message) = match words.as_slice() {
-        [_filename, line, column, message] => {
-            let line = line.parse::<u32>().unwrap_or_default();
+        [_, _, line, column, message] | [_, line, column, message] => {
+            let line = line.parse::<u32>().unwrap_or_default().saturating_sub(1);
             let column = column.parse::<u32>().unwrap_or_default();
             (
                 Range::new(
-                    Position::new(line.saturating_sub(1), column.saturating_sub(1)),
+                    Position::new(line, column.saturating_sub(1)),
                     Position::new(line, column),
                 ),
                 message.trim(),

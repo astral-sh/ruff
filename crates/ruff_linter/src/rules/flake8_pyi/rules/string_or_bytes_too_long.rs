@@ -59,6 +59,10 @@ pub(crate) fn string_or_bytes_too_long(checker: &mut Checker, string: StringLike
         return;
     }
 
+    if semantic.in_annotation() {
+        return;
+    }
+
     let length = match string {
         StringLike::String(ast::ExprStringLiteral { value, .. }) => value.chars().count(),
         StringLike::Bytes(ast::ExprBytesLiteral { value, .. }) => value.len(),

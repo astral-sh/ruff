@@ -3,8 +3,8 @@ use std::any::Any;
 use js_sys::Error;
 use wasm_bindgen::prelude::*;
 
-use red_knot_python_semantic::{ProgramSettings, SearchPathSettings};
 use red_knot_workspace::db::RootDatabase;
+use red_knot_workspace::workspace::settings::Configuration;
 use red_knot_workspace::workspace::WorkspaceMetadata;
 use ruff_db::files::{system_path_to_file, File};
 use ruff_db::system::walk_directory::WalkDirectoryBuilder;
@@ -41,16 +41,17 @@ impl Workspace {
     #[wasm_bindgen(constructor)]
     pub fn new(root: &str, settings: &Settings) -> Result<Workspace, Error> {
         let system = WasmSystem::new(SystemPath::new(root));
-        let workspace =
-            WorkspaceMetadata::from_path(SystemPath::new(root), &system).map_err(into_error)?;
+        let workspace = WorkspaceMetadata::from_path(
+            SystemPath::new(root),
+            &system,
+            Some(Configuration {
+                target_version: Some(settings.target_version.into()),
+                ..Configuration::default()
+            }),
+        )
+        .map_err(into_error)?;
 
-        let program_settings = ProgramSettings {
-            target_version: settings.target_version.into(),
-            search_paths: SearchPathSettings::default(),
-        };
-
-        let db =
-            RootDatabase::new(workspace, program_settings, system.clone()).map_err(into_error)?;
+        let db = RootDatabase::new(workspace, system.clone()).map_err(into_error)?;
 
         Ok(Self { db, system })
     }
@@ -109,7 +110,7 @@ impl Workspace {
     pub fn check_file(&self, file_id: &FileHandle) -> Result<Vec<String>, Error> {
         let result = self.db.check_file(file_id.file).map_err(into_error)?;
 
-        Ok(result.to_vec())
+        Ok(result.clone())
     }
 
     /// Checks all open files
@@ -231,13 +232,6 @@ impl System for WasmSystem {
     ) -> Result<ruff_notebook::Notebook, ruff_notebook::NotebookError> {
         let content = self.read_to_string(path)?;
         Notebook::from_source_code(&content)
-    }
-
-    fn virtual_path_metadata(
-        &self,
-        _path: &SystemVirtualPath,
-    ) -> ruff_db::system::Result<Metadata> {
-        Err(not_found())
     }
 
     fn read_virtual_path_to_string(

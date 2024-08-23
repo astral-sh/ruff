@@ -4,15 +4,38 @@ use ruff_python_ast::name::Name;
 use crate::builtins::builtins_scope;
 use crate::semantic_index::definition::Definition;
 use crate::semantic_index::symbol::{ScopeId, ScopedSymbolId};
-use crate::semantic_index::{global_scope, symbol_table, use_def_map};
+use crate::semantic_index::{
+    global_scope, semantic_index, symbol_table, use_def_map, DefinitionWithConstraints,
+    DefinitionWithConstraintsIterator,
+};
+use crate::types::narrow::narrowing_constraint;
 use crate::{Db, FxOrderSet};
 
+pub(crate) use self::builder::{IntersectionBuilder, UnionBuilder};
+pub(crate) use self::diagnostic::TypeCheckDiagnostics;
+pub(crate) use self::infer::{
+    infer_definition_types, infer_expression_types, infer_scope_types, TypeInference,
+};
+
 mod builder;
+mod diagnostic;
 mod display;
 mod infer;
+mod narrow;
 
-pub(crate) use self::builder::UnionBuilder;
-pub(crate) use self::infer::{infer_definition_types, infer_scope_types};
+pub fn check_types(db: &dyn Db, file: File) -> TypeCheckDiagnostics {
+    let _span = tracing::trace_span!("check_types", file=?file.path(db)).entered();
+
+    let index = semantic_index(db, file);
+    let mut diagnostics = TypeCheckDiagnostics::new();
+
+    for scope_id in index.scope_ids() {
+        let result = infer_scope_types(db, scope_id);
+        diagnostics.extend(result.diagnostics());
+    }
+
+    diagnostics
+}
 
 /// Infer the public type of a symbol (its type as seen from outside its scope).
 pub(crate) fn symbol_ty<'db>(
@@ -82,10 +105,31 @@ pub(crate) fn definition_ty<'db>(db: &'db dyn Db, definition: Definition<'db>) -
 /// provide an `unbound_ty`.
 pub(crate) fn definitions_ty<'db>(
     db: &'db dyn Db,
-    definitions: &[Definition<'db>],
+    definitions_with_constraints: DefinitionWithConstraintsIterator<'_, 'db>,
     unbound_ty: Option<Type<'db>>,
 ) -> Type<'db> {
-    let def_types = definitions.iter().map(|def| definition_ty(db, *def));
+    let def_types = definitions_with_constraints.map(
+        |DefinitionWithConstraints {
+             definition,
+             constraints,
+         }| {
+            let mut constraint_tys =
+                constraints.filter_map(|test| narrowing_constraint(db, test, definition));
+            let definition_ty = definition_ty(db, definition);
+            if let Some(first_constraint_ty) = constraint_tys.next() {
+                let mut builder = IntersectionBuilder::new(db);
+                builder = builder
+                    .add_positive(definition_ty)
+                    .add_positive(first_constraint_ty);
+                for constraint_ty in constraint_tys {
+                    builder = builder.add_positive(constraint_ty);
+                }
+                builder.build()
+            } else {
+                definition_ty
+            }
+        },
+    );
     let mut all_types = unbound_ty.into_iter().chain(def_types);
 
     let Some(first) = all_types.next() else {
@@ -113,7 +157,7 @@ pub enum Type<'db> {
     Any,
     /// the empty set of values
     Never,
-    /// unknown type (no annotation)
+    /// unknown type (either no annotation, or some kind of type error)
     /// equivalent to Any, or possibly to object in strict mode
     Unknown,
     /// name does not exist or is not bound to any value (this represents an error, but with some
@@ -137,12 +181,18 @@ pub enum Type<'db> {
     IntLiteral(i64),
     /// A boolean literal, either `True` or `False`.
     BooleanLiteral(bool),
+    /// A bytes literal
+    BytesLiteral(BytesLiteralType<'db>),
     // TODO protocols, callable types, overloads, generics, type vars
 }
 
 impl<'db> Type<'db> {
     pub const fn is_unbound(&self) -> bool {
         matches!(self, Type::Unbound)
+    }
+
+    pub const fn is_unknown(&self) -> bool {
+        matches!(self, Type::Unknown)
     }
 
     pub const fn is_never(&self) -> bool {
@@ -174,20 +224,42 @@ impl<'db> Type<'db> {
         }
     }
 
+    /// Resolve a member access of a type.
+    ///
+    /// For example, if `foo` is `Type::Instance(<Bar>)`,
+    /// `foo.member(&db, "baz")` returns the type of `baz` attributes
+    /// as accessed from instances of the `Bar` class.
+    ///
+    /// TODO: use of this method currently requires manually checking
+    /// whether the returned type is `Unknown`/`Unbound`
+    /// (or a union with `Unknown`/`Unbound`) in many places.
+    /// Ideally we'd use a more type-safe pattern, such as returning
+    /// an `Option` or a `Result` from this method, which would force
+    /// us to explicitly consider whether to handle an error or propagate
+    /// it up the call stack.
     #[must_use]
     pub fn member(&self, db: &'db dyn Db, name: &Name) -> Type<'db> {
         match self {
             Type::Any => Type::Any,
-            Type::Never => todo!("attribute lookup on Never type"),
+            Type::Never => {
+                // TODO: attribute lookup on Never type
+                Type::Unknown
+            }
             Type::Unknown => Type::Unknown,
             Type::Unbound => Type::Unbound,
-            Type::None => todo!("attribute lookup on None type"),
-            Type::Function(_) => todo!("attribute lookup on Function type"),
+            Type::None => {
+                // TODO: attribute lookup on None type
+                Type::Unknown
+            }
+            Type::Function(_) => {
+                // TODO: attribute lookup on function type
+                Type::Unknown
+            }
             Type::Module(file) => global_symbol_ty_by_name(db, *file, name),
             Type::Class(class) => class.class_member(db, name),
             Type::Instance(_) => {
                 // TODO MRO? get_own_instance_member, get_instance_member
-                todo!("attribute lookup on Instance type")
+                Type::Unknown
             }
             Type::Union(union) => union
                 .elements(db)
@@ -199,13 +271,17 @@ impl<'db> Type<'db> {
             Type::Intersection(_) => {
                 // TODO perform the get_member on each type in the intersection
                 // TODO return the intersection of those results
-                todo!("attribute lookup on Intersection type")
+                Type::Unknown
             }
             Type::IntLiteral(_) => {
                 // TODO raise error
                 Type::Unknown
             }
             Type::BooleanLiteral(_) => Type::Unknown,
+            Type::BytesLiteral(_) => {
+                // TODO defer to Type::Instance(<bytes from typeshed>).member
+                Type::Unknown
+            }
         }
     }
 
@@ -300,4 +376,117 @@ pub struct IntersectionType<'db> {
     /// narrowing along with intersections (e.g. `if not isinstance(...)`), so we represent them
     /// directly in intersections rather than as a separate type.
     negative: FxOrderSet<Type<'db>>,
+}
+
+#[salsa::interned]
+pub struct BytesLiteralType<'db> {
+    #[return_ref]
+    value: Box<[u8]>,
+}
+
+#[cfg(test)]
+mod tests {
+    use anyhow::Context;
+
+    use ruff_db::files::system_path_to_file;
+    use ruff_db::system::{DbWithTestSystem, SystemPathBuf};
+
+    use crate::db::tests::TestDb;
+    use crate::{Program, ProgramSettings, PythonVersion, SearchPathSettings};
+
+    use super::TypeCheckDiagnostics;
+
+    fn setup_db() -> TestDb {
+        let db = TestDb::new();
+        db.memory_file_system()
+            .create_directory_all("/src")
+            .unwrap();
+
+        Program::from_settings(
+            &db,
+            &ProgramSettings {
+                target_version: PythonVersion::default(),
+                search_paths: SearchPathSettings::new(SystemPathBuf::from("/src")),
+            },
+        )
+        .expect("Valid search path settings");
+
+        db
+    }
+
+    fn assert_diagnostic_messages(diagnostics: &TypeCheckDiagnostics, expected: &[&str]) {
+        let messages: Vec<&str> = diagnostics
+            .iter()
+            .map(|diagnostic| diagnostic.message())
+            .collect();
+        assert_eq!(&messages, expected);
+    }
+
+    #[test]
+    fn unresolved_import_statement() -> anyhow::Result<()> {
+        let mut db = setup_db();
+
+        db.write_file("src/foo.py", "import bar\n")
+            .context("Failed to write foo.py")?;
+
+        let foo = system_path_to_file(&db, "src/foo.py").context("Failed to resolve foo.py")?;
+
+        let diagnostics = super::check_types(&db, foo);
+        assert_diagnostic_messages(&diagnostics, &["Import 'bar' could not be resolved."]);
+
+        Ok(())
+    }
+
+    #[test]
+    fn unresolved_import_from_statement() {
+        let mut db = setup_db();
+
+        db.write_file("src/foo.py", "from bar import baz\n")
+            .unwrap();
+        let foo = system_path_to_file(&db, "src/foo.py").unwrap();
+        let diagnostics = super::check_types(&db, foo);
+        assert_diagnostic_messages(&diagnostics, &["Import 'bar' could not be resolved."]);
+    }
+
+    #[test]
+    fn unresolved_import_from_resolved_module() {
+        let mut db = setup_db();
+
+        db.write_files([("/src/a.py", ""), ("/src/b.py", "from a import thing")])
+            .unwrap();
+
+        let b_file = system_path_to_file(&db, "/src/b.py").unwrap();
+        let b_file_diagnostics = super::check_types(&db, b_file);
+        assert_diagnostic_messages(
+            &b_file_diagnostics,
+            &["Could not resolve import of 'thing' from 'a'"],
+        );
+    }
+
+    #[ignore = "\
+A spurious second 'Unresolved import' diagnostic message is emitted on `b.py`, \
+despite the symbol existing in the symbol table for `a.py`"]
+    #[test]
+    fn resolved_import_of_symbol_from_unresolved_import() {
+        let mut db = setup_db();
+
+        db.write_files([
+            ("/src/a.py", "import foo as foo"),
+            ("/src/b.py", "from a import foo"),
+        ])
+        .unwrap();
+
+        let a_file = system_path_to_file(&db, "/src/a.py").unwrap();
+        let a_file_diagnostics = super::check_types(&db, a_file);
+        assert_diagnostic_messages(
+            &a_file_diagnostics,
+            &["Import 'foo' could not be resolved."],
+        );
+
+        // Importing the unresolved import into a second first-party file should not trigger
+        // an additional "unresolved import" violation
+        let b_file = system_path_to_file(&db, "/src/b.py").unwrap();
+        let b_file_diagnostics = super::check_types(&db, b_file);
+        assert_eq!(&*b_file_diagnostics, &[]);
+    }
 }

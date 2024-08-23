@@ -91,7 +91,7 @@ enum Reason<'a> {
 #[allow(clippy::too_many_arguments)]
 pub(crate) fn categorize<'a>(
     module_name: &str,
-    level: u32,
+    is_relative: bool,
     src: &[PathBuf],
     package: Option<&Path>,
     detect_same_package: bool,
@@ -103,14 +103,14 @@ pub(crate) fn categorize<'a>(
 ) -> &'a ImportSection {
     let module_base = module_name.split('.').next().unwrap();
     let (mut import_type, mut reason) = {
-        if level == 0 && module_base == "__future__" {
+        if !is_relative && module_base == "__future__" {
             (&ImportSection::Known(ImportType::Future), Reason::Future)
         } else if no_sections {
             (
                 &ImportSection::Known(ImportType::FirstParty),
                 Reason::NoSections,
             )
-        } else if level > 0 {
+        } else if is_relative {
             (
                 &ImportSection::Known(ImportType::LocalFolder),
                 Reason::NonZeroLevel,
@@ -132,7 +132,7 @@ pub(crate) fn categorize<'a>(
                 &ImportSection::Known(ImportType::FirstParty),
                 Reason::SourceMatch(src),
             )
-        } else if level == 0 && module_name == "__main__" {
+        } else if !is_relative && module_name == "__main__" {
             (
                 &ImportSection::Known(ImportType::FirstParty),
                 Reason::KnownFirstParty,
@@ -190,7 +190,7 @@ pub(crate) fn categorize_imports<'a>(
     for (alias, comments) in block.import {
         let import_type = categorize(
             &alias.module_name(),
-            0,
+            false,
             src,
             package,
             detect_same_package,
@@ -210,7 +210,7 @@ pub(crate) fn categorize_imports<'a>(
     for (import_from, aliases) in block.import_from {
         let classification = categorize(
             &import_from.module_name(),
-            import_from.level,
+            import_from.level > 0,
             src,
             package,
             detect_same_package,
@@ -230,7 +230,7 @@ pub(crate) fn categorize_imports<'a>(
     for ((import_from, alias), aliases) in block.import_from_as {
         let classification = categorize(
             &import_from.module_name(),
-            import_from.level,
+            import_from.level > 0,
             src,
             package,
             detect_same_package,
@@ -250,7 +250,7 @@ pub(crate) fn categorize_imports<'a>(
     for (import_from, comments) in block.import_from_star {
         let classification = categorize(
             &import_from.module_name(),
-            import_from.level,
+            import_from.level > 0,
             src,
             package,
             detect_same_package,

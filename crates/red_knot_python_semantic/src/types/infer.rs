@@ -29,7 +29,8 @@ use salsa::plumbing::AsId;
 use ruff_db::files::File;
 use ruff_db::parsed::parsed_module;
 use ruff_python_ast as ast;
-use ruff_python_ast::{ExprContext, TypeParams};
+use ruff_python_ast::{AnyNodeRef, ExprContext};
+use ruff_text_size::Ranged;
 
 use crate::builtins::builtins_scope;
 use crate::module_name::ModuleName;
@@ -40,9 +41,10 @@ use crate::semantic_index::expression::Expression;
 use crate::semantic_index::semantic_index;
 use crate::semantic_index::symbol::{FileScopeId, NodeWithScopeKind, NodeWithScopeRef, ScopeId};
 use crate::semantic_index::SemanticIndex;
+use crate::types::diagnostic::{TypeCheckDiagnostic, TypeCheckDiagnostics};
 use crate::types::{
-    builtins_symbol_ty_by_name, definitions_ty, global_symbol_ty_by_name, ClassType, FunctionType,
-    Name, Type, UnionBuilder,
+    builtins_symbol_ty_by_name, definitions_ty, global_symbol_ty_by_name, BytesLiteralType,
+    ClassType, FunctionType, Name, Type, UnionBuilder,
 };
 use crate::Db;
 
@@ -123,13 +125,16 @@ pub(crate) enum InferenceRegion<'db> {
 }
 
 /// The inferred types for a single region.
-#[derive(Debug, Eq, PartialEq, Default, Clone)]
+#[derive(Debug, Eq, PartialEq, Default)]
 pub(crate) struct TypeInference<'db> {
     /// The types of every expression in this region.
     expressions: FxHashMap<ScopedExpressionId, Type<'db>>,
 
     /// The types of every definition in this region.
     definitions: FxHashMap<Definition<'db>, Type<'db>>,
+
+    /// The diagnostics for this region.
+    diagnostics: TypeCheckDiagnostics,
 }
 
 impl<'db> TypeInference<'db> {
@@ -142,9 +147,14 @@ impl<'db> TypeInference<'db> {
         self.definitions[&definition]
     }
 
+    pub(crate) fn diagnostics(&self) -> &[std::sync::Arc<TypeCheckDiagnostic>] {
+        &self.diagnostics
+    }
+
     fn shrink_to_fit(&mut self) {
         self.expressions.shrink_to_fit();
         self.definitions.shrink_to_fit();
+        self.diagnostics.shrink_to_fit();
     }
 }
 
@@ -235,6 +245,7 @@ impl<'db> TypeInferenceBuilder<'db> {
     fn extend(&mut self, inference: &TypeInference<'db>) {
         self.types.definitions.extend(inference.definitions.iter());
         self.types.expressions.extend(inference.expressions.iter());
+        self.types.diagnostics.extend(&inference.diagnostics);
     }
 
     /// Infers types in the given [`InferenceRegion`].
@@ -294,10 +305,17 @@ impl<'db> TypeInferenceBuilder<'db> {
                 );
             }
             DefinitionKind::Assignment(assignment) => {
-                self.infer_assignment_definition(assignment.assignment(), definition);
+                self.infer_assignment_definition(
+                    assignment.target(),
+                    assignment.assignment(),
+                    definition,
+                );
             }
             DefinitionKind::AnnotatedAssignment(annotated_assignment) => {
                 self.infer_annotated_assignment_definition(annotated_assignment.node(), definition);
+            }
+            DefinitionKind::AugmentedAssignment(augmented_assignment) => {
+                self.infer_augment_assignment_definition(augmented_assignment.node(), definition);
             }
             DefinitionKind::NamedExpression(named_expression) => {
                 self.infer_named_expression_definition(named_expression.node(), definition);
@@ -315,11 +333,14 @@ impl<'db> TypeInferenceBuilder<'db> {
             DefinitionKind::ParameterWithDefault(parameter_with_default) => {
                 self.infer_parameter_with_default_definition(parameter_with_default, definition);
             }
+            DefinitionKind::WithItem(with_item) => {
+                self.infer_with_item_definition(with_item.target(), with_item.node(), definition);
+            }
         }
     }
 
     fn infer_region_expression(&mut self, expression: Expression<'db>) {
-        self.infer_expression(expression.node(self.db));
+        self.infer_expression(expression.node_ref(self.db));
     }
 
     fn infer_module(&mut self, module: &ast::ModModule) {
@@ -600,11 +621,40 @@ impl<'db> TypeInferenceBuilder<'db> {
         } = with_statement;
 
         for item in items {
-            self.infer_expression(&item.context_expr);
-            self.infer_optional_expression(item.optional_vars.as_deref());
+            match item.optional_vars.as_deref() {
+                Some(ast::Expr::Name(name)) => {
+                    self.infer_definition(name);
+                }
+                _ => {
+                    // TODO infer definitions in unpacking assignment
+                    self.infer_expression(&item.context_expr);
+                }
+            }
         }
 
         self.infer_body(body);
+    }
+
+    fn infer_with_item_definition(
+        &mut self,
+        target: &ast::ExprName,
+        with_item: &ast::WithItem,
+        definition: Definition<'db>,
+    ) {
+        let expression = self.index.expression(&with_item.context_expr);
+        let result = infer_expression_types(self.db, expression);
+        self.extend(result);
+
+        // TODO(dhruvmanila): The correct type inference here is the return type of the __enter__
+        // method of the context manager.
+        let context_expr_ty = self
+            .types
+            .expression_ty(with_item.context_expr.scoped_ast_id(self.db, self.scope));
+
+        self.types
+            .expressions
+            .insert(target.scoped_ast_id(self.db, self.scope), context_expr_ty);
+        self.types.definitions.insert(definition, context_expr_ty);
     }
 
     fn infer_match_statement(&mut self, match_statement: &ast::StmtMatch) {
@@ -706,6 +756,7 @@ impl<'db> TypeInferenceBuilder<'db> {
 
     fn infer_assignment_definition(
         &mut self,
+        target: &ast::ExprName,
         assignment: &ast::StmtAssign,
         definition: Definition<'db>,
     ) {
@@ -715,6 +766,9 @@ impl<'db> TypeInferenceBuilder<'db> {
         let value_ty = self
             .types
             .expression_ty(assignment.value.scoped_ast_id(self.db, self.scope));
+        self.types
+            .expressions
+            .insert(target.scoped_ast_id(self.db, self.scope), value_ty);
         self.types.definitions.insert(definition, value_ty);
     }
 
@@ -755,15 +809,35 @@ impl<'db> TypeInferenceBuilder<'db> {
     }
 
     fn infer_augmented_assignment_statement(&mut self, assignment: &ast::StmtAugAssign) {
-        // TODO this should be a Definition
+        if assignment.target.is_name_expr() {
+            self.infer_definition(assignment);
+        } else {
+            // TODO currently we don't consider assignments to non-Names to be Definitions
+            self.infer_augment_assignment(assignment);
+        }
+    }
+
+    fn infer_augment_assignment_definition(
+        &mut self,
+        assignment: &ast::StmtAugAssign,
+        definition: Definition<'db>,
+    ) {
+        let target_ty = self.infer_augment_assignment(assignment);
+        self.types.definitions.insert(definition, target_ty);
+    }
+
+    fn infer_augment_assignment(&mut self, assignment: &ast::StmtAugAssign) -> Type<'db> {
         let ast::StmtAugAssign {
             range: _,
             target,
             op: _,
             value,
         } = assignment;
-        self.infer_expression(target);
         self.infer_expression(value);
+        self.infer_expression(target);
+
+        // TODO(dhruvmanila): Resolve the target type using the value type and the operator
+        Type::Unknown
     }
 
     fn infer_type_alias_statement(&mut self, type_alias_statement: &ast::StmtTypeAlias) {
@@ -824,7 +898,26 @@ impl<'db> TypeInferenceBuilder<'db> {
             asname: _,
         } = alias;
 
-        let module_ty = self.module_ty_from_name(ModuleName::new(name));
+        let module_ty = ModuleName::new(name)
+            .ok_or(ModuleResolutionError::InvalidSyntax)
+            .and_then(|module_name| self.module_ty_from_name(module_name));
+
+        let module_ty = match module_ty {
+            Ok(ty) => ty,
+            Err(ModuleResolutionError::InvalidSyntax) => {
+                tracing::debug!("Failed to resolve import due to invalid syntax");
+                Type::Unknown
+            }
+            Err(ModuleResolutionError::UnresolvedModule) => {
+                self.add_diagnostic(
+                    AnyNodeRef::Alias(alias),
+                    "unresolved-import",
+                    format_args!("Import '{name}' could not be resolved."),
+                );
+                Type::Unknown
+            }
+        };
+
         self.types.definitions.insert(definition, module_ty);
     }
 
@@ -872,10 +965,18 @@ impl<'db> TypeInferenceBuilder<'db> {
     /// - `tail` is the relative module name stripped of all leading dots:
     ///   - `from .foo import bar` => `tail == "foo"`
     ///   - `from ..foo.bar import baz` => `tail == "foo.bar"`
-    fn relative_module_name(&self, tail: Option<&str>, level: NonZeroU32) -> Option<ModuleName> {
+    fn relative_module_name(
+        &self,
+        tail: Option<&str>,
+        level: NonZeroU32,
+    ) -> Result<ModuleName, ModuleResolutionError> {
         let Some(module) = file_to_module(self.db, self.file) else {
-            tracing::debug!("Failed to resolve file {:?} to a module", self.file);
-            return None;
+            tracing::debug!(
+                "Relative module resolution '{}' failed; could not resolve file '{}' to a module",
+                format_import_from_module(level.get(), tail),
+                self.file.path(self.db)
+            );
+            return Err(ModuleResolutionError::UnresolvedModule);
         };
         let mut level = level.get();
         if module.kind().is_package() {
@@ -883,17 +984,19 @@ impl<'db> TypeInferenceBuilder<'db> {
         }
         let mut module_name = module.name().to_owned();
         for _ in 0..level {
-            module_name = module_name.parent()?;
+            module_name = module_name
+                .parent()
+                .ok_or(ModuleResolutionError::UnresolvedModule)?;
         }
         if let Some(tail) = tail {
             if let Some(valid_tail) = ModuleName::new(tail) {
                 module_name.extend(&valid_tail);
             } else {
-                tracing::debug!("Failed to resolve relative import due to invalid syntax");
-                return None;
+                tracing::debug!("Relative module resolution failed: invalid syntax");
+                return Err(ModuleResolutionError::InvalidSyntax);
             }
         }
-        Some(module_name)
+        Ok(module_name)
     }
 
     fn infer_import_from_definition(
@@ -913,16 +1016,27 @@ impl<'db> TypeInferenceBuilder<'db> {
         // `follow_nonexistent_import_bare_to_module()`.
         let ast::StmtImportFrom { module, level, .. } = import_from;
         tracing::trace!("Resolving imported object {alias:?} from statement {import_from:?}");
+        let module = module.as_deref();
         let module_name = if let Some(level) = NonZeroU32::new(*level) {
-            self.relative_module_name(module.as_deref(), level)
+            tracing::trace!(
+                "Resolving imported object '{}' from module '{}' relative to file '{}'",
+                alias.name,
+                format_import_from_module(level.get(), module),
+                self.file.path(self.db),
+            );
+            self.relative_module_name(module, level)
         } else {
-            let module_name = module
-                .as_ref()
-                .expect("Non-relative import should always have a non-None `module`!");
-            ModuleName::new(module_name)
+            tracing::trace!(
+                "Resolving imported object '{}' from module '{}'",
+                alias.name,
+                format_import_from_module(*level, module),
+            );
+            module
+                .and_then(ModuleName::new)
+                .ok_or(ModuleResolutionError::InvalidSyntax)
         };
 
-        let module_ty = self.module_ty_from_name(module_name);
+        let module_ty = module_name.and_then(|module_name| self.module_ty_from_name(module_name));
 
         let ast::Alias {
             range: _,
@@ -930,9 +1044,39 @@ impl<'db> TypeInferenceBuilder<'db> {
             asname: _,
         } = alias;
 
-        let ty = module_ty.member(self.db, &Name::new(&name.id));
+        // If a symbol is unbound in the module the symbol was originally defined in,
+        // when we're trying to import the symbol from that module into "our" module,
+        // the runtime error will occur immediately (rather than when the symbol is *used*,
+        // as would be the case for a symbol with type `Unbound`), so it's appropriate to
+        // think of the type of the imported symbol as `Unknown` rather than `Unbound`
+        let member_ty = module_ty
+            .unwrap_or(Type::Unbound)
+            .member(self.db, &Name::new(&name.id))
+            .replace_unbound_with(self.db, Type::Unknown);
 
-        self.types.definitions.insert(definition, ty);
+        if matches!(module_ty, Err(ModuleResolutionError::UnresolvedModule)) {
+            self.add_diagnostic(
+                AnyNodeRef::StmtImportFrom(import_from),
+                "unresolved-import",
+                format_args!(
+                    "Import '{}{}' could not be resolved.",
+                    ".".repeat(*level as usize),
+                    module.unwrap_or_default()
+                ),
+            );
+        } else if module_ty.is_ok() && member_ty.is_unknown() {
+            self.add_diagnostic(
+                AnyNodeRef::Alias(alias),
+                "unresolved-import",
+                format_args!(
+                    "Could not resolve import of '{name}' from '{}{}'",
+                    ".".repeat(*level as usize),
+                    module.unwrap_or_default()
+                ),
+            );
+        }
+
+        self.types.definitions.insert(definition, member_ty);
     }
 
     fn infer_return_statement(&mut self, ret: &ast::StmtReturn) {
@@ -946,10 +1090,13 @@ impl<'db> TypeInferenceBuilder<'db> {
         }
     }
 
-    fn module_ty_from_name(&self, module_name: Option<ModuleName>) -> Type<'db> {
-        module_name
-            .and_then(|module_name| resolve_module(self.db, module_name))
-            .map_or(Type::Unbound, |module| Type::Module(module.file()))
+    fn module_ty_from_name(
+        &self,
+        module_name: ModuleName,
+    ) -> Result<Type<'db>, ModuleResolutionError> {
+        resolve_module(self.db, module_name)
+            .map(|module| Type::Module(module.file()))
+            .ok_or(ModuleResolutionError::UnresolvedModule)
     }
 
     fn infer_decorator(&mut self, decorator: &ast::Decorator) -> Type<'db> {
@@ -992,6 +1139,9 @@ impl<'db> TypeInferenceBuilder<'db> {
             ast::Expr::NumberLiteral(literal) => self.infer_number_literal_expression(literal),
             ast::Expr::BooleanLiteral(literal) => self.infer_boolean_literal_expression(literal),
             ast::Expr::StringLiteral(literal) => self.infer_string_literal_expression(literal),
+            ast::Expr::BytesLiteral(bytes_literal) => {
+                self.infer_bytes_literal_expression(bytes_literal)
+            }
             ast::Expr::FString(fstring) => self.infer_fstring_expression(fstring),
             ast::Expr::EllipsisLiteral(literal) => self.infer_ellipsis_literal_expression(literal),
             ast::Expr::Tuple(tuple) => self.infer_tuple_expression(tuple),
@@ -1018,8 +1168,7 @@ impl<'db> TypeInferenceBuilder<'db> {
             ast::Expr::Yield(yield_expression) => self.infer_yield_expression(yield_expression),
             ast::Expr::YieldFrom(yield_from) => self.infer_yield_from_expression(yield_from),
             ast::Expr::Await(await_expression) => self.infer_await_expression(await_expression),
-
-            _ => todo!("expression type resolution for {:?}", expression),
+            ast::Expr::IpyEscapeCommand(_) => todo!("Implement Ipy escape command support"),
         };
 
         let expr_id = expression.scoped_ast_id(self.db, self.scope);
@@ -1056,6 +1205,15 @@ impl<'db> TypeInferenceBuilder<'db> {
         Type::Unknown
     }
 
+    #[allow(clippy::unused_self)]
+    fn infer_bytes_literal_expression(&mut self, literal: &ast::ExprBytesLiteral) -> Type<'db> {
+        // TODO: ignoring r/R prefixes for now, should normalize bytes values
+        Type::BytesLiteral(BytesLiteralType::new(
+            self.db,
+            literal.value.bytes().collect(),
+        ))
+    }
+
     fn infer_fstring_expression(&mut self, fstring: &ast::ExprFString) -> Type<'db> {
         let ast::ExprFString { range: _, value } = fstring;
 
@@ -1071,21 +1229,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                         flags: _,
                     } = fstring;
                     for element in elements {
-                        match element {
-                            ast::FStringElement::Literal(_) => {
-                                // TODO string literal type
-                            }
-                            ast::FStringElement::Expression(expr_element) => {
-                                let ast::FStringExpressionElement {
-                                    range: _,
-                                    expression,
-                                    debug_text: _,
-                                    conversion: _,
-                                    format_spec: _,
-                                } = expr_element;
-                                self.infer_expression(expression);
-                            }
-                        }
+                        self.infer_fstring_element(element);
                     }
                 }
             }
@@ -1093,6 +1237,30 @@ impl<'db> TypeInferenceBuilder<'db> {
 
         // TODO str type
         Type::Unknown
+    }
+
+    fn infer_fstring_element(&mut self, element: &ast::FStringElement) {
+        match element {
+            ast::FStringElement::Literal(_) => {
+                // TODO string literal type
+            }
+            ast::FStringElement::Expression(expr_element) => {
+                let ast::FStringExpressionElement {
+                    range: _,
+                    expression,
+                    debug_text: _,
+                    conversion: _,
+                    format_spec,
+                } = expr_element;
+                self.infer_expression(expression);
+
+                if let Some(format_spec) = format_spec {
+                    for spec_element in &format_spec.elements {
+                        self.infer_fstring_element(spec_element);
+                    }
+                }
+            }
+        }
     }
 
     #[allow(clippy::unused_self)]
@@ -1519,6 +1687,7 @@ impl<'db> TypeInferenceBuilder<'db> {
         let left_ty = self.infer_expression(left);
         let right_ty = self.infer_expression(right);
 
+        // TODO flatten the matches by matching on (left_ty, right_ty, op)
         match left_ty {
             Type::Any => Type::Any,
             Type::Unknown => Type::Unknown,
@@ -1551,6 +1720,22 @@ impl<'db> TypeInferenceBuilder<'db> {
                                 .map(Type::IntLiteral)
                                 // TODO division by zero error
                                 .unwrap_or(Type::Unknown),
+                            _ => Type::Unknown, // TODO
+                        }
+                    }
+                    _ => Type::Unknown, // TODO
+                }
+            }
+            Type::BytesLiteral(lhs) => {
+                match right_ty {
+                    Type::BytesLiteral(rhs) => {
+                        match op {
+                            ast::Operator::Add => Type::BytesLiteral(BytesLiteralType::new(
+                                self.db,
+                                [lhs.value(self.db).as_ref(), rhs.value(self.db).as_ref()]
+                                    .concat()
+                                    .into_boxed_slice(),
+                            )),
                             _ => Type::Unknown, // TODO
                         }
                     }
@@ -1623,7 +1808,7 @@ impl<'db> TypeInferenceBuilder<'db> {
         Type::Unknown
     }
 
-    fn infer_type_parameters(&mut self, type_parameters: &TypeParams) {
+    fn infer_type_parameters(&mut self, type_parameters: &ast::TypeParams) {
         let ast::TypeParams {
             range: _,
             type_params,
@@ -1660,6 +1845,28 @@ impl<'db> TypeInferenceBuilder<'db> {
         }
     }
 
+    /// Adds a new diagnostic.
+    ///
+    /// The diagnostic does not get added if the rule isn't enabled for this file.
+    fn add_diagnostic(&mut self, node: AnyNodeRef, rule: &str, message: std::fmt::Arguments) {
+        if !self.db.is_file_open(self.file) {
+            return;
+        }
+
+        // TODO: Don't emit the diagnostic if:
+        // * The enclosing node contains any syntax errors
+        // * The rule is disabled for this file. We probably want to introduce a new query that
+        //   returns a rule selector for a given file that respects the package's settings,
+        //   any global pragma comments in the file, and any per-file-ignores.
+
+        self.types.diagnostics.push(TypeCheckDiagnostic {
+            file: self.file,
+            rule: rule.to_string(),
+            message: message.to_string(),
+            range: node.range(),
+        });
+    }
+
     pub(super) fn finish(mut self) -> TypeInference<'db> {
         self.infer_region();
         self.types.shrink_to_fit();
@@ -1667,9 +1874,24 @@ impl<'db> TypeInferenceBuilder<'db> {
     }
 }
 
+fn format_import_from_module(level: u32, module: Option<&str>) -> String {
+    format!(
+        "{}{}",
+        ".".repeat(level as usize),
+        module.unwrap_or_default()
+    )
+}
+
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+enum ModuleResolutionError {
+    InvalidSyntax,
+    UnresolvedModule,
+}
+
 #[cfg(test)]
 mod tests {
     use anyhow::Context;
+
     use ruff_db::files::{system_path_to_file, File};
     use ruff_db::parsed::parsed_module;
     use ruff_db::system::{DbWithTestSystem, SystemPathBuf};
@@ -1696,14 +1918,9 @@ mod tests {
 
         Program::from_settings(
             &db,
-            ProgramSettings {
+            &ProgramSettings {
                 target_version: PythonVersion::default(),
-                search_paths: SearchPathSettings {
-                    extra_paths: Vec::new(),
-                    src_root,
-                    site_packages: vec![],
-                    custom_typeshed: None,
-                },
+                search_paths: SearchPathSettings::new(src_root),
             },
         )
         .expect("Valid search path settings");
@@ -1723,13 +1940,11 @@ mod tests {
 
         Program::from_settings(
             &db,
-            ProgramSettings {
+            &ProgramSettings {
                 target_version: PythonVersion::default(),
                 search_paths: SearchPathSettings {
-                    extra_paths: Vec::new(),
-                    src_root,
-                    site_packages: vec![],
                     custom_typeshed: Some(SystemPathBuf::from(typeshed)),
+                    ..SearchPathSettings::new(src_root)
                 },
             },
         )
@@ -1783,7 +1998,7 @@ mod tests {
             ("src/package/bar.py", "from .foo import X"),
         ])?;
 
-        assert_public_ty(&db, "src/package/bar.py", "X", "Unbound");
+        assert_public_ty(&db, "src/package/bar.py", "X", "Unknown");
 
         Ok(())
     }
@@ -1821,7 +2036,7 @@ mod tests {
     fn follow_nonexistent_relative_import_bare_to_package() -> anyhow::Result<()> {
         let mut db = setup_db();
         db.write_files([("src/package/bar.py", "from . import X")])?;
-        assert_public_ty(&db, "src/package/bar.py", "X", "Unbound");
+        assert_public_ty(&db, "src/package/bar.py", "X", "Unknown");
         Ok(())
     }
 
@@ -1851,7 +2066,7 @@ mod tests {
             ("src/package/bar.py", "from . import foo"),
         ])?;
 
-        assert_public_ty(&db, "src/package/bar.py", "foo", "Unbound");
+        assert_public_ty(&db, "src/package/bar.py", "foo", "Unknown");
 
         Ok(())
     }
@@ -1874,7 +2089,7 @@ mod tests {
     fn follow_nonexistent_relative_import_from_dunder_init() -> anyhow::Result<()> {
         let mut db = setup_db();
         db.write_files([("src/package/__init__.py", "from .foo import X")])?;
-        assert_public_ty(&db, "src/package/__init__.py", "X", "Unbound");
+        assert_public_ty(&db, "src/package/__init__.py", "X", "Unknown");
         Ok(())
     }
 
@@ -1898,6 +2113,34 @@ mod tests {
             "Literal[42]",
         );
 
+        Ok(())
+    }
+
+    #[test]
+    fn imported_unbound_symbol_is_unknown() -> anyhow::Result<()> {
+        let mut db = setup_db();
+
+        db.write_files([
+            ("src/package/__init__.py", ""),
+            ("src/package/foo.py", "x"),
+            ("src/package/bar.py", "from package.foo import x"),
+        ])?;
+
+        // the type as seen from external modules (`Unknown`)
+        // is different from the type inside the module itself (`Unbound`):
+        assert_public_ty(&db, "src/package/foo.py", "x", "Unbound");
+        assert_public_ty(&db, "src/package/bar.py", "x", "Unknown");
+
+        Ok(())
+    }
+
+    #[test]
+    fn from_import_with_no_module_name() -> anyhow::Result<()> {
+        // This test checks that invalid syntax in a `StmtImportFrom` node
+        // leads to the type being inferred as `Unknown`
+        let mut db = setup_db();
+        db.write_file("src/foo.py", "from import bar")?;
+        assert_public_ty(&db, "src/foo.py", "bar", "Unknown");
         Ok(())
     }
 
@@ -2013,6 +2256,28 @@ mod tests {
     }
 
     #[test]
+    fn bytes_type() -> anyhow::Result<()> {
+        let mut db = setup_db();
+
+        db.write_dedented(
+            "src/a.py",
+            "
+            w = b'red' b'knot'
+            x = b'hello'
+            y = b'world' + b'!'
+            z = b'\\xff\\x00'
+            ",
+        )?;
+
+        assert_public_ty(&db, "src/a.py", "w", "Literal[b\"redknot\"]");
+        assert_public_ty(&db, "src/a.py", "x", "Literal[b\"hello\"]");
+        assert_public_ty(&db, "src/a.py", "y", "Literal[b\"world!\"]");
+        assert_public_ty(&db, "src/a.py", "z", "Literal[b\"\\xff\\x00\"]");
+
+        Ok(())
+    }
+
+    #[test]
     fn resolve_union() -> anyhow::Result<()> {
         let mut db = setup_db();
 
@@ -2063,6 +2328,23 @@ mod tests {
 
         assert_public_ty(&db, "src/a.py", "x", "Literal[2]");
         assert_public_ty(&db, "src/a.py", "y", "Literal[1]");
+
+        Ok(())
+    }
+
+    #[test]
+    fn walrus_self_plus_one() -> anyhow::Result<()> {
+        let mut db = setup_db();
+
+        db.write_dedented(
+            "src/a.py",
+            "
+            x = 0
+            (x := x + 1)
+            ",
+        )?;
+
+        assert_public_ty(&db, "src/a.py", "x", "Literal[1]");
 
         Ok(())
     }
@@ -2563,6 +2845,26 @@ mod tests {
     }
 
     #[test]
+    fn narrow_not_none() -> anyhow::Result<()> {
+        let mut db = setup_db();
+
+        db.write_dedented(
+            "/src/a.py",
+            "
+            x = None if flag else 1
+            y = 0
+            if x is not None:
+                y = x
+            ",
+        )?;
+
+        assert_public_ty(&db, "/src/a.py", "x", "Literal[1] | None");
+        assert_public_ty(&db, "/src/a.py", "y", "Literal[0, 1]");
+
+        Ok(())
+    }
+
+    #[test]
     fn while_loop() -> anyhow::Result<()> {
         let mut db = setup_db();
 
@@ -2659,10 +2961,11 @@ mod tests {
 
     fn first_public_def<'db>(db: &'db TestDb, file: File, name: &str) -> Definition<'db> {
         let scope = global_scope(db, file);
-        *use_def_map(db, scope)
+        use_def_map(db, scope)
             .public_definitions(symbol_table(db, scope).symbol_id_by_name(name).unwrap())
-            .first()
+            .next()
             .unwrap()
+            .definition
     }
 
     #[test]

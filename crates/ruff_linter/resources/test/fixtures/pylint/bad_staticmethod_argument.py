@@ -42,3 +42,9 @@ class Foo:
     @classmethod
     def graze(cls, x, y, z):
         pass
+
+
+class Foo:
+    @staticmethod
+    def __new__(cls, x, y, z):  # OK, see https://docs.python.org/3/reference/datamodel.html#basic-customization
+        pass

@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_bugbear/mod.rs
+assertion_line: 74
 ---
 B015.py:3:1: B015 Pointless comparison. Did you mean to assign a value? Otherwise, prepend `assert` or remove it.
   |
@@ -19,7 +20,7 @@ B015.py:7:1: B015 Pointless comparison. Did you mean to assign a value? Otherwis
   | ^^^^^^^^^^^ B015
   |
 
-B015.py:17:5: B015 Pointless comparison. Did you mean to assign a value? Otherwise, prepend `assert` or remove it.
+B015.py:17:5: B015 Pointless comparison at end of function scope. Did you mean to return the expression result?
    |
 15 |     assert 1 in (1, 2)
 16 | 
@@ -27,11 +28,17 @@ B015.py:17:5: B015 Pointless comparison. Did you mean to assign a value? Otherwi
    |     ^^^^^^^^^^^ B015
    |
 
-B015.py:24:5: B015 Pointless comparison. Did you mean to assign a value? Otherwise, prepend `assert` or remove it.
+B015.py:21:5: B015 Pointless comparison. Did you mean to assign a value? Otherwise, prepend `assert` or remove it.
    |
-23 | class TestClass:
-24 |     1 == 1
+20 | def test2():
+21 |     1 in (1, 2)
+   |     ^^^^^^^^^^^ B015
+22 |     return
+   |
+
+B015.py:29:5: B015 Pointless comparison. Did you mean to assign a value? Otherwise, prepend `assert` or remove it.
+   |
+28 | class TestClass:
+29 |     1 == 1
    |     ^^^^^^ B015
    |
-
-

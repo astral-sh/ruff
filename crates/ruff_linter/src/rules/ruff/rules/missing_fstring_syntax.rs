@@ -4,7 +4,7 @@ use ruff_python_ast as ast;
 use ruff_python_literal::format::FormatSpec;
 use ruff_python_parser::parse_expression;
 use ruff_python_semantic::analyze::logging::is_logger_candidate;
-use ruff_python_semantic::SemanticModel;
+use ruff_python_semantic::{Modules, SemanticModel};
 use ruff_source_file::Locator;
 use ruff_text_size::{Ranged, TextRange};
 
@@ -12,6 +12,7 @@ use memchr::memchr2_iter;
 use rustc_hash::FxHashSet;
 
 use crate::checkers::ast::Checker;
+use crate::rules::fastapi::rules::is_fastapi_route_call;
 
 /// ## What it does
 /// Searches for strings that look like they were meant to be f-strings, but are missing an `f` prefix.
@@ -34,7 +35,7 @@ use crate::checkers::ast::Checker;
 /// 5. The string references variables that are not in scope, or it doesn't capture variables at all.
 /// 6. Any format specifiers in the potential f-string are invalid.
 /// 7. The string is part of a function call that is known to expect a template string rather than an
-///    evaluated f-string: for example, a `logging` call or a [`gettext`] call
+///    evaluated f-string: for example, a [`logging`] call, a [`gettext`] call, or a [`fastAPI` path].
 ///
 /// ## Example
 ///
@@ -53,6 +54,7 @@ use crate::checkers::ast::Checker;
 ///
 /// [`logging`]: https://docs.python.org/3/howto/logging-cookbook.html#using-particular-formatting-styles-throughout-your-application
 /// [`gettext`]: https://docs.python.org/3/library/gettext.html
+/// [`fastAPI` path]: https://fastapi.tiangolo.com/tutorial/path-params/
 #[violation]
 pub struct MissingFStringSyntax;
 
@@ -81,11 +83,13 @@ pub(crate) fn missing_fstring_syntax(checker: &mut Checker, literal: &ast::Strin
     }
 
     let logger_objects = &checker.settings.logger_objects;
+    let fastapi_seen = semantic.seen_module(Modules::FASTAPI);
 
     // We also want to avoid:
     // - Expressions inside `gettext()` calls
     // - Expressions passed to logging calls (since the `logging` module evaluates them lazily:
     //   https://docs.python.org/3/howto/logging-cookbook.html#using-particular-formatting-styles-throughout-your-application)
+    // - `fastAPI` paths: https://fastapi.tiangolo.com/tutorial/path-params/
     // - Expressions where a method is immediately called on the string literal
     if semantic
         .current_expressions()
@@ -94,6 +98,7 @@ pub(crate) fn missing_fstring_syntax(checker: &mut Checker, literal: &ast::Strin
             is_method_call_on_literal(call_expr, literal)
                 || is_gettext(call_expr, semantic)
                 || is_logger_candidate(&call_expr.func, semantic, logger_objects)
+                || (fastapi_seen && is_fastapi_route_call(call_expr, semantic))
         })
     {
         return;

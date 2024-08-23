@@ -3,7 +3,7 @@ use anyhow::Context;
 use salsa::Durability;
 use salsa::Setter;
 
-use ruff_db::system::SystemPathBuf;
+use ruff_db::system::{SystemPath, SystemPathBuf};
 
 use crate::module_resolver::SearchPaths;
 use crate::Db;
@@ -12,33 +12,31 @@ use crate::Db;
 pub struct Program {
     pub target_version: PythonVersion,
 
-    #[default]
     #[return_ref]
     pub(crate) search_paths: SearchPaths,
 }
 
 impl Program {
-    pub fn from_settings(db: &dyn Db, settings: ProgramSettings) -> anyhow::Result<Self> {
+    pub fn from_settings(db: &dyn Db, settings: &ProgramSettings) -> anyhow::Result<Self> {
         let ProgramSettings {
             target_version,
             search_paths,
         } = settings;
 
-        tracing::info!("Target version: {target_version}");
+        tracing::info!("Target version: Python {target_version}");
 
         let search_paths = SearchPaths::from_settings(db, search_paths)
             .with_context(|| "Invalid search path settings")?;
 
-        Ok(Program::builder(settings.target_version)
+        Ok(Program::builder(settings.target_version, search_paths)
             .durability(Durability::HIGH)
-            .search_paths(search_paths)
             .new(db))
     }
 
     pub fn update_search_paths(
-        &self,
+        self,
         db: &mut dyn Db,
-        search_path_settings: SearchPathSettings,
+        search_path_settings: &SearchPathSettings,
     ) -> anyhow::Result<()> {
         let search_paths = SearchPaths::from_settings(db, search_path_settings)?;
 
@@ -49,16 +47,20 @@ impl Program {
 
         Ok(())
     }
+
+    pub fn custom_stdlib_search_path(self, db: &dyn Db) -> Option<&SystemPath> {
+        self.search_paths(db).custom_stdlib()
+    }
 }
 
-#[derive(Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub struct ProgramSettings {
     pub target_version: PythonVersion,
     pub search_paths: SearchPathSettings,
 }
 
 /// Configures the search paths for module resolution.
-#[derive(Eq, PartialEq, Debug, Clone, Default)]
+#[derive(Eq, PartialEq, Debug, Clone)]
 pub struct SearchPathSettings {
     /// List of user-provided paths that should take first priority in the module resolution.
     /// Examples in other type checkers are mypy's MYPYPATH environment variable,
@@ -74,5 +76,25 @@ pub struct SearchPathSettings {
     pub custom_typeshed: Option<SystemPathBuf>,
 
     /// The path to the user's `site-packages` directory, where third-party packages from ``PyPI`` are installed.
-    pub site_packages: Vec<SystemPathBuf>,
+    pub site_packages: SitePackages,
+}
+
+impl SearchPathSettings {
+    pub fn new(src_root: SystemPathBuf) -> Self {
+        Self {
+            src_root,
+            extra_paths: vec![],
+            custom_typeshed: None,
+            site_packages: SitePackages::Known(vec![]),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Eq, PartialEq)]
+pub enum SitePackages {
+    Derived {
+        venv_path: SystemPathBuf,
+    },
+    /// Resolved site packages paths
+    Known(Vec<SystemPathBuf>),
 }

@@ -42,7 +42,7 @@ use super::helpers::{
 /// import pytest
 ///
 ///
-/// @pytest.fixture
+/// @pytest.fixture()
 /// def my_fixture(): ...
 /// ```
 ///
@@ -52,7 +52,7 @@ use super::helpers::{
 /// import pytest
 ///
 ///
-/// @pytest.fixture()
+/// @pytest.fixture
 /// def my_fixture(): ...
 /// ```
 ///

@@ -1,4 +1,3 @@
-use std::cell::OnceCell;
 use std::collections::BTreeMap;
 use std::fmt;
 use std::num::{NonZeroU16, NonZeroUsize};
@@ -6,78 +5,12 @@ use std::ops::{RangeFrom, RangeInclusive};
 use std::str::FromStr;
 
 use once_cell::sync::Lazy;
-use ruff_db::system::SystemPath;
 use rustc_hash::FxHashMap;
-
-use ruff_db::files::{system_path_to_file, File};
 
 use super::vendored::vendored_typeshed_stubs;
 use crate::db::Db;
 use crate::module_name::ModuleName;
-use crate::python_version::PythonVersion;
-
-#[derive(Debug)]
-pub(crate) struct LazyTypeshedVersions<'db>(OnceCell<&'db TypeshedVersions>);
-
-impl<'db> LazyTypeshedVersions<'db> {
-    #[must_use]
-    pub(crate) fn new() -> Self {
-        Self(OnceCell::new())
-    }
-
-    /// Query whether a module exists at runtime in the stdlib on a certain Python version.
-    ///
-    /// Simply probing whether a file exists in typeshed is insufficient for this question,
-    /// as a module in the stdlib may have been added in Python 3.10, but the typeshed stub
-    /// will still be available (either in a custom typeshed dir or in our vendored copy)
-    /// even if the user specified Python 3.8 as the target version.
-    ///
-    /// For top-level modules and packages, the VERSIONS file can always provide an unambiguous answer
-    /// as to whether the module exists on the specified target version. However, VERSIONS does not
-    /// provide comprehensive information on all submodules, meaning that this method sometimes
-    /// returns [`TypeshedVersionsQueryResult::MaybeExists`].
-    /// See [`TypeshedVersionsQueryResult`] for more details.
-    #[must_use]
-    pub(crate) fn query_module(
-        &self,
-        db: &'db dyn Db,
-        module: &ModuleName,
-        stdlib_root: Option<&SystemPath>,
-        target_version: PythonVersion,
-    ) -> TypeshedVersionsQueryResult {
-        let versions = self.0.get_or_init(|| {
-            let versions_path = if let Some(system_path) = stdlib_root {
-                system_path.join("VERSIONS")
-            } else {
-                return &VENDORED_VERSIONS;
-            };
-            let Ok(versions_file) = system_path_to_file(db.upcast(), &versions_path) else {
-                todo!(
-                    "Still need to figure out how to handle VERSIONS files being deleted \
-                    from custom typeshed directories! Expected a file to exist at {versions_path}"
-                )
-            };
-            // TODO(Alex/Micha): If VERSIONS is invalid,
-            // this should invalidate not just the specific module resolution we're currently attempting,
-            // but all type inference that depends on any standard-library types.
-            // Unwrapping here is not correct...
-            parse_typeshed_versions(db, versions_file).as_ref().unwrap()
-        });
-        versions.query_module(module, target_version)
-    }
-}
-
-#[salsa::tracked(return_ref)]
-pub(crate) fn parse_typeshed_versions(
-    db: &dyn Db,
-    versions_file: File,
-) -> Result<TypeshedVersions, TypeshedVersionsParseError> {
-    // TODO: Handle IO errors
-    let file_content = versions_file
-        .read_to_string(db.upcast())
-        .unwrap_or_default();
-    file_content.parse()
-}
+use crate::{Program, PythonVersion};
 
 static VENDORED_VERSIONS: Lazy<TypeshedVersions> = Lazy::new(|| {
     TypeshedVersions::from_str(
@@ -87,6 +20,14 @@ static VENDORED_VERSIONS: Lazy<TypeshedVersions> = Lazy::new(|| {
     )
     .unwrap()
 });
+
+pub(crate) fn vendored_typeshed_versions() -> &'static TypeshedVersions {
+    &VENDORED_VERSIONS
+}
+
+pub(crate) fn typeshed_versions(db: &dyn Db) -> &TypeshedVersions {
+    Program::get(db).search_paths(db).typeshed_versions()
+}
 
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub(crate) struct TypeshedVersionsParseError {
@@ -174,7 +115,7 @@ impl TypeshedVersions {
     }
 
     #[must_use]
-    fn query_module(
+    pub(in crate::module_resolver) fn query_module(
         &self,
         module: &ModuleName,
         target_version: PythonVersion,
@@ -204,7 +145,7 @@ impl TypeshedVersions {
     }
 }
 
-/// Possible answers [`LazyTypeshedVersions::query_module()`] could give to the question:
+/// Possible answers [`TypeshedVersions::query_module()`] could give to the question:
 /// "Does this module exist in the stdlib at runtime on a certain target version?"
 #[derive(Debug, Copy, PartialEq, Eq, Clone, Hash)]
 pub(crate) enum TypeshedVersionsQueryResult {

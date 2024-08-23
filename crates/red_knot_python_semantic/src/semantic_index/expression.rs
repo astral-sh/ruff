@@ -21,7 +21,7 @@ pub(crate) struct Expression<'db> {
     /// The expression node.
     #[no_eq]
     #[return_ref]
-    pub(crate) node: AstNodeRef<ast::Expr>,
+    pub(crate) node_ref: AstNodeRef<ast::Expr>,
 
     #[no_eq]
     count: countme::Count<Expression<'static>>,

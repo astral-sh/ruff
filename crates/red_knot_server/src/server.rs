@@ -3,11 +3,11 @@
 use std::num::NonZeroUsize;
 use std::panic::PanicInfo;
 
-use lsp_server as lsp;
-use lsp_types as types;
+use lsp_server::Message;
 use lsp_types::{
-    ClientCapabilities, DiagnosticOptions, NotebookCellSelector, NotebookDocumentSyncOptions,
-    NotebookSelector, TextDocumentSyncCapability, TextDocumentSyncOptions,
+    ClientCapabilities, DiagnosticOptions, DiagnosticServerCapabilities, MessageType,
+    ServerCapabilities, TextDocumentSyncCapability, TextDocumentSyncKind, TextDocumentSyncOptions,
+    Url,
 };
 
 use self::connection::{Connection, ConnectionInitializer};
@@ -74,7 +74,7 @@ impl Server {
             init_params.client_info.as_ref(),
         );
 
-        let mut workspace_for_url = |url: lsp_types::Url| {
+        let mut workspace_for_url = |url: Url| {
             let Some(workspace_settings) = workspace_settings.as_mut() else {
                 return (url, ClientSettings::default());
             };
@@ -93,12 +93,17 @@ impl Server {
             }).collect())
             .or_else(|| {
                 tracing::warn!("No workspace(s) were provided during initialization. Using the current working directory as a default workspace...");
-                let uri = types::Url::from_file_path(std::env::current_dir().ok()?).ok()?;
+                let uri = Url::from_file_path(std::env::current_dir().ok()?).ok()?;
                 Some(vec![workspace_for_url(uri)])
             })
             .ok_or_else(|| {
                 anyhow::anyhow!("Failed to get the current working directory while creating a default workspace.")
             })?;
+
+        if workspaces.len() > 1 {
+            // TODO(dhruvmanila): Support multi-root workspaces
+            anyhow::bail!("Multi-root workspaces are not supported yet");
+        }
 
         Ok(Self {
             connection,
@@ -149,7 +154,7 @@ impl Server {
             try_show_message(
                 "The Ruff language server exited with a panic. See the logs for more details."
                     .to_string(),
-                lsp_types::MessageType::ERROR,
+                MessageType::ERROR,
             )
             .ok();
         }));
@@ -182,9 +187,9 @@ impl Server {
                 break;
             }
             let task = match msg {
-                lsp::Message::Request(req) => api::request(req),
-                lsp::Message::Notification(notification) => api::notification(notification),
-                lsp::Message::Response(response) => scheduler.response(response),
+                Message::Request(req) => api::request(req),
+                Message::Notification(notification) => api::notification(notification),
+                Message::Response(response) => scheduler.response(response),
             };
             scheduler.dispatch(task);
         }
@@ -206,28 +211,17 @@ impl Server {
             .unwrap_or_default()
     }
 
-    fn server_capabilities(position_encoding: PositionEncoding) -> types::ServerCapabilities {
-        types::ServerCapabilities {
+    fn server_capabilities(position_encoding: PositionEncoding) -> ServerCapabilities {
+        ServerCapabilities {
             position_encoding: Some(position_encoding.into()),
-            diagnostic_provider: Some(types::DiagnosticServerCapabilities::Options(
-                DiagnosticOptions {
-                    identifier: Some(crate::DIAGNOSTIC_NAME.into()),
-                    ..Default::default()
-                },
-            )),
-            notebook_document_sync: Some(types::OneOf::Left(NotebookDocumentSyncOptions {
-                save: Some(false),
-                notebook_selector: [NotebookSelector::ByCells {
-                    notebook: None,
-                    cells: vec![NotebookCellSelector {
-                        language: "python".to_string(),
-                    }],
-                }]
-                .to_vec(),
+            diagnostic_provider: Some(DiagnosticServerCapabilities::Options(DiagnosticOptions {
+                identifier: Some(crate::DIAGNOSTIC_NAME.into()),
+                ..Default::default()
             })),
             text_document_sync: Some(TextDocumentSyncCapability::Options(
                 TextDocumentSyncOptions {
                     open_close: Some(true),
+                    change: Some(TextDocumentSyncKind::INCREMENTAL),
                     ..Default::default()
                 },
             )),

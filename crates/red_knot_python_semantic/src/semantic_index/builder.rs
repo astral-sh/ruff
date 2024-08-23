@@ -7,7 +7,8 @@ use ruff_db::parsed::ParsedModule;
 use ruff_index::IndexVec;
 use ruff_python_ast as ast;
 use ruff_python_ast::name::Name;
-use ruff_python_ast::visitor::{walk_expr, walk_stmt, Visitor};
+use ruff_python_ast::visitor::{walk_expr, walk_pattern, walk_stmt, Visitor};
+use ruff_python_ast::AnyParameterRef;
 
 use crate::ast_node_ref::AstNodeRef;
 use crate::semantic_index::ast_ids::node_key::ExpressionNodeKey;
@@ -24,6 +25,8 @@ use crate::semantic_index::symbol::{
 use crate::semantic_index::use_def::{FlowSnapshot, UseDefMapBuilder};
 use crate::semantic_index::SemanticIndex;
 use crate::Db;
+
+use super::definition::WithItemDefinitionNodeRef;
 
 pub(super) struct SemanticIndexBuilder<'db> {
     // Builder state
@@ -155,7 +158,7 @@ impl<'db> SemanticIndexBuilder<'db> {
         self.current_use_def_map_mut().restore(state);
     }
 
-    fn flow_merge(&mut self, state: &FlowSnapshot) {
+    fn flow_merge(&mut self, state: FlowSnapshot) {
         self.current_use_def_map_mut().merge(state);
     }
 
@@ -195,9 +198,16 @@ impl<'db> SemanticIndexBuilder<'db> {
         definition
     }
 
+    fn add_constraint(&mut self, constraint_node: &ast::Expr) -> Expression<'db> {
+        let expression = self.add_standalone_expression(constraint_node);
+        self.current_use_def_map_mut().record_constraint(expression);
+
+        expression
+    }
+
     /// Record an expression that needs to be a Salsa ingredient, because we need to infer its type
     /// standalone (type narrowing tests, RHS of an assignment.)
-    fn add_standalone_expression(&mut self, expression_node: &ast::Expr) {
+    fn add_standalone_expression(&mut self, expression_node: &ast::Expr) -> Expression<'db> {
         let expression = Expression::new(
             self.db,
             self.file,
@@ -210,6 +220,7 @@ impl<'db> SemanticIndexBuilder<'db> {
         );
         self.expressions_by_node
             .insert(expression_node.into(), expression);
+        expression
     }
 
     fn with_type_params(
@@ -298,6 +309,23 @@ impl<'db> SemanticIndexBuilder<'db> {
             for expr in &generator.ifs {
                 self.visit_expr(expr);
             }
+        }
+    }
+
+    fn declare_parameter(&mut self, parameter: AnyParameterRef) {
+        let symbol =
+            self.add_or_update_symbol(parameter.name().id().clone(), SymbolFlags::IS_DEFINED);
+
+        let definition = self.add_definition(symbol, parameter);
+
+        if let AnyParameterRef::NonVariadic(with_default) = parameter {
+            // Insert a mapping from the parameter to the same definition.
+            // This ensures that calling `HasTy::ty` on the inner parameter returns
+            // a valid type (and doesn't panic)
+            self.definitions_by_node.insert(
+                DefinitionNodeRef::from(AnyParameterRef::Variadic(&with_default.parameter)).key(),
+                definition,
+            );
         }
     }
 
@@ -391,11 +419,7 @@ where
 
                         // Add symbols and definitions for the parameters to the function scope.
                         for parameter in &*function_def.parameters {
-                            let symbol = builder.add_or_update_symbol(
-                                parameter.name().id().clone(),
-                                SymbolFlags::IS_DEFINED,
-                            );
-                            builder.add_definition(symbol, parameter);
+                            builder.declare_parameter(parameter);
                         }
 
                         builder.visit_body(&function_def.body);
@@ -473,9 +497,24 @@ where
                 self.visit_expr(&node.target);
                 self.current_assignment = None;
             }
+            ast::Stmt::AugAssign(
+                aug_assign @ ast::StmtAugAssign {
+                    range: _,
+                    target,
+                    op: _,
+                    value,
+                },
+            ) => {
+                debug_assert!(self.current_assignment.is_none());
+                self.visit_expr(value);
+                self.current_assignment = Some(aug_assign.into());
+                self.visit_expr(target);
+                self.current_assignment = None;
+            }
             ast::Stmt::If(node) => {
                 self.visit_expr(&node.test);
                 let pre_if = self.flow_snapshot();
+                self.add_constraint(&node.test);
                 self.visit_body(&node.body);
                 let mut post_clauses: Vec<FlowSnapshot> = vec![];
                 for clause in &node.elif_else_clauses {
@@ -488,7 +527,7 @@ where
                     self.visit_elif_else_clause(clause);
                 }
                 for post_clause_state in post_clauses {
-                    self.flow_merge(&post_clause_state);
+                    self.flow_merge(post_clause_state);
                 }
                 let has_else = node
                     .elif_else_clauses
@@ -497,7 +536,7 @@ where
                 if !has_else {
                     // if there's no else clause, then it's possible we took none of the branches,
                     // and the pre_if state can reach here
-                    self.flow_merge(&pre_if);
+                    self.flow_merge(pre_if);
                 }
             }
             ast::Stmt::While(node) => {
@@ -515,14 +554,26 @@ where
 
                 // We may execute the `else` clause without ever executing the body, so merge in
                 // the pre-loop state before visiting `else`.
-                self.flow_merge(&pre_loop);
+                self.flow_merge(pre_loop);
                 self.visit_body(&node.orelse);
 
                 // Breaking out of a while loop bypasses the `else` clause, so merge in the break
                 // states after visiting `else`.
                 for break_state in break_states {
-                    self.flow_merge(&break_state);
+                    self.flow_merge(break_state);
                 }
+            }
+            ast::Stmt::With(ast::StmtWith { items, body, .. }) => {
+                for item in items {
+                    self.visit_expr(&item.context_expr);
+                    if let Some(optional_vars) = item.optional_vars.as_deref() {
+                        self.add_standalone_expression(&item.context_expr);
+                        self.current_assignment = Some(item.into());
+                        self.visit_expr(optional_vars);
+                        self.current_assignment = None;
+                    }
+                }
+                self.visit_body(body);
             }
             ast::Stmt::Break(_) => {
                 self.loop_break_states.push(self.flow_snapshot());
@@ -540,12 +591,21 @@ where
 
         match expr {
             ast::Expr::Name(name_node @ ast::ExprName { id, ctx, .. }) => {
-                let flags = match ctx {
+                let mut flags = match ctx {
                     ast::ExprContext::Load => SymbolFlags::IS_USED,
                     ast::ExprContext::Store => SymbolFlags::IS_DEFINED,
                     ast::ExprContext::Del => SymbolFlags::IS_DEFINED,
                     ast::ExprContext::Invalid => SymbolFlags::empty(),
                 };
+                if matches!(
+                    self.current_assignment,
+                    Some(CurrentAssignment::AugAssign(_))
+                ) && !ctx.is_invalid()
+                {
+                    // For augmented assignment, the target expression is also used, so we should
+                    // record that as a use.
+                    flags |= SymbolFlags::IS_USED;
+                }
                 let symbol = self.add_or_update_symbol(id.clone(), flags);
                 if flags.contains(SymbolFlags::IS_DEFINED) {
                     match self.current_assignment {
@@ -561,6 +621,9 @@ where
                         Some(CurrentAssignment::AnnAssign(ann_assign)) => {
                             self.add_definition(symbol, ann_assign);
                         }
+                        Some(CurrentAssignment::AugAssign(aug_assign)) => {
+                            self.add_definition(symbol, aug_assign);
+                        }
                         Some(CurrentAssignment::Named(named)) => {
                             // TODO(dhruvmanila): If the current scope is a comprehension, then the
                             // named expression is implicitly nonlocal. This is yet to be
@@ -571,6 +634,15 @@ where
                             self.add_definition(
                                 symbol,
                                 ComprehensionDefinitionNodeRef { node, first },
+                            );
+                        }
+                        Some(CurrentAssignment::WithItem(with_item)) => {
+                            self.add_definition(
+                                symbol,
+                                WithItemDefinitionNodeRef {
+                                    node: with_item,
+                                    target: name_node,
+                                },
                             );
                         }
                         None => {}
@@ -586,11 +658,11 @@ where
             }
             ast::Expr::Named(node) => {
                 debug_assert!(self.current_assignment.is_none());
-                self.current_assignment = Some(node.into());
                 // TODO walrus in comprehensions is implicitly nonlocal
+                self.visit_expr(&node.value);
+                self.current_assignment = Some(node.into());
                 self.visit_expr(&node.target);
                 self.current_assignment = None;
-                self.visit_expr(&node.value);
             }
             ast::Expr::Lambda(lambda) => {
                 if let Some(parameters) = &lambda.parameters {
@@ -609,11 +681,7 @@ where
                 // Add symbols and definitions for the parameters to the lambda scope.
                 if let Some(parameters) = &lambda.parameters {
                     for parameter in &**parameters {
-                        let symbol = self.add_or_update_symbol(
-                            parameter.name().id().clone(),
-                            SymbolFlags::IS_DEFINED,
-                        );
-                        self.add_definition(symbol, parameter);
+                        self.declare_parameter(parameter);
                     }
                 }
 
@@ -631,7 +699,7 @@ where
                 let post_body = self.flow_snapshot();
                 self.flow_restore(pre_if);
                 self.visit_expr(orelse);
-                self.flow_merge(&post_body);
+                self.flow_merge(post_body);
             }
             ast::Expr::ListComp(
                 list_comprehension @ ast::ExprListComp {
@@ -702,17 +770,38 @@ where
             self.visit_parameter(parameter);
         }
     }
+
+    fn visit_pattern(&mut self, pattern: &'ast ast::Pattern) {
+        if let ast::Pattern::MatchAs(ast::PatternMatchAs {
+            name: Some(name), ..
+        })
+        | ast::Pattern::MatchStar(ast::PatternMatchStar {
+            name: Some(name),
+            range: _,
+        })
+        | ast::Pattern::MatchMapping(ast::PatternMatchMapping {
+            rest: Some(name), ..
+        }) = pattern
+        {
+            // TODO(dhruvmanila): Add definition
+            self.add_or_update_symbol(name.id.clone(), SymbolFlags::IS_DEFINED);
+        }
+
+        walk_pattern(self, pattern);
+    }
 }
 
 #[derive(Copy, Clone, Debug)]
 enum CurrentAssignment<'a> {
     Assign(&'a ast::StmtAssign),
     AnnAssign(&'a ast::StmtAnnAssign),
+    AugAssign(&'a ast::StmtAugAssign),
     Named(&'a ast::ExprNamed),
     Comprehension {
         node: &'a ast::Comprehension,
         first: bool,
     },
+    WithItem(&'a ast::WithItem),
 }
 
 impl<'a> From<&'a ast::StmtAssign> for CurrentAssignment<'a> {
@@ -727,8 +816,20 @@ impl<'a> From<&'a ast::StmtAnnAssign> for CurrentAssignment<'a> {
     }
 }
 
+impl<'a> From<&'a ast::StmtAugAssign> for CurrentAssignment<'a> {
+    fn from(value: &'a ast::StmtAugAssign) -> Self {
+        Self::AugAssign(value)
+    }
+}
+
 impl<'a> From<&'a ast::ExprNamed> for CurrentAssignment<'a> {
     fn from(value: &'a ast::ExprNamed) -> Self {
         Self::Named(value)
+    }
+}
+
+impl<'a> From<&'a ast::WithItem> for CurrentAssignment<'a> {
+    fn from(value: &'a ast::WithItem) -> Self {
+        Self::WithItem(value)
     }
 }

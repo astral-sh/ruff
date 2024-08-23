@@ -1,4 +1,4 @@
-use ruff_db::system::{SystemPath, SystemPathBuf};
+use ruff_db::system::{SystemPath, SystemPathBuf, SystemVirtualPathBuf};
 pub use watcher::{directory_watcher, EventHandler, Watcher};
 pub use workspace_watcher::WorkspaceWatcher;
 
@@ -20,6 +20,9 @@ mod workspace_watcher;
 /// event instead of emitting an event for each file or subdirectory in that path.
 #[derive(Debug, PartialEq, Eq)]
 pub enum ChangeEvent {
+    /// The file corresponding to the given path was opened in an editor.
+    Opened(SystemPathBuf),
+
     /// A new path was created
     Created {
         path: SystemPathBuf,
@@ -38,6 +41,15 @@ pub enum ChangeEvent {
         kind: DeletedKind,
     },
 
+    /// A new virtual path was created.
+    CreatedVirtual(SystemVirtualPathBuf),
+
+    /// The content of a virtual path was changed.
+    ChangedVirtual(SystemVirtualPathBuf),
+
+    /// A virtual path was deleted.
+    DeletedVirtual(SystemVirtualPathBuf),
+
     /// The file watcher failed to observe some changes and now is out of sync with the file system.
     ///
     /// This can happen if many files are changed at once. The consumer should rescan all files to catch up
@@ -46,16 +58,27 @@ pub enum ChangeEvent {
 }
 
 impl ChangeEvent {
-    pub fn file_name(&self) -> Option<&str> {
-        self.path().and_then(|path| path.file_name())
+    /// Creates a new [`Changed`] event for the file content at the given path.
+    ///
+    /// [`Changed`]: ChangeEvent::Changed
+    pub fn file_content_changed(path: SystemPathBuf) -> ChangeEvent {
+        ChangeEvent::Changed {
+            path,
+            kind: ChangedKind::FileContent,
+        }
     }
 
-    pub fn path(&self) -> Option<&SystemPath> {
+    pub fn file_name(&self) -> Option<&str> {
+        self.system_path().and_then(|path| path.file_name())
+    }
+
+    pub fn system_path(&self) -> Option<&SystemPath> {
         match self {
-            ChangeEvent::Created { path, .. }
+            ChangeEvent::Opened(path)
+            | ChangeEvent::Created { path, .. }
             | ChangeEvent::Changed { path, .. }
             | ChangeEvent::Deleted { path, .. } => Some(path),
-            ChangeEvent::Rescan => None,
+            _ => None,
         }
     }
 }

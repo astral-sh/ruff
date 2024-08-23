@@ -74,14 +74,7 @@ pub(crate) fn camelcase_imported_as_acronym(
         }
 
         // Ignore names that follow a community-agreed import convention.
-        if checker
-            .settings
-            .flake8_import_conventions
-            .aliases
-            .get(&*alias.name)
-            .map(String::as_str)
-            == Some(asname)
-        {
+        if is_ignored_because_of_import_convention(asname, stmt, alias, checker) {
             return None;
         }
 
@@ -96,4 +89,35 @@ pub(crate) fn camelcase_imported_as_acronym(
         return Some(diagnostic);
     }
     None
+}
+
+fn is_ignored_because_of_import_convention(
+    asname: &str,
+    stmt: &Stmt,
+    alias: &Alias,
+    checker: &Checker,
+) -> bool {
+    let full_name = if let Some(import_from) = stmt.as_import_from_stmt() {
+        // Never test relative imports for exclusion because we can't resolve the full-module name.
+        let Some(module) = import_from.module.as_ref() else {
+            return false;
+        };
+
+        if import_from.level != 0 {
+            return false;
+        }
+
+        std::borrow::Cow::Owned(format!("{module}.{}", alias.name))
+    } else {
+        std::borrow::Cow::Borrowed(&*alias.name)
+    };
+
+    // Ignore names that follow a community-agreed import convention.
+    checker
+        .settings
+        .flake8_import_conventions
+        .aliases
+        .get(&*full_name)
+        .map(String::as_str)
+        == Some(asname)
 }

@@ -344,6 +344,7 @@ pub(crate) fn unused_arguments(
             ) {
                 function_type::FunctionType::Function => {
                     if checker.enabled(Argumentable::Function.rule_code())
+                        && !function_type::is_stub(function_def, checker.semantic())
                         && !visibility::is_overload(decorator_list, checker.semantic())
                     {
                         function(

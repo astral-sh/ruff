@@ -1,6 +1,6 @@
 import { useDeferredValue, useMemo, useState } from "react";
 import { Panel, PanelGroup } from "react-resizable-panels";
-import { Diagnostic, Workspace } from "../pkg/ruff_wasm";
+import { Diagnostic, Workspace } from "../pkg";
 import { ErrorMessage } from "./ErrorMessage";
 import PrimarySideBar from "./PrimarySideBar";
 import { HorizontalResizeHandle } from "./ResizeHandle";

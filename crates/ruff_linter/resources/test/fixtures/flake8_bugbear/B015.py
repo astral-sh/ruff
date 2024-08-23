@@ -17,6 +17,11 @@ def test():
     1 in (1, 2)
 
 
+def test2():
+    1 in (1, 2)
+    return
+
+
 data = [x for x in [1, 2, 3] if x in (1, 2)]
 
 

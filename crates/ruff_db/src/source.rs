@@ -22,7 +22,7 @@ pub fn source_text(db: &dyn Db, file: File) -> SourceText {
     let kind = if is_notebook(file.path(db)) {
         file.read_to_notebook(db)
             .unwrap_or_else(|error| {
-                tracing::debug!("Failed to read notebook {path}: {error}");
+                tracing::debug!("Failed to read notebook '{path}': {error}");
 
                 has_read_error = true;
                 SourceDiagnostic(Arc::new(SourceTextError::FailedToReadNotebook(error)))
@@ -33,7 +33,7 @@ pub fn source_text(db: &dyn Db, file: File) -> SourceText {
     } else {
         file.read_to_string(db)
             .unwrap_or_else(|error| {
-                tracing::debug!("Failed to read file {path}: {error}");
+                tracing::debug!("Failed to read file '{path}': {error}");
 
                 has_read_error = true;
                 SourceDiagnostic(Arc::new(SourceTextError::FailedToReadFile(error))).accumulate(db);

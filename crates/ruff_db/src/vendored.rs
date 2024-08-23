@@ -97,7 +97,16 @@ impl VendoredFileSystem {
         fn read_to_string(fs: &VendoredFileSystem, path: &VendoredPath) -> Result<String> {
             let mut archive = fs.lock_archive();
             let mut zip_file = archive.lookup_path(&NormalizedVendoredPath::from(path))?;
-            let mut buffer = String::new();
+
+            // Pre-allocate the buffer with the size specified in the ZIP file metadata
+            // because `read_to_string` passes `None` as the size hint.
+            // But let's not trust the zip file metadata (even though it's vendored)
+            // and limit it to a reasonable size.
+            let mut buffer = String::with_capacity(
+                usize::try_from(zip_file.size())
+                    .unwrap_or(usize::MAX)
+                    .min(10_000_000),
+            );
             zip_file.read_to_string(&mut buffer)?;
             Ok(buffer)
         }

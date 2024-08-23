@@ -24,10 +24,10 @@ crossbeam = { workspace = true }
 notify = { workspace = true }
 rustc-hash = { workspace = true }
 salsa = { workspace = true }
-thiserror = { workspace = true }
 tracing = { workspace = true }
 
 [dev-dependencies]
+ruff_db = { workspace = true, features = ["testing"]}
 
 [lints]
 workspace = true

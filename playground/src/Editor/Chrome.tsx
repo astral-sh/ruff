@@ -3,7 +3,7 @@ import Header from "./Header";
 import { persist, persistLocal, restore, stringify } from "./settings";
 import { useTheme } from "./theme";
 import { default as Editor, Source } from "./Editor";
-import initRuff, { Workspace } from "../pkg/ruff_wasm";
+import initRuff, { Workspace } from "../pkg";
 import { loader } from "@monaco-editor/react";
 import { setupMonaco } from "./setupMonaco";
 import { DEFAULT_PYTHON_SOURCE } from "../constants";
@@ -104,8 +104,6 @@ async function startPlayground(): Promise<{
 }> {
   await initRuff();
   const monaco = await loader.init();
-
-  console.log(monaco);
 
   setupMonaco(monaco);
 

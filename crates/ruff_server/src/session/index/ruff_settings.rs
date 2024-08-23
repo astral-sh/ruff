@@ -3,6 +3,7 @@ use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 
+use anyhow::Context;
 use ignore::{WalkBuilder, WalkState};
 
 use ruff_linter::{
@@ -100,7 +101,7 @@ impl RuffSettings {
 
 impl RuffSettingsIndex {
     pub(super) fn new(root: &Path, editor_settings: &ResolvedEditorSettings) -> Self {
-        let mut error = false;
+        let mut has_error = false;
         let mut index = BTreeMap::default();
         let mut respect_gitignore = None;
 
@@ -127,20 +128,27 @@ impl RuffSettingsIndex {
                             );
                             break;
                         }
-                        Err(err) => {
+                        error => {
                             tracing::error!(
-                                "Error while resolving settings from {}: {err}",
-                                pyproject.display()
+                                "{:#}",
+                                error
+                                    .with_context(|| {
+                                        format!(
+                                            "Failed to resolve settings for {}",
+                                            pyproject.display()
+                                        )
+                                    })
+                                    .unwrap_err()
                             );
-                            error = true;
+                            has_error = true;
                             continue;
                         }
                     }
                 }
                 Ok(None) => continue,
                 Err(err) => {
-                    tracing::error!("{err}");
-                    error = true;
+                    tracing::error!("{err:#}");
+                    has_error = true;
                     continue;
                 }
             }
@@ -162,7 +170,7 @@ impl RuffSettingsIndex {
         let walker = builder.build_parallel();
 
         let index = std::sync::RwLock::new(index);
-        let error = AtomicBool::new(error);
+        let has_error = AtomicBool::new(has_error);
 
         walker.run(|| {
             Box::new(|result| {
@@ -224,19 +232,26 @@ impl RuffSettingsIndex {
                                     }),
                                 );
                             }
-                            Err(err) => {
+                            error => {
                                 tracing::error!(
-                                    "Error while resolving settings from {}: {err}",
-                                    pyproject.display()
+                                    "{:#}",
+                                    error
+                                        .with_context(|| {
+                                            format!(
+                                                "Failed to resolve settings for {}",
+                                                pyproject.display()
+                                            )
+                                        })
+                                        .unwrap_err()
                                 );
-                                error.store(true, Ordering::Relaxed);
+                                has_error.store(true, Ordering::Relaxed);
                             }
                         }
                     }
                     Ok(None) => {}
                     Err(err) => {
-                        tracing::error!("{err}");
-                        error.store(true, Ordering::Relaxed);
+                        tracing::error!("{err:#}");
+                        has_error.store(true, Ordering::Relaxed);
                     }
                 }
 
@@ -244,7 +259,7 @@ impl RuffSettingsIndex {
             })
         });
 
-        if error.load(Ordering::Relaxed) {
+        if has_error.load(Ordering::Relaxed) {
             let root = root.display();
             show_err_msg!(
                 "Error while resolving settings from workspace {root}. Please refer to the logs for more details.",
