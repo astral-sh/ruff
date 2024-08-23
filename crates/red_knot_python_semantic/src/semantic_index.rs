@@ -1095,4 +1095,56 @@ match subject:
             vec!["subject", "a", "b", "c", "d", "f", "e", "h", "g", "Foo", "i", "j", "k", "l"]
         );
     }
+
+    #[test]
+    fn for_loops_single_assignment() {
+        let TestCase { db, file } = test_case("for x in a: pass");
+        let scope = global_scope(&db, file);
+        let global_table = symbol_table(&db, scope);
+
+        assert_eq!(&names(&global_table), &["a", "x"]);
+
+        let use_def = use_def_map(&db, scope);
+        let definition = use_def
+            .first_public_definition(global_table.symbol_id_by_name("x").unwrap())
+            .unwrap();
+
+        assert!(matches!(definition.node(&db), DefinitionKind::For(_)));
+    }
+
+    #[test]
+    fn for_loops_simple_unpacking() {
+        let TestCase { db, file } = test_case("for (x, y) in a: pass");
+        let scope = global_scope(&db, file);
+        let global_table = symbol_table(&db, scope);
+
+        assert_eq!(&names(&global_table), &["a", "x", "y"]);
+
+        let use_def = use_def_map(&db, scope);
+        let x_definition = use_def
+            .first_public_definition(global_table.symbol_id_by_name("x").unwrap())
+            .unwrap();
+        let y_definition = use_def
+            .first_public_definition(global_table.symbol_id_by_name("y").unwrap())
+            .unwrap();
+
+        assert!(matches!(x_definition.node(&db), DefinitionKind::For(_)));
+        assert!(matches!(y_definition.node(&db), DefinitionKind::For(_)));
+    }
+
+    #[test]
+    fn for_loops_complex_unpacking() {
+        let TestCase { db, file } = test_case("for [((a,) b), (c, d)] in e: pass");
+        let scope = global_scope(&db, file);
+        let global_table = symbol_table(&db, scope);
+
+        assert_eq!(&names(&global_table), &["e", "a", "b", "c", "d"]);
+
+        let use_def = use_def_map(&db, scope);
+        let definition = use_def
+            .first_public_definition(global_table.symbol_id_by_name("a").unwrap())
+            .unwrap();
+
+        assert!(matches!(definition.node(&db), DefinitionKind::For(_)));
+    }
 }

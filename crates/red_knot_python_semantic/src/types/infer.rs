@@ -138,7 +138,6 @@ pub(crate) struct TypeInference<'db> {
 }
 
 impl<'db> TypeInference<'db> {
-    #[allow(unused)]
     pub(crate) fn expression_ty(&self, expression: ScopedExpressionId) -> Type<'db> {
         self.expressions[&expression]
     }
@@ -316,6 +315,13 @@ impl<'db> TypeInferenceBuilder<'db> {
             }
             DefinitionKind::AugmentedAssignment(augmented_assignment) => {
                 self.infer_augment_assignment_definition(augmented_assignment.node(), definition);
+            }
+            DefinitionKind::For(for_statement_definition) => {
+                self.infer_for_statement_definition(
+                    for_statement_definition.target(),
+                    for_statement_definition.iterable(),
+                    definition,
+                );
             }
             DefinitionKind::NamedExpression(named_expression) => {
                 self.infer_named_expression_definition(named_expression.node(), definition);
@@ -865,9 +871,46 @@ impl<'db> TypeInferenceBuilder<'db> {
         } = for_statement;
 
         self.infer_expression(iter);
-        self.infer_expression(target);
+        // TODO more complex assignment targets
+        if let ast::Expr::Name(name) = &**target {
+            self.infer_definition(name);
+        } else {
+            self.infer_expression(target);
+        }
         self.infer_body(body);
         self.infer_body(orelse);
+    }
+
+    fn infer_for_statement_definition(
+        &mut self,
+        target: &ast::ExprName,
+        iterable: &ast::Expr,
+        definition: Definition<'db>,
+    ) {
+        let expression = self.index.expression(iterable);
+        let result = infer_expression_types(self.db, expression);
+        self.extend(result);
+        let iterable_ty = self
+            .types
+            .expression_ty(iterable.scoped_ast_id(self.db, self.scope));
+
+        // TODO(Alex): only a valid iterable if the *type* of `iterable_ty` has an `__iter__`
+        // member (dunders are never looked up on an instance)
+        let _dunder_iter_ty = iterable_ty.member(self.db, &ast::name::Name::from("__iter__"));
+
+        // TODO(Alex):
+        // - infer the return type of the `__iter__` method, which gives us the iterator
+        // - lookup the `__next__` method on the iterator
+        // - infer the return type of the iterator's `__next__` method,
+        //   which gives us the type of the variable being bound here
+        //   (...or the type of the object being unpacked into multiple definitions, if it's something like
+        //   `for k, v in d.items(): ...`)
+        let loop_var_value_ty = Type::Unknown;
+
+        self.types
+            .expressions
+            .insert(target.scoped_ast_id(self.db, self.scope), loop_var_value_ty);
+        self.types.definitions.insert(definition, loop_var_value_ty);
     }
 
     fn infer_while_statement(&mut self, while_statement: &ast::StmtWhile) {
