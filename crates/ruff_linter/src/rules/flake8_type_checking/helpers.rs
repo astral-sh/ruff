@@ -1,4 +1,7 @@
 use anyhow::Result;
+use ast::str::Quote;
+use ast::visitor::{self, Visitor};
+use similar::DiffableStr;
 use std::cmp::Reverse;
 
 use ruff_diagnostics::Edit;
@@ -266,7 +269,18 @@ pub(crate) fn quote_annotation(
     let annotation = generator.expr(expr);
 
     let annotation_new = if annotation.contains(quote.as_char()) {
-        annotation.replace(quote.as_char(), &quote.opposite().as_char().to_string())
+        let mut quote_annotation = QuoteAnnotation {
+            can_remove: true,
+            annotation,
+        };
+        quote_annotation.visit_expr(expr);
+        if quote_annotation.can_remove {
+            quote_annotation.annotation.replace(quote.as_char(), "")
+        } else {
+            quote_annotation
+                .annotation
+                .replace(quote.as_char(), &quote.opposite().as_char().to_string())
+        }
     } else {
         annotation
     };
@@ -295,4 +309,32 @@ pub(crate) fn filter_contained(edits: Vec<Edit>) -> Vec<Edit> {
         }
     }
     filtered
+}
+
+pub(crate) struct QuoteAnnotation {
+    can_remove: bool,
+    annotation: String,
+}
+
+impl<'a> visitor::Visitor<'a> for QuoteAnnotation {
+    fn visit_expr(&mut self, expr: &'a Expr) {
+        match expr {
+            Expr::Subscript(ast::ExprSubscript { value, slice, .. }) => {
+                if let Some(name) = value.as_name_expr() {
+                    if name.id.as_str() == "Literal" {
+                        self.can_remove = false;
+                    }
+                    if name.id.as_str() == "Annotation" {
+                        self.can_remove = false;
+                    }
+                }
+                visitor::walk_expr(self, expr);
+            }
+            // NOTE: check if string is inside literal or first parameter of annotation
+            Expr::StringLiteral(ast::ExprStringLiteral { value, .. }) => {
+                visitor::walk_expr(self, expr);
+            }
+            _ => visitor::walk_expr(self, expr),
+        }
+    }
 }
