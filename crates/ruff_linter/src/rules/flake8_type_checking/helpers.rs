@@ -1,7 +1,8 @@
 use anyhow::Result;
 use ast::str::Quote;
-use ast::visitor::{self, Visitor};
-use similar::DiffableStr;
+use ast::visitor::transformer::Transformer;
+use ast::visitor::{self, transformer, Visitor};
+use ast::{ExprStringLiteral, StringLiteralFlags, StringLiteralValue};
 use std::cmp::Reverse;
 
 use ruff_diagnostics::Edit;
@@ -266,27 +267,22 @@ pub(crate) fn quote_annotation(
     }
 
     let quote = stylist.quote();
-    let annotation = generator.expr(expr);
-
-    let annotation_new = if annotation.contains(quote.as_char()) {
-        let mut quote_annotation = QuoteAnnotation {
-            can_remove: true,
-            annotation,
-        };
-        quote_annotation.visit_expr(expr);
-        if quote_annotation.can_remove {
-            quote_annotation.annotation.replace(quote.as_char(), "")
-        } else {
-            quote_annotation
-                .annotation
-                .replace(quote.as_char(), &quote.opposite().as_char().to_string())
-        }
-    } else {
-        annotation
+    let mut quote_annotation = QuoteAnnotation {
+        can_remove: vec![],
+        generator: &generator,
+        stylist: &stylist,
+        contain_single_quote: false,
+        contain_double_quote: false,
+        annotation: String::new(),
     };
 
+    let mut new_expr = expr.clone();
+    quote_annotation.visit_expr(&mut new_expr);
+
+    let annotation = generator.expr(&new_expr);
+
     Ok(Edit::range_replacement(
-        format!("{quote}{annotation_new}{quote}"),
+        format!("{quote}{annotation}{quote}"),
         expr.range(),
     ))
 }
@@ -311,30 +307,40 @@ pub(crate) fn filter_contained(edits: Vec<Edit>) -> Vec<Edit> {
     filtered
 }
 
-pub(crate) struct QuoteAnnotation {
-    can_remove: bool,
+pub(crate) struct QuoteAnnotation<'a> {
+    can_remove: Vec<bool>,
+    generator: &'a Generator<'a>,
+    stylist: &'a Stylist<'a>,
+    contain_single_quote: bool,
+    contain_double_quote: bool,
     annotation: String,
 }
 
-impl<'a> visitor::Visitor<'a> for QuoteAnnotation {
-    fn visit_expr(&mut self, expr: &'a Expr) {
+impl<'a> transformer::Transformer for QuoteAnnotation<'a> {
+    fn visit_expr(&self, expr: &mut Expr) {
         match expr {
             Expr::Subscript(ast::ExprSubscript { value, slice, .. }) => {
                 if let Some(name) = value.as_name_expr() {
                     if name.id.as_str() == "Literal" {
-                        self.can_remove = false;
+                        todo!()
                     }
                     if name.id.as_str() == "Annotation" {
-                        self.can_remove = false;
+                        todo!()
                     }
+                    transformer::walk_expr(self, expr);
                 }
-                visitor::walk_expr(self, expr);
             }
-            // NOTE: check if string is inside literal or first parameter of annotation
-            Expr::StringLiteral(ast::ExprStringLiteral { value, .. }) => {
-                visitor::walk_expr(self, expr);
+            Expr::StringLiteral(ast::ExprStringLiteral { value, range }) => {
+                let new_str = value.to_string();
+                let node = Expr::from(ast::ExprName {
+                    id: new_str,
+                    range: *range,
+                    ctx: ast::ExprContext::Load,
+                });
+                *expr = node;
+                transformer::walk_expr(self, expr);
             }
-            _ => visitor::walk_expr(self, expr),
+            _ => transformer::walk_expr(self, expr),
         }
     }
 }
