@@ -412,11 +412,6 @@ where
                         builder.pop_scope()
                     },
                 );
-
-                let symbol = self
-                    .add_or_update_symbol(function_def.name.id.clone(), SymbolFlags::IS_DEFINED);
-                self.add_definition(symbol, function_def);
-
                 // The default value of the parameters needs to be evaluated in the
                 // enclosing scope.
                 for default in function_def
@@ -426,6 +421,12 @@ where
                 {
                     self.visit_expr(default);
                 }
+                // The symbol for the function name itself has to be evaluated
+                // at the end to match the runtime evaluation of parameter defaults
+                // and return-type annotations.
+                let symbol = self
+                    .add_or_update_symbol(function_def.name.id.clone(), SymbolFlags::IS_DEFINED);
+                self.add_definition(symbol, function_def);
             }
             ast::Stmt::ClassDef(class) => {
                 for decorator in &class.decorator_list {
