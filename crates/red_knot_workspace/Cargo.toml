@@ -22,12 +22,13 @@ ruff_text_size = { workspace = true }
 anyhow = { workspace = true }
 crossbeam = { workspace = true }
 notify = { workspace = true }
+rayon = { workspace = true }
 rustc-hash = { workspace = true }
 salsa = { workspace = true }
 tracing = { workspace = true }
 
 [dev-dependencies]
-ruff_db = { workspace = true, features = ["testing"]}
+ruff_db = { workspace = true, features = ["testing"] }
 
 [lints]
 workspace = true

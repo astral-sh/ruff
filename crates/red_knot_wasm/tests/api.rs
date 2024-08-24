@@ -11,11 +11,11 @@ fn check() {
     };
     let mut workspace = Workspace::new("/", &settings).expect("Workspace to be created");
 
-    let test = workspace
+    workspace
         .open_file("test.py", "import random22\n")
         .expect("File to be opened");
 
-    let result = workspace.check_file(&test).expect("Check to succeed");
+    let result = workspace.check().expect("Check to succeed");
 
     assert_eq!(
         result,

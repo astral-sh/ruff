@@ -56,6 +56,8 @@ impl RootDatabase {
     }
 
     pub fn check_file(&self, file: File) -> Result<Vec<String>, Cancelled> {
+        let _span = tracing::debug_span!("check_file", file=%file.path(self)).entered();
+
         self.with_db(|db| check_file(db, file))
     }
 
