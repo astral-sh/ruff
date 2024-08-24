@@ -58,17 +58,19 @@ Module(
 ```
 ## Errors
 
+error: Invalid syntax
   |
 1 | # Starred expression isn't allowed in a parenthesized expression.
 2 | (*x)
-  |  ^^ Syntax Error: Starred expression cannot be used here
+  |  ^^ Starred expression cannot be used here
 3 | 
 4 | # Unparenthesized named expression is allowed.
   |
 
 
+error: Invalid syntax
   |
 4 | # Unparenthesized named expression is allowed.
 5 | x := 1
-  |   ^^ Syntax Error: Expected a statement
+  |   ^^ Expected a statement
   |

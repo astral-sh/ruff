@@ -1,7 +1,9 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_simplify/mod.rs
 ---
-SIM116.py:5:1: SIM116 Use a dictionary instead of consecutive `if` statements
+error[SIM116]: 5:1: Use a dictionary instead of consecutive `if` statements
+
+  --> SIM116.py:4:9
    |
  4 |   # SIM116
  5 | / if a == "foo":
@@ -12,12 +14,13 @@ SIM116.py:5:1: SIM116 Use a dictionary instead of consecutive `if` statements
 10 | |     return "ooh"
 11 | | else:
 12 | |     return 42
-   | |_____________^ SIM116
+   | |_____________^
 13 |   
 14 |   # SIM116
    |
+error[SIM116]: 15:1: Use a dictionary instead of consecutive `if` statements
 
-SIM116.py:15:1: SIM116 Use a dictionary instead of consecutive `if` statements
+  --> SIM116.py:14:9
    |
 14 |   # SIM116
 15 | / if a == 1:
@@ -28,12 +31,13 @@ SIM116.py:15:1: SIM116 Use a dictionary instead of consecutive `if` statements
 20 | |     return (7, 8, 9)
 21 | | else:
 22 | |     return (10, 11, 12)
-   | |_______________________^ SIM116
+   | |_______________________^
 23 |   
 24 |   # SIM116
    |
+error[SIM116]: 25:1: Use a dictionary instead of consecutive `if` statements
 
-SIM116.py:25:1: SIM116 Use a dictionary instead of consecutive `if` statements
+  --> SIM116.py:24:9
    |
 24 |   # SIM116
 25 | / if a == 1:
@@ -42,12 +46,13 @@ SIM116.py:25:1: SIM116 Use a dictionary instead of consecutive `if` statements
 28 | |     return (4, 5, 6)
 29 | | elif a == 3:
 30 | |     return (7, 8, 9)
-   | |____________________^ SIM116
+   | |____________________^
 31 |   
 32 |   # SIM116
    |
+error[SIM116]: 33:1: Use a dictionary instead of consecutive `if` statements
 
-SIM116.py:33:1: SIM116 Use a dictionary instead of consecutive `if` statements
+  --> SIM116.py:32:9
    |
 32 |   # SIM116
 33 | / if a == "hello 'sir'":
@@ -58,12 +63,13 @@ SIM116.py:33:1: SIM116 Use a dictionary instead of consecutive `if` statements
 38 | |     return (7, 8, 9)
 39 | | else:
 40 | |     return (10, 11, 12)
-   | |_______________________^ SIM116
+   | |_______________________^
 41 |   
 42 |   # SIM116
    |
+error[SIM116]: 43:1: Use a dictionary instead of consecutive `if` statements
 
-SIM116.py:43:1: SIM116 Use a dictionary instead of consecutive `if` statements
+  --> SIM116.py:42:9
    |
 42 |   # SIM116
 43 | / if a == b"one":
@@ -72,12 +78,13 @@ SIM116.py:43:1: SIM116 Use a dictionary instead of consecutive `if` statements
 46 | |     return 2
 47 | | elif a == b"three":
 48 | |     return 3
-   | |____________^ SIM116
+   | |____________^
 49 |   
 50 |   # SIM116
    |
+error[SIM116]: 51:1: Use a dictionary instead of consecutive `if` statements
 
-SIM116.py:51:1: SIM116 Use a dictionary instead of consecutive `if` statements
+  --> SIM116.py:50:9
    |
 50 |   # SIM116
 51 | / if a == "hello 'sir'":
@@ -88,12 +95,13 @@ SIM116.py:51:1: SIM116 Use a dictionary instead of consecutive `if` statements
 56 | |     return (7, 8, 9)
 57 | | else:
 58 | |     return (10, 11, 12)
-   | |_______________________^ SIM116
+   | |_______________________^
 59 |   
 60 |   # OK
    |
+error[SIM116]: 79:1: Use a dictionary instead of consecutive `if` statements
 
-SIM116.py:79:1: SIM116 Use a dictionary instead of consecutive `if` statements
+  --> SIM116.py:78:9
    |
 78 |   # SIM116
 79 | / if func_name == "create":
@@ -104,9 +112,7 @@ SIM116.py:79:1: SIM116 Use a dictionary instead of consecutive `if` statements
 84 | |     return "D"
 85 | | elif func_name == "move":
 86 | |     return "MV"
-   | |_______________^ SIM116
+   | |_______________^
 87 |   
 88 |   # OK
    |
-
-

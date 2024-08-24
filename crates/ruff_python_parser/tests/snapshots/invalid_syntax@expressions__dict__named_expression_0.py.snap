@@ -120,21 +120,23 @@ Module(
 ```
 ## Errors
 
+error: Invalid syntax
   |
 1 | # Unparenthesized named expression not allowed in key
 2 | 
 3 | {x := 1: y, z := 2: a}
-  |  ^^^^^^ Syntax Error: Unparenthesized named expression cannot be used here
+  |  ^^^^^^ Unparenthesized named expression cannot be used here
 4 | 
 5 | x + y
   |
 
 
+error: Invalid syntax
   |
 1 | # Unparenthesized named expression not allowed in key
 2 | 
 3 | {x := 1: y, z := 2: a}
-  |               ^^ Syntax Error: Expected ':', found ':='
+  |               ^^ Expected ':', found ':='
 4 | 
 5 | x + y
   |

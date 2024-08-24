@@ -296,65 +296,72 @@ Module(
 ```
 ## Errors
 
+error: Invalid syntax
   |
 1 | # Invalid test expression
 2 | x if *expr else y
-  |      ^^^^^ Syntax Error: Starred expression cannot be used here
+  |      ^^^^^ Starred expression cannot be used here
 3 | x if lambda x: x else y
 4 | x if yield x else y
   |
 
 
+error: Invalid syntax
   |
 1 | # Invalid test expression
 2 | x if *expr else y
 3 | x if lambda x: x else y
-  |      ^^^^^^^^^^^ Syntax Error: Lambda expression cannot be used here
+  |      ^^^^^^^^^^^ Lambda expression cannot be used here
 4 | x if yield x else y
 5 | x if yield from x else y
   |
 
 
+error: Invalid syntax
   |
 2 | x if *expr else y
 3 | x if lambda x: x else y
 4 | x if yield x else y
-  |      ^^^^^^^ Syntax Error: Yield expression cannot be used here
+  |      ^^^^^^^ Yield expression cannot be used here
 5 | x if yield from x else y
   |
 
 
+error: Invalid syntax
   |
 3 | x if lambda x: x else y
 4 | x if yield x else y
 5 | x if yield from x else y
-  |      ^^^^^^^^^^^^ Syntax Error: Yield expression cannot be used here
+  |      ^^^^^^^^^^^^ Yield expression cannot be used here
 6 | 
 7 | # Invalid orelse expression
   |
 
 
+error: Invalid syntax
    |
  7 | # Invalid orelse expression
  8 | x if expr else *orelse
-   |                ^^^^^^^ Syntax Error: Starred expression cannot be used here
+   |                ^^^^^^^ Starred expression cannot be used here
  9 | x if expr else yield y
 10 | x if expr else yield from y
    |
 
 
+error: Invalid syntax
    |
  7 | # Invalid orelse expression
  8 | x if expr else *orelse
  9 | x if expr else yield y
-   |                ^^^^^^^ Syntax Error: Yield expression cannot be used here
+   |                ^^^^^^^ Yield expression cannot be used here
 10 | x if expr else yield from y
    |
 
 
+error: Invalid syntax
    |
  8 | x if expr else *orelse
  9 | x if expr else yield y
 10 | x if expr else yield from y
-   |                ^^^^^^^^^^^^ Syntax Error: Yield expression cannot be used here
+   |                ^^^^^^^^^^^^ Yield expression cannot be used here
    |

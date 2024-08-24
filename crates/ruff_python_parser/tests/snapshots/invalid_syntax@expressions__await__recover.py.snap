@@ -244,84 +244,93 @@ Module(
 ```
 ## Errors
 
+error: Invalid syntax
   |
 4 | # Nested await
 5 | await await x
-  |       ^^^^^^^ Syntax Error: Await expression cannot be used here
+  |       ^^^^^^^ Await expression cannot be used here
 6 | 
 7 | # Starred expressions
   |
 
 
+error: Invalid syntax
   |
 7 | # Starred expressions
 8 | await *x
-  |       ^^ Syntax Error: Starred expression cannot be used here
+  |       ^^ Starred expression cannot be used here
 9 | await (*x)
   |
 
 
+error: Invalid syntax
    |
  7 | # Starred expressions
  8 | await *x
  9 | await (*x)
-   |        ^^ Syntax Error: Starred expression cannot be used here
+   |        ^^ Starred expression cannot be used here
 10 | 
 11 | # Invalid expression as per precedence
    |
 
 
+error: Invalid syntax
    |
 11 | # Invalid expression as per precedence
 12 | await yield x
-   |       ^^^^^^^ Syntax Error: Yield expression cannot be used here
+   |       ^^^^^^^ Yield expression cannot be used here
 13 | await lambda x: x
 14 | await +x
    |
 
 
+error: Invalid syntax
    |
 11 | # Invalid expression as per precedence
 12 | await yield x
 13 | await lambda x: x
-   |       ^^^^^^^^^^^ Syntax Error: Lambda expression cannot be used here
+   |       ^^^^^^^^^^^ Lambda expression cannot be used here
 14 | await +x
 15 | await -x
    |
 
 
+error: Invalid syntax
    |
 12 | await yield x
 13 | await lambda x: x
 14 | await +x
-   |       ^^ Syntax Error: Unary '+' expression cannot be used here
+   |       ^^ Unary '+' expression cannot be used here
 15 | await -x
 16 | await ~x
    |
 
 
+error: Invalid syntax
    |
 13 | await lambda x: x
 14 | await +x
 15 | await -x
-   |       ^^ Syntax Error: Unary '-' expression cannot be used here
+   |       ^^ Unary '-' expression cannot be used here
 16 | await ~x
 17 | await not x
    |
 
 
+error: Invalid syntax
    |
 14 | await +x
 15 | await -x
 16 | await ~x
-   |       ^^ Syntax Error: Unary '~' expression cannot be used here
+   |       ^^ Unary '~' expression cannot be used here
 17 | await not x
    |
 
 
+error: Invalid syntax
    |
 15 | await -x
 16 | await ~x
 17 | await not x
-   |       ^^^^^ Syntax Error: Boolean 'not' expression cannot be used here
+   |       ^^^^^ Boolean 'not' expression cannot be used here
    |

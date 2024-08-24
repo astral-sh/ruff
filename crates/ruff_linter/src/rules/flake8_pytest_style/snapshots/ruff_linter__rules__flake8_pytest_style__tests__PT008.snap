@@ -1,116 +1,127 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_pytest_style/mod.rs
 ---
-PT008.py:35:1: PT008 Use `return_value=` instead of patching with `lambda`
+error[PT008]: 35:1: Use `return_value=` instead of patching with `lambda`
+
+  --> PT008.py:34:1
    |
 33 | # Error
 34 | 
 35 | mocker.patch("module.name", lambda: None)
-   | ^^^^^^^^^^^^ PT008
+   | ^^^^^^^^^^^^
 36 | module_mocker.patch("module.name", lambda: None)
 37 | mocker.patch.object(obj, "attr", lambda: None)
    |
+error[PT008]: 36:1: Use `return_value=` instead of patching with `lambda`
 
-PT008.py:36:1: PT008 Use `return_value=` instead of patching with `lambda`
+  --> PT008.py:35:42
    |
 35 | mocker.patch("module.name", lambda: None)
 36 | module_mocker.patch("module.name", lambda: None)
-   | ^^^^^^^^^^^^^^^^^^^ PT008
+   | ^^^^^^^^^^^^^^^^^^^
 37 | mocker.patch.object(obj, "attr", lambda: None)
 38 | module_mocker.patch.object(obj, "attr", lambda: None)
    |
+error[PT008]: 37:1: Use `return_value=` instead of patching with `lambda`
 
-PT008.py:37:1: PT008 Use `return_value=` instead of patching with `lambda`
+  --> PT008.py:36:49
    |
 35 | mocker.patch("module.name", lambda: None)
 36 | module_mocker.patch("module.name", lambda: None)
 37 | mocker.patch.object(obj, "attr", lambda: None)
-   | ^^^^^^^^^^^^^^^^^^^ PT008
+   | ^^^^^^^^^^^^^^^^^^^
 38 | module_mocker.patch.object(obj, "attr", lambda: None)
    |
+error[PT008]: 38:1: Use `return_value=` instead of patching with `lambda`
 
-PT008.py:38:1: PT008 Use `return_value=` instead of patching with `lambda`
+  --> PT008.py:37:47
    |
 36 | module_mocker.patch("module.name", lambda: None)
 37 | mocker.patch.object(obj, "attr", lambda: None)
 38 | module_mocker.patch.object(obj, "attr", lambda: None)
-   | ^^^^^^^^^^^^^^^^^^^^^^^^^^ PT008
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^
 39 | 
 40 | mocker.patch("module.name", lambda x, y: None)
    |
+error[PT008]: 40:1: Use `return_value=` instead of patching with `lambda`
 
-PT008.py:40:1: PT008 Use `return_value=` instead of patching with `lambda`
+  --> PT008.py:39:1
    |
 38 | module_mocker.patch.object(obj, "attr", lambda: None)
 39 | 
 40 | mocker.patch("module.name", lambda x, y: None)
-   | ^^^^^^^^^^^^ PT008
+   | ^^^^^^^^^^^^
 41 | module_mocker.patch("module.name", lambda x, y: None)
 42 | mocker.patch.object(obj, "attr", lambda x, y: None)
    |
+error[PT008]: 41:1: Use `return_value=` instead of patching with `lambda`
 
-PT008.py:41:1: PT008 Use `return_value=` instead of patching with `lambda`
+  --> PT008.py:40:47
    |
 40 | mocker.patch("module.name", lambda x, y: None)
 41 | module_mocker.patch("module.name", lambda x, y: None)
-   | ^^^^^^^^^^^^^^^^^^^ PT008
+   | ^^^^^^^^^^^^^^^^^^^
 42 | mocker.patch.object(obj, "attr", lambda x, y: None)
 43 | module_mocker.patch.object(obj, "attr", lambda x, y: None)
    |
+error[PT008]: 42:1: Use `return_value=` instead of patching with `lambda`
 
-PT008.py:42:1: PT008 Use `return_value=` instead of patching with `lambda`
+  --> PT008.py:41:54
    |
 40 | mocker.patch("module.name", lambda x, y: None)
 41 | module_mocker.patch("module.name", lambda x, y: None)
 42 | mocker.patch.object(obj, "attr", lambda x, y: None)
-   | ^^^^^^^^^^^^^^^^^^^ PT008
+   | ^^^^^^^^^^^^^^^^^^^
 43 | module_mocker.patch.object(obj, "attr", lambda x, y: None)
    |
+error[PT008]: 43:1: Use `return_value=` instead of patching with `lambda`
 
-PT008.py:43:1: PT008 Use `return_value=` instead of patching with `lambda`
+  --> PT008.py:42:52
    |
 41 | module_mocker.patch("module.name", lambda x, y: None)
 42 | mocker.patch.object(obj, "attr", lambda x, y: None)
 43 | module_mocker.patch.object(obj, "attr", lambda x, y: None)
-   | ^^^^^^^^^^^^^^^^^^^^^^^^^^ PT008
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^
 44 | 
 45 | mocker.patch("module.name", lambda *args, **kwargs: None)
    |
+error[PT008]: 45:1: Use `return_value=` instead of patching with `lambda`
 
-PT008.py:45:1: PT008 Use `return_value=` instead of patching with `lambda`
+  --> PT008.py:44:1
    |
 43 | module_mocker.patch.object(obj, "attr", lambda x, y: None)
 44 | 
 45 | mocker.patch("module.name", lambda *args, **kwargs: None)
-   | ^^^^^^^^^^^^ PT008
+   | ^^^^^^^^^^^^
 46 | module_mocker.patch("module.name", lambda *args, **kwargs: None)
 47 | mocker.patch.object(obj, "attr", lambda *args, **kwargs: None)
    |
+error[PT008]: 46:1: Use `return_value=` instead of patching with `lambda`
 
-PT008.py:46:1: PT008 Use `return_value=` instead of patching with `lambda`
+  --> PT008.py:45:58
    |
 45 | mocker.patch("module.name", lambda *args, **kwargs: None)
 46 | module_mocker.patch("module.name", lambda *args, **kwargs: None)
-   | ^^^^^^^^^^^^^^^^^^^ PT008
+   | ^^^^^^^^^^^^^^^^^^^
 47 | mocker.patch.object(obj, "attr", lambda *args, **kwargs: None)
 48 | module_mocker.patch.object(obj, "attr", lambda *args, **kwargs: None)
    |
+error[PT008]: 47:1: Use `return_value=` instead of patching with `lambda`
 
-PT008.py:47:1: PT008 Use `return_value=` instead of patching with `lambda`
+  --> PT008.py:46:65
    |
 45 | mocker.patch("module.name", lambda *args, **kwargs: None)
 46 | module_mocker.patch("module.name", lambda *args, **kwargs: None)
 47 | mocker.patch.object(obj, "attr", lambda *args, **kwargs: None)
-   | ^^^^^^^^^^^^^^^^^^^ PT008
+   | ^^^^^^^^^^^^^^^^^^^
 48 | module_mocker.patch.object(obj, "attr", lambda *args, **kwargs: None)
    |
+error[PT008]: 48:1: Use `return_value=` instead of patching with `lambda`
 
-PT008.py:48:1: PT008 Use `return_value=` instead of patching with `lambda`
+  --> PT008.py:47:63
    |
 46 | module_mocker.patch("module.name", lambda *args, **kwargs: None)
 47 | mocker.patch.object(obj, "attr", lambda *args, **kwargs: None)
 48 | module_mocker.patch.object(obj, "attr", lambda *args, **kwargs: None)
-   | ^^^^^^^^^^^^^^^^^^^^^^^^^^ PT008
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^
    |
-
-

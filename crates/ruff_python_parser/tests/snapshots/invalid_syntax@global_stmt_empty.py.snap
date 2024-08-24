@@ -21,7 +21,8 @@ Module(
 ```
 ## Errors
 
+error: Invalid syntax
   |
 1 | global
-  |       ^ Syntax Error: Global statement must have at least one name
+  |       ^ Global statement must have at least one name
   |

@@ -1,27 +1,31 @@
 ---
 source: crates/ruff_linter/src/rules/pycodestyle/mod.rs
 ---
-E11.py:3:1: E111 Indentation is not a multiple of 4
+error[E111]: 3:1: Indentation is not a multiple of 4
+
+ --> E11.py:2:10
   |
 1 | #: E111
 2 | if x > 2:
 3 |   print(x)
-  | ^^ E111
+  | ^^
 4 | #: E111 E117
 5 | if True:
   |
+error[E111]: 6:1: Indentation is not a multiple of 4
 
-E11.py:6:1: E111 Indentation is not a multiple of 4
+ --> E11.py:5:9
   |
 4 | #: E111 E117
 5 | if True:
 6 |      print()
-  | ^^^^^ E111
+  | ^^^^^
 7 | #: E112
 8 | if False:
   |
+error[syntax-error]: 9:1: Expected an indented block after `if` statement
 
-E11.py:9:1: SyntaxError: Expected an indented block after `if` statement
+  --> E11.py:8:10
    |
  7 | #: E112
  8 | if False:
@@ -30,8 +34,9 @@ E11.py:9:1: SyntaxError: Expected an indented block after `if` statement
 10 | #: E113
 11 | print()
    |
+error[syntax-error]: 12:1: Unexpected indentation
 
-E11.py:12:1: SyntaxError: Unexpected indentation
+  --> E11.py:11:8
    |
 10 | #: E113
 11 | print()
@@ -40,8 +45,9 @@ E11.py:12:1: SyntaxError: Unexpected indentation
 13 | #: E114 E116
 14 | mimetype = 'application/x-directory'
    |
+error[syntax-error]: 14:1: Expected a statement
 
-E11.py:14:1: SyntaxError: Expected a statement
+  --> E11.py:13:13
    |
 12 |     print()
 13 | #: E114 E116
@@ -50,8 +56,9 @@ E11.py:14:1: SyntaxError: Expected a statement
 15 |      # 'httpd/unix-directory'
 16 | create_date = False
    |
+error[syntax-error]: 45:1: Expected an indented block after `if` statement
 
-E11.py:45:1: SyntaxError: Expected an indented block after `if` statement
+  --> E11.py:44:13
    |
 43 | #: E112
 44 | if False:  #

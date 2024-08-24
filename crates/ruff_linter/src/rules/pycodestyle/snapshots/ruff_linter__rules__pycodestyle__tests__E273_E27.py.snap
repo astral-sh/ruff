@@ -1,17 +1,18 @@
 ---
 source: crates/ruff_linter/src/rules/pycodestyle/mod.rs
 ---
-E27.py:11:9: E273 [*] Tab after keyword
+error[E273]: 11:9: [*] Tab after keyword
+
+  --> E27.py:11:9
    |
  9 |     pass
 10 | #: E273
 11 | True and        False
-   |         ^^^^^^^^ E273
+   |         ^^^^^^^^
 12 | #: E273 E274
 13 | True        and False
    |
    = help: Replace with single space
-
 ℹ Safe fix
 8  8  | if   1:
 9  9  |     pass
@@ -22,17 +23,18 @@ E27.py:11:9: E273 [*] Tab after keyword
 13 13 | True		and	False
 14 14 | #: E271
 
-E27.py:13:5: E273 [*] Tab after keyword
+error[E273]: 13:5: [*] Tab after keyword
+
+  --> E27.py:13:5
    |
 11 | True and        False
 12 | #: E273 E274
 13 | True        and False
-   |     ^^^^^^^^ E273
+   |     ^^^^^^^^
 14 | #: E271
 15 | a and  b
    |
    = help: Replace with single space
-
 ℹ Safe fix
 10 10 | #: E273
 11 11 | True and		False
@@ -43,17 +45,18 @@ E27.py:13:5: E273 [*] Tab after keyword
 15 15 | a and  b
 16 16 | #: E271
 
-E27.py:13:10: E273 [*] Tab after keyword
+error[E273]: 13:10: [*] Tab after keyword
+
+  --> E27.py:13:16
    |
 11 | True and        False
 12 | #: E273 E274
 13 | True        and False
-   |                ^ E273
+   |                ^
 14 | #: E271
 15 | a and  b
    |
    = help: Replace with single space
-
 ℹ Safe fix
 10 10 | #: E273
 11 11 | True and		False
@@ -64,17 +67,18 @@ E27.py:13:10: E273 [*] Tab after keyword
 15 15 | a and  b
 16 16 | #: E271
 
-E27.py:27:6: E273 [*] Tab after keyword
+error[E273]: 27:6: [*] Tab after keyword
+
+  --> E27.py:27:6
    |
 25 | this  and False
 26 | #: E273
 27 | a and   b
-   |      ^^^ E273
+   |      ^^^
 28 | #: E274
 29 | a       and b
    |
    = help: Replace with single space
-
 ℹ Safe fix
 24 24 | #: E272
 25 25 | this  and False
@@ -85,17 +89,18 @@ E27.py:27:6: E273 [*] Tab after keyword
 29 29 | a		and b
 30 30 | #: E273 E274
 
-E27.py:31:10: E273 [*] Tab after keyword
+error[E273]: 31:10: [*] Tab after keyword
+
+  --> E27.py:31:16
    |
 29 | a       and b
 30 | #: E273 E274
 31 | this        and False
-   |                ^ E273
+   |                ^
 32 | #: Okay
 33 | from u import (a, b)
    |
    = help: Replace with single space
-
 ℹ Safe fix
 28 28 | #: E274
 29 29 | a		and b
@@ -106,16 +111,17 @@ E27.py:31:10: E273 [*] Tab after keyword
 33 33 | from u import (a, b)
 34 34 | from v import c, d
 
-E27.py:74:5: E273 [*] Tab after keyword
+error[E273]: 74:5: [*] Tab after keyword
+
+  --> E27.py:74:5
    |
 73 | #: E273
 74 | type    Number = int
-   |     ^^^^ E273
+   |     ^^^^
 75 | 
 76 | #: E275
    |
    = help: Replace with single space
-
 ℹ Safe fix
 71 71 | type  Number = int
 72 72 | 

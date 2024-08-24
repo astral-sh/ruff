@@ -86,15 +86,17 @@ Module(
 ```
 ## Errors
 
+error: Invalid syntax
   |
 1 | raise x from y,
-  |              ^^ Syntax Error: Unparenthesized tuple expression cannot be used here
+  |              ^^ Unparenthesized tuple expression cannot be used here
 2 | raise x from y, z
   |
 
 
+error: Invalid syntax
   |
 1 | raise x from y,
 2 | raise x from y, z
-  |              ^^^^ Syntax Error: Unparenthesized tuple expression cannot be used here
+  |              ^^^^ Unparenthesized tuple expression cannot be used here
   |

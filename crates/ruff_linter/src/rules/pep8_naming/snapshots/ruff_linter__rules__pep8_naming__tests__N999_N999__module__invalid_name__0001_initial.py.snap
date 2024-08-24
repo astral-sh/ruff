@@ -1,4 +1,4 @@
 ---
 source: crates/ruff_linter/src/rules/pep8_naming/mod.rs
 ---
-0001_initial.py:1:1: N999 Invalid module name: '0001_initial'
+error[N999]: 1:1: Invalid module name: '0001_initial'

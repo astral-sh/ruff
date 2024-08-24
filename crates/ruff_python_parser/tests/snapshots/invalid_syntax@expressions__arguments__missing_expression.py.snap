@@ -140,27 +140,30 @@ Module(
 ```
 ## Errors
 
+error: Invalid syntax
   |
 1 | call( = 1)
-  |       ^ Syntax Error: Expected an expression or a ')'
+  |       ^ Expected an expression or a ')'
 2 | call(x = )
 3 | call(*, y)
   |
 
 
+error: Invalid syntax
   |
 1 | call( = 1)
 2 | call(x = )
-  |          ^ Syntax Error: Expected an expression
+  |          ^ Expected an expression
 3 | call(*, y)
   |
 
 
+error: Invalid syntax
   |
 1 | call( = 1)
 2 | call(x = )
 3 | call(*, y)
-  |       ^ Syntax Error: Expected an expression
+  |       ^ Expected an expression
 4 | 
 5 | foo
   |

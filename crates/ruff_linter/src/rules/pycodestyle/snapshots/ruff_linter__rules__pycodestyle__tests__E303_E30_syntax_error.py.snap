@@ -1,7 +1,9 @@
 ---
 source: crates/ruff_linter/src/rules/pycodestyle/mod.rs
 ---
-E30_syntax_error.py:4:15: SyntaxError: Expected ']', found '('
+error[syntax-error]: 4:15: Expected ']', found '('
+
+ --> E30_syntax_error.py:4:15
   |
 2 | # parenthesis.
 3 | 
@@ -9,17 +11,19 @@ E30_syntax_error.py:4:15: SyntaxError: Expected ']', found '('
   |               ^
 5 |     pass
   |
+error[E303]: 12:1: Too many blank lines (3)
 
-E30_syntax_error.py:12:1: E303 Too many blank lines (3)
+  --> E30_syntax_error.py:12:1
    |
 12 | class Foo:
-   | ^^^^^ E303
+   | ^^^^^
 13 |     def __init__(
 14 |         pass
    |
    = help: Remove extraneous blank line(s)
+error[syntax-error]: 13:18: Expected ')', found newline
 
-E30_syntax_error.py:13:18: SyntaxError: Expected ')', found newline
+  --> E30_syntax_error.py:13:18
    |
 12 | class Foo:
 13 |     def __init__(
@@ -28,8 +32,9 @@ E30_syntax_error.py:13:18: SyntaxError: Expected ')', found newline
 15 |     def method():
 16 |         pass
    |
+error[syntax-error]: 18:11: Expected ')', found newline
 
-E30_syntax_error.py:18:11: SyntaxError: Expected ')', found newline
+  --> E30_syntax_error.py:18:11
    |
 16 |         pass
 17 | 
@@ -39,8 +44,9 @@ E30_syntax_error.py:18:11: SyntaxError: Expected ')', found newline
 20 | 
 21 | def top(
    |
+error[syntax-error]: 21:9: Expected ')', found newline
 
-E30_syntax_error.py:21:9: SyntaxError: Expected ')', found newline
+  --> E30_syntax_error.py:21:9
    |
 21 | def top(
    |         ^

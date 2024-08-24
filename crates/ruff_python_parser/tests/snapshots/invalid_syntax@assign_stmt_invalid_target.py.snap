@@ -207,52 +207,58 @@ Module(
 ```
 ## Errors
 
+error: Invalid syntax
   |
 1 | 1 = 1
-  | ^ Syntax Error: Invalid assignment target
+  | ^ Invalid assignment target
 2 | x = 1 = 2
 3 | x = 1 = y = 2 = z
   |
 
 
+error: Invalid syntax
   |
 1 | 1 = 1
 2 | x = 1 = 2
-  |     ^ Syntax Error: Invalid assignment target
+  |     ^ Invalid assignment target
 3 | x = 1 = y = 2 = z
 4 | ["a", "b"] = ["a", "b"]
   |
 
 
-  |
-1 | 1 = 1
-2 | x = 1 = 2
-3 | x = 1 = y = 2 = z
-  |     ^ Syntax Error: Invalid assignment target
-4 | ["a", "b"] = ["a", "b"]
-  |
-
-
+error: Invalid syntax
   |
 1 | 1 = 1
 2 | x = 1 = 2
 3 | x = 1 = y = 2 = z
-  |             ^ Syntax Error: Invalid assignment target
+  |     ^ Invalid assignment target
 4 | ["a", "b"] = ["a", "b"]
   |
 
 
+error: Invalid syntax
+  |
+1 | 1 = 1
+2 | x = 1 = 2
+3 | x = 1 = y = 2 = z
+  |             ^ Invalid assignment target
+4 | ["a", "b"] = ["a", "b"]
+  |
+
+
+error: Invalid syntax
   |
 2 | x = 1 = 2
 3 | x = 1 = y = 2 = z
 4 | ["a", "b"] = ["a", "b"]
-  |  ^^^ Syntax Error: Invalid assignment target
+  |  ^^^ Invalid assignment target
   |
 
 
+error: Invalid syntax
   |
 2 | x = 1 = 2
 3 | x = 1 = y = 2 = z
 4 | ["a", "b"] = ["a", "b"]
-  |       ^^^ Syntax Error: Invalid assignment target
+  |       ^^^ Invalid assignment target
   |

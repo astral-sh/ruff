@@ -89,15 +89,17 @@ Module(
 ```
 ## Errors
 
+error: Invalid syntax
   |
 1 | def (): ...
-  |     ^ Syntax Error: Expected an identifier
+  |     ^ Expected an identifier
 2 | def () -> int: ...
   |
 
 
+error: Invalid syntax
   |
 1 | def (): ...
 2 | def () -> int: ...
-  |     ^ Syntax Error: Expected an identifier
+  |     ^ Expected an identifier
   |

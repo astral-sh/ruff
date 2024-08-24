@@ -77,17 +77,19 @@ Module(
 ```
 ## Errors
 
+error: Invalid syntax
   |
 1 | while : ...
-  |       ^ Syntax Error: Expected an expression
+  |       ^ Expected an expression
 2 | while :
 3 |     a = 1
   |
 
 
+error: Invalid syntax
   |
 1 | while : ...
 2 | while :
-  |       ^ Syntax Error: Expected an expression
+  |       ^ Expected an expression
 3 |     a = 1
   |

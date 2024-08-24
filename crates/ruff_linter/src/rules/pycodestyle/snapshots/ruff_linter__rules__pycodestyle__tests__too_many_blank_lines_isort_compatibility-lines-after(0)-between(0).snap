@@ -1,7 +1,9 @@
 ---
 source: crates/ruff_linter/src/rules/pycodestyle/mod.rs
 ---
-E30_isort.py:1:1: I001 [*] Import block is un-sorted or un-formatted
+error[I001]: 1:1: [*] Import block is un-sorted or un-formatted
+
+ --> E30_isort.py:1:1
   |
 1 | / import json
 2 | | 
@@ -10,11 +12,10 @@ E30_isort.py:1:1: I001 [*] Import block is un-sorted or un-formatted
 5 | | from typing import Any, Sequence
 6 | | 
 7 | | 
-8 | | class MissingCommand(TypeError): ...  # noqa: N818
-  | |_^ I001
+  | |__^
+8 |   class MissingCommand(TypeError): ...  # noqa: N818
   |
   = help: Organize imports
-
 ℹ Safe fix
 1 1 | import json
 2   |-
@@ -27,13 +28,14 @@ E30_isort.py:1:1: I001 [*] Import block is un-sorted or un-formatted
 9 4 | 
 10 5 | 
 
-E30_isort.py:5:1: E303 [*] Too many blank lines (3)
+error[E303]: 5:1: [*] Too many blank lines (3)
+
+ --> E30_isort.py:5:1
   |
 5 | from typing import Any, Sequence
-  | ^^^^ E303
+  | ^^^^
   |
   = help: Remove extraneous blank line(s)
-
 ℹ Safe fix
 1 1 | import json
 2 2 | 
@@ -43,13 +45,14 @@ E30_isort.py:5:1: E303 [*] Too many blank lines (3)
 6 5 | 
 7 6 | 
 
-E30_isort.py:8:1: E303 [*] Too many blank lines (2)
+error[E303]: 8:1: [*] Too many blank lines (2)
+
+ --> E30_isort.py:8:1
   |
 8 | class MissingCommand(TypeError): ...  # noqa: N818
-  | ^^^^^ E303
+  | ^^^^^
   |
   = help: Remove extraneous blank line(s)
-
 ℹ Safe fix
 3 3 | 
 4 4 | 
@@ -60,15 +63,16 @@ E30_isort.py:8:1: E303 [*] Too many blank lines (2)
 9 7 | 
 10 8 | 
 
-E30_isort.py:21:5: E303 [*] Too many blank lines (2)
+error[E303]: 21:5: [*] Too many blank lines (2)
+
+  --> E30_isort.py:21:5
    |
 21 |     abcd.foo()
-   |     ^^^^ E303
+   |     ^^^^
 22 | 
 23 | def __init__(self, backend_module: str, backend_obj: str | None) -> None: ...
    |
    = help: Remove extraneous blank line(s)
-
 ℹ Safe fix
 17 17 | if __name__ == "__main__":
 18 18 |     import abcd
@@ -78,7 +82,9 @@ E30_isort.py:21:5: E303 [*] Too many blank lines (2)
 22 21 | 
 23 22 | def __init__(self, backend_module: str, backend_obj: str | None) -> None: ...
 
-E30_isort.py:26:1: I001 [*] Import block is un-sorted or un-formatted
+error[I001]: 26:1: [*] Import block is un-sorted or un-formatted
+
+  --> E30_isort.py:25:18
    |
 25 |   if TYPE_CHECKING:
 26 | /     import os
@@ -86,13 +92,12 @@ E30_isort.py:26:1: I001 [*] Import block is un-sorted or un-formatted
 28 | | 
 29 | | 
 30 | |     from typing_extensions import TypeAlias
-31 | | 
-   | |_^ I001
+   | |____________________________________________^
+31 |   
 32 |   
 33 |       abcd.foo()
    |
    = help: Organize imports
-
 ℹ Safe fix
 25 25 | if TYPE_CHECKING:
 26 26 |     import os
@@ -103,13 +108,14 @@ E30_isort.py:26:1: I001 [*] Import block is un-sorted or un-formatted
 31 29 | 
 32 30 | 
 
-E30_isort.py:30:5: E303 [*] Too many blank lines (3)
+error[E303]: 30:5: [*] Too many blank lines (3)
+
+  --> E30_isort.py:30:5
    |
 30 |     from typing_extensions import TypeAlias
-   |     ^^^^ E303
+   |     ^^^^
    |
    = help: Remove extraneous blank line(s)
-
 ℹ Safe fix
 25 25 | if TYPE_CHECKING:
 26 26 |     import os
@@ -120,15 +126,16 @@ E30_isort.py:30:5: E303 [*] Too many blank lines (3)
 31 29 | 
 32 30 | 
 
-E30_isort.py:33:5: E303 [*] Too many blank lines (2)
+error[E303]: 33:5: [*] Too many blank lines (2)
+
+  --> E30_isort.py:33:5
    |
 33 |     abcd.foo()
-   |     ^^^^ E303
+   |     ^^^^
 34 | 
 35 | def __call__(self, name: str, *args: Any, **kwargs: Any) -> Any:
    |
    = help: Remove extraneous blank line(s)
-
 ℹ Safe fix
 29 29 | 
 30 30 |     from typing_extensions import TypeAlias
@@ -138,15 +145,16 @@ E30_isort.py:33:5: E303 [*] Too many blank lines (2)
 34 33 | 
 35 34 | def __call__(self, name: str, *args: Any, **kwargs: Any) -> Any:
 
-E30_isort.py:60:1: I001 [*] Import block is un-sorted or un-formatted
+error[I001]: 60:1: [*] Import block is un-sorted or un-formatted
+
+  --> E30_isort.py:60:1
    |
 60 | / from typing import Any, Sequence
 61 | | 
-62 | | class MissingCommand(TypeError): ...  # noqa: N818
-   | |_^ I001
+   | |__^
+62 |   class MissingCommand(TypeError): ...  # noqa: N818
    |
    = help: Organize imports
-
 ℹ Safe fix
 58 58 | 
 59 59 | 
@@ -154,15 +162,16 @@ E30_isort.py:60:1: I001 [*] Import block is un-sorted or un-formatted
 61    |-
 62 61 | class MissingCommand(TypeError): ...  # noqa: N818
 
-E30_isort.py:62:1: E303 [*] Too many blank lines (1)
+error[E303]: 62:1: [*] Too many blank lines (1)
+
+  --> E30_isort.py:61:1
    |
 60 | from typing import Any, Sequence
 61 | 
 62 | class MissingCommand(TypeError): ...  # noqa: N818
-   | ^^^^^ E303
+   | ^^^^^
    |
    = help: Remove extraneous blank line(s)
-
 ℹ Safe fix
 58 58 | 
 59 59 | 

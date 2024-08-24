@@ -116,25 +116,28 @@ Module(
 ```
 ## Errors
 
+error: Invalid syntax
   |
 1 | class : ...
-  |       ^ Syntax Error: Expected an identifier
+  |       ^ Expected an identifier
 2 | class (): ...
 3 | class (metaclass=ABC): ...
   |
 
 
+error: Invalid syntax
   |
 1 | class : ...
 2 | class (): ...
-  |       ^ Syntax Error: Expected an identifier
+  |       ^ Expected an identifier
 3 | class (metaclass=ABC): ...
   |
 
 
+error: Invalid syntax
   |
 1 | class : ...
 2 | class (): ...
 3 | class (metaclass=ABC): ...
-  |       ^ Syntax Error: Expected an identifier
+  |       ^ Expected an identifier
   |

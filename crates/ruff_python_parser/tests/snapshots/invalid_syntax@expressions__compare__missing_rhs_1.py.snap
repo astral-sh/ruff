@@ -72,19 +72,21 @@ Module(
 ```
 ## Errors
 
+error: Invalid syntax
   |
 1 | # Without the `in`, this is considered to be a unary `not`
 2 | x not
-  |   ^^^ Syntax Error: Simple statements must be separated by newlines or semicolons
+  |   ^^^ Simple statements must be separated by newlines or semicolons
 3 | 
 4 | 1 + 2
   |
 
 
+error: Invalid syntax
   |
 1 | # Without the `in`, this is considered to be a unary `not`
 2 | x not
-  |      ^ Syntax Error: Expected an expression
+  |      ^ Expected an expression
 3 | 
 4 | 1 + 2
   |

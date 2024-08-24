@@ -79,15 +79,17 @@ Module(
 ```
 ## Errors
 
+error: Invalid syntax
   |
 1 | f'hello \N{INVALID} world'
-  |            ^^^^^^^ Syntax Error: Got unexpected unicode
+  |            ^^^^^^^ Got unexpected unicode
 2 | f"""hello \N{INVALID} world"""
   |
 
 
+error: Invalid syntax
   |
 1 | f'hello \N{INVALID} world'
 2 | f"""hello \N{INVALID} world"""
-  |              ^^^^^^^ Syntax Error: Got unexpected unicode
+  |              ^^^^^^^ Got unexpected unicode
   |

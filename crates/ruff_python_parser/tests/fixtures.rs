@@ -3,12 +3,11 @@ use std::fmt::{Formatter, Write};
 use std::fs;
 use std::path::Path;
 
-use annotate_snippets::display_list::{DisplayList, FormatOptions};
-use annotate_snippets::snippet::{AnnotationType, Slice, Snippet, SourceAnnotation};
+use annotate_snippets::{Level, Renderer, Snippet};
 
-use ruff_python_ast::visitor::source_order::{walk_module, SourceOrderVisitor, TraversalSignal};
 use ruff_python_ast::{AnyNodeRef, Mod};
-use ruff_python_parser::{parse_unchecked, Mode, ParseErrorType, Token};
+use ruff_python_ast::visitor::source_order::{SourceOrderVisitor, TraversalSignal, walk_module};
+use ruff_python_parser::{Mode, parse_unchecked, ParseErrorType, Token};
 use ruff_source_file::{LineIndex, OneIndexed, SourceCode};
 use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 
@@ -203,33 +202,15 @@ impl std::fmt::Display for CodeFrame<'_> {
             .source_code
             .slice(TextRange::new(start_offset, end_offset));
 
-        let start_char = source[TextRange::up_to(annotation_range.start())]
-            .chars()
-            .count();
+        let label = self.error.to_string();
+        let message = Level::Error.title("Invalid syntax").snippet(
+            Snippet::source(source)
+                .line_start(start_index.get())
+                .annotation(Level::Error.span(annotation_range.into()).label(&label)),
+        );
 
-        let char_length = source[annotation_range].chars().count();
-        let label = format!("Syntax Error: {error}", error = self.error);
-
-        let snippet = Snippet {
-            title: None,
-            slices: vec![Slice {
-                source,
-                line_start: start_index.get(),
-                annotations: vec![SourceAnnotation {
-                    label: &label,
-                    annotation_type: AnnotationType::Error,
-                    range: (start_char, start_char + char_length),
-                }],
-                // The origin (file name, line number, and column number) is already encoded
-                // in the `label`.
-                origin: None,
-                fold: false,
-            }],
-            footer: Vec::new(),
-            opt: FormatOptions::default(),
-        };
-
-        writeln!(f, "{message}", message = DisplayList::from(snippet))
+        let result = writeln!(f, "{}", Renderer::plain().render(message));
+        result
     }
 }
 

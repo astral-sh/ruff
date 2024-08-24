@@ -137,33 +137,37 @@ Module(
 ```
 ## Errors
 
+error: Invalid syntax
   |
 1 | from x import a.
-  |                ^ Syntax Error: Expected ',', found '.'
+  |                ^ Expected ',', found '.'
 2 | from x import a.b
 3 | from x import a, b.c, d, e.f, g
   |
 
 
+error: Invalid syntax
   |
 1 | from x import a.
 2 | from x import a.b
-  |                ^ Syntax Error: Expected ',', found '.'
+  |                ^ Expected ',', found '.'
 3 | from x import a, b.c, d, e.f, g
   |
 
 
+error: Invalid syntax
   |
 1 | from x import a.
 2 | from x import a.b
 3 | from x import a, b.c, d, e.f, g
-  |                   ^ Syntax Error: Expected ',', found '.'
+  |                   ^ Expected ',', found '.'
   |
 
 
+error: Invalid syntax
   |
 1 | from x import a.
 2 | from x import a.b
 3 | from x import a, b.c, d, e.f, g
-  |                           ^ Syntax Error: Expected ',', found '.'
+  |                           ^ Expected ',', found '.'
   |

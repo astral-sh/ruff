@@ -46,7 +46,8 @@ Module(
 ```
 ## Errors
 
+error: Invalid syntax
   |
 1 | not x := 1
-  |       ^^ Syntax Error: Expected a statement
+  |       ^^ Expected a statement
   |

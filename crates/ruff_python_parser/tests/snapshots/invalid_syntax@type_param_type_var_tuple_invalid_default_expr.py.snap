@@ -285,37 +285,41 @@ Module(
 ```
 ## Errors
 
+error: Invalid syntax
   |
 1 | type X[*Ts = *int] = int
 2 | type X[*Ts = *int or str] = int
-  |               ^^^^^^^^^^ Syntax Error: Boolean expression cannot be used here
+  |               ^^^^^^^^^^ Boolean expression cannot be used here
 3 | type X[*Ts = yield x] = int
 4 | type X[*Ts = yield from x] = int
   |
 
 
+error: Invalid syntax
   |
 1 | type X[*Ts = *int] = int
 2 | type X[*Ts = *int or str] = int
 3 | type X[*Ts = yield x] = int
-  |              ^^^^^^^ Syntax Error: Yield expression cannot be used here
+  |              ^^^^^^^ Yield expression cannot be used here
 4 | type X[*Ts = yield from x] = int
 5 | type X[*Ts = x := int] = int
   |
 
 
+error: Invalid syntax
   |
 2 | type X[*Ts = *int or str] = int
 3 | type X[*Ts = yield x] = int
 4 | type X[*Ts = yield from x] = int
-  |              ^^^^^^^^^^^^ Syntax Error: Yield expression cannot be used here
+  |              ^^^^^^^^^^^^ Yield expression cannot be used here
 5 | type X[*Ts = x := int] = int
   |
 
 
+error: Invalid syntax
   |
 3 | type X[*Ts = yield x] = int
 4 | type X[*Ts = yield from x] = int
 5 | type X[*Ts = x := int] = int
-  |                ^^ Syntax Error: Expected ',', found ':='
+  |                ^^ Expected ',', found ':='
   |

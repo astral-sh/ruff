@@ -1,23 +1,27 @@
 ---
 source: crates/ruff_linter/src/rules/pyflakes/mod.rs
 ---
-__init__.py:19:8: F401 `sys` imported but unused
+error[F401]: 19:8: `sys` imported but unused
+
+  --> __init__.py:19:8
    |
 19 | import sys  # F401: remove unused
-   |        ^^^ F401
+   |        ^^^
    |
    = help: Remove unused import: `sys`
+error[F401]: 33:15: `.unused` imported but unused; consider removing, adding to `__all__`, or using a redundant alias
 
-__init__.py:33:15: F401 `.unused` imported but unused; consider removing, adding to `__all__`, or using a redundant alias
+  --> __init__.py:33:15
    |
 33 | from . import unused  # F401: change to redundant alias
-   |               ^^^^^^ F401
+   |               ^^^^^^
    |
    = help: Use an explicit re-export: `unused as unused`
+error[F401]: 36:26: `.renamed` imported but unused; consider removing, adding to `__all__`, or using a redundant alias
 
-__init__.py:36:26: F401 `.renamed` imported but unused; consider removing, adding to `__all__`, or using a redundant alias
+  --> __init__.py:36:26
    |
 36 | from . import renamed as bees  # F401: no fix
-   |                          ^^^^ F401
+   |                          ^^^^
    |
    = help: Use an explicit re-export: `renamed as renamed`

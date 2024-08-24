@@ -60,9 +60,10 @@ Module(
 ```
 ## Errors
 
+error: Invalid syntax
   |
 1 | {x:
 2 | 
 3 | 1 + 2
-  |       Syntax Error: unexpected EOF while parsing
+  |      ^ unexpected EOF while parsing
   |

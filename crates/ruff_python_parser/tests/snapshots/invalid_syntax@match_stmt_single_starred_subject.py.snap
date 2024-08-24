@@ -58,8 +58,9 @@ Module(
 ```
 ## Errors
 
+error: Invalid syntax
   |
 1 | match *foo:
-  |       ^^^^ Syntax Error: Starred expression cannot be used here
+  |       ^^^^ Starred expression cannot be used here
 2 |     case _: ...
   |

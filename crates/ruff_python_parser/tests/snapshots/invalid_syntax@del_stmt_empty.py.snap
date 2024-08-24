@@ -21,7 +21,8 @@ Module(
 ```
 ## Errors
 
+error: Invalid syntax
   |
 1 | del
-  |    ^ Syntax Error: Delete statement must have at least one target
+  |    ^ Delete statement must have at least one target
   |

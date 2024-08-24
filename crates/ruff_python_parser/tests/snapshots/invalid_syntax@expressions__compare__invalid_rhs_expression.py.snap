@@ -108,17 +108,19 @@ Module(
 ```
 ## Errors
 
+error: Invalid syntax
   |
 1 | x not in lambda y: y
-  |          ^^^^^^^^^^^ Syntax Error: Lambda expression cannot be used here
+  |          ^^^^^^^^^^^ Lambda expression cannot be used here
 2 | 
 3 | x == yield y
   |
 
 
+error: Invalid syntax
   |
 1 | x not in lambda y: y
 2 | 
 3 | x == yield y
-  |      ^^^^^^^ Syntax Error: Yield expression cannot be used here
+  |      ^^^^^^^ Yield expression cannot be used here
   |

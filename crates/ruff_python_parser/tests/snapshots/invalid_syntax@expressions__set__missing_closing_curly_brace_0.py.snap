@@ -34,9 +34,10 @@ Module(
 ```
 ## Errors
 
+error: Invalid syntax
   |
 1 | # Missing closing curly brace 0: No elements
 2 | 
 3 | {
-  |   Syntax Error: unexpected EOF while parsing
+  |  ^ unexpected EOF while parsing
   |

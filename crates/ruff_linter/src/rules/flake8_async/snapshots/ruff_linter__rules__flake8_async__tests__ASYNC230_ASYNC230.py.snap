@@ -1,101 +1,114 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_async/mod.rs
 ---
-ASYNC230.py:6:5: ASYNC230 Async functions should not open files with blocking methods like `open`
-  |
-5 | async def foo():
-6 |     open("")  # ASYNC230
-  |     ^^^^ ASYNC230
-7 |     io.open_code("")  # ASYNC230
-  |
+error[ASYNC230]: 6:5: Async functions should not open files with blocking methods like `open`
 
-ASYNC230.py:7:5: ASYNC230 Async functions should not open files with blocking methods like `open`
+ --> ASYNC230.py:6:5
+  |
+5 | async def foo():
+6 |     open("")  # ASYNC230
+  |     ^^^^
+7 |     io.open_code("")  # ASYNC230
+  |
+error[ASYNC230]: 7:5: Async functions should not open files with blocking methods like `open`
+
+ --> ASYNC230.py:7:5
   |
 5 | async def foo():
 6 |     open("")  # ASYNC230
 7 |     io.open_code("")  # ASYNC230
-  |     ^^^^^^^^^^^^ ASYNC230
+  |     ^^^^^^^^^^^^
 8 | 
 9 |     with open(""):  # ASYNC230
   |
+error[ASYNC230]: 9:10: Async functions should not open files with blocking methods like `open`
 
-ASYNC230.py:9:10: ASYNC230 Async functions should not open files with blocking methods like `open`
+  --> ASYNC230.py:9:10
    |
  7 |     io.open_code("")  # ASYNC230
  8 | 
  9 |     with open(""):  # ASYNC230
-   |          ^^^^ ASYNC230
+   |          ^^^^
 10 |         ...
    |
+error[ASYNC230]: 12:10: Async functions should not open files with blocking methods like `open`
 
-ASYNC230.py:12:10: ASYNC230 Async functions should not open files with blocking methods like `open`
+  --> ASYNC230.py:12:10
    |
 10 |         ...
 11 | 
 12 |     with open("") as f:  # ASYNC230
-   |          ^^^^ ASYNC230
+   |          ^^^^
 13 |         ...
    |
+error[ASYNC230]: 15:17: Async functions should not open files with blocking methods like `open`
 
-ASYNC230.py:15:17: ASYNC230 Async functions should not open files with blocking methods like `open`
+  --> ASYNC230.py:15:17
    |
 13 |         ...
 14 | 
 15 |     with foo(), open(""):  # ASYNC230
-   |                 ^^^^ ASYNC230
+   |                 ^^^^
 16 |         ...
    |
+error[ASYNC230]: 18:16: Async functions should not open files with blocking methods like `open`
 
-ASYNC230.py:18:16: ASYNC230 Async functions should not open files with blocking methods like `open`
+  --> ASYNC230.py:18:16
    |
 16 |         ...
 17 | 
 18 |     async with open(""):  # ASYNC230
-   |                ^^^^ ASYNC230
+   |                ^^^^
 19 |         ...
    |
+error[ASYNC230]: 29:5: Async functions should not open files with blocking methods like `open`
 
-ASYNC230.py:29:5: ASYNC230 Async functions should not open files with blocking methods like `open`
+  --> ASYNC230.py:29:5
    |
 28 | async def func():
 29 |     open("foo")  # ASYNC230
-   |     ^^^^ ASYNC230
+   |     ^^^^
    |
+error[ASYNC230]: 36:5: Async functions should not open files with blocking methods like `open`
 
-ASYNC230.py:36:5: ASYNC230 Async functions should not open files with blocking methods like `open`
+  --> ASYNC230.py:36:5
    |
 35 | async def func():
 36 |     Path("foo").open()  # ASYNC230
-   |     ^^^^^^^^^^^^^^^^ ASYNC230
+   |     ^^^^^^^^^^^^^^^^
    |
+error[ASYNC230]: 41:5: Async functions should not open files with blocking methods like `open`
 
-ASYNC230.py:41:5: ASYNC230 Async functions should not open files with blocking methods like `open`
+  --> ASYNC230.py:41:5
    |
 39 | async def func():
 40 |     p = Path("foo")
 41 |     p.open()  # ASYNC230
-   |     ^^^^^^ ASYNC230
+   |     ^^^^^^
    |
+error[ASYNC230]: 45:10: Async functions should not open files with blocking methods like `open`
 
-ASYNC230.py:45:10: ASYNC230 Async functions should not open files with blocking methods like `open`
+  --> ASYNC230.py:45:10
    |
 44 | async def func():
 45 |     with Path("foo").open() as f:  # ASYNC230
-   |          ^^^^^^^^^^^^^^^^ ASYNC230
+   |          ^^^^^^^^^^^^^^^^
 46 |         pass
    |
+error[ASYNC230]: 53:9: Async functions should not open files with blocking methods like `open`
 
-ASYNC230.py:53:9: ASYNC230 Async functions should not open files with blocking methods like `open`
+  --> ASYNC230.py:53:9
    |
 52 |     async def bar():
 53 |         p.open()  # ASYNC230
-   |         ^^^^^^ ASYNC230
+   |         ^^^^^^
    |
+error[ASYNC230]: 59:5: Async functions should not open files with blocking methods like `open`
 
-ASYNC230.py:59:5: ASYNC230 Async functions should not open files with blocking methods like `open`
+  --> ASYNC230.py:59:5
    |
 57 |     (p1, p2) = (Path("foo"), Path("bar"))
 58 | 
 59 |     p1.open()  # ASYNC230
-   |     ^^^^^^^ ASYNC230
+   |     ^^^^^^^
    |

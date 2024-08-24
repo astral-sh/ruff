@@ -184,28 +184,31 @@ Module(
 ```
 ## Errors
 
+error: Invalid syntax
   |
 1 | match x:
 2 |     case y if *a: ...
-  |               ^^ Syntax Error: Starred expression cannot be used here
+  |               ^^ Starred expression cannot be used here
 3 | match x:
 4 |     case y if (*a): ...
   |
 
 
+error: Invalid syntax
   |
 2 |     case y if *a: ...
 3 | match x:
 4 |     case y if (*a): ...
-  |                ^^ Syntax Error: Starred expression cannot be used here
+  |                ^^ Starred expression cannot be used here
 5 | match x:
 6 |     case y if yield x: ...
   |
 
 
+error: Invalid syntax
   |
 4 |     case y if (*a): ...
 5 | match x:
 6 |     case y if yield x: ...
-  |               ^^^^^^^ Syntax Error: Yield expression cannot be used here
+  |               ^^^^^^^ Yield expression cannot be used here
   |

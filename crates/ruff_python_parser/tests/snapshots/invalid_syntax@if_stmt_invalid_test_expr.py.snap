@@ -108,25 +108,28 @@ Module(
 ```
 ## Errors
 
+error: Invalid syntax
   |
 1 | if *x: ...
-  |    ^^ Syntax Error: Starred expression cannot be used here
+  |    ^^ Starred expression cannot be used here
 2 | if yield x: ...
 3 | if yield from x: ...
   |
 
 
+error: Invalid syntax
   |
 1 | if *x: ...
 2 | if yield x: ...
-  |    ^^^^^^^ Syntax Error: Yield expression cannot be used here
+  |    ^^^^^^^ Yield expression cannot be used here
 3 | if yield from x: ...
   |
 
 
+error: Invalid syntax
   |
 1 | if *x: ...
 2 | if yield x: ...
 3 | if yield from x: ...
-  |    ^^^^^^^^^^^^ Syntax Error: Yield expression cannot be used here
+  |    ^^^^^^^^^^^^ Yield expression cannot be used here
   |

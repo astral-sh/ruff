@@ -76,9 +76,10 @@ Module(
 ```
 ## Errors
 
+error: Invalid syntax
   |
 1 | match subject:
 2 |     case 1:
 3 |     case 2: ...
-  |     ^^^^ Syntax Error: Expected an indented block after `case` block
+  |     ^^^^ Expected an indented block after `case` block
   |

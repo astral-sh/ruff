@@ -75,19 +75,22 @@ Module(
 ```
 ## Errors
 
+error: Invalid syntax
   |
 1 | type X[*T: int] = int
-  |          ^ Syntax Error: Expected ']', found ':'
+  |          ^ Expected ']', found ':'
   |
 
 
-  |
-1 | type X[*T: int] = int
-  |               ^ Syntax Error: Expected a statement
-  |
-
-
+error: Invalid syntax
   |
 1 | type X[*T: int] = int
-  |                 ^ Syntax Error: Expected a statement
+  |               ^ Expected a statement
+  |
+
+
+error: Invalid syntax
+  |
+1 | type X[*T: int] = int
+  |                 ^ Expected a statement
   |

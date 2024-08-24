@@ -71,17 +71,19 @@ Module(
 ```
 ## Errors
 
+error: Invalid syntax
   |
 1 | type
 2 | type x
-  |      ^ Syntax Error: Simple statements must be separated by newlines or semicolons
+  |      ^ Simple statements must be separated by newlines or semicolons
 3 | type x =
   |
 
 
+error: Invalid syntax
   |
 1 | type
 2 | type x
 3 | type x =
-  |         ^ Syntax Error: Expected an expression
+  |         ^ Expected an expression
   |

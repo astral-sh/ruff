@@ -335,45 +335,50 @@ Module(
 ```
 ## Errors
 
+error: Invalid syntax
   |
 1 | type X[T = *int] = int
-  |            ^^^^ Syntax Error: Starred expression cannot be used here
+  |            ^^^^ Starred expression cannot be used here
 2 | type X[T = yield x] = int
 3 | type X[T = (yield x)] = int
   |
 
 
+error: Invalid syntax
   |
 1 | type X[T = *int] = int
 2 | type X[T = yield x] = int
-  |            ^^^^^^^ Syntax Error: Yield expression cannot be used here
+  |            ^^^^^^^ Yield expression cannot be used here
 3 | type X[T = (yield x)] = int
 4 | type X[T = yield from x] = int
   |
 
 
+error: Invalid syntax
   |
 2 | type X[T = yield x] = int
 3 | type X[T = (yield x)] = int
 4 | type X[T = yield from x] = int
-  |            ^^^^^^^^^^^^ Syntax Error: Yield expression cannot be used here
+  |            ^^^^^^^^^^^^ Yield expression cannot be used here
 5 | type X[T = x := int] = int
 6 | type X[T: int = *int] = int
   |
 
 
+error: Invalid syntax
   |
 3 | type X[T = (yield x)] = int
 4 | type X[T = yield from x] = int
 5 | type X[T = x := int] = int
-  |              ^^ Syntax Error: Expected ',', found ':='
+  |              ^^ Expected ',', found ':='
 6 | type X[T: int = *int] = int
   |
 
 
+error: Invalid syntax
   |
 4 | type X[T = yield from x] = int
 5 | type X[T = x := int] = int
 6 | type X[T: int = *int] = int
-  |                 ^^^^ Syntax Error: Starred expression cannot be used here
+  |                 ^^^^ Starred expression cannot be used here
   |

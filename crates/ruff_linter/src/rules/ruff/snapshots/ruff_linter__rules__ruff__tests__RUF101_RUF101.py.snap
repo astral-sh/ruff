@@ -1,15 +1,16 @@
 ---
 source: crates/ruff_linter/src/rules/ruff/mod.rs
 ---
-RUF101.py:1:15: RUF101 [*] `RUF940` is a redirect to `RUF950`
+error[RUF101]: 1:15: [*] `RUF940` is a redirect to `RUF950`
+
+ --> RUF101.py:1:15
   |
 1 | x = 2 # noqa: RUF940
-  |               ^^^^^^ RUF101
+  |               ^^^^^^
 2 | x = 2 # noqa: RUF950
 3 | x = 2 # noqa: RUF940, RUF950
   |
   = help: Replace with `RUF950`
-
 ℹ Safe fix
 1   |-x = 2 # noqa: RUF940
 2 1 | x = 2 # noqa: RUF950
@@ -18,17 +19,18 @@ RUF101.py:1:15: RUF101 [*] `RUF940` is a redirect to `RUF950`
 4 4 | x = 2 # noqa: RUF950, RUF940, RUF950, RUF950, RUF950
 5 5 | x = 2 # noqa: RUF940, RUF950, RUF940
 
-RUF101.py:3:15: RUF101 [*] `RUF940` is a redirect to `RUF950`
+error[RUF101]: 3:15: [*] `RUF940` is a redirect to `RUF950`
+
+ --> RUF101.py:3:15
   |
 1 | x = 2 # noqa: RUF940
 2 | x = 2 # noqa: RUF950
 3 | x = 2 # noqa: RUF940, RUF950
-  |               ^^^^^^ RUF101
+  |               ^^^^^^
 4 | x = 2 # noqa: RUF950, RUF940, RUF950, RUF950, RUF950
 5 | x = 2 # noqa: RUF940, RUF950, RUF940
   |
   = help: Replace with `RUF950`
-
 ℹ Safe fix
 1 1 | x = 2 # noqa: RUF940
 2 2 | x = 2 # noqa: RUF950
@@ -38,17 +40,18 @@ RUF101.py:3:15: RUF101 [*] `RUF940` is a redirect to `RUF950`
 5 5 | x = 2 # noqa: RUF940, RUF950, RUF940
 6 6 | x = 2 # noqa: RUF940, RUF950, RUF940, RUF950
 
-RUF101.py:4:23: RUF101 [*] `RUF940` is a redirect to `RUF950`
+error[RUF101]: 4:23: [*] `RUF940` is a redirect to `RUF950`
+
+ --> RUF101.py:4:23
   |
 2 | x = 2 # noqa: RUF950
 3 | x = 2 # noqa: RUF940, RUF950
 4 | x = 2 # noqa: RUF950, RUF940, RUF950, RUF950, RUF950
-  |                       ^^^^^^ RUF101
+  |                       ^^^^^^
 5 | x = 2 # noqa: RUF940, RUF950, RUF940
 6 | x = 2 # noqa: RUF940, RUF950, RUF940, RUF950
   |
   = help: Replace with `RUF950`
-
 ℹ Safe fix
 1 1 | x = 2 # noqa: RUF940
 2 2 | x = 2 # noqa: RUF950
@@ -58,16 +61,17 @@ RUF101.py:4:23: RUF101 [*] `RUF940` is a redirect to `RUF950`
 5 5 | x = 2 # noqa: RUF940, RUF950, RUF940
 6 6 | x = 2 # noqa: RUF940, RUF950, RUF940, RUF950
 
-RUF101.py:5:15: RUF101 [*] `RUF940` is a redirect to `RUF950`
+error[RUF101]: 5:15: [*] `RUF940` is a redirect to `RUF950`
+
+ --> RUF101.py:5:15
   |
 3 | x = 2 # noqa: RUF940, RUF950
 4 | x = 2 # noqa: RUF950, RUF940, RUF950, RUF950, RUF950
 5 | x = 2 # noqa: RUF940, RUF950, RUF940
-  |               ^^^^^^ RUF101
+  |               ^^^^^^
 6 | x = 2 # noqa: RUF940, RUF950, RUF940, RUF950
   |
   = help: Replace with `RUF950`
-
 ℹ Safe fix
 2 2 | x = 2 # noqa: RUF950
 3 3 | x = 2 # noqa: RUF940, RUF950
@@ -76,16 +80,17 @@ RUF101.py:5:15: RUF101 [*] `RUF940` is a redirect to `RUF950`
   5 |+x = 2 # noqa: RUF950, RUF950, RUF940
 6 6 | x = 2 # noqa: RUF940, RUF950, RUF940, RUF950
 
-RUF101.py:5:31: RUF101 [*] `RUF940` is a redirect to `RUF950`
+error[RUF101]: 5:31: [*] `RUF940` is a redirect to `RUF950`
+
+ --> RUF101.py:5:31
   |
 3 | x = 2 # noqa: RUF940, RUF950
 4 | x = 2 # noqa: RUF950, RUF940, RUF950, RUF950, RUF950
 5 | x = 2 # noqa: RUF940, RUF950, RUF940
-  |                               ^^^^^^ RUF101
+  |                               ^^^^^^
 6 | x = 2 # noqa: RUF940, RUF950, RUF940, RUF950
   |
   = help: Replace with `RUF950`
-
 ℹ Safe fix
 2 2 | x = 2 # noqa: RUF950
 3 3 | x = 2 # noqa: RUF940, RUF950
@@ -94,15 +99,16 @@ RUF101.py:5:31: RUF101 [*] `RUF940` is a redirect to `RUF950`
   5 |+x = 2 # noqa: RUF940, RUF950, RUF950
 6 6 | x = 2 # noqa: RUF940, RUF950, RUF940, RUF950
 
-RUF101.py:6:15: RUF101 [*] `RUF940` is a redirect to `RUF950`
+error[RUF101]: 6:15: [*] `RUF940` is a redirect to `RUF950`
+
+ --> RUF101.py:6:15
   |
 4 | x = 2 # noqa: RUF950, RUF940, RUF950, RUF950, RUF950
 5 | x = 2 # noqa: RUF940, RUF950, RUF940
 6 | x = 2 # noqa: RUF940, RUF950, RUF940, RUF950
-  |               ^^^^^^ RUF101
+  |               ^^^^^^
   |
   = help: Replace with `RUF950`
-
 ℹ Safe fix
 3 3 | x = 2 # noqa: RUF940, RUF950
 4 4 | x = 2 # noqa: RUF950, RUF940, RUF950, RUF950, RUF950
@@ -110,15 +116,16 @@ RUF101.py:6:15: RUF101 [*] `RUF940` is a redirect to `RUF950`
 6   |-x = 2 # noqa: RUF940, RUF950, RUF940, RUF950
   6 |+x = 2 # noqa: RUF950, RUF950, RUF940, RUF950
 
-RUF101.py:6:31: RUF101 [*] `RUF940` is a redirect to `RUF950`
+error[RUF101]: 6:31: [*] `RUF940` is a redirect to `RUF950`
+
+ --> RUF101.py:6:31
   |
 4 | x = 2 # noqa: RUF950, RUF940, RUF950, RUF950, RUF950
 5 | x = 2 # noqa: RUF940, RUF950, RUF940
 6 | x = 2 # noqa: RUF940, RUF950, RUF940, RUF950
-  |                               ^^^^^^ RUF101
+  |                               ^^^^^^
   |
   = help: Replace with `RUF950`
-
 ℹ Safe fix
 3 3 | x = 2 # noqa: RUF940, RUF950
 4 4 | x = 2 # noqa: RUF950, RUF940, RUF950, RUF950, RUF950

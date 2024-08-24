@@ -47,7 +47,8 @@ Module(
 ```
 ## Errors
 
+error: Invalid syntax
   |
 1 | if True: if True: pass
-  |          ^^ Syntax Error: Expected a simple statement
+  |          ^^ Expected a simple statement
   |

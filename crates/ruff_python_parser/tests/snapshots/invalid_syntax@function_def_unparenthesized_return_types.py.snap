@@ -122,15 +122,17 @@ Module(
 ```
 ## Errors
 
+error: Invalid syntax
   |
 1 | def foo() -> int,: ...
-  |              ^^^^ Syntax Error: Multiple return types must be parenthesized
+  |              ^^^^ Multiple return types must be parenthesized
 2 | def foo() -> int, str: ...
   |
 
 
+error: Invalid syntax
   |
 1 | def foo() -> int,: ...
 2 | def foo() -> int, str: ...
-  |              ^^^^^^^^ Syntax Error: Multiple return types must be parenthesized
+  |              ^^^^^^^^ Multiple return types must be parenthesized
   |

@@ -42,41 +42,46 @@ Module(
 ```
 ## Errors
 
+error: Invalid syntax
   |
 3 | finally:
 4 |     pass
 5 | else:
-  | ^^^^ Syntax Error: `else` block must come before `finally` block
+  | ^^^^ `else` block must come before `finally` block
 6 |     pass
   |
 
 
+error: Invalid syntax
   |
 3 | finally:
 4 |     pass
 5 | else:
-  |     ^ Syntax Error: Expected a statement
+  |     ^ Expected a statement
 6 |     pass
   |
 
 
+error: Invalid syntax
   |
 3 | finally:
 4 |     pass
 5 | else:
-  |      ^ Syntax Error: Expected a statement
+  |      ^ Expected a statement
 6 |     pass
   |
 
 
+error: Invalid syntax
   |
 4 |     pass
 5 | else:
 6 |     pass
-  | ^^^^ Syntax Error: Unexpected indentation
+  | ^^^^ Unexpected indentation
   |
 
 
+error: Invalid syntax
   |
 5 | else:
 6 |     pass

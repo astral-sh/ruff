@@ -91,15 +91,17 @@ Module(
 ```
 ## Errors
 
+error: Invalid syntax
   |
 1 | if True: pass if False: pass
-  |               ^^ Syntax Error: Compound statements are not allowed on the same line as simple statements
+  |               ^^ Compound statements are not allowed on the same line as simple statements
 2 | if True: pass; if False: pass
   |
 
 
+error: Invalid syntax
   |
 1 | if True: pass if False: pass
 2 | if True: pass; if False: pass
-  |                ^^ Syntax Error: Compound statements are not allowed on the same line as simple statements
+  |                ^^ Compound statements are not allowed on the same line as simple statements
   |

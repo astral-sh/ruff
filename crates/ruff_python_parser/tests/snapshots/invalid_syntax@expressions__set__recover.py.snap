@@ -236,67 +236,74 @@ Module(
 ```
 ## Errors
 
+error: Invalid syntax
   |
 3 | # These are same as for the list expressions.
 4 | 
 5 | {,}
-  |  ^ Syntax Error: Expected an expression
+  |  ^ Expected an expression
 6 | 
 7 | {1,,2}
   |
 
 
+error: Invalid syntax
   |
 5 | {,}
 6 | 
 7 | {1,,2}
-  |    ^ Syntax Error: Expected an expression or a '}'
+  |    ^ Expected an expression or a '}'
 8 | 
 9 | {1,,}
   |
 
 
+error: Invalid syntax
    |
  7 | {1,,2}
  8 | 
  9 | {1,,}
-   |    ^ Syntax Error: Expected an expression or a '}'
+   |    ^ Expected an expression or a '}'
 10 | 
 11 | # Missing comma
    |
 
 
+error: Invalid syntax
    |
 11 | # Missing comma
 12 | {1 2}
-   |    ^ Syntax Error: Expected ',', found int
+   |    ^ Expected ',', found int
 13 | 
 14 | # Dictionary element in a list
    |
 
 
+error: Invalid syntax
    |
 17 | # Missing expression
 18 | {1, x + }
-   |         ^ Syntax Error: Expected an expression
+   |         ^ Expected an expression
 19 | 
 20 | {1; 2}
    |
 
 
+error: Invalid syntax
    |
 18 | {1, x + }
 19 | 
 20 | {1; 2}
-   |   ^ Syntax Error: Expected an expression or a '}'
+   |   ^ Expected an expression or a '}'
 21 | 
 22 | [*]
    |
 
 
+error: Invalid syntax
    |
 20 | {1; 2}
 21 | 
 22 | [*]
-   |   ^ Syntax Error: Expected an expression
+   |   ^ Expected an expression
    |

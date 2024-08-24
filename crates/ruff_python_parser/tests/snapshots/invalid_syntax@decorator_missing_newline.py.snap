@@ -138,25 +138,28 @@ Module(
 ```
 ## Errors
 
+error: Invalid syntax
   |
 1 | @x def foo(): ...
-  |    ^^^ Syntax Error: Expected newline, found 'def'
+  |    ^^^ Expected newline, found 'def'
 2 | @x async def foo(): ...
 3 | @x class Foo: ...
   |
 
 
+error: Invalid syntax
   |
 1 | @x def foo(): ...
 2 | @x async def foo(): ...
-  |    ^^^^^ Syntax Error: Expected newline, found 'async'
+  |    ^^^^^ Expected newline, found 'async'
 3 | @x class Foo: ...
   |
 
 
+error: Invalid syntax
   |
 1 | @x def foo(): ...
 2 | @x async def foo(): ...
 3 | @x class Foo: ...
-  |    ^^^^^ Syntax Error: Expected newline, found 'class'
+  |    ^^^^^ Expected newline, found 'class'
   |

@@ -61,17 +61,19 @@ Module(
 ```
 ## Errors
 
+error: Invalid syntax
   |
 1 | with (:
-  |       ^ Syntax Error: Expected an expression
+  |       ^ Expected an expression
 2 | 
 3 | x + y
   |
 
 
+error: Invalid syntax
   |
 1 | with (:
 2 | 
 3 | x + y
-  |       Syntax Error: unexpected EOF while parsing
+  |      ^ unexpected EOF while parsing
   |

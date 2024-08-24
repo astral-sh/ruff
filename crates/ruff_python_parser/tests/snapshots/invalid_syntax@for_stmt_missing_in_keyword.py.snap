@@ -81,15 +81,17 @@ Module(
 ```
 ## Errors
 
+error: Invalid syntax
   |
 1 | for a b: ...
-  |       ^ Syntax Error: Expected 'in', found name
+  |       ^ Expected 'in', found name
 2 | for a: ...
   |
 
 
+error: Invalid syntax
   |
 1 | for a b: ...
 2 | for a: ...
-  |      ^ Syntax Error: Expected 'in', found ':'
+  |      ^ Expected 'in', found ':'
   |

@@ -74,10 +74,11 @@ Module(
 ```
 ## Errors
 
+error: Invalid syntax
   |
 1 | # Missing test expression, followed by a statement
 2 | x if
-  |     ^ Syntax Error: Expected an expression
+  |     ^ Expected an expression
 3 | 
 4 | def foo():
 5 |     pass

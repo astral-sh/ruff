@@ -46,19 +46,21 @@ Module(
 ```
 ## Errors
 
+error: Invalid syntax
   |
 1 | try:
 2 |     pass
 3 | except as:
-  |        ^^ Syntax Error: Expected one or more exception types
+  |        ^^ Expected one or more exception types
 4 |     pass
   |
 
 
+error: Invalid syntax
   |
 1 | try:
 2 |     pass
 3 | except as:
-  |          ^ Syntax Error: Expected name after `as`
+  |          ^ Expected name after `as`
 4 |     pass
   |

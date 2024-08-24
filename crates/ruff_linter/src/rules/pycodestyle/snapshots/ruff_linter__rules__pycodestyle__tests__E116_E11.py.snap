@@ -1,7 +1,9 @@
 ---
 source: crates/ruff_linter/src/rules/pycodestyle/mod.rs
 ---
-E11.py:9:1: SyntaxError: Expected an indented block after `if` statement
+error[syntax-error]: 9:1: Expected an indented block after `if` statement
+
+  --> E11.py:8:10
    |
  7 | #: E112
  8 | if False:
@@ -10,8 +12,9 @@ E11.py:9:1: SyntaxError: Expected an indented block after `if` statement
 10 | #: E113
 11 | print()
    |
+error[syntax-error]: 12:1: Unexpected indentation
 
-E11.py:12:1: SyntaxError: Unexpected indentation
+  --> E11.py:11:8
    |
 10 | #: E113
 11 | print()
@@ -20,8 +23,9 @@ E11.py:12:1: SyntaxError: Unexpected indentation
 13 | #: E114 E116
 14 | mimetype = 'application/x-directory'
    |
+error[syntax-error]: 14:1: Expected a statement
 
-E11.py:14:1: SyntaxError: Expected a statement
+  --> E11.py:13:13
    |
 12 |     print()
 13 | #: E114 E116
@@ -30,48 +34,53 @@ E11.py:14:1: SyntaxError: Expected a statement
 15 |      # 'httpd/unix-directory'
 16 | create_date = False
    |
+error[E116]: 15:1: Unexpected indentation (comment)
 
-E11.py:15:1: E116 Unexpected indentation (comment)
+  --> E11.py:14:37
    |
 13 | #: E114 E116
 14 | mimetype = 'application/x-directory'
 15 |      # 'httpd/unix-directory'
-   | ^^^^^ E116
+   | ^^^^^
 16 | create_date = False
 17 | #: E116 E116 E116
    |
+error[E116]: 22:1: Unexpected indentation (comment)
 
-E11.py:22:1: E116 Unexpected indentation (comment)
+  --> E11.py:21:15
    |
 20 |         self.master.start()
 21 |         # try:
 22 |             # self.master.start()
-   | ^^^^^^^^^^^^ E116
+   | ^^^^^^^^^^^^
 23 |         # except MasterExit:
 24 |             # self.shutdown()
    |
+error[E116]: 24:1: Unexpected indentation (comment)
 
-E11.py:24:1: E116 Unexpected indentation (comment)
+  --> E11.py:23:29
    |
 22 |             # self.master.start()
 23 |         # except MasterExit:
 24 |             # self.shutdown()
-   | ^^^^^^^^^^^^ E116
+   | ^^^^^^^^^^^^
 25 |         # finally:
 26 |             # sys.exit()
    |
+error[E116]: 26:1: Unexpected indentation (comment)
 
-E11.py:26:1: E116 Unexpected indentation (comment)
+  --> E11.py:25:19
    |
 24 |             # self.shutdown()
 25 |         # finally:
 26 |             # sys.exit()
-   | ^^^^^^^^^^^^ E116
+   | ^^^^^^^^^^^^
 27 | #: E115 E115 E115 E115 E115 E115
 28 | def start(self):
    |
+error[syntax-error]: 45:1: Expected an indented block after `if` statement
 
-E11.py:45:1: SyntaxError: Expected an indented block after `if` statement
+  --> E11.py:44:13
    |
 43 | #: E112
 44 | if False:  #

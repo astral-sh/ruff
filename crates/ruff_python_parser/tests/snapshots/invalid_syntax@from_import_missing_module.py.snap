@@ -40,15 +40,17 @@ Module(
 ```
 ## Errors
 
+error: Invalid syntax
   |
 1 | from
-  |     ^ Syntax Error: Expected a module name
+  |     ^ Expected a module name
 2 | from import x
   |
 
 
+error: Invalid syntax
   |
 1 | from
 2 | from import x
-  |      ^^^^^^ Syntax Error: Expected a module name
+  |      ^^^^^^ Expected a module name
   |

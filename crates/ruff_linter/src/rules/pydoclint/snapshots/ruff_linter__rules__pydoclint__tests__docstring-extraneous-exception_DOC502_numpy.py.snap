@@ -1,7 +1,9 @@
 ---
 source: crates/ruff_linter/src/rules/pydoclint/mod.rs
 ---
-DOC502_numpy.py:22:1: DOC502 Raised exception is not explicitly raised: `FasterThanLightError`
+error[DOC502]: 22:1: Raised exception is not explicitly raised: `FasterThanLightError`
+
+  --> DOC502_numpy.py:21:1
    |
 20 |           Speed as distance divided by time.
 21 |   
@@ -10,12 +12,13 @@ DOC502_numpy.py:22:1: DOC502 Raised exception is not explicitly raised: `FasterT
 24 | |     FasterThanLightError
 25 | |         If speed is greater than the speed of light.
 26 | |     """
-   | |____^ DOC502
+   | |____^
 27 |       return distance / time
    |
    = help: Remove `FasterThanLightError` from the docstring
+error[DOC502]: 47:1: Raised exceptions are not explicitly raised: `FasterThanLightError`, `DivisionByZero`
 
-DOC502_numpy.py:47:1: DOC502 Raised exceptions are not explicitly raised: `FasterThanLightError`, `DivisionByZero`
+  --> DOC502_numpy.py:46:1
    |
 45 |           Speed as distance divided by time.
 46 |   
@@ -26,12 +29,13 @@ DOC502_numpy.py:47:1: DOC502 Raised exceptions are not explicitly raised: `Faste
 51 | |     DivisionByZero
 52 | |         If attempting to divide by zero.
 53 | |     """
-   | |____^ DOC502
+   | |____^
 54 |       return distance / time
    |
    = help: Remove `FasterThanLightError`, `DivisionByZero` from the docstring
+error[DOC502]: 74:1: Raised exception is not explicitly raised: `DivisionByZero`
 
-DOC502_numpy.py:74:1: DOC502 Raised exception is not explicitly raised: `DivisionByZero`
+  --> DOC502_numpy.py:73:1
    |
 72 |           Speed as distance divided by time.
 73 |   
@@ -42,7 +46,7 @@ DOC502_numpy.py:74:1: DOC502 Raised exception is not explicitly raised: `Divisio
 78 | |     DivisionByZero
 79 | |         If attempting to divide by zero.
 80 | |     """
-   | |____^ DOC502
+   | |____^
 81 |       try:
 82 |           return distance / time
    |

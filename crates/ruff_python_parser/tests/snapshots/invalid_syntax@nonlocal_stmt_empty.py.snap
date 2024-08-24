@@ -21,7 +21,8 @@ Module(
 ```
 ## Errors
 
+error: Invalid syntax
   |
 1 | nonlocal
-  |         ^ Syntax Error: Nonlocal statement must have at least one name
+  |         ^ Nonlocal statement must have at least one name
   |

@@ -14,7 +14,8 @@ Module(
 ```
 ## Errors
 
+error: Invalid syntax
   |
 1 | 👍
-  | ^^ Syntax Error: Got unexpected token 👍
+  | ^^ Got unexpected token 👍
   |

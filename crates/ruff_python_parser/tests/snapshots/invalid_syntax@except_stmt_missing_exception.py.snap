@@ -115,41 +115,45 @@ Module(
 ```
 ## Errors
 
+error: Invalid syntax
   |
 1 | try:
 2 |     pass
 3 | except as exc:
-  |        ^^ Syntax Error: Expected one or more exception types
+  |        ^^ Expected one or more exception types
 4 |     pass
 5 | # If a '*' is present then exception type is required
   |
 
 
+error: Invalid syntax
    |
  6 | try:
  7 |     pass
  8 | except*:
-   |        ^ Syntax Error: Expected one or more exception types
+   |        ^ Expected one or more exception types
  9 |     pass
 10 | except*
    |
 
 
+error: Invalid syntax
    |
  8 | except*:
  9 |     pass
 10 | except*
-   |        ^ Syntax Error: Expected one or more exception types
+   |        ^ Expected one or more exception types
 11 |     pass
 12 | except* as exc:
 13 |     pass
    |
 
 
+error: Invalid syntax
    |
 10 | except*
 11 |     pass
 12 | except* as exc:
-   |         ^^ Syntax Error: Expected one or more exception types
+   |         ^^ Expected one or more exception types
 13 |     pass
    |

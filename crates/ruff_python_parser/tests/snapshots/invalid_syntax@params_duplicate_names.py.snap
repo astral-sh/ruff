@@ -133,31 +133,36 @@ Module(
 ```
 ## Errors
 
+error: Invalid syntax
   |
 1 | def foo(a, a=10, *a, a, a: str, **a): ...
-  |            ^ Syntax Error: Duplicate parameter "a"
+  |            ^ Duplicate parameter "a"
   |
 
 
-  |
-1 | def foo(a, a=10, *a, a, a: str, **a): ...
-  |                   ^ Syntax Error: Duplicate parameter "a"
-  |
-
-
+error: Invalid syntax
   |
 1 | def foo(a, a=10, *a, a, a: str, **a): ...
-  |                      ^ Syntax Error: Duplicate parameter "a"
+  |                   ^ Duplicate parameter "a"
   |
 
 
-  |
-1 | def foo(a, a=10, *a, a, a: str, **a): ...
-  |                         ^ Syntax Error: Duplicate parameter "a"
-  |
-
-
+error: Invalid syntax
   |
 1 | def foo(a, a=10, *a, a, a: str, **a): ...
-  |                                   ^ Syntax Error: Duplicate parameter "a"
+  |                      ^ Duplicate parameter "a"
+  |
+
+
+error: Invalid syntax
+  |
+1 | def foo(a, a=10, *a, a, a: str, **a): ...
+  |                         ^ Duplicate parameter "a"
+  |
+
+
+error: Invalid syntax
+  |
+1 | def foo(a, a=10, *a, a, a: str, **a): ...
+  |                                   ^ Duplicate parameter "a"
   |

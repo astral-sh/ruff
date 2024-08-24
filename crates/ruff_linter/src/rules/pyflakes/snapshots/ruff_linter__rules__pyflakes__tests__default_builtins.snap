@@ -1,10 +1,10 @@
 ---
 source: crates/ruff_linter/src/rules/pyflakes/mod.rs
 ---
-builtins.py:1:1: F821 Undefined name `_`
+error[F821]: 1:1: Undefined name `_`
+
+ --> builtins.py:1:1
   |
 1 | _("Translations")
-  | ^ F821
+  | ^
   |
-
-

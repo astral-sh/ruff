@@ -155,33 +155,37 @@ Module(
 ```
 ## Errors
 
+error: Invalid syntax
   |
 1 | x >= *y
-  |      ^^ Syntax Error: Starred expression cannot be used here
+  |      ^^ Starred expression cannot be used here
 2 | x not in *y
   |
 
 
+error: Invalid syntax
   |
 1 | x >= *y
 2 | x not in *y
-  |          ^^ Syntax Error: Starred expression cannot be used here
+  |          ^^ Starred expression cannot be used here
 3 | 
 4 | *x < y
   |
 
 
+error: Invalid syntax
   |
 2 | x not in *y
 3 | 
 4 | *x < y
-  |  ^^^^^ Syntax Error: Comparison expression cannot be used here
+  |  ^^^^^ Comparison expression cannot be used here
 5 | *x is not y
   |
 
 
+error: Invalid syntax
   |
 4 | *x < y
 5 | *x is not y
-  |  ^^^^^^^^^^ Syntax Error: Comparison expression cannot be used here
+  |  ^^^^^^^^^^ Comparison expression cannot be used here
   |

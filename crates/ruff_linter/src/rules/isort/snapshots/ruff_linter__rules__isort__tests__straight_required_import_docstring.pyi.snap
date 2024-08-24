@@ -1,7 +1,8 @@
 ---
 source: crates/ruff_linter/src/rules/isort/mod.rs
 ---
-docstring.pyi:1:1: I002 [*] Missing required import: `import os`
+error[I002]: 1:1: [*] Missing required import: `import os`
+
 ℹ Safe fix
 1 1 | """Hello, world!"""
   2 |+import os

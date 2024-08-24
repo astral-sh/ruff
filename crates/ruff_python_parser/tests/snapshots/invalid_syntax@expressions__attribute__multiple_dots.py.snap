@@ -121,33 +121,37 @@ Module(
 ```
 ## Errors
 
+error: Invalid syntax
   |
 1 | extra..dot
-  |       ^ Syntax Error: Expected an identifier
+  |       ^ Expected an identifier
 2 | multiple....dots
 3 | multiple.....dots
   |
 
 
+error: Invalid syntax
   |
 1 | extra..dot
 2 | multiple....dots
-  |         ^^^ Syntax Error: Simple statements must be separated by newlines or semicolons
+  |         ^^^ Simple statements must be separated by newlines or semicolons
 3 | multiple.....dots
   |
 
 
+error: Invalid syntax
   |
 1 | extra..dot
 2 | multiple....dots
 3 | multiple.....dots
-  |         ^^^ Syntax Error: Simple statements must be separated by newlines or semicolons
+  |         ^^^ Simple statements must be separated by newlines or semicolons
   |
 
 
+error: Invalid syntax
   |
 1 | extra..dot
 2 | multiple....dots
 3 | multiple.....dots
-  |             ^ Syntax Error: Expected an identifier
+  |             ^ Expected an identifier
   |

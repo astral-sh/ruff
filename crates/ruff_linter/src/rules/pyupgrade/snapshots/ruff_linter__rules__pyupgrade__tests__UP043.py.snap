@@ -1,14 +1,15 @@
 ---
 source: crates/ruff_linter/src/rules/pyupgrade/mod.rs
 ---
-UP043.py:4:15: UP043 [*] Unnecessary default type arguments
+error[UP043]: 4:15: [*] Unnecessary default type arguments
+
+ --> UP043.py:4:15
   |
 4 | def func() -> Generator[int, None, None]:
-  |               ^^^^^^^^^^^^^^^^^^^^^^^^^^ UP043
+  |               ^^^^^^^^^^^^^^^^^^^^^^^^^^
 5 |     yield 42
   |
   = help: Remove default type arguments
-
 ℹ Safe fix
 1 1 | from typing import Generator, AsyncGenerator
 2 2 | 
@@ -19,14 +20,15 @@ UP043.py:4:15: UP043 [*] Unnecessary default type arguments
 6 6 | 
 7 7 | 
 
-UP043.py:8:15: UP043 [*] Unnecessary default type arguments
+error[UP043]: 8:15: [*] Unnecessary default type arguments
+
+ --> UP043.py:8:15
   |
 8 | def func() -> Generator[int, None]:
-  |               ^^^^^^^^^^^^^^^^^^^^ UP043
+  |               ^^^^^^^^^^^^^^^^^^^^
 9 |     yield 42
   |
   = help: Remove default type arguments
-
 ℹ Safe fix
 5 5 |     yield 42
 6 6 | 
@@ -37,15 +39,16 @@ UP043.py:8:15: UP043 [*] Unnecessary default type arguments
 10 10 | 
 11 11 | 
 
-UP043.py:21:15: UP043 [*] Unnecessary default type arguments
+error[UP043]: 21:15: [*] Unnecessary default type arguments
+
+  --> UP043.py:21:15
    |
 21 | def func() -> Generator[int, int, None]:
-   |               ^^^^^^^^^^^^^^^^^^^^^^^^^ UP043
+   |               ^^^^^^^^^^^^^^^^^^^^^^^^^
 22 |     _ = yield 42
 23 |     return None
    |
    = help: Remove default type arguments
-
 ℹ Safe fix
 18 18 |     return foo
 19 19 | 
@@ -56,14 +59,15 @@ UP043.py:21:15: UP043 [*] Unnecessary default type arguments
 23 23 |     return None
 24 24 | 
 
-UP043.py:31:21: UP043 [*] Unnecessary default type arguments
+error[UP043]: 31:21: [*] Unnecessary default type arguments
+
+  --> UP043.py:31:21
    |
 31 | async def func() -> AsyncGenerator[int, None]:
-   |                     ^^^^^^^^^^^^^^^^^^^^^^^^^ UP043
+   |                     ^^^^^^^^^^^^^^^^^^^^^^^^^
 32 |     yield 42
    |
    = help: Remove default type arguments
-
 ℹ Safe fix
 28 28 |     return 42
 29 29 | 

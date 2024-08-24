@@ -1,4 +1,4 @@
 ---
 source: crates/ruff_linter/src/rules/pep8_naming/mod.rs
 ---
-file-with-dashes.py:1:1: N999 Invalid module name: 'file-with-dashes'
+error[N999]: 1:1: Invalid module name: 'file-with-dashes'
