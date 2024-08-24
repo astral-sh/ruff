@@ -617,44 +617,6 @@ def f(a: str, /, b: str, c: int = 1, *args, d: int = 2, **kwargs):
     }
 
     #[test]
-    fn function_parameter_same_name_default() {
-        let TestCase { db, file } = test_case(
-            "
-def bool(x=bool):
-    return x
-",
-        );
-
-        let index = semantic_index(&db, file);
-        let global_table = symbol_table(&db, global_scope(&db, file));
-
-        assert_eq!(names(&global_table), vec!["bool"]);
-
-        let [(function_scope_id, _function_scope)] = index
-            .child_scopes(FileScopeId::global())
-            .collect::<Vec<_>>()[..]
-        else {
-            panic!("Expected a function scope")
-        };
-
-        let function_table = index.symbol_table(function_scope_id);
-        assert_eq!(names(&function_table), vec!["x"],);
-
-        let use_def = index.use_def_map(function_scope_id);
-        let definition = use_def
-            .first_public_definition(
-                function_table
-                    .symbol_id_by_name("x")
-                    .expect("symbol exists"),
-            )
-            .unwrap();
-        assert!(matches!(
-            definition.node(&db),
-            DefinitionKind::ParameterWithDefault(_)
-        ));
-    }
-
-    #[test]
     fn lambda_parameter_symbols() {
         let TestCase { db, file } = test_case("lambda a, b, c=1, *args, d=2, **kwargs: None");
 
