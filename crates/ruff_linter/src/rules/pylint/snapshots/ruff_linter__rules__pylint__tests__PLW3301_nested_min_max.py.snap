@@ -303,6 +303,8 @@ nested_min_max.py:44:1: PLW3301 [*] Nested `min` calls can be flattened
 43 | import builtins
 44 | builtins.min(1, min(2, 3))
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^ PLW3301
+45 | 
+46 | max_word_len = max( # OK
    |
    = help: Flatten nested `min` calls
 
@@ -312,3 +314,6 @@ nested_min_max.py:44:1: PLW3301 [*] Nested `min` calls can be flattened
 43 43 | import builtins
 44    |-builtins.min(1, min(2, 3))
    44 |+builtins.min(1, 2, 3)
+45 45 | 
+46 46 | max_word_len = max( # OK
+47 47 |     *(len(word) for word in "blah blah blah".split(" ")),

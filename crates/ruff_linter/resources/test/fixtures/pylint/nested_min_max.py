@@ -42,3 +42,8 @@ max(1, max(*a))
 
 import builtins
 builtins.min(1, min(2, 3))
+
+max_word_len = max( # OK
+    *(len(word) for word in "blah blah blah".split(" ")),
+    len("Done!"),
+)
