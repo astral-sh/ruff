@@ -1,8 +1,7 @@
 use anyhow::Result;
 use ast::str::Quote;
-use ast::visitor::transformer::Transformer;
-use ast::visitor::{self, transformer, Visitor};
-use ast::{ExprStringLiteral, StringLiteralFlags, StringLiteralValue};
+use ast::visitor::source_order;
+use ruff_python_ast::visitor::source_order::SourceOrderVisitor;
 use std::cmp::Reverse;
 
 use ruff_diagnostics::Edit;
@@ -267,20 +266,12 @@ pub(crate) fn quote_annotation(
     }
 
     let quote = stylist.quote();
-    let mut quote_annotation = QuoteAnnotation {
-        can_remove: vec![],
-        generator: &generator,
-        stylist: &stylist,
-        contain_single_quote: false,
-        contain_double_quote: false,
-        annotation: String::new(),
-    };
+    let mut quote_annotation = QuoteAnnotation::new(stylist);
+    quote_annotation.visit_expr(&expr);
 
-    let mut new_expr = expr.clone();
-    quote_annotation.visit_expr(&mut new_expr);
+    let annotation = quote_annotation.annotation;
 
-    let annotation = generator.expr(&new_expr);
-
+    dbg!(&annotation);
     Ok(Edit::range_replacement(
         format!("{quote}{annotation}{quote}"),
         expr.range(),
@@ -307,40 +298,90 @@ pub(crate) fn filter_contained(edits: Vec<Edit>) -> Vec<Edit> {
     filtered
 }
 
-pub(crate) struct QuoteAnnotation<'a> {
-    can_remove: Vec<bool>,
-    generator: &'a Generator<'a>,
-    stylist: &'a Stylist<'a>,
-    contain_single_quote: bool,
-    contain_double_quote: bool,
-    annotation: String,
+#[derive(Copy, PartialEq, Clone)]
+enum State {
+    Literal,
+    Annotated,
+    AnnotatedNonFirstElm,
+    Other,
 }
 
-impl<'a> transformer::Transformer for QuoteAnnotation<'a> {
-    fn visit_expr(&self, expr: &mut Expr) {
+pub(crate) struct QuoteAnnotation<'a> {
+    state: Vec<State>,
+    stylist: &'a Stylist<'a>,
+    annotation: String,
+    final_quote_type: Quote,
+}
+
+impl<'a> QuoteAnnotation<'a> {
+    pub(crate) fn new(stylist: &'a Stylist<'a>) -> Self {
+        let final_quote_type = stylist.quote();
+        Self {
+            state: vec![],
+            stylist,
+            annotation: String::new(),
+            final_quote_type,
+        }
+    }
+}
+
+impl<'a> source_order::SourceOrderVisitor<'a> for QuoteAnnotation<'a> {
+    fn visit_expr(&mut self, expr: &'a Expr) {
+        let generator = Generator::from(self.stylist);
         match expr {
             Expr::Subscript(ast::ExprSubscript { value, slice, .. }) => {
                 if let Some(name) = value.as_name_expr() {
-                    if name.id.as_str() == "Literal" {
-                        todo!()
+                    let value = generator.expr(value);
+                    self.annotation.push_str(&format!("{value}["));
+                    match name.id.as_str() {
+                        "Literal" => self.state.push(State::Literal),
+                        "Annotated" => self.state.push(State::Annotated),
+                        _ => self.state.push(State::Other),
                     }
-                    if name.id.as_str() == "Annotation" {
-                        todo!()
-                    }
-                    transformer::walk_expr(self, expr);
+
+                    self.visit_expr(slice);
+                    self.state.pop();
+                    self.annotation.push_str(&format!("]"));
                 }
             }
-            Expr::StringLiteral(ast::ExprStringLiteral { value, range }) => {
-                let new_str = value.to_string();
-                let node = Expr::from(ast::ExprName {
-                    id: new_str,
-                    range: *range,
-                    ctx: ast::ExprContext::Load,
-                });
-                *expr = node;
-                transformer::walk_expr(self, expr);
+            Expr::Tuple(ast::ExprTuple { elts, .. }) => {
+                let first_elm = elts.first().unwrap();
+                self.visit_expr(first_elm);
+                if self.state.last().copied() == Some(State::Annotated) {
+                    self.state.push(State::AnnotatedNonFirstElm);
+                }
+                for elm in elts.iter().skip(1) {
+                    self.annotation.push_str(", ");
+                    self.visit_expr(elm);
+                }
+                self.state.pop();
             }
-            _ => transformer::walk_expr(self, expr),
+            Expr::BinOp(ast::ExprBinOp {
+                left, op, right, ..
+            }) => {
+                self.visit_expr(left);
+                self.annotation.push_str(&format!(" {op} "));
+                self.visit_expr(right);
+            }
+            _ => {
+                let source = match self.state.last().copied() {
+                    Some(State::Literal | State::Annotated) => {
+                        let mut source = generator.expr(expr);
+                        source = source.replace(
+                            self.final_quote_type.as_char(),
+                            &self.final_quote_type.opposite().as_char().to_string(),
+                        );
+                        source
+                    }
+                    _ => {
+                        let mut source = generator.expr(expr);
+                        source = source.replace(self.final_quote_type.as_char(), "");
+                        source = source.replace(self.final_quote_type.opposite().as_char(), "");
+                        source
+                    }
+                };
+                self.annotation.push_str(&source);
+            }
         }
     }
 }
