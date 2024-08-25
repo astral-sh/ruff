@@ -308,6 +308,8 @@ pub struct Options {
     ///
     /// If both are specified, `target-version` takes precedence over
     /// `requires-python`.
+    ///
+    /// Please note, it is recommend that stub files [use the latest language features available](https://typing.readthedocs.io/en/latest/guides/writing_stubs.html#language-features); therefore, Ruff will ignore the `target-version` setting for stub files.
     #[option(
         default = r#""py38""#,
         value_type = r#""py37" | "py38" | "py39" | "py310" | "py311" | "py312""#,
