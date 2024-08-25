@@ -606,7 +606,7 @@ impl AlwaysFixableViolation for PytestUnnecessaryAsyncioMarkOnFixture {
 }
 
 #[derive(Debug, PartialEq, Eq)]
-enum Parentheses {
+pub(crate) enum Parentheses {
     None,
     Empty,
 }

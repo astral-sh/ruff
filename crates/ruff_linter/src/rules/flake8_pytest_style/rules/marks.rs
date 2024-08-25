@@ -6,6 +6,7 @@ use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
 use crate::registry::Rule;
+use crate::rules::flake8_pytest_style::rules::fixture::Parentheses;
 
 use super::helpers::get_mark_decorators;
 
@@ -52,8 +53,8 @@ use super::helpers::get_mark_decorators;
 #[violation]
 pub struct PytestIncorrectMarkParenthesesStyle {
     mark_name: String,
-    expected_parens: String,
-    actual_parens: String,
+    expected_parens: Parentheses,
+    actual_parens: Parentheses,
 }
 
 impl AlwaysFixableViolation for PytestIncorrectMarkParenthesesStyle {
@@ -71,7 +72,14 @@ impl AlwaysFixableViolation for PytestIncorrectMarkParenthesesStyle {
     }
 
     fn fix_title(&self) -> String {
-        "Add/remove parentheses".to_string()
+        let PytestIncorrectMarkParenthesesStyle {
+            expected_parens: expected,
+            ..
+        } = self;
+        match expected {
+            Parentheses::None => "Remove parentheses".to_string(),
+            Parentheses::Empty => "Add parentheses".to_string(),
+        }
     }
 }
 
@@ -121,14 +129,14 @@ fn pytest_mark_parentheses(
     decorator: &Decorator,
     marker: &str,
     fix: Fix,
-    preferred: &str,
-    actual: &str,
+    preferred: Parentheses,
+    actual: Parentheses,
 ) {
     let mut diagnostic = Diagnostic::new(
         PytestIncorrectMarkParenthesesStyle {
             mark_name: marker.to_string(),
-            expected_parens: preferred.to_string(),
-            actual_parens: actual.to_string(),
+            expected_parens: preferred,
+            actual_parens: actual,
         },
         decorator.range(),
     );
@@ -153,13 +161,30 @@ fn check_mark_parentheses(checker: &mut Checker, decorator: &Decorator, marker: 
                 && keywords.is_empty()
             {
                 let fix = Fix::safe_edit(Edit::deletion(func.end(), decorator.end()));
-                pytest_mark_parentheses(checker, decorator, marker, fix, "", "()");
+                pytest_mark_parentheses(
+                    checker,
+                    decorator,
+                    marker,
+                    fix,
+                    Parentheses::None,
+                    Parentheses::Empty,
+                );
             }
         }
         _ => {
             if checker.settings.flake8_pytest_style.mark_parentheses {
-                let fix = Fix::safe_edit(Edit::insertion("()".to_string(), decorator.end()));
-                pytest_mark_parentheses(checker, decorator, marker, fix, "()", "");
+                let fix = Fix::safe_edit(Edit::insertion(
+                    Parentheses::Empty.to_string(),
+                    decorator.end(),
+                ));
+                pytest_mark_parentheses(
+                    checker,
+                    decorator,
+                    marker,
+                    fix,
+                    Parentheses::Empty,
+                    Parentheses::None,
+                );
             }
         }
     }
