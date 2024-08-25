@@ -111,8 +111,7 @@ KNOWN_PARSE_ERRORS = [
     "unexpected-indentation",
 ]
 
-SCRIPT_DIR = Path(__file__).resolve().parent
-ROOT_DIR = SCRIPT_DIR.parent
+ROOT_DIR = Path(__file__).resolve().parent.parent
 
 
 class CodeBlockError(Exception):
@@ -125,22 +124,18 @@ class InvalidInput(ValueError):
 
 def format_str(code: str) -> str:
     """Format a code block with ruff by writing to a temporary file."""
-    tmp_file = SCRIPT_DIR / "tmp.py"
-
-    # Create a temporary file to write the code block to
-    with tmp_file.open("w+") as f:
-        f.write(code)
-
     # Run ruff to format the tmp file
     try:
-        subprocess.run(
-            ["./target/debug/ruff", "format", tmp_file.as_posix()],
+        completed_process = subprocess.run(
+            ["./target/debug/ruff", "format", "-"],
             cwd=ROOT_DIR,
             check=True,
             capture_output=True,
+            text=True,
+            input=code,
         )
     except subprocess.CalledProcessError as e:
-        err = e.stderr.decode()
+        err = e.stderr
         if "error: Failed to parse" in err:
             raise InvalidInput(err) from e
 
@@ -149,14 +144,7 @@ def format_str(code: str) -> str:
             f"`check_docs_formatted.py\n\nError:\n\n{err}",
         ) from e
 
-    # Read the formatted code from the tmp file
-    with tmp_file.open("r") as f:
-        formatted_code = f.read()
-
-    # Remove the temporary file
-    tmp_file.unlink()
-
-    return formatted_code
+    return completed_process.stdout
 
 
 def format_contents(src: str) -> tuple[str, Sequence[CodeBlockError]]:
