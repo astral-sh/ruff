@@ -111,8 +111,6 @@ KNOWN_PARSE_ERRORS = [
     "unexpected-indentation",
 ]
 
-ROOT_DIR = Path(__file__).resolve().parent.parent
-
 
 class CodeBlockError(Exception):
     """A code block parse error."""
@@ -127,8 +125,7 @@ def format_str(code: str) -> str:
     # Run ruff to format the tmp file
     try:
         completed_process = subprocess.run(
-            ["./target/debug/ruff", "format", "-"],
-            cwd=ROOT_DIR,
+            ["ruff", "format", "-"],
             check=True,
             capture_output=True,
             text=True,
@@ -279,11 +276,6 @@ def main(argv: Sequence[str] | None = None) -> int:
             print("\n".join([f"  - {x}" for x in duplicates]))
             print("Please remove them and re-run.")
             return 1
-
-    # Build ruff
-    print("Building ruff, this may take a some time...")
-    subprocess.run(["cargo", "build"], cwd=ROOT_DIR, check=True)
-    print("Ruff build complete.")
 
     violations = 0
     errors = 0
