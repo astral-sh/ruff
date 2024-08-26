@@ -44,7 +44,7 @@ use crate::semantic_index::SemanticIndex;
 use crate::types::diagnostic::{TypeCheckDiagnostic, TypeCheckDiagnostics};
 use crate::types::{
     builtins_symbol_ty_by_name, definitions_ty, global_symbol_ty_by_name, BytesLiteralType,
-    ClassType, FunctionType, Name, Type, UnionBuilder,
+    ClassType, FunctionType, Name, StringLiteralType, Type, UnionBuilder,
 };
 use crate::Db;
 
@@ -1243,9 +1243,8 @@ impl<'db> TypeInferenceBuilder<'db> {
     }
 
     #[allow(clippy::unused_self)]
-    fn infer_string_literal_expression(&mut self, _literal: &ast::ExprStringLiteral) -> Type<'db> {
-        // TODO Literal["..."] or str
-        Type::Unknown
+    fn infer_string_literal_expression(&mut self, literal: &ast::ExprStringLiteral) -> Type<'db> {
+        Type::StringLiteral(StringLiteralType::new(self.db, literal.value.to_string()))
     }
 
     #[allow(clippy::unused_self)]
@@ -1785,6 +1784,17 @@ impl<'db> TypeInferenceBuilder<'db> {
                     _ => Type::Unknown, // TODO
                 }
             }
+            Type::StringLiteral(lhs) => match right_ty {
+                Type::StringLiteral(rhs) => match op {
+                    ast::Operator::Add => Type::StringLiteral(StringLiteralType::new(self.db, {
+                        let lhs_value = lhs.value(self.db);
+                        let rhs_value = rhs.value(self.db);
+                        lhs_value.clone() + rhs_value
+                    })),
+                    _ => Type::Unknown, // TODO
+                },
+                _ => Type::Unknown, // TODO
+            },
             _ => Type::Unknown, // TODO
         }
     }
@@ -2294,6 +2304,28 @@ mod tests {
 
         assert_public_ty(&db, "src/a.py", "x", "Literal[True]");
         assert_public_ty(&db, "src/a.py", "y", "Literal[False]");
+
+        Ok(())
+    }
+
+    #[test]
+    fn string_type() -> anyhow::Result<()> {
+        let mut db = setup_db();
+
+        db.write_dedented(
+            "src/a.py",
+            r#"
+            w = "Hello"
+            x = 'world'
+            y = "Guten " + 'tag'
+            z = 'bon ' + "jour"
+            "#,
+        )?;
+
+        assert_public_ty(&db, "src/a.py", "w", "Literal[Hello]");
+        assert_public_ty(&db, "src/a.py", "x", "Literal[world]");
+        assert_public_ty(&db, "src/a.py", "y", "Literal[Guten tag]");
+        assert_public_ty(&db, "src/a.py", "z", "Literal[bon jour]");
 
         Ok(())
     }
