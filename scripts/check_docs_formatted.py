@@ -125,7 +125,7 @@ def format_str(code: str, extension: Literal["py", "pyi"]) -> str:
     # Run ruff to format the tmp file
     try:
         completed_process = subprocess.run(
-            ["ruff", "format", "--stdin-filename", f"file.{extension}" "-"],
+            ["ruff", "format", "--stdin-filename", f"file.{extension}", "-"],
             check=True,
             capture_output=True,
             text=True,
