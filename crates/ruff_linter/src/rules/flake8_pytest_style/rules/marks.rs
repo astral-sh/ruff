@@ -6,9 +6,8 @@ use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
 use crate::registry::Rule;
-use crate::rules::flake8_pytest_style::rules::fixture::Parentheses;
 
-use super::helpers::get_mark_decorators;
+use super::helpers::{get_mark_decorators, Parentheses};
 
 /// ## What it does
 /// Checks for argument-free `@pytest.mark.<marker>()` decorators with or
@@ -72,11 +71,7 @@ impl AlwaysFixableViolation for PytestIncorrectMarkParenthesesStyle {
     }
 
     fn fix_title(&self) -> String {
-        let PytestIncorrectMarkParenthesesStyle {
-            expected_parens: expected,
-            ..
-        } = self;
-        match expected {
+        match &self.expected_parens {
             Parentheses::None => "Remove parentheses".to_string(),
             Parentheses::Empty => "Add parentheses".to_string(),
         }
