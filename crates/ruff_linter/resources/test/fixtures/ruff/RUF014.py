@@ -241,3 +241,12 @@ def _check_basic_constructor(self, empty):
 
     frame = DataFrame(empty((3, 0)))
     assert len(frame.columns) == 0
+
+
+def after_return():
+    return "reachable"
+    print("unreachable")
+    print("unreachable")
+    print("unreachable")
+    print("unreachable")
+    print("unreachable")

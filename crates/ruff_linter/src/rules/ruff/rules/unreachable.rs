@@ -1,4 +1,3 @@
-use log::error;
 use ruff_python_ast::{
     self as ast, Expr, ExprBooleanLiteral, Identifier, MatchCase, Pattern, PatternMatchAs,
     PatternMatchOr, Stmt, StmtContinue, StmtFor, StmtMatch, StmtReturn, StmtTry, StmtWhile,
@@ -56,20 +55,14 @@ pub(crate) fn in_function(name: &Identifier, body: &[Stmt]) -> Vec<Diagnostic> {
             continue;
         }
 
-        // TODO: add more information to the diagnostic. Include the entire
-        // code block, not just the first line. Maybe something to indicate
-        // the code flow and where it prevents this block from being reached
-        // for example.
-        let Some(stmt) = block.stmts.first() else {
-            // This should never happen.
-            error!("Got an unexpected empty code block");
-            continue;
-        };
+        // TODO: add more information to the diagnostic.
+        // Maybe something to indicate the code flow and where it
+        // prevents this block from being reached for example.
         let diagnostic = Diagnostic::new(
             UnreachableCode {
                 name: name.as_str().to_owned(),
             },
-            stmt.range(),
+            block.range(),
         );
         diagnostics.push(diagnostic);
     }
@@ -257,6 +250,14 @@ impl<'stmt> Ranged for Condition<'stmt> {
 }
 
 impl<'stmt> BasicBlock<'stmt> {
+    fn new(stmts: &'stmt [Stmt], next: NextBlock<'stmt>) -> Self {
+        Self {
+            stmts,
+            next,
+            reachable: false,
+        }
+    }
+
     /// A sentinel block indicating an empty termination block.
     const EMPTY: BasicBlock<'static> = BasicBlock {
         stmts: &[],
@@ -300,6 +301,18 @@ impl<'stmt> BasicBlock<'stmt> {
     /// Returns true if `self` is a [`BasicBlock::LOOP_CONTINUE`].
     fn is_loop_continue(&self) -> bool {
         self.stmts == BasicBlock::LOOP_CONTINUE.stmts
+    }
+}
+
+impl Ranged for BasicBlock<'_> {
+    fn range(&self) -> TextRange {
+        let Some(first) = self.stmts.first() else {
+            return TextRange::new(TextSize::new(0), TextSize::new(0));
+        };
+        let Some(last) = self.stmts.last() else {
+            return TextRange::new(TextSize::new(0), TextSize::new(0));
+        };
+        TextRange::new(first.start(), last.end())
     }
 }
 
@@ -453,11 +466,7 @@ fn try_block<'stmt>(
                 orelse: next_branch,
                 exit: after,
             };
-            let block = BasicBlock {
-                stmts,
-                next,
-                reachable: false,
-            };
+            let block = BasicBlock::new(stmts, next);
             next_branch = blocks.blocks.push(block);
         } else {
             // If no exception type is provided, i.e., `except:`
@@ -626,11 +635,7 @@ fn match_case<'stmt>(
             exit: Some(orelse_after_block),
         }
     };
-    BasicBlock {
-        stmts,
-        next,
-        reachable: false,
-    }
+    BasicBlock::new(stmts, next)
 }
 
 /// Returns true if the [`MatchCase`] is a wildcard pattern.
@@ -716,11 +721,7 @@ impl<'stmt> BasicBlocksBuilder<'stmt> {
                                 exit: after,
                             };
                             let stmts = std::slice::from_ref(stmt);
-                            let block = BasicBlock {
-                                stmts,
-                                next,
-                                reachable: false,
-                            };
+                            let block = BasicBlock::new(stmts, next);
                             self.blocks.push(block)
                         } else {
                             consequent
@@ -860,11 +861,7 @@ impl<'stmt> BasicBlocksBuilder<'stmt> {
                 start -= 1;
             }
 
-            let block = BasicBlock {
-                stmts: &stmts[start..end],
-                next,
-                reachable: false,
-            };
+            let block = BasicBlock::new(&stmts[start..end], next);
             after = Some(self.blocks.push(block));
         }
 
