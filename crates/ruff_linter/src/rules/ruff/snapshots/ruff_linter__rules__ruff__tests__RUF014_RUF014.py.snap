@@ -1,7 +1,7 @@
 ---
 source: crates/ruff_linter/src/rules/ruff/mod.rs
 ---
-RUF014.py:3:5: RUF014 Unreachable code in after_return
+RUF014.py:3:5: RUF014 Unreachable code in `after_return`
   |
 1 | def after_return():
 2 |     return "reachable"
@@ -11,7 +11,7 @@ RUF014.py:3:5: RUF014 Unreachable code in after_return
 5 | async def also_works_on_async_functions():
   |
 
-RUF014.py:7:5: RUF014 Unreachable code in also_works_on_async_functions
+RUF014.py:7:5: RUF014 Unreachable code in `also_works_on_async_functions`
   |
 5 | async def also_works_on_async_functions():
 6 |     return "reachable"
@@ -21,7 +21,7 @@ RUF014.py:7:5: RUF014 Unreachable code in also_works_on_async_functions
 9 | def if_always_true():
   |
 
-RUF014.py:12:5: RUF014 Unreachable code in if_always_true
+RUF014.py:12:5: RUF014 Unreachable code in `if_always_true`
    |
 10 |     if True:
 11 |         return "reachable"
@@ -31,7 +31,7 @@ RUF014.py:12:5: RUF014 Unreachable code in if_always_true
 14 | def if_always_false():
    |
 
-RUF014.py:16:9: RUF014 Unreachable code in if_always_false
+RUF014.py:16:9: RUF014 Unreachable code in `if_always_false`
    |
 14 | def if_always_false():
 15 |     if False:
@@ -40,7 +40,7 @@ RUF014.py:16:9: RUF014 Unreachable code in if_always_false
 17 |     return "reachable"
    |
 
-RUF014.py:21:9: RUF014 Unreachable code in if_elif_always_false
+RUF014.py:21:9: RUF014 Unreachable code in `if_elif_always_false`
    |
 19 | def if_elif_always_false():
 20 |     if False:
@@ -50,7 +50,7 @@ RUF014.py:21:9: RUF014 Unreachable code in if_elif_always_false
 23 |         return "also unreachable"
    |
 
-RUF014.py:23:9: RUF014 Unreachable code in if_elif_always_false
+RUF014.py:23:9: RUF014 Unreachable code in `if_elif_always_false`
    |
 21 |         return "unreachable"
 22 |     elif False:
@@ -59,7 +59,7 @@ RUF014.py:23:9: RUF014 Unreachable code in if_elif_always_false
 24 |     return "reachable"
    |
 
-RUF014.py:28:9: RUF014 Unreachable code in if_elif_always_true
+RUF014.py:28:9: RUF014 Unreachable code in `if_elif_always_true`
    |
 26 | def if_elif_always_true():
 27 |     if False:
@@ -69,7 +69,7 @@ RUF014.py:28:9: RUF014 Unreachable code in if_elif_always_true
 30 |         return "reachable"
    |
 
-RUF014.py:31:5: RUF014 Unreachable code in if_elif_always_true
+RUF014.py:31:5: RUF014 Unreachable code in `if_elif_always_true`
    |
 29 |     elif True:
 30 |         return "reachable"
@@ -79,7 +79,7 @@ RUF014.py:31:5: RUF014 Unreachable code in if_elif_always_true
 33 | def ends_with_if():
    |
 
-RUF014.py:35:9: RUF014 Unreachable code in ends_with_if
+RUF014.py:35:9: RUF014 Unreachable code in `ends_with_if`
    |
 33 | def ends_with_if():
 34 |     if False:
@@ -89,7 +89,7 @@ RUF014.py:35:9: RUF014 Unreachable code in ends_with_if
 37 |         return "reachable"
    |
 
-RUF014.py:42:5: RUF014 Unreachable code in infinite_loop
+RUF014.py:42:5: RUF014 Unreachable code in `infinite_loop`
    |
 40 |     while True:
 41 |         continue
@@ -99,7 +99,7 @@ RUF014.py:42:5: RUF014 Unreachable code in infinite_loop
 44 | '''  TODO: we could determine these, but we don't yet.
    |
 
-RUF014.py:75:5: RUF014 Unreachable code in match_wildcard
+RUF014.py:75:5: RUF014 Unreachable code in `match_wildcard`
    |
 73 |         case _:
 74 |             return "reachable"
@@ -109,7 +109,7 @@ RUF014.py:75:5: RUF014 Unreachable code in match_wildcard
 77 | def match_case_and_wildcard(status):
    |
 
-RUF014.py:83:5: RUF014 Unreachable code in match_case_and_wildcard
+RUF014.py:83:5: RUF014 Unreachable code in `match_case_and_wildcard`
    |
 81 |         case _:
 82 |             return "reachable"
@@ -119,7 +119,7 @@ RUF014.py:83:5: RUF014 Unreachable code in match_case_and_wildcard
 85 | def raise_exception():
    |
 
-RUF014.py:87:5: RUF014 Unreachable code in raise_exception
+RUF014.py:87:5: RUF014 Unreachable code in `raise_exception`
    |
 85 | def raise_exception():
 86 |     raise Exception
@@ -129,7 +129,7 @@ RUF014.py:87:5: RUF014 Unreachable code in raise_exception
 89 | def while_false():
    |
 
-RUF014.py:91:9: RUF014 Unreachable code in while_false
+RUF014.py:91:9: RUF014 Unreachable code in `while_false`
    |
 89 | def while_false():
 90 |     while False:
@@ -138,7 +138,7 @@ RUF014.py:91:9: RUF014 Unreachable code in while_false
 92 |     return "reachable"
    |
 
-RUF014.py:96:9: RUF014 Unreachable code in while_false_else
+RUF014.py:96:9: RUF014 Unreachable code in `while_false_else`
    |
 94 | def while_false_else():
 95 |     while False:
@@ -148,7 +148,7 @@ RUF014.py:96:9: RUF014 Unreachable code in while_false_else
 98 |         return "reachable"
    |
 
-RUF014.py:102:9: RUF014 Unreachable code in while_false_else_return
+RUF014.py:102:9: RUF014 Unreachable code in `while_false_else_return`
     |
 100 | def while_false_else_return():
 101 |     while False:
@@ -158,7 +158,7 @@ RUF014.py:102:9: RUF014 Unreachable code in while_false_else_return
 104 |         return "reachable"
     |
 
-RUF014.py:105:5: RUF014 Unreachable code in while_false_else_return
+RUF014.py:105:5: RUF014 Unreachable code in `while_false_else_return`
     |
 103 |     else:
 104 |         return "reachable"
@@ -168,7 +168,7 @@ RUF014.py:105:5: RUF014 Unreachable code in while_false_else_return
 107 | def while_true():
     |
 
-RUF014.py:110:5: RUF014 Unreachable code in while_true
+RUF014.py:110:5: RUF014 Unreachable code in `while_true`
     |
 108 |     while True:
 109 |         return "reachable"
@@ -178,7 +178,7 @@ RUF014.py:110:5: RUF014 Unreachable code in while_true
 112 | def while_true_else():
     |
 
-RUF014.py:116:9: RUF014 Unreachable code in while_true_else
+RUF014.py:116:9: RUF014 Unreachable code in `while_true_else`
     |
 114 |         return "reachable"
 115 |     else:
@@ -188,7 +188,7 @@ RUF014.py:116:9: RUF014 Unreachable code in while_true_else
 118 | def while_true_else_return():
     |
 
-RUF014.py:122:9: RUF014 Unreachable code in while_true_else_return
+RUF014.py:122:9: RUF014 Unreachable code in `while_true_else_return`
     |
 120 |         return "reachable"
 121 |     else:
@@ -197,7 +197,7 @@ RUF014.py:122:9: RUF014 Unreachable code in while_true_else_return
 123 |     return "also unreachable"
     |
 
-RUF014.py:123:5: RUF014 Unreachable code in while_true_else_return
+RUF014.py:123:5: RUF014 Unreachable code in `while_true_else_return`
     |
 121 |     else:
 122 |         return "unreachable"
@@ -207,7 +207,7 @@ RUF014.py:123:5: RUF014 Unreachable code in while_true_else_return
 125 | def while_false_var_i():
     |
 
-RUF014.py:128:9: RUF014 Unreachable code in while_false_var_i
+RUF014.py:128:9: RUF014 Unreachable code in `while_false_var_i`
     |
 126 |     i = 0
 127 |     while False:
@@ -216,7 +216,7 @@ RUF014.py:128:9: RUF014 Unreachable code in while_false_var_i
 129 |     return i
     |
 
-RUF014.py:135:5: RUF014 Unreachable code in while_true_var_i
+RUF014.py:135:5: RUF014 Unreachable code in `while_true_var_i`
     |
 133 |     while True:
 134 |         i += 1
@@ -226,7 +226,7 @@ RUF014.py:135:5: RUF014 Unreachable code in while_true_var_i
 137 | def while_infinite():
     |
 
-RUF014.py:140:5: RUF014 Unreachable code in while_infinite
+RUF014.py:140:5: RUF014 Unreachable code in `while_infinite`
     |
 138 |     while True:
 139 |         pass
@@ -236,7 +236,7 @@ RUF014.py:140:5: RUF014 Unreachable code in while_infinite
 142 | def while_if_true():
     |
 
-RUF014.py:146:5: RUF014 Unreachable code in while_if_true
+RUF014.py:146:5: RUF014 Unreachable code in `while_if_true`
     |
 144 |         if True:
 145 |             return "reachable"
@@ -246,7 +246,7 @@ RUF014.py:146:5: RUF014 Unreachable code in while_if_true
 148 | def while_break():
     |
 
-RUF014.py:152:9: RUF014 Unreachable code in while_break
+RUF014.py:152:9: RUF014 Unreachable code in `while_break`
     |
 150 |         print("reachable")
 151 |         break
