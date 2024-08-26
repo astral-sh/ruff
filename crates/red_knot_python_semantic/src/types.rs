@@ -185,6 +185,10 @@ pub enum Type<'db> {
     StringLiteral(StringLiteralType<'db>),
     /// A bytes literal
     BytesLiteral(BytesLiteralType<'db>),
+    /// A literal string, like `StringLiteral`, but *without* the value.
+    ///
+    /// Useful for e.g. `1000000 * "hello"`.
+    LiteralString,
     // TODO protocols, callable types, overloads, generics, type vars
 }
 
@@ -280,7 +284,7 @@ impl<'db> Type<'db> {
                 Type::Unknown
             }
             Type::BooleanLiteral(_) => Type::Unknown,
-            Type::StringLiteral(_) => {
+            Type::StringLiteral(_) | Type::LiteralString => {
                 // TODO defer to Type::Instance(<str from typeshed>).member
                 Type::Unknown
             }

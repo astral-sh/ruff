@@ -217,6 +217,12 @@ struct TypeInferenceBuilder<'db> {
 }
 
 impl<'db> TypeInferenceBuilder<'db> {
+    /// How big a string do we build before bailing?
+    ///
+    /// This is a fairly arbitrary number. It should be *far* more than enough
+    /// for most use cases, but we can reevaluate it later if useful.
+    const MAX_STRING_LITERAL_SIZE: usize = 4096;
+
     /// Creates a new builder for inferring types in a region.
     pub(super) fn new(
         db: &'db dyn Db,
@@ -1775,6 +1781,23 @@ impl<'db> TypeInferenceBuilder<'db> {
                     lhs_value.clone() + rhs_value
                 }))
             }
+
+            (Type::StringLiteral(s), Type::IntLiteral(n), ast::Operator::Mult)
+            | (Type::IntLiteral(n), Type::StringLiteral(s), ast::Operator::Mult) => {
+                match usize::try_from(n) {
+                    Ok(n)
+                        if n * s.value(self.db).len()
+                            <= TypeInferenceBuilder::MAX_STRING_LITERAL_SIZE =>
+                    {
+                        let new_literal = s.value(self.db).repeat(n);
+                        Type::StringLiteral(StringLiteralType::new(self.db, new_literal))
+                    }
+                    // This throws away the conversion error because we don't
+                    // care: it just means the value was too large.
+                    _ => Type::LiteralString,
+                }
+            }
+
             _ => Type::Unknown, // TODO
         }
     }
@@ -1923,6 +1946,7 @@ enum ModuleResolutionError {
 
 #[cfg(test)]
 mod tests {
+
     use anyhow::Context;
 
     use ruff_db::files::{system_path_to_file, File};
@@ -1940,6 +1964,8 @@ mod tests {
     use crate::semantic_index::{global_scope, semantic_index, symbol_table, use_def_map};
     use crate::types::{global_symbol_ty_by_name, infer_definition_types, symbol_ty_by_name, Type};
     use crate::{HasTy, ProgramSettings, SemanticModel};
+
+    use super::TypeInferenceBuilder;
 
     fn setup_db() -> TestDb {
         let db = TestDb::new();
@@ -2346,6 +2372,44 @@ mod tests {
         assert_public_ty(&db, "src/a.py", "x", r#"Literal["I say \"hello\" to you"]"#);
         assert_public_ty(&db, "src/a.py", "y", r#"Literal["You say \"hey\" back"]"#);
         assert_public_ty(&db, "src/a.py", "z", r#"Literal["No \"closure here"]"#);
+
+        Ok(())
+    }
+
+    #[test]
+    fn multiplied_string() -> anyhow::Result<()> {
+        let mut db = setup_db();
+
+        db.write_dedented(
+            "src/a.py",
+            &format!(
+                r#"
+            w = 2 * "hello"
+            x = "goodbye" * 3
+            y = "a" * {y}
+            z = {z} * "b"
+            a = 0 * "hello"
+            b = -3 * "hello"
+            "#,
+                y = TypeInferenceBuilder::MAX_STRING_LITERAL_SIZE,
+                z = TypeInferenceBuilder::MAX_STRING_LITERAL_SIZE + 1
+            ),
+        )?;
+
+        assert_public_ty(&db, "src/a.py", "w", r#"Literal["hellohello"]"#);
+        assert_public_ty(&db, "src/a.py", "x", r#"Literal["goodbyegoodbyegoodbye"]"#);
+        assert_public_ty(
+            &db,
+            "src/a.py",
+            "y",
+            &format!(
+                r#"Literal["{}"]"#,
+                "a".repeat(TypeInferenceBuilder::MAX_STRING_LITERAL_SIZE)
+            ),
+        );
+        assert_public_ty(&db, "src/a.py", "z", "LiteralString");
+        assert_public_ty(&db, "src/a.py", "a", r#"Literal[""]"#);
+        assert_public_ty(&db, "src/a.py", "b", "LiteralString");
 
         Ok(())
     }
