@@ -1337,8 +1337,7 @@ impl<'db> TypeInferenceBuilder<'db> {
         &mut self,
         _literal: &ast::ExprEllipsisLiteral,
     ) -> Type<'db> {
-        // TODO Ellipsis
-        Type::Unknown
+        Type::EllipsisType
     }
 
     fn infer_tuple_expression(&mut self, tuple: &ast::ExprTuple) -> Type<'db> {
@@ -2466,6 +2465,22 @@ mod tests {
         assert_public_ty(&db, "src/a.py", "x", "Literal[b\"hello\"]");
         assert_public_ty(&db, "src/a.py", "y", "Literal[b\"world!\"]");
         assert_public_ty(&db, "src/a.py", "z", "Literal[b\"\\xff\\x00\"]");
+
+        Ok(())
+    }
+
+    #[test]
+    fn ellipsis_type() -> anyhow::Result<()> {
+        let mut db = setup_db();
+
+        db.write_dedented(
+            "src/a.py",
+            "
+            x = ...
+            ",
+        )?;
+
+        assert_public_ty(&db, "src/a.py", "x", "EllipsisType");
 
         Ok(())
     }

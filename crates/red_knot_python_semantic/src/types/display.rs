@@ -55,6 +55,7 @@ impl Display for DisplayType<'_> {
                 escape.bytes_repr().write(f)?;
                 f.write_str("]")
             }
+            Type::EllipsisType => write!(f, "EllipsisType"),
         }
     }
 }
