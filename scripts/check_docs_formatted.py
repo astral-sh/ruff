@@ -10,13 +10,13 @@ import subprocess
 import textwrap
 from pathlib import Path
 from re import Match
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Literal
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
 
 SNIPPED_RE = re.compile(
-    r"(?P<before>^(?P<indent> *)```\s*python\n)"
+    r"(?P<before>^(?P<indent> *)```(?:\s*(?P<language>\w+))?\n)"
     r"(?P<code>.*?)"
     r"(?P<after>^(?P=indent)```\s*$)",
     re.DOTALL | re.MULTILINE,
@@ -120,12 +120,12 @@ class InvalidInput(ValueError):
     """Raised when ruff fails to parse file."""
 
 
-def format_str(code: str) -> str:
+def format_str(code: str, extension: Literal["py", "pyi"]) -> str:
     """Format a code block with ruff by writing to a temporary file."""
     # Run ruff to format the tmp file
     try:
         completed_process = subprocess.run(
-            ["ruff", "format", "-"],
+            ["ruff", "format", "--stdin-filename", f"file.{extension}" "-"],
             check=True,
             capture_output=True,
             text=True,
@@ -149,9 +149,20 @@ def format_contents(src: str) -> tuple[str, Sequence[CodeBlockError]]:
     errors: list[CodeBlockError] = []
 
     def _snipped_match(match: Match[str]) -> str:
+        language = match["language"]
+        extension: Literal["py", "pyi"]
+        if language == "python":
+            extension = "py"
+        elif language == "pyi":
+            extension = "pyi"
+        else:
+            # We are only interested in checking the formatting of py or pyi code blocks
+            # so we can return early if the language is not one of these.
+            return f'{match["before"]}{match["code"]}{match["after"]}'
+
         code = textwrap.dedent(match["code"])
         try:
-            code = format_str(code)
+            code = format_str(code, extension)
         except InvalidInput as e:
             errors.append(CodeBlockError(e))
         except NotImplementedError as e:
