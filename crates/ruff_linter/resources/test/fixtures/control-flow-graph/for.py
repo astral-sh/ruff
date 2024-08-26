@@ -67,3 +67,44 @@ def func():
     else:
         raise Exception()
     x = 0
+
+def func():
+    for i in range(13):
+        for i in range(12):
+            x = 2
+            if True:
+                break
+
+        x = 3
+        if True:
+            break
+
+    print('hello')
+
+
+def func():
+    for i in range(13):
+        for i in range(12):
+            x = 2
+            if True:
+                continue
+
+        x = 3
+        if True:
+            break
+
+    print('hello')
+
+
+def func():
+    for i in range(13):
+        for i in range(12):
+            x = 2
+            if True:
+                break
+
+        x = 3
+        if True:
+            continue
+
+    print('hello')
