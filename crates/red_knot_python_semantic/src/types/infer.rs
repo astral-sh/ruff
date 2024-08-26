@@ -28,7 +28,7 @@ use salsa::plumbing::AsId;
 
 use ruff_db::files::File;
 use ruff_db::parsed::parsed_module;
-use ruff_python_ast as ast;
+use ruff_python_ast::{self as ast, UnaryOp};
 use ruff_python_ast::{AnyNodeRef, ExprContext};
 use ruff_text_size::Ranged;
 
@@ -1708,14 +1708,14 @@ impl<'db> TypeInferenceBuilder<'db> {
     fn infer_unary_expression(&mut self, unary: &ast::ExprUnaryOp) -> Type<'db> {
         let ast::ExprUnaryOp {
             range: _,
-            op: _,
+            op,
             operand,
         } = unary;
 
-        self.infer_expression(operand);
-
-        // TODO unary op types
-        Type::Unknown
+        match (op, self.infer_expression(operand)) {
+            (UnaryOp::USub, Type::IntLiteral(value)) => Type::IntLiteral(-value),
+            _ => Type::Unknown, // TODO other unary op types
+        }
     }
 
     fn infer_binary_expression(&mut self, binary: &ast::ExprBinOp) -> Type<'db> {
@@ -2292,6 +2292,26 @@ mod tests {
         assert_public_ty(&db, "src/a.py", "b", "int");
         assert_public_ty(&db, "src/a.py", "c", "float");
         assert_public_ty(&db, "src/a.py", "d", "complex");
+
+        Ok(())
+    }
+
+    #[test]
+    fn negated_int_literal() -> anyhow::Result<()> {
+        let mut db = setup_db();
+
+        db.write_dedented(
+            "src/a.py",
+            "
+            x = -1
+            y = -1234567890987654321
+            z = --987
+            ",
+        )?;
+
+        assert_public_ty(&db, "src/a.py", "x", "Literal[-1]");
+        assert_public_ty(&db, "src/a.py", "y", "Literal[-1234567890987654321]");
+        assert_public_ty(&db, "src/a.py", "z", "Literal[987]");
 
         Ok(())
     }
