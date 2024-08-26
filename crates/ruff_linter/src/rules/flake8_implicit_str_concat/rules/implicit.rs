@@ -172,8 +172,13 @@ fn concatenate_strings(a_range: TextRange, b_range: TextRange, locator: &Locator
         return None;
     }
 
-    let a_body = &a_text[a_leading_quote.len()..a_text.len() - a_trailing_quote.len()];
+    let mut a_body =
+        a_text[a_leading_quote.len()..a_text.len() - a_trailing_quote.len()].to_string();
     let b_body = &b_text[b_leading_quote.len()..b_text.len() - b_trailing_quote.len()];
+
+    if a_leading_quote.find(['r', 'R']).is_none() {
+        a_body = normalize_ending_octal(&a_body);
+    }
 
     let concatenation = format!("{a_leading_quote}{a_body}{b_body}{a_trailing_quote}");
     let range = TextRange::new(a_range.start(), b_range.end());
@@ -182,4 +187,42 @@ fn concatenate_strings(a_range: TextRange, b_range: TextRange, locator: &Locator
         concatenation,
         range,
     )))
+}
+
+/// Pads an octal at the end of the string
+/// to three digits, if necessary.
+fn normalize_ending_octal(text: &str) -> String {
+    // Early return for short strings
+    if text.len() < 2 {
+        return text.to_string();
+    }
+
+    let mut rev_bytes = text.bytes().rev();
+    if let Some(last_byte @ b'0'..=b'7') = rev_bytes.next() {
+        // "\y" -> "\00y"
+        if has_odd_consecutive_backslashes(&rev_bytes) {
+            let prefix = &text[..text.len() - 2];
+            return format!("{prefix}\\00{}", last_byte as char);
+        }
+        // "\xy" -> "\0xy"
+        if let Some(penultimate_byte @ b'0'..=b'7') = rev_bytes.next() {
+            if has_odd_consecutive_backslashes(&rev_bytes) {
+                let prefix = &text[..text.len() - 3];
+                return format!(
+                    "{prefix}\\0{}{}",
+                    penultimate_byte as char, last_byte as char
+                );
+            }
+        }
+    }
+    text.to_string()
+}
+
+fn has_odd_consecutive_backslashes<I: Iterator<Item = u8> + Clone>(itr: &I) -> bool {
+    let mut itrclone = itr.clone();
+    let mut odd_backslashes = false;
+    while let Some(b'\\') = itrclone.next() {
+        odd_backslashes = !odd_backslashes;
+    }
+    odd_backslashes
 }
