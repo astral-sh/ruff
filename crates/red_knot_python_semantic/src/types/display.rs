@@ -41,6 +41,11 @@ impl Display for DisplayType<'_> {
             Type::BooleanLiteral(boolean) => {
                 write!(f, "Literal[{}]", if *boolean { "True" } else { "False" })
             }
+            Type::StringLiteral(string) => write!(
+                f,
+                r#"Literal["{}"]"#,
+                string.value(self.db).replace('"', r#"\""#)
+            ),
             Type::BytesLiteral(bytes) => {
                 let escape =
                     AsciiEscape::with_preferred_quote(bytes.value(self.db).as_ref(), Quote::Double);
