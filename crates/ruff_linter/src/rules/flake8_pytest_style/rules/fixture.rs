@@ -1,5 +1,3 @@
-use std::fmt;
-
 use ruff_diagnostics::{AlwaysFixableViolation, Violation};
 use ruff_diagnostics::{Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
@@ -20,6 +18,7 @@ use crate::registry::Rule;
 
 use super::helpers::{
     get_mark_decorators, is_pytest_fixture, is_pytest_yield_fixture, keyword_is_literal,
+    Parentheses,
 };
 
 /// ## What it does
@@ -602,21 +601,6 @@ impl AlwaysFixableViolation for PytestUnnecessaryAsyncioMarkOnFixture {
 
     fn fix_title(&self) -> String {
         "Remove `pytest.mark.asyncio`".to_string()
-    }
-}
-
-#[derive(Debug, PartialEq, Eq)]
-enum Parentheses {
-    None,
-    Empty,
-}
-
-impl fmt::Display for Parentheses {
-    fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
-        match self {
-            Parentheses::None => fmt.write_str(""),
-            Parentheses::Empty => fmt.write_str("()"),
-        }
     }
 }
 
