@@ -15,14 +15,14 @@ use crate::checkers::ast::Checker;
 /// `Literal["foo"] | Literal[42]`, but is clearer and more concise.
 ///
 /// ## Example
-/// ```python
+/// ```pyi
 /// from typing import Literal
 ///
 /// field: Literal[1] | Literal[2] | str
 /// ```
 ///
 /// Use instead:
-/// ```python
+/// ```pyi
 /// from typing import Literal
 ///
 /// field: Literal[1, 2] | str

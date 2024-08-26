@@ -51,30 +51,23 @@ use crate::checkers::ast::Checker;
 ///
 /// ## Example
 ///
-/// ```python
+/// ```pyi
 /// class Foo:
 ///     def __new__(cls, *args: Any, **kwargs: Any) -> Foo: ...
-///
 ///     def __enter__(self) -> Foo: ...
-///
 ///     async def __aenter__(self) -> Foo: ...
-///
 ///     def __iadd__(self, other: Foo) -> Foo: ...
 /// ```
 ///
 /// Use instead:
 ///
-/// ```python
+/// ```pyi
 /// from typing_extensions import Self
-///
 ///
 /// class Foo:
 ///     def __new__(cls, *args: Any, **kwargs: Any) -> Self: ...
-///
 ///     def __enter__(self) -> Self: ...
-///
 ///     async def __aenter__(self) -> Self: ...
-///
 ///     def __iadd__(self, other: Foo) -> Self: ...
 /// ```
 /// ## References

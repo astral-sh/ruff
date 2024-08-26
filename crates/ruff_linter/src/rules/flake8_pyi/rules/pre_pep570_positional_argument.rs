@@ -17,13 +17,13 @@ use crate::settings::types::PythonVersion;
 ///
 /// ## Example
 ///
-/// ```python
+/// ```pyi
 /// def foo(__x: int) -> None: ...
 /// ```
 ///
 /// Use instead:
 ///
-/// ```python
+/// ```pyi
 /// def foo(x: int, /) -> None: ...
 /// ```
 ///

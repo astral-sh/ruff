@@ -15,13 +15,13 @@ use crate::checkers::ast::Checker;
 /// for this purpose.
 ///
 /// ## Example
-/// ```python
+/// ```pyi
 /// def double(x: int) -> int:
 ///     return x * 2
 /// ```
 ///
 /// Use instead:
-/// ```python
+/// ```pyi
 /// def double(x: int) -> int: ...
 /// ```
 ///
