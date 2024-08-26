@@ -40,7 +40,7 @@ impl Violation for UnreachableCode {
     #[derive_message_formats]
     fn message(&self) -> String {
         let UnreachableCode { name } = self;
-        format!("Unreachable code in {name}")
+        format!("Unreachable code in `{name}`")
     }
 }
 
