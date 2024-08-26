@@ -254,3 +254,16 @@ RUF014.py:152:9: RUF014 Unreachable code in `while_break`
     |         ^^^^^^^^^^^^^^^^^^^^ RUF014
 153 |     return "reachable"
     |
+
+RUF014.py:248:5: RUF014 Unreachable code in `after_return`
+    |
+246 |   def after_return():
+247 |       return "reachable"
+248 |       print("unreachable")
+    |  _____^
+249 | |     print("unreachable")
+250 | |     print("unreachable")
+251 | |     print("unreachable")
+252 | |     print("unreachable")
+    | |________________________^ RUF014
+    |
