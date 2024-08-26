@@ -1,3 +1,5 @@
+use std::cmp;
+
 use ruff_python_ast::{
     self as ast, Expr, ExprBooleanLiteral, Identifier, MatchCase, Pattern, PatternMatchAs,
     PatternMatchOr, Stmt, StmtContinue, StmtFor, StmtMatch, StmtReturn, StmtTry, StmtWhile,
@@ -49,22 +51,54 @@ pub(crate) fn in_function(name: &Identifier, body: &[Stmt]) -> Vec<Diagnostic> {
     }
 
     let mut diagnostics: Vec<Diagnostic> = Vec::new();
-    // For each unreached code block create a diagnostic.
-    for block in basic_blocks.blocks {
-        if block.is_sentinel() || block.reachable {
+
+    // Combine sequential unreachable blocks
+    let mut blocks = basic_blocks.blocks.raw;
+    blocks.sort_by(|a, b| a.range().ordering(b.range()));
+    let mut start = None;
+    let mut end = None;
+    for block in blocks {
+        if block.is_sentinel() {
             continue;
         }
 
-        // TODO: add more information to the diagnostic.
-        // Maybe something to indicate the code flow and where it
-        // prevents this block from being reached for example.
-        let diagnostic = Diagnostic::new(
-            UnreachableCode {
-                name: name.as_str().to_owned(),
-            },
-            block.range(),
-        );
-        diagnostics.push(diagnostic);
+        if !block.reachable {
+            if let Some(end_index) = end {
+                end = Some(cmp::max(block.end(), end_index));
+            } else {
+                start = Some(block.start());
+                end = Some(block.end());
+            }
+        } else {
+            if let Some(start_index) = start {
+                if let Some(end_index) = end {
+                    // TODO: add more information to the diagnostic.
+                    // Maybe something to indicate the code flow and where it
+                    // prevents this block from being reached for example.
+                    let diagnostic = Diagnostic::new(
+                        UnreachableCode {
+                            name: name.as_str().to_owned(),
+                        },
+                        TextRange::new(start_index, end_index),
+                    );
+                    diagnostics.push(diagnostic);
+
+                    start = None;
+                    end = None;
+                }
+            }
+        }
+    }
+    if let Some(start_index) = start {
+        if let Some(end_index) = end {
+            let diagnostic = Diagnostic::new(
+                UnreachableCode {
+                    name: name.as_str().to_owned(),
+                },
+                TextRange::new(start_index, end_index),
+            );
+            diagnostics.push(diagnostic);
+        }
     }
     diagnostics
 }
