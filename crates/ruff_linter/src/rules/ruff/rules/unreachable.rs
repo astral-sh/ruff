@@ -303,7 +303,7 @@ impl<'stmt> BasicBlock<'stmt> {
     }
 }
 
-/// Handle a loop block, such as a `while`, `for` or `async for` statement.
+/// Handle a loop block, such as a `while`, `for`, or `async for` statement.
 fn loop_block<'stmt>(
     blocks: &mut BasicBlocksBuilder<'stmt>,
     condition: Condition<'stmt>,
@@ -336,6 +336,9 @@ fn loop_block<'stmt>(
     }
 }
 
+/// Step through the loop in the forward direction so that `break`
+/// and `continue` can be correctly directed now that the loop start
+/// and exit have been established.
 fn post_process_loop(
     blocks: &mut BasicBlocksBuilder<'_>,
     start_index: BlockIndex,
@@ -487,6 +490,9 @@ fn try_block<'stmt>(
     }
 }
 
+/// Step through the try in the forward direction so that `assert`
+/// and `raise` can be correctly directed now that the try blocks
+/// been established.
 fn post_process_try(
     blocks: &mut BasicBlocksBuilder<'_>,
     start_index: BlockIndex,
