@@ -57,7 +57,7 @@ impl AlwaysFixableViolation for InvalidCharacterBackspace {
 ///
 /// Use instead:
 /// ```python
-/// x = "\x1A"
+/// x = "\x1a"
 /// ```
 #[violation]
 pub struct InvalidCharacterSub;
@@ -90,7 +90,7 @@ impl AlwaysFixableViolation for InvalidCharacterSub {
 ///
 /// Use instead:
 /// ```python
-/// x = "\x1B"
+/// x = "\x1b"
 /// ```
 #[violation]
 pub struct InvalidCharacterEsc;
@@ -155,7 +155,7 @@ impl AlwaysFixableViolation for InvalidCharacterNul {
 ///
 /// Use instead:
 /// ```python
-/// x = "Dear Sir\u200B/\u200BMadam"  # zero width space
+/// x = "Dear Sir\u200b/\u200bMadam"  # zero width space
 /// ```
 #[violation]
 pub struct InvalidCharacterZeroWidthSpace;

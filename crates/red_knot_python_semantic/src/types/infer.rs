@@ -28,7 +28,7 @@ use salsa::plumbing::AsId;
 
 use ruff_db::files::File;
 use ruff_db::parsed::parsed_module;
-use ruff_python_ast as ast;
+use ruff_python_ast::{self as ast, UnaryOp};
 use ruff_python_ast::{AnyNodeRef, ExprContext};
 use ruff_text_size::Ranged;
 
@@ -44,7 +44,7 @@ use crate::semantic_index::SemanticIndex;
 use crate::types::diagnostic::{TypeCheckDiagnostic, TypeCheckDiagnostics};
 use crate::types::{
     builtins_symbol_ty_by_name, definitions_ty, global_symbol_ty_by_name, BytesLiteralType,
-    ClassType, FunctionType, Name, Type, UnionBuilder,
+    ClassType, FunctionType, Name, StringLiteralType, Type, UnionBuilder,
 };
 use crate::Db;
 
@@ -1243,9 +1243,8 @@ impl<'db> TypeInferenceBuilder<'db> {
     }
 
     #[allow(clippy::unused_self)]
-    fn infer_string_literal_expression(&mut self, _literal: &ast::ExprStringLiteral) -> Type<'db> {
-        // TODO Literal["..."] or str
-        Type::Unknown
+    fn infer_string_literal_expression(&mut self, literal: &ast::ExprStringLiteral) -> Type<'db> {
+        Type::StringLiteral(StringLiteralType::new(self.db, literal.value.to_string()))
     }
 
     #[allow(clippy::unused_self)]
@@ -1709,14 +1708,14 @@ impl<'db> TypeInferenceBuilder<'db> {
     fn infer_unary_expression(&mut self, unary: &ast::ExprUnaryOp) -> Type<'db> {
         let ast::ExprUnaryOp {
             range: _,
-            op: _,
+            op,
             operand,
         } = unary;
 
-        self.infer_expression(operand);
-
-        // TODO unary op types
-        Type::Unknown
+        match (op, self.infer_expression(operand)) {
+            (UnaryOp::USub, Type::IntLiteral(value)) => Type::IntLiteral(-value),
+            _ => Type::Unknown, // TODO other unary op types
+        }
     }
 
     fn infer_binary_expression(&mut self, binary: &ast::ExprBinOp) -> Type<'db> {
@@ -1730,60 +1729,51 @@ impl<'db> TypeInferenceBuilder<'db> {
         let left_ty = self.infer_expression(left);
         let right_ty = self.infer_expression(right);
 
-        // TODO flatten the matches by matching on (left_ty, right_ty, op)
-        match left_ty {
-            Type::Any => Type::Any,
-            Type::Unknown => Type::Unknown,
-            Type::IntLiteral(n) => {
-                match right_ty {
-                    Type::IntLiteral(m) => {
-                        match op {
-                            ast::Operator::Add => {
-                                n.checked_add(m).map(Type::IntLiteral).unwrap_or_else(|| {
-                                    builtins_symbol_ty_by_name(self.db, "int").instance()
-                                })
-                            }
-                            ast::Operator::Sub => {
-                                n.checked_sub(m).map(Type::IntLiteral).unwrap_or_else(|| {
-                                    builtins_symbol_ty_by_name(self.db, "int").instance()
-                                })
-                            }
-                            ast::Operator::Mult => {
-                                n.checked_mul(m).map(Type::IntLiteral).unwrap_or_else(|| {
-                                    builtins_symbol_ty_by_name(self.db, "int").instance()
-                                })
-                            }
-                            ast::Operator::Div => {
-                                n.checked_div(m).map(Type::IntLiteral).unwrap_or_else(|| {
-                                    builtins_symbol_ty_by_name(self.db, "int").instance()
-                                })
-                            }
-                            ast::Operator::Mod => n
-                                .checked_rem(m)
-                                .map(Type::IntLiteral)
-                                // TODO division by zero error
-                                .unwrap_or(Type::Unknown),
-                            _ => Type::Unknown, // TODO
-                        }
-                    }
-                    _ => Type::Unknown, // TODO
-                }
+        match (left_ty, right_ty, op) {
+            (Type::Any, _, _) | (_, Type::Any, _) => Type::Any,
+            (Type::Unknown, _, _) | (_, Type::Unknown, _) => Type::Unknown,
+
+            (Type::IntLiteral(n), Type::IntLiteral(m), ast::Operator::Add) => n
+                .checked_add(m)
+                .map(Type::IntLiteral)
+                .unwrap_or_else(|| builtins_symbol_ty_by_name(self.db, "int").instance()),
+
+            (Type::IntLiteral(n), Type::IntLiteral(m), ast::Operator::Sub) => n
+                .checked_sub(m)
+                .map(Type::IntLiteral)
+                .unwrap_or_else(|| builtins_symbol_ty_by_name(self.db, "int").instance()),
+
+            (Type::IntLiteral(n), Type::IntLiteral(m), ast::Operator::Mult) => n
+                .checked_mul(m)
+                .map(Type::IntLiteral)
+                .unwrap_or_else(|| builtins_symbol_ty_by_name(self.db, "int").instance()),
+
+            (Type::IntLiteral(n), Type::IntLiteral(m), ast::Operator::Div) => n
+                .checked_div(m)
+                .map(Type::IntLiteral)
+                .unwrap_or_else(|| builtins_symbol_ty_by_name(self.db, "int").instance()),
+
+            (Type::IntLiteral(n), Type::IntLiteral(m), ast::Operator::Mod) => n
+                .checked_rem(m)
+                .map(Type::IntLiteral)
+                // TODO division by zero error
+                .unwrap_or(Type::Unknown),
+
+            (Type::BytesLiteral(lhs), Type::BytesLiteral(rhs), ast::Operator::Add) => {
+                Type::BytesLiteral(BytesLiteralType::new(
+                    self.db,
+                    [lhs.value(self.db).as_ref(), rhs.value(self.db).as_ref()]
+                        .concat()
+                        .into_boxed_slice(),
+                ))
             }
-            Type::BytesLiteral(lhs) => {
-                match right_ty {
-                    Type::BytesLiteral(rhs) => {
-                        match op {
-                            ast::Operator::Add => Type::BytesLiteral(BytesLiteralType::new(
-                                self.db,
-                                [lhs.value(self.db).as_ref(), rhs.value(self.db).as_ref()]
-                                    .concat()
-                                    .into_boxed_slice(),
-                            )),
-                            _ => Type::Unknown, // TODO
-                        }
-                    }
-                    _ => Type::Unknown, // TODO
-                }
+
+            (Type::StringLiteral(lhs), Type::StringLiteral(rhs), ast::Operator::Add) => {
+                Type::StringLiteral(StringLiteralType::new(self.db, {
+                    let lhs_value = lhs.value(self.db);
+                    let rhs_value = rhs.value(self.db);
+                    lhs_value.clone() + rhs_value
+                }))
             }
             _ => Type::Unknown, // TODO
         }
@@ -2287,6 +2277,26 @@ mod tests {
     }
 
     #[test]
+    fn negated_int_literal() -> anyhow::Result<()> {
+        let mut db = setup_db();
+
+        db.write_dedented(
+            "src/a.py",
+            "
+            x = -1
+            y = -1234567890987654321
+            z = --987
+            ",
+        )?;
+
+        assert_public_ty(&db, "src/a.py", "x", "Literal[-1]");
+        assert_public_ty(&db, "src/a.py", "y", "Literal[-1234567890987654321]");
+        assert_public_ty(&db, "src/a.py", "z", "Literal[987]");
+
+        Ok(())
+    }
+
+    #[test]
     fn boolean_literal() -> anyhow::Result<()> {
         let mut db = setup_db();
 
@@ -2294,6 +2304,48 @@ mod tests {
 
         assert_public_ty(&db, "src/a.py", "x", "Literal[True]");
         assert_public_ty(&db, "src/a.py", "y", "Literal[False]");
+
+        Ok(())
+    }
+
+    #[test]
+    fn string_type() -> anyhow::Result<()> {
+        let mut db = setup_db();
+
+        db.write_dedented(
+            "src/a.py",
+            r#"
+            w = "Hello"
+            x = 'world'
+            y = "Guten " + 'tag'
+            z = 'bon ' + "jour"
+            "#,
+        )?;
+
+        assert_public_ty(&db, "src/a.py", "w", r#"Literal["Hello"]"#);
+        assert_public_ty(&db, "src/a.py", "x", r#"Literal["world"]"#);
+        assert_public_ty(&db, "src/a.py", "y", r#"Literal["Guten tag"]"#);
+        assert_public_ty(&db, "src/a.py", "z", r#"Literal["bon jour"]"#);
+
+        Ok(())
+    }
+
+    #[test]
+    fn string_type_with_nested_quotes() -> anyhow::Result<()> {
+        let mut db = setup_db();
+
+        db.write_dedented(
+            "src/a.py",
+            r#"
+            x = 'I say "hello" to you'
+            y = "You say \"hey\" back"
+            z = 'No "closure here'
+            "#,
+        )?;
+
+        assert_public_ty(&db, "src/a.py", "x", r#"Literal["I say \"hello\" to you"]"#);
+        assert_public_ty(&db, "src/a.py", "y", r#"Literal["You say \"hey\" back"]"#);
+        assert_public_ty(&db, "src/a.py", "z", r#"Literal["No \"closure here"]"#);
 
         Ok(())
     }
