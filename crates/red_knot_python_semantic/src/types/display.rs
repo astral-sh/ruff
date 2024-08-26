@@ -3,7 +3,7 @@
 use std::fmt::{Display, Formatter};
 
 use ruff_python_ast::str::Quote;
-use ruff_python_literal::escape::{AsciiEscape, Escape};
+use ruff_python_literal::escape::AsciiEscape;
 
 use crate::types::{IntersectionType, Type, UnionType};
 use crate::Db;
@@ -41,22 +41,17 @@ impl Display for DisplayType<'_> {
             Type::BooleanLiteral(boolean) => {
                 write!(f, "Literal[{}]", if *boolean { "True" } else { "False" })
             }
+            Type::StringLiteral(string) => write!(
+                f,
+                r#"Literal["{}"]"#,
+                string.value(self.db).replace('"', r#"\""#)
+            ),
             Type::BytesLiteral(bytes) => {
                 let escape =
                     AsciiEscape::with_preferred_quote(bytes.value(self.db).as_ref(), Quote::Double);
 
                 f.write_str("Literal[")?;
                 escape.bytes_repr().write(f)?;
-                f.write_str("]")
-            }
-            Type::StringLiteral(string) => {
-                let escape = AsciiEscape::with_preferred_quote(
-                    string.value(self.db).as_bytes(),
-                    Quote::Double,
-                );
-
-                f.write_str("Literal[")?;
-                escape.write_body(f)?;
                 f.write_str("]")
             }
         }

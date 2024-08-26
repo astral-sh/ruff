@@ -2322,10 +2322,30 @@ mod tests {
             "#,
         )?;
 
-        assert_public_ty(&db, "src/a.py", "w", "Literal[Hello]");
-        assert_public_ty(&db, "src/a.py", "x", "Literal[world]");
-        assert_public_ty(&db, "src/a.py", "y", "Literal[Guten tag]");
-        assert_public_ty(&db, "src/a.py", "z", "Literal[bon jour]");
+        assert_public_ty(&db, "src/a.py", "w", r#"Literal["Hello"]"#);
+        assert_public_ty(&db, "src/a.py", "x", r#"Literal["world"]"#);
+        assert_public_ty(&db, "src/a.py", "y", r#"Literal["Guten tag"]"#);
+        assert_public_ty(&db, "src/a.py", "z", r#"Literal["bon jour"]"#);
+
+        Ok(())
+    }
+
+    #[test]
+    fn string_type_with_nested_quotes() -> anyhow::Result<()> {
+        let mut db = setup_db();
+
+        db.write_dedented(
+            "src/a.py",
+            r#"
+            x = 'I say "hello" to you'
+            y = "You say \"hey\" back"
+            z = 'No "closure here'
+            "#,
+        )?;
+
+        assert_public_ty(&db, "src/a.py", "x", r#"Literal["I say \"hello\" to you"]"#);
+        assert_public_ty(&db, "src/a.py", "y", r#"Literal["You say \"hey\" back"]"#);
+        assert_public_ty(&db, "src/a.py", "z", r#"Literal["No \"closure here"]"#);
 
         Ok(())
     }
