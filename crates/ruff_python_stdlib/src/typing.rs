@@ -299,8 +299,10 @@ pub fn is_mutable_return_type(qualified_name: &[&str]) -> bool {
 pub fn is_immutable_return_type(qualified_name: &[&str]) -> bool {
     matches!(
         qualified_name,
-        ["datetime", "date" | "datetime" | "timedelta"]
-            | ["decimal", "Decimal"]
+        [
+            "datetime",
+            "date" | "datetime" | "time" | "timedelta" | "timezone" | "tzinfo"
+        ] | ["decimal", "Decimal"]
             | ["fractions", "Fraction"]
             | ["operator", "attrgetter" | "itemgetter" | "methodcaller"]
             | ["pathlib", "Path"]
