@@ -26,6 +26,7 @@ mod tests {
     #[test_case(Rule::AmbiguousClassName, Path::new("E742.py"))]
     #[test_case(Rule::AmbiguousFunctionName, Path::new("E743.py"))]
     #[test_case(Rule::AmbiguousVariableName, Path::new("E741.py"))]
+    #[test_case(Rule::AmbiguousVariableName, Path::new("E741.pyi"))]
     #[test_case(Rule::LambdaAssignment, Path::new("E731.py"))]
     #[test_case(Rule::BareExcept, Path::new("E722.py"))]
     #[test_case(Rule::BlankLineWithWhitespace, Path::new("W29.py"))]

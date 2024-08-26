@@ -1,7 +1,7 @@
 use ruff_diagnostics::Diagnostic;
 use ruff_python_ast::helpers;
 use ruff_python_ast::types::Node;
-use ruff_python_ast::{self as ast, Expr, Stmt};
+use ruff_python_ast::{self as ast, Expr, PySourceType, Stmt};
 use ruff_python_semantic::ScopeKind;
 use ruff_text_size::Ranged;
 
@@ -23,14 +23,18 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
             if checker.enabled(Rule::GlobalAtModuleLevel) {
                 pylint::rules::global_at_module_level(checker, stmt);
             }
-            if checker.enabled(Rule::AmbiguousVariableName) {
+            if checker.source_type != PySourceType::Stub
+                && checker.enabled(Rule::AmbiguousVariableName)
+            {
                 checker.diagnostics.extend(names.iter().filter_map(|name| {
                     pycodestyle::rules::ambiguous_variable_name(name, name.range())
                 }));
             }
         }
         Stmt::Nonlocal(nonlocal @ ast::StmtNonlocal { names, range: _ }) => {
-            if checker.enabled(Rule::AmbiguousVariableName) {
+            if checker.source_type != PySourceType::Stub
+                && checker.enabled(Rule::AmbiguousVariableName)
+            {
                 checker.diagnostics.extend(names.iter().filter_map(|name| {
                     pycodestyle::rules::ambiguous_variable_name(name, name.range())
                 }));
