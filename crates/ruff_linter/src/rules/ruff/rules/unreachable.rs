@@ -1,5 +1,3 @@
-use std::iter;
-
 use log::error;
 use ruff_python_ast::{
     self as ast, Expr, ExprBooleanLiteral, Identifier, MatchCase, Pattern, PatternMatchAs,
@@ -46,120 +44,51 @@ impl Violation for UnreachableCode {
 
 pub(crate) fn in_function(name: &Identifier, body: &[Stmt]) -> Vec<Diagnostic> {
     // Create basic code blocks from the body.
-    let basic_blocks = BasicBlocks::from(body);
-
-    // Using the code blocks we can (more) easily follow what statements are
-    // and aren't reached, we'll mark them as such in `reached_map`.
-    let mut reached_map = Bitmap::with_capacity(basic_blocks.len());
-
+    let mut basic_blocks = BasicBlocks::from(body);
     if let Some(start_index) = basic_blocks.start_index() {
-        mark_reached(&mut reached_map, &basic_blocks.blocks, start_index);
+        mark_reached(&mut basic_blocks.blocks, start_index);
     }
 
+    let mut diagnostics: Vec<Diagnostic> = Vec::new();
     // For each unreached code block create a diagnostic.
-    reached_map
-        .unset()
-        .filter_map(|idx| {
-            let block = &basic_blocks.blocks[idx];
-            if block.is_sentinel() {
-                return None;
-            }
-
-            // TODO: add more information to the diagnostic. Include the entire
-            // code block, not just the first line. Maybe something to indicate
-            // the code flow and where it prevents this block from being reached
-            // for example.
-            let Some(stmt) = block.stmts.first() else {
-                // This should never happen.
-                error!("Got an unexpected empty code block");
-                return None;
-            };
-            Some(Diagnostic::new(
-                UnreachableCode {
-                    name: name.as_str().to_owned(),
-                },
-                stmt.range(),
-            ))
-        })
-        .collect()
-}
-
-/// Simple bitmap.
-#[derive(Debug)]
-struct Bitmap {
-    bits: Box<[usize]>,
-    capacity: usize,
-}
-
-impl Bitmap {
-    /// Create a new `Bitmap` with `capacity` capacity.
-    fn with_capacity(capacity: usize) -> Bitmap {
-        let mut size = capacity / usize::BITS as usize;
-        if (capacity % usize::BITS as usize) != 0 {
-            size += 1;
+    for block in basic_blocks.blocks {
+        if block.is_sentinel() || block.reachable {
+            continue;
         }
-        Bitmap {
-            bits: vec![0; size].into_boxed_slice(),
-            capacity,
-        }
-    }
 
-    /// Set bit at index `idx` to true.
-    ///
-    /// Returns a boolean indicating if the bit was already set.
-    fn set(&mut self, idx: BlockIndex) -> bool {
-        let bits_index = (idx.as_u32() / usize::BITS) as usize;
-        let shift = idx.as_u32() % usize::BITS;
-        if (self.bits[bits_index] & (1 << shift)) == 0 {
-            self.bits[bits_index] |= 1 << shift;
-            false
-        } else {
-            true
-        }
+        // TODO: add more information to the diagnostic. Include the entire
+        // code block, not just the first line. Maybe something to indicate
+        // the code flow and where it prevents this block from being reached
+        // for example.
+        let Some(stmt) = block.stmts.first() else {
+            // This should never happen.
+            error!("Got an unexpected empty code block");
+            continue;
+        };
+        let diagnostic = Diagnostic::new(
+            UnreachableCode {
+                name: name.as_str().to_owned(),
+            },
+            stmt.range(),
+        );
+        diagnostics.push(diagnostic);
     }
-
-    /// Returns an iterator of all unset indices.
-    fn unset(&self) -> impl Iterator<Item = BlockIndex> + '_ {
-        let mut index = 0;
-        let mut shift = 0;
-        let last_max_shift = self.capacity % usize::BITS as usize;
-        iter::from_fn(move || loop {
-            if shift >= usize::BITS as usize {
-                shift = 0;
-                index += 1;
-            }
-            if self.bits.len() <= index || (index >= self.bits.len() - 1 && shift >= last_max_shift)
-            {
-                return None;
-            }
-
-            let is_set = (self.bits[index] & (1 << shift)) != 0;
-            shift += 1;
-            if !is_set {
-                return Some(BlockIndex::from_usize(
-                    (index * usize::BITS as usize) + shift - 1,
-                ));
-            }
-        })
-    }
+    diagnostics
 }
 
 /// Set bits in `reached_map` for all blocks that are reached in `blocks`
 /// starting with block at index `idx`.
-fn mark_reached(
-    reached_map: &mut Bitmap,
-    blocks: &IndexSlice<BlockIndex, BasicBlock<'_>>,
-    start_index: BlockIndex,
-) {
+fn mark_reached(blocks: &mut IndexSlice<BlockIndex, BasicBlock<'_>>, start_index: BlockIndex) {
     let mut idx = start_index;
 
     loop {
-        let block = &blocks[idx];
-        if reached_map.set(idx) {
+        if blocks[idx].reachable {
             return; // Block already visited, no needed to do it again.
+        } else {
+            blocks[idx].reachable = true;
         }
 
-        match &block.next {
+        match &blocks[idx].next {
             NextBlock::Always(next) => idx = *next,
             NextBlock::If {
                 condition,
@@ -173,7 +102,7 @@ fn mark_reached(
                     None => {
                         // Don't know, both branches might be taken.
                         idx = *next;
-                        mark_reached(reached_map, blocks, *orelse);
+                        mark_reached(blocks, *orelse);
                     }
                 }
             }
@@ -242,10 +171,6 @@ struct BasicBlocks<'stmt> {
 }
 
 impl BasicBlocks<'_> {
-    fn len(&self) -> usize {
-        self.blocks.len()
-    }
-
     fn start_index(&self) -> Option<BlockIndex> {
         self.blocks.indices().last()
     }
@@ -270,6 +195,7 @@ impl<'stmt> From<&'stmt [Stmt]> for BasicBlocks<'stmt> {
 struct BasicBlock<'stmt> {
     stmts: &'stmt [Stmt],
     next: NextBlock<'stmt>,
+    reachable: bool,
 }
 
 /// Edge between basic blocks (in the control-flow graph).
@@ -338,6 +264,7 @@ impl<'stmt> BasicBlock<'stmt> {
     const EMPTY: BasicBlock<'static> = BasicBlock {
         stmts: &[],
         next: NextBlock::Terminate,
+        reachable: false,
     };
 
     /// A sentinel block indicating an exception was raised.
@@ -347,6 +274,7 @@ impl<'stmt> BasicBlock<'stmt> {
             value: None,
         })],
         next: NextBlock::Terminate,
+        reachable: false,
     };
 
     const LOOP_CONTINUE: BasicBlock<'static> = BasicBlock {
@@ -354,6 +282,7 @@ impl<'stmt> BasicBlock<'stmt> {
             range: TextRange::new(TextSize::new(0), TextSize::new(0)),
         })],
         next: NextBlock::Terminate, // This must be updated dynamically
+        reachable: false,
     };
 
     /// Return true if the block is a sentinel or fake block.
@@ -524,7 +453,11 @@ fn try_block<'stmt>(
                 orelse: next_branch,
                 exit: after,
             };
-            let block = BasicBlock { stmts, next };
+            let block = BasicBlock {
+                stmts,
+                next,
+                reachable: false,
+            };
             next_branch = blocks.blocks.push(block);
         } else {
             // If no exception type is provided, i.e., `except:`
@@ -690,7 +623,11 @@ fn match_case<'stmt>(
             exit: Some(orelse_after_block),
         }
     };
-    BasicBlock { stmts, next }
+    BasicBlock {
+        stmts,
+        next,
+        reachable: false,
+    }
 }
 
 /// Returns true if the [`MatchCase`] is a wildcard pattern.
@@ -776,7 +713,11 @@ impl<'stmt> BasicBlocksBuilder<'stmt> {
                                 exit: after,
                             };
                             let stmts = std::slice::from_ref(stmt);
-                            let block = BasicBlock { stmts, next };
+                            let block = BasicBlock {
+                                stmts,
+                                next,
+                                reachable: false,
+                            };
                             self.blocks.push(block)
                         } else {
                             consequent
@@ -919,6 +860,7 @@ impl<'stmt> BasicBlocksBuilder<'stmt> {
             let block = BasicBlock {
                 stmts: &stmts[start..end],
                 next,
+                reachable: false,
             };
             after = Some(self.blocks.push(block));
         }
