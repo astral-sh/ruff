@@ -250,3 +250,14 @@ def after_return():
     print("unreachable")
     print("unreachable")
     print("unreachable")
+
+
+def check_if_url_exists(url: str) -> bool:  # type: ignore[return]
+    return True  # uncomment to check URLs
+    response = requests.head(url, allow_redirects=True)
+    if response.status_code == 200:
+        return True
+    if response.status_code == 404:
+        return False
+    console.print(f"[red]Unexpected error received: {response.status_code}[/]")
+    response.raise_for_status()
