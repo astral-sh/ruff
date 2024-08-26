@@ -165,7 +165,7 @@ fn is_open_preview(semantic: &SemanticModel, call: &ast::ExprCall) -> bool {
                     | "tokenize"
                     | "wave",
                 "open"
-            ] | ["dbm", "gnu" | "ndbm" | "dumb", "open"]
+            ] | ["dbm", "gnu" | "ndbm" | "dumb" | "sqlite3", "open"]
                 | ["fileinput", "FileInput" | "input"]
                 | ["io", "open" | "open_code"]
                 | ["lzma", "LZMAFile" | "open"]
