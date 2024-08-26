@@ -8,7 +8,7 @@ use rustc_hash::FxHashSet;
 use ruff_diagnostics::{Diagnostic, Edit, Fix};
 use ruff_python_trivia::CommentRanges;
 use ruff_source_file::Locator;
-use ruff_text_size::Ranged;
+use ruff_text_size::{Ranged, TextRange};
 
 use crate::fix::edits::delete_comment;
 use crate::noqa::{
@@ -118,10 +118,12 @@ pub(crate) fn check_noqa(
             match &line.directive {
                 Directive::All(directive) => {
                     if line.matches.is_empty() {
-                        let mut diagnostic =
-                            Diagnostic::new(UnusedNOQA { codes: None }, directive.range());
-                        diagnostic
-                            .set_fix(Fix::safe_edit(delete_comment(directive.range(), locator)));
+                        let edit = delete_comment(directive.range(), locator);
+                        let mut diagnostic = Diagnostic::new(
+                            UnusedNOQA { codes: None },
+                            TextRange::new(directive.start(), edit.end()),
+                        );
+                        diagnostic.set_fix(Fix::safe_edit(edit));
 
                         diagnostics.push(diagnostic);
                     }
@@ -172,6 +174,14 @@ pub(crate) fn check_noqa(
                         && unknown_codes.is_empty()
                         && unmatched_codes.is_empty())
                     {
+                        let edit = if valid_codes.is_empty() {
+                            delete_comment(directive.range(), locator)
+                        } else {
+                            Edit::range_replacement(
+                                format!("# noqa: {}", valid_codes.join(", ")),
+                                directive.range(),
+                            )
+                        };
                         let mut diagnostic = Diagnostic::new(
                             UnusedNOQA {
                                 codes: Some(UnusedCodes {
@@ -193,19 +203,9 @@ pub(crate) fn check_noqa(
                                         .collect(),
                                 }),
                             },
-                            directive.range(),
+                            TextRange::new(directive.start(), edit.end()),
                         );
-                        if valid_codes.is_empty() {
-                            diagnostic.set_fix(Fix::safe_edit(delete_comment(
-                                directive.range(),
-                                locator,
-                            )));
-                        } else {
-                            diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
-                                format!("# noqa: {}", valid_codes.join(", ")),
-                                directive.range(),
-                            )));
-                        }
+                        diagnostic.set_fix(Fix::safe_edit(edit));
                         diagnostics.push(diagnostic);
                     }
                 }
