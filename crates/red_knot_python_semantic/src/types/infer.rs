@@ -549,14 +549,21 @@ impl<'db> TypeInferenceBuilder<'db> {
             self.infer_expression(default);
         }
 
-        // If there are type params, parameters and returns are evaluated in that scope.
-        if type_params.is_none() {
+        // If there are type params, parameters and returns are evaluated in that scope, that is, in
+        // `infer_function_type_params`, rather than here.
+        let returns_ty = if type_params.is_none() {
             self.infer_parameters(parameters);
-            self.infer_optional_expression(returns.as_deref());
-        }
+            self.infer_optional_annotation_expression(returns.as_deref())
+        } else {
+            None
+        };
 
-        let function_ty =
-            Type::Function(FunctionType::new(self.db, name.id.clone(), decorator_tys));
+        let function_ty = Type::Function(FunctionType::new(
+            self.db,
+            name.id.clone(),
+            decorator_tys,
+            returns_ty,
+        ));
 
         self.types.definitions.insert(definition, function_ty);
     }
@@ -1297,6 +1304,13 @@ impl<'db> TypeInferenceBuilder<'db> {
         expression.map(|expr| self.infer_expression(expr))
     }
 
+    fn infer_optional_annotation_expression(
+        &mut self,
+        expr: Option<&ast::Expr>,
+    ) -> Option<Type<'db>> {
+        expr.map(|expr| self.infer_annotation_expression(expr))
+    }
+
     fn infer_expression(&mut self, expression: &ast::Expr) -> Type<'db> {
         let ty = match expression {
             ast::Expr::NoneLiteral(ast::ExprNoneLiteral { range: _ }) => Type::None,
@@ -1341,6 +1355,35 @@ impl<'db> TypeInferenceBuilder<'db> {
         ty
     }
 
+    fn infer_annotation_expression(&mut self, expression: &ast::Expr) -> Type<'db> {
+        // https://typing.readthedocs.io/en/latest/spec/annotations.html#grammar-token-expression-grammar-annotation_expression
+        let ty = match expression {
+            // type_expression is responsible for returning an error in the case
+            // that the name is somehow in an invalid context.
+            name @ ast::Expr::Name(..) => self.infer_type_expression(name),
+            // TODO Remaining forms from grammar
+            _ => Type::Unknown, // TODO: this needs to error?
+        };
+
+        ty
+    }
+    fn infer_type_expression(&mut self, expression: &ast::Expr) -> Type<'db> {
+        // https://typing.readthedocs.io/en/latest/spec/annotations.html#grammar-token-expression-grammar-type_expression
+        // TODO: this does not include any of the special forms, and is only a
+        //   stub of the forms other than a standalone name in scope.
+        match expression {
+            ast::Expr::Name(name) => {
+                assert!(
+                    name.ctx.is_load(),
+                    "name in a type expression is always 'load' but got: '{:?}'",
+                    name.ctx
+                );
+                self.infer_name_expression(name).instance()
+            }
+
+            _ => Type::Unknown, // TODO
+        }
+    }
     fn infer_number_literal_expression(&mut self, literal: &ast::ExprNumberLiteral) -> Type<'db> {
         let ast::ExprNumberLiteral { range: _, value } = literal;
 
@@ -2589,6 +2632,27 @@ mod tests {
         // TODO: update this once `infer_ellipsis_literal_expression` correctly
         // infers `types.EllipsisType`.
         assert_public_ty(&db, "src/a.py", "x", "Unknown | Literal[EllipsisType]");
+
+        Ok(())
+    }
+
+    #[test]
+    fn function_return_type() -> anyhow::Result<()> {
+        let mut db = setup_db();
+
+        db.write_file("src/a.py", "def example() -> int: return 42")?;
+
+        let mod_file = system_path_to_file(&db, "src/a.py").unwrap();
+        let ty = global_symbol_ty_by_name(&db, mod_file, "example");
+        let Type::Function(function) = ty else {
+            panic!("example is not a function");
+        };
+
+        let returns = function
+            .returns(&db)
+            .expect("There is a return type on the function");
+
+        assert_eq!(returns.display(&db).to_string(), "int");
 
         Ok(())
     }

@@ -338,6 +338,9 @@ pub struct FunctionType<'db> {
 
     /// types of all decorators on this function
     decorators: Vec<Type<'db>>,
+
+    /// return type for this function
+    returns: Option<Type<'db>>,
 }
 
 impl<'db> FunctionType<'db> {
