@@ -281,8 +281,7 @@ impl<'db> Type<'db> {
             }
             Type::BooleanLiteral(_) => Type::Unknown,
             Type::StringLiteral(_) => {
-                // TODO fix this comment with whatever it is we should say we
-                // want to do in the future.
+                // TODO defer to Type::Instance(<str from typeshed>).member
                 Type::Unknown
             }
             Type::BytesLiteral(_) => {
