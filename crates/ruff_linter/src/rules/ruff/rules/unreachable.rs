@@ -46,7 +46,7 @@ pub(crate) fn in_function(name: &Identifier, body: &[Stmt]) -> Vec<Diagnostic> {
     // Create basic code blocks from the body.
     let mut basic_blocks = BasicBlocks::from(body);
     if let Some(start_index) = basic_blocks.start_index() {
-        mark_reached(&mut basic_blocks.blocks, start_index);
+        mark_reachable(&mut basic_blocks.blocks, start_index);
     }
 
     let mut diagnostics: Vec<Diagnostic> = Vec::new();
@@ -78,15 +78,14 @@ pub(crate) fn in_function(name: &Identifier, body: &[Stmt]) -> Vec<Diagnostic> {
 
 /// Set bits in `reached_map` for all blocks that are reached in `blocks`
 /// starting with block at index `idx`.
-fn mark_reached(blocks: &mut IndexSlice<BlockIndex, BasicBlock<'_>>, start_index: BlockIndex) {
+fn mark_reachable(blocks: &mut IndexSlice<BlockIndex, BasicBlock<'_>>, start_index: BlockIndex) {
     let mut idx = start_index;
 
     loop {
         if blocks[idx].reachable {
             return; // Block already visited, no needed to do it again.
-        } else {
-            blocks[idx].reachable = true;
         }
+        blocks[idx].reachable = true;
 
         match &blocks[idx].next {
             NextBlock::Always(next) => idx = *next,
@@ -102,7 +101,7 @@ fn mark_reached(blocks: &mut IndexSlice<BlockIndex, BasicBlock<'_>>, start_index
                     None => {
                         // Don't know, both branches might be taken.
                         idx = *next;
-                        mark_reached(blocks, *orelse);
+                        mark_reachable(blocks, *orelse);
                     }
                 }
             }
@@ -182,9 +181,7 @@ impl<'stmt> From<&'stmt [Stmt]> for BasicBlocks<'stmt> {
     /// This assumes that `stmts` is a function body.
     fn from(stmts: &'stmt [Stmt]) -> BasicBlocks<'stmt> {
         let mut blocks = BasicBlocksBuilder::with_capacity(stmts.len());
-
         blocks.create_blocks(stmts, None);
-
         blocks.finish()
     }
 }
