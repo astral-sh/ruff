@@ -495,13 +495,26 @@ fn parse_entries_numpy(content: &str) -> Vec<QualifiedName> {
     entries
 }
 
-/// An individual documentable statement in a function body.
+/// An individual `yield` expression in a function body.
 #[derive(Debug)]
-struct Entry {
+struct YieldEntry {
     range: TextRange,
 }
 
-impl Ranged for Entry {
+impl Ranged for YieldEntry {
+    fn range(&self) -> TextRange {
+        self.range
+    }
+}
+
+/// An individual `return` statement in a function body.
+#[derive(Debug)]
+struct ReturnEntry {
+    range: TextRange,
+    is_none_return: bool,
+}
+
+impl Ranged for ReturnEntry {
     fn range(&self) -> TextRange {
         self.range
     }
@@ -523,17 +536,15 @@ impl Ranged for ExceptionEntry<'_> {
 /// A summary of documentable statements from the function body
 #[derive(Debug)]
 struct BodyEntries<'a> {
-    returns: Vec<Entry>,
-    none_returns: usize,
-    yields: Vec<Entry>,
+    returns: Vec<ReturnEntry>,
+    yields: Vec<YieldEntry>,
     raised_exceptions: Vec<ExceptionEntry<'a>>,
 }
 
 /// An AST visitor to extract a summary of documentable statements from a function body.
 struct BodyVisitor<'a> {
-    returns: Vec<Entry>,
-    none_returns: usize,
-    yields: Vec<Entry>,
+    returns: Vec<ReturnEntry>,
+    yields: Vec<YieldEntry>,
     currently_suspended_exceptions: Option<&'a ast::Expr>,
     raised_exceptions: Vec<ExceptionEntry<'a>>,
     semantic: &'a SemanticModel<'a>,
@@ -543,7 +554,6 @@ impl<'a> BodyVisitor<'a> {
     fn new(semantic: &'a SemanticModel) -> Self {
         Self {
             returns: Vec::new(),
-            none_returns: 0,
             yields: Vec::new(),
             currently_suspended_exceptions: None,
             raised_exceptions: Vec::new(),
@@ -554,7 +564,6 @@ impl<'a> BodyVisitor<'a> {
     fn finish(self) -> BodyEntries<'a> {
         let BodyVisitor {
             returns,
-            none_returns,
             yields,
             mut raised_exceptions,
             ..
@@ -576,7 +585,6 @@ impl<'a> BodyVisitor<'a> {
 
         BodyEntries {
             returns,
-            none_returns,
             yields,
             raised_exceptions,
         }
@@ -631,10 +639,10 @@ impl<'a> Visitor<'a> for BodyVisitor<'a> {
                 range,
                 value: Some(value),
             }) => {
-                self.returns.push(Entry { range: *range });
-                if value.is_none_literal_expr() {
-                    self.none_returns += 1;
-                }
+                self.returns.push(ReturnEntry {
+                    range: *range,
+                    is_none_return: value.is_none_literal_expr(),
+                });
             }
             Stmt::FunctionDef(_) | Stmt::ClassDef(_) => return,
             _ => {}
@@ -649,10 +657,10 @@ impl<'a> Visitor<'a> for BodyVisitor<'a> {
                 range,
                 value: Some(_),
             }) => {
-                self.yields.push(Entry { range: *range });
+                self.yields.push(YieldEntry { range: *range });
             }
             Expr::YieldFrom(ast::ExprYieldFrom { range, .. }) => {
-                self.yields.push(Entry { range: *range });
+                self.yields.push(YieldEntry { range: *range });
             }
             Expr::Lambda(_) => return,
             _ => {}
@@ -750,7 +758,11 @@ pub(crate) fn check_docstring(
                         Some(returns) if !Expr::is_none_literal_expr(returns) => diagnostics.push(
                             Diagnostic::new(DocstringMissingReturns, body_return.range()),
                         ),
-                        None if body_entries.returns.len() != body_entries.none_returns => {
+                        None if body_entries
+                            .returns
+                            .iter()
+                            .any(|entry| !entry.is_none_return) =>
+                        {
                             diagnostics.push(Diagnostic::new(
                                 DocstringMissingReturns,
                                 body_return.range(),
