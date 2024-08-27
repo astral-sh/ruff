@@ -176,7 +176,9 @@ fn concatenate_strings(a_range: TextRange, b_range: TextRange, locator: &Locator
         a_text[a_leading_quote.len()..a_text.len() - a_trailing_quote.len()].to_string();
     let b_body = &b_text[b_leading_quote.len()..b_text.len() - b_trailing_quote.len()];
 
-    if a_leading_quote.find(['r', 'R']).is_none() {
+    if a_leading_quote.find(['r', 'R']).is_none()
+        && b_body.starts_with(['0', '1', '2', '3', '4', '5', '6', '7'])
+    {
         a_body = normalize_ending_octal(&a_body);
     }
 
