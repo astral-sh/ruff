@@ -188,6 +188,8 @@ pub enum Type<'db> {
     LiteralString,
     /// A bytes literal
     BytesLiteral(BytesLiteralType<'db>),
+    /// A generator
+    Generator(GeneratorType<'db>),
     // TODO protocols, callable types, overloads, generics, type vars
 }
 
@@ -297,6 +299,7 @@ impl<'db> Type<'db> {
                 // TODO defer to Type::Instance(<bytes from typeshed>).member
                 Type::Unknown
             }
+            Type::Generator(_) => Type::Unknown,
         }
     }
 
@@ -403,6 +406,13 @@ pub struct StringLiteralType<'db> {
 pub struct BytesLiteralType<'db> {
     #[return_ref]
     value: Box<[u8]>,
+}
+
+#[salsa::interned]
+pub struct GeneratorType<'db> {
+    yield_type: Type<'db>,
+    send_type: Type<'db>,
+    return_type: Type<'db>,
 }
 
 #[cfg(test)]
