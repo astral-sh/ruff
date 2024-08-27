@@ -1,3 +1,5 @@
+use std::borrow::Cow;
+
 use itertools::Itertools;
 
 use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
@@ -173,13 +175,13 @@ fn concatenate_strings(a_range: TextRange, b_range: TextRange, locator: &Locator
     }
 
     let mut a_body =
-        a_text[a_leading_quote.len()..a_text.len() - a_trailing_quote.len()].to_string();
+        Cow::Borrowed(&a_text[a_leading_quote.len()..a_text.len() - a_trailing_quote.len()]);
     let b_body = &b_text[b_leading_quote.len()..b_text.len() - b_trailing_quote.len()];
 
     if a_leading_quote.find(['r', 'R']).is_none()
-        && b_body.starts_with(['0', '1', '2', '3', '4', '5', '6', '7'])
+        && matches!(b_body.bytes().next(), Some(b'0'..=b'7'))
     {
-        a_body = normalize_ending_octal(&a_body);
+        normalize_ending_octal(&mut a_body);
     }
 
     let concatenation = format!("{a_leading_quote}{a_body}{b_body}{a_trailing_quote}");
@@ -193,10 +195,10 @@ fn concatenate_strings(a_range: TextRange, b_range: TextRange, locator: &Locator
 
 /// Pads an octal at the end of the string
 /// to three digits, if necessary.
-fn normalize_ending_octal(text: &str) -> String {
+fn normalize_ending_octal(text: &mut Cow<'_, str>) {
     // Early return for short strings
     if text.len() < 2 {
-        return text.to_string();
+        return;
     }
 
     let mut rev_bytes = text.bytes().rev();
@@ -204,20 +206,19 @@ fn normalize_ending_octal(text: &str) -> String {
         // "\y" -> "\00y"
         if has_odd_consecutive_backslashes(&mut rev_bytes.clone()) {
             let prefix = &text[..text.len() - 2];
-            return format!("{prefix}\\00{}", last_byte as char);
+            *text = Cow::Owned(format!("{prefix}\\00{}", last_byte as char));
         }
         // "\xy" -> "\0xy"
-        if let Some(penultimate_byte @ b'0'..=b'7') = rev_bytes.next() {
+        else if let Some(penultimate_byte @ b'0'..=b'7') = rev_bytes.next() {
             if has_odd_consecutive_backslashes(&mut rev_bytes.clone()) {
                 let prefix = &text[..text.len() - 3];
-                return format!(
+                *text = Cow::Owned(format!(
                     "{prefix}\\0{}{}",
                     penultimate_byte as char, last_byte as char
-                );
+                ));
             }
         }
     }
-    text.to_string()
 }
 
 fn has_odd_consecutive_backslashes(mut itr: impl Iterator<Item = u8>) -> bool {
