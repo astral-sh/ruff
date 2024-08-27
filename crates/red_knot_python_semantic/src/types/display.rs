@@ -55,6 +55,22 @@ impl Display for DisplayType<'_> {
                 escape.bytes_repr().write(f)?;
                 f.write_str("]")
             }
+            Type::Generator(generator) => write!(
+                f,
+                "Generator[{}, {}, {}]",
+                DisplayType {
+                    ty: &generator.yield_type(self.db),
+                    db: self.db
+                },
+                DisplayType {
+                    ty: &generator.send_type(self.db),
+                    db: self.db
+                },
+                DisplayType {
+                    ty: &generator.return_type(self.db),
+                    db: self.db
+                }
+            ),
         }
     }
 }
