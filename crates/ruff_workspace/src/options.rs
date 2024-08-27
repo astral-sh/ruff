@@ -309,7 +309,15 @@ pub struct Options {
     /// If both are specified, `target-version` takes precedence over
     /// `requires-python`.
     ///
-    /// Please note, it is recommend that stub files [use the latest language features available](https://typing.readthedocs.io/en/latest/guides/writing_stubs.html#language-features); therefore, Ruff will ignore the `target-version` setting for stub files.
+    /// Note that a stub file can [sometimes make use of a typing feature](https://typing.readthedocs.io/en/latest/spec/distributing.html#syntax)
+    /// before it is available at runtime, as long as the stub does not make
+    /// use of new *syntax*. For example, a type checker will understand
+    /// `int | str` in a stub as being a `Union` type annotation, even if the
+    /// type checker is run using Python 3.9, despite the fact that the `|`
+    /// operator can only be used to create union types at runtime on Python
+    /// 3.10+. As such, Ruff will often recommend newer features in a stub
+    /// file than it would for an equivalent runtime file with the same target
+    /// version.
     #[option(
         default = r#""py38""#,
         value_type = r#""py37" | "py38" | "py39" | "py310" | "py311" | "py312""#,
