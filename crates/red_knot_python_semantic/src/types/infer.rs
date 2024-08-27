@@ -217,6 +217,12 @@ struct TypeInferenceBuilder<'db> {
 }
 
 impl<'db> TypeInferenceBuilder<'db> {
+    /// How big a string do we build before bailing?
+    ///
+    /// This is a fairly arbitrary number. It should be *far* more than enough
+    /// for most use cases, but we can reevaluate it later if useful.
+    const MAX_STRING_LITERAL_SIZE: usize = 4096;
+
     /// Creates a new builder for inferring types in a region.
     pub(super) fn new(
         db: &'db dyn Db,
@@ -1259,12 +1265,16 @@ impl<'db> TypeInferenceBuilder<'db> {
         Type::BooleanLiteral(*value)
     }
 
-    #[allow(clippy::unused_self)]
     fn infer_string_literal_expression(&mut self, literal: &ast::ExprStringLiteral) -> Type<'db> {
-        Type::StringLiteral(StringLiteralType::new(self.db, literal.value.to_string()))
+        let value = if literal.value.len() <= Self::MAX_STRING_LITERAL_SIZE {
+            literal.value.to_str().into()
+        } else {
+            Box::default()
+        };
+
+        Type::StringLiteral(StringLiteralType::new(self.db, value))
     }
 
-    #[allow(clippy::unused_self)]
     fn infer_bytes_literal_expression(&mut self, literal: &ast::ExprBytesLiteral) -> Type<'db> {
         // TODO: ignoring r/R prefixes for now, should normalize bytes values
         Type::BytesLiteral(BytesLiteralType::new(
@@ -1787,11 +1797,30 @@ impl<'db> TypeInferenceBuilder<'db> {
 
             (Type::StringLiteral(lhs), Type::StringLiteral(rhs), ast::Operator::Add) => {
                 Type::StringLiteral(StringLiteralType::new(self.db, {
-                    let lhs_value = lhs.value(self.db);
-                    let rhs_value = rhs.value(self.db);
-                    lhs_value.clone() + rhs_value
+                    let lhs_value = lhs.value(self.db).to_string();
+                    let rhs_value = rhs.value(self.db).as_ref();
+                    (lhs_value + rhs_value).into()
                 }))
             }
+
+            (Type::StringLiteral(s), Type::IntLiteral(n), ast::Operator::Mult)
+            | (Type::IntLiteral(n), Type::StringLiteral(s), ast::Operator::Mult) => {
+                if n < 1 {
+                    Type::StringLiteral(StringLiteralType::new(self.db, Box::default()))
+                } else if let Ok(n) = usize::try_from(n) {
+                    if n.checked_mul(s.value(self.db).len())
+                        .is_some_and(|new_length| new_length <= Self::MAX_STRING_LITERAL_SIZE)
+                    {
+                        let new_literal = s.value(self.db).repeat(n);
+                        Type::StringLiteral(StringLiteralType::new(self.db, new_literal.into()))
+                    } else {
+                        Type::LiteralString
+                    }
+                } else {
+                    Type::LiteralString
+                }
+            }
+
             _ => Type::Unknown, // TODO
         }
     }
@@ -1951,6 +1980,7 @@ enum ModuleNameResolutionError {
 
 #[cfg(test)]
 mod tests {
+
     use anyhow::Context;
 
     use ruff_db::files::{system_path_to_file, File};
@@ -1968,6 +1998,8 @@ mod tests {
     use crate::semantic_index::{global_scope, semantic_index, symbol_table, use_def_map};
     use crate::types::{global_symbol_ty_by_name, infer_definition_types, symbol_ty_by_name, Type};
     use crate::{HasTy, ProgramSettings, SemanticModel};
+
+    use super::TypeInferenceBuilder;
 
     fn setup_db() -> TestDb {
         let db = TestDb::new();
@@ -2374,6 +2406,44 @@ mod tests {
         assert_public_ty(&db, "src/a.py", "x", r#"Literal["I say \"hello\" to you"]"#);
         assert_public_ty(&db, "src/a.py", "y", r#"Literal["You say \"hey\" back"]"#);
         assert_public_ty(&db, "src/a.py", "z", r#"Literal["No \"closure here"]"#);
+
+        Ok(())
+    }
+
+    #[test]
+    fn multiplied_string() -> anyhow::Result<()> {
+        let mut db = setup_db();
+
+        db.write_dedented(
+            "src/a.py",
+            &format!(
+                r#"
+            w = 2 * "hello"
+            x = "goodbye" * 3
+            y = "a" * {y}
+            z = {z} * "b"
+            a = 0 * "hello"
+            b = -3 * "hello"
+            "#,
+                y = TypeInferenceBuilder::MAX_STRING_LITERAL_SIZE,
+                z = TypeInferenceBuilder::MAX_STRING_LITERAL_SIZE + 1
+            ),
+        )?;
+
+        assert_public_ty(&db, "src/a.py", "w", r#"Literal["hellohello"]"#);
+        assert_public_ty(&db, "src/a.py", "x", r#"Literal["goodbyegoodbyegoodbye"]"#);
+        assert_public_ty(
+            &db,
+            "src/a.py",
+            "y",
+            &format!(
+                r#"Literal["{}"]"#,
+                "a".repeat(TypeInferenceBuilder::MAX_STRING_LITERAL_SIZE)
+            ),
+        );
+        assert_public_ty(&db, "src/a.py", "z", "LiteralString");
+        assert_public_ty(&db, "src/a.py", "a", r#"Literal[""]"#);
+        assert_public_ty(&db, "src/a.py", "b", r#"Literal[""]"#);
 
         Ok(())
     }

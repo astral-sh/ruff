@@ -46,6 +46,7 @@ impl Display for DisplayType<'_> {
                 r#"Literal["{}"]"#,
                 string.value(self.db).replace('"', r#"\""#)
             ),
+            Type::LiteralString => write!(f, "LiteralString"),
             Type::BytesLiteral(bytes) => {
                 let escape =
                     AsciiEscape::with_preferred_quote(bytes.value(self.db).as_ref(), Quote::Double);

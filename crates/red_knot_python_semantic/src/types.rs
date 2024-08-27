@@ -183,6 +183,9 @@ pub enum Type<'db> {
     BooleanLiteral(bool),
     /// A string literal
     StringLiteral(StringLiteralType<'db>),
+    /// A string known to originate only from literal values, but whose value is not known (unlike
+    /// `StringLiteral` above).
+    LiteralString,
     /// A bytes literal
     BytesLiteral(BytesLiteralType<'db>),
     // TODO protocols, callable types, overloads, generics, type vars
@@ -281,7 +284,13 @@ impl<'db> Type<'db> {
             }
             Type::BooleanLiteral(_) => Type::Unknown,
             Type::StringLiteral(_) => {
-                // TODO defer to Type::Instance(<str from typeshed>).member
+                // TODO defer to `typing.LiteralString`/`builtins.str` methods
+                // from typeshed's stubs
+                Type::Unknown
+            }
+            Type::LiteralString => {
+                // TODO defer to `typing.LiteralString`/`builtins.str` methods
+                // from typeshed's stubs
                 Type::Unknown
             }
             Type::BytesLiteral(_) => {
@@ -387,7 +396,7 @@ pub struct IntersectionType<'db> {
 #[salsa::interned]
 pub struct StringLiteralType<'db> {
     #[return_ref]
-    value: String,
+    value: Box<str>,
 }
 
 #[salsa::interned]
