@@ -48,6 +48,8 @@ use crate::types::{
 };
 use crate::Db;
 
+use super::GeneratorType;
+
 /// Infer all types for a [`ScopeId`], including all definitions and expressions in that scope.
 /// Use when checking a scope, or needing to provide a type for an arbitrary expression in the
 /// scope.
@@ -1395,12 +1397,15 @@ impl<'db> TypeInferenceBuilder<'db> {
     }
 
     /// Infer the type of the `iter` expression of the first comprehension.
-    fn infer_first_comprehension_iter(&mut self, comprehensions: &[ast::Comprehension]) {
+    fn infer_first_comprehension_iter(
+        &mut self,
+        comprehensions: &[ast::Comprehension],
+    ) -> Type<'db> {
         let mut generators_iter = comprehensions.iter();
         let Some(first_generator) = generators_iter.next() else {
             unreachable!("Comprehension must contain at least one generator");
         };
-        self.infer_expression(&first_generator.iter);
+        self.infer_expression(&first_generator.iter)
     }
 
     fn infer_generator_expression(&mut self, generator: &ast::ExprGenerator) -> Type<'db> {
@@ -1411,10 +1416,15 @@ impl<'db> TypeInferenceBuilder<'db> {
             parenthesized: _,
         } = generator;
 
-        self.infer_first_comprehension_iter(generators);
+        let yield_type = self.infer_first_comprehension_iter(generators);
 
         // TODO generator type
-        Type::Unknown
+        Type::Generator(GeneratorType::new(
+            self.db,
+            yield_type,
+            Type::None,
+            Type::None,
+        ))
     }
 
     fn infer_list_comprehension_expression(&mut self, listcomp: &ast::ExprListComp) -> Type<'db> {
@@ -3258,6 +3268,18 @@ mod tests {
 
         // TODO should be a generic type
         assert_public_ty(&db, "/src/a.py", "x", "dict");
+
+        Ok(())
+    }
+
+    #[test]
+    fn generator_expr() -> anyhow::Result<()> {
+        let mut db = setup_db();
+
+        db.write_file("src/a.py", "x = (y for y in [1,2,3])")?;
+
+        assert_public_ty(&db, "src/a.py", "x", "Generator[list, None, None]");
+        assert_public_ty(&db, "src/a.py", "y", "Unbound");
 
         Ok(())
     }
