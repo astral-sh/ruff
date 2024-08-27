@@ -398,6 +398,7 @@ ISC.py:88:5: ISC001 [*] Implicitly concatenated string literals on one line
    88 |+_ = r"\120" # fix should be r"\120"
 89 89 | _ = "\12 and more""0" # fix should be "\12 and more0"
 90 90 | _ = "\8""0" # fix should be "\80"
+91 91 | _ = "\12""8" # fix should be "\128"
 
 ISC.py:89:5: ISC001 [*] Implicitly concatenated string literals on one line
    |
@@ -406,6 +407,7 @@ ISC.py:89:5: ISC001 [*] Implicitly concatenated string literals on one line
 89 | _ = "\12 and more""0" # fix should be "\12 and more0"
    |     ^^^^^^^^^^^^^^^^^ ISC001
 90 | _ = "\8""0" # fix should be "\80"
+91 | _ = "\12""8" # fix should be "\128"
    |
    = help: Combine string literals
 
@@ -416,6 +418,8 @@ ISC.py:89:5: ISC001 [*] Implicitly concatenated string literals on one line
 89    |-_ = "\12 and more""0" # fix should be "\12 and more0"
    89 |+_ = "\12 and more0" # fix should be "\12 and more0"
 90 90 | _ = "\8""0" # fix should be "\80"
+91 91 | _ = "\12""8" # fix should be "\128"
+92 92 | _ = "\12""foo" # fix should be "\12foo"
 
 ISC.py:90:5: ISC001 [*] Implicitly concatenated string literals on one line
    |
@@ -423,6 +427,8 @@ ISC.py:90:5: ISC001 [*] Implicitly concatenated string literals on one line
 89 | _ = "\12 and more""0" # fix should be "\12 and more0"
 90 | _ = "\8""0" # fix should be "\80"
    |     ^^^^^^^ ISC001
+91 | _ = "\12""8" # fix should be "\128"
+92 | _ = "\12""foo" # fix should be "\12foo"
    |
    = help: Combine string literals
 
@@ -432,3 +438,39 @@ ISC.py:90:5: ISC001 [*] Implicitly concatenated string literals on one line
 89 89 | _ = "\12 and more""0" # fix should be "\12 and more0"
 90    |-_ = "\8""0" # fix should be "\80"
    90 |+_ = "\80" # fix should be "\80"
+91 91 | _ = "\12""8" # fix should be "\128"
+92 92 | _ = "\12""foo" # fix should be "\12foo"
+
+ISC.py:91:5: ISC001 [*] Implicitly concatenated string literals on one line
+   |
+89 | _ = "\12 and more""0" # fix should be "\12 and more0"
+90 | _ = "\8""0" # fix should be "\80"
+91 | _ = "\12""8" # fix should be "\128"
+   |     ^^^^^^^^ ISC001
+92 | _ = "\12""foo" # fix should be "\12foo"
+   |
+   = help: Combine string literals
+
+ℹ Safe fix
+88 88 | _ = r"\12"r"0" # fix should be r"\120"
+89 89 | _ = "\12 and more""0" # fix should be "\12 and more0"
+90 90 | _ = "\8""0" # fix should be "\80"
+91    |-_ = "\12""8" # fix should be "\128"
+   91 |+_ = "\128" # fix should be "\128"
+92 92 | _ = "\12""foo" # fix should be "\12foo"
+
+ISC.py:92:5: ISC001 [*] Implicitly concatenated string literals on one line
+   |
+90 | _ = "\8""0" # fix should be "\80"
+91 | _ = "\12""8" # fix should be "\128"
+92 | _ = "\12""foo" # fix should be "\12foo"
+   |     ^^^^^^^^^^ ISC001
+   |
+   = help: Combine string literals
+
+ℹ Safe fix
+89 89 | _ = "\12 and more""0" # fix should be "\12 and more0"
+90 90 | _ = "\8""0" # fix should be "\80"
+91 91 | _ = "\12""8" # fix should be "\128"
+92    |-_ = "\12""foo" # fix should be "\12foo"
+   92 |+_ = "\12foo" # fix should be "\12foo"
