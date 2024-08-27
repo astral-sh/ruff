@@ -492,3 +492,146 @@ flowchart TD
   block1 --> block0
   block0 --> return
 ```
+
+## Function 11
+### Source
+```python
+def func():
+    try:
+        if catalog is not None:
+            try:
+                x = 0
+            except PySparkParseException:
+                x = 1
+        try:
+            x = 2
+        except PySparkParseException:
+            x = 3
+        x = 8
+    finally:
+        if catalog is not None:
+            try:
+                x = 4
+            except PySparkParseException:
+                x = 5
+        try:
+            x = 6
+        except PySparkParseException:
+            x = 7
+```
+
+### Control Flow Graph
+```mermaid
+flowchart TD
+  start(("Start"))
+  return(("End"))
+  block0[["`*(empty)*`"]]
+  block1["x = 6\n"]
+  block2["\n"]
+  block3["x = 7\n"]
+  block4["try:
+            x = 6
+        except PySparkParseException:
+            x = 7\n"]
+  block5["try:
+            x = 6
+        except PySparkParseException:
+            x = 7\n"]
+  block6["x = 4\n"]
+  block7["x = 5\n"]
+  block8["try:
+                x = 4
+            except PySparkParseException:
+                x = 5\n"]
+  block9["try:
+                x = 4
+            except PySparkParseException:
+                x = 5\n"]
+  block10["if catalog is not None:
+            try:
+                x = 4
+            except PySparkParseException:
+                x = 5\n"]
+  block11["x = 8\n"]
+  block12["x = 2\n"]
+  block13["x = 3\n"]
+  block14["try:
+            x = 2
+        except PySparkParseException:
+            x = 3\n"]
+  block15["try:
+            x = 2
+        except PySparkParseException:
+            x = 3\n"]
+  block16["x = 0\n"]
+  block17["x = 1\n"]
+  block18["try:
+                x = 0
+            except PySparkParseException:
+                x = 1\n"]
+  block19["try:
+                x = 0
+            except PySparkParseException:
+                x = 1\n"]
+  block20["if catalog is not None:
+            try:
+                x = 0
+            except PySparkParseException:
+                x = 1\n"]
+  block21["try:
+        if catalog is not None:
+            try:
+                x = 0
+            except PySparkParseException:
+                x = 1
+        try:
+            x = 2
+        except PySparkParseException:
+            x = 3
+        x = 8
+    finally:
+        if catalog is not None:
+            try:
+                x = 4
+            except PySparkParseException:
+                x = 5
+        try:
+            x = 6
+        except PySparkParseException:
+            x = 7\n"]
+
+  start --> block21
+  block21 -- "Exception raised" --> block2
+  block21 -- "else" --> block20
+  block20 -- "catalog is not None" --> block19
+  block20 -- "else" --> block15
+  block19 -- "Exception raised" --> block18
+  block19 -- "else" --> block16
+  block18 -- "PySparkParseException" --> block17
+  block18 -- "else" --> block2
+  block17 --> block15
+  block16 --> block15
+  block15 -- "Exception raised" --> block14
+  block15 -- "else" --> block12
+  block14 -- "PySparkParseException" --> block13
+  block14 -- "else" --> block2
+  block13 --> block11
+  block12 --> block11
+  block11 --> block10
+  block10 -- "catalog is not None" --> block9
+  block10 -- "else" --> block5
+  block9 -- "Exception raised" --> block8
+  block9 -- "else" --> block6
+  block8 -- "PySparkParseException" --> block7
+  block8 -- "else" --> block2
+  block7 --> block5
+  block6 --> block5
+  block5 -- "Exception raised" --> block4
+  block5 -- "else" --> block1
+  block4 -- "PySparkParseException" --> block3
+  block4 -- "else" --> block2
+  block3 --> block0
+  block2 --> block10
+  block1 --> block0
+  block0 --> return
+```

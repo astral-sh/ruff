@@ -480,7 +480,6 @@ fn try_block<'stmt>(
     } else {
         Some(next_branch)
     };
-
     post_process_try(
         blocks,
         try_block,
@@ -488,7 +487,6 @@ fn try_block<'stmt>(
         finally_index,
         Some(else_block),
     );
-
     // We cannot know if the try block will raise an exception (apart from explicit raise statements)
     // We therefore assume that both paths may execute
     NextBlock::If {
@@ -536,6 +534,8 @@ fn post_process_try(
                         }
                         return;
                     }
+                    // return has already been re-routed
+                    Some(Stmt::Return(_)) => return,
                     _ => {}
                 };
             }

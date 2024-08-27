@@ -83,3 +83,26 @@ def func():
     finally:
         print("reached")
 
+# Test case from ibis caused overflow
+def func():
+    try:
+        if catalog is not None:
+            try:
+                x = 0
+            except PySparkParseException:
+                x = 1
+        try:
+            x = 2
+        except PySparkParseException:
+            x = 3
+        x = 8
+    finally:
+        if catalog is not None:
+            try:
+                x = 4
+            except PySparkParseException:
+                x = 5
+        try:
+            x = 6
+        except PySparkParseException:
+            x = 7
