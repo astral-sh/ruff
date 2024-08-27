@@ -24,16 +24,16 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                 pylint::rules::global_at_module_level(checker, stmt);
             }
             if checker.enabled(Rule::AmbiguousVariableName) {
-                checker.diagnostics.extend(names.iter().filter_map(|name| {
-                    pycodestyle::rules::ambiguous_variable_name(name, name.range())
-                }));
+                for name in names {
+                    pycodestyle::rules::ambiguous_variable_name(checker, name, name.range());
+                }
             }
         }
         Stmt::Nonlocal(nonlocal @ ast::StmtNonlocal { names, range: _ }) => {
             if checker.enabled(Rule::AmbiguousVariableName) {
-                checker.diagnostics.extend(names.iter().filter_map(|name| {
-                    pycodestyle::rules::ambiguous_variable_name(name, name.range())
-                }));
+                for name in names {
+                    pycodestyle::rules::ambiguous_variable_name(checker, name, name.range());
+                }
             }
             if checker.enabled(Rule::NonlocalWithoutBinding) {
                 if !checker.semantic.scope_id.is_global() {
