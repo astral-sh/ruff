@@ -202,13 +202,13 @@ fn normalize_ending_octal(text: &str) -> String {
     let mut rev_bytes = text.bytes().rev();
     if let Some(last_byte @ b'0'..=b'7') = rev_bytes.next() {
         // "\y" -> "\00y"
-        if has_odd_consecutive_backslashes(&rev_bytes) {
+        if has_odd_consecutive_backslashes(&mut rev_bytes.clone()) {
             let prefix = &text[..text.len() - 2];
             return format!("{prefix}\\00{}", last_byte as char);
         }
         // "\xy" -> "\0xy"
         if let Some(penultimate_byte @ b'0'..=b'7') = rev_bytes.next() {
-            if has_odd_consecutive_backslashes(&rev_bytes) {
+            if has_odd_consecutive_backslashes(&mut rev_bytes.clone()) {
                 let prefix = &text[..text.len() - 3];
                 return format!(
                     "{prefix}\\0{}{}",
@@ -220,10 +220,9 @@ fn normalize_ending_octal(text: &str) -> String {
     text.to_string()
 }
 
-fn has_odd_consecutive_backslashes<I: Iterator<Item = u8> + Clone>(itr: &I) -> bool {
-    let mut itrclone = itr.clone();
+fn has_odd_consecutive_backslashes(mut itr: impl Iterator<Item = u8>) -> bool {
     let mut odd_backslashes = false;
-    while let Some(b'\\') = itrclone.next() {
+    while let Some(b'\\') = itr.next() {
         odd_backslashes = !odd_backslashes;
     }
     odd_backslashes
