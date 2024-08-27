@@ -188,8 +188,6 @@ pub enum Type<'db> {
     LiteralString,
     /// A bytes literal
     BytesLiteral(BytesLiteralType<'db>),
-    /// `...`
-    EllipsisType,
     // TODO protocols, callable types, overloads, generics, type vars
 }
 
@@ -297,10 +295,6 @@ impl<'db> Type<'db> {
             }
             Type::BytesLiteral(_) => {
                 // TODO defer to Type::Instance(<bytes from typeshed>).member
-                Type::Unknown
-            }
-            Type::EllipsisType => {
-                // TODO: attribute lookup on Ellipsis type
                 Type::Unknown
             }
         }

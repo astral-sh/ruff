@@ -1337,7 +1337,10 @@ impl<'db> TypeInferenceBuilder<'db> {
         &mut self,
         _literal: &ast::ExprEllipsisLiteral,
     ) -> Type<'db> {
-        Type::EllipsisType
+        // TODO: this does not currently resolve to `types.EllipsisType` as it
+        // should, and it needs support for sealed types (with a single member
+        // for singletons like this) as well (#12694).
+        builtins_symbol_ty_by_name(self.db, "Ellipsis")
     }
 
     fn infer_tuple_expression(&mut self, tuple: &ast::ExprTuple) -> Type<'db> {
@@ -2480,7 +2483,9 @@ mod tests {
             ",
         )?;
 
-        assert_public_ty(&db, "src/a.py", "x", "EllipsisType");
+        // TODO: update this once `infer_ellipsis_literal_expression` correctly
+        // infers `types.EllipsisType`.
+        assert_public_ty(&db, "src/a.py", "x", "Unknown | Literal[EllipsisType]");
 
         Ok(())
     }
