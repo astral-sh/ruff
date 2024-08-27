@@ -21,7 +21,7 @@ struct Case {
 
 const TOMLLIB_312_URL: &str = "https://raw.githubusercontent.com/python/cpython/8e8a4baf652f6e1cee7acde9d78c4b6154539748/Lib/tomllib";
 
-// This first "unresolved import" is because we don't understand `*` imports yet.
+// The "unresolved import" is because we don't understand `*` imports yet.
 static EXPECTED_DIAGNOSTICS: &[&str] = &[
     "/src/tomllib/_parser.py:7:29: Module 'collections.abc' has no member 'Iterable'",
     "Line 69 is too long (89 characters)",
