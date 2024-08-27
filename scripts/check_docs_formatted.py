@@ -151,14 +151,15 @@ def format_contents(src: str) -> tuple[str, Sequence[CodeBlockError]]:
     def _snipped_match(match: Match[str]) -> str:
         language = match["language"]
         extension: Literal["py", "pyi"]
-        if language == "python":
-            extension = "py"
-        elif language == "pyi":
-            extension = "pyi"
-        else:
-            # We are only interested in checking the formatting of py or pyi code blocks
-            # so we can return early if the language is not one of these.
-            return f'{match["before"]}{match["code"]}{match["after"]}'
+        match language:
+            case "python":
+                extension = "py"
+            case "pyi":
+                extension = "pyi"
+            case _:
+                # We are only interested in checking the formatting of py or pyi code
+                # blocks so we can return early if the language is not one of these.
+                return f'{match["before"]}{match["code"]}{match["after"]}'
 
         code = textwrap.dedent(match["code"])
         try:
