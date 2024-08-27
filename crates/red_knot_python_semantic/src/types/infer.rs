@@ -1418,7 +1418,6 @@ impl<'db> TypeInferenceBuilder<'db> {
 
         let yield_type = self.infer_first_comprehension_iter(generators);
 
-        // TODO generator type
         Type::Generator(GeneratorType::new(
             self.db,
             yield_type,
