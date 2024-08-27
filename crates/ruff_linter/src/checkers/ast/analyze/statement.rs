@@ -25,22 +25,14 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
             }
             if checker.enabled(Rule::AmbiguousVariableName) {
                 for name in names {
-                    if let Some(diagnostic) =
-                        pycodestyle::rules::ambiguous_variable_name(checker, name, name.range())
-                    {
-                        checker.diagnostics.push(diagnostic);
-                    }
+                    pycodestyle::rules::ambiguous_variable_name(checker, name, name.range());
                 }
             }
         }
         Stmt::Nonlocal(nonlocal @ ast::StmtNonlocal { names, range: _ }) => {
             if checker.enabled(Rule::AmbiguousVariableName) {
                 for name in names {
-                    if let Some(diagnostic) =
-                        pycodestyle::rules::ambiguous_variable_name(checker, name, name.range())
-                    {
-                        checker.diagnostics.push(diagnostic);
-                    }
+                    pycodestyle::rules::ambiguous_variable_name(checker, name, name.range());
                 }
             }
             if checker.enabled(Rule::NonlocalWithoutBinding) {

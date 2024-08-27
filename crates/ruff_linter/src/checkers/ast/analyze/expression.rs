@@ -259,11 +259,7 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
                         }
                     }
                     if checker.enabled(Rule::AmbiguousVariableName) {
-                        if let Some(diagnostic) =
-                            pycodestyle::rules::ambiguous_variable_name(checker, id, expr.range())
-                        {
-                            checker.diagnostics.push(diagnostic);
-                        }
+                        pycodestyle::rules::ambiguous_variable_name(checker, id, expr.range());
                     }
                     if !checker.semantic.current_scope().kind.is_class() {
                         if checker.enabled(Rule::BuiltinVariableShadowing) {
