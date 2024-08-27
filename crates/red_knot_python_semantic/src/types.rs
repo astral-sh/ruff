@@ -444,7 +444,7 @@ mod tests {
         let foo = system_path_to_file(&db, "src/foo.py").context("Failed to resolve foo.py")?;
 
         let diagnostics = super::check_types(&db, foo);
-        assert_diagnostic_messages(&diagnostics, &["Import 'bar' could not be resolved."]);
+        assert_diagnostic_messages(&diagnostics, &["Cannot resolve import 'bar'."]);
 
         Ok(())
     }
@@ -457,7 +457,7 @@ mod tests {
             .unwrap();
         let foo = system_path_to_file(&db, "src/foo.py").unwrap();
         let diagnostics = super::check_types(&db, foo);
-        assert_diagnostic_messages(&diagnostics, &["Import 'bar' could not be resolved."]);
+        assert_diagnostic_messages(&diagnostics, &["Cannot resolve import 'bar'."]);
     }
 
     #[test]
@@ -469,15 +469,9 @@ mod tests {
 
         let b_file = system_path_to_file(&db, "/src/b.py").unwrap();
         let b_file_diagnostics = super::check_types(&db, b_file);
-        assert_diagnostic_messages(
-            &b_file_diagnostics,
-            &["Could not resolve import of 'thing' from 'a'"],
-        );
+        assert_diagnostic_messages(&b_file_diagnostics, &["Module 'a' has no member 'thing'"]);
     }
 
-    #[ignore = "\
-A spurious second 'Unresolved import' diagnostic message is emitted on `b.py`, \
-despite the symbol existing in the symbol table for `a.py`"]
     #[test]
     fn resolved_import_of_symbol_from_unresolved_import() {
         let mut db = setup_db();
@@ -490,10 +484,7 @@ despite the symbol existing in the symbol table for `a.py`"]
 
         let a_file = system_path_to_file(&db, "/src/a.py").unwrap();
         let a_file_diagnostics = super::check_types(&db, a_file);
-        assert_diagnostic_messages(
-            &a_file_diagnostics,
-            &["Import 'foo' could not be resolved."],
-        );
+        assert_diagnostic_messages(&a_file_diagnostics, &["Cannot resolve import 'foo'."]);
 
         // Importing the unresolved import into a second first-party file should not trigger
         // an additional "unresolved import" violation

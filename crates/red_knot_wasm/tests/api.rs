@@ -19,6 +19,6 @@ fn check() {
 
     assert_eq!(
         result,
-        vec!["/test.py:1:8: Import 'random22' could not be resolved.",]
+        vec!["/test.py:1:8: Cannot resolve import 'random22'."]
     );
 }
