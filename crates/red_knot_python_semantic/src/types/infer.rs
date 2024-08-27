@@ -1248,12 +1248,16 @@ impl<'db> TypeInferenceBuilder<'db> {
         Type::BooleanLiteral(*value)
     }
 
-    #[allow(clippy::unused_self)]
     fn infer_string_literal_expression(&mut self, literal: &ast::ExprStringLiteral) -> Type<'db> {
-        Type::StringLiteral(StringLiteralType::new(self.db, literal.value.to_string()))
+        let value = if literal.value.len() <= Self::MAX_STRING_LITERAL_SIZE {
+            literal.value.to_str().into()
+        } else {
+            Box::default()
+        };
+
+        Type::StringLiteral(StringLiteralType::new(self.db, value))
     }
 
-    #[allow(clippy::unused_self)]
     fn infer_bytes_literal_expression(&mut self, literal: &ast::ExprBytesLiteral) -> Type<'db> {
         // TODO: ignoring r/R prefixes for now, should normalize bytes values
         Type::BytesLiteral(BytesLiteralType::new(
@@ -1776,25 +1780,27 @@ impl<'db> TypeInferenceBuilder<'db> {
 
             (Type::StringLiteral(lhs), Type::StringLiteral(rhs), ast::Operator::Add) => {
                 Type::StringLiteral(StringLiteralType::new(self.db, {
-                    let lhs_value = lhs.value(self.db);
-                    let rhs_value = rhs.value(self.db);
-                    lhs_value.clone() + rhs_value
+                    let lhs_value = lhs.value(self.db).to_string();
+                    let rhs_value = rhs.value(self.db).as_ref();
+                    (lhs_value + rhs_value).into()
                 }))
             }
 
             (Type::StringLiteral(s), Type::IntLiteral(n), ast::Operator::Mult)
             | (Type::IntLiteral(n), Type::StringLiteral(s), ast::Operator::Mult) => {
-                match usize::try_from(n) {
-                    Ok(n)
-                        if n * s.value(self.db).len()
-                            <= TypeInferenceBuilder::MAX_STRING_LITERAL_SIZE =>
+                if n < 1 {
+                    Type::StringLiteral(StringLiteralType::new(self.db, Box::default()))
+                } else if let Ok(n) = usize::try_from(n) {
+                    if n.checked_mul(s.value(self.db).len())
+                        .is_some_and(|new_length| new_length <= Self::MAX_STRING_LITERAL_SIZE)
                     {
                         let new_literal = s.value(self.db).repeat(n);
-                        Type::StringLiteral(StringLiteralType::new(self.db, new_literal))
+                        Type::StringLiteral(StringLiteralType::new(self.db, new_literal.into()))
+                    } else {
+                        Type::LiteralString
                     }
-                    // This throws away the conversion error because we don't
-                    // care: it just means the value was too large.
-                    _ => Type::LiteralString,
+                } else {
+                    Type::LiteralString
                 }
             }
 
@@ -2409,7 +2415,7 @@ mod tests {
         );
         assert_public_ty(&db, "src/a.py", "z", "LiteralString");
         assert_public_ty(&db, "src/a.py", "a", r#"Literal[""]"#);
-        assert_public_ty(&db, "src/a.py", "b", "LiteralString");
+        assert_public_ty(&db, "src/a.py", "b", r#"Literal[""]"#);
 
         Ok(())
     }
