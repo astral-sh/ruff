@@ -1,4 +1,4 @@
-use ruff_python_ast::{self as ast, ExceptHandler, PySourceType};
+use ruff_python_ast::{self as ast, ExceptHandler};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
@@ -69,12 +69,12 @@ pub(crate) fn except_handler(except_handler: &ExceptHandler, checker: &mut Check
                 pylint::rules::binary_op_exception(checker, except_handler);
             }
             if let Some(name) = name {
-                if checker.source_type != PySourceType::Stub
-                    && checker.enabled(Rule::AmbiguousVariableName)
-                {
-                    if let Some(diagnostic) =
-                        pycodestyle::rules::ambiguous_variable_name(name.as_str(), name.range())
-                    {
+                if checker.enabled(Rule::AmbiguousVariableName) {
+                    if let Some(diagnostic) = pycodestyle::rules::ambiguous_variable_name(
+                        checker,
+                        name.as_str(),
+                        name.range(),
+                    ) {
                         checker.diagnostics.push(diagnostic);
                     }
                 }

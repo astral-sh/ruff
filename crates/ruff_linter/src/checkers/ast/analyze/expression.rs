@@ -1,4 +1,4 @@
-use ruff_python_ast::{self as ast, Arguments, Expr, ExprContext, Operator, PySourceType};
+use ruff_python_ast::{self as ast, Arguments, Expr, ExprContext, Operator};
 use ruff_python_literal::cformat::{CFormatError, CFormatErrorType};
 
 use ruff_diagnostics::Diagnostic;
@@ -258,11 +258,9 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
                             );
                         }
                     }
-                    if checker.source_type != PySourceType::Stub
-                        && checker.enabled(Rule::AmbiguousVariableName)
-                    {
+                    if checker.enabled(Rule::AmbiguousVariableName) {
                         if let Some(diagnostic) =
-                            pycodestyle::rules::ambiguous_variable_name(id, expr.range())
+                            pycodestyle::rules::ambiguous_variable_name(checker, id, expr.range())
                         {
                             checker.diagnostics.push(diagnostic);
                         }

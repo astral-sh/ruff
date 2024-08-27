@@ -1,5 +1,4 @@
 use ruff_python_ast::Parameter;
-use ruff_python_ast::PySourceType;
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
@@ -8,10 +7,12 @@ use crate::rules::{flake8_builtins, pep8_naming, pycodestyle};
 
 /// Run lint rules over a [`Parameter`] syntax node.
 pub(crate) fn parameter(parameter: &Parameter, checker: &mut Checker) {
-    if checker.source_type != PySourceType::Stub && checker.enabled(Rule::AmbiguousVariableName) {
-        if let Some(diagnostic) =
-            pycodestyle::rules::ambiguous_variable_name(&parameter.name, parameter.name.range())
-        {
+    if checker.enabled(Rule::AmbiguousVariableName) {
+        if let Some(diagnostic) = pycodestyle::rules::ambiguous_variable_name(
+            checker,
+            &parameter.name,
+            parameter.name.range(),
+        ) {
             checker.diagnostics.push(diagnostic);
         }
     }

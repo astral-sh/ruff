@@ -3,6 +3,7 @@ use ruff_text_size::TextRange;
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
 
+use crate::checkers::ast::Checker;
 use crate::rules::pycodestyle::helpers::is_ambiguous_name;
 
 /// ## What it does
@@ -38,7 +39,14 @@ impl Violation for AmbiguousVariableName {
 }
 
 /// E741
-pub(crate) fn ambiguous_variable_name(name: &str, range: TextRange) -> Option<Diagnostic> {
+pub(crate) fn ambiguous_variable_name(
+    checker: &Checker,
+    name: &str,
+    range: TextRange,
+) -> Option<Diagnostic> {
+    if checker.settings.preview.is_enabled() && checker.source_type.is_stub() {
+        return None;
+    }
     if is_ambiguous_name(name) {
         Some(Diagnostic::new(
             AmbiguousVariableName(name.to_string()),
