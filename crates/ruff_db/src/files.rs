@@ -424,6 +424,13 @@ impl File {
     pub fn exists(self, db: &dyn Db) -> bool {
         self.status(db) == FileStatus::Exists
     }
+
+    /// Returns `true` if the file should be analyzed as a type stub.
+    pub fn is_stub(self, db: &dyn Db) -> bool {
+        self.path(db)
+            .extension()
+            .is_some_and(|extension| extension == "pyi")
+    }
 }
 
 /// A virtual file that doesn't exist on the file system.

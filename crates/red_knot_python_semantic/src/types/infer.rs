@@ -42,8 +42,8 @@ use crate::semantic_index::symbol::{FileScopeId, NodeWithScopeKind, NodeWithScop
 use crate::semantic_index::SemanticIndex;
 use crate::types::diagnostic::{TypeCheckDiagnostic, TypeCheckDiagnostics};
 use crate::types::{
-    builtins_symbol_ty_by_name, definitions_ty, global_symbol_ty_by_name, BytesLiteralType,
-    ClassType, FunctionType, StringLiteralType, Type, UnionBuilder,
+    builtins_symbol_ty_by_name, definitions_ty, global_symbol_ty_by_name, symbol_ty,
+    BytesLiteralType, ClassType, FunctionType, StringLiteralType, Type, UnionBuilder,
 };
 use crate::Db;
 
@@ -96,6 +96,28 @@ pub(crate) fn infer_definition_types<'db>(
     TypeInferenceBuilder::new(db, InferenceRegion::Definition(definition), index).finish()
 }
 
+/// Infer types for all deferred type expressions in a [`Definition`].
+///
+/// Deferred expressions are type expressions (annotations, base classes, aliases...) in a stub
+/// file, or in a file with `from __future__ import annotations`, or stringified annotations.
+#[salsa::tracked(return_ref)]
+pub(crate) fn infer_deferred_types<'db>(
+    db: &'db dyn Db,
+    definition: Definition<'db>,
+) -> TypeInference<'db> {
+    let file = definition.file(db);
+    let _span = tracing::trace_span!(
+        "infer_deferred_types",
+        definition = ?definition.as_id(),
+        file = %file.path(db)
+    )
+    .entered();
+
+    let index = semantic_index(db, file);
+
+    TypeInferenceBuilder::new(db, InferenceRegion::Deferred(definition), index).finish()
+}
+
 /// Infer all types for an [`Expression`] (including sub-expressions).
 /// Use rarely; only for cases where we'd otherwise risk double-inferring an expression: RHS of an
 /// assignment, which might be unpacking/multi-target and thus part of multiple definitions, or a
@@ -118,8 +140,13 @@ pub(crate) fn infer_expression_types<'db>(
 
 /// A region within which we can infer types.
 pub(crate) enum InferenceRegion<'db> {
+    /// infer types for a standalone [`Expression`]
     Expression(Expression<'db>),
+    /// infer types for a [`Definition`]
     Definition(Definition<'db>),
+    /// infer deferred types for a [`Definition`]
+    Deferred(Definition<'db>),
+    /// infer types for an entire [`ScopeId`]
     Scope(ScopeId<'db>),
 }
 
@@ -230,7 +257,9 @@ impl<'db> TypeInferenceBuilder<'db> {
     ) -> Self {
         let (file, scope) = match region {
             InferenceRegion::Expression(expression) => (expression.file(db), expression.scope(db)),
-            InferenceRegion::Definition(definition) => (definition.file(db), definition.scope(db)),
+            InferenceRegion::Definition(definition) | InferenceRegion::Deferred(definition) => {
+                (definition.file(db), definition.scope(db))
+            }
             InferenceRegion::Scope(scope) => (scope.file(db), scope),
         };
 
@@ -252,11 +281,22 @@ impl<'db> TypeInferenceBuilder<'db> {
         self.types.diagnostics.extend(&inference.diagnostics);
     }
 
+    /// Are we currently inferring types in a stub file?
+    fn is_stub(&self) -> bool {
+        self.file.is_stub(self.db.upcast())
+    }
+
+    /// Are we currently inferred deferred types?
+    fn is_deferred(&self) -> bool {
+        matches!(self.region, InferenceRegion::Deferred(_))
+    }
+
     /// Infers types in the given [`InferenceRegion`].
     fn infer_region(&mut self) {
         match self.region {
             InferenceRegion::Scope(scope) => self.infer_region_scope(scope),
             InferenceRegion::Definition(definition) => self.infer_region_definition(definition),
+            InferenceRegion::Deferred(definition) => self.infer_region_deferred(definition),
             InferenceRegion::Expression(expression) => self.infer_region_expression(expression),
         }
     }
@@ -290,6 +330,16 @@ impl<'db> TypeInferenceBuilder<'db> {
                 self.infer_generator_expression_scope(generator.node());
             }
         }
+
+        let mut deferred_expression_types: FxHashMap<ScopedExpressionId, Type<'db>> =
+            FxHashMap::default();
+        for definition in self.types.definitions.keys() {
+            let deferred = infer_deferred_types(self.db, *definition);
+            deferred_expression_types.extend(deferred.expressions.iter());
+        }
+        self.types
+            .expressions
+            .extend(deferred_expression_types.iter());
     }
 
     fn infer_region_definition(&mut self, definition: Definition<'db>) {
@@ -347,6 +397,19 @@ impl<'db> TypeInferenceBuilder<'db> {
             DefinitionKind::WithItem(with_item) => {
                 self.infer_with_item_definition(with_item.target(), with_item.node(), definition);
             }
+        }
+    }
+
+    fn infer_region_deferred(&mut self, definition: Definition<'db>) {
+        match definition.node(self.db) {
+            DefinitionKind::Function(_function) => {
+                // TODO self.infer_function_deferred(function.node());
+            }
+            DefinitionKind::Class(class) => self.infer_class_deferred(class.node()),
+            DefinitionKind::AnnotatedAssignment(_annotated_assignment) => {
+                // TODO self.infer_annotated_assignment_deferred(annotated_assignment.node());
+            }
+            _ => {}
         }
     }
 
@@ -576,8 +639,19 @@ impl<'db> TypeInferenceBuilder<'db> {
 
         self.types.definitions.insert(definition, class_ty);
 
-        for base in class.bases() {
-            self.infer_expression(base);
+        // inference of bases deferred in stubs
+        if !self.is_stub() {
+            for base in class.bases() {
+                self.infer_expression(base);
+            }
+        }
+    }
+
+    fn infer_class_deferred(&mut self, class: &ast::StmtClassDef) {
+        if self.is_stub() {
+            for base in class.bases() {
+                self.infer_expression(base);
+            }
         }
     }
 
@@ -1669,10 +1743,18 @@ impl<'db> TypeInferenceBuilder<'db> {
 
     fn infer_name_expression(&mut self, name: &ast::ExprName) -> Type<'db> {
         let ast::ExprName { range: _, id, ctx } = name;
+        let file_scope_id = self.scope.file_scope_id(self.db);
+
+        // if we're inferring types of deferred expressions, always treat them as public symbols
+        if self.is_deferred() {
+            let symbols = self.index.symbol_table(file_scope_id);
+            // SAFETY: the symbol table always creates a symbol for every Name node.
+            let symbol = symbols.symbol_id_by_name(id).unwrap();
+            return symbol_ty(self.db, self.scope, symbol);
+        }
 
         match ctx {
             ExprContext::Load => {
-                let file_scope_id = self.scope.file_scope_id(self.db);
                 let use_def = self.index.use_def_map(file_scope_id);
                 let use_id = name.scoped_use_id(self.db, self.scope);
                 let may_be_unbound = use_def.use_may_be_unbound(use_id);
