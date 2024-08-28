@@ -1063,7 +1063,6 @@ impl<'db> TypeInferenceBuilder<'db> {
         // `follow_relative_import_bare_to_module()` and
         // `follow_nonexistent_import_bare_to_module()`.
         let ast::StmtImportFrom { module, level, .. } = import_from;
-        tracing::trace!("Resolving imported object {alias:?} from statement {import_from:?}");
         let module = module.as_deref();
 
         let module_name = if let Some(level) = NonZeroU32::new(*level) {
