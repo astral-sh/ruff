@@ -17,7 +17,7 @@ app = FastAPI()
 router = APIRouter()
 
 
-# Errors
+# Fixable errors
 
 @app.get("/items/")
 def get_items(
@@ -38,6 +38,34 @@ def do_stuff(
     some_form_param: str = Form(),
 ):
     # do stuff
+    pass
+
+@app.get("/users/")
+def get_users(
+    skip: int,
+    limit: int,
+    current_user: User = Depends(get_current_user),
+):
+    pass
+
+@app.get("/users/")
+def get_users(
+    current_user: User = Depends(get_current_user),
+    skip: int = 0,
+    limit: int = 10,
+):
+    pass
+
+
+
+# Non fixable errors
+
+@app.get("/users/")
+def get_users(
+    skip: int = 0,
+    limit: int = 10,
+    current_user: User = Depends(get_current_user),
+):
     pass
 
 
