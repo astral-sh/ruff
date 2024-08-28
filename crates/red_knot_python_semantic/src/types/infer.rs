@@ -1,4 +1,4 @@
-//! We have three Salsa queries for inferring types at three different granularities: scope-level,
+//! We have Salsa queries for inferring types at three different granularities: scope-level,
 //! definition-level, and expression-level.
 //!
 //! Scope-level inference is for when we are actually checking a file, and need to check types for
@@ -11,15 +11,21 @@
 //! allows us to handle import cycles without getting into a cycle of scope-level inference
 //! queries.
 //!
-//! The expression-level inference query is needed in only a few cases. Since an assignment
-//! statement can have multiple targets (via `x = y = z` or unpacking `(x, y) = z`, it can be
-//! associated with multiple definitions. In order to avoid inferring the type of the right-hand
-//! side once per definition, we infer it as a standalone query, so its result will be cached by
-//! Salsa. We also need the expression-level query for inferring types in type guard expressions
-//! (e.g. the test clause of an `if` statement.)
+//! The expression-level inference query is needed in only a few cases. Since some assignments can
+//! have multiple targets (via `x = y = z` or unpacking `(x, y) = z`, they can be associated with
+//! multiple definitions (one per assigned symbol). In order to avoid inferring the type of the
+//! right-hand side once per definition, we infer it as a standalone query, so its result will be
+//! cached by Salsa. We also need the expression-level query for inferring types in type guard
+//! expressions (e.g. the test clause of an `if` statement.)
 //!
 //! Inferring types at any of the three region granularities returns a [`TypeInference`], which
 //! holds types for every [`Definition`] and expression within the inferred region.
+//!
+//! Some type expressions can require deferred evaluation. This includes all type expressions in
+//! stub files, or annotation expressions in modules with `from __future__ import annotations`, or
+//! stringified annotations. We have a fourth Salsa query for inferring the deferred types
+//! associated with a particular definition. Scope-level inference infers deferred types for all
+//! definitions once the rest of the types in the scope have been inferred.
 use std::num::NonZeroU32;
 
 use rustc_hash::FxHashMap;

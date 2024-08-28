@@ -15,7 +15,8 @@ use crate::{Db, FxOrderSet};
 pub(crate) use self::builder::{IntersectionBuilder, UnionBuilder};
 pub(crate) use self::diagnostic::TypeCheckDiagnostics;
 pub(crate) use self::infer::{
-    infer_definition_types, infer_expression_types, infer_scope_types, TypeInference,
+    infer_deferred_types, infer_definition_types, infer_expression_types, infer_scope_types,
+    TypeInference,
 };
 
 mod builder;
@@ -346,13 +347,15 @@ impl<'db> ClassType<'db> {
         let DefinitionKind::Class(class_stmt_node) = self.definition(db).node(db) else {
             panic!("Class type definition must have DefinitionKind::Class");
         };
-        // TODO if there are type params, the bases should be inferred inside that scope (only)
-        let scope = self.definition(db).scope(db);
-        let inference = infer_scope_types(db, scope);
-        class_stmt_node
-            .bases()
-            .iter()
-            .map(move |base_expr| inference.expression_ty(base_expr.scoped_ast_id(db, scope)))
+        let definition = self.definition(db);
+        let inference = if definition.file(db).is_stub(db.upcast()) {
+            infer_deferred_types(db, definition)
+        } else {
+            infer_definition_types(db, definition)
+        };
+        class_stmt_node.bases().iter().map(move |base_expr| {
+            inference.expression_ty(base_expr.scoped_ast_id(db, definition.scope(db)))
+        })
     }
 
     /// Returns the class member of this class named `name`.
