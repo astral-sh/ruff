@@ -177,6 +177,10 @@ impl<'db> TypeInference<'db> {
         self.expressions[&expression]
     }
 
+    pub(crate) fn try_expression_ty(&self, expression: ScopedExpressionId) -> Option<Type<'db>> {
+        self.expressions.get(&expression).copied()
+    }
+
     pub(crate) fn definition_ty(&self, definition: Definition<'db>) -> Type<'db> {
         self.definitions[&definition]
     }
@@ -658,6 +662,7 @@ impl<'db> TypeInferenceBuilder<'db> {
         }
 
         // inference of bases deferred in stubs
+        // TODO also defer stringified generic type parameters
         if !self.is_stub() {
             for base in class.bases() {
                 self.infer_expression(base);

@@ -90,6 +90,24 @@ pub(crate) fn definition_ty<'db>(db: &'db dyn Db, definition: Definition<'db>) -
     inference.definition_ty(definition)
 }
 
+/// Infer the type of a (possibly deferred) sub-expression of a [`Definition`].
+///
+/// ## Panics
+/// If the given expression is not a sub-expression of the given [`Definition`].
+pub(crate) fn definition_expression_ty<'db>(
+    db: &'db dyn Db,
+    definition: Definition<'db>,
+    expression: &ast::Expr,
+) -> Type<'db> {
+    let expr_id = expression.scoped_ast_id(db, definition.scope(db));
+    let inference = infer_definition_types(db, definition);
+    if let Some(ty) = inference.try_expression_ty(expr_id) {
+        ty
+    } else {
+        infer_deferred_types(db, definition).expression_ty(expr_id)
+    }
+}
+
 /// Infer the combined type of an array of [`Definition`]s, plus one optional "unbound type".
 ///
 /// Will return a union if there is more than one definition, or at least one plus an unbound
@@ -344,18 +362,14 @@ impl<'db> ClassType<'db> {
     /// # Panics:
     /// If `definition` is not a `DefinitionKind::Class`.
     pub fn bases(&self, db: &'db dyn Db) -> impl Iterator<Item = Type<'db>> {
-        let DefinitionKind::Class(class_stmt_node) = self.definition(db).node(db) else {
+        let definition = self.definition(db);
+        let DefinitionKind::Class(class_stmt_node) = definition.node(db) else {
             panic!("Class type definition must have DefinitionKind::Class");
         };
-        let definition = self.definition(db);
-        let inference = if definition.file(db).is_stub(db.upcast()) {
-            infer_deferred_types(db, definition)
-        } else {
-            infer_definition_types(db, definition)
-        };
-        class_stmt_node.bases().iter().map(move |base_expr| {
-            inference.expression_ty(base_expr.scoped_ast_id(db, definition.scope(db)))
-        })
+        class_stmt_node
+            .bases()
+            .iter()
+            .map(move |base_expr| definition_expression_ty(db, definition, base_expr))
     }
 
     /// Returns the class member of this class named `name`.
