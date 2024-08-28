@@ -349,7 +349,7 @@ impl<'db> Type<'db> {
     }
 
     #[must_use]
-    pub fn into_instance(&self) -> Type<'db> {
+    pub fn to_instance(&self) -> Type<'db> {
         match self {
             Type::Any => Type::Any,
             Type::Unknown => Type::Unknown,
