@@ -313,9 +313,11 @@ mod tests {
         let db = setup_db();
         let t0 = Type::IntLiteral(0);
         let t1 = Type::IntLiteral(1);
-        let Type::Union(union) = UnionBuilder::new(&db).add(t0).add(t1).build() else {
-            panic!("expected a union");
-        };
+        let union = UnionBuilder::new(&db)
+            .add(t0)
+            .add(t1)
+            .build()
+            .expect_union();
 
         assert_eq!(union.elements_vec(&db), &[t0, t1]);
     }
@@ -380,9 +382,11 @@ mod tests {
         let t1 = Type::IntLiteral(1);
         let t2 = Type::IntLiteral(2);
         let u1 = UnionBuilder::new(&db).add(t0).add(t1).build();
-        let Type::Union(union) = UnionBuilder::new(&db).add(u1).add(t2).build() else {
-            panic!("expected a union");
-        };
+        let union = UnionBuilder::new(&db)
+            .add(u1)
+            .add(t2)
+            .build()
+            .expect_union();
 
         assert_eq!(union.elements_vec(&db), &[t0, t1, t2]);
     }
@@ -402,16 +406,14 @@ mod tests {
         let db = setup_db();
         let t0 = Type::IntLiteral(0);
         let ta = Type::Any;
-        let Type::Intersection(inter) = IntersectionBuilder::new(&db)
+        let intersection = IntersectionBuilder::new(&db)
             .add_positive(ta)
             .add_negative(t0)
             .build()
-        else {
-            panic!("expected to be an intersection");
-        };
+            .expect_intersection();
 
-        assert_eq!(inter.pos_vec(&db), &[ta]);
-        assert_eq!(inter.neg_vec(&db), &[t0]);
+        assert_eq!(intersection.pos_vec(&db), &[ta]);
+        assert_eq!(intersection.neg_vec(&db), &[t0]);
     }
 
     #[test]
@@ -424,16 +426,14 @@ mod tests {
             .add_positive(ta)
             .add_negative(t1)
             .build();
-        let Type::Intersection(inter) = IntersectionBuilder::new(&db)
+        let intersection = IntersectionBuilder::new(&db)
             .add_positive(t2)
             .add_positive(i0)
             .build()
-        else {
-            panic!("expected to be an intersection");
-        };
+            .expect_intersection();
 
-        assert_eq!(inter.pos_vec(&db), &[t2, ta]);
-        assert_eq!(inter.neg_vec(&db), &[t1]);
+        assert_eq!(intersection.pos_vec(&db), &[t2, ta]);
+        assert_eq!(intersection.neg_vec(&db), &[t1]);
     }
 
     #[test]
@@ -446,16 +446,14 @@ mod tests {
             .add_positive(ta)
             .add_negative(t1)
             .build();
-        let Type::Intersection(inter) = IntersectionBuilder::new(&db)
+        let intersection = IntersectionBuilder::new(&db)
             .add_positive(t2)
             .add_negative(i0)
             .build()
-        else {
-            panic!("expected to be an intersection");
-        };
+            .expect_intersection();
 
-        assert_eq!(inter.pos_vec(&db), &[t2, t1]);
-        assert_eq!(inter.neg_vec(&db), &[ta]);
+        assert_eq!(intersection.pos_vec(&db), &[t2, t1]);
+        assert_eq!(intersection.neg_vec(&db), &[ta]);
     }
 
     #[test]
@@ -466,13 +464,11 @@ mod tests {
         let ta = Type::Any;
         let u0 = UnionBuilder::new(&db).add(t0).add(t1).build();
 
-        let Type::Union(union) = IntersectionBuilder::new(&db)
+        let union = IntersectionBuilder::new(&db)
             .add_positive(ta)
             .add_positive(u0)
             .build()
-        else {
-            panic!("expected a union");
-        };
+            .expect_union();
         let [Type::Intersection(i0), Type::Intersection(i1)] = union.elements_vec(&db)[..] else {
             panic!("expected a union of two intersections");
         };

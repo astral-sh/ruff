@@ -463,9 +463,10 @@ impl<'db> TypeInferenceBuilder<'db> {
     }
 
     fn infer_function_type_params(&mut self, function: &ast::StmtFunctionDef) {
-        let Some(type_params) = function.type_params.as_deref() else {
-            panic!("function type params scope without type params");
-        };
+        let type_params = function
+            .type_params
+            .as_deref()
+            .expect("function type params scope without type params");
 
         // TODO: this should also be applied to parameter annotations.
         if !self.is_stub() {
@@ -1398,10 +1399,10 @@ impl<'db> TypeInferenceBuilder<'db> {
             ast::Number::Int(n) => n
                 .as_i64()
                 .map(Type::IntLiteral)
-                .unwrap_or_else(|| builtins_symbol_ty_by_name(self.db, "int").instance()),
-            ast::Number::Float(_) => builtins_symbol_ty_by_name(self.db, "float").instance(),
+                .unwrap_or_else(|| builtins_symbol_ty_by_name(self.db, "int").into_instance()),
+            ast::Number::Float(_) => builtins_symbol_ty_by_name(self.db, "float").into_instance(),
             ast::Number::Complex { .. } => {
-                builtins_symbol_ty_by_name(self.db, "complex").instance()
+                builtins_symbol_ty_by_name(self.db, "complex").into_instance()
             }
         }
     }
@@ -1501,7 +1502,7 @@ impl<'db> TypeInferenceBuilder<'db> {
         }
 
         // TODO generic
-        builtins_symbol_ty_by_name(self.db, "tuple").instance()
+        builtins_symbol_ty_by_name(self.db, "tuple").into_instance()
     }
 
     fn infer_list_expression(&mut self, list: &ast::ExprList) -> Type<'db> {
@@ -1516,7 +1517,7 @@ impl<'db> TypeInferenceBuilder<'db> {
         }
 
         // TODO generic
-        builtins_symbol_ty_by_name(self.db, "list").instance()
+        builtins_symbol_ty_by_name(self.db, "list").into_instance()
     }
 
     fn infer_set_expression(&mut self, set: &ast::ExprSet) -> Type<'db> {
@@ -1527,7 +1528,7 @@ impl<'db> TypeInferenceBuilder<'db> {
         }
 
         // TODO generic
-        builtins_symbol_ty_by_name(self.db, "set").instance()
+        builtins_symbol_ty_by_name(self.db, "set").into_instance()
     }
 
     fn infer_dict_expression(&mut self, dict: &ast::ExprDict) -> Type<'db> {
@@ -1539,7 +1540,7 @@ impl<'db> TypeInferenceBuilder<'db> {
         }
 
         // TODO generic
-        builtins_symbol_ty_by_name(self.db, "dict").instance()
+        builtins_symbol_ty_by_name(self.db, "dict").into_instance()
     }
 
     /// Infer the type of the `iter` expression of the first comprehension.
@@ -1927,22 +1928,22 @@ impl<'db> TypeInferenceBuilder<'db> {
             (Type::IntLiteral(n), Type::IntLiteral(m), ast::Operator::Add) => n
                 .checked_add(m)
                 .map(Type::IntLiteral)
-                .unwrap_or_else(|| builtins_symbol_ty_by_name(self.db, "int").instance()),
+                .unwrap_or_else(|| builtins_symbol_ty_by_name(self.db, "int").into_instance()),
 
             (Type::IntLiteral(n), Type::IntLiteral(m), ast::Operator::Sub) => n
                 .checked_sub(m)
                 .map(Type::IntLiteral)
-                .unwrap_or_else(|| builtins_symbol_ty_by_name(self.db, "int").instance()),
+                .unwrap_or_else(|| builtins_symbol_ty_by_name(self.db, "int").into_instance()),
 
             (Type::IntLiteral(n), Type::IntLiteral(m), ast::Operator::Mult) => n
                 .checked_mul(m)
                 .map(Type::IntLiteral)
-                .unwrap_or_else(|| builtins_symbol_ty_by_name(self.db, "int").instance()),
+                .unwrap_or_else(|| builtins_symbol_ty_by_name(self.db, "int").into_instance()),
 
             (Type::IntLiteral(n), Type::IntLiteral(m), ast::Operator::Div) => n
                 .checked_div(m)
                 .map(Type::IntLiteral)
-                .unwrap_or_else(|| builtins_symbol_ty_by_name(self.db, "int").instance()),
+                .unwrap_or_else(|| builtins_symbol_ty_by_name(self.db, "int").into_instance()),
 
             (Type::IntLiteral(n), Type::IntLiteral(m), ast::Operator::Mod) => n
                 .checked_rem(m)
@@ -2152,7 +2153,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                     name.ctx
                 );
 
-                self.infer_name_expression(name).instance()
+                self.infer_name_expression(name).into_instance()
             }
 
             ast::Expr::NoneLiteral(_literal) => Type::None,
@@ -2328,7 +2329,7 @@ mod tests {
     use crate::semantic_index::definition::Definition;
     use crate::semantic_index::symbol::FileScopeId;
     use crate::semantic_index::{global_scope, semantic_index, symbol_table, use_def_map};
-    use crate::types::{global_symbol_ty_by_name, infer_definition_types, symbol_ty_by_name, Type};
+    use crate::types::{global_symbol_ty_by_name, infer_definition_types, symbol_ty_by_name};
     use crate::{HasTy, ProgramSettings, SemanticModel};
 
     use super::TypeInferenceBuilder;
@@ -2587,9 +2588,7 @@ mod tests {
         let mod_file = system_path_to_file(&db, "src/mod.py").expect("Expected file to exist.");
         let ty = global_symbol_ty_by_name(&db, mod_file, "Sub");
 
-        let Type::Class(class) = ty else {
-            panic!("Sub is not a Class")
-        };
+        let class = ty.expect_class();
 
         let base_names: Vec<_> = class
             .bases(&db)
@@ -2615,19 +2614,11 @@ mod tests {
 
         let mod_file = system_path_to_file(&db, "src/mod.py").unwrap();
         let ty = global_symbol_ty_by_name(&db, mod_file, "C");
-
-        let Type::Class(class_id) = ty else {
-            panic!("C is not a Class");
-        };
-
+        let class_id = ty.expect_class();
         let member_ty = class_id.class_member(&db, &Name::new_static("f"));
-
-        let Type::Function(func) = member_ty else {
-            panic!("C.f is not a Function");
-        };
+        let func = member_ty.expect_function();
 
         assert_eq!(func.name(&db), "f");
-
         Ok(())
     }
 
@@ -2826,11 +2817,7 @@ mod tests {
         db.write_file("src/a.py", "def example() -> int: return 42")?;
 
         let mod_file = system_path_to_file(&db, "src/a.py").unwrap();
-        let ty = global_symbol_ty_by_name(&db, mod_file, "example");
-        let Type::Function(function) = ty else {
-            panic!("example is not a function");
-        };
-
+        let function = global_symbol_ty_by_name(&db, mod_file, "example").expect_function();
         let returns = function.return_type(&db);
         assert_eq!(returns.display(&db).to_string(), "int");
 
@@ -3248,20 +3235,14 @@ mod tests {
 
         let a = system_path_to_file(&db, "src/a.py").expect("Expected file to exist.");
         let c_ty = global_symbol_ty_by_name(&db, a, "C");
-        let Type::Class(c_class) = c_ty else {
-            panic!("C is not a Class")
-        };
+        let c_class = c_ty.expect_class();
         let mut c_bases = c_class.bases(&db);
         let b_ty = c_bases.next().unwrap();
-        let Type::Class(b_class) = b_ty else {
-            panic!("B is not a Class")
-        };
+        let b_class = b_ty.expect_class();
         assert_eq!(b_class.name(&db), "B");
         let mut b_bases = b_class.bases(&db);
         let a_ty = b_bases.next().unwrap();
-        let Type::Class(a_class) = a_ty else {
-            panic!("A is not a Class")
-        };
+        let a_class = a_ty.expect_class();
         assert_eq!(a_class.name(&db), "A");
 
         Ok(())
@@ -3481,9 +3462,7 @@ mod tests {
         // imported builtins module is the same file as the implicit builtins
         let file = system_path_to_file(&db, "/src/a.py").expect("Expected file to exist.");
         let builtins_ty = global_symbol_ty_by_name(&db, file, "builtins");
-        let Type::Module(builtins_file) = builtins_ty else {
-            panic!("Builtins are not a module?");
-        };
+        let builtins_file = builtins_ty.expect_module();
         let implicit_builtins_file = builtins_scope(&db).expect("builtins to exist").file(&db);
         assert_eq!(builtins_file, implicit_builtins_file);
 

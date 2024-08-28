@@ -152,9 +152,9 @@ pub(crate) fn definitions_ty<'db>(
     );
     let mut all_types = unbound_ty.into_iter().chain(def_types);
 
-    let Some(first) = all_types.next() else {
-        panic!("definitions_ty should never be called with zero definitions and no unbound_ty.")
-    };
+    let first = all_types
+        .next()
+        .expect("definitions_ty should never be called with zero definitions and no unbound_ty.");
 
     if let Some(second) = all_types.next() {
         let mut builder = UnionBuilder::new(db);
@@ -171,7 +171,7 @@ pub(crate) fn definitions_ty<'db>(
 }
 
 /// Unique ID for a type.
-#[derive(Copy, Clone, Debug, PartialOrd, Ord, PartialEq, Eq, Hash)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash, is_macro::Is)]
 pub enum Type<'db> {
     /// the dynamic type: a statically-unknown set of values
     Any,
@@ -212,18 +212,6 @@ pub enum Type<'db> {
 }
 
 impl<'db> Type<'db> {
-    pub const fn is_unbound(&self) -> bool {
-        matches!(self, Type::Unbound)
-    }
-
-    pub const fn is_unknown(&self) -> bool {
-        matches!(self, Type::Unknown)
-    }
-
-    pub const fn is_never(&self) -> bool {
-        matches!(self, Type::Never)
-    }
-
     /// Returns `true` if this type should be displayed as a literal value.
     pub const fn is_literal(&self) -> bool {
         matches!(
@@ -361,7 +349,7 @@ impl<'db> Type<'db> {
     }
 
     #[must_use]
-    pub fn instance(&self) -> Type<'db> {
+    pub fn into_instance(&self) -> Type<'db> {
         match self {
             Type::Any => Type::Any,
             Type::Unknown => Type::Unknown,
