@@ -27,14 +27,14 @@ use crate::checkers::ast::Checker;
 ///
 /// ## Example
 ///
-/// ```python
+/// ```pyi
 /// class Foo:
 ///     def __eq__(self, obj: typing.Any) -> bool: ...
 /// ```
 ///
 /// Use instead:
 ///
-/// ```python
+/// ```pyi
 /// class Foo:
 ///     def __eq__(self, obj: object) -> bool: ...
 /// ```

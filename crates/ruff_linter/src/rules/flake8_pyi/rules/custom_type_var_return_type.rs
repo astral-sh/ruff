@@ -25,27 +25,22 @@ use crate::checkers::ast::Checker;
 ///
 /// ## Example
 ///
-/// ```python
+/// ```pyi
 /// class Foo:
 ///     def __new__(cls: type[_S], *args: str, **kwargs: int) -> _S: ...
-///
 ///     def foo(self: _S, arg: bytes) -> _S: ...
-///
 ///     @classmethod
 ///     def bar(cls: type[_S], arg: int) -> _S: ...
 /// ```
 ///
 /// Use instead:
 ///
-/// ```python
+/// ```pyi
 /// from typing import Self
-///
 ///
 /// class Foo:
 ///     def __new__(cls, *args: str, **kwargs: int) -> Self: ...
-///
 ///     def foo(self, arg: bytes) -> Self: ...
-///
 ///     @classmethod
 ///     def bar(cls, arg: int) -> Self: ...
 /// ```

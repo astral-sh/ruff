@@ -17,19 +17,17 @@ use crate::registry::Rule;
 /// For example, comparing against a string can lead to unexpected behavior.
 ///
 /// ## Example
-/// ```python
+/// ```pyi
 /// import sys
 ///
-/// if sys.version_info[0] == "2":
-///     ...
+/// if sys.version_info[0] == "2": ...
 /// ```
 ///
 /// Use instead:
-/// ```python
+/// ```pyi
 /// import sys
 ///
-/// if sys.version_info[0] == 2:
-///     ...
+/// if sys.version_info[0] == 2: ...
 /// ```
 ///
 /// ## References
@@ -58,19 +56,17 @@ impl Violation for UnrecognizedVersionInfoCheck {
 /// and minor versions.
 ///
 /// ## Example
-/// ```python
+/// ```pyi
 /// import sys
 ///
-/// if sys.version_info >= (3, 4, 3):
-///     ...
+/// if sys.version_info >= (3, 4, 3): ...
 /// ```
 ///
 /// Use instead:
-/// ```python
+/// ```pyi
 /// import sys
 ///
-/// if sys.version_info >= (3, 4):
-///     ...
+/// if sys.version_info >= (3, 4): ...
 /// ```
 ///
 /// ## References
@@ -96,19 +92,17 @@ impl Violation for PatchVersionComparison {
 /// behavior.
 ///
 /// ## Example
-/// ```python
+/// ```pyi
 /// import sys
 ///
-/// if sys.version_info[:2] == (3,):
-///     ...
+/// if sys.version_info[:2] == (3,): ...
 /// ```
 ///
 /// Use instead:
-/// ```python
+/// ```pyi
 /// import sys
 ///
-/// if sys.version_info[0] == 3:
-///     ...
+/// if sys.version_info[0] == 3: ...
 /// ```
 ///
 /// ## References

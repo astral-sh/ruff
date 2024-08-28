@@ -16,7 +16,7 @@ use crate::checkers::ast::Checker;
 ///
 /// ## Example
 ///
-/// ```python
+/// ```pyi
 /// def function():
 ///     x = 1
 ///     y = 2
@@ -25,7 +25,7 @@ use crate::checkers::ast::Checker;
 ///
 /// Use instead:
 ///
-/// ```python
+/// ```pyi
 /// def function(): ...
 /// ```
 #[violation]

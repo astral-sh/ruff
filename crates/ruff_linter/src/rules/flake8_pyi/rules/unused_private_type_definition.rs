@@ -16,7 +16,7 @@ use crate::checkers::ast::Checker;
 /// should either be used, made public, or removed to avoid confusion.
 ///
 /// ## Example
-/// ```python
+/// ```pyi
 /// import typing
 /// import typing_extensions
 ///
@@ -50,9 +50,8 @@ impl Violation for UnusedPrivateTypeVar {
 ///
 /// ## Example
 ///
-/// ```python
+/// ```pyi
 /// import typing
-///
 ///
 /// class _PrivateProtocol(typing.Protocol):
 ///     foo: int
@@ -60,13 +59,11 @@ impl Violation for UnusedPrivateTypeVar {
 ///
 /// Use instead:
 ///
-/// ```python
+/// ```pyi
 /// import typing
-///
 ///
 /// class _PrivateProtocol(typing.Protocol):
 ///     foo: int
-///
 ///
 /// def func(arg: _PrivateProtocol) -> None: ...
 /// ```
@@ -93,7 +90,7 @@ impl Violation for UnusedPrivateProtocol {
 ///
 /// ## Example
 ///
-/// ```python
+/// ```pyi
 /// import typing
 ///
 /// _UnusedTypeAlias: typing.TypeAlias = int
@@ -101,11 +98,10 @@ impl Violation for UnusedPrivateProtocol {
 ///
 /// Use instead:
 ///
-/// ```python
+/// ```pyi
 /// import typing
 ///
 /// _UsedTypeAlias: typing.TypeAlias = int
-///
 ///
 /// def func(arg: _UsedTypeAlias) -> _UsedTypeAlias: ...
 /// ```
@@ -132,9 +128,8 @@ impl Violation for UnusedPrivateTypeAlias {
 ///
 /// ## Example
 ///
-/// ```python
+/// ```pyi
 /// import typing
-///
 ///
 /// class _UnusedPrivateTypedDict(typing.TypedDict):
 ///     foo: list[int]
@@ -142,13 +137,11 @@ impl Violation for UnusedPrivateTypeAlias {
 ///
 /// Use instead:
 ///
-/// ```python
+/// ```pyi
 /// import typing
-///
 ///
 /// class _UsedPrivateTypedDict(typing.TypedDict):
 ///     foo: set[str]
-///
 ///
 /// def func(arg: _UsedPrivateTypedDict) -> _UsedPrivateTypedDict: ...
 /// ```

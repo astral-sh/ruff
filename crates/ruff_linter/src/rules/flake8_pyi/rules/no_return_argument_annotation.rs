@@ -22,14 +22,14 @@ use crate::settings::types::PythonVersion::Py311;
 /// members).
 ///
 /// ## Example
-/// ```python
+/// ```pyi
 /// from typing import NoReturn
 ///
 /// def foo(x: NoReturn): ...
 /// ```
 ///
 /// Use instead:
-/// ```python
+/// ```pyi
 /// from typing import Never
 ///
 /// def foo(x: Never): ...

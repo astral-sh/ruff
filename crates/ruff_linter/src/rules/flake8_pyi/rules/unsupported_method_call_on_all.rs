@@ -16,7 +16,7 @@ use crate::checkers::ast::Checker;
 /// `__all__`, which is known to be supported by all major type checkers.
 ///
 /// ## Example
-/// ```python
+/// ```pyi
 /// import sys
 ///
 /// __all__ = ["A", "B"]
@@ -29,7 +29,7 @@ use crate::checkers::ast::Checker;
 /// ```
 ///
 /// Use instead:
-/// ```python
+/// ```pyi
 /// import sys
 ///
 /// __all__ = ["A"]
