@@ -1365,8 +1365,12 @@ impl<'db> TypeInferenceBuilder<'db> {
             _ => Type::Unknown, // TODO: this needs to error?
         };
 
+        let expr_id = expression.scoped_ast_id(self.db, self.scope);
+        self.types.expressions.insert(expr_id, ty);
+
         ty
     }
+
     fn infer_type_expression(&mut self, expression: &ast::Expr) -> Type<'db> {
         // https://typing.readthedocs.io/en/latest/spec/annotations.html#grammar-token-expression-grammar-type_expression
         // TODO: this does not include any of the special forms, and is only a
