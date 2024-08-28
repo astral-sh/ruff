@@ -645,6 +645,10 @@ impl<'db> TypeInferenceBuilder<'db> {
 
         self.types.definitions.insert(definition, class_ty);
 
+        for keyword in class.keywords() {
+            self.infer_expression(&keyword.value);
+        }
+
         // inference of bases deferred in stubs
         if !self.is_stub() {
             for base in class.bases() {
