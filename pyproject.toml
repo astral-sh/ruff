@@ -132,5 +132,8 @@ dev-dependencies = [
     # and `check_docs_formatted.py`
 ]
 
+# No need to build Ruff from source just to run our development scripts
+package = false
+
 [tool.uv.workspace]
 members = []

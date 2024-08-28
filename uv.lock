@@ -150,7 +150,7 @@ wheels = [
 [[package]]
 name = "ruff"
 version = "0.6.2"
-source = { editable = "." }
+source = { virtual = "." }
 
 [package.dev-dependencies]
 dev = [
