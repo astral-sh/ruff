@@ -97,8 +97,8 @@ pub(crate) fn fastapi_non_annotated_dependency(
             updatable_count += 1;
             // Determine if it's safe to update this parameter:
             // - if all parameters are updatable its safe.
-            // - if we've encountered a non-updatable parameter with a default value, its no longer
-            // safe. (https://github.com/astral-sh/ruff/issues/12982)
+            // - if we've encountered a non-updatable parameter with a default value, it's no longer
+            //   safe. (https://github.com/astral-sh/ruff/issues/12982)
             let safe_to_update = updatable_count == total_params || !has_non_updatable_default;
             create_diagnostic(checker, parameter, safe_to_update);
         } else if parameter.default.is_some() {
