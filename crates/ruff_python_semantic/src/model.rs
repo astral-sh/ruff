@@ -2241,6 +2241,8 @@ bitflags! {
         /// ```python
         /// def f(x: Annotated[int, "A"]): ...
         /// ```
+        ///
+        ///  [PEP 593]: https://peps.python.org/pep-0593/
         const TYPING_ANNOTATED_PEP593 = 1<<27;
 
         /// The context is in any type annotation.
