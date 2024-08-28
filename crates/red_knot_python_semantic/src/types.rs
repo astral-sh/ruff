@@ -339,7 +339,7 @@ pub struct FunctionType<'db> {
     /// types of all decorators on this function
     decorators: Vec<Type<'db>>,
 
-    /// return type for this function
+    /// annotated return type for this function, if any
     returns: Option<Type<'db>>,
 }
 
