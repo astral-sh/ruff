@@ -8,6 +8,7 @@ use salsa::{Durability, Setter};
 pub use file_root::{FileRoot, FileRootKind};
 pub use path::FilePath;
 use ruff_notebook::{Notebook, NotebookError};
+use ruff_python_ast::PySourceType;
 
 use crate::file_revision::FileRevision;
 use crate::files::file_root::FileRoots;
@@ -429,7 +430,7 @@ impl File {
     pub fn is_stub(self, db: &dyn Db) -> bool {
         self.path(db)
             .extension()
-            .is_some_and(|extension| extension == "pyi")
+            .is_some_and(|extension| PySourceType::from_extension(extension).is_stub())
     }
 }
 
