@@ -1758,8 +1758,9 @@ impl<'db> TypeInferenceBuilder<'db> {
         // if we're inferring types of deferred expressions, always treat them as public symbols
         if self.is_deferred() {
             let symbols = self.index.symbol_table(file_scope_id);
-            // SAFETY: the symbol table always creates a symbol for every Name node.
-            let symbol = symbols.symbol_id_by_name(id).unwrap();
+            let symbol = symbols
+                .symbol_id_by_name(id)
+                .expect("Expected the symbol table to create a symbol for every Name node");
             return symbol_ty(self.db, self.scope, symbol);
         }
 
