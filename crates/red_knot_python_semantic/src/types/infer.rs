@@ -167,6 +167,9 @@ pub(crate) struct TypeInference<'db> {
 
     /// The diagnostics for this region.
     diagnostics: TypeCheckDiagnostics,
+
+    /// Are there deferred type expressions in this region?
+    has_deferred: bool,
 }
 
 impl<'db> TypeInference<'db> {
@@ -285,6 +288,7 @@ impl<'db> TypeInferenceBuilder<'db> {
         self.types.definitions.extend(inference.definitions.iter());
         self.types.expressions.extend(inference.expressions.iter());
         self.types.diagnostics.extend(&inference.diagnostics);
+        self.types.has_deferred |= inference.has_deferred;
     }
 
     /// Are we currently inferring types in a stub file?
@@ -337,15 +341,19 @@ impl<'db> TypeInferenceBuilder<'db> {
             }
         }
 
-        let mut deferred_expression_types: FxHashMap<ScopedExpressionId, Type<'db>> =
-            FxHashMap::default();
-        for definition in self.types.definitions.keys() {
-            let deferred = infer_deferred_types(self.db, *definition);
-            deferred_expression_types.extend(deferred.expressions.iter());
+        if self.types.has_deferred {
+            let mut deferred_expression_types: FxHashMap<ScopedExpressionId, Type<'db>> =
+                FxHashMap::default();
+            for definition in self.types.definitions.keys() {
+                if infer_definition_types(self.db, *definition).has_deferred {
+                    let deferred = infer_deferred_types(self.db, *definition);
+                    deferred_expression_types.extend(deferred.expressions.iter());
+                }
+            }
+            self.types
+                .expressions
+                .extend(deferred_expression_types.iter());
         }
-        self.types
-            .expressions
-            .extend(deferred_expression_types.iter());
     }
 
     fn infer_region_definition(&mut self, definition: Definition<'db>) {
@@ -659,6 +667,7 @@ impl<'db> TypeInferenceBuilder<'db> {
 
     fn infer_class_deferred(&mut self, class: &ast::StmtClassDef) {
         if self.is_stub() {
+            self.types.has_deferred = true;
             for base in class.bases() {
                 self.infer_expression(base);
             }
