@@ -169,7 +169,7 @@ dev = [
     { name = "pysource-minimize" },
     { name = "rich-argparse" },
     { name = "ruff" },
-    { name = "stdlibs", specifier = ">=2022.10.9" },
+    { name = "stdlibs" },
     { name = "termcolor" },
 ]
 

@@ -118,7 +118,7 @@ version_files = [
 # version of the dependency installed wouldn't be recorded in `uv.lock`.
 dev-dependencies = [
     # Required by `generate_known_standard_library.py`
-    "stdlibs>=2022.10.9",
+    "stdlibs>=2024.1.28",
     # Required by `fuzz-parser.py
     "pysource-codegen",
     "pysource-minimize",
