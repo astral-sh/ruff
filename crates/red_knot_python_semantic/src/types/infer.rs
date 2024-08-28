@@ -423,9 +423,7 @@ impl<'db> TypeInferenceBuilder<'db> {
 
     fn infer_region_deferred(&mut self, definition: Definition<'db>) {
         match definition.node(self.db) {
-            DefinitionKind::Function(_function) => {
-                // TODO self.infer_function_deferred(function.node());
-            }
+            DefinitionKind::Function(function) => self.infer_function_deferred(function.node()),
             DefinitionKind::Class(class) => self.infer_class_deferred(class.node()),
             DefinitionKind::AnnotatedAssignment(_annotated_assignment) => {
                 // TODO self.infer_annotated_assignment_deferred(annotated_assignment.node());
@@ -554,18 +552,19 @@ impl<'db> TypeInferenceBuilder<'db> {
 
         // If there are type params, parameters and returns are evaluated in that scope, that is, in
         // `infer_function_type_params`, rather than here.
-        let returns_ty = if type_params.is_none() {
+        if type_params.is_none() {
             self.infer_parameters(parameters);
-            self.infer_optional_annotation_expression(returns.as_deref())
-        } else {
-            None
-        };
+
+            if !self.is_stub() {
+                self.infer_optional_annotation_expression(returns.as_deref());
+            }
+        }
 
         let function_ty = Type::Function(FunctionType::new(
             self.db,
             name.id.clone(),
+            definition,
             decorator_tys,
-            returns_ty,
         ));
 
         self.types.definitions.insert(definition, function_ty);
@@ -677,6 +676,13 @@ impl<'db> TypeInferenceBuilder<'db> {
             for base in class.bases() {
                 self.infer_expression(base);
             }
+        }
+    }
+
+    fn infer_function_deferred(&mut self, function: &ast::StmtFunctionDef) {
+        if self.is_stub() {
+            self.types.has_deferred = true;
+            self.infer_optional_annotation_expression(function.returns.as_deref());
         }
     }
 
@@ -1372,6 +1378,10 @@ impl<'db> TypeInferenceBuilder<'db> {
         };
 
         let expr_id = expression.scoped_ast_id(self.db, self.scope);
+        tracing::trace!(
+            expr_id = expr_id.as_u32(),
+            ty = ty.display(self.db).to_string(),
+        );
         self.types.expressions.insert(expr_id, ty);
 
         ty
