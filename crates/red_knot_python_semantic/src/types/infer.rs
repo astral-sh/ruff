@@ -77,6 +77,7 @@ fn infer_definition_types_cycle_recovery<'db>(
     _cycle: &salsa::Cycle,
     input: Definition<'db>,
 ) -> TypeInference<'db> {
+    tracing::trace!("infer_definition_types_cycle_recovery");
     let mut inference = TypeInference::default();
     inference.definitions.insert(input, Type::Unknown);
     inference
@@ -316,6 +317,8 @@ impl<'db> TypeInferenceBuilder<'db> {
     }
 
     fn infer_region_scope(&mut self, scope: ScopeId<'db>) {
+        let _span = tracing::trace_span!("infer_region_scope").entered();
+
         let node = scope.node(self.db);
         match node {
             NodeWithScopeKind::Module => {
@@ -1308,6 +1311,8 @@ impl<'db> TypeInferenceBuilder<'db> {
         &mut self,
         expr: Option<&ast::Expr>,
     ) -> Option<Type<'db>> {
+        let _span =
+            tracing::trace_span!("infer_optional_annotation_expression", expr=?expr).entered();
         expr.map(|expr| self.infer_annotation_expression(expr))
     }
 
@@ -1356,6 +1361,7 @@ impl<'db> TypeInferenceBuilder<'db> {
     }
 
     fn infer_annotation_expression(&mut self, expression: &ast::Expr) -> Type<'db> {
+        let _span = tracing::trace_span!("infer_annotation_expression").entered();
         // https://typing.readthedocs.io/en/latest/spec/annotations.html#grammar-token-expression-grammar-annotation_expression
         let ty = match expression {
             // type_expression is responsible for returning an error in the case
@@ -1375,6 +1381,9 @@ impl<'db> TypeInferenceBuilder<'db> {
         // https://typing.readthedocs.io/en/latest/spec/annotations.html#grammar-token-expression-grammar-type_expression
         // TODO: this does not include any of the special forms, and is only a
         //   stub of the forms other than a standalone name in scope.
+
+        let _span = tracing::trace_span!("infer_type_expression").entered();
+
         match expression {
             ast::Expr::Name(name) => {
                 debug_assert!(
@@ -1382,7 +1391,10 @@ impl<'db> TypeInferenceBuilder<'db> {
                     "name in a type expression is always 'load' but got: '{:?}'",
                     name.ctx
                 );
-                self.infer_name_expression(name).instance()
+
+                let instance = self.infer_name_expression(name).instance();
+                tracing::trace!(instance = instance.display(self.db).to_string(), name=?name);
+                instance
             }
 
             _ => Type::Unknown, // TODO
@@ -1814,6 +1826,8 @@ impl<'db> TypeInferenceBuilder<'db> {
 
     fn infer_name_expression(&mut self, name: &ast::ExprName) -> Type<'db> {
         let ast::ExprName { range: _, id, ctx } = name;
+        let _span = tracing::trace_span!("infer_name_expression", id=?id, ctx=?ctx).entered();
+
         let file_scope_id = self.scope.file_scope_id(self.db);
 
         // if we're inferring types of deferred expressions, always treat them as public symbols
