@@ -1377,7 +1377,7 @@ impl<'db> TypeInferenceBuilder<'db> {
         //   stub of the forms other than a standalone name in scope.
         match expression {
             ast::Expr::Name(name) => {
-                assert!(
+                debug_assert!(
                     name.ctx.is_load(),
                     "name in a type expression is always 'load' but got: '{:?}'",
                     name.ctx
