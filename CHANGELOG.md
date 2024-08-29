@@ -1,5 +1,27 @@
 # Changelog
 
+## 0.6.3
+
+### Preview features
+
+- \[`flake8-simplify`\] Extend `open-file-with-context-handler` to work with `dbm.sqlite3` (`SIM115`) ([#13104](https://github.com/astral-sh/ruff/pull/13104))
+- \[`pycodestyle`\] Disable `E741` in stub files (`.pyi`) ([#13119](https://github.com/astral-sh/ruff/pull/13119))
+- \[`pydoclint`\] Avoid `DOC201` on explicit returns in functions that only return `None` ([#13064](https://github.com/astral-sh/ruff/pull/13064))
+
+### Rule changes
+
+- \[`flake8-async`\] Disable check for `asyncio` before Python 3.11 (`ASYNC109`) ([#13023](https://github.com/astral-sh/ruff/pull/13023))
+
+### Bug fixes
+
+- \[`FastAPI`\] Avoid introducing invalid syntax in fix for `fast-api-non-annotated-dependency` (`FAST002`) ([#13133](https://github.com/astral-sh/ruff/pull/13133))
+- \[`flake8-implicit-str-concat`\] Normalize octals before merging concatenated strings in `single-line-implicit-string-concatenation` (`ISC001`) ([#13118](https://github.com/astral-sh/ruff/pull/13118))
+- \[`flake8-pytest-style`\] Improve help message for `pytest-incorrect-mark-parentheses-style` (`PT023`) ([#13092](https://github.com/astral-sh/ruff/pull/13092))
+- \[`pylint`\] Avoid autofix for calls that aren't `min` or `max` as starred expression (`PLW3301`) ([#13089](https://github.com/astral-sh/ruff/pull/13089))
+- \[`ruff`\] Add `datetime.time`, `datetime.tzinfo`, and `datetime.timezone` as immutable function calls (`RUF009`) ([#13109](https://github.com/astral-sh/ruff/pull/13109))
+- \[`ruff`\] Extend comment deletion for `RUF100` to include trailing text from `noqa` directives while preserving any following comments on the same line, if any ([#13105](https://github.com/astral-sh/ruff/pull/13105))
+- Fix dark theme on initial page load for the Ruff playground ([#13077](https://github.com/astral-sh/ruff/pull/13077))
+
 ## 0.6.2
 
 ### Preview features
