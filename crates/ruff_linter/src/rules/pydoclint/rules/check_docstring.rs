@@ -736,8 +736,12 @@ fn generator_yield_annotation<'a>(expr: &'a Expr, checker: &'a Checker) -> Optio
             .segments(),
         [
             "typing" | "typing_extensions",
-            "Generator" | "AsyncGenerator"
-        ] | ["collections", "abc", "Generator" | "AsyncGenerator"]
+            "Generator" | "AsyncGenerator" | "Iterator" | "AsyncIterator"
+        ] | [
+            "collections",
+            "abc",
+            "Generator" | "AsyncGenerator" | "Iterator" | "AsyncIterator"
+        ]
     ) {
         return slice.elts.first();
     }
