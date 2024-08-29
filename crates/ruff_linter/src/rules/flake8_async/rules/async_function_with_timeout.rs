@@ -11,10 +11,18 @@ use crate::settings::types::PythonVersion;
 /// ## What it does
 /// Checks for `async` functions with a `timeout` argument.
 ///
+/// This rule is only applied for Python 3.11 and newer,
+/// as `asyncio.timeout` was added in Python 3.11.
+///
 /// ## Why is this bad?
 /// Rather than implementing asynchronous timeout behavior manually, prefer
-/// built-in timeout functionality, such as `asyncio.timeout`, `trio.fail_after`,
-/// or `anyio.move_on_after`, among others.
+/// built-in timeout functionality, such as `asyncio.timeout`,
+/// `trio.fail_after`, or `anyio.move_on_after`, among others.
+///
+/// If you are abstracting `asyncio` within a function
+/// that internally utilizes `asyncio.timeout`,
+/// this rule can be disabled, or use a more specific timeout name
+/// such as `your_behavior_timeout`.
 ///
 /// ## Example
 ///
