@@ -103,13 +103,7 @@ conflicts with the isort rules, like `I001`).
 
 Beyond the rule set, Ruff's primary limitation vis-à-vis Flake8 is that it does not support custom
 lint rules. (Instead, popular Flake8 plugins are re-implemented in Rust as part of Ruff itself.)
-
-There are a few other minor incompatibilities between Ruff and the originating Flake8 plugins:
-
-- Ruff doesn't implement all the "opinionated" lint rules from flake8-bugbear.
-- Depending on your project structure, Ruff and isort can differ in their detection of first-party
-    code. (This is often solved by modifying the `src` property, e.g., to `src = ["src"]`, if your
-    code is nested in a `src` directory.)
+One minor difference is that Ruff doesn't include all the 'opinionated' rules from flake8-bugbear.
 
 ## How does Ruff's linter compare to Pylint?
 
