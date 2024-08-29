@@ -461,7 +461,12 @@ impl<'db> TypeInferenceBuilder<'db> {
         let Some(type_params) = function.type_params.as_deref() else {
             panic!("function type params scope without type params");
         };
-        self.infer_optional_expression(function.returns.as_deref());
+
+        // TODO: this should also be applied to type parameters and parameters.
+        if !self.is_stub() {
+            self.infer_optional_expression(function.returns.as_deref());
+        }
+
         self.infer_type_parameters(type_params);
         self.infer_parameters(&function.parameters);
     }
@@ -555,6 +560,7 @@ impl<'db> TypeInferenceBuilder<'db> {
         if type_params.is_none() {
             self.infer_parameters(parameters);
 
+            // TODO: this should also be applied to parameters.
             if !self.is_stub() {
                 self.infer_optional_annotation_expression(returns.as_deref());
             }
