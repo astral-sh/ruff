@@ -180,11 +180,11 @@ pub(crate) fn implicit_optional(checker: &mut Checker, parameters: &Parameters) 
 
         if let Expr::StringLiteral(string_expr) = annotation.as_ref() {
             // Quoted annotation.
-            if let Ok((parsed_annotation, kind)) =
+            if let Ok(parsed_annotation) =
                 parse_type_annotation(string_expr, checker.locator().contents())
             {
                 let Some(expr) = type_hint_explicitly_allows_none(
-                    parsed_annotation.expr(),
+                    parsed_annotation.expression(),
                     checker.semantic(),
                     checker.locator(),
                     checker.settings.target_version.minor(),
@@ -195,7 +195,7 @@ pub(crate) fn implicit_optional(checker: &mut Checker, parameters: &Parameters) 
 
                 let mut diagnostic =
                     Diagnostic::new(ImplicitOptional { conversion_type }, expr.range());
-                if kind.is_simple() {
+                if parsed_annotation.kind().is_simple() {
                     diagnostic.try_set_fix(|| generate_fix(checker, conversion_type, expr));
                 }
                 checker.diagnostics.push(diagnostic);

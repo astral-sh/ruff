@@ -116,9 +116,9 @@ impl<'a> TypingTarget<'a> {
                 string_expr,
                 locator.contents(),
             )
-            .map_or(None, |(parsed_annotation, _)| {
+            .map_or(None, |parsed_annotation| {
                 Some(TypingTarget::ForwardReference(
-                    parsed_annotation.into_expr(),
+                    parsed_annotation.into_expression(),
                 ))
             }),
             _ => semantic.resolve_qualified_name(expr).map_or(

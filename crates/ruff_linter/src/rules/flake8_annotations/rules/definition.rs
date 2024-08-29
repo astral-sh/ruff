@@ -514,11 +514,11 @@ fn check_dynamically_typed<F>(
 {
     if let Expr::StringLiteral(string_expr) = annotation {
         // Quoted annotations
-        if let Ok((parsed_annotation, _)) =
+        if let Ok(parsed_annotation) =
             parse_type_annotation(string_expr, checker.locator().contents())
         {
             if type_hint_resolves_to_any(
-                parsed_annotation.expr(),
+                parsed_annotation.expression(),
                 checker.semantic(),
                 checker.locator(),
                 checker.settings.target_version.minor(),
