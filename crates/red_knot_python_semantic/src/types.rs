@@ -100,6 +100,7 @@ pub(crate) fn definition_expression_ty<'db>(
     expression: &ast::Expr,
 ) -> Type<'db> {
     let expr_id = expression.scoped_ast_id(db, definition.scope(db));
+
     let inference = infer_definition_types(db, definition);
     if let Some(ty) = inference.try_expression_ty(expr_id) {
         ty

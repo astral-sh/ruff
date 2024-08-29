@@ -178,10 +178,12 @@ impl<'db> TypeInference<'db> {
         self.expressions[&expression]
     }
 
+    #[tracing::instrument(skip_all)]
     pub(crate) fn try_expression_ty(&self, expression: ScopedExpressionId) -> Option<Type<'db>> {
         self.expressions.get(&expression).copied()
     }
 
+    #[tracing::instrument(skip(self))]
     pub(crate) fn definition_ty(&self, definition: Definition<'db>) -> Type<'db> {
         self.definitions[&definition]
     }
@@ -190,6 +192,7 @@ impl<'db> TypeInference<'db> {
         &self.diagnostics
     }
 
+    #[tracing::instrument(skip_all)]
     fn shrink_to_fit(&mut self) {
         self.expressions.shrink_to_fit();
         self.definitions.shrink_to_fit();
@@ -420,6 +423,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                 self.infer_with_item_definition(with_item.target(), with_item.node(), definition);
             }
         }
+        tracing::trace!("finished inferring definition");
     }
 
     #[tracing::instrument(skip_all)]
@@ -613,7 +617,7 @@ impl<'db> TypeInferenceBuilder<'db> {
             default: _,
         } = parameter_with_default;
 
-        self.infer_optional_expression(parameter.annotation.as_deref());
+        self.infer_optional_annotation_expression(parameter.annotation.as_deref());
 
         self.infer_definition(parameter_with_default);
     }
@@ -702,6 +706,7 @@ impl<'db> TypeInferenceBuilder<'db> {
         }
     }
 
+    #[tracing::instrument(skip(self))]
     fn infer_function_deferred(&mut self, function: &ast::StmtFunctionDef) {
         if self.is_stub() {
             self.types.has_deferred = true;
@@ -1342,7 +1347,7 @@ impl<'db> TypeInferenceBuilder<'db> {
     ) -> Option<Type<'db>> {
         let _span =
             tracing::trace_span!("infer_optional_annotation_expression", expr=?expr).entered();
-        expr.map(|expr| self.infer_annotation_expression(expr))
+        expr.map(|expr| self.annotation_expression(expr))
     }
 
     fn infer_expression(&mut self, expression: &ast::Expr) -> Type<'db> {
@@ -1389,50 +1394,6 @@ impl<'db> TypeInferenceBuilder<'db> {
         ty
     }
 
-    fn infer_annotation_expression(&mut self, expression: &ast::Expr) -> Type<'db> {
-        let _span = tracing::trace_span!("infer_annotation_expression").entered();
-        // https://typing.readthedocs.io/en/latest/spec/annotations.html#grammar-token-expression-grammar-annotation_expression
-        let ty = match expression {
-            // type_expression is responsible for returning an error in the case
-            // that the name is somehow in an invalid context.
-            name @ ast::Expr::Name(..) => self.infer_type_expression(name),
-            // TODO Remaining forms from grammar
-            _ => Type::Unknown, // TODO: this needs to error?
-        };
-
-        let expr_id = expression.scoped_ast_id(self.db, self.scope);
-        tracing::trace!(
-            expr_id = expr_id.as_u32(),
-            ty = ty.display(self.db).to_string(),
-        );
-        self.types.expressions.insert(expr_id, ty);
-
-        ty
-    }
-
-    fn infer_type_expression(&mut self, expression: &ast::Expr) -> Type<'db> {
-        // https://typing.readthedocs.io/en/latest/spec/annotations.html#grammar-token-expression-grammar-type_expression
-        // TODO: this does not include any of the special forms, and is only a
-        //   stub of the forms other than a standalone name in scope.
-
-        let _span = tracing::trace_span!("infer_type_expression").entered();
-
-        match expression {
-            ast::Expr::Name(name) => {
-                debug_assert!(
-                    name.ctx.is_load(),
-                    "name in a type expression is always 'load' but got: '{:?}'",
-                    name.ctx
-                );
-
-                let instance = self.infer_name_expression(name).instance();
-                tracing::trace!(instance = instance.display(self.db).to_string(), name=?name);
-                instance
-            }
-
-            _ => Type::Unknown, // TODO
-        }
-    }
     fn infer_number_literal_expression(&mut self, literal: &ast::ExprNumberLiteral) -> Type<'db> {
         let ast::ExprNumberLiteral { range: _, value } = literal;
 
@@ -2150,6 +2111,293 @@ impl<'db> TypeInferenceBuilder<'db> {
         self.infer_region();
         self.types.shrink_to_fit();
         self.types
+    }
+}
+
+/// Annotation expressions.
+impl<'db> TypeInferenceBuilder<'db> {
+    fn annotation_expression(&mut self, expression: &ast::Expr) -> Type<'db> {
+        let _span = tracing::trace_span!(
+            "infer_annotation_expression",
+            expr = ?expression
+        )
+        .entered();
+        // https://typing.readthedocs.io/en/latest/spec/annotations.html#grammar-token-expression-grammar-annotation_expression
+        let ty = match expression {
+            // Forms which are possibly valid type expressions.
+            type_expr @ (ast::Expr::NoneLiteral(..) | ast::Expr::Name(..)) => {
+                self.type_expression(type_expr)
+            }
+
+            // NOTE: This section is presently identical with the corresponding section in the type
+            // expressions implementation, but they may diverge from each other in the future,
+            // especially after the introduction of special forms.
+            //
+            // Forms which are invalid in the context of annotation expressions: we infer their
+            // nested expressions as normal expressions, but the type of the top-level expression is
+            // always `Type::Unknown` in these cases.
+            ast::Expr::BoolOp(bool_op) => {
+                self.infer_boolean_expression(bool_op);
+                Type::Unknown
+            }
+            ast::Expr::Named(named) => {
+                self.infer_named_expression(named);
+                Type::Unknown
+            }
+            ast::Expr::BinOp(binary) => {
+                self.infer_binary_expression(binary);
+                Type::Unknown
+            }
+            ast::Expr::UnaryOp(unary) => {
+                self.infer_unary_expression(unary);
+                Type::Unknown
+            }
+            ast::Expr::Lambda(lambda_expression) => {
+                self.infer_lambda_expression(lambda_expression);
+                Type::Unknown
+            }
+            ast::Expr::If(if_expression) => {
+                self.infer_if_expression(if_expression);
+                Type::Unknown
+            }
+            ast::Expr::Dict(dict) => {
+                self.infer_dict_expression(dict);
+                Type::Unknown
+            }
+            ast::Expr::Set(set) => {
+                self.infer_set_expression(set);
+                Type::Unknown
+            }
+            ast::Expr::ListComp(listcomp) => {
+                self.infer_list_comprehension_expression(listcomp);
+                Type::Unknown
+            }
+            ast::Expr::SetComp(setcomp) => {
+                self.infer_set_comprehension_expression(setcomp);
+                Type::Unknown
+            }
+            ast::Expr::DictComp(dictcomp) => {
+                self.infer_dict_comprehension_expression(dictcomp);
+                Type::Unknown
+            }
+            ast::Expr::Generator(generator) => {
+                self.infer_generator_expression(generator);
+                Type::Unknown
+            }
+            ast::Expr::Await(await_expression) => {
+                self.infer_await_expression(await_expression);
+                Type::Unknown
+            }
+            ast::Expr::Yield(yield_expression) => {
+                self.infer_yield_expression(yield_expression);
+                Type::Unknown
+            }
+            ast::Expr::YieldFrom(yield_from) => {
+                self.infer_yield_from_expression(yield_from);
+                Type::Unknown
+            }
+            ast::Expr::Compare(compare) => {
+                self.infer_compare_expression(compare);
+                Type::Unknown
+            }
+            ast::Expr::Call(call_expr) => {
+                self.infer_call_expression(call_expr);
+                Type::Unknown
+            }
+            ast::Expr::FString(fstring) => {
+                self.infer_fstring_expression(fstring);
+                Type::Unknown
+            }
+            ast::Expr::Attribute(attribute) => {
+                self.infer_attribute_expression(attribute);
+                Type::Unknown
+            }
+            // TODO: this may be a place we need to revisit with special forms.
+            ast::Expr::Subscript(subscript) => {
+                self.infer_subscript_expression(subscript);
+                Type::Unknown
+            }
+            ast::Expr::Starred(starred) => {
+                self.infer_starred_expression(starred);
+                Type::Unknown
+            }
+            ast::Expr::List(list) => {
+                self.infer_list_expression(list);
+                Type::Unknown
+            }
+            ast::Expr::Tuple(tuple) => {
+                self.infer_tuple_expression(tuple);
+                Type::Unknown
+            }
+            ast::Expr::Slice(slice) => {
+                self.infer_slice_expression(slice);
+                Type::Unknown
+            }
+
+            // Literals do not have meaningful values in the annotation expression context. However,
+            // we will we want to handle these differently when working with special forms, since
+            // `"hello"` is not valid in an annotation expression but `Literal["hello"]` is.
+            ast::Expr::StringLiteral(_literal) => Type::Unknown,
+            ast::Expr::BytesLiteral(_literal) => Type::Unknown,
+            ast::Expr::NumberLiteral(_literal) => Type::Unknown,
+            ast::Expr::BooleanLiteral(_literal) => Type::Unknown,
+            ast::Expr::EllipsisLiteral(_literal) => Type::Unknown,
+
+            ast::Expr::IpyEscapeCommand(_) => todo!("Implement Ipy escape command support"),
+        };
+
+        let expr_id = expression.scoped_ast_id(self.db, self.scope);
+        tracing::trace!(
+            expr_id = expr_id.as_u32(),
+            ty = ty.display(self.db).to_string(),
+        );
+        self.types.expressions.insert(expr_id, ty);
+
+        ty
+    }
+}
+
+/// Type expressions
+impl<'db> TypeInferenceBuilder<'db> {
+    fn type_expression(&mut self, expression: &ast::Expr) -> Type<'db> {
+        // https://typing.readthedocs.io/en/latest/spec/annotations.html#grammar-token-expression-grammar-type_expression
+        // TODO: this does not include any of the special forms, and is only a
+        //   stub of the forms other than a standalone name in scope.
+
+        let _span = tracing::trace_span!("infer_type_expression").entered();
+
+        match expression {
+            ast::Expr::Name(name) => {
+                debug_assert!(
+                    name.ctx.is_load(),
+                    "name in a type expression is always 'load' but got: '{:?}'",
+                    name.ctx
+                );
+
+                let instance = self.infer_name_expression(name).instance();
+                tracing::trace!(instance = instance.display(self.db).to_string(), name=?name);
+                instance
+            }
+
+            ast::Expr::NoneLiteral(_literal) => Type::None,
+
+            // Other literals do not have meaningful values in the annotation expression context.
+            // However, we will we want to handle these differently when working with special forms,
+            // since `"hello"` is not valid in an annotation expression but `Literal["hello"]` is.
+            ast::Expr::StringLiteral(_literal) => Type::Unknown,
+            ast::Expr::BytesLiteral(_literal) => Type::Unknown,
+            ast::Expr::NumberLiteral(_literal) => Type::Unknown,
+            ast::Expr::BooleanLiteral(_literal) => Type::Unknown,
+            ast::Expr::EllipsisLiteral(_literal) => Type::Unknown,
+
+            // NOTE: This section is presently identical with the corresponding section in the
+            // annotation expressions implementation, but they may diverge from each other in the
+            // future, especially after the introduction of special forms.
+            //
+            // Forms which are invalid in the context of annotation expressions: we infer their
+            // nested expressions as normal expressions, but the type of the top-level expression is
+            // always `Type::Unknown` in these cases.
+            ast::Expr::BoolOp(bool_op) => {
+                self.infer_boolean_expression(bool_op);
+                Type::Unknown
+            }
+            ast::Expr::Named(named) => {
+                self.infer_named_expression(named);
+                Type::Unknown
+            }
+            ast::Expr::BinOp(binary) => {
+                self.infer_binary_expression(binary);
+                Type::Unknown
+            }
+            ast::Expr::UnaryOp(unary) => {
+                self.infer_unary_expression(unary);
+                Type::Unknown
+            }
+            ast::Expr::Lambda(lambda_expression) => {
+                self.infer_lambda_expression(lambda_expression);
+                Type::Unknown
+            }
+            ast::Expr::If(if_expression) => {
+                self.infer_if_expression(if_expression);
+                Type::Unknown
+            }
+            ast::Expr::Dict(dict) => {
+                self.infer_dict_expression(dict);
+                Type::Unknown
+            }
+            ast::Expr::Set(set) => {
+                self.infer_set_expression(set);
+                Type::Unknown
+            }
+            ast::Expr::ListComp(listcomp) => {
+                self.infer_list_comprehension_expression(listcomp);
+                Type::Unknown
+            }
+            ast::Expr::SetComp(setcomp) => {
+                self.infer_set_comprehension_expression(setcomp);
+                Type::Unknown
+            }
+            ast::Expr::DictComp(dictcomp) => {
+                self.infer_dict_comprehension_expression(dictcomp);
+                Type::Unknown
+            }
+            ast::Expr::Generator(generator) => {
+                self.infer_generator_expression(generator);
+                Type::Unknown
+            }
+            ast::Expr::Await(await_expression) => {
+                self.infer_await_expression(await_expression);
+                Type::Unknown
+            }
+            ast::Expr::Yield(yield_expression) => {
+                self.infer_yield_expression(yield_expression);
+                Type::Unknown
+            }
+            ast::Expr::YieldFrom(yield_from) => {
+                self.infer_yield_from_expression(yield_from);
+                Type::Unknown
+            }
+            ast::Expr::Compare(compare) => {
+                self.infer_compare_expression(compare);
+                Type::Unknown
+            }
+            ast::Expr::Call(call_expr) => {
+                self.infer_call_expression(call_expr);
+                Type::Unknown
+            }
+            ast::Expr::FString(fstring) => {
+                self.infer_fstring_expression(fstring);
+                Type::Unknown
+            }
+            //
+            ast::Expr::Attribute(attribute) => {
+                self.infer_attribute_expression(attribute);
+                Type::Unknown
+            }
+            // TODO: this may be a place we need to revisit with special forms.
+            ast::Expr::Subscript(subscript) => {
+                self.infer_subscript_expression(subscript);
+                Type::Unknown
+            }
+            ast::Expr::Starred(starred) => {
+                self.infer_starred_expression(starred);
+                Type::Unknown
+            }
+            ast::Expr::List(list) => {
+                self.infer_list_expression(list);
+                Type::Unknown
+            }
+            ast::Expr::Tuple(tuple) => {
+                self.infer_tuple_expression(tuple);
+                Type::Unknown
+            }
+            ast::Expr::Slice(slice) => {
+                self.infer_slice_expression(slice);
+                Type::Unknown
+            }
+
+            ast::Expr::IpyEscapeCommand(_) => todo!("Implement Ipy escape command support"),
+        }
     }
 }
 
