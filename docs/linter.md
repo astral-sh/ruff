@@ -279,13 +279,13 @@ Ruff supports several mechanisms for suppressing lint errors, be they false posi
 permissible violations.
 
 To omit a lint rule entirely, add it to the "ignore" list via the [`lint.ignore`](settings.md#lint_ignore)
-setting, either on the command-line or in your `pyproject.toml` or `ruff.toml` file.
 
 To suppress a violation inline, Ruff uses a `noqa` system similar to [Flake8](https://flake8.pycqa.org/en/3.1.1/user/ignoring-errors.html).
 To ignore an individual violation, add `# noqa: {code}` to the end of the line, like so:
 
 ```python
 # Ignore F841.
+setting, either on the command-line or in your `pyproject.toml` or `ruff.toml` file.
 x = 1  # noqa: F841
 
 # Ignore E741 and F841.
@@ -368,6 +368,91 @@ Unlike isort, Ruff does not respect action comments within docstrings.
 
 See the [isort documentation](https://pycqa.github.io/isort/docs/configuration/action_comments.html)
 for more.
+
+## JSON output format
+
+The schema for JSON outputs is as follow:
+
+=== "Python"
+
+    ```python
+    type OneIndexed = int
+
+    type Applicability = Literal[
+        'displayonly',
+        'unsafe',
+        'safe'
+    ]
+
+    class SourceLocation(TypedDict):
+        row: OneIndexed
+        column: OneIndexed
+
+
+    class ExpandedEdit(TypedDict):
+        content: str
+        location: SourceLocation
+        end_location: SourceLocation
+
+
+    class Fix(TypedDict):
+        applicability: Applicability
+        message: str | None
+        edits: list[ExpandedEdit]
+
+
+    class Message(TypedDict):
+        code: str | None
+        url: str | None
+        message: str
+        fix: Fix | None
+        cell: OneIndexed | None
+        location: SourceLocation
+        end_location: SourceLocation
+        filename: str
+        noqa_row: OneIndexed | None
+    ```
+
+=== "TypeScript"
+
+    ```typescript
+    type OneIndexed = number
+
+    enum Applicability {
+        DisplayOnly = 'displayonly',
+        Unsafe = 'unsafe',
+        Safe = 'safe'
+    }
+
+    interface SourceLocation {
+        row: OneIndexed;
+        column: OneIndexed;
+    }
+
+    interface ExpandedEdit {
+        content: string;
+        location: SourceLocation;
+        end_location: SourceLocation;
+    }
+
+    interface Fix {
+        applicability: Applicability;
+        message: string | null;
+        edits: ExpandedEdit[];
+    }
+
+    interface Message {
+        code: string | null;
+        url: string | null;
+        message: string;
+        fix: Fix | null;
+        cell: OneIndexed | null;
+        location: SourceLocation;
+        end_location: SourceLocation;
+        filename: string;
+        noqa_row: OneIndexed | null;
+    }
+    ```
 
 ## Exit codes
 
