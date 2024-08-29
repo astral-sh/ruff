@@ -3,6 +3,7 @@ use ruff_diagnostics::Diagnostic;
 use ruff_diagnostics::Violation;
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::helpers::map_callable;
+use ruff_python_ast::helpers::map_subscript;
 use ruff_python_ast::name::QualifiedName;
 use ruff_python_ast::visitor::Visitor;
 use ruff_python_ast::{self as ast, visitor, Expr, Stmt};
@@ -126,7 +127,8 @@ impl Violation for DocstringExtraneousReturns {
 /// Docstrings missing yields sections are a sign of incomplete documentation
 /// or refactors.
 ///
-/// This rule is not enforced for abstract methods and stubs functions.
+/// This rule is not enforced for abstract methods, stubs functions, or
+/// functions that only yield `None`.
 ///
 /// ## Example
 /// ```python
@@ -499,6 +501,7 @@ fn parse_entries_numpy(content: &str) -> Vec<QualifiedName> {
 #[derive(Debug)]
 struct YieldEntry {
     range: TextRange,
+    is_none_yield: bool,
 }
 
 impl Ranged for YieldEntry {
@@ -655,12 +658,24 @@ impl<'a> Visitor<'a> for BodyVisitor<'a> {
         match expr {
             Expr::Yield(ast::ExprYield {
                 range,
-                value: Some(_),
+                value: Some(value),
             }) => {
-                self.yields.push(YieldEntry { range: *range });
+                self.yields.push(YieldEntry {
+                    range: *range,
+                    is_none_yield: value.is_none_literal_expr(),
+                });
+            }
+            Expr::Yield(ast::ExprYield { range, value: None }) => {
+                self.yields.push(YieldEntry {
+                    range: *range,
+                    is_none_yield: true,
+                });
             }
             Expr::YieldFrom(ast::ExprYieldFrom { range, .. }) => {
-                self.yields.push(YieldEntry { range: *range });
+                self.yields.push(YieldEntry {
+                    range: *range,
+                    is_none_yield: false,
+                });
             }
             Expr::Lambda(_) => return,
             _ => {}
@@ -709,6 +724,24 @@ fn yields_documented(
 ) -> bool {
     docstring_sections.yields.is_some()
         || (matches!(convention, Some(Convention::Google)) && starts_with_yields(docstring))
+}
+
+/// Returns the first subscript element of a generator annotation, if it exists.
+fn generator_yield_annotation<'a>(expr: &'a Expr, checker: &'a Checker) -> Option<&'a Expr> {
+    let slice = expr.as_subscript_expr()?.slice.as_tuple_expr()?;
+    if matches!(
+        checker
+            .semantic()
+            .resolve_qualified_name(map_subscript(expr))?
+            .segments(),
+        [
+            "typing" | "typing_extensions",
+            "Generator" | "AsyncGenerator"
+        ] | ["collections", "abc", "Generator" | "AsyncGenerator"]
+    ) {
+        return slice.elts.first();
+    }
+    None
 }
 
 /// DOC201, DOC202, DOC402, DOC403, DOC501, DOC502
@@ -779,8 +812,20 @@ pub(crate) fn check_docstring(
     if checker.enabled(Rule::DocstringMissingYields) {
         if !yields_documented(docstring, &docstring_sections, convention) {
             if let Some(body_yield) = body_entries.yields.first() {
-                let diagnostic = Diagnostic::new(DocstringMissingYields, body_yield.range());
-                diagnostics.push(diagnostic);
+                match function_def.returns.as_deref() {
+                    Some(returns)
+                        if generator_yield_annotation(returns, checker)
+                            .map_or(true, |expr| !Expr::is_none_literal_expr(expr)) =>
+                    {
+                        diagnostics
+                            .push(Diagnostic::new(DocstringMissingYields, body_yield.range()));
+                    }
+                    None if body_entries.yields.iter().any(|entry| !entry.is_none_yield) => {
+                        diagnostics
+                            .push(Diagnostic::new(DocstringMissingYields, body_yield.range()));
+                    }
+                    _ => {}
+                }
             }
         }
     }

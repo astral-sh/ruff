@@ -87,3 +87,14 @@ def f(num: int):
         num (int): A number
     """
     yield 1
+
+
+from collections import abc
+
+
+# DOC402
+def foo() -> abc.Generator[int | None, None, None]:
+    """
+    Do something
+    """
+    yield
