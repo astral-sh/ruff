@@ -1321,7 +1321,7 @@ impl<'db> TypeInferenceBuilder<'db> {
         &mut self,
         expr: Option<&ast::Expr>,
     ) -> Option<Type<'db>> {
-        expr.map(|expr| self.annotation_expression(expr))
+        expr.map(|expr| self.infer_annotation_expression(expr))
     }
 
     fn infer_expression(&mut self, expression: &ast::Expr) -> Type<'db> {
@@ -2088,12 +2088,12 @@ impl<'db> TypeInferenceBuilder<'db> {
 
 /// Annotation expressions.
 impl<'db> TypeInferenceBuilder<'db> {
-    fn annotation_expression(&mut self, expression: &ast::Expr) -> Type<'db> {
+    fn infer_annotation_expression(&mut self, expression: &ast::Expr) -> Type<'db> {
         // https://typing.readthedocs.io/en/latest/spec/annotations.html#grammar-token-expression-grammar-annotation_expression
         let ty = match expression {
             // Forms which are possibly valid type expressions.
             type_expr @ (ast::Expr::NoneLiteral(..) | ast::Expr::Name(..)) => {
-                self.type_expression(type_expr)
+                self.infer_type_expression(type_expr)
             }
 
             // NOTE: This section is presently identical with the corresponding section in the type
@@ -2228,7 +2228,7 @@ impl<'db> TypeInferenceBuilder<'db> {
 
 /// Type expressions
 impl<'db> TypeInferenceBuilder<'db> {
-    fn type_expression(&mut self, expression: &ast::Expr) -> Type<'db> {
+    fn infer_type_expression(&mut self, expression: &ast::Expr) -> Type<'db> {
         // https://typing.readthedocs.io/en/latest/spec/annotations.html#grammar-token-expression-grammar-type_expression
         // TODO: this does not include any of the special forms, and is only a
         //   stub of the forms other than a standalone name in scope.
