@@ -279,13 +279,13 @@ Ruff supports several mechanisms for suppressing lint errors, be they false posi
 permissible violations.
 
 To omit a lint rule entirely, add it to the "ignore" list via the [`lint.ignore`](settings.md#lint_ignore)
+setting, either on the command-line or in your `pyproject.toml` or `ruff.toml` file.
 
 To suppress a violation inline, Ruff uses a `noqa` system similar to [Flake8](https://flake8.pycqa.org/en/3.1.1/user/ignoring-errors.html).
 To ignore an individual violation, add `# noqa: {code}` to the end of the line, like so:
 
 ```python
 # Ignore F841.
-setting, either on the command-line or in your `pyproject.toml` or `ruff.toml` file.
 x = 1  # noqa: F841
 
 # Ignore E741 and F841.
