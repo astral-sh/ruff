@@ -96,10 +96,7 @@ pub(crate) fn missing_fstring_syntax_expr(checker: &mut Checker, literal: &ast::
     }
 
     // Simple assignments will be dealt with by `missing_fstring_syntax_binding`
-    if semantic
-        .current_statements()
-        .any(|stmt| is_simple_assignment_to_literal(stmt, literal))
-    {
+    if is_simple_assignment_to_literal(literal, semantic) {
         return;
     }
 
@@ -235,17 +232,27 @@ pub(crate) fn missing_fstring_syntax_binding(
 
 /// Determine whether `stmt` represents a "simple assignment" to the string literal `literal`.
 ///
-/// For our purposes here, a "simple assignment" is either an annotated assignment (`foo: str = "bar"`)
-/// or an unannotated assignment with a single target (`foo = "bar"`).
-fn is_simple_assignment_to_literal(stmt: &ast::Stmt, literal: &ast::StringLiteral) -> bool {
-    match stmt {
-        ast::Stmt::Assign(ast::StmtAssign { targets, value, .. }) => match targets.as_slice() {
-            [_] => value.range() == literal.range(),
-            _ => false,
-        },
+/// For our purposes here, a "simple assignment" is any assignment
+/// where `literal` appears on the right-hand side
+/// and `literal` is not part of an implicitly concatenated string.
+fn is_simple_assignment_to_literal(literal: &ast::StringLiteral, semantic: &SemanticModel) -> bool {
+    if semantic.current_expressions().any(|expr| match expr {
+        ast::Expr::Call(_) => true,
+        ast::Expr::StringLiteral(ast::ExprStringLiteral { value, .. }) => {
+            value.is_implicit_concatenated()
+        }
+        ast::Expr::FString(ast::ExprFString { value, .. }) => value.is_implicit_concatenated(),
+        _ => false,
+    }) {
+        return false;
+    }
+    match semantic.current_statement() {
+        ast::Stmt::Assign(ast::StmtAssign { value, .. }) => {
+            value.range().contains_range(literal.range())
+        }
         ast::Stmt::AnnAssign(ast::StmtAnnAssign {
             value: Some(value), ..
-        }) => value.range() == literal.range(),
+        }) => value.range().contains_range(literal.range()),
         _ => false,
     }
 }

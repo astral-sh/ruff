@@ -72,3 +72,16 @@ def method_calls():
 def format_specifiers():
     a = 4
     b = "{a:b} {a:^5}"
+
+
+def implicitly_concatenated_fstring(x: int):
+    y = f"{x}" "{x}"  # RUF027
+    z = "{x}" f"{x}"  # RUF027
+
+
+def method_call_passed_to_logging(x: int):
+    # We special-case bindings that are passed to logging calls later on,
+    # but not bindings that involve arbitrary call expressions!
+    y = foo("{x}")  # RUF027
+    import logging
+    logging.log(0, y)

@@ -89,3 +89,12 @@ def binding_defined_after_string():
         x = "{foo}"
     foo = 42
     print(x.format(foo=foo))
+
+
+def variable_immediately_used_after_more_complex_binding(arg: str, as_pypath: bool):
+    msg = (
+        "module or package not found: {arg} (missing __init__.py?)"
+        if as_pypath
+        else "file or directory not found: {arg}"
+    )
+    raise TypeError(msg.format(arg=arg))
