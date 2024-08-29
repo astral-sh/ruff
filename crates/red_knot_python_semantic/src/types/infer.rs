@@ -2234,14 +2234,20 @@ impl<'db> TypeInferenceBuilder<'db> {
                 Type::Unknown
             }
 
-            // Literals do not have meaningful values in the annotation expression context. However,
-            // we will we want to handle these differently when working with special forms, since
-            // `"hello"` is not valid in an annotation expression but `Literal["hello"]` is.
+            // TODO: parse the expression and check whether it is a string annotation.
+            // https://typing.readthedocs.io/en/latest/spec/annotations.html#string-annotations
             ast::Expr::StringLiteral(_literal) => Type::Unknown,
+
+            // TODO: an Ellipsis literal *on its own* does not have any meaning in annotation
+            // expressions, but is meaningful in the context of a number of special forms.
+            ast::Expr::EllipsisLiteral(_literal) => Type::Unknown,
+
+            // Other literals do not have meaningful values in the annotation expression context.
+            // However, we will we want to handle these differently when working with special forms,
+            // since (e.g.) `123` is not valid in an annotation expression but `Literal[123]` is.
             ast::Expr::BytesLiteral(_literal) => Type::Unknown,
             ast::Expr::NumberLiteral(_literal) => Type::Unknown,
             ast::Expr::BooleanLiteral(_literal) => Type::Unknown,
-            ast::Expr::EllipsisLiteral(_literal) => Type::Unknown,
 
             ast::Expr::IpyEscapeCommand(_) => todo!("Implement Ipy escape command support"),
         };
@@ -2281,14 +2287,20 @@ impl<'db> TypeInferenceBuilder<'db> {
 
             ast::Expr::NoneLiteral(_literal) => Type::None,
 
+            // TODO: parse the expression and check whether it is a string annotation.
+            // https://typing.readthedocs.io/en/latest/spec/annotations.html#string-annotations
+            ast::Expr::StringLiteral(_literal) => Type::Unknown,
+
+            // TODO: an Ellipsis literal *on its own* does not have any meaning in annotation
+            // expressions, but is meaningful in the context of a number of special forms.
+            ast::Expr::EllipsisLiteral(_literal) => Type::Unknown,
+
             // Other literals do not have meaningful values in the annotation expression context.
             // However, we will we want to handle these differently when working with special forms,
-            // since `"hello"` is not valid in an annotation expression but `Literal["hello"]` is.
-            ast::Expr::StringLiteral(_literal) => Type::Unknown,
+            // since (e.g.) `123` is not valid in an annotation expression but `Literal[123]` is.
             ast::Expr::BytesLiteral(_literal) => Type::Unknown,
             ast::Expr::NumberLiteral(_literal) => Type::Unknown,
             ast::Expr::BooleanLiteral(_literal) => Type::Unknown,
-            ast::Expr::EllipsisLiteral(_literal) => Type::Unknown,
 
             // NOTE: This section is presently identical with the corresponding section in the
             // annotation expressions implementation, but they may diverge from each other in the
