@@ -178,12 +178,10 @@ impl<'db> TypeInference<'db> {
         self.expressions[&expression]
     }
 
-    #[tracing::instrument(skip_all)]
     pub(crate) fn try_expression_ty(&self, expression: ScopedExpressionId) -> Option<Type<'db>> {
         self.expressions.get(&expression).copied()
     }
 
-    #[tracing::instrument(skip(self))]
     pub(crate) fn definition_ty(&self, definition: Definition<'db>) -> Type<'db> {
         self.definitions[&definition]
     }
@@ -192,7 +190,6 @@ impl<'db> TypeInference<'db> {
         &self.diagnostics
     }
 
-    #[tracing::instrument(skip_all)]
     fn shrink_to_fit(&mut self) {
         self.expressions.shrink_to_fit();
         self.definitions.shrink_to_fit();
@@ -310,7 +307,6 @@ impl<'db> TypeInferenceBuilder<'db> {
     }
 
     /// Infers types in the given [`InferenceRegion`].
-    #[tracing::instrument(skip_all)]
     fn infer_region(&mut self) {
         match self.region {
             InferenceRegion::Scope(scope) => self.infer_region_scope(scope),
@@ -320,7 +316,6 @@ impl<'db> TypeInferenceBuilder<'db> {
         }
     }
 
-    #[tracing::instrument(skip_all)]
     fn infer_region_scope(&mut self, scope: ScopeId<'db>) {
         let node = scope.node(self.db);
         match node {
@@ -366,7 +361,6 @@ impl<'db> TypeInferenceBuilder<'db> {
         }
     }
 
-    #[tracing::instrument(skip_all)]
     fn infer_region_definition(&mut self, definition: Definition<'db>) {
         match definition.node(self.db) {
             DefinitionKind::Function(function) => {
@@ -423,10 +417,8 @@ impl<'db> TypeInferenceBuilder<'db> {
                 self.infer_with_item_definition(with_item.target(), with_item.node(), definition);
             }
         }
-        tracing::trace!("finished inferring definition");
     }
 
-    #[tracing::instrument(skip_all)]
     fn infer_region_deferred(&mut self, definition: Definition<'db>) {
         match definition.node(self.db) {
             DefinitionKind::Function(function) => self.infer_function_deferred(function.node()),
@@ -438,12 +430,10 @@ impl<'db> TypeInferenceBuilder<'db> {
         }
     }
 
-    #[tracing::instrument(skip_all)]
     fn infer_region_expression(&mut self, expression: Expression<'db>) {
         self.infer_expression(expression.node_ref(self.db));
     }
 
-    #[tracing::instrument(skip_all)]
     fn infer_module(&mut self, module: &ast::ModModule) {
         self.infer_body(&module.body);
     }
@@ -470,7 +460,7 @@ impl<'db> TypeInferenceBuilder<'db> {
             panic!("function type params scope without type params");
         };
 
-        // TODO: this should also be applied to type parameters and parameters.
+        // TODO: this should also be applied to parameter annotations.
         if !self.is_stub() {
             self.infer_optional_expression(function.returns.as_deref());
         }
@@ -525,19 +515,16 @@ impl<'db> TypeInferenceBuilder<'db> {
         }
     }
 
-    #[tracing::instrument(skip_all)]
     fn infer_definition(&mut self, node: impl Into<DefinitionNodeKey>) {
         let definition = self.index.definition(node);
         let result = infer_definition_types(self.db, definition);
         self.extend(result);
     }
 
-    #[tracing::instrument(skip_all)]
     fn infer_function_definition_statement(&mut self, function: &ast::StmtFunctionDef) {
         self.infer_definition(function);
     }
 
-    #[tracing::instrument(skip_all)]
     fn infer_function_definition(
         &mut self,
         function: &ast::StmtFunctionDef,
@@ -571,7 +558,7 @@ impl<'db> TypeInferenceBuilder<'db> {
         if type_params.is_none() {
             self.infer_parameters(parameters);
 
-            // TODO: this should also be applied to parameters.
+            // TODO: this should also be applied to parameter annotations.
             if !self.is_stub() {
                 self.infer_optional_annotation_expression(returns.as_deref());
             }
@@ -587,7 +574,6 @@ impl<'db> TypeInferenceBuilder<'db> {
         self.types.definitions.insert(definition, function_ty);
     }
 
-    #[tracing::instrument(skip_all)]
     fn infer_parameters(&mut self, parameters: &ast::Parameters) {
         let ast::Parameters {
             range: _,
@@ -609,7 +595,6 @@ impl<'db> TypeInferenceBuilder<'db> {
         }
     }
 
-    #[tracing::instrument(skip_all)]
     fn infer_parameter_with_default(&mut self, parameter_with_default: &ast::ParameterWithDefault) {
         let ast::ParameterWithDefault {
             range: _,
@@ -617,12 +602,11 @@ impl<'db> TypeInferenceBuilder<'db> {
             default: _,
         } = parameter_with_default;
 
-        self.infer_optional_annotation_expression(parameter.annotation.as_deref());
+        self.infer_optional_expression(parameter.annotation.as_deref());
 
         self.infer_definition(parameter_with_default);
     }
 
-    #[tracing::instrument(skip_all)]
     fn infer_parameter(&mut self, parameter: &ast::Parameter) {
         let ast::Parameter {
             range: _,
@@ -637,18 +621,13 @@ impl<'db> TypeInferenceBuilder<'db> {
 
     fn infer_parameter_with_default_definition(
         &mut self,
-        parameter_with_default: &ast::ParameterWithDefault,
+        _parameter_with_default: &ast::ParameterWithDefault,
         definition: Definition<'db>,
     ) {
-        tracing::trace!(
-            param = ?parameter_with_default,
-            "infer_parameter_with_default_definition",
-        );
         // TODO(dhruvmanila): Infer types from annotation or default expression
         self.types.definitions.insert(definition, Type::Unknown);
     }
 
-    #[tracing::instrument(skip_all)]
     fn infer_parameter_definition(
         &mut self,
         _parameter: &ast::Parameter,
@@ -659,12 +638,10 @@ impl<'db> TypeInferenceBuilder<'db> {
         self.types.definitions.insert(definition, Type::Unknown);
     }
 
-    #[tracing::instrument(skip_all)]
     fn infer_class_definition_statement(&mut self, class: &ast::StmtClassDef) {
         self.infer_definition(class);
     }
 
-    #[tracing::instrument(skip_all)]
     fn infer_class_definition(&mut self, class: &ast::StmtClassDef, definition: Definition<'db>) {
         let ast::StmtClassDef {
             range: _,
@@ -706,7 +683,6 @@ impl<'db> TypeInferenceBuilder<'db> {
         }
     }
 
-    #[tracing::instrument(skip(self))]
     fn infer_function_deferred(&mut self, function: &ast::StmtFunctionDef) {
         if self.is_stub() {
             self.types.has_deferred = true;
@@ -1345,8 +1321,6 @@ impl<'db> TypeInferenceBuilder<'db> {
         &mut self,
         expr: Option<&ast::Expr>,
     ) -> Option<Type<'db>> {
-        let _span =
-            tracing::trace_span!("infer_optional_annotation_expression", expr=?expr).entered();
         expr.map(|expr| self.annotation_expression(expr))
     }
 
@@ -1820,8 +1794,6 @@ impl<'db> TypeInferenceBuilder<'db> {
 
     fn infer_name_expression(&mut self, name: &ast::ExprName) -> Type<'db> {
         let ast::ExprName { range: _, id, ctx } = name;
-        let _span = tracing::trace_span!("infer_name_expression", id=?id, ctx=?ctx).entered();
-
         let file_scope_id = self.scope.file_scope_id(self.db);
 
         // if we're inferring types of deferred expressions, always treat them as public symbols
@@ -2117,11 +2089,6 @@ impl<'db> TypeInferenceBuilder<'db> {
 /// Annotation expressions.
 impl<'db> TypeInferenceBuilder<'db> {
     fn annotation_expression(&mut self, expression: &ast::Expr) -> Type<'db> {
-        let _span = tracing::trace_span!(
-            "infer_annotation_expression",
-            expr = ?expression
-        )
-        .entered();
         // https://typing.readthedocs.io/en/latest/spec/annotations.html#grammar-token-expression-grammar-annotation_expression
         let ty = match expression {
             // Forms which are possibly valid type expressions.
@@ -2253,10 +2220,6 @@ impl<'db> TypeInferenceBuilder<'db> {
         };
 
         let expr_id = expression.scoped_ast_id(self.db, self.scope);
-        tracing::trace!(
-            expr_id = expr_id.as_u32(),
-            ty = ty.display(self.db).to_string(),
-        );
         self.types.expressions.insert(expr_id, ty);
 
         ty
@@ -2270,8 +2233,6 @@ impl<'db> TypeInferenceBuilder<'db> {
         // TODO: this does not include any of the special forms, and is only a
         //   stub of the forms other than a standalone name in scope.
 
-        let _span = tracing::trace_span!("infer_type_expression").entered();
-
         match expression {
             ast::Expr::Name(name) => {
                 debug_assert!(
@@ -2281,7 +2242,6 @@ impl<'db> TypeInferenceBuilder<'db> {
                 );
 
                 let instance = self.infer_name_expression(name).instance();
-                tracing::trace!(instance = instance.display(self.db).to_string(), name=?name);
                 instance
             }
 
