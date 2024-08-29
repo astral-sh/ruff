@@ -49,6 +49,7 @@ pub(crate) enum DefinitionNodeRef<'a> {
     Comprehension(ComprehensionDefinitionNodeRef<'a>),
     Parameter(ast::AnyParameterRef<'a>),
     WithItem(WithItemDefinitionNodeRef<'a>),
+    MatchPattern(MatchPatternDefinitionNodeRef<'a>),
 }
 
 impl<'a> From<&'a ast::StmtFunctionDef> for DefinitionNodeRef<'a> {
@@ -123,6 +124,12 @@ impl<'a> From<ast::AnyParameterRef<'a>> for DefinitionNodeRef<'a> {
     }
 }
 
+impl<'a> From<MatchPatternDefinitionNodeRef<'a>> for DefinitionNodeRef<'a> {
+    fn from(node: MatchPatternDefinitionNodeRef<'a>) -> Self {
+        Self::MatchPattern(node)
+    }
+}
+
 #[derive(Copy, Clone, Debug)]
 pub(crate) struct ImportFromDefinitionNodeRef<'a> {
     pub(crate) node: &'a ast::StmtImportFrom,
@@ -151,6 +158,17 @@ pub(crate) struct ForStmtDefinitionNodeRef<'a> {
 pub(crate) struct ComprehensionDefinitionNodeRef<'a> {
     pub(crate) node: &'a ast::Comprehension,
     pub(crate) first: bool,
+}
+
+#[derive(Copy, Clone, Debug)]
+pub(crate) struct MatchPatternDefinitionNodeRef<'a> {
+    /// The outermost pattern node in which the identifier being defined occurs.
+    pub(crate) pattern: &'a ast::Pattern,
+    /// The identifier being defined.
+    pub(crate) identifier: &'a ast::Identifier,
+    /// The index of the identifier in the pattern when visiting the `pattern` node in evaluation
+    /// order.
+    pub(crate) index: u32,
 }
 
 impl DefinitionNodeRef<'_> {
@@ -213,6 +231,15 @@ impl DefinitionNodeRef<'_> {
                     target: AstNodeRef::new(parsed, target),
                 })
             }
+            DefinitionNodeRef::MatchPattern(MatchPatternDefinitionNodeRef {
+                pattern,
+                identifier,
+                index,
+            }) => DefinitionKind::MatchPattern(MatchPatternDefinitionKind {
+                pattern: AstNodeRef::new(parsed.clone(), pattern),
+                identifier: AstNodeRef::new(parsed, identifier),
+                index,
+            }),
         }
     }
 
@@ -241,6 +268,9 @@ impl DefinitionNodeRef<'_> {
                 ast::AnyParameterRef::NonVariadic(parameter) => parameter.into(),
             },
             Self::WithItem(WithItemDefinitionNodeRef { node: _, target }) => target.into(),
+            Self::MatchPattern(MatchPatternDefinitionNodeRef { identifier, .. }) => {
+                identifier.into()
+            }
         }
     }
 }
@@ -260,6 +290,25 @@ pub enum DefinitionKind {
     Parameter(AstNodeRef<ast::Parameter>),
     ParameterWithDefault(AstNodeRef<ast::ParameterWithDefault>),
     WithItem(WithItemDefinitionKind),
+    MatchPattern(MatchPatternDefinitionKind),
+}
+
+#[derive(Clone, Debug)]
+#[allow(dead_code)]
+pub struct MatchPatternDefinitionKind {
+    pattern: AstNodeRef<ast::Pattern>,
+    identifier: AstNodeRef<ast::Identifier>,
+    index: u32,
+}
+
+impl MatchPatternDefinitionKind {
+    pub(crate) fn pattern(&self) -> &ast::Pattern {
+        self.pattern.node()
+    }
+
+    pub(crate) fn index(&self) -> u32 {
+        self.index
+    }
 }
 
 #[derive(Clone, Debug)]
@@ -408,5 +457,11 @@ impl From<&ast::Parameter> for DefinitionNodeKey {
 impl From<&ast::ParameterWithDefault> for DefinitionNodeKey {
     fn from(node: &ast::ParameterWithDefault) -> Self {
         Self(NodeKey::from_node(node))
+    }
+}
+
+impl From<&ast::Identifier> for DefinitionNodeKey {
+    fn from(identifier: &ast::Identifier) -> Self {
+        Self(NodeKey::from_identifier(identifier))
     }
 }
