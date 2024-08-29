@@ -8,7 +8,7 @@ use rustc_hash::FxHashSet;
 use ruff_diagnostics::{Diagnostic, Edit, Fix};
 use ruff_python_trivia::CommentRanges;
 use ruff_source_file::Locator;
-use ruff_text_size::{Ranged, TextRange};
+use ruff_text_size::Ranged;
 
 use crate::fix::edits::delete_comment;
 use crate::noqa::{
@@ -119,10 +119,8 @@ pub(crate) fn check_noqa(
                 Directive::All(directive) => {
                     if line.matches.is_empty() {
                         let edit = delete_comment(directive.range(), locator);
-                        let mut diagnostic = Diagnostic::new(
-                            UnusedNOQA { codes: None },
-                            TextRange::new(directive.start(), edit.end()),
-                        );
+                        let mut diagnostic =
+                            Diagnostic::new(UnusedNOQA { codes: None }, directive.range());
                         diagnostic.set_fix(Fix::safe_edit(edit));
 
                         diagnostics.push(diagnostic);
@@ -203,7 +201,7 @@ pub(crate) fn check_noqa(
                                         .collect(),
                                 }),
                             },
-                            TextRange::new(directive.start(), edit.end()),
+                            directive.range(),
                         );
                         diagnostic.set_fix(Fix::safe_edit(edit));
                         diagnostics.push(diagnostic);
